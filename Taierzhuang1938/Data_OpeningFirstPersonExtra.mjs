@@ -61,8 +61,9 @@ export const HAND_SHAPES = Freeze({
 
 export const EXTRA_HAND_POSES = Freeze({
   // SB01: the LEFT palm up with a five-round clip, low centre-left (survey target screen (0.33,0.80)).
-  palmClip: H("cam", [.14, -.14, -.36], [-.38, .12, -1], [.28, -1, .05], [18, 26, 16], { shape: "cradle" }),
-  palmClipTilt: H("cam", [.135, -.135, -.37], [-.32, .2, -1], [.16, -1, -.03], [18, 26, 16], { shape: "cradle" }),
+  // Original -15 degree shot targets in the yaw-only body frame: looking down cannot pull the hand into the jacket.
+  palmClip: H("body", [.14, -.2284, -.3115], [-.38, -.143, -.997], [.28, -.953, .307], [18, 26, 16], { shape: "cradle" }),
+  palmClipTilt: H("body", [.135, -.2262, -.3224], [-.32, -.066, -1.018], [.16, -.974, .23], [18, 26, 16], { shape: "cradle" }),
   // SB02: the RIGHT hand flung open towards the mouth, ≥0.35 m from the eye (not a half-screen of skin);
   // survey target screen (0.72,0.45) in the mirrored shot. Storyboard: the back of the hand to the eye, the
   // spread fingers up and out in the picture plane (review 09-25: fingers pointing into the frame foreshortened
@@ -112,14 +113,10 @@ const Leg = (ankle, knee, flexDeg = 0) => Freeze({ ankle: V(...ankle), knee: V(.
 export const LEG_POSES = Freeze({
   // SB01 (eye 0.95, pitch −15°): sitting against the back wall, legs out towards the mouth, right knee
   // up under the loading rifle (bolt low right), left leg longer.
-  // The eye is 0.95 m up, so he sits on something low (a crate: hip 0.4 m up, 0.4 m ahead of the eye, leaning
-  // back on the wall); the right knee is drawn up (ankle 0.75 m ahead) so the knee and the top of the thigh are
-  // in the lower right with the rifle across them (review 09-25: knee (0.82,1.0) was out of frame and the rifle
-  // read as lying on the ground). Browser bench 09-25 (01 Orders, contract camera): right knee (0.68,0.79), left
-  // knee (0.40,0.87), the rifle's receiver on the right thigh just short of the knee, muzzle to the upper left;
-  // storyboard knee ≈ (0.7,0.9), bolt (0.92,0.9).
-  sitForward: Freeze({ hip: V(.02, .4, -.4), up: V(0, .95, .3),
-    l: Leg([-.25, .1, -1.02], [-.2, 1, -.1], 5), r: Leg([.3, .1, -.75], [.15, 1, 0], 0) }),
+  // Hips sit just behind the eye, jacket leaning back, feet ahead of the seat. Move the whole seated
+  // pose together: the old hips ahead of the eye put the restored torso in front of the camera.
+  sitForward: Freeze({ hip: V(.02, .4, .1), up: V(0, .95, .3),
+    l: Leg([-.25, .1, -.52], [-.2, 1, -.1], 5), r: Leg([.3, .1, -.25], [.15, 1, 0], 0) }),
   // SB02 (eye falling to 0.75, roll +17°): thrown down, legs sprawled in the foreground, one knee up.
   sprawl: Freeze({ hip: V(0, .16, -.22), up: V(-.2, .7, .7),
     l: Leg([-.36, .09, -.95], [-.5, 1, 0], -5), r: Leg([.2, .12, -.6], [.1, 1, .1], 10) }),

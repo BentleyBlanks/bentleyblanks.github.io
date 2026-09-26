@@ -172,24 +172,46 @@ for(const [name,pose] of Object.entries(EXTRA_HAND_POSES)){
 }
 assert.equal(FP_PROPS[FP_PROPS.rifleSlide.prop]?.kind,"rifle","rifleSlide moves the loading rifle");
 {
-  // The trimmed body: arms keep only arm-weighted triangles; the legs (legs + pelvis weights, never torso)
-  // go on a hidden SkinnedMesh bound to the same skeleton.
-  const names=["Bip002 Pelvis","Bip002 Spine","Bip002 L UpperArm","Bip002 L Thigh","Bip002 L Calf"],bones=names.map(name=>{const b=new THREE.Bone();b.name=name;return b;});
-  const geometry=new THREE.BufferGeometry(),tris=[[2,2,2],[3,4,3],[0,3,4],[1,1,0]];
+  // Continuous clothing survives mixed weights, including a knee with a small spine influence.
+  // Arms/body partition the source triangles; only the head is removed, without mutating shared geometry.
+  const names=["Bip002 Pelvis","Bip002 Spine","Bip002 L UpperArm","Bip002 L Thigh","Bip002 L Calf","Bip002 Head"],bones=names.map(name=>{const b=new THREE.Bone();b.name=name;return b;});
+  const geometry=new THREE.BufferGeometry(),tris=[[2,2,2],[3,4,3],[0,3,4],[1,1,0],[0,0,0],[5,5,5]];
   geometry.setAttribute("position",new THREE.Float32BufferAttribute(new Float32Array(tris.length*9),3));
   const skinIndex=[],skinWeight=[];
-  for(const tri of tris)for(const bone of tri){
+  for(const [triangle,tri] of tris.entries())for(const bone of tri){
     // the third triangle blends pelvis with the thigh on its first vertex (a hip triangle)
-    skinIndex.push(bone,bone===0?3:0,0,0);skinWeight.push(bone===0?.4:1,bone===0?.6:0,0,0);
+    const mixedHip=bone===0&&triangle!==4;
+    skinIndex.push(bone,mixedHip?3:1,0,0);skinWeight.push(mixedHip?.4:bone===4?.98:1,mixedHip?.6:bone===4?.02:0,0,0);
   }
   geometry.setAttribute("skinIndex",new THREE.Uint16BufferAttribute(skinIndex,4));geometry.setAttribute("skinWeight",new THREE.Float32BufferAttribute(skinWeight,4));
   geometry.setIndex([...Array(tris.length*3).keys()]);
   const mesh=new THREE.SkinnedMesh(geometry,new THREE.MeshStandardMaterial()),root=new THREE.Group();root.add(mesh,bones[0]);mesh.bind(new THREE.Skeleton(bones));
   const actor={root},{geometries,legs}=TrimOpeningPlayerBody(actor);
   assert.deepEqual([...mesh.geometry.index.array],[0,1,2],"the arm mesh keeps only the arm triangle");
-  assert.equal(legs.length,1);assert.deepEqual([...legs[0].geometry.index.array],[3,4,5,6,7,8],"the leg mesh keeps leg and hip triangles, not the torso");
+  assert.equal(legs.length,1);assert.deepEqual([...legs[0].geometry.index.array],[3,4,5,6,7,8,9,10,11,12,13,14],"body keeps blended knees, hips, waist and jacket without holes");
+  assert.equal(geometry.index.count,18,"shared source mesh remains intact for NPCs");
   assert.ok(legs[0].isSkinnedMesh&&legs[0].skeleton===mesh.skeleton&&legs[0].visible===false&&legs[0].frustumCulled===false,"legs share the skeleton and start hidden");
   assert.equal(actor.openingLegMeshes,legs);assert.equal(geometries.length,2,"both new geometries are handed to the caller to dispose");
+}
+{
+  // The seated body belongs under the eyes, and looking down moves neither the lap nor the clip hand.
+  const playerBody=Actor("TengxianNra02"),eye=new THREE.PerspectiveCamera(65,16/9,.05,100);
+  eye.position.set(0,.95,0);eye.rotation.order="YXZ";
+  const show={playerBody,ready:true,phase:"Banter",Age:5,flags:{},r:{time:5,player:{camera:eye},battlefield:{GroundHeight:()=>0}}};
+  const firstPerson=new OpeningFirstPerson(show);let lastHip=null;
+  for(const pitch of [-15,-35,-55,-80]){
+    eye.rotation.x=pitch*Math.PI/180;eye.updateMatrixWorld(true);
+    firstPerson.Pose({left:"palmClip",right:"rest",legs:"sitForward",instant:true});firstPerson.Update(1/60);
+    const hip=new THREE.Vector3(...firstPerson.report.legs.hip),palm=new THREE.Vector3(...firstPerson.report.hands.l.palm);
+    assert.ok(hip.z>=.08,"seated hips stay behind the eye, not detached in front of it");
+    if(lastHip)assert.ok(hip.distanceTo(lastHip)<1e-5,"head pitch cannot move the body");
+    assert.ok(palm.y>.6&&palm.z<-.2,`clip hand stays above the lap and ahead of the jacket at ${pitch} degrees`);
+    const legs=firstPerson.rig.legs;
+    const up=new THREE.Vector3(0,1,0).applyQuaternion(legs.pelvis.getWorldQuaternion(new THREE.Quaternion()).multiply(legs.pelvisFrame));
+    assert.ok(up.dot(new THREE.Vector3(...LEG_POSES.sitForward.up).normalize())>.9999,"the torso retains its authored seated lean");
+    assert.ok(playerBody.characterRig.bones.neck.getWorldPosition(new THREE.Vector3()).z>.08,"collar stays behind the eyes");
+    lastHip=hip;
+  }
 }
 {
   // A partner grip lands on the partner's bone (the partner's own arm is not touched), eases to its

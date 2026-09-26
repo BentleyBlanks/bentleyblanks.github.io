@@ -201,13 +201,12 @@ function MixShape(a,b,t){
 }
 
 // ---- 2026-09-25 storyboard round: legs, partner grips, first-person props -----------------------------
-const LEG_BONES=/Thigh|Calf|Foot|Toe/;
 /**
- * Split the NRA02 player body for the first person: the skinned meshes keep only the arm triangles
- * (as before), and a second SkinnedMesh on the same skeleton keeps the legs and boots (triangles whose
- * weights are all on the legs or the pelvis; torso and head stay cut). The leg meshes start hidden; the
- * first person shows them only while a LEG_POSES pose is solved. Returns the new geometries (the caller
- * owns and disposes them) and the leg meshes (also on actor.openingLegMeshes).
+ * Split the NRA02 skin into arms and a continuous jacket/pelvis/legs surface, hiding only the head.
+ * Assign every retained triangle to exactly one mesh on the same skeleton. Requiring 100% leg weights
+ * used to delete blended knee/hip faces, and omitting pelvis-only faces left two disconnected thighs.
+ * The body surface is shown while a LEG_POSES pose is solved. The caller owns the returned geometries;
+ * openingLegMeshes retains its name for the director/debug consumers but now includes the jacket.
  */
 export function TrimOpeningPlayerBody(actor){
   const geometries=[],legs=[],meshes=[];
@@ -216,21 +215,21 @@ export function TrimOpeningPlayerBody(actor){
     const source=mesh.geometry,indices=source.index?.array,skin=source.getAttribute("skinIndex"),weight=source.getAttribute("skinWeight");
     if(!indices||!skin||!weight)continue;
     const Set_=pattern=>new Set(mesh.skeleton.bones.flatMap((bone,i)=>pattern.test(bone.name)?[i]:[]));
-    const arms=Set_(/UpperArm|Forearm|Hand|Finger/),legBones=Set_(LEG_BONES),pelvis=Set_(/Pelvis$/);
+    const arms=Set_(/UpperArm|Forearm|Hand|Finger/),head=Set_(/Head|Neck|Face_/);
     const Weight=(index,set)=>{let total=0;for(let k=0;k<4;k++)if(set.has(skin.array[index*4+k]))total+=weight.array[index*4+k];return total;};
     const KeepArm=index=>Weight(index,arms)>.999;
-    const KeepLeg=index=>Weight(index,legBones)+Weight(index,pelvis)>.999;
     const armIndex=[],legIndex=[];
     for(let i=0;i<indices.length;i+=3){
       const tri=[indices[i],indices[i+1],indices[i+2]];
+      if(tri.some(v=>Weight(v,head)>.5))continue;
       if(tri.every(KeepArm))armIndex.push(...tri);
-      else if(tri.every(KeepLeg)&&tri.some(v=>Weight(v,legBones)>.5))legIndex.push(...tri);
+      else legIndex.push(...tri);
     }
     const armGeometry=source.clone();armGeometry.setIndex(armIndex);armGeometry.clearGroups();mesh.geometry=armGeometry;geometries.push(armGeometry);
     if(!legIndex.length||!mesh.parent)continue;
     const legGeometry=source.clone();legGeometry.setIndex(legIndex);legGeometry.clearGroups();geometries.push(legGeometry);
     const leg=new THREE.SkinnedMesh(legGeometry,mesh.material);
-    leg.name=(mesh.name||"PlayerBody")+"_OpeningLegs";leg.bindMode=mesh.bindMode;
+    leg.name=(mesh.name||"PlayerBody")+"_OpeningBody";leg.bindMode=mesh.bindMode;
     leg.position.copy(mesh.position);leg.quaternion.copy(mesh.quaternion);leg.scale.copy(mesh.scale);
     leg.castShadow=mesh.castShadow;leg.receiveShadow=mesh.receiveShadow;leg.layers.mask=mesh.layers.mask;
     // Skinned bounds are cached from the first pose; the legs are always just in front of the eye.
@@ -251,7 +250,10 @@ function LegRig(actor){
   rig._Restore(rig.bindPose);
   const rootQ=actor.root.getWorldQuaternion(Q()),front=V(0,0,-1).applyQuaternion(rootQ),up=V(0,1,0).applyQuaternion(rootQ);
   const Local=(bone,world)=>world.clone().applyQuaternion(bone.getWorldQuaternion(Q()).invert());
+  // The jacket is visible too: start the spine from its authored bind pose rather than inheriting the
+  // actor factory's last third-person idle. Arms are solved independently after the body.
   const chain=new Set([bones.pelvis]);
+  for(const e of rig.bindPose)if(/Spine|Clavicle|Neck/.test(e.object.name))chain.add(e.object);
   for(const side of ["L","R"])bones["thigh"+side].traverse(bone=>{if(bone.isBone)chain.add(bone);});
   const legs={pelvis:bones.pelvis,pelvisFrame:FrameQuaternion(Local(bones.pelvis,front),Local(bones.pelvis,up)),
     entries:rig.bindPose.filter(e=>chain.has(e.object)),sides:{}};
@@ -295,6 +297,9 @@ function SolveLegs(legs,spec,frames){
   const Dir=v=>V(...v).applyQuaternion(bodyQ);
   const Point=p=>{const t=V(p[0],0,p[2]).applyQuaternion(bodyQ).add(cam.position);t.y=Ground(t.x,t.z)+p[1];return t;};
   const hip=Point(spec.hip),up=Dir(spec.up).normalize(),front=Dir([0,0,-1]);
+  // FrameQuaternion prioritizes its forward axis. Project forward onto the pelvis plane first so
+  // the authored lean survives; otherwise the seated jacket stands upright in front of the eyes.
+  front.addScaledVector(up,-front.dot(up)).normalize();
   SetBoneWorld(legs.pelvis,FrameQuaternion(front,up).multiply(legs.pelvisFrame.clone().invert()),hip);
   const out={hip:hip.toArray(),sides:{}};
   for(const side of ["l","r"]){

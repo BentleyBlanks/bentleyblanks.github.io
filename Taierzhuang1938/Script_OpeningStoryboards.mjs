@@ -157,8 +157,8 @@ export class FirstLevelBunkerShow {
     this.AdoptAssault();
     this.playerBody=r.actorFactory.Create("nra",{weapon:null,modelVariant:1,seed:101});
     this.playerBody.characterRig?.SetHeadVisible?.(false);
-    // First-person body (Eye package): the arms as before, plus the legs and boots on their own hidden
-    // SkinnedMesh (same skeleton), shown by OpeningFirstPerson while a leg pose is solved; torso and head cut.
+    // Arms plus a continuous jacket/pelvis/legs surface on the same skeleton. Only the head is cut;
+    // OpeningFirstPerson shows and poses the body surface whenever a leg pose is solved.
     this.ownedGeometry=[...TrimOpeningPlayerBody(this.playerBody).geometries];
     this.playerProxy={actor:this.playerBody};InstallOpeningStoryboardAnimation(this.playerProxy);
     r.scene.add(this.playerBody.root);
