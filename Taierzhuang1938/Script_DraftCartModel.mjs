@@ -48,7 +48,9 @@ export function CreateDraftCartInstance(assets, kind) {
     if (!object.isMesh) return;
     object.castShadow = true;
     object.receiveShadow = true;
-    object.frustumCulled = false;
+    // 视锥剔除必须开着：车队从 01 起就停在两三百米外，关掉剔除时每辆车六十来个分件
+    // 在阴影两级、预通道、主场景里每帧全画，实测占全帧 draw 的 55–70%（2026-09-27）。
+    // 分件是节点动画的刚体网格，几何包围球乘 matrixWorld 就是对的，不需要特殊处理。
     AttachShadowDepth(object);
   });
   const wheels = [cartModel.getObjectByName("WheelLeft"), cartModel.getObjectByName("WheelRight")];
