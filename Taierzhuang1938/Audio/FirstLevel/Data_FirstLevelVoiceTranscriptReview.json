@@ -75,10 +75,10 @@
       "note": "炮→跑、趴→爬，同音。"
     },
     "CaptiveTaunt.03": {
-      "sha256": "73405c74b282864f0ffc019b73000ceac1ccc20383eac13c71fcd99728205fe9",
-      "transcript": "フン、バカ野郎",
-      "cer": 1,
-      "note": "「フン」是导演表写的句前冷笑（effort）；バカ野郎＝ばかやろう（写法不同）。"
+      "sha256": "335532af6ea26a1389a95a67f247ddd1632e9f4830c2095ef0f766a66195d53e",
+      "transcript": "ヘヘヘヘヘ、バカ野郎",
+      "cer": 0.5,
+      "note": "句前「ヘヘヘヘヘ」是导演表写的怪笑（effort），字错率计算已剔除；剩下バカ野郎＝ばかやろう，只是写法不同（2026-09-26 审问重录）。"
     },
     "RescueFlee.01": {
       "sha256": "50875072defa420bf6d8a579f2216909233cb921e77f67a5a487914fce4f1436",
@@ -239,17 +239,10 @@
       "note": "催命嗦→随你所谓（cui-ming-suo/sui-ni-suo-wei），近音，含着烟的嘟囔。"
     },
     "CaptiveInterrogation.04": {
-      "sha256": "8d23c3fea06bf234b1b76867bcb305c496ab91e6b919568f965c540d60dbcdd9",
-      "transcript": "傻子?",
+      "sha256": "c0b746e0b31bc31cc8ba9b79d84e1f9dd8925b382f085c075285dba7bc1f19e6",
+      "transcript": "傻子",
       "cer": 0.5,
-      "note": "稿面『啥子』被转写为『傻子』，同音近音，当前补录已匹配川军本人参考音。"
-    },
-    "CaptiveInterrogation.06": {
-      "sha256": "0fe258e644e50812a811ab37b80a21d4a5798e8b7664379e3723a5c80c079b6b",
-      "transcript": "このしな野郎早く言え負け",
-      "cer": 0.4,
-      "note": "转写仍有不确定处，已保留当前原片供试听；不得据此宣称逐字听验通过。",
-      "needsListening": true
+      "note": "稿面「啥子」被转写为「傻子」，四川话同音近音，字数一致（2026-09-26 审问重录）。"
     },
     "CaptiveDragged.01": {
       "sha256": "27e99dd1ed6f804896f75d5ae93ef21e0f3d38e5ede2baf13bb8cd94198bfe08",
@@ -263,6 +256,12 @@
       "cer": 0.5,
       "note": "转写仍有不确定处，已保留当前原片供试听；不得据此宣称逐字听验通过。",
       "needsListening": true
+    },
+    "RescueInterrogation.02": {
+      "sha256": "da662912a1a3bd72da52f7d40dace5a40ce311cd97419a50404b532eb4e5a962",
+      "transcript": "はい!はい!",
+      "cer": 1,
+      "note": "翻译被日兵的疯劲吓到，连应了两声「はい」（稿里一声），多出的是同一个字；片段不到 1.2 秒不判念错，字幕仍是「是！」（2026-09-26 审问重录）。"
     }
   }
 }

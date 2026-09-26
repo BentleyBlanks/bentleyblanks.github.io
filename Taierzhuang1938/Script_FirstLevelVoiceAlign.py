@@ -26,7 +26,7 @@ its lines when they agree, otherwise Chinese.
 (story cues only; the guide cues keep coming from GUIDE_VOICE_ALIGNMENT), so the
 60-odd intervals never have to be copied by hand.
 """
-import argparse, hashlib, json, pathlib, subprocess
+import argparse, hashlib, json, pathlib, re, subprocess
 import numpy as np
 from faster_whisper import WhisperModel
 from faster_whisper.audio import decode_audio, pad_or_trim
@@ -68,9 +68,17 @@ def Normalize(text):
     # 片假名折成平假名（whisper 常把「ぐずぐず」写成「グズグズ」），标点与空白去掉。
     return "".join(chr(ord(c)-0x60) if "ァ"<=c<="ヶ" else c for c in text if c not in PUNCT)
 
+LAUGH_RUN=re.compile(r"[あう]?([はへひふほ哈嘿呵嘻])\1+|[はへひふほ哈嘿呵嘻]{4,}")
+
+def StripLaughter(hyp, ref):
+    # 稿里 effort 写的狂笑/怪笑不是台词（与 Script_SeedAudioVoiceKit.StripLaughter 同一口径）：
+    # 同一个笑音节连着 ≥ 2 次、或笑音节连着 ≥ 4 个的串去掉，稿里本来就有的串不去。
+    return LAUGH_RUN.sub(lambda m: m.group(0) if m.group(0) in ref else "", hyp)
+
 def Cer(hyp, ref):
     # 句末的促音/长音符只是收气（whisper 把「はい！」的急收写成「はいっ」），不算一个字。
-    a,b=Normalize(hyp).rstrip("っッーｰ"),Normalize(ref).rstrip("っッーｰ")
+    b=Normalize(ref).rstrip("っッーｰ")
+    a=StripLaughter(Normalize(hyp),b).rstrip("っッーｰ")
     if not b: return 0.0 if not a else 1.0
     prev=list(range(len(b)+1))
     for i,ca in enumerate(a,1):
@@ -96,7 +104,8 @@ def Lines(model, jobs_path, result_path):
         prompt=job.get("initialPrompt") or ("以下是简体中文的句子。" if lang=="zh" else None)
         # 一句台词只有几秒：只用温度 0、束宽 2、按字数封顶输出长度。温度回退 + 束宽 5 会在
         # 短句上反复生成到 448 个 token 的上限（实测 75 条 take 转写跑了 30 分钟还没完）。
-        limit=max(24,len(Normalize(job.get("text","")))*3+16)
+        # 句前句后写了笑/喘的（extraTokens）多给笑声留 token，否则整个上限花在「ハハハ」上、台词转不出来。
+        limit=max(24,len(Normalize(job.get("text","")))*3+16)+int(job.get("extraTokens",0))
         segments,_=model.transcribe(samples,language=lang,beam_size=2,vad_filter=False,temperature=0.0,
             condition_on_previous_text=False,without_timestamps=True,initial_prompt=prompt,max_new_tokens=limit)
         text="".join(seg.text for seg in segments).strip()

@@ -37,7 +37,7 @@ import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner } from "./Data_FirstLevelVoiceCast.mjs";
 import { PROJECTION_DB, LINE_MASTER, LineDirection, FIRST_LEVEL_DIALOGUE_DIRECTION } from "./Data_FirstLevelDialogueDirection.mjs";
 import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, Pool, requestStats,
-  SEED_AUDIO_MODEL, MasterSceneWav, EncodeSegment, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines, TruePeakDb }
+  SEED_AUDIO_MODEL, MasterSceneWav, EncodeSegment, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines, TruePeakDb, StripLaughter }
   from "./Script_SeedAudioVoiceKit.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url)),
@@ -290,26 +290,39 @@ function Judge(results) {
   const cut = results.filter((r) => r.slices);
   const lineJobs = cut.flatMap((r) => r.slices.map((s, i) => ({ r, s, i, line: r.cue.lines[i] })));
   const castFiles = [...new Set(lineJobs.map((j) => CastReference(j.line.who)?.file).filter(Boolean))];
-  const vectors = SpeakerEmbed([...lineJobs.map((j) => j.s.file), ...castFiles]);
+  // 句前句后写了笑/喘（effort）的句子：嗓子只量念台词那一段（逐字时间首字前 0.1 s 到末字后 0.2 s）。
+  // 狂笑、怪笑跟定妆独白的音色向量本来就远，整片去量会把本人的句子判成「像别人」。
+  for (const j of lineJobs) {
+    const effort = LineDirection(j.r.cue, j.i).effort;
+    j.laugh = !!(effort?.before || effort?.after);
+    const chars = j.s.chars || [];
+    if (!j.laugh || chars.length < 2) continue;
+    const startS = Math.max(0, chars[0][1] - 0.1), endS = Math.min(j.s.endS - j.s.startS, chars.at(-1)[2] + 0.2);
+    if (endS - startS < 0.6 || endS - startS > 0.85 * (j.s.endS - j.s.startS)) continue;
+    j.s.speakerSpanS = [+startS.toFixed(3), +endS.toFixed(3)];
+    j.embedFile = EncodeSegment(j.s.file, j.s.file.replace(/\.mp3$/, ".span.mp3"), { startS, endS });
+  }
+  const vectors = SpeakerEmbed([...lineJobs.map((j) => j.embedFile || j.s.file), ...castFiles]);
   const texts = Transcribe(lineJobs.map((j) => ({ file: j.s.file, lang: j.line.lang === "ja" ? "ja" : "zh",
-    text: MissionVoiceSpoken(j.r.cue, j.i),
+    text: MissionVoiceSpoken(j.r.cue, j.i), ...(j.laugh ? { extraTokens: 64 } : {}),
     reference: j.line.lang === "ja" ? JAPANESE_SPEECH[j.line.id]?.kanji : MissionVoiceSpoken(j.r.cue, j.i) })));
   if (!texts || !vectors) {
     console.error(`scene judge aborted: ${!texts ? "whisper transcription" : "speaker embedding"} unavailable; rerun with --rescore`);
     process.exitCode = 1;
     return false;
   }
-  for (const { r, s, i, line } of lineJobs) {
+  for (const { r, s, i, line, embedFile } of lineJobs) {
+    const voiceFile = embedFile || s.file;
     s.measure = MeasureVoice(s.file);
     s.measure.truePeakDb = r.master.slicePeaks[i];
     s.cer = texts[s.file]?.cer ?? null;
     s.transcript = texts[s.file]?.text ?? null;
     if (r.master.cutMethod === "silence" && texts[s.file]?.chars?.length) { s.chars = texts[s.file].chars; s.charSource = "whisper-forced"; }
     const own = CastReference(line.who);
-    s.speakerCos = own && vectors[s.file] && vectors[own.file] ? +CenteredCosine(vectors[s.file], vectors[own.file]).toFixed(3) : null;
+    s.speakerCos = own && vectors[voiceFile] && vectors[own.file] ? +CenteredCosine(vectors[voiceFile], vectors[own.file]).toFixed(3) : null;
     const others = [...new Set(r.cue.lines.map((l) => l.who))].filter((who) => CastVoiceOwner(who) !== CastVoiceOwner(line.who))
       .map((who) => [who, CastReference(who)]).filter(([, ref]) => ref && vectors[ref.file])
-      .map(([who, ref]) => [who, +CenteredCosine(vectors[s.file], vectors[ref.file]).toFixed(3)]).sort((a, b) => b[1] - a[1]);
+      .map(([who, ref]) => [who, +CenteredCosine(vectors[voiceFile], vectors[ref.file]).toFixed(3)]).sort((a, b) => b[1] - a[1]);
     s.nearestOther = others[0] || null;
     // 分错嗓子只跟本场挂了参考音的人比：没挂参考音的人（第 4 个说话人）这场里的嗓子本来就不是他的定妆音。
     const refs = SceneReferences(r.cue);
@@ -323,7 +336,8 @@ function Judge(results) {
       r.flags.push(`${line.id} 与${Name(s.nearestOther[0])}的定妆音更近（本人 ${s.speakerCos} / ${s.nearestOther[1]}；${judged ? "对方本场没挂参考音" : "片段太短"}）`);
     // 字错率高但字数对得上 = 四川话被 whisper 写成普通话同音字（人工逐字核对）；字数也差得多才算念错 / 漏词。
     const want = [...MissionVoiceSpoken(r.cue, i)].filter((c) => /[\p{L}\p{N}]/u.test(c)).length;
-    const got = [...(s.transcript || "")].filter((c) => /[\p{L}\p{N}]/u.test(c)).length;
+    const got = [...StripLaughter(s.transcript || "", MissionVoiceSpoken(r.cue, i) + (JAPANESE_SPEECH[line.id]?.kanji || ""))]
+      .filter((c) => /[\p{L}\p{N}]/u.test(c)).length;
     s.lengthDiff = got - want;
     if (judged && s.cer != null && s.cer > SCENE_CHECK.reviewedMaxCer && Math.abs(got - want) > Math.max(2, 0.3 * want)) r.hard.push(`${line.id} 字错率 ${s.cer}「${s.transcript}」`);
     else if (s.cer != null && s.cer > SCENE_CHECK.maxCer) r.flags.push(`${line.id} 字错率 ${s.cer} 待逐字核对「${s.transcript}」`);
@@ -445,7 +459,8 @@ function Install(cue, best, all, manifestLines, scenes, timings, manifest, picke
       metrics: { activeRmsDb: s.measure.activeRmsDb, truePeakDb: s.measure.truePeakDb, snrDb: s.measure.snrDb,
         voicedS: s.measure.voicedS, lowShare: s.measure.lowShare, f0: s.measure.f0, cer: s.cer, transcript: s.transcript,
         speakerCos: s.speakerCos, nearestOther: s.nearestOther, referencedOther: s.referencedOther ?? null,
-        lengthDiff: s.lengthDiff ?? null, subtitleCoverage: s.coverage, sceneGainDb: best.master.gainDb },
+        lengthDiff: s.lengthDiff ?? null, subtitleCoverage: s.coverage, sceneGainDb: best.master.gainDb,
+        ...(s.speakerSpanS ? { speakerSpanS: s.speakerSpanS } : {}) },
       mastering: "SliceOfWholeSceneMaster",
     };
     timings[sha256] = { lineId: line.id, who: line.who, lang: line.lang || "zh", seconds: s.measure.seconds,

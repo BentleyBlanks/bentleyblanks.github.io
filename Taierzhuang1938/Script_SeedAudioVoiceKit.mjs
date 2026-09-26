@@ -450,6 +450,16 @@ export function SliceScene(framesInfo, lines, { activeRmsDb, silenceDb = 30, pad
 }
 
 /**
+ * 转写里的笑声（稿里 effort 写的狂笑 / 怪笑）不是台词：whisper 会把它写成「アハハハ…」「ヘヘヘ」「哈哈」，
+ * 字错率与字数差就被笑声撑爆。去掉同一个笑音节连着 ≥ 2 次、或笑音节连着 ≥ 4 个的串（稿里本来就有的串不去）。
+ * 与 Script_FirstLevelVoiceAlign.py 的 StripLaughter 同一口径。
+ */
+const LAUGH_RUN = /[あアうウ]?([はハへヘひヒふフほホ哈嘿呵嘻])\1+|[はハへヘひヒふフほホ哈嘿呵嘻]{4,}/gu;
+export function StripLaughter(hyp, ref = "") {
+  return String(hyp ?? "").replace(LAUGH_RUN, (run) => ref.includes(run) ? run : "");
+}
+
+/**
  * 音色向量（py3.10 + 本机 Qwen3-TTS 说话人编码器）。拿不到返回 null，调用方退回别的指标。
  */
 export function SpeakerEmbed(files) {

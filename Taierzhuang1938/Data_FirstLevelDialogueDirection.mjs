@@ -90,43 +90,46 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "01": P("shout", 0.8, { spatial: "offscreen", delivery: "边跑边喊，不停下来" }),
     "02": P("shout", 0.8, { spatial: "offscreen", delivery: "从后面压上来催", offsetS: -0.3 }),
   }),
+  // 2026-09-26 用户口径：日军审问「太温柔」，要变态、癫狂、发了疯一样。台词原文不动（Notion 稿），只改表演：
+  // 杀红了眼的狂笑、贴脸嘶吼、情绪失控地忽高忽低；翻译被这股疯劲逼着，对俘虏也凶到发狠。
+  // CaptiveDragged 不在其列：三次整段生成都在川军的含糊怒骂上出硬错误，保留原录音（日兵只有 0.6 s 的「立て！」）。
   CaptiveDragged: Scene(true, "两名日兵把被炸得神志不清的受伤川军从松土里拽出来，贴身拉扯；另一名日兵在前面十几米外喊", {
     "01": P("shout", 0.95, { context: "重伤被日兵从土里拽出，疼得喘气，认出敌人后怒火猛冲上来", delivery: "极度愤怒、厌恶，嫉恶如仇，咬牙把骂声狠狠砸向日本侵略者；四川口音，字字清楚，受伤也绝不求饶", effort: { before: "疼得闷哼，紧接着猛吸气怒骂" } }),
     "02": P("shout", 0.8, { context: "抓住后领猛地一提", delivery: "短促粗暴" }),
     "03": P("shout", 0.95, { context: "胳膊被扯到伤处，痛楚激起更强的反抗", delivery: "咬紧牙关又迸出怒骂，痛恨侵略者，狠而有力；不哭、不哀求、不软弱含糊", pauseBeforeS: 1.2, effort: { before: "忍痛猛吸一口气" } }),
     "04": P("shout", 0.8, { spatial: "offscreen", context: "前方枪声又起", delivery: "远处的急喊", pauseBeforeS: 1 }),
   }),
-  CaptiveInterrogation: Scene(true, "交通壕里，日兵抓着受伤的川军俘虏按在沟壁上审问，翻译蹲在俘虏面前传话，几个人挤在一两米之内", {
-    "01": P("shout", 0.75, { context: "抓着俘虏，转头冲翻译吼", delivery: "居高临下" }),
-    "02": P("normal", 0.6, { delivery: "马上应，点头哈腰" }),
-    "03": P("normal", 0.6, { context: "凑到俘虏面前", delivery: "急躁粗暴" }),
+  CaptiveInterrogation: Scene(true, "交通壕里，两名日兵把受伤的川军俘虏按在沟壁上审问，翻译蹲在俘虏面前传话，几个人挤在一两米之内。审问的日兵像发了疯的变态：杀红了眼，喘着粗气，狂笑着贴脸嘶吼，情绪忽高忽低，笑着笑着突然暴怒；翻译被这股疯劲吓得发抖，对俘虏也凶到发狠", {
+    "01": P("shout", 1, { context: "揪着俘虏的头发往沟壁上撞，转头冲翻译狂吼", delivery: "发了疯一样的癫狂嘶吼，嗓音嘶哑，尾音带神经质的颤笑；不是居高临下地下命令，是失控的疯子", effort: { before: "喉咙里先挤出一串兴奋的怪笑" } }),
+    "02": P("normal", 0.7, { delivery: "被日兵的疯劲吓得一哆嗦，连忙应" }),
+    "03": P("shout", 0.9, { context: "被身后日兵逼着，揪住俘虏脸贴脸地吼", delivery: "又急又凶又怕，吼得唾沫星子喷到对方脸上" }),
     "04": P("normal", 0.85, { context: "抬眼认出替日军传话的汉奸，怒目逼视他", delivery: "带着强烈鄙夷和憎恶，从牙缝里冷硬地吐出，不是神志不清的呢喃", pauseBeforeS: 0.9 }),
-    "05": P("shout", 0.75, { delivery: "拔高嗓门吼" }),
-    "06": P("shout", 0.85, { delivery: "不耐烦，压着翻译的话骂进来", offsetS: -0.25 }),
+    "05": P("shout", 0.95, { delivery: "歇斯底里地吼，一字一顿砸下去，吼完还在喘" }),
+    "06": P("shout", 1, { delivery: "等不及，压着翻译的话疯狗一样扑进来狂吼，越吼越失控，嗓音嘶哑发颤", offsetS: -0.25, effort: { after: "吼完呼哧呼哧喘粗气，喉咙里咯咯怪笑" } }),
     "07": P("shout", 1, { context: "被压着仍拼力抬头，怒斥眼前卖国的翻译", delivery: "极度愤怒厌恶，嫉恶如仇，四川话骂得短促、凶狠、字字带刺；中间咬牙停一下再爆发，绝不哀求", pauseBeforeS: 0.8, effort: { before: "两口压着怒火的粗喘" } }),
-    "08": P("shout", 0.8, { context: "皱眉扯住衣领", delivery: "逼问" }),
-    "09": P("normal", 0.65, { delivery: "慌，谄媚地回报" }),
+    "08": P("shout", 1, { context: "猛地揪住衣领把人提起来，脸贴着脸", delivery: "先阴森森地笑着压低，下一瞬间暴怒狂吼，情绪像疯子一样失控", effort: { before: "神经质地短笑两声" } }),
+    "09": P("normal", 0.75, { delivery: "声音发抖，又急又慌地赶紧回报，生怕日兵的疯劲撒到自己身上" }),
     "10": P("shout", 1, { context: "满嘴血仍抬头怒视日兵和翻译", delivery: "带着痛恨和蔑视一字一顿怒骂，重音锋利，喘息之间也不泄气；坚决抵抗到底", pauseBeforeS: 0.7 }),
     "11": P("shout", 1, { context: "知道自己会死，仍直视敌人，把最后一口气顶上来", delivery: "决绝、愤怒、鄙夷，把对汉奸和日本侵略者的刻骨仇恨砸进最后一句；咬牙爆发，收尾硬而狠，绝不是平静交代遗言", pauseBeforeS: 1.2, emit: [{ id: "CaptiveLastWord", at: "end" }] }),
   }),
   // 割喉之后：导演在刀划过那一刻发 ThroatCut。
-  CaptiveTaunt: Scene(true, "日兵刚割了俘虏的喉，还抓着他的头发嘲弄，另一名日兵在旁边一两米冷笑；远处十几米外有日兵催促往前", {
-    "01": P("shout", 0.8, { after: "event:ThroatCut", offsetS: 0.7, context: "仍抓着俘虏的头发", delivery: "嘲弄" }),
-    "02": P("shout", 0.85, { delivery: "更狠的嘲弄" }),
-    "03": P("low", 0.5, { delivery: "冷笑着骂一句", effort: { before: "鼻子里冷笑一声" } }),
+  CaptiveTaunt: Scene(true, "日兵刚割了俘虏的喉，满手是血，兴奋得发了狂，抓着尸体的头发一边摇晃一边狂笑嘲弄；另一名日兵在旁边一两米跟着阴冷地怪笑；远处十几米外有日兵催促往前", {
+    "01": P("shout", 1, { after: "event:ThroatCut", offsetS: 0.7, context: "抓着尸体的头发来回摇晃", delivery: "变态地狂笑着嘲弄，声音因兴奋而发颤、忽高忽低，像在玩弄猎物", effort: { before: "一阵停不下来的歇斯底里狂笑" } }),
+    "02": P("shout", 1, { delivery: "贴着死人的脸狂吼，笑着吼、吼着笑，癫狂失控", effort: { after: "咯咯的怪笑" } }),
+    "03": P("low", 0.8, { delivery: "阴冷变态，慢慢吐出，带着享受杀戮的满足", effort: { before: "喉咙深处一串低沉黏腻的怪笑" } }),
     "04": P("shout", 0.8, { spatial: "offscreen", context: "前方远处", delivery: "远处的催促", pauseBeforeS: 1.2 }),
   }),
-  ShunziFound: Scene(true, "日兵拨开断木，俯到塌了的洞口，发现里面还有一个活人", {
-    "01": P("low", 0.5, { delivery: "压低的冷笑，慢，不喊" }),
+  ShunziFound: Scene(true, "日兵拨开断木，俯到塌了的洞口，发现里面还有一个活人，像发现猎物一样兴奋得发狂", {
+    "01": P("low", 0.85, { delivery: "变态的兴奋：压着嗓子、拖长了音，一字一字笑着说，笑声里透着疯劲，不喊", effort: { before: "憋不住地嘿嘿怪笑" } }),
   }),
-  RescueInterrogation: Scene(true, "日兵把顺子从洞里拽出来按在地上，翻译蹲下来审问，另一名日兵在旁边催，几个人都在两米之内", {
-    "01": P("shout", 0.7, { context: "抓住顺子前襟把他拽起来", delivery: "命令翻译" }),
-    "02": P("normal", 0.6, { delivery: "马上应" }),
-    "03": P("normal", 0.65, { context: "蹲下来", delivery: "急躁" }),
-    "04": P("normal", 0.7, { context: "顺子头垂着不答", delivery: "更急", pauseBeforeS: 1.2 }),
-    "05": P("shout", 0.8, { context: "朝顺子踢了一脚", delivery: "不耐烦" }),
+  RescueInterrogation: Scene(true, "日兵把顺子从洞里拽出来按在地上，翻译蹲下来审问，另一名日兵在旁边催，几个人都在两米之内。日兵杀红了眼、像发了疯一样狂笑狂吼，翻译被逼得对顺子又打又吼", {
+    "01": P("shout", 1, { context: "揪住顺子前襟把他拽起来", delivery: "兴奋又癫狂地冲翻译狂吼，嗓音嘶哑发颤，像个疯子", effort: { after: "一串疯癫的狂笑" } }),
+    "02": P("normal", 0.7, { delivery: "吓一跳，连忙应" }),
+    "03": P("shout", 0.85, { context: "蹲下来抽了顺子一耳光", delivery: "被日兵逼得发了狠，又急又凶" }),
+    "04": P("shout", 0.95, { context: "顺子头垂着不答，揪着头发来回晃", delivery: "歇斯底里地吼，越吼越失控", pauseBeforeS: 1.2 }),
+    "05": P("shout", 1, { context: "朝顺子狠狠踹了一脚", delivery: "失控地疯狂狂吼，像要把人活活踢死", effort: { after: "喘着粗气怪笑" } }),
     // 「说话！」要等导演：顺子抬眼越过翻译的肩膀看见班长之后（gate）。
-    "06": P("shout", 0.8, { after: "gate", offsetS: 0, context: "一把抓住顺子的衣领", delivery: "吼" }),
+    "06": P("shout", 0.95, { after: "gate", offsetS: 0, context: "一把揪住顺子的衣领往上提", delivery: "吓疯了一样嘶吼" }),
   }),
   RescueFlee: Scene(true, "翻译看见同伴被大刀砍倒，踉跄着往前沟逃", {
     "01": P("shout", 0.95, { delivery: "惊叫，破音" }),
