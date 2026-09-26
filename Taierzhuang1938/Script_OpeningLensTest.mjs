@@ -54,7 +54,10 @@ Check("SB02 near miss: aberration ~0.02 decaying over 1.5 s, radial blur, heavie
 Check("the fallback shell flight is the director's FireShell flight", () => {
   const source = Read("Script_OpeningStoryboards.mjs");
   const blast = source.slice(source.indexOf("  Blast(){"), source.indexOf("\n  }", source.indexOf("  Blast(){")));
-  const flight = Number(/FireShell\(.*?\{[^}]*flight:\s*([\d.]+)/.exec(blast)?.[1]);
+  // The flight is a literal or read from the storyboard data (b = C.banter inside Blast()).
+  const raw = /FireShell\(.*?\{[^}]*flight:\s*([\d.]+|b\.blastShot\.fallStartS)\b/.exec(blast)?.[1];
+  if (raw?.startsWith("b.")) assert.match(blast, /\bb\s*=\s*C\.banter\b/, "Blast() reads the flight from C.banter");
+  const flight = raw?.startsWith("b.") ? C.banter.blastShot.fallStartS : Number(raw);
   assert.ok(Number.isFinite(flight), "Blast() fires the near miss with a flight time");
   assert.equal(SHELL_FLIGHT_S, flight, "Data_OpeningLens.SHELL_FLIGHT_S matches the director's flight (or hand events.impactAt)");
 });
