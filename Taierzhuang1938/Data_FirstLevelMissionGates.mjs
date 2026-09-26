@@ -317,6 +317,12 @@ export const MISSION_FACT_GATES = Object.freeze({
     requires: Object.freeze(["bundleRoutePoint"]),
     text: "沿阵位后侧支沟到达旧弹药屋，无无效强制匍匐",
   }),
+  // 进了弹药屋就算走完支沟：05 起头前人已在屋里（04 末尾先跑到了箱子前）时，
+  // 没踩到的 bundleRoutePoint 一并补记，否则箱子永远不给拿（2026-09-27 实机卡死）。
+  bundleHouseReached: Gate({
+    kind: "proximity", step: "Tank", point: Sortie.house, radiusM: Sortie.supplierRangeM,
+    source: "UpdateSortie", text: "玩家到了东南旧院弹药屋（补记没踩到的侧沟检查点）",
+  }),
   bundleTaken: Gate({
     kind: "interaction", step: "Tank", interaction: "MissionBundle", anchor: "bundle",
     source: "Register", text: "在东南旧院弹药屋从后门领到集束弹",
@@ -700,7 +706,8 @@ export const MISSION_FACT_GATES = Object.freeze({
   bundleRoutePoint: Gate({
     kind: "proximityFamily", step: "Tank", family: "bundleRoutePoint",
     pointsFrom: "FRONT_SORTIE.route", points: Sortie.route, radiusM: Sortie.checkpointRadiusM,
-    source: "UpdateSortie", text: "侧沟线上的第 i 个检查点（bundleRouteTraversed 的前提之一）",
+    source: "UpdateSortie", text: "侧沟线上的第 i 个检查点（bundleRouteTraversed 的前提之一）；"
+      + "走到后面的点或进了弹药屋（bundleHouseReached）时，前面没踩到的一并补记",
   }),
 
 });

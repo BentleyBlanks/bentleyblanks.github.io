@@ -336,6 +336,17 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
       "tank finished from the branch before anyone reached the attack position: the beat is recorded as skipped");
     assert.equal(battle.leg,"retreat","and the sortie moves on to the retreat leg");
   }
+  // 2026-09-27: 05 began with the player already past the rear junction (route point 0) and bundleRouteTraversed never
+  // came, so the crate never offered itself. A later checkpoint (or the ammo house itself) back-fills the ones missed.
+  for(const [label,at] of [["second route point",S.route[1]],["ammo house",S.bundle]]){
+    const facts=new Map(),player={stance:"stand",position:{x:at.x,y:0,z:at.z}};
+    const r={player,Has:id=>facts.has(id),Record:(id,d)=>{if(!facts.has(id))facts.set(id,d??{});},Say(){},EnsureBundleKeeper(){},
+      Near:(p,m)=>Math.hypot(p.x-player.position.x,p.z-player.position.z)<m,GateNear:FirstLevelMissionRuntime.prototype.GateNear};
+    FirstLevelMissionRuntime.prototype.UpdateSortie.call(r);
+    assert.ok(facts.has("bundleRoutePoint0")&&facts.has("bundleRoutePoint1"),`${label}: the missed rear junction is back-filled`);
+    if(at===S.bundle)assert.ok(facts.has("bundleRouteTraversed"),"standing in the ammo house completes the sap");
+    else assert.ok(!facts.has("bundleRoutePoint2"),"points ahead of the player stay open");
+  }
   // 2026-09-24 (contract §2.9, Space §10.3): waiting guards kneel (not prone), and a released guard stays
   // untargetable through the gap until he is in the safe zone.
   {

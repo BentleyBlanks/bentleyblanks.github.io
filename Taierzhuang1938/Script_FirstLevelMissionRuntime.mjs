@@ -1836,8 +1836,18 @@ export class FirstLevelMissionRuntime {
     this.EnsureBundleKeeper();
     for(const crawl of Sortie.crawl)if(this.player.stance==='prone' && this.GateNear(`bundleCrawl${crawl.id}`) && this.player.position.y<this.battlefield.GroundHeight(this.player.position.x,this.player.position.z)+.2)
       this.Record(`bundleCrawl${crawl.id}`,{x:this.player.position.x,z:this.player.position.z,stance:this.player.stance});
+    // 检查点不再死守顺序：走到后面的点（或已经进了弹药屋）时，前面没踩到的一并补记。
+    // 只认「下一个」时，05 起头前人已顺支沟走过后侧岔口（04 末尾 BundleOrder 还在说、躲炮往前挪），
+    // 第 0 点就永远等不到，箱子前交互不出现、引导指回门外（2026-09-27 实机卡死）。
+    if(this.GateNear('bundleHouseReached'))this.Record('bundleHouseReached');
     const next=Sortie.route.findIndex((point,index)=>!this.Has(`bundleRoutePoint${index}`));
-    if(next>=0 && this.GateNear(`bundleRoutePoint${next}`))this.Record(`bundleRoutePoint${next}`);
+    if(next>=0){
+      let reached=-1;
+      for(let index=Sortie.route.length-1;index>=next&&reached<0;index--)if(this.GateNear(`bundleRoutePoint${index}`))reached=index;
+      if(reached<0&&this.Has('bundleHouseReached'))reached=Sortie.route.length-1;
+      for(let index=next;index<=reached;index++)
+        this.Record(`bundleRoutePoint${index}`,index<reached?{via:reached}:undefined);
+    }
     if(Sortie.route.every((point,index)=>this.Has(`bundleRoutePoint${index}`)) &&
       Sortie.crawl.every(crawl=>this.Has(`bundleCrawl${crawl.id}`)))this.Record('bundleRouteTraversed');
     if(this.Near(Sortie.house,Sortie.supplierRangeM))this.Say('BundleSupply');
