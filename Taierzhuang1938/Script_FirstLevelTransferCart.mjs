@@ -23,6 +23,7 @@ import { MISSION_ENCOUNTERS, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelM
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as M, MidWalkingWounded } from "./Data_Tuning_FirstLevelMid.mjs";
 import { MissionRouteLength, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
+import { CartDeckLift } from "./Script_CartCorpseBump.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const Wrap = (radians) => Math.atan2(Math.sin(radians), Math.cos(radians));
@@ -222,7 +223,9 @@ export class FirstLevelTransferCart {
     cart.x = at.x; cart.z = at.z; cart.yaw = at.yaw ?? Math.PI;
     if (r.controls?.kind === "cartRide") {
       const seat = CartSeatPoint(cart, P.cartRide.playerSeat);
-      const y = r.battlefield.GroundHeight(seat.x, seat.z) + M.cartSeatRiseM;
+      // 压过尸体时车身颠一下，眼位按座位在车板上的位置跟着起伏（Script_CartCorpseBump）。
+      const y = r.battlefield.GroundHeight(seat.x, seat.z) + M.cartSeatRiseM
+        + CartDeckLift(cart, P.cartRide.playerSeat.dx, P.cartRide.playerSeat.dz);
       r.player.position.set(seat.x, y, seat.z);
       r.player.body?.Teleport(seat.x, y, seat.z);
       r.player.velocity.set(0, 0, 0);

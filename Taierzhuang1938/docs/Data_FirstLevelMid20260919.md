@@ -117,6 +117,22 @@
   车沿 `MISSION_STAGE_ROUTES.cartRide` 真走，起点取车**当前**位置再接上authored折线
   （否则上车那一帧车会跳 2.4 m）。离开 `cartTalkAfterM` 才 `Say("CartTalk")`，
   离开 `R.cartDepartedM` 才记 `zhouCartDeparted`。
+- **牛马车压过尸体（2026-09-27）**：所有牛马车（接运的、过路的、顺子坐的）车轮滚上尸体都会
+  软软地颠一下 —— 车身起伏、车头下沉、压到哪边哪边抬。规则在 `Script_CartCorpseBump`（纯规则、
+  无 three），数值在 `M.cartCorpseBump`（轮距/轮半径/辕头位置量自 `Model_WoodenEvacCart.glb`）。
+  - 尸体两路：静态战场尸体（`MissionAftermath` 的 512 具）开机由 `BuildAftermathTopField` 烘成
+    10 cm 顶面高度格（约 3.7 万格、30–55 ms）；战斗里倒下的人（AI 尸体、`MissionPeople` 里
+    `alive:false` 的人）按命中体胶囊现算，只看车周 `dynamicRangeM`。
+  - 两轮大车：每只轮子沿行进方向探一个轮半径，按轮子滚过障碍的几何求轮心抬升，乘 `softness`、
+    封顶 `maxLiftM`；每只轮子一根欠阻尼弹簧（`springHz` / `dampingRatio`），落回地面按
+    `groundRestitution` 小弹。车辕前端搭在牲口身上当支点 → `cart.bumpHeave / bumpPitch / bumpRoll`。
+  - 消费方一律从 `CartDeckLift(cart, 局部x, 局部z)` 取：`DraftCartModels.Sync`（车模）、
+    `MissionView` 白盒回退件、车上担架与老周（`zhouRoot` 跟着俯仰侧倾）、过路车上的伤员、
+    `TransferCart.UpdateRide` 的顺子眼位（晚一帧，弹簧是连续的，看不出来）。
+  - 碰撞盒不跟着颠（玩家踩不到车板，量级也只有十几厘米）。
+  - 回归：`Script_CartCorpseBumpTest`（纯 Node）；实机取证 `Script_CartCorpseBumpBrowserProbe.mjs`
+    （12 直接切 CartRide，两条车辙各放一具真打死的日军，出 `_shots/CartCorpseBump/`：左轮压过时车身
+    抬 0.17 m、侧倾 7.6°，顺子眼位 1.24 → 1.36 m；南向车流穿过的 31 号尸堆顶面 0.47 m）。
 
 ### 13 日机空袭桥头道路与车列
 
@@ -164,6 +180,7 @@
 
 ```
 node Taierzhuang1938/Script_FirstLevelMidTest.mjs
+node Taierzhuang1938/Script_CartCorpseBumpTest.mjs
 node Taierzhuang1938/Script_FirstLevelMissionTest.mjs
 node Taierzhuang1938/Script_MissionGatesTest.mjs
 node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs

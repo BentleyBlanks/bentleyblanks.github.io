@@ -2610,7 +2610,7 @@ export class FirstLevelMissionRuntime {
     if (["Regroup", "WallPath", "ReceptionGate"].includes(stage)) this.quietMarch.Update(dt, stage);
     if (["ReceptionGate", "Handover", "Death", "BridgeOrders"].includes(stage)) this.reception.Update(dt, stage);
     this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
-    this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null });
+    this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null,soldiers:this.ai?.soldiers });
     // 集结处的伤员与搬运人员走 view 的立即模式人群：view.Update 里 people.End()
     // 会把这一帧没提交的人藏起来，所以补提交只能放在它后面。
     this.frontShow?.Draw(this.time);

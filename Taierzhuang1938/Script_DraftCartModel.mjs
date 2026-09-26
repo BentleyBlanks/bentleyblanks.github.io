@@ -129,8 +129,10 @@ export class DraftCartModels {
     }
     instance.root.visible = true;
     for (const mesh of Object.values(instance.parts)) mesh.visible = true;
-    instance.cartRoot.position.set(cart.x, ground + 1, cart.z);
-    instance.cartRoot.rotation.set(0, cart.yaw, cart.overturned ? 1.1 : 0, "YXZ");
+    // bump*：压过尸体的颠簸（Script_CartCorpseBump 写在 cart 上；编辑器里的车没有就是 0）。
+    instance.cartRoot.position.set(cart.x, ground + 1 + (cart.overturned ? 0 : cart.bumpHeave || 0), cart.z);
+    instance.cartRoot.rotation.set(cart.overturned ? 0 : cart.bumpPitch || 0, cart.yaw,
+      cart.overturned ? 1.1 : cart.bumpRoll || 0, "YXZ");
     instance.animalRoot.position.set(animal.x, animal.ground, animal.z);
     instance.animalRoot.rotation.set(0, animal.yaw, 0);
     instance.animalRoot.visible = animal.visible;

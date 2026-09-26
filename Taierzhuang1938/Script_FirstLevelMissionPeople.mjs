@@ -23,7 +23,8 @@ export class MissionPeople {
       entry={actor,pose,planted,phase:variant*.17,used:true,last:{x,z},speed:0};
       this.people.set(id,entry);this.root.add(actor.root);
     }
-    entry.used=true;
+    // dead：牛马车压尸体要认得出哪些是躺着的人（Script_CartCorpseBump，MissionView.CorpseHeightNear）。
+    entry.used=true;entry.dead=!alive;
     const {actor,pose}=entry;actor.root.visible=true;
     const distance=Math.hypot(x-entry.last.x,z-entry.last.z);
     const speed=this.dt>0&&distance<1?distance/this.dt:0;

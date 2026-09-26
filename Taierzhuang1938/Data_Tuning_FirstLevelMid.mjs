@@ -114,6 +114,40 @@ export const MID_TUNING = Object.freeze({
   cartTalkAfterM: 1.6,
   // 坐在车板上的眼位：车板面（CartInstance 的 cart 体在 ground+1，板厚 0.38）加坐姿。
   cartSeatRiseM: 1.24,
+  // 牛马车压过尸体（Script_CartCorpseBump）：车轮滚上尸体顶面 → 软弹簧 → 车身起伏、
+  // 俯仰、侧倾；车上的担架、伤员、坐车的顺子眼位一起走。用户 2026-09-27：
+  // 「碰到了尸体应该是会有碰撞/软软的上下起伏」。
+  cartCorpseBump: Object.freeze({
+    // 车轮几何量自 Model_WoodenEvacCart.glb：WheelLeft/Right 枢轴 x=±1.32、y=0.72
+    //（= 轮半径，枢轴在车地面原点之上）、z=0.18；车辕前端搭在牲口身上，
+    // 牲口在车前 4.8 m（MissionView 的 cart.x - sin(yaw)*4.8），辕头取 -4.7。
+    wheelHalfTrackM: 1.32,
+    wheelRadiusM: 0.72,
+    axleZ: 0.18,
+    hitchZ: -4.7,
+    // 沿车轮前后各探一个轮半径，步长 5 cm（躯干命中胶囊半径 0.12–0.16 m，步子要小于它）。
+    probeStepM: 0.05,
+    // 尸体是软的：轮子压下去一截，只按顶面高度的这一成抬车。
+    softness: 0.7,
+    // 抬升封顶：31 号尸堆叠了两层（顶面 0.5–0.6 m），整只轮子爬上去不像压过人。
+    maxLiftM: 0.34,
+    // 每只轮子一根弹簧：2.1 Hz、阻尼比 0.3 → 压上去之后还会软软地弹两下。
+    springHz: 2.1,
+    dampingRatio: 0.3,
+    // 从尸体上掉回地面：地是硬的，只回弹这一成速度（木轮压回土路那一下）。
+    groundRestitution: 0.2,
+    // 积分子步（弹簧在 30 fps 下也稳）。
+    maxSubstepS: 1 / 120,
+    // 静态战场尸体（MISSION_AFTERMATH）开机烘成一张顶面高度格：原型局部先按 7 cm 取顶，
+    // 摆到世界再落进 10 cm 的格子（源比格子密，旋转后不留洞）。
+    localCellM: 0.07,
+    fieldCellM: 0.10,
+    // 战斗中倒下的人（AI 尸体、任务人群里的死者）按命中体胶囊现算，只看车周这么远。
+    dynamicRangeM: 8,
+    // 尸体刚倒下还会滑（StepCorpse 最多 8 s），每隔这么久或挪了 3 cm 就重取命中体。
+    dynamicRefreshS: 0.5,
+    dynamicMoveM: 0.03,
+  }),
 
   // -------------------------------------------------------------------------
   // 13 日机空袭桥头道路与车列

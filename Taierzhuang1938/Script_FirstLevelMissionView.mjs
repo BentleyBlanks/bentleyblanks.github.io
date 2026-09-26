@@ -16,6 +16,7 @@ import { TANK } from "./Data_Tuning_Tank.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ApplyPatches, PatchesOf, MakeUvScrollPatch } from "./Script_MaterialPatches.mjs";
 import { DraftCartModels } from "./Script_DraftCartModel.mjs";
+import { BuildAftermathTopField, CartDeckLift, CartSuspension, CorpseSegments, SegmentTop } from "./Script_CartCorpseBump.mjs";
 export class FirstLevelMissionView {
   constructor({ scene, battlefield, physics, column, actorFactory, library, hud, vfx }) {
     Object.assign(this, { scene, battlefield, physics, column, actorFactory, library, vfx });
@@ -104,6 +105,12 @@ export class FirstLevelMissionView {
     // 尸体层的实例桶在它自己的构造里建齐；挂共用深度材质的事在这里做，
     // 那个文件的桶结构归另一路（见 docs/Data_TechRenderPipeline.md §17.11）。
     ApplyShadowDepth(this.aftermath.root);
+    // 牛马车压过尸体（Script_CartCorpseBump）：静态战场尸体开机烘一张顶面高度格，
+    // 战斗里新倒下的人每辆车现取命中体。
+    this.corpseTopField=BuildAftermathTopField(this.aftermath);
+    this.cartSuspension=new CartSuspension();
+    this.corpseSegmentCache=new WeakMap();
+    this.lastUpdateTime=null;
     this.BuildTank();
     this.BuildSupplies();
 
@@ -261,9 +268,9 @@ export class FirstLevelMissionView {
   CartInstance(key,cart,ground,x,y,z,rx=0,rz=0) {
     const mesh=this.parts[key],index=mesh.count++;
     if(index>=mesh.instanceMatrix.count){mesh.count--;return;}
-    this.cartRotation.setFromEuler(new THREE.Euler(0,cart.yaw,cart.overturned?1.1:0,"YXZ"));
+    this.cartRotation.setFromEuler(new THREE.Euler(cart.bumpPitch||0,cart.yaw,cart.overturned?1.1:(cart.bumpRoll||0),"YXZ"));
     this.position.set(x,y,z).applyQuaternion(this.cartRotation);
-    this.position.add(new THREE.Vector3(cart.x,ground+(cart.overturned?1.6:1),cart.z));
+    this.position.add(new THREE.Vector3(cart.x,ground+(cart.overturned?1.6:1+(cart.bumpHeave||0)),cart.z));
     this.localRotation.setFromEuler(new THREE.Euler(rx,0,rz));
     this.rotation.copy(this.cartRotation).multiply(this.localRotation);
     this.scale.set(1,1,1);this.matrix.compose(this.position,this.rotation,this.scale);
@@ -292,9 +299,9 @@ export class FirstLevelMissionView {
   }
   StableCartInstance(key,cart,identity,ground,x,y,z,rx=0,rz=0) {
     const mesh=this.StableCartPart(cart,key,identity);
-    this.cartRotation.setFromEuler(new THREE.Euler(0,cart.yaw,cart.overturned?1.1:0,"YXZ"));
+    this.cartRotation.setFromEuler(new THREE.Euler(cart.bumpPitch||0,cart.yaw,cart.overturned?1.1:(cart.bumpRoll||0),"YXZ"));
     this.position.set(x,y,z).applyQuaternion(this.cartRotation);
-    this.position.add(new THREE.Vector3(cart.x,ground+(cart.overturned?1.6:1),cart.z));
+    this.position.add(new THREE.Vector3(cart.x,ground+(cart.overturned?1.6:1+(cart.bumpHeave||0)),cart.z));
     this.localRotation.setFromEuler(new THREE.Euler(rx,0,rz));
     this.rotation.copy(this.cartRotation).multiply(this.localRotation);
     mesh.position.copy(this.position);mesh.quaternion.copy(this.rotation);mesh.scale.set(1,1,1);
@@ -331,7 +338,36 @@ export class FirstLevelMissionView {
     }
     mesh.position.set(x,y,z);mesh.rotation.set(0,yaw,0);mesh.visible=true;
   }
-  Update(time, { tank,player,camera=null } = {}) {
+  /**
+   * 这辆车周围「尸体比地面高多少」：静态顶面格 + 车周 dynamicRangeM 内倒下的人
+   *（AI 尸体、任务人群里的死者）的命中体胶囊。
+   */
+  CorpseHeightNear(cart,soldiers){
+    const B=MID.cartCorpseBump,range2=B.dynamicRangeM*B.dynamicRangeM,segments=[];
+    // AI 尸体在远景层里 root 是藏着的，命中体照样在（走人群矩阵）；
+    // 任务人群的死者这一帧没人报就被 People.End 藏起来，那就是不在场。
+    const Take=(actor,x,z,requireVisible)=>{
+      if(!actor?.GetBoneHitboxes||(requireVisible&&!actor.root?.visible))return;
+      if((x-cart.x)**2+(z-cart.z)**2>range2)return;
+      let cached=this.corpseSegmentCache.get(actor);
+      if(!cached||this.time-cached.time>B.dynamicRefreshS||Math.hypot(x-cached.x,z-cached.z)>B.dynamicMoveM){
+        cached={x,z,time:this.time,segments:CorpseSegments(actor.GetBoneHitboxes())};
+        this.corpseSegmentCache.set(actor,cached);
+      }
+      for(const segment of cached.segments)segments.push(segment);
+    };
+    for(const s of soldiers||[])if(!s.alive&&s.actor)Take(s.actor,s.position.x,s.position.z,false);
+    for(const entry of this.people.people.values())if(entry.dead)Take(entry.actor,entry.last.x,entry.last.z,true);
+    const field=this.corpseTopField,ground=this.battlefield;
+    return (x,z)=>{
+      let top=field.Top(x,z);
+      for(const segment of segments){const y=SegmentTop(segment,x,z);if(y>top)top=y;}
+      return top===-Infinity?0:Math.max(0,top-ground.GroundHeight(x,z));
+    };
+  }
+  Update(time, { tank,player,camera=null,soldiers=null } = {}) {
+    const dt=this.lastUpdateTime===null||!(time>this.lastUpdateTime)?0:Math.min(.1,time-this.lastUpdateTime);
+    this.lastUpdateTime=time;this.time=time;
     this.people.Begin(time,player?.position);
     this.aftermath.Update(player?.position,camera);
     for (const mesh of Object.values(this.parts)) mesh.count = 0;
@@ -343,13 +379,21 @@ export class FirstLevelMissionView {
     // 已无人写入，MISSION_PLACEMENT.stationCasualties 也一并删了）。
     for (const litter of this.column.litters) {
       if (!litter.visible) continue;
-      const ground = this.battlefield.GroundHeight(litter.x, litter.z),
-        height = litter.loaded
+      const ground = this.battlefield.GroundHeight(litter.x, litter.z);
+      let height = litter.loaded
           ? 1.2
           : litter.state === "fallen" || litter.state === "critical" || litter.state === "placed"
             ? 0.22
             : .76 + (litter.liftFraction || 0) * .44;
       const yaw = litter.yaw || 0;
+      // 车上的担架跟着车身颠（Script_CartCorpseBump）：按它在车板上的局部位置取抬升。
+      const onCart = litter.loaded ? this.column.vehicles.find((cart) => cart.load.includes(litter.id)) : null;
+      let tiltPitch = 0, tiltRoll = 0;
+      if (onCart) {
+        const dx = litter.x - onCart.x, dz = litter.z - onCart.z, cc = Math.cos(onCart.yaw), cs = Math.sin(onCart.yaw);
+        height += CartDeckLift(onCart, dx * cc - dz * cs, dx * cs + dz * cc);
+        tiltPitch = onCart.bumpPitch || 0; tiltRoll = onCart.bumpRoll || 0;
+      }
       // 06 老周坐在土壁边时是活人身体（Script_FirstLevelCollection.SeatZhou），这一副担架连人都不画。
       if (litter.zhou && litter.liveSeated) { this.zhouRoot.visible = false; continue; }
       if (litter.zhou) {
@@ -359,7 +403,7 @@ export class FirstLevelMissionView {
         // 而躺在上面的人（实例化的也好、带骨架的老周也好）是平的 —— 人浮在坡面上方，
         // 从地板镜头看过去整副担架读不出「上面躺着个人」（2026-09-16 屋内伏击出图实拍）。
         // litter.roll 是 16 过厢房门槛时那一歪（FirstLevelReception 写，几帧就回正）。
-        this.zhouRoot.rotation.set(litter.state === "fallen" ? 0.1 : 0, yaw, litter.roll || 0);
+        this.zhouRoot.rotation.set((litter.state === "fallen" ? 0.1 : 0) + tiltPitch, yaw, (litter.roll || 0) + tiltRoll, "YXZ");
         this.zhouPatient.material.color.setHex(litter.health < 25 ? 0xbda5a0 : 0xd9d7cb);
         // 老周担架上的近景件（他的挎包）。**身份稳定的普通 Mesh**，不是实例 ——
         // 逐实例形变不在 MotionVector 契约内（见 Script_PostPrepass 抬头），
@@ -426,6 +470,7 @@ export class FirstLevelMissionView {
       if (cart.z > 178) continue;
       const y = this.battlefield.GroundHeight(cart.x, cart.z);
       this.SyncCartCollider(cart,y);
+      this.cartSuspension.Step(cart,dt,this.CorpseHeightNear(cart,soldiers));
       const stable=cart.id===stableCartId;
       const c=Math.cos(cart.yaw),s=Math.sin(cart.yaw);
       const moving=!cart.overturned&&(cart.departed||cart.state==="approaching"||cart.id.startsWith("SouthCart"));
@@ -491,7 +536,7 @@ export class FirstLevelMissionView {
         {id:cart.id+"Driver",kind:"medic",moving:moving||!!team});
       if (cart.id.startsWith("SouthCart")) {
         for (const side of [-1, 1]) {
-          this.people.Patient(cart.id+side,cart.x+c*side*.65,y+1.22,cart.z-s*side*.65,cart.yaw,time);
+          this.people.Patient(cart.id+side,cart.x+c*side*.65,y+1.22+CartDeckLift(cart,side*.65,0),cart.z-s*side*.65,cart.yaw,time);
         }
       }
     }
