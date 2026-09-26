@@ -92,7 +92,7 @@
     {
       "id": "TengxianNra02",
       "file": "Animation_TengxianNra02MachineGunCaptives.json",
-      "sha256": "5ff2bf7baa55f717afd30c40e26fecc583c22eb78a822d06b0356bc053314eaa",
+      "sha256": "4cd2cb93d275a4c7df322e33a20c58abec54b2d6b87463c5b8e0665ff97092fd",
       "clipIds": [
         "CaptiveHandsUpWalk",
         "CaptiveShovedStumble",
@@ -104,12 +104,12 @@
         "CaptiveStruckDown",
         "CaptiveStabbedCollapse"
       ],
-      "originalModelSha256": "67550199849f78d581b356580f25595f361bece70fef0c82d7bd08a954197790"
+      "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de"
     },
     {
       "id": "TengxianNra05",
       "file": "Animation_TengxianNra05MachineGunCaptives.json",
-      "sha256": "95e7005f0c64ae79d5f9b09db137996e45cc957e6bfc8e1949c38e3a8fa02e24",
+      "sha256": "01ec4c23d2c248db36f38d7dde48130b355c0efd6e2ef7f09ebc2ff0a0aa5cb4",
       "clipIds": [
         "CaptiveHandsUpWalk",
         "CaptiveShovedStumble",
@@ -121,12 +121,12 @@
         "CaptiveStruckDown",
         "CaptiveStabbedCollapse"
       ],
-      "originalModelSha256": "b85b90fac1843261d40fbf257470a933819a9302dff1727a591feda1a5327b55"
+      "originalModelSha256": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72"
     },
     {
       "id": "TengxianIja01",
       "file": "Animation_TengxianIja01MachineGunCaptives.json",
-      "sha256": "4cd4fd9cd2f24f8b713d5da51d1b1117728eadf31e2a3960dde9e7a5f054ec05",
+      "sha256": "7ac7420e78338404a093cc6fb5f0d2b5031a843ddb840316c2d223f30fccc94c",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
@@ -135,12 +135,12 @@
         "IjaRifleButtStrike",
         "IjaBayonetDownThrust"
       ],
-      "originalModelSha256": "fc6c84ad51c9752066127b148a1f9db307da9659dea441989861265693b02c6b"
+      "originalModelSha256": "0acb11411d2984cf7bd9dd578141ffcc8541e9bbe8c83b0cf3dcff76f3a2d9b1"
     },
     {
       "id": "TengxianIja02",
       "file": "Animation_TengxianIja02MachineGunCaptives.json",
-      "sha256": "592cdbde8c2ae33414899267c20ff8db19d896fcb92309ae7c319e397ef7a60f",
+      "sha256": "1e75c85c2be720a1dc82dcf8ffa6e1c97cf16aec9f737c7922c8bae4d09a7c6f",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
@@ -149,12 +149,12 @@
         "IjaRifleButtStrike",
         "IjaBayonetDownThrust"
       ],
-      "originalModelSha256": "fc429bafc6973e54e8d1fa72ac99c8740c81be25f895ddb1417bb47707578788"
+      "originalModelSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61"
     },
     {
       "id": "TengxianIja03",
       "file": "Animation_TengxianIja03MachineGunCaptives.json",
-      "sha256": "b0906f041c369d9207f4daa09fe065032a4a679d17e0eabcb2083e51deba04b9",
+      "sha256": "1ed5606cbc28c565be16957b8b1782d557f113eb04f30b13d2505059275852a0",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
@@ -163,7 +163,7 @@
         "IjaRifleButtStrike",
         "IjaBayonetDownThrust"
       ],
-      "originalModelSha256": "17163f830cdf91b2b8bbe9b6e197855bf739a48116464b19eb24738d921b4f74"
+      "originalModelSha256": "652df6a3e31f26257754d6e7fe5bc1e5f56af6372bc0d4df2db0e753b5d8a952"
     }
   ]
 }

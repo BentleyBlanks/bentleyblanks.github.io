@@ -17,6 +17,9 @@
 // 文件长度与其余字节不变），不走 Blender 导出，免得把整套模型的浮点噪音重烘一遍。
 // 判据是「脚骨相对静止姿势（≈小腿延长线）的局部转角」。修完的轨道均值与每帧都
 // 落在阈值内，重复跑不改文件。
+// 改了字节，GLB 的 sha256 就变了：记着身体 sha256 的动作库要跟着重记，否则
+// OpeningStoryboards / SpeakerGesture / MachineGunCaptives / BackRifleRun / ActorLocomotion
+// 的门禁报「原模型被改」。清单与命令见 docs/Data_CharacterStandard.md「就地改写身体 GLB 之后」。
 //
 // 用法：node Taierzhuang1938/_import/Script_FixMocapFootRoll.mjs [--check]
 //   --check  只报告，不写文件；有未翻正的 clip 时退出码 1。

@@ -113,6 +113,36 @@ node scripts/Script_BlenderMcp.mjs status --scan
     （Lugou 骨架上骨盆绑在 GroundRoot 原点，被 1 cm 过滤掉了），不是骨段长度。
 - 机枪俘虏库仍是第一次规范化的重定向产物；它的烘焙脚本已改到新模型名与作者副本，重烘会得到作者化版本。
 
+## 就地改写身体 GLB 之后
+
+`_import/Script_FixMocapFootRoll.mjs` 这类脚本就地改 `Model_Tengxian*.glb` 里的动作数据：骨架、蒙皮、网格一个字节
+不动，但文件的 sha256 变了。下面这些文件记着身体的 sha256（门禁用它确认「烘焙用的身体就是发货的身体」），要跟着重记，
+否则对应门禁报「原模型被改」（2026-09-27 脚掌翻正后就红了 SpeakerGesture、MachineGunCaptives、BackRifleRun、
+ActorLocomotion 四个门禁）：
+
+| 文件 | 记的身体 | 重记方法 |
+| --- | --- | --- |
+| `Animation/OpeningStoryboards/*.json` | 五款 | `_import/Script_OpeningStoryboardBake.py`（bake → manifest） |
+| `Animation/SpeakerGestures/*.json` | NRA02、NRA05 | `_import/Script_SpeakerGestureBake.py`：两具身体各 bake 一次，再跑 `GESTURE_PASS=manifest` |
+| `Animation/MachineGunCaptives/*.json`、`Animation/BackRifleRun/Data_BackRifleRun.json` | 五款 / NRA02 | `Script_StandardizeCharacters.py` 的 `STANDARDIZE_PASS=libraries`（`RebakeBodyHashRecords`：重跑 `Main` 里背枪跑与俘虏库那两步，以发货身体为目标，不用场景） |
+| `Data_ActorLocomotion.mjs` | 七款 | `node Taierzhuang1938/_import/Script_LocomotionProfileBake.mjs`（上一行那一遍末尾也会跑）；改完抬 `index.html` 里它的 `?v=` |
+
+```powershell
+$env:GESTURE_PROJECT = (Resolve-Path Taierzhuang1938).Path
+foreach ($m in 'TengxianNra02', 'TengxianNra05') { $env:GESTURE_MODEL = $m; blender --background --factory-startup --python-exit-code 1 --python Taierzhuang1938/_import/Script_SpeakerGestureBake.py }
+$env:GESTURE_PASS = 'manifest'; blender --background --factory-startup --python-exit-code 1 --python Taierzhuang1938/_import/Script_SpeakerGestureBake.py
+$env:STANDARDIZE_PASS = 'libraries'; blender --background --factory-startup --python-exit-code 1 --python Taierzhuang1938/_import/Script_StandardizeCharacters.py
+```
+
+- 这些烘焙只读身体的绑定、蒙皮和网格，不读身体里的 clip，所以重记后动作数据应与原来逐字节相同，只有哈希变。
+  2026-09-27 实测：说话手势、五个机枪俘虏文件、背枪跑 GLB、步态档案都逐字节复现（哈希除外）；
+  `Data_BackRifleRun.json` 照旧只差 `0` / `0.0` 写法，保留已提交版本、只改哈希那一行。复现不出来说明烘焙脚本
+  自己变了，查清再提交。
+- 清单里的「文件字节 sha256」直接对检出的字节算。本机 Git 全局 `core.autocrlf=true`：带换行的文件检出后是 CRLF，
+  Python 在 Windows 上 `write_text` 也写 CRLF，同一个哈希在 LF 检出和 CRLF 检出里只能对上一边。所以被哈希的
+  动作文件一律单行、不带末尾换行（机枪俘虏库 2026-09-27 起去掉末尾换行；开场 IJA02 文件被补上的末尾换行也去掉了）。
+  多行的清单本身不被哈希。
+
 ## 2026-09-26 验证与边界
 
 - BlenderMCP 源工程实查：五具身体各 53 根骨，身体绑定矩阵最大差为 0；面部派生件 64 根，

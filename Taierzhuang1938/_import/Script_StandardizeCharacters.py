@@ -8,11 +8,15 @@ After a rebake, run `node Taierzhuang1938/_import/Script_FixMocapFootRoll.mjs`: 
 sources carry CarryStretcherRear / WoundedLimp with feet rolled 180 degrees (sole up); that
 script flips them back, re-grounds both clips and rewrites their manifest audit.
 Script_CharacterModelTest fails on the flipped feet until it has run.
+That changes the body bytes this script has just recorded: then run the STANDARDIZE_PASS=libraries pass
+(RebakeBodyHashRecords) and the speaker-gesture and opening-storyboard bakers
+(docs/Data_CharacterStandard.md, section 就地改写身体 GLB 之后).
 """
 import bpy
 import copy
 import hashlib
 import json
+import os
 import re
 import struct
 import subprocess
@@ -544,7 +548,9 @@ def BakeStoryLibraries(outputs):
             row['originalModelSha256'] = record['originalModelSha256']
             row['id'] = Name(row['id']); row['file'] = Name(row['file'])
             destination = PROJECT / 'Animation' / folder / row['file']
-            destination.write_text(json.dumps(record, separators=(',', ':')) + '\n', encoding='utf8')
+            # One line, no trailing newline: row['sha256'] is checked against the checked-out bytes,
+            # and a newline turns into CRLF under core.autocrlf (write_text on Windows, or a checkout).
+            destination.write_text(json.dumps(record, separators=(',', ':')), encoding='utf8')
             row['sha256'] = hashlib.sha256(destination.read_bytes()).hexdigest()
             print('Retargeted', folder, identifier, flush=True)
         (PROJECT / 'Animation' / folder / manifestName).write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf8')
@@ -764,4 +770,20 @@ def Main(skipBodies=False):
     SaveBlenderSource()
     print('Body assets, compatible animations and editable Blender source saved.', flush=True)
 
-if __name__ == '__main__': Main()
+def RebakeBodyHashRecords():
+    """Main's back-rifle and story-library steps and the gait profiles again, on the shipped bodies.
+
+    They record each body's sha256; run this after anything rewrites Model_Tengxian*.glb in place
+    (Script_FixMocapFootRoll.mjs). Only reads the bodies' bind, skins and meshes, so the clips and the
+    back-rifle GLB come out byte-identical and only the recorded hashes move. Needs no scene:
+    STANDARDIZE_PASS=libraries blender --background --factory-startup --python-exit-code 1 --python <this file>
+    """
+    source = 'Animation/BackRifleRun/Animation_LugouNraBackRifleRun.glb'
+    BakeModel('NraBackRifleRun', source, PROJECT / Name(source))
+    AdoptBackRifleAppearance()
+    BakeStoryLibraries({identifier: (Glb((PROJECT / 'Model/Character' / ('Model_Tengxian' + identifier + '.glb')).read_bytes()),
+                                     Glb(Source('Model/Character/Model_Lugou' + identifier + '.glb')), None) for identifier in ADOPTED})
+    subprocess.run(['node', str(PROJECT / '_import/Script_LocomotionProfileBake.mjs')], cwd=str(REPO), check=True)
+    print('Body hash records rebaked.', flush=True)
+
+if __name__ == '__main__': RebakeBodyHashRecords() if os.environ.get('STANDARDIZE_PASS') == 'libraries' else Main()

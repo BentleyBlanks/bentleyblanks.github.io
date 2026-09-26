@@ -134,7 +134,7 @@
   {
    "id": "TengxianHumanoidV1",
    "file": "Animation_TengxianHumanoidV1SpeakerGestures.json",
-   "sha256": "3c7644fa79886dcea3573a380ff5021b7b33cc24c690f1f1cb734e4cfffb3dab",
+   "sha256": "016b64a5220d46a91ace2eb7e978ec5c4c0fc85e8962ab872e434c7742a17be6",
    "bytes": 342278,
    "bodies": [
     "TengxianIja01",
@@ -147,8 +147,8 @@
    ],
    "reference": "TengxianNra02",
    "bakedOnModelSha256": {
-    "TengxianNra02": "67550199849f78d581b356580f25595f361bece70fef0c82d7bd08a954197790",
-    "TengxianNra05": "b85b90fac1843261d40fbf257470a933819a9302dff1727a591feda1a5327b55"
+    "TengxianNra02": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
+    "TengxianNra05": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72"
    },
    "clipIds": [
     "GesturePointL",

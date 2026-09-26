@@ -27,7 +27,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
         ]
       },
       "source": "Model/Character/Model_TengxianIja01.glb",
-      "sha256": "fc6c84ad51c9752066127b148a1f9db307da9659dea441989861265693b02c6b"
+      "sha256": "0acb11411d2984cf7bd9dd578141ffcc8541e9bbe8c83b0cf3dcff76f3a2d9b1"
     },
     "RifleCrouchAdvance": {
       "referenceMps": 0.23864468053263868
@@ -60,7 +60,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
         ]
       },
       "source": "Model/Character/Model_TengxianIja02.glb",
-      "sha256": "fc429bafc6973e54e8d1fa72ac99c8740c81be25f895ddb1417bb47707578788"
+      "sha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61"
     },
     "RifleCrouchAdvance": {
       "referenceMps": 0.23864468053263868
@@ -93,7 +93,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
         ]
       },
       "source": "Model/Character/Model_TengxianIja03.glb",
-      "sha256": "17163f830cdf91b2b8bbe9b6e197855bf739a48116464b19eb24738d921b4f74"
+      "sha256": "652df6a3e31f26257754d6e7fe5bc1e5f56af6372bc0d4df2db0e753b5d8a952"
     },
     "RifleCrouchAdvance": {
       "referenceMps": 0.23864468053263868
@@ -126,7 +126,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
         ]
       },
       "source": "Model/Character/Model_TengxianIja06.glb",
-      "sha256": "137ae283403ef39430c15e356dfe70ed07b2ca8a8bb65f217c6b72051dd3fb83"
+      "sha256": "433015bec29e79fa7508b86f51f4d31bb1e669b3cc0d668745f5e202945d613e"
     },
     "RifleCrouchAdvance": {
       "referenceMps": 0.23864468053263868
@@ -159,7 +159,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
         ]
       },
       "source": "Model/Character/Model_TengxianNra02.glb",
-      "sha256": "67550199849f78d581b356580f25595f361bece70fef0c82d7bd08a954197790"
+      "sha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de"
     },
     "RifleCrouchAdvance": {
       "referenceMps": 0.2554529916490837
@@ -212,7 +212,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
         ]
       },
       "source": "Model/Character/Model_TengxianNra05.glb",
-      "sha256": "b85b90fac1843261d40fbf257470a933819a9302dff1727a591feda1a5327b55"
+      "sha256": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72"
     },
     "RifleCrouchAdvance": {
       "referenceMps": 0.2554529916490837
@@ -265,7 +265,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
         ]
       },
       "source": "Model/Character/Model_TengxianNra06.glb",
-      "sha256": "440cee221ce31fd124be2e154bda3a3568b1be448d04c159d60ae583122d1b83"
+      "sha256": "7d3dcde8195b3070178b31fc5184ef45808acc8306ee9bf806252d680b6ed961"
     },
     "RifleCrouchAdvance": {
       "referenceMps": 0.2554529916490837
