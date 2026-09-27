@@ -113,9 +113,9 @@
 | Trapped | `BunkerBanter`(7，黑屏；末句被近爆打断) · `BunkerKilling`(6，日兵甲/伤兵/扶人川军/日兵乙) · `BunkerSearch`(2，日语) · `ShunziCurse`(1，压声) |
 | BunkerRescue | `RescueCall`(6) · `RescueLift`(3) · `RescueOut`(3) |
 | RearTrench | `TrenchCurse`(4) · `CornerCheck`(5) · `SupportOrder`(4) |
-| Support | `FrontBlockade`(3) · `FrontApproach`(2) · `FrontAttack`(1) · `FrontWithdraw`(1) · `TakeOverGun`(3) |
-| MachineGun | `TankRoadContact`(2) · `TankTerror`(1) · `BundleOrder`(5) |
-| Tank | `BundleGo`(2) · `BundleProne`(2) · `BundleSupply`(2) · `BundleReturnCall`(2) · `BundleAttack`(2) · `BundleRetreat`(1) · `TankStopped`(3) · `FrontRelief`(3) |
+| Support | `FrontBlockade`(3) · `FrontApproach`(2) · `FrontAttack`(1) · `FrontWithdraw`(1) · `TakeOverGun`(3) · `TankHeard`(2，2026-09-27 用户追加) |
+| MachineGun | `TankRoadContact`(2) · `TankArmor`(2，2026-09-27 用户追加，玩家枪打车体才喊) · `TankTerror`(1) · `BundleOrder`(5) |
+| Tank | `BundleGo`(2) · `BundleProne`(2) · `BundleWhy`(4，2026-09-27 用户追加) · `BundleSupply`(2) · `BundleBrief`(5，2026-09-27 用户追加) · `BundleReturnCall`(2) · `BundleAttack`(2) · `BundleRetreat`(1) · `TankStopped`(3) · `FrontRelief`(3) |
 | Orders | `Volunteer`(5：传令兵/罗/传令兵/顺子/罗) · `BorrowLight`(9，含两处动作停顿) · `ZhouLift`(4) |
 | South | `SouthWhisper`(6) · `VillagePointer`(1) |
 | Village | `StreetBlocked`(2) · `KitchenDetour`(2) |

@@ -2,7 +2,7 @@ import { FirstLevelFrontBattle, ColumnDeparture, GuardWithdrawalRoute } from "./
 import { FirstLevelFrontScenes } from "./Script_FirstLevelFrontScenes.mjs";
 // 03–05 战车：纯规则大脑 + 接线层（战车包 2026-09-23）。开关 Data_Tuning_Tank.brainEnabled，关掉走下面旧的定时插值。
 import { FirstLevelTankRuntime } from "./Script_FirstLevelTankRuntime.mjs";
-import { BundleResupplyOpen } from "./Script_FirstLevelTankBrain.mjs";
+import { BundleResupplyOpen, TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
 import { TANK } from "./Data_Tuning_Tank.mjs";
 import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex, RushStalled, RushPaused, AssaultState, FIRST_LEVEL_AI_RULE_STEPS } from "./Script_FirstLevelFrontPressure.mjs";
 import { FirstLevelBackdropSquads } from "./Script_FirstLevelBackdropSquads.mjs";
@@ -13,7 +13,7 @@ import { CompactGuideRoute } from "./Script_NpcMissionGuide.mjs";
 import { MISSION_GUIDE_TUNING as GUIDE } from "./Data_Tuning_MissionGuide.mjs";
 import { MissionReturn } from "./Script_MissionReturn.mjs";
 import { MISSION_RETURN } from "./Data_Tuning_FirstLevel.mjs";
-import { FRONT_BATTLE_TUNING as FB } from "./Data_Tuning_FirstLevelFront.mjs";
+import { FRONT_BATTLE_TUNING as FB, FRONT_TUNING as FT } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MID_TUNING } from "./Data_Tuning_FirstLevelMid.mjs";
 import { MISSION_RETURN_ROUTES, MISSION_RETURN_PERSON_STAGES, MISSION_RETURN_SQUAD_STAGES, MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
@@ -1876,7 +1876,15 @@ export class FirstLevelMissionRuntime {
   // UpdateFrontAttack（机枪组伤亡过半 / 被压住就沿跃进线退回、全组退完记 frontAttackRepelled）从来没有调用点：
   // 2026-09-23 起由压力表的 mgAttack 组规则接管（fallback.repelledFact，Script_FirstLevelFrontPressure）。
   /** 枪弹打在车体上（Script_Main 的弹道命中 missionTank）：火花 / 叮当在 Main，这里只告诉大脑。 */
-  OnTankHit(point, from) { return this.tankRuntime?.OnBulletHit(point, from) ?? null; }
+  OnTankHit(point, from) {
+    // 2026-09-27 用户追加：玩家认真打车体（第 FT.tankArmorHits 发起）时班长喊「莫打铁壳子！枪子儿钻不进去！打跟车的！」
+    // （TankArmor，可让路）。04 与 05 取弹前；车解决了就不喊。
+    this.tankArmorHits = (this.tankArmorHits || 0) + 1;
+    const stage = this.flow?.stage?.id;
+    if (this.tankArmorHits >= FT.tankArmorHits && (stage === "MachineGun" || (stage === "Tank" && !this.Has("bundleTaken")))
+      && !this.Has(TankClearFact(this.tank))) this.Say("TankArmor");
+    return this.tankRuntime?.OnBulletHit(point, from) ?? null;
+  }
   UpdateTank() {
     if (this.tankRuntime) { this.tankRuntime.Update(this.delta); return; }
     const tank = this.tank;

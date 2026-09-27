@@ -69,7 +69,7 @@ export const TEXT = Object.freeze({
   "firstLevel.hint.guardsLoss": "活着的守军已经撤回，其余已伤亡。下机枪，去侧沟领取集束弹炸停战车",
   "firstLevel.hint.guardsLost": "这一批守军全部阵亡，接应失败",
   "firstLevel.hint.gunSupply": "机枪弹药不足：F 离位，身后弹药箱可补充弹匣",
-  "firstLevel.hint.bundle": "按住 H 蓄力投向战车，炸停并解除火力后退回支沟",
+  "firstLevel.hint.bundle": "按住 H 蓄力：先扔到履带边炸断履带；还在打就再补一捆上车尾后甲板。炸哑后退回支沟",
   "firstLevel.hint.bundleEmpty": "集束弹已用完：回侧沟弹药箱补充后继续投掷",
   "firstLevel.hint.queue": "担架正在分批通过，留意两侧火力和来路",
   "firstLevel.hint.transferEast": "鬼子顺着村路压过来了！守住矮墙，让第一批伤员装车",

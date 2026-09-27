@@ -174,8 +174,15 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   TakeOverGun: Scene(true, `${FRONT}。罗班长安排何有田接机枪、幺娃扶老周下去；老周腿伤不肯走，罗班长压着他下`, {
     "01": P("shout", 0.8), "02": P("shout", 0.7, { delivery: "腿疼，急" }), "03": P("shout", 0.75),
   }),
+  // 2026-09-27 用户追加（TankHeard / TankArmor / BundleWhy / BundleBrief）：战车怎么回事、为什么要集束弹、往哪扔。
+  TankHeard: Scene(true, `${FRONT}。第一批守军刚撤下来，路那头传来发动机和履带声、残墙后闪过车影；顺子在夺下的机枪位上问，罗班长在他旁边两三米，认出是战车，压着他先顾眼前`, {
+    "01": P("normal", 0.6, { delivery: "竖着耳朵，心里发毛" }), "02": P("shout", 0.75, { delivery: "先认出来是什么，再把人拽回眼前的事" }),
+  }),
   TankRoadContact: Scene(true, `${FRONT}。何有田先看见路上开出来的日军战车，喊罗班长；罗班长隔着几米回喊`, {
     "01": P("shout", 0.9, { delivery: "吃惊的急喊" }), "02": P("shout", 0.8),
+  }),
+  TankArmor: Scene(true, `${FRONT}。顺子的子弹打在战车钢板上直冒火花、叮当乱响，罗班长在他旁边几米吼他别浪费子弹`, {
+    "01": P("shout", 0.85, { delivery: "又急又气" }), "02": P("shout", 0.8, { delivery: "短促的命令" }),
   }),
   TankTerror: Scene(true, `${FRONT}。战车的机枪扫过来，罗班长冲站起来的人吼`, { "01": P("shout", 1) }),
   BundleOrder: Scene(true, `${FRONT}。一名守军喊着报告旧弹药屋里还有集束手榴弹，罗班长分派人手，顺子在他身边问了一句`, {
@@ -188,8 +195,17 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   BundleProne: Scene(true, "交通沟里贴着土坡低身移动，罗班长在顺子前面一两米，压着嗓子提醒，看见岔口有人再急促报警", {
     "01": P("low", 0.75), "02": P("low", 0.8, { after: "gate", offsetS: 0 }),
   }),
+  BundleWhy: Scene(true, "交通沟里往旧弹药屋跑最后一段，刚打完岔口下沟的日兵；顺子跟在罗班长身后一两米，边跑边问，罗班长头也不回边跑边答，两人都喘", {
+    "01": P("normal", 0.6, { delivery: "喘着问，心里没底" }), "02": P("normal", 0.7, { delivery: "喘着，一句一顿，说得笃定" }),
+    "03": P("normal", 0.55, { delivery: "喘着追问" }), "04": P("normal", 0.6, { delivery: "喘着，理所当然" }),
+  }),
   BundleSupply: Scene(true, "旧弹药屋门口，守屋的老兵指着里面的箱子，罗班长接过来就催顺子往回走", {
     "01": P("normal", 0.6), "02": P("normal", 0.7),
+  }),
+  BundleBrief: Scene(true, "拿到集束弹沿原交通沟往回跑，罗班长在顺子前面一两米，边跑边回头交代怎么炸战车；顺子喘着问一句，罗班长答得短", {
+    "01": P("normal", 0.7, { delivery: "回头压给顺子，要他记住" }), "02": P("normal", 0.7, { delivery: "喘着，一字一顿" }),
+    "03": P("normal", 0.75, { delivery: "喘着，说得急，一口气交代完" }), "04": P("normal", 0.55, { delivery: "喘着，有点佩服" }),
+    "05": P("normal", 0.6, { delivery: "喘着，轻描淡写，不想多说" }),
   }),
   BundleReturnCall: Scene(true, "何有田在二三十米外的机枪位上隔着枪声喊，罗班长在沟里回喊，再叮嘱身边的顺子", {
     "01": P("shout", 0.85, { spatial: "offscreen" }), "02": P("shout", 0.75),

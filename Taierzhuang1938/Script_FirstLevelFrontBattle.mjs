@@ -173,7 +173,7 @@ export class FirstLevelFrontBattle {
   get Active(){return ["Support","MachineGun","Tank"].includes(this.r.flow.stage.id);}
   get Leader(){return this.r.companion.Handle("luo");}
   SetWalk(actor,route){if(!actor)return;this.walks.set(actor.id,{route:route.map(p=>({...p})),index:0});this.r.squadRoutes.set(actor.id,route.map(p=>({...p})));}
-  Walk(actor,{follow=false,speed=R.squadSpeedMps,lead=false}={}){
+  Walk(actor,{follow=false,speed=R.squadSpeedMps,lead=false,talk=false}={}){
     const r=this.r,w=actor&&this.walks.get(actor.id);if(!actor?.alive||!w)return false;
     const last=w.route.at(-1);
     // A grenade evade is finished by RespondToGrenade itself (no live grenade near him: the flag drops). It used to be
@@ -234,7 +234,12 @@ export class FirstLevelFrontBattle {
     const ahead=MissionRouteProjection(w.route,actor.position).progress>MissionRouteProjection(w.route,r.player.position).progress+B.leaderLeadM;
     // 03 lead stretch (B.leaderLead): until the last bend before the nest's west door the leader keeps 3-5 m ahead.
     if(lead)w.leadEnd??=MissionRouteProjection(w.route,S.approach[B.leaderLead.endApproachIndex]).progress;
+    // 05 walk-and-talk legs (talk: to the ammo house and back, where BundleWhy / BundleBrief are said on the run): the same
+    // lead pace - 3-5 m ahead, up and running when the player catches up, holding at a corner for him - so Luo is in
+    // front of the player, not behind a trench corner, while he explains the bundles (2026-09-27 03->06 drive: crouched
+    // at squad speed he fell 10 m behind the sprinting player and every BundleBrief line came through the trench wall).
     const pace=lead&&MissionRouteProjection(w.route,actor.position).progress<w.leadEnd-B.arrivalM
+      ||talk&&w.index<w.route.length
       ?LeadPace(w.route,w.index,actor.position,r.player.position,w.lead||(w.lead={})):null;
     if(lead)this.lead=pace;
     let wait=pace?pace.wait:follow&&ahead&&Distance(actor.position,r.player.position)>S.leaderWaitM;
@@ -516,7 +521,7 @@ export class FirstLevelFrontBattle {
     for(const cast of ["heyoutian","liuwencai","yaowa"])this.Walk(r.companion.Handle(cast),{
       speed:cast==="yaowa"&&this.walks.has(r.opening.zhou?.id)&&!r.Has("zhouGunWounded")?R.walkSpeedMps:R.squadSpeedMps});
     const leading=stage==="Support"&&this.leg==="capture";if(!leading)this.lead=null;
-    this.Walk(this.Leader,{follow:true,lead:leading});
+    this.Walk(this.Leader,{follow:true,lead:leading,talk:stage==="Tank"&&["supply","return"].includes(this.leg)});
     this.blocked=this.InfantryBlockade()||this.TankBlockade();
     this.UpdateHandover();
     this.UpdateLeftGunner();
@@ -562,6 +567,8 @@ export class FirstLevelFrontBattle {
       r.tank.present=true;r.tank.active=true;
       this.StartHandover();
     }
+    // 2026-09-27 用户追加：车影在路那头露面时班长点破「战车」（TankHeard，可让路：04 何有田一喊就不说了）。
+    if(r.Has("tankPreviewed"))r.Say("TankHeard");
   }
   UpdatePressure(){
     const r=this.r;
@@ -588,7 +595,9 @@ export class FirstLevelFrontBattle {
   UpdateSortie(){
     const r=this.r;
     if(!r.Has("bundleTaken"))return;
-    const bundles=r.Inventory().bundles;if(this.bundleCount!=null&&bundles<this.bundleCount)r.Say("BundleRetreat");this.bundleCount=bundles;
+    // 投出一捆：「回来！低头！」；边跑边交代打法的 BundleBrief 这时还没说完就掐掉（车解决了同理）。
+    const bundles=r.Inventory().bundles;if(this.bundleCount!=null&&bundles<this.bundleCount){r.frontScenes?.Cut?.("BundleBrief");r.Say("BundleRetreat");}this.bundleCount=bundles;
+    if(r.Has(TankClearFact(r.tank)))r.frontScenes?.Cut?.("BundleBrief");
     if(!r.Has("bundleReturned")){
       this.SetLeg("return",Routes.bundleReturn);
       if(r.Near(S.rear,B.rearArrivalM)&&Distance(this.Leader.position,S.rear)<B.rearArrivalM)r.Record("bundleReturned");

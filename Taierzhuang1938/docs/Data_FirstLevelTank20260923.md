@@ -111,3 +111,18 @@
   先试过「照打过头最少的那一发」，战车探针 16 发里仍有 2 发炸在 (−11.4, −142.7)、(−15.6, −141.2)。TankProbe 断言每发过头 ≤ 6.5 m。
 - 来袭啸声放在真炸点（`sound.OnCannon(from, safe.impact || at, …)`）。
 - 03 预告 / 04 压阵位前的指引标记不压炮塔：放在车旁地上（朝玩家 4 m、玩家右手 6 m，`FRONT_BATTLE_TUNING.guideTankLeadM / SideM`）。
+
+## 2026-09-27 战车交代（用户追加）
+
+用户反馈：战车露面时班长不说它是什么，集束弹也没人讲——为什么要集束、屋里为什么有、往哪扔、为什么有用。补了四场逐句对白（台词在 [09.22 稿](Data_FirstLevelFrontSource20260922.md) 各段「用户追加」，录音同样整段一次生成再切句）：
+
+| 场景 | 什么时候 | 交代什么 | 触发点 |
+| --- | --- | --- | --- |
+| `TankHeard`（顺子问 / 罗答） | 03 车影在路那头露面（`tankPreviewed`） | 「战车！还在路那头，先把人接下来！」——03 就把「战车」说出口，但不讲打法 | `FrontBattle.UpdateCapture` |
+| `TankArmor`（罗 ×2） | 04 / 05 取弹前，玩家的枪弹第 `FRONT_TUNING.tankArmorHits`（2）发打中车体 | 「莫打铁壳子！枪子儿钻不进去！打跟车的！」——枪打不动它 | `MissionRuntime.OnTankHit` |
+| `BundleWhy`（顺子 / 罗 ×2） | 05 去程，岔口切入的两个日兵倒了、离弹药屋后门 < `bundleWhyDoorM`（18 m；< 9 m 不等敌兵也说） | 一颗炸不动、五颗捆一捆一起炸；屋里是前几天专门为它捆好的 | `FrontShow.UpdateTank` |
+| `BundleBrief`（罗 ×3 / 顺子 / 罗） | 05 拿到弹往回跑（`bundleTaken`，排在 BundleSupply 之后） | 前脸最厚别扔；先扔履带边炸断履带（`MobilityKill`）；还在打就补一捆上车尾后甲板、底下是发动机（`Disabled`）；「山西见弟兄这么炸过」 | `FrontShow.UpdateTank`；投出第一捆或车解决了就掐掉（`FrontScenes.Cut`） |
+
+- 打法台词与大脑的毁伤部位一致：履带（车旁地面约 3.2 m 内）→ `MobilityKill`，后甲板 / 格栅 / 炮塔座圈 → `Disabled`；断履带后的喊话「履带断了！还在打！再补一捆！」（`tank_track`）接得上。HUD 投掷提示 `firstLevel.hint.bundle` 同步写明「先扔履带边、还在打再补一捆上车尾后甲板」。
+- `TankHeard` / `TankArmor` 是可让路的旁白（`FRONT_OPTIONAL_SCENES`）：还在排队时来了任何别的前沿场景就丢掉——何有田一喊「战车出来了」03 那句就过时了，「莫打铁壳子」不许耽误「下来！莫站枪口上！」。
+- `BundleWhy` 在拿到弹时还没开口就丢掉；`BundleBrief` 只排一次。场景一次一场的队列不变，所以 BundleSupply（留守兵）可能等 BundleWhy 说完、BundleReturnCall 排在 BundleBrief 之后。

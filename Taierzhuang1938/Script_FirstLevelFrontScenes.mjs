@@ -31,12 +31,18 @@ import { BRAIN } from "./Data_Tuning_Ai.mjs";
 
 /** The 03–06 scenes (steps Support, MachineGun, Tank, Orders). */
 export const FRONT_SCENE_IDS = Object.freeze([
-  "FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdraw", "TakeOverGun",
-  "TankRoadContact", "TankTerror", "BundleOrder",
-  "BundleGo", "BundleProne", "BundleSupply", "BundleReturnCall", "BundleAttack", "BundleRetreat", "TankStopped", "FrontRelief",
+  "FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdraw", "TakeOverGun", "TankHeard",
+  "TankRoadContact", "TankArmor", "TankTerror", "BundleOrder",
+  "BundleGo", "BundleProne", "BundleWhy", "BundleSupply", "BundleBrief", "BundleReturnCall", "BundleAttack", "BundleRetreat", "TankStopped", "FrontRelief",
   "Volunteer", "BorrowLight", "ZhouLift",
 ]);
 const OWNED = new Set(FRONT_SCENE_IDS);
+/**
+ * Asides that never hold up the story (2026-09-27 user addition): still waiting their turn when any other front scene
+ * is asked for, they are dropped - 03's「战车！还在路那头」is stale once He Youtian shouts the tank is out, 04's
+ * 「莫打铁壳子！」must not delay「下来！莫站枪口上！」.
+ */
+export const FRONT_OPTIONAL_SCENES = Object.freeze(["TankHeard", "TankArmor"]);
 const CUES = new Map(MISSION_DIALOGUE.map((cue) => [cue.id, cue]));
 /** Steps in which the ids above are played as scenes (outside them runtime.Say keeps the old queue). */
 export const FRONT_SCENE_STEPS = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
@@ -176,6 +182,7 @@ export class FirstLevelFrontScenes {
   Say(id) {
     const voice = this.r.voice;
     if (voice?.played?.has(id) || this.pending.includes(id) || this.handle?.id === id) return false;
+    if (!FRONT_OPTIONAL_SCENES.includes(id)) for (const optional of FRONT_OPTIONAL_SCENES) this.Drop(optional);
     this.pending.push(id);
     return true;
   }
@@ -185,6 +192,17 @@ export class FirstLevelFrontScenes {
     if (i < 0) return false;
     this.pending.splice(i, 1);
     this.log.push({ id, t: this.r.time ?? 0, dropped: true });
+    return true;
+  }
+  /**
+   * The scene is overtaken by events: off the queue if it has not started, cut where it is if it is playing
+   * (BundleBrief - how to throw - once the first bundle has flown). True when anything was dropped or cut.
+   */
+  Cut(id) {
+    if (this.Drop(id)) return true;
+    if (this.handle?.id !== id || this.handle.done) return false;
+    this.handle.Stop?.();
+    this.log.push({ id, t: this.r.time ?? 0, cut: true });
     return true;
   }
   /** A front scene is playing or waiting its turn (the leader's reminders and casualty barks stay quiet). */

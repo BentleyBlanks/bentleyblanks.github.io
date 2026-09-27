@@ -102,6 +102,13 @@ export const FRONT_TUNING = Object.freeze({
   bundleCoveredThrowRangeM: 9,
   // 「停了！」在履带断掉之后这么久说（先让爆炸声过去）。
   tankStoppedAfterS: 1.4,
+  // 2026-09-27 用户追加「为什么是集束弹」（BundleWhy）：岔口切入的两个日兵（FRONT_SORTIE.enemies）都倒了、
+  // 玩家离弹药屋后门（FRONT_SORTIE.leaderDoorSide）不到这么远就边跑边说。岔口 route[3] 离后门 16.4 m、
+  // 受损沟沿离后门 23 m：留到打完岔口以后，不压「低点！上头看得到！」。敌兵没倒、人已跑到后门这么近也照说。
+  bundleWhyDoorM: 18,
+  bundleWhyDoorForceM: 9,
+  // 「莫打铁壳子！」（TankArmor）：玩家的枪弹打中车体这么多发才喊（第一发可能是擦过去的，第二发是在认真打车）。
+  tankArmorHits: 2,
 
   // =========================================================================
   // 06 回到伤员集结处 · 借火
@@ -227,6 +234,8 @@ export const FRONT_TUNING_SOURCES = Object.freeze({
   southTargetSecondsMin: "契约 §2：07 目标时长 45–75 秒",
   litterTransition: "用户 2026-09-27：伤员地上→担架用黑屏加文字过渡；停留按两行字的阅读时间",
   careStrawM: "一张铺开的稻草帘，躺一个人（身长 1.7 m）头脚各留一点",
+  bundleWhyDoorM: "FRONT_SORTIE：岔口 route[3] 离后门 16.4 m，受损沟沿 23 m；四句约 9 s，跑到屋前说到一半",
+  tankArmorHits: "用户 2026-09-27：打车体才点破，第一发可能是擦过",
 });
 
 // Notion 2026-09-22 front whitebox calibration: proximity is physical, all deaths are observed.

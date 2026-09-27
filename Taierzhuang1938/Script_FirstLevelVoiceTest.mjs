@@ -97,8 +97,9 @@ const expectedStory = new Set([...ORDER0923, ...RETIRE_PENDING, ...contractCues.
 assert.deepEqual(story.map((cue) => cue.id).filter((id) => !expectedStory.has(id)), [], "剧情 cue 不许多出契约之外的条目");
 assert.equal(story.length, expectedStory.size, "剧情 cue 总数与两份契约一致");
 // 01–06 全部逐句；07 以后全部整段。
-const ORDER0305 = ["FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdraw", "TakeOverGun", "TankRoadContact", "TankTerror",
-  "BundleOrder", "BundleGo", "BundleProne", "BundleSupply", "BundleReturnCall", "BundleAttack", "BundleRetreat", "TankStopped", "FrontRelief"];
+// TankHeard / TankArmor / BundleWhy / BundleBrief：2026-09-27 用户追加（战车怎么回事、为什么要集束弹、往哪扔），稿里标「用户追加」。
+const ORDER0305 = ["FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdraw", "TakeOverGun", "TankHeard", "TankRoadContact", "TankArmor", "TankTerror",
+  "BundleOrder", "BundleGo", "BundleProne", "BundleWhy", "BundleSupply", "BundleBrief", "BundleReturnCall", "BundleAttack", "BundleRetreat", "TankStopped", "FrontRelief"];
 const ORDER06 = ["Volunteer", "BorrowLight", "ZhouLift"];
 assert.deepEqual(perLine.map((cue) => cue.id).sort(), [...new Set([...ORDER0923, ...ORDER0305, ...ORDER06])].sort(),
   "01–06 的剧情 cue 全部是逐句格式，07 以后没有");
