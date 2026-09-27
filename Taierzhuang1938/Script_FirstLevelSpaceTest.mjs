@@ -19,6 +19,7 @@ import { MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes,
   MISSION_NORTH_RIVER as River, RiverCutAt, RiverProfileAt,
   MISSION_RAIL_BRIDGE as RailBridge, MISSION_SOUTH_BRIDGE as RoadBridge,
   MISSION_RECEPTION_SPACE as Reception } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_ENCOUNTERS, MISSION_TACTICS } from "./Data_FirstLevelMission.mjs";
 import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { END_TUNING as END } from "./Data_Tuning_FirstLevelEnd.mjs";
@@ -640,46 +641,47 @@ if (!rearOnly) {
 }
 
 // ---------------------------------------------------------------------------
-// 14. 侧巷在装载区东南，火力够得着出场的车列，玩家够得着从巷口出来的人
+// 14. 侧巷 = 12 守线右手的东巷（2026-09-27 掩护装载改守来时路，docs/Data_FirstLevelTransferCover20260927.md）：
+//     巷子够窄、两侧是整面屋墙 / 院墙；巷口那挺机枪隔着低墙东段罩得住车列出场的路；
+//     从低墙东段打得到它，从顺子的射口打不到（逼玩家沿墙往右挪）。
 // ---------------------------------------------------------------------------
 {
   const Named = (id) => Layout.blocks.find((box) => box.id === id);
-  const north = Named("SideAlleyNorthWall"), south = Named("SideAlleySouthWall");
-  assert.ok(north && south, "the side alley is two yard walls");
-  const clear = (south.z - south.d / 2) - (north.z + north.d / 2);
+  const west = [Named("StreetEastSouthRowBBody"), Named("VillageRoadEastHouseBody")], east = Named("VillageEastLaneWall");
+  assert.ok(west.every(Boolean) && east, "the side lane is a house row on the west and a yard wall on the east");
+  const westFace = Math.max(...west.map((b) => b.x + b.w / 2)), eastFace = east.x - east.w / 2;
+  const clear = eastFace - westFace;
   report.sideAlleyWidthM = +clear.toFixed(2);
-  assert.ok(clear >= 5 && clear <= 9, `the alley is an alley, not a yard: ${clear.toFixed(2)} m`);
-  assert.ok(north.h >= 2.4 && south.h >= 2.4, "both sides are full-height yard walls");
-  // 东南侧：巷身整个在装载区以东、桥头路以东。
-  assert.ok(S.sideAlley.x > A.queue.x + 15, "the alley is east of the loading lane");
-  assert.ok(S.sideAlley.z > 110 && S.sideAlley.z < 136, "the alley opens onto the departure road, not the yard entrance");
-  assert.ok(S.sideAlley.z > north.z && S.sideAlley.z < south.z, "the anchor stands in the alley itself");
-  // 旧的西侧那条巷子没了。
+  assert.ok(clear >= 5 && clear <= 9, `the lane is a lane, not a yard: ${clear.toFixed(2)} m`);
+  assert.ok(east.h >= 2.4 && west.every((b) => b.h >= 2.4), "both sides are full-height walls");
+  assert.ok(S.sideAlley.x > westFace && S.sideAlley.x < eastFace
+    && S.sideAlley.z > east.z - east.d / 2 && S.sideAlley.z < east.z + east.d / 2, "the anchor stands in the lane itself");
+  assert.ok(S.sideAlley.x > S.transferWall.x + 20 && S.sideAlley.z < S.transferWall.z - 15,
+    "the lane opens on the right hand of the wall post, in front of the wall");
+  // 旧的西侧那条巷子没了；装载区东南那两道 SideAlley 墙留作院墙，不再有人从那里出来。
   assert.deepEqual(Layout.blocks.filter((b) => /^SideAlley/.test(b.id) && b.x < 80).map((b) => b.id), [],
     "the first-wave west-side alley is gone");
   const solids = Solids("BunkerCollapsed");
-  // 巷口朝西：从巷子里望得见牛马车的出场道（cartRide 中段与桥头路）。
-  const mouth = { x: north.x - north.w / 2, z: S.sideAlley.z };
+  const gun = MISSION_TACTICS[MISSION_ENCOUNTERS.transferAlley[0].id].points.at(-1);
+  assert.ok(Math.hypot(gun.x - S.sideAlley.x, gun.z - S.sideAlley.z) < 8 && gun.x > westFace && gun.x < eastFace,
+    "the lane gun lies in the lane mouth");
   report.sideAlleySight = {};
   for (const [label, target] of [["cartRide", StageRoutes.cartRide[2]], ["bridgeheadRoad", { x: 76, z: 127 }]]) {
-    const blocker = SightBlocker(Eye({ x: S.sideAlley.x + 4, z: S.sideAlley.z }, 1.1), Eye(target, 1.2), solids);
+    const blocker = SightBlocker(Eye(gun, 1.1), Eye(target, 1.2), solids);
     report.sideAlleySight[label] = blocker;
-    assert.equal(blocker, null, `the alley gun covers the ${label}: blocked by ${blocker}`);
+    assert.equal(blocker, null, `the lane gun covers the ${label}: blocked by ${blocker}`);
   }
-  // 玩家朝村落方向的低墙／墙角射位打得到从巷口出来的人。
-  for (const [label, from] of [["village wall", { x: 66.5, z: 85.5 }], ["yard corner", { x: 95, z: 97.5 }]]) {
-    const blocker = SightBlocker(Eye(from, 1.6), Eye(mouth, 1.4), solids);
-    report.sideAlleySight[label] = blocker;
-    assert.equal(blocker, null, `the player returns fire from the ${label}: blocked by ${blocker}`);
+  {
+    const blocker = SightBlocker(Eye({ x: 91.5, z: 85.6 }, 1.6), Eye(gun, 1.4), solids);
+    report.sideAlleySight["east end of the village wall"] = blocker;
+    assert.equal(blocker, null, `the player returns fire from the east end of the wall: blocked by ${blocker}`);
   }
-  // 巷身不许压在车位上，也不许挡住 cartRide 本身。
-  for (const bay of P.cartBays) for (const wall of [north, south])
-    assert.ok(Math.abs(bay.x - wall.x) > wall.w / 2 + 2 || Math.abs(bay.z - wall.z) > wall.d / 2 + 3.2,
-      `the alley wall stands clear of the cart bay at ${bay.x},${bay.z}`);
+  report.sideAlleySight.notch = SightBlocker(Eye(S.transferWall, 1.6), Eye(gun, 1.4), solids);
+  assert.ok(report.sideAlleySight.notch, "the lane gun is out of sight from the notch");
   assert.deepEqual(RouteClearance(StageRoutes.cartRide, solids, { boxHalf: [1.25, 1.45], ceiling: 2.2 }), [],
-    "moving the alley east leaves the cart lane clear");
-  console.log("ok the side alley moved to the south-east of the loading yard",
-    JSON.stringify({ widthM: report.sideAlleyWidthM, anchor: S.sideAlley }));
+    "the cart lane stays clear");
+  console.log("ok the side lane is the east lane on the right of the village wall",
+    JSON.stringify({ widthM: report.sideAlleyWidthM, anchor: S.sideAlley, gun }));
 }
 
 // ---------------------------------------------------------------------------

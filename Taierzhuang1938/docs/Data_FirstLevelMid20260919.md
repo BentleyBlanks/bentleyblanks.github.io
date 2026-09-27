@@ -100,8 +100,12 @@
 
 ### 12 掩护装载与离开
 
-- **射位**：`M.defencePosts` 把班里四个人摆到 `TransferCorner` / `TransferEastCover` 一线，
-  朝村路；全部到位记 `transferPostsManned`。玩家自己的射位就是 `A.transfer` 那个墙角。
+- **2026-09-27 起守来时路**（[口径](Data_FirstLevelTransferCover20260927.md)）：顺子的射位是村口低墙射口 `A.transferWall`
+  (67.5,86)，`transferArrived` 改成到它 ±8 m；第一处威胁从 10 担架队走过的绕回短巷冲出来、顺主街穿门楼压向装载区，
+  第二处是守线右手东巷口的机枪（`A.sideAlley` 挪到 (95.2,61)）；装载区受压的判定点改成排队道
+  `M.loadingThreatPoint`；弹药箱挪到射口身后。下面几条里的旧射位与旧威胁位置以该文为准。
+- **射位**：`M.defencePosts` 把班里三个人摆在低墙背后一线（罗班长路口西、刘文财西头、何有田东段），
+  没目标时脸朝门楼 / 东巷口（`face` → `watchYaw`）；幺娃跟着担架在装载区。全部到位记 `transferPostsManned`。
 - **威胁 ↔ 装载联动**：`column.loadAllowance` 每帧由 `TransferCart.LoadAllowance()` 写：
   解除 0 处 → 0（`Load()` 直接 return，装载与出发一起被压住）；解除 1 处 → 2
   （`loadAllowancePerThreat` = `R.transferBatchLoads` = cartCapacity 2 × 2 车）；
@@ -109,7 +113,7 @@
   老周永远轮不到）。
 - `firstBatchLoaded` 要求 `loadEvents ≥ 2` **且 `column.departed ≥ 1`** —— 这一批真的装完开走了。
 - **轮到老周**：`column.ReserveBoardingCart(cartBays[0])` 把下一辆空车叫到上车位旁边；
-  他被 `Load()` 真的抬上那一辆（只许上那一辆）。何有田真的走到 `A.transfer`
+  他被 `Load()` 真的抬上那一辆（只许上那一辆）。何有田真的走到顺子的射口 `A.transferWall`
   （`escortReliefM` 以内）才记 `escortRelieved` 并 `Say("EscortZhou")`。
 - **上车**：`MissionCart` 交互 → `TransferCart.Board()`（老周已在车上，顺子上车板）→
   `BeginControl("cartRide")`。座位偏移读 `MISSION_PLACEMENT.cartRide.playerSeat`，

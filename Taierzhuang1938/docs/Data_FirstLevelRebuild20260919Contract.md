@@ -175,7 +175,7 @@
 
 **已定的偏差**
 - 主街人缝 0.90 m（玩家胶囊半径 0.34，0.8 会卡；担架队通行宽 1.25 m 仍过不去）。
-- 侧巷在装载区东南侧，`sideAlley` (103,122)，巷口朝西对着车位与桥头路；`cartBoard` 是车旁边的上车位，不是车位中心。
+- 侧巷：2026-09-27 起是 12 守线右手的东巷，`sideAlley` (95.2,61) 是巷身中心；12 的顺子射位是村口低墙射口 `transferWall` (67.5,86)（新增键，[守来时路](Data_FirstLevelTransferCover20260927.md)）。原装载区东南那条巷子 (103,122) 只留院墙。`cartBoard` 是车旁边的上车位，不是车位中心。
 - 15B 夹道就是撤离线 `evacuation` 的尾段；`retreatA` (32,134)、`retreatC` (16,222)。
 - `orders` 锚点在集结处 (−34,−99)，运行时统一用 `collection`；`MISSION_ROUTES.south` 与 `southWalk` 是同一个数组（135 m；2.2 m/s 约 62 秒）。
 - 空间换态：掩蔽部完好/坍塌与北门夜景走 `layout.scenario` 线性三态，由事实驱动（`MISSION_SCENARIO_SIGNALS`：信号 → 事实；回跳/重试清事实时空间自动退回）；铁路桥走 gates（5 个完好件 + 3 个残骸件）。**scenario 体块不在 `MISSION_LAYOUT.blocks` 里**，净空检查要分态单独扫（`Script_FirstLevelMissionTest` 已有三条短路 × 三态的闸，新增必经短路要加进去）。

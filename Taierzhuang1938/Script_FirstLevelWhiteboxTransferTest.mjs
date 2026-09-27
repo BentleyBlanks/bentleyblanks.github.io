@@ -70,12 +70,17 @@ for (const group of ["transfer", "transferAlley", "air"]) for (const spawn of En
   if (group === "air") assert.deepEqual(RouteHits([spawn, ...Pursuit], authored.blocks), [], `${spawn.id} pursuit clear of new walls`);
 }
 
-const villagePost = { x: 66.5, z: 86 }, threatA = Encounters.transfer[0];
+// 12 守来时路（docs/Data_FirstLevelTransferCover20260927.md）：两挺机枪都量它们跑到位之后的地方
+// （MISSION_TACTICS 的最后一个折点），不是出生点 —— 出生点在门楼以北的街里 / 东巷北头，本来就看不见。
+const villagePost = Anchors.transferWall, threatA = Tactics[Encounters.transfer[0].id].points.at(-1);
 assert.ok(SightHits(villagePost, threatA, .65, 1.4).some(id => id.startsWith("TransferVillageWall")), "north wall shields crouched player from A");
 assert.deepEqual(SightHits(villagePost, threatA), [], "standing player can engage A over low wall");
-const alleyGun = Encounters.transferAlley[0], alleyMouth = { x: 103.5, z: 122 };
+assert.deepEqual(SightHits(threatA, Mid.loadingThreatPoint, 1.1, 1.2), [], "A fires down the road into the loading queue");
+const alleyGun = Tactics[Encounters.transferAlley[0].id].points.at(-1);
 for (const point of [Routes.cartRide[2], { x: 76, z: 127 }])
   assert.deepEqual(SightHits(alleyGun, point, 1.1, 1.2), [], "B covers departing carts");
-for (const point of [{ x: 66.5, z: 85.5 }, { x: 95, z: 97.5 }])
-  assert.deepEqual(SightHits(point, alleyMouth), [], "player can engage the alley mouth");
-console.log(`PASS transfer whitebox: ${authored.blocks.length} blocks; 4 cart bays; ${transfer.pockets.length + transfer.walkerPockets.length} crowd pockets; 1.6x3m carry corridor; 6 tactical sight checks`);
+// 东巷口在守线右手：从低墙东段打得到它，从顺子的射口打不到 —— 第二拨逼玩家沿墙往右挪。
+const eastEnd = { x: 91.5, z: 85.6 };
+assert.deepEqual(SightHits(eastEnd, alleyGun, 1.6, 1.1), [], "player can engage the side-lane gun from the east end of the wall");
+assert.ok(SightHits(villagePost, alleyGun, 1.6, 1.1).length > 0, "the side-lane gun is out of sight from the notch");
+console.log(`PASS transfer whitebox: ${authored.blocks.length} blocks; 4 cart bays; ${transfer.pockets.length + transfer.walkerPockets.length} crowd pockets; 1.6x3m carry corridor; 7 tactical sight checks`);

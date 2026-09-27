@@ -398,7 +398,7 @@ const Step = (host, module, seconds, options = {}) => {
   Check(Ready(Infinity).loadEvents.length > M.loadAllowancePerThreat, "两处都解除后接运继续");
 }
 {
-  // 何有田真的走过来接住射位，才轮到 EscortZhou。
+  // 何有田真的走过来接住顺子在村口低墙上的射位（A.transferWall），才轮到 EscortZhou。
   const host = MakeHost("Transfer");
   const transfer = new FirstLevelTransferCart(host);
   transfer.Enter("Transfer");
@@ -406,10 +406,10 @@ const Step = (host, module, seconds, options = {}) => {
   host.Record("alleyThreatResolved");
   for (const litter of host.column.litters) if (!litter.zhou) { litter.loaded = true; }
   const he = host.companion.Handle("heyoutian");
-  he.position = { x: A.transfer.x + 20, z: A.transfer.z };
+  he.position = { x: A.transferWall.x + 20, z: A.transferWall.z };
   transfer.Update(1 / 60);
   Check(!host.said.includes("EscortZhou"), "何有田还在半路，不许先放顺子走");
-  he.position = { ...A.transfer };
+  he.position = { ...A.transferWall };
   transfer.Update(1 / 60);
   Check(host.Has("escortRelieved") && host.said.includes("EscortZhou"),
     "他接住射位了才喊「这边我看着！去搭把手！」");
@@ -629,13 +629,13 @@ const Step = (host, module, seconds, options = {}) => {
   Check(plans[2].route.every((p) => p.x < E.walls.westX), "已在西墙外的人不回头穿墙");
   Check(plans[3] === null, "不在路上的人不被点名散开");
 
-  // 12 班里人上射位（TakePosts）、何有田接替顺子的射位（A.transfer）、13 罗班长跑到停车处：
+  // 12 班里人上射位（TakePosts）、何有田接替顺子在村口低墙上的射位（A.transferWall）、13 罗班长跑到停车处：
   // 这些都是 squadRoutes / MoveActor 直线走位，没有寻路。12 里班里人能站的地方 —— 各射位、
   // 接替点、进场的村路段（z ≥ 75）、排队点、分拣区里车路两侧的遮挡点与北通道口 —— 出发，走
   // MidTransferWalkRoute 给的折线（车路两侧残墙挡着就走缺口），0.35 m 胶囊一路不撞实心体块。
   // （13 的散开点、南半场与撤退通道只归担架队与步行伤员，班里人 12 里不在那儿，不列。）
   const starts = [
-    ...M.defencePosts, A.transfer, A.queue,
+    ...M.defencePosts, A.transfer, A.transferWall, A.queue,
     ...E.covers.map((cover) => cover.path.at(-1)).filter((point) => point.z < 111),
     E.lanes[0].gate, ...E.lanes[0].points,
     ...MISSION_ROUTES.village.filter((point) => point.z >= 75), ...MISSION_ROUTES.southTraffic.filter((p) => p.z >= 75 && p.z <= 111),
@@ -651,7 +651,7 @@ const Step = (host, module, seconds, options = {}) => {
     }
     return null;
   };
-  for (const [who, target] of [...M.defencePosts.map((post) => [post.cast, post]), ["heyoutian relief", A.transfer]])
+  for (const [who, target] of [...M.defencePosts.map((post) => [post.cast, post]), ["heyoutian relief", A.transferWall]])
     for (const start of starts) {
       const blocked = WalkSweep([start, ...MidTransferWalkRoute(start, target)]);
       if (blocked) walkBad.push(`${who} from ${start.x},${start.z}: ${blocked}`);

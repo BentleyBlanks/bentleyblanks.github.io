@@ -208,11 +208,16 @@ export async function Drive(ctx) {
 
   // --- 12 掩护装载与离开：只有两处威胁，每解除一处真实推进一批 ------------------
   await JumpStage(12);
-  // 箱子在 x=93、够到 2.5 m。Route 可能停在终点前 0.8 m：走到 x=95 会够不着。
-  await Route([{ x: 94.5, z: 110 }], "TransferSupply", { fight: true });
+  // 2026-09-27 起 12 守来时路（docs/Data_FirstLevelTransferCover20260927.md）：弹药箱在村口低墙
+  // 射口身后 (63.3,87.1)。从场院东头过去要走车路东墙的缺口（z 95.6–99.6）和西墙北头以北，
+  // 不贴墙：Route 没有寻路。够得着 2.5 m，Route 可能停在终点前 0.8 m。
+  await Route([{ x: 82, z: 97.6 }, { x: 78, z: 96 }, { x: 70, z: 88.5 }, { x: 64.4, z: 88.1 }],
+    "TransferSupply", { fight: true });
   assert.equal((await Interact()).kind, "supply", "the transfer crate is actually within reach");
-  await Route([{ x: 95, z: 103 }], "TransferLowWallPost", { fight: true });
+  await Route([{ x: 67.5, z: 85.6 }], "TransferLowWallPost", { fight: true });
   await Capture("TransferLowWallPost");
+  const posted = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().facts);
+  assert.ok(posted.includes("transferArrived"), "顺子上了村口低墙的射位（transferArrived）");
   // 第一处威胁解除之前一个伤员都装不上。
   const beforeFirst = await page.evaluate(() => {
     const m = window.Tengxian.Debug.FirstLevelMission();
@@ -224,12 +229,13 @@ export async function Drive(ctx) {
   assert.ok(firstCleared.loaded <= 4, "第一处解除时装载额度只放开了一批");
   await FightUntilFact(page, "firstBatchLoaded", 240);
   await Capture("FirstBatchLoaded");
-  // 第二处威胁在装载区东南的侧巷（sideAlley 103,122），从低墙射位打不到它的巷口，
-  // 得挪到车位东侧去压住那条巷子。
-  await Route([{ x: 96, z: 108 }, { x: 95, z: 115 }], "SideAlleyPost", { fight: true });
+  // 第二处威胁在守线右手的东巷（sideAlley 95.2,61），巷口被路东那排房挡着，从射口打不到，
+  // 得沿低墙背后往右挪到东段（何有田右手边）。
+  await Route([{ x: 78, z: 86.4 }, { x: 91.3, z: 86.4 }], "SideAlleyPost", { fight: true });
   await Capture("SideAlleyThreat");
   await FightUntilFact(page, "alleyThreatResolved", 420);
-  await Route([{ x: 95, z: 108 }, { x: 93, z: 105 }], "TransferBackToPost", { fight: true });
+  // 两处都解除之后往场院里去（上车位在那一头），把射口让给接位的何有田。
+  await Route([{ x: 78, z: 86.4 }, { x: 78, z: 95 }, { x: 78.5, z: 98 }], "TransferBackToPost", { fight: true });
   await WaitStage("CartRide", 420, { fight: true, cover: true });
   const transferPacing = await page.evaluate(() => {
     const m = window.Tengxian.Debug.FirstLevelMission();

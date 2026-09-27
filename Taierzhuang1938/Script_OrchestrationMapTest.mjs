@@ -1024,8 +1024,8 @@ try {
     map.SetLive({
       player: { x: 100, z: 100, yaw: 0.6 },
       enemies: [
-        { id: "TransferRifleA", alive: true, encounter: "transfer", x: 106, z: 96 },
-        { id: "TransferRifleB", alive: false, encounter: "transfer", x: 110, z: 108 },
+        { id: "TransferRifleA", alive: true, encounter: "transfer", x: 61, z: 80 },
+        { id: "TransferRifleB", alive: false, encounter: "transfer", x: 66, z: 75 },
       ],
       guideRoute: [{ x: 90, z: 120 }, { x: 100, z: 104 }, { x: 116, z: 92 }],
     });
@@ -1157,8 +1157,8 @@ try {
   });
   SavePng("filter_transfer.png", filter.png);
   delete filter.png;
-  Check("SetFilter({encounters:transfer}) 之后地图上只剩 transfer 组那四个人",
-    filter.onlyIds.length === 4 && filter.onlyIds.join(",") === filter.truth.join(",")
+  Check("SetFilter({encounters:transfer}) 之后地图上只剩 transfer 组那六个人",
+    filter.onlyIds.length === 6 && filter.onlyIds.join(",") === filter.truth.join(",")
     && filter.onlyEnc.length === 1 && filter.onlyEnc[0] === "transfer",
     `${filter.allCount} 人 → ${filter.onlyIds.length} 人（${filter.onlyIds.join("、")}）`);
   Check("过滤后组把手也只剩这一个，当前过滤记在 map.filter 上",

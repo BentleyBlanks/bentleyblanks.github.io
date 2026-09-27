@@ -161,12 +161,12 @@ export const GUIDE_VOICE_ALIGNMENT = Object.freeze({
     ]
   },
   "GuideTransfer": {
-    "sha256": "a7d71d4e90b6cef9ff7226b5cb5cd91e675d8c1fe62c28e43289b40a5c682047",
-    "scriptSha256": "86f7202c7a93c051b85742f30b4b3058febb3b215ee367d54ea0398b6857ef1f",
+    "sha256": "2d45fb64b965c2ac535d87bbfc6b9640228385066b46a7d95923e6e377143603",
+    "scriptSha256": "a1038f4b96098e88fd698feee884e58aeeb6ad0d865c44130eec1b836d34d6b8",
     "lines": [
       [
         0,
-        8.229
+        8.411
       ]
     ]
   },

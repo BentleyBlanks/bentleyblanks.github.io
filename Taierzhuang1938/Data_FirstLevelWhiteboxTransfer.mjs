@@ -79,8 +79,9 @@ export function BuildTransferWhitebox(groundAt) {
   // 1.6–2.3 m long with tops 0.98–1.2 (the old 1.2 m envelope), a 0.6 m
   // firing notch between the post (66.5,86) and the 12_1 eye (68,85.4); a few
   // loose capstones break the line of the top without leaving the envelope. Every stone is an AI
-  // cover facing north. The east run keeps one unbroken stone over x 79.5–84.6
-  // where the crouched post's line to the gunner (113,80) crosses it.
+  // cover facing north. Since the 2026-09-27 cover rebuild this is the squad's line (12 holds
+  // the road back into the village): a crouched player at the notch loses the south-gate gunner
+  // (79.2,65.85) behind these stones, a standing one engages him over them (TransferTest).
   const westEdges = [60.0, 61.9, 64.0, 66.2, 67.9, 68.5, 70.3, 71.9, 73.0];
   const westStones = [[1.0, 84.05, .8, .03], [.86, 83.95, .85, -.02], [1.12, 84.1, .8, .04],
     [.98, 84.0, .8, -.04], [.7, 84.15, .7, 0], [1.05, 83.95, .85, -.03], [.9, 84.05, .8, .02], [.98, 84.1, .75, -.05]];
@@ -133,12 +134,90 @@ export function BuildTransferWhitebox(groundAt) {
       // Brick rubble at the outer foot (non-solid), never in the gaps.
       Detail(`TransferRoadWall${side}${i}_Rubble`, x + (side === "West" ? -.8 : .8), (z0 + z1) / 2, .6, .3, 1.4, "earthDark", { ry: .2 });
     });
-  // 12_1 outside the wall: a house either side of the village road (z 75–82),
-  // clear of the southTraffic cart line and of the crouched post's line to A.
-  House("TransferNorthWestHouse", 61.5, 78.75, 7, 5.5, 3.1, { alongX: true });
-  Detail("TransferNorthWestHouseDoor", 65.04, 78.9, .12, 1.9, 1.0, "timber");
-  House("TransferNorthEastHouse", 97.5, 78.0, 7, 4.8, 3.0, { alongX: true });
   Pole("TransferPoleNorthWest", 57.6, 82.6);
+
+  // ---------------------------------------------------------------------
+  // 12 村口残垣（2026-09-27 掩护装载重做，docs/Data_FirstLevelTransferCover20260927.md）。
+  // 守线 = 这道低墙 + 两头的残墙；墙外门楼前那片空场是追兵顺来时的主街、东西两条巷子
+  // 穿出来之后逐段跃进的开阔地。原先墙外两栋整屋塌成残屋：西北那栋是西巷绕过来的人
+  // 钻进去打侧面的地方，东北那栋是东巷（右边）那一拨占的巷口。
+  // 日军在 12 只认手工的 cover 块（碰撞盒派生的掩体只给国军，Data_Tuning_AiCover），
+  // 所以空场与残屋里给他们躲的每一件都带 cover；法线是无符号的轴，躲的一侧由威胁方向定。
+  const Face = (faceX, faceZ) => ({ cover: { faceX, faceZ } });
+  // 西北残屋（原 TransferNorthWestHouse 的 7 x 5.5 m 屋基）：北墙东头塌出一道 1.3 m 的口，西巷
+  // 绕过来的人从这里进屋；南墙留一扇窗和东南角的塌口，正对低墙西段 —— 屋里的人从这两处
+  // 打守线，玩家也能从东南塌口冲进去清屋。屋顶整个塌了，只剩两根烧黑的梁。
+  Block("TransferNorthWestRuinNorth0", 59.9, 76.25, 3.8, 2.9, .5);
+  Block("TransferNorthWestRuinNorth1", 62.5, 76.25, 1.4, 2.05, .5);
+  Block("TransferNorthWestRuinWest", 58.25, 78.75, .5, 2.75, 5.5);
+  Block("TransferNorthWestRuinEast0", 64.75, 76.85, .5, 2.45, 1.7);
+  Block("TransferNorthWestRuinEastSill", 64.75, 78.6, .5, .9, 1.8, "plaster", Face(1, 0));
+  Block("TransferNorthWestRuinEast1", 64.75, 80.0, .5, 1.95, 1.0);
+  Block("TransferNorthWestRuinSouth0", 59.45, 81.25, 2.9, 2.35, .5, "plaster", Face(0, -1));
+  Block("TransferNorthWestRuinSouthSill", 61.4, 81.25, 1.0, 1.0, .5, "plaster", Face(0, -1));
+  At("TransferNorthWestRuinSouthHead", 61.4, 81.25, 1.0, .3, .5, groundAt(61.4, 81.25) + 2.0, "plaster", { solid: false });
+  Block("TransferNorthWestRuinSouth1", 62.6, 81.25, 1.4, 2.1, .5, "plaster", Face(0, -1));
+  // 东南塌口：外沿一块矮碎砖（< 台阶高，跨得过去），其余是踩得过去的碎砖。
+  Block("TransferNorthWestRuinCornerLip", 64.55, 81.2, .8, .38, .6, "earthDark");
+  for (const [i, x, z, w, h, d, ry] of [[0, 63.8, 80.9, .9, .3, .7, .4], [1, 64.2, 81.8, .7, .22, .6, -.5],
+    [2, 63.4, 81.6, .5, .18, .45, 1.1], [3, 64.9, 80.4, .6, .26, .5, .7], [4, 60.1, 77.6, 1.4, .45, 1.1, .2],
+    [5, 61.3, 78.4, .8, .3, .7, -.6], [6, 63.4, 76.9, .9, .35, .6, .3], [7, 59.0, 80.2, .7, .28, .6, 1.2]])
+    Detail(`TransferNorthWestRuinRubble${i}`, x, z, w, h, d, i % 2 ? "plaster" : "earthDark", { ry });
+  for (const [i, x, z, ry, rise] of [[0, 61.6, 78.1, .18, 2.55], [1, 60.4, 79.9, -.12, 2.45]])
+    At(`TransferNorthWestRuinBeam${i}`, x, z, 6.4, .2, .24, groundAt(x, z) + rise, "timber", { solid: false, ry });
+  // 东北残屋（原 TransferNorthEastHouse 的屋基）：东巷口那一拨的落脚处。北墙中间塌出
+  // 进屋的口，西墙南段和西南角塌了、南墙留一扇窗 —— 屋里的人隔着低墙东段打守线右翼。
+  // 草垛挪在空场偏西（x 86.4–89.2）：东巷机枪 (94.3,67.15) 往车位与桥头路的射线从它东边过。
+  Block("TransferNorthEastRuinNorth0", 95.55, 75.85, 3.1, 2.3, .5);
+  Block("TransferNorthEastRuinNorth1", 99.85, 75.85, 2.3, 2.7, .5);
+  Block("TransferNorthEastRuinEast", 100.75, 78.0, .5, 2.65, 4.8);
+  Block("TransferNorthEastRuinWest", 94.25, 76.3, .5, 2.1, 1.4);
+  Block("TransferNorthEastRuinWestLip", 94.3, 79.5, .6, .55, 1.0, "earthDark", Face(1, 0));
+  Block("TransferNorthEastRuinSouth0", 97.65, 80.15, 1.5, 1.85, .5, "plaster", Face(0, -1));
+  Block("TransferNorthEastRuinSouthSill", 98.9, 80.15, 1.0, 1.0, .5, "plaster", Face(0, -1));
+  Block("TransferNorthEastRuinSouth1", 100.2, 80.15, 1.6, 1.85, .5, "plaster", Face(0, -1));
+  Block("TransferNorthEastRuinCorner", 95.6, 80.1, 1.2, .6, .6, "earthDark", Face(0, -1));
+  for (const [i, x, z, w, h, d, ry] of [[0, 94.9, 78.3, .9, .3, .8, .5], [1, 95.1, 80.9, .7, .25, .6, -.4],
+    [2, 96.6, 79.3, 1.1, .35, .9, .2], [3, 100.0, 76.7, .9, .4, .8, -.3], [4, 95.6, 76.9, .6, .22, .5, .9]])
+    Detail(`TransferNorthEastRuinRubble${i}`, x, z, w, h, d, i % 2 ? "plaster" : "earthDark", { ry });
+  At("TransferNorthEastRuinBeam", 98.0, 78.3, .24, .2, 5.4, groundAt(98, 78.3) + 2.3, "timber", { solid: false, ry: .15 });
+
+  // 门楼前空场（z 75–83）里追兵跃进时躲的东西。每件的「藏身点」在它北侧 0.65 m，
+  // MISSION_TACTICS 的中间折点就钉在那里（折点离掩体超过 0.9 m 会被拽回去，敌军 AI §19）。
+  // 路西：一段断墙被过路大车压出一道豁口（southTraffic 车辙从两截中间斜穿过去，
+  // MissionTest 按 0.35 m 扫着）、车辙东边路口旁一堆塌下来的墙土；路东：一辆翻倒的大车、一个草垛。
+  Block("TransferPlazaWallWest0", 66.4, 75.6, 1.7, 1.05, .7, "structure", Face(0, -1));
+  Block("TransferPlazaWallWest1", 70.9, 75.7, 1.5, .92, .65, "earthDark", { ry: .06, ...Face(0, -1) });
+  Block("TransferPlazaRubbleWest", 74.6, 79.3, 1.6, .88, .8, "earthDark", { ry: -.12, ...Face(0, -1) });
+  Block("TransferPlazaCartBed", 84.9, 76.5, 2.6, 1.1, .45, "timber", Face(0, -1));
+  // 车轮与车轴翻在南侧（车底朝守线），北侧车板后头是躲人的地方。
+  Detail("TransferPlazaCartWheel", 86.0, 77.05, 1.1, 1.1, .12, "timber");
+  Detail("TransferPlazaCartAxle", 84.9, 77.05, 2.4, .16, .16, "timber", { y: groundAt(84.9, 77.05) + .55 });
+  Detail("TransferPlazaCartShaft0", 82.6, 77.4, .12, .12, 2.6, "timber", { ry: .5 });
+  Detail("TransferPlazaCartShaft1", 83.3, 78.1, .12, .12, 2.4, "timber", { ry: .35 });
+  Block("TransferPlazaHaystack", 87.8, 79.6, 2.8, 1.3, 2.8, "canvas",
+    { cover: { faceX: 0, faceZ: -1, points: [{ x: 87.2, z: 78.2 }, { x: 88.5, z: 78.2 }] } });
+  Detail("TransferPlazaHaystackMid", 87.8, 79.6, 2.2, .75, 2.2, "canvas", { y: groundAt(87.8, 79.6) + 1.65 });
+  Detail("TransferPlazaHaystackTop", 87.8, 79.6, 1.2, .5, 1.2, "canvas", { y: groundAt(87.8, 79.6) + 2.25 });
+  for (const [i, x, z, w, h, d, ry] of [[0, 70.2, 77.3, .5, .25, .4, .3], [1, 73.8, 76.2, .6, .2, .5, -.8],
+    [2, 81.2, 79.8, .5, .22, .4, 1.3], [3, 87.4, 81.6, .45, .2, .4, .2], [4, 66.9, 80.6, .6, .24, .45, -.4],
+    [5, 78.9, 82.2, .4, .18, .35, .9], [6, 75.0, 79.3, .55, .16, .4, .6], [7, 92.0, 82.6, .5, .22, .45, -.2]])
+    Detail(`TransferPlazaStone${i}`, x, z, w, h, d, "earthDark", { ry });
+
+  // 守线两头的残墙与路口砖垛：低墙本身不动（TransferTest 的 ≤ 1.2 m 包络），
+  // 西头接着场院西北角那段墙、东头接成一个塌了半截的墙角，路口两边各一根砖垛。
+  // 路口净宽 4.85 m（village 路线 0.625 m 担架走廊、southTraffic 车道都在里面）。
+  Block("TransferWallWestRuin0", 56.3, 84.05, 1.8, 2.45, .5);
+  Block("TransferWallWestRuinSill", 57.75, 84.05, 1.1, 1.1, .5);
+  Block("TransferWallWestRuin1", 59.15, 84.05, 1.7, 1.85, .5);
+  Block("TransferWallPierWest", 73.45, 84.1, .8, 1.75, .9);
+  Block("TransferWallPierEast", 79.1, 84.1, .8, 2.05, .9);
+  Block("TransferWallEastRuin0", 95.3, 84.0, 1.6, 2.2, .5);
+  Block("TransferWallEastRuin1", 96.85, 84.0, 1.5, 1.45, .5);
+  Block("TransferWallEastRuinStub", 97.35, 85.45, .5, 1.7, 2.4);
+  for (const [i, x, z, w, h, d, ry] of [[0, 56.9, 84.9, .6, .3, .5, .3], [1, 73.5, 85.0, .5, .25, .45, -.6],
+    [2, 79.3, 85.1, .55, .28, .5, .8], [3, 96.2, 84.8, .7, .3, .55, .2], [4, 95.7, 83.2, .6, .25, .5, -.4]])
+    Detail(`TransferWallFootRubble${i}`, x, z, w, h, d, "earthDark", { ry });
 
   // ---------------------------------------------------------------------
   // 11: west perimeter. The yard's west screen and the farm store stay; the

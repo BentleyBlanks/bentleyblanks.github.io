@@ -609,19 +609,20 @@ try {
       otherCounts: { count: Number(other.dataset.filterCount), visible: Number(other.dataset.filterVisible) },
     };
   });
-  Check("点「只看」某一组：集合里只剩它那 4 个人",
-    solo.after.members?.length === 4 && solo.after.encounters?.length === 1
+  // 2026-09-27 12 掩护装载改守来时路：transfer 组 4 → 6 人。
+  Check("点「只看」某一组：集合里只剩它那 6 个人",
+    solo.after.members?.length === 6 && solo.after.encounters?.length === 1
     && solo.after.encounters[0] === "transfer",
     JSON.stringify(solo.after.members));
   Check("「只看」时别的类别是空集（不是不管）",
     solo.after.friendlies === 0 && solo.after.zones === 0,
     `友军 ${solo.after.friendlies} / 触发区 ${solo.after.zones}`);
-  Check("面板计数与集合一致（这一行 4/4、别的组 0）",
-    solo.counts.visible === 4 && solo.counts.count === 4
+  Check("面板计数与集合一致（这一行 6/6、别的组 0）",
+    solo.counts.visible === 6 && solo.counts.count === 6
     && solo.otherCounts.visible === 0 && solo.otherCounts.count === 3
-    && solo.badge === "4" && solo.otherBadge === "0/3",
+    && solo.badge === "6" && solo.otherBadge === "0/3",
     `${solo.badge} / ${solo.otherBadge}`);
-  Check("同一份集合递给了俯视图", solo.mapFilter?.members === 4, JSON.stringify(solo.mapFilter));
+  Check("同一份集合递给了俯视图", solo.mapFilter?.members === 6, JSON.stringify(solo.mapFilter));
   Check("再点一次「只看」就回到全画", solo.cleared);
 
   const presets = await page.evaluate(() => {
@@ -761,9 +762,10 @@ try {
       collapsed, reopened, sortedFirst,
     };
   });
-  // 2026-09-23 01–05 重构：新增五组、前沿组 12→10 等，全关敌人 61→78（契约 §8 组 id 表）。
-  Check("布设表列出当前编排全部敌人（78 人、九列表头）",
-    table.all === 78 && table.head.length === 9 && table.groupRows === 18,
+  // 2026-09-23 01–05 重构：新增五组、前沿组 12→10 等，全关敌人 61→78（契约 §8 组 id 表）；
+  // 2026-09-27 12 掩护装载 transfer 组 4→6，全关 78→80。
+  Check("布设表列出当前编排全部敌人（80 人、九列表头）",
+    table.all === 80 && table.head.length === 9 && table.groupRows === 18,
     `${table.all} 行 / 表头 ${table.head.join(" ")}`);
   Check("按组排时第一列表头是「图标」（组名写在分组线上），换别的排法就变回「组」",
     table.head[0] === "图标 ▲" && table.headAfterSort[0] === "组",
@@ -773,18 +775,18 @@ try {
     `${table.firstGroup.trim()} ｜ ${table.rowPhases[0]}`);
   Check("这一局里没有这个人时，「实时」列写他这一阶段的状态（不是一整列破折号）",
     table.deadCell === "已清除", `front 组的实时列写「${table.deadCell}」`);
-  Check("表跟着筛选联动：只看 transfer 时只剩那 4 行",
-    table.filtered.length === 4 && table.filtered.includes("TransferGunner"),
+  Check("表跟着筛选联动：只看 transfer 时只剩那 6 行",
+    table.filtered.length === 6 && table.filtered.includes("TransferGunner"),
     table.filtered.join(" "));
   Check("行里写着组 / 编号 / 出现 / 本阶段 / 武器 / 特点 / 出生点 / 路线点",
     table.cells[1] === "TransferGunner" && table.cells[2] === "第 12 阶段" && table.cells[3] === "活跃"
-    && table.cells[4] === "机枪" && table.cells[5].includes("钉在原地") && table.cells[6] === "113, 80",
+    && table.cells[4] === "机枪" && table.cells[5].includes("钉在原地") && table.cells[6] === "79, 46",
     table.cells.join(" ｜ "));
   Check("点一行 = 选中那个人（右栏与地图一起跟过去）",
     table.picked.sel?.kind === "member" && table.picked.sel?.id === "TransferGunner"
     && table.picked.sel2?.id === "TransferGunner" && table.picked.marked,
     JSON.stringify(table.picked.sel));
-  Check("按组能收起也能摊开", table.collapsed === 0 && table.reopened === 4,
+  Check("按组能收起也能摊开", table.collapsed === 0 && table.reopened === 6,
     `收起后 ${table.collapsed} 行、摊开后 ${table.reopened} 行`);
   Check("点表头按那一列排（按本阶段排时活跃的在最前）", table.sortedFirst === "活跃", String(table.sortedFirst));
   Check("「复制 CSV」首行是中文表头",

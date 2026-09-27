@@ -14,6 +14,7 @@ import { MISSION_GUIDE_TUNING as GUIDE } from "./Data_Tuning_MissionGuide.mjs";
 import { MissionReturn } from "./Script_MissionReturn.mjs";
 import { MISSION_RETURN } from "./Data_Tuning_FirstLevel.mjs";
 import { FRONT_BATTLE_TUNING as FB } from "./Data_Tuning_FirstLevelFront.mjs";
+import { MID_TUNING } from "./Data_Tuning_FirstLevelMid.mjs";
 import { MISSION_RETURN_ROUTES, MISSION_RETURN_PERSON_STAGES, MISSION_RETURN_SQUAD_STAGES, MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { SquadCoverRoute, SquadCoverBounds, SquadCoverThreat } from "./Script_SquadMarchCover.mjs";
@@ -1791,16 +1792,19 @@ export class FirstLevelMissionRuntime {
         if (suppressed) this.ai.SetStance(actor, 1, 1, true);
         continue;
       }
+      // 跑速与每个折点的停留可以由表给（MISSION_TACTICS 的 mps / holdS，折点自己的 holdS 优先）：
+      // 12 的追兵要跑步穿街、在掩体后停一两秒再跃进，不是守区巡逻那种走一步停 4.5 s。
       if (Distance(actor.position, target) < R.tacticalArrivalM) {
         this.Defend(actor, target);
         state.shelter={...target};
         state.mode = "cover";
         state.hold += dt;
-        if (state.hold >= (plan.near?R.approachBoundHoldS:R.tacticalHoldSeconds)) { state.index++; state.hold = 0; }
+        const holdS=target.holdS ?? plan.holdS ?? (plan.near?R.approachBoundHoldS:R.tacticalHoldSeconds);
+        if (state.hold >= holdS) { state.index++; state.hold = 0; }
       } else {
         state.mode = "advance";
         this.ai.SetStance(actor, 0, .4, true);
-        this.MoveActor(actor, target, plan.near?R.approachAdvanceMps:R.tacticalMoveMps);
+        this.MoveActor(actor, target, plan.mps ?? (plan.near?R.approachAdvanceMps:R.tacticalMoveMps));
         state.movingSeconds += dt;
       }
     }
@@ -2559,7 +2563,8 @@ export class FirstLevelMissionRuntime {
         this.guideRoute = null;
       }
       const transferIds=MISSION_TRANSFER_THREATS.flatMap(threat=>MISSION_ENCOUNTERS[threat.id].map(spec=>spec.id));
-      safe = !this.Threatens(A.transfer,transferIds);
+      // 装载区受不受压，看的是村路进场院那一段排队道（门楼那挺机枪顺着车路扫的就是它）。
+      safe = !this.Threatens(MID_TUNING.loadingThreatPoint,transferIds);
       safeAt=point=>!this.Threatens(point,transferIds);
       // 每装完一批喊一次「这批过了，下一批」；侧巷那一处露头时喊「右边有人」。
       // 原来那三条按队列人数倒数的（TransferQueue / TransferTwo / TransferOne）

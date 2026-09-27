@@ -53,7 +53,8 @@ Check(PRESETS.length === 6 && PRESET_IDS.includes("new"), "六个预设都在");
 const soloState = SoloFilterItem(base, "encounter", "transfer");
 const solo = BuildOrchestrationFilter(model, layout, soloState);
 const transfer = layout.encounters.find((encounter) => encounter.id === "transfer");
-Check(solo.members.size === transfer.members.length && transfer.members.length === 4,
+// 2026-09-27 12 掩护装载改守来时路：transfer 组 4 → 6 人（机枪 + 五个跃进的步枪兵）。
+Check(solo.members.size === transfer.members.length && transfer.members.length === 6,
   `只看 transfer 后只剩它的 ${transfer.members.length} 个人`);
 Check(transfer.members.every((member) => solo.members.has(member.id)), "剩下的正好是那一组的人");
 Check(solo.encounters.size === 1 && solo.encounters.has("transfer"), "组的集合里也只剩它");
@@ -64,15 +65,15 @@ Check(SoloFilterItem(soloState, "encounter", "transfer").solo === null, "再点�
 
 const soloSummary = FilterSummary(model, layout, soloState);
 const soloRow = soloSummary.enemies.groups.find((row) => row.id === "transfer");
-Check(soloRow.visible === 4 && soloRow.count === 4 && soloRow.soloed === true, "面板计数与集合一致（4/4，标着「只看」）");
-Check(soloSummary.enemies.visible === 4 && soloSummary.enemies.count === members.length,
+Check(soloRow.visible === 6 && soloRow.count === 6 && soloRow.soloed === true, "面板计数与集合一致（6/6，标着「只看」）");
+Check(soloSummary.enemies.visible === 6 && soloSummary.enemies.count === members.length,
   `敌军一栏写 ${soloSummary.enemies.visible}/${soloSummary.enemies.count}`);
 const otherRow = soloSummary.enemies.groups.find((row) => row.id === "transferAlley");
 Check(otherRow.visible === 0, "别的组在面板上写 0");
 
-// solo 压过一切：就算别的筛选写着只看机枪，也还是这一组的四个人
+// solo 压过一切：就算别的筛选写着只看机枪，也还是这一组的六个人
 const soloOverride = SoloFilterItem({ ...base, weapons: new Set(["Type11"]) }, "encounter", "transfer");
-Check(BuildOrchestrationFilter(model, layout, soloOverride).members.size === 4, "solo 压过别的筛选");
+Check(BuildOrchestrationFilter(model, layout, soloOverride).members.size === 6, "solo 压过别的筛选");
 
 // ---------------------------------------------------------------------------
 // 3) 状态 / 武器 / 行为：人数与 PhaseLayout 逐个数出来的一致
@@ -147,8 +148,8 @@ Check(groupIds.length === 18, `这一关十八组（实际 ${groupIds.length}）
 let toggled = ToggleFilterItem(base, "encounter", "transfer", groupIds);
 Check(toggled.encounters.size === groupIds.length - 1 && !toggled.encounters.has("transfer"),
   "关掉一组 = 全集减那一组");
-Check(BuildOrchestrationFilter(model, layout, toggled).members.size === members.length - 4,
-  "集合里也少了那四个人");
+Check(BuildOrchestrationFilter(model, layout, toggled).members.size === members.length - 6,
+  "集合里也少了那六个人");
 toggled = ToggleFilterItem(toggled, "encounter", "transfer", groupIds);
 Check(toggled.encounters === null, "开回全集就还原成 null（不限制）");
 const catOff = ToggleFilterItem(base, "category", "friendlies");
@@ -177,21 +178,21 @@ for (const row of rows) {
 const gunner = rows.find((row) => row.member === "TransferGunner");
 Check(gunner.group === "转运区第 1 处威胁" && gunner.stateText === "活跃"
   && gunner.weaponText === "机枪" && gunner.traitText.includes("钉在原地")
-  && gunner.spawnText === "113, 80",
+  && gunner.spawnText === "79, 46",
   `TransferGunner 这一行：${gunner.group} / ${gunner.stateText} / ${gunner.weaponText} / ${gunner.traitText}`);
 
 // 实时：有 live 才填「实时」列
 const liveRows = EnemyTableRows(model, layout, {
-  enemies: [{ id: "TransferGunner", alive: false, x: 114.4, z: 79.6, dormant: false }],
+  enemies: [{ id: "TransferGunner", alive: false, x: 79.4, z: 65.6, dormant: false }],
 });
 const dead = liveRows.find((row) => row.member === "TransferGunner");
-Check(dead.live?.alive === false && dead.liveText.includes("阵亡") && dead.liveText.includes("114"),
+Check(dead.live?.alive === false && dead.liveText.includes("阵亡") && dead.liveText.includes("79"),
   `实时列写「${dead.liveText}」`);
 Check(liveRows.find((row) => row.member === "TransferRifleA").liveText === "", "没实时数据的那几行空着");
 
 // 表按当前筛选联动
 const visibleRows = rows.filter((row) => RowVisible(solo, row));
-Check(visibleRows.length === 4 && visibleRows.every((row) => row.encounterId === "transfer"),
+Check(visibleRows.length === 6 && visibleRows.every((row) => row.encounterId === "transfer"),
   `只看 transfer 时表里剩 ${visibleRows.length} 行`);
 Check(rows.filter((row) => RowVisible(all, row)).length === rows.length, "不筛时一行不少");
 

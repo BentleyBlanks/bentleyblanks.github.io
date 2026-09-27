@@ -557,8 +557,48 @@ export function BuildVillageWhitebox(groundAt) {
   for (const [s, x] of [["W", 74.7], ["E", 79.7]]) Bank(`VillageSouthGatePier${s}`, x, 70.5, .8, 3.0, 1.6, "plaster");
   Block("VillageSouthGateBeam", 77.2, 70.5, 6.2, .4, .5, "timber", { y: groundAt(77.2, 70.5) + 3.05 });
   Roof("VillageSouthGateRoof", 77.2, 70.5, 7.6, 2.6, 3.25, true, 1.3, true);
-  YardWall("VillageSouthGateWingW", 72.2, 70.5, 4.2, .5, 2.2);
-  YardWall("VillageSouthGateWingE", 81.6, 70.5, 3.0, .5, 2.2);
+  // 12 掩护装载（docs/Data_FirstLevelTransferCover20260927.md）：追兵从门楼北侧压过来，
+  // 两翼墙是他们贴着探头的地方（高墙 → 在墙头侧身探出），掩体点放在靠门洞和靠外的两头。
+  YardWall("VillageSouthGateWingW", 72.2, 70.5, 4.2, .5, 2.2,
+    { faceX: 0, faceZ: -1, points: [{ x: 73.7, z: 70.5 }, { x: 70.7, z: 70.5 }] });
+  YardWall("VillageSouthGateWingE", 81.6, 70.5, 3.0, .5, 2.2,
+    { faceX: 0, faceZ: -1, points: [{ x: 80.6, z: 70.5 }, { x: 82.6, z: 70.5 }] });
+  // 12 追兵的跃进掩体（日军只认手工 cover 块）。每件的藏身点在它北侧 0.65 m，
+  // MISSION_TACTICS 的折点钉在那里。这一段不调 Rand()：它是整个文件共用的确定性序列，
+  // 中途多取几次，后面所有碎砖、柴垛、枯树枝的位置都会跟着挪。
+  const Cover = (id, x, z, w, h, d, semantic, extra = {}) =>
+    Block(id, x, z, w, h, d, semantic, { cover: { faceX: 0, faceZ: -1 }, ...extra });
+  const Bats = (id, list) => list.forEach(([x, z, w, h, d, ry], i) =>
+    Detail(`${id}${i}`, x, z, w, h, d, i % 2 ? "plaster" : "earthDark", { ry, y: groundAt(x, z) + h / 2 - .03 }));
+  // 门楼北侧：一辆翻在路东的大车，第一拨的机枪趴在它后头顺着车路往接运场里扫。
+  // 两挺机枪的掩体都只到 0.7–0.75 m：跪着开火露出头肩，从低墙上打得到（0.95 m 的柴垛
+  // 把跪姿的人整个挡住，整段实跑里东巷机枪 420 s 没被打掉）。
+  // 离 village 路线 0.9 m 以上（VillageTest 按 0.625 m 担架走廊扫）。
+  Cover("VillageGateCartBed", 79.2, 66.55, 1.6, .75, .5, "timber");
+  Detail("VillageGateCartWheel", 80.35, 66.95, .12, 1.1, 1.1, "timber", { ry: .3 });
+  Detail("VillageGateCartShaft", 80.9, 64.6, .12, .12, 2.8, "timber", { ry: -.25, y: groundAt(80.9, 64.6) + .08 });
+  // 门楼东侧塌下来的一堆墙土。
+  Cover("VillageGateRubbleEast", 82.3, 73.4, 2.0, .82, 1.0, "earthDark", { ry: .1 });
+  Bats("VillageGateRubbleEastFoot", [[81.1, 74.3, .4, .2, .3, .5], [81.8, 74.45, .5, .16, .35, 1.9],
+    [82.6, 74.25, .3, .22, .3, .2], [83.3, 74.4, .45, .14, .3, 2.6]]);
+  // 主街南段：西巷口一摞木箱、路东一垛麻袋。
+  Cover("VillageStreetCrates", 73.5, 55.4, 1.1, 1.1, .9, "timber");
+  Detail("VillageStreetCratesTop", 73.45, 55.35, .75, .5, .6, "timber", { ry: .3, y: groundAt(73.5, 55.4) + 1.35 });
+  Cover("VillageStreetSacks", 80.9, 55.2, 1.1, .95, .8, "canvas");
+  // 西巷（后排房与路西房之间，第一拨两个人从这里绕到守线左手）：一摞货箱、巷口一堆碎砖。
+  // 过路车线 southTraffic 斜穿这条巷子（VillageTest 按 0.35 m 扫），两件都让开它。
+  Cover("VillageWestLaneCrates", 58.6, 64.4, 1.0, 1.05, 1.1, "timber");
+  Cover("VillageWestLaneRubble", 57.4, 72.1, 1.8, .85, .9, "earthDark", { ry: -.15 });
+  Bats("VillageWestLaneRubbleFoot", [[56.3, 73.0, .45, .18, .3, .7], [57.1, 73.15, .35, .22, .3, 2.2],
+    [57.9, 72.95, .5, .15, .35, 1.1], [58.7, 73.1, .3, .2, .25, .4]]);
+  // 东巷（街东房与东排房之间，第二拨「右边有人」从这里下来）：东侧补一道院墙把巷子收到
+  // 7–8 m，巷里一个柴垛（第二拨机枪的位置）、北头一只木箱。
+  YardWall("VillageEastLaneWall", 99.4, 64.8, .5, 12.8, 2.5);
+  Cover("VillageEastLaneWoodpile", 94.3, 67.95, 1.8, .7, .7, "timber");
+  for (const [i, dx, l, ry] of [[0, -.1, 1.5, .04], [1, .08, 1.65, -.05], [2, -.04, 1.4, .02]])
+    Detail(`VillageEastLaneWoodpileLog${i}`, 94.3 + dx, 67.95 + (i - 1) * .2, l, .16, .16,
+      "timber", { y: groundAt(94.3, 67.95) + .78, ry });
+  Cover("VillageEastLaneCrate", 97.4, 56.4, 1.0, 1.05, 1.0, "timber");
   Pole("VillagePole3", 80.9, 57.6);
   Pole("VillagePole4", 81.3, 67.2);
   Wires("VillagePole3", "VillagePole4");
@@ -605,7 +645,8 @@ export function BuildVillageWhitebox(groundAt) {
   House("EastSouthRowB", 107, 66, 10, 8, 3.3, {
     doors: [["W", -1, 1.1, 2.1, 1]], windows: [["W", 2.5, 1, 1.15, .8]] });
   DeadTree("EastSouthTree", 94.2, 58.2, 6.9);
-  Haystack("EastSouthHaystack", 97, 68.5, 1.1, 1.8);
+  // 12：东移 0.6/0.7 m，与东巷柴垛之间留 1.3 m 过人的缝（第二拨从这里下来）。
+  Haystack("EastSouthHaystack", 97.6, 69.2, 1.1, 1.8);
   // Taller masses behind the long street frontages read as a damaged block.
   HouseMass("StreetEastSouthHouse", 105, 28, 11.5, 11, 3.6);
   HouseMass("VillageWestCourtWing", 30, 23, 4, 18, 3.3);

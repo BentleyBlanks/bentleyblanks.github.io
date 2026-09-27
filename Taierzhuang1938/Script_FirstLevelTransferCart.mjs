@@ -175,6 +175,15 @@ export class FirstLevelTransferCart {
       this.postsTaken = true;
       r.Record("transferPostsManned");
     }
+    // 到了射位、手上没有目标的人脸朝村路（门楼 / 东巷口），不是转过身来看玩家。
+    // 共用 AI 只在没有目标时认 watchYaw（Script_Ai 的戒备朝向），开火照旧归它。
+    for (const post of M.defencePosts) {
+      const actor = post.face && r.companion.Handle(post.cast);
+      if (!actor?.alive || actor.target || Distance(actor.position, post) >= M.defencePostArrivalM) continue;
+      if (post.cast === "heyoutian" && r.Has("escortRelieved")) continue;
+      actor.watchYaw = Math.atan2(actor.position.x - post.face.x, actor.position.z - post.face.z);
+      actor.watchUntil = (r.ai?.time ?? 0) + 0.5;
+    }
     // 第一批真的装完并离开（不是「装了两个」）。
     if (r.Has("loadingThreatResolved") && column.loadEvents.length >= R.transferBatchLoads && column.departed >= 1)
       r.Record("firstBatchLoaded", { loaded: column.loadEvents.length, departed: column.departed });
@@ -184,10 +193,10 @@ export class FirstLevelTransferCart {
     column.BeginZhouBoarding();
     column.ReserveBoardingCart(P.cartBays[0]);
     if (Distance(column.zhou, column.zhouBoardingStart) >= R.boardingWitnessM) r.Record("zhouNext");
-    // 何有田真的走过来接住射位，才轮到「这边我看着！去搭把手！」
+    // 何有田真的走过来接住顺子在村口低墙上的射位，才轮到「这边我看着！去搭把手！」
     const he = r.companion.Handle("heyoutian");
-    if (he?.alive) r.squadRoutes.set(he.id, MidTransferWalkRoute(he.position, A.transfer));
-    const relieved = !he?.alive || Distance(he.position, A.transfer) <= M.escortReliefM;
+    if (he?.alive && !r.Has("escortRelieved")) r.squadRoutes.set(he.id, MidTransferWalkRoute(he.position, A.transferWall));
+    const relieved = !he?.alive || Distance(he.position, A.transferWall) <= M.escortReliefM;
     if (relieved) {
       r.Record("escortRelieved", { x: he?.position.x ?? null, z: he?.position.z ?? null });
       r.Say("EscortZhou");

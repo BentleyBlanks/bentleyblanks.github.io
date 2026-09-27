@@ -144,11 +144,11 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
   courtyard: Object.freeze({ spawn: Object.freeze({ kind: "step", step: "Courtyard" }) }),
   transfer: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "Transfer" }),
-    note: "第一处威胁：压向装载区",
+    note: "第一处威胁：顺来时的主街追下来，压向装载区",
   }),
   transferAlley: Object.freeze({
     spawn: Object.freeze({ kind: "threat", threat: "transferAlley", step: "Transfer" }),
-    note: "第二处威胁：侧巷火力，第一处解除（loadingThreatResolved）之后才出现",
+    note: "第二处威胁：守线右手东巷口的火力，第一处解除（loadingThreatResolved）之后才出现",
   }),
   air: Object.freeze({ spawn: Object.freeze({ kind: "step", step: "AirFirst" }) }),
   bridgeNorth: Object.freeze({
@@ -403,10 +403,13 @@ export const MISSION_FACT_GATES = Object.freeze({
   transferSortingHeard: Gate({ kind: "voice", step: "TransferApproach", cue: "TransferSorting", source: "VoiceDone" }),
   villageRoadThreatSeen: Gate({ kind: "voice", step: "TransferApproach", cue: "VillageRoadThreat", source: "VoiceDone" }),
   // --- Transfer ----------------------------------------------------------
-  transferArrived: Gate({ kind: "proximity", step: "Transfer", anchor: "transfer", radiusM: 14, source: "Update" }),
+  // 12 守来时路（docs/Data_FirstLevelTransferCover20260927.md）：顺子真的上了村口低墙（射口 ± 8 m，
+  // 盖住低墙西段与路口）。装载从这时开始，第一拨追兵也是这时才开始往前压（MISSION_TACTICS 的 fact）。
+  transferArrived: Gate({ kind: "proximity", step: "Transfer", anchor: "transferWall", radiusM: 8, source: "Update",
+    text: "顺子上了村口低墙的射位" }),
   loadingThreatResolved: Gate({
     kind: "combat", step: "Transfer", encounter: "transfer", source: "UpdateTransferThreats",
-    text: "压向装载区的那一处威胁被清掉",
+    text: "顺着来时的主街追下来、压向装载区的那一拨被清掉",
   }),
   firstBatchLoaded: Gate({
     kind: "column", step: "Transfer", source: "FirstLevelTransferCart.UpdateTransfer",
@@ -414,7 +417,7 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   alleyThreatResolved: Gate({
     kind: "combat", step: "Transfer", encounter: "transferAlley", source: "UpdateTransferThreats",
-    text: "侧巷那一处威胁被清掉",
+    text: "守线右手东巷口那一拨（机枪扫车列出场的路）被清掉",
   }),
   zhouNext: Gate({
     kind: "column", step: "Transfer", source: "FirstLevelTransferCart.UpdateTransfer",

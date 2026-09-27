@@ -24,8 +24,8 @@ const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 // Targeted 06–18 verification (--rear-only) leaves the 01–05 assertions intact in the
 // default run. The front topology and its earlier camera points are a separate baseline.
 const rearOnly = process.argv.includes("--rear-only");
-if (rearOnly) assert.equal(MISSION_WHITEBOX_VERSION, "first-level-20260927-whitebox-05-18-r2",
-  "the reviewed 05–18 concept-frame whitebox revision is live");
+if (rearOnly) assert.equal(MISSION_WHITEBOX_VERSION, "first-level-20260927-whitebox-05-18-r3",
+  "the reviewed 05–18 concept-frame whitebox revision (r3: 12 holds the road back into the village) is live");
 else assert.match(MISSION_TOPOLOGY_VERSION, /^first-level-20260923-space-0106$/, "the 2026.09.23 01-06 space rebuild is live");
 
 // ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ const ZONES = [
   { id: "B", label: "村落与后送线 07-10", z: [-30, 46],
     anchors: ["litterHold", "streetBlock", "eastAlley", "streetRejoin"] },
   { id: "C", label: "桥头接运与空袭 11-14", z: [86, 145],
-    anchors: ["cartBoard", "cartHalt", "sideAlley"] },
+    anchors: ["cartBoard", "cartHalt", "transferWall"] },
   { id: "D", label: "桥南接收与回援 15-18", z: [165, 252],
     anchors: ["wallPathStart", "wallPathEnd", "receptionGate", "bridgeSouthEnd", "bridgeCover",
       "blastSafe", "marchOut"] },
@@ -173,15 +173,17 @@ assert.ok(Math.abs(StageRoutes.southWalk.at(-1).x - A.village.x) < 10
     .filter((p, i) => p.z < StageRoutes.southWalk[i].z - 1).map((p) => `${p.x},${p.z}`);
   assert.deepEqual(backtrack, [], "07 never turns back north");
 }
-// 12 的第二处威胁来自东／东南（Notion「村东突入部队沿既有东巷追出」），
-// 威胁的是沿桥头路离开的牛马车，不是装载区的西侧。
-assert.ok(S.sideAlley.x > A.queue.x + 15 && S.sideAlley.x > S.cartBoard.x + 10,
-  `the side alley is east of the loading yard and the boarding bay: x=${S.sideAlley.x}`);
-assert.ok(S.sideAlley.z > S.cartBoard.z && S.sideAlley.z < River.z - 15,
-  "the side alley sits south-east of the bays and north of the river");
+// 12 守来时路（2026-09-27，docs/Data_FirstLevelTransferCover20260927.md）：顺子的射位在接运场北缘、
+// 朝村子的低墙上（装载区在他身后），第二处威胁是守线右手的东巷 —— 村东突入的那批人
+// （Notion「村东突入部队沿既有东巷追出」）沿东巷追下来，在村子南头，不在场院里。
+assert.ok(S.transferWall.z < S.cartBoard.z - 20 && S.transferWall.z < A.queue.z - 20,
+  `the squad holds the village side of the yard, with the loading behind it: z=${S.transferWall.z}`);
+assert.ok(S.sideAlley.x > S.transferWall.x + 20, `the side lane opens on the right of the wall post: x=${S.sideAlley.x}`);
+assert.ok(S.sideAlley.z > ZONES[1].z[1] && S.sideAlley.z < S.transferWall.z - 15,
+  `the side lane is in the south end of the village, in front of the wall: z=${S.sideAlley.z}`);
 {
   const road = StageRoutes.cartRide.map((p) => Math.hypot(p.x - S.sideAlley.x, p.z - S.sideAlley.z));
-  assert.ok(Math.min(...road) < 30, `the alley can reach the departure road: ${Math.min(...road).toFixed(1)} m`);
+  assert.ok(Math.min(...road) < 60, `the lane gun can reach the departure road over the wall: ${Math.min(...road).toFixed(1)} m`);
 }
 console.log("ok metric adjacency", JSON.stringify(Object.fromEntries(
   Object.entries(measured).map(([k, v]) => [k, +v.toFixed(1)]))));

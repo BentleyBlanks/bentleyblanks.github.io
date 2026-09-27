@@ -100,15 +100,30 @@ export const MID_TUNING = Object.freeze({
   // -------------------------------------------------------------------------
   // 12 掩护装载与离开
   // -------------------------------------------------------------------------
-  // 班里人的射位：低墙 / 墙角一线朝村路，不站在伤员中间。
-  // TransferCorner (95,96,8x0.7) 与 TransferEastCover (98,104,0.75x11) 夹出来的那个角。
+  // 班里人的射位（2026-09-27 掩护装载重做，docs/Data_FirstLevelTransferCover20260927.md）：
+  // 守来时路 —— 全在村口低墙（z≈84）背后一线，朝北对着门楼与主街，不站在伤员中间。
+  // 顺子在 A.transferWall（低墙射口 67.5,86）；罗班长在他右手、紧挨路口西砖垛；刘文财在
+  // 左手、低墙西头（西巷绕过来的人钻西北残屋，他先看见）；何有田在右翼低墙东段，东巷口
+  // 就在他正前方（「右边有人！」）。幺娃不上墙，跟着担架在装载区（14 他从这里奔沟口救人）。
+  // face：没有目标时脸朝哪儿（watchYaw），不写就不管。
+  // 都在墙南侧：13/14 罗班长直奔停车处、幺娃刘文财直奔沟口都是直线（MidTest 量着），
+  // 墙北侧的射位会让这几条直线穿墙。
   defencePosts: Object.freeze([
-    Object.freeze({ cast: "luo", x: 91.5, z: 99.4 }),
-    Object.freeze({ cast: "heyoutian", x: 96.2, z: 107 }),
-    Object.freeze({ cast: "liuwencai", x: 84, z: 106 }),
+    Object.freeze({ cast: "luo", x: 71.2, z: 85.75, face: Object.freeze({ x: 77.2, z: 70.5 }) }),
+    Object.freeze({ cast: "heyoutian", x: 88.8, z: 85.6, face: Object.freeze({ x: 94.5, z: 70 }) }),
+    Object.freeze({ cast: "liuwencai", x: 60.6, z: 85.6, face: Object.freeze({ x: 62, z: 74 }) }),
     Object.freeze({ cast: "yaowa", x: 79, z: 110 }),
   ]),
   defencePostArrivalM: 1.6,
+  // 装载区受不受压的判定点（运行时 Threatens 的点）：村路进场院那一段排队道。
+  // 门楼北侧那挺机枪顺着车路往里扫的就是这里（29.5 m，在 passageRangeM 36 以内）。
+  loadingThreatPoint: Object.freeze({ x: 76.5, z: 96 }),
+  // 村口低墙一线（低墙 + 两头残墙 + 路口砖垛）：12 班里人走射位时直线要是从墙身穿过去，
+  // 改走路口（MidTransferWalkRoute）。runs 是墙身的 x 区间，gapX 是路口中线。
+  villageWall: Object.freeze({ z: 84.05, thickM: .9, runs: Object.freeze([[55.4, 73.85], [78.7, 97.6]]), gapX: 76.2 }),
+  // 场院东头那道沙袋墙角 TransferCorner（x 91–99、z 96）：从 A.transfer 一带往北去低墙东段的人
+  // 绕它的西头走（gapX 在墙头以西 1.6 m）。
+  yardCorner: Object.freeze({ z: 96, thickM: .7, runs: Object.freeze([[91, 99]]), gapX: 89.4 }),
   // 威胁还在时装载额度是 0：装载与出发被压住，不是「慢一点」。
   // 每解除一处放开 R.transferBatchLoads(2 = cartCapacity 2 x 2 车) 个名额。
   loadAllowancePerThreat: R.transferBatchLoads,
@@ -371,8 +386,18 @@ export function MidTransferWalkRoute(from, to) {
     return [sorted[0][0] - 1.5, ...sorted.slice(1).map((seg, i) => (sorted[i][1] + seg[0]) / 2), sorted.at(-1)[1] + 1.5];
   };
   let a = { x: from.x, z: from.z };
+  // 东西向的横墙：村口低墙（12 的守线，z≈84）与场院东头的沙袋墙角 TransferCorner（z 96）。
+  // 直线从墙这边到墙那边、穿墙点又落在墙身（连 0.9 m 余量）上，就绕到 gapX（路口 / 墙头外）
+  // 过去，墙两侧各 1.5 m 一个折点。
+  const ZWalls = [MID_TUNING.villageWall, MID_TUNING.yardCorner];
   for (let guard = 0; guard < 4; guard++) {
     let hit = null;
+    for (const V of ZWalls) {
+      if ((a.z - V.z) * (to.z - V.z) >= 0) continue;
+      const t = (V.z - a.z) / (to.z - a.z), x = a.x + (to.x - a.x) * t;
+      if (!V.runs.some(([x0, x1]) => x > x0 - .9 && x < x1 + .9)) continue;
+      if (!hit || t < hit.t) hit = { t, wall: V };
+    }
     for (const [x, segs] of [[W.westX, W.west], [W.eastX, W.east]]) {
       if ((a.x - x) * (to.x - x) >= 0) continue;
       const t = (x - a.x) / (to.x - a.x), z = a.z + (to.z - a.z) * t;
@@ -389,6 +414,12 @@ export function MidTransferWalkRoute(from, to) {
       if (!hit || t < hit.t) hit = { t, x, z, segs };
     }
     if (!hit) break;
+    if (hit.wall) {
+      const side = Math.sign(to.z - a.z);
+      out.push({ x: hit.wall.gapX, z: hit.wall.z - side * 1.5 }, { x: hit.wall.gapX, z: hit.wall.z + side * 1.5 });
+      a = out.at(-1);
+      continue;
+    }
     const gap = Gaps(hit.segs).reduce((best, g) => (Math.abs(g - hit.z) < Math.abs(best - hit.z) ? g : best));
     const side = Math.sign(to.x - a.x);
     out.push({ x: hit.x - side * 1.5, z: gap }, { x: hit.x + side * 1.5, z: gap });

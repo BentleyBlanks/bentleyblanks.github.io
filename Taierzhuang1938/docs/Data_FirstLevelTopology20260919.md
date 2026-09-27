@@ -25,7 +25,7 @@ Z 一路向南单调递增，只有第 18 阶段回头向北过铁路桥。分�
 | --- | --- | --- | --- |
 | A | 掩蔽部、后交通壕、前沿、集结处（01–06） | −220 … −96 | `bunker` `bunkerDoor` `bunkerKilling` `bunkerRear` `rearCorner` `collection` |
 | B | 村落主街、灶屋连屋、内院（07–10） | −30 … 46 | `litterHold` `streetBlock` `eastAlley` `streetRejoin` |
-| C | 桥头接运点、空袭、西沟（11–14） | 86 … 145 | `cartBoard` `cartHalt` `sideAlley` |
+| C | 桥头接运点、空袭、西沟（11–14） | 86 … 145 | `cartBoard` `cartHalt` `transferWall` |
 | D | 桥南接收院、铁路桥、夜入北门（15–18） | 165 … 252 | `wallPathStart` `wallPathEnd` `receptionGate` `bridgeSouthEnd` `bridgeCover` `blastSafe` `marchOut` |
 
 北沙河（z=153）夹在 C 的南界 145 与 D 的北界 165 之间。`railBridge`(z=153)、`bridgeNorthEnd`(z=136)、
@@ -102,7 +102,7 @@ bunker(-40,-123.4)         bunkerDoor(-40,-129.6)      bunkerKilling(-40,-131.9)
 bunkerRear(-40,-119)       rearCorner(-42,-113)        collection(-37,-101)
 streetBlock(76.65,15)      litterHold(66,-20)          eastAlley(88,11)
 streetRejoin(77,34)        cartBoard(85.6,113)         cartHalt(76,135)
-sideAlley(103,122)         wallPathStart(56,207)       wallPathEnd(16,220)
+sideAlley(95.2,61)         wallPathStart(56,207)       wallPathEnd(16,220)
 receptionGate(2,240)       railBridge(-77,153)         bridgeNorthEnd(-77,136)
 bridgeSouthEnd(-77,170)    bridgeCover(-81,179.4)      bridgeEnemy(-68,130.5)
 blastSafe(-66,201)         marchOut(-62,232)           nightSpawn(-160,292)
@@ -276,7 +276,7 @@ node Taierzhuang1938/Script_FirstLevelMissionTopologyBrowserTest.mjs
 | 18 | 五条视线（掩体↔桥面/敌、爆破区↔桥面、敌↔桥面/南桥头）全通；胸墙高 1.1–1.7（蹲姿断线）；**爆破安全距离 ≥ 40 m** | 49.2 m |
 | 夜景 | 白天不存在（不在更早的态、不在 blocks、不在 gates）；城墙 8–10 m；门洞 3.6–4.2 m | 15 件、9 m、3.80 m |
 | 北沙河 | 河宽 24–34；除浅滩与两桥外逐米扫过全都过不去；撤离线过河坡度 < tan52 | 28.4 m，最陡 0.53 |
-| 侧巷 | 净宽 5–9 m；两侧墙 ≥ 2.4；巷口朝西四条视线全通 | 7.30 m |
+| 侧巷 | 2026-09-27 起是 12 守线右手的东巷（[守来时路](Data_FirstLevelTransferCover20260927.md)）：净宽 5–9 m；两侧墙 ≥ 2.4；巷口机枪罩住出场路与桥头路；低墙东段打得到它、射口打不到 | 7.15 m |
 | 军列下线 | 一条正则扫 blocks / gates / 三态体块；`walkableSurfaces` 恰是两块桥面；铁路只剩两段引道 | 通过 |
 | bounds | maxZ 360–400、minZ −225…−245；每一件与每个锚点都在里面 | −232 / 370 |
 

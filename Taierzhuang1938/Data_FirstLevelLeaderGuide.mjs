@@ -16,7 +16,8 @@ export const MISSION_LEADER_STAGES = Object.freeze({
   Melee: Entry("clear", "Melee", A.melee),
   Courtyard: Entry("clear", "Gate", P.sideRoomGunner),
   TransferApproach: Entry("follow", "Follow", null, {rejoinRoute: true}),
-  Transfer: Entry("cover", "Transfer", A.transfer, {story: true}),
+  // 12 守来时路：命令指着村口低墙上顺子的射位（docs/Data_FirstLevelTransferCover20260927.md）。
+  Transfer: Entry("cover", "Transfer", A.transferWall, {story: true}),
   CartRide: Entry("move", "Cart", A.cartBoard, {story: true}),
   AirFirst: Entry("cover", "WestDitch", A.ditchMouth, {story: true}),
   Carry: Entry("carry", "Carry", null, {story: true}),
@@ -33,8 +34,9 @@ export const MISSION_LEADER_STAGES = Object.freeze({
   BridgeWithdraw: Entry("cover", "Withdraw", A.blastSafe, {story: true}),
   NightMarch: Entry("follow", "NorthGate", null, {story: true, hidden: true}),
 });
-// 12 只有两处威胁（MISSION_TRANSFER_THREATS）。
+// 12 只有两处威胁（MISSION_TRANSFER_THREATS）：顺村路追来的那一拨守在低墙上打；
+// 东巷那一拨指着巷身（A.sideAlley）。
 export const MISSION_GUIDE_TRANSFERS = Object.freeze({
-  transfer: {cue:"GuideTransfer", target:A.transfer},
+  transfer: {cue:"GuideTransfer", target:A.transferWall},
   transferAlley: {cue:"GuideAlley", target:A.sideAlley},
 });

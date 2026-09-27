@@ -268,10 +268,10 @@
     },
     "GuideTransfer": {
       "file": "AudioVoice_FirstLevelGuideTransfer.mp3",
-      "seconds": 8.229,
-      "bytes": 99414,
-      "promptHash": "9a451ed8e2b88fb589f2605170917619e2e9547cfe68831e730f8d5559ec30e8",
-      "sha256": "a7d71d4e90b6cef9ff7226b5cb5cd91e675d8c1fe62c28e43289b40a5c682047",
+      "seconds": 8.411,
+      "bytes": 101609,
+      "promptHash": "d241333cd222b0647b96bd16ea0e2ce0d19c2b2836b059bf7a122b3b0b3601d4",
+      "sha256": "2d45fb64b965c2ac535d87bbfc6b9640228385066b46a7d95923e6e377143603",
       "lineCount": 1,
       "requests": 1,
       "speechRate": 0,
@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-26T18:50:40.603Z",
+  "updatedAt": "2026-09-27T10:15:42.144Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",

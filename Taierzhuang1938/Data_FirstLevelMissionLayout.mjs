@@ -732,7 +732,7 @@ export const MISSION_ANCHORS = Object.freeze({
   throw: Sortie.throw,
   village: { x: 55, z: -20 },
   melee: { x: 58, z: 6 },
-  transferSupply: { x: 93, z: 110 },
+  transferSupply: { x: 63.3, z: 87.1 },
   forwardNest: Sortie.leftGun,
   gate: { x: 53, z: 34 }, courtCover: { x: 67, z: 24 },
   transfer: { x: 95, z: 103 }, queue: { x: 74, z: 111 },
@@ -1002,7 +1002,9 @@ export const MISSION_SUPPLIES = Object.freeze([
   {id:"RightTrench",x:12.8,z:-142.7,supportHeight:null},
   {id:"Orders",x:Sortie.orders.x-1.5,z:Sortie.orders.z,supportHeight:null},
   {id:"Courtyard",x:50,z:33.05,supportHeight:null},
-  {id:"Transfer",x:93,z:110,supportHeight:1.15},
+  // 12 守的是村口低墙（2026-09-27，docs/Data_FirstLevelTransferCover20260927.md）：弹药箱放在
+  // 顺子射口身后、墙根那几只木箱旁边，不再搁在场院东头 TransferCrates 的顶上。
+  {id:"Transfer",x:63.3,z:87.1,supportHeight:null},
   {id:"Retreat",x:53.8,z:184,supportHeight:null},
   {id:"Reception",x:-7.8,z:231,supportHeight:null},
 ]);
@@ -1110,7 +1112,9 @@ for (const part of whiteboxPackages) {
     if (replaced.has(blocks[index].id)) blocks.splice(index, 1);
   blocks.push(...part.blocks);
 }
-export const MISSION_WHITEBOX_VERSION = "first-level-20260927-whitebox-05-18-r2";
+// r3（2026-09-27）：12 掩护装载改守来时路 —— 村口低墙两头残墙、墙外两栋残屋与门楼前空场的掩体、
+// 东巷院墙（docs/Data_FirstLevelTransferCover20260927.md）。
+export const MISSION_WHITEBOX_VERSION = "first-level-20260927-whitebox-05-18-r3";
 export const MISSION_TRENCH_PLACEMENTS = (() => {
   const shared = { groundAt: SampleMissionTerrain, laneCuts: FrontAssaultLaneCuts };
   const handPlaced = blocks.filter((block) => block.solid !== false)

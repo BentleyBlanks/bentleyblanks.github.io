@@ -16,6 +16,8 @@
 
 - **05–18 场景白盒按概念图重做（2026-09-27 起）**：[差距清单、约束、地形接口与分区](docs/Data_FirstLevelWhitebox0518Gap.md)。四区（A 05–07 / B 08–10 / C 11–14 / D 15–18）各改自己的 `Data_FirstLevelWhitebox<Front|Village|Transfer|Rear>` 体块包与 `Data_FirstLevelWhiteboxTerrain<Region>` 地形表（由 `SampleMissionTerrain` 统一叠加，门禁 `Script_FirstLevelWhiteboxTerrainTest`）；对照出图 `Script_FirstLevelWhitebox0518Shots.mjs`（机位表 `Data_FirstLevelWhitebox0518Cameras`）。07+ 地面指纹只在集成时重生。已实装，结果与遗留差距见该文 §5；13 空袭疏散 / 15A 撤退改走固定通道（`MID_TUNING.transferEvac`），地上平放的担架统一走 `MISSION_PLACEMENT.groundStretchers`（担架模型）。
 
+- **12「掩护装载与离开」改守来时路（2026-09-27）**：[口径](docs/Data_FirstLevelTransferCover20260927.md)。按概念图 12 备选 C 重做：守线是村口低墙（顺子射口 `A.transferWall`），墙外门楼前空场与两栋残屋是追兵跃进的开阔地；第一处威胁从 10 担架队走过的绕回短巷冲出来顺主街压向装载区，第二处是守线右手东巷口的机枪（`A.sideAlley` 改指东巷）。`MISSION_TACTICS` 新增可选 `mps` / `holdS`；装载受压判定点 `MID_TUNING.loadingThreatPoint`；取证 `Script_FirstLevelTransferCoverProbe.mjs`，对照机位 12_3 / 12_4。
+
 - **06–18 场景白盒采用 Notion 2026-09-24 参考迭代**：[概念/拓扑对应与验收](docs/Data_FirstLevelWhitebox20260924.md)。三个 `Data_FirstLevelWhitebox*` 模块承载村落、接运与后方体块，Layout统一接地与合并；夜门新增体块仍仅属于NightGate。06起连续验收可用 `Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=6`，加载时初始化06后不再跳阶段。
 
 - **03–05 当前采用稿为 Notion 2026.09.22 修订**：[正文](docs/Data_FirstLevelFrontSource20260922.md)、[白盒与连续流程](docs/Data_FirstLevelFrontTopology20260922.md)。以右侧夺点、同一撤口、同一道路战车、东南旧院取弹、原路返回攻击支路为准。导演为 `Script_FirstLevelFrontBattle`。本轮用户限定实机验收 03–06：`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=3 --stage-to=6`，仅加载时初始化 03，之后连续推进，不测试 07 及其他阶段。
