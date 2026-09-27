@@ -4,6 +4,9 @@
 
 ## 操作参考
 
+可炸断枯树：`Data_BreakableTreePlacements` / `Script_BreakableTrees`；
+布设、断裂资产、物理与回归入口见 [枯树说明](Data_BreakableTrees.md)。
+
 ### 出图（优先复用的入口；输出落 `_shots/`）
 
 ```powershell

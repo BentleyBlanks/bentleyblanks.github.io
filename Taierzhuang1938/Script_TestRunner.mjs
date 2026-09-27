@@ -47,6 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  BreakableTreesTest: {file:"Script_BreakableTreesTest.mjs",desc:"Seeded tree clearance, blast falloff and shipped split GLB budget"},
+  BreakableTreesBrowserTest: {file:"Script_BreakableTreesBrowserTest.mjs",timeoutMs:300000,desc:"Actual first-level trees: explosion, collider removal, falling, grounding and disposal"},
   FirstLevelDistantSmokeTest: {file:"Script_FirstLevelDistantSmokeTest.mjs",desc:"Reference smoke districts: clear routes, layered 04–06 views, bounded density and combat particle isolation"},
   FirstLevelDistantSmokeBrowserTest: {file:"Script_FirstLevelDistantSmokeBrowserTest.mjs",timeoutMs:120000,desc:"Smoke atlas GPU: real animation, low-quality density, occlusion, reset and one-draw budget"},
   BlastFeedbackTest: {file:"Script_BlastFeedbackTest.mjs",timeoutMs:300000,desc:"Shared grenade/shell camera response, bounded tinnitus, actual PCM, mute and reset"},
@@ -397,6 +399,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "BreakableTreesBrowserTest",
   "FirstLevelDistantSmokeBrowserTest",
   "OpeningActorPerformanceBrowserTest", "OpeningClipsBrowserTest", "FirstLevelVoicePerspectiveTest",
   "OpeningHandbackBrowserTest", "OpeningLensBrowserTest", "FirstLevelOpeningCampaignTest",
@@ -474,6 +477,7 @@ export const browserTests = new Set([
 ]);
 
 export const tier0Fast = [
+  "BreakableTreesTest",
   "FacialReviewTest",
   "CharacterSpeechTest",
   "SpeakerGestureTest",
@@ -543,6 +547,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest","FirstLevelDistantSmokeBrowserTest"]},
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest","OpeningStoryboardShotsTest"]},
   facialEditor: {label:"人物面部可视化编辑器",tests:["FacialReviewTest","FacialEditorBrowserTest","ModuleGraphTest"]},
@@ -653,6 +658,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"breakableTrees",pattern:/BreakableTree|Script_Combat|Script_FirstLevelWhiteboxField/},
   {domain:"distantSmoke",pattern:/FirstLevelDistantSmoke|BattleSmoke|Script_Vfx/},
   {domain:"facialEditor",pattern:/FacialReview|EditorFacial|FacialEditor/},
   {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear)/},

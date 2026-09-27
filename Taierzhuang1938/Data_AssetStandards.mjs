@@ -116,6 +116,10 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 }
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
+  Object.freeze({ id: "BreakableDeadTree", name: "可炸断枯树", pack: "Model_BreakableDeadTree.glb",
+    sourceTriangles: 499875, actualTriangles: 12251, targetTriangles: 12500,
+    sourceTexture: "用户提供的 FBX 内嵌 PBR", runtimeTexture: "2K 源 PBR / 程序木质断面",
+    policy: "target", note: "两份 FBX 几何相同；去土盘、减面、0.9 m 锯齿断口。源授权由用户保留，未声明 CC0。" }),
   Object.freeze({
     id: "GongxianGrenade", name: "国产木柄手榴弹", pack: "Model_Type24Grenade.glb",
     sourceTriangles: 4480, actualTriangles: 4480, targetTriangles: 4480,

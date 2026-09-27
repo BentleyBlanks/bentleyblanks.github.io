@@ -203,5 +203,9 @@ for (const [name,width,depth] of [["Model_CuredPorkWhole",.28,.038],["Model_Cure
     && span[2]>=depth*.95 && span[2]<depth*1.35,`${name} X 长边、Y 肥瘦分层、Z 厚度`,span.map(v=>v.toFixed(4)).join(" / "));
 }
 
+const treeCloud = GlbPoints(path.join(projectDir,"Model/Model_BreakableDeadTree.glb"));
+const treeY = treeCloud.map(p=>p[1]);
+Check(Math.abs(Math.min(...treeY))<0.001 && Math.abs(Math.max(...treeY)-7.2)<0.001,
+  "枯树导出为 Y-up、根部零高、7.2 m 米制尺寸");
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机机首与战车车头全部按几何复量落在 -Z");

@@ -30,6 +30,7 @@ import { LoadTrenchSurface, BuildTrenchSurface, PaintTrenchBatch } from "./Scrip
 import { MakeTrenchSurfacePatch } from "./Script_TrenchSurfaceMaterial.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { TerrainContactField } from "./Script_TerrainContact.mjs";
+import { BreakableTrees } from "./Script_BreakableTrees.mjs";
 
 export function IsP012TrainBlock(id) { return /^Station(?:Car\d|Engine|ExitStep)/.test(id); }
 /** 跟着车厢一起平移的那两扇门（SetTrainOffset 每帧改它们的 z）。 */
@@ -221,6 +222,7 @@ export class FirstLevelWhiteboxField {
       this.materials.set(semantic, material);
     }
     if(this.layout.fortifications)this.fortificationModels=await LoadMissionFortifications(this.library);
+    if(this.layout.fortifications)this.breakableTrees=await BreakableTrees.Load(this);
   }
 
   BuildWhiteBoxes() {
@@ -470,6 +472,7 @@ export class FirstLevelWhiteboxField {
     this.BuildScenarioWarm();
     this.BuildLegend();
     this.BuildSupplyLabels();
+    for(const tree of this.breakableTrees?.trees || [])this.colliders.push(tree.stump,tree.trunk);
     yield { label: T("p012.whitebox.build.collision"), progress: 0.88 };
     this.BuildCollisionGrid();
     yield { label: T("p012.whitebox.build.ready"), progress: 1 };
@@ -814,6 +817,7 @@ export class FirstLevelWhiteboxField {
   }
 
   Dispose() {
+    this.breakableTrees?.Dispose(); this.breakableTrees=null;
     this.legend?.remove(); this.legend = null;
     for(const texture of this.labelTextures||[])texture.dispose();
     const disposedMaterials = new Set();

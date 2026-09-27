@@ -542,6 +542,7 @@ export class CombatSystem {
   }
 
   Update(dt, ctx) {
+    this.host.battlefield.breakableTrees?.Update(dt);
     this.time += dt;
     if (this.mortarCooldown > 0) this.mortarCooldown -= dt;
     if (this.runnerCooldown > 0) this.runnerCooldown -= dt;
@@ -749,6 +750,7 @@ export class CombatSystem {
       this.host.destruction.Blast(position, radius, damage, { kind });
     }
     this.host.battlefield.deformation?.ApplyBlast(position, explosiveId);
+    this.host.battlefield.breakableTrees?.Blast(position, radius, damage);
     const bf = this.host.battlefield;
     const ai = this.host.ai;
     const from = position.clone();

@@ -1,0 +1,15 @@
+{
+  "sourceFiles": [
+    "Tree_50K.fbx",
+    "Tree_50k_1.fbx"
+  ],
+  "identicalSources": true,
+  "sourceTriangles": 499875,
+  "height": 7.2,
+  "breakHeight": 0.9,
+  "parts": {
+    "Stump": 2083,
+    "Crown": 10168
+  },
+  "bytes": 13594448
+}
