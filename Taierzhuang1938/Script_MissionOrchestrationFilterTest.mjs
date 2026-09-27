@@ -178,7 +178,7 @@ for (const row of rows) {
 const gunner = rows.find((row) => row.member === "TransferGunner");
 Check(gunner.group === "转运区第 1 处威胁" && gunner.stateText === "活跃"
   && gunner.weaponText === "机枪" && gunner.traitText.includes("钉在原地")
-  && gunner.spawnText === "79, 46",
+  && gunner.spawnText === "71, 39",
   `TransferGunner 这一行：${gunner.group} / ${gunner.stateText} / ${gunner.weaponText} / ${gunner.traitText}`);
 
 // 实时：有 live 才填「实时」列

@@ -58,7 +58,7 @@
 
 | 拨 | 人 | 路线（折点钉在掩体北侧 0.45 m，离开时绕掩体一头） | 落脚 |
 | --- | --- | --- | --- |
-| 第一处 `transfer`（出生在绕回短巷 x 59–70、z 39–41；`fact: transferArrived`，顺子上了低墙才冲出来） | 机枪 TransferGunner | 出巷口 → 主街中线 → 门楼北侧翻车后 | (79.2,65.85) |
+| 第一处 `transfer`（出生在绕回短巷 x 53–71、z 38.8–42.6，两排错开 4.5–5 m；`fact: transferArrived`，顺子上了低墙才冲出来） | 机枪 TransferGunner | 出巷口 → 主街中线 → 门楼北侧翻车后 | (79.2,65.85) |
 | | TransferRifleA / B | 出巷口 → 主街 → 西巷口 → 西巷货箱 → 巷口碎砖 → A 钻进西北残屋的南窗、B 蹲到路西断墙后 | (61.4,80.45) / (66.4,74.8) |
 | | TransferRifleC | 出巷口 → 西巷口木箱 → 门楼西翼墙 → 穿门洞 → 路口墙土 | (74.6,78.4) |
 | | TransferRifleD（上刺刀）/ E | 出巷口 → 路东麻袋 → 门楼东翼墙 → 穿门洞 → D 翻车后、E 草垛后 | (84.9,75.83) / (87.2,77.75) |
@@ -103,7 +103,8 @@ node Taierzhuang1938/Script_FirstLevelLeaderGuideTest.mjs
 node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs
 ```
 
-`Script_FirstLevelMissionFortificationsTest` 在改动前的基线（48a1c460）上就红（全关铁丝网「射击缺口」为 null），与本次无关。
+既有红（改动前的基线 48a1c460 上就红，与本次无关）：`Script_FirstLevelMissionFortificationsTest`（全关铁丝网「射击缺口」为 null）、
+`Script_OrchestrationEditorTest` 的「入口面板共 26 个按钮」（09-26 加了表情审阅编辑器后是 27 个）。
 
 实机：
 
@@ -113,3 +114,15 @@ node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs
 - 整段 `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-jumps --stage-from=11 --stage-to=14`
   （驾驶脚本 12 段：取弹 → 射口打第一拨 → 沿墙挪到东段打第二拨 → 回场院上车）。
 - 对照出图 `Script_FirstLevelWhitebox0518Shots.mjs --only=12_1,12_3,12_4`（12_3 = 概念图 C 的机位，12_4 = 低墙东段朝东巷口）。
+
+2026-09-27 实测（真实输入驾驶，`--stage-from=11 --stage-to=14`，页面报错 0）：12 用时 208 s —— 第一拨约 70 s 打退（此前装车数一直是 0），
+12 s 后东巷那一拨露头，111 s 第一批 2 人装车、1 辆车开走，121 s 东巷解除，192 s 轮到老周，199 s 何有田接位；13–14 照常。
+第一拨六人死在门楼翻车旁、西北残屋里、路西断墙后与门洞口（确实冲出来了）。取证里两拨九人没有一次「跑动中原地不动」超过 0.5 s
+（东巷 B 在草垛后停过 3 s，是到位后的掩体停留）。
+
+## 6. 已知的边界
+
+- 班里人遵守 09-16 定的交战规则：看见 50 m 内的敌人就地找掩体。玩家一进 12 就冲上墙（取证里是瞬移）时，追兵出巷比班里人到位早，
+  罗班长和刘文财会停在场院半路打；正常走过去（8–10 s）时他们先到墙。没为这一段改交战规则。
+- 13 空袭后的村东追兵（`air` 组）仍从场院东边的空地上来，没挪到东巷。
+- 低墙石块仍是白盒的蓝色 cover 语义色（与 05–18 白盒口径一致），不是概念图里的红砖胸墙。

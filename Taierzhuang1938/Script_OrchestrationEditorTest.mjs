@@ -780,7 +780,7 @@ try {
     table.filtered.join(" "));
   Check("行里写着组 / 编号 / 出现 / 本阶段 / 武器 / 特点 / 出生点 / 路线点",
     table.cells[1] === "TransferGunner" && table.cells[2] === "第 12 阶段" && table.cells[3] === "活跃"
-    && table.cells[4] === "机枪" && table.cells[5].includes("钉在原地") && table.cells[6] === "79, 46",
+    && table.cells[4] === "机枪" && table.cells[5].includes("钉在原地") && table.cells[6] === "71, 39",
     table.cells.join(" ｜ "));
   Check("点一行 = 选中那个人（右栏与地图一起跟过去）",
     table.picked.sel?.kind === "member" && table.picked.sel?.id === "TransferGunner"
@@ -790,7 +790,7 @@ try {
     `收起后 ${table.collapsed} 行、摊开后 ${table.reopened} 行`);
   Check("点表头按那一列排（按本阶段排时活跃的在最前）", table.sortedFirst === "活跃", String(table.sortedFirst));
   Check("「复制 CSV」首行是中文表头",
-    table.csvHead === "组,编号,出现,本阶段,武器,特点,出生点,路线点,实时" && table.csvLines === 5,
+    table.csvHead === "组,编号,出现,本阶段,武器,特点,出生点,路线点,实时" && table.csvLines === 7,
     `${table.csvHead}（${table.csvLines - 1} 行数据）`);
 
   // 抽屉收起来再往下走：底下那几段要量整张俯视图（批注截图的体积也是按它算的）。
