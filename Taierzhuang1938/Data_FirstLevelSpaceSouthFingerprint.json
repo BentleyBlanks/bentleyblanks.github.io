@@ -1,6 +1,6 @@
 {
- "note": "01-06 rebuild guard: MISSION_LAYOUT.blocks, MISSION_TRENCH_PLACEMENTS, MISSION_AFTERMATH and SampleMissionTerrain south of z=-95 (07 onward). History: f581ac7dd (pre-rebuild) -> b3ba06096 (2026-09-24 06-18 whitebox) -> a3cecea79 (2026-09-27 05-18 concept-frame whitebox rebuild, docs/Data_FirstLevelWhitebox0518Gap.md; user-authorised change of 07+ blocks, terrain and trench dressing) -> fae97d50 (kitchen door jambs flush with the infill; blocks only). Regenerate only from the baseline: git archive <baseline> Taierzhuang1938, then Script_FirstLevelSpaceProbe.SouthFingerprint over its modules.",
- "baseline": "fae97d50",
+ "note": "01-06 rebuild guard: MISSION_LAYOUT.blocks, MISSION_TRENCH_PLACEMENTS, MISSION_AFTERMATH and SampleMissionTerrain south of z=-95 (07 onward). History: f581ac7dd (pre-rebuild) -> b3ba06096 (2026-09-24 06-18 whitebox) -> 12aa1e956 (2026-09-27 05-18 concept-frame whitebox rebuild, docs/Data_FirstLevelWhitebox0518Gap.md; user-authorised change of 07+ blocks, terrain and trench dressing) -> 8a83ab61 (kitchen door jambs flush with the infill; blocks only). Regenerate only from the baseline: git archive <baseline> Taierzhuang1938, then Script_FirstLevelSpaceProbe.SouthFingerprint over its modules.",
+ "baseline": "8a83ab61",
  "zMin": -95,
  "blocks": {
   "count": 2512,
@@ -23,7 +23,7 @@
   "count": 56048,
   "sha": "98f8a65f2b5e9dcc"
  },
- "previousBaseline": "a3cecea79",
+ "previousBaseline": "12aa1e956",
  "structuralBlocks": {
   "count": 2512,
   "sha": "e92c61afb98b451c"
