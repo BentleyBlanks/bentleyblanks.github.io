@@ -158,7 +158,7 @@ const PROPAGATION_CUES = new Set([
 ]);
 /** 枪类 cue 里 FAR_CUE / SAMPLE_BURST 覆盖不到的那几条。 */
 const GUN_EXTRA_CUES = new Set([
-  "rifleNra", "rifleHanYang", "rifleIja", "zb26", "type11", "type92",
+  "rifleNra", "rifleHanYang", "rifleIja", "zb26", "type11", "type92", "tankMg",
   "strafeNear", "strafeFar", "strafeDirt",
 ]);
 
@@ -986,6 +986,18 @@ const RECIPES = {
       mechFreq: 5600, mechLevel: 0.22, mechDelay: 0.012,
       tailDur: 0.45, tailLevel: 0.055, wet: 0.32,
     }, shots, 60 / 500);
+  },
+
+  // 战车机枪（八九式甲的九一式车载机枪，2026-09-27）：实录走 Warfare Library 那挺通用机枪，
+  // 这一条只是采样载不到时的回落 —— 比十一年式低、厚。
+  tankMg(A, v) {
+    const shots = Clamp(v.burst ?? 4, 1, 12);
+    GunAuto(A, v, {
+      thumpHi: 130, thumpLo: 58, thumpDur: 0.08, thumpLevel: 0.6,
+      blastFreq: 2300, blastQ: 0.7, blastLevel: 0.8, blastDecay: 0.05, drive: 0.7,
+      mechFreq: 4800, mechLevel: 0.18, mechDelay: 0.015,
+      tailDur: 0.6, tailLevel: 0.08, wet: 0.3,
+    }, shots, 60 / 430);
   },
 
   // 九二式重机枪：**实际射速约 200 发/分 = 0.30 s 一发**。
@@ -2495,7 +2507,7 @@ function GunFarAuto(v, p, shots, interval) {
 }
 
 // 连发武器的默认点射长度。游戏逻辑若逐发驱动，传 { burst: 1 } 即可。
-const BURST_DEFAULT = { zb26: 3, type11: 4, type92: 3 };
+const BURST_DEFAULT = { zb26: 3, type11: 4, type92: 3, tankMg: 4 };
 
 // 低优先级音效：节点预算紧张时先丢它们（丢一记脚步没人发现，丢一发爆炸就穿帮）。
 // 低优先级的门槛按 NODE_BUDGET * LOW_PRIORITY_HEADROOM 算，给要紧的声音留位置。
@@ -2629,8 +2641,11 @@ const OCCLUSION_MAX_BLAST = 0.25;
  * 战车常驻循环（发动机 / 履带 / 手摇）的遮挡封顶（战车包 2026-09-23）。
  * 12 吨的车隔着一道土坎：高频被挡掉，隆隆声照样翻过来 —— 03「先闻其声」靠的就是这一层。
  * 探针对整道高地后面的车给 1.0（实测），不封顶就是 −12 dB 干声 + 800 Hz 低通，两百米外等于没有。
+ * 【2026-09-27】0.5 → 0.3（−3.6 dB + 约 6.9 kHz）。用户：「没有轰鸣声」。09-27 探针：04/05 玩家大半时间趴在
+ * 阵位 / 墙后，看不见车体的采样占八成以上，引擎一直吃着封顶值；而这几条的能量几乎全在 1 kHz 以下，
+ * 矮墙与土坎挡不住这一段（绕射），−6 dB 等于把「车就在墙那边」这件事删了一半。
  */
-const OCCLUSION_MAX_TANK_LOOP = 0.5;
+const OCCLUSION_MAX_TANK_LOOP = 0.3;
 
 /**
  * 喊话的嘴离脚底多高。与 `Data_Companions.COMPANION_TUNING.mouthY`（1.52）同值 ——
@@ -2709,7 +2724,7 @@ function WetFalloff(distance) {
 const NODE_COST = {
   zb26: 19, bolt: 19, boltHanYang: 19, stripperLoad: 19, shellImpact: 19, bodyFall: 19,
   type92: 18, explosionNear: 18,
-  rifleNra: 16, rifleHanYang: 16, rifleIja: 16, type11: 16, bayonetHit: 16, magIn: 15,
+  rifleNra: 16, rifleHanYang: 16, rifleIja: 16, type11: 16, tankMg: 16, bayonetHit: 16, magIn: 15,
   rifleNraFar: 14, rifleIjaFar: 14, impactMetal: 14,
   grenadePin: 13, impactBrick: 13, impactWood: 13, footstepRubble: 13, hurt: 13,
   dadaoHit: 12, shellIncoming: 11, whistle: 11,
@@ -2773,7 +2788,7 @@ const DEFAULT_COST = 19;
  *     （换没换弹、刀挥空没有），听不见等于没有。
  */
 const MIX_GAIN = {
-  zb26: 0.71, type11: 0.70, type92: 0.67,
+  zb26: 0.71, type11: 0.70, type92: 0.67, tankMg: 0.7,
   bolt: 3.9, boltHanYang: 3.9, grenadePin: 3.9, hurt: 3.6, dadaoSwing: 3.0,
   rifleNraFar: 2.2, rifleIjaFar: 2.2,
   impactMetal: 1.75, grenadeThrow: 1.5, impactBrick: 1.5,
@@ -2843,7 +2858,8 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-24：十一年式换枪声（用户拍板）：type11 = SeedAudio 1 + MINIMI 1 m 2，type11Far 补 MINIMI 50 m 2；
 // AudioSfx_Type11_01/02 同文件名、内容变了（BAR 0.1 m → MINIMI），不抬戳就还是缓存里的 BAR。
 // 2026-09-25：type11 去掉 SeedAudio 生成音、只留 MINIMI 1 m 两条（用户定，清单条目变了）。
-export const SFX_PACK_VERSION = "20260925type11minimionly";
+// 2026-09-27：战车机枪单开 tankMg（Warfare Library 通用机枪三条），清单新增一个 cue。
+export const SFX_PACK_VERSION = "20260927tankmg";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -2942,6 +2958,7 @@ const SAMPLE_BURST = {
   zb26: 60 / 500,      // 捷克式 500 rpm
   type11: 60 / 500,    // 十一年式 500 rpm
   type92: 60 / 200,    // 九二式 200 rpm ——「啄木鸟」的间隔
+  tankMg: 0.14,        // 战车机枪：与 Data_Tuning_Tank.mg.shotIntervalS 同一个数（≈430 rpm）
   // --- 接线批 INT4（2026-09-08）：三挺机枪的远场 --------------------------
   // **射速与近场是同一组数**（同一挺枪，只是听的位置换了）。
   // 登记在这儿还有一件副作用是要的：CullDistance 会因此把这三条按枪声那一档
@@ -2965,6 +2982,8 @@ const SAMPLE_BURST = {
 const SAMPLE_MIX = {
   explosionNear: 1.0, shellImpact: 0.95, launcherPop: 0.72,
   rifleNra: 0.88, rifleIja: 0.86, type92: 0.8, zb26: 0.76, type11: 0.72,
+  // 战车机枪：素材自带野地回声、>2.5 kHz 比十一年式少 3 dB（重），站得比步兵那挺轻机高一档。
+  tankMg: 0.82,
   explosionFar: 0.5, rifleNraFar: 0.42, rifleIjaFar: 0.46, shellIncoming: 0.62,
   bolt: 0.95, stripperLoad: 1.0, magIn: 1.0, grenadePin: 0.7, grenadeThrow: 0.5,
   // 汉阳造两条是 2026-09-13 用户试听确认过的一整条（混音 0.88、枪机段 +8.83 dB）拆出来的，
@@ -3038,6 +3057,7 @@ const SAMPLE_WET = {
   // boltHanYang 不按操作音那一档（0.08）给：试听确认的是它在枪声那条里、吃 0.42 的样子。
   rifleNra: 0.42, rifleHanYang: 0.42, boltHanYang: 0.42, rifleIja: 0.38, rifleNraFar: 0.55, rifleIjaFar: 0.55,
   zb26: 0.36, type11: 0.32, type92: 0.42,
+  tankMg: 0.26,   // 素材里已经有野地拖出来的尾巴，send 给少一点，别把一串点射糊成一片
   explosionNear: 0.45, explosionFar: 0.55, shellImpact: 0.45, shellIncoming: 0.3,
   launcherPop: 0.35, bugleCharge: 0.55, whistle: 0.45,
   bolt: 0.08, stripperLoad: 0.08, magIn: 0.08,
@@ -3218,7 +3238,8 @@ const TANK_LOOP_CUES = new Set(["tankEngine", "tankTracks", "tankTurret"]);
 
 /** 发动机的次低频层。 */
 function TankSubLayer(v) {
-  const o = v.Osc("sawtooth", 32), lp = v.Filter("lowpass", 120, 0.7), g = v.Gain(FLOOR);
+  // 低通 160 Hz（2026-09-27，原 120）：30–70 Hz 的基频在多数耳机上听不见，「嗵嗵嗵」靠 3–5 次谐波。
+  const o = v.Osc("sawtooth", 32), lp = v.Filter("lowpass", 160, 0.7), g = v.Gain(FLOOR);
   o.connect(lp).connect(g).connect(v.out);
   o.start(v.t);
   return { o, g };
@@ -5091,7 +5112,7 @@ export class AudioEngine {
    *
    * 探针返回 undefined = 「这一次不知道」，沿用旧值而不是当作通透。
    */
-  Occlusion(position, distance) {
+  Occlusion(position, distance, exclude = null) {
     const probe = this.probes.occlusion;
     if (!probe || !position || !this.ctx) return 0;
     if (distance <= OCCLUSION_MIN_M) return 0;
@@ -5104,7 +5125,7 @@ export class AudioEngine {
     }
     const key = `${Math.round(position.x / OCCLUSION_CELL_M)},`
       + `${Math.round(position.y / OCCLUSION_CELL_M)},`
-      + `${Math.round(position.z / OCCLUSION_CELL_M)}`;
+      + `${Math.round(position.z / OCCLUSION_CELL_M)}` + (exclude ? "|x" : "");
     const hit = this.occCache.get(key);
     if (hit !== undefined && now - hit.at < OCCLUSION_CACHE_S) {
       this.stats.occlusionCached += 1;
@@ -5119,7 +5140,7 @@ export class AudioEngine {
     this.stats.occlusionQueries += 1;
     let value = hit ? hit.value : 0;
     try {
-      const raw = probe({ x: L.x, y: L.y, z: L.z }, position);
+      const raw = exclude ? probe({ x: L.x, y: L.y, z: L.z }, position, { exclude }) : probe({ x: L.x, y: L.y, z: L.z }, position);
       if (raw !== undefined && raw !== null && Number.isFinite(Number(raw))) value = Clamp01(Number(raw));
     } catch (err) {
       // 探针抛了不该让这一声静音（与配方异常同一条原则），但要留痕迹。
@@ -5251,7 +5272,7 @@ export class AudioEngine {
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
     bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null,
     weaponClass = null, sourceSizeM = 0, storySpeech = false, selfCapped = false, yieldFirst = false, propagate = true,
-    blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false } = {}) {
+    blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false, occlusionExclude = null } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
     // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
@@ -5400,7 +5421,11 @@ export class AudioEngine {
     if (position) {
       // 遮挡：一次射线（有缓存与每帧预算，见 Occlusion）。
       // 室内/室外的分界再叠一档 —— 射线回答不了「你在屋里」这件事（门开着射线就是通的）。
-      let occ = occlusion !== null ? Clamp01(occlusion) : this.Occlusion(position, distance);
+      // occlusionExclude：发声体自己的碰撞记录（战车，2026-09-27）。引擎挂点与车载机枪都在车体碰撞盒
+      // 里面或贴着它，不排除的话射线先撞上自己 —— 车在开阔地上也被判成「墙后」（−6 dB + 4 kHz 低通、
+      // 机枪 −12 dB + 800 Hz），那就是「战车没有轰鸣声」「机枪闷得怪」的一大半。MoveVoice 重查时沿用。
+      v.occlusionExclude = occlusionExclude;
+      let occ = occlusion !== null ? Clamp01(occlusion) : this.Occlusion(position, distance, occlusionExclude);
       if (this.ZoneBoundary(zone)) occ = Clamp01(occ + ZONE_BOUNDARY_OCC);
       // 人说话封顶（见 IsVoiceCue 第 3 条）。放在 ZoneBoundary **之后**：
       // 那一档加的 0.35 本来就常常是探针把开阔地判成室内加出来的
@@ -5466,7 +5491,9 @@ export class AudioEngine {
       // 信息，不是背景里的远处战斗，压掉它就等于把命令删了。
       // farGrouped 是**取证字段**：WebAudio 读不出一个节点接到哪儿去了，
       // 而「这句喊话有没有被扔进远声组」正是 Script_AudioWiringTest 要断言的事。
-      v.farGrouped = bus === "sfx" && distance > FAR_GROUP_M && !IsVoiceCue(name);
+      // 战车常驻循环也不进：远近是起播那一刻定的，而这三条是从一百多米外（03 先闻其声）一路开到
+      // 玩家跟前的同一条 voice —— 进了远声组就一直挂在那儿，车到了十米外，玩家每扣一次扳机它照样让 −3 dB。
+      v.farGrouped = bus === "sfx" && distance > FAR_GROUP_M && !IsVoiceCue(name) && !TANK_LOOP_CUES.has(name);
       if (storySpeech) {
         const world = v.Gain(1), self = v.Gain(0);
         // Own speech must not inherit the world source's HRTF, occlusion,
@@ -5599,7 +5626,7 @@ export class AudioEngine {
     if (voice.occGain || this.probes.occlusion) {
       if (t - (voice.occAt ?? -1) >= OCCLUSION_REFRESH_S) {
         voice.occAt = t;
-        let occ = this.Occlusion(position, distance);
+        let occ = this.Occlusion(position, distance, voice.occlusionExclude);
         if (this.ZoneBoundary(voice.reverbZone || this.space)) occ = Clamp01(occ + ZONE_BOUNDARY_OCC);
         if (IsVoiceCue(voice.name)) occ = Math.min(occ, OCCLUSION_MAX_VOICE);   // 与 Play 同一道封顶
         if (TANK_LOOP_CUES.has(voice.name)) occ = Math.min(occ, OCCLUSION_MAX_TANK_LOOP);

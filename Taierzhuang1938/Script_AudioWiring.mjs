@@ -122,6 +122,8 @@ const FAR_SECTOR_CUE = {
   zb26: "zb26Far", zb26Far: "zb26Far",
   type11: "type11Far", type11Far: "type11Far",
   type92: "type92Far", type92Far: "type92Far",
+  // 战车机枪（通用机枪实录）落到同类的 L7A2 50 m 那条上。
+  tankMg: "zb26Far",
 };
 function FarSectorCue(cue) { return FAR_SECTOR_CUE[cue] || null; }
 /** 这几条是连发的远场（SAMPLE_BURST 里有射速），扇区层要给 burst 发数。 */
@@ -262,7 +264,7 @@ export class AudioWiring {
    */
   Probes() {
     return {
-      occlusion: (from, to) => this.Occlusion(from, to),
+      occlusion: (from, to, opts) => this.Occlusion(from, to, opts),
       zone: (position) => this.Zone(position),
     };
   }
@@ -294,11 +296,11 @@ export class AudioWiring {
    * @returns {number|undefined} 0 通透 / partialOcc 矮挡 / 1 挡死；
    *   undefined = 这一帧没有战场可问
    */
-  Occlusion(from, to, { rise = true } = {}) {
+  Occlusion(from, to, { rise = true, exclude = null } = {}) {
     const bf = this.Battlefield;
     if (!bf || !from || !to) return undefined;
     const g = PROBE.gridM;
-    const key = `${rise ? "s" : "r"}|`
+    const key = `${rise ? "s" : "r"}${exclude ? "x" : ""}|`
       + `${Math.round(from.x / g)},${Math.round(from.y / g)},${Math.round(from.z / g)}`
       + `|${Math.round(to.x / g)},${Math.round(to.y / g)},${Math.round(to.z / g)}`;
     const cached = this.occCache.get(key);
@@ -318,7 +320,7 @@ export class AudioWiring {
       const hit = bf.Raycast(
         { x: from.x, y: from.y, z: from.z },
         { x: dx / dist, y: dy / dist, z: dz / dist },
-        dist, { terrain: true },
+        dist, exclude ? { terrain: true, excludeCollider: exclude } : { terrain: true },
       );
       // 留 0.4 m 余量：擦着声源旁边的墙角不算挡住。
       return !!(hit && hit.t < dist - 0.4);

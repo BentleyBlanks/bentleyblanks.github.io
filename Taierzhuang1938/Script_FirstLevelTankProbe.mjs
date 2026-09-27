@@ -46,7 +46,19 @@ async function InstallSampler(page, lane) {
   await page.evaluate(async (lane) => {
     const g = window.Tengxian, R = g.Debug.FirstLevelMissionRuntime(), tr = R.tankRuntime;
     const { YawTo } = await import("./Script_FirstLevelTankBrain.mjs");
-    const probe = window.tankProbe = { samples: [], nextAt: -1 };
+    const probe = window.tankProbe = { samples: [], nextAt: -1, mg: [] };
+    // 车载机枪每一发：实际吃到的遮挡 / 电平，旁边给「不排除车自己的碰撞盒」时射线会判多少（2026-09-27 取证：
+    // 车体把自己的枪口和发动机挡成「墙后」）。认法：带 occlusionExclude 的，或旧版那条 2.6 kHz 车内低通。
+    const audio = g.audio, playGun = audio.PlayGunshot.bind(audio);
+    audio.PlayGunshot = (name, opts = {}) => {
+      const v = playGun(name, opts);
+      if ((opts.occlusionExclude || opts.airCut === 2600) && opts.position && probe.mg.length < 4000) {
+        const L = audio.listenerPos, P = opts.position, d = Math.hypot(P.x - L.x, P.y - L.y, P.z - L.z);
+        probe.mg.push({ t: +R.time.toFixed(2), stage: R.flow.stage.id, cue: name, d: +d.toFixed(1), occ: v ? +(v.occ || 0).toFixed(2) : null,
+          gain: v ? +(v.effectiveGain || 0).toFixed(4) : null, occSelf: +audio.Occlusion(P, d).toFixed(2) });
+      }
+      return v;
+    };
     const original = tr.Update.bind(tr);
     tr.Update = (dt) => {
       original(dt);
@@ -70,6 +82,9 @@ async function InstallSampler(page, lane) {
         player: p ? { x: +p.position.x.toFixed(2), z: +p.position.z.toFixed(2), alive: p.Alive, health: Math.round(p.health) } : null,
         seen, hull, aimed, hullAimed,
         audio: s ? { live: s.liveLoops, engine: s.loops.tankEngine?.effectiveGain ?? 0, engineOcc: s.loops.tankEngine?.occ ?? 0,
+          // 同一时刻不排除车自己的碰撞盒时射线判多少（对照：修之前引擎一直吃这个数）。
+          engineOccSelf: present && s.loops.tankEngine ? +a.Occlusion({ x: t.x, y: R.view.tank.position.y + 1.1, z: t.z }, s.loops.tankEngine.distance || 0).toFixed(2) : null,
+          farGrouped: !!tr.sound?.loops.tankEngine?.farGrouped,
           tracks: s.loops.tankTracks?.effectiveGain ?? 0, turret: s.loops.tankTurret?.effectiveGain ?? 0,
           distance: s.loops.tankEngine?.distance ?? null, layers: s.last?.engine?.gains?.map((v) => +v.toFixed(3)) ?? null,
           crank: s.last?.turret?.gains?.[0] ?? 0, offstage: !!s.last?.offstage } : null,
@@ -93,7 +108,9 @@ function Windows(samples, flag, minS = 0) {
   return out;
 }
 
-function Metrics(samples, debug) {
+const Median = (values) => { const v = values.filter(Number.isFinite).sort((a, b) => a - b); return v.length ? v[v.length >> 1] : null; };
+
+function Metrics(samples, debug, mgPlays = []) {
   const log = debug.log, tel = debug.telemetry || {};
   const firstEngine = samples.find((s) => s.audio && s.audio.engine > 0);
   const appeared = log.appearedAt;
@@ -138,10 +155,19 @@ function Metrics(samples, debug) {
   const audioSamples = samples.filter((s) => s.audio);
   const byStage = {};
   for (const s of audioSamples) {
-    const e = byStage[s.stage] ||= { n: 0, engine: 0, rifleRef: 0, maxLive: 0, nodesMax: 0 };
+    const e = byStage[s.stage] ||= { n: 0, engine: 0, rifleRef: 0, maxLive: 0, nodesMax: 0, occ: [], occSelf: [], farGrouped: 0 };
     e.n += 1; e.engine += s.audio.engine; e.rifleRef += s.rifleRef || 0; e.maxLive = Math.max(e.maxLive, s.audio.live); e.nodesMax = Math.max(e.nodesMax, s.nodes);
+    if (s.present) { e.occ.push(s.audio.engineOcc); e.occSelf.push(s.audio.engineOccSelf); e.farGrouped += s.audio.farGrouped ? 1 : 0; }
   }
-  for (const e of Object.values(byStage)) { e.engine = Round(e.engine / e.n, 4); e.rifleRef = Round(e.rifleRef / e.n, 4); }
+  for (const e of Object.values(byStage)) {
+    e.engine = Round(e.engine / e.n, 4); e.rifleRef = Round(e.rifleRef / e.n, 4);
+    e.engineOccMedian = Median(e.occ); e.engineOccSelfMedian = Median(e.occSelf); delete e.occ; delete e.occSelf;
+  }
+  const mgAudio = Object.fromEntries(["Support", "MachineGun", "Tank"].map((st) => {
+    const m = mgPlays.filter((p) => p.stage === st);
+    return [st, { shots: m.length, cue: m[0]?.cue ?? null, distanceMedian: Median(m.map((p) => p.d)), occMedian: Median(m.map((p) => p.occ)),
+      occSelfMedian: Median(m.map((p) => p.occSelf)), gainMedian: Median(m.map((p) => p.gain)) }];
+  }));
   return {
     appearance: appeared ? { ...appeared, t: Round(appeared.t), distance: Round(appeared.distance, 1),
       playerExposedToTank: atAppear ? !!atAppear.seen : null, hullVisible: atAppear ? !!atAppear.hull : null,
@@ -170,7 +196,7 @@ function Metrics(samples, debug) {
     entry: log.entry, luoFinish: log.luoFinish, frames: log.frames,
     reactions,
     states: log.states.map((s) => ({ ...s, t: Round(s.t) })),
-    audio: { maxLiveLoops: Math.max(0, ...audioSamples.map((s) => s.audio.live)), byStage,
+    audio: { maxLiveLoops: Math.max(0, ...audioSamples.map((s) => s.audio.live)), byStage, mg: mgAudio,
       loopsAfterDisable: afterDisable.length ? Math.max(...afterDisable.map((s) => s.audio.live)) : null,
       final: debug.audio },
   };
@@ -189,15 +215,19 @@ async function RunCampaign() {
     await DriveFront(ctx);
     const data = await page.evaluate(() => ({
       samples: window.tankProbe.samples,
+      mg: window.tankProbe.mg,
       debug: window.Tengxian.Debug.FirstLevelMission().tankBrain,
       stage: window.Tengxian.Debug.FirstLevelMission().stage,
     }));
-    const metrics = Metrics(data.samples, data.debug);
-    await fs.writeFile(path.join(output, "Data_TankProbe.json"), JSON.stringify({ metrics, samples: data.samples }, null, 1));
+    const metrics = Metrics(data.samples, data.debug, data.mg);
+    await fs.writeFile(path.join(output, "Data_TankProbe.json"), JSON.stringify({ metrics, samples: data.samples, mg: data.mg }, null, 1));
     console.log(JSON.stringify({ ...metrics, shots: metrics.shots.length, states: metrics.states }, null, 1).slice(0, 6000));
     assert.deepEqual(ctx.errors, [], "no page errors");
     assert.ok(metrics.appearance, "the tank appeared to the player");
     assert.ok(metrics.appearance.heardBeforeSeenS > 0, `engine heard before the turret is seen (${metrics.appearance.heardBeforeSeenS} s)`);
+    // 2026-09-27：车载机枪走自己的 cue；引擎那条一路开到跟前的 voice 不许挂在远声组上（玩家开枪就让 −3 dB）。
+    assert.ok(data.mg.length > 0 && data.mg.every((p) => p.cue === TANK.audio.mgCue), `tank MG plays its own cue ${TANK.audio.mgCue} (${data.mg.length} shots)`);
+    assert.ok(Object.values(metrics.audio.byStage).every((e) => !e.farGrouped), "the engine loop is never in the far group");
     assert.ok(metrics.audio.maxLiveLoops <= 3, `contract §6: ≤ 3 resident tank loops (max ${metrics.audio.maxLiveLoops})`);
     assert.ok(metrics.shots.length >= 2 && metrics.telegraph.minLayS >= TANK.gunner.layMinS - 0.05,
       `every main-gun shot has the 1.2–1.8 s lay pause (${metrics.shots.length} shots, min ${metrics.telegraph.minLayS} s)`);

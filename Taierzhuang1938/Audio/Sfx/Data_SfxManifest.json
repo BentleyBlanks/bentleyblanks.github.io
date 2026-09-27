@@ -939,9 +939,19 @@
       "seconds": 1.42,
       "credit": "Volcengine SeedAudio 1.0 · 熄火后金属冷却滴答（拟音替身：热铁皮冷却） · 2026-09-23",
       "license": "volcengine"
+    },
+    "tankMg": {
+      "files": [
+        "AudioSfx_TankMg_01.mp3",
+        "AudioSfx_TankMg_02.mp3",
+        "AudioSfx_TankMg_03.mp3"
+      ],
+      "seconds": 1.05,
+      "credit": "Pole Position Production · The Warfare Library 机枪近距·开阔野地 · Sonniss GDC 2017",
+      "license": "sonniss"
     }
   },
-  "bakedAt": "2026-09-24",
+  "bakedAt": "2026-09-27",
   "normalization": {
     "normalizedAt": "2026-09-08",
     "tool": "Script_AudioNormalize.mjs",

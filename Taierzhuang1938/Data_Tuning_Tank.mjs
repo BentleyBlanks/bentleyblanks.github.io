@@ -306,8 +306,11 @@ export const TANK = Object.freeze({
     engineY: 1.1,
     turretY: 1.8,
     // 发动机两层等功率交叉：x = (rpm − 怠速) / (满转 − 怠速)。
-    // [素] 四号 G 型原录音里怠速段比稳态高转段轻约 9.5 dB（−24.3 vs −14.9 dBFS 有声段），烘焙对齐之后在这里还原。
-    idleGain: 0.34,
+    // [素] 四号 G 型原录音里怠速段比稳态高转段轻约 9.5 dB（−24.3 vs −14.9 dBFS 有声段），烘焙对齐之后原本在这里
+    // 按 0.34 还原。[需] 2026-09-27 用户：「没有轰鸣声，太奇怪了」—— 03–05 车大半时间停着怠速（探针：Tank 段负载层
+    // 中位 0），怠速层就是玩家听到的全部。四号 G 那条是车外几米的录音；游戏里要的是十几吨的车在四五十米外还压得住
+    // 身边的零星枪声，只留 −4.4 dB（低频本来就在这一层里：<80 Hz 与 80–250 Hz 各只比全带宽低 6–7 dB）。
+    idleGain: 0.6,
     loadGain: 1.0,
     // 负载（踩油门、挤压、原地转）再抬一点：同样的转速，吃力的时候更「闷」更响。[需] 手感值。
     loadBoostDb: 3,
@@ -319,8 +322,10 @@ export const TANK = Object.freeze({
     subHzPerRpm: 1 / 20,
     subMinHz: 30,
     subMaxHz: 70,
-    subGain: 0.28,
-    subLoadGain: 0.22,
+    // 2026-09-27：低通从 120 Hz 抬到 160 Hz（Script_Audio.TankSubLayer），让 90–150 Hz 的谐波出来 —— 30 Hz 基频
+    // 在耳机 / 笔记本上等于没有，能听成「嗵嗵嗵」的是它的 3–5 次谐波；增益相应收一点，基频别吃掉总线余量。
+    subGain: 0.24,
+    subLoadGain: 0.2,
     // 引擎还「活着」的门槛：rpm 低于这个就当熄火了（大脑熄火时 rpm 在 stallS 里掉到 0）。
     runningRpm: 60,
     // 履带：增益 = (|车速| / 巡航)^0.7 + 原地转向项；变速随车速。
@@ -366,11 +371,14 @@ export const TANK = Object.freeze({
     hatchVolume: 0.8,
     stallVolume: 1,
     jamVolume: 0.8,
-    // 车载机枪：[史] 九一式车载机枪（十一年式的车载版）→ 机枪类 cue；枪在车体里，隔着钢板与观察孔，
-    // 车外听是闷的：低通 2.6 kHz。
-    mgCue: "type11",
-    mgAirCutHz: 2600,
-    mgVolume: 0.8,
+    // 车载机枪：[史] 九一式车载机枪（十一年式的车载版）。2026-09-27 重配（用户：「战车的机枪声音重新配置」）：
+    //   · 自己的 cue `tankMg`（Warfare Library 通用机枪，Data_SfxSources.TankMgWarfareClose），不再借步兵那挺
+    //     十一年式的 MINIMI —— 同一个声音从车上和从沟里响，分不出是车在打还是步兵在打；
+    //   · 去掉原来的 2.6 kHz「车内」低通：枪口伸在车体外，车外的人听到的是枪口，不是隔着钢板的闷响；
+    //     0 = 不额外压（距离的空气吸收照旧由 Play 按距离算）。
+    mgCue: "tankMg",
+    mgAirCutHz: 0,
+    mgVolume: 0.9,
     // 熄火之后：冷却滴答（延迟、间隔、持续多久、渐弱）。
     coolDelayS: 4,
     coolEveryMinS: 1.8,

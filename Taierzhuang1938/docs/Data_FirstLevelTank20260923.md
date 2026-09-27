@@ -39,14 +39,17 @@
 | 文件 | 作用 |
 | --- | --- |
 | `Script_TankAudio.mjs` | 控制器（无 three）：三条常驻循环跟车走、一次性音、03 先闻其声；映射是导出的纯函数（`TankLoopParams / CannonLayerWeights / ShellPassPoint`），node 里测 |
-| `Script_Audio.mjs`「第一关战车」段 | 13 条合成回落配方 + `TankLoopSampleRecipe`（采样盖上后的循环，接口 `v.SetTank({gains, rates, subHz, subGain}, tau)`）；主炮进 `PROPAGATION_CUES / DUCK_ON / DEAFEN_ON`，炮口声按爆炸封遮挡（0.25），常驻循环封遮挡 0.5 |
+| `Script_Audio.mjs`「第一关战车」段 | 13 条合成回落配方 + `TankLoopSampleRecipe`（采样盖上后的循环，接口 `v.SetTank({gains, rates, subHz, subGain}, tau)`）；主炮进 `PROPAGATION_CUES / DUCK_ON / DEAFEN_ON`，炮口声按爆炸封遮挡（0.25），常驻循环封遮挡 0.3（09-27 由 0.5 下调）|
 | `Data_SfxSources.TANK_SFX` + `Script_TankAudioBake.mjs` | 素材、许可、切点；循环做接缝交叉淡化并多接 0.2 s（清单 `loopSpans`），只在中间那一整圈里转 |
 | `Data_Tuning_Tank.audio` | 全部声音数值（层间电平、±12 % 变速、点火频率、手摇起停、三层交叉距离、掠过判据、节流、冷却滴答） |
 
 - **常驻 ≤ 3 条**（契约 §6）：`tankEngine`（怠速 / 负载两层按转速等功率交叉，±12 % 变速；垫一层 30–70 Hz 点火脉冲 = rpm / 20，走音效总线，对白侧链不压它）、`tankTracks`（按车速，原地转向也响）、`tankTurret`（手摇棘轮，只在摇的时候响；停摇 50 ms 内收干净 —— 「咔嗒声停了 = 要开炮了」）。循环 `priority`，不会被偷；熄火后收掉。
 - **一次性**：起步 / 刹车 / 原地转 / 倒车的履带尖啸（2.5 s 节流）；主炮近（≤ 25 m）/ 中 / 远（≥ 110 m）三层等功率交叉 + 按声源所在区的尾音（借机枪尾巴降调）；弹道离听者 ≤ 7 m 且飞过去了才排一声低速炮弹掠过；弹打装甲「当」（跳弹照旧由 Main 的 `Ricochet` 出）；观察窗关上 / 开舱盖；`Disabled`：熄火（咳两下、停）+ 炮塔卡死磨擦 + 4 s 后 50 s 的冷却滴答。
-- 车载机枪：`FireVehicleBullet(..., { gunCue: "type11", gunOpts: { burst: 1, airCut: 2600, weaponClass: "mg" } })`（九一式车载机枪 = 十一年式车载版；隔着钢板，车外听是闷的）。其它调用不传就还是旧的 `type92`。
-- 03「先闻其声」：阵位没夺下、车还没开进图时，引擎在 `path.waypoints[0]`（北面高地后面）怠速，5 s 渐起；开进图后是同一条 voice 接着跟车（不重起）。常驻循环的遮挡封顶 0.5：高地后面的车高频被挡、隆隆声照样翻过来。
+- 车载机枪（2026-09-27 重配）：`FireVehicleBullet(..., { gunCue: "tankMg", gunOpts: { burst: 1, weaponClass: "mg", occlusionExclude: tankCollider } })`。`tankMg` 是自己的 cue（Warfare Library「机枪·近距·开阔野地」三次长点射的末发，7.62 级通用机枪、带野地回声；`Data_SfxSources.TankMgWarfareClose`），不再借步兵十一年式的 MINIMI；原来那道 2.6 kHz「车内」低通去掉 —— 枪口伸在车外。其它调用不传就还是旧的 `type92`。
+- **遮挡排除车自己**（2026-09-27）：`Play({ occlusionExclude })` → 遮挡探针 → `Raycast(..., { excludeCollider })`，`MoveVoice` 重查时沿用。引擎挂点（车体 y 1.1 m）在 2.56 m 高的车体碰撞盒里面，修之前射线先撞上车自己：开阔地上引擎也按「墙后」算（封顶 0.5 = −6 dB + 4 kHz 低通，09-26 探针各段中位都是 0.5），机枪从车侧后听是 −12 dB + 800 Hz。战车全部声音（三条循环、一次性音、机枪）都带这个排除。
+- **常驻循环不进远声组**：`farGrouped` 在起播那一刻按距离定，引擎是在一百多米外（03 先闻其声）起播、一路开到跟前的同一条 voice，修之前一直挂在远声组上，玩家连射时跟着让 −3 dB。
+- 发动机电平（2026-09-27，用户「没有轰鸣声」）：怠速层 `idleGain` 0.34 → 0.6（车大半时间停着怠速，怠速层就是玩家听到的全部）；点火脉冲低通 120 → 160 Hz（基频 30 Hz 多数耳机放不出，「嗵嗵」靠 3–5 次谐波），`subGain` 0.28 → 0.24。
+- 03「先闻其声」：阵位没夺下、车还没开进图时，引擎在 `path.waypoints[0]`（北面高地后面）怠速，5 s 渐起；开进图后是同一条 voice 接着跟车（不重起）。常驻循环的遮挡封顶 0.3（09-27 由 0.5 下调：引擎能量几乎全在 1 kHz 以下，矮墙挡不住）：高地后面的车高频被挡、隆隆声照样翻过来。
 - 声源尺寸 `sourceSizeM` 10 m（车长 5.7 m、118 hp 汽油机不是一个人那么响）：130 m 外比 5 m 口径亮 8 dB。
 - 素材（全部是 Sonniss GDC 镜像的真车实录，另三条 SeedAudio）：发动机 = Pole Position 四号坦克 G 型（Maybach 水冷汽油机，与八九式甲同为水冷汽油机）车外稳态怠速 / 高转；履带 = 三号坦克车上履带近麦；手摇 = T-34-85 高低机手轮拟音；主炮近 = Bluezone 坦克炮、中 / 远 = Warfare Library 林地远处火炮两发；熄火 = 斯图亚特 M5A1；舱盖 = 虎 II / TKS；弹打装甲 = Gamemaster 子弹打厚金属 + Bluezone 重金属中板升调；卡死 = Kopeikin 干硬金属磨擦；履带尖啸 / 炮弹掠过 / 冷却滴答 = SeedAudio（第一轮「履带尖啸」直说三条全塌成宽带隆隆，改「生锈重铁门铰链」才出音调线）。每条的有声段 RMS、真峰值、<500 Hz 占比、可闻带电平与循环接缝跳变由烘焙脚本打印并写 `Audio/Sfx/_raw/Tank/Data_TankQc.json`。**没有人耳试听过**，只按数字与频谱图选的，请人工过一遍编辑器里的「战车」几条。
 - 取证：`Debug.FirstLevelMission().tankBrain.audio`（循环数、每层有效电平与遮挡、一次性音计数、每发主炮用了哪几层）；专项探针 `Script_FirstLevelTankProbe.mjs`（见下）。

@@ -1121,6 +1121,28 @@ export const SFX_SOURCES = [
     cuts: [{ cue: "type92", exactAtS: 4.605, tail: 1.10, gain: 0.92, rate: 1.03,
       append: true, alignDbfs: -25 }],
   },
+  // --- 战车机枪：八九式甲的九一式车载机枪（2026-09-27 单开一条 cue）----------------
+  // 原来借 `type11`（MINIMI 1 m）再压 2.6 kHz「车内」低通：枪口伸在车外，这个低通是错的，
+  // 加上车体碰撞盒把自己的枪口挡成「墙后」（−12 dB + 800 Hz），出来是一串闷的「噗噗噗」。
+  // 九一式是十一年式的车载版，但玩家要听的是「一挺架在十几吨钢上的机枪在扫」—— 与步兵手里
+  // 那挺十一年式（MINIMI）分开，也不跟九二式 / 扫射撞素材（M1919A4 的三条都被占了）。
+  // 选 Warfare Library「机枪·近距·开阔野地」：一挺 650 rpm 的 7.62 级通用机枪在野地里长点射，
+  // 低频厚、每发后面有野地拖出来的回声。镜像里这条之外没有别的车载 / 通用机枪长片没被用过。
+  // 只取三次长点射的**末发**（17.354 / 31.084 / 24.064 s）：前面那几十发的尾巴本来就在，
+  // 游戏里也是一串一串地打，末发后面 1 s 多没有别的动作。射速仍由引擎排（shotIntervalS 0.14）。
+  {
+    id: "TankMgWarfareClose",
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "Pole Position - The Warfare Library/warfare_t2_mg_firing_close_projectile_tail_large_field_Telinga_w_MKH8020_or_MKH8060.mp3",
+    credit: "Pole Position Production · The Warfare Library 机枪近距·开阔野地 · Sonniss GDC 2017",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    cuts: [
+      { cue: "tankMg", exactAtS: 17.354, tail: 1.05, gain: 0.9, hp: 35, fadeOutS: 0.35, alignDbfs: -25 },
+      { cue: "tankMg", exactAtS: 31.084, tail: 1.05, gain: 0.9, hp: 35, fadeOutS: 0.35, append: true, alignDbfs: -25 },
+      { cue: "tankMg", exactAtS: 24.064, tail: 1.05, gain: 0.9, hp: 35, fadeOutS: 0.35, append: true, alignDbfs: -25 },
+    ],
+  },
 
   // --- 远场步枪 -------------------------------------------------------------
   {

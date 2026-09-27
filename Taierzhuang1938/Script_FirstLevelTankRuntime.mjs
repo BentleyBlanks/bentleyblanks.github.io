@@ -62,7 +62,7 @@ export class FirstLevelTankRuntime {
 
   /** 声音（Script_TankAudio）：第一次用到时建；没有音频引擎（node 测试）就一直是 null。 */
   get Sound() {
-    if (!this.sound && this.r.audio) this.sound = new TankAudio(this.r.audio, this.T.audio, this.T.drive);
+    if (!this.sound && this.r.audio) this.sound = new TankAudio(this.r.audio, this.T.audio, this.T.drive, { occluder: () => this.r.view?.tankCollider ?? null });
     return this.sound;
   }
   /** 03「先闻其声」：车还没开进图时，引擎在路线起点怠速。 */
@@ -468,10 +468,12 @@ export class FirstLevelTankRuntime {
     if (elevation < -M.downRad || elevation > M.upRad) return;
     this.log.mgShots++;
     if (f.kind === "walkIn") this.log.walkInShots++;
-    // 车载机枪：机枪类 cue、逐发一声（burst 1）、隔着钢板的车内低通。
+    // 车载机枪：自己的 cue（tankMg）、逐发一声（burst 1）；枪口伸在车外，不再压「车内」低通，
+    // 遮挡射线排除车自己的碰撞盒（不然从车侧后听，枪口被自己的车体挡成 −12 dB + 800 Hz）。
     const A = this.T.audio;
     t.lastMgShot = r.FireVehicleBullet(from, dir, { weaponId: "Type11", damageScale: f.damageScale, sourceCollider: view.tankCollider,
-      gunCue: A.mgCue, gunOpts: { volume: A.mgVolume, burst: 1, airCut: A.mgAirCutHz, weaponClass: "mg" } });
+      gunCue: A.mgCue, gunOpts: { volume: A.mgVolume, burst: 1, weaponClass: "mg", occlusionExclude: view.tankCollider,
+        ...(A.mgAirCutHz ? { airCut: A.mgAirCutHz } : {}) } });
   }
   OnImpact(position, f, shot) {
     const r = this.r, t = r.tank;

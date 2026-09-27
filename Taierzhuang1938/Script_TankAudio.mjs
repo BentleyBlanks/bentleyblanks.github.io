@@ -101,11 +101,13 @@ export class TankAudio {
    * @param {AudioEngine} audio  Script_Audio 的引擎（出图模式下 Play 返回 null，这里全部静默跳过）
    * @param {object} A           Data_Tuning_Tank.audio
    * @param {object} drive       Data_Tuning_Tank.drive（怠速 / 满转 / 巡航 / 原地转速）
+   * @param {{ occluder?: () => object|null }} [opts] occluder：车自己的碰撞记录（遮挡射线要排除它，见 Occluder）
    */
-  constructor(audio, A, drive) {
+  constructor(audio, A, drive, { occluder = null } = {}) {
     this.audio = audio;
     this.A = A;
     this.D = drive;
+    this.occluder = occluder;
     this.loops = { tankEngine: null, tankTracks: null, tankTurret: null };
     this.fresh = new Set();         // 刚起播、还没设过值的循环：第一次 SetTank 立即生效
     this.offstage = false;
@@ -124,10 +126,18 @@ export class TankAudio {
 
   get Enabled() { return !!this.audio && !!this.audio.ctx && !this.audio.disposed; }
 
+  /**
+   * 车自己的碰撞盒（2026-09-27）。发动机 / 手摇 / 炮口 / 冷却滴答都挂在车体盒子里面，遮挡射线不排除它的话
+   * 先撞上的就是车自己 —— 开阔地上也按「墙后」处理（循环封顶 0.5 = −6 dB + 4 kHz 低通），轰鸣声就没了。
+   */
+  Occluder() {
+    try { return this.occluder?.() ?? null; } catch (error) { return null; }
+  }
+
   Play(name, opts) {
     if (!this.Enabled) return null;
     this.stats.plays[name] = (this.stats.plays[name] || 0) + 1;
-    return this.audio.Play(name, opts);
+    return this.audio.Play(name, { occlusionExclude: this.Occluder(), ...opts });
   }
 
   /** 起播缺的循环（被引擎自己回收 / 还没起的都补上）。 */
@@ -136,7 +146,7 @@ export class TankAudio {
     for (const name of names) {
       const v = this.loops[name];
       if (v && v.nodes && v.nodes.length && !v.stopping) continue;
-      const voice = this.audio.Play(name, { position: at, priority: true, sourceSizeM: this.A.sourceSizeM });
+      const voice = this.audio.Play(name, { position: at, priority: true, sourceSizeM: this.A.sourceSizeM, occlusionExclude: this.Occluder() });
       this.loops[name] = voice || null;
       if (voice) { this.fresh.add(name); this.stats.loopsStarted += 1; } else this.stats.loopsMissing += 1;
     }
