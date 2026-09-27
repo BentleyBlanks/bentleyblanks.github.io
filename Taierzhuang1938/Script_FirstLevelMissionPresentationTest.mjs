@@ -18,13 +18,13 @@ try{
  await page.goto(("http://127.0.0.1:"+server.address().port)+"/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=medium&scale=small");
  await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:90000});
  await page.evaluate(async()=>{
-const g=window.Tengxian,T=await import("three"),{MissionPeople}=await import("./Script_FirstLevelMissionPeople.mjs"),{CreateStretcherGeometry,CreateStretcherMaterial}=await import("./Script_StretcherAsset.mjs");
+const g=window.Tengxian,T=await import("three"),{MissionPeople}=await import("./Script_FirstLevelMissionPeople.mjs"),{CreateStretcherGeometry,CreateStretcherMaterial}=await import("./Script_StretcherAsset.mjs"),{STRETCHER_PATIENT_LIFT_M}=await import("./Data_Carry.mjs");
 const root=new T.Group();g.scene.add(root);window.crowdProbe=new MissionPeople({root,actorFactory:g.actorFactory,battlefield:g.battlefield});
 window.probeBed=new T.Mesh(CreateStretcherGeometry(),CreateStretcherMaterial());root.add(window.probeBed);
 window.UpdateCrowdProbe=(time,progress=0,yaw=0)=>{
  const x=42+progress,z=-40,h=g.battlefield.GroundHeight(x,z),c=Math.cos(yaw),s=Math.sin(yaw),people=window.crowdProbe;people.Begin(time);
  for(const end of [-1,1])people.Person("Probe"+end,x-s*end*1.28,z-c*end*1.28,yaw,{role:end===1?"front":"rear",carryTarget:{left:new T.Vector3(x-c*.29-s*end,h+.88,z+s*.29-c*end),right:new T.Vector3(x+c*.29-s*end,h+.88,z-s*.29-c*end)}});
- people.Patient("ProbePatient",x,h+.83,z,yaw,time);people.End();window.probeBed.position.set(x,h+.76,z);window.probeBed.rotation.y=yaw;return people.State();};
+ people.Patient("ProbePatient",x,h+.76+STRETCHER_PATIENT_LIFT_M,z,yaw,time);people.End();window.probeBed.position.set(x,h+.76,z);window.probeBed.rotation.y=yaw;return people.State();};
 g.player.position.set(45,g.battlefield.GroundHeight(45,-35),-35);g.player.yaw=Math.atan2(3,5);g.player.pitch=-.14;g.player.SyncCamera(0);
 for(let i=0;i<120;i++)window.UpdateCrowdProbe(i/60);g.StepFrames(1,1/60,true);return window.crowdProbe.State();
 });

@@ -13,6 +13,7 @@ import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 const URL = "./Model/Model_BambooStretcher.glb?v=stretcher20260927";
 const loader = new GLTFLoader();
 let pending = null;
+
 let geometry = null;
 
 export function LoadStretcherAsset() {

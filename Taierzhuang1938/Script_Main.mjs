@@ -3396,8 +3396,9 @@ function SetpiecePropTexture(path) {
  *   panel        立着的一块带贴图的平面（信纸、底稿、报纸）
  *   plane        平躺的一块带贴图的平面（摊在桌上的纸）
  *   box          一只箱子（烧黑的弹药箱、药箱）
- *   shroudedBody 盖白布的门板担架（五关 A 区那一副）
- *   crate/stretcher/debris  box 的几个别名，只是默认尺寸与颜色不同
+ *   shroudedBody 担架上躺着的国军伤员（带骨架的人物，摆成仰躺）
+ *   stretcher    1938 竹竿布兜担架模型（Script_StretcherAsset）
+ *   crate/debris box 的别名，只是默认尺寸与颜色不同
  */
 function UpdateWoundedActor(actor,dt){
   const rig=actor.characterRig;
@@ -3424,6 +3425,9 @@ function UpdateWoundedActor(actor,dt){
   aim("upperArmL","forearmL",-.18,-1,.08);aim("forearmL","handL",0,-1,0);
 }
 
+/** 担架放在地上时原点离地的高度（布兜底贴地）。 */
+const LITTER_REST_M = 0.02;
+
 function MakeSetpieceProp(spec = {}) {
   if (!scene || !spec || !spec.position) return null;
   const id = String(spec.id || `sp${setpieceProps.size}`);
@@ -3435,13 +3439,15 @@ function MakeSetpieceProp(spec = {}) {
   const y = Number.isFinite(at.y) ? at.y : (battlefield ? battlefield.GroundHeight(at.x, at.z) : 0);
   let mesh = null;
   let woundedActor=null;
-  if(whiteboxColors&&kind==="shroudedBody"){
+  // 担架上的伤员一律是躺着的国军人物（原来非白盒关是一块白方块）。
+  if(kind==="shroudedBody"){
     woundedActor=actorFactory.Create("nra",{weapon:null,modelVariant:1,seed:1938});
     mesh=new THREE.Group();mesh.add(woundedActor.root);
     // The parent remains the same movable casualty/litter centre.
     woundedActor.root.rotation.x=Math.PI/2;woundedActor.root.position.set(0,.02,-.85);
     UpdateWoundedActor(woundedActor,0);
-    mesh.position.set(at.x,y+.34,at.z);
+    // 与担架放在地上时同一口径：担架原点离地 0.02，人在担架原点上方 0.20。
+    mesh.position.set(at.x,y+LITTER_REST_M+.20,at.z);
   } else if (kind === "panel" || kind === "plane") {
     const size = spec.size || [0.28, 0.20];
     const geometry = whiteboxColors ? new THREE.BoxGeometry(size[0], size[1], 0.015) : new THREE.PlaneGeometry(size[0], size[1]);
@@ -3456,8 +3462,7 @@ function MakeSetpieceProp(spec = {}) {
     mesh.position.set(at.x, y + (kind === "plane" ? 0.92 : 1.15), at.z);
   } else {
     const size = spec.size
-      || (kind === "shroudedBody" ? [0.62, 0.26, 1.92]
-        : kind === "stretcher" ? [0.58, 0.14, 1.85]
+      || (kind === "stretcher" ? [0.58, 0.14, 1.85]
           : kind === "debris" ? [0.9, 0.22, 0.7] : [0.72, 0.42, 0.48]);
     // 担架一律用 1938 竹竿布兜担架（颜色在顶点色里），没有方块替身。
     const litter = kind === "stretcher";
@@ -3465,13 +3470,14 @@ function MakeSetpieceProp(spec = {}) {
       : new THREE.BoxGeometry(size[0], size[1], size[2]);
     const material = new THREE.MeshStandardMaterial({
       color: litter ? 0xffffff
-        : whiteboxColors && kind !== "shroudedBody"
+        : whiteboxColors
           ? whiteboxColors[kind === "debris" ? "ground" : "missionRoute"]
-          : spec.color ?? (kind === "shroudedBody" ? 0xd8d2c4 : 0x6b5a41),
+          : spec.color ?? 0x6b5a41,
       vertexColors: litter, roughness: litter ? 0.92 : 1.0, metalness: 0,
     });
     mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(at.x, y + size[1] / 2 + (kind === "shroudedBody" ? 0.34 : 0), at.z);
+    // 担架放在地上：原点离地 0.02 m（模型最低点是布兜底 +0.03），布兜贴地、横撑离地几厘米。
+    mesh.position.set(at.x, y + (litter ? LITTER_REST_M : size[1] / 2), at.z);
   }
   mesh.rotation.y = Number(spec.rotationY) || 0;
   mesh.castShadow = false;

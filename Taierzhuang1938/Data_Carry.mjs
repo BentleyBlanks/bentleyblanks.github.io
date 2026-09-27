@@ -71,3 +71,9 @@ export const CARRY_KINDS = Object.freeze({
 
 // 状态机自己的节奏数（重拾空窗、字幕时长）不在这张档案表里 ——
 // 它们与交互点、架设武器的同类数一起放在 Data_Tuning_Interact.mjs 的 `CARRY` 段。
+
+/**
+ * 担架上躺着的人（MissionPeople.Patient 的烘焙躺姿）放在担架原点上方多高：
+ * 布兜底在 +0.03 m、中段 +0.04 m，人背贴着布兜。原来的 0.07 让人浮在布面上 3–4 cm。
+ */
+export const STRETCHER_PATIENT_LIFT_M = 0.04;

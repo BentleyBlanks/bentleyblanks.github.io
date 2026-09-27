@@ -621,8 +621,9 @@ export class EscortColumn {
         if (rearAlive) litter.rear.handle.carryRole = null;
         const at = litter.lastMid;
         if (at && this.host.MoveProp) {
-          this.host.MoveProp(litter.propLitter, { x: at.x, y: at.gy + 0.10, z: at.z, rotationY: at.yaw });
-          this.host.MoveProp(litter.propBody, { x: at.x, y: at.gy + 0.30, z: at.z, rotationY: at.yaw });
+          // 撂在地上：担架布兜贴地（原点离地 0.02），人在担架原点上方 0.20。
+          this.host.MoveProp(litter.propLitter, { x: at.x, y: at.gy + 0.02, z: at.z, rotationY: at.yaw });
+          this.host.MoveProp(litter.propBody, { x: at.x, y: at.gy + 0.22, z: at.z, rotationY: at.yaw });
         }
         continue;
       }
@@ -1049,8 +1050,10 @@ export const SETPIECES = {
       if (p012 && s.mem.p012ReleaseAt && !s.mem.p012ReleaseAt.placed && s.mem.p012CarriedLitter) {
         const point = s.mem.p012ReleaseAt, litter = s.mem.p012CarriedLitter;
         const mid=litter.lastMid || point;
-        s.d.host.MoveProp?.(litter.propLitter, { x: mid.x, y: .1, z: mid.z, rotationY: mid.yaw || 0 });
-        s.d.host.MoveProp?.(litter.propBody, { x: mid.x, y: .3, z: mid.z, rotationY: mid.yaw || 0 });
+        // 按地面高度放（原来写死绝对 y=.1，地面不在 0 的地方就悬空或埋进土里）。
+        const gy = mid.gy ?? 0;
+        s.d.host.MoveProp?.(litter.propLitter, { x: mid.x, y: gy + .02, z: mid.z, rotationY: mid.yaw || 0 });
+        s.d.host.MoveProp?.(litter.propBody, { x: mid.x, y: gy + .22, z: mid.z, rotationY: mid.yaw || 0 });
         // Input release precedes physical arrival in the ditch. Keep that
         // receipt until this dodge succeeds or fails, across every frame.
         point.placed = true;

@@ -5,6 +5,7 @@ import { MissionPeople } from "./Script_FirstLevelMissionPeople.mjs";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as MID } from "./Data_Tuning_FirstLevelMid.mjs";
 import { CreateStretcherGeometry } from "./Script_StretcherAsset.mjs";
+import { STRETCHER_PATIENT_LIFT_M } from "./Data_Carry.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { PlaceGeometry } from "./Script_Geo.mjs";
 import { ApplyShadowDepth, AttachShadowDepth } from "./Script_ShadowDepth.mjs";
@@ -412,8 +413,10 @@ export class FirstLevelMissionView {
       const ground = this.battlefield.GroundHeight(litter.x, litter.z);
       let height = litter.loaded
           ? 1.2
-          : litter.state === "fallen" || litter.state === "critical" || litter.state === "placed"
-            ? 0.22
+          // 放在地上：布兜底（模型最低点 +0.03）贴地。倒地那副还往一头歪 0.1 rad，
+          // 低的那头竿子要离开地面，所以多垫 3 cm。原来的 0.22 让地上的担架悬空二十几厘米。
+          : litter.state === "fallen" ? 0.03
+            : litter.state === "critical" || litter.state === "placed" ? 0
             : .76 + (litter.liftFraction || 0) * .44;
       const yaw = litter.yaw || 0;
       // 车上的担架跟着车身颠（Script_CartCorpseBump）：按它在车板上的局部位置取抬升。
@@ -446,7 +449,7 @@ export class FirstLevelMissionView {
       // 2026.09.19 第三波：屋内伏击拍下线之后，「挨刀的老周走带骨架伤员」那条支路
       // （MissionPeople.RiggedPatient）永远走不到 —— 挂 clip 的入口没人调了。
       // 担架上的人统一走实例化的烘焙姿势。
-      this.people.Patient(litter.id,litter.x,ground+height+.07,litter.z,yaw,time,litter.zhou?{stabbed:!!litter.stabbed}:null);
+      this.people.Patient(litter.id,litter.x,ground+height+STRETCHER_PATIENT_LIFT_M,litter.z,yaw,time,litter.zhou?{stabbed:!!litter.stabbed}:null);
       const SetGrip=(side,end)=>new THREE.Vector3(litter.x+Math.cos(yaw)*side*.29-Math.sin(yaw)*end,
         ground+height+.12,litter.z-Math.sin(yaw)*side*.29-Math.cos(yaw)*end);
       // 06 借火时仍是这副担架原有的两名担架员，只是 Collection 用同一组人物 id

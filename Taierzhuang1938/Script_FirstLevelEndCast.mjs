@@ -19,6 +19,8 @@
 // 决定，三维向量一律从宿主（view / actor）已有的对象上借。
 // ===========================================================================
 
+import { STRETCHER_PATIENT_LIFT_M } from "./Data_Carry.mjs";
+
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 /** 从 from 指向 to 的 yaw（朝向 = (−sin yaw, −cos yaw)，与 MISSION_PLACEMENT 同口径）。 */
@@ -207,7 +209,7 @@ export class EndDressing {
     for (const litter of this.litters) {
       const deck = view.battlefield.GroundHeight(litter.x, litter.z) + 0.76;
       view.Instance("bed", litter.x, deck, litter.z, litter.yaw);
-      view.people.Patient(litter.id, litter.x, deck + 0.07, litter.z, litter.yaw, time);
+      view.people.Patient(litter.id, litter.x, deck + STRETCHER_PATIENT_LIFT_M, litter.z, litter.yaw, time);
       if (!litter.bearers) continue;
       const cos = Math.cos(litter.yaw), sin = Math.sin(litter.yaw);
       for (const side of [-1, 1]) {

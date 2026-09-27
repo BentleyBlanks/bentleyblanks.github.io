@@ -22,6 +22,7 @@ import { MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as Place } from
 import { MissionRouteProjection, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { CreateStretcherGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
+import { STRETCHER_PATIENT_LIFT_M } from "./Data_Carry.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 
 /** 借火那一段的姿态顺序（State().borrow 按这个序列记，测试照它对账）。 */
@@ -127,11 +128,11 @@ export class FirstLevelCollection {
   Draw(time) {
     const r = this.r;
     if (!this.dressed || !r.view?.Person) return;
-    // 担架上的人：躺姿与担架队同一口径（担架原点上方 0.07 m）。这里在 view.Update
+    // 担架上的人：躺姿与担架队同一口径（STRETCHER_PATIENT_LIFT_M）。这里在 view.Update
     // 之后才报，所以报完再走一遍 people.End() 让伤员实例桶重新算可见性。
     const people = r.view.people;
     if (people?.Patient) {
-      for (const prop of this.props) people.Patient(prop.id, prop.x, prop.y + .07, prop.z, prop.yaw, time);
+      for (const prop of this.props) people.Patient(prop.id, prop.x, prop.y + STRETCHER_PATIENT_LIFT_M, prop.z, prop.yaw, time);
       people.End();
     }
     for (const person of this.people)
