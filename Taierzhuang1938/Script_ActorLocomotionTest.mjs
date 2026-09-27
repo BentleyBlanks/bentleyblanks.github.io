@@ -118,11 +118,12 @@ try {
     for(const mode of ['mission','march','back']) {
       const actor=factory.Create('nra',{seed:5432,modelVariant:0,weapon:'HanYang'}),rig=actor.characterRig;
       const soldier={id:5432,actor,alive:true,p012BackRifle:mode==='back',squadMarchCommand:{controlled:true}};
-      if(mode!=='march'){InstallP012ActorMotion(soldier);await rig.p012BackRifleReady;}else InstallSquadMarchActor(soldier);
+      if(mode!=='march'){InstallP012ActorMotion(soldier);await rig.p012BackRifleReady;await rig.allyGaitReady;}else InstallSquadMarchActor(soldier);
       let time=0;const rates=[];
       for(const speed of [1.2,2.4]) {
         for(let i=0;i<90;i++){time+=1/60;actor.root.position.z-=speed/60;actor.Update(1/60,{elapsed:time,moveSpeed:speed/3.6,moveSpeedMps:speed});}
-        rates.push(rig.currentAction.getEffectiveTimeScale());
+        const reference=rig.locomotion.profiles[rig.currentId].referenceMps*rig.root.getWorldScale(new THREE.Vector3()).y;
+        rates.push(rig.currentAction.getEffectiveTimeScale()*reference);
       }
       adapters.push({mode,clip:rig.currentId,rates});actor.Dispose();
     }
@@ -153,7 +154,11 @@ try {
     assert.equal(row.blocked.speed,0);assert.notEqual(row.blocked.clip,'RifleRun');
     assert.equal(row.zeroRead,0);assert.equal(row.teleport,0);
   }
-  for(const row of results.adapters)assert.ok(Math.abs(row.rates[1]/row.rates[0]-2)<1e-6,`competing clock: ${row.mode}`);
+  for(const row of results.adapters){
+    // A safe walk now changes to a run at the higher pace. Compare travelled
+    // metres per second, not rates from two clips with different stride lengths.
+    assert.ok(Math.abs(row.rates[0]-1.2)<1e-6&&Math.abs(row.rates[1]-2.4)<1e-6,`competing clock: ${row.mode}`);
+  }
   for(const row of results.clocks)assert.ok(row.error<.0001,`LOD distance clock: ${JSON.stringify(row)}`);
   assert.equal(results.previewLocked,false,'in-place editor preview must not pin feet to a stationary world root');
   assert.ok(results.farError<1e-6,'culled skeleton still advances by actual stride distance');

@@ -71,6 +71,8 @@ export function InstallP012ActorMotion(soldier) {
   const phase=((Number(soldier.id)||0)*.61803398875)%1;
   rig.p012ActorMotion=true;
   rig.p012BackRifleReady=import("./Script_FirstLevelP012BackRifle.mjs").then(module=>module.InstallP012BackRifle(soldier)).catch(error=>{rig.p012BackRifleError=String(error);console.warn("[P012BackRifle]",error);});
+  rig.allyGaitReady=rig.p012BackRifleReady.then(()=>import("./Script_AllyGait.mjs"))
+    .then(module=>module.InstallAllyGait(soldier)).catch(error=>{rig.allyGaitError=String(error);console.warn("[AllyGait]",error);});
   rig.p012StandIdle=standIdle;
   rig.Update=function UpdateP012ActorMotion(dt,state={}) {
     // mixer 采样之前先撤掉上一帧的待机叠加，FK 不累积。

@@ -47,6 +47,9 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  AllyGaitTest: {file:"Script_AllyGaitTest.mjs",desc:"Ally gait policy, actual skin contact, stable forward lean, loop seams and bone lengths"},
+  AllyGaitMissionTest: {file:"Script_AllyGaitMissionTest.mjs",timeoutMs:900000,desc:"Ordinary 06–07 escort: real cast selects carry, dialogue palm contact and fire priority"},
+  AllyGaitBrowserTest: {file:"Script_AllyGaitBrowserTest.mjs",timeoutMs:300000,desc:"Real NRA rigs and weapons: crouched ready/carry, free left hand, threat transition and rendered review"},
   BreakableTreesTest: {file:"Script_BreakableTreesTest.mjs",desc:"Seeded tree clearance, blast falloff and shipped split GLB budget"},
   BreakableTreesBrowserTest: {file:"Script_BreakableTreesBrowserTest.mjs",timeoutMs:300000,desc:"Actual first-level trees: explosion, collider removal, falling, grounding and disposal"},
   FirstLevelDistantSmokeTest: {file:"Script_FirstLevelDistantSmokeTest.mjs",desc:"Reference smoke districts: clear routes, layered 04–06 views, bounded density and combat particle isolation"},
@@ -405,6 +408,8 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "AllyGaitBrowserTest",
+  "AllyGaitMissionTest",
   "BreakableTreesBrowserTest",
   "FirstLevelDistantSmokeBrowserTest",
   "OpeningActorPerformanceBrowserTest", "OpeningClipsBrowserTest", "FirstLevelVoicePerspectiveTest",
@@ -532,6 +537,7 @@ export const tier0Fast = [
   "OpeningStoryboardsTest",
   "OpeningSetTest",
   "RelaxedGaitTest",
+  "AllyGaitTest",
 ];
 
 export const tier0Browser = ["BootTest", "BootStallTest", "GeoTest"];
@@ -555,6 +561,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest","FirstLevelSmokeOriginsTest","FirstLevelDistantSmokeBrowserTest"]},
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest","OpeningStoryboardShotsTest"]},
@@ -666,6 +673,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"allyGait",pattern:/AllyGait|Script_FirstLevelP012CastAppearance/},
   {domain:"firstLevel",pattern:/Cigarette/},
   {domain:"propVelocity",pattern:/Cigarette|FirstLevelCollection|CollectionCare/},
   // 06 集结处救护动作（docs/Data_CollectionCare20260927.md）：动作库、烘焙脚本与播放层的文件名里没有 FirstLevel。
@@ -870,6 +878,7 @@ const prepushGateRules = [
 ];
 
 const domainPrepushGates = {
+  allyGait: ["BootTest", "MotionVectorContractTest"],
   terrain: ["BootTest", "GeoTest"],
   // 2026-09-06：PlayTest 已删，这些领域推送前不再追加整局门禁；领域专项本身仍完整运行。
   physics: ["GeoTest"],

@@ -356,6 +356,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   改流水线前先读它。首批三条 clip：CarryStretcherFront/Rear、WoundedLimp。
 
 - 背枪走 / 空手走与放松站姿：`Animation/RelaxedGait/`（生成器 `_import/Script_RelaxedGaitBake.mjs`，运行时 `Script_RelaxedGait.SetRelaxedGait`，目前只有 01–02 开场导演用；门禁 `Script_RelaxedGaitTest`），契约见该目录 `Data_RelaxedGait.md`。
+- 第一关友军稳定俯身蹲走 / 单手提枪行进与待机：`Script_AllyGait`，BlenderMCP 重建和接线见 [AllyGait](../Animation/AllyGait/Data_AllyGait.md)；`Script_AllyGaitTest`、`Script_AllyGaitBrowserTest`。
 - 背枪跑步源包：`Animation/BackRifleRun/`（P012 的 `Script_FirstLevelP012BackRifle` 在领械后行军使用，其他关卡仍用原动作）；契约见该目录 `Data_BackRifleRun.md`，烘焙入口 `_import/Script_BackRifleRunBake.py`，验收 `Script_BackRifleRunTest`（animation 域）。
 - 五种视频步兵动作已接入两军 01–04 模型；运行时、重建与验收见 [步兵动作说明](Data_InfantryAnimations.md)。
 - NPC 步幅标定、按实际位移驱动的共享动画时钟与支撑脚 IK 见 [位移与步态同步](Data_ActorLocomotion.md)。`CharacterModel` 统一拥有跑步播放速率；任务/小队适配器不得重复以 AI 目标速度或固定 3.6 米/秒覆盖。

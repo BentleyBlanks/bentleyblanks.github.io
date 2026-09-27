@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **第一关友军俯身蹲走与低位提枪（2026-09-27）**：`Script_AllyGait` / `Animation/AllyGait`，五条 NRA 共用动作；护送与交谈按实际威胁选择提枪，战斗蹲走稳定胸部并前俯。BlenderMCP 重建、播放优先级和验收见 [友军步态](Animation/AllyGait/Data_AllyGait.md)，门禁 `Script_AllyGaitTest` / `Script_AllyGaitBrowserTest`。
+
 - **01 洞口过场 2026-09-26 现场修订**：[渐显、翻译避让、踹国军旗与独立摄影机](docs/Data_OpeningCinematic20260926.md)。CaptiveDragged→Wipe 使用独立机位，Reach 回到第一人称；这段覆盖旧 SB03 倒地旁观镜头与人物旧站位。同文第二轮：日军走动背枪、翻译空手走/小跑（`Script_RelaxedGait` + `Animation/RelaxedGait`，门禁 `Script_RelaxedGaitTest`），日兵乙发现伤兵后喊翻译（`InterpreterCall`）。
 
 - **01 日兵甲翻越塌顶木、从木头底下拖出顺子（2026-09-27）**：[翻越与倒拖](docs/Data_OpeningVaultHaul20260927.md)。Found 不再穿木头走进坑，DragOut 不再背对顺子往前走；三条新动作只烘 IJA02，烘焙 spec 新增 `groundWeight`。
