@@ -17,7 +17,7 @@ export class ProneGroundContact {
     this.rig=rig;this.saved=[];this.snapshots=new Map();this.active=false;
     this.v=Array.from({length:12},()=>new THREE.Vector3());
     this.q=Array.from({length:4},()=>new THREE.Quaternion());
-    this.solveV=Array.from({length:8},()=>new THREE.Vector3());
+    this.solveV=Array.from({length:7},()=>new THREE.Vector3());
     this.limbs=['L','R'].flatMap(side=>[
       {a:rig.bones['thigh'+side],b:rig.bones['calf'+side],c:rig.bones['foot'+side],side,part:'leg'},
       {a:rig.bones['upperArm'+side],b:rig.bones['forearm'+side],c:rig.bones['hand'+side],side,part:'arm'},
@@ -67,24 +67,23 @@ export class ProneGroundContact {
     saved.p.copy(bone.position);saved.q.copy(bone.quaternion);this.saved.push(saved);
   }
   Solve(l,target,pole) {
-    // The middle joint has a height constraint, not merely a bend-direction hint.
-    // A hint can still put a knee under a slope after the ankle is grounded.
-    const [start,middle,end,axis,centre,up,across,knee]=this.solveV;
+    // Transport the authored bend plane. The old exact-height circle chose one
+    // of two roots every solve, flipping elbows/knees near a straight limb.
+    const [start,middle,end,axis,centre,bend,knee]=this.solveV;
     l.a.getWorldPosition(start);l.b.getWorldPosition(middle);l.c.getWorldPosition(end);
     const upper=start.distanceTo(middle),lower=middle.distanceTo(end);
     axis.subVectors(target,start);
-    const distance=THREE.MathUtils.clamp(axis.length(),Math.abs(upper-lower)+.0001,upper+lower-.0001);
+    const distance=THREE.MathUtils.clamp(axis.length(),Math.abs(upper-lower)+.002,upper+lower-.006);
     axis.normalize();
     const along=(upper*upper-lower*lower+distance*distance)/(2*distance);
     centre.copy(start).addScaledVector(axis,along);
     const radius=Math.sqrt(Math.max(0,upper*upper-along*along));
-    up.set(0,1,0).addScaledVector(axis,-axis.y).normalize();
-    if(up.y<.01){this.rig.locomotion.Solve({thigh:l.a,calf:l.b,foot:l.c,target,pole});return;}
-    across.crossVectors(axis,up).normalize();
-    const cosine=THREE.MathUtils.clamp((pole.y-centre.y)/Math.max(.00001,radius*up.y),-1,1);
-    const sine=Math.sqrt(Math.max(0,1-cosine*cosine));
-    const sign=across.dot(end.subVectors(pole,centre))<0?-1:1;
-    knee.copy(centre).addScaledVector(up,radius*cosine).addScaledVector(across,radius*sine*sign);
+    bend.subVectors(pole,start).addScaledVector(axis,-bend.dot(axis));
+    if(bend.lengthSq()<1e-6){
+      bend.copy(l.authoredBend).addScaledVector(axis,-bend.dot(axis));
+    }
+    bend.normalize();
+    knee.copy(centre).addScaledVector(bend,radius);
     this.rig.locomotion.Aim(l.a,l.b,knee);this.rig.locomotion.Aim(l.b,l.c,target);
   }
   Apply(state) {
@@ -110,7 +109,11 @@ export class ProneGroundContact {
     const pitch=THREE.MathUtils.clamp(Math.atan2(dy,Math.max(.1,span)),-PRONE_CRAWL.maximumSlopeRad,PRONE_CRAWL.maximumSlopeRad);
     const roll=THREE.MathUtils.clamp(Math.atan2(sample(rightPoint)-sample(leftPoint),.5),-PRONE_CRAWL.maximumSlopeRad,PRONE_CRAWL.maximumSlopeRad);
     // Keep each authored contact's height above the original flat support plane.
-    const targets=this.limbs.map(l=>({l,end:l.c.getWorldPosition(new THREE.Vector3()),pole:l.b.getWorldPosition(new THREE.Vector3()),rotation:l.c.getWorldQuaternion(new THREE.Quaternion())}));
+    const targets=this.limbs.map(l=>{
+      const end=l.c.getWorldPosition(new THREE.Vector3()),pole=l.b.getWorldPosition(new THREE.Vector3());
+      l.authoredBend ||= new THREE.Vector3();l.authoredBend.copy(pole).sub(l.a.getWorldPosition(this.v[7]));
+      return {l,end,pole,rotation:l.c.getWorldQuaternion(new THREE.Quaternion())};
+    });
     this.Remember(pelvis);
     const delta=this.q[0].setFromAxisAngle(right,-pitch).multiply(this.q[1].setFromAxisAngle(forward,roll));
     pelvis.getWorldQuaternion(this.q[2]).premultiply(delta);
@@ -136,7 +139,7 @@ export class ProneGroundContact {
       pole.y+=THREE.MathUtils.clamp(sample(pole)-rootY,-PRONE_CRAWL.maximumGroundDeltaM,PRONE_CRAWL.maximumGroundDeltaM);
       this.Solve(l,end,pole);
       const hit=probe(end.x,end.z,rootY),normal=hit?.normal;
-      if(normal){
+      if(normal&&l.part==='arm'&&l.side==='L'){
         const n=this.v[7].fromArray(normal).normalize();
         if(n.y>.5)rotation.premultiply(this.q[1].setFromUnitVectors(this.v[8].set(0,1,0),n));
       }
@@ -168,9 +171,14 @@ export class ProneGroundContact {
       return {x:point.x,z:point.z,y:hit?.y??rootY,n};
     });
     const floorAt=p=>{
-      let near=surfaces[0],distance=Infinity;
-      for(const s of surfaces){const d=(p.x-s.x)**2+(p.z-s.z)**2;if(d<distance){distance=d;near=s;}}
-      return near.y-(near.n[0]*(p.x-near.x)+near.n[2]*(p.z-near.z))/Math.max(.5,near.n[1]);
+      // A continuous field avoids jumping between nearest tangent planes on
+      // small humps, which previously fed discontinuous height into the IK.
+      let height=0,total=0;
+      for(const s of surfaces){
+        const d=(p.x-s.x)**2+(p.z-s.z)**2,w=1/(d+.025)**3;
+        height+=w*(s.y-(s.n[0]*(p.x-s.x)+s.n[2]*(p.z-s.z))/Math.max(.5,s.n[1]));total+=w;
+      }
+      return height/total;
     };
     for(let pass=0;pass<2;pass++){
       rig.root.updateWorldMatrix(true,false);rig.root.updateMatrixWorld(true);

@@ -203,10 +203,11 @@ try {
     const checkRiggedSoldier = (candidate, faction) => {
       check(candidate.meshSource.startsWith(`glb:Tengxian${faction}`),
         `${faction} should use a Lugou skinned GLB, got ${candidate.meshSource}`);
-      // 16 条源动作 + 3 条救护动作 + 5 条新步兵动作；军官保留原 19 条。
-      const expectedActions = candidate.characterRig?.asset.infantry ? 24 : 19;
+      // 19 source/aid clips, five infantry clips where present, and the shared crawl.
+      const expectedActions = (candidate.characterRig?.asset.infantry ? 24 : 19) + 1;
       check(candidate.characterRig?.clipById?.size === expectedActions,
         `${candidate.meshSource} did not expose all ${expectedActions} imported actions`);
+      check(candidate.characterRig.clipById.has('ProneCrawl'), `${candidate.meshSource} missing shared crawl`);
       let skinnedMeshes = 0;
       candidate.characterRig.root.traverse((item) => {
         if (item.isSkinnedMesh && item.visible) skinnedMeshes += 1;

@@ -22,6 +22,7 @@
 
 import * as THREE from "three";
 import { BLOOD_WOUND } from "./Data_Tuning_Blood.mjs";
+import { PRONE_CRAWL } from "./Data_Tuning_ProneCrawl.mjs";
 import { CharacterWounds } from "./Script_CharacterWounds.mjs";
 import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
 import { INFANTRY_RELEASE_SECONDS } from "./Script_InfantryAnimation.mjs";
@@ -1707,6 +1708,20 @@ export class Actor {
       SOCKET_FRAME_TARGET.multiply(SOCKET_FRAME_SOURCE.invert()));
     this.weaponGroup.position.set(0, 0, 0);
     this.weaponGroup.quaternion.copy(SOCKET_AIM_Q);
+    if (this.characterRig.currentId === "ProneCrawl" && this.weaponTwoHanded) {
+      // Carry at the wooden fore-end near the balance point, with the authored
+      // overhand fingers wrapped across it. The left hand remains free to crawl.
+      this.weaponGroup.position.copy(this.weaponGripFront);
+      this.weaponGroup.position.y += PRONE_CRAWL.carryTopOffsetM;
+      this.weaponGroup.position
+        .multiply(this.weaponGroup.scale).applyQuaternion(SOCKET_AIM_Q).negate();
+      rightSocket.getWorldPosition(SOCKET_RIGHT_WORLD);
+      this.characterRig.bones.handR.getWorldPosition(SOCKET_ELBOW_WORLD);
+      SOCKET_ELBOW_WORLD.sub(SOCKET_RIGHT_WORLD).normalize()
+        .multiplyScalar(PRONE_CRAWL.carryPalmInsetM).add(SOCKET_RIGHT_WORLD);
+      this.riggedWeaponMount.worldToLocal(SOCKET_ELBOW_WORLD);
+      this.weaponGroup.position.add(SOCKET_ELBOW_WORLD);
+    }
     this.weaponGroup.updateMatrix();
   }
 
@@ -2186,7 +2201,6 @@ export class Actor {
     // --- 开火 / 拉栓的边沿检测 --------------------------------------------
     const firing = !!s.firing;
     if (this.characterRig) {
-      this.characterRig.proneContact?.Restore();
       // Undo our post-animation correction before the mixer (including unkeyed bones).
       if (this.rigAimApplied) {
         for (const arm of this.rigAimArms) {
@@ -2196,6 +2210,7 @@ export class Actor {
         }
         this.rigAimApplied = false;
       }
+      this.characterRig.proneContact?.Restore();
       this.characterRig.Update(dt, s);
       this._UpdateRiggedWeaponMount();
       this._UpdateInfantryProps();
@@ -2647,9 +2662,11 @@ export class Actor {
     if (this.characterRig) {
       this.body.position.set(0, d.hipY, 0);
       this.body.rotation.set(0, 0, 0);
-      this._ApplyRiggedAim(s);
       this.characterRig.proneContact?.Apply(s);
       if (this.characterRig.proneContact?.active) this._UpdateRiggedWeaponMount();
+      // Stationary prone aiming is the last arm layer: terrain fitting must
+      // not rotate the live barrel away from the requested yaw/pitch.
+      this._ApplyRiggedAim(s);
     }
   }
 
