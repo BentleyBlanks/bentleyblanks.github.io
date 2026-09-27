@@ -23,8 +23,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { VOICE_LINES } from "./Data_Voice.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
-import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner, SQUAD_BARK_CAST, SquadBarkEntries }
-  from "./Data_FirstLevelVoiceCast.mjs";
+import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner, SQUAD_BARK_CAST, SquadBarkEntries, SquadBarkScript,
+  SQUAD_BARK_RETIRED_TEXT } from "./Data_FirstLevelVoiceCast.mjs";
 import { LINE_MASTER } from "./Data_FirstLevelDialogueDirection.mjs";
 import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, Pool, requestStats,
   SEED_AUDIO_MODEL, MasterSceneWav, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines }
@@ -71,7 +71,7 @@ const Name = (who) => MISSION_VOICE_CAST[who]?.[0] || who;
 const TEXT = new Map(VOICE_LINES.filter((l) => (l.side || "nra") === "nra" && l.kind !== "story").map((l) => [l.key, l.text]));
 const Letters = (text) => [...String(text)].filter((c) => /[\p{L}\p{N}]/u.test(c)).length;
 
-/** 各条短句的表演说明（只照着演，不念出来）。 */
+/** 各条短句的表演说明（只照着演，不念出来）。撤下的句子（SQUAD_BARK_RETIRED）的说明也要留着：它们还在录音稿里。 */
 const KEY_NOTES = Object.freeze({
   spot_east: "发现敌人，急着给弟兄指方向", spot_enemy: "发现敌人摸上来，急促报警", spot_gap: "看见敌人从缺口钻进来，急促报警",
   spot_wall: "看见敌人爬上墙，急促报警", move_cover: "招呼身边的弟兄赶紧找掩护", move_flank: "招呼弟兄从左边绕过去",
@@ -91,10 +91,10 @@ export function CastReference(who) {
 function People() {
   return Object.keys(SQUAD_BARK_CAST).filter((who) => !selected || selected.includes(who));
 }
-/** 这个人要录的句子：[{ who, key, bank, file, text }]，文本取自 Data_Voice。 */
+/** 这个人录音稿里的句子：[{ who, key, bank, file, text }]，文本取自 Data_Voice（已删的撤下句取 SQUAD_BARK_RETIRED_TEXT）。 */
 export function BarkLines(who) {
-  return SquadBarkEntries().filter((e) => e.who === who).map((e) => {
-    const text = TEXT.get(e.key);
+  return SquadBarkScript(who).map((e) => {
+    const text = TEXT.get(e.key) ?? SQUAD_BARK_RETIRED_TEXT[e.key];
     if (!text) throw new Error(`Data_Voice 没有中方口令 ${e.key}`);
     return { ...e, text };
   });
@@ -268,8 +268,11 @@ function Install(r, manifest, attempts) {
   const barks = manifest.barks;
   for (const key of Object.keys(barks)) if (barks[key].who === r.who) delete barks[key];
   fs.mkdirSync(path.join(out, "Barks"), { recursive: true });
+  // 录音稿里撤下的句子照样切、照样打分（整条的硬错误要算上它们），但不装。
+  const live = new Set(SquadBarkEntries().map((e) => e.bank));
   for (const [i, s] of r.slices.entries()) {
     const line = r.lines[i], dest = path.join(out, line.file);
+    if (!live.has(line.bank)) continue;
     fs.copyFileSync(s.file, dest);
     barks[line.bank] = { who: r.who, key: line.key, file: line.file, sha256: Sha256(dest), text: line.text,
       seconds: s.measure.seconds, voicedS: s.measure.voicedS, activeRmsDb: s.measure.activeRmsDb, truePeakDb: s.measure.truePeakDb,

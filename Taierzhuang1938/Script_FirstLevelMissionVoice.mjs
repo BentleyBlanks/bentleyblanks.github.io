@@ -137,7 +137,7 @@ export class FirstLevelMissionVoice {
    * 按 who 找人的那条通路），水平距离 ≤ BARK_SPEAKER_MATCH_M 的最近那个。VoicePosition 找不到人时
    * 退回的是玩家身边那一点，先量出这一点，等于它的一律当「没找到」。认不出返回 null（用公用声库）。
    * 只在 01–06（SQUAD_BARK_STAGES）认人，07 以后行为不变；已阵亡的人不认——Script_Ai.Kill 在阵亡处喊的
-   * hurt 是旁边的人喊的，不能认成死者自己（那样「班长哦！班长！」就再也挑不到了）。
+   * hurt 不能认成死者自己（中方那一声点名真人痛呼，不分人）。
    */
   BarkSpeaker({ seed = 0, side = "nra", position = null, priority = false } = {}) {
     if (side !== "nra" || !position) return null;

@@ -606,6 +606,9 @@ P012 冒烟认 fire/charge/bayonet/melee）。新增七个：
    补词走 `Script_VoiceBake` 流程，补完在 `BARK_LINES` 里加一行即可。
    已接线的四类用的都是**现成的**词：中方 move_cover / move_flank / warn_grenade / rally_shoot，
    日方 ija_warn_cover / ija_move_flank / ija_warn_grenade / ija_rally_suppress。
+   **2026-09-27**：中方的绕侧 / 压制 / 推进 / 趴下四类已摘掉（move_flank、warn_down 删句，rally_shoot、
+   move_go 只留给玩家下令）：普通兵对全场喊命令，玩家以为任务触发了什么。中方 AI 现在只喊
+   找掩护 / 手榴弹 / 冲锋 / 发现鬼子 / 中弹 / 换弹，阵亡只喊真人痛呼。口径在 `Data_Voice.mjs` 头注。
 5. **性能 A/B 没跑。** §7 的 `FrameProbe` 三机位交替对照留给验收批（`ai` 桶均值
    ≤ 基线 + 1.0 ms）。已做的预算控制：`UpdateCover` 受 `COVER_CYCLE.reselectMinS` 限流
    （「身上没有掩体」**不算**紧急重选 —— 前沿有 24 个人身边根本没有掩体点，当成紧急的话

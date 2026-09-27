@@ -20,7 +20,8 @@ import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { FIRST_LEVEL_DIALOGUE_DIRECTION, PROJECTION_DB, DIALOGUE_DUCK, LineDirection, FALLBACK_GAP_S, MAX_LIVE_DIALOGUE_LINES } from "./Data_FirstLevelDialogueDirection.mjs";
-import { FIRST_LEVEL_VOICE_CAST, CastVoiceOwner, SQUAD_BARK_KEYS, SQUAD_BARK_CAST, SQUAD_BARK_STAGES, SquadBarkEntries, SquadBarkKey }
+import { FIRST_LEVEL_VOICE_CAST, CastVoiceOwner, SQUAD_BARK_KEYS, SQUAD_BARK_CAST, SQUAD_BARK_STAGES, SquadBarkEntries, SquadBarkKey,
+  SquadBarkLive, SQUAD_BARK_RETIRED, SQUAD_BARK_RETIRED_TEXT }
   from "./Data_FirstLevelVoiceCast.mjs";
 import { FirstLevelMissionVoice, BARK_SPEAKER_MATCH_M } from "./Script_FirstLevelMissionVoice.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
@@ -523,14 +524,19 @@ const FakeAudio = () => {
   const nraPicks = [...table.matchAll(/nra: \{ kind: "(\w+)"(?:, key: "(\w+)")? \}/g)].map(([, kind, key]) => ({ kind, key }));
   for (const kind of [...aiSource.matchAll(/\.Bark\("(\w+)", \{ position: [^}]*side: (?:s|this)\.side \}\)/g)].map(([, kind]) => kind)) nraPicks.push({ kind });
   const nra = VOICE_LINES.filter((line) => (line.side || "nra") === "nra" && line.kind !== "story");
-  // hurt_down（「班长哦！班长！」）是旁人喊阵亡的人（Script_Ai.Kill 用阵亡处的位置），不归喊话的这个人；真人素材句不分人。
+  // 真人素材句不分人；阵亡那一声（Script_Ai.Kill）点名 hurt_scream，也是真人素材。
   const expectedSquad = new Set(nraPicks.flatMap(({ kind, key }) => key ? [key]
-    : nra.filter((line) => line.kind === kind && !line.event && !line.sample && line.key !== "hurt_down").map((line) => line.key)));
-  assert.deepEqual([...SQUAD_BARK_KEYS.squad].sort(), [...expectedSquad].sort(), "班组 AI 会喊的中方口令每条都有本人版本");
+    : nra.filter((line) => line.kind === kind && !line.event && !line.sample).map((line) => line.key)));
+  assert.deepEqual([...SquadBarkLive("squad")].sort(), [...expectedSquad].sort(), "班组 AI 会喊的中方口令每条都有本人版本，撤下的一条不装");
+  // 2026-09-27 撤下的口令（听着像任务提示）：Data_Voice 里已删的不许回来，录音稿里撤下的键都还在录音稿里（提示词哈希靠它）。
+  for (const key of Object.keys(SQUAD_BARK_RETIRED_TEXT)) assert.ok(!VOICE_LINES.some((line) => line.key === key), key + " 已撤下，不许回到 Data_Voice");
+  for (const [set, keys] of Object.entries(SQUAD_BARK_RETIRED)) for (const key of keys)
+    assert.ok(SQUAD_BARK_KEYS[set].includes(key) && (SQUAD_BARK_RETIRED_TEXT[key] || nra.some((line) => line.key === key)), set + " 撤下的 " + key + " 在录音稿里、原文找得到");
+  assert.ok(!expectedSquad.has("rally_shoot") && !expectedSquad.has("move_go"), "AI 不再喊「打！打！莫歇气！」「走！莫站到起！」（只留给玩家下令）");
   // 罗班长那一套 = 班组那一套 + 战车接线层点名要他喊的中方句（Data_Tuning_Tank.barkCues 里 who:"luo" 的 key），不多不少。
   const { TANK_BARK_CUES } = await import("./Data_Tuning_Tank.mjs");
   const luoTank = Object.values(TANK_BARK_CUES).filter((c) => c && c.who === "luo").map((c) => c.key);
-  assert.deepEqual([...SQUAD_BARK_KEYS.leader].sort(), [...SQUAD_BARK_KEYS.squad, ...new Set(luoTank)].sort(), "罗班长的本人版本 = 班组口令 + 战车预兆喊话");
+  assert.deepEqual([...SquadBarkLive("leader")].sort(), [...SquadBarkLive("squad"), ...new Set(luoTank)].sort(), "罗班长的本人版本 = 班组口令 + 战车预兆喊话");
   for (const c of Object.values(TANK_BARK_CUES).filter(Boolean)) {
     const line = VOICE_LINES.find((l) => l.key === c.key);
     assert.ok(line && (line.side || "nra") === (c.side || "nra") && line.kind === c.kind, "战车喊话点名的 " + c.key + " 在 Data_Voice 里、阵营与类别对得上");
@@ -538,7 +544,7 @@ const FakeAudio = () => {
     if (c.kind === "tank") assert.ok(line.event === true, "战车喊话 " + c.key + " 标 event（有前提的句子只许点名喊）");
   }
   const orders = aiSource.slice(aiSource.indexOf("const ORDER_LINE"), aiSource.indexOf("};", aiSource.indexOf("const ORDER_LINE")));
-  assert.deepEqual([...SQUAD_BARK_KEYS.player].sort(), [...new Set([...orders.matchAll(/: "(\w+)"/g)].map(([, key]) => key))].sort(),
+  assert.deepEqual([...SquadBarkLive("player")].sort(), [...new Set([...orders.matchAll(/: "(\w+)"/g)].map(([, key]) => key))].sort(),
     "玩家（顺子）下令喊的每条都有本人版本");
   // 本人版本录的是会被随机喊到的口令（非 event）；罗班长的战车预兆句例外：它们只由战车接线层点名，本来就标 event。
   for (const { key } of SquadBarkEntries()) assert.ok(nra.some((line) => line.key === key && (!line.event || luoTank.includes(key))),
@@ -565,7 +571,7 @@ const FakeAudio = () => {
   assert.equal(probe.BarkSpeaker({ seed: 0, priority: true, side: "nra", position: V(4, 0, 0) }), null, "不在玩家脚下的无种子喊话不算顺子");
   assert.equal(new FirstLevelMissionVoice({ audio: {}, Stage: () => "Support", Position: () => { throw new Error("boom"); } })
     .BarkSpeaker({ seed: 3, side: "nra", position: V(0, 0, 0) }), null, "认人出错只退回公用声库");
-  // 阵亡：Script_Ai.Kill 在死者脚下喊 hurt，那是旁边的人喊的，不许认成死者本人（hurt_down 要留在可选里）。
+  // 阵亡：Script_Ai.Kill 在死者脚下喊 hurt（中方点名真人痛呼），不许认成死者本人。
   dead.add("luo");
   assert.equal(probe.BarkSpeaker({ seed: 19, side: "nra", position: V(5, 0, 0) }), null, "死人位置上的喊话不认成死者");
   assert.equal(probe.BarkSpeaker({ seed: 13, side: "nra", position: V(5.6, 0, 0) }), "yaowa", "死者旁边活着的人照认");
@@ -592,7 +598,7 @@ const FakeAudio = () => {
   // 11c. Script_Audio.Bark：认出是谁只在他自己的版本里挑，不变调；没有本人版本的 TTS 句不说，真人素材照常；
   //      本人版本不进公用池子；认不出、或这个人一条本人版本都没有，照旧用公用声库。
   const bank = new Map(nra.map((line) => [line.key, { ...line }]));
-  for (const key of ["spot_enemy", "spot_gap", "hurt_hit", "rally_hold"]) {
+  for (const key of ["spot_enemy", "hurt_hit", "rally_hold"]) {
     const who = key === "rally_hold" ? "shunzi" : "luo";
     bank.set(SquadBarkKey(key, who), { key: SquadBarkKey(key, who), kind: nra.find((l) => l.key === key).kind, side: "nra", barkOf: who, base: key });
   }
@@ -605,7 +611,7 @@ const FakeAudio = () => {
     AudioEngine.prototype.Bark.call(engine, kind, options); return played[0]; };
   const Many = (kind, options, n = 40) => Array.from({ length: n }, () => Bark(kind, options));
   const luoSpot = Many("spot", { seed: 7 });
-  assert.ok(luoSpot.every((p) => ["voice.spot_enemy@luo", "voice.spot_gap@luo"].includes(p.name) && p.pitch === 1),
+  assert.ok(luoSpot.every((p) => p.name === "voice.spot_enemy@luo" && p.pitch === 1),
     "罗班长喊 spot 只挑他自己的版本、不变调：" + [...new Set(luoSpot.map((p) => p.name))]);
   assert.ok(Many("hurt", { seed: 7 }).every((p) => ["voice.hurt_hit@luo", "voice.hurt_scream"].includes(p.name)), "中弹：本人版本或真人素材，不说别人嗓子的 TTS");
   const generic = Many("spot", { seed: 3 });

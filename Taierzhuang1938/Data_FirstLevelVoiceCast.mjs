@@ -161,13 +161,17 @@ export const VOICE_LANG_RULE = Object.freeze({
 // 录一份自己的版本：同一个人的全部短句**一次请求**念完（带本人定妆音作参考），按句切开、逐句齐平
 // 到战斗口令的同一档电平（喊话彼此独立，音量只该由距离与遮挡决定）。
 //
-// 文本一字不改，取自 Data_Voice（中方口令）；只录运行时真会从这个人嘴里出来的那几条：
-//   · squad  —— 班组 AI（Script_Ai）自己喊的：spot（非 event 的 4 条）、move_cover / move_flank、
-//               warn_grenade、rally_shoot、hurt（hurt_hit / hurt_medic；hurt_down 是旁人喊阵亡者，
-//               hurt_scream 是真人素材、不分人）、ammo（非 event 的 3 条）
+// 文本一字不改，取自 Data_Voice（中方口令）；只装运行时真会从这个人嘴里出来的那几条：
+//   · squad  —— 班组 AI（Script_Ai）自己喊的：spot_enemy、move_cover、rally_charge、warn_grenade、
+//               hurt_hit（hurt_scream 是真人素材、不分人）、ammo_reload
 //   · player —— 玩家（顺子）下令时喊的（Script_Ai.IssueOrder 的 ORDER_LINE）
 // 声库键 `<key>@<who>`（SquadBarkKey）；Script_Audio.Bark 认出说话人后只在这个人的版本里挑，
 // 没有本人版本的 TTS 句不说（真人素材句照常可选），一条本人版本都没有才退回公用声库。
+//
+// **SQUAD_BARK_KEYS 是录音稿，不是运行时清单。** 2026-09-27 撤下了一批听着像任务提示的口令（Data_Voice 头注），
+// 但每人的本人版本是全部短句一次念完再切开的：撤句不重录，录音稿原样保留（提示词哈希才对得上那条录音），
+// 撤下的句子记在 SQUAD_BARK_RETIRED，运行时、清单与 Barks/ 目录只认 SquadBarkEntries()（录音稿减去撤下的）。
+// 哪天整人重录，把撤下的键从 SQUAD_SET / player 与下面两张表里一起删掉即可。
 const SQUAD_SET = Object.freeze(["spot_east", "spot_enemy", "spot_gap", "spot_wall", "move_cover", "move_flank", "move_go", "rally_charge", "warn_down",
   "warn_grenade", "rally_shoot", "hurt_hit", "hurt_medic", "ammo_ask", "ammo_out", "ammo_reload"]);
 /** 战车预兆喊话（Data_Tuning_Tank.barkCues 点名的中方 key）：只有罗班长喊，所以只录进他那一套。 */
@@ -178,6 +182,18 @@ export const SQUAD_BARK_KEYS = Object.freeze({
   leader: Object.freeze([...SQUAD_SET, ...LEADER_TANK_BARK_KEYS]),
   player: Object.freeze(["rally_follow", "move_go", "rally_charge", "rally_hold", "move_flank", "move_cover", "rally_shoot"]),
 });
+/** 2026-09-27 撤下、但还在录音稿里的键（按套）。squad / leader 里的 rally_shoot、move_go 只是 AI 不再喊，玩家下令照旧用。 */
+const SQUAD_RETIRED = Object.freeze(["spot_east", "spot_gap", "spot_wall", "move_flank", "move_go", "warn_down", "rally_shoot",
+  "hurt_medic", "ammo_ask", "ammo_out"]);
+export const SQUAD_BARK_RETIRED = Object.freeze({ squad: SQUAD_RETIRED, leader: SQUAD_RETIRED, player: Object.freeze(["move_flank"]) });
+/** 撤下且已从 Data_Voice 删掉的句子原文：只给录音稿重建提示词用（Script_SeedAudioSquadBarkBake.BarkPrompt）。 */
+export const SQUAD_BARK_RETIRED_TEXT = Object.freeze({
+  spot_east: "东边！东边有鬼子！", spot_gap: "缺口！鬼子钻进来了！", spot_wall: "墙上！鬼子爬上墙了！",
+  move_flank: "左手边！绕过去！", warn_down: "趴倒！趴倒！", hurt_medic: "担架兵！这头有人挂彩！",
+  ammo_ask: "桥夹！哪个匀我一个！", ammo_out: "子弹！我莫得子弹了！",
+});
+/** 这一套运行时真用的键 = 录音稿减去撤下的。 */
+export const SquadBarkLive = (set) => SQUAD_BARK_KEYS[set].filter((key) => !SQUAD_BARK_RETIRED[set]?.includes(key));
 /** 谁录哪一套。老周只在 01–03（开场分镜认得他的那几段）能被认出来，之后退回公用声库。 */
 export const SQUAD_BARK_CAST = Object.freeze({
   luo: "leader", yaowa: "squad", heyoutian: "squad", liuwencai: "squad", zhou: "squad", shunzi: "player",
@@ -191,8 +207,12 @@ export const SquadBarkKey = (key, who) => `${key}@${who}`;
 const Pascal = (text) => String(text).split("_").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("");
 /** 相对 Audio/FirstLevel/ 的文件名。 */
 export const SquadBarkFile = (key, who) => `Barks/AudioVoice_FirstLevelBark${Pascal(who)}${Pascal(key)}.mp3`;
-/** [{ who, key, bank, file }]，按 SQUAD_BARK_CAST 的顺序。 */
+/** 运行时装的本人版本：[{ who, key, bank, file }]，按 SQUAD_BARK_CAST 的顺序。 */
 export function SquadBarkEntries() {
-  return Object.entries(SQUAD_BARK_CAST).flatMap(([who, set]) => SQUAD_BARK_KEYS[set].map((key) =>
+  return Object.entries(SQUAD_BARK_CAST).flatMap(([who, set]) => SquadBarkLive(set).map((key) =>
     ({ who, key, bank: SquadBarkKey(key, who), file: SquadBarkFile(key, who) })));
+}
+/** 这个人录音稿里的全部句子（含撤下的，按录音顺序）：只给烘焙脚本重建提示词、切整条录音用。 */
+export function SquadBarkScript(who) {
+  return SQUAD_BARK_KEYS[SQUAD_BARK_CAST[who]].map((key) => ({ who, key, bank: SquadBarkKey(key, who), file: SquadBarkFile(key, who) }));
 }

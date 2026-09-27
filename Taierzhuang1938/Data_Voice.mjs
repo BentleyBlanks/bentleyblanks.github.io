@@ -102,6 +102,16 @@
 //   8. 「担架兵」要和仓内医疗系统的措辞对齐：docs 里包扎机制写的是「任何人捡到药包都能救人」，若 HUD／交互文案还写「卫生兵」，语音与界面会当场打架。这是本轮唯一一处语音改动倒逼系统文案的地方。
 //   9. 「老子」全篇只留 2 次（都在班长督战句）是三位评审的共同意见，但代价是整体口气比用户实听认可的那条测试句要收敛不少。若实听下来觉得味淡，加浓的地方应该是语气词与补语（哈／哦／到起／拢／走拢），不要再加「老子」，更不要往里塞方言名词——那正是这次返工要修的老毛病。
 //
+// ## 2026-09-27：删掉 9 条「听着像任务提示」的口令
+// 这批句子没有主人、随机抽，所以**不能带方位、地形、事件，也不能是普通兵对全场下的命令**——
+// 玩家分不清是环境喊话还是任务触发（用户原话：「打！打！」不知道的以为是任务触发了什么）。
+// 删掉的：spot_east「东边！」（方位写死）、spot_gap「缺口！」、spot_wall「墙上！」（地形/事件写死）、
+// hurt_down「班长哦！班长！」（死谁都喊班长）、ammo_out / ammo_ask（换弹时喊没子弹、要桥夹，信息是假的）、
+// hurt_medic「担架兵！」（像救护任务提示）、warn_down「趴倒！」（像来炮了）、move_flank「左手边！」（方位写死）。
+// rally_shoot「打！打！莫歇气！」与 move_go「走！莫站到起！」留着，但**只给玩家下令用**：
+// AI 压制 / 推进不再喊中方口令（Script_Ai.BARK_LINES 的 suppress / advance 只剩 ija）。
+// 以后往这张表加中方随机口令，照这条口径先过一遍。
+//
 // role 只记录「这句话该由谁喊」，运行时不据此挑人 —— 挑选按 kind + 种子，
 // 见 Script_Audio.Bark()。
 //
@@ -214,9 +224,7 @@ const BATTLE_LINES = [
   { key: "rally_noretreat", kind: "rally",  file: "AudioVoice_RallyNoretreat.mp3", dur: 2.35,  role: "班长",    pitch: -2,                  text: "莫退！一步都莫退！" },
   { key: "rally_oath",      kind: "rally",  file: "AudioVoice_RallyOath.mp3", dur: 2.49,  role: "班长",    pitch: -2,                  text: "鬼子不打完，莫回四川！" },
   { key: "rally_shoot",     kind: "rally",  file: "AudioVoice_RallyShoot.mp3", dur: 2.37,  role: "班长",    pitch: -2,                  text: "打！打！莫歇气！" },
-  { key: "spot_east",       kind: "spot",   file: "AudioVoice_SpotEast.mp3", dur: 2.36,  role: "普通兵",   pitch: 0,                   text: "东边！东边有鬼子！" },
   { key: "spot_enemy",      kind: "spot",   file: "AudioVoice_SpotEnemy.mp3", dur: 2.37,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "鬼子！鬼子摸拢来了！" },
-  { key: "spot_gap",        kind: "spot",   file: "AudioVoice_SpotGap.mp3", dur: 2.35,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "缺口！鬼子钻进来了！" },
   { key: "spot_plane",      kind: "spot",   file: "AudioVoice_SpotPlane.mp3", dur: 2.30,  role: "普通兵",   pitch: 0,   event: true,  text: "飞机！快躲起！" },
   { key: "spot_tank",       kind: "spot",   file: "AudioVoice_SpotTank.mp3", dur: 2.36,  role: "新兵",    pitch: 0,   event: true,  speed: 1.15, text: "战车！战车碾拢来了！" },
   // 第一关 03–05 战车的预兆喊话（契约 §2 第 7 条「不加 HUD 标记，靠声音、炮塔指向和罗班长喊话传达窗口」；
@@ -226,17 +234,11 @@ const BATTLE_LINES = [
   { key: "tank_turret",     kind: "tank",   file: "AudioVoice_TankTurret.mp3", dur: 0.86,  role: "老兵",    pitch: -4,  event: true,  text: "炮塔转过来了！" },
   { key: "tank_window",     kind: "tank",   file: "AudioVoice_TankWindow.mp3", dur: 2.35,  role: "老兵",    pitch: -4,  event: true,  text: "它在打口子！就现在！" },
   { key: "tank_track",      kind: "tank",   file: "AudioVoice_TankTrack.mp3", dur: 2.36,   role: "老兵",    pitch: -4,  event: true,  text: "履带断了！还在打！再补一捆！" },
-  { key: "spot_wall",       kind: "spot",   file: "AudioVoice_SpotWall.mp3", dur: 2.34,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "墙上！鬼子爬上墙了！" },
-  { key: "warn_down",       kind: "warn",   file: "AudioVoice_WarnDown.mp3", dur: 1.84,  role: "老兵",    pitch: -4,                  text: "趴倒！趴倒！" },
   { key: "warn_grenade",    kind: "warn",   file: "AudioVoice_WarnGrenade.mp3", dur: 1.91,  role: "普通兵",   pitch: 0,                   text: "手榴弹！闪！" },
   { key: "warn_shell",      kind: "warn",   file: "AudioVoice_WarnShell.mp3", dur: 2.36,  role: "老兵",    pitch: -4,                  speed: 1.1, text: "炮来了！趴倒！莫动！" },
-  { key: "ammo_ask",        kind: "ammo",   file: "AudioVoice_AmmoAsk.mp3", dur: 2.37,  role: "普通兵",   pitch: 0,                   text: "桥夹！哪个匀我一个！" },
   { key: "ammo_grenade",    kind: "ammo",   file: "AudioVoice_AmmoGrenade.mp3", dur: 2.36,  role: "普通兵",   pitch: 0,   event: true,  text: "手榴弹！莫得了！" },
-  { key: "ammo_out",        kind: "ammo",   file: "AudioVoice_AmmoOut.mp3", dur: 2.35,  role: "普通兵",   pitch: 0,                   text: "子弹！我莫得子弹了！" },
   { key: "ammo_reload",     kind: "ammo",   file: "AudioVoice_AmmoReload.mp3", dur: 2.14,  role: "普通兵",   pitch: 0,                   text: "我压子弹！掩护我一哈！" },
-  { key: "hurt_down",       kind: "hurt",   file: "AudioVoice_HurtDown.mp3", dur: 2.37,  role: "普通兵",   pitch: -4, speed: 0.85,                   text: "班长哦！班长！" },
   { key: "hurt_hit",        kind: "hurt",   file: "AudioVoice_HurtHit.mp3", dur: 2.37,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "遭了！我遭枪子了！" },
-  { key: "hurt_medic",      kind: "hurt",   file: "AudioVoice_HurtMedic.mp3", dur: 2.36,  role: "普通兵",   pitch: 0,                   text: "担架兵！这头有人挂彩！" },
     { key: "hurt_scream", kind: "hurt", file: "AudioVoice_HurtScream.mp3", dur: 0.82, role: "普通兵",
     // **这一条不走 TTS**：非语言的惨叫模型做不像，而且 seedaudio 的默认音色偏女声，
     // pitch 压到 -6 出来还是个女的（用户第一反应就是「啊——怎么是女声」）。
@@ -248,7 +250,6 @@ const BATTLE_LINES = [
     },
     text: "啊——！" },
   { key: "move_cover",      kind: "move",   file: "AudioVoice_MoveCover.mp3", dur: 2.35,  role: "班长",    pitch: -2,                  text: "找掩护！躲到起！" },
-  { key: "move_flank",      kind: "move",   file: "AudioVoice_MoveFlank.mp3", dur: 1.73,  role: "班长",    pitch: -2,                  text: "左手边！绕过去！" },
   { key: "move_go",         kind: "move",   file: "AudioVoice_MoveGo.mp3", dur: 1.84,  role: "班长",    pitch: -2,                  text: "走！莫站到起！" },
   { key: "move_nogun",      kind: "move",   file: "AudioVoice_MoveNogun.mp3", dur: 2.22,  role: "班长",    pitch: -2,  event: true,  text: "莫得枪的，跟到走！" },
 
@@ -259,7 +260,7 @@ const BATTLE_LINES = [
   // 写成假名的「とつげき！」才读出四拍日语。汉字写法记在 kanji 字段，只作文档用。
   //
   // side: "ija" —— Bark 按阵营过滤声库。挑错阵营就是日本兵喊中文（或反过来），
-  // 那比没有配音更糟。未标 side 的一律按中方处理（中方那 31 条的兼容默认）。
+  // 那比没有配音更糟。未标 side 的一律按中方处理（中方口令的兼容默认）。
   //
   // 红线（考据组定的，都在这批里守住了）：
   //   · **一句「バカヤロー」都没有** —— 这是抗日神剧的头号标志，列了黑名单第一条
@@ -407,7 +408,7 @@ const CHAPTER_LINES = [];
 
 /**
  * 总表 = 战场口令 + 序章与第一章的剧情台词（第二到终章已废弃）。
- * 顺序有意义：战场口令在前（中方 31 条 + 日方 28 条），章节台词按章号接在后面。
+ * 顺序有意义：战场口令在前（中方 25 条 + 日方 30 条），章节台词按章号接在后面。
  * 现有断言（「战斗 Bark 时长在 0.3—2.6 s」之类）按 kind 过滤，不靠下标 ——
  * 2026-08-29 删掉表头那 11 条 prologue_* 行时，正因为如此一条断言都没受影响。
  */

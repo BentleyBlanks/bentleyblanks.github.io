@@ -84,8 +84,11 @@ const EMPTY_CANDIDATES = Object.freeze([]);
  * 行为 → 喊话的对照表（docs/Data_EnemyAi.md §8）。
  *
  * 键全部是 `Data_Voice.mjs` 里**已经烘出来的**行，一条新词都没加：
- * 中方走「找掩护 / 左手边绕过去 / 手榴弹 / 打莫歇气」，日方走对应的
- * `ija_warn_cover` / `ija_move_flank` / `ija_warn_grenade` / `ija_rally_suppress`。
+ * 中方走「找掩护 / 手榴弹」，日方走对应的 `ija_warn_cover` / `ija_warn_grenade`；
+ * 绕侧 / 压制 / 推进 / 趴下这几类只有日方喊（`ija_move_flank` / `ija_rally_suppress` / …）。
+ * 【2026-09-27】中方那几句（「左手边！绕过去！」「打！打！莫歇气！」「走！莫站到起！」「趴倒！趴倒！」）
+ * 是普通兵对全场下的命令，随口一喊玩家以为任务触发了什么，已从 AI 这边摘掉（口径见 Data_Voice 头注）；
+ * 「打！打！」与「走！」仍留给玩家自己下令时喊（IssueOrder 的 ORDER_LINE）。
  * `lost`（跟丢了）两侧都没有现成的词 —— 于是它**不在表里**，Bark 直接返回 null，
  * 等 Script_VoiceBake 补了词再加一行就行（这就是「静默降级」的形状）。
  */
@@ -100,7 +103,6 @@ const BARK_LINES = Object.freeze({
     ija: { kind: "warn", key: "ija_warn_cover" },
   },
   flank: {
-    nra: { kind: "move", key: "move_flank" },
     ija: { kind: "move", key: "ija_move_flank" },
   },
   grenade: {
@@ -108,7 +110,6 @@ const BARK_LINES = Object.freeze({
     ija: { kind: "warn", key: "ija_warn_grenade" },
   },
   suppress: {
-    nra: { kind: "rally", key: "rally_shoot" },
     ija: { kind: "rally", key: "ija_rally_suppress" },
   },
   // --- 2026-09-23（docs/Data_EnemyAi.md §20）：反应层补的六类 -----------------------
@@ -120,14 +121,12 @@ const BARK_LINES = Object.freeze({
     ija: { kind: "rally", key: "ija_rally_storm", priority: true },
   },
   advance: {
-    nra: { kind: "move", key: "move_go" },
     ija: { kind: "move", keys: ["ija_move_advance", "ija_move_forward"] },
   },
   fallback: { ija: { kind: "move", key: "ija_move_back" } },
   mg: { ija: { kind: "spot", key: "ija_spot_mg" } },
   leaderDown: { ija: { kind: "hurt", key: "ija_hurt_leader", priority: true } },
   down: {
-    nra: { kind: "warn", key: "warn_down" },
     ija: { kind: "warn", key: "ija_warn_down" },
   },
 });
@@ -550,11 +549,12 @@ export class Soldier {
     // 结果是：日军炮弹炸死中国兵扣日方的票，玩家亲手打死人扣两票。
     this.director?.ctx?.vfx?.CorpseBlood?.(this.actor);
     if (this.director) this.director.NotifyDeath(this);
-    // 倒下的那一声是**旁边的人**喊的（「班长！班长！」），所以位置取阵亡处、
-    // 但语气归活人。这一条比"死人自己惨叫"更接近战场，也更不容易滥。
+    // 倒下的那一声。中方只喊真人痛呼：原来的「班长哦！班长！」死谁都喊班长（2026-09-27 删了），
+    // 而中弹那句「我遭枪子了」在阵亡处被旁边活着的人认领时，就成了没挨枪的人喊自己中弹。
     const A2 = this.director && this.director.ctx && this.director.ctx.audio;
     if (A2) {
-      A2.Bark("hurt", { position: this.position.clone(), seed: (this.id | 0) + 7, side: this.side });
+      A2.Bark("hurt", { position: this.position.clone(), seed: (this.id | 0) + 7, side: this.side,
+        key: this.side === "nra" ? "hurt_scream" : null });
     }
     return true;
   }
@@ -1286,9 +1286,10 @@ export class AiDirector {
     // 下令要**听得见**。原来命令只改数据不出声，玩家按了 Tab 转轮盘松手，
     // 除了小队开始动之外没有任何反馈 —— 不知道令下没下、下的是哪条。
     // priority: true —— 玩家自己下的令必须响，不能被一街的喊杀挤掉。
+    // 散开 / 包抄不喊：原来那句「左手边！绕过去！」方位写死、半数时候跟分队方向相反（2026-09-27 删了）。
     const ORDER_LINE = {
       follow: "rally_follow", advance: "move_go", charge: "rally_charge",
-      hold: "rally_hold", spread: "move_flank", flank: "move_flank",
+      hold: "rally_hold",
       cover: "move_cover", fire: "rally_shoot",
     };
     if (this.ctx.audio && ORDER_LINE[orderId]) {

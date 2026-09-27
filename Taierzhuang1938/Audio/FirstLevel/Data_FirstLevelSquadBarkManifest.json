@@ -229,31 +229,6 @@
   }
  },
  "barks": {
-  "spot_east@luo": {
-   "who": "luo",
-   "key": "spot_east",
-   "file": "Barks/AudioVoice_FirstLevelBarkLuoSpotEast.mp3",
-   "sha256": "5c89cccba34d872a8e41ce49a5125d4323810e59a10c43349213a2d0bc9d2eb4",
-   "text": "东边！东边有鬼子！",
-   "seconds": 1.36,
-   "voicedS": 0.92,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -3.05,
-   "noiseDb": -87.93,
-   "lowShare": 0.233,
-   "f0": 239,
-   "gainDb": 0.74,
-   "takeStartS": 0.02,
-   "takeEndS": 1.4,
-   "tight": false,
-   "speakerCos": 0.696,
-   "nearestOther": [
-    "yaowa",
-    0.561
-   ],
-   "cer": 0.2857,
-   "transcript": "东边,东边有规则!"
-  },
   "spot_enemy@luo": {
    "who": "luo",
    "key": "spot_enemy",
@@ -278,56 +253,6 @@
    ],
    "cer": 0.25,
    "transcript": "鬼子,鬼子魔龙来了!"
-  },
-  "spot_gap@luo": {
-   "who": "luo",
-   "key": "spot_gap",
-   "file": "Barks/AudioVoice_FirstLevelBarkLuoSpotGap.mp3",
-   "sha256": "e4c20386d1655a2cd2d5be0e3a35c9aa4bcc7de193813d4b25e00c6bd7fe9714",
-   "text": "缺口！鬼子钻进来了！",
-   "seconds": 1.56,
-   "voicedS": 1.08,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -2.22,
-   "noiseDb": -87.73,
-   "lowShare": 0.205,
-   "f0": 203,
-   "gainDb": 1.43,
-   "takeStartS": 4.27,
-   "takeEndS": 5.84,
-   "tight": false,
-   "speakerCos": 0.818,
-   "nearestOther": [
-    "heyoutian",
-    0.652
-   ],
-   "cer": 0.25,
-   "transcript": "缺寇,闺子钻进来了。"
-  },
-  "spot_wall@luo": {
-   "who": "luo",
-   "key": "spot_wall",
-   "file": "Barks/AudioVoice_FirstLevelBarkLuoSpotWall.mp3",
-   "sha256": "ad08a2c16aeae985b0c1991997eacc599c5ef82e4bcff72e4b93a35e474ebd0e",
-   "text": "墙上！鬼子爬上墙了！",
-   "seconds": 1.6,
-   "voicedS": 1.14,
-   "activeRmsDb": -16.61,
-   "truePeakDb": -1.85,
-   "noiseDb": -83.54,
-   "lowShare": 0.113,
-   "f0": 174,
-   "gainDb": 2.87,
-   "takeStartS": 6.9,
-   "takeEndS": 8.51,
-   "tight": false,
-   "speakerCos": 0.817,
-   "nearestOther": [
-    "zhou",
-    0.679
-   ],
-   "cer": 0.5,
-   "transcript": "强撒,规则爬上墙了。"
   },
   "move_cover@luo": {
    "who": "luo",
@@ -354,56 +279,6 @@
    "cer": 0.6667,
    "transcript": "走烟符,躲到去。"
   },
-  "move_flank@luo": {
-   "who": "luo",
-   "key": "move_flank",
-   "file": "Barks/AudioVoice_FirstLevelBarkLuoMoveFlank.mp3",
-   "sha256": "8426b45726743e9119ff5882b1e826f5960a545c1c09ec07c81e14f2007505d8",
-   "text": "左手边！绕过去！",
-   "seconds": 1.36,
-   "voicedS": 0.86,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -3.19,
-   "noiseDb": -87.26,
-   "lowShare": 0.255,
-   "f0": 229,
-   "gainDb": 0.26,
-   "takeStartS": 10.84,
-   "takeEndS": 12.21,
-   "tight": false,
-   "speakerCos": 0.763,
-   "nearestOther": [
-    "heyoutian",
-    0.624
-   ],
-   "cer": 0,
-   "transcript": "左手边,绕过去。"
-  },
-  "move_go@luo": {
-   "who": "luo",
-   "key": "move_go",
-   "file": "Barks/AudioVoice_FirstLevelBarkLuoMoveGo.mp3",
-   "sha256": "e0be5b9aa7a1179f27d666b2f7fdd18ec8971366f932cfdf7c360804b3769133",
-   "text": "走！莫站到起！",
-   "seconds": 1.2,
-   "voicedS": 0.68,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -2.2,
-   "noiseDb": -84.92,
-   "lowShare": 0.228,
-   "f0": 180,
-   "gainDb": 2.01,
-   "takeStartS": 12.55,
-   "takeEndS": 13.76,
-   "tight": false,
-   "speakerCos": 0.818,
-   "nearestOther": [
-    "zhou",
-    0.665
-   ],
-   "cer": 0.4,
-   "transcript": "走,莫攒到去。"
-  },
   "rally_charge@luo": {
    "who": "luo",
    "key": "rally_charge",
@@ -428,31 +303,6 @@
    ],
    "cer": 0,
    "transcript": "冲!给老子冲!"
-  },
-  "warn_down@luo": {
-   "who": "luo",
-   "key": "warn_down",
-   "file": "Barks/AudioVoice_FirstLevelBarkLuoWarnDown.mp3",
-   "sha256": "b155c868a482102a89fe12142d2066ccc32d25c9669e6a33184038a83f89b095",
-   "text": "趴倒！趴倒！",
-   "seconds": 1,
-   "voicedS": 0.54,
-   "activeRmsDb": -16.56,
-   "truePeakDb": -4.65,
-   "noiseDb": -90.58,
-   "lowShare": 0.071,
-   "f0": 276,
-   "gainDb": -1.72,
-   "takeStartS": 16.12,
-   "takeEndS": 17.16,
-   "tight": false,
-   "speakerCos": 0.601,
-   "nearestOther": [
-    "heyoutian",
-    0.513
-   ],
-   "cer": 1,
-   "transcript": "爬刀,爬刀!"
   },
   "warn_grenade@luo": {
    "who": "luo",
@@ -479,31 +329,6 @@
    "cer": 1.25,
    "transcript": "所有的胆,散!"
   },
-  "rally_shoot@luo": {
-   "who": "luo",
-   "key": "rally_shoot",
-   "file": "Barks/AudioVoice_FirstLevelBarkLuoRallyShoot.mp3",
-   "sha256": "b44b6fa1d8d12eb9be109df211635bde061090135519ad7d991b979cfe853eba",
-   "text": "打！打！莫歇气！",
-   "seconds": 1.86,
-   "voicedS": 1,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -3.33,
-   "noiseDb": -88.13,
-   "lowShare": 0.081,
-   "f0": 291,
-   "gainDb": -1.01,
-   "takeStartS": 20.01,
-   "takeEndS": 21.89,
-   "tight": false,
-   "speakerCos": 0.722,
-   "nearestOther": [
-    "heyoutian",
-    0.615
-   ],
-   "cer": 1,
-   "transcript": "大,大,我学起。"
-  },
   "hurt_hit@luo": {
    "who": "luo",
    "key": "hurt_hit",
@@ -528,81 +353,6 @@
    ],
    "cer": 0.4286,
    "transcript": "糟了,我找墙子了。"
-  },
-  "hurt_medic@luo": {
-   "who": "luo",
-   "key": "hurt_medic",
-   "file": "Barks/AudioVoice_FirstLevelBarkLuoHurtMedic.mp3",
-   "sha256": "11e637b202c934371321a6d9db7733c532213d087d94b5a201a8668ce26f9e03",
-   "text": "担架兵！这头有人挂彩！",
-   "seconds": 1.7,
-   "voicedS": 1.22,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -2.08,
-   "noiseDb": -81.48,
-   "lowShare": 0.185,
-   "f0": 262,
-   "gainDb": 1.32,
-   "takeStartS": 24.61,
-   "takeEndS": 26.32,
-   "tight": false,
-   "speakerCos": 0.75,
-   "nearestOther": [
-    "heyoutian",
-    0.623
-   ],
-   "cer": 0.4444,
-   "transcript": "胆家兵,这头有人刮菜!"
-  },
-  "ammo_ask@luo": {
-   "who": "luo",
-   "key": "ammo_ask",
-   "file": "Barks/AudioVoice_FirstLevelBarkLuoAmmoAsk.mp3",
-   "sha256": "a02229b33b06a3f455f7e414a054571b9212ca948a78bdd791a3dda3aaaeea38",
-   "text": "桥夹！哪个匀我一个！",
-   "seconds": 1.5,
-   "voicedS": 1.12,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -3.43,
-   "noiseDb": -83.4,
-   "lowShare": 0.134,
-   "f0": 254,
-   "gainDb": -0.51,
-   "takeStartS": 26.98,
-   "takeEndS": 28.49,
-   "tight": false,
-   "speakerCos": 0.701,
-   "nearestOther": [
-    "yaowa",
-    0.601
-   ],
-   "cer": 0.75,
-   "transcript": "乔家,拿个云威一狗。"
-  },
-  "ammo_out@luo": {
-   "who": "luo",
-   "key": "ammo_out",
-   "file": "Barks/AudioVoice_FirstLevelBarkLuoAmmoOut.mp3",
-   "sha256": "ac1348595db346e9558b9af2c5624476f2c250a243b22dc8d6e339bfc97d4816",
-   "text": "子弹！我莫得子弹了！",
-   "seconds": 1.58,
-   "voicedS": 1.12,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -3.06,
-   "noiseDb": -85.87,
-   "lowShare": 0.135,
-   "f0": 246,
-   "gainDb": -0.9,
-   "takeStartS": 28.91,
-   "takeEndS": 30.49,
-   "tight": false,
-   "speakerCos": 0.677,
-   "nearestOther": [
-    "yaowa",
-    0.582
-   ],
-   "cer": 0.25,
-   "transcript": "子弹,我摸到子弹了。"
   },
   "ammo_reload@luo": {
    "who": "luo",
@@ -704,31 +454,6 @@
    "cer": 0.3636,
    "transcript": "绿带短了,还在打,再不一困。"
   },
-  "spot_east@yaowa": {
-   "who": "yaowa",
-   "key": "spot_east",
-   "file": "Barks/AudioVoice_FirstLevelBarkYaowaSpotEast.mp3",
-   "sha256": "7df9e828ded1dd8bf9a57d54eacae5fb474145a87c6369780fd8fdcb00b47848",
-   "text": "东边！东边有鬼子！",
-   "seconds": 1.99,
-   "voicedS": 1.22,
-   "activeRmsDb": -16.76,
-   "truePeakDb": -1.78,
-   "noiseDb": -98.49,
-   "lowShare": 0.224,
-   "f0": 246,
-   "gainDb": 6.7,
-   "takeStartS": 0.02,
-   "takeEndS": 2.01,
-   "tight": false,
-   "speakerCos": 0.756,
-   "nearestOther": [
-    "liuwencai",
-    0.621
-   ],
-   "cer": 0.2857,
-   "transcript": "东边,东边有龟字。"
-  },
   "spot_enemy@yaowa": {
    "who": "yaowa",
    "key": "spot_enemy",
@@ -753,56 +478,6 @@
    ],
    "cer": 0.5,
    "transcript": "桂子,桂子魔龙来了。"
-  },
-  "spot_gap@yaowa": {
-   "who": "yaowa",
-   "key": "spot_gap",
-   "file": "Barks/AudioVoice_FirstLevelBarkYaowaSpotGap.mp3",
-   "sha256": "0de2f811e0d792b5215939da148970c1d15d40c6ac897a4ddccc57dc3a513f1e",
-   "text": "缺口！鬼子钻进来了！",
-   "seconds": 2.12,
-   "voicedS": 1.32,
-   "activeRmsDb": -16.81,
-   "truePeakDb": -1.88,
-   "noiseDb": -104.2,
-   "lowShare": 0.115,
-   "f0": 258,
-   "gainDb": 1.13,
-   "takeStartS": 7.32,
-   "takeEndS": 9.47,
-   "tight": false,
-   "speakerCos": 0.767,
-   "nearestOther": [
-    "liuwencai",
-    0.61
-   ],
-   "cer": 0.25,
-   "transcript": "缺扣,柜子钻进来了。"
-  },
-  "spot_wall@yaowa": {
-   "who": "yaowa",
-   "key": "spot_wall",
-   "file": "Barks/AudioVoice_FirstLevelBarkYaowaSpotWall.mp3",
-   "sha256": "a8ef4072eb881f6e04e4f501306f7f59f4f38b773d2302e09e88383d2057e33b",
-   "text": "墙上！鬼子爬上墙了！",
-   "seconds": 2.38,
-   "voicedS": 1.46,
-   "activeRmsDb": -16.73,
-   "truePeakDb": -1.81,
-   "noiseDb": -103.51,
-   "lowShare": 0.073,
-   "f0": 254,
-   "gainDb": 1.35,
-   "takeStartS": 10.09,
-   "takeEndS": 12.49,
-   "tight": false,
-   "speakerCos": 0.731,
-   "nearestOther": [
-    "liuwencai",
-    0.574
-   ],
-   "cer": 0.5,
-   "transcript": "枪伤,规子爬上枪了。"
   },
   "move_cover@yaowa": {
    "who": "yaowa",
@@ -829,56 +504,6 @@
    "cer": 1,
    "transcript": "造烟符,多道歉。"
   },
-  "move_flank@yaowa": {
-   "who": "yaowa",
-   "key": "move_flank",
-   "file": "Barks/AudioVoice_FirstLevelBarkYaowaMoveFlank.mp3",
-   "sha256": "2bff31fd6589f1db2eac332a75e6ede2b5ce86557c141a4ac1d1fba4f68bb5e0",
-   "text": "左手边！绕过去！",
-   "seconds": 1.88,
-   "voicedS": 1.14,
-   "activeRmsDb": -16.56,
-   "truePeakDb": -1.91,
-   "noiseDb": -102.48,
-   "lowShare": 0.138,
-   "f0": 281,
-   "gainDb": 3.09,
-   "takeStartS": 15.76,
-   "takeEndS": 17.66,
-   "tight": false,
-   "speakerCos": 0.694,
-   "nearestOther": [
-    "liuwencai",
-    0.534
-   ],
-   "cer": 0,
-   "transcript": "左手边,绕过去。"
-  },
-  "move_go@yaowa": {
-   "who": "yaowa",
-   "key": "move_go",
-   "file": "Barks/AudioVoice_FirstLevelBarkYaowaMoveGo.mp3",
-   "sha256": "f44c3c9b1a426c17c8e8313b6e5e635b41ea98a6f3161f8c78d37e3b039a6247",
-   "text": "走！莫站到起！",
-   "seconds": 1.64,
-   "voicedS": 0.9,
-   "activeRmsDb": -16.67,
-   "truePeakDb": -1.89,
-   "noiseDb": -104.35,
-   "lowShare": 0.124,
-   "f0": 276,
-   "gainDb": 0.92,
-   "takeStartS": 19.23,
-   "takeEndS": 20.9,
-   "tight": false,
-   "speakerCos": 0.703,
-   "nearestOther": [
-    "liuwencai",
-    0.568
-   ],
-   "cer": 0.8,
-   "transcript": "走,摸斩刀器。"
-  },
   "rally_charge@yaowa": {
    "who": "yaowa",
    "key": "rally_charge",
@@ -903,31 +528,6 @@
    ],
    "cer": 0.4,
    "transcript": "从!给老子从!"
-  },
-  "warn_down@yaowa": {
-   "who": "yaowa",
-   "key": "warn_down",
-   "file": "Barks/AudioVoice_FirstLevelBarkYaowaWarnDown.mp3",
-   "sha256": "a373ffefda3ec3ef9b0cd10b144e4bb8df181c6faa678264fd4f19fcda6ed243",
-   "text": "趴倒！趴倒！",
-   "seconds": 1.3,
-   "voicedS": 0.88,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -3.84,
-   "noiseDb": -89.56,
-   "lowShare": 0.05,
-   "f0": 340,
-   "gainDb": -3.44,
-   "takeStartS": 24.69,
-   "takeEndS": 26.01,
-   "tight": false,
-   "speakerCos": 0.566,
-   "nearestOther": [
-    "heyoutian",
-    0.497
-   ],
-   "cer": 1,
-   "transcript": "拔刀!拔刀!"
   },
   "warn_grenade@yaowa": {
    "who": "yaowa",
@@ -954,31 +554,6 @@
    "cer": 1,
    "transcript": "搜六胆"
   },
-  "rally_shoot@yaowa": {
-   "who": "yaowa",
-   "key": "rally_shoot",
-   "file": "Barks/AudioVoice_FirstLevelBarkYaowaRallyShoot.mp3",
-   "sha256": "2d6cfb9d196d881dcdb34a1b96b3475b166bd7d06e3067f8490ab7d34659ff0d",
-   "text": "打！打！莫歇气！",
-   "seconds": 1.621,
-   "voicedS": 1.16,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -3.03,
-   "noiseDb": -89.21,
-   "lowShare": 0.051,
-   "f0": 296,
-   "gainDb": -2.75,
-   "takeStartS": 27.06,
-   "takeEndS": 28.7,
-   "tight": false,
-   "speakerCos": 0.657,
-   "nearestOther": [
-    "liuwencai",
-    0.533
-   ],
-   "cer": 1,
-   "transcript": "大大摩羯齐。"
-  },
   "hurt_hit@yaowa": {
    "who": "yaowa",
    "key": "hurt_hit",
@@ -1003,81 +578,6 @@
    ],
    "cer": 0.4286,
    "transcript": "糟了,我找强子了。"
-  },
-  "hurt_medic@yaowa": {
-   "who": "yaowa",
-   "key": "hurt_medic",
-   "file": "Barks/AudioVoice_FirstLevelBarkYaowaHurtMedic.mp3",
-   "sha256": "30895191bc46278f297cf9654aded27f1026766523ed84a2fe34c74eda6d5504",
-   "text": "担架兵！这头有人挂彩！",
-   "seconds": 2.24,
-   "voicedS": 1.46,
-   "activeRmsDb": -16.88,
-   "truePeakDb": -1.78,
-   "noiseDb": -104.19,
-   "lowShare": 0.084,
-   "f0": 286,
-   "gainDb": 0.75,
-   "takeStartS": 32.26,
-   "takeEndS": 34.54,
-   "tight": false,
-   "speakerCos": 0.734,
-   "nearestOther": [
-    "liuwencai",
-    0.587
-   ],
-   "cer": 0.7778,
-   "transcript": "单嘉宾,这头又认瓜菜。"
-  },
-  "ammo_ask@yaowa": {
-   "who": "yaowa",
-   "key": "ammo_ask",
-   "file": "Barks/AudioVoice_FirstLevelBarkYaowaAmmoAsk.mp3",
-   "sha256": "30254dea2301d9f0f8ec0dcd3454ee6013615bbce1165ff71ebbb37cb28697e8",
-   "text": "桥夹！哪个匀我一个！",
-   "seconds": 2.18,
-   "voicedS": 1.42,
-   "activeRmsDb": -16.69,
-   "truePeakDb": -1.82,
-   "noiseDb": -102.4,
-   "lowShare": 0.117,
-   "f0": 271,
-   "gainDb": 2.69,
-   "takeStartS": 36.89,
-   "takeEndS": 39.07,
-   "tight": false,
-   "speakerCos": 0.705,
-   "nearestOther": [
-    "liuwencai",
-    0.523
-   ],
-   "cer": 0.75,
-   "transcript": "敲架,拉个云窝一狗。"
-  },
-  "ammo_out@yaowa": {
-   "who": "yaowa",
-   "key": "ammo_out",
-   "file": "Barks/AudioVoice_FirstLevelBarkYaowaAmmoOut.mp3",
-   "sha256": "a08ded7f1f8473e972896f3ecbd4199221d771fbd5691849624466bcee0974db",
-   "text": "子弹！我莫得子弹了！",
-   "seconds": 2.08,
-   "voicedS": 1.32,
-   "activeRmsDb": -16.6,
-   "truePeakDb": -1.87,
-   "noiseDb": -104.64,
-   "lowShare": 0.093,
-   "f0": 267,
-   "gainDb": 0.82,
-   "takeStartS": 39.4,
-   "takeEndS": 41.53,
-   "tight": false,
-   "speakerCos": 0.671,
-   "nearestOther": [
-    "liuwencai",
-    0.526
-   ],
-   "cer": 0.125,
-   "transcript": "子弹!我没得子弹了!"
   },
   "ammo_reload@yaowa": {
    "who": "yaowa",
@@ -1104,31 +604,6 @@
    "cer": 0.1111,
    "transcript": "我压子弹,掩护我一下。"
   },
-  "spot_east@heyoutian": {
-   "who": "heyoutian",
-   "key": "spot_east",
-   "file": "Barks/AudioVoice_FirstLevelBarkHeyoutianSpotEast.mp3",
-   "sha256": "253d5124189a88710d7368385c8f5099982f3814d5eda2d8b72f987ad2d4fd56",
-   "text": "东边！东边有鬼子！",
-   "seconds": 1.34,
-   "voicedS": 0.84,
-   "activeRmsDb": -16.79,
-   "truePeakDb": -1.79,
-   "noiseDb": -68.43,
-   "lowShare": 0.23,
-   "f0": 327,
-   "gainDb": 3.28,
-   "takeStartS": 0.03,
-   "takeEndS": 1.38,
-   "tight": false,
-   "speakerCos": 0.627,
-   "nearestOther": [
-    "yaowa",
-    0.584
-   ],
-   "cer": 0.1429,
-   "transcript": "东边,东边有桂子!"
-  },
   "spot_enemy@heyoutian": {
    "who": "heyoutian",
    "key": "spot_enemy",
@@ -1153,56 +628,6 @@
    ],
    "cer": 0.5,
    "transcript": "桂子!桂子魔龙来了!"
-  },
-  "spot_gap@heyoutian": {
-   "who": "heyoutian",
-   "key": "spot_gap",
-   "file": "Barks/AudioVoice_FirstLevelBarkHeyoutianSpotGap.mp3",
-   "sha256": "0652102f0821b5654bebb45a4e97905109a34aa8776143f5e2c760dcfefdf5af",
-   "text": "缺口！鬼子钻进来了！",
-   "seconds": 1.52,
-   "voicedS": 1.14,
-   "activeRmsDb": -16.62,
-   "truePeakDb": -1.88,
-   "noiseDb": -59.8,
-   "lowShare": 0.154,
-   "f0": 320,
-   "gainDb": 0.89,
-   "takeStartS": 3.91,
-   "takeEndS": 5.44,
-   "tight": false,
-   "speakerCos": 0.732,
-   "nearestOther": [
-    "yaowa",
-    0.66
-   ],
-   "cer": 0.25,
-   "transcript": "缺寇, 桂子钻进来了。"
-  },
-  "spot_wall@heyoutian": {
-   "who": "heyoutian",
-   "key": "spot_wall",
-   "file": "Barks/AudioVoice_FirstLevelBarkHeyoutianSpotWall.mp3",
-   "sha256": "c3f0b55cf0f34a00a03e733c3995cdca4289727724afcdd1f1ed2e8899c8d0ba",
-   "text": "墙上！鬼子爬上墙了！",
-   "seconds": 1.52,
-   "voicedS": 1.12,
-   "activeRmsDb": -16.75,
-   "truePeakDb": -1.77,
-   "noiseDb": -65.43,
-   "lowShare": 0.099,
-   "f0": 308,
-   "gainDb": 2.68,
-   "takeStartS": 5.91,
-   "takeEndS": 7.44,
-   "tight": false,
-   "speakerCos": 0.701,
-   "nearestOther": [
-    "yaowa",
-    0.606
-   ],
-   "cer": 0.125,
-   "transcript": "墙上,柜子爬上墙了!"
   },
   "move_cover@heyoutian": {
    "who": "heyoutian",
@@ -1229,56 +654,6 @@
    "cer": 1,
    "transcript": "糟烟糊,多多气!"
   },
-  "move_flank@heyoutian": {
-   "who": "heyoutian",
-   "key": "move_flank",
-   "file": "Barks/AudioVoice_FirstLevelBarkHeyoutianMoveFlank.mp3",
-   "sha256": "a7338e11cbc84d894961d315979030e564d15bc1c4b26d84fca3991cbbb52650",
-   "text": "左手边！绕过去！",
-   "seconds": 1.28,
-   "voicedS": 0.9,
-   "activeRmsDb": -16.96,
-   "truePeakDb": -1.83,
-   "noiseDb": -66.04,
-   "lowShare": 0.164,
-   "f0": 291,
-   "gainDb": 3.05,
-   "takeStartS": 9.55,
-   "takeEndS": 10.84,
-   "tight": false,
-   "speakerCos": 0.704,
-   "nearestOther": [
-    "yaowa",
-    0.609
-   ],
-   "cer": 0,
-   "transcript": "左手边,绕过去。"
-  },
-  "move_go@heyoutian": {
-   "who": "heyoutian",
-   "key": "move_go",
-   "file": "Barks/AudioVoice_FirstLevelBarkHeyoutianMoveGo.mp3",
-   "sha256": "d19743f71f907cb45dc08f9cdd43a555adc9229ce3427eb5b6593455caeaa8c7",
-   "text": "走！莫站到起！",
-   "seconds": 1.16,
-   "voicedS": 0.74,
-   "activeRmsDb": -16.78,
-   "truePeakDb": -1.88,
-   "noiseDb": -64.71,
-   "lowShare": 0.138,
-   "f0": 333,
-   "gainDb": 0.62,
-   "takeStartS": 11.24,
-   "takeEndS": 12.41,
-   "tight": false,
-   "speakerCos": 0.682,
-   "nearestOther": [
-    "yaowa",
-    0.56
-   ],
-   "cer": 0.8,
-   "transcript": "走,我攒个气。"
-  },
   "rally_charge@heyoutian": {
    "who": "heyoutian",
    "key": "rally_charge",
@@ -1303,31 +678,6 @@
    ],
    "cer": 0,
    "transcript": "冲!给老子冲!"
-  },
-  "warn_down@heyoutian": {
-   "who": "heyoutian",
-   "key": "warn_down",
-   "file": "Barks/AudioVoice_FirstLevelBarkHeyoutianWarnDown.mp3",
-   "sha256": "d8d18f83b57c6ad734039b5c4d31a7279cabb54ee479c00e38fe8fc9489fddc1",
-   "text": "趴倒！趴倒！",
-   "seconds": 1.14,
-   "voicedS": 0.66,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -5.61,
-   "noiseDb": -76.7,
-   "lowShare": 0.055,
-   "f0": 340,
-   "gainDb": -5.6,
-   "takeStartS": 14.94,
-   "takeEndS": 16.14,
-   "tight": false,
-   "speakerCos": 0.591,
-   "nearestOther": [
-    "luo",
-    0.504
-   ],
-   "cer": 1,
-   "transcript": "爬刀!爬刀!"
   },
   "warn_grenade@heyoutian": {
    "who": "heyoutian",
@@ -1354,31 +704,6 @@
    "cer": 1.25,
    "transcript": "那么,开始吧!"
   },
-  "rally_shoot@heyoutian": {
-   "who": "heyoutian",
-   "key": "rally_shoot",
-   "file": "Barks/AudioVoice_FirstLevelBarkHeyoutianRallyShoot.mp3",
-   "sha256": "34fac4eb2ba0b63043f223025b095359476e234a7e2f52323c133ae3880b57a0",
-   "text": "打！打！莫歇气！",
-   "seconds": 1.9,
-   "voicedS": 0.94,
-   "activeRmsDb": -16.56,
-   "truePeakDb": -2.2,
-   "noiseDb": -64.63,
-   "lowShare": 0.066,
-   "f0": 348,
-   "gainDb": -1.64,
-   "takeStartS": 18.82,
-   "takeEndS": 20.73,
-   "tight": false,
-   "speakerCos": 0.693,
-   "nearestOther": [
-    "yaowa",
-    0.589
-   ],
-   "cer": 1,
-   "transcript": "大!大!摩西奇!"
-  },
   "hurt_hit@heyoutian": {
    "who": "heyoutian",
    "key": "hurt_hit",
@@ -1403,81 +728,6 @@
    ],
    "cer": 0.2857,
    "transcript": "糟了!我找枪子了!"
-  },
-  "hurt_medic@heyoutian": {
-   "who": "heyoutian",
-   "key": "hurt_medic",
-   "file": "Barks/AudioVoice_FirstLevelBarkHeyoutianHurtMedic.mp3",
-   "sha256": "7bce68275450ff442e79f213716f43aa3c44f43721d98612340d15ad9b1a54a8",
-   "text": "担架兵！这头有人挂彩！",
-   "seconds": 1.72,
-   "voicedS": 1.22,
-   "activeRmsDb": -16.89,
-   "truePeakDb": -1.8,
-   "noiseDb": -63.56,
-   "lowShare": 0.128,
-   "f0": 286,
-   "gainDb": 2.23,
-   "takeStartS": 23.79,
-   "takeEndS": 25.52,
-   "tight": false,
-   "speakerCos": 0.771,
-   "nearestOther": [
-    "yaowa",
-    0.644
-   ],
-   "cer": 0.6667,
-   "transcript": "胆假瓶,这头佣人寡菜。"
-  },
-  "ammo_ask@heyoutian": {
-   "who": "heyoutian",
-   "key": "ammo_ask",
-   "file": "Barks/AudioVoice_FirstLevelBarkHeyoutianAmmoAsk.mp3",
-   "sha256": "4dfe301711122acc5139264f1a4d0f7de813f883d02dbb5bfc096c0ed3c8f96d",
-   "text": "桥夹！哪个匀我一个！",
-   "seconds": 1.44,
-   "voicedS": 1.06,
-   "activeRmsDb": -16.66,
-   "truePeakDb": -1.9,
-   "noiseDb": -60.3,
-   "lowShare": 0.133,
-   "f0": 296,
-   "gainDb": 1.48,
-   "takeStartS": 25.87,
-   "takeEndS": 27.31,
-   "tight": false,
-   "speakerCos": 0.691,
-   "nearestOther": [
-    "yaowa",
-    0.63
-   ],
-   "cer": 0.875,
-   "transcript": "乔佳,拿个云喂狗。"
-  },
-  "ammo_out@heyoutian": {
-   "who": "heyoutian",
-   "key": "ammo_out",
-   "file": "Barks/AudioVoice_FirstLevelBarkHeyoutianAmmoOut.mp3",
-   "sha256": "0e9d1a3b83b77be38232285eb61c130f6a3d8e5ed0743ce3ff91083ba3273607",
-   "text": "子弹！我莫得子弹了！",
-   "seconds": 1.34,
-   "voicedS": 0.92,
-   "activeRmsDb": -16.77,
-   "truePeakDb": -1.84,
-   "noiseDb": -63.03,
-   "lowShare": 0.102,
-   "f0": 320,
-   "gainDb": 2.88,
-   "takeStartS": 27.78,
-   "takeEndS": 29.12,
-   "tight": false,
-   "speakerCos": 0.709,
-   "nearestOther": [
-    "yaowa",
-    0.643
-   ],
-   "cer": 0.25,
-   "transcript": "子弹,我没有子弹了。"
   },
   "ammo_reload@heyoutian": {
    "who": "heyoutian",
@@ -1504,31 +754,6 @@
    "cer": 0.3333,
    "transcript": "我鸭子蛋,掩护我一好。"
   },
-  "spot_east@liuwencai": {
-   "who": "liuwencai",
-   "key": "spot_east",
-   "file": "Barks/AudioVoice_FirstLevelBarkLiuwencaiSpotEast.mp3",
-   "sha256": "8ebb5629613ecc1079711cc5da1b5f2068d66121f6bb9aafe1928eee26318802",
-   "text": "东边！东边有鬼子！",
-   "seconds": 2.34,
-   "voicedS": 1.44,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -4.62,
-   "noiseDb": -104.79,
-   "lowShare": 0.437,
-   "f0": 205,
-   "gainDb": -0.06,
-   "takeStartS": 0,
-   "takeEndS": 2.35,
-   "tight": false,
-   "speakerCos": 0.79,
-   "nearestOther": [
-    "yaowa",
-    0.688
-   ],
-   "cer": 0.2857,
-   "transcript": "东边,东边有硅字。"
-  },
   "spot_enemy@liuwencai": {
    "who": "liuwencai",
    "key": "spot_enemy",
@@ -1553,56 +778,6 @@
    ],
    "cer": 0.75,
    "transcript": "矽字,矽字魔龙来了。"
-  },
-  "spot_gap@liuwencai": {
-   "who": "liuwencai",
-   "key": "spot_gap",
-   "file": "Barks/AudioVoice_FirstLevelBarkLiuwencaiSpotGap.mp3",
-   "sha256": "a08565ab131e3e690436cb91f482b2fa1ef128b6850609fcb87f7bc64d04c03f",
-   "text": "缺口！鬼子钻进来了！",
-   "seconds": 2.26,
-   "voicedS": 1.32,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -2.56,
-   "noiseDb": -103.32,
-   "lowShare": 0.382,
-   "f0": 193,
-   "gainDb": 0.85,
-   "takeStartS": 6.58,
-   "takeEndS": 8.87,
-   "tight": false,
-   "speakerCos": 0.866,
-   "nearestOther": [
-    "yaowa",
-    0.749
-   ],
-   "cer": 0.5,
-   "transcript": "缺扣, 矽字转进来了。"
-  },
-  "spot_wall@liuwencai": {
-   "who": "liuwencai",
-   "key": "spot_wall",
-   "file": "Barks/AudioVoice_FirstLevelBarkLiuwencaiSpotWall.mp3",
-   "sha256": "04459cd6e8c1a858a740fa2347afeaf5e4c3fe31cf9fea4de4f4a0f7904c1e60",
-   "text": "墙上！鬼子爬上墙了！",
-   "seconds": 2.42,
-   "voicedS": 1.54,
-   "activeRmsDb": -17,
-   "truePeakDb": -1.89,
-   "noiseDb": -102.23,
-   "lowShare": 0.352,
-   "f0": 131,
-   "gainDb": 2.2,
-   "takeStartS": 9.8,
-   "takeEndS": 12.26,
-   "tight": false,
-   "speakerCos": 0.836,
-   "nearestOther": [
-    "yaowa",
-    0.68
-   ],
-   "cer": 0.5,
-   "transcript": "枪上,龟子爬上枪楼。"
   },
   "move_cover@liuwencai": {
    "who": "liuwencai",
@@ -1629,56 +804,6 @@
    "cer": 1,
    "transcript": "遭淹糊多道歉。"
   },
-  "move_flank@liuwencai": {
-   "who": "liuwencai",
-   "key": "move_flank",
-   "file": "Barks/AudioVoice_FirstLevelBarkLiuwencaiMoveFlank.mp3",
-   "sha256": "18aa931d72b3737261e0150b958afd72327b86c6e5b80baf9eb7d97c5b908bac",
-   "text": "左手边！绕过去！",
-   "seconds": 2.04,
-   "voicedS": 1.2,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -3.14,
-   "noiseDb": -105.23,
-   "lowShare": 0.302,
-   "f0": 211,
-   "gainDb": -0.78,
-   "takeStartS": 16.51,
-   "takeEndS": 18.6,
-   "tight": false,
-   "speakerCos": 0.843,
-   "nearestOther": [
-    "yaowa",
-    0.741
-   ],
-   "cer": 0,
-   "transcript": "左手边,绕过去。"
-  },
-  "move_go@liuwencai": {
-   "who": "liuwencai",
-   "key": "move_go",
-   "file": "Barks/AudioVoice_FirstLevelBarkLiuwencaiMoveGo.mp3",
-   "sha256": "79b7831cbca21bd71b4acad3b944cd0082ee75b6d7f8356e05e74d70902de4c9",
-   "text": "走！莫站到起！",
-   "seconds": 1.88,
-   "voicedS": 1,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -2.1,
-   "noiseDb": -104.15,
-   "lowShare": 0.344,
-   "f0": 174,
-   "gainDb": 0.41,
-   "takeStartS": 19.91,
-   "takeEndS": 21.83,
-   "tight": false,
-   "speakerCos": 0.831,
-   "nearestOther": [
-    "yaowa",
-    0.722
-   ],
-   "cer": 0.4,
-   "transcript": "走!莫攒到气!"
-  },
   "rally_charge@liuwencai": {
    "who": "liuwencai",
    "key": "rally_charge",
@@ -1703,31 +828,6 @@
    ],
    "cer": 0.4,
    "transcript": "从 给老子从"
-  },
-  "warn_down@liuwencai": {
-   "who": "liuwencai",
-   "key": "warn_down",
-   "file": "Barks/AudioVoice_FirstLevelBarkLiuwencaiWarnDown.mp3",
-   "sha256": "b027f20d9680cfdc6d000ecb35573ceeb3137a8772521065f00308d3d19ae357",
-   "text": "趴倒！趴倒！",
-   "seconds": 1.68,
-   "voicedS": 0.76,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -1.93,
-   "noiseDb": -105.43,
-   "lowShare": 0.085,
-   "f0": 246,
-   "gainDb": -1.05,
-   "takeStartS": 26.22,
-   "takeEndS": 27.92,
-   "tight": false,
-   "speakerCos": 0.697,
-   "nearestOther": [
-    "yaowa",
-    0.617
-   ],
-   "cer": 1,
-   "transcript": "拔刀"
   },
   "warn_grenade@liuwencai": {
    "who": "liuwencai",
@@ -1754,32 +854,6 @@
    "cer": 1,
    "transcript": "搜溜达 三"
   },
-  "rally_shoot@liuwencai": {
-   "who": "liuwencai",
-   "key": "rally_shoot",
-   "file": "Barks/AudioVoice_FirstLevelBarkLiuwencaiRallyShoot.mp3",
-   "sha256": "40c603cff932de35022e598683ec0f84fa52ca95cfc97faf78b05b5bde73c8bf",
-   "text": "打！打！莫歇气！",
-   "seconds": 2.56,
-   "voicedS": 1.06,
-   "activeRmsDb": -16.78,
-   "truePeakDb": -1.9,
-   "noiseDb": -104.86,
-   "lowShare": 0.207,
-   "f0": 219,
-   "gainDb": -0.61,
-   "tempo": 1.055,
-   "takeStartS": 31.17,
-   "takeEndS": 33.88,
-   "tight": false,
-   "speakerCos": 0.812,
-   "nearestOther": [
-    "yaowa",
-    0.685
-   ],
-   "cer": 1,
-   "transcript": "大, 大, 摩羞起。"
-  },
   "hurt_hit@liuwencai": {
    "who": "liuwencai",
    "key": "hurt_hit",
@@ -1804,81 +878,6 @@
    ],
    "cer": 0.4286,
    "transcript": "糟了,我找强子了。"
-  },
-  "hurt_medic@liuwencai": {
-   "who": "liuwencai",
-   "key": "hurt_medic",
-   "file": "Barks/AudioVoice_FirstLevelBarkLiuwencaiHurtMedic.mp3",
-   "sha256": "b320d6af103749bae08b06d03452ab1ccdf6fa70305a9e70076be509ccd82164",
-   "text": "担架兵！这头有人挂彩！",
-   "seconds": 2.56,
-   "voicedS": 1.6,
-   "activeRmsDb": -16.84,
-   "truePeakDb": -1.88,
-   "noiseDb": -102.83,
-   "lowShare": 0.378,
-   "f0": 167,
-   "gainDb": 1.43,
-   "takeStartS": 38.03,
-   "takeEndS": 40.61,
-   "tight": false,
-   "speakerCos": 0.873,
-   "nearestOther": [
-    "yaowa",
-    0.741
-   ],
-   "cer": 0.8889,
-   "transcript": "单嘉宾,贼头幽刃寡菜。"
-  },
-  "ammo_ask@liuwencai": {
-   "who": "liuwencai",
-   "key": "ammo_ask",
-   "file": "Barks/AudioVoice_FirstLevelBarkLiuwencaiAmmoAsk.mp3",
-   "sha256": "c89c6c3ecf4b37ae2632c9f6215180d09c0de6c957143787632a5aeff90050f2",
-   "text": "桥夹！哪个匀我一个！",
-   "seconds": 2.16,
-   "voicedS": 1.28,
-   "activeRmsDb": -16.64,
-   "truePeakDb": -1.92,
-   "noiseDb": -103.92,
-   "lowShare": 0.277,
-   "f0": 157,
-   "gainDb": 0.34,
-   "takeStartS": 41.51,
-   "takeEndS": 43.73,
-   "tight": false,
-   "speakerCos": 0.838,
-   "nearestOther": [
-    "yaowa",
-    0.754
-   ],
-   "cer": 0.75,
-   "transcript": "乔家 哪个云未过。"
-  },
-  "ammo_out@liuwencai": {
-   "who": "liuwencai",
-   "key": "ammo_out",
-   "file": "Barks/AudioVoice_FirstLevelBarkLiuwencaiAmmoOut.mp3",
-   "sha256": "576236aa9846f678ba73612a959111a2fdb332c0f53a362a9974ad91ea5dc517",
-   "text": "子弹！我莫得子弹了！",
-   "seconds": 2.02,
-   "voicedS": 1.08,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -3.03,
-   "noiseDb": -103.78,
-   "lowShare": 0.445,
-   "f0": 195,
-   "gainDb": 0.51,
-   "takeStartS": 44.89,
-   "takeEndS": 46.95,
-   "tight": false,
-   "speakerCos": 0.797,
-   "nearestOther": [
-    "yaowa",
-    0.673
-   ],
-   "cer": 0.125,
-   "transcript": "子弹,我没得子弹了。"
   },
   "ammo_reload@liuwencai": {
    "who": "liuwencai",
@@ -1905,31 +904,6 @@
    "cer": 0.5556,
    "transcript": "我要子弹,要抚摸一下。"
   },
-  "spot_east@zhou": {
-   "who": "zhou",
-   "key": "spot_east",
-   "file": "Barks/AudioVoice_FirstLevelBarkZhouSpotEast.mp3",
-   "sha256": "f0022a2b0f818ecdefb349e19f9bddb81532844ed7f83a93feadf70324385597",
-   "text": "东边！东边有鬼子！",
-   "seconds": 1.46,
-   "voicedS": 1.1,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -1.83,
-   "noiseDb": -72.69,
-   "lowShare": 0.446,
-   "f0": 198,
-   "gainDb": -0.17,
-   "takeStartS": 0.02,
-   "takeEndS": 1.49,
-   "tight": false,
-   "speakerCos": 0.679,
-   "nearestOther": [
-    "luo",
-    0.533
-   ],
-   "cer": 0.2857,
-   "transcript": "东边,东边有规则!"
-  },
   "spot_enemy@zhou": {
    "who": "zhou",
    "key": "spot_enemy",
@@ -1954,56 +928,6 @@
    ],
    "cer": 0.25,
    "transcript": "鬼子!鬼子魔龙来了!"
-  },
-  "spot_gap@zhou": {
-   "who": "zhou",
-   "key": "spot_gap",
-   "file": "Barks/AudioVoice_FirstLevelBarkZhouSpotGap.mp3",
-   "sha256": "3c465da6ef0925f9c026673a5f8057859001009612af9570351011256f640e3d",
-   "text": "缺口！鬼子钻进来了！",
-   "seconds": 1.74,
-   "voicedS": 1.34,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -2.72,
-   "noiseDb": -71.27,
-   "lowShare": 0.319,
-   "f0": 281,
-   "gainDb": 0.32,
-   "takeStartS": 3.5,
-   "takeEndS": 5.25,
-   "tight": false,
-   "speakerCos": 0.633,
-   "nearestOther": [
-    "luo",
-    0.478
-   ],
-   "cer": 0,
-   "transcript": "缺口,鬼子钻进来了!"
-  },
-  "spot_wall@zhou": {
-   "who": "zhou",
-   "key": "spot_wall",
-   "file": "Barks/AudioVoice_FirstLevelBarkZhouSpotWall.mp3",
-   "sha256": "f7775ffa15204d34e8ddf0e43e049deb5f9de45e61f2fffd742c4424f3bfd845",
-   "text": "墙上！鬼子爬上墙了！",
-   "seconds": 1.76,
-   "voicedS": 1.28,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -2.37,
-   "noiseDb": -71.46,
-   "lowShare": 0.25,
-   "f0": 258,
-   "gainDb": 0.95,
-   "takeStartS": 5.53,
-   "takeEndS": 7.3,
-   "tight": false,
-   "speakerCos": 0.706,
-   "nearestOther": [
-    "luo",
-    0.532
-   ],
-   "cer": 0,
-   "transcript": "墙上,鬼子爬上墙了!"
   },
   "move_cover@zhou": {
    "who": "zhou",
@@ -2030,56 +954,6 @@
    "cer": 0.6667,
    "transcript": "找烟符,夺到气。"
   },
-  "move_flank@zhou": {
-   "who": "zhou",
-   "key": "move_flank",
-   "file": "Barks/AudioVoice_FirstLevelBarkZhouMoveFlank.mp3",
-   "sha256": "fd3b445de4aafa19530eba03ae7d66498b4ea979d05ef05fe623d5ce60141a3f",
-   "text": "左手边！绕过去！",
-   "seconds": 1.38,
-   "voicedS": 0.94,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -1.85,
-   "noiseDb": -69.49,
-   "lowShare": 0.338,
-   "f0": 198,
-   "gainDb": 0.98,
-   "takeStartS": 9.36,
-   "takeEndS": 10.76,
-   "tight": false,
-   "speakerCos": 0.723,
-   "nearestOther": [
-    "luo",
-    0.582
-   ],
-   "cer": 0,
-   "transcript": "左手边,绕过去。"
-  },
-  "move_go@zhou": {
-   "who": "zhou",
-   "key": "move_go",
-   "file": "Barks/AudioVoice_FirstLevelBarkZhouMoveGo.mp3",
-   "sha256": "9806d912c4ae39bd77aa05d402aba03fa6695294a5838019dbf1d92ffe3b39d4",
-   "text": "走！莫站到起！",
-   "seconds": 1.29,
-   "voicedS": 0.84,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -2.15,
-   "noiseDb": -70.17,
-   "lowShare": 0.305,
-   "f0": 229,
-   "gainDb": 2.61,
-   "takeStartS": 10.93,
-   "takeEndS": 12.22,
-   "tight": false,
-   "speakerCos": 0.732,
-   "nearestOther": [
-    "luo",
-    0.516
-   ],
-   "cer": 0.6,
-   "transcript": "走,我攒到气。"
-  },
   "rally_charge@zhou": {
    "who": "zhou",
    "key": "rally_charge",
@@ -2104,31 +978,6 @@
    ],
    "cer": 0.4,
    "transcript": "从!给老子从!"
-  },
-  "warn_down@zhou": {
-   "who": "zhou",
-   "key": "warn_down",
-   "file": "Barks/AudioVoice_FirstLevelBarkZhouWarnDown.mp3",
-   "sha256": "4409f6e44a01a703e2e0c39b2f9170e4ba810d3b3969e8368b61ae2f087999ab",
-   "text": "趴倒！趴倒！",
-   "seconds": 1.34,
-   "voicedS": 1,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -3.76,
-   "noiseDb": -72.13,
-   "lowShare": 0.059,
-   "f0": 340,
-   "gainDb": -1.35,
-   "takeStartS": 14.24,
-   "takeEndS": 15.59,
-   "tight": false,
-   "speakerCos": 0.419,
-   "nearestOther": [
-    "luo",
-    0.323
-   ],
-   "cer": 1,
-   "transcript": "扒刀!扒刀!"
   },
   "warn_grenade@zhou": {
    "who": "zhou",
@@ -2155,31 +1004,6 @@
    "cer": 1,
    "transcript": "搜六胆,散!"
   },
-  "rally_shoot@zhou": {
-   "who": "zhou",
-   "key": "rally_shoot",
-   "file": "Barks/AudioVoice_FirstLevelBarkZhouRallyShoot.mp3",
-   "sha256": "76660bc38c467ff014e2d3a59a4b02a60acec363a25aa97573ca9d564c6f3440",
-   "text": "打！打！莫歇气！",
-   "seconds": 1.8,
-   "voicedS": 1.14,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -2.8,
-   "noiseDb": -71.04,
-   "lowShare": 0.123,
-   "f0": 302,
-   "gainDb": -1.79,
-   "takeStartS": 17.48,
-   "takeEndS": 19.29,
-   "tight": false,
-   "speakerCos": 0.637,
-   "nearestOther": [
-    "luo",
-    0.468
-   ],
-   "cer": 0.6,
-   "transcript": "打!打!摩羯齐!"
-  },
   "hurt_hit@zhou": {
    "who": "zhou",
    "key": "hurt_hit",
@@ -2204,81 +1028,6 @@
    ],
    "cer": 0.2857,
    "transcript": "糟了,我找枪子了!"
-  },
-  "hurt_medic@zhou": {
-   "who": "zhou",
-   "key": "hurt_medic",
-   "file": "Barks/AudioVoice_FirstLevelBarkZhouHurtMedic.mp3",
-   "sha256": "559cc335224c30fda52bfb2e094b7a8b602313023310f4053f8e898344b4e2ae",
-   "text": "担架兵！这头有人挂彩！",
-   "seconds": 1.88,
-   "voicedS": 1.48,
-   "activeRmsDb": -16.55,
-   "truePeakDb": -3.66,
-   "noiseDb": -71.15,
-   "lowShare": 0.38,
-   "f0": 200,
-   "gainDb": -0.02,
-   "takeStartS": 21.85,
-   "takeEndS": 23.74,
-   "tight": false,
-   "speakerCos": 0.775,
-   "nearestOther": [
-    "luo",
-    0.604
-   ],
-   "cer": 0.4444,
-   "transcript": "男嘉宾,这头有人挂菜。"
-  },
-  "ammo_ask@zhou": {
-   "who": "zhou",
-   "key": "ammo_ask",
-   "file": "Barks/AudioVoice_FirstLevelBarkZhouAmmoAsk.mp3",
-   "sha256": "af6bb01e3361c7a6c143f083bcea0ed8fe0b92cd628fc1e20d4017e479758aa4",
-   "text": "桥夹！哪个匀我一个！",
-   "seconds": 2.16,
-   "voicedS": 1.74,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -4.01,
-   "noiseDb": -73.04,
-   "lowShare": 0.327,
-   "f0": 225,
-   "gainDb": -1.48,
-   "takeStartS": 24.07,
-   "takeEndS": 26.25,
-   "tight": false,
-   "speakerCos": 0.714,
-   "nearestOther": [
-    "luo",
-    0.529
-   ],
-   "cer": 0.75,
-   "transcript": "乔驾,拿个云窝一国。"
-  },
-  "ammo_out@zhou": {
-   "who": "zhou",
-   "key": "ammo_out",
-   "file": "Barks/AudioVoice_FirstLevelBarkZhouAmmoOut.mp3",
-   "sha256": "5c62cfb1ed31b81400ff1a82c811e03c0e5d684e98c4e582428667fef412a426",
-   "text": "子弹！我莫得子弹了！",
-   "seconds": 1.92,
-   "voicedS": 1.32,
-   "activeRmsDb": -16.6,
-   "truePeakDb": -1.91,
-   "noiseDb": -71.29,
-   "lowShare": 0.217,
-   "f0": 314,
-   "gainDb": 0.07,
-   "takeStartS": 26.7,
-   "takeEndS": 28.63,
-   "tight": false,
-   "speakerCos": 0.611,
-   "nearestOther": [
-    "luo",
-    0.471
-   ],
-   "cer": 0.25,
-   "transcript": "子弹!我摸到子弹了!"
   },
   "ammo_reload@zhou": {
    "who": "zhou",
@@ -2404,31 +1153,6 @@
    ],
    "cer": 0.4444,
    "transcript": "叮到气,给老子叮到气。"
-  },
-  "move_flank@shunzi": {
-   "who": "shunzi",
-   "key": "move_flank",
-   "file": "Barks/AudioVoice_FirstLevelBarkShunziMoveFlank.mp3",
-   "sha256": "e9fc6e801f0f2e22b67f63a3fcedb8a08d7fd5b81de3378bec10c0dc968753e0",
-   "text": "左手边！绕过去！",
-   "seconds": 1.38,
-   "voicedS": 0.98,
-   "activeRmsDb": -16.54,
-   "truePeakDb": -3.32,
-   "noiseDb": -68.6,
-   "lowShare": 0.129,
-   "f0": 340,
-   "gainDb": 0.66,
-   "takeStartS": 7.79,
-   "takeEndS": 9.18,
-   "tight": false,
-   "speakerCos": 0.488,
-   "nearestOther": [
-    "yaowa",
-    0.367
-   ],
-   "cer": 0,
-   "transcript": "左手边,绕过去。"
   },
   "move_cover@shunzi": {
    "who": "shunzi",
