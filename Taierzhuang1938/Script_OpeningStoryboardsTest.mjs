@@ -59,7 +59,9 @@ for(const id of NEW){
     assert.equal(OpeningHoldTime(spec.holdLoop,spec.duration,release+span+spec.duration,release),spec.duration,`${id}: reaches the end after holdUntil`);
   }
   if(spec.additive)assert.ok(spec.additive.bones.length>0&&typeof spec.additive.reference==="string",`${id}: additive mask`);
-  for(const [key,metres] of Object.entries(spec.env||{}))assert.ok(/^wall(Behind|Left|Right)M$/.test(key)&&metres>0&&metres<1.5,`${id}: env ${key}`);
+  // wallLeanFromM / wallLeanDeg: the wall behind leans back above that height (the planks behind R3, 2026-09-27).
+  for(const [key,value] of Object.entries(spec.env||{}))assert.ok(/^wall(Behind|Left|Right|LeanFrom)M$/.test(key)&&value>0&&value<1.5
+    ||key==="wallLeanDeg"&&value>0&&value<45&&spec.env.wallBehindM>0&&spec.env.wallLeanFromM>0,`${id}: env ${key}`);
 }
 
 // ---- paired staging: every actor of a stage plays a clip on the rig the stage names, and a

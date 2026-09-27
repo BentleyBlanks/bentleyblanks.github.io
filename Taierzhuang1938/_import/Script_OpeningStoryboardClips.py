@@ -241,7 +241,8 @@ PARTNER_SOURCES = {}
 CLIPS = {}
 # env: walls the clip is authored against, RUNTIME metres from the clip root (NRA02/IJA02 scale):
 # wallBehindM / wallLeftM / wallRightM = distance from the root to the wall plane. The director
-# puts the root that far from the real trench/dugout wall.
+# puts the root that far from the real trench/dugout wall. wallLeanFromM / wallLeanDeg: the wall behind
+# leans back that many degrees above that height over the root's ground (the planks behind R3).
 
 
 def Meta(name, duration, loop, hold, **extra):
@@ -331,6 +332,9 @@ Meta('BlastDazedStir', 6.4, True, 'free', role='comrade', rig='TengxianNra02', r
 
 
 # -- 01 the comrade is dragged out, shoved to the wall -----------------------------------
+# The planks behind the kneeling comrade (R3), in the R3 actor frame: R3WallEnv(T) with the NRA02 scale;
+# R3Clip checks the two agree (2026-09-27: they stand 0.41 m behind R3 and lean back 20 deg above 0.50 m).
+KNEEL_WALL_ENV = {'wallBehindM': .41, 'wallLeanFromM': .496, 'wallLeanDeg': 20}
 STAGES['captiveDrag'] = {
     'anchor': 'comrade', 'syncS': 0.0,
     'notes': 'All three clips start together; roots stay put, every body moves inside its clip. '
@@ -345,7 +349,7 @@ STAGES['captiveDrag'] = {
 STAGES['captiveWall'] = {
     'anchor': 'comrade', 'syncS': 0.0,
     'notes': 'Comrade root R3 = his kneel spot at the end of the drag (pelvis hand-over: models[].clips[].root, CaptiveDraggedFromDirt end = CaptiveWallBrace start); '
-             'the trench wall is 0.49 m behind him (he was hauled round to face his right). ijaA stands square in front.',
+             'he kneels on the north bank with the planks of trenchFacadeN 0.41 m behind (KNEEL_WALL_ENV; he was hauled round to face his right). ijaA stands square in front.',
     'actors': {
         'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveWallBrace', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
         'ijaA': {'rig': 'TengxianIja02', 'clip': 'IjaShoveToWall', 'x': .02, 'z': -.60, 'yawDeg': 180},
@@ -385,13 +389,13 @@ Meta('IjaPullArm', 4.4, False, 'track', role='ijaB', rig='TengxianIja01', props=
      notes='Two-handed hold on the right upper arm and wrist, sidesteps back with the drag, '
            'wrenches the arm up at 3.2 s and lets go at 4.05 s.')
 Meta('CaptiveWallBrace', 2.0, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=True, weaponState='dropped', weaponDropFrom='BlastSlamBuried',
-     stage='captiveWall', env={'wallBehindM': .49},
+     stage='captiveWall', env=KNEEL_WALL_ENV,
      contacts=[{'t': .34, 'by': 'ijaA', 'part': 'chestFront', 'action': 'shove'},
                {'t': .62, 'limb': 'handL', 'action': 'brace', 'target': 'wall', 'untilT': 1.0},
                {'t': 1.20, 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': 2.0}],
      prev=['CaptiveDraggedFromDirt'], next=['CaptiveKneelMud', 'CaptiveHeadPulledBack'],
-     notes='Shoved in the chest: topples back-left, the left palm finds the wall and slides down the loose '
-           'earth, he ends kneel-sitting with shoulder and back on the wall, right hand on the torn bandage.')
+     notes='Shoved in the chest: topples back-left, the left palm finds the planks and slides down them, he ends '
+           'kneeling on the bank leaning back with shoulders and back on the planks, right hand on the torn bandage.')
 Meta('IjaShoveToWall', 1.0, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=True,
      stage='captiveWall', weaponState='slungBack', extra=True,
      contacts=[{'t': .34, 'limb': 'handR', 'action': 'shove', 'partnerRole': 'comrade', 'part': 'chestFront', 'standoffM': .04},
@@ -400,11 +404,12 @@ Meta('IjaShoveToWall', 1.0, False, 'track', role='ijaA', rig='TengxianIja02', pr
      notes='Not in contract §5.4 (added): the shove the draft describes ("推到沟壁上") needs its own pair '
            'with CaptiveWallBrace. Short wind-up, lunge on the left foot, flat right palm to the chest.')
 Meta('CaptiveKneelMud', 3.0, True, 'free', role='comrade', rig='TengxianNra02', rootMotion=False, weaponState='dropped', weaponDropFrom='BlastSlamBuried',
-     env={'wallBehindM': .49},
+     env=KNEEL_WALL_ENV,
      contacts=[{'t': 0.0, 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': 3.0}],
      prev=['CaptiveWallBrace'], next=['CaptiveHeadPulledBack'],
-     notes='Interrogation idle: kneel-sitting in the mud against the wall, three hard breaths per loop, head '
-           'lolling, right hand pressed on the bandage. Same root as CaptiveWallBrace.')
+     notes='Interrogation idle: kneeling on the bank (shins up the slope, sitting on high heels) and leaning back on '
+           'the planks, three hard breaths per loop, head lolling, right hand pressed on the bandage. Same root as '
+           'CaptiveWallBrace.')
 
 
 # =================================================================================
@@ -1445,9 +1450,165 @@ def BuildBlastSlam(T, name):
 # 01: the comrade dragged out of the dirt, shoved to the wall, kneeling against it.
 # Victim root = BlastSlamBuried root for the drag; R3 (his kneel spot) afterwards.
 # ---------------------------------------------------------------------------------
-DRAG_END = (.06, -.50)          # victim kneel spot (R3 origin) in the drag root (source metres, Blender axes)
+# 2026-09-27: the kneel spot is on the bank too. The trench floor ends 0.36 m in front of the old R3
+# (4.057, -125.905) and a 32-degree bank rises behind it to the foot of trenchFacadeN's planks (0.29 m
+# behind, 0.20 m up), then 64 degrees. Authored on a flat floor with a vertical wall 0.49 m behind, his
+# insteps and toes lay 0.45 m deep in the bank and 0.2 m behind the planks, and his back was 6-11 cm in
+# the leaning planks, from the drop to his knees (drag 2.1 s) to the corpse. R3 moves KNEEL_SHIFT forward
+# (south; the stage partners ride on R3 and move with it), the feet are laid on the bank (BankLegs) and
+# every R3 clip grounds on it (R3Bank) against the real planks (R3Walls).
+# KNEEL_BANK: (runtime m north of the OLD R3, height over the old R3's own ground), battlefield.GroundHeight
+# at x 4.057 sampled 2026-09-27; x 3.7-4.45 agree within 2-3 cm, the west a little higher (KNEEL_BANK_WEST).
+KNEEL_BANK = ((-.36, -.222), (.245, .156), (.345, .228), (.395, .271), (.445, .374), (.80, 1.105))
+KNEEL_BANK_WEST = .035          # runtime m per m: the ground rises to the west (his right at R3)
+# The planks: m north of the old R3, upright to this height over its ground (floorAt + 0.384), then leaning
+# back 20 degrees (Data_OpeningSet0103 lean; the built rows lean from floorAt + 0.3, 3 cm further back).
+KNEEL_FACE = (.29, .424, math.tan(math.radians(20)))
+DRAG_ROOT_SOUTH = .055          # banter.comradeBlast is this far south of the old R3 (runtime m)
+KNEEL_SHIFT = .131              # source m (0.12 runtime): R3 forward (south) of the old kneel spot, off the planks
+KNEE_CONTACT = .10              # source: with the shin up the slope the knee rests on its front, this far behind the joint
+KNEE_FLAT = (-.055, .022)       # (y, z) source, before grounding: the knee joint of the flat KneelWallBase (bake 2026-09-27)
+KNEE_MIN_DEG = 25.0             # the smallest knee angle (thigh over shin) the bank kneel folds to
+KNEEL_RECLINE_M = .42           # source: the trunk reclines 1 rad per this much the seat comes forward (shoulders to the planks)
+DRAG_END = (.06 - KNEEL_SHIFT, -.50)   # victim kneel spot (R3 origin) in the drag root (source metres, Blender axes)
 DRAG_TURN = -math.pi / 2        # hauled round to face his right: the trench wall ends up behind him
-WALL_R3_Y = .54                 # that wall, behind him in R3 (it is the same wall as WALL_LEFT_X)
+WALL_R3_Y = .54                 # the flat-floor wall of the old authoring (R3_WALL_BOX review prop only)
+
+
+def KneelBankOld(b):
+    """Ground b runtime m north of the old R3, runtime m over the old R3's ground."""
+    pts = KNEEL_BANK
+    if b <= pts[0][0]:
+        return pts[0][1]
+    for (b0, h0), (b1, h1) in zip(pts, pts[1:]):
+        if b <= b1 or b1 == pts[-1][0]:
+            return h0 + (b - b0) * (h1 - h0) / (b1 - b0)
+
+
+def R3Bank(T, x, y):
+    """Ground under R3 source (x, y) in source m over the (moved) R3's own ground: +Y = north, +X = east."""
+    s = T.s
+    return (KneelBankOld(y * s - KNEEL_SHIFT * s) - KneelBankOld(-KNEEL_SHIFT * s) - KNEEL_BANK_WEST * x * s) / s
+
+
+def DragBank(T, x, y):
+    """The same ground in the drag root (banter.comradeBlast, facing east): +X = north, +Y = west."""
+    s = T.s
+    return (KneelBankOld(x * s - DRAG_ROOT_SOUTH) - KneelBankOld(-DRAG_ROOT_SOUTH) + KNEEL_BANK_WEST * y * s) / s
+
+
+def PlankWalls(T, north, axis):
+    """trenchFacadeN as two wall planes (point, inward normal, edge) in source m: upright below the lean,
+    leaning back above. `north` = runtime m from the root to the planks, `axis` = 0 (+X north) or 1 (+Y)."""
+    face, upright, lean = KNEEL_FACE
+    s, tilt = T.s, math.atan(lean)
+    d, z0 = (face + north) / s, (upright - KneelBankOld(-north)) / s
+
+    def V(a, z):
+        return (a, 0, z) if axis == 0 else (0, a, z)
+    return [(V(d, 0), V(-1, 0), (0, 0, z0), (0, 0, -1)),
+            (V(d, z0), V(-math.cos(tilt), math.sin(tilt)), (0, 0, z0), (0, 0, 1))]
+
+
+def R3Walls(T):
+    return PlankWalls(T, KNEEL_SHIFT * T.s, 1)
+
+
+def R3WallY(T, z):
+    """Back distance (source) of the planks at height z over R3's ground."""
+    face, upright, lean = KNEEL_FACE
+    s = T.s
+    z0 = (upright - KneelBankOld(-KNEEL_SHIFT * s)) / s
+    return (face + KNEEL_SHIFT * s) / s + max(0.0, z - z0) * lean
+
+
+def R3WallEnv(T):
+    """The planks for the manifest env (runtime m, the R3 actor frame): OpeningClipsBrowserTest's wall gap."""
+    face, upright, lean = KNEEL_FACE
+    north = KNEEL_SHIFT * T.s
+    return {'wallBehindM': round(face + north, 3), 'wallLeanFromM': round(upright - KneelBankOld(-north), 3),
+            'wallLeanDeg': 20}
+
+
+def BankLegs(T, f, bank, knee, back=(0.0, 1.0), w=1.0):
+    """A kneel authored on a flat floor with its feet laid on the bank. Each ankle rises by the ground under it
+    over the ground under the knees (`knee` = (x, y); the bake grounds the knees on the bank), and each foot
+    pitches with the slope along the body's back direction (`back`, a unit (x, y)). `bank`(x, y): source m."""
+    if w <= 1e-6:
+        return f
+    out = dict(f)
+    base, e = bank(*knee), .04
+    for s in LR:
+        a = f.get('ankle.' + s)
+        if a is None:
+            continue
+        out['ankle.' + s] = (a[0], a[1], a[2] + w * (bank(a[0], a[1]) - base))
+        slope = (bank(a[0] + back[0] * e, a[1] + back[1] * e) - bank(a[0] - back[0] * e, a[1] - back[1] * e)) / (2 * e)
+        foot = f.get('foot.' + s)
+        if foot is not None:
+            out['foot.' + s] = (foot[0] + w * math.degrees(math.atan(slope)), foot[1], foot[2])
+    return out
+
+
+def BankKneelSpot(T, a):
+    """(knee joint y, kneecap contact y) of the bank kneel, R3 source: the shin (T.S) from the knee joint (at
+    KNEE_FLAT's height) reaches the ankle `a` laid on the bank at its flat height over the ground under the kneecap."""
+    lo, hi = -.40, a[1] - .05
+    for _ in range(40):
+        ky = (lo + hi) / 2
+        dz = a[2] + R3Bank(T, 0, a[1]) - R3Bank(T, 0, ky + KNEE_CONTACT) - KNEE_FLAT[1]
+        lo, hi = (ky, hi) if math.hypot(a[1] - ky, dz) > T.S else (lo, ky)
+    return ky, ky + KNEE_CONTACT
+
+
+def KneelSpot(T):
+    """BankKneelSpot of the R3 kneel's own feet (every R3 clip kneels on them; the slide moves one out)."""
+    if 'kneelSpot' not in T.cache:
+        T.cache['kneelSpot'] = BankKneelSpot(T, KneelFeet(T, KneelFlat(T))['ankle.L'])
+    return T.cache['kneelSpot']
+
+
+def BankKneel(T, f, w=1.0):
+    """The seat of a flat-floor kneel on the bank. With the knees on the slope and the shins lying up it
+    (BankLegs), the heels are ~0.2 m higher than the knees: the thigh keeps its authored angle unless that
+    folds the knee under KNEE_MIN_DEG, then it stands up (the seat comes up and forward, sitting on high
+    heels). The trunk reclines by as much as the seat came forward so the shoulders stay on the planks."""
+    if w <= 1e-6:
+        return f
+    out = dict(f)
+    px, py, pz = f['pelvis']
+    vy, vz = py - KNEE_FLAT[0], pz - KNEE_FLAT[1]
+    # One thigh length for every frame (the kneel-sit's): a seat that rises or sinks turns about the planted knee.
+    k = KneelFlat(T, 0.0, .02, sit=KNEEL_WALL_SIT)['pelvis']
+    length, elev = math.hypot(k[1] - KNEE_FLAT[0], k[2] - KNEE_FLAT[1]), math.atan2(vz, vy)
+    a = KneelFeet(T, KneelFlat(T))['ankle.L']
+    ky, contact = KneelSpot(T)
+    shin = math.atan2(a[2] + R3Bank(T, 0, a[1]) - R3Bank(T, 0, contact) - KNEE_FLAT[1], a[1] - ky)
+    stand = max(elev, shin + math.radians(KNEE_MIN_DEG))
+    # Heights over the ground under the knees (the bake lays the knees on the bank).
+    ny, nz = ky + length * math.cos(stand), KNEE_FLAT[1] + length * math.sin(stand)
+    dy, dz = w * (ny - py), w * (nz - pz)
+    out['pelvis'] = (px, py + dy, pz + dz)
+    t = f['pelvisTilt']
+    out['pelvisTilt'] = (t[0] + min(0.0, dy) / KNEEL_RECLINE_M, t[1], t[2])
+    return out
+
+
+def R3OnBank(T, f, kneel=1.0):
+    return BankLegs(T, BankKneel(T, f, kneel), lambda x, y: R3Bank(T, x, y), (0.0, KneelSpot(T)[1]))
+
+
+def R3BankReview(T):
+    """The bank and the planks behind R3 for the Blender review stills."""
+    s = T.s
+    X = (T.R(-1.0), T.R(1.0))
+    ys = [y / 20 / s for y in range(-8, 13)]
+    faces = [('poly', [(X[0], a, R3Bank(T, 0, a)), (X[1], a, R3Bank(T, 0, a)), (X[1], b, R3Bank(T, 0, b)),
+                       (X[0], b, R3Bank(T, 0, b))], None, 0) for a, b in zip(ys, ys[1:]) if a < R3WallY(T, 0)]
+    y0, z0, top = R3WallY(T, 0), R3Bank(T, 0, R3WallY(T, 0)), T.R(1.6)
+    zu = (KNEEL_FACE[1] - KneelBankOld(-KNEEL_SHIFT * s)) / s
+    return faces + [('poly', [(X[0], y0, z0), (X[1], y0, z0), (X[1], y0, zu), (X[0], y0, zu)], None, 0),
+                    ('poly', [(X[0], y0, zu), (X[1], y0, zu), (X[1], R3WallY(T, top), top), (X[0], R3WallY(T, top), top)], None, 0)]
 
 
 def R3ToDrag(p):
@@ -1456,10 +1617,25 @@ def R3ToDrag(p):
     return (x + DRAG_END[0], y + DRAG_END[1], p[2])
 
 
+# The planks stand 0.49 m behind R3's origin at the foot (source): flat on their insteps behind him the
+# toes reached 0.53 m. The ankles come in and the heels out, the toes turn in (as a man sitting between his
+# heels), so the feet end in front of the planks once BankLegs lays them up the slope.
+KNEEL_FEET = (.22, 0.0, 40.0)   # source: ankles at most this far back, heels this much further out; toe-in (deg)
+
+
+def KneelFeet(T, f):
+    back, splay, turn = KNEEL_FEET
+    out = dict(f)
+    for s, sign in (('L', 1), ('R', -1)):
+        a, p = f['ankle.' + s], f.get('foot.' + s) or (0, 0, 0)
+        out['ankle.' + s] = (a[0] + sign * splay, min(a[1], back), a[2])
+        out['foot.' + s] = (p[0], p[1] + sign * turn, p[2])
+    return out
+
+
 def R3Kneel(T):
     """The kneel he is dropped into, R3 local (upright on both knees, no wall contact yet)."""
-    k = KneelFlat(T, 0.0, 0.0)
-    return k
+    return KneelFeet(T, KneelFlat(T, 0.0, 0.0))
 
 
 def DragVictimKeys(T):
@@ -1504,7 +1680,10 @@ def DragVictimKeys(T):
                 'hand.R': (-.285, -.711, .914), 'armPole.R': (-.011, -.673, .517)}),
         (1.70, {'ankle.R': kneelMid['ankle.R'], 'legPole.R': kneelMid['legPole.R'], 'foot.R': kp,
                 'pelvis': (.26, -.38, .36), 'bend': .45, 'hand.R': (-.295, -.774, .861), 'armPole.R': (-.021, -.736, .464)}),
-        (2.00, {'pelvis': (ex, ey - .02, .36), 'hand.R': (-.496, -.915, .785), 'armPole.R': (-.222, -.877, .388), 'turn': 0.0}),
+        # (2026-09-27: his knees and feet are dragged along with him, off the bank toward R3; left where they
+        # trailed at 1.7 s they stayed on the bank and up against the planks through the jerk up.)
+        (2.00, {'pelvis': (ex, ey - .02, .36), 'hand.R': (-.496, -.915, .785), 'armPole.R': (-.222, -.877, .388), 'turn': 0.0,
+                **{k: Add3(kneelMid[k], (ex - .26, ey - .02 + .38, 0)) for k in ('ankle.L', 'ankle.R', 'legPole.L', 'legPole.R')}}),
         # "立て！" -- jerked up and round by the collar; the head snaps back, the legs do not hold.
         (2.20, {'pelvis': (ex, ey, kz + .16), 'pelvisTilt': (.10, 0, 0), 'bend': .18, 'turn': -.55,
                 'head': (-.12, 0, 0), 'neck': (-.05, 0, 0), 'shrug': .20,
@@ -1512,7 +1691,8 @@ def DragVictimKeys(T):
         (2.45, {'pelvis': (ex, ey, kz + .08), 'bend': .25, 'head': (.15, 0, .05), 'turn': -1.25,
                 'hand.R': (-.284, -.510, .871), 'armPole.R': (-.161, -.354, .687)}),
         (2.75, {'pelvis': kneel['pelvis'], 'ankle.L': kneel['ankle.L'], 'ankle.R': kneel['ankle.R'],
-                'legPole.L': kneel['legPole.L'], 'legPole.R': kneel['legPole.R'], 'turn': DRAG_TURN, 'armPole.R': armBase,
+                'legPole.L': kneel['legPole.L'], 'legPole.R': kneel['legPole.R'], 'foot.L': kneel['foot.L'], 'foot.R': kneel['foot.R'],
+                'turn': DRAG_TURN, 'armPole.R': armBase,
                 # The held right arm comes round with him (R3 = his own frame from here on).
                 'hand.R': R3ToDrag((-.20, -.30, .80)),
                 'pelvisTilt': (.12, 0, 0), 'bend': .32, 'head': (.35, .05, .08),
@@ -1536,15 +1716,43 @@ def DragVictimKeys(T):
 DRAG_OFF_BANK = lambda t: 1 - Smooth((t - 1.2) / 1.0)
 
 
+def DragKnee(T, f, t):
+    """The kneeling knees in the drag root: under the dragged man (KneelFlat's femur foot, turned with him)
+    until he is dropped onto them, then R3's (KneelSpot), where CaptiveWallBrace keeps them."""
+    p, psi = f['pelvis'], f.get('turn') or 0.0
+    kx, ky = _Rot(0.0, -.13, psi)
+    r3, w = R3ToDrag((0.0, KneelSpot(T)[1], 0.0)), Smooth((t - 2.45) / .30)
+    return (Mix(p[0] + kx, r3[0], w), Mix(p[1] + ky, r3[1], w))
+
+
 @Builder('CaptiveDraggedFromDirt')
 def BuildCaptiveDragged(T, name):
     raw = DragVictimKeys(T)
 
     def anim(t):
-        f = OnBank(T, raw(t), DRAG_OFF_BANK(t))
+        # Off the heap's bank (OnBank fades 1.2-2.2 s) and on his knees on the real ground: from 1.2 s the feet
+        # are laid on the bank the way the R3 kneel's are (BankLegs, the same ground seen from this root), so the
+        # last frame is CaptiveWallBrace's first.
+        f = raw(t)
+        knee, back = DragKnee(T, f, t), _Rot(0.0, 1.0, f.get('turn') or 0.0)
+        f = OnBank(T, f, DRAG_OFF_BANK(t))
+        # Dropped onto his knees at R3: the seat of the bank kneel (BankKneel, worked out in R3).
+        wK = Smooth((t - 2.45) / .30)
+        if wK > 0:
+            ex, ey = DRAG_END
+            p = f['pelvis']
+            x, y = _Rot(p[0] - ex, p[1] - ey, -DRAG_TURN)
+            k = BankKneel(T, {'pelvis': (x, y, p[2]), 'pelvisTilt': f['pelvisTilt']}, wK)
+            x, y = _Rot(k['pelvis'][0], k['pelvis'][1], DRAG_TURN)
+            f['pelvis'], f['pelvisTilt'] = (x + ex, y + ey, k['pelvis'][2]), k['pelvisTilt']
+        f = BankLegs(T, f, lambda x, y: DragBank(T, x, y), knee, back, 1 - DRAG_OFF_BANK(t))
         return Turned(f, f['turn'])
-    return {'pose': lambda t: T.Nest(anim(t)), 'ground': BankGround(T, DRAG_OFF_BANK),
-            'walls': lambda t: BankWalls(T) if DRAG_OFF_BANK(t) > .99 else [],
+
+    def Ground(x, y, t):
+        w = DRAG_OFF_BANK(t)
+        return w * BankHeight(T, x) + (1 - w) * DragBank(T, x, y)
+    return {'pose': lambda t: T.Nest(anim(t)), 'ground': Ground,
+            'walls': lambda t: BankWalls(T) if DRAG_OFF_BANK(t) > .99 else PlankWalls(T, DRAG_ROOT_SOUTH, 0) if DRAG_OFF_BANK(t) < .01 else [],
             'reviewProps': lambda t: BankReview(T),
             'reviewViews': [('side', (-3.4, -.3, .8), (.25, -.2, .45)), ('q', (-2.4, -2.9, 1.7), (.25, -.2, .45))],
             'reviewFrames': lambda n: [0, int(n * .14), int(n * .3), int(n * .5), int(n * .62), int(n * .75), n - 1],
@@ -1770,7 +1978,9 @@ def BuildPullArm(T, name):
     # ijaA has hauled the man up and backed off (wrist 0.62 s, upper arm 0.70 s): grabbing at
     # 0.28 s with ijaA put his head through ijaA's chest (both reached for the same shoulder).
     # (TengxianHumanoidV1 2026-09-26: starts at .80, not .72 -- the common skeleton's longer thighs met ijaA's, 8.7 cm)
-    stand = [(0.0, .80), (.6, .80), (1.8, .80), (2.1, .66), (2.4, .62), (2.8, .58), (4.4, .58)]
+    # (2026-09-27: 4 cm closer through the jerk up -- dropped at R3's bank kneel, 0.12 m further south, the arm
+    # swung 3 cm out of reach at 2.45 s.)
+    stand = [(0.0, .80), (.6, .80), (1.8, .80), (2.1, .64), (2.4, .58), (2.8, .57), (4.4, .58)]
 
     def PelvisXY(t):
         c = Channel(arm)(t)
@@ -1808,8 +2018,17 @@ def BuildPullArm(T, name):
     return spec
 
 
-R3_WALL = [((0, WALL_R3_Y, 0), (0, -1, 0))]
 R3_WALL_BOX = ('box', (0, WALL_R3_Y + .03, .7), (2.0, .06, 1.4), 0)
+
+
+def R3Clip(T, spec):
+    """An R3 clip on the real ground: grounded on the bank, walled by the planks, the bank in the stills."""
+    env = R3WallEnv(T)
+    assert all(abs(env[k] - KNEEL_WALL_ENV[k]) < .002 for k in env), ('KNEEL_WALL_ENV', env)
+    spec.update({'ground': lambda x, y, t: R3Bank(T, x, y), 'walls': R3Walls(T)})
+    props = spec.get('reviewProps')
+    spec['reviewProps'] = lambda t: (props(t) if props else []) + R3BankReview(T)
+    return spec
 R3_VIEWS = [('side', (-3.0, -.3, .8), (0, 0, .55)), ('q', (-2.2, -2.8, 1.6), (0, 0, .5)),
             ('front', (-.4, -3.2, .9), (0, 0, .55))]
 
@@ -1832,7 +2051,7 @@ def KneelWallBase(T):
     if 'kneelWall' in T.cache:
         return dict(T.cache['kneelWall'])
     f = Standing(T)
-    k = KneelFlat(T, 0.0, .02, sit=KNEEL_WALL_SIT)
+    k = KneelFeet(T, KneelFlat(T, 0.0, .02, sit=KNEEL_WALL_SIT))
     f.update(k)
     f.update({'pelvisTilt': KNEEL_WALL_TILT, 'bend': KNEEL_WALL_BEND, 'lean': .05, 'twist': -.05, 'shrug': .10,
               'neck': KNEEL_WALL_NECK, 'head': KNEEL_WALL_HEAD,
@@ -1872,7 +2091,8 @@ def BuildWallBrace(T, name):
     # The left arm was hanging in the body frame at the end of the drag: keep it there.
     start['handRel.L'], start['poleRel.L'], start['handRelW.L'] = (.06, -.10, -.50), (.40, .30, -.20), 1.0
     start['palmF.L'], start['palmN.L'] = (0, -.2, -1), (-1, 0, 0)
-    wallY = WALL_R3_Y - .07          # wrist target: the palm and fingers lie on the wall in front of it
+    # Wrist target: the palm and fingers lie on the planks in front of it (they lean back with height).
+    wallY = lambda z: R3WallY(T, z) - .055
     rows = [
         (0.00, {}),
         (0.26, {'head': (.25, 0, .05)}),
@@ -1883,12 +2103,12 @@ def BuildWallBrace(T, name):
         # Toppling backward: the left hand shoots back for the wall.
         # The knees skid back 2 cm with the topple (they stay put from here on).
         (0.48, {'pelvis': (.02, .10, kz - .06), 'bend': -.05, 'lean': .08, 'head': (.10, .05, .05),
-                'hand.L': (.24, wallY - .03, kz + .30), 'palmFw.L': (0, .2, 1), 'palmNw.L': (0, 1, 0), 'curl.L': .15,
+                'hand.L': (.24, wallY(kz + .30) - .03, kz + .30), 'palmFw.L': (0, .2, 1), 'palmNw.L': (0, 1, 0), 'curl.L': .15,
                 'armPole.L': (.55, -.20, kz), 'handRelW.R': 0.0, 'handRelW.L': 0.0,
                 **{key: end[key] for key in ('ankle.L', 'ankle.R', 'legPole.L', 'legPole.R', 'foot.L', 'foot.R')}}),
-        (0.62, {'hand.L': (.24, wallY, kz + .22)}),
+        (0.62, {'hand.L': (.24, wallY(kz + .22), kz + .22)}),
         # The loose earth gives: the palm slides down, shoulders and back take the wall.
-        (1.20, {'hand.L': (.26, wallY, kz - .12), 'pelvis': end['pelvis'], 'lean': end['lean'] + .01,
+        (1.20, {'hand.L': (.26, wallY(kz - .12), kz - .12), 'pelvis': end['pelvis'], 'lean': end['lean'] + .01,
                 'pelvisTilt': Add3(end['pelvisTilt'], (-.02, 0, -.01)), 'bend': end['bend'] - .02, 'head': (.30, .08, .10)}),
         (1.35, {'handRelW.R': 1.0, 'handRelW.L': 0.0}),
         (1.70, {'handRelW.L': 1.0, 'curl.L': .5}),
@@ -1897,9 +2117,9 @@ def BuildWallBrace(T, name):
         (2.00, dict(end)),
     ]
     anim = Keys(start, rows, lag={'head': .05, 'neck': .03})
-    return {'pose': lambda t: T.Nest(anim(t)), 'walls': R3_WALL, 'kneePlants': [('L', .62, 2.0), ('R', .62, 2.0)],
-            'reviewProps': lambda t: [R3_WALL_BOX], 'reviewViews': R3_VIEWS,
-            'reviewFrames': lambda n: [0, int(n * .17), int(n * .26), int(n * .45), n - 1], 'reviewScale': 2.2}
+    return R3Clip(T, {'pose': lambda t: T.Nest(R3OnBank(T, anim(t))), 'kneePlants': [('L', .62, 2.0), ('R', .62, 2.0)],
+                      'reviewViews': R3_VIEWS,
+                      'reviewFrames': lambda n: [0, int(n * .17), int(n * .26), int(n * .45), n - 1], 'reviewScale': 2.2})
 
 
 @Builder('CaptiveKneelMud')
@@ -1920,9 +2140,8 @@ def BuildKneelMud(T, name):
         f['twist'] += .02 * sway
         r = f['handRel.R']
         f['handRel.R'] = (r[0], r[1], r[2] + .008 * breath)
-        return T.Nest(f)
-    return {'pose': Pose, 'walls': R3_WALL, 'reviewProps': lambda t: [R3_WALL_BOX], 'reviewViews': R3_VIEWS,
-            'kneePlants': [('L', 0, 3.0), ('R', 0, 3.0)], 'reviewScale': 2.2}
+        return T.Nest(R3OnBank(T, f))
+    return R3Clip(T, {'pose': Pose, 'reviewViews': R3_VIEWS, 'kneePlants': [('L', 0, 3.0), ('R', 0, 3.0)], 'reviewScale': 2.2})
 
 
 @Builder('IjaShoveToWall')
@@ -1989,7 +2208,7 @@ PARTNER_SOURCES['TengxianNra02'].update({
 })
 
 Meta('CaptiveHeadPulledBack', 1.8, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=False, stage='slashGrab', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
-     env={'wallBehindM': .49},
+     env=KNEEL_WALL_ENV,
      contacts=[{'t': .28, 'by': 'ijaA', 'part': 'collarFront', 'action': 'grab'},
                {'t': 0.0, 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': .28},
                {'t': .42, 'limb': 'shoulderBack', 'action': 'release', 'target': 'wall'}],
@@ -2025,7 +2244,7 @@ Meta('IjaThroatSlash', 4.0, False, 'track', role='ijaA', rig='TengxianIja02', pr
            'the throat 0.24 s). Keeps the collar and leans in to taunt; 1.0-4.0 s is a seamless hold loop '
            '(the director samples it in window until "日兵甲松手") with two collar shakes on the taunt lines.')
 Meta('CaptiveThroatCut', 1.0, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=True, stage='slashCut', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
-     env={'wallBehindM': .49},
+     env=KNEEL_WALL_ENV,
      contacts=[{'t': .24, 'by': 'ijaA', 'part': 'throat', 'action': 'cut'},
                {'t': .44, 'limb': 'handsLR', 'action': 'clutch', 'target': 'self.throat'},
                {'t': .52, 'limb': 'shoulderBack', 'action': 'slam', 'target': 'wall', 'untilT': 1.0}],
@@ -2034,7 +2253,7 @@ Meta('CaptiveThroatCut', 1.0, False, 'free', role='comrade', rig='TengxianNra02'
      notes='The cut lands: a full-body jolt, both hands fly to the throat, the legs go and the trunk slams '
            'back into the wall (0.52 s); the collar fist keeps his shoulders raised.')
 Meta('CaptiveClutchThroat', 3.0, True, 'free', role='comrade', rig='TengxianNra02', rootMotion=False, stage='slashTaunt', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
-     env={'wallBehindM': .49},
+     env=KNEEL_WALL_ENV,
      contacts=[{'t': 0.0, 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': 3.0}],
      events=[{'t': .30, 'kind': 'spasm'}, {'t': 1.2, 'kind': 'spasm'}, {'t': 2.2, 'kind': 'spasm'},
              {'t': .60, 'kind': 'hairShake'}, {'t': 1.80, 'kind': 'hairShake'}],
@@ -2042,20 +2261,21 @@ Meta('CaptiveClutchThroat', 3.0, True, 'free', role='comrade', rig='TengxianNra0
      notes='Hands clamped on the throat, choking spasms, collar held by the fist and shaken twice per loop '
            '(in step with IjaThroatSlash hold window).')
 Meta('CaptiveWallSlideTwitch', 3.2, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=True, stage='slashWipe', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
-     env={'wallBehindM': .49}, terminal=True,
+     env=KNEEL_WALL_ENV, terminal=True,
      contacts=[{'t': 0.0, 'limb': 'shoulderBack', 'action': 'slide', 'target': 'wall', 'untilT': 1.2},
                {'t': 1.6, 'limb': 'shoulderBack', 'action': 'rest', 'target': 'wall', 'untilT': 3.2}],
      events=[{'t': 0.0, 'kind': 'released'}, {'t': 1.6, 'kind': 'twitch'}, {'t': 2.1, 'kind': 'twitch'},
              {'t': 2.5, 'kind': 'twitch'}, {'t': 3.2, 'kind': 'dead', 'fact': 'captivesKilled'}],
      prev=['CaptiveClutchThroat'], next=[],
-     notes='Let go: the head drops, he slides down the wall onto his side-sit, one hand slips off the throat, '
-           'the legs jerk three times and stop. Last frame is the corpse (hold it; replaces ShotCollapse).')
+     notes='Let go: the head drops, the seat sags to his right on his heels and he slides down the planks over to his '
+           'right -- he dies kneeling on the bank; one hand slips off the throat, the legs jerk three times and stop. '
+           'Last frame is the corpse (hold it; replaces ShotCollapse).')
 WIPE_LEAD = 3.2     # IjaWipeSheathBayonet: the release and the watch while CaptiveWallSlideTwitch plays
 Meta('IjaWipeSheathBayonet', WIPE_LEAD + 2.4, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon', 'bayonet'],
      rootMotion=True, stage='slashWipe', weaponState='slungBack',
      contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'collarFront', 'standoffM': .03},
                {'t': .05, 'limb': 'handL', 'action': 'release', 'partnerRole': 'comrade'},
-               {'t': WIPE_LEAD + .55, 'limb': 'bayonet', 'action': 'wipe', 'partnerRole': 'comrade', 'part': 'thighL'},
+               {'t': WIPE_LEAD + .55, 'limb': 'bayonet', 'action': 'wipe', 'partnerRole': 'comrade', 'part': 'shoulderL'},
                {'t': WIPE_LEAD + .85, 'limb': 'bayonet', 'action': 'lift'},
                {'t': WIPE_LEAD + 1.50, 'limb': 'bayonet', 'action': 'sheathe', 'target': 'scabbard'},
                {'t': WIPE_LEAD + 2.30, 'limb': 'handR', 'action': 'grip', 'target': 'weapon', 'part': 'barrel'}],
@@ -2063,7 +2283,8 @@ Meta('IjaWipeSheathBayonet', WIPE_LEAD + 2.4, False, 'track', role='ijaA', rig='
      prev=['IjaThroatSlash'], next=['IjaReadyRifle'],
      notes='Frame 0 is the IjaThroatSlash hold pose: the fist opens (0.05 s) and drops, the knife stays low at '
            'the hip while he watches the man slide down the wall (to 3.2 s, in step with CaptiveWallSlideTwitch). '
-           'Then he squats, drags the flat of the blade once across the dead man\'s trouser leg, straightens, '
+           'Then he stoops, drags the flat of the blade once across the dead man\'s left shoulder (slumped kneeling '
+           'against the planks), straightens, '
            'sheathes on the left hip and reaches over the right shoulder for the slung rifle '
            '(last frame = IjaReadyRifle frame 0).')
 Meta('IjaReadyRifle', 1.1, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
@@ -2165,17 +2386,17 @@ def HeadPulledBackKeys(T):
 
 
 def R3Review(extra=None):
-    return {'walls': R3_WALL, 'reviewViews': R3_VIEWS, 'reviewScale': 2.4}
+    return {'reviewViews': R3_VIEWS, 'reviewScale': 2.4}
 
 
 @Builder('CaptiveHeadPulledBack')
 def BuildHeadPulledBack(T, name):
     anim = HeadPulledBackKeys(T)
-    spec = {'pose': lambda t: T.Nest(anim(t)), 'reviewProps': lambda t: [R3_WALL_BOX],
+    spec = {'pose': lambda t: T.Nest(R3OnBank(T, anim(t))),
             'kneePlants': [('L', 0, 1.8), ('R', 0, 1.8)],
             'reviewFrames': lambda n: [0, int(n * .16), int(n * .24), n - 1]}
     spec.update(R3Review())
-    return spec
+    return R3Clip(T, spec)
 
 
 # Both hands on the cut (torso frame from each hand's own shoulder: left, back, up). The wrist
@@ -2184,7 +2405,9 @@ def BuildHeadPulledBack(T, name):
 # TengxianHumanoidV1 (2026-09-26): +2.0 / +1.5 cm toward his left. With the clavicles on Spine2 (no
 # longer under the neck) the shrugged shoulders the hands hang from sit further out, and both
 # knuckle groups landed ~2.5 / 1.5 cm to his right of the throat check (CaptiveClutchThroat 4.0 cm).
-THROAT_R, THROAT_L = (.15, -.17, -.02), (-.095, -.20, .00)
+# 2026-09-27 on the bank (the trunk reclined by BankKneel): 4.5 cm further back, the knuckles
+# had come off the front of the throat.
+THROAT_R, THROAT_L = (.15, -.128, -.024), (-.095, -.16, -.008)
 THROAT_PALM_F_R, THROAT_PALM_N_R = Unit((1, .10, .10)), (0, 1, 0)
 THROAT_PALM_F_L, THROAT_PALM_N_L = Unit((-1, .10, .15)), (0, 1, 0)
 THROAT_POLE_R, THROAT_POLE_L = (-.25, -.10, -.65), (.25, -.10, -.65)
@@ -2245,11 +2468,11 @@ def OwnThroatCheck(T, stage, since):
 @Builder('CaptiveThroatCut')
 def BuildThroatCut(T, name):
     anim = ThroatCutKeys(T)
-    spec = {'pose': lambda t: T.Nest(anim(t)), 'reviewProps': lambda t: [R3_WALL_BOX],
+    spec = {'pose': lambda t: T.Nest(R3OnBank(T, anim(t))),
             'check': OwnThroatCheck(T, 'slashCut', .46), 'kneePlants': [('L', 0, 1.0), ('R', 0, 1.0)],
             'reviewFrames': lambda n: [0, int(n * .24), int(n * .36), int(n * .52), n - 1]}
     spec.update(R3Review())
-    return spec
+    return R3Clip(T, spec)
 
 
 def Pulse(t, c, w):
@@ -2279,59 +2502,55 @@ def ClutchPose(T, t):
 
 @Builder('CaptiveClutchThroat')
 def BuildClutchThroat(T, name):
-    spec = {'pose': lambda t: T.Nest(ClutchPose(T, t)), 'check': OwnThroatCheck(T, 'slashTaunt', 0.0),
-            'kneePlants': [('L', 0, 3.0), ('R', 0, 3.0)], 'reviewProps': lambda t: [R3_WALL_BOX]}
+    spec = {'pose': lambda t: T.Nest(R3OnBank(T, ClutchPose(T, t))), 'check': OwnThroatCheck(T, 'slashTaunt', 0.0),
+            'kneePlants': [('L', 0, 3.0), ('R', 0, 3.0)]}
     spec.update(R3Review())
-    return spec
+    return R3Clip(T, spec)
 
 
-_SLIDE = [float(v) for v in (__import__('os').environ.get('SLIDE') or '-.15,.07,.13,.14').split(',')]
-SLIDE_SEAT = tuple(_SLIDE[:3])     # end seat: off the heels to his right, on the ground (x, +y, z)
+_SLIDE = [float(v) for v in (__import__('os').environ.get('SLIDE') or '-.10,.03,-.02,.14').split(',')]
+# 2026-09-27 on the bank: he dies kneeling. His heels are up the slope behind him, higher than the seat can drop
+# (the knee is already at its fold, BankKneel), and the flat floor's side-sit off the heels put the knees and the
+# feet through the bank on the way down; so the seat only sags to his right on his heels and the trunk slides
+# down the planks over to his right (SB03A: the head at the door's east post).
+SLIDE_SEAT = tuple(_SLIDE[:3])     # the seat's sag from the kneel: (x, +y, z)
 SLIDE_TILT = (_SLIDE[3], -.12, -.10)   # added to the kneel-wall pelvis tilt: the back stays on the wall
-SLIDE_LEG = [float(v) for v in (__import__('os').environ.get('SLIDELEG') or '.22,.0').split(',')]   # left ankle out: (left, forward)
 
 
 def SlideKeys(T):
-    """Released: the head drops, the seat slides off the heels to his right and down onto the
-    ground while his back slides down the wall; he ends slumped in a side-sit, shoulders and the
-    back of the head against the foot of the wall, legs folded to his left, hands dropped off the
-    throat into his lap. The last frame is the corpse (pelvis on the ground, limbs slack)."""
-    base = ClutchPose(T, 0.0)
+    """Released: the head drops, the seat sags to his right on his heels while his back slides down the
+    planks; he ends slumped kneeling against them over to his right, hands dropped off the throat, the legs
+    jerking three times. The last frame is the corpse (limbs slack). Authored from the bank kneel
+    (BankKneel: its seat and recline are the slide's start)."""
+    base = BankKneel(T, ClutchPose(T, 0.0))
     ar, al = base['ankle.R'], base['ankle.L']
     p0 = base['pelvis']
-    endPelvis = (p0[0] + SLIDE_SEAT[0], p0[1] + SLIDE_SEAT[1], SLIDE_SEAT[2])
-    A = T.A
-    # The left leg slides out along the foot of the wall to his left as the seat drops (not forward:
-    # ijaA stands over him there).
-    alOut = (endPelvis[0] + SLIDE_LEG[0], endPelvis[1] - SLIDE_LEG[1], A)
-    poleOut = (endPelvis[0] + SLIDE_LEG[0] * .8, endPelvis[1] - SLIDE_LEG[1] - .25, .55)
+    endPelvis = Add3(p0, SLIDE_SEAT)
     rows = [
         (0.00, {}),
         # The fist opens: the head drops forward, the neck follows; the hands stay on the throat.
         (0.18, {'head': (.10, .05, .05), 'neck': (0.0, 0, 0)}),
         (0.40, {'head': (.30, -.05, -.05), 'neck': (.14, 0, 0)}),
-        # Down the wall: the seat slips off the heels to his right and drops, the back rides
-        # down the wall, the trunk sags over to his right.
-        (0.95, {'pelvis': Add3(p0, (-.06, .01, -.10)), 'lean': -.16, 'pelvisTilt': Add3(base['pelvisTilt'], (.04, -.06, -.04)),
-                'bend': base['bend'] + .04, 'legPole.L': base['legPole.L'], 'ankle.L': al}),
-        # The left foot comes out from under him and the leg slides out forward.
-        (1.25, {'ankle.L': Lerp3(Add3(al, (0, 0, .06)), alOut, .45), 'legPole.L': Add3(poleOut, (0, -.05, .10))}),
+        # Down the planks: the seat sags to his right on his heels, the back rides down, the trunk sags over.
+        (0.95, {'pelvis': Lerp3(p0, endPelvis, .5), 'lean': -.16, 'pelvisTilt': Add3(base['pelvisTilt'], (.04, -.06, -.04)),
+                'bend': base['bend'] + .04}),
         # Still clutching his throat as he goes down.
         (1.60, {'pelvis': endPelvis, 'lean': -.34, 'pelvisTilt': Add3(base['pelvisTilt'], SLIDE_TILT),
                 'bend': base['bend'] + .08, 'twist': -.10, 'head': (.40, -.30, -.20), 'neck': (.10, -.10, 0),
-                'ankle.L': alOut, 'legPole.L': poleOut, 'foot.L': (-20, 15, 5), 'handRel.R': base['handRel.R']}),
+                'handRel.R': base['handRel.R']}),
         (1.64, {'ankle.R': ar}),
-        (1.72, {'ankle.R': Add3(ar, (0, .02, .035)), 'shrug': base['shrug'] + .06}),        # twitch 1
+        # (The jerks go out sideways along the slope: lifting a foot up the bank swung the knee into it.)
+        (1.72, {'ankle.R': Add3(ar, (-.03, -.01, .01)), 'shrug': base['shrug'] + .06}),        # twitch 1
         (1.84, {'ankle.R': ar}),
         # The right hand slips off onto his lap.
         (1.95, {'handRel.R': (.10, -.18, -.30), 'poleRel.R': (-.40, .20, -.40), 'palmF.R': (.1, -.5, -.9), 'palmN.R': (0, 0, -1),
                 'curl.R': .30}),
-        (2.10, {'ankle.L': alOut}),
-        (2.18, {'ankle.L': Add3(alOut, (0, -.02, .045)), 'bend': base['bend'] + .11}),       # twitch 2: the out leg kicks
-        (2.30, {'ankle.L': alOut, 'bend': base['bend'] + .08, 'handRel.L': base['handRel.L']}),
+        (2.10, {'ankle.L': al}),
+        (2.18, {'ankle.L': Add3(al, (.035, -.01, .01)), 'bend': base['bend'] + .11}),       # twitch 2: the left leg jerks
+        (2.30, {'ankle.L': al, 'bend': base['bend'] + .08, 'handRel.L': base['handRel.L']}),
         (2.50, {'ankle.R': ar}),
-        (2.56, {'ankle.R': Add3(ar, (0, .01, .015))}),                                     # twitch 3, smaller
-        # The left hand drops off the throat onto the ground beside his thigh, palm up, slack.
+        (2.56, {'ankle.R': Add3(ar, (-.015, 0, .005))}),                                   # twitch 3, smaller
+        # The left hand drops off the throat onto his thigh, palm up, slack.
         (2.70, {'ankle.R': ar, 'head': (.46, -.34, -.22)}),
         (2.75, {'handRel.L': (-.02, -.10, -.34), 'poleRel.L': (.40, .20, -.40),
                 'palmF.L': (-.1, -.3, -.9), 'palmN.L': (0, .3, -1), 'curl.L': .25}),
@@ -2343,11 +2562,14 @@ def SlideKeys(T):
 @Builder('CaptiveWallSlideTwitch')
 def BuildWallSlide(T, name):
     anim = SlideKeys(T)
-    spec = {'pose': lambda t: T.Nest(anim(t)), 'reviewProps': lambda t: [R3_WALL_BOX],
-            'kneePlants': [('L', 0, .5), ('R', 0, .5)],
+
+    def Pose(t):
+        # SlideKeys starts from the bank kneel (its seat is BankKneel's): only the feet are laid on the bank here.
+        return T.Nest(R3OnBank(T, anim(t), kneel=0.0))
+    spec = {'pose': Pose, 'kneePlants': [('L', 0, .5), ('R', 0, .5)],
             'reviewFrames': lambda n: [0, int(n * .15), int(n * .35), int(n * .55), n - 1]}
     spec.update(R3Review())
-    return spec
+    return R3Clip(T, spec)
 
 
 # ---- ijaA side ------------------------------------------------------------------------
@@ -2474,7 +2696,7 @@ def BuildDrawBayonet(T, name):
 HAIR_GRAB_HAND_R = (-.04, -.16, -.42)     # ijaA's free right hand at the end of IjaHairGrabPull
 
 
-WIPE_SQUAT = [float(v) for v in (__import__('os').environ.get('WIPESQUAT') or '.45,.02,.30').split(',')]   # bend, forward, down
+WIPE_SQUAT = [float(v) for v in (__import__('os').environ.get('WIPESQUAT') or '.30,.02,.10').split(',')]   # bend, forward, down
 
 
 WIPE_STROKE = [float(v) for v in (__import__('os').environ.get('WIPESTROKE') or '.15,.14').split(',')]   # fist to patch, pull
@@ -2607,12 +2829,13 @@ def BuildWipeSheath(T, name):
     L = WIPE_LEAD
 
     def Thigh():
-        # The dead man's left thigh, the nearest cloth to ijaA's right hand once he sits slumped
-        # against the wall (his shoulders are at the wall, over his legs: reaching them put
-        # ijaA's body through the legs). The corpse at rest.
+        # The dead man's left shoulder, the nearest cloth to ijaA's right hand once he is slumped kneeling
+        # against the planks over to his right (2026-09-27; on the flat floor he sat with the left knee up and
+        # the blade went over that thigh -- kneeling, the thigh is down at the bank and the squat to it put
+        # ijaA's knee on the ground). The corpse at rest.
         try:
-            hit = PartnerPoint(T, 'slashWipe', 'ijaA', 'comrade', 'thighL', L)
-        except KeyError:   # partner track dumped before thighL was listed
+            hit = PartnerPoint(T, 'slashWipe', 'ijaA', 'comrade', 'shoulderL', L)
+        except KeyError:   # partner track dumped before shoulderL was listed
             hit = None
         return (hit[0] + hit[1] * T.R(.02)) if hit else Vector((0, -T.R(.5), .3))
     sh = Thigh()

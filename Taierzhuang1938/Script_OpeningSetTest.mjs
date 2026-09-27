@@ -508,16 +508,17 @@ const Samples = (route) => {
   const set = new OpeningSet({ scene: new THREE.Scene(), library, groundAt: GG });
   set.Enter("Trapped");
   const At = (x, z, h) => new THREE.Vector3(x, GG(x, z) + h, z), AtRoot = (x, z, root, h) => new THREE.Vector3(x, GG(root.x, root.z) + h, z);
-  const comradeRoot = { x: 4.057, z: -125.905 }, deadRoot = { x: 4.061, z: -125.88 };
+  // 2026-09-27：他跪在北壁坡上（R3 南移 0.12 m、身体顺坡、背靠后仰板墙，docs/Data_OpeningComradeKneelBank20260927.md），头位重量。
+  const comradeRoot = { x: 4.057, z: -125.785 }, deadRoot = { x: 4.057, z: -125.785 };
   const shots = [
     { shot: "SB03", phase: "Interrogation", eye: At(0.35, -125.15, 0.26), targets: [
-      ["comrade head (kneeling, leaning back on the north wall)", AtRoot(4.068, -126.29, comradeRoot, 0.870)],
-      ["ijaA head", AtRoot(4.097, -125.712, { x: 4.097, z: -125.625 }, 1.359)]] },
+      ["comrade head (kneeling, leaning back on the north wall)", AtRoot(4.064, -126.207, comradeRoot, 0.804)],
+      ["ijaA head", AtRoot(3.873, -125.316, { x: 3.857, z: -125.255 }, 1.322)]] },
     { shot: "SB03A", phase: "Reach", settle: true, eye: At(0.25, -125.25, 0.18), targets: [
-      ["dead comrade head (slid down the wall)", AtRoot(3.793, -126.21, deadRoot, 0.735)],
-      ["ijaA head (looking back)", AtRoot(4.879, -124.46, { x: 4.9, z: -124.45 }, 1.356)]] },
+      ["dead comrade head (slid down the wall)", AtRoot(3.87, -126.121, deadRoot, 0.835)],
+      ["ijaA head (looking back)", AtRoot(4.892, -124.444, { x: 4.9, z: -124.45 }, 1.332)]] },
     { shot: "SB04", phase: "Butt", eye: At(2.3, -124.4, 0.35), targets: [
-      ["dead comrade head right of the door", AtRoot(3.793, -126.21, deadRoot, 0.735)]] },
+      ["dead comrade head right of the door", AtRoot(3.87, -126.121, deadRoot, 0.835)]] },
   ];
   const ray = new THREE.Raycaster();
   const Shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };

@@ -13,7 +13,7 @@ path; start/stop the instance around it). Environment:
                      OpeningStoryboards_20260926HumanoidV1 -- the 20260922/20260923/20260925
                      Lugou-rig sources stay untouched; the 0926 folder started as a copy of
                      the 0925 partner tracks, renamed to the Tengxian rig ids)
-  OPENING_VERSION    manifest version (default 20260927OpeningStoryboardsV11ExecutionVaultRig)
+  OPENING_VERSION    manifest version (default 20260927OpeningStoryboardsV12KneelBank)
   OPENING_MODEL      comma list of rigs (default all five)
   OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON. A clip's only
                      inputs from other clips are the arm-roll seeds of its `prev` clip (below): a
@@ -61,7 +61,7 @@ from mathutils import Vector, Matrix, Quaternion
 project = Path(os.environ['OPENING_PROJECT'])
 private = Path(os.environ.get('OPENING_BLEND_DIR')
                or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OpeningStoryboards_20260926HumanoidV1')
-VERSION = os.environ.get('OPENING_VERSION') or '20260927OpeningStoryboardsV11ExecutionVaultRig'
+VERSION = os.environ.get('OPENING_VERSION') or '20260927OpeningStoryboardsV12KneelBank'
 committedDir = project / 'Animation/OpeningStoryboards'
 output = Path(os.environ.get('OPENING_OUTPUT') or (project.parent / 'tmp/OpeningStoryboards/Verify'
                                                    if os.environ.get('OPENING_PASS') == 'verify' else committedDir))
@@ -492,7 +492,8 @@ def BakeRig(ctx):
         lift = (CLEARANCE - low) * weight
         solveState['lift'] = lift
         if os.environ.get('OPENING_LOWDBG'):
-            print('LOW t=%.2f %.4f at %s' % (t, low, lowAt), flush=True)
+            print('LOW t=%.2f %.4f at %s knees %s %s ankles %s %s pelvis %s' % (
+                t, low, lowAt, *[tuple(round(c, 3) for c in Point(Bone(n))) for n in ('L Calf', 'R Calf', 'L Foot', 'R Foot', 'Pelvis')]), flush=True)
         pelvis = Bone('Pelvis')
         matrix = BWorld(pelvis)
         matrix.translation = matrix.translation + Vector((0, 0, lift))

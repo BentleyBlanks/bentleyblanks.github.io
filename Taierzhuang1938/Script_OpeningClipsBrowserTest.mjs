@@ -11,7 +11,8 @@
 //      带四肢的 ≤ 8 cm（胶囊把袖子裤腿都包进去了）。clip 声明了手去碰对方的那条胳膊，前臂不跟对方算。
 //   6) 跪地的膝盖：bake 声明的膝盖着地窗口（kneePlants）里，膝关节离窗口起点的最大位移 ≤ 2 cm；
 //   7) 贴墙：clip 声明的墙面接触（contacts 里 target:"wall"），那块皮肤（运行时 CPU 蒙皮的顶点）到 env 墙面的
-//      距离在整个窗口里离墙 ≤ 3 cm、进墙 ≤ 3 cm；
+//      距离在整个窗口里离墙 ≤ 3 cm、进墙 ≤ 3 cm；env 带 wallLeanFromM / wallLeanDeg 的背墙在那个高度以上往后仰
+//      （R3 身后的板墙，2026-09-27）；
 //   8) 运行时行为：换 clip 时枪/刺刀跟着 0.28 s 的姿态混合走（不瞬移）、炸飞的枪留在地上不回手、
 //      刺刀收鞘后挂在骨盆上、LuoKneelCheck 的 holdUntil 放开循环后播到底。
 //   9) 抓第一人称玩家（2026-09-25 起）：clip 带 player 轨（collar / head / forearmR…）的，手在 grab/hold 窗口里
@@ -346,7 +347,8 @@ try {
         const inverse = new THREE.Matrix4().copy(e.actor.root.matrixWorld).invert();
         for (const i of picked) {
           mesh.getVertexPosition(i, v); v.applyMatrix4(mesh.matrixWorld).applyMatrix4(inverse);
-          if (env?.wallBehindM) best = Math.min(best, env.wallBehindM - v.z);
+          // A wall behind that leans back above wallLeanFromM (the planks behind R3): further back with height.
+          if (env?.wallBehindM) best = Math.min(best, env.wallBehindM + (env.wallLeanDeg ? Math.max(0, v.y - env.wallLeanFromM) * Math.tan(env.wallLeanDeg * Math.PI / 180) : 0) - v.z);
           if (env?.wallLeftM) best = Math.min(best, v.x + env.wallLeftM);
           if (env?.wallRightM) best = Math.min(best, env.wallRightM - v.x);
         }

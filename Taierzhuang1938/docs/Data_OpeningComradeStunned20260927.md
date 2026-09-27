@@ -24,5 +24,5 @@
 
 ## 验收
 
-- 实机穿模探针（蒙皮顶点对 `battlefield.GroundHeight` 与板面）：Black、Wake、FrontPass、切镜后、拖出 0 / 0.6 / 1.2 s 全部入土 0、进墙 0；拖出 1.8 s 入土 0.13 m / 进墙 0.04 m（基线 0.27 / 0.12）。2.1 s 以后（跪到审问位）与基线相同，是原有问题，本轮未处理。
+- 实机穿模探针（蒙皮顶点对 `battlefield.GroundHeight` 与板面）：Black、Wake、FrontPass、切镜后、拖出 0 / 0.6 / 1.2 s 全部入土 0、进墙 0；拖出 1.8 s 入土 0.13 m / 进墙 0.04 m（基线 0.27 / 0.12）。2.1 s 以后（跪到审问位）与基线相同，是原有问题，本轮未处理（已由 [跪姿贴坡](Data_OpeningComradeKneelBank20260927.md) 解决，审问跪姿与 `ComradeWallRoot` 随之改变）。
 - `OpeningStoryboardsTest`（新增两处同根交接：倒地 → 震晕、震晕末帧 → 拖出）、`--rebake` 五条逐帧复现；`OpeningClipsBrowserTest` 全过（captiveDrag 川军/日兵甲最深重叠 7.6 cm，限值 8，基线 6.8）；分镜 SB01–SB03A 判据通过。
