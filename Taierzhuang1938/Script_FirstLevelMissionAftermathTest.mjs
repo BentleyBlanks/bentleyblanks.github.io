@@ -138,6 +138,35 @@ try {
   assert.ok(contacts.isolated.every(s=>s.gap>=0&&s.gap<.01&&s.stable&&s.length>1.3),"isolated pile hints settle to flat/sloped terrain deterministically at human scale");
   assert.ok(contacts.isolated.every(s=>s.thirds.every(h=>h<.13)),"head, torso and legs settle together; a touching helmet alone is insufficient");
   assert.ok(contacts.frozen&&contacts.samples===0,"camera/LOD changes never resample terrain or move settled bodies");
+  // 2026-09-28 per-material BatchedMesh: after a tier change the multi-draw list three actually submits must
+  // hold the new tier's index ranges (r185's setGeometryIdAt alone leaves the old ranges in place).
+  const batches=await page.evaluate(async()=>{
+    const g=window.Tengxian,a=g.Debug.FirstLevelMissionRuntime().view.aftermath,T=await import("three");
+    const Check=()=>{
+      let expected=0,actual=0,shownBatches=0;
+      for(const batch of a.batches){
+        const mesh=batch.mesh;
+        mesh.onBeforeRender(g.renderer,g.scene,g.camera,mesh.geometry,mesh.material);
+        for(let i=0;i<mesh._multiDrawCount;i++)actual+=mesh._multiDrawCounts[i];
+        if(mesh.visible)shownBatches++;
+      }
+      for(const instance of a.instances)instance.prototype.parts.forEach((part,p)=>{
+        const want=part.tierSlots[instance.tier];
+        if(want)for(const slot of instance.slots[p])if(slot.on&&slot.batch===want.batch)expected+=want.geometry.index.count;
+      });
+      return {expected,actual,shownBatches,tiers:{...a.visible}};
+    };
+    const first=a.instances[0],near=new T.Vector3(first.x,0,first.z);
+    a.Update(near);const atNear=Check();
+    a.Update(new T.Vector3(first.x+2000,0,first.z));const atFar=Check();
+    a.Update(near);const back=Check();
+    return {atNear,atFar,back,batches:a.batches.length,meshes:a.root.children.filter(o=>o.isBatchedMesh).length};
+  });
+  console.log(JSON.stringify(batches));
+  for(const key of ["atNear","atFar","back"])
+    assert.ok(batches[key].expected>0&&batches[key].actual===batches[key].expected,`${key}: submitted index ranges follow the current tier`);
+  assert.ok(batches.atFar.tiers.detail===0&&batches.atNear.tiers.detail>0,"moving away drops every body out of the detail tier");
+  assert.ok(batches.batches===batches.meshes,"one BatchedMesh per material and near/far group");
   for(const shot of [
     {id:"CorpseRoad",x:-35.75,z:36.9,yaw:Math.PI/4,pitch:-.38},
     {id:"CorpseFormerFloating",x:-10.87,z:-146.9,yaw:Math.PI/4,pitch:-.38},

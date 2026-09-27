@@ -9081,6 +9081,20 @@ THREE.Skeleton.prototype.update = function SkeletonUpdateOncePerFrame() {
 };
 
 /**
+ * three r185 的程序判定（WebGLRenderer.setProgram）拿 `object.colorTexture` 和 null 比，而 BatchedMesh
+ * 的逐实例颜色纹理字段叫 `_colorsTexture`：`undefined !== null` 恒真 —— **每只 BatchedMesh 每画一次**
+ * 都整套重算着色器参数、拼缓存键（getProgram）。阴影静态合批、破坏碎块一直在白付这笔；2026-09-28 尸体层 /
+ * 远景人群改成按材质合批后，05 战车段每帧 getProgram 从 31 涨到 125—173 次才把它翻出来。
+ * 补一个只读别名让那两条判定读到真值（vendor 不动）。
+ */
+if (!Object.getOwnPropertyDescriptor(THREE.BatchedMesh.prototype, "colorTexture")) {
+  Object.defineProperty(THREE.BatchedMesh.prototype, "colorTexture", {
+    configurable: true,
+    get() { return this._colorsTexture; },
+  });
+}
+
+/**
  * 合成与出画。抽成函数是因为**过场也要走同一条** ——
  * 曝光、雾、泛光、去饱和全按当关的天光预设装配，过场那条分支自己再抄一份
  * 必然抄漏（夜战预设 exposure 是 3.6，抄成 0.5 整帧就是纯黑）。

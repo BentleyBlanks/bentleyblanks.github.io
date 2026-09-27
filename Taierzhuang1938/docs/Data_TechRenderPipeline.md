@@ -240,7 +240,7 @@ function generateShadowMapTypeDefine( parameters ) {
 
 使用两张全分辨率 RGBA16F、NoColorSpace、Nearest 靶：`terrainAlbedoRoughness`（线性 albedo RGB、roughness A），`terrainNormalDepth`（视空间映射法线 XYZ、线性视深 W）。来源材质标记 `userData.terrainBlendSource`，接收材质标记 `terrainBlendReceiver`。原始材质通过表面补丁注册捕获输出，因此弹坑的后续覆盖仍生效；无光场景代理只借用原几何/材质，不接管它们的生命周期或 draw 回调。普通标准材质保留 three 自动声明的 location 0，仅额外声明 location 1；显式 GLSL3 ShaderMaterial 仍须声明全部输出。
 
-`Prepare` 收可见来源，`Render` 同步世界矩阵/替换后的几何后填靶，捕获状态在 finally 复位；材质输入经共享 uniform 对象绑定，当前 pipeline 每帧发布自己的纹理，Idle 清 validity 和纹理引用。`ctx.terrainBlend` 提供本帧靶；无来源时释放代理引用。接收者在光照前混合 albedo、normal、roughness；prepass 使用同一个深度 mask，只改 normal，不改 depth/velocity。屏幕空间深度差换算法向距离，空像素和前方表面不参与。默认过渡宽度由 `Data_TrenchSurface.contact.blendWidthM` 管理。
+`Prepare` 收可见来源（2026-09-28 起只在预通道结构监听的 `structureGeneration` 变了、或换了 scene 时才整场景找一遍候选，平时只对候选短表逐个查父链可见性；原来每帧 traverse 整场景约 1 ms），`Render` 同步世界矩阵/替换后的几何后填靶，捕获状态在 finally 复位；材质输入经共享 uniform 对象绑定，当前 pipeline 每帧发布自己的纹理，Idle 清 validity 和纹理引用。`ctx.terrainBlend` 提供本帧靶；无来源时释放代理引用。接收者在光照前混合 albedo、normal、roughness；prepass 使用同一个深度 mask，只改 normal，不改 depth/velocity。屏幕空间深度差换算法向距离，空像素和前方表面不参与。默认过渡宽度由 `Data_TrenchSurface.contact.blendWidthM` 管理。
 
 新增两个接收材质 sampler，GI 开启的石材最高 15，地形弹坑仍 16。门禁：TerrainBlendTest、PostFrameGraphTest、SamplerBudgetTest、MotionVectorContractTest、CarriagePropVelocityTest。POM 与素材说明见 [壕沟表面](Data_TrenchSurface.md)。
 
@@ -2288,6 +2288,12 @@ define，热切不重编译视模材质；滤波半径按米给（默认 6 mm）
   补丁已处理 `USE_BATCHING`），克隆是为了不让同一只深度材质在普通 Mesh 与 BatchedMesh 之间翻种类
   （§17.12 那条 getProgram 风暴）。
 * 镜像件（matrixWorld 行列式 ≤ 0）不收：绕序要逐件翻，一整批只有一个 frontFace。
+* **会反复变形的地形不收**（2026-09-28）：`TerrainDeformationView` 给弹坑地形块、弹坑覆盖层标
+  `userData.noShadowBatch`，被 `CutSource` 切过的源地形块也当场标上。原来它们每挨一次近爆就被踢出、
+  冷却后换新版本重新加进来，BatchedMesh 只追加不复用空洞，攒够碎片就在战斗中途 `optimize()` /
+  `setGeometrySize()` 整批拷贝整块重传 —— 用户 05 战车段录制里 `shadowBatch` 一帧 199 ms。
+* **建组时一次留够容量**：按当时登记的同组投影体总量 × `reserveScale`（1.5）建 BatchedMesh，
+  不再从 64 K 顶点起按两倍扩；拷索引改整块 `set`（原来逐个 `getX`，一块 8192 三角的地形要毫秒级）。
 
 验收：定帧下合批开/关（调试口 `Tengxian.shadowCasterBatch.bypass`，只在烘焙时绕过、不拆批次）三级
 阴影深度图逐纹素比对，差值在 1e-6 量级（偶有一两个边缘纹素 ~1e-3，浮点翻转）；实战 60 s（炸出 7–8 个
@@ -5486,6 +5492,43 @@ composite 的抖动都跟着帧号走，多推一帧就整屏差 ~3/255。§17.1
   而且车队与骨头两项先把阴影趟压小了。收益小，但逐纹素无差、零现编，留着。
 * **预热帧从来没烘过阴影**（§18.5）：`WarmLevel` 的强制出画不走玩法帧，没人拟合级联，
   `ScheduleShadowUpdate` 一张都不排；刚体代理的「投影深度变体」其实一直留到开局现编。
+
+### 17.16 05 战车段：提交量与 BatchedMesh 程序判定（2026-09-28）
+
+起因：用户战车段 Profiler 录制（真玩的 #441–#701）平均 16 fps、主线程 52.7 ms、GPU 33 ms。渲染提交
+29.8 ms 随 draw 数涨：同一段转头看空地时 draw 850→200、提交 30→15 ms，约 21 µs 一个 draw。
+第 5 阶段无头探针按归属数 draw：尸体层每帧 220 左右（main + prepass 各 102），燃烧残骸 76，远景人群约 70。
+
+这一轮改了什么（机制见各节）：
+
+| 项 | 改法 | 位置 |
+| --- | --- | --- |
+| 日军 `Material #47`（脸上 44 三角，BLEND + 双面） | three 对「透明 + 双面」每次拆两趟、每趟 `needsUpdate`；人物接材质时置 `forceSinglePass`，尸体层 / 人群的克隆照抄；第一人称枪口焰同理 | `Script_CharacterModel` / `Script_Viewmodel` |
+| 尸体层 | 每种材质 near / far 两只 BatchedMesh | `Script_FirstLevelMissionAftermath.BuildBatches` |
+| 远景人群 | 「kind × 材质」一只 BatchedMesh，姿势桶只当数据 | `Script_ActorCrowd`，`docs/Data_ActorCrowdLod.md` §4.5 |
+| 燃烧残骸 | 64 m 分区 → 全场按材质各一只（168 → 7 只，8.7 万三角） | `Script_FirstLevelSmokeOrigins` |
+| 地形融合 | 只在结构变了时整场景找源（§1.4.1 那段） | `Script_TerrainBlend` + `PrepassPass.structureGeneration` |
+| 预通道 | 按物体种类排序（`PrepassOpaqueSort`），共用覆盖材质不再来回翻程序 | `Script_PostPrepass` |
+| 阴影静态合批 | 变形地形不收、建组一次留够、索引整块拷（§6.13） | `Script_ShadowCasterBatch` / `Script_TerrainDeformationView` |
+| **three r185 的 BatchedMesh 程序判定** | `setProgram` 拿 `object.colorTexture` 比 null，BatchedMesh 的字段叫 `_colorsTexture` —— 恒真，每只批次每画一次都 getProgram；`Script_Main` 给原型补只读别名 | `Script_Main`（骨骼补丁旁边） |
+
+实测（第 5 阶段、定帧 dt=0、同机位，基线 = 当时 origin/master，逐帧平均）：
+
+| 机位 | draw（改前 → 改后） | 其中尸体层 | 人群 | 残骸 | getProgram / 帧 |
+| --- | --- | --- | --- | --- | --- |
+| 出生点朝北 | 720 → 554 | 153 → 99 | 44 → 14 | 108 → 28 | 31 → 10 |
+| 尸堆边上 | 798 → 551 | 226 → 143 | 44 → 14 | 131 → 24 | 37 → 10 |
+| 田野 | 577 → 491 | 142 → 125 | 44 → 14 | 54 → 14 | 35 → 10 |
+
+三组截图与基线逐项看过一致（姿势、贴图、血迹、位置）。毫秒数这台机器满载时测不准（同组 24–62 ms 乱跳），
+按 21 µs / draw 折算约省 3.5–5 ms，getProgram 再省约 1 ms。
+
+坑：
+* **`setGeometryIdAt` 不标脏**（r185）：关着逐实例剔除时 `onBeforeRender` 直接早退，multi-draw 表不重排，
+  画出来还是旧几何。换号后手动 `_visibilityChanged = true`（尸体层换档、人群换姿势两处）。
+* 录制里还有 0.4–2.2 s 的长卡（#598、#643、#624）：那几帧 JS 只有 41–51 ms，GPU 计时尖峰随机落在
+  motionBlur 240 ms / composite / main 上，是显卡或合成器被别的进程抢，录的时候本机 60 多个 Edge 进程、
+  CPU 100%。这一类不在代码里，要在空闲机器上重录才能判。
 
 ## 18. 预热账：进过场与开机的着色器编译
 

@@ -358,6 +358,8 @@ function BuildMaterials(library) {
       color: new THREE.Color(MUZZLE_FLASH.color).multiplyScalar(MUZZLE_FLASH.radiance),
       blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
       transparent: true, opacity: 1, depthWrite: false, toneMapped: false,
+      // 加色混合与先后无关：单趟画，免得 three 把「透明+双面」拆两趟、每趟标脏重算参数。
+      forceSinglePass: true,
     }),
   };
 }

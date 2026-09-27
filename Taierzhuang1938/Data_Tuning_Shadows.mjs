@@ -274,6 +274,11 @@ export const STATIC_CASTER_BATCH = {
   /** BatchedMesh 的起始容量；不够时先整理碎片，再按两倍扩。 */
   minInstanceCapacity: 256,
   minVertexCapacity: 65536,
+  /**
+   * 建组时按当时登记的同组投影体总量乘这个数一次留够（下限仍是上面两项）。中途扩容 / 整理是
+   * 整批拷贝整块重传，05 战车段录到一帧 199 ms（2026-09-28）；会反复变形的地形块已不收。
+   */
+  reserveScale: 1.5,
 };
 
 /** 画质档名。`SHADOW_PRESETS` 缺档一律退回 high。 */

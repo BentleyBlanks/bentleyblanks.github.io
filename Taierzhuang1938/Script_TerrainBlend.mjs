@@ -28,18 +28,39 @@ float TerrainBlendMask(vec4 soil, vec3 viewPosition) {
   return 1.0-smoothstep(.008,uTerrainBlendWidth,normalDistance);
 }`;
 
+// Same answer as scene.traverseVisible reaching the object: every node up to the scene is visible.
+function ShownIn(object,scene){
+  for(let node=object;node;node=node.parent){
+    if(!node.visible)return false;
+    if(node===scene)return true;
+  }
+  return false;
+}
+
 export class TerrainBlendPass {
   constructor(pipeline) {
     this.name='terrainBlend';this.pipeline=pipeline;
     this.scene=new THREE.Scene();this.proxies=new Map();this.target=null;
     this.sources=[];this.savedClear=new THREE.Color();
+    this.candidates=[];this.scanScene=null;this.scanGeneration=-1;
   }
   Prepare(ctx) {
+    // Sources are the soil meshes (ground + crater tiles); they only come and go with the scene
+    // structure. Walking the whole scene every frame cost ~1 ms in the 05 tank fight (2026-09-28), so
+    // re-walk only when the prepass structure listeners (childadded / childremoved on every node) saw a
+    // change, and just re-check visibility of the short candidate list otherwise.
+    const generation=this.pipeline.prepassPass?.structureGeneration;
+    if(generation===undefined || ctx.scene!==this.scanScene || generation!==this.scanGeneration){
+      this.candidates.length=0;
+      ctx.scene.traverse(object=>{
+        if(object.isMesh && !object.isInstancedMesh && object.material?.userData.terrainBlendSource)
+          this.candidates.push(object);
+      });
+      this.scanScene=ctx.scene;this.scanGeneration=generation;
+    }
     this.sources.length=0;
-    ctx.scene.traverseVisible(object=>{
-      if(object.isMesh && !object.isInstancedMesh && object.material?.userData.terrainBlendSource)
-        this.sources.push(object);
-    });
+    for(const object of this.candidates)
+      if(object.material?.userData.terrainBlendSource && ShownIn(object,ctx.scene))this.sources.push(object);
   }
   Enabled(){return !!(this.pipeline.preset.terrainBlend && this.pipeline.hdrCapable && this.sources.length);}
   Idle(ctx){

@@ -34,6 +34,10 @@
 // 实测军人 GLB 是 7 个，所以站+倒地两档 = 14 / kind。姿势档从 2 加到 8 之后，
 // 最坏情况（八档同时有人）是 56 / kind。三角形不变：一个人只画在一个桶里。
 // 逐桶的账与实测见 docs/Data_ActorCrowdLod.md。
+//
+// 【2026-09-28 起上面这笔账改了】出画走「kind × 材质」一只 BatchedMesh（_BuildBatches / End）：
+// 姿势档只占几何不占 draw，一个 kind 最多「材质桶数」个 draw（军人 7 个），再加档也不涨。
+// 姿势桶里的 InstancedMesh 留作数据（几何 + 本帧实例矩阵），不进场景。
 
 import * as THREE from "three";
 import { PRONE_CRAWL } from './Script_ProneCrawl.mjs';
@@ -55,6 +59,9 @@ import { ClusterDistantGeometry } from "./Script_DistantGeometry.mjs";
  * 每帧只上传 [0, count) 那一段（见 End），空桶一个字节都不传。
  */
 const CROWD_CAPACITY = 512;
+
+/** 合批（「kind × 材质」一只 BatchedMesh）的起始实例容量；不够时按两倍扩（只在人数创新高那一帧）。 */
+const CROWD_BATCH_START = 64;
 
 /**
  * 换一档姿势之后推几帧再烘。**这个数不是随手给的**，一档一个值，理由如下。
@@ -190,6 +197,9 @@ export class ActorCrowd {
     this.kinds = new Map();
     // 每个 kind 的材质克隆（全部姿势桶共用一份，见 _Harvest 的注释）；Dispose 从这里收。
     this.materials = [];
+    // 出画用的合批：「kind × 材质」一只 BatchedMesh（见 _BuildBatches）。
+    this.batches = [];
+    this._batchMatrix = new THREE.Matrix4();
     this.disposed = false;
     // 翻页参数在构造时取一次：Push 选桶与 _Poses 烘桶必须用同一个 N，
     // 半路改表会让 `run3` 指到一个没烘过的桶。
@@ -290,6 +300,7 @@ export class ActorCrowd {
       }
       this.kinds.set(`${kind}:${pose.id}`, this._Harvest(actor, kind, pose, materials));
     }
+    this._BuildBatches(kind, materials);
     actor.Dispose();
     if (cycleS > 0) this.bakeStats.runCycleS = Math.round(cycleS * 1000) / 1000;
     const ms = Now() - started;
@@ -370,7 +381,8 @@ export class ActorCrowd {
       // 但**同一个 kind 的八档共用一份材质**（见上面），program 缓存键完全相同，
       // 所以只要站姿档一直在场，其余七档的 program 就已经热着了。
       mesh.visible = pose.id === "standing";
-      this.scene.add(mesh);
+      // 2026-09-28 起这只 InstancedMesh 只当**数据**（几何 + 这一帧的实例矩阵，测试与取证照读），
+      // 不进场景；真正出画的是「kind × 材质」一只 BatchedMesh（见 _BuildBatches / End）。
       meshes.push(mesh);
       triangles += geometry.index
         ? geometry.index.count / 3
@@ -392,6 +404,72 @@ export class ActorCrowd {
       clip: typeof actor.characterRig?.currentAction?.getClip === "function"
         ? actor.characterRig.currentAction.getClip().name : null,
     };
+  }
+
+  /**
+   * 【2026-09-28 按材质合批】一个 kind 的各档姿势共用一份材质克隆（见 _Harvest），所以「kind × 材质」
+   * 一只 BatchedMesh 就装得下这个材质在全部姿势里的几何：一趟一个 multi-draw，姿势档再多也不加 draw。
+   * 原来是「姿势 × 材质」各一只 InstancedMesh —— 05 战车段同屏 42 只，预通道 + 主场景每帧约 70 个 draw，
+   * 而那一帧卡在 CPU 提交（每个 draw 约 21 µs）。每个人一帧只落一个姿势，所以一只批次的实例数就是
+   * 这一帧这个 kind 被 Push 的人数（End 里灌）。几何属性表不同的姿势分到不同批次（BatchedMesh 的要求）。
+   */
+  _BuildBatches(kind, materials) {
+    const entries = [];
+    for (const [key, entry] of this.kinds) if (key.startsWith(`${kind}:`)) entries.push(entry);
+    const Signature = (geometry) => Object.keys(geometry.attributes).sort().map((name) => {
+      const a = geometry.attributes[name]; return `${name}:${a.itemSize}${a.normalized ? "n" : ""}`;
+    }).join(",") + (geometry.index ? "|i" : "");
+    for (const clone of new Set(materials.values())) {
+      const groups = new Map();                       // 属性签名 -> [{ entry, index, geometry }]
+      for (const entry of entries) entry.meshes.forEach((mesh, index) => {
+        if (mesh.material !== clone) return;
+        const key = Signature(mesh.geometry);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push({ entry, index, geometry: mesh.geometry });
+      });
+      for (const members of groups.values()) {
+        let vertices = 0, indices = 0;
+        for (const { geometry } of members) {
+          const count = geometry.attributes.position.count;
+          vertices += count; indices += geometry.index ? geometry.index.count : count;
+        }
+        const mesh = new THREE.BatchedMesh(CROWD_BATCH_START, vertices, indices, clone);
+        mesh.name = `Crowd_${kind}_Batch${this.batches.length}`;
+        // 逐人视锥剔除已经在 Script_AI 那边做过；远景的人不投影（同 _Harvest 的注释）。
+        mesh.frustumCulled = false; mesh.perObjectFrustumCulled = false; mesh.sortObjects = false;
+        mesh.castShadow = false; mesh.receiveShadow = false;
+        // 先亮着：进关预热（WarmupShaders）要真画它一遍把 program 用起来；第一次 End 之后按有没有人显隐。
+        mesh.visible = true;
+        const batch = { mesh, used: 0, shown: 0, allocated: 0, geometryOf: [] };
+        for (const { entry, index, geometry } of members) {
+          (entry.batchSlots ||= [])[index] = { batch, geometryId: mesh.addGeometry(geometry) };
+        }
+        this.scene.add(mesh);
+        this.batches.push(batch);
+      }
+    }
+  }
+
+  /** 往批次里放第 `used` 个实例（实例号按顺序复用，从不删；换姿势只换几何号）。 */
+  _Place(batch, geometryId, array, offset) {
+    const mesh = batch.mesh, k = batch.used;
+    batch.used += 1;
+    if (k >= batch.allocated) {
+      if (k >= mesh.maxInstanceCount) mesh.setInstanceCount(mesh.maxInstanceCount * 2);
+      mesh.addInstance(geometryId);
+      batch.allocated += 1;
+      batch.geometryOf[k] = geometryId;
+    } else {
+      if (batch.geometryOf[k] !== geometryId) {
+        mesh.setGeometryIdAt(k, geometryId);
+        // r185 的 setGeometryIdAt 只改号不标脏：不关逐实例剔除时 onBeforeRender 直接早退，
+        // multi-draw 表还是旧几何的起止 —— 画出来仍是上一个姿势（ActorCrowdTest 的跪 / 卧剪影抓到的）。
+        mesh._visibilityChanged = true;
+        batch.geometryOf[k] = geometryId;
+      }
+      if (k >= batch.shown) mesh.setVisibleAt(k, true);
+    }
+    mesh.setMatrixAt(k, this._batchMatrix.fromArray(array, offset));
   }
 
   /** 取一个姿势桶；这个 kind 还没烘过就整组烘出来。找不到的姿势退回站姿。 */
@@ -537,15 +615,27 @@ export class ActorCrowd {
    *      而实际写进去的常常只有几十个人。空桶连脏标记都不设。
    */
   End() {
+    for (const batch of this.batches) batch.used = 0;
     for (const entry of this.kinds.values()) {
       const active = entry.count > 0;
-      for (const mesh of entry.meshes) {
+      for (let index = 0; index < entry.meshes.length; index += 1) {
+        const mesh = entry.meshes[index];
         mesh.count = entry.count;
         if (entry.optional) mesh.visible = active;
         if (!active) continue;
-        mesh.instanceMatrix.addUpdateRange(0, entry.count * 16);
-        mesh.instanceMatrix.needsUpdate = true;
+        // 数据网格不出画（见 _Harvest）；这一帧的人按姿势桶的顺序灌进各自材质的批次。
+        const slot = entry.batchSlots?.[index];
+        if (!slot) continue;
+        const array = mesh.instanceMatrix.array;
+        for (let i = 0; i < entry.count; i += 1) this._Place(slot.batch, slot.geometryId, array, i * 16);
       }
+    }
+    for (const batch of this.batches) {
+      const mesh = batch.mesh;
+      for (let k = batch.used; k < batch.shown; k += 1) mesh.setVisibleAt(k, false);
+      batch.shown = batch.used;
+      // 空批次整只退出渲染列表：省掉一次不画像素的 setProgram。
+      mesh.visible = batch.used > 0;
     }
   }
 
@@ -565,7 +655,7 @@ export class ActorCrowd {
 
   /**
    * 本帧逐姿势桶的账：谁在用、用了几个人、要花几个 draw call。
-   * `drawCalls` 只数**本帧真的会提交**的网格（空桶在 three 里早退，不算）。
+   * `drawCalls` 只数**本帧真的会提交**的合批（有人的「kind × 材质」批次，一只一个 multi-draw）。
    */
   PoseReport() {
     const poses = {};
@@ -574,8 +664,9 @@ export class ActorCrowd {
     for (const [key, entry] of this.kinds) {
       poses[key] = { count: entry.count, meshes: entry.meshes.length, triangles: entry.triangles };
       instances += entry.count;
-      if (entry.count > 0) drawCalls += entry.meshes.length;
     }
+    // 出画的是合批：一只有人的批次一个 multi-draw，与这一帧摊到几档姿势无关。
+    for (const batch of this.batches) if (batch.used > 0) drawCalls += 1;
     return {
       poses, drawCalls, instances, buckets: this.kinds.size,
       runFrames: this.runFrames, runCycleS: this.runCycleS, bake: this.bakeStats,
@@ -623,6 +714,11 @@ export class ActorCrowd {
         mesh.geometry.dispose();
       }
     }
+    for (const batch of this.batches) {
+      batch.mesh.removeFromParent();
+      batch.mesh.dispose();
+    }
+    this.batches.length = 0;
     // 材质是**按 kind 共用**的（一份挂在八档桶上），只能在这里统一收；
     // 跟着 mesh 逐件 dispose 会把同一份材质 dispose 七八遍。
     for (const material of this.materials) material.dispose();

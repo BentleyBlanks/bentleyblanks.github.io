@@ -88,6 +88,27 @@ let MARK_STAMP = 0;
 export function InvalidatePrepassSkip() { MARK_STAMP += 1; }
 
 /**
+ * 预通道共用一只覆盖材质，three 的程序选择跟着物体种类走（蒙皮 / 实例 / 批次 / 形变 /
+ * 实例颜色）。同一种挨着画，一趟只翻几次程序；其余次序与 three 的 painterSortStable 相同。
+ */
+function PrepassKind(item) {
+  const object = item.object, morph = item.geometry.morphAttributes;
+  let kind = object.isBatchedMesh ? 48 : object.isInstancedMesh ? 32 : object.isSkinnedMesh ? 16 : 0;
+  if ((object.isInstancedMesh && object.instanceColor) || (object.isBatchedMesh && object.colorTexture)) kind += 8;
+  if (morph.position || morph.normal || morph.color) kind += 4;
+  return kind;
+}
+export function PrepassOpaqueSort(a, b) {
+  if (a.groupOrder !== b.groupOrder) return a.groupOrder - b.groupOrder;
+  if (a.renderOrder !== b.renderOrder) return a.renderOrder - b.renderOrder;
+  const kind = PrepassKind(a) - PrepassKind(b);
+  if (kind !== 0) return kind;
+  if (a.material.id !== b.material.id) return a.material.id - b.material.id;
+  if (a.z !== b.z) return a.z - b.z;
+  return a.id - b.id;
+}
+
+/**
  * 把一份材质排除在深度法线预通道之外。
  *
  * 事故根源：r165 起 `scene.overrideMaterial` 加了 `material.allowOverride` 闸门，
@@ -401,6 +422,9 @@ export class PrepassPass {
     this._skipWatched = new WeakSet();  // 已经挂上结构监听的节点
     this._skipTops = new Map();        // 顶层子树 → 它那一份分类 { always, ranged, skinned }
     this._skipDirtyTops = new Set();   // 结构变了、下一帧只重分类的顶层子树
+    // 场景结构的代数：任何已挂监听的节点增删子节点、或整场重分类时加一。
+    // 地形融合（TerrainBlendPass.Prepare）按它决定要不要重找源网格，不必每帧整场景 traverse。
+    this.structureGeneration = 0;
     this._OnSceneStructure = (event) => this._SkipStructureChanged(event);
     this._skipWorldPosition = new THREE.Vector3();
     this._skeletons = new Set();       // 本帧在场的骨骼（下面拷上一帧矩阵用）
@@ -529,6 +553,7 @@ export class PrepassPass {
    * 只可能由结构或标记变化引起，那两条都报得到。
    */
   _RebuildSkipClassification(scene) {
+    this.structureGeneration += 1;
     const mrt = this.velocityEnabled;
     this._skipTops.clear();
     this._skipDirtyTops.clear();
@@ -549,6 +574,7 @@ export class PrepassPass {
    * 不在场景里的子树不管，它挂回场景那一刻整棵重分类。
    */
   _SkipStructureChanged(event) {
+    this.structureGeneration += 1;
     const scene = this._skipScene;
     if (this._skipDirty || !scene) return;
     let node = event.target;
@@ -820,7 +846,15 @@ export class PrepassPass {
     renderer.setRenderTarget(this.target);
     renderer.setClearColor(0x000000, 0);
     renderer.clear(true, true, false);
-    renderer.render(scene, camera);
+    // 覆盖材质只有一份 materialProperties：three 按物体自己的材质 id 排序，普通 / 蒙皮 /
+    // 实例 / 批次交错着画，每换一种就整套重算一次程序参数（05 战车段每帧 13 次）。
+    // 先按种类归堆，同种里仍按材质 id、深度排；深度趟的结果与先后无关。
+    renderer.setOpaqueSort(PrepassOpaqueSort);
+    try {
+      renderer.render(scene, camera);
+    } finally {
+      renderer.setOpaqueSort(null);
+    }
     // Advance once after every material group has drawn, never between groups.
     this._SnapshotObjects();
     scene.overrideMaterial = prevOverride;

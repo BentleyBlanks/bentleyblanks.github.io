@@ -92,6 +92,9 @@ Push(kind, position, yaw, scale = 1, prone = 0, dead = false, pose = null)
 
 ### 4.1 提交量
 
+> **2026-09-28 起本节的「一桶一只网格」口径作废，现行口径见 §4.5**：出画改成「kind × 材质」一只
+> BatchedMesh，姿势档只占几何不占 draw。下面保留当时的账，解释为什么要合批。
+
 军人 GLB 一档姿势是 **7 个材质桶** = 7 只 InstancedMesh。两个阵营八档 = 112 只（旧口径 28 只）。
 
 **但空桶不进渲染列表**：`mesh.visible = count > 0`（站姿档例外，见下）。这一条不是可选优化 ——
@@ -145,6 +148,24 @@ three 的 `primcount === 0` 早退在 `renderInstances` 里，而 `renderBufferD
 
 想再压：`crowdRunFrames` 调小（4 → 2 省两档），或者给 0 直接退回站姿滑行。
 **不要**改成「用到时再烘」：那会把这笔账从加载画面挪进「第一次有人跑起来」的那一帧。
+
+### 4.5 按材质合批（2026-09-28，现行口径）
+
+起因：用户 05 战车段录制平均 16 fps，主线程 52.7 ms 里渲染提交 29.8 ms，按每个 draw 约 21 µs 涨；
+远景人群同屏 42 只姿势桶网格（14 种材质），预通道 + 主场景每帧约 70 个 draw。
+
+* 一个 kind 的各档姿势本来就共用一份材质克隆，所以 `_BuildBatches` 给「kind × 材质」各建一只
+  `BatchedMesh`，把这个材质在**全部姿势**里的几何都放进去（属性表不同的姿势分到不同批次，BatchedMesh 的要求）。
+  一只批次一趟一个 multi-draw：军人一个 kind 至多 7 个 draw，姿势档再加也不涨。
+* 姿势桶里的 `InstancedMesh` 留作**数据**（几何 + 本帧实例矩阵，`Push` 照旧往里写，测试与取证照读），
+  不进场景。`End()` 按姿势桶顺序把这一帧的人灌进各自材质的批次：实例号按顺序复用、从不删，
+  换姿势只 `setGeometryIdAt`，多余的 `setVisibleAt(false)`；批次容量从 64 起按两倍扩。
+* **坑**：r185 的 `setGeometryIdAt` 只改号不标脏，关着逐实例剔除时 `onBeforeRender` 直接早退，
+  multi-draw 表还是旧几何的起止 —— 画出来一直是上一个姿势。换号后手动 `_visibilityChanged = true`
+  （`Script_ActorCrowdTest` 的跪 / 卧剪影断言抓到的）。
+* 批次建好先亮着，进关预热真画一遍把 program 用起来；第一次 `End` 之后按有没有人显隐（空批次不进渲染列表）。
+* `PoseReport().drawCalls` 现在数的是有人的批次；`Script_ActorCrowdTest` 的预算断言改成
+  「同样多的人摊到全部姿势，批次数与整帧 draw call 都不变」。
 
 ## 5. 闸门
 

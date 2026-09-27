@@ -18,9 +18,9 @@ const root=new THREE.Group(),battlefield={StaticGroundHeight:SampleMissionTerrai
 const solids=new Set(),physics={AddSolid(c){c._physicsHandle=c;solids.add(c)},RemoveSolid(c){solids.delete(c)}};
 const materials=new Map(),library={Get(name){if(!materials.has(name))materials.set(name,new THREE.MeshStandardMaterial());return materials.get(name)}};
 const origins=new FirstLevelSmokeOrigins({root,battlefield,physics,library,actorFactory:{ModelInstance(_id,materials){return InstantiateModel(doc,{materials})}}});
-assert.equal(origins.entries.size,64);assert.equal(solids.size,64);
+assert.equal(origins.entries.size,63);assert.equal(solids.size,63);
 const counts={};for(const spec of FIRST_LEVEL_SMOKE_ORIGINS)counts[spec.kind]=(counts[spec.kind]||0)+1;
-assert.deepEqual(counts,{tank:8,truck:15,timber:23,barrels:18});
+assert.deepEqual(counts,{tank:7,truck:14,timber:24,barrels:18});
 const emitters=FIRST_LEVEL_DISTANT_SMOKE.map(column=>origins.Emitter(column));
 for(let i=0;i<emitters.length;i++) {
   const emitter=emitters[i],column=FIRST_LEVEL_DISTANT_SMOKE[i],fire=emitter.options.firePosition;
@@ -42,9 +42,9 @@ for(const c of solids)for(const [id,route] of Object.entries(MISSION_ROUTES))for
 const sources=emitters.map(e=>({position:e.position,backdrop:e.options.backdrop}));
 for(const entry of origins.entries.values()) if(entry.spec.kind==="tank"||entry.spec.kind==="truck")
   for(const tree of MakeTreePlacements())assert.ok(Math.hypot(entry.position.x-tree.x,entry.position.z-tree.z)>3.2,"vehicle body clears authored tree trunks");
-assert.equal(BuildBattleSmokeInstances(sources,"low").length,768);
-assert.equal(BuildBattleSmokeInstances(sources,"ultra").length,1280);
-assert.ok(origins.meshes.length<210,"wreck geometry is merged by 64m sector and material");
+assert.equal(BuildBattleSmokeInstances(sources,"low").length,756);
+assert.equal(BuildBattleSmokeInstances(sources,"ultra").length,1260);
+assert.ok(origins.meshes.length<=origins.materials.size,"wreck geometry is merged into one mesh per material: "+origins.meshes.length);
 const triangles=origins.meshes.reduce((n,m)=>n+m.geometry.index.count/3,0);
 assert.ok(triangles<100000,"origin triangle budget: "+triangles);
 // Image decoding is the browser gate; this fixture exercises actual pool allocation.

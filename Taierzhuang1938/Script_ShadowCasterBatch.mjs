@@ -300,17 +300,46 @@ export class ShadowCasterBatch {
     this.live.length = 0;
   }
 
+  /** 分组键：「深度材质 × side × shadowSide」。 */
+  _GroupKey(rec) {
+    return `${rec.depth ? rec.depth.uuid : "shared"}|${rec.side}|${rec.shadowSide}`;
+  }
+
+  /**
+   * 这一组眼下登记在册的全部投影体要多少实例 / 顶点 / 索引（同一份几何只算一次）。
+   * 建组时按它一次留够：游戏中途扩容（setGeometrySize / setInstanceCount）与整理
+   * （optimize）都是整批拷贝再整块重传，2026-09-28 战车段录到一帧 199 ms。
+   */
+  _Demand(key) {
+    let instances = 0, vertices = 0, indices = 0;
+    const seen = new Set();
+    for (const rec of this.records.values()) {
+      if (!rec.geometry || this._GroupKey(rec) !== key) continue;
+      instances += 1;
+      if (seen.has(rec.geometry)) continue;
+      seen.add(rec.geometry);
+      const count = rec.geometry.attributes.position?.count || 0;
+      vertices += count;
+      indices += rec.geometry.index ? rec.geometry.index.count : count;
+    }
+    return { instances, vertices, indices };
+  }
+
   /** 按「深度材质 × side × shadowSide」分组，每组一只 BatchedMesh。 */
   _Group(rec) {
-    const depthKey = rec.depth ? rec.depth.uuid : "shared";
-    const key = `${depthKey}|${rec.side}|${rec.shadowSide}`;
+    const key = this._GroupKey(rec);
     let group = this.groups.get(key);
     if (group) return group;
     const T = this.tuning;
     const material = new THREE.MeshBasicMaterial({ side: rec.side, colorWrite: false, depthWrite: false });
     material.shadowSide = rec.shadowSide;
     material.name = `ShadowCasterBatch_${key}`;
-    const mesh = new THREE.BatchedMesh(T.minInstanceCapacity, T.minVertexCapacity, T.minVertexCapacity * 2, material);
+    const demand = this._Demand(key), reserve = T.reserveScale ?? 1;
+    const mesh = new THREE.BatchedMesh(
+      Math.max(T.minInstanceCapacity, Math.ceil(demand.instances * reserve)),
+      Math.max(T.minVertexCapacity, Math.ceil(demand.vertices * reserve)),
+      Math.max(T.minVertexCapacity * 2, Math.ceil(demand.indices * reserve)),
+      material);
     mesh.name = `ShadowCasterBatch_${this.groups.size}`;
     mesh.userData.shadowCasterBatch = true;
     mesh.castShadow = true;
@@ -351,8 +380,15 @@ export class ShadowCasterBatch {
     }
     const indexCount = source.index ? source.index.count : count;
     const indices = count > 65535 ? new Uint32Array(indexCount) : new Uint16Array(indexCount);
-    if (source.index) for (let i = 0; i < indexCount; i += 1) indices[i] = source.index.getX(i);
-    else for (let i = 0; i < indexCount; i += 1) indices[i] = i;
+    const sourceIndex = source.index;
+    // 整块拷（值都 < count，Uint32 → Uint16 不会截断）；逐个 getX 在一块 8192 三角的地形上要毫秒级。
+    if (sourceIndex && !sourceIndex.isInterleavedBufferAttribute && sourceIndex.array.length >= indexCount) {
+      indices.set(sourceIndex.array.subarray(0, indexCount));
+    } else if (sourceIndex) {
+      for (let i = 0; i < indexCount; i += 1) indices[i] = sourceIndex.getX(i);
+    } else {
+      for (let i = 0; i < indexCount; i += 1) indices[i] = i;
+    }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geometry.setIndex(new THREE.BufferAttribute(indices, 1));

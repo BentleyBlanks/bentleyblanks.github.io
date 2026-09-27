@@ -107,7 +107,11 @@ export class FirstLevelSmokeOrigins {
       damage.Update(20,{present:true,damageState:"Disabled",trackCut:true,engineKilled:true,damageSide:spec.seed%2?1:-1,damageAt:0,engineAt:0});
       model.root.updateMatrixWorld(true); firePoint.fromArray(MISSION_TUNING.tankDamage.engineOutlet); model.root.localToWorld(firePoint);
     } else { firePoint.set(spec.x,group.position.y+firePoint.y,spec.z); }
-    sink.SetSector(`SmokeOrigin_${Math.floor(spec.x/64)}_${Math.floor(spec.z/64)}`);
+    // One bucket per material for the whole field. 64 m sectors made 168 meshes (63 wrecks in 27 sectors),
+    // about 76 draws a frame across prepass / main / shadow in the 05 tank fight, where the frame is
+    // CPU-submission bound (~21 µs a draw); the merged field is well under 100 k triangles, so losing
+    // per-sector culling costs the GPU nothing measurable (2026-09-28).
+    sink.SetSector("SmokeOrigin");
     const materialKey = new Map([...this.materials].map(([key,material])=>[material,key]));
     if(damage) { materialKey.set(damage.steel,"steel");materialKey.set(damage.scorch,"scorch"); }
     group.updateMatrixWorld(true);

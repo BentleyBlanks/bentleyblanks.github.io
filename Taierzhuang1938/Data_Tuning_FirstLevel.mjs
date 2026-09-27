@@ -416,6 +416,7 @@ export const MISSION_TUNING = Object.freeze({
 // aftermathTiers[0].exitM, 5 cm clusters to aftermathTiers[1].exitM, 14 cm clusters beyond. Live corpses keep ACTOR_DETAIL.
 // 2026-09-09: 试过在中间再插一档 2 cm，交替 A/B 量到 draw call +109 而帧时间不变 —— 一具尸体 7 个材质，
 // 每加一档就是 8 姿势 x 7 = 56 只网格。档数在这里是 draw call，不是三角形；账在 Script_FirstLevelMissionAftermath 抬头。
+// 2026-09-28 起尸体层按材质合批（near / far 两只 BatchedMesh），第 1 档以后再加档只加几何、不加 draw。
 // Tables are recompacted only after the focus moves aftermathRefreshM or the view turns (1-|q·q'| > aftermathRefreshDot).
 // Static casualty contact at scene construction: 8 cm lower envelope / 6 cm
 // occupied support cells, then a full-mesh clearance pass. No per-frame solver.

@@ -530,6 +530,10 @@ export class TerrainDeformationView {
     if (!CutTerrainRectangles(source, rects, options || (source.userData.trenchEarth ? { AllowTriangle: () => true } : undefined))) return false;
     if (!this.originalGeometry.has(source)) this.originalGeometry.set(source, before);
     else before.dispose();
+    // A cut chunk keeps changing while the fight goes on; left in the static shadow batch it is evicted and
+    // re-added on every nearby blast, the batch fragments and then compacts / regrows mid-fight (one 199 ms
+    // frame in the 05 tank recording, 2026-09-28). Once cut, it casts its own shadow for good.
+    source.userData.noShadowBatch = true;
     return true;
   }
   /** `keys[i]` is the tile whose rect is `rects[i]`; all are freshly allocated. */
@@ -553,6 +557,7 @@ export class TerrainDeformationView {
         geometry.setAttribute("terrainBlast", new THREE.BufferAttribute(new Float32Array(baseHeights.length * 2), 2).setUsage(THREE.DynamicDrawUsage));
         const mesh = new THREE.Mesh(geometry, this.OverlayMaterial(source)); mesh.name = `TerrainSurface_${keys[tile]}_${source.name}`;
         mesh.receiveShadow = source.receiveShadow; mesh.castShadow = source.castShadow;
+        mesh.userData.noShadowBatch = true;   // follows its tile's deformation (see CutSource)
         mesh.onBeforeRender = source.onBeforeRender; mesh.onAfterRender = source.onAfterRender;
         mesh.customDepthMaterial = source.customDepthMaterial;
         this.scene.add(mesh); meshesByTile[tile].push(mesh);
@@ -657,6 +662,7 @@ export class TerrainDeformationView {
         geometry.setIndex(new THREE.BufferAttribute(TileIndexArray(n), 1));
         const mesh = new THREE.Mesh(geometry, this.material); mesh.name = `TerrainCrater_${tx}_${tz}`;
         mesh.receiveShadow = true; mesh.castShadow = true; mesh.userData.terrainTile = key; mesh.userData.fresh = true;
+        mesh.userData.noShadowBatch = true;   // rewritten by every nearby blast (see CutSource)
         this.scene.add(mesh); this.tileMeshes.set(key, mesh);
       }
     }

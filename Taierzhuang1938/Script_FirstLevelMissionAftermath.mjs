@@ -19,8 +19,8 @@ import { CreateBodyContactShape, MissionBodySupport } from "./Script_FirstLevelM
 // 5 ms of a 17 ms GPU frame, plus a per-frame name-parsing walk over every sector mesh.
 // Tripling the count that way was impossible. Now:
 //   · geometry lives once per pose (detail / mid / far), instances carry only a matrix;
-//   · every frame does its own frustum + distance test and compacts the instance tables
-//     (InstancedMesh cannot cull per instance; the whole-scene table has no sectors);
+//   · after the camera moves or turns, one frustum + distance test per body picks its tier and
+//     visibility (2026-09-28: the instances live in per-material BatchedMeshes, see BuildBatches);
 //   · only the detail tier casts shadows, and only when the camera is near enough;
 //   · materials are cloned from the live actor materials so the static instances never
 //     share a material object with skinned meshes (see CloneShadedMaterial).
@@ -42,6 +42,10 @@ import { CreateBodyContactShape, MissionBodySupport } from "./Script_FirstLevelM
 // 平民一具 23—24 只 → 2 只（其中 17—18 个分件本来就共用一份材质，纯几何合并）。
 // 档表仍保持三档：加档的代价降了，但收益没验过，别顺手加。
 // 人群远景层（每档也是 7 个材质桶）是同一笔账，见 docs/Data_ActorCrowdLod.md §4.1。
+//
+// 【2026-09-28 按材质合批】上面两笔账都是「一只网格一个 draw」的前提。现在每种材质只有 near / far
+// 两只 BatchedMesh（见 BuildBatches），同一种材质不论多少姿势、第 1 档还是第 2 档都在一个 multi-draw
+// 里：加档不再加 draw，只加几何。第一关同屏 draw 由每趟约 103 降到 29 种材质以内。
 const TIERS = C.aftermathTiers.length;
 const _frustum = new THREE.Frustum();
 const _matrix = new THREE.Matrix4();
@@ -98,23 +102,7 @@ export class MissionAftermath {
           seed:((spec.x*7.31+spec.z*3.19)%1+1)%1});
     }
     this.settleMs=performance.now()-settleStart;
-    // One instance table per part and tier, sized to the pose's member count.
-    for(const prototype of this.prototypes.values()){
-      for(const part of prototype.parts){
-        part.meshes=part.tiers.map((geometry,tier)=>{
-          const mesh=new THREE.InstancedMesh(geometry,part.material,Math.max(1,prototype.members.length));
-          mesh.name=`MissionAftermath_${prototype.key}_${tier}`;
-          mesh.frustumCulled=false;mesh.count=0;
-          // 最远那一档合点之后有的分件一个三角都不剩（眼睛、帽徽），
-          // 但空几何照样走一整趟提交 —— 直接钉死不画。
-          mesh.userData.emptyGeometry=!(part.triangles[tier]>0);
-          // 只有最近那一档投阴影（`ACTOR_DETAIL.shadowM` 以外的尸体在阴影图里看不见）。
-          mesh.castShadow=tier===0;mesh.receiveShadow=true;
-          mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-          this.root.add(mesh);return mesh;
-        });
-      }
-    }
+    this.batches=this.BuildBatches();
     this.bloodMeshes=this.bloodLayer?[this.bloodLayer.mesh]:[];
     this.count=bodies.length;
     // Budget report: what the whole field would cost at every tier.
@@ -124,6 +112,61 @@ export class MissionAftermath {
     for(let tier=0;tier<TIERS;tier++){this.triangles[TierName(tier)]=0;this.visible[TierName(tier)]=0;}
     for(const prototype of this.prototypes.values())for(const part of prototype.parts)
       for(let tier=0;tier<TIERS;tier++) this.triangles[TierName(tier)]+=part.triangles[tier]*prototype.members.length;
+  }
+  /**
+   * 【2026-09-28 按材质合批】原来每个「姿势 × 分件 × 档」一只 InstancedMesh（第一关 145 只，同屏画
+   * 103 只却只有 29 种材质）：05 战车段每帧预通道 + 主场景 + 阴影合计约 240 个 draw，占渲染提交两成，
+   * 而那一帧卡在 CPU 提交（每个 draw 约 21 µs）。现在每种材质两只 BatchedMesh（一趟一个 multi-draw）：
+   * near 只放第 0 档 —— 唯一投影的一档，far 放其余各档。一具尸体的每个分件在它用到的每只批次里各占一个
+   * 实例，矩阵开机写一次；换档只换几何号、出入视锥只换显隐（见 Update）。
+   * 几何号表挂在分件上：`part.tierSlots[tier] = {batch, geometryId}`，合点后一个三角都不剩的档是 null。
+   * @returns {Array<{mesh: THREE.BatchedMesh, material: THREE.Material, near: boolean, shown: number}>}
+   */
+  BuildBatches(){
+    const batches=[],byKey=new Map();
+    // BatchedMesh 要求同一批几何的属性表（名字 / itemSize / normalized）与有无索引完全一致。
+    const Signature=geometry=>Object.keys(geometry.attributes).sort().map(name=>{
+      const a=geometry.attributes[name];return `${name}:${a.itemSize}${a.normalized?"n":""}`;
+    }).join(",")+(geometry.index?"|i":"");
+    for(const prototype of this.prototypes.values())for(const part of prototype.parts){
+      part.tierSlots=part.tiers.map((geometry,tier)=>{
+        // 最远那一档合点之后有的分件一个三角都不剩（眼睛、帽徽）：不进批次，那一档就不画它。
+        if(!(part.triangles[tier]>0))return null;
+        const near=tier===0,key=`${part.material.uuid}|${near}|${Signature(geometry)}`;
+        let batch=byKey.get(key);
+        if(!batch){batch={material:part.material,near,geometries:[],ids:new Map(),instances:0,mesh:null,shown:0};byKey.set(key,batch);batches.push(batch);}
+        if(!batch.ids.has(geometry)){batch.ids.set(geometry,-1);batch.geometries.push(geometry);}
+        return {batch,geometry,geometryId:-1};
+      });
+      part.batchList=[...new Set(part.tierSlots.filter(Boolean).map(slot=>slot.batch))];
+      for(const batch of part.batchList)batch.instances+=prototype.members.length;
+    }
+    batches.forEach((batch,i)=>{
+      let vertices=0,indices=0;
+      for(const geometry of batch.geometries){
+        const count=geometry.attributes.position.count;vertices+=count;indices+=geometry.index?geometry.index.count:count;
+      }
+      const mesh=new THREE.BatchedMesh(Math.max(1,batch.instances),Math.max(1,vertices),Math.max(1,indices),batch.material);
+      mesh.name=`MissionAftermath_${i}_${batch.near?"near":"far"}`;
+      // 逐具的视锥与距离档在 Update 里一次算好（只在相机挪动 / 转向后），三趟 render 不再各剔一遍。
+      mesh.frustumCulled=false;mesh.perObjectFrustumCulled=false;mesh.sortObjects=false;
+      // 只有最近那一档投阴影（`ACTOR_DETAIL.shadowM` 以外的尸体在阴影图里看不见）。
+      mesh.castShadow=batch.near;mesh.receiveShadow=true;mesh.visible=false;
+      for(const geometry of batch.geometries)batch.ids.set(geometry,mesh.addGeometry(geometry));
+      batch.mesh=mesh;this.root.add(mesh);
+    });
+    for(const prototype of this.prototypes.values())for(const part of prototype.parts)
+      for(const slot of part.tierSlots)if(slot)slot.geometryId=slot.batch.ids.get(slot.geometry);
+    // 每具尸体：分件 p 在批次 b 里的那个实例（开机写好矩阵，先藏着）。
+    for(const prototype of this.prototypes.values())for(const instance of prototype.members){
+      instance.slots=prototype.parts.map(part=>part.batchList.map(batch=>{
+        const first=part.tierSlots.find(slot=>slot?.batch===batch);
+        const id=batch.mesh.addInstance(first.geometryId);
+        batch.mesh.setMatrixAt(id,instance.matrix);batch.mesh.setVisibleAt(id,false);
+        return {batch,id,geometryId:first.geometryId,on:false};
+      }));
+    }
+    return batches;
   }
   /**
    * Compact the instance tables for this camera. Runs every frame but only rewrites the
@@ -152,8 +195,9 @@ export class MissionAftermath {
       .map(t=>({enter:t.enterM**2,exit:t.exitM**2})));
     const shadow=ACTOR_DETAIL.shadowM**2;
     const visible=this.visible;for(const key in visible)visible[key]=0;
+    for(const batch of this.batches)batch.shown=0;
     for(const prototype of this.prototypes.values()){
-      for(const part of prototype.parts)for(const mesh of part.meshes)mesh.count=0;
+      const parts=prototype.parts;
       for(const instance of prototype.members){
         const dx=instance.x-focus.x,dz=instance.z-focus.z,d2=dx*dx+dz*dz;
         // Hysteresis per body so a corpse on the boundary does not flicker between tiers.
@@ -161,21 +205,37 @@ export class MissionAftermath {
         while(tier>0&&d2<=bounds[tier-1].enter)tier--;
         while(tier<TIERS-1&&d2>bounds[tier].exit)tier++;
         instance.tier=tier;
+        let shown=true;
         if(camera){
           _sphere.center.copy(instance.center);_sphere.radius=instance.radius;
           // Bodies just outside the view still throw shadows into it; keep the near ones.
-          if(!_frustum.intersectsSphere(_sphere)&&!(tier===0&&d2<=shadow))continue;
+          shown=_frustum.intersectsSphere(_sphere)||(tier===0&&d2<=shadow);
         }
-        for(const part of prototype.parts){const mesh=part.meshes[tier];mesh.setMatrixAt(mesh.count++,instance.matrix);}
-        visible[TierName(tier)]++;
+        // 只在状态真的变了时才碰批次（换几何号 / 显隐都会让 three 下一趟重排 multi-draw 表）。
+        for(let p=0;p<parts.length;p++){
+          const want=shown?parts[p].tierSlots[tier]:null,slots=instance.slots[p];
+          for(let s=0;s<slots.length;s++){
+            const slot=slots[s],on=!!want&&want.batch===slot.batch;
+            if(on&&slot.geometryId!==want.geometryId){
+              // r185 的 setGeometryIdAt 只改号不标脏，multi-draw 表不重排就还画旧档：手动标一下。
+              slot.batch.mesh.setGeometryIdAt(slot.id,want.geometryId);slot.batch.mesh._visibilityChanged=true;
+              slot.geometryId=want.geometryId;
+            }
+            if(on!==slot.on){slot.batch.mesh.setVisibleAt(slot.id,on);slot.on=on;}
+            if(on)slot.batch.shown++;
+          }
+        }
+        if(shown)visible[TierName(tier)]++;
       }
-      for(const part of prototype.parts)for(const mesh of part.meshes){mesh.instanceMatrix.needsUpdate=true;mesh.visible=mesh.count>0&&!mesh.userData.emptyGeometry;}
     }
+    // 空批次整只退出渲染列表：不然一趟不画像素的 setProgram 照样要付。
+    for(const batch of this.batches)batch.mesh.visible=batch.shown>0;
   }
   Bake(factory,spec){return BakeMissionBody(factory,spec,this.materials);}
   Dispose(){
     this.root.removeFromParent();
-    for(const prototype of this.prototypes.values())for(const part of prototype.parts){for(const g of part.tiers)g.dispose();for(const m of part.meshes)m.dispose?.();}
+    for(const prototype of this.prototypes.values())for(const part of prototype.parts)for(const g of part.tiers)g.dispose();
+    for(const batch of this.batches)batch.mesh.dispose();
     this.bloodLayer?.Dispose();
     for(const material of this.clones)material.dispose();
     // 图集是这一层自己烘的，材质 dispose 不会带走它们。

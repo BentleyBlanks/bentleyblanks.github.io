@@ -895,6 +895,14 @@ export class LugouCharacterRig {
         // 拿不到网格就挂不回去。同一份源材质只换一次并被所有网格共用。
         mesh: object,
       });
+      // 「半透明 + 双面」在 three 里每次 draw 都拆成背面、正面两趟，每趟还把
+      // needsUpdate 置真 —— 等于每帧整套重算着色器参数两次。日军模型脸上那片
+      // 44 个三角的 `Material #47`（BLEND + doubleSided）就是这样，活人、尸体层、
+      // 远景人群全跟着翻（2026-09-28 战车段：每帧 getProgram 36 → 22、draw −10）。
+      // 这么小的面片单趟混合看不出前后序差别；尸体层 / 人群的克隆照抄这一位。
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (material?.transparent && material.side === THREE.DoubleSide) material.forceSinglePass = true;
+      }
       object.castShadow = true;
       object.receiveShadow = true;
       object.userData.actorOriginalCastShadow = true;

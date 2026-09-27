@@ -282,7 +282,7 @@ try {
   // ── ④ 预算 ──────────────────────────────────────────────────────────────
   // 最坏情况：同一批人全挤在两档（旧口径） vs 摊到全部姿势（含匍匐六帧）。
   // 人数一样，三角形必须一个都不多（一个人只画在一个桶里）；
-  // draw call 只许多出「新增桶数 × 材质桶数」。
+  // 2026-09-28 起出画走「kind × 材质」合批：摊到全部姿势 draw call 一个都不许多。
   const budget = await page.evaluate(() => {
     const T = window.Taierzhuang;
     const crowd = T.ai.crowd;
@@ -326,31 +326,39 @@ try {
     crowd.End();
     const spread = Draw();
     const spreadReport = crowd.PoseReport();
+    // 同一帧再画一遍：合批的程序不许再算参数（three r185 读 `colorTexture` 那条判定恒真，
+    // 每只 BatchedMesh 每画一次都 getProgram —— Script_Main 补了别名，这里盯着）。
+    let batchPrograms = 0;
+    const hooks = crowd.batches.map((batch) => {
+      const material = batch.mesh.material, own = Object.prototype.hasOwnProperty.call(material, "customProgramCacheKey");
+      const previous = material.customProgramCacheKey;
+      material.customProgramCacheKey = function () { batchPrograms += 1; return previous.call(this); };
+      return () => { if (own) material.customProgramCacheKey = previous; else delete material.customProgramCacheKey; };
+    });
+    Draw();
+    for (const restore of hooks.reverse()) restore();
     crowd.Begin(); crowd.End();
     return {
-      empty, legacy, spread,
+      empty, legacy, spread, batchPrograms,
       legacyCrowdCalls: legacyReport.drawCalls, spreadCrowdCalls: spreadReport.drawCalls,
       instances: spreadReport.instances, meshesPerBucket: legacyReport.poses[`${actor.kind}:standing`].meshes,
       bucketsPerKind: crowd.poses.length,
       activeBuckets:Object.values(spreadReport.poses).filter(p=>p.count>0).length,
     };
   });
-  const newPoses = budget.bucketsPerKind - 2;
   const crowdDelta = budget.spreadCrowdCalls - budget.legacyCrowdCalls;
-  // 一只网格在这一帧图里提交几遍：拿「两档桶 14 只网格」这一段现场标定。
+  // 一只批次在这一帧图里提交几遍：拿「两档桶」这一段现场标定（只作报数）。
   const passes = (budget.legacy.calls - budget.empty.calls) / Math.max(1, budget.legacyCrowdCalls);
   const callDelta = budget.spread.calls - budget.legacy.calls;
-  Check("同样多的人摊到全部姿势，远景层只多出「新增桶数 × 材质桶数」只网格",
-    budget.activeBuckets===budget.bucketsPerKind&&crowdDelta === newPoses * budget.meshesPerBucket,
-    `${budget.legacyCrowdCalls} → ${budget.spreadCrowdCalls} 只（+${crowdDelta}，`
-      + `= ${newPoses}×${budget.meshesPerBucket}）`);
-  // pass 数是现场标定的小数（实测 2.14 —— 帧图里不是每条 pass 都画所有东西），
-  // 上限取整到「每只网格 ⌈pass⌉ 遍」：既留出帧图排班变动的余量，又仍然是
-  // 「增量与新增网格数成正比」这一条真判据。结构上的严格断言在上一条。
-  const callCap = newPoses * budget.meshesPerBucket * Math.ceil(passes);
-  Check("整帧 draw call 的增量不超过「新增网格 × 每只网格的 pass 数」",
-    callDelta <= callCap && callDelta >= 0,
-    `+${callDelta}（每只网格实测 ${passes.toFixed(2)} 遍 pass；上限 ${callCap}）`);
+  Check("同样多的人摊到全部姿势，远景层不多出批次（一个 kind 至多「材质桶数」只）",
+    budget.activeBuckets===budget.bucketsPerKind && crowdDelta === 0
+      && budget.spreadCrowdCalls <= budget.meshesPerBucket,
+    `${budget.legacyCrowdCalls} → ${budget.spreadCrowdCalls} 只批次（材质桶 ${budget.meshesPerBucket}）`);
+  Check("合批画第二遍不再重算程序参数（getProgram）",
+    budget.batchPrograms === 0, `${budget.batchPrograms} 次`);
+  Check("整帧 draw call 不随姿势档数增加",
+    callDelta === 0,
+    `${callDelta >= 0 ? "+" : ""}${callDelta}（每只批次实测 ${passes.toFixed(2)} 遍 pass）`);
   Check("三角形一个都不多（一个人只画在一个桶里）",
     Math.abs(budget.spread.triangles - budget.legacy.triangles) <= budget.legacy.triangles * 0.02,
     `${budget.legacy.triangles} → ${budget.spread.triangles}（${budget.instances} 个实例）`);
@@ -391,22 +399,24 @@ try {
     const ActorCrowd = T.ai.crowd.constructor;
     const CountMeshes = () => {
       let n = 0;
-      T.scene.traverse((o) => { if (o.isInstancedMesh && /^Crowd_probe_/.test(o.name)) n += 1; });
+      T.scene.traverse((o) => { if ((o.isInstancedMesh || o.isBatchedMesh) && /^Crowd_probe_/.test(o.name)) n += 1; });
       return n;
     };
     const kind = T.ai.soldiers.find((s) => s.actor)?.actor.kind;
     const probe = new ActorCrowd(T.scene, T.ai.ctx.actorFactory);
     probe.Prepare([kind]);
+    // 进场景的是合批（姿势桶的 InstancedMesh 只当数据，不进场景）。
     let added = 0;
-    for (const entry of probe.kinds.values()) {
-      added += entry.meshes.length;
-      for (const mesh of entry.meshes) mesh.name = `Crowd_probe_${mesh.name}`;
+    for (const batch of probe.batches) {
+      added += 1;
+      batch.mesh.name = `Crowd_probe_${batch.mesh.name}`;
     }
     const before = CountMeshes();
     probe.Dispose();
     return { added, before, after: CountMeshes(), buckets: probe.kinds.size, materials: probe.materials.length };
   });
-  Check("Dispose 之后场景里没有残留桶", disposed.after === 0 && disposed.buckets === 0
+  Check("Dispose 之后场景里没有残留桶", disposed.added > 0 && disposed.before === disposed.added
+    && disposed.after === 0 && disposed.buckets === 0
     && disposed.materials === 0,
     `建了 ${disposed.added} 只网格，收前 ${disposed.before} / 收后 ${disposed.after}`);
 
