@@ -91,7 +91,7 @@ try{
    return Object.fromEntries([...box].map(([n,b])=>[n,+Math.hypot(...b.max.map((m,i)=>m-b.min[i])).toFixed(4)]));
   };
   const s=Make(91),rig=s.actor.characterRig;
-  const Sample=()=>({clip:rig.currentPlaybackId,rate:rig.currentAction.getEffectiveTimeScale(),time:rig.currentAction.time});
+  const Sample=()=>({clip:rig.currentPlaybackId,rate:rig.currentAction.getEffectiveTimeScale(),stride:rig.locomotion.stride,time:rig.currentAction.time});
   for(let i=0;i<60;i++)Frame(s,0);const empty=Sample();
   for(let i=0;i<60;i++)Frame(s,1.35);const slow=Sample();
   for(let i=0;i<60;i++)Frame(s,2.7);const fast=Sample();
@@ -128,7 +128,8 @@ try{
  console.log('Motion',JSON.stringify(result));
  assert.equal(result.empty.clip,'AttackCommand');assert.equal(result.empty.rate,0);
  assert.equal(result.slow.clip,'RifleRun');assert.equal(result.fast.clip,'RifleRun');
- assert.ok(Math.abs(result.fast.rate/result.slow.rate-2)<1e-6);
+ // Doubling the pace doubles playback rate x stride (Data_ActorLocomotion.md 速度分摊), not the rate alone.
+ assert.ok(Math.abs(result.fast.rate*result.fast.stride/(result.slow.rate*result.slow.stride)-2)<1e-6);
  assert.equal(result.stop.clip,'AttackCommand');assert.equal(result.stop.rate,0);
  assert.equal(result.fire.rate,1);assert.equal(result.forced.rate,1);
  assert.ok(result.bearers.every(b=>b.from===b.to&&b.rate===0&&b.resumed));

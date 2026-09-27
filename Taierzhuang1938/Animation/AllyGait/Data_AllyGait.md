@@ -52,6 +52,8 @@ V2 可编辑工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/
 任务可用 `missionCombatAlert` 声明看不见步兵的威胁：第一关 03–05 敌方战车还活着（未 `tankFireDisabled`）时，
 `FirstLevelFrontBattle.SetCombatAlert` 给全班挂上，班里人不提枪（2026-09-28 用户：战车八米外班长竖着枪干站）。
 数值在 `Data_Tuning_AllyGait`。跑步继续使用原跑步/背枪动作。
+日军步枪兵同一骨架，只借 `AllyCrouchReady` 做快速蹲姿移动（按速度带回差选片，提枪、枪轨和瞄准钩子仍只给 NRA）；
+任何人蹲着移动而步枪动作库不可用（机枪手、手势）时也播这条，见 [位移与步态同步](../../docs/Data_ActorLocomotion.md)「速度分摊」。
 
 导演动作、强制动作、卧姿、跪姿、投弹、白刃、伸手、望远镜、伤员、抬担架、空手和死亡仍拥有姿态优先级。
 位移、碰撞、AI 决策和任务条件保持原有归属。步频按实际位移和各自参考速度驱动，受阻不原地踏步。

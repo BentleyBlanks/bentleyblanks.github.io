@@ -1,14 +1,37 @@
 // Five Blender-authored clips on the shared NRA rig. One library for the first-level cast.
 import { AnimationClip, Object3D, Vector3, Quaternion } from 'three';
 import { ALLY_GAIT as C } from './Data_Tuning_AllyGait.mjs';
-import { AllyGaitThreat, SelectAllyGait } from './Script_AllyGaitPolicy.mjs';
+import { AllyGaitThreat, SelectAllyGait, CrouchWalkBySpeed } from './Script_AllyGaitPolicy.mjs';
 let promise;
 export function LoadAllyGait() {
   return promise ||= fetch(`./Animation/AllyGait/Animation_TengxianAllyGait.json?v=${C.version}`)
     .then(r => { if (!r.ok) throw new Error('AllyGait HTTP '+r.status); return r.json(); });
 }
+let crouchWalk=null;
+// IJA riflemen share TengxianHumanoidV1 (identical rest bones), so the ready crouch walk plays
+// on them unchanged. Only the gait choice is taken; carry, rifle and aim hooks stay NRA-only.
+async function InstallCrouchWalk(soldier) {
+  const rig=soldier.actor.characterRig;
+  if (rig.allyGaitInstalled) return;
+  const data=await LoadAllyGait();
+  if (rig.disposed || rig.allyGaitInstalled) return;
+  rig.allyGaitInstalled=true;
+  crouchWalk ||= AnimationClip.parse(data.clips.find(json=>json.name==='AllyCrouchReady'));
+  rig.clipById.set(crouchWalk.name,crouchWalk);
+  rig.locomotion.profiles={...rig.locomotion.profiles,[crouchWalk.name]:data.profiles[crouchWalk.name]};
+  const select=rig._ActionForState;
+  let walking=false;
+  rig._ActionForState=function SelectCrouchWalk(state={}) {
+    const id=select.call(this,state);
+    if (id!=='RifleCrouchAdvance' || this.forcedClip) { walking=false; return id; }
+    walking=CrouchWalkBySpeed(state.moveSpeedMps ?? (state.moveSpeed || 0) * 3.6, walking);
+    return walking?crouchWalk.name:id;
+  };
+}
+
 export async function InstallAllyGait(soldier) {
   const actor=soldier?.actor, rig=actor?.characterRig;
+  if (rig?.modelId?.startsWith('TengxianIja')) return InstallCrouchWalk(soldier);
   if (!rig?.modelId?.startsWith('TengxianNra') || rig.allyGaitInstalled) return;
   const data=await LoadAllyGait();
   if (rig.disposed || rig.allyGaitInstalled) return;

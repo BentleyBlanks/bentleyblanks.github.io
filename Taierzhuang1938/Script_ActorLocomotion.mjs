@@ -14,6 +14,10 @@ export class ActorLocomotion {
     this.phase=phase;this.previous=new THREE.Vector3();this.position=new THREE.Vector3();
     this.scale=new THREE.Vector3();this.sampled=false;this.elapsed=null;this.step=0;
     this.speedMps=0;this.discontinuity=false;this.lastAction=null;
+    // Speed split (Data_Tuning_ActorLocomotion playRate*/stride*): shown stride scale, its warp weight.
+    this.stride=1;this.strideWeight=0;this.ratioSmooth=null;
+    this.pelvis=rig.bones.pelvis||null;this.pelvisSaved=new THREE.Vector3();this.pelvisApplied=false;this.pelvisDropM=0;
+    this.forward=new THREE.Vector3();
     this.crowdPhase=phase;this.crowdPronePhase=phase;this.crowdSpeedMps=0;
     this.v=Array.from({length:10},()=>new THREE.Vector3());
     this.q=Array.from({length:3},()=>new THREE.Quaternion());
@@ -27,6 +31,7 @@ export class ActorLocomotion {
   }
 
   Restore() {
+    if(this.pelvisApplied){this.pelvis.position.copy(this.pelvisSaved);this.pelvisApplied=false;}
     for(const f of this.feet)if(f.applied){
       f.thigh.quaternion.copy(f.saved[0]);f.calf.quaternion.copy(f.saved[1]);f.foot.quaternion.copy(f.saved[2]);f.applied=false;
     }
@@ -93,20 +98,89 @@ export class ActorLocomotion {
     if(this.heldIdle && !held)this.heldIdle.setEffectiveTimeScale(1);
     this.heldIdle=held?action:null;
     if(held){action.time=action.getClip().duration*STAND_IDLE.advanceFireHold;action.setEffectiveTimeScale(0);}
-    if(rig.forcedClip){action?.setEffectiveTimeScale(1);this.ResetContacts();return;}
-    if(!profile||!action)return;
+    if(rig.forcedClip){action?.setEffectiveTimeScale(1);this.ResetContacts();this.UpdateStride(dt,1,false);return;}
+    if(!profile||!action){this.UpdateStride(dt,1,false,!this.WarpFree(state));return;}
     rig.root.getWorldScale(this.scale);
     // Convert source metres through the real hierarchy scale, including actor height.
     // No positive minimum rate: a blocked capsule must not keep taking steps.
-    const rate=this.speedMps/Math.max(.001,profile.referenceMps*Math.abs(this.scale.y));
+    const ratio=this.speedMps/Math.max(.001,profile.referenceMps*Math.abs(this.scale.y));
+    // Rate x shown stride = ratio, exactly: the planted foot's authored travel, scaled by the
+    // stride warp, equals the root's travel whatever share each of the two takes.
+    const free=this.WarpFree(state);
+    const rate=ratio/this.UpdateStride(dt,ratio,free&&!!(profile.contacts?.L?.length&&profile.contacts.R?.length),!free);
     action.stopWarping().setEffectiveTimeScale(dt>0?rate*this.step/dt:rate);
     if(state.grounded===false||state.meleeCombat||state.dead)this.ResetContacts();
+  }
+
+  // Stride warping needs a grounded body moving in the world that no special pose owns. Only
+  // measured cyclic gaits (contact spans prove a clean stance) start it; it fades out across
+  // a crossfade to another clip, but stops at once when the body is taken over or lies down
+  // (a prone body's legs trail along the forward axis; scaling them there stretches them).
+  WarpFree(state) {
+    const rig=this.rig;
+    return !!this.pelvis&&(state.locomotionTracked||Number.isFinite(state.moveSpeedMps))
+      &&!rig.forcedClip&&state.grounded!==false&&!state.meleeCombat&&!state.dead&&!state.carryRole&&!(state.prone>.45)&&!rig.actor?.ragdollState;
+  }
+
+  // UE5 Lyra split: playback rate within [playRateMin, playRateMax], stride warping takes the rest;
+  // past the stride limits the rate takes it again (a foot must never slide to honour a clamp).
+  UpdateStride(dt,ratio,warpable,blocked=true) {
+    const h=this.step>0?this.step:Math.max(0,dt);
+    const follow=h>0?1-Math.exp(-h/C.strideSmoothS):0;
+    this.ratioSmooth=this.ratioSmooth===null||!warpable&&this.strideWeight<=0?ratio:this.ratioSmooth+(ratio-this.ratioSmooth)*follow;
+    const r=this.ratioSmooth,rate=Clamp(r,C.playRateMin,C.playRateMax);
+    const target=Clamp(r/rate,C.strideMin,C.strideMax);
+    this.strideWeight=blocked?0:Clamp(this.strideWeight+(warpable?1:-1)*h/C.strideBlendS,0,1);
+    this.stride=1+(target-1)*Smooth(this.strideWeight);
+    return this.stride;
+  }
+
+  SaveLeg(f) {
+    if(f.applied)return;
+    f.saved[0].copy(f.thigh.quaternion);f.saved[1].copy(f.calf.quaternion);f.saved[2].copy(f.foot.quaternion);f.applied=true;
+  }
+
+  // Stride warping: scale each foot's offset from the pelvis along the body's forward axis
+  // (the clip's stride axis), lower the pelvis when a long stride would overreach, and solve
+  // both legs. Heel/toe roll, lateral placement and foot height stay authored.
+  Warp(state) {
+    const rig=this.rig,s=this.stride;
+    if(Math.abs(s-1)<1e-3||!this.WarpFree(state))return;
+    const legs=this.feet.filter(f=>f.thigh&&f.calf&&f.foot);
+    if(legs.length<2)return;
+    const root=rig.actor?.root||rig.root;
+    root.getWorldQuaternion(this.q[0]);
+    this.forward.set(0,0,-1).applyQuaternion(this.q[0]).setY(0);
+    if(this.forward.lengthSq()<1e-6)return;
+    this.forward.normalize();
+    const centre=this.pelvis.getWorldPosition(this.v[9]);
+    let drop=0;
+    for(const f of legs) {
+      f.foot.getWorldPosition(f.target);f.foot.getWorldQuaternion(f.rotation);
+      const along=(f.target.x-centre.x)*this.forward.x+(f.target.z-centre.z)*this.forward.z;
+      f.target.addScaledVector(this.forward,along*(s-1));
+      const hip=f.thigh.getWorldPosition(this.v[0]),knee=f.calf.getWorldPosition(this.v[1]),ankle=f.foot.getWorldPosition(this.v[2]);
+      const reach=(hip.distanceTo(knee)+knee.distanceTo(ankle))*C.legReachShare;
+      const flat=(f.target.x-hip.x)**2+(f.target.z-hip.z)**2,height=hip.y-f.target.y;
+      drop=Math.max(drop,flat<reach*reach?height-Math.sqrt(reach*reach-flat):C.pelvisDropMaxM);
+    }
+    this.pelvisDropM=Clamp(drop,0,C.pelvisDropMaxM);
+    if(this.pelvisDropM>1e-4) {
+      this.pelvisSaved.copy(this.pelvis.position);this.pelvisApplied=true;
+      const point=this.pelvis.getWorldPosition(this.v[0]);point.y-=this.pelvisDropM;
+      this.pelvis.position.copy(this.pelvis.parent.worldToLocal(point));
+    }
+    for(const f of legs) {
+      f.calf.getWorldPosition(f.pole);this.SaveLeg(f);this.Solve(f);
+      f.foot.quaternion.copy(f.foot.parent.getWorldQuaternion(this.q[0]).invert().multiply(f.rotation));
+    }
   }
 
   Apply(dt,state) {
     const rig=this.rig,action=rig.currentAction,profile=this.profiles[rig.currentId];
     const holding=this.speedMps<=C.movingMps && ['AdvanceFire','AttackCommand'].includes(rig.currentId) && !state.firing;
     const worldMotion=state.locomotionTracked||Number.isFinite(state.moveSpeedMps);
+    if(worldMotion)this.Warp(state);
     if(!worldMotion||(!profile?.contacts&&!holding)||rig.forcedClip||state.grounded===false||state.meleeCombat||state.dead
       ||state.carryRole||rig.actor?.ragdollState||this.discontinuity) {this.ResetContacts();this.lastAction=action;return;}
     const phase=holding?this.phase:action.time/action.getClip().duration;
@@ -135,7 +209,7 @@ export class ActorLocomotion {
       f.thigh.getWorldPosition(this.v[2]);f.calf.getWorldPosition(f.pole);
       f.foot.getWorldPosition(f.target);f.foot.getWorldQuaternion(f.rotation);
       f.target.addScaledVector(correction,weight);
-      f.saved[0].copy(f.thigh.quaternion);f.saved[1].copy(f.calf.quaternion);f.saved[2].copy(f.foot.quaternion);f.applied=true;
+      this.SaveLeg(f);
       this.Solve(f);
       f.foot.quaternion.copy(f.foot.parent.getWorldQuaternion(this.q[0]).invert().multiply(f.rotation));
       f.toe.getWorldPosition(this.v[0]);f.errorM=Math.hypot(this.v[0].x-f.anchor.x,this.v[0].z-f.anchor.z);

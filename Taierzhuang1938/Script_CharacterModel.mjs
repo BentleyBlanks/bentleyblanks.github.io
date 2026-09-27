@@ -12,6 +12,7 @@ import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION
 import { MeleeAnimationPlayer } from "./Script_MeleeAnimation.mjs";
 import { LoadProneCrawl, ProneGroundContact, PRONE_CRAWL } from './Script_ProneCrawl.mjs';
 import { ActorLocomotion } from "./Script_ActorLocomotion.mjs";
+import { LayeredGaitId } from "./Script_LayeredGait.mjs";
 import { ACTOR_LOCOMOTION } from "./Data_Tuning_ActorLocomotion.mjs";
 import { CharacterFacialAnimation } from "./Script_CharacterFacialAnimation.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
@@ -236,6 +237,8 @@ const POSE_CLIPS = Object.freeze({
 });
 
 export const LUGOU_POSE_CLIPS = POSE_CLIPS;
+/** Crouch walk on TengxianHumanoidV1, installed per rig by Script_AllyGait (NRA and IJA). */
+const CROUCH_WALK_CLIP = "AllyCrouchReady";
 
 /**
  * 把资产的正面接到引擎的正面上 —— 这两条约定差整整 180°。
@@ -1201,8 +1204,9 @@ export class LugouCharacterRig {
     // 抬担架决定整具骨架（双手都钉在杆上），排在开火/姿态之前：担架员不开火、
     // 不卧倒 —— 中弹走的是 Actor 的死亡链，不经过这里。停着不放手，原地踏步
     // 比松手立正好看（担架还在两人手里）。
-    if (state.carryRole === "front") return POSE_CLIPS.carryFront;
-    if (state.carryRole === "rear") return POSE_CLIPS.carryRear;
+    // Travelling bearers walk on the measured cycle below the pelvis (Script_LayeredGait).
+    if (state.carryRole === "front") return LayeredGaitId(this, POSE_CLIPS.carryFront, moving);
+    if (state.carryRole === "rear") return LayeredGaitId(this, POSE_CLIPS.carryRear, moving);
     const prone = (state.prone || 0) > 0.45;
     const low = !prone && ((state.crouch || 0) > 0.35 || (state.kneel || 0) > 0.35);
     const infantryAllowed = this.CanPlayInfantry() && !state.meleeCombat
@@ -1225,12 +1229,15 @@ export class LugouCharacterRig {
       return POSE_CLIPS.standFire;
     }
     if (prone) return POSE_CLIPS.proneFire;
-    if (low) return POSE_CLIPS.crouchIdle;
+    // Crouched and travelling without the rifle infantry library (a Type 11 / ZB26 gunner, a hand
+    // gesture): the idle kneel would glide across the ground. Walk crouched on the shared-skeleton
+    // clip when it is installed (Script_AllyGait); its clock follows the actual travel like any gait.
+    if (low) return moving && this.clipById.has(CROUCH_WALK_CLIP) ? CROUCH_WALK_CLIP : POSE_CLIPS.crouchIdle;
     if (state.throwing > 0.08 || state.melee > 0.08 || state.binoculars > 0.08 || state.reach > 0.08) {
       return POSE_CLIPS.standReach;
     }
     // 轻伤员：走动时跛行；站定回普通站姿（跛行是步态素材，原地播像踏步）。
-    if ((state.woundedWalk || 0) > 0.5 && moving) return POSE_CLIPS.woundedWalk;
+    if ((state.woundedWalk || 0) > 0.5 && moving) return LayeredGaitId(this, POSE_CLIPS.woundedWalk, true);
     if (moving) return POSE_CLIPS.run;
     return POSE_CLIPS.standIdle;
   }

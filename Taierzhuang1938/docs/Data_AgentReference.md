@@ -359,7 +359,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - 第一关友军稳定俯身蹲走 / 单手提枪行进与待机：`Script_AllyGait`，BlenderMCP 重建和接线见 [AllyGait](../Animation/AllyGait/Data_AllyGait.md)；`Script_AllyGaitTest`、`Script_AllyGaitBrowserTest`。
 - 背枪跑步源包：`Animation/BackRifleRun/`（P012 的 `Script_FirstLevelP012BackRifle` 在领械后行军使用，其他关卡仍用原动作）；契约见该目录 `Data_BackRifleRun.md`，烘焙入口 `_import/Script_BackRifleRunBake.py`，验收 `Script_BackRifleRunTest`（animation 域）。
 - 五种视频步兵动作已接入两军 01–04 模型；运行时、重建与验收见 [步兵动作说明](Data_InfantryAnimations.md)。
-- NPC 步幅标定、按实际位移驱动的共享动画时钟与支撑脚 IK 见 [位移与步态同步](Data_ActorLocomotion.md)。`CharacterModel` 统一拥有跑步播放速率；任务/小队适配器不得重复以 AI 目标速度或固定 3.6 米/秒覆盖。
+- NPC 步幅标定、按实际位移驱动的共享动画时钟与支撑脚 IK 见 [位移与步态同步](Data_ActorLocomotion.md)。`CharacterModel` 统一拥有跑步播放速率；任务/小队适配器不得重复以 AI 目标速度或固定 3.6 米/秒覆盖。速度按「播放速率 × 步幅」分摊（UE5 Lyra 式速率钳制 + Stride Warping + 骨盆下沉），日军蹲姿移动按速度选蹲走片，抬担架/跛行移动时下半身换成标定走路片（`Script_LayeredGait`），见该文「速度分摊」。
 
 ### 人物 / AI / 合批
 - **带路跑通用设计**：普通随队士兵采用独立错峰的「跑几步 → 短停喘息与左右观察 → 再跑」，班长按引导职责行动。跨关卡复用、行为优先级、动画衔接与动态验收见 [NPC 带路跑通用设计](Data_NpcGuideCadence.md)。共享 `Script_SquadMarch` / `Script_SquadMarchAi` 已接第一关 Guide，`Script_EditorSquadMarch` 提供 1–24 人、路线、种子与参数预览/保存；分项验收状态见设计文档第 9 节。

@@ -8,6 +8,11 @@ export function AllyGaitThreat(soldier, state) {
     || (soldier.targetVisible && !soldier.targetFromMemory && !soldier.missionFireHold));
 }
 
+// Crouched gait by speed (3A gait selection with hysteresis): true = the crouch walk, false = the creep.
+export function CrouchWalkBySpeed(speedMps, walking = false) {
+  return speedMps > (walking ? C.crouchSlowBelowMps : C.crouchFastAboveMps);
+}
+
 export function SelectAllyGait(soldier, state, id, readySeconds = 0) {
   if (soldier.p012AwaitingWeapon || soldier.relaxedGait || soldier.openingActorPerformance
       || soldier.openingStoryboardPose || soldier.openingStoryboardTravel != null

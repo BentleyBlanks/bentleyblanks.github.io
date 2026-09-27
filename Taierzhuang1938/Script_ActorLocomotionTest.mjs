@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { ACTOR_LOCOMOTION_PROFILES } from './Data_ActorLocomotion.mjs';
+import { ACTOR_LOCOMOTION as C } from './Data_Tuning_ActorLocomotion.mjs';
 import { LaunchBrowser } from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import { ServeRoot } from './Script_DevServer.mjs';
 
@@ -41,7 +42,8 @@ try {
         if(i>5 && previousId===rig.currentId) {
           const duration=rig.currentAction.getClip().duration;
           totalPhase+=(rig.currentAction.time-before+duration)%duration;
-          expectedPhase+=speed*dt/(rig.locomotion.profiles.RifleRun.referenceMps*rig.root.getWorldScale(new THREE.Vector3()).y);
+          // Rate x shown stride covers the travelled distance: the phase runs 1/stride as fast.
+          expectedPhase+=speed*dt/(rig.locomotion.profiles.RifleRun.referenceMps*rig.root.getWorldScale(new THREE.Vector3()).y*rig.locomotion.stride);
         }
         for(const f of rig.locomotion.feet)if(f.weight>.999) {
           const point=f.toe.getWorldPosition(new THREE.Vector3());
@@ -63,7 +65,8 @@ try {
           f.thigh.quaternion.copy(rotations[0]);f.calf.quaternion.copy(rotations[1]);f.foot.quaternion.copy(rotations[2]);
         }
       }
-      const rate=rig.currentAction.getEffectiveTimeScale();
+      const rate=rig.currentAction.getEffectiveTimeScale(),stride=rig.locomotion.stride,pelvisDrop=rig.locomotion.pelvisDropM;
+      const ratio=speed/(rig.locomotion.profiles.RifleRun.referenceMps*rig.root.getWorldScale(new THREE.Vector3()).y);
       actor.root.position.z-=speed/60;time+=1/60;
       actor.Update(1/60,{moveSpeed:1,moveSpeedMps:speed,elapsed:time,locomotionTracked:true,firing:true,aim:1});
       const movingFire=rig.currentId;
@@ -79,8 +82,8 @@ try {
       // NRA05 borrows NRA02's crouch library; its clock must use that same mapping.
       actor.Update(.1,{crouch:1,moveSpeed:.2,moveSpeedMps:.4});
       const crouchRate=rig.currentAction.getEffectiveTimeScale();
-      const crouchSpeed=crouchRate*(kind==='nra'?.2554529916490837:.23864468053263868)*rig.root.getWorldScale(new THREE.Vector3()).y;
-      rows.push({kind,modelVariant,modelId:rig.modelId,speed,rate,maxContactError,maxRawError,contacts,phaseError:Math.abs(totalPhase-expectedPhase),movingFire,blocked,zeroRead,teleport,crouchSpeed});
+      const crouchSpeed=crouchRate*rig.locomotion.stride*(kind==='nra'?.2554529916490837:.23864468053263868)*rig.root.getWorldScale(new THREE.Vector3()).y;
+      rows.push({kind,modelVariant,modelId:rig.modelId,speed,rate,stride,ratio,pelvisDrop,maxContactError,maxRawError,contacts,phaseError:Math.abs(totalPhase-expectedPhase),movingFire,blocked,zeroRead,teleport,crouchSpeed});
       actor.Dispose();
     }
     const clocks=[];
@@ -88,16 +91,17 @@ try {
       const actor=factory.Create('nra',{seed:1543,modelVariant:0,weapon:'HanYang'}),rig=actor.characterRig;
       actor.root.scale.setScalar(scale);
       actor.Update(1/60,{elapsed:0,moveSpeedMps:0,locomotionTracked:true});
-      let expected=0,actual=0;
+      let expected=0,actual=0,travelled=0;
       for(let frame=1;frame<=240;frame++) {
         // Accelerate, brake and restart while updates alternate between LOD and firing cadence.
         const speed=frame<100?.09+frame*.03:frame<150?(150-frame)*.06:2.4;
         actor.root.position.z-=speed/60;
         const worldScale=rig.root.getWorldScale(new THREE.Vector3()).y;
-        expected+=speed/60/(rig.locomotion.profiles.RifleRun.referenceMps*worldScale);
+        travelled+=speed/60;
         if(frame%cadence && frame%17)continue;
         const previous=rig.currentAction?.time,previousId=rig.currentId;
         actor.Update(cadence/60,{elapsed:frame/60,moveSpeedMps:speed,locomotionTracked:true});
+        expected+=travelled/(rig.locomotion.profiles.RifleRun.referenceMps*worldScale*rig.locomotion.stride);travelled=0;
         if(previousId==='RifleRun')actual+=(rig.currentAction.time-previous+rig.currentAction.getClip().duration)%rig.currentAction.getClip().duration;
         else actual+=rig.currentAction.getEffectiveTimeScale()*cadence/60;
       }
@@ -123,9 +127,25 @@ try {
       for(const speed of [1.2,2.4]) {
         for(let i=0;i<90;i++){time+=1/60;actor.root.position.z-=speed/60;actor.Update(1/60,{elapsed:time,moveSpeed:speed/3.6,moveSpeedMps:speed});}
         const reference=rig.locomotion.profiles[rig.currentId].referenceMps*rig.root.getWorldScale(new THREE.Vector3()).y;
-        rates.push(rig.currentAction.getEffectiveTimeScale()*reference);
+        rates.push(rig.currentAction.getEffectiveTimeScale()*rig.locomotion.stride*reference);
       }
       adapters.push({mode,clip:rig.currentId,rates});actor.Dispose();
+    }
+    // Layered load/injury gaits: the mocap sources shuffle in place (the rear bearer walks backwards),
+    // so while travelling the legs come from the measured walk. Planted-toe world travel / body travel.
+    const {LayeredGaitReady}=await import('./Script_LayeredGait.mjs');await LayeredGaitReady();
+    const layered=[];
+    for(const [name,speed,extra] of [['front',1.34,{carryRole:'front'}],['rear',1.34,{carryRole:'rear'}],['limp',1.1,{woundedWalk:1,locomotionTracked:true}]]) {
+      const actor=factory.Create('nra',{seed:77,modelVariant:1,weapon:null}),rig=actor.characterRig;
+      let time=0,slide=0,travel=0,previous=null;
+      for(let i=0;i<180;i++) {
+        time+=1/60;actor.root.position.z-=speed/60;
+        actor.Update(1/60,{moveSpeed:speed/3.6,moveSpeedMps:speed,elapsed:time,...extra});
+        const toes=rig.locomotion.feet.map(f=>f.toe.getWorldPosition(new THREE.Vector3()));
+        if(previous&&i>60){const k=toes[0].y<toes[1].y?0:1;slide+=Math.hypot(toes[k].x-previous[k].x,toes[k].z-previous[k].z);travel+=speed/60;}
+        previous=toes;
+      }
+      layered.push({name,clip:rig.currentId,slide:slide/travel});actor.Dispose();
     }
     // Render a real model sequence against ground grid lines for visual contact review.
     const scene=new THREE.Scene();scene.background=new THREE.Color('#bac1be');
@@ -139,7 +159,7 @@ try {
     actors.forEach((actor,i)=>{actor.root.position.x=(i-.5)*1.5;scene.add(actor.root);});
     window.LocomotionReview={scene,camera,renderer,actors,time:0};
     renderer.render(scene,camera);
-    return {rows,adapters,clocks,previewLocked,farError,farStopError};
+    return {rows,adapters,clocks,previewLocked,farError,farStopError,layered};
   });
   await fs.writeFile(path.join(output,'Data_LocomotionValidation.json'),JSON.stringify(results,null,2));
   console.log(JSON.stringify({maxContactError:Math.max(...results.rows.map(row=>row.maxContactError)),
@@ -148,6 +168,12 @@ try {
     assert.ok(row.contacts>20,'contact windows exercised');
     assert.ok(row.maxContactError<.015,`planted foot: ${JSON.stringify(row)}`);
     assert.ok(row.phaseError<.0001,'distance integration');
+    // Lyra split after the smoothing has settled: rate stays in its band while the stride can take the rest.
+    assert.ok(Math.abs(row.rate*row.stride-row.ratio)<1e-6,`rate x stride = speed ratio: ${JSON.stringify(row)}`);
+    assert.ok(row.stride>=C.strideMin-1e-9&&row.stride<=C.strideMax+1e-9,`stride within limits: ${JSON.stringify(row)}`);
+    if(row.ratio>=C.playRateMin*C.strideMin&&row.ratio<=C.playRateMax*C.strideMax)
+      assert.ok(row.rate>=C.playRateMin-.02&&row.rate<=C.playRateMax+.02,`play rate within band: ${JSON.stringify(row)}`);
+    assert.ok(row.pelvisDrop<=C.pelvisDropMaxM+1e-9);
     assert.equal(row.modelId,`Tengxian${row.kind==='nra'?'Nra':'Ija'}${String(row.modelVariant+1).padStart(2,'0')}`,'test must exercise the requested approved appearance');
     assert.ok(Math.abs(row.crouchSpeed-.4)<.00001,'borrowed infantry library speed');
     assert.equal(row.movingFire,'RifleRun','moving fire must preserve the lower-body gait');
@@ -163,6 +189,10 @@ try {
   assert.equal(results.previewLocked,false,'in-place editor preview must not pin feet to a stationary world root');
   assert.ok(results.farError<1e-6,'culled skeleton still advances by actual stride distance');
   assert.equal(results.farStopError,0,'far LOD cannot keep stepping while stopped or consume a teleport');
+  for(const row of results.layered) {
+    assert.ok(row.clip.endsWith('Walk'),`travelling ${row.name} plays the layered walk: ${JSON.stringify(row)}`);
+    assert.ok(row.slide<.05,`layered ${row.name} keeps the supporting foot: ${JSON.stringify(row)}`);
+  }
   for(let i=0;i<8;i++) {
     await page.evaluate(()=>{
       const r=window.LocomotionReview;

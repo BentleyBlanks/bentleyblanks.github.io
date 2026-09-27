@@ -8,6 +8,7 @@ import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 import { MISSION_PEOPLE_TUNING as C, ZHOU_WOUNDS } from "./Data_Tuning_FirstLevel.mjs";
 import { PaintBakedWounds, CreateWoundUniforms } from "./Script_CharacterWounds.mjs";
 import { InstallCareClips, RemoveCareClips } from "./Script_CollectionCareAnimation.mjs";
+import { LayeredGaitId } from "./Script_LayeredGait.mjs";
 
 // Visible people share the production character rig; two-bone IK corrects hands onto the actual rails.
 export class MissionPeople {
@@ -59,8 +60,11 @@ export class MissionPeople {
     }
     if(carryTarget && rig){
       // A halted bearer keeps a loaded stance, with planted feet instead of jogging in place.
-      rig.Play(role==="front"?"CarryStretcherFront":"CarryStretcherRear");
-      rig.currentAction.setEffectiveTimeScale(gait?entry.speed/C.carrySourceMps:0);
+      // Travelling: the layered walk (Script_LayeredGait) on the shared distance clock. The source
+      // clip holds while halted, and plays at the old rate only until the walk library has loaded.
+      const carryClip=LayeredGaitId(rig,role==="front"?"CarryStretcherFront":"CarryStretcherRear",gait>0);
+      rig.Play(carryClip);
+      if(!rig.locomotion.profiles[carryClip])rig.currentAction.setEffectiveTimeScale(gait?entry.speed/C.carrySourceMps:0);
       rig.Update(poseDt,{carryRole:role||"rear",moveSpeed:gait,elapsed:this.time});
       const b=rig.bones;pose.basis=actor.root;actor.root.updateWorldMatrix(true,false);
       const pelvis=actor.root.worldToLocal(pose.World(b.pelvis));
