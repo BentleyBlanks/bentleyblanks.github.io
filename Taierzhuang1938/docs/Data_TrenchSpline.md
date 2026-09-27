@@ -309,6 +309,29 @@ id 是 `<段名>TrenchBay<n>`，段名在前。
 | `Data_FirstLevelMissionLayout` | 删掉手写护壁循环；`MISSION_TRENCH_PLACEMENTS` 出件，`layout.trenchPlacements` 带出去 |
 | `Script_FirstLevelMissionFortifications` | `MISSION_DEFENSE_OBJECTS` 之后再吃 `layout.trenchPlacements` |
 
+### 高度场在沟壁上细分（2026-09-28）
+
+`MISSION_TERRAIN.cellM` 是 0.75 m，而沟深 2 m、坡宽只有 1.1–1.6 m：一格里的线性插值能差出半米，
+格点落在坡上的哪个位置又随沟的走向周期性变化，于是斜着走的沟被渲染成一排齿（用户截图）。
+只换三角的对角线不够（沟壁误差中位 0.08 m、最大 0.57 m），根子是一格采不住坡面。
+
+`Data_FirstLevelP012Terrain.RefineCells` 只把一格插值误差大于 `refine.errorM`（4 cm）的格子
+细分成 3×3 小格（0.25 m，与弹坑形变格距相同），小格点仍取 `SampleMissionTerrain` 的解析高度：
+
+- 筛格：粗格点二阶差分或非平面度超过 `screenM` 才取样；取样点就落在细分要用的小格点上，缓存复用。
+- 不开裂：细分格与不细分邻格的共享边上，小格点取两端粗格点的直线（邻格三角边就是这条直线）；
+  这条边上解析高度也偏得多时，把邻格一并细分，重复到稳定。
+- 一份地表：渲染网格和 `SampleHeight`（贴地、角色、弹坑块重采样、土皮/石块/根毯贴坡）读同一份细分；
+  `terrain.heights` / `NodeHeight` 仍是粗格，`TerrainContactField` 的远距离遮蔽取样用粗格就够。
+- 代价：约 1.3 万格、+21 万地形三角；沟壁误差中位 0.09 → 0.03 m、p90 0.31 → 0.06 m。
+  同一轮把烘焙里用不上的旧 P012 公式、每次调用新建的常量数组和道路/踏步坑的远距离计算去掉了
+  （粗格高度逐位不变），整张烘焙反而从约 2.5 s 降到约 1.8 s。
+
+细分后沟壁不再被锯齿盖住，`Script_TrenchEarth` 的土皮原先「跟着土块的随机判定铺、随机缺片」
+留下的 20 cm 台阶露了出来：土皮现在只看沟壁几何连续成段，段的两头把抬高渐收到地面以下。
+`Script_TrenchSurface` 的根毯同理往坡里挪到坡宽 0.80–0.92 处，搭在沟沿上往下垂——沟沿变成真实形状后，
+原来 0.91–1.03 的位置已是沟沿外的平地，从沟里看只剩一条黑线。
+
 **`bottom` 的数变了，拿它当走廊半宽的旧断言要跟着改。** 旧表 FrontCommunication 的
 `bottom` 是 4.2 m，新表是 3.4 m：`bottom/2` 从 2.1 缩到 1.7。
 真正对应「挖开的地面」的是走廊半宽 `bottom/2 + bank`，旧断言在 4.2 那会儿
