@@ -59,9 +59,14 @@ try {
   for(const [name,ground] of Object.entries(surfaces))for(const kind of ['nra','ija'])for(const modelVariant of CHARACTER_MODEL_VARIANTS_BY_KIND[kind]) {
    const actor=f.Create(kind,{seed:1234,modelVariant,weapon:kind==='ija'?'Type38':'HanYang'}),rig=actor.characterRig;
    const meshes=[];rig.root.traverse(o=>{if(o.isSkinnedMesh)meshes.push(o);});
+   const wristSkin=meshes.find(m=>m.skeleton.bones.includes(rig.bones.handR)&&m.skeleton.bones.includes(rig.bones.forearmR));
+   const wristSkeleton=wristSkin.skeleton,restWrist=new T.Quaternion();
+   wristSkeleton.boneInverses[wristSkeleton.bones.indexOf(rig.bones.forearmR)].clone()
+    .multiply(wristSkeleton.boneInverses[wristSkeleton.bones.indexOf(rig.bones.handR)].clone().invert())
+    .decompose(new T.Vector3(),restWrist,new T.Vector3());
    f.groundProbe=(x,z)=>({y:ground(x,z),normal:new T.Vector3(-(ground(x+.001,z)-ground(x-.001,z))/.002,1,-(ground(x,z+.001)-ground(x,z-.001))/.002).normalize().toArray()});
    let minimum=Infinity,maximumLengthError=0,maxSupportSlip=0,worst=null;const costs=[];const baseLengths=new Map(),start=new T.Vector3(),p=new T.Vector3();
-   const frameBones=[],previousRotations=new Map();let maxJointStep=0,maxGripError=0,maxGripAlongError=0,maxWristBend=0,maxToeRise=-Infinity,minFootAlignment=1,maxGripSkinDepth=0,maxThumbGap=0,maxFingerGap=0,gripSkinSamples=0,probeGrip,gripWorst,invalidGripDepth=0;const jointSteps={};
+   const frameBones=[],previousRotations=new Map();let maxJointStep=0,maxGripError=0,maxGripAlongError=0,maxWristBend=0,maxWristRotation=0,maxToeRise=-Infinity,minFootAlignment=1,maxGripSkinDepth=0,maxThumbGap=0,maxFingerGap=0,gripSkinSamples=0,probeGrip,gripWorst,invalidGripDepth=0;const jointSteps={};
    for(let frame=0;frame<160;frame++){
     actor.root.position.z=-frame*.3/30;actor.root.position.y=ground(0,actor.root.position.z);
     const before=performance.now();
@@ -92,6 +97,8 @@ try {
     const forearm=wrist.clone().sub(rig.bones.forearmR.getWorldPosition(new T.Vector3())).normalize();
     const palm=rig.Grip('weaponR').getWorldPosition(new T.Vector3()).sub(wrist).normalize();
     maxWristBend=Math.max(maxWristBend,forearm.angleTo(palm));
+    const wristRelative=rig.bones.forearmR.getWorldQuaternion(new T.Quaternion()).invert().multiply(rig.bones.handR.getWorldQuaternion(new T.Quaternion()));
+    maxWristRotation=Math.max(maxWristRotation,restWrist.angleTo(wristRelative));
     for(const [key,bone] of Object.entries(rig.bones))if(bone.isBone&&bone.parent?.isBone&&key!=='pelvis'){
      const length=bone.getWorldPosition(p).distanceTo(bone.parent.getWorldPosition(start));
      if(!baseLengths.has(key))baseLengths.set(key,length);maximumLengthError=Math.max(maximumLengthError,Math.abs(length-baseLengths.get(key)));
@@ -108,7 +115,7 @@ try {
    const movingId=rig.currentId;
    actor.Update(1/30,{prone:1,moveSpeed:1,moveSpeedMps:1,elapsed:160/30,locomotionTracked:true});
    const stopped={id:rig.currentId,speed:rig.locomotion.speedMps};
-   rows.push({name,kind,modelVariant,movingId,minimum,worst,maximumLengthError,maxSupportSlip,maxJointStep,jointSteps,maxGripError,maxGripAlongError,maxWristBend,maxGripSkinDepth,maxThumbGap,maxFingerGap,gripSkinSamples,gripWorst,invalidGripDepth,maxToeRise,minFootAlignment,poseP95Ms:costs.sort((a,b)=>a-b)[Math.floor(costs.length*.95)],travel:Object.fromEntries(['handL','handR','calfL','calfR','footL','footR'].map(n=>[n,range(n)])),stopped});
+   rows.push({name,kind,modelVariant,movingId,minimum,worst,maximumLengthError,maxSupportSlip,maxJointStep,jointSteps,maxGripError,maxGripAlongError,maxWristBend,maxWristRotation,maxGripSkinDepth,maxThumbGap,maxFingerGap,gripSkinSamples,gripWorst,invalidGripDepth,maxToeRise,minFootAlignment,poseP95Ms:costs.sort((a,b)=>a-b)[Math.floor(costs.length*.95)],travel:Object.fromEntries(['handL','handR','calfL','calfR','footL','footR'].map(n=>[n,range(n)])),stopped});
    actor.Dispose();
   }
   const scene=new T.Scene();scene.background=new T.Color('#bac4ce');scene.add(new T.HemisphereLight(0xffffff,0x57514a,2.5));
@@ -188,7 +195,11 @@ try {
   assert.ok(row.maxJointStep<Math.PI/12,`${row.name}/${row.kind}/${row.modelVariant} joint snap ${row.maxJointStep*180/Math.PI} degrees/frame`);
   assert.ok(row.maxToeRise<-.035&&row.minFootAlignment>.9,`ankle must point down/back with calf: ${row.maxToeRise}/${row.minFootAlignment}`);
   assert.ok(row.maxGripAlongError<.005,`rifle centre carry ${row.maxGripAlongError}`);
-  assert.ok(row.maxWristBend<70*Math.PI/180,`carry wrist folded ${row.maxWristBend*180/Math.PI} degrees`);
+  // A 70-degree direction-only limit accepted the visibly broken V2 wrist.
+  // Check both centreline bending and the full rotation from the bind wrist,
+  // which also catches axial twist that a centreline cannot see.
+  assert.ok(row.maxWristBend<30*Math.PI/180,`carry wrist folded ${row.maxWristBend*180/Math.PI} degrees`);
+  assert.ok(row.maxWristRotation<30*Math.PI/180,`carry wrist twisted ${row.maxWristRotation*180/Math.PI} degrees`);
   assert.ok(row.gripSkinSamples>1000&&row.maxGripSkinDepth<.003,`${row.name}/${row.kind}/${row.modelVariant} hand skin inside rifle ${row.maxGripSkinDepth} m`);
   assert.ok(row.invalidGripDepth>.005,'mesh probe must reject a deliberately intersecting hand');
   assert.ok(row.maxThumbGap<.008&&row.maxFingerGap<.008,`${row.name}/${row.kind}/${row.modelVariant} loose grip ${row.maxThumbGap}/${row.maxFingerGap} m`);

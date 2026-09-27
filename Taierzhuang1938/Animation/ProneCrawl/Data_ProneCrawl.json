@@ -1,12 +1,12 @@
 {
-  "version": "20260927ProneCrawlV2",
+  "version": "20260928ProneCrawlV3",
   "skeleton": "TengxianHumanoidV1",
   "clip": "ProneCrawl",
   "fps": 30,
   "duration": 2.0,
   "referenceMps": 0.32000009639505284,
   "stance": 0.64,
-  "minimumSkinHeight": 0.005242,
+  "minimumSkinHeight": 0.006,
   "source": "BlenderMCP / Script_ProneCrawlBake.py",
   "referenceModel": "TengxianNra02"
 }

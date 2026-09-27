@@ -65,9 +65,7 @@ def Bake(ctx):
         q=Quaternion((0,0,1),yaw) @ Quaternion((1,0,0),math.radians(132)) @ ctx['footQuats'][side]
         ctx['Put'](foot,Matrix.LocRotScale(p,q,Vector((1,1,1))))
     def ArmPole(side):
-        # Carry outside the right shoulder, elbow down underneath it. This
-        # lets the palm and forearm point across the rifle without wrist twist.
-        return (Point(Bone('R UpperArm'))+Vector((.025,.03,-.35))) if side=='R' else Vector((.53,-.12,.06))
+        return (Point(Bone('R UpperArm'))+Vector((.02,-.20,-.15))) if side=='R' else Vector((.53,-.12,.06))
     def CarryFingers(normal):
         # Short fingers meet the side of the stock; they cannot reach under it
         # with the same curl as the middle finger without crossing the wood.
@@ -84,6 +82,21 @@ def Bake(ctx):
         p,_,scale=ctx['BWorld'](forearm).decompose()
         ctx['Put'](forearm,Matrix.LocRotScale(p,matrix.to_quaternion() @ relative.inverted(),scale))
         Aim(forearm,hand,matrix.translation);ctx['Put'](hand,matrix)
+    def CarryArm(phase):
+        # The carrying arm does not bear body weight. Solve the elbow and
+        # wrist together at the settled hand height: forcing the elbow down
+        # while holding the palm horizontal folded the wrist by 60 degrees.
+        upper,lower,hand=[Bone('R '+part) for part in ('UpperArm','Forearm','Hand')]
+        shoulder=Point(upper);height=Point(hand).z
+        upperLength=(Point(lower)-shoulder).length;lowerLength=(Point(hand)-Point(lower)).length
+        matrix=ctx['BWorld'](hand);dx=.02;dz=height-shoulder.z
+        ahead=math.sqrt(max(.003,upperLength**2-dx**2-dz**2))
+        elbow=shoulder+Vector((dx,-ahead,dz))
+        reach,_=Cycle(phase);yaw=.30*reach
+        wrist=elbow+Vector((-math.cos(yaw),math.sin(yaw),0))*lowerLength
+        Aim(upper,lower,elbow);Aim(lower,hand,wrist)
+        matrix.translation=Point(hand);ctx['Put'](hand,matrix)
+        AlignWrist()
     for frame in range(round(DURATION*FPS)+1):
         t=frame/FPS; phase=t/DURATION
         for pb in arm.pose.bones: pb.matrix_basis=base[pb.name]
@@ -141,7 +154,7 @@ def Bake(ctx):
                     else: Chain(Bone(side+' '+upperRole),Bone(side+' '+lowerRole),end,target,ArmPole(side))
                     p,q,scale=ctx['BWorld'](end).decompose();ctx['Put'](end,Matrix.LocRotScale(p,rotation,scale))
                     if kind=='foot': ProneFoot(side)
-        AlignWrist()
+        CarryArm(phase)
         # Ground the visible skin, not the skeleton pivots.
         low,_=ctx['LowestVertex']()
         if low<.003: Move(Bone('Pelvis'),Point(Bone('Pelvis'))+Vector((0,0,.003-low)))
@@ -158,7 +171,7 @@ def Bake(ctx):
             data['tracks'].append({'name':n.replace(' ','_')+'.'+prop,'type':'vector' if prop=='position' else 'quaternion','times':times,'values':values})
     output.mkdir(parents=True,exist_ok=True); private.mkdir(parents=True,exist_ok=True)
     (output/'Animation_TengxianHumanoidV1ProneCrawl.json').write_text(json.dumps(data,separators=(',',':')),encoding='utf-8')
-    manifest={'version':'20260927ProneCrawlV2','skeleton':'TengxianHumanoidV1','clip':'ProneCrawl','fps':FPS,'duration':DURATION,
+    manifest={'version':'20260928ProneCrawlV3','skeleton':'TengxianHumanoidV1','clip':'ProneCrawl','fps':FPS,'duration':DURATION,
               'referenceMps':SPEED/f,'stance':STANCE,'minimumSkinHeight':round(min(minima)/f,6),
               'source':'BlenderMCP / Script_ProneCrawlBake.py','referenceModel':'TengxianNra02'}
     (output/'Data_ProneCrawl.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
