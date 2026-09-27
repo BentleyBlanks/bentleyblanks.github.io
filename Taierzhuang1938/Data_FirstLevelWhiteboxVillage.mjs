@@ -503,7 +503,9 @@ export function BuildVillageWhitebox(groundAt) {
   for (const [s, x] of [["W", 49.95], ["E", 56.05]])
     Bank(`CourtyardGatePier${s}`, x, 34, .9, 3.1, 1.2, "plaster");
   Roof("CourtyardGateRoof", 53, 34, 8.8, 2.6, 3.3, true, 1.3, true);
-  Block("CourtyardGateStep", 53, 34.72, 4.8, .14, .64, "structure");
+  // Visual only: a solid 0.14 m step here stalled the real Rapier capsule under
+  // the gate lintel (TopologyBrowserTest courtyardBypass forward).
+  Detail("CourtyardGateStep", 53, 34.72, 4.8, .12, .64, "structure");
   // Yard furniture between the pocket columns (x 39/44.2/47.3/49/58.5/63.4/66.3/68.3).
   Block("CourtWell", 45.7, 24.6, 1.2, .75, 1.2, "structure");
   for (const s of [-1, 1]) Detail(`CourtWellPost${s}`, 45.7 + s * .5, 24.6, .1, 1.8, .1, "timber");
