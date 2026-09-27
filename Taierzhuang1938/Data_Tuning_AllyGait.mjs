@@ -4,5 +4,5 @@ export const ALLY_GAIT = Object.freeze({
   walkMaximumMps: 1.9,
   suppressionReady: .28,
   readyHoldS: .8,
-  version: '20260927AllyGaitV1',
+  version: '20260927AllyGaitV2Upright',
 });

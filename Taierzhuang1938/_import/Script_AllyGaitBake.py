@@ -14,7 +14,7 @@ os.environ['CAPTIVES_SKIP_BLEND'] = '1'
 source = json.loads((project.parent / 'tmp/AllyGait/Data_AllyGaitSource.json').read_text())
 helpers = runpy.run_path(str(project / '_import/Script_MachineGunCaptivesBake.py'), run_name='AllyGaitHelpers')
 convert = helpers['convert']
-private = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/AllyGait_20260927')
+private = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/AllyGait_20260927/Upright')
 output = project / 'Animation/AllyGait'
 private.mkdir(parents=True, exist_ok=True)
 output.mkdir(parents=True, exist_ok=True)
@@ -98,8 +98,12 @@ def Bake(ctx):
                         if n.startswith(prefix+'R Finger'):
                             arm.pose.bones[n].matrix_basis=ctx['rest'][n]
                     Update()
-                    ctx['TurnPalm']('R', (0,-.2,-.98),(1,0,0))
-                    ctx['CurlFingers']('R',Vector((1,0,0)),.95)
+                    # Thumb up, palm inward: hold an upright stock beside the body.
+                    # The straight index lies along the stock, outside the trigger guard.
+                    ctx['TurnPalm']('R', (0,-.9945,-.1045),(1,0,0))
+                    ctx['CurlFingers']('R',Vector((1,0,0)),.95,indexAmount=0)
+                    ctx['Aim'](Bone('R Finger1'),Bone('R Finger11'),
+                               Point(Bone('R Finger1'))+Vector((0,-.1045,.9945)))
             # Correct measured skin contact, preserving the authored foot transforms.
             floor,_=ctx['LowestVertex']()
             if abs(floor-.004*factor)>.00005:
@@ -112,8 +116,8 @@ def Bake(ctx):
             # A rifle's local -Z is its muzzle direction. Convert Blender world to
             # source glTF coordinates; runtime keeps the real weapon dimensions.
             grip=ctx['GripPoint']('R')
-            direction=Vector((0,-.94,-.342)).normalized()
-            up=Vector((0,-.342,.94)).normalized()
+            direction=Vector((0,-.1045,.9945)).normalized()
+            up=Vector((0,.9945,.1045)).normalized()
             right=direction.cross(up).normalized()
             prop=Matrix(((right.x,up.x,-direction.x,grip.x),
                          (right.y,up.y,-direction.y,grip.y),
@@ -139,7 +143,7 @@ def Bake(ctx):
                         'contacts':{} if idle else relaxed['walk']['contacts'],
                         'floorM':[min(floors),max(floors)],'leanDeg':[min(leans),max(leans)]}
         print(clipId,report[clipId],flush=True)
-    data={'schema':1,'revision':'20260927AllyGaitV1','skeleton':'TengxianHumanoidV1','clips':clips,'profiles':report}
+    data={'schema':1,'revision':'20260927AllyGaitV2Upright','skeleton':'TengxianHumanoidV1','clips':clips,'profiles':report}
     text=json.dumps(data,separators=(',',':'))
     (output/'Animation_TengxianAllyGait.json').write_text(text,encoding='utf-8')
     # Put the first action on the timeline for direct editing/review.

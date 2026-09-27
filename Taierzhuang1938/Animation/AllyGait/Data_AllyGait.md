@@ -1,6 +1,17 @@
-# 第一关友军俯身蹲走与低位提枪
+# 第一关友军俯身蹲走与枪口向上提枪
 
-2026-09-27 用户要求：蹲走上身不摇晃、身体前俯；护送和交谈时可以单手低位提枪。
+2026-09-27 用户要求：蹲走上身不摇晃、身体前俯；护送和交谈时可以提枪。
+当日复核：初版把提枪做成低位、枪口向前下方，用户指出同行与交谈时的枪口风险。
+V2 将四条提枪动作改为右侧贴体、枪口约向上 84°，手腕随之重做，食指伸直离开扳机。
+
+## 携枪参考与适用范围
+
+- [加拿大国防部 C19 操枪手册 §11–15](https://www.canada.ca/en/services/defence/caf/military-identity-system/drill-manual/chapter-5.html)：短距离行进的 short trail 要求枪身竖直、贴近身体；该手册说明动作沿用并调整自 Lee-Enfield 操枪法。
+- [美国海军陆战队 MCRP 3-01A 第三章](https://www.trngcmd.marines.mil/Portals/207/Docs/TBS/MCRP%203-1A%20Rifle%20Marksmanship.pdf)：安全原则要求控制枪口、不指向无意射击的人或物、食指离开扳机；无立即威胁的 tactical carry 枪口上扬，alert carry 则可向下。
+
+以上是现代操枪与枪口控制参考，不是对 1938 年国军制式动作的考证结论。
+游戏这次采用单手近竖直携行，适用于近距离护送和交谈；不照搬队列正步或枪托仅离地 2 cm 的规定。
+向上不等于任何环境都安全，本次验收覆盖移动、转身时的方向、枪托离地和手指姿势；不声称增加了场景动态枪口避让系统。
 
 ## 资产与重建
 
@@ -9,7 +20,7 @@
 | 动作 | 用途 |
 | --- | --- |
 | AllyCrouchReady | 俯身、稳住肩线的持枪蹲走 |
-| AllyCrouchCarry | 右手低位提枪蹲走，左臂自由 |
+| AllyCrouchCarry | 右手贴体、枪口向上提枪蹲走，左臂自由 |
 | AllyCarryWalk | 正常速度提枪走 |
 | AllyCarryStand | 站立提枪待机 / 交谈 |
 | AllyCrouchCarryStand | 停下后保持低姿提枪 |
@@ -30,7 +41,7 @@ node scripts/Script_BlenderMcp.mjs stop
 node scripts/Script_BlenderMcp.mjs status --scan
 ```
 
-可编辑工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/AllyGait_20260927/Scene_AllyGait.blend`。
+V2 可编辑工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/AllyGait_20260927/Upright/Scene_AllyGait.blend`；上一版保留在父目录。
 原始采样和验收截图在忽略目录 `tmp/AllyGait/`，不提交。
 
 ## 播放规则
@@ -56,7 +67,7 @@ node Taierzhuang1938/Script_TestRunner.mjs --profile=prepush --domain=allyGait -
 NRA02/NRA05 的真实模型及中正式、汉阳造、三八式检查提枪、开火接管、左右视图，截图在 `tmp/AllyGait/Review`。
 浏览器测试结果与截图必须实际查看，不以烘焙报告替代视觉验收。
 
-2026-09-27 本次实测：五条动作的循环、蒙皮接地与骨长通过；蹲行前倾约 16°，
+2026-09-27 V1 既有结果（不作为 V2 枪口姿势通过的依据）：五条动作的循环、蒙皮接地与骨长通过；蹲行前倾约 16°，
 完整支撑阶段脚部锚点误差小于 0.001 mm；已查看正面、侧面与三个步态相位截图。
 `AllyGaitBrowserTest`、`ActorLocomotionTest`、`FirstLevelP012ActorTest`、
 `FirstLevelMissionTest`、`MotionVectorContractTest`、`ModuleGraphTest`、测试注册检查通过。
@@ -67,3 +78,9 @@ NRA02/NRA05 的真实模型及中正式、汉阳造、三八式检查提枪、�
 完整 prepush 不能标为全绿：通用 `BootTest` 的 phase 1/2 报告「日军远景辨识材质未接全 count=0」，
 随后到达 240 秒限时；在未修改的主检出 `3a46204d` 单独运行其原 phase 1 断言，同样复现 count=0。
 这是本次确认的既有失败，未修改门禁或登记豁免。51 项静态预检查与上述专项通过。
+
+V2 增补门禁：交付曲线和真实武器在所有采样帧、24 个朝向下均须距竖直向上不足 10°；
+实际枪口高于握点至少 0.5 m，枪托离地大于 0.08 m。另拍手部近景，检查枪颈、手掌与伸直食指。
+V2 本次 `AllyGaitTest`、`AllyGaitBrowserTest`、`ModuleGraphTest` 均通过；真实武器上向分量最低 0.99452（距竖直约 6°），
+枪托离地最低 0.337 m，枪口高于握点至少 0.860 m。已查看正面、侧面、手部近景；开火接管及原接地门禁同时通过。
+移动、任务与动作选择逻辑未在 V2 中改动；06–07 连续关卡结果仍指上面的 V1 实测。

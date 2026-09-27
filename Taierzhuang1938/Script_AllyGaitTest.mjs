@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import {Object3D, Quaternion, Vector3} from 'three';
+import { ALLY_GAIT } from './Data_Tuning_AllyGait.mjs';
 import { SelectAllyGait, AllyGaitThreat } from './Script_AllyGaitPolicy.mjs';
 import { LoadGlb, PoseScene, BuildSkin, MinSkinnedY } from './_import/Script_LugouGlbPose.mjs';
 const file=path.join(import.meta.dirname,'Animation/AllyGait/Animation_TengxianAllyGait.json');
 const data=JSON.parse(fs.readFileSync(file));
+assert.equal(data.revision,ALLY_GAIT.version,'asset cache version matches the shipped action library');
 assert.equal(data.clips.length,5);
 assert.equal(new Set(data.clips.map(c=>c.uuid)).size,5,'mixer actions have distinct clip identities');
 const calm={targetVisible:false,suppression:0};
@@ -33,7 +36,13 @@ for(const clip of data.clips){
     const start=track.values.slice(0,width),end=track.values.slice(-width);
     const seam=width===4?1-Math.abs(start.reduce((s,v,i)=>s+v*end[i],0)):Math.max(...start.map((v,i)=>Math.abs(v-end[i])));
     maxSeam=Math.max(maxSeam,seam);assert.ok(seam<.0001,clip.name+' loop seam '+track.name);
-    if(name==='AllyRifle')continue;
+    if(name==='AllyRifle'){
+      if(property==='quaternion')for(let i=0;i<track.values.length;i+=4){
+        const muzzle=new Vector3(0,0,-1).applyQuaternion(new Quaternion().fromArray(track.values,i));
+        assert.ok(muzzle.y>Math.cos(10*Math.PI/180),clip.name+' carry muzzle stays within 10 degrees of up');
+      }
+      continue;
+    }
     assert.ok(index.has(name),'bone '+name);
     channels.push({node:index.get(name),path:property==='quaternion'?'rotation':'translation',width,input:track.times,output:track.values,interpolation:'LINEAR'});
   }
@@ -59,7 +68,6 @@ for(const clip of data.clips){
 console.log(JSON.stringify({pass:true,clips:data.clips.length,minFloor,maxFloor,maxSeam}));
 
 // A carry keeps speech's collision clearance even though it bypasses aiming.
-const {Object3D}=await import('three');
 const {InstallAllyGait}=await import('./Script_AllyGait.mjs');
 const savedFetch=globalThis.fetch;
 let aimCalls=0,gestureCalls=0;

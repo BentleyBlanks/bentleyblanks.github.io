@@ -40,6 +40,14 @@ try {
       const row={wanted:spec.name,clip:rig.currentId,model:rig.modelId,carryWeight:rig.allyCarryWeight,aimApplied:!!actor.rigAimApplied};
       const travel=new THREE.Vector3(0,0,-1).applyQuaternion(actor.root.quaternion);
       const leans=[],floors=[],grips=[];let contactError=0,contactFrames=0;
+      const muzzleUp=[],weaponFloors=[],muzzleRise=[];
+      const CheckCarry=()=>{
+        if(!spec.name.includes('Carry'))return;
+        const weapon=actor.weaponGroup;weapon.updateWorldMatrix(true,true);
+        muzzleUp.push(new THREE.Vector3(0,0,-1).applyQuaternion(weapon.getWorldQuaternion(new THREE.Quaternion())).y);
+        weaponFloors.push(new THREE.Box3().setFromObject(weapon).min.y);
+        muzzleRise.push(weapon.localToWorld(actor.weaponMuzzle.clone()).y-rig.Grip('weaponR').getWorldPosition(new THREE.Vector3()).y);
+      };
       rig.locomotion.ResetContacts();
       for(let f=0;f<65;f++){
         actor.root.position.addScaledVector(travel,(state.moveSpeedMps||0)/60);
@@ -54,6 +62,7 @@ try {
         floors.push(floor);
         const grip=rig.Grip('weaponR').getWorldPosition(new THREE.Vector3());
         grips.push(grip.distanceTo(actor.weaponGroup.getWorldPosition(new THREE.Vector3())));
+        CheckCarry();
         // Heel landing / toe release intentionally blend the anchor. Measure
         // sliding only while the sole carries full weight, as ActorLocomotionTest does.
         for(const foot of rig.locomotion.feet)if(foot.applied&&foot.weight>.999){
@@ -66,6 +75,13 @@ try {
       row.gripMax=Math.max(...grips);
       row.contactError=contactError;
       row.contactFrames=contactFrames;
+      // A carry must remain upright through a full turn, not only facing the camera.
+      for(let turn=0;turn<24;turn++){
+        actor.root.rotation.y=.65+turn*Math.PI/12;rig.locomotion.ResetContacts();
+        actor.Update(0,state);CheckCarry();
+      }
+      actor.root.rotation.y=.65;
+      if(muzzleUp.length){row.muzzleUpMin=Math.min(...muzzleUp);row.weaponFloor=Math.min(...weaponFloors);row.muzzleRiseMin=Math.min(...muzzleRise);}
       // Actual fire must recover a ready action and the aim layer.
       actor.Update(.1,{...state,firing:true,aim:1});
       row.fireClip=rig.currentId;row.fireAim=actor.rigAimApplied;
@@ -91,6 +107,8 @@ try {
   for(const phase of [.05,.45,.75]){await page.evaluate(p=>window.AllyGaitReview.Draw(p),phase);await page.screenshot({path:path.join(output,`Gaits_${phase}.png`)});}
   await page.evaluate(()=>{const r=window.AllyGaitReview;r.actors.forEach(e=>e.actor.root.rotation.y=Math.PI/2);r.Draw(.25);});
   await page.screenshot({path:path.join(output,'Gaits_Side.png')});
+  await page.evaluate(()=>{const r=window.AllyGaitReview;r.actors.forEach(e=>e.actor.root.rotation.y=.65);r.camera.position.set(.3,1.7,-2.15);r.camera.lookAt(0,1,0);r.Draw(.25);});
+  await page.screenshot({path:path.join(output,'Gaits_Hand.png')});
   console.log(JSON.stringify(report,null,2));
   if(!process.argv.includes('--review-only')){
     assert.deepEqual(errors,[]);
@@ -101,7 +119,12 @@ try {
       assert.ok(row.contactError<.015,row.clip+' planted-foot drift '+row.contactError);
       if(!row.clip.includes('Stand'))assert.ok(row.contactFrames>20,'full contact exercised');
       if(row.clip.includes('Crouch'))assert.ok(row.lean[0]>12&&row.lean[1]-row.lean[0]<3,row.clip+' stable forward lean');
-      if(row.clip.includes('Carry')){assert.ok(row.carryWeight>.99);assert.equal(row.aimApplied,false);assert.ok(!row.fireClip.includes('Carry'));assert.equal(row.fireAim,true);}
+      if(row.clip.includes('Carry')){
+        assert.ok(row.carryWeight>.99);assert.equal(row.aimApplied,false);assert.ok(!row.fireClip.includes('Carry'));assert.equal(row.fireAim,true);
+        assert.ok(row.muzzleUpMin>Math.cos(10*Math.PI/180),row.clip+' muzzle remains upward while walking and turning');
+        assert.ok(row.weaponFloor>.08,row.clip+' stock clears the ground');
+        assert.ok(row.muzzleRiseMin>.5,row.clip+' actual muzzle lies above the hand');
+      }
     }
   }
   console.log('AllyGaitBrowserTest: passed; '+output);
