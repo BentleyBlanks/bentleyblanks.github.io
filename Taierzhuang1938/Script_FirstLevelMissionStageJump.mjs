@@ -44,6 +44,8 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   // the one-man trench (probe: 0.7 m behind for 5-8 s whatever his run speed).
   const leadStart = n === 3 ? MissionRoutePoint(MISSION_ROUTES.support,
     MissionRouteProjection(MISSION_ROUTES.support, spawn).progress + FB.leaderLead.minM + 1) : null;
+  // 03 opens on Luo's order (FrontBattle replays SupportOrder 04-06): face him, not back at the collection.
+  if (leadStart) r.player.yaw = Math.atan2(spawn.x - leadStart.x, spawn.z - leadStart.z);
   for (const [i,actor] of (r.squad||[]).entries()) {
     actor.missionTrainReady = true;
     const point = n === 2 ? bunkerPosts[i] || bunkerPosts.at(-1)

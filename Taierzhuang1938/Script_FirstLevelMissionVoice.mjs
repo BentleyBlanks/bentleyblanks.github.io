@@ -174,8 +174,11 @@ export class FirstLevelMissionVoice {
   }
   /** 把台词表 + 导演表 + 清单拼成播放器要的场景。 */
   BuildScene(cue, only = null) {
+    // only：一句的 id，或同一场里要播的几句 id；第一句从头起播，后面的照原间隔接上。
+    const pick = only == null ? null : new Set([only].flat());
+    const first = pick && cue.lines.find((line) => pick.has(line.id))?.id;
     const lines = cue.lines.map((line, index) => {
-      if (only && line.id !== only) return null;
+      if (pick && !pick.has(line.id)) return null;
       const key = this.LineKey(line.id), bank = this.audio?.voiceBank?.get(key);
       const entry = this.manifest.lines?.[line.id];
       const direction = LineDirection(cue, index);
@@ -187,7 +190,7 @@ export class FirstLevelMissionVoice {
         speaker: Localize(FirstLevelCastTextId(line.who), MISSION_VOICE_CAST[line.who]?.[0] || line.who),
         text: Localize(FirstLevelVoiceTextId(cue.id, index), MissionVoiceSubtitle(cue, index)),
         subtitle: cue.subtitles === false ? false : true,
-        direction: only ? Object.freeze({ ...direction, after: "start", offsetS: 0 })
+        direction: line.id === first ? Object.freeze({ ...direction, after: "start", offsetS: 0 })
           : Object.freeze({ ...direction, offsetS: PlaybackOffset(direction, entry?.gapBeforeS) }),
       };
     }).filter(Boolean);
@@ -222,6 +225,20 @@ export class FirstLevelMissionVoice {
     return this.dialogue.Play(this.BuildScene(cue, lineId), {
       speakers: speaker ? { [line.who]: speaker } : {}, priority,
       Position: () => this.Position?.(cue, line), onEnd,
+    });
+  }
+  /**
+   * 重播同一场里的几句（lineIds 按台词表顺序），不记这场已播/播完 —— 检查点起步补交代用。
+   * speakers 同 PlayScene。
+   */
+  PlayLines(lineIds, { speakers = {}, onEnd = null, priority } = {}) {
+    const sceneId = String(lineIds[0]).split(".")[0];
+    const cue = MISSION_DIALOGUE.find((entry) => entry.id === sceneId);
+    const lines = lineIds.map((id) => cue?.lines.find((entry) => entry.id === id));
+    if (!cue?.perLine || lines.some((line) => !line)) { console.warn(`FirstLevelMissionVoice: unknown lines ${lineIds}`); return null; }
+    return this.dialogue.Play(this.BuildScene(cue, lineIds), {
+      speakers, priority,
+      Position: (line) => this.Position?.(cue, cue.lines[line.index]), onEnd,
     });
   }
   /** 导演事件（如 ThroatCut / Blast）：转给所有在播的逐句场景（after:event / stopOn 用）。 */

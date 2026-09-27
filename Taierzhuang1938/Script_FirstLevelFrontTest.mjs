@@ -48,6 +48,12 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
   assert.ok(JSON.stringify(support).includes("rifleWithdrawalResolved"));
   assert.ok(Read("Script_FirstLevelMissionRuntime.mjs").includes('actor.suppression >= R.threatSuppression'));
   assert.ok(Read("Script_FirstLevelFrontBattle.mjs").includes('r.Threatens(p,null,B.guardHeightM,B.blockadeRangeM)'));
+  // A cold start at 03 skips the collection: Luo and Shunzi still say why they head for the front (SupportOrder 04-06).
+  const battle=Read("Script_FirstLevelFrontBattle.mjs"),order=Cue("SupportOrder").lines;
+  assert.ok(battle.includes('CHECKPOINT_ORDER_LINES=Object.freeze(["SupportOrder.04","SupportOrder.05","SupportOrder.06"])'));
+  assert.ok(battle.includes('r.debugStart?.number===3')&&battle.includes('r.voice?.PlayLines?.(CHECKPOINT_ORDER_LINES'));
+  assert.deepEqual(order.slice(3).map(line=>line.who),["luo","shunzi","luo"],"03 replay: Luo orders, Shunzi asks, Luo answers");
+  assert.ok(order[3].text.includes("跟老子走")&&order[5].text.includes("接下来"));
 }
 
 // ---------------------------------------------------------------------------

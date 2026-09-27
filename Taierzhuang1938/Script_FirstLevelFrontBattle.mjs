@@ -16,6 +16,8 @@ import { ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const AliveBatch=batch=>batch.filter(g=>g.actor.alive);
+/** 03 cold start: 「何有田守后头！顺子，跟老子走！」「不是撤了？」「先把那几个接下来！」 (SupportOrder's own recordings). */
+const CHECKPOINT_ORDER_LINES=Object.freeze(["SupportOrder.04","SupportOrder.05","SupportOrder.06"]);
 /** Route split at the point nearest to `point`: [head ending there, tail starting there]. */
 export function SplitRoute(route,point){
   const {progress}=MissionRouteProjection(route,point),at=MissionRoutePoint(route,progress),head=[],tail=[{x:at.x,z:at.z}];
@@ -527,6 +529,12 @@ export class FirstLevelFrontBattle {
   }
   UpdateCapture(){
     const r=this.r;
+    // Cold start at 03 (death retry / chapter select): the collection's SupportOrder never played there, so Luo would
+    // just lead off to the front with nothing said. Replay its order and Shunzi's answer once, as they set off.
+    if(r.debugStart?.number===3&&!this.checkpointOrderSaid&&this.Leader?.alive&&r.time-r.frontBattleAt>=B.checkpointOrderDelayS){
+      this.checkpointOrderSaid=true;
+      r.voice?.PlayLines?.(CHECKPOINT_ORDER_LINES,{speakers:{luo:this.Leader}});
+    }
     // K3: Zhou and Luo shout across the observation step, where the player first sees the pinned guards, the gap
     // and the burning nest (it used to fire at 0 s of the step with Zhou 50 m away: Voice report).
     if(r.Near(Space.observationSpur[0],B.observationCallM)||r.Near(Space.fold,B.observationCallM))r.Say("FrontBlockade");

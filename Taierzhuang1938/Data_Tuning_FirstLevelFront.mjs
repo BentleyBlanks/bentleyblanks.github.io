@@ -264,6 +264,9 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   handoverReadyM:3,
   // FrontBlockade (Zhou/Luo shouting across) fires when the player is this close to the observation spur mouth or the fold (K3).
   observationCallM:6,
+  // A cold start at 03 (death retry / chapter select, missionStage=3) skips the collection's SupportOrder: this long
+  // after 03 begins Luo and Shunzi replay its last three lines (「顺子，跟老子走！」「不是撤了？」「先把那几个接下来！」).
+  checkpointOrderDelayS:.8,
   // FrontApproach ("贴这道墙！前头有人！") fires frontApproachCallRadiusM around this FRONT_SORTIE.approach point.
   // 09-25 storyboard round (contract §2.11, SB07): the line is the SB07 frame, player at about (5,-143) with Luo 4-5 m
   // ahead against the wall and the backslope LMG pair on the left of the frame. Point 9 (7,-143.5) at 2.5 m fires at
