@@ -1,10 +1,10 @@
 {
- "note": "01-06 rebuild guard: MISSION_LAYOUT.blocks, MISSION_TRENCH_PLACEMENTS, MISSION_AFTERMATH and SampleMissionTerrain south of z=-95 (07 onward). History: f581ac7dd (pre-rebuild) -> b3ba06096 (2026-09-24 06-18 whitebox) -> 12aa1e956 (2026-09-27 05-18 concept-frame whitebox rebuild, docs/Data_FirstLevelWhitebox0518Gap.md; user-authorised change of 07+ blocks, terrain and trench dressing) -> 8a83ab61 (kitchen door jambs flush with the infill; blocks only) -> 431a8795 (2026-09-27 stage 12 holds the road back into the village, docs/Data_FirstLevelTransferCover20260927.md; user-authorised ruins, plaza cover and east-lane wall; blocks only, ground unchanged). Regenerate only from the baseline: git archive <baseline> Taierzhuang1938, then Script_FirstLevelSpaceProbe.SouthFingerprint over its modules.",
- "baseline": "431a8795",
+ "note": "01-06 rebuild guard: MISSION_LAYOUT.blocks, MISSION_TRENCH_PLACEMENTS, MISSION_AFTERMATH and SampleMissionTerrain south of z=-95 (07 onward). History: f581ac7dd (pre-rebuild) -> b3ba06096 (2026-09-24 06-18 whitebox) -> 12aa1e956 (2026-09-27 05-18 concept-frame whitebox rebuild, docs/Data_FirstLevelWhitebox0518Gap.md; user-authorised change of 07+ blocks, terrain and trench dressing) -> 8a83ab61 (kitchen door jambs flush with the infill; blocks only) -> 431a8795 (2026-09-27 stage 12 holds the road back into the village, docs/Data_FirstLevelTransferCover20260927.md; user-authorised ruins, plaza cover and east-lane wall; blocks only, ground unchanged). Regenerate only from the baseline: git archive <baseline> Taierzhuang1938, then Script_FirstLevelSpaceProbe.SouthFingerprint over its modules. 2026-09-27 user-authorised replacement of every primitive tree by the supplied dead-tree model; baseline ba95e821. Preserves the integrated stage-12 update; terrain, aftermath bodies and trench props unchanged.",
+ "baseline": "ba95e821",
  "zMin": -95,
  "blocks": {
-  "count": 2586,
-  "sha": "bd026029dcf9ee6c"
+  "count": 2296,
+  "sha": "eb55f07597ef2d72"
  },
  "placements": {
   "count": 2,
@@ -23,10 +23,10 @@
   "count": 56048,
   "sha": "98f8a65f2b5e9dcc"
  },
- "previousBaseline": "8a83ab61",
+ "previousBaseline": "431a8795",
  "structuralBlocks": {
-  "count": 2586,
-  "sha": "bd026029dcf9ee6c"
+  "count": 2296,
+  "sha": "eb55f07597ef2d72"
  },
  "trenchArtRevision": "2026-09-26 concept 07 removes only generated non-solid Revetment<n>_<side>Post/Slat and Duckboard<n>; structuralBlocks excludes those ids."
 }

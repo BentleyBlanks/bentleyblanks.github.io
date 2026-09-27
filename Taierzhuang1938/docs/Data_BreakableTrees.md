@@ -14,8 +14,8 @@ been removed. River reeds are separate scenery and remain unchanged.
 
 The replacement removes 310 primitive crowns, branches, leaders and twigs. A layout
 comparison against `ed4d9e60` verifies every non-tree block and trench placement is
-unchanged. The south-layout fingerprint is regenerated from runtime commit
-`76da735a`; its terrain, aftermath bodies and trench-prop hashes remain unchanged.
+unchanged before integration. The latest stage-12 scenery update is retained. The south-layout fingerprint is regenerated from runtime commit
+`ba95e821`; its terrain, aftermath bodies and trench-prop hashes remain unchanged.
 `Script_BreakableTreesTest` checks the actual enlarged trunk footprints against all
 mission routes with 0.625 m litter clearance. The browser regression checks every
 authored replacement for duplicate legacy colliders and captures nine tree locations.
@@ -119,3 +119,14 @@ The identical CH1 check also fails on unchanged checkout `3a46204d`.
 The smoke-origin fixture also has a pre-existing 63-versus-64 count failure,
 reproduced from exported `ed4d9e60`; a separate vehicle/tree clearance comparison
 finds no overlaps within 3.2 m before or after the replacement.
+
+The normal-input `--campaign --stage-from=6` run completes 06–15 and places Zhou
+in 16, then fails waiting for `squadAssigned`: Luo remained in the kitchen.
+This is not reported as a completed 06–18 campaign. A controlled 600-step real
+character-capsule comparison from the failure pose `(55.1202, 0, -10.76426)` toward
+`(58, -9)` produces the identical blocked endpoint
+`(55.12044568157823, 0, -10.763593905419917)` on exported `ed4d9e60` (84 trees) and
+the replacement (130 trees). The unchanged `KitchenPartitionWestS` blocks that
+route; the nearest replacement tree is 9.02 m away. The diagnostic confirms the
+existing wall obstruction without changing mission facts or relaxing the campaign
+assertion. Stages 17–18 remain unverified in this run.
