@@ -144,6 +144,8 @@ export class PhysicsWorld {
     /** collider.handle -> 建关时那条碰撞盒记录（子弹要读 tag 判材质音效）。 */
     this.recordByHandle = new Map();
     this.terrainTiles = new Map();
+    /** SetDebrisGround 的临时地面（只接碎块，不进 terrainTiles）。 */
+    this.debrisGround = new Map();
     /** 搁在弹坑地形块外沿上算不算站住（见 TERRAIN_TILE_EDGE_SNAP_M）。任务侧开关，默认关。 */
     this.terrainTileEdgeRest = false;
 
@@ -383,6 +385,31 @@ export class PhysicsWorld {
     if (!collider) return;
     if (!this.disposed) { this.recordByHandle.delete(collider.handle); this.world.removeCollider(collider, true); }
     this.terrainTiles.delete(key);
+  }
+
+  /**
+   * Temporary ground under large falling debris (a toppled tree crown).
+   *
+   * Same heightfield layout as SetTerrainTile, but it touches **only DEBRIS**:
+   * characters keep walking on the analytic ground, rays ignore it, and it is
+   * not in `terrainTiles` (the character edge-snap rule reads that map).
+   * The caller removes it once its body settles.
+   */
+  SetDebrisGround(key, { x0, z0, sizeM, cells, heights }) {
+    this.RemoveDebrisGround(key);
+    if (this.disposed) return;
+    const desc = R.ColliderDesc.heightfield(cells, cells, heights, { x: sizeM, y: 1, z: sizeM },
+      R.HeightFieldFlags?.FIX_INTERNAL_EDGES || 0)
+      .setTranslation(x0 + sizeM * 0.5, 0, z0 + sizeM * 0.5)
+      .setCollisionGroups(InteractionGroups(GROUP.WORLD, GROUP.DEBRIS)).setFriction(0.9);
+    this.debrisGround.set(key, this.world.createCollider(desc, this.staticBody));
+  }
+
+  RemoveDebrisGround(key) {
+    const collider = this.debrisGround.get(key);
+    if (!collider) return;
+    if (!this.disposed) this.world.removeCollider(collider, true);
+    this.debrisGround.delete(key);
   }
 
   /**
@@ -638,6 +665,36 @@ export class PhysicsWorld {
     return body;
   }
 
+  /**
+   * Large debris whose shape one capsule cannot describe (a toppled tree crown
+   * with its branches): a dynamic body made of convex hulls in body-local space.
+   * Same DEBRIS groups and CCD as MakeLimbBody; it never pushes living people.
+   *
+   * @param {Float32Array[]} hulls  xyz point clouds, body-local metres
+   * @param {number[]} masses       per-hull mass (kg); sets the centre of mass
+   */
+  MakeHullBody({ position, quaternion = null, velocity = null, angularVelocity = null, hulls, masses,
+    friction = 0.9, restitution = 0.05, linearDamping = 0.2, angularDamping = 0.4 }) {
+    const desc = R.RigidBodyDesc.dynamic()
+      .setTranslation(position.x, position.y, position.z)
+      .setLinearDamping(linearDamping)
+      .setAngularDamping(angularDamping)
+      .setCcdEnabled(true);
+    if (quaternion) desc.setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w });
+    if (velocity) desc.setLinvel(velocity.x, velocity.y, velocity.z);
+    if (angularVelocity) desc.setAngvel(angularVelocity);
+    const body = this.world.createRigidBody(desc);
+    for (const [i, points] of hulls.entries()) {
+      const hull = R.ColliderDesc.convexHull(points);
+      if (!hull) continue;
+      this.world.createCollider(hull.setMass(Math.max(0.2, masses[i]))
+        .setRestitution(restitution).setFriction(friction)
+        .setCollisionGroups(InteractionGroups(GROUP.DEBRIS, GROUP.WORLD | GROUP.DEBRIS | GROUP.RAGDOLL)), body);
+    }
+    this.dynamics.add(body);
+    return body;
+  }
+
   RemoveBody(body) {
     if (!body || this.disposed) return;
     this.dynamics.delete(body);
@@ -736,6 +793,7 @@ export class PhysicsWorld {
     this.characters.clear();
     this.dynamics.clear();
     this.terrainTiles.clear();
+    this.debrisGround.clear();
     this.recordByHandle.clear();
     this.world.free();
     this.world = null;

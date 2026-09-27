@@ -3,6 +3,10 @@ export const BREAKABLE_TREES = Object.freeze({
   minSpacingM: 10, routeClearanceM: 8.5, blockClearanceM: 5,
   scaleMin: 0.78, scaleMax: 1.12, health: 38, sectorM: 48,
   massKg: 180, impulseSpeed: 2.2, spinSpeed: 1.1, settleAfterS: 12,
+  // Falling crown collision (2026-09-27): convex pieces of the real bark, and a debris-only
+  // heightfield of the ground under it (cell and margin in metres). One capsule on the axis
+  // plus analytic support points left 102 of 130 fallen trunks more than 0.3 m above the ground.
+  hullPieces: 14, groundCellM: 0.6, groundMarginM: 2,
   // Distance detail (2026-09-27). Every tree at full 12,251 triangles put 64 trees into both the
   // prepass and the main pass on the 03 right-nest captures: +1.57 M of a frame capped at 8.10 M
   // (SCENE_RENDER_LIMITS). Past `distanceM` a level uses vertex-clustered copies of the same bark

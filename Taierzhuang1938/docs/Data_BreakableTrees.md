@@ -26,14 +26,42 @@ occlusion after structural destruction. On fracture, the sector's static batches
 are rebuilt without the broken crown, shrinking their draw counts. Hidden crowns
 consume no vertex work and empty crown batches stop drawing. A broken tree retains its stump and loses
 its upper static collider; the crown becomes an ordinary mesh with a Rapier body.
-`Combat.Update` follows the physics step and synchronizes the crown. Analytic soil
-support samples the crown's directional extrema; settled visual debris stops
-consuming a dynamic body. Only the active falling set receives per-frame updates;
-settled crowns freeze their local/world matrices and leave that set. Explosions
-scan only the standing set. Stumps keep their small static collider; settled
-crowns have no collider, terrain sampling or physics integration. Falling wood
+`Combat.Update` follows the physics step and synchronizes the crown. Only the active
+falling set receives per-frame updates; settled crowns freeze their local/world matrices
+and leave that set. Explosions scan only the standing set. Stumps keep their small static
+collider; settled crowns have no collider, terrain sampling or physics integration. Falling wood
 does not push living characters. Field
 disposal releases instance buffers, geometry, textures, materials and bodies.
+
+## Falling crown collision (2026-09-27)
+
+The analytic ground is not part of the Rapier world, so the first version kept a single
+capsule on the crown axis plus 26 directional extreme vertices sampled against
+`GroundHeight`. The extremes are branch tips: a toppled crown came to rest propped on
+one tip, or floated over the capsule. Toppling all 130 trees measured 102 lower trunks
+more than 0.3 m above the ground (median 0.88 m; two whole crowns 0.66 m and 1.2 m up).
+
+Now the crown body (`Physics.MakeHullBody`) is `hullPieces` convex hulls: deterministic
+k-means over the full-detail bark, each hull made from its piece's 26 directional
+extremes and weighted by vertex share. The body origin is the tree origin, so the fallen
+mesh copies the body pose. While it falls, `Physics.SetDebrisGround` adds a heightfield of
+`GroundHeight` (trench cuts and craters included, `groundCellM` lattice) around it. That
+heightfield collides only with DEBRIS: characters, rays and the crater-tile edge rule
+never see it. It follows a crown that rolls away and is removed when the crown settles.
+Measured on the same 130-tree topple: median lower-trunk clearance 0.007 m and 7 trunks
+over 0.3 m, each resting on a wall, a wreck, its own stump or another fallen crown.
+
+## Charred broken wood
+
+A shell-broken tree is charred. `PaintCharred` writes model-space vertex colours on
+every bark and cap geometry (distance levels copy them): black at the fracture and down
+the stump, patchy scorch fading up the crown, fine branches keeping some bark colour.
+Only the broken-tree materials (`*_Charred`, roughness at least 0.95) enable vertex
+colours; standing trees ignore them. Broken stumps move from the standing stump batch
+to a charred batch of the same level, caps and fallen crowns use charred copies.
+`BreakableTrees.Warm()` (called by `Script_Main` next to the crater warm-up) parks one
+proxy per charred program below the level until a shadow pass has drawn it, so the
+first blast does not link shaders.
 
 ## Distance detail (rendering budget)
 
@@ -98,7 +126,8 @@ The FBX stays read-only. The repository contains only the GLB, recipe and audit.
 clearance, damage falloff and the actual GLB budget.
 `node Taierzhuang1938/Script_BreakableTreesBrowserTest.mjs` checks the real first-level
 high-quality renderer, Combat explosion path, standing/removed colliders, falling,
-ground contact, occlusion, repeat hits and resource disposal. It also topples all
+ground contact on real bark vertices, charred batches and materials, debris-ground
+cleanup, warm-proxy retirement, occlusion, repeat hits and resource disposal. It also topples all
 130 trees, verifies that their dynamic bodies return to zero and static tree
 colliders fall from 260 to 130 stumps, and checks that 10,000 subsequent tree updates
 perform zero terrain samples. Distance checks verify full detail near the camera,

@@ -3319,6 +3319,8 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   await yieldFrame();
   // 炮坑材质在这里就编译：第一颗手榴弹落地那一帧才建 program 会冻 400 ms。
   new TerrainDeformationView(battlefield, scene, library).Warm(renderer, camera);
+  // 炸断的树（焦黑树桩 / 倒下的树冠）同理，第一次炸树不现编。
+  battlefield.breakableTrees?.Warm();
   BuildPhysics();
   if (destruction) destruction.SetWorld(battlefield, physics, null);
 }

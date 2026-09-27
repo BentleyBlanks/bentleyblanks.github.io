@@ -15,6 +15,24 @@ try {
   const origin=process.env.TREE_PREVIEW_ORIGIN||`http://127.0.0.1:${server.address().port}`;
   await page.goto(`${origin}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&missionStage=3&quality=high&scale=small`,{timeout:180000});
   await page.waitForFunction(()=>window.Tengxian?.state.ready,null,{timeout:240000});
+  await page.evaluate(async()=>{
+    const {Vector3}=await import("three"),v=new Vector3(),field=window.Tengxian.battlefield;
+    // Lowest bark vertex over the ground, and the same for the lower trunk (model y < 3.5 m).
+    window.treeClearance=tree=>{
+      let minGap=Infinity,trunkGap=Infinity;
+      tree.fallen.updateMatrixWorld(true);
+      for(const {mesh} of tree.fallenBark){
+        const a=mesh.geometry.attributes.position;
+        for(let i=0;i<a.count;i++){
+          v.fromBufferAttribute(a,i);const trunk=v.y<3.5&&Math.hypot(v.x,v.z)<0.45;
+          v.applyMatrix4(mesh.matrixWorld);
+          const gap=v.y-field.GroundHeight(v.x,v.z);
+          minGap=Math.min(minGap,gap);if(trunk)trunkGap=Math.min(trunkGap,gap);
+        }
+      }
+      return {minGap,trunkGap};
+    };
+  });
   const replacements=await page.evaluate(()=>{
     const field=window.Tengxian.battlefield, trees=field.breakableTrees.trees;
     const authored=trees.filter(t=>t.authored);
@@ -60,7 +78,7 @@ try {
     for(const b of trees.root.children)if(b.isInstancedMesh){const k=b.name.replace(/^Trees_[^_]+_[^_]+_/,"");members.set(k,(members.get(k)||0)+(b.visible?b.count:0));}
     return {snapshot:trees.Snapshot(),collider:hit?.box?.id,expected:tree.trunk.id,probeLod:tree.lod,members:Object.fromEntries(members),
       treeColliders:g.battlefield.colliders.filter(c=>c.tag==="tree").length,
-      cameraHit:cameraHit?.box?.id,
+      cameraHit:cameraHit?.box?.id,warmProxies:trees.root.children.filter(m=>m.name.startsWith("TreeWarm_")).length,
       triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls};
   });
   assert.equal(initial.snapshot.count,TREE_COUNT);assert.equal(initial.snapshot.broken,0);
@@ -71,6 +89,7 @@ try {
   for(const part of ["Stump","Crown"])assert.equal(initial.snapshot.lod.reduce((n,_,l)=>n+(initial.members[`${part}_L${l}`]||0),0),TREE_COUNT,part+" is drawn exactly once per tree");
   assert.equal(initial.collider,initial.expected,"standing trunk has a real Rapier collider");
   assert.equal(initial.cameraHit,initial.expected,"capture camera has an unobstructed view of the tree");
+  assert.equal(initial.warmProxies,0,"charred-tree shader proxies retire after loading has drawn them");
   await page.screenshot({path:path.join(out,"Image_TreesIntact.png")});
   const broken=await page.evaluate(async()=>{
     const g=window.Tengxian,tree=window.treeProbe,{Vector3}=await import("three");
@@ -78,13 +97,17 @@ try {
     const hit=g.physics.Raycast(new Vector3(tree.x-3,tree.y+2,tree.z),new Vector3(1,0,0),6);
     const snapshot=g.battlefield.breakableTrees.Snapshot();
     const drawn=part=>tree.sector.batches.reduce((n,{batch})=>n+(batch.name.includes(`_${part}_`)&&batch.visible?batch.count:0),0);
-    const sectorDraws={cap:drawn("StumpCap"),crown:drawn("Crown"),stump:drawn("Stump"),trees:tree.sector.trees.length};
+    const sectorDraws={cap:drawn("StumpCap"),crown:drawn("Crown"),stump:drawn("Stump"),charred:drawn("StumpCharred"),trees:tree.sector.trees.length};
+    const charredMaterials=[...tree.fallen.children.map(m=>m.material),
+      ...tree.sector.batches.filter(({batch})=>/_Stump(Cap|Charred)_/.test(batch.name)).map(({batch})=>batch.material)].every(m=>m.vertexColors);
     g.StepFrames(45,1/60,false);g.StepFrames(1,0,true);
-    return {snapshot,sectorDraws,oldCollider:hit?.box?.id||null,stumpHandle:tree.stump._physicsHandle,
+    return {snapshot,sectorDraws,charredMaterials,debrisGround:g.physics.debrisGround.size,oldCollider:hit?.box?.id||null,stumpHandle:tree.stump._physicsHandle,
       moved:tree.fallen?.quaternion.toArray(),body:!!tree.body};
   });
   assert.equal(broken.snapshot.broken,1);
-  assert.deepEqual([broken.sectorDraws.cap,broken.sectorDraws.crown,broken.sectorDraws.stump],[1,broken.sectorDraws.trees-1,broken.sectorDraws.trees],"a broken tree keeps its stump, shows its cap and loses its standing crown");assert.equal(broken.snapshot.activeBodies,1);
+  assert.deepEqual([broken.sectorDraws.cap,broken.sectorDraws.crown,broken.sectorDraws.stump,broken.sectorDraws.charred],[1,broken.sectorDraws.trees-1,broken.sectorDraws.trees-1,1],"a broken tree keeps a charred stump, shows its cap and loses its standing crown");
+  assert.ok(broken.charredMaterials,"broken stump, cap and fallen crown draw charred (vertex-coloured) materials");
+  assert.equal(broken.debrisGround,1,"a falling crown lands on its own debris-only ground patch");assert.equal(broken.snapshot.activeBodies,1);
   assert.notEqual(broken.oldCollider,initial.expected);assert.ok(broken.body);
   await page.screenshot({path:path.join(out,"Image_TreeBreaking.png")});
   const fallen=await page.evaluate(()=>{
@@ -92,16 +115,13 @@ try {
     // Continue the same production frame loop, including Physics.Step and Combat.Update.
     g.StepFrames(900,1/60,false);g.StepFrames(8,0,true);
     const snapshot=trees.Snapshot();
-    let minGap=Infinity;
-    for(const point of trees.support){
-      const v=point.clone().applyMatrix4(tree.fallen.matrixWorld);
-      minGap=Math.min(minGap,v.y-g.battlefield.GroundHeight(v.x,v.z));
-    }
-    return {snapshot,minGap,staticMatrices:!tree.fallen.matrixAutoUpdate&&!tree.fallen.matrixWorldAutoUpdate,
+    const {minGap,trunkGap}=window.treeClearance(tree);
+    return {snapshot,minGap,trunkGap,debrisGround:g.physics.debrisGround.size,staticMatrices:!tree.fallen.matrixAutoUpdate&&!tree.fallen.matrixWorldAutoUpdate,
       quaternion:tree.fallen.quaternion.toArray(),
       linked:g.renderer.info.programs.every(p=>g.renderer.getContext().getProgramParameter(p.program,g.renderer.getContext().LINK_STATUS))};
   });
-  assert.equal(fallen.snapshot.activeBodies,0);assert.ok(fallen.minGap>=-0.08&&fallen.minGap<0.4,JSON.stringify(fallen));
+  assert.equal(fallen.snapshot.activeBodies,0);assert.equal(fallen.debrisGround,0);
+  assert.ok(fallen.minGap>=-0.1&&fallen.minGap<0.08,"the fallen crown touches the ground: "+JSON.stringify(fallen));
   assert.ok(Math.hypot(fallen.quaternion[0],fallen.quaternion[2])>0.45,"crown actually topples");
   assert.ok(fallen.linked);
   assert.ok(fallen.staticMatrices);assert.equal(fallen.snapshot.settled,1);
@@ -126,6 +146,10 @@ try {
     const treeBodies=[...system.activeTrees].map(t=>t.body);
     g.StepFrames(1800,1/60,false);g.StepFrames(1,0,true);
     const settled=system.Snapshot();
+    // Every fallen crown measured on its real bark vertices (the old capsule + support-point
+    // model left 102 of 130 lower trunks over 0.3 m up, propped on a branch tip).
+    const trunkGaps=system.trees.map(t=>window.treeClearance(t).trunkGap).sort((a,b)=>a-b);
+    const debrisGround=g.physics.debrisGround.size;
     const treeColliders=g.battlefield.colliders.filter(c=>c.tag==="tree").length;
     let terrainSamples=0;
     const ground=g.battlefield.GroundHeight;
@@ -136,7 +160,8 @@ try {
     g.battlefield.GroundHeight=ground;
     let allStatic=true;
     for(const t of system.trees)t.fallen.traverse(m=>{allStatic&&=!m.matrixAutoUpdate&&!m.matrixWorldAutoUpdate;});
-    const stress={peak:peak.activeBodies,settled:settled.settled,activeBodies:settled.activeBodies,
+    const stress={peak:peak.activeBodies,debrisGround,trunkGapMedian:trunkGaps[trunkGaps.length>>1],
+      trunkRaised:trunkGaps.filter(v=>v>0.3).length,settled:settled.settled,activeBodies:settled.activeBodies,
       standing:settled.standing,treeColliders,terrainSamples,idleUpdateMs,allStatic,
       crownInstances:system.root.children.filter(m=>m.isInstancedMesh&&m.name.includes("_Crown_L")).reduce((n,m)=>n+m.count,0),
       remainingTreeBodies:treeBodies.filter(body=>g.physics.dynamics.has(body)).length,
@@ -156,7 +181,9 @@ try {
   assert.equal(lifecycle.stress.peak,TREE_COUNT-1);assert.equal(lifecycle.stress.settled,TREE_COUNT);
   assert.equal(lifecycle.stress.activeBodies,0);assert.equal(lifecycle.stress.standing,0);
   assert.equal(lifecycle.stress.treeColliders,TREE_COUNT);assert.equal(lifecycle.stress.terrainSamples,0);
-  assert.equal(lifecycle.stress.crownInstances,0);
+  assert.equal(lifecycle.stress.crownInstances,0);assert.equal(lifecycle.stress.debrisGround,0);
+  // Remaining raised trunks rest on walls, wrecks, their own stump or another fallen crown.
+  assert.ok(lifecycle.stress.trunkGapMedian<0.05&&lifecycle.stress.trunkRaised<=20,"fallen trunks lie on the ground: "+JSON.stringify(lifecycle.stress));
   assert.equal(lifecycle.stress.remainingTreeBodies,0);assert.ok(lifecycle.stress.allStatic);
   assert.deepEqual(errors,[]);
   await fs.writeFile(path.join(out,"Data_Verification.json"),JSON.stringify({replacements,initial,broken,fallen,lifecycle,errors},null,2));
