@@ -264,6 +264,9 @@ export const testDefs = {
   AllyCloseRangeTest: { file: "Script_AllyCloseRangeTest.mjs", timeoutMs: 300000, desc: "友军近距离实弹：贴脸打得中日军/远距离口径不变/名额接替" },
   AiTacticsTest: { file: "Script_AiTacticsTest.mjs", desc: "班组战术：令牌/侧翼点/跃进配对/投弹/撤退" },
   AiInitiativeBrowserTest: {file:"Script_AiInitiativeBrowserTest.mjs",timeoutMs:300000,desc:"战术执行：受压移动/跃进/失败掩体/刺刀接触/失去目标"},
+  // §21（2026-09-27）：被玩家拿枪指着要理人、手榴弹落在脚边要跑。受控空地，各一两分钟。
+  AiAimedAtBrowserTest: { file: "Script_AiAimedAtBrowserTest.mjs", timeoutMs: 300000, desc: "被玩家拿枪指着：锁着国军的日军转向玩家并开火、被禁火的人自卫、没被指着时禁火不破" },
+  AiGrenadeEvadeBrowserTest: { file: "Script_AiGrenadeEvadeBrowserTest.mjs", timeoutMs: 300000, desc: "日军躲手榴弹：落地才反应、冲出杀伤圈/来不及扑倒、躲时不开枪、守点的人也躲并回位、伤亡开关对照" },
   AiBrainGraphTest: { file: "Script_AiBrainGraphTest.mjs", desc: "敌军 AI 行为图：节点=STATE、边两端存在、表键可解析、任务=TASK（纯 Node，毫秒级）" },
   TuningWriterTest: { file: "Script_TuningWriterTest.mjs", desc: "调参表改写器：按花括号层级只改那一个数字、注释格式不动（纯 Node，毫秒级）" },
   MissionNotesTest: { file: "Script_MissionNotesTest.mjs", desc: "关卡编排批注：schema/快照/漂移/交接文本 + /__notes 保存端点的四道闸（纯 Node，秒级）" },
@@ -470,7 +473,7 @@ export const browserTests = new Set([
   "TrainLibraryTest",
   'ProneCrawlTest', 'ActorLocomotionTest', 'BackRifleRunTest', 'MeleeAnimationTest', 'DadaoSwingTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
-  "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest",
+  "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
@@ -622,7 +625,7 @@ export const domains = {
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
     // 第一关敌军探针（30 min 真实驾驶）只登记在 firstLevel 域：改 Script_Ai 的包跑 ai 域时带纯 Node 的
     // FirstLevelFrontPressureTest 就够了（2026-09-24 审查）。
-    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest", "FirstLevelRearDoorWalkTest",
+    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest", "FirstLevelRearDoorWalkTest",
       "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },

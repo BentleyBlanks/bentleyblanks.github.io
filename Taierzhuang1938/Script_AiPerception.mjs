@@ -408,6 +408,9 @@ export class PerceptionModel {
     const cosHalf = Math.cos(halfAngle < Math.PI ? halfAngle : Math.PI);
     const flashHalf = halfAngle + PERCEPTION.fov.muzzleFlashBonusDeg * DEG;
     const cosFlash = Math.cos(flashHalf < Math.PI ? flashHalf : Math.PI);
+    // 【§21】拿枪指着他的人（`c.aimedAt`，Script_Ai 算）：视锥放宽、觉察更快。
+    const aimedHalf = halfAngle + PERCEPTION.threat.aimedAt.fovBonusDeg * DEG;
+    const cosAimed = Math.cos(aimedHalf < Math.PI ? aimedHalf : Math.PI);
     const engagedOmni = PERCEPTION.fov.engagedTargetOmni && mem.alertIndex >= 3;
 
     for (let i = 0; i < mem.list.length; i += 1) mem.list[i].sensedThisTick = false;
@@ -416,7 +419,7 @@ export class PerceptionModel {
     // rank：候选自带的选目标倍率（`c.rank`，Think 给禁火的人身上的玩家打
     // `LOCK.heldTargetRank`）。只进 nearest / switchDistanceRatio 的比较，
     // 觉察、通视、发现距离与报出去的 dist 都是真实距离。
-    let nearest = null, nearestDist = Infinity, nearestRank = Infinity, nearestId = null;
+    let nearest = null, nearestDist = Infinity, nearestRank = Infinity, nearestId = null, nearestUrgent = false;
     let lockCand = null, lockDist = Infinity, lockRank = Infinity, lockSeen = false;
     const count = candidates ? candidates.length : 0;
     for (let i = 0; i < count; i += 1) {
@@ -427,7 +430,8 @@ export class PerceptionModel {
       if (id === undefined || id === null) continue;
       const dx = c.position.x - sx, dz = c.position.z - sz;
       const dist = Math.sqrt(dx * dx + dz * dz);
-      const rank = c.rank > 1 ? dist * c.rank : dist;
+      // 【§21】倍率可以 < 1（威胁权重把玩家往前排），不只是禁火那条 > 1 的往后排。
+      const rank = c.rank > 0 && c.rank !== 1 ? dist * c.rank : dist;
       const stance = c.stance | 0;
       const isLock = mem.lockId !== null && id === mem.lockId;
 
@@ -435,7 +439,7 @@ export class PerceptionModel {
       let seen = c.visible === true;
       if (seen && dist > PERCEPTION.fov.omniRadiusM && !(engagedOmni && isLock)) {
         const cosA = (forwardX * dx + forwardZ * dz) / (dist > 1e-6 ? dist : 1);
-        seen = cosA >= (c.firingRecently ? cosFlash : cosHalf);
+        seen = cosA >= (c.firingRecently ? cosFlash : c.aimedAt ? cosAimed : cosHalf);
       }
       // 目标那个姿态现在的发现距离。**一拍只问宿主一次** —— 视锥闸与累积速率共用它，
       // 问两次不但白花钱，还给「照明弹倍率在半拍中间变了」留了一条不一致的缝。
@@ -461,7 +465,8 @@ export class PerceptionModel {
         if (c.firingRecently) {
           track.awareness = PERCEPTION.awareness.firingFillsTo;   // 枪口焰 = 瞬间拉满
         } else {
-          const rate = this._RiseRate(dist, sight, !!c.moving);
+          const rate = this._RiseRate(dist, sight, !!c.moving)
+            * (c.aimedAt ? PERCEPTION.threat.aimedAt.riseMul : 1);
           track.awareness = Clamp01(track.awareness + rate * dt);
         }
         track.lastSeenAt = now;
@@ -474,7 +479,7 @@ export class PerceptionModel {
         track.lkp.y = Number.isFinite(c.position.y) ? c.position.y : 0;
         track.lkp.z = c.position.z;
         track.lkpTime = now;
-        if (rank < nearestRank) { nearestRank = rank; nearestDist = dist; nearest = c; nearestId = id; }
+        if (rank < nearestRank) { nearestRank = rank; nearestDist = dist; nearest = c; nearestId = id; nearestUrgent = c.urgent === true; }
       } else {
         track.visible = false;
         this._Fade(track, now, dt);
@@ -498,8 +503,12 @@ export class PerceptionModel {
     let target = null, visible = false, dist = Infinity, changed = false;
     const sameAcquired = nearest !== null && mem.lockId !== null && nearestId === mem.lockId;
     // 锁定期过了、而且新目标近到当前目标的一半，才允许主动换人。
+    // 【§21】`c.urgent`（玩家已经拿枪指着他 overrideLockS 以上）：不等锁定期，也不要求近一倍 ——
+    // 威胁排名（已含 playerBias / aimedAt.rankDiv）高过当前目标就换。被人拿枪指着还盯着
+    // 十几米外的另一个人对射，就是「他根本不理我」。
     const muchBetter = nearest !== null && mem.lockId !== null && !sameAcquired
-      && now >= mem.lockUntil && nearestRank < lockRank * lock.switchDistanceRatio;
+      && (nearestUrgent ? nearestRank < lockRank
+        : now >= mem.lockUntil && nearestRank < lockRank * lock.switchDistanceRatio);
 
     if (lockSeen && !muchBetter) {
       target = lockCand; dist = lockDist; visible = true; mem.lostTime = 0;

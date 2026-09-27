@@ -174,10 +174,12 @@ export function RushStalled(s, position, target, dt, tuning) {
 
 /**
  * 这一帧是不是「自己停下来的」（不算冲刺卡死）：迟疑中（军官阵亡 3–5 s、看见战友倒下 0.6–1.5 s，
- * Act 把速度清零）、在换弹、在投弹。审查 2026-09-24：迟疑 4 s 以上的人曾被当成卡死。
+ * Act 把速度清零）、在换弹、在投弹、在躲手榴弹（`grenadeEvade`，docs/Data_EnemyAi.md §21：往回跑
+ * 两三秒不是卡死）。审查 2026-09-24：迟疑 4 s 以上的人曾被当成卡死。
  */
 export function RushPaused(actor, aiTime) {
-  return aiTime < (actor.hesitateUntil ?? -99) || actor.state === "reload" || actor.state === "grenade";
+  return aiTime < (actor.hesitateUntil ?? -99) || actor.state === "reload" || actor.state === "grenade"
+    || !!actor.grenadeEvade;
 }
 
 /** 离他最近、又不超过 top 的那条线（成组冲锋散了之后接回跃进用）。 */

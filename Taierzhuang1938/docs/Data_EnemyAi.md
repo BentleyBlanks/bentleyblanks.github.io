@@ -1814,3 +1814,89 @@ fix4 驾驶器躲手榴弹后卡在 RightNestApproach 的壕壁上（→ 第 8 �
    对 9 个授权点都是 0/9；三个人的守点圈挪到各自那堵墙的端头（引擎射线量过，见数据文件头注）。
 4. **nest 组点名表**加西门外接近沟 `westApproach`：入口守卫蹲姿对相位表 0/12，只有这一点通（20.10 第 8 条遗留的一半）；
    院里两名守卫对哪一点都不通视，不硬给点。
+
+## 21. 2026-09-27：「我拿枪指着他，他不理我」与「看见手榴弹不躲」
+
+用户原话：「日军的 AI 怎么那么蠢，我都在瞄准看到他了，面前三个日军没有一个理我的」「日军看到了手榴弹都不会躲」。
+对标 3A（CoD 的 threatbias / grenade danger、Halo / Killzone 的目标打分、最后生还者的躲雷）补两件基建：
+**威胁评估**（选目标不再是纯距离）与**通用躲雷**。数在 `Data_Tuning_AiPerception.THREAT` 与 `Data_Tuning_Ai.GRENADE_EVADE`，
+两张表都进了编辑器「调参」页（感知 / 大脑）。
+
+### 21.1 取证（改前）
+
+- **整关驾驶探针**（scratchpad `probe_ignore.mjs`，不进仓库；正常驾驶 01→，每 0.1 s 记玩家视线 ±35°、45 m 内、双方眼对眼通视的日军）：
+  03 Support 210 人·帧里 169 帧（80%）不以玩家为目标、3 s 内也没对玩家开过枪，其中 25 m 内 68 帧；主因「锁着国军」（`tgtAI`，
+  觉察早已拉满）与「开火窗口禁火」（`fireHold`）。05 Tank 174 / 73，主因守点兵（`defend`）锁着国军。01–02 那一大批是开场演出兵
+  （`scriptedNoncombatant`），是故意的，不动。
+- **病根在选目标，不在感知数值**（觉察 0.5 s 内就拉满了）：
+  1. 候选只取「离他最近的三个敌人」，玩家也在里面抢槽 —— 队友围在玩家身边时，玩家连候选都进不去；
+  2. 已有 3 人在打玩家（`COMBAT.maxShootersOnPlayer`）时，25 m 外的人**直接看不见**玩家（`Think.playerOpen` 挂在选目标层）；
+  3. 锁上一个国军后，玩家要**近到那个国军的一半**、还要等 3–3.8 s 锁定期才换得过来；
+  4. 感知层只认 > 1 的排名倍率（当初只为禁火那条「往后排」写的），任何「玩家优先」写进去都被丢掉。
+- **受控复现**（`Script_AiAimedAtBrowserTest --root=<改前树>`）：三个日军与 12 m 外的国军对射，玩家在 24 m 拿枪指着其中一个 8 s ——
+  **一次都没转过来**；被禁火的那个同样不转、不开枪。
+- **躲雷**：`UpdateGrenadeThreats` 只写 `grenadeThreat` 并喊一声「手榴弾！」；唯一的反应是 `UpdateCover` 在**身上已有掩体**时
+  紧急换点。空地上 / 走剧本路线 / 守点的人一步都不挪。任务侧只有第一关国军护送有躲雷（`MissionRuntime.RespondToGrenade`）。
+
+### 21.2 改法
+
+1. **名额只管扣扳机，不管眼睛。** 玩家单独占一个候选位（`THREAT.playerOwnSlot`）；名额满了不再「看不见」玩家，只是排名乘
+   `saturatedRankMul`（有别的目标先打别的，不然九个人焊死一个人）。瞄准射击仍要抢 `AcquireFireToken` 的 3 个名额，
+   抢不到就是压制射击（命中恒 false）—— `DamageTest` 三人 25 m 对射 TTK 仍是 16.9 s。
+2. **威胁权重**：选 / 换目标时玩家距离 ÷ `playerBias`（1.5）；**被关卡禁火的人不吃这一条**（§19：偏向玩家只会让他锁着玩家哑火）。
+   `Script_AiPerception.Sense` 的排名倍率改成认 < 1。
+3. **被拿枪指着**（`Script_Ai.PlayerAimsAt`：玩家 `AimDirection` 与「眼 → 他胸口」夹角 ≤ `aimedAt.coneDeg` + 身体半宽，
+   ≤ `rangeM`，不打射线、候选照样要过通视）：视锥 + `fovBonusDeg`、觉察 × `riseMul`、排名 ÷ `rankDiv`；
+   被连续指着 `overrideLockS` 以上（候选 `urgent`）就不等锁定期、也不要求「近一倍」—— 排名高过当前目标就换。
+4. **禁火的人自卫**（`AiDirector.SelfDefense`，`THREAT.selfDefense`）：玩家贴到 `nearM`（12 m）以内，或在 `aimedM`（35 m）内
+   拿枪指着他满 `aimedS`，这一拍 `missionFireHold` 对他失效（`TryFire` / `AmbientBlocked` 两处）。开火窗口仍管远处的火力节奏。
+5. **待命兵被惊动就醒**（`wakeOnThreat`，`THREAT.wake`，`AiDirector.ThreatWakes`）：挨打 / 被压住、玩家在视锥里 22 m 内且通视、
+   或被指着 0.6 s。醒了清 `scriptedNoncombatant`、记 `threatWokenAt`；关卡看这个时刻收自己的旗。目前只给两类人标：
+   `MISSION_TACTICS.near` 的局部突击组（`UpdateTactics` 当场放行）与 `village` 守兵（`UpdateFront` 收 `missionDormant`）。
+   开场演出、白刃配对（melee）、`bunkerAssault`、压力表的场外组、战车护兵、连屋埋伏都**没标**，行为逐位不变。
+6. **通用躲雷**（`AiDirector.UpdateGrenadeEvades` / `GrenadeEscapePoint` / `GrenadeEvading`，`GRENADE_EVADE`，现只给 `ija`）：
+   雷落到离地 `landedM` 以内、人在 伤害外沿 × `triggerScale`（木柄弹 9.3 m）以内、没被墙挡 → 反应 `reactMinS–MaxS`（雷在身后
+   再 + `behindExtraS`）→ 以背离爆心为起点绕一圈采样逃跑点（不穿墙、不爬坎、不从雷上跨过去，同 `RespondToGrenade` 的判据），
+   以 `sprintMps` 冲过去；引信剩 `diveFuseS` 还在圈里就扑倒；`panicChance`（15%）的人慌了直接扑倒 —— 没拉弦的雷偶尔也炸得到人，
+   拉弦才是正解。躲的时候压过守点锚点 / 剧本路线 / 冲锋的走位，不开枪（含环境射击）、不投弹、枪不上肩；炸完照常回原来的活。
+   白刃、抬担架、剧本动作、任务躲雷（`missionGrenadeEvade`）、剧本非战斗员不归它管。
+
+### 21.3 数字（改前 / 改后）
+
+| 口径 | 改前 | 改后 |
+| --- | --- | --- |
+| 被指着的日军（正与 12 m 外国军对射，玩家 24 m）转向玩家 | 8 s 内从不 | 1.7 s |
+| 同上，对玩家开第一枪 | 从不 | 2.2 s |
+| 被禁火的日军被指着：转向 / 开枪 | 从不 / 从不 | 0.6 s / 8 s 内开火（这一跑先换弹 3 s、又被国军压着瞄了 2 s，第一枪 6.7 s） |
+| 没被指着时，被禁火的人打玩家 | 0 发 | 0 发 |
+| 手榴弹落在六人班正中（`AiGrenadeEvadeBrowserTest`，躲 关 / 开） | 2 死、掉血 245 | 0 死、掉血 25–74（1 人慌了扑倒） |
+| 同上，爆炸时离爆心平均 | 6.4 m | 10.8–11.6 m |
+
+门禁与整段回归见 21.4。
+
+### 21.4 门禁
+
+| 门禁 | 结果（本树，直接 node 跑） |
+| --- | --- |
+| `AiPerceptionTest` | 13 项全过（新 ⑬：被指着视锥放宽 / 觉察 × riseMul / urgent 打断锁定期） |
+| `AiBrainGraphTest` / `AiTacticsTest` / `AiCoverTest` / `AiShootingTest` / `TuningWriterTest` / `TestRunnerTest` / `ModuleGraphTest` | 全过（keyOwners 登记 `GRENADE_EVADE` / `THREAT`） |
+| `FirstLevelP012ActorTest` / `FirstLevelP012RuntimeTest`（沙箱重放 Think / Act） | 全过 —— 新方法一律可缺省调用 |
+| `FirstLevelFrontPressureTest` / `FirstLevelMissionTest` | 全过（`RushPaused` 认躲雷，往回跑不算冲刺卡死） |
+| `AiAimedAtBrowserTest`（新） | 过；`--root=<改前树>` 复现「从不转向」 |
+| `AiGrenadeEvadeBrowserTest`（新） | 过 |
+| `DamageTest` | 25/25，三人 25 m 对射 TTK 16.9 s（不变） |
+| `AiEditorTest` / `AiBehaviorTest` / `AllyCloseRangeTest` | 全过 |
+| `FirstLevelMissionBrowserTest --campaign --stage-from=3 --stage-to=6 --probe-front-gun` | 绿；玩家最低 79 血，`guards` 遥测 `targets.guard` 全程 0 |
+| `FirstLevelEnemyIdleProbe --stage-from=3 --stage-to=6 --gate` | 过：03–05 合并 zero30 10% / idle4 13% / idle4Strict 27%，03 12% / 18%、04 9% / 11%、05 8% / 7%，机枪 947 发，hunters 0 |
+| `AiCombatBrowserTest` | ③「实墙遮挡时停火」、⑨「46–74 m 三分之一伏低」红 —— **改前的树（fd58856b）同样两条红、⑨ 数字一模一样**（4 人、站 3）；其余全过 |
+| `AiCloseRangeTest` / `AiInitiativeBrowserTest` | 红，改前的树同样红（夹具墙不存在 / gunnerShelter，§19.4 已记） |
+
+### 21.5 留给下一轮
+
+1. 躲雷只开了 `ija`。国军护送有任务侧那一套；通用国军要开，先把 `missionGrenadeEvade` 的人从 `GrenadeEvadeEligible` 排除（已排除），
+   再量护送队形会不会被一颗雷冲散（关卡节奏）。
+2. 没做「把雷踢回 / 扔回去」（CoD 的 grenade return）：没有动作 clip。
+3. `wakeOnThreat` 只标了局部突击组与村里守兵。连屋埋伏（`FirstLevelVillageBlock`）、压力表场外组、战车护兵仍是「演出没到就不醒」——
+   要不要让玩家提前摸过去就惊动埋伏，是关卡设计的账。
+4. 整关探针的驾驶器不会拿枪去指敌人，所以 21.1 的比例量的是「在视野里」而不是「被指着」；被指着的行为靠 `AiAimedAtBrowserTest` 锁。
+   同一跑驾驶器在 11 TransferSupply 停住（`actual body reached route end`，改前的树上跑出来的，与本节无关），08 以后的样本很少。

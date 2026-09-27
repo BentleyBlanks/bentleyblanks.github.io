@@ -332,3 +332,54 @@ export const BRAIN = Freeze({
   fireAimBlendMin: 0.95,
   fireBarrelAngleRad: 0.12,
 });
+
+/**
+ * 躲手榴弹（2026-09-27，docs/Data_EnemyAi.md §21）。
+ *
+ * 改前：敌方手榴弹落在脚边，通用 AI 只喊一声「手榴弾！」；**身上已经有掩体**的人才会触发
+ * 一次紧急换掩体，站在空地上 / 走剧本路线 / 守点的人一步都不挪。任务侧只给第一关的国军
+ * 护送写过躲雷（`MissionRuntime.RespondToGrenade`，`missionGrenadeEvade`）。
+ *
+ * 对标 3A（CoD / Halo / 最后生还者的公共做法）：落点进了杀伤圈 → 反应一拍（看不见弹的
+ * 人更慢）→ 背离爆心冲出杀伤圈外；来不及就在引信最后那一下扑倒。躲的时候不开枪、
+ * 不投弹；炸完照常回到原来的活（守点回锚点、走路线的接着走）。
+ *
+ * sides          哪一方走这套通用躲雷。国军护送由任务侧那一套管（两套同时管一个人会抢腿），
+ *                要给通用国军也开，先把那批任务兵从这里排除。
+ * landedM        雷离地这么近才算「落下来了」（之前在头顶飞，按那一刻的位置跑会跑错方向）。
+ * reactMinS/MaxS 从「落进杀伤圈」到「拔腿」的反应时间，按人抽。0.2–0.55 s 是 3A 常见的量级：
+ *                短到能躲开，长到玩家把雷扔在脚下时仍然来不及。
+ * behindExtraS   手榴弹在他身后（视线外）时再慢这么多 —— 他是听见同伴喊、听见落地声才知道的。
+ * triggerScale   触发半径 = 伤害外沿（`GrenadeDangerRadius` = 武器半径 × BLAST.radiusScale，木柄弹 12.4 m）
+ *                × 这个数。伤害按 (1 − d/外沿)² 掉，0.75（9.3 m）外只剩 8 点血：再外面的人不必跑。
+ * marginM        要跑到触发半径以外多远才算安全。
+ * directions / fractions  逃跑点的采样：以背离爆心为起点绕一圈 directions 个方向，
+ *                每个方向先试整段（fraction 1），被墙挡再试短一截（窄壕里先横挪再拐弯）。
+ *                跑不到圈外也比原地强：伤害随距离平方掉，4 m 外就出了致死 / 断肢那两圈。
+ * maxRiseM       逃跑路线上地面最多抬高多少（翻不上胸墙、爬不出壕的就不是路）。
+ * sprintMps      逃跑速度。高于冲锋（3.6）、低于下了命令的冲锋（5.0）：再快脚会打滑。
+ * replanS        多久重算一次逃跑点（第二颗雷、雷滚了、人被挤开）。
+ * diveFuseS      引信剩这么多还在杀伤圈里 → 就地扑倒（跑不出去了）。
+ * panicChance    落进圈里的人有这么大概率不跑、反应过来就地扑倒（慌了）。趴着不减伤，
+ *                所以这就是「没拉弦的雷偶尔也炸得到人」的那一份；拉弦（cook）才是玩家的正解。
+ * proneHoldS     扑倒后至少趴多久（炸完不马上弹起来）。
+ * arriveM        到逃跑点的到位半径。
+ */
+export const GRENADE_EVADE = Freeze({
+  sides: Freeze(["ija"]),
+  triggerScale: 0.75,
+  landedM: 1.2,
+  reactMinS: 0.2,
+  reactMaxS: 0.55,
+  behindExtraS: 0.3,
+  marginM: 1.5,
+  directions: 12,
+  fractions: Freeze([1, 0.6, 0.35]),
+  maxRiseM: 0.8,
+  sprintMps: 4.4,
+  replanS: 0.5,
+  diveFuseS: 0.45,
+  panicChance: 0.15,
+  proneHoldS: 1.2,
+  arriveM: 0.6,
+});

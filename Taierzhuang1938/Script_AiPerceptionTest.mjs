@@ -472,4 +472,44 @@ const ok = (line) => { checks += 1; console.log(`ok ${checks} — ${line}`); };
   ok("照明弹：发现距离倍率只经 host.SightRange 生效，感知层没有第二处乘法");
 }
 
-console.log(`AiPerceptionTest OK — ${checks} 项：视锥/姿态/觉察标定/级别迟滞/听觉/LKP 记忆/目标锁/禁火先打能打的/Attach/零分配/照明弹`);
+// ---------------------------------------------------------------- 【§21】被玩家拿枪指着
+{
+  const TA = PERCEPTION.threat.aimedAt;
+  // ① 视锥：unaware 半角外、半角 + fovBonusDeg 以内的一点，平时看不见，被指着看得见。
+  const offDeg = fov.halfAngleDeg.unaware + TA.fovBonusDeg / 2;
+  const at = AtAngle(offDeg, 30);
+  {
+    const host = MakeHost(), model = new PerceptionModel(host), s = MakeSoldier(1, "ija", 0, 0, 0, 0);
+    const plain = [MakeCand(PLAYER_TRACK_ID, at.x, at.z, { isPlayer: true, ref: { alive: true } })];
+    for (let i = 0; i < 5; i += 1) Step(model, host, s, plain);
+    assert.equal(model.Track(s, PLAYER_TRACK_ID), null, `视锥外 ${offDeg}° 平时看不见`);
+    const aimed = [{ ...plain[0], aimedAt: true }];
+    Step(model, host, s, aimed);
+    assert.ok(model.Track(s, PLAYER_TRACK_ID)?.visible, `被拿枪指着时 ${offDeg}° 也被余光抓到`);
+  }
+  // ② 觉察：同一距离、同一姿态，被指着的累积速率 × riseMul。
+  {
+    const Rise = (aimedAt) => {
+      const host = MakeHost(), model = new PerceptionModel(host), s = MakeSoldier(1, "ija", 0, 0, 0, 0);
+      const c = [{ ...MakeCand(PLAYER_TRACK_ID, 0, -60, { isPlayer: true, stance: 1, ref: { alive: true } }), aimedAt }];
+      Step(model, host, s, c, 0.1);
+      return model.Track(s, PLAYER_TRACK_ID).awareness;
+    };
+    const a0 = Rise(false), a1 = Rise(true);
+    assert.ok(Math.abs(a1 / a0 - TA.riseMul) < 1e-6, `被指着的觉察累积 × ${TA.riseMul}（${a0.toFixed(3)} → ${a1.toFixed(3)}）`);
+  }
+  // ③ 锁定期：锁着一个 20 m 外的国军，玩家在 12 m（没过「近一倍」的距离比）。不 urgent 不换，
+  //    urgent（被指够久）当拍就换 —— 排名近过当前目标就够。
+  const Switch = (urgent) => {
+    const host = MakeHost(), model = new PerceptionModel(host), s = MakeSoldier(1, "ija", 0, 0, 0, 0);
+    const nra = MakeCand(7, 0, -20);
+    for (let i = 0; i < 3; i += 1) Step(model, host, s, [nra]);
+    const player = { ...MakeCand(PLAYER_TRACK_ID, 1, -12, { isPlayer: true, ref: { alive: true } }), aimedAt: true, urgent };
+    return Step(model, host, s, [nra, player]).trackId;
+  };
+  assert.equal(Switch(false), 7, "锁定期内、没被指够久：不换");
+  assert.equal(Switch(true), PLAYER_TRACK_ID, "被指够久（urgent）：不等锁定期就换到玩家");
+  ok(`被玩家拿枪指着：视锥放宽 ${TA.fovBonusDeg}°、觉察 × ${TA.riseMul}、可打断锁定期`);
+}
+
+console.log(`AiPerceptionTest OK — ${checks} 项：视锥/姿态/觉察标定/级别迟滞/听觉/LKP 记忆/目标锁/禁火先打能打的/Attach/零分配/照明弹/被指着`);

@@ -19,13 +19,14 @@ import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Da
 import { ActorCrowd } from "./Script_ActorCrowd.mjs";
 import {
   SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, FIRE_STANCE, ACTOR_DETAIL, HURT_FLINCH, BRAIN, WATCH, CROWD,
+  GRENADE_EVADE,
 } from "./Data_Tuning_Ai.mjs";
 import { PlayerHitboxes, PlayerAimPoint, RaycastPlayerHitboxes, GaussianPair } from "./Script_PlayerHitbox.mjs";
 import { LitterSegments, LitterPush, BlockStepByLitters } from "./Script_LitterBlock.mjs";
 // 敌军 AI 的四件基建（docs/Data_EnemyAi.md §4）。四个模块都不 import three，
 // 只吃普通对象 `{x,y,z}` 与本文件组装的 host 回调 —— Script_Ai 仍是唯一的 three 适配层。
 import { PerceptionModel, PLAYER_TRACK_ID, ALERT_ORDER } from "./Script_AiPerception.mjs";
-import { LOCK as PERCEPTION_LOCK } from "./Data_Tuning_AiPerception.mjs";
+import { PERCEPTION, LOCK as PERCEPTION_LOCK, THREAT as PERCEPTION_THREAT } from "./Data_Tuning_AiPerception.mjs";
 import { CoverRegistry } from "./Script_AiCover.mjs";
 import { COVER, COVER_CYCLE, DERIVED_COVER } from "./Data_Tuning_AiCover.mjs";
 import { ShootingModel, CloseRangeWeight } from "./Script_AiShooting.mjs";
@@ -458,6 +459,9 @@ export class Soldier {
     this.stationaryS = 0;        // 在原地待了多久（投弹判据「对方钉在一处」读它）
     this.coverStore = null;      // s.cover 的复用容器（不每次选点都新建）
     this.grenadeThreatAt = -99;  // 上一次「敌方手榴弹落在我掩体边上」的时刻
+    this.aimedAtSince = -1;      // 【§21】玩家从什么时候起一直拿枪指着我（没指着 = −1）
+    this.threatWokenAt = -1;     // 【§21】待命兵（wakeOnThreat）被玩家惊动的时刻
+    this.grenadeEvade = null;    // 通用躲雷（GRENADE_EVADE）：{ grenade, startAt, goal, replanAt, dive }
     this.coverPhase = "none";    // "hide" | "peek" | "none"
     this.coverPhaseUntil = -99;
     this.coverPickAt = -99;      // 上一次（重）选掩体的时刻，reselectMinS 限流
@@ -699,12 +703,15 @@ export class AiDirector {
     // （Script_AiPerception 头注偏离 b），漏填不会静默退回旧的全知行为。
     this.nearSlots = [
       { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null,
-        visible: false, moving: false, firingRecently: false, rank: 1 },
+        visible: false, moving: false, firingRecently: false, rank: 1, aimedAt: false, urgent: false },
       { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null,
-        visible: false, moving: false, firingRecently: false, rank: 1 },
+        visible: false, moving: false, firingRecently: false, rank: 1, aimedAt: false, urgent: false },
       { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null,
-        visible: false, moving: false, firingRecently: false, rank: 1 },
+        visible: false, moving: false, firingRecently: false, rank: 1, aimedAt: false, urgent: false },
     ];
+    /** 【§21】玩家自己的候选位（`THREAT.playerOwnSlot`）：不和最近的三个 AI 抢槽。 */
+    this.playerSlot = { ref: null, isPlayer: true, id: PLAYER_TRACK_ID, dist: 1e9, stance: 0, position: null,
+      visible: false, moving: false, firingRecently: false, rank: 1, aimedAt: false, urgent: false };
     /** Sense 要的稠密候选数组（只放有 ref 的槽，长度每拍重写，不新建）。 */
     this.senseCandidates = [];
 
@@ -1416,6 +1423,7 @@ export class AiDirector {
     const player = this.ctx.player;
     profiler?.B("ai/grenade");
     this.UpdateGrenadeThreats();
+    this.UpdateGrenadeEvades();
     profiler?.E("ai/grenade");
 
     profiler?.B("ai/crowd");
@@ -1612,6 +1620,139 @@ export class AiDirector {
   }
 
   /**
+   * 通用躲雷（`GRENADE_EVADE`，docs/Data_EnemyAi.md §21）。每帧跑，但只碰身上有
+   * `grenadeThreat` 或还挂着 `grenadeEvade` 的人 —— 没有在飞的雷时整条循环只是属性检查。
+   * 这里只**定**逃跑点 / 扑倒；腿由 `Act` 读 `GrenadeEvading` 接管，扳机由 `TryFire` 让开。
+   */
+  UpdateGrenadeEvades() {
+    for (let i = 0; i < this.soldiers.length; i += 1) {
+      const s = this.soldiers[i];
+      if (s.grenadeThreat || s.grenadeEvade) this.UpdateGrenadeEvade(s);
+    }
+  }
+
+  /** 这个人归不归通用躲雷管：别的系统握着他身体（白刃、抬担架、剧本动作、任务躲雷）的不管。 */
+  GrenadeEvadeEligible(s) {
+    return s.alive && !s.dummy && GRENADE_EVADE.sides.includes(s.side)
+      && !s.scriptedNoncombatant && !s.missionGrenadeEvade && !s.meleeCombat && !s.carryRole
+      && !s.p012CarriedCasualty && !s.missionCarriageAction && !s.missionAmbushClip && !s.missionDormant
+      && !s.missionTrainPassenger && !s.weaponRangeTargetId && !s.crowdPinned
+      && !s.actor?.pendingGrenadeThrow && !(s.vaultT >= 0);
+  }
+
+  /**
+   * 躲雷的触发半径 = 伤害外沿 × `GRENADE_EVADE.triggerScale`。伤害按 (1 − d/外沿)² 掉，
+   * 外沿最后那四分之一只剩几点血：那里的人也拔腿就跑，读起来是一场雷全排作鸟兽散。
+   */
+  GrenadeEvadeRadius(grenade) {
+    return this.GrenadeDangerRadius(grenade) * GRENADE_EVADE.triggerScale;
+  }
+
+  UpdateGrenadeEvade(s) {
+    const E = GRENADE_EVADE, g = s.grenadeThreat, now = this.time;
+    // 还在头顶上飞的雷不算（往哪儿落还不知道，按此刻的位置跑只会跑错方向）；落到离地
+    // `landedM` 以内才开始反应。已经在躲的人不因为雷弹起来一下就停。
+    const field = this.ctx.battlefield;
+    const landed = !!g && (!!s.grenadeEvade || !field
+      || g.position.y - field.GroundHeight(g.position.x, g.position.z) < GRENADE_EVADE.landedM);
+    const live = !!g && landed && g.alive && g.fuse > 0 && this.GrenadeEvadeEligible(s)
+      && Math.hypot(s.position.x - g.position.x, s.position.z - g.position.z) < this.GrenadeEvadeRadius(g)
+      && !this.GrenadeShielded(s, g);
+    if (!live) { s.grenadeEvade = null; return; }
+    let ev = s.grenadeEvade;
+    if (!ev) {
+      // 反应时间按人抽；雷在他身后（前向量与「指向雷」夹角过 90°）再慢一截。
+      const fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw);
+      const behind = fx * (g.position.x - s.position.x) + fz * (g.position.z - s.position.z) < 0;
+      const delay = E.reactMinS + s.rnd() * (E.reactMaxS - E.reactMinS) + (behind ? E.behindExtraS : 0);
+      // 有人慌了不跑、就地扑倒（`panicChance`）：3A 里也是这样，雷才没有变成「扔了也白扔」。
+      const panic = s.rnd() < GRENADE_EVADE.panicChance;
+      ev = s.grenadeEvade = { grenade: g, startAt: now + delay, goal: null, replanAt: -99, dive: panic, panic };
+      this.stats.grenadeEvades = (this.stats.grenadeEvades || 0) + 1;
+      if (panic) this.stats.grenadeDives = (this.stats.grenadeDives || 0) + 1;
+    }
+    if (ev.grenade !== g) { ev.grenade = g; ev.replanAt = -99; }
+    if (now < ev.startAt) return;
+    // 引信快到了还在圈里：扑倒（跑不出去了，趴下至少不再往爆心那边蹭）。
+    if (ev.dive || g.fuse <= E.diveFuseS) {
+      if (!ev.dive) this.stats.grenadeDives = (this.stats.grenadeDives || 0) + 1;
+      ev.dive = true; ev.goal = null;
+      return;
+    }
+    if (now >= ev.replanAt || (ev.goal && Math.hypot(ev.goal.x - s.position.x, ev.goal.z - s.position.z) < E.arriveM)) {
+      ev.replanAt = now + E.replanS;
+      ev.goal = this.GrenadeEscapePoint(s, g, ev.goal);
+    }
+  }
+
+  /**
+   * 逃跑点：以背离爆心为起点绕一圈采样，挑「离所有在圈里的雷最远」且路上不穿墙、
+   * 不爬坎、不从雷上跨过去的那一点（与 `MissionRuntime.RespondToGrenade` 同一套判据，
+   * 只是不依赖任务运行时）。一个都没有就返回 null —— 调用方原地不动，等引信扑倒。
+   */
+  GrenadeEscapePoint(s, grenade, previous) {
+    const E = GRENADE_EVADE, field = this.ctx.battlefield;
+    if (!field) return null;
+    const at = s.position, radius = this.GrenadeEvadeRadius(grenade);
+    const list = this.ctx.combat?.projectiles || [grenade];
+    const threats = this._evadeThreats || (this._evadeThreats = []);
+    threats.length = 0;
+    for (const p of list) {
+      if (!p.alive || p.fuse <= 0 || p.owner === s.side || (p.owner === "player" && s.side === "nra")) continue;
+      if (Math.hypot(at.x - p.position.x, at.z - p.position.z) < this.GrenadeEvadeRadius(p) + radius + E.marginM) threats.push(p);
+    }
+    if (!threats.length) threats.push(grenade);
+    const Safety = (x, z) => {
+      let v = Infinity;
+      for (const p of threats) v = Math.min(v, Math.hypot(x - p.position.x, z - p.position.z) - this.GrenadeEvadeRadius(p));
+      return v;
+    };
+    const ceiling = field.GroundHeight(at.x, at.z) + E.maxRiseM;
+    const from = this._evadeFrom || (this._evadeFrom = new THREE.Vector3());
+    const dir = this._evadeDir || (this._evadeDir = new THREE.Vector3());
+    const away = Math.atan2(at.z - grenade.position.z, at.x - grenade.position.x);
+    let best = previous ? Safety(previous.x, previous.z) : Safety(at.x, at.z), goal = null;
+    for (const scale of E.fractions) for (let i = 0; i < E.directions; i += 1) {
+      // 先试背离方向，再左右交替往两侧扩（0, +1, −1, +2, …），同分时先到的赢。
+      const k = i === 0 ? 0 : (i % 2 ? (i + 1) / 2 : -i / 2);
+      const angle = away + k * Math.PI * 2 / E.directions;
+      const reach = (radius + E.marginM) * scale;
+      const x = at.x + Math.cos(angle) * reach, z = at.z + Math.sin(angle) * reach;
+      const safety = Safety(x, z);
+      if (safety <= best) continue;
+      // 不从雷身上跨过去：起点在圈里时，朝爆心那一侧的点不算路。
+      let crosses = false;
+      for (const p of threats) {
+        if (Math.hypot(at.x - p.position.x, at.z - p.position.z) < this.GrenadeEvadeRadius(p)
+          && (x - at.x) * (at.x - p.position.x) + (z - at.z) * (at.z - p.position.z) < -1e-6) { crosses = true; break; }
+      }
+      if (crosses) continue;
+      let clear = true;
+      for (let step = 1; step <= 6; step += 1) {
+        const t = step / 6;
+        if (field.GroundHeight(at.x + (x - at.x) * t, at.z + (z - at.z) * t) > ceiling) { clear = false; break; }
+      }
+      if (!clear) continue;
+      from.set(at.x, field.GroundHeight(at.x, at.z) + 0.5, at.z);
+      dir.set(x - at.x, 0, z - at.z);
+      const len = dir.length();
+      dir.divideScalar(len || 1);
+      const hit = field.Raycast(from, dir, len);
+      if (hit && hit.t < len - 0.3) continue;
+      goal = goal || { x: 0, z: 0 };
+      goal.x = x; goal.z = z; best = safety;
+    }
+    // 上一个逃跑点仍然最好：沿用它（不在两个差不多的点之间来回改主意）。
+    return goal || previous || null;
+  }
+
+  /** 这一帧腿归不归躲雷（反应时间过了才算）。 */
+  GrenadeEvading(s) {
+    const ev = s.grenadeEvade;
+    return !!ev && this.time >= ev.startAt;
+  }
+
+  /**
    * 只剔除真正落在镜头视锥外的人。视锥内不分阵营、不分生死、不设数量名额；
    * 只按投影尺寸近似值（距离）选完整 Actor / 合批远景层。
    */
@@ -1727,6 +1868,66 @@ export class AiDirector {
   }
 
   /** 姿态对应的枪眼高度。站 1.5 / 蹲 1.0 / 卧 0.5 —— 卧倒的人本来就该更难被看见。 */
+  /**
+   * 【§21】玩家是不是正拿枪指着这个人：枪口方向（`AimDirection`，自由瞄准偏移之后的那条，
+   * 不是相机）与「玩家眼 → 他胸口」的夹角，在 `THREAT.aimedAt.coneDeg` + 身体半宽折成的角度以内。
+   * 不打射线：调用方的候选还要过通视（`HasLineOfSight`），看不见的人被指着也不知道。
+   */
+  PlayerAimsAt(s, player, d) {
+    const A = PERCEPTION_THREAT.aimedAt;
+    if (!(d <= A.rangeM) || typeof player.AimDirection !== "function") return false;
+    const eye = player.EyePosition;
+    const ex = eye.x, ey = eye.y, ez = eye.z;
+    const dir = player.AimDirection(this._playerAimDir || (this._playerAimDir = new THREE.Vector3()));
+    const cx = s.position.x - ex, cz = s.position.z - ez;
+    const cy = s.position.y + AiDirector.StanceEye(s.stance, s) - BRAIN.torsoBelowEyeM - ey;
+    const len = Math.sqrt(cx * cx + cy * cy + cz * cz);
+    if (len < 0.5) return true;
+    const cos = (dir.x * cx + dir.y * cy + dir.z * cz) / len;
+    return cos >= Math.cos(A.coneDeg * Math.PI / 180 + Math.atan(A.bodyHalfM / len));
+  }
+
+  /**
+   * 【§21】被关卡禁火的人自卫：玩家贴到 `THREAT.selfDefense.nearM` 以内、或拿枪指着他满
+   * aimedS（aimedM 以内），禁火对他失效（这一拍）。只看玩家；目标得看得见。
+   */
+  SelfDefense(s, player) {
+    const t = s.target;
+    if (!t || !t.isPlayer || !s.targetVisible || !player) return false;
+    const D = PERCEPTION_THREAT.selfDefense;
+    const d = Math.hypot(player.position.x - s.position.x, player.position.z - s.position.z);
+    if (d <= D.nearM) return true;
+    return s.aimedAtSince >= 0 && d <= D.aimedM && this.time - s.aimedAtSince >= D.aimedS;
+  }
+
+  /**
+   * 【§21】待命兵被玩家惊动没有（`THREAT.wake`）：挨了打 / 被压住、玩家在视锥里且贴得够近、
+   * 或者玩家拿枪指着他够久。后两条要通视（一条射线，只在距离与朝向都够的时候才打）。
+   */
+  ThreatWakes(s, player) {
+    const W = PERCEPTION_THREAT.wake;
+    if (W.hurt) {
+      if (!Number.isFinite(s.wakeDamageSeq)) s.wakeDamageSeq = s.damageSequence || 0;
+      if ((s.damageSequence || 0) !== s.wakeDamageSeq || s.suppression > 0.3) return true;
+    }
+    if (!player || !player.Alive || player.Protected) { s.aimedAtSince = -1; return false; }
+    const d = Math.hypot(player.position.x - s.position.x, player.position.z - s.position.z);
+    const aimed = this.PlayerAimsAt(s, player, d);
+    if (aimed) { if (!(s.aimedAtSince >= 0)) s.aimedAtSince = this.time; } else s.aimedAtSince = -1;
+    const aimedLong = aimed && this.time - s.aimedAtSince >= W.aimedS;
+    let near = d <= W.nearM;
+    if (near && d > PERCEPTION.fov.omniRadiusM) {
+      const fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw);
+      const cos = (fx * (player.position.x - s.position.x) + fz * (player.position.z - s.position.z)) / Math.max(d, 1e-6);
+      near = cos >= Math.cos(PERCEPTION.fov.halfAngleDeg.suspicious * Math.PI / 180);
+    }
+    if (!near && !aimedLong) return false;
+    const st = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
+    const slot = this.playerSlot;
+    slot.ref = player; slot.position = player.position; slot.stance = st; slot.id = PLAYER_TRACK_ID; slot.isPlayer = true;
+    return this.HasLineOfSight(s, slot);
+  }
+
   static StanceEye(stance, subject = null) {
     const heightScale = (subject?.ref || subject)?.childCapsules?.[0]?.height / CAPSULE[0].height;
     return (stance === 2 ? 0.5 : stance === 1 ? 1.0 : 1.5) * (Number.isFinite(heightScale) ? heightScale : 1);
@@ -1870,11 +2071,13 @@ export class AiDirector {
       const dst = slots[i], src = slots[i - 1];
       dst.dist = src.dist; dst.ref = src.ref; dst.isPlayer = src.isPlayer;
       dst.id = src.id; dst.stance = src.stance; dst.position = src.position; dst.rank = src.rank;
+      dst.aimedAt = src.aimedAt; dst.urgent = src.urgent;
       i -= 1;
     }
     const t = slots[i];
     t.dist = dist; t.ref = ref; t.isPlayer = isPlayer;
     t.id = id; t.stance = stance; t.position = position; t.rank = rank;
+    t.aimedAt = false; t.urgent = false;
   }
 
   // ---------------------------------------------------------------- 决策
@@ -1885,6 +2088,12 @@ export class AiDirector {
 
     // Opt-in scene actors follow the host's evacuation goals, never a combat cover/target.
     // Physics, suppression accounting, wounded poses and death remain on the normal path.
+    // 【§21】关卡标了 `wakeOnThreat` 的待命兵（「还没轮到他们上」）被玩家惊动就醒：
+    // 醒了就是普通活人，关卡看 `threatWokenAt` 收自己的待命旗（MissionRuntime.UpdateTactics / UpdateFront）。
+    if (s.scriptedNoncombatant && s.wakeOnThreat && this.ThreatWakes?.(s, player)) {
+      s.scriptedNoncombatant = false; s.wakeOnThreat = false; s.threatWokenAt = this.time;
+      this.stats.threatWakes = (this.stats.threatWakes || 0) + 1;
+    }
     if (s.scriptedNoncombatant) {
       s.target = null; s.targetVisible = false; s.bayonetFixed = false;
       // 有授权点的剧本兵（01 背景兵，§20）停下来要举枪朝外打：别每拍把据枪清零，
@@ -1915,7 +2124,11 @@ export class AiDirector {
     for (const slot of slots) {
       slot.dist = 1e9; slot.ref = null; slot.position = null;
       slot.visible = false; slot.moving = false; slot.firingRecently = false; slot.rank = 1;
+      slot.aimedAt = false; slot.urgent = false;
     }
+    const pSlot = this.playerSlot;
+    pSlot.ref = null; pSlot.position = null; pSlot.dist = 1e9; pSlot.visible = false; pSlot.moving = false;
+    pSlot.firingRecently = false; pSlot.rank = 1; pSlot.aimedAt = false; pSlot.urgent = false;
     // 距离门槛按**目标的姿态**缩放：站着的人一百二十米外就看得见，趴下的四十五米。
     // 这是姿态第一次真的影响"会不会被打"，也是潜行命令能成立的前提。
     // 玩家能不能被选中，取决于三件事：活着、出生保护过了、**已经锁他的人还没到上限**。
@@ -1934,24 +2147,47 @@ export class AiDirector {
     //
     // 名额那一条不变：`playerTargetedBy`（Update 里重数）**本来就不数禁火的人**，
     // 所以没有开火窗口的阶段行为与改前逐位相同 —— 非禁火的人仍然吃满这条上限。
-    const playerOpen = player && player.Alive && !player.Protected
-      // 已经锁住玩家的人不占「新锁」名额。旧写法达到上限后会把现有三个人也一起
-      // 排除，下一次 Think 全部转头找 NPC，再下一次又转回来，正是集体抽搐的一条源头。
-      && (s.scriptTrackPlayer || s.missionFireHold || s.target?.isPlayer
+    //
+    // 【2026-09-27 §21】**名额只管扣扳机，不管眼睛**（3A 的通行做法）：旧写法名额满了、
+    // 又在 25 m 外的人直接看不见玩家 —— 玩家拿枪指着他，他照样盯着别人。现在名额满时
+    // 玩家只是排名靠后（`THREAT.saturatedRankMul`）：有别的目标先打别的，没有 / 玩家正指着他时
+    // 照样转过来。瞄准射击的名额仍是 `AcquireFireToken` 那 3 个，TTK 账不变。
+    const playerOpen = player && player.Alive && !player.Protected;
+    const saturated = playerOpen && !(s.scriptTrackPlayer || s.missionFireHold || s.target?.isPlayer
         || this.playerTargetedBy < (COMBAT.maxShootersOnPlayer ?? 3)
         || s.position.distanceTo(player.position) <= CLOSE_RANGE.priorityM);
     if (enemySide === "nra" && playerOpen) {
       const d = s.position.distanceTo(player.position);
       const st = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
+      const aimed = this.PlayerAimsAt ? this.PlayerAimsAt(s, player, d) : false;
+      if (aimed) { if (!(s.aimedAtSince >= 0)) s.aimedAtSince = this.time; } else s.aimedAtSince = -1;
       if (d < this.SightRange(st)) {
         // 【2026-09-23】被禁火（且不是压制档）的人**先打能打的**：玩家的距离乘
         // `LOCK.heldTargetRank` 再进选目标 —— 有看得见的国军就打国军，一个都看不见
         // 才盯着玩家（面向、进掩体、举枪，扳机仍在 TryFire 里挡着）。不然禁火一放开
         // 眼睛，原来打国军的那批人全变成锁玩家 + 哑火（实测总弹数 77 → 49）。
-        const rank = s.missionFireHold && !s.missionFireSuppressOnly ? PERCEPTION_LOCK.heldTargetRank : 1;
-        this._PushNear(d, player, true, PLAYER_TRACK_ID, st, player.position, rank);
+        // 【§21】再乘威胁权重：玩家本身 ÷ playerBias，正指着他再 ÷ aimedAt.rankDiv。
+        // **被禁火的人不吃 playerBias**：他打不了玩家，偏向玩家只会让他锁着玩家哑火、
+        // 把原本打国军的那几发也丢掉（§19 的 77 → 49 发）。只有玩家在自卫距离里拿枪指着他时
+        // 才偏向玩家 —— 那时 `SelfDefense` 会放开他的扳机。
+        const T = PERCEPTION_THREAT;
+        const held = s.missionFireHold && !s.missionFireSuppressOnly;
+        const aimedRank = aimed && (!held || d <= T.selfDefense.aimedM);
+        const rank = (held ? PERCEPTION_LOCK.heldTargetRank : 1)
+          * (saturated ? T.saturatedRankMul : 1) / (held ? 1 : T.playerBias) / (aimedRank ? T.aimedAt.rankDiv : 1);
+        if (T.playerOwnSlot) {
+          pSlot.ref = player; pSlot.position = player.position; pSlot.dist = d; pSlot.stance = st; pSlot.rank = rank;
+        } else {
+          this._PushNear(d, player, true, PLAYER_TRACK_ID, st, player.position, rank);
+        }
+        const slot = T.playerOwnSlot ? pSlot : slots.find((x) => x.isPlayer && x.ref === player);
+        if (slot) {
+          slot.aimedAt = aimed;
+          // 被禁火的人在自卫距离外被指着：不 urgent（换过来也扣不了扳机，只会锁着玩家哑火）。
+          slot.urgent = aimedRank && this.time - s.aimedAtSince >= T.aimedAt.overrideLockS;
+        }
       }
-    }
+    } else s.aimedAtSince = -1;
     for (const other of this.soldiers) {
       if (other.side !== enemySide || !other.alive) continue;
       // 关卡标成「还没轮到他们挨打」的人（第一关等待接应的守军，见 FrontBattle.UpdateGuards）：
@@ -1968,7 +2204,8 @@ export class AiDirector {
     // 不给 visible 一律当被挡住 —— 漏填只会让 AI 变瞎，不会静默恢复成旧的全知。
     const cands = this.senseCandidates;
     let candCount = 0;
-    for (const slot of slots) {
+    for (let k = 0; k <= slots.length; k += 1) {
+      const slot = k < slots.length ? slots[k] : pSlot;
       if (!slot.ref) continue;
       slot.visible = this.HasLineOfSight(s, slot);
       if (slot.isPlayer) {
@@ -2410,7 +2647,7 @@ export class AiDirector {
     if (s.state === STATE.WATCH || s.state === STATE.IDLE || s.state === STATE.ADVANCE) return true;
     const t = s.target;
     if (!t) return true;
-    if (t.isPlayer && s.missionFireHold && !s.missionFireSuppressOnly) return true;
+    if (t.isPlayer && s.missionFireHold && !s.missionFireSuppressOnly && !this.SelfDefense(s, this.ctx.player)) return true;
     // 扳机空转（§20.7）：想打、弹在膛、有目标，却 stalledTargetS 内一发没对人打出去 —— 看得见也算：
     // 掩体里探头那一下看见了壕里的人，弹道却被他那道胸墙挡死（ShotPathClear 不过），缩头、探头、
     // 再看见……旧判据要「丢失视线满 2.5 s」，探头周期（hide 0.9–2.2 s）每轮都把它清零，
@@ -2430,7 +2667,7 @@ export class AiDirector {
    */
   AmbientOwnsAim(s) {
     if (!s.ambientFirePoint || s.unarmed || s.meleeCombat) return false;
-    if (s.missionSurfaceRest || s.missionGrenadeEvade || this.time < s.hesitateUntil) return false;
+    if (s.missionSurfaceRest || s.missionGrenadeEvade || this.GrenadeEvading(s) || this.time < s.hesitateUntil) return false;
     const st = s.state;
     if (st !== STATE.FIRE && st !== STATE.WATCH && st !== STATE.COVER_ENGAGE && st !== STATE.SUPPRESS
       && st !== STATE.IDLE && st !== STATE.ADVANCE) return false;
@@ -3458,7 +3695,8 @@ export class AiDirector {
         break;
       }
       case STATE.GRENADE:
-        this.TryGrenade(s, player);
+        // 自己脚边有雷时先躲，不在杀伤圈里站着拉弦。
+        if (!this.GrenadeEvading?.(s)) this.TryGrenade(s, player);
         break;
       case STATE.CHARGE: {
         // 自主冲锋受局部战区约束；玩家明确下达的刺刀令可越出守区。
@@ -3519,7 +3757,10 @@ export class AiDirector {
     let followsGoal = false;
     // Exact escort corridors own their queue waits. Locally mobile infantry
     // retain obstacle recovery even during authored bounds.
-    const lockedCorridor = scriptedPathFollower && !(s.tacticalRadiusM > 0);
+    // 【§21】躲雷的那几秒腿归躲雷：窄走廊的「不许绕」也让开（逃跑点的路已经验过）。
+    // 可缺省调用：P012ActorTest / RuntimeTest 把 Act 抽进没有这些方法的沙箱重放。
+    const evading = this.GrenadeEvading ? this.GrenadeEvading(s) : false;
+    const lockedCorridor = scriptedPathFollower && !(s.tacticalRadiusM > 0) && !evading;
     if (scriptedPathFollower) {
       if (lockedCorridor) { s.detourTime = 0; s.stuckTime = 0; }
       // Combat still owns aiming, firing, reloading and damage above. The
@@ -3533,6 +3774,21 @@ export class AiDirector {
     else if(this.time<(s.scriptProneUntil||0))this.SetStance(s,2,s.scriptProneUntil-this.time,true);
     if (Number.isFinite(s.scriptMoveSpeedMps)) speed = s.p012Guided && desired
       ? Math.max(0, s.scriptMoveSpeedMps) : Math.min(speed, Math.max(0, s.scriptMoveSpeedMps));
+    // 【§21】通用躲雷压过一切走位（守点锚点、剧本路线、跃进、冲锋）：冲出杀伤圈，来不及就扑倒。
+    // 炸完 `grenadeEvade` 清掉，下一帧照常回到原来的活。
+    if (evading) {
+      const ev = s.grenadeEvade;
+      wantsFire = false;
+      followsGoal = false;
+      if (ev.dive || !ev.goal) {
+        desired = null; speed = 0;
+        if (ev.dive) this.SetStance(s, 2, GRENADE_EVADE.proneHoldS, true);
+      } else {
+        desired = this.tmpD.set(ev.goal.x, 0, ev.goal.z);
+        speed = GRENADE_EVADE.sprintMps;
+        this.SetStance(s, 0, GRENADE_EVADE.replanS, true);
+      }
+    }
     if (desired && speed > 0) {
       const dx = desired.x - s.position.x, dz = desired.z - s.position.z;
       const d = Math.hypot(dx, dz);
@@ -3541,7 +3797,8 @@ export class AiDirector {
       // A route walker who replaced the moveOrder with s.goal keeps the route's radius: FIRE's displace order left
       // moveArriveM at 0.6 m, so Luo stood 0.58 m short of a 0.25 m route corner at the nest's rear door until the
       // displace timed out or FrontBattle.Walk skipped the corner (2026-09-25 relay r2 Front step 2).
-      const arrivalRadius = !followsGoal && Number.isFinite(s.moveArriveM) ? Math.max(0.05, s.moveArriveM)
+      const arrivalRadius = evading ? GRENADE_EVADE.arriveM
+        : !followsGoal && Number.isFinite(s.moveArriveM) ? Math.max(0.05, s.moveArriveM)
         : (Number.isFinite(s.scriptArrivalRadius) ? Math.max(0.05, s.scriptArrivalRadius) : 1.2);
       if (d > arrivalRadius) {
         let nx = dx / d, nz = dz / d;
@@ -3663,9 +3920,10 @@ export class AiDirector {
 
     // FIRE/ADVANCE 是离散战术状态，枪托不是电门。短暂离开 FIRE 仍保留 0.35 s
     // 的据枪承诺，再用连续 blend 上肩/放下，距离阈值两侧不会横着甩枪。
-    const mayAim = wantsFire || s.state === STATE.FIRE || s.state === STATE.COVER_ENGAGE
+    // 躲雷的人枪不上肩（跑着端枪瞄人读起来像没在躲）。
+    const mayAim = !evading && (wantsFire || s.state === STATE.FIRE || s.state === STATE.COVER_ENGAGE
       || s.state === STATE.SUPPRESS
-      || (s.state === STATE.SUPPRESSED && s.target && s.suppression <= 0.75);
+      || (s.state === STATE.SUPPRESSED && s.target && s.suppression <= 0.75));
     if ((mayAim && s.target) || ambient) s.aimUntil = this.time + 0.35;
     const wantedAim = (s.target || ambient) && this.time < s.aimUntil ? 1 : 0;
     const aimRate = wantedAim ? 5.5 : 4.0;
@@ -4605,7 +4863,7 @@ export class AiDirector {
 
   TryFire(s, dt, player) {
     if (s.unarmed) return;
-    if(s.missionGrenadeEvade || this.time<(s.scriptShelterUntil||0))return;
+    if(s.missionGrenadeEvade || this.time<(s.scriptShelterUntil||0) || this.GrenadeEvading?.(s))return;
     s.fireTimer -= dt;
     // 潜行的班不许开枪 —— 这是那道命令的全部代价，也是它区别于"跟我来"的地方
     if (s.order === "covert" && this.time < s.covertUntil) return;
@@ -4637,7 +4895,7 @@ export class AiDirector {
     // 他跳过下面的「暴露采样 + 抢令牌」，直接走压制射击（打 SuppressPoint、命中恒
     // false、不占令牌），所以一枚子弹都不进 TTK 账，只让玩家听见近失弹、被压住。
     // 其余闸（瞄准时间、枪口朝向、友军走廊、ShotPathClear）照常一道不少。
-    const holdingTrigger = s.missionFireHold && s.target.isPlayer;
+    const holdingTrigger = s.missionFireHold && s.target.isPlayer && !this.SelfDefense?.(s, player);
     if (s.missionSurfaceRest || (holdingTrigger && !s.missionFireSuppressOnly)) return;
     const suppressOnly = holdingTrigger && s.missionFireSuppressOnly;
     const aimNeeded = s.weapon.aiAimTimeS ?? 0.8;

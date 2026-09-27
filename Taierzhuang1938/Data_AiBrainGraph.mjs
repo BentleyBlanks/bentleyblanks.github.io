@@ -488,6 +488,7 @@ export const BRAIN_GRAPH = Object.freeze({
     BRAIN: "Data_Tuning_Ai",
     WATCH: "Data_Tuning_Ai",
     CROWD: "Data_Tuning_Ai",
+    GRENADE_EVADE: "Data_Tuning_Ai",
 
     COVER_WEIGHTS: "Data_Tuning_AiCover",
     COVER: "Data_Tuning_AiCover",
@@ -499,6 +500,7 @@ export const BRAIN_GRAPH = Object.freeze({
     HEARING: "Data_Tuning_AiPerception",
     MEMORY: "Data_Tuning_AiPerception",
     LOCK: "Data_Tuning_AiPerception",
+    THREAT: "Data_Tuning_AiPerception",
     EXPOSURE: "Data_Tuning_AiPerception",
     FALLBACK: "Data_Tuning_AiPerception",
     PERCEPTION: "Data_Tuning_AiPerception",

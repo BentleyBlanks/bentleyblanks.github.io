@@ -202,6 +202,73 @@ export const LOCK = Freeze({
 });
 
 /**
+ * 威胁评估：选目标时玩家排第几（2026-09-27，docs/Data_EnemyAi.md §21）。
+ *
+ * 起因：「我都在瞄准看到他了，面前三个日军没有一个理我」。改前选目标是**纯距离**：
+ *   · 候选只取离他最近的三个敌人，玩家也在里面抢槽 —— 护送队友围在玩家身边时，
+ *     三个槽全被队友占掉，玩家**连候选都进不去**；
+ *   · 已经有 3 个人在打玩家（`COMBAT.maxShootersOnPlayer`）时，25 m 外的人**看不见**玩家；
+ *   · 锁上一个国军之后，玩家要近到那个国军的一半、还要等锁定期（3–3.8 s）过完才换得过来。
+ * 3A（CoD 的 threatbias、Halo / Killzone 的目标打分）的做法是：**感知不设名额，名额只管扣扳机**
+ * （射击令牌仍是 3 个，TTK 账不变）；选目标按「距离 ÷ 威胁权重」，玩家本身权重更高，
+ * 正拿枪指着我的人再高一档，而且可以打断锁定期。
+ *
+ * playerOwnSlot  玩家单独占一个候选位，不和最近的三个 AI 抢槽。
+ * playerBias     选目标时玩家的距离除以它（1.5 = 30 m 外的玩家和 20 m 外的国军一样要紧）。
+ *                只进选 / 换目标，觉察、通视、发现距离一律按真实距离。
+ *                **被关卡禁火的人不吃这一条**（打不了玩家，偏向玩家只会让他锁着玩家哑火，§19 的教训）；
+ *                他只在玩家于 selfDefense.aimedM 内拿枪指着他时偏向玩家（那时扳机也放开）。
+ * saturatedRankMul
+ *                打玩家的名额已满、这人又不是其中之一时，玩家的排名再乘它：有别的目标就先打别的，
+ *                不然九个人焊死一个人（旧注释里的教训）；没别的目标 / 玩家正指着他时照样转过来。
+ *                改前这一档是「直接看不见」。
+ * aimedAt        玩家拿枪指着他（枪口方向 `AimDirection` 与「玩家眼 → 他胸口」夹角在
+ *                coneDeg + 身体半宽对应的角度以内，距离 ≤ rangeM）：
+ *   coneDeg      准星容差。4° 在 30 m 上约 2 m —— 「在瞄他」而不是「在瞄他那一片」。
+ *   bodyHalfM    身体半宽，折成角度加进容差（近处的人占的角度大）。
+ *   rangeM       多远以内算得上「被指着」。60 m：步枪有效射程内，人能看出枪口朝着自己。
+ *   fovBonusDeg  被指着的人视锥额外放宽这么多度（与枪口焰的 muzzleFlashBonusDeg 同一个意思：
+ *                余光里一支对着自己的枪是会被抓到的）。
+ *   riseMul      觉察累积速率乘它。
+ *   rankDiv      选目标时玩家距离再除以它。
+ *   overrideLockS 被连续指着这么久，就不等锁定期、也不要求玩家近到当前目标的一半
+ *                （`LOCK.switchDistanceRatio`）：玩家的威胁排名高过当前目标就把枪口转过来。
+ * selfDefense    关卡禁火（`missionFireHold`，开火窗口没轮到他）的人什么时候照样开枪：
+ *                禁火是给远处火力排节奏的（同一时刻只放几个人打玩家），不是让贴脸的人当木桩。
+ *   nearM        玩家在这个距离内、看得见。
+ *   aimedS / aimedM  玩家拿枪指着他满这么久、距离在 aimedM 以内。
+ *                瞄准射击仍要抢射击令牌（3 个），抢不到就是压制射击 —— TTK 账不变。
+ * wake           关卡「还没轮到他」的待命兵（`wakeOnThreat`，由关卡在生成时标）被玩家惊动就醒：
+ *   nearM        玩家在他视锥里、通视、这么近。
+ *   aimedS       被玩家指着这么久（距离不超过 aimedAt.rangeM）。
+ *   hurt         挨了玩家的打 / 被压制（近失弹）也算。
+ */
+export const THREAT = Freeze({
+  playerOwnSlot: true,
+  playerBias: 1.5,
+  saturatedRankMul: 2.5,
+  aimedAt: Freeze({
+    coneDeg: 4,
+    bodyHalfM: 0.35,
+    rangeM: 60,
+    fovBonusDeg: 25,
+    riseMul: 2.5,
+    rankDiv: 2,
+    overrideLockS: 0.5,
+  }),
+  selfDefense: Freeze({
+    nearM: 12,
+    aimedS: 0.8,
+    aimedM: 35,
+  }),
+  wake: Freeze({
+    nearM: 22,
+    aimedS: 0.6,
+    hurt: true,
+  }),
+});
+
+/**
  * 暴露度**先验**。感知层不射线（射线预算在 docs/Data_EnemyAi.md §7 里分给了
  * 掩体验证与射击采样），所以这里只按目标姿态给一个粗估：
  * 站着整个人在外面 1.0 / 蹲着躯干缩掉三分之一 0.62 / 趴着只剩头肩 0.34。
@@ -231,6 +298,7 @@ export const PERCEPTION = Freeze({
   hearing: HEARING,
   memory: MEMORY,
   lock: LOCK,
+  threat: THREAT,
   exposure: EXPOSURE,
   fallback: FALLBACK,
 });

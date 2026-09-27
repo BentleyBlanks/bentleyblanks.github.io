@@ -1045,6 +1045,9 @@ export class FirstLevelMissionRuntime {
       actor.missionReserve=!!spec.reserve;
       actor.missionReleaseDelayS=spec.releaseDelayS||0;
       if(["village","melee","bunkerAssault"].includes(id)){actor.missionDormant=true;actor.scriptedNoncombatant=true;}
+      // 村里的守兵被玩家提前惊动（挨打、贴近、被枪指着）就醒，不等 wake 半径（docs/Data_EnemyAi.md §21）。
+      // melee 组是白刃两两配对的演出、bunkerAssault 是开场行刑，不给。
+      if(id==="village")actor.wakeOnThreat=true;
       if (MISSION_TACTICS[spec.id]) actor.missionTactic = { index: 0, elapsed: 0, hold: 0,
         movingSeconds: 0, distance: 0, last: { x: spec.x, z: spec.z }, shelter: {x:spec.x,z:spec.z}, mode: "cover" };
       // Finite front teams remain ordinary alert AI before the assault starts.
@@ -1087,6 +1090,8 @@ export class FirstLevelMissionRuntime {
         // offscreen while the player was still several trench bends away.
         actor.missionTacticStandby=true;
         actor.scriptedNoncombatant=true;
+        // 玩家从别的方向摸过来、先撞见他们时不再当木桩：被惊动就醒、当场放行（§21，UpdateTactics）。
+        actor.wakeOnThreat=true;
       }
       this.enemies.set(spec.id, actor);
       return actor;
@@ -1759,7 +1764,8 @@ export class FirstLevelMissionRuntime {
       if (!actor.alive || !state || actor.meleeCombat) continue;
       // Local attacks start as the marching player reaches each sector, not offscreen at stage entry.
       if(plan.near && !state.released){
-        if(!this.Near(plan.near,plan.nearM))continue;
+        // Script_Ai 把被玩家惊动的待命兵（wakeOnThreat → threatWokenAt）先放出来了：当场放行。
+        if(!this.Near(plan.near,plan.nearM) && !(actor.threatWokenAt>=0))continue;
         state.released=true;
         // Clear only the noncombatant state owned by this local-attack gate. Other authored
         // noncombatant duties must survive a generic tactics update.
@@ -1814,6 +1820,8 @@ export class FirstLevelMissionRuntime {
       &&this.Has(MISSION_ENCOUNTER_ACTIVATION[actor.missionEncounter]?.standbyUntil)){
       actor.missionFrontStandby=false;
     }
+    // 被玩家提前惊动的村里守兵（Script_Ai 已经清了 scriptedNoncombatant）：睡旗一并收掉。
+    for(const actor of this.enemies.values())if(actor.missionDormant&&actor.threatWokenAt>=0&&actor.missionEncounter==="village")actor.missionDormant=false;
     const wake=MISSION_ENCOUNTER_ACTIVATION.village.wake;
     for(const actor of this.enemies.values())if(this.flow.stage.id===wake.step && actor.missionEncounter!=="melee" && actor.missionDormant && Distance(actor.position,this.player.position)<wake.radiusM){
       actor.missionDormant=false;actor.scriptedNoncombatant=false;
