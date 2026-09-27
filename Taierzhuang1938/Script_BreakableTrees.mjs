@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
+import { ClusterDistantGeometry } from "./Script_DistantGeometry.mjs";
 import { BREAKABLE_TREES as T } from "./Data_Tuning_BreakableTrees.mjs";
 import { MakeTreePlacements, TreeBlastDamage } from "./Data_BreakableTreePlacements.mjs";
 
@@ -12,7 +13,10 @@ function TrunkBox(tree, low, high) {
 }
 
 // Field-owned resources: small spatial instance batches while standing, ordinary
-// meshes with real motion history while falling. No animated instance matrices.
+// meshes with real motion history while falling. No animated instance matrices:
+// a distance-detail change only moves a static tree to another static batch.
+// Fracture caps are hidden inside a standing tree, so only broken stumps draw them.
+const CAP_MATERIAL = "Material_FracturedWood";
 export class BreakableTrees {
   static async Load(field) {
     const gltf = await new GLTFLoader().loadAsync("./Model/Model_BreakableDeadTree.glb?v=20260927a");
@@ -40,7 +44,10 @@ export class BreakableTrees {
           materialMap.set(material, { standing, falling }); return materialMap.get(material);
         };
         const materials = Array.isArray(mesh.material) ? mesh.material.map(Bind) : Bind(mesh.material);
-        this.parts.push({ name, geometry,
+        const cap = !Array.isArray(mesh.material) && mesh.material.name === CAP_MATERIAL;
+        // Distant copies only for the bark: the 62-triangle caps never leave full detail.
+        const lods = T.lod.map(level => level.cellM > 0 && !cap ? ClusterDistantGeometry(geometry, level.cellM) : geometry);
+        this.parts.push({ name, cap, geometry, lods,
           standing: Array.isArray(materials) ? materials.map(m=>m.standing) : materials.standing,
           falling: Array.isArray(materials) ? materials.map(m=>m.falling) : materials.falling });
       });
@@ -49,25 +56,35 @@ export class BreakableTrees {
     const sourceMaterials = new Set();
     source.traverse(m=>{ if(m.isMesh){m.geometry.dispose();for(const mat of Array.isArray(m.material)?m.material:[m.material])sourceMaterials.add(mat);} });
     sourceMaterials.forEach(m=>m.dispose());
+    if (!this.parts.some(p=>p.cap) || this.parts.filter(p=>!p.cap).length!==2) throw new Error("Tree GLB lost its bark/cap split");
+    // Until the first UpdateView every tree sits at the cheapest level.
     this.trees = MakeTreePlacements().map(p => ({ ...p, y: field.GroundHeight(p.x,p.z)-0.09,
-      health: T.health, broken: false, batches: [], body: null, fallen: null, age: 0, rest: 0 }));
+      health: T.health, broken: false, lod: T.lod.length-1, body: null, fallen: null, fallenBark: [], age: 0, rest: 0 }));
     const sectors = new Map();
     for (const tree of this.trees) {
       const key = `${Math.floor(tree.x/T.sectorM)}_${Math.floor(tree.z/T.sectorM)}`;
-      if(!sectors.has(key))sectors.set(key,[]);sectors.get(key).push(tree);
+      if(!sectors.has(key))sectors.set(key,{key,trees:[],batches:[]});
+      tree.sector = sectors.get(key); tree.sector.trees.push(tree);
+      tree.matrix = new THREE.Matrix4().compose(new THREE.Vector3(tree.x,tree.y,tree.z),
+        new THREE.Quaternion().setFromAxisAngle(up,tree.ry),new THREE.Vector3().setScalar(tree.scale));
       tree.stump = TrunkBox(tree,0,T.breakHeightM);
       tree.trunk = TrunkBox(tree,T.breakHeightM,5.5);
     }
-    for (const [key, trees] of sectors) for (const part of this.parts) {
-      const batch = new THREE.InstancedMesh(part.geometry, part.standing, trees.length);
-      batch.name = `Trees_${key}_${part.name}`; batch.castShadow = true; batch.receiveShadow = true;
-      for (const [i,tree] of trees.entries()) {
-        const matrix = new THREE.Matrix4().compose(new THREE.Vector3(tree.x,tree.y,tree.z),
-          new THREE.Quaternion().setFromAxisAngle(up,tree.ry),new THREE.Vector3().setScalar(tree.scale));
-        batch.setMatrixAt(i,matrix);
-        if(part.name==="Crown")tree.batches.push({batch,index:i});
+    // One batch per sector, part and detail level; a batch with no members is not drawn.
+    this.sectors = [...sectors.values()];
+    for (const sector of this.sectors) {
+      for (const part of this.parts) {
+        if (part.cap && part.name==="Crown") continue;
+        for (const [level, geometry] of (part.cap ? [part.geometry] : part.lods).entries()) {
+          const batch = new THREE.InstancedMesh(geometry, part.standing, sector.trees.length);
+          batch.name = `Trees_${sector.key}_${part.name}${part.cap?"Cap":""}_L${level}`;
+          batch.castShadow = true; batch.receiveShadow = true;
+          const Member = part.cap ? tree => tree.broken
+            : part.name==="Crown" ? tree => !tree.broken && tree.lod===level : tree => tree.lod===level;
+          sector.batches.push({ batch, Member }); this.root.add(batch);
+        }
       }
-      batch.computeBoundingSphere(); this.root.add(batch);
+      this.Rebuild(sector);
     }
     // Sample all directions' extreme vertices for sloping analytic-ground support.
     const points=[];
@@ -83,6 +100,28 @@ export class BreakableTrees {
     }
     field.scene.add(this.root);
     this.vector = new THREE.Vector3(); this.quaternion = new THREE.Quaternion();
+  }
+  Rebuild(sector) {
+    for (const { batch, Member } of sector.batches) {
+      let count = 0;
+      for (const tree of sector.trees) if (Member(tree)) batch.setMatrixAt(count++, tree.matrix);
+      batch.count = count; batch.visible = count > 0;
+      if (count) { batch.instanceMatrix.needsUpdate = true; batch.computeBoundingSphere(); }
+    }
+  }
+  // Called once a frame before the first render (Script_Main.RenderScene), with the drawing camera.
+  UpdateView(camera) {
+    const e = camera.matrixWorld.elements, h = T.hysteresisM, dirty = new Set();
+    for (const tree of this.trees) {
+      const d = Math.hypot(tree.x-e[12], tree.y+T.heightM*tree.scale/2-e[13], tree.z-e[14]);
+      let level = tree.lod;
+      while (level+1 < T.lod.length && d > T.lod[level+1].distanceM+h) level++;
+      while (level > 0 && d < T.lod[level].distanceM-h) level--;
+      if (level === tree.lod) continue;
+      tree.lod = level; dirty.add(tree.sector);
+      for (const { mesh, part } of tree.fallenBark) mesh.geometry = part.lods[level];
+    }
+    for (const sector of dirty) this.Rebuild(sector);
   }
   Blast(position,radius,damage) {
     const physics=this.field.physics;
@@ -105,14 +144,15 @@ export class BreakableTrees {
   Break(tree,origin) {
     if(tree.broken)return;
     tree.broken=true;
-    for(const {batch,index} of tree.batches){batch.setMatrixAt(index,new THREE.Matrix4().makeScale(0,0,0));batch.instanceMatrix.needsUpdate=true;}
+    this.Rebuild(tree.sector);
     const physics=this.field.physics;
     physics.RemoveSolid(tree.trunk._physicsHandle);
     const index=this.field.colliders.indexOf(tree.trunk);if(index>=0)this.field.colliders.splice(index,1);
     const root=new THREE.Group();root.name=`Fallen_${tree.id}`;
     root.position.set(tree.x,tree.y,tree.z);root.rotation.y=tree.ry;root.scale.setScalar(tree.scale);
     for(const p of this.parts.filter(p=>p.name==="Crown")){
-      const m=new THREE.Mesh(p.geometry,p.falling);m.castShadow=true;m.receiveShadow=true;root.add(m);
+      const m=new THREE.Mesh(p.lods[tree.lod],p.falling);m.castShadow=true;m.receiveShadow=true;root.add(m);
+      if(!p.cap)tree.fallenBark.push({mesh:m,part:p});
     }
     this.root.add(root);tree.fallen=root;
     let dx=tree.x-origin.x,dz=tree.z-origin.z,length=Math.hypot(dx,dz);
@@ -160,7 +200,7 @@ export class BreakableTrees {
     }
   }
   Snapshot(){return {count:this.trees.length,broken:this.trees.filter(t=>t.broken).length,
-    activeBodies:this.trees.filter(t=>t.body).length,trees:this.trees.map(t=>({id:t.id,x:t.x,y:t.y,z:t.z,scale:t.scale,
+    activeBodies:this.trees.filter(t=>t.body).length,lod:T.lod.map((_,level)=>this.trees.filter(t=>t.lod===level).length),trees:this.trees.map(t=>({id:t.id,x:t.x,y:t.y,z:t.z,scale:t.scale,
       broken:t.broken,health:t.health,fallPosition:t.fallen?.position.toArray(),fallRotation:t.fallen?.quaternion.toArray()}))};}
   Dispose(){
     for(const tree of this.trees)if(tree.body)this.field.physics?.RemoveBody(tree.body);
@@ -169,7 +209,7 @@ export class BreakableTrees {
     this.field.colliders=this.field.colliders.filter(c=>!colliders.has(c));
     this.field.BuildCollisionGrid();
     this.root.removeFromParent();this.root.traverse(m=>{if(m.isInstancedMesh)m.dispose();});
-    for(const p of this.parts)p.geometry.dispose();
+    for(const p of this.parts)for(const g of new Set(p.lods))g.dispose();
     for(const m of this.materials){this.field.library.externalPbrMaterials?.delete(m);m.dispose();}
     for(const t of this.textures)t.dispose();
     this.trees.length=0;

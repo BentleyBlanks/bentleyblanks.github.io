@@ -22,11 +22,18 @@ try {
     g.StepFrames(3,0,true);
     const sight=new Vector3(tree.x,tree.y+3,tree.z).sub(g.camera.position);
     const cameraHit=g.physics.Raycast(g.camera.position,sight.clone().normalize(),sight.length());
-    return {snapshot:trees.Snapshot(),collider:hit?.box?.id,expected:tree.trunk.id,
+    // Distance detail: one draw per member, caps only on broken stumps, crowns only on standing trees.
+    const members=new Map();
+    for(const b of trees.root.children)if(b.isInstancedMesh){const k=b.name.replace(/^Trees_[^_]+_[^_]+_/,"");members.set(k,(members.get(k)||0)+(b.visible?b.count:0));}
+    return {snapshot:trees.Snapshot(),collider:hit?.box?.id,expected:tree.trunk.id,probeLod:tree.lod,members:Object.fromEntries(members),
       cameraHit:cameraHit?.box?.id,
       triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls};
   });
   assert.equal(initial.snapshot.count,84);assert.equal(initial.snapshot.broken,0);
+  assert.equal(initial.probeLod,0,"the tree 16 m away draws at full detail");
+  assert.ok(initial.snapshot.lod[0]<12&&initial.snapshot.lod.slice(2).reduce((a,b)=>a+b,0)>40,"distant trees use the clustered copies: "+initial.snapshot.lod);
+  assert.equal(initial.members.StumpCap_L0||0,0,"standing trees hide their fracture caps");
+  for(const part of ["Stump","Crown"])assert.equal(initial.snapshot.lod.reduce((n,_,l)=>n+(initial.members[`${part}_L${l}`]||0),0),84,part+" is drawn exactly once per tree");
   assert.equal(initial.collider,initial.expected,"standing trunk has a real Rapier collider");
   assert.equal(initial.cameraHit,initial.expected,"capture camera has an unobstructed view of the tree");
   await page.screenshot({path:path.join(out,"Image_TreesIntact.png")});
@@ -35,11 +42,14 @@ try {
     g.combat.Blast(new Vector3(tree.x-1,tree.y+0.8,tree.z),6,160,"shell");
     const hit=g.physics.Raycast(new Vector3(tree.x-3,tree.y+2,tree.z),new Vector3(1,0,0),6);
     const snapshot=g.battlefield.breakableTrees.Snapshot();
+    const drawn=part=>tree.sector.batches.reduce((n,{batch})=>n+(batch.name.includes(`_${part}_`)&&batch.visible?batch.count:0),0);
+    const sectorDraws={cap:drawn("StumpCap"),crown:drawn("Crown"),stump:drawn("Stump"),trees:tree.sector.trees.length};
     g.StepFrames(45,1/60,false);g.StepFrames(1,0,true);
-    return {snapshot,oldCollider:hit?.box?.id||null,stumpHandle:tree.stump._physicsHandle,
+    return {snapshot,sectorDraws,oldCollider:hit?.box?.id||null,stumpHandle:tree.stump._physicsHandle,
       moved:tree.fallen?.quaternion.toArray(),body:!!tree.body};
   });
-  assert.equal(broken.snapshot.broken,1);assert.equal(broken.snapshot.activeBodies,1);
+  assert.equal(broken.snapshot.broken,1);
+  assert.deepEqual([broken.sectorDraws.cap,broken.sectorDraws.crown,broken.sectorDraws.stump],[1,broken.sectorDraws.trees-1,broken.sectorDraws.trees],"a broken tree keeps its stump, shows its cap and loses its standing crown");assert.equal(broken.snapshot.activeBodies,1);
   assert.notEqual(broken.oldCollider,initial.expected);assert.ok(broken.body);
   await page.screenshot({path:path.join(out,"Image_TreeBreaking.png")});
   const fallen=await page.evaluate(()=>{

@@ -9210,6 +9210,8 @@ function RenderScene(dt) {
   if (actorBatch) actorBatch.Update(camera);
   profiler.GpuPop();
   profiler.E("actorBatch");
+  // 可炸断的枯树按这一帧的出画相机挑细节档（远处换聚类减面的同一棵树），排在第一次 renderer.render 之前。
+  battlefield?.breakableTrees?.UpdateView(camera);
   const hitDisorientation = state.running && !state.menu && !state.cutscene && !editor?.Capturing
     ? player?.HitDisorientation || 0 : 0;
   audio.SetHitDisorientation(hitDisorientation);
