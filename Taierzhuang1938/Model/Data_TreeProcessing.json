@@ -1,15 +1,106 @@
 {
   "sourceFiles": [
-    "Tree_50K.fbx",
-    "Tree_50k_1.fbx"
+    {
+      "file": "Tree_50k_2.fbx",
+      "sha256": "19d4db45eebadef4e2507d06ac99fd7c59c3594c764ec4d41bb03cff23dae66a",
+      "geometryUvSha256": "3dd0f021dde8ac3951d026fa0cc73c2a3feda067bb30e9832718a240c6285247",
+      "matrix": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          7.549790126404332e-08,
+          -1.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          7.549790126404332e-08,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "sourceTriangles": 50000,
+      "textureSha256": [
+        "c1be344240370dfd4fdb57d48ab3cf8f7dd38aae57216b6074384d9bc667306b",
+        "b9097cc6b1a442a13122a629b1fcb9924b717b0e3601002be358f03e25ce3b1e",
+        "35e4acb63cf00896888416094f9832306b8bc7b9a14887aa2f7c67784883cf17",
+        "da4d86dfcfee8570c22bdaa0a3281d8d05d5f3a5e4d6c943555d39a14fb2d9a1"
+      ],
+      "outputTriangles": 4956
+    },
+    {
+      "file": "Tree_50k_3.fbx",
+      "sha256": "d5ee8378ccceb578937ec1a62ab06783f2ac5df1aee8d488717914b6bb1f44b9",
+      "geometryUvSha256": "3dd0f021dde8ac3951d026fa0cc73c2a3feda067bb30e9832718a240c6285247",
+      "matrix": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          7.549790126404332e-08,
+          -1.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          7.549790126404332e-08,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "sourceTriangles": 50000,
+      "textureSha256": [
+        "c1be344240370dfd4fdb57d48ab3cf8f7dd38aae57216b6074384d9bc667306b",
+        "b9097cc6b1a442a13122a629b1fcb9924b717b0e3601002be358f03e25ce3b1e",
+        "35e4acb63cf00896888416094f9832306b8bc7b9a14887aa2f7c67784883cf17",
+        "da4d86dfcfee8570c22bdaa0a3281d8d05d5f3a5e4d6c943555d39a14fb2d9a1"
+      ],
+      "outputTriangles": 4956
+    }
   ],
   "identicalSources": true,
-  "sourceTriangles": 499875,
+  "triangleLimit": 5000,
+  "sourceTriangles": 50000,
   "height": 7.2,
   "breakHeight": 0.9,
+  "sourceWorldMin": [
+    -0.1633100062608719,
+    -0.10809300094842911,
+    1.9777428583722667e-09
+  ],
+  "sourceWorldMax": [
+    0.3544119894504547,
+    0.14178405702114105,
+    1.120859980583191
+  ],
+  "sourceUp": "Z",
+  "exportUp": "Y",
+  "facing": "Non-directional scenery; source yaw preserved, placement yaw randomized",
+  "totalTriangles": 4956,
   "parts": {
-    "Stump": 2083,
-    "Crown": 10168
+    "Stump": 744,
+    "Crown": 4212
   },
-  "bytes": 13594448
+  "bytes": 9992452
 }

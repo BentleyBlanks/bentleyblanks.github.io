@@ -8,16 +8,22 @@ The old yard's authored landmark remains part of the whitebox layout.
 
 `Script_BreakableTrees` belongs to `FirstLevelWhiteboxField`. Standing trees use
 spatial instance batches. `Combat.Blast` applies distance-squared falloff and world
-occlusion after structural destruction. A broken tree retains its stump and loses
+occlusion after structural destruction. On fracture, the sector's static batches
+are rebuilt without the broken crown, shrinking their draw counts. Hidden crowns
+consume no vertex work and empty crown batches stop drawing. A broken tree retains its stump and loses
 its upper static collider; the crown becomes an ordinary mesh with a Rapier body.
 `Combat.Update` follows the physics step and synchronizes the crown. Analytic soil
 support samples the crown's directional extrema; settled visual debris stops
-consuming a dynamic body. Falling wood does not push living characters. Field
+consuming a dynamic body. Only the active falling set receives per-frame updates;
+settled crowns freeze their local/world matrices and leave that set. Explosions
+scan only the standing set. Stumps keep their small static collider; settled
+crowns have no collider, terrain sampling or physics integration. Falling wood
+does not push living characters. Field
 disposal releases instance buffers, geometry, textures, materials and bodies.
 
 ## Distance detail (rendering budget)
 
-At full detail every tree costs 12,251 triangles in each pass that draws it. With all 84
+Before this model replacement, every tree cost 12,251 triangles in each pass. With all 84
 trees at that level the 03 captures rose from 7.78 M to 9.81 M triangles per frame, above
 `SCENE_RENDER_LIMITS`. Measured from the right nest facing north, 64 visible trees in the
 prepass and main pass cost 1.57 M, and the shadow bake cost another 0.28 M.
@@ -32,29 +38,44 @@ still holds. Fallen crowns switch their bark geometry by the same level.
 The fracture caps sit inside a standing tree. Only broken stumps draw their cap; the crown's
 cap appears only on the fallen mesh. Empty batches are hidden, so a sector normally submits two
 draws per pass. After the change, the same north-facing view costs 0.20 M triangles for the
-trees across all passes, down from 1.85 M.
+trees across all passes, down from 1.85 M. These figures describe the previous mesh;
+the replacement's full-detail budget is 4,956 triangles including caps. The same
+distance thresholds and clustering remain active for the new mesh.
 
 ## Source and rebuild
 
-User supplied `Tree_50K.fbx` and `Tree_50k_1.fbx` from the local FPS/tree directory.
-Despite their names, both contain 499,875 triangles. Their geometry, UVs and embedded
-textures match. This is one unique tree; placement variation does not imply a second
-species. Source ownership/licensing remains with the supplied files; no CC0 claim.
+The 2026-09-27 replacement uses user-supplied `Tree_50k_2.fbx` and
+`Tree_50k_3.fbx` from `C:\Users\Bentl\OneDrive\Sync\饮河\FPS\建模\树`.
+Each contains 50,000 triangles. Their geometry, UVs, transforms and all four
+embedded textures match; only file metadata differs. Both sources share one
+runtime asset. Source ownership/licensing remains with the supplied files; no
+CC0 claim. `Model/Data_TreeProcessing.json` records both file hashes, geometry/UV
+and texture hashes, measured bounds and each source's output triangle count.
 
 Geometry digest (source vertex/index audit):
-`2e8689ce374c451ceffad0e63d764954c39df1998080acc5f914fb3740042d48`.
+`3dd0f021dde8ac3951d026fa0cc73c2a3feda067bb30e9832718a240c6285247`.
 
-The bake removes the flat soil disc, retains the root flare, scales to 7.2 m and
-decimates before cutting a matching jagged fracture at 0.9 m. Source PBR becomes
-2K; the closed cut faces get procedural wood grain. Final geometry: 2,083 stump +
-10,168 crown = 12,251 triangles, a 97.55% reduction. Four primitives, two materials,
-13.6 MB GLB. Actual geometry and Y-up dimensions are measured by the tests.
+The new source has a flat trunk base without the former soil disc. The bake
+measures the source Z-up vertex cloud, scales to 7.2 m, centers the trunk at the
+fracture plane and decimates before cutting a matching jagged fracture at 0.9 m.
+Source PBR becomes 2K; closed cut faces get procedural wood grain. Final geometry:
+744 stump + 4,212 crown = **4,956 triangles**, a 90.088% source reduction. The 5,000
+triangle limit includes both cut caps. Four primitives, two materials, 9,992,452
+bytes GLB. Y-up export dimensions and the shipped index count are verified by tests.
+Compared with the previous 12,251-triangle runtime tree, each placement uses 59.55%
+fewer triangles. The split parts are instanced while intact; ordinary meshes and
+a single simple Rapier body are created only on fracture, sharing the same geometry
+and textures. No network request or high-resolution asset swap occurs during a blast.
 
 Rebuild script: `_blender/Script_BakeBreakableDeadTree.py`. Run it through the task's
-BlenderMCP `exec` entry with `sys.argv` containing `-- --source <FBX> --out <Model>`
+BlenderMCP `exec` entry with `sys.argv` containing
+`-- --source <Tree_50k_2.fbx> --source-check <Tree_50k_3.fbx> --out <Model>`
 and `--blend-dir <source engineering directory>`. The script starts a fresh file;
 save current work first. Source engineering directory:
-`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\BreakableDeadTree`.
+`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\DeadTreeModels20260927`.
+The identical processed mesh is saved as `Scene_Tree_50k_2.blend` and
+`Scene_Tree_50k_3.blend`; the recipe rejects mismatching source content rather
+than silently treating different trees as duplicates.
 The FBX stays read-only. The repository contains only the GLB, recipe and audit.
 
 ## Verification
@@ -63,7 +84,11 @@ The FBX stays read-only. The repository contains only the GLB, recipe and audit.
 clearance, damage falloff and the actual GLB budget.
 `node Taierzhuang1938/Script_BreakableTreesBrowserTest.mjs` checks the real first-level
 high-quality renderer, Combat explosion path, standing/removed colliders, falling,
-ground contact, occlusion, repeat hits and resource disposal. It also checks the distance
-levels: the tree beside the camera is at full detail, distant trees use the clustered
-copies, each tree is drawn once, and caps are drawn only on broken stumps. Screenshots and reports
+ground contact, occlusion, repeat hits and resource disposal. It also topples all
+84 trees, verifies that their dynamic bodies return to zero and static tree
+colliders fall from 168 to 84 stumps, and checks that 10,000 subsequent tree updates
+perform zero terrain samples. Distance checks verify full detail near the camera,
+clustered distant copies, one instance per tree and caps only on broken stumps.
+`TREE_PREVIEW_ORIGIN` optionally selects an existing
+LocalPreview server; otherwise the test starts its own temporary server. Screenshots and reports
 stay under ignored `_shots/BreakableTrees`; they are not published assets.

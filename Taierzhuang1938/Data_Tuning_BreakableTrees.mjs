@@ -7,7 +7,7 @@ export const BREAKABLE_TREES = Object.freeze({
   // prepass and the main pass on the 03 right-nest captures: +1.57 M of a frame capped at 8.10 M
   // (SCENE_RENDER_LIMITS). Past `distanceM` a level uses vertex-clustered copies of the same bark
   // (Script_DistantGeometry, cell size in model metres); `hysteresisM` stops boundary flicker.
-  // Cells measured on the shipped GLB: 0.12 m -> 1,808 crown + 621 stump; 0.18 m -> 876 + 311;
+  // Cells measured on the previous 12K GLB: 0.12 m -> 1,808 crown + 621 stump; 0.18 m -> 876 + 311;
   // 0.3 m -> ~350 + ~110. 0.25 m visibly dropped the fine upper branches at 75 m in a side-by-side
   // capture, so the coarsest cell waits until a 7 m tree is about 40 px tall (130 m at 1440x900).
   lod: [

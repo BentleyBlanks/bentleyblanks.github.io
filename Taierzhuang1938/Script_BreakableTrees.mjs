@@ -19,13 +19,14 @@ function TrunkBox(tree, low, high) {
 const CAP_MATERIAL = "Material_FracturedWood";
 export class BreakableTrees {
   static async Load(field) {
-    const gltf = await new GLTFLoader().loadAsync("./Model/Model_BreakableDeadTree.glb?v=20260927a");
+    const gltf = await new GLTFLoader().loadAsync("./Model/Model_BreakableDeadTree.glb?v=20260927b");
     return new BreakableTrees(field, gltf.scene);
   }
   constructor(field, source) {
     this.field = field;
     this.root = new THREE.Group(); this.root.name = "BreakableTrees";
     this.parts = []; this.materials = new Set(); this.textures = new Set();
+    this.activeTrees = new Set();
     const materialMap = new Map();
     source.updateMatrixWorld(true);
     for (const name of ["Stump","Crown"]) {
@@ -45,7 +46,7 @@ export class BreakableTrees {
         };
         const materials = Array.isArray(mesh.material) ? mesh.material.map(Bind) : Bind(mesh.material);
         const cap = !Array.isArray(mesh.material) && mesh.material.name === CAP_MATERIAL;
-        // Distant copies only for the bark: the 62-triangle caps never leave full detail.
+        // Distant copies only for the bark: fracture caps never leave full detail.
         const lods = T.lod.map(level => level.cellM > 0 && !cap ? ClusterDistantGeometry(geometry, level.cellM) : geometry);
         this.parts.push({ name, cap, geometry, lods,
           standing: Array.isArray(materials) ? materials.map(m=>m.standing) : materials.standing,
@@ -60,6 +61,7 @@ export class BreakableTrees {
     // Until the first UpdateView every tree sits at the cheapest level.
     this.trees = MakeTreePlacements().map(p => ({ ...p, y: field.GroundHeight(p.x,p.z)-0.09,
       health: T.health, broken: false, lod: T.lod.length-1, body: null, fallen: null, fallenBark: [], age: 0, rest: 0 }));
+    this.standingTrees = new Set(this.trees);
     const sectors = new Map();
     for (const tree of this.trees) {
       const key = `${Math.floor(tree.x/T.sectorM)}_${Math.floor(tree.z/T.sectorM)}`;
@@ -127,8 +129,7 @@ export class BreakableTrees {
     const physics=this.field.physics;
     if(!physics)return 0;
     let broken=0;
-    for(const tree of this.trees){
-      if(tree.broken)continue;
+    for(const tree of this.standingTrees){
       const target=new THREE.Vector3(tree.x,tree.y+T.breakHeightM*tree.scale,tree.z);
       const delta=target.clone().sub(position),distance=delta.length();
       const dealt=TreeBlastDamage(distance,radius,damage);
@@ -144,6 +145,8 @@ export class BreakableTrees {
   Break(tree,origin) {
     if(tree.broken)return;
     tree.broken=true;
+    this.standingTrees.delete(tree);
+    this.activeTrees.add(tree);
     this.Rebuild(tree.sector);
     const physics=this.field.physics;
     physics.RemoveSolid(tree.trunk._physicsHandle);
@@ -168,9 +171,9 @@ export class BreakableTrees {
     });
   }
   Update(dt) {
+    if(!this.activeTrees.size)return;
     const physics=this.field.physics;if(!physics||physics.disposed)return;
-    for(const tree of this.trees){
-      if(!tree.body)continue;
+    for(const tree of this.activeTrees){
       tree.age+=dt;
       const body=tree.body,p=body.translation(),q=body.rotation();
       this.quaternion.set(q.x,q.y,q.z,q.w);
@@ -196,11 +199,19 @@ export class BreakableTrees {
       tree.rest=still?tree.rest+dt:0;
       if(tree.rest>1 || (tree.age>T.settleAfterS && penetration>=-0.05)){
         physics.RemoveBody(body);tree.body=null;
+        this.activeTrees.delete(tree);
+        // Final pose remains an ordinary static mesh, with no physics, terrain
+        // sampling or matrix recomposition after settling. Motion history stays
+        // under the shared renderer contract, including the final moving frame.
+        tree.fallen.traverse(mesh=>{
+          mesh.updateMatrix();mesh.matrixAutoUpdate=false;mesh.matrixWorldAutoUpdate=false;
+        });
       }
     }
   }
   Snapshot(){return {count:this.trees.length,broken:this.trees.filter(t=>t.broken).length,
-    activeBodies:this.trees.filter(t=>t.body).length,lod:T.lod.map((_,level)=>this.trees.filter(t=>t.lod===level).length),trees:this.trees.map(t=>({id:t.id,x:t.x,y:t.y,z:t.z,scale:t.scale,
+    activeBodies:this.activeTrees.size,standing:this.standingTrees.size,settled:this.trees.filter(t=>t.broken&&!t.body).length,
+    lod:T.lod.map((_,level)=>this.trees.filter(t=>t.lod===level).length),trees:this.trees.map(t=>({id:t.id,x:t.x,y:t.y,z:t.z,scale:t.scale,
       broken:t.broken,health:t.health,fallPosition:t.fallen?.position.toArray(),fallRotation:t.fallen?.quaternion.toArray()}))};}
   Dispose(){
     for(const tree of this.trees)if(tree.body)this.field.physics?.RemoveBody(tree.body);
@@ -213,5 +224,6 @@ export class BreakableTrees {
     for(const m of this.materials){this.field.library.externalPbrMaterials?.delete(m);m.dispose();}
     for(const t of this.textures)t.dispose();
     this.trees.length=0;
+    this.activeTrees.clear();this.standingTrees.clear();
   }
 }

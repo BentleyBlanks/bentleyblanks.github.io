@@ -11,7 +11,8 @@ const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
 page.on("pageerror",e=>errors.push(String(e)));
 page.on("console",m=>{if(m.type()==="error")console.log("BROWSER",m.text().slice(0,300));});
 try {
-  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&missionStage=3&quality=high&scale=small`,{timeout:180000});
+  const origin=process.env.TREE_PREVIEW_ORIGIN||`http://127.0.0.1:${server.address().port}`;
+  await page.goto(`${origin}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&missionStage=3&quality=high&scale=small`,{timeout:180000});
   await page.waitForFunction(()=>window.Tengxian?.state.ready,null,{timeout:240000});
   const initial=await page.evaluate(async()=>{
     const g=window.Tengxian,trees=g.battlefield.breakableTrees;
@@ -26,10 +27,12 @@ try {
     const members=new Map();
     for(const b of trees.root.children)if(b.isInstancedMesh){const k=b.name.replace(/^Trees_[^_]+_[^_]+_/,"");members.set(k,(members.get(k)||0)+(b.visible?b.count:0));}
     return {snapshot:trees.Snapshot(),collider:hit?.box?.id,expected:tree.trunk.id,probeLod:tree.lod,members:Object.fromEntries(members),
+      treeColliders:g.battlefield.colliders.filter(c=>c.tag==="tree").length,
       cameraHit:cameraHit?.box?.id,
       triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls};
   });
   assert.equal(initial.snapshot.count,84);assert.equal(initial.snapshot.broken,0);
+  assert.equal(initial.treeColliders,168);assert.equal(initial.snapshot.activeBodies,0);
   assert.equal(initial.probeLod,0,"the tree 16 m away draws at full detail");
   assert.ok(initial.snapshot.lod[0]<12&&initial.snapshot.lod.slice(2).reduce((a,b)=>a+b,0)>40,"distant trees use the clustered copies: "+initial.snapshot.lod);
   assert.equal(initial.members.StumpCap_L0||0,0,"standing trees hide their fracture caps");
@@ -62,12 +65,14 @@ try {
       const v=point.clone().applyMatrix4(tree.fallen.matrixWorld);
       minGap=Math.min(minGap,v.y-g.battlefield.GroundHeight(v.x,v.z));
     }
-    return {snapshot,minGap,quaternion:tree.fallen.quaternion.toArray(),
+    return {snapshot,minGap,staticMatrices:!tree.fallen.matrixAutoUpdate&&!tree.fallen.matrixWorldAutoUpdate,
+      quaternion:tree.fallen.quaternion.toArray(),
       linked:g.renderer.info.programs.every(p=>g.renderer.getContext().getProgramParameter(p.program,g.renderer.getContext().LINK_STATUS))};
   });
   assert.equal(fallen.snapshot.activeBodies,0);assert.ok(fallen.minGap>=-0.08&&fallen.minGap<0.4,JSON.stringify(fallen));
   assert.ok(Math.hypot(fallen.quaternion[0],fallen.quaternion[2])>0.45,"crown actually topples");
   assert.ok(fallen.linked);
+  assert.ok(fallen.staticMatrices);assert.equal(fallen.snapshot.settled,1);
   await page.screenshot({path:path.join(out,"Image_TreeFallen.png")});
   const lifecycle=await page.evaluate(async()=>{
     const g=window.Tengxian,system=g.battlefield.breakableTrees,tree=system.trees.find(t=>!t.broken);
@@ -82,11 +87,45 @@ try {
     const bodiesBefore=g.physics.dynamics.size;
     system.Break(tree,new Vector3(tree.x-1,tree.y+1,tree.z));
     const bodiesDuring=g.physics.dynamics.size;
+    // Stress the worst case: every remaining tree falls in the same frame.
+    for(const t of [...system.standingTrees])system.Break(t,new Vector3(t.x-1,t.y+1,t.z));
+    g.battlefield.BuildCollisionGrid();g.physics.RefreshStaticQueries();
+    const peak=system.Snapshot();
+    const treeBodies=[...system.activeTrees].map(t=>t.body);
+    g.StepFrames(1800,1/60,false);g.StepFrames(1,0,true);
+    const settled=system.Snapshot();
+    const treeColliders=g.battlefield.colliders.filter(c=>c.tag==="tree").length;
+    let terrainSamples=0;
+    const ground=g.battlefield.GroundHeight;
+    g.battlefield.GroundHeight=function(...args){terrainSamples++;return ground.apply(this,args);};
+    const start=performance.now();
+    for(let i=0;i<10000;i++)system.Update(1/60);
+    const idleUpdateMs=performance.now()-start;
+    g.battlefield.GroundHeight=ground;
+    let allStatic=true;
+    for(const t of system.trees)t.fallen.traverse(m=>{allStatic&&=!m.matrixAutoUpdate&&!m.matrixWorldAutoUpdate;});
+    const stress={peak:peak.activeBodies,settled:settled.settled,activeBodies:settled.activeBodies,
+      standing:settled.standing,treeColliders,terrainSamples,idleUpdateMs,allStatic,
+      crownInstances:system.root.children.filter(m=>m.isInstancedMesh&&m.name.includes("_Crown_L")).reduce((n,m)=>n+m.count,0),
+      remainingTreeBodies:treeBodies.filter(body=>g.physics.dynamics.has(body)).length,
+      bodiesAfterSettling:g.physics.dynamics.size};
+    // Gameplay may create unrelated projectiles during those 30 simulated seconds.
+    // Track exact tree bodies for leaks and preserve every unrelated body on disposal.
+    const unrelatedBodies=[...g.physics.dynamics];
     system.Dispose();
-    return {shielded,count,detached:!root.parent,bodiesBefore,bodiesDuring,bodiesAfter:g.physics.dynamics.size};
+    const preservedBodies=unrelatedBodies.every(body=>g.physics.dynamics.has(body));
+    return {shielded,count,detached:!root.parent,bodiesBefore,bodiesDuring,bodiesAfter:g.physics.dynamics.size,
+      preservedBodies,treeCollidersAfterDispose:g.battlefield.colliders.filter(c=>c.tag==="tree").length,stress};
   });
   assert.equal(lifecycle.shielded,0);assert.equal(lifecycle.count,1);assert.ok(lifecycle.detached);
-  assert.equal(lifecycle.bodiesDuring,lifecycle.bodiesBefore+1);assert.equal(lifecycle.bodiesAfter,lifecycle.bodiesBefore);
+  assert.equal(lifecycle.bodiesDuring,lifecycle.bodiesBefore+1);
+  assert.equal(lifecycle.bodiesAfter,lifecycle.stress.bodiesAfterSettling);assert.ok(lifecycle.preservedBodies);
+  assert.equal(lifecycle.treeCollidersAfterDispose,0);
+  assert.equal(lifecycle.stress.peak,83);assert.equal(lifecycle.stress.settled,84);
+  assert.equal(lifecycle.stress.activeBodies,0);assert.equal(lifecycle.stress.standing,0);
+  assert.equal(lifecycle.stress.treeColliders,84);assert.equal(lifecycle.stress.terrainSamples,0);
+  assert.equal(lifecycle.stress.crownInstances,0);
+  assert.equal(lifecycle.stress.remainingTreeBodies,0);assert.ok(lifecycle.stress.allStatic);
   assert.deepEqual(errors,[]);
   await fs.writeFile(path.join(out,"Data_Verification.json"),JSON.stringify({initial,broken,fallen,lifecycle,errors},null,2));
   console.log("PASS BreakableTreesBrowserTest",JSON.stringify({count:84,broken:fallen.snapshot.broken,minGap:fallen.minGap,lifecycle}));
