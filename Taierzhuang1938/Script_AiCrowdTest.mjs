@@ -7,12 +7,13 @@ import fs from "node:fs";
 import vm from "node:vm";
 import { CROWD } from "./Data_Tuning_Ai.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
+import { LitterSegments, LitterPush, BlockStepByLitters } from "./Script_LitterBlock.mjs";
 
 const source = fs.readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8").replace(/\r/g, "");
 const Method = (name) => source.match(new RegExp(`  ${name}\\([^\\n]*\\{[\\s\\S]*?\\n  }\\n`))[0];
 const director = vm.runInNewContext(
   `({${Method("CrowdPinned")},${Method("SeparateSoldiers")},${Method("CoverHideTaken")}})`,
-  { CROWD, COVER, Math });
+  { CROWD, COVER, Math, LitterSegments, LitterPush });
 
 let serial = 1;
 const Man = (x, z, extra = {}) => ({ id: serial++, side: "nra", alive: true, position: { x, y: 0, z }, vaultT: -1, ...extra });
@@ -113,9 +114,72 @@ Ok(!Host([]).CrowdPinned(Man(0, 0, { missionTrainPassenger: true, missionTrainRe
   Ok(!host.CoverHideTaken(me, { x: 5, z: 5 }), "an enemy's spot does not block");
   Ok(!host.CoverHideTaken(me, { x: 7, z: 7 }), "a dead man's stale cover does not block");
 }
+// ⑦b 抬着的担架（2026-09-27：队友从两个担架员中间直接穿过去）。
+{
+  const clearance = CROWD.litterHalfWidthM + 0.34;
+  // 两名担架员沿 z 轴相距 2.56 m，担架在他们中间。
+  const Pair = () => {
+    const front = Man(0, 1.28, { carryRole: "front" }), rear = Man(0, -1.28, { carryRole: "rear" });
+    front.carryLitterRear = rear;
+    return [front, rear];
+  };
+  // 站在担架正中间的队友被推出担架（担架员本人不动）。
+  {
+    const [front, rear] = Pair(), mate = Man(0.1, 0), host = Host([front, rear, mate]);
+    Run(host, 120);
+    Ok(Math.abs(mate.position.x) >= CROWD.litterHalfWidthM + CROWD.spacingM / 2 - 1e-6,
+      `an ally standing on the litter steps off it (${mate.position.x.toFixed(3)})`);
+    Ok(front.position.z === 1.28 && rear.position.z === -1.28 && front.position.x === 0, "the bearers are not moved");
+  }
+  // 往担架中间横穿的一步被裁掉法向分量（只能沿担架滑）；背离担架的步子照走。
+  {
+    const [front, rear] = Pair(), segs = LitterSegments([front, rear], null);
+    Ok(segs.length === 1, "a front bearer with a living rear partner makes one litter segment");
+    const mate = Man(-clearance - 0.01, 0.2);
+    let crossed = false;
+    for (let i = 0; i < 180; i += 1) {
+      const step = BlockStepByLitters(mate, 0.05, 0.01, segs, clearance, CROWD.maxDyM);
+      mate.position.x += step.dx; mate.position.z += step.dz;
+      if (mate.position.x > -clearance + 1e-3 && Math.abs(mate.position.z) < 1.28) crossed = true;
+    }
+    Ok(!crossed, "an ally walking straight at the litter never crosses between the bearers");
+    Ok(mate.position.z > 1.28 || mate.position.x < 0, "he slides along the litter instead of passing through it");
+    const away = BlockStepByLitters(Man(-clearance - 0.01, 0), -0.05, 0, segs, clearance, CROWD.maxDyM);
+    Ok(away.dx === -0.05 && !away.blocked, "a step away from the litter is untouched");
+    const inside = Man(-0.2, 0);
+    const deeper = BlockStepByLitters(inside, 0.05, 0, segs, clearance, CROWD.maxDyM);
+    Ok(deeper.dx <= 1e-9, "someone already inside may not go deeper");
+    Ok(BlockStepByLitters(front, 0, -0.05, segs, clearance, CROWD.maxDyM).dz === -0.05, "the bearers themselves are not blocked by their own litter");
+  }
+  // 担架落地（后位死了或不再是 rear）、楼上楼下：不挡。
+  {
+    const [front, rear] = Pair(); rear.alive = false;
+    Ok(LitterSegments([front, rear], null).length === 0, "a dropped litter (dead rear) is no obstacle");
+    const [f2, r2] = Pair(); r2.carryRole = null;
+    Ok(LitterSegments([f2, r2], null).length === 0, "a rear who let go makes no segment");
+    const [f3, r3] = Pair(), segs = LitterSegments([f3, r3], null);
+    const upstairs = Man(-0.2, 0, { position: { x: -0.2, y: CROWD.maxDyM + 0.1, z: 0 } });
+    Ok(BlockStepByLitters(upstairs, 0.3, 0, segs, clearance, CROWD.maxDyM).dx === 0.3, "different floors are not blocked");
+  }
+  // 玩家接了后端：担架连到玩家身上。
+  {
+    const front = Man(0, 1.28, { carryRole: "front", carryLitterRear: "player" });
+    const player = { Alive: true, position: { x: 0, y: 0, z: -1.28 } };
+    const segs = LitterSegments([front], player);
+    Ok(segs.length === 1 && segs[0].bz === -1.28, "a litter carried with the player spans to the player");
+  }
+  // 关卡报来的担架队（不在 soldiers 里的表现人物）也挡。
+  {
+    const mate = Man(0.1, 0);
+    const host = Object.assign(Host([mate]), { ctx: { LitterObstacles: (out) => out.push({ ax: 0, az: 1.28, bx: 0, bz: -1.28, y: 0 }) } });
+    Run(host, 120);
+    Ok(Math.abs(mate.position.x) >= CROWD.litterHalfWidthM + CROWD.spacingM / 2 - 1e-6, "a level-reported stretcher team pushes allies off too");
+  }
+}
 // ⑧ 接线：推开量随 StepBody 走角色控制器；待机隔帧步进遇到推开量当帧就走；选掩体用硬过滤。
 Ok(/this\.SeparateSoldiers\(dt\);[\s\S]{0,200}for \(let i = 0; i < this\.soldiers\.length/.test(source), "Update separates before the Act loop");
-Ok(/dx \+= s\.crowdPushX;[\s\S]{0,120}body\.Move\(dx, s\.velocityY \* dt, dz\)/.test(source), "the push goes through the character controller");
+Ok(/dx \+= s\.crowdPushX;[\s\S]{0,600}body\.Move\(dx, s\.velocityY \* dt, dz\)/.test(source), "the push goes through the character controller");
+Ok(/BlockStepByLitters\(s, dx, dz, this\.litterSegs[\s\S]{0,200}body\.Move\(dx, s\.velocityY \* dt, dz\)/.test(source), "StepBody trims steps against carried litters before the controller");
 Ok(/cadence === 1 \|\| s\.crowdPushX \|\| s\.crowdPushZ/.test(source), "idle cadence does not delay a push");
 Ok(/CoverAllowed\(s, cand\)\) continue;\n\s*if \(this\.CoverHideTaken\(s, cand\.hidePos\)\) continue;/.test(source), "UpdateCover rejects claimed hide spots");
 

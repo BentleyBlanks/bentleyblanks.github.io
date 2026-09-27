@@ -1352,6 +1352,8 @@ async function Boot() {
       if(PHASE_TABLE[state.phaseIndex]?.whitebox?.p012)InstallP012ActorMotion(soldier);
     },
     BlocksSight: (from, to) => missionRuntime?.BlocksSight(from,to) || p012Runtime?.BlocksSight(from, to) || false,
+    // 第一关任务流的担架队是表现人物，不在 soldiers 里：抬着的担架由任务运行时报给 AI 当实物挡。
+    LitterObstacles: (out) => missionRuntime?.LitterObstacles?.(out),
     // 票池 = 兵力池：**谁死了扣谁的**。
     // 以前只有玩家的命和玩家的战绩会动票池，而 Combat.Blast 的 onKill 不带 side，
     // 装配层写死扣日方 —— 日军炮弹炸死中国兵扣的是日军的票。

@@ -267,6 +267,22 @@ export class FirstLevelMissionRuntime {
     const hit=this.battlefield.Raycast(from,delta.multiplyScalar(1/distance),distance,{terrain:true,excludeCollider});
     return !!hit && hit.t<distance-.1;
   }
+  /**
+   * 正在抬着走的担架（前后抬架员 + 中间那副担架）给 AI 当实物挡（Script_LitterBlock）。
+   * 担架队是 MissionPeople 画的表现人物，不在 ai.soldiers 里，AI 本来看不见他们。
+   * 只算有人抬着的（与 MissionView 画抬架员、抬高担架的条件一致）；落在地上的（fallen/critical/placed）、
+   * 装上车的不算 —— 14 幺娃要蹲到落地的老周担架边上把人拖回来，挡住就卡关。
+   */
+  LitterObstacles(out) {
+    for (const litter of this.column?.litters || []) {
+      if (!litter.visible || litter.loaded || ["placed", "fallen", "critical"].includes(litter.state) || litter.borrowBearersStaged
+        || (litter.zhou && litter.liveSeated) || !litter.bearers?.some(health => health > 0)) continue;
+      const yaw = litter.yaw || 0, sx = Math.sin(yaw) * R.litterBearerOffsetM, sz = Math.cos(yaw) * R.litterBearerOffsetM;
+      out.push({ ax: litter.x - sx, az: litter.z - sz, bx: litter.x + sx, bz: litter.z + sz,
+        y: this.battlefield.GroundHeight(litter.x, litter.z) });
+    }
+    return out;
+  }
   Record(id, detail) {
     return this.flow.Record(id, detail);
   }

@@ -131,9 +131,9 @@ export function StepP012PlayerLitter(s) {
   const corners=path.slice(self.index).filter(point=>P012RouteProjection(path,point).along<projection.along+span);
   const next=P012NextVisiblePoint(s.phase.whitebox.layout.blocks,at,[...corners,goal],0,front.body?.radius||.42);
   const previous=s.mem.p012CarryPartner?.previous || Object.fromEntries(
-    ["p012Guided","scriptMoveSpeedMps","scriptArrivalRadius","scriptDefensive","order","carryRole"].map(key=>[key,front[key]]));
+    ["p012Guided","scriptMoveSpeedMps","scriptArrivalRadius","scriptDefensive","order","carryRole","carryLitterRear"].map(key=>[key,front[key]]));
   front.p012Guided=true;front.scriptMoveSpeedMps=3.05;front.scriptArrivalRadius=.15;
-  front.scriptDefensive=false;front.order="advance";front.carryRole="front";
+  front.scriptDefensive=false;front.order="advance";front.carryRole="front";front.carryLitterRear="player";
   if(load)load.partner=front;
   s.d.host.SetGoal?.(front,next.point.x,next.point.z);
   const mid={x:(at.x+rear.x)/2,z:(at.z+rear.z)/2},gy=Math.min(at.y||0,rear.y||0);
@@ -508,7 +508,7 @@ export class EscortColumn {
   /** 收摊。**不 Kill** —— 撤走不是阵亡。 */
   Reset() {
     for (const litter of this.litters || []) {
-      if (litter.front?.handle) litter.front.handle.carryRole = null;
+      if (litter.front?.handle) { litter.front.handle.carryRole = null; litter.front.handle.carryLitterRear = null; }
       if (litter.rear?.handle) litter.rear.handle.carryRole = null;
       this.host.SetPropState?.(litter.propLitter, "removed");
       this.host.SetPropState?.(litter.propBody, "removed");
@@ -616,6 +616,7 @@ export class EscortColumn {
       const rearAlive = litter.rear.handle && this._Alive(litter.rear.handle);
       if (!frontAlive || !rearAlive) {
         litter.dropped = true;
+        if (litter.front.handle) litter.front.handle.carryLitterRear = null;
         if (frontAlive) litter.front.handle.carryRole = null;
         if (rearAlive) litter.rear.handle.carryRole = null;
         const at = litter.lastMid;
@@ -628,6 +629,8 @@ export class EscortColumn {
       const fp = this.host.PositionOf ? this.host.PositionOf(litter.front.handle) : null;
       const rp = this.host.PositionOf ? this.host.PositionOf(litter.rear.handle) : null;
       if (!fp || !rp) continue;
+      // 两人中间这一段是实物：Script_Ai 按它挡住别人（Script_LitterBlock）。
+      litter.front.handle.carryLitterRear = litter.rear.handle;
       const mid = { x: (fp.x + rp.x) / 2, z: (fp.z + rp.z) / 2 };
       const gy = Math.min(fp.y || 0, rp.y || 0);
       const yaw = Math.atan2(fp.x - rp.x, fp.z - rp.z);
@@ -1054,6 +1057,7 @@ export const SETPIECES = {
       }
       if(p012 && s.mem.p012ReleaseAt && s.mem.p012CarryPartner){
         const actor=s.mem.p012CarryPartner.actor,at=s.d.host.PositionOf?.(actor),point=s.mem.p012ReleaseAt;
+        actor.carryLitterRear=null; // 玩家已经松手：担架不再连到玩家身上
         const target={x:point.x+1.2,z:point.z-2.4};
         const next=at&&P012NextVisiblePoint(s.phase.whitebox.layout.blocks,at,[target],0,actor.body?.radius||.42);
         if(next&&!next.blocked)s.d.host.SetGoal?.(actor,next.point.x,next.point.z);

@@ -261,8 +261,10 @@ export const HURT_FLINCH = Freeze({ base: 0.45, damageDiv: 90, decayS: 0.45 });
  * spacingM   两人水平间距低于它就开始推（站/蹲胶囊半径 0.34 × 2 = 0.68，加一点肩宽）
  * pushMps    推开速度上限（米/秒）；比走路慢得多，看起来是侧身让一步而不是被弹开
  * maxDyM     高度差超过它不算挤在一起（楼上楼下、壕底与壕沿）
+ * litterHalfWidthM  抬着的担架的半宽（2026-09-27）。前后两个担架员之间那一段当成这么宽的实物，
+ *            别人不许从中间穿过去（Script_LitterBlock；担架道具宽约 0.6 m）
  */
-export const CROWD = Freeze({ spacingM: 0.75, pushMps: 1.4, maxDyM: 1.2 });
+export const CROWD = Freeze({ spacingM: 0.75, pushMps: 1.4, maxDyM: 1.2, litterHalfWidthM: 0.32 });
 
 /**
  * 大脑接线（docs/Data_EnemyAi.md §5）。

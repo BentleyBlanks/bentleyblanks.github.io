@@ -21,6 +21,7 @@ import {
   SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, FIRE_STANCE, ACTOR_DETAIL, HURT_FLINCH, BRAIN, WATCH, CROWD,
 } from "./Data_Tuning_Ai.mjs";
 import { PlayerHitboxes, PlayerAimPoint, RaycastPlayerHitboxes, GaussianPair } from "./Script_PlayerHitbox.mjs";
+import { LitterSegments, LitterPush, BlockStepByLitters } from "./Script_LitterBlock.mjs";
 // 敌军 AI 的四件基建（docs/Data_EnemyAi.md §4）。四个模块都不 import three，
 // 只吃普通对象 `{x,y,z}` 与本文件组装的 host 回调 —— Script_Ai 仍是唯一的 three 适配层。
 import { PerceptionModel, PLAYER_TRACK_ID, ALERT_ORDER } from "./Script_AiPerception.mjs";
@@ -1502,6 +1503,20 @@ export class AiDirector {
         const shareA = pinA ? 0 : pinB ? 1 : 0.5, shareB = 1 - shareA;
         a.crowdPushX -= ux * push * shareA; a.crowdPushZ -= uz * push * shareA;
         b.crowdPushX += ux * push * shareB; b.crowdPushZ += uz * push * shareB;
+      }
+    }
+    // 抬着的担架（前后两个担架员中间那一段）也挡人：站进去的往外让，走过来的在 StepBody 里被裁步。
+    // 敌我都算 —— 担架是实物，不是同阵营的礼让。
+    const litters = this.litterSegs = LitterSegments(list, this.ctx?.player, this.litterSegs || []);
+    this.ctx?.LitterObstacles?.(litters);   // 关卡自己画的担架队（不在 soldiers 里的表现人物）
+    if (litters.length) {
+      const clearance = CROWD.litterHalfWidthM + spacing / 2, out = { x: 0, z: 0 };
+      for (let i = 0; i < n; i += 1) {
+        const s = list[i];
+        if (!s.alive || this.CrowdPinned(s)) continue;
+        out.x = 0; out.z = 0;
+        LitterPush(s, litters, clearance, maxStep, CROWD.maxDyM, out);
+        s.crowdPushX += out.x; s.crowdPushZ += out.z;
       }
     }
     // 友军给玩家让路（玩家这边的挡位在 Script_PlayerActorBlock：他走不进人身体里）。
@@ -4201,6 +4216,12 @@ export class AiDirector {
     s.velocityY = s.grounded ? -0.6 : s.velocityY - 19.6 * dt;   // 贴地那一点向下的力保证 grounded 稳定
     // 同阵营软分离的推开量（SeparateSoldiers）随这一步一起走控制器，推不进墙。
     if (s.crowdPushX || s.crowdPushZ) { dx += s.crowdPushX; dz += s.crowdPushZ; s.crowdPushX = 0; s.crowdPushZ = 0; }
+    // 抬着的担架不许穿（Script_LitterBlock）：朝担架的分量削掉、贴边滑过去。
+    if (this.litterSegs?.length && !this.CrowdPinned(s)) {
+      const clearance = CROWD.litterHalfWidthM + cap.radius;
+      const step = BlockStepByLitters(s, dx, dz, this.litterSegs, clearance, CROWD.maxDyM, this.litterStep ||= {});
+      dx = step.dx; dz = step.dz;
+    }
     const r = body.Move(dx, s.velocityY * dt, dz);
     s.position.set(r.x, r.y, r.z);
     s.grounded = r.grounded;
