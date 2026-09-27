@@ -11,7 +11,7 @@
 // 得 de, 着 zhe, 都 dou, 重 zhong, 行 xing, 干 gan, 担 dan, 当 dang, 处 chu).
 // Script_CharacterSpeechTest fails when a spoken Han character is missing here.
 export const HAN_PINYIN = Object.freeze({
-  ai: "挨", an: "岸",
+  ai: "挨矮", an: "岸",
   ba: "把拔", ban: "班绊板", bei: "备北", ben: "本", bi: "闭", bian: "边遍", bie: "别", bing: "兵",
   bo: "拨", bu: "不部补步",
   cai: "才财", ce: "侧", ceng: "蹭", cha: "差岔", che: "撤车", cheng: "城成", chong: "冲",
