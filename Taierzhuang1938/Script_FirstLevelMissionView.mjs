@@ -10,6 +10,7 @@ import { PlaceGeometry } from "./Script_Geo.mjs";
 import { ApplyShadowDepth, AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { MISSION_PLACEMENT, MISSION_SUPPLIES, MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { Type89Damage } from "./Script_Type89Damage.mjs";
+import { FirstLevelSmokeOrigins } from "./Script_FirstLevelSmokeOrigins.mjs";
 import { FRONT_BATTLE_TUNING } from "./Data_Tuning_FirstLevelFront.mjs";
 // 战车包（2026-09-23）：炮管运行时枢轴、履带滚动、按车体轴贴地、履带尘 / 排气。数值在 Data_Tuning_Tank.view。
 import { TANK } from "./Data_Tuning_Tank.mjs";
@@ -115,6 +116,7 @@ export class FirstLevelMissionView {
     this.lastUpdateTime=null;
     this.BuildTank();
     this.BuildSupplies();
+    this.smokeOrigins = new FirstLevelSmokeOrigins({root:this.root,battlefield,physics,actorFactory,library});
 
   }
   /** 接收院西北角码着的空担架（静态实例，与担架队同一份几何和材质）。 */
@@ -612,6 +614,7 @@ export class FirstLevelMissionView {
     bone.add(mesh);this.frontBandage=mesh;this.materials.push(material);
   }
   Dispose() {
+    this.smokeOrigins.Dispose();
     this.draftCartModels.Dispose();
     if(this.frontBandage){this.frontBandage.removeFromParent();this.frontBandage.geometry.dispose();}
     this.tankDamage.Dispose();

@@ -5229,8 +5229,9 @@ function SeedSmokeColumns(phase) {
 
   if (phase.smokeColumns) {
     for (const column of phase.smokeColumns) {
+      const origin = missionRuntime?.view.smokeOrigins?.Emitter(column);
       const y = battlefield.StaticGroundHeight(column.x, column.z) + column.heightOffset;
-      state.smokeHandles.push(vfx.SmokeSource({ x: column.x, y, z: column.z }, column.options));
+      state.smokeHandles.push(vfx.SmokeSource(origin?.position || { x: column.x, y, z: column.z }, origin?.options || column.options));
     }
     return;
   }

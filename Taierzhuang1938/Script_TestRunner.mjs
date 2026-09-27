@@ -50,6 +50,7 @@ export const testDefs = {
   BreakableTreesTest: {file:"Script_BreakableTreesTest.mjs",desc:"Seeded tree clearance, blast falloff and shipped split GLB budget"},
   BreakableTreesBrowserTest: {file:"Script_BreakableTreesBrowserTest.mjs",timeoutMs:300000,desc:"Actual first-level trees: explosion, collider removal, falling, grounding and disposal"},
   FirstLevelDistantSmokeTest: {file:"Script_FirstLevelDistantSmokeTest.mjs",desc:"Reference smoke districts: clear routes, layered 04–06 views, bounded density and combat particle isolation"},
+  FirstLevelSmokeOriginsTest: {file:"Script_FirstLevelSmokeOriginsTest.mjs",desc:"Burning wrecks: actual engine outlets, clear routes, terrain, fire budget and lifecycle"},
   FirstLevelDistantSmokeBrowserTest: {file:"Script_FirstLevelDistantSmokeBrowserTest.mjs",timeoutMs:120000,desc:"Smoke atlas GPU: real animation, low-quality density, occlusion, reset and one-draw budget"},
   BlastFeedbackTest: {file:"Script_BlastFeedbackTest.mjs",timeoutMs:300000,desc:"Shared grenade/shell camera response, bounded tinnitus, actual PCM, mute and reset"},
   FirstLevelWhiteboxVillageTest: {file:"Script_FirstLevelWhiteboxVillageTest.mjs",desc:"06–10 referenced village buildings, kitchen link, real alley entry and sheltered litter detour"},
@@ -548,7 +549,7 @@ export const tier2 = [
 
 export const domains = {
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
-  distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest","FirstLevelDistantSmokeBrowserTest"]},
+  distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest","FirstLevelSmokeOriginsTest","FirstLevelDistantSmokeBrowserTest"]},
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest","OpeningStoryboardShotsTest"]},
   facialEditor: {label:"人物面部可视化编辑器",tests:["FacialReviewTest","FacialEditorBrowserTest","ModuleGraphTest"]},
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
@@ -659,7 +660,7 @@ export const domains = {
 
 const changedDomainRules = [
   {domain:"breakableTrees",pattern:/BreakableTree|Script_Combat|Script_FirstLevelWhiteboxField/},
-  {domain:"distantSmoke",pattern:/FirstLevelDistantSmoke|BattleSmoke|Script_Vfx/},
+  {domain:"distantSmoke",pattern:/FirstLevelDistantSmoke|FirstLevelSmokeOrigins|BattleSmoke|Script_Vfx/},
   {domain:"facialEditor",pattern:/FacialReview|EditorFacial|FacialEditor/},
   {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear)/},
   {domain:"menu",pattern:/PlayerDeath/},
@@ -789,7 +790,7 @@ const changedDomainRules = [
   { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|CameraShake|FpsArm|FpsHand|FpsAnatomy|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe|ModelFacing|Model_\w+\.glb)/i },
   { domain: "interact", pattern: /(Carry|Interact|Emplacement|MountedGrip|Telegraph|Checkpoint|Script_Input|Hud|Prompt)/i },
   // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
-  { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion|MissionSetpieces)/i },
+  { domain: "ai", pattern: /(Script_Ai|LitterBlock|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion|MissionSetpieces)/i },
   { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Telegraph|Whitebox|DebugOptions|Script_Input|Style_Game|index\.html)/i },
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },
   { domain: "voice", pattern: /(Voice|Dialogue|Speech)/i },

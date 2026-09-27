@@ -6,6 +6,7 @@
 
 可炸断枯树：`Data_BreakableTreePlacements` / `Script_BreakableTrees`；
 布设、断裂资产、物理与回归入口见 [枯树说明](Data_BreakableTrees.md)。
+第一关硝烟与燃烧残骸：`Data_FirstLevelSmokeOrigins` / `Script_FirstLevelSmokeOrigins` → [烟柱实体源头](Data_FirstLevelSmokeOrigins20260927.md)；`Script_FirstLevelSmokeOriginsTest` 验证出口、道路与独立火焰池。
 
 ### 出图（优先复用的入口；输出落 `_shots/`）
 

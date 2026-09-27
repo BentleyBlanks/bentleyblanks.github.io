@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
 import { MakeVolumetricNoiseTexture } from "./Script_PostVolumetrics.mjs";
-import { BATTLE_SMOKE_QUALITY, BATTLE_SMOKE_STYLES, BATTLE_SMOKE_LIGHTING } from "./Data_Tuning_BattleSmoke.mjs";
+import { BATTLE_SMOKE_QUALITY, BATTLE_SMOKE_STYLES, BATTLE_SMOKE_LIGHTING, BATTLE_SMOKE_ROOT as ROOT } from "./Data_Tuning_BattleSmoke.mjs";
 
 export const BATTLE_SMOKE_LOBES = Object.freeze(Object.fromEntries(Object.entries(BATTLE_SMOKE_QUALITY).map(([id,q])=>[id,q.lobes])));
 
@@ -26,6 +26,16 @@ export function BuildBattleSmokeInstances(sources, quality = "high") {
         lobe: [(random() - 0.5) * 2, (random() - 0.5) * 2, 0.72 + random() * 0.52, p.nearFade || 3],
         tint: style.tint, motion: style.motion,
       });
+    }
+    if(p.ignition) {
+      // Narrow continuous soot joins the hot outlet to lifted/windblown smoke.
+      const rise=Math.max(ROOT.height,source.position.y-p.ignition[1]+ROOT.height);
+      const rootStyle=BATTLE_SMOKE_STYLES[p.frame===1||p.frame===4?1:0];
+      for(let i=0;i<ROOT.lobes;i++) instances.push({origin:p.ignition.slice(),
+        column:[rise,ROOT.baseWidth,ROOT.crownWidth,ROOT.life],
+        flow:[p.driftX*.025,p.driftZ*.025,(i+random()*.3)/ROOT.lobes,.35],
+        shape:[1.35,ROOT.opacity,0,random()],lobe:[(random()-.5)*.4,(random()-.5)*.4,1,1.5],
+        tint:rootStyle.tint,motion:rootStyle.motion});
     }
   }
   return instances;
