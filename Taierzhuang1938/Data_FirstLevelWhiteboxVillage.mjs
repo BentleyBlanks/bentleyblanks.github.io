@@ -1,4 +1,4 @@
-// First-level whitebox, 06–10. Notion concept sheet 06/06B: a sheltered
+// First-level whitebox, 08–10 (06/07 masses live in Data_FirstLevelWhiteboxFront). Notion concept sheet 06/06B: a sheltered
 // casualty assembly area; 07/07B: communication route opening into a village;
 // 08/08B and Topology_09: ruined street, physical obstruction and the kitchen on the right
 // when facing south; 09/09B: roofed kitchen–connected-house passage;
@@ -49,15 +49,8 @@ export function BuildVillageWhitebox(groundAt) {
     Roof(id, x, z, w, d, h);
   }
 
-  // 06: wrap the existing northern reverse slope around the west side of the
-  // same assembly pad. All litter, borrower and relief-route positions stay.
-  Bank("CollectionWestReturn", -48, -105.5, 2.2, 2.5, 16);
-  Bank("CollectionWestFoot", -49.5, -103.5, 3, 1.35, 20);
-
-  // 07: earth shoulders define the southbound communication line at the
-  // village approach. The centre route and its existing excavation stay open.
-  Bank("SouthVillageBankWest", 17, -29.4, 12, 1.7, 2.4);
-  Bank("SouthVillageBankEast", 33.5, -17.5, 11, 1.55, 2.2);
+  // 06/07 (collection west return, southbound banks) moved to
+  // Data_FirstLevelWhiteboxFront.mjs on 2026-09-27 (05–18 regional split).
 
   // 07B/08: a compact north edge, not isolated freestanding street walls.
   // The north passage z=-20 remains wide enough for the entire waiting party.

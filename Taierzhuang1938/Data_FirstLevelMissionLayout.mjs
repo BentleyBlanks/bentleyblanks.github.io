@@ -5,6 +5,7 @@ import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, SampleMissionNaturalHeight, MissionPathDistance, SampleMissionGroundColor, SampleMissionGroundSurface, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { PlanTrenchDressing } from "./Script_TrenchPlan.mjs";
+import { BuildFrontWhitebox } from "./Data_FirstLevelWhiteboxFront.mjs";
 import { BuildVillageWhitebox } from "./Data_FirstLevelWhiteboxVillage.mjs";
 import { BuildTransferWhitebox } from "./Data_FirstLevelWhiteboxTransfer.mjs";
 import { BuildRearWhitebox } from "./Data_FirstLevelWhiteboxRear.mjs";
@@ -1076,7 +1077,7 @@ const TRENCH_TRAFFIC_LANES = [
 // Notion 06–18 concept/topology refactor. Resolve authored replacements before
 // trench dressing so both automatic keep-outs and runtime collision see the
 // same final buildings. Scenario-only night geometry is attached separately.
-const whiteboxPackages = [BuildVillageWhitebox, BuildTransferWhitebox, BuildRearWhitebox]
+const whiteboxPackages = [BuildFrontWhitebox, BuildVillageWhitebox, BuildTransferWhitebox, BuildRearWhitebox]
   .map(build => build(SampleMissionTerrain));
 for (const part of whiteboxPackages) {
   const replaced = new Set(part.replaceBlockIds);

@@ -5,6 +5,7 @@ import { MISSION_RECEPTION_SPACE, MISSION_NORTH_RIVER, RiverCutAt } from "./Data
 import { FRONT_BREACHES, FRONT_BOUND_CRATERS } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
 import { CompileTrenchNetwork, TrenchRevision } from "./Script_TrenchPlan.mjs";
+import { WHITEBOX_TERRAIN } from "./Data_FirstLevelWhiteboxTerrain.mjs";
 const Smooth = (value) => {
   const t = Math.max(0, Math.min(1, value));
   return t * t * (3 - 2 * t);
@@ -84,6 +85,9 @@ export const MISSION_TERRAIN = Object.freeze({
   // 壕沟不再是一张折线表：中心线与段级参数在 Data_FirstLevelMissionTrenches，
   // 逐点的宽/深/抛土由 Script_TrenchPlan 的位置噪声算（docs/Data_TrenchSpline.md）。
   trenchNetwork: MISSION_TRENCH_NETWORK,
+  // 05–18 白盒的局部地形修饰（四区各一张纯数据表，Data_FirstLevelWhiteboxTerrain*）。
+  // 在 steps 之后、河槽与回归缓坡之前叠加；表空时逐位不变。口径 docs/Data_FirstLevelWhitebox0518Gap.md。
+  whiteboxTerrain: WHITEBOX_TERRAIN,
   // 兼容视图：旧消费者（Layout 的清理网、任务/布设回归）只读 id/role/points/
   // depth/bottom/bank，这里照编译结果现算。getter 而不是字段，是因为编辑器改过
   // 参数之后 revision 一抬，下一次读就得是新的那份。
@@ -194,6 +198,9 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
       t = 1 - Smooth((d - step.radius) / 1.3);
     if (t > 0) height = height * (1 - t) + (natural - step.depth) * t;
   }
+  // 05–18 白盒局部修饰（土坎/沟/下沉路/台地）。放在河槽之前：河岸以内与浅滩仍由 RiverCutAt 说了算；
+  // 放在四处回归缓坡之前：沟口与院口的可走坡不会被修饰抬走。
+  if (spec.whiteboxTerrain) height = spec.whiteboxTerrain.Apply(x, z, height, natural);
   // 北沙河。旧写法是一行硬编码（54<x<99 就把地面压到 -1.8 的一条排水沟）；
   // 现在是数据驱动的东西贯穿河槽，断面按 x 插值（浅滩），口径在
   // Data_FirstLevelMissionTopology.MISSION_NORTH_RIVER。取 min 而不是相减：
