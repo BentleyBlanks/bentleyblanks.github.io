@@ -350,7 +350,8 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
     RearTrench: ["rearTrenchEntered", "cornerReached", "collectionPointSeen", "supportOrdersHeard"],
     // 契约 §2.6（Front 包 09-24）：03 等「何有田接枪 + 老周离枪 ≥10 m」，zhouGunWounded 挪到 05 的背景条件。
     Support: ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "leftGunHandover", "zhouLeftGun", "tankPreviewed"],
-    MachineGun: ["tankPositionPressured", "remainingGuardsGathered", "tankBlocksExit", "rightRearReached", "bundleOrderHeard"],
+    // 2026-09-28：tankBlocksExit 不再是 04 的过关条件（班长下完取弹命令就带人走，车在 05 里压到位）。
+    MachineGun: ["tankPositionPressured", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
     Tank: ["bundleRouteTraversed", "bundleTaken", "bundleReturned", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned", "zhouGunWounded"],
     Orders: ["ordersReached", "volunteerHeard", "lightShared", "zhouOnLitter", "columnDeparted"],
     South: ["southWhisperHeard", "villageMouthReached", "mainStreetPointed"],

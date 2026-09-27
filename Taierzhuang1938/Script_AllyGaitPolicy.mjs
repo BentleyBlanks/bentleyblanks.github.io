@@ -1,7 +1,9 @@
 import { ALLY_GAIT as C } from './Data_Tuning_AllyGait.mjs';
 
+// missionCombatAlert: the mission says the danger is there without a rifleman in sight (FirstLevelFrontBattle: a live
+// enemy tank on the field). No carry for that man until it drops.
 export function AllyGaitThreat(soldier, state) {
-  return !!(state.firing || state.fire > 0 || soldier.missionGrenadeEvade
+  return !!(state.firing || state.fire > 0 || soldier.missionGrenadeEvade || soldier.missionCombatAlert
     || soldier.suppression > C.suppressionReady
     || (soldier.targetVisible && !soldier.targetFromMemory && !soldier.missionFireHold));
 }

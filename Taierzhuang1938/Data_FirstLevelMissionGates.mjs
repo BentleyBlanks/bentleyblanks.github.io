@@ -302,8 +302,9 @@ export const MISSION_FACT_GATES = Object.freeze({
     text: "两批均至少一人存活，所有存活守军实际撤入安全区",
   }),
   tankBlocksExit: Gate({
-    kind: "scripted", step: "MachineGun", source: "UpdateTank",
+    kind: "scripted", step: "MachineGun", source: "FirstLevelFrontBattle.Update",
     text: "战车压到沟口（tankStopZ 附近），把前沿的退路堵住",
+    note: "2026-09-28 起不是 04 的过关条件：班长下完取弹命令就带人走，车多半在 05 取弹途中才压到位（04、05 都记）",
   }),
   bundleOrderHeard: Gate({ kind: "voice", step: "MachineGun", cue: "BundleOrder", source: "VoiceDone" }),
   // --- Tank --------------------------------------------------------------

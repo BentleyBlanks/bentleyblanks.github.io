@@ -24,6 +24,10 @@ for(const field of ['openingActorPerformance','openingStoryboardPose','missionRe
   assert.equal(SelectAllyGait({...calm,[field]:true},{},'AdvanceFire'),'AdvanceFire',field+' retains priority');
 }
 assert.ok(AllyGaitThreat(calm,{firing:true}));
+// A live enemy tank (FirstLevelFrontBattle.SetCombatAlert) keeps the rifle ready with no rifleman in sight.
+assert.equal(SelectAllyGait({...calm,missionCombatAlert:true},{crouch:1,moveSpeedMps:0},'KneelHold'),'KneelHold');
+assert.equal(SelectAllyGait({...calm,missionCombatAlert:true},{crouch:1,moveSpeedMps:.8},'RifleCrouchAdvance'),'AllyCrouchReady');
+assert.equal(SelectAllyGait({...calm,missionCombatAlert:true},{},'AdvanceFire'),'AdvanceFire');
 const glb=LoadGlb(path.join(import.meta.dirname,'Model/Character/Model_TengxianNra02.glb'));
 const scene=new PoseScene(glb),skin=BuildSkin(glb);
 const index=new Map(scene.nodes.map((n,i)=>[n.name.replace(/\s/g,'_'),i]));

@@ -246,9 +246,9 @@ try {
     r.flow.index++; g.menu.Show("pause");
   });
   assert.deepEqual(await page.locator(".mnPauseCondition").evaluateAll(rows => rows.map(row => row.dataset.condition)),
-    ["tankPositionPressured", "remainingGuardsGathered", "tankBlocksExit", "rightRearReached", "bundleOrderHeard"],
+    ["tankPositionPressured", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
     "MachineGun exposes the adopted tank-pressure and retreat conditions");
-  assert.equal(await page.locator(".mnPauseCondition").count(), 5, "new stage replaces all previous conditions");
+  assert.equal(await page.locator(".mnPauseCondition").count(), 4, "new stage replaces all previous conditions");
   assert.equal(await page.locator('[data-condition="frontReached"]').count(), 0);
   assert.ok(await page.locator('[data-condition="tankPositionPressured"]').isVisible());
   await page.evaluate(() => {

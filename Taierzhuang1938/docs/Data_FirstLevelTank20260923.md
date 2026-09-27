@@ -126,3 +126,14 @@
 - 打法台词与大脑的毁伤部位一致：履带（车旁地面约 3.2 m 内）→ `MobilityKill`，后甲板 / 格栅 / 炮塔座圈 → `Disabled`；断履带后的喊话「履带断了！还在打！再补一捆！」（`tank_track`）接得上。HUD 投掷提示 `firstLevel.hint.bundle` 同步写明「先扔履带边、还在打再补一捆上车尾后甲板」。
 - `TankHeard` / `TankArmor` 是可让路的旁白（`FRONT_OPTIONAL_SCENES`）：还在排队时来了任何别的前沿场景就丢掉——何有田一喊「战车出来了」03 那句就过时了，「莫打铁壳子」不许耽误「下来！莫站枪口上！」。
 - `BundleWhy` 在拿到弹时还没开口就丢掉；`BundleBrief` 只排一次。场景一次一场的队列不变，所以 BundleSupply（留守兵）可能等 BundleWhy 说完、BundleReturnCall 排在 BundleBrief 之后。
+
+## 2026-09-28 班长说完「跟我走」就走；车活着不提枪（用户反馈）
+
+用户截图：04 末尾罗班长在后墙岔口竖着枪干站，玩家已经往取弹沟里走了 7 m，「在我干掉战车之前班长都是这一幅蠢样子」。两个病根：
+
+- **04→05 等车**：`rightRearReached` 一记就说 BundleOrder（「顺子，跟我走后沟，去拿弹！……跟到老子！」），可 05（他的 supply 腿）要等 `tankBlocksExit`。压阵位那一发（`tankPositionPressured`）是战车在 03 露面点 HullDown 打的，04 一开头就记；车还要掉头、开 60 m、在 Pressure 停 14 s 才到 Block。三趟 03→06 连续跑（其他 worktree 的 FrontTopology 证据）说完命令到进 05：37 / 42 / 38 s；04 检查点起两趟 42.3 s。改法：`tankBlocksExit` 不再是 04 的过关条件（`Data_FirstLevelMission` 的 MachineGun 列表；事实门还在，`FrontBattle.UpdateTankBlock` 在 04、05 都记）。05 里没有东西要求车已经在 Block：取弹往返 ≥ 30 s，车那时早到了（两趟都在 67.2 s 记，玩家正在弹药屋）。
+- **车活着时提枪**：`Script_AllyGaitPolicy.AllyGaitThreat` 只认看得见的步兵，战车不是 AI 目标，于是岔口、攻击位旁边八米都选 `AllyCarryStand / AllyCrouchCarryStand`。新旗 `missionCombatAlert` 算威胁；`FrontBattle.SetCombatAlert` 在车 `active` 且未 `TankClearFact` 时给全班挂上，离开 03–05 清掉。
+
+验收（04 检查点起、正常输入驱动器 `--campaign --stage-from=4 --stage-to=6`，改前两趟用 `--baseline-root` 同驱动器）：命令说完到进 05 由 42.3 s → 0 s；04+05 总长 245.8 / 248.4 s → 210.2 / 210.2 s；四趟全过、零阵亡。探针 `tmp/LuoTankProbe`（不提交）逐 0.25 s 采罗班长：车活着的 535 个采样里提枪 9 个，全是读档后头 2.5 s 出生时选定的那一个动作。
+
+攻击位上罗班长仍只是「照应」：投弹按设计归玩家（09.22 稿「保留玩家的关键操作，不把高潮交给NPC代办」）；他那个点看不见车北侧的护兵，基本不开枪。要他真的压制护兵得另挪站位，没做。

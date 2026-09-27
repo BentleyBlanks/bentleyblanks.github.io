@@ -440,7 +440,7 @@ export class FirstLevelFrontBattle {
   }
   Enter(stage){
     if(["BunkerRescue","Support"].includes(stage))this.Prepare();
-    if(!this.Active)return;const r=this.r;
+    if(!this.Active){this.SetCombatAlert(false);return;}const r=this.r;
     for(const actor of r.squad){actor.missionTrainReady=true;actor.scriptedNoncombatant=false;actor.missionNaturalMarch=false;}
     if(stage==="Support"){
       this.SetLeg("capture",FrontEntryRoute(this.Leader.position,[...Routes.support.slice(0,-1),LeaderCover()]));r.Record("frontBattleStarted");r.frontBattleAt=r.time;
@@ -516,8 +516,16 @@ export class FirstLevelFrontBattle {
     if(!t.active||t.fireDisabled||(!t.brain&&t.immobilized)||!r.Has("tankPositionPressured"))return false;
     return !r.BlocksSight(r.view.TankMuzzle(t),r.Point(S.gap,B.guardHeightM),r.view.tankCollider);
   }
+  /**
+   * The squad's ally gait reads missionCombatAlert as a threat (Script_AllyGaitPolicy): no rifle-up carry while the enemy
+   * tank is live. Its gunner and coax are what the men here are hiding from, and none of them is a rifleman the brain can
+   * see, so with only the infantry test Luo stood 8 m from the tank at the attack position, and 40 s at the rear
+   * junction in 04, with his rifle upright like a man on a march (2026-09-28 user report).
+   */
+  SetCombatAlert(on){for(const actor of this.r.squad||[])if(actor)actor.missionCombatAlert=on;}
   Update(dt){
     if(!this.Active)return;const r=this.r,stage=r.flow.stage.id;
+    this.SetCombatAlert(!!r.tank?.active&&!r.Has(TankClearFact(r.tank)));
     for(const cast of ["heyoutian","liuwencai","yaowa"])this.Walk(r.companion.Handle(cast),{
       speed:cast==="yaowa"&&this.walks.has(r.opening.zhou?.id)&&!r.Has("zhouGunWounded")?R.walkSpeedMps:R.squadSpeedMps});
     const leading=stage==="Support"&&this.leg==="capture";if(!leading)this.lead=null;
@@ -529,6 +537,8 @@ export class FirstLevelFrontBattle {
     if(stage==="Tank"&&r.Has(TankClearFact(r.tank))&&!this.blocked)r.Record("breachReopened");
     if(stage==="Support")this.UpdateCapture();
     if(stage==="MachineGun")this.UpdatePressure();
+    // No longer a 04 exit condition (Data_FirstLevelMission): the tank usually gets there during 05's bundle run.
+    if(stage==="MachineGun"||stage==="Tank")this.UpdateTankBlock();
     if(stage==="Tank")this.UpdateSortie();
     this.UpdatePoint(dt);
   }
@@ -589,6 +599,9 @@ export class FirstLevelFrontBattle {
         }
       }
     }
+  }
+  UpdateTankBlock(){
+    const r=this.r;if(r.Has("tankBlocksExit"))return;
     const atBlock=r.tank.brain?!!r.tank.atBlock:(r.tank.roadProgress||0)>=this.RoadDistance(S.tankBlockIndex)-.2;
     if(atBlock&&this.TankBlockade())r.Record("tankBlocksExit");
   }

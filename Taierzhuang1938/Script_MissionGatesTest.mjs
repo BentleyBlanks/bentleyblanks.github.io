@@ -100,7 +100,8 @@ for (const stage of MISSION_STAGES)
   }
 checks += 1;
 // 98 = 96 + leftGunHandover、zhouLeftGun（契约 §2.6：03 改为「何有田接枪 + 老周离枪 ≥10 m」，zhouGunWounded 挪到 05）。
-Check(requirementFacts.length === 98, `requirements 事实共 98 条，实际 ${requirementFacts.length}`);
+// 97：2026-09-28 tankBlocksExit 不再是 04 的过关条件（门还在，只是不挡阶段）。
+Check(requirementFacts.length === 97, `requirements 事实共 97 条，实际 ${requirementFacts.length}`);
 
 const KINDS = new Set(["proximity", "proximityFamily", "interior", "voice", "interaction",
   "combat", "column", "cutscene", "scripted", "timer"]);

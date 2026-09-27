@@ -49,6 +49,8 @@ V2 可编辑工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/
 `InstallP012ActorMotion` 在背枪层安装完成后安装 `Script_AllyGait`，只作用于 NRA 共用骨架的步枪兵。
 无可见威胁的走路、站立/蹲姿等候使用提枪；看见真实目标、受压制、避雷或开火时立即恢复备战，
 威胁消失后保留短暂准备窗口，避免反复举放。记忆目标不要求一直端枪；剧情禁止开火时允许提枪交谈。
+任务可用 `missionCombatAlert` 声明看不见步兵的威胁：第一关 03–05 敌方战车还活着（未 `tankFireDisabled`）时，
+`FirstLevelFrontBattle.SetCombatAlert` 给全班挂上，班里人不提枪（2026-09-28 用户：战车八米外班长竖着枪干站）。
 数值在 `Data_Tuning_AllyGait`。跑步继续使用原跑步/背枪动作。
 
 导演动作、强制动作、卧姿、跪姿、投弹、白刃、伸手、望远镜、伤员、抬担架、空手和死亡仍拥有姿态优先级。

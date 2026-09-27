@@ -179,7 +179,7 @@ frontAttackRepelled → 挑一个离玩家最近、还活着的撤退守军当�
   让他朝 A.bundle（北头弹药屋）转头 bundleOrderPointS 秒 → Say BundleOrder
   （BundleOrder 的声音从这个守军身上出来）
 bundleOrderHeard → 何有田走到机枪位、刘文财走到沟口 trenchMouthWatch（一路保持到 05 结束）
-tankBlocksExit：战车压到 tankStopZ 附近
+tankBlocksExit：战车压到 tankStopZ 附近（2026-09-28 起不再是 04→05 的门，见 Data_FirstLevelTank20260923.md 末节）
 ```
 
 **04 不再由任务触发关中过场 `CS_MachineGunCaptives`**（契约 §2：主题已由 01 承担）。

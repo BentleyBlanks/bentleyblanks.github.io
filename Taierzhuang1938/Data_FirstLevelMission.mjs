@@ -51,7 +51,9 @@ export const MISSION_STAGES = Object.freeze([
     "MachineGun",
     "掩护后续守军，留意右前方道路。",
     A.gun,
-    ["tankPositionPressured", "remainingGuardsGathered", "tankBlocksExit", "rightRearReached", "bundleOrderHeard"],
+    // 2026-09-28：不再等 tankBlocksExit。罗班长在后墙岔口说完「顺子，跟我走后沟，去拿弹！」就该带人走；战车那时
+    // 多半还在路上（三趟 03→06 连续跑：说完到压到沟口 37–42 s），他原地干站到车到位。车照样开到 Block 封口，05 里记。
+    ["tankPositionPressured", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
     null,
   ),
   Stage(
