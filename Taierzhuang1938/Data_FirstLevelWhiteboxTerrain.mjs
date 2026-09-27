@@ -111,7 +111,11 @@ export function WhiteboxShapeWeight(shape, x, z) {
  * 返回 { regions, shapes, bounds, Apply(x, z, height, natural) }。
  * Apply 在没有任何形状覆盖 (x,z) 时原样返回传进来的 height（同一个 number，逐位不变）。
  */
-export function CompileWhiteboxTerrain(regions = WHITEBOX_TERRAIN_REGIONS) {
+export function CompileWhiteboxTerrain(sourceRegions = WHITEBOX_TERRAIN_REGIONS) {
+  // 形状的 note 是给人看的中文说明，留在分区源表里；编译结果会挂进任务数据
+  // （FIRST_LEVEL_MISSION_PHASE……terrainSpec），字体子集取字器会把那里的字符串当界面文案扫。
+  const regions = sourceRegions.map((region) => ({ ...region,
+    shapes: region.shapes.map(({ note, ...shape }) => shape) }));
   const shapes = [];
   for (const region of regions) for (const shape of region.shapes) {
     const b = WhiteboxShapeBounds(shape);
