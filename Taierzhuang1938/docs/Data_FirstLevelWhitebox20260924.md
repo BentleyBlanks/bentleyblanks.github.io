@@ -20,7 +20,7 @@
 | 15–17 | 沟尾到院墙之间的连续斜向夹道、墙后屋顶、普通院门门罩、接收厢房完整顶与檐廊、等候棚 | 同一院落确认身份、交接、老周死亡及继续接收伤员；院门和担架通道保留 |
 | 18 | 桥南射位侧翼、爆破安全位侧墙；夜门楼顶、城垛、门内物资棚和两侧街屋 | 尾队北向南过桥、小队撤出、专业人员爆破；通过时间转场进入独立夜景片 |
 
-新增纯数据模块 `Data_FirstLevelWhiteboxVillage`、`Data_FirstLevelWhiteboxTransfer`、`Data_FirstLevelWhiteboxRear` 分别导出 `Build*Whitebox(groundAt)`。返回替换id和体块，由 `Data_FirstLevelMissionLayout` 在自动壕沟布设之前合并，所有体块继续走既有 BuildSink 与碰撞管线。夜景体块只加入 `NightGate` 状态，不加入日间 `blocks`。
+新增纯数据模块 `Data_FirstLevelWhiteboxVillage`、`Data_FirstLevelWhiteboxTransfer`、`Data_FirstLevelWhiteboxRear` 分别导出 `Build*Whitebox(groundAt)`。（2026-09-27 起 06/07 的四块移到 `Data_FirstLevelWhiteboxFront`，合并顺序与结果不变；05–18 新一轮见 [差距与分区](Data_FirstLevelWhitebox0518Gap.md)。）返回替换id和体块，由 `Data_FirstLevelMissionLayout` 在自动壕沟布设之前合并，所有体块继续走既有 BuildSink 与碰撞管线。夜景体块只加入 `NightGate` 状态，不加入日间 `blocks`。
 
 版本标记：`MISSION_WHITEBOX_VERSION = first-level-20260924-whitebox-06-18-r1`。步骤id、任务事实、对白、桥梁信号、共享地形采样与全关边界不变。素材均可用现有几何表达，本轮无需付费生成资产。
 
