@@ -4902,6 +4902,12 @@ CPU 采样（Profiler，300 帧）里排前面的是 `updateMatrixWorld` 17%、`
 （`AiDirector.viewOwner` / `cullDeferred`），导演交还镜头的那一帧由它补剔玩家视角。
 回归：`Script_OpeningLensBrowserTest` 的 FLAPS 行。
 
+同日把那两处重扫改成**只扫变了的那棵顶层子树**（scene 的直接子节点：一个人、一组布景）：骨头能不能剪、
+对象要不要藏出预通道都只看它自己的子树和父链，scene 本身不进任何一类，所以各棵顶层子树互不相干。
+结构事件沿父链找到所在的顶层子树标脏；不在场景里的子树不管，挂回场景那一刻整棵重判。整场重扫只留给
+首帧、换场景、开关与预通道标记（`MarkNoPrepass` 等）变化。等价性由 `Script_BonePruneTest` 与
+`Script_PrepassSkipTest` 的随机增删对照（与从头按规则算 / 整场重建逐个相同）看守。
+
 另把人物实例缓冲按本关总人数一次预留，转头时不再让几十个材质桶依次 16→32→64
 扩容；high 档去掉与最终 FXAA 重复的 4×MSAA，4× 只留给 ultra。RTX 4070 SUPER
 同一超宽测试里，4×MSAA 单独把 GPU 从约 3.8 ms 抬到 4.8 ms。

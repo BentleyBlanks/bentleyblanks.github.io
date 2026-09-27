@@ -78,6 +78,8 @@ export class NavGrid {
     this.componentJob = null;
     this.componentSpare = null;
     this.componentQueue = null;
+    this.rasterJob = null;         // Refresh({ spread: true }) 的跨帧栅格化（见 _PumpRaster）
+    this.blockedSpare = null;
 
     this.Refresh(battlefield);
   }
@@ -91,17 +93,45 @@ export class NavGrid {
    */
   Refresh(battlefield, { spread = false } = {}) {
     if (!battlefield) return false;
+    this.rasterJob = null;
+    // spread：栅格化与连通分量都摊到后面几帧（BeginFrame 按 componentBudgetMs 推）。栅格写进另一张
+    // 位图，写完才换上；换上之前 Walkable / 距离场 / InMain 读的都是上一版 —— 只差塌掉那几格，
+    // 几帧之内没人走得到那儿。场景换态（01 洞口塌方）用它：一次做完是栅格 2.7 ms + 分量 16–19 ms，
+    // 正好压在近爆那一帧上（2026-09-27 实测）。
+    if (spread && this.component?.length === this.blocked.length) {
+      let next = this.blockedSpare;
+      this.blockedSpare = null;
+      if (!next || next.length !== this.blocked.length || next === this.blocked) next = new Uint8Array(this.blocked.length);
+      next.fill(0);
+      this.rasterJob = { battlefield, colliders: battlefield.colliders.slice(), index: 0, blocked: next };
+      return true;
+    }
+    this.blocked.fill(0);
+    this._Rasterize(battlefield, battlefield.colliders, 0, this.blocked, Infinity);
+    this._CommitRaster(false);
+    return true;
+  }
+
+  /**
+   * 栅格化。不逐格去查碰撞盒（那要几万次空间散列），而是反过来把每个盒子刷进格子里。
+   * 「挡不挡路」的判据照抄 AiDirector.Blocked：盒顶比地面高出 stepOver 以上才算墙，
+   * 矮的东西（沙袋边、门槛、瓦砾）能跨过去，不许把街面刷成死路。
+   * 从 start 起刷，超过 budgetMs 就停（每 32 个盒子看一次表）。
+   * @returns {number} 下一个要刷的下标（= colliders.length 表示刷完）
+   */
+  _Rasterize(battlefield, colliders, start, blocked, budgetMs) {
     const margin = this.margin;
     const stepOver = this.stepOver;
-    this.blocked.fill(0);
-    // 栅格化。不逐格去查碰撞盒（那要几万次空间散列），而是反过来把每个盒子刷进格子里。
-    // 「挡不挡路」的判据照抄 AiDirector.Blocked：盒顶比地面高出 stepOver 以上才算墙，
-    // 矮的东西（沙袋边、门槛、瓦砾）能跨过去，不许把街面刷成死路。
-    for (const box of battlefield.colliders) {
+    const t0 = budgetMs === Infinity ? 0 : performance.now();
+    const Ground = battlefield.BaseGroundHeight || battlefield.GroundHeight;
+    let i = start;
+    for (; i < colliders.length; i += 1) {
+      if (budgetMs !== Infinity && ((i - start) & 31) === 31 && performance.now() - t0 > budgetMs) return i;
+      const box = colliders[i];
       if (!box || box.destroyed) continue;
       const cx = (box.min[0] + box.max[0]) * 0.5;
       const cz = (box.min[2] + box.max[2]) * 0.5;
-      const ground = (battlefield.BaseGroundHeight || battlefield.GroundHeight).call(battlefield, cx, cz);
+      const ground = Ground.call(battlefield, cx, cz);
       if (box.max[1] - ground < stepOver) continue;          // 矮，跨得过去
       if (box.min[1] > ground + 1.6) continue;               // 悬在头顶（屋檐、二层）
       const x0 = this._Cx(box.min[0] - margin);
@@ -113,22 +143,36 @@ export class NavGrid {
         const row = gz * this.width;
         for (let gx = x0; gx <= x1; gx += 1) {
           if (gx < 0 || gx >= this.width) continue;
-          this.blocked[row + gx] = 1;
+          blocked[row + gx] = 1;
         }
       }
     }
+    return i;
+  }
+
+  /** 新位图生效：作废距离场、重算（或开始摊）连通分量。 */
+  _CommitRaster(spread) {
     this.openCells = 0;
     for (let i = 0; i < this.blocked.length; i += 1) if (!this.blocked[i]) this.openCells += 1;
     this.fieldCache.clear();
     // 半路上的那张场基于旧的 blocked 位图，作废；dist 池照留（网格尺寸没变）。
     this.pending = null;
     this.pumpSpentMs = 0;
-    // spread：连通分量摊到后面几帧（BeginFrame 按 componentBudgetMs 推），摊完之前 InMain /
-    // SnapToMain 读的还是上一版分量 —— 只差塌掉那几格，几帧之内没人走得到那儿。
-    // 场景换态（01 洞口塌方）用它：整张重算要 16–19 ms，正好压在近爆那一帧上。
     if (spread && this.component?.length === this.blocked.length) this._BeginComponents();
     else this._BuildComponents();
     this.revisions += 1;
+  }
+
+  /** 推进跨帧栅格化；刷完就换上新位图并开始摊连通分量。 @returns {boolean} 刷完了没有 */
+  _PumpRaster(budgetMs) {
+    const job = this.rasterJob;
+    if (!job) return true;
+    job.index = this._Rasterize(job.battlefield, job.colliders, job.index, job.blocked, budgetMs);
+    if (job.index < job.colliders.length) return false;
+    this.rasterJob = null;
+    this.blockedSpare = this.blocked;
+    this.blocked = job.blocked;
+    this._CommitRaster(true);
     return true;
   }
 
@@ -214,7 +258,8 @@ export class NavGrid {
   /** 每帧开头调一次：重置毫秒预算，并把跨帧摊的那张场推进一步。AiDirector.Update 负责调。 */
   BeginFrame() {
     this.pumpSpentMs = 0;
-    if (this.componentJob) this._PumpComponents(this.componentBudgetMs);
+    if (this.rasterJob) this._PumpRaster(this.componentBudgetMs);
+    else if (this.componentJob) this._PumpComponents(this.componentBudgetMs);
     if (this.pending) this._Pump(false);
   }
 

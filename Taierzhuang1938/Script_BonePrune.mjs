@@ -12,9 +12,11 @@
 //
 // 规矩：
 //   1. **只动自己藏的骨头**。别人本来就藏着的骨头不碰；还原也只还原自己藏的。
-//   2. **结构一变就整树重判**：任何节点 childadded / childremoved（枪挂到手骨、绷带挂到
-//      胸骨、断肢件挂到骨头上、人被摘下 / 挂回场景）都把下一次 Update 标脏，出画前重判，
-//      那条骨链当帧就恢复可见。监听装在每个扫到的节点上（同 PostPrepass 的做法）。
+//   2. **结构一变就重判那棵顶层子树**：任何节点 childadded / childremoved（枪挂到手骨、绷带挂到
+//      胸骨、断肢件挂到骨头上、人被摘下 / 挂回场景）都把它所在的 scene 直接子节点标脏，
+//      出画前重判，那条骨链当帧就恢复可见。监听装在每个扫到的节点上（同 PostPrepass 的做法）。
+//      每棵顶层子树的判定互不相干，所以只重扫变了的那几棵，与整场重扫逐根相同
+//      （Script_BonePruneTest 的随机增删对照）。
 //   3. 判据只看子树里**有没有**可画物体（网格 / 线 / 点 / 精灵 / 灯 / LOD），不看它们此刻的
 //      visible —— 藏着的枪显隐翻转不需要重判，也不会被这里误藏。
 //   4. 这一帧没扫到的骨头（整个人被摘下场景）一律还原并忘掉：挂回来时会被重判，
@@ -33,13 +35,24 @@ export class BonePrune {
   constructor() {
     this.enabled = true;
     this.scene = null;
-    this.dirty = true;
-    this.pruned = new Set();         // 自己藏的骨头
+    this.dirty = true;               // 整场重判（首帧、换场景、开关、Invalidate）
+    this.dirtyTops = new Set();      // 只重判这几棵顶层子树（scene 的直接子节点）
+    this.tops = new Map();           // 顶层子树 → 这棵树里自己藏的骨头
     this.watched = new WeakSet();
     this.next = [];                  // 扫描复用
     this.stats = { roots: 0, scans: 0 };
-    this._onStructure = () => { this.dirty = true; };
+    this._onStructure = (event) => this._Changed(event);
   }
+
+  /** 自己藏的全部骨头（取证 / A/B 用；每次调用现拼）。 */
+  get pruned() {
+    const all = new Set();
+    for (const bones of this.tops.values()) for (const bone of bones) all.add(bone);
+    return all;
+  }
+
+  /** 下一次 Update 有没有要重判的。 */
+  get Pending() { return this.dirty || this.dirtyTops.size > 0; }
 
   /** 关掉时立即把自己藏的骨头全部还原（A/B 与排障用）。 */
   SetEnabled(enabled) {
@@ -52,44 +65,86 @@ export class BonePrune {
   Invalidate() { this.dirty = true; }
 
   /**
-   * 出画前调一次。结构没变就是一次布尔检查；变了才整树走一遍。
+   * 结构事件落到哪一棵顶层子树。骨头能不能剪只看它自己的子树，而 scene 本身既不是骨头
+   * 也不可画，所以每棵顶层子树的判定互不相干：一个人挂上枪、摘下场景，只重判这个人
+   * （2026-09-27：开场近爆那几帧人进场、布景换态、炮弹挂上摘下，每次都把四千多个节点
+   * 整场走一遍）。不在场景里的子树不管：它挂回场景那一刻整棵重判。
+   */
+  _Changed(event) {
+    if (this.dirty || !this.scene) return;
+    const scene = this.scene;
+    let node = event.target;
+    if (node === scene) { if (event.child) this.dirtyTops.add(event.child); return; }
+    while (node && node.parent !== scene) node = node.parent;
+    if (node) this.dirtyTops.add(node);
+  }
+
+  /**
+   * 出画前调一次。结构没变就是一次布尔检查；变了只重判变了的那几棵顶层子树。
    * @returns {boolean} 这一帧有没有重判
    */
   Update(scene) {
     if (!scene) return false;
-    if (!this.enabled) { if (this.pruned.size) this._RestoreAll(); return false; }
+    if (!this.enabled) { if (this.tops.size) this._RestoreAll(); return false; }
     if (scene !== this.scene) { this._RestoreAll(); this.scene = scene; this.dirty = true; }
-    if (!this.dirty) return false;
-    this.dirty = false;
+    if (!this.Pending) return false;
+    this._Watch(scene);
+    if (this.dirty) {
+      this.dirty = false;
+      this.dirtyTops.clear();
+      for (const top of [...this.tops.keys()]) if (top.parent !== scene) this._ApplyTop(top, null);
+      for (const top of scene.children) this._ScanTop(top);
+    } else {
+      const tops = [...this.dirtyTops];
+      this.dirtyTops.clear();
+      for (const top of tops) {
+        if (top.parent === scene) this._ScanTop(top);
+        else this._ApplyTop(top, null);
+      }
+    }
+    let roots = 0;
+    for (const bones of this.tops.values()) roots += bones.size;
+    this.stats.roots = roots;
+    this.stats.scans += 1;
+    return true;
+  }
+
+  _Watch(object) {
+    if (this.watched.has(object)) return;
+    this.watched.add(object);
+    object.addEventListener?.("childadded", this._onStructure);
+    object.addEventListener?.("childremoved", this._onStructure);
+  }
+
+  /** 一棵顶层子树的剪法；顶层节点自己是整棵不可画的骨头时剪它本身。 */
+  _ScanTop(top) {
     const next = this.next;
     next.length = 0;
-    this._Scan(scene, next);
+    if (!this._Scan(top, next) && top.isBone) next.push(top);
+    this._ApplyTop(top, next);
+  }
+
+  /** 按新的剪法藏 / 还原这棵树里的骨头。list 为 null：这棵树离开了场景，全部还原并忘掉。 */
+  _ApplyTop(top, list) {
+    const old = this.tops.get(top);
     const keep = new Set();
-    for (const bone of next) {
-      if (this.pruned.has(bone)) {
+    if (list) for (const bone of list) {
+      if (old?.has(bone)) {
         keep.add(bone);
         bone.visible = false;              // 自己的：别人中途打开过也收回来
       } else if (bone.visible !== false) {
         bone.visible = false;
         keep.add(bone);
-      } else {
-        continue;                          // 别人藏的，不碰
-      }
+      }                                    // 别人藏的，不碰
     }
-    for (const bone of this.pruned) if (!keep.has(bone)) bone.visible = true;
-    this.pruned = keep;
-    this.stats.roots = keep.size;
-    this.stats.scans += 1;
-    return true;
+    if (old) for (const bone of old) if (!keep.has(bone)) bone.visible = true;
+    if (keep.size) this.tops.set(top, keep);
+    else this.tops.delete(top);
   }
 
   /** 返回这棵子树里有没有可画物体；把「最上层、整棵不可画」的子骨头推进 out。 */
   _Scan(object, out) {
-    if (!this.watched.has(object)) {
-      this.watched.add(object);
-      object.addEventListener?.("childadded", this._onStructure);
-      object.addEventListener?.("childremoved", this._onStructure);
-    }
+    this._Watch(object);
     let renderable = IsRenderable(object);
     let candidates = null;
     const children = object.children;
@@ -111,8 +166,9 @@ export class BonePrune {
   }
 
   _RestoreAll() {
-    for (const bone of this.pruned) bone.visible = true;
-    this.pruned.clear();
+    for (const bones of this.tops.values()) for (const bone of bones) bone.visible = true;
+    this.tops.clear();
+    this.dirtyTops.clear();
     this.stats.roots = 0;
   }
 }

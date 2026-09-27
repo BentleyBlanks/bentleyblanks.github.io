@@ -227,6 +227,7 @@ export const testDefs = {
   PlayerDeathTest: {file:"Script_PlayerDeathTest.mjs",desc:"First-person collapse stance/slope/platform/wall continuity and held endpoint"},
   PlayerHitboxTest: { file: "Script_PlayerHitboxTest.mjs", desc: "玩家命中几何：三姿态分段 / 正面部位次序 / 卧倒藏躯干 / 瞄点 / 散点部位分布（纯 Node，毫秒级）" },
   PlayerActorBlockTest: { file: "Script_PlayerActorBlockTest.mjs", desc: "玩家走不进人物身体：正面挡/贴边滑/窄缝/被挤出/豁免（纯 Node）" },
+  NavRefreshSpreadTest: { file: "Script_NavRefreshSpreadTest.mjs", desc: "导航网格摊帧重刷：栅格与连通分量摊完后与一次做完逐格相同、摊完前读旧版、可被打断（纯 Node，毫秒级）" },
   CoverLeanTest: { file: "Script_CoverLeanTest.mjs", desc: "墙角自动探身规则、侧向稳定性和头部扫掠（纯 Node）" },
   CoverLeanBrowserTest: { file: "Script_CoverLeanBrowserTest.mjs", timeoutMs: 240000, desc: "真实右键墙角探身、射击遮挡、手动控制和退出还原" },
   CameraShakeTest: { file: "Script_CameraShakeTest.mjs", desc: "相机震动：创伤漏光 / 弹簧回位 / 幅度封顶 / 距离与遮挡衰减 / 扑沟栽向下 / 确定性（纯 Node，毫秒级）" },
@@ -377,7 +378,9 @@ export const testDefs = {
   ShadowSkipTest: { file: "Script_ShadowSkipTest.mjs",
     desc: "阴影烘焙子树跳过（纯 Node）：登记根只在烘那一刻藏、烘完/抛错都还原、三方早退不翻位、幂等、与外层包装叠加" },
   BonePruneTest: { file: "Script_BonePruneTest.mjs",
-    desc: "骨头子树遍历剪枝（纯 Node）：只剪整棵不可画的最上层骨头、矩阵照算、挂件当帧恢复、不碰别人藏的、摘下挂回自洽" },
+    desc: "骨头子树遍历剪枝（纯 Node）：只剪整棵不可画的最上层骨头、矩阵照算、挂件当帧恢复、不碰别人藏的、摘下挂回自洽、只重扫变了的顶层子树" },
+  PrepassSkipTest: { file: "Script_PrepassSkipTest.mjs",
+    desc: "预通道藏出分类（纯 Node）：顶层子树增量重分类与整场重建逐个相同、只标变了的那棵、前景继承跟着结构走" },
   ShadowCasterBatchTest: { file: "Script_ShadowCasterBatchTest.mjs",
     desc: "阴影静态投影体合批（纯 Node）：只收稳定的叶子、烘焙那一刻换人并原样还原、任何变化当帧踢出、不改成员属性、关掉全还原" },
   MaterialUpgradeTest: { file: "Script_MaterialUpgradeTest.mjs", timeoutMs: 15 * 60 * 1000,
@@ -506,6 +509,7 @@ export const tier0Fast = [
   "CharacterHitboxMathTest",
   "PlayerHitboxTest",
   "PlayerActorBlockTest",
+  "NavRefreshSpreadTest",
   "CameraShakeTest",
   "FirstLevelBattleSoundTest",
   "FirstLevelAirRaidTest",
@@ -568,7 +572,7 @@ export const domains = {
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
-    tests: ["MovementRangeTest", "PhysicsTest", "ColliderTest", "JumpTest", "DestructionTest", "FractureBakeTest", "PlayerActorBlockTest"],
+    tests: ["MovementRangeTest", "PhysicsTest", "ColliderTest", "JumpTest", "DestructionTest", "FractureBakeTest", "PlayerActorBlockTest", "NavRefreshSpreadTest"],
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
@@ -640,7 +644,7 @@ export const domains = {
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
     // 开机顺序（存档画质何时套上）与关卡预热的改动连着 SavedGraphicsWarmTest 跑（约一分半）。
-    tests: ["MuzzleFlashTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "ShadowCasterBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest"],
+    tests: ["MuzzleFlashTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -694,7 +698,8 @@ const changedDomainRules = [
   // 蒙皮克隆共用骨骼 / 阴影趟按对象种类共用深度材质：两条都改渲染提交。
   // Script_SkinnedClone 还被 /Skinn/ 那条拉进 motionVector（骨骼历史按 Skeleton 记）。
   // Script_ShadowSkip 是阴影烘焙那一趟的子树跳过包装（ShadowSkipTest 是它的纯 Node 门禁）。
-  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch/ },
+  // 预通道藏出分类按顶层子树增量重建（PrepassSkipTest 是它的纯 Node 门禁）。
+  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch|Script_PostPrepass|Script_PrepassSkip/ },
   // 2026.09.19 第二波：被测对象从军列车厢里的腊肉/背包换成 12/13 牛马车上老周的担架与车上近景件
   // （军列开场已下线）。改牛马车的那两个模块也要拉进这个域。
   {domain:"firstLevel",pattern:/CartCorpseBump/},

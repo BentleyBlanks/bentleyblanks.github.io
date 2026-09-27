@@ -399,7 +399,9 @@ export class PrepassPass {
     this._skipMarkStamp = -1;
     this._skipVelocity = null;
     this._skipWatched = new WeakSet();  // 已经挂上结构监听的节点
-    this._OnSceneStructure = () => { this._skipDirty = true; };
+    this._skipTops = new Map();        // 顶层子树 → 它那一份分类 { always, ranged, skinned }
+    this._skipDirtyTops = new Set();   // 结构变了、下一帧只重分类的顶层子树
+    this._OnSceneStructure = (event) => this._SkipStructureChanged(event);
     this._skipWorldPosition = new THREE.Vector3();
     this._skeletons = new Set();       // 本帧在场的骨骼（下面拷上一帧矩阵用）
     this._upgraded = new WeakSet();    // 已经换成「高度翻倍」boneTexture 的骨骼
@@ -527,10 +529,62 @@ export class PrepassPass {
    * 只可能由结构或标记变化引起，那两条都报得到。
    */
   _RebuildSkipClassification(scene) {
+    const mrt = this.velocityEnabled;
+    this._skipTops.clear();
+    this._skipDirtyTops.clear();
+    // scene 自己单独过一遍（监听 + 前景标记），它下面每棵顶层子树各记一份。
+    this._ClassifyTree(scene, null, mrt, false);
+    for (const top of scene.children) this._skipTops.set(top, this._ClassifyTree(top, {}, mrt, true));
+    this._JoinSkipClassification();
+    this._skipScene = scene;
+    this._skipDirty = false;
+    this._skipMarkStamp = MARK_STAMP;
+    this._skipVelocity = mrt;
+  }
+
+  /**
+   * 结构事件落到哪一棵顶层子树（scene 的直接子节点）。分类只看对象自己和它的父链
+   * （前景继承），scene 本身不进任何一类，所以每棵顶层子树的分类互不相干：一个人挂上枪、
+   * 摘下场景，只重分类这个人（2026-09-27：开场近爆那几帧每次结构变化都整场 traverse）。
+   * 不在场景里的子树不管，它挂回场景那一刻整棵重分类。
+   */
+  _SkipStructureChanged(event) {
+    const scene = this._skipScene;
+    if (this._skipDirty || !scene) return;
+    let node = event.target;
+    if (node === scene) { if (event.child) this._skipDirtyTops.add(event.child); return; }
+    while (node && node.parent !== scene) node = node.parent;
+    if (node) this._skipDirtyTops.add(node);
+  }
+
+  /** 只重分类标脏的顶层子树；离开场景的整棵忘掉。 */
+  _UpdateSkipClassification(scene) {
+    const mrt = this.velocityEnabled;
+    for (const top of this._skipDirtyTops) {
+      if (top.parent === scene) this._skipTops.set(top, this._ClassifyTree(top, {}, mrt, true));
+      else this._skipTops.delete(top);
+    }
+    this._skipDirtyTops.clear();
+    this._JoinSkipClassification();
+  }
+
+  _JoinSkipClassification() {
     const always = this._skipAlways, ranged = this._skipRanged, skinned = this._skipSkinned;
     always.length = 0; ranged.length = 0; skinned.length = 0;
-    const mrt = this.velocityEnabled;
-    scene.traverse((object) => {
+    for (const bucket of this._skipTops.values()) {
+      if (bucket.always) for (const object of bucket.always) always.push(object);
+      if (bucket.ranged) for (const object of bucket.ranged) ranged.push(object);
+      if (bucket.skinned) for (const object of bucket.skinned) skinned.push(object);
+    }
+  }
+
+  /**
+   * 一棵子树的分类，结果放进 bucket 的 always / ranged / skinned（bucket 为 null 时只挂监听、
+   * 记前景）。deep = false 只处理 root 自己。
+   */
+  _ClassifyTree(root, bucket, mrt, deep) {
+    const Push = (key, object) => { if (bucket) (bucket[key] ||= []).push(object); };
+    const Visit = (object) => {
       this._WatchStructure(object);
       const foreground = !!object.userData?.foregroundPrepassRoot || this._foregroundObjects.has(object.parent);
       if (foreground) this._foregroundObjects.add(object);
@@ -541,15 +595,15 @@ export class PrepassPass {
         object.userData.foregroundPrepass = foreground;
         if (foreground && [object.material].flat().some(material => material
             && (material.transparent || material.alphaTest > 0 || material.depthWrite === false))) {
-          always.push(object);
+          Push("always", object);
           return;
         }
       }
       if (object.isSkinnedMesh && object.skeleton) {
-        skinned.push(object);
+        Push("skinned", object);
       }
       if (object.userData.skipNormalDepth) {
-        always.push(object);
+        Push("always", object);
         return;
       }
       // **MRT 的硬约束**：WebGL2 里「有一个 enabled 的 draw buffer 却没有对应的
@@ -569,20 +623,18 @@ export class PrepassPass {
         const material = object.material;
         if (Array.isArray(material)) {
           if (material.some((item) => item && item.allowOverride === false)) {
-            always.push(object);
+            Push("always", object);
             return;
           }
         } else if (material && material.allowOverride === false) {
-          always.push(object);
+          Push("always", object);
           return;
         }
       }
-      if ((Number(object.userData.normalDepthMaxDistance) || 0) > 0) ranged.push(object);
-    });
-    this._skipScene = scene;
-    this._skipDirty = false;
-    this._skipMarkStamp = MARK_STAMP;
-    this._skipVelocity = mrt;
+      if ((Number(object.userData.normalDepthMaxDistance) || 0) > 0) Push("ranged", object);
+    };
+    if (deep) root.traverse(Visit); else Visit(root);
+    return bucket;
   }
 
   /**
@@ -598,6 +650,8 @@ export class PrepassPass {
     if (this._skipDirty || scene !== this._skipScene
         || this._skipMarkStamp !== MARK_STAMP || this._skipVelocity !== this.velocityEnabled) {
       this._RebuildSkipClassification(scene);
+    } else if (this._skipDirtyTops.size) {
+      this._UpdateSkipClassification(scene);
     }
     const list = this._skipScratch;
     list.length = 0;

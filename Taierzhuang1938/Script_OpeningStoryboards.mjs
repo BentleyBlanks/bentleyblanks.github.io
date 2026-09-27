@@ -578,10 +578,16 @@ export class FirstLevelBunkerShow {
     this.blastFrom=this.FollowPoint();
     this.Stage("Blast");
     r.voice?.Signal?.("Blast");
-    r.combat?.FireShell(r.Point(b.shellFrom,14),r.Point(b.shellAt),{flight:b.blastShot.fallStartS,damage:0,radius:4,incoming:false,feedbackOnly:true});
-    r.audio?.Play?.("debrisFall",{position:r.Point(C.shunzi.trap,1),volume:.9});
+    // The shouter outside dies when the shell lands, not when it is fired: that is also 0.22 s later than the
+    // frame that fires it, which already pays the collapse and the story tinnitus (09-27 stutter review).
+    // PhaseBlast still kills him before the black if the shell never reports an impact.
     const shouter=this.cast.shouter;
-    if(shouter?.alive)this.Kill(shouter,"explosion");
+    r.combat?.FireShell(r.Point(b.shellFrom,14),r.Point(b.shellAt),{flight:b.blastShot.fallStartS,damage:0,radius:4,incoming:false,feedbackOnly:true,
+      OnImpact:()=>this.ShouterDown(shouter)});
+    r.audio?.Play?.("debrisFall",{position:r.Point(C.shunzi.trap,1),volume:.9});
+  }
+  ShouterDown(shouter=this.cast.shouter){
+    if(shouter?.alive&&shouter===this.cast.shouter&&["Blast","Black"].includes(this.phase))this.Kill(shouter,"explosion");
   }
   UpdateBunker(){ /* Driven after UpdateSquad by FrontShow.Update. */ }
   Update(dt){
@@ -853,7 +859,7 @@ export class FirstLevelBunkerShow {
     // The loose timber lands on his pack in the mouth, where he lies from the black on (not before his eyes).
     if(this.beam)this.beam.visible=false;
     this.ExitSquad();this.DepthWalkers();
-    if(age>=C.banter.blastShot.phaseS)this.Stage("Black");
+    if(age>=C.banter.blastShot.phaseS){this.ShouterDown();this.Stage("Black");}
   }
   /** Stunned in the heap from the landing to the drag: BlastSlamBuried plays out, then the BlastDazedStir loop
    *  (its frame 0 and last frame are the heap, CaptiveDraggedFromDirt frame 0). */
