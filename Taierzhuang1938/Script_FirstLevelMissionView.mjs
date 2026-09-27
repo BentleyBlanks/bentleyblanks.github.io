@@ -6,6 +6,8 @@ import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as MID } from "./Data_Tuning_FirstLevelMid.mjs";
 import { CreateStretcherGeometry } from "./Script_StretcherAsset.mjs";
 import { STRETCHER_PATIENT_LIFT_M } from "./Data_Carry.mjs";
+// 地上平放的担架（MISSION_PLACEMENT.groundStretchers）：按 z 分簇的簇宽、伤员报画的距离。
+const GROUND_STRETCHER_CLUSTER_M = 60, GROUND_STRETCHER_PATIENT_DRAW_M = 70;
 import { BuildSink } from "./Script_World.mjs";
 import { PlaceGeometry } from "./Script_Geo.mjs";
 import { ApplyShadowDepth, AttachShadowDepth } from "./Script_ShadowDepth.mjs";
@@ -125,20 +127,30 @@ export class FirstLevelMissionView {
   BuildGroundStretchers() {
     const list = MISSION_PLACEMENT.groundStretchers || [];
     this.groundStretchers = list.map((spec) => ({ ...spec, y: this.battlefield.GroundHeight(spec.x, spec.z) }));
-    if (!list.length) return;
-    const mesh = new THREE.InstancedMesh(this.parts.bed.geometry, this.parts.bed.material, list.length);
-    mesh.name = "MissionGroundStretchers";
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    AttachShadowDepth(mesh);
+    // 06 / 11 / 15–17 各成一簇：一簇一只实例网格，包围球只罩住本簇，视锥外整簇不画
+    // （一只网格罩住全关的话它永远在视锥里，每个阴影层也都要画一遍）。
+    const clusters = new Map();
+    for (const spec of this.groundStretchers) {
+      const key = Math.round(spec.z / GROUND_STRETCHER_CLUSTER_M);
+      if (!clusters.has(key)) clusters.set(key, []);
+      clusters.get(key).push(spec);
+    }
     const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
-    this.groundStretchers.forEach((spec, i) => {
-      q.setFromEuler(new THREE.Euler(0, spec.yaw, 0));
-      matrix.compose(new THREE.Vector3(spec.x, spec.y, spec.z), q, one);
-      mesh.setMatrixAt(i, matrix);
-    });
-    this.root.add(mesh);
-    this.meshes.push(mesh);
+    for (const [key, specs] of clusters) {
+      const mesh = new THREE.InstancedMesh(this.parts.bed.geometry, this.parts.bed.material, specs.length);
+      mesh.name = `MissionGroundStretchers${key}`;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      AttachShadowDepth(mesh);
+      specs.forEach((spec, i) => {
+        q.setFromEuler(new THREE.Euler(0, spec.yaw, 0));
+        matrix.compose(new THREE.Vector3(spec.x, spec.y, spec.z), q, one);
+        mesh.setMatrixAt(i, matrix);
+      });
+      mesh.computeBoundingSphere();
+      this.root.add(mesh);
+      this.meshes.push(mesh);
+    }
   }
   /** 接收院西北角码着的空担架（静态实例，与担架队同一份几何和材质）。 */
   BuildEmptyLitterStack() {
@@ -596,8 +608,11 @@ export class FirstLevelMissionView {
     // 15–18 的布景（掉队伤员、门外抬进来的下一副担架、夜景里的队列与搬运）：
     // 必须画在 people.Begin/End 之间，没报的那一帧人自动藏起来。
     this.extras?.Draw(this, time);
+    // 担架上的伤员是立即模式、不做视锥剔除：只在玩家走近时才报（离远了整帧、每个阴影层都白画）。
+    const eye = camera?.position || player?.position;
     for (const spec of this.groundStretchers)
-      if (spec.patient) this.people.Patient(spec.id, spec.x, spec.y + STRETCHER_PATIENT_LIFT_M, spec.z, spec.yaw, time);
+      if (spec.patient && (!eye || Math.hypot(eye.x - spec.x, eye.z - spec.z) <= GROUND_STRETCHER_PATIENT_DRAW_M))
+        this.people.Patient(spec.id, spec.x, spec.y + STRETCHER_PATIENT_LIFT_M, spec.z, spec.yaw, time);
     this.people.End();
     const visibleCarts=new Set([...this.column.vehicles,...this.column.traffic.filter(c=>c.visible)].filter(c=>c.z<=178).map(c=>c.id));
     for(const [id,box] of this.cartColliders)if(!visibleCarts.has(id)){
