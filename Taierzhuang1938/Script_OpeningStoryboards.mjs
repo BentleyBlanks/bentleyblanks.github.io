@@ -145,8 +145,11 @@ export class FirstLevelBunkerShow {
     if(!rig?.bones?.chest||!rig.root)return false;
     let hasSkin=false;rig.root.traverse(object=>{if(object.isSkinnedMesh)hasSkin=true;});
     if(!hasSkin)return false;
-    if(CharacterFacial.Of(rig))CharacterFacial.SetFaceBlood(rig,look.face);
+    // The stains are placed on the seated pose they were authored on, but he is unhurt until the shell:
+    // they stay hidden (and the face clean, its materials made now) until ComradeBleeds at the black.
+    if(CharacterFacial.Of(rig))CharacterFacial.PrepareFaceBlood(rig);
     actor.woundBlood ||= new CharacterWounds(rig.root);
+    actor.woundBlood.Hide();
     rig.root.updateWorldMatrix(true,true);
     const rotation=actor.root.getWorldQuaternion(new THREE.Quaternion());
     const forward=new THREE.Vector3(0,0,-1).applyQuaternion(rotation);
@@ -160,6 +163,18 @@ export class FirstLevelBunkerShow {
       if(!actor.woundBlood.Add({part:wound.part,point,direction,preferCloth:true,radiusM:wound.radiusM,ageS:wound.ageS}))
         throw Error(`Opening comrade wound ${wound.from}/${wound.to} found no skin`);
     }
+    return true;
+  }
+  /** The shell has landed on him (from the black on, or any later start): show the stains and the face blood. */
+  ComradeBlasted(){
+    const order=C.phases.Trapped,at=order.indexOf(this.phase);
+    return this.r.flow.stage.id!=="Trapped"||at>order.indexOf("Blast");
+  }
+  ComradeBleeds(soldier){
+    const actor=soldier?.actor,rig=actor?.characterRig;
+    if(!actor?.woundBlood)return false;
+    actor.woundBlood.Show();
+    if(CharacterFacial.Of(rig))CharacterFacial.SetFaceBlood(rig,C.comradeBlood.face);
     return true;
   }
   /** Bunker-assault men arrive through the generic spawner (spawn queue): adopt each once. */
@@ -594,10 +609,13 @@ export class FirstLevelBunkerShow {
     }
     this.UpdatePursuit();
     this.UpdatePerformances();
-    // The actor's first animation pass follows Setup. Project the old blood onto the
+    // The actor's first animation pass follows Setup. Lay the (hidden) blood onto the
     // already posed uniform on the next frame, while the opening is still fading in.
     if(!this.flags.comradeBloodied&&r.time-this.setupAt>=.1)
       this.flags.comradeBloodied=this.BloodiedComrade(this.cast.comrade);
+    // He is unhurt until the shell: the blood shows in the black after it (unseen).
+    if(this.flags.comradeBloodied&&!this.flags.comradeBled&&this.ComradeBlasted())
+      this.flags.comradeBled=this.ComradeBleeds(this.cast.comrade);
     // Outside the director's shots the AI's own cull is the frame's last word.
     if(!this.CameraActive)this.MarkNotShown();
   }

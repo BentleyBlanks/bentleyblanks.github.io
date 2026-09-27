@@ -120,7 +120,7 @@ export function PrepareWoundVariants(root) {
 // Bind-space masks deform with the existing skin, preserving lighting, normals and motion vectors.
 // Private materials isolate each wearer; no decals, transparent shells or per-frame vertex uploads.
 export class CharacterWounds {
-  constructor(root) { this.root=root; this.records=new Map(); this.time=0; this.count=0; }
+  constructor(root) { this.root=root; this.records=new Map(); this.time=0; this.count=0; this.hiddenAt=null; }
   // radiusM / ageS default to a fresh bullet wound; scripted casualties (Lao Zhou's litter)
   // pass larger, already-dried stains.
   Add({part="torso",shapeId=null,point=null,direction=null,preferCloth=false,radiusM=C.radiusM,ageS=0}={}) {
@@ -220,9 +220,27 @@ export class CharacterWounds {
     const radius=radiusM/Math.max(.0001,stretch/3);
     const slot=record.cursor++%C.slots, age=Math.max(0,ageS);
     record.uniforms.uClothWounds.value[slot].set(rest.x,rest.y,rest.z,radius);
-    record.born[slot]=this.time-age;record.uniforms.uClothWoundAge.value[slot].set(age,0);
+    record.born[slot]=(this.hiddenAt??this.time)-age;record.uniforms.uClothWoundAge.value[slot].set(age,0);
+    if(this.hiddenAt!=null){(record.parked||=record.uniforms.uClothWounds.value.map(()=>0))[slot]=radius;record.uniforms.uClothWounds.value[slot].w=0;}
     this.count++;return true;
   }
+  // Stains placed in one pose but shown later (the 01 comrade: laid on while he sits, shown from the blast).
+  // Hidden slots park their radius; Show restores them and each stain resumes at the age it was added with.
+  Hide() {
+    if(this.hiddenAt!=null)return;
+    this.hiddenAt=this.time;
+    for(const r of this.records.values())r.parked=r.uniforms.uClothWounds.value.map(v=>{const w=v.w;v.w=0;return w;});
+  }
+  Show() {
+    if(this.hiddenAt==null)return;
+    const held=this.time-this.hiddenAt;this.hiddenAt=null;
+    for(const r of this.records.values()) {
+      r.parked?.forEach((w,i)=>{r.uniforms.uClothWounds.value[i].w=w;});r.parked=null;
+      for(let i=0;i<r.born.length;i++)r.born[i]+=held;
+    }
+  }
+  /** Stains on show (0 while hidden). */
+  get shown() { return this.hiddenAt==null?this.count:0; }
   Update(dt) {
     this.time+=Math.max(0,dt);
     for(const record of this.records.values())for(let i=0;i<record.born.length;i++)
@@ -235,6 +253,6 @@ export class CharacterWounds {
       if(r.mesh.material===r.material)r.mesh.material=r.original;
       for(const m of Array.isArray(r.material)?r.material:[r.material])m.dispose();
     }
-    this.records.clear();this.count=0;this.time=0;
+    this.records.clear();this.count=0;this.time=0;this.hiddenAt=null;
   }
 }

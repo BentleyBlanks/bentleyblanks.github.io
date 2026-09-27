@@ -113,6 +113,8 @@ export function JudgeShot(judge, dump) {
     if (want.pelvisM) out.push(Range(`${role} pelvis height (m)`, a.pelvisY, want.pelvisM));
     if (want.woundMin != null) out.push(Range(`${role} persistent stains`, a.woundCount, [want.woundMin, null]));
     if (want.faceBloodMin != null) out.push(Range(`${role} face blood`, a.faceBlood, [want.faceBloodMin, null]));
+    if (want.woundMax != null) out.push(Range(`${role} persistent stains (before they show)`, a.woundCount, [null, want.woundMax]));
+    if (want.faceBloodMax != null) out.push(Range(`${role} face blood (before it shows)`, a.faceBlood, [null, want.faceBloodMax]));
   }
   if (judge.actorSeparation) {
     const [roleA, roleB] = judge.actorSeparation.roles;
@@ -377,7 +379,7 @@ function Dump({ warm, freeze, points }) {
       footR: bones?.footR?.getWorldPosition(new T.Vector3()).toArray().map(R3),
       pelvisY: pelvis ? R3(pelvis.y - feet.y) : null, headPx: head ? Screen(head) : null, feetPx: Screen(feet),
       jaw: jaw ? R3(jaw.bone.quaternion.angleTo(jaw.quaternion)) : null,
-      woundCount: a.actor.woundBlood?.count || 0, faceBlood: R3(a.actor.characterRig?.facial?.faceBlood?.amount || 0) });
+      woundCount: a.actor.woundBlood?.shown || 0, faceBlood: R3(a.actor.characterRig?.facial?.faceBlood?.amount || 0) });
     if (head) heads.set(actors[actors.length - 1], head);
     people.add(a.actor.root); roots.set(actors[actors.length - 1], a.actor.root);
   }
