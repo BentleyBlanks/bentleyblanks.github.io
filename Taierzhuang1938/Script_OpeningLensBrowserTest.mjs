@@ -4,6 +4,7 @@
 //   - Wake / Reach → Found: player mud and red corners; independent film coverage in between is clean;
 //   - Butt: the rifle butt's white flash peaks ≥ 0.8 (the director's strikeAt really arrives);
 //   - loading phases: the world rifle stays hidden (one loading rifle on screen);
+//   - no actor is taken out of the scene and put back within one frame (AI and director culling two frusta);
 // and once the director lets go of the view (Released, then the rifle pickup into RearTrench) nothing of the
 // lens remains: Perception().lens null, the HUD mud / flash layers off, uRadialBlur 0, uBloodEdge.w 0, the
 // director's blood cap lifted. Also: no OpeningLens "has run … without" warning on the way.
@@ -27,7 +28,16 @@ try {
       return { radialBlur: U.uRadialBlur.value, bloodEdge: U.uBloodEdge.value.w, mudOn: hud.mud.on, mudOpacity: hud.mud.opacity,
         flashOn: hud.flash.on, flashOpacity: hud.flash.opacity, bloodCap: g.hud.storyBloodCap ?? 1 };
     };
-    window.lensProbe = { phases: {}, drawn: {}, rifleShownInLoading: 0, order: [], Drawn };
+    window.lensProbe = { phases: {}, drawn: {}, rifleShownInLoading: 0, order: [], Drawn, flapFrames: 0, flaps: [] };
+    // An actor taken out of the scene and put back (or the reverse) inside one frame: the AI culled against the
+    // player's view and the director against its shot (2026-09-27, every frame through Incoming and the blast).
+    const ai = g.ai, attach = ai._SetDetailedAttached.bind(ai), P = window.lensProbe;
+    P.changed = new Map();
+    ai._SetDetailedAttached = (actor, detailed) => {
+      const was = !!actor?.root?.parent, out = attach(actor, detailed);
+      if (actor?.root && was !== !!actor.root.parent) P.changed.set(actor.root, (P.changed.get(actor.root) || 0) + 1);
+      return out;
+    };
   });
   // 01–02 are watched: about 200 s of game time. Each round trip steps 600 frames and samples every one.
   let state = null;
@@ -37,7 +47,10 @@ try {
       const RENDER = { Blast: 0.35, Interrogation: 1.0, Reach: 0.5 };
       for (let i = 0; i < 600; i++) {
         const phase = s.phase, age = s.Age, render = RENDER[phase] != null && age >= RENDER[phase] && !P.drawn[phase];
+        P.changed.clear();
         g.StepFrames(1, 1 / 60, render);
+        const flapped = [...P.changed].filter(([, n]) => n > 1).map(([root]) => root.name);
+        if (flapped.length) { P.flapFrames++; if (P.flaps.length < 8) P.flaps.push({ phase, age: +age.toFixed(2), flapped }); }
         const lens = r.Perception().lens, row = P.phases[s.phase] ||= { frames: 0, lensFrames: 0, maxFlash: 0, maxMud: 0, looks: [] };
         if (P.order.at(-1) !== s.phase) P.order.push(s.phase);
         row.frames++;
@@ -53,7 +66,7 @@ try {
     });
     if (state.phase === "Released" || !["Trapped", "BunkerRescue"].includes(state.stage)) break;
   }
-  const probe = await page.evaluate(() => { const { Drawn, ...rest } = window.lensProbe; return rest; });
+  const probe = await page.evaluate(() => { const { Drawn, changed, ...rest } = window.lensProbe; return rest; });
   await fs.writeFile(path.join(output, "Data_OpeningLensProbe.json"), JSON.stringify({ state, probe, warnings }, null, 2));
   console.log("PHASES", probe.order.join(" "));
   console.log("DRAWN", JSON.stringify(probe.drawn));
@@ -66,6 +79,10 @@ try {
   for (const phase of ["Wake", "Reach", "Found"]) assert.ok(P[phase].maxMud > 0, `${phase}: mud on the lens (${P[phase].maxMud})`);
   assert.equal(P.Hold.maxMud, 0, "SB05: the lens is clean again");
   assert.equal(P.Interrogation.maxMud, 0, "cinematic interrogation has no player mud overlay");
+  // Each flap rescans the scene (bone pruning, prepass classes) and re-poses the actor in full: the 01 stutter.
+  // One frame may still flap where the director first takes the view (the AI culled before it that frame).
+  console.log("FLAPS", probe.flapFrames, JSON.stringify(probe.flaps));
+  assert.ok(probe.flapFrames <= 2, `actors do not enter and leave the scene within one frame (${probe.flapFrames} frames: ${JSON.stringify(probe.flaps)})`);
   assert.equal(probe.rifleShownInLoading, 0, "the loading phases never show the world rifle next to the loading rifle");
   // The rendered side: the composite and the HUD really get the lens (so the residue checks below are not vacuous).
   assert.ok(probe.drawn.Blast?.radialBlur > 0.01, `Blast: radial blur in the composite (${JSON.stringify(probe.drawn.Blast)})`);

@@ -4894,6 +4894,14 @@ CPU 采样（Profiler，300 帧）里排前面的是 `updateMatrixWorld` 17%、`
 | `ActorBatcher.Update` | 0.31 ms | 0.18 ms |
 | 90 帧平均整帧 | 7.52 ms | 4.70 ms |
 
+摘下 / 挂回是 scene 的结构变更：骨头剪枝（`Script_BonePrune`）与预通道分类
+（`PostPrepass._RebuildSkipClassification`）都会整场重扫，挂回还置 `poseDirty` 让这个人整身重采样。
+所以**一帧只能按一个视锥剔一次**。开场导演接管镜头时会在 `ApplyCamera` 之后按出画机位再剔一遍；
+2026-09-27 之前 `ai.Update` 先按玩家自己的视角剔，镜头边上的人一帧里挂回又摘下，Incoming 与近爆那两秒
+每帧都在翻（从开场到近爆后一秒，人物进出场景约 570 次；改后 28 次）。现在导演剔过、下一帧仍接管，`ai.Update` 就把剔除留给它
+（`AiDirector.viewOwner` / `cullDeferred`），导演交还镜头的那一帧由它补剔玩家视角。
+回归：`Script_OpeningLensBrowserTest` 的 FLAPS 行。
+
 另把人物实例缓冲按本关总人数一次预留，转头时不再让几十个材质桶依次 16→32→64
 扩容；high 档去掉与最终 FXAA 重复的 4×MSAA，4× 只留给 ultra。RTX 4070 SUPER
 同一超宽测试里，4×MSAA 单独把 GPU 从约 3.8 ms 抬到 4.8 ms。

@@ -2415,7 +2415,11 @@ export class FirstLevelBunkerShow {
   }
   ApplyCamera(){
     const r=this.r,p=this.phase,a=this.Age;
-    if(!this.CameraActive)return false;
+    if(!this.CameraActive){
+      // The AI left this frame's cull to the director (it still owned the view at ai.Update); cull the player's own view.
+      if(r.ai?.viewOwner===this&&r.ai.cullDeferred){r.ai.cullDeferred=false;r.ai.CullActors(r.player.camera);}
+      return false;
+    }
     const cam=r.player.camera,shot=this.Shot(),sense=this.Perceive(),head=this.HeadLook(),still=r.opening?.reducedMotion?.matches;
     const shotId=shot.id||"firstPerson",cut=this.presentedShotId!=null&&this.presentedShotId!==shotId;
     if(cut){this.cameraFrom=null;this.presentedCamera=null;this.previousViewPosition=null;this.previousViewQuaternion=null;this.cameraCutAt=r.time;this.cameraCutSerial=(this.cameraCutSerial||0)+1;r.NotifyCameraCut?.();}
@@ -2454,8 +2458,10 @@ export class FirstLevelBunkerShow {
     // The AI culls actors earlier in the frame against the player's own view (Script_Main runs ai.Update
     // before the mission's ApplyCamera); while the director owns the view that frustum points elsewhere and
     // actors in the shot were taken out of the scene (09-24: Luo invisible at K2, renderLod "culled" while
-    // centred in frame). Cull again against the shot actually shown.
-    r.ai?.CullActors?.(cam);
+    // centred in frame). Cull again against the shot actually shown. From the next frame the AI skips its own
+    // cull while this one owns the view (09-27: the two frusta put actors at the shot's edge in and out of
+    // the scene twice a frame through Incoming and the blast, each time rescanning the scene and re-posing them).
+    if(r.ai?.CullActors){r.ai.CullActors(cam);r.ai.viewOwner=this;this.culledFrame=r.ai.updateFrame;r.ai.cullDeferred=false;}
     this.MarkNotShown();
     // The HUD's incoming-fire arcs point relative to the player's own yaw, not to the director's shot, and the
     // player cannot act on them here: near misses in 01–02 showed a white arc over the frame (09-24 review:
@@ -2623,6 +2629,7 @@ export class FirstLevelBunkerShow {
       headLook:this.headLook||null,meet:this.meet?{s:this.meet.s}:null};
   }
   Dispose(){
+    if(this.r.ai?.viewOwner===this)this.r.ai.viewOwner=null;
     if(this.cinematicBaseFov!=null){this.r.player.camera.fov=this.cinematicBaseFov;this.r.player.camera.updateProjectionMatrix();this.cinematicBaseFov=null;}
     this.presentedShotId=null;
     this.ReleaseMeleeDormancy();

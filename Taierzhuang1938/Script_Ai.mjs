@@ -656,6 +656,10 @@ export class AiDirector {
     this.rnd = Mulberry32(seed);
     this.tickIndex = 0;
     this.time = 0;
+    // 接管镜头、自己在出画机位上剔除的导演（见 Update 末尾的 ai/cull）。
+    this.viewOwner = null;
+    this.updateFrame = 0;
+    this.cullDeferred = false;
     this.tmpA = new THREE.Vector3();
     // 打玩家的部位几何（PlayerHitPart）用的临时量；boxes 复用一份，每发不产垃圾。
     this.tmpAim = { x: 0, y: 0, z: 0 };
@@ -1462,7 +1466,15 @@ export class AiDirector {
     }
 
     profiler?.B("ai/cull");
-    this.CullActors(camera);
+    // 开场导演接管镜头时，它在 ApplyCamera 之后按真正出画的机位再剔一遍
+    // （Script_OpeningStoryboards.ApplyCamera）。这里若先按玩家自己的视角剔，镜头边上的人
+    // 一帧里先挂回场景、再被摘下：两次结构变更逼骨头剪枝与预通道分类整场重扫，挂回还置
+    // poseDirty 逼整身重采样（2026-09-27 近爆前后每帧都在翻）。导演上一帧剔过、这一帧仍
+    // 接管，就把这一帧的剔除留给它；它交还镜头的那一帧由它补剔（cullDeferred）。
+    this.updateFrame += 1;
+    const owner = this.viewOwner;
+    this.cullDeferred = !!owner && owner.culledFrame === this.updateFrame - 1 && !!owner.CameraActive;
+    if (!this.cullDeferred) this.CullActors(camera);
     profiler?.E("ai/cull");
   }
 
