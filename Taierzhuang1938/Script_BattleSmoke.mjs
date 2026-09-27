@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
 import { MakeVolumetricNoiseTexture } from "./Script_PostVolumetrics.mjs";
-import { BATTLE_SMOKE_QUALITY, BATTLE_SMOKE_STYLES } from "./Data_Tuning_BattleSmoke.mjs";
+import { BATTLE_SMOKE_QUALITY, BATTLE_SMOKE_STYLES, BATTLE_SMOKE_LIGHTING } from "./Data_Tuning_BattleSmoke.mjs";
 
 export const BATTLE_SMOKE_LOBES = Object.freeze(Object.fromEntries(Object.entries(BATTLE_SMOKE_QUALITY).map(([id,q])=>[id,q.lobes])));
 
@@ -22,7 +22,7 @@ export function BuildBattleSmokeInstances(sources, quality = "high") {
         origin: [source.position.x, source.position.y, source.position.z],
         column: [p.height, p.baseWidth, p.crownWidth, p.life],
         flow: [p.driftX, p.driftZ, p.frame === 5 ? burstPhase + i / count * .18 : (i + random() * 0.6) / count, p.spread],
-        shape: [p.aspect, p.opacity * (BATTLE_SMOKE_QUALITY[quality] || BATTLE_SMOKE_QUALITY.high).opacity, p.frame, random()],
+        shape: [p.aspect, p.opacity * style.opticalDepth * (BATTLE_SMOKE_QUALITY[quality] || BATTLE_SMOKE_QUALITY.high).opacity, p.frame, random()],
         lobe: [(random() - 0.5) * 2, (random() - 0.5) * 2, 0.72 + random() * 0.52, p.nearFade || 3],
         tint: style.tint, motion: style.motion,
       });
@@ -104,6 +104,7 @@ void main() {
 
 const FRAG = /* glsl */`
 precision highp sampler3D;
+uniform vec3 uSmokeLighting;
 uniform sampler3D uDensity;
 uniform sampler2D uNormalDepth;
 uniform vec2 uResolution;
@@ -130,8 +131,8 @@ float Density(vec3 p, vec3 flow) {
   vec2 noise = texture(uDensity, curl * 0.68 + flow).rg;
   // Broad cavities break the contour; small eddies erode it without photograph
   // grain, hard sprite borders or the repeated silhouette of an atlas stamp.
-  float body = 0.85 - dot(p, p);
-  float field = body + (noise.r - 0.5) * 1.2 + (noise.g - 0.52) * 2.5;
+  float body = 1.04 - dot(p, p);
+  float field = body + (noise.r - 0.5) * 1.2 + (noise.g - 0.52) * 1.9;
   return smoothstep(0.0, 0.56, field) * (0.75 + noise.g * 0.25);
 }
 void main() {
@@ -149,8 +150,14 @@ void main() {
     float density = Density(p, flow);
     float sampleDepth = vViewDepth - z * vRadius;
     if (sceneDepth > 0.001) density *= smoothstep(0.0, 0.85, sceneDepth - sampleDepth);
-    float shade = clamp((density - Density(p + light * 0.25, flow)) * 0.42 + 0.58, 0.35, 0.86);
-    vec3 lit = base * (0.64 + shade * 0.8);
+    // Integrate an approximate light path to the sphere boundary. Unlike a
+    // nearly flat density gradient, this darkens thick cores while preserving
+    // light around the rolling edges. Reuses the same second density sample.
+    float alongLight = dot(p, light);
+    float lightPath = max(0.0, sqrt(max(0.0, alongLight * alongLight + 1.0 - dot(p,p))) - alongLight);
+    float lightDensity = (density + Density(p + light * lightPath * .5, flow)) * .5;
+    float transmittance = exp(-lightDensity * lightPath * uSmokeLighting.z);
+    vec3 lit = base * (uSmokeLighting.x + uSmokeLighting.y * transmittance);
     float a = 1.0 - exp(-density * halfRay * vSmoke.x * 9.0 / float(SMOKE_STEPS));
     sum.rgb += (1.0 - sum.a) * a * lit;
     sum.a += (1.0 - sum.a) * a;
@@ -177,7 +184,8 @@ export class BattleSmoke {
     this.geometry.setIndex([0,1,2,0,2,3]);
     this.geometry.instanceCount = 0;
     this.material = new THREE.ShaderMaterial({
-      uniforms: { ...shared, uDensity: { value: this.texture } },
+      uniforms: { ...shared, uDensity: { value: this.texture }, uSmokeLighting: { value: new THREE.Vector3(
+        BATTLE_SMOKE_LIGHTING.ambient, BATTLE_SMOKE_LIGHTING.direct, BATTLE_SMOKE_LIGHTING.extinction) } },
       glslVersion: THREE.GLSL3,
       defines: { SMOKE_STEPS: (BATTLE_SMOKE_QUALITY[quality] || BATTLE_SMOKE_QUALITY.high).steps },
       vertexShader: VERT, fragmentShader: FRAG,

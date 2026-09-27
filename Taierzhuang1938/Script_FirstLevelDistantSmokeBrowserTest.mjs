@@ -64,6 +64,23 @@ try {
         vfx.Update(1/60,camera,time);const first=Read();
         vfx.Update(1/60,camera,time+1);const second=Read();
         const style={type:profile.type,visible:Changed(roadEmpty,first),oneSecond:Changed(first,second)};
+        if(frame===1||frame===4) {
+          // Recover opacity using identical smoke over white/black backgrounds;
+          // a darker tint alone cannot satisfy this dense-core requirement.
+          const background=scene.background.clone();
+          scene.background.setRGB(1,1,1);const white=Read();
+          scene.background.setRGB(0,0,0);const black=Read();
+          scene.background.copy(background);
+          let core=0,edge=0,peak=0;
+          for(let i=0;i<white.length;i+=4) {
+            const alpha=1-(white[i]-black[i]+white[i+1]-black[i+1]+white[i+2]-black[i+2])/765;
+            peak=Math.max(peak,alpha);
+            if(alpha>.85)core++;else if(alpha>.08&&alpha<.65)edge++;
+          }
+          const lighting=vfx.battleSmoke.material.uniforms.uSmokeLighting.value,extinction=lighting.z;
+          lighting.z=0;const unshadowed=Read();lighting.z=extinction;
+          style.layers={core,edge,peak,selfShadow:Changed(second,unshadowed)};
+        }
         if(frame===5) {
           vfx.Update(1/60,camera,(1.8-phase)*profile.life);
           style.quiet=Changed(roadEmpty,Read());
@@ -90,6 +107,11 @@ try {
   for(const style of r.styles) {
     assert.ok(style.visible>500,style.type+" is visibly rendered on its own");
     assert.ok(style.oneSecond>150,style.type+" visibly changes within one second");
+    if(style.layers) {
+      assert.ok(style.layers.core>500,style.type+" has a substantial opaque core");
+      assert.ok(style.layers.edge>500,style.type+" retains a translucent outer layer");
+      assert.ok(style.layers.selfShadow>600,style.type+" has visible internal light absorption");
+    }
   }
   assert.equal(r.styles.find(s=>s.type==="burstDust").quiet,0,"dust eruptions include a quiet interval instead of a permanent column");
   assert.equal(r.combatParticles,0,"backdrop never consumes combat particle slots");

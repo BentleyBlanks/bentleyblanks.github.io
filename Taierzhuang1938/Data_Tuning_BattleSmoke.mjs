@@ -7,11 +7,14 @@ export const BATTLE_SMOKE_QUALITY = Object.freeze({
   high: { lobes: 14, steps: 10, opacity: 1 },
   ultra: { lobes: 16, steps: 12, opacity: 1 },
 });
+// Denser 04–06 battlefield art direction: light is absorbed through each lobe,
+// leaving deep cores and a lit, translucent outer shell. No global fog change.
+export const BATTLE_SMOKE_LIGHTING = Object.freeze({ ambient: .24, direct: 1.05, extinction: 2.8 });
 export const BATTLE_SMOKE_STYLES = Object.freeze([
-  { id: "sootColumn", tint: [.085,.079,.072], motion: [.10,.025,.10,.08] },
-  { id: "billowColumn", tint: [.52,.52,.49], motion: [-.23,.060,.15,.14] },
-  { id: "dustBank", tint: [.46,.31,.16], motion: [.16,.080,.10,.26] },
-  { id: "windShear", tint: [.28,.32,.34], motion: [-.18,.075,.13,.22] },
-  { id: "groundScreen", tint: [.68,.67,.63], motion: [.29,.065,.17,.18] },
-  { id: "burstDust", tint: [.42,.275,.13], motion: [-.32,.090,.14,.12] },
+  { id: "sootColumn", tint: [.065,.061,.054], opticalDepth: 2.5, motion: [.10,.025,.10,.08] },
+  { id: "billowColumn", tint: [.36,.345,.315], opticalDepth: 2.2, motion: [-.23,.060,.15,.14] },
+  { id: "dustBank", tint: [.40,.28,.15], opticalDepth: 2.0, motion: [.16,.080,.10,.26] },
+  { id: "windShear", tint: [.25,.24,.22], opticalDepth: 2.4, motion: [-.18,.075,.13,.22] },
+  { id: "groundScreen", tint: [.64,.62,.57], opticalDepth: 2.0, motion: [.29,.065,.17,.18] },
+  { id: "burstDust", tint: [.38,.255,.13], opticalDepth: 2.6, motion: [-.32,.090,.14,.12] },
 ].map(style=>Object.freeze({...style,tint:Object.freeze(style.tint),motion:Object.freeze(style.motion)})));
