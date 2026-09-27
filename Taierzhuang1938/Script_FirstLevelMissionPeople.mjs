@@ -7,12 +7,17 @@ import { MergeBodyParts } from "./Script_PartAtlasMerge.mjs";
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 import { MISSION_PEOPLE_TUNING as C, ZHOU_WOUNDS } from "./Data_Tuning_FirstLevel.mjs";
 import { PaintBakedWounds, CreateWoundUniforms } from "./Script_CharacterWounds.mjs";
+import { InstallCareClips, RemoveCareClips } from "./Script_CollectionCareAnimation.mjs";
 
 // Visible people share the production character rig; two-bone IK corrects hands onto the actual rails.
 export class MissionPeople {
   constructor({root,actorFactory,battlefield}){Object.assign(this,{root,actorFactory,battlefield});this.people=new Map();this.time=0;this.patients=new Map();this.patientMerge=new Map();this.patientOwned={materials:[],geometries:[],textures:[]};this.patientMatrix=new THREE.Matrix4();this.patientRotation=new THREE.Quaternion();}
   Begin(time,focus=null){this.focus=focus;this.dt=Math.max(0,Math.min(.05,time-this.time));this.time=time;for(const entry of this.people.values())entry.used=false;for(const parts of this.patients.values())for(const mesh of parts)mesh.count=0;}
-  Person(id,x,z,yaw,{alive=true,moving=false,crouch=false,kind="bearer",carryTarget=null,role=null}={}){
+  /**
+   * perform：{clip, phase, y} 播作者动作（Script_CollectionCareAnimation，06 集结处的伤员与医护），y 是根的离地高度（草垫厚）；
+   * 动作库没到或装不上时照旧走下面的程序化姿态。dress(actor)：这具人第一次建出来时挂一次东西（袖标、绷带）。
+   */
+  Person(id,x,z,yaw,{alive=true,moving=false,crouch=false,kind="bearer",carryTarget=null,role=null,perform=null,dress=null}={}){
     let entry=this.people.get(id);
     if(!entry){
       const variant=[...id].reduce((n,c)=>n+c.charCodeAt(0),0);
@@ -22,6 +27,7 @@ export class MissionPeople {
       const planted=actor.characterRig?Object.fromEntries(["L","R"].map(s=>[s,actor.characterRig.bones["foot"+s].getWorldQuaternion(new THREE.Quaternion())])):null;
       entry={actor,pose,planted,phase:variant*.17,used:true,last:{x,z},speed:0};
       this.people.set(id,entry);this.root.add(actor.root);
+      if(dress&&actor.characterRig){actor.root.updateMatrixWorld(true);dress(actor);}
     }
     // dead：牛马车压尸体要认得出哪些是躺着的人（Script_CartCorpseBump，MissionView.CorpseHeightNear）。
     entry.used=true;entry.dead=!alive;
@@ -29,7 +35,7 @@ export class MissionPeople {
     const distance=Math.hypot(x-entry.last.x,z-entry.last.z);
     const speed=this.dt>0&&distance<1?distance/this.dt:0;
     entry.last={x,z};entry.speed+=(speed-entry.speed)*Math.min(1,this.dt*10);
-    actor.root.position.set(x,this.battlefield.GroundHeight(x,z),z);actor.root.rotation.set(0,yaw,0);
+    actor.root.position.set(x,this.battlefield.GroundHeight(x,z)+(perform?.y||0),z);actor.root.rotation.set(0,yaw,0);
     const away=this.focus?Math.hypot(x-this.focus.x,z-this.focus.z):0;
     actor.SetShadowEnabled(away<=ACTOR_DETAIL.shadowM);
     const interval=away>C.farAnimationM?C.farAnimationS:away>C.nearAnimationM?C.midAnimationS:
@@ -44,6 +50,13 @@ export class MissionPeople {
     }
     const gait=entry.speed>C.walkThresholdMps?Math.min(1,entry.speed/C.gaitSpeedMps):0;
     const rig=actor.characterRig;
+    const layer=perform&&rig?InstallCareClips(actor):(RemoveCareClips(actor),null);
+    if(layer){
+      // 作者动作写满全身 53 根骨：不再叠下面的手臂 IK 与头胸摆动。
+      layer.clock=this.time;layer.Play(perform.clip,this.time,perform.phase||0);
+      rig.Update(poseDt,{moveSpeed:0,elapsed:this.time});
+      actor.root.updateMatrixWorld(true);return actor;
+    }
     if(carryTarget && rig){
       // A halted bearer keeps a loaded stance, with planted feet instead of jogging in place.
       rig.Play(role==="front"?"CarryStretcherFront":"CarryStretcherRear");

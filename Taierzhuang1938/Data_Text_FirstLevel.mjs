@@ -76,6 +76,7 @@ export const TEXT = Object.freeze({
   "firstLevel.guide.loading": "转运车辆与老周的担架",
   "firstLevel.transition.night.title": "1938年3月15日 夜｜滕县",
   "firstLevel.transition.night.text": "队伍沿公路向北，进滕城北门。",
+  "firstLevel.transition.litter.text": "担架员托肩抬腿，把老周挪上了担架。\n包扎好的几个重伤员也抬上了担架，后送队准备出发。",
 });
 export const DYNAMIC_PREFIXES = ["firstLevel.return.", "firstLevel.interaction.", "firstLevel.guide.", "firstLevel.hint.", "firstLevel.leader.", "firstLevel.transition."];
 export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_FirstLevelMissionVoice.mjs", "Script_FirstLevelOpening.mjs", "Script_FirstLevelLeaderGuide.mjs",

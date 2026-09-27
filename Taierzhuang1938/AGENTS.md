@@ -10,6 +10,8 @@
 
 - **01 日兵甲翻越塌顶木、从木头底下拖出顺子（2026-09-27）**：[翻越与倒拖](docs/Data_OpeningVaultHaul20260927.md)。Found 不再穿木头走进坑，DragOut 不再背对顺子往前走；三条新动作只烘 IJA02，烘焙 spec 新增 `groundWeight`。
 
+- **06 集结处伤员与上担架黑场（2026-09-27）**：[伤员、医护、老周与黑场](docs/Data_CollectionCare20260927.md)。草垫上的伤员挣扎/被包扎、医护跪着包扎按压、老周靠墙半躺，都是 Blender 烘的作者动作（`Animation/CollectionCare`，`_import/Script_CollectionCareBake.py` 走开场动作库的帧循环）；上担架走 `litterTransition` 黑场字幕。门禁 `Script_FirstLevelCollectionCareTest`。
+
 - **05–18 场景白盒按概念图重做（2026-09-27 起）**：[差距清单、约束、地形接口与分区](docs/Data_FirstLevelWhitebox0518Gap.md)。四区（A 05–07 / B 08–10 / C 11–14 / D 15–18）各改自己的 `Data_FirstLevelWhitebox<Front|Village|Transfer|Rear>` 体块包与 `Data_FirstLevelWhiteboxTerrain<Region>` 地形表（由 `SampleMissionTerrain` 统一叠加，门禁 `Script_FirstLevelWhiteboxTerrainTest`）；对照出图 `Script_FirstLevelWhitebox0518Shots.mjs`（机位表 `Data_FirstLevelWhitebox0518Cameras`）。07+ 地面指纹只在集成时重生。已实装，结果与遗留差距见该文 §5；13 空袭疏散 / 15A 撤退改走固定通道（`MID_TUNING.transferEvac`），地上平放的担架统一走 `MISSION_PLACEMENT.groundStretchers`（担架模型）。
 
 - **06–18 场景白盒采用 Notion 2026-09-24 参考迭代**：[概念/拓扑对应与验收](docs/Data_FirstLevelWhitebox20260924.md)。三个 `Data_FirstLevelWhitebox*` 模块承载村落、接运与后方体块，Layout统一接地与合并；夜门新增体块仍仅属于NightGate。06起连续验收可用 `Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=6`，加载时初始化06后不再跳阶段。

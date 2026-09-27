@@ -883,8 +883,18 @@ export const MISSION_PLACEMENT = Object.freeze({
   collection: {
     litters: [{ x: -40.5, z: -99.2, yaw: 0 }, { x: -38, z: -98.6, yaw: 0 },
       { x: -35.5, z: -99.4, yaw: 0 }, { x: -33, z: -98.8, yaw: 0 }],
-    wounded: [{ x: -43, z: -102.4 }, { x: -42.2, z: -105 }, { x: -30.6, z: -103.2 },
-      { x: -29.4, z: -100.2 }, { x: -39.2, z: -103.6 }],   // [4] moved off the collection->SJ trench floor (2026-09-23)
+    // 2026-09-27 按 Notion 概念图 06/06B（docs/Data_CollectionCare20260927.md）：伤员躺在草垫上排在西、北两面背坡
+    // 脚下，头朝坡、脚朝场坪；care 为 bandage / press 的身边跪一个医护（站位由 Data_FirstLevelCollectionCare 的
+    // COLLECTION_CARE_PAIRS 从伤员位置推），没有的在挣扎。坐标是伤员的骨盆（演员根），yaw 让「前方」指向脚。
+    // 玩家从东北交通沟进来、到借火位，都走场坪东半，不从草垫上过。两列都头朝西：西列的头让开 05–18 白盒
+    // 摆在西坡脚的备用担架（groundStretchers CollectionSpare*，x −44.95）与背包（CollectionWestPack*），
+    // 中列在四副空担架（z −99 一排）以南、北坡脚那排木箱（CollectionNorthFoot*，z −106.4）以北。
+    wounded: [
+      { x: -43.55, z: -97.7, yaw: -Math.PI / 2, care: "bandage" },
+      { x: -43.55, z: -100.45, yaw: -Math.PI / 2 },
+      { x: -43.55, z: -103.2, yaw: -Math.PI / 2, care: "press" },
+      { x: -40.0, z: -102.8, yaw: -Math.PI / 2 },
+      { x: -40.0, z: -104.95, yaw: -Math.PI / 2, care: "bandage" }],
     // 2026-09-20 演出打磨：原来 (-37.2,-97) 与 (-34.2,-97.2) 两个搬运人员正好堵在
     // 玩家来向（集结处锚点 (-37,-101)）与老周 (-36.4,-95.9) 之间 —— 实拍里借火那一拍
     // 整个画面是两张后背，老周根本不在画里。四个人都退到担架那一侧，
@@ -897,6 +907,9 @@ export const MISSION_PLACEMENT = Object.freeze({
     bearerWait: [{ x: -40.3, z: -97.6, yaw: 0 }, { x: -32.4, z: -97.4, yaw: 0 }],
     bearerClose: [{ x: -37.9, z: -96.6, yaw: 0 }, { x: -35.0, z: -96.8, yaw: 0 }],
     zhouWall: { x: -36.4, z: -95.9, yaw: Math.PI },  // 靠 CollectionLitterWall 的土壁等担架
+    // 06 老周靠墙半躺（CareZhouRecline）时的骨盆：离 CollectionLitterWall 北面（z −95.35）正好
+    // COLLECTION_CARE_RECLINE_WALL_M 0.43 m —— 背贴着墙。zhouWall 仍是他走回来的终点与任务里的位置。
+    zhouRecline: { x: -36.4, z: -95.78 },
     // 玩家过来借火站的地方：老周正北 2.6 m，两个人中间空着，火柴与纸烟读得出来。
     borrowStand: { x: -36.5, z: -98.5 },
     runner: { x: -31, z: -95.4, yaw: Math.PI },

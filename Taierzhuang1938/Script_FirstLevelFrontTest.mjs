@@ -156,14 +156,22 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
   collection.UpdateOrders(0);
   assert.equal(zhou.state, "fallen");
   assert.equal(collection.ZhouLiftComplete(), false, "voice completion must not finish the lift at t=0");
-  r.time = F.zhouLiftMoveS / 2;
-  collection.UpdateOrders(F.zhouLiftMoveS / 2);
-  assert.equal(collection.ZhouLiftComplete(), false, "a partly moved litter still keeps Orders active");
-  r.time = F.zhouLiftMoveS;
-  collection.UpdateOrders(F.zhouLiftMoveS / 2);
+  // 2026-09-27: the lift is covered by the black title card (FRONT_TUNING.litterTransition): the swap happens at full
+  // black, the column is released only once the card has faded out.
+  const card = F.litterTransition, cardS = card.fadeOutS + card.holdS + card.fadeInS;
+  assert.ok(card.fadeOutS > 0.3 && card.holdS >= 2 && card.fadeInS > 0.3 && cardS < 6, "黑场字幕读得完、又不拖");
+  r.time = card.fadeOutS * 0.5;
+  collection.UpdateOrders(0);
+  assert.equal(collection.State().care.loaded, false, "fading out: nobody has been moved yet");
+  r.time = card.fadeOutS + card.holdS * 0.5;
+  collection.UpdateOrders(0);
   const target = MissionCarryRoutePoint(route, zhou.progress);
   assert.ok(Math.hypot(zhou.x - target.x, zhou.z - target.z) < 1e-9,
-    "completion follows actual placement on the column route");
+    "at full black Zhou's litter is already placed on the column route");
+  assert.equal(collection.State().care.loaded, true, "at full black the treated wounded are on the collection litters");
+  assert.equal(collection.ZhouLiftComplete(), false, "the card still up keeps Orders active");
+  r.time = cardS + 0.01;
+  collection.UpdateOrders(0);
   assert.equal(zhou.state, "waiting", "the regular column loop can move Zhou after the lift");
   assert.equal(collection.ZhouLiftComplete(), true);
   const runtime = Read("Script_FirstLevelMissionRuntime.mjs");
@@ -174,10 +182,27 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
 }
 {
   const dressing = CollectionDressing();
-  assert.equal(dressing.length, P.collection.wounded.length + P.collection.bearers.length,
-    "摆位人数＝MISSION_PLACEMENT.collection 给的伤员＋搬运人员");
+  const cared = P.collection.wounded.filter((spot) => spot.care).length;
+  assert.equal(dressing.length, P.collection.wounded.length + cared + P.collection.bearers.length,
+    "摆位人数＝MISSION_PLACEMENT.collection 给的伤员＋每位受包扎伤员身边的医护＋搬运人员");
   assert.ok(P.collection.litters.length >= 4, "集结处至少四副担架");
   assert.ok(dressing.filter((person) => person.kind === "wounded").length >= 4, "伤员不止一两个");
+  // 概念图 06：有人在挣扎，有人正被包扎；包扎好的在黑场里上担架（一人一副，不超过集结处的担架数）。
+  assert.ok(dressing.some((person) => person.clip === "CareLieWrithe"), "有伤员在疼得挣扎");
+  assert.ok(dressing.filter((person) => person.kind === "medic").length >= 2, "至少两个医护在跪着包扎");
+  const litters = dressing.filter((person) => person.litter != null).map((person) => person.litter);
+  assert.equal(new Set(litters).size, litters.length, "上担架的伤员一人一副");
+  assert.ok(litters.every((i) => i < P.collection.litters.length), "上的是集结处现有的担架");
+  // 医护与伤员同相位（拉紧绷带与伤员吃痛同一拍），医护跪在伤员身侧不到一米。
+  for (const medic of dressing.filter((person) => person.kind === "medic")) {
+    const patient = dressing.find((person) => person.id === medic.id.replace("Medic", "Wounded"));
+    assert.equal(medic.phase, patient.phase, `${medic.id} 与自己那位伤员同相位`);
+    assert.ok(Math.hypot(medic.x - patient.x, medic.z - patient.z) < 1, `${medic.id} 跪在伤员身边`);
+  }
+  // 草垫上的人不挡玩家：集结处锚点（进场）与借火位之间留出通道。
+  for (const person of dressing.filter((p) => p.kind !== "bearer"))
+    assert.ok(Math.hypot(person.x - P.collection.borrowStand.x, person.z - P.collection.borrowStand.z) > 4,
+      `${person.id} 不在借火位跟前`);
   assert.ok(dressing.filter((person) => person.kind === "bearer").length >= 3, "搬运人员成组");
   for (const person of dressing)
     assert.ok(Math.hypot(person.x - A.collection.x, person.z - A.collection.z) < 14,

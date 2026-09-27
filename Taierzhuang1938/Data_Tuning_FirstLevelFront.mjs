@@ -129,18 +129,15 @@ export const FRONT_TUNING = Object.freeze({
   borrowLightS: 1.4,
   // 老周挪身牵到伤腿皱眉：递完烟之后这么久（一次吸气）。
   borrowWinceS: 0.8,
-  // 担架员把老周抬上担架（ZhouLift 播完 → zhouOnLitter）之后，
-  // 他从土壁挪回队列那一小段的时长，走 litterSpeedMps 的量级。
-  zhouLiftMoveS: 2.6,
-  // 06 老周坐在土壁边的那副活人身体（有脸、会说话）换回担架上的烘焙躺姿：玩家闭一下眼盖住这一下替换。
-  // 合眼 / 全黑停留 / 睁眼，秒。[需] 集成负责人 2026-09-24 第 9 条（NotifyCameraCut 或淡入淡出盖住切换）；
-  // 数值按一次正常眨眼放慢到读得出「顺子眨了下眼」的量级（眨眼 0.1–0.4 s）。
-  zhouSeatSwapCloseS: 0.22,
-  zhouSeatSwapHoldS: 0.12,
-  zhouSeatSwapOpenS: 0.3,
-  // 他坐的那只弹药箱（宽 × 高 × 深，米）。Actor 的 sit 是凳面坐姿：胯落到「大腿长 + 0.045 身高」≈ 0.5 m，
-  // 箱面比它低 5 cm 让胯坐实。[几] 木制子弹箱量级。
-  zhouSeatBoxM: Object.freeze([0.56, 0.44, 0.36]),
+  // 06 伤员从地上到担架上（2026-09-27 用户要求「黑屏 + 文字说明过渡」，docs/Data_CollectionCare20260927.md）：
+  // 担架员催完（zhouOnLitter）淡出到全黑、黑场里打一行字、再淡入。全黑那一刻老周从靠墙半躺的活人换回担架上的
+  // 烘焙躺姿、挪到队列里，集结处三个包扎完的伤员也上了担架。秒：淡出 / 黑场停留（读完两行字）/ 淡入。
+  litterTransition: Object.freeze({ fadeOutS: 0.8, holdS: 2.8, fadeInS: 0.9 }),
+  // 集结处伤员身下的草垫（宽 × 长，米）与厚度：伤员的根抬到草面上。[几] 一张铺开的稻草帘量级。
+  careStrawM: Object.freeze([0.95, 2.1]),
+  careStrawThicknessM: 0.035,
+  // 镜头离集结处锚点超过这么远（07 以后走远了，背坡挡着）就不再报草垫上的伤员与医护。
+  careDrawM: 90,
 
   // =========================================================================
   // 07 沿沟南行
@@ -228,7 +225,8 @@ export const FRONT_TUNING_SOURCES = Object.freeze({
   machineGunDriverHealHealth: "WOUNDS.bandageRegenCap 80 以下留两点受击余量",
   southMarchSpeedMps: "Notion 采用稿 07 的配速要求（2.2–2.6 m/s）",
   southTargetSecondsMin: "契约 §2：07 目标时长 45–75 秒",
-  zhouLiftMoveS: "litterSpeedMps（1.4 m/s）量级",
+  litterTransition: "用户 2026-09-27：伤员地上→担架用黑屏加文字过渡；停留按两行字的阅读时间",
+  careStrawM: "一张铺开的稻草帘，躺一个人（身长 1.7 m）头脚各留一点",
 });
 
 // Notion 2026-09-22 front whitebox calibration: proximity is physical, all deaths are observed.

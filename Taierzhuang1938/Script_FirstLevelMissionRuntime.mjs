@@ -139,9 +139,9 @@ const CARRY_GOALS = Object.freeze({ Carry: "ditch", WallPath: "wallPathEnd", Han
 /** 抬着走时指引箭头的标签（`firstLevel.guide.<label>`）。 */
 const CARRY_GOAL_LABELS = Object.freeze({ Carry: "ditch", WallPath: "wallPath", Handover: "place" });
 /** 控制接管的全部 kind（契约 §2）。未知 kind 抛错 —— 不再有「兜底当成 death」。 */
-const CONTROL_KINDS = Object.freeze(["trapped", "rescue", "cartRide", "dive", "death", "nightTransition"]);
+const CONTROL_KINDS = Object.freeze(["trapped", "rescue", "cartRide", "dive", "death", "nightTransition", "litterTransition"]);
 /** 这几种短接管期间玩家不许被瞄准或打伤（复用出生保护）。 */
-const CONTROL_GRACE_KINDS = Object.freeze(["trapped", "rescue", "cartRide", "dive", "death", "nightTransition"]);
+const CONTROL_GRACE_KINDS = Object.freeze(["trapped", "rescue", "cartRide", "dive", "death", "nightTransition", "litterTransition"]);
 export class FirstLevelMissionRuntime {
   constructor(host) {
     Object.assign(this, host);
@@ -2092,10 +2092,9 @@ export class FirstLevelMissionRuntime {
    * 2026.09.19 起整关只有掩蔽部那一处重击，曲线在 FirstLevelOpening 里采样。
    */
   Perception() {
-    // 06 老周从坐着的活人换回担架躺姿时玩家闭一下眼（FirstLevelCollection.SeatSwapClosure）。
-    const swap = this.frontShow?.collection?.SeatSwapClosure?.() || 0;
+    // 06 老周从靠墙的活人换回担架躺姿那一下由黑场字幕盖住（litterTransition），不再闭眼。
     return { blackout: this.frontShow?.bunker?.CameraActive ? this.opening.blackout || 0 : 0,
-      eyeClosure: Math.max(this.opening.eyeClosure || 0, swap), concussion: this.opening.concussion || null,
+      eyeClosure: this.opening.eyeClosure || 0, concussion: this.opening.concussion || null,
       lens: this.OpeningLens() };
   }
   /**
@@ -2436,6 +2435,8 @@ export class FirstLevelMissionRuntime {
     prof?.E("story/mission/director");
     prof?.B("story/mission/other");
     if (this.controls) {
+      // 06 伤员上担架的黑场字幕（FirstLevelCollection.BeginLitterTransition 起、全黑那一刻它自己换人）。
+      if(this.controls.kind==="litterTransition")this.transition.Update(this.controls.time);
       if(this.controls.kind==="nightTransition"){
         this.transition.Update(this.controls.time);
         if(this.controls.time>=R.nightTransition.fadeOutS && !this.Has("nightArrivalPlaced"))this.PlaceNightArrival();
@@ -2456,6 +2457,7 @@ export class FirstLevelMissionRuntime {
         else if(kind==="nightTransition"){
           this.transition.Hide();this.Record("nightTransitionComplete");
         }
+        else if(kind==="litterTransition"){ this.transition.Hide(); /* 集结处那一层看 controls 收尾放队伍起行。 */ }
         else if (kind === "dive") this.Record("diveComplete");
         else if (kind === "death") {
           // 确认完了，但 17 还没走完：接收处要真的继续工作（门外那一副担架、

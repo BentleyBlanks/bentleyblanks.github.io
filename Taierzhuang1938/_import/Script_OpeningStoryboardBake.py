@@ -28,6 +28,11 @@ path; start/stop the instance around it). Environment:
                      files: every bone within 0.5 deg and 1 mm on every frame)
   OPENING_RENDER     '1' renders review stills to tmp/OpeningStoryboards/BlenderReview
   OPENING_SKIP_BLEND '1' skips saving the editable scene while iterating
+  OPENING_LIBRARY    another clip library with the same module contract (default the 01-02 one,
+                     _import/Script_OpeningStoryboardClips.py); OPENING_LIBRARY_NAME names its files
+                     (default OpeningStoryboards: Animation/<name>/Animation_<rig><name>.json,
+                     Data_<name>Animation.json) and OPENING_LIBRARY_MODELS its rigs. The 06 casualty
+                     collection library (_import/Script_CollectionCareBake.py) runs through this.
 
 Reproducibility (2026-09-25 review): each clip starts from a clean solver state (grounding lift,
 hand/forearm/finger rate limits). A clip that continues another on the same root (`prev`) takes
@@ -59,13 +64,16 @@ from pathlib import Path
 from mathutils import Vector, Matrix, Quaternion
 
 project = Path(os.environ['OPENING_PROJECT'])
+NAME = os.environ.get('OPENING_LIBRARY_NAME') or 'OpeningStoryboards'
+OWN = NAME == 'OpeningStoryboards'
 private = Path(os.environ.get('OPENING_BLEND_DIR')
-               or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OpeningStoryboards_20260926HumanoidV1')
-VERSION = os.environ.get('OPENING_VERSION') or '20260927OpeningStoryboardsV12KneelBank'
-committedDir = project / 'Animation/OpeningStoryboards'
-output = Path(os.environ.get('OPENING_OUTPUT') or (project.parent / 'tmp/OpeningStoryboards/Verify'
+               or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/' + NAME + '_20260926HumanoidV1')
+VERSION = os.environ.get('OPENING_VERSION') or ('20260927OpeningStoryboardsV12KneelBank' if OWN else NAME)
+committedDir = project / 'Animation' / NAME
+output = Path(os.environ.get('OPENING_OUTPUT') or (project.parent / 'tmp' / NAME / 'Verify'
                                                    if os.environ.get('OPENING_PASS') == 'verify' else committedDir))
-reviews = Path(os.environ.get('OPENING_REVIEW') or (project.parent / 'tmp/OpeningStoryboards/BlenderReview'))
+reviews = Path(os.environ.get('OPENING_REVIEW') or (project.parent / 'tmp' / NAME / 'BlenderReview'))
+VALIDATION = 'OpeningValidation' if OWN else NAME + 'Validation'
 PASS = os.environ.get('OPENING_PASS', 'bake')
 RENDER = os.environ.get('OPENING_RENDER') == '1'
 SKIP_BLEND = os.environ.get('OPENING_SKIP_BLEND') == '1'
@@ -75,9 +83,10 @@ os.environ['CAPTIVES_PROJECT'] = str(project)
 os.environ['CAPTIVES_SKIP_BLEND'] = '1'
 FPS = 24
 CLEARANCE = .003
-MODELS = ['TengxianNra02', 'TengxianNra05', 'TengxianIja01', 'TengxianIja02', 'TengxianIja03']
+MODELS = [m for m in os.environ.get('OPENING_LIBRARY_MODELS', '').split(',') if m]     or ['TengxianNra02', 'TengxianNra05', 'TengxianIja01', 'TengxianIja02', 'TengxianIja03']
 PARTNER_GLOB = 'Data_OpeningPartnerTracks_*.json'   # one file per partner rig (parallel-safe)
-library = runpy.run_path(str(project / '_import/Script_OpeningStoryboardClips.py'), run_name='OpeningClipLibrary')
+library = runpy.run_path(os.environ.get('OPENING_LIBRARY') or str(project / '_import/Script_OpeningStoryboardClips.py'),
+                         run_name='OpeningClipLibrary')
 CLIPS = library['CLIPS']            # name -> static metadata written to the manifest
 TARGET_HEIGHT = {'nra': 1.66, 'ija': 1.62}   # Script_Actor KIND_SPEC, what CharacterModel scales to
 selectedModels = [m for m in os.environ.get('OPENING_MODEL', '').split(',') if m] or MODELS
@@ -531,7 +540,7 @@ def BakeRig(ctx):
 
     clipsOut, reports, partnerDump = {}, [], {}
     twistEnd = {}
-    committedFile = committedDir / ('Animation_' + modelId + 'OpeningStoryboards.json')
+    committedFile = committedDir / ('Animation_' + modelId + NAME + '.json')
     committed = json.loads(committedFile.read_text()) if committedFile.exists() else {'clips': {}}
     depth = {name: len(arm.pose.bones[name].parent_recursive) for name in names}
 
@@ -816,7 +825,7 @@ def BakeRig(ctx):
         return {'id': modelId, 'partner': list(partnerDump)}
 
     source = project / 'Model/Character' / ('Model_' + modelId + '.glb')
-    file = output / ('Animation_' + modelId + 'OpeningStoryboards.json')
+    file = output / ('Animation_' + modelId + NAME + '.json')
     if selectedClips and file.exists() and PASS != 'verify':
         previous = json.loads(file.read_text())
         merged = previous['clips']
@@ -835,13 +844,13 @@ def BakeRig(ctx):
     if PASS == 'verify':
         print('OPENING_VERIFY_BAKED', modelId, len(clipsOut), str(file), flush=True)
         return {'id': modelId, 'verify': list(clipsOut)}
-    reportFile = private / ('Data_' + modelId + 'OpeningValidation.json')
+    reportFile = private / ('Data_' + modelId + VALIDATION + '.json')
     if selectedClips and reportFile.exists():
         old = {row['clip']: row for row in json.loads(reportFile.read_text())['clips']}
         old.update({row['clip']: row for row in reports})
         reports = [old[name] for name in CLIPS if name in old and name in onRig]
     reportFile.write_text(json.dumps({'modelId': modelId, 'scale': scale, 'clips': reports}, indent=1), encoding='utf-8')
-    blend = private / ('Scene_' + modelId + 'OpeningStoryboards.blend')
+    blend = private / ('Scene_' + modelId + NAME + '.blend')
     if not SKIP_BLEND:
         if wanted:
             arm.animation_data.action = bpy.data.actions[wanted[0]]
@@ -1026,7 +1035,7 @@ def RenderReview(clip, frame, t, spec, modelId):
 
 
 def WriteManifest(results):
-    existing = output / 'Data_OpeningStoryboardsAnimation.json'
+    existing = output / ('Data_' + NAME + 'Animation.json')
     rows = {}
     if existing.exists():
         rows = {row['id']: row for row in json.loads(existing.read_text()).get('models', [])}
@@ -1036,7 +1045,7 @@ def WriteManifest(results):
         previous = rows.get(result['id'], {})
         rows[result['id']] = {**previous, **result, 'clips': previous.get('clips', [])}
     for modelId in MODELS:
-        file = output / ('Animation_' + modelId + 'OpeningStoryboards.json')
+        file = output / ('Animation_' + modelId + NAME + '.json')
         if file.exists():
             row = rows.setdefault(modelId, {'id': modelId, 'file': file.name})
             asset = json.loads(file.read_text())
@@ -1044,12 +1053,12 @@ def WriteManifest(results):
             row['originalModelSha256'] = Sha(project / 'Model/Character' / ('Model_' + modelId + '.glb'))
             row['clipIds'] = list(asset['clips'])
             row['contactPoints'] = asset.get('contactPoints', {})
-            blend = private / ('Scene_' + modelId + 'OpeningStoryboards.blend')
+            blend = private / ('Scene_' + modelId + NAME + '.blend')
             if blend.exists() or 'blend' not in row:
                 row['blend'] = str(blend)
             # Validation numbers of the bake (runtime metres) from the private report, so the
             # repository test can gate foot slide, contact error and pelvis continuity.
-            report = private / ('Data_' + modelId + 'OpeningValidation.json')
+            report = private / ('Data_' + modelId + VALIDATION + '.json')
             if report.exists():
                 keep = ('frames', 'footSlideM', 'contactErrorM', 'gripSolveErrorM', 'wallPenetrationM',
                         'pelvisMaxStepM', 'floorCorrectionMin', 'floorCorrectionMax', 'root', 'finite', 'plants',

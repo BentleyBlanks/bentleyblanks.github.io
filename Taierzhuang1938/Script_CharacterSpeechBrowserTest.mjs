@@ -565,7 +565,7 @@ try {
     const Jaw=()=>{const c=face.controls.find(c=>c.name==='Face_Jaw');return c.bone.quaternion.angleTo(c.quaternion);};
     const Moving=()=>face.weights.Open>=.1||face.weights.Wide>=.25||face.weights.Round>=.25||face.weights.Close>=.5;
     const hip=rig.bones.pelvis||rig.bones.hips||rig.bones.hip,T=p.T;
-    const pose={bound:r.speakers.ActorForWho('zhou')===zhou,model:rig.modelId,sit:zhou.actor.lifePose?.sit??null,
+    const pose={bound:r.speakers.ActorForWho('zhou')===zhou,model:rig.modelId,sit:zhou.actor.lifePose?.sit??null,clip:rig.authoredPose?.clip??null,
       hipY:hip?+(hip.getWorldPosition(new T.Vector3()).y-g.battlefield.GroundHeight(zhou.position.x,zhou.position.z)).toFixed(3):null,
       headY:+(rig.bones.head.getWorldPosition(new T.Vector3()).y-g.battlefield.GroundHeight(zhou.position.x,zhou.position.z)).toFixed(3),
       weaponShown:!!zhou.actor.weaponGroup?.visible,baked:r.column.zhou.liveSeated===true};
@@ -587,9 +587,10 @@ try {
   assert.ok(!seat06.error,`06: ${seat06.error} ${JSON.stringify(seat06.state)} ${seat06.stage}`);
   assert.ok(seat06.pose.bound,'06: the speaker binder plays zhou on the seated live body');
   assert.equal(seat06.pose.model,'TengxianNra02','06: seated Zhou keeps his NRA02 face');
-  assert.equal(seat06.pose.sit,1,'06: Zhou sits (lifePose.sit)');
-  // Actor.sit is a bench pose (Zhou sits on an ammo box against the wall): standing heads are ~1.6 m.
-  assert.ok(seat06.pose.headY<1.42,`06: his head is at sitting height (${seat06.pose.headY} m above the ground)`);
+  // 2026-09-27 (docs/Data_CollectionCare20260927.md): he half-reclines on the ground against the low wall, the
+  // authored CareZhouRecline under the speaker head layer and the face (standing heads are ~1.6 m, the old bench ~1.3 m).
+  assert.equal(seat06.pose.clip,'CareZhouRecline','06: Zhou reclines against the wall (authored CareZhouRecline)');
+  assert.ok(seat06.pose.headY<1.05,`06: his head is at reclining height (${seat06.pose.headY} m above the ground)`);
   assert.equal(seat06.pose.weaponShown,false,'06: no rifle on the seated Zhou');
   {
     const SETTLE_S=.15;let spoke=-1e9;

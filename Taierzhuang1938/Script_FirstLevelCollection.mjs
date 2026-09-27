@@ -7,6 +7,10 @@
 //   · 02 途经集结处：玩家**第一次**看见已有担架、伤员和搬运人员
 //     （摆位一律读 MISSION_PLACEMENT.collection，本模块不自己估坐标）。
 //   · 06 回到同一处：传令兵下令后送；借火戏；担架员把老周抬上担架；后送队起行。
+//   · 2026-09-27 按 Notion 概念图 06/06B 重做人物（docs/Data_CollectionCare20260927.md）：伤员躺在背坡脚下的草垫上，
+//     有的在挣扎、有的正被跪在身边的医护包扎 / 按住伤口；担架空着排在场坪上；老周背靠南面低土壁半躺，伤腿缠着
+//     带血的绷带。动作是 Blender 烘的作者动作（Script_CollectionCareAnimation）。从地上到担架上用黑场字幕过渡
+//     （BeginLitterTransition）：全黑那一刻老周换回担架躺姿并挪进队列，包扎好的三个伤员也上了集结处的担架。
 //
 // 渲染口径：
 //   · 担架（帆布 + 躺着的人）是常驻白盒体块，直接挂在场景上 —— 集结处一直在收伤员，
@@ -25,18 +29,32 @@ import { CreateStretcherGeometry, CreateStretcherMaterial } from "./Script_Stret
 import { CreateCigaretteAsset, DisposeCigaretteAsset } from "./Script_CigaretteAsset.mjs";
 import { STRETCHER_PATIENT_LIFT_M } from "./Data_Carry.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
+import { COLLECTION_CARE_CLIPS as CARE, CareMedicSpot, CarePatientClip } from "./Data_FirstLevelCollectionCare.mjs";
+import { LoadCollectionCareAnimation, CollectionCareLibrary, CareClipDuration, InstallCareClips, RemoveCareClips,
+  DressMedic, DressWound, StrawMaterial } from "./Script_CollectionCareAnimation.mjs";
+import { T } from "./Script_Text.mjs";
 
 /** 借火那一段的姿态顺序（State().borrow 按这个序列记，测试照它对账）。 */
 export const BORROW_POSE_ORDER = Object.freeze(["ask", "pat", "pocket", "offer", "light", "share", "wince"]);
 
 /**
- * 集结处摆的人：伤员（躺/坐）与搬运人员（半跪在担架旁）。
- * 纯函数，坐标全部来自 MISSION_PLACEMENT.collection —— 测试拿它对账摆位没漏。
+ * 集结处摆的人：草垫上的伤员（挣扎 / 接受包扎）、跪在伤员身边的医护、担架旁的搬运人员。
+ * 纯函数，坐标全部来自 MISSION_PLACEMENT.collection（医护由伤员位置与 COLLECTION_CARE_PAIRS 推）——
+ * 测试拿它对账摆位没漏。`litter`：黑场过渡后这位伤员上的是集结处的第几副担架（包扎好的依次上，挣扎的留在草上）。
  */
 export function CollectionDressing(placement = Place.collection) {
   const people = [];
-  for (const [i, spot] of placement.wounded.entries())
-    people.push({ id: `CollectionWounded${i}`, kind: "wounded", x: spot.x, z: spot.z, yaw: spot.yaw ?? 0, crouch: true });
+  let litter = 0;
+  for (const [i, spot] of placement.wounded.entries()) {
+    const clip = CarePatientClip(spot);
+    const loads = clip !== CARE.writhe && litter < placement.litters.length ? litter++ : null;
+    // 每人错开一点相位，免得几个人同一拍抽动；医护与自己那位伤员同相位（拉紧绷带与伤员吃痛对得上）。
+    const phase = (i * 1.37) % 4;
+    people.push({ id: `CollectionWounded${i}`, kind: "wounded", x: spot.x, z: spot.z, yaw: spot.yaw ?? 0, clip, phase, litter: loads,
+      wound: clip === CARE.writhe ? { side: i % 2 ? "L" : "R", part: "calf" } : { side: "L", part: "thigh" } });
+    const medic = spot.care ? CareMedicSpot({ x: spot.x, z: spot.z, yaw: spot.yaw ?? 0 }, spot.care) : null;
+    if (medic) people.push({ id: `CollectionMedic${i}`, kind: "medic", x: medic.x, z: medic.z, yaw: medic.yaw, clip: medic.clip, phase });
+  }
   for (const [i, spot] of placement.bearers.entries())
     people.push({ id: `CollectionBearer${i}`, kind: "bearer", x: spot.x, z: spot.z, yaw: spot.yaw ?? 0, crouch: i % 2 === 0 });
   return people;
@@ -82,7 +100,6 @@ export class FirstLevelCollection {
     this.shareAt = null;
     this.zhouParked = false;
     this.zhouLiftAt = null;
-    this.zhouLiftFrom = null;
     this.zhouLiftComplete = false;
     // 抬老周那两个担架员：对白期间在 bearerWait 上等，ZhouLift 催的时候才走上来。
     this.liftBearers = Place.collection.bearerWait.map((spot, i) => ({
@@ -92,9 +109,13 @@ export class FirstLevelCollection {
     }));
     this.bearerCloseAt = null;
     this.borrowSaid = false;
-    // 06 老周：坐在土壁边的活人身体（带脸），抬上担架时换回烘焙躺姿（见 SeatZhou）。
+    // 06 老周：靠在土壁边半躺的活人身体（带脸），抬上担架时换回烘焙躺姿（见 SeatZhou）。
     this.seated = null;
-    this.seatSwapAt = null;
+    this.zhouWinceAt = null;
+    // 黑场字幕：起始时刻、全黑时换人做完没有、伤员是否已经上了集结处的担架。
+    this.transitionAt = null;
+    this.swapped = false;
+    this.loaded = false;
   }
 
   // --- 摆位 -----------------------------------------------------------------
@@ -107,6 +128,9 @@ export class FirstLevelCollection {
     const r = this.r;
     if (this.dressed || !r.scene) return;
     this.dressed = true;
+    // 伤员与医护的动作库（1.6 MB）在这里才取；到之前那几个人不画（不画成站着的伤员）。
+    LoadCollectionCareAnimation().catch((error) => console.warn(`[CollectionCare] ${String(error).slice(0, 160)}`));
+    this.DressStraw();
     const material = CreateStretcherMaterial();
     const geometry = CreateStretcherGeometry();
     for (const [i, spot] of Place.collection.litters.entries()) {
@@ -125,6 +149,38 @@ export class FirstLevelCollection {
     this.propGeometry = geometry;
     this.propMaterial = material;
   }
+  /**
+   * 伤员身下的草垫：每张三束压扁的稻草顺着人铺开、略微错开，全场一只 InstancedMesh（StrawMaterial 的草秆贴图）。
+   */
+  DressStraw() {
+    const r = this.r, [w, l] = F.careStrawM, h = F.careStrawThicknessM;
+    const mats = this.people.filter((person) => person.kind === "wounded");
+    // [横移（垫宽的比例）, 沿人（垫长的比例）, 宽, 长, 转角]
+    const layout = [[0.0, -0.28, 1.0, 0.52, 0.03], [0.05, 0.1, 0.94, 0.46, -0.05], [-0.04, 0.38, 0.86, 0.34, 0.07]];
+    const material = StrawMaterial() || new THREE.MeshStandardMaterial({ color: 0x8f7443, roughness: 0.97, metalness: 0 });
+    const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, mats.length * layout.length);
+    mesh.name = "MissionCollectionStraw";
+    mesh.receiveShadow = true;
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    let n = 0;
+    for (const person of mats) {
+      // 草垫中心在骨盆往头那边挪 0.15 m（人从骨盆到头顶比到脚跟短一点点，但头下垫得多）。
+      const cx = person.x + Math.sin(person.yaw) * 0.15, cz = person.z + Math.cos(person.yaw) * 0.15;
+      const ground = r.battlefield.GroundHeight(cx, cz);
+      for (const [dx, dz, width, length, turn] of layout) {
+        const yaw = person.yaw + turn, c = Math.cos(person.yaw), s = Math.sin(person.yaw);
+        p.set(cx + dx * w * c + dz * l * s, ground + h * 0.5, cz - dx * w * s + dz * l * c);
+        q.setFromAxisAngle(up, yaw);
+        sc.set(w * width, h * (0.8 + 0.2 * width), l * length);
+        mesh.setMatrixAt(n++, m.compose(p, q, sc));
+      }
+    }
+    mesh.count = n;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    r.scene.add(mesh);
+    this.straw = mesh;
+  }
   /** 立即模式的人群：每帧在 view.Update 之后补一次，不然 people.End() 会把他们藏起来。 */
   Draw(time) {
     const r = this.r;
@@ -132,13 +188,41 @@ export class FirstLevelCollection {
     // 担架上的人：躺姿与担架队同一口径（STRETCHER_PATIENT_LIFT_M）。这里在 view.Update
     // 之后才报，所以报完再走一遍 people.End() 让伤员实例桶重新算可见性。
     const people = r.view.people;
-    if (people?.Patient) {
-      for (const prop of this.props) people.Patient(prop.id, prop.x, prop.y + STRETCHER_PATIENT_LIFT_M, prop.z, prop.yaw, time);
+    // 担架起初是空的（概念图 06）；黑场字幕里包扎好的伤员才上去。
+    if (people?.Patient && this.loaded) {
+      const loaded = new Set(this.people.filter((person) => person.litter != null).map((person) => person.litter));
+      for (const [i, prop] of this.props.entries())
+        if (loaded.has(i)) people.Patient(prop.id, prop.x, prop.y + STRETCHER_PATIENT_LIFT_M, prop.z, prop.yaw, time);
       people.End();
     }
-    for (const person of this.people)
-      r.view.Person(person.x, person.z, person.yaw, time,
-        { id: person.id, kind: person.kind === "wounded" ? "medic" : "bearer", crouch: person.crouch });
+    // 走远了（07 以后）背坡挡着看不见，这些人不报，MissionPeople 自动藏起来。
+    const camera = r.camera?.position, anchor = COLLECTION_ANCHOR;
+    if (camera && Math.hypot(camera.x - anchor.x, camera.z - anchor.z) > F.careDrawM) return this.DrawLiftBearers(time);
+    const clips = !!CollectionCareLibrary(), straw = F.careStrawThicknessM;
+    for (const person of this.people) {
+      if (person.kind === "bearer") {
+        r.view.Person(person.x, person.z, person.yaw, time, { id: person.id, kind: "bearer", crouch: person.crouch });
+        continue;
+      }
+      // 伤员与医护要等动作库：库没到之前不画（程序化姿态会把伤员画成站着的）。
+      if (!clips) continue;
+      if (person.kind === "wounded") {
+        if (this.loaded && person.litter != null) continue;           // 他已经在担架上了
+        const wound = person.wound;
+        r.view.Person(person.x, person.z, person.yaw, time, { id: person.id, kind: "bearer",
+          perform: { clip: person.clip, phase: person.phase, y: straw },
+          dress: (actor) => DressWound(actor.characterRig, wound.side, wound.part) });
+      } else {
+        // 医护：伤员上了担架以后蹲在原处歇着。
+        r.view.Person(person.x, person.z, person.yaw, time, { id: person.id, kind: "bearer", crouch: true,
+          perform: this.loaded ? null : { clip: person.clip, phase: person.phase },
+          dress: (actor) => DressMedic(actor.characterRig) });
+      }
+    }
+    this.DrawLiftBearers(time);
+  }
+  DrawLiftBearers(time) {
+    const r = this.r;
     // 抬老周那两个：06 才出现（担架队在这儿等着接他），位置由 UpdateOrders 推。
     if (r.Has("ordersReached") && r.column.zhou.borrowBearersStaged)
       for (const bearer of this.liftBearers)
@@ -175,9 +259,9 @@ export class FirstLevelCollection {
    * 担架上的老周是烘焙的实例化躺姿，没有骨架，嘴动不了（调研缺口 G9）；06 他有 BorrowLight 五句、ZhouLift 两句。
    * 所以 06 从一开始（玩家还在 60 m 外的前沿往回走）就在土壁边换成一个活人：NRA02 带脸那一副
    *（SpeakingCastOptions("zhou")，castId + speakerRole = zhou，说话人绑定按 castId 认他），剧本旗、不可被瞄，
-   * 不拿枪，背靠土壁坐在一只弹药箱上（lifePose.sit 是凳面高度的坐姿，所以要一件东西垫着，见 SeatBox）。
-   * 烘焙的那一副这期间不画（column.zhou.liveSeated，MissionView 读）。
-   * 担架员来抬（zhouOnLitter）那一刻玩家闭一下眼（SeatSwapClosure → runtime.Perception），全黑那一帧换回担架。
+   * 不拿枪，背靠 CollectionLitterWall 半躺在地上（作者动作 CareZhouRecline，伤腿伸直缠着带血的绷带，概念图 06B），
+   * 借火那一拍的「牵到伤腿」是 CareZhouWince。烘焙的那一副这期间不画（column.zhou.liveSeated，MissionView 读）。
+   * 担架员催完（zhouOnLitter）走黑场字幕（BeginLitterTransition），全黑那一刻换回担架。
    */
   /**
    * 坐着的老周脸朝玩家借火站的地方（Place.collection.borrowStand），背靠土壁。演员根节点 yaw=0 时脸朝 −Z，
@@ -190,7 +274,8 @@ export class FirstLevelCollection {
   SeatZhou() {
     const r = this.r, spot = Place.collection.zhouWall;
     if (this.seated?.alive) return this.seated;
-    const soldier = r.ai.Spawn("nra", spot.x, spot.z,
+    const seat = Place.collection.zhouRecline || spot;
+    const soldier = r.ai.Spawn("nra", seat.x, seat.z,
       { weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionCollectionZhou", ...SpeakingCastOptions("zhou") });
     if (!soldier) return null;
     soldier.missionId = "CollectionZhou";
@@ -200,15 +285,23 @@ export class FirstLevelCollection {
     soldier.yaw = FirstLevelCollection.SeatYaw();
     // 准星认人读 identity.name / age：他是「老周」（字幕同一张表），年龄与 03–05 枪上那一副同一个数（B.zhouAge）。
     soldier.identity = { ...soldier.identity, name: MISSION_VOICE_CAST.zhou?.[0] ?? soldier.identity?.name, age: B.zhouAge };
-    // Spawn 的找空位会把人从贴着土壁的座位挪开一米多（站姿胶囊的净空）；他是坐着的，放回座位上。
-    const ground = r.battlefield.GroundHeight(spot.x, spot.z);
-    soldier.position.set(spot.x, ground, spot.z); soldier.body?.Teleport(spot.x, ground, spot.z);
+    // Spawn 的找空位会把人从贴着土壁的座位挪开一米多（站姿胶囊的净空）；他是半躺着的，放回墙根。
+    const ground = r.battlefield.GroundHeight(seat.x, seat.z);
+    soldier.position.set(seat.x, ground, seat.z); soldier.body?.Teleport(seat.x, ground, seat.z);
     r.MoveActor(soldier, soldier.position, 0);
-    const body = soldier.actor, original = body.Update, yaw = soldier.yaw;
-    // 姿态只在演员这一层改：AI 照常给它一帧的状态（位置、朝向、受击），这里把走、举枪、蹲卧一律压掉，
-    // 换成坐姿；枪不画（他的枪在 04 就交给了何有田）。
+    const body = soldier.actor, original = body.Update, yaw = soldier.yaw, self = this;
+    // 伤腿上的绷带（左小腿，概念图 06B 那一截带血的白布）；下场时摘掉（AI 的演员是池子里复用的）。
+    if (body.characterRig) this.zhouBandage = DressWound(body.characterRig, "L", "calf");
+    // 姿态只在演员这一层改：AI 照常给它一帧的状态（位置、朝向、受击），这里把走、举枪、蹲卧一律压掉；
+    // 动作库到了由作者动作层写全身（半躺 / 吃痛），没到之前退回坐姿。枪不画（他的枪在 04 就交给了何有田）。
     body.Update = function (dt, state = {}) {
       this.root.rotation.y = yaw;
+      const layer = InstallCareClips(this);
+      if (layer) {
+        layer.clock = r.time;
+        const wince = self.zhouWinceAt != null && r.time - self.zhouWinceAt < CareClipDuration(CARE.zhouWince);
+        layer.Play(wince ? CARE.zhouWince : CARE.zhouRecline, wince ? self.zhouWinceAt : r.time);
+      }
       const result = original.call(this, dt, { ...state, moveSpeed: 0, strafe: 0, aim: 0, firing: false, fire: 0,
         crouch: 0, prone: 0, kneel: 0, reach: 0, throwing: 0, melee: 0, lifePose: { sit: 1 }, idleLife: false });
       if (this.weaponGroup) this.weaponGroup.visible = false;
@@ -217,45 +310,19 @@ export class FirstLevelCollection {
     };
     this.seated = soldier;
     r.column.zhou.liveSeated = true;
-    this.SeatBox(true);
     return soldier;
-  }
-  /**
-   * 他坐的那只箱子（只在他坐着时显示）。材质借白盒场同一张「timber」语义材质（MeshStandard，走 GTAO / GI / 画质表、
-   * 着色器开机已编好）：自建 Lambert 受光和周围白盒对不上，06 第一次看见时还要现编一个着色器（2026-09-24 审查）。
-   */
-  SeatBox(on) {
-    const r = this.r, spot = Place.collection.zhouWall, size = F.zhouSeatBoxM;
-    if (on && !this.seatBox && r.scene) {
-      const shared = r.battlefield?.materials?.get?.("timber") || null;
-      this.seatBoxOwnMaterial = !shared;
-      this.seatBox = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]),
-        shared || new THREE.MeshStandardMaterial({ color: 0x7d6a4f, roughness: 0.85, metalness: 0 }));
-      this.seatBox.name = "MissionZhouSeatBox";
-      this.seatBox.castShadow = true; this.seatBox.receiveShadow = true;
-      // 箱子在人的胯下、略往土壁那边靠（坐姿把胯往后送 0.06H；背后 = (sin θ, cos θ)）。
-      const back = 0.12, yaw = FirstLevelCollection.SeatYaw();
-      this.seatBox.position.set(spot.x + Math.sin(yaw) * back, r.battlefield.GroundHeight(spot.x, spot.z) + size[1] / 2, spot.z + Math.cos(yaw) * back);
-      this.seatBox.rotation.y = yaw;
-      r.scene.add(this.seatBox);
-    }
-    if (this.seatBox) this.seatBox.visible = !!on;
   }
   /** 活人老周下场：从 AI 里收走（不是阵亡），烘焙的那一副重新画出来。 */
   UnseatZhou() {
     const r = this.r;
-    if (this.seated) { r.ai.Remove(this.seated); this.seated = null; }
+    if (this.seated) {
+      // AI 的演员是池子里复用的：动作层与绷带不能跟着他去当下一个兵。
+      RemoveCareClips(this.seated.actor);
+      this.zhouBandage?.parent?.remove(this.zhouBandage);
+      this.zhouBandage = null;
+      r.ai.Remove(this.seated); this.seated = null;
+    }
     if (r.column?.zhou) r.column.zhou.liveSeated = false;
-    this.SeatBox(false);
-  }
-  /** 换身体那一下的合眼量（0 睁 … 1 全闭）；runtime.Perception 取它与开场那一套的较大值。 */
-  SeatSwapClosure() {
-    if (this.seatSwapAt == null) return 0;
-    const t = this.r.time - this.seatSwapAt, close = F.zhouSeatSwapCloseS, hold = F.zhouSeatSwapHoldS, open = F.zhouSeatSwapOpenS;
-    if (t < 0) return 0;
-    if (t < close) return t / close;
-    if (t < close + hold) return 1;
-    return Math.max(0, 1 - (t - close - hold) / open);
   }
 
   // --- 06 借火 ---------------------------------------------------------------
@@ -277,7 +344,10 @@ export class FirstLevelCollection {
     if (action === "offer") r.audio?.Play?.("clothMove", { position: r.Point(zhou, 0.6), volume: 0.55 });
     if (action === "light") this.ShowMatch(true);
     if (action === "share") this.shareAt = r.time;
-    if (action === "wince") r.audio?.Play?.("painGrunt", { position: r.Point(zhou, 0.6), volume: 0.5 });
+    if (action === "wince") {
+      r.audio?.Play?.("painGrunt", { position: r.Point(zhou, 0.6), volume: 0.5 });
+      this.zhouWinceAt = r.time;     // CareZhouWince：牵到伤腿，捂住大腿弯下去，再靠回墙上
+    }
   }
   /** 老周嘴上的卷烟：源 FBX 的减面模型，嘴端为原点、烟灰朝局部 -Z。 */
   ShowSmoke(on) {
@@ -343,11 +413,6 @@ export class FirstLevelCollection {
       Object.assign(zhou, { ...Place.collection.zhouWall, state: "fallen", visible: true });
       this.SeatZhou();
     }
-    // 抬上担架：先合眼，全黑那一刻才把活人换回担架上的烘焙躺姿。
-    if (r.Has("zhouOnLitter") && this.seated) {
-      this.seatSwapAt ??= r.time;
-      if (r.time - this.seatSwapAt >= F.zhouSeatSwapCloseS) this.UnseatZhou();
-    }
     // View 平时会从 column.zhou 自动画出这一副担架自己的两名担架员；借火期间
     // 改由 Draw 用同一组 id 报告等待位，避免正式抬架位与等待位同时出现四个人。
     zhou.borrowBearersStaged = !r.Has("zhouOnLitter");
@@ -379,26 +444,53 @@ export class FirstLevelCollection {
       );
       this.match.rotation.y = yaw;
     }
-    // 担架员来催（ZhouLift 播完 → zhouOnLitter）之后，老周从土壁挪回队列。
-    if (r.Has("zhouOnLitter")) {
-      zhou.borrowBearersStaged = false;
-      if (this.zhouLiftAt == null) {
-        this.zhouLiftAt = r.time;
-        this.zhouLiftFrom = { x: zhou.x, z: zhou.z };
-        zhou.progress = MissionRouteProjection(r.column.route, Place.collection.zhouWall).progress;
-      }
-      const t = Math.min(1, (r.time - this.zhouLiftAt) / F.zhouLiftMoveS);
-      const target = MissionCarryRoutePoint(r.column.route, zhou.progress);
-      zhou.x = this.zhouLiftFrom.x + (target.x - this.zhouLiftFrom.x) * t;
-      zhou.z = this.zhouLiftFrom.z + (target.z - this.zhouLiftFrom.z) * t;
-      zhou.yaw = target.yaw ?? zhou.yaw;
-      if (t >= 1 && zhou.state === "fallen") {
-        zhou.state = "waiting";
-        this.zhouLiftComplete = true;
-        this.ShowSmoke(false);
-      }
-    }
+    // 担架员催完（ZhouLift 播完 → zhouOnLitter）：黑场字幕把「从地上到担架上」盖过去。
+    if (r.Has("zhouOnLitter")) this.UpdateLitterTransition();
     void dt;
+  }
+
+  /** 老周那副担架在队列里的落点（他靠着的墙根投影到后送路线上）。 */
+  ZhouLitterTarget() {
+    const route = this.r.column.route;
+    const progress = MissionRouteProjection(route, Place.collection.zhouWall).progress;
+    return { progress, point: MissionCarryRoutePoint(route, progress) };
+  }
+  /**
+   * 黑场字幕开场：锁住玩家（grace，不挨打），黑场期间把视线转到老周那副担架上 —— 淡入时看见他躺在担架上、
+   * 两个担架员在杆子两头。字与时长取 firstLevel.transition.litter / FRONT_TUNING.litterTransition。
+   */
+  BeginLitterTransition() {
+    const r = this.r, timing = F.litterTransition;
+    this.transitionAt = r.time;
+    const { point } = this.ZhouLitterTarget();
+    const lookAt = r.Point?.(point, 0.35);
+    r.BeginControl?.("litterTransition", timing.fadeOutS + timing.holdS + timing.fadeInS,
+      lookAt ? { lookAt, lookSeconds: timing.fadeOutS + timing.holdS } : {});
+    r.transition?.Show({ title: "", text: T("firstLevel.transition.litter.text"), ...timing });
+    r.transition?.Update(0);
+  }
+  UpdateLitterTransition() {
+    const r = this.r, zhou = r.column.zhou, timing = F.litterTransition;
+    zhou.borrowBearersStaged = false;
+    if (this.transitionAt == null) this.BeginLitterTransition();
+    const t = r.time - this.transitionAt;
+    // 全黑那一刻：活人老周下场，烘焙躺姿的那一副直接放进队列；集结处包扎好的伤员上担架。
+    if (!this.swapped && t >= timing.fadeOutS) {
+      this.swapped = true;
+      this.UnseatZhou();
+      this.ShowSmoke(false);
+      this.ShowMatch(false);
+      this.loaded = true;
+      const { progress, point } = this.ZhouLitterTarget();
+      zhou.progress = progress;
+      zhou.x = point.x; zhou.z = point.z; zhou.yaw = point.yaw ?? zhou.yaw;
+      this.zhouLiftAt = r.time;
+    }
+    // 字幕淡出完才放队伍起行（columnDeparted 等 ZhouLiftComplete）。
+    if (this.swapped && !this.zhouLiftComplete && t >= timing.fadeOutS + timing.holdS + timing.fadeInS) {
+      if (zhou.state === "fallen") zhou.state = "waiting";
+      this.zhouLiftComplete = true;
+    }
   }
 
   /**
@@ -453,8 +545,12 @@ export class FirstLevelCollection {
       zhouParked: this.zhouParked,
       zhouLifted: this.zhouLiftAt != null,
       zhouSeated: this.seated?.alive ? { id: this.seated.id, x: +this.seated.position.x.toFixed(2), z: +this.seated.position.z.toFixed(2),
-        model: this.seated.actor?.characterRig?.modelId ?? null, face: !!this.seated.actor?.characterRig?.facial } : null,
-      seatSwapAt: this.seatSwapAt,
+        model: this.seated.actor?.characterRig?.modelId ?? null, face: !!this.seated.actor?.characterRig?.facial,
+        clip: this.seated.actor?.characterRig?.authoredPose?.clip ?? null } : null,
+      care: { clips: !!CollectionCareLibrary(), loaded: this.loaded,
+        wounded: this.people.filter((person) => person.kind === "wounded").length,
+        medics: this.people.filter((person) => person.kind === "medic").length },
+      transitionAt: this.transitionAt,
       zhouLiftComplete: this.ZhouLiftComplete(),
     };
   }
@@ -466,14 +562,14 @@ export class FirstLevelCollection {
     this.propGeometry = this.propMaterial = null;
     this.props = [];
     DisposeCigaretteAsset(this.smoke);
-    for (const mesh of [this.match, this.seatBox]) {
+    for (const mesh of [this.match, this.straw]) {
       if (!mesh) continue;
       mesh.parent?.remove(mesh);
       mesh.geometry.dispose();
-      // 箱子借的是白盒场的共享材质，不归这里释放。
-      if (mesh !== this.seatBox || this.seatBoxOwnMaterial) mesh.material.dispose();
+      // 草垫的材质是 StrawMaterial 全场共用的一只，不归这里释放。
+      if (mesh !== this.straw) mesh.material.dispose();
     }
-    this.smoke = this.match = this.seatBox = null;
+    this.smoke = this.match = this.straw = null;
   }
 }
 

@@ -770,6 +770,8 @@ export class LugouCharacterRig {
     // Shared speaker head layer (Script_SpeakerHeadLayer); the speaker binder
     // attaches it to rigs that talk or listen, never to anonymous soldiers.
     this.speakerHead = null;
+    // Optional authored clip layer ({Restore, Apply}), set by the scene that owns this body.
+    this.authoredPose = null;
     this.root.name = `Rigged_${this.modelId}`;
     this.actor = null;
     this.forcedClip = null;
@@ -1298,6 +1300,10 @@ export class LugouCharacterRig {
 
   Update(dt, state = {}) {
     if (this.disposed) return;
+    // Authored clip layer (06 casualty collection, Script_CollectionCareAnimation): put back the bones it
+    // wrote last frame before the mixer samples, write this frame's pose after the body and before the
+    // speaker head layer / face (the head still turns to the listener, the mouth still moves).
+    this.authoredPose?.Restore();
     this.locomotion.Restore();
     state = this.locomotion.Sample(dt, state);
     this._RestoreHurtTilt();
@@ -1327,6 +1333,7 @@ export class LugouCharacterRig {
     // one combined SkinnedMesh, so there is no detachable head object; collapse
     // the head bone after mixer evaluation instead.  Doing it before mixer.update
     // would be overwritten by the clip's sampled scale track on the same frame.
+    this.authoredPose?.Apply(dt, state);
     if (!this.headVisible && this.bones.head) this.bones.head.scale.setScalar(0.001);
     this.speakerHead?.Apply(dt, state);
     this.facial?.Update(dt, state);

@@ -1,0 +1,321 @@
+{
+ "schema": 2,
+ "version": "20260927CollectionCareV1",
+ "fps": 24,
+ "actorForward": [
+  0,
+  0,
+  -1
+ ],
+ "blendSeconds": 0.12,
+ "floorClearanceM": 0.003,
+ "coordinates": {
+  "values": "glTF node-local bone transforms (p xyz, q xyzw), stride 7",
+  "props": "glTF scene space = rig.root local, source metres: origin xyz, axis xyz, up xyz, visible",
+  "stages": "runtime metres in the anchor actor frame (+x right, +y up, -z forward); yawDeg + = turn left",
+  "contacts": "clip seconds; partner parts are contactPoints names; standoffM = runtime metres along the patch normal where the knuckle centroid (finger roots) sits"
+ },
+ "clips": {
+  "CareLieWrithe": {
+   "duration": 4.8,
+   "loop": true,
+   "weaponHold": "free",
+   "role": "wounded",
+   "notes": "Alone on the straw in pain: the right knee drawn up and dropped, back arching, rolling to his left and back, the right hand clutching the belly, the left clawing the straw. Loops seamlessly."
+  },
+  "CareLieTreated": {
+   "duration": 4.0,
+   "loop": true,
+   "weaponHold": "free",
+   "role": "wounded",
+   "notes": "Lying for a medic: left leg straight and still, right knee up, the head lifting to look at the leg, a flinch at 2.5 s (a pulled wrap). Pairs with CareMedicBandage / CareMedicPress (stages bandage / press)."
+  },
+  "CareMedicBandage": {
+   "duration": 4.0,
+   "loop": true,
+   "weaponHold": "free",
+   "role": "medic",
+   "notes": "Kneels at the lying man's left, wraps his left thigh: two wraps per loop, the right hand carrying the roll round the limb, the left holding the turns, a tug at the top of each wrap."
+  },
+  "CareMedicPress": {
+   "duration": 3.2,
+   "loop": true,
+   "weaponHold": "free",
+   "role": "medic",
+   "notes": "Kneels at the lying man's right, both hands pressing a dressing onto his right upper chest, the weight rocking onto the hands; glances up over his right shoulder once a loop."
+  },
+  "CareZhouRecline": {
+   "duration": 5.0,
+   "loop": true,
+   "weaponHold": "free",
+   "role": "zhou",
+   "notes": "Zhou half-reclined against the low wall: left leg out straight (bandaged), right knee up, right forearm over the knee, left hand on the thigh. Head neutral: the speaker head layer turns it at runtime."
+  },
+  "CareZhouWince": {
+   "duration": 2.4,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "zhou",
+   "next": [
+    "CareZhouRecline"
+   ],
+   "notes": "BorrowLight \"wince\": the leg pulls, he folds forward over it with both hands on the thigh, holds, and breathes back out into the recline (last frame = CareZhouRecline frame 0)."
+  }
+ },
+ "stages": {
+  "bandage": {
+   "anchor": "patient",
+   "notes": "CareMedicBandage kneels at CareLieTreated's left: medic root = patient root + (-0.40 x, -0.24 z) in the patient frame, yaw = patient yaw - 90 deg.",
+   "medic": {
+    "x": -0.4,
+    "z": -0.24,
+    "yawDeg": -90
+   }
+  },
+  "press": {
+   "anchor": "patient",
+   "notes": "CareMedicPress kneels at CareLieTreated's right: medic root = patient root + (0.42 x, 0.36 z) in the patient frame, yaw = patient yaw + 90 deg.",
+   "medic": {
+    "x": 0.42,
+    "z": 0.36,
+    "yawDeg": 90
+   }
+  },
+  "recline": {
+   "anchor": "wall",
+   "notes": "CareZhouRecline / CareZhouWince: the root 0.43 m in front of the wall face, his back to it.",
+   "wallBehindM": 0.43
+  }
+ },
+ "props": {},
+ "models": [
+  {
+   "id": "TengxianNra02",
+   "file": "Animation_TengxianNra02CollectionCare.json",
+   "sha256": "570af32a339ca21a5bb1ae17781d19654512942108b6f961e65a38877669b5e6",
+   "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\CollectionCare_20260927\\Scene_TengxianNra02CollectionCare.blend",
+   "contactPoints": {},
+   "clips": [
+    {
+     "clip": "CareLieWrithe",
+     "frames": 117,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0097,
+     "floorCorrectionMin": 0.06479,
+     "floorCorrectionMax": 0.07646,
+     "root": {
+      "start": [
+       -0.0,
+       0.0,
+       -0.0,
+       0.1688
+      ],
+      "end": [
+       -0.0,
+       0.0,
+       -0.0,
+       0.1688
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "CareLieTreated",
+     "frames": 97,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0007,
+     "floorCorrectionMin": 0.04607,
+     "floorCorrectionMax": 0.0525,
+     "root": {
+      "start": [
+       -0.0,
+       0.0,
+       -0.0,
+       0.154
+      ],
+      "end": [
+       -0.0,
+       0.0,
+       -0.0,
+       0.154
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "CareMedicBandage",
+     "frames": 97,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.2313,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.05088,
+     "floorCorrectionMax": 0.05088,
+     "root": {
+      "start": [
+       0.0,
+       0.1731,
+       0.0,
+       0.3632
+      ],
+      "end": [
+       0.0,
+       0.1731,
+       0.0,
+       0.3632
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       4.0
+      ],
+      [
+       "R",
+       0,
+       4.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "CareMedicPress",
+     "frames": 78,
+     "footSlideM": 0.0054,
+     "contactErrorM": 0.0743,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0055,
+     "floorCorrectionMin": 0.05088,
+     "floorCorrectionMax": 0.05684,
+     "root": {
+      "start": [
+       0.0,
+       0.1731,
+       0.0,
+       0.3632
+      ],
+      "end": [
+       0.0,
+       0.1731,
+       0.0,
+       0.3632
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.2
+      ],
+      [
+       "R",
+       0,
+       3.2
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "CareZhouRecline",
+     "frames": 121,
+     "footSlideM": 0.0003,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.001,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.03547,
+     "floorCorrectionMax": 0.036,
+     "root": {
+      "start": [
+       -0.0,
+       0.0548,
+       1.72,
+       0.1422
+      ],
+      "end": [
+       -0.0,
+       0.0548,
+       1.72,
+       0.1422
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       5.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "CareZhouWince",
+     "frames": 59,
+     "footSlideM": 0.0062,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.001,
+     "pelvisMaxStepM": 0.0022,
+     "floorCorrectionMin": 0.02896,
+     "floorCorrectionMax": 0.03601,
+     "root": {
+      "start": [
+       -0.0,
+       0.0548,
+       1.72,
+       0.1422
+      ],
+      "end": [
+       -0.0,
+       0.0548,
+       1.72,
+       0.1422
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       2.4
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    }
+   ],
+   "clipIds": [
+    "CareLieWrithe",
+    "CareLieTreated",
+    "CareMedicBandage",
+    "CareMedicPress",
+    "CareZhouRecline",
+    "CareZhouWince"
+   ]
+  }
+ ]
+}
