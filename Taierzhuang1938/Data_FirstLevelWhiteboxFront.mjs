@@ -83,12 +83,6 @@ export function BuildFrontWhitebox(groundAt) {
     Block(`${id}CrownTop`, x + .2, z - .1, crownW * .6, crownH * .5, crownW * .55, "foliage",
       { solid: false, y: g + trunkH + crownH * .95 });
   }
-  // A spare bamboo litter lying on the ground (two poles and the canvas), long axis along ry.
-  function Litter(id, x, z, ry) {
-    const c = Math.cos(ry), s = Math.sin(ry);
-    for (const side of [-1, 1]) Detail(`${id}Pole${side}`, x + side * .28 * c, z - side * .28 * s, .06, .06, 2.3, "timber", { ry });
-    Detail(`${id}Canvas`, x, z, .5, .05, 1.8, "canvas", { ry });
-  }
 
   // One-storey brick house knocked open: four walls with broken tops (tops[] per
   // wall N,E,S,W above the ground at the centre), the south wall split by a door
@@ -173,13 +167,10 @@ export function BuildFrontWhitebox(groundAt) {
   ]) Detail(`CollectionNorthFoot${i}`, x, z, w, h, d, sem, { ry });
   // One crate on top of another at the north foot.
   Detail("CollectionNorthFootStack", -40.2, -106.35, .75, .42, .5, "timber", { y: Low(-40.2, -106.35, .9, .55) + .5 + .21 });
-  // West foot: two spare litters and a row of packs.
-  Litter("CollectionSpareLitterA", -44.9, -104.9, 0);
-  Litter("CollectionSpareLitterB", -44.95, -97.6, 0);
+  // West foot: a row of packs. The two spare litters beside them (and the one at the east
+  // revetment) are the real stretcher model: MISSION_PLACEMENT.groundStretchers.
   for (const [i, z] of [[0, -101.8], [1, -100.9], [2, -100.1]])
     Detail(`CollectionWestPack${i}`, -45.05, z, .45, .38, .35, "canvas", { ry: i * .4 });
-  // 06B: a litter set down at the foot of the east revetment.
-  Litter("CollectionEastLitter", -28.05, -99.4, 0);
   Detail("CollectionEastStones", -27.9, -101.9, .6, .3, .5, STONE, { ry: .6 });
   // Stones scattered on the hollow floor, clear of litters, bearers and the routes.
   for (const [i, x, z, w, h, d] of [[0, -44.2, -95.9, .5, .25, .4], [1, -30.6, -105.4, .45, .22, .4],

@@ -159,8 +159,7 @@ export function BuildTransferWhitebox(groundAt) {
   Detail("TransferScreenCrate1", 55.8, 107.3, .8, .6, .6, "timber", { ry: .3 });
   // 11 foreground: the sorting yard is all crowd lanes (lateral at z 88/111,
   // straight down each pocket's x), so only non-solid litter between them:
-  // a dropped stretcher, crates, a wheel and a basket.
-  Detail("TransferYardStretcher", 62.2, 97.5, .62, .22, 2.1, "canvas", { ry: .2 });
+  // crates, a wheel and a basket (the dropped stretchers are MISSION_PLACEMENT.groundStretchers).
   Detail("TransferYardCrate0", 62.8, 102.4, .8, .6, .6, "timber", { ry: -.35 });
   Detail("TransferYardCrate1", 63.1, 101.6, .6, .45, .5, "timber", { ry: .5, y: groundAt(62.8, 102.4) + .75 });
   Detail("TransferYardWheel", 79.2, 95.4, 1.1, .12, 1.1, "timber", { ry: .6 });
@@ -197,8 +196,6 @@ export function BuildTransferWhitebox(groundAt) {
     const g = groundAt(62.2, z) - .1;
     At(`TransferShelterPost62_${z}`, 62.2, z, 0.3, leanTop - .7 - g, 0.3, g, "timber");
   }
-  Detail("TransferShelterStretcher0", 57.6, 127.3, .62, .22, 2.1, "canvas");
-  Detail("TransferShelterStretcher1", 58.3, 128.9, .62, .22, 2.1, "canvas", { ry: .08 });
   Detail("TransferShelterCrate0", 56.2, 126.6, .8, .6, .6);
   Detail("TransferShelterCrate1", 56.1, 130.2, .7, .55, .6, "timber", { ry: .25 });
   // 14: telegraph poles over the ditch and loose stones on its east lip.

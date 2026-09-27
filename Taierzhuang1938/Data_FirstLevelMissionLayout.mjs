@@ -939,6 +939,18 @@ export const MISSION_PLACEMENT = Object.freeze({
     // 西北角码着的空担架：两列三层，用的就是担架模型（原来是一块 1.5×0.48×2.9 的白盒）。
     emptyLitterStack: { x: -38.5, z: 233, yaw: 0, columns: 2, layers: 3 },
   },
+  // 05–18 白盒按概念图重做（2026-09-27）：地上平放的担架，用的就是担架模型（MissionView 实例化，
+  // 不碰撞）；patient 为 true 的上面躺一个烘焙躺姿的伤员（MissionPeople.Patient）。
+  groundStretchers: [
+    { id: "CollectionSpareLitterA", x: -44.9, z: -104.9, yaw: 0 },
+    { id: "CollectionSpareLitterB", x: -44.95, z: -97.6, yaw: 0 },
+    { id: "CollectionEastLitter", x: -28.05, z: -99.4, yaw: 0 },
+    { id: "TransferYardStretcher", x: 62.2, z: 97.5, yaw: .2 },
+    { id: "TransferShelterStretcher0", x: 57.4, z: 127.8, yaw: 0 },
+    { id: "TransferShelterStretcher1", x: 58.3, z: 128.3, yaw: .08 },
+    ...[229.4, 231.1, 232.8].map((z, i) => ({ id: `ReceptionYardWounded${i}`, x: -16.4, z, yaw: Math.PI / 2, patient: true })),
+    ...[236.6, 238.4].map((z, i) => ({ id: `ReceptionWestWounded${i}`, x: -38.2, z, yaw: Math.PI / 2, patient: true })),
+  ],
   // 18 铁路桥。
   bridge: {
     rearColumnForm: [{ x: -77, z: 122 }, { x: -79.4, z: 125.6 }, { x: -74.6, z: 126.4 }],
@@ -1085,7 +1097,7 @@ for (const part of whiteboxPackages) {
     if (replaced.has(blocks[index].id)) blocks.splice(index, 1);
   blocks.push(...part.blocks);
 }
-export const MISSION_WHITEBOX_VERSION = "first-level-20260924-whitebox-06-18-r1";
+export const MISSION_WHITEBOX_VERSION = "first-level-20260927-whitebox-05-18-r2";
 export const MISSION_TRENCH_PLACEMENTS = (() => {
   const shared = { groundAt: SampleMissionTerrain, laneCuts: FrontAssaultLaneCuts };
   const handPlaced = blocks.filter((block) => block.solid !== false)

@@ -82,14 +82,6 @@ export function BuildRearWhitebox(groundAt) {
         { y: groundAt(px, pz) + h / 2 - .03, ry: Rand() * Math.PI });
     }
   }
-  // A static litter with a covered casualty (non-solid, under 0.4 m).
-  function LyingWounded(id, x, z, ry = 0) {
-    const g = groundAt(x, z);
-    Detail(`${id}Canvas`, x, z, .56, .06, 1.9, "canvas", { y: g + .2, ry });
-    for (const side of [-1, 1]) Detail(`${id}Pole${side < 0 ? "A" : "B"}`,
-      x + Math.cos(ry) * side * .3, z - Math.sin(ry) * side * .3, .05, .05, 2.35, "timber", { y: g + .2, ry });
-    Detail(`${id}Body`, x, z, .42, .22, 1.55, "earthDark", { y: g + .33, ry });
-  }
   // Solid cot: a raised board over legs, blanket and pillow; top at 0.52 m (walk graph ignores it).
   function Cot(id, x, z, occupied = false) {
     const w = .84, d = 2, g = groundAt(x, z);
@@ -286,10 +278,8 @@ export function BuildRearWhitebox(groundAt) {
   // 空担架摞：这块只留碰撞（visual:false），画面由 MissionView 用担架模型码两列三层
   // （MISSION_PLACEMENT.receptionYard.emptyLitterStack）。原西北角让给 05–18 重做的西北厢房。
   Box(blocks, "ReceptionEmptyLitterStack", -38.5, 233, 1.5, .48, 2.9, "timber", { visual: false });
-  // Casualties waiting on litters beside the ward (x <= -15.3, the reception lane is x=-13),
-  // and in the west strip behind it.
-  for (const [i, z] of [229.4, 231.1, 232.8].entries()) LyingWounded(`ReceptionYardWounded${i}`, -16.4, z, Math.PI / 2);
-  for (const [i, z] of [236.6, 238.4].entries()) LyingWounded(`ReceptionWestWounded${i}`, -38.2, z, Math.PI / 2);
+  // Casualties waiting on litters beside the ward and in the west strip behind it are the real
+  // stretcher model with a baked patient: MISSION_PLACEMENT.groundStretchers.
   // Clutter against walls: water vats, baskets, a brick pile, firewood.
   for (const [i, x, z, h] of [[0, -34.2, 245.35, .7], [1, -11.3, 236.95, .6], [2, -39.9, 250.8, .65]]) {
     Box(blocks, `ReceptionVat${i}`, x, z, .62, h, .62, "earthDark");

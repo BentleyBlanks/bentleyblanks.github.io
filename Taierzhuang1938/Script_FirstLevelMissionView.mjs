@@ -104,6 +104,7 @@ export class FirstLevelMissionView {
     this.zhouRoot.add(zhouHead);zhouHead.visible=false;
     this.zhouRoot.visible = false;
     this.BuildEmptyLitterStack();
+    this.BuildGroundStretchers();
     this.people=new MissionPeople({root:this.root,actorFactory,battlefield});
     this.aftermath=new MissionAftermath({root:this.root,actorFactory,battlefield,vfx});
     // 尸体层的实例桶在它自己的构造里建齐；挂共用深度材质的事在这里做，
@@ -119,6 +120,25 @@ export class FirstLevelMissionView {
     this.BuildSupplies();
     this.smokeOrigins = new FirstLevelSmokeOrigins({root:this.root,battlefield,physics,actorFactory,library});
 
+  }
+  /** 05–18 地上平放的担架（MISSION_PLACEMENT.groundStretchers；静态实例，与担架队同一份几何和材质）。 */
+  BuildGroundStretchers() {
+    const list = MISSION_PLACEMENT.groundStretchers || [];
+    this.groundStretchers = list.map((spec) => ({ ...spec, y: this.battlefield.GroundHeight(spec.x, spec.z) }));
+    if (!list.length) return;
+    const mesh = new THREE.InstancedMesh(this.parts.bed.geometry, this.parts.bed.material, list.length);
+    mesh.name = "MissionGroundStretchers";
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    AttachShadowDepth(mesh);
+    const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
+    this.groundStretchers.forEach((spec, i) => {
+      q.setFromEuler(new THREE.Euler(0, spec.yaw, 0));
+      matrix.compose(new THREE.Vector3(spec.x, spec.y, spec.z), q, one);
+      mesh.setMatrixAt(i, matrix);
+    });
+    this.root.add(mesh);
+    this.meshes.push(mesh);
   }
   /** 接收院西北角码着的空担架（静态实例，与担架队同一份几何和材质）。 */
   BuildEmptyLitterStack() {
@@ -576,6 +596,8 @@ export class FirstLevelMissionView {
     // 15–18 的布景（掉队伤员、门外抬进来的下一副担架、夜景里的队列与搬运）：
     // 必须画在 people.Begin/End 之间，没报的那一帧人自动藏起来。
     this.extras?.Draw(this, time);
+    for (const spec of this.groundStretchers)
+      if (spec.patient) this.people.Patient(spec.id, spec.x, spec.y + STRETCHER_PATIENT_LIFT_M, spec.z, spec.yaw, time);
     this.people.End();
     const visibleCarts=new Set([...this.column.vehicles,...this.column.traffic.filter(c=>c.visible)].filter(c=>c.z<=178).map(c=>c.id));
     for(const [id,box] of this.cartColliders)if(!visibleCarts.has(id)){
