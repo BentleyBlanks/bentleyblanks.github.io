@@ -522,6 +522,7 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
 | 人物 GLB・皮肤（+ 预积分 LUT） | 20 | **16** | boneTexture / specularIntensityMap / map / roughnessMap / envMap / dfgLUT / 阴影×3 / uSsaoMap / uSsilMap / uGi×2 / uSsrMap / uClusterData / uMatSkinLut |
 | 人物 GLB・布（sheen） | 19 | **15** | 同上去掉皮肤 LUT（外部 GLB 一律不吃细节法线，atlas UV） |
 | 第一人称视模 | 19 | **15** | 同上，把 uSsrMap 换成 uFirstPersonShadowMap（视模不挂 SSR，见坑表） |
+| 国军军装（`Material #1721585337`，2026-09-27 布细节层） | 15 | **16** | 人物 GLB・布那一排（boneTexture / map / normalMap / roughnessMap(=ORM) …）+ `uNraClothDetailMap`（布纹/污渍包，`Script_UniformColors`）。**贴线**：再给军装加一路之前先腾一个；第一人称那份不挂 SSR，是 15 |
 
 **八轮实测的上界**（`Script_SamplerBudgetTest`）：low 11 / medium・high・ultra `gi=0` 14 /
 medium・high・ultra `gi=1` **16**。gi=1 那三档是贴着上限跑的 —— 再加一路采样器

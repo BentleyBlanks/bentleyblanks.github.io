@@ -38,6 +38,44 @@ export const NRA_UNIFORM_COLORS = Object.freeze({
   variants: Object.freeze(["grayBlue", "grayBlue", "grayGreen", "grayGreen", "leader"]),
 });
 
+// 2026-09-27 军装细节层：原 atlas 约 1 px/mm，但底图是糊的手绘，换成灰蓝/灰绿后
+// 近看只剩一块块平涂。在同一套 UV 上用高平铺再采一张细节包（Lovart 生成的斜纹布与
+// 污渍照片，`_import/Script_BakeNraClothDetail.py` 烘成 RGBA：RG 布纹法线、B 布纹明暗、
+// A 污渍），只作用在换色遮罩里的布面 —— 铜扣、红领章、皮带、鞋底不受影响。
+//
+// 平铺倍数按实测 UV 密度定：NRA02/05 军装三角形面积加权中位数 2.2 米 / UV 单位
+// （10%–90% 分位 1.5–3.4）。weaveTile 10 ≈ 22 cm 一格、斜纹约 3 mm 一道 —— 比真布
+// 粗一倍：1.5 mm 的真实尺度在 0.8 倍内部分辨率下 1 米外不到一个像素，被 mip 平均成没有；
+// grimeTile 3.5 ≈ 63 cm 一格，污渍块跨得过一个口袋但不会一整片裤腿同一个斑。
+//   normalStrength   布纹法线权重（UDN 叠在 atlas 法线之上）
+//   atlasNormalScale atlas 自带褶皱法线的强度（GLB 里写的是 0.3，褶皱在灯下几乎不起伏）
+//   normalFade       [满强度, 完全淡出]（米）；远处 mip 已经把布纹平均掉，淡出只是省掉闪烁
+//   mottleTile       第二层污渍采样（≈ 15 cm 一格）：染色不匀/洗褪，破 2–5 米距离上的平涂
+//   weaveAlbedo      布纹明暗幅度（±，乘在反照率上）；mottleAlbedo 同理
+//   grimeAlbedo      污渍明暗幅度；grimeTint 是积灰处往哪个颜色拉（鲁南黄土）
+//   grimeOffset      每种配色的污渍 uv 错位：同一套 UV 上不错开的话，一个班的人脏在同一个地方
+//   roughness        棉布基础粗糙度（atlas 的粗糙度图均值 0.55，棉布偏塑料，这里接管）
+//   atlasRoughness   保留多少 atlas 粗糙度图的起伏（褶皱里的湿/磨痕）
+//   weaveRoughness / grimeRoughness  线缝更糙、积灰更糙
+export const NRA_CLOTH_DETAIL = Object.freeze({
+  texture: "./Texture/Texture_NraUniformClothDetail.webp",
+  weaveTile: 10,
+  grimeTile: 3.5,
+  mottleTile: 15,
+  normalStrength: 0.85,
+  atlasNormalScale: 0.7,
+  normalFade: Object.freeze([1.5, 9]),
+  weaveAlbedo: 0.16,
+  grimeAlbedo: 0.38,
+  mottleAlbedo: 0.22,
+  grimeTint: 0x8c7a5c,
+  grimeOffset: Object.freeze({ grayBlue: [0, 0], grayGreen: [0.37, 0.61], leader: [0.71, 0.23] }),
+  roughness: 0.86,
+  atlasRoughness: 0.35,
+  weaveRoughness: 0.1,
+  grimeRoughness: 0.06,
+});
+
 /**
  * 逐配方的表面参数。`Script_Materials` 按配方名查这张表决定编哪几个 define。
  *
@@ -216,7 +254,8 @@ export const SKIN = {
  */
 export const EXTERNAL_MATERIAL_CLASSES = {
   skin: /(skin|face|head|hand|body|皮肤|脸|头部|手)/i,
-  cloth: /(cloth|uniform|coat|fabric|cotton|jacket|trouser|puttee|军装|棉|布|衣|裤|绑腿)/i,
+  // 国军军装的材质名是 3ds Max 流水号，关键字匹配不到，按全名单列（2026-09-27 起才真吃上绒光）。
+  cloth: /(cloth|uniform|coat|fabric|cotton|jacket|trouser|puttee|军装|棉|布|衣|裤|绑腿)|^Material #1721585337$/i,
   metal: /(metal|steel|iron|barrel|bolt|bayonet|blade|sword|receiver|gun|rifle|枪|刺刀|刀|钢|铁)/i,
 };
 

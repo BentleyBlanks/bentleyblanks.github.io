@@ -12,7 +12,7 @@
 
 import * as THREE from "three";
 // 视模那一份材质要重挂一次间接光补丁（去掉 SSR，见 CloneOwnedMaterial 的账）。
-import { ApplyPatches, IndirectLightingPatches } from "./Script_MaterialPatches.mjs";
+import { ApplyPatches, IndirectLightingPatches, PatchesOf, SSR_PATCH_KEY } from "./Script_MaterialPatches.mjs";
 
 export const FIRST_PERSON_SHADOW_LAYER = 29;
 
@@ -133,7 +133,14 @@ function CloneOwnedMaterial(material) {
   clone.onBeforeCompile = material.onBeforeCompile;
   clone.customProgramCacheKey = material.customProgramCacheKey;
   clone.userData = { ...(material.userData || {}) };
-  if (clone.userData.indirectLightingInjected && clone.userData.ssrUniforms) {
+  // 装过注册表的材质：照抄它的补丁表、只拿掉 SSR。旧写法按间接光那一套重建整张表，
+  // 顺手把材质着色与国军军装换色/布纹补丁也丢了 —— 高画质下第一人称袖子一直是
+  // GLB 里的土黄纯色，与低头看见的灰蓝军装两个颜色（2026-09-27 查到）。
+  const sourcePatches = PatchesOf(material);
+  if (sourcePatches && clone.userData.ssrUniforms) {
+    clone.userData.ssrUniforms = null;
+    ApplyPatches(clone, sourcePatches.filter((patch) => patch.key !== SSR_PATCH_KEY));
+  } else if (clone.userData.indirectLightingInjected && clone.userData.ssrUniforms) {
     clone.userData.ssrUniforms = null;
     ApplyPatches(clone, IndirectLightingPatches({
       // ORM 三合一的描述子是纯 JSON，material.clone() 的 userData 深拷能原样带过来；

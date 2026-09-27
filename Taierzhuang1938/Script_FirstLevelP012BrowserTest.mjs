@@ -1430,7 +1430,7 @@ async function VerifyCastClothing() {
   Check(cast.length === 5 && new Set(cast.map(entry => entry.expected)).size === 3
     && cast.every(entry => entry.clothes.length > 0
       && entry.clothes.every(material => material.palette === entry.expected && material.map
-        && material.patches.some(key => key.startsWith("nraUniformCloth1")))
+        && material.patches.some(key => key.startsWith("nraUniformCloth")))
       && entry.other.some(material => material.map)),
   "具名NPC使用灰蓝/灰绿军装，班长深橄榄灰绿，衣服与装备贴图完整");
   for (const entry of cast) {

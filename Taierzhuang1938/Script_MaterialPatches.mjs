@@ -693,10 +693,13 @@ ${GI_SAMPLE_GLSL}`],
  * （屋里的金属件不该反一片亮天）。SSR 拿到的是真实屏幕空间的光，不该再吃
  * 那一层近似遮蔽，所以它排在后面、直接覆盖。
  */
+/** SSR 补丁的 key；第一人称视模克隆材质时按它把 SSR 摘掉（Script_FirstPersonSelfShadow）。 */
+export const SSR_PATCH_KEY = "ssr1";
+
 export function MakeSsrPatch(ssr) {
   if (!ssr) return null;
   return MakePatch({
-    key: "ssr1",
+    key: SSR_PATCH_KEY,
     uniforms: (uniforms) => {
       uniforms.uSsrMap = ssr.map;
       uniforms.uSsrResolution = ssr.resolution;

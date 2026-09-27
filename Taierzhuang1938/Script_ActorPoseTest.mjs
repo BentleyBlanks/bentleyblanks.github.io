@@ -97,7 +97,7 @@ try {
       `pooled body re-dyed on Create keeps the shared atlas: pooled=${pooledOfficer.pooled} palette=${Cloth(pooledOfficer)?.userData.nraUniformPalette}`);
     pooledOfficer.Dispose();
     for (const candidate of [leader, regular, green]) {
-      check(PatchKeysOf(Cloth(candidate)).some(key => key.startsWith("nraUniformCloth1")), "cloth patch survives lighting setup");
+      check(PatchKeysOf(Cloth(candidate)).some(key => key.startsWith("nraUniformCloth")), "cloth patch survives lighting setup");
       candidate.Dispose();
     }
 
