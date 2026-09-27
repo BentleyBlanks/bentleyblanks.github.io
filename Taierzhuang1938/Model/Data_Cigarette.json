@@ -1,0 +1,23 @@
+{
+  "sourceFile": "Smoke.fbx",
+  "sourceSha256": "8289669b551c546b80805bea4402cd2bca64925e09a2d7ea750df3d373487d60",
+  "sourceTriangles": 50000,
+  "triangles": 1798,
+  "sourceBounds": [
+    [
+      -0.09497600048780441,
+      -0.0880759209394455,
+      -2.121491003703735e-11
+    ],
+    [
+      0.08983899652957916,
+      0.10339108109474182,
+      1.194877028465271
+    ]
+  ],
+  "sourceAshAxis": "+Z",
+  "runtimeAshAxis": "-Z",
+  "lengthM": 0.09,
+  "mouthInsetM": 0.005,
+  "textureSize": 1024
+}

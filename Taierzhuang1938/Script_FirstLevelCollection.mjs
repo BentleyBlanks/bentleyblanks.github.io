@@ -22,6 +22,7 @@ import { MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as Place } from
 import { MissionRouteProjection, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { CreateStretcherGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
+import { CreateCigaretteAsset, DisposeCigaretteAsset } from "./Script_CigaretteAsset.mjs";
 import { STRETCHER_PATIENT_LIFT_M } from "./Data_Carry.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 
@@ -278,12 +279,11 @@ export class FirstLevelCollection {
     if (action === "share") this.shareAt = r.time;
     if (action === "wince") r.audio?.Play?.("painGrunt", { position: r.Point(zhou, 0.6), volume: 0.5 });
   }
-  /** 老周嘴上那根没点着的纸烟（一个小白盒）。 */
+  /** 老周嘴上的卷烟：源 FBX 的减面模型，嘴端为原点、烟灰朝局部 -Z。 */
   ShowSmoke(on) {
     const r = this.r;
     if (on && !this.smoke && r.scene) {
-      this.smoke = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.09),
-        new THREE.MeshLambertMaterial({ color: 0xe4ddc8 }));
+      this.smoke = CreateCigaretteAsset(r.library);
       this.smoke.name = "MissionZhouCigarette";
       r.scene.add(this.smoke);
     }
@@ -402,7 +402,7 @@ export class FirstLevelCollection {
   }
 
   /**
-   * 坐着的活人：烟叼在两片嘴唇中间，往脸前探出半截（F 没有这条数：烟长 9 cm，探出一半 4 cm）。
+   * 坐着的活人：卷烟嘴端叼在两片嘴唇中间，模型自身已留 5 mm 咬入段。
    * 脸朝向取「头骨 → 嘴」的水平方向（头会转向玩家，身体朝向不跟着转）。没有面部骨骼时退回头骨往前 12 cm。
    * 2026-09-24 审查：旧写法按头骨往下 9 cm、按身体朝向往前 10 cm，烟飘在下巴 / 领口高度（06 老周头骨在颈根附近）。
    */
@@ -417,9 +417,9 @@ export class FirstLevelCollection {
     } else {
       p.copy(h); p.x -= Math.sin(this.seated.yaw) * 0.12; p.z -= Math.cos(this.seated.yaw) * 0.12;
     }
-    const fx = p.x - h.x, fz = p.z - h.z, f = Math.hypot(fx, fz) || 1;
-    p.x += fx / f * 0.04; p.z += fz / f * 0.04; p.y -= 0.005;
-    this.smoke.rotation.y = Math.atan2(fx, fz);
+    const fx = p.x - h.x, fz = p.z - h.z;
+    p.y -= 0.005;
+    this.smoke.rotation.y = Math.atan2(-fx, -fz);
   }
 
   /** The lift actually placed Zhou on the column route; the voice fact alone cannot leave 06. */
@@ -465,7 +465,8 @@ export class FirstLevelCollection {
     this.propMaterial?.dispose();
     this.propGeometry = this.propMaterial = null;
     this.props = [];
-    for (const mesh of [this.smoke, this.match, this.seatBox]) {
+    DisposeCigaretteAsset(this.smoke);
+    for (const mesh of [this.match, this.seatBox]) {
       if (!mesh) continue;
       mesh.parent?.remove(mesh);
       mesh.geometry.dispose();

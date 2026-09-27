@@ -663,6 +663,8 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"firstLevel",pattern:/Cigarette/},
+  {domain:"propVelocity",pattern:/Cigarette|FirstLevelCollection/},
   {domain:"breakableTrees",pattern:/BreakableTree|Script_Combat|Script_FirstLevelWhiteboxField/},
   {domain:"distantSmoke",pattern:/FirstLevelDistantSmoke|FirstLevelSmokeOrigins|BattleSmoke|Script_Vfx/},
   {domain:"facialEditor",pattern:/FacialReview|EditorFacial|FacialEditor/},

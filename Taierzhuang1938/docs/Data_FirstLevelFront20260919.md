@@ -239,7 +239,7 @@ ZhouLift 播完 → zhouOnLitter → 老周用 zhouLiftMoveS 秒从土壁挪回�
 `collectionReturn` 全长 86.60 m；共享沟底最大坡度 0.043（约 2.44°）。这避免路线点与
 实际沟槽再次漂移成单向陡壁。
 
-烟与火柴是两个小白盒（`MissionZhouCigarette` / `MissionShunziMatchbox`），
+烟改用用户 FBX 减面后的卷烟模型（[资产说明](Data_Cigarette20260927.md)）；火柴仍是小白盒（`MissionShunziMatchbox`），
 不做手部 IK —— 本轮口径是「流程与白盒到位，人物动作可以简化」。
 
 ### 07 South —— 沿沟南行

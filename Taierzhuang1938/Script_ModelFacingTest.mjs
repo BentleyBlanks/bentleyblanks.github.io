@@ -207,5 +207,18 @@ const treeCloud = GlbPoints(path.join(projectDir,"Model/Model_BreakableDeadTree.
 const treeY = treeCloud.map(p=>p[1]);
 Check(Math.abs(Math.min(...treeY))<0.001 && Math.abs(Math.max(...treeY)-7.2)<0.001,
   "枯树导出为 Y-up、根部零高、7.2 m 米制尺寸");
+const cigaretteFile = path.join(projectDir, "Model/Model_Cigarette.glb");
+const cigarette = LoadGlb(cigaretteFile);
+const cigarettePoints = GlbPoints(cigaretteFile);
+const cigaretteZ = cigarettePoints.map(p => p[2]);
+const cigaretteCount = cigarette.json.meshes.flatMap(m => m.primitives)
+  .reduce((n, p) => n + cigarette.json.accessors[p.indices ?? p.attributes.POSITION].count / 3, 0);
+Check(cigaretteCount >= 500 && cigaretteCount <= 2000, "卷烟实际面数在指定预算内", String(cigaretteCount));
+Check(Math.abs(Math.min(...cigaretteZ) + .085) < .001 && Math.abs(Math.max(...cigaretteZ) - .005) < .001,
+  "卷烟长 9 cm、嘴端咬入 5 mm、烟灰朝 -Z");
+// The irregular ash is broader than the twisted paper mouth in the source.
+const EndRadius = predicate => Math.max(...cigarettePoints.filter(p => predicate(p[2])).map(p => Math.hypot(p[0], p[1])));
+Check(EndRadius(z => z < -.08) > EndRadius(z => z > .002) * 1.2, "卷烟真实烟灰端在 -Z，拧口在 +Z");
+Check(cigarette.json.textures?.length >= 3, "卷烟保留底色、法线与粗糙度贴图");
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机机首与战车车头全部按几何复量落在 -Z");

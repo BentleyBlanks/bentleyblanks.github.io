@@ -108,6 +108,7 @@ import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { LoadGrenadeAsset, CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { LoadStretcherAsset, CreateStretcherGeometry } from "./Script_StretcherAsset.mjs";
+import { LoadCigaretteAsset } from "./Script_CigaretteAsset.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { MeleeCombatDirector } from "./Script_MeleeCombat.mjs";
 import { MELEE_SCENARIOS, MELEE_ENCOUNTERS } from "./Data_MeleeCombat.mjs";
@@ -1298,7 +1299,7 @@ async function Boot() {
   setStep(T("boot.step.actorsProgress", { loaded: meshes.loaded, requested: meshes.requested }),
     BOOT.progress.actorMeshes);
   // 担架 GLB 与手榴弹一起等：CreateStretcherGeometry 是同步的，进关前得已经在手里；读不到就开机失败。
-  const [grenadeAsset] = await Promise.all([LoadGrenadeAsset(), LoadStretcherAsset()]);
+  const [grenadeAsset] = await Promise.all([LoadGrenadeAsset(), LoadStretcherAsset(), LoadCigaretteAsset()]);
   vfx = new VfxSystem(scene, library, {
     quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
   });

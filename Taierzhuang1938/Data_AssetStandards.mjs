@@ -116,6 +116,10 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 }
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
+  Object.freeze({ id: "Cigarette", name: "老周卷烟", pack: "Model_Cigarette.glb",
+    sourceTriangles: 50000, actualTriangles: 1798, targetTriangles: 1800,
+    sourceTexture: "用户 FBX 内嵌 PBR", runtimeTexture: "源 UV / 1K PBR",
+    policy: "target", note: "用户指定几百至几千面；9 cm 卷烟，嘴端原点、烟灰朝 -Z。源文件与 Blender 工程留本地。" }),
   Object.freeze({ id: "BreakableDeadTree", name: "可炸断枯树", pack: "Model_BreakableDeadTree.glb",
     sourceTriangles: 499875, actualTriangles: 12251, targetTriangles: 12500,
     sourceTexture: "用户提供的 FBX 内嵌 PBR", runtimeTexture: "2K 源 PBR / 程序木质断面",
