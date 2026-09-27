@@ -76,12 +76,9 @@ export function BuildFrontWhitebox(groundAt) {
     }
     Block(`${id}RidgeCap`, x, z, 1.6, .35, d + .2, "roof", { y: floor + height + .77 });
   }
-  function Tree(id, x, z, trunkH, crownW, crownH) {
-    Block(`${id}Trunk`, x, z, .3, trunkH, .32, "timber");
-    const g = groundAt(x, z);
-    Block(`${id}Crown`, x, z, crownW, crownH, crownW * .9, "foliage", { solid: false, y: g + trunkH + crownH * .35 });
-    Block(`${id}CrownTop`, x + .2, z - .1, crownW * .6, crownH * .5, crownW * .55, "foliage",
-      { solid: false, y: g + trunkH + crownH * .95 });
+  function Tree(id, x, z, trunkH, crownH) {
+    Block(`${id}Trunk`, x, z, .3, trunkH, .32, "timber",
+      {treeModel:{heightM:trunkH+crownH*1.2,region:"FrontAuthored"}});
   }
 
   // One-storey brick house knocked open: four walls with broken tops (tops[] per
@@ -101,12 +98,9 @@ export function BuildFrontWhitebox(groundAt) {
       Detail(`${id}Beam${i}`, x, z + dz, w - .2, .16, .18, "timber", { y: g + Math.min(n, e, wTop) - .1, ry });
     Detail(`${id}Rubble`, x - w * .15, z + d * .15, w * .4, .45, d * .3, "plaster", { ry: .3 });
   }
-  // A leafless tree: trunk and three bare branches.
+  // Same supplied model for the tank-road landmark; reserve only its footprint.
   function DeadTree(id, x, z, h) {
-    Block(`${id}Trunk`, x, z, .34, h, .34, "timber");
-    const g = groundAt(x, z);
-    for (const [i, dx, dz, y, len, ry] of [[0, .5, .1, .62, 1.8, .5], [1, -.4, -.2, .78, 1.4, -.8], [2, .1, -.3, .9, 1.2, 1.5]])
-      Detail(`${id}Branch${i}`, x + dx, z + dz, len, .14, .16, "timber", { y: g + h * y, ry });
+    Block(`${id}Trunk`, x, z, .34, h, .34, "timber",{treeModel:{heightM:h,region:"FrontAuthored"}});
   }
 
   // ── 05 tank approach ──────────────────────────────────────────────────────
@@ -181,8 +175,8 @@ export function BuildFrontWhitebox(groundAt) {
   RuinHouse("CollectionWestRuin", -54.5, -101.5, 5, 6.5, [2.9, 2.3, 1.8, 2.6], { gable: -1 });
 
   // Trees on the east high ground behind the 06B retaining wall.
-  Tree("CollectionEastTreeA", -21.5, -100.5, 3.4, 3.2, 3.4);
-  Tree("CollectionEastTreeB", -19.2, -94.5, 2.8, 2.6, 2.8);
+  Tree("CollectionEastTreeA", -21.5, -100.5, 3.4, 3.4);
+  Tree("CollectionEastTreeB", -19.2, -94.5, 2.8, 2.8);
 
   // 06B: the right-hand courtyard wall with a lean-to shed, parallel to the
   // southWalk leg (−26,−92)→(−16,−76) and 4.6 m right (west) of it. The shed
@@ -267,8 +261,8 @@ export function BuildFrontWhitebox(groundAt) {
     Topped(`SouthRimRuin${i}`, x, z, .5, top, len, "plaster", { ry: Math.atan2(.453, .891) });
   Detail("SouthRimRuinRubble", -17.6, -43.2, 1.2, .35, .9, "plaster", { ry: .5 });
   // Trees: one beyond the south exit (the end of the trench view), one by the east road.
-  Tree("SouthExitTree", -9.5, -30.6, 4.2, 3.4, 4.0);
-  Tree("SouthRoadTree", -5.2, -47.5, 3.6, 2.8, 3.4);
+  Tree("SouthExitTree", -9.5, -30.6, 4.2, 4.0);
+  Tree("SouthRoadTree", -5.2, -47.5, 3.6, 3.4);
 
   // 07: earth shoulders define the southbound communication line at the
   // village approach. The centre route and its existing excavation stay open.

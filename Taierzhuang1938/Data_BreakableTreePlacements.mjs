@@ -29,6 +29,12 @@ export function TreePlacementAllowed(p) {
   const heights = [[0,0],[-1.7,0],[1.7,0],[0,-1.7],[0,1.7]].map(([x,z]) => SampleMissionTerrain(p.x+x,p.z+z));
   return Math.max(...heights) - Math.min(...heights) < 0.32;
 }
+export function MakeAuthoredTreePlacements() {
+  return MISSION_LAYOUT.blocks.filter(b => b.treeModel).map(b => ({
+    id:b.id, x:b.x, z:b.z, ry:b.ry || 0, scale:b.treeModel.heightM/T.heightM,
+    region:b.treeModel.region, authored:true,
+  }));
+}
 export function MakeTreePlacements(seed = T.seed) {
   const random = Mulberry32(seed), result = [];
   for (const region of T.regions) {
@@ -42,7 +48,9 @@ export function MakeTreePlacements(seed = T.seed) {
     }
     if (count !== region.count) throw new Error(`Tree region ${region.id} has only ${count} safe placements`);
   }
-  return result;
+  // Authored anchors already belong to the proven layout. They do not use the
+  // scatter exclusion zones (the old-yard landmark deliberately borders a route).
+  return [...result, ...MakeAuthoredTreePlacements()];
 }
 export function TreeBlastDamage(distance, radius, damage) {
   if (!(radius > 0) || !(damage > 0) || distance >= radius) return 0;

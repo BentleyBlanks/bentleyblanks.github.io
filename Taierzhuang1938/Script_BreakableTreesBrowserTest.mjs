@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+const TREE_COUNT=130;
 const here=path.dirname(fileURLToPath(import.meta.url)),out=path.join(here,"_shots/BreakableTrees");
 await fs.mkdir(out,{recursive:true});
 const server=await ServeRoot(path.resolve(here,".."),0),browser=await LaunchBrowser();
@@ -14,6 +15,26 @@ try {
   const origin=process.env.TREE_PREVIEW_ORIGIN||`http://127.0.0.1:${server.address().port}`;
   await page.goto(`${origin}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&missionStage=3&quality=high&scale=small`,{timeout:180000});
   await page.waitForFunction(()=>window.Tengxian?.state.ready,null,{timeout:240000});
+  const replacements=await page.evaluate(()=>{
+    const field=window.Tengxian.battlefield, trees=field.breakableTrees.trees;
+    const authored=trees.filter(t=>t.authored);
+    return {count:authored.length, missing:field.layout.blocks.filter(b=>b.treeModel &&
+      !authored.some(t=>t.id===b.id&&t.x===b.x&&t.z===b.z)).map(b=>b.id),
+      ghostColliders:authored.flatMap(t=>field.colliders.filter(c=>c!==t.stump&&c!==t.trunk&&
+        Math.abs(c.c[0]-t.x)<.01&&Math.abs(c.c[2]-t.z)<.01).map(c=>c.id||c.tag)),
+      legacyCrowns:field.layout.blocks.filter(b=>/(?:Tree|Poplar).*?(?:Crown|Branch)/.test(b.id)).length};
+  });
+  assert.equal(replacements.count,46);assert.deepEqual(replacements.missing,[]);
+  assert.deepEqual(replacements.ghostColliders,[]);assert.equal(replacements.legacyCrowns,0);
+  for(const id of ["FieldPoplarEast3Trunk","FieldPoplarWest3Trunk","FieldPoplarSouthRoad1Trunk",
+    "FieldPoplarRailApproach3Trunk","OldYardDeadTreeTrunk","CollectionEastTreeATrunk","SouthExitTreeTrunk","TankRoadDeadTreeTrunk","VillageMouthTree0Trunk"]){
+    await page.evaluate(id=>{
+      const g=window.Tengxian,t=g.battlefield.breakableTrees.trees.find(t=>t.id===id);
+      g.player.Spawn(t.x-10,t.z+13,Math.atan2(-10,13));g.player.pitch=.08;
+      g.StepFrames(8,0,true);
+    },id);
+    await page.screenshot({path:path.join(out,`Image_Replaced_${id}.png`)});
+  }
   const initial=await page.evaluate(async()=>{
     const g=window.Tengxian,trees=g.battlefield.breakableTrees;
     const tree=trees.trees.find(t=>t.region==="Village");window.treeProbe=tree;
@@ -31,12 +52,12 @@ try {
       cameraHit:cameraHit?.box?.id,
       triangles:g.renderer.info.render.triangles,calls:g.renderer.info.render.calls};
   });
-  assert.equal(initial.snapshot.count,84);assert.equal(initial.snapshot.broken,0);
-  assert.equal(initial.treeColliders,168);assert.equal(initial.snapshot.activeBodies,0);
+  assert.equal(initial.snapshot.count,TREE_COUNT);assert.equal(initial.snapshot.broken,0);
+  assert.equal(initial.treeColliders,TREE_COUNT*2);assert.equal(initial.snapshot.activeBodies,0);
   assert.equal(initial.probeLod,0,"the tree 16 m away draws at full detail");
   assert.ok(initial.snapshot.lod[0]<12&&initial.snapshot.lod.slice(2).reduce((a,b)=>a+b,0)>40,"distant trees use the clustered copies: "+initial.snapshot.lod);
   assert.equal(initial.members.StumpCap_L0||0,0,"standing trees hide their fracture caps");
-  for(const part of ["Stump","Crown"])assert.equal(initial.snapshot.lod.reduce((n,_,l)=>n+(initial.members[`${part}_L${l}`]||0),0),84,part+" is drawn exactly once per tree");
+  for(const part of ["Stump","Crown"])assert.equal(initial.snapshot.lod.reduce((n,_,l)=>n+(initial.members[`${part}_L${l}`]||0),0),TREE_COUNT,part+" is drawn exactly once per tree");
   assert.equal(initial.collider,initial.expected,"standing trunk has a real Rapier collider");
   assert.equal(initial.cameraHit,initial.expected,"capture camera has an unobstructed view of the tree");
   await page.screenshot({path:path.join(out,"Image_TreesIntact.png")});
@@ -121,14 +142,14 @@ try {
   assert.equal(lifecycle.bodiesDuring,lifecycle.bodiesBefore+1);
   assert.equal(lifecycle.bodiesAfter,lifecycle.stress.bodiesAfterSettling);assert.ok(lifecycle.preservedBodies);
   assert.equal(lifecycle.treeCollidersAfterDispose,0);
-  assert.equal(lifecycle.stress.peak,83);assert.equal(lifecycle.stress.settled,84);
+  assert.equal(lifecycle.stress.peak,TREE_COUNT-1);assert.equal(lifecycle.stress.settled,TREE_COUNT);
   assert.equal(lifecycle.stress.activeBodies,0);assert.equal(lifecycle.stress.standing,0);
-  assert.equal(lifecycle.stress.treeColliders,84);assert.equal(lifecycle.stress.terrainSamples,0);
+  assert.equal(lifecycle.stress.treeColliders,TREE_COUNT);assert.equal(lifecycle.stress.terrainSamples,0);
   assert.equal(lifecycle.stress.crownInstances,0);
   assert.equal(lifecycle.stress.remainingTreeBodies,0);assert.ok(lifecycle.stress.allStatic);
   assert.deepEqual(errors,[]);
-  await fs.writeFile(path.join(out,"Data_Verification.json"),JSON.stringify({initial,broken,fallen,lifecycle,errors},null,2));
-  console.log("PASS BreakableTreesBrowserTest",JSON.stringify({count:84,broken:fallen.snapshot.broken,minGap:fallen.minGap,lifecycle}));
+  await fs.writeFile(path.join(out,"Data_Verification.json"),JSON.stringify({replacements,initial,broken,fallen,lifecycle,errors},null,2));
+  console.log("PASS BreakableTreesBrowserTest",JSON.stringify({count:TREE_COUNT,broken:fallen.snapshot.broken,minGap:fallen.minGap,lifecycle}));
 }catch(error){
   await page.screenshot({path:path.join(out,"Image_Failure.png")}).catch(()=>{});
   console.error(await page.evaluate(()=>({boot:document.querySelector("#bootText")?.textContent,errors:document.body.innerText.slice(-1200)})).catch(()=>{}));

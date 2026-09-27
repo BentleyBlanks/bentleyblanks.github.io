@@ -316,7 +316,7 @@ export class FirstLevelWhiteboxField {
     for(const [key,material] of this.materials)if(key.startsWith("MissionDefenseMaterial_"))this.sharedFortificationMaterials.add(material);
     const trainSink = new BuildSink(),derailSink=new BuildSink();
     for (const block of this.layout.blocks) {
-      if(block.dynamic)continue;
+      if(block.dynamic || block.treeModel)continue;
       const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? (this.layout.fortifications && block.id.startsWith(`StationCar${this.layout.derailCar}`) ? derailSink : trainSink) : sink;
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
       const seamOwner=block.id.includes("BagSeam")?block.id.split("BagSeam")[0]:null;

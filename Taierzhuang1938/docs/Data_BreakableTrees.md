@@ -1,10 +1,16 @@
 # Breakable dead trees
 
-First-level scenery uses 84 deterministic placements across the front, village,
-transfer area and rear. `Data_BreakableTreePlacements` reserves authored roads,
+First-level scenery uses 130 copies of the supplied dead-tree model: 84 deterministic
+scatter placements plus 46 authored replacements (35 former green block trees along
+the east/west field edges, south road and rail approach, the collection area and exits, plus 11 primitive dead trees).
+`Data_BreakableTreePlacements` reserves authored roads,
 railway, trenches, mission routes, objective areas and all scenario blocks before
 sampling. Trees vary in yaw and uniform scale; the same seed reproduces the field.
-The old yard's authored landmark remains part of the whitebox layout.
+Authored tree anchors retain their positions and heights. Their layout trunk records
+carry `treeModel` metadata and reserve space for dressing; `FirstLevelWhiteboxField`
+skips their box geometry and static colliders. `BreakableTrees` alone draws and owns
+their destructible colliders. The green crowns/tips and old-yard box branches have
+been removed. River reeds are separate scenery and remain unchanged.
 
 `Script_BreakableTrees` belongs to `FirstLevelWhiteboxField`. Standing trees use
 spatial instance batches. `Combat.Blast` applies distance-squared falloff and world
@@ -85,8 +91,8 @@ clearance, damage falloff and the actual GLB budget.
 `node Taierzhuang1938/Script_BreakableTreesBrowserTest.mjs` checks the real first-level
 high-quality renderer, Combat explosion path, standing/removed colliders, falling,
 ground contact, occlusion, repeat hits and resource disposal. It also topples all
-84 trees, verifies that their dynamic bodies return to zero and static tree
-colliders fall from 168 to 84 stumps, and checks that 10,000 subsequent tree updates
+130 trees, verifies that their dynamic bodies return to zero and static tree
+colliders fall from 260 to 130 stumps, and checks that 10,000 subsequent tree updates
 perform zero terrain samples. Distance checks verify full detail near the camera,
 clustered distant copies, one instance per tree and caps only on broken stumps.
 `TREE_PREVIEW_ORIGIN` optionally selects an existing

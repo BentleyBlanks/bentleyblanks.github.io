@@ -277,10 +277,9 @@ Block("BundleSupplyHouseRoof",45.3,-109,4,.22,10,"structure",{y:SampleMissionTer
 Block("BundleCrate",Sortie.bundle.x,Sortie.bundle.z,1.2,.5,.8,"missionRoute");
 // Landmark: the old yard's dead tree at the collapsed north-west corner (the sap climbs out beside it).
 // 7 m: its crown clears the nest's rear wall and reads from the observation step and the rear junction.
-Block("OldYardDeadTreeTrunk",36.0,-122.8,.42,7,.42,"timber");
-Detail("OldYardDeadTreeBranchA",36.5,-122.6,1.8,.18,.2,"timber",{y:SampleMissionTerrain(36,-122.8)+5.6,ry:.5});
-Detail("OldYardDeadTreeBranchB",35.5,-123.1,1.4,.16,.18,"timber",{y:SampleMissionTerrain(36,-122.8)+4.7,ry:-.7});
-Detail("OldYardDeadTreeBranchC",36.2,-123.4,1.2,.14,.16,"timber",{y:SampleMissionTerrain(36,-122.8)+6.3,ry:1.4});
+// Keep the authored footprint for layout clearance; BreakableTrees owns both
+// its rendered model and destructible colliders, never an extra whitebox trunk.
+Block("OldYardDeadTreeTrunk",36.0,-122.8,.42,7,.42,"timber",{treeModel:{heightM:7,region:"OldYard"}});
 // Attack position: broken road-side wall between the throw spot and the stopped tank (throw cover).
 // Top ~0.7 m above ground level: covers a man crouched at the throw spot (floor 0.75 m down), a man standing there sees the tank's side over it.
 TopBlock("RoadsideRuin",42.33,-161.4,3.4,1.62,.7,"cover",{ry:.616,cover:Face(-.578,-.816)},Sortie.throw);
@@ -617,7 +616,8 @@ FarmSilhouette('TransferFieldStore',120,126,13,12,4.6);
 FarmSilhouette('WestFieldHouse',-113,99,15,10,4.2);
 FarmSilhouette('SouthFieldHouse',60,-60,12,9,4);
 FarmSilhouette('RearOrchardHouse',-120,-20,13,11,4.1);
-// Poplar rows mark the field edge and break long empty sightlines without closing combat lanes.
+// Authored tree rows use the supplied dead-tree model, at the original anchors.
+// These trunk records reserve space for dressing; the field does not draw them.
 for(const [row,points] of [
   ['East',[-180,-151,-116,-81,-43,-5,36,71,104,142,167].map((z,i)=>({x:125+(i%3)*2,z}))],
   ['West',[-165,-131,-97,-63,-29,6,84,122,151].map((z,i)=>({x:-117-(i%2)*5,z}))],
@@ -629,10 +629,9 @@ for(const [row,points] of [
 ]) for(const [i,p] of points.entries()) {
   // 河槽里不长树：断面在这儿把地面切下去 4.2 m，树会立在河床上。
   if (RiverCutAt(p.x, p.z) > 0.5) continue;
-  const id='FieldPoplar'+row+i, ground=SampleMissionTerrain(p.x,p.z),height=6+(i%3)*.7;
-  Block(id+'Trunk',p.x,p.z,.28,height*.65,.3,'timber');
-  Detail(id+'Crown',p.x,p.z,1.8,height*.6,1.6,'foliage',{y:ground+height*.75});
-  Detail(id+'CrownTip',p.x+.15,p.z,1.1,1.2,1,'foliage',{y:ground+height*1.06});
+  const id='FieldPoplar'+row+i, height=6+(i%3)*.7;
+  Block(id+'Trunk',p.x,p.z,.28,height*.65,.3,'timber',
+    {treeModel:{heightM:height,region:row},ry:i*2.399963229728653});
 }
 // Interior props sit beside movement lanes and identify kitchen, ward and sorting station.
 Block('KitchenStove',54,-10,1.6,1.05,1.2,'earthDark');

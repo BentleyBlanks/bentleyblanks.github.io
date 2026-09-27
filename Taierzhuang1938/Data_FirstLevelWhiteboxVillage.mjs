@@ -207,25 +207,12 @@ export function BuildVillageWhitebox(groundAt) {
     Detail(`${id}Mid`, x, z, r * 1.6, h * .3, r * 1.6, "canvas", { y: groundAt(x, z) + h * .7 });
     Detail(`${id}Top`, x, z, r * .9, h * .2, r * .9, "canvas", { y: groundAt(x, z) + h * .95 });
   }
-  // Bare tree: trunk plus radiating branches, all non-solid (it only reads).
+  // Supplied dead-tree model replaces every primitive branch and twig.
   function DeadTree(id, x, z, h = 6.5) {
-    const g = groundAt(x, z);
-    Detail(`${id}Trunk`, x, z, .3, h * .72, .3, "timber");
-    // Two forked leaders carry the crown; branches spiral up with twigs that
-    // climb from their tips, so the silhouette reads as a tree, not a pole.
-    for (const s of [-1, 1])
-      Detail(`${id}Leader${s}`, x + s * .22, z - s * .12, .16, h * .38, .16, "timber",
-        { y: g + h * .62 + h * .19 });
-    for (let i = 0; i < 8; i++) {
-      const a = i * 2.4 + Rand() * .8, l = .9 + Rand() * 1.3, y = g + h * (.42 + i * .07);
-      Detail(`${id}Branch${i}`, x + Math.sin(a) * l * .45, z + Math.cos(a) * l * .45, .07, .07, l,
-        "timber", { ry: a, y });
-      const tl = .5 + Rand() * .9;
-      Detail(`${id}Twig${i}`, x + Math.sin(a) * l * .8, z + Math.cos(a) * l * .8, .04, tl, .04,
-        "timber", { y: y + tl / 2 });
-      Detail(`${id}Sprig${i}`, x + Math.sin(a) * l * .55, z + Math.cos(a) * l * .55, .04, tl * .7, .04,
-        "timber", { y: y + tl * .35 });
-    }
+    Detail(`${id}Trunk`, x, z, .3, h * .72, .3, "timber",
+      {treeModel:{heightM:h,region:"VillageAuthored"}});
+    // Keep the downstream dressing random stream unchanged (8 branches x 3 draws).
+    for(let i=0;i<24;i++)Rand();
   }
   // Telegraph pole with a cross-arm; wires are drawn between named poles.
   const poles = [];
