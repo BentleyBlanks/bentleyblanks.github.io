@@ -19,7 +19,7 @@ import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_R
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_FACT_GATES, MISSION_ENCOUNTER_ACTIVATION, MissionGateInArea } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { MID_TUNING as M, MidLitterHoldSlots, MidDraftKind } from "./Data_Tuning_FirstLevelMid.mjs";
+import { MID_TUNING as M, MidLitterHoldSlots, MidDraftKind, MidTransferScatterPlan, MidTransferRetreatJoin } from "./Data_Tuning_FirstLevelMid.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import {
   FirstLevelMissionColumn, MissionRouteProjection, MissionCarryRoutePoint,
@@ -536,8 +536,98 @@ const Step = (host, module, seconds, options = {}) => {
   // 抬得动的都让开了路；抬架员被打倒的那几副留在原地等替补（15A 收拢那一段的事）。
   const movable = host.column.litters.filter((l) =>
     l.health > 0 && !l.evacuated && !l.loaded && !["fallen", "critical"].includes(l.state));
-  Check(movable.length > 0 && movable.every((litter) => Math.abs(litter.x - road) >= M.scatterFromRoadM - 0.7),
-    "抬得动的那几副真的走到了路外");
+  // 2026-09-27 起散开走固定遮挡点（残墙后 / 洼地 / 房檐下，MID.transferEvac）：真的停到了
+  // 自己那个遮挡点上，而且那个点在路两侧残墙（x 71 / x 80）外侧。
+  // 还挂在车板上的那一副（上面把 loaded 清了，但 cart.load 每帧把它钉在车上）不是步行散开的人：
+  // 旧断言只是碰巧——那辆车停在 x 88 的车位上。
+  const onCart = (litter) => host.column.vehicles.some((cart) => cart.load.includes(litter.id));
+  const onFoot = movable.filter((litter) => !onCart(litter));
+  Check(onFoot.length > 0 && onFoot.every((litter) => litter.held && !litter.holdRoute?.length
+    && Math.abs(litter.x - road) >= M.scatterCoverOffRoadM),
+    "抬得动的那几副真的走到了路边遮挡点（残墙外侧）");
+}
+
+// ---------------------------------------------------------------------------
+// 13/15A 固定通道（MID.transferEvac，2026-09-27 白盒 C 区第二轮）
+// 车路两侧砌了带缺口的残墙之后，散开与撤退都只走数据表里的折线。这里对真实布局的
+// 实心体块逐条扫：担架 1.3 m 走廊（中心 0.65）加前后两个搬运员胶囊（±litterBearerOffsetM，0.34），
+// 0.1 m 抽样 —— 与上面「额外乘员进西沟」那一条同一把尺。
+// ---------------------------------------------------------------------------
+{
+  const solids = MISSION_LAYOUT.blocks.filter((block) => block.solid !== false);
+  const Hit = (x, z, margin) => {
+    const y = SampleMissionTerrain(x, z);
+    return solids.find((box) => {
+      const c = Math.cos(box.ry || 0), s = Math.sin(box.ry || 0), bx = x - box.x, bz = z - box.z;
+      return Math.abs(bx * c - bz * s) < box.w / 2 + margin && Math.abs(bx * s + bz * c) < box.d / 2 + margin
+        && box.y + box.h / 2 > y + .3 && box.y - box.h / 2 < y + 1.8;
+    });
+  };
+  // skipM：起点本身是人已经站着的地方，前这么多米不算（人不会凭空站进墙里，起点另行筛过）。
+  const Sweep = (route, skipM = 0) => {
+    const hits = new Set();
+    let run = 0;
+    for (let leg = 1; leg < route.length; leg++) {
+      const a = route[leg - 1], b = route[leg], length = Distance(a, b);
+      if (!length) continue;
+      const dx = (b.x - a.x) / length, dz = (b.z - a.z) / length;
+      for (let d = 0; d <= length; d += .1) {
+        if (run + d < skipM) continue;
+        for (const [offset, margin] of [[0, .65], [-R.litterBearerOffsetM, .34], [R.litterBearerOffsetM, .34]]) {
+          const box = Hit(a.x + dx * (d + offset), a.z + dz * (d + offset), margin);
+          if (box) hits.add(`${box.id}@leg${leg}`);
+        }
+      }
+      run += length;
+    }
+    return [...hits];
+  };
+  const E = M.transferEvac;
+  for (const lane of E.lanes)
+    assert.deepEqual(Sweep([lane.gate, ...lane.points, E.ditchMouth]), [], `retreat lane ${lane.id} is a clear litter corridor`);
+  for (const cover of E.covers) {
+    assert.deepEqual(Sweep(cover.path), [], `scatter path to ${cover.id} is clear`);
+    assert.ok(Math.abs(cover.path.at(-1).x - E.roadX) >= M.scatterCoverOffRoadM, `${cover.id} is off the carriageway`);
+    // 一个遮挡点最多排 slotsPerCover 个人（0、+1、-1 个 slotSpreadM），每个位置都走得到、也都接得上撤退通道。
+    for (let k = 0; k < E.slotsPerCover; k++) {
+      const hold = cover.path.at(-1), off = (k % 2 ? -1 : 1) * Math.ceil(k / 2) * E.slotSpreadM;
+      const slot = { x: hold.x, z: hold.z + off };
+      const from = cover.path.length > 1 ? cover.path.at(-2) : { x: E.roadX + cover.side * 4, z: hold.z };
+      assert.deepEqual(Sweep([from, slot]), [], `${cover.id} slot ${k} reachable`);
+      assert.deepEqual(Sweep([slot, ...MidTransferRetreatJoin(slot)]), [], `${cover.id} slot ${k} joins a retreat lane`);
+    }
+  }
+  // 场上任何一个站得下担架的位置都能接上某条通道，一路到下沟口不撞墙。「站得下」：担架朝哪个方向
+  // 都放得下 —— 中心 litterBearerOffsetM + 0.34（搬运员胶囊）≈ 1.65 m 内无实心体块。
+  // 范围：接运场 x 58–92、z 88–136（车位与侧巷以东不是后送队站人的地方）。
+  let joined = 0;
+  const bad = [];
+  for (let x = 58; x <= 92; x += 1.5) for (let z = 88; z <= 136; z += 1.5) {
+    if (Hit(x, z, R.litterBearerOffsetM + .34 + .03) || SampleMissionTerrain(x, z) < -1.4) continue;
+    const route = [{ x, z }, ...MidTransferRetreatJoin({ x, z })];
+    const hits = Sweep(route, 1.0);
+    if (hits.length) bad.push(`${x},${z}:${hits.join("/")}`);
+    else joined++;
+  }
+  if (bad.length) console.log(bad.join(" | "));
+  assert.deepEqual(bad, [], "every standing position in the transfer yard joins a retreat lane");
+  Check(joined > 300, `转运场上 ${joined} 个站位都接得上撤退通道`);
+  // 14 救人：幺娃、刘文才由 MoveActor 直线奔向沟口的老周（没有寻路，只会贴墙滑）。从各自射位出发的
+  // 直线（0.35 m 胶囊）不许撞上路边残墙 —— 2026-09-27 实跑卡死过一次：墙头突出的碎砖台阶挂住了刘文才。
+  for (const post of M.defencePosts.filter((p) => ["yaowa", "liuwencai"].includes(p.cast))) {
+    const hits = new Set(), a = post, b = E.ditchMouth, length = Distance(a, b);
+    for (let d = 0; d <= length; d += .1) {
+      const box = Hit(a.x + (b.x - a.x) * d / length, a.z + (b.z - a.z) * d / length, .35);
+      if (box) hits.add(box.id);
+    }
+    assert.deepEqual([...hits], [], `${post.cast} runs straight from the defence post to the ditch mouth`);
+  }
+  // 散开计划本身：路上的人分到同侧遮挡点，最后一点就是停车位；墙外的人不回头穿墙。
+  const plans = MidTransferScatterPlan([{ x: 75, z: 100 }, { x: 78, z: 100 }, { x: 69.5, z: 100 }, { x: 88, z: 100 }]);
+  Check(plans[0].route.at(-1).x < E.walls.westX && plans[1].route.at(-1).x > E.walls.eastX,
+    "路上的人按所在一侧去残墙外侧");
+  Check(plans[2].route.every((p) => p.x < E.walls.westX), "已在西墙外的人不回头穿墙");
+  Check(plans[3] === null, "不在路上的人不被点名散开");
 }
 
 // ---------------------------------------------------------------------------

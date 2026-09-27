@@ -2,7 +2,7 @@ import { MISSION_RECEPTION_SPACE as Reception } from "./Data_FirstLevelMissionTo
 import { MISSION_CROWD_AREAS } from "./Data_FirstLevelMissionCrowd.mjs";
 import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT } from "./Data_FirstLevelMissionLayout.mjs";
-import { MID_TUNING as MID, MidDraftKind } from "./Data_Tuning_FirstLevelMid.mjs";
+import { MID_TUNING as MID, MidDraftKind, MidTransferScatterPlan, MidTransferRetreatJoin } from "./Data_Tuning_FirstLevelMid.mjs";
 export function MissionRouteLength(route) {
   return route.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - route[i].x, p.z - route[i].z), 0);
 }
@@ -251,10 +251,13 @@ export class FirstLevelMissionColumn {
    * 走完 `entry.held = true`，位置就钉在车位上不再漂。
    */
   UpdateHold(entry, dt, SafeAt) {
-    const slot = entry.holdSlot;
-    if (!slot) return false;
+    if (!entry.holdSlot) return false;
+    // 13 散开走墙缺口：holdRoute 是停车位之前要先经过的折点（MidTransferScatterPlan）。
+    while (entry.holdRoute?.length && Math.hypot(entry.holdRoute[0].x - entry.x, entry.holdRoute[0].z - entry.z) <= .3)
+      entry.holdRoute.shift();
+    const slot = entry.holdRoute?.length ? entry.holdRoute[0] : entry.holdSlot;
     const distance = Math.hypot(slot.x - entry.x, slot.z - entry.z);
-    if (distance > MID.litterHoldArrivalM && SafeAt(entry)) {
+    if ((entry.holdRoute?.length || distance > MID.litterHoldArrivalM) && SafeAt(entry)) {
       const speed = entry.bearers ? this.LitterPace(entry, R.litterSpeedMps) : R.walkSpeedMps;
       const step = Math.min(1, (dt * speed) / (distance || 1));
       entry.x += (slot.x - entry.x) * step;
@@ -264,7 +267,7 @@ export class FirstLevelMissionColumn {
       entry.held = false;
     } else {
       entry.state = "waiting";
-      entry.held = distance <= MID.litterHoldArrivalM;
+      entry.held = !entry.holdRoute?.length && distance <= MID.litterHoldArrivalM;
       if (entry.held && Number.isFinite(slot.yaw)) entry.yaw = slot.yaw;
     }
     return true;
@@ -335,21 +338,22 @@ export class FirstLevelMissionColumn {
     return true;
   }
   /**
-   * 13 车列与人群被迫散开：离桥头路中线 marginM 以外，各自就近往两边让。
+   * 13 车列与人群被迫散开：在路上的人（离桥头路中线 < marginM）各自去同侧最近的路边遮挡点，
+   * 路上先穿过对应的残墙缺口（MID.transferEvac，Data_Tuning_FirstLevelMid.MidTransferScatterPlan）。
    * 走的是和 08 停车位同一套 holdSlot —— 「停到那个点上不再漂」是同一件事。
    */
   ScatterFromRoad(marginM) {
     const road = MID.bridgeHeadPoint.x;
-    let scattered = 0;
-    for (const entry of [...this.litters, ...this.walkers]) {
-      if (entry.health <= 0 || entry.evacuated || entry.loaded) continue;
-      if (Math.abs(entry.x - road) >= marginM) continue;
-      const side = entry.x <= road ? -1 : 1;
-      entry.holdSlot = { x: road + side * marginM, z: entry.z, yaw: entry.yaw || 0 };
+    const movers = [...this.litters, ...this.walkers].filter((entry) => entry.health > 0 && !entry.evacuated
+      && !entry.loaded && Math.abs(entry.x - road) < marginM);
+    const plans = MidTransferScatterPlan(movers, { force: true });
+    movers.forEach((entry, i) => {
+      const route = plans[i].route, hold = route.at(-1);
+      entry.holdRoute = route.slice(0, -1);
+      entry.holdSlot = { x: hold.x, z: hold.z, yaw: entry.yaw || 0 };
       entry.held = false;
-      scattered++;
-    }
-    return scattered;
+    });
+    return movers.length;
   }
   RetreatLimit(point) {
     const index = this.route.findIndex((p) => Math.hypot(p.x - point.x, p.z - point.z) < 0.1);
@@ -413,7 +417,7 @@ export class FirstLevelMissionColumn {
   StartRetreat() {
     if (this.mode === "retreat") return;
     // 收拢段重新排队：08 的停车位与 13 的散开点到这里都作废。
-    for(const entry of [...this.litters,...this.walkers]){entry.staging=null;entry.holdSlot=null;entry.held=false;}
+    for(const entry of [...this.litters,...this.walkers]){entry.staging=null;entry.holdSlot=null;entry.holdRoute=null;entry.held=false;}
     this.mode = "retreat";
     this.loading = false;
     const route = [
@@ -426,11 +430,11 @@ export class FirstLevelMissionColumn {
     this.length = MissionRouteLength(route);
     this.retreatDistance = 0;
     // Assign each survivor a connection from their current position; never teleport the column.
+    // 接法走固定通道：经车路两侧残墙的缺口进下沟口（MID.transferEvac / MidTransferRetreatJoin）。
     for (const entry of [...this.litters, ...this.walkers]) {
       entry.joinRoute = [
         { x: entry.x, z: entry.z },
-        { x: 60, z: entry.z },
-        { x: 54, z: 114 },
+        ...MidTransferRetreatJoin(entry),
         ...route.slice(3),
       ];
       entry.joinProgress = 0;

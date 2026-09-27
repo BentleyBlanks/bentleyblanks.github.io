@@ -156,10 +156,72 @@ export const MID_TUNING = Object.freeze({
   // -------------------------------------------------------------------------
   // 13 日机空袭桥头道路与车列
   // -------------------------------------------------------------------------
-  // 散开：离桥头路中线（x=76）这么远算离开道路。
+  // 散开：离桥头路中线（x=76）这么近的人算「在路上」，要让开。
   scatterFromRoadM: 9,
   scatterMps: 2.1,
   scatterArrivalM: 1.2,
+  // 让开以后停的地方至少离路中线这么远：路两侧残墙在 x 71 / x 80（transferEvac.walls），
+  // 遮挡点都在墙外侧（西 x ≤ 69.5、东 x ≥ 82.5）。
+  scatterCoverOffRoadM: 6.5,
+  // 13 疏散 / 15A 撤退走固定通道（2026-09-27 白盒 C 区第二轮）。
+  // 车路 x76 两侧砌了带缺口的残墙（Data_FirstLevelWhiteboxTransfer 按这张表砌），人不再
+  // 「就地横着让开」「从哪儿都正西走到 x 60」，而是：
+  //   · 疏散：走到同侧最近的路边遮挡点（残墙背后 / 房檐下 / 洼地里），路上先穿对应的墙缺口；
+  //   · 撤退：从所在位置接到三条通道之一（北 z 111 分流口、中 z 120.8 追兵线、南 卸车点），
+  //     经西墙缺口进下沟口 ditchMouth (54,114)，再接 evacuation。
+  // 纯数据 + 下面两个纯函数（MidTransferScatterPlan / MidTransferRetreatJoin）；
+  // 通道、遮挡路径与墙体的净空由 Script_FirstLevelMidTest 用担架走廊 + 两端搬运员胶囊扫。
+  transferEvac: Object.freeze({
+    roadX: 76,
+    walls: Object.freeze({
+      westX: 71, eastX: 80, thickM: 0.5,
+      // [zStart, zEnd]。西墙 z 109.6–122 整段敞开：分流出口 z 111、分拣台、追兵线 z 120.5 都在这儿。
+      // 西墙南段止于 z 130：卸车点 (72.6,135) 到沟口的斜向走廊要从它南头过。
+      west: Object.freeze([[90.6, 94.8], [97.0, 101.4], [103.6, 108.4], [122.0, 125.8], [127.0, 130.0]]),
+      // 东墙只到 z 104.2：以南是车位、上车位 (80,120)、发车与牛车驶离的斜线，不能砌墙；
+      // 104.2–110 也空着 —— 14 救人时刘文才从射位 (84,106) 直奔沟口，斜线在 x 80 处 z≈107、
+      // 在 x 71 处 z≈109.5（所以西墙北段止于 108.4）。脚本走位没有绕行，只会贴墙滑，撞墙角就卡死。
+      // 95.6–99.6 的缺口让开低墙射位 → 侧巷口的视线（SpaceTest sideAlley「village wall」）。
+      east: Object.freeze([[90.0, 95.6], [99.6, 104.2]]),
+    }),
+    // 东墙外侧的人撤退时先从最近的东缺口进车路（缺口中心 z；最后一个是墙南头以南）。
+    eastGapZ: Object.freeze([97.6, 106.6]),
+    // 遮挡点：path 是从车路一侧走过去的折线，最后一点是停的地方；同一遮挡点最多 slotsPerCover 人，
+    // 按 slotSpreadM 沿墙错开（0、+1、-1 格）。
+    slotSpreadM: 1.5,
+    slotsPerCover: 3,
+    covers: Object.freeze([
+      Object.freeze({ id: "WestWallA", side: -1, path: Object.freeze([{ x: 71, z: 95.9 }, { x: 68.8, z: 95.9 }, { x: 68.8, z: 92.6 }]) }),
+      Object.freeze({ id: "WestWallB", side: -1, path: Object.freeze([{ x: 71, z: 95.9 }, { x: 68.8, z: 95.9 }, { x: 68.8, z: 99.2 }]) }),
+      Object.freeze({ id: "WestWallC", side: -1, path: Object.freeze([{ x: 71, z: 102.5 }, { x: 68.8, z: 102.5 }, { x: 68.8, z: 106.2 }]) }),
+      Object.freeze({ id: "WestWallD", side: -1, path: Object.freeze([{ x: 71, z: 121.0 }, { x: 68.9, z: 121.0 }, { x: 68.9, z: 124.2 }]) }),
+      Object.freeze({ id: "WestWallE", side: -1, path: Object.freeze([{ x: 71, z: 131.4 }, { x: 68.9, z: 131.4 }, { x: 68.9, z: 128.2 }]) }),
+      Object.freeze({ id: "WestDip", side: -1, path: Object.freeze([{ x: 71, z: 131.4 }, { x: 66.2, z: 129.8 }]) }),
+      Object.freeze({ id: "EastWallA", side: 1, path: Object.freeze([{ x: 80, z: 97.6 }, { x: 83, z: 97.6 }, { x: 83, z: 92.6 }]) }),
+      Object.freeze({ id: "EastWallB", side: 1, path: Object.freeze([{ x: 80, z: 97.6 }, { x: 83, z: 97.6 }, { x: 83, z: 101.4 }]) }),
+      Object.freeze({ id: "EastWallC", side: 1, path: Object.freeze([{ x: 83, z: 106.4 }]) }),
+      Object.freeze({ id: "EastDipNorth", side: 1, path: Object.freeze([{ x: 86.8, z: 128.2 }]) }),
+      Object.freeze({ id: "EastDipSouth", side: 1, path: Object.freeze([{ x: 90.8, z: 131.4 }]) }),
+      Object.freeze({ id: "ShedEaves", side: 1, path: Object.freeze([{ x: 94.0, z: 131.4 }]) }),
+    ]),
+    // 撤退通道：gate 在西墙缺口的车路一侧；points 是缺口以西的折线（西墙外的人从 points[0] 接）；
+    // 终点一律是下沟口。untilZ：按所在位置的 z 分给哪一条。
+    lanes: Object.freeze([
+      Object.freeze({ id: "North", untilZ: 116, gate: { x: 73.5, z: 111 }, points: Object.freeze([{ x: 60, z: 111 }]) }),
+      // 西墙南段背后（x ≥ 67.5）的人先贴墙往北走到墙头 (68.9,121)，再横过去：斜着走会蹭到分拣台旁的物资堆。
+      Object.freeze({ id: "Middle", untilZ: 124.5, gate: { x: 73.5, z: 120.8 }, points: Object.freeze([{ x: 61, z: 120.8 }, { x: 60, z: 114 }]),
+        westEntry: Object.freeze({ minX: 66.8, via: Object.freeze({ x: 68.9, z: 121 }) }) }),
+      // 棚下（x < 62）的人先顺着棚走到 (58.2,125.2) 再去下沟口：往 (64.6,125) 走会撞棚柱与物资堆，
+      // 直接斜着去沟口会蹭砖房东北角。
+      Object.freeze({ id: "South", untilZ: Infinity, gate: { x: 72.8, z: 133.4 }, points: Object.freeze([{ x: 64.6, z: 125 }]),
+        westDirect: Object.freeze({ maxX: 62, via: Object.freeze({ x: 58.2, z: 125.2 }) }) }),
+    ]),
+    ditchMouth: Object.freeze({ x: 54, z: 114 }),
+    // 北段车路的「路中」：贴西墙的人先横到这里。
+    corridorX: 73.5,
+    // 西墙敞口里的分拣台一带（担架凳 (65,119)/(68,119)、物资堆 (66,124)）。
+    triageGap: Object.freeze({ minX: 68, minZ: 112, maxZ: 122 }),
+  }),
   // 罗班长从后方赶到：跑到停车处这么近才喊「莫挤路上」。
   luoArriveM: 7,
   luoArriveMps: 3.4,
@@ -225,4 +287,74 @@ export function MidWalkingWounded() {
 export function MidDraftKind(kind, index) {
   const list = kind === "bay" ? MID_TUNING.oxBayIndices : MID_TUNING.oxTrafficIndices;
   return list.includes(index) ? "ox" : "horse";
+}
+
+/**
+ * 13 散开：给每个人挑同侧最近的路边遮挡点，返回 { cover, route }（route 最后一点是停的地方）。
+ * 不在路上（离 x76 ≥ scatterFromRoadM）的给 null；force 时一律分配（11 的步行伤员）。
+ * 已经站在墙外侧的人跳过车路一侧的那几个折点，直接走到遮挡点。
+ */
+export function MidTransferScatterPlan(points, { force = false } = {}) {
+  const E = MID_TUNING.transferEvac, W = E.walls, load = new Map();
+  return points.map((point) => {
+    if (!force && Math.abs(point.x - E.roadX) >= MID_TUNING.scatterFromRoadM) return null;
+    const side = point.x <= E.roadX ? -1 : 1;
+    let best = null, bestCost = Infinity;
+    for (const cover of E.covers) {
+      if (cover.side !== side) continue;
+      const hold = cover.path.at(-1);
+      const used = load.get(cover.id) || 0;
+      const cost = Math.abs(hold.z - point.z) + 0.3 * Math.abs(hold.x - point.x) + 4 * used
+        + (used >= E.slotsPerCover ? 1e4 * used : 0);
+      if (cost < bestCost) { bestCost = cost; best = cover; }
+    }
+    const k = load.get(best.id) || 0;
+    load.set(best.id, k + 1);
+    const slot = k % E.slotsPerCover, offset = (slot % 2 ? -1 : 1) * Math.ceil(slot / 2) * E.slotSpreadM;
+    const outside = side < 0 ? point.x < W.westX : point.x > W.eastX;
+    const route = best.path
+      .filter((p, i) => i === best.path.length - 1 || !outside || (side < 0 ? p.x < W.westX : p.x > W.eastX))
+      .map((p) => ({ x: p.x, z: p.z }));
+    route[route.length - 1].z += offset;
+    return { cover: best.id, route };
+  });
+}
+
+/**
+ * 15A 撤退：从 point 接到三条通道之一，返回从 point 之后到下沟口（含）的折线。
+ * 调用方在前面补 point 本身、在后面接 evacuation 的剩余段。
+ */
+export function MidTransferRetreatJoin(point) {
+  const E = MID_TUNING.transferEvac, W = E.walls, T = E.triageGap;
+  const Lane = (z) => E.lanes.find((lane) => z < lane.untilZ);
+  const out = [];
+  // 西墙 z 109.6–122 那段敞口里、分拣台一带（x ≥ 68）的人按车路一侧算：从车路进通道口，
+  // 斜着穿分拣台会撞上担架凳和物资堆。
+  const inTriageGap = point.x >= T.minX && point.z > T.minZ && point.z < T.maxZ;
+  if (point.x < W.westX && !inTriageGap) {
+    // 已经在西墙外：直接接通道缺口以西那一段。棚下（x < westDirectMaxX）的直接去下沟口；
+    // 西墙南段背后的先贴墙走到墙头，再横过去。
+    const lane = Lane(point.z);
+    if (lane.westDirect && point.x < lane.westDirect.maxX) out.push(lane.westDirect.via);
+    else {
+      if (lane.westEntry && point.x >= lane.westEntry.minX) out.push(lane.westEntry.via);
+      out.push(...lane.points);
+    }
+  } else {
+    let z = point.z;
+    if (point.x > W.eastX && point.z < E.eastGapZ.at(-1)) {
+      // 东墙外：先离墙站开，再从最近的东缺口钻进车路。
+      const gap = E.eastGapZ.reduce((a, b) => (Math.abs(b - point.z) < Math.abs(a - point.z) ? b : a));
+      if (point.x < W.eastX + 2.5) out.push({ x: W.eastX + 2.5, z: point.z });
+      out.push({ x: W.eastX + 1.8, z: gap }, { x: W.eastX - 1.8, z: gap });
+      z = gap;
+    } else if (point.x < E.corridorX && point.z < E.eastGapZ.at(-1)) {
+      // 北段车路里贴着西墙的人先横到路中间，再顺路往南，不贴墙蹭过去。
+      out.push({ x: E.corridorX, z: point.z });
+    }
+    const lane = Lane(z);
+    out.push(lane.gate, ...lane.points);
+  }
+  out.push(E.ditchMouth);
+  return out.map((p) => ({ x: p.x, z: p.z }));
 }

@@ -21,7 +21,7 @@ import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelM
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_ENCOUNTERS, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { MID_TUNING as M, MidWalkingWounded } from "./Data_Tuning_FirstLevelMid.mjs";
+import { MID_TUNING as M, MidWalkingWounded, MidTransferScatterPlan } from "./Data_Tuning_FirstLevelMid.mjs";
 import { MissionRouteLength, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
 import { CartDeckLift } from "./Script_CartCorpseBump.mjs";
 
@@ -251,10 +251,13 @@ export class FirstLevelTransferCart {
     const column = this.r.column;
     column.loading = false;
     column.ScatterFromRoad(M.scatterFromRoadM);
-    for (const walker of this.walkers) {
-      walker.scatterTo = { x: walker.x - M.scatterFromRoadM, z: walker.z + 2 };
+    // 现场步行伤员也去路边遮挡点（残墙后 / 洼地 / 房檐下），路上穿墙缺口。
+    const plans = MidTransferScatterPlan(this.walkers, { force: true });
+    this.walkers.forEach((walker, i) => {
+      walker.scatterRoute = plans[i].route;
+      walker.scatterTo = plans[i].route.at(-1);
       walker.sorted = true;
-    }
+    });
   }
 
   UpdateAirGround(dt) {
@@ -262,12 +265,14 @@ export class FirstLevelTransferCart {
     r.Say("AircraftFirst");
     for (const walker of this.walkers) {
       if (!walker.scatterTo) continue;
-      const distance = Distance(walker, walker.scatterTo);
-      if (distance <= M.scatterArrivalM) { walker.moving = false; walker.crouch = true; continue; }
+      while (walker.scatterRoute?.length > 1 && Distance(walker, walker.scatterRoute[0]) <= .3) walker.scatterRoute.shift();
+      const goal = walker.scatterRoute?.length > 1 ? walker.scatterRoute[0] : walker.scatterTo;
+      const distance = Distance(walker, goal);
+      if (goal === walker.scatterTo && distance <= M.scatterArrivalM) { walker.moving = false; walker.crouch = true; continue; }
       const step = Math.min(1, (dt * M.scatterMps) / (distance || 1));
-      walker.x += (walker.scatterTo.x - walker.x) * step;
-      walker.z += (walker.scatterTo.z - walker.z) * step;
-      walker.yaw = Math.atan2(walker.x - walker.scatterTo.x, walker.z - walker.scatterTo.z);
+      walker.x += (goal.x - walker.x) * step;
+      walker.z += (goal.z - walker.z) * step;
+      walker.yaw = Math.atan2(walker.x - goal.x, walker.z - goal.z);
       walker.moving = true;
     }
     // 罗班长从后方赶到：他真的跑到停车处才喊「莫挤路上！能下沟的下沟！」

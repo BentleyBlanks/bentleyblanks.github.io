@@ -10,14 +10,16 @@
 // Data_FirstLevelWhiteboxTerrainTransfer). Both sides of the x76 road dip ~1 m
 // in the south half of the yard (back to grade before the river lip, which is
 // Topology's), so the road reads as an embankment at bridge-deck height.
-// The west terrace scarp stands behind the farm store. Everything solid added here sits on the yard's
-// edges, never inside x 60–95 / z 108–138: stage 13 pushes everybody within
-// 9 m of the road out to x 67 / x 85 (ScatterFromRoad) and StartRetreat then
-// walks every litter and walker due west to x 60 at its own z before turning
-// for the ditch mouth (54,114). A north–south wall anywhere in that band would
-// be walked through, which is why the concept's road-side walls (12_2/13_1)
-// live only as the yard's west house wall, the bridgehead piers and an
-// east–west ruin by the river. Non-solid dressing is allowed in the band.
+// Round 2: the road is lined with broken brick walls at x 71 / x 80 whose
+// segments and gaps come from MID_TUNING.transferEvac — the same table the
+// stage-13 scatter (roadside cover behind the walls) and the 15A retreat lanes
+// (through the west-wall gaps to the ditch mouth) walk. South of z 110 the east
+// side stays open: cart bays, the loading stand (80,120) and every departing
+// cart's straight run to the bridge cross it. The west terrace scarp stands
+// behind the farm store; an east levee ridge by the river carries the concept's
+// left-hand high ground. Non-solid dressing is allowed anywhere.
+import { MID_TUNING } from "./Data_Tuning_FirstLevelMid.mjs";
+
 export function BuildTransferWhitebox(groundAt) {
   const blocks = [];
   function Block(id, x, z, w, h, d, semantic = "plaster", extra = {}) {
@@ -113,6 +115,32 @@ export function BuildTransferWhitebox(groundAt) {
   Pole("TransferPoleNorth", 81.0, 77.2);
 
   // ---------------------------------------------------------------------
+  // 11/12_2: broken brick walls lining the x76 road (1.6–2.5 m, segments of
+  // 4–6 m). Gaps are the scatter/retreat openings in MID_TUNING.transferEvac;
+  // each segment is two courses of different height plus a fallen-brick step.
+  const RoadWalls = MID_TUNING.transferEvac.walls;
+  const courseHeights = [2.3, 1.75, 2.5, 1.9, 2.15, 1.6, 2.4, 2.0];
+  let course = 0;
+  for (const [side, x, list] of [["West", RoadWalls.westX, RoadWalls.west], ["East", RoadWalls.eastX, RoadWalls.east]])
+    list.forEach(([z0, z1], i) => {
+      const split = z0 + (z1 - z0) * (.45 + .1 * (i % 2));
+      for (const [k, a, b] of [[0, z0, split], [1, split, z1]])
+        Block(`TransferRoadWall${side}${i}_${k}`, x, (a + b) / 2, RoadWalls.thickM, courseHeights[course++ % courseHeights.length], b - a, "earthDark");
+      // Fallen-brick step at one end, flush with the wall faces: a proud corner
+      // snags scripted movers sliding along the wall (14 rescuers, 2026-09-27 run).
+      const stepZ = i % 2 ? z0 + .45 : z1 - .45;
+      Block(`TransferRoadWall${side}${i}_Step`, x, stepZ, RoadWalls.thickM, 1.0, .8, "earthDark");
+      // Brick rubble at the outer foot (non-solid), never in the gaps.
+      Detail(`TransferRoadWall${side}${i}_Rubble`, x + (side === "West" ? -.8 : .8), (z0 + z1) / 2, .6, .3, 1.4, "earthDark", { ry: .2 });
+    });
+  // 12_1 outside the wall: a house either side of the village road (z 75–82),
+  // clear of the southTraffic cart line and of the crouched post's line to A.
+  House("TransferNorthWestHouse", 61.5, 78.75, 7, 5.5, 3.1, { alongX: true });
+  Detail("TransferNorthWestHouseDoor", 65.04, 78.9, .12, 1.9, 1.0, "timber");
+  House("TransferNorthEastHouse", 97.5, 78.0, 7, 4.8, 3.0, { alongX: true });
+  Pole("TransferPoleNorthWest", 57.6, 82.6);
+
+  // ---------------------------------------------------------------------
   // 11: west perimeter. The yard's west screen and the farm store stay; the
   // store's back wall now stands against the 2.2 m terrace scarp (terrain).
   Block("TransferYardNorthWestReturn", 55, 86, 0.7, 2.6, 4);
@@ -123,6 +151,7 @@ export function BuildTransferWhitebox(groundAt) {
   Block("TransferStoreSouth", 48.5, 103.5, 11, 3.1, 0.7);
   Roof("TransferStoreRoof", 46, 96, 6.6, 15.8, 3.3);
   Cover("TransferDitchNorthLip", 49, 109, 10, 1.4, 0.8);
+  House("TransferScreenHouse", 49.3, 106.25, 8.6, 4.1, 2.9, { alongX: true });
   // Crates, a basket and a cart wheel along the screen, clear of pocket (59,105).
   Detail("TransferScreenCrate0", 55.7, 91.2, .8, .6, .6);
   Detail("TransferScreenBasket", 55.6, 92.6, .55, .5, .55, "canvas");
@@ -158,16 +187,19 @@ export function BuildTransferWhitebox(groundAt) {
   // Lean-to: posts only on the outer edge (x 64); the old inner posts at x 56
   // stood in the retreat fan. Canvas steps down in three strips (no tilt in
   // the block format) from the house eaves to the posts.
+  // Posts at x 62.2 stay clear of the retreat lanes (Middle z 120.8, South
+  // (64.6,125)->(54,114)) and of the WestWall D/E/Dip cover paths.
   const leanTop = groundAt(50.65, 126.8) + 3.3;
-  [[56.65, 0.3], [59.75, 0.5], [62.8, 0.7]].forEach(([x, drop], i) =>
-    At(`TransferShelterCanvas${i}`, x, 126.75, 3.2, .12, 8.7, leanTop - drop, "canvas"));
-  for (const z of [123, 130.5]) {
-    const g = groundAt(64, z) - .1;
-    At(`TransferShelterPost64_${z}`, 64, z, 0.3, leanTop - .7 - g, 0.3, g, "timber");
+  [[56.35, 0.3], [58.8, 0.5], [61.25, 0.7]].forEach(([x, drop], i) =>
+    At(`TransferShelterCanvas${i}`, x, 128.3, 2.5, .12, 4.6, leanTop - drop, "canvas"));
+  // z 126.6 also keeps the post 1.8 m off the unload->ditch carry (TransferTest).
+  for (const z of [126.6, 130.0]) {
+    const g = groundAt(62.2, z) - .1;
+    At(`TransferShelterPost62_${z}`, 62.2, z, 0.3, leanTop - .7 - g, 0.3, g, "timber");
   }
-  Detail("TransferShelterStretcher0", 57.6, 125.0, .62, .22, 2.1, "canvas");
+  Detail("TransferShelterStretcher0", 57.6, 127.3, .62, .22, 2.1, "canvas");
   Detail("TransferShelterStretcher1", 58.3, 128.9, .62, .22, 2.1, "canvas", { ry: .08 });
-  Detail("TransferShelterCrate0", 56.2, 124.0, .8, .6, .6);
+  Detail("TransferShelterCrate0", 56.2, 126.6, .8, .6, .6);
   Detail("TransferShelterCrate1", 56.1, 130.2, .7, .55, .6, "timber", { ry: .25 });
   // 14: telegraph poles over the ditch and loose stones on its east lip.
   Pole("TransferPoleDitchHouse", 45.3, 120.9);
@@ -187,15 +219,14 @@ export function BuildTransferWhitebox(groundAt) {
   Pole("TransferPoleEast", 97.4, 112.2);
   // Thatched shed (11_1 left): south of the side alley's sight fan, north of
   // the bolting team's run (94,134)->(119,169), west of the alley store.
-  House("TransferThatchShed", 99.1, 130.8, 4.2, 5.2, 2.6, { wall: "earthDark", roof: "canvas" });
-  Detail("TransferThatchShedDoor", 96.96, 130.4, .12, 1.8, 1.0, "timber");
-  Detail("TransferShedBasket", 96.4, 131.2, .55, .5, .55, "canvas");
-  Detail("TransferShedJar", 96.5, 129.6, .55, .7, .55, "earthDark");
-  // Preserve the established open west-facing alley and its northern pursuit
-  // gap. Add a real building mass only south/east of its walls and gun sight.
-  Block("TransferAlleyStoreSouth", 108.5, 133, 14, 3.2, 0.7);
-  Block("TransferAlleyStoreEast", 115.5, 129.5, 0.7, 3.2, 7);
-  Roof("TransferAlleyStoreRoof", 111, 130, 9, 6.5, 3.4);
+  House("TransferThatchShed", 98.2, 132, 3.8, 4.8, 2.6, { wall: "earthDark", roof: "canvas" });
+  Detail("TransferThatchShedDoor", 96.26, 132.4, .12, 1.8, 1.0, "timber");
+  Detail("TransferShedBasket", 95.6, 133.9, .55, .5, .55, "canvas");
+  Detail("TransferShedJar", 95.7, 129.9, .55, .7, .55, "earthDark");
+  // The old alley store (x 101.5–115.5, z 126–133) gave way to the east levee
+  // ridge (terrain, x 100–113, z 130.5–138.8): from the 11_1 entrance the
+  // ridge is the high ground on the left the concept shows, and its crest must
+  // clear the side alley's 2.6 m south wall in that view.
 
   // ---------------------------------------------------------------------
   // 12_2/13: the bridgehead. The road is an embankment at deck height; both

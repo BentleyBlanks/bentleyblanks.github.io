@@ -35,11 +35,17 @@ export const WHITEBOX_TERRAIN_TRANSFER = Object.freeze({
       x: 63.75, z: 128.15, w: 9.5, d: 10.3,
       note: "11/13 路西洼地内圈：x 59–68.5、z 123–133.3 降 1.1；x 68.5→74 是路堤西坡" }),
     Object.freeze({ id: "YardDipEastOuter", kind: "box", op: "cut", dy: 0.5, feather: 4.5,
-      x: 92.75, z: 131.65, w: 14.5, d: 5.3,
+      x: 90.75, z: 131.65, w: 10.5, d: 5.3,
       note: "13 路东洼地外圈（13_1 路左缓坡）：x 85.5–100、z 129–134.3；北缘让开车位 (94,126)" }),
     Object.freeze({ id: "YardDipEastInner", kind: "box", op: "cut", dy: 1.0, feather: 5.5,
-      x: 92.75, z: 131.9, w: 12.5, d: 2.8,
+      x: 90.75, z: 131.9, w: 8.5, d: 2.8,
       note: "13 路东洼地内圈：x 86.5–99、z 130.5–133.3 降 1.0；x 81→86.5 是路堤东坡" }),
+    // 11_1 左手的高坎（概念图坎顶有行军纵队）：河口北侧、侧巷以南的一道堤，顶宽 ~9×4 m。
+    // 从 11_1 北口隔着东墙缺口 z 95.6–99.6 看，坎顶要高过侧巷南墙（2.6 m）才入画，所以 3.6 m；坡面 feather 2 是陡的背景坎，
+    // 不走人。南缘羽化正好止于河口 z 138.8；西缘 x 100 让开草房与牲口挣脱线 (94,134)→(119,169)。
+    Object.freeze({ id: "EastLeveeRidge", kind: "box", op: "raise", dy: 3.6, feather: 2,
+      x: 106.5, z: 134.65, w: 9, d: 4.3,
+      note: "11 东侧河堤高坎：x 102–111、z 132.5–136.8 抬 3.6，羽化到 x 100–113 / z 130.5–138.8" }),
     // 14：西沟口两侧抛土（沟口 (54,114) 9 m 回归缓坡之外），北段东沿接着抛到河口。
     Object.freeze({ id: "DitchMouthBermNorth", kind: "line", op: "raise", dy: 0.45, feather: 1.2, halfW: 0.7,
       points: Object.freeze([Object.freeze({ x: 35, z: 110.6 }), Object.freeze({ x: 44.5, z: 110.4 })]),
