@@ -2,7 +2,7 @@
 import { FRONT_SORTIE as S, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_FRONT_COLLECTION_ROUTE, MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_ENCOUNTERS, FRONT_BATTLE_OBJECTIVES as Objectives } from "./Data_FirstLevelMission.mjs";
 import { MissionRouteProjection, MissionRoutePoint, MissionRouteLength, MissionRouteLookahead } from "./Script_FirstLevelMissionColumn.mjs";
@@ -906,13 +906,27 @@ export class FirstLevelFrontBattle {
         tank={x:r.tank.x+ux*B.guideTankLeadM+uz*B.guideTankSideM,z:r.tank.z+uz*B.guideTankLeadM-ux*B.guideTankSideM};}
       else tank={x:r.tank.x,z:r.tank.z};
     }
+    // From the capture until the tank shells the nest the player's post is the captured gun: nothing happens at the gap
+    // (33 m west) or at the tank, they are where to fire. The marker used to stand on the gap as a place to go ("前往"):
+    // the player ran 33 m to it, nothing came of it, and at the shelling the rear route sent him 39 m back past the gun
+    // (09-27 user report). Off the gun with it empty the marker is the ammo box; out of the nest it is the gun (the gun
+    // stays optional: a rifle inside the nest covers too). Otherwise the gap or the tank, in "cover" mode
+    // (FirstLevelLeaderGuide shows 掩护, not 前往).
+    const Cover=objective=>{
+      const gun=r.emplacement?.Emplacement?.(r.gunId);
+      if(gun&&r.emplacement.MountedId!==gun.id){
+        if(gun.rounds===0&&gun.belts===0){const box=MISSION_SUPPLIES.find(s=>s.id==="Front");return {target:{x:box.x,z:box.z},label:"gunSupply",mode:"move",objective};}
+        if(Distance(r.player.position,A.gun)>B.captureRadiusM)return {target:{x:A.gun.x,z:A.gun.z},label:"gun",mode:"use",objective};
+      }
+      return tank&&(stage!=="Support"||r.Has("tankPreviewed"))?{target:tank,label:"tank",mode:"cover",objective}:{target:S.gap,label:"front",mode:"cover",objective};
+    };
     if(stage==="Support"){
       if(!r.Has("rightNestCaptured"))return {target:MissionRouteLookahead(Routes.support,r.player.position),label:"support",objective:Objectives.capture};
-      return tank&&r.Has("tankPreviewed")?{target:tank,label:"tank",objective:Objectives.coverFirst}:{target:S.gap,label:"front",objective:Objectives.coverFirst};
+      return Cover(Objectives.coverFirst);
     }
     if(stage==="MachineGun"){
       if(r.Has("tankPositionPressured"))return {target:MissionRouteLookahead(S.rearRoute,r.player.position),label:"bundle",objective:Objectives.rear};
-      return tank?{target:tank,label:"tank",objective:Objectives.coverRest}:{target:S.gap,label:"front",objective:Objectives.coverRest};
+      return Cover(Objectives.coverRest);
     }
     const labels={supply:"bundle",return:"bundle",attack:"throw",retreat:"front",gapWatch:"front",disengage:"orders",home:"orders"};
     return {target:!r.Has("bundleTaken")&&r.Near(S.house,S.supplierRangeM)?A.bundle:MissionRouteLookahead(this.leaderRoute||Routes.bundle,r.player.position),label:labels[this.leg]||"bundle",objective:Objectives[{gapWatch:"retreat",home:"disengage"}[this.leg]||this.leg]||Objectives.supply};

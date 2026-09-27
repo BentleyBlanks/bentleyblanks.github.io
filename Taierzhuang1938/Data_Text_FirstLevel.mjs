@@ -45,6 +45,7 @@ export const TEXT = Object.freeze({
   "firstLevel.guide.support": "沿交通壕进入阵地",
   "firstLevel.guide.orders": "伤员集结处",
   "firstLevel.guide.gun": "接管机枪",
+  "firstLevel.guide.gunSupply": "阵位弹药箱",
   "firstLevel.guide.bundle": "集束手榴弹",
   "firstLevel.guide.throw": "侧沟投掷位置",
   "firstLevel.guide.south": "南行道路",

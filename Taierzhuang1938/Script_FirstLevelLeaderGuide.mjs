@@ -151,7 +151,7 @@ export class FirstLevelLeaderGuide {
       else {const z=r.column.zhou;target={x:z.x+Math.sin(z.yaw)*1.6,z:z.z+Math.cos(z.yaw)*1.6};}
     }
     const battle=r.frontBattle?.Guide();
-    if(battle){target=battle.target;mode=label="move";cue=null;variant=r.flow.stage.id+"_"+r.frontBattle.leg;}
+    if(battle){target=battle.target;mode=label=battle.mode||"move";cue=null;variant=r.flow.stage.id+"_"+r.frontBattle.leg;}
     if(mode==="follow"||mode==="rally") {
       target=actor.position;
       label=actor.missionGuideWaiting||actor.missionCoverWaiting?"rally":"follow";

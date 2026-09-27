@@ -49,7 +49,7 @@ import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
-import { MISSION_ROUTES as Routes, MISSION_PLACEMENT as P, MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ROUTES as Routes, MISSION_PLACEMENT as P, MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { MISSION_BATTLE_SOUND as Sound } from "./Data_FirstLevelMissionBattleSound.mjs";
@@ -325,12 +325,25 @@ const Ok = (label) => console.log(`ok ${label}`);
 // ---------------------------------------------------------------------------
 {
   const facts = new Set(["rightNestCaptured"]);
+  const gun = { id: "MissionGun", rounds: 30, belts: 4 };
+  const emplacement = { mounted: null, get MountedId() { return this.mounted; }, Emplacement: (id) => (id === gun.id ? gun : null) };
   const r = { flow: { stage: { id: "Support" } }, tank: { present: true, x: 49.5, z: -202.4 }, player: { position: { ...S.seat } },
-    Has: (id) => facts.has(id), Near: () => false, companion: { Handle: () => null } };
+    gunId: gun.id, emplacement, Has: (id) => facts.has(id), Near: () => false, companion: { Handle: () => null } };
   const battle = new FirstLevelFrontBattle(r);
-  assert.equal(battle.Guide().label, "front", "03 before the preview: the gap");
-  facts.add("tankPreviewed");
+  // 09-27 user report: after the capture the marker stood on the gap 33 m west as a place to go, nothing happened
+  // there, and the shelling sent the player back past the gun. Off the gun the marker is the gun itself.
   let g = battle.Guide();
+  assert.ok(g.label === "front" && g.mode === "cover", "03 in the nest, off the gun (the gun is optional): the gap is where to fire, not where to go");
+  r.player.position = { ...S.gap };
+  g = battle.Guide();
+  assert.ok(g.label === "gun" && g.mode === "use" && Dist(g.target, A.gun) < 0.01, "03 out at the gap: back to the captured gun");
+  gun.rounds = 0; gun.belts = 0; g = battle.Guide();
+  assert.ok(g.label === "gunSupply" && Dist(g.target, MISSION_SUPPLIES.find((s) => s.id === "Front")) < 0.01, "an empty gun: the ammo box");
+  gun.rounds = 30; gun.belts = 4; emplacement.mounted = gun.id; r.player.position = { ...S.seat };
+  g = battle.Guide();
+  assert.ok(g.label === "front" && g.mode === "cover", "03 on the gun, before the preview: the gap");
+  facts.add("tankPreviewed");
+  g = battle.Guide();
   const beside = Math.hypot(B.guideTankLeadM, B.guideTankSideM);
   // Bearing from the player: the marker sits off the tank's line by guideTankSideM (not on the turret).
   const OffLine = (t, m) => { const p = r.player.position, ax = t.x - p.x, az = t.z - p.z, bx = m.x - p.x, bz = m.z - p.z;
@@ -345,8 +358,8 @@ const Ok = (label) => console.log(`ok ${label}`);
   assert.equal(battle.Guide().label, "bundle", "04 after the pressure: back to the rear wall");
   const text = Read("Data_Text_FirstLevel.mjs");
   assert.ok(text.includes('"firstLevel.guide.tank"'), "guide label text for the tank");
-  checks += 5;
-  Ok("⑤ guide points at the tank during the preview and before the pressure");
+  checks += 9;
+  Ok("⑤ guide: never out to the gap - the gun when out of the nest, else where to fire; the tank during the preview and before the pressure");
 }
 
 // ---------------------------------------------------------------------------
