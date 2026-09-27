@@ -12,6 +12,14 @@ skips their box geometry and static colliders. `BreakableTrees` alone draws and 
 their destructible colliders. The green crowns/tips and old-yard box branches have
 been removed. River reeds are separate scenery and remain unchanged.
 
+The replacement removes 310 primitive crowns, branches, leaders and twigs. A layout
+comparison against `ed4d9e60` verifies every non-tree block and trench placement is
+unchanged. The south-layout fingerprint is regenerated from runtime commit
+`76da735a`; its terrain, aftermath bodies and trench-prop hashes remain unchanged.
+`Script_BreakableTreesTest` checks the actual enlarged trunk footprints against all
+mission routes with 0.625 m litter clearance. The browser regression checks every
+authored replacement for duplicate legacy colliders and captures nine tree locations.
+
 `Script_BreakableTrees` belongs to `FirstLevelWhiteboxField`. Standing trees use
 spatial instance batches. `Combat.Blast` applies distance-squared falloff and world
 occlusion after structural destruction. On fracture, the sector's static batches
@@ -98,3 +106,16 @@ clustered distant copies, one instance per tree and caps only on broken stumps.
 `TREE_PREVIEW_ORIGIN` optionally selects an existing
 LocalPreview server; otherwise the test starts its own temporary server. Screenshots and reports
 stay under ignored `_shots/BreakableTrees`; they are not published assets.
+
+2026-09-27 replacement verification: the tree browser regression passes with
+46 replacements, zero legacy colliders/crowns and zero page errors. All 130 trees
+settle after fracture, leaving 130 stump colliders and zero tree bodies; 10,000 idle
+updates sample no terrain. Nine regional captures were visually inspected.
+Tree clearance, first-level space/front topology, village geometry, mission,
+surface and terrain tests pass. This is scoped validation, not a claim that the
+entire repository suite is green: the seven-slice `BootTest` timed out at 240 s
+after reporting `CH1_NanLu` missing distant IJA identification materials (`count=0`).
+The identical CH1 check also fails on unchanged checkout `3a46204d`.
+The smoke-origin fixture also has a pre-existing 63-versus-64 count failure,
+reproduced from exported `ed4d9e60`; a separate vehicle/tree clearance comparison
+finds no overlaps within 3.2 m before or after the replacement.

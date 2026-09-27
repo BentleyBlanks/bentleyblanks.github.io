@@ -28,11 +28,22 @@ try {
   assert.deepEqual(replacements.ghostColliders,[]);assert.equal(replacements.legacyCrowns,0);
   for(const id of ["FieldPoplarEast3Trunk","FieldPoplarWest3Trunk","FieldPoplarSouthRoad1Trunk",
     "FieldPoplarRailApproach3Trunk","OldYardDeadTreeTrunk","CollectionEastTreeATrunk","SouthExitTreeTrunk","TankRoadDeadTreeTrunk","VillageMouthTree0Trunk"]){
-    await page.evaluate(id=>{
+    const visible=await page.evaluate(async id=>{
       const g=window.Tengxian,t=g.battlefield.breakableTrees.trees.find(t=>t.id===id);
-      g.player.Spawn(t.x-10,t.z+13,Math.atan2(-10,13));g.player.pitch=.08;
-      g.StepFrames(8,0,true);
+      const {Vector3}=await import("three");
+      for(let i=0;i<16;i++){
+        const angle=-.65+i*Math.PI/8,dx=Math.sin(angle)*16,dz=Math.cos(angle)*16;
+        const eye=new Vector3(t.x+dx,g.battlefield.GroundHeight(t.x+dx,t.z+dz)+1.65,t.z+dz);
+        const delta=new Vector3(t.x,t.y+3,t.z).sub(eye),distance=delta.length();
+        const hit=g.battlefield.Raycast(eye,delta.normalize(),distance,{terrain:true});
+        if(hit&&hit.box!==t.trunk)continue;
+        g.player.Spawn(eye.x,eye.z,Math.atan2(dx,dz));g.player.pitch=.08;
+        g.StepFrames(8,0,true);
+        return true;
+      }
+      return false;
     },id);
+    assert.ok(visible,`${id} capture must have an unobstructed view`);
     await page.screenshot({path:path.join(out,`Image_Replaced_${id}.png`)});
   }
   const initial=await page.evaluate(async()=>{
