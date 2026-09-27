@@ -1634,7 +1634,14 @@ export class Actor {
     if (!rightSocket) return;
 
     let hasTarget = false;
-    if (this.weaponTwoHanded && this.weaponGripFront.lengthSq() > 1e-8) {
+    if (this.characterRig.currentId === "ProneCrawl") {
+      rightSocket.getWorldPosition(SOCKET_TARGET_WORLD);
+      this.root.getWorldQuaternion(SOCKET_AIM_Q);
+      SOCKET_TARGET_LOCAL.set(0, .08, -1).applyQuaternion(SOCKET_AIM_Q);
+      SOCKET_TARGET_WORLD.add(SOCKET_TARGET_LOCAL);
+      SOCKET_SOURCE_AXIS.copy(this.weaponMuzzle);
+      hasTarget = true;
+    } else if (this.weaponTwoHanded && this.weaponGripFront.lengthSq() > 1e-8) {
       const leftSocket = this.characterRig.Grip("weaponL");
       if (leftSocket) {
         // 03–06 说话手势抬起左手时，枪按手势前的左握点摆（Script_SpeakerGestureLayer.HeldLeftGrip）。
@@ -1673,7 +1680,10 @@ export class Actor {
 
     const bodyLow = this.characterRig.bones.pelvis;
     const bodyHigh = this.characterRig.bones.neck || this.characterRig.bones.chest;
-    if (bodyLow && bodyHigh) {
+    if (this.characterRig.currentId === "ProneCrawl") {
+      SOCKET_MOUNT_INVERSE.copy(this.riggedWeaponMount.matrixWorld).invert();
+      SOCKET_TARGET_UP.set(0,1,0).transformDirection(SOCKET_MOUNT_INVERSE);
+    } else if (bodyLow && bodyHigh) {
       bodyLow.getWorldPosition(SOCKET_BODY_LOW_WORLD);
       bodyHigh.getWorldPosition(SOCKET_BODY_HIGH_WORLD);
       SOCKET_TARGET_UP.copy(SOCKET_BODY_HIGH_WORLD).sub(SOCKET_BODY_LOW_WORLD);
@@ -2176,6 +2186,7 @@ export class Actor {
     // --- 开火 / 拉栓的边沿检测 --------------------------------------------
     const firing = !!s.firing;
     if (this.characterRig) {
+      this.characterRig.proneContact?.Restore();
       // Undo our post-animation correction before the mixer (including unkeyed bones).
       if (this.rigAimApplied) {
         for (const arm of this.rigAimArms) {
@@ -2637,6 +2648,8 @@ export class Actor {
       this.body.position.set(0, d.hipY, 0);
       this.body.rotation.set(0, 0, 0);
       this._ApplyRiggedAim(s);
+      this.characterRig.proneContact?.Apply(s);
+      if (this.characterRig.proneContact?.active) this._UpdateRiggedWeaponMount();
     }
   }
 
@@ -2644,7 +2657,7 @@ export class Actor {
   _ApplyRiggedAim(state) {
     const rig = this.characterRig;
     const weight = Clamp01(state.aim || 0);
-    if (!rig || !this.weaponGroup || weight < 0.001
+    if (!rig || rig.currentId === "ProneCrawl" || !this.weaponGroup || weight < 0.001
         || rig.forcedClip || state.dead || this.ragdollState || state.meleeCombat
         || state.throwing > 0 || rig.infantry.IsThrowing() || state.melee > 0
         || state.carryRole || state.woundedWalk > 0.5

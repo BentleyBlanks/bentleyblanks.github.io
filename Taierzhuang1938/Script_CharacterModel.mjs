@@ -10,6 +10,7 @@ import { DEATH_POSE } from "./Data_DeathPose.mjs";
 import { DEATH_CONTACT } from "./Data_Tuning_ActorDeath.mjs";
 import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION_LABELS, INFANTRY_ONCE_IDS } from "./Script_InfantryAnimation.mjs";
 import { MeleeAnimationPlayer } from "./Script_MeleeAnimation.mjs";
+import { LoadProneCrawl, ProneGroundContact, PRONE_CRAWL } from './Script_ProneCrawl.mjs';
 import { ActorLocomotion } from "./Script_ActorLocomotion.mjs";
 import { ACTOR_LOCOMOTION } from "./Data_Tuning_ActorLocomotion.mjs";
 import { CharacterFacialAnimation } from "./Script_CharacterFacialAnimation.mjs";
@@ -512,7 +513,10 @@ async function LoadAsset(record) {
       try { facial = AdoptBaseFacialResources(await LOADER.loadAsync(`${record.facialUrl}?v=${record.facialVersion}`), gltf); }
       catch (error) { console.warn("[CharacterModel] facial model unavailable", record.id, String(error)); }
     }
-    return { record, gltf, infantry, death, facial, error: null };
+    let proneCrawl = null;
+    try { proneCrawl = await LoadProneCrawl(); }
+    catch (error) { console.warn('[ProneCrawl] optional library unavailable', String(error)); }
+    return { record, gltf, infantry, death, facial, proneCrawl, error: null };
   } catch (error) {
     console.warn(`[CharacterModel] ${record.id} 读取失败：${String(error).slice(0, 180)}`);
     return { record, gltf: null, error: String(error) };
@@ -816,6 +820,7 @@ export class LugouCharacterRig {
     if (!this.root.userData.sharedHumanoid && this.clipById.has("StandFireCrouch") && this.clipById.has("AdvanceFire")) {
       this.clipById.set("StandFireCrouch", FullSizeProneClip(asset, this.clipById.get("AdvanceFire")));
     }
+    if (asset.proneCrawl && this.root.userData.sharedHumanoid) this.clipById.set("ProneCrawl", asset.proneCrawl);
     this.mixer = new THREE.AnimationMixer(this.root);
     this.infantryPropTracks = new Map((asset.infantry?.animations || []).map(clip => [clip.name,
       clip.tracks.filter(track => /^Infantry(Rifle|Grenade)\./.test(track.name)).map(track => ({
@@ -830,6 +835,8 @@ export class LugouCharacterRig {
       if (bone) this.bones[role] = bone;
     }
     this.locomotion = new ActorLocomotion(this, (HashString(`${seed}|gait`) % 1000) / 1000);
+    this.proneContact = new ProneGroundContact(this);
+    this.locomotion.profiles = { ...this.locomotion.profiles, ProneCrawl: { duration: PRONE_CRAWL.duration, referenceMps: PRONE_CRAWL.referenceMps } };
     // Rigid carried equipment is parented to its authored bone in the GLB.
     this.sockets = {
       weaponR: FindNode(this.root, "Socket_WeaponR") || this.bones.handR || null,
@@ -1205,6 +1212,7 @@ export class LugouCharacterRig {
       const selected = this.infantry.Select(low, moving || (low && (state.moveSpeed || 0) > .10));
       if (selected) return selected;
     } else this.infantry.Cancel();
+    if (prone && moving && this.clipById.has("ProneCrawl")) return "ProneCrawl";
     if (state.firing) {
       if (this.actor?.weaponData?.kind === "pistol") return POSE_CLIPS.pistolFire;
       // 机枪手无论卧倒还是蹲着都走机枪那一段（它自带的就是低姿），

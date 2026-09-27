@@ -1639,7 +1639,7 @@ export class AiDirector {
       }
       const distanceSq = s.position.distanceToSquared(camera.position);
       s.actor.renderDistanceSq = distanceSq;
-      s.actor.allowFootIk = distanceSq <= ACTOR_DETAIL.footIkM ** 2;
+      s.actor.allowFootIk = distanceSq <= ACTOR_DETAIL.footIkM ** 2 || s.stance === 2 || s.proneBlend > .45;
       s.actor.SetShadowEnabled(distanceSq <= ACTOR_DETAIL.shadowM ** 2);
       const settledCorpse = !s.alive && s.deadTime >= 0.9;
       // 远景层里的尸体有距离上限（ACTOR_DETAIL.corpseCrowdMaxM 那段账）；活人没有。
@@ -1673,6 +1673,7 @@ export class AiDirector {
         const bucket = crowd.Push(s.actor.kind, s.position, s.yaw ?? 0, s.actor.sizeScale ?? 1, prone, !s.alive,
           { stance: s.stance | 0, moveSpeed: s.moveSpeed ?? 0, crouch: s.crouchBlend ?? 0,
             phase: s.actor.characterRig?.locomotion.crowdPhase,
+            pronePhase: s.actor.characterRig?.locomotion.crowdPronePhase,
             moveSpeedMps: s.actor.characterRig?.locomotion.crowdSpeedMps,
             elapsed: this.time, jitter: s.id * 0.37 });
         // 命中体跟着画出来的姿势桶走（骨架此刻是冻住的，见 Actor.SetCrowdHitboxes）。

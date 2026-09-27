@@ -36,6 +36,7 @@
 // 逐桶的账与实测见 docs/Data_ActorCrowdLod.md。
 
 import * as THREE from "three";
+import { PRONE_CRAWL } from './Script_ProneCrawl.mjs';
 import { ACTOR_LOCOMOTION } from './Data_Tuning_ActorLocomotion.mjs';
 import { MergeGeometries } from "./Script_Geo.mjs";
 import { CHARACTER_CROWD_VARIANT_BY_KIND } from "./Data_CharacterSelection.mjs";
@@ -227,6 +228,7 @@ export class ActorCrowd {
     for (let i = 0; i < this.runFrames; i += 1) {
       list.push({ id: `run${i}`, state: RUN_STATE, ...POSE_BAKE.run, run: i });
     }
+    for (let i=0;i<PRONE_CRAWL.crowdFrames;i++) list.push({id:`crawl${i}`,crawl:i,state:{prone:1,moveSpeedMps:PRONE_CRAWL.referenceMps,moveSpeed:.08},seconds:.4,dt:1/30});
     list.push({ id: "dead", state: DEAD_BAKE_STATE, ...POSE_BAKE.dead, dead: true });
     return list;
   }
@@ -262,7 +264,12 @@ export class ActorCrowd {
     const materials = new Map();
     let cycleS = 0;
     for (const pose of this.poses) {
-      if (pose.run === undefined) {
+      if (pose.crawl !== undefined && actor.characterRig?.clipById.has('ProneCrawl')) {
+        actor.characterRig.ForceClip(null);
+        this._Settle(actor,pose);
+        actor.characterRig.currentAction.time=pose.crawl/PRONE_CRAWL.crowdFrames*PRONE_CRAWL.duration;
+        actor.Update(0,pose.state);
+      } else if (pose.run === undefined) {
         actor.characterRig?.ForceClip(null);
         this._Settle(actor, pose);
       } else if (pose.run === 0) {
@@ -447,7 +454,11 @@ export class ActorCrowd {
       const moveSpeed = pose.moveSpeed ?? 0;
       if (stance === 2 || lie >= 0.5) {
         // 真卧姿：`Actor.PoseProne` 解出来的那一档，身子本来就贴着地，不再翻不再抬。
-        poseId = "prone";
+        const moving=Number.isFinite(pose.moveSpeedMps)?pose.moveSpeedMps>ACTOR_LOCOMOTION.movingMps:moveSpeed>.01;
+        const phase=Number.isFinite(pose.pronePhase)?pose.pronePhase:(pose.elapsed||0)/PRONE_CRAWL.duration+(pose.jitter||0);
+        // Do not add 1 before taking the fraction: 2/6 would round below its bucket edge.
+        const frame=Math.floor((phase-Math.floor(phase))*PRONE_CRAWL.crowdFrames+1e-8)%PRONE_CRAWL.crowdFrames;
+        poseId = moving ? `crawl${frame}` : "prone";
       } else if (this.runFrames > 0 && (Number.isFinite(pose.moveSpeedMps)
         ? pose.moveSpeedMps > ACTOR_LOCOMOTION.movingMps : moveSpeed > this.runSignal)) {
         poseId = `run${this._RunFrame(pose, position)}`;
@@ -462,6 +473,14 @@ export class ActorCrowd {
     const entry = this._Bucket(kind, poseId);
     const index = entry.count;
     this._euler.set(-tilt * 1.4, yaw, 0);
+    if(pose&&!dead&&(poseId==='prone'||poseId.startsWith('crawl'))&&this.factory.groundProbe){
+      const probe=this.factory.groundProbe,sy=Math.sin(yaw),cy=Math.cos(yaw);
+      const height=(x,z)=>probe(position.x+x*scale,position.z+z*scale,position.y)?.y??position.y;
+      const front=height(-sy*.7,-cy*.7),back=height(sy*.7,cy*.7);
+      const left=height(-cy*.3,sy*.3),right=height(cy*.3,-sy*.3);
+      this._euler.x=THREE.MathUtils.clamp(Math.atan2(front-back,1.4*scale),-PRONE_CRAWL.maximumSlopeRad,PRONE_CRAWL.maximumSlopeRad);
+      this._euler.z=THREE.MathUtils.clamp(Math.atan2(right-left,.6*scale),-PRONE_CRAWL.maximumSlopeRad,PRONE_CRAWL.maximumSlopeRad);
+    }
     this._quat.setFromEuler(this._euler);
     this._pos.set(position.x, position.y + tilt * 0.28 * scale, position.z);
     this._scale.setScalar(scale);

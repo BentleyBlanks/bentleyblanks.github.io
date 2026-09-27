@@ -50,6 +50,8 @@
 - 第一关的编排（哪一步放哪些人、什么条件过关、组怎么激活）**是表不是脚本**：`Data_FirstLevelMissionGates.mjs` 的四张表 + `Data_FirstLevelMission*`，运行时只读表；用户的现场意见走「关卡编排」工作台存进 `Taierzhuang1938/Notes/<Level>/notes.json`（进仓库，agent 用 `Script_MissionNotesCli.mjs` 读与结案），改完跑 `Script_MissionGatesTest.mjs`。口径见 [关卡编排工作台](docs/Data_MissionOrchestration.md)。
 - `?whitebox=p012-archive` 是旧 P0–P2 的开发回归夹具，旧资产与组件契约继续保留。旧任务表、旧 Notion 摘录和旧通关结果不能替代新版需求与验收；任务涉及哪条入口，就核对对应运行时及测试。新需求在当前任务授权范围内同步数据、消费方和文档，不按旧提案自行恢复已废弃内容。
 
+- **通用匍匐移动与贴地（2026-09-27）**：共用 Blender 循环、位移时钟、四肢独立接地及远景六帧循环，见 [匍匐动作](docs/Data_ProneCrawl.md)；验收 `Script_ProneCrawlTest`。
+
 ## 跨系统契约
 
 - **近爆反馈为跨关卡共用机制**：手榴弹、炮弹等实弹通过 `Combat.Blast` 接入；无伤害剧情爆破用 `Combat.BlastFeedback`。距离与遮挡控制相机冲击、余震和耳鸣，不在关卡内复制一套震屏/耳鸣。接口、数值入口与验收见 [通用近爆反馈](docs/Data_BlastFeedback.md)。

@@ -167,6 +167,30 @@ try {
       <= 0.25 * (buckets.runFrames / buckets.runCycleS),
     `表里 ${ACTOR_DETAIL.crowdRunFps} Hz / 资产 ${(buckets.runFrames / buckets.runCycleS).toFixed(2)} Hz`);
 
+  const crawl = await page.evaluate(() => {
+    const crowd=Taierzhuang.ai.crowd,actor=Taierzhuang.ai.soldiers.find(s=>s.actor).actor;
+    const poses=crowd.poses.filter(p=>p.crawl!==undefined),hit=[];
+    let maxDelta=0,sameNeighbours=0,previous=null;
+    for(const pose of poses){
+      crowd.Begin();
+      const entry=crowd.Push(actor.kind,actor.root.position,0,1,1,false,
+        {stance:2,moveSpeedMps:.32,pronePhase:pose.crawl/poses.length});
+      crowd.End();hit.push(entry.pose);
+      if(previous){
+        let delta=0;
+        for(let m=0;m<entry.meshes.length;m++){
+          const a=previous.meshes[m].geometry.attributes.position.array,b=entry.meshes[m].geometry.attributes.position.array;
+          for(let k=0;k<a.length;k++)delta=Math.max(delta,Math.abs(a[k]-b[k]));
+        }
+        maxDelta=Math.max(maxDelta,delta);if(delta<.02)sameNeighbours++;
+      }
+      previous=entry;
+    }
+    crowd.Begin();crowd.End();return {distinct:[...new Set(hit)],maxDelta,sameNeighbours};
+  });
+  Check("六帧匍匐逐帧切换且真实几何有收腿前伸",
+    crawl.distinct.length===6&&crawl.sameNeighbours===0&&crawl.maxDelta>.05,JSON.stringify(crawl));
+
   // ── ③ 像素 ──────────────────────────────────────────────────────────────
   // 【为什么非要数像素】桶接对了、实例进去了、`visible` 是 true —— 这三条全绿
   // 也可能画出来一模一样（几何烘错、材质错、被别的桶盖住）。60 m 外把跪姿实例
@@ -256,7 +280,7 @@ try {
       + `站高 ${pixels.stand.height} px、${pixels.stand.count} px²`);
 
   // ── ④ 预算 ──────────────────────────────────────────────────────────────
-  // 最坏情况：同一批人全挤在两档（旧口径） vs 摊到全部八档（新口径）。
+  // 最坏情况：同一批人全挤在两档（旧口径） vs 摊到全部姿势（含匍匐六帧）。
   // 人数一样，三角形必须一个都不多（一个人只画在一个桶里）；
   // draw call 只许多出「新增桶数 × 材质桶数」。
   const budget = await page.evaluate(() => {
@@ -289,15 +313,15 @@ try {
     crowd.End();
     const legacy = Draw();
     const legacyReport = crowd.PoseReport();
-    // 新口径：同样多的人，摊到全部八档
+    // 同样多的人，填满真实姿势表；新增匍匐帧也必须计入最坏预算。
     crowd.Begin();
+    const crawlFrames=crowd.poses.filter(p=>p.crawl!==undefined).length;
     for (let i = 0; i < COUNT; i += 1) {
-      const slot = i % 8;
-      if (slot === 7) crowd.Push(actor.kind, at, 0, 1, 0, true);
-      else if (slot === 6) crowd.Push(actor.kind, at, 0, 1, 1, false, { stance: 2, moveSpeed: 0 });
-      else if (slot === 5) crowd.Push(actor.kind, at, 0, 1, 0, false, { stance: 1, moveSpeed: 0 });
-      else if (slot === 4) crowd.Push(actor.kind, at, 0, 1, 0, false, { stance: 0, moveSpeed: 0 });
-      else crowd.Push(actor.kind, at, 0, 1, 0, false, { stance: 0, moveSpeed: 1, phase: slot / 4 });
+      const pose=crowd.poses[i%crowd.poses.length];
+      if(pose.dead)crowd.Push(actor.kind,at,0,1,0,true);
+      else if(pose.crawl!==undefined)crowd.Push(actor.kind,at,0,1,1,false,{stance:2,moveSpeedMps:.32,pronePhase:pose.crawl/crawlFrames});
+      else if(pose.run!==undefined)crowd.Push(actor.kind,at,0,1,0,false,{stance:0,moveSpeed:1,phase:pose.run/crowd.runFrames});
+      else crowd.Push(actor.kind,at,0,1,pose.id==='prone'?1:0,false,{stance:pose.id==='prone'?2:pose.id==='kneel'?1:0,moveSpeed:0});
     }
     crowd.End();
     const spread = Draw();
@@ -308,6 +332,7 @@ try {
       legacyCrowdCalls: legacyReport.drawCalls, spreadCrowdCalls: spreadReport.drawCalls,
       instances: spreadReport.instances, meshesPerBucket: legacyReport.poses[`${actor.kind}:standing`].meshes,
       bucketsPerKind: crowd.poses.length,
+      activeBuckets:Object.values(spreadReport.poses).filter(p=>p.count>0).length,
     };
   });
   const newPoses = budget.bucketsPerKind - 2;
@@ -315,8 +340,8 @@ try {
   // 一只网格在这一帧图里提交几遍：拿「两档桶 14 只网格」这一段现场标定。
   const passes = (budget.legacy.calls - budget.empty.calls) / Math.max(1, budget.legacyCrowdCalls);
   const callDelta = budget.spread.calls - budget.legacy.calls;
-  Check("同样多的人摊到八档，远景层只多出「新增桶数 × 材质桶数」只网格",
-    crowdDelta === newPoses * budget.meshesPerBucket,
+  Check("同样多的人摊到全部姿势，远景层只多出「新增桶数 × 材质桶数」只网格",
+    budget.activeBuckets===budget.bucketsPerKind&&crowdDelta === newPoses * budget.meshesPerBucket,
     `${budget.legacyCrowdCalls} → ${budget.spreadCrowdCalls} 只（+${crowdDelta}，`
       + `= ${newPoses}×${budget.meshesPerBucket}）`);
   // pass 数是现场标定的小数（实测 2.14 —— 帧图里不是每条 pass 都画所有东西），

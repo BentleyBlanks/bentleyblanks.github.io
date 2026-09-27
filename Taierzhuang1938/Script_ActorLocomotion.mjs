@@ -14,7 +14,7 @@ export class ActorLocomotion {
     this.phase=phase;this.previous=new THREE.Vector3();this.position=new THREE.Vector3();
     this.scale=new THREE.Vector3();this.sampled=false;this.elapsed=null;this.step=0;
     this.speedMps=0;this.discontinuity=false;this.lastAction=null;
-    this.crowdPhase=phase;this.crowdSpeedMps=0;
+    this.crowdPhase=phase;this.crowdPronePhase=phase;this.crowdSpeedMps=0;
     this.v=Array.from({length:10},()=>new THREE.Vector3());
     this.q=Array.from({length:3},()=>new THREE.Quaternion());
     this.feet=['L','R'].map(side=>{
@@ -40,6 +40,8 @@ export class ActorLocomotion {
     this.crowdSpeedMps=dt>0&&distance<=Math.max(C.teleportM,dt*C.maximumMps)?Math.max(0,distance/dt):0;
     if(!profile||!this.crowdSpeedMps)return;
     this.rig.root.getWorldScale(this.scale);
+    const prone=this.profiles.ProneCrawl;
+    if(prone)this.crowdPronePhase=(this.crowdPronePhase+distance/(prone.referenceMps*Math.abs(this.scale.y)*prone.duration))%1;
     this.crowdPhase=(this.crowdPhase+distance/(profile.referenceMps*Math.abs(this.scale.y)*profile.duration))%1;
   }
 
