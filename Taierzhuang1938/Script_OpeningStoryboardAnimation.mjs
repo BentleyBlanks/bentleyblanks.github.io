@@ -28,6 +28,9 @@ function ReportMissingOpeningClip(modelId, clip){
 /** Every "<modelId>/<clip>" a director asked for that the rig does not have (see ReportMissingOpeningClip). */
 export function OpeningMissingClips(){return [...missingClips];}
 
+/** The loaded library ({config, models: Map modelId -> baked record}) or null before LoadOpeningStoryboardAnimation
+ *  resolves: the first-person body plays its seated fill clip straight from it (Script_OpeningFirstPerson). */
+export function OpeningClipLibrary(){return library||null;}
 /** Static metadata of one opening clip (manifest `clips[name]`): role, contacts, holdLoop, ... */
 export function OpeningClipMeta(clip){return library?.config.clips?.[clip]||null;}
 /** Paired staging (runtime metres, anchor frame) and prop definitions from the manifest. */

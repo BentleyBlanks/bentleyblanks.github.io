@@ -23,7 +23,7 @@ const BUTT = Object.freeze({ yawDeg:0, letGoS:1.05, holdS:0, strikeS:1.375, boot
 // Script_OpeningStoryboardsTest's sight/drag checks. Wave 2 sets wave1Allowances.revetment to null.
 const REVETMENT = "BunkerSouthRevetment";
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260927OpeningStoryboardsV12KneelBank", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260927OpeningStoryboardsV13FirstPersonLoad", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
@@ -55,7 +55,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // 2026-09-27 review 「日军从外面走进来怎么能直接进的，至少有个翻越动作吧。拖动的动作也还是很奇怪」: ijaA vaults the
       // fallen roof timber into the pit and back out, and hauls Shunzi out from under it by the wrist
       // (ija.vaultIn / ija.dragOutRoute, docs/Data_OpeningVaultHaul20260927.md).
-      "IjaVaultTimberIn","IjaVaultTimberOut","IjaHaulForearmUnder"],
+      "IjaVaultTimberIn","IjaVaultTimberOut","IjaHaulForearmUnder",
+      // 2026-09-27 review 「主角应该在给自己的弹夹装弹，手上的动作是自然延续的而不是僵住的」: the first-person body sits
+      // filling a charger round by round through Banter / Orders (firstPerson.hands.beats, firstPerson.fill).
+      "ShunziSitFillCharger"],
   },
   // The NRA02 comrade is clean in SB01; the shell that buries him wounds him, and he is bloodied from the
   // black after it through the drag and the interrogation (2026-09-27 review: 「应该是在爆炸后才变得伤痕累累」).
@@ -135,9 +138,14 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // trapped clamp, Data_Tuning_FirstLevel.trappedLookRadians). Outside the listed phases (key
     // compositions: the cut, the find, the drag, K2) the look eases back to centre over returnS.
     headLook:Object.freeze({ maxRad:.14, returnS:.6,
-      free:Object.freeze(["Wake","FrontPass","CaptiveDragged","CaptiveWall","Interrogation","Taunt","Wipe","Reach","Boots","Hold","Ask","LongShot"]) }),
+      free:Object.freeze(["Wake","FrontPass","CaptiveDragged","CaptiveWall","Interrogation","Taunt","Wipe","Reach","Boots","Hold","Ask","LongShot"]),
+      // 2026-09-27 review 「给到自由视角即可，听队友聊天不需要帮玩家主动切镜头方向」: sitting in the dugout (Banter, and
+      // Orders until Luo's order) the player looks round freely: yaw either side of the seat's shot, pitch [down, up]
+      // from it (rad; the seat shot is pitched seatShot.pitchDeg). The mission runtime's trapped clamp widens to the same
+      // limits (FirstLevelBunkerShow.LookLimits). After the order the look eases back to the follow shot over returnS.
+      seated:Object.freeze({ yawRad:1.75, pitchRad:Object.freeze([-.95,1.15]), returnS:1.1 }) }),
     // Shot pitch (rad, + up) while a hand beat is the subject; the push-up lift of the lying eye (m).
-    look:Object.freeze({ digPitch:-.45, clawPitch:-.8, reachPitch:-.28, pushUpM:.13, dragRollRad:.025,
+    look:Object.freeze({ clawPitch:-.8, reachPitch:-.28, pushUpM:.13, dragRollRad:.025,
       // Parry: the eye steps this far aside from ijaA's back so He (behind ijaA) is seen, and holds the
       // duel this long after the cut before following the interpreter.
       duelAsideM:.25, duelHoldS:.45 }),
@@ -151,6 +159,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // it at grip (rifle-local, HanYang canonical: muzzle -z, top +y, bolt side +x). right: [t, point on the rifle,
     // fingers, back of the hand (rifle-local), curl]. charger: the clip stands in the guide at chargerAt and goes
     // down pressM over press (s) while the thumb works it (thumbM at thumbHz); the bolt strips it at chargerOffS.
+    // The seated fill clip (hands.beats Banter / Orders `fill`): the body root stands at the seat facing shunzi.seat.yaw,
+    // shifted once so the clip's eye is over shunzi.seat; the eye is the head bone plus eyeFromHeadM (body frame: x right,
+    // y up, -z forward; the clip keeps the head bowed over the charger, eye to head measured in the bake, 09-27).
+    fill:Object.freeze({ eyeFromHeadM:Object.freeze([0,.024,-.127]) }),
     followUp:Object.freeze({
       standS:1.2, walkAtS:1.1, walkMps:.24, walkRampS:.8, stopEaseM:.25, bobM:.016, stepHz:1.6, swayRad:.01,
       pitch:Object.freeze([[0,0],[.6,-.42],[3.9,-.42],[4.8,-.04]]),
@@ -203,13 +215,14 @@ export const OPENING_STORYBOARDS = Object.freeze({
         brace:H("body",[.28,-.5,-.06],[.6,-.3,-.8],[0,1,0],[8,12,8]),             // 「伸手撑住地面」
         rifle:H("ground",[.2,.05,-.3],[.3,-.3,-1],[0,1,0],[46,62,40],{to:"rifle"}),// 「抓住枪」
       }),
-      // Seated inspection: the charger rests in the left palm, the rifle on the thighs.
-      // Orders' exit signal (Luo's order) hands over to followUp's stand / load / bolt / look-over in OpeningFirstPerson.
+      // Seated (Banter, Orders until Luo's order): the whole body plays the baked fill clip (`fill`, BlenderMCP:
+      // _import/Script_OpeningStoryboardClips.py ShunziSitFillCharger) on an ammo crate at the seat -- the rounds one by one
+      // from the belt pouch into the charger in the left hand, the rifle across the lap -- one clock from Banter on, so the hands never
+      // stop at a phase change (09-27 review: the two held palm poses read as frozen hands). Orders' exit signal hands
+      // over to followUp's stand / load / bolt / look-over in OpeningFirstPerson.
       beats:Object.freeze({
-        Banter:Object.freeze({keys:Object.freeze([[0,"palmClip","rest"],[1.1,"palmClipTilt","rest"],[2.5,"palmClip","rest"]]),legs:"sitForward",props:Object.freeze(["palmClipProp","loadingRifleOnLegs"])}),
-        // Still at it while the runner reports: the charger turned in the palm and back (not a frozen hand).
-        Orders:Object.freeze({keys:Object.freeze([[0,"palmClip","rest"],[1.3,"palmClipTilt","rest"],[2.8,"palmClip","rest"],[4.2,"palmClipTilt","rest"],[5.8,"palmClip","rest"]]),
-          legs:"sitForward",props:Object.freeze(["palmClipProp","loadingRifleOnLegs"])}),
+        Banter:Object.freeze({fill:"ShunziSitFillCharger",props:Object.freeze(["fillCharger","fillRound","fillRifle","fillSeat"])}),
+        Orders:Object.freeze({fill:"ShunziSitFillCharger",props:Object.freeze(["fillCharger","fillRound","fillRifle","fillSeat"])}),
         Blast:K([0,"protect","protect"],[.4,"protect","protect"],[.8,"limp","limp"]),
         Black:K([0,"limp","limp"]),
         // 「他试着撑起身体。背包带一下绷紧……又落回地面。手指在泥里抓出一道痕。」
@@ -299,7 +312,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // the pinned body with the chin in the mud: SB03 holds witnessEye, the reach (SB03A) sinks to reachEye.
     // Lean into the trench opening while reaching so the fallen man's face clears the timber post.
     witnessEye:P(.35,-125.15), reachEye:P(.25,-125.05),
-    seatEyeM:.95, standEyeM:1.32, lieEyeM:.26, reachEyeM:.18,
+    seatEyeM:.95, standEyeM:1.32,   // seatEyeM: only without the fill clip (its eye is the clip's, ~0.7 m)
+    lieEyeM:.26, reachEyeM:.18,
     // SB04 (contract §2.5): ijaA drags him out of the mouth to the trench edge east of the mouth rubble (where the
     // fallen lintel lies) and brings the butt down on him there. SB04A (§2.7): he drags him on by the forearm, south
     // of the rubble, into the north mouth of the SSW leg, where 02's circle closes round him (§2.6).
@@ -327,8 +341,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // MessengerReport / PointBlockade (standing) unless the clip is in ContactClips, and the director's Move hands the
     // native layer kneel:0 (Script_OpeningStoryboardAnimation). LuoKneelCheck is a contact clip, so it is kept.
     luoKneelS:1.6,
-    // SB01 camera (eye = shunzi.seat) and the talk's head turn toward whoever speaks (clamped, eased).
-    seatShot:Object.freeze({ yawDeg:-93, pitchDeg:-15, speakerTurnRad:.14, turnRps:2 }),
+    // SB01 camera: the seat's look (eye = the fill clip's eye, set over shunzi.seat). The player's own look is laid over
+    // it (firstPerson.headLook.seated); the head no longer turns to whoever speaks (09-27 review). Pitched so the charger
+    // in his hands is in the lower third.
+    seatShot:Object.freeze({ yawDeg:-93, pitchDeg:-18 }),
     // SB02 mirrored (contract §2.2): the shell lands at fallStartS (FireShell flight); the eye drops to eyeM and turns
     // to yaw/pitch with the head rolled to the left by fallEndS; the eyes close at eyesCloseS; Black at phaseS.
     // pitchDeg -6 (contract -14, ±8): at -14 the lintel was above the frame and the north post's top half hung over the

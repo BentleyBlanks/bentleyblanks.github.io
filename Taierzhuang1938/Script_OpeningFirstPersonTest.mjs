@@ -76,7 +76,7 @@ for(const model of ["TengxianNra05","TengxianNra02"]){
     // Flag clocks start with the phase; supply overlays (dirt, bolt) likewise.
     show.flags={dirtAt:phase==="Banter"?start:null,exitAt:phase==="Orders"?start:null,buttAt:start,collarReleasedAt:start,checkLineAt:start,kickRifleAt:start};
     // Banter covers the collar/dig overlay; Orders (flags.exitAt at its start) the whole followUp after the order.
-    const frames=Math.max(50,Math.ceil(((beat?.keys.at(-1)[0]||0)+.6)*60),phase==="Banter"?150:0,phase==="Orders"?Math.ceil((FOLLOW.rifle.at(-1)[0]+.6)*60):0);
+    const frames=Math.max(50,Math.ceil(((beat?.keys?.at(-1)[0]||0)+.6)*60),phase==="Banter"?150:0,phase==="Orders"?Math.ceil((FOLLOW.rifle.at(-1)[0]+.6)*60):0);
     for(let frame=0;frame<frames;frame++){
       show.Age=frame/60;r.time=start+frame/60;firstPerson.Update(1/60);
       if(phase==="Orders"){
@@ -395,6 +395,90 @@ assert.equal(FP_PROPS[FP_PROPS.rifleSlide.prop]?.kind,"rifle","rifleSlide moves 
   }
   eye.rotation.set(-.1,0,0,"YXZ");eye.updateMatrixWorld(true);
   firstPerson.Dispose();console.warn=warn;delete globalThis.Tengxian;
+}
+// ---- 2026-09-27 the seated fill clip (ShunziSitFillCharger, BlenderMCP) on the player body ------------------------
+// 「主角应该在给自己的弹夹装弹，手上的动作是自然延续的」: through Banter and Orders until the order the body plays the baked
+// clip at the seat (not two held palm poses): the hands keep moving and stay continuous, five rounds go into the charger
+// one by one, the eye stays over shunzi.seat, and the order's followUp eases in from where the hands were.
+{
+  // Node has no fetch for the repository files: read them from disk (the loaders ask for ./... and file: URLs).
+  const realFetch=globalThis.fetch;
+  globalThis.fetch=async url=>{
+    const text=String(url),file=text.startsWith("file:")?fileURLToPath(text.split("?")[0]):path.join(here,text.split("?")[0]);
+    const ok=fs.existsSync(file);return {ok,status:ok?200:404,json:async()=>JSON.parse(fs.readFileSync(file,"utf8"))};
+  };
+  const {LoadOpeningStoryboardAnimation,OpeningClipMeta}=await import("./Script_OpeningStoryboardAnimation.mjs");
+  await LoadOpeningStoryboardAnimation();globalThis.fetch=realFetch;
+  const meta=OpeningClipMeta("ShunziSitFillCharger");
+  assert.ok(meta?.loop&&meta.duration>=6,"the fill clip is a baked loop");
+  assert.deepEqual(meta.events.filter(e=>e.kind==="roundIn").map(e=>e.n),[1,2,3,4,5],"five rounds go in, in order");
+  for(const phase of ["Banter","Orders"])assert.equal(C.firstPerson.hands.beats[phase].fill,"ShunziSitFillCharger",`${phase} plays the fill clip`);
+  const seat=C.shunzi.seat;
+  for(const model of ["TengxianNra05","TengxianNra02"]){
+    const playerBody=Actor(model);playerBody.characterRig.modelId=model;playerBody.characterRig.clipModelId="TengxianNra02";
+    playerBody.openingLegMeshes=[];
+    const clip=new THREE.Group();clip.add(new THREE.Object3D());for(let i=0;i<5;i++)clip.add(new THREE.Object3D());
+    const eye=new THREE.PerspectiveCamera(55,16/9,.04,100),scene=new THREE.Group();scene.add(playerBody.root);
+    const r={player:{camera:eye},battlefield:{GroundHeight:()=>0},time:100};
+    const show={playerBody,ready:true,phase:"Banter",Age:0,flags:{dirtAt:null,exitAt:null},supplyRoot:new THREE.Group(),loadingRifle:new THREE.Group(),
+      loadingRifleGrip:new THREE.Vector3(),clips:[clip,clip.clone()],r};
+    const firstPerson=new OpeningFirstPerson(show);
+    const Frame=()=>{
+      const e=firstPerson.PoseFill(r.time);
+      if(e){eye.position.copy(e);eye.rotation.set(-.3,C.banter.seatShot.yawDeg*Math.PI/180,0,"YXZ");eye.updateMatrixWorld(true);}
+      firstPerson.Update(1/60);return firstPerson.report;
+    };
+    const last={},path={l:0,r:0},range={l:new THREE.Box3(),r:new THREE.Box3()},seen=new Set();
+    let maxStep=0,maxTurn=0,turnAt="",maxEyeOff=0,maxChargerGap=0,roundsSeen=0,hidden=0,frames=0;
+    const start=r.time,banterS=12;
+    show.flags.dirtAt=start+2.3;
+    for(let frame=0;frame<(banterS+6)*60;frame++){
+      r.time=start+frame/60;
+      if(frame===banterS*60){show.phase="Orders";show.Age=0;}
+      show.Age+=1/60;
+      const report=Frame();
+      assert.equal(report.pose,"Fill",`${model} seated frame ${frame} plays the fill clip`);
+      const F=report.fill;
+      maxEyeOff=Math.max(maxEyeOff,Math.hypot(F.eye[0]-seat.x,F.eye[2]-seat.z));
+      assert.ok(F.eye[1]>.85&&F.eye[1]<1.05,`${model} a seated eye on the crate (SB01 eyeM) (${F.eye[1].toFixed(3)} m)`);
+      roundsSeen=Math.max(roundsSeen,F.rounds);seen.add(F.rounds);if(!F.charger)hidden++;
+      for(const side of ["l","r"]){
+        const hand=report.hands[side],palm=new THREE.Vector3(...hand.palm);
+        if(last[side]){const step=palm.distanceTo(last[side]);maxStep=Math.max(maxStep,step);path[side]+=step;}
+        last[side]=palm;range[side].expandByPoint(palm);
+        if(frame&&hand.rotationStepDegrees>maxTurn){maxTurn=hand.rotationStepDegrees;turnAt=`${side} ${(r.time-start).toFixed(2)} s (clip ${F.seconds.toFixed(2)} s, dig ${F.dig.toFixed(2)})`;}
+      }
+      const charger=report.props.fillCharger;
+      if(charger?.visible)maxChargerGap=Math.max(maxChargerGap,new THREE.Vector3(...charger.position).distanceTo(last.l));
+      frames++;
+    }
+    const size=side=>range[side].getSize(new THREE.Vector3()).length();
+    assert.ok(maxEyeOff<.08,`${model} the eye stays over shunzi.seat (${maxEyeOff.toFixed(3)} m)`);
+    assert.ok(maxStep<.06,`${model} the palms move continuously (${maxStep.toFixed(3)} m in a frame)`);
+    assert.ok(maxTurn<12,`${model} the palms turn continuously (${maxTurn.toFixed(1)} deg in a frame, ${turnAt})`);
+    assert.ok(path.r>2.5&&size("r")>.2,`${model} the right hand keeps working, pouch to charger (${path.r.toFixed(2)} m, ${size("r").toFixed(2)} m)`);
+    assert.ok(path.l>.3&&size("l")>.05,`${model} the left hand is not frozen either (${path.l.toFixed(2)} m, ${size("l").toFixed(2)} m)`);
+    assert.deepEqual([...seen].sort(),[0,1,2,3,4,5],`${model} the charger fills round by round`);
+    assert.ok(hidden>0&&hidden<frames*.1,`${model} the charger is out of sight only while it is in the pocket (${hidden} frames)`);
+    assert.ok(maxChargerGap<.09,`${model} the charger stays in the left hand (${maxChargerGap.toFixed(3)} m)`);
+    // Luo's order: the followUp's rifle hands ease in from where the fill hands were (no jump, no snap of the palm).
+    show.flags.exitAt=r.time+1/60;
+    let transitionStep=0,transitionTurn=0;
+    for(let frame=1;frame<40;frame++){
+      r.time+=1/60;show.Age+=1/60;
+      eye.position.y=Math.max(eye.position.y,.7);eye.updateMatrixWorld(true);
+      firstPerson.Update(1/60);const report=firstPerson.report;
+      assert.notEqual(report.pose,"Fill",`${model} after the order the body is off the fill clip`);
+      for(const side of ["l","r"]){
+        const palm=new THREE.Vector3(...report.hands[side].palm);
+        if(frame>1)transitionStep=Math.max(transitionStep,palm.distanceTo(last[side]));
+        transitionTurn=Math.max(transitionTurn,report.hands[side].rotationStepDegrees);last[side]=palm;
+      }
+    }
+    assert.ok(transitionTurn<12,`${model} the order's hands turn from the fill hands continuously (${transitionTurn.toFixed(1)} deg)`);
+    console.log(JSON.stringify({fill:model,maxEyeOff,maxStep,maxTurn,pathR:path.r,pathL:path.l,roundsSeen,hidden,maxChargerGap,transitionStep,transitionTurn}));
+    firstPerson.Dispose();
+  }
 }
 console.log(JSON.stringify({samples,maxBend,maxTwist,maxRotation,groundContacts,maxGroundError,claspSamples,maxClaspError,minClaspAlignment,maxClaspBend,freeReachSamples,maxFreeFrameError}));
 console.log("ok production opening arms preserve anatomical length, wrist axes and hidden shoulder roots");

@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260927OpeningStoryboardsV12KneelBank",
+ "version": "20260927OpeningStoryboardsV13FirstPersonLoad",
  "fps": 24,
  "actorForward": [
   0,
@@ -2547,6 +2547,90 @@
    "rigs": [
     "TengxianIja02"
    ]
+  },
+  "ShunziSitFillCharger": {
+   "duration": 9.5,
+   "loop": true,
+   "weaponHold": "free",
+   "role": "shunzi",
+   "rig": "TengxianNra02",
+   "props": [],
+   "rootMotion": false,
+   "env": {
+    "wallBehindM": 0.35
+   },
+   "firstPerson": true,
+   "seat": {
+    "crateM": [
+     0.44,
+     0.3,
+     0.28
+    ]
+   },
+   "events": [
+    {
+     "t": 0.73,
+     "kind": "roundPicked",
+     "n": 1
+    },
+    {
+     "t": 1.33,
+     "kind": "roundIn",
+     "n": 1
+    },
+    {
+     "t": 2.18,
+     "kind": "roundPicked",
+     "n": 2
+    },
+    {
+     "t": 2.78,
+     "kind": "roundIn",
+     "n": 2
+    },
+    {
+     "t": 3.63,
+     "kind": "roundPicked",
+     "n": 3
+    },
+    {
+     "t": 4.23,
+     "kind": "roundIn",
+     "n": 3
+    },
+    {
+     "t": 5.08,
+     "kind": "roundPicked",
+     "n": 4
+    },
+    {
+     "t": 5.68,
+     "kind": "roundIn",
+     "n": 4
+    },
+    {
+     "t": 6.53,
+     "kind": "roundPicked",
+     "n": 5
+    },
+    {
+     "t": 7.13,
+     "kind": "roundIn",
+     "n": 5
+    },
+    {
+     "t": 8.3,
+     "kind": "chargerStowed"
+    },
+    {
+     "t": 8.55,
+     "kind": "chargerDrawn"
+    }
+   ],
+   "notes": "SB01 first person (2026-09-27): seated on an ammo crate (seat.crateM, drawn at runtime) against the back wall, feet on the floor, rifle across the thighs (runtime prop), the charger held in the left hand over the lap. Five rounds from the right front belt pouch pressed into it one after the other (events roundPicked / roundIn n), then the full charger looked over, into the left breast pocket (chargerStowed) and an empty one out (chargerDrawn). Hands in the torso frame. Played on the player body in Banter / Orders until the order to leave.",
+   "rigs": [
+    "TengxianNra02"
+   ]
   }
  },
  "stages": {
@@ -2849,7 +2933,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "5737b5bde13302ab92efa2422cd449be15507f6ca47951785e25251bd0f43a90",
+   "sha256": "42c2b6df91df145d70f7eeb432c508644b70494fce9537553fa5fef9cb28dea3",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
@@ -2893,7 +2977,8 @@
     "HeSwapDadaoRifle",
     "RunnerLeanPostCall",
     "InterpreterHurryReach",
-    "YaowaSitLoad"
+    "YaowaSitLoad",
+    "ShunziSitFillCharger"
    ],
    "contactPoints": {
     "hairBack": {
@@ -4597,6 +4682,49 @@
      "kneeSlideM": 0,
      "lookErrorDeg": 0.63,
      "headTurnDeg": 40.93
+    },
+    {
+     "clip": "ShunziSitFillCharger",
+     "frames": 229,
+     "footSlideM": 0,
+     "contactErrorM": 0,
+     "gripSolveErrorM": 0,
+     "wallPenetrationM": 0,
+     "pelvisMaxStepM": 0.0001,
+     "floorCorrectionMin": 0,
+     "floorCorrectionMax": 0,
+     "root": {
+      "start": [
+       0,
+       0.0457,
+       1.72,
+       0.3759
+      ],
+      "end": [
+       0,
+       0.0457,
+       1.72,
+       0.3759
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       9.5
+      ],
+      [
+       "R",
+       0,
+       9.5
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0,
+     "lookErrorDeg": 3.81,
+     "headTurnDeg": 30.62
     }
    ]
   },

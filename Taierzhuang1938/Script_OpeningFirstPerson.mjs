@@ -5,6 +5,8 @@ import * as THREE from "three";
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone, FrameQuaternion } from "./Script_FpsAnatomy.mjs";
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 import { EXTRA_HAND_POSES, HAND_SHAPES, LEG_POSES, FP_PROPS, FIRST_PERSON_EXTRA as X } from "./Data_OpeningFirstPersonExtra.mjs";
+import { CutscenePerformer } from "./Script_CutscenePerformance.mjs";
+import { OpeningClipLibrary, OpeningClipMeta } from "./Script_OpeningStoryboardAnimation.mjs";
 
 const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 const Q=()=>new THREE.Quaternion();
@@ -617,6 +619,14 @@ export class OpeningFirstPerson{
         // back of the hand; offset in the palm frame (negative y = on the palm side).
         const q=frame.clone().multiply(Q().setFromAxisAngle(V(0,1,0),(spec.yawDeg||0)/Degrees)).multiply(CLIP_IN_PALM);
         SetWorld(prop.object,palm.add(V(...spec.offset).applyQuaternion(frame)),q);
+        // The fill clip's charger: its rounds (children 1-5, stacked along its strip) show as they are pressed in.
+        if(spec.fill){const f=this.fillState||{};prop.object.children.forEach((child,i)=>{if(i)child.visible=i<=(f.rounds||0);});shown=f.charger!==false;}
+      }else if(spec.kind==="round"){
+        // A loose round pinched in the hand (the fill clip from roundPicked to roundIn): long axis `axis` in the palm frame.
+        const palm=Palm(this.rig,spec.hand);
+        const frame=this.rig.bones[spec.hand].hand.getWorldQuaternion(Q()).multiply(this.rig.anatomy[spec.hand].frame.quaternion);
+        SetWorld(prop.object,palm.add(V(...spec.offset).applyQuaternion(frame)),frame.clone().multiply(Q().setFromUnitVectors(V(0,1,0),V(...spec.axis).normalize())));
+        shown=!!this.fillState?.round;
       }else if(spec.kind==="rifle"){
         const L=legReport?.sides;
         // One loading rifle at a time: while the hands still hold it (a loading phase without hand keys) the
@@ -646,6 +656,14 @@ export class OpeningFirstPerson{
           }else prop.slide=null;
           SetWorld(prop.object,position,quaternion);
         }
+      }else if(spec.kind==="crate"){
+        // Under the pelvis on the ground, square to the body, pushed back towards the wall.
+        const L=legReport,hip=L?V(...L.hip):null;
+        if(!hip){shown=false;this.Warn(`prop:${name}:legs`,`${name} needs the seated body; hidden`);}
+        else{
+          const at=hip.addScaledVector(Dir([0,0,1]),spec.backM||0),size=prop.size;
+          at.y=Ground(at.x,at.z)+size[2]/2;SetWorld(prop.object,at,bodyQ.clone());
+        }
       }else if(spec.kind==="strap"){
         SetWorld(prop.object,cam.position,cam.quaternion);
       }
@@ -664,6 +682,18 @@ export class OpeningFirstPerson{
     // (one warning, report missing:true), never replaced by an empty stand-in.
     const Source=(source,what)=>{if(source?.clone)return source.clone();this.Warn(`prop:${name}:source`,`${name}: the director has no ${what}; prop missing`);return null;};
     if(spec.kind==="clip")object=Source(s.clips?.[0],"procedural clip (show.clips[0])");
+    else if(spec.kind==="round")object=Source(s.clips?.[0]?.children?.[1],"round of the procedural clip (show.clips[0])");
+    else if(spec.kind==="crate"){
+      // The fill clip was authored sitting on this crate (seat.crateM): across (x), deep (z), high (y).
+      const size=OpeningClipMeta(this.fillClip)?.seat?.crateM||spec.sizeM,[w,d,h]=size,lid=.035;
+      const wood=new THREE.MeshStandardMaterial({color:spec.color,roughness:.92,metalness:0}),band=new THREE.MeshStandardMaterial({color:spec.lidColor,roughness:.9,metalness:0});
+      const box=new THREE.BoxGeometry(w,h-lid,d),top=new THREE.BoxGeometry(w+.01,lid,d+.01);
+      object=new THREE.Group();const body=new THREE.Mesh(box,wood),cap=new THREE.Mesh(top,band);
+      body.position.y=-lid/2;cap.position.y=h/2-lid/2;object.add(body,cap);
+      for(const mesh of [body,cap]){mesh.castShadow=mesh.receiveShadow=true;}
+      Own(box,wood);Own(top,band);
+      return this.AdoptProp(name,object,spec,root,{size});
+    }
     else if(spec.kind==="rifle")object=Source(s.loadingRifle,"loading rifle (show.loadingRifle)");
     else if(spec.kind==="strap"){
       // A canvas ribbon along the points, facing the eye (camera-local, so it hangs from the camera frame):
@@ -701,8 +731,116 @@ export class OpeningFirstPerson{
       }
     }
     if(!object)return null;
+    return this.AdoptProp(name,object,spec,root);
+  }
+  AdoptProp(name,object,spec,root,extra={}){
     object.name=`OpeningFirstPerson_${name}`;object.visible=false;root.add(object);
-    return {object,kind:spec.kind};
+    return {object,kind:spec.kind,...extra};
+  }
+  /** The phase's seated fill beat (hands.beats[p].fill), Orders only until Luo's order; null otherwise. */
+  FillBeat(p){
+    const beat=HANDS.beats[p];
+    return beat?.fill&&!(p==="Orders"&&this.show.flags?.exitAt!=null)?beat:null;
+  }
+  /**
+   * Pose the player body on the fill clip at `now` (once a frame: the director asks for the eye before Update runs).
+   * The root stands on the ground at shunzi.seat facing its yaw, shifted on the first frame so the clip's eye is over the
+   * seat; one clock from the first seated frame on (Banter into Orders). Returns the eye (world) or null when the clip is
+   * not loaded on this rig (said once; the hand-key code path then runs).
+   */
+  PoseFill(now){
+    const s=this.show,beat=this.FillBeat(s.phase);
+    if(!beat||this.override||!this.rig)return null;
+    if(this.fillPosedAt===now)return this.fillEye;
+    const actor=s.playerBody,rig=actor.characterRig,model=rig?.clipModelId||rig?.modelId,lib=OpeningClipLibrary(),record=lib?.models.get(model);
+    if(!record?.clips[beat.fill]){this.Warn(`fill:${model}:${beat.fill}`,`fill clip ${beat.fill} is not baked on ${model}; the seated body falls back to the hand-key path`);return null;}
+    this.fillPerformer ||= new CutscenePerformer(actor,record,lib.config);
+    this.fillPerformer.Restore();
+    this.fillAt ??= now;
+    const S=C.shunzi.seat,ground=s.r.battlefield,body=actor.root;
+    this.fillYaw ||= Q().setFromAxisAngle(V(0,1,0),S.yaw);
+    const Place=()=>{
+      const x=S.x+(this.fillShift?.x||0),z=S.z+(this.fillShift?.z||0),y=ground?.GroundHeight?.(x,z);
+      body.position.set(x,Number.isFinite(y)?y:body.position.y,z);body.quaternion.copy(this.fillYaw);body.updateMatrixWorld(true);
+    };
+    Place();
+    this.fillPerformer.Apply({clipId:beat.fill,t0:0,phase:0,speed:0,previous:null},now-this.fillAt);
+    let eye=this.FillEye();
+    if(!this.fillShift){this.fillShift=V(S.x-eye.x,0,S.z-eye.z);Place();eye=this.FillEye();}
+    this.fillPosedAt=now;
+    return this.fillEye=eye;
+  }
+  FillEye(){return Pos(this.show.playerBody.characterRig.bones.head).add(V(...C.firstPerson.fill.eyeFromHeadM).applyQuaternion(this.fillYaw));}
+  /** Back from the fill clip to the solved body: the bones as they were before it. */
+  EndFill(){
+    if(this.fillPosedAt==null)return;
+    this.fillPerformer?.Restore();this.fillPosedAt=null;this.fillState=null;
+    this.show.playerBody?.root?.updateMatrixWorld(true);
+  }
+  /** Where the fill clip is in its loop: rounds in the charger, a round in the right hand, the charger out of the pocket. */
+  FillState(clip,now){
+    const meta=OpeningClipMeta(clip),duration=meta?.duration||1,events=meta?.events||[];
+    const u=((now-this.fillAt)%duration+duration)%duration;
+    const At=(kind,n)=>events.find(e=>e.kind===kind&&(n==null||e.n===n))?.t;
+    const stow=At("chargerStowed")??Infinity,draw=At("chargerDrawn")??Infinity;
+    let rounds=0,round=false;
+    for(const e of events){
+      if(e.kind==="roundIn"&&e.t<=u)rounds=Math.max(rounds,e.n);
+      if(e.kind==="roundPicked"&&e.t<=u&&u<(At("roundIn",e.n)??e.t))round=true;
+    }
+    return {seconds:u,rounds:u>=stow?0:rounds,round,charger:!(u>=stow&&u<draw)};
+  }
+  /**
+   * The fill frame: the clip already posed the whole body (PoseFill). Banter's dirt in the collar is laid over the right
+   * arm (the same keys as the hand-key path); the props follow the hands; the palms / frames / shoulders are remembered
+   * so the order's followUp eases in from where the hands were.
+   */
+  UpdateFill(dt,now){
+    const s=this.show,r=s.r,p=s.phase,cam=r.player.camera,rig=this.rig,actor=s.playerBody,flags=s.flags||{},beat=this.FillBeat(p);
+    if(this.frameClock!==now){this.frameClock=now;this.previousFrameFrames=Object.fromEntries(Object.entries(this.lastFrames).map(([side,q])=>[side,q.clone()]));this.previousFramePartners={...this.lastPartners};}
+    this.phase="Fill";this.partnerEntryFrom={};this.legShown=null;this.legName=null;
+    actor.root.visible=s.ready;
+    for(const mesh of actor.openingLegMeshes||[])mesh.visible=true;
+    const eyeGround=cam.position.y-C.shunzi.lieEyeM;
+    const Ground=(x,z)=>{const y=r.battlefield?.GroundHeight?.(x,z);return Number.isFinite(y)?y:eyeGround;};
+    const frames={cam,bodyQ:this.fillYaw,Ground},state=this.fillState=this.FillState(beat.fill,now);
+    this.fillClip=beat.fill;
+    const dig=p==="Banter"&&flags.dirtAt!=null?now-flags.dirtAt:null;
+    const digWeight=dig==null?0:Smooth((dig-.2)/.6)*(1-Smooth((dig-1.7)/.6));
+    if(digWeight>0){
+      // 「几块土掉进顺子衣领。他缩起脖子，伸手往外掏」: the right hand leaves the clip for the collar and comes back.
+      const k=SampleKeys([[0,"digCollar","digCollar"],[.8,"digCollar","digCollar"],[1.3,"dig","dig"]],dig-.25);
+      const over=this.BeatPose({r:[HANDS.poses[k.a[1]],HANDS.poses[k.b[1]]],mix:k.mix},"r",frames,now);
+      // Solved onto the collar pose outright, then every arm bone eased from the clip's by the weight (a target eased in
+      // instead starts from the solver's own elbow, not the clip's: a 15 deg palm turn in the first frame).
+      const chain=rig.bones.r,bones=[chain.upperArm,chain.forearm,chain.hand,...rig.fingerBones.r],clipQ=bones.map(bone=>bone.quaternion.clone());
+      const pole=V(.43,-.51,.1).applyQuaternion(cam.quaternion).add(cam.position);
+      Solve(rig,"r",Pos(chain.upperArm),over.target,V(0,0,1).applyQuaternion(over.frame),V(0,1,0).applyQuaternion(over.frame),pole);
+      Fingers(rig,"r",over.curl);
+      for(const [i,bone] of bones.entries()){const q=bone.quaternion.clone();bone.quaternion.copy(clipQ[i]).slerp(q,digWeight);}
+      rig.root.updateWorldMatrix(true,true);
+      if(digWeight>.2)state.round=false;
+    }
+    this.report={available:true,phase:p,pose:"Fill",age:s.Age,beat:null,hands:{},
+      fill:{clip:beat.fill,seconds:state.seconds,rounds:state.rounds,round:state.round,charger:state.charger,dig:digWeight,
+        eye:this.fillEye.toArray(),root:actor.root.position.toArray()}};
+    for(const side of ["l","r"]){
+      const chain=rig.bones[side],palm=Palm(rig,side),shoulder=Pos(chain.upperArm);
+      const frame=chain.hand.getWorldQuaternion(Q()).multiply(rig.anatomy[side].frame.quaternion);
+      this.report.hands[side]={pose:"fill",palm:palm.toArray(),wrist:Pos(chain.hand).toArray(),elbow:Pos(chain.forearm).toArray(),
+        forward:V(0,0,1).applyQuaternion(frame).toArray(),dorsal:V(0,1,0).applyQuaternion(frame).toArray(),frameQuaternion:frame.toArray(),
+        eyeDistance:palm.distanceTo(cam.position),shoulderBehind:cam.worldToLocal(shoulder.clone()).z,
+        rotationStepDegrees:this.previousFrameFrames[side]?this.previousFrameFrames[side].angleTo(frame)*Degrees:0};
+      this.lastTargets[side]=palm;this.lastFrames[side]=frame;this.lastShoulders[side]=cam.worldToLocal(shoulder.clone());
+    }
+    const B=actor.characterRig.bones,At=bone=>Pos(bone).toArray();
+    const legReport={hip:At(B.pelvis),sides:{l:{hip:At(B.thighL),knee:At(B.calfL)},r:{hip:At(B.thighR),knee:At(B.calfR)}}};
+    this.report.legs={pose:"fill",visible:true,...legReport};
+    this.report.props=this.UpdateProps({props:beat.props},frames,now,legReport,false);
+    if(s.supplyRoot)s.supplyRoot.visible=false;
+    if(r.bunkerRifle?.view)r.bunkerRifle.view.visible=false;
+    this.report.worldRifleVisible=r.bunkerRifle?.view?false:null;
+    actor.root.updateWorldMatrix(true,true);s.firstPersonState=this.report;
   }
   Update(dt=1/60){
     const s=this.show,r=s.r,p=s.phase,a=s.Age,cam=r.player.camera,fp=C.firstPerson;
@@ -724,6 +862,9 @@ export class OpeningFirstPerson{
     // The debug bench (Pose) overrides the director's beat; its clock starts at its first frame.
     const override=this.override;
     if(override&&override.at==null)override.at=now;
+    // Seated (Banter, Orders until the order): the whole body plays the baked fill clip at the seat.
+    if(!override&&this.FillBeat(p)&&this.PoseFill(now)){this.UpdateFill(dt,now);return;}
+    this.EndFill();
     // The loading rifle is in his hands until the near miss throws it out of them (Blast +0.12 s), unless the
     // director gives those phases hand keys (then the beat, e.g. palmClip with the rifle on his legs, rules).
     const legacySupply=phase=>SUPPLY_PHASES.has(phase)&&!HandKeys(HANDS.beats[phase]);

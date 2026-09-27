@@ -8,6 +8,8 @@
 
 - **第一关友军俯身蹲走与枪口向上提枪（2026-09-27）**：`Script_AllyGait` / `Animation/AllyGait`，五条 NRA 共用动作；护送与交谈按实际威胁选择贴体、枪口向上提枪，战斗蹲走稳定胸部并前俯。BlenderMCP 重建、参考依据、播放优先级和验收见 [友军步态](Animation/AllyGait/Data_AllyGait.md)，门禁 `Script_AllyGaitTest` / `Script_AllyGaitBrowserTest`。
 
+- **01 掩蔽部坐着压弹、听聊天自由视角（2026-09-27）**：[压弹动作与自由视角](docs/Data_OpeningFirstPersonLoad20260927.md)。Banter / 下令前的 Orders 里第一人称身体整个播 BlenderMCP 烘的 `ShunziSitFillCharger`（坐弹药箱、五发逐颗压进桥夹、换夹循环），不再是两个静止托夹手势；视角在这两段放开（`firstPerson.headLook.seated`，运行时受困钳制经 `LookLimits` 同步放宽），不再朝说话人转头。门禁 `Script_OpeningFirstPersonTest`、`Script_OpeningStoryboardShots --shots=SB01`。
+
 - **01 洞口过场 2026-09-26 现场修订**：[渐显、翻译避让、踹国军旗与独立摄影机](docs/Data_OpeningCinematic20260926.md)。CaptiveDragged→Wipe 使用独立机位，Reach 回到第一人称；这段覆盖旧 SB03 倒地旁观镜头与人物旧站位。同文第二轮：日军走动背枪、翻译空手走/小跑（`Script_RelaxedGait` + `Animation/RelaxedGait`，门禁 `Script_RelaxedGaitTest`），日兵乙发现伤兵后喊翻译（`InterpreterCall`）。
 
 - **01 日军先头兵警戒持枪小跑（2026-09-27）**：日兵甲、乙入场从背枪放松走改为双手持枪、站直小跑、头左右扫视（`SetRelaxedGait(...,"alert")`，BlenderMCP 烘的 `Animation/IjaAlertGait` 三条），到位甩枪上背再拖人。口径与重烘见 [IjaAlertGait](Animation/IjaAlertGait/Data_IjaAlertGait.md)，门禁 `Script_IjaAlertGaitTest`。

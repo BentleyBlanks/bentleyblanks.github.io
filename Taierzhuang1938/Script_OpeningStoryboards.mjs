@@ -804,7 +804,8 @@ export class FirstLevelBunkerShow {
   FollowShot(){
     const r=this.r,S=C.shunzi,b=C.banter,F=C.firstPerson.followUp,t=this.FollowAge()??0;
     const eye=this.FollowPoint(t),pace=this.FollowPace(t),step=Math.PI*F.stepHz*Math.max(0,t-F.walkAtS);
-    let height=S.seatEyeM+(S.standEyeM-S.seatEyeM)*Smooth(t/F.standS);
+    const seated=this.seatEyeM??S.seatEyeM;
+    let height=seated+(S.standEyeM-seated)*Smooth(t/F.standS);
     height+=F.bobM*pace*(Math.abs(Math.sin(step))*2-1);
     const comrade=this.Comrade,out=r.Point(b.exitRoute[0],1.1);
     if(this.phase==="Incoming"&&comrade?.alive)out.lerp(r.Point(comrade.position,1.2),Smooth(this.Age/.8));
@@ -841,17 +842,23 @@ export class FirstLevelBunkerShow {
   Aim(eye,height,yaw,pitch){
     return this.r.Point(eye,height).add(new THREE.Vector3(-Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch)));
   }
-  /** SB01's look from the seat; during the talk the head turns a little (±speakerTurnRad) toward whoever speaks. */
-  SeatAim(eye,height,pitch){
-    const Q=C.banter.seatShot,r=this.r;
-    if(this.seatTurnAt!==r.time){
-      const dt=this.seatTurnAt==null?0:Math.max(0,r.time-this.seatTurnAt);this.seatTurnAt=r.time;
-      let want=0;
-      const who=this.phase==="Banter"?this.CurrentSpeaker()?.who:null,head=who&&who!=="shunzi"?this.HeadPoint(this.SpeakerActor(who)):null;
-      if(head)want=Math.max(-Q.speakerTurnRad,Math.min(Q.speakerTurnRad,Wrap(Math.atan2(eye.x-head.x,eye.z-head.z)-Q.yawDeg*DEG)));
-      this.seatTurn=(this.seatTurn||0)+Math.max(-Q.turnRps*dt,Math.min(Q.turnRps*dt,want-(this.seatTurn||0)));
-    }
-    return this.Aim(eye,height,Q.yawDeg*DEG+(this.seatTurn||0),pitch);
+  /** SB01's look from the seat (the player's own look is laid over it; 09-27: no turn to whoever speaks). */
+  SeatAim(eye,height,pitch){return this.Aim(eye,height,C.banter.seatShot.yawDeg*DEG,pitch);}
+  /** The seated eye: the fill clip's (over shunzi.seat, ~0.7 m up), else the old fixed seat eye. Remembered for FollowShot. */
+  SeatEye(){
+    const S=C.shunzi,e=this.playerBody?this.firstPerson?.PoseFill(this.r.time):null;
+    if(!e)return {eye:S.seat,height:S.seatEyeM};
+    const eye={x:e.x,z:e.z},height=e.y-this.r.battlefield.GroundHeight(e.x,e.z);
+    this.seatEyeM=height;return {eye,height};
+  }
+  /** Sitting in the dugout (Banter, Orders until Luo's order): the player looks round freely. */
+  Seated(){return this.phase==="Banter"||this.phase==="Orders"&&this.flags.exitAt==null;}
+  /** The player's look limits about the control's look (rad, {yaw:[min,max], pitch:[min,max]}) while seated, else null:
+   *  the mission runtime's trapped clamp takes them (Script_FirstLevelMissionRuntime.BeforePlayer). */
+  LookLimits(){
+    if(!this.CameraActive||!this.Seated())return null;
+    const W=C.firstPerson.headLook.seated;
+    return {yaw:[-W.yawRad,W.yawRad],pitch:W.pitchRad};
   }
   PhaseBlast(age){
     const comrade=this.Comrade,Q=C.banter.blastShot,landed=age>=Q.fallStartS;
@@ -2254,14 +2261,15 @@ export class FirstLevelBunkerShow {
     const cinematic=C.interrogation.cinematic[p];
     if(cinematic)return {...cinematic,cinematic:true,roll:0,pitch:0,target:At(cinematic.target,cinematic.targetH)};
     let eye=S.witnessEye,height=S.lieEyeM,target=At({x:4,z:-125.4},.9),roll=0,pitch=0;
-    if(p==="Banter"){
-      // SB01: from the back of the dugout out through the mouth (the talk turns the head a little to the speaker).
-      eye=S.seat;height=S.seatEyeM;
-      // 「几块土掉进顺子衣领。他缩起脖子，伸手往外掏」: head down to the hand at the collar.
-      if(this.flags.dirtAt!=null){const t=r.time-this.flags.dirtAt,w=Smooth((t-.2)/.5)*(1-Smooth((t-1.7)/.6));pitch=L.digPitch*w;height-=.04*w;}
+    if(p==="Banter"||p==="Orders"&&this.flags.exitAt==null){
+      // SB01: from the back of the dugout out through the mouth. The eye is the seated fill clip's (the body filling the
+      // charger, Script_OpeningFirstPerson.PoseFill); where the player looks is his own (HeadLook / LookLimits): the view
+      // is not turned to whoever speaks, nor pitched down to the collar (09-27 review 「给到自由视角即可」).
+      ({eye,height}=this.SeatEye());
+      // 「几块土掉进顺子衣领。他缩起脖子」: the shoulders hunch (the hand at the collar is the first person's own layer).
+      if(p==="Banter"&&this.flags.dirtAt!=null){const t=r.time-this.flags.dirtAt;height-=.04*Smooth((t-.2)/.5)*(1-Smooth((t-1.7)/.6));}
       target=this.SeatAim(eye,height,b.seatShot.pitchDeg*DEG);
     }
-    else if(p==="Orders"&&this.flags.exitAt==null){eye=S.seat;height=S.seatEyeM;target=this.SeatAim(eye,height,b.seatShot.pitchDeg*DEG);}
     else if(p==="Orders"||p==="Incoming")({eye,height,target,pitch,roll}=this.FollowShot());   // 「弹装起！……跟紧！」
     else if(p==="Blast"){
       // SB02 mirrored (contract §2.2): standing where he had followed to, knocked down onto blastFall, the head rolled
@@ -2471,7 +2479,8 @@ export class FirstLevelBunkerShow {
       const travel=cam.position.distanceTo(this.previousViewPosition),most=C.cameraMoveMps*this.delta;
       if(travel>most)cam.position.lerpVectors(this.previousViewPosition,cam.position,most/travel);
     }
-    if(this.previousViewQuaternion){
+    // The turn limit smooths the director's own cuts and swings; a free seated look is the player's mouse, 1:1.
+    if(this.previousViewQuaternion&&!this.LookLimits()){
       const desiredQuaternion=cam.quaternion.clone();
       cam.quaternion.copy(this.previousViewQuaternion).rotateTowards(desiredQuaternion,C.cameraTurnRps*(this.delta||0));
     }
@@ -2531,14 +2540,18 @@ export class FirstLevelBunkerShow {
       pitch:(blast?.pitch||0)+(strike?.pitch||0)*P.strike+W.pitchRad*amount*Sway(1.3),
       yaw:W.yawRad*amount*Sway(2.9)};
   }
-  /** 「玩家只能小幅转头」: the player's own look, clamped, eased back to centre outside the free phases. */
+  /** 「玩家只能小幅转头」: the player's own look, clamped, eased back to centre outside the free phases. Seated in the
+   *  dugout the look is free within headLook.seated (LookLimits) and eases back over its returnS after the order. */
   HeadLook(){
-    const r=this.r,H=C.firstPerson.headLook,ctl=r.controls,dt=this.delta||0,free=H.free.includes(this.phase)?1:0;
-    const was=this.headFree??0;this.headFree=was+Math.max(-dt/H.returnS,Math.min(dt/H.returnS,free-was));
+    const r=this.r,H=C.firstPerson.headLook,ctl=r.controls,dt=this.delta||0,wide=this.LookLimits(),free=wide||H.free.includes(this.phase)?1:0;
+    const was=this.headFree??0;this.headFree=wide?1:was+Math.max(-dt/H.returnS,Math.min(dt/H.returnS,free-was));
     if(!ctl||!Number.isFinite(ctl.yaw)||!Number.isFinite(ctl.pitch))return {yaw:0,pitch:0};
-    const Cl=v=>Math.max(-H.maxRad,Math.min(H.maxRad,v));
-    let yaw=Cl(Wrap(r.player.yaw-ctl.yaw)),pitch=Cl(r.player.pitch-ctl.pitch);
-    if(!free){const k=Math.max(0,1-dt/H.returnS);yaw*=k;pitch*=k;r.player.yaw=ctl.yaw+yaw;r.player.pitch=ctl.pitch+pitch;}
+    const Cl=(v,range)=>Math.max(range?range[0]:-H.maxRad,Math.min(range?range[1]:H.maxRad,v));
+    let yaw=Wrap(r.player.yaw-ctl.yaw),pitch=r.player.pitch-ctl.pitch;
+    // Coming back from a wide seated look: keep what was shown and ease it home (no snap to ±maxRad first).
+    const returning=!free&&Math.max(Math.abs(yaw),Math.abs(pitch))>H.maxRad;
+    if(!returning){yaw=Cl(yaw,wide?.yaw);pitch=Cl(pitch,wide?.pitch);}
+    if(!free){const k=Math.max(0,1-dt/(returning?H.seated.returnS:H.returnS));yaw*=k;pitch*=k;r.player.yaw=ctl.yaw+yaw;r.player.pitch=ctl.pitch+pitch;}
     this.headLook={yaw:yaw*this.headFree,pitch:pitch*this.headFree,free};
     return this.headLook;
   }
@@ -2631,7 +2644,7 @@ export class FirstLevelBunkerShow {
     this.strikeAt=null;this.bloodMask=0;this.cameraFrom=null;this.shownEyeClosure=null;this.presentedCamera=null;this.pointActor=null;this.phaseEntered=null;
     this.beam=null;this.leftBeam=null;this.beamState=null;
     this.perception=null;this.perceptionLevel=null;this.headFree=0;this.headLook=null;this.releaseAt=null;this.releaseLevel=null;
-    this.meet=null;this.guardRoute=null;this.restRoute=null;this.clawPath=null;this.blastFrom=null;this.seatTurn=0;this.seatTurnAt=null;
+    this.meet=null;this.guardRoute=null;this.restRoute=null;this.clawPath=null;this.blastFrom=null;this.seatEyeM=null;
     for(const actor of [...this.r.squad,...this.r.enemies.values()]){
       if(actor.openingCombatReleased)actor.missionFireHold=false;
       actor.openingCombatReleased=false;actor.openingStoryboardLast=null;actor.openingStoryboardPose=null;actor.openingStoryboardTravel=null;

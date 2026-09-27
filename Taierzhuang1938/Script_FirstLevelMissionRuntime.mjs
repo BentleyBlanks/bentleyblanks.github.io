@@ -2220,10 +2220,13 @@ export class FirstLevelMissionRuntime {
     );
     // 倒地那一段镜头自带一份抬头，先减掉再夹取（站着的时候这一份恒为 0，行为逐字不变）。
     const pitchAim = control.pitch - this.ControlPitchBias();
-    // 被压在木架下只能小幅转头（契约 §2 的受困段）。
+    // 被压在木架下只能小幅转头（契约 §2 的受困段）。坐在掩蔽部里听大家聊天那一段（Banter、下令前的 Orders）
+    // 视角放开：幅度由开场导演给（FirstLevelBunkerShow.LookLimits，数据在 firstPerson.headLook.seated）。
     const limit = control.kind === "trapped" ? R.trappedLookRadians : R.limitedLookRadians;
-    this.player.yaw = control.yaw + Clamp(yawDelta, -limit, limit);
-    this.player.pitch = Clamp(this.player.pitch, pitchAim - limit, pitchAim + limit);
+    const wide = control.kind === "trapped" ? this.frontShow?.bunker?.LookLimits?.() : null;
+    const yawRange = wide ? wide.yaw : [-limit, limit], pitchRange = wide ? wide.pitch : [-limit, limit];
+    this.player.yaw = control.yaw + Clamp(yawDelta, yawRange[0], yawRange[1]);
+    this.player.pitch = Clamp(this.player.pitch, pitchAim + pitchRange[0], pitchAim + pitchRange[1]);
     if(control.kind==="rescue"){
       const poseSeconds=this.opening.RescueSampleTime();
       this.player.stance=poseSeconds<OPENING.rescuePullSeconds?"prone":poseSeconds<OPENING.rescueStandSeconds?"crouch":"stand";

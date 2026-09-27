@@ -156,6 +156,17 @@ export const FP_PROPS = Freeze({
   palmClipProp: Freeze({ kind: "clip", hand: "l", offset: V(0, -.02, 0), yawDeg: 0 }),
   // The receiver on the right thigh short of the knee, muzzle forward-left (browser bench 09-25, variant B).
   loadingRifleOnLegs: Freeze({ kind: "rifle", thigh: "r", along: .6, lift: .07, gripAheadM: .2, muzzle: V(-.45, -.1, -.88), up: V(-.3, 1, .2) }),
+  // The seated fill clip (ShunziSitFillCharger, 09-27): the charger in the left hand filling up (`fill`: its rounds show
+  // one by one at the clip's roundIn events, none after chargerStowed, the charger itself hidden in the pocket until
+  // chargerDrawn), a loose round pinched in the right hand from roundPicked to roundIn (kind "round": its long axis
+  // `axis` in the palm frame), and the rifle across both thighs (no `thigh`: hips to the knees' midpoint).
+  fillCharger: Freeze({ kind: "clip", hand: "l", offset: V(.012, -.026, .035), yawDeg: 0, fill: true }),
+  fillRound: Freeze({ kind: "round", hand: "r", offset: V(.02, -.03, .055), axis: V(0, 0, 1) }),
+  // Across the thighs, muzzle out to his left and a little forward, lying on its side with the bolt up and towards him.
+  fillRifle: Freeze({ kind: "rifle", along: .55, lift: .07, gripAheadM: .05, muzzle: V(-.95, 0, -.3), up: V(0, .55, .83) }),
+  // The ammo crate he sits on: its size is the clip's (manifest clips.<fill>.seat.crateM: across, deep, high; sizeM only
+  // if that is missing), under the pelvis `backM` towards the wall, a darker lid band on top.
+  fillSeat: Freeze({ kind: "crate", sizeM: V(.44, .30, .28), backM: .03, color: 0x6e5337, lidColor: 0x4f3b27 }),
   rifleSlide: Freeze({ kind: "track", prop: "loadingRifleOnLegs", t0: .25, t1: .7, direction: V(-.45, 0, -.55), moveM: .4, spinDeg: 28, restM: .03 }),
   // Canvas olive-drab with darker hems and a stitched band every few centimetres (vertex shades), a steel
   // buckle at buckleAt (0–1 along); review 09-25: the flat 0x4a4031 read as a black bar.

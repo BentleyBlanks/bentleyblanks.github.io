@@ -5143,6 +5143,164 @@ def BuildYaowaSitLoad(T, name):
     return spec
 
 
+# -- SB01 ShunziSitFillCharger (Nra02: the first-person player body) ---------------------------
+# 2026-09-27 review 「主角应该在给自己的弹夹装弹，手上的动作是自然延续的而不是僵住」: through Banter and the
+# first half of Orders Shunzi sits against the back wall filling an empty five-round charger with loose rounds from
+# the pouch at the right front of his belt. The first-person body plays this clip (Script_OpeningFirstPerson
+# fill mode); it replaces the two held palm poses (palmClip / palmClipTilt) that only tilted the charger.
+# He sits on an ammo crate against the back wall (FILL_SEAT; the runtime draws it: SB01's eye stays 0.85-1.05 m up
+# -- on the floor the eye was 0.72 m and Luo's head covered the men going up the trench), feet on the floor, the rifle
+# flat across his thighs (laid on them at runtime), the charger held in the left hand over the lap, the head bowed. Loop (9.5 s): five rounds -- the right hand dips into the
+# pouch, comes back with a round, sets it over the charger's lips, presses it down and slides it home with the
+# thumb -- then the full charger is looked over, tucked into the left breast pocket and an empty one comes out
+# (each way ~0.65 s: the palm turns ~130 deg from under the charger to the pocket). Hands are written in the torso
+# frame (left, back, up) from the shoulders' midpoint (RelArm), so the breathing and the lean carry them; the FILL_
+# points are palm centres, the wrist sits FILL_PALM behind along the fingers.
+FILL_T = 228 / 24                                   # 9.5 s
+FILL_ROUND0, FILL_ROUND_S = .25, 1.45               # the first round's cycle start; one round
+FILL_PICK, FILL_OVER, FILL_PRESS, FILL_SLIDE = .48, .92, 1.08, 1.22   # in a cycle: round taken, over the lips, pressed, home
+FILL_REST_AT = 7.85                                 # the right hand back on the knee after the fifth round
+FILL_STOW, FILL_DRAW = 8.30, 8.55                   # the full charger into the pocket, the empty one out
+FILL_PALM = .075
+FILL_CHARGER = (.03, -.42, -.12)                    # the charger (under the right palm pressing on it)
+FILL_POUCH = (-.16, -.16, -.47)                     # right front belt pouch
+FILL_POCKET = (.10, -.11, -.15)                     # left breast pocket
+FILL_KNEE = (-.14, -.36, -.40)                      # right hand resting on the right knee
+FILL_SEAT = (.44, .30, .28)                         # the crate (runtime m: across, deep, high) under the seat
+
+
+def FillRounds():
+    """Clip seconds of each round's pick-up (event roundPicked) and press (roundIn)."""
+    return [(FILL_ROUND0 + k * FILL_ROUND_S + FILL_PICK, FILL_ROUND0 + k * FILL_ROUND_S + FILL_PRESS) for k in range(5)]
+
+
+Meta('ShunziSitFillCharger', FILL_T, True, 'free', role='shunzi', rig='TengxianNra02', props=[], rootMotion=False,
+     env={'wallBehindM': .35}, firstPerson=True, seat={'crateM': list(FILL_SEAT)},
+     events=[e for k, (pick, press) in enumerate(FillRounds())
+             for e in ({'t': round(pick, 3), 'kind': 'roundPicked', 'n': k + 1}, {'t': round(press, 3), 'kind': 'roundIn', 'n': k + 1})]
+            + [{'t': FILL_STOW, 'kind': 'chargerStowed'}, {'t': FILL_DRAW, 'kind': 'chargerDrawn'}],
+     notes='SB01 first person (2026-09-27): seated on an ammo crate (seat.crateM, drawn at runtime) against the back '
+           'wall, feet on the floor, rifle across the thighs (runtime prop), the charger held in the left hand over the lap. Five rounds from the right '
+           'front belt pouch pressed into it one after the other (events roundPicked / roundIn n), then the full '
+           'charger looked over, into the left breast pocket (chargerStowed) and an empty one out (chargerDrawn). '
+           'Hands in the torso frame. Played on the player body in Banter / Orders until the order to leave.')
+
+
+def FillPalms():
+    """Palm (fingers, palm normal) in the torso frame (left, back, up)."""
+    return {
+        # left: palm up under the charger, fingers across to the right, thumb over the top
+        'hold': (Unit((-.60, -.78, .12)), Unit((-.30, -.10, .95))),
+        'check': (Unit((-.45, -.70, .55)), Unit((-.35, .55, .76))),
+        'pocket': (Unit((.05, -.50, -.86)), Unit((.05, .86, -.50))),
+        # right: palm down over the charger, fingers forward and to the left
+        'press': (Unit((.45, -.85, -.28)), Unit((.10, .25, -.96))),
+        'pouch': (Unit((.05, -.35, -.94)), Unit((.25, .90, -.35))),
+        'knee': (Unit((.15, -.85, -.50)), Unit((.05, .50, -.86))),
+    }
+
+
+def FillWrist(palm, forward):
+    return tuple(Vector(palm) - Vector(forward) * FILL_PALM)
+
+
+@Builder('ShunziSitFillCharger')
+def BuildShunziSitFillCharger(T, name):
+    H, A, SX = T.H, T.A, T.SX
+    base = SitBase(T)
+    seatZ = T.R(FILL_SEAT[2])
+    base.update({'pelvis': (0, .05, .125 + seatZ - .02), 'pelvisTilt': (-.12, 0, .03), 'bend': .40, 'lean': .02, 'twist': .03,
+                 'shrug': .05, 'lookW': .85,
+                 # on the crate: thighs level, shins down to the floor a little apart, the rifle lies across the thighs
+                 'ankle.L': (H + .10, -.46, A), 'ankle.R': (-(H + .08), -.42, A),
+                 'legPole.L': (H + .30, -.90, .50), 'legPole.R': (-(H + .28), -.90, .50), 'foot.L': (0, 8, 0), 'foot.R': (0, -8, 0),
+                 'grip.L': None, 'grip.R': None})
+    P = FillPalms()
+    C, pouch, pocket, knee = Vector(FILL_CHARGER), Vector(FILL_POUCH), Vector(FILL_POCKET), Vector(FILL_KNEE)
+    over = C + Vector((-.012, .012, .062))
+    press = C + Vector((0, 0, .034))
+    home = C + Vector((.010, .006, .030))
+    # the arc out to the right between pouch and charger, low: the forearm stays under the eye line
+    up = (C + pouch) * .5 + Vector((-.09, -.02, -.01))
+    down = (C + pouch) * .5 + Vector((-.10, -.02, -.04))
+    # right palm centre, the pouch weight (palm turned into the pouch), the knee weight, curl and index curl
+    rows = [(0.0, knee, 0.0, 1.0, .40, .40)]
+    for k in range(5):
+        s = FILL_ROUND0 + k * FILL_ROUND_S
+        start = knee if k == 0 else home
+        rows += [(s, start, 0.0, 1.0 if k == 0 else 0.0, .40 if k == 0 else .45, .40 if k == 0 else .45),
+                 (s + .20, down, .55, .0, .30, .25),
+                 (s + .38, pouch, 1.0, .0, .25, .20),
+                 (s + FILL_PICK, pouch + Vector((0, 0, -.018)), 1.0, .0, .80, .95),
+                 (s + .66, up, .45, .0, .75, .90),
+                 (s + FILL_OVER, over, 0.0, .0, .70, .85),
+                 (s + FILL_PRESS, press, 0.0, .0, .55, .70),
+                 (s + FILL_SLIDE, home, 0.0, .0, .45, .45)]
+    rows += [(FILL_REST_AT, knee, 0.0, 1.0, .40, .40), (FILL_T, knee, 0.0, 1.0, .40, .40)]
+    rows.sort(key=lambda r: r[0])
+    palmR = Channel([(r[0], tuple(r[1])) for r in rows], periodic=True)
+    pouchW = Channel([(r[0], r[2]) for r in rows], periodic=True)
+    kneeW = Channel([(r[0], r[3]) for r in rows], periodic=True)
+    curlR = Channel([(r[0], r[4]) for r in rows], periodic=True)
+    indexR = Channel([(r[0], r[5]) for r in rows], periodic=True)
+    # left palm centre: under the charger, pushing up a little against each press; the check, the pocket, back
+    hold = C + Vector((.035, .01, -.03))
+    rowsL = [(0.0, hold, 0.0, 0.0)]
+    for pick, pressAt in FillRounds():
+        rowsL += [(pick + .20, hold + Vector((-.006, 0, -.004)), 0.0, 0.0),                   # turns the lips to the round
+                  (pressAt, hold + Vector((-.004, 0, .010)), 0.0, 0.0),                       # meets the press
+                  (pressAt + .22, hold, 0.0, 0.0)]
+    check = hold + Vector((-.02, .03, .10))
+    rowsL += [(7.30, hold, 0.0, 0.0), (7.50, check, 1.0, 0.0), (7.62, check + Vector((.005, 0, .008)), 1.0, 0.0),
+              (FILL_STOW - .02, pocket, 0.0, 1.0), (FILL_DRAW, pocket + Vector((0, 0, .012)), 0.0, 1.0),
+              (9.20, hold + Vector((0, .01, -.01)), 0.0, 0.0), (FILL_T, hold, 0.0, 0.0)]
+    rowsL.sort(key=lambda r: r[0])
+    palmL = Channel([(r[0], tuple(r[1])) for r in rowsL], periodic=True)
+    checkW = Channel([(r[0], r[2]) for r in rowsL], periodic=True)
+    pocketW = Channel([(r[0], r[3]) for r in rowsL], periodic=True)
+    lookAt = (-.02, -.62, .30)                               # world (source m): down at the charger in front of him
+
+    def Frame(palm):
+        """(fingers, palm normal) -> the palm's rotation, so two palms mix by slerp (lerping the two directions apart
+        bunched the whole roll of the pocket tuck into a few frames)."""
+        x = Vector(palm[0]).normalized()
+        z = Vector(palm[1]) - x * x.dot(Vector(palm[1]))
+        z.normalize()
+        return Matrix((x, z.cross(x), z)).transposed().to_quaternion()
+
+    Q = {name: Frame(palm) for name, palm in P.items()}
+
+    def Mix(a, b, w):
+        return a.slerp(b, Clamp(w))
+
+    def Palm(q):
+        return tuple(q @ Vector((1, 0, 0))), tuple(q @ Vector((0, 0, 1)))
+
+    def Pose(t):
+        f = SitBreath(t, dict(base), period=FILL_T / 2, amount=.5)
+        # the shoulders dip a little into each press
+        f['bend'] += .015 * sum(Bump(t, p - .10, p + .25) for _, p in FillRounds())
+        pw, kw = pouchW(t), kneeW(t)
+        fR, nR = Palm(Mix(Mix(Q['press'], Q['pouch'], pw), Q['knee'], kw))
+        cw, qw = checkW(t), pocketW(t)
+        fL, nL = Palm(Mix(Mix(Q['hold'], Q['check'], cw), Q['pocket'], qw))
+        # handRel is measured from each shoulder: they sit SX to either side of the midpoint
+        wristR = Vector(FillWrist(palmR(t), fR)) + Vector((SX, 0, 0))
+        wristL = Vector(FillWrist(palmL(t), fL)) - Vector((SX, 0, 0))
+        f['handRel.R'], f['handRel.L'] = tuple(wristR), tuple(wristL)
+        f['palmF.R'], f['palmN.R'], f['curl.R'], f['index.R'] = fR, nR, curlR(t), indexR(t)
+        f['palmF.L'], f['palmN.L'], f['curl.L'], f['index.L'] = fL, nL, .55 - .25 * qw, .40
+        f['poleRel.L'], f['poleRel.R'] = (.40, .30, -.40), (-.40, .30, -.40)
+        f['look'] = lookAt
+        return T.Nest(f)
+    spec = {'pose': Pose, 'plants': [('L', 0, FILL_T), ('R', 0, FILL_T)], 'look': lambda t: lookAt,
+            'walls': SIT_WALL, 'reviewFrames': lambda n: [0, int(n * .06), int(n * .08), int(n * .12), int(n * .14), int(n * .87), int(n * .93)],
+            'reviewProps': lambda t: [('box', (0, .06, seatZ / 2), (T.R(FILL_SEAT[0]), T.R(FILL_SEAT[1]), seatZ), 0)]}
+    spec['reviewViews'] = list(SIT_VIEWS)
+    spec['reviewScale'] = 2.2
+    return spec
+
+
 # -- SB05A IjaChoppedFallBack (ijaB, Ija01) -----------------------------------------------
 # SB05A frames ijaB going over backwards: sat down hard in the mud, one leg shot out toward Shunzi,
 # the other knee up, trunk thrown back, arms flung out, mouth open. IjaChoppedFallWall (staggers left
