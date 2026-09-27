@@ -584,7 +584,7 @@ export class FirstLevelBunkerShow {
     const shouter=this.cast.shouter;
     r.combat?.FireShell(r.Point(b.shellFrom,14),r.Point(b.shellAt),{flight:b.blastShot.fallStartS,damage:0,radius:4,incoming:false,feedbackOnly:true,
       OnImpact:()=>this.ShouterDown(shouter)});
-    r.audio?.Play?.("debrisFall",{position:r.Point(C.shunzi.trap,1),volume:.9});
+    // The dirt and timber coming down on him is PhaseBlast's (blastShot.debrisS): after the explosion, not before it.
   }
   ShouterDown(shouter=this.cast.shouter){
     if(shouter?.alive&&shouter===this.cast.shouter&&["Blast","Black"].includes(this.phase))this.Kill(shouter,"explosion");
@@ -698,20 +698,21 @@ export class FirstLevelBunkerShow {
     for(const role of ["ijaA","ijaB","ijaC","ijaD"])this.Hide(this.Ija(role));
     this.DepthWalkers();
     const post=b.runnerRoute.at(-1),seat=C.shunzi.seat;
-    // BunkerOrders.01 is shouted at Luo (「班长！……」), not at the camera: the runner turns to Luo's back in the mouth,
-    // Luo glances down the front trench and turns round to the room with his own line.
+    // BunkerOrders.01 is shouted at Luo (「班长！……」), not at the camera: the runner turns to Luo's back in the mouth.
+    // Luo keeps looking down the front trench while he thinks it over (.02–.04, Yaowa asks in between; user 09-27:
+    // he must not order the instant he hears it) and only turns round to the room with the order itself (.05).
     const runnerIn=this.flags.exitAt==null&&this.Follow(runner,"orders",b.runnerRoute,C.speed.run,null,b.luo);
     if(this.flags.exitAt==null){
       if(runnerIn||Distance(runner.position,post)<.4)this.Hold(runner,{...post,yaw:Face(post,b.luo)},"MessengerReport");
       if(!this.Started("BunkerOrders")&&(runnerIn||age>C.timeouts.runnerArriveS)){
-        this.Scene("BunkerOrders",r.voice?.PlayScene("BunkerOrders",{speakers:this.Speakers(),onLine:(lineId)=>{if(lineId==="BunkerOrders.02")this.flags.luoTurnAt=r.time;}}));
+        this.Scene("BunkerOrders",r.voice?.PlayScene("BunkerOrders",{speakers:this.Speakers(),onLine:(lineId)=>{if(lineId==="BunkerOrders.05")this.flags.luoTurnAt=r.time;}}));
       }
-      // 「朝前沟看了一眼，立即回身」: kneeling, looking out, until his own line; then up, round to the room and pointing.
+      // Kneeling, looking out, while he thinks it over; up, round to the room and pointing with the order.
       if(this.flags.luoTurnAt==null)this.Hold(luo,b.luo,"LuoKneelCheck",{seconds:b.luoKneelS});
       else this.Hold(luo,{...b.luo,yaw:Face(b.luo,seat)},"PointBlockade",{upperBody:true});
       this.Tableau2(yaowa,he,liu,comrade);
       if(this.Started("BunkerOrders")&&this.SceneDone("BunkerOrders"))this.flags.exitAt=r.time;
-      if(age>C.timeouts.runnerArriveS+8)this.flags.exitAt??=r.time;
+      if(age>C.timeouts.runnerArriveS+this.SceneLength("BunkerOrders")+C.timeouts.ordersSlackS)this.flags.exitAt??=r.time;
       return;
     }
     // Everyone leaves by the mouth and the south-south-west leg; they disappear beyond RC.
@@ -853,11 +854,21 @@ export class FirstLevelBunkerShow {
     return this.Aim(eye,height,Q.yawDeg*DEG+(this.seatTurn||0),pitch);
   }
   PhaseBlast(age){
-    const comrade=this.Comrade;
-    if(!this.phaseEntered){this.phaseEntered=true;this.PlayClip(comrade,"BlastSlamBuried",{restart:true});this.MoveRifle(C.rescue.rifleMouth,true);}
-    this.Put(comrade,C.banter.comradeBlast);this.Pose(comrade,"BlastSlamBuried");
+    const comrade=this.Comrade,Q=C.banter.blastShot,landed=age>=Q.fallStartS;
+    this.phaseEntered=true;
+    // Blast() fires the shell; nothing it does happens before it lands at fallStartS (user 09-27: the timber broke
+    // before the shell was heard). Then the comrade is thrown into the wall and the rifle knocked out of his hands.
+    if(landed&&!this.flags.blastLanded){
+      this.flags.blastLanded=true;this.PlayClip(comrade,"BlastSlamBuried",{restart:true});this.MoveRifle(C.rescue.rifleMouth,true);
+    }
+    // What the blast throws down on him (dirt, the broken timber) is heard after the explosion.
+    if(!this.flags.blastDebris&&age>=Q.debrisS){
+      this.flags.blastDebris=true;this.r.audio?.Play?.("debrisFall",{position:this.r.Point(C.shunzi.trap,1),volume:.9});
+    }
+    if(landed){this.Put(comrade,C.banter.comradeBlast);this.Pose(comrade,"BlastSlamBuried");}
+    else this.Hold(comrade,C.banter.comradeBlast,null);
     // The loose timber lands on his pack in the mouth, where he lies from the black on (not before his eyes).
-    if(this.beam)this.beam.visible=false;
+    if(landed&&this.beam)this.beam.visible=false;
     this.ExitSquad();this.DepthWalkers();
     if(age>=C.banter.blastShot.phaseS){this.ShouterDown();this.Stage("Black");}
   }

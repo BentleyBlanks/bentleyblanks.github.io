@@ -14,11 +14,11 @@ export const HAN_PINYIN = Object.freeze({
   ai: "挨矮", an: "岸",
   ba: "把拔", ban: "班绊板", bei: "备北", ben: "本", bi: "闭", bian: "边遍", bie: "别", bing: "兵",
   bo: "拨", bu: "不部补步",
-  cai: "才财", ce: "侧", ceng: "蹭", cha: "差岔", che: "撤车", cheng: "城成", chong: "冲",
+  cai: "才财", ce: "侧", ceng: "蹭", cha: "差岔", chao: "抄", che: "撤车", cheng: "城成", chong: "冲",
   chou: "臭抽", chu: "出处", chuan: "穿川", chuang: "窗", ci: "刺", cong: "从", cuan: "蹿",
   cui: "催", cun: "村",
   da: "大搭打答", dai: "带", dan: "弹担", dang: "裆当", dao: "到道刀", de: "得的", deng: "等",
-  di: "低底弟地", dian: "点", diao: "叼掉", ding: "顶盯定", diu: "丢", dong: "东动懂",
+  di: "低底弟地", dian: "点", diao: "叼掉", ding: "顶盯定", diu: "丢", dong: "东动懂洞",
   dou: "抖都", du: "堵", duan: "段端断", dui: "队", duo: "多",
   en: "嗯", er: "儿二",
   fa: "法发", fang: "放方", fei: "废飞", fen: "分坟", feng: "封", fu: "扶副",
@@ -50,7 +50,7 @@ export const HAN_PINYIN = Object.freeze({
   ya: "压哑", yan: "沿烟掩", yao: "咬要幺药", ye: "也", yi: "一以", ying: "硬应", yong: "用",
   you: "有又右", yuan: "员原院", yun: "运",
   za: "咋", zai: "在再", zao: "遭早灶", zen: "怎", zha: "炸", zhan: "战站", zhang: "长",
-  zhao: "照", zhe: "着这", zhen: "真阵", zhi: "指", zhong: "重", zhou: "周", zhu: "住",
+  zhao: "照", zhe: "着这", zhen: "真阵", zheng: "整", zhi: "指", zhong: "重", zhou: "周", zhu: "住",
   zhuan: "转专", zhuang: "装", zhui: "追", zhun: "准", zi: "子自", zou: "走", zuan: "钻", zui: "嘴最", zuo: "左",
 });
 

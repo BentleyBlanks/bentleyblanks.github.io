@@ -76,9 +76,13 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "14": P("normal", 0.55, { context: "拍了拍自己的枪", delivery: "得意，嘴角带笑", pauseBeforeS: 0.4,
       effort: { after: "说完几个人一起短促地笑了一声，马上收住" }, emit: [{ id: "BanterPatRifle", at: "start" }] }),
   }),
-  BunkerOrders: Scene(true, "传令兵跑到防炮洞口扶住木撑，冲洞里的班长喊；班长在洞里一两米外，听完立刻回身下令", {
+  // 2026-09-27 用户追加 02–04：班长不是一听就下令，先压着嗓子盘算，幺娃慌着问一句，班长再想一句，05 才回身下令。
+  BunkerOrders: Scene(true, "传令兵跑到防炮洞口扶住木撑，冲洞里的班长喊；班长跪在洞口一两米外朝前沟看，听完没有马上下令：先压着嗓子自己盘算，幺娃在洞里紧张地问了一句，班长盯着前沟又低声想了一句，这才回身朝洞里下令", {
     "01": P("shout", 0.85, { context: "刚跑到洞口", delivery: "话几乎和喘气挤在一起", effort: { before: "急喘两下" } }),
-    "02": P("shout", 0.8, { context: "朝前沟看了一眼，立即回身", delivery: "短促有力的命令，不拖音" }),
+    "02": P("normal", 0.5, { context: "跪在洞口朝前沟看，没有回头", delivery: "自言自语地盘算，声音压着但实在、洞里的人都听得清，不是耳语气声；中间停一下", pauseBeforeS: 0.8 }),
+    "03": P("normal", 0.6, { context: "抱着枪坐在洞里，盯着班长的背", delivery: "压着嗓子，心里发慌，有点结巴", pauseBeforeS: 0.5 }),
+    "04": P("normal", 0.6, { context: "还是盯着前沟，没回头", delivery: "边想边说，声音沉、实在、听得清，不是耳语，不拖；最后半句下了决心，语气一沉", pauseBeforeS: 0.5 }),
+    "05": P("shout", 0.8, { context: "一撑地站起来，回身朝洞里", delivery: "短促有力的命令，不拖音", pauseBeforeS: 0.3 }),
   }),
   // 被爆炸截断：句尾约 0.35 s 处硬掐（原文「炮弹！趴下——！（被爆炸截断）」），截断那一刻发 BunkerBlast。
   BunkerIncoming: Scene(true, "洞外交通沟里一个兵听见炮弹啸声逼近，隔着十来米朝防炮洞拼命示警", {

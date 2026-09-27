@@ -102,7 +102,7 @@ export class FirstLevelOpening {
   BeginBunker(){
     const r=this.r;
     if(this.bunker)return;
-    this.bunker={started:r.time,blastAt:null,killAt:null,killed:0,searchAt:null};
+    this.bunker={started:r.time,blastAt:null,landedAt:null,killAt:null,killed:0,searchAt:null};
     r.BeginControl("trapped",R.trappedMaxS,{lookAt:r.Point(A.bunkerDoor,1.1),lookSeconds:R.deathLookSeconds});
     r.player.stance="prone";
     this.SpawnCaptives();
@@ -115,17 +115,27 @@ export class FirstLevelOpening {
     this.r.frontShow?.bunker.Begin();
   }
   get captives(){return this.r.frontShow?.bunker.captives || [];}
-  /** 近爆（黑屏对白末句被打断处；没有音频时按 bunkerBlastAtS 兜底）。 */
+  /**
+   * 近爆（黑屏对白末句被打断处；没有音频时按 bunkerBlastAtS 兜底）。这一刻炮弹才出膛：
+   * 洞口塌方（bunkerCollapsed → 断门楣、断木板、塌土换上来）与震屏等炮弹落地（LandBunkerShell）。
+   * 2026-09-27 用户：「先断木板，再出现炮弹的声音，太怪了」——原来这三样都记在出膛这一帧，比爆炸早 0.22 s。
+   */
   BunkerBlast(){
     const r=this.r;
     if(!this.bunker||this.bunker.blastAt!=null)return;
     this.bunker.blastAt=r.time;
     this.blastAt=r.time;
-    r.player.Suppress?.(.9);
     // The shell is still in flight: hold the story tinnitus open past the impact so the blast is heard first.
     r.audio.Deafen?.(1.1,C.deafenHoldS);
-    r.Record("bunkerCollapsed",{x:A.bunker.x,z:A.bunker.z});
     r.frontShow?.bunker.Blast();
+  }
+  /** 炮弹落地（出膛后 blastShot.fallStartS，与 Blast 里 FireShell 的飞行时间同一个数）：这才塌、才震。 */
+  LandBunkerShell(){
+    const r=this.r,bunker=this.bunker;
+    if(!bunker||bunker.blastAt==null||bunker.landedAt!=null)return;
+    bunker.landedAt=r.time;
+    r.player.Suppress?.(.9);
+    r.Record("bunkerCollapsed",{x:A.bunker.x,z:A.bunker.z});
   }
   /** 检查点重试落在 01：整拍重来。 */
   ResetBunker(){
@@ -149,6 +159,7 @@ export class FirstLevelOpening {
     // old banter-length fallback.
     if(!r.frontShow?.bunker&&bunker.blastAt==null&&r.time-bunker.started>=R.bunkerBanterFallbackS)this.BunkerBlast();
     if(bunker.blastAt==null)return;
+    if(bunker.landedAt==null&&r.time-bunker.blastAt>=Storyboard.banter.blastShot.fallStartS)this.LandBunkerShell();
     r.frontShow?.bunker.UpdateBunker(bunker);
   }
 

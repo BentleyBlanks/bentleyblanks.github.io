@@ -886,6 +886,16 @@ stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress�
 - 喘息：原来近爆与枪托后各连续喘约 19 s（`breathHeavy` 0.95，每 2.4 s 续一条），外加压制那层的喘息与心跳。
   现在各喘 3 / 2 口（`OPENING.breath`：1.5 s 起、间隔 2.6 s、0.62 起每口递减到一半），压制那层让位（见第 5 节）。
 
+【2026-09-27 用户反馈「先断木板，再出现炮弹的声音，太怪了」】
+- 还是出膛与落地差 0.22 s 的问题：出膛那一帧导演已经播了近处落土 `debrisFall`（0.9，挂在顺子身上），
+  `BunkerBlast` 也已经记 `bunkerCollapsed`（断门楣、断木板、塌土整套换上来）、`Suppress` 震屏，川军的
+  `BlastSlamBuried` 撞墙、顺子手里的枪飞出去也都在这一帧起——全比 `explosionNear` 早 0.22 s。
+- 改：出膛那一帧只留耳鸣起音期（它本来就从触发算）；`FirstLevelOpening.LandBunkerShell` 在
+  `blastShot.fallStartS` 记 `bunkerCollapsed` + 震屏，导演 `PhaseBlast` 在同一刻起撞墙动作、甩枪、藏木头，
+  近处落土挪到 `blastShot.debrisS`（0.38 s，爆炸后 0.16 s）。
+- 实测（无头浏览器，逐帧推）：出膛 63.850 → `explosionNear` 64.067 → `bunkerCollapsed` / 塌方布景出现 / 震屏 64.083
+  → 导演的落土 64.233。
+
 ### 7. 配乐让位与标点（`Data_FirstLevelMissionMusic.FIRST_LEVEL_MUSIC_COMBAT`）
 
 撤退段与 03–05：战场强度 0.35 → 0.9 时配乐线性压到 0.45 倍（按 0.05 取整，免得每帧写斜坡）；

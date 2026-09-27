@@ -110,7 +110,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // skips a physical beat that the flow needs: it forces the beat (a late walker runs, a
   // missed shot is fired again by another man, a contact that did not kill is made lethal).
   timeouts:Object.freeze({
-    banterExtraS:8, runnerArriveS:9, ordersExitS:9, blastEventS:3.5, blackS:3.0, wakeS:5.8,
+    // ordersSlackS: past the runner's arrival timeout plus the whole BunkerOrders take, the squad leaves anyway.
+    banterExtraS:8, runnerArriveS:9, ordersSlackS:3, ordersExitS:9, blastEventS:3.5, blackS:3.0, wakeS:5.8,
     // interpreterCallS: from ijaB's call (InterpreterCall) until the drag may start without it having ended.
     frontPassS:14, walkInS:12, interpreterCallS:6, interrogationExtraS:10, tauntExtraS:8, reachS:3.4, foundWalkS:10,
     dragOutS:9, bootsS:8, holdLineS:8, glimpseGateS:2.2, luoArriveS:7, heArriveS:7, fleeS:3.2,
@@ -331,7 +332,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // to yaw/pitch with the head rolled to the left by fallEndS; the eyes close at eyesCloseS; Black at phaseS.
     // pitchDeg -6 (contract -14, ±8): at -14 the lintel was above the frame and the north post's top half hung over the
     // bank of the trench outside (09-25 review); at -6 post and lintel frame the mouth on the right (tmp/fix trials).
-    blastShot:Object.freeze({ fallStartS:.22, fallEndS:.65, eyeM:.75, yawDeg:-66, pitchDeg:-6, rollDeg:17, eyesCloseS:.84, phaseS:1.0 }),
+    // debrisS: the dirt and timber raining on him after the explosion (debrisFall; was played on the trigger frame, i.e.
+    // before the shell landed -- 「先断木板，再出现炮弹的声音」, user 09-27).
+    blastShot:Object.freeze({ fallStartS:.22, fallEndS:.65, eyeM:.75, yawDeg:-66, pitchDeg:-6, rollDeg:17, eyesCloseS:.84, phaseS:1.0, debrisS:.38 }),
     // The runner comes down the SSW leg, round the bend and in along the north wall to the inside of the north post.
     runnerRoute:Route([-1,-118.5],[1.2,-120.6],[3.0,-121.6],[3.3,-123.6],[2.2,-126.0],[.72,-127.0]),
     // Everyone who leaves after the order goes out of the mouth, down the SSW leg to RC and on west.

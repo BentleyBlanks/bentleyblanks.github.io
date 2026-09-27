@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-27T10:15:42.144Z",
+  "updatedAt": "2026-09-27T15:04:34.747Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -2276,52 +2276,52 @@
       "who": "runner",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 3.88,
-      "bytes": 47378,
-      "sha256": "c57ebd6c7899ade440f0d420d441ad3dbf33678f10b25e0db2663088e77bc630",
+      "seconds": 4.09,
+      "bytes": 49886,
+      "sha256": "82d4a88f44d9f3650106fe2764073fffcb7a904c55a68b1a430ba9bef35be7c2",
       "source": "scene",
-      "sceneSha256": "09f06a7ef317b86483e002036362efb8d79576a511dcb2c8221de49b97dbfdf9",
-      "sceneStartS": 0.02,
-      "sceneEndS": 3.9,
+      "sceneSha256": "731e541bb3e889f07fc3a644cb7a0a070e4ef08b9fe180de72fb5ea6d208d6d9",
+      "sceneStartS": 0.01,
+      "sceneEndS": 4.1,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -38.7,
-        -43.5
+        -88,
+        -65.4
       ],
       "cutMethod": "subtitle",
       "castOwner": "runner",
       "castSha256": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.83,
-        "truePeakDb": -3.21,
-        "snrDb": 43.76,
-        "voicedS": 2.54,
-        "lowShare": 0.124,
+        "activeRmsDb": -15.15,
+        "truePeakDb": -2.32,
+        "snrDb": 43.45,
+        "voicedS": 2.66,
+        "lowShare": 0.098,
         "f0": {
-          "median": 327,
-          "p10": 250,
-          "p90": 381,
-          "frames": 81
+          "median": 356,
+          "p10": 286,
+          "p90": 400,
+          "frames": 90
         },
-        "cer": 0.2778,
-        "transcript": "班长,冬头破了,鬼子的仙头冰铁上炮上来了。",
-        "speakerCos": 0.811,
+        "cer": 0.4444,
+        "transcript": "班长,冬头婆了,闺子里的闲头兵,铁子跑上来了。",
+        "speakerCos": 0.566,
         "nearestOther": [
-          "luo",
-          0.287
+          "yaowa",
+          0.604
         ],
         "referencedOther": [
-          "luo",
-          0.287
+          "yaowa",
+          0.604
         ],
-        "lengthDiff": 0,
+        "lengthDiff": 1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 3.06
+        "sceneGainDb": 1.58
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -2331,53 +2331,53 @@
       "index": 1,
       "who": "luo",
       "lang": "zh",
-      "projection": "shout",
-      "seconds": 1.937,
-      "bytes": 24182,
-      "sha256": "94f97e2c797dabe2605e507f51e3250a7d5b08a9d1d5f90e3bbacdbec333e28d",
+      "projection": "normal",
+      "seconds": 3.67,
+      "bytes": 44871,
+      "sha256": "3a85a2d026958fd93eb54c3ad98edaeef607b5f2c909d0a5ac79ab5e1cb8811b",
       "source": "scene",
-      "sceneSha256": "09f06a7ef317b86483e002036362efb8d79576a511dcb2c8221de49b97dbfdf9",
-      "sceneStartS": 4.07,
-      "sceneEndS": 6.007,
-      "gapBeforeS": 0.17,
+      "sceneSha256": "731e541bb3e889f07fc3a644cb7a0a070e4ef08b9fe180de72fb5ea6d208d6d9",
+      "sceneStartS": 4.29,
+      "sceneEndS": 7.96,
+      "gapBeforeS": 0.19,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -39.4,
-        -11.8
+        -93.6,
+        -57
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -14.71,
-        "truePeakDb": -1.45,
-        "snrDb": 53.28,
-        "voicedS": 1.42,
-        "lowShare": 0.168,
+        "activeRmsDb": -31.48,
+        "truePeakDb": -11.78,
+        "snrDb": 61.15,
+        "voicedS": 2.28,
+        "lowShare": 0.335,
         "f0": {
-          "median": 308,
-          "p10": 178,
-          "p90": 356,
-          "frames": 29
+          "median": 98,
+          "p10": 78,
+          "p90": 176,
+          "frames": 26
         },
-        "cer": 0.6667,
-        "transcript": "胆装气,挖喉沟菜,跟进!",
-        "speakerCos": 0.636,
+        "cer": 0.3077,
+        "transcript": "东头破了,那钱沟一下就要造草。",
+        "speakerCos": 0.839,
         "nearestOther": [
-          "runner",
-          0.526
+          "yaowa",
+          0.649
         ],
         "referencedOther": [
-          "runner",
-          0.526
+          "yaowa",
+          0.649
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 3.06
+        "sceneGainDb": 1.58
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7755,6 +7755,174 @@
         "sceneGainDb": 2.45
       },
       "mastering": "SliceOfWholeSceneMaster"
+    },
+    "BunkerOrders.03": {
+      "file": "Lines/AudioVoice_FirstLevelBunkerOrders_03.mp3",
+      "scene": "BunkerOrders",
+      "index": 2,
+      "who": "yaowa",
+      "lang": "zh",
+      "projection": "normal",
+      "seconds": 2.03,
+      "bytes": 25122,
+      "sha256": "9e7926dedfef813e18086f7ecaf880c2dae855b5686910b9603dc8a14b9a433a",
+      "source": "scene",
+      "sceneSha256": "731e541bb3e889f07fc3a644cb7a0a070e4ef08b9fe180de72fb5ea6d208d6d9",
+      "sceneStartS": 8.63,
+      "sceneEndS": 10.66,
+      "gapBeforeS": 0.67,
+      "tight": [
+        false,
+        false
+      ],
+      "edgeDb": [
+        -70,
+        -67.1
+      ],
+      "cutMethod": "subtitle",
+      "castOwner": "yaowa",
+      "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
+      "referenced": true,
+      "metrics": {
+        "activeRmsDb": -24.66,
+        "truePeakDb": -6.79,
+        "snrDb": 54.18,
+        "voicedS": 1.16,
+        "lowShare": 0.284,
+        "f0": {
+          "median": 162,
+          "p10": 125,
+          "p90": 198,
+          "frames": 25
+        },
+        "cer": 0.5714,
+        "transcript": "班长,拿扎个阵。",
+        "speakerCos": 0.707,
+        "nearestOther": [
+          "luo",
+          0.585
+        ],
+        "referencedOther": [
+          "luo",
+          0.585
+        ],
+        "lengthDiff": -1,
+        "subtitleCoverage": 1,
+        "sceneGainDb": 1.58
+      },
+      "mastering": "SliceOfWholeSceneMaster"
+    },
+    "BunkerOrders.04": {
+      "file": "Lines/AudioVoice_FirstLevelBunkerOrders_04.mp3",
+      "scene": "BunkerOrders",
+      "index": 3,
+      "who": "luo",
+      "lang": "zh",
+      "projection": "normal",
+      "seconds": 5.06,
+      "bytes": 61485,
+      "sha256": "1327038c36dcbf960f06f687553a7d44b8c56d7ac0ec7ef475e0eb343fafc6cc",
+      "source": "scene",
+      "sceneSha256": "731e541bb3e889f07fc3a644cb7a0a070e4ef08b9fe180de72fb5ea6d208d6d9",
+      "sceneStartS": 10.87,
+      "sceneEndS": 15.93,
+      "gapBeforeS": 0.21,
+      "tight": [
+        false,
+        false
+      ],
+      "edgeDb": [
+        -72.5,
+        -37.5
+      ],
+      "cutMethod": "subtitle",
+      "castOwner": "luo",
+      "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
+      "referenced": true,
+      "metrics": {
+        "activeRmsDb": -31.19,
+        "truePeakDb": -11.55,
+        "snrDb": 68.39,
+        "voicedS": 2.9,
+        "lowShare": 0.41,
+        "f0": {
+          "median": 103,
+          "p10": 79,
+          "p90": 130,
+          "frames": 38
+        },
+        "cer": 0.3,
+        "transcript": "铁轴跑上来的,跑一停就磨进沟了,这个洞收不住。",
+        "speakerCos": 0.852,
+        "nearestOther": [
+          "yaowa",
+          0.65
+        ],
+        "referencedOther": [
+          "yaowa",
+          0.65
+        ],
+        "lengthDiff": 0,
+        "subtitleCoverage": 1,
+        "sceneGainDb": 1.58
+      },
+      "mastering": "SliceOfWholeSceneMaster"
+    },
+    "BunkerOrders.05": {
+      "file": "Lines/AudioVoice_FirstLevelBunkerOrders_05.mp3",
+      "scene": "BunkerOrders",
+      "index": 4,
+      "who": "luo",
+      "lang": "zh",
+      "projection": "shout",
+      "seconds": 2.283,
+      "bytes": 28257,
+      "sha256": "5dd5cebb99902e156f100b95a5e878cf65b2c0eeae1bb36935066b1953784249",
+      "source": "scene",
+      "sceneSha256": "731e541bb3e889f07fc3a644cb7a0a070e4ef08b9fe180de72fb5ea6d208d6d9",
+      "sceneStartS": 16.25,
+      "sceneEndS": 18.533,
+      "gapBeforeS": 0.32,
+      "tight": [
+        false,
+        false
+      ],
+      "edgeDb": [
+        -77.2,
+        -35.3
+      ],
+      "cutMethod": "subtitle",
+      "castOwner": "luo",
+      "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
+      "referenced": true,
+      "metrics": {
+        "activeRmsDb": -15.56,
+        "truePeakDb": -2.25,
+        "snrDb": 77.1,
+        "voicedS": 1.46,
+        "lowShare": 0.179,
+        "f0": {
+          "median": 327,
+          "p10": 205,
+          "p90": 381,
+          "frames": 26
+        },
+        "cer": 0.6667,
+        "transcript": "胆壮气,往后狗腿,跟进!",
+        "speakerCos": 0.74,
+        "nearestOther": [
+          "yaowa",
+          0.573
+        ],
+        "referencedOther": [
+          "yaowa",
+          0.573
+        ],
+        "lengthDiff": 0,
+        "subtitleCoverage": 1,
+        "sceneGainDb": 1.58
+      },
+      "mastering": "SliceOfWholeSceneMaster"
     }
   },
   "scenes": {
@@ -7949,11 +8117,11 @@
     },
     "BunkerOrders": {
       "file": "AudioVoice_FirstLevelBunkerOrders.mp3",
-      "sha256": "09f06a7ef317b86483e002036362efb8d79576a511dcb2c8221de49b97dbfdf9",
-      "seconds": 6.007,
-      "bytes": 72769,
-      "promptHash": "797ac5f26c3eddd264f0ee2425d8d2cb916be8a735f4e34bbe1c1113be7f5e99",
-      "castKey": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
+      "sha256": "731e541bb3e889f07fc3a644cb7a0a070e4ef08b9fe180de72fb5ea6d208d6d9",
+      "seconds": 18.533,
+      "bytes": 223235,
+      "promptHash": "3707db523a57262f06d11e80e8b4f8a62e8b81fcfddb05e58693f8398d307621",
+      "castKey": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be,1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
       "references": [
         {
           "who": [
@@ -7968,11 +8136,21 @@
           ],
           "owner": "luo",
           "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+        },
+        {
+          "who": [
+            "yaowa"
+          ],
+          "owner": "yaowa",
+          "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706"
         }
       ],
       "lines": [
         "BunkerOrders.01",
-        "BunkerOrders.02"
+        "BunkerOrders.02",
+        "BunkerOrders.03",
+        "BunkerOrders.04",
+        "BunkerOrders.05"
       ],
       "attempt": 1,
       "pickedBy": "check",
@@ -7981,20 +8159,22 @@
         {
           "n": 1,
           "hard": [],
-          "flags": 1
+          "flags": 3
         }
       ],
       "hard": [],
       "flags": [
-        "BunkerOrders.02 字错率 0.6667 待逐字核对「胆装气,挖喉沟菜,跟进!」"
+        "BunkerOrders.01 字错率 0.4444 待逐字核对「班长,冬头婆了,闺子里的闲头兵,铁子跑上来了。」",
+        "BunkerOrders.03 字错率 0.5714 待逐字核对「班长,拿扎个阵。」",
+        "BunkerOrders.05 字错率 0.6667 待逐字核对「胆壮气,往后狗腿,跟进!」"
       ],
-      "targetDb": -16,
-      "gainDb": 3.06,
-      "trimStartS": 1.02,
+      "targetDb": -17.81,
+      "gainDb": 1.58,
+      "trimStartS": 0.38,
       "measure": {
-        "activeRmsDb": -16.31,
-        "truePeakDb": -1.37,
-        "snrDb": 45.41
+        "activeRmsDb": -17.81,
+        "truePeakDb": -2.33,
+        "snrDb": 65.12
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },

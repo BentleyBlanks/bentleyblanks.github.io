@@ -62,11 +62,24 @@
       "cer": 0.5,
       "note": "拿→那、噻→是，同音；句尾省略号是随后的短笑。"
     },
-    "BunkerOrders.02": {
-      "sha256": "94f97e2c797dabe2605e507f51e3250a7d5b08a9d1d5f90e3bbacdbec333e28d",
-      "transcript": "胆装气,挖喉沟菜,跟进!",
+    "BunkerOrders.01": {
+      "sha256": "82d4a88f44d9f3650106fe2764073fffcb7a904c55a68b1a430ba9bef35be7c2",
+      "transcript": "班长,冬头婆了,闺子里的闲头兵,铁子跑上来了。",
+      "cer": 0.4444,
+      "note": "逐字：东→冬、破→婆、鬼→闺、先→闲、贴着炮→铁子跑，全是同音/近音字；「鬼子的」转成「闺子里的」多一个「里」，其余字数语序一致。"
+    },
+    "BunkerOrders.03": {
+      "sha256": "9e7926dedfef813e18086f7ecaf880c2dae855b5686910b9603dc8a14b9a433a",
+      "transcript": "班长,拿扎个阵。",
+      "cer": 0.5714,
+      "note": "那→拿、咋→扎、整→阵（四川话 zheng/zhen 不分）为近音字；稿里的结巴「那、那」只转出一个字，可能被 whisper 合并，也可能没结巴出来。",
+      "needsListening": true
+    },
+    "BunkerOrders.05": {
+      "sha256": "5dd5cebb99902e156f100b95a5e878cf65b2c0eeae1bb36935066b1953784249",
+      "transcript": "胆壮气,往后狗腿,跟进!",
       "cer": 0.6667,
-      "note": "弹→胆、起→气、往→挖、后→喉、撤→菜（che/cai 近音）、紧→进；三段短命令都在。"
+      "note": "弹→胆、装→壮、起→气、沟撤→狗腿（gou-che 近音）、紧→进；三段短命令都在，字数一致。与上一版录音同样的同音转写。"
     },
     "BunkerIncoming.01": {
       "sha256": "71312a4ca4d254ed994829997b42e387f16403adc9afc8e0939b0012083e9c39",
