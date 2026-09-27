@@ -21,6 +21,7 @@ import {
   MakeRubbleField, MakeInstanced, TILE_METERS, BRICK_UV_GRID,
 } from "./Script_Geo.mjs";
 import { ColliderDestructionData } from "./Data_Destruction.mjs";
+import { SANDBAG_ASSET_IDS, SANDBAG_METRICS } from "./Data_SandbagStandard.mjs";
 import { AddCourtyardLife } from "./Script_LivedInProps.mjs";
 
 /** 建造过程中的收集器：按材质名分桶攒几何体，最后一次性合并。 */
@@ -1722,21 +1723,15 @@ export function AddMosque(sink, { x, z, ry = 0, seed = "mq", damage = 0.4 }) {
 }
 
 /**
- * 外部战场包里的三种沙袋组合件。
+ * 外部战场包里的三种沙袋 —— 全项目沙袋的唯一模型（Data_SandbagStandard，
+ * docs/Data_SandbagStandard.md）。这里保留旧导出名给既有调用方。
  *
- * 这三件不是 0.62 m 的程序化单袋，而是约 1.9—2.0 m 宽的一小段袋墙；构建器按
- * 目标槽宽等比缩放后拼排。尺寸来自 Model_BattlefieldPack.glb 的实测包围盒，既
- * 决定相邻件间距，也让 01/02/03 的原始比例保持不变。
+ * 每件约 1.9—2.0 m 长；构建器按目标槽宽等比缩放后拼排。尺寸来自
+ * Model_BattlefieldPack.glb 的实测包围盒，既决定相邻件间距，也让 01/02/03 的原始比例保持不变。
  */
-export const EXTERNAL_SANDBAG_ASSET_IDS = Object.freeze([
-  "battlefieldSandbag01", "battlefieldSandbag02", "battlefieldSandbag03",
-]);
+export const EXTERNAL_SANDBAG_ASSET_IDS = SANDBAG_ASSET_IDS;
 
-export const EXTERNAL_SANDBAG_METRICS = Object.freeze({
-  battlefieldSandbag01: Object.freeze({ width: 1.926, height: 0.426, depth: 0.866 }),
-  battlefieldSandbag02: Object.freeze({ width: 2.017, height: 0.426, depth: 1.303 }),
-  battlefieldSandbag03: Object.freeze({ width: 1.883, height: 0.533, depth: 0.936 }),
-});
+export const EXTERNAL_SANDBAG_METRICS = SANDBAG_METRICS;
 // 堆垛参数只在这里定一份：层距必须小于三种模型缩放后的最低袋高，奇偶层错缝；
 // 纵深三道互相压叠。否则包围盒看似相交，袋端的收尖轮廓仍会在斜视图里露出贯通空洞。
 export const EXTERNAL_SANDBAG_PACKING = Object.freeze({
@@ -1788,15 +1783,16 @@ function MakeExternalSandbagPicker(rnd) {
 }
 
 function PushExternalSandbag(sink, placements, pick, rnd, {
-  x, y, z, ry, slotWidth = EXTERNAL_SANDBAG_PACKING.slot,
+  x, y, z, ry, slotWidth = EXTERNAL_SANDBAG_PACKING.slot, groundRow = false,
 }) {
   const asset = pick();
   const metrics = EXTERNAL_SANDBAG_METRICS[asset];
   // 袋体略宽于槽位：软袋落下会相互挤压，不能像木箱一样边贴边仍留下笔直暗缝。
   const scale = (slotWidth * (1.08 + (rnd() - 0.5) * 0.08)) / metrics.width;
+  // groundRow：最底一层。摆放时（Script_ExternalProps）顶面不动、往下伸到袋底压进地面。
   placements.push({
     asset, x, y, z, ry, scale, solid: false,
-    generatedSandbag: true,
+    generatedSandbag: true, ...(groundRow ? { groundRow: true } : {}),
   });
 }
 
@@ -1823,7 +1819,7 @@ export function AddBarricade(sink, { x, z, ry = 0, length = 5, seed = "bar", hei
         y: row * EXTERNAL_SANDBAG_PACKING.layerStep,
         z: z - sin * lx - cos * lz,
         ry: ry + (rnd() - 0.5) * 0.20,
-        slotWidth,
+        slotWidth, groundRow: row === 0,
       });
     }
   }
@@ -3147,7 +3143,7 @@ export function AddSandbagPlug(sink, {
           PushExternalSandbag(sink, placements, pick, rnd, {
             x: p.x, y, z: p.z,
             ry: ry + (rnd() - 0.5) * 0.22,
-            slotWidth,
+            slotWidth, groundRow: r === 0,
           });
         }
       }
@@ -3204,7 +3200,7 @@ export function AddSandbagEmplacement(sink, {
         PushExternalSandbag(sink, placements, pick, rnd, {
           x: p.x, y: baseY + bagH * row, z: p.z,
           ry: axisRy + (rnd() - 0.5) * 0.16,
-          slotWidth,
+          slotWidth, groundRow: row === 0,
         });
       }
     }

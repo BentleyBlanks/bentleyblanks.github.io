@@ -33,6 +33,18 @@ try {
     const {MISSION_TACTICS,MISSION_ENCOUNTERS,MISSION_PURSUIT_ROUTE}=await import("./Data_FirstLevelMission.mjs");
     const {MISSION_DEFENSE_OBJECTS,IsMissionSandbagBlock}=await import("./Data_FirstLevelMissionFortifications.mjs");
     const {Box3,Vector3,Matrix4,Quaternion}=await import("three");
+    const {SANDBAG_GROUNDING,SANDBAG_METRICS,SandbagFootprintGround}=await import("./Data_SandbagStandard.mjs");
+    // 贴地：每件最底层袋子的袋底（不是包围盒底）都要压进它脚印下的地面；下伸到上限的单独记。
+    const floating=[],capped=[];let bottomRow=0;
+    for(const p of field.fortificationPlacements.filter(p=>p.sourceBlock&&/_0_\d+$/.test(p.id))){
+      const m=SANDBAG_METRICS[p.asset],size=field.fortificationModels.get(p.asset).size;bottomRow++;
+      const {ground}=SandbagFootprintGround((x,z)=>field.GroundHeight(x,z),p.x,p.z,p.ry,size.x*p.scale[0]/2,size.z*p.scale[2]/2);
+      const sole=p.y+m.sole*size.y*p.scale[1];
+      if(sole>ground-SANDBAG_GROUNDING.embedM+.005){
+        const block=field.layout.blocks.find(b=>b.id===p.sourceBlock);
+        (block.y-block.h/2-p.y>=SANDBAG_GROUNDING.maxDropM-.005?capped:floating).push(`${p.id} +${(sole-ground).toFixed(2)}`);
+      }
+    }
     const blocks=field.layout.blocks.filter(b=>IsMissionSandbagBlock(b.id));
     const missing=blocks.filter(b=>!field.fortificationPlacements.some(p=>p.sourceBlock===b.id)).map(b=>b.id);
     const envelopeErrors=[];
@@ -51,8 +63,11 @@ try {
         }
       }
       const dimensions=local.getSize(new Vector3()),center=local.getCenter(new Vector3());
-      if(Math.abs(dimensions.x-block.w)>.025||Math.abs(dimensions.y-block.h)>.025||Math.abs(dimensions.z-block.d)>.025||
-        Math.abs(center.x)>.025||Math.abs(center.y)>.025||Math.abs(center.z)>.025)envelopeErrors.push(block.id);
+      // 顶面与四周贴着实体外壳；底面只许往下伸（最底层贴地，docs/Data_SandbagStandard.md），
+      // 最多 SANDBAG_GROUNDING.maxDropM。
+      const drop=-block.h/2-local.min.y;
+      if(Math.abs(dimensions.x-block.w)>.025||Math.abs(local.max.y-block.h/2)>.025||Math.abs(dimensions.z-block.d)>.025||
+        Math.abs(center.x)>.025||Math.abs(center.z)>.025||drop<-.025||drop>SANDBAG_GROUNDING.maxDropM+.025)envelopeErrors.push(block.id);
     }
     const meshes=field.meshes.filter(m=>m.name.includes("MissionDefense_"));
     const obstacles=field.colliders.filter(c=>["fence","barricade"].includes(c.tag));
@@ -90,7 +105,7 @@ try {
       allDeform:earthMeshes.every(m=>m.userData.deformableTerrain),
       finite:earthMeshes.every(m=>Array.from(m.geometry.attributes.position.array).every(Number.isFinite)),
       oldTimbers:field.layout.blocks.filter(b=>/(?:Revetment\d+_-?1(?:Post|Slat\d+)|Duckboard\d+)$/.test(b.id)).length};
-    return {earth,terrainPbr,count:field.fortificationPlacements.length,blocks:blocks.length,missing,envelopeErrors,wireGaps,cuts:cuts.slice(0,10),assets,
+    return {earth,terrainPbr,count:field.fortificationPlacements.length,blocks:blocks.length,missing,envelopeErrors,floating,capped,bottomRow,wireGaps,cuts:cuts.slice(0,10),assets,
       objectCount:MISSION_DEFENSE_OBJECTS.length,obstacles:obstacles.length,meshCount:meshes.length,
       triangles:meshes.reduce((n,m)=>n+(m.geometry.index?.count||m.geometry.attributes.position.count)/3,0),bounds};
   });
@@ -163,7 +178,9 @@ try {
     },shot);
     await page.screenshot({path:path.join(out,shot.id+".png")});
   }
-  assert.ok(report.count>100);assert.equal(report.missing.length,0);assert.deepEqual(report.envelopeErrors,[],"visual stacks retain the collision envelopes");assert.equal(report.cuts.length,0,"obstacles must leave mission and withdrawal lanes clear");
+  assert.ok(report.count>100);assert.equal(report.missing.length,0);assert.deepEqual(report.envelopeErrors,[],"visual stacks retain the collision envelopes");
+  console.log(`bottom-row sandbags ${report.bottomRow}, floating ${report.floating.length}, capped ${report.capped.length}`,report.capped.slice(0,8));
+  assert.deepEqual(report.floating,[],"every bottom-row sandbag presses its sole into the ground (docs/Data_SandbagStandard.md)");assert.equal(report.cuts.length,0,"obstacles must leave mission and withdrawal lanes clear");
   assert.ok(report.meshCount>0&&report.meshCount<70);assert.ok(report.triangles<600000);
   assert.ok(report.wireGaps.every(p=>p.gap!=="fence"&&p.post==="fence"&&p.strand==="fence"),"stake and strand collision must leave open firing gaps: "+JSON.stringify(report.wireGaps));
   const rebuild=await page.evaluate(async()=>{

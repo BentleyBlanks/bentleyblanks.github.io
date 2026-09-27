@@ -183,11 +183,10 @@ export function BuildRearWhitebox(groundAt) {
   Coping("ReceptionEastNorth", 2, 228.1, 19.8, .7, 2.84);
   Detail("ReceptionEastSouthSkin", 2, 243.5, .9, 3.05, 2.9, "plaster", { y: groundAt(2, 243.5) + 1.33 });
   // Forecourt: sandbag breastwork south of the door (1.0 m, 3 m), broken brick north of it.
+  // The block is only the solid/cover envelope: IsMissionSandbagBlock fills it with the standard
+  // sandbag model (docs/Data_SandbagStandard.md); the old canvas course strips are gone with it.
   Box(blocks, "ReceptionGateSandbags", 3.55, 244.75, .9, 1, 3.1, "earthDark",
     { cover: { faceX: 1, faceZ: 0 } });
-  for (let i = 0; i < 3; i++)
-    Detail(`ReceptionGateSandbagCourse${i}`, 3.55 + (i % 2 ? .04 : -.04), 244.75, .96, .05, 3.14 - i * .08,
-      "canvas", { y: groundAt(3.55, 244.75) + .33 * (i + 1) });
   Rubble("ReceptionGateBrick", 3.5, 234.2, 9, 1, 1.4, .5);
   Rubble("ReceptionForecourt", 8.2, 226.5, 8, 1.6, 2.4, .3, "earthDark");
   Detail("ReceptionGateBrokenCart", 11.3, 234.4, 2.8, .55, 1.2, "timber",

@@ -1,4 +1,5 @@
 // Historical placement rationale and sources: docs/Data_FirstLevelFortifications.md.
+import { SANDBAG_ASSET_IDS } from "./Data_SandbagStandard.mjs";
 // Authored gameplay coordinates, not surveyed 1938 positions. X east, Z south, metres.
 export const MISSION_DEFENSE_POSTS = Object.freeze([
   {id:"StationDefense",x:-65,z:48,w:5.4,h:.85,d:.75},
@@ -9,17 +10,19 @@ export const MISSION_DEFENSE_POSTS = Object.freeze([
 ]);
 
 // Existing human-scale solid envelopes become layered bags, retaining their cover/route contract.
+// Every block the layout means as sandbags belongs here - a sandbag drawn any other way (a blue box
+// with painted seams, a canvas strip, a procedural bag) is not allowed (docs/Data_SandbagStandard.md).
 export function IsMissionSandbagBlock(id) {
   if(id.includes("BagSeam"))return false;
   // 沟沿上的射击位是 PCG 摆的（Script_TrenchPlan 的 bays 通道），id 是
   // `<段名>TrenchBay<n>` —— 段名在前，所以这条不能锚在开头。
   if(/TrenchBay\d+$/.test(id))return true;
-  return /^(FrontParapet|FrontTraverseCover|MachineGunSideCover|MachineGunRest$|RightNestFrontRest$|LeftGunRest$|BundleParapet$|FlankParapet$|WithdrawCover|GuardWaitingCover|GuardWaitingWing|VillageRoadBlock$|VillageApproachCover$|TransferEastCover$|TransferCorner$|TransferWestCover$|DrainCorner$|RearExitCover$|FinalAlleyCover$)/.test(id)
+  return /^(FrontParapet|FrontTraverseCover|MachineGunSideCover|MachineGunRest$|RightNestFrontRest$|LeftGunRest$|BundleParapet$|FlankParapet$|WithdrawCover|GuardWaitingCover|GuardWaitingWing|VillageRoadBlock$|VillageApproachCover$|TransferEastCover$|TransferCorner$|TransferWestCover$|DrainCorner$|RearExitCover$|FinalAlleyCover$|GapLastCover$|ObservationParapet$|ReceptionSecondCover$|ReceptionGateSandbags$)/.test(id)
     || MISSION_DEFENSE_POSTS.some(post=>post.id===id);
 }
 
 export const MISSION_DEFENSE_ASSETS = Object.freeze([
-  "battlefieldSandbag01", "battlefieldSandbag02", "battlefieldSandbag03",
+  ...SANDBAG_ASSET_IDS,
   "battlefieldBarbedWire02", "battlefieldBeamObstacle01", "battlefieldSupplyBox",
   "battlefieldCompartmentCrate", "battlefieldCanvasCover01",
 ]);

@@ -56,6 +56,7 @@ import {
 } from "./Script_TextIds.mjs";
 import { TEXT_HOLD, CARD, LOOK } from "./Data_Tuning_Cutscene.mjs";
 import { TILE_METERS, ScaleBoxUv } from "./Script_Geo.mjs";
+import { SANDBAG_ASSET_IDS, SANDBAG_METRICS, SandbagRunPlacements } from "./Data_SandbagStandard.mjs";
 import { FarLandY, ReliefHeight, FarmlandTint } from "./Script_FarLand.mjs";
 
 // 过场里的少量静态模型（例如出川的小站）走独立 loader：它们只是演出布景，
@@ -1143,8 +1144,45 @@ export class CutsceneDirector {
     return group;
   }
 
+  /**
+   * 沙袋：size 是它占的盒子（中心在 pos，同 box），里面填标准沙袋模型（docs/Data_SandbagStandard.md）。
+   * 高不过 0.6 m 的是单件，拉伸到盒子；更高的按层码成一段袋墙。模型与材质是 ExternalProps 的
+   * 共享缓存，不进 owned 清单 —— 退场只摘节点。组先返回（propMoves 按名字动的是这只组），模型到了再挂。
+   */
+  _MakeSandbagProp(spec) {
+    const group = new THREE.Group();
+    group.name = spec.name || "sandbag";
+    group.position.set(spec.pos[0], spec.pos[1], spec.pos[2]);
+    if (spec.rx) group.rotation.x = spec.rx;
+    if (spec.ry) group.rotation.y = spec.ry;
+    if (spec.rz) group.rotation.z = spec.rz;
+    const [w, h, d = w] = spec.size || [0.62, 0.24, 0.34];
+    const single = h <= 0.6;
+    const placements = single
+      ? [{ asset: spec.asset || SANDBAG_ASSET_IDS[HashString(spec.name || "sandbag") % 3], x: 0, y: -h / 2, z: 0, ry: 0, scale: null }]
+      : SandbagRunPlacements({ a: { x: -w / 2, z: 0 }, b: { x: w / 2, z: 0 }, layers: Math.max(2, Math.round(h / 0.3)),
+        layerM: h / (Math.max(2, Math.round(h / 0.3)) + 0.25), depthM: d, groundAt: () => -h / 2, seed: spec.name || "sandbagWall" });
+    const library = this.library;
+    if (!library) return group;
+    import("./Script_ExternalProps.mjs").then(async ({ InstantiateExternalProp }) => {
+      for (const p of placements) {
+        const bag = await InstantiateExternalProp(p.asset, library);
+        // 跳过/结束时组已经被摘掉就不再补挂（同 _MakeModelProp）。
+        if (!bag || !group.parent) return;
+        const m = SANDBAG_METRICS[p.asset];
+        bag.position.set(p.x, p.y, p.z);
+        bag.rotation.y = p.ry;
+        if (p.scale) bag.scale.set(...p.scale);
+        else bag.scale.set(w / m.width, h / m.height, d / m.depth);
+        group.add(bag);
+      }
+    }).catch((error) => console.warn(`[Cutscene] ${this.cut?.id || "unknown"}: 沙袋 ${spec.name || ""} 读取失败 —— ${String(error).slice(0, 160)}`));
+    return group;
+  }
+
   _MakeProp(spec) {
     if (spec.kind === "model") return this._MakeModelProp(spec);
+    if (spec.kind === "sandbag") return this._MakeSandbagProp(spec);
     const size = spec.size || [1, 1, 1];
     let geometry = null;
     // 贴图按**世界尺寸**铺：一张 Ground 是 2.6 m、一张砖是 1.2 m。Box/Plane 的 UV

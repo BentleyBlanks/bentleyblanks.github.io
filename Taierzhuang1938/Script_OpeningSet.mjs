@@ -31,7 +31,8 @@ import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { FRONT_BREAKABLES } from "./Data_FirstLevelFrontBreakables.mjs";
 import { BuildSink } from "./Script_World.mjs";
-import { MakeBox, MakeSandbag, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
+import { MakeBox, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
+import { SandbagRunPlacements } from "./Data_SandbagStandard.mjs";
 import { OpeningBlastFx } from "./Script_OpeningBlastFx.mjs";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
 
@@ -451,10 +452,13 @@ export class OpeningSet {
     const sinks = { always: new BuildSink(), collapsed: new BuildSink(), rescue: new BuildSink() };
     const materials = new Map();
     this.sinkMaterials = materials;
+    const parents = { always: this.root, collapsed: this.collapsedRoot, rescue: this.rescueRoot };
+    this.sandbagJobs = [];
     for (const prop of PROPS) {
       const sink = sinks[prop.show || "always"];
       if (!sink) throw new Error(`OpeningSet: unknown show ${prop.show} (${prop.id})`);
       sink.SetSector(`OpeningSet_${prop.show || "always"}`);
+      this.sandbagParent = parents[prop.show || "always"];
       this.BuildProp(prop, sink, materials);
     }
     const resolve = (name) => materials.get(name) || this.Lib(name);
@@ -465,6 +469,7 @@ export class OpeningSet {
     this.scene.add(this.root);
     this.root.updateMatrixWorld(true);
     this.LoadExternals();
+    this.LoadSandbags(this.sandbagJobs);
   }
 
   Lib(name, options) {
@@ -497,21 +502,18 @@ export class OpeningSet {
     throw new Error(`OpeningSet: unknown prop kind ${kind} (${prop.id})`);
   }
 
-  BuildSandbagWall(prop, sink) {
-    const rnd = Rng(prop.id), floor = this.Floor(prop, prop.a.x, prop.a.z);
-    const along = new THREE.Vector3(prop.b.x - prop.a.x, 0, prop.b.z - prop.a.z), len = along.length(); along.normalize();
-    const ry = Math.atan2(along.x, along.z) - Math.PI / 2;     // MakeSandbag 长轴沿局部 x
-    for (let layer = 0; layer < prop.layers; layer++) {
-      const stagger = layer % 2 ? prop.bagM / 2 : 0, count = Math.ceil((len + stagger) / prop.bagM);
-      for (let i = 0; i < count; i++) {
-        const s = Math.min(len - prop.bagM * 0.35, Math.max(prop.bagM * 0.35, i * prop.bagM - stagger + prop.bagM / 2));
-        for (const row of [-0.25, 0.25]) {
-          const x = prop.a.x + along.x * s + along.z * row * prop.depthM, z = prop.a.z + along.z * s - along.x * row * prop.depthM;
-          sink.Add("Sandbag", PlaceGeometry(MakeSandbag(prop.bagM * (0.94 + rnd() * 0.08), prop.layerM * 1.25, prop.depthM * 0.52, TILE_METERS.sandbag, `${prop.id}${layer}${i}${row}`),
-            { x, y: floor + prop.layerM * (layer + 0.55), z, ry: ry + (rnd() - 0.5) * 0.12, rz: (rnd() - 0.5) * 0.05 }));
-        }
-      }
-    }
+  /**
+   * 沙袋一律是标准模型（docs/Data_SandbagStandard.md）：这里只算摆位，几何由 LoadSandbags 异步烘进
+   * 本组（模板和第一关工事共用 ExternalProps 缓存，进 01 时早已下好）。洞里那面墙站在洞底上。
+   */
+  BuildSandbagWall(prop) {
+    const floor = this.Floor(prop, prop.a.x, prop.a.z);
+    this.QueueSandbags(SandbagRunPlacements({ a: prop.a, b: prop.b, layers: prop.layers, layerM: prop.layerM,
+      depthM: prop.depthM, groundAt: () => floor, seed: prop.id }));
+  }
+
+  QueueSandbags(placements) {
+    if (placements.length) this.sandbagJobs?.push({ parent: this.sandbagParent || this.root, placements });
   }
 
   BuildPoster(prop, sink) {
@@ -785,16 +787,12 @@ export class OpeningSet {
       // 指向沟里：默认北（南沟沿的沙袋），inward 可写 east/west/south（缺口西沿的沙袋朝东）。
       const inward = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] }[prop.inward || "north"];
       const n = new THREE.Vector3(d.z, 0, -d.x); if (n.x * inward[0] + n.z * inward[1] < 0) n.negate();
-      const ry = Math.atan2(d.x, d.z) - Math.PI / 2;
-      for (let layer = 0; layer < prop.layers; layer++) {
-        const stagger = layer % 2 ? prop.bagM / 2 : 0;
-        for (let s = prop.bagM / 2 - stagger; s < len; s += prop.bagM) {
-          if (s < 0.1) continue;
-          const x = a.x + d.x * s - n.x * (prop.depthM * 0.25), z = a.z + d.z * s - n.z * (prop.depthM * 0.25);
-          sink.Add("Sandbag", PlaceGeometry(MakeSandbag(prop.bagM * (0.93 + rnd() * 0.1), prop.layerM * 1.25, prop.depthM * 0.8, TILE_METERS.sandbag, `${prop.id}${i}${layer}${s}`),
-            { x, y: this.groundAt(x, z) + prop.layerM * (layer + 0.5) - 0.03, z, ry: ry + (rnd() - 0.5) * 0.15, rz: (rnd() - 0.5) * 0.06 }));
-        }
-      }
+      // 袋子中心线在桩线里侧 depthM/4（原程序化袋的位置），两端各收 5 cm。
+      const inset = prop.depthM * 0.25, trim = Math.min(0.05, len * 0.1);
+      this.QueueSandbags(SandbagRunPlacements({
+        a: { x: a.x + d.x * trim - n.x * inset, z: a.z + d.z * trim - n.z * inset },
+        b: { x: b.x - d.x * trim - n.x * inset, z: b.z - d.z * trim - n.z * inset },
+        layers: prop.layers, layerM: prop.layerM, depthM: prop.depthM * 0.8, groundAt: this.groundAt, seed: `${prop.id}${i}` }));
       for (let s = 0.3; s < len; s += prop.stakeEveryM) {
         const x = a.x + d.x * s + n.x * (prop.depthM * 0.5 + 0.06), z = a.z + d.z * s + n.z * (prop.depthM * 0.5 + 0.06), y = this.groundAt(x, z);
         const axis = new THREE.Vector3(-n.x * 0.12, 1, -n.z * 0.12).normalize();
@@ -955,8 +953,11 @@ export class OpeningSet {
     // 砖：城墙灰砖染成土黄灰（契约：阵位白盒改成「土黄砖色」的破砖墙；参考概念图 04）。缺配方就抛（不静默退回）。
     materials.set("OpeningSetBrick", this.FrontLib(front, BRICK.recipe, { color: BRICK.color }));
     const resolve = (name) => materials.get(name) || this.FrontLib(front, name);
-    const saved = { sinkMaterials: this.sinkMaterials, ownedMaterials: this.ownedMaterials };
+    const saved = { sinkMaterials: this.sinkMaterials, ownedMaterials: this.ownedMaterials,
+      sandbagParent: this.sandbagParent, sandbagJobs: this.sandbagJobs };
     this.sinkMaterials = materials; this.ownedMaterials = front.ownedMaterials;
+    this.sandbagParent = root; this.sandbagJobs = [];
+    const frontSandbags = this.sandbagJobs;
     // 能被打塌的体块：每一级一份砖壳，各自一个组（只有当前级那一组显示，见 SyncBreakables）。
     front.breakables = [];
     try {
@@ -978,11 +979,15 @@ export class OpeningSet {
         else if (prop.kind === "collapsedWall") this.BuildCollapsedWall(prop, sink);
         else this.BuildProp(prop, sink, materials);
       }
-    } finally { this.sinkMaterials = saved.sinkMaterials; this.ownedMaterials = saved.ownedMaterials; }
+    } finally {
+      this.sinkMaterials = saved.sinkMaterials; this.ownedMaterials = saved.ownedMaterials;
+      this.sandbagParent = saved.sandbagParent; this.sandbagJobs = saved.sandbagJobs;
+    }
     for (const mesh of sink.Flush(root, {}, { castShadow: true, receiveShadow: true, resolve })) mesh.name = `OpeningSet0103_Front_${mesh.name}`;
     this.scene.add(root);
     root.updateMatrixWorld(true);
     this.front = front;
+    this.LoadSandbags(frontSandbags);
   }
 
   /**
@@ -1103,6 +1108,42 @@ export class OpeningSet {
       const p = At(sAlong, off), size = 0.08 + rnd() * 0.16;
       sink.Add("OpeningSetBrick", PlaceGeometry(MakeBox(size * 1.8, size * 0.6, size, TILE_METERS.brick, `${prop.id}r${i}`),
         { x: p.x, y: this.groundAt(p.x, p.z) + size * 0.15, z: p.z, ry: rnd() * 6.28, rx: (rnd() - 0.5) * 0.6, rz: (rnd() - 0.5) * 0.6 }));
+    }
+  }
+
+  // ---------------------------------------------------------------- 标准沙袋：异步，烘进各自的组
+  async LoadSandbags(jobs) {
+    if (!jobs?.length || !this.loadExternal) return;
+    const generation = this.generation;
+    try {
+      const templates = new Map();
+      const ids = [...new Set(jobs.flatMap((job) => job.placements.map((p) => p.asset)))];
+      await Promise.all(ids.map(async (id) => templates.set(id, await this.loadExternal(id))));
+      for (const job of jobs) {
+        // 这一组在等模板的时候被拆了（换关 / 03 前沿收走）就不再补挂。
+        if (generation !== this.generation || !job.parent.parent) continue;
+        const sink = new BuildSink(), materials = new Map();
+        sink.SetSector("OpeningSet_Sandbags");
+        for (const p of job.placements) {
+          const template = templates.get(p.asset);
+          if (!template) throw new Error(`missing sandbag asset ${p.asset}`);
+          template.updateMatrixWorld(true);
+          const matrix = new THREE.Matrix4().compose(new THREE.Vector3(p.x, p.y, p.z),
+            new THREE.Quaternion().setFromAxisAngle(UP, p.ry), new THREE.Vector3(...p.scale));
+          template.traverse((mesh) => {
+            if (!mesh.isMesh || Array.isArray(mesh.material)) return;
+            const key = `OpeningSetSandbag_${mesh.material.uuid}`;
+            materials.set(key, mesh.material);
+            sink.Add(key, mesh.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(matrix, mesh.matrixWorld)));
+          });
+        }
+        for (const mesh of sink.Flush(job.parent, {}, { castShadow: true, receiveShadow: true, resolve: (key) => materials.get(key) })) {
+          mesh.name = `${job.parent.name}_Sandbags_${mesh.name}`;
+        }
+        job.parent.updateMatrixWorld(true);
+      }
+    } catch (error) {
+      console.warn(`[OpeningSet] sandbags failed: ${error}`);
     }
   }
 

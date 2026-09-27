@@ -578,8 +578,10 @@ for (const [id,x,z,rows] of [
   ["ReceptionStores",-35,221,2]]) SupplyStack(id,x,z,rows);
 // 护壁 / 踏板 / 射击位 / 杂物不再在这里手写：见文件末尾 MISSION_TRENCH_PLACEMENTS
 // 那一段（沿编译好的中心线 PCG，要等 MISSION_ROUTES / MISSION_PLACEMENT 定义完）。
-// Repeated sandbag seams provide scale without changing the proven solid envelope.
-for (const wall of blocks.filter(b=>b.semantic==='cover' && b.h<1.21 && b.w>2 && b.d<1)) {
+// Repeated sandbag seams provide scale without changing the proven solid envelope. Every wall that
+// gets them is a sandbag wall and IsMissionSandbagBlock replaces it (seams and all) with the standard
+// model; the field ruins are broken walls, not bags, and get no seams.
+for (const wall of blocks.filter(b=>b.semantic==='cover' && b.h<1.21 && b.w>2 && b.d<1 && !b.id.startsWith('FieldRuin'))) {
   for (let x=wall.x-wall.w/2+.25,i=0;x<wall.x+wall.w/2-.2;x+=.65,i++)
     Detail(wall.id+'BagSeam'+i,x,wall.z-.01,.035,wall.h+.018,wall.d+.024,'earthDark');
 }

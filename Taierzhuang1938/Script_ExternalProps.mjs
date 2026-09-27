@@ -49,6 +49,10 @@ import { PropStreamer } from "./Script_PropStreaming.mjs";
 import { PropBatcher } from "./Script_PropBatch.mjs";
 import { MergeGeometries, TILE_METERS } from "./Script_Geo.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
+import {
+  IsStandardSandbagAsset, SANDBAG_METRICS, SandbagGroundedBottom, SandbagGroundedY,
+} from "./Data_SandbagStandard.mjs";
+import { SandbagContactMaterial } from "./Script_SandbagStandard.mjs";
 // 并行下载工作包各交一份目录片段（PACK.url + 无 url 的 ASSETS 表），此处接线。
 import { PACK as HW_PACK, ASSETS as HW_ASSETS } from "./Data_ExternalAssets_HouseholdWare.mjs";
 import { PACK as RY_PACK, ASSETS as RY_ASSETS } from "./Data_ExternalAssets_RuralYard.mjs";
@@ -243,7 +247,9 @@ const ASSETS = Object.freeze({
   house: { label: "乡村房屋", url: "./Model/Model_ChineseRuralHouse.glb?v=4", material: null, tag: "wall", category: "建筑" },
   houseRow: { label: "民居排屋", url: "./Model/Model_AsianHouseRow.glb?v=2", material: null, tag: "wall", category: "建筑" },
   housePair: { label: "民居双栋", url: "./Model/Model_AsianHousePair.glb?v=2", material: null, tag: "wall", category: "建筑" },
-  sandbag: { label: "沙袋", url: "./Model/Model_Sandbag.glb?v=2", material: null, tag: "barricade", category: "工事" },
+  // 已不在任何关卡摆放：沙袋一律用 battlefieldSandbag01..03（docs/Data_SandbagStandard.md）。
+  // 条目暂留给编辑器构件库，删不删待用户定；Script_SandbagStandardTest 禁止关卡再摆它。
+  sandbag: { label: "沙袋（旧 · 不再摆放）", url: "./Model/Model_Sandbag.glb?v=2", material: null, tag: "barricade", category: "工事" },
   cart: {
     label: "市场木制手推车", url: "./Model/Model_Handcart.glb?v=2",
     materialMap: { WoodBeam: "HandcartWood" }, tag: "householdCart", category: "院落小件",
@@ -319,7 +325,7 @@ const PLACEMENTS = Object.freeze({
   CH1_NanLu: [
     { asset: "house", x: -1224, z: -164, ry: 0.04 },
     { asset: "houseRow", x: -1152, z: -208, ry: -0.1 },
-    { asset: "sandbag", x: -1210, z: -140, ry: 0.35 },
+    { asset: "battlefieldSandbag01", x: -1210, z: -140, ry: 0.35, scale: 0.45 },
     { asset: "cart", x: -1192, z: -121, ry: 0.22 },
     { asset: "crate", x: -1190, z: -119, ry: -0.15, scale: 0.96 },
     { asset: "fence", x: -1260, z: -104, ry: 0.05 },
@@ -408,9 +414,9 @@ const PLACEMENTS = Object.freeze({
 
     { asset: "rubble", x: 307, z: -67, ry: 0.52, scale: 1.18 },
     { asset: "crate", x: 260, z: -89, ry: -0.18, scale: 0.92 },
-    { asset: "sandbag", x: 252, z: -80, ry: 0.42 },
-    { asset: "sandbag", x: 257, z: -76, ry: -0.28, scale: 0.94 },
-    { asset: "sandbag", x: 248, z: -85, ry: 0.88, scale: 0.9 },
+    { asset: "battlefieldSandbag02", x: 252, z: -80, ry: 0.42, scale: 0.45 },
+    { asset: "battlefieldSandbag03", x: 257, z: -76, ry: -0.28, scale: 0.423 },
+    { asset: "battlefieldSandbag01", x: 248, z: -85, ry: 0.88, scale: 0.405 },
     { asset: "stackableStone01", x: 303, z: -65, ry: 0.18 },
     { asset: "stackableStone03", x: 304, z: -64.7, ry: -0.42, scale: 0.82 },
     { asset: "stackableStone05", x: 304.3, z: -64.4, ry: 0.62, scale: 0.68 },
@@ -420,7 +426,7 @@ const PLACEMENTS = Object.freeze({
     { asset: "cart", x: 112, z: -38, ry: 0.38, scale: 0.84 },
     { asset: "crate", x: 116, z: -36, ry: -0.22, scale: 0.86 },
     { asset: "houseRow", x: 84, z: -70, ry: 0.22 },
-    { asset: "sandbag", x: 100, z: -52, ry: -0.4 },
+    { asset: "battlefieldSandbag02", x: 100, z: -52, ry: -0.4, scale: 0.45 },
     { asset: "rubble", x: -66, z: 44, ry: 0.18, scale: 0.92 },
     { asset: "deadTreeTrunk02", x: -72, z: 51, ry: -0.44, scale: 0.9 },
   ],
@@ -431,7 +437,7 @@ const PLACEMENTS = Object.freeze({
     // 0,-520）的那条对角线上，两条通视一起被这一栋挡掉。往西让 9 m 就都让开了
     // （空位是扫出来的：不压进既有院墙、也不落在任何一条目标连线上）。
     { asset: "housePair", x: -232, z: -164, ry: 0.12 },
-    { asset: "sandbag", x: -176, z: -118, ry: 0.55 },
+    { asset: "battlefieldSandbag03", x: -176, z: -118, ry: 0.55, scale: 0.45 },
     { asset: "rubble", x: -246, z: -36, ry: 0.41, scale: 0.96 },
   ],
 });
@@ -634,9 +640,15 @@ function MappedMaterialName(source, spec) {
   return name;
 }
 
-function ApplyRuntimeMaterial(root, spec, library) {
+/** 沙袋走地形融合接收者（docs/Data_SandbagStandard.md），其余原样。 */
+function GroundContactFor(id, material) {
+  return IsStandardSandbagAsset(id) ? SandbagContactMaterial(material) : material;
+}
+
+function ApplyRuntimeMaterial(root, spec, library, id = null) {
   if (spec.materialMap) {
-    const bind = (source) => RuntimeMaterialFor(MappedMaterialName(source, spec), library, source);
+    const bind = (source) => GroundContactFor(id,
+      RuntimeMaterialFor(MappedMaterialName(source, spec), library, source));
     root.traverse((object) => {
       if (!object.isMesh) return;
       object.material = Array.isArray(object.material)
@@ -657,7 +669,7 @@ function CloneLoadedAsset(id, asset, library) {
   if (!asset) return null;
   const spec = ASSETS[id];
   const prop = asset.shell.clone(true);
-  ApplyRuntimeMaterial(prop, spec, library);
+  ApplyRuntimeMaterial(prop, spec, library, id);
   prop.traverse((object) => {
     if (!object.isMesh) return;
     object.castShadow = true;
@@ -708,9 +720,9 @@ function InstancedFormFor(id, asset, library) {
         if (name !== "position" && name !== "normal" && name !== "uv") { ok = false; return; }
       }
     }
-    const material = spec.materialMap
+    const material = GroundContactFor(id, spec.materialMap
       ? RuntimeMaterialFor(MappedMaterialName(object.material, spec), library, object.material)
-      : (spec.material ? RuntimeMaterialFor(spec.material, library, object.material) : object.material);
+      : (spec.material ? RuntimeMaterialFor(spec.material, library, object.material) : object.material));
     // 挑出要合并的三个属性各拷一份（InterleavedBufferAttribute.clone() 会
     // 顺手解交织），再把相对 shell 根的变换烘进去 —— shell 自己是单位阵，
     // matrixWorld 就是那份局部变换。
@@ -874,11 +886,28 @@ export async function AddExternalProps({
   for (const placement of placements) {
     const asset = models.get(placement.asset);
     if (!asset) { failed.push(placement.asset); continue; }
-    const y = Number.isFinite(placement.y)
+    let y = Number.isFinite(placement.y)
       ? placement.y
       : groundAt(placement.x, placement.z) + (placement.yOffset || 0);
-    SolidFor(sink, ASSETS[placement.asset], asset, { ...placement, y });
     const scale = placement.scale || 1;
+    let scaleY = scale;
+    // 沙袋贴地（Data_SandbagStandard）：落地的单件按脚印多点采样、袋底压进土里；
+    // 组合件的最底一层顶面不动、往下伸 —— 等比缩放的上一层照旧压在它上面，不开缝。
+    if (IsStandardSandbagAsset(placement.asset)) {
+      const metrics = SANDBAG_METRICS[placement.asset];
+      if (placement.groundRow) {
+        const top = y + metrics.height * scale;
+        const grounded = SandbagGroundedBottom(groundAt, {
+          asset: placement.asset, x: placement.x, z: placement.z, ry: placement.ry || 0,
+          halfWidth: metrics.width * scale / 2, halfDepth: metrics.depth * scale / 2, topY: top, bottomY: y,
+        });
+        y = grounded.bottom; scaleY = grounded.height / metrics.height;
+      } else if (!Number.isFinite(placement.y)) {
+        y = SandbagGroundedY(groundAt, { asset: placement.asset, x: placement.x, z: placement.z,
+          ry: placement.ry || 0, scale }) + (placement.yOffset || 0);
+      }
+    }
+    SolidFor(sink, ASSETS[placement.asset], asset, { ...placement, y });
     const maxDim = Math.max(asset.half[0], asset.half[1], asset.half[2]) * 2 * scale;
     const index = count;
     const id = placement.asset;
@@ -891,7 +920,7 @@ export async function AddExternalProps({
       const matrix = new THREE.Matrix4().compose(
         new THREE.Vector3(placement.x, y, placement.z),
         new THREE.Quaternion().setFromEuler(euler.set(0, placement.ry || 0, 0)),
-        new THREE.Vector3(scale, scale, scale),
+        new THREE.Vector3(scale, scaleY, scale),
       );
       parts = form.parts.map((part) => ({
         bucket: batcher.BucketFor(part.geometry, part.material),
@@ -902,7 +931,7 @@ export async function AddExternalProps({
       probe = {
         name: `External_${id}_${index}`,
         x: placement.x, y, z: placement.z,
-        minY: y + form.geoMinY * scale,
+        minY: y + form.geoMinY * scaleY,
         generatedSandbag: Boolean(placement.generatedSandbag),
         generatedTree: Boolean(placement.generatedTree),
         requiresOwnCollider: placement.solid !== false,
@@ -919,7 +948,7 @@ export async function AddExternalProps({
         prop.name = `External_${id}_${index}`;
         prop.position.set(placement.x, y, placement.z);
         prop.rotation.y = placement.ry || 0;
-        prop.scale.setScalar(scale);
+        prop.scale.set(scale, scaleY, scale);
         prop.userData.generatedSandbag = Boolean(placement.generatedSandbag);
         prop.userData.generatedTree = Boolean(placement.generatedTree);
         prop.userData.requiresOwnCollider = placement.solid !== false;

@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { IsMissionSandbagBlock, MISSION_DEFENSE_ASSETS, MISSION_DEFENSE_OBJECTS,
   MISSION_DEFENSE_PACKING as PACKING, MISSION_STAKE_FENCE as FENCE } from "./Data_FirstLevelMissionFortifications.mjs";
+import { IsStandardSandbagAsset, SANDBAG_ASSET_IDS, SandbagGroundedBottom } from "./Data_SandbagStandard.mjs";
+import { SandbagContactMaterial } from "./Script_SandbagStandard.mjs";
 
 // Templates have already been grounded, centred and rebound to the project's PBR library.
 export async function LoadMissionFortifications(library) {
@@ -27,8 +29,10 @@ export function AddMissionFortifications(sink,layout,models,groundAt,materials) 
     model.root.traverse(mesh=>{
       if(!mesh.isMesh)return;
       if(Array.isArray(mesh.material))throw new Error(`Unsplit mission defense material: ${asset}`);
-      const key=`MissionDefenseMaterial_${mesh.material.uuid}`;
-      materials.set(key,mesh.material);
+      // 沙袋走地形融合接收者（docs/Data_SandbagStandard.md）：贴地那一截换成下面那块地。
+      const material=IsStandardSandbagAsset(asset)?SandbagContactMaterial(mesh.material):mesh.material;
+      const key=`MissionDefenseMaterial_${material.uuid}`;
+      materials.set(key,material);
       sink.Add(key,mesh.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(matrix,mesh.matrixWorld)));
     });
     placements.push({id,asset,x,y,z,ry,scale:scale.toArray(),sourceBlock});
@@ -44,10 +48,15 @@ export function AddMissionFortifications(sink,layout,models,groundAt,materials) 
       const odd=row%2===1&&columns>1,shift=odd?slot*.18:0;
       const start=-span/2+col*slot+(col===0?0:shift)- (col?PACKING.overlapM/2:0);
       const end=-span/2+(col+1)*slot+(col===columns-1?0:shift)+(col<columns-1?PACKING.overlapM/2:0);
-      const asset=MISSION_DEFENSE_ASSETS[(row+col)%3],model=models.get(asset),along=(start+end)/2;
-      const height=rowHeight+(row<rows-1?PACKING.overlapM:0);
-      Place(`${block.id}_${row}_${col}`,asset,block.x+cos*along,block.y-block.h/2+row*rowHeight,
-        block.z-sin*along,ry,new THREE.Vector3((end-start)/model.size.x,height/model.size.y,depth/model.size.z),block.id);
+      const asset=SANDBAG_ASSET_IDS[(row+col)%3],model=models.get(asset),along=(start+end)/2;
+      const x=block.x+cos*along,z=block.z-sin*along;
+      let bottom=block.y-block.h/2+row*rowHeight,height=rowHeight+(row<rows-1?PACKING.overlapM:0);
+      // 最底一层按自己的脚印贴地：顶面不动，往下伸到袋底压进土里（Data_SandbagStandard）。
+      // 体块的底是按一个点量的，沟沿、坡上的那几件原来底下是空的。
+      if(row===0)({bottom,height}=SandbagGroundedBottom(groundAt,{asset,x,z,ry,
+        halfWidth:(end-start)/2,halfDepth:depth/2,topY:bottom+height,bottomY:bottom}));
+      Place(`${block.id}_${row}_${col}`,asset,x,bottom,z,ry,
+        new THREE.Vector3((end-start)/model.size.x,height/model.size.y,depth/model.size.z),block.id);
     }
     replaced.add(block.id);
   }

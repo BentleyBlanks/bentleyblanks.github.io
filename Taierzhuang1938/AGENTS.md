@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **沙袋只有一种（2026-09-27）**：全项目沙袋只用战场包 `battlefieldSandbag01/02/03`，最底层按脚印贴地、袋底压进土，材质接地形融合；程序化椭圆袋、`Model_Sandbag.glb`、画袋缝的白盒块不再用来画沙袋。选哪个入口、贴地与融合参数见 [沙袋标准](docs/Data_SandbagStandard.md)，门禁 `Script_SandbagStandardTest`、`Script_FirstLevelMissionFortificationsTest`。
+
 - **第一关友军俯身蹲走与枪口向上提枪（2026-09-27）**：`Script_AllyGait` / `Animation/AllyGait`，五条 NRA 共用动作；护送与交谈按实际威胁选择贴体、枪口向上提枪，战斗蹲走稳定胸部并前俯。BlenderMCP 重建、参考依据、播放优先级和验收见 [友军步态](Animation/AllyGait/Data_AllyGait.md)，门禁 `Script_AllyGaitTest` / `Script_AllyGaitBrowserTest`。
 
 - **01 掩蔽部坐着压弹、听聊天自由视角（2026-09-27）**：[压弹动作与自由视角](docs/Data_OpeningFirstPersonLoad20260927.md)。Banter / 下令前的 Orders 里第一人称身体整个播 BlenderMCP 烘的 `ShunziSitFillCharger`（坐弹药箱、五发逐颗压进桥夹、换夹循环），不再是两个静止托夹手势；视角在这两段放开（`firstPerson.headLook.seated`，运行时受困钳制经 `LookLimits` 同步放宽），不再朝说话人转头。门禁 `Script_OpeningFirstPersonTest`、`Script_OpeningStoryboardShots --shots=SB01`。
