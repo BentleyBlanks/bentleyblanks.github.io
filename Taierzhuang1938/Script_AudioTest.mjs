@@ -547,7 +547,8 @@ const gunAudibility = await page.evaluate(() => {
   const field = a.Play("rifleIjaFar", { position: At(220), soundField: true, priority: true });
   for (const distance of [220, 300]) {
     if (distance === 300) a.MoveVoice(field, At(distance));
-    const expected = field.baseGain * 64 / (64 + 0.9 * (distance - 64));
+    // 扩展声源 rolloff 0.45（2026-09-27，SOUND_FIELD_ROLLOFF：一条战线是线声源）。
+    const expected = field.baseGain * 64 / (64 + 0.45 * (distance - 64));
     rows.push({ cue: "soundField", distance, ok: Math.abs(field.effectiveGain - expected) < 1e-6 });
   }
   a.StopVoice(field, 0.001);
@@ -766,14 +767,20 @@ const spatial = await page.evaluate(async () => {
 
   // 1) 遮挡：同一条 cue、同一个距离，只把遮挡度从 0 拨到 1。
   //    30 m 是刻意选的：超过 OCCLUSION_MIN_M，又不至于让空气低通自己就压到 1 kHz 以下
-  //    （18000/(1+30×0.09) = 4865 Hz）。
-  a.lastPlayAt.delete("rifleNra");
+  //    （AirAbsorptionHz(30) ≈ 14 kHz）。
+  //    【2026-09-27】换成跳弹（ricochet）：枪声从这一天起有自己的遮挡封顶（OCCLUSION_MAX_GUN 0.7），
+  //    量「挡死是什么样」要用一条不封顶的 cue；枪的封顶另起一条（gunBlocked）。
+  a.lastPlayAt.delete("ricochet");
   window.__occ = 0;
-  const clear = Snap(a.Play("rifleNra", { position: At(30), priority: true, volume: 1 }));
+  const clear = Snap(a.Play("ricochet", { position: At(30), priority: true, volume: 1 }));
   await sleep(140);
   // 缓存按空间格算，同一格里 0.25 s 内共用一次射线 —— 换个位置才问得到新值。
   window.__occ = 1;
-  const blocked = Snap(a.Play("rifleNra", { position: { x: L.x + 30, y: L.y, z: L.z + 40 }, priority: true, volume: 1 }));
+  a.lastPlayAt.delete("ricochet");
+  const blocked = Snap(a.Play("ricochet", { position: { x: L.x + 30, y: L.y, z: L.z + 40 }, priority: true, volume: 1 }));
+  await sleep(140);
+  a.lastPlayAt.delete("rifleNra");
+  const gunBlocked = Snap(a.Play("rifleNra", { position: { x: L.x - 30, y: L.y, z: L.z + 40 }, priority: true, volume: 1 }));
   await sleep(140);
 
   // 2) 分区混响：zone 探针说 interior，湿声就必须接到 interior 那只卷积上。
@@ -800,7 +807,7 @@ const spatial = await page.evaluate(async () => {
 
   const queries = a.stats.occlusionQueries;
   a.SetProbes({ occlusion: null, zone: null });
-  return { clear, blocked, inside, outside, boom, mine, queries };
+  return { clear, blocked, gunBlocked, inside, outside, boom, mine, queries };
 });
 
 if (!spatial.clear || !spatial.blocked) {
@@ -818,6 +825,11 @@ if (!spatial.clear || !spatial.blocked) {
       + `${spatial.clear.airHz.toFixed(0)} → ${spatial.blocked.airHz.toFixed(0)} Hz（射线 ${spatial.queries} 次）`);
   }
 }
+// 枪声遮挡封顶（2026-09-27，OCCLUSION_MAX_GUN）：探针说挡死，枪也只吃 0.7（−8.4 dB + 2.1 kHz）——墙后的枪还是枪。
+if (!spatial.gunBlocked) Fail("枪声遮挡封顶量不到（Play 返回 null）");
+else if (Math.abs(spatial.gunBlocked.occ - 0.7) > 1e-6) Fail(`挡死的枪声遮挡 ${spatial.gunBlocked.occ}（封顶应为 0.7）`);
+else if (!(spatial.gunBlocked.airHz > 1800 && spatial.gunBlocked.airHz < 2500)) Fail(`挡死的枪声低通 ${spatial.gunBlocked.airHz?.toFixed?.(0)} Hz（应 ≈ 2.1 kHz）`);
+else Ok(`枪声遮挡封顶：探针给 1，枪吃 ${spatial.gunBlocked.occ}、低通 ${spatial.gunBlocked.airHz.toFixed(0)} Hz`);
 if (!spatial.inside || !spatial.outside) Fail("分区混响量不到（Play 返回 null）");
 else if (spatial.inside.zone !== "interior" || !spatial.inside.interiorConv) {
   Fail(`zone=interior 的声音没接到 interior 卷积上：${JSON.stringify(spatial.inside)}`);

@@ -288,7 +288,8 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   assert.equal(audio.firstLevelSoundscape, false, "07：声景开关关上");
   const south = audio.calls.slice(before);
   const ids = new Set(D.sources.map((s) => s.cue));
-  assert.ok(south.length > 5 && south.every((c) => ids.has(c.cue) && c.bus === "ambience"), "07：只剩旧的固定声源");
+  // 2026-09-27 起走远声组（bus "far"），不再归环境推子（默认 10 %）管。
+  assert.ok(south.length > 5 && south.every((c) => ids.has(c.cue) && c.bus === "far"), "07：只剩旧的固定声源（走远声组）");
   assert.ok(south.every((c) => D.sources.some((s) => s.x === c.position.x && s.z === c.position.z)), "07：位置就是旧的五个点");
   assert.equal(sound.frontQueue.length, 0, "离开 01–06 时远处队列清空");
   Ok(`07 以后 ${south.length} 声全是旧声源`);

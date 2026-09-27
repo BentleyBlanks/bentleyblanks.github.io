@@ -43,7 +43,7 @@ import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { VOICE_BASE, VOICE_LINES } from "./Data_Voice.mjs";
 import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_MUSIC_MIX } from "./Data_FirstLevelMissionMusic.mjs";
 import { HIT_DISORIENTATION } from "./Data_Tuning_Player.mjs";
-import { GUN_AUDIBILITY, BLAST_HEARING } from "./Data_Tuning_Audio.mjs";
+import { GUN_AUDIBILITY, BLAST_HEARING, AIR_ABSORPTION, SHOUT_AUDIBILITY } from "./Data_Tuning_Audio.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { OPENING_AMBIENCE_PRESETS } from "./Data_FirstLevelMissionBattleSound.mjs";
 import { AUDIO_MIX_DEFAULTS, STORY_SPEECH, TINNITUS } from "./Data_Tuning_Audio.mjs";
@@ -359,9 +359,19 @@ function OcclusionCut(occ) {
   return 20000 * Math.pow(OCCLUSION_LP_HZ / 20000, Clamp01(occ));
 }
 
+/**
+ * 空气吸收的低通截止（Hz）。口径与拟合点见 Data_Tuning_Audio.AIR_ABSORPTION。
+ * 2026-09-27 以前是 18000/(1+0.09d)、地板 700 Hz（比真空气狠五倍，远处的仗全成了闷点）。
+ */
+export function AirAbsorptionHz(distance) {
+  const A = AIR_ABSORPTION;
+  const d = Math.max(1, distance || 0);
+  return Clamp(A.refHz * Math.pow(A.refM / d, A.exponent), A.floorHz, 20000);
+}
+
 /** Panner inverse curve; use the actual source reference distance for voice stealing. */
-function DryFalloff(distance, refDistance = 3.5) {
-  return refDistance / (refDistance + 0.9 * Math.max(0, distance - refDistance));
+function DryFalloff(distance, refDistance = 3.5, rolloff = 0.9) {
+  return refDistance / (refDistance + rolloff * Math.max(0, distance - refDistance));
 }
 
 /**
@@ -2582,7 +2592,11 @@ const GUN_CULL_M = 160;
  */
 const FAR_LOW_PRIORITY_M = 45;
 
-/** 人喊一嗓子传得到的距离。四百米外那句「卧倒」不是听不清，是根本不存在。 */
+/**
+ * 剧情台词的空间化半径：再远就退化成居中播放（PlayStoryVoice / PlayDialogueLine）。
+ * 战场喊话的剔除距离另走 SHOUT_AUDIBILITY.cullM（2026-09-27 起 140 m）——
+ * 喊出来的口令比说话传得远，九十米外的日本兵喊「突撃」原来一声都不出。
+ */
 const VOICE_CULL_M = 90;
 
 /**
@@ -2648,6 +2662,31 @@ const OCCLUSION_MAX_BLAST = 0.25;
 const OCCLUSION_MAX_TANK_LOOP = 0.3;
 
 /**
+ * 扩展声源（`soundField`：远处前线、07 以后的五个远处声源、空袭炸弹、远枪扇区）的遮挡封顶（2026-09-27）。
+ * 一片几百米宽的仗不是墙后面的一个点：一条射线撞上身边的院墙 / 房檐，不等于整条战线都被挡住 ——
+ * 声音从屋顶上、巷口里绕过来。实测 07–11 那五个远处声源遮挡中位 1.0（−12 dB + 800 Hz），
+ * 叠在环境推子的 −22 dB 上整片消失。0.5 折 −6 dB + 4 kHz：听得出隔着房子，仗还在。
+ */
+const OCCLUSION_MAX_FIELD = 0.5;
+
+/**
+ * 扩展声源（`soundField`）的衰减斜率（2026-09-27）。一条几百米宽的战线是**线声源**：距离翻一倍只掉 3 dB，
+ * 不是点声源的 6 dB。原来与一个枪口同斜率（0.9）：七百米外的前线 −20 dB、再叠旧空气低通的 700 Hz，
+ * 实测远声组峰值比身边台词低 30—45 dB。0.45：220 m −6.4 dB（原 −10.1）、700 m −14.8（原 −20.0）、
+ * 880 m −16.6（原 −22.0）。起点 refDistance 64 m 不动。Data_FirstLevelMissionBattleSound.front.fieldRolloff 跟着同一个数。
+ */
+const SOUND_FIELD_ROLLOFF = 0.45;
+
+/**
+ * 枪声的遮挡封顶（2026-09-27）。一声步枪在枪口是一百五六十分贝，隔一堵墙削掉二十分贝还是全场最响的东西之一；
+ * 按「墙后的一个点」给满 1.0（−12 dB + 800 Hz）的结果是墙那边二三十米外正在朝你打的机枪只剩一记闷响 ——
+ * 实测 05 玩家站在一段 13 m 长的白盒墙前，墙后 27 m 的战车机枪每一发都是 1.0。
+ * 3A 的做法同一个意思：战斗声的遮挡有上限，墙后的威胁要听得出方位。0.7 折 −8.4 dB + 2.1 kHz：
+ * 明显隔着墙，枪还是枪。玩家自己那一枪（firstPerson）本来就不问遮挡。
+ */
+const OCCLUSION_MAX_GUN = 0.7;
+
+/**
  * 喊话的嘴离脚底多高。与 `Data_Companions.COMPANION_TUNING.mouthY`（1.52）同值 ——
  * 剧情台词走那一条，战场口令走这一条，同一个人的两句话不能站在两个高度上。
  */
@@ -2658,7 +2697,7 @@ function CullDistance(name) {
   // 两条飞机声都按机身在几百米外起播（drone 在进入段第一帧、planeDive 在开火前 3.5 s），按默认距离剔除就一条都不响。
   if (name === "planeDrone" || name === "planeDive") return PLANE_DRONE_CULL_M;
   if (FAR_CUE[name] || SAMPLE_BURST[name] || FAR_CUE_TARGET.has(name)) return GUN_CULL_M;
-  if (name.startsWith("voice.")) return VOICE_CULL_M;
+  if (name.startsWith("voice.")) return SHOUT_AUDIBILITY.cullM;
   return CULL_DEFAULT_M;
 }
 
@@ -3118,13 +3157,14 @@ const AMB_WET = {
  * 而它同时又不带任何方位（只有一个随机 pan）。**「不知道从哪儿来的音效」
  * 有一半是这么来的。**
  *
- * 数值就照位置音那条公式反推：两百米上是 950 Hz，三百米上是 640 Hz。
+ * 数值就照位置音那条公式反推。【2026-09-27】公式换成 ISO 9613-1 的空气吸收（AirAbsorptionHz）之后
+ * 整张表跟着重推：两三百米上是 3.5—4.6 kHz（旧公式给的是 950 / 640 Hz，比真空气闷五倍）。
  * 三条例外：弹啸（`amb.whizz`）本来就是从你耳边过去的，落屑与吱呀就在旁边的
  * 废墟上 —— 这三条**不滤**，它们「近」正是它们吓人的原因。
  */
 const AMB_AIR = {   // → Play 的 airCut
-  rifleNraFar: 1200, rifleIjaFar: 1200, zb26: 1100, type92: 1000, type11: 1100,
-  "amb.cannonFar": 800, "amb.planeFar": 1800, "amb.moanFar": 1400,
+  rifleNraFar: 3000, rifleIjaFar: 3000, zb26: 2800, type92: 2600, type11: 2800,
+  "amb.cannonFar": 1600, "amb.planeFar": 3200, "amb.moanFar": 2800,
   "amb.crow": 2600, "amb.dogFar": 2200, "amb.rooster": 2200,
   // 缺口批 A2 里**只有这两条会以「没有 position 的远处」身份出现**（其余十三条
   // 都由接线侧带着 position 播，空气低通由 Play 按距离自己算）：
@@ -3133,12 +3173,12 @@ const AMB_AIR = {   // → Play 的 airCut
   //     亮一档 —— 它「近」正是这一拍吓人的原因，滤狠了就成了另一架飞机。
   // 撒进 AMBIENCE_PRESETS.events 的那一刻这两行才起作用；先备着，
   // 免得接线侧只加了事件、忘了这一层，于是远处那一梭子带着全套高频蹦出来。
-  strafeFar: 1100, planeDive: 2200,
+  strafeFar: 2800, planeDive: 4200,
   // --- 接线批 INT4（2026-09-08）：三挺机枪的远场 --------------------------
   // 与近场那三行（zb26 1100 / type92 1000 / type11 1100）差一档：
   // 远场素材录于更远处，本来就该更闷。同样只在**没有 position** 地撒进环境床时
   // 才起作用；接线侧带着位置播时空气低通由 Play 按距离自己算。
-  zb26Far: 950, type11Far: 950, type92Far: 850,
+  zb26Far: 2400, type11Far: 2400, type92Far: 2200,
 };
 
 /**
@@ -3348,6 +3388,29 @@ function BugleSampleRecipe(buffer, toneHz) {
 // 环境事件调度的节拍：0.4 秒掷一次骰子，一分钟 150 次。
 const AMB_TICK_MS = 400;
 const AMB_TICKS_PER_MIN = 60000 / AMB_TICK_MS;
+
+/**
+ * 远处的仗不是环境床（2026-09-27）。
+ *
+ * 2026-09-11 用户要「环境床默认 10 %」，推子落在 ambienceBus 后面 —— 而远处战场那几条床
+ *（battleFar 远处交火、shellingFar 连绵炮声）与撒播的远枪 / 远炮 / 远处飞机也都挂在 ambienceBus 上，
+ * 于是它们跟着风声、乌鸦一起被压了 −22 dB（总线 0.8 × 推子 0.1）。那几条的电平是 09-09 按推子 1 配的，
+ * 07 以后固定的五个远处声源也是 09-07 按推子 1 配的：用户说的「背景里的枪声、飞机都听不见」有一半是这一下。
+ *
+ * 3A 的分法：环境（风、鸟、火、车厢的吱呀）归环境推子；战场（远处的枪、炮、飞机、交火人群）
+ * 是世界里正在发生的事，走 SFX 那一侧的远声组（farGain → 对白侧链 −3 dB → sfxBus）——
+ * 玩家连射时让一点、说话时让一点，但不会被一个「环境音量」推子整片关掉。
+ * 01–02 开场两档（OPENING_AMBIENCE_PRESETS）09-26 已经这么改过，这里推到所有预设。
+ *
+ * 换总线时电平乘 FAR_BATTLE_AMBIENCE_GAIN（0.8）= 环境总线自己那道 ×0.8：搬过来之后正好回到 09-09 按推子 1
+ * 配的设计值，比现在响 +20 dB。第一版试过 0.5（与开场那次换算同一口径），实测 07–10 远声组峰值仍比身边台词低
+ * 24 dB 上下，听感上还是「后面没有仗」。写了 `bus` 的层 / 撒播照写的走、电平不换算。
+ */
+const FAR_BATTLE_AMBIENCE_GAIN = 0.8;
+const FAR_BATTLE_BEDS = new Set(["battleFar", "shellingFar"]);
+const FAR_BATTLE_EVENTS = new Set(["amb.planeFar"]);
+function IsFarBattleBed(cfg) { return !!cfg && (!!cfg.battle || FAR_BATTLE_BEDS.has(cfg.bed)); }
+function IsFarBattleEvent(ev) { return !!ev && (!!ev.battle || FAR_BATTLE_EVENTS.has(ev.name)); }
 
 /**
  * 环境床编排表。**按天空预设取名**（Script_Sky 的 SKY_PRESETS），
@@ -3691,6 +3754,9 @@ class LoopLayer {
     this.buffer = buffer;
     this.level = cfg.gain ?? 0.6;
     this.busName = cfg.bus || "ambience";
+    // 远处战场那几条床（battleFar / shellingFar / 带 battle 的层）没写 bus 的一律走远声组，
+    // 不归环境推子（见 FAR_BATTLE_AMBIENCE_GAIN）。
+    if (!cfg.bus && IsFarBattleBed(cfg)) { this.busName = "far"; this.level *= FAR_BATTLE_AMBIENCE_GAIN; }
     // random=false 是音乐用的：曲子必须从头放，随机起播点对音乐是灾难。
     this.random = cfg.random !== false;
     // 一条播放头放多久。素材短的时候按比例缩 —— 不缩的话随机起播点会被挤没，
@@ -4727,7 +4793,7 @@ export class AudioEngine {
       const dx = position.x - this.listenerPos.x;
       const dy = position.y - this.listenerPos.y;
       const dz = position.z - this.listenerPos.z;
-      if (dx * dx + dy * dy + dz * dz > VOICE_CULL_M * VOICE_CULL_M) { this.drops.distance += 1; return null; }
+      if (dx * dx + dy * dy + dz * dz > SHOUT_AUDIBILITY.cullM ** 2) { this.drops.distance += 1; return null; }
     }
     const now = this.ctx.currentTime;
     if (!priority && now - this.lastBarkAt < 0.55) return null;
@@ -4786,7 +4852,9 @@ export class AudioEngine {
     // 剧情台词那一路早就抬了（Script_Companion.Locate → COMPANION_TUNING.mouthY = 1.52），
     // 喊话这一路一直没抬 —— 同一个人的两句话走两套坐标，这里补齐。
     const at = position ? { x: position.x, y: position.y + BARK_MOUTH_Y, z: position.z } : null;
-    return this.Play("voice." + pick.key, { position: at, volume, pitch, priority });
+    // 喊话按「喊」配距离衰减（SHOUT_AUDIBILITY）：近处与说话同一条，远处衰减慢一半。
+    return this.Play("voice." + pick.key, { position: at, volume, pitch, priority,
+      rolloff: SHOUT_AUDIBILITY.rolloff });
   }
 
   /**
@@ -5271,7 +5339,7 @@ export class AudioEngine {
 
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
     bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null,
-    weaponClass = null, sourceSizeM = 0, storySpeech = false, selfCapped = false, yieldFirst = false, propagate = true,
+    weaponClass = null, sourceSizeM = 0, rolloff = null, storySpeech = false, selfCapped = false, yieldFirst = false, propagate = true,
     blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false, occlusionExclude = null } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
@@ -5340,7 +5408,9 @@ export class AudioEngine {
     const mix = MIX_GAIN[name] ?? 1;
     const refDistance = soundField ? 64 : Math.max(3.5, sourceSizeM || 0,
       IsGunCue(name) ? GUN_AUDIBILITY.refDistanceM : 0);
-    const effectiveGain = volume * mix * (position && !firstPerson ? DryFalloff(distance, refDistance) : 1);
+    // rolloff：这一类声音自己的衰减斜率（喊话 0.45，见 SHOUT_AUDIBILITY；扩展声源 SOUND_FIELD_ROLLOFF）；其余都是 0.9。
+    const rolloffK = rolloff ?? (soundField ? SOUND_FIELD_ROLLOFF : 0.9);
+    const effectiveGain = volume * mix * (position && !firstPerson ? DryFalloff(distance, refDistance, rolloffK) : 1);
 
     // 预算闸门：按实测开销**发声前**判断。
     // 连发的开销与点射长度无关（整条点射共用一套链，见 GunAuto），所以查表就够。
@@ -5435,13 +5505,16 @@ export class AudioEngine {
       // 爆炸封顶（见 IsBlastCue）：一层木板挡不住冲击波，低频照样绕得过来。
       if (IsBlastCue(name)) occ = Math.min(occ, OCCLUSION_MAX_BLAST);
       if (TANK_LOOP_CUES.has(name)) occ = Math.min(occ, OCCLUSION_MAX_TANK_LOOP);
+      if (soundField) occ = Math.min(occ, OCCLUSION_MAX_FIELD);
+      if (IsGunCue(name) || name.startsWith("gunTail")) occ = Math.min(occ, OCCLUSION_MAX_GUN);
+      v.soundField = !!soundField;
       v.occ = occ;
       v.occAt = now;
-      // 空气吸收：距离越远高频掉得越快。20 m 上还有 8 kHz，200 m 上只剩 1 kHz 出头。
+      // 空气吸收：距离越远高频掉得越快（AirAbsorptionHz，ISO 9613-1）。100 m 上 6.9 kHz，450 m 上 2.9 kHz。
       // 遮挡的低通并到同一只滤波器上（取更狠的那个）：墙与空气吃的是同一段高频，
       // 串两只滤波器只是多一个节点。
       const airHz = Math.min(airCut || 20000,
-        Clamp(18000 / (1 + distance * 0.09), 700, 20000), OcclusionCut(occ));
+        AirAbsorptionHz(distance), OcclusionCut(occ));
       const air = v.Filter("lowpass", airHz, 0.7);
       src.connect(air);
       // 混响 send 接在空气低通**之后**（坑 1 说的是不能接在 Panner 之后，
@@ -5458,7 +5531,7 @@ export class AudioEngine {
       //（sourceSizeM 由调用侧给，接线层交的就是爆炸半径，见 IsBlastCue 的抬头）。
       panner.refDistance = refDistance;
       panner.maxDistance = soundField ? 1000 : 600;
-      panner.rolloffFactor = 0.9;
+      panner.rolloffFactor = rolloffK;
       // 【2026-09-09】**极近场钳位**（PANNER_MIN_M）：贴到听者身上的声源沿自己的
       // 方向推到 1 m 外再交给 panner。方位不变，距离衰减也不变
       //（inverse 在 refDistance 3.5 m 以内本来就是恒 1 —— 顺带记下来：
@@ -5630,6 +5703,7 @@ export class AudioEngine {
         if (this.ZoneBoundary(voice.reverbZone || this.space)) occ = Clamp01(occ + ZONE_BOUNDARY_OCC);
         if (IsVoiceCue(voice.name)) occ = Math.min(occ, OCCLUSION_MAX_VOICE);   // 与 Play 同一道封顶
         if (TANK_LOOP_CUES.has(voice.name)) occ = Math.min(occ, OCCLUSION_MAX_TANK_LOOP);
+        if (voice.soundField) occ = Math.min(occ, OCCLUSION_MAX_FIELD);
         voice.occ = occ;
         // occGain 是起播那一刻按 occ > 0 才建的。起播时通透、飞到墙后面去的那种
         // 只能靠低通与湿声表达 —— 中途插节点要断开重接一条正在响的链，
@@ -5640,7 +5714,7 @@ export class AudioEngine {
       }
     }
     if (voice.air) {
-      const airHz = Math.min(Clamp(18000 / (1 + distance * 0.09), 700, 20000), voice.airOcc ?? 20000);
+      const airHz = Math.min(AirAbsorptionHz(distance), voice.airOcc ?? 20000);
       voice.air.frequency.setTargetAtTime(airHz, t, tau);
     }
     if (voice.wetGain && voice.wetBase !== undefined) {
@@ -5649,7 +5723,8 @@ export class AudioEngine {
     voice.distance = distance;
     // 有效电平跟着距离走 —— 不更新的话，一架飞远了的飞机在 stealing 那儿
     // 永远还挂着起飞时的电平，成了偷不掉的常驻声部。
-    if (voice.baseGain !== undefined) voice.effectiveGain = voice.baseGain * DryFalloff(distance, voice.panner?.refDistance ?? 3.5);
+    if (voice.baseGain !== undefined) voice.effectiveGain = voice.baseGain
+      * DryFalloff(distance, voice.panner?.refDistance ?? 3.5, voice.panner?.rolloffFactor ?? 0.9);
     if (velocity && typeof voice.SetDoppler === "function" && distance > 1e-3) {
       // 朝听者为正：f' = f * c / (c - v_radial)
       const radial = -(velocity.x * dx + velocity.y * dy + velocity.z * dz) / distance;
@@ -6304,15 +6379,18 @@ export class AudioEngine {
         const perMin = (ev.perMin || 0) * (ev.battle ? rateScale : 1);
         if (this.ambienceRng() >= perMin / AMB_TICKS_PER_MIN) continue;
         if (ev.battle) this.stats.battleEvents += 1;
+        // 远处战场的撒播走远声组（见 FAR_BATTLE_AMBIENCE_GAIN）；写了 bus 的照写的走。
+        const farBattle = !ev.bus && IsFarBattleEvent(ev);
         this.Play(ev.name, {
-          volume: ev.volume * (ev.battle ? volScale : 1) * (0.7 + this.ambienceRng() * 0.6),
+          volume: ev.volume * (ev.battle ? volScale : 1) * (farBattle ? FAR_BATTLE_AMBIENCE_GAIN : 1)
+            * (0.7 + this.ambienceRng() * 0.6),
           // 远处的声音在立体声里撒开，别都堆在正中。
           pan: this.ambienceRng() * 2 - 1,
           pitch: (ev.pitch ?? 1) * (0.94 + this.ambienceRng() * 0.12),
           airCut: ev.airCut ?? AMB_AIR[ev.name] ?? 0,
           delay: this.ambienceRng() * 0.35,
           burst: ev.burst ?? undefined,
-          bus: "ambience",
+          bus: ev.bus || (farBattle ? "far" : "ambience"),
         });
       }
       this.ScheduleAmbienceEvent();

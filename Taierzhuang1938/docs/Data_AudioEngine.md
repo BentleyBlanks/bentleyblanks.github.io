@@ -804,6 +804,12 @@ gunTail{Open|Street|Interior}{Rifle|Mg}      courtyard 用 Street 那条
 | `BUS_COMP` / `BUS_MAKEUP` / `PEAK_LIMITER` | 见 §8 | 8 |
 | `GUN_TAIL_GAIN` | 0.55 | 9 |
 | `PANNER_MIN_M` | 1.0 m（panner 的最小距离，不改电平只改 HRTF 方位）| 1.5 |
+| `AIR_ABSORPTION`（`Data_Tuning_Audio`）→ `AirAbsorptionHz(d)` | 8000 × (78/d)^0.6，地板 1 kHz | 12 |
+| `SHOUT_AUDIBILITY`（`Data_Tuning_Audio`）| rolloff 0.45、剔除 140 m | 12 |
+| `SOUND_FIELD_ROLLOFF` | 0.45（扩展声源 = 线声源）| 12 |
+| `OCCLUSION_MAX_GUN` / `OCCLUSION_MAX_FIELD` | 0.7 / 0.5 | 12 |
+| `PROBE.listenerRiseM` / `edgeOcc` / `lateralM` / `lateralRiseM`（`Data_Tuning_Audio`）| 1.8 m / 0.3 / 3 m / 0.4 m | 12 |
+| `FAR_BATTLE_AMBIENCE_GAIN` | 0.8（远处战场床 / 撒播换到远声组时的换算）| 12 |
 
 ---
 
@@ -829,3 +835,72 @@ node Taierzhuang1938/Script_FirstLevelAudioNodeBudgetTest.mjs   # 01–06 节点
 **这一整块测的东西全都是静默的**：探针没注册上、遮挡只压了湿声、混响送错了档、
 延迟把去重窗顶掉、duck 随采样一起失效、预算满了丢的是玩家的枪 ——
 没有一条会报错、掉帧或者让别的断言翻红，只会「听着不对」。
+
+---
+
+## 12. 远处的仗听得见：3A 那一套混音层级（2026-09-27）
+
+用户原话：「现在背景里的枪声、车声、飞机、敌军的喊声，完全都听不见，只听得见旁边的人的声音，这很不合理，参考 3A 的做法帮我解决掉」。
+
+### 怎么量的
+
+`Script_MixBalanceBrowserProbe.mjs`（p012 实时、开声音、玩家无敌不动）：每一声 `Play` 出来按名字归类，把末级节点并联一条到该类的
+AnalyserNode，每 50 ms 取峰值 / RMS；另挂主输出、远声组（`farGain`）、环境、配乐四条总线；逐声记距离、有效电平、遮挡、空气低通。
+各类读的是**总线之前**，比的是彼此之间的相对电平。
+
+### 改前是什么样（第一关 03–10，每段 25–40 s）
+
+| 段 | 身边台词 p90 | 近处的枪 p90（遮挡 / 低通中位）| 日军喊话 p90（距离）| 远声组 RMS 中位 |
+| --- | --- | --- | --- | --- |
+| 03 | — | −49（**1.0 / 800 Hz**）| — | −66 |
+| 04 | −8 | −26（0.45）| −31（39 m）| −52 |
+| 08 | −29（12 m）| −34（**1.0 / 800 Hz**）| −20（22 m）| **−73** |
+| 10 | −12 | −12（0）| −23（24 m）| **−73** |
+
+远处前线（03–06）单声有效电平 −38 dB、空气低通 **655 Hz**；07 以后五个远处声源有效电平 −45 到 −50 dB，再过环境总线 −22 dB。
+配乐 p90 −24 到 −30，比远处的仗响 20 dB 以上。
+
+### 六条根因，按影响大小
+
+1. **遮挡把「在沟里」当成「隔着一整间砖房」。** 交通壕深 1.85–2 m，站着的耳朵比沟沿低 0.3 m，从耳朵往外的每一条射线先撞沟沿 ——
+   近处的枪、远处前线、喊话遮挡中位全是 1.0（−12 dB + 800 Hz）。05 的出生点另有一段 13 m 长的白盒墙贴在身后 4 m。
+2. **环境推子吃掉了远处的仗。** 09-11 环境床默认改 10 % 之后，挂在环境总线上的远处战场床（battleFar / shellingFar）、
+   远枪远炮撒播、07 以后的五个远处声源全跟着 −22 dB（总线 0.8 × 推子 0.1）。它们的电平是 09-07 / 09-09 按推子 1 配的。
+3. **空气低通比真空气狠五倍。** `18000/(1+0.09d)`、地板 700 Hz：100 m 就只剩 1.8 kHz；前线生成器 600 m 外还再压到 520 Hz。
+4. **战线按点声源衰减。** 扩展声源 refDistance 64 m 但斜率与枪口一样（0.9）：700 m −20 dB。一条战线是线声源，翻倍掉 3 dB。
+5. **喊话按说话衰减。** refDistance 3.5 m、rolloff 0.9：40 m −21 dB、70 m −25 dB；90 m 外直接不喊。
+6. **枪声遮挡没有上限。** 同一个引擎里喊话（0.5）、爆炸（0.25）、战车发动机（0.3）都有封顶，只有枪没有。
+
+### 改了什么（3A 的对应做法）
+
+| 3A 做法 | 这里 | 位置 |
+| --- | --- | --- |
+| obstruction 与 occlusion 分开：直达被挡、绕过去的路很短的只掉一点 | 两条源侧射线都挡住后，先从听者头顶 1.8 m 再问（通了 = 沟沿 / 墙根，`edgeOcc` 0.3 = −3.6 dB + 6.9 kHz），再把听者左右各挪 3 m 问（通了 = 有头有尾的墙，`partialOcc` 0.45）；听者在 interior / dugout 里不问（01 防炮洞的「隔着土」不变）| `Script_AudioWiring.Occlusion`、`PROBE` |
+| 战斗声遮挡有上限 | 枪（含枪尾）封顶 0.7（−8.4 dB + 2.1 kHz）；扩展声源封顶 0.5 | `OCCLUSION_MAX_GUN` / `OCCLUSION_MAX_FIELD` |
+| 环境与战场分两组推子 | 没写 `bus` 的 battleFar / shellingFar / 带 `battle` 的层与撒播、`amb.planeFar` 一律走远声组，电平 ×0.8（= 回到 09-09 的设计值）；07 以后五个远处声源 `ambience` → `far` | `IsFarBattleBed` / `IsFarBattleEvent`、`UpdateLegacy` |
+| 距离低通照空气吸收表配 | ISO 9613-1（20 °C、70 % RH）拟合：30 m 14 kHz、100 m 6.9 kHz、450 m 2.9 kHz、880 m 1.9 kHz，地板 1 kHz；前线 880 m 外按真实距离补同一条；`AMB_AIR` 与 07 以后远枪的 airCut 跟着重推 | `AirAbsorptionHz`、`Place` |
+| 按类别配衰减曲线 | 扩展声源 rolloff 0.45（线声源）；喊话 rolloff 0.45、剔除 140 m（近处与说话同一条，不让身边的人更响）| `SOUND_FIELD_ROLLOFF`、`SHOUT_AUDIBILITY` |
+| 远处战场层在台词下 10–15 dB | 前线生成器 `cueVolume` ×1.4；07 以后远枪 +11 dB、远炮 +3 dB | `Data_FirstLevelMissionBattleSound` |
+
+没动的：对白侧链（环境 −6 dB、远声组 −3 dB）、玩家开枪压环境（HDR-lite）、母线两级动态、配乐电平、近处枪声的 `GUN_AUDIBILITY`、
+01/02 的 `stages.gain`。喊话第一版给 refDistance 10 m，十米内的己方喊话一下响了 8 dB、比身边台词还响，撤了换 rolloff。
+
+### 改后（同一探针）
+
+| 段 | 身边台词 p90 | 近处的枪 p90（遮挡 / 低通中位）| 日军喊话 p90（距离）| 远声组 RMS 中位 | 远声组 p90 |
+| --- | --- | --- | --- | --- | --- |
+| 01 | −10 | — | — | −43 | −26 |
+| 03 | — | −40（0.45 / 4.7 kHz）| −30（69 m）| −41 | −28 |
+| 04 | −13 | −28 | −29（48 m）| −42 | −28 |
+| 05 | −15 | −27（0.7 / 2.1 kHz）| −26（33 m）| −41 | −26 |
+| 08 | −27（13 m）| −31（0.7 / 2.1 kHz）| −26（36 m）| −44 | −31 |
+| 10 | −11 | −13 | −26（34 m）| −46 | −31 |
+
+远处那一层的 RMS 在身边台词 RMS 下 10–12 dB（改前 03–10 是 20–40 dB），说话时再让对白侧链 −3 dB；主输出 p90 −7 到 −16，没有更贴 0 dBFS。
+这些都是数字，**没有人耳试听过**；探针的玩家站着不动，打起来走动时遮挡分布会不一样。
+
+回归：`Script_AudioTest`（冒烟全过；遮挡模型那条改用不封顶的跳弹量，另加一条「枪声遮挡封顶 0.7」；扩展声源的期望衰减改 rolloff 0.45）、
+`Script_AudioWiringTest` 81/81（overReportDb 改后另跑一遍，见下）、`Script_FirstLevelBattleSoundTest` 28 组（07 以后五个声源断言改成走远声组）、`Script_FirstLevelAirRaidTest`。
+`Script_AudioWiringTest` 8.8 的「150 m / 掠过 2 m 弹啸 ≤ 本体」余量变小：基线 −4.1 dB，改后两次 +0.7（红）/ −1.4
+（同一次运行里两行 150 m 的本体峰值能差 4 dB，远处本体的空气低通放开后随变体抖得更厉害）。`NEAR_MISS.overReportDb` 因此 −2 → −3 dB，改后四点 −9.5 / −13.6 / −5.2 / −3.6 dB，81/81。
+

@@ -11,7 +11,7 @@
 // player.shake（震屏）、Has（事实）。缺哪样就少哪样，测试夹具只给 audio 也照跑。
 // 数全在 Data_FirstLevelMissionBattleSound；口径见 docs/Data_AudioWiring.md「二之三」。
 import { MISSION_BATTLE_SOUND as D } from './Data_FirstLevelMissionBattleSound.mjs';
-import { BATTLE_ARTILLERY } from './Data_Tuning_Audio.mjs';
+import { BATTLE_ARTILLERY, AIR_ABSORPTION } from './Data_Tuning_Audio.mjs';
 import { BattleArtillery } from './Script_BattleArtillery.mjs';
 import { FirstLevelAirRaid } from './Script_FirstLevelAirRaid.mjs';
 import { FIRST_LEVEL_AIR_RAID } from './Data_FirstLevelAirRaid.mjs';
@@ -354,11 +354,9 @@ export class FirstLevelMissionBattleSound {
     const placed = Math.min(d, F.placeMaxM);
     const k = placed / d;
     const extra = d > placed ? FieldFalloff(d) / FieldFalloff(placed) : 1;
-    let airCut = 20000;
-    if (d > F.airCutFromM) {
-      const u = Math.min(1, (d - F.airCutFromM) / (F.airCutFarM - F.airCutFromM));
-      airCut = 700 + (F.airCutAtFarHz - 700) * u;
-    }
+    // 引擎按摆放距离算空气吸收；摆近了的那一段按真实距离补上（同一条 ISO 9613-1 曲线）。
+    const A = AIR_ABSORPTION;
+    const airCut = d > placed ? Math.max(A.floorHz, Math.min(20000, A.refHz * Math.pow(A.refM / d, A.exponent))) : 20000;
     return { position: { x: L.x + dx * k, y: L.y + F.placeRiseM, z: L.z + dz * k }, gain: extra, airCut, distance: d };
   }
 
@@ -447,7 +445,10 @@ export class FirstLevelMissionBattleSound {
       source.count++;
       const options={position:{x:s.x,y:s.y,z:s.z},volume:s.volume*profile.gain*ramp*(speaking?D.speechGain:1),
         // 车厢那一档再压一道墙：隔着木板与铁皮，外面只剩低频。
-        airCut:Math.min(s.airCut,profile.airCut??Infinity),burst:s.burst,bus:'ambience',soundField:true};
+        // 【2026-09-27】bus 'ambience' → 'far'：这五条是 09-07 按环境推子 1 配的远处前线，09-11 环境推子默认改成 10 % 之后
+        // 跟着风声一起被压了 −22 dB（07 以后远处的仗「完全听不见」的一大半）。远处的仗走远声组，不归环境推子（见
+        // Script_Audio.FAR_BATTLE_AMBIENCE_GAIN 的抬头）。电平不换算：远声组没有环境总线那道 ×0.8，净比设计值高 +1.9 dB。
+        airCut:Math.min(s.airCut,profile.airCut??Infinity),burst:s.burst,bus:'far',soundField:true};
       const voice=this.audio.Play(s.cue,options);
       if(voice)this.voices.push(voice);
       this.events.push({id:s.id,cue:s.cue,at:this.elapsed,stage,position:options.position,volume:options.volume,played:!!voice});

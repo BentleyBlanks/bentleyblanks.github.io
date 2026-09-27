@@ -84,6 +84,8 @@ const DUGOUT_TAGS = new Set(["dugoutRoof", "dugout"]);
 /** 四条直径（单位向量）：东西、南北、两条对角。壕沟判据要**一条直径两端都高**。 */
 /** 开关关着时的壕沟判据：什么都不陷（Zone 回到四档）。 */
 const NO_SINK = Object.freeze({ trench: false, sunkDirs: 0, rise: 0, ground: null });
+/** 听者在这几档里就是「被关起来了」：遮挡探针不再问绕射（见 Occlusion）。与引擎 ENCLOSED_SPACES 同一组。 */
+const ENCLOSED_ZONES = new Set(["interior", "dugout"]);
 const TRENCH_AXES = [[1, 0], [0, 1], [Math.SQRT1_2, Math.SQRT1_2], [Math.SQRT1_2, -Math.SQRT1_2]];
 
 /**
@@ -293,7 +295,7 @@ export class AudioWiring {
    *   调用方才给 false** —— 见 `AiNearMissAtPlayer`：那里问的是一颗子弹的实际弹道
    *   有没有被挡住，抬高会让越过矮墙的那一发变成"没挡住"，于是墙后面的玩家听见
    *   一条根本不存在的弹啸。两个问题只是碰巧共用一条射线，不是同一件事。
-   * @returns {number|undefined} 0 通透 / partialOcc 矮挡 / 1 挡死；
+   * @returns {number|undefined} 0 通透 / edgeOcc 贴着听者的矮挡（沟沿）/ partialOcc 矮挡 / 1 挡死；
    *   undefined = 这一帧没有战场可问
    */
   Occlusion(from, to, { rise = true, exclude = null } = {}) {
@@ -310,15 +312,22 @@ export class AudioWiring {
     // 天上的飞机（y 已经两百米）不该再被抬一次。
     const ground = rise && typeof bf.GroundHeight === "function"
       ? bf.GroundHeight(to.x, to.z) : null;
-    const Shoot = (riseM) => {
+    const Shoot = (riseM, fromRiseM = 0, sideM = 0) => {
       const ty = ground === null ? to.y : Math.max(to.y, ground + riseM);
-      const dx = to.x - from.x, dy = ty - from.y, dz = to.z - from.z;
+      // sideM：听者沿「垂直于这条路径」的水平方向挪开多少（绕墙端的那两条，见下面）。
+      let fx = from.x, fz = from.z;
+      if (sideM) {
+        const hx = to.x - from.x, hz = to.z - from.z, h = Math.hypot(hx, hz) || 1;
+        fx += (-hz / h) * sideM; fz += (hx / h) * sideM;
+      }
+      const fy = from.y + fromRiseM;
+      const dx = to.x - fx, dy = ty - fy, dz = to.z - fz;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (!(dist > 0.05)) return false;
       // terrain:true 不能漏 —— 不带这个标志的射线只跟碰撞盒求交，土坎、河堤、
       // 路基一律穿过去（与弹道、识别那两条是同一个坑）。
       const hit = bf.Raycast(
-        { x: from.x, y: from.y, z: from.z },
+        { x: fx, y: fy, z: fz },
         { x: dx / dist, y: dy / dist, z: dz / dist },
         dist, exclude ? { terrain: true, excludeCollider: exclude } : { terrain: true },
       );
@@ -329,7 +338,16 @@ export class AudioWiring {
     if (Shoot(PROBE.sourceRiseM)) {
       // 不抬高的那一路（弹道）没有"矮挡"这一档：子弹要么打在墙上要么没有，
       // 所以也不必再花第二条射线。
-      value = !rise || Shoot(PROBE.clearRiseM) ? 1 : PROBE.partialOcc;
+      if (!rise) value = 1;
+      else if (!Shoot(PROBE.clearRiseM)) value = PROBE.partialOcc;
+      // 【2026-09-27】两条都挡住：问绕射（见 PROBE.listenerRiseM / lateralM）。只有被挡时才花这几条，
+      // 通透的常见情形仍是一条射线。听者自己被关在屋里 / 洞里时不问：那是真的隔开了，
+      // 从头顶、从旁边绕的路都出不去（01 防炮洞里的「隔着土」靠这一条保住）。
+      else if (ENCLOSED_ZONES.has(this.Zone(from))) value = 1;
+      else if (!Shoot(PROBE.clearRiseM, PROBE.listenerRiseM)) value = PROBE.edgeOcc;
+      else if (!Shoot(PROBE.clearRiseM, PROBE.lateralRiseM, PROBE.lateralM)
+        || !Shoot(PROBE.clearRiseM, PROBE.lateralRiseM, -PROBE.lateralM)) value = PROBE.partialOcc;
+      else value = 1;
     }
     if (this.occCache.size > PROBE.maxEntries) this.occCache.clear();
     this.occCache.set(key, { v: value, at: this.time });

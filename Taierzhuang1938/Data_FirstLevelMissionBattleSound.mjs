@@ -31,12 +31,18 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     BridgeOrders:{gain:.6,interval:1.3}, BridgeCover:{gain:.85,interval:1.1},
     BridgeWithdraw:{gain:.6,interval:1.3}, NightMarch:{gain:.3,interval:2},
   },
+  // 【2026-09-27】用户：「背景里的枪声、车声、飞机、敌军的喊声完全都听不见」。07 以后远处的仗就是这五条。
+  //   · 总线 ambience → far（Script_FirstLevelMissionBattleSound.UpdateLegacy）：原来跟着环境推子默认 10 % 一起 −22 dB；
+  //   · 三条枪的 airCut 1000/950/700 → 3200/3200/3000：原来照旧空气公式（两百米 950 Hz）配的，按 ISO 9613-1
+  //     两百多米上还有 4 kHz 上下（Data_Tuning_Audio.AIR_ABSORPTION）。两门炮的 650/600 不动：炮口闷响本来就在低频；
+  //   · volume 枪 .055/.075 → .2/.27（+11 dB）、炮 .55/.42 → .78/.6（+3 dB）：只换总线的话，实测 08/10 这五条峰值
+  //     仍比身边台词低 30 dB 以上（一两百米外、多半隔着房子，遮挡封顶 0.5）。改后远声组峰值在台词下 12–15 dB。
   sources: [
-    {id:'WestRifles',cue:'rifleNraFar',x:-100,z:-210,y:5,volume:.055,airCut:1000,first:.7,intervals:[3.2,5.1,2.6,6.3]},
-    {id:'EastRifles',cue:'rifleIjaFar',x:116,z:-195,y:5,volume:.055,airCut:950,first:2.1,intervals:[5.5,3.8,6.2,3]},
-    {id:'FrontMachineGun',cue:'type92',x:42,z:-226,y:5,volume:.075,airCut:700,burst:5,first:3.4,intervals:[6.7,4.3,8.2,5.6]},
-    {id:'NorthArtillery',cue:'amb.cannonFar',x:-72,z:-285,y:12,volume:.55,airCut:650,first:1.5,intervals:[11.2,8.4,13.7,9.5]},
-    {id:'EastArtillery',cue:'amb.cannonFar',x:168,z:-250,y:12,volume:.42,airCut:600,first:7.3,intervals:[16.4,12.1,18.2,13.7]},
+    {id:'WestRifles',cue:'rifleNraFar',x:-100,z:-210,y:5,volume:.2,airCut:3200,first:.7,intervals:[3.2,5.1,2.6,6.3]},
+    {id:'EastRifles',cue:'rifleIjaFar',x:116,z:-195,y:5,volume:.2,airCut:3200,first:2.1,intervals:[5.5,3.8,6.2,3]},
+    {id:'FrontMachineGun',cue:'type92',x:42,z:-226,y:5,volume:.27,airCut:3000,burst:5,first:3.4,intervals:[6.7,4.3,8.2,5.6]},
+    {id:'NorthArtillery',cue:'amb.cannonFar',x:-72,z:-285,y:12,volume:.78,airCut:650,first:1.5,intervals:[11.2,8.4,13.7,9.5]},
+    {id:'EastArtillery',cue:'amb.cannonFar',x:168,z:-250,y:12,volume:.6,airCut:600,first:7.3,intervals:[16.4,12.1,18.2,13.7]},
   ],
   speechGain:.62,
 
@@ -129,12 +135,15 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     }),
     /**
      * 每条 cue 的基础音量（sfx 总线、soundField 64 m 参考距离下的量）。
-     * 五百米上 inverse 衰到 0.14，0.5 × 0.14 ≈ 0.07 —— 比二百二十米外的远枪扇区层
-     *（AudioWiring.FarSectors，0.65 × 0.31 × 强度）低 6 dB 上下：远的那一片更远。
+     * 五百米上 inverse（rolloff 0.45）衰到 0.25，0.7 × 0.25 ≈ 0.17 —— 比二百二十米外的远枪扇区层
+     *（AudioWiring.FarSectors，0.65 × 0.48 × 强度）低 5 dB 上下：远的那一片更远。
      */
+    // 【2026-09-27】整张 ×1.4（+2.9 dB），与 fieldRolloff 0.9 → 0.45、ISO 空气吸收同一轮：实测 01/04 远声组峰值
+    // 仍比身边台词低 16–18 dB，3A 的远处战场层在台词下 12–15 dB（说话时再让对白侧链 −3 dB）。
+    // 原值 0.5 / 0.5 / 0.45 / 0.52 / 0.45 / 1.3 / 1.2 / 0.9。01/02 的 stages.gain（10 / 7）不动。
     cueVolume: Object.freeze({
-      rifleNraFar: 0.5, rifleIjaFar: 0.5, zb26Far: 0.45, type92Far: 0.52, type11Far: 0.45,
-      "amb.cannonFar": 1.3, explosionFar: 1.2, launcherPop: 0.9,
+      rifleNraFar: 0.7, rifleIjaFar: 0.7, zb26Far: 0.63, type92Far: 0.73, type11Far: 0.63,
+      "amb.cannonFar": 1.8, explosionFar: 1.7, launcherPop: 1.25,
     }),
     /** 引擎只保留 1000 m 内的 soundField；更远的摆到这里并按反比律补衰减（见 Place）。 */
     placeMaxM: 880,
@@ -142,11 +151,13 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     placeRiseM: 3,
     /**
      * soundField 那一档 panner 的 inverse 衰减参数（照抄 Script_Audio 的 soundField 距离模型：
-     * refDistance 64、rolloff 0.9）。只用来给摆到 placeMaxM 的远声补回两段距离之差。
+     * refDistance 64、rolloff 0.45）。只用来给摆到 placeMaxM 的远声补回两段距离之差。
      */
-    fieldRefM: 64, fieldRolloff: 0.9,
-    /** 远于 airCutFromM 的再压一道高频（引擎的空气低通到 700 Hz 就不往下了）。 */
-    airCutFromM: 600, airCutAtFarHz: 520, airCutFarM: 1500,
+    // 【2026-09-27】fieldRolloff 0.9 → 0.45，与引擎 SOUND_FIELD_ROLLOFF 同一个数（战线是线声源，翻倍掉 3 dB）。
+    fieldRefM: 64, fieldRolloff: 0.45,
+    // 【2026-09-27】原来这里还有一道「600 m 外再压到 700→520 Hz」的高频（airCutFromM / airCutAtFarHz / airCutFarM），
+    // 叠在引擎旧的 700 Hz 空气低通上，一公里外的交火只剩一团闷点。现在引擎按 ISO 9613-1 算空气吸收
+    //（Data_Tuning_Audio.AIR_ABSORPTION）；摆到 placeMaxM 的远声由 Place 按**真实距离**补上同一条曲线。
     /** 同时在响的前线声部上限。 */
     maxVoices: 5,
     /**
