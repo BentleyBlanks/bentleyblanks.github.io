@@ -278,8 +278,9 @@ export class FirstLevelMissionRuntime {
       if (!litter.visible || litter.loaded || ["placed", "fallen", "critical"].includes(litter.state) || litter.borrowBearersStaged
         || (litter.zhou && litter.liveSeated) || !litter.bearers?.some(health => health > 0)) continue;
       const yaw = litter.yaw || 0, sx = Math.sin(yaw) * R.litterBearerOffsetM, sz = Math.cos(yaw) * R.litterBearerOffsetM;
+      // player：顺子自己抬着后端的那副（carried）不挡他本人。
       out.push({ ax: litter.x - sx, az: litter.z - sz, bx: litter.x + sx, bz: litter.z + sz,
-        y: this.battlefield.GroundHeight(litter.x, litter.z) });
+        y: this.battlefield.GroundHeight(litter.x, litter.z), player: litter.state === "carried" });
     }
     return out;
   }

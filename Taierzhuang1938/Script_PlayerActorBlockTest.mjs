@@ -3,6 +3,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { BlockPlayerStep, ActorBlocksPlayer, PLAYER_ACTOR_BLOCK } from "./Script_PlayerActorBlock.mjs";
+import { BlockPlayerByLitters } from "./Script_LitterBlock.mjs";
+import { CROWD } from "./Data_Tuning_Ai.mjs";
 
 const R = 0.34, dt = 1 / 60, speed = 3.05;
 const RadiusOf = (a) => a.radius ?? 0.34;
@@ -83,10 +85,39 @@ for (const [label, extra] of [["corpse", { alive: false }], ["melee bind", { mel
   const out = BlockPlayerStep({ x: 0, y: 0, z: 0 }, 0.03, -0.02, R, [], RadiusOf, dt, {});
   Ok(out.dx === 0.03 && out.dz === -0.02 && !out.blocked && !out.pushed, "no actors: step unchanged");
 }
+// ⑦b 抬着的担架也挡玩家（2026-09-27）；玩家自己抬着的那副不挡。
+{
+  const clearance = CROWD.litterHalfWidthM + R, maxOut = PLAYER_ACTOR_BLOCK.pushOutMps * dt;
+  const seg = { ax: 0, az: 1.28, bx: 0, bz: -1.28, y: 0 };
+  const WalkLitter = (p, segs, frames) => {
+    let crossed = false;
+    for (let i = 0; i < frames; i += 1) {
+      const out = BlockPlayerByLitters(p, speed * dt, 0.2 * speed * dt, segs, clearance, maxOut, CROWD.maxDyM);
+      p.position.x += out.dx; p.position.z += out.dz;
+      if (p.position.x > -clearance + 1e-3 && p.position.x < clearance - 1e-3 && Math.abs(p.position.z) < 1.28) crossed = true;
+    }
+    return crossed;
+  };
+  const me = { position: { x: -2, y: 0, z: 0 } };
+  Ok(!WalkLitter(me, [seg], 300), "walking at a carried litter never takes the player between the bearers");
+  Ok(me.position.z > 1.28, "the player slides round the litter's end instead");
+  const carrier = { position: { x: -2, y: 0, z: 0 } };
+  Ok(WalkLitter(carrier, [{ ...seg, player: true }], 120), "the litter the player carries himself (level flag) does not block him");
+  const rearMan = { position: { x: -2, y: 0, z: 0 } };
+  Ok(WalkLitter(rearMan, [{ ...seg, rear: rearMan }], 120), "a litter whose rear end is the player does not block him");
+  const swept = { position: { x: 0.05, y: 0, z: 0 } };
+  const out = BlockPlayerByLitters(swept, 0, 0, [seg], clearance, maxOut, CROWD.maxDyM);
+  Ok(out.pushed && Math.hypot(out.dx, out.dz) <= maxOut + 1e-9 && out.dx > 0, "a player swept into a litter steps out at the capped speed");
+  const none = BlockPlayerByLitters({ position: { x: 0, y: 0, z: 0 } }, 0.03, -0.02, [], clearance, maxOut, CROWD.maxDyM);
+  Ok(none.dx === 0.03 && none.dz === -0.02 && !none.blocked && !none.pushed, "no litters: step unchanged");
+}
 // ⑧ 接线：玩家这一步先过裁剪再交给角色控制器；装配层给了人物列表与半径。
 const player = fs.readFileSync(new URL("./Script_Player.mjs", import.meta.url), "utf8").replace(/\r/g, "");
 const main = fs.readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8").replace(/\r/g, "");
-Ok(/BlockPlayerStep\([\s\S]{0,400}const moved = body\.Move\(step\.x, step\.y, step\.z\)/.test(player), "Player clips the step before body.Move");
+Ok(/BlockPlayerStep\([\s\S]{0,1200}const moved = body\.Move\(step\.x, step\.y, step\.z\)/.test(player), "Player clips the step before body.Move");
+Ok(/BlockPlayerByLitters\(this, step\.x, step\.z[\s\S]{0,500}const moved = body\.Move\(step\.x, step\.y, step\.z\)/.test(player), "Player clips the step against litters before body.Move");
 Ok(/ActorBlockers: \(\) => ai\?\.soldiers/.test(main) && /ActorRadius: /.test(main), "Main wires actors and their capsule radius");
+Ok(/LitterBlockers: \(\) => ai\?\.litterSegs/.test(main), "Main wires the AI's litter segments to the player");
+Ok(/\.\.\.PlayerBodyBlockers\(\)/.test(main) && /LitterBlockers: PlayerBodyBlockers\(\)\.LitterBlockers/.test(main), "the rebuilt player world on level change keeps the litter blockers");
 
 console.log(`PlayerActorBlockTest 通过：${checks} 条断言`);

@@ -201,6 +201,20 @@ const FLAT_NORMAL = [0, 1, 0];
  */
 let levelBounds = { minX: -300, maxX: 300, minZ: -300, maxZ: 300 };
 
+/**
+ * 玩家 world 里「人挡玩家」的几条查询。开局建 PlayerController 与换关重建 world 两处共用 ——
+ * 以前换关那处漏了，进白盒之后玩家能走进人身体。ai 在后面才建，闭包按调用时的值取。
+ */
+function PlayerBodyBlockers() {
+  return {
+    // 活人的身体挡玩家（Script_PlayerActorBlock）。
+    ActorBlockers: () => ai?.soldiers,
+    ActorRadius: (s) => (s.childCapsules?.[s.stance] || AI_CAPSULE[s.stance] || AI_CAPSULE[0]).radius,
+    // 抬着的担架也挡玩家（Script_LitterBlock）：用 AI 这一帧收集好的线段，含第一关的担架队。
+    LitterBlockers: () => ai?.litterSegs,
+  };
+}
+
 function MakeLevelBounds(bounds, margin = 10) {
   return {
     minX: bounds.minX + margin, maxX: bounds.maxX - margin,
@@ -1327,9 +1341,7 @@ async function Boot() {
     // 地形在 Script_Battlefield，装配层只负责把这条查询接上
     WaterDepth: (x, z, y) => battlefield.WaterDepth(x, z, y),
     bounds: battlefield.bounds,
-    // 活人的身体挡玩家（Script_PlayerActorBlock）。ai 在下面才建，闭包按当时的值取。
-    ActorBlockers: () => ai?.soldiers,
-    ActorRadius: (s) => (s.childCapsules?.[s.stance] || AI_CAPSULE[s.stance] || AI_CAPSULE[0]).radius,
+    ...PlayerBodyBlockers(),
   }, { seed: 1938 });
   // 胶囊挂进物理世界。BuildField 已经把这一关的静态几何灌好了，
   // 这里补的是「玩家」这一具 —— 换关时由 EnterLevel 再挂一次新的。
@@ -3638,6 +3650,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
       GroundHeight: (x, z) => battlefield.GroundHeight(x, z),
       WaterDepth: (x, z, y) => battlefield.WaterDepth(x, z, y),
       bounds: battlefield.bounds,
+      // 担架挡玩家（Script_LitterBlock）。注意 ActorBlockers/ActorRadius 这里一直没抄 ——
+      // 换关之后「人挡玩家」其实是关着的；第一关自 09-17 起都在这个状态下调，补回会改驾驶，另案处理。
+      LitterBlockers: PlayerBodyBlockers().LitterBlockers,
     };
     vfx.AmbientDust(DustBox(phase), 0.075);
   } else {

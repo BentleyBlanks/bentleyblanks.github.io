@@ -8,7 +8,8 @@
 //   · `LitterSegments` 每帧收集正在抬着的担架；
 //   · `LitterPush` 给已经站进担架里的人算往外让的量（并进 crowdPush，限速同软分离）；
 //   · `BlockStepByLitters` 把这一步裁成不会穿进担架的位移（削掉法向分量、贴边滑），
-//     结果照样交给 `CharacterBody.Move`，墙仍然说了算。
+//     结果照样交给 `CharacterBody.Move`，墙仍然说了算；
+//   · `BlockPlayerByLitters` 给玩家用同一套（玩家自己抬着的那副除外）。
 //
 // 谁算在抬：`carryRole === "front"` 的人身上挂 `carryLitterRear`（后位的人，或字符串
 // "player" 表示玩家接了后端），由 Script_MissionSetpieces 每帧写。后位是 AI 时还要求
@@ -65,6 +66,31 @@ export function LitterPush(s, segs, clearance, maxStep, maxDy, out) {
     const push = Math.min(clearance - o.d, maxStep);
     out.x += o.nx * push; out.z += o.nz * push;
   }
+  return out;
+}
+
+/**
+ * 玩家这一步对担架的裁剪（2026-09-27 第二轮：玩家也不许穿担架队）。
+ * 玩家自己抬着的那副不挡他：AI 抬的后端连到玩家（seg.rear === player），
+ * 关卡报来的标 `seg.player`。已经被担架扫进身体时往外让，限速 maxOut（米/帧）。
+ * @returns {{dx,dz,slideX,slideZ,blocked,pushed}}  slide 是不含往外让的那部分，给速度用
+ */
+export function BlockPlayerByLitters(player, dx, dz, segs, clearance, maxOut, maxDy, out = {}) {
+  const list = out.list || (out.list = []);
+  list.length = 0;
+  for (let i = 0; i < (segs?.length || 0); i += 1) {
+    const seg = segs[i];
+    if (seg.player || seg.rear === player || seg.front === player) continue;
+    list.push(seg);
+  }
+  const push = out.push || (out.push = { x: 0, z: 0 });
+  push.x = 0; push.z = 0;
+  LitterPush(player, list, clearance, Infinity, maxDy, push);
+  const pushLen = Math.hypot(push.x, push.z);
+  if (pushLen > maxOut) { push.x *= maxOut / pushLen; push.z *= maxOut / pushLen; }
+  BlockStepByLitters(player, dx, dz, list, clearance, maxDy, out);
+  out.slideX = out.dx; out.slideZ = out.dz; out.pushed = pushLen > 1e-6;
+  out.dx += push.x; out.dz += push.z;
   return out;
 }
 

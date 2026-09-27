@@ -1257,7 +1257,11 @@ draw，SRP Batcher 是 Unity 的东西，这两条这里都用不上；能省的
 - P012 后送队（`Script_MissionSetpieces` 的队列）：担架员是 AI 士兵、带 `carryRole`，软分离会推开撞到他们本人的人，但两人之间那副担架和伤员只是道具 —— 目标在担架另一边的队友从前后担架员中间直接走过去。
 - 第一关任务流（`FirstLevelMissionColumn` + `MissionPeople`）：担架队整个是表现人物，不在 `ai.soldiers` 里，AI 完全不知道他们存在。
 
-**改法**（`Script_LitterBlock.mjs`，纯规则；半宽 `CROWD.litterHalfWidthM` 0.32 m）：把「前位担架员 → 后位」当成一段有宽度的线段。`SeparateSoldiers` 每帧收集线段 —— AI 抬的由前位身上的 `carryLitterRear`（后位的人，或 `"player"` 表示玩家接了后端；`Script_MissionSetpieces` 每帧写、落地清掉）给出，第一关由 `ctx.LitterObstacles` → `FirstLevelMissionRuntime.LitterObstacles` 报来（只算有人抬着的；`fallen/critical/placed` 落地、装车的不算 —— 14 幺娃要蹲到落地的老周担架边上拖人）。站进担架里的人按软分离的限速往外让；`StepBody` 在交给角色控制器前按线段裁步（朝担架的分量削掉、贴边滑、已经在里面的只许往外）。敌我都挡，钉住的人与担架员自己不挡。玩家不受这条影响（`Script_PlayerActorBlock` 仍放行担架员，接替担架要站到他们的位置上）。
+**改法**（`Script_LitterBlock.mjs`，纯规则；半宽 `CROWD.litterHalfWidthM` 0.32 m）：把「前位担架员 → 后位」当成一段有宽度的线段。`SeparateSoldiers` 每帧收集线段 —— AI 抬的由前位身上的 `carryLitterRear`（后位的人，或 `"player"` 表示玩家接了后端；`Script_MissionSetpieces` 每帧写、落地清掉）给出，第一关由 `ctx.LitterObstacles` → `FirstLevelMissionRuntime.LitterObstacles` 报来（只算有人抬着的；`fallen/critical/placed` 落地、装车的不算 —— 14 幺娃要蹲到落地的老周担架边上拖人）。站进担架里的人按软分离的限速往外让；`StepBody` 在交给角色控制器前按线段裁步（朝担架的分量削掉、贴边滑、已经在里面的只许往外）。敌我都挡，钉住的人与担架员自己不挡。
+
+**第二轮（同日，用户要求玩家也挡）**：`Script_Player.MoveWithCollision` 在人物裁步之后再过一次 `BlockPlayerByLitters`（同一批线段，`world.LitterBlockers` → `ai.litterSegs`；被担架扫进身体时往外让，限速 `PLAYER_ACTOR_BLOCK.pushOutMps`）。玩家自己抬着的那副不挡他：P012 前位的 `carryLitterRear === "player"`，第一关 `litter.state === "carried"` 报成 `seg.player`。接担架不受影响：交互够得着的距离（第一关 2.5 m、摆点 2.2 m）比挡位留出的缝大。
+
+坑：`Script_Main` 换关时整块重建 `player.world`，只抄了地形几条 —— 第一版 `LitterBlockers` 因此在白盒里根本没接上（实测修前修后一样）。现在换关那处单独补了 `LitterBlockers`。**同一处也漏了 `ActorBlockers/ActorRadius`：进白盒之后「人挡玩家」（§17）其实一直是关着的。** 试过一起补回，整关续跑回归在 02–05 的「罗班长说话时在画面里」红了（基线同处是绿的）—— 第一关自 09-17 起都在「玩家能穿人」的状态下调，补回要另案处理，这次没动。
 
 **实测**（无头 `?whitebox=p012`，`FirstLevelJump` 后推 90 s，统计非钉住国军离担架线段内段 < 0.52 m 的帧；修前把挂钩与裁步都关掉，同页交替跑两轮）：
 
@@ -1267,7 +1271,9 @@ draw，SRP Batcher 是 Unity 的东西，这两条这里都用不上；能省的
 | 14 第二轮扫射 → 收拢 | 278 / 0.006 m / 264 帧；112 / 0.139 m / 98 帧 | 0（两轮都照常推进到 Regroup） |
 | 15 收拢 → 院墙夹道 | 796 / 0.001 m / 158 帧；1027 / 0.028 m / 258 帧 | 0 |
 
-验收：`Script_AiCrowdTest.mjs` ⑦b（站在担架上的被推出、担架员不动、横穿被裁成贴边滑、背离不裁、已在里面不许更深、担架员不被自己的担架挡、落地/松手/楼层不挡、玩家接后端、关卡报来的担架队、StepBody 接线）。
+玩家侧实测（15 段，玩家按住 W 反复朝最近一副担架横穿 40 s）：修前 273–300 帧在担架中段、最近 0.002 m；修后 0。
+
+验收：`Script_PlayerActorBlockTest.mjs` ⑦b（冲着担架走绕到担架头、自己抬的两种标法不挡、被扫进身体限速往外让、接线含换关重建）；`Script_AiCrowdTest.mjs` ⑦b（站在担架上的被推出、担架员不动、横穿被裁成贴边滑、背离不裁、已在里面不许更深、担架员不被自己的担架挡、落地/松手/楼层不挡、玩家接后端、关卡报来的担架队、StepBody 接线）。
 
 ## 18. 2026-09-16：队友接敌先找掩体、节节抗击
 

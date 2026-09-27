@@ -28,7 +28,9 @@ import { CoverLean, LeanClearance } from "./Script_CoverLean.mjs";
 import { AUTOMATIC_RECOIL } from "./Data_Tuning_FirearmHandling.mjs";
 import { FirearmHandling, GunClearance } from "./Script_FirearmHandling.mjs";
 import { CameraShake } from "./Script_CameraShake.mjs";
-import { BlockPlayerStep } from "./Script_PlayerActorBlock.mjs";
+import { BlockPlayerStep, PLAYER_ACTOR_BLOCK } from "./Script_PlayerActorBlock.mjs";
+import { BlockPlayerByLitters } from "./Script_LitterBlock.mjs";
+import { CROWD } from "./Data_Tuning_Ai.mjs";
 import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
 import { CapturePlayerDeath, SyncPlayerDeathCamera } from "./Script_PlayerDeath.mjs";
 
@@ -997,6 +999,14 @@ export class PlayerController {
     if (actors?.length) {
       const r = BlockPlayerStep(this.position, step.x, step.z, this.radius, actors,
         this.world.ActorRadius, dt, this._actorBlock || (this._actorBlock = {}));
+      if (r.blocked && dt > 0) { this.velocity.x = r.slideX / dt; this.velocity.z = r.slideZ / dt; }
+      step.x = r.dx; step.z = r.dz;
+    }
+    // 抬着的担架（两个担架员中间那一段，含第一关的担架队）同样不许穿；自己抬着的那副除外。
+    const litters = this.world.LitterBlockers?.();
+    if (litters?.length) {
+      const r = BlockPlayerByLitters(this, step.x, step.z, litters, CROWD.litterHalfWidthM + this.radius,
+        PLAYER_ACTOR_BLOCK.pushOutMps * dt, CROWD.maxDyM, this._litterBlock || (this._litterBlock = {}));
       if (r.blocked && dt > 0) { this.velocity.x = r.slideX / dt; this.velocity.z = r.slideZ / dt; }
       step.x = r.dx; step.z = r.dz;
     }
