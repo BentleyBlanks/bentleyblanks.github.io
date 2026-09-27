@@ -42,6 +42,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { MarkNoPrepass } from "./Script_Post.mjs";
+import { LoadStretcherAsset, StretcherAssetGeometry, CreateStretcherGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
 // Lerp 在 Script_Noise 里没导出，导出的名字是 Mix —— 别自己再写一个线性插值，
 // 两份实现迟早会有一份被改。
 import { HashString, ValueNoise2, Clamp01, Clamp, Mix as Lerp } from "./Script_Noise.mjs";
@@ -1166,6 +1167,11 @@ export class CutsceneDirector {
         for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) * (size[0] / tile), uv.getY(i) * (size[1] / tile));
         uv.needsUpdate = true;
       }
+    } else if (spec.kind === "stretcher") {
+      // 担架只有一副：Script_StretcherAsset 的竹竿布兜担架（原点=担架中心，竿心在
+      // 原点上方 0.12 m，头朝 -Z）。颜色在顶点色里，材质不走库。预览入口可能没等过
+      // 开机预载，那就先挂一只空几何，模型到了再换上。
+      geometry = StretcherAssetGeometry() ? CreateStretcherGeometry() : new THREE.BufferGeometry();
     } else if (spec.kind === "heightTerrain") {
       geometry = BuildHeightTerrainGeometry(spec.terrain || {});
     } else if (spec.kind === "backdrop" || spec.kind === "panel") {
@@ -1184,7 +1190,8 @@ export class CutsceneDirector {
     }
     this.ownedGeometries.push(geometry);
 
-    let material = null;
+    let material = spec.kind === "stretcher" ? CreateStretcherMaterial() : null;
+    if (material) this.ownedMaterials.push(material);
     // ── prop.texture：贴一张图上去（2026-08-28 集成批 INT1 补全）────────────
     // 用在四关/终章那几件「一张纸就是全部内容」的道具：传单、报纸、布告、
     // 电报底稿、糊在墙上的标语。它们不是砖也不是木头，材质库里没有对应配方，
@@ -1271,6 +1278,13 @@ export class CutsceneDirector {
     // 会在预通道里变成一块实心方片，SSAO 与体积光的天空判据跟着废。
     if (material && (material.transparent || material.alphaTest > 0)) MarkNoPrepass(material);
     const mesh = new THREE.Mesh(geometry, material);
+    if (spec.kind === "stretcher" && !StretcherAssetGeometry()) {
+      LoadStretcherAsset().then(() => {
+        const loaded = CreateStretcherGeometry();
+        this.ownedGeometries.push(loaded);
+        mesh.geometry = loaded;
+      }).catch((error) => console.error(String(error)));
+    }
     // 自发光只是**让自己亮**，照不亮旁边的东西（没有 GI）。
     // 「台灯是唯一光源」「油灯」「门缝一条光」这三处要真的照亮屋子，
     // 就必须挂一盏点光 —— 少了它，三场室内戏在 night 预设下是纯黑的，

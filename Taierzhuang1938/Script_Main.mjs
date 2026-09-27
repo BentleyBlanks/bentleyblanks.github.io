@@ -71,7 +71,7 @@ import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
 import { FirstLevelP012Runtime } from "./Script_FirstLevelP012Runtime.mjs";
 import { FirstLevelP012Resting } from "./Script_FirstLevelP012Resting.mjs";
-import { FirstLevelP012CarryView, CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mjs";
+import { FirstLevelP012CarryView } from "./Script_FirstLevelP012CarryView.mjs";
 import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 import { FirstLevelP012Binoculars, P012BinocularLensContains } from "./Script_FirstLevelP012Binoculars.mjs";
 import { P012SouthPoint } from "./Data_FirstLevelP012Space.mjs";
@@ -107,7 +107,7 @@ import { StoryDirector, CHAPTER_RELEASE_SIGNAL } from "./Script_Story.mjs";
 import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { LoadGrenadeAsset, CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
-import { LoadStretcherAsset } from "./Script_StretcherAsset.mjs";
+import { LoadStretcherAsset, CreateStretcherGeometry } from "./Script_StretcherAsset.mjs";
 import { InputRouter } from "./Script_Input.mjs";
 import { MeleeCombatDirector } from "./Script_MeleeCombat.mjs";
 import { MELEE_SCENARIOS, MELEE_ENCOUNTERS } from "./Data_MeleeCombat.mjs";
@@ -1283,7 +1283,7 @@ async function Boot() {
   }
   setStep(T("boot.step.actorsProgress", { loaded: meshes.loaded, requested: meshes.requested }),
     BOOT.progress.actorMeshes);
-  // 担架 GLB 与手榴弹一起等：CreateP012StretcherGeometry 是同步的，进关前得已经在手里。
+  // 担架 GLB 与手榴弹一起等：CreateStretcherGeometry 是同步的，进关前得已经在手里；读不到就开机失败。
   const [grenadeAsset] = await Promise.all([LoadGrenadeAsset(), LoadStretcherAsset()]);
   vfx = new VfxSystem(scene, library, {
     quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
@@ -3448,9 +3448,9 @@ function MakeSetpieceProp(spec = {}) {
       || (kind === "shroudedBody" ? [0.62, 0.26, 1.92]
         : kind === "stretcher" ? [0.58, 0.14, 1.85]
           : kind === "debris" ? [0.9, 0.22, 0.7] : [0.72, 0.42, 0.48]);
-    // 担架一律用 1938 竹竿布兜担架（颜色在顶点色里）；只有显式给了 size 的才退回方块。
-    const litter = kind === "stretcher" && (whiteboxColors || !spec.size);
-    const geometry = litter ? CreateP012StretcherGeometry()
+    // 担架一律用 1938 竹竿布兜担架（颜色在顶点色里），没有方块替身。
+    const litter = kind === "stretcher";
+    const geometry = litter ? CreateStretcherGeometry()
       : new THREE.BoxGeometry(size[0], size[1], size[2]);
     const material = new THREE.MeshStandardMaterial({
       color: litter ? 0xffffff

@@ -1,12 +1,11 @@
-// P012 first-person stretcher hands. This view reads the original litter and
+// P012 first-person stretcher hands. This view reads the litter (the baked
+// bamboo stretcher, Script_StretcherAsset, built in this grip frame) and
 // carry state only: gameplay owns the load, its serial and every release.
 // The torso faces the original litter in world space. Looking around never
 // tilts the prop or pulls the hands off its handles.
 
 import * as THREE from "three";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
-import { MergeGeometries } from "./Script_Geo.mjs";
-import { StretcherAssetGeometry } from "./Script_StretcherAsset.mjs";
 
 export const P012_STRETCHER_GRIPS = Object.freeze({
   // +Z points from the rear bearer toward the front bearer; the rear bearer's
@@ -26,44 +25,6 @@ const LOAD_CROUCH = 0.12;
 
 const Clamp01 = value => Math.max(0, Math.min(1, value));
 const Smooth = value => value * value * (3 - 2 * value);
-
-const FALLBACK_CLOTH = new THREE.Color(0xb6ae99);
-const FALLBACK_POLE = new THREE.Color(0x9c8054);
-
-function Painted(geometry, color) {
-  const rgb = new Float32Array(geometry.attributes.position.count * 3);
-  for (let i = 0; i < rgb.length; i += 3) { rgb[i] = color.r; rgb[i + 1] = color.g; rgb[i + 2] = color.b; }
-  geometry.setAttribute("color", new THREE.BufferAttribute(rgb, 3));
-  return geometry;
-}
-
-/**
- * The litter geometry in the grip frame, coloured through its `color`
- * attribute (use a white material with vertexColors). A private copy of the
- * baked 1938 bamboo stretcher (Script_StretcherAsset, preloaded at boot);
- * the procedural box-and-sheet litter only when that GLB could not be read.
- */
-export function CreateP012StretcherGeometry() {
-  const asset = StretcherAssetGeometry();
-  if (asset) return asset.clone();
-  const bed = new THREE.PlaneGeometry(.58,1.85,6,12);
-  bed.rotateX(-Math.PI/2);
-  const cloth=bed.attributes.position;
-  for(let i=0;i<cloth.count;i++)cloth.setY(i,.085-.055*(1-(cloth.getX(i)/.29)**2));
-  bed.computeVertexNormals();
-  const railRight = new THREE.BoxGeometry(0.065, 0.065, P012_STRETCHER_GRIPS.railLengthM);
-  const railLeft = railRight.clone();
-  railRight.translate(P012_STRETCHER_GRIPS.railSpacingM / 2, P012_STRETCHER_GRIPS.gripHeightAbovePropM, 0);
-  railLeft.translate(-P012_STRETCHER_GRIPS.railSpacingM / 2, P012_STRETCHER_GRIPS.gripHeightAbovePropM, 0);
-  // Crosspieces connect the raised rails to the bed. The grip centres sit
-  // beyond the bed end, so the fingers close on handles rather than its edge.
-  const crosspieces = [-.68, .68].map(z => new THREE.BoxGeometry(.65, .06, .065).translate(0, .075, z));
-  const geometry = MergeGeometries([Painted(bed, FALLBACK_CLOTH),
-    ...[railRight, railLeft, ...crosspieces].map(part => Painted(part, FALLBACK_POLE))]);
-  geometry.name = "P012OriginalStretcherWithHandles";
-  geometry.computeBoundingBox();
-  return geometry;
-}
 
 function CarryView(value) {
   return value?.load?.kindId ? value.load : value;

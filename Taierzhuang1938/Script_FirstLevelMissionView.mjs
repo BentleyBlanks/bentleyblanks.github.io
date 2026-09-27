@@ -4,7 +4,7 @@ import { MissionAftermath } from "./Script_FirstLevelMissionAftermath.mjs";
 import { MissionPeople } from "./Script_FirstLevelMissionPeople.mjs";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as MID } from "./Data_Tuning_FirstLevelMid.mjs";
-import { CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mjs";
+import { CreateStretcherGeometry } from "./Script_StretcherAsset.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { PlaceGeometry } from "./Script_Geo.mjs";
 import { ApplyShadowDepth, AttachShadowDepth } from "./Script_ShadowDepth.mjs";
@@ -62,7 +62,7 @@ export class FirstLevelMissionView {
       // 担架：1938 竹竿布兜担架（Script_StretcherAsset），颜色在顶点色里，材质取白。
       // 布面亮度照旧压在脏帆布那一档：0xd1d0be 在门口那片天光下会被顶成一块发光的白板，
       // 躺在上面的人整个读成一团黑影（2026-09-16 屋内伏击出图实拍）。十副担架同一份材质。
-      ["bed", CreateP012StretcherGeometry(), 0xffffff, 20],
+      ["bed", CreateStretcherGeometry(), 0xffffff, 20],
       ["patient", new THREE.BoxGeometry(0.49, 0.19, 1.55), 0xd9d7cb, 26],
       ["medical", new THREE.BoxGeometry(0.24, 0.2, 0.12), 0xe1e2d5, 32],
       ["cart", new THREE.BoxGeometry(3, 0.38, 5.8), 0x8a7b69, 7],
@@ -88,7 +88,7 @@ export class FirstLevelMissionView {
     this.zhouRoot = new THREE.Group();
     this.zhouRoot.name = "MissionOriginalZhouStretcher";
     this.root.add(this.zhouRoot);
-    this.zhouBed = new THREE.Mesh(CreateP012StretcherGeometry(), this.parts.bed.material);
+    this.zhouBed = new THREE.Mesh(CreateStretcherGeometry(), this.parts.bed.material);
     this.zhouRoot.add(this.zhouBed);
     this.zhouPatient = new THREE.Mesh(
       new THREE.BoxGeometry(0.49, 0.19, 1.55),
@@ -101,6 +101,7 @@ export class FirstLevelMissionView {
     zhouHead.position.set(0, 0.22, -0.84);
     this.zhouRoot.add(zhouHead);zhouHead.visible=false;
     this.zhouRoot.visible = false;
+    this.BuildEmptyLitterStack();
     this.people=new MissionPeople({root:this.root,actorFactory,battlefield});
     this.aftermath=new MissionAftermath({root:this.root,actorFactory,battlefield,vfx});
     // 尸体层的实例桶在它自己的构造里建齐；挂共用深度材质的事在这里做，
@@ -115,6 +116,32 @@ export class FirstLevelMissionView {
     this.BuildTank();
     this.BuildSupplies();
 
+  }
+  /** 接收院西北角码着的空担架（静态实例，与担架队同一份几何和材质）。 */
+  BuildEmptyLitterStack() {
+    const spec = MISSION_PLACEMENT.receptionYard?.emptyLitterStack;
+    if (!spec) return;
+    const count = spec.columns * spec.layers;
+    const mesh = new THREE.InstancedMesh(this.parts.bed.geometry, this.parts.bed.material, count);
+    mesh.name = "MissionEmptyLitterStack";
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    AttachShadowDepth(mesh);
+    // 上一层的横撑（底面 +0.047 m）压在下一层的竹竿顶（+0.155 m）上：层距 0.11 m。
+    const ground = this.battlefield.GroundHeight(spec.x, spec.z);
+    const c = Math.cos(spec.yaw), s = Math.sin(spec.yaw), matrix = new THREE.Matrix4(), q = new THREE.Quaternion();
+    let index = 0;
+    for (let layer = 0; layer < spec.layers; layer++) for (let column = 0; column < spec.columns; column++) {
+      const jitter = Math.sin(index * 12.9898) * .5;          // 码得不齐：每副偏一点点
+      const lx = (column - (spec.columns - 1) / 2) * .72 + jitter * .05, lz = jitter * .12;
+      q.setFromEuler(new THREE.Euler(0, spec.yaw + jitter * .06, 0));
+      matrix.compose(new THREE.Vector3(spec.x + c * lx + s * lz, ground + layer * .11, spec.z - s * lx + c * lz),
+        q, new THREE.Vector3(1, 1, 1));
+      mesh.setMatrixAt(index++, matrix);
+    }
+    this.root.add(mesh);
+    this.meshes.push(mesh);
+    this.emptyLitterStack = mesh;
   }
   Box(root, w, h, d, x, y, z, color) {
     const material = new THREE.MeshStandardMaterial({ color, roughness: 0.9 });

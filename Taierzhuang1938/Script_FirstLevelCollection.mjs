@@ -21,6 +21,7 @@ import { FRONT_TUNING as F, BORROW_LIGHT_BEATS, FRONT_BATTLE_TUNING as B } from 
 import { MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as Place } from "./Data_FirstLevelMissionLayout.mjs";
 import { MissionRouteProjection, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
+import { CreateStretcherGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 
 /** 借火那一段的姿态顺序（State().borrow 按这个序列记，测试照它对账）。 */
@@ -95,32 +96,44 @@ export class FirstLevelCollection {
   }
 
   // --- 摆位 -----------------------------------------------------------------
-  /** 担架：一块帆布板加一个躺着的人，常驻场景（02 路过时就已经在了）。 */
+  /**
+   * 担架：竹竿布兜担架（Script_StretcherAsset，全游戏同一副模型）平放在地上，
+   * 上面躺一个烘焙躺姿的伤员（与担架队同一套 MissionPeople.Patient），常驻场景
+   *（02 路过时就已经在了）。担架是静态网格；伤员是立即模式，在 Draw 里逐帧报。
+   */
   Dress() {
     const r = this.r;
     if (this.dressed || !r.scene) return;
     this.dressed = true;
-    const canvas = new THREE.MeshLambertMaterial({ color: 0xb6ae99 });
-    const body = new THREE.MeshLambertMaterial({ color: 0xd0cec2 });
+    const material = CreateStretcherMaterial();
+    const geometry = CreateStretcherGeometry();
     for (const [i, spot] of Place.collection.litters.entries()) {
       const group = new THREE.Group();
       group.name = `MissionCollectionLitter${i}`;
-      const bed = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.08, 1.92), canvas);
-      bed.position.y = 0.3;
-      const patient = new THREE.Mesh(new THREE.BoxGeometry(0.49, 0.19, 1.55), body);
-      patient.position.y = 0.43;
-      group.add(bed, patient);
-      group.position.set(spot.x, r.battlefield.GroundHeight(spot.x, spot.z), spot.z);
+      const bed = new THREE.Mesh(geometry, material);
+      bed.castShadow = true; bed.receiveShadow = true;
+      group.add(bed);
+      // 模型最低点是布兜底（+0.03 m）：放在地上就是布兜贴地、横撑离地两三厘米。
+      const ground = r.battlefield.GroundHeight(spot.x, spot.z);
+      group.position.set(spot.x, ground, spot.z);
       group.rotation.y = spot.yaw ?? 0;
-      for (const mesh of [bed, patient]) { mesh.castShadow = true; mesh.receiveShadow = true; }
       r.scene.add(group);
-      this.props.push({ group, materials: [canvas, body], geometries: [bed.geometry, patient.geometry] });
+      this.props.push({ group, id: `CollectionPatient${i}`, x: spot.x, y: ground, z: spot.z, yaw: spot.yaw ?? 0 });
     }
+    this.propGeometry = geometry;
+    this.propMaterial = material;
   }
   /** 立即模式的人群：每帧在 view.Update 之后补一次，不然 people.End() 会把他们藏起来。 */
   Draw(time) {
     const r = this.r;
     if (!this.dressed || !r.view?.Person) return;
+    // 担架上的人：躺姿与担架队同一口径（担架原点上方 0.07 m）。这里在 view.Update
+    // 之后才报，所以报完再走一遍 people.End() 让伤员实例桶重新算可见性。
+    const people = r.view.people;
+    if (people?.Patient) {
+      for (const prop of this.props) people.Patient(prop.id, prop.x, prop.y + .07, prop.z, prop.yaw, time);
+      people.End();
+    }
     for (const person of this.people)
       r.view.Person(person.x, person.z, person.yaw, time,
         { id: person.id, kind: person.kind === "wounded" ? "medic" : "bearer", crouch: person.crouch });
@@ -446,11 +459,10 @@ export class FirstLevelCollection {
   }
   Dispose() {
     this.UnseatZhou();
-    for (const prop of this.props) {
-      prop.group.parent?.remove(prop.group);
-      for (const geometry of prop.geometries) geometry.dispose();
-    }
-    if (this.props.length) for (const material of this.props[0].materials) material.dispose();
+    for (const prop of this.props) prop.group.parent?.remove(prop.group);
+    this.propGeometry?.dispose();
+    this.propMaterial?.dispose();
+    this.propGeometry = this.propMaterial = null;
     this.props = [];
     for (const mesh of [this.smoke, this.match, this.seatBox]) {
       if (!mesh) continue;

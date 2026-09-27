@@ -3,9 +3,9 @@
 // The GLB is one mesh in the litter's own frame: +Z toward the front bearer,
 // head at -Z, pole centre-lines at x = ±0.29, y = 0.12, ending at z = ±1.075 —
 // the same frame as P012_STRETCHER_GRIPS, so carry IK needs no offsets. Colour
-// lives in COLOR_0; consumers use a white material with vertexColors. Boot
-// waits for it next to the grenade; if it cannot be read, callers keep the
-// procedural litter and the level still starts.
+// lives in COLOR_0 (CreateStretcherMaterial). It is the game's only stretcher:
+// boot waits for it next to the grenade and fails loudly if it cannot be read —
+// there is no procedural stand-in to fall back to.
 
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
@@ -39,14 +39,25 @@ export function LoadStretcherAsset() {
       geometry = source;
       return geometry;
     }).catch((error) => {
-      console.warn(`[StretcherAsset] 读取失败，退回程序化担架：${String(error).slice(0, 180)}`);
-      return null;
+      pending = null;
+      throw new Error(`[StretcherAsset] 担架模型读取失败：${String(error).slice(0, 180)}`);
     });
   }
   return pending;
 }
 
-/** The loaded geometry (shared, do not mutate), or null before/without the GLB. */
+/** The loaded geometry (shared, do not mutate), or null before the GLB has arrived. */
 export function StretcherAssetGeometry() {
   return geometry;
+}
+
+/** A private copy of the stretcher geometry in the grip frame. Boot must have loaded it. */
+export function CreateStretcherGeometry() {
+  if (!geometry) throw new Error("[StretcherAsset] 担架模型还没加载：先 await LoadStretcherAsset()");
+  return geometry.clone();
+}
+
+/** The material every stretcher draws with: white, tinted by the baked vertex colours. */
+export function CreateStretcherMaterial(options = {}) {
+  return new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.92, metalness: 0, ...options });
 }

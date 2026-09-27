@@ -935,6 +935,8 @@ export const MISSION_PLACEMENT = Object.freeze({
     yaowaBedside: { x: -23.1, z: 241.5, yaw: 1.83 },
     zhouPlaced: { x: -26, z: 239.4, yaw: 0 },
     nextLitterEntry: { x: -13, z: 243.4, yaw: -1.57 },
+    // 西北角码着的空担架：两列三层，用的就是担架模型（原来是一块 1.5×0.48×2.9 的白盒）。
+    emptyLitterStack: { x: -37.6, z: 221.5, yaw: 0, columns: 2, layers: 3 },
   },
   // 18 铁路桥。
   bridge: {

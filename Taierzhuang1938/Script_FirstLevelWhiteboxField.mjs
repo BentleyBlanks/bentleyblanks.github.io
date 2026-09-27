@@ -318,7 +318,8 @@ export class FirstLevelWhiteboxField {
       const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? (this.layout.fortifications && block.id.startsWith(`StationCar${this.layout.derailCar}`) ? derailSink : trainSink) : sink;
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
       const seamOwner=block.id.includes("BagSeam")?block.id.split("BagSeam")[0]:null;
-      if(!defenses.replaced.has(block.id) && !defenses.replaced.has(seamOwner))targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
+      // visual:false —— 只要碰撞，画面由模型负责（例：接收院的空担架摞）。
+      if(block.visual!==false && !defenses.replaced.has(block.id) && !defenses.replaced.has(seamOwner))targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
         x: block.x,
         y: block.y,
         z: block.z,

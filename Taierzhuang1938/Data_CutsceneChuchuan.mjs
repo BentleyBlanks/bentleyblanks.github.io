@@ -1300,10 +1300,10 @@ const CHUCHUAN_STRETCHER_STOP_Z = 8.4;
 const CHUCHUAN_STRETCHER_SPEED = CHUCHUAN_STATION_SPEED + CHUCHUAN_STRETCHER_WALK / CHUCHUAN_STATION_PASS;
 const CHUCHUAN_STRETCHER_FROM_Z = CHUCHUAN_STRETCHER_STOP_Z - CHUCHUAN_STRETCHER_SPEED * CHUCHUAN_TRAIN_STOP_AT;
 
+// 担架本身是全游戏同一副竹竿布兜担架（kind "stretcher"，Script_StretcherAsset）：
+// 原点在担架中心、竿心在原点上方 0.12 m，所以原点 y 取竿高 1.08 − 0.12。
 const CHUCHUAN_STRETCHER_PARTS = [
-  { name: "StationStretcher", kind: "box", size: [1.25, 0.15, 2.15], pos: [6.85, 1.22], mat: "ClothNra", color: 0xb29a78 },
-  { name: "StationStretcherPoleA", kind: "box", size: [0.13, 0.10, 2.34], pos: [6.22, 1.08], mat: "WoodStock", color: 0x8a6b4c },
-  { name: "StationStretcherPoleB", kind: "box", size: [0.13, 0.10, 2.34], pos: [7.48, 1.08], mat: "WoodStock", color: 0x8a6b4c },
+  { name: "StationStretcher", kind: "stretcher", pos: [6.85, 0.96] },
 ];
 
 function StretcherProps() {

@@ -75,7 +75,9 @@ export function BuildRearWhitebox(groundAt) {
     Box(blocks, `ReceptionWaitingPost${i}`, x, z, .22, 2.8, .22, "timber");
   Box(blocks, "ReceptionWaitingBench", -13.2, 220, 5.6, .44, .6, "timber");
   Box(blocks, "ReceptionReceivingTable", -16.2, 226, 1.7, .78, .8, "timber");
-  Box(blocks, "ReceptionEmptyLitterStack", -37.6, 221.5, 1.5, .48, 2.9, "timber");
+  // 空担架摞：这块只留碰撞（visual:false，07+ 结构冻结的指纹不变），画面由 MissionView
+  // 用担架模型码两列三层（MISSION_PLACEMENT.receptionYard.emptyLitterStack）。
+  Box(blocks, "ReceptionEmptyLitterStack", -37.6, 221.5, 1.5, .48, 2.9, "timber", { visual: false });
   // Gate hood is intentionally small: this is an ordinary yard pressed into service.
   Box(blocks, "ReceptionGateHood", 2, 240, 2.6, .22, 5.6, "roof",
     { y: groundAt(2, 240) + 2.94 });

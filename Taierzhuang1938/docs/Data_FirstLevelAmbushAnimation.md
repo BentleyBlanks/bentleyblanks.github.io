@@ -90,7 +90,7 @@ fps 24，stride 7（局部位移 xyz + 四元数 xyzw），`frameCount = round(d
 - 盆骨骨节在 `deckY + 0.18`，腹部表面约 `deckY + 0.29`（所以 `BayonetStabDown` 的刀尖
   0.95–0.96 m 是**扎进肚子里**，不是停在表面）。
 - 身体沿 Actor 局部 Z 轴躺，长 1.64 m：**头在局部 −Z**（即担架的行进方向、前担架员那一侧），
-  脚在 +Z。横向 ±0.30 m，比 `CreateP012StretcherGeometry` 的床宽略宽一点点（手肘搭在边沿外）。
+  脚在 +Z。横向 ±0.30 m，比 担架模型（`Script_StretcherAsset`）的床宽略宽一点点（手肘搭在边沿外）。
 - `Script_FirstLevelMissionView` 现在给老周画的是 `MissionPeople.Patient()` 的**实例化静态
   网格**，不是蒙皮 Actor。要播这两条 clip，Package A 得把老周换成 `Person()` 那条蒙皮路径。
 
