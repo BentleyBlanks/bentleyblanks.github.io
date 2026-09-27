@@ -19,7 +19,7 @@ import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_R
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_FACT_GATES, MISSION_ENCOUNTER_ACTIVATION, MissionGateInArea } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { MID_TUNING as M, MidLitterHoldSlots, MidDraftKind, MidTransferScatterPlan, MidTransferRetreatJoin } from "./Data_Tuning_FirstLevelMid.mjs";
+import { MID_TUNING as M, MidLitterHoldSlots, MidDraftKind, MidTransferScatterPlan, MidTransferRetreatJoin, MidTransferWalkRoute } from "./Data_Tuning_FirstLevelMid.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import {
   FirstLevelMissionColumn, MissionRouteProjection, MissionCarryRoutePoint,
@@ -628,6 +628,62 @@ const Step = (host, module, seconds, options = {}) => {
     "路上的人按所在一侧去残墙外侧");
   Check(plans[2].route.every((p) => p.x < E.walls.westX), "已在西墙外的人不回头穿墙");
   Check(plans[3] === null, "不在路上的人不被点名散开");
+
+  // 12 班里人上射位（TakePosts）、何有田接替顺子的射位（A.transfer）、13 罗班长跑到停车处：
+  // 这些都是 squadRoutes / MoveActor 直线走位，没有寻路。12 里班里人能站的地方 —— 各射位、
+  // 接替点、进场的村路段（z ≥ 75）、排队点、分拣区里车路两侧的遮挡点与北通道口 —— 出发，走
+  // MidTransferWalkRoute 给的折线（车路两侧残墙挡着就走缺口），0.35 m 胶囊一路不撞实心体块。
+  // （13 的散开点、南半场与撤退通道只归担架队与步行伤员，班里人 12 里不在那儿，不列。）
+  const starts = [
+    ...M.defencePosts, A.transfer, A.queue,
+    ...E.covers.map((cover) => cover.path.at(-1)).filter((point) => point.z < 111),
+    E.lanes[0].gate, ...E.lanes[0].points,
+    ...MISSION_ROUTES.village.filter((point) => point.z >= 75), ...MISSION_ROUTES.southTraffic.filter((p) => p.z >= 75 && p.z <= 111),
+  ].filter((point) => !Hit(point.x, point.z, .6));
+  const walkBad = [];
+  const WalkSweep = (route) => {
+    for (let leg = 1; leg < route.length; leg++) {
+      const a = route[leg - 1], b = route[leg], length = Distance(a, b);
+      for (let d = 0; d <= length; d += .1) {
+        const box = Hit(a.x + (b.x - a.x) * d / (length || 1), a.z + (b.z - a.z) * d / (length || 1), .35);
+        if (box) return box.id;
+      }
+    }
+    return null;
+  };
+  for (const [who, target] of [...M.defencePosts.map((post) => [post.cast, post]), ["heyoutian relief", A.transfer]])
+    for (const start of starts) {
+      const blocked = WalkSweep([start, ...MidTransferWalkRoute(start, target)]);
+      if (blocked) walkBad.push(`${who} from ${start.x},${start.z}: ${blocked}`);
+    }
+  // 13 罗班长用 MoveActor 直奔停车处（不走折线）：从他的射位出发必须本来就是通的。
+  const luoPost = M.defencePosts.find((post) => post.cast === "luo");
+  const luoBlocked = WalkSweep([luoPost, A.cartHalt]);
+  if (luoBlocked) walkBad.push(`luo post -> cartHalt: ${luoBlocked}`);
+  assert.deepEqual(walkBad, [], "12–13 scripted squad walks reach their posts around the road walls");
+  Check(starts.length > 15, `12–13 班里人直线走位：${starts.length} 个起点全部走得到射位 / 接替点`);
+}
+
+// ---------------------------------------------------------------------------
+// 08–10 门框不许凸出墙面（2026-09-27 集成实跑：灶屋北门的门框比填墙厚 12 cm，何有田在 10
+// 贴墙滑向门洞时胶囊挂在门框角上，一直卡到 12，「何有田接替射位」永远等不到）。
+// 脚本走位只会贴墙滑，实心门框必须与所在墙段齐平。
+// ---------------------------------------------------------------------------
+{
+  const solid = MISSION_LAYOUT.blocks.filter((block) => block.solid !== false);
+  const jambs = solid.filter((block) => /DoorJamb/.test(block.id));
+  assert.ok(jambs.length > 0, "the narrowed village doorways still have solid frames");
+  for (const jamb of jambs) {
+    const infill = solid.filter((block) => block.id.startsWith(jamb.id.replace(/Jamb.*$/, "Infill")));
+    assert.ok(infill.length, `${jamb.id} sits in an infill wall`);
+    for (const wall of infill) {
+      const alongX = wall.w > wall.d;   // wall runs along x → thickness is along z
+      const [jc, jh, wc, wh] = alongX ? [jamb.z, jamb.d / 2, wall.z, wall.d / 2] : [jamb.x, jamb.w / 2, wall.x, wall.w / 2];
+      assert.ok(jc - jh >= wc - wh - 1e-6 && jc + jh <= wc + wh + 1e-6,
+        `${jamb.id} is flush with ${wall.id} (a proud frame corner snags scripted movers)`);
+    }
+  }
+  Check(true, `门框齐平：${jambs.length} 根实心门框都不凸出墙面`);
 }
 
 // ---------------------------------------------------------------------------

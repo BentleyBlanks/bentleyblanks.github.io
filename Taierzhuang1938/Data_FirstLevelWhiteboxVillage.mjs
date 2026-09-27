@@ -404,7 +404,9 @@ export function BuildVillageWhitebox(groundAt) {
     const g = groundAt(58, z);
     for (const s of [-1, 1]) {
       Block(`${door}Infill${s}`, 58 + s * 1.5, z, .8, 2.445, .6, "plaster", { y: g + 1.2225 });
-      Block(`${door}Jamb${s}`, 58 + s * 1.1, z, .16, 2.3, .72, "timber", { y: g + 1.15 });
+      // Jamb flush with the 0.6 m infill: a frame standing 6 cm proud caught 何有田's
+      // capsule while he slid along the wall to the door (10 catch-up, stuck to 12).
+      Block(`${door}Jamb${s}`, 58 + s * 1.1, z, .16, 2.3, .6, "timber", { y: g + 1.15 });
     }
     Block(`${door}Head`, 58, z, 2.36, .2, .72, "timber", { y: g + 2.3 });
     Block(`${door}Threshold`, 58, z, 2.04, .12, .72, "structure", { y: g + .06 });

@@ -165,7 +165,10 @@ export async function Drive(ctx) {
     const dressings = await Interact();
     assert.equal(dressings.kind, "supply", "the courtyard medical post provides real supplies");
     await page.evaluate(() => { const g = window.Tengxian; g.Debug.Key("KeyB"); g.StepFrames(1, 1 / 60, false); });
-    await Route([{ x: 53, z: 32.2 }, { x: 53, z: 38 }, { x: 57, z: 38 }], "CourtyardWatch", { fight: true });
+    // 守院门外：站在院门以北、绕回巷拐角的西侧，不堵巷口。2026-09-27 起巷子收窄到 3.8 m
+    //（南侧棚 z 37.3、北侧院墙 z 41.1），旧站位 (57,38) 正好卡在巷口：队尾刘文财给玩家让路，
+    // 停在玩家身后 0.75 m 一直不走，「队尾掩护脱离」等不到（集成实跑 FirstLevelWhitebox0618_Fix12）。
+    await Route([{ x: 53, z: 32.2 }, { x: 53, z: 36.4 }, { x: 51.2, z: 36.4 }], "CourtyardWatch", { fight: true });
     await WaitStage("TransferApproach", 420, { fight: true });
     const passed = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission());
     assert.ok(passed.facts.includes("rearCoverDisengaged"), "队尾掩护真的脱离了才算过院子");

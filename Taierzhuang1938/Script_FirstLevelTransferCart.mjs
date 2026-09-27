@@ -21,7 +21,7 @@ import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelM
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_ENCOUNTERS, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { MID_TUNING as M, MidWalkingWounded, MidTransferScatterPlan } from "./Data_Tuning_FirstLevelMid.mjs";
+import { MID_TUNING as M, MidWalkingWounded, MidTransferScatterPlan, MidTransferWalkRoute } from "./Data_Tuning_FirstLevelMid.mjs";
 import { MissionRouteLength, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
 import { CartDeckLift } from "./Script_CartCorpseBump.mjs";
 
@@ -86,7 +86,8 @@ export class FirstLevelTransferCart {
     for (const post of M.defencePosts) {
       const actor = this.r.companion.Handle(post.cast);
       if (!actor?.alive) continue;
-      this.r.squadRoutes.set(actor.id, [{ x: post.x, z: post.z }]);
+      // 从哪儿来都绕开车路两侧残墙的墙段，走缺口（MidTransferWalkRoute）。
+      this.r.squadRoutes.set(actor.id, MidTransferWalkRoute(actor.position, post));
     }
   }
 
@@ -185,7 +186,7 @@ export class FirstLevelTransferCart {
     if (Distance(column.zhou, column.zhouBoardingStart) >= R.boardingWitnessM) r.Record("zhouNext");
     // 何有田真的走过来接住射位，才轮到「这边我看着！去搭把手！」
     const he = r.companion.Handle("heyoutian");
-    if (he?.alive) r.squadRoutes.set(he.id, [{ x: A.transfer.x, z: A.transfer.z }]);
+    if (he?.alive) r.squadRoutes.set(he.id, MidTransferWalkRoute(he.position, A.transfer));
     const relieved = !he?.alive || Distance(he.position, A.transfer) <= M.escortReliefM;
     if (relieved) {
       r.Record("escortRelieved", { x: he?.position.x ?? null, z: he?.position.z ?? null });

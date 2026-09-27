@@ -358,3 +358,42 @@ export function MidTransferRetreatJoin(point) {
   out.push(E.ditchMouth);
   return out.map((p) => ({ x: p.x, z: p.z }));
 }
+
+/**
+ * 12 班里人上射位 / 何有田接替射位：从 from 走到 to 的折线（不含 from）。直线要是从车路两侧
+ * 残墙的墙段中间穿过去，就改走最近的缺口（缺口两侧各一个折点，离墙 1.5 m），其余照直走。
+ * 这些人由 squadRoutes 驱动，没有寻路，只会贴墙滑 —— 墙段中间正对着过去就会顶在墙上。
+ */
+export function MidTransferWalkRoute(from, to) {
+  const W = MID_TUNING.transferEvac.walls, out = [];
+  const Gaps = (segs) => {
+    const sorted = [...segs].sort((a, b) => a[0] - b[0]);
+    return [sorted[0][0] - 1.5, ...sorted.slice(1).map((seg, i) => (sorted[i][1] + seg[0]) / 2), sorted.at(-1)[1] + 1.5];
+  };
+  let a = { x: from.x, z: from.z };
+  for (let guard = 0; guard < 4; guard++) {
+    let hit = null;
+    for (const [x, segs] of [[W.westX, W.west], [W.eastX, W.east]]) {
+      if ((a.x - x) * (to.x - x) >= 0) continue;
+      const t = (x - a.x) / (to.x - a.x), z = a.z + (to.z - a.z) * t;
+      // 斜着擦过墙头也算：看这一段离每个墙段（连 0.9 m 余量）是否有交，不只看穿墙点。
+      const length = Math.hypot(to.x - a.x, to.z - a.z), n = Math.ceil(length / .2);
+      const near = segs.some(([z0, z1]) => {
+        for (let i = 0; i <= n; i++) {
+          const px = a.x + (to.x - a.x) * i / n, pz = a.z + (to.z - a.z) * i / n;
+          if (Math.abs(px - x) < W.thickM / 2 + .9 && pz > z0 - .9 && pz < z1 + .9) return true;
+        }
+        return false;
+      });
+      if (!near) continue;
+      if (!hit || t < hit.t) hit = { t, x, z, segs };
+    }
+    if (!hit) break;
+    const gap = Gaps(hit.segs).reduce((best, g) => (Math.abs(g - hit.z) < Math.abs(best - hit.z) ? g : best));
+    const side = Math.sign(to.x - a.x);
+    out.push({ x: hit.x - side * 1.5, z: gap }, { x: hit.x + side * 1.5, z: gap });
+    a = out.at(-1);
+  }
+  out.push({ x: to.x, z: to.z });
+  return out;
+}
