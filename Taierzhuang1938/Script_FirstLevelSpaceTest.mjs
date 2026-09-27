@@ -727,6 +727,7 @@ if (!rearOnly) {
 // 2026-09-26 用户授权统一壕沟外观，只排除已移除的非实体通用木护壁/踏板（另断言其不存在）。
 //（Data_FirstLevelSpaceSouthFingerprint.json；只许从 baseline 字段那份提交重新生成）。基线原是重排前的 f581ac7dd；
 // 2026-09-24 并入 master 后换成 master 的 b3ba06096（其 c85614d43 重建了 06–18 白盒），合并后 07+ 与它逐项相同。
+// 2026-09-27 05–18 按概念图重做白盒（docs/Data_FirstLevelWhitebox0518Gap.md），用户授权改动 07+ 的体块与地面，基线随之换成该集成提交。
 // ---------------------------------------------------------------------------
 {
   const expected = JSON.parse(fs.readFileSync(new URL("./Data_FirstLevelSpaceSouthFingerprint.json", import.meta.url), "utf8"));
