@@ -38,6 +38,7 @@
 用户反馈：日军、翻译从远处走来走去都是端枪的步态；日军发现川军后要有喊翻译过来的喊话。
 
 - **步态**（资产与运行时见 [RelaxedGait](../Animation/RelaxedGait/Data_RelaxedGait.md)）：
+  - **2026-09-27 改**：日兵甲、乙是先头兵，改为双手持枪、站直小跑、左右扫视进沟（`"alert"`，`speed.trot` 2.4 m/s），到拖人站位后倒放 `IjaReadyRifle` 把枪甩上背再拖人；资产与实拍见 [IjaAlertGait](../Animation/IjaAlertGait/Data_IjaAlertGait.md)。下一条是 09-26 的原口径，入场那一段作废，拖人之后照旧。
   - 日兵甲、乙：睁眼（Wake）后按 `walkInDelayS` 起步，背枪走下连接支沟（`speed.amble` 1.65 m/s，原来是 brisk 2.3 的端枪跑）；到位后放松站姿、枪仍在背上。之后的拖人、抓领、行刑动作片段本来就是 `slungBack` 武器轨，直接接上。日兵乙在 CaptiveWall 的 `IjaReadyRifle`（`slungBack → twoHand`）、日兵甲在 Wipe 的 `IjaReadyRifle` 起改回持枪，此后的搜索、催促、看押仍端枪；释放给 AI（`ReleaseCombat`）一律改回持枪。
   - 纵深两名日兵（`OPENING_DEPTH_IJA`）：生成即背枪走；踹旗那一脚只用 `IjaKickPrisoner` 的下身（`pose.nativeArms`），两手垂着，枪留在背上。
   - 翻译（`unarmed`，本来就没有枪）：空手走（退下南南西沟）、空手小跑（应声入场 `speed.trot` 2.4 m/s，原来 walk 1.5；Boots 催促 2.0 仍带 `InterpreterPoint` 上身；逃跑 3.4）、站着时放松站姿，不再空手做端枪动作。

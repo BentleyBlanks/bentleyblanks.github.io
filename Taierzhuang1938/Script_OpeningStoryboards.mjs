@@ -953,17 +953,22 @@ export class FirstLevelBunkerShow {
     return {ijaA:this.StageRoot("captiveDrag","ijaA",root),ijaB:this.StageRoot("captiveDrag","ijaB",root)};
   }
   /**
-   * ijaA / ijaB walk down the link sap to the buried comrade, rifles slung on their backs (relaxed gait; a late man
-   * runs after walkInS of FrontPass). Returns how many stand on their marks.
+   * ijaA / ijaB, the vanguard, come down the link sap into a trench just shelled: upright at a trot, rifles in both
+   * hands at the waist, heads sweeping (alert gait; a late man runs after walkInS of FrontPass). On his mark each
+   * slings his rifle (IjaReadyRifle backwards: twoHand -> slungBack) for the drag, whose clips carry it slung.
+   * Returns how many stand on their marks, rifles on their backs.
    */
   WalkIn(age){
-    const r=this.r,marks=this.DragMarks();let ready=0;
+    const r=this.r,marks=this.DragMarks(),sling=ClipLength("IjaReadyRifle",1.1);let ready=0;
     for(const role of ["ijaA","ijaB"]){
       const actor=this.Ija(role);if(!actor)continue;
       if(r.time-this.flags.vanguardAt<C.ija.walkInDelayS[role]){this.Hide(actor);continue;}
-      SetRelaxedGait(actor,"slung");
-      const mark=marks[role];
-      if(this.Follow(actor,"walkIn",[...C.ija.walkIn,mark],age>C.timeouts.walkInS?C.speed.run:C.speed.amble,null,mark.yaw)){
+      const mark=marks[role],key="slungAt:"+role;
+      if(this.flags[key]==null)SetRelaxedGait(actor,"alert");
+      if(this.Follow(actor,"walkIn",[...C.ija.walkIn,mark],age>C.timeouts.walkInS?C.speed.run:C.speed.trot,null,mark.yaw)){
+        const t=r.time-(this.flags[key]??=r.time);
+        if(t<sling){this.Hold(actor,mark,"IjaReadyRifle",{seconds:sling-t});continue;}
+        SetRelaxedGait(actor,"slung");
         if(this.Hold(actor,mark,null))ready++;
       }
     }
@@ -996,7 +1001,7 @@ export class FirstLevelBunkerShow {
     if(ready===2&&called)this.Stage("CaptiveDragged");
     else if(age>C.timeouts.frontPassS+(this.flags.callAt!=null?C.timeouts.interpreterCallS:0)){
       // Late from the spawn queue (or held up): whoever is here stands on his mark, the drag goes on.
-      for(const role of ["ijaA","ijaB"]){const actor=this.Ija(role);if(actor){this.Show(actor);this.Put(actor,marks[role]);}}
+      for(const role of ["ijaA","ijaB"]){const actor=this.Ija(role);if(actor){this.Show(actor);this.Put(actor,marks[role]);SetRelaxedGait(actor,"slung");}}
       this.flags.frontPassForced=r.time;this.Stage("CaptiveDragged");
     }
   }

@@ -100,7 +100,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // Move speeds of the director's walks along trench polylines (m/s).
   // drag: Luo's haul to cover (02; 1.25 until 09-26). (01's haul out of the mouth is IjaHaulForearmUnder's own root motion.)
   // 2026-09-26 relaxed gait (Script_RelaxedGait; switch walk/run at Data_Tuning_ActorLocomotion.RELAXED_GAIT):
-  // amble: ijaA / ijaB walking in with the rifle slung (was brisk, which read as the rifle-at-the-ready run);
+  // amble: a man strolling with the rifle slung (ijaA / ijaB walked in at it until 09-27; before that brisk);
+  // 2026-09-27 the vanguard (ijaA / ijaB) comes in at trot, upright, rifle in both hands (alert gait, IjaAlertTrot);
   // trot: the interpreter jogging over when ijaB calls him (InterpreterCall; was walk).
   speed:Object.freeze({ walk:1.5, brisk:2.3, creep:1.15, run:3.2, drag:1.55, flee:3.4, stroll:1.1, amble:1.65, trot:2.4 }),
   arriveM:.12,

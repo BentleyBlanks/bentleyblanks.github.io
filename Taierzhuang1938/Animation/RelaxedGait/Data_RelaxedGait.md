@@ -24,6 +24,6 @@ node Taierzhuang1938/Script_RelaxedGaitTest.mjs                    # 纯 node �
 
 ## 运行时
 
-`Script_RelaxedGait.mjs`：`SetRelaxedGait(soldier, "slung" | "unarmed" | null)`。装上后 rig 仍按状态选动作，只替换「端枪」那几个选择：`RifleRun` → `RelaxedWalk`（< `walkBelowMps`）/ `BackRifleRun`（> `runAboveMps`，中间保持原步态，变化须持续 `switchFrames` 帧；走/跑按调用方下达的步速 `soldier.relaxedGaitPaceMps` 判，没有才用实测位移速度——动画降频更新时实测速度会连续几帧虚高），`AdvanceFire` → `RelaxedStand`；开火、蹲/卧、搬运、白刃、投掷、伸手时不替换。`"slung"` 隐藏手里的枪、在背后挂一支同款复制件（带背带）；动作片段自带武器轨时手里的枪接管，缓入从背上的位置起。数值在 `Data_Tuning_ActorLocomotion.RELAXED_GAIT`。
+`Script_RelaxedGait.mjs`：`SetRelaxedGait(soldier, "slung" | "unarmed" | "alert" | null)`（`"alert"` 是 2026-09-27 加的警戒持枪小跑，资产与口径见 [IjaAlertGait](../IjaAlertGait/Data_IjaAlertGait.md)）。装上后 rig 仍按状态选动作，只替换「端枪」那几个选择：`RifleRun` → `RelaxedWalk`（< `walkBelowMps`）/ `BackRifleRun`（> `runAboveMps`，中间保持原步态，变化须持续 `switchFrames` 帧；走/跑按调用方下达的步速 `soldier.relaxedGaitPaceMps` 判，没有才用实测位移速度——动画降频更新时实测速度会连续几帧虚高），`AdvanceFire` → `RelaxedStand`；开火、蹲/卧、搬运、白刃、投掷、伸手时不替换。`"slung"` 隐藏手里的枪、在背后挂一支同款复制件（带背带）；动作片段自带武器轨时手里的枪接管，缓入从背上的位置起。数值在 `Data_Tuning_ActorLocomotion.RELAXED_GAIT`。
 
 当前消费方只有 01–02 开场导演（`Script_OpeningStoryboards`），见 [01 洞口过场修订](../../docs/Data_OpeningCinematic20260926.md)「背枪走、空手走与喊翻译」。

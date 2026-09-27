@@ -1,11 +1,15 @@
 // Relaxed gait for skeletal characters: walking with the rifle slung on the back ("slung"), or with
-// no weapon in the hands at all ("unarmed", the 01 interpreter). Without it every standing or moving
+// no weapon in the hands at all ("unarmed", the 01 interpreter); or its opposite, "alert": upright,
+// the rifle in both hands at the waist, the head sweeping (the 01 vanguard coming into the trench). Without it every standing or moving
 // man plays the one production locomotion, RifleRun / AdvanceFire -- the rifle held at the ready,
 // empty hands clasping an invisible one for a man who carries none.
 //
 //   RelaxedWalk / RelaxedStand  Animation/RelaxedGait (baked by _import/Script_RelaxedGaitBake.mjs on
 //                               the shared TengxianHumanoidV1 skeleton; every Tengxian model can play it)
 //   BackRifleRun               Animation/BackRifleRun (the P012 jog; same skeleton)
+//   IjaAlertWalk / IjaAlertTrot / IjaAlertStand
+//                              Animation/IjaAlertGait (BlenderMCP, _import/Script_IjaAlertGaitBake.py;
+//                              loaded only when a man is first set "alert"; the hand weapon stays shown)
 //
 // SetRelaxedGait(soldier, mode) switches it per man; the rig keeps choosing clips by state, this only
 // swaps the rifle-at-the-ready choices (RifleRun -> RelaxedWalk / BackRifleRun, AdvanceFire ->
@@ -19,7 +23,16 @@ import { ACTOR_LOCOMOTION, RELAXED_GAIT as C } from "./Data_Tuning_ActorLocomoti
 import { MarkDynamicPrepass } from "./Script_Post.mjs";
 
 const VERSION = "20260927RelaxedGaitV1";
-let libraryPromise = null, library = null;
+const ALERT_VERSION = "20260927IjaAlertGaitV1";
+let libraryPromise = null, library = null, alertPromise = null, alert = null;
+
+/** The alert clips (lazy: only the 01 vanguard uses them). */
+export function LoadAlertGait() {
+  return alertPromise ||= fetch(`./Animation/IjaAlertGait/Animation_TengxianIjaAlertGait.json?v=${ALERT_VERSION}`)
+    .then(r => { if (!r.ok) throw new Error("IjaAlertGait HTTP " + r.status); return r.json(); })
+    .then(data => (alert = { clips: data.clips.map(json => AnimationClip.parse(json)), profiles: data.profiles }));
+}
+export const AlertGaitLoaded = () => !!alert;
 
 /** Load the clips and the back socket once (the P012 back-rifle GLB is shared with it). */
 export function LoadRelaxedGait() {
@@ -59,6 +72,18 @@ function Adapt(rig, clip, sourceScene, sourceRest) {
   return out;
 }
 
+/** Adds the alert clips to a rig that has the relaxed gait (once both libraries are here). */
+function InstallAlert(rig) {
+  if (!rig?.relaxedGaitInstalled || rig.alertGaitInstalled) return !!rig?.alertGaitInstalled;
+  if (!alert) { LoadAlertGait().catch(() => {}); return false; }
+  rig.alertGaitInstalled = true;
+  for (const clip of alert.clips) rig.clipById.set(clip.name, Adapt(rig, clip, null, null));
+  if (rig.locomotion) rig.locomotion.profiles = { ...rig.locomotion.profiles,
+    ...Object.fromEntries(Object.entries(alert.profiles).filter(([, p]) => p.referenceMps > 0)
+      .map(([id, p]) => [id, { duration: p.duration, referenceMps: p.referenceMps, contacts: p.contacts }])) };
+  return true;
+}
+
 function Install(soldier) {
   const actor = soldier.actor, rig = actor?.characterRig;
   if (!rig?.asset?.gltf || rig.relaxedGaitInstalled) return !!rig?.relaxedGaitInstalled;
@@ -88,8 +113,11 @@ function Install(soldier) {
       const wantsRun = speed > (this.relaxedGaitRunning ? C.walkBelowMps : C.runAboveMps);
       this.relaxedGaitSwitch = wantsRun !== !!this.relaxedGaitRunning ? (this.relaxedGaitSwitch || 0) + 1 : 0;
       if (this.relaxedGaitSwitch >= C.switchFrames) { this.relaxedGaitRunning = wantsRun; this.relaxedGaitSwitch = 0; }
-      chosen = this.relaxedGaitRunning ? "BackRifleRun" : "RelaxedWalk";
-    } else if (free && id === "AdvanceFire") { chosen = "RelaxedStand"; this.relaxedGaitRunning = false; this.relaxedGaitSwitch = 0; }
+      chosen = mode === "alert" ? (this.relaxedGaitRunning ? "IjaAlertTrot" : "IjaAlertWalk")
+        : this.relaxedGaitRunning ? "BackRifleRun" : "RelaxedWalk";
+    } else if (free && id === "AdvanceFire") { chosen = mode === "alert" ? "IjaAlertStand" : "RelaxedStand"; this.relaxedGaitRunning = false; this.relaxedGaitSwitch = 0; }
+    // Until the alert clips have arrived the man keeps the native rifle-at-the-ready choice.
+    if (mode === "alert" && !this.alertGaitInstalled) chosen = id;
     this.relaxedGaitActive = chosen !== id ? chosen : null;
     return chosen;
   };
@@ -98,17 +126,19 @@ function Install(soldier) {
   return true;
 }
 
-/** mode: "slung" | "unarmed" | null. Installs on first use (the clips load in the background). */
+/** mode: "slung" | "unarmed" | "alert" | null. Installs on first use (the clips load in the background). */
 export function SetRelaxedGait(soldier, mode) {
   if (!soldier) return;
   soldier.relaxedGait = mode || null;
   if (mode) Install(soldier);
+  if (mode === "alert") InstallAlert(soldier.actor?.characterRig);
   else if (soldier.actor?.characterRig) soldier.actor.characterRig.relaxedGaitActive = null;
 }
 
 /** Per frame from the animation layer: installs once the clips have arrived (SetRelaxedGait may come first). */
 export function EnsureRelaxedGait(soldier) {
   if (soldier?.relaxedGait && !soldier.actor?.characterRig?.relaxedGaitInstalled) Install(soldier);
+  if (soldier?.relaxedGait === "alert" && !soldier.actor?.characterRig?.alertGaitInstalled) InstallAlert(soldier.actor?.characterRig);
 }
 
 /** True when this frame's body is the relaxed gait's (the rig picked one of its clips). */
