@@ -97,17 +97,34 @@ function WriteJson(key, value) {
 }
 
 /**
+ * 把存下来的画质值灌回 graphics 表（只灌表里已有、类型相同的键），不调 ApplyGraphics。
+ * 返回改了几个键；没有存档时返回 null。
+ *
+ * Script_Main 在开机第一次 EnterLevel **之前**就调它并 ApplyGraphics：着色器预热
+ * （WarmActorShaders / WarmLevel）按当时的画质编 program，POM / 细节法线 / 第一人称自阴影
+ * 这类编译期开关不对的话，预热编出来的全是用不上的变体。编辑器建在开机最后，等它的
+ * ApplySavedSettings 才套设置，改过画质的玩家第一颗手榴弹炸出弹坑 / 断肢那一帧会现编
+ * 一批着色器（2026-09-27 实测两帧 3 s + 9 s）。
+ */
+export function LoadSavedGraphics(graphics) {
+  const gfx = ReadJson(KEY_GFX);
+  if (!gfx || !graphics) return null;
+  let changed = 0;
+  for (const key of Object.keys(graphics)) {
+    if (typeof gfx[key] === typeof graphics[key] && gfx[key] != null && graphics[key] !== gfx[key]) {
+      graphics[key] = gfx[key];
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+/**
  * 开机时把存下来的设置装回去。EditorSuite 的构造函数调它 ——
  * 只在打开面板时才生效的设置不叫设置，那叫开关。
  */
 export function ApplySavedSettings(host) {
-  const gfx = ReadJson(KEY_GFX);
-  if (gfx && host.game && host.game.graphics) {
-    for (const key of Object.keys(host.game.graphics)) {
-      if (typeof gfx[key] === typeof host.game.graphics[key] && gfx[key] != null) {
-        host.game.graphics[key] = gfx[key];
-      }
-    }
+  if (host.game && host.game.graphics && LoadSavedGraphics(host.game.graphics) !== null) {
     if (host.game.ApplyGraphics) host.game.ApplyGraphics();
   }
   const sfx = ReadJson(KEY_SFX);

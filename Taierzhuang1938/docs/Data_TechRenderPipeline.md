@@ -5710,6 +5710,27 @@ program 都没新建。涨出来的全是**卢沟桥人物 GLB 的材质**：`Jo
 一次都没跑。修法：强制出画之前按当前相机补一次 `lights.UpdateShadowFrustum(...)`。复测 01/02/04/07/12/16
 开局 12 s 零现编（之前 04 有一只 `SharedSkinnedShadowDepth @ 日军A` 开局现编，也随之消失）。
 
+### 18.6 存档画质要在预热之前套上（2026-09-27）
+
+用户报「第一颗手榴弹在三名日军旁边爆炸必卡 2–5 s」。默认画质下怎么量都不卡（爆炸帧 ~110 ms、零现编），
+读用户本机 Edge 的 `tengxian1938_graphics_v1` 照着设才复现：爆炸后两帧 `renderer.render` 3065 ms + 9178 ms，
+现编 6 个 program —— 弹坑地块的 `FirstLevelMissionTerrainLayers` ×3、被炸的 `MeshStandardMaterial_DestructibleStatic`、
+断肢块 `Material #25#part`、第一人称手榴弹。与同名旧 program 比缓存键，差的正是 POM / 细节法线 / 微阴影 /
+地平线遮蔽 / 第一人称自阴影这几位编译期开关。
+
+病根是开机顺序：`Boot` 先 `EnterLevel`（`WarmActorShaders` / `WarmLevel` 按**当时的画质**编），编辑器套件建在
+最后，它构造函数里的 `ApplySavedSettings` 才把存档画质套上。改过任一编译期开关的玩家，预热编出来的全是用不上的
+变体；开局看得见的材质在头几帧现编（被开场盖住），爆炸时才第一次出现的材质就卡在第一颗弹上。
+
+修法：`Script_EditorSettings.LoadSavedGraphics` 只把存档值灌进 `graphics` 表，`Boot` 在第一次 `EnterLevel`
+之前调它并 `ApplyGraphics()`；编辑器那次再套是同一组值，`ApplyGraphics` 对编译期开关只在变了时重编，不多花。
+开机最早期（设置套上之前）编过的变体会留在材质自己的变体缓存里，没人用、不卡。
+回归口：`Script_SavedGraphicsWarmTest`（存档关 POM → 没有材质正在用 POM 变体；真扔一颗弹炸死三名日军，
+program 数不涨、爆炸帧 < 1000 ms）。去掉修复同一条测试爆炸帧 19161 ms。
+
+**规矩**：以后凡是往开机链里加「按画质建东西 / 预热」的步骤，都要排在 `LoadSavedGraphics` 之后；
+复现卡顿先用用户存的设置（记忆条「复现用用户的设置」），默认画质下量不到的不等于没有。
+
 ## 19. 坑（按被踩频率排序）
 
 排序规则：**一、真的踩过并留下事故记录的**（含本仓库现役 bug）；

@@ -23,7 +23,7 @@ import {
   MakeMaterialShadingUniforms, ApplyShadingQuality, SyncShadingKnobs,
 } from "./Script_MaterialShading.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
-import { NormalizeGraphicsDetails } from "./Script_EditorSettings.mjs";
+import { NormalizeGraphicsDetails, LoadSavedGraphics } from "./Script_EditorSettings.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { InstallShadowSkip, ShadowSkipCount, SetShadowSkipEnabled } from "./Script_ShadowSkip.mjs";
 import { BonePrune } from "./Script_BonePrune.mjs";
@@ -2086,6 +2086,15 @@ async function Boot() {
 
   await NextFrame();
   setStep(T("boot.step.ready"), BOOT.progress.ready);
+  // 存下来的画质要赶在第一次 EnterLevel 之前套上：那里面的着色器预热按当时的画质编 program，
+  // 编辑器（它的 ApplySavedSettings）建在开机最后才套，改过 POM / 自阴影等编译期开关的玩家
+  // 预热全编成了用不上的变体，第一颗手榴弹炸出弹坑、断肢那一帧再现编（实测 3 s + 9 s）。
+  // 编辑器那次再套是同一组值，编译期开关不变就不重编。
+  try {
+    if (LoadSavedGraphics(graphics)) ApplyGraphics();
+  } catch (error) {
+    console.warn("[Main] 预热前套用存档画质失败（退回编辑器建好后再套）", error);
+  }
   await EnterLevel(state.phaseIndex, { initial: true, cutscenes: false, stageJump:FIRST_LEVEL_STAGE_START });
   state.ready = true;
   bootStart.disabled = false;
