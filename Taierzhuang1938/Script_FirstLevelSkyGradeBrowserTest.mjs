@@ -3,8 +3,8 @@
 //   node Taierzhuang1938/Script_FirstLevelSkyGradeBrowserTest.mjs [--root=<另一份检出>]
 // 读回像素，不看开关位：
 //   1. 结构化云层真的在天上（天空探针同仰角一圈的相对起伏 ≥ 旧云项的 1.2 倍，均值不塌）；
-//   2. 室内天光遮蔽真的接进了材质的 AO：灶屋 09_2 机位下半幅比「拆掉屋子表」暗 ≥ 12%，
-//      室外 08_1 机位差 < 1.5%（屋外逐像素不该动）；
+//   2. 室内天光遮蔽 + 暖反弹真的接进了材质的 AO / SSIL：灶屋 09_2 下半幅跟着屋子表变（> 5%）、
+//      暗部 R > G > B（2026-09-28 第二轮：此前暗部品红），室外 08_1 机位差 < 1.5%（屋外逐像素不该动）；
 //   3. 曝光锚点：11 个室外对照机位实测 avgLog 的中位数与 EXPOSURE_ANCHORS 登记值差 < 0.3 EV
 //      （白盒换材质、改天光之后这一条会红 —— 照打印的中位数重标）；
 //   4. 夜档能套上、页面无报错、无 GL 错误。
@@ -86,19 +86,42 @@ try {
     const pixels = new Uint8Array(w * h * 4);
     g.renderer.readRenderTargetPixels(target, 0, 0, w, h, pixels);
     let sum = 0, n = 0;
+    const dark = [0, 0, 0]; let nd = 0;
     for (let y = 0; y < h / 2; y += 1) for (let x = 0; x < w; x += 1) {   // 读回是自下而上：前 h/2 行 = 画面下半幅
       const i = (y * w + x) * 4; sum += 0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2]; n += 1;
+      if (pixels[i] + pixels[i + 1] + pixels[i + 2] < 150) { dark[0] += pixels[i]; dark[1] += pixels[i + 1]; dark[2] += pixels[i + 2]; nd += 1; }
     }
-    return { mean: sum / n, stats: occ.InteriorVolumeStats(),
-      bound: g.post.AoTexture === g.post.interiorSkyPass.combined?.texture };
+    // 合成图本身：AO′ 的 R 与 SSIL′ 的 rgb，对比 GTAO 原图（屋里天光压下去、暖反弹加上来）
+    const { HalfToFloat } = await import("./Script_Sky.mjs");
+    const MeanOf = (rt, index) => {
+      if (!rt) return null;
+      const tw = rt.width, th = rt.height, buf = new Uint16Array(tw * th * 4);
+      g.renderer.readRenderTargetPixels(rt, 0, 0, tw, th, buf, undefined, index);
+      const m = [0, 0, 0, 0];
+      for (let i = 0; i < buf.length; i += 4) for (let c = 0; c < 4; c += 1) m[c] += HalfToFloat(buf[i + c]);
+      return m.map((v) => v / (tw * th));
+    };
+    const pass = g.post.interiorSkyPass;
+    const maps = withRooms ? { ao: MeanOf(g.post.targets.aoBlur, 0), aoOut: MeanOf(pass.combined, 0), ilOut: MeanOf(pass.combined, 1) } : null;
+    return { maps, mean: sum / n, dark: dark.map((v) => v / Math.max(nd, 1)), stats: occ.InteriorVolumeStats(),
+      bound: g.post.AoTexture === g.post.interiorSkyPass.combined?.texture,
+      ssilBound: g.post.contactShadowsPass.uniformsCompose?.uSsil.value === g.post.interiorSkyPass.SsilTexture };
   }, { pose, withRooms });
   await page.evaluate(() => { const g = window.Tengxian; g.graphics.autoExposure = false; g.ApplyGraphics(); });
   const kitchenOn = await Shoot(Pose("09_2"), true);
-  Check("第一关装上了室内遮蔽体，材质 AO 改采合成图", kitchenOn.stats.rooms >= 6 && kitchenOn.bound,
-    `${kitchenOn.stats.rooms} rooms / ${kitchenOn.stats.portals} portals: ${kitchenOn.stats.ids.join(",")}`);
+  Check("第一关装上了室内遮蔽体，材质 AO 与 SSIL 都改采合成图", kitchenOn.stats.rooms >= 6 && kitchenOn.bound && kitchenOn.ssilBound,
+    `${kitchenOn.stats.rooms} rooms / ${kitchenOn.stats.portals} portals: ${kitchenOn.stats.ids.join(",")} ssil=${kitchenOn.ssilBound}`);
   const kitchenOff = await Shoot(Pose("09_2"), false);
-  Check("灶屋 09_2 下半幅比拆掉屋子表时暗 ≥ 12%", kitchenOn.mean < kitchenOff.mean * 0.88,
-    `${kitchenOn.mean.toFixed(1)} vs ${kitchenOff.mean.toFixed(1)}`);
+  // 第二轮（2026-09-28）：屋里压天光 + 补暖反弹，两者在整幅亮度上接近相抵（实测 25.6 vs 26.0），
+  // 所以直接读合成图：灶屋画面里 AO′ 的 R 明显低于 GTAO 原图、SSIL′ 多出一份 R ≥ G ≥ B 的暖反弹。
+  const m = kitchenOn.maps;
+  Check("灶屋 09_2 合成图：天光压下去（AO′ R < 原图 × 0.8）、暖反弹加上来（SSIL′ R > G > B > 0）",
+    m && m.aoOut[0] < m.ao[0] * 0.8 && m.ilOut[0] > m.ilOut[1] && m.ilOut[1] > m.ilOut[2] && m.ilOut[2] > 0,
+    m ? `AO ${m.ao[0].toFixed(3)} → ${m.aoOut[0].toFixed(3)}  SSIL′ ${m.ilOut.slice(0, 3).map((v) => v.toFixed(3)).join("/")}` : "no maps");
+  console.log(`   09_2 下半幅 L ${kitchenOn.mean.toFixed(1)}（拆掉屋子表 ${kitchenOff.mean.toFixed(1)}）`);
+  const [dr, dg, db] = kitchenOn.dark;
+  Check("灶屋 09_2 暗部是暖棕（R > G > B，不偏品红 / 蓝）", dr > dg && dg > db && db > 5,
+    `dark ${dr.toFixed(1)}/${dg.toFixed(1)}/${db.toFixed(1)}`);
   const streetOff = await Shoot(Pose("08_1"), false);
   const streetOn = await Shoot(Pose("08_1"), true);
   Check("室外 08_1 不受影响（< 1.5%）", Math.abs(streetOn.mean - streetOff.mean) < streetOff.mean * 0.015,

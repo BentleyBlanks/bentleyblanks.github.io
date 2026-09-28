@@ -363,7 +363,10 @@ export const SKY_PRESETS = {
       desat: 0.16, flatten: 0.03,
       // contrastCurve "soft"：对比 1.10 走幂形 S 曲线 —— 线性拉伸会把 sRGB < 0.045 整块裁成 0
       //（掩蔽部 SB01 实拍 7–10% 的像素死黑），S 曲线在中灰斜率相同、两端只压不裁。
-      grade: { shadow: 0.45, highlight: 0.25, shadowTint: [0.93, 0.98, 1.08], contrastCurve: "soft" } },
+      // lift 归零（2026-09-28 第二轮）：出厂 lift (0.006, 0.004, 0.012) 是一层蓝紫底（G 最低、B 最高），
+      // 亮画面里看不出，屋里一压暗它就成了主色 —— 灶屋全零间接光时读回还有 sRGB 13/10/23 的品红底。
+      // shadow 0.45 → 0.3：暗部的冷偏再收一点，室内暗部交给暖反弹（参考暗部 R > G > B）。
+      grade: { lift: [0, 0, 0], shadow: 0.3, highlight: 0.25, shadowTint: [0.93, 0.98, 1.08], contrastCurve: "soft" } },
     exposure: 0.78, godStrength: 0, bloom: 0.04, lensFlare: 0, saturation: 0.92, contrast: 1.10,
     atmosphere: { mie: 8, rayleigh: 0.30, groundAlbedo: 0.2, sunIrradiance: 12,
       skyTint: [0.97, 0.97, 1.0], skyFloor: [0.95, 0.95, 0.92],
