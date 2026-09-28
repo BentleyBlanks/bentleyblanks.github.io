@@ -601,16 +601,20 @@ def CheckGates(metrics, total, outputs, gates, cls):
 
 
 def ManifestSnippet(args, channel, outputs, record_path):
-    files = ",\n".join(f'      {o["channel"]}: ["{o["file"]}", {o["width"]}, {o["height"]}]' for o in outputs)
+    files = "\n".join(f'      ["{o["file"]}", "{o["channel"]}", {o["width"]}, {o["height"]}],' for o in outputs)
+    kind = "terrainLayer" if args.normal_convention == "terrain" else "material"
+    conv = '\n    normalConvention: "terrain",' if args.normal_convention == "terrain" else ""
     return f"""  {{
-    id: "{args.name}", kind: "material", toneClass: "{args.preset}",
-    files: {{
-{files},
-    }},
-    metersPerTile: {args.tile_m},
+    id: "{args.name}", kind: "{kind}", tier: "level:FirstLevel",
+    toneClass: "{args.preset}",
+    metersPerTile: {args.tile_m},{conv}
+    bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "{Rel(record_path)}",
-    source: {{ provider: "lovart", ref: "<thread id>", prompt: "_import/Prompts/Texture_{args.name}.txt", date: "{datetime.date.today().isoformat()}" }},
-    consumers: [{{ file: "<消费模块>.mjs", token: "{args.name}" }}],
+    source: {{ provider: "lovart", date: "{datetime.date.today().isoformat()}", ref: "<Lovart thread id>", prompt: "_import/Prompts/Texture_{args.name}.txt" }},
+    consumers: [{{ file: "Data_LevelTextureSets.mjs", token: "{args.name}" }}],
+    files: [
+{files}
+    ],
   }},"""
 
 
