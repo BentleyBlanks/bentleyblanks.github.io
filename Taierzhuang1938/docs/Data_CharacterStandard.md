@@ -195,8 +195,17 @@ $env:STANDARDIZE_PASS = 'libraries'; blender --background --factory-startup --py
   `John_Sp` 不再上传）。呢子 14。远景合批（BatchedMesh）比蒙皮多一个采样器，皮肤与国军军装的合批变体不采细节包
   （片元里用 `CHAR_BATCHED` / `NRA_CLOTH_BATCHED`，three 的 `USE_BATCHING` 只进顶点着色器）——这顺手修掉了 2026-09-28
   人群合批上线后 `SamplerBudgetTest` 的两条 17。
-- **Program**：日军按部件拆开、腕环与 NRA05/NRA02 的脸改成皮肤，第一关 ultra|gi=1 程序 219 → 234（+15，全在进关人物预热
-  `WarmActorShaders` 里编掉，换人不现编）；国军军装只是在键尾多一段常数 `charGrime1`，不多程序。
+- **代价（2026-09-28 实测，本机 RTX 4070S / ANGLE-D3D11）**：
+  - Program：日军按部件拆开、腕环与 NRA05/NRA02 的脸改成皮肤，第一关 ultra|gi=1 程序 219 → 229（全在进关人物预热
+    `WarmActorShaders` 里编掉，换人不现编：`RespawnShaderWarmTest` 的「摆上来的模型号一个 program 都不新建」过）；
+    国军军装只是在键尾多一段常数 `charGrime1`，不多程序。
+  - 编译：人物程序单个编译 + 链接多约 50–70 ms（皮肤约 225 → 290 ms），进关人物预热 24 → 33 s（低负载 A/B）。
+    第一版把散列值噪声全放在片元里，预热 42 → 62 s；改成正弦噪声、低频场挪进顶点着色器之后是现在的数。再压要从
+    「皮肤 / 呢子各一份补丁」合并成一份按 uniform 分支的补丁入手。
+  - Draw：尸体层 / 任务人物按着色签名合批（`Script_PartAtlasMerge`），日军手从「未分类」变成皮肤、呢子与装具各一种签名，
+    每具日军原型多一组 → 第一关前沿两机位 draw +22 / +24（约 +5%，全在 `FirstLevelMissionWhitebox` 组的尸体合批里，
+    CPU 提交约 21 µs/draw）。NRA02 的毛巾 / 枪套因此不打「装具」部件（与帽徽、眼球同签名，省一组）。
+  - GPU：人物像素多了一张细节包采样 + 少量 ALU，交替 A/B 在争用下看不出差别（中位数差在逐次波动 ±30% 以内）。
 
 **贴图**（烘焙 `_import/Script_BakeCharacterDetail.py`，源图不入库、落 `_shots/Gap3A_Source/B3/`；清单 `Data_TextureManifest`）：
 
@@ -205,7 +214,9 @@ $env:STANDARDIZE_PASS = 'libraries'; blender --background --factory-startup --py
 | `Texture/Texture_CharacterSkinDetail.webp` | 256²（6 cm 一格 = 0.23 mm/纹素，比第一人称手上一个屏幕像素还细；毛孔噪声不好压，512² 要四倍字节） | RG 毛孔法线、B 凹处明暗、A 皮脂 | Lovart thread `1e919f94-dd3c-4960-ac27-65fb9b9cea34`，提示词 `_import/Prompts/Texture_CharacterSkin.txt` |
 | `Texture/Texture_IjaUniformWoolDetail.webp` | 512² | RG 斜纹法线、B 斜纹明暗、A 污渍 | Lovart thread `6d31d311-6887-426c-b194-ea67ec861b42`（布纹）+ 国军布细节的污渍源图，提示词 `_import/Prompts/Texture_IjaUniformWool.txt` |
 
-两张都是 `lazy`：第一个人物造出来时才下（先挂中性 1×1，到了原地换，不重编译），URL 带 `?v=`。
+两张都是 `lazy`：第一个人物造出来时才下（先挂中性 1×1，到了原地换，不重编译），URL 字面量带 `?v=`（国军布细节包同轮补戳）。
+清单 `Data_TextureManifest`（kind `detail`），提示词 `_import/Prompts/Texture_{CharacterSkin,IjaUniformWool}.txt`；两张合计约 400 KB，
+lazy 层整层预算 5 MB（皮肤包因此取 256²、呢子包用有损 alpha）。
 
 **门禁**：`Script_CharacterSurfaceTest`（纯 Node：部件表对得上 GLB 材质名、spec 图无 alpha、细节包规格、打标先于 PBR 接入）、
 `Script_SamplerBudgetTest`、`Script_CharacterModelTest`、`Script_MaterialUpgradeTest`、`Script_MotionVectorContractTest`、

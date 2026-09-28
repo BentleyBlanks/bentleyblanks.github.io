@@ -136,37 +136,38 @@ function Seed(text) {
 // GLSL
 // ---------------------------------------------------------------------------
 
-/** 公共段：绑定姿势的位置 / 法线 varying、值噪声、按屏幕导数现算的切线基。 */
-const COMMON_PATCH = MakePatch({
-  key: CHARACTER_SURFACE_PATCH_KEYS.common,
-  vertex: [
-    ["#include <common>", "varying vec3 vCharRest;\nvarying vec3 vCharRestN;"],
-    // 蒙皮之前的 position / normal：泥跟着布走，不随动作滑；不改 transformed，运动矢量不受影响。
-    ["#include <begin_vertex>", "vCharRest = position;\nvCharRestN = normal;"],
-  ],
-  // 函数形式：编译那一刻按参数写 CHAR_BATCHED（BatchedMesh 的 USE_BATCHING 只进顶点着色器）。
-  fragment: (shader) => [["#include <common>", (shader?.batching ? "#define CHAR_BATCHED\n" : "") + COMMON_FRAGMENT]],
-});
-
-const COMMON_FRAGMENT = /* glsl */`
-varying vec3 vCharRest;
-varying vec3 vCharRestN;
-const vec3 CHAR_LUMA = vec3(0.2126, 0.7152, 0.0722);
+// 噪声（两个着色器都要）。平滑噪声是两组方向错开、互相扭曲的正弦（不散列、不插值）：第一版用的八角
+// 散列值噪声、全在片元里算，ANGLE-D3D 的着色器编译器很吃不消 —— 人物预热的「等待着色器就绪」
+// 26 s → 53 s（2026-09-28 A/B 实测）。现在低频的那几路（泥线、膝肘、袖口、落灰、皮肤污渍与汗）
+// 都在**顶点**里算、插值下来（人物网格 2–5 cm 一个点，这些场都是十厘米量级），片元只做泥线那一刀
+// （有符号距离插值后 smoothstep，边照样利）、溅点与细节包。
+const NOISE_GLSL = /* glsl */`
 float CharHash(vec3 p) {
   p = fract(p * vec3(0.1031, 0.1030, 0.0973));
   p += dot(p, p.yxz + 33.33);
   return fract((p.x + p.y) * p.z);
 }
-float CharNoise(vec3 x) {
-  vec3 i = floor(x), f = fract(x);
-  f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(mix(CharHash(i), CharHash(i + vec3(1.0, 0.0, 0.0)), f.x),
-                 mix(CharHash(i + vec3(0.0, 1.0, 0.0)), CharHash(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
-             mix(mix(CharHash(i + vec3(0.0, 0.0, 1.0)), CharHash(i + vec3(1.0, 0.0, 1.0)), f.x),
-                 mix(CharHash(i + vec3(0.0, 1.0, 1.0)), CharHash(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z);
+float CharNoise(vec3 p) {
+  float a = sin(dot(p, vec3(1.00, 0.61, 0.37)) + 1.3 * sin(dot(p, vec3(-0.43, 0.89, 0.71)) * 1.7));
+  float b = sin(dot(p, vec3(-0.72, 0.28, 1.13)) * 1.3 + 1.1 * sin(dot(p, vec3(0.57, -0.94, 0.21)) * 2.1 + 0.7));
+  return 0.5 + 0.25 * (a + b);
 }
 float CharFbm(vec3 p) {
-  return CharNoise(p) * 0.5 + CharNoise(p * 2.07 + 11.3) * 0.3 + CharNoise(p * 4.13 + 27.1) * 0.2;
+  return CharNoise(p) * 0.65 + CharNoise(p * 2.31 + 7.7) * 0.35;
+}
+`;
+
+const COMMON_FRAGMENT = /* glsl */`
+varying vec3 vCharRest;
+varying vec3 vCharRestN;
+const vec3 CHAR_LUMA = vec3(0.2126, 0.7152, 0.0722);
+// 点：每个单位格一个随机大小、随机偏移的圆点（一次散列），density 是有点的格子比例。溅泥、漆面崩口用它。
+float CharDots(vec3 p, float density) {
+  float h = CharHash(floor(p));
+  vec3 o = fract(vec3(h * 13.1, h * 71.7, h * 27.3)) - 0.5;
+  float r = 0.22 + 0.2 * fract(h * 5.3);
+  float d = length(fract(p) - 0.5 - o * 0.4);
+  return (1.0 - smoothstep(r * 0.55, r, d)) * step(1.0 - density, fract(h * 3.7));
 }
 vec3 CharSafeNormalize(vec3 v) { return v * inversesqrt(max(dot(v, v), 1e-12)); }
 // three 的 getTangentFrame 同款（那一份只在有切线空间法线贴图时才声明）。导数在一致控制流里求。
@@ -189,6 +190,18 @@ mat3 CharTangentFrame(vec3 n, vec2 uv) {
   #define CHAR_SURFACE_UV (vec2(vCharRest.x + vCharRest.z * 0.7, vCharRest.y) / 1.9)
 #endif`;
 
+/** 公共段：绑定姿势的位置 / 法线 varying、噪声、按屏幕导数现算的切线基。 */
+const COMMON_PATCH = MakePatch({
+  key: CHARACTER_SURFACE_PATCH_KEYS.common,
+  vertex: [
+    ["#include <common>", `varying vec3 vCharRest;\nvarying vec3 vCharRestN;\n${NOISE_GLSL}`],
+    // 蒙皮之前的 position / normal：泥跟着布走，不随动作滑；不改 transformed，运动矢量不受影响。
+    ["#include <begin_vertex>", "vCharRest = position;\nvCharRestN = normal;"],
+  ],
+  // 函数形式：编译那一刻按参数写 CHAR_BATCHED（BatchedMesh 的 USE_BATCHING 只进顶点着色器）。
+  fragment: (shader) => [["#include <common>", (shader?.batching ? "#define CHAR_BATCHED\n" : "") + NOISE_GLSL + COMMON_FRAGMENT]],
+});
+
 /** 泥污 / 磨损 / 落灰（所有部件共用；强度按部件的 uCharGrimeRole）。 */
 function GrimePatch(role, seed, heightOffset, part) {
   const G = CHARACTER_GRIME;
@@ -199,55 +212,63 @@ function GrimePatch(role, seed, heightOffset, part) {
     uCharElbow: { value: new THREE.Vector3(part?.elbowX ?? G.elbow[0], G.elbow[1], G.elbow[2]) },
     uCharCuff: { value: new THREE.Vector3(part?.cuffX ?? G.cuff[0], G.cuff[1], strengths.cuff || 0) },
   };
+  const DECLARE = /* glsl */`
+uniform vec4 uCharGrimeShape;   // x 泥线高, y 泥线起伏, z 溅点最高, w 溅点覆盖
+uniform vec2 uCharGrimeScale;   // x 噪声频率, y 溅点频率
+uniform vec3 uCharWear;         // x 提亮, y 去饱和, z 泥里湿的比例
+uniform vec4 uCharGrimeRole;    // x 泥, y 膝, z 肘, w 落灰
+uniform vec4 uCharGrimeSeed;    // xyz 噪声错位, w 高度偏移（刚体小件 = 抬走）
+varying vec4 vCharGrime;        // x 到泥线的有符号距离（米，负 = 线下）, y 湿, z 膝肘磨损, w 落灰
+varying vec4 vCharGrime2;       // x 溅点覆盖, y 膝上的泥 / 袖口蹭脏, z 低频噪声`;
   return MakePatch({
     key: CHARACTER_SURFACE_PATCH_KEYS.grime,
     uniforms: (target) => { Object.assign(target, Shared().grime, uniforms); },
-    fragment: [
-      ["#include <common>", /* glsl */`
-uniform vec4 uCharGrimeShape;   // x 泥线高, y 泥线起伏, z 溅点最高, w 溅点覆盖
-uniform vec2 uCharGrimeScale;   // x 噪声频率, y 溅点频率
-uniform vec4 uCharGrimeRough;   // x 湿泥, y 干泥, z 落灰, w 磨损
-uniform vec3 uCharWear;         // x 提亮, y 去饱和, z 泥里湿的比例
+    vertex: [
+      ["#include <common>", `${DECLARE}
 uniform vec3 uCharCuff;         // x 袖口 |x|, y 往里多宽, z 强度
 uniform vec3 uCharKnee;         // |x|, y, 半径
-uniform vec3 uCharElbow;
-uniform vec3 uCharMudWet, uCharMudDry, uCharDustTint;
-uniform vec4 uCharGrimeRole;    // x 泥, y 膝, z 肘, w 落灰
-uniform vec4 uCharGrimeSeed;    // xyz 噪声错位, w 高度偏移（刚体小件 = 抬走）`],
-      ["#include <color_fragment>", /* glsl */`
-float charMud = 0.0, charWet = 0.0, charWear = 0.0, charDust = 0.0;
+uniform vec3 uCharElbow;`],
+      ["#include <begin_vertex>", /* glsl */`
 {
-  vec3 p = vCharRest + uCharGrimeSeed.xyz;
-  float h = vCharRest.y + uCharGrimeSeed.w;
+  vec3 p = position + uCharGrimeSeed.xyz;
+  float h = position.y + uCharGrimeSeed.w;
   float n = CharFbm(p * uCharGrimeScale.x);
-  // 泥线：平均高度上下按噪声起伏，线以下是整片泥。
+  // 泥线：平均高度上下按噪声起伏。
   float edge = uCharGrimeShape.x + (n - 0.5) * 2.0 * uCharGrimeShape.y;
-  float solid = 1.0 - smoothstep(edge - 0.04, edge + 0.02, h);
-  // 溅点：线以上稀疏的小泥点，越高越少。
-  float chance = uCharGrimeShape.w * (1.0 - smoothstep(edge, uCharGrimeShape.z, h));
-  float splash = smoothstep(1.0 - chance, 1.0 - chance + 0.06, CharNoise(p * uCharGrimeScale.y)) * step(0.002, chance);
-  charMud = max(solid, splash * 0.9) * uCharGrimeRole.x;
-  // 湿：脚面几乎全湿，往上干壳（黄土色、粗糙）渐多，中间按噪声成片；新溅的点还湿着。
+  // 湿：脚面几乎全湿，往上干壳（黄土色、粗糙）渐多，中间按噪声成片。
   float wetN = CharNoise(p * uCharGrimeScale.x * 2.3 + 4.1);
   float wetLevel = clamp(1.0 - h / max(edge, 0.05) + (wetN - 0.5) * 1.2 + (uCharWear.z - 0.5), 0.0, 1.0);
-  charWet = max(solid * wetLevel, splash * 0.7) * uCharGrimeRole.x;
-  // 膝（跪）：正面一圈磨白，中间一块泥；肘（趴）：一圈磨白。
-  vec2 kq = vec2(abs(vCharRest.x) - uCharKnee.x, h - uCharKnee.y) / uCharKnee.z;
-  float kneeFront = smoothstep(-0.25, 0.35, vCharRestN.z);
-  float knee = (1.0 - smoothstep(0.5, 1.0, length(kq) + (n - 0.5) * 0.6)) * kneeFront * uCharGrimeRole.y;
-  vec2 eq = vec2(abs(vCharRest.x) - uCharElbow.x, h - uCharElbow.y) / uCharElbow.z;
+  // 膝（跪）：正面一圈磨白，中间一块软边的泥；肘（趴）：一圈磨白。
+  vec2 kq = vec2(abs(position.x) - uCharKnee.x, h - uCharKnee.y) / uCharKnee.z;
+  float knee = (1.0 - smoothstep(0.5, 1.0, length(kq) + (n - 0.5) * 0.6)) * smoothstep(-0.25, 0.35, normal.z) * uCharGrimeRole.y;
+  vec2 eq = vec2(abs(position.x) - uCharElbow.x, h - uCharElbow.y) / uCharElbow.z;
   float elbow = (1.0 - smoothstep(0.45, 1.0, length(eq) + (n - 0.5) * 0.6)) * uCharGrimeRole.z;
-  charWear = max(knee, elbow);
+  float kneeMud = knee * smoothstep(0.35, 0.95, n + 0.3 * (1.0 - length(kq)));
   // 袖口往里一段蹭脏（手在泥里、枪上）。
-  float cuff = smoothstep(uCharCuff.x - uCharCuff.y, uCharCuff.x - uCharCuff.y * 0.3, abs(vCharRest.x))
+  float cuff = smoothstep(uCharCuff.x - uCharCuff.y, uCharCuff.x - uCharCuff.y * 0.3, abs(position.x))
     * smoothstep(1.15, 1.28, h) * smoothstep(0.35, 0.65, n + 0.2) * uCharCuff.z;
-  charMud = max(charMud, cuff * 0.55);
-  // 跪出来的那块泥：边缘软、不压死（硬边的深色块读起来像迷彩斑）。
-  float kneeMud = knee * smoothstep(0.35, 0.85, n + 0.3 * (1.0 - length(kq)));
-  charMud = max(charMud, kneeMud * 0.5);
-  charWet = max(charWet, kneeMud * 0.15);
   // 落灰：朝上的面（肩、背包顶、帽顶），胸口以上。
-  charDust = smoothstep(0.25, 0.85, vCharRestN.y) * smoothstep(1.0, 1.35, h) * smoothstep(0.3, 0.7, n) * uCharGrimeRole.w;
+  float dust = smoothstep(0.25, 0.85, normal.y) * smoothstep(1.0, 1.35, h) * smoothstep(0.3, 0.7, n) * uCharGrimeRole.w;
+  // 溅点：线以上稀疏的小泥点，越高越少（点本身在片元里画）。
+  float chance = uCharGrimeShape.w * (1.0 - smoothstep(edge, uCharGrimeShape.z, h));
+  vCharGrime = vec4(h - edge, wetLevel, max(knee, elbow), dust);
+  vCharGrime2 = vec4(chance, max(kneeMud * 0.4, cuff * 0.55), n, 0.0);
+}`],
+    ],
+    fragment: [
+      ["#include <common>", /* glsl */`${DECLARE}
+uniform vec4 uCharGrimeRough;   // x 湿泥, y 干泥, z 落灰, w 磨损
+uniform vec3 uCharMudWet, uCharMudDry, uCharDustTint;`],
+      ["#include <color_fragment>", /* glsl */`
+float charMud = 0.0, charWet = 0.0, charWear = vCharGrime.z, charDust = vCharGrime.w;
+{
+  float n = vCharGrime2.z;
+  // 线以下是整片泥（有符号距离插值下来再切，边是利的）。
+  float solid = 1.0 - smoothstep(-0.04, 0.02, vCharGrime.x);
+  float splash = CharDots((vCharRest + uCharGrimeSeed.xyz) * uCharGrimeScale.y, vCharGrime2.x);
+  charMud = max(solid, splash * 0.75) * uCharGrimeRole.x;
+  charWet = max(solid * vCharGrime.y, splash * 0.3) * uCharGrimeRole.x;
+  charMud = max(charMud, vCharGrime2.y);
   vec3 c = diffuseColor.rgb;
   float L = dot(c, CHAR_LUMA);
   c = mix(c, mix(c, vec3(L), uCharWear.y) * (1.0 + uCharWear.x), charWear * (1.0 - charMud));
@@ -277,6 +298,16 @@ function SkinPatch(tile) {
   return MakePatch({
     key: CHARACTER_SURFACE_PATCH_KEYS.skin,
     uniforms: (target) => { Object.assign(target, Shared().skin, uniforms); },
+    // 污渍与汗是十厘米 / 几厘米的低频场：顶点里算（脸上 2114 个三角，点距一两厘米）。
+    vertex: [
+      ["#include <common>", "uniform vec4 uCharSkinDirt;\nvarying vec2 vCharSkin;   // x 污渍, y 汗（已乘脸部遮罩）"],
+      ["#include <begin_vertex>", /* glsl */`
+{
+  float smudge = smoothstep(0.44, 0.7, CharFbm(position * uCharSkinDirt.w + 5.3));
+  float face = smoothstep(1.45, 1.55, position.y) * (1.0 - smoothstep(0.1, 0.2, abs(position.x))) * smoothstep(-0.1, 0.4, normal.z);
+  vCharSkin = vec2(smudge, smoothstep(0.5, 0.78, CharNoise(position * 28.0 + 1.7)) * face);
+}`],
+    ],
     fragment: [
       ["#include <common>", /* glsl */`
 // 远景人群 / 尸体层是 BatchedMesh：batchingTexture + batchingIdTexture 比蒙皮多一个采样器，
@@ -288,7 +319,8 @@ uniform sampler2D uCharSkinDetailMap;
 uniform float uCharSkinTile;
 uniform vec3 uCharSkinTone, uCharSkinDirtTint;
 uniform vec4 uCharSkinGrade, uCharSkinNormal, uCharSkinDirt;
-uniform vec2 uCharSkinSweat;`],
+uniform vec2 uCharSkinSweat;
+varying vec2 vCharSkin;`],
       ["#include <color_fragment>", /* glsl */`
 #ifdef CHAR_BATCHED
   vec4 charSkinTexel = vec4(0.5);
@@ -310,13 +342,10 @@ float charSkinDirt = 0.0, charSkinSweat = 0.0;
     float charCavity = dot(sampledDiffuseColor.rgb - charBlur, CHAR_LUMA);
     charSkinDirt = smoothstep(-0.008, -0.06, charCavity) * uCharSkinDirt.x;
   #endif
-  // 大块污渍（泥手印、硝烟）。
-  float smudge = smoothstep(0.52, 0.78, CharFbm(vCharRest * uCharSkinDirt.w + 5.3));
-  charSkinDirt = max(charSkinDirt, smudge * uCharSkinDirt.z);
+  // 大块污渍（泥手印、硝烟）与脸上的汗：顶点里算好的低频场。
+  charSkinDirt = max(charSkinDirt, vCharSkin.x * uCharSkinDirt.z);
   c = mix(c, uCharSkinDirtTint * (0.7 + 0.6 * charSkinTexel.b), charSkinDirt * 0.75);
-  // 汗：只在脸上（绑定姿势头部正面）。
-  float face = smoothstep(1.45, 1.55, vCharRest.y) * (1.0 - smoothstep(0.1, 0.2, abs(vCharRest.x))) * smoothstep(-0.1, 0.4, vCharRestN.z);
-  charSkinSweat = smoothstep(0.5, 0.78, CharNoise(vCharRest * 28.0 + 1.7)) * face * uCharSkinSweat.x;
+  charSkinSweat = vCharSkin.y * uCharSkinSweat.x;
   diffuseColor.rgb = c;
 }`],
       ["#include <roughnessmap_fragment>", /* glsl */`
@@ -402,7 +431,7 @@ vec4 ijaWeave = vec4(0.5);
   // 钢盔漆：橄榄漆 × atlas 明暗；帽檐一圈与零星崩口露出钢色；雨水湿斑。
   float hn = CharNoise(vec3(vMapUv * 90.0, 3.1));
   float edgeWear = smoothstep(uIjaHelmetEdge.x, uIjaHelmetEdge.y, hr) * smoothstep(0.3, 0.6, hn + 0.25);
-  float chips = smoothstep(1.0 - uIjaHelmetEdge.z * 0.2, 1.0 - uIjaHelmetEdge.z * 0.2 + 0.03, CharNoise(vec3(vMapUv * 320.0, 7.7)));
+  float chips = CharDots(vec3(vMapUv * 260.0, 7.7), uIjaHelmetEdge.z * 0.25);
   ijaHelmetEdge = clamp(edgeWear + chips, 0.0, 1.0) * ijaHelmet;
   ijaHelmetWet = smoothstep(0.5, 0.8, CharNoise(vec3(vMapUv * 150.0, 1.7))) * ijaHelmet;
   vec3 paint = uIjaHelmetPaint * clamp(L / 0.07, 0.55, 1.4) * (0.9 + 0.2 * hn);

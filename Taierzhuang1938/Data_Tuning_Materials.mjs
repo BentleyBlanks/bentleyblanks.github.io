@@ -165,10 +165,11 @@ export const CHARACTER_SURFACE_PARTS = Object.freeze({
 export const CHARACTER_GRIME = Object.freeze({
   mudTop: 0.32,
   mudEdge: 0.10,
-  splashTop: 0.95,
-  splashDensity: 0.42,
+  splashTop: 0.8,
+  splashDensity: 0.35,
   noiseScale: 9,
-  splashScale: 30,
+  // 溅点要小而碎（≈ 1–2 cm）：第一版 30 /m、硬边的深色溅点在浅色布上读成迷彩斑。
+  splashScale: 55,
   knee: Object.freeze([0.10, 0.52, 0.12]),
   elbow: Object.freeze([0.42, 1.447, 0.10]),
   cuff: Object.freeze([0.63, 0.10]),
@@ -222,7 +223,7 @@ export const CHARACTER_SKIN = Object.freeze({
   creaseDirt: 0.45,
   creaseBias: 3.5,
   dirtTint: 0x4a3c2d,
-  smudge: 0.26,
+  smudge: 0.3,
   smudgeScale: 12,
   sweat: 0.35,
   sweatRoughness: 0.4,
