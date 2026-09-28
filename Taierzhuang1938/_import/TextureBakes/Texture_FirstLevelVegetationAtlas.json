@@ -1,0 +1,183 @@
+{
+  "generator": "Script_BakeVegetationAtlas.py@2",
+  "name": "FirstLevelVegetationAtlas",
+  "date": "2026-09-28",
+  "source": {
+    "path": "_shots/Gap3A_Source/B6/atlas_v2/lovart_376da24500f3.png",
+    "sha256": "386c8d11eef33154f7b9cb2280de31e2c7ff9f16d5167e38a97241f0e611502b",
+    "origin": "Lovart (generate_image_nano_banana_pro)",
+    "keyColour": "#FF00FF"
+  },
+  "params": {
+    "keyLo": 70.0,
+    "keyHi": 210.0,
+    "saturation": 0.8,
+    "pinkToBeige": true,
+    "atlas": 1024,
+    "cell": [
+      256,
+      512
+    ],
+    "columns": 4
+  },
+  "colorSpace": {
+    "rgb": "sRGB",
+    "alpha": "linear coverage"
+  },
+  "outputs": [
+    {
+      "file": "Texture_FirstLevelVegetationAtlas.webp",
+      "channel": "Base",
+      "sha256": "cdf6e2f4a9cb2ee42be8a46ed22b02e7ff213274f73a1cf02802193fa379b89f",
+      "bytes": 267702,
+      "width": 1024,
+      "height": 1024
+    }
+  ],
+  "cards": [
+    {
+      "id": "TallGrass",
+      "cell": 0,
+      "uv": [
+        0.00391,
+        0.50098,
+        0.24609,
+        0.90625
+      ],
+      "aspect": 0.5976,
+      "heightM": 0.62,
+      "coverage": 0.278,
+      "meanSrgb": [
+        0.5149999856948853,
+        0.4740000069141388,
+        0.4320000112056732
+      ]
+    },
+    {
+      "id": "LowTuft",
+      "cell": 1,
+      "uv": [
+        0.25391,
+        0.50098,
+        0.49609,
+        0.61621
+      ],
+      "aspect": 2.1017,
+      "heightM": 0.26,
+      "coverage": 0.636,
+      "meanSrgb": [
+        0.45399999618530273,
+        0.4020000100135803,
+        0.3409999907016754
+      ]
+    },
+    {
+      "id": "WeedStalks",
+      "cell": 2,
+      "uv": [
+        0.50391,
+        0.50098,
+        0.74609,
+        0.83008
+      ],
+      "aspect": 0.7359,
+      "heightM": 0.8,
+      "coverage": 0.143,
+      "meanSrgb": [
+        0.3059999942779541,
+        0.28999999165534973,
+        0.26600000262260437
+      ]
+    },
+    {
+      "id": "Bramble",
+      "cell": 3,
+      "uv": [
+        0.75391,
+        0.50098,
+        0.99609,
+        0.72656
+      ],
+      "aspect": 1.0736,
+      "heightM": 0.85,
+      "coverage": 0.149,
+      "meanSrgb": [
+        0.1889999955892563,
+        0.1679999977350235,
+        0.15399999916553497
+      ]
+    },
+    {
+      "id": "Reeds",
+      "cell": 4,
+      "uv": [
+        0.00391,
+        0.00098,
+        0.24609,
+        0.4375
+      ],
+      "aspect": 0.5548,
+      "heightM": 1.8,
+      "coverage": 0.211,
+      "meanSrgb": [
+        0.5600000023841858,
+        0.5210000276565552,
+        0.47999998927116394
+      ]
+    },
+    {
+      "id": "GreenSprouts",
+      "cell": 5,
+      "uv": [
+        0.25391,
+        0.00098,
+        0.49609,
+        0.12695
+      ],
+      "aspect": 1.9225,
+      "heightM": 0.22,
+      "coverage": 0.464,
+      "meanSrgb": [
+        0.4350000023841858,
+        0.421999990940094,
+        0.3319999873638153
+      ]
+    },
+    {
+      "id": "MixedClump",
+      "cell": 6,
+      "uv": [
+        0.50391,
+        0.00098,
+        0.74609,
+        0.19043
+      ],
+      "aspect": 1.2784,
+      "heightM": 0.42,
+      "coverage": 0.395,
+      "meanSrgb": [
+        0.527999997138977,
+        0.4860000014305115,
+        0.41999998688697815
+      ]
+    },
+    {
+      "id": "TwigShrub",
+      "cell": 7,
+      "uv": [
+        0.75391,
+        0.00098,
+        0.99609,
+        0.2207
+      ],
+      "aspect": 1.1022,
+      "heightM": 0.7,
+      "coverage": 0.138,
+      "meanSrgb": [
+        0.36899998784065247,
+        0.35199999809265137,
+        0.32600000500679016
+      ]
+    }
+  ]
+}

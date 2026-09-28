@@ -32,6 +32,8 @@ import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { SET_MATERIALS as OPENING_SET_MATERIALS } from "./Data_OpeningSet0103.mjs";
 import { TerrainContactField } from "./Script_TerrainContact.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
+import { LoadFirstLevelPropDressing, AddFirstLevelPropDressing } from "./Script_FirstLevelPropDressing.mjs";
+import { FirstLevelVegetation, LoadFirstLevelVegetationAtlas } from "./Script_FirstLevelVegetation.mjs";
 
 export function IsP012TrainBlock(id) { return /^Station(?:Car\d|Engine|ExitStep)/.test(id); }
 /** 跟着车厢一起平移的那两扇门（SetTrainOffset 每帧改它们的 z）。 */
@@ -227,6 +229,8 @@ export class FirstLevelWhiteboxField {
     }
     if(this.layout.fortifications)this.fortificationModels=await LoadMissionFortifications(this.library);
     if(this.layout.fortifications)this.breakableTrees=await BreakableTrees.Load(this);
+    // 道具换模型 + 植被图集（docs/Data_FirstLevelVegetationProps.md）。
+    if(this.layout.fortifications)[this.propDressing,this.vegetationAtlas]=await Promise.all([LoadFirstLevelPropDressing(this.library),LoadFirstLevelVegetationAtlas(this.library)]);
   }
 
   BuildWhiteBoxes() {
@@ -317,6 +321,10 @@ export class FirstLevelWhiteboxField {
       ? AddMissionFortifications(sink,this.layout,this.fortificationModels,(x,z)=>this.GroundHeight(x,z),this.materials)
       : {replaced:new Set(),placements:[]};
     this.fortificationPlacements=defenses.placements;
+    // 平色道具盒 / 散块 / foliage 盒换成模型、碎砖瓦与植被：只换外观，碰撞与掩体仍由下面的原块登记。
+    this.propDressingStats=this.propDressing?AddFirstLevelPropDressing(sink,this.layout,this.propDressing,(x,z)=>this.StaticGroundHeight(x,z),this.materials,this.library,{scene:this.scene,meshes:this.meshes}):null;
+    this.vegetation=this.vegetationAtlas?new FirstLevelVegetation(this.scene,this.layout,this.library,this.vegetationAtlas,(x,z)=>this.TerrainHeight(x,z),this.quality):null;
+    for(const id of [...(this.propDressingStats?.replaced||[]),...(this.vegetation?.plan.replaced||[])])defenses.replaced.add(id);
     for(const [key,material] of this.materials)if(key.startsWith("MissionDefenseMaterial_"))this.sharedFortificationMaterials.add(material);
     const trainSink = new BuildSink(),derailSink=new BuildSink();
     for (const block of this.layout.blocks) {
@@ -827,6 +835,7 @@ export class FirstLevelWhiteboxField {
 
   Dispose() {
     this.breakableTrees?.Dispose(); this.breakableTrees=null;
+    this.vegetation?.Dispose(); this.vegetation=null; this.vegetationAtlas?.dispose(); this.vegetationAtlas=null;
     this.legend?.remove(); this.legend = null;
     for(const texture of this.labelTextures||[])texture.dispose();
     const disposedMaterials = new Set();
