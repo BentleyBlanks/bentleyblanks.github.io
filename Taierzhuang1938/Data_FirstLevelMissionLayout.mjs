@@ -1117,7 +1117,7 @@ for (const part of whiteboxPackages) {
 }
 // r3（2026-09-27）：12 掩护装载改守来时路 —— 村口低墙两头残墙、墙外两栋残屋与门楼前空场的掩体、
 // 东巷院墙（docs/Data_FirstLevelTransferCover20260927.md）。
-export const MISSION_WHITEBOX_VERSION = "first-level-20260927-whitebox-05-18-r3";
+export const MISSION_WHITEBOX_VERSION = "first-level-20260928-guidance-r1";
 export const MISSION_TRENCH_PLACEMENTS = (() => {
   const shared = { groundAt: SampleMissionTerrain, laneCuts: FrontAssaultLaneCuts };
   const handPlaced = blocks.filter((block) => block.solid !== false)
