@@ -77,6 +77,58 @@ paths: Object.freeze([
 「离开战场区域 · 返回 · N 秒」（文本走 `Data_Text_FirstLevel`，数值走 `Data_Tuning_MissionArea`）。
 过场 / 受控段（01–02、坐车、抬担架、死亡场、夜行军）不判。判负走既有检查点重试，不另起一套。
 
+#### 3.3.1 实装（S 包，2026-09-28）
+
+| 件 | 文件 | 说明 |
+| --- | --- | --- |
+| 走廊表 | `Data_FirstLevelMissionArea.mjs` | `MISSION_AREA_STEPS`：27 个可玩步骤各一行 `{routes:[{key,halfWidthM,from?,to?}], discs:[{anchor,r}], polygons:[{id,points}], exempt?, exemptUntil?}`；路线键取 `MISSION_ROUTES`，锚点取 `MISSION_ANCHORS`。零 import |
+| 规则 | `Script_MissionAreaGuard.mjs` | `ResolveMissionArea(s)`（键写错开机就抛）、`DistanceToArea(point, area)`（有符号：正数在外）、`MissionAreaGuard.Update(dt,{step,point,area,controlled})` → `{outside, warning, urgent, distanceM, secondsLeft, failed}`；零 three |
+| 数值 | `Data_Tuning_MissionArea.mjs` | `MISSION_AREA_GUARD`，见下表 |
+| 钩子 | `Script_FirstLevelMissionRuntime.mjs` | `UpdateMissionArea`（`Update` 末尾一行）、`InsideMissionArea`、`SaveCheckpoint` 一行、`ClearReturnWarning` 两行、`State().missionArea` |
+| HUD | `Script_Hud.SetMissionArea` + `Style_Game.css .hudMissionArea` | 顶部正中一行，字样同目标通知（粗体、硬黑描边、无底板），最后 3 秒转红；文本键 `firstLevel.area.warning`「离开战场区域 · 返回 · {seconds} 秒」 |
+| 空气墙调试 | `Script_Main`（`?airWalls=1` → `debugAirWalls`）+ `Script_FirstLevelWhiteboxField` | `tag:"airWall"` 的体块另画一层半透明红板（不写深度、不投影、`MarkNoPrepass`）；默认不画，碰撞两种情况都一样 |
+
+计时（`MISSION_AREA_GUARD`）：出了走廊连续 `graceS` **1.5 s** 才亮；亮起后倒数 `countdownS` **10 s**，走完判负；
+亮着时回到边内 `reenterM` **2 m** 才算回来（回滞），回来立刻灭；回来连续 `resetS` **3 s** 倒计时才补满，
+没满又出去立刻重亮、接着剩下的秒数走（蹭边补不满）；换步（含检查点重来、阶段跳转）前 `stepGraceS` **3 s** 不判；
+最后 `urgentS` **3 s** 转红。出处写在表里（工作单 S 包 + 同关回头警告 `MISSION_RETURN` 的 1.25 s / 3 s / 3 m）。
+
+走廊半宽怎么定的：
+- **步行段胶囊 40 m**。同一关已有的「返回任务区域 / 返回行动路线」方向面板（`Script_MissionReturn`）在离本步路线
+  `MISSION_RETURN.corridorM` **36 m** 时亮，这一层必须比它宽：玩家先看到方向，走得更远才出倒计时；再加 4 m 给躲雷、绕掩体的横移。
+  工作单给的区间 25–40 m，取上限。**停点圆 30 m**（集结处、掩蔽部、院门、射位这些停下来的地方）。
+- **战斗段框整个战场**：前沿 03–06 `FrontField` x −62…80、z −208…−88（日军最北一道跃进线 −193 以北 15 m；战车路 60–64 以东 16 m；
+  集结处以南）；村落 08–10 `Village` x 30…100、z −40…48；桥头 12–14 `TransferYard` x 28…114、z 36…146（把 12 追兵出生的绕回短巷框进来）；
+  接收院 15C–18 `ReceptionYard` x −56…24、z 206…264。
+- 验收标准是「宁松勿紧」：`Script_MissionAreaGuardTest` 把每一步的回头警告线、契约路线、目标、上一步目标（交接处）、接近门锚点、
+  检查点出生点、`MISSION_PLACEMENT` 摆位、05 取弹路 / 攻击支路 / 投掷位、现有连续驾驭脚本在这一步走过的每个点（共 1858 个）
+  逐点核对，都要在走廊里且离边 ≥ 4 m；同时核对关卡四角与每一步往错方向走的点在走廊外。
+
+不判：`controls` 在（受困、救援、坐车、扑沟、死亡、夜行军、上担架黑场、进门遭伏击）、抬着担架（`carry.Active`）、倒地、豁免步
+（`Trapped` `CartRide` `Carry` `Dive` `Death` `NightMarch`）、`BunkerRescue` 在 `luoRescueComplete` 之前。
+
+判负：`player.Kill()`，之后装配层照常 `OnPlayerDown` → 死亡菜单「你已阵亡」→「从检查点开始」→ `Retry`，没有另一套失败流程。
+为了不重生在走廊外面，`SaveCheckpoint` 在已有存档点、人又在走廊外时不覆盖它。
+
+和回头警告的分工：回头警告是方向（36 m 起亮、58 m 转急，不判负，画面中上的面板）；走廊是界（出了走廊才出倒计时，顶部一行）。
+两层同时亮时上下错开，不叠字。
+
+验收：
+
+```powershell
+node Taierzhuang1938/Script_MissionAreaGuardTest.mjs          # 纯 node：表、1858 点覆盖、错方向在外、计时器、空气墙红板
+node Taierzhuang1938/Script_MissionAreaGuardBrowserTest.mjs   # 实机：07 真按 W 往西跑出走廊 → 1.5 s 后亮 → 回来灭 → 转红 → 阵亡菜单 → 检查点重来
+node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=6   # 06 起连续驾驭不被走廊误判
+```
+
+截图在 `_shots/MissionAreaGuard/`（`Scene_AreaWarning` / `Scene_AreaUrgent` / `Scene_AreaFailed` / `Scene_AreaRetry`）。
+走廊太窄的症状是连续驾驭里多一次阵亡（`CAMPAIGN_DEATH` 那一行 `activity` 正常、`lastHits` 为空）或 `State().missionArea.log` 里有出界记录：
+放宽那一步的走廊，别调计时。
+
+2026-09-28 实测（读 `State().missionArea.log`）：`--campaign --stage-from=4 --stage-to=6` 到 07、`--stage-jumps --stage-from=8` 走到 17、
+`--stage-jumps --stage-from=18` 到 Complete，全程 0 次出界。`--stage-from=6` 在 07→08 被 VillageCorner 刺死、`--stage-jumps --stage-from=15`
+卡在 17（幺娃不拉覆盖物，`coverS` 恒 0），这两条在未改的 60166b9f 上同样红，与走廊无关。
+
 ### 3.4 阻挡与光的词汇（体块包里的写法）
 
 - **倒墙 + 碎砖坡**（08 已有）、**翻倒的车 / 大车横在路上**、**铁丝网**（`MISSION_DEFENSE_POSTS` 有带模型的 fence）、
@@ -124,7 +176,8 @@ paths: Object.freeze([
   看向**下一步要去的方向**，另拍一两张看向**错误方向**的。每张图做眯眼测试（缩到 1/8）。
 - 门禁：`Script_FirstLevelWhiteboxTerrainTest`（含小路）、`Script_FirstLevelWhiteboxVillageTest`、`Script_FirstLevelWhiteboxTransferTest`、
   `Script_FirstLevelSpaceTest --rear-only`、`Script_FirstLevelMissionTopologyTest --rear-only`、`Script_FirstLevelFrontTopologyTest`（动了 05–07）、
-  `Script_MissionAreaGuardTest`（S）、`Script_ModuleGraphTest`、`Script_TextTest`；最后 `Script_FirstLevelMissionTopologyBrowserTest`。
+  `Script_MissionAreaGuardTest`（S）、`Script_ModuleGraphTest`、`Script_TextTest`；最后 `Script_FirstLevelMissionTopologyBrowserTest`
+  与 `Script_MissionAreaGuardBrowserTest`（S，出界警告与检查点重来）。
 - 实机：`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=6`（06 起连续）、`--campaign --stage-to=3`（01–03）。
 
 ## 7. 实装结果

@@ -27,6 +27,8 @@ export const TEXT = Object.freeze({
   "firstLevel.return.route": "你已偏离行动路线。",
   "firstLevel.return.squad": "你已远离小队。",
   "firstLevel.return.boundary": "你已离开作战区域。",
+  // 任务走廊出界倒计时（docs/Data_FirstLevelGuidance20260928.md §3.3，Script_Hud.SetMissionArea）。
+  "firstLevel.area.warning": "离开战场区域 · 返回 · {seconds} 秒",
 
   "firstLevel.casualty.speaker": "战友",
   "firstLevel.casualty.reaction": "有弟兄倒下了！守住掩体，继续掩护！",

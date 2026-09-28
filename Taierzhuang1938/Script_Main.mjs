@@ -239,6 +239,8 @@ const params = new URLSearchParams(location.search);
 const QUALITY = params.get("quality") || "high";
 const SCALE = SCALE_PRESETS[params.get("scale") || "medium"] || SCALE_PRESETS.medium;
 const SHOT = params.get("shot");                 // 出图模式：不进指针锁、固定机位
+// 空气墙调试显示：第一关白盒把 tag:"airWall" 的体块画成半透明红板（docs/Data_FirstLevelGuidance20260928.md §3.2）。
+const AIR_WALLS_DEBUG = params.get("airWalls") === "1";
 const EDITOR_PARAM = params.get("editor");
 // 上一版曾把完整场景编辑器的车厢按钮指到正式序章预览。旧书签若还带着这组 query，
 // 也必须按静态场景解释，不能因为缓存 URL 又把过场播起来。
@@ -3263,6 +3265,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     foci: phase.zones.map((z) => [z.x, z.z]),
     zones: phase.zones,
     whiteboxLayout: phase.whitebox?.layout || null,
+    debugAirWalls: AIR_WALLS_DEBUG,
     // 每关自己的 LOD 分界（Data_Battle.TUNING）；没给就用默认。
     // 这是 draw call 的主要旋钮之一，改它之前先跑 BootTest 看数
     detailRadius: (phase.detailRadius ?? 100) * (QUALITY === "low" ? 0.72 : 1),
