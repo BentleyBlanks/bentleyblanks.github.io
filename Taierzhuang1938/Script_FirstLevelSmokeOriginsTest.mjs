@@ -18,9 +18,12 @@ const root=new THREE.Group(),battlefield={StaticGroundHeight:SampleMissionTerrai
 const solids=new Set(),physics={AddSolid(c){c._physicsHandle=c;solids.add(c)},RemoveSolid(c){solids.delete(c)}};
 const materials=new Map(),library={Get(name){if(!materials.has(name))materials.set(name,new THREE.MeshStandardMaterial());return materials.get(name)}};
 const origins=new FirstLevelSmokeOrigins({root,battlefield,physics,library,actorFactory:{ModelInstance(_id,materials){return InstantiateModel(doc,{materials})}}});
-assert.equal(origins.entries.size,63);assert.equal(solids.size,63);
+// 63 处远烟 / 路边散点 + 1 处引导地标（2026-09-28，Data_FirstLevelDistantSmoke.LANDMARK_COLUMNS：08 横车上的木料火）。
+assert.equal(origins.entries.size,64);assert.equal(solids.size,64);
 const counts={};for(const spec of FIRST_LEVEL_SMOKE_ORIGINS)counts[spec.kind]=(counts[spec.kind]||0)+1;
-assert.deepEqual(counts,{tank:7,truck:14,timber:24,barrels:18});
+assert.deepEqual(counts,{tank:7,truck:14,timber:25,barrels:18});
+// 地标自带 kind：不动原来按帧分配的 tank 奇偶（7 辆战车还是同样那 7 根柱子）。
+assert.equal(FIRST_LEVEL_SMOKE_ORIGINS.find(spec=>spec.id==="StreetBlockFire")?.kind,"timber");
 const emitters=FIRST_LEVEL_DISTANT_SMOKE.map(column=>origins.Emitter(column));
 for(let i=0;i<emitters.length;i++) {
   const emitter=emitters[i],column=FIRST_LEVEL_DISTANT_SMOKE[i],fire=emitter.options.firePosition;
@@ -42,8 +45,8 @@ for(const c of solids)for(const [id,route] of Object.entries(MISSION_ROUTES))for
 const sources=emitters.map(e=>({position:e.position,backdrop:e.options.backdrop}));
 for(const entry of origins.entries.values()) if(entry.spec.kind==="tank"||entry.spec.kind==="truck")
   for(const tree of MakeTreePlacements())assert.ok(Math.hypot(entry.position.x-tree.x,entry.position.z-tree.z)>3.2,"vehicle body clears authored tree trunks");
-assert.equal(BuildBattleSmokeInstances(sources,"low").length,756);
-assert.equal(BuildBattleSmokeInstances(sources,"ultra").length,1260);
+assert.equal(BuildBattleSmokeInstances(sources,"low").length,768);   // 12 per source × 64
+assert.equal(BuildBattleSmokeInstances(sources,"ultra").length,1280); // 20 per source × 64
 assert.ok(origins.meshes.length<=origins.materials.size,"wreck geometry is merged into one mesh per material: "+origins.meshes.length);
 const triangles=origins.meshes.reduce((n,m)=>n+m.geometry.index.count/3,0);
 assert.ok(triangles<100000,"origin triangle budget: "+triangles);

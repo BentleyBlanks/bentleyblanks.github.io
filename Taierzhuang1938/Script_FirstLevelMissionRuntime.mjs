@@ -1565,7 +1565,11 @@ export class FirstLevelMissionRuntime {
         for (const actor of this.enemies.values())
           if (actor.alive && actor.missionDormant && actor.missionEncounter !== "melee") actor.scriptedNoncombatant = false;
         this.audio.Ambience("firstLevelFront");
-        this.Guide(MISSION_ROUTES.village.slice(0, 3));
+        // 2026-09-28 引导轮：班长先带到主街口（`streetBlockSeen` 只在那个 box 里落，见 Gates 表），
+        // 看见倒墙横车再折回灶屋北门；一开始就往灶屋走的话玩家跟着进屋，08 永远过不了。
+        // 折回那一段贴村北口的巷子走（G08 脚径 KitchenDoorTread 就画在这条线上）。
+        this.Guide([MISSION_ROUTES.village[0], {x:75.5,z:-22.5}, {x:66,z:-21.5}, {x:60.4,z:-19.9},
+          MISSION_ROUTES.village[1], MISSION_ROUTES.village[2]]);
         this.column.active = true;
         this.village.Enter(stage.id);
         break;

@@ -112,9 +112,15 @@ export class FirstLevelLeaderGuide {
       || (r.flow.stage.id==="Unloading"&&!r.Has("luoRescueComplete")))return null;
     let {mode,cue,target}=spec, label=mode, variant=r.flow.stage.id;
     if(variant==="Support"&&r.Has("frontReached"))mode=label="cover";
+    // holdUntil：事实落下之前标记指 holdTarget。缺省口径是 BridgeCover 那种「守住射位」：动作词 cover、
+    // 守着时喊本步的 cue、守完不再喊。08 Village 反过来（先去主街口看见街堵了，再进灶屋）：
+    // holdMode "move"、守着时不喊（holdCue null）、落下之后才喊 afterHoldCue（GuideKitchen）。
     if(spec.holdUntil){
-      if(!r.Has(spec.holdUntil)){target=spec.holdTarget;mode=label="cover";variant+="Hold";}
-      else cue=null;
+      if(!r.Has(spec.holdUntil)){
+        target=spec.holdTarget;mode=label=spec.holdMode||"cover";variant+="Hold";
+        if(spec.holdCue!==undefined)cue=spec.holdCue;
+      }
+      else cue=spec.afterHoldCue??null;
     }
     if(variant==="Tank"){
       const returning=r.Has("bundleTaken")&&r.Inventory().bundles>0;
