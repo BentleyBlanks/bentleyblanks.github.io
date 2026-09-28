@@ -253,3 +253,17 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
 - 11 路两侧 8–15 m 内做不了房屋（西侧是人群 pocket 通道，东侧 z < 104 以南是车辆作业区），只能是带缺口的残墙；接运场整体「向河缓降」做不到（河槽内地面冻结），只做两侧浅洼。
 - 18 铁路桥仍是实心桁架板（桁架随炸桥消失，斜杆加在白盒包里会在炸桥后悬空）。
 - 07 新沟沟底用的是田地贴图（地表层不读地形修饰，§3 已知限制）；体块只能绕竖轴转，翻倒木车、枯树、屋顶偏方正。
+
+## 6. 2026-09-28 材质（3A 画面迭代 B1 建筑材质）
+
+白盒体块原来是按语义的平色 `MeshStandardMaterial`（没贴图、不走材质库、没有 AO/GI/细节补丁，cover 画成调试蓝灰）。本轮只改「看起来」：坐标、尺寸、碰撞、cover 语义、体块数一个不动。
+
+- **语义 → 外观**：`Data_FirstLevelWhiteboxMaterials.mjs`（纯数据）。先按体块 id 规则（`WHITEBOX_LOOK_RULES`：门洞门板、桥墩条石、墙裙青砖碱脚、灶台泥抹、土工事、病房白灰、北门城砖……），再按语义缺省（`WHITEBOX_SEMANTIC_LOOKS`；plaster / cover 墙身按「建筑组」哈希在泥抹面 / 青砖 / 白灰三种里挑，同一栋房子各面同一种），外观参数（套名、每张铺几米、tint、UV 方向、风化强度、明度抖动）在 `WHITEBOX_LOOKS`。布局写 `materialLooks: true` 才启用；归档夹具与 Node 测试仍是平色。
+- **运行时**：`Script_FirstLevelWhiteboxLooks.mjs`。`PrepareAssets` 开头 `LoadLevelSets("FirstLevel")`（阶段 A 的按需集；失败的套借 fallback 并换 `fallbackTint`），外观材质走 `MaterialLibrary.Get` 再克隆、挂风化补丁；体块按外观合批（一外观一只网格，名字仍是 `FirstLevelWhitebox_StaticWhiteBoxes`，前沿可破坏块照旧能塌顶点）；瓦垄转成顺坡、木纹顺长边；gate（桥面、桁架、院门）、scenario（掩蔽部、北门夜景）与前沿可破坏块（`WhiteboxPiece`）用同一套外观。铁路样条的道砟 / 枕木 / 钢轨按语义键换成道砟、风化木、旧钢外观。
+- **风化补丁**：`Script_MaterialPatches.MakeWhiteboxWeatherPatch`（挂在表面补丁那格，零新增采样器）：墙根返潮与溅泥（按顶点处地面高）、块顶往下的雨痕、棱角磨损提亮 + 倒角法线、大尺度色斑、朝下面压暗。数值在 `Data_Tuning_Materials.WHITEBOX_WEATHERING`，每个外观再乘自己的 `weather`。
+- **铁路桥桁架**：`steelTruss` 外观，运行时画一节华伦桁架（alphaTest 镂空、双面），不下载贴图；炸桥逻辑与碰撞不变（上面「18 铁路桥仍是实心桁架板」这条差距就此收掉）。
+- **北沙河**：52 块示意水盒收成一条连续水带（相邻段接缝取两段的平均高），走 `Script_Water` 新预设 `muddyRiver`（浑、吸收快、泡沫少）。水盒本来就 `solid:false`，碰撞与净空不变。
+- **语义修正**：门窗 `Void` 盒改 `void`、墙头压顶改 `coping`（原来都借 `roof`）。只改助手里的语义参数；07+ 指纹因语义字段变了按口径重生，把 void/coping 映回 roof 逐位得到旧基线 `8e5277e874f90e43`（见指纹 JSON 的 note）。
+- **新贴图**（Lovart 源图 → `_import/Script_BakePbrTexture.py` → `Data_TextureManifest` + `Data_LevelTextureSets.FirstLevel`）：`VillageMudPlaster`、`VillageLimePlaster`、`VillageRoofTile`、`VillageTimber`、`RailBallast`；其余外观复用开机就有的 BrickWall / BrickWallSooty / CityWallBrickPbr / Stone / Ground / ShopDoorPbr / Sandbag / WattleFence / WaterVatCeramic / CarriageCeilingSteel / GatePaintedWood。
+- **门禁**：`Script_TextureStandardsTest`、`Script_ModuleGraphTest`、`Script_FirstLevelSpaceTest`（07+ 指纹）、`Script_SamplerBudgetTest`（浏览器，含 `?whitebox=p012`）；对照出图 `Script_FirstLevelWhitebox0518Shots.mjs --quality=high --out=_shots/Gap3A_After/B1`。
+- **仍差**：屋顶还是阶梯盒（瓦面只是贴上去，没有真的坡与瓦当）；墙面没有真的破口 / 缺角几何；灶屋等室内偏暗偏平（室内光归 B4）；地面与路面（归 B2）仍是亮米色，和墙根返潮接不上色。
