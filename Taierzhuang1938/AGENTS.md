@@ -20,11 +20,13 @@
 
 - **01 掩蔽部坐着压弹、听聊天自由视角（2026-09-27）**：[压弹动作与自由视角](docs/Data_OpeningFirstPersonLoad20260927.md)。Banter / 下令前的 Orders 里第一人称身体整个播 BlenderMCP 烘的 `ShunziSitFillCharger`（坐弹药箱、五发逐颗压进桥夹、换夹循环），不再是两个静止托夹手势；视角在这两段放开（`firstPerson.headLook.seated`，运行时受困钳制经 `LookLimits` 同步放宽），不再朝说话人转头。门禁 `Script_OpeningFirstPersonTest`、`Script_OpeningStoryboardShots --shots=SB01`。
 
-- **01 洞口过场 2026-09-26 现场修订**：[渐显、翻译避让、踹国军旗与独立摄影机](docs/Data_OpeningCinematic20260926.md)。CaptiveDragged→Wipe 使用独立机位，Reach 回到第一人称；这段覆盖旧 SB03 倒地旁观镜头与人物旧站位。同文第二轮：日军走动背枪、翻译空手走/小跑（`Script_RelaxedGait` + `Animation/RelaxedGait`，门禁 `Script_RelaxedGaitTest`），日兵乙发现伤兵后喊翻译（`InterpreterCall`）。
+- **01–02 压在塌木下原地审问、反冲锋白刃战（2026-09-27 改稿，覆盖下面两条的 Slash 以后部分）**：[改稿口径](docs/Data_OpeningPinnedRescue20260927.md)。顺子趴在洞口塌顶木下、半身在外，全程第一人称（独立机位已删）；割喉改成从川军左肩揪发横拉、割中即嘲弄，日兵甲边骂边走发现顺子，原地审问扇两记耳光（被扇那半边屏幕发晕：`uSideDaze`），第三下抬手时枪炮与四川话喊杀四起，罗班长带一帮人冲下弹坑台阶白刃战，何有田掀木、罗班长把人拖出来，再接「还能打不？」→踢枪→还权。phase：Trapped …Slash→Taunt→Found；BunkerRescue Hold→Ask→Charge→Melee→Lift→Check→KickRifle→Released。
+
+- **01 洞口过场 2026-09-26 现场修订**（CaptiveDragged 起的独立机位已由上一条取消）：[渐显、翻译避让、踹国军旗与独立摄影机](docs/Data_OpeningCinematic20260926.md)。CaptiveDragged→Wipe 使用独立机位，Reach 回到第一人称；这段覆盖旧 SB03 倒地旁观镜头与人物旧站位。同文第二轮：日军走动背枪、翻译空手走/小跑（`Script_RelaxedGait` + `Animation/RelaxedGait`，门禁 `Script_RelaxedGaitTest`），日兵乙发现伤兵后喊翻译（`InterpreterCall`）。
 
 - **01 日军先头兵警戒持枪小跑（2026-09-27）**：日兵甲、乙入场从背枪放松走改为双手持枪、站直小跑、头左右扫视（`SetRelaxedGait(...,"alert")`，BlenderMCP 烘的 `Animation/IjaAlertGait` 三条），到位甩枪上背再拖人。口径与重烘见 [IjaAlertGait](Animation/IjaAlertGait/Data_IjaAlertGait.md)，门禁 `Script_IjaAlertGaitTest`。
 
-- **01 日兵甲翻越塌顶木、从木头底下拖出顺子（2026-09-27）**：[翻越与倒拖](docs/Data_OpeningVaultHaul20260927.md)。Found 不再穿木头走进坑，DragOut 不再背对顺子往前走；三条新动作只烘 IJA02，烘焙 spec 新增 `groundWeight`。
+- **01 日兵甲翻越塌顶木、从木头底下拖出顺子（2026-09-27，已被 2026-09-27 改稿取代：不再拖出）**：[翻越与倒拖](docs/Data_OpeningVaultHaul20260927.md)。Found 不再穿木头走进坑，DragOut 不再背对顺子往前走；三条新动作只烘 IJA02，烘焙 spec 新增 `groundWeight`。
 
 - **06 集结处伤员与上担架黑场（2026-09-27）**：[伤员、医护、老周与黑场](docs/Data_CollectionCare20260927.md)。草垫上的伤员挣扎/被包扎、医护跪着包扎按压、老周靠墙半躺，都是 Blender 烘的作者动作（`Animation/CollectionCare`，`_import/Script_CollectionCareBake.py` 走开场动作库的帧循环）；上担架走 `litterTransition` 黑场字幕。门禁 `Script_FirstLevelCollectionCareTest`。
 

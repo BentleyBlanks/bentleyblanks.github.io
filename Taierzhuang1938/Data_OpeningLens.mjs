@@ -13,8 +13,7 @@
 //         "blast"   — seconds since the near miss (events.blastAt: FirstLevelOpening.BunkerBlast, the start of Blast);
 //         "impact"  — seconds since the shell lands (events.impactAt when the director hands it; otherwise
 //                     blastAt + SHELL_FLIGHT_S);
-//         "buttHit" — seconds since the rifle butt lands (events.buttHit: the director's strikeAt, clip contact "strike");
-//         "clearAt" — seconds since ijaA stops over the trap (events.clearAt: the director's flags.clearAt, Found).
+//         "slap"    — seconds since the last slap landed (events.slapAt; the side struck is events.slapSide).
 //   keys are linear between points and held past both ends. `before` is used while that event has not
 //   happened yet (default: the first key's value). `byConcussion` scales the value by
 //   min(1, events.concussion / byConcussion) — 「随震荡量渐入」; no concussion given = full value.
@@ -62,71 +61,47 @@ export const LOOKS = Freeze({
     radialBlur: K("impact", [[0, 0], [0.06, 0.055], [0.75, 0.032], [1.6, 0]]),
     vignette: K("impact", [[0, 0.42], [0.1, 0.8], [2.4, 0.55]]),
   }),
-  cinematic: Freeze({ blendInS: 0, vignette: 0.38, aberration: 0, mud: 0 }),
   // SB03 lying in the mud watching the group (Wake → Wipe): blood-red corners ~0.3 fading in with the
   // concussion, near depth of field 0.5 focused ~3.8 m (foreground 0.3–1 m soft), mud on the lens.
+  // 2026-09-27: the group is 2.3-4.2 m off the pinned eye now (focus 2.8), and the throat cut must read: mud 0.6.
   witness: Freeze({
     blendInS: 2.2,
     aberration: 0.0035,
     vignette: 0.52,
     bloodEdge: Freeze({ strength: Freeze({ clock: "phase", keys: Freeze([Freeze([0, 0.3])]), byConcussion: 0.5 }),
       tint: BLOOD_TINT, corners: WITNESS_CORNERS }),
-    dofNear: Freeze({ strength: 0.5, focusM: 3.8, rangeM: 2.8, maxPx: 9 }),
-    mud: 0.85,
+    dofNear: Freeze({ strength: 0.45, focusM: 2.8, rangeM: 2.4, maxPx: 9 }),
+    mud: 0.6,
   }),
-  // SB03A reaching for the rifle (Reach): darker, lower contrast, red edge weaker than SB03, mud.
-  reach: Freeze({
-    blendInS: 0.8,
-    aberration: 0.003,
-    vignette: 0.64,
-    darken: 0.3,
-    desaturate: 0.12,
-    bloodEdge: Freeze({ strength: Freeze({ clock: "phase", keys: Freeze([Freeze([0, 0.17])]), byConcussion: 0.5 }),
-      tint: BLOOD_TINT, corners: WITNESS_CORNERS }),
-    dofNear: Freeze({ strength: 0.4, focusM: 3.8, rangeM: 2.8, maxPx: 9 }),
-    mud: 0.85,
-  }),
-  // Found: as Reach until the blink (「泥土落下来。顺子闭了一下眼」, clearAt + 0.95–1.25 s); the mud goes
-  // with the blink, so SB04 starts with a clean lens.
+  // 2026-09-27 rework (docs/Data_OpeningPinnedRescue20260927.md): the find and the questioning where he lies.
+  // Found: ijaA's boots come up the trench at the eye, still dazed and muddy.
   found: Freeze({
-    blendInS: 0.6,
-    aberration: 0.003,
-    vignette: 0.6,
-    darken: K("clearAt", [[0.95, 0.3], [1.25, 0.08]]),
-    desaturate: 0.1,
-    bloodEdge: Freeze({ strength: K("clearAt", [[0.95, 0.17], [1.25, 0]]), tint: BLOOD_TINT, corners: WITNESS_CORNERS }),
-    dofNear: Freeze({ strength: K("clearAt", [[0.95, 0.4], [1.25, 0]]), focusM: 3.8, rangeM: 2.8, maxPx: 9 }),
-    mud: K("clearAt", [[0.95, 0.85], [1.25, 0]]),
-  }),
-  // Dragged out to the butt position (Drag → DragOut): SB04 has no red edge before the strike.
-  dragged: Freeze({ blendInS: 0.8, aberration: 0.003, vignette: 0.5, desaturate: 0.05 }),
-  // SB04 butt strike (Butt): white flash 0.08 s when the butt lands and a short aberration kick. The
-  // storyboard frame is otherwise clean: no red edge of the lens's own, and the director's HUD blood layer
-  // (0.92 after the strike) is capped to 0.5 once the flash has gone (review 09-25: the frame read all red).
-  butt: Freeze({
-    blendInS: 0.4,
-    vignette: 0.48,
-    flash: K("buttHit", [[0, 0.92], [0.08, 0.92], [0.2, 0]], { before: 0 }),
-    aberration: K("buttHit", [[0, 0.014], [0.9, 0.0022]], { before: 0.0022 }),
-    storyBloodCap: K("buttHit", [[0.1, 1], [0.4, 0.5]], { before: 1 }),
-  }),
-  // SB04A dragged into the SSW sap (Boots): blood layer down to ~0.3, desaturated.
-  boots: Freeze({
     blendInS: 0.8,
-    aberration: 0.004,
-    vignette: 0.55,
-    desaturate: 0.45,
-    bloodEdge: Freeze({ strength: 0.3, tint: BLOOD_TINT, corners: WITNESS_CORNERS }),
-    storyBloodCap: 0.3,
+    aberration: 0.003,
+    vignette: 0.56,
+    darken: 0.12,
+    desaturate: 0.08,
+    bloodEdge: Freeze({ strength: 0.2, tint: BLOOD_TINT, corners: WITNESS_CORNERS }),
+    dofNear: Freeze({ strength: 0.3, focusM: 1.4, rangeM: 1.6, maxPx: 7 }),
+    mud: 0.6,
   }),
-  // SB05 held by the collar (Hold → Collar): nearly clean (Glimpse keeps its light ghosting, which is the
-  // director's concussion curve, not a lens look).
+  // Held up by the hair (Hold / Ask): nearly clean; each slap swims the struck side of the frame (`slap`: the amount
+  // on the slap clock; Script_OpeningLens hands the side over with it, Script_PostComposite SideDaze) and kicks the
+  // aberration. 「被扇的单边的屏幕有眩晕效果」.
   held: Freeze({
-    blendInS: 1.2,
+    blendInS: 1.0,
+    vignette: 0.5,
+    desaturate: 0.12,
+    bloodEdge: Freeze({ strength: 0.1, tint: BLOOD_TINT, corners: WITNESS_CORNERS }),
+    storyBloodCap: 0.45,
+    slap: K("slap", [[0, 0], [0.04, 1], [0.5, 0.8], [1.4, 0.45], [2.4, 0]], { before: 0 }),
+    aberration: K("slap", [[0, 0.0022], [0.04, 0.012], [0.9, 0.0022]], { before: 0.0022 }),
+  }),
+  // The charge and the cuts (Charge / Melee): the last slap's daze wears off, then clean.
+  charge: Freeze({
+    blendInS: 0.4,
     vignette: 0.46,
-    desaturate: 0.15,
-    bloodEdge: Freeze({ strength: 0.08, tint: BLOOD_TINT, corners: WITNESS_CORNERS }),
-    storyBloodCap: 0.15,
+    slap: K("slap", [[0, 0], [0.04, 1], [0.5, 0.8], [1.4, 0.45], [2.4, 0]], { before: 0 }),
   }),
 });
 
@@ -135,13 +110,10 @@ export const LOOKS = Freeze({
 export const PHASE_LOOKS = Freeze({
   Banter: "clean", Orders: "clean", Incoming: "clean",
   Blast: "nearMiss", Black: "nearMiss",
-  Wake: "witness", FrontPass: "witness", CaptiveDragged: "cinematic", CaptiveWall: "cinematic",
-  Interrogation: "cinematic", Slash: "cinematic", Taunt: "cinematic", Wipe: "cinematic",
-  Reach: "reach", Found: "found",
-  Drag: "dragged", Snag: "dragged", KickBeam: "dragged", DragOut: "dragged",
-  Butt: "butt", Boots: "boots",
-  Hold: "held", Ask: "held", KickShunzi: "held", Glimpse: "held", Collar: "held",
-  Chop: "clean", Parry: "clean", Flee: "clean", DragCover: "clean", LongShot: "clean",
+  Wake: "witness", FrontPass: "witness", CaptiveDragged: "witness", CaptiveWall: "witness",
+  Interrogation: "witness", Slash: "witness", Taunt: "witness",
+  Found: "found", Hold: "held", Ask: "held",
+  Charge: "charge", Melee: "charge", Lift: "clean",
   Check: "clean", KickRifle: "clean", Released: "clean",
 });
 

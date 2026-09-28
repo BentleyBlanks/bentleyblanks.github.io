@@ -78,7 +78,9 @@ const SPIKE_EXEMPT = [
 ];
 // player-track part a contact names (the bake keeps one collar point for the front and the back of the collar)
 const PLAYER_PART = { collar: "collar", collarFront: "collar", collarBack: "collar", head: "head", forearmR: "forearmR", shoulderR: "shoulderR",
-  chest: "chest" };
+  chest: "chest",
+  // 2026-09-27 IjaCrouchHairHold / the slaps: the fist in the hair on the crown (the track is where the fist closes)
+  crown: "crown" };
 // Skin regions of the wall contacts (the bake's WALL_REGIONS): bones whose weight the vertex carries.
 const WALL_REGIONS = {
   shoulderBack: ["spine2", "lclavicle", "rclavicle"], back: ["spine1", "spine2"], shoulderL: ["lclavicle", "lupperarm"],
@@ -356,7 +358,7 @@ try {
       return best;
     };
     const clips = Object.entries(library.config.clips).filter(([, m]) => !m.legacy && m.rig).map(([name, m]) => ({ name, rig: m.rig, role: m.role, duration: m.duration,
-      contacts: m.contacts || [], env: m.env || null, stage: m.stage || null, player: m.player === true }));
+      contacts: m.contacts || [], env: m.env || null, stage: m.stage || null, player: m.player === true, retired: !!m.retired }));
     return { clips, stages: library.config.stages, fps: library.config.fps };
   }, { W, H, WALL_REGIONS });
 
@@ -555,6 +557,9 @@ try {
     stageRuns.push(["chopRear+FallBack", { ...chopRear, actors: { ...chopRear.actors, ijaB: { ...chopRear.actors.ijaB, clip: "IjaChoppedFallBack" } } }]);
   for (const [name, stage] of stageRuns) {
     const actors = Object.entries(stage.actors).filter(([, a]) => a.rig && a.clip);
+    // A retired clip (manifest `retired`: IjaWipeSheathBayonet, 2026-09-27) is no longer played; its stage kept the frames it
+    // was baked with against the old partner and is not reviewed.
+    if (actors.some(([, a]) => plan.clips.find(c => c.name === a.clip)?.retired)) { console.log(`skip stage ${name}: a retired clip`); continue; }
     if (only.length && !actors.some(([, a]) => only.includes(a.clip))) continue;
     const checks = [];
     for (const [role, a] of actors) {
@@ -593,7 +598,8 @@ try {
       for (const [role, a] of actors) {
         const e = s.Make(a.rig, role, a.clip);
         e.offsetS = a.offsetS || 0;
-        e.actor.root.position.set(a.x, 0, a.z); e.actor.root.rotation.set(0, a.yawDeg * Math.PI / 180, 0);
+        // yM: the actor's root ground over the anchor's (2026-09-27: ijaA on the trench floor at the foot of R3's bank)
+        e.actor.root.position.set(a.x, a.yM || 0, a.z); e.actor.root.rotation.set(0, a.yawDeg * Math.PI / 180, 0);
         byRole[role] = e;
       }
       const out = [];

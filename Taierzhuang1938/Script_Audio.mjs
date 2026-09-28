@@ -1464,6 +1464,37 @@ const RECIPES = {
     v.Live(0.3);
   },
 
+  // 一片喊杀声（2026-09-27 开场 02 反冲锋）：实录（SeedAudio）AudioSfx_SeedAudioChargeCrowd 盖在上面；载不到时只剩
+  // 一层低低的人声噪（带通的粉噪起落），不冒充喊话。
+  chargeCrowd(A, v) {
+    const t = v.t, dur = 3.2;
+    const src = v.Noise("pink", dur);
+    const bp = v.Filter("bandpass", v.F(700), 0.8);
+    const g = v.Gain(FLOOR);
+    g.gain.setValueAtTime(FLOOR, t);
+    g.gain.linearRampToValueAtTime(0.18, t + 0.4);
+    g.gain.setValueAtTime(0.18, t + dur - 0.8);
+    g.gain.linearRampToValueAtTime(FLOOR, t + dur);
+    src.connect(bp).connect(g).connect(v.out);
+    v.Start(src, t, dur);
+    v.wetGain.gain.value = 0.35;
+    v.Live(dur + 0.5);
+  },
+
+  // 耳光（2026-09-27 开场：日兵甲扇顺子）：实录 AudioSfx_Slap 盖在上面，这里是载不到时的退路 ——
+  // 手掌拍在脸上是又脆又干的「啪」，比 impactFlesh 亮得多，没有闷的那一层。
+  slap(A, v) {
+    const t = v.t;
+    const src = v.Noise("white", 0.07);
+    const bp = v.Filter("bandpass", v.F(2400), 0.9);
+    const g = v.Gain(FLOOR);
+    Hit(g.gain, t, 0.5, 0.0008, 0.045);
+    src.connect(bp).connect(g).connect(v.out);
+    v.Start(src, t, 0.07);
+    v.wetGain.gain.value = 0.05;
+    v.Live(0.2);
+  },
+
   /**
    * 命中确认。**非空间化**：Play 时不给 position，它不在战场上，它在开枪的人耳朵里。
    *
@@ -2771,7 +2802,7 @@ const NODE_COST = {
   // + 碎屑 3；land 少一层骨）。
   goreSever: 14, goreLimbLand: 11,
   shellDrop: 22,
-  grenadeThrow: 10, launcherPop: 10, impactDirt: 10, impactFlesh: 10,
+  grenadeThrow: 10, launcherPop: 10, impactDirt: 10, impactFlesh: 10, slap: 6, chargeCrowd: 6,
   footstepDirt: 10, heartbeat: 10,
   explosionFar: 9, dadaoSwing: 7, bugleCharge: 7,
   // 命中/击杀回执：一条 Thud（4 节点）+ 一条带通噪声（4 节点），击杀多一条 Thud。
@@ -2898,7 +2929,8 @@ export const MUSIC_BASE = "Audio/Music/";
 // AudioSfx_Type11_01/02 同文件名、内容变了（BAR 0.1 m → MINIMI），不抬戳就还是缓存里的 BAR。
 // 2026-09-25：type11 去掉 SeedAudio 生成音、只留 MINIMI 1 m 两条（用户定，清单条目变了）。
 // 2026-09-27：战车机枪单开 tankMg（Warfare Library 通用机枪三条），清单新增一个 cue。
-export const SFX_PACK_VERSION = "20260927tankmg";
+// 2026-09-27 开场改稿：耳光 slap、反冲锋一片喊杀 chargeCrowd。
+export const SFX_PACK_VERSION = "20260928slapchargecrowd";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -3036,7 +3068,7 @@ const SAMPLE_MIX = {
   // 而且十有八九与那一发枪声同时响，站低了就被枪盖掉）；落地那一记按 bodyFall
   // 再压一点 —— 掉的是一条胳膊不是一个人。
   goreSever: 0.78, goreLimbLand: 0.45,
-  impactBrick: 0.55, impactDirt: 0.45, impactWood: 0.5, impactMetal: 0.55, impactFlesh: 0.72,
+  impactBrick: 0.55, impactDirt: 0.45, impactWood: 0.5, impactMetal: 0.55, impactFlesh: 0.72, slap: 0.85, chargeCrowd: 0.9,
   footstepDirt: 0.26, footstepRubble: 0.28, bodyFall: 0.55, hurt: 0.8, heartbeat: 0.75,
   // 弹壳与脚步同一档：每开一枪响一次的东西，与枪声同量级的话整场只剩叮叮当当。
   shellDrop: 0.3,

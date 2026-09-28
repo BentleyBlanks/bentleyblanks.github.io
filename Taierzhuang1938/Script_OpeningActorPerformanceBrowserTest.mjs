@@ -169,7 +169,8 @@ try{
     {role:"ijaB",phase:"Interrogation",kind:"ija",variant:0,clip:"IjaBayonetGuard",minHeadRad:.1},
     {role:"guard",phase:"Interrogation",kind:"ija",variant:2,clip:"IjaBayonetGuard",minHeadRad:.1},
     {role:"comrade",phase:"Interrogation",kind:"nra",variant:1,clip:"CaptiveHeld",freeHand:"handL",minHandM:.1},
-    {role:"ijaA",caseName:"ButtStrike",phase:"Butt",kind:"ija",variant:5,castId:"ijaA",clip:"ButtThreat",onceDuration:1.4,minHeadRad:.1},
+    // 2026-09-27: the butt strike is gone (slaps where he lies); ijaA questioning over the pinned man.
+    {role:"ijaA",caseName:"Questioning",phase:"Ask",kind:"ija",variant:5,castId:"ijaA",clip:"InterrogateCrouch",freeHand:"handR",minHandM:.07},
   ];
   const receipts=[];
   for(const spec of cases){
@@ -258,14 +259,14 @@ try{
         samples.push({time:soldier.deadTime,shown:rig.openingStoryboardState?.seconds,clip:soldier.openingStoryboardPose?.clip||null,
           head:Pos(rig.bones.head),chest:Pos(rig.bones.chest),pelvis:Pos(rig.bones.pelvis),root:actor.root.position.toArray()});
       }
-      if(scene.phase==="Reach"&&scene.Age>1){g.StepFrames(3,1/60,true);break;}
+      if(["Found","Hold","Ask"].includes(scene.phase)&&soldier.deadTime>6){g.StepFrames(3,1/60,true);break;}
     }
     return {samples,clipRoot,phase:scene.phase,alive:scene.Comrade?.alive};
   });
   await fs.writeFile(path.join(output,"Data_CaptiveCollapse.json"),JSON.stringify(corpse,null,2));
   await page.screenshot({path:path.join(output,"Scene_CaptiveCollapseTerminal.png")});
   assert.equal(corpse.alive,false,"the normal opening actually kills the comrade at the wall");
-  assert.equal(corpse.phase,"Reach","the normal opening continues past the cut to Shunzi's reach for the rifle");
+  assert.ok(["Found","Hold","Ask"].includes(corpse.phase),"the normal opening continues past the cut to ijaA finding and questioning Shunzi");
   const sliding=corpse.samples.filter(sample=>sample.time>.91&&sample.time<3.25);
   assert.ok(sliding.length>20&&sliding.every(sample=>sample.clip==="CaptiveWallSlideTwitch")&&sliding.at(-1).shown>=3.1,
     "the corpse finishes the authored 3.2-second slide down the wall beyond native AI's 0.9-second freeze");
