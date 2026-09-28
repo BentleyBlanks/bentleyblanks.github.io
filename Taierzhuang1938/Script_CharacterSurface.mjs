@@ -2,26 +2,31 @@
 // 口径：docs/Data_CharacterStandard.md「人物表面」；数值：Data_Tuning_Materials 的
 // CHARACTER_SURFACE_PARTS / CHARACTER_GRIME / CHARACTER_SKIN / IJA_UNIFORM_COLORS / IJA_WOOL_DETAIL。
 //
-// 三条规矩：
+// 四条规矩：
 //   · 部件按「模型 id × 材质名」查表（TagCharacterSurface），**在 ConfigureExternalPbr 之前**打标 ——
 //     Script_Materials._UpgradeExternal 优先读标签里的 cls（皮肤接预积分散射、呢子换 Physical 加绒光）。
+//   · program 数与进关预热是账（第一关 CPU / 编译都紧）：补丁 key 只随 GLSL 变，部件差异（呢子 / 装具、
+//     配色、钢盔圆盘、平铺）一律 uniform；日军 COLOR_0 全白、打标时关掉顶点色，日军皮肤与国军皮肤共用程序。
+//     合批变体（CHAR_BATCHED）不做依赖原 atlas UV 的东西，尸体层才能把同签名的分件拼成一张图集。
 //   · 补丁一律走 Script_MaterialPatches 注册表，克隆走 CloneShadedMaterial；同一份源材质每种用法只出一份
 //     变体（所有同模型的人共用，program 按部件共享，不按模型分）。国军布军装的换色仍在 Script_UniformColors，
 //     它在自己的补丁后面接本层的公共段与泥污段（CharacterClothPatches）。
 //   · 采样器：泥污 / 磨损 / 落灰是程序化的（零采样器，读蒙皮前的 position，不改顶点 → 蒙皮运动矢量不变）；
 //     皮肤多一张微细节包，但同时摘掉 GLB 的 specularIntensityMap —— three 只读那张图的 alpha，而人物的
 //     spec 图全是 RGB WebP（alpha 恒 1），摘掉逐像素无差，腾出的槽给细节包（皮肤仍是 16）；
-//     呢子多一张细节包（呢子材质本来只有 13）。远景合批（BatchedMesh，多一个采样器）的皮肤与国军布
-//     不采细节包。门禁 Script_SamplerBudgetTest。
+//     呢子多一张细节包（呢子材质本来只有 13）。远景合批（BatchedMesh，多一个采样器）的皮肤、呢子与国军布
+//     不采细节包。门禁 Script_SamplerBudgetTest、Script_CharacterSurfaceTest。
 import * as THREE from "three";
 import {
   CHARACTER_SURFACE_PARTS, CHARACTER_GRIME, CHARACTER_SKIN, IJA_UNIFORM_COLORS, IJA_WOOL_DETAIL, CLOTH_SHEEN,
+  CHARACTER_WHITE_VERTEX_COLOR_MODELS,
 } from "./Data_Tuning_Materials.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 
+// 补丁 key 只随 GLSL 变，部件之间的差异全走 uniform（key 不同 = 程序不同 = 进关多编一份，见 Data_Tuning_Materials 抬头）。
 export const CHARACTER_SURFACE_PATCH_KEYS = Object.freeze({
-  common: "charCommon1", grime: "charGrime1", skin: "charSkin1", wool: "ijaWool1", gear: "charGear1",
+  common: "charCommon1", grime: "charGrime1", skin: "charSkin1", wool: "ijaWool2",
 });
 
 const F = (value) => Number(value).toFixed(5);
@@ -32,12 +37,16 @@ const Luma = (color) => color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722;
 export function TagCharacterSurface(root, modelId) {
   const parts = CHARACTER_SURFACE_PARTS[modelId];
   if (!root || !parts) return 0;
+  const whiteVertexColors = CHARACTER_WHITE_VERTEX_COLOR_MODELS.includes(modelId);
   let tagged = 0;
   root.traverse((mesh) => {
     if (!mesh.isMesh) return;
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
       const part = material && parts[material.name];
       if (!part || material.userData.characterSurface) continue;
+      // COLOR_0 全白（门禁逐点查过）：关掉顶点色逐像素无差，少一个编译参数，日军的皮肤 / 眼球与国军共用程序。
+      // 只动表里的材质 —— 带脸皮的 Material_FacialOral 的顶点色是口腔颜色，不能关。
+      if (whiteVertexColors && material.vertexColors) { material.vertexColors = false; material.needsUpdate = true; }
       // 纯 JSON：Material.copy / clone 走 JSON 深拷 userData，换类与克隆都会带过去。
       material.userData.characterSurface = JSON.parse(JSON.stringify({ modelId, ...part }));
       tagged += 1;
@@ -118,10 +127,7 @@ function Shared() {
       uIjaHelmetEdge: { value: new THREE.Vector3(I.helmetEdge[0], I.helmetEdge[1], I.helmetChips) },
       uIjaHelmetRough: { value: new THREE.Vector2(I.helmetRoughness, I.helmetWetRoughness) },
     },
-    gear: {
-      uCharGearTint: { value: Linear(I.gearTint) },
-      uCharGear: { value: new THREE.Vector2(I.gearDesat, I.gearValue) },
-    },
+    gear: { uCharGearTint: { value: Linear(I.gearTint) } },
   };
   return shared;
 }
@@ -379,17 +385,24 @@ function WoolPatch(part) {
     uIjaWoolMask: { value: part.officer ? 0.14 : 0.24 },
     uIjaWoolOffset: { value: new THREE.Vector2(offset[0], offset[1]) },
     uIjaHelmet: { value: new THREE.Vector3(helmet[0], helmet[1], helmet[2]) },
+    // 装具（gear）：同一份补丁，x = 开关、y 去饱和、z 明度（uniform 切换，不另编程序）。
+    uIjaGear: { value: new THREE.Vector3(part.gear ? 1 : 0, IJA_UNIFORM_COLORS.gearDesat, IJA_UNIFORM_COLORS.gearValue) },
   };
   return MakePatch({
     key: CHARACTER_SURFACE_PATCH_KEYS.wool,
-    uniforms: (targetUniforms) => { Object.assign(targetUniforms, Shared().wool, uniforms); },
+    uniforms: (targetUniforms) => { Object.assign(targetUniforms, Shared().wool, Shared().gear, uniforms); },
     fragment: [
       ["#include <common>", /* glsl */`
+// 合批变体（远景人群、尸体层 = BatchedMesh）：尸体层把同签名的分件拼成一张图集、UV 重映射，
+// 按原 atlas UV 定位的钢盔圆盘、按 UV 平铺的呢子细节、逐材质的装具开关在图集里都对不上 ——
+// 这三样合批变体不做（远看也看不出），呢子与装具于是能在尸体层合成一只网格（少一组 draw）。
+#ifndef CHAR_BATCHED
 uniform sampler2D uIjaWoolDetailMap;
+#endif
 uniform vec4 uIjaWoolTile;
 uniform vec2 uIjaWoolFade, uIjaWoolOffset, uIjaHelmetRough;
 uniform vec3 uIjaWoolAlbedo, uIjaWoolRough, uIjaLeather, uIjaHelmet, uIjaHelmetEdge;
-uniform vec3 uIjaWoolTarget, uIjaWoolGrimeTint, uIjaHelmetPaint, uIjaHelmetSteel;
+uniform vec3 uIjaWoolTarget, uIjaWoolGrimeTint, uIjaHelmetPaint, uIjaHelmetSteel, uIjaGear, uCharGearTint;
 uniform float uIjaWoolBaseLuma, uIjaWoolMask;`],
       ["#include <color_fragment>", /* glsl */`
 float ijaWoolMask = 0.0, ijaLeather = 0.0, ijaHelmet = 0.0, ijaHelmetEdge = 0.0, ijaHelmetWet = 0.0;
@@ -409,15 +422,21 @@ vec4 ijaWeave = vec4(0.5);
   float hr = length(hd);
   float star = smoothstep(0.5, 0.65, sat) * smoothstep(0.45, 0.6, mx);
   ijaHelmet = step(1e-4, uIjaHelmet.z) * (1.0 - smoothstep(0.985, 1.0, hr)) * (1.0 - star);
+  #ifdef CHAR_BATCHED
+    ijaHelmet = 0.0;
+  #endif
   // 呢子：土黄那一段色相、有点饱和、不太暗。
   ijaWoolMask = smoothstep(22.0, 30.0, hue) * (1.0 - smoothstep(66.0, 80.0, hue))
     * smoothstep(0.10, 0.18, sat) * smoothstep(uIjaWoolMask, uIjaWoolMask + 0.08, mx) * (1.0 - ijaHelmet);
   // 皮革：偏红的深褐（子弹盒、皮带、军靴）。
   ijaLeather = step(3.0, hue) * (1.0 - smoothstep(28.0, 36.0, hue)) * smoothstep(0.30, 0.42, sat)
     * (1.0 - smoothstep(0.68, 0.78, mx)) * (1.0 - ijaHelmet) * (1.0 - ijaWoolMask);
-  ijaWeave = texture2D(uIjaWoolDetailMap, vMapUv * uIjaWoolTile.x);
-  ijaGrime = texture2D(uIjaWoolDetailMap, vMapUv * uIjaWoolTile.y + uIjaWoolOffset).a - 0.5;
-  float mottle = texture2D(uIjaWoolDetailMap, mat2(0.8, -0.6, 0.6, 0.8) * vMapUv * uIjaWoolTile.w + uIjaWoolOffset.yx).a - 0.5;
+  float mottle = 0.0;
+  #ifndef CHAR_BATCHED
+    ijaWeave = texture2D(uIjaWoolDetailMap, vMapUv * uIjaWoolTile.x);
+    ijaGrime = texture2D(uIjaWoolDetailMap, vMapUv * uIjaWoolTile.y + uIjaWoolOffset).a - 0.5;
+    mottle = texture2D(uIjaWoolDetailMap, mat2(0.8, -0.6, 0.6, 0.8) * vMapUv * uIjaWoolTile.w + uIjaWoolOffset.yx).a - 0.5;
+  #endif
   ijaWeaveValue = ijaWeave.b - 0.5;
   // 换色：目标色 × atlas 的相对明度（褶皱、缝线的明暗留着）。
   vec3 cloth = uIjaWoolTarget * clamp(L / uIjaWoolBaseLuma, 0.3, 1.8);
@@ -440,6 +459,11 @@ vec4 ijaWeave = vec4(0.5);
   c = mix(c, cloth, ijaWoolMask);
   c = mix(c, leather, ijaLeather);
   c = mix(c, helmetColor, ijaHelmet);
+  // 装具：整体再往橄榄褐去饱和、压暗（背包帆布、卷毯、子弹盒一起旧）。
+  #ifndef CHAR_BATCHED
+    vec3 gearTint = uCharGearTint / max(dot(uCharGearTint, CHAR_LUMA), 1e-3);
+    c = mix(c, mix(c, dot(c, CHAR_LUMA) * gearTint, uIjaGear.y) * uIjaGear.z, uIjaGear.x);
+  #endif
   diffuseColor.rgb = c;
 }
 #endif`],
@@ -450,6 +474,7 @@ vec4 ijaWeave = vec4(0.5);
   roughnessFactor = mix(roughnessFactor, uIjaLeather.z, ijaLeather);
   float ijaHelmetRough = mix(uIjaHelmetRough.x, uIjaHelmetRough.y, ijaHelmetWet / max(ijaHelmet, 1e-3));
   roughnessFactor = mix(roughnessFactor, mix(ijaHelmetRough, 0.5, ijaHelmetEdge), ijaHelmet);
+  roughnessFactor = mix(roughnessFactor, max(roughnessFactor, 0.72), uIjaGear.x);
 }`],
       ["#include <metalnessmap_fragment>", "metalnessFactor = mix(metalnessFactor, 0.85, ijaHelmetEdge);"],
       ["#include <normal_fragment_maps>", /* glsl */`
@@ -465,25 +490,6 @@ vec4 ijaWeave = vec4(0.5);
   normal = normalize(normal + CharSafeNormalize(ijaFrame[0]) * ijaN.x + CharSafeNormalize(ijaFrame[1]) * ijaN.y);
 }
 #endif`],
-    ],
-  });
-}
-
-/** 装具（背包、卷毯、子弹盒）：往橄榄褐去饱和、压暗、别反光。 */
-function GearPatch() {
-  return MakePatch({
-    key: CHARACTER_SURFACE_PATCH_KEYS.gear,
-    uniforms: (target) => { Object.assign(target, Shared().gear); },
-    fragment: [
-      ["#include <common>", "uniform vec3 uCharGearTint;\nuniform vec2 uCharGear;"],
-      ["#include <color_fragment>", /* glsl */`
-{
-  vec3 c = diffuseColor.rgb;
-  float L = dot(c, CHAR_LUMA);
-  vec3 tintN = uCharGearTint / max(dot(uCharGearTint, CHAR_LUMA), 1e-3);
-  diffuseColor.rgb = mix(c, L * tintN, uCharGear.x) * uCharGear.y;
-}`],
-      ["#include <roughnessmap_fragment>", "roughnessFactor = max(roughnessFactor, 0.72);"],
     ],
   });
 }
@@ -531,6 +537,12 @@ export function CharacterSurfaceMaterial(material, { rigid = false } = {}) {
     if (variant.isMeshPhysicalMaterial) variant.specularIntensity = S.specularIntensity;
     variant.roughness = S.roughness;
     if (part.noMap) variant.color.set(S.wristColor);
+    if (part.normalScale && variant.normalScale) {
+      // 保留 GLTFLoader 选的符号，只改强度（统一脸与手的法线强度，尸体层才能把它们拼成一张图集）。
+      // fround：GLB 里的 0.3 是 float32（0.30000001…），着色签名按 JSON 比，差一位就拼不到一起。
+      const k = Math.fround(part.normalScale);
+      variant.normalScale.set(Math.sign(variant.normalScale.x || 1) * k, Math.sign(variant.normalScale.y || 1) * k);
+    }
     mine.push(SkinPatch((part.uvMeters || 1) / S.tileMeters));
   } else if (part.role === "ijaWool") {
     variant.roughness = IJA_WOOL_DETAIL.roughness;
@@ -545,10 +557,8 @@ export function CharacterSurfaceMaterial(material, { rigid = false } = {}) {
         .lerp(new THREE.Color(1, 1, 1), IJA_WOOL_DETAIL.sheenLift);
     }
     mine.push(WoolPatch(part));
-  } else if (part.role === "gear") {
-    mine.push(GearPatch());
   }
-  mine.push(GrimePatch(part.role, seed, heightOffset, part));
+  mine.push(GrimePatch(part.gear ? "gear" : part.role, seed, heightOffset, part));
   ApplyPatches(variant, [...(PatchesOf(variant) || []), ...mine]);
   variant.userData.characterSurfaceRole = part.role;
   variant.needsUpdate = true;

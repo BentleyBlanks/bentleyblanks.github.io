@@ -262,6 +262,12 @@ mat3 MatTangentFrameFrom(vec3 q0, vec3 q1, vec2 st0, vec2 st1, vec3 surfNormal) 
   return mat3(tan0 * scl, bit0 * scl, nrm);
 }`;
 
+/** 合批变体（BatchedMesh）不编细节法线：见 MakeMaterialShadingPatch 里 fragment 那段的说明。 */
+const BATCHED_NO_DETAIL = `#ifdef USE_MATERIAL_DETAIL_NORMAL
+#undef USE_MATERIAL_DETAIL_NORMAL
+#endif
+`;
+
 /**
  * `<clipping_planes_fragment>`：视差遮蔽映射。
  *
@@ -583,8 +589,13 @@ export function MakeMaterialShadingPatch(pack, features) {
       uniforms.uMatSkinRadius = pack.skinRadius;
       uniforms.uMatDebugView = pack.debugView;
     },
-    fragment: [
-      ["#include <common>", GLSL_COMMON],
+    // `<common>` 那一段按编译参数现写（函数形式）：BatchedMesh 比普通网格多两个采样器
+    // （batchingTexture + batchingIdTexture），细节法线再占一个，静态库材质合批后就是 17 ——
+    // 程序不链接、整批不画（2026-09-28 SamplerBudgetTest，第一关尸体层 / 人群合批上线后）。合批件都是
+    // 远景 / 尸体，细节法线 1.5–4.5 m 就淡没了，合批变体直接不编这一路。three 的 USE_BATCHING 只进
+    // 顶点着色器，片元这边看 parameters.batching。
+    fragment: (shader) => [
+      ["#include <common>", (shader?.batching ? BATCHED_NO_DETAIL : "") + GLSL_COMMON],
       ["#include <clipping_planes_fragment>", GLSL_POM],
       ["#include <normal_fragment_maps>", GLSL_DETAIL_NORMAL],
       ["#include <lights_fragment_maps>", GLSL_HORIZON],

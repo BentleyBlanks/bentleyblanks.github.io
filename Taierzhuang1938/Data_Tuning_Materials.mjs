@@ -86,26 +86,35 @@ export const NRA_CLOTH_DETAIL = Object.freeze({
 //   cls   外部材质分类（Script_Materials._UpgradeExternal 优先读它）："skin" 接预积分散射、
 //         "cloth" 换 MeshPhysicalMaterial 加绒光、"none" 不分类（压掉按名字的误判）；
 //   role  人物表面补丁（Script_CharacterSurface）："nraCloth" 国军布军装（换色补丁之上再叠泥污）、
-//         "ijaWool" 日军呢子（换色 + 呢子细节 + 皮革 / 钢盔分区）、"skin"、"gear" 装具、"garb" 便服；
+//         "ijaWool" 日军呢子（换色 + 呢子细节 + 皮革 / 钢盔分区；gear: true = 装具 atlas，同一份补丁、
+//         uniform 切成装具的去饱和）、"skin"；
 //   其余  逐模型参数：uvMeters 这份 atlas 一个 UV 单位多少米（三角形面积加权中位数，
 //         皮肤细节按它换算平铺）、wool 呢子 atlas 的布面均色、helmet 钢盔在 atlas 上的圆盘
 //         [u, v, 半径]（IJA01/02/03 的九〇式钢盔是一块俯视投影的圆盘，圆盘外缘就是帽檐）、
 //         elbowX / cuffX 绑定姿势下肘与袖口的 |x|（第一人称汉阳造手臂比身体骨架长）、noMap 腕部那种无贴图的皮。
-// 没列进表的材质按旧规矩：名字分类、不挂人物表面补丁。
+// 没列进表的材质按旧规矩：名字分类、不挂人物表面补丁（翻译 NRA06 的便服就是：他只在具名镜头里出现，
+// 单为他编一类带泥污的程序不值 —— 程序数与进关预热的账见 docs/Data_CharacterStandard.md）。
+//
+// **program 数的账**（2026-09-28 第二轮）：部件差异一律走 uniform，不走补丁 key —— 呢子与装具同一份补丁，
+// 装具靠 uniform 切换；日军 GLB 的 COLOR_0 全是 (255,255,255,255)（CharacterSurfaceTest 逐点查），
+// 打标时关掉 vertexColors（逐像素无差），日军的皮肤于是与国军的皮肤共用程序。
 const SkinPart = (uvMeters, extra = {}) => Object.freeze({ role: "skin", cls: "skin", uvMeters, ...extra });
 const NraClothPart = (extra = {}) => Object.freeze({ role: "nraCloth", cls: "cloth", ...extra });
 const IjaWoolPart = (extra = {}) => Object.freeze({ role: "ijaWool", cls: "cloth", ...extra });
-const GEAR_PART = Object.freeze({ role: "gear", cls: "none" });
+// 装具（背包、卷毯、子弹盒；Spetsnaz 配件 atlas，布面均色 0x85754b）：与呢子同一份补丁、同一个程序，
+// 着色签名也相同 —— 尸体层把呢子与装具拼成一只图集网格（合批变体不做钢盔 / 细节 / 装具开关，见补丁）。
+const GEAR_PART = IjaWoolPart({ gear: true, wool: 0x85754b });
 const NOT_SKIN = Object.freeze({ role: null, cls: "none" });
 // 九〇式钢盔圆盘（IJA01/02/03 共用这一块 atlas 布局；IJA06 在同一位置换成了九八式略帽的布面）。
 const IJA_HELMET_DISC = Object.freeze([0.861, 0.350, 0.138]);
 export const CHARACTER_SURFACE_PARTS = Object.freeze({
   TengxianIja01: Object.freeze({
-    "Material #54": SkinPart(0.475), "Material #25": SkinPart(0.475), "Material #45": NOT_SKIN,
+    "Material #54": SkinPart(0.475), "Material #25": SkinPart(0.475), "Material #45": NOT_SKIN, "Material #47": NOT_SKIN,
     "Material #57": IjaWoolPart({ wool: 0x594a29, officer: true, helmet: IJA_HELMET_DISC }),
   }),
   TengxianIja02: Object.freeze({
-    "Material #48": SkinPart(0.475), "Material #25": SkinPart(0.475),
+    // 脸的法线强度 0.35 → 0.3，与手（#25）一致：尸体层按着色签名把脸和手拼成一只网格（少一组 draw）。
+    "Material #48": SkinPart(0.475, { normalScale: 0.3 }), "Material #25": SkinPart(0.475),
     "Material #55": IjaWoolPart({ wool: 0x938049, helmet: IJA_HELMET_DISC }), "Material #164": GEAR_PART,
   }),
   TengxianIja03: Object.freeze({
@@ -116,7 +125,7 @@ export const CHARACTER_SURFACE_PARTS = Object.freeze({
     "Material #164": GEAR_PART,
   }),
   TengxianIja06: Object.freeze({
-    "Material #48": SkinPart(0.477), "Material #25": SkinPart(0.475),
+    "Material #48": SkinPart(0.477, { normalScale: 0.3 }), "Material #25": SkinPart(0.475),
     "Material #55": IjaWoolPart({ wool: 0x94814a }), "Material #164": GEAR_PART,
   }),
   // NRA02 的毛巾与枪套（Material #1721585343 / #29）不打部件：它们与帽徽、眼球是同一种平铺着色，
@@ -128,10 +137,7 @@ export const CHARACTER_SURFACE_PARTS = Object.freeze({
     "Material #26": SkinPart(0.486), "John_All Body": SkinPart(1.879), "战士1_头部": NOT_SKIN,
     "Material #1721585337": NraClothPart(),
   }),
-  TengxianNra06: Object.freeze({
-    "Material #9": SkinPart(0.508), "John_All Body": SkinPart(1.879),
-    "Material_InterpreterGarb": Object.freeze({ role: "garb", cls: "none" }),
-  }),
+  TengxianNra06: Object.freeze({ "Material #9": SkinPart(0.508), "John_All Body": SkinPart(1.879) }),
   // 第一人称：默认骨骼双臂、汉阳造双手（第一关全程用它）、低头看见的身体。
   // 汉阳造手的网格比身体大 1.36 倍、视模再缩 0.7，屏幕上的 UV 密度与身体的 John_Color 相当。
   FpsArms: Object.freeze({ "John_All Body": SkinPart(1.93), "Material #1721585337": NraClothPart() }),
@@ -143,6 +149,9 @@ export const CHARACTER_SURFACE_PARTS = Object.freeze({
   }),
   FirstPersonBody: Object.freeze({ "Material #1721585337": NraClothPart() }),
 });
+
+/** 这些模型的 COLOR_0 全白：打标时关掉表里各材质的 vertexColors（逐像素无差，少一个编译参数 = 与国军共用程序）。 */
+export const CHARACTER_WHITE_VERTEX_COLOR_MODELS = Object.freeze(["TengxianIja01", "TengxianIja02", "TengxianIja03", "TengxianIja06"]);
 
 /**
  * 泥污 / 磨损 / 落灰（所有人物部件共用一层，程序化，**零采样器**）。
@@ -186,7 +195,6 @@ export const CHARACTER_GRIME = Object.freeze({
   roles: Object.freeze({
     nraCloth: Object.freeze({ mud: 1, knee: 1, elbow: 0.8, dust: 0.4, cuff: 0.55 }),
     ijaWool: Object.freeze({ mud: 1, knee: 1, elbow: 0.8, dust: 0.55, cuff: 0.55 }),
-    garb: Object.freeze({ mud: 0.8, knee: 0.6, elbow: 0.4, dust: 0.45, cuff: 0.4 }),
     gear: Object.freeze({ mud: 0.9, knee: 0, elbow: 0, dust: 0.5, cuff: 0 }),
     skin: Object.freeze({ mud: 0, knee: 0, elbow: 0, dust: 0.3, cuff: 0 }),
   }),
@@ -239,7 +247,7 @@ export const CHARACTER_SKIN = Object.freeze({
  *   helmetPaint / helmetSteel  钢盔漆色与磨出来的钢色
  *   helmetEdge     [开始磨损, 圆盘边]（圆盘半径的比例）：帽檐一圈磨出金属
  *   helmetChips    漆面崩口的覆盖；helmetRoughness / helmetWetRoughness 漆面与雨水湿亮处
- *   gear*          装具（背包、卷毯、子弹盒）：往橄榄褐去饱和、压暗
+ *   gear*          装具（背包、卷毯、子弹盒）：呢子补丁的 uniform 分支，再往橄榄褐去饱和、压暗
  *   leather*       皮革（子弹盒、皮带、军靴）：压暗、去一点饱和、略亮一点的粗糙度
  */
 export const IJA_UNIFORM_COLORS = Object.freeze({

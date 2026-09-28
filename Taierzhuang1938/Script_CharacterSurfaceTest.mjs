@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  CHARACTER_SURFACE_PARTS, CHARACTER_GRIME, CHARACTER_SKIN, IJA_WOOL_DETAIL,
+  CHARACTER_SURFACE_PARTS, CHARACTER_GRIME, CHARACTER_SKIN, IJA_WOOL_DETAIL, CHARACTER_WHITE_VERTEX_COLOR_MODELS,
 } from "./Data_Tuning_Materials.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -43,7 +43,24 @@ function ReadGlb(file) {
     const start = bin + (view.byteOffset || 0);
     return { name: entry.name, mime: entry.mimeType, bytes: buf.subarray(start, start + view.byteLength) };
   };
-  return { json, image };
+  // 一个图元 COLOR_0 的最小分量（0..255；归一化 UNSIGNED_BYTE / UNSIGNED_SHORT / FLOAT 三种都认）。
+  const colorMin = (primitive) => {
+    const index = primitive.attributes.COLOR_0;
+    if (index === undefined) return null;
+    const a = json.accessors[index], view = json.bufferViews[a.bufferView];
+    const comps = a.type === "VEC4" ? 4 : 3;
+    const size = { 5121: 1, 5123: 2, 5126: 4 }[a.componentType];
+    const stride = view.byteStride || comps * size;
+    const base = bin + (view.byteOffset || 0) + (a.byteOffset || 0);
+    let min = 255;
+    for (let i = 0; i < a.count; i += 1) for (let c = 0; c < comps; c += 1) {
+      const o = base + i * stride + c * size;
+      const v = a.componentType === 5121 ? buf[o] : a.componentType === 5123 ? buf.readUInt16LE(o) / 257 : buf.readFloatLE(o) * 255;
+      if (v < min) min = v;
+    }
+    return min;
+  };
+  return { json, image, colorMin };
 }
 
 /** 一张嵌入图片有没有 alpha 通道（WebP：VP8X 的 alpha 位 / VP8L 头的 alpha 提示；PNG：颜色类型）。 */
@@ -77,13 +94,22 @@ function WebpInfo(file) {
 }
 
 // ---- 1 + 2：部件表对得上 GLB -------------------------------------------------------------
-const ROLES = new Set(["skin", "nraCloth", "ijaWool", "gear", "garb", null]);
+const ROLES = new Set(["skin", "nraCloth", "ijaWool", null]);
 const CLASSES = new Set(["skin", "cloth", "none"]);
 let parts = 0, specChecked = 0;
 for (const [modelId, table] of Object.entries(CHARACTER_SURFACE_PARTS)) {
   const file = GlbPath(modelId);
   if (!fs.existsSync(file)) { Check(false, `${modelId} 的 GLB 在`, file); continue; }
-  const { json, image } = ReadGlb(file);
+  const { json, image, colorMin } = ReadGlb(file);
+  if (CHARACTER_WHITE_VERTEX_COLOR_MODELS.includes(modelId)) {
+    // 打标时关掉这些材质的 vertexColors：COLOR_0 必须处处是 (255,255,255,255) 才是逐像素无差。
+    for (const mesh of json.meshes) for (const primitive of mesh.primitives) {
+      const name = json.materials[primitive.material]?.name;
+      if (!(name in table)) continue;
+      const min = colorMin(primitive);
+      Check(min === null || min >= 254.5, `${modelId}/${name} 的 COLOR_0 全白（关顶点色无差）`, String(min));
+    }
+  }
   const byName = new Map((json.materials || []).map((m) => [m.name, m]));
   for (const [name, part] of Object.entries(table)) {
     parts += 1;
@@ -147,8 +173,12 @@ Check(/"\.\/Script_CharacterSurface\.mjs": "\.\/Script_CharacterSurface\.mjs\?v=
 const surface = source("Script_CharacterSurface.mjs");
 Check(/vCharRest = position;/.test(surface) && !/transformed\s*=/.test(surface), "泥污读蒙皮前的 position、不改顶点（运动矢量不变）");
 Check(/#ifndef CHAR_BATCHED\s+uniform sampler2D uCharSkinDetailMap;/.test(surface)
+  && /#ifndef CHAR_BATCHED\s+uniform sampler2D uIjaWoolDetailMap;/.test(surface)
   && /#ifndef NRA_CLOTH_BATCHED\s+uniform sampler2D uNraClothDetailMap;/.test(source("Script_UniformColors.mjs")),
-  "远景合批（BatchedMesh）的皮肤与国军布不采细节包（采样器 ≤ 16）");
+  "远景合批（BatchedMesh）的皮肤、呢子与国军布不采细节包（采样器 ≤ 16，尸体层图集合批不错位）");
+// 部件差异走 uniform：补丁 key 里不许带配色 / 部件名（key 不同 = 程序不同 = 进关多编一份）。
+Check(/key: "nraUniformCloth3"/.test(source("Script_UniformColors.mjs")) && !/charGear|garb/.test(surface),
+  "补丁 key 与配色 / 部件无关（国军三种配色、日军呢子与装具各共用一个程序）");
 
 if (failed) { console.log(`\n人物表面门禁：${failed} 项失败。`); process.exit(1); }
 console.log("\n人物表面门禁：全部通过。");

@@ -74,7 +74,9 @@ function UniformMaterial(material, palette) {
   const detail = ClothDetailUniforms();
   const grimeOffset = new THREE.Vector2(...(NRA_CLOTH_DETAIL.grimeOffset[palette] || [0, 0]));
   const patch = MakePatch({
-    key: `nraUniformCloth2:${palette}`,
+    // 配色只进 uniform，GLSL 与配色无关：key 不带配色，三种配色共用程序（以前一种配色一份，
+    // 蒙皮 / 远景合批 / 伤口变体各乘一遍，2026-09-28 人物表面第二轮收回来）。
+    key: "nraUniformCloth3",
     uniforms: (uniforms) => {
       uniforms.uNraClothTarget = { value: target };
       uniforms.uNraClothBaseLuma = { value: baseLuma };
