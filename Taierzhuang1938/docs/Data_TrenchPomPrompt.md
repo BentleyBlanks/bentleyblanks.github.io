@@ -4,7 +4,7 @@
 
 本次只制作一套土壁材质，第一版实机颗粒过密，第二版修正后用于运行时。源图是生成图，高度是根据颜色图推断的形状，不是扫描或实测位移。法线/AO/roughness 由 `_import/Script_BakeTrenchPom.py` 从同一高度派生。早期试图生成的两份图留在宿主工具输出目录，仓库仅保留实际采用的两份源图与三个派生文件。
 
-采用的颜色输出：`exec-ebe32480-cfd1-41ef-bc2d-d757195b050f.png` → `Texture/Texture_TrenchPomSource.png`。
+采用的颜色输出：`exec-ebe32480-cfd1-41ef-bc2d-d757195b050f.png` → `Texture/Texture_TrenchPomSource.png`（2026-09-28 按[贴图资产规范](Data_TextureAssetStandard.md)移到 `_import/Source/TrenchPom/`：源图不放在运行时贴图目录）。
 
 颜色修正提示词（输入为第一版土壁源图）：
 
@@ -12,7 +12,7 @@
 Edit this single terrain PBR albedo source tile for a realistic excavated trench wall. Keep square, orthographic, tightly cropped surface-only texture, 1.5 metre physical extent. The current tile is much too gravelly and has strong baked directional lighting. Replace most of the fine raised gravel with compact brown loess/clay: about 70% softly eroded compact matte earth with broad flatter patches, narrow irregular vertical erosion striations and occasional shallow cracks; only 30% scattered small gravel and 5-8 partially buried flat angular stones. Stones must sink softly into the same clay. Important: true flat diffuse albedo under uniform fully overcast illumination, almost no directional shadows, no highlights, no artificial dark outlines around every grain. Natural subtle warm brown variations, darker dust between clay plates, small-scale fine porous detail. It must read as a cut soil bank, not a gravel pile, carpet, sponge or rocky mountain. Edge-to-edge seamless tiling; no horizon, vegetation, objects, text, grids, borders or diagram. Preserve realistic fine detail but much calmer and more cohesive than current image.
 ```
 
-采用的高度输出：`exec-da589db3-094f-47e8-b228-834ee749fd81.png` → `Texture/Texture_TrenchPomHeightSource.png`。
+采用的高度输出：`exec-da589db3-094f-47e8-b228-834ee749fd81.png` → `Texture/Texture_TrenchPomHeightSource.png`（同上，现位于 `_import/Source/TrenchPom/`）。
 
 高度提示词（唯一输入为上面的采用颜色图）：
 

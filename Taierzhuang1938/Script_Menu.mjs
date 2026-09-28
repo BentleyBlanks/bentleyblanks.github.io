@@ -135,13 +135,13 @@ function IsChapter(entry) { return !!entry && (!entry.sandbox || !!entry.chapter
 // 章节任务图由菜单独占，不进入战斗数据。按章节 id 取（条目可用 artId 指定借哪一章的图：
 // 第一关的白盒借第一章那张）；一章一图，右侧横向预览使用已有原创图片，不嵌入外部游戏截图。
 const MISSION_ART = {
-  CH0_Chuchuan: "./Texture/Menu/Texture_MissionCh0Chuchuan.png",
-  CH1_NanLu: "./Texture/Menu/Texture_MissionCh1NanLu.png",
-  CH2_Shouliudan: "./Texture/Menu/Texture_MissionCh2Shouliudan.png",
-  CH3_Jiuhusuo: "./Texture/Menu/Texture_MissionCh3Jiuhusuo.png",
-  CH4_DongguanYe: "./Texture/Menu/Texture_MissionCh4DongguanYe.png",
-  CH5_Chengqiang: "./Texture/Menu/Texture_MissionCh5Chengqiang.png",
-  CH6_Zuihou: "./Texture/Menu/Texture_MissionCh6Zuihou.png",
+  CH0_Chuchuan: "./Texture/Menu/Texture_MissionCh0Chuchuan.webp?v=20260928",
+  CH1_NanLu: "./Texture/Menu/Texture_MissionCh1NanLu.webp?v=20260928",
+  CH2_Shouliudan: "./Texture/Menu/Texture_MissionCh2Shouliudan.webp?v=20260928",
+  CH3_Jiuhusuo: "./Texture/Menu/Texture_MissionCh3Jiuhusuo.webp?v=20260928",
+  CH4_DongguanYe: "./Texture/Menu/Texture_MissionCh4DongguanYe.webp?v=20260928",
+  CH5_Chengqiang: "./Texture/Menu/Texture_MissionCh5Chengqiang.webp?v=20260928",
+  CH6_Zuihou: "./Texture/Menu/Texture_MissionCh6Zuihou.webp?v=20260928",
 };
 function MissionArt(entry) { return MISSION_ART[entry?.artId || entry?.id] || ""; }
 

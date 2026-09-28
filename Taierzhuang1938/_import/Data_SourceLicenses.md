@@ -145,7 +145,7 @@ CC0 不强制署名；表里的作者与链接是为了以后还能找回源文�
 
 | 游戏内资产 | 源文件 | 作者 | 许可 | 处理方式 |
 |---|---|---|---|---|
-| 爆炸火球序列帧 `Texture/Texture_ExplosionFire_01.png` | [Explosion Sheet](https://opengameart.org/content/explosion-sheet) 的 `boom3.png` | [StumpyStrust](https://opengameart.org/users/stumpystrust) | CC0 | 原图未改动（1024×1024，4×4 共 16 帧）。运行时由 `Script_Vfx.mjs` 的火球池按序列帧采样：形状细节来自贴图，颜色仍乘游戏色板（fireHot→fireCool）走 HDR 加性混合——台儿庄的爆炸主体色是考据出来的砖粉黄土，色调不归贴图管。贴图加载失败时静默降级回程序化辉光圆片。 |
+| 爆炸火球序列帧 `Texture/Texture_ExplosionFire_01.webp`（2026-09-28 由原 PNG 无损转 WebP，像素逐位不变） | [Explosion Sheet](https://opengameart.org/content/explosion-sheet) 的 `boom3.png` | [StumpyStrust](https://opengameart.org/users/stumpystrust) | CC0 | 原图未改动（1024×1024，4×4 共 16 帧）。运行时由 `Script_Vfx.mjs` 的火球池按序列帧采样：形状细节来自贴图，颜色仍乘游戏色板（fireHot→fireCool）走 HDR 加性混合——台儿庄的爆炸主体色是考据出来的砖粉黄土，色调不归贴图管。贴图加载失败时静默降级回程序化辉光圆片。 |
 | 紧凑爆炸 `Texture/Texture_ExplosionUnityCompact_01.webp` | [Unity Labs Free VFX image sequences and flipbooks](https://unity.com/blog/engine-platform/free-vfx-image-sequences-flipbooks) 的 `Explosion00_5x5.tga` | Unity Labs Paris | CC0 | 1024×1024、5×5 共 25 帧；无损 WebP 转码，保留 Alpha。用于掷弹筒、手榴弹等轻/中型爆炸。 |
 | 持续火球 `Texture/Texture_ExplosionUnityFireBall_02.webp` | 同上页面的 `FireBall02_8x8.tga` | Unity Labs Paris | CC0 | 1024×1024、8×8 共 64 帧；无损 WebP 转码。黑底贴图走 HDR 加性混合，用于中型爆炸的随机火球形制。 |
 | 重炮爆炸 `Texture/Texture_ExplosionUnityHeavy_02.webp` | 同上页面的 `Explosion02HD_5x5.tga` | Unity Labs Paris | CC0 | 2048×2048、5×5 共 25 帧；无损 WebP 转码，保留 Alpha。用于联队炮、师团炮兵与大当量迫击炮。 |
@@ -154,7 +154,7 @@ CC0 不强制署名；表里的作者与链接是为了以后还能找回源文�
 
 ```powershell
 Invoke-WebRequest -Uri 'https://opengameart.org/sites/default/files/boom3.png' `
-  -OutFile 'Taierzhuang1938/Texture/Texture_ExplosionFire_01.png'
+  -OutFile 'Taierzhuang1938/Texture/Texture_ExplosionFire_01.png'   # 下载后按贴图资产规范无损转 .webp 再入库
 ```
 
 Unity Labs 三个源包的直接下载地址分别是：
@@ -238,7 +238,7 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 
 ## 血液特效纹理（2026-09-11）
 
-- 游戏文件：`Texture/Texture_BloodSplatterCc0.png`，1600×1200 RGBA，2,625,982 bytes。
+- 游戏文件：`Texture/Texture_BloodSplatterCc0.webp`，1600×1200 RGBA（2026-09-28 由原样 PNG 转 WebP：alpha 逐位不变、RGB 有损 q90，2,625,982 → 1,301,720 bytes；运行时只采样 alpha）。下方 SHA-256 是原始 PNG 的。
 - 作者：ExileGL；[Blood Splatter](https://opengameart.org/content/blood-splatter)，页面标记 CC0。
 - 原始下载：<https://opengameart.org/sites/default/files/blood_0.png>；原样保存，没有重绘或图像生成。
 - SHA-256：`2f625d3ce46c723c54f3a78a94cd54aef808ef2480b470dd70bf7b6fdbb42c14`。
@@ -250,6 +250,6 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 
 `Texture_TrenchMud{Base,Normal,Orh}.webp` 来自 [Poly Haven / Brown Mud 02](https://polyhaven.com/a/brown_mud_02)，Rob Tuytel，CC0；原始 AO / Roughness / Displacement 打包为 Orh。重建入口同 `Script_ImportTrenchMaterials.py --mud`。2026-09-26 `mudLayer` 改用 TrenchPom 后无消费方，2026-09-28 按[贴图资产规范](../docs/Data_TextureAssetStandard.md)删除；重新启用时先登记 `Data_TextureManifest.mjs`。
 
-`Texture_TrenchRootMat.png` 为 2026-09-26 通过直接内置 imagegen 单张生成的枯草根毯 RGBA，原样保留透明度；不是下载或从概念图裁切的素材。提示词与接入记录见 [生成记录](../docs/Data_TrenchRootMatPrompt.md)。
+`Texture_TrenchRootMat.webp`（原 `.png`，2026-09-28 转有损 q95、alpha 逐位不变）为 2026-09-26 通过直接内置 imagegen 单张生成的枯草根毯 RGBA，原样保留透明度；不是下载或从概念图裁切的素材。提示词与接入记录见 [生成记录](../docs/Data_TrenchRootMatPrompt.md)。
 
 `Texture_NraUniformClothDetail.webp`（国军军装布细节包，512×512 RGBA）由 2026-09-27 通过 Lovart 生成的两张图烘成：斜纹土布微距（`_import/Reference/NraClothDetail/Source_CottonDrillWeave.webp`）与污渍遮罩（`Source_UniformGrime.webp`），用户指定走 Lovart，无第三方作者与许可约束。`_import/Script_BakeNraClothDetail.py` 做四边无缝、从亮度推布纹法线与明暗、打进 RG/B/A；运行时由 `Script_UniformColors.mjs` 采样，数值在 `Data_Tuning_Materials.NRA_CLOTH_DETAIL`。
