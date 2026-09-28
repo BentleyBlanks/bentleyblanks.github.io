@@ -324,6 +324,7 @@ const Step = (host, module, seconds, options = {}) => {
   Check(win.host.meleeCombat.Fighter(win.host.player).state !== "idle", "玩家真的倒在共用状态机里（fall / down）");
   Check(win.lead.meleeCombat?.clip === "BayonetPressure", "他骑上来压刀：共用 Pressure 姿势");
   Check(!win.village.AmbushPromptView(), "倒地镜头落稳之前不给键");
+  Check(!win.host.said.includes("MeleeCurse"), "被撞翻压住时还不骂：「滚你妈的！」归反刺那一下");
   Run(win, 2, () => Phase(win) === "prompt");
   Check(Phase(win) === "prompt" && win.host.Has("kitchenAmbushPrompted"), `撞上 ${T.promptDelayS} s 后给键`);
   const ring = win.village.AmbushPromptView();
@@ -331,6 +332,7 @@ const Step = (host, module, seconds, options = {}) => {
   Check(win.host.meleeCombat.qte.active.input === "press", "走共用倒地僵持的 input \"press\"");
   Run(win, 0.5);
   Check(win.village.AmbushPromptView().progress < ring.progress, "弧在漏（窗口在走）");
+  Check(!win.host.said.includes("MeleeCurse"), "按键窗口里也还没骂");
   win.host.meleeCombat.qte.Press(true, false);
   Frame(win);
   Check(Phase(win) === "countered" && !win.lead.alive && win.host.Has("kitchenAmbushCountered"),

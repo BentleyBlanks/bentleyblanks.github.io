@@ -471,9 +471,11 @@ export class FirstLevelVillageBlock {
    */
   UpdateMeleeBeat() {
     const r = this.r;
-    const bound = r.meleeCombat?.Active
+    // 进门遭伏击那一拍没收尾之前不算：那句归反刺那一下喊（伏击兵被压在身上时就在这把尺以内，
+    // 不挡的话「滚你妈的！」会在刚被撞翻、还没按键时就喊出来 —— 2026-09-28 线上实机量到的）。
+    const bound = this.ambush.Done && (r.meleeCombat?.Active
       || this.Ambushers.some((actor) => actor.alive && !actor.missionDormant
-        && Distance(actor.position, r.player.position) <= M.meleeCurseReachM);
+        && Distance(actor.position, r.player.position) <= M.meleeCurseReachM));
     if (bound) r.Say("MeleeCurse");
     // 近战结束，窗口火力仍封锁院口。
     if (r.Has("meleeResolved") && this.WindowHoldsYard()) {
