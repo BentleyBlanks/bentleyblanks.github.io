@@ -256,6 +256,7 @@ node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-
 | `--campaign --stage-to=3`、`--campaign --stage-from=3 --stage-to=6` | 通过（A 区分支上，1173 s / 1336 s，0 次检查点重试） |
 | `--campaign --stage-jumps --stage-from=18` | 通过到 Complete（D 区分支上） |
 | `--campaign --stage-jumps --stage-from=15` | **基线红**：17 `deathSceneComplete` 不落（幺娃不拉覆盖物，`coverS` 恒 0），D 与 S 都在未改的基线上复现同一卡法 |
+| `--campaign --stage-from=6`（06 起连续、不跳阶段） | **基线红**：07→08 到村北口时被村口那组打死（本轮 122.7 s 于 (64.2,−23.4) 失血至零：进 07 时 34 血、0 绷带、0 弹药；S 包在未改的 60166b9f 上同一命令 108.8 s 于 (47.2,−20.3) 同样死在 VillageCorner 手里）。08 起分段驾驭全通（上一行），所以是 06→07 驾驶器的补给 / 血量问题，不是引导几何 |
 
 出图：`_shots/GuidanceFinal/`（46 个 G 机位 + 31 个原机位 + 8 张数据俯视图，忽略目录）；改前基线在 `_shots/GuidanceBaseline/`。
 
