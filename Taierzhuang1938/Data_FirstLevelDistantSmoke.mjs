@@ -131,7 +131,8 @@ export const LANDMARK_COLUMNS = Object.freeze([
   // 07 出沟那一眼（A 区 G07_4）：迎面是大车路和往南走的难民，村子在左边 40 m 外没有任何抬头的东西。
   // 村北口路北土埂后一垛着火的柴（路北碎石矮墙 VillageMouthNorthBerm 的北面），黑烟柱把「往东拐进村」抬到天际线上；
   // 离 southWalk 末段 9 m，3 m 内没有实心体块。
-  Object.freeze({ id: "VillageMouthFire", x: 40, z: -30.5, frame: 0, kind: "timber", scale: 1,
+  // scale 1.5：从出沟点看它在 45 m 外、房子后面，只露烟柱；1.0 的 9 m 柱子在灰天上只是一小抹，13.5 m 才够抬头。
+  Object.freeze({ id: "VillageMouthFire", x: 40, z: -30.5, frame: 0, kind: "timber", scale: 1.5,
     reference: "07 village mouth landmark: burning woodpile north of the lane" }),
 ]);
 function BuildLandmarkSmoke(random) {
