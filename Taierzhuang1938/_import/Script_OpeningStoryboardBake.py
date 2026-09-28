@@ -103,7 +103,7 @@ WALL_REGIONS = {
 convertInv = convert.inverted()
 # Reach assist (Solve): where it starts (fraction of the bare arm length, shoulder to grip), how far
 # the pelvis may travel over the planted feet (source m) and how much extra trunk lean it may add
-# (rad). A clip may override any of them with spec 'reach': {'fraction', 'travel', 'bend'} (a number
+# (rad). A clip may override any of them with spec 'reach': {'fraction', 'travel', 'bend', 'sink'} (a number
 # or a function of the clip time; 'sides' limits the fraction to those hands, 'fractionBySide'
 # gives each hand its own number or function of time). TengxianHumanoidV1 (2026-09-26): the IJA shoulders
 # sit ~5 cm further back and 3.6 cm higher and the arm is 2.4 cm shorter than IJA02's own (NRA02
@@ -484,7 +484,10 @@ def BakeRig(ctx):
                 over = moved.length - travel
                 moved = moved.normalized() * travel
                 p['bend'] = min(bend0 + lean, p.get('bend', 0.0) + over / .45)
-            p['pelvis'] = (p0[0] + moved.x, p0[1] + moved.y, max(p0[2] - .15, pz + min(0.0, excess.z) * .6))
+            # spec reach 'sink' (source m, default .15): how far the hips may drop toward a low grip (2026-09-27: 0 for
+            # ijaA's throat cut -- dropping his hips put his body into the kneeling man's raised arm).
+            sink = assist.get('sink', .15)
+            p['pelvis'] = (p0[0] + moved.x, p0[1] + moved.y, max(p0[2] - (sink(t) if callable(sink) else sink), pz + min(0.0, excess.z) * .6))
             Reset()
             ctx['ApplyPose'](p, 0.0)
             if p.get('post'):

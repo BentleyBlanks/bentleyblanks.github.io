@@ -73,75 +73,56 @@ Check("a look stuck waiting for its event warns once (renamed / retimed director
       assert.equal(seen.filter(m => m.includes(`${phase} has run`) && m.includes(event)).length, 1, `${phase}: one warning naming ${event}`);
     }
     const ok = new OpeningLensDriver();
-    ok.Sample(50, "Butt", 20, { buttHit: 40 }); ok.Sample(51, "Found", 30, { clearAt: 30 });
+    ok.Sample(50, "Blast", 20, { blastAt: 40 });
     assert.equal(ok.warnings.length, 0, "no warning once the event has come");
   } finally { console.warn = warn; }
 });
 
-Check("SB03 witness: blood corners 0.3 with the concussion, near DOF 0.5 at 3.8 m, mud", () => {
+Check("witness (Wake → Taunt, first person from the pinned eye): blood corners 0.3 with the concussion, near DOF at 2.8 m, mud", () => {
   const full = Evaluate("FrontPass", 3, { concussion: 0.8 });
   Near(full.bloodEdge.strength, 0.3, 1e-9, "blood edge");
   const [tl, tr, bl, br] = full.bloodEdge.corners;
   assert.ok(tr >= 0.95 && tl >= 0.8 && bl >= 0.8 && br < 0.5, "upper right and left heavier, lower right light");
   assert.ok(full.bloodEdge.tint[0] > full.bloodEdge.tint[1] * 4, "red tint");
   Near(Evaluate("Wake", 0.5, { concussion: 0.25 }).bloodEdge.strength, 0.15, 1e-9, "fades in with the concussion");
-  assert.equal(full.dofNear.strength, 0.5); assert.equal(full.dofNear.focusM, 3.8);
-  assert.ok(full.dofNear.focusM - full.dofNear.rangeM <= 1.0 + 1e-9, "foreground 0.3–1 m inside the soft range");
-  assert.ok(full.mud >= 0.8, "mud Wake→Found");
-  for (const phase of ["Wake", "FrontPass"])
+  assert.equal(full.dofNear.focusM, 2.8, "focus on the group 2.3-4.2 m off");
+  assert.ok(full.dofNear.focusM - full.dofNear.rangeM <= 1.0 + 1e-9, "the mud right in front inside the soft range");
+  assert.ok(full.mud >= 0.5 && full.mud <= 0.7, "mud, light enough for the throat cut to read");
+  // 2026-09-27: no cut-away camera; the questioning and the cut are seen through the same lens.
+  for (const phase of ["Wake", "FrontPass", "CaptiveDragged", "CaptiveWall", "Interrogation", "Slash", "Taunt"])
     assert.equal(Evaluate(phase, 1).look, "witness", phase);
+  assert.ok(!("cinematic" in LOOKS), "the cut-away look is gone");
 });
 
-Check("the captive film cuts immediately to a clean lens", () => {
-  const driver=new OpeningLensDriver();driver.Sample(1,"FrontPass",3,{concussion:1});
-  const cut=driver.Sample(1.016,"CaptiveDragged",0,{concussion:1});
-  for(const phase of ["CaptiveDragged","CaptiveWall","Interrogation","Slash","Taunt","Wipe"]){
-    const lens=Evaluate(phase,3,{concussion:1});
-    assert.equal(lens.look,"cinematic");assert.equal(lens.mud,0);assert.equal(lens.bloodEdge.strength,0);assert.equal(lens.radialBlur,0);
-  }
-  assert.equal(cut.mud,0);assert.equal(cut.bloodEdge.strength,0);
+Check("the slap: the struck side swims for 2.4 s, the aberration kicks, the side follows the blow", () => {
+  const at = t => Evaluate("Ask", 3, { now: 30 + t, slapAt: 30, slapSide: 1 });
+  assert.equal(Evaluate("Hold", 1, { now: 10 }).slap.amount, 0, "nothing before the first slap");
+  assert.ok(at(0.05).slap.amount >= 0.95, "full on the blow");
+  assert.equal(at(0.05).slap.side, 1, "struck on the left cheek: the left of the frame");
+  assert.ok(at(1).slap.amount > 0.3 && at(1).slap.amount < 0.9, "easing off");
+  assert.equal(at(2.5).slap.amount, 0, "gone after 2.4 s");
+  assert.equal(Evaluate("Ask", 3, { now: 31, slapAt: 30, slapSide: -1 }).slap.side, -1, "backhand: the right of the frame");
+  assert.ok(at(0.05).aberration > 0.01, "aberration kick");
+  assert.ok(Evaluate("Charge", 0.5, { now: 30.5, slapAt: 30, slapSide: 1 }).slap.amount > 0, "the last slap's daze carries into the charge");
+  const post = ApplyLensToPost({ vignette: 0.42 }, at(0.05));
+  assert.equal(post.sideDaze.side, 1); assert.ok(post.sideDaze.amount > 0.9, "handed to the composite");
+  assert.equal(ApplyLensToPost({ vignette: 0.42 }, at(3)).sideDaze, null, "no daze: no parameter");
 });
 
-Check("SB03A reach: darker, red weaker than SB03, mud; Found's blink clears the mud", () => {
-  const reach = Evaluate("Reach", 1, { concussion: 1 }), witness = Evaluate("Wake", 1, { concussion: 1 });
-  assert.ok(reach.darken > 0.1, "darker");
-  assert.ok(reach.bloodEdge.strength < witness.bloodEdge.strength && reach.bloodEdge.strength > 0, "weaker red");
-  assert.ok(reach.mud >= 0.8, "mud");
-  const found = t => Evaluate("Found", 3, { now: 50 + t, clearAt: 50 });
-  assert.ok(Evaluate("Found", 1, { now: 10 }).mud >= 0.8, "mud until ijaA stops (no clearAt yet)");
-  assert.ok(found(0.5).mud >= 0.8, "mud until the blink");
-  assert.equal(found(1.3).mud, 0, "gone with the blink (clearAt + 0.95–1.25 s)");
-  assert.equal(found(1.3).bloodEdge.strength, 0, "SB04 starts without a red edge");
-});
-
-Check("SB04 butt: 0.08 s white flash on the hit, no red edge (storyboard clean), director blood capped after", () => {
-  const before = Evaluate("Butt", 1, { now: 20 });
-  assert.equal(before.flash, 0); assert.equal(before.bloodEdge.strength, 0);
-  assert.equal(Evaluate("Drag", 1).bloodEdge.strength, 0, "dragged out: no red edge");
-  const hit = t => Evaluate("Butt", 2, { now: 30 + t, buttHit: 30 });
-  assert.ok(hit(0).flash >= 0.9 && hit(0.08).flash >= 0.9, "white for 0.08 s");
-  assert.ok(hit(0.14).flash < hit(0.08).flash && hit(0.14).flash > 0, "fast fall");
-  assert.equal(hit(0.25).flash, 0);
-  assert.equal(hit(0.5).bloodEdge.strength, 0, "no red edge of the lens's own after the hit");
-  assert.equal(hit(0.05).storyBloodCap, 1, "the director's blood layer is not capped under the flash");
-  Near(hit(0.5).storyBloodCap, 0.5, 1e-9, "then capped to 0.5");
-  assert.ok(hit(0.02).aberration > 0.01, "aberration kick on the hit");
-});
-
-Check("SB04A boots: blood 0.3, desaturated; SB05 nearly clean; SB05A/SB06 clean", () => {
-  const boots = Evaluate("Boots", 1);
-  Near(boots.bloodEdge.strength, 0.3, 1e-9, "blood 0.3"); assert.ok(boots.desaturate >= 0.3, "desaturated");
-  Near(boots.storyBloodCap, 0.3, 1e-9, "the director's blood layer capped to 0.3");
-  assert.ok(Evaluate("Collar", 1).storyBloodCap <= 0.2, "SB05 nearly clean: blood layer capped");
-  for (const phase of C.phases.BunkerRescue.slice(0, 5)) {
-    const held = Evaluate(phase, 1);
+Check("found / held nearly clean; Lift, Check, KickRifle, Released clean", () => {
+  const found = Evaluate("Found", 1);
+  assert.ok(found.mud > 0 && found.bloodEdge.strength <= 0.3, "found: still muddy");
+  for (const phase of ["Hold", "Ask"]) {
+    const held = Evaluate(phase, 1, { now: 99 });
     assert.ok(held.bloodEdge.strength <= 0.1 && held.radialBlur === 0 && held.flash === 0 && held.mud === 0, phase);
+    assert.ok(held.storyBloodCap <= 0.5, `${phase}: the split lip's blood layer capped`);
   }
-  for (const phase of ["Chop", "Parry", "Flee", "DragCover", "LongShot", "Check", "KickRifle", "Released", "Banter", "Orders", "Incoming"]) {
-    const lens = Evaluate(phase, 1, { now: 99, blastAt: 98.8, buttHit: 99 });
+  for (const phase of ["Lift", "Check", "KickRifle", "Released", "Banter", "Orders", "Incoming"]) {
+    const lens = Evaluate(phase, 1, { now: 99, blastAt: 98.8 });
     const { look, ...rest } = lens;
-    assert.deepEqual(rest, JSON.parse(JSON.stringify(LENS_DEFAULT)), `${phase} is clean`);
+    assert.deepEqual(rest, { ...JSON.parse(JSON.stringify(LENS_DEFAULT)), slap: { side: 1, amount: 0 } }, `${phase} is clean`);
   }
+  for (const phase of C.phases.Trapped.concat(C.phases.BunkerRescue)) assert.ok(PHASE_LOOKS[phase], `${phase} has a look`);
 });
 
 Check("driver: crossfade between looks, idempotent per frame, null the moment 01–02 ends", () => {
@@ -159,7 +140,7 @@ Check("driver: crossfade between looks, idempotent per frame, null the moment 01
   assert.equal(d.Sample(14.6, null, 0, {}), null, "leaving 01–02: null at once");
   assert.equal(d.Sample(14.7, "Withdraw", 0, {}), null, "02→03 phases are outside");
   const again = d.Sample(20, "Hold", 0, {});
-  assert.equal(again.look, "held"); Near(again.bloodEdge.strength, 0.08, 1e-9, "no stale blend from before the gap");
+  assert.equal(again.look, "held"); Near(again.bloodEdge.strength, 0.1, 1e-9, "no stale blend from before the gap");
   // A snapshot older than a frame or two (frames stepped without rendering) is not a crossfade source.
   const s = new OpeningLensDriver();
   s.Sample(1.0, "Blast", 0.3, { blastAt: 0.7 });
@@ -171,9 +152,9 @@ Check("debug bench: Force(look, age) holds a look, Clear() returns to the phase"
   globalThis.Tengxian = { Debug: {} };
   const d = new OpeningLensDriver(), D = globalThis.Tengxian.Debug.OpeningLens;
   assert.ok(D && D.Force && D.Clear && D.State && D.Looks().includes("nearMiss"));
-  D.Force("butt", 0.04);
+  D.Force("held", 0.04);
   const forced = d.Sample(1, null, 0, {});
-  assert.equal(forced.look, "butt"); assert.ok(forced.flash >= 0.9); assert.ok(forced.forced);
+  assert.equal(forced.look, "held"); assert.ok(forced.slap.amount >= 0.9); assert.ok(forced.forced);
   D.Force("nearMiss", 0.3);
   Near(d.Sample(2, null, 0, {}).aberration, 0.02, 0.001, "forced near miss at 0.3 s");
   assert.throws(() => D.Force("nope"), /unknown look/);
@@ -194,17 +175,17 @@ Check("ApplyLensToPost: null leaves every parameter untouched; a lens lays over 
   assert.equal(out, base); assert.deepEqual(out, Base(), "null lens: identical parameters");
   assert.ok(!("radialBlur" in out) && !("bloodEdge" in out), "no lens keys added");
   const witness = ApplyLensToPost(Base(), Evaluate("Wake", 1, { concussion: 1 }));
-  assert.equal(witness.nearDofStrength, 0.5); assert.equal(witness.nearDofFocus, 3.8); assert.equal(witness.nearDofMaxPx, 9);
+  assert.equal(witness.nearDofStrength, 0.45); assert.equal(witness.nearDofFocus, 2.8); assert.equal(witness.nearDofMaxPx, 9);
   Near(witness.vignette, 0.52 * 0.8, 1e-9, "vignette keeps the graphics scale");
   assert.equal(witness.bloodEdge.strength, 0.3);
-  const reach = ApplyLensToPost(Base(), Evaluate("Reach", 1, { concussion: 1 }));
-  assert.ok(reach.exposure < 1.1 && reach.saturation < 0.9, "darken and desaturate scale the caller's values");
+  const found = ApplyLensToPost(Base(), Evaluate("Found", 1, { concussion: 1 }));
+  assert.ok(found.exposure < 1.1 && found.saturation < 0.9, "darken and desaturate scale the caller's values");
   const dying = ApplyLensToPost({ ...Base(), dofStrength: 1 }, Evaluate("Wake", 1));
   assert.equal(dying.dofStrength, 1, "death DOF wins over the lens far DOF");
   const blast = ApplyLensToPost(Base(), Evaluate("Blast", 0.3, { now: 0.3, blastAt: 0 }));
   assert.ok(blast.radialBlur > 0.04 && blast.aberration > 0.015);
-  const mix = BlendLens(Evaluate("Hold", 0), Evaluate("Boots", 0), 0.5);
-  Near(mix.bloodEdge.strength, (0.08 + 0.3) / 2, 1e-9, "blend");
+  const mix = BlendLens(Evaluate("Hold", 0), Evaluate("Wake", 0, { concussion: 1 }), 0.5);
+  Near(mix.bloodEdge.strength, (0.1 + 0.3) / 2, 1e-9, "blend");
 });
 
 Check("wiring: Main, Runtime, Composite and HUD use the lens; no new pass or sampler", () => {
@@ -215,8 +196,8 @@ Check("wiring: Main, Runtime, Composite and HUD use the lens; no new pass or sam
   assert.match(main, /post\.Render\(scene, camera, ApplyLensToPost\(\{[\s\S]*?\}, openingLens\)\);/);
   assert.match(runtime, /lens: this\.OpeningLens\(\)/);
   assert.match(runtime, /live \? show\.phase : null/);
-  for (const u of ["uRadialBlur", "uBloodEdge", "uBloodCorners"]) {
-    assert.match(composite, new RegExp(`uniform vec4 ${u};|uniform float ${u};`), `${u} declared`);
+  for (const u of ["uRadialBlur", "uBloodEdge", "uBloodCorners", "uSideDaze"]) {
+    assert.match(composite, new RegExp(`uniform vec4 ${u};|uniform float ${u};|uniform vec2 ${u};`), `${u} declared`);
     assert.ok(!new RegExp(`sampler2D\\s+${u}`).test(composite));
   }
   const segmentAt = composite.indexOf("vec3 MotionBlur(");

@@ -2182,15 +2182,15 @@ export class FirstLevelMissionRuntime {
   }
   /**
    * 01–02 storyboard lens (Script_OpeningLens, contract §4.4): while the director owns the view, its phase,
-   * phase age and events (blast, butt hit, Found's clear, concussion) pick and sample a look; null otherwise,
+   * phase age and events (blast, slaps, concussion) pick and sample a look; null otherwise,
    * so Script_Main's post parameters are all defaults outside 01–02. The director may hand its own events
    * through bunker.LensEvents() (second wave).
    */
   OpeningLens() {
     const show = this.frontShow?.bunker, live = !!show?.CameraActive;
     this.openingLens ??= new OpeningLensDriver();
-    const events = live ? (show.LensEvents?.() ?? { blastAt: this.opening?.blastAt, buttHit: show.strikeAt,
-      clearAt: show.flags?.clearAt, concussion: show.perception?.amount }) : {};
+    const events = live ? (show.LensEvents?.() ?? { blastAt: this.opening?.blastAt, slapAt: show.flags?.slapAt,
+      slapSide: show.flags?.slapSide, concussion: show.perception?.amount }) : {};
     return this.openingLens.Sample(this.time, live ? show.phase : null, live ? show.Age : 0, events);
   }
   /**

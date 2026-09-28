@@ -41,10 +41,12 @@ const Clamp01 = (v) => Math.max(0, Math.min(1, v));
 const UP = new THREE.Vector3(0, 1, 0);
 /** 01 的导演拍：任务步骤在「Found」前后就从 Trapped 切到 BunkerRescue 了，01/02 的界线要看导演 phase。 */
 const TRAPPED_PHASES = new Set(OPENING_STORYBOARDS.phases.Trapped);
-/** 02（救援）起才出现的组：步骤进了 01–02 之后，或者 01–02 里导演已经演到 02 的拍。 */
+/** 还权坐位靠背那一组：罗班长把顺子从木头底下拖出来、坐上坐位（导演 Check）起才出现。2026-09-27 起顺子在 02 前半
+ *  （Hold…Lift）还压在洞口、胸口正趴在靠背那块地上，早出现就会从他身下冒出来。 */
+const SEATED_PHASES = new Set(["Check", "KickRifle", "Released"]);
 export function RescueShown(stageId, phase) {
   if (stageId === "Trapped") return false;
-  if (stageId === "BunkerRescue") return !TRAPPED_PHASES.has(phase);
+  if (stageId === "BunkerRescue") return !TRAPPED_PHASES.has(phase) && (phase == null || SEATED_PHASES.has(phase));
   return true;
 }
 /**
@@ -389,6 +391,8 @@ export class OpeningSet {
     let p = u * u;
     const after = t.age - s.seconds;
     if (after > 0 && after < s.bounceS) p = 1 - s.bounceRad * Math.sin(Math.PI * after / s.bounceS);
+    // 2026-09-27：02 何有田把压着顺子的木料抬起来（导演 Lift → LiftRoofTimber，0 = 压着、1 = 回到洞顶下）。
+    if (this.roofLift > 0 && t.age > s.seconds + s.bounceS) p = 1 - this.roofLift;
     if (p !== t.progress) {
       // 看着它塌下来的那一下：砸地的一小团土（和垫块同时出现，盖住它们「冒出来」）。
       if (t.sawHang && p >= 0.9 && (t.progress ?? 0) < 0.9 && this.blastFx) {
@@ -400,6 +404,9 @@ export class OpeningSet {
       this.PoseRoofTimber(p);
     }
   }
+
+  /** 导演把塌顶木从顺子身上抬起 k（0 = 压着，1 = 抬到 hang）。 */
+  LiftRoofTimber(k) { this.roofLift = Math.max(0, Math.min(1, k || 0)); }
 
   /** 塌顶木姿态：0 = hang，1 = 落定（a/b）。两头各自插值，网格局部 +z 从 a 指向 b。 */
   PoseRoofTimber(progress) {

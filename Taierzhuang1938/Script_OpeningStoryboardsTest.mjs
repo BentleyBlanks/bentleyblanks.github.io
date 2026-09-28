@@ -201,7 +201,9 @@ for(const [asset,a,ia,b,ib] of [[comrade,"WoundedSitRifleIdle",0,"BanterPatRifle
   // end (IjaThroatSlash 4.0 s = 1.0 s) is IjaWipeSheathBayonet frame 0, whose last frame is
   // IjaReadyRifle frame 0.
   [ijaA,"IjaHairGrabPull",-1,"IjaDrawBayonet",0],[ijaA,"IjaDrawBayonet",-1,"IjaThroatSlash",0],
-  [ijaA,"IjaThroatSlash",-1,"IjaWipeSheathBayonet",0],[ijaA,"IjaWipeSheathBayonet",-1,"IjaReadyRifle",0]]){
+  // (2026-09-27: IjaWipeSheathBayonet is retired -- the director walks ijaA off from the taunt -- and keeps the frames it was
+  // baked with against the old chain; only its hand-over to IjaReadyRifle still holds.)
+  [ijaA,"IjaWipeSheathBayonet",-1,"IjaReadyRifle",0]]){
   const {angle,offset}=HandOver(asset,a,ia,b,ib),jump=PropJump(asset,a,ia,b,ib);
   assert.ok(angle<2&&offset<.01,`${a}@${ia} hands over to ${b}@${ib} (${angle.toFixed(2)} deg, ${offset.toFixed(4)} source units)`);
   assert.ok(jump<=.02,`${a}@${ia} -> ${b}@${ib}: a prop jumps ${jump.toFixed(3)} m`);
@@ -310,69 +312,106 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
     chains++;
   }
 }
-// ---- 2026-09-27 (review 「日军从外面走进来怎么能直接进的，至少有个翻越动作吧。拖动的动作也还是很奇怪」): ijaA vaults the
-// fallen roof timber into the pit and back out, and hauls Shunzi out from under it by the wrist. The clips are authored
-// against the timber (Data_OpeningSet0103 roofTimberDown) at the director's roots; no foot, toe or hip ever goes into it,
-// and the haul lands the eye on the butt spot (docs/Data_OpeningVaultHaul20260927.md). ----------------------------------
+// ---- 2026-09-27 vault / haul (IjaVaultTimberIn, IjaVaultTimberOut, IjaHaulForearmUnder): retired the same day by the
+// pinned-rescue rework (docs/Data_OpeningPinnedRescue20260927.md: ijaA no longer drags him out); the clips stay in the
+// library (their seams and contacts are still checked above), their staging against the removed marks is gone.
+// ---- 2026-09-27 pinned rescue (user: 「那个割喉的日军动作还需要优化现在看不出来是割喉」, 「日军也不再拖出主角，直接在原地审问，
+// 把从枪托改成扇巴掌」): the throat cut seen from the pinned eye, the jeering walk, the find, the hair hold and the slaps,
+// He heaving the roof timber. Clip-level checks only (the director's own checks are elsewhere). --------------------
 {
-  const {PROPS:SetProps}=await import("./Data_OpeningSet0103.mjs");
-  const reportOf=id=>manifest.models.find(m=>m.id==="TengxianIja02").clips.find(c=>c.clip===id);
-  const D=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z),R=(y,x,z)=>({x:x*Math.cos(y)+z*Math.sin(y),z:-x*Math.sin(y)+z*Math.cos(y)});
-  const At=(pose,part,i)=>({x:pose.player.parts[part][i*3],y:pose.player.parts[part][i*3+1],z:pose.player.parts[part][i*3+2]});
-  const timber=SetProps.find(p=>p.id==="roofTimberDown"),east=timber.a.x+timber.w/2,west=timber.a.x-timber.w/2;
-  // the snag root as the director derives it (Script_OpeningStoryboards SnagRoot)
-  const T0=C.shunzi.trap,collar={x:T0.x+Math.sin(T0.yaw)*C.shunzi.lieCollarBackM,z:T0.z+Math.cos(T0.yaw)*C.shunzi.lieCollarBackM};
-  const c0=At(ijaA.clips.IjaCollarDragSnag,"collar",0),o0=R(Math.PI/2,c0.x,c0.z),snagRoot={x:collar.x-o0.x,z:collar.z-o0.z,yaw:Math.PI/2};
-  const vin=manifest.clips.IjaVaultTimberIn,vout=manifest.clips.IjaVaultTimberOut,haul=manifest.clips.IjaHaulForearmUnder,V=C.ija.vaultIn;
-  assert.ok(Math.abs(V.yaw-Math.PI/2)<1e-6&&Math.abs(snagRoot.yaw-Math.PI/2)<1e-6,"both vaults are authored on roots facing west, across the timber");
-  assert.ok(Math.abs(V.x-east-vin.obstacle.nearM)<.01&&Math.abs(V.x-west-vin.obstacle.farM)<.01,"IjaVaultTimberIn's timber faces are the Set's, ahead of ija.vaultIn");
-  assert.ok(Math.abs(west-snagRoot.x-vout.obstacle.nearM)<.01&&Math.abs(east-snagRoot.x-vout.obstacle.farM)<.01,"IjaVaultTimberOut's timber faces are the Set's, behind the snag root");
-  assert.ok(V.z>Math.min(timber.a.z,timber.b.z)&&V.z<timber.supports.reduce((z,s)=>Math.max(z,s.z),-Infinity)-timber.supports[0].d/2,"the vault lane crosses between the timber's supports");
-  // where the vault in ends (its root motion) is the snag root, the reach assist's few cm aside
-  const vinEnd=reportOf("IjaVaultTimberIn").root.end,ve=R(V.yaw,vinEnd[0],vinEnd[1]);
-  assert.ok(D({x:V.x+ve.x,z:V.z+ve.z},snagRoot)<.12,`IjaVaultTimberIn ends on the snag root (${(V.x+ve.x).toFixed(2)},${(V.z+ve.z).toFixed(2)})`);
-  // no foot, toe or hip inside the timber (ahead of the vault in's root, behind the vault out's), over or under it
-  for(const [id,sign] of [["IjaVaultTimberIn",1],["IjaVaultTimberOut",-1]]){
-    const clip=ijaA.clips[id],spec=manifest.clips[id],top=spec.obstacle.topM,bottom=top-timber.h,report=reportOf(id);
-    const bone=name=>ijaA.bones.findIndex(n=>n.endsWith(name)),pelvis=bone(" Pelvis");
-    const k=report.root.start[3]/WorldPose("TengxianIja02",ijaA,id,0)[pelvis].p[1];   // glTF scene -> runtime metres
-    const inside=[];
-    for(let f=0;f<clip.frameCount;f++){
-      const t=f*clip.duration/(clip.frameCount-1),w=WorldPose("TengxianIja02",ijaA,id,t);
-      for(const [name,margin] of [[" Pelvis",.10],[" L Foot",.05],[" R Foot",.05],[" L Toe0",.02],[" R Toe0",.02]]){
-        const p=w[bone(name)].p,d=p[2]*k*sign,h=p[1]*k;   // the rig's glTF forward is +z
-        if(d>=spec.obstacle.nearM&&d<=spec.obstacle.farM&&h>bottom-margin&&h<top+margin)inside.push(`${name.trim()}@${t.toFixed(2)} ${h.toFixed(2)} m`);
-      }
-    }
-    assert.deepEqual(inside,[],`${id}: over or under the timber, never in it`);
+  const reportOf=(rig,id)=>manifest.models.find(m=>m.id===rig).clips.find(c=>c.clip===id);
+  const WorldHandOver=(rig,asset,a,ta,b,tb)=>{
+    const x=WorldPose(rig,asset,a,ta),y=WorldPose(rig,asset,b,tb);
+    let angle=0,offset=0,where="";
+    x.forEach((p,i)=>{
+      if(/Finger\d\d|Nub/.test(asset.bones[i]))return;
+      const q=y[i],deg=2*Math.acos(Math.min(1,Math.abs(p.q[0]*q.q[0]+p.q[1]*q.q[1]+p.q[2]*q.q[2]+p.q[3]*q.q[3])))*180/Math.PI;
+      if(deg>angle){angle=deg;where=asset.bones[i];}
+      offset=Math.max(offset,Math.hypot(p.p[0]-q.p[0],p.p[1]-q.p[1],p.p[2]-q.p[2]));
+    });
+    return {angle,offset,where};
+  };
+  // The slash stages: ijaA at the comrade's LEFT shoulder (the side away from the pinned eye, which is 2.21 m to his right
+  // and 0.54 m ahead), on his own lower ground (yM), and never on the line from the eye to the comrade's throat.
+  const eye={x:2.21,z:-.54};
+  for(const name of ["slashGrab","slashDraw","slashCut","slashTaunt"]){
+    const a=manifest.stages[name].actors.ijaA;
+    assert.ok(a.x<=-.18&&a.x>=-.5&&a.z<=0&&a.z>=-.35,`${name}: ijaA at the comrade's left shoulder (${a.x}, ${a.z})`);
+    assert.ok(a.yM<0&&a.yM>-.3,`${name}: ijaA's root ground under the kneel spot (${a.yM})`);
+    const t=Math.max(0,Math.min(1,(a.x*eye.x+a.z*eye.z)/(eye.x*eye.x+eye.z*eye.z)));
+    assert.ok(t===0,`${name}: ijaA is behind the comrade from the eye, not between them`);
   }
-  // frame 0 of the vault out is the kick's last frame (same root, the fist still in the collar)
+  // His feet are laid on the bank (the stage ground): the per-frame grounding lift stays within 3 cm (a foot authored
+  // in the slope, or over it, would push or drop the whole body).
+  for(const id of ["IjaHairGrabPull","IjaDrawBayonet","IjaThroatSlash"]){
+    const r=reportOf("TengxianIja02",id);
+    assert.ok(Math.abs(r.floorCorrectionMin)<=.03&&Math.abs(r.floorCorrectionMax)<=.03,`${id}: on the bank ground (lift ${r.floorCorrectionMin}..${r.floorCorrectionMax})`);
+  }
+  // The fist in the hair: the grab/hold contacts name the new patch on both sides, and the patch is baked on the NRA02 rig.
+  assert.ok(comrade.contactPoints.hairNape&&comrade.contactPoints.throat,"TengxianNra02: hairNape and throat patches");
+  for(const id of ["IjaHairGrabPull","IjaDrawBayonet","IjaThroatSlash"])
+    assert.ok(manifest.clips[id].contacts.some(c=>c.limb==="handL"&&c.part==="hairNape"),`${id}: the left fist in the hair`);
+  // The blade at the throat at the cut, cut at 0.24 s (bake probe on the baked frame next to it: the throat patch to the
+  // blade's centre line, which runs a fist's half-width out from the skin; the blade mesh on the skin within 3 cm is
+  // Script_OpeningClipsBrowserTest's cut contact).
+  const cut=manifest.clips.IjaThroatSlash.contacts.find(c=>c.action==="cut");
+  assert.ok(cut.part==="throat"&&Math.abs(cut.t-.24)<1e-9,"IjaThroatSlash: the cut on the throat at 0.24 s");
+  const blade=reportOf("TengxianIja02","IjaThroatSlash").probes?.bladeOnThroat;
+  assert.ok(blade&&blade[0]<=.07&&Math.abs(blade[1]-cut.t)<=.03,`IjaThroatSlash: the blade at the throat at the cut (${blade})`);
+  // The blade sweeps across the neck: the bayonet track's origin moves >= 0.25 m between the cock (0.08 s) and the end of
+  // the stroke (0.30 s) (glTF scene space, shipped node units -> runtime by the pelvis height ratio).
   {
-    const {angle,offset}=HandOver(ijaA,"IjaKickBeam",-1,"IjaVaultTimberOut",0);
-    assert.ok(angle<2&&offset<.01&&PropJump(ijaA,"IjaKickBeam",-1,"IjaVaultTimberOut",0)<=.02,`IjaKickBeam hands over to IjaVaultTimberOut (${angle.toFixed(2)} deg)`);
+    const clip=ijaA.clips.IjaThroatSlash,v=clip.props.bayonet.values,fps=(clip.frameCount-1)/clip.duration;
+    const f=t=>Math.round(t*fps),o=i=>v.slice(i*10,i*10+3);
+    const r=reportOf("TengxianIja02","IjaThroatSlash"),pelvis=ijaA.bones.findIndex(n=>n.endsWith(" Pelvis"));
+    const k=r.root.start[3]/WorldPose("TengxianIja02",ijaA,"IjaThroatSlash",0)[pelvis].p[1];
+    const travel=Math.hypot(...[0,1,2].map(i=>o(f(.30))[i]-o(f(.08))[i]))*k;
+    assert.ok(travel>=.25,`IjaThroatSlash: the blade travels ${travel.toFixed(2)} m across the throat`);
   }
-  // the haul: its root faces back along ija.dragOutRoute from where the frame-0 head track lands on its first point;
-  // the eye ends on the butt spot, passes under the timber clear of it, and the vault out ends where the haul starts
-  const route=C.ija.dragOutRoute,eye=route[0],yaw=Math.atan2(route.at(-1).x-eye.x,route.at(-1).z-eye.z);
-  const hp=ijaA.clips.IjaHaulForearmUnder.player,n=hp.parts.head.length/3,h0=At({player:hp},"head",0);
-  const o=R(yaw,h0.x,h0.z),root={x:eye.x-o.x,z:eye.z-o.z},he=At({player:hp},"head",n-1),end={x:root.x+R(yaw,he.x,he.z).x,z:root.z+R(yaw,he.x,he.z).z};
-  assert.ok(D(route.at(-1),C.shunzi.butt)<1e-6&&D(end,C.shunzi.butt)<.05,`the haul brings the eye to the butt spot (${end.x.toFixed(2)},${end.z.toFixed(2)})`);
-  for(let i=0;i<n;i++){
-    const p=At({player:hp},"head",i),q=R(yaw,p.x,p.z),x=root.x+q.x;
-    if(x>west-.05&&x<east+.05)assert.ok(p.y<=vin.obstacle.topM-timber.h-.15,`the eye goes under the timber, clear of it (${p.y.toFixed(2)} m at x ${x.toFixed(2)})`);
+  // The chain hands over frame to frame on one root (comrade: HeadPulledBack -> ThroatCut -> ClutchThroat -> WallSlide is
+  // checked above with the rest of the chains).
+  for(const [a,ta,b,tb] of [["IjaHairGrabPull",1.0,"IjaDrawBayonet",0],["IjaDrawBayonet",.8,"IjaThroatSlash",0]]){
+    const h=WorldHandOver("TengxianIja02",ijaA,a,ta,b,tb);
+    assert.ok(h.angle<=2&&h.offset<=.01,`${a}@${ta} -> ${b}@${tb}: ${h.angle.toFixed(2)} deg at ${h.where}, ${(h.offset*100).toFixed(2)} cm`);
   }
-  const haulTravel=Math.hypot(...[0,1].map(i=>reportOf("IjaHaulForearmUnder").root.end[i]-reportOf("IjaHaulForearmUnder").root.start[i]));
-  assert.ok(haulTravel>=1.6&&haulTravel<=2.4&&reportOf("IjaHaulForearmUnder").root.end[1]>reportOf("IjaHaulForearmUnder").root.start[1],`IjaHaulForearmUnder hauls ${haulTravel.toFixed(2)} m backwards`);
-  const grab=haul.contacts.find(c=>c.action==="grab");
-  assert.ok(grab&&grab.part==="forearmL"&&grab.partnerRole==="shunzi"&&grab.limb==="handR","IjaHaulForearmUnder grabs Shunzi's left forearm with the right hand");
-  const parts=id=>Object.keys(ijaA.clips[id].player?.parts||{}).sort().join(",");
-  assert.equal(parts("IjaHaulForearmUnder"),"forearmL,head");assert.equal(parts("IjaVaultTimberOut"),"collar");
-  const vs=reportOf("IjaVaultTimberOut").root.end,vw=R(snagRoot.yaw,vs[0],vs[1]),hs=reportOf("IjaHaulForearmUnder").root.start,hw=R(yaw,hs[0],hs[1]);
-  assert.ok(D({x:snagRoot.x+vw.x,z:snagRoot.z+vw.z},{x:root.x+hw.x,z:root.z+hw.z})<.03&&Math.abs((snagRoot.yaw+vs[2]*Math.PI/180)-yaw)<.03,
-    "IjaVaultTimberOut's last frame stands where IjaHaulForearmUnder's first does (the director re-roots with the skeleton kept)");
-  // the first-person left hand takes his forearm when he grabs the wrist
-  const gripKey=C.firstPerson.hands.beats.DragOut.keys.find(k=>k[1]==="gripHaul");
-  assert.ok(gripKey&&Math.abs(gripKey[0]-(vout.duration+grab.t))<.05,`beats.DragOut takes his forearm at the grab (${gripKey?.[0]} s)`);
+  // IjaTauntWalk: an upper-body loop with the bayonet; IjaFoundLook: a hold loop, the bayonet sheathed by its end.
+  for(const id of ["IjaTauntWalk","IjaFoundLook","IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","HeLiftTimber"]){
+    const spec=manifest.clips[id];
+    for(const v of [spec.duration,...(spec.holdLoop||[])])assert.ok(Math.abs(v*manifest.fps-Math.round(v*manifest.fps))<1e-6,`${id}: ${v} s is whole frames`);
+  }
+  const walk=manifest.clips.IjaTauntWalk;
+  assert.ok(walk.upperBody===true&&walk.loop===true&&ijaA.clips.IjaTauntWalk.loop&&walk.props.includes("bayonet"),"IjaTauntWalk: an upper-body loop with the bayonet");
+  const found=manifest.clips.IjaFoundLook;
+  assert.ok(found.holdLoop&&found.holdLoop[1]===found.duration&&found.contacts.some(c=>c.action==="sheathe"),"IjaFoundLook: sheathes, then a hold loop");
+  // IjaCrouchHairHold: the left fist on the crown from 0.25 s, the eye lifted 0.16 m by 0.70 s (player head track), a hold
+  // loop to the end; the slaps start and end on its hold-loop start, slap contacts at 0.34 on the cheeks with the palm
+  // (or the back of the hand) on the cheek at the hit (bake probes).
+  const hold=manifest.clips.IjaCrouchHairHold,head=ijaA.clips.IjaCrouchHairHold.player.parts.head;
+  assert.ok(hold.contacts.some(c=>c.action==="grab"&&c.part==="crown"&&Math.abs(c.t-.25)<1e-9),"IjaCrouchHairHold: grabs the crown at 0.25 s");
+  const y=t=>head[Math.round(t*12)*3+1],rise=y(.75)-y(0);
+  assert.ok(Math.abs(rise-.16)<=.02&&Math.abs(y(0)-.28)<=.02,`IjaCrouchHairHold: the eye rises ${rise.toFixed(3)} m from ${y(0)} m`);
+  const h0=hold.holdLoop[0];
+  assert.ok(h0>=.7&&h0<=.8&&hold.holdLoop[1]===hold.duration,`IjaCrouchHairHold: hold loop from ${h0} s`);
+  for(const [id,part,probe] of [["IjaSlapForehand","cheekL","palmOnCheek"],["IjaSlapBackhand","cheekR","backOnCheek"]]){
+    const slap=manifest.clips[id].contacts.find(c=>c.action==="slap");
+    assert.ok(slap&&slap.t===.34&&slap.limb==="handR"&&slap.part===part&&slap.partnerRole==="shunzi",`${id}: slap contact on ${part} at 0.34 s`);
+    const p=reportOf("TengxianIja02",id).probes?.[probe];
+    assert.ok(p&&p[0]<=.03&&Math.abs(p[1]-slap.t)<=.021,`${id}: the hand on the cheek at the hit (${p})`);
+  }
+  for(const [a,ta,b,tb] of [["IjaCrouchHairHold",h0,"IjaSlapForehand",0],["IjaSlapForehand",manifest.clips.IjaSlapForehand.duration,"IjaCrouchHairHold",h0],
+    ["IjaCrouchHairHold",h0,"IjaSlapBackhand",0],["IjaSlapBackhand",manifest.clips.IjaSlapBackhand.duration,"IjaCrouchHairHold",h0],
+    ["IjaCrouchHairHold",h0,"IjaSlapRaise",0]]){
+    const h=WorldHandOver("TengxianIja02",ijaA,a,ta,b,tb);
+    assert.ok(h.angle<=2&&h.offset<=.01,`${a}@${ta} -> ${b}@${tb}: ${h.angle.toFixed(2)} deg at ${h.where}, ${(h.offset*100).toFixed(2)} cm`);
+    chains++;
+  }
+  for(const id of ["IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise"])
+    assert.ok(ijaA.clips[id].player?.parts?.head,`${id}: player head track`);
+  // HeLiftTimber: hands on the timber from gripS, a hold loop with an exit into the release.
+  const lift=manifest.clips.HeLiftTimber;
+  assert.ok(lift.rigs.includes("TengxianNra02")&&lift.holdLoop&&typeof lift.holdExit==="string"&&lift.contacts.some(c=>c.action==="grip"&&Math.abs(c.t-C.rescue.lift.gripS)<1e-9),
+    "HeLiftTimber: grips at rescue.lift.gripS, a hold loop with an exit");
+  assert.ok(reportOf("TengxianNra02","HeLiftTimber").contactErrorM<=.03,"HeLiftTimber: the hands ride the timber");
 }
 // ---- 2026-09-25 storyboard clips on the NRA rigs (§4.1: SB01 runner/Yaowa, SB04A interpreter, SB06 Luo) ----------
 {
@@ -482,76 +521,84 @@ for(const id of ["CaptiveDraggedFromDirt","CaptiveWallBrace","CaptiveKneelMud","
 // The sheathed bayonet rides ijaA's pelvis between clips (rig asset propMounts).
 assert.ok(["origin","axis","up"].every(k=>ijaA.propMounts?.bayonet?.[k]?.length===3&&ijaA.propMounts.bayonet[k].every(Number.isFinite)),"TengxianIja02: bayonet scabbard mount");
 
-// ---- 2026-09-23 director data (contract §5.3, space §2.1/§3) --------------------------------
+// ---- director data (2026-09-27 rework, docs/Data_OpeningPinnedRescue20260927.md; space §2.1/§3) ---------------
 assert.deepEqual([...C.phases.Trapped],["Banter","Orders","Incoming","Blast","Black","Wake","FrontPass","CaptiveDragged","CaptiveWall",
-  "Interrogation","Slash","Taunt","Wipe","Reach","Found","Drag","Snag","KickBeam","DragOut","Butt","Boots"],"contract §5.3 Trapped phases");
-assert.deepEqual([...C.phases.BunkerRescue],["Hold","Ask","KickShunzi","Glimpse","Collar","Chop","Parry","Flee","DragCover","LongShot",
-  "Check","KickRifle","Released"],"contract §5.3 BunkerRescue phases");
+  "Interrogation","Slash","Taunt","Found"],"Trapped phases (2026-09-27 rework)");
+assert.deepEqual([...C.phases.BunkerRescue],["Hold","Ask","Charge","Melee","Lift","Check","KickRifle","Released"],"BunkerRescue phases (2026-09-27 rework)");
 assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","SupportOrder"],"contract §5.3 RearTrench phases");
+assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持第一人称，不在切换视角」)");
 {
-  const {MISSION_PLACEMENT:Place,MISSION_ANCHORS:Anchor,MISSION_LAYOUT:Layout}=await import("./Data_FirstLevelMissionLayout.mjs");
+  const {MISSION_PLACEMENT:Place,MISSION_LAYOUT:Layout}=await import("./Data_FirstLevelMissionLayout.mjs");
   const {MISSION_TUNING:Tune}=await import("./Data_Tuning_FirstLevel.mjs");
+  const {PROPS:SetProps}=await import("./Data_OpeningSet0103.mjs");
   const D=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
-  // 2026-09-25 storyboard round (contract §2.1): he sits at the back of the dugout for SB01 and is pinned in the
-  // mouth itself from the blast on (SB03–SB04): west of the door posts, between them, out of reach of the rifle.
   const blocks=Layout.scenario.states.find(state=>state.id==="BunkerCollapsed").blocks,Block=id=>blocks.find(b=>b.id===id);
   const postN=Block("BunkerMouthPostN"),postS=Block("BunkerMouthPostS");
-  const trap=C.shunzi.trap,seat=C.shunzi.seat;
-  assert.ok(trap.x<postN.x-postN.w/2&&trap.x>postN.x-1.5&&trap.z>postN.z+.5&&trap.z<postS.z-.5,"Shunzi is pinned in the dugout mouth, inside the door posts");
-  assert.ok(D(seat,Place.bunker.player)<1&&seat.x<trap.x-1.5,"SB01 seat at the back of the dugout, near the dugout anchor");
-  for(const id of ["BunkerBeamPinWest","BunkerBeamPinEast","BunkerRoofSag"]){const b=Block(id);
-    assert.ok(Math.abs(trap.x-b.x)>b.w/2+.3||Math.abs(trap.z-b.z)>b.d/2+.3,`the in-dugout collapse ${id} no longer pins him`);}
-  // Contract §2.6 had 02's circle close in the SSW leg's north mouth (0.6,-123.9). 2026-09-27 review (「左边那么大一石头
-  // 一样的东西穿模了……审问的地方改改」): the floor there is x 0.2-0.6 beside BunkerMouthSpoil and ijaA stood half inside it,
-  // so the circle closes down the leg past the spoil's south face, the spoil behind the eye (circleShot yaw).
+  const S=C.shunzi,eye=S.witnessEye,seat=S.seat;
+  // Pinned across the doorway (「主角变成压在房梁下，半个身子在外面」): the hips under the roof timber between the posts, the eye
+  // outside them, closer to the comrade than the old in-mouth eye (3.8 m).
+  assert.ok(S.pinnedHips.x>postN.x-.4&&S.pinnedHips.x<postN.x+.2&&S.pinnedHips.z>postS.z-1.5&&S.pinnedHips.z<postS.z-.5,"his hips lie in the doorway between the posts");
+  assert.ok(eye.x>postN.x+.5&&D(eye,S.pinnedHips)>.8&&D(eye,S.pinnedHips)<1.05,"chest and head outside the posts (hips to eye ~0.9 m)");
+  const timber=SetProps.find(p=>p.id==="roofTimberDown");
+  assert.ok(Math.abs(timber.a.x-S.pinnedHips.x)<.1&&Math.abs(timber.b.x-S.pinnedHips.x)<.1&&timber.settle.phase==="Black","the roof timber lies on his hips from the black");
+  const wall={x:4.0568,z:-125.7852};
+  assert.ok(D(eye,wall)<2.5,`the comrade kneels ${D(eye,wall).toFixed(2)} m from the pinned eye (was 3.8 m)`);
+  assert.ok(D(seat,Place.bunker.player)<1&&seat.x<S.trap.x-1.5,"SB01 seat at the back of the dugout, near the dugout anchor");
+  // The walk from the kill to the find stays on the trench floor and ends over his head; the squat is at his head.
+  const J=C.ija;
+  assert.ok(D(J.found,eye)>.9&&D(J.found,eye)<1.4&&D(J.crouch,eye)>.5&&D(J.crouch,eye)<.7,"ijaA stops 1.1 m off, then squats 0.6 m in front of his face");
+  assert.ok(J.tauntWalk.every((p,i,all)=>p.x<=(i?all[i-1].x:4.3))&&J.tauntWalk.at(-1).x>J.found.x,"he walks west toward the mouth");
+  assert.ok(Math.abs(J.found.yaw-Math.PI/2)<1e-6&&Math.abs(J.crouch.yaw-Math.PI/2)<1e-6,"facing west onto the pinned man");
+  // 02: the questioning's marks, the charge and the haul stand clear of the mouth's collapse blocks.
+  const R=C.rescue;
+  const solid=["BunkerMouthRubbleS","BunkerMouthSpoil","BunkerMouthPostS","BunkerMouthPostN"].map(Block);
+  const Clear=(p,m)=>solid.every(b=>!(Math.abs(p.x-b.x)<b.w/2+m&&Math.abs(p.z-b.z)<b.d/2+m));
+  const Rot=(y,x,z)=>({x:x*Math.cos(y)+z*Math.sin(y),z:-x*Math.sin(y)+z*Math.cos(y)});
+  const Stage=(stage,role,anchor)=>{const a=manifest.stages[stage].actors[role],d=Rot(anchor.yaw,a.x,a.z);return {x:anchor.x+d.x,z:anchor.z+d.z};};
+  const parry={...J.crouch,yaw:J.crouch.yaw+R.parryTurnDeg*Math.PI/180};
+  const heParry=Stage("chopParry","heyoutian",parry),luoChop=Stage("chopRear","luo",R.ijaBGuard);
+  for(const [name,p,m] of [["ijaA's crouch",J.crouch,.1],["the interpreter's squat",R.interpreter,.1],["ijaB's guard",R.ijaBGuard,.3],
+    ["He's parry mark",heParry,.2],["Luo's chop mark",luoChop,.3],["Liu's firing spot",R.liuShot,.2],["Liu's trench post",R.liuCover,.3],
+    ["He's timber spot",R.lift.heLift,.1],["Luo's check kneel",R.luoCheck,.3],["the hand-back seat",S.cover,.3],
+    ["Luo's kick spot",R.kickFrom,.2],["He's trench-edge post",R.heCover,.3]])
+    assert.ok(Clear(p,m),`02: ${name} (${p.x.toFixed(2)},${p.z.toFixed(2)}) stands clear of the mouth's collapse blocks`);
+  assert.ok(D(R.interpreter,eye)>=1.2&&D(R.interpreter,J.crouch)>=.6,"the interpreter squats 1.2 m+ off the lens and clear of ijaA");
+  // He's parry mark is off the line from the eye through ijaA (he shows beside him, not straight behind his back).
+  const Bearing=(a,b)=>Math.atan2(b.x-a.x,-(b.z-a.z))*180/Math.PI;
+  assert.ok(Math.abs(Bearing(eye,heParry)-Bearing(eye,J.crouch))>25,`He's parry shows beside ijaA from the eye (${(Bearing(eye,heParry)-Bearing(eye,J.crouch)).toFixed(0)} deg)`);
+  // The charge comes over the crater step at the right of the pinned eye, from out of its sight.
+  const {Sight,Eye}=await import("./Script_FirstLevelSpaceProbe.mjs");
+  for(const [name,p] of [["Luo",R.luoStart],["He",R.heStart],["Liu",R.liuStart],...R.extras.map(e=>[e.id,e.start])])
+    assert.ok([1.7,1.2].every(h=>Sight(Eye(eye,.44),Eye(p,h),{state:"BunkerCollapsed"})!=null)||Math.abs(Bearing(eye,p)-90)>60,`${name} waits out of the pinned man's view (bearing ${Bearing(eye,p).toFixed(0)})`);
+  assert.equal(R.chargeRoute.at(-1).x,3.3,"the charge comes down the crater step into the front trench");
+  // Slaps: one each way, landing on the questioning's lines; the raised hand for the third before the charge.
+  assert.deepEqual(R.slap.blows.map(b=>b.side).sort(),[-1,1],"a forehand and a backhand");
+  assert.ok(R.slap.recoverS<R.slap.dizzyS&&R.slap.yawDeg>=15&&R.slap.yawDeg<=35,"the head snaps aside and back; the struck side swims longer");
+  // The haul: from the pinned eye out onto the seat.
+  // LuoDragToCover's collar track at haulStopS: the eye comes out past the seat and he sits back onto it.
   {
-    const spoil=Block("BunkerMouthSpoil"),S=C.shunzi.dragged,yaw=C.rescue.circleShot.yawDeg*Math.PI/180;
-    assert.ok(S.z>spoil.z+spoil.d/2+.25&&S.z<spoil.z+spoil.d/2+1,"ijaA drags him down the SSW leg to just past the spoil's south face");
-    const fwd={x:-Math.sin(yaw),z:-Math.cos(yaw)};
-    for(const [cx,cz] of [[-1,-1],[-1,1],[1,-1],[1,1]]){
-      const c={x:spoil.x+cx*spoil.w/2,z:spoil.z+cz*spoil.d/2};
-      assert.ok((c.x-S.x)*fwd.x+(c.z-S.z)*fwd.z<0,`SB05: the spoil is behind the eye (corner ${c.x},${c.z})`);
-    }
+    const track=JSON.parse(Read("./Animation/OpeningStoryboards/Animation_TengxianNra05OpeningStoryboards.json")).clips.LuoDragToCover.player;
+    const k=Math.min(track.parts.collar.length/3-1,Math.round(R.lift.haulStopS*track.fps)),travel=track.parts.collar[k*3+2]-track.parts.collar[2];
+    const out=eye.x+travel;
+    assert.ok(out>S.cover.x&&out-S.cover.x<.6,`Luo hauls him out just past the seat (eye to x ${out.toFixed(2)}), he sits back onto it`);
+    const corpse=R.parryMeet;
+    assert.ok(D(corpse,S.cover)>.7&&Math.abs(corpse.z-eye.z)>.5,"ijaA dies down the trench, off the haul and the seat");
   }
-  // SB04 / SB04A (contract §2.5, §2.7): the butt spot east of the mouth rubble; the forearm drag (IjaDragByForearm) from it
-  // west along the strip between the mouth rubble and the spoil into the SSW mouth -- Shunzi on dragAway.route, ijaA the
-  // clip's hold distance (holdM) from him toward dragAway.face at the same fraction -- keeps clear of the mouth's collapse
-  // blocks, and ijaA ends south of him in the SSW leg.
-  {
-    const Inside=(p,b,m)=>Math.abs(p.x-b.x)<b.w/2+m&&Math.abs(p.z-b.z)<b.d/2+m;
-    // BunkerSouthRevetment counts too, unless wave 1 still lists it (Data_OpeningStoryboards.wave1Allowances.revetment).
-    const solid=["BunkerMouthRubbleS","BunkerMouthSpoil","BunkerMouthPostS","BunkerMouthPostN","BunkerSouthRevetment"]
-      .filter(id=>id!==C.wave1Allowances?.revetment).map(Block);
-    const G=C.ija.dragAway,route=[C.shunzi.butt,...G.route,C.shunzi.dragged];
-    const Len=r=>r.slice(1).reduce((sum,p,i)=>sum+D(r[i],p),0);
-    const At=(r,s)=>{for(let i=1;i<r.length;i++){const a=r[i-1],b=r[i],d=D(a,b);if(s<=d||i===r.length-1){const k=Math.min(1,s/(d||1));return {x:a.x+(b.x-a.x)*k,z:a.z+(b.z-a.z)*k};}s-=d;}};
-    let ijaA=null;
-    for(let k=0;k<=40;k++){
-      const p=At(route,k/40*Len(route)),t=At(G.face,k/40*Len(G.face)),d=D(p,t);
-      ijaA={x:p.x+(t.x-p.x)/d*G.holdM,z:p.z+(t.z-p.z)/d*G.holdM};
-      for(const b of solid){
-        assert.ok(!Inside(p,b,.12),`the SB04A drag keeps Shunzi clear of ${b.id} at (${p.x.toFixed(2)},${p.z.toFixed(2)})`);
-        assert.ok(!Inside(ijaA,b,.12),`the SB04A drag keeps ijaA clear of ${b.id} at (${ijaA.x.toFixed(2)},${ijaA.z.toFixed(2)})`);
-      }
-    }
-    assert.ok(ijaA.z>C.shunzi.dragged.z+.4,"ijaA ends the drag south of him in the SSW leg (02's circle)");
+  // The kicked rifle slides past his front to his right hand (clear of the collapse blocks).
+  const slide=[R.rifleMouth,R.rifleKickVia,R.rifleKicked];
+  for(let i=1;i<slide.length;i++)for(let k=0;k<=20;k++){
+    const p={x:slide[i-1].x+(slide[i].x-slide[i-1].x)*k/20,z:slide[i-1].z+(slide[i].z-slide[i-1].z)*k/20};
+    assert.ok(Clear(p,.05),`the kicked rifle's slide keeps clear of the collapse blocks at (${p.x.toFixed(2)},${p.z.toFixed(2)})`);
   }
-  const rifleReach=D(C.rescue.rifleMouth,trap);
-  assert.ok(rifleReach>.9&&rifleReach<1.6,`the rifle lies in the mouth mud just out of reach (${rifleReach.toFixed(2)} m)`);
-  assert.ok(C.rescue.rifleMouth.x>trap.x&&C.rescue.rifleMouth.x<postN.x+.6,"the rifle lies between him and the posts");
-  assert.ok(C.ija.foundRoute.every(p=>p.x>trap.x)&&C.ija.dragOutRoute[0].x>trap.x&&D(C.ija.dragOutRoute[0],trap)<1.5,"ijaA comes back to the mouth and drags him out from there");
+  assert.ok(D(R.rifleKicked,S.cover)<Tune.interactionRangeM-1,"Luo's kick leaves the rifle within easy reach of the seat");
+  assert.ok(D(R.rifleMouth,eye)>.8,"the rifle lies out of his reach while he is pinned");
   // SB02 (contract §2.2): the fall ends in the dugout, looking at the north post with the head rolled left.
   const B=C.banter.blastShot;
   assert.ok(B.fallStartS<B.fallEndS&&B.fallEndS<B.eyesCloseS&&B.eyesCloseS<B.phaseS,"blast: fall, then the eyes close, then Black");
   assert.ok(B.rollDeg>=12&&B.yawDeg<-50&&B.yawDeg>-80,"blast: mirrored (yaw -66, head rolled left)");
-  // SB01 depth walkers: they walk away from the mouth (east) and leave down the link sap.
-  const {OPENING_DEPTH_WALKERS:Walkers}=await import("./Data_FirstLevelBackdropSquads.mjs");
+  const {OPENING_DEPTH_WALKERS:Walkers,OPENING_DEPTH_IJA:DepthIja}=await import("./Data_FirstLevelBackdropSquads.mjs");
   for(const m of Walkers.members)assert.ok(m.start.x>postN.x+5&&m.route.every((p,i,all)=>p.x>=(i?all[i-1].x:m.start.x)),`${m.id} walks away east from the mouth`);
-  // SB03A's Japanese going away: they wait out of SB03's picture and walk away east.
-  const {OPENING_DEPTH_IJA:DepthIja}=await import("./Data_FirstLevelBackdropSquads.mjs");
-  const Bearing=(a,b)=>Math.atan2(a.x-b.x,a.z-b.z)*180/Math.PI;
   for(const m of DepthIja.members){
-    if(!m.flagKick)assert.ok(Math.abs(Bearing(C.shunzi.witnessEye,m.start)-C.interrogation.witnessShot.yawDeg)>55,`${m.id} waits out of SB03's picture`);
     if(m.flagKick){
       const {RouteClearance}=await import("./Script_FirstLevelSpaceProbe.mjs");
       const clearance=RouteClearance([m.start,m.flagKick.root,...m.route],{state:"BunkerCollapsed"});
@@ -560,88 +607,34 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
     }
     assert.ok(m.route.every((p,i,all)=>p.x>=(i?all[i-1].x:m.start.x)),`${m.id} walks away east`);
   }
+  assert.ok(R.extras.every(e=>!e.victim||R.depthPost[e.victim]),"a charging man's victim holds a post");
   // Storyboard shots and wave-1 stand-ins (contract §4.6).
   assert.ok(C.storyboardShots.length>=2&&C.storyboardShots.every(s=>/^SB0[1-9]/.test(s.id)&&(s.when||s.phase&&Number.isFinite(s.age))&&s.judge),"storyboard shots are well formed");
   for(const e of C.pendingWiring){
     assert.ok(["shot","what","now","wave2"].every(k=>typeof e[k]==="string"&&e[k].length>3),"pendingWiring entry "+JSON.stringify(e));
     assert.ok(C.storyboardShots.some(s=>s.id===e.shot||s.id.startsWith(e.shot+"_")),`pendingWiring names a storyboard shot (${e.shot})`);
   }
-  // Contract §3/§7.2: after the wave-2 wiring (wave 2) the stand-in list is empty and no wave-1 allowance is left; before
-  // it, every allowance is backed by a listed stand-in.
   {
     const judged=C.storyboardShots.flatMap(s=>Object.entries(s.judge?.actors||{}).map(([role,w])=>({shot:s.id,role,w})));
     const allowances=judged.filter(({w})=>w.behindOk||w.coverOk||w.headOptional);
     assert.ok(C.wave===1||C.wave===2,`wave is 1 or 2 (${C.wave})`);
     if(C.wave===2){
       assert.deepEqual(C.pendingWiring,[],"wave 2: every stand-in is wired (pendingWiring empty)");
-      assert.ok(!C.wave1Allowances||Object.values(C.wave1Allowances).every(v=>v==null),"wave 2: no wave-1 allowance left");
       assert.deepEqual(allowances.map(a=>a.shot+":"+a.role),[],"wave 2: no behindOk / coverOk / headOptional left in storyboardShots");
     }else for(const a of allowances){
       assert.ok(C.pendingWiring.some(e=>e.shot===a.shot.split("_")[0]),`wave 1: ${a.shot} ${a.role}'s allowance has a pendingWiring entry`);
     }
   }
-  // The butt strike (SB04): the data's strike time is the clip's, and the hand keys let go after it.
-  {
-    const strike=manifest.clips.IjaButtStrikeCollar.contacts.find(c=>c.action==="strike"),loop=manifest.clips.IjaButtStrikeCollar.holdLoop;
-    assert.ok(Math.abs(strike.t-C.ija.butt.strikeS)<1e-6,`ija.butt.strikeS is IjaButtStrikeCollar's strike contact (${strike.t})`);
-    assert.ok(C.ija.butt.letGoS>=loop[1]-1e-6&&C.ija.butt.letGoS<strike.t,"the apex loop is let go (letGoS) before the blow");
-    assert.ok(loop[1]-loop[0]+C.ija.butt.holdS>=.4,"the pause at the top holds at least 0.4 s (contract §5 SB04)");
-    const push=C.firstPerson.hands.beats.Butt.keys.filter(k=>k[2]==="push").at(-1)[0];
-    assert.ok(Math.abs(push-(C.ija.butt.strikeS+C.ija.butt.holdS))<1e-6,"beats.Butt pushes until the blow lands (strike + holdS)");
-  }
   // The withdrawal routes back from the SB06 posts (Script_OpeningStoryboards Aftermath).
   {
     const W=C.withdraw,Same=(a,b)=>D(a,b)<1e-6;
-    assert.ok(Same(W.liuBackRoute[0],C.rescue.liuCoverRoute.at(-1)),"Liu's way back starts where his cover route ended");
-    assert.ok(W.liuBackRoute.slice(1).every((p,i)=>Same(p,W.lane[3+i])),"Liu's way back follows the lane from the crater step to RC");
     assert.ok(W.heBackRoute.every((p,i)=>Same(p,W.lane[3+i]))&&Same(W.heBackRoute.at(-1),W.luoCover),"He's way back follows the lane to the first intact wall");
+    assert.ok(W.liuBackRoute.slice(1).every((p,i)=>Same(p,W.lane[3+i])),"Liu's way back follows the lane from the crater step to RC");
   }
-  assert.ok(D(C.rescue.rifleKicked,C.shunzi.cover)<Tune.interactionRangeM-1,"Luo's kick leaves the rifle within easy reach of the cover");
-  // 02 (contract §2.6 / §2.9, SB05–SB06): the circle's marks, the rescuers' marks and the SB06 marks stand clear of the
-  // mouth's collapse blocks (the floor strip at the SSW leg's mouth is x 0.4–0.8 between the west slope and the spoil).
-  {
-    const R=C.rescue,S=C.shunzi.dragged,Deg=Math.PI/180;
-    const solid=["BunkerMouthRubbleS","BunkerMouthSpoil","BunkerMouthPostS","BunkerMouthPostN"].map(Block);
-    const Clear=(p,m)=>solid.every(b=>!(Math.abs(p.x-b.x)<b.w/2+m&&Math.abs(p.z-b.z)<b.d/2+m));
-    // ijaA's root as the director solves it (IjaHoldCollarUp's player head track at 0 s onto shunzi.dragged), and the
-    // paired stages' marks off the anchors (manifest stages chopParry / chopRear: +x right, +z back of the anchor).
-    const track=JSON.parse(Read("./Animation/OpeningStoryboards/Animation_TengxianIja02OpeningStoryboards.json")).clips.IjaHoldCollarUp.player;
-    const head={x:track.parts.head[0],z:track.parts.head[2]},dist=Math.hypot(head.x,head.z),b=R.ijaAHoldBearingDeg*Deg;
-    const approx={x:S.x+Math.sin(b)*dist,z:S.z+Math.cos(b)*dist},yaw=Math.atan2(approx.x-S.x,approx.z-S.z);
-    const Rot=(y,x,z)=>({x:x*Math.cos(y)+z*Math.sin(y),z:-x*Math.sin(y)+z*Math.cos(y)}),o=Rot(yaw,head.x,head.z);
-    const ijaA={x:S.x-o.x+Math.sin(b)*R.ijaAStandoffM,z:S.z-o.z+Math.cos(b)*R.ijaAStandoffM,yaw};
-    assert.ok(R.ijaAStandoffM>=0&&R.ijaAStandoffM<=.4,"SB05: ijaA's stand-off is a small correction of the clip's reach");
-    const Stage=(stage,role,anchor)=>{const a=manifest.stages[stage].actors[role],d=Rot(anchor.yaw,a.x,a.z);return {x:anchor.x+d.x,z:anchor.z+d.z};};
-    const heParry=Stage("chopParry","heyoutian",ijaA),luoChop=Stage("chopRear","luo",R.ijaBWatch);
-    for(const [name,p,m] of [["ijaA's hold",ijaA,.05],["He's parry mark",heParry,.2],["Luo's chop mark",luoChop,.3],["ijaB's guard",R.ijaBGuard,.3],
-      ["ijaB's watch",R.ijaBWatch,.3],["the interpreter",R.interpreter,.02],["He's wait",R.heWait,.3],["Liu's trench-edge post",R.liuCover,.3],
-      ["He's trench-edge post",R.heCover,.3],["Luo's check kneel",R.luoCheck,.3],["the hand-back seat",C.shunzi.cover,.3],["Luo's kick spot",R.kickFrom,.2]])
-      assert.ok(Clear(p,m),`02: ${name} (${p.x.toFixed(2)},${p.z.toFixed(2)}) stands clear of the mouth's collapse blocks`);
-    assert.ok(ijaA.z>S.z+.3&&Math.abs(ijaA.x-S.x)<.35,"SB05: ijaA holds him from down the leg (south)");
-    // The kicked rifle slides out of the mouth past his right side (clear of the rubble, his seat and his legs east of it).
-    const slide=[R.rifleMouth,R.rifleKickVia,R.rifleKicked],seat=C.shunzi.cover;
-    for(let i=1;i<slide.length;i++)for(let k=0;k<=20;k++){
-      const p={x:slide[i-1].x+(slide[i].x-slide[i-1].x)*k/20,z:slide[i-1].z+(slide[i].z-slide[i-1].z)*k/20};
-      assert.ok(Clear(p,.05),`the kicked rifle's slide keeps clear of the collapse blocks at (${p.x.toFixed(2)},${p.z.toFixed(2)})`);
-      const legs=Math.max(0,Math.min(1,(p.x-seat.x)/.9));
-      assert.ok(Math.hypot(p.x-(seat.x+.9*legs),p.z-seat.z)>.3,`the kicked rifle's slide passes his body and legs at (${p.x.toFixed(2)},${p.z.toFixed(2)})`);
-    }
-    // SB05/SB06 cameras and the hand-back view (contract §5, §2.9).
-    // 2026-09-27 circle move: from the new circle the leg runs away south-south-west (yaw 174 = 6 deg west of south).
-    assert.ok(Math.abs(R.circleShot.yawDeg-174)<=8&&R.circleShot.pitchDeg>=-5&&R.circleShot.pitchDeg<=10,"SB05: down the leg, about level");
-    assert.ok(Math.abs(C.shunzi.cover.yaw/Deg+94)<1&&R.checkShot.kickPitchDeg>=-15&&R.checkShot.kickPitchDeg<=5,"SB06: east down the trench; the hand-back view is not at the ground");
-    // The rescuers wait out of SB05's picture (the static sight probe from the circle's eye; the revetment it sits in is
-    // pendingWiring SB05) and so does the RC backdrop man.
-    const {Sight,Eye}=await import("./Script_FirstLevelSpaceProbe.mjs");
-    const {BACKDROP_SQUADS:Backdrop}=await import("./Data_FirstLevelBackdropSquads.mjs");
-    const eye=Eye(S,R.circleShot.eyeM),rc=Backdrop.members.find(m=>m.rosterId==="BunkerBackdropNra0");
-    for(const [name,p] of [["Luo",R.luoStart],["He",R.heStart],["Liu",R.liuStart],["the RC backdrop rifleman",rc]])
-      assert.ok([1.7,1.2].every(h=>Sight(eye,Eye(p,h),{state:"BunkerCollapsed",ignore:[C.wave1Allowances?.revetment].filter(Boolean)})),`SB05: ${name} waits out of the leg's picture (${p.x},${p.z})`);
-  }
-  assert.ok(D(C.rescue.liuShot,Place.bunker.liuwencaiShot)<.01,"Liu Wencai shoots from the space's mark");
-  for(const [name,route] of [["runner",C.banter.runnerRoute],["exit",C.banter.exitRoute],["walkIn",C.ija.walkIn],["found",C.ija.foundRoute],
-    ["dragOut",C.ija.dragOutRoute],["luo",C.rescue.luoRoute],["he",C.rescue.heRoute],["dragCover",C.rescue.dragCoverRoute],["withdraw",C.withdraw.lane]])
-    assert.ok(route.length>=2&&route.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.z)),`${name} route is a finite polyline`);
+  assert.ok(Math.abs(S.cover.yaw*180/Math.PI+94)<1&&R.checkShot.kickPitchDeg>=-15&&R.checkShot.kickPitchDeg<=5,"SB06: east down the trench; the hand-back view is not at the ground");
+  for(const [name,route] of [["runner",C.banter.runnerRoute],["exit",C.banter.exitRoute],["walkIn",C.ija.walkIn],["taunt",C.ija.tauntWalk],
+    ["charge",R.chargeRoute],["flee",C.ija.interpreterFlee],["withdraw",C.withdraw.lane]])
+    assert.ok(route.length>=1&&route.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.z)),`${name} route is a finite polyline`);
   // Every director wait has a finite timeout (the show can never stall).
   assert.ok(Object.values(C.timeouts).every(v=>Number.isFinite(v)&&v>0),"all director timeouts are finite and positive");
   assert.deepEqual([...C.vanguardIds].sort(),["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowB"],"hand-back waits for ijaA, ijaB and ijaD only");
@@ -724,43 +717,21 @@ console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips 
   }
   assert.ok(C.timeouts.wakeS>=C.blackoutRecovery.fadeS&&C.blackoutRecovery.fadeS>=5,"wake cannot cut off the slow full-screen fade");
   assert.ok(Math.hypot(C.interrogation.interpreterAt.x-C.interrogation.ijaBAt.x,C.interrogation.interpreterAt.z-C.interrogation.ijaBAt.z)>1.2,"interrogation roots do not overlap");
-  // 02 circle (2026-09-27 reviews 「审问的时候穿模错位」, 「左边那么大一石头一样的东西穿模了」): the interpreter comes up the
-  // leg from where he waited to his squat without crossing the grip (Shunzi's head -> ijaA's root) or passing the eye,
-  // squats behind ijaA's right shoulder well off the lens, and nobody in the circle stands in the spoil (its skin's
-  // west-face stakes stand out 0.17 m; a body is ~0.25 m).
-  const marks=show.CircleMarks(),returnPath=[C.interrogation.backOff.interpreter,...C.rescue.interpreterReturn,marks.interpreter];
+  // 02 questioning where he lies (2026-09-27 rework): the interpreter trots from his SB03 mark to his squat at the pinned
+  // man's right front without crossing between ijaA's squat and the eye, and squats 1.2 m+ off the lens, 0.6 m+ off ijaA.
+  const R=C.rescue,eye=C.shunzi.witnessEye,crouch=C.ija.crouch,squat=R.interpreter;
+  const returnPath=[C.interrogation.interpreterAt,...R.interpreterReturn,squat];
   const returnClear=RouteClearance(returnPath,{state:"BunkerCollapsed",radius:0});
   assert.deepEqual(returnClear.hits,[]);assert.deepEqual(returnClear.slopes,[]);
-  // ijaA's root as the director solves it with the clip's own head track (CircleMarks falls back to a stand-in track
-  // when the animation library is not loaded, as here).
-  const holdTrack=JSON.parse(Read("./Animation/OpeningStoryboards/Animation_TengxianIja02OpeningStoryboards.json")).clips.IjaHoldCollarUp.player.parts.head;
-  {const S=C.shunzi.dragged,R=C.rescue,b=R.ijaAHoldBearingDeg*Math.PI/180,h={x:holdTrack[0],z:holdTrack[2]},dist=Math.hypot(h.x,h.z);
-    const approx={x:S.x+Math.sin(b)*dist,z:S.z+Math.cos(b)*dist},yaw=Math.atan2(approx.x-S.x,approx.z-S.z);
-    const o={x:h.x*Math.cos(yaw)+h.z*Math.sin(yaw),z:-h.x*Math.sin(yaw)+h.z*Math.cos(yaw)};
-    marks.ijaA={x:S.x-o.x+Math.sin(b)*R.ijaAStandoffM,z:S.z-o.z+Math.cos(b)*R.ijaAStandoffM};}
-  const eye=C.shunzi.dragged,Near=(p,a,b)=>{const dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz||1)));return Math.hypot(a.x+t*dx-p.x,a.z+t*dz-p.z);};
-  const SegSeg=(a,b,c,d)=>{let best=Infinity;for(let k=0;k<=40;k++){const p={x:a.x+(b.x-a.x)*k/40,z:a.z+(b.z-a.z)*k/40};best=Math.min(best,Near(p,c,d));}return best;};
+  const Near=(p,a,b)=>{const dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz||1)));return Math.hypot(a.x+t*dx-p.x,a.z+t*dz-p.z);};
   for(let i=1;i<returnPath.length;i++){
     const a=returnPath[i-1],b=returnPath[i];
-    assert.ok(Near(marks.ijaA,a,b)>C.rescue.interpreterClearanceM+.03,"return route passes the collar-holder with the corner margin");
-    assert.ok(Near(eye,a,b)>=.6,`return route keeps off the circle's eye (${a.x},${a.z})-(${b.x},${b.z})`);
-    assert.ok(SegSeg(a,b,eye,marks.ijaA)>=.4,`return route does not cross between ijaA and Shunzi (${a.x},${a.z})-(${b.x},${b.z})`);
+    assert.ok(Near(crouch,a,b)>R.interpreterClearanceM,"the interpreter's way to his squat passes ijaA with a margin");
+    assert.ok(Near(eye,a,b)>=.9,`the interpreter's way keeps off the pinned eye (${a.x},${a.z})-(${b.x},${b.z})`);
   }
-  // He stays on the squat through 「说话！」 (no second hand on the collar) and bolts from there.
-  const squat=marks.interpreter;
-  assert.ok(Math.hypot(squat.x-eye.x,squat.z-eye.z)>=1.2&&squat.x>marks.ijaA.x+.2,"the interpreter squats behind ijaA's right shoulder (the left third), 1.2 m or more off the eye");
-  assert.ok(Math.hypot(squat.x-marks.ijaA.x,squat.z-marks.ijaA.z)>=.6,"the interpreter's squat keeps 0.6 m off the collar-holder's root");
-  {
-    const {MISSION_LAYOUT:Layout}=await import("./Data_FirstLevelMissionLayout.mjs");
-    const spoil=Layout.scenario.states.find(state=>state.id==="BunkerCollapsed").blocks.find(b=>b.id==="BunkerMouthSpoil");
-    const Gap=p=>Math.hypot(Math.max(0,Math.abs(p.x-spoil.x)-spoil.w/2),Math.max(0,Math.abs(p.z-spoil.z)-spoil.d/2));
-    for(const [name,p] of [["ijaA",marks.ijaA],["the interpreter",squat],["ijaB's guard",C.rescue.ijaBGuard],
-      ["ijaB's watch",C.rescue.ijaBWatch],["ijaB's kick",marks.kick]])
-      assert.ok(Gap(p)>=.45,`${name} (${p.x.toFixed(2)},${p.z.toFixed(2)}) stands 0.45 m clear of BunkerMouthSpoil (${Gap(p).toFixed(2)})`);
-    // Luo hauls him to cover over the crater step, never along the spoil's faces (the neck pinned the eye against it).
-    const haul=[C.shunzi.dragged,...C.rescue.dragCoverRoute];
-    for(let i=1;i<haul.length;i++)for(let k=0;k<=10;k++){const a=haul[i-1],b=haul[i],p={x:a.x+(b.x-a.x)*k/10,z:a.z+(b.z-a.z)*k/10};
-      assert.ok(Gap(p)>=.45,`the haul to cover keeps 0.45 m off BunkerMouthSpoil at (${p.x.toFixed(2)},${p.z.toFixed(2)})`);}
-  }
+  assert.ok(Math.hypot(squat.x-eye.x,squat.z-eye.z)>=1.2&&Math.hypot(squat.x-crouch.x,squat.z-crouch.z)>=.6,"the squat: 1.2 m+ off the eye, 0.6 m+ off ijaA");
+  // His flight runs east down the trench's north side, clear of the crater step the charge comes down.
+  const step=R.chargeRoute.at(-1);
+  assert.ok(C.ija.interpreterFlee.slice(0,3).every(p=>Math.hypot(p.x-step.x,p.z-step.z)>1.2),"the flight keeps off the foot of the crater step");
   console.log("ok interpreter swept clearance, passing route and sustained blackout recovery");
 }

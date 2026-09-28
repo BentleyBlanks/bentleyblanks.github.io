@@ -812,18 +812,13 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
     // 2026-09-23 director (Data_OpeningStoryboards): every leg its actors walk, in every scenario state.
     OrdersRunner:storyboards.banter.runnerRoute,
     OrdersExit:storyboards.banter.exitRoute,
-    FoundIn:[...storyboards.ija.foundRoute],
-    DragOut:storyboards.ija.dragOutRoute,
-    RescueLuo:storyboards.rescue.luoRoute,
-    RescueHe:storyboards.rescue.heRoute,
-    RescueLiu:[...storyboards.rescue.liuRoute,storyboards.rescue.liuShot],
-    DragCover:[...storyboards.rescue.dragCoverRoute,storyboards.rescue.luoCheck],
-    // 2026-09-25 storyboard round (SB06): Liu and He go over the crater step to the trench edge east of the seat.
-    RescueLiuCover:[storyboards.rescue.liuShot,...storyboards.rescue.liuCoverRoute,storyboards.rescue.liuCover],
-    RescueHeCover:[...storyboards.rescue.heCoverRoute,storyboards.rescue.heCover],
-    // 2026-09-25 storyboard round: the interpreter / ijaB backing off down the SSW leg, SB03A's Japanese going away.
-    BackOff:[storyboards.interrogation.interpreterAt,...storyboards.interrogation.backOffRoute,storyboards.interrogation.backOff.interpreter],
-    BackOffB:[storyboards.interrogation.ijaBAt,...storyboards.interrogation.backOffRoute,storyboards.interrogation.backOff.ijaB],
+    // 2026-09-27 rework (docs/Data_OpeningPinnedRescue20260927.md): ijaA walks off from the kill to the pinned man; the
+    // interpreter trots to his squat; the charge comes over the crater step; Liu goes down into the trench after his shot.
+    TauntWalk:[...storyboards.ija.tauntWalk,storyboards.ija.found],
+    InterpreterSquat:[storyboards.interrogation.interpreterAt,...storyboards.rescue.interpreterReturn,storyboards.rescue.interpreter],
+    Charge:[...storyboards.rescue.chargeRoute],
+    RescueLiuCover:[storyboards.rescue.liuShot,{x:3.3,z:-123.4},storyboards.rescue.liuCover],
+    InterpreterFlee:[...storyboards.ija.interpreterFlee],
     DepthIja:[OPENING_DEPTH_IJA.members[0].start,...OPENING_DEPTH_IJA.members[0].route],
     DepthIjaB:[OPENING_DEPTH_IJA.members[1].start,...OPENING_DEPTH_IJA.members[1].route],
     Withdraw:storyboards.withdraw.lane,

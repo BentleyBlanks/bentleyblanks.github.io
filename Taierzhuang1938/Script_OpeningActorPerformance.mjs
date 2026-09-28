@@ -21,6 +21,9 @@ const ContactClips=new Set(["DuckBlast","BayonetClearWood","CollarDrag","ButtThr
   "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
   // 2026-09-27: over the fallen roof timber in and out, and the haul out from under it (the face on the eye).
   "IjaVaultTimberIn","IjaVaultTimberOut","IjaHaulForearmUnder",
+  // 2026-09-27 pinned rescue: the jeering walk (upper body), the find, the hair hold and the slaps (the face on the pinned
+  // eye inside the clip), He heaving the roof timber (hands on it).
+  "IjaTauntWalk","IjaFoundLook","IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","HeLiftTimber",
   // hands on the post, the rifle or held out to Shunzi, faces aimed inside the clip: no dialogue gestures or the
   // Banter/Orders MessengerReport substitution on top (the runner and Yaowa talk in those phases)
   "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad",
@@ -35,7 +38,7 @@ const Guards=new Set(["ijaA","ijaB","guard","heyoutian","liuwencai"]);
 const Hash=value=>[...String(value)].reduce((sum,char)=>(sum*31+char.charCodeAt(0))>>>0,7);
 const HandClips=new Set(["ButtThreat","InterrogateCrouch","InterpreterPoint","MessengerReport","PointBlockade"]);
 // Phases in which the interpreter questions a prisoner (01 comrade, 02 Shunzi), 09.23 phase table.
-const Interrogating=new Set(["CaptiveWall","Interrogation","Slash","Taunt","Hold","Ask","KickShunzi","Glimpse","Collar"]);
+const Interrogating=new Set(["CaptiveWall","Interrogation","Slash","Taunt","Hold","Ask"]);
 
 export function SettleOpeningCaptive(soldier,pose){
   if(soldier.alive!==false||pose?.clip!=="ShotCollapse")return;

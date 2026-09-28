@@ -1,8 +1,8 @@
 // 01–02 storyboard lens in the real page (contract docs/Data_FirstLevelStoryboard0103Contract.md §4.4, §6;
 // review 2026-09-25). The director's own events drive the looks — no Debug.OpeningLens.Force here:
 //   - Blast: the radial blur reaches the composite (uRadialBlur > 0);
-//   - Wake / Reach → Found: player mud and red corners; independent film coverage in between is clean;
-//   - Butt: the rifle butt's white flash peaks ≥ 0.8 (the director's strikeAt really arrives);
+//   - Wake → Found: player mud and red corners, first person all through (2026-09-27: no cut-away camera);
+//   - Ask: each slap swims the struck side of the frame (the composite's uSideDaze really gets it);
 //   - loading phases: the world rifle stays hidden (one loading rifle on screen);
 //   - no actor is taken out of the scene and put back within one frame (AI and director culling two frusta);
 // and once the director lets go of the view (Released, then the rifle pickup into RearTrench) nothing of the
@@ -25,10 +25,11 @@ try {
     // Rendered checks read what the last real frame drew: the composite's uniforms and the HUD layers.
     const Drawn = () => {
       const U = g.post.uniformsComposite, hud = g.hud.LensState();
-      return { radialBlur: U.uRadialBlur.value, bloodEdge: U.uBloodEdge.value.w, mudOn: hud.mud.on, mudOpacity: hud.mud.opacity,
+      return { radialBlur: U.uRadialBlur.value, bloodEdge: U.uBloodEdge.value.w, sideDaze: U.uSideDaze.value.y, sideDazeSide: U.uSideDaze.value.x,
+        mudOn: hud.mud.on, mudOpacity: hud.mud.opacity,
         flashOn: hud.flash.on, flashOpacity: hud.flash.opacity, bloodCap: g.hud.storyBloodCap ?? 1 };
     };
-    window.lensProbe = { phases: {}, drawn: {}, rifleShownInLoading: 0, order: [], Drawn, flapFrames: 0, flaps: [] };
+    window.lensProbe = { phases: {}, drawn: {}, rifleShownInLoading: 0, order: [], Drawn, flapFrames: 0, flaps: [], slapDrawn: [] };
     // An actor taken out of the scene and put back (or the reverse) inside one frame: the AI culled against the
     // player's view and the director against its shot (2026-09-27, every frame through Incoming and the blast).
     const ai = g.ai, attach = ai._SetDetailedAttached.bind(ai), P = window.lensProbe;
@@ -44,18 +45,22 @@ try {
   for (let round = 0; round < 40; round++) {
     state = await page.evaluate(() => {
       const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime(), s = r.frontShow.bunker, P = window.lensProbe;
-      const RENDER = { Blast: 0.35, Interrogation: 1.0, Reach: 0.5 };
+      const RENDER = { Blast: 0.35, Interrogation: 1.0, Found: 0.5 };
       for (let i = 0; i < 600; i++) {
         const phase = s.phase, age = s.Age, render = RENDER[phase] != null && age >= RENDER[phase] && !P.drawn[phase];
         P.changed.clear();
         g.StepFrames(1, 1 / 60, render);
         const flapped = [...P.changed].filter(([, n]) => n > 1).map(([root]) => root.name);
         if (flapped.length) { P.flapFrames++; if (P.flaps.length < 8) P.flaps.push({ phase, age: +age.toFixed(2), flapped }); }
-        const lens = r.Perception().lens, row = P.phases[s.phase] ||= { frames: 0, lensFrames: 0, maxFlash: 0, maxMud: 0, looks: [] };
+        // Each slap: the frame drawn 0.1 s after it lands.
+        if (s.flags.slapAt != null && r.time - s.flags.slapAt >= .1 && !P.slapDrawn.some((d) => d.at === s.flags.slapAt)) {
+          g.StepFrames(1, 1 / 60, true); P.slapDrawn.push({ at: s.flags.slapAt, side: s.flags.slapSide, ...P.Drawn() });
+        }
+        const lens = r.Perception().lens, row = P.phases[s.phase] ||= { frames: 0, lensFrames: 0, maxFlash: 0, maxMud: 0, maxSlap: 0, looks: [] };
         if (P.order.at(-1) !== s.phase) P.order.push(s.phase);
         row.frames++;
         if (lens) {
-          row.lensFrames++; row.maxFlash = Math.max(row.maxFlash, lens.flash); row.maxMud = Math.max(row.maxMud, lens.mud);
+          row.lensFrames++; row.maxFlash = Math.max(row.maxFlash, lens.flash); row.maxMud = Math.max(row.maxMud, lens.mud); row.maxSlap = Math.max(row.maxSlap, lens.slap?.amount || 0);
           if (!row.looks.includes(lens.look)) row.looks.push(lens.look);
         }
         if (render) P.drawn[phase] = { age, ...P.Drawn() };
@@ -73,12 +78,11 @@ try {
   assert.equal(state.phase, "Released", "the director reaches the hand-back");
   const P = probe.phases;
   // Inside 01–02 the lens is on every frame the director owns the view.
-  for (const phase of ["Banter", "Blast", "Wake", "Interrogation", "Reach", "Found", "Butt", "Boots", "Hold"])
+  for (const phase of ["Banter", "Blast", "Wake", "Interrogation", "Found", "Hold", "Ask", "Charge", "Lift"])
     assert.ok(P[phase]?.lensFrames > 0, `${phase}: a lens look is on (${JSON.stringify(P[phase])})`);
-  assert.ok(P.Butt.maxFlash >= 0.8, `Butt: the butt strike's white flash peaks ≥ 0.8 (${P.Butt.maxFlash}) — the director's strikeAt arrives`);
-  for (const phase of ["Wake", "Reach", "Found"]) assert.ok(P[phase].maxMud > 0, `${phase}: mud on the lens (${P[phase].maxMud})`);
-  assert.equal(P.Hold.maxMud, 0, "SB05: the lens is clean again");
-  assert.equal(P.Interrogation.maxMud, 0, "cinematic interrogation has no player mud overlay");
+  for (const phase of ["Wake", "Interrogation", "Found"]) assert.ok(P[phase].maxMud > 0, `${phase}: mud on the lens (${P[phase].maxMud})`);
+  assert.equal(P.Ask.maxMud, 0, "held up by the hair: the mud has cleared (the found look crossfades out over Hold)");
+  assert.ok(P.Ask.maxSlap > 0.9, `Ask: the slaps swim the struck side (${P.Ask.maxSlap})`);
   // Each flap rescans the scene (bone pruning, prepass classes) and re-poses the actor in full: the 01 stutter.
   // One frame may still flap where the director first takes the view (the AI culled before it that frame).
   console.log("FLAPS", probe.flapFrames, JSON.stringify(probe.flaps));
@@ -86,10 +90,13 @@ try {
   assert.equal(probe.rifleShownInLoading, 0, "the loading phases never show the world rifle next to the loading rifle");
   // The rendered side: the composite and the HUD really get the lens (so the residue checks below are not vacuous).
   assert.ok(probe.drawn.Blast?.radialBlur > 0.01, `Blast: radial blur in the composite (${JSON.stringify(probe.drawn.Blast)})`);
-  const cinema=probe.drawn.Interrogation;
-  assert.ok(cinema&&cinema.bloodEdge===0&&cinema.radialBlur===0&&!cinema.mudOn&&cinema.mudOpacity===0&&!cinema.flashOn,
-    `SB03: independent camera draws no player blood, mud or concussion (${JSON.stringify(cinema)})`);
-  assert.ok(probe.drawn.Reach?.mudOn&&probe.drawn.Reach.bloodEdge>.05, "SB03A: player mud and red corners return");
+  // 2026-09-27: the interrogation is first person from the pinned eye (mud and red corners on).
+  assert.ok(probe.drawn.Interrogation?.mudOn&&probe.drawn.Interrogation.bloodEdge>.05, `SB03: the pinned man's mud and red corners (${JSON.stringify(probe.drawn.Interrogation)})`);
+  assert.ok(probe.drawn.Found?.mudOn, "Found: still muddy");
+  console.log("SLAPS", JSON.stringify(probe.slapDrawn));
+  assert.ok(probe.slapDrawn.length >= 2, `both slaps land (${probe.slapDrawn.length})`);
+  for (const d of probe.slapDrawn) assert.ok(d.sideDaze > .8 && Math.sign(d.sideDazeSide) === Math.sign(d.side), `the composite swims the struck side (${JSON.stringify(d)})`);
+  assert.ok(probe.slapDrawn.some((d) => d.side > 0) && probe.slapDrawn.some((d) => d.side < 0), "one forehand (left side), one backhand (right side)");
   // ---- leaving 01–02: nothing remains --------------------------------------------------------------
   const Residue = () => page.evaluate(() => {
     const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
@@ -99,7 +106,7 @@ try {
   const Clean = (at, x) => {
     assert.equal(x.lens, null, `${at}: Perception().lens is null`);
     assert.ok(!x.mudOn && !x.flashOn && x.mudOpacity === 0 && x.flashOpacity === 0, `${at}: HUD mud / flash layers off (${JSON.stringify(x)})`);
-    assert.equal(x.radialBlur, 0, `${at}: uRadialBlur 0`); assert.equal(x.bloodEdge, 0, `${at}: uBloodEdge.w 0`);
+    assert.equal(x.radialBlur, 0, `${at}: uRadialBlur 0`); assert.equal(x.bloodEdge, 0, `${at}: uBloodEdge.w 0`); assert.equal(x.sideDaze, 0, `${at}: uSideDaze.y 0`);
     assert.equal(x.bloodCap, 1, `${at}: the director's blood layer is uncapped`);
   };
   const released = await Residue();
@@ -114,7 +121,7 @@ try {
   Clean(after.stage, after);
   assert.deepEqual(warnings, [], "no OpeningLens event warnings (every event the looks wait for arrived)");
   ok = true;
-  console.log(`ok opening lens in the page: flash ${P.Butt.maxFlash.toFixed(2)} in Butt, clean cinematic coverage, player mud returns at Reach, residue-free at Released and ${after.stage}`);
+  console.log(`ok opening lens in the page: slaps ${probe.slapDrawn.map((d) => d.sideDaze.toFixed(2)).join("/")} on the struck side, first-person mud through Found, residue-free at Released and ${after.stage}`);
 } catch (error) {
   await CaptureFailure(ctx).catch(() => {});
   throw error;
