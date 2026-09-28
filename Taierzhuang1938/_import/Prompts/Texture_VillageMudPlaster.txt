@@ -1,0 +1,7 @@
+Generate ONE square 1:1 image (2048x2048): a seamless tileable albedo (base colour) texture for a realistic 3D video game.
+Subject: the outside wall of a poor rural farmhouse in southern Shandong, China, March 1938, overcast day. The wall is built of sun-dried adobe mud bricks and coated with a coarse mud-and-chopped-straw plaster (yellow-grey loess mud render). The render is old: cracked, pitted, with several irregular patches where it has flaked off and exposes the rows of adobe bricks and their mud joints, plus a few grey fired bricks. Fine hairline cracks, straw fibres, small holes, faint vertical rain streaks and light dust.
+Colours: desaturated grey-brown and dusty ochre-grey loess, low saturation, muted. NOT orange, NOT saturated yellow, NOT red.
+Scale: the image covers 2.4 m x 2.4 m of wall (adobe bricks about 30 cm long, 10 cm high).
+Camera: perfectly orthographic, straight-on front view of a flat wall, no perspective, no curvature.
+Lighting: completely flat, even, shadowless diffuse light (de-lit albedo). No cast shadows, no specular highlights, no vignette, no light gradient from one side to the other.
+The texture must tile seamlessly on all four edges. Fill the entire frame with the wall surface only: no text, no watermark, no border, no frame, no objects, no windows, no doors, no ground, no sky, no plants.

@@ -18,7 +18,14 @@
 /** 关卡 id 与 Notes/<Level>/、关卡编排工作台同一套（第一关 = "FirstLevel"）。 */
 export const LEVEL_TEXTURE_SETS = Object.freeze({
   // 阶段 B（2026-09-28 3A 迭代）各包往这里加条目；现有贴图的加载时机不在此表管理。
-  FirstLevel: Object.freeze([]),
+  FirstLevel: Object.freeze([
+    // B1 建筑材质（Data_FirstLevelWhiteboxMaterials 的外观表；消费方 Script_FirstLevelWhiteboxLooks）
+    Object.freeze({ name: "VillageMudPlaster", v: "b1wb20260928", fallback: "Adobe" }),
+    Object.freeze({ name: "VillageLimePlaster", v: "b1wb20260928", fallback: "TemplePlaster" }),
+    Object.freeze({ name: "VillageRoofTile", v: "b1wb20260928", fallback: "GateRoofTile" }),
+    Object.freeze({ name: "VillageTimber", v: "b1wb20260928", fallback: "HandcartWood" }),
+    Object.freeze({ name: "RailBallast", v: "b1wb20260928", fallback: "GroundRubble" }),
+  ]),
 });
 
 /** 每关按需集合计上限（字节）。第一关 6 MB ≈ 线上 0.5 MB/s 下 12 s，分摊在建场过程里。 */
