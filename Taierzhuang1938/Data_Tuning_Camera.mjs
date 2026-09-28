@@ -166,7 +166,8 @@ export const EXPOSURE_ANCHORS = {
   // 取 05–18 对照机位里 11 个室外机位（05_1 05_2 06_1 06_2 07_2 08_1 11_1 12_1 13_2 15_1 18_1）实测
   // avgLog 的中位数（high / 1280×720，Script_FirstLevelSkyGradeBrowserTest 会重量并在偏差 > 0.3 EV 时报红）。
   // **白盒体块换材质（反照率变了）之后要重标**：跑那个测试，照它打印的中位数改这里。
-  FirstLevelP012Whitebox: { logLum: -0.90 },   // firstLevelBattleDay
+  // 2026-09-28 集成重标：B1 建筑材质 + B2 地面合入后 11 机位中位数 −0.90 → −1.29。
+  FirstLevelP012Whitebox: { logLum: -1.29 },   // firstLevelBattleDay
 };
 
 /**

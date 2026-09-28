@@ -9277,7 +9277,7 @@ function RenderScene(dt) {
     skyPreset: skyName,
     saturation: preset.saturation * (1 - suppression * 0.35),
     contrast: preset.contrast,
-    grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,
+    grain: ((skyName === "night" || skyName === "firstLevelNight") ? 0.020 : 0.014) * graphics.grain,
     // 眼皮与恍惚：开场出轨与屋内伏击共用同一组通道，由运行时合成成一份。
     fade: player?.Alive ? missionRuntime?.Perception().blackout || 0 : 0,
     eyeClosure: player?.Alive ? missionRuntime?.Perception().eyeClosure || 0 : 0,
