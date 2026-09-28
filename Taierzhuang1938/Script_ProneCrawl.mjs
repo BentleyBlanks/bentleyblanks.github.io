@@ -18,6 +18,8 @@ export class ProneGroundContact {
     this.v=Array.from({length:12},()=>new THREE.Vector3());
     this.q=Array.from({length:4},()=>new THREE.Quaternion());
     this.solveV=Array.from({length:7},()=>new THREE.Vector3());
+    this.hingeV=Array.from({length:4},()=>new THREE.Vector3());
+    this.hingeQ=Array.from({length:4},()=>new THREE.Quaternion());
     this.limbs=['L','R'].flatMap(side=>[
       {a:rig.bones['thigh'+side],b:rig.bones['calf'+side],c:rig.bones['foot'+side],side,part:'leg'},
       {a:rig.bones['upperArm'+side],b:rig.bones['forearm'+side],c:rig.bones['hand'+side],side,part:'arm'},
@@ -29,6 +31,22 @@ export class ProneGroundContact {
     this.skin=[];
     this.rig.root.traverse(mesh=>{
       if(!mesh.isSkinnedMesh)return;
+      for(const l of this.limbs)if(l.part==='arm'&&!l.restHinge){
+        const skeleton=mesh.skeleton,ia=skeleton.bones.indexOf(l.a),ib=skeleton.bones.indexOf(l.b);
+        if(ia<0||ib<0)continue;
+        const upper=skeleton.boneInverses[ia].clone().invert(),lower=skeleton.boneInverses[ib].clone().invert();
+        const q=new THREE.Quaternion();upper.decompose(new THREE.Vector3(),q,new THREE.Vector3());
+        // TengxianHumanoidV1 bind arms extend sideways, and flex toward source
+        // +Z. Store the SIGNED hinge in the upper arm, not a world-space pole.
+        l.restHinge=new THREE.Vector3().setFromMatrixPosition(lower).sub(new THREE.Vector3().setFromMatrixPosition(upper))
+          .normalize().cross(new THREE.Vector3(0,0,1)).normalize().applyQuaternion(q.invert());
+        const ic=skeleton.bones.indexOf(l.c);
+        if(ic>=0){
+          l.restWrist=new THREE.Quaternion();
+          skeleton.boneInverses[ib].clone().multiply(skeleton.boneInverses[ic].clone().invert())
+            .decompose(new THREE.Vector3(),l.restWrist,new THREE.Vector3());
+        }
+      }
       let vertices=skinProbeCache.get(mesh.geometry);
       if(!vertices){
       vertices=[];const indices=mesh.geometry.attributes.skinIndex,weights=mesh.geometry.attributes.skinWeight;
@@ -85,6 +103,38 @@ export class ProneGroundContact {
     bend.normalize();
     knee.copy(centre).addScaledVector(bend,radius);
     this.rig.locomotion.Aim(l.a,l.b,knee);this.rig.locomotion.Aim(l.b,l.c,target);
+    if(l.restHinge){
+      // Transport the anatomical bend axis after each terrain solve. Keeping
+      // the elbow position continuous does not prevent a backwards elbow:
+      // upper-arm roll must follow the signed shoulder/elbow/wrist plane too.
+      const [u,v,hinge,want]=this.hingeV,[upperQ,lowerQ,rollQ,parentQ]=this.hingeQ;
+      l.a.getWorldPosition(start);l.b.getWorldPosition(middle);l.c.getWorldPosition(end);
+      u.subVectors(middle,start).normalize();v.subVectors(end,middle).normalize();want.crossVectors(u,v);
+      if(want.lengthSq()>1e-5){
+        want.normalize();l.a.getWorldQuaternion(upperQ);l.b.getWorldQuaternion(lowerQ);
+        hinge.copy(l.restHinge).applyQuaternion(upperQ);
+        const angle=Math.atan2(u.dot(v.crossVectors(hinge,want)),hinge.dot(want));
+        upperQ.premultiply(rollQ.setFromAxisAngle(u,angle));
+        l.a.quaternion.copy(l.a.parent.getWorldQuaternion(parentQ).invert().multiply(upperQ));
+        // Preserve forearm pronation and the hand; this roll changes neither
+        // endpoints nor lengths, and does not transfer the error into the wrist.
+        l.b.quaternion.copy(l.b.parent.getWorldQuaternion(parentQ).invert().multiply(lowerQ));
+      }
+    }
+  }
+  OrientEnd(l,rotation) {
+    if(l.part==='arm'&&l.side==='R'&&l.restWrist&&this.rig.currentId==='ProneCrawl'){
+      // The carrying palm has an authored world orientation. Let the forearm
+      // take its pronation, while preserving its solved direction, instead of
+      // leaving terrain-induced roll at the wrist.
+      const [desired,parent,relative,align]=this.hingeQ,[axis,want,start,end]=this.hingeV;
+      desired.copy(rotation).multiply(relative.copy(l.restWrist).invert());
+      axis.copy(l.c.position).normalize().applyQuaternion(desired);
+      l.b.getWorldPosition(start);l.c.getWorldPosition(end);want.subVectors(end,start).normalize();
+      desired.premultiply(align.setFromUnitVectors(axis,want));
+      l.b.quaternion.copy(l.b.parent.getWorldQuaternion(parent).invert().multiply(desired));
+    }
+    l.c.quaternion.copy(l.c.parent.getWorldQuaternion(this.q[0]).invert().multiply(rotation));
   }
   Apply(state) {
     const rig=this.rig,actor=rig.actor,probe=actor?.factory?.groundProbe;
@@ -143,7 +193,7 @@ export class ProneGroundContact {
         const n=this.v[7].fromArray(normal).normalize();
         if(n.y>.5)rotation.premultiply(this.q[1].setFromUnitVectors(this.v[8].set(0,1,0),n));
       }
-      l.c.quaternion.copy(l.c.parent.getWorldQuaternion(this.q[0]).invert().multiply(rotation));
+      this.OrientEnd(l,rotation);
     }
     for(let pass=0;pass<4;pass++){
       let shifted=false;
@@ -162,7 +212,7 @@ export class ProneGroundContact {
     }
     for(const {l,end,pole,rotation} of targets){
       this.Solve(l,end,pole);
-      l.c.quaternion.copy(l.c.parent.getWorldQuaternion(this.q[0]).invert().multiply(rotation));
+      this.OrientEnd(l,rotation);
     }
     // Clothing is not identical across the shared skeleton. Correct against this
     // actor's visible skin, so a thicker puttee cannot sink into the same pose.
@@ -194,7 +244,7 @@ export class ProneGroundContact {
         if(!lift&&!bodyLift)continue;
         end.y+=lift;pole.y+=lift;
         this.Solve(l,end,pole);
-        l.c.quaternion.copy(l.c.parent.getWorldQuaternion(this.q[0]).invert().multiply(rotation));
+        this.OrientEnd(l,rotation);
       }
     }
     this.active=true;

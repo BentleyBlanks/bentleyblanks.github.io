@@ -20,6 +20,13 @@ def Bake(ctx):
     arm, scene, names = ctx['arm'], ctx['scene'], ctx['names']
     Bone, Point, Update, Move, Tilt, Chain, Aim = [ctx[k] for k in ('Bone','Point','Update','Move','Tilt','Chain','Aim')]
     f = ctx['authoringFactor']
+    restHinge = {}
+    for side in 'LR':
+        upper=Bone(side+' UpperArm');lower=Bone(side+' Forearm')
+        upperRest=arm.matrix_world @ upper.bone.matrix_local
+        lowerRest=arm.matrix_world @ lower.bone.matrix_local
+        direction=(lowerRest.translation-upperRest.translation).normalized()
+        restHinge[side]=upperRest.to_quaternion().inverted() @ direction.cross(Vector((0,-1,0))).normalized()
     # Read the full-size shipped prone hold as the neutral pose, before authoring motion.
     raw = ctx['source'].read_bytes(); length = struct.unpack_from('<I', raw, 12)[0]
     doc = json.loads(raw[20:20+length]); binary = raw[28+length:]
@@ -82,18 +89,29 @@ def Bake(ctx):
         p,_,scale=ctx['BWorld'](forearm).decompose()
         ctx['Put'](forearm,Matrix.LocRotScale(p,matrix.to_quaternion() @ relative.inverted(),scale))
         Aim(forearm,hand,matrix.translation);ctx['Put'](hand,matrix)
+    def ArmHinge(side):
+        # Positions alone do not define an anatomical elbow: shortest-arc Aim
+        # can leave the upper arm rolled 180 degrees and bend through its back.
+        upper,lower,hand=[Bone(side+' '+part) for part in ('UpperArm','Forearm','Hand')]
+        forearm=ctx['BWorld'](lower).copy();p=Point(upper)
+        u=(Point(lower)-p).normalized();v=(Point(hand)-Point(lower)).normalized()
+        hinge=ctx['BWorld'](upper).to_quaternion() @ restHinge[side]
+        want=u.cross(v).normalized()
+        angle=math.atan2(u.dot(hinge.cross(want)),hinge.dot(want))
+        ctx['Put'](upper,Matrix.Translation(p) @ Quaternion(u,angle).to_matrix().to_4x4() @ Matrix.Translation(-p) @ ctx['BWorld'](upper))
+        ctx['Put'](lower,forearm)
     def CarryArm(phase):
-        # The carrying arm does not bear body weight. Solve the elbow and
-        # wrist together at the settled hand height: forcing the elbow down
-        # while holding the palm horizontal folded the wrist by 60 degrees.
+        # Elbow outside the torso, fingers toward the centre. The old outward
+        # palm needed a backwards elbow or >120 degrees of forearm twist.
         upper,lower,hand=[Bone('R '+part) for part in ('UpperArm','Forearm','Hand')]
         shoulder=Point(upper);height=Point(hand).z
         upperLength=(Point(lower)-shoulder).length;lowerLength=(Point(hand)-Point(lower)).length
-        matrix=ctx['BWorld'](hand);dx=.02;dz=height-shoulder.z
+        matrix=ctx['BWorld'](hand);dx=-.17;dz=height+.045-shoulder.z
         ahead=math.sqrt(max(.003,upperLength**2-dx**2-dz**2))
         elbow=shoulder+Vector((dx,-ahead,dz))
-        reach,_=Cycle(phase);yaw=.30*reach
-        wrist=elbow+Vector((-math.cos(yaw),math.sin(yaw),0))*lowerLength
+        reach,_=Cycle(phase);yaw=-.12+.24*reach
+        horizontal=math.sqrt(lowerLength**2-.045**2)
+        wrist=elbow+Vector((math.cos(yaw)*horizontal,math.sin(yaw)*horizontal,-.045))
         Aim(upper,lower,elbow);Aim(lower,hand,wrist)
         matrix.translation=Point(hand);ctx['Put'](hand,matrix)
         AlignWrist()
@@ -132,11 +150,11 @@ def Bake(ctx):
                 # fingers run across the rifle, palm down, thumb opposite them.
                 for pb in arm.pose.bones:
                     if 'R Finger' in pb.name: pb.matrix_basis=ctx['rest'][pb.name]
-                Update();normal=ctx['TurnPalm']('R',(-1,0,0),(0,0,-1))
+                Update();normal=ctx['TurnPalm']('R',(1,0,0),(0,0,-1))
                 CarryFingers(normal)
                 grip=ctx['GripPoint']('R')
-                Aim(Bone('R Finger0'),Bone('R Finger01'),grip+Vector((.060,-.028,-.02)))
-                Aim(Bone('R Finger01'),Bone('R Finger02'),grip+Vector((.055,-.009,-.04)))
+                Aim(Bone('R Finger0'),Bone('R Finger01'),grip+Vector((-.060,.028,-.02)))
+                Aim(Bone('R Finger01'),Bone('R Finger02'),grip+Vector((-.055,.009,-.04)))
         # Measure each actual skin patch and settle it separately. Lifting the
         # whole body by its single lowest vertex leaves the other three limbs hovering.
         for contactPass in range(3):
@@ -155,6 +173,7 @@ def Bake(ctx):
                     p,q,scale=ctx['BWorld'](end).decompose();ctx['Put'](end,Matrix.LocRotScale(p,rotation,scale))
                     if kind=='foot': ProneFoot(side)
         CarryArm(phase)
+        for side in 'LR': ArmHinge(side)
         # Ground the visible skin, not the skeleton pivots.
         low,_=ctx['LowestVertex']()
         if low<.003: Move(Bone('Pelvis'),Point(Bone('Pelvis'))+Vector((0,0,.003-low)))
@@ -171,7 +190,7 @@ def Bake(ctx):
             data['tracks'].append({'name':n.replace(' ','_')+'.'+prop,'type':'vector' if prop=='position' else 'quaternion','times':times,'values':values})
     output.mkdir(parents=True,exist_ok=True); private.mkdir(parents=True,exist_ok=True)
     (output/'Animation_TengxianHumanoidV1ProneCrawl.json').write_text(json.dumps(data,separators=(',',':')),encoding='utf-8')
-    manifest={'version':'20260928ProneCrawlV3','skeleton':'TengxianHumanoidV1','clip':'ProneCrawl','fps':FPS,'duration':DURATION,
+    manifest={'version':'20260928ProneCrawlV4','skeleton':'TengxianHumanoidV1','clip':'ProneCrawl','fps':FPS,'duration':DURATION,
               'referenceMps':SPEED/f,'stance':STANCE,'minimumSkinHeight':round(min(minima)/f,6),
               'source':'BlenderMCP / Script_ProneCrawlBake.py','referenceModel':'TengxianNra02'}
     (output/'Data_ProneCrawl.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')

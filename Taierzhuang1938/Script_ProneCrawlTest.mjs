@@ -64,9 +64,28 @@ try {
    wristSkeleton.boneInverses[wristSkeleton.bones.indexOf(rig.bones.forearmR)].clone()
     .multiply(wristSkeleton.boneInverses[wristSkeleton.bones.indexOf(rig.bones.handR)].clone().invert())
     .decompose(new T.Vector3(),restWrist,new T.Vector3());
+   const armBinds=['L','R'].map(side=>{
+    const a=rig.bones['upperArm'+side],b=rig.bones['forearm'+side],c=rig.bones['hand'+side];
+    const skeleton=meshes.find(m=>m.skeleton.bones.includes(a)&&m.skeleton.bones.includes(c)).skeleton;
+    const rest=[a,b,c].map(bone=>skeleton.boneInverses[skeleton.bones.indexOf(bone)].clone().invert());
+    const [pa,pb,pc]=rest.map(m=>new T.Vector3().setFromMatrixPosition(m)),[qa,qb]=rest.map(m=>{const q=new T.Quaternion();m.decompose(new T.Vector3(),q,new T.Vector3());return q;});
+    return {side,a,b,c,hinge:pb.clone().sub(pa).normalize().cross(new T.Vector3(0,0,1)).normalize().applyQuaternion(qa.clone().invert()),
+      relative:qa.clone().invert().multiply(qb),axis:pc.sub(pb).normalize().applyQuaternion(qb.invert())};
+   });
+   function ArmAngles(bind){
+    const {a,b,c,hinge,relative,axis}=bind,qa=a.getWorldQuaternion(new T.Quaternion()),qb=b.getWorldQuaternion(new T.Quaternion());
+    const u=b.getWorldPosition(new T.Vector3()).sub(a.getWorldPosition(new T.Vector3())).normalize(),v=c.getWorldPosition(new T.Vector3()).sub(b.getWorldPosition(new T.Vector3())).normalize();
+    const normal=hinge.clone().applyQuaternion(qa),cross=u.clone().cross(v),bend=Math.atan2(normal.dot(cross),u.dot(v));
+    const neutral=qa.clone().multiply(relative),neutralAxis=axis.clone().applyQuaternion(neutral);
+    neutral.premultiply(new T.Quaternion().setFromUnitVectors(neutralAxis,v));
+    const delta=qb.multiply(neutral.invert());let twist=2*Math.atan2(new T.Vector3(delta.x,delta.y,delta.z).dot(v),delta.w);
+    twist=T.MathUtils.euclideanModulo(twist+Math.PI,2*Math.PI)-Math.PI;
+    return {bend,hingeError:normal.angleTo(cross),twist:Math.abs(twist)};
+   }
    f.groundProbe=(x,z)=>({y:ground(x,z),normal:new T.Vector3(-(ground(x+.001,z)-ground(x-.001,z))/.002,1,-(ground(x,z+.001)-ground(x,z-.001))/.002).normalize().toArray()});
    let minimum=Infinity,maximumLengthError=0,maxSupportSlip=0,worst=null;const costs=[];const baseLengths=new Map(),start=new T.Vector3(),p=new T.Vector3();
    const frameBones=[],previousRotations=new Map();let maxJointStep=0,maxGripError=0,maxGripAlongError=0,maxWristBend=0,maxWristRotation=0,maxToeRise=-Infinity,minFootAlignment=1,maxGripSkinDepth=0,maxThumbGap=0,maxFingerGap=0,gripSkinSamples=0,probeGrip,gripWorst,invalidGripDepth=0;const jointSteps={};
+   let minElbowFlexion=Infinity,maxElbowFlexion=0,maxElbowHingeError=0,maxForearmTwist=0,invalidElbowFlexion=0;
    for(let frame=0;frame<160;frame++){
     actor.root.position.z=-frame*.3/30;actor.root.position.y=ground(0,actor.root.position.z);
     const before=performance.now();
@@ -77,6 +96,16 @@ try {
       l.c.getWorldPosition(p);maxSupportSlip=Math.max(maxSupportSlip,Math.hypot(p.x-l.anchor.x,p.z-l.anchor.z));
     }
     actor.root.updateMatrixWorld(true);
+    for(const bind of armBinds){const angles=ArmAngles(bind);minElbowFlexion=Math.min(minElbowFlexion,angles.bend);maxElbowFlexion=Math.max(maxElbowFlexion,angles.bend);maxElbowHingeError=Math.max(maxElbowHingeError,angles.hingeError);maxForearmTwist=Math.max(maxForearmTwist,angles.twist);}
+    if(frame===20){
+      // Same endpoints and wrist, but a backwards upper-arm hinge, as in V3.
+      // The new check must reject it; position/length/wrist tests cannot.
+      const bind=armBinds[1],{a,b}=bind,oldA=a.quaternion.clone(),oldB=b.quaternion.clone(),worldB=b.getWorldQuaternion(new T.Quaternion());
+      const axis=b.getWorldPosition(new T.Vector3()).sub(a.getWorldPosition(new T.Vector3())).normalize();
+      const q=a.getWorldQuaternion(new T.Quaternion()).premultiply(new T.Quaternion().setFromAxisAngle(axis,Math.PI));
+      a.quaternion.copy(a.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(q));b.quaternion.copy(b.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(worldB));
+      invalidElbowFlexion=ArmAngles(bind).bend;a.quaternion.copy(oldA);b.quaternion.copy(oldB);actor.root.updateMatrixWorld(true);
+    }
     if(frame===20){probeGrip=GripSkinProbe(actor);invalidGripDepth=probeGrip(-.05).maximumDepth;}
     if(frame%4===0){const measurement=probeGrip();if(measurement.maximumDepth>maxGripSkinDepth){maxGripSkinDepth=measurement.maximumDepth;gripWorst={frame,...measurement.worst};}maxThumbGap=Math.max(maxThumbGap,measurement.gaps.thumb);maxFingerGap=Math.max(maxFingerGap,measurement.gaps.fingers);gripSkinSamples+=measurement.samples;}
     for(const key of ['thighL','thighR','calfL','calfR','upperArmL','upperArmR','forearmL','forearmR']){
@@ -115,7 +144,7 @@ try {
    const movingId=rig.currentId;
    actor.Update(1/30,{prone:1,moveSpeed:1,moveSpeedMps:1,elapsed:160/30,locomotionTracked:true});
    const stopped={id:rig.currentId,speed:rig.locomotion.speedMps};
-   rows.push({name,kind,modelVariant,movingId,minimum,worst,maximumLengthError,maxSupportSlip,maxJointStep,jointSteps,maxGripError,maxGripAlongError,maxWristBend,maxWristRotation,maxGripSkinDepth,maxThumbGap,maxFingerGap,gripSkinSamples,gripWorst,invalidGripDepth,maxToeRise,minFootAlignment,poseP95Ms:costs.sort((a,b)=>a-b)[Math.floor(costs.length*.95)],travel:Object.fromEntries(['handL','handR','calfL','calfR','footL','footR'].map(n=>[n,range(n)])),stopped});
+   rows.push({name,kind,modelVariant,movingId,minimum,worst,maximumLengthError,maxSupportSlip,maxJointStep,jointSteps,maxGripError,maxGripAlongError,maxWristBend,maxWristRotation,minElbowFlexion,maxElbowFlexion,maxElbowHingeError,maxForearmTwist,invalidElbowFlexion,maxGripSkinDepth,maxThumbGap,maxFingerGap,gripSkinSamples,gripWorst,invalidGripDepth,maxToeRise,minFootAlignment,poseP95Ms:costs.sort((a,b)=>a-b)[Math.floor(costs.length*.95)],travel:Object.fromEntries(['handL','handR','calfL','calfR','footL','footR'].map(n=>[n,range(n)])),stopped});
    actor.Dispose();
   }
   const scene=new T.Scene();scene.background=new T.Color('#bac4ce');scene.add(new T.HemisphereLight(0xffffff,0x57514a,2.5));
@@ -181,7 +210,7 @@ try {
  const finger=suffix=>Object.entries(hand).find(([name])=>name.endsWith(suffix))[1];
  // Opposing digits enclose the wood: a coincident socket alone can pass with
  // an open hand or with all fingers on the same side of the rifle.
- assert.ok(finger('R_Finger01')[0]<-.015&&finger('R_Finger21')[0]>.02,'thumb and fingers must oppose across rifle');
+ assert.ok(finger('R_Finger01')[0]>.015&&finger('R_Finger21')[0]<-.02,'thumb and inward-facing fingers must oppose across rifle');
  assert.ok(finger('R_Finger2')[1]>.045&&finger('R_Finger22')[1]<.035,'middle finger must wrap from above barrel to lower stock');
  await page.screenshot({path:path.join(out,'Grip.png')});
  await page.evaluate(async()=>{
@@ -192,6 +221,10 @@ try {
  await page.screenshot({path:path.join(out,'Feet.png')});
  console.log(JSON.stringify(report,null,2));
  for(const row of report){
+  assert.ok(row.minElbowFlexion>10*Math.PI/180&&row.maxElbowFlexion<150*Math.PI/180,`signed elbow flexion ${row.minElbowFlexion*180/Math.PI} .. ${row.maxElbowFlexion*180/Math.PI}`);
+  assert.ok(row.maxElbowHingeError<5*Math.PI/180,`elbow off hinge ${row.maxElbowHingeError*180/Math.PI} degrees`);
+  assert.ok(row.maxForearmTwist<95*Math.PI/180,`excess forearm twist ${row.maxForearmTwist*180/Math.PI} degrees`);
+  assert.ok(row.invalidElbowFlexion<0,'signed hinge check must reject a backwards elbow with unchanged endpoints');
   assert.ok(row.maxJointStep<Math.PI/12,`${row.name}/${row.kind}/${row.modelVariant} joint snap ${row.maxJointStep*180/Math.PI} degrees/frame`);
   assert.ok(row.maxToeRise<-.035&&row.minFootAlignment>.9,`ankle must point down/back with calf: ${row.maxToeRise}/${row.minFootAlignment}`);
   assert.ok(row.maxGripAlongError<.005,`rifle centre carry ${row.maxGripAlongError}`);
