@@ -117,12 +117,12 @@ export const WHITEBOX_LOOK_RULES = Object.freeze([
   { id: /Sill$/, semantic: /^(structure|step)$/, look: "stone" },
   { id: /Court(Mill|Well)|Mill(Stone)?$|Well$/, semantic: /^structure$/, look: "stone" },
   // 关尾北门：城墙、瓮城、垛口是城砖，城楼是旧漆木
-  { id: /^Night(Wall|Barbican|CityMerlon|GateLintel|GateHaunch)/, look: "cityBrick" },
+  { id: /^Night(Wall|Barbican|CityMerlon|GateLintel|GateHaunch)/, semantic: /^(plaster|cover|structure)$/, look: "cityBrick" },
   { id: /^NightGateTower$/, look: "paintedWood" },
   // 接收院的病房（参考图 16）：屋里是刷过白灰的墙
   { id: /Ward/, semantic: /^(cover|plaster)$/, look: "limePlaster" },
   // 灶台、炕、烟囱：泥抹的
-  { id: /Hearth|Stove|Kang(?!Mat)|Chimney/, semantic: /^(earthDark|plaster|structure|cover)$/, look: "mudPlaster" },
+  { id: /Hearth|Stove|Kang(?!Mat)|Chimney|Flue/, semantic: /^(earthDark|plaster|structure|cover)$/, look: "mudPlaster" },
   // 墙裙（House() 的 Plinth）是青砖碱脚
   { id: /Plinth/, look: "brickPlinth" },
   { id: /Jar/, semantic: /^earthDark$/, look: "jar" },
@@ -134,6 +134,9 @@ export const WHITEBOX_LOOK_RULES = Object.freeze([
   { id: /StoneWall|VillageWall|FieldStone|Stones?\d*$/, semantic: /^(cover|plaster|structure|railBallast)$/, look: "stone" },
   { id: /Brick/, semantic: /^railBallast$/, look: "greyBrick" },
   { id: /Rubble|Chips|Spill|Bats/, semantic: /^(plaster|structure|cover)$/, look: "greyBrick" },
+  // 前沿的残屋断墙段（…Ruin / …RuinA / …Ruin3）是砖；土色语义的「墙」是夯土残墙（接运路两侧、碎墙段）
+  { id: /Ruin[A-Z]?\d*$/, semantic: /^(cover|structure|plaster)$/, look: "greyBrick" },
+  { id: /Wall/, semantic: /^earthDark$/, look: "mudPlaster" },
   // 前沿土工事：沟里的横墙、胸墙、土坎、弹坑沿、射击台
   { id: /Trench|Bay$|Parapet|Traverse|Mound|Ridge|Bank|Crater|Scrape|GunRest|GunSide|Lip$|Rally|Drain|Backslope|Spoil|Berm|Defense/,
     semantic: /^(cover|structure)$/, look: "earthWork" },
