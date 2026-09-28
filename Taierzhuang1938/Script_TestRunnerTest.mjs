@@ -157,6 +157,16 @@ for(const file of ['Script_PostPrepass.mjs','Script_Actor.mjs','Script_Viewmodel
 }
 const texturePrepush = ResolveSelection(ParseArgs(["--changed=origin/master", "--profile=prepush"]), textureChange.domains, textureChange);
 Check(texturePrepush.includes("BootTest") && texturePrepush.includes("BootStallTest"), "贴图推送前追加开机与挂死门禁");
+// 贴图资产规范（2026-09-28）：贴图、清单、通用烘焙脚本（.py 也不忽略）、烘焙记录都映射 textureAssets 域。
+for (const file of ["Texture/Texture_BrickWallBase.webp", "Data_TextureManifest.mjs", "_import/Script_BakePbrTexture.py",
+  "_import/TextureBakes/Texture_TerrainFieldSoil.json", "Data_LevelTextureSets.mjs"]) {
+  const change = InferDomains([`Taierzhuang1938/${file}`]);
+  Check(change.domains.includes("textureAssets") && !change.ignoredProjectFiles.length, `${file} 映射 textureAssets 域`);
+  Check(ResolveSelection(ParseArgs(["--changed=origin/master"]), change.domains, change).includes("TextureStandardsTest"),
+    `${file} 的编辑循环跑 TextureStandardsTest`);
+}
+Check(InferDomains(["Taierzhuang1938/_import/Script_BakeTerrainLayers.py"]).ignoredProjectFiles.length === 1,
+  "其余 .py 烘焙脚本仍按离线工具忽略");
 
 const trackedProjectResult = spawnSync("git", ["ls-files", "Taierzhuang1938"], {
   cwd: path.resolve(dirHere, ".."),

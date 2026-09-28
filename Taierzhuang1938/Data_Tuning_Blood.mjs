@@ -1,6 +1,6 @@
 // Shared blood rendering, in metres and seconds. Visual calibration: BloodEffectsTest.
 // Decal approach: Unity URP decal documentation; source texture: ExileGL, CC0.
-export const BLOOD_TEXTURE = "./Texture/Texture_BloodSplatterCc0.png";
+export const BLOOD_TEXTURE = "./Texture/Texture_BloodSplatterCc0.webp?v=20260928";
 // Drops doubled 2026-09-13: a pumping stump keeps 15–25 drops in flight, and a close
 // grenade opens up to four stumps at once (docs/Data_Dismemberment.md §11.8).
 export const BLOOD_QUALITY = Object.freeze({

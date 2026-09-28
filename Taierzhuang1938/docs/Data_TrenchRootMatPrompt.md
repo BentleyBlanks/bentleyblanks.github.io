@@ -1,6 +1,6 @@
 # 枯草根毯生成记录
 
-2026-09-26，直接内置 `image_gen__imagegen`，单张生成，`transparent_background: true`，未使用 CLI 或付费回退。输出原样复制到 `Texture/Texture_TrenchRootMat.png`，1254×1254 RGBA；不是用概念参考图裁出的图片。
+2026-09-26，直接内置 `image_gen__imagegen`，单张生成，`transparent_background: true`，未使用 CLI 或付费回退。输出原样复制到 `Texture/Texture_TrenchRootMat.png`，1254×1254 RGBA（2026-09-28 按贴图资产规范转 `.webp`：有损 q95、alpha 逐位不变）；不是用概念参考图裁出的图片。
 
 完整提示词：
 

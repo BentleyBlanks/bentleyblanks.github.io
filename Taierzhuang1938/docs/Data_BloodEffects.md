@@ -95,7 +95,7 @@ CPU 只追踪有上限的可碰撞液滴，GPU 与 CPU 使用相同的解析解�
 
 仅下载一张实际使用的免费纹理，没有批量生成图片或动画。
 [Blood Splatter，ExileGL](https://opengameart.org/content/blood-splatter)，页面声明 CC0。
-原始 PNG 1600×1200 原样进入 `Texture/Texture_BloodSplatterCc0.png`，详见来源登记。
+原始 PNG 1600×1200 原样进入 `Texture/Texture_BloodSplatterCc0.png`；2026-09-28 转 `Texture_BloodSplatterCc0.webp`（只有 alpha 被采样，alpha 逐位不变、RGB 有损），详见来源登记。
 纹理控制飞溅细节，池边与扩散由着色器控制；下载失败仍有程序化轮廓兜底。
 
 投影依赖实际不透明表面的深度；透明玻璃／水面不支持。薄投影体积内、法线方向合格的

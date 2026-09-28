@@ -177,6 +177,7 @@ export const testDefs = {
     desc: "P012节点、担架扫掠、三态枢纽与敌军遮挡来向（纯 Node）" },
   FirstLevelP012TerrainTest: { file: "Script_FirstLevelP012TerrainTest.mjs", desc: "P012连续地形、道路基底和渲染三角形共享高度（纯 Node）" },
   TerrainLayersTest: { file: "Script_TerrainLayersTest.mjs", desc: "分层地形材质：图层贴图存在/尺寸/体积红线、远近平铺非整数倍、烘焙脚本同步、第一关 splat 权重（纯 Node）" },
+  TextureStandardsTest: { file: "Script_TextureStandardsTest.mjs", desc: "贴图资产规范：Texture/ ↔ 清单一一对应、命名/格式/2 的幂/套件完整、来源与消费方、烘焙记录、分层体积、关卡按需集、无戳 URL、legacy 只许变短（纯 Node）" },
   FirstLevelP012TerrainBrowserTest: { file: "Script_FirstLevelP012TerrainBrowserTest.mjs", timeoutMs:240000, desc: "P012实际地形渲染、人物胶囊坡地、弹坑碰撞与预算" },
   FirstLevelP012DebugTest: { file: "Script_FirstLevelP012DebugTest.mjs", timeoutMs: 300000, desc: "P012真实调试菜单逐段跳转与NPC剧情衔接" },
   FirstLevelP012FlowTest: { file: "Script_FirstLevelP012FlowTest.mjs",
@@ -513,6 +514,7 @@ export const tier0Fast = [
   "TextGatherCheck",
   "BootPayloadTest",
   "TerrainLayersTest",
+  "TextureStandardsTest",
   "AssetStandardsTest",
   "ModelFacingTest",
   "TestRunnerTest",
@@ -679,9 +681,17 @@ export const domains = {
     label: "参考火车资产与构件库接入",
     tests: ["TrainLibraryTest", "ExternalPropAssetTest", "AssetStandardsTest"],
   },
+  // 贴图资产规范（docs/Data_TextureAssetStandard.md）：清单、烘焙脚本 / 预设 / 记录、关卡按需集。
+  // 四项都是纯 Node 毫秒级；贴图本身的改动另由 render 域与 prepush 的 BootTest / BootStallTest 兜。
+  textureAssets: {
+    label: "贴图资产规范与烘焙",
+    tests: ["TextureStandardsTest", "TerrainLayersTest", "BootPayloadTest", "AssetStandardsTest"],
+  },
 };
 
 const changedDomainRules = [
+  // 贴图资产规范：Texture/ 下任何文件、清单、通用烘焙脚本与预设、烘焙记录、关卡按需集。
+  {domain:"textureAssets",pattern:/\/Texture\/|Data_TextureManifest|Script_BakePbrTexture|Data_TextureBakePresets|\/TextureBakes\/|Script_TextureStandards|Data_LevelTextureSets|Script_LevelTextureSets/},
   {domain:"allyGait",pattern:/AllyGait|Script_FirstLevelP012CastAppearance/},
   {domain:"firstLevel",pattern:/Cigarette/},
   {domain:"firstLevel",pattern:/SandbagStandard/},
@@ -715,7 +725,8 @@ const changedDomainRules = [
   { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },
   {domain:"firstLevel",pattern:/Type89Damage/},
   {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|CharacterFaceBlood|SpeechEnvelope|NraFacial|Nra05Facial|Lugou\w*Facial|SpeakerBinder|SpeakerHeadLayer|SpeakerGesture|SpeakingCast|FaceTrack|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
-  { domain: "animation", pattern: /ActorLocomotion|LocomotionProfileBake/ },
+  // Script_LayeredGait（分层步态，docs/Data_ActorLocomotion.md）由 ActorLocomotionTest 验收：2026-09-28 补上映射。
+  { domain: "animation", pattern: /ActorLocomotion|LocomotionProfileBake|LayeredGait/ },
   {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing|GrenadeThrow/},
   {domain:"combat",pattern:/HitDisorientation/},
   {domain:'render',pattern:/TerrainBlend|TrenchSurfaceMaterial/},
@@ -863,7 +874,8 @@ const ignoredChangeRules = [
   /\/docs\//i,
   /\/(?:AGENTS|README)[^/]*\.md$/i,
   /\.md$/i,
-  /\.(?:py|ps1|ms|blend|mtl|txt)$/i,
+  // 例外：通用贴图烘焙脚本改了要跑 textureAssets（它的输出口径由 TextureStandardsTest 核对）。
+  /^(?!.*\/_import\/Script_BakePbrTexture\.py$).*\.(?:py|ps1|ms|blend|mtl|txt)$/i,
   /\/(?:_raw|_shots)\//i,
   /\/\.gitignore$/i,
 ];
