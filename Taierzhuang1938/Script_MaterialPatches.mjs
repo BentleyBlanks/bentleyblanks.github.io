@@ -881,16 +881,24 @@ export function MakeWhiteboxWeatherUniforms(tuning) {
  * 挂在表面补丁那一格（`MaterialLibrary.InjectSurface`）：它改的是反照率 / 粗糙度 / 法线，
  * 与 ORM 三合一共存（ORM 在它之后声明 gOrmTexel，互不读写）。不编 SSR。
  * 数值口径：Data_Tuning_Materials.WHITEBOX_WEATHERING；`strength` 是每个外观自己的倍率。
+ *
+ * 抹面剥落（2026-09-28 第二轮，`peel`）：贴图里自带的剥落斑按固定格子重复，铺满一面墙就成了迷彩圆斑。
+ * 墙面中部把贴图对比往它自己的均色收（`flatten`，均色取同一采样器的末级 mip，不多一个采样器），
+ * 剥落改由程序噪声生成、只长在墙根 / 墙角 / 块顶附近（离地高与离竖棱距离调制概率），
+ * 露出底下的土坯或青砖（`substrate` 0 = 土坯泥色、1 = 青砖层），边缘不规则、带一圈抹面厚度的暗边。
  * @param {object} shared MakeWhiteboxWeatherUniforms 的返回值（全场共用）
  * @param {number} strength 0..1
+ * @param {{flatten?:number, amount?:number, substrate?:number}} peel 抹面剥落（缺省不剥）
  */
-export function MakeWhiteboxWeatherPatch(shared, strength = 1) {
+export function MakeWhiteboxWeatherPatch(shared, strength = 1, peel = null) {
   const strengthUniform = { value: strength };
+  const peelUniform = { value: [peel?.flatten ?? 0, peel?.amount ?? 0, peel?.substrate ?? 0, 0] };
   return MakePatch({
-    key: "wbWeather1",
+    key: "wbWeather2",
     uniforms: (uniforms) => {
       Object.assign(uniforms, shared);
       uniforms.uWbStrength = strengthUniform;
+      uniforms.uWbPeel = peelUniform;
     },
     vertex: [
       ["#include <common>", /* glsl */`
@@ -915,6 +923,7 @@ export function MakeWhiteboxWeatherPatch(shared, strength = 1) {
         uniform vec4 uWbEdge;
         uniform vec4 uWbMacro;
         uniform float uWbStrength;
+        uniform vec4 uWbPeel;
         varying vec3 vWbWorld;
         varying vec3 vWbNormal;
         varying vec4 vWbFace;
@@ -945,6 +954,36 @@ export function MakeWhiteboxWeatherPatch(shared, strength = 1) {
           vec2 wbMacroP = (vWbWorld.xz + vec2(vWbWorld.y * 0.61, -vWbWorld.y * 0.37)) / uWbMacro.x;
           float wbMacro = WbNoise(wbMacroP) * 0.65 + WbNoise(wbMacroP * 2.7 + 11.3) * 0.35;
           diffuseColor.rgb *= 1.0 + (wbMacro - 0.5) * 2.0 * uWbMacro.y * wbS;
+          // 抹面剥落：墙中部收贴图自带斑块的对比，程序剥落只长在墙根 / 竖棱 / 块顶一带
+          if (uWbPeel.x + uWbPeel.y > 0.0) {
+            float wbEdgeH = min(vWbFace.x, vWbFace.z - vWbFace.x);
+            // 墙根带随墙高收窄：一人高的矮墙不能整面都算「墙根」
+            float wbBaseTop = clamp((vWbSpan.y - vWbSpan.x) * 0.3, 0.3, 0.95);
+            float wbZone = max(max(1.0 - smoothstep(0.15, wbBaseTop, wbH), 1.0 - smoothstep(0.06, 0.55, wbEdgeH)),
+              (1.0 - smoothstep(0.05, 0.4, wbBelowTop)) * 0.6) * wbWall;
+            #ifdef USE_MAP
+              vec3 wbMeanTex = texture2D(map, vMapUv, 12.0).rgb;
+              vec3 wbFlat = diffuseColor.rgb / max(sampledDiffuseColor.rgb, vec3(0.004)) * wbMeanTex;
+              diffuseColor.rgb = mix(diffuseColor.rgb, wbFlat, uWbPeel.x * (1.0 - wbZone) * wbWall);
+            #endif
+            vec2 wbPP = vec2(wbAlong, vWbWorld.y);
+            float wbPN = WbNoise(wbPP * 1.6) * 0.55 + WbNoise(wbPP * 4.3 + 7.1) * 0.3 + WbNoise(wbPP * 12.0 + 3.3) * 0.15;
+            float wbField = wbPN + wbZone * 0.55 - 0.92;
+            float wbPeelMask = smoothstep(0.0, 0.03, wbField) * uWbPeel.y * wbWall;
+            float wbRim = (smoothstep(-0.045, 0.0, wbField) - smoothstep(0.0, 0.03, wbField)) * uWbPeel.y * wbWall;
+            // 底层：土坯（0.30 × 0.10 m 泥砖、泥缝）或青砖（0.24 × 0.055 m、灰缝），同一套错缝
+            float wbCourse = mix(0.10, 0.055, uWbPeel.z), wbLen = mix(0.30, 0.24, uWbPeel.z);
+            float wbRow = floor(vWbWorld.y / wbCourse);
+            vec2 wbB = vec2(wbAlong / wbLen + mod(wbRow, 2.0) * 0.5, vWbWorld.y / wbCourse);
+            vec2 wbBf = fract(wbB);
+            float wbFace = smoothstep(0.02, 0.06, min(wbBf.x, 1.0 - wbBf.x)) * smoothstep(0.04, 0.12, min(wbBf.y, 1.0 - wbBf.y));
+            float wbCell = WbHash(floor(wbB) + 17.0);
+            vec3 wbUnit = mix(vec3(0.19, 0.145, 0.10), vec3(0.085, 0.085, 0.09), uWbPeel.z) * (0.78 + 0.44 * wbCell);
+            vec3 wbJoint = mix(vec3(0.13, 0.10, 0.075), vec3(0.23, 0.22, 0.20), uWbPeel.z);
+            vec3 wbSub = mix(wbJoint, wbUnit, wbFace);
+            diffuseColor.rgb = mix(diffuseColor.rgb, wbSub, wbPeelMask);
+            diffuseColor.rgb *= 1.0 - 0.4 * wbRim;
+          }
           // 墙根返潮：上沿锯齿
           float wbRag = WbNoise(vec2(wbAlong * 1.3, 17.0)) * 0.7 + WbNoise(vec2(wbAlong * 4.1, 3.0)) * 0.3;
           float wbDampTop = uWbDamp.x + (wbRag - 0.5) * 2.0 * uWbDamp.y;

@@ -650,6 +650,17 @@ export const SFX_SOURCES = [
     cuts: [{ cue: "impactFlesh", tail: 0.5, gain: 0.95, whole: true }],
   },
 
+  // 2026-09-27 开场改稿（docs/Data_OpeningPinnedRescue20260927.md）：日兵甲原地审问时扇顺子的耳光
+  // （用户：「把从枪托改成扇巴掌」）。镜像里真的「扇脸」只有这一条（2015—2026 各届搜过 slap/smack）。
+  {
+    id: "FaceSlap",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "The Chris Alan - Hand-to-Hand Combat - Body Hits & Vocal Excursions/Hand-to-Hand Combat - Body Hits - Face Slap Hard 04.mp3",
+    credit: "The Chris Alan · 重扇耳光 · Sonniss GDC 2018",
+    license: "sonniss",
+    cuts: [{ cue: "slap", tail: 0.2, gain: 0.95, whole: true, alignDbfs: -16 }],
+  },
+
   // === 身体 ===============================================================
   {
     id: "StepDirt19",
@@ -1758,6 +1769,15 @@ export const SFX_SOURCES = [
       { cue: "rifleIjaFar", durS: 1.8, files: ["AudioSfx_SeedAudioRifleIjaFar_01.mp3"],
         credit: "Volcengine SeedAudio 1.0 · rifleIjaFar · 2026-09-11" },
     ],
+  },
+  // 2026-09-27 开场 02 反冲锋「杀喊声四起（全都是四川话）」：一整片四川口音喊杀的铺底（Script_SeedAudioChargeBake 烘、选 take）。
+  {
+    id: "ChargeCrowdSeedAudio",
+    seedAudio: true,
+    bake: "Script_SeedAudioChargeBake.mjs",
+    license: "volcengine",
+    credit: "Volcengine SeedAudio 1.0 · 四川口音的一片喊杀声 · 2026-09-27",
+    cuts: [{ cue: "chargeCrowd", durS: 5.62, files: ["AudioSfx_SeedAudioChargeCrowd_01.mp3"] }],
   },
   // 战车那一批：成品由 Script_TankAudioBake.mjs 烘，这里只负责在全量 SfxBake 时把它们重新登记进清单。
   ...TANK_SFX.map((entry) => ({

@@ -36,6 +36,9 @@ for (const [quality, plan] of Object.entries(plans))
     `${quality} 档 ${plan.instances.length} ≤ 上限 ${VEGETATION_QUALITY[quality].maxInstances}（撒出 ${plan.stats.planned}）`);
 Check(plans.low.instances.length <= plans.high.instances.length, "低档不多于高档");
 Check(high.instances.length > 5000, "高档确实长了草（> 5000 件）");
+Check(high.stats.thicket >= 200 && high.stats.bankTop > 10, `有低矮灌木丛（${high.stats.thicket} 丛）与坎上矮草（${high.stats.bankTop} 件）`);
+const reeds = VEGETATION_CARDS.find((c) => c.id === "Reeds");
+Check(reeds.shade && reeds.shade.every((v) => v < 0.75), "芦苇顶点色压暗（不发白）");
 const counts = {};
 for (const it of high.instances) counts[VEGETATION_CARDS[it.card].id] = (counts[VEGETATION_CARDS[it.card].id] || 0) + 1;
 Check(VEGETATION_CARDS.every((card) => counts[card.id] > 50), `八种卡片都用上了（${JSON.stringify(counts)}）`);
@@ -66,7 +69,7 @@ const bad = { route: 0, anchor: 0, solid: 0, roof: 0, trench: 0, track: 0, crate
 const examples = {};
 const Mark = (key, it) => { bad[key]++; examples[key] ||= `${it.x.toFixed(1)},${it.z.toFixed(1)}`; };
 for (const it of high.instances) {
-  const card = VEGETATION_CARDS[it.card], clusterSlack = VEGETATION.clusterSpreadM * 1.42;
+  const card = VEGETATION_CARDS[it.card], clusterSlack = Math.max(VEGETATION.clusterSpreadM, VEGETATION.thicketSpreadM) * 1.42;
   const dRoute = routes.Distance(it.x, it.z, 20);
   if (dRoute < VEGETATION.routeClearM - clusterSlack) Mark("route", it);
   const dAnchor = anchors.Distance(it.x, it.z, 20);

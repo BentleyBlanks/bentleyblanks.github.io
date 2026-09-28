@@ -30,7 +30,16 @@
 //   · 北沙河河槽、西沟浅滩（RiverCutAt 取 min）在修饰之后算：河岸以内改不了。
 //   · 四处 9 m 回归自然缓坡（(-62,64)、(54,114)、(52,209.5)、接收院入口 (-13,240)）在修饰之后算：
 //     这四处 9 m 内的修饰会被压回自然地面（保护沟口与院口的可走坡）。
-//   · 纹理层（路面/抛土/麦茬）不读这里：下沉路的路面颜色仍按 MISSION_TERRAIN.roads 走。
+//   · 纹理层（路面/抛土/麦茬）不读 shapes：下沉路的路面颜色仍按 MISSION_TERRAIN.roads 走。
+//
+// ── 小路（每区可选的 paths 数组，2026-09-28 引导轮，docs/Data_FirstLevelGuidance20260928.md §3）──
+//   { id, points:[{x,z},…], width, wear?, note }
+//   踩出来的路：**只画不挖** —— 只进地表纹理层（SampleMissionGroundSurface 的 track 层 +
+//   麦茬退让），不进高度采样（Apply 不读它，SampleMissionTerrain 逐位不变，07+ 地面指纹不动）。
+//   width 是路面全宽（米，脚径 1.2–2.5、车辙 3–5），wear 0–1 是踩实程度（缺省 0.85；路面纹理权重
+//   = wear × 核心 1 → 外沿 1.8 m 内落到 0）。用途：把玩家要走的路线画在地上（村巷、院墙夹道、
+//   去桥的田埂路、桥南撤出路），是「有明确路线的地方要有一条像路一样的存在」那条要求的载体。
+//   同样只许落在本区 boxes 内（连 1.8 m 的染色边），Script_FirstLevelWhiteboxTerrainTest 断言。
 // 纯数据 + 纯函数，无 three 依赖（AGENTS.md 跨系统契约 2）。
 import { WHITEBOX_TERRAIN_FRONT } from "./Data_FirstLevelWhiteboxTerrainFront.mjs";
 import { WHITEBOX_TERRAIN_VILLAGE } from "./Data_FirstLevelWhiteboxTerrainVillage.mjs";
@@ -42,6 +51,15 @@ export const WHITEBOX_TERRAIN_REGIONS = Object.freeze([
 ]);
 export const WHITEBOX_TERRAIN_KINDS = Object.freeze(["disc", "box", "polygon", "line"]);
 export const WHITEBOX_TERRAIN_OPS = Object.freeze(["level", "raise", "cut"]);
+/** 小路染色边（米）：路面全宽之外再羽化这么宽落到 0，与 MISSION_TERRAIN.roads 的 1.8 m 同口径。 */
+export const WHITEBOX_PATH_EDGE_M = 1.8;
+export const WHITEBOX_PATH_DEFAULT_WEAR = 0.85;
+/** 小路（连染色边）的外接框：这一框之外它对地表纹理的贡献严格为 0。 */
+export function WhiteboxPathBounds(path) {
+  const pad = path.width / 2 + WHITEBOX_PATH_EDGE_M;
+  const xs = (path.points || []).map((p) => p.x), zs = (path.points || []).map((p) => p.z);
+  return { minX: Math.min(...xs) - pad, maxX: Math.max(...xs) + pad, minZ: Math.min(...zs) - pad, maxZ: Math.max(...zs) + pad };
+}
 
 const Smooth = (value) => {
   const t = value < 0 ? 0 : value > 1 ? 1 : value;
@@ -110,14 +128,17 @@ export function WhiteboxShapeWeight(shape, x, z) {
 
 /**
  * 把分区表编译成一个采样钩子。`regions` 缺省为四区正式表；测试可以传自造的表。
- * 返回 { regions, shapes, bounds, Apply(x, z, height, natural) }。
+ * 返回 { regions, shapes, paths, bounds, Apply(x, z, height, natural) }。
  * Apply 在没有任何形状覆盖 (x,z) 时原样返回传进来的 height（同一个 number，逐位不变）。
+ * paths 是四区小路的平铺表（{ id, region, points, width, wear }，note 已剥掉），只给地表纹理采样读。
  */
 export function CompileWhiteboxTerrain(sourceRegions = WHITEBOX_TERRAIN_REGIONS) {
   // 形状的 note 是给人看的中文说明，留在分区源表里；编译结果会挂进任务数据
   // （FIRST_LEVEL_MISSION_PHASE……terrainSpec），字体子集取字器会把那里的字符串当界面文案扫。
   const regions = sourceRegions.map((region) => ({ ...region,
-    shapes: region.shapes.map(({ note, ...shape }) => shape) }));
+    shapes: region.shapes.map(({ note, ...shape }) => shape),
+    paths: (region.paths || []).map(({ note, ...path }) => ({ wear: WHITEBOX_PATH_DEFAULT_WEAR, ...path })) }));
+  const paths = regions.flatMap((region) => region.paths.map((path) => Object.freeze({ ...path, region: region.id })));
   const shapes = [];
   for (const region of regions) for (const shape of region.shapes) {
     const b = WhiteboxShapeBounds(shape);
@@ -152,7 +173,7 @@ export function CompileWhiteboxTerrain(sourceRegions = WHITEBOX_TERRAIN_REGIONS)
     }
     return raise === 0 && cut === 0 ? h : h + raise - cut;
   }
-  return Object.freeze({ regions, shapes, bounds, Apply });
+  return Object.freeze({ regions, shapes, paths: Object.freeze(paths), bounds, Apply });
 }
 /** 正式表编译结果：Data_FirstLevelMissionTerrain.MISSION_TERRAIN.whiteboxTerrain。 */
 export const WHITEBOX_TERRAIN = CompileWhiteboxTerrain();

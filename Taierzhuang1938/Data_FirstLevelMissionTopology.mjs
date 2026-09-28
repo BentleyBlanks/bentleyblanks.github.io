@@ -131,6 +131,9 @@ export const MISSION_RAIL_BRIDGE = Object.freeze({
   trussOffsetX: 2.95, trussW: 0.5, trussH: 2.4,
   railGaugeHalf: 0.7175,
   abutmentZ: Object.freeze([140.5, 165.5]), abutmentW: 7, abutmentD: 3,
+  // 料石桥台的桥座面（Model_RailBridge：帽石顶 -0.47）。白盒桥台碰撞盒顶收到它下面，
+  // 模型装上之后那两块灰盒子整个埋在料石里，不会从支座旁边戳出来。
+  abutmentTopY: -0.55,
   signal: "RailBridgeDestroyed",
 });
 

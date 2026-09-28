@@ -1296,7 +1296,8 @@ node Taierzhuang1938/Script_PostFrameGraphTest.mjs        # 帧图顺序（atmos
    新增 `grade.contrastCurve: "soft"`（`uContrastCurve`）：对比度改走幂形 S 曲线
    `v<.5 ? .5(2v)^c : 1−.5(2−2v)^c` —— 中灰斜率同样是 c，两端渐近不硬裁。线性拉伸在 c = 1.10 时把
    sRGB < 0.045 整块裁成 0（SB01 掩蔽部门柱内侧 7–10% 死黑）。`GradeMathJs` 与 LUT 缓存键同步；
-   没写的预设仍是线性拉伸，逐比特不变。
+   没写的预设仍是线性拉伸，逐比特不变。第二轮起第一关 `lift` 归零、分离调色暗部 0.45 → 0.3
+   （出厂 lift 是蓝紫底，屋里压暗后它成了主色，见 §5.11 第二轮）。
 3. **填充光与对比**：envIntensity / shProbe / ambient 下调、平行光略抬、contrast 1.10、
    skyTint 去暖（数与理由在 `SKY_PRESETS.firstLevelBattleDay` 的注释里）。
 4. **曝光**：`SKY_EXPOSURE.firstLevelBattleDay`（evUp 0.6 / evDown 0.25：进屋只适应一半，
@@ -1928,6 +1929,20 @@ node Taierzhuang1938/Script_ProfilerTest.mjs
 
 **为什么不是材质补丁**：补丁要给每份材质挂几十个 vec4 的 uniform 数组，three 对数组 uniform
 不缓存、每次换材质整组重传，第一关是 CPU 提交瓶颈。
+
+**第二轮（2026-09-28 集成后）：室内暗部发品红 → 去 lift + 暖反弹。** 集成实拍灶屋暗像素 28/23/30
+（G 最低、B 最高），参考四张室内暗部都是暖棕 R > G > B（39/35/32、29/24/19、32/27/24、分镜 01 34/28/23）。
+逐项消融（09_2、自动曝光关）：HDR 主场景那一块本身是暖的（0.035/0.025/0.018），品红出在后期 ——
+把天光 / SH / 环境光全部归零后读回仍有 sRGB 13/10/23 的底，正好是出厂分级 lift (0.006, 0.004, 0.012)
+经 sRGB 与 S 曲线之后的值；体积雾 / 大气透视 / SSIL / 簇光 / 分离调色各自只差 0–2。修法两件：
+① 第一关 `fog.grade.lift = [0,0,0]`（出厂 lift 不动，其余预设逐比特不变）；
+② 同一趟 `interiorSky` 多出一张附件，把「被屋顶挡掉的天光」按 `(1 − roomVis)·逐屋 bounce·GTAO 可见度`
+补成暖色辐照度写进 **SSIL 那一路**（`INTERIOR_SKY.bounce`：color [1, .94, .86]、strength 2.4；
+逐屋倍率厢房 0.8、其余 1）。实拍（前 = 集成 Int3 / 后 / 参考，整幅 L，暗像素 RGB）：09_2 25 → 36 / 52，
+暗部 28/23/30 → 39/32/25（参考 39/35/32）；16_2 33 → 40 / 51；室外 08_1 −5.5%、11_1 −4.0%、SB03 更暗（lift 去掉）。材质端原样 ×反照率/π×SSIL 强度加进 indirectDiffuse —— 仍然只动间接光、
+零采样器、零材质改动；medium 档 SSIL 关着时这张里就只有暖反弹。接线：`PostPipeline.SsilTexture` 与
+`ContactShadowsPass._Compose` 在有屋子时改读 `interiorSkyPass.SsilTexture`。数值与消融表见第二轮报告
+（`_shots/Gap3A_After/B4R2/`）。
 
 **已知限制（有意的）**：没挂 AO 补丁的材质不吃它 —— 白盒纯色体块（`MakeSemanticMaterial`）
 目前就没挂，墙面要等白盒材质走 `MaterialLibrary` 注入（B1）才会跟着暗；low 档没有 GTAO 也没有它；

@@ -63,8 +63,11 @@
 
 ## 6. 回归口
 
+- 2026-09-27 开场改稿新增 `IjaTauntWalk`、`IjaFoundLook`、`IjaCrouchHairHold`、`IjaSlapForehand`、`IjaSlapBackhand`、`IjaSlapRaise`、`HeLiftTimber`，割喉链改到川军左肩后（新接触部位 `hairNape` / `crown` / `cheekL` / `cheekR`），口径见 [压木原地审问改稿](Data_OpeningPinnedRescue20260927.md) 第 6 节。
+
 - 2026-09-27 新增 `IjaVaultTimberIn` / `IjaVaultTimberOut` / `IjaHaulForearmUnder`（只烘 IJA02）与 spec 键 `groundWeight(t)`（翻越离地、跪地那几帧不贴地），口径见 [翻越与倒拖](Data_OpeningVaultHaul20260927.md)。
 - `Script_OpeningStoryboardsTest.mjs`（纯 node）：每套骨架每个 clip 脚滑 ≤ 2 cm、接触误差 ≤ 3 cm、穿墙 ≤ 3 cm、骨盆每帧 ≤ 0.2 m、膝盖 ≤ 2 cm；
+  任何一条 clip 里四肢的骨头（大腿、小腿、脚、上臂、前臂、手）相邻两帧绕自身轴转动 ≤ 70°（世界旋转拆成骨头方向的摆动和绕骨头的扭转，只量扭转；IK 换分支就是这个量 140–180°，见 §10）；
   声明了墙面接触的时段离墙、进墙都 ≤ 3 cm；同根交接逐骨 < 2°、道具跳动 ≤ 2 cm；holdLoop 接缝按世界空间 ≤ 2°、≤ 1 cm。
 - `Script_OpeningClipsBrowserTest.mjs`（浏览器，tier2，`openingStoryboards` 领域；`--shots` 出四视角审片图到 `tmp/OpeningClipsReview/`，`--clip=名,…` 只跑几条）：
   用正式 GLB 与运行时加载链逐条播，量脚滑、成对接触、骨长变化 ≤ 1%、NaN、人与人穿插（躯干 / 头 ≤ 3 cm，带四肢 ≤ 8 cm）和运行时道具行为。
@@ -73,7 +76,7 @@
 
 ## 7. 已知没做完的（2026-09-24，Anim 包报告）
 
-- 世界旋转的单帧突跳还剩 34 处（从 399 处降下来，多数改动前就有，例如 `BlastSlamBuried` 左上臂、`HeSwapDadaoRifle` 右前臂），没有逐个处理。
+- 世界旋转的单帧突跳还剩 34 处（从 399 处降下来，多数改动前就有，例如 `BlastSlamBuried` 左上臂、`HeSwapDadaoRifle` 右前臂），没有逐个处理。（2026-09-28 按 §10 处理了其中 IK 换分支的那一类。）
 - 几处抓握是手臂伸直够到的（臂长 1.1–1.4 倍，接触误差仍 ≤ 3 cm），画面上是锁直的胳膊；第一人称下日兵甲、乙与川军贴身穿插 5–8 cm，都在门槛内，待用户看。
 - 对顺子（第一人称，没有身体）的接触浏览器量不了，只由烘焙端对 `player` 轨检查。
 
@@ -82,3 +85,50 @@
 `IjaHairGrabPull` 保留冻结的 clip 名，实际接触改为前领。日兵甲在川军右前方约半米处跨步抓领，随后拔刺刀、割喉、擦刀并退回持枪站姿；五段沿用同一演员根。旧正面 0.28 m 的根距离让两人胸腹重叠，旧抓发动作在拉开距离后又够不到头顶。川军的防御手势降到胸前，空出刀刃和喉部；`CaptiveHeadPulledBack`、`CaptiveThroatCut`、`CaptiveClutchThroat` 与日兵甲动作均由独立 Blender 源工程重烘。
 
 检查以正式模型和实际导演镜头为准：`Script_OpeningStoryboardsTest` 核对五段逐骨交接，`Script_OpeningClipsBrowserTest --clip=IjaHairGrabPull,IjaDrawBayonet,IjaThroatSlash,IjaWipeSheathBayonet,IjaReadyRifle,CaptiveHeadPulledBack,CaptiveThroatCut,CaptiveClutchThroat` 核对接触、脚滑和人体净空；`Script_OpeningStoryboardShots --shots=SB03_Blade,SB03_Slash` 与连续 01–03 验收实际镜头。源工程位于 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningExecution_20260926`，不入库。
+
+## 9. 运行时播放层：过场动作自然化（2026-09-28）
+
+用户反馈「过场里人物动作全都不太自然」。先用逐帧探针真实播放 01–02（每帧记录每个人的骨骼帧间转角、骨盆高度、朝向、着地脚位移，每 0.25 s 截图），按来源分类后改运行时，动作库数据本身不动。改前 → 改后（01–02 全程，活人、30 m 内）：单帧 ≥25° 的骨骼跳变 446 → 211 帧（腿部 187 → 48），≥60° 122 → 28，骨盆单帧高度跳 172 → 84；剩下的 ≥60° 大多在下面「还没做的」烘焙数据里。
+
+- **混合在所有叠加层之后做**（`Script_OpeningStoryboardAnimation`）：姿态混合从「clip 采样之后、说话表演与握枪修正之前」挪到这两层之后，起点是上一帧**最终显示**的姿态。之前这两层在换 clip 那一帧整层开/关，手和前臂单帧拧 90–150°（罗班长指点进出、传令兵、战友起身）。握枪修正开关、受保护/只动头切换、加性动作（`BanterLaugh` 等）换条，即使 clip 没换也重启混合。
+- **换根只混骨盆以下**：`RerootUnderPelvis`（`noBlend`）的根与骨盆直接用新 clip，四肢、脊柱、头照样混（原来整段不混，战友起身接走路手腕 123°、罗班长放下拖人前臂 69°）。骨盆旋转不能在局部空间混：换根前后根的朝向可差 180°（翻译逃跑）。
+- **选弧不换边**：混合开始时按最短弧定下每根骨头走哪边，之后不再换（`SlerpArc`）。three 的 slerp 每帧都取短弧，两端接近相反时目标一动就换边（日兵乙端枪转背枪走，手腕 99°）。
+- **交还 AI 也混**：导演放手（无 pose、无位移、无表演）后，原生姿态从最后显示的姿态用 `poseBlendS` 过渡；交还后立刻端枪的（`nativeCombat`）用 `combatBlendS` 0.12 s，不再一帧切过去（罗班长交还时前臂 146°）。
+- **每帧开头还原原生姿态**：three 的 `PropertyMixer` 只在自己算出的值变化时才写骨头，常量轨道（背枪走/空手走的手、手指）写过一次就不再写；这一层在 mixer 之后改过骨头又不还原，旧值就一直留着——翻译站着时手腕停在某次混合留下的姿态，一起步 mixer 的值「变了」才写回，手腕一帧拧 148°。现在每帧开头把骨头还原成上一帧 `original.call` 之后的原生姿态（`baseBuffer`），与代码库其余层「mixer 采样前撤掉叠加」的约定一致。
+- **定格保活**（`Script_OpeningActorPerformance.OpeningHeldLife`，数在 `Data_OpeningStoryboards.heldLife`）：导演用固定帧长时间摆着、又没有说话表演的人（Banter 全段 53 s 跪在洞口的罗班长、02 Hold 端枪站 10 s 的日兵乙、揪领的 holdLoop）自动加呼吸、胸口侧摆和慢速视线漂移；看守骨骼角速度低于 `stillRadS` 才淡入，clip 一动 0.12 s 内退出；脸在 clip 里对准第一人称的动作头部幅度只给 `faceAimedShare`。说话表演层的手势按「站定」权重淡入淡出（约 0.3 s），不再在起步那一帧消失。
+- **走位缓动**（`Script_OpeningStoryboards.Move`，数在 `Data_OpeningStoryboards.pace` / `turnAccelRps2`）：不带 clip 的自由走动按加速度起步、按 `sqrt(2ad)` 减速停在路线**末点**（`Follow` 传剩余路程，拐角不减速）；转身有角加速度、到角度前收住，最高仍是 `turnRps`。带 clip 的位移（拖人、成对站位）与 `Settle` 不缓动，保证接触对位。
+- 全游戏共用的两处也在这一轮修：脚底锁定松锁（[位移与步态同步](Data_ActorLocomotion.md)「松锁」）；P012 站定钉帧不再被 `aim 0.18` 打断（原来洞外背景兵、喊话兵每 2.9 s 原地「上前两步」再弹回，`Script_FirstLevelP012CastAppearance`）。
+
+**还没做的**（已在 §10 处理，2026-09-28）：动作库里仍有 IK 解中途换分支的帧（前臂/手/小腿绕自身轴约 180°，烘焙端已有扭转展开与 30°/帧滚转限速，但求解器仍会换分支）。本轮探针在 01–02 里看到的：`BlastSlamBuried` 左手、`BlastDazedStir` 右前臂、`CaptiveDraggedFromDirt` 左脚、`CaptiveWallBrace` 头、`IjaSlingRifle` 右前臂、`IjaCollarDragSnag` 左上臂、`IjaVaultTimberIn/Out` 小腿与脚、`IjaParriedChoppedFall` 左上臂、`HeSwapDadaoRifle` 右手、`HeDadaoParryChop`、`LuoDadaoChopRear` 左前臂、`WoundedRiseWall` 左手；未用到的 `ButtThreat` 五套骨架都有。
+
+## 10. IK 换分支重烘（2026-09-28）
+
+§9 末列出的那些 clip 里，前臂、手、大腿、小腿、脚在相邻两帧之间绕自身轴转 140–180°，之后停在另一边，01–02 过场里表现为肢体突然一拧。逐帧看（世界旋转拆成「骨头方向的摆动」和「绕骨头自身的扭转」）原因有四类，改法如下。烘焙脚本的改动都只在出问题的帧上起作用，连续的帧逐位不变，所以没重烘的相邻 clip 照样能接上（§6 的交接检查全过）。
+
+1. **腿：膝盖朝向跟着 IK 的最短旋转走，不跟着膝盖弯曲的平面走**（`CaptiveDraggedFromDirt` 左大腿 0.79 s 一帧转 167°、`IjaVaultTimberIn/Out` 小腿 107–167°）。新加 `LegRoll`：大腿绕自身轴转到膝盖真正弯曲的那个平面上，小腿从静止姿态重新对准脚踝（膝盖成纯铰链），脚保持世界朝向。站、坐、跪的原有偏差 ≤ 45° 的不动；超过 45° 的按 1:1 斜率逐步去掉，超过 90° 的全部去掉；大腿被拉到接近反方向（离静止方向 150–170° 以上，被拖着走时膝盖顶到胸口）时全部去掉；离地（spec `groundWeight` 为 0，翻越的腾空段）时全部去掉。
+2. **肘、膝在「肩—腕」「髋—踝」连线周围一帧甩到另一边**（极向量掠过这条线；`BlastSlamBuried` 左臂 0.33 s 一帧 176°）。新加 `LimitSwivel`：肘（膝）绕这条线的转角在胸（骨盆）坐标里每帧最多 30°，手腕（脚踝）和手（脚）不动，握点、着地点不受影响。几乎伸直的那几帧记住上一次的弯向，重新弯曲时从那一边继续。接续上一条 clip 的，从上一条最后一帧的弯向起步（和扭转分支一样用种子）。
+3. **前臂扭转一直展开下去**：旧烘焙里有几处一帧转回来的「甩」（`BlastSlamBuried` 左前臂 166°、`CaptiveWallBrace` 右前臂 1.29 s），甩掉之后后面整串 clip 都在另一支上。去掉甩之后前臂和手腕会一直停在各转 160–170° 的姿态。新加 `TWIST_MAX`（默认 320°，clip 可用 spec `twistMax` 另设）：展开超过这个值就取回 ±180° 以内的那一支，前臂按 30°/帧的滚转限速在几帧里转过去。`BlastSlamBuried` 设 200°，让左前臂在爆炸那几帧里转回去（原来是一帧）。`IjaButtStrikeCollar` 设 400°（顶点循环的接缝要是同一个姿势，不能在循环里换支）。
+4. **关键帧本身一帧跳过去**（抓握瞬间开/关、手的目标一帧换到另一处、轨迹穿过肩关节），逐条改关键帧：
+   - `WoundedRiseWall`：左手离开墙后先到肩前，再用 0.2 s（1.9–2.1 s）握上护木；`StoopRifle`（端枪姿势）的枪轴前倾，护木不再贴在左肩前 13 cm（原来左臂折到 170°）。
+   - `BlastSlamBuried`：两手从握枪处在 0.05–0.20 s 松开甩出（原来 0.08 s 一帧跳到胯边再甩上去）。
+   - `BlastDazedStir`：右手摸头的位置离肩远一点（手肘 140°，原来 163°），上去（2.1–2.6 s）、下来（3.45–3.85 s）经过胸前，不再从肩关节穿过。
+   - `CaptiveWallBrace`：左手 0.32–0.54 s 从垂着伸到墙上（原来两帧），右手 0.9–1.45 s 放回伤口（原来 0.15 s）；这两个权重在 Pose 里单独设，不加关键帧行（关键帧会把前一个值带到下一行，加一行就把所有通道都钉住了）。
+   - `HeSwapDadaoRifle`：右手 0.18 s 松开插在地上的大刀，伸到肩上方 17 cm（原来贴在肩上，手肘 155°），0.16 s 握上背上的枪；枪 0.72–1.04 s 从背上拿下（原来 0.28 s），左手 0.30 s 握上。
+   - `HeDadaoParryChop`：左手 0.30–0.55 s 握上长柄、0.62–0.82 s 松开（原来各 0.08 s）。`LuoDadaoChopRear`：左手 0.28–0.44 s 松开（原来 0.06 s），砍完收刀的低位从 0.60 s 挪到 0.66 s。
+   - `IjaSlingRifle`：举枪时枪在肩前 22 cm、握在离托底 0.45 m 处（原来握点贴在肩上，手肘 179°），0.30–0.48 s 松手。
+   - `IjaParriedChoppedFall`：两手抓枪 0.16 s，左手等枪离开肩膀后 0.18–0.34 s 才握护木（原来伸过胸口去够右肩，左臂折平），被磕开时左手 0.18 s 甩出。
+   - `IjaVaultTimberIn/Out`：腾空最高那几帧两脚低 1–8 cm（仍高过木头顶 5 cm 以上），翻进时左手 0.06–0.34 s 把枪举起（原来 0.12–0.30 s，同时拳头离肩远一点），翻出时左手 0.72 s 起伸向木头（原来 0.80 s）。
+   - `ButtThreat`、`ShotCollapse`（09-22 的旧 clip，用俘虏库的 Author 摆姿势，不走求解）：摆好之后补上和其他 clip 一样的连续性处理（肘弯向限速、上臂滚转、前臂扭转展开）；`ButtThreat` 两手握枪，枪竖直时 `GripPalms` 换参考方向，两手一帧绕枪杆转 180°，`KeepGripBranch` 选同一个握法的另一支（手绕枪杆转半圈、握点不动）。
+
+另外：
+- **手的目标在够不着的地方时**（`BlastDazedStir` 右手在 1.7 倍臂长外的土里），`RelArm` 在世界目标与身体目标之间过渡时，先把够不着的那一端收到臂长处（权重 0 或 1 时姿势不变）。原来胳膊伸直不动、到过渡后 40% 才一下子跨过去。
+- **接续的扭转分支**：`IjaSlingRifle` 现在从 `IjaReadyRifle` 的最后一帧起步（原来两者右前臂差 178°，过场切换时甩半圈），后面 `IjaCollarDragSnag`、`IjaKickBeam`、`IjaVaultTimberOut`、`IjaHaulForearmUnder` 跟着重烘（右手垂着那 7 秒里原来手腕一直拧着 164°）。`IjaButtStrikeCollar` 的右前臂从 `IjaHaulForearmUnder` 结尾的那一支起步（spec `seedAnyHand: 'R'`：手不是同一个姿势也取最近的那一支，导演在两者之间做混合）。一条 clip 只从烘焙顺序在它前面的 `prev` 取种子，所以 `Script_OpeningStoryboardClips` 末尾把 09-27 的翻越/拖拽三条挪到 `IjaButtStrikeCollar` 前面烘（`_BakeBefore`，只影响烘焙顺序和骨架文件里 clip 的顺序）。
+- `CaptiveDraggedFromDirt` 手腕接触点跟着前臂转了 0.7 cm，`IjaPullArm`（IJA01）用新的伙伴轨重烘（右手接触 3.2 cm → 1.6 cm）。
+
+**重烘清单**：NRA02 `WoundedRiseWall`、`BlastSlamBuried`、`BlastDazedStir`、`CaptiveDraggedFromDirt`、`CaptiveWallBrace`、`HeDadaoParryChop`、`HeSwapDadaoRifle`；NRA05 `LuoDadaoChopRear`；IJA02 `IjaSlingRifle`、`IjaCollarDragSnag`、`IjaKickBeam`、`IjaVaultTimberIn`、`IjaVaultTimberOut`、`IjaHaulForearmUnder`、`IjaButtStrikeCollar`、`IjaParriedChoppedFall`；IJA01 `IjaPullArm`；五套骨架的 `ButtThreat`、`ShotCollapse`。先 `OPENING_PASS=partner`（NRA02 `CaptiveDraggedFromDirt,CaptiveWallBrace`，IJA02 `IjaParriedChoppedFall`），再 bake。可编辑工程与伙伴轨在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningIkBranch_20260928`（伙伴轨起点拷自 `OpeningPinnedRescue_20260927`）。manifest 版本 `20260928OpeningStoryboardsV15IkBranch`（接在压木救人改稿的 V14 之后）；bake 会整份重写 manifest（数字和中文的写法会变），交付时只把版本号和五个 `models` 行并进已提交的 manifest。
+
+**改前 → 改后**（压木救人改稿之后的 master，五套骨架全部 163 条 clip，相邻帧）：绕自身轴的最大扭转 178° → 61°（最大的是 `IjaVaultTimberOut` 腾空时的左大腿）；存储值（局部旋转）> 45° 的帧 285 → 255；世界旋转 > 45° 的帧 191 → 130。表中各 clip 的最大摆动（骨头方向一帧转多少）：`BlastSlamBuried` 165° → 59°、`WoundedRiseWall` 125° → 29°、`IjaSlingRifle` 141° → 55°、`HeDadaoParryChop` 109° → 56°、`HeSwapDadaoRifle` 108° → 53°、`LuoDadaoChopRear` 107° → 56°、`IjaParriedChoppedFall` 107° → 68°、`CaptiveWallBrace` 96° → 56°、`ButtThreat` 179° → 84–87°。
+
+实际流程里（§9 的逐帧探针，60 fps 真实播放 01–02，30 m 内每个人，关键骨骼相对 root）：一帧转 > 45° 的 38 → 21 次、> 90° 12 → 5、> 140° 9 → 2；剩下两次 > 140° 不是动作库（翻译 `gait:unarmed` 的大腿、`BunkerFollowB` 的原生动画）。`CaptiveDraggedFromDirt` 接 `CaptiveWallBrace` 那一帧探针报头部 90°，是换根（前者终帧朝 −90°、后者首帧朝 0°，`ChainRoot` 转 root），世界姿态连续：头 < 0.2°，躯干、腿 < 0.3°，只有右手 17°（改前就有）和左上臂 7°。
+
+**剩下的**：以上剩下的 45–87° 都是摆动（骨头方向转），不是换分支：砍刀的挥砍和收势、爆炸把手臂甩开、`ButtThreat` 枪托砸下、翻越的收腿蹬腿；`CaptiveDraggedFromDirt` 0.83 s 左膝从胸前落到地上两帧各 60–67°（脚踝从髋关节 7 cm 处经过，那一刻膝盖只能绕着很短的髋—踝连线转，要改拖拽时左脚的路线才能再慢下来）。`IjaLookBackLow`（不在现在的流程里）接 `IjaButtStrikeCollar` 右前臂差 163°。`HeDadaoParryChop` 结尾接 `HeLiftTimber`（压木救人改稿的新 clip，没重烘）时左前臂局部差 66° → 114°：砍完那段左手的扭转回到了 ±180° 以内的那一支，`HeLiftTimber` 从自己的姿势起步，两者之间是导演的混合（整条胳膊从握刀换到抬木头）。压木救人改稿（2026-09-28）之后 `IjaSlingRifle`、`IjaCollarDragSnag`、`IjaKickBeam`、两条翻越、`IjaHaulForearmUnder`、`IjaButtStrikeCollar` 已不在导演流程里，仍在库里，按上面的清单一起重烘。

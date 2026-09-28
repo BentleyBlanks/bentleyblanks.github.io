@@ -25,6 +25,9 @@ export class ActorLocomotion {
       const thigh=rig.bones['thigh'+side],calf=rig.bones['calf'+side],foot=rig.bones['foot'+side];
       return {side,thigh,calf,foot,toe:foot?.children.find(node=>/Toe0$/.test(node.name)),
         anchor:new THREE.Vector3(),target:new THREE.Vector3(),pole:new THREE.Vector3(),
+        // offset: the planar lock correction shown this frame; residual: what a finished stance
+        // left over, eased out while the foot is in the air (contactReleaseS).
+        offset:new THREE.Vector3(),residual:new THREE.Vector3(),
         saved:[new THREE.Quaternion(),new THREE.Quaternion(),new THREE.Quaternion()],
         rotation:new THREE.Quaternion(),applied:false,key:null,weight:0,errorM:0};
     });
@@ -36,7 +39,7 @@ export class ActorLocomotion {
       f.thigh.quaternion.copy(f.saved[0]);f.calf.quaternion.copy(f.saved[1]);f.foot.quaternion.copy(f.saved[2]);f.applied=false;
     }
   }
-  ResetContacts() { for(const f of this.feet){f.key=null;f.weight=0;f.errorM=0;} }
+  ResetContacts() { for(const f of this.feet){f.key=null;f.weight=0;f.errorM=0;f.offset.set(0,0,0);f.residual.set(0,0,0);} }
 
   // AI calls this even when the expensive skeleton is culled. Far LOD uses the
   // same measured stride, and a rendered run resynchronizes the exact clip phase.
@@ -188,32 +191,53 @@ export class ActorLocomotion {
     const changed=!holding&&action!==this.lastAction;
     this.phase=phase;this.lastAction=action;
     if(rig.currentId==='RifleRun')this.crowdPhase=phase;
+    // The lock's correction is never dropped at once: whatever a stance leaves (the clip's planted foot
+    // drifting against the real travel) eases out while that foot swings. Releasing it over the old
+    // 35 ms ramp threw the foot up to 28 cm and snapped the knee 25-45 deg in one frame, every step
+    // (2026-09-28 cutscene probe: Luo, He, Liu, Yaowa and the runner walking out of the dugout).
+    const h=this.step>0?this.step:Math.max(0,dt),fade=Math.exp(-h/C.contactReleaseS);
     for(const f of this.feet) {
       if(!f.toe||!f.thigh||!f.calf)continue;
-      if(holding&&(!f.key||f.weight<.99)){f.key=null;f.weight=0;continue;}
+      if(holding&&(!f.key||f.weight<.99)){f.key=null;f.weight=0;f.offset.set(0,0,0);f.residual.set(0,0,0);continue;}
       const spans=profile?.contacts?.[f.side]||[],index=holding?0:spans.findIndex(([a,b])=>phase>=a&&phase<b);
-      if(index<0){f.key=null;f.weight=0;continue;}
-      const [start,end]=spans[index]||[0,1];
-      // Keep the supporting foot through the stop blend; the free foot can settle.
-      const weight=holding?1:Smooth((phase-start)*profile.duration/C.contactBlendS)
-        *Smooth((end-phase)*profile.duration/C.contactBlendS)*action.getEffectiveWeight();
-      const key=holding?f.key:rig.currentId+':'+index;
+      const key=index<0?null:holding?f.key:rig.currentId+':'+index;
+      if(changed||wrapped||index<0)f.releasedKey=null;
+      // In the air, or a stance let go early (below): ease the correction out.
+      if(index<0||!holding&&key===f.releasedKey){this.Release(f,fade);continue;}
+      const [start]=spans[index]||[0,1];
+      f.residual.multiplyScalar(fade);
+      // Lock in from the carried-over residual (so a stance starts where the foot is shown), hold to the end.
+      const weight=holding?1:Smooth((phase-start)*profile.duration/C.contactBlendS)*action.getEffectiveWeight();
       const toe=f.toe.getWorldPosition(this.v[0]);
-      if(changed||wrapped||f.key!==key){f.anchor.copy(toe);f.key=key;}
+      if(changed||wrapped||f.key!==key){f.anchor.copy(toe).add(f.residual);f.key=key;}
       const correction=this.v[1].subVectors(f.anchor,toe);
       // Keep authored heel/toe roll and terrain height; anchor only the sole's planar contact.
       correction.y=0;
-      if(correction.length()>C.maximumCorrectionM){f.key=null;f.weight=0;continue;}
+      // Past the reach this stance lets go as if the foot lifted early; the next one locks afresh.
+      if(correction.length()>C.maximumCorrectionM){if(!holding)f.releasedKey=key;this.Release(f,fade);continue;}
       f.weight=weight;
-      if(weight<=0)continue;
-      f.thigh.getWorldPosition(this.v[2]);f.calf.getWorldPosition(f.pole);
-      f.foot.getWorldPosition(f.target);f.foot.getWorldQuaternion(f.rotation);
-      f.target.addScaledVector(correction,weight);
-      this.SaveLeg(f);
-      this.Solve(f);
-      f.foot.quaternion.copy(f.foot.parent.getWorldQuaternion(this.q[0]).invert().multiply(f.rotation));
+      f.offset.copy(correction).multiplyScalar(weight).addScaledVector(f.residual,1-weight);
+      if(f.offset.lengthSq()<=1e-10)continue;
+      this.Offset(f,f.offset);
       f.toe.getWorldPosition(this.v[0]);f.errorM=Math.hypot(this.v[0].x-f.anchor.x,this.v[0].z-f.anchor.z);
     }
+  }
+
+  /** No lock this frame: what was shown eases toward the authored foot. */
+  Release(f,fade) {
+    f.key=null;f.weight=0;
+    f.residual.copy(f.offset).multiplyScalar(fade);f.offset.copy(f.residual);
+    if(f.offset.lengthSq()>1e-6)this.Offset(f,f.offset);
+  }
+
+  /** Move the foot by a planar world offset with the two-bone solve, keeping its authored world rotation. */
+  Offset(f,offset) {
+    f.calf.getWorldPosition(f.pole);
+    f.foot.getWorldPosition(f.target);f.foot.getWorldQuaternion(f.rotation);
+    f.target.add(offset);
+    this.SaveLeg(f);
+    this.Solve(f);
+    f.foot.quaternion.copy(f.foot.parent.getWorldQuaternion(this.q[0]).invert().multiply(f.rotation));
   }
 
   Solve(f) {

@@ -135,10 +135,14 @@ const Evaluate = /* glsl */`
 #ifndef TRENCH_STONE
   {
     // 湿泥与积水（Script_TerrainMaterial.TerrainWater）：车道照常；沟底（翻土 × 凹度）更湿、积水更多。
+    // 01–05 前沿湿泥区（TERRAIN_MUD_ZONE）：翻土压暗转冷灰褐、沟壁也湿、沟底水更多更深。
+    float mud=TerrainMudZone(vTerrainWorld.xz);
     float floorSite=spoil*trenchLow;
-    vec3 wetColor=diffuseColor.rgb;
-    TerrainWater(wetColor,vTerrainWorld.xz,geomN,max(gTerrainWeights.y*uTerrainWaterD.x,floorSite*uTrenchWater.x),
-      trenchLow*spoil,max(gTerrainWeights.y*uTerrainWaterD.w,floorSite*uTrenchWater.y));
+    vec3 wetColor=diffuseColor.rgb*mix(vec3(1.0),uTerrainMudB.xyz,spoil*mud);
+    TerrainWater(wetColor,vTerrainWorld.xz,geomN,
+      max(gTerrainWeights.y*uTerrainWaterD.x,floorSite*uTrenchWater.x*mix(1.0,uTerrainMudA.z,mud)),
+      floorSite*(uTerrainWaterD.z+mud*uTerrainMudA.w),
+      max(max(gTerrainWeights.y*mix(uTerrainWaterD.w,uTerrainMudB.w,mud),floorSite*uTrenchWater.y),spoil*mud*uTerrainMudA.y));
     diffuseColor.rgb=wetColor;
     gTrenchWet=max(gTerrainWet,gTerrainWater);
   }

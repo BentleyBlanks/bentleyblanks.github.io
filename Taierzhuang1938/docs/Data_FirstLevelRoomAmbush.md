@@ -7,6 +7,11 @@
 > `Script_FirstLevelMissionAmbush.mjs` 已删；动作库 `Script_FirstLevelAmbushAnimation.mjs` 与
 > `Animation/FirstLevelAmbush/` 暂时保留（见交付报告的可删清单）。
 > 下面的内容只作为那一拍的历史记录，**不再是任何代码的口径**。
+>
+> 2026-09-28 起 09 另有一拍新的「进门遭伏击」（用户要求照 COD5 万岁冲锋做一次性按键 QTE）：
+> 口径在 [Mid 册 09](Data_FirstLevelMid20260919.md)，代码在 `Script_FirstLevelKitchenAmbush.mjs`。
+> 它只借了本文沉淀下来的几样通用做法（倒地镜头跟着头骨走、第一人称手位偏移、近景刺刀档、提示环钉在握枪点），
+> 拍表、站位、人物与本文无关。
 
 
 入口 `?whitebox=p012`。这一步夹在公开阶段 8「村口截击」和阶段 10「夺下院子」之间，

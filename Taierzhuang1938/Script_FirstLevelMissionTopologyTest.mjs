@@ -24,7 +24,7 @@ const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 // Targeted 06–18 verification (--rear-only) leaves the 01–05 assertions intact in the
 // default run. The front topology and its earlier camera points are a separate baseline.
 const rearOnly = process.argv.includes("--rear-only");
-if (rearOnly) assert.equal(MISSION_WHITEBOX_VERSION, "first-level-20260927-whitebox-05-18-r3",
+if (rearOnly) assert.equal(MISSION_WHITEBOX_VERSION, "first-level-20260928-guidance-r1",
   "the reviewed 05–18 concept-frame whitebox revision (r3: 12 holds the road back into the village) is live");
 else assert.match(MISSION_TOPOLOGY_VERSION, /^first-level-20260923-space-0106$/, "the 2026.09.23 01-06 space rebuild is live");
 

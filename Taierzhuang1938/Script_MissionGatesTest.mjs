@@ -247,7 +247,8 @@ const NEAR_WHITELIST = [
   // 以下都不记事实：
   { pattern: /Sortie\.crawl\.some\(c=>this\.Near\(c,c\.d\/2\+2\)\)/,
     why: "OpeningPrompt 的「按 Z 趴下」键帽提示，靠近爬行段就显示，不记任何事实" },
-  { pattern: /if\(!this\.Near\(plan\.near,plan\.nearM\)\)continue;/,
+  // 2026-09-27 敌军威胁评估：被惊动（threatWokenAt）的人不等放行点也走；仍然只放走位、不记事实。
+  { pattern: /if\(!this\.Near\(plan\.near,plan\.nearM\) && !\(actor\.threatWokenAt>=0\)\)continue;/,
     why: "UpdateTactics 的战术放行点，点与半径来自 MISSION_TACTICS 的 near/nearM，放的是走位不是事实" },
   { pattern: /if\(this\.Near\(Sortie\.house,Sortie\.supplierRangeM\)\)this\.Say\('BundleSupply'\);/,
     why: "补给兵台词的触发圈；事实 bundleDirectionsHeard 由 VoiceDone 记，走的是 voice 门" },

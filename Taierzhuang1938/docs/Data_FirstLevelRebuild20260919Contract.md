@@ -49,7 +49,7 @@
 | Orders | `ordersReached` `volunteerHeard`(voice) `lightShared`(voice) `zhouOnLitter` `columnDeparted` | 回到 02 途经过的集结处；借火戏 `BorrowLight`；后送队**真实**起行 |
 | South | `southWhisperHeard`(voice) `villageMouthReached`(proximity) `mainStreetPointed`(voice) | **真走一段**（取消旧黑屏转场 `southTransition`），目标时长 45–75 秒；顺子与幺娃私语 |
 | Village | `streetBlockSeen`(proximity) `littersInCover`(column) `kitchenEntered`(proximity) | 主街被倒墙＋横车堵住，东巷窗口日军火力；担架队停入可靠遮挡，不跟进未清空间 |
-| Melee | `meleeResolved` | 日军来自与东巷相通的连屋。**提前击败近战敌人则不强制固定 QTE**；旧「老周挨刀、两名担架员阵亡」的屋内伏击拍下线（担架不进屋）。敌人真的贴上玩家时才走共用白刃僵持 |
+| Melee | `meleeResolved` | 日军来自与东巷相通的连屋。**2026-09-28 用户要求补回进门遭伏击**（照 COD5 万岁冲锋的一次性按键 QTE）：领头 `MeleeLead` 藏在灶屋—连屋过道西段，玩家跨进过道就扑上来撞翻、压刀，窗口里按一下 F 反刺、漏掉被捅死回灶屋重来；**冲锋途中被打死则不进 QTE**（「提前击败近战敌人则不强制固定 QTE」）。旧「老周挨刀、两名担架员阵亡」那一拍仍下线（担架不进屋）。其余三人在那一拍收尾后才进来，贴上身走共用白刃僵持。口径见 [Mid 册 09](Data_FirstLevelMid20260919.md) |
 | Courtyard | `villageGunSilent` `courtyardGateOpen` `courtyardPassed` | 担架从 08 等待点真实移动，穿院落绕过障碍，在障碍南侧 `streetRejoin` 接回主街 |
 | TransferApproach | `transferApproachReached` `transferSortingHeard`(voice) `villageRoadThreatSeen`(voice) | 牛车、马车、人力担架、步行伤员；无汽车 |
 | Transfer | `transferArrived` `loadingThreatResolved`(combat) `firstBatchLoaded`(column) `alleyThreatResolved`(combat) `zhouNext` `escortGranted`(voice) | **只有两处威胁**（压向装载区的 `transfer`、侧巷的 `transferAlley`），不做四拍守波次；每解除一处，接运真实推进一批 |
@@ -68,7 +68,7 @@
 | BridgeWithdraw | `blastZoneCleared`(proximity) `bridgeDestroyed`(scripted) `marchOrderHeard`(voice) | 爆破由在场人员完成；玩家在安全距离看见桥被破坏（不可逆）；无己方剧情伤亡；不说「所有人都过来了」 |
 | NightMarch | `nightTransitionComplete`(scripted) `northGateReached`(proximity) `gateEntered`(proximity) | 行军脚步持续 → 淡出 → 字幕「1938年3月15日 夜｜滕县」→ 切夜间天空（藏在黑屏里）→ 淡入北门外行军队列 → 随罗班长进北门 → `Complete` |
 
-控制接管 kind：保留 `rescue` `dive` `death`，新增 `trapped` `cartRide` `nightTransition`；下线 `derail` `southTransition` `ambush`（若 09 仍复用僵持 QTE 的接管则保留 `ambush`）。**`BeginControl` 释放分支不许再有「兜底当成 death」的 else**，未知 kind 必须抛错。黑屏字幕类 `FirstLevelTransition` 改成参数化（标题/正文从文本表取）。
+控制接管 kind：保留 `rescue` `dive` `death`，新增 `trapped` `cartRide` `nightTransition`；下线 `derail` `southTransition`；`ambush` 2026-09-28 恢复，给 09 进门遭伏击用（不在保护名单里，那一拍按帧自己续保护）。**`BeginControl` 释放分支不许再有「兜底当成 death」的 else**，未知 kind 必须抛错。黑屏字幕类 `FirstLevelTransition` 改成参数化（标题/正文从文本表取）。
 
 ## 3. 空间：四区、锚点与路线
 
@@ -94,7 +94,7 @@
 | --- | --- | --- |
 | `bunkerAssault` | Trapped（scripted） | 门外 2 名行刑日兵＋随后跟进的 1–2 人；被何有田火力逼转身；玩家拾枪后可交火但不是过关条件 |
 | `front` `approach` `machineGun` `tank` `bundleApproach` | 沿用 | 03–05 同一场前沿压力 |
-| `village` `melee` `courtyard` | 沿用 | `melee` 改为从连屋（通东巷）进来，不再预埋伏击位 |
+| `village` `melee` `courtyard` | 沿用 | `melee` 其余三人从连屋（通东巷）进来；领头 `MeleeLead` 2026-09-28 起预埋在灶屋—连屋过道西段（进门遭伏击），不再挂战术折线 |
 | `transfer` | Transfer 进入 | 第一处威胁：压向装载区 |
 | `transferAlley` | `loadingThreatResolved` 后 | 第二处威胁：侧巷火力 |
 | `air` | 沿用 | 空袭后的村东追兵 |

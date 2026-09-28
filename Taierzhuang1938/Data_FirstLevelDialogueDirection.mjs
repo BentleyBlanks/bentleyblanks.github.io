@@ -129,7 +129,8 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   }),
   // 割喉之后：导演在刀划过那一刻发 ThroatCut。
   CaptiveTaunt: Scene(true, "日兵刚割了俘虏的喉，满手是血，兴奋得发了狂，抓着尸体的头发一边摇晃一边狂笑嘲弄；另一名日兵在旁边一两米跟着阴冷地怪笑；远处十几米外有日兵催促往前", {
-    "01": P("shout", 1, { after: "event:ThroatCut", offsetS: 0.7, context: "抓着尸体的头发来回摇晃", delivery: "变态地狂笑着嘲弄，声音因兴奋而发颤、忽高忽低，像在玩弄猎物", effort: { before: "一阵停不下来的歇斯底里狂笑" } }),
+    // 2026-09-27（用户：「一割马上就嚣张的说了那些台词」）：割中后 0.1 s 就开口（原 0.7 s）；录音不动。
+    "01": P("shout", 1, { after: "event:ThroatCut", offsetS: 0.1, context: "抓着尸体的头发来回摇晃", delivery: "变态地狂笑着嘲弄，声音因兴奋而发颤、忽高忽低，像在玩弄猎物", effort: { before: "一阵停不下来的歇斯底里狂笑" } }),
     "02": P("shout", 1, { delivery: "贴着死人的脸狂吼，笑着吼、吼着笑，癫狂失控", effort: { after: "咯咯的怪笑" } }),
     "03": P("low", 0.8, { delivery: "阴冷变态，慢慢吐出，带着享受杀戮的满足", effort: { before: "喉咙深处一串低沉黏腻的怪笑" } }),
     "04": P("shout", 0.8, { spatial: "offscreen", context: "前方远处", delivery: "远处的催促", pauseBeforeS: 1.2 }),

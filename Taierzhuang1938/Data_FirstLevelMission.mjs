@@ -84,7 +84,8 @@ export const MISSION_STAGES = Object.freeze([
     ["streetBlockSeen", "littersInCover", "kitchenEntered"],
     "StreetBlocked",
   ),
-  Stage("Melee", "连屋里冲出来了！上刺刀。", A.melee, ["meleeResolved"], "MeleeRight"),
+  // 目标文字不剧透：进过道那一下是偷袭（2026-09-28 进门遭伏击），原文「连屋里冲出来了！上刺刀。」提前把它说破了。
+  Stage("Melee", "穿过灶屋，打通连屋。", A.melee, ["meleeResolved"], "MeleeRight"),
   Stage(
     "Courtyard",
     "清理窗口机枪，打开院门，掩护担架分批通过。",
@@ -231,9 +232,12 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "RearWindow", ...P.streetBlock.windowShooter, hold: true },
     { id: "SideYard", x: 40, z: 27 },
   ],
-  // 09：日军从与东巷相通的连屋出来，不再预埋伏击位（契约 §4）。玩家先手打掉就没有僵持。
+  // 09：日军从与东巷相通的连屋出来。领头那个（MeleeLead）2026-09-28 起改回预埋：
+  // 藏在连屋北门内西侧屏风后面，玩家跨进门槛就扑出来（COD5 万岁冲锋式一次性按键 QTE，
+  // Script_FirstLevelKitchenAmbush；坐标与 MID_TUNING.kitchenAmbush.hide 是同一个点，
+  // Script_FirstLevelMidTest 对账）。其余三个在那一拍收尾后才从东巷那扇门压进来。
   melee: [
-    { id: "MeleeLead", x: 56.5, z: 13.5, weapon: "Type38", bayonet: true },
+    { id: "MeleeLead", x: 54, z: -0.5, weapon: "Type38", bayonet: true },
     { id: "MeleeSecond", x: 58, z: 14.4, weapon: "Type38", bayonet: true },
     { id: "MeleeThird", x: 54.5, z: 11, weapon: "Type38", bayonet: true },
     { id: "MeleeAlley", x: 66, z: 17, weapon: "Type38", bayonet: true },
@@ -324,7 +328,7 @@ export const MISSION_TACTICS = Object.freeze({
   CourtyardPursuerA: { delay: 1, points: [{x:86,z:37},{x:62,z:40},{x:53,z:38}] },
   CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:66,z:43},{x:59,z:40}] },
   CourtyardPursuerC: { delay: 25, points: [{x:91,z:41},{x:70,z:44},{x:64,z:40}] },
-  MeleeLead: { delay: 0, points: [{x:57,z:8},{x:58,z:3.5}] },
+  // MeleeLead 没有折线：他藏在灶屋—连屋过道里，冲锋由进门遭伏击那一拍驱动（VillageBlock.DriveLunge）。
   MeleeSecond: { delay: 1.5, points: [{x:58.6,z:9},{x:59,z:4}] },
   MeleeThird: { delay: 3, points: [{x:55.5,z:7},{x:56,z:4}] },
   MeleeAlley: { delay: 5, points: [{x:62,z:17.5},{x:58,z:17},{x:58,z:13.5}] },

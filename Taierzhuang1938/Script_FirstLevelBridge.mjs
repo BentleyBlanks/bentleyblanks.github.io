@@ -11,6 +11,11 @@
 //     绝不是「到点就炸」的计时器。
 //   · 台词不许出现「所有人都过来了」（BridgeWithdraw 的三句里没有这句）。
 //
+// 2026-09-28 毁桥大场面（docs/Data_RailBridge.md）：人走净之后再等玩家把脸转向桥
+// （≤ blastGazeWaitS），蹲在起爆器后面的爆破手压杆，exploderPressLeadS 之后起爆；
+// 桥的坍塌与特效由 railBridgeSet（Script_RailBridgeSet，带 three）演，这里仍只调一次
+// Combat.BlastFeedback。「往滕县！跟上前队！」挪到桥身砸进河之后（marchOrderDelayS）。
+//
 // 零 three：node 里可以直接 import。
 // ===========================================================================
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
@@ -55,7 +60,8 @@ export class FirstLevelBridge {
       r.extras.Keep([...BRIDGE_CAST, ...REAR_COLUMN_IDS]);
     }
     if (step === "BridgeWithdraw") {
-      this.blast = { set: 0, ready: false, fired: false, waitedS: 0, stuckS: 0, overdue: false, lastInside: null };
+      this.blast = { set: 0, ready: false, fired: false, waitedS: 0, stuckS: 0, overdue: false, lastInside: null,
+        gazeS: 0, pressing: false, pressS: 0, sinceFireS: 0, ordered: false, exploderManned: false };
     }
   }
   /**
@@ -173,7 +179,20 @@ export class FirstLevelBridge {
   // -------------------------------------------------------------------------
   UpdateWithdraw(dt) {
     const r = this.runtime, state = this.blast;
-    if (!state || state.fired) { if (state?.fired) this.PullBack(dt); return; }
+    if (!state) return;
+    if (state.fired) {
+      this.PullBack(dt);
+      // 军官那一句等桥身砸进河、烟柱立起来再喊：起爆那一刻喊出来，整句都被爆炸盖掉。
+      state.sinceFireS += dt;
+      if (!state.ordered && state.sinceFireS >= E.marchOrderDelayS) { state.ordered = true; r.Say("MarchToTengxian"); }
+      return;
+    }
+    if (state.pressing) {
+      this.PullBack(dt);
+      state.pressS += dt;
+      if (state.pressS >= E.exploderPressLeadS) this.Fire();
+      return;
+    }
     // 1. 在场的爆破人员装药（蹲在桥台上），顺子不参与。
     if (!state.ready) {
       let set = true;
@@ -207,7 +226,29 @@ export class FirstLevelBridge {
       } else state.stuckS = 0;
       if (!state.overdue) return;
     }
-    this.Fire();
+    // 4. 人都走净了：等玩家把脸转向桥再按起爆器（最多等 blastGazeWaitS）。
+    //    「玩家在安全距离看见通路发生不可逆变化」—— 背对着桥炸，这一场就白演了。
+    state.gazeS += dt;
+    const watching = this.PlayerWatching();
+    if (!watching && state.gazeS < E.blastGazeWaitS) return;
+    this.Press(watching);
+  }
+  /** 玩家视线与桥心的水平夹角在 blastGazeHalfAngleDeg 以内。替身宿主没有朝向就当是看着的。 */
+  PlayerWatching() {
+    const player = this.runtime.player, yaw = player?.yaw;
+    if (!player?.position || !Number.isFinite(yaw)) return true;
+    const dx = A.railBridge.x - player.position.x, dz = A.railBridge.z - player.position.z;
+    const length = Math.hypot(dx, dz);
+    if (length < 1e-3) return true;
+    const cos = (-Math.sin(yaw) * dx - Math.cos(yaw) * dz) / length;
+    return cos >= Math.cos(E.blastGazeHalfAngleDeg * Math.PI / 180);
+  }
+  /** 爆破手按下起爆器；exploderPressLeadS 之后才真响。 */
+  Press(watching) {
+    const r = this.runtime, state = this.blast;
+    state.pressing = true; state.pressS = 0;
+    r.Record("exploderPressed", { watching, gazeWaitS: Number(state.gazeS.toFixed(1)) });
+    r.railBridgeSet?.Press?.();
   }
   /**
    * 把还赖在爆破区里的自己人往南岸赶（「桥头撤！」就是这个意思），并盯着他到底
@@ -250,11 +291,17 @@ export class FirstLevelBridge {
     return null;
   }
   PullBack(dt) {
-    const r = this.runtime;
+    const r = this.runtime, state = this.blast;
     void dt;
     r.extras.Walk("BridgeOfficer", E.officerPullback, E.demolitionMps, { arriveM: 1 });
-    for (const [index, route] of E.demolitionPullback.entries())
-      r.extras.Walk(BRIDGE_CAST[index + 1], route, E.demolitionMps, { arriveM: 1 });
+    for (const [index, route] of E.demolitionPullback.entries()) {
+      const id = BRIDGE_CAST[index + 1];
+      // 东边那位撤到起爆器后面就蹲下守着它（面朝北、朝桥）。一旦蹲下就不再喂折线：
+      // Walk 换了目标会把折线重新铺一遍，人会走回第一个点去。
+      if (index === 1 && state?.exploderManned) { r.extras.Hold(id, route.at(-1), { yaw: 0, stance: 1 }); continue; }
+      const done = r.extras.Walk(id, route, E.demolitionMps, { arriveM: 1 });
+      if (index === 1 && done && state) state.exploderManned = true;
+    }
     // 过了桥的尾队继续南下，不堵在南桥头。
     for (const entry of this.column || []) {
       const actor = r.extras.Actor(entry.id);
@@ -267,14 +314,17 @@ export class FirstLevelBridge {
   }
   Fire() {
     const r = this.runtime, state = this.blast;
-    state.fired = true;
+    state.fired = true; state.pressing = false; state.sinceFireS = 0;
     const at = r.Point(A.railBridge, 1.2);
-    r.vfx.Explosion?.(at, { radius: R.bridgeBlastRadiusM });
+    // 桥的模型在场：分段药包、半空火球、水柱、两个半孔折进河里、烟柱与断口的火
+    // 都由 RailBridgeSet 按 Blender 烘的时间线演（docs/Data_RailBridge.md）。
+    // 模型不在（node 替身、加载失败）就退回一发普通爆炸 —— 白盒桥照样翻闸门。
+    if (!r.railBridgeSet?.Detonate?.()) r.vfx.Explosion?.(at, { radius: R.bridgeBlastRadiusM });
+    // 震屏、耳鸣与爆炸声只走这一次共用感知入口（docs/Data_BlastFeedback.md）。
     r.combat.BlastFeedback(at, R.bridgeBlastRadiusM);
     // 桥面 / 桁架 / 钢轨的 5 个完好件与 3 个残骸件都挂在 RailBridgeDestroyed 这个信号上
     //（MISSION_SCENARIO_SIGNALS：信号 → bridgeDestroyed 这条事实）。一次翻完，不可逆。
     r.Record("bridgeDestroyed", { x: A.railBridge.x, z: A.railBridge.z, waitedS: Number(state.waitedS.toFixed(1)) });
-    r.Say("MarchToTengxian");
   }
 
   // -------------------------------------------------------------------------
@@ -309,7 +359,9 @@ export class FirstLevelBridge {
     return {
       runner: this.runner && { ...this.runner },
       blast: this.blast && { set: Number(this.blast.set.toFixed(1)), ready: this.blast.ready,
-        fired: this.blast.fired, stuckS: Number((this.blast.stuckS || 0).toFixed(1)), overdue: !!this.blast.overdue },
+        fired: this.blast.fired, stuckS: Number((this.blast.stuckS || 0).toFixed(1)), overdue: !!this.blast.overdue,
+        gazeS: Number((this.blast.gazeS || 0).toFixed(1)), pressing: !!this.blast.pressing,
+        ordered: !!this.blast.ordered, exploderManned: !!this.blast.exploderManned },
       rearColumn: (this.column || []).map(entry => ({
         id: entry.id, load: entry.load, progress: Number(entry.progress.toFixed(1)),
         crossed: entry.crossed, pinned: entry.pinned, alive: !!this.runtime.extras.Actor(entry.id),

@@ -15,12 +15,15 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     stats.triangles += (geometry.index?.count || geometry.attributes.position.count) / 3;
     sink.Add(key, geometry);
   };
-  const CrustLift = (x,z,u) => {
+  // taper 0 sinks the skin just under the heightfield: a run of skin ends without a step.
+  const CrustLift = (x,z,u,taper=1) => {
     if(u<=0||u>=1)return 0;
     const ridge=ValueNoise2(x*3.7,z*3.7,71),grain=ValueNoise2(x*13.1,z*13.1,93);
     const layer=ValueNoise2(x*8.3,z*8.3,417);
-    return Math.sin(u*Math.PI)*(.025+Style.crustReliefM*(ridge*.5+layer*.75)+.045*grain)-.008;
+    return Math.sin(u*Math.PI)*(.025+Style.crustReliefM*(ridge*.5+layer*.75)+.045*grain)*taper-.008;
   };
+  const Ease = t => { t=Math.max(0,Math.min(1,t)); return t*t*(3-2*t); };
+  const CrustTaper = (v, ends) => (ends.start ? Ease(v/.5) : 1) * (ends.end ? Ease((1-v)/.5) : 1);
   const Clod = (center, radius, relief, random, crown=false, heightAt=groundAt) => {
     const geometry = shape.clone();
     geometry.userData.trenchCrown=crown;
@@ -38,7 +41,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     geometry.computeVertexNormals();
     Add(earth, geometry); stats.clods++;
   };
-  const Crust = (st, next, side) => {
+  const Crust = (st, next, side, ends) => {
     const positions=[],uvs=[],indices=[],cols=12,rows=8;
     for(let row=0;row<=rows;row++)for(let col=0;col<=cols;col++) {
       const u=col/cols,v=row/rows;
@@ -46,7 +49,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       const lateral=half+bank*(.02+u*.98);
       const nx=st.nx+(next.nx-st.nx)*v,nz=st.nz+(next.nz-st.nz)*v;
       const x=st.x+(next.x-st.x)*v+nx*side*lateral,z=st.z+(next.z-st.z)*v+nz*side*lateral;
-      const lift=CrustLift(x,z,u);
+      const lift=CrustLift(x,z,u,CrustTaper(v,ends));
       positions.push(x,groundAt(x,z)+lift,z);uvs.push(u,v);
     }
     for(let row=0;row<rows;row++)for(let col=0;col<cols;col++) {
@@ -71,6 +74,25 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
   };
   for (const segment of plan.segments) {
     const random = Mulberry32(HashString(`${plan.seed}:${segment.id}:Earth07`));
+    // The skin follows the bank itself, not whichever clods won their random draw: a patch
+    // skipped between two neighbours used to leave a 20 cm step running down the whole wall.
+    const skin = { [-1]: new Uint8Array(segment.stations.length), [1]: new Uint8Array(segment.stations.length) };
+    for (let i = 0; i < segment.stations.length; i += Style.stationStride) {
+      const st = segment.stations[i], next = segment.stations[i + Style.stationStride];
+      if (!next || st.junctionClear || next.junctionClear || st.s < Style.endClearM || next.s > segment.path.length - Style.endClearM) continue;
+      const floor = groundAt(st.x, st.z);
+      for (const side of [-1, 1]) {
+        const offset = st.halfFloor + st.bank * .6, x = st.x + st.nx * side * offset, z = st.z + st.nz * side * offset;
+        if (plan.Corridor(x, z) && groundAt(x, z) - floor >= Style.minRiseM && plan.Depth(x, z) <= st.depth - Style.minRiseM) skin[side][i] = 1;
+      }
+    }
+    const SkinEnds = (i, side) => ({ start: !skin[side][i - Style.stationStride], end: !skin[side][i + Style.stationStride] });
+    for (let i = 0; i < segment.stations.length; i += Style.stationStride)
+      for (const side of [-1, 1]) if (skin[side][i]) {
+        const st = segment.stations[i];
+        sink.SetSector(`TrenchEarth_${Math.floor(st.x / Style.sectorM)}_${Math.floor(st.z / Style.sectorM)}`);
+        Crust(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
+      }
     for (let i = 0; i < segment.stations.length; i += Style.stationStride) {
       const st = segment.stations[i];
       if (st.junctionClear || st.s < Style.endClearM || st.s > segment.path.length - Style.endClearM) continue;
@@ -92,12 +114,13 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         const cell = `${Math.round(center.x * 2)}:${Math.round(center.z * 2)}`;
         if (occupied.has(cell)) continue;
         occupied.add(cell);
-        const next=segment.stations[i+Style.stationStride];
-        if(next&&!next.junctionClear)Crust(st,next,side);
+        const ends=skin[side][i]?SkinEnds(i,side):null,span=ends?segment.stations[i+Style.stationStride].s-st.s:1;
         const dressAt=(x,z)=>{
+          if(!ends)return groundAt(x,z);
           const lateral=((x-st.x)*st.nx+(z-st.z)*st.nz)*side;
           const u=(lateral-st.halfFloor-st.bank*.02)/(st.bank*.98);
-          return groundAt(x,z)+(next&&!next.junctionClear?Math.max(0,CrustLift(x,z,u)):0);
+          const v=Math.max(0,Math.min(1,((x-st.x)*st.tx+(z-st.z)*st.tz)/span));
+          return groundAt(x,z)+Math.max(0,CrustLift(x,z,u,CrustTaper(v,ends)));
         };
         if (random() < Style.clodChance) {
           const radius = Range(random, Style.clodRadiusM), relief = Range(random, Style.clodReliefM);

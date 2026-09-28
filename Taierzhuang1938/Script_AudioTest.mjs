@@ -149,7 +149,8 @@ const load = await page.evaluate(() => {
 // 2026-09-13: dedicated Hanyang shot + synchronized bolt cycle.
 // 2026-09-15: that recording split into rifleHanYang (shot) + boltHanYang (bolt, plays with the action).
 // 2026-09-23: 第一关战车 13 条（三条常驻循环 + 主炮三层 + 尖啸 / 掠过 / 装甲 / 舱盖 / 熄火 / 卡死 / 冷却）→ 100.
-const RECIPE_COUNT = 101;
+// 2026-09-27: 开场改稿的耳光 slap 与反冲锋的一片喊杀 chargeCrowd → 103.
+const RECIPE_COUNT = 103;
 
 if (!load.enabled) Fail("AudioEngine 被禁用了（正常模式不该走到出图那条路）");
 if (load.manifestCues !== RECIPE_COUNT) {

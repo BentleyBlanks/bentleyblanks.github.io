@@ -13,7 +13,7 @@ path; start/stop the instance around it). Environment:
                      OpeningStoryboards_20260926HumanoidV1 -- the 20260922/20260923/20260925
                      Lugou-rig sources stay untouched; the 0926 folder started as a copy of
                      the 0925 partner tracks, renamed to the Tengxian rig ids)
-  OPENING_VERSION    manifest version (default 20260927OpeningStoryboardsV12KneelBank)
+  OPENING_VERSION    manifest version (default 20260928OpeningStoryboardsV15IkBranch)
   OPENING_MODEL      comma list of rigs (default all five)
   OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON. A clip's only
                      inputs from other clips are the arm-roll seeds of its `prev` clip (below): a
@@ -36,11 +36,17 @@ path; start/stop the instance around it). Environment:
 
 Reproducibility (2026-09-25 review): each clip starts from a clean solver state (grounding lift,
 hand/forearm/finger rate limits). A clip that continues another on the same root (`prev`) takes
-its forearm-twist branch, arm rolls and grounding lift (rig JSON `endLift`) from the LAST WRITTEN
-FRAME of the first `prev` clip that
+its forearm-twist branch, arm rolls, elbow and knee sides (LimitSwivel) and grounding lift (rig JSON
+`endLift`) from the LAST WRITTEN FRAME of the first `prev` clip that
 bakes before it on this rig -- the one baked in this run, or else the committed repository file
 (the same numbers, which 'verify' checks) -- so baking one clip alone gives the frames a full
 bake gives.
+
+Limb continuity (2026-09-28, docs/Data_OpeningClipLibrary20260923.md §10): LegRoll (the kneecap onto the
+knee's bend plane where the IK leaves it far off), LimitSwivel (elbow and knee turn about the shoulder-wrist /
+hip-ankle line at most SWIVEL_STEP a frame), KeepGripBranch and the arm passes for the captives-authored legacy
+clips. Spec keys: `seedAnyHand` ('L' / 'R': the twist branch of the `prev` clip's end even when the hand is not the
+same) and `twistMax` (deg: the forearm twist unwraps only that far, then the principal branch).
 
 It reuses the production-rig importer, two-bone IK, palm solver and original-local-frame
 exporter of `_import/Script_MachineGunCaptivesBake.py`; meshes, skins and inverse binds are
@@ -68,7 +74,7 @@ NAME = os.environ.get('OPENING_LIBRARY_NAME') or 'OpeningStoryboards'
 OWN = NAME == 'OpeningStoryboards'
 private = Path(os.environ.get('OPENING_BLEND_DIR')
                or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/' + NAME + '_20260926HumanoidV1')
-VERSION = os.environ.get('OPENING_VERSION') or ('20260927OpeningStoryboardsV12KneelBank' if OWN else NAME)
+VERSION = os.environ.get('OPENING_VERSION') or ('20260928OpeningStoryboardsV15IkBranch' if OWN else NAME)
 committedDir = project / 'Animation' / NAME
 output = Path(os.environ.get('OPENING_OUTPUT') or (project.parent / 'tmp' / NAME / 'Verify'
                                                    if os.environ.get('OPENING_PASS') == 'verify' else committedDir))
@@ -103,7 +109,7 @@ WALL_REGIONS = {
 convertInv = convert.inverted()
 # Reach assist (Solve): where it starts (fraction of the bare arm length, shoulder to grip), how far
 # the pelvis may travel over the planted feet (source m) and how much extra trunk lean it may add
-# (rad). A clip may override any of them with spec 'reach': {'fraction', 'travel', 'bend'} (a number
+# (rad). A clip may override any of them with spec 'reach': {'fraction', 'travel', 'bend', 'sink'} (a number
 # or a function of the clip time; 'sides' limits the fraction to those hands, 'fractionBySide'
 # gives each hand its own number or function of time). TengxianHumanoidV1 (2026-09-26): the IJA shoulders
 # sit ~5 cm further back and 3.6 cm higher and the arm is 2.4 cm shorter than IJA02's own (NRA02
@@ -280,11 +286,20 @@ def BakeRig(ctx):
         ua = Bone(s + ' UpperArm')
         u = (Point(Bone(s + ' Forearm')) - Point(ua)).normalized()
         restHinge[s] = BWorld(ua).to_3x3().normalized().inverted() @ u.cross(Vector((0, -1, 0))).normalized()
+    # The same for each knee in the thigh's own frame: the calf folds backward (+Y), and the rest
+    # direction of the thigh as its parent (the pelvis) carries it (LegRoll's conditioning).
+    legHinge, thighRest = {}, {}
+    for s in 'LR':
+        th = Bone(s + ' Thigh')
+        u = (Point(Bone(s + ' Calf')) - Point(th)).normalized()
+        legHinge[s] = BWorld(th).to_3x3().normalized().inverted() @ u.cross(Vector((0, 1, 0))).normalized()
+        thighRest[s] = BWorld(th.parent).to_3x3().normalized().inverted() @ u
     ARM_TWIST_SHARE = .5
     twistPrev, twistNow, twistSeed = {}, {}, {}
     uaPrev, uaNow, faPrev, faNow = {}, {}, {}, {}
     uaSeed, faSeed = {}, {}
     ROLL_STEP = math.radians(float(os.environ.get('OPENING_ROLL_STEP') or 30))
+    TWIST_MAX = math.radians(float(os.environ.get('OPENING_TWIST_MAX') or 320))   # a clip's spec twistMax overrides it
 
     def ArmRoll(side):
         """Canonical arm roll, independent of how the frame's IK passes got there.
@@ -342,12 +357,22 @@ def BakeRig(ctx):
         twist = (twist + math.pi) % (2 * math.pi) - math.pi
         # Unwrapped against the previous frame: the twist crosses +-180 deg for a turned-over
         # palm, and the wrapped value would swing the forearm half a turn in one frame.
+        # ... as far as TWIST_MAX (2026-09-28, 320 deg; a clip's spec twistMax overrides it): past it the principal
+        # twist (within +-180) is taken again and the forearm roll limit below turns the forearm over to it in a few
+        # frames. The old bakes had one-frame snaps that did this (BlastSlamBuried's left forearm, 166 deg; the right
+        # one in CaptiveWallBrace at 1.29 s); with the snaps gone, unwrapped without end, the forearm and the wrist
+        # stayed 160-170 deg round each through the heap and the interrogation and every clip after them was a half
+        # turn of the forearm away. BlastSlamBuried sets 200: the left forearm turns over during the blast.
         prev = twistPrev.get(side)
         if prev is not None:
-            twist += 2 * math.pi * round((prev - twist) / (2 * math.pi))
+            unwrapped = twist + 2 * math.pi * round((prev - twist) / (2 * math.pi))
+            if abs(unwrapped) <= solveState.get('twistMax', TWIST_MAX):
+                twist = unwrapped
         elif side in twistSeed:
             turns = round((twistSeed[side] - twist) / (2 * math.pi))
-            if abs(twistSeed[side] - twist - 2 * math.pi * turns) < math.radians(20):
+            # (spec seedAnyHand, the sides: the branch nearest the previous clip's even when the hand is not the same -- a
+            # clip the director blends into from its `prev`)
+            if abs(twistSeed[side] - twist - 2 * math.pi * turns) < math.radians(20) or side in solveState.get('seedAnyHand', ''):
                 twist += 2 * math.pi * turns
         twistNow[side] = twist
         ctx['Put'](fa, Matrix.Translation(E) @ Quaternion(a, twist * ARM_TWIST_SHARE).to_matrix().to_4x4()
@@ -368,6 +393,148 @@ def BakeRig(ctx):
                 ctx['Put'](fa, Matrix.Translation(E) @ back.to_matrix().to_4x4() @ Matrix.Translation(-E) @ BWorld(fa))
         faNow[side] = (BWorld(fa).to_quaternion(), a.copy())
         ctx['Put'](hd, Matrix.LocRotScale(Wr, Hq, Hs))
+
+    # LegRoll (2026-09-28). The two-bone leg IK aims the thigh with the smallest rotation from where the pelvis
+    # carries its rest direction, so the thigh's roll about its own axis -- where the kneecap faces -- does not
+    # follow the plane the knee really bends in. Standing, sitting and kneeling it is off by 0-45 deg (a
+    # slight knock-knee, left as authored). Two poses break it: a thigh pulled up to within ~20 deg of
+    # the opposite of its rest direction (a man dragged along on his back, the knee at his chest) turns the
+    # smallest rotation over by up to 50 deg a frame and snaps it back (CaptiveDraggedFromDirt, 167 deg in
+    # one frame at 0.79 s), and a knee pole that crosses to the other side of the leg (the vaults' tuck,
+    # the fallen heap) leaves the kneecap 80-180 deg off the bend, the calf folding sideways or backward.
+    # LegRoll rolls the thigh about its own axis onto the bend plane (a pure knee hinge) where either
+    # happens, and nowhere else: offsets up to LEG_KEEP are kept, beyond it the kept part falls off one
+    # degree per degree (none is kept past twice LEG_KEEP -- a slope of one, so the kept roll never moves
+    # faster than the solver's own), and within 20 deg of the singular direction the roll is the hinge's
+    # alone. A function of the frame's pose only (no state), so a clip baked alone is the same, and a pose
+    # inside those limits comes out bit for bit as before (hand-overs to clips not re-baked hold).
+    LEG_KEEP = math.radians(float(os.environ.get('OPENING_LEG_KEEP') or 45))
+    LEG_SINGULAR = math.radians(150), math.radians(170)
+
+    def LegRoll(side, planted=1.0):
+        """`planted` (spec groundWeight): off the ground (0: the vaults' hop, legs tucked and swung in a few frames)
+        the kneecap follows the hinge throughout -- the kept offset came and went there by 26 deg a frame."""
+        th, ca, ft = Bone(side + ' Thigh'), Bone(side + ' Calf'), Bone(side + ' Foot')
+        H, Kn, A = Point(th), Point(ca), Point(ft)
+        u = (Kn - H).normalized()
+        v = A - Kn
+        d = v - u * v.dot(u)
+        h = BWorld(th).to_3x3().normalized() @ legHinge[side]
+        h = h - u * h.dot(u)
+        if d.length < 1e-6 or h.length < 1e-6:
+            return
+        h.normalize()
+        want = u.cross(d.normalized())
+        off = math.atan2(u.dot(h.cross(want)), h.dot(want))       # the roll that puts the hinge on the bend plane
+        keep = math.copysign(max(0.0, min(abs(off), 2 * LEG_KEEP - abs(off))), off)
+        rest = (BWorld(th.parent).to_3x3().normalized() @ thighRest[side]).normalized()
+        sigma = math.acos(max(-1.0, min(1.0, rest.dot(u))))
+        keep *= (1 - Smooth01((sigma - LEG_SINGULAR[0]) / (LEG_SINGULAR[1] - LEG_SINGULAR[0]))) * max(0.0, min(1.0, planted))
+        # a nearly straight leg has no bend plane (as ArmRoll)
+        angle = (off - keep) * Smooth01(d.length / (.08 * max(v.length, 1e-6)))
+        if abs(angle) < 1e-7:
+            return
+        _, Fq, Fs = BWorld(ft).decompose()
+        ctx['Put'](th, Matrix.Translation(H) @ Quaternion(u, angle).to_matrix().to_4x4() @ Matrix.Translation(-H) @ BWorld(th))
+        # the calf re-aimed from its rest relation to the thigh, as the IK leaves it: a pure hinge now
+        ca.matrix_basis = ctx['rest'][ca.name]
+        Update()
+        ctx['Aim'](ca, ft, A)
+        ctx['Put'](ft, Matrix.LocRotScale(A, Fq, Fs))                 # the foot keeps its world orientation
+
+    # Swivel limit (2026-09-28). The two-bone IK puts the elbow (knee) in the plane of shoulder (hip), wrist
+    # (ankle) and pole. A pole that passes near the shoulder-wrist line flips the elbow to the other side of
+    # it in one frame (BlastSlamBuried's left arm, 176 deg at 0.33 s; ArmRoll then turns the whole arm over),
+    # and an ankle drawn up past the hip swings the hip-ankle line under a knee that then whips round it
+    # (CaptiveDraggedFromDirt's left knee, 60 deg a frame at 0.83 s). The elbow's (knee's) turn about that
+    # line, in the chest (pelvis) frame, moves at most SWIVEL_STEP a frame from the previous frame's; the
+    # wrist and the hand (ankle and foot) stay where they are, so grips and plants hold. A clip that
+    # continues its `prev` starts from that clip's last elbow and knee, as the arm rolls do.
+    SWIVEL_STEP = math.radians(float(os.environ.get('OPENING_SWIVEL_STEP') or 30))
+    SWIVEL_CHAINS = {'L': ('L UpperArm', 'L Forearm', 'L Hand', 'Spine2'), 'R': ('R UpperArm', 'R Forearm', 'R Hand', 'Spine2'),
+                     'legL': ('L Thigh', 'L Calf', 'L Foot', 'Pelvis'), 'legR': ('R Thigh', 'R Calf', 'R Foot', 'Pelvis')}
+    swivelPrev, swivelNow, swivelSeed = {}, {}, {}
+
+    def Swivel(chain):
+        """(root->end unit axis, unit middle-joint offset off that line, bend rad, unit root->middle) in world, or None."""
+        a_, b_, c_, _ = SWIVEL_CHAINS[chain]
+        S, E, W = Point(Bone(a_)), Point(Bone(b_)), Point(Bone(c_))
+        a, e = W - S, E - S
+        if a.length < 1e-4 or e.length < 1e-6 or (W - E).length < 1e-6:
+            return None
+        a.normalize()
+        p = e - a * e.dot(a)
+        if p.length < 1e-5:
+            return None
+        bend = math.acos(max(-1.0, min(1.0, e.normalized().dot((W - E).normalized()))))
+        return a, p.normalized(), bend, e.normalized()
+
+    def LimitSwivel(chain):
+        cur = Swivel(chain)
+        top, _, end, frameBone = SWIVEL_CHAINS[chain]
+        frame = BWorld(Bone(frameBone)).to_quaternion()
+        if cur is None:
+            swivelNow.pop(chain, None)
+            return
+        a, s, bend, _ = cur
+        prev, step = swivelPrev.get(chain), SWIVEL_STEP
+        if prev is None and chain in swivelSeed and (frame @ swivelSeed[chain][1]).dot(a) > math.cos(math.radians(5)):
+            prev, step = swivelSeed[chain], 0.0
+        if prev is not None:
+            # where the previous frame's upper bone points, off the current root->end line: the side of the
+            # line the middle joint was on. (The previous elbow side itself is no reference when an ankle
+            # drawn up past the hip swings that line round by 60 deg in a frame.)
+            q = frame @ prev[0]
+            q = q - a * q.dot(a)
+            if q.length > .15:
+                q.normalize()
+                phi = math.atan2(a.dot(q.cross(s)), q.dot(s))
+                # a nearly straight limb's middle joint sits on the line: its side does not show, the limit eases in with the bend
+                excess = (phi - math.copysign(step, phi)) * Smooth01((math.degrees(bend) - 10) / 15) if abs(phi) > step else 0.0
+                if abs(excess) > 1e-7:
+                    root, tip = Bone(top), Bone(end)
+                    S = Point(root)
+                    Tloc, Tq, Ts = BWorld(tip).decompose()
+                    back = Quaternion(a, -excess)
+                    ctx['Put'](root, Matrix.Translation(S) @ back.to_matrix().to_4x4() @ Matrix.Translation(-S) @ BWorld(root))
+                    ctx['Put'](tip, Matrix.LocRotScale(Tloc, Tq, Ts))
+        if bend < math.radians(15) and prev is not None:
+            # nearly straight: the side the middle joint was on is kept for when the limb bends again (a flung arm that
+            # straightened and bent again came out with the elbow on the other side, 136 deg round in a frame)
+            swivelNow[chain] = prev
+        else:
+            swivelNow[chain] = (frame.inverted() @ (Point(Bone(SWIVEL_CHAINS[chain][1])) - Point(Bone(top))).normalized(), frame.inverted() @ a)
+
+    def KeepGripBranch():
+        """Both hands on one rifle in a clip the captives authoring poses (the legacy ButtThreat): the palm hints turn
+        over by half a turn about the rifle when it passes the vertical (GripPalms swaps its reference there), and both
+        hands spun round the stock in one frame, and back 16 frames later. The grip turned half a turn about the rifle
+        is the same grip on its other branch: a hand more than 120 deg from its previous frame takes that branch when it
+        is nearer, turned about the rifle through its grip point (which stays where it is)."""
+        axis = ctx['GripPoint']('L') - ctx['GripPoint']('R')
+        if axis.length < 1e-3:
+            return
+        flip = Quaternion(axis.normalized(), math.pi)
+
+        def Angle(a, b):
+            x = a.rotation_difference(b).angle
+            return min(x, 2 * math.pi - x)
+        for side in 'LR':
+            prev = handPrev.get(side)
+            if prev is None:
+                continue
+            ua, fa, hd = Bone(side + ' UpperArm'), Bone(side + ' Forearm'), Bone(side + ' Hand')
+            loc, q, sc = BWorld(hd).decompose()
+            alt = flip @ q
+            if Angle(prev, q) <= math.radians(120) or Angle(prev, alt) >= Angle(prev, q):
+                continue
+            G = ctx['GripPoint'](side)
+            S, E = Point(ua), Point(fa)
+            a = loc - S
+            off = (E - S) - a * ((E - S).dot(a) / max(a.length_squared, 1e-9))
+            pole = E + (off.normalized() if off.length > 1e-6 else Vector((0, 0, -1))) * .5
+            ctx['Chain'](ua, fa, hd, G + flip @ (loc - G), pole)
+            ctx['Put'](hd, Matrix.LocRotScale(Point(hd), alt, sc))
 
     fingerPrev = {}
     FINGER_STEP = math.radians(float(os.environ.get('OPENING_FINGER_STEP') or 22))
@@ -428,6 +595,16 @@ def BakeRig(ctx):
             spec['author'](t, 0.0)
             low, _ = ctx['LowestVertex']()
             spec['author'](t, CLEARANCE - low)
+            # (2026-09-28) the arm continuity the solved clips have: the rifle grip's branch, the elbow's side, the arm
+            # rolls and the forearm twist (the captives authoring aims every bone from rest: ButtThreat's forearms turned
+            # 130-170 deg about themselves in a frame, ShotCollapse's 70-90)
+            if spec.get('twoHand'):
+                KeepGripBranch()
+            for side in 'LR':
+                LimitSwivel(side)
+                ArmRoll(side)
+            LimitFingers()
+            Update()
             return CLEARANCE - low, {}
         Reset()
         p = spec['pose'](t)
@@ -484,12 +661,19 @@ def BakeRig(ctx):
                 over = moved.length - travel
                 moved = moved.normalized() * travel
                 p['bend'] = min(bend0 + lean, p.get('bend', 0.0) + over / .45)
-            p['pelvis'] = (p0[0] + moved.x, p0[1] + moved.y, max(p0[2] - .15, pz + min(0.0, excess.z) * .6))
+            # spec reach 'sink' (source m, default .15): how far the hips may drop toward a low grip (2026-09-27: 0 for
+            # ijaA's throat cut -- dropping his hips put his body into the kneeling man's raised arm).
+            sink = assist.get('sink', .15)
+            p['pelvis'] = (p0[0] + moved.x, p0[1] + moved.y, max(p0[2] - (sink(t) if callable(sink) else sink), pz + min(0.0, excess.z) * .6))
             Reset()
             ctx['ApplyPose'](p, 0.0)
             if p.get('post'):
                 p['post']()
                 Update()
+        planted = spec['groundWeight'](t) if spec.get('groundWeight') else 1.0
+        for side in 'LR':
+            LimitSwivel('leg' + side)
+            LegRoll(side, planted)
         # `ground` (x, y, t) -> z: a clip authored on uneven ground (the comrade's bank) grounds on it.
         ground = spec.get('ground')
         low, lowAt = ctx['LowestVertex']((lambda x, y: ground(x, y, t)) if ground else None)
@@ -533,6 +717,7 @@ def BakeRig(ctx):
             if side not in errors:
                 LimitHand(side)
         for side in 'LR':
+            LimitSwivel(side)
             ArmRoll(side)
         LimitFingers()
         Update()
@@ -570,12 +755,17 @@ def BakeRig(ctx):
     def SeedsFromValues(bones, values):
         """ArmRoll's carried state for the frame `values`: the forearm-twist branch (twice the forearm's roll about
         its own axis against the same forearm re-aimed from rest -- the forearm takes half the twist) and the
-        upper-arm / forearm world rotations with their axes."""
-        twist, ua, fa = {}, {}, {}
+        upper-arm / forearm world rotations with their axes; and LimitSwivel's elbow and knee sides."""
+        twist, ua, fa, swivel = {}, {}, {}, {}
         for side in 'LR':
             PoseFromValues(bones, values)
             u_, f_, h_ = Bone(side + ' UpperArm'), Bone(side + ' Forearm'), Bone(side + ' Hand')
             S, E, Wr = Point(u_), Point(f_), Point(h_)
+            for chain in (side, 'leg' + side):
+                sw = Swivel(chain)
+                if sw is not None:
+                    frame = BWorld(Bone(SWIVEL_CHAINS[chain][3])).to_quaternion().inverted()
+                    swivel[chain] = (frame @ sw[3], frame @ sw[0])
             a = (Wr - E).normalized()
             ua[side] = (BWorld(u_).to_quaternion(), (E - S).normalized())
             fa[side] = (BWorld(f_).to_quaternion(), a.copy())
@@ -586,7 +776,7 @@ def BakeRig(ctx):
             roll = 2 * math.atan2(Vector((rel.x, rel.y, rel.z)).dot(a), rel.w)
             twist[side] = 2 * ((roll + math.pi) % (2 * math.pi) - math.pi)
         Reset()
-        return twist, ua, fa
+        return twist, ua, fa, swivel
     # Bone mounts of props an actor carries between clips (spec 'mountFrames': {prop: (bone role,
     # frame)}): the prop track at that frame in that bone's glTF node frame -- the sheathed
     # bayonet on the pelvis, taken from IjaDrawBayonet frame 0.
@@ -600,6 +790,9 @@ def BakeRig(ctx):
     for clip in wanted:
         spec = specs[clip]
         meta = CLIPS[clip]
+        spec['twoHand'] = meta.get('weaponHold') == 'twoHand'
+        solveState['seedAnyHand'] = spec.get('seedAnyHand') or ''      # the sides ('L', 'R', 'LR')
+        solveState['twistMax'] = math.radians(spec['twistMax']) if spec.get('twistMax') else TWIST_MAX
         duration, loop = meta['duration'], meta['loop']
         count = math.ceil(duration * FPS) + 1
         action = bpy.data.actions.new(clip)
@@ -639,6 +832,9 @@ def BakeRig(ctx):
         twistSeed.clear()
         uaSeed.clear()
         faSeed.clear()
+        swivelPrev.clear()
+        swivelNow.clear()
+        swivelSeed.clear()
         # The first `prev` that bakes before this clip on this rig (what a full bake has in twistEnd); when
         # this run did not bake it, its last frame comes from the committed file.
         earlier = onRig[:onRig.index(clip)]
@@ -654,7 +850,8 @@ def BakeRig(ctx):
                 twistSeed.update(twistEnd[before][0])
                 uaSeed.update(twistEnd[before][1])
                 faSeed.update(twistEnd[before][2])
-                solveState['lift'] = twistEnd[before][3]
+                swivelSeed.update(twistEnd[before][3])
+                solveState['lift'] = twistEnd[before][4]
                 break
         for frame in range(count):
             arm.animation_data.action = None
@@ -666,6 +863,8 @@ def BakeRig(ctx):
             twistPrev.update(twistNow)
             uaPrev.update(uaNow)
             faPrev.update(faNow)
+            swivelPrev.clear()
+            swivelPrev.update(swivelNow)
             for s in 'LR':
                 for pb in fingerBones[s]:
                     fingerPrev[pb.name] = pb.matrix_basis.to_quaternion()

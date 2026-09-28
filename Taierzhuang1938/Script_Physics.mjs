@@ -73,6 +73,12 @@ const IG_DEBRIS = InteractionGroups(GROUP.DEBRIS, ALL);
 const IG_RAGDOLL = InteractionGroups(GROUP.RAGDOLL, GROUP.WORLD | GROUP.DEBRIS | GROUP.QUERY);
 /** 射线默认只认静态世界。 */
 const IG_RAY_WORLD = InteractionGroups(GROUP.QUERY, GROUP.WORLD);
+/**
+ * 空气墙（碰撞 tag `airWall`，docs/Data_FirstLevelGuidance20260928.md §3）：只挡角色控制器。
+ * 成员位仍是 WORLD（角色的过滤位认它），过滤位只留 CHARACTER —— 子弹/视线射线（QUERY）、
+ * 手榴弹与碎块（DEBRIS）、布娃娃（RAGDOLL）一律从它穿过去，画面上不会出现打在空气上的弹着。
+ */
+const IG_AIR_WALL = InteractionGroups(GROUP.WORLD, GROUP.CHARACTER);
 
 // 单帧步长的钳位。**每帧必须步进一次** —— 角色是运动学刚体，
 // 它的碰撞体位置是在 world.step() 里从刚体同步过去的；跳过一帧不步进，
@@ -234,7 +240,7 @@ export class PhysicsWorld {
     if (!(hx > 1e-4) || !(hy > 1e-4) || !(hz > 1e-4)) return null;
     const desc = R.ColliderDesc.cuboid(hx, hy, hz)
       .setTranslation(cx, cy, cz)
-      .setCollisionGroups(IG_WORLD)
+      .setCollisionGroups(box.tag === "airWall" ? IG_AIR_WALL : IG_WORLD)
       .setFriction(0.85)
       .setRestitution(box.tag === "water" ? 0 : 0.08);
     if (ry) desc.setRotation(YawQuat(ry));

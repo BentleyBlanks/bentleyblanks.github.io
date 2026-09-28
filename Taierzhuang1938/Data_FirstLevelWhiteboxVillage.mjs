@@ -59,6 +59,14 @@ export function BuildVillageWhitebox(groundAt) {
       ["RejoinAlleyWest", 50, 39, .7, 2.6, 10], ["StreetBlockFallenWall", 74.3, 20, 3.85, 1.35, 2],
       ["LitterHoldCover", 66, -16.5, 10, 1.5, .8]].map((row) => [...row, true]),
     ["EastLaneRuin", 95, 6, .7, 2.1, 23],
+    // 2026-09-28 引导轮：Layout FarmSilhouette 的两栋（村东 106,40 / 村西南 39,65）还是蓝色 cover 墙，
+    // 10_2 绕回巷朝东、主街南段一眼看过去最跳的是它 —— 眯眼测试里无关的蓝墙。几何原样，只换灰泥色。
+    ...[["VillageEdgeHouse", 106, 40, 16, 12], ["VillageRearHouse", 39, 65, 13, 11]].flatMap(([room, x, z, w, d]) => {
+      const side = (w - 3.8) / 2, off = (w + 3.8) / 4;
+      return [[`${room}SouthLeft`, x - off, z + d / 2, side, 2.9, .6], [`${room}SouthRight`, x + off, z + d / 2, side, 2.9, .6],
+        [`${room}NorthLeft`, x - off, z - d / 2, side, 2.9, .6], [`${room}NorthRight`, x + off, z - d / 2, side, 2.9, .6],
+        [`${room}West`, x - w / 2, z, .6, 2.9, d], [`${room}East`, x + w / 2, z, .6, 2.9, d]];
+    }),
   ];
   replaceBlockIds.push(...RESKIN.map(([id]) => id));
   function Block(id, x, z, w, h, d, semantic = "plaster", extra = {}) {
@@ -119,8 +127,12 @@ export function BuildVillageWhitebox(groundAt) {
     return Block(id, x, z, w, h, d, semantic, { y: groundAt(gx, gz) + y0 + h / 2,
       ...(solid ? {} : { solid: false }) });
   }
+  // 2026-09-28 引导轮：House() 的门全是假门（屋身是实心 Bank），画成黑洞就在邀请玩家进去。
+  // 一律画成关着的板门（门板 + 两道横带）；真能进的只有 Layout Room() 的门洞（灶屋、连屋、侧间）。
   function Door(id, f, at, width = 1.1, height = 2.1, steps = 1) {
-    OnFace(`${id}Void`, f, at, width, 0, height, "void", .05);
+    OnFace(`${id}Leaf`, f, at, width, 0, height, "timber", .05);
+    for (const [k, y0] of [[0, .42], [1, height - .55]])
+      OnFace(`${id}Batten${k}`, f, at, width - .08, y0, .11, "earthDark", .04, .05);
     for (const s of [-1, 1])
       OnFace(`${id}Jamb${s}`, f, at + s * (width / 2 + .07), .14, 0, height + .12, "timber", .1);
     OnFace(`${id}Head`, f, at, width + .44, height, .18, "timber", .12);
@@ -318,8 +330,20 @@ export function BuildVillageWhitebox(groundAt) {
     doors: [["W", 4.5, 1.1, 2.1, 1]], windows: [["W", -4.1, .9, 1.2, .8], ["W", 1.7, .9, 1.2, .8]] });
   // North of the cart a corner house closes the street between the alley
   // mouth (z 8…14, the east alley route at z=11) and the cart.
-  House("StreetEastCornerHouse", 83.4, 16.95, 6.2, 5.3, 3.5, { overhang: .6,
-    doors: [["N", .6, 1.0, 2.05, 1]], windows: [["W", -1.2, .9, 1.2, .8]] });
+  // 2026-09-28 引导轮：它是塌进街里的那一栋 —— 烧剩的空壳（不画屋顶，墙头参差，焦梁朝天），
+  // 从主街北口看过去，障碍东半边的天际线是断墙和黑梁，不再是一栋完好的房子。
+  // 这里不调 Rand()（整份文件共用一条确定性序列）。
+  {
+    Bank("StreetEastCornerHouseBody", 83.4, 16.95, 6.2, 2.3, 5.3, "plaster");
+    Detail("StreetEastCornerHousePlinth", 83.4, 16.95, 6.28, .5, 5.38, "earthDark", { y: groundAt(83.4, 16.95) + .2 });
+    for (const [k, x, z, w, h, d] of [[0, 80.55, 15.35, .5, 3.4, 2.1], [1, 80.55, 18.55, .5, 2.9, 1.1],
+      [2, 82.2, 14.55, 1.8, 3.15, .5], [3, 85.6, 14.55, 1.2, 2.75, .5]])
+      Bank(`StreetEastCornerHouseWallStub${k}`, x, z, w, h, d, "plaster");
+    for (const [k, x, z, h] of [[0, 81.3, 16.2, 3.9], [1, 83.9, 17.7, 3.35], [2, 85.2, 15.6, 2.95]])
+      Block(`StreetEastCornerHouseCharredPost${k}`, x, z, .22, h, .22, "boundary");
+    Detail("StreetEastCornerHouseCharredBeam", 83.2, 16.6, 5.4, .24, .24, "boundary",
+      { y: groundAt(83.2, 16.6) + 2.46, ry: .42 });
+  }
   // Side room's street entrance reads as a doorway: posts, head beam, threshold.
   for (const z of [7.62, 12.38])
     Block(`SideRoomStreetPost${z}`, 72, z, .36, 2.8, .22, "timber");
@@ -637,6 +661,70 @@ export function BuildVillageWhitebox(groundAt) {
   // Taller masses behind the long street frontages read as a damaged block.
   HouseMass("StreetEastSouthHouse", 105, 28, 11.5, 11, 3.6);
   HouseMass("VillageWestCourtWing", 30, 23, 4, 18, 3.3);
+
+  // ---------------------------------------------------------------------------
+  // 2026-09-28 场景引导轮（docs/Data_FirstLevelGuidance20260928.md §5 B）。放在文件末尾：
+  // Rand() 是整份文件共用的确定性序列，这一段之前的碎砖、柴垛、枯树枝位置一个都不动。
+  // ---------------------------------------------------------------------------
+  // 08 主街障碍要一眼读成「过不去」。从北口 (76,-22) 看过去 42 m，原来只有 1.35–1.6 m 的一道
+  // 矮堆，街后半截一路看得到门楼，读成「路还往南通」。倒墙上压一堆塌下来的屋顶（瓦 + 焦梁，
+  // 顶到 2.75 m），横车后面竖一辆翻起来的大车（车板 3 m、车辕朝天 4.4 m）；两件都在原障碍
+  // 南侧，不进北边前队站的街面。人缝 x 76.225…77.125 一件不放；缝后 z≈25 立一摞门板，挡住
+  // 从缝里望见的远街（钻过缝的人从它东边绕，东侧留 2.2 m）。东窗、侧间、担架遮挡几条射线都在
+  // 障碍以北或被它加强，不受影响。
+  {
+    const wallTop = groundAt(74.3, 20) + 1.35;
+    Block("StreetBlockRoofHeap", 74.25, 20.3, 3.5, 1.4, 1.1, "roof", { y: wallTop + .7 });
+    Detail("StreetBlockRoofHeapRidge", 74.1, 20.25, 2.6, .3, .7, "roof", { y: wallTop + 1.55, ry: -.12 });
+    for (const [i, x, z, h] of [[0, 73.2, 19.6, 3.3], [1, 74.7, 20.55, 2.95], [2, 75.75, 19.85, 3.6]])
+      Block(`StreetBlockCharredBeam${i}`, x, z, .2, h, .2, "boundary");
+    Detail("StreetBlockCharredBeamLying", 74.2, 20.1, 3.5, .24, .24, "boundary", { y: wallTop + 1.52, ry: .18 });
+    Block("StreetBlockCartUpBed", 79.15, 22.7, 2.2, 3.0, .3, "boundary");
+    for (const x of [78.0, 80.15])
+      Detail(`StreetBlockCartUpRail${x}`, x, 22.8, .12, 3.1, .6, "timber");
+    for (const x of [78.55, 79.75])
+      Detail(`StreetBlockCartUpShaft${x}`, x, 22.5, .12, 4.4, .12, "boundary");
+    Block("StreetBlockDoorStack", 76.8, 25.4, 2.4, 2.3, .45, "timber");
+    for (const [i, x, h, ry] of [[0, 76.1, 2.1, .08], [1, 77.4, 1.95, -.1]])
+      Detail(`StreetBlockDoorStackLeaf${i}`, x, 25.05, 1.0, h, .08, "earthDark", { ry });
+    RubbleStrip("StreetBlockDoorStackFoot", 75.2, 24.6, 78.2, 24.7, 6);
+    // 障碍前 7 m 的街面撒满碎瓦碎砖（≤ 0.28 m，不绊人），眼睛顺着越来越密的碎片走到倒墙跟前。
+    // 让开街心 x 76.1…77.3（北口望障碍那条视线、人缝的来路）和前队四个人的站位。
+    RubbleStrip("StreetBlockSpillWest", 74.6, 10.2, 75.6, 17.6, 12);
+    RubbleStrip("StreetBlockSpillEast", 78.3, 14.0, 79.6, 17.3, 8);
+  }
+  // 10→11 的地标：村南门楼加一层檐（重檐顶到约 5.8 m，高过两边屋脊 4.5–4.8 m），门梁正中挂红匾、
+  // 两侧挂灯笼 —— 与灶屋门的红对联同一个意思：红的地方就是要穿过去的口。门洞净空与墙体不变。
+  {
+    const g = groundAt(77.2, 70.5);
+    Detail("VillageSouthGateLoft", 77.2, 70.5, 4.4, 1.0, 1.3, "timber", { y: g + 4.02 });
+    Roof("VillageSouthGateUpper", 77.2, 70.5, 5.6, 2.0, 4.45, true, 1.3, true);
+    Detail("VillageSouthGatePlaque", 77.2, 70.22, 1.6, .36, .05, "danger", { y: g + 3.05 });
+    for (const x of [75.4, 79.0]) {
+      Detail(`VillageSouthGateLantern${x}`, x, 70.5, .34, .44, .34, "canvas", { y: g + 2.5 });
+      Detail(`VillageSouthGateLanternCap${x}`, x, 70.5, .42, .06, .42, "danger", { y: g + 2.75 });
+    }
+  }
+  // 08 主街北口东侧：街东房与东北房之间 z −27…−24 那道 3 m 的口子，顺着巷子望过去像路还往东通。
+  // 贴街面封一道院墙 + 关着的院门 + 门前一垛柴（flank 路线在 x≈90，离它 9 m）。
+  YardWall("StreetMouthEastWall", 80.45, -25.5, .5, 3.0, 2.4);
+  Door("StreetMouthEastGate", { axis: "x", plane: 80.2, dir: -1, c: 0 }, -25.5, 1.3, 2.0, 0);
+  Woodpile("StreetMouthEastFaggots", 79.75, -25.4, .8, 2.2, 1.05);
+  // 08 灶屋北门：画面里唯一开着的门。白天没有点光，靠对比：门两边贴红对联、门头横批，
+  // 门里门外撒一地稻草（暖黄，像门里透出来的光），门楣挂一只灯笼；对面那栋房的门关着、门口堆杂物。
+  {
+    const f = { axis: "z", plane: -16.8, dir: -1, c: 0 };
+    for (const x of [56.5, 59.5]) OnFace(`KitchenNorthDoorCouplet${x}`, f, x, .3, .7, 1.45, "danger", .04);
+    OnFace("KitchenNorthDoorBanner", f, 58, 1.3, 2.44, .28, "danger", .04);
+    Detail("KitchenNorthDoorLantern", 56.75, -17.15, .32, .42, .32, "canvas", { y: groundAt(56.75, -17.15) + 2.02 });
+    Detail("KitchenNorthDoorLanternCap", 56.75, -17.15, .4, .06, .4, "danger", { y: groundAt(56.75, -17.15) + 2.26 });
+    Detail("KitchenNorthDoorStrawIn", 58, -15.2, 2.0, .03, 2.1, "step", { y: groundAt(58, -15.2) + .02 });
+    Detail("KitchenNorthDoorStrawOut", 58.25, -17.55, 1.7, .03, .95, "step", { y: groundAt(58.25, -17.55) + .02, ry: .1 });
+  }
+  // 灶屋对门那栋（KitchenLaneHouse）的门就在 08 起步机位左手 1.5 m，门口堆上门板和缸（离 village 路线 ≥ 0.9 m）。
+  Detail("KitchenLaneHouseDoorBoards", 50.25, -21.1, 1.3, 1.35, .22, "timber", { ry: .06 });
+  Jar("KitchenLaneHouseDoorJar", 51.45, -21.2, .8);
+  Basket("KitchenLaneHouseDoorBasket", 49.3, -21.15, .8);
 
   return { replaceBlockIds, blocks };
 }

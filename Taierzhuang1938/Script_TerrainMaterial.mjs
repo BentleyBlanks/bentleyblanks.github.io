@@ -33,7 +33,7 @@ import * as THREE from "three";
 import { MakePatch, SurfacePatchEnd } from "./Script_MaterialPatches.mjs";
 import {
   TERRAIN_SETS, TERRAIN_DISTANCE, TERRAIN_MACRO, TERRAIN_STUBBLE, TERRAIN_BLEND,
-  TERRAIN_AO_INTENSITY, TERRAIN_RUTS, TERRAIN_WATER, TerrainLayerUrls, TerrainQualityOf,
+  TERRAIN_AO_INTENSITY, TERRAIN_RUTS, TERRAIN_WATER, TERRAIN_MUD_ZONE, TerrainLayerUrls, TerrainQualityOf,
 } from "./Data_Tuning_Terrain.mjs";
 
 const SRGB_TO_LINEAR = (() => {
@@ -221,6 +221,9 @@ uniform vec4 uTerrainWaterB;              // x,y 平地阈值  z 水线过渡  w
 uniform vec4 uTerrainWaterC;              // x 水面粗糙度 y 湿痕粗糙度倍率 z 湿土压暗 w 积水压暗
 uniform vec4 uTerrainWaterD;              // x 车道积水 y 车辙抬水位 z 沟底抬水位 w 车道底湿度
 uniform vec4 uTerrainWaterE;              // x 材质高度参与水线的比例 y 湿土饱和度增量
+uniform vec4 uTerrainMudBox;              // 前沿湿泥区 minX minZ maxX maxZ（Data_Tuning_Terrain.TERRAIN_MUD_ZONE）
+uniform vec4 uTerrainMudA;                // x 羽化 y 翻土底湿度 z 沟底积水倍率 w 沟底抬水位
+uniform vec4 uTerrainMudB;                // xyz 翻土线性倍率 w 车道底湿度
 varying vec4 vTerrainLayers;
 varying vec3 vTerrainWorld;
 
@@ -260,14 +263,20 @@ vec2 TerrainGradXZ(vec2 dS, vec2 dPx, vec2 dPy) {
   return vec2(dS.x * dPy.y - dS.y * dPx.y, dPx.x * dS.y - dPy.x * dS.x) / det;
 }
 
+// 前沿湿泥区的权重（矩形内 1，羽化带 smoothstep 到 0）。
+float TerrainMudZone(vec2 xz) {
+  vec2 d = max(max(uTerrainMudBox.xy - xz, xz - uTerrainMudBox.zw), 0.0);
+  return 1.0 - smoothstep(0.0, uTerrainMudA.x, length(d));
+}
+
 // 湿泥与积水（Data_Tuning_Terrain.TERRAIN_WATER）：低频噪声给水位，材质高度低于水位的像素是水面，
-// 水线以上一条带是湿痕。site = 这里会不会积水（0..1），low = 沟底/坑底抬水位，damp = 底湿度。
+// 水线以上一条带是湿痕。site = 这里会不会积水（0..1），lowRaise = 沟底/坑底把水位抬高多少（高度单位），damp = 底湿度。
 // 写 albedo（线性反照率）与 gTerrainRough / gTerrainNormalW / gMaterialAo / gTerrainWet / gTerrainWater。
-void TerrainWater(inout vec3 albedo, vec2 xz, vec3 geomN, float site, float low, float damp) {
+void TerrainWater(inout vec3 albedo, vec2 xz, vec3 geomN, float site, float lowRaise, float damp) {
   float wet = damp, water = 0.0;
   if (site > 0.001) {
     float n = TerrainNoise(xz * uTerrainWaterA.x) * 0.62 + TerrainNoise(xz * uTerrainWaterA.y + 7.13) * 0.38;
-    float level = (n - uTerrainWaterA.z) * uTerrainWaterA.w + gTerrainRut * uTerrainWaterD.y + low * uTerrainWaterD.z;
+    float level = (n - uTerrainWaterA.z) * uTerrainWaterA.w + gTerrainRut * uTerrainWaterD.y + lowRaise;
     // 材质高度只按比例参与（卵石级的起伏全额进来，水线会碎成一粒粒黑点）。
     float h = 0.5 + (gTerrainHeight - 0.5) * uTerrainWaterE.x - gTerrainRut * 0.35;
     float above = level - h;
@@ -479,9 +488,11 @@ ${PerLayer((c, i) => `    if (tB.${c} > 0.0) {
   float tAo = clamp(tSurface.a, 0.0, 1.0);
   gMaterialAo = mix(tAo, 1.0 - (1.0 - tAo) * uTerrainFade.y, farT);
 #ifndef TERRAIN_WATER_EXTERNAL
-  // 湿泥与积水：车道/场坪会积水；翻土层（无壕沟网时的沟底）按一半算。
+  // 湿泥与积水：车道/场坪会积水；翻土层（无壕沟网时的沟底）按一半算；前沿湿泥区里翻土更暗更湿。
+  float tMud = TerrainMudZone(txz);
+  tOut *= mix(vec3(1.0), uTerrainMudB.xyz, tB.w * tMud);
   TerrainWater(tOut, txz, tGeomN, tB.y * uTerrainWaterD.x + tB.w * 0.5,
-    0.0, tB.y * uTerrainWaterD.w);
+    0.0, max(tB.y * mix(uTerrainWaterD.w, uTerrainMudB.w, tMud), tB.w * tMud * uTerrainMudA.y));
 #endif
   diffuseColor.rgb *= tOut;
 }`;
@@ -530,7 +541,7 @@ function Ended(anchor, glsl) { return `${glsl}\n${SurfacePatchEnd(anchor)}`; }
 
 /** 车辙与积水的 uniform（Data_Tuning_Terrain.TERRAIN_RUTS / TERRAIN_WATER）。 */
 function TerrainWaterUniforms() {
-  const R = TERRAIN_RUTS, W = TERRAIN_WATER;
+  const R = TERRAIN_RUTS, W = TERRAIN_WATER, M = TERRAIN_MUD_ZONE;
   return {
     uTerrainRut: { value: Vec4Of([R.encodeRangeM, R.halfGaugeM, 1 / R.halfWidthM, R.wobbleM]) },
     uTerrainRut2: { value: Vec4Of([1 / R.wobbleScaleM, R.depthM, R.darken, R.roughness]) },
@@ -540,6 +551,9 @@ function TerrainWaterUniforms() {
     uTerrainWaterC: { value: Vec4Of([W.waterRough, W.wetRough, W.wetDarken, W.waterDarken]) },
     uTerrainWaterD: { value: Vec4Of([W.site.track, W.rutWater, W.lowWater, W.damp.track]) },
     uTerrainWaterE: { value: Vec4Of([W.heightWeight, W.wetSaturation, 0, 0]) },
+    uTerrainMudBox: { value: Vec4Of(M.box) },
+    uTerrainMudA: { value: Vec4Of([M.featherM, M.wallDamp, M.floorWater, M.floorRaise]) },
+    uTerrainMudB: { value: Vec4Of([...M.soilTint, M.trackDamp]) },
   };
 }
 

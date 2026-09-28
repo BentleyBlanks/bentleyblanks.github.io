@@ -13,8 +13,9 @@
 //   3. **AudioContext 的输出端有没有电平**：`softClip`（destination 前最后一环）
 //      上挂一只 AnalyserNode，逐帧量 RMS，按每条台词的起播时刻归窗取峰值。
 //
-// 对照组是 03 阶段班长那条既有对白（`voice.MissionSupportOrder`），走**同一条
-// `Play` 路径、同一只探针**：它量得到，就证明探针本身是好的，九条为零就只能是九条的事。
+// 对照组是 03 阶段那场既有对白的第一句（`voice.MissionSupportOrder_01`，撤回的守军向
+// 罗班长报告），走**同一条 `Play` 路径、同一只探针**：它量得到，就证明探针本身是好的，
+// 九条为零就只能是九条的事。
 //
 // 三条现场纪律（都踩过）：
 //   · URL 不带 `?shot=1` / `audio=0` —— 那两个会把 AudioEngine 整个关掉；
@@ -34,8 +35,13 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(here, "_shots/MachineGunCutsceneAudio");
 const CUT_ID = "CS_MachineGunCaptives";
 
-/** 对照组：03 阶段（Support）班长那条既有整段录音。它与九条台词走同一条 Play。 */
-const CONTROL_CUE = "MissionSupportOrder";
+/**
+ * 对照组：03 阶段（Support）`SupportOrder` 那场的第一句逐句录音（3.9 s，整条都有人声）。
+ * 它与九条台词走同一条 Play。原先用的整段键 `MissionSupportOrder` 在逐句播放器上线
+ * （d26523ce）后不再装库 —— 那一场只装 `MissionSupportOrder_01…06`（见
+ * Script_FirstLevelMissionVoice.Load 的 PerLineRecorded 分支），对照组就此静默失效。
+ */
+const CONTROL_CUE = "MissionSupportOrder_01";
 
 /**
  * 判据（输出端峰值 RMS，线性幅度，不是 dB）。
@@ -107,7 +113,7 @@ try {
   // 由 AudioEngine.LoadVoicePack 装（Data_Voice.VOICE_LINES）。建关时装配层
   // `await missionRuntime.voiceReady`，所以前一路必然先落地 —— 两路共用一个
   // 「载过没有」的旗标时，后一路会被永久挡在门外（那正是本轮的根因）。
-  const bank = await page.evaluate((cues) => {
+  const bank = await page.evaluate(({ cues, control }) => {
     const a = window.Tengxian.audio;
     const keys = [...a.voiceBank.keys()];
     return {
@@ -120,11 +126,11 @@ try {
       ch1: keys.filter((k) => k.startsWith("ch1_")).length,
       battle: keys.filter((k) => !k.startsWith("Mission") && !k.startsWith("ch")).length,
       missing: cues.filter((cue) => !a.voiceBank.has(cue)),
-      controlInBank: a.voiceBank.has("MissionSupportOrder"),
+      controlInBank: a.voiceBank.has(control),
       voiceErrors: a.voiceErrors.slice(0, 6),
       masterVolume: a.masterVolume, mix: { ...a.mix },
     };
-  }, CAPTIVE_LINES.map((line) => line.key));
+  }, { cues: CAPTIVE_LINES.map((line) => line.key), control: CONTROL_CUE });
   receipts.bank = bank;
   console.log("bank", JSON.stringify(bank));
   Check(bank.ctxState === "running", "AudioContext 已解锁并在跑", bank.ctxState);
@@ -134,7 +140,7 @@ try {
   Check(bank.battle >= 50 && bank.ch1 > 0 && bank.mission > 0,
     "两路声库并存（战场口令 + 章节台词 + 第一关整段录音）",
     JSON.stringify({ battle: bank.battle, ch0: bank.ch0, ch1: bank.ch1, mission: bank.mission }));
-  Check(bank.controlInBank, "对照组那条既有对白也在声库里");
+  Check(bank.controlInBank, "对照组那条既有对白也在声库里", CONTROL_CUE);
 
   // --- 对照组：证明探针本身量得到声音 ---------------------------------------
   const control = await page.evaluate(async ({ cue, windowS }) => {
@@ -178,10 +184,11 @@ try {
     "对照组在输出端量到明确高于底噪的电平（探针本身是好的）",
     `peak=${control.peak} floor=${control.floor}`);
 
-  // --- 夹具：摆到 04，人放在触发圈里 ----------------------------------------
-  // 与 Script_FirstLevelMachineGunCutsceneTest 同一套阶段摆法。差别是这里**直接
-  // 站到座位上**：那条测试已经守住了「必须自己走进来才触发」，这里要验的是声音，
-  // 多走七米只会把 44 s 的实时采样又推远一点。
+  // --- 夹具：摆到 04，人站在机枪座上 ----------------------------------------
+  // 与 Script_FirstLevelMachineGunCutsceneTest 同一套阶段摆法。2026.09.19 重构
+  // （309409cf）起**任务不再触发这一场**（那条测试的 A 段守着「不触发」），过场本身
+  // 保留、按它的 B 段直接调 `PlayMidCutscene` 起播。人仍摆到座位上：过场的机位、
+  // 演员站位与听者都是按「玩家在机枪后面」写的。
   await page.evaluate(async () => {
     const g = window.Tengxian;
     await g.Debug.FirstLevelJump(3);
@@ -214,6 +221,8 @@ try {
   // --- 实时推完整场，逐帧量输出端 -------------------------------------------
   const run = await page.evaluate(async ({ cutId, seconds }) => {
     const g = window.Tengxian, a = g.audio;
+    // 任务侧已不触发（见上），直接走装配层的关中过场入口 —— 与正片同一条 RunCutscene。
+    const invoked = !!g.Debug.PlayMidCutscene(cutId);
     const analyser = a.ctx.createAnalyser();
     analyser.fftSize = 2048;
     a.softClip.connect(analyser);
@@ -281,7 +290,7 @@ try {
     // `state.cutscenesPlayed` 是在 `RunCutscene` 的 `await pending` 之后才记的。
     // 时间轴走完那一帧同步读它永远是空的 —— 让出一趟事件循环再读。
     await new Promise((resolve) => setTimeout(resolve, 80));
-    return { plays, samples, started, listenerGap: +listenerGap.toFixed(3),
+    return { invoked, plays, samples, started, listenerGap: +listenerGap.toFixed(3),
       current: g.Debug.Cutscene().current,
       playedIds: g.Debug.Cutscene().played.map((entry) => entry.id) };
   }, { cutId: CUT_ID, seconds: plan.seconds });
@@ -301,6 +310,7 @@ try {
     outGain: p.outGain, effectiveGain: p.effectiveGain, distance: p.distance }));
   receipts.chainAtFirstLine = run.plays.find((p) => p.name.startsWith("voice."))?.chain ?? null;
 
+  Check(run.invoked, "PlayMidCutscene 接下了这一场（过场仍注册着）");
   Check(run.started && run.playedIds.filter((id) => id === CUT_ID).length === 1,
     "过场在本轮真的播了一次", JSON.stringify({ played: run.playedIds, current: run.current }));
   Check(run.samples.length > plan.seconds * 20,

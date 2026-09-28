@@ -24,6 +24,12 @@ const LOADER = new GLTFLoader();
 const _box = new THREE.Box3();
 const _center = new THREE.Vector3();
 const _size = new THREE.Vector3();
+// 摆炸弹实例用的临时量（SetBombs 每帧几十颗，别在循环里 new）。
+const BOMB_EULER = new THREE.Euler();
+const BOMB_QUAT = new THREE.Quaternion();
+const BOMB_POS = new THREE.Vector3();
+const BOMB_SCALE = new THREE.Vector3();
+const BOMB_MATRIX = new THREE.Matrix4();
 
 function PrepareAircraft(gltf, spec) {
   const root = new THREE.Group();
@@ -243,38 +249,80 @@ export class AircraftFlight {
   }
 
   /**
-   * 在空中的炸弹：list 每一项 { x, y, z, dirX, dirZ, pitch }（pitch 为机头朝下的角）。
-   * look = { lengthM, radiusM, visualScale }，第一次用到时建一份共用几何与材质。空 list = 收起。
+   * 在空中的炸弹：list 每一项 { x, y, z, dirX, dirZ, pitch, lengthM, radiusM, scale }
+   *（pitch 为机头朝下的角；lengthM / radiusM 是弹体真尺寸，scale 是远处补足像素的放大倍数，
+   * 由规则层按离听者的距离给）。没给逐颗尺寸的旧调用方用 look = { lengthM, radiusM, visualScale }。
+   * 一组一只 InstancedMesh（一轮几十颗也只一次绘制），不够就按两倍扩容。空 list = 收起。
    */
   SetBombs(key, list, look = null) {
     this.bombSets ??= new Map();
-    const meshes = this.bombSets.get(key) || [];
+    let set = this.bombSets.get(key);
     const want = list?.length || 0;
-    if (want && !this.bombGeometry) {
-      const L = look || { lengthM: 1.1, radiusM: 0.17, visualScale: 1 };
-      // 胶囊沿 Y 建，转到 Z 轴上：机头（局部 -Z）与飞机同一个约定。
-      this.bombGeometry = new THREE.CapsuleGeometry(L.radiusM, Math.max(0.01, L.lengthM - L.radiusM * 2), 2, 6);
-      this.bombGeometry.rotateX(Math.PI / 2);
-      this.bombScale = L.visualScale || 1;
+    if (!want) { if (set) this._Show(set.mesh, false); return; }
+    if (!set || set.capacity < want) {
+      const capacity = Math.max(16, 2 ** Math.ceil(Math.log2(want)));
+      if (set) { this._Show(set.mesh, false); set.mesh.dispose(); }
+      const mesh = new THREE.InstancedMesh(this.BombGeometry(), this.BombMaterial(), capacity);
+      mesh.name = `AircraftBombs_${key}`;
+      mesh.castShadow = false; mesh.receiveShadow = false;
+      // 实例散在几百米的天上，包围球不跟着实例重算；一组只一次绘制，关掉剔除。
+      mesh.frustumCulled = false;
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      set = { mesh, capacity };
+      this.bombSets.set(key, set);
     }
+    const fallback = look || { lengthM: 1.1, radiusM: 0.17, visualScale: 1 };
     for (let i = 0; i < want; i += 1) {
-      let mesh = meshes[i];
-      if (!mesh) {
-        mesh = meshes[i] = new THREE.Mesh(this.bombGeometry, this.BombMaterial());
-        mesh.name = `AircraftBomb_${key}_${i}`;
-        mesh.castShadow = false; mesh.receiveShadow = false;
-        mesh.scale.setScalar(this.bombScale);
-      }
       const b = list[i];
-      mesh.position.set(b.x, b.y, b.z);
-      mesh.rotation.set(-(b.pitch || 0), Math.atan2(-b.dirX, -b.dirZ), 0, "YXZ");
-      this._Show(mesh, true);
+      const length = b.lengthM ?? fallback.lengthM, radius = b.radiusM ?? fallback.radiusM;
+      const s = b.scale ?? fallback.visualScale ?? 1;
+      BOMB_EULER.set(-(b.pitch || 0), Math.atan2(-b.dirX, -b.dirZ), 0, "YXZ");
+      BOMB_QUAT.setFromEuler(BOMB_EULER);
+      BOMB_POS.set(b.x, b.y, b.z);
+      BOMB_SCALE.set(radius * s, radius * s, length * s);
+      set.mesh.setMatrixAt(i, BOMB_MATRIX.compose(BOMB_POS, BOMB_QUAT, BOMB_SCALE));
     }
-    for (let i = want; i < meshes.length; i += 1) this._Show(meshes[i], false);
-    this.bombSets.set(key, meshes);
+    set.mesh.count = want;
+    set.mesh.instanceMatrix.needsUpdate = true;
+    this._Show(set.mesh, true);
+  }
+
+  /**
+   * 单位弹体：最大半径 1、全长 1，机头朝局部 -Z（与飞机同一个约定），逐颗按真尺寸非等比缩放。
+   * 尖拱形弹头、圆柱弹身、收口的尾锥 + 十字尾翼 —— 近处看得出是炸弹，远处一个像素也还是一个像素。
+   * 手拼成一只非索引几何（不引 addon 的 BufferGeometryUtils）。
+   */
+  BombGeometry() {
+    if (this.bombGeometry) return this.bombGeometry;
+    const profile = [[0, -0.5], [0.3, -0.5], [0.55, -0.36], [0.86, -0.24], [1, -0.14], [1, 0.12], [0.97, 0.24],
+      [0.86, 0.34], [0.62, 0.42], [0.34, 0.475], [0, 0.5]].map(([r, y]) => new THREE.Vector2(r, y));
+    const parts = [new THREE.LatheGeometry(profile, 10)];
+    for (const [w, d] of [[0.07, 2.5], [2.5, 0.07]]) {
+      const fin = new THREE.BoxGeometry(w, 0.26, d);
+      fin.translate(0, -0.37, 0);
+      parts.push(fin);
+    }
+    const flat = parts.map((g) => (g.index ? g.toNonIndexed() : g));
+    const count = flat.reduce((n, g) => n + g.attributes.position.count, 0);
+    const position = new Float32Array(count * 3), normal = new Float32Array(count * 3);
+    let offset = 0;
+    for (const g of flat) {
+      position.set(g.attributes.position.array, offset * 3);
+      normal.set(g.attributes.normal.array, offset * 3);
+      offset += g.attributes.position.count;
+    }
+    for (const g of new Set([...parts, ...flat])) g.dispose();
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(position, 3));
+    geometry.setAttribute("normal", new THREE.BufferAttribute(normal, 3));
+    geometry.rotateX(-Math.PI / 2);        // 车床沿 +Y 转出来，弹头 +Y → 局部 -Z
+    geometry.computeBoundingSphere();
+    this.bombGeometry = geometry;
+    return geometry;
   }
 
   BombMaterial() {
+    // 日军航弹的暗灰涂装，半光：天上那几个像素读成「一个暗点」而不是一粒反光。
     this.bombMaterial ??= new THREE.MeshStandardMaterial({ color: 0x2b2c28, roughness: 0.6, metalness: 0.35 });
     return this.bombMaterial;
   }
@@ -293,18 +341,21 @@ export class AircraftFlight {
       clone.scale.multiplyScalar(0.02);    // 缩到几十厘米：它只是来编材质的
       group.add(clone);
     }
-    this.warmBox ??= new THREE.BoxGeometry(0.2, 0.2, 0.6);
-    group.add(new THREE.Mesh(this.warmBox, this.BombMaterial()));
+    // 炸弹一组一只 InstancedMesh：预热的也得是实例化的那一份程序（含深度预通道的实例化变体）。
+    const bombs = new THREE.InstancedMesh(this.BombGeometry(), this.BombMaterial(), 1);
+    bombs.setMatrixAt(0, BOMB_MATRIX.makeScale(0.1, 0.1, 0.5));
+    bombs.frustumCulled = false;
+    group.add(bombs);
     return group;
   }
 
   Dispose() {
     for (const key of [...(this.formations?.keys() || [])]) this.SetFormation(key, null);
     this.clonePool?.clear();
-    for (const key of [...(this.bombSets?.keys() || [])]) this.SetBombs(key, null);
+    for (const set of this.bombSets?.values() || []) { this._Show(set.mesh, false); set.mesh.dispose(); }
     this.bombSets?.clear();
-    this.bombGeometry?.dispose(); this.bombMaterial?.dispose(); this.warmBox?.dispose();
-    this.bombGeometry = this.bombMaterial = this.warmBox = null;
+    this.bombGeometry?.dispose(); this.bombMaterial?.dispose();
+    this.bombGeometry = this.bombMaterial = null;
     for (const { root } of this.forms) DisposeObject(root);
     this.group.removeFromParent();
     this.forms.length = 0;

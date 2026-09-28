@@ -198,7 +198,8 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
 - `--digest` 打印 05–18 分区框内 1 m 网格的地面 sha256。本次实装前后：0.5 m 网格 240526 个采样逐位相同（钩子接入前后 sha256 均为 `13189e2c…`），`MISSION_LAYOUT.blocks`/gates/scenario/壕沟布设 JSON 摘要在拆出 Front 包前后相同。
 - 改完地形必看 `Map_<区>.png` 的挖/填等值线，再跑 §2 的门禁；07+ 指纹变红按 §2 最后一行处理。
 
-**已知限制**：纹理层（路面/抛土/麦茬，`SampleMissionGroundSurface`）不读修饰，下沉路的路面仍按 `MISSION_TERRAIN.roads` 着色；
+**已知限制**：纹理层（路面/抛土/麦茬，`SampleMissionGroundSurface`）不读 shapes，下沉路的路面仍按 `MISSION_TERRAIN.roads` 着色
+（2026-09-28 起各区表另有 `paths`：只染路面纹理、不改高度，见 [场景引导](Data_FirstLevelGuidance20260928.md) §3.1）；
 高度场格距 0.75 m，窄于 ~1.5 m 的台阶/门槛/路沿用体块；壕沟抛土 `bermMask` 只认 roads/pads，不认修饰。
 
 ## 4. 分区与并行方案
@@ -210,7 +211,7 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
 | A Front0507 | 05–07 | Tank05 x15…65 z−175…−100；Collection06 x−62…−15 z−118…−84；South07 x−40…60 z−84…−30 | `Data_FirstLevelWhiteboxFront.mjs`（本次从 Village 拆出 06/07 四块，合并顺序不变） | `Data_FirstLevelWhiteboxTerrainFront.mjs` | FrontTopologyTest、SpaceTest --rear-only（06 背坡、07 长度）、TerrainTest |
 | B Village0810 | 08–10（含 07 末段村北口） | Village x20…120 z−30…75 | `Data_FirstLevelWhiteboxVillage.mjs` | `…TerrainVillage.mjs` | VillageTest、SpaceTest 08 |
 | C Transfer1114 | 11–14（含西沟北段） | Transfer x25…125 z75…150 | `Data_FirstLevelWhiteboxTransfer.mjs` | `…TerrainTransfer.mjs` | TransferTest、SpaceTest 12/侧巷/北沙河 |
-| D Rear1518 | 15–18 | Reception15 x−50…70 z150…260；Bridge18 x−100…−50 z110…260；Night18 x−185…−135 z280…360 | `Data_FirstLevelWhiteboxRear.mjs` | `…TerrainRear.mjs` | SpaceTest 15B/15C/18/夜景、MissionTopologyTest --rear-only、EndTest |
+| D Rear1518 | 15–18 | Reception15 x−41…70 z150…260；Bridge18 x−100…−41 z110…260（2026-09-28 引导轮把分界从 x=−50 挪到院西墙外皮 −41：去桥的小路不能跨框）；Night18 x−185…−135 z280…360 | `Data_FirstLevelWhiteboxRear.mjs` | `…TerrainRear.mjs` | SpaceTest 15B/15C/18/夜景、MissionTopologyTest --rear-only、EndTest |
 
 **衔接点**（两区都要对得上的地方，边界两侧各留 2 m 不做高差，或双方约定同一高度）：
 
@@ -266,4 +267,9 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
 - **语义修正**：门窗 `Void` 盒改 `void`、墙头压顶改 `coping`（原来都借 `roof`）。只改助手里的语义参数；07+ 指纹因语义字段变了按口径重生，把 void/coping 映回 roof 逐位得到旧基线 `8e5277e874f90e43`（见指纹 JSON 的 note）。
 - **新贴图**（Lovart 源图 → `_import/Script_BakePbrTexture.py` → `Data_TextureManifest` + `Data_LevelTextureSets.FirstLevel`）：`VillageMudPlaster`、`VillageLimePlaster`、`VillageRoofTile`、`VillageTimber`、`RailBallast`；其余外观复用开机就有的 BrickWall / BrickWallSooty / CityWallBrickPbr / Stone / Ground / ShopDoorPbr / Sandbag / WattleFence / WaterVatCeramic / CarriageCeilingSteel / GatePaintedWood。
 - **门禁**：`Script_TextureStandardsTest`、`Script_ModuleGraphTest`、`Script_FirstLevelSpaceTest`（07+ 指纹）、`Script_SamplerBudgetTest`（浏览器，含 `?whitebox=p012`）；对照出图 `Script_FirstLevelWhitebox0518Shots.mjs --quality=high --out=_shots/Gap3A_After/B1`。
-- **仍差**：屋顶还是阶梯盒（瓦面只是贴上去，没有真的坡与瓦当）；墙面没有真的破口 / 缺角几何；灶屋等室内偏暗偏平（室内光归 B4）；地面与路面（归 B2）仍是亮米色，和墙根返潮接不上色。
+- **第二轮（同日）**：
+  - 抹面剥落：风化补丁升到 `wbWeather2`，外观可带 `peel`（`flatten` 把墙中部贴图自带的剥落斑往均色收、`amount` 程序剥落强度、`substrate` 露出土坯或青砖）。剥落只长在墙根（带宽随墙高收窄）/ 竖棱（门洞边就是墙段的竖棱）/ 块顶一带，边缘噪声不规则、带一圈抹面厚度的暗边；白灰墙中部不再是迷彩圆斑。均色取同一采样器的末级 mip，零新增采样器。
+  - 坡顶外壳：`PlanRoofShells` 认出每个台阶屋顶（RidgeCap + Eave/Slope/Ridge 或 Roof0..3），在上面盖两片沿坡的薄瓦面 + 一道脊（坡度取盖住所有台阶外角的最陡值），只是外观几何，碰撞 / 遮挡仍是原来的盒子，台阶留作山墙那头的填充。陡过 40° 的窄顶（门楼、窄厢房）保留台阶。
+  - 06 补给点（`Script_FirstLevelMissionView.BuildSupplies`）从米白平色盒换成旧弹药箱材质（开场布景的 `OpeningCrate`，退回 `WoodCrate`），可交互的呼吸发光不变。
+  - 青砖整体提亮（`brightness`），门窗楣 / 窗台 / 外皮与所在墙同组同外观；桥头墩改条石，13 河岸残段改夯土。
+- **仍差**：屋顶外壳是平直坡面（没有瓦当、屋脊起翘）；墙面没有真的破口 / 缺角几何；灶屋等室内偏暗偏平（室内光归 B4）；地面与路面（归 B2）仍是亮米色，和墙根返潮接不上色。

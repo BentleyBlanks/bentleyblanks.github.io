@@ -45,6 +45,7 @@ NRA02：`OPENING_PASS=partner` 再 bake `CaptiveDraggedFromDirt,CaptiveWallBrace
 - `Script_OpeningStoryboardShots --shots=SB03_Drag,SB03,SB03_Slash,SB03_FlagKick,SB03_FlagDown,SB03A`（连带 SB03_Blade）判据全过。
 - `Script_OpeningSetTest` 4b 的头位按新流程重量（SB03 川军头 (4.064, −126.207)，SB03A/SB04 尸体头 (3.87, −126.121)）。
 - `Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=3`。
+- `Script_OpeningActorPerformanceBrowserTest`（2026-09-28 补改）：尸体终帧原来断言「骨盆 < 0.25 m、坐塌在泥里」，是平地版的口径，本轮以后必红（实测 0.371 m）。改成按跪姿查：终帧骨盆高度与 `CaptiveWallSlideTwitch` 的 clip root 末帧 `pelvisHeight`（0.368 m）相差 < 0.04 m，且不高于滑前跪姿（0.386 m）、终帧后不再抬起；尸体不动、滑落每帧 < 4 cm 两条不变。
 
 ## 未处理
 

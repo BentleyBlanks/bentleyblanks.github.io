@@ -13,6 +13,10 @@ import { CompactGuideRoute } from "./Script_NpcMissionGuide.mjs";
 import { MISSION_GUIDE_TUNING as GUIDE } from "./Data_Tuning_MissionGuide.mjs";
 import { MissionReturn } from "./Script_MissionReturn.mjs";
 import { MISSION_RETURN } from "./Data_Tuning_FirstLevel.mjs";
+// 任务走廊与「离开战场区域 · 返回 · N 秒」（S 包，docs/Data_FirstLevelGuidance20260928.md §3.3）。
+import { MissionAreaGuard, ResolveMissionAreas, DistanceToArea } from "./Script_MissionAreaGuard.mjs";
+import { MISSION_AREA_GUARD } from "./Data_Tuning_MissionArea.mjs";
+import { MISSION_AREA_STEPS } from "./Data_FirstLevelMissionArea.mjs";
 import { FRONT_BATTLE_TUNING as FB, FRONT_TUNING as FT } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MID_TUNING } from "./Data_Tuning_FirstLevelMid.mjs";
 import { MISSION_RETURN_ROUTES, MISSION_RETURN_PERSON_STAGES, MISSION_RETURN_SQUAD_STAGES, MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
@@ -85,6 +89,7 @@ import { FirstLevelBridge } from "./Script_FirstLevelBridge.mjs";
 import { FirstLevelNightGate } from "./Script_FirstLevelNightGate.mjs";
 import { FirstLevelNightLights } from "./Script_FirstLevelNightLights.mjs";
 import { OpeningSet } from "./Script_OpeningSet.mjs";
+import { RailBridgeSet } from "./Script_RailBridgeSet.mjs";
 import { EmplacementInteraction } from "./Script_Emplacement.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { ActionKeyGlyph } from "./Script_Input.mjs";
@@ -140,7 +145,9 @@ const CARRY_GOALS = Object.freeze({ Carry: "ditch", WallPath: "wallPathEnd", Han
 /** 抬着走时指引箭头的标签（`firstLevel.guide.<label>`）。 */
 const CARRY_GOAL_LABELS = Object.freeze({ Carry: "ditch", WallPath: "wallPath", Handover: "place" });
 /** 控制接管的全部 kind（契约 §2）。未知 kind 抛错 —— 不再有「兜底当成 death」。 */
-const CONTROL_KINDS = Object.freeze(["trapped", "rescue", "cartRide", "dive", "death", "nightTransition", "litterTransition"]);
+// ambush：09 进门遭伏击（Script_FirstLevelKitchenAmbush）。不在 GRACE 名单里 —— 那一拍自己按帧续保护，
+// 漏按那一刀要先摘保护才能落下去（VillageBlock.StabAmbush）。
+const CONTROL_KINDS = Object.freeze(["trapped", "rescue", "cartRide", "dive", "death", "nightTransition", "litterTransition", "ambush"]);
 /** 这几种短接管期间玩家不许被瞄准或打伤（复用出生保护）。 */
 const CONTROL_GRACE_KINDS = Object.freeze(["trapped", "rescue", "cartRide", "dive", "death", "nightTransition", "litterTransition"]);
 export class FirstLevelMissionRuntime {
@@ -149,6 +156,9 @@ export class FirstLevelMissionRuntime {
     this.host = host;
     this.time = 0;
     this.missionReturn = new MissionReturn(MISSION_RETURN);
+    // 每一步一条走廊（开机解析一次，键写错当场抛）；出界倒计时走完按阵亡走 OnPlayerDown → Retry。
+    this.missionAreas = ResolveMissionAreas(MISSION_AREA_STEPS, { routes: MISSION_ROUTES, anchors: A });
+    this.areaGuard = new MissionAreaGuard(MISSION_AREA_GUARD);
     this.enemies = new Map();
     this.spawned = new Set();
     this.spawnQueue = [];
@@ -242,6 +252,11 @@ export class FirstLevelMissionRuntime {
     // 03 开头的飞机、阴天开关也在里面。03 阵位的破砖墙外观装到 06 才收（它是 04–06 的战场）。
     this.openingSet = new OpeningSet({ scene: this.scene, library: this.library, groundAt: (x, z) => this.battlefield.GroundHeight(x, z),
       vfx: this.vfx, aircraft: this.aircraft, applySky: (name) => this.ApplySky?.(name), restoreSky: () => this.RestoreSky?.() });
+    // 北沙河铁路桥的模型与 18 毁桥的坍塌演出（docs/Data_RailBridge.md）。后台加载，
+    // 装好之前（或加载失败）白盒桥照旧；FirstLevelBridge.Fire 通过 railBridgeSet.Detonate 起爆。
+    this.railBridgeSet = new RailBridgeSet({ scene: this.scene, library: this.library, battlefield: this.battlefield,
+      vfx: this.vfx, audio: this.audio, player: this.player });
+    this.railBridgeSet.Load();
     this.quietMarch = new FirstLevelQuietMarch(this);
     this.reception = new FirstLevelReception(this);
     this.bridge = new FirstLevelBridge(this);
@@ -313,7 +328,9 @@ export class FirstLevelMissionRuntime {
    * （把视野收窄到「卡着只能盯着看」），平滑与数值都在 Front 包的 FirstLevelFrontShow。
    */
   NarrowFovDeg(baseFov, dt) {
-    return this.frontShow?.NarrowFovDeg(baseFov, dt) ?? baseFov;
+    const fov = this.frontShow?.NarrowFovDeg(baseFov, dt) ?? baseFov;
+    // 18 毁桥：起爆后玩家看着桥的那几秒视野收一点（Data_RailBridgeDemolition.focus）。
+    return fov * (this.railBridgeSet?.FovScale?.(dt) ?? 1);
   }
   /**
    * 事实门的距离判定：点与半径一律从 MISSION_FACT_GATES 取，代码里不再写坐标与米数。
@@ -1548,7 +1565,13 @@ export class FirstLevelMissionRuntime {
         for (const actor of this.enemies.values())
           if (actor.alive && actor.missionDormant && actor.missionEncounter !== "melee") actor.scriptedNoncombatant = false;
         this.audio.Ambience("firstLevelFront");
-        this.Guide(MISSION_ROUTES.village.slice(0, 3));
+        // 2026-09-28 引导轮：班长先带到主街口（`streetBlockSeen` 只在那个 box 里落，见 Gates 表），
+        // 看见倒墙横车再折回灶屋北门；一开始就往灶屋走的话玩家跟着进屋，08 永远过不了。
+        // 整队走同一道折线（只让班长折回会改变伏击那一拍队员的站位、起身收不掉）；停点 (76,−24) 在
+        // streetBlockSeen 的 box 里、离主街西墙北端 (72,−22) 的墙角 2 m，来回都走巷子北侧 z≈−24 ——
+        // 实测过：线贴着 z −22.5 走时两名队员会顶在那个墙角上一动不动，队尾到不了院门以南，10 过不了。
+        this.Guide([MISSION_ROUTES.village[0], {x:66,z:-23.8}, {x:76,z:-24}, {x:68,z:-23.8}, {x:60.4,z:-20.5},
+          MISSION_ROUTES.village[1], MISSION_ROUTES.village[2]]);
         this.column.active = true;
         this.village.Enter(stage.id);
         break;
@@ -2085,9 +2108,10 @@ export class FirstLevelMissionRuntime {
     this.player.SyncCamera(0);
   }
   // ---------------------------------------------------------------------------
-  // 09 连屋近战（内部步骤 Melee）。2026.09.19 起下线屋内伏击拍：日军从与东巷相通的
-  // 连屋进来，玩家先手打掉就不触发僵持；真贴上来才走共用白刃（Script_MeleeCombat）。
-  // 旧拍表与它那七百行副作用见 docs/Data_FirstLevelRoomAmbush.md（已作废）。
+  // 09 灶屋—连屋近战（内部步骤 Melee）。2026.09.19 下线了旧的屋内伏击拍（老周挨刀，
+  // docs/Data_FirstLevelRoomAmbush.md 只作历史）；2026-09-28 按用户要求补回进门遭伏击，
+  // 照 COD5 万岁冲锋做一次性按键 QTE：编排在 Script_FirstLevelKitchenAmbush，副作用在
+  // Script_FirstLevelVillageBlock，这里只留装配层要读的几个口（提示环、HUD 让位、按键）。
   // ---------------------------------------------------------------------------
   get Ambushers() {
     return MISSION_ENCOUNTERS.melee.map(spec => this.enemies.get(spec.id)).filter(Boolean);
@@ -2101,12 +2125,64 @@ export class FirstLevelMissionRuntime {
    * 全员阵亡＝ meleeResolved；有人真的贴到白刃距离就记 meleeEngaged（取证，不是闸）。
    */
   UpdateMelee() {
+    // 还在装睡的（过道里藏着的那个、东巷那三个）不碰：剧本旗单位每拍会被 AI 摘掉刺刀，
+    // 这里再每帧装回去等于每拍重建一次手持武器。醒了之后刺刀一直在枪上。
     const living = this.Ambushers.filter(actor => actor.alive);
-    for (const actor of living) actor.bayonetFixed = true;
-    if (living.some(actor => Distance(actor.position, this.player.position) <= R.ambushBindReachM + .4))
+    const awake = living.filter(actor => !actor.missionDormant);
+    for (const actor of awake) actor.bayonetFixed = true;
+    if (awake.some(actor => Distance(actor.position, this.player.position) <= R.ambushBindReachM + .4))
       this.Record("meleeEngaged");
     if (this.Ambushers.length === MISSION_ENCOUNTERS.melee.length && !living.length)
       this.Record("meleeResolved", { killed: this.Ambushers.length });
+  }
+  /** 装配层每帧读：进门遭伏击正占着屏幕（HUD 整个让位，只留字幕、提示环与血）。 */
+  get AmbushCinematic() { return this.village?.AmbushCinematic === true; }
+  /** 装配层每帧读一次：那一拍的按键环，加上键面字与屏幕锚点。没有就是 null。 */
+  AmbushPromptView() {
+    const view = this.village?.AmbushPromptView?.();
+    if (!view || !this.player.alive) return null;
+    return { ...view, key: ActionKeyGlyph(view.action), ...this.AmbushPromptAnchor() };
+  }
+  /**
+   * 环钉在哪：把压上来那个人握枪的那一点投到屏幕上。投不出来（在镜头背后、出了安全区）
+   * 就退回屏幕中央偏下 —— 提示必须看得见，宁可位置不准也不能跑到屏幕外面去。
+   */
+  AmbushPromptAnchor() {
+    const width = globalThis.innerWidth || 1280, height = globalThis.innerHeight || 720;
+    const fallback = { x: width / 2, y: height * 0.54 };
+    const lead = this.village?.AmbushLead?.(), camera = this.player.camera;
+    if (!lead?.alive || !camera) return fallback;
+    const point = lead.actor?.WeaponWorldPoint?.(this.ambushAnchorPoint ||= new THREE.Vector3());
+    if (!point) return fallback;
+    point.applyMatrix4(camera.matrixWorldInverse);
+    if (point.z >= 0) return fallback;
+    point.applyMatrix4(camera.projectionMatrix);
+    const x = (point.x * 0.5 + 0.5) * width, y = (-point.y * 0.5 + 0.5) * height, margin = 110;
+    if (!Number.isFinite(x) || !Number.isFinite(y)
+      || x < margin || x > width - margin || y < margin || y > height - margin) return fallback;
+    return { x, y };
+  }
+  /**
+   * 那一拍的按键先于共用白刃层与键位表：环开着的时候 F 归它（否则 F 会去拾弹药）。
+   * 按下去的那一下交给共用倒地僵持（input "press"），成败与起身都走共用结算。
+   * @returns {boolean} true = 这一下被这一拍吃掉了
+   */
+  AmbushInput(code, down = false, repeat = false) {
+    if (code !== "KeyF" || !this.player.alive || !this.village?.AmbushPromptView?.()) return false;
+    this.meleeCombat?.qte?.Press(down, repeat);
+    return true;
+  }
+  /**
+   * 锁着的视线**跟着会动的目标走**：只换落点，不重开转头那一段（AimControl 每调一次就重开一段
+   * smoothstep，每帧调等于把镜头钉死）。转头走完之后交回 ±limitedLookRadians 的夹取，夹的中心也跟着走。
+   */
+  TrackControl(kind, lookAt) {
+    const control = this.controls;
+    if (!control || control.kind !== kind || !lookAt) return false;
+    const eye = this.ControlEye();
+    control.yaw = Math.atan2(eye.x - lookAt.x, eye.z - lookAt.z);
+    control.pitch = Math.atan2(lookAt.y - eye.y, Math.hypot(lookAt.x - eye.x, lookAt.z - eye.z));
+    return true;
   }
   /**
    * 这一帧的感知（眼皮 + 恍惚）。装配层只问这一个口。
@@ -2120,15 +2196,15 @@ export class FirstLevelMissionRuntime {
   }
   /**
    * 01–02 storyboard lens (Script_OpeningLens, contract §4.4): while the director owns the view, its phase,
-   * phase age and events (blast, butt hit, Found's clear, concussion) pick and sample a look; null otherwise,
+   * phase age and events (blast, slaps, concussion) pick and sample a look; null otherwise,
    * so Script_Main's post parameters are all defaults outside 01–02. The director may hand its own events
    * through bunker.LensEvents() (second wave).
    */
   OpeningLens() {
     const show = this.frontShow?.bunker, live = !!show?.CameraActive;
     this.openingLens ??= new OpeningLensDriver();
-    const events = live ? (show.LensEvents?.() ?? { blastAt: this.opening?.blastAt, buttHit: show.strikeAt,
-      clearAt: show.flags?.clearAt, concussion: show.perception?.amount }) : {};
+    const events = live ? (show.LensEvents?.() ?? { blastAt: this.opening?.blastAt, slapAt: show.flags?.slapAt,
+      slapSide: show.flags?.slapSide, concussion: show.perception?.amount }) : {};
     return this.openingLens.Sample(this.time, live ? show.phase : null, live ? show.Age : 0, events);
   }
   /**
@@ -2362,6 +2438,26 @@ export class FirstLevelMissionRuntime {
   ClearReturnWarning() {
     this.missionReturn.Reset();
     this.hud.SetMissionReturn?.(null);
+    this.areaGuard?.Reset();
+    this.hud.SetMissionArea?.(null);
+  }
+  /**
+   * 任务走廊软边界（S 包，docs/Data_FirstLevelGuidance20260928.md §3.3）：出了这一步的走廊亮一行倒计时，
+   * 走完按阵亡处理 —— player.Kill() 之后装配层照常走 OnPlayerDown → 死亡菜单 → 从检查点重来，不另起一套。
+   * 受控演出、抬担架、倒地、豁免步不判；规则与计时在 Script_MissionAreaGuard。
+   */
+  UpdateMissionArea(dt) {
+    if(!this.areaGuard)return;   // 测试夹具直接借原型方法、没走构造
+    const step=this.flow.stage.id, area=this.missionAreas[step]||null;
+    const view=this.areaGuard.Update(dt,{step,point:this.player.position,area,
+      controlled:!!this.controls||!!this.carry?.Active||!this.player.alive||(!!area?.exemptUntil&&!this.Has(area.exemptUntil))});
+    this.hud.SetMissionArea?.(view.warning?view:null);
+    if(view.failed)this.player.Kill();
+  }
+  /** 人在这一步的走廊里（豁免步、没有走廊的步算在里面）。 */
+  InsideMissionArea(point=this.player.position){
+    const area=this.missionAreas?.[this.flow?.stage?.id];
+    return !area||area.exempt||DistanceToArea(point,area)<=0;
   }
   UpdateReturnWarning(dt) {
     const stage=this.flow.stage,guide=this.CurrentGuide();
@@ -2420,6 +2516,7 @@ export class FirstLevelMissionRuntime {
     this.openingSet?.Update(dt, this.flow.stage.id, this.frontShow?.bunker?.phase ?? null,
       { collapsed: this.Has("bunkerCollapsed"), blastAge: this.opening.blastAt != null ? this.time - this.opening.blastAt : null, player: this.player?.position,
         flagFall:this.frontShow?.bunker?.flags?.flagFallProgress??0,breakables: this.tankRuntime?.breakables ?? null });
+    this.railBridgeSet?.Update(dt, this.flow.stage.id, { destroyed: this.Has("bridgeDestroyed"), night: this.Has("nightArrivalPlaced") });
     if(this.failed){prof?.E("story/mission/other");return;}
     prof?.E("story/mission/other");
     prof?.B("story/mission/spawns");
@@ -2483,6 +2580,8 @@ export class FirstLevelMissionRuntime {
         }
         else if(kind==="litterTransition"){ this.transition.Hide(); /* 集结处那一层看 controls 收尾放队伍起行。 */ }
         else if (kind === "dive") this.Record("diveComplete");
+        // 进门遭伏击的锁由拍表自己收；到了上限还没收，说明哪一拍卡住了 —— 起身、还权、放人。
+        else if (kind === "ambush") this.village.ambush.Break("lockTimeout");
         else if (kind === "death") {
           // 确认完了，但 17 还没走完：接收处要真的继续工作（门外那一副担架、
           // 军医转过去救下一个、幺娃拉正覆盖物）才记 deathSceneComplete。
@@ -2661,6 +2760,7 @@ export class FirstLevelMissionRuntime {
     this.flow.Update(dt);
     this.leaderGuide?.Update();
     this.hud.SetMissionReturn?.(this.UpdateReturnWarning(dt));
+    this.UpdateMissionArea(dt);
     prof?.E("story/mission/other");
   }
   SaveCheckpoint() {
@@ -2671,6 +2771,8 @@ export class FirstLevelMissionRuntime {
     // exposed near-fatal player can overwrite safety while a rifleman fires
     // from beyond the passage radius.
     const threatRange=FirstLevelCheckpointThreatRange(this.player,this.ai);
+    // 有旧存档点时，人在走廊外不覆盖它：不然出界倒计时判负之后会重生在走廊外面。
+    if(this.safePoint&&!this.InsideMissionArea())return false;
     if(!FirstLevelCheckpointIsSafe(this.player,
       this.Threatens(this.player.position,null,targetHeight,threatRange)))return false;
     this.safePoint = {
@@ -2706,7 +2808,9 @@ export class FirstLevelMissionRuntime {
     this.UpdateMusic();
   }
   Retry() {
-    const point = this.retryPoint || this.safePoint;
+    // 死在 09 进门遭伏击那一拍里：他回到过道里装睡，玩家从灶屋正中重来（照 COD5，不是原地复活）。
+    const ambushPoint = ["Village", "Melee"].includes(this.flow.stage.id) ? this.village.RearmAmbush() : null;
+    const point = ambushPoint || this.retryPoint || this.safePoint;
     if (!point) return false;
     const z = point.z;
     this.player.Spawn(point.x, z, point.yaw);
@@ -2718,7 +2822,8 @@ export class FirstLevelMissionRuntime {
       this.player.body?.Teleport(savedPosition.x, savedPosition.y, savedPosition.z);
     }
     this.player.stance = point.stance || "stand";
-    Object.assign(this.player,FirstLevelCheckpointVitals(point,this.player));
+    // 进门遭伏击的重来点不是存档点：没带血量与绷带，按当时的检查点补（FirstLevelCheckpointVitals 的下限照样兜）。
+    Object.assign(this.player,FirstLevelCheckpointVitals(ambushPoint ? { ...(this.safePoint || {}), ...ambushPoint } : point,this.player));
     this.failed = false;
     this.controls = null;
     this.Control?.(false);
@@ -2790,6 +2895,7 @@ export class FirstLevelMissionRuntime {
       ...this.flow.State(),
       missionVersion: MISSION_VERSION,
       returnWarning: this.missionReturn.result,
+      missionArea: this.areaGuard?.State() ?? null,
       transferBeats:this.transferBeats || null,
       melee:{actors:MISSION_ENCOUNTERS.melee.map(spec=>{
         const actor=this.enemies.get(spec.id);
@@ -2865,6 +2971,7 @@ export class FirstLevelMissionRuntime {
     this.extras.Clear();
     this.nightLights?.Dispose();
     this.openingSet?.Exit();
+    this.railBridgeSet?.Dispose();
     this.opening.Dispose();
     this.frontShow?.Dispose();
     this.frontPressure?.Dispose();

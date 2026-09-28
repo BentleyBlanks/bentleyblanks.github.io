@@ -136,10 +136,12 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
   melee: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "Support" }),
     dormant: true,
-    // 玩家先进灶屋（kitchenEntered）、再走到连屋这个半径里，他们才从东巷那扇门进来。
-    // 实装：Script_FirstLevelVillageBlock.UpdateMeleeBeat。
+    // 玩家先进灶屋（kitchenEntered）、再跨出灶屋南门，过道里藏着的那个（MeleeLead）扑出来；
+    // 其余三个等那一拍收尾（反杀 / 先手打掉 / 旁路）才从东巷那扇门进来。
+    // radiusM 只剩「离连屋这么远以内才算数」的外圈；真正的触发是 MID_TUNING.kitchenAmbush。
+    // 实装：Script_FirstLevelVillageBlock.UpdateMeleeBeat + Script_FirstLevelKitchenAmbush。
     wake: Object.freeze({ kind: "playerWithinM", step: "Melee", radiusM: 26, fact: "kitchenEntered" }),
-    note: "连屋里的四个人：村口那批醒的时候他们不跟着醒，玩家进了灶屋、走到连屋附近才出来",
+    note: "连屋这一组四个人：领头那个藏在灶屋—连屋过道里，玩家出灶屋南门就扑上来（一次性按键 QTE）；其余三个在那之后从东巷进来",
   }),
   courtyard: Object.freeze({ spawn: Object.freeze({ kind: "step", step: "Courtyard" }) }),
   transfer: Object.freeze({
@@ -594,7 +596,35 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   meleeBreachStarted: Gate({
     kind: "scripted", step: "Melee", source: "FirstLevelVillageBlock.UpdateMeleeBeat",
-    text: "连屋那一组从东巷那扇门进来（玩家进了灶屋、走到连屋附近才放）",
+    text: "连屋那一组其余三个从东巷那扇门进来（进门遭伏击那一拍收尾之后才放）",
+  }),
+  kitchenAmbushSprung: Gate({
+    kind: "scripted", step: "Melee", source: "FirstLevelKitchenAmbush.Spring",
+    text: "玩家跨出灶屋南门进过道，藏在过道西段的日军嚎着「突撃！」扑出来",
+  }),
+  kitchenAmbushTackled: Gate({
+    kind: "scripted", step: "Melee", source: "FirstLevelKitchenAmbush.Tackle",
+    text: "他撞上了：玩家被撞翻在地，他骑上来举刺刀往下捅",
+  }),
+  kitchenAmbushPrompted: Gate({
+    kind: "scripted", step: "Melee", source: "FirstLevelKitchenAmbush.Prompt",
+    text: "屏幕上只剩一个按键环（F）：窗口里按一下就反刺",
+  }),
+  kitchenAmbushCountered: Gate({
+    kind: "scripted", step: "Melee", source: "FirstLevelKitchenAmbush.Counter",
+    text: "按上了：顺子反手一刺，他死在这一下上（「滚你妈的！」）",
+  }),
+  kitchenAmbushFailed: Gate({
+    kind: "scripted", step: "Melee", source: "FirstLevelKitchenAmbush.Fail",
+    text: "没按上：刀捅进去，玩家阵亡，检查点重来这一拍",
+  }),
+  kitchenAmbushPreempted: Gate({
+    kind: "scripted", step: "Melee", source: "FirstLevelKitchenAmbush.Preempt",
+    text: "他还没扑到就被打死了（Notion 09：提前击败近战敌人则不强制播放固定 QTE）",
+  }),
+  kitchenAmbushBroken: Gate({
+    kind: "scripted", step: "Melee", source: "FirstLevelKitchenAmbush.Break",
+    text: "旁路收尾：压着玩家的人没了、或共用白刃层没开成僵持，起身还权、不卡在锁里",
   }),
   windowFireHolding: Gate({
     kind: "combat", step: "Melee", member: "VillageGunner", encounter: "village",

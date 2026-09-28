@@ -320,6 +320,21 @@ export class Hud {
   }
 
   /**
+   * 任务走廊出界（docs/Data_FirstLevelGuidance20260928.md §3.3）：顶部正中一行「离开战场区域 · 返回 · N 秒」，
+   * 字样同目标通知那一档；最后几秒转红（view.urgent）。null 收起。秒数变了才重写那一行。
+   */
+  SetMissionArea(view) {
+    SetClass(this.el.missionArea,"on",!!view);
+    SetAttr(this.el.missionArea,"aria-hidden",String(!view));
+    if(!view){this.missionAreaSeconds=null;return;}
+    SetClass(this.el.missionArea,"urgent",!!view.urgent);
+    const seconds=Math.max(0,Math.ceil(view.secondsLeft));
+    if(seconds===this.missionAreaSeconds)return;
+    this.missionAreaSeconds=seconds;
+    SetText(this.el.missionArea,T("firstLevel.area.warning",{seconds}));
+  }
+
+  /**
    * 玩家刚跟武器打了交道：开枪 / 干扣扳机 / 开镜 / 装填 / 换枪。
    * 数字没变也算（对着空膛扣扳机、开镜看一眼都在「看弹药」），所以装配层在
    * 输入边沿上调它；数字变了的那一路由 SetState 自己拨。每帧调都行 —— 就改一个数。
@@ -368,6 +383,12 @@ export class Hud {
     this.el.returnArrow.textContent="↑";
     this.el.returnArrow.setAttribute("aria-hidden","true");
     this.el.returnTarget=mk("missionReturnTarget",returnBearing);
+    // 任务走廊出界倒计时（SetMissionArea）：叠在回头警告的暗角之上、顶部正中一行。
+    this.el.missionArea = mk("hudMissionArea");
+    this.el.missionArea.setAttribute("role", "status");
+    this.el.missionArea.setAttribute("aria-live", "polite");
+    this.el.missionArea.setAttribute("aria-hidden", "true");
+    this.missionAreaSeconds = null;
     this.el.suppress = mk("hudSuppress");        // 压制暗角：纯 CSS 径向渐变，零成本
     this.el.damage = mk("hudDamage");
     this.el.meleeKillBlood = mk("hudMeleeKillBlood");

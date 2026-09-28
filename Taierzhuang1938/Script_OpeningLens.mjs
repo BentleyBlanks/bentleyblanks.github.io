@@ -7,7 +7,7 @@
 //     (lens null: the object is returned untouched — nothing of 01–02 survives outside it).
 // Looks and curves live in Data_OpeningLens. The flash and the mud are HUD layers (Script_Hud.SetLens).
 //
-// events = { now, blastAt, impactAt?, buttHit, clearAt, concussion } — times on the mission clock (r.time); any
+// events = { now, blastAt, impactAt?, slapAt, slapSide, concussion } — times on the mission clock (r.time); any
 // may be missing (the channel then shows its `before` value; a phase that runs on without the event it waits
 // for says so once on the console, see EVENT_WAITS). Debug: Tengxian.Debug.OpeningLens.Force(look, age).
 import { LENS_DEFAULT, LOOKS, PHASE_LOOKS, LOOK_BLEND_S, SHELL_FLIGHT_S } from "./Data_OpeningLens.mjs";
@@ -21,7 +21,7 @@ const STALE_S = 0.25;
 // near miss starts with the phase; Butt's hold before the strike is ≥ 0.4 s (contract §4.2) and the strike
 // comes well inside 8 s; Found waits for ijaA to walk up (well under 15 s). Past that the look is stuck on its
 // `before` value — a renamed or retimed director event — and the driver warns once.
-export const EVENT_WAITS = Object.freeze({ Blast: Object.freeze(["blastAt", 1]), Butt: Object.freeze(["buttHit", 8]), Found: Object.freeze(["clearAt", 15]) });
+export const EVENT_WAITS = Object.freeze({ Blast: Object.freeze(["blastAt", 1]) });
 
 /** Linear through [[t, v], ...], held past both ends. */
 export function SampleKeys(keys, t) {
@@ -38,7 +38,7 @@ export function SampleKeys(keys, t) {
 function Clocks(age, events = {}) {
   const now = events.now, Since = at => (now != null && at != null && now >= at ? now - at : null);
   const impactAt = events.impactAt ?? (events.blastAt != null ? events.blastAt + SHELL_FLIGHT_S : null);
-  return { phase: age ?? 0, blast: Since(events.blastAt), impact: Since(impactAt), buttHit: Since(events.buttHit), clearAt: Since(events.clearAt) };
+  return { phase: age ?? 0, blast: Since(events.blastAt), impact: Since(impactAt), slap: Since(events.slapAt) };
 }
 
 function Channel(spec, fallback, clocks, events) {
@@ -72,6 +72,8 @@ export function EvaluateLook(name, age = 0, events = {}) {
     desaturate: Clamp01(Ch(look.desaturate, D.desaturate)),
     darken: Clamp01(Ch(look.darken, D.darken)),
     storyBloodCap: Clamp01(Ch(look.storyBloodCap, D.storyBloodCap)),
+    // The slap's one-sided daze: side +1 = struck on the left cheek (the left of the frame swims), -1 the right.
+    slap: { side: events.slapSide < 0 ? -1 : 1, amount: Clamp01(Ch(look.slap, 0)) },
   };
 }
 
@@ -132,7 +134,7 @@ export class OpeningLensDriver {
     if (!this.enabled) return (this.last = null);
     if (this.forced) {
       const f = this.forced, at = 0 - f.age;
-      const lens = EvaluateLook(f.look, f.age, { now: 0, blastAt: at, buttHit: at, clearAt: at, concussion: 1, ...f.events });
+      const lens = EvaluateLook(f.look, f.age, { now: 0, blastAt: at, slapAt: at, concussion: 1, ...f.events });
       lens.forced = true;
       return (this.last = lens);
     }
@@ -173,6 +175,7 @@ export function ApplyLensToPost(params, lens) {
   params.vignette = (params.vignette ?? D.vignette) * (lens.vignette / D.vignette);
   params.radialBlur = lens.radialBlur;
   params.bloodEdge = lens.bloodEdge;
+  params.sideDaze = lens.slap?.amount > 0 ? lens.slap : null;
   if (lens.darken > 0) params.exposure = (params.exposure ?? 1) * (1 - lens.darken);
   if (lens.desaturate > 0) params.saturation = (params.saturation ?? 0.94) * (1 - lens.desaturate);
   const far = lens.dofFar;

@@ -949,9 +949,25 @@
       "seconds": 1.05,
       "credit": "Pole Position Production · The Warfare Library 机枪近距·开阔野地 · Sonniss GDC 2017",
       "license": "sonniss"
+    },
+    "slap": {
+      "files": [
+        "AudioSfx_Slap_01.mp3"
+      ],
+      "seconds": 0.126,
+      "credit": "The Chris Alan · 重扇耳光 · Sonniss GDC 2018",
+      "license": "sonniss"
+    },
+    "chargeCrowd": {
+      "files": [
+        "AudioSfx_SeedAudioChargeCrowd_01.mp3"
+      ],
+      "seconds": 5.62,
+      "credit": "Volcengine SeedAudio 1.0 · 四川口音的一片喊杀声 · 2026-09-27",
+      "license": "volcengine"
     }
   },
-  "bakedAt": "2026-09-27",
+  "bakedAt": "2026-09-28",
   "normalization": {
     "normalizedAt": "2026-09-08",
     "tool": "Script_AudioNormalize.mjs",

@@ -2,7 +2,7 @@ import { CutscenePerformer, LoadMachineGunCaptivesAnimation } from "./Script_Cut
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 import { LoadMeleeAnimations } from "./Script_MeleeAnimationData.mjs";
 import { Quaternion, Matrix4, Vector3 } from "three";
-import { OpeningActorPerformance, ResolveOpeningActorPose, CorrectOpeningActorGrips, SettleOpeningCaptive } from "./Script_OpeningActorPerformance.mjs";
+import { OpeningActorPerformance, OpeningHeldLife, ResolveOpeningActorPose, CorrectOpeningActorGrips, SettleOpeningCaptive } from "./Script_OpeningActorPerformance.mjs";
 import { ApplyOpeningRescueReady } from "./Script_OpeningFirstPerson.mjs";
 import { OpeningPropSet, ApplyOpeningWeaponTrack, BlendWeaponFrom, OpeningHoldTime } from "./Script_OpeningProps.mjs";
 import { EnsureRelaxedGait, RelaxedGaitShown, UpdateRelaxedGaitWeapon } from "./Script_RelaxedGait.mjs";
@@ -24,6 +24,15 @@ function ReportMissingOpeningClip(modelId, clip){
   missingClips.add(key);
   console.warn(`opening clip ${clip} is not baked on ${modelId}: the native animation plays instead`);
   if(typeof window!=="undefined")(window.__openingMissingClips ||= []).push(key);
+}
+/** Slerp a -> b on the arc their signs give (no switch to the shorter arc, unlike Quaternion.slerp). */
+function SlerpArc(out,a,b,t){
+  let cos=Math.max(-1,Math.min(1,a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w)),sign=1;
+  // b = -a is the same rotation as a: that one case goes the short way (the long one is a full turn).
+  if(cos<-.9995){sign=-1;cos=-cos;}
+  let wa=1-t,wb=t*sign;
+  if(cos<.9995){const theta=Math.acos(cos),s=Math.sin(theta);wa=Math.sin((1-t)*theta)/s;wb=Math.sin(t*theta)/s;}
+  return out.set(a.x*wa+b.x*wb,a.y*wa+b.y*wb,a.z*wa+b.z*wb,a.w*wa+b.w*wb).normalize();
 }
 /** Every "<modelId>/<clip>" a director asked for that the rig does not have (see ReportMissingOpeningClip). */
 export function OpeningMissingClips(){return [...missingClips];}
@@ -128,7 +137,14 @@ export function InstallOpeningStoryboardAnimation(soldier){
   const originalDispose=rig.Dispose;
   // The prop set (and any weapon left in the world) goes with the rig.
   rig.Dispose=function(...args){rig.openingProps?.Dispose();rig.openingProps=null;return originalDispose?.apply(this,args);};
-  let performer,clock=0,blendFrom,blendAt=0,lastKey,travelClock=0,wasRescueReady=false,rescueHandoff=false;
+  let performer,clock=0,blendFrom,blendAt=0,lastKey,lastLayers=null,limbsOnly=false,travelClock=0,wasRescueReady=false,rescueHandoff=false;
+  // The director let go of him (released to the AI): the native pose eases in from the last one shown.
+  let releaseFrom=null,releaseAt=0,releaseArcNew=false;
+  // baseBuffer holds last frame's native pose (the mixer's output) when this layer drew over it: put back before
+  // the next sample. three's PropertyMixer writes a bone only when its own result changes, so a constant track
+  // (the relaxed gait's hands, fingers) never overwrote what the blend or the grip correction left there -- the
+  // interpreter stood with a stale wrist that flipped 148 deg when he set off (2026-09-28 probe).
+  let baseValid=false;
   // The hand weapon as displayed at the end of the last frame (the native Update re-mounts it
   // before this layer runs): the start of the weapon's blend and of a drop.
   const shownWeapon={p:null,q:null,group:null},weaponFrom={p:null,q:null,group:null};
@@ -139,7 +155,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
   const Allocate=()=>bones.map(bone=>({p:bone.position.clone(),q:bone.quaternion.clone()}));
   const shownBuffer=Allocate(),baseBuffer=Allocate(),blendBuffer=Allocate();
   const RescueHandoffBone=bone=>/Pelvis|Spine|Neck|Head|UpperArm|Forearm|Hand|Finger|Clavicle/.test(bone.name);
-  const blendTarget=new Quaternion();
+  const blendTarget=new Quaternion(),arcPrevious=bones.map(()=>new Quaternion());let arcAt=null;
   const Snapshot=out=>{for(let i=0;i<bones.length;i++){out[i].p.copy(bones[i].position);out[i].q.copy(bones[i].quaternion);}return out;};
   let displayed;
   // The skeleton root bone (GroundRoot) as last shown, in world space: a blend that starts after the director
@@ -168,8 +184,12 @@ export function InstallOpeningStoryboardAnimation(soldier){
   const rootRest=rootBone>=0?{p:bones[rootBone].position.clone(),q:bones[rootBone].quaternion.clone()}:null;
   actor.Update=function(dt,state){
     const acting=rig.openingActorPerformance ||= new OpeningActorPerformance(soldier);
+    const life=rig.openingHeldLife ||= new OpeningHeldLife(soldier);
+    life.Restore();
     acting.Restore();
     performer?.Restore();
+    if(baseValid)for(let i=0;i<bones.length;i++){bones[i].position.copy(baseBuffer[i].p);bones[i].quaternion.copy(baseBuffer[i].q);}
+    baseValid=false;
     // Not shown last frame (the AI culled him and skipped this layer): what was remembered as displayed is from
     // the last frame he was on screen, somewhere else; blend from the pose, never re-root against that place
     // (09-24: ijaB slid 1.4 m, Liu 6.8 m from where they were last seen when the camera turned to them).
@@ -215,8 +235,27 @@ export function InstallOpeningStoryboardAnimation(soldier){
       if(rig.relaxedGaitRifle)UpdateRelaxedGaitWeapon(soldier,false);
       if(lastKey==="InterrogateCrouch"&&actor.weaponGroup)actor.weaponGroup.visible=true;
       rig.openingProps?.HideAll();
-      rig.openingStoryboardState=null;lastKey=null;displayed=null;blendFrom=null;return result;
+      // Handed back to the AI: ease from the last shown pose into the native one (Luo's forearm turned 149 deg
+      // in the hand-back frame, 2026-09-28 probe), on the same actor root, then let the native pose stand alone.
+      if(displayed&&!freshShow&&!state.dead){releaseFrom=blendBuffer;for(let i=0;i<bones.length;i++){releaseFrom[i].p.copy(displayed[i].p);releaseFrom[i].q.copy(displayed[i].q);}releaseAt=clock;releaseArcNew=true;}
+      const release=releaseFrom?Math.min(1,(clock-releaseAt)/C.poseBlendS):1;
+      if(releaseFrom&&release<1&&!state.dead&&!freshShow){
+        const mix=release*release*(3-2*release);
+        Snapshot(baseBuffer);baseValid=true;
+        const arcNew=releaseArcNew;releaseArcNew=false;arcAt=null;
+        for(let i=0;i<bones.length;i++){
+          if(i===rootBone)continue;
+          bones[i].position.lerpVectors(releaseFrom[i].p,bones[i].position,mix);
+          blendTarget.copy(bones[i].quaternion);
+          if(blendTarget.dot(arcNew?releaseFrom[i].q:arcPrevious[i])<0)blendTarget.set(-blendTarget.x,-blendTarget.y,-blendTarget.z,-blendTarget.w);
+          arcPrevious[i].copy(blendTarget);
+          SlerpArc(bones[i].quaternion,releaseFrom[i].q,blendTarget,mix);
+        }
+        rig.root.updateMatrixWorld(true);actor._UpdateRiggedWeaponMount?.();
+      }else releaseFrom=null;
+      rig.openingStoryboardState=null;lastKey=null;lastLayers=null;displayed=null;blendFrom=null;life.weight=0;life.primed=false;return result;
     }
+    releaseFrom=null;
     // Native Kimodo death owns the guard from the instant the blade connects.
     // The kneeling captive retains his authored collapse and terminal pose.
     if(state.dead&&!pose){rig.openingStoryboardState=null;return result;}
@@ -238,12 +277,16 @@ export function InstallOpeningStoryboardAnimation(soldier){
       if(weaponEase){weaponFrom.p=shownWeapon.p.clone();weaponFrom.q=shownWeapon.q.clone();weaponFrom.group=shownWeapon.group;}
       rig.openingProps?.BeginBlend();
       blendAt=clock;if(key!==lastKey)travelClock=0;lastKey=key;
-      if(noBlend){blendFrom=null;displayed=null;}
+      // A re-root under the pelvis into the gait it hands to (RerootUnderPelvis): the root and the pelvis's
+      // place are the new clip's at once (a blend would drag the old root offset along), the limbs still ease
+      // over (the comrade's hand turned 123 deg, the fleeing interpreter's thigh 180 deg in that frame).
+      limbsOnly=!!noBlend;
+      if(noBlend&&!displayed)blendFrom=null;
     }
     // First frame back on screen: nobody saw the pose he had, so show the current one outright (a blend from
     // the pose he had when culled moved the pelvis 0.15 m in a frame, 09-24 run).
     if(freshShow){blendFrom=null;lastKey=key;}
-    const locomotion=Snapshot(baseBuffer);
+    const locomotion=Snapshot(baseBuffer);baseValid=true;
     if(pose&&record&&pose.clip!=="DadaoAmbush"){
     performer ||= new CutscenePerformer(actor,record,library.config);
     // Sample the requested time directly. A new phase may reset its clock even
@@ -264,18 +307,46 @@ export function InstallOpeningStoryboardAnimation(soldier){
     }
     if(pose.additive)ApplyOpeningAdditive(performer,record,pose.additive);
     }else{rig.openingStoryboardState=null;}
-    const blend=nativeCombat?1:Math.min(1,(clock-blendAt)/C.poseBlendS),mix=blend*blend*(3-2*blend);
-    rig.openingBlendState={key,mix:blendFrom?mix:1,rerooted:!!rerooted,noBlend:!!noBlend};
-    if(blendFrom&&blend<1)for(let i=0;i<bones.length;i++){
-      if(rescueHandoff&&RescueHandoffBone(bones[i]))continue;
-      bones[i].position.lerpVectors(blendFrom[i].p,bones[i].position,mix);
-      blendTarget.copy(bones[i].quaternion);
-      bones[i].quaternion.slerpQuaternions(blendFrom[i].q,blendTarget,mix);
-    }
     SettleOpeningCaptive(soldier,pose);
-    if(!rescueHandoff)displayed=Snapshot(shownBuffer);rig.root.updateMatrixWorld(true);if(!rescueHandoff)RememberDisplayedParent();
+    rig.root.updateMatrixWorld(true);
     acting.Apply(dt,state,pose);
     CorrectOpeningActorGrips(soldier,pose);
+    // A held clip pose with no dialogue acting on it breathes and looks about (Data_OpeningStoryboards.heldLife).
+    const acted=!!rig.openingActorPerformanceState&&!rig.openingActorPerformanceState.protected;
+    life.Apply(dt,pose,!!pose&&pose.clip!=="DadaoAmbush"&&soldier.alive!==false&&!state.dead&&!state.meleeCombat&&!acted&&!rescueReady&&!rescueHandoff);
+    // The pose blend runs on the finished pose (clip + dialogue acting + grip correction) and starts from the
+    // finished pose last shown. Blending before those layers let them switch on or off in one frame at every
+    // hand-over: the 2026-09-28 probe measured 90-150 deg hand/forearm jumps (Luo PointBlockade in and out, the
+    // runner, the comrade rising). A layer switching without a clip change (grip correction, a protected or
+    // head-only beat) restarts the blend from what was shown too.
+    const layers=`${rig.openingActorGripState?1:0}|${rig.openingActorPerformanceState?.protected?1:0}|${rig.openingActorPerformanceState?.headOnly?1:0}|${pose?.additive?.clip||""}`;
+    if(layers!==lastLayers&&lastLayers!=null&&displayed&&!freshShow&&!noBlend&&blendAt!==clock){
+      blendFrom=blendBuffer;
+      for(let i=0;i<bones.length;i++){blendFrom[i].p.copy(displayed[i].p);blendFrom[i].q.copy(displayed[i].q);}
+      KeepDisplayedPelvis();blendAt=clock;limbsOnly=false;
+    }
+    lastLayers=layers;
+    // Native combat (a man handed back who raises his rifle at once) takes over in a short blend, not in one frame.
+    const blend=Math.min(1,(clock-blendAt)/(nativeCombat?C.combatBlendS:C.poseBlendS)),mix=blend*blend*(3-2*blend);
+    rig.openingBlendState={key,mix:blendFrom?mix:1,rerooted:!!rerooted,noBlend:!!noBlend};
+    if(blendFrom&&blend<1){
+      const arcNew=arcAt!==blendAt;arcAt=blendAt;
+      for(let i=0;i<bones.length;i++){
+        if(rescueHandoff&&RescueHandoffBone(bones[i]))continue;
+        // limbsOnly (a re-root into the gait): the root and the pelvis are the new clip's, only what hangs below eases.
+        if(limbsOnly&&(i===rootBone||bones[i]===rig.bones.pelvis))continue;
+        bones[i].position.lerpVectors(blendFrom[i].p,bones[i].position,mix);
+        // The arc is chosen when the blend begins and kept: three's slerp takes the shorter arc every frame, which
+        // swaps sides when the two ends are nearly opposite (ijaB's wrist, rifle grip to hanging hand, jumped 99 deg
+        // a third of the way in).
+        blendTarget.copy(bones[i].quaternion);
+        if(blendTarget.dot(arcNew?blendFrom[i].q:arcPrevious[i])<0)blendTarget.set(-blendTarget.x,-blendTarget.y,-blendTarget.z,-blendTarget.w);
+        arcPrevious[i].copy(blendTarget);
+        SlerpArc(bones[i].quaternion,blendFrom[i].q,blendTarget,mix);
+      }
+      rig.root.updateMatrixWorld(true);
+    }
+    if(!rescueHandoff){displayed=Snapshot(shownBuffer);RememberDisplayedParent();}
     let rescueHandoffApplied=false;
     if(rescueReady){
       // The kick owns the legs. Both empty hands have already released the

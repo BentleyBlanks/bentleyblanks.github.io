@@ -169,7 +169,8 @@ try{
     {role:"ijaB",phase:"Interrogation",kind:"ija",variant:0,clip:"IjaBayonetGuard",minHeadRad:.1},
     {role:"guard",phase:"Interrogation",kind:"ija",variant:2,clip:"IjaBayonetGuard",minHeadRad:.1},
     {role:"comrade",phase:"Interrogation",kind:"nra",variant:1,clip:"CaptiveHeld",freeHand:"handL",minHandM:.1},
-    {role:"ijaA",caseName:"ButtStrike",phase:"Butt",kind:"ija",variant:5,castId:"ijaA",clip:"ButtThreat",onceDuration:1.4,minHeadRad:.1},
+    // 2026-09-27: the butt strike is gone (slaps where he lies); ijaA questioning over the pinned man.
+    {role:"ijaA",caseName:"Questioning",phase:"Ask",kind:"ija",variant:5,castId:"ijaA",clip:"InterrogateCrouch",freeHand:"handR",minHandM:.07},
   ];
   const receipts=[];
   for(const spec of cases){
@@ -239,43 +240,54 @@ try{
   }
   }
   // 09.23 draft: the comrade dies at the throat cut and the authored CaptiveWallSlideTwitch (3.2 s) plays
-  // on past the AI's corpse freeze until he sits slumped against the wall (pelvis 0.16 m, clip root data).
+  // on past the AI's corpse freeze. Since 09-27 (docs/Data_OpeningComradeKneelBank20260927.md) he dies
+  // kneeling on the bank: both feet stay, the pelvis only slumps ~0.1 m to his right, the trunk slides
+  // down the planks. The kneel heights come from the clip root data (manifest models[].clips[].root).
   const corpse=await page.evaluate(()=>{
-    const p=window.openingActorPerformanceProbe,{g,r,T}=p;
+    const p=window.openingActorPerformanceProbe,{g,r,T,api}=p;
     if(p.soldier){p.soldier.actor.Dispose();p.soldier=null;}
     g.post.Render=p.render;
-    const scene=r.frontShow.bunker,samples=[];
+    const scene=r.frontShow.bunker,samples=[];let clipRoot=null;
     for(let frame=0;frame<14000;frame++){
       g.StepFrames(1,1/60,false);
       const soldier=scene.Comrade;if(!soldier||soldier.alive)continue;
       const actor=soldier.actor,rig=actor.characterRig;
+      clipRoot ||= api.OpeningClipRoot(rig.clipModelId||rig.modelId,"CaptiveWallSlideTwitch");
       if(soldier.deadTime<3.6||frame%60===0){
         rig.root.updateMatrixWorld(true);
         const Pos=bone=>bone.getWorldPosition(new T.Vector3()).sub(actor.root.position).toArray();
         samples.push({time:soldier.deadTime,shown:rig.openingStoryboardState?.seconds,clip:soldier.openingStoryboardPose?.clip||null,
           head:Pos(rig.bones.head),chest:Pos(rig.bones.chest),pelvis:Pos(rig.bones.pelvis),root:actor.root.position.toArray()});
       }
-      if(scene.phase==="Reach"&&scene.Age>1){g.StepFrames(3,1/60,true);break;}
+      if(["Found","Hold","Ask"].includes(scene.phase)&&soldier.deadTime>6){g.StepFrames(3,1/60,true);break;}
     }
-    return {samples,phase:scene.phase,alive:scene.Comrade?.alive};
+    return {samples,clipRoot,phase:scene.phase,alive:scene.Comrade?.alive};
   });
   await fs.writeFile(path.join(output,"Data_CaptiveCollapse.json"),JSON.stringify(corpse,null,2));
   await page.screenshot({path:path.join(output,"Scene_CaptiveCollapseTerminal.png")});
   assert.equal(corpse.alive,false,"the normal opening actually kills the comrade at the wall");
-  assert.equal(corpse.phase,"Reach","the normal opening continues past the cut to Shunzi's reach for the rifle");
+  assert.ok(["Found","Hold","Ask"].includes(corpse.phase),"the normal opening continues past the cut to ijaA finding and questioning Shunzi");
   const sliding=corpse.samples.filter(sample=>sample.time>.91&&sample.time<3.25);
   assert.ok(sliding.length>20&&sliding.every(sample=>sample.clip==="CaptiveWallSlideTwitch")&&sliding.at(-1).shown>=3.1,
     "the corpse finishes the authored 3.2-second slide down the wall beyond native AI's 0.9-second freeze");
   const terminal=corpse.samples.filter(sample=>sample.time>3.5);
   assert.ok(terminal.length>3,"observe the corpse over several seconds after the slide");
+  // Clip root pelvisHeight: 0.386 m kneeling upright before the slide, 0.368 m slumped at the terminal frame;
+  // sitting in the mud (the pre-09-27 death) put the pelvis near 0.16 m, well outside the tolerance.
+  const kneelStart=corpse.clipRoot?.start?.[3],kneelEnd=corpse.clipRoot?.end?.[3];
+  assert.ok(Number.isFinite(kneelStart)&&Number.isFinite(kneelEnd)&&kneelEnd<kneelStart,
+    `CaptiveWallSlideTwitch clip root data gives the kneel heights (${JSON.stringify(corpse.clipRoot)})`);
   for(const sample of terminal){
-    assert.ok(sample.pelvis[1]<.25,`dead comrade sits slumped in the mud instead of kneeling (${sample.pelvis[1]})`);
+    assert.ok(Math.abs(sample.pelvis[1]-kneelEnd)<.04,
+      `dead comrade stays kneeling on the bank at the clip's terminal pelvis height ${kneelEnd} m (${sample.pelvis[1]})`);
+    assert.ok(sample.pelvis[1]<kneelStart+.01&&sample.pelvis[1]<terminal[0].pelvis[1]+.005,
+      `dead comrade does not rise back up after slumping (${sample.pelvis[1]}, first terminal ${terminal[0].pelvis[1]}, kneel ${kneelStart})`);
     assert.ok(Math.hypot(...sample.head.map((n,i)=>n-terminal[0].head[i]))<.001,"terminal corpse remains still without replaying the death");
   }
   let maxStep=0;
   for(let i=1;i<sliding.length;i++)maxStep=Math.max(maxStep,Math.hypot(...sliding[i].head.map((n,j)=>n-sliding[i-1].head[j])));
   assert.ok(maxStep<.04,`the slide advances continuously (${maxStep} m/frame)`);
-  console.log("ok normal comrade death: the authored wall slide completes after the AI corpse freeze, rests slumped and never replays");
+  console.log(`ok normal comrade death: the authored wall slide completes after the AI corpse freeze, rests kneeling on the bank (pelvis ${terminal.at(-1).pelvis[1].toFixed(3)} m, clip ${kneelEnd} m) and never replays`);
   assert.deepEqual(ctx.errors,[]);
   if(!process.argv.includes("--corpse-only"))console.log("ok five production rigs, dialogue gestures, idle attention, planted soles, clear lifecycle and high-quality rendered frames");
 }finally{await CloseCampaign(ctx);}

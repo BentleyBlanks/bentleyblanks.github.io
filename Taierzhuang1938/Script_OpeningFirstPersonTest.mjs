@@ -110,11 +110,11 @@ assert.ok(groundContacts>=20,"ground beats were sampled at rest ("+groundContact
 assert.ok(followSamples>=500,"followUp sampled for both skins ("+followSamples+")");
 // Flag clocks: an unset flag holds the first key; the key after the flag follows it.
 {
-  const show={phase:"Butt",Age:3,flags:{},r:{time:10}};
-  assert.equal(OpeningHandBeat(show).names.r,"flat","before ijaA reaches his mark Shunzi lies flat");
-  show.flags.buttAt=9.8;assert.equal(OpeningHandBeat(show).names.r,"push","he pushes up before the stock lands");
-  show.flags.buttAt=10-(C.ija.butt.strikeS+C.ija.butt.holdS+.3);
-  assert.equal(OpeningHandBeat(show).names.r,"rest","after the strike the arms go slack");
+  // 2026-09-27: Hold counts from the hair grab (holdGripAt): the right hand claws, then both hands push.
+  const show={phase:"Hold",Age:3,flags:{},r:{time:10}};
+  assert.equal(OpeningHandBeat(show).names.r,"clawIn","before ijaA takes the hair the right hand claws at the mud");
+  show.flags.holdGripAt=9.9;assert.equal(OpeningHandBeat(show).names.l,"push","the left hand braces as the head is hauled up");
+  show.flags.holdGripAt=9;assert.equal(OpeningHandBeat(show).names.r,"push","then both hands strain against the mud");
 }
 // A cut between phases (the camera jumps, e.g. Blast -> Wake) must not carry last frame's world shoulder
 // into the new view: the shoulder blend is camera-local (campaign probe minShoulderBehind was -0.003).

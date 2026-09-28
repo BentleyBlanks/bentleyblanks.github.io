@@ -58,7 +58,8 @@ function BakeCards(instances) {
     const [u0, v0, u1, v1] = card.uv;
     // 色调：干草偏暖到偏灰之间抖一点，整体亮度 0.8–1.05。
     const bright = 0.8 + it.tint * 0.25, warm = (it.tint * 7.31) % 1;
-    const tint = [bright * (0.96 + warm * 0.06), bright * (0.97 + warm * 0.02), bright * (1.0 - warm * 0.06)];
+    const shade = card.shade || [1, 1, 1];
+    const tint = [bright * (0.96 + warm * 0.06) * shade[0], bright * (0.97 + warm * 0.02) * shade[1], bright * (1.0 - warm * 0.06) * shade[2]];
     // 轻微倾斜：顶边沿面片方向错开，不让一片草地全是笔直的板。
     const lean = ((it.tint * 13.7) % 1 - 0.5) * 0.18 * h;
     for (let q = 0; q < 2; q++) {

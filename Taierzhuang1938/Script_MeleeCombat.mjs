@@ -329,13 +329,16 @@ export class MeleeCombatDirector {
    * 也不要求玩家手里正握着白刃武器 —— 压上来的是对方的刺刀。
    * 窗口、力度、连按进度与成败结算仍然走共用规则，成功不自动杀敌
    *（这一拍的杀招是赢了之后玩家自己按下去的那一下反捅）。
+   *
+   * input "press"：一次性按键（第一关 09 灶屋伏击，照《使命召唤：战争世界》的万岁冲锋），
+   * 窗口里按一下就赢；杀招由任务在结算那一刻自己下（见 Script_FirstLevelKitchenAmbush）。
    */
-  BeginScriptedGround(player, opponent, { windowS = null, strength = 1, reason = "scripted" } = {}) {
+  BeginScriptedGround(player, opponent, { windowS = null, strength = 1, reason = "scripted", input = "mash" } = {}) {
     if (!Alive(player) || !Alive(opponent) || this.Active) return false;
     const pf = this.Fighter(player), of = this.Fighter(opponent);
     opponent.yaw = Math.atan2(opponent.position.x - player.position.x, opponent.position.z - player.position.z);
     of.qteCount = 0; pf.qteUntil = -99;
-    if (!this.qte.Begin("ground", opponent, { stamina: pf.stamina / 100, reason, strength, windowS })) return false;
+    if (!this.qte.Begin("ground", opponent, { stamina: pf.stamina / 100, reason, strength, windowS, input })) return false;
     const seconds = this.qte.active.windowS;
     this.SetState(pf, "qte", seconds, "Ground");
     this.SetState(of, "qte", seconds, "Pressure");
@@ -406,8 +409,11 @@ export class MeleeCombatDirector {
     if (a.success) {
       // 剧本僵持里玩家手上可能根本不是白刃武器（刺刀是对方顶上来的）：
       // 顶开的距离退回共用默认值，不要读一个不存在的武器表。
-      this.Repel(a.attacker, p, W[pf.weapon]?.pushDistance ?? R.pushDistanceM);
-      this.SetState(of, "stagger", (a.kind==='ground'?R.riseS:0)+Q.recoveryAdvantageS, "Pushed");
+      // 对方已经死在结算里（剧本一次性按键的反刺）就不推尸体，只收起身。
+      if (Alive(a.attacker)) {
+        this.Repel(a.attacker, p, W[pf.weapon]?.pushDistance ?? R.pushDistanceM);
+        this.SetState(of, "stagger", (a.kind==='ground'?R.riseS:0)+Q.recoveryAdvantageS, "Pushed");
+      }
       pf.poise = 65;
       this.SetState(pf, a.kind === "ground" ? "rise" : "idle", a.kind === "ground" ? R.riseS : 0, a.kind === "ground" ? "Rise" : "Guard");
     } else {
@@ -741,7 +747,9 @@ export class MeleeCombatDirector {
   Step(dt) {
     this.time += dt;
     const player = this.Player();
-    if (this.Active && (!Alive(player) || !Alive(this.qte.active.attacker))) this.Cancel("participantGone");
+    // 赢下来之后对方死在结算里（剧本一次性按键的反刺）不算「人没了」：结算那 0.6 s 与起身照常走完。
+    const won = this.qte.active?.phase === "resolve" && this.qte.active.success === true;
+    if (this.Active && (!Alive(player) || (!Alive(this.qte.active.attacker) && !won))) this.Cancel("participantGone");
     if(this.Active) {const threat=this.ImmediateThreat(this.qte.active.attacker);if(threat)this.EscapeQte(threat);}
     const all = [player, ...this.Soldiers()].filter(Boolean);
     this.BuildIndex(all);
@@ -799,7 +807,8 @@ export class MeleeCombatDirector {
     if (f.state === "idle") clip = f.move > 0 ? "Advance" : f.move < 0 ? "Retreat" : "Guard";
     const a = this.qte.active;
     if (f.state === "qte" && a) {
-      if (a.phase === "resolve") clip = a.kind === "ground" ? (f.entity === this.Player() ? a.success ? "GroundWin" : "GroundLose" : "Pushed") : a.success === (f.entity === this.Player()) ? "BindWin" : "BindLose";
+      // 倒地僵持输了，压在上面的人是**捅下去**，不是被推开：保持 Pressure 姿势直到结算走完。
+      if (a.phase === "resolve") clip = a.kind === "ground" ? (f.entity === this.Player() ? a.success ? "GroundWin" : "GroundLose" : a.success ? "Pushed" : "Pressure") : a.success === (f.entity === this.Player()) ? "BindWin" : "BindLose";
     }
     const phase = f.attack ? f.t < f.attack.windup ? "windup" : f.t < f.attack.windup + f.attack.active ? "active" : "recovery" : f.state;
     const attackTime=f.attack ? (f.t<f.attack.windup ? f.t/f.attack.windup*f.attack.baseWindup : f.attack.baseWindup+f.t-f.attack.windup) / f.attack.baseDuration : null;

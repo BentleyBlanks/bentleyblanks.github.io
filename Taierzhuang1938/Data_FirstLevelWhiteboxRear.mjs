@@ -13,6 +13,12 @@
 //   18_1  the south bank has an earthen crest (terrain) and the firing walls wear earth
 //         skins; the railway bridge gets stone piers (non-colliding).
 //   18_2  (NightGate only) houses front the approach street, ammunition stacks line it.
+// Rev 2026-09-28 guidance round (docs/Data_FirstLevelGuidance20260928.md §5 D; cameras G15_*…G18_*):
+//   Layout's blue legend walls in 15–18 are re-emitted as plaster / stone / earth (RESKIN, same
+//   geometry); a lantern pole marks the 15B square turn; a stone garden wall closes the lane exit's
+//   forecourt so it opens only on the gatehouse; the yard's unused south gate is shut and barred,
+//   the back door stands open, and the ward flies a red-cross flag. Trodden paths live in the
+//   terrain table (Data_FirstLevelWhiteboxTerrainRear.paths).
 // Frozen: every anchor/route/placement, the 15B lane members, gate 4.0 m, ward threshold,
 // bedside tolerances, bridge four states, blast stand-off, night gate/wall sizes.
 // Litter lines from wardEntry (-26,240) to MISSION_RECEPTION_SPACE.litterOrigin slots and
@@ -28,6 +34,40 @@ export function BuildRearWhitebox(groundAt) {
   const replaceBlockIds = ["ReceptionWardRoof", "ReceptionStreetRoomRoof", "RearCourtyardHouseRoof",
     // The ward's south door narrows to 2.8 m and its west wall gains a window.
     "ReceptionWardSouthLeft", "ReceptionWardSouthRight", "ReceptionWardSouthLintel", "ReceptionWardWest"];
+  // 2026-09-28 guidance round (docs/Data_FirstLevelGuidance20260928.md): Layout builds the compound,
+  // lane and bank walls as blue `cover` legend walls; at 1/8 scale the blue was the loudest thing in
+  // every 15–18 frame. Same pattern as the village RESKIN: re-emit each with Layout's own formula
+  // (Wall / GroundedWall, same cover face, same id), only the semantic changes, so the doorways and
+  // the lit yard read first. [id, x, z, w, h, d, grounded, semantic] with Layout's arguments.
+  // Measured members (15B lane walls, gate piers, bridge parapets, north ridge) keep every number.
+  const Door = (id, x, z, w, h, opening = 3.8) => {
+    const side = (w - opening) / 2;
+    return [[`${id}Left`, x - (w + opening) / 4, z, side, h, .6], [`${id}Right`, x + (w + opening) / 4, z, side, h, .6]];
+  };
+  const Room = (id, x, z, w, d, { south = true, north = true } = {}) => [
+    ...(south ? Door(`${id}South`, x, z + d / 2, w, 2.9) : []), ...(north ? Door(`${id}North`, x, z - d / 2, w, 2.9) : []),
+    ...(id === "ReceptionWard" ? [] : [[`${id}West`, x - w / 2, z, .6, 2.9, d]]),
+    [`${id}EastFront`, x + w / 2, z - d * .36, .6, 2.9, d * .28], [`${id}EastBack`, x + w / 2, z + d * .36, .6, 2.9, d * .28],
+    [`${id}WindowSill`, x + w / 2, z, .6, .82, d * .44]];
+  const RESKIN = [
+    ...[...Room("ReceptionWard", -26, 234, 14, 18, { south: false }), ...Room("ReceptionStreetRoom", -5, 229, 10, 14),
+      ...Room("RearCourtyardHouse", 27, 232, 13, 12), ["ReceptionNorth", -22, 218, 37, 2.8, .7],
+      ...Door("ReceptionSouth", -22, 252, 37, 2.8, 5),
+      ["ReceptionWestNorth", -41, 229.75, .7, 2.8, 23.5], ["ReceptionWestSouth", -41, 249.25, .7, 2.8, 5.5]]
+      .map((row) => [...row, false, "plaster"]),
+    ...[["WallPathYardWall", 25, 209.5, 22, 2.8, .7], ["WallPathTurnWest", 13.25, 216.5, .7, 2.8, 10],
+      ["ReceptionEastNorth", 2, 228, .7, 2.8, 20], ["ReceptionEastSouth", 2, 243.5, .7, 2.8, 3],
+      ["BackyardWall", 21.5, 224, 7, 2.8, .7], ["RearWallSightBreak", 38, 199, 16, 2.8, 1],
+      ["RearWallGapWest", 45, 184, 16, 2.8, .7], ["RearWallGapEast", 65, 184, 14, 2.8, .7],
+      ["DrainSightBreak", 44, 160, 9, 2.8, 1]].map((row) => [...row, true, "plaster"]),
+    ...[["WallPathLowWall", 27, 213, 18, 1.1, .7, true, "railBallast"],
+      ["BridgeSouthCoverWest", -82.5, 177.6, 9, 1.3, .8, true, "earthDark"],
+      ["BridgeSouthCoverEast", -64.5, 178.4, 9, 1.45, .8, true, "earthDark"],
+      ["BlastSafeBank", -66, 197.5, 7, 1.35, .9, true, "earthDark"],
+      ["BridgeNorthRidgeWest", -87, 132.2, 10, 1.45, 1.2, true, "earthDark"],
+      ["BridgeNorthRidgeEast", -66, 132.2, 12, 1.45, 1.2, true, "earthDark"]],
+  ];
+  replaceBlockIds.push(...RESKIN.map(([id]) => id));
   function Box(list, id, x, z, w, h, d, semantic = "plaster", extra = {}) {
     const block = { id, x, z, w, h, d, y: groundAt(x, z) + h / 2,
       semantic, tag: "whiteboxWall", ...extra };
@@ -82,6 +122,15 @@ export function BuildRearWhitebox(groundAt) {
         { y: groundAt(px, pz) + h / 2 - .03, ry: Rand() * Math.PI });
     }
   }
+  // Re-emit the reskinned Layout walls first (same geometry, Layout's grounding formula).
+  for (const [id, x, z, w, h, d, grounded, semantic] of RESKIN) {
+    const wall = Box(blocks, id, x, z, w, h, d, semantic, { cover: { faceX: 0, faceZ: -1 } });
+    if (!grounded) continue;
+    const top = wall.y + wall.h / 2;
+    const base = Math.min(...[-1, 0, 1].flatMap(a => [-1, 0, 1].map(b => groundAt(x + a * w / 2, z + b * d / 2)))) - .1;
+    wall.y = (top + base) / 2;
+    wall.h = top - base;
+  }
   // Solid cot: a raised board over legs, blanket and pillow; top at 0.52 m (walk graph ignores it).
   function Cot(id, x, z, occupied = false) {
     const w = .84, d = 2, g = groundAt(x, z);
@@ -114,6 +163,15 @@ export function BuildRearWhitebox(groundAt) {
     Detail(`RearDitchPoleArm${i}`, 63.5, z, 1.8, .12, .14, "timber", { y: groundAt(63.5, z) + 5.4 });
   }
   Rubble("RearDitchLipRubble", 61.5, 191, 7, 1.2, 5, .38, "earthDark");
+  // Guidance 09-28: from the ditch floor the lane mouth is a narrow gap behind the low wall's end and
+  // the turn's lantern pole is hidden by the outbuilding, so a signpost on the ramp top, just past
+  // the yard wall's east end, points its board west down the lane (2 m clear of the ditch route end).
+  {
+    // Board along the lane's first leg (56,207)→(36,211): local x = (cos ry, -sin ry) = (0.98, -0.2).
+    const x = 57.35, z = 209.4, g = groundAt(x, z), ry = Math.atan2(4, 20);
+    Grounded("LaneMouthSignPost", x, z, .14, 2.35, .14, "timber");
+    Detail("LaneMouthSignBoard", x - .6, z + .12, 1.25, .3, .05, "canvas", { y: g + 1.95, ry });
+  }
   // 15B lane wall skins: plaster yard wall and a stone low wall with tile coping. They wrap
   // Layout's WallPathYardWall (25,209.5 22×0.7) / WallPathLowWall (27,213 18×0.7).
   {
@@ -154,6 +212,17 @@ export function BuildRearWhitebox(groundAt) {
     const wall = Along("RearLaneWestGardenWall", 12.9, 222.3, 8.0, 230.2, 0, 1.15, "railBallast", .5);
     Coping("RearLaneWestGardenWall", wall.x, wall.z, wall.d, .5, 1.15, wall.ry);
   }
+  // Guidance 09-28: a 6 m lantern pole on the inner (south-east) corner of the square turn. From
+  // the ditch mouth and down the westward lane the end looks like a dead end at the mud house;
+  // the pole stands over the low wall on the left exactly where the lane turns.
+  {
+    const x = 18.45, z = 213.85, g = groundAt(x, z);
+    Grounded("LaneTurnLanternPole", x, z, .2, 6, .2, "timber");
+    Detail("LaneTurnLanternArm", x - .6, z, 1.3, .1, .1, "timber", { y: g + 5.35 });
+    Detail("LaneTurnLantern", x - 1.1, z, .4, .6, .4, "canvas", { y: g + 4.9 });
+    Detail("LaneTurnLanternCap", x - 1.1, z, .5, .08, .5, "roof", { y: g + 5.24 });
+    Detail("LaneTurnPennant", x + .05, z + .5, .04, .5, .9, "danger", { y: g + 5.55 });
+  }
   // Chips along both wall feet inside the turn leg (x 13.7–14.2 / 16.95–17.35).
   Rubble("LaneTurnWestFoot", 13.95, 216.5, 6, .08, 4.3, .3, "railBallast", .6);
   Rubble("LaneTurnEastFoot", 17.15, 217, 5, .04, 3.6, .28, "railBallast", .5);
@@ -191,13 +260,25 @@ export function BuildRearWhitebox(groundAt) {
   Rubble("ReceptionForecourt", 8.2, 226.5, 8, 1.6, 2.4, .3, "earthDark");
   Detail("ReceptionGateBrokenCart", 11.3, 234.4, 2.8, .55, 1.2, "timber",
     { y: groundAt(11.3, 234.4) + .32, ry: -.5 });
+  // Guidance 09-28: the lane's exit opened on the left onto one field running south-east to the
+  // horizon (G15_3). A 1.15 m stone garden wall carries on from the lane's stone bend (14.3,229.7)
+  // south to z 247 and back west to the south-east outhouse, so the forecourt's only way on is the
+  // gatehouse. Clear of wallPath, the evacuation queue (9,233)→(9,240), the x=6 walk, the runner.
+  for (const [id, x, z, w, d] of [["RearForecourtEastWall", 14.55, 238.5, .5, 17.1],
+    ["RearForecourtSouthWall", 8.2, 247.2, 13.2, .5]]) {
+    Grounded(id, x, z, w, 1.15, d, "railBallast");
+    Coping(id, x, z, Math.max(w, d), .5, 1.15, w > d ? Math.PI / 2 : 0);
+  }
+  Rubble("RearForecourtEastFoot", 13.9, 239.5, 7, .12, 6.5, .32, "railBallast", .6);
+  Detail("RearForecourtCartWheel", 13.95, 244.2, .16, 1.2, 1.2, "timber",
+    { y: groundAt(13.95, 244.2) + .6, ry: .15 });
 
   // ---------------------------------------------------------------------------
   // 16–17: the ward, split into a south treatment bay and a north litter bay
   // ---------------------------------------------------------------------------
   {
     const wall = (id, x, z, w, h, d) =>
-      Box(blocks, id, x, z, w, h, d, "cover", { cover: { faceX: 0, faceZ: -1 } });
+      Box(blocks, id, x, z, w, h, d, "plaster", { cover: { faceX: 0, faceZ: -1 } });
     // South door 3.8 → 2.8 m (x -27.4…-24.6); head bottom 2.4 m. Threshold stays Layout's.
     wall("ReceptionWardSouthWest", -30.2, 243, 5.6, 2.9, .6);
     wall("ReceptionWardSouthEast", -21.8, 243, 5.6, 2.9, .6);
@@ -288,6 +369,29 @@ export function BuildRearWhitebox(groundAt) {
     Detail(`ReceptionBasket${i}`, x, z, .5, .45, .5, "timber", { y: groundAt(x, z) + .22 });
   Rubble("ReceptionYardSouthFoot", -30, 251.1, 8, 7, .3, .35);
   Rubble("ReceptionYardNorthFoot", -26, 218.9, 6, 6, .3, .3, "earthDark");
+  // Guidance 09-28 (16–18: which door). The yard had three open doors: the ward's south door (16
+  // goal), the 5 m south gate in ReceptionSouth (x -24.5…-19.5, straight across from the ward door,
+  // no route uses it) and the 5 m back door in the west wall (18 goal). The south gate is shut and
+  // barred; the back door's leaves stand swung open against the outer face; the ward flies a red-cross
+  // flag at its south-east corner, seen over the yard from the gate.
+  for (const [side, x] of [["West", -23.24], ["East", -20.76]])
+    Box(blocks, `ReceptionSouthGateLeaf${side}`, x, 252, 2.46, 2.3, .12, "timber");
+  Detail("ReceptionSouthGateBar", -22, 251.87, 4.9, .16, .12, "timber", { y: groundAt(-22, 251.9) + 1.25 });
+  for (const [i, dx] of [-1.8, -.6, .6, 1.8].entries())
+    Detail(`ReceptionSouthGateBatten${i}`, -22 + dx, 251.9, .14, 2.1, .06, "timber",
+      { y: groundAt(-22 + dx, 251.9) + 1.15 });
+  for (const [side, z] of [["North", 240.25], ["South", 247.75]])
+    Detail(`ReceptionRearDoorLeaf${side}`, -41.46, z, .08, 2.3, 2.38, "timber", { y: groundAt(-41.46, z) + 1.17 });
+  {
+    // Against the ward's east wall, north of the (-5,240)→(-26,246) walker line (0.9 m clear).
+    const x = -18.35, z = 242.8, g = groundAt(x, z), ry = .8;
+    const off = (along) => ({ x: x + Math.cos(ry) * along, z: z - Math.sin(ry) * along });
+    Grounded("ReceptionWardFlagPole", x, z, .14, 5.7, .14, "timber");
+    const flag = off(.68), cross = off(.68);
+    Detail("ReceptionWardFlag", flag.x, flag.z, 1.24, .82, .04, "canvas", { y: g + 5.18, ry });
+    Detail("ReceptionWardFlagCrossV", cross.x, cross.z, .22, .62, .07, "danger", { y: g + 5.18, ry });
+    Detail("ReceptionWardFlagCrossH", cross.x, cross.z, .62, .22, .07, "danger", { y: g + 5.18, ry });
+  }
   // Beyond the south wall: two ruined houses and spill, seen through the ward door (17).
   HouseMass("ReceptionSouthRuinA", -32.5, 258.5, 9, 6.5, 3.2, { alongX: true });
   Grounded("ReceptionSouthRuinAGable", -36.2, 258.5, .6, 4.5, 6.5, "plaster");
@@ -334,15 +438,8 @@ export function BuildRearWhitebox(groundAt) {
   Rubble("BridgeBankStones", -90, 174.6, 8, 5, .6, .4);
   for (const [i, x, z, s] of [[0, -93.5, 175.4, 1.2], [1, -85.6, 175.9, .9], [2, -66, 176.6, 1.1], [3, -60.5, 177.1, .8]])
     Detail(`BridgeBankGrass${i}`, x, z, s, s * .6, s * .8, "foliage", { y: groundAt(x, z) + s * .3 });
-  // Stone piers under the span (river floor to deck bottom 0.11 m), non-colliding details:
-  // they stand under the deck, off every line of sight above it, and survive the demolition.
-  for (const [side, z] of [["North", 148.6], ["South", 157.4]]) {
-    const floor = groundAt(-77, z), top = .11;
-    Detail(`RailBridgePier${side}`, -77, z, 3.4, top - floor + .3, 1.7, "structure", { y: (top + floor - .3) / 2 });
-    Detail(`RailBridgePierCap${side}`, -77, z, 4.2, .3, 2.1, "structure", { y: top - .15 });
-    Detail(`RailBridgePierCutwater${side}`, -77, z - .85, 1.2, top - floor - .4, 1.2, "structure",
-      { y: (top - .4 + floor) / 2, ry: Math.PI / 4 });
-  }
+  // The rail bridge is a single-span truss now (Model_RailBridge, docs/Data_RailBridge.md):
+  // no river piers. The old non-colliding pier details were removed with the whitebox look.
 
   // ---------------------------------------------------------------------------
   // 18_2 NightGate only: street houses, ammunition stacks, arch haunches, flag poles.

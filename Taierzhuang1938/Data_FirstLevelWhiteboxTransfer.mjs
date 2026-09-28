@@ -121,12 +121,19 @@ export function BuildTransferWhitebox(groundAt) {
   // each segment is two courses of different height plus a fallen-brick step.
   const RoadWalls = MID_TUNING.transferEvac.walls;
   const courseHeights = [2.3, 1.75, 2.5, 1.9, 2.15, 1.6, 2.4, 2.0];
+  // 2026-09-28 引导轮（docs/Data_FirstLevelGuidance20260928.md §5 C）：东墙北头那一截原先 2.5 m，
+  // 正好挡在「过了低墙路口往左拐进装载区」的视线上（G11_2）。塌成齐腰的墙头：从路口看得见
+  // 墙后的担架、车与人流，拐角读成装载区的入口；13 躲在它背后的遮挡点（EastWallA）仍有 1.9 m 那一截。
+  const courseOverride = { East0_0: 1.05 };
   let course = 0;
   for (const [side, x, list] of [["West", RoadWalls.westX, RoadWalls.west], ["East", RoadWalls.eastX, RoadWalls.east]])
     list.forEach(([z0, z1], i) => {
       const split = z0 + (z1 - z0) * (.45 + .1 * (i % 2));
-      for (const [k, a, b] of [[0, z0, split], [1, split, z1]])
-        Block(`TransferRoadWall${side}${i}_${k}`, x, (a + b) / 2, RoadWalls.thickM, courseHeights[course++ % courseHeights.length], b - a, "earthDark");
+      for (const [k, a, b] of [[0, z0, split], [1, split, z1]]) {
+        const h = courseOverride[`${side}${i}_${k}`] ?? courseHeights[course % courseHeights.length];
+        course++;
+        Block(`TransferRoadWall${side}${i}_${k}`, x, (a + b) / 2, RoadWalls.thickM, h, b - a, "earthDark");
+      }
       // Fallen-brick step at one end, flush with the wall faces: a proud corner
       // snags scripted movers sliding along the wall (14 rescuers, 2026-09-27 run).
       const stepZ = i % 2 ? z0 + .45 : z1 - .45;
@@ -229,7 +236,9 @@ export function BuildTransferWhitebox(groundAt) {
   Block("TransferStoreNorth", 48.5, 88.5, 11, 3.1, 0.7);
   Block("TransferStoreSouth", 48.5, 103.5, 11, 3.1, 0.7);
   Roof("TransferStoreRoof", 46, 96, 6.6, 15.8, 3.3);
-  Cover("TransferDitchNorthLip", 49, 109, 10, 1.4, 0.8);
+  // 沟口北沿的土埂（仍是 AI 掩体、朝北）。原先是蓝色 cover 语义块：从卸人处（G13_1）看过去，
+  // 下沟口正后方横着一道蓝墙，眯眼看最显眼的是它、而且像「此路不通」。换成抛土色，读成沟沿的土埂。
+  Block("TransferDitchNorthLip", 49, 109, 10, 1.4, 0.8, "earthDark", { cover: { faceX: 0, faceZ: -1 } });
   House("TransferScreenHouse", 49.3, 106.25, 8.6, 4.1, 2.9, { alongX: true });
   // Crates, a basket and a cart wheel along the screen, clear of pocket (59,105).
   Detail("TransferScreenCrate0", 55.7, 91.2, .8, .6, .6);
@@ -286,6 +295,67 @@ export function BuildTransferWhitebox(groundAt) {
     Detail(`TransferDitchLipStone${i}`, x, z, w, h, d, "earthDark", { ry: i * .9 });
 
   // ---------------------------------------------------------------------
+  // 13→14 引导（2026-09-28，docs/Data_FirstLevelGuidance20260928.md §5 C）：空袭后停车处的人
+  // 被迫往西北 28 m 抬进下沟口 ditchMouth (54,114)。原先从卸人处看过去沟口只是一条橘色抛土边，
+  // 沟在地面以下看不见。三样东西让它读成「唯一的路」：
+  //   · 地标：沟口东北角一根挂红十字旗的高杆（后送担架往这儿走），高出砖房与棚顶，从停车处、
+  //     场院北口都看得见。旗面南北向，停车处与场院两个方向各斜 40° 左右看，不会正好看成一条线。
+  //   · 入口：北边旗杆、南边一根齐胸石栏柱（像河口石栏断开的一个口子），两者之间就是下沟的坡。
+  //   · 路：担架队踩出来的泥路 —— 场院整片在 MISSION_TERRAIN.pads 的铺路层里（track 已经是 1），
+  //     地形表的 paths 在这里画不出任何东西，所以用贴地的深色泥块（不碰撞）沿 South 撤退通道
+  //     （transferEvac.lanes 第三条：路西缺口 → (64.6,125) → 下沟口）铺一条，洼地最湿那段垫几块跳板，
+  //     路边掉着担架杆与绷带。全部 solid:false：担架走廊、撤退通道、散开点的扫测都不看它们。
+  // 杆子与石栏柱离每条撤退通道、westDirect 斜线、TransferTest 的卸人→沟口走廊都 ≥ 1.3 m。
+  {
+    const g = groundAt(55.8, 110.4);
+    At("TransferAidFlagPole", 55.8, 110.4, .2, 6.6, .2, g - .4, "timber");
+    // 旗面 2.1 × 1.45 m：1.6 m 那一版从停车处（28 m）缩到 1/8 只剩一个红点。
+    At("TransferAidFlagArm", 55.8, 111.5, .08, .08, 2.2, g + 6.05, "timber", { solid: false });
+    At("TransferAidFlag", 55.8, 111.55, .04, 1.45, 2.1, g + 4.55, "structure", { solid: false });
+    for (const [id, h, d] of [["V", 1.05, .34], ["H", .34, 1.05]])
+      At(`TransferAidFlagCross${id}`, 55.8, 111.55, .07, h, d, g + 4.55 + (1.45 - h) / 2, "danger", { solid: false });
+  }
+  // 北侧不立柱：坡道北沿 x 51–54.2、z 108–112.4 是 15A 赶车人丢下那辆车的位置（END_TUNING.droverCart，
+  // 运行时摆的道具），东边紧贴着刘文财 14 从低墙西头直奔沟口的直线（MidTest，0.35 m 胶囊）和 North 通道
+  // 最后一段 —— 北边由旗杆和沟沿土埂收住，南边一根石栏柱 + 半截倒下的栏板。
+  Block("TransferDitchMouthPostS", 53.1, 117.9, .55, 1.25, .55, "plaster");
+  At("TransferDitchMouthPostCapS", 53.1, 117.9, .72, .14, .72, groundAt(53.1, 117.9) + 1.25, "plaster", { solid: false });
+  Detail("TransferDitchMouthSlabS", 51.7, 118.35, 1.9, .3, .3, "plaster", { ry: .3 });
+  {
+    // 泥路：沿折线每 ~1.05 m 一块踩烂的泥，长 0.75（坡上 0.4）、宽 0.9–1.25，左右错开一点、偶尔断一块；
+    // 块底取五个采样点的最低处，块顶取中心与四角均值里高的那个 +3 cm —— 平地上只露 5 cm，
+    // 坡上高的一头略埋、低的一头露不到 10 cm（第一版取最高处，坡上一块块像台阶）。
+    const trail = [{ x: 73.4, z: 134.2 }, { x: 72.8, z: 133.4 }, { x: 64.6, z: 125 }, { x: 55.2, z: 115.2 }];
+    const Hash = (n) => { const s = Math.sin(n * 12.9898 + 4.1) * 43758.5453; return s - Math.floor(s); };
+    let n = 0;
+    for (let leg = 1; leg < trail.length; leg++) {
+      const a = trail[leg - 1], b = trail[leg], length = Math.hypot(b.x - a.x, b.z - a.z);
+      const dx = (b.x - a.x) / length, dz = (b.z - a.z) / length;
+      for (let s = leg === 1 ? 0 : .5; s < length; s += 1.05, n++) {
+        if (n > 2 && Hash(n + 170) > .86) continue;
+        const j = (Hash(n) - .5) * .45, cx = a.x + dx * s - dz * j, cz = a.z + dz * s + dx * j;
+        const slope = Math.abs(groundAt(cx + dx * .5, cz + dz * .5) - groundAt(cx - dx * .5, cz - dz * .5));
+        const L = slope > .08 ? .4 : .75, W = .9 + Hash(n + 50) * .35, ry = Math.atan2(-dz, dx) + (Hash(n + 90) - .5) * .3;
+        const c = Math.cos(ry), sn = Math.sin(ry), hs = [];
+        for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]])
+          hs.push(groundAt(cx + c * u * L / 2 + sn * v * W / 2, cz - sn * u * L / 2 + c * v * W / 2));
+        const mid = groundAt(cx, cz), lo = Math.min(mid, ...hs) - .02;
+        const hi = Math.max(mid, hs.reduce((sum, h) => sum + h, 0) / 4) + .03;
+        At(`TransferDitchTrail${n}`, cx, cz, L, hi - lo, W, lo, "earthDark", { solid: false, ry });
+      }
+    }
+    // 洼地底（平的、最湿的那一段）垫了几块门板 / 跳板，横着铺，担架队从上面过。
+    for (const [i, t] of [[0, .62], [1, .72], [2, .82], [3, .92]]) {
+      const a = trail[1], b = trail[2], x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+      At(`TransferDitchTrailBoard${i}`, x, z, .3, .06, 1.5, groundAt(x, z) + .01, "timber",
+        { solid: false, ry: Math.atan2(-(b.z - a.z), b.x - a.x) + (i % 2 ? .08 : -.06) });
+    }
+    Detail("TransferDitchTrailPole", 61.4, 123.2, 2.3, .06, .06, "timber", { ry: .55 });
+    Detail("TransferDitchTrailBandage0", 67.9, 127.4, .5, .05, .35, "canvas", { ry: .4 });
+    Detail("TransferDitchTrailBandage1", 57.6, 117.9, .45, .05, .3, "canvas", { ry: -.7 });
+  }
+
+  // ---------------------------------------------------------------------
   // 11/12: east perimeter. The corner and east cover are the established
   // squad firing posts (Mid defencePosts); only dressing is added around them.
   Cover("TransferCorner", 95, 96, 8, 1.1, 0.7);
@@ -299,6 +369,22 @@ export function BuildTransferWhitebox(groundAt) {
   Detail("TransferThatchShedDoor", 96.26, 132.4, .12, 1.8, 1.0, "timber");
   Detail("TransferShedBasket", 95.6, 133.9, .55, .5, .55, "canvas");
   Detail("TransferShedJar", 95.7, 129.9, .55, .7, .55, "earthDark");
+  // 界（2026-09-28 引导轮）：场院东边 x 104–137 原先是一整片平地，一路缓升到关卡边界，从场院、
+  // 停车处看都像「还能往那边走」。沿 x 121.5 砌一道连续的夯土院墙（z 76.5–137.5，河口之前收住），
+  // 墙外靠两间棚。追兵 air 组出生在 x 106–115（墙内），往西压过来的折线与 MISSION_PURSUIT_ROUTE
+  // 都在墙西边，不受影响；墙本身不带 cover（不是给谁躲的，是这片地的边）。
+  {
+    const wallX = 121.5;
+    const runs = [[76.5, 82.8, 2.55], [82.6, 89.4, 2.3], [89.2, 95.1, 2.7], [94.9, 101.6, 2.4], [101.4, 107.3, 2.6],
+      [107.1, 113.8, 2.25], [113.6, 119.9, 2.65], [119.7, 126.2, 2.35], [126.0, 131.6, 2.5], [131.4, 137.5, 2.2]];
+    runs.forEach(([z0, z1, h], i) =>
+      Block(`TransferEastFieldWall${i}`, wallX + (i % 3 - 1) * .06, (z0 + z1) / 2, .6, h, z1 - z0, "earthDark"));
+    for (const [i, z] of [[0, 88.6], [1, 108.6], [2, 128.4]])
+      Block(`TransferEastFieldWallButt${i}`, wallX - .55, z, .6, 1.2, .9, "earthDark");
+    // 墙外（东）靠墙两间棚，只露出屋顶：墙线不至于一整条平顶。
+    House("TransferEastFieldShedA", wallX + 1.9, 97.5, 3.2, 6.2, 2.6, { wall: "earthDark" });
+    House("TransferEastFieldShedB", wallX + 1.9, 118.8, 3.2, 5.4, 2.5, { wall: "earthDark", roof: "canvas" });
+  }
   // The old alley store (x 101.5–115.5, z 126–133) gave way to the east levee
   // ridge (terrain, x 100–113, z 130.5–138.8): from the 11_1 entrance the
   // ridge is the high ground on the left the concept shows, and its crest must
@@ -321,7 +407,18 @@ export function BuildTransferWhitebox(groundAt) {
   Detail("TransferBrokenCartWheel", 87.2, 133.9, .12, 1.1, 1.1, "timber", { ry: .5 });
   // Brick piers beside the bridge deck's north end (deck z 137, x 72–80):
   // outside the cart lane and 2.4 m south of the unload point (72.6,135).
-  for (const x of [71.3, 80.7]) Block(`TransferBridgeheadPier${x}`, x, 137.4, .7, 2.3, .7, "plaster");
+  // 2026-09-28 引导轮：原先 2.3 m 的灰泥墩从门楼（65 m 外）看不出来，桥面是贴着地的一块板，
+  // 11 那句「正前方向南是桥头」没有东西撑着。改成 3.1 m 砖墩 + 收分的墩帽，顶到 4.1 m 左右，
+  // 从门楼、场院北口看都高过河南岸的房顶、衬在天上；深色，和浅色天空拉开。
+  // （试过 3.6 m：停车处 13_2 机位左边一根柱子占掉半屏。）
+  // 过路车 / 牛车只走 x 72–80 的桥面，墩子在两边；桥炸断后墩子留着，路口就是两根墩夹着的断头。
+  for (const x of [71.3, 80.7]) {
+    Block(`TransferBridgeheadPier${x}`, x, 137.4, .9, 3.1, .9, "earthDark");
+    const top = groundAt(x, 137.4) + 3.1;
+    At(`TransferBridgeheadPierNeck${x}`, x, 137.4, .7, .55, .7, top, "earthDark", { solid: false });
+    At(`TransferBridgeheadPierCap${x}`, x, 137.4, 1.05, .18, 1.05, top + .55, "plaster", { solid: false });
+    At(`TransferBridgeheadPierFinial${x}`, x, 137.4, .36, .3, .36, top + .73, "earthDark", { solid: false });
+  }
   // East–west ruin on the east bank lip (13_1 left, 12_2 ahead): a broken
   // brick wall with a window; parallel to every retreat line, south of all
   // unload targets and west of the bolting team's run.

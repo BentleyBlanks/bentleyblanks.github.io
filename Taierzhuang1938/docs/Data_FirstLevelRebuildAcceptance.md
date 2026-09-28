@@ -64,7 +64,7 @@
 | 6 Orders | `Orders` | 回到集结处接下后送差事，借火戏演完，老周上担架，后送队真实起行 | `ordersReached` `volunteerHeard` `lightShared` `zhouOnLitter` `columnDeparted` | 同上 |
 | 7 South | `South` | 真走一段（45–75 秒），听到顺子与幺娃的私语，到村口被路边的人指路 | `southWhisperHeard` `villageMouthReached` `mainStreetPointed` | `FirstLevelFrontTest` 的 `SouthWalkSeconds()` 静态核 + 实跑阶段时长 |
 | 8 Village | `Village` | 主街被倒墙＋横车堵住，担架队停进可靠遮挡不跟进，玩家进灶屋 | `streetBlockSeen` `littersInCover` `kitchenEntered` | `FirstLevelMidTest`、`--campaign --stage-from=8 --stage-jumps` |
-| 9 Melee | `Melee` | 连屋来的日军被解决；提前打掉就不走固定 QTE | `meleeResolved` | 同上 |
+| 9 Melee | `Melee` | 进门遭伏击（2026-09-28，COD5 式一次性按键：反刺 / 被捅死重来 / 冲锋途中先手打掉不进 QTE），其余连屋来敌被解决 | `meleeResolved` | 同上 |
 | 10 Courtyard | `Courtyard` | 打开内院，担架从 08 等待点真实穿院绕过障碍，在 `streetRejoin` 接回主街 | `villageGunSilent` `courtyardGateOpen` `courtyardPassed` | 同上 |
 | 11 TransferApproach | `TransferApproach` | 抵达桥头接运点，辨认出牛车/马车/人力担架/步行伤员，看住村路来路 | `transferApproachReached` `transferSortingHeard` `villageRoadThreatSeen` | `FirstLevelMidTest`、`--campaign --stage-from=11 --stage-jumps` |
 | 12 Transfer | `Transfer` → `CartRide` | 两处威胁各解除一处就真实推进一批装载；老周轮到、上车、车真实离开装载位 | `transferArrived` `loadingThreatResolved` `firstBatchLoaded` `alleyThreatResolved` `zhouNext` `escortGranted` / `cartBoarded` `zhouCartDeparted` `cartTalkHeard` | 同上 + `CarriagePropVelocityTest` |

@@ -229,7 +229,9 @@ export class ContactShadowsPass {
   /** 把 SSIL 的 rgb 与一张接触阴影图合进 `combined`。 */
   _Compose(ctx, contactTexture) {
     if (!this.combined) return;
-    this.uniformsCompose.uSsil.value = this.pipeline.gtaoPass?.SsilTexture ?? null;
+    // 有室内遮蔽体时读 interiorSky 那张（近场反弹 + 室内暖反弹，Script_InteriorSkyOcclusion）
+    this.uniformsCompose.uSsil.value = this.pipeline.interiorSkyPass?.SsilTexture
+      ?? this.pipeline.gtaoPass?.SsilTexture ?? null;
     this.uniformsCompose.uContact.value = contactTexture;
     ctx.blitter.Blit(this.materialCompose, this.combined);
   }

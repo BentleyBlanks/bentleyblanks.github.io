@@ -62,17 +62,14 @@ const KEY_FRAMES = [
   { label: "FrontPass", phase: "FrontPass", age: 2 },
   { label: "Interrogation", phase: "Interrogation", age: 3 },
   { label: "ThroatCut", phase: "Slash", flag: "throatCut", at: .25 },
-  { label: "Drag", phase: "Drag", age: 1.2 },
-  { label: "Boots", phase: "Boots", age: 1 },
-  // K2 / SB05 (2026-09-25 storyboard round): from the SSW leg's north mouth down the leg, Luo creeping up its west wall
-  // about 8 m off when Shunzi looks up; SB05A: the cut.
-  { label: "K2_Glimpse", phase: "Glimpse", age: 1 },
-  { label: "SB05A_Chop", phase: "Chop", age: .35 },
-  { label: "LuoChop", phase: "Parry", flag: "luoChopAt", at: .5 },
-  // He's parry and cut run on past Parry into Flee (Parry hands over 0.4 s after heChopAt): no phase filter.
+  // 2026-09-27 rework (docs/Data_OpeningPinnedRescue20260927.md): the find, the slap, the charge, the cuts, the haul.
+  { label: "Found", phase: "Found", age: 1.5 },
+  { label: "Slap", flag: "slapAt", at: .15 },
+  { label: "Charge", phase: "Charge", age: 1.5 },
   { label: "HeParry", flag: "heChopAt", at: .42 },
   { label: "HeChop", flag: "heChopAt", at: .8 },
-  { label: "DragCover", phase: "DragCover", age: 1.2 },
+  { label: "LuoChop", flag: "luoChopAt", at: .5 },
+  { label: "Haul", flag: "haulAt", at: 1.2 },
   { label: "KickRifle", phase: "KickRifle", flag: "kickRifleAt", at: .95 },
 ];
 
@@ -177,24 +174,24 @@ async function InstallProbe(page) {
         }
       }
       if(s.flags.flagKickedAt!=null)P.flagKicked=true;
-      if(s.phase==="Glimpse"&&s.Age>.5){const i=s.cast.interpreter,m=s.CircleMarks().interpreter;P.rescueInterpreterAtMark=Math.hypot(i.position.x-m.x,i.position.z-m.z)<.2;}
-      // 02 circle (2026-09-27 review 「审问穿模」): the interpreter's head against the lens and his root against the
-      // collar-holder's, from his way back (Boots) until he bolts.
-      if(["Boots","Hold","Ask","KickShunzi","Glimpse","Collar","Chop","Parry"].includes(s.phase)&&(r.opening?.eyeClosure??0)<.5){
+      if(s.phase==="Ask"&&s.Age>1&&s.cast.interpreter){const i=s.cast.interpreter,m=C.rescueInterpreter;P.rescueInterpreterAtMark=Math.hypot(i.position.x-m.x,i.position.z-m.z)<.2;}
+      // 02 questioning where he lies (2026-09-27): the interpreter's head against the lens and his root against the
+      // hair-holder's, from Hold until he bolts.
+      if(["Hold","Ask"].includes(s.phase)&&(r.opening?.eyeClosure??0)<.5){
         const i=s.cast.interpreter,head=i&&!i.openingStoryboardHidden?s.HeadPoint(i):null,cam=r.player.camera.getWorldPosition(Vec()),a=s.Ija("ijaA");
         if(head){const d=head.distanceTo(cam);if(d<(P.rescueInterpreterEyeMinM??Infinity)){P.rescueInterpreterEyeMinM=d;P.rescueInterpreterEyeMinAt={phase:s.phase,age:s.Age};}}
-        if(head&&a?.alive&&["Hold","Ask","KickShunzi","Glimpse","Collar","Chop"].includes(s.phase))
+        if(head&&a?.alive&&["Hold","Ask"].includes(s.phase))
           P.rescueInterpreterIjaAMinM=Math.min(P.rescueInterpreterIjaAMinM??Infinity,Math.hypot(i.position.x-a.position.x,i.position.z-a.position.z));
       }
-      // His run out over the crater step (after InterpreterFlee) shares it with He going to cover (09-27: side by side, 0.16 m).
+      // His run east down the front trench (after InterpreterFlee) crosses the charge coming down the crater step.
       if(s.flags.fleeAt!=null&&!s.flags.interpreterGone&&s.cast.interpreter){
         const i=s.cast.interpreter;
         for(const id of ["luo","heyoutian","liuwencai"]){const o=s.Squad(id);if(!o||o.openingStoryboardHidden)continue;
           const d=Math.hypot(i.position.x-o.position.x,i.position.z-o.position.z);
           if(d<(P.rescueFleeSquadMinM??Infinity)){P.rescueFleeSquadMinM=d;P.rescueFleeSquadMinAt={who:id,phase:s.phase,age:s.Age};}}
       }
-      if(s.phase==="Reach")P.flagDown=r.openingSet?.flags?.get("flagTrench")?.progress;
-      const shotId=C.cinematic[s.phase]?.id||"firstPerson";
+      if(s.phase==="Found")P.flagDown=r.openingSet?.flags?.get("flagTrench")?.progress;
+      const shotId=(C.cinematic||{})[s.phase]?.id||"firstPerson";
       if(P.shotId!=null&&P.shotId!==shotId){
         (P.cameraCuts??=[]).push({from:P.shotId,to:shotId,phase:s.phase});P.camera=null;P.cameraRotation=null;
       }
@@ -207,7 +204,10 @@ async function InstallProbe(page) {
       }
       // Camera and the first-person arms while the director owns the view. A cut under closed eyes
       // (the fade-in, the blast's black) is not a jump anyone sees.
-      if ((r.opening?.eyeClosure ?? 0) >= .5) { P.camera = null; P.cameraRotation = null; }
+      // The slaps fling the head aside on purpose (rescue.slap, within ~0.1 s): not a jump of the director's view.
+      const slapped = s.flags.slapAt != null && r.time - s.flags.slapAt >= 0 && r.time - s.flags.slapAt < .3;
+      if (slapped) P.slapFrames = (P.slapFrames || 0) + 1;
+      if ((r.opening?.eyeClosure ?? 0) >= .5 || slapped) { P.camera = null; P.cameraRotation = null; }
       else if (s.CameraActive && s.playerBody) {
         if (P.camera) {
           const step = cam.position.distanceTo(Vec().fromArray(P.camera));
@@ -274,7 +274,7 @@ async function InstallProbe(page) {
         else if (r.time - row.lastTalk > C.silentAfterS) { row.silentFrames++; if (jaw > row.silentMax) { row.silentMax = jaw; row.silentMaxPhase = s.phase; row.silentMaxTime = r.time; } }
       }
     };
-  }, { interpreterAt:Storyboards.interrogation.interpreterAt,cinematic:Storyboards.interrogation.cinematic, vanguardIds: Storyboards.vanguardIds, silentAfterS: SILENT_AFTER_S, stepLimitM: STEP_LIMIT_M, headingWindowS: HEADING_WINDOW_S });
+  }, { interpreterAt:Storyboards.interrogation.interpreterAt,rescueInterpreter:Storyboards.rescue.interpreter,cinematic:Storyboards.interrogation.cinematic||null, vanguardIds: Storyboards.vanguardIds, silentAfterS: SILENT_AFTER_S, stepLimitM: STEP_LIMIT_M, headingWindowS: HEADING_WINDOW_S });
 }
 
 /**
@@ -360,7 +360,7 @@ export async function DriveOpening(ctx){
   for(const phase of DIRECTOR_PHASES)assert.ok(show.beats.includes(phase),`storyboard performed: ${phase}`);
   const firsts=[];for(const e of show.events)if(DIRECTOR_PHASES.includes(e.phase)&&!firsts.includes(e.phase))firsts.push(e.phase);
   assert.deepEqual(firsts,DIRECTOR_PHASES.filter(p=>firsts.includes(p)),"phases start in contract §5.3 order");
-  for(const fact of ["bunkerCollapsed","captivesKilled","playerButtStruck","doorSearchStarted","rescueCallHeard","vanguardMeleeResolved","junctionShot","luoRescueComplete","playerDraggedFromWreck"])
+  for(const fact of ["bunkerCollapsed","captivesKilled","playerSlapped","doorSearchStarted","rescueCallHeard","vanguardMeleeResolved","junctionShot","luoRescueComplete","playerDraggedFromWreck"])
     assert.ok(state.facts.includes(fact),`observed event: ${fact}`);
   assert.ok(show.captives.length===1&&show.captives.every(a=>!a.alive),"the comrade dies at the wall");
   // ---- physical events: ijaA / ijaB cut down, ijaD shot, before Check -------------------------
@@ -371,10 +371,10 @@ export async function DriveOpening(ctx){
     assert.ok(probe.deaths[id]?.time<=eventTime("Check"),`${id} died before Check (${JSON.stringify(probe.deaths[id])})`);
   }
   const {ijaA,ijaB,ijaD}=Storyboards.cast;
-  // The cut lands at the clip's contact frame; He's (0.79 s into HeDadaoParryChop) falls after Flee has begun.
-  for(const id of [ijaA,ijaB])assert.ok(["Chop","Parry","Flee"].includes(probe.kills[id]?.phase)&&probe.kills[id].kind==="blade"&&probe.kills[id].weapon==="Dadao",
+  // The cuts land at the clips' contact frames in the charge (He's may land just after Melee has begun).
+  for(const id of [ijaA,ijaB])assert.ok(["Charge","Melee"].includes(probe.kills[id]?.phase)&&probe.kills[id].kind==="blade"&&probe.kills[id].weapon==="Dadao",
     `${id} falls to the dadao contact (${JSON.stringify(probe.kills[id])})`);
-  assert.ok(["DragCover","LongShot"].includes(probe.kills[ijaD]?.phase)&&probe.kills[ijaD].kind==="bullet",`${ijaD} is shot at the junction (${JSON.stringify(probe.kills[ijaD])})`);
+  assert.ok(["Charge","Melee","Lift"].includes(probe.kills[ijaD]?.phase)&&probe.kills[ijaD].kind==="bullet",`${ijaD} is shot at the junction (${JSON.stringify(probe.kills[ijaD])})`);
   // Normal input: Liu Wencai's own shot drops the junction man (contract §2.1); He's backup and the
   // timeout are the negative variants' business (Script_OpeningHandbackBrowserTest).
   assert.equal(show.flags.junctionBy,"liu",`Liu Wencai really shoots the junction man (${show.flags.junctionBy})`);
@@ -387,21 +387,24 @@ export async function DriveOpening(ctx){
   assert.deepEqual(probe.violations,[],"actors move continuously (no pelvis step > STEP_LIMIT_M per frame) and nobody is released early");
   console.log("CINEMATIC",JSON.stringify({clearance:probe.interpreterMinM,at:probe.interpreterMinAt,arrived:probe.interpreterAtMark,flagKicked:probe.flagKicked,flagDown:probe.flagDown,cuts:probe.cameraCuts}));
   assert.ok(probe.interpreterMinM>=Storyboards.interpreterClearanceM-.025&&probe.interpreterAtMark,"interpreter passes soldiers without overlap and reaches his questioning mark");
-  assert.ok(probe.flagKicked&&probe.flagDown===1,"the background soldier kicks the flag all the way down before Reach");
-  assert.ok(probe.rescueInterpreterAtMark,"the interpreter returns around the collar-holder and reaches the rescue circle");
+  assert.ok(probe.flagKicked&&probe.flagDown===1,"the background soldier kicks the flag all the way down before ijaA finds Shunzi");
+  assert.ok(probe.rescueInterpreterAtMark,"the interpreter trots over and squats at Shunzi's right front for the questioning");
   console.log("RESCUE_INTERPRETER",JSON.stringify({eyeMin:probe.rescueInterpreterEyeMinM,at:probe.rescueInterpreterEyeMinAt,ijaAMin:probe.rescueInterpreterIjaAMinM,fleeSquadMin:probe.rescueFleeSquadMinM,fleeAt:probe.rescueFleeSquadMinAt}));
   assert.ok(probe.rescueInterpreterEyeMinM>=.38,`the interpreter's head keeps off the lens in 02 (${probe.rescueInterpreterEyeMinM} m at ${JSON.stringify(probe.rescueInterpreterEyeMinAt)})`);
   assert.ok(probe.rescueInterpreterIjaAMinM>=.6,`the interpreter squats clear of the collar-holder (${probe.rescueInterpreterIjaAMinM} m)`);
   assert.ok(probe.rescueFleeSquadMinM>=.6,`the fleeing interpreter runs clear of the squad (${probe.rescueFleeSquadMinM} m at ${JSON.stringify(probe.rescueFleeSquadMinAt)})`);
-  assert.deepEqual(probe.cameraCuts?.map(c=>c.to),["captiveDrag","captiveGroup","captiveCut","captiveAftermath","firstPerson"],"only the authored film edits cut the camera");
+  // 2026-09-27 (user: 「保持第一人称，不在切换视角」): no cut-away shots any more.
+  assert.deepEqual(probe.cameraCuts||[],[],"first person all through: the camera never cuts away");
   const fadeAt=t=>probe.wakeSamples?.find(s=>s.age>=t)?.blackout;
   assert.ok(fadeAt(1)>.8&&fadeAt(2)>.5&&fadeAt(4)<.2&&fadeAt(5.3)===0,"blackout recovers gradually across more than five seconds");
   assert.ok(probe.maxCameraStep<.14,`camera never jumps between shots (${probe.maxCameraStep})`);
+  // The slaps fling the head aside on purpose (rescue.slap: 24 deg within ~0.07 s; those frames are left out); the rest stays smooth.
+  assert.ok(probe.slapFrames>0,"the slaps were seen (their frames are left out of the continuity check)");
   assert.ok(probe.maxCameraTurn<10,`camera turns continuously (${probe.maxCameraTurn}° in ${probe.maxCameraTurnPhase})`);
-  // Luo's haul into cover stays on the front trench (rescue.dragShot): it swept 582 deg (347 net) before 09-27.
-  const haul=["DragCover","LongShot"].map(p=>probe.headingSweep?.[p]||{sweep:0,net:0}),haulSweep=haul[0].sweep+haul[1].sweep,haulNet=haul[0].net+haul[1].net;
+  // Luo hauling him out from under the timber: up at Luo, then round onto the seat facing down the trench (no spin).
+  const haul=probe.headingSweep?.Lift||{sweep:0,net:0};
   console.log("HEADING",JSON.stringify(Object.fromEntries(Object.entries(probe.headingSweep||{}).map(([k,v])=>[k,{sweep:+v.sweep.toFixed(1),net:+v.net.toFixed(1)}]))));
-  assert.ok(haulSweep>0&&haulSweep<200&&Math.abs(haulNet)<60,`the drag into cover does not turn the eye round (${haulSweep.toFixed(0)}° swept, ${haulNet.toFixed(0)}° net)`);
+  assert.ok(haul.sweep<200&&Math.abs(haul.net)<90,"the haul out does not turn the eye round ("+haul.sweep.toFixed(0)+" deg swept, "+haul.net.toFixed(0)+" deg net)");
   // Nowhere does the eye spin: 443 deg one way in 4 s over DragCover, 232 over DragOut before 09-27.
   const spin=probe.headingWindow||{maxNet:0};
   console.log("HEADING_WINDOW",JSON.stringify({maxNet:+spin.maxNet.toFixed(1),at:spin.at}));
@@ -928,12 +931,12 @@ export async function CheckOpeningActing(ctx){
 const C_KICK_WALK_S = Storyboards.timeouts.kickRifleS;
 export const HANDBACK_HIDE_POINT = Object.freeze({ x: FRONT_SPACE.pursuitFallback[0].x + .6, z: FRONT_SPACE.pursuitFallback[0].z + 3 });
 /**
- * Start at BunkerRescue (debug start 2, `missionStage=2`) and bend the long shot (it starts with the DragCover pull):
+ * Start at BunkerRescue (debug start 2, `missionStage=2`) and bend the long shot (it starts with the charge):
  *   "miss":  Liu Wencai fires and misses (his line to the junction man is spoiled for his shot only);
- *            He Youtian's backup at +4 s must drop him.
- *   "hide":  the junction man ducks into the depth sap as DragCover begins, out of every rescuer's
+ *            Luo's backup at +8 s (or the +8.5 s timeout) must drop him (He is lifting the timber then).
+ *   "hide":  the junction man ducks into the depth sap as the charge begins, out of every rescuer's
  *            sight; Luo's forced shot at +8 s (or the +8.5 s timeout) must take him.
- *   "early": the junction man is already dead when DragCover begins (the backdrop fire got him);
+ *   "early": the junction man is already dead when the charge begins (the backdrop fire got him);
  *            nobody shoots a dead man and the hand-back does not wait for a shot.
  *   "absent": the junction man is missing from the enemy table from Hold on (a spawn failure or a debug
  *            removal): nobody can see him dead, the kick still hands back after kickRifleS.
@@ -953,14 +956,14 @@ export async function DriveHandbackNegative(page,variant,output){
     const blocks=r.BlocksSight.bind(r);
     r.BlocksSight=(from,to)=>{
       const ijaD=r.enemies.get(C.ijaD);
-      if(F.variant==="miss"&&["DragCover","LongShot"].includes(s.phase)&&s.flags["shot:liu"]!=null&&s.flags["shot:he"]==null
+      if(F.variant==="miss"&&["Charge","Melee","Lift","Check"].includes(s.phase)&&s.flags["shot:liu"]!=null&&s.flags["shot:he"]==null
         &&ijaD&&Math.hypot(to.x-ijaD.position.x,to.z-ijaD.position.z)<1){F.blocked++;return true;}
       return blocks(from,to);
     };
     const stage=s.Stage.bind(s);
     s.Stage=function(phase){
       const ijaD=r.enemies.get(C.ijaD);
-      if(phase==="DragCover"&&!F.applied&&ijaD?.alive){
+      if(phase==="Charge"&&!F.applied&&ijaD?.alive){
         F.applied=true;
         if(F.variant==="hide"){
           s.Put(ijaD,{x:C.hide.x,z:C.hide.z,yaw:0});
@@ -992,12 +995,15 @@ export async function DriveHandbackNegative(page,variant,output){
   assert.equal(result.control,null,`${variant}: control returns`);
   assert.deepEqual(result.violations,[],`${variant}: no teleports, no early hand-back`);
   for(const fact of ["vanguardMeleeResolved","junctionShot","luoRescueComplete","playerDraggedFromWreck"])assert.ok(result.facts.includes(fact),`${variant}: ${fact}`);
-  // The long shot starts with the DragCover pull (longShotAt); Check follows the junction man's fall.
+  // The long shot starts with the charge (longShotAt); Check follows the junction man's fall and the haul out.
   const waited=at("Check")-result.flags.longShotAt;
-  assert.ok(waited<=Storyboards.timeouts.longShotForceS+2,`${variant}: the hand-back never waits past the long-shot timeouts (${waited.toFixed(2)} s)`);
+  // The junction man is down within the long-shot timeouts (the hand-back itself also waits for the haul out, Lift).
+  const downBy=(result.deaths[Storyboards.cast.ijaD]?.time??result.events.find(e=>e.phase==="Check")?.time)-result.flags.longShotAt;
+  assert.ok(variant==="absent"||variant==="early"||downBy<=Storyboards.timeouts.longShotForceS+.6,variant+": the junction man is down within the long-shot timeouts ("+downBy.toFixed(2)+" s)");
   if(variant==="miss"){
     assert.ok(result.fixture.blocked>0&&result.flags["shot:liu"]!=null,"miss: Liu really fired and missed");
-    assert.equal(result.flags.junctionBy,"he","miss: He Youtian's backup shot drops the junction man");
+    // 2026-09-27: He is lifting the timber off Shunzi then (Lift), so the backup is Luo's shot at longShotForceS (or the timeout).
+    assert.ok(["luo","forced"].includes(result.flags.junctionBy),`miss: Luo's backup (or the timeout) drops the junction man (${result.flags.junctionBy})`);
   }
   if(variant==="hide"){
     assert.equal(result.fixture.sightFrom?.liu,true,"hide: the hiding place is out of Liu's sight");
@@ -1006,8 +1012,7 @@ export async function DriveHandbackNegative(page,variant,output){
   if(variant==="early"){
     assert.ok(result.fixture.earlyKilled,"early: already down");
     assert.equal(result.flags["shot:liu"],undefined,"early: nobody shoots a dead man");
-    const lingered=at("Check")-at("LongShot");
-    assert.ok(lingered<1.5,`early: the hand-back does not wait for a shot (${lingered.toFixed(2)} s after LongShot)`);
+    assert.ok(!Object.keys(result.flags).some(k=>k.startsWith("shot:")),"early: nobody fires a long shot");
   }
   if(variant==="absent"){
     assert.ok(result.fixture.removed,"absent: the junction man was taken out of the enemy table");

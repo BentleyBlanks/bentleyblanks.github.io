@@ -120,6 +120,8 @@ export const TEXT = Object.freeze({
   "gameplay.melee.qte.standing": "武器僵持",
   // 剧本僵持（第一关屋内伏击）：刺刀已经顶进来了，不是两支武器架住。
   "gameplay.melee.qte.prompt": "快速连按 F · 抵抗",
+  // 一次性按键（09 灶屋伏击，照《使命召唤：战争世界》的万岁冲锋）：按一下就反刺。
+  "gameplay.melee.qte.pressPrompt": "按 F · 反击",
 
   // --- Script_Combat ----------------------------------------------------------
   "gameplay.mortar.noShells": "没有炮弹了",

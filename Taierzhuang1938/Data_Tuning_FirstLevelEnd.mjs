@@ -178,18 +178,31 @@ export const END_TUNING = Object.freeze({
   // 掩体墙里**：他顶着墙走不到，停在离桥心 24 m 的爆破区里，桥只能靠
   // blastFriendlyStuck 兜底晚二十秒才炸（实拍 2026-09-20）。改成先往东挪到口子上。
   // 折线净空由 Script_FirstLevelSpaceTest 守着。
+  // 东边那位的终点就是起爆器后面：他走到这儿蹲下，按起爆器的也是他
+  //（起爆器在 exploderAt，模型里的 Exploder 节点摆在同一个点上）。
   demolitionPullback: Object.freeze([
     Object.freeze([{ x: -76, z: 176 }, { x: -74, z: 190 }, { x: -70.5, z: 200 }]),
-    Object.freeze([{ x: -73, z: 178.5 }, { x: -71.5, z: 190 }, { x: -72.5, z: 200 }]),
+    Object.freeze([{ x: -73, z: 178.5 }, { x: -71.5, z: 190 }, { x: -72.6, z: 199.1 }]),
   ]),
+  // 起爆器（Model_RailBridge 的 Exploder / ExploderHandle；_blender/Script_ExportRailBridgeTerrain 读它，
+  // 改了要重导地形并重烘模型）。导线从南桥台背后顺着路堤肩拉过来。
+  exploderAt: Object.freeze({ x: -72.6, z: 198.3 }),
   officerPullback: Object.freeze([{ x: -71.5, z: 182 }, { x: -71, z: 194 }, { x: -74.5, z: 200 }]),
   demolitionMps: 3.4,
   // 爆破安全：炸之前这个半径里不许有任何己方（玩家、班里人、军官、爆破手、尾队）。
-  // R.bridgeBlastRadiusM 是特效半径 12 m；安全判据取 30 m（blastSafe 离桥心 48 m）。
+  // 药包火球半径 11–15 m（Data_RailBridgeDemolition）；安全判据取 30 m（blastSafe 离桥心 48 m）。
   blastClearRadiusM: 30,
   // 卡住的 NPC 不许把整关钉死：他连着这么久一步没挪、而且玩家早已退到安全区，
   // 就记一条 blastFriendlyStuck 取证并放行。**玩家在区里永远等**，这一条只对 NPC。
   blastStuckS: 20,
+  // 三个条件都满足之后，再等玩家把脸转向桥（视线与桥心的水平夹角在这个半角以内）才按起爆器；
+  // 最多等 blastGazeWaitS 秒 —— 这是给「看见」留的一口气，不是计时器闸门：人没走净照样一直等。
+  blastGazeHalfAngleDeg: 30,
+  blastGazeWaitS: 3.5,
+  // 起爆器压杆到药包响的间隔（压杆动画 0.18 s + 电流那一下）。
+  exploderPressLeadS: 0.45,
+  // 军官那句「往滕县！跟上前队！」等桥身砸进河、烟柱立起来再喊（坍塌动画 6 s，两个半孔 1.2–1.4 s 砸底）。
+  marchOrderDelayS: 6.5,
 
   // -------------------------------------------------------------------------
   // 18 NightMarch —— 夜入滕城北门

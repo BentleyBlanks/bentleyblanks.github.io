@@ -119,6 +119,7 @@ export const SKY_EXPOSURE = {
   //     全量适应会把室内天光遮蔽（Script_InteriorSkyOcclusion）整个抵消掉；
   //   evDown 0.25（最多 ×0.84）：抬头看天、看空旷的桥头场地时只压一点，地面不跟着天乱跳
   //     （0.35 那一版实拍天空区显示亮度从 173 掉到 162，比参考 178 还暗）。
+  // 2026-09-28 集成试过 evUp 1.0：灶屋 09 只从 27 抬到 33，室外沟里的 SB03 却从 71 冲到 92（分镜 56）—— 退回 0.6。
   firstLevelBattleDay: { logLum: null, evBias: 0, evUp: 0.6, evDown: 0.25 },
   // 第一关关尾夜行军（Script_Sky.firstLevelNight）：钳位照抄夜战（同一条「不许把夜拉成白天」的口径）。
   // 过场式换天（cutsceneSky）不传逐关锚点，这一档只测不调。

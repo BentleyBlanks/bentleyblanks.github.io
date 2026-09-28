@@ -74,7 +74,7 @@ export const PROPS = Object.freeze([
     // 完好时的门楣（= MISSION_SCENARIO 完好态的 BunkerMouthLintel：中心 (1.05,-125.9)，0.3×0.22×3.4，顶在洞底上 1.95 m）。
     intact: Object.freeze({ x: 1.05, z: -125.9, lift: 1.84, w: 0.3, h: 0.22, d: 3.4 }),
     pivot: P(1.05, -124.3, 1.84),          // 南段绕南门柱顶转
-    rest: P(0.72, -126.15, 0.87),          // 断头落在塌顶木 roofTimberDown 上（顶面离地 0.76 + 半厚 0.11）
+    rest: P(0.95, -126.05, 0.69),          // 断头落在塌顶木 roofTimberDown 北头上（顶面离地 0.58 + 半厚 0.11；2026-09-27 木料挪到洞口正中）
     breakZ: -126.5,                         // 断口：北段 z -127.6…-126.5 留在北柱顶（MISSION_SCENARIO 塌方态的 BunkerMouthLintelN 体块）
     // 近爆后的落下时刻（秒，从 Blast 起算），契约 §5 SB02「fallenLintel 0.25–0.6 s 塌下」。
     fall: Object.freeze({ startS: 0.25, endS: 0.6, bounceRad: 0.05, bounceS: 0.18 }) },
@@ -88,19 +88,23 @@ export const PROPS = Object.freeze([
   // 2°，同一根木料落定在这里就会在 SB03 也横在画面上 25%、把旗面挡掉；分镜 SB03 画面顶上是天，没有这条木料）。
   // hang 是卡在洞顶下的姿态（北头 1.62、南头 1.05：两个眼位看都在画面上沿以外），settle 是塌下的时刻与时长。
   // 离眼 0.45 m 的木料要在 SB03 画框外，下沿得高过眼 0.35 m 以上（竖直半视场 32.5° + 俯仰 5°）。
+  // **2026-09-27 改稿**（用户：「主角变成压在房梁下，半个身子在外面」）：塌顶木落在洞口正中、压着顺子的胯（导演
+  // shunzi.pinnedHips (0.95,-125.3)），他腿在洞里、胸口和头伸在洞外。近爆后的黑场里（Black）就落定，睁眼时已经压着；
+  // 两头垫在齐胯高的两堆土上（顶 0.30），木料下沿 0.30 贴着他的背。02 何有田把它抬起来（导演 Lift → LiftRoofTimber），
+  // 罗班长把人拖出来。长度收到 1.55 m（z -126.15…-124.6），南头离南门柱 0.15 m。
   { id: "roofTimberDown", kind: "timber", ground: FLOOR, show: "collapsed",
-    a: P(0.8, -126.25, 0.62), b: P(0.8, -124.5, 0.66), w: 0.3, h: 0.28,
+    a: P(0.95, -126.15, 0.44), b: P(0.95, -124.6, 0.44), w: 0.3, h: 0.28,
     hang: Object.freeze({ a: P(0.8, -126.25, 1.62), b: P(0.8, -124.5, 1.05) }),
-    settle: Object.freeze({ phase: "Reach", seconds: 0.32, bounceRad: 0.03, bounceS: 0.16, impact: Object.freeze({ clods: 4, dust: 10, grit: 6 }) }),
-    supports: Object.freeze([Object.freeze({ x: 0.8, z: -126.15, w: 0.5, h: 0.48, d: 0.45 }),
-      Object.freeze({ x: 0.82, z: -124.62, w: 0.45, h: 0.52, d: 0.4 })]) },
+    settle: Object.freeze({ phase: "Black", seconds: 0.32, bounceRad: 0.03, bounceS: 0.16, impact: Object.freeze({ clods: 4, dust: 10, grit: 6 }) }),
+    supports: Object.freeze([Object.freeze({ x: 0.95, z: -126.2, w: 0.5, h: 0.3, d: 0.4 }),
+      Object.freeze({ x: 0.95, z: -124.66, w: 0.45, h: 0.3, d: 0.3 })]) },
 
   // SB03 左上角那根斜断木（分镜 03：画面左上一截劈开的木料斜着插下来；SB03A 左侧也有）：门楣断口（北段 z -126.5）南边
   // 挂下来的一块断板，上头卡在洞顶边、下头垂到离地 0.55 m，在门洞北半、x 0.98（塌顶木 x 0.65–0.95 的东边一点）。
   // 下头在塌顶木 roofTimberDown 的通道限制以内（人从洞口进出本来就得走 z < -126.4 或 x > 1.25），不另外占路。
   // 画面位置（SB03 眼位、1280×720）：下端约 (0.28, 0.29)，上端出左上角（Script_OpeningSetTest 量）。
   { id: "brokenBoardNW", kind: "timber", ground: FLOOR, show: "collapsed",
-    a: P(1.02, -126.32, 1.8), b: P(0.98, -125.62, 0.55), w: 0.22, h: 0.05, splinters: 5 },
+    a: P(1.02, -126.32, 1.8), b: P(0.98, -125.72, 0.8), w: 0.22, h: 0.05, splinters: 5 },   // 2026-09-27：下头抬到 0.8，让开压在顺子身上的塌顶木
 
   // ---------------------------------------------------------------- 洞口外前沟（SB03/03A/04/04A 的背景）
   // 北壁木框洞口立面：挖在北壁里的另一处掩蔽部口（纯装饰，门内黑），门洞 x 2.7–3.5（契约写 2.7–3.9，见下面 09-26 那段），另一口 x 4.9–5.5。
@@ -271,7 +275,9 @@ export const SET_MATERIALS = Object.freeze({
 export const INTERIOR = Object.freeze({
   box: Object.freeze({ x0: -3.4, x1: 1.0, z0: -128.2, z1: -123.8, top: 2.1 }),
   featherMouthM: 1.0, featherM: 0.3,
-  ambientScale: 0.45,
+  // 2026-09-28 集成：B4 的室内遮蔽体（Data_FirstLevelInteriors「Bunker」，乘进 AO）同样压掩蔽部，两层叠起来 SB01 只剩 30（分镜 50）。
+  // 通用机制归 B4，这里退成 1.0（不再额外压）；数据与入口保留，需要单独调掩蔽部时再动。
+  ambientScale: 1.0,
 });
 
 // ---------------------------------------------------------------------------
@@ -470,15 +476,15 @@ export const FRONT_PROPS = Object.freeze([
  * Data_OpeningStoryboards 里被豁免的标记路径（`shunzi.trap` 这种写法）及原因。
  */
 export const DESIGNED_CONTACTS = Object.freeze({
-  fallenLintel: Object.freeze({ marks: Object.freeze(["shunzi.trap", "SB02.trap", "SB03.eye", "SB03A.eye", "ija.dragOutRoute"]),
-    why: "塌下的门楣就落在受困的顺子身边（SB02/SB03A）；DragOut 顺子趴着从塌顶木和门楣底下被拖出来（ija.dragOutRoute 是他眼睛那条线，离地 0.3 m，不是站立胶囊）" }),
-  roofTimberDown: Object.freeze({ marks: Object.freeze(["shunzi.trap", "SB02.trap", "SB03.eye", "SB03A.eye", "ija.dragOutRoute"]),
-    why: "SB03A：顺子压在塌顶木下伸手够枪；DragOut 从它底下被拖出来（日兵甲翻越它的两条动作见 Script_OpeningStoryboardsTest 的不穿木断言）" }),
-  rubbleMoundBack: Object.freeze({ marks: Object.freeze(["shunzi.cover", "SB06.seat", "SB06.dragCoverSet", "withdraw.playerSet"]),
-    why: "SB06：顺子坐着背靠塌土（拖进遮挡的终点、撤出的起点都是坐位）" }),
+  fallenLintel: Object.freeze({ marks: Object.freeze(["shunzi.trap", "shunzi.pinnedHips", "SB02.trap", "SB03.eye", "SB03A.eye"]),
+    why: "塌下的门楣就落在压着顺子的塌顶木北头上（2026-09-27：他趴在洞口正中，门楣斜在他腰胯上方 1 m 以上）" }),
+  roofTimberDown: Object.freeze({ marks: Object.freeze(["shunzi.trap", "shunzi.pinnedHips", "SB02.trap", "SB03.eye", "SB03A.eye"]),
+    why: "2026-09-27：塌顶木就压在顺子的胯上（「主角变成压在房梁下，半个身子在外面」），02 何有田把它抬起来、罗班长把人拖出来" }),
+  rubbleMoundBack: Object.freeze({ marks: Object.freeze(["shunzi.cover", "shunzi.trap", "shunzi.witnessEye", "SB06.seat", "SB06.dragCoverSet", "withdraw.playerSet"]),
+    why: "SB06：顺子坐着背靠塌土；它只在他被拖出来、坐上坐位（导演 Check）以后出现，压着的时候他的胸口在这块地上（RescueShown）" }),
   bunkerCrateStackN: Object.freeze({ marks: Object.freeze(["SB01.yaowa"]), why: "SB01：幺娃靠着北壁坐，身后就是弹药箱" }),
-  trenchFacadeN: Object.freeze({ marks: Object.freeze(["SB03.captive", "SB03A.captive", "banter.comradeBlast"]),
-    why: "SB03/03A：死川军背靠门框边的板墙；近爆时他就是被摔在这面北壁上（BlastSlamBuried）" }),
+  trenchFacadeN: Object.freeze({ marks: Object.freeze(["SB03.captive", "SB03A.captive", "banter.comradeBlast", "rescue.rifleMouth"]),
+    why: "SB03/03A：死川军背靠门框边的板墙；近爆时他就是被摔在这面北壁上（BlastSlamBuried）；汉阳造躺在板墙脚下的泥里（不是人，只是标记）" }),
 });
 
 export const OPENING_SET = Object.freeze({ version: "20260928OpeningSetV3", stages: SET_STAGES, PROPS, BLAST, SMOKE, FLYOVER, FLYOVER_TRIGGER, sky,

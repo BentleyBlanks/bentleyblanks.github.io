@@ -6,7 +6,7 @@
 // 单独一份而不是并进 Script_FirstLevelMissionTest：第二波三个玩法包并行，
 // 挤在同一个文件里必冲突（契约 §8）。这里只看 08–14：
 //   1. 担架真的停进遮挡，而且不跟进未清空间；
-//   2. 近战先手打掉不触发僵持，真贴上才走共用白刃；
+//   2. 09 进门遭伏击（COD5 万岁冲锋式一次性按键）：反刺 / 被捅死重来 / 先手打掉 / 追不上作罢；
 //   3. 内院放行按真实队列计数，队尾掩护脱离才算过；
 //   4. 两处威胁与装载额度联动（威胁没解除就一个都装不上）；
 //   5. 上车 / 停车 / 卸人的时序（卸人有过程，不是一帧）；
@@ -14,7 +14,10 @@
 //   7. 扑沟与救人：进沟内遮挡、队伍离开主车道。
 // ===========================================================================
 import assert from "node:assert/strict";
-import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
+import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TRANSFER_THREATS, MISSION_TACTICS } from "./Data_FirstLevelMission.mjs";
+import { MELEE_QTE_RULES as Q } from "./Data_MeleeCombat.mjs";
+import { MeleeCombatDirector } from "./Script_MeleeCombat.mjs";
+import { KitchenAmbushTriggered, KitchenAmbushLungeTarget } from "./Script_FirstLevelKitchenAmbush.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_FACT_GATES, MISSION_ENCOUNTER_ACTIVATION, MissionGateInArea } from "./Data_FirstLevelMissionGates.mjs";
@@ -201,76 +204,212 @@ const Step = (host, module, seconds, options = {}) => {
 }
 
 // ---------------------------------------------------------------------------
-// 09 灶屋—连屋近战
+// 09 灶屋—连屋近战：进门遭伏击（2026-09-28，COD5 万岁冲锋式一次性按键 QTE）
 // ---------------------------------------------------------------------------
 {
-  const MakeMelee = () => {
+  const T = M.kitchenAmbush;
+  // --- 数据对账 ---
+  const leadSpec = MISSION_ENCOUNTERS.melee[0];
+  Check(leadSpec.id === "MeleeLead" && leadSpec.x === T.hide.x && leadSpec.z === T.hide.z,
+    "藏在过道里的就是名册第一个 MeleeLead，出生点与 kitchenAmbush.hide 是同一个点");
+  Check(!MISSION_TACTICS.MeleeLead, "MeleeLead 没有战术折线：冲锋归伏击那一拍驱动，不许两边抢着下命令");
+  Check(MISSION_ENCOUNTER_ACTIVATION.melee.wake.fact === "kitchenEntered", "激活表仍写明「进了灶屋」才上膛");
+  Check(T.windowS >= 1 && T.windowS <= Q.windowS, `按键窗口在共用上限以内（${T.windowS} s ≤ ${Q.windowS} s）`);
+  Check(T.failDamage * 0.8 >= 100, "漏按那一刀在「体验」档 0.8 倍受伤率下也是一刀致命");
+  for (const id of ["kitchenAmbushSprung", "kitchenAmbushTackled", "kitchenAmbushPrompted", "kitchenAmbushCountered",
+    "kitchenAmbushFailed", "kitchenAmbushPreempted", "kitchenAmbushBroken"])
+    Check(!!MISSION_FACT_GATES[id], `新事实 ${id} 登记进了 MISSION_FACT_GATES（工作台照它讲人话）`);
+
+  // --- 触发几何：灶屋里不扑、门框里不扑，真跨进过道 / 绕进连屋才扑 ---
+  const Trig = (x, z) => KitchenAmbushTriggered({ x, z }, T);
+  Check(!Trig(58, -6) && !Trig(58, -3) && !Trig(56, -2.5), "还在灶屋里（离他不到五米、隔着南墙）不扑");
+  Check(!Trig(58, -1.5), "站在灶屋南门的墙厚里不扑：往西看被门框挡着，看不见扑过来的人");
+  Check(Trig(58, -0.9) && Trig(60, -0.5), "跨进过道就扑");
+  Check(Trig(58, 6) && Trig(62, 12), "从东巷／内院绕进连屋也扑（他从过道北口那扇门出来）");
+
+  // --- 藏身点从灶屋里看不见：灶屋正中那间任一处到他胸口的连线都被墙挡住 ---
+  const SegmentBlocked = (from, to) => MISSION_LAYOUT.blocks.some((box) => {
+    if (box.solid === false || MISSION_LAYOUT.walkableSurfaces.some((surface) => surface.id === box.id)) return false;
+    const y = SampleMissionTerrain(to.x, to.z);
+    if (!(box.y + box.h / 2 > y + 1.5 && box.y - box.h / 2 < y + 1.0)) return false;
+    for (let t = 0.05; t < 0.95; t += 0.02) {
+      const x = from.x + (to.x - from.x) * t, z = from.z + (to.z - from.z) * t;
+      const dx = x - box.x, dz = z - box.z, c = Math.cos(box.ry || 0), s = Math.sin(box.ry || 0);
+      if (Math.abs(dx * c - dz * s) < box.w / 2 && Math.abs(dx * s + dz * c) < box.d / 2) return true;
+    }
+    return false;
+  });
+  for (const eye of [{ x: 58, z: -6 }, { x: 57, z: -3 }, { x: 59, z: -2.2 }, { x: 58, z: -10 }])
+    Check(SegmentBlocked(eye, T.hide), `灶屋里 (${eye.x},${eye.z}) 看不见过道里的他`);
+  Check(!SegmentBlocked({ x: 58, z: -0.8 }, T.hide), "跨进过道一扭头就看得见他（整条过道是通的）");
+
+  // --- 冲锋路线：人在过道里、目标在过道外，先冲门洞口 ---
+  const inside = KitchenAmbushLungeTarget(T.hide, { x: 58, z: 6 }, T);
+  Check(inside.x === T.doorX && inside.z < T.linkZ.max, "目标在连屋里：先冲到连屋北门口再拐（直线会顶在过道南墙上）");
+  const straight = KitchenAmbushLungeTarget(T.hide, { x: 58, z: -0.8 }, T);
+  Check(straight.x === 58 && straight.z === -0.8, "目标就在过道里：直冲");
+
+  // --- 真的共用白刃层 + 假宿主，逐帧跑四条路 ---
+  const MakeAmbush = () => {
     const host = MakeHost("Melee", { sight: () => false });
+    host.Record("kitchenEntered");
     for (const spec of MISSION_ENCOUNTERS.melee)
       host.enemies.set(spec.id, {
-        alive: true, missionDormant: true, scriptedNoncombatant: true,
-        missionEncounter: "melee", position: { x: spec.x, z: spec.z },
+        id: spec.id, missionId: spec.id, side: "ija", alive: true, health: 100, yaw: 0, meleeWeapon: "Bayonet",
+        missionDormant: true, scriptedNoncombatant: true, missionEncounter: "melee",
+        position: { x: spec.x, z: spec.z },
+        TakeHit(amount) { this.health -= amount; if (this.health <= 0) { this.health = 0; this.alive = false; } },
       });
     host.enemies.set("VillageGunner", { alive: true, missionEncounter: "village", position: { ...P.sideRoomGunner } });
-    return { host, village: new FirstLevelVillageBlock(host) };
+    Object.assign(host.player, {
+      alive: true, health: 100, side: "nra", meleeWeapon: null, spawnGrace: 0,
+      TakeHit(amount) { if (this.spawnGrace > 0) return; this.health -= amount; if (this.health <= 0) { this.health = 0; this.alive = false; } },
+    });
+    host.player.position.x = 58; host.player.position.z = -6;
+    host.meleeCombat = new MeleeCombatDirector({
+      Player: () => host.player,
+      Soldiers: () => [...host.enemies.values()].filter((actor) => actor.side === "ija"),
+      Damage: (target, attacker, amount) => target.TakeHit(amount),
+    });
+    host.BeginControl = (kind, seconds) => { host.controls = { kind, seconds, time: 0 }; };
+    host.TrackControl = () => true;
+    host.AimControl = () => true;
+    host.PlaceActor = (actor, point) => { actor.position.x = point.x; actor.position.z = point.z; };
+    // 冲锋按剧本步速真的挪人（假宿主没有 AI）。
+    host.MoveActor = (actor, point, speed) => {
+      const d = Distance(actor.position, point);
+      if (d > 1e-6 && speed > 0) {
+        const step = Math.min(d, speed / 60);
+        actor.position.x += (point.x - actor.position.x) / d * step;
+        actor.position.z += (point.z - actor.position.z) / d * step;
+      }
+    };
+    const village = new FirstLevelVillageBlock(host);
+    village.Enter("Melee");
+    return { host, village, lead: host.enemies.get("MeleeLead") };
   };
-  const wake = MISSION_ENCOUNTER_ACTIVATION.melee.wake;
-  Check(wake.fact === "kitchenEntered", "激活表写明连屋那一组由「玩家进了灶屋」放出");
+  const Frame = ({ host, village }) => {
+    host.time += 1 / 60;
+    host.meleeCombat.Update(1 / 60);
+    village.Update(1 / 60);
+  };
+  const Run = (ctx, seconds, until = () => false) => {
+    for (let i = 0; i < Math.round(seconds * 60) && !until(); i++) Frame(ctx);
+  };
+  const Phase = (ctx) => ctx.village.ambush.Phase;
 
-  // 没进灶屋不许出来。
-  const early = MakeMelee();
-  early.host.player.position = { ...A.melee };
-  early.village.Update(1 / 60);
-  Check(!early.host.Has("meleeBreachStarted"), "玩家还没进灶屋，连屋那一组不出来");
+  // 1) 灶屋里站着不动：他一直装睡，「右手！」不喊。
+  const idle = MakeAmbush();
+  Run(idle, 3);
+  Check(Phase(idle) === "hidden" && idle.lead.missionDormant && idle.lead.meleeDormant,
+    "玩家还在灶屋里，他一直藏着（装睡 + 不归共用白刃层认领）");
+  Check(!idle.host.said.includes("MeleeRight") && !idle.host.Has("meleeBreachStarted"), "没扑出来就没有「右手！」，东巷那三个也不放");
 
-  // 进了灶屋、走到连屋附近才破门；「右手！」压在破门之后。
-  const live = MakeMelee();
-  live.host.Record("kitchenEntered");
-  live.host.player.position = { x: A.melee.x, z: A.melee.z - wake.radiusM - 1 };
-  live.village.Update(1 / 60);
-  Check(!live.host.Has("meleeBreachStarted"), "离得太远也不出来（激活表的半径说了算）");
-  live.host.player.position = { ...A.melee };
-  live.village.Update(1 / 60);
-  Check(live.host.Has("meleeBreachStarted"), "进了灶屋、走到连屋附近，他们才从东巷那扇门进来");
-  Check([...live.host.enemies.values()].filter((a) => a.missionEncounter === "melee")
-    .every((a) => !a.missionDormant && !a.scriptedNoncombatant), "破门之后这一组真的活过来了");
-  Check(!live.host.said.includes("MeleeRight"), "破门当帧还压着「右手！」（meleeBreachHoldS）");
-  live.host.time += M.meleeBreachHoldS + 0.1;
-  live.village.Update(1 / 60);
-  Check(live.host.said.includes("MeleeRight"), "压过那一下就喊「右手！」");
+  // 2) 反刺：跨进过道 → 冲锋 → 撞翻 → 按 F → 他死在这一下上 → 起身还权 → 剩下三个错峰出来。
+  const win = MakeAmbush();
+  win.host.player.position.z = -0.8;
+  Frame(win);
+  Check(Phase(win) === "lunge" && win.host.Has("kitchenAmbushSprung"), "跨进过道当帧就扑出来");
+  Check(win.host.said[0] === "MeleeRight", "罗班长吼「右手！」（插队，不排在别的台词后面）");
+  Check(!win.lead.scriptedNoncombatant && win.lead.missionSurfaceRest === true && win.lead.bayonetFixed,
+    "冲锋途中：醒了、端着刺刀、扳机整段不扣（missionSurfaceRest）");
+  Run(win, 0.1);
+  Check(Distance(win.lead.position, T.hide) < 0.05, `露头那 ${T.emergeS} s 先站住嚎一声，不是一出来就冲`);
+  Run(win, 3, () => Phase(win) !== "lunge");
+  Check(Phase(win) === "pinned" && win.host.Has("kitchenAmbushTackled"), "够到撞翻距离就撞上");
+  Check(win.host.controls?.kind === "ambush" && win.village.AmbushCinematic, "撞上就锁控制、HUD 让位");
+  Check(win.host.player.meleeWeapon === "Bayonet", "撞翻那一刻借一把刺刀给共用倒地层（顶住那把刀的就是手里这支枪）");
+  Check(win.host.player.health === 100 - T.tackleDamage, `撞翻真的掉血（${T.tackleDamage}）`);
+  Run(win, 0.2);
+  Check(win.host.meleeCombat.Fighter(win.host.player).state !== "idle", "玩家真的倒在共用状态机里（fall / down）");
+  Check(win.lead.meleeCombat?.clip === "BayonetPressure", "他骑上来压刀：共用 Pressure 姿势");
+  Check(!win.village.AmbushPromptView(), "倒地镜头落稳之前不给键");
+  Check(!win.host.said.includes("MeleeCurse"), "被撞翻压住时还不骂：「滚你妈的！」归反刺那一下");
+  Run(win, 2, () => Phase(win) === "prompt");
+  Check(Phase(win) === "prompt" && win.host.Has("kitchenAmbushPrompted"), `撞上 ${T.promptDelayS} s 后给键`);
+  const ring = win.village.AmbushPromptView();
+  Check(ring?.mode === "press" && ring.progress > 0.9, "屏幕上是一次性按键环，弧从满开始漏");
+  Check(win.host.meleeCombat.qte.active.input === "press", "走共用倒地僵持的 input \"press\"");
+  Run(win, 0.5);
+  Check(win.village.AmbushPromptView().progress < ring.progress, "弧在漏（窗口在走）");
+  Check(!win.host.said.includes("MeleeCurse"), "按键窗口里也还没骂");
+  win.host.meleeCombat.qte.Press(true, false);
+  Frame(win);
+  Check(Phase(win) === "countered" && !win.lead.alive && win.host.Has("kitchenAmbushCountered"),
+    "按上了：他死在这一下上（反刺走共用伤害链）");
+  Check(win.host.said.includes("MeleeCurse"), "顺子「滚你妈的！」");
+  Check(win.host.meleeCombat.Active, "他死了共用结算照样走完（不当成「人没了」取消，起身不被砍掉）");
+  Run(win, 3, () => Phase(win) === "done");
+  Check(Phase(win) === "done" && win.host.controls === null, "起完身还权");
+  Check(win.host.player.meleeWeapon === null, "借的刺刀起完身还回去");
+  Check(win.host.player.alive && win.host.player.health === 100 - T.tackleDamage, "只挨了撞翻那一下");
+  Run(win, T.releaseDelaysS.at(-1) + 0.2);
+  Check(MISSION_ENCOUNTERS.melee.slice(1).every((spec) => !win.host.enemies.get(spec.id).missionDormant)
+    && win.host.Has("meleeBreachStarted"), "那一拍收尾后东巷那三个才进来（meleeBreachStarted）");
+  Check(!win.village.RearmAmbush(), "已经反杀的不在检查点重试里重放");
 
-  // 先手打掉：不贴身就没有僵持，也没有那句骂。
-  for (const spec of MISSION_ENCOUNTERS.melee) live.host.enemies.get(spec.id).alive = false;
-  live.village.Update(1 / 60);
-  Check(!live.host.said.includes("MeleeCurse"), "提前击败近战敌人不触发固定僵持，也就没有 MeleeCurse");
-  Check(!live.host.Has("meleeEngaged"), "没有人贴上来，meleeEngaged 不落");
+  // 3) 漏按：刀捅进去、满血也死；检查点重来 —— 他回到过道里装睡、玩家回到灶屋。
+  const lose = MakeAmbush();
+  lose.host.player.position.z = -0.8;
+  Run(lose, 6, () => Phase(lose) === "prompt");
+  Run(lose, T.windowS + 0.2, () => Phase(lose) !== "prompt");
+  Check(Phase(lose) === "failed" && lose.host.Has("kitchenAmbushFailed"), "窗口漏完就是被捅");
+  Check(!lose.host.player.alive, "满血也是一刀致命（COD5：万岁冲锋捅中就是死）");
+  Frame(lose);
+  Check(!lose.village.AmbushCinematic && lose.host.controls === null, "死了收锁、收环，整拍停着等重来");
+  const retry = lose.village.RearmAmbush();
+  Check(retry && retry.x === T.retryPoint.x && retry.z === T.retryPoint.z, "重来点是灶屋正中（不是原地复活在他脚下）");
+  Check(Phase(lose) === "hidden" && lose.lead.missionDormant && Distance(lose.lead.position, T.hide) < 1e-6,
+    "他回到过道里装睡");
+  Check(lose.village.ambush.attempts === 1 && lose.host.player.meleeWeapon === null, "借的刺刀还回去；次数记着");
+  // 重来：走进过道，这一拍从头再演一遍。
+  Object.assign(lose.host.player, { alive: true, health: 100 });
+  lose.host.meleeCombat.Cancel("retry");
+  lose.host.player.position.x = retry.x; lose.host.player.position.z = retry.z;
+  Run(lose, 1);
+  Check(Phase(lose) === "hidden", "重来之后在灶屋里他照样藏着");
+  lose.host.player.position.z = -0.8;
+  Frame(lose);
+  Check(Phase(lose) === "lunge" && lose.village.ambush.attempts === 2, "再跨进过道，他再扑一次");
 
-  // 真贴上：走共用白刃僵持（Script_MeleeCombat 的 Active），那句才出来。
-  const bound = MakeMelee();
-  bound.host.Record("kitchenEntered");
-  bound.host.player.position = { ...A.melee };
-  bound.village.Update(1 / 60);
-  bound.host.enemies.get("MeleeLead").position = { ...bound.host.player.position };
-  bound.village.Update(1 / 60);
-  Check(bound.host.said.includes("MeleeCurse"), "敌人真贴上玩家才喊 MeleeCurse");
+  // 4) 冲锋途中先手打掉：不进 QTE、不锁控制，东巷那三个照常放出来（Notion 09「提前击败不强制 QTE」）。
+  const shot = MakeAmbush();
+  shot.host.player.position.z = -0.8;
+  Run(shot, T.emergeS + 0.1);
+  shot.lead.TakeHit(200);
+  Frame(shot);
+  Check(Phase(shot) === "preempted" && shot.host.Has("kitchenAmbushPreempted"), "冲锋途中被打死：提前击败");
+  Check(!shot.host.Has("kitchenAmbushTackled") && shot.host.controls === null && !shot.host.meleeCombat.Active,
+    "提前击败就没有撞翻、没有锁、没有僵持");
+  Run(shot, T.releaseDelaysS.at(-1) + 0.2);
+  Check(shot.host.Has("meleeBreachStarted"), "照常放出剩下三个");
+  Check(!shot.village.RearmAmbush(), "先手打掉的不重放");
 
-  // 近战结束，窗口火力仍封锁院口 → WindowOrder。
-  const after = MakeMelee();
-  after.host.Record("kitchenEntered");
-  after.host.player.position = { ...A.melee };
-  after.village.Update(1 / 60);
+  // 5) 追不上（玩家从连屋深处触发、一直往外跑）：这一拍作罢，他转普通白刃兵，不隔着几米「撞」人。
+  const far = MakeAmbush();
+  far.host.player.position.x = 58; far.host.player.position.z = 14;
+  Frame(far);
+  Check(Phase(far) === "lunge", "从连屋深处触发");
+  Run(far, T.emergeS + T.lungeMaxS + 0.1, () => Phase(far) !== "lunge");
+  Check(Phase(far) === "done" && far.host.Has("kitchenAmbushBroken") && !far.host.Has("kitchenAmbushTackled"),
+    "冲了 lungeMaxS 还够不着就作罢，不撞人");
+  Check(!far.lead.missionDormant && !far.lead.meleeDormant && far.lead.scriptEssential === false,
+    "他当场转成普通白刃兵");
+
+  // --- 连屋那一组的收尾台词（原口径不变）---
+  const after = MakeAmbush();
   for (const spec of MISSION_ENCOUNTERS.melee) after.host.enemies.get(spec.id).alive = false;
   after.host.Record("meleeResolved");
-  after.village.Update(1 / 60);
+  after.host.player.position.z = -6;
+  Frame(after);
   Check(after.host.Has("windowFireHolding") && after.host.said.includes("WindowOrder"),
     "近战结束、窗口那挺机枪还封着院口，才喊 WindowOrder");
-  const silent = MakeMelee();
-  silent.host.Record("kitchenEntered");
+  const silent = MakeAmbush();
   silent.host.Record("meleeResolved");
   silent.host.enemies.get("VillageGunner").alive = false;
-  silent.host.player.position = { ...A.melee };
-  silent.village.Update(1 / 60);
+  Frame(silent);
   Check(!silent.host.said.includes("WindowOrder"), "窗口已经哑了就不喊那句分工");
+  Check(!silent.host.said.includes("MeleeCurse"), "没人贴上身就没有「滚你妈的」");
 }
 
 // ---------------------------------------------------------------------------

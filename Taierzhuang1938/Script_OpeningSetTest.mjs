@@ -304,37 +304,30 @@ const Samples = (route) => {
     }
     return null;
   };
+  // 2026-09-27 rework: one pinned eye outside the mouth (shunzi.witnessEye) for the interrogation, the cut and the find;
+  // the lifted head (Hold/Ask) looks at ijaA squatting at it.
+  const E = C.shunzi.witnessEye;
   const groups = {
-    SB03: { eye: { x: 0.35, z: -125.15 }, h: 0.26, pitchDeg: 5, yawDeg: -80, targets: [["ijaA", { x: 4.10, z: -125.63 }, [1.55, 0.9, 0.35]],
-      ["captive (sitting)", { x: 4.06, z: -125.90 }, [0.85, 0.5]], ["ijaB", { x: 5.0, z: -124.86 }, [1.55, 0.9, 0.35]],
-      ["interpreter (crouched)", { x: 4.75, z: -124.85 }, [1.0, 0.6]]] },
-    SB03A: { eye: { x: 0.25, z: -125.25 }, h: 0.18, pitchDeg: 4, yawDeg: -82, targets: [["captive (sitting)", { x: 4.06, z: -125.88 }, [0.85, 0.5]],
-      ["ijaA looking back", { x: 4.9, z: -124.45 }, [1.55, 0.9, 0.35]]] },
+    SB03: { eye: E, h: C.shunzi.lieEyeM, pitchDeg: 12, yawDeg: -88, targets: [["ijaA", { x: 4.10, z: -125.63 }, [1.55, 0.9, 0.35]],
+      ["captive (sitting)", { x: 4.06, z: -125.90 }, [0.85, 0.5]], ["ijaB", { x: 6.05, z: -125.0 }, [1.55, 0.9, 0.35]],
+      ["interpreter (crouched)", { x: 4.9, z: -124.05 }, [1.0, 0.6]]] },
+    Found: { eye: E, h: C.shunzi.lieEyeM, pitchDeg: 30, yawDeg: -90, targets: [["ijaA over him", C.ija.found, [1.55, 0.9, 0.35]]] },
+    Held: { eye: E, h: C.shunzi.lieEyeM + C.rescue.holdShot.liftM, pitchDeg: 20, yawDeg: -90, targets: [["ijaA squatting", C.ija.crouch, [0.9, 0.6]],
+      ["interpreter squatting", C.rescue.interpreter, [0.9, 0.6]], ["ijaB watching", C.rescue.ijaBGuard, [1.55, 0.9]]] },
   };
   report.setSight = {};
   for (const [shot, spec] of Object.entries(groups)) {
-    boxes01 = shot === "SB03" ? boxesHung : boxesDown;
+    boxes01 = boxesDown;
     report.setSight[shot] = spec.targets.flatMap(([name, at, heights]) => heights.map((h) => ({ name, h, blocker: SetBlocker(spec.eye, spec.h, at, h) })));
     const blocked = report.setSight[shot].filter((row) => row.blocker);
     assert.deepEqual(blocked, [], `${shot}: the set dressing does not hide the interrogation group`);
   }
-  // 塌顶木的下沿在 SB03/03A 画面里的位置（1280×720、竖直视场 65°，沿镜头正前方量）：SB03A 要「上沿一整条黑木料」，
-  // SB03 不能再被它框住（门柱过梁不再框住画面）。
-  const timberData = PROPS.find((p) => p.id === "roofTimberDown"), tanHalf = Math.tan(32.5 * Math.PI / 180);
-  report.timberBand = {};
-  for (const [shot, spec] of Object.entries(groups)) {
-    const timber = shot === "SB03" ? { ...timberData, ...timberData.hang } : timberData;
-    const yaw = spec.yawDeg * Math.PI / 180, dir = { x: -Math.sin(yaw), z: -Math.cos(yaw) };
-    // 木料在眼睛上方：挡住的下边界是它的远端下棱（东面那条棱）。
-    const dist = (timber.a.x + timber.w / 2 - spec.eye.x) / dir.x, z = spec.eye.z + dir.z * dist;
-    const t = (z - timber.a.z) / (timber.b.z - timber.a.z), bottom = timber.a.lift + (timber.b.lift - timber.a.lift) * t - timber.h / 2;
-    const eyeY = G(spec.eye.x, spec.eye.z) + spec.h, floor = G(FLOOR.x, FLOOR.z);
-    const elev = Math.atan2(floor + bottom - eyeY, dist) - spec.pitchDeg * Math.PI / 180;
-    report.timberBand[shot] = +(0.5 - Math.tan(elev) / (2 * tanHalf)).toFixed(3);   // 木料下沿在画面的纵向位置（0 = 上沿）
-  }
-  assert.ok(report.timberBand.SB03A > 0.06 && report.timberBand.SB03A < 0.25, `SB03A: the fallen roof timber is a band along the top: ${report.timberBand.SB03A}`);
-  assert.ok(report.timberBand.SB03 < 0, `SB03: the roof timber still hangs under the roof, out of the frame (it drops at Reach): ${report.timberBand.SB03}`);
-  assert.equal(timberData.settle.phase, "Reach", "the roof timber drops at Reach (SB03A), after the SB03 interrogation");
+  // 2026-09-27: the roof timber is down from the black, lying on his hips behind the eye (not in any forward view).
+  const timberData = PROPS.find((p) => p.id === "roofTimberDown");
+  assert.equal(timberData.settle.phase, "Black", "the roof timber is down on him from the black after the near miss");
+  assert.ok(Math.max(timberData.a.x, timberData.b.x) + timberData.w / 2 < E.x - 0.5, "the timber lies behind the eye (on his hips)");
+  const hips = C.shunzi.pinnedHips, lift = timberData.a.lift + (timberData.b.lift - timberData.a.lift) * ((hips.z - timberData.a.z) / (timberData.b.z - timberData.a.z));
+  assert.ok(Math.abs(timberData.a.x - hips.x) < 0.1 && lift - timberData.h / 2 < 0.34 && lift - timberData.h / 2 > 0.22, `the timber rests on his hips (underside ${lift - timberData.h / 2})`);
   // 相机投影（1280×720、竖直视场 65°、三轴 YXZ）：SB03 看旗面、右四分之一的沟纵深、左上角的斜断木。
   const Camera = (spec) => {
     const cam = new THREE.PerspectiveCamera(65, 16 / 9, 0.05, 400);
@@ -343,8 +336,8 @@ const Samples = (route) => {
     return cam;
   };
   const Screen = (cam, x, y, z) => { const v = new THREE.Vector3(x, y, z).project(cam); return { x: +((v.x + 1) / 2).toFixed(3), y: +((1 - v.y) / 2).toFixed(3), front: v.z < 1 }; };
-  const sb03 = { ...groups.SB03, rollDeg: 4 }, cam03 = Camera(sb03);
-  boxes01 = boxesHung;
+  const sb03 = { ...groups.SB03, rollDeg: 2 }, cam03 = Camera(sb03);
+  boxes01 = boxesDown;
   // 旗面（杆顶往下 0.46 m，离地 2.4–2.8）不被本包道具挡（Space 的通视在上面 targets 里量过）。
   const flag = PROPS.find((p) => p.id === "flagTrench");
   report.sb03Flag = [2.45, 2.62, 2.78].map((h) => ({ h, blocker: SetBlocker(sb03.eye, sb03.h, flag, h), at: Screen(cam03, flag.x, G(flag.x, flag.z) + h, flag.z) }));
@@ -363,12 +356,7 @@ const Samples = (route) => {
     report.sb03Right.push({ sx, sy, hit });
   }
   assert.deepEqual(report.sb03Right.filter((r) => r.hit), [], `SB03: nothing of the set in the right quarter of the frame: ${JSON.stringify(report.sb03Right.filter((r) => r.hit))}`);
-  // 左上角的斜断木（分镜 03 左上前景）：下端在画面左上三分之一里，上端出左上角。
-  const board = PROPS.find((p) => p.id === "brokenBoardNW"), boardFloor = G(board.ground.x, board.ground.z);
-  report.sb03Board = { low: Screen(cam03, board.b.x, boardFloor + board.b.lift, board.b.z), high: Screen(cam03, board.a.x, boardFloor + board.a.lift, board.a.z) };
-  assert.ok(report.sb03Board.low.front && report.sb03Board.low.x > 0.05 && report.sb03Board.low.x < 0.4 && report.sb03Board.low.y > 0.05 && report.sb03Board.low.y < 0.4,
-    `SB03: the broken board's hanging end is in the upper-left of the frame: ${JSON.stringify(report.sb03Board)}`);
-  assert.ok(report.sb03Board.high.x < report.sb03Board.low.x + 0.05 && report.sb03Board.high.y < report.sb03Board.low.y, "SB03: it runs from the upper-left corner down to the right");
+  // (2026-09-27: the broken board over the doorway is behind the pinned eye now; it framed the old in-mouth SB03.)
   // SB02 镜像机位（真实流程 Blast 的镜头：眼 (-0.6,-125.95) 离地 0.75、yaw -66、pitch -13.3、roll +15）：标语的字与马灯在画框里。
   const cam02 = Camera({ eye: { x: -0.6, z: -125.95 }, h: 0.75, yawDeg: -65.9, pitchDeg: -13.3, rollDeg: 15 });
   const poster = PROPS.find((p) => p.id === "bunkerPoster"), lamp = PROPS.find((p) => p.id === "bunkerLantern"), floor01 = G(FLOOR.x, FLOOR.z);
@@ -379,7 +367,7 @@ const Samples = (route) => {
   const sandTop = PROPS.find((p) => p.id === "bunkerSandbagWallN"), sandLift = sandTop.layers * sandTop.layerM;
   assert.ok(textBottom >= sandLift - 0.01, `SB02: the characters sit above the sandbag wall (${textBottom.toFixed(2)} >= ${sandLift.toFixed(2)})`);
   assert.ok(report.sb02Lantern.front && report.sb02Lantern.y > 0.03 && report.sb02Lantern.y < 0.5 && report.sb02Lantern.x > 0.02 && report.sb02Lantern.x < 0.6, `SB02: the lantern is in the left half of the Blast frame: ${JSON.stringify(report.sb02Lantern)}`);
-  console.log(`ok rubble: heap ${report.rubbleTopM} m, SB03 group, flag and right-hand trench in view, broken board ${JSON.stringify(report.sb03Board)}, `
+  console.log(`ok rubble: heap ${report.rubbleTopM} m, SB03 group, flag and right-hand trench in view, `
     + `backrest ${JSON.stringify(report.backrest)}, seat sees J; seat->F ${JSON.stringify(report.seatF)} ${DIR_MERGED ? "(asserted)" : "(Dir not merged: reported)"} ${JSON.stringify(report.seatFConflict)}; `
     + `SB02 text ${JSON.stringify(report.sb02Text.map((p) => [p.x, p.y]))} lantern ${JSON.stringify([report.sb02Lantern.x, report.sb02Lantern.y])}`);
 }
@@ -436,18 +424,24 @@ const Samples = (route) => {
   assert.equal(set.Stats().lintelProgress, 1, "the lintel is down by 1.2 s");
   assert.equal(set.Stats().collapsedVisible, true, "after the blast the collapse group shows");
   assert.equal(set.Stats().rescueVisible, false, "the hand-back backrest stays hidden through 01 (it would hide the SB03 group)");
-  // 塌顶木：SB03（Interrogation）还卡在洞顶下，Reach 那一拍 0.32 s 塌下来、垫块跟着出现；落定后两头在数据的 a/b 上。
-  set.Update(0.016, "Trapped", "Interrogation", { collapsed: true, blastAge: 20 });
-  assert.equal(set.roofTimber.progress, 0, "SB03 (Interrogation): the roof timber still hangs, out of the frame");
-  set.Update(0.016, "Trapped", "Reach", { collapsed: true, blastAge: 30 });
+  // 塌顶木（2026-09-27）：近爆后的黑场里 0.32 s 塌下来压在顺子胯上、垫块跟着出现；落定后两头在数据的 a/b 上。
+  set.Update(0.016, "Trapped", "Black", { collapsed: true, blastAge: 1.3 });
   const settling = set.roofTimber.progress;
-  for (let i = 0; i < 40; i++) set.Update(1 / 60, "Trapped", "Reach", { collapsed: true, blastAge: 30 + i / 60 });
-  assert.ok(settling < 0.2 && set.roofTimber.progress === 1 && set.roofTimber.supports.visible, `SB03A (Reach): it drops within the beat: ${settling} -> ${set.roofTimber.progress}`);
+  for (let i = 0; i < 40; i++) set.Update(1 / 60, "Trapped", "Black", { collapsed: true, blastAge: 1.3 + i / 60 });
+  assert.ok(settling < 0.2 && set.roofTimber.progress === 1 && set.roofTimber.supports.visible, `Black: it drops on him unseen: ${settling} -> ${set.roofTimber.progress}`);
+  set.Update(0.016, "Trapped", "Interrogation", { collapsed: true, blastAge: 20 });
+  assert.equal(set.roofTimber.progress, 1, "still on him through the interrogation");
   {
     const spec = PROPS.find((p) => p.id === "roofTimberDown"), mesh = set.roofTimber.mesh, floor = G(spec.ground.x, spec.ground.z);
     const len = Math.hypot(spec.b.x - spec.a.x, spec.b.lift - spec.a.lift, spec.b.z - spec.a.z);
     const endB = new THREE.Vector3(0, 0, len / 2).applyMatrix4(mesh.matrixWorld);
-    assert.ok(endB.distanceTo(new THREE.Vector3(spec.b.x, floor + spec.b.lift, spec.b.z)) < 0.02, "the settled roof timber lies on its SB03A mark");
+    assert.ok(endB.distanceTo(new THREE.Vector3(spec.b.x, floor + spec.b.lift, spec.b.z)) < 0.02, "the settled roof timber lies on its mark (on his hips)");
+    // 02 Lift: He lifts it off him (LiftRoofTimber), and it drops back when let go.
+    set.LiftRoofTimber(0.55); set.Update(1 / 60, "BunkerRescue", "Lift", { collapsed: true, blastAge: 40 });
+    const raised = new THREE.Vector3(0, 0, len / 2).applyMatrix4(mesh.matrixWorld);
+    assert.ok(Math.abs(set.roofTimber.progress - 0.45) < 1e-9 && raised.y > endB.y + 0.2, `lifted off him: progress ${set.roofTimber.progress}`);
+    set.LiftRoofTimber(0); set.Update(1 / 60, "BunkerRescue", "Check", { collapsed: true, blastAge: 40 });
+    assert.equal(set.roofTimber.progress, 1, "dropped back once he is out");
   }
   // 断头落在 rest 点上（世界坐标核对 FallLintel 的朝向）。
   const spec = PROPS.find((p) => p.id === "fallenLintel"), piece = set.lintel.mesh;
@@ -456,14 +450,20 @@ const Samples = (route) => {
   const floor = G(spec.ground.x, spec.ground.z);
   assert.ok(tip.distanceTo(new THREE.Vector3(spec.rest.x, floor + spec.rest.lift, spec.rest.z)) < 0.02, `the fallen lintel's broken end rests on its mark: ${tip.toArray().map((v) => v.toFixed(2))}`);
   // 选章 / 回跳直接进 02：没见过近爆＝已经落定；马灯灭。
-  // 任务步骤在 Found 前后就切到 BunkerRescue，导演还在演 01 的拍：靠背仍藏着（SB03A/SB04 的画面）。
+  // 任务步骤在 Found 前后就切到 BunkerRescue，导演还在演 01 的拍：靠背仍藏着。
   set.Update(0.016, "BunkerRescue", "Found", { collapsed: true, blastAge: null });
   assert.equal(set.Stats().rescueVisible, false, "the backrest stays hidden while the director still plays 01 beats under the BunkerRescue step");
-  assert.equal(set.roofTimber.progress, 1, "Found (and anything after Reach) has the roof timber down");
+  assert.equal(set.roofTimber.progress, 1, "Found has the roof timber down on him");
   set.Update(0.016, "BunkerRescue", "Hold", { collapsed: true, blastAge: null });
   assert.equal(set.Stats().lintelProgress, 1, "entering 02 without a blast shows the lintel already down");
   assert.ok(!set.lantern.light.visible && set.lantern.light.intensity === 0, "the lantern is out after 01");
-  assert.equal(set.Stats().rescueVisible, true, "the hand-back backrest shows from 02 on");
+  // 2026-09-27: he lies across the backrest's patch until Luo hauls him out; it shows once he sits (Check).
+  for (const phase of ["Hold", "Ask", "Charge", "Melee", "Lift"]) {
+    set.Update(0.016, "BunkerRescue", phase, { collapsed: true, blastAge: null });
+    assert.equal(set.Stats().rescueVisible, false, `${phase}: the backrest stays hidden (he lies on its patch)`);
+  }
+  set.Update(0.016, "BunkerRescue", "Check", { collapsed: true, blastAge: null });
+  assert.equal(set.Stats().rescueVisible, true, "the hand-back backrest shows once he is sat on the seat (Check)");
   // 离开 01–03：场景零残留，几何与自有材质全部 dispose，共享库材质不碰。
   const geometries = new Set(), owned = [...set.ownedMaterials];
   set.root.traverse((o) => { if (o.geometry) geometries.add(o.geometry); });
@@ -510,15 +510,16 @@ const Samples = (route) => {
   const At = (x, z, h) => new THREE.Vector3(x, GG(x, z) + h, z), AtRoot = (x, z, root, h) => new THREE.Vector3(x, GG(root.x, root.z) + h, z);
   // 2026-09-27：他跪在北壁坡上（R3 南移 0.12 m、身体顺坡、背靠后仰板墙，docs/Data_OpeningComradeKneelBank20260927.md），头位重量。
   const comradeRoot = { x: 4.057, z: -125.785 }, deadRoot = { x: 4.057, z: -125.785 };
+  // 2026-09-27: all from the pinned eye outside the mouth (shunzi.witnessEye, 0.28 m); the old in-mouth SB03 eye stays for the
+  // control below (the upright facade it was written against).
+  const pinned = At(C.shunzi.witnessEye.x, C.shunzi.witnessEye.z, C.shunzi.lieEyeM);
   const shots = [
-    { shot: "SB03", phase: "Interrogation", eye: At(0.35, -125.15, 0.26), targets: [
+    { shot: "SB03", phase: "Interrogation", settle: true, eye: pinned, targets: [
       ["comrade head (kneeling, leaning back on the north wall)", AtRoot(4.064, -126.207, comradeRoot, 0.804)],
       ["ijaA head", AtRoot(3.873, -125.316, { x: 3.857, z: -125.255 }, 1.322)]] },
-    { shot: "SB03A", phase: "Reach", settle: true, eye: At(0.25, -125.25, 0.18), targets: [
+    { shot: "Found", phase: "Found", settle: true, eye: pinned, targets: [
       ["dead comrade head (slid down the wall)", AtRoot(3.87, -126.121, deadRoot, 0.835)],
-      ["ijaA head (looking back)", AtRoot(4.892, -124.444, { x: 4.9, z: -124.45 }, 1.332)]] },
-    { shot: "SB04", phase: "Butt", eye: At(2.3, -124.4, 0.35), targets: [
-      ["dead comrade head right of the door", AtRoot(3.87, -126.121, deadRoot, 0.835)]] },
+      ["ijaA head over him", AtRoot(C.ija.found.x, C.ija.found.z, C.ija.found, 1.5)]] },
   ];
   const ray = new THREE.Raycaster();
   const Shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
@@ -531,8 +532,9 @@ const Samples = (route) => {
   };
   report.setHeads = {};
   for (const s of shots) {
+    set.Update(0.016, "Trapped", "Black", { collapsed: true, blastAge: 1.2 });
+    if (s.settle) for (let i = 0; i < 40; i++) set.Update(1 / 60, "Trapped", "Black", { collapsed: true, blastAge: 1.2 + i / 60 });
     set.Update(0.016, "Trapped", s.phase, { collapsed: true, blastAge: 20 });
-    if (s.settle) for (let i = 0; i < 40; i++) set.Update(1 / 60, "Trapped", s.phase, { collapsed: true, blastAge: 20 + i / 60 });
     report.setHeads[s.shot] = s.targets.map(([name, target]) => ({ name, blocker: FirstHit(set.root, s.eye, target) }));
     assert.deepEqual(report.setHeads[s.shot].filter((r) => r.blocker), [], `${s.shot}: the built set hides no judged head`);
   }
@@ -542,7 +544,7 @@ const Samples = (route) => {
       openings: [{ x0: 2.7, x1: 3.9, h: 1.7 }, { x0: 4.9, x1: 5.5, h: 1.45 }] };
     const group = new THREE.Group(), material = new THREE.MeshStandardMaterial();
     set.BuildFacade(old, { Add: (key, geometry) => group.add(new THREE.Mesh(geometry, material)) }, new Map([["OpeningSetVoid", material]]));
-    report.setHeadsControl = FirstHit(group, shots[0].eye, shots[0].targets[0][1]);
+    report.setHeadsControl = FirstHit(group, At(0.35, -125.15, 0.26), shots[0].targets[0][1]);
     assert.ok(report.setHeadsControl, "control: the pre-fix upright facade hides the SB03 comrade head (the check can see that red)");
     group.traverse((o) => o.geometry?.dispose());
   }

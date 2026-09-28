@@ -164,6 +164,8 @@ export function DeriveCoversFromColliders(colliders, opts) {
   const boxes = [];
   for (const c of colliders) {
     if (!c || !c.c || !c.h || !c.min || !c.max) continue;
+    // 空气墙（tag airWall）看不见也挡不了子弹，不能派生成掩体。
+    if (c.tag === "airWall") continue;
     boxes.push(c);
   }
   // 局部坐标里 (px,pz) 是否落在盒子的水平投影内（带 pad 余量）。

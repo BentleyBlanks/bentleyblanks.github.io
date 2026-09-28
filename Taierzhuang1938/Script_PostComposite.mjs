@@ -163,6 +163,7 @@ uniform vec4 uConcussion;   // intensity, focus loss, blur pixels, secondary ima
 uniform vec3 uConcussionGrade; // secondary image mix, desaturation, peripheral dimming
 // 01–02 storyboard lens (Script_OpeningLens; zero / off everywhere else):
 uniform float uRadialBlur;   // SB02: edges dragged outward (uv at the corner per unit), inside the concussion taps
+uniform vec2 uSideDaze;      // 01-02 slap (2026-09-27): x = struck side (+1 left of the frame, -1 right), y = amount
 uniform vec4 uBloodEdge;     // rgb multiplicative tint, a strength (SB03 blood-red corners)
 uniform vec4 uBloodCorners;  // weights top-left, top-right, bottom-left, bottom-right
 uniform vec4 uLidShape;      // feather, curvature, tilt, upper lid share
@@ -211,6 +212,12 @@ vec3 ViewPos(vec2 uv, float depth) {
 // 位置留在这里是因为它必须是**对 uHdr 的第一次取样**。
 // 色差只在画面边缘拉开、中心保持锐利 —— 真镜头就是这样。
 // ===========================================================================
+// The slap's daze on the struck side of the frame only (0 on the other half and whenever uSideDaze.y is 0).
+float SideDaze(vec2 uv) {
+  if(uSideDaze.y<=0.0) return 0.0;
+  float s = uSideDaze.x > 0.0 ? 1.0 - uv.x : uv.x;
+  return uSideDaze.y * smoothstep(.38, 1.0, s);
+}
 vec3 MotionBlur(vec2 uv, vec2 centered, float r2, vec4 nd) {
   float ca = uAberration * r2;
   vec3 clear=texture2D(uHdr,uv).rgb;
@@ -222,9 +229,11 @@ vec3 MotionBlur(vec2 uv, vec2 centered, float r2, vec4 nd) {
   // The storyboard's radial blur (SB02) rides the same nine taps: each tap is also pulled towards the
   // centre by a growing share of streak, so the periphery smears outward and the centre stays put
   // (streak is 0 there). No extra pass, target, sampler or tap.
-  if(uConcussion.y>0.001||uRadialBlur>0.0001){
-    float peripheral=smoothstep(.015,.32,r2);
-    vec2 radius=vec2(uConcussion.z*uConcussion.y*(.35+.65*peripheral))/uResolution;
+  float side=SideDaze(uv);
+  if(uConcussion.y>0.001||uRadialBlur>0.0001||side>0.001){
+    float peripheral=max(smoothstep(.015,.32,r2),side);
+    float focus=max(uConcussion.y,side);
+    vec2 radius=vec2(uConcussion.z*focus*(.35+.65*peripheral)*(1.0+1.5*side))/uResolution;
     // A small per-pixel, per-frame jitter of the streak length joins the nine copies into one smear; kept narrow
     // (±15 %) so it reads as a directional drag, not grain, and TAA averages what is left.
     vec2 streak=centered*uRadialBlur*peripheral*2.0*(.85+.3*Hash12(gl_FragCoord.xy+uFrame*7.13));
@@ -238,14 +247,14 @@ vec3 MotionBlur(vec2 uv, vec2 centered, float r2, vec4 nd) {
           +texture2D(uHdr,clamp(uv-radius-streak*.375,0.0,1.0)).rgb
           +texture2D(uHdr,clamp(uv+vec2(radius.x,-radius.y)-streak*.625,0.0,1.0)).rgb
           +texture2D(uHdr,clamp(uv+vec2(-radius.x,radius.y)-streak*.875,0.0,1.0)).rgb)*.0625;
-    vec2 offset=vec2(uConcussion.w,-uConcussion.w*.22)*uConcussion.y/uResolution;
+    vec2 offset=vec2(uConcussion.w*(1.0+3.0*side)*(side>0.001?uSideDaze.x:1.0),-uConcussion.w*.22)*focus/uResolution;
     vec3 secondary=texture2D(uHdr,clamp(uv+offset,0.0,1.0)).rgb;
-    vec3 blurred=mix(soft,secondary,uConcussionGrade.x*uConcussion.y*(.25+.75*peripheral));
+    vec3 blurred=mix(soft,secondary,uConcussionGrade.x*focus*(.25+.75*peripheral));
     // Keep the channel split of the plain tap on top of the smear (SB02 wants both at once); both effects fade
     // in smoothly from zero (no step where the radial blur crosses a threshold).
     float radialWeight=smoothstep(0.0,.01,uRadialBlur);
     blurred+=(clear-center)*radialWeight;
-    return mix(clear,blurred,max(smoothstep(0.0,.08,uConcussion.y),radialWeight));
+    return mix(clear,blurred,max(smoothstep(0.0,.08,focus),radialWeight));
   }
   return clear;
 }
@@ -515,6 +524,13 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
     color = mix(color, uBloodEdge.rgb * (.28 + .72 * Luma(color)), blood);
   }
 
+  // The slap: the struck side dims and goes blood red at the edge (SideDaze, 0 elsewhere).
+  float daze = SideDaze(uv);
+  if (daze > 0.001) {
+    color = mix(color, vec3(0.55, 0.06, 0.05) * (.3 + .7 * Luma(color)), .32 * daze);
+    color *= 1.0 - .38 * daze;
+  }
+
   // 暗角：别做成一圈发灰的环，压的是亮度不是加黑纱
   float vig = 1.0 - uVignette * smoothstep(0.02, 0.50, r2);
   color *= vig;
@@ -624,7 +640,7 @@ export class CompositePass {
       uHitGhostMix: { value: HIT_DISORIENTATION.ghostMix },
       uDamage: { value: 0 }, uFade: { value: 0 }, uEyeClosure:{value:0},
       uConcussion:{value:new THREE.Vector4()},
-      uRadialBlur:{value:0}, uBloodEdge:{value:new THREE.Vector4()}, uBloodCorners:{value:new THREE.Vector4(1,1,1,1)},
+      uRadialBlur:{value:0}, uSideDaze:{value:new THREE.Vector2()}, uBloodEdge:{value:new THREE.Vector4()}, uBloodCorners:{value:new THREE.Vector4(1,1,1,1)},
       uConcussionGrade:{value:new THREE.Vector3(OPENING_PERCEPTION.ghostMix,OPENING_PERCEPTION.desaturation,OPENING_PERCEPTION.vignette)},
       uLidShape:{value:new THREE.Vector4(OPENING_PERCEPTION.lidFeather,OPENING_PERCEPTION.lidCurve,OPENING_PERCEPTION.lidTilt,OPENING_PERCEPTION.lidUpperShare)},
       uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 },
@@ -785,6 +801,8 @@ export class CompositePass {
       this.reducedMotion?.matches?0:perception.ghostPx*pixelScale);
     // 01–02 storyboard lens (Script_OpeningLens.ApplyLensToPost); absent = off.
     U.uRadialBlur.value = this.reducedMotion?.matches ? 0 : Math.max(0, options.radialBlur || 0);
+    const daze = options.sideDaze;
+    U.uSideDaze.value.set(daze?.side < 0 ? -1 : 1, Math.max(0, Math.min(1, daze?.amount || 0)) * (this.reducedMotion?.matches ? .5 : 1));
     const blood = options.bloodEdge;
     if (blood?.strength > 0) {
       U.uBloodEdge.value.set(blood.tint[0], blood.tint[1], blood.tint[2], Math.min(1, blood.strength));

@@ -132,6 +132,9 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   `Script_FirstLevelQuietMarch`（15A/15B）、`Script_FirstLevelReception`（15C/16/17）、`Script_FirstLevelBridge`（18 桥头）、
   `Script_FirstLevelNightGate`（18 夜入北门）、`Script_FirstLevelNightLights`（夜景点光，唯一带 three 的一只）、
   `Data_Tuning_FirstLevelEnd`、`Script_FirstLevelEndTest`、`Script_FirstLevelCampaignEnd`。
+- 18 铁路桥（[说明](Data_RailBridge.md)）：`_blender/Script_BuildRailBridge.py` + `_blender/Script_ExportRailBridgeTerrain.mjs`
+  （Blender 烘 `Model/Model_RailBridge.glb` + `Model/Data_RailBridge.json`）、`Script_RailBridgeSet`（模型 / 三态 / 起爆时间线，带 three）、
+  `Data_RailBridgeDemolition`（地址、材质、特效分量）、`Script_RailBridgeTest`、`Script_RailBridgeShots`。
 - 驾驶脚本公共层 `Script_FirstLevelCampaignKit`：`ParseCampaignArgs` / `OpenCampaign` / `CloseCampaign` /
   `CaptureFailure` / `CheckVoiceAssets` / `InstallInputDriver` / `CampaignActions(ctx)`（`JumpStage` `Capture`
   `CaptureFocus` `WaitOutCutscene` `Route` `Interact` `RetryCampaign` `WaitStage`）。允许的起止以 `ParseCampaignArgs` 为准
@@ -709,6 +712,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 
 ### VFX
 - `Data_FirstLevelAirRaid.mjs` / `Script_FirstLevelAirRaid.mjs` —— 第一关 01（先头兵经过洞口起）到 06 中远处日机轮番轰炸（编队克隆在 `Script_Aircraft.SetFormation`、声部与前线床共账）；[口径与验收](Data_FirstLevelAirRaid20260926.md)，回归口 `Script_FirstLevelAirRaidTest.mjs`，实拍取证 `Script_FirstLevelAirRaidBrowserProbe.mjs`。
+- `Data_AerialBombs.mjs` / `Script_BombBallistics.mjs` —— 航空炸弹的弹体、二次阻力外弹道（RK4）、投弹前冲距离与地面交点、立方根落地尺度（纯函数）；画面在 `Script_Vfx.BombBlast`（专用池 `bombSmoke`）。回归口 `Script_BombBallisticsTest.mjs`。
 - `Data_FirstLevelDistantSmoke.mjs` / `Script_BattleSmoke.mjs` —— 第一关64处近中远硝烟，按道路随机布设、三维密度烟团与独立实例渲染；[形态、道路布设与验收](Data_FirstLevelNaturalSmoke20260926.md)，回归口 `Script_FirstLevelDistantSmokeTest.mjs` / `Script_FirstLevelDistantSmokeBrowserTest.mjs`。旧图集方案见第二轮历史说明。
 - `Script_Vfx.mjs` —— 粒子与特效（弹孔/砖粉/烟/碎砖弹跳）；三条架构约束在头注。
   先读：`docs/Data_TechRenderPipeline.md`。战车机枪的光束（`TracerBeam`，带像素下限/上限的分段条带）

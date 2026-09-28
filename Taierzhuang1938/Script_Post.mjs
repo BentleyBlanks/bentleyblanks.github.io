@@ -535,7 +535,8 @@ export class PostPipeline {
    * SSIL 关着时的 1×1 傅底图也是 1）= 没挡住，正是中性值。永远不为 null。
    */
   get SsilTexture() {
-    return this.contactShadowsPass.CombinedTexture || this.gtaoPass.SsilTexture;
+    // 有室内遮蔽体时 SSIL 那一路由 interiorSky 接手（近场反弹 + 室内暖反弹，§5.11）
+    return this.contactShadowsPass.CombinedTexture || this.interiorSkyPass.SsilTexture || this.gtaoPass.SsilTexture;
   }
 
   /** 运行时开关 SSIL（重建 GTAO 的材质与靶；不是每帧的事）。 */
