@@ -1,10 +1,10 @@
 {
- "note": "01-06 rebuild guard: MISSION_LAYOUT.blocks, MISSION_TRENCH_PLACEMENTS, MISSION_AFTERMATH and SampleMissionTerrain south of z=-95 (07 onward). History: f581ac7dd (pre-rebuild) -> b3ba06096 (2026-09-24 06-18 whitebox) -> 12aa1e956 (2026-09-27 05-18 concept-frame whitebox rebuild, docs/Data_FirstLevelWhitebox0518Gap.md; user-authorised change of 07+ blocks, terrain and trench dressing) -> 8a83ab61 (kitchen door jambs flush with the infill; blocks only) -> 431a8795 (2026-09-27 stage 12 holds the road back into the village, docs/Data_FirstLevelTransferCover20260927.md; user-authorised ruins, plaza cover and east-lane wall; blocks only, ground unchanged). Regenerate only from the baseline: git archive <baseline> Taierzhuang1938, then Script_FirstLevelSpaceProbe.SouthFingerprint over its modules. 2026-09-27 user-authorised replacement of every primitive tree by the supplied dead-tree model; baseline ba95e821. Preserves the integrated stage-12 update; terrain, aftermath bodies and trench props unchanged. 2026-09-27 user-authorised sandbag standard (docs/Data_SandbagStandard.md): the three canvas course strips on ReceptionGateSandbags are removed (the block is filled with the standard sandbag model); blocks only, placements/bodies/ground unchanged. 2026-09-28 user-authorised rail bridge model (docs/Data_RailBridge.md): the six non-colliding whitebox RailBridgePier* details are removed (single-span truss, no river piers) and the four RailBridgeAbutment* colliders are capped at MISSION_RAIL_BRIDGE.abutmentTopY under the stone bridge seat; blocks only, placements/bodies/ground unchanged.",
- "baseline": "rail-bridge-model-20260928",
+ "note": "01-06 rebuild guard: MISSION_LAYOUT.blocks, MISSION_TRENCH_PLACEMENTS, MISSION_AFTERMATH and SampleMissionTerrain south of z=-95 (07 onward). History: f581ac7dd (pre-rebuild) -> b3ba06096 (2026-09-24 06-18 whitebox) -> 12aa1e956 (2026-09-27 05-18 concept-frame whitebox rebuild, docs/Data_FirstLevelWhitebox0518Gap.md; user-authorised change of 07+ blocks, terrain and trench dressing) -> 8a83ab61 (kitchen door jambs flush with the infill; blocks only) -> 431a8795 (2026-09-27 stage 12 holds the road back into the village, docs/Data_FirstLevelTransferCover20260927.md; user-authorised ruins, plaza cover and east-lane wall; blocks only, ground unchanged). Regenerate only from the baseline: git archive <baseline> Taierzhuang1938, then Script_FirstLevelSpaceProbe.SouthFingerprint over its modules. 2026-09-27 user-authorised replacement of every primitive tree by the supplied dead-tree model; baseline ba95e821. Preserves the integrated stage-12 update; terrain, aftermath bodies and trench props unchanged. 2026-09-27 user-authorised sandbag standard (docs/Data_SandbagStandard.md): the three canvas course strips on ReceptionGateSandbags are removed (the block is filled with the standard sandbag model); blocks only, placements/bodies/ground unchanged. 2026-09-28 user-authorised rail bridge model (docs/Data_RailBridge.md): the six non-colliding whitebox RailBridgePier* details are removed (single-span truss, no river piers) and the four RailBridgeAbutment* colliders are capped at MISSION_RAIL_BRIDGE.abutmentTopY under the stone bridge seat; blocks only, placements/bodies/ground unchanged. 2026-09-28 guidance round (docs/Data_FirstLevelGuidance20260928.md): user-authorised guidance dressing in all four regions (trodden paths are texture-only; blocks, boundary walls, air walls and landmarks); ground samples expected unchanged unless a region table changed heights.",
+ "baseline": "guidance-20260928",
  "zMin": -95,
  "blocks": {
-  "count": 2287,
-  "sha": "3baa2c51eec6108c"
+  "count": 2530,
+  "sha": "28efa283a8d1dd04"
  },
  "placements": {
   "count": 2,
@@ -21,12 +21,12 @@
   "maxZ": 400,
   "stepM": 2,
   "count": 56048,
-  "sha": "98f8a65f2b5e9dcc"
+  "sha": "03a67a21f813c6ee"
  },
- "previousBaseline": "ba95e821",
+ "previousBaseline": "rail-bridge-model-20260928",
  "structuralBlocks": {
-  "count": 2287,
-  "sha": "3baa2c51eec6108c"
+  "count": 2530,
+  "sha": "28efa283a8d1dd04"
  },
  "trenchArtRevision": "2026-09-26 concept 07 removes only generated non-solid Revetment<n>_<side>Post/Slat and Duckboard<n>; structuralBlocks excludes those ids."
 }
