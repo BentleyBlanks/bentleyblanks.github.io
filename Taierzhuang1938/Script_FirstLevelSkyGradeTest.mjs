@@ -59,6 +59,14 @@ const neutral = { lift: [0, 0, 0], gain: [1, 1, 1], shadowTint: [1, 1, 1], highl
 const Grade = (srgb, curve) => LinearToSrgbJs(GradeMathJs([SrgbToLinearJs(srgb), SrgbToLinearJs(srgb), SrgbToLinearJs(srgb)],
   { ...neutral, contrastCurve: curve })[0]);
 assert.equal(day.fog.grade.contrastCurve, "soft");
+// 第二轮（2026-09-28）：出厂 lift 是蓝紫底（G 最低、B 最高），屋里一压暗就成了主色 —— 第一关必须归零；
+// 室内补回来的是暖反弹（R ≥ G ≥ B），不是天色。
+assert.deepEqual(day.fog.grade.lift, [0, 0, 0], "first-level grade has no lift (the default blue-magenta lift tinted every dark interior)");
+assert.ok(GRADE_DEFAULTS.lift[2] > GRADE_DEFAULTS.lift[0] && GRADE_DEFAULTS.lift[1] < GRADE_DEFAULTS.lift[0],
+  "sanity: the factory lift really is the magenta-blue one this rule guards against");
+const bounce = INTERIOR_SKY.bounce;
+assert.ok(bounce.strength > 0 && bounce.color[0] >= bounce.color[1] && bounce.color[1] >= bounce.color[2],
+  "interior fill is a warm ground/wall bounce");
 assert.equal(Grade(0.03, 0), 0, "linear stretch crushes sRGB 0.03 at the first-level contrast (why the soft curve exists)");
 assert.ok(Grade(0.03, 1) > 0.01 && Grade(0.03, 1) < 0.03, "soft curve deepens the shadow without clipping it");
 assert.ok(Math.abs(Grade(0.5, 1) - 0.5) < 1e-6 && Grade(0.98, 1) < 1, "soft curve keeps mid grey and rolls off the top");
