@@ -71,6 +71,7 @@ node scripts/Script_BlenderMcp.mjs status --scan
   `SampleMissionGroundSurface` 决定谁是路谁是沟（[分层地形 §8.3](Data_TerrainLayers.md)）。
 - **石材法线**：`TrenchStone` 的 Poly Haven `nor_gl` 在 terrain 约定数组里绿通道反了，Stone 段着色器里翻绿补偿；
   它 Orm 的 B（金属）落在数组 alpha，石材那段不读 alpha。
+- **01–05 前沿湿泥区**（第二轮，对标分镜 03–06）：开场段沟壁/沟底更暗更冷、整片湿、沟底积水更多，开场布景土皮同色；区与数值在 `Data_Tuning_Terrain.TERRAIN_MUD_ZONE`，口径见 [分层地形 §9](Data_TerrainLayers.md)。07 以后不受影响。
 - 木护壁/踏板仍按概念图 07 关闭（[Data_TrenchReference07.md](Data_TrenchReference07.md)），本轮不恢复。
 - 门禁：`Script_TrenchSurfaceTest`（湿/干粗糙度范围改读 `TERRAIN_WATER`）、`Script_TextureStandardsTest`（`TrenchPom` 已移出 legacy）、
   `Script_TerrainBlendTest`、`Script_SamplerBudgetTest --only=firstLevel`、`Script_CraterSurfaceTest`。

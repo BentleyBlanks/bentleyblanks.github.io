@@ -35,6 +35,7 @@ import { MakeBox, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import { SandbagRunPlacements } from "./Data_SandbagStandard.mjs";
 import { OpeningBlastFx } from "./Script_OpeningBlastFx.mjs";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
+import { TERRAIN_MUD_ZONE } from "./Data_Tuning_Terrain.mjs";
 
 const DEG = Math.PI / 180;
 const Clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -498,6 +499,10 @@ export class OpeningSet {
     const materials = new Map();
     this.sinkMaterials = materials;
     materials.set(TIMBER, this.SetMaterial("timber")); materials.set(CRATE, this.SetMaterial("crate"));
+    // 土皮 / 土堆 / 垫木土块与 01–05 前沿湿泥同色（B2 地面 2026-09-28，Data_Tuning_Terrain.TERRAIN_MUD_ZONE.rubble）。
+    const mud = TERRAIN_MUD_ZONE.rubble;
+    materials.set("GroundRubble", this.Lib("GroundRubble", { roughness: mud.roughness,
+      color: new THREE.Color().setRGB(mud.color[0], mud.color[1], mud.color[2], THREE.LinearSRGBColorSpace).getHex() }));
     const parents = { always: this.root, collapsed: this.collapsedRoot, rescue: this.rescueRoot };
     this.sandbagJobs = [];
     for (const prop of PROPS) {
@@ -823,7 +828,7 @@ export class OpeningSet {
     if (prop.hang && prop.supports?.length) {
       const group = new THREE.Group(); group.name = `OpeningSet0103_${prop.id}_Supports`; group.visible = false;
       this.collapsedRoot.add(group);
-      supportSink.Flush(group, {}, { castShadow: true, receiveShadow: true, resolve: () => this.Lib("GroundRubble") });
+      supportSink.Flush(group, {}, { castShadow: true, receiveShadow: true, resolve: () => this.sinkMaterials?.get("GroundRubble") || this.Lib("GroundRubble") });
       this.roofTimber.supports = group;
       this.PoseRoofTimber(this.roofTimber.progress ?? 0);
     }
