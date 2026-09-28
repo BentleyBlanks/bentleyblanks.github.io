@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "about": "Script_BakePbrTexture.py 的材质类预设与 Script_TextureStandardsTest.mjs 的定色门槛（同一份数）。口径：docs/Data_TextureAssetStandard.md §4。luma = sRGB 三通道均值；sat = 均色 (max-min)/max；std = luma 的标准差。1938 年 3 月鲁南阴天：低饱和冷灰棕，别让新木发橙、土发黄。isotropic=false 的类（砖、瓦、木纹）成行成列，不查 border/swing，只查 seamRatio；heightFromLuma=invert 表示源图里亮的是凹处（石灰砖缝）。",
+  "gates": {
+    "borderMin": 0.9,
+    "swingMax": 0.02,
+    "seamRatioMax": 1.5,
+    "clipLowMax": 0.02,
+    "clipHighMax": 0.02,
+    "lowFreqMax": 0.035,
+    "texelsPerMeter": [128, 1024],
+    "setBudgetBytes": 1048576,
+    "singleBudgetBytes": 614400
+  },
+  "classes": {
+    "greyBrick": {
+      "label": "青砖墙（风化、偏冷灰）",
+      "mean": [0.365, 0.362, 0.352], "contrast": 0.075,
+      "lumaRange": [0.26, 0.46], "satRange": [0.0, 0.1], "stdRange": [0.045, 0.13],
+      "reliefM": 0.01, "rough": 0.86, "roughVar": 0.06, "roughLumaK": 0.0, "ao": 0.55, "metal": 0.0,
+      "seamless": "weld", "rowFlatten": false, "flattenSigma": 0.12, "isotropic": false, "heightFromLuma": "invert"
+    },
+    "rammedEarth": {
+      "label": "夯土 / 土坯 / 黄泥抹面",
+      "mean": [0.47, 0.41, 0.325], "contrast": 0.07,
+      "lumaRange": [0.32, 0.52], "satRange": [0.12, 0.38], "stdRange": [0.035, 0.11],
+      "reliefM": 0.008, "rough": 0.93, "roughVar": 0.04, "roughLumaK": 0.0, "ao": 0.45, "metal": 0.0,
+      "seamless": "blend", "rowFlatten": true, "flattenSigma": 0.088, "isotropic": true, "heightFromLuma": "direct"
+    },
+    "limePlaster": {
+      "label": "石灰抹面（剥落、脏旧）",
+      "mean": [0.66, 0.64, 0.595], "contrast": 0.06,
+      "lumaRange": [0.5, 0.75], "satRange": [0.0, 0.16], "stdRange": [0.03, 0.1],
+      "reliefM": 0.004, "rough": 0.9, "roughVar": 0.04, "roughLumaK": 0.0, "ao": 0.4, "metal": 0.0,
+      "seamless": "blend", "rowFlatten": true, "flattenSigma": 0.088, "isotropic": true, "heightFromLuma": "direct"
+    },
+    "roofTile": {
+      "label": "小青瓦屋面",
+      "mean": [0.3, 0.305, 0.31], "contrast": 0.07,
+      "lumaRange": [0.2, 0.38], "satRange": [0.0, 0.08], "stdRange": [0.04, 0.13],
+      "reliefM": 0.02, "rough": 0.84, "roughVar": 0.06, "roughLumaK": 0.0, "ao": 0.6, "metal": 0.0,
+      "seamless": "weld", "rowFlatten": false, "flattenSigma": 0.15, "isotropic": false, "heightFromLuma": "direct"
+    },
+    "weatheredWood": {
+      "label": "风化灰褐木料（不是橙黄新木）",
+      "mean": [0.42, 0.38, 0.33], "contrast": 0.07,
+      "lumaRange": [0.26, 0.5], "satRange": [0.06, 0.3], "stdRange": [0.03, 0.11],
+      "reliefM": 0.004, "rough": 0.88, "roughVar": 0.05, "roughLumaK": 0.0, "ao": 0.45, "metal": 0.0,
+      "seamless": "weld", "rowFlatten": false, "flattenSigma": 0.15, "isotropic": false, "heightFromLuma": "direct"
+    },
+    "drySoil": {
+      "label": "干土 / 车道硬地 / 翻土",
+      "mean": [0.416, 0.362, 0.268], "contrast": 0.1,
+      "lumaRange": [0.28, 0.46], "satRange": [0.18, 0.42], "stdRange": [0.05, 0.12],
+      "reliefM": 0.016, "rough": 0.91, "roughVar": 0.05, "roughLumaK": 0.0, "ao": 0.42, "metal": 0.0,
+      "seamless": "blend", "rowFlatten": true, "flattenSigma": 0.088, "isotropic": true, "heightFromLuma": "direct"
+    },
+    "wetMud": {
+      "label": "湿泥（暗、粗糙度低、积水反光）",
+      "mean": [0.27, 0.235, 0.19], "contrast": 0.07,
+      "lumaRange": [0.16, 0.32], "satRange": [0.12, 0.38], "stdRange": [0.035, 0.11],
+      "reliefM": 0.012, "rough": 0.55, "roughVar": 0.12, "roughLumaK": 0.25, "ao": 0.5, "metal": 0.0,
+      "seamless": "blend", "rowFlatten": true, "flattenSigma": 0.088, "isotropic": true, "heightFromLuma": "direct"
+    },
+    "stone": {
+      "label": "石材（井台、磨盘、条石）",
+      "mean": [0.55, 0.53, 0.5], "contrast": 0.08,
+      "lumaRange": [0.38, 0.66], "satRange": [0.0, 0.16], "stdRange": [0.04, 0.13],
+      "reliefM": 0.012, "rough": 0.82, "roughVar": 0.06, "roughLumaK": 0.0, "ao": 0.5, "metal": 0.0,
+      "seamless": "blend", "rowFlatten": true, "flattenSigma": 0.1, "isotropic": true, "heightFromLuma": "direct"
+    },
+    "fabric": {
+      "label": "粗布 / 麻袋 / 草帘",
+      "mean": [0.5, 0.44, 0.345], "contrast": 0.06,
+      "lumaRange": [0.32, 0.52], "satRange": [0.1, 0.38], "stdRange": [0.03, 0.1],
+      "reliefM": 0.002, "rough": 0.95, "roughVar": 0.03, "roughLumaK": 0.0, "ao": 0.35, "metal": 0.0,
+      "seamless": "blend", "rowFlatten": false, "flattenSigma": 0.088, "isotropic": true, "heightFromLuma": "direct"
+    },
+    "wornSteel": {
+      "label": "旧钢铁（枪机、铁件、车体）",
+      "mean": [0.24, 0.24, 0.245], "contrast": 0.05,
+      "lumaRange": [0.12, 0.36], "satRange": [0.0, 0.1], "stdRange": [0.01, 0.1],
+      "reliefM": 0.002, "rough": 0.55, "roughVar": 0.12, "roughLumaK": 0.0, "ao": 0.3, "metal": 0.85,
+      "seamless": "blend", "rowFlatten": false, "flattenSigma": 0.088, "isotropic": true, "heightFromLuma": "direct"
+    }
+  }
+}
