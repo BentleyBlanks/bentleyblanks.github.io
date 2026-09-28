@@ -646,6 +646,20 @@ export const TEXTURE_MANIFEST = Object.freeze([
     ],
   },
   {
+    // 第一关植被卡片图集（docs/Data_FirstLevelVegetationProps.md）：8 格干草 / 枯蒿 / 荆棘 / 芦苇 / 绿芽，Base 的 A = 镂空。
+    // 品红底生成、脚本键出 alpha（不信生成器的透明通道）；卡片 UV 照抄进 Data_FirstLevelVegetation.VEGETATION_CARDS。
+    id: "FirstLevelVegetationAtlas", kind: "decal", tier: "level:FirstLevel",
+    bake: "_import/Script_BakeVegetationAtlas.py",
+    bakeRecord: "_import/TextureBakes/Texture_FirstLevelVegetationAtlas.json",
+    source: { provider: "lovart", date: "2026-09-28",
+      ref: "thread a97e84e9-d6af-432d-9fcd-44e7d3347a58（generate_image_nano_banana_pro，品红底 8 格）",
+      prompt: "_import/Prompts/Texture_FirstLevelVegetationAtlas.txt" },
+    consumers: [{ file: "Data_FirstLevelVegetation.mjs", token: "Texture_FirstLevelVegetationAtlas" }],
+    files: [
+      ["Texture_FirstLevelVegetationAtlas.webp", "Base", 1024, 1024],
+    ],
+  },
+  {
     id: "TrenchMudHeight", kind: "decal", tier: "level:FirstLevel",
     packing: "RGBA 泥面高度遮罩（Blender 生成）",
     bake: "_import/Script_BakeTrenchSurface.py",

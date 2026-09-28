@@ -30,7 +30,7 @@ const LOADER = new THREE.TextureLoader();
 /** 图集贴图（sRGB，mip + 各向异性）。失败返回 null，关卡照常建，只是没有植被。 */
 export async function LoadFirstLevelVegetationAtlas(library) {
   try {
-    const texture = await LOADER.loadAsync(`${VEGETATION_ATLAS.url}?v=${VEGETATION_ATLAS.version}`);
+    const texture = await LOADER.loadAsync(VEGETATION_ATLAS.url);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
     texture.anisotropy = Math.min(8, library?.anisotropy || 1);

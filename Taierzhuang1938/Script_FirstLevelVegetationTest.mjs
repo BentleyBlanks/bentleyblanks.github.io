@@ -97,12 +97,14 @@ Check(foliageIds.size === 25 && [...foliageIds].every((id) => high.replaced.has(
 
 // ---- 图集与烘焙记录 ----------------------------------------------------------
 const record = JSON.parse(fs.readFileSync(path.join(root, "_import/TextureBakes/Texture_FirstLevelVegetationAtlas.json"), "utf8"));
-const atlasFile = path.join(root, VEGETATION_ATLAS.url.replace(/^\.\//, ""));
+const atlasFile = path.join(root, VEGETATION_ATLAS.url.replace(/^\.\//, "").replace(/\?.*$/, ""));
 Check(fs.existsSync(atlasFile), "图集文件存在");
 const bytes = fs.existsSync(atlasFile) ? fs.statSync(atlasFile).size : 0;
-Check(bytes === record.output.bytes && bytes === VEGETATION_ATLAS.bytes && bytes <= 600 * 1024,
+Check(bytes === record.outputs[0].bytes && bytes === VEGETATION_ATLAS.bytes && bytes <= 600 * 1024,
   `图集字节与烘焙记录一致且 ≤ 600 KB（${bytes}）`);
-Check(record.output.size.every((v) => (v & (v - 1)) === 0), `图集尺寸是 2 的幂（${record.output.size.join("×")}）`);
+const size = [record.outputs[0].width, record.outputs[0].height];
+Check(size.every((v) => (v & (v - 1)) === 0), `图集尺寸是 2 的幂（${size.join("×")}）`);
+Check(/\?v=/.test(VEGETATION_ATLAS.url), "图集 URL 带 ?v= 戳");
 const cardMismatch = VEGETATION_CARDS.filter((card) => {
   const baked = record.cards.find((c) => c.id === card.id);
   return !baked || baked.uv.some((v, i) => Math.abs(v - card.uv[i]) > 1e-4) || Math.abs(baked.aspect - card.aspect) > 1e-3

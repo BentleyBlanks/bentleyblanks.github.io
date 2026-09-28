@@ -17,7 +17,7 @@
     # --dry-run：只出预览到 _shots/TextureBake/FirstLevelVegetationAtlas/，不写 Texture/
 
 产物：
-    Texture/Texture_FirstLevelVegetationAtlas.webp   1024×1024 RGBA，sRGB（alpha 线性）
+    Texture/Texture_FirstLevelVegetationAtlas.webp   1024×1024 RGBA，sRGB（alpha 线性）；清单 Data_TextureManifest 登记为 decal / Base
     _import/TextureBakes/Texture_FirstLevelVegetationAtlas.json   烘焙记录（源 sha256、参数、卡片表、产物 sha256/字节）
     _shots/TextureBake/FirstLevelVegetationAtlas/Preview.png      灰底合成预览（不进仓库）
 """
@@ -174,8 +174,9 @@ def Bake(source, out_path, record_path, preview_dir, dry_run):
                    "origin": "Lovart (generate_image_nano_banana_pro)", "keyColour": "#FF00FF"},
         "params": {"keyLo": KEY_LO, "keyHi": KEY_HI, "saturation": SATURATION, "pinkToBeige": True, "atlas": ATLAS, "cell": [CELL_W, CELL_H], "columns": COLUMNS},
         "colorSpace": {"rgb": "sRGB", "alpha": "linear coverage"},
-        "output": {"path": os.path.relpath(out_path, PROJECT).replace("\\", "/"), "sha256": Sha256(target),
-                   "bytes": os.path.getsize(target), "size": [ATLAS, ATLAS]},
+        # 与 Script_BakePbrTexture 的记录同一个 outputs 形状（Script_TextureStandardsTest 逐项核 sha256 / 尺寸）。
+        "outputs": [{"file": os.path.basename(out_path), "channel": "Base", "sha256": Sha256(target),
+                     "bytes": os.path.getsize(target), "width": ATLAS, "height": ATLAS}],
         "cards": table,
     }
     if not dry_run:
@@ -183,7 +184,7 @@ def Bake(source, out_path, record_path, preview_dir, dry_run):
         with open(record_path, "w", encoding="utf-8") as f:
             json.dump(record, f, ensure_ascii=False, indent=2)
             f.write("\n")
-    print(json.dumps({"bytes": record["output"]["bytes"], "cards": table}, ensure_ascii=False, indent=1))
+    print(json.dumps({"bytes": record["outputs"][0]["bytes"], "cards": table}, ensure_ascii=False, indent=1))
 
 
 def Main():

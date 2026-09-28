@@ -24,15 +24,16 @@
     "rgb": "sRGB",
     "alpha": "linear coverage"
   },
-  "output": {
-    "path": "Texture/Texture_FirstLevelVegetationAtlas.webp",
-    "sha256": "cdf6e2f4a9cb2ee42be8a46ed22b02e7ff213274f73a1cf02802193fa379b89f",
-    "bytes": 267702,
-    "size": [
-      1024,
-      1024
-    ]
-  },
+  "outputs": [
+    {
+      "file": "Texture_FirstLevelVegetationAtlas.webp",
+      "channel": "Base",
+      "sha256": "cdf6e2f4a9cb2ee42be8a46ed22b02e7ff213274f73a1cf02802193fa379b89f",
+      "bytes": 267702,
+      "width": 1024,
+      "height": 1024
+    }
+  ],
   "cards": [
     {
       "id": "TallGrass",

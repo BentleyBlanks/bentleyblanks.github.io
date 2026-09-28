@@ -26,8 +26,8 @@ import { HashSeed, Rng, RouteIndex, PointIndex } from "./Data_FirstLevelPropDres
 
 export const VEGETATION_VERSION = "first-level-vegetation-20260928";
 export const VEGETATION_ATLAS = Object.freeze({
-  url: "./Texture/Texture_FirstLevelVegetationAtlas.webp",
-  version: "veg20260928b",
+  // 改图就改戳（清单 Data_TextureManifest 的 FirstLevelVegetationAtlas；Script_TextureStandardsTest 查戳）。
+  url: "./Texture/Texture_FirstLevelVegetationAtlas.webp?v=veg20260928b",
   bytes: 267702,
 });
 

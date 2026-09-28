@@ -10,7 +10,7 @@
 | 道具换模型 | `Data_FirstLevelPropDressing.mjs` 的 `PROP_DRESSING`、`FitPropToBox`、`PlanPropDressing` | `Script_FirstLevelPropDressing.mjs` | `Script_FirstLevelPropDressingTest.mjs` |
 | 碎砖瓦 | 同上 `PROP_RUBBLE`、`PlanRubbleScatter` | 同上 | 同上 |
 | 植被 | `Data_FirstLevelVegetation.mjs` 的 `VEGETATION`、`VEGETATION_CARDS`、`VEGETATION_QUALITY`、`PlanFirstLevelVegetation` | `Script_FirstLevelVegetation.mjs` | `Script_FirstLevelVegetationTest.mjs` |
-| 植被图集 | `_import/Script_BakeVegetationAtlas.py`（烘焙记录 `_import/TextureBakes/Texture_FirstLevelVegetationAtlas.json`） | `Texture/Texture_FirstLevelVegetationAtlas.webp` | 同上（卡片表与记录一致、2 的幂、≤ 600 KB） |
+| 植被图集 | `_import/Script_BakeVegetationAtlas.py`（烘焙记录 `_import/TextureBakes/Texture_FirstLevelVegetationAtlas.json`，提示词 `_import/Prompts/Texture_FirstLevelVegetationAtlas.txt`） | `Texture/Texture_FirstLevelVegetationAtlas.webp`（清单 `Data_TextureManifest` 的 `FirstLevelVegetationAtlas`：decal / Base 带 A / `level:FirstLevel`） | 同上（卡片表与记录一致、2 的幂、≤ 600 KB、URL 带戳）＋ `Script_TextureStandardsTest.mjs` |
 
 接线只在 `Script_FirstLevelWhiteboxField.mjs` 几行：`PrepareAssets` 里（仅 `layout.fortifications` 的正式第一关）并行预载模型与图集；
 `BuildWhiteBoxes` 里紧跟 `AddMissionFortifications`：`AddFirstLevelPropDressing` 往同一只 `BuildSink` 加几何，`new FirstLevelVegetation` 建植被，
@@ -66,7 +66,7 @@
 
 全部在两张 Data 表：密度 / 禁区 / 视线门槛 / 簇大小 `VEGETATION`，画质分档 `VEGETATION_QUALITY`，调色 `VEGETATION_TINT`；
 替换表 `PROP_DRESSING`、配法容差 `PROP_FIT_TOLERANCE`、贴地 `PROP_GROUND`、调色 `PROP_MATERIAL_TINT`、碎砖瓦 `PROP_RUBBLE`。
-改卡片图：重跑烘焙脚本 → 照抄打印的卡片表 → 改 `VEGETATION_ATLAS.bytes / version`。
+改卡片图：重跑烘焙脚本 → 照抄打印的卡片表 → 改 `VEGETATION_ATLAS.bytes` 与 URL 的 `?v=` 戳（清单条目的 sha256 由门禁对烘焙记录核）。
 
 ## 6 门禁与验收
 
