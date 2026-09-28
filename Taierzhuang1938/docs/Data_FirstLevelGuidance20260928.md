@@ -226,6 +226,38 @@ node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-
   与 `Script_MissionAreaGuardBrowserTest`（S，出界警告与检查点重来）。
 - 实机：`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=6`（06 起连续）、`--campaign --stage-to=3`（01–03）。
 
-## 7. 实装结果
+## 7. 实装结果（2026-09-28 集成，`MISSION_WHITEBOX_VERSION = first-level-20260928-guidance-r1`）
 
-（集成时填写）
+五路并行（S 系统 + A/B/C/D 四区）各在自己的 worktree 从基线 60166b9f（小路层 + 空气墙契约）分出，按 S → C → B → D → A 合入，
+再合 origin/master 两次（开场压木改稿 b366d39e、开场动画重烘 56ebe386）。共享文件只有 `index.html` 的 `?v=` 与机位表各区自己的段冲突，全部取较大戳。
+
+**集成时另做的三件事**（§3.5）：08 标记与班长先到主街口再进灶屋；两根地标烟柱；两条本来就红的门禁登记（`Script_MissionGatesTest` 白名单正则、
+`Script_TestRunner` 的 LayeredGait 领域）。
+
+**08 折回线踩过的坑**（写在 `Script_FirstLevelMissionRuntime` 的 `case "Village"` 上）：第一版折回线贴 z −22.5 走，两名队员顶在主街西墙北端
+(72,−22) 的墙角上一动不动，队尾刘文财到不了院门以南、10 的 `rearCoverDisengaged` 永远落不下（实机取证 `_shots/GuidanceIntegration/CourtyardStallProbe.mjs`
+每 30 s 打印全队与担架的位置）；改成「只给班长折回」后伏击那一拍的起身反而收不掉（两次确定性复现）——队员在那一刻穿过道的站位变了。
+最终是整队走同一道折线、停点 (76,−24)、来回走巷子北侧 z≈−24（离墙角 2 m），08–14 一次跑通。
+
+**门禁**（全部在合完 master 之后的树上跑）：
+
+| 门禁 | 结果 |
+| --- | --- |
+| `Script_FirstLevelWhiteboxTerrainTest` | 366 项通过；28 个形状、10 条小路（B 4 / D 3 / A 3；C 的场院在 pads 上，改用贴地泥块） |
+| `Script_FirstLevelSpaceTest`（全量） | 通过；07+ 指纹按本轮重生（体块 2287 → 2530，遗体 191 / 壕沟布设 2 不变，地面采样变化 = A 区 06 沟西沿的弹坑） |
+| `Script_FirstLevelMissionTopologyTest`（全量 / `--rear-only`） | 通过 |
+| `Script_FirstLevelFrontTopologyTest`、`WhiteboxVillageTest`、`WhiteboxTransferTest`、`MidTest`、`EndTest`、`FrontTest`、`CollectionCareTest` | 通过 |
+| `Script_MissionAreaGuardTest`、`Script_FirstLevelLeaderGuideTest`、`Script_MissionGatesTest`、`Script_TestRunnerTest`、`Script_TextTest`、`Script_ModuleGraphTest`、`Script_FirstLevelVoiceTest` | 通过 |
+| `Script_FirstLevelDistantSmokeTest`、`Script_FirstLevelSmokeOriginsTest` | 通过（65 处烟源；「近处烟 ≥ 20」那条原来在基线上是 19，本轮加地标后转绿） |
+| `Script_FirstLevelMissionTest` | **基线红**：1199 行「07+ keeps the legacy fixed-source front, quieter than 03」（战场声音模块），干净的 origin/master 上同样红，本轮没碰 |
+| `Script_FirstLevelMissionTopologyBrowserTest` | 通过（26 段双向路线、两桥四态、夜景 125 件） |
+| `Script_MissionAreaGuardBrowserTest` | 通过（S 包分支上：07 往西跑出走廊 → 1.5 s 亮 → 回来灭 → 转红 → 阵亡菜单 → 检查点重来） |
+| `--campaign --stage-jumps --stage-from=8 --stage-to=14` | **通过**（合并后的树，探针版：08 主街口 → 灶屋 → 伏击反刺起身 → 10 担架过院、队尾脱离 → 11–14 → 15A 收拢） |
+| `--campaign --stage-to=3`、`--campaign --stage-from=3 --stage-to=6` | 通过（A 区分支上，1173 s / 1336 s，0 次检查点重试） |
+| `--campaign --stage-jumps --stage-from=18` | 通过到 Complete（D 区分支上） |
+| `--campaign --stage-jumps --stage-from=15` | **基线红**：17 `deathSceneComplete` 不落（幺娃不拉覆盖物，`coverS` 恒 0），D 与 S 都在未改的基线上复现同一卡法 |
+
+出图：`_shots/GuidanceFinal/`（46 个 G 机位 + 31 个原机位 + 8 张数据俯视图，忽略目录）；改前基线在 `_shots/GuidanceBaseline/`。
+
+**仍然读不出来的**：各区 §5 末尾各自列了；跨区的两条——(1) 小路在浅色碎石地面、场坪和壕沟里几乎看不出来（地表纹理对比问题，纹理层归渲染侧），
+(2) 03 观察射台前的正面空地与西沟以西 / 桥南以西的空田仍是平地，只有任务走廊兜底。
