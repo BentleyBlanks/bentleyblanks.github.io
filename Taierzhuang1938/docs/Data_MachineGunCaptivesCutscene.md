@@ -461,6 +461,17 @@ South，守军才走到第 4 个折点就被冻住。过场不消耗任务时钟
 合入 master 的房间伏击三条之后是 `Mission*` 90 / 总数 256，门禁按「> 0」断言，
 不钉死条数。
 
+2026-09-28 门禁跟上两处口径变化（过场本身与声音链路都没变）：
+
+- **对照组改成 `voice.MissionSupportOrder_01`**。逐句播放器上线（d26523ce）后，逐句录音齐全的
+  场景只装 `Mission<场景>_<序号>`，整段键 `MissionSupportOrder` 不再入库，旧对照组连带让
+  「过场播了没有」之后的判定全部落空。
+- **过场改为直接调 `Debug.PlayMidCutscene` 起播**。2026-09-19 采用稿（309409cf）撤掉了 04 的任务触发，
+  人站到枪位上等不来这一场；与 `Script_FirstLevelMachineGunCutsceneTest` 的 B 段同一个入口。
+
+当天实测：对照组峰值 0.329（底噪 0.054），九条台词 0.232 – 0.415，静场地板 0.036，十九条音效全部起播，
+声库 398 条（`Mission*` 198 / ch0 31 / ch1 76 / 战场口令 93）。
+
 增益链在每条台词起播那一刻逐项读过，全部是 1.0：
 `master / sfxBus / sfxUser / duck / storyDuck / hitGain / outGain`，
 三只滤波器都在 20 kHz。`AudioContext.state = "running"`，听者与过场相机的距离恒为 0 m。
