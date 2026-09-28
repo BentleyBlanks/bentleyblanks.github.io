@@ -9,7 +9,7 @@
 //   另有 Top_<region>.png：游戏内高空俯拍（同一分区框，fov 自适应），看实际体块与地形。
 // 用法（从 worktree 根）：
 //   node Taierzhuang1938/Script_FirstLevelWhitebox0518Shots.mjs [--only=08_1,08_2] [--out=<dir>]
-//        [--no-shots] [--no-maps] [--no-top] [--scale=0.5]
+//        [--no-shots] [--no-maps] [--no-top] [--scale=0.5] [--quality=low|medium|high|ultra]（默认 medium）
 // 这是出图脚本不是门禁，不进 TestRunner；浏览器全局锁只在 TestRunner 里，单跑直接 node。
 import fs from "node:fs"; import path from "node:path"; import { pathToFileURL, fileURLToPath } from "node:url";
 const WT = fileURLToPath(new URL("../", import.meta.url)).replace(/\\/g, "/");
@@ -18,6 +18,7 @@ const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slic
 const flag = (name) => process.argv.includes(`--${name}`);
 const only = arg("only")?.split(",").filter(Boolean) || null;
 const out = path.resolve(arg("out") || WT + "Taierzhuang1938/_shots/Whitebox0518");
+const quality = ["low", "medium", "high", "ultra"].includes(arg("quality")) ? arg("quality") : "medium";
 fs.mkdirSync(out, { recursive: true });
 const { WHITEBOX_0518_CAMERAS: CAMERAS } = await import(U("Data_FirstLevelWhitebox0518Cameras.mjs"));
 const { WHITEBOX_TERRAIN_REGIONS: REGIONS } = await import(U("Data_FirstLevelWhiteboxTerrain.mjs"));
@@ -120,7 +121,7 @@ async function EngineShots(browser, server) {
   for (const [stage, { cams, tops: tlist }] of [...byStage].sort((a, b) => a[0] - b[0])) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     const errors = []; page.on("pageerror", (e) => errors.push(String(e)));
-    const url = `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&missionStage=${stage}&quality=medium&scale=small`;
+    const url = `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&missionStage=${stage}&quality=${quality}&scale=small`;
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 180000 });
     await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 300000 });
     await page.evaluate(() => window.Tengxian.StepFrames(120));
