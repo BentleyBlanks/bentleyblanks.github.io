@@ -1,33 +1,33 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
   "date": "2026-09-28",
-  "name": "TerrainCartTrack",
+  "name": "TrenchPom",
   "preset": "drySoil",
   "source": {
-    "path": "_shots/Gap3A_Source/B2Ground/CartTrack/lovart_7e04807493ff.png",
-    "sha256": "c91601eaaa17222e7d5c49f9c366d2f278ca32f331adabb225920e693366d35d",
+    "path": "_shots/Gap3A_Source/B2Ground/TrenchEarth/lovart_2dfe95ea5114.png",
+    "sha256": "412034c2fd8d97ea867998519377b7b2f4f36d4cf6851bd00a5b7da662d86b92",
     "metrics": {
       "meanSrgb": [
-        0.4165,
-        0.3698,
-        0.3253
+        0.3874,
+        0.349,
+        0.313
       ],
-      "luma": 0.3705,
-      "lumaStd": 0.0929,
-      "sat": 0.2189,
-      "clipLow": 0.0,
+      "luma": 0.3498,
+      "lumaStd": 0.1167,
+      "sat": 0.1921,
+      "clipLow": 0.0007,
       "clipHigh": 0.0,
-      "lowFreq": 0.0163
+      "lowFreq": 0.0205
     }
   },
   "heightSource": null,
   "params": {
     "mean": [
-      0.44,
-      0.38,
-      0.3
+      0.4,
+      0.335,
+      0.255
     ],
-    "contrast": 0.08,
+    "contrast": 0.085,
     "lumaRange": [
       0.28,
       0.46
@@ -40,18 +40,18 @@
       0.05,
       0.12
     ],
-    "reliefM": 0.009,
-    "rough": 0.84,
-    "roughVar": 0.06,
+    "reliefM": 0.05,
+    "rough": 0.9,
+    "roughVar": 0.05,
     "roughLumaK": 0.0,
-    "ao": 0.32,
+    "ao": 0.5,
     "metal": 0.0,
     "seamless": "blend",
     "rowFlatten": true,
     "flattenSigma": 0.088,
     "isotropic": true,
     "heightFromLuma": "direct",
-    "tileM": 3.1,
+    "tileM": 1.5,
     "size": 1024,
     "dataSize": 512,
     "pack": "orh",
@@ -70,50 +70,50 @@
   "outputs": [
     {
       "channel": "Base",
-      "file": "Texture_TerrainCartTrackBase.webp",
+      "file": "Texture_TrenchPomBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 335748,
-      "sha256": "25a799f601595202725b8e1b62e56b604ce51d4c624013ebc5234d4098b9d0f5"
+      "bytes": 316730,
+      "sha256": "59c35e4019a2c84546de33985252f6ff5f14541c9191eb10e619827a28275f9e"
     },
     {
       "channel": "Normal",
-      "file": "Texture_TerrainCartTrackNormal.webp",
+      "file": "Texture_TrenchPomNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 98400,
-      "sha256": "43b9934f5a71171227320503d58b7b2f0a31626307515d1d07d2cecd37eb6561"
+      "bytes": 203934,
+      "sha256": "0bbede964242f4cf28eda60d2d70857679d7066bb7c2685498365a645bd13c8d"
     },
     {
       "channel": "Orh",
-      "file": "Texture_TerrainCartTrackOrh.webp",
+      "file": "Texture_TrenchPomOrh.webp",
       "width": 512,
       "height": 512,
-      "bytes": 77592,
-      "sha256": "d4bfde9bb7fb873ae6908f42dc8846547a6243ab5e84d38dfb0d58fa1e83d8e7"
+      "bytes": 93426,
+      "sha256": "d0a2ea18381304c829f0bdbe6a9960c3abd9a05ef3869361dacf650580ba45ff"
     }
   ],
-  "totalBytes": 511740,
+  "totalBytes": 614090,
   "metrics": {
     "meanSrgb": [
-      0.4398,
-      0.3807,
-      0.2996
+      0.3999,
+      0.3357,
+      0.2544
     ],
-    "luma": 0.3734,
-    "lumaStd": 0.0811,
-    "sat": 0.3186,
+    "luma": 0.33,
+    "lumaStd": 0.0855,
+    "sat": 0.3638,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0051,
-    "seam": 0.0481,
-    "interior": 0.0507,
-    "seamRatio": 0.95,
-    "border": 0.954,
+    "lowFreq": 0.009,
+    "seam": 0.0484,
+    "interior": 0.0512,
+    "seamRatio": 0.945,
+    "border": 0.956,
     "swing": 0.0052,
-    "aoMean": 0.933,
-    "roughMean": 0.82,
-    "texelsPerMeter": 330.3
+    "aoMean": 0.89,
+    "roughMean": 0.888,
+    "texelsPerMeter": 682.7
   },
   "gateProblems": []
 }
