@@ -10,6 +10,10 @@ export const BATTLE_SMOKE_QUALITY = Object.freeze({
 // Denser 04–06 battlefield art direction: light is absorbed through each lobe,
 // leaving deep cores and a lit, translucent outer shell. No global fog change.
 export const BATTLE_SMOKE_LIGHTING = Object.freeze({ ambient: .24, direct: 1.05, extinction: 2.8 });
+// 2026-09-28 远景烟柱（只作用于带 `plume` 的远景柱，Data_FirstLevelDistantSmoke）：
+//   dilute  上部被风拉开、稀释之后趋向的灰（线性），按年龄与 baseDark 混过去
+//   warm    受光面往太阳色偏多少（0 = 原来的单色光照）；cool = 背光面往天光冷灰偏多少
+export const BATTLE_SMOKE_PLUME = Object.freeze({ dilute: Object.freeze([.30, .295, .285]), warm: .45, cool: .18 });
 export const BATTLE_FIRE_QUALITY = Object.freeze({low:1024,medium:1536,high:2048,ultra:2048});
 export const BATTLE_FIRE = Object.freeze({emission:1.2,hot:[2.6,.55,.06],cool:[.28,.015,.002]});
 export const BATTLE_SMOKE_ROOT = Object.freeze({lobes:4,height:2.6,baseWidth:.6,crownWidth:3.0,life:4.8,opacity:.78});

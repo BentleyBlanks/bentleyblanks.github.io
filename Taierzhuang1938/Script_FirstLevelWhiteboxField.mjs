@@ -31,6 +31,8 @@ import { MakeTrenchSurfacePatch } from "./Script_TrenchSurfaceMaterial.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { TerrainContactField } from "./Script_TerrainContact.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
+import { BuildInteriorVolumes } from "./Data_FirstLevelInteriors.mjs";
+import { SetInteriorVolumes } from "./Script_InteriorSkyOcclusion.mjs";
 
 export function IsP012TrainBlock(id) { return /^Station(?:Car\d|Engine|ExitStep)/.test(id); }
 /** 跟着车厢一起平移的那两扇门（SetTrainOffset 每帧改它们的 z）。 */
@@ -466,6 +468,8 @@ export class FirstLevelWhiteboxField {
   *BuildSteps() {
     yield { label: T("p012.whitebox.build.ground"), progress: 0.24 };
     this.BuildWhiteBoxes();
+    // 室内天光遮蔽（Script_InteriorSkyOcclusion）：屋子与门窗口子按本关布局现算，别的布局返回空表。
+    SetInteriorVolumes(BuildInteriorVolumes(this.layout, (x, z) => this.TerrainHeight(x, z)));
     yield { label: T("p012.whitebox.build.blocks"), progress: 0.62 };
     this.BuildGates();
     this.SetScenarioState(this.layout.scenario?.states[0]);
@@ -817,6 +821,7 @@ export class FirstLevelWhiteboxField {
   }
 
   Dispose() {
+    SetInteriorVolumes(null);
     this.breakableTrees?.Dispose(); this.breakableTrees=null;
     this.legend?.remove(); this.legend = null;
     for(const texture of this.labelTextures||[])texture.dispose();

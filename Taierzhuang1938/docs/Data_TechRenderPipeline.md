@@ -136,6 +136,7 @@ function generateShadowMapTypeDefine( parameters ) {
  3  hzb                   RT0.w 的 max-reduce 金字塔（SSR / 体积雾 / 接触阴影共用）
  4  ssr                   自建 min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域（在 main 之前：材质要采它）
  5  gtao                  地平线搜索（AO + 弯曲法线 + SSIL）→ 时域 → 双边 → rtAoBlur（§5）
+ 5a interiorSky           装了屋子表的关卡才跑：室内天光可见度乘进 AO 图的 R（§5.11）
  5b contactShadows        屏幕空间接触阴影（只压直射太阳）→ 合进 SSIL 靶的 alpha（§6）
  6  main                  HDR 主场景（AO / SSIL / SSR / 簇状局部光由材质补丁注入；ultra 才 4×MSAA）
  7  wireframe             着色模式非 shaded 时叠一层三角形边线
@@ -769,7 +770,7 @@ LUT 参数化沿用 Bruneton & Neyret 2008 / Bruneton 2017 的标准值。
 
 #### 第一关概念图 06 的天气（2026-09-26）
 
-正式第一关《往南的路》日间使用 `firstLevelBattleDay`，依据[游戏概念参考图](https://app.notion.com/p/3e460335331c80799ad5f4faf4f837a9)的 06 主图和补充镜头：灰白云幕、褐灰硝烟、被遮住的太阳和远景烟霾，仍保持日间人物可读。此前误用了无云无雾的 `testSceneDay`。测试场、武器场与旧 P012 夹具继续使用自己的基准；关尾 `NightMarch` 仍切换到 `night`。
+正式第一关《往南的路》日间使用 `firstLevelBattleDay`，依据[游戏概念参考图](https://app.notion.com/p/3e460335331c80799ad5f4faf4f837a9)的 06 主图和补充镜头：灰白云幕、褐灰硝烟、被遮住的太阳和远景烟霾，仍保持日间人物可读。此前误用了无云无雾的 `testSceneDay`。测试场、武器场与旧 P012 夹具继续使用自己的基准；关尾 `NightMarch` 2026-09-28 起切换到第一关专用的 `firstLevelNight`（阴云夜，见 §2.10）。
 
 `Script_Sky` 的可选 `cloudShape` 四项依次是噪声频率、密度低阈值、高阈值、最小覆盖率；缺省 `[5.5, 0.445, 0.615, 0]` 保留其他预设。沿用同一五倍频噪声与 `SkyRadiance`，因此天穹、PMREM 和 GI 漏空射线读取同一片云，不增加贴图或渲染 pass。第一关另外校准直射、环境补光与远景雾，数值以预设为准。参考图和同机位验收截图只存本地。
 
@@ -1248,6 +1249,53 @@ node Taierzhuang1938/Script_PostFrameGraphTest.mjs        # 帧图顺序（atmos
 ```
 
 `Script_AtmosphereTest` 的三个阈值分别在守什么，写在那个文件的抬头 —— 改阈值之前先读它。
+
+### 2.10 第一关的天与调色（2026-09-28，对标 3A 迭代 B4）
+
+**先量再调。** `_import/Script_FrameGradeStats.py` 对概念图 28 张 + 分镜 9 张与同机位实拍量
+亮度均值/标准差、色度、暗部 B−R / 高光 R−B、天空区亮度与起伏、天地线性亮度比、带通局部对比、
+黑白位堆积（用法见脚本抬头；`--pairs` 吃「参考 / 改前 / 改后」三列）。量出来的差距与简报的直觉
+有一处相反，照数据走：
+
+* 天的**显示亮度**参考与实机几乎一样（约 170–180），差在**起伏**（天空区亮度标准差参考约 25、
+  实机约 14 —— 一张白纸）；
+* 天地比参考 11–14 : 1、实机 4.5–6 : 1 —— 是**地太亮**，不是天太亮。所以天不压，压的是
+  地上的填充光（IBL / Global SH / 环境光），平行光反而略抬（局部对比从明暗面来）；
+* 高光参考近中性（R−B 约 2–6），实机偏暖 12–13（`skyTint` 是暖的）；暗部参考略暖（泥土）；
+* 整幅均值参考 64–70、实机 98–110 的大头是白盒体块的反照率（B1 建筑 / B2 地面在换），调色**不**
+  去追它，否则材质换完之后整幅再黑一截。
+
+做了什么（全部只挂在 `firstLevelBattleDay` / `firstLevelNight` 上，其余预设逐比特不变）：
+
+1. **结构化云层**（`Script_Sky` 的 `CloudDeck()`，预设字段 `cloudDeck`）：视线投到云盘上
+   （平面投影 = 云层透视），域扭曲的二维 fbm 当覆盖，朝太阳挪一步再取一次密度估「上游厚度」
+   给云底上明暗，云缝取物理天空 × `gap`。`uCloudDeck.x = 0` 的预设走旧云项。签名
+   `SkyRadiance(dir, sunDiskGain)` 不变，探针体 GI 的漏空射线与 PMREM 自动问同一片天。
+   扭曲幅度必须小（第一版 1.4 满天放射状刷子印，现 0.35）。
+2. **调色按预设**：`fog.grade` 现在认 `lift / gain / shadowTint / highlightTint / shadow /
+   highlight` 全部六项；**没写的项每帧回落 `Data_Tuning_Camera.GRADE_DEFAULTS`**（2026-09-28 之前
+   uniform 只在有 grade 时写，换预设会把上一档的色偏留下）。第一关：分离调色减半、暗部少一点青蓝。
+3. **填充光与对比**：envIntensity / shProbe / ambient 下调、平行光略抬、contrast 1.10、
+   skyTint 去暖（数与理由在 `SKY_PRESETS.firstLevelBattleDay` 的注释里）。
+4. **曝光**：`SKY_EXPOSURE.firstLevelBattleDay`（evUp 0.5 / evDown 0.25：进屋只适应一半，
+   看天几乎不压）+ `EXPOSURE_ANCHORS.FirstLevelP012Whitebox`。锚点**不取出生机位**（出生在掩蔽部里），
+   取 11 个室外对照机位 avgLog 的中位数；`Script_FirstLevelSkyGradeBrowserTest` 每次重量，
+   偏差 > 0.3 EV 报红 —— 白盒换材质之后照它打印的中位数重标。
+5. **体积雾**：`VOLUMETRIC_PRESETS.firstLevelBattleDay`（g 0.30、尘霾噪声 0.28 只减不加），
+   densityScale 按 §8.5 算出来是 1.00；消光仍走 legacyTransmittance —— 70 m 透过率
+   0.7993（地面）/ 0.8068（1.7 m）/ 0.8106（2.6 m），与改前逐位相同（「先别动雾」，Node 门禁钉死）。
+6. **关尾夜**：`firstLevelNight`（以 `night` 为底：云层高覆盖、云底近黑、无星、曝光 3.6→2.7），
+   `Script_FirstLevelMissionRuntime` 的 NightMarch 改套它。`night` 本身不动（AtmosphereTest 钉着）。
+7. **远景烟柱**（`Data_FirstLevelDistantSmoke` 的 `plume` + `Script_BattleSmoke` 的 `iPlume`）：
+   两种柱子加高、漂移指数 1.3→1.7–2.1（根部直、上部被风横拉）、上部横向拉宽、根部压黑往上稀释成灰、
+   受光面偏太阳色背光面偏冷、边缘侵蚀加倍；数量位置不动，路边烟逐比特不变。烟的光照另按
+   本时段 `fog.sky` 的亮度钳一道（白天恒 1），夜里不再整团发白。
+
+旋钮：`Script_Sky.SKY_PRESETS.firstLevelBattleDay / firstLevelNight`、`Data_Tuning_Camera`
+（`GRADE_DEFAULTS` / `SKY_EXPOSURE` / `EXPOSURE_ANCHORS`）、`Data_Tuning_Volumetrics`、
+`Data_Tuning_BattleSmoke.BATTLE_SMOKE_PLUME`、`Data_FirstLevelDistantSmoke.DISTANT_SMOKE_TYPES`。
+门禁：`Script_FirstLevelSkyGradeTest`（纯 Node）、`Script_FirstLevelSkyGradeBrowserTest`、
+`Script_FirstLevelDistantSmokeTest`、`Script_VolumetricsTest`、`Script_ExposureTest`。
 
 ---
 
@@ -1837,6 +1885,35 @@ node Taierzhuang1938/Script_ProfilerTest.mjs
 下一次调参的人要能一眼看到当前落在哪儿、离门槛还有多远。取证机位是
 `Probe.html?scene=ssil`：世界坐标已知，每一条断言都用 `camera.project()` 把世界点
 投到屏幕上再去读那一块像素，不靠「画面左下角大概是地面」。
+
+### 5.11 室内天光遮蔽（2026-09-28，第一关）
+
+**要解决的**：屋里（09 灶屋 / 连屋 / 侧间、16–17 厢房、01 掩蔽部）与屋外一样亮。间接光只有
+天空 IBL + Global SH，都没有位置；GTAO 只管一两米的接触遮蔽；探针体 GI 出厂关，而且拿碰撞盒
+当代理体 —— 第一关屋顶檐以上是非实心的，探针照样看得见天。
+
+**做法**：帧图里紧跟 `gtao` 的一趟 `interiorSky`（`Script_InteriorSkyOcclusion`）。读 GTAO
+最终 AO 图，用 A（线性视深）还原世界坐标，落在某间屋子的内框里就把 R（可见度）再乘
+`vis = clamp(dark + Σ口子, dark, 1)`，每个口子贡献「从该点看过去这个口子的投影立体角」
+（`gain·A·facing / (π(d² + A·soften))`）；写进自己的 `combined` 靶，`PostPipeline.AoTexture`
+在有屋子时改指它。材质端 AO 补丁原样乘进 indirectDiffuse 与镜面遮蔽 —— **只压间接光**（契约 6），
+直射由阴影管，马灯 / 火这类簇光不受影响。零采样器、零材质改动、没有屋子的关卡不跑。
+
+**屋子从哪来**：`Data_FirstLevelInteriors.FIRST_LEVEL_INTERIORS` 手写屋子（墙中线矩形 + 净高 +
+最深处可见度 `dark`），门窗缺口由 `BuildInteriorVolumes` 按 `MISSION_LAYOUT.blocks` 在墙中线
+（及往里 0.4 m，门帘也挡光）上自动找；缺口外侧是另一间屋子的不算采光口；掩蔽部三面是坑壁（地形），
+洞口写死。场地（`FirstLevelWhiteboxField`）建关时装、拆关时清；布局 id 对不上返回空表。
+
+**为什么不是材质补丁**：补丁要给每份材质挂几十个 vec4 的 uniform 数组，three 对数组 uniform
+不缓存、每次换材质整组重传，第一关是 CPU 提交瓶颈。
+
+**已知限制（有意的）**：没挂 AO 补丁的材质不吃它 —— 白盒纯色体块（`MakeSemanticMaterial`）
+目前就没挂，墙面要等白盒材质走 `MaterialLibrary` 注入（B1）才会跟着暗；low 档没有 GTAO 也没有它；
+二次反弹（亮屋子照进暗屋子）不算；画质面板的 AO 强度（`uSsaoStrength`）同样作用在它身上。
+
+旋钮 `Data_Tuning_Lights.INTERIOR_SKY`（总强度、口子增益、过渡带）与逐屋 `dark`；
+门禁 `Script_FirstLevelSkyGradeTest`（纯 Node：屋子深处 < 0.2、门口 > 0.5、外墙面 / 屋面 / 街上 = 1）、
+`Script_FirstLevelSkyGradeBrowserTest`（灶屋 09_2 下半幅变暗 ≥ 12%、室外 08_1 < 1.5%）。
 
 ---
 

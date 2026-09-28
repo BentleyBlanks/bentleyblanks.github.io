@@ -77,6 +77,7 @@ import {
 } from "./Script_PostPrepass.mjs";
 import { TerrainBlendPass } from './Script_TerrainBlend.mjs';
 import { GtaoPass } from "./Script_PostGtao.mjs";
+import { InteriorSkyPass } from "./Script_InteriorSkyOcclusion.mjs";
 import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
 import { VolumetricsPass } from "./Script_PostVolumetrics.mjs";
 import { ContactShadowsPass, MakeShadowDebugViews } from "./Script_ContactShadows.mjs";
@@ -218,6 +219,8 @@ export class PostPipeline {
     this.ssrColorPass = new SsrColorPass(this, this.ssrPass);
     // GTAO + 弯曲法线 + SSIL（子系统 B2）。替掉了旧的 Script_PostSsao。
     this.gtaoPass = new GtaoPass(this);
+    // 室内天光遮蔽（2026-09-28）：把「屋里比屋外暗」乘进 AO 图，只在装了屋子的关卡跑。
+    this.interiorSkyPass = new InteriorSkyPass(this);
     // 屏幕空间接触阴影（子系统 B1）。
     this.contactShadowsPass = new ContactShadowsPass(this, { quality: this.quality });
     this.taaPass = new TaaPass(this);
@@ -261,6 +264,8 @@ export class PostPipeline {
       // 上一帧 —— 口径与 UE 的 SSR 相同，详见 Script_PostSsr 抬头。
       this.ssrPass,
       this.gtaoPass,
+      // 紧跟 gtao：读它的最终 AO 图、写 AoTexture 改指的那张（材质在 main 里采）。
+      this.interiorSkyPass,
       // 屏幕空间接触阴影：要预通道的法线+视深，产出的图要在主场景那一趟被材质
       // 采到，所以卡在 gtao 与 main 之间。关着时 Idle() 把材质那边还原成纯白。
       this.contactShadowsPass,
@@ -517,7 +522,7 @@ export class PostPipeline {
    * 通道布局（2026-09 起是 GTAO）：R = 可见度、G/B = 弯曲法线（视空间八面体）、
    * A = 线性视深（材质端的联合双边升采样要它）。
    */
-  get AoTexture() { return this.targets.aoBlur.texture; }
+  get AoTexture() { return this.interiorSkyPass.CombinedTexture || this.targets.aoBlur.texture; }
 
   /**
    * 材质端 `uSsilMap` 采的那张：**rgb = SSIL 近场反弹，alpha = 屏幕空间接触阴影**。

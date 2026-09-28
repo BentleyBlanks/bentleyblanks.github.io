@@ -448,3 +448,38 @@ export function ConeBoundingSphere(range, cosHalfAngle) {
   }
   return { along: range * c, radius: range * sin };
 }
+
+// ---------------------------------------------------------------------------
+// 3. 室内天光遮蔽（2026-09-28，第一关；Script_InteriorSkyOcclusion + Data_FirstLevelInteriors）
+// ---------------------------------------------------------------------------
+
+/**
+ * 「屋里比屋外暗」的数。屏幕空间一趟：按 AO 图里的视深还原世界坐标，落在某间屋子
+ * 内框里就把 AO 可见度再乘一个室内天光可见度（**只压间接光**，契约 6；直射光由阴影管）。
+ *
+ * 可见度模型（每间屋子）：vis = clamp(dark + Σ 口子, dark, 1)，每个口子贡献
+ *   gain · A · (cosθ·(1−cosFloor) + cosFloor) / (π · (d² + A · soften))
+ * 即「从该点看过去这个口子占了多大的投影立体角」—— 离 2×2.35 m 的门三米约 0.13，贴着门 ≈ 1。
+ * `dark` 是屋子最深处的底（逐屋写在 Data_FirstLevelInteriors）。
+ *
+ *   strength     总强度（0 = 关；mix(1, vis, strength)）
+ *   gain         口子贡献倍率
+ *   cosFloor     背对口子的点也分一点（口子两侧的墙根不至于死黑）
+ *   soften       分母软化：口子面积 × 它 —— 贴着口子时不发散
+ *   featherH     内框之外水平方向的过渡带（米）。墙外皮在内框外一个墙厚（0.6），
+ *                过渡带必须比它短，外墙面才一点不暗
+ *   featherTop   顶棚之上的过渡带（米）。屋面板最低也在顶棚上 0.32 m
+ *
+ * 为什么乘进 AO 而不是写材质补丁：补丁要给每份材质挂几十个 vec4 的 uniform 数组，
+ * three 对数组 uniform 不做缓存，每次换材质都整组重传（第一关本来就是 CPU 提交瓶颈）；
+ * 乘进 AO 图是半分辨率一趟 blit，所有吃 AO 的材质（地形、人物、道具、库材质）自动生效，
+ * 零采样器、零材质改动。代价：没挂 AO 补丁的材质（白盒纯色体块）不吃它，low 档没有 AO 也没有它。
+ */
+export const INTERIOR_SKY = Object.freeze({
+  strength: 1.0,
+  gain: 1.0,
+  cosFloor: 0.2,
+  soften: 0.35,
+  featherH: 0.5,
+  featherTop: 0.25,
+});
