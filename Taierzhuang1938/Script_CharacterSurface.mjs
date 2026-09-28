@@ -54,13 +54,14 @@ export function CharacterSurfaceOf(material) {
 // ---------------------------------------------------------------------------
 // 共享贴图（与 Script_UniformColors 的布纹包同一个模式：先挂一张中性 1×1，图到了原地换，不重编译）
 // ---------------------------------------------------------------------------
-function DetailTexture(file, version) {
+function DetailTexture(file) {
   const neutral = new THREE.DataTexture(new Uint8Array([128, 128, 128, 128]), 1, 1, THREE.RGBAFormat);
   neutral.colorSpace = THREE.NoColorSpace;
   neutral.needsUpdate = true;
   const uniform = { value: neutral };
   if (typeof document !== "undefined") {
-    new THREE.TextureLoader().load(new URL(`${file}?v=${version}`, import.meta.url).href, (texture) => {
+    // 数据表里的路径自带 ?v= 戳。
+    new THREE.TextureLoader().load(new URL(file, import.meta.url).href, (texture) => {
       // 数据不是颜色；glTF 的 UV 朝向（flipY = false），与它骑着的 atlas 一致。
       texture.colorSpace = THREE.NoColorSpace;
       texture.flipY = false;
@@ -91,7 +92,7 @@ function Shared() {
       uCharDustTint: { value: Linear(G.dustTint) },
     },
     skin: {
-      uCharSkinDetailMap: DetailTexture(S.detailTexture, S.version),
+      uCharSkinDetailMap: DetailTexture(S.detailTexture),
       uCharSkinTone: { value: Linear(S.tone) },
       // x 色相拉向 tone，y 去饱和，z 明度，w 凹处压暗
       uCharSkinGrade: { value: new THREE.Vector4(S.toneMix, S.desat, S.value, S.cavityAlbedo) },
@@ -103,7 +104,7 @@ function Shared() {
       uCharSkinSweat: { value: new THREE.Vector2(S.sweat, S.sweatRoughness) },
     },
     wool: {
-      uIjaWoolDetailMap: DetailTexture(W.texture, W.version),
+      uIjaWoolDetailMap: DetailTexture(W.texture),
       // x 布纹平铺，y 污渍平铺，z 布纹法线权重，w 斑驳平铺
       uIjaWoolTile: { value: new THREE.Vector4(W.weaveTile, W.grimeTile, W.normalStrength, W.mottleTile) },
       uIjaWoolFade: { value: new THREE.Vector2(W.normalFade[0], W.normalFade[1]) },

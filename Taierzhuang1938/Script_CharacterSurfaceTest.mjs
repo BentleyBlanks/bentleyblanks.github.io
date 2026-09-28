@@ -6,7 +6,7 @@
 //      部件的 role / cls 只取已知值，皮肤都写了 uvMeters，钢盔圆盘在 atlas 内；
 //   2. 被打成部件的材质如果带 KHR_materials_specular 的 specularTexture，那张图必须**没有 alpha**：
 //      three 只读它的 alpha（KHR 规范），人物变体摘掉它才是逐像素无差 —— 这是腾采样器的前提；
-//   3. 两张细节包（皮肤 / 呢子）在、512² 带 alpha 的 WebP、单张 ≤ 400 KB；
+//   3. 两张细节包（皮肤 256² / 呢子 512²）在、带 alpha 的 WebP、单张 ≤ 400 KB（lazy 层预算紧）；
 //   4. 打标在 ConfigureExternalPbr 之前（人物 / 第一人称双臂 / 第一人称身体三处）、新模块登记进 import map。
 // 用法：node Taierzhuang1938/Script_CharacterSurfaceTest.mjs
 import fs from "node:fs";
@@ -121,15 +121,15 @@ Check(CHARACTER_SKIN.tileMeters >= 0.02 && CHARACTER_SKIN.tileMeters <= 0.2 && C
   "皮肤细节平铺与高光强度", `${CHARACTER_SKIN.tileMeters} m / ${CHARACTER_SKIN.specularIntensity}`);
 
 // ---- 3：细节包 -----------------------------------------------------------------------
-for (const [label, spec] of [["皮肤细节包", CHARACTER_SKIN], ["呢子细节包", IJA_WOOL_DETAIL]]) {
-  const texture = spec.detailTexture || spec.texture;
+for (const [label, spec, size] of [["皮肤细节包", CHARACTER_SKIN, 256], ["呢子细节包", IJA_WOOL_DETAIL, 512]]) {
+  const texture = (spec.detailTexture || spec.texture).split("?")[0];
   const file = path.join(here, texture);
   if (!fs.existsSync(file)) { Check(false, `${label}在`, texture); continue; }
   const info = WebpInfo(file);
-  Check(info.riff && info.width === 512 && info.height === 512 && info.alpha, `${label}是 512² 带 alpha 的 WebP`,
+  Check(info.riff && info.width === size && info.height === size && info.alpha, `${label}是 ${size}² 带 alpha 的 WebP`,
     `${info.width}×${info.height} alpha=${info.alpha}`);
   Check(info.bytes <= 400 * 1024, `${label} ≤ 400 KB`, `${(info.bytes / 1024).toFixed(0)} KB`);
-  Check(Number.isInteger(spec.version) && spec.version > 0, `${label}带版本戳`, String(spec.version));
+  Check(/\?v=\d+$/.test(spec.detailTexture || spec.texture), `${label}的 URL 带 ?v= 戳`, spec.detailTexture || spec.texture);
 }
 
 // ---- 4：接线 ----------------------------------------------------------------------------

@@ -1,0 +1,7 @@
+Generate ONE square 1:1 image (2048x2048), fully opaque: a seamless tileable texture photograph for a game material.
+
+Subject: macro close-up of weathered skin of a young East Asian farmer soldier (back of the hand / outer forearm), rural southern Shandong, March 1938, overcast day. Warm tan, slightly sallow skin tone, not pink. The image covers exactly 3 cm x 3 cm of skin.
+
+Must show: visible pores, fine criss-cross skin micro lines forming a small diamond pattern, tiny creases, very light fine dust ground into the lines. Same scale and same density everywhere.
+
+Orthographic, camera looking straight at a flat patch of skin. Flat even delit lighting: no shadows, no specular highlights, no shine, no vignette, no gradient. No hair, no veins, no knuckles, no nails, no scars, no tattoos, no large wrinkles or folds, no text, no border, no objects. The skin fills the entire frame edge to edge and tiles seamlessly.

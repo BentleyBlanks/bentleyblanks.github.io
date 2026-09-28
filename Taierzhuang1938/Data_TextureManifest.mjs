@@ -714,9 +714,45 @@ export const TEXTURE_MANIFEST = Object.freeze([
     bake: "_import/Script_BakeNraClothDetail.py",
     source: { provider: "lovart", date: "2026-09-27" },
     consumers: [{ file: "Data_Tuning_Materials.mjs", token: "Texture_NraUniformClothDetail" }],
-    legacy: "Lovart 提示词 / thread 未入库；URL 无 ?v= 戳（Script_UniformColors 读 Data_Tuning_Materials）",
+    legacy: "Lovart 提示词 / thread 未入库（2026-09-28 URL 已补 ?v= 戳）",
     files: [
       ["Texture_NraUniformClothDetail.webp", "Detail", 512, 512],
+    ],
+  },
+  {
+    id: "CharacterSkin", kind: "detail", tier: "lazy",
+    packing: "RG 毛孔 / 皮纹法线（切线空间，0.5 = 平）、B 凹处明暗（0.5 = 中性）、A 皮脂 / 粗糙度起伏（0.5 = 中性）",
+    metersPerTile: 0.06,
+    bake: "_import/Script_BakeCharacterDetail.py",
+    source: {
+      provider: "lovart", date: "2026-09-28", ref: "1e919f94-dd3c-4960-ac27-65fb9b9cea34",
+      prompt: "_import/Prompts/Texture_CharacterSkin.txt",
+      note: "3A 迭代 B3；源图 _shots/Gap3A_Source/B3/SkinMicroDetail/（不入库，3 cm 视野，按 6 cm 一格铺）",
+    },
+    consumers: [
+      { file: "Data_Tuning_Materials.mjs", token: "Texture_CharacterSkinDetail" },
+      { file: "Script_CharacterSurface.mjs", token: "uCharSkinDetailMap" },
+    ],
+    files: [
+      ["Texture_CharacterSkinDetail.webp", "Detail", 256, 256],
+    ],
+  },
+  {
+    id: "IjaUniformWool", kind: "detail", tier: "lazy",
+    packing: "RG 呢子斜纹法线（切线空间，0.5 = 平）、B 斜纹明暗（0.5 = 中性）、A 污渍 / 洗褪（低平铺采样）",
+    metersPerTile: 0.23,
+    bake: "_import/Script_BakeCharacterDetail.py",
+    source: {
+      provider: "lovart", date: "2026-09-28", ref: "6d31d311-6887-426c-b194-ea67ec861b42",
+      prompt: "_import/Prompts/Texture_IjaUniformWool.txt",
+      note: "3A 迭代 B3；布纹源图 _shots/Gap3A_Source/B3/IjaWoolSerge/（不入库）；A 通道复用 _import/Reference/NraClothDetail/Source_UniformGrime.webp（上下翻转）",
+    },
+    consumers: [
+      { file: "Data_Tuning_Materials.mjs", token: "Texture_IjaUniformWoolDetail" },
+      { file: "Script_CharacterSurface.mjs", token: "uIjaWoolDetailMap" },
+    ],
+    files: [
+      ["Texture_IjaUniformWoolDetail.webp", "Detail", 512, 512],
     ],
   },
   {

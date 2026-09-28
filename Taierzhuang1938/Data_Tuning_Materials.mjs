@@ -58,7 +58,8 @@ export const NRA_UNIFORM_COLORS = Object.freeze({
 //   atlasRoughness   保留多少 atlas 粗糙度图的起伏（褶皱里的湿/磨痕）
 //   weaveRoughness / grimeRoughness  线缝更糙、积灰更糙
 export const NRA_CLOTH_DETAIL = Object.freeze({
-  texture: "./Texture/Texture_NraUniformClothDetail.webp",
+  // ?v= 戳写在字面量里（贴图规范 §6：改图就改戳；Script_TextureStandardsTest 扫字面量）。
+  texture: "./Texture/Texture_NraUniformClothDetail.webp?v=20260927",
   weaveTile: 10,
   grimeTile: 3.5,
   mottleTile: 15,
@@ -206,8 +207,7 @@ export const CHARACTER_GRIME = Object.freeze({
  *   wristColor      腕环（noMap）用的前臂均色（John_Color 前臂区实测，sRGB）
  */
 export const CHARACTER_SKIN = Object.freeze({
-  detailTexture: "./Texture/Texture_CharacterSkinDetail.webp",
-  version: 1,
+  detailTexture: "./Texture/Texture_CharacterSkinDetail.webp?v=20260928",
   tileMeters: 0.06,
   normalStrength: 0.42,
   fade: Object.freeze([0.4, 2.8]),
@@ -265,8 +265,7 @@ export const IJA_UNIFORM_COLORS = Object.freeze({
  * sheen / sheenLift：呢子的绒光比棉布弱、颜色更贴布色（CLOTH_SHEEN 的全局值会把橄榄褐刷成一层灰白）。
  */
 export const IJA_WOOL_DETAIL = Object.freeze({
-  texture: "./Texture/Texture_IjaUniformWoolDetail.webp",
-  version: 1,
+  texture: "./Texture/Texture_IjaUniformWoolDetail.webp?v=20260928",
   weaveTile: 10,
   grimeTile: 3.3,
   mottleTile: 13,

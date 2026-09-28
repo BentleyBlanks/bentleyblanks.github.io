@@ -202,7 +202,7 @@ $env:STANDARDIZE_PASS = 'libraries'; blender --background --factory-startup --py
 
 | 文件 | 尺寸 | 通道 | 来源 |
 |---|---|---|---|
-| `Texture/Texture_CharacterSkinDetail.webp` | 512² | RG 毛孔法线、B 凹处明暗、A 皮脂 | Lovart thread `1e919f94-dd3c-4960-ac27-65fb9b9cea34`，提示词 `_import/Prompts/Texture_CharacterSkin.txt` |
+| `Texture/Texture_CharacterSkinDetail.webp` | 256²（6 cm 一格 = 0.23 mm/纹素，比第一人称手上一个屏幕像素还细；毛孔噪声不好压，512² 要四倍字节） | RG 毛孔法线、B 凹处明暗、A 皮脂 | Lovart thread `1e919f94-dd3c-4960-ac27-65fb9b9cea34`，提示词 `_import/Prompts/Texture_CharacterSkin.txt` |
 | `Texture/Texture_IjaUniformWoolDetail.webp` | 512² | RG 斜纹法线、B 斜纹明暗、A 污渍 | Lovart thread `6d31d311-6887-426c-b194-ea67ec861b42`（布纹）+ 国军布细节的污渍源图，提示词 `_import/Prompts/Texture_IjaUniformWool.txt` |
 
 两张都是 `lazy`：第一个人物造出来时才下（先挂中性 1×1，到了原地换，不重编译），URL 带 `?v=`。

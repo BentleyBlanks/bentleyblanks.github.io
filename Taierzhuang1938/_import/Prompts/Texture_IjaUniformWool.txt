@@ -1,0 +1,7 @@
+Generate ONE square 1:1 image (2048x2048), fully opaque: a seamless tileable texture photograph for a game material.
+
+Subject: macro close-up of worn Japanese Army Type 98 wool serge uniform cloth as worn in the field in rural southern Shandong, March 1938, overcast day. Desaturated olive-drab / khaki-brown wool (dull olive-brown, not yellow, not green). The image covers exactly 6 cm x 6 cm of fabric.
+
+Must show: fine diagonal twill ribs about 1 mm apart running across the whole frame, a slightly felted fuzzy wool surface with tiny loose fibres and pilling, faint uneven dye and very light dust. Same scale and same density everywhere.
+
+Orthographic, camera looking straight down at flat fabric. Flat even delit lighting: no shadows, no specular highlights, no vignette, no gradient. No folds, no wrinkles, no seams, no stitches, no buttons, no insignia, no text, no border, no objects. The fabric fills the entire frame edge to edge and tiles seamlessly.

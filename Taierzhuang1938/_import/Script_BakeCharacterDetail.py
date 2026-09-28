@@ -9,12 +9,12 @@ the grime photo is the NRA one already in `_import/Reference/NraClothDetail/`. B
 the NRA cloth pack layout (`Script_BakeNraClothDetail.py`, same seamless closing and resize) and
 are sampled a second time at a high repeat on the atlas UV of the character material:
 
-  Texture_IjaUniformWoolDetail.webp   (Data_Tuning_Materials.IJA_WOOL_DETAIL)
+  Texture_IjaUniformWoolDetail.webp   (Data_Tuning_Materials.IJA_WOOL_DETAIL, 512 px)
     R, G  serge twill normal, tangent-space xy (0.5 = flat), glTF orientation (flipY = false)
     B     twill value: rib crowns bright, gaps dark (0.5 = neutral)
     A     grime / wear (dust, sun-faded blotches), sampled at a low repeat
 
-  Texture_CharacterSkinDetail.webp    (Data_Tuning_Materials.CHARACTER_SKIN)
+  Texture_CharacterSkinDetail.webp    (Data_Tuning_Materials.CHARACTER_SKIN, 256 px)
     R, G  pore and skin-line normal, tangent-space xy (0.5 = flat)
     B     cavity value: pores and lines dark (0.5 = neutral)
     A     sebum / roughness variation: lines and pores rougher (0.5 = neutral)
@@ -38,7 +38,11 @@ SOURCE_DIR = HERE.parent / "_shots" / "Gap3A_Source" / "B3"
 DEFAULT_WOOL = SOURCE_DIR / "IjaWoolSerge" / "lovart_3710010418a9.png"
 DEFAULT_SKIN = SOURCE_DIR / "SkinMicroDetail" / "lovart_4b91632ca3ee.png"
 DEFAULT_OUT = HERE.parent / "Texture"
-SIZE = 512
+WOOL_SIZE = 512
+# Skin: 6 cm per tile / 256 px = 0.23 mm per texel, finer than a screen pixel on first-person hands
+# (~0.34 mm at 1080p, 0.35 m away). Pore noise barely compresses, so 512 would cost ~4x the bytes
+# of the lazy texture tier for detail nobody can see.
+SKIN_SIZE = 256
 
 
 def NormalFrom(value, strength):
@@ -49,9 +53,9 @@ def NormalFrom(value, strength):
     return -dx / length, dy / length
 
 
-def Save(rgba, target):
+def Save(rgba, target, quality=88, alphaQuality=100):
     image = Image.fromarray(np.uint8(np.round(np.clip(rgba, 0, 1) * 255)), "RGBA")
-    image.save(target, quality=88, alpha_quality=100, method=6)
+    image.save(target, quality=quality, alpha_quality=alphaQuality, method=6)
     stats = {name: (round(float(c.mean()), 3), round(float(c.std()), 3))
              for name, c in zip("RGBA", np.moveaxis(rgba, -1, 0))}
     print(f"wrote {target} ({target.stat().st_size} bytes) channel mean/std {stats}")
@@ -60,27 +64,28 @@ def Save(rgba, target):
 
 def BakeWool(woolPath, grimePath, destination):
     # The serge photo is ~0.03 mm/px; ribs ~25 px apart. Drop the weave-scale lighting drift first.
-    weave = Resize(Seamless(HighPass(Luminance(woolPath), 40), "wool weave"), SIZE)
-    grime = Resize(Seamless(Luminance(grimePath), "grime"), SIZE)
+    weave = Resize(Seamless(HighPass(Luminance(woolPath), 40), "wool weave"), WOOL_SIZE)
+    grime = Resize(Seamless(Luminance(grimePath), "grime"), WOOL_SIZE)
     weave = gaussian_filter(weave, 0.6, mode="wrap")
     value = np.clip(0.5 + weave / (8 * weave.std()), 0, 1)
     nx, ny = NormalFrom(value, 4.0)
     # Same grime treatment as the NRA pack, flipped so the two uniforms never share blotches.
-    grime = HighPass(grime, SIZE * 0.22)[::-1, :]
+    grime = HighPass(grime, WOOL_SIZE * 0.22)[::-1, :]
     grime = np.clip(0.5 + grime / (6 * grime.std()), 0, 1)
     rgba = np.stack([0.5 + 0.5 * nx, 0.5 + 0.5 * ny, value, grime], axis=-1)
-    return Save(rgba, Path(destination) / "Texture_IjaUniformWoolDetail.webp")
+    # Lossy alpha is fine for the smooth grime mask; keeps the pack inside the lazy texture tier budget.
+    return Save(rgba, Path(destination) / "Texture_IjaUniformWoolDetail.webp", quality=82, alphaQuality=85)
 
 
 def BakeSkin(skinPath, destination):
     lum = Luminance(skinPath)
     # Pores and the diamond line pattern live below ~1 mm (~30 px in the 3 cm source).
-    fine = Resize(Seamless(HighPass(lum, 24), "skin fine"), SIZE)
-    fine = gaussian_filter(fine, 0.5, mode="wrap")
+    fine = Resize(Seamless(HighPass(lum, 24), "skin fine"), SKIN_SIZE)
+    fine = gaussian_filter(fine, 0.4, mode="wrap")
     value = np.clip(0.5 + fine / (7 * fine.std()), 0, 1)
-    nx, ny = NormalFrom(value, 3.2)
+    nx, ny = NormalFrom(value, 2.4)
     # Sebum: lines and pores catch dirt and read rougher; the flat patches between them are oilier.
-    oil = gaussian_filter(fine, 2.0, mode="wrap")
+    oil = gaussian_filter(fine, 1.0, mode="wrap")
     oil = np.clip(0.5 - oil / (6 * oil.std()), 0, 1)
     rgba = np.stack([0.5 + 0.5 * nx, 0.5 + 0.5 * ny, value, oil], axis=-1)
     return Save(rgba, Path(destination) / "Texture_CharacterSkinDetail.webp")
