@@ -132,6 +132,9 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   `Script_FirstLevelQuietMarch`（15A/15B）、`Script_FirstLevelReception`（15C/16/17）、`Script_FirstLevelBridge`（18 桥头）、
   `Script_FirstLevelNightGate`（18 夜入北门）、`Script_FirstLevelNightLights`（夜景点光，唯一带 three 的一只）、
   `Data_Tuning_FirstLevelEnd`、`Script_FirstLevelEndTest`、`Script_FirstLevelCampaignEnd`。
+- 18 铁路桥（[说明](Data_RailBridge.md)）：`_blender/Script_BuildRailBridge.py` + `_blender/Script_ExportRailBridgeTerrain.mjs`
+  （Blender 烘 `Model/Model_RailBridge.glb` + `Model/Data_RailBridge.json`）、`Script_RailBridgeSet`（模型 / 三态 / 起爆时间线，带 three）、
+  `Data_RailBridgeDemolition`（地址、材质、特效分量）、`Script_RailBridgeTest`、`Script_RailBridgeShots`。
 - 驾驶脚本公共层 `Script_FirstLevelCampaignKit`：`ParseCampaignArgs` / `OpenCampaign` / `CloseCampaign` /
   `CaptureFailure` / `CheckVoiceAssets` / `InstallInputDriver` / `CampaignActions(ctx)`（`JumpStage` `Capture`
   `CaptureFocus` `WaitOutCutscene` `Route` `Interact` `RetryCampaign` `WaitStage`）。允许的起止以 `ParseCampaignArgs` 为准

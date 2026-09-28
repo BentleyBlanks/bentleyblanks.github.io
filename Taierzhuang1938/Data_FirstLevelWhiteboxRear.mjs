@@ -334,15 +334,8 @@ export function BuildRearWhitebox(groundAt) {
   Rubble("BridgeBankStones", -90, 174.6, 8, 5, .6, .4);
   for (const [i, x, z, s] of [[0, -93.5, 175.4, 1.2], [1, -85.6, 175.9, .9], [2, -66, 176.6, 1.1], [3, -60.5, 177.1, .8]])
     Detail(`BridgeBankGrass${i}`, x, z, s, s * .6, s * .8, "foliage", { y: groundAt(x, z) + s * .3 });
-  // Stone piers under the span (river floor to deck bottom 0.11 m), non-colliding details:
-  // they stand under the deck, off every line of sight above it, and survive the demolition.
-  for (const [side, z] of [["North", 148.6], ["South", 157.4]]) {
-    const floor = groundAt(-77, z), top = .11;
-    Detail(`RailBridgePier${side}`, -77, z, 3.4, top - floor + .3, 1.7, "structure", { y: (top + floor - .3) / 2 });
-    Detail(`RailBridgePierCap${side}`, -77, z, 4.2, .3, 2.1, "structure", { y: top - .15 });
-    Detail(`RailBridgePierCutwater${side}`, -77, z - .85, 1.2, top - floor - .4, 1.2, "structure",
-      { y: (top - .4 + floor) / 2, ry: Math.PI / 4 });
-  }
+  // The rail bridge is a single-span truss now (Model_RailBridge, docs/Data_RailBridge.md):
+  // no river piers. The old non-colliding pier details were removed with the whitebox look.
 
   // ---------------------------------------------------------------------------
   // 18_2 NightGate only: street houses, ammunition stacks, arch haunches, flag poles.

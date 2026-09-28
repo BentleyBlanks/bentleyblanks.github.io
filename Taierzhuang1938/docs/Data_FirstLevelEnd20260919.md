@@ -140,9 +140,12 @@
   ① `demolitionCharged`；② 玩家 `blastZoneCleared`（`blastSafe` 10 m 内，该点离桥心 48 m）；
   ③ `BlastZoneOccupant()` 为空：玩家、班里人、桥头人员、尾队，**没有一个**在桥心
   `blastClearRadiusM`(30 m) 以内。有人就一直等（每次等都记一条 `blastHeldForFriendly` 取证），
-  **不是到点就炸的计时器**。点火 → `vfx.Explosion` + `shellImpact` → `bridgeDestroyed`
-  → 信号 `RailBridgeDestroyed` 一次翻完 **5 个完好件 + 3 个残骸件**，桥面退出可走面（不可逆）
-  → `MarchToTengxian`。爆破不造成己方剧情伤亡。
+  **不是到点就炸的计时器**。人走净之后再等玩家把脸转向桥（≤ `blastGazeWaitS` 3.5 s），
+  蹲在起爆器后面的爆破手压杆（`exploderPressed`），`exploderPressLeadS` 之后点火 →
+  `railBridgeSet.Detonate()`（钢桁架桥分段起爆、两个半孔折进河里、水柱烟柱，见 [铁路桥](Data_RailBridge.md)）
+  + 唯一一次 `Combat.BlastFeedback` → `bridgeDestroyed`
+  → 信号 `RailBridgeDestroyed` 一次翻完 **5 个完好件 + 3 个残骸件**（碰撞；外观归模型），桥面退出可走面（不可逆）
+  → 起爆后 `marchOrderDelayS` 6.5 s 才 `MarchToTengxian`（两个半孔都砸进河之后）。爆破不造成己方剧情伤亡。
 * **夜入滕城**：
   * 先随队沿 `marchOut` 真走一段（行军脚步不停），走到 `marchOutReached`
     （锚点 `marchOut`，`marchOutArriveM` 8 m）才 `BeginNightTransition()` ——
@@ -193,7 +196,9 @@
 | `woundedEnteringLitters` | 2 | `R.litterCount` 7 里先进院的头两副 |
 | `surgeonReachM` | 2.4 | 站位离放置点 1.65 m + 走位到达余量 0.5 m |
 | `rearColumnHoldM` | 13 | `bridgeCrossing` 起点到北桥头 16 m，停在离桥头 3 m |
-| `blastClearRadiusM` | 30 | 特效半径 12 m 的两倍半；`blastSafe` 离桥心 48 m，退到那儿一定算走净 |
+| `blastClearRadiusM` | 30 | 药包火球半径 9.5–13 m 的两倍多；`blastSafe` 离桥心 48 m，退到那儿一定算走净 |
+| `MISSION_TUNING.bridgeBlastRadiusM` | 16 | 共用爆炸感知半径：48 m 外震屏创伤约 0.5，耳鸣伸不到安全区（原 12） |
+| `blastGazeWaitS` / `exploderPressLeadS` / `marchOrderDelayS` | 3.5 / 0.45 / 6.5 | 等玩家看桥 / 压杆到起爆 / 起爆到「往滕县」（[铁路桥](Data_RailBridge.md) §3） |
 | `marchOutArriveM` | 8 | `marchOut` 那一段约 35 m，到锚点 8 m 内算走完 |
 
 摆位读空间包已有的 `MISSION_PLACEMENT.wallPath / receptionYard / bridge / night`；

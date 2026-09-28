@@ -85,6 +85,7 @@ import { FirstLevelBridge } from "./Script_FirstLevelBridge.mjs";
 import { FirstLevelNightGate } from "./Script_FirstLevelNightGate.mjs";
 import { FirstLevelNightLights } from "./Script_FirstLevelNightLights.mjs";
 import { OpeningSet } from "./Script_OpeningSet.mjs";
+import { RailBridgeSet } from "./Script_RailBridgeSet.mjs";
 import { EmplacementInteraction } from "./Script_Emplacement.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { ActionKeyGlyph } from "./Script_Input.mjs";
@@ -244,6 +245,11 @@ export class FirstLevelMissionRuntime {
     // 03 开头的飞机、阴天开关也在里面。03 阵位的破砖墙外观装到 06 才收（它是 04–06 的战场）。
     this.openingSet = new OpeningSet({ scene: this.scene, library: this.library, groundAt: (x, z) => this.battlefield.GroundHeight(x, z),
       vfx: this.vfx, aircraft: this.aircraft, applySky: (name) => this.ApplySky?.(name), restoreSky: () => this.RestoreSky?.() });
+    // 北沙河铁路桥的模型与 18 毁桥的坍塌演出（docs/Data_RailBridge.md）。后台加载，
+    // 装好之前（或加载失败）白盒桥照旧；FirstLevelBridge.Fire 通过 railBridgeSet.Detonate 起爆。
+    this.railBridgeSet = new RailBridgeSet({ scene: this.scene, library: this.library, battlefield: this.battlefield,
+      vfx: this.vfx, audio: this.audio, player: this.player });
+    this.railBridgeSet.Load();
     this.quietMarch = new FirstLevelQuietMarch(this);
     this.reception = new FirstLevelReception(this);
     this.bridge = new FirstLevelBridge(this);
@@ -315,7 +321,9 @@ export class FirstLevelMissionRuntime {
    * （把视野收窄到「卡着只能盯着看」），平滑与数值都在 Front 包的 FirstLevelFrontShow。
    */
   NarrowFovDeg(baseFov, dt) {
-    return this.frontShow?.NarrowFovDeg(baseFov, dt) ?? baseFov;
+    const fov = this.frontShow?.NarrowFovDeg(baseFov, dt) ?? baseFov;
+    // 18 毁桥：起爆后玩家看着桥的那几秒视野收一点（Data_RailBridgeDemolition.focus）。
+    return fov * (this.railBridgeSet?.FovScale?.(dt) ?? 1);
   }
   /**
    * 事实门的距离判定：点与半径一律从 MISSION_FACT_GATES 取，代码里不再写坐标与米数。
@@ -2474,6 +2482,7 @@ export class FirstLevelMissionRuntime {
     this.openingSet?.Update(dt, this.flow.stage.id, this.frontShow?.bunker?.phase ?? null,
       { collapsed: this.Has("bunkerCollapsed"), blastAge: this.opening.blastAt != null ? this.time - this.opening.blastAt : null, player: this.player?.position,
         flagFall:this.frontShow?.bunker?.flags?.flagFallProgress??0,breakables: this.tankRuntime?.breakables ?? null });
+    this.railBridgeSet?.Update(dt, this.flow.stage.id, { destroyed: this.Has("bridgeDestroyed"), night: this.Has("nightArrivalPlaced") });
     if(this.failed){prof?.E("story/mission/other");return;}
     prof?.E("story/mission/other");
     prof?.B("story/mission/spawns");
@@ -2924,6 +2933,7 @@ export class FirstLevelMissionRuntime {
     this.extras.Clear();
     this.nightLights?.Dispose();
     this.openingSet?.Exit();
+    this.railBridgeSet?.Dispose();
     this.opening.Dispose();
     this.frontShow?.Dispose();
     this.frontPressure?.Dispose();
