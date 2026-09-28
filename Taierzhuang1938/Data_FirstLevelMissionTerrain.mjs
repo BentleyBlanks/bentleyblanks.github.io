@@ -360,6 +360,11 @@ function WhiteboxSurfaceShapes() {
       minZ: Math.min(acc.minZ, c.minZ), maxZ: Math.max(acc.maxZ, c.maxZ) }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
     whiteboxSurfaceShapes.push({ shape, clips: entry.clips, wall, trench, hollow, reach, b });
   }
+  // 整组外接框（含 reach）：地块大半在框外，一次比较就跳过整圈形状。
+  whiteboxSurfaceShapes.bounds = whiteboxSurfaceShapes.reduce((acc, s) => ({
+    minX: Math.min(acc.minX, s.b.minX - s.reach), maxX: Math.max(acc.maxX, s.b.maxX + s.reach),
+    minZ: Math.min(acc.minZ, s.b.minZ - s.reach), maxZ: Math.max(acc.maxZ, s.b.maxZ + s.reach),
+  }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
   return whiteboxSurfaceShapes;
 }
 
@@ -420,7 +425,8 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
     if (dig > G.digTrackM[0]) track *= 1 - Smooth((dig - G.digTrackM[0]) / (G.digTrackM[1] - G.digTrackM[0]));
   }
   // 白盒地形修饰：陡土壁 / 交通沟 → 裸土；下沉洼地的底 → 踩实的场地（车道层），把穿进来的壕沟翻土盖掉。
-  for (const item of WhiteboxSurfaceShapes()) {
+  const shapes = WhiteboxSurfaceShapes(), sb = shapes.bounds;
+  for (const item of x < sb.minX || x > sb.maxX || z < sb.minZ || z > sb.maxZ ? [] : shapes) {
     const b = item.b, reach = item.reach;
     if (x < b.minX - reach || x > b.maxX + reach || z < b.minZ - reach || z > b.maxZ + reach) continue;
     if (!item.clips.some((c) => x >= c.minX && x <= c.maxX && z >= c.minZ && z <= c.maxZ)) continue;
