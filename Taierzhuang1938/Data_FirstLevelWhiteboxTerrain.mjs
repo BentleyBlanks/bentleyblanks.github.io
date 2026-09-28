@@ -99,6 +99,8 @@ function CoreDistance(shape, x, z) {
   }
   return { d: best - shape.halfW, dy };
 }
+/** 到核心区边界的距离 d（核心内 ≤ 0，米）与该处的 dy。地表图层（SampleMissionGroundSurface）按它铺土壁/沟底。 */
+export function WhiteboxShapeDistance(shape, x, z) { return CoreDistance(shape, x, z); }
 /** 单个形状在 (x,z) 的权重与 dy（纯函数，测试与出图用）。 */
 export function WhiteboxShapeWeight(shape, x, z) {
   const { d, dy } = CoreDistance(shape, x, z);

@@ -571,9 +571,10 @@ export const TEXTURE_MANIFEST = Object.freeze([
     toneClass: "drySoil",
     metersPerTile: 3.1,
     normalConvention: "terrain",
-    bake: "_import/Script_BakeTerrainLayers.py",
+    bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "_import/TextureBakes/Texture_TerrainCartTrack.json",
-    source: { provider: "lovart", date: "2026-09-17", ref: "Lovart 项目 oKHfWa1O2A，每层一个新会话（thread 未单列）", prompt: "docs/Data_TerrainLayers.md" },
+    // 2026-09-28 B2 地面：压实湿泥车道（碎砖瓦、蹄印；车辙与积水由 Script_TerrainMaterial 画）。
+    source: { provider: "lovart", date: "2026-09-28", ref: "841fdeb9-9e70-4710-a6ba-c8bd751f0eec", prompt: "_import/Prompts/Texture_TerrainCartTrack.txt" },
     consumers: [{ file: "Data_Tuning_Terrain.mjs", token: "CartTrack" }],
     files: [
       ["Texture_TerrainCartTrackBase.webp", "Base", 1024, 1024],
@@ -644,15 +645,19 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "TrenchPom", kind: "terrainLayer", tier: "level:FirstLevel",
+    toneClass: "drySoil",
+    metersPerTile: 1.5,
     normalConvention: "terrain",
-    bake: "_import/Script_BakeTrenchPom.py",
-    source: { provider: "imagegen", date: "2026-09-26", prompt: "docs/Data_TrenchPomPrompt.md" },
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_TrenchPom.json",
+    // 2026-09-28 B2 地面：冷灰棕湿黄土（土块、细根、小石子），替掉偏红橙的 2026-09-26 imagegen 版
+    //（均色饱和 0.53 → 0.36，整套 2.0 MB → 0.6 MB；高度改由亮度带通推，Orh 半分辨率有损）。
+    source: { provider: "lovart", date: "2026-09-28", ref: "0d1b846e-7b95-4baa-9caf-83b03f63b6ed", prompt: "_import/Prompts/Texture_TrenchPom.txt" },
     consumers: [{ file: "Data_TrenchSurface.mjs", token: "Texture_TrenchPom" }],
-    legacy: "Base 644 KB > 单张 600 KB、整套 2.0 MB > 1 MB（Normal/Orh 存无损）",
     files: [
       ["Texture_TrenchPomBase.webp", "Base", 1024, 1024],
       ["Texture_TrenchPomNormal.webp", "Normal", 512, 512],
-      ["Texture_TrenchPomOrh.webp", "Orh", 1024, 1024],
+      ["Texture_TrenchPomOrh.webp", "Orh", 512, 512],
     ],
   },
   {
@@ -660,7 +665,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     bake: "_import/Script_ImportTrenchMaterials.py",
     source: { provider: "polyhaven", date: "2026-09-26", ref: "https://polyhaven.com/a/rock_boulder_dry", license: "CC0" },
     consumers: [{ file: "Data_TrenchSurface.mjs", token: "Texture_TrenchStone" }],
-    legacy: "Poly Haven nor_gl（gl 约定）进了 terrain 约定的数组，法线绿通道方向相反；Orm 的 B 是金属却被当高度用",
+    legacy: "Poly Haven nor_gl（gl 约定）进了 terrain 约定的数组（2026-09-28 起 Script_TrenchSurfaceMaterial 的 Stone 段在着色器里翻绿补偿，文件未重烘）；Orm 的 B 是金属，进数组后落在 alpha（石材那段不读它）",
     files: [
       ["Texture_TrenchStoneBase.webp", "Base", 1024, 1024],
       ["Texture_TrenchStoneNormal.webp", "Normal", 512, 512],

@@ -2,6 +2,8 @@
 
 2026-09-26：翻土层 SpoilEarth 已按[概念图 07 通用壕沟](Data_TrenchReference07.md)更新，使用新的内置 imagegen 源图与烘焙参数。其余三层、四层数组结构、采样器及高度场保持不变；下文翻土图的 Lovart 来源与旧标定值属于 2026-09-17 历史。
 
+2026-09-28：对标 3A 参考图的色调、湿泥积水与车辙见 §8（`terrainLayers` 改为 4 个分量）。
+
 第一关《往南的路》地面的唯一现状文档。实现：`Script_TerrainMaterial.mjs`；数值：`Data_Tuning_Terrain.mjs`；
 splat 权重：`Data_FirstLevelMissionTerrain.SampleMissionGroundSurface`；贴图烘焙：`_import/Script_BakeTerrainLayers.py`；
 离线闸门：`Script_TerrainLayersTest.mjs`。
@@ -200,3 +202,62 @@ node Taierzhuang1938/Script_ModuleGraphTest.mjs
 - 高度只用于图层混合，没做位移或 POM；碰撞面不变。
 - 陡坡侧投影只取主导侧面，沟壁转角 45° 附近会看到两个侧面的分界（已用 smoothstep 过渡，近看仍可辨）。
 - 地形的远景（地块边界外）不在本次范围。
+
+## 8. 2026-09-28 对标参考图：冷灰棕、湿泥积水、车辙（3A 迭代 B2 地面）
+
+用户要求「对标 3A 参考图」。参考图（Notion 概念图 05–18、过场分镜 01/04A/05/07）的地面：冷灰褐、低饱和，
+沟底与路面是湿泥，有积水反光、车辙、碎砖石。实机原来的问题：壕沟土偏红橙（`TrenchPom` 均色饱和 0.53）、
+06 集结洼地整片是沟底土、村街/接运场是一层均匀米黄细沙、07 交通沟的沟壁是草茬贴图。
+
+### 8.1 定色目标（参考图地面取样）
+
+在参考图的地面区域取 sRGB 均值（打光后的画面，不是反照率）：场地/路/街 色相 23–26°、均色饱和 0.19–0.24；
+湿沟底 色相 24–27°、饱和约 0.2，明显更暗。实机同机位同口径量：打光后色相比贴图低约 5–10°，饱和度约 ×0.75
+（天光与雾偏冷的加性分量，暗处更明显），所以贴图目标要比画面目标**暖一些**：车道 sRGB (0.44, 0.38, 0.30)、
+壕沟土 (0.40, 0.335, 0.255)。改后同口径：路/街/场地 色相 26–28°、饱和 0.20–0.23（改前 34°、0.20，沟土 10–22°、0.30–0.44）。
+取样脚本与机位写在报告里；再调色按这一套量，不按单张截图目测。
+
+### 8.2 贴图
+
+- `CartTrack` 与 `TrenchPom` 两层重生（Lovart，提示词 `_import/Prompts/Texture_TerrainCartTrack.txt` /
+  `Texture_TrenchPom.txt`，thread 与烘焙记录在 `Data_TextureManifest` / `_import/TextureBakes/`），按
+  [贴图资产规范](Data_TextureAssetStandard.md) 用 `Script_BakePbrTexture.py --pack orh --normal-convention terrain` 烘。
+  车道图只画压实泥面、碎砖瓦与蹄印；**车辙与积水不画进贴图**（平铺几百遍会排队），由着色器按道路走向画。
+- `FieldSoil` / `DryStubble` 不重烘，层表加 `tint`（线性逐通道倍率，只把偏黄的 b 通道补一点，亮度不变）。
+- `TrenchPom` 高度改由亮度带通推、Orh 半分辨率有损（整套 2.0 → 0.6 MB）；`Script_BakeTrenchPom.py` 只能重建旧版，
+  不带 `--legacy-20260926` 拒绝运行。
+
+### 8.3 权重（`SampleMissionGroundSurface`，只改输出，不改高度）
+
+- `terrainLayers` 由 3 个分量变 **4 个**：w = 离最近一条「带车辙」道路中线的带符号横向距离 ÷ `TERRAIN_RUTS.encodeRangeM`，
+  非路写 1。只有 3 个分量的几何（壕沟碎土、测试夹具）由 WebGL 补 w = 1，正好落在车辙之外；地块与弹坑瓦片都写 4 个
+  （`Script_FirstLevelWhiteboxField`、`Script_TerrainDeformationView`）。场坪 `ruts:false`（村落）里车辙渐隐。
+- 壕沟真实开挖（`TrenchPlan.Apply` 的挖深）超过 `TERRAIN_GROUND_SURFACE.digTrackM` 就收掉车道权重：沟切断了路，沟壁不画路面。
+- 白盒地形修饰（`Data_FirstLevelWhiteboxTerrain`，新增导出 `WhiteboxShapeDistance`）：够陡的形状（1.5·dy/feather）羽化带铺裸土；
+  窄而深的折线 cut（07 交通沟）沟底与抛土也铺裸土；下沉的 level 洼地（06 集结处）核心是车道层（踩实场地），把穿进来的壕沟翻土盖掉。
+- 壕沟补丁的翻土权重改成 `g·(1−r)`（与基础地形同一口径）——原来整块按 g 替换，06 的场坪被沟土盖掉就是这个。
+
+### 8.4 着色（`Script_TerrainMaterial` / `Script_TrenchSurfaceMaterial`，不加采样器）
+
+- 车辙（`TERRAIN_RUTS`）：两道平行槽 + 外侧一条被压实的宽带；槽的法向 = 横向坐标的世界梯度（屏幕导数反解，
+  导数在一致控制流里求）；只进法线/反照率/粗糙度，不动高度场与碰撞；沿路低频噪声调深浅，远处与像素宽度双重淡出。
+- 湿泥与积水（`TERRAIN_WATER`）：低频噪声给水位，材质高度（按 `heightWeight` 比例参与）低于水位的像素是水面，
+  以上一条带是湿痕；水面粗糙度 0.05、法线回平、材质 AO 归 1，靠地面已开的 SSR 反射天空与人；湿土压暗并按湿度加一点饱和。
+  会积水的地方：车道/场坪、车辙槽（抬水位）、沟底（壕沟补丁用接触高度场四向 1.2/3.2 m 的「四周比这里高多少」判沟底，
+  沟沿与抛土顶不积水）；坡上（几何法线 y < `flat`）不积水。
+- 调试：`?terrainView=7` 红车辙槽 / 绿积水 / 蓝湿痕（4 湿度、5 粗糙度照旧）。
+- `TrenchStone` 的法线是 Poly Haven `nor_gl`，进 terrain 约定的数组后绿通道反了：石材那段着色器里翻绿补偿（文件未重烘，清单仍 legacy）。
+
+### 8.5 旋钮与门禁
+
+旋钮全在 `Data_Tuning_Terrain`：`TERRAIN_SETS…layers[].tint`、`TERRAIN_RUTS`、`TERRAIN_WATER`、`TERRAIN_GROUND_SURFACE`；
+道路是否画车辙 `MISSION_TERRAIN.roads[].ruts` / `pads[].ruts`。门禁：`Script_TerrainLayersTest`、`Script_TrenchSurfaceTest`、
+`Script_TextureStandardsTest`、`Script_SamplerBudgetTest --only=firstLevel`、`Script_TerrainBlendTest`、`Script_CraterSurfaceTest`、
+`Script_FirstLevelMissionFortificationsTest`（地块 `terrainLayers.itemSize === 4`）。对照出图 `Script_FirstLevelWhitebox0518Shots.mjs`
+（05_2 06_1 06_2 07_1 07_2 08_1 08_2 11_1 13_1）与 `Script_OpeningStoryboardShots.mjs --shots=SB01,SB04A,SB05`。
+
+### 8.6 已知边界
+
+- 车辙只沿 `MISSION_TERRAIN.roads` 的折线：没有登记成道路的巷子、院子没有车辙；道路交叉处横向坐标跳变，交叉口一格里车辙会乱。
+- 积水不随脚步/车轮溅起，也没有雨滴涟漪；low 画质没有 SSR 时水面只反射环境图。
+- 碎砖屑只在车道贴图里（平面）；立体的碎砖瓦散布归 B6。

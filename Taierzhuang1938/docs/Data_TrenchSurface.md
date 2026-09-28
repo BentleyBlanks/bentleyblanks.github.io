@@ -1,5 +1,7 @@
 # 通用壕沟表面：参考图 07
 
+2026-09-28：土壁换成冷灰棕 Lovart 贴图、湿泥积水并入地形统一的水位模型、翻土让位给车道，见文末「2026-09-28 对标 3A」。
+
 2026-09-26 第四次迭代：此前视觉结果仍未通过用户验收。本轮重做土壁颜色/高度素材、增加自适应 POM，并用实际可见地形的 G-buffer 混合石土交界；前三轮的连续坡皮、嵌石与冠部根毯保留。入口是 `FirstLevelWhiteboxField.PrepareAssets / BuildWhiteBoxes`；参数在 `Data_TrenchSurface.mjs` 与 `Data_TrenchAppearance.mjs`。关卡路线、沟宽、沟深及碰撞高度保持原契约。
 
 ## 表面与接地
@@ -49,4 +51,26 @@ node scripts/Script_BlenderMcp.mjs status --scan
 
 ## 新土壁贴图重建
 
-运行 `python Taierzhuang1938/_import/Script_BakeTrenchPom.py`（需要 Pillow、NumPy）。源颜色与灰度高度同尺度重采样、同位置接边；高度先抑制细粒尖峰，再派生切线法线和邻域 AO，roughness 与高度打包为 Orh。Base/Orh 为 1024²，Normal 为 512²。法线按 1.5 m / 5 cm 标定，运行时另有艺术强度。高度推断仍有生成误差，不能作为真实扫描精度的承诺。
+**2026-09-28 起本节只描述旧版（偏红橙的 2026-09-26 土壁）**：现行 `TrenchPom` 由 Lovart 源图经 `Script_BakePbrTexture.py` 烘出，见下一节；旧脚本不带 `--legacy-20260926` 拒绝运行，免得把新图覆盖回旧图。
+
+运行 `python Taierzhuang1938/_import/Script_BakeTrenchPom.py --legacy-20260926`（需要 Pillow、NumPy）。源颜色与灰度高度同尺度重采样、同位置接边；高度先抑制细粒尖峰，再派生切线法线和邻域 AO，roughness 与高度打包为 Orh。Base/Orh 为 1024²，Normal 为 512²。法线按 1.5 m / 5 cm 标定，运行时另有艺术强度。高度推断仍有生成误差，不能作为真实扫描精度的承诺。
+
+## 2026-09-28 对标 3A：冷灰棕土壁、沟底湿泥积水（3A 迭代 B2 地面）
+
+- **土壁贴图**：`Texture_TrenchPom{Base,Normal,Orh}` 换成 Lovart 生成的冷灰棕湿黄土（土块、细根、小石子；提示词
+  `_import/Prompts/Texture_TrenchPom.txt`，thread 与烘焙记录见 `Data_TextureManifest`），按[贴图资产规范](Data_TextureAssetStandard.md)
+  用 `Script_BakePbrTexture.py --pack orh --normal-convention terrain --tile-m 1.5 --reliefM 0.05` 烘：均色饱和 0.53 → 0.36，
+  整套 2.0 MB → 0.6 MB。高度改由亮度带通推（不再有配准高度源图），Orh 半分辨率有损；POM 仍读反照率数组 alpha 里的高度。
+  缓存戳 `TRENCH_SURFACE.version`。
+- **湿泥与积水**：原来的 `gTrenchWet`（噪声 × 平地 × 低处，只压暗 12%、粗糙度 0.28）换成地形统一的水位模型
+  （`Data_Tuning_Terrain.TERRAIN_WATER`，口径在 [分层地形 §8.4](Data_TerrainLayers.md)）：沟底由接触高度场四向
+  1.2 / 3.2 m「四周比这里高多少」判出（`lowRiseM`），沟底底湿度更高、水位抬高，水洼顺着 POM 高度走，粗糙度 0.05 接 SSR；
+  沟沿与抛土顶四周更低，不积水；坡上不积水。`Data_TrenchSurface.mud` 里的 `roughWet` / `darken` 删除。
+  `?terrainView=4` 仍是湿度，`7` 看车辙/积水/湿痕。石材（`TrenchStone`）不上水。
+- **翻土让位给车道**：翻土权重改 `g·(1−r)`，与基础地形同口径；06 集结洼地、沟切断路的地方由
+  `SampleMissionGroundSurface` 决定谁是路谁是沟（[分层地形 §8.3](Data_TerrainLayers.md)）。
+- **石材法线**：`TrenchStone` 的 Poly Haven `nor_gl` 在 terrain 约定数组里绿通道反了，Stone 段着色器里翻绿补偿；
+  它 Orm 的 B（金属）落在数组 alpha，石材那段不读 alpha。
+- 木护壁/踏板仍按概念图 07 关闭（[Data_TrenchReference07.md](Data_TrenchReference07.md)），本轮不恢复。
+- 门禁：`Script_TrenchSurfaceTest`（湿/干粗糙度范围改读 `TERRAIN_WATER`）、`Script_TextureStandardsTest`（`TrenchPom` 已移出 legacy）、
+  `Script_TerrainBlendTest`、`Script_SamplerBudgetTest --only=firstLevel`、`Script_CraterSurfaceTest`。

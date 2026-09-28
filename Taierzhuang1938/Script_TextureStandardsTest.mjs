@@ -43,7 +43,7 @@ const LEGACY_IDS = new Set([
   "GateRoofTile", "Sandbag", "WattleFence", "BrickWallSooty", "BuildingDamageEarly", "BuildingDamageSevere",
   "Adobe", "Stone", "WellStone", "Millstone", "WaterVat", "StationBrick",
   "PrisonBrick", "TemplePlaster", "CarriageBenchWood", "CarriageFloorSteel", "CarriageCeilingSteel", "Lugouqiao",
-  "TrenchPom", "TrenchStone", "TrenchRootMat", "TrenchMudHeight", "BunkerPoster", "ShopDoorPbr",
+  "TrenchStone", "TrenchRootMat", "TrenchMudHeight", "BunkerPoster", "ShopDoorPbr",
   "NraUniformClothDetail", "RuralHouse", "IncomingMarker", "BulletImpactPbrAtlas", "BloodSplatter", "HudMeleeKillBlood",
   "GrenadeReticleIcon", "GrenadeWarningIcon", "SettingsToolsIcon", "MissionMenuArt", "OrchestrationIcons", "OxCartPbr",
   "PaperProps", "PaperPropsTool", "BunkerPosterTool",

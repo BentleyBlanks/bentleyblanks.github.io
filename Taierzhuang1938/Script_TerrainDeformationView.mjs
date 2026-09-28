@@ -308,7 +308,7 @@ export class TerrainDeformationView {
     this.colorOut = [0, 0, 0];
     // Splat weights for the layered terrain material (Script_TerrainMaterial). Only
     // fields that render with it expose SampleGroundSurface; others keep the colour path.
-    this.layersOut = [0, 0, 0];
+    this.layersOut = [0, 0, 0, 1];
     this.originalGeometry = new Map(); this.tileMeshes = new Map(); this.sourceBounds = new Map();
     this.overlayTiles = new Map(); this.overlayMaterials = new Map();
     this.blastPages = new Map();
@@ -651,7 +651,8 @@ export class TerrainDeformationView {
         geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(width * width * 2), 2).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute("terrainBlast", new THREE.BufferAttribute(new Float32Array(width * width * 2), 2).setUsage(THREE.DynamicDrawUsage));
         if (this.field.SampleGroundSurface) {
-          geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(new Float32Array(width * width * 3), 3));
+          // xyz splat weights, w = rut lateral coordinate (Data_Tuning_Terrain.TERRAIN_RUTS; 1 = no road).
+          geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(new Float32Array(width * width * 4), 4));
         }
         const uv = new Float32Array(width * width * 2);
         const tileM = this.field.layout?.terrainSpec?.textureTileM || 3.4;
@@ -708,9 +709,11 @@ export class TerrainDeformationView {
           nrm[at * 3] = nx / norm; nrm[at * 3 + 1] = 2 * s / norm; nrm[at * 3 + 2] = nz / norm;
           if (paint && layerArray) {
             // Layered terrain: the same corridor walk yields both the tint and the splat weights.
+            this.layersOut[3] = 1;
             const rgb = this.field.SampleGroundSurface(pos[at * 3], pos[at * 3 + 2], this.colorOut, this.layersOut);
             this.groundColor.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace).toArray(col, at * 3);
-            layerArray[at * 3] = this.layersOut[0]; layerArray[at * 3 + 1] = this.layersOut[1]; layerArray[at * 3 + 2] = this.layersOut[2];
+            layerArray[at * 4] = this.layersOut[0]; layerArray[at * 4 + 1] = this.layersOut[1];
+            layerArray[at * 4 + 2] = this.layersOut[2]; layerArray[at * 4 + 3] = this.layersOut[3];
           } else if (paint) {
             // Rebuilt soil inherits the field's base albedo before blast wear is applied.
             const rgb = this.field.SampleGroundColor?.(pos[at * 3], pos[at * 3 + 2], this.colorOut);

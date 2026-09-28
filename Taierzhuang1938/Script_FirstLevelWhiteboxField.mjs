@@ -260,16 +260,18 @@ export class FirstLevelWhiteboxField {
       if (this.SampleGroundSurface) {
         // One corridor walk per vertex yields the layered tint and the splat weights.
         const positions=mesh.geometry.attributes.position, colors=new Float32Array(positions.count*3);
-        const layers=new Float32Array(positions.count*3), rgb=[0,0,0], weights=[0,0,0];
+        const layers=new Float32Array(positions.count*4), rgb=[0,0,0], weights=[0,0,0,1];
         const color=new THREE.Color();
         for(let i=0;i<positions.count;i++) {
+          weights[3]=1;
           this.SampleGroundSurface(positions.getX(i),positions.getZ(i),rgb,weights);
           color.setRGB(rgb[0],rgb[1],rgb[2],THREE.SRGBColorSpace).toArray(colors,i*3);
-          layers[i*3]=weights[0]; layers[i*3+1]=weights[1]; layers[i*3+2]=weights[2];
+          layers[i*4]=weights[0]; layers[i*4+1]=weights[1]; layers[i*4+2]=weights[2]; layers[i*4+3]=weights[3];
         }
         mesh.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
         // Float32 on purpose: the crater cutter copies every attribute into Float32 arrays.
-        mesh.geometry.setAttribute('terrainLayers',new THREE.BufferAttribute(layers,3));
+        // w = rut lateral coordinate (Data_Tuning_Terrain.TERRAIN_RUTS; 1 = no road).
+        mesh.geometry.setAttribute('terrainLayers',new THREE.BufferAttribute(layers,4));
         mesh.material.vertexColors=true; mesh.material.color.setHex(0xffffff);
       } else if (this.layout.SampleGroundColor) {
         const positions=mesh.geometry.attributes.position, colors=new Float32Array(positions.count*3);

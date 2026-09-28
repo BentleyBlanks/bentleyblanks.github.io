@@ -246,7 +246,8 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
   const blocks = BlockIndex([...ctx.blocks, ...(ctx.scenarioBlocks || [])], groundAt);
   const craters = PointIndex(ctx.craters.map((c) => ({ x: c.x, z: c.z })), 16);
   const maxCrater = Math.max(0, ...ctx.craters.map((c) => c.radius));
-  const layers = [0, 0, 0], color = [0, 0, 0];
+  const layers = [0, 0, 0, 0], color = [0, 0, 0];
+  const memberLayers = [0, 0, 0, 0], memberColor = [0, 0, 0];
   const instances = [], replaced = new Set();
   const stats = { candidates: 0, wallFoot: 0, trenchLip: 0, bank: 0, open: 0, far: 0, foliage: 0, capped: false };
   const crossings = ctx.river?.crossings || [];
@@ -256,11 +257,13 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
     return false;
   };
   // 每件带一个 keep 随机数：超过画质上限时按它均匀抽稀（不按扫描顺序截断，否则南边整片没草）。
-  const Push = (rng, x, z, card, count, maxHeightM = Infinity) => {
+  const Push = (rng, x, z, card, count, maxHeightM = Infinity, accept = null) => {
     for (let k = 0; k < count; k++) {
       const ox = k ? (rng() * 2 - 1) * rules.clusterSpreadM : 0, oz = k ? (rng() * 2 - 1) * rules.clusterSpreadM : 0;
       const scale = Math.min(rules.scaleRange[0] + rng() * (rules.scaleRange[1] - rules.scaleRange[0]),
         maxHeightM / VEGETATION_CARDS[card].heightM);
+      // 簇成员各自再验一次（簇心在路肩外、成员却可能落进陡升的路面/场坪权重里）；rng 已先取完，不影响其余成员。
+      if (k && accept && !accept(x + ox, z + oz)) { rng(); rng(); rng(); continue; }
       instances.push({ x: x + ox, z: z + oz, y: groundAt(x + ox, z + oz), yaw: rng() * Math.PI, scale,
         card, tint: rng(), keep: rng() });
     }
@@ -365,7 +368,12 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
     let maxHeight = dRoute < 3 + rules.clusterSpreadM ? rules.sightMaxHeightM : Infinity;
     if (lip) maxHeight = Math.min(maxHeight, rules.trenchLipMaxHeightM);
     if (z < rules.frontZ && zone !== "wallFoot") maxHeight = Math.min(maxHeight, rules.frontMaxHeightM);
-    Push(rng, x, z, card, count, maxHeight);
+    // 不在路面上的簇：成员落点的路面权重也不能越过门槛（墙脚那一窄条照旧放行）。
+    const accept = onTrack || atWall ? null : (mx, mz) => {
+      ctx.surfaceAt(mx, mz, memberColor, memberLayers);
+      return memberLayers[0] <= rules.trackMax + 0.3;
+    };
+    Push(rng, x, z, card, count, maxHeight, accept);
   }
   stats.planned = instances.length;
   if (instances.length > q.maxInstances) {
