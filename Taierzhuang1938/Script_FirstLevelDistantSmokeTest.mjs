@@ -26,8 +26,10 @@ for (const source of smoke) {
     // Higher crowns may project over the route; they are broad aerial smoke.
     for (const age of [0.1,0.3,0.5,0.7,0.9]) {
       const t=Math.min(1,age/.85),growth=p.frame===5?Math.pow(age,.4):t*t*(3-2*t);
-      const size=(p.baseWidth+(p.crownWidth-p.baseWidth)*growth)*1.24;
-      const center={x:x+p.driftX*Math.pow(age,1.3),z:z+p.driftZ*Math.pow(age,1.3)};
+      // 远景柱的 plume（2026-09-28）：漂移指数与上部横向拉宽照 Script_BattleSmoke 的顶点着色器算
+      const [shear,flatten]=p.plume||[1.3,0],u=Math.min(1,Math.max(0,(age-.25)/.75)),spread=flatten*u*u*(3-2*u);
+      const size=(p.baseWidth+(p.crownWidth-p.baseWidth)*growth)*1.24*(1+spread);
+      const center={x:x+p.driftX*Math.pow(age,shear),z:z+p.driftZ*Math.pow(age,shear)};
       const routeGround=Math.max(Ground(route[i-1].x,route[i-1].z),Ground(route[i].x,route[i].z));
       const bottom=Ground(x,z)+source.heightOffset+p.height*age-size*p.aspect*0.5;
       if(bottom>routeGround+4) continue;

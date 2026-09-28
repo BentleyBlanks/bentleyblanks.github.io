@@ -167,6 +167,16 @@ export const VOLUMETRIC_PRESETS = {
     densityScale: 1.0, albedo: 0.94, anisotropy: 0.42, sunScale: 0.9,
     noiseAmount: 0.10, noiseScale: 0.008, noiseFar: 200, far: 300,
   },
+  // 第一关《往南的路》（2026-09-28，B4）。原来没有这一行，吃 VOLUMETRIC_DEFAULT（g 0.45、噪声 0.22）。
+  // 阴天但太阳没被完全遮住（52°、平行光 4.6）：g 取 0.30 —— 门洞、院墙缺口切出来的斜光带
+  // 读得出，又不至于在天空方向刷出一片假光斑；尘霾团噪声略加（0.28，只减不加，见抬头第 1 道闸）。
+  // densityScale 按抬头公式算：fog 0.0032 / 45 m / 0.72，y = 2.6 m 时 s = 1.0003 → 取 1.00
+  // （与出厂 default 相同）。消光仍走 legacyTransmittance 解析式 —— 70 m 透过率 0.8106（2.6 m）/
+  // 0.8068（1.7 m）/ 0.7993（地面），与改前逐位相同（「先别动雾」）。
+  firstLevelBattleDay: {
+    densityScale: 1.0, albedo: 0.92, anisotropy: 0.30, sunScale: 0.9, ambientScale: 1.0,
+    noiseAmount: 0.28, noiseScale: 0.020, noiseWind: [0.60, 0.05, 0.24], far: 260,
+  },
   // 阴天：没有方向性主光，g 必须小。形体全靠 AO 与环境光，雾也只做各向同性的一层。
   overcast: {
     densityScale: 0.91, albedo: 0.95, anisotropy: 0.10, sunScale: 0.30,
@@ -187,6 +197,12 @@ export const VOLUMETRIC_PRESETS = {
   // 照明弹走 LightRig 的火源池（flicker:false），所以它在这里就是一盏 priority 高的点光 ——
   // 体积雾一接上，照明弹第一次真的在空中拖出一支光锥。
   night: {
+    densityScale: 0.84, albedo: 0.88, anisotropy: 0.30, sunScale: 0.35,
+    ambientScale: 1.0, pointScale: 0.18, noiseAmount: 0.28, noiseScale: 0.016,
+    fireSmoke: 1.4, far: 220,
+  },
+  // 第一关关尾夜行军（Script_Sky.firstLevelNight）：雾与 night 相同，这一行照抄 night 的口径。
+  firstLevelNight: {
     densityScale: 0.84, albedo: 0.88, anisotropy: 0.30, sunScale: 0.35,
     ambientScale: 1.0, pointScale: 0.18, noiseAmount: 0.28, noiseScale: 0.016,
     fireSmoke: 1.4, far: 220,
