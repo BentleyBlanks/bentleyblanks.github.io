@@ -33,7 +33,7 @@ import * as THREE from "three";
 import { MakePatch, SurfacePatchEnd } from "./Script_MaterialPatches.mjs";
 import {
   TERRAIN_SETS, TERRAIN_DISTANCE, TERRAIN_MACRO, TERRAIN_STUBBLE, TERRAIN_BLEND,
-  TERRAIN_AO_INTENSITY, TerrainLayerUrls, TerrainQualityOf,
+  TERRAIN_AO_INTENSITY, TERRAIN_RUTS, TERRAIN_WATER, TerrainLayerUrls, TerrainQualityOf,
 } from "./Data_Tuning_Terrain.mjs";
 
 const SRGB_TO_LINEAR = (() => {
@@ -179,9 +179,11 @@ function MeansOf(array) {
 // GLSL
 // ===========================================================================
 
+// terrainLayers.w：车辙横向坐标（Data_Tuning_Terrain.TERRAIN_RUTS）。只有 3 个分量的几何
+// 由 WebGL 补 w = 1（= 离路中线 encodeRangeM 米，落在车辙之外）。
 const GLSL_VERTEX_COMMON = /* glsl */`
-attribute vec3 terrainLayers;
-varying vec3 vTerrainLayers;
+attribute vec4 terrainLayers;
+varying vec4 vTerrainLayers;
 varying vec3 vTerrainWorld;`;
 
 const GLSL_VERTEX_WORLD = /* glsl */`
@@ -210,7 +212,16 @@ uniform vec3 uTerrainBlend;               // x 高度混合厚度 y 1/去重复�
 uniform vec3 uTerrainContrast;            // x 对比度淡出起 y 淡出满 z 远处对比度倍率
 uniform float uTerrainAlbedoScale;        // 整套反照率的亮度标定（Data_Tuning_Terrain.albedoScale）
 uniform float uTerrainDebug;              // Data_Tuning_Terrain.TERRAIN_DEBUG_VIEWS：0 关
-varying vec3 vTerrainLayers;
+uniform vec3 uTerrainTint[TERRAIN_LAYERS]; // 逐层线性反照率倍率（层表 tint）
+uniform vec4 uTerrainRut;                 // x 编码范围米 y 半轮距 z 1/半槽宽 w 摆动幅度
+uniform vec4 uTerrainRut2;                // x 1/摆动尺度 y 槽深米 z 压暗 w 粗糙度倍率
+uniform vec4 uTerrainRut3;                // x 远处淡出起 y 满 z 像素宽淡出起 w 满（米）
+uniform vec4 uTerrainWaterA;              // x,y 两档噪声 1/米  z 水位基准 w 增益
+uniform vec4 uTerrainWaterB;              // x,y 平地阈值  z 水线过渡  w 湿痕带宽
+uniform vec4 uTerrainWaterC;              // x 水面粗糙度 y 湿痕粗糙度倍率 z 湿土压暗 w 积水压暗
+uniform vec4 uTerrainWaterD;              // x 车道积水 y 车辙抬水位 z 沟底抬水位 w 车道底湿度
+uniform vec4 uTerrainWaterE;              // x 材质高度参与水线的比例 y 湿土饱和度增量
+varying vec4 vTerrainLayers;
 varying vec3 vTerrainWorld;
 
 // 材质自带遮蔽（未乘强度）。微阴影（Script_MaterialShading）在 <lights_fragment_end> 读它。
@@ -219,6 +230,10 @@ float gTerrainRough = 1.0;
 vec4 gTerrainWeights = vec4(1.0, 0.0, 0.0, 0.0);
 vec3 gTerrainAlbedo = vec3(0.0);
 vec3 gTerrainNormalW = vec3(0.0, 1.0, 0.0);
+float gTerrainHeight = 0.5;   // 混合后的材质高度（0..1），积水按它定水线
+float gTerrainRut = 0.0;      // 车辙槽截面 0..1（已乘淡出与车道权重）
+float gTerrainWet = 0.0;      // 湿痕 0..1
+float gTerrainWater = 0.0;    // 积水 0..1
 
 float TerrainHash(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -235,6 +250,41 @@ float TerrainNoise(vec2 p) {
 vec4 TerrainVpMix(vec4 a, vec4 b, float t, vec4 mean) {
   float s = inversesqrt(max((1.0 - t) * (1.0 - t) + t * t, 0.5));
   return mean + ((a - mean) * (1.0 - t) + (b - mean) * t) * s;
+}
+
+// 表面梯度（Mikkelsen 2010「Bump Mapping Unparametrized Surfaces」的平面版）：由一个标量场的
+// 屏幕导数与世界 xz 的屏幕导数反解它在世界 xz 上的梯度。导数必须在一致控制流里先求好传进来。
+vec2 TerrainGradXZ(vec2 dS, vec2 dPx, vec2 dPy) {
+  float det = dPx.x * dPy.y - dPx.y * dPy.x;
+  if (abs(det) < 1e-12) return vec2(0.0);
+  return vec2(dS.x * dPy.y - dS.y * dPx.y, dPx.x * dS.y - dPy.x * dS.x) / det;
+}
+
+// 湿泥与积水（Data_Tuning_Terrain.TERRAIN_WATER）：低频噪声给水位，材质高度低于水位的像素是水面，
+// 水线以上一条带是湿痕。site = 这里会不会积水（0..1），low = 沟底/坑底抬水位，damp = 底湿度。
+// 写 albedo（线性反照率）与 gTerrainRough / gTerrainNormalW / gMaterialAo / gTerrainWet / gTerrainWater。
+void TerrainWater(inout vec3 albedo, vec2 xz, vec3 geomN, float site, float low, float damp) {
+  float wet = damp, water = 0.0;
+  if (site > 0.001) {
+    float n = TerrainNoise(xz * uTerrainWaterA.x) * 0.62 + TerrainNoise(xz * uTerrainWaterA.y + 7.13) * 0.38;
+    float level = (n - uTerrainWaterA.z) * uTerrainWaterA.w + gTerrainRut * uTerrainWaterD.y + low * uTerrainWaterD.z;
+    // 材质高度只按比例参与（卵石级的起伏全额进来，水线会碎成一粒粒黑点）。
+    float h = 0.5 + (gTerrainHeight - 0.5) * uTerrainWaterE.x - gTerrainRut * 0.35;
+    float above = level - h;
+    float onFlat = smoothstep(uTerrainWaterB.x, uTerrainWaterB.y, geomN.y);   // 平地（坡上存不住水）
+    water = smoothstep(-uTerrainWaterB.z, uTerrainWaterB.z, above) * onFlat * site;
+    wet = max(wet, smoothstep(-uTerrainWaterB.w, 0.0, above) * site);
+  }
+  wet = clamp(max(wet, water), 0.0, 1.0);
+  gTerrainWet = wet; gTerrainWater = water;
+  albedo *= (1.0 - uTerrainWaterC.z * wet) * (1.0 - uTerrainWaterC.w * water);
+  // 湿土更「饱和」（表面那层散射掉的白光没了，Lagarde 2013 湿表面）：保亮度拉开色度。
+  float wetLuma = dot(albedo, vec3(0.2126, 0.7152, 0.0722));
+  albedo = max(vec3(wetLuma) + (albedo - vec3(wetLuma)) * (1.0 + uTerrainWaterE.y * wet), vec3(0.0));
+  gTerrainRough = mix(gTerrainRough, gTerrainRough * uTerrainWaterC.y, wet);
+  gTerrainRough = mix(gTerrainRough, uTerrainWaterC.x, water);
+  gTerrainNormalW = normalize(mix(gTerrainNormalW, geomN, water));
+  gMaterialAo = mix(gMaterialAo, 1.0, water);
 }
 
 // 一层、一种投影的采样。uv 以米给，内部乘 1/平铺。variant = 去重复噪声（全层共用）。
@@ -283,13 +333,20 @@ const PerLayer = (fn, joiner = "\n") => COMPONENTS.slice(0, LAYER_COUNT).map((c,
 const GLSL_EVALUATE = /* glsl */`
 {
   vec3 tw = vTerrainWorld;
+#ifdef TERRAIN_HOISTED_DERIVATIVES
+  // 调用方把这一段包进了非一致分支（壕沟补丁），导数已在分支外求好。
+  vec3 twDx = trenchWorldDx, twDy = trenchWorldDy;
+  vec2 tRutD = trenchRutD;
+#else
   vec3 twDx = dFdx(tw), twDy = dFdy(tw);
+  vec2 tRutD = vec2(dFdx(vTerrainLayers.w), dFdy(vTerrainLayers.w));
+#endif
   float tDist = length(vViewPosition);
   // 世界空间几何法线（视矩阵的旋转部分是正交的，转置即逆）。
   vec3 tGeomN = normalize(transpose(mat3(viewMatrix)) * normalize(vNormal));
 
   // --- 1. 权重：顶点给的三路 + 宏观噪声决定的草茬 --------------------------------
-  vec3 tl = clamp(vTerrainLayers, 0.0, 1.0);
+  vec3 tl = clamp(vTerrainLayers.xyz, 0.0, 1.0);
   float wTrack = tl.r;
   float wSpoil = tl.g * (1.0 - wTrack);
   float wRest = max(0.0, 1.0 - wTrack - wSpoil);
@@ -332,6 +389,36 @@ ${PerLayer((c, i) => `  vec4 tAlb${i} = uTerrainAlbedoMean[${i}];
   vec4 tSurface = ${PerLayer((c, i) => `tSurf${i} * tB.${c}`, " + ")};
   vec2 tNxy = ${PerLayer((c, i) => `(tSurf${i}.rg * 2.0 - 1.0) * (uTerrainNormalScale.${c} * tB.${c})`, "\n    + ")};
   vec3 tPerturb = vec3(tNxy.x, 0.0, tNxy.y);
+  gTerrainHeight = clamp(${PerLayer((c, i) => `tAlb${i}.a * tB.${c}`, " + ")}, 0.0, 1.0);
+
+  // --- 3b. 车辙（Data_Tuning_Terrain.TERRAIN_RUTS）：两道平行槽，只进法线/反照率/粗糙度 ------
+  // 横向坐标由顶点插值（直线段上精确），槽的法向 = 横向坐标的世界梯度（表面梯度反解）。
+  float rutS = vTerrainLayers.w * uTerrainRut.x;
+  float rutSw = rutS + (TerrainNoise(txz * uTerrainRut2.x + 3.3) - 0.5) * 2.0 * uTerrainRut.w;
+  float rutU = (abs(rutSw) - uTerrainRut.y) * uTerrainRut.z;
+  float rutPixelM = (abs(tRutD.x) + abs(tRutD.y)) * uTerrainRut.x;
+  float rutFade = tB.y * (1.0 - smoothstep(uTerrainRut3.x, uTerrainRut3.y, tDist))
+    * (1.0 - smoothstep(uTerrainRut3.z, uTerrainRut3.w, rutPixelM));
+  float rutSlope = 0.0;
+  // 每道槽外还有一条被轮子和人畜反复压过的宽带（半宽是槽的 2.6 倍）：只轻微压暗、压光，
+  // 让车辙读成「路面上被压出来的两条沟」而不是画上去的两条线。沿路再用低频噪声调深浅（有的段干、有的段积泥）。
+  float rutBandU = rutU / 2.6;
+  if (abs(rutBandU) < 1.0 && rutFade > 0.001) {
+    float along = mix(0.55, 1.0, TerrainNoise(txz * 0.21 + 9.1));
+    float qb = 1.0 - rutBandU * rutBandU;
+    gTerrainRut = qb * qb * 0.3 * rutFade * along;
+    if (abs(rutU) < 1.0) {
+      float q = 1.0 - rutU * rutU;
+      gTerrainRut = max(gTerrainRut, q * q * rutFade * along);
+      // 槽截面 h = -depth·(1-u²)²，dh/ds = 4u(1-u²)·depth/半槽宽·sign(s)；扰动 = -∇h。
+      rutSlope = -4.0 * rutU * q * uTerrainRut2.y * uTerrainRut.z * sign(rutSw) * rutFade * along;
+    }
+  }
+  if (rutSlope != 0.0) {
+    vec2 rutGrad = TerrainGradXZ(tRutD * uTerrainRut.x, twDx.xz, twDy.xz);
+    rutGrad /= max(length(rutGrad), 1e-4);
+    tPerturb += vec3(rutGrad.x, 0.0, rutGrad.y) * rutSlope;
+  }
 
 #ifdef TERRAIN_BIPLANAR
   // --- 4. 陡坡：主导侧面投影（沟壁不再被俯视投影拉成竖条）--------------------------
@@ -367,6 +454,8 @@ ${PerLayer((c, i) => `    if (tB.${c} > 0.0) {
     + uTerrainAlbedoMean[2].rgb * tB.z + uTerrainAlbedoMean[3].rgb * tB.w;
   float tContrast = mix(1.0, uTerrainContrast.z, smoothstep(uTerrainContrast.x, uTerrainContrast.y, tDist));
   tAlbedo = tMeanAlbedo + (tAlbedo - tMeanAlbedo) * tContrast;
+  // 逐层定色（Data_Tuning_Terrain 层表的 tint，线性倍率；权重混合后的倍率 ≈ 逐层乘，各层 tint 相近）。
+  tAlbedo *= uTerrainTint[0] * tB.x + uTerrainTint[1] * tB.y + uTerrainTint[2] * tB.z + uTerrainTint[3] * tB.w;
 
   // --- 5. 宏观变化 ----------------------------------------------------------------
   float m0 = TerrainNoise(txz * uTerrainMacroScale.x + 3.7) - 0.5;
@@ -377,17 +466,24 @@ ${PerLayer((c, i) => `    if (tB.${c} > 0.0) {
   tAlbedo *= 1.0 + vec3(0.9, 0.25, -0.8) * m2 * 2.0 * uTerrainMacroScale.w;
   float damp = smoothstep(0.12, 0.42, m1) * uTerrainMacroAmp.w;
   tAlbedo *= 1.0 - damp * 1.4;
+  tAlbedo *= 1.0 - uTerrainRut2.z * gTerrainRut;
 
   // --- 6. 写出 ----------------------------------------------------------------------
-  diffuseColor.rgb *= max(tAlbedo, vec3(0.0)) * uTerrainAlbedoScale;
+  vec3 tOut = max(tAlbedo, vec3(0.0)) * uTerrainAlbedoScale;
   // 远处法线淡出：一个像素盖住几十个纹素，法线的方差该表现成粗糙度，而不是一粒粒高光。
   float nFade = mix(1.0, uTerrainFade.x, smoothstep(uTerrainDistance.z, uTerrainDistance.w, tDist));
   tPerturb *= nFade;
   tPerturb -= tGeomN * dot(tGeomN, tPerturb);
   gTerrainNormalW = normalize(tGeomN + tPerturb);
-  gTerrainRough = clamp(tSurface.b - damp, 0.3, 1.0);
+  gTerrainRough = clamp(tSurface.b - damp, 0.3, 1.0) * mix(1.0, uTerrainRut2.w, gTerrainRut);
   float tAo = clamp(tSurface.a, 0.0, 1.0);
   gMaterialAo = mix(tAo, 1.0 - (1.0 - tAo) * uTerrainFade.y, farT);
+#ifndef TERRAIN_WATER_EXTERNAL
+  // 湿泥与积水：车道/场坪会积水；翻土层（无壕沟网时的沟底）按一半算。
+  TerrainWater(tOut, txz, tGeomN, tB.y * uTerrainWaterD.x + tB.w * 0.5,
+    0.0, tB.y * uTerrainWaterD.w);
+#endif
+  diffuseColor.rgb *= tOut;
 }`;
 
 // 调试假彩色（Data_Tuning_Terrain.TERRAIN_DEBUG_VIEWS），整帧覆盖输出。
@@ -399,8 +495,15 @@ if (uTerrainDebug > 0.5) {
     terrainDebug = vec3(gTerrainWeights.y, gTerrainWeights.z, gTerrainWeights.w) + gTerrainWeights.x * 0.35;
   } else if (uTerrainDebug < 2.5) {
     terrainDebug = gTerrainAlbedo;
-  } else {
+  } else if (uTerrainDebug < 3.5) {
     terrainDebug = gTerrainNormalW * 0.5 + 0.5;
+  } else if (uTerrainDebug < 4.5) {
+    terrainDebug = vec3(gTerrainWet);
+  } else if (uTerrainDebug < 6.5) {
+    terrainDebug = vec3(gTerrainRough);
+  } else {
+    // 7：红 = 车辙槽，绿 = 积水，蓝 = 湿痕
+    terrainDebug = vec3(gTerrainRut, gTerrainWater, gTerrainWet);
   }
   gl_FragColor = vec4(terrainDebug, 1.0);
 }`;
@@ -424,6 +527,21 @@ const GLSL_AO = /* glsl */`
 }`;
 
 function Ended(anchor, glsl) { return `${glsl}\n${SurfacePatchEnd(anchor)}`; }
+
+/** 车辙与积水的 uniform（Data_Tuning_Terrain.TERRAIN_RUTS / TERRAIN_WATER）。 */
+function TerrainWaterUniforms() {
+  const R = TERRAIN_RUTS, W = TERRAIN_WATER;
+  return {
+    uTerrainRut: { value: Vec4Of([R.encodeRangeM, R.halfGaugeM, 1 / R.halfWidthM, R.wobbleM]) },
+    uTerrainRut2: { value: Vec4Of([1 / R.wobbleScaleM, R.depthM, R.darken, R.roughness]) },
+    uTerrainRut3: { value: Vec4Of([R.fadeStartM, R.fadeEndM, R.pixelFadeM[0], R.pixelFadeM[1]]) },
+    uTerrainWaterA: { value: Vec4Of([1 / W.noiseScalesM[0], 1 / W.noiseScalesM[1], W.level, W.gain]) },
+    uTerrainWaterB: { value: Vec4Of([W.flat[0], W.flat[1], W.soft, W.wetBand]) },
+    uTerrainWaterC: { value: Vec4Of([W.waterRough, W.wetRough, W.wetDarken, W.waterDarken]) },
+    uTerrainWaterD: { value: Vec4Of([W.site.track, W.rutWater, W.lowWater, W.damp.track]) },
+    uTerrainWaterE: { value: Vec4Of([W.heightWeight, W.wetSaturation, 0, 0]) },
+  };
+}
 
 /**
  * 造分层地形的表面补丁。
@@ -466,11 +584,13 @@ export function MakeTerrainPatch(pack, quality) {
       value: new THREE.Vector3(TERRAIN_DISTANCE.contrastFadeStart, TERRAIN_DISTANCE.contrastFadeEnd, TERRAIN_DISTANCE.contrastFar),
     },
     uTerrainAlbedoScale: { value: set.albedoScale ?? 1 },
+    uTerrainTint: { value: layers.map((l) => new THREE.Vector3(...(l.tint || [1, 1, 1]))) },
     // 全场共用一份，调试入口直接改它的 value（不重编译）
     uTerrainDebug: TERRAIN_DEBUG_UNIFORM,
+    ...TerrainWaterUniforms(),
   };
   const patch = MakePatch({
-    key: `terrain3${quality.antiTile ? "t" : ""}${quality.biplanar ? "b" : ""}`,
+    key: `terrain4${quality.antiTile ? "t" : ""}${quality.biplanar ? "b" : ""}`,
     uniforms: (shaderUniforms) => { Object.assign(shaderUniforms, uniforms); },
     vertex: [
       ["#include <common>", GLSL_VERTEX_COMMON],
