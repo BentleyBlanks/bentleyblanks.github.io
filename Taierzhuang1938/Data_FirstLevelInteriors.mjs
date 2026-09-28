@@ -38,9 +38,9 @@ export const FIRST_LEVEL_INTERIORS = Object.freeze({
     { id: "ReceptionWard", box: { x: -26, z: 234, w: 14, d: 18 }, ceil: 2.9, dark: 0.10 },
     // 01 掩蔽部：坑底 = 自然地面 − 2.0 m，顶是 BunkerRoof（底面在自然地面 −0.15）。
     // 三面是坑壁（地形，不在体块表里），只有东面的洞口采光，所以口子写死。
-    // dark 0.15：SB01 坐在坑底往洞口看，0.08 那一版整幅均值 31（分镜 49），人脸读不出来
+    // dark 0.22：SB01 坐在坑底往洞口看，0.08 / 0.15 两版整幅均值 31 / 32（分镜 49），近处坑底死黑
     { id: "Bunker", box: { x: -1.15, z: -126.0, w: 4.1, d: 4.2 }, wall: 0, floorY: BUNKER_FLOOR,
-      ceil: 1.85, dark: 0.15,
+      ceil: 1.85, dark: 0.22,
       portals: [{ face: "E", from: -127.4, to: -124.4, bottom: 0, top: 1.73 }] },
   ].map((room) => Object.freeze(room))),
 });
