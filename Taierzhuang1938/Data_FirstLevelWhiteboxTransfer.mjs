@@ -309,10 +309,11 @@ export function BuildTransferWhitebox(groundAt) {
   {
     const g = groundAt(55.8, 110.4);
     At("TransferAidFlagPole", 55.8, 110.4, .2, 6.6, .2, g - .4, "timber");
-    At("TransferAidFlagArm", 55.8, 111.25, .08, .08, 1.7, g + 5.95, "timber", { solid: false });
-    At("TransferAidFlag", 55.8, 111.3, .04, 1.15, 1.6, g + 4.75, "structure", { solid: false });
-    for (const [id, h, d] of [["V", .82, .26], ["H", .26, .82]])
-      At(`TransferAidFlagCross${id}`, 55.8, 111.3, .07, h, d, g + 4.75 + (1.15 - h) / 2, "danger", { solid: false });
+    // 旗面 2.1 × 1.45 m：1.6 m 那一版从停车处（28 m）缩到 1/8 只剩一个红点。
+    At("TransferAidFlagArm", 55.8, 111.5, .08, .08, 2.2, g + 6.05, "timber", { solid: false });
+    At("TransferAidFlag", 55.8, 111.55, .04, 1.45, 2.1, g + 4.55, "structure", { solid: false });
+    for (const [id, h, d] of [["V", 1.05, .34], ["H", .34, 1.05]])
+      At(`TransferAidFlagCross${id}`, 55.8, 111.55, .07, h, d, g + 4.55 + (1.45 - h) / 2, "danger", { solid: false });
   }
   // 北侧不立柱：坡道北沿 x 51–54.2、z 108–112.4 是 15A 赶车人丢下那辆车的位置（END_TUNING.droverCart，
   // 运行时摆的道具），东边紧贴着刘文财 14 从低墙西头直奔沟口的直线（MidTest，0.35 m 胶囊）和 North 通道
