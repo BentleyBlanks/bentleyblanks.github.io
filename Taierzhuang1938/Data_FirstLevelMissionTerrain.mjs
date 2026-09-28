@@ -5,7 +5,8 @@ import { MISSION_RECEPTION_SPACE, MISSION_NORTH_RIVER, RiverCutAt } from "./Data
 import { FRONT_BREACHES, FRONT_BOUND_CRATERS } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
 import { CompileTrenchNetwork, TrenchRevision } from "./Script_TrenchPlan.mjs";
-import { WHITEBOX_TERRAIN } from "./Data_FirstLevelWhiteboxTerrain.mjs";
+import { WHITEBOX_TERRAIN, WhiteboxShapeDistance } from "./Data_FirstLevelWhiteboxTerrain.mjs";
+import { TERRAIN_RUTS, TERRAIN_GROUND_SURFACE } from "./Data_Tuning_Terrain.mjs";
 const Smooth = (value) => {
   const t = Math.max(0, Math.min(1, value));
   return t * t * (3 - 2 * t);
@@ -125,7 +126,8 @@ export const MISSION_TERRAIN = Object.freeze({
   ],
   pads: [
     { x: -71, z: 74, w: 13, d: 50 },
-    { x: 55, z: 6, w: 62, d: 42 },
+    // ruts:false —— 村落场坪：两条道路折线斜穿院落与房基，车辙不跟着它们画（地表图层用，不影响高度）。
+    { x: 55, z: 6, w: 62, d: 42, ruts: false },
     { x: 76, z: 113, w: 57, d: 54 },
     { x: -20, z: 235, w: 48, d: 40 },
     // 06 背坡伤员集结处的场坪：担架队要在这儿把人放平、换手、排队，不能是田垄。
@@ -312,14 +314,71 @@ export function SampleMissionGroundColor(x, z, out = [0, 0, 0]) {
   return out;
 }
 
+/**
+ * 带符号的「离折线多远」：正负号 = 在最近那段的左/右（叉积）。`reach` 以外返回 null。
+ * 车辙用它当横向坐标（Data_Tuning_Terrain.TERRAIN_RUTS）；在一段直线上它对位置是线性的，
+ * 所以写进顶点、由光栅化插值是精确的。
+ */
+function RouteSignedDistanceWithin(x, z, route, reach) {
+  const bounds = RouteBounds(route);
+  if (x < bounds.minX - reach || x > bounds.maxX + reach
+    || z < bounds.minZ - reach || z > bounds.maxZ + reach) return null;
+  let best = reach * reach, signed = null;
+  for (let i = 1; i < route.length; i++) {
+    const a = route[i - 1], b = route[i];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    let t = ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz || 1);
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const ex = x - a.x - dx * t, ez = z - a.z - dz * t, d2 = ex * ex + ez * ez;
+    if (d2 < best) {
+      best = d2;
+      const side = dx * (z - a.z) - dz * (x - a.x);
+      signed = side < 0 ? -Math.sqrt(d2) : Math.sqrt(d2);
+    }
+  }
+  return signed;
+}
+
+// 白盒地形修饰（Data_FirstLevelWhiteboxTerrain）怎么落到地表图层上：够陡的土壁铺裸土，窄而深的
+// 折线 cut 是交通沟（沟底也铺裸土），下沉的 level 洼地是踩实的场地。编译一次（形状表是冻结的）。
+let whiteboxSurfaceShapes = null;
+function WhiteboxSurfaceShapes() {
+  if (whiteboxSurfaceShapes) return whiteboxSurfaceShapes;
+  const G = TERRAIN_GROUND_SURFACE;
+  whiteboxSurfaceShapes = [];
+  for (const entry of MISSION_TERRAIN.whiteboxTerrain?.shapes || []) {
+    const shape = entry.shape;
+    const dys = [shape.dy ?? 0, ...(shape.points || []).map((p) => p.dy ?? shape.dy ?? 0)];
+    const dyMax = Math.max(...dys.map(Math.abs));
+    const steep = 1.5 * dyMax / Math.max(shape.feather, 1e-3);
+    const wall = dyMax >= G.wallMinDyM && steep > G.wallSlope[0];
+    const trench = wall && shape.op === "cut" && shape.kind === "line" && shape.halfW <= G.trenchHalfWM;
+    const hollow = shape.op === "level" && (shape.dy ?? 0) <= G.hollowDyM;
+    if (!wall && !hollow) continue;
+    const reach = shape.feather + G.wallFadeM + (trench ? G.trenchSpillM : 0);
+    const b = entry.clips.reduce((acc, c) => ({ minX: Math.min(acc.minX, c.minX), maxX: Math.max(acc.maxX, c.maxX),
+      minZ: Math.min(acc.minZ, c.minZ), maxZ: Math.max(acc.maxZ, c.maxZ) }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+    whiteboxSurfaceShapes.push({ shape, clips: entry.clips, wall, trench, hollow, reach, b });
+  }
+  // 整组外接框（含 reach）：地块大半在框外，一次比较就跳过整圈形状。
+  whiteboxSurfaceShapes.bounds = whiteboxSurfaceShapes.reduce((acc, s) => ({
+    minX: Math.min(acc.minX, s.b.minX - s.reach), maxX: Math.max(acc.maxX, s.b.maxX + s.reach),
+    minZ: Math.min(acc.minZ, s.b.minZ - s.reach), maxZ: Math.max(acc.maxZ, s.b.maxZ + s.reach),
+  }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+  return whiteboxSurfaceShapes;
+}
+
 // Layered terrain (Script_TerrainMaterial): the corridor tints above move into
 // real texture layers, so the vertex colour only keeps the rail-ballast spill.
-// `layers` = [track, spoil, open]: cart track (roads + pads), trench spoil, and
-// how much dry stubble the shader may grow here. Stubble keeps a clear margin
-// around every worked surface; the shader's macro noise decides the rest.
+// `layers` = [track, spoil, open, rut]: cart track (roads + pads), trench spoil,
+// how much dry stubble the shader may grow here, and the signed lateral distance
+// to the nearest rutted road ÷ TERRAIN_RUTS.encodeRangeM (1 = no road; see there).
+// Stubble keeps a clear margin around every worked surface; the shader's macro
+// noise decides the rest. Heights never read this: it is shading only.
 const STUBBLE_CLEAR_M = 3.5;
-export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0, 0, 0]) {
-  let track = 0, spoil = 0, worked = 0;
+export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0, 0, 0, 1]) {
+  let track = 0, spoil = 0, worked = 0, rut = 1, rutDist = Infinity, padTrack = 0, padNoRuts = 0;
+  const rutRange = TERRAIN_RUTS.encodeRangeM;
   for (const road of MISSION_TERRAIN.roads) {
     const d = RouteDistanceWithin(x, z, road.points, road.width / 2 + STUBBLE_CLEAR_M);
     if (d === Infinity) continue;
@@ -327,6 +386,10 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
     if (t > track) track = t;
     const w = 1 - Smooth((d - road.width / 2) / STUBBLE_CLEAR_M);
     if (w > worked) worked = w;
+    if (road.ruts !== false && d < rutDist && d < rutRange) {
+      const s = RouteSignedDistanceWithin(x, z, road.points, rutRange);
+      if (s !== null) { rutDist = d; rut = Math.max(-1, Math.min(1, s / rutRange)); }
+    }
   }
   for (const pad of MISSION_TERRAIN.pads) {
     const ex = Math.abs(x - pad.x) - pad.w / 2, ez = Math.abs(z - pad.z) - pad.d / 2;
@@ -334,9 +397,13 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
     const dx = ex > 0 ? ex : 0, dz = ez > 0 ? ez : 0, d = Math.sqrt(dx * dx + dz * dz);
     const t = 1 - Smooth(d / 3);
     if (t > track) track = t;
+    if (t > padTrack) padTrack = t;
+    if (pad.ruts === false && t > padNoRuts) padNoRuts = t;
     const w = 1 - Smooth(d / STUBBLE_CLEAR_M);
     if (w > worked) worked = w;
   }
+  // 车辙穿不过 ruts:false 的场坪：把横向坐标推到车辙之外（1 = 离中线 encodeRangeM 米），在场坪边上渐变。
+  if (padNoRuts > 0 && rut < 1) rut = rut + ((rut < 0 ? -1 : 1) - rut) * padNoRuts;
   // 壕沟翻土层跟着样条计划的**实际**沟沿走（带噪声的 halfFloor / bank，分桶网格只碰
   // 同一格里的边），沿沟沿再多铺 0.8 m —— 挖出来的土就堆在唇上。Corridor 的可见范围
   // 到坡顶外 bermW 为止，够这一层用；麦茬的 3.5 m 退让带比它远，照旧按标称折线量。
@@ -351,6 +418,42 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
     const w = 1 - Smooth((d - trench.bottom / 2) / (trench.bank + STUBBLE_CLEAR_M));
     if (w > worked) worked = w;
   }
+  const G = TERRAIN_GROUND_SURFACE;
+  // 壕沟真的切断了路/场坪：沟底与沟壁不画路面（shader 里翻土层让位给车道，见 Script_TrenchSurfaceMaterial）。
+  if (track > 0) {
+    const dig = -TrenchPlanFor(MISSION_TERRAIN).Apply(x, z, 0, 0);
+    if (dig > G.digTrackM[0]) track *= 1 - Smooth((dig - G.digTrackM[0]) / (G.digTrackM[1] - G.digTrackM[0]));
+  }
+  // 白盒地形修饰：陡土壁 / 交通沟 → 裸土；下沉洼地的底 → 踩实的场地（车道层），把穿进来的壕沟翻土盖掉。
+  const shapes = WhiteboxSurfaceShapes(), sb = shapes.bounds;
+  for (const item of x < sb.minX || x > sb.maxX || z < sb.minZ || z > sb.maxZ ? [] : shapes) {
+    const b = item.b, reach = item.reach;
+    if (x < b.minX - reach || x > b.maxX + reach || z < b.minZ - reach || z > b.maxZ + reach) continue;
+    if (!item.clips.some((c) => x >= c.minX && x <= c.maxX && z >= c.minZ && z <= c.maxZ)) continue;
+    const shape = item.shape, { d, dy } = WhiteboxShapeDistance(shape, x, z);
+    if (d > reach) continue;
+    const f = shape.feather;
+    if (item.hollow) {
+      const yard = Smooth(-d / G.hollowEdgeM);
+      if (yard > 0) {
+        if (yard > track) track = yard;
+        if (yard > worked) worked = yard;
+        spoil *= 1 - yard;
+      }
+    }
+    if (item.wall) {
+      const steep = 1.5 * Math.abs(dy) / Math.max(f, 1e-3);
+      const s = Smooth((steep - G.wallSlope[0]) / (G.wallSlope[1] - G.wallSlope[0]));
+      let band = s * (1 - Smooth((Math.abs(d - f / 2) - f / 2) / G.wallFadeM));
+      // 交通沟：沟底（核心）与沟外抛土一带也是裸土。
+      if (item.trench) band = Math.max(band, s * (1 - Smooth((d - f) / (G.wallFadeM + G.trenchSpillM))));
+      if (band > 0) {
+        if (band > spoil) spoil = band;
+        if (band > worked) worked = band;
+        track *= 1 - band;
+      }
+    }
+  }
   const rail = Math.abs(x + 77);
   const railT = 1 - Smooth((rail - 2.4) / 1.5);
   const railNear = 1 - Smooth((rail - 2.4) / STUBBLE_CLEAR_M);
@@ -358,6 +461,6 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
   let r = 1, g = 1, b = 1;
   if (railT > 0) { r += (.43 - r) * railT; g += (.44 - g) * railT; b += (.41 - b) * railT; }
   color[0] = r; color[1] = g; color[2] = b;
-  layers[0] = track; layers[1] = spoil; layers[2] = 1 - worked;
+  layers[0] = track; layers[1] = spoil; layers[2] = 1 - worked; layers[3] = rut;
   return color;
 }

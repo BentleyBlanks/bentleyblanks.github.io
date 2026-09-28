@@ -203,9 +203,12 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 | 深度法线预通道 + 速度 + HZB | `Script_PostPrepass.mjs` | §3 | `Script_PostFrameGraphTest.mjs`、`Script_ActorDepthTest.mjs` |
 | 屏幕空间反射 | `Script_PostSsr.mjs` | §4 | `Script_SsrTest.mjs` |
 | GTAO + 弯曲法线 + SSIL | `Script_PostGtao.mjs`、`Data_Tuning_Gtao.mjs` | §5 | `Script_GtaoTest.mjs` |
+| 室内天光遮蔽（第一关屋里暗于屋外，乘进 AO 图） | `Script_InteriorSkyOcclusion.mjs`、`Data_FirstLevelInteriors.mjs`、`Data_Tuning_Lights.INTERIOR_SKY` | §5.11 | `Script_FirstLevelSkyGradeTest.mjs`、`Script_FirstLevelSkyGradeBrowserTest.mjs` |
+| 第一关天空云层 / 专属调色 / 曝光锚点 / 关尾夜 | `Script_Sky.mjs`（`CloudDeck`、`firstLevelBattleDay` / `firstLevelNight`）、`Data_Tuning_Camera.mjs`；量差距 `_import/Script_FrameGradeStats.py` | §2.10 | 同上 |
 | 级联阴影 + PCSS + 接触阴影 | `Script_Csm.mjs`、`Script_ContactShadows.mjs`、`Data_Tuning_Shadows.mjs` | §6 | `Script_CsmTest.mjs` ＋ `Script_BootTest.mjs`（三角红线）；出图 `Script_CsmShot.mjs` |
 | 主场景 / 材质烘焙 / 材质着色升级 | `Script_Materials.mjs`、`Script_TexBake.mjs`、`Script_MaterialShading.mjs`、`Data_Tuning_Materials.mjs` | §7 | `Script_MaterialUpgradeTest.mjs`（`--shot`） |
 | 分层地形材质（splat / 纹理数组 / 远近平铺 / 去重复 / 陡坡侧投影） | `Script_TerrainMaterial.mjs`、`Data_Tuning_Terrain.mjs`、`_import/Script_BakeTerrainLayers.py` | [Data_TerrainLayers.md](Data_TerrainLayers.md) | `Script_TerrainLayersTest.mjs`、`Script_SamplerBudgetTest.mjs`、`Script_FirstLevelMissionFortificationsTest.mjs` |
+| 第一关道具换模型 / 碎砖瓦 / 植被（干草簇、灌木、芦苇卡片图集） | `Data_/Script_FirstLevelPropDressing.mjs`、`Data_/Script_FirstLevelVegetation.mjs`、`_import/Script_BakeVegetationAtlas.py` | [Data_FirstLevelVegetationProps.md](Data_FirstLevelVegetationProps.md) | `Script_FirstLevelPropDressingTest.mjs`、`Script_FirstLevelVegetationTest.mjs`（纯 Node）、`Script_FirstLevelWhiteboxBrowserTest.mjs`、`Script_SamplerBudgetTest.mjs` |
 | 贴图资产规范（命名 / 清单 / 通用烘焙 / 关卡按需集 / 体积预算） | `Data_TextureManifest.mjs`、`_import/Script_BakePbrTexture.py`、`_import/Data_TextureBakePresets.json`、`Data_LevelTextureSets.mjs`、`Script_LevelTextureSets.mjs`（`MaterialLibrary.LoadLevelSets`） | [Data_TextureAssetStandard.md](Data_TextureAssetStandard.md) | `Script_TextureStandardsTest.mjs`、`Script_BootPayloadTest.mjs`、`Script_SamplerBudgetTest.mjs` |
 | froxel 体积雾 / 体积光 | `Script_PostVolumetrics.mjs`、`Data_Tuning_Volumetrics.mjs` | §8 | `Script_VolumetricsTest.mjs` |
 | TAA / TAAU / FXAA / CAS | `Script_PostTaa.mjs`、`Script_PostFxaa.mjs`、`Data_Tuning_TemporalDof.mjs` | §9 | `Script_TaauTest.mjs` |

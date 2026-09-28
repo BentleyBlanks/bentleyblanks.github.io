@@ -4,10 +4,19 @@ The height source is an authored imagegen estimate, not measured displacement.
 Normal and AO are derived from that SAME height field. No extra GPU sampler.
 Run with Python, Pillow and numpy; the two source PNGs live in _import/Source/TrenchPom/
 (moved out of the served Texture/ folder on 2026-09-28, docs/Data_TextureAssetStandard.md).
+
+SUPERSEDED 2026-09-28: the runtime TrenchPom is now a Lovart source baked by
+_import/Script_BakePbrTexture.py (record _import/TextureBakes/Texture_TrenchPom.json,
+docs/Data_TrenchSurface.md). This script only rebuilds the reddish 2026-09-26 version and would
+overwrite the current one, so it refuses to run without --legacy-20260926.
 """
+import sys
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageFilter
+
+if '--legacy-20260926' not in sys.argv:
+    raise SystemExit('Script_BakeTrenchPom.py is superseded (see docstring); pass --legacy-20260926 to rebuild the old texture.')
 
 root = Path(__file__).resolve().parents[1] / 'Texture'
 source = Path(__file__).resolve().parent / 'Source' / 'TrenchPom'

@@ -26,7 +26,7 @@
 // ===========================================================================
 import * as THREE from "three";
 import { PROPS, SET_STAGES, FLOOR, BLAST, SMOKE, SmokeOptions, SmokeShare, FLYOVER, FLYOVER_TRIGGER, FlyoverPose, sky as SKY,
-  FRONT_SET_STAGES, FRONT_PROPS, BRICK, ProfileAt } from "./Data_OpeningSet0103.mjs";
+  FRONT_SET_STAGES, FRONT_PROPS, BRICK, ProfileAt, SET_MATERIALS, INTERIOR } from "./Data_OpeningSet0103.mjs";
 import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { FRONT_BREAKABLES } from "./Data_FirstLevelFrontBreakables.mjs";
@@ -39,6 +39,20 @@ import { SKY_PRESETS } from "./Script_Sky.mjs";
 const DEG = Math.PI / 180;
 const Clamp01 = (v) => Math.max(0, Math.min(1, v));
 const UP = new THREE.Vector3(0, 1, 0);
+/** BuildSink 的材质键：布景木料、弹药箱（SetMaterial 解析成按需集或程序化回退，见 Data SET_MATERIALS）。 */
+const TIMBER = "OpeningSetTimber", CRATE = "OpeningSetCrate";
+/**
+ * 镜头在掩蔽部里有多深（Data INTERIOR）：1 = 洞里，0 = 洞外。洞口那一侧（东）淡 featherMouthM 米，其余三面与顶淡 featherM 米。
+ * floorY 是洞底（FLOOR）的地面高。纯函数，测试直接量。
+ */
+export function InteriorWeight(eye, floorY, spec = INTERIOR) {
+  const b = spec.box, top = floorY + b.top, side = spec.featherM, mouth = spec.featherMouthM;
+  const dx = eye.x < b.x0 ? (b.x0 - eye.x) / side : eye.x > b.x1 ? (eye.x - b.x1) / mouth : 0;
+  const dz = eye.z < b.z0 ? (b.z0 - eye.z) / side : eye.z > b.z1 ? (eye.z - b.z1) / side : 0;
+  const dy = eye.y > top ? (eye.y - top) / side : 0;
+  const d = Math.min(1, Math.hypot(dx, dy, dz));
+  return 1 - d * d * (3 - 2 * d);
+}
 /** 01 的导演拍：任务步骤在「Found」前后就从 Trapped 切到 BunkerRescue 了，01/02 的界线要看导演 phase。 */
 const TRAPPED_PHASES = new Set(OPENING_STORYBOARDS.phases.Trapped);
 /** 02（救援）起才出现的组：步骤进了 01–02 之后，或者 01–02 里导演已经演到 02 的拍。 */
@@ -75,10 +89,34 @@ function Rng(seedText) {
   for (const ch of String(seedText)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
   return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
 }
+/**
+ * 木料盒子（2026-09-28 3A 迭代 B5）：UV 照 MakeBox 按世界米铺，再把每个面的 V 轴转到盒子**最长的那条边**上 ——
+ * 木料贴图（OpeningTimber）的木纹是竖的（沿 V），这样柱子、横梁、铺板、护壁横木的木纹都顺着木料走，
+ * 不会出现「横梁侧面的木纹是竖着的」。端面（不含长边的那两面）不动，读作截面。
+ */
+export function TimberBox(w, h, d, tile = TILE_METERS.wood, seed = "timber") {
+  const geometry = MakeBox(w, h, d, tile, seed), uv = geometry.attributes.uv;
+  const long = w >= h && w >= d ? "x" : h >= d ? "y" : "z";
+  // BoxGeometry 面序 +x,-x,+y,-y,+z,-z；ScaleBoxUv 给每面的 (u 轴, v 轴)：±x (z, y)、±y (x, z)、±z (x, y)。
+  const U_AXIS = ["z", "z", "x", "x", "x", "x"];
+  for (let f = 0; f < 6; f++) {
+    if (U_AXIS[f] !== long) continue;
+    for (let i = f * 4; i < f * 4 + 4; i++) { const u = uv.getX(i); uv.setXY(i, uv.getY(i), u); }
+  }
+  uv.needsUpdate = true;
+  return geometry;
+}
+/** 圆木：CylinderGeometry 的 UV 是 0..1，按周长 / 长度换成世界米（木纹沿 V = 沿长度），加一点按种子的偏移。 */
+function LogGeometry(w, len, tile, seed) {
+  const geometry = new THREE.CylinderGeometry(w / 2, w / 2, len, 8, 1), uv = geometry.attributes.uv, rnd = Rng(seed);
+  const su = Math.PI * w / tile, sv = len / tile, ou = rnd() * 4, ov = rnd() * 4;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su + ou, uv.getY(i) * sv + ov);
+  return geometry.rotateX(Math.PI / 2);
+}
 /** 一段圆木 / 方木：从 a 到 b（世界坐标 Vector3）。 */
 function Beam(a, b, { w = 0.1, h = w, round = false, tile = TILE_METERS.wood, seed = "beam" } = {}) {
   const dir = new THREE.Vector3().subVectors(b, a), len = dir.length();
-  const geometry = round ? new THREE.CylinderGeometry(w / 2, w / 2, len, 8, 1).rotateX(Math.PI / 2) : MakeBox(w, h, len, tile, seed);
+  const geometry = round ? LogGeometry(w, len, tile, seed) : TimberBox(w, h, len, tile, seed);
   const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.normalize());
   return geometry.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5), q, new THREE.Vector3(1, 1, 1)));
 }
@@ -173,6 +211,8 @@ export class OpeningSet {
     if(flags.flagFall!=null)this.PoseFlag("flagTrench",flags.flagFall);
     this.UpdateBlast(flags.blastAge, stageId);
     this.UpdateLantern(stageId, collapsed);
+    this.UpdateInterior();
+    this.SyncSetMaterials();
     if (this.smokeStage !== stageId) { this.smokeStage = stageId; this.UpdateSmoke(stageId); }
     this.UpdateFlyover(dt, stageId, flags.player);
     this.SyncBreakables(flags.breakables);
@@ -191,6 +231,8 @@ export class OpeningSet {
     this.EndFlyover();
     this.blastFx?.Clear();
     this.blastSprayed = false;
+    this.ApplyAmbientScale(1);
+    this.interiorWeight = 0;
     if (this.skyApplied) { this.skyApplied = false; this.restoreSky?.(); }
     if (!this.root) return;
     this.DisposeRoot(this.root, this.ownedMaterials, this.ownedTextures, this.lights);
@@ -241,7 +283,9 @@ export class OpeningSet {
       collapsedVisible: !!this.collapsedRoot?.visible, rescueVisible: !!this.rescueRoot?.visible, lintelProgress: this.lintelProgress,
       front: !!this.front, frontMeshes, smoke: [...this.smoke.keys()], blast: this.blastFx?.Stats() ?? null, blastSprayed: this.blastSprayed,
       flyover: this.flyover ? { t: +this.flyover.t.toFixed(2), triggered: this.flyover.triggered, flying: [...this.flyover.poses] } : null,
-      overcast: this.overcast, skyApplied: this.skyApplied, suspended: this.suspended };
+      overcast: this.overcast, skyApplied: this.skyApplied, suspended: this.suspended,
+      interior: { weight: +(this.interiorWeight || 0).toFixed(3), ambientScale: +(this.ambientScale ?? 1).toFixed(3) },
+      setMaterials: { ...(this.setMaterialSource || {}) } };
   }
 
   // ---------------------------------------------------------------- 近爆的定向喷土
@@ -262,6 +306,7 @@ export class OpeningSet {
     const dustAt = b.dustAt ? { x: b.dustAt.x, y: this.groundAt(b.dustAt.x, b.dustAt.z) + (b.dustAt.lift ?? 0.7), z: b.dustAt.z } : null;
     return this.blastFx.DirectionalBlast({ x: b.at.x, y: floor + (lo + hi) / 2, z: b.at.z }, b.dir,
       { heightM: (hi - lo) / 2, groundY: this.groundAt(FLOOR.x, FLOOR.z), clods: b.clods, splinters: b.splinters, spray: b.spray, dust: b.dust,
+        grit: b.grit, mist: b.mist, gritSize: b.gritSize, mudSize: b.mudSize, shutterS: b.shutterS, dustOpacity: b.dustOpacity,
         seconds: b.seconds, spreadRad: b.spreadRad, speed: b.speed, burst: b.burst, clodSize: b.clodSize, upBoost: b.upBoost,
         sprayDir: b.sprayDir, dustDir: b.dustDir, dustAt, dustHeightM: b.dustHeightM, dustLead: b.dustLead });
   }
@@ -394,7 +439,7 @@ export class OpeningSet {
       if (t.sawHang && p >= 0.9 && (t.progress ?? 0) < 0.9 && this.blastFx) {
         const s = t.spec.settle, mid = t.restA.clone().lerp(t.restB, 0.7);
         this.blastFx.DirectionalBlast({ x: mid.x, y: mid.y - 0.3, z: mid.z }, { x: 0.35, y: 0.3, z: 0.2 },
-          { clods: s.impact.clods, splinters: 0, spray: 0, dust: s.impact.dust, seconds: 0.3, spreadRad: 1.0, heightM: 0.15, groundY: this.groundAt(FLOOR.x, FLOOR.z),
+          { clods: s.impact.clods, splinters: 0, grit: s.impact.grit ?? 0, spray: 0, mist: 0, dust: s.impact.dust, seconds: 0.3, spreadRad: 1.0, heightM: 0.15, groundY: this.groundAt(FLOOR.x, FLOOR.z),
             speed: { clods: [1, 3], splinters: [1, 2], spray: [1, 2], dust: [0.6, 1.6] } });
       }
       this.PoseRoofTimber(p);
@@ -452,6 +497,7 @@ export class OpeningSet {
     const sinks = { always: new BuildSink(), collapsed: new BuildSink(), rescue: new BuildSink() };
     const materials = new Map();
     this.sinkMaterials = materials;
+    materials.set(TIMBER, this.SetMaterial("timber")); materials.set(CRATE, this.SetMaterial("crate"));
     const parents = { always: this.root, collapsed: this.collapsedRoot, rescue: this.rescueRoot };
     this.sandbagJobs = [];
     for (const prop of PROPS) {
@@ -470,6 +516,8 @@ export class OpeningSet {
     this.root.updateMatrixWorld(true);
     this.LoadExternals();
     this.LoadSandbags(this.sandbagJobs);
+    // 近爆泥浆池是新着色器：装载时生一颗看不见的预热粒子，关卡预热（WarmLevel）真画它一次，近爆那一帧不现编。
+    this.blastFx?.Warm({ x: BLAST.at.x, y: this.groundAt(BLAST.at.x, BLAST.at.z) + 0.6, z: BLAST.at.z });
   }
 
   Lib(name, options) {
@@ -480,6 +528,75 @@ export class OpeningSet {
     return this.sinkMaterials.get(key);
   }
   Own(material) { this.ownedMaterials.push(material); return material; }
+
+  // ---------------------------------------------------------------- 布景材质（Data SET_MATERIALS）
+  /** 材质库里有没有这一套（按需材质集下完了没有）。 */
+  LibraryHas(name) {
+    const lib = this.library;
+    if (!lib) return false;
+    if (typeof lib.Has === "function") return !!lib.Has(name);
+    return !!lib.baked?.has?.(name);
+  }
+
+  /**
+   * 木料 / 弹药箱的材质：按需集（Lovart 风化旧木）在就用它，不在就用程序化回退配方染成灰褐，并记下来等它到了再换
+   * （SyncSetMaterials）。lib 是取库材质的入口（前沿布景用 FrontLib，材质归前沿组）。
+   */
+  SetMaterial(kind, lib = (name, options) => this.Lib(name, options)) {
+    const spec = SET_MATERIALS[kind], ready = this.LibraryHas(spec.recipe);
+    const material = ready ? this.library.Get(spec.recipe, spec.options) : lib(spec.fallback, spec.fallbackOptions);
+    (this.setMaterialSource ??= {})[kind] = ready ? spec.recipe : spec.fallback;
+    if (!ready && this.library?.Get) (this.pendingSetMaterials ??= new Map()).set(material, kind);
+    return material;
+  }
+
+  /** 按需集在布景建好之后才下完：把已建网格上的回退材质换成新的（一次性，换完就不再查）。 */
+  SyncSetMaterials() {
+    if (!this.pendingSetMaterials?.size) return;
+    const swap = new Map();
+    for (const [from, kind] of this.pendingSetMaterials) {
+      const spec = SET_MATERIALS[kind];
+      if (!this.LibraryHas(spec.recipe)) continue;
+      swap.set(from, this.library.Get(spec.recipe, spec.options));
+      this.setMaterialSource[kind] = spec.recipe;
+      this.pendingSetMaterials.delete(from);
+    }
+    if (!swap.size) return;
+    const Swap = (root) => root?.traverse((o) => { if (o.isMesh && swap.has(o.material)) o.material = swap.get(o.material); });
+    Swap(this.root); Swap(this.front?.root);
+    for (const map of [this.sinkMaterials, this.front?.materials]) for (const [key, m] of map || []) if (swap.has(m)) map.set(key, swap.get(m));
+  }
+
+  // ---------------------------------------------------------------- 洞内环境光（Data INTERIOR）
+  /** 出画镜头（vfx.eye：上一帧 vfx.Update 记下的机位，过场独立机位也在里面）在洞里就把全场环境光压暗。 */
+  UpdateInterior() {
+    const eye = this.vfx?.eye;
+    this.interiorWeight = eye && !this.suspended ? InteriorWeight(eye, this.groundAt(FLOOR.x, FLOOR.z)) : 0;
+    this.ApplyAmbientScale(1 - (1 - INTERIOR.ambientScale) * this.interiorWeight);
+  }
+
+  /** 要压的三样环境光：天空 IBL（scene.environmentIntensity）、LightRig 的全局 SH 与 AmbientLight。宿主没有的就跳过。 */
+  AmbientTargets() {
+    if (this.ambientTargets) return this.ambientTargets;
+    const list = [], lights = this.vfx?.lights;
+    const Add = (obj, key) => { if (obj && typeof obj[key] === "number") list.push({ obj, key, base: null, written: null }); };
+    Add(this.scene, "environmentIntensity"); Add(lights?.globalProbe, "intensity"); Add(lights?.ambient, "intensity");
+    return (this.ambientTargets = list);
+  }
+
+  /**
+   * k × 基准。基准是「我们上次写之后别人又写过」的那个值（换天光、GI 开关都会重设这几项），所以不会把别人的新值压丢，
+   * 也不会把自己压过的值当基准越压越暗。k = 1 时写回基准并放手。
+   */
+  ApplyAmbientScale(k) {
+    this.ambientScale = k;
+    for (const t of this.AmbientTargets()) {
+      const current = t.obj[t.key];
+      if (t.written == null || Math.abs(current - t.written) > 1e-6) t.base = current;
+      if (k >= 0.999) { if (t.written != null) { t.obj[t.key] = t.base; t.written = null; } continue; }
+      t.obj[t.key] = t.written = t.base * k;
+    }
+  }
   Floor(prop, x, z) { return prop.ground ? this.groundAt(prop.ground.x, prop.ground.z) : this.groundAt(x, z); }
 
   BuildProp(prop, sink, materials) {
@@ -521,15 +638,16 @@ export class OpeningSet {
     // 背后的木板墙：竖板，洞底到顶板。
     for (let x = b.x0; x < b.x1 - 0.01; x += b.plankM) {
       const w = Math.min(b.plankM, b.x1 - x) - 0.012, h = b.lift1 - b.lift0 - rnd() * 0.08;
-      sink.Add("WoodBeam", PlaceGeometry(MakeBox(w, h, 0.04, TILE_METERS.wood, `${prop.id}${x}`),
+      sink.Add(TIMBER, PlaceGeometry(TimberBox(w, h, 0.04, TILE_METERS.wood, `${prop.id}${x}`),
         { x: x + w / 2, y: floor + b.lift0 + h / 2, z: b.z + (rnd() - 0.5) * 0.02, rz: (rnd() - 0.5) * 0.02 }));
     }
     const material = this.Own(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, alphaTest: 0.5, side: THREE.FrontSide }));
     if (!this.loadTexture) material.color.setHex(0xb8a27a);
     else {
       const generation = this.generation;
-      this.loadTexture(prop.texture).then((texture) => {
-        if (generation !== this.generation || !this.root) { texture.dispose(); return; }
+      this.loadTexture(prop.texture).then((loaded) => {
+        if (generation !== this.generation || !this.root) { loaded.dispose(); return; }
+        const texture = this.AgePoster(loaded, prop);
         texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 4;
         this.ownedTextures.push(texture); material.map = texture; material.needsUpdate = true;
       }).catch((error) => console.warn(`[OpeningSet] poster texture failed: ${error}`));
@@ -544,6 +662,49 @@ export class OpeningSet {
     const key = `OpeningSetPoster_${prop.id}`;
     this.sinkMaterials.set(key, material);
     sink.Add(key, PlaceGeometry(paper, { x: prop.x, y: floor + prop.lift, z: b.z + 0.035, ry: (prop.faceYawDeg - 180) * DEG, rz: 0.03 }));
+  }
+
+  /**
+   * 标语宣传画做旧（2026-09-28 3A 迭代 B5，分镜 01/02 墙上那张是受潮、边角发黄发黑、溅了泥的旧纸）：
+   * 装载时在画布上叠一层——边缘往里渗的水渍黄褐、下沿受潮的深色带、几道干了的水迹线、泥点——再当贴图用。
+   * 只动 RGB（source-atop），原图的透明镂空不变；没有画布（纯 node）就原样返回。数在 Data 的 bunkerPoster.aging。
+   */
+  AgePoster(texture, prop) {
+    const img = texture.image, age = prop.aging;
+    const W = img?.width, H = img?.height, canvas = age && W && H ? this.makeCanvas?.(W, H) : null, ctx = canvas?.getContext?.("2d");
+    if (!ctx) return texture;
+    const rnd = Rng(`${prop.id}aging`);
+    ctx.drawImage(img, 0, 0);
+    ctx.globalCompositeOperation = "source-atop";
+    // 纸整体受潮发黄、压一点亮度。
+    ctx.fillStyle = `rgba(120,96,62,${age.tint})`; ctx.fillRect(0, 0, W, H);
+    // 边缘渗进来的水渍：四边往里的褐色渐变。
+    const edge = Math.min(W, H) * age.edgeFrac;
+    for (const [x0, y0, x1, y1, rx, ry, rw, rh] of [[0, 0, edge, 0, 0, 0, edge, H], [W, 0, W - edge, 0, W - edge, 0, edge, H],
+      [0, 0, 0, edge, 0, 0, W, edge], [0, H, 0, H - edge * 1.6, 0, H - edge * 1.6, W, edge * 1.6]]) {
+      const g = ctx.createLinearGradient(x0, y0, x1, y1);
+      g.addColorStop(0, `rgba(70,50,30,${age.edge})`); g.addColorStop(1, "rgba(70,50,30,0)");
+      ctx.fillStyle = g; ctx.fillRect(rx, ry, rw, rh);
+    }
+    // 干了的水迹线：几条沿下半张横着走的起伏细线。
+    ctx.lineWidth = Math.max(1, W / 256);
+    for (let k = 0; k < age.tideLines; k++) {
+      const y = H * (0.55 + rnd() * 0.4), amp = H * 0.02;
+      ctx.strokeStyle = `rgba(80,58,34,${0.25 + rnd() * 0.2})`;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += W / 24) ctx.lineTo(x, y + Math.sin(x / W * 9 + k * 2.1) * amp + (rnd() - 0.5) * amp * 0.6);
+      ctx.stroke();
+    }
+    // 泥点：下半张多、上半张少。
+    for (let k = 0; k < age.mudSpots; k++) {
+      const x = rnd() * W, y = H * Math.pow(rnd(), 0.6), r = (0.004 + rnd() * rnd() * 0.02) * W;
+      ctx.fillStyle = `rgba(58,44,30,${0.35 + rnd() * 0.45})`;
+      ctx.beginPath(); ctx.ellipse(x, y, r, r * (0.6 + rnd() * 0.6), rnd() * 3, 0, Math.PI * 2); ctx.fill();
+    }
+    const aged = new THREE.CanvasTexture(canvas);
+    aged.flipY = texture.flipY;
+    texture.dispose();
+    return aged;
   }
 
   BuildLantern(prop) {
@@ -595,13 +756,13 @@ export class OpeningSet {
     for (const [i, layer] of prop.layers.entries()) {
       const ry = ((prop.yawDeg || 0) + (layer.dyawDeg || 0)) * DEG, cx = prop.x + (layer.dx || 0), cz = prop.z + (layer.dz || 0);
       const h = layer.lid ? layer.h * 0.9 : layer.h;
-      sink.Add("WoodCrate", PlaceGeometry(MakeBox(layer.w, h, layer.d, 0.6, `${prop.id}${i}`), { x: cx, y: y + h / 2, z: cz, ry }));
+      sink.Add(CRATE, PlaceGeometry(MakeBox(layer.w, h, layer.d, 0.6, `${prop.id}${i}`), { x: cx, y: y + h / 2, z: cz, ry }));
       // 箱角包边与提手：两根横条，读得出是弹药箱不是方块。
-      for (const side of [-1, 1]) sink.Add("WoodBeam", PlaceGeometry(MakeBox(0.04, h * 0.98, layer.d + 0.02, 0.8, `${prop.id}${i}e${side}`),
+      for (const side of [-1, 1]) sink.Add(TIMBER, PlaceGeometry(TimberBox(0.04, h * 0.98, layer.d + 0.02, 0.8, `${prop.id}${i}e${side}`),
         { x: cx + Math.cos(ry) * side * (layer.w / 2 - 0.03), y: y + h / 2, z: cz - Math.sin(ry) * side * (layer.w / 2 - 0.03), ry }));
       if (layer.lid) {
         // 掀开的盖子斜靠在箱后沿。
-        sink.Add("WoodCrate", PlaceGeometry(MakeBox(layer.w, 0.03, layer.d, 0.6, `${prop.id}lid`),
+        sink.Add(CRATE, PlaceGeometry(MakeBox(layer.w, 0.03, layer.d, 0.6, `${prop.id}lid`),
           { x: cx + Math.sin(ry) * (-layer.d * 0.55), y: y + h + layer.d * 0.3, z: cz + Math.cos(ry) * (-layer.d * 0.55), ry, rx: 1.05 + rnd() * 0.1 }));
       }
       y += h;
@@ -612,18 +773,18 @@ export class OpeningSet {
     const floor = this.Floor(prop, prop.intact.x, prop.intact.z), i = prop.intact, rnd = Rng(prop.id);
     // 北段还搁在北柱顶上：它是 MISSION_SCENARIO 塌方态的 Space 体块 BunkerMouthLintelN（整关都在，04 以后洞口不会
     // 少一根门楣）。这里只加断口处几根劈开的木刺。
-    for (let k = 0; k < 4; k++) sink.Add("WoodBeam", PlaceGeometry(MakeBox(0.04 + rnd() * 0.03, 0.03 + rnd() * 0.03, 0.18 + rnd() * 0.14, TILE_METERS.wood, `${prop.id}sN${k}`),
+    for (let k = 0; k < 4; k++) sink.Add(TIMBER, PlaceGeometry(TimberBox(0.04 + rnd() * 0.03, 0.03 + rnd() * 0.03, 0.18 + rnd() * 0.14, TILE_METERS.wood, `${prop.id}sN${k}`),
       { x: i.x + (rnd() - 0.5) * i.w * 0.8, y: floor + i.lift + (rnd() - 0.5) * i.h * 0.7, z: prop.breakZ + 0.06, rx: (rnd() - 0.5) * 0.5, ry: (rnd() - 0.5) * 0.4 }));
     // 南段：以南门柱顶为轴落下，单独一只网格（每帧设姿态）。局部 -z 指向断头。
     const pivot = new THREE.Vector3(prop.pivot.x, floor + prop.pivot.lift, prop.pivot.z);
     const rest = new THREE.Vector3(prop.rest.x, floor + prop.rest.lift, prop.rest.z);
     const len = pivot.distanceTo(rest), over = Math.max(0, prop.pivot.z - (i.z + i.d / 2)) * -1 + 0.1;
-    const parts = [PlaceGeometry(MakeBox(i.w, i.h, len + over, TILE_METERS.wood, `${prop.id}S`), { z: -(len - over) / 2 })];
-    for (let k = 0; k < 5; k++) parts.push(PlaceGeometry(MakeBox(0.04 + rnd() * 0.04, 0.03 + rnd() * 0.04, 0.22 + rnd() * 0.2, TILE_METERS.wood, `${prop.id}sS${k}`),
+    const parts = [PlaceGeometry(TimberBox(i.w, i.h, len + over, TILE_METERS.wood, `${prop.id}S`), { z: -(len - over) / 2 })];
+    for (let k = 0; k < 5; k++) parts.push(PlaceGeometry(TimberBox(0.04 + rnd() * 0.04, 0.03 + rnd() * 0.04, 0.22 + rnd() * 0.2, TILE_METERS.wood, `${prop.id}sS${k}`),
       { x: (rnd() - 0.5) * i.w * 0.8, y: (rnd() - 0.5) * i.h * 0.7, z: -len - 0.08, rx: (rnd() - 0.5) * 0.6, ry: (rnd() - 0.5) * 0.5 }));
     const pieceSink = new BuildSink();
-    for (const g of parts) pieceSink.Add("WoodBeam", g);
-    const [mesh] = pieceSink.Flush(this.collapsedRoot, {}, { castShadow: true, receiveShadow: true, resolve: () => this.Lib("WoodBeam") });
+    for (const g of parts) pieceSink.Add(TIMBER, g);
+    const [mesh] = pieceSink.Flush(this.collapsedRoot, {}, { castShadow: true, receiveShadow: true, resolve: () => this.SetMaterial("timber") });
     mesh.name = `OpeningSet0103_${prop.id}_Falling`;
     mesh.position.copy(pivot);
     const qIntact = new THREE.Quaternion();                              // 局部 -z = 世界 -z（朝北，沿门楣）
@@ -639,19 +800,19 @@ export class OpeningSet {
     if (prop.hang) {
       // 会塌的那根：单独一只网格（原点在中点、局部 +z 沿木料），每帧由 PoseRoofTimber 摆。
       const len = a.distanceTo(b), pieceSink = new BuildSink();
-      pieceSink.Add("WoodBeam", MakeBox(prop.w, prop.h, len, TILE_METERS.wood, prop.id));
-      const [mesh] = pieceSink.Flush(this.collapsedRoot, {}, { castShadow: true, receiveShadow: true, resolve: () => this.Lib("WoodBeam") });
+      pieceSink.Add(TIMBER, TimberBox(prop.w, prop.h, len, TILE_METERS.wood, prop.id));
+      const [mesh] = pieceSink.Flush(this.collapsedRoot, {}, { castShadow: true, receiveShadow: true, resolve: () => this.SetMaterial("timber") });
       mesh.name = `OpeningSet0103_${prop.id}_Settling`;
       const V = (p) => new THREE.Vector3(p.x, floor + p.lift, p.z);
       this.roofTimber = { spec: prop, mesh, restA: a, restB: b, hangA: V(prop.hang.a), hangB: V(prop.hang.b), progress: null, age: null };
       this.PoseRoofTimber(0);
-    } else sink.Add("WoodBeam", Beam(a, b, { w: prop.w, h: prop.h, seed: prop.id }));
+    } else sink.Add(TIMBER, Beam(a, b, { w: prop.w, h: prop.h, seed: prop.id }));
     // 断口的木刺（断板用）：挂在下端。
     const dir = b.clone().sub(a).normalize();
     for (let k = 0; k < (prop.splinters || 0); k++) {
       const tip = b.clone().addScaledVector(dir, 0.04 + rnd() * 0.12);
       tip.x += (rnd() - 0.5) * prop.w * 0.8;
-      sink.Add("WoodBeam", Beam(b.clone().addScaledVector(dir, -0.05), tip, { w: 0.02 + rnd() * 0.03, h: 0.015 + rnd() * 0.02, seed: `${prop.id}s${k}` }));
+      sink.Add(TIMBER, Beam(b.clone().addScaledVector(dir, -0.05), tip, { w: 0.02 + rnd() * 0.03, h: 0.015 + rnd() * 0.02, seed: `${prop.id}s${k}` }));
     }
     // 两头垫的土块：会塌的那根，土块跟它一起下来（塌下之前不在：南头那堆在 SB03 画面右下，审查 09-25）。
     const supportSink = prop.hang ? new BuildSink() : sink;
@@ -687,7 +848,7 @@ export class OpeningSet {
         if (!open && start == null) start = x;
         if ((open || x >= prop.x1) && start != null) {
           const end = Math.min(x, prop.x1), w = end - start;
-          if (w > 0.05) sink.Add("WoodBeam", PlaceGeometry(MakeBox(w, h, 0.05, TILE_METERS.wood, `${prop.id}${y}${start}`),
+          if (w > 0.05) sink.Add(TIMBER, PlaceGeometry(TimberBox(w, h, 0.05, TILE_METERS.wood, `${prop.id}${y}${start}`),
             { x: (start + end) / 2, y: floorAt((start + end) / 2) + yc, z: z + Back(yc) + (rnd() - 0.5) * 0.015, rx: Tilt(yc), rz: (rnd() - 0.5) * 0.015 }));
           start = null;
         }
@@ -699,21 +860,21 @@ export class OpeningSet {
     for (const x of posts) {
       const rz = (rnd() - 0.5) * 0.03, top = prop.heightM + 0.05;
       if (!lean) {
-        sink.Add("WoodBeam", PlaceGeometry(MakeBox(prop.postM, prop.heightM + 0.1, prop.postM, TILE_METERS.wood, `${prop.id}p${x}`),
+        sink.Add(TIMBER, PlaceGeometry(TimberBox(prop.postM, prop.heightM + 0.1, prop.postM, TILE_METERS.wood, `${prop.id}p${x}`),
           { x, y: floorAt(x) + (prop.heightM + 0.1) / 2 - 0.05, z: z + 0.05, rz }));
         continue;
       }
       const lowH = lean.from + 0.05, upH = top - lean.from, mid = lean.from + upH / 2;
-      sink.Add("WoodBeam", PlaceGeometry(MakeBox(prop.postM, lowH, prop.postM, TILE_METERS.wood, `${prop.id}p${x}`),
+      sink.Add(TIMBER, PlaceGeometry(TimberBox(prop.postM, lowH, prop.postM, TILE_METERS.wood, `${prop.id}p${x}`),
         { x, y: floorAt(x) + lowH / 2 - 0.05, z: z + 0.05, rz }));
-      sink.Add("WoodBeam", PlaceGeometry(MakeBox(prop.postM, upH / Math.cos(lean.rad), prop.postM, TILE_METERS.wood, `${prop.id}pu${x}`),
+      sink.Add(TIMBER, PlaceGeometry(TimberBox(prop.postM, upH / Math.cos(lean.rad), prop.postM, TILE_METERS.wood, `${prop.id}pu${x}`),
         { x, y: floorAt(x) + mid, z: z + 0.05 + Back(mid), rx: -lean.rad, rz }));
     }
     const voidKey = "OpeningSetVoid";
     if (!materials.has(voidKey)) materials.set(voidKey, this.Own(new THREE.MeshStandardMaterial({ color: 0x050403, roughness: 1, metalness: 0 })));
     for (const o of opens) {
       const w = o.x1 - o.x0, x = (o.x0 + o.x1) / 2, lintelH = o.h + 0.1;
-      sink.Add("WoodBeam", PlaceGeometry(MakeBox(w + prop.postM * 2, 0.2, 0.24, TILE_METERS.wood, `${prop.id}l${x}`),
+      sink.Add(TIMBER, PlaceGeometry(TimberBox(w + prop.postM * 2, 0.2, 0.24, TILE_METERS.wood, `${prop.id}l${x}`),
         { x, y: floorAt(x) + lintelH, z: z + 0.04 + Back(lintelH), rx: Tilt(lintelH) }));
       if (!lean) sink.Add(voidKey, PlaceGeometry(MakeBox(w, o.h, 0.04, 1, `${prop.id}v${x}`), { x, y: floorAt(x) + o.h / 2, z: z - 0.1 }));
       else {
@@ -723,7 +884,7 @@ export class OpeningSet {
         sink.Add(voidKey, PlaceGeometry(MakeBox(w, upH / Math.cos(lean.rad), 0.04, 1, `${prop.id}vu${x}`),
           { x, y: floorAt(x) + mid, z: z - 0.03 + Back(mid), rx: -lean.rad }));
       }
-      sink.Add("WoodBeam", PlaceGeometry(MakeBox(w, 0.06, 0.3, TILE_METERS.wood, `${prop.id}t${x}`), { x, y: floorAt(x) + 0.03, z: z - 0.02 }));   // 门槛
+      sink.Add(TIMBER, PlaceGeometry(TimberBox(w, 0.06, 0.3, TILE_METERS.wood, `${prop.id}t${x}`), { x, y: floorAt(x) + 0.03, z: z - 0.02 }));   // 门槛
     }
   }
 
@@ -742,13 +903,13 @@ export class OpeningSet {
             const P0 = (t) => new THREE.Vector3(a.x + d.x * t + n.x * (off + side * prop.width), 0, a.z + d.z * t + n.z * (off + side * prop.width));
             const p0 = P0(s), p1 = P0(e);
             p0.y = this.groundAt(p0.x, p0.z) + 0.025; p1.y = this.groundAt(p1.x, p1.z) + 0.025;
-            sink.Add("WoodBeam", Beam(p0, p1, { w: 0.06, h: 0.05, seed: `${prop.id}${c}${s}${side}` }));
+            sink.Add(TIMBER, Beam(p0, p1, { w: 0.06, h: 0.05, seed: `${prop.id}${c}${s}${side}` }));
           }
         }
         for (let s = prop.slatM / 2; s < len; s += prop.slatM + prop.gapM) {
           if (rnd() < 0.04) continue;                                     // 偶尔缺一块
           const x = a.x + d.x * s + n.x * off, z = a.z + d.z * s + n.z * off;
-          sink.Add("WoodBeam", PlaceGeometry(MakeBox(prop.width * (0.94 + rnd() * 0.08), 0.03, prop.slatM, TILE_METERS.wood, `${prop.id}${c}${s}`),
+          sink.Add(TIMBER, PlaceGeometry(TimberBox(prop.width * (0.94 + rnd() * 0.08), 0.03, prop.slatM, TILE_METERS.wood, `${prop.id}${c}${s}`),
             { x, y: this.groundAt(x, z) + 0.066, z, ry: ry + (rnd() - 0.5) * 0.06, rz: (rnd() - 0.5) * 0.04 }));
         }
       }
@@ -768,14 +929,14 @@ export class OpeningSet {
       for (let k = 0; k < count; k++) {
         const t = k / (count - 1), x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t, y = this.groundAt(x, z);
         ground.push(y);
-        sink.Add("WoodBeam", Post(new THREE.Vector3(x, y - 0.15, z), axis, heightM + 0.15 + rnd() * 0.12, 0.09, { round: true, seed: `${prop.id}${i}${k}` }));
+        sink.Add(TIMBER, Post(new THREE.Vector3(x, y - 0.15, z), axis, heightM + 0.15 + rnd() * 0.12, 0.09, { round: true, seed: `${prop.id}${i}${k}` }));
       }
       const g0 = Math.min(...ground);
       for (let l = 0; l < prop.logs; l++) {
         const hy = (l + 0.5) / prop.logs * heightM * 0.92, back = Math.tan(lean) * hy - 0.07;
         const p0 = new THREE.Vector3(a.x + n.x * back - d.x * 0.1, g0 + hy, a.z + n.z * back - d.z * 0.1);
         const p1 = new THREE.Vector3(b.x + n.x * back + d.x * 0.1, g0 + hy + (rnd() - 0.5) * 0.04, b.z + n.z * back + d.z * 0.1);
-        sink.Add("WoodBeam", Beam(p0, p1, { w: prop.round ? 0.14 : 0.12, h: 0.1, round: !!prop.round || l % 2 === 0, seed: `${prop.id}${i}l${l}` }));
+        sink.Add(TIMBER, Beam(p0, p1, { w: prop.round ? 0.14 : 0.12, h: 0.1, round: !!prop.round || l % 2 === 0, seed: `${prop.id}${i}l${l}` }));
       }
     }
   }
@@ -796,7 +957,7 @@ export class OpeningSet {
       for (let s = 0.3; s < len; s += prop.stakeEveryM) {
         const x = a.x + d.x * s + n.x * (prop.depthM * 0.5 + 0.06), z = a.z + d.z * s + n.z * (prop.depthM * 0.5 + 0.06), y = this.groundAt(x, z);
         const axis = new THREE.Vector3(-n.x * 0.12, 1, -n.z * 0.12).normalize();
-        sink.Add("WoodBeam", Post(new THREE.Vector3(x, y - prop.stakeBelowM, z), axis, prop.stakeBelowM + prop.stakeAboveM + rnd() * 0.1, 0.07, { round: true, seed: `${prop.id}st${s}` }));
+        sink.Add(TIMBER, Post(new THREE.Vector3(x, y - prop.stakeBelowM, z), axis, prop.stakeBelowM + prop.stakeAboveM + rnd() * 0.1, 0.07, { round: true, seed: `${prop.id}st${s}` }));
       }
     }
   }
@@ -805,7 +966,7 @@ export class OpeningSet {
     const moving=Number.isFinite(prop.fallYawDeg),targetSink=moving?new BuildSink():sink;
     sink=targetSink;
     const y = this.groundAt(prop.x, prop.z) - 0.25;
-    sink.Add("WoodBeam", Post(new THREE.Vector3(prop.x, y, prop.z), new THREE.Vector3(0.03, 1, 0.02).normalize(), prop.poleM + 0.25, 0.045, { round: true, seed: prop.id }));
+    sink.Add(TIMBER, Post(new THREE.Vector3(prop.x, y, prop.z), new THREE.Vector3(0.03, 1, 0.02).normalize(), prop.poleM + 0.25, 0.045, { round: true, seed: prop.id }));
     const [w, h] = prop.cloth, cloth = new THREE.PlaneGeometry(w, h, 10, 5), pos = cloth.attributes.position;
     // 旗面挂在杆顶，沿 fly 方向伸出；布自己往下耷、有两道褶。
     for (let i = 0; i < pos.count; i++) {
@@ -863,7 +1024,7 @@ export class OpeningSet {
 
   BuildPlanks(prop, sink) {
     for (const [k, p] of prop.planks.entries())
-      sink.Add("WoodBeam", PlaceGeometry(MakeBox(p.w, p.t, p.len, TILE_METERS.wood, `${prop.id}${k}`),
+      sink.Add(TIMBER, PlaceGeometry(TimberBox(p.w, p.t, p.len, TILE_METERS.wood, `${prop.id}${k}`),
         { x: p.x, y: this.groundAt(p.x, p.z) + p.lift, z: p.z, ry: (p.yawDeg || 0) * DEG, rx: (p.pitchDeg || 0) * DEG, rz: (p.rollDeg || 0) * DEG }));
   }
 
@@ -911,14 +1072,14 @@ export class OpeningSet {
         const base = f.o.clone().addScaledVector(f.t, s + (rnd() - 0.5) * 0.08).addScaledVector(f.n, prop.bulgeM + st.w / 2);
         base.y = bottom;
         const axis = new THREE.Vector3(-f.n.x * 0.06, 1, -f.n.z * 0.06).normalize();
-        sink.Add("WoodBeam", Post(base, axis, h + st.aboveM + rnd() * 0.1, st.w, { round: true, seed: `${prop.id}${key}${s}` }));
+        sink.Add(TIMBER, Post(base, axis, h + st.aboveM + rnd() * 0.1, st.w, { round: true, seed: `${prop.id}${key}${s}` }));
       }
       // 横板：压在木桩外侧。
       for (const lift of st ? dress.planks || [] : []) {
         const y = bottom + 0.06 + lift, off = prop.bulgeM + st.w + 0.018;
         const a = f.o.clone().addScaledVector(f.t, 0.05).addScaledVector(f.n, off), b = f.o.clone().addScaledVector(f.t, f.len - 0.05).addScaledVector(f.n, off);
         a.y = y + (rnd() - 0.5) * 0.04; b.y = y + (rnd() - 0.5) * 0.04;
-        sink.Add("WoodBeam", Beam(a, b, { w: 0.18, h: 0.035, seed: `${prop.id}${key}p${lift}` }));
+        sink.Add(TIMBER, Beam(a, b, { w: 0.18, h: 0.035, seed: `${prop.id}${key}p${lift}` }));
       }
     }
     // 顶上的土：起伏的一层，四边垂到体块顶以下一点。
@@ -952,6 +1113,9 @@ export class OpeningSet {
     sink.SetSector("OpeningSet_Front");
     // 砖：城墙灰砖染成土黄灰（契约：阵位白盒改成「土黄砖色」的破砖墙；参考概念图 04）。缺配方就抛（不静默退回）。
     materials.set("OpeningSetBrick", this.FrontLib(front, BRICK.recipe, { color: BRICK.color }));
+    materials.set(TIMBER, this.SetMaterial("timber", (name, options) => this.FrontLib(front, name, options)));
+    materials.set(CRATE, this.SetMaterial("crate", (name, options) => this.FrontLib(front, name, options)));
+    front.materials = materials;
     const resolve = (name) => materials.get(name) || this.FrontLib(front, name);
     const saved = { sinkMaterials: this.sinkMaterials, ownedMaterials: this.ownedMaterials,
       sandbagParent: this.sandbagParent, sandbagJobs: this.sandbagJobs };

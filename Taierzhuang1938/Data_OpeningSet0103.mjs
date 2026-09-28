@@ -43,12 +43,17 @@ export const PROPS = Object.freeze([
   { id: "bunkerPoster", kind: "poster", ground: FLOOR, x: 0.5, z: -127.8, lift: 0.95, w: 0.6, h: 0.9, faceYawDeg: 180,
     textBand: Object.freeze([0.605, 0.955]),        // 字在贴图里的纵向范围（从上往下，0–1），与 Script_MakeBunkerPoster 的 textBottom 一致
     texture: "./Texture/Texture_BunkerPosterDefendShandong.webp",
+    // 做旧（2026-09-28 3A 迭代 B5，Script_OpeningSet.AgePoster）：受潮发黄 tint、四边水渍 edge（深度占短边 edgeFrac）、
+    // 下半张几道干水迹 tideLines、泥点 mudSpots。字（textBand）要读得出来：水渍与泥点都压得很淡、很小。
+    aging: Object.freeze({ tint: 0.14, edge: 0.38, edgeFrac: 0.07, tideLines: 3, mudSpots: 34 }),
     board: Object.freeze({ x0: -0.75, x1: 0.92, z: -127.87, lift0: 0.0, lift1: 1.84, plankM: 0.2 }) },
   // 铁皮马灯：挂在北门柱内侧（柱 x 0.925…1.175、z -127.65…-127.35）的钉子上，暖色点光只在 01 亮、轻微闪烁。
   // 离洞底 1.0 m（调研写 1.55，上一版 1.28）：Blast 机位俯 13° 时 1.28 只在画面上沿露一小块亮斑（审查 09-25）；
   // 1.0 时灯身在画面 (0.37, 0.13)，挨着北门柱。
+  // 2026-09-28（3A 迭代 B5）：洞内环境光压暗以后（INTERIOR）马灯要撑起一圈暖光池（分镜 01/02：柱上一盏马灯把北壁、
+  // 标语、弹药箱照成暖橙，其余是暗土洞）。强度 2.2 → 4.2、半径 3.2 → 4.4 m、色温往煤油灯拉（约 1900 K）。
   { id: "bunkerLantern", kind: "lantern", ground: FLOOR, x: 0.84, z: -127.42, lift: 1.0,
-    light: Object.freeze({ color: 0xffa65a, intensity: 2.2, distanceM: 3.2, decay: 2, flickerHz: Object.freeze([7.3, 11.1, 2.3]), flicker: 0.16 }),
+    light: Object.freeze({ color: 0xff9a4e, intensity: 4.2, distanceM: 4.4, decay: 2, flickerHz: Object.freeze([7.3, 11.1, 2.3]), flicker: 0.16 }),
     litStages: Object.freeze(["Trapped"]) },
   // 北壁弹药箱两层（幺娃身后，SB01 左中），箱背嵌进北壁坡脚。
   // z -127.92（原 -127.88）：幺娃坐位 (-0.55,-127.35) 离箱前沿差 3 cm 就进了箱子（Script_OpeningSetTest §2 的 banter.yaowa），
@@ -86,7 +91,7 @@ export const PROPS = Object.freeze([
   { id: "roofTimberDown", kind: "timber", ground: FLOOR, show: "collapsed",
     a: P(0.8, -126.25, 0.62), b: P(0.8, -124.5, 0.66), w: 0.3, h: 0.28,
     hang: Object.freeze({ a: P(0.8, -126.25, 1.62), b: P(0.8, -124.5, 1.05) }),
-    settle: Object.freeze({ phase: "Reach", seconds: 0.32, bounceRad: 0.03, bounceS: 0.16, impact: Object.freeze({ clods: 4, dust: 10 }) }),
+    settle: Object.freeze({ phase: "Reach", seconds: 0.32, bounceRad: 0.03, bounceS: 0.16, impact: Object.freeze({ clods: 4, dust: 10, grit: 6 }) }),
     supports: Object.freeze([Object.freeze({ x: 0.8, z: -126.15, w: 0.5, h: 0.48, d: 0.45 }),
       Object.freeze({ x: 0.82, z: -124.62, w: 0.45, h: 0.52, d: 0.4 })]) },
 
@@ -216,15 +221,57 @@ export const BLAST = Object.freeze({
   dustDir: Object.freeze({ x: -0.95, y: 0.15, z: -0.2 }),
   /** 从近爆（blastAge 0 = 导演 Blast() 的那一帧）起算：炮弹 0.22 s 落地就喷。 */
   atS: 0.22, seconds: 0.68,
-  clods: 18, splinters: 14, dust: 30, spray: 80,
+  // 2026-09-28（3A 迭代 B5）：泥浆（spray）改走 Script_Vfx 的泥浆池（沿速度拉伸、受光、软边），土块 / 木片 / 碎渣（grit）
+  // 走不规则几何碎块池；加一溜贴着泥浆的细尘团（mist）。旧版的泥雾是烟团池里不透明的近黑圆盘，SB02 画面里读成一堆黑圆片。
+  clods: 18, splinters: 14, grit: 50, dust: 30, spray: 110, mist: 24,
   spreadRad: 0.38,
   // 土块边长（米）与额外上抛（米/秒）：少抛，贴着画面右三分之一飞。边长上限 0.13：试过 0.22，离镜头 1 m 的土块读成一只只黑方箱。
   clodSize: Object.freeze([0.05, 0.13]),
+  /** 碎渣边长、泥团半宽（米）；泥浆拖尾 = 瞬时速度 × shutterS（秒，约一帧半的运动模糊）。 */
+  gritSize: Object.freeze([0.014, 0.034]), mudSize: Object.freeze([0.025, 0.065]), shutterS: 0.065,
+  /** 扬尘峰值不透明度（旧版 0.62 + 浅砖粉色，Blast 帧右半一片发白）。 */
+  dustOpacity: 0.55,
   upBoost: Object.freeze({ clods: Object.freeze([0.1, 0.7]), splinters: Object.freeze([0.2, 1.0]) }),
-  // 速度（米/秒）：土块 5–10、碎木 6–12（更轻、飞得远）、泥雾 8–13（一片扫过镜头前）、扬尘 1.2–3.2（填满洞口）。
-  speed: Object.freeze({ clods: Object.freeze([5, 10]), splinters: Object.freeze([6, 12]), spray: Object.freeze([8, 13]), dust: Object.freeze([1.2, 3.2]) }),
+  // 速度（米/秒）：土块 5–10、碎木 6–12（更轻、飞得远）、碎渣 7–12、泥浆 8–13（一片扫过镜头前）、细尘团 3–6、扬尘 1.2–3.2（填满洞口）。
+  speed: Object.freeze({ clods: Object.freeze([5, 10]), splinters: Object.freeze([6, 12]), grit: Object.freeze([7, 12]),
+    spray: Object.freeze([8, 13]), mist: Object.freeze([3, 6]), dust: Object.freeze([1.2, 3.2]) }),
   // 前 0.18 s 喷出 70%，后面是拖尾（落土）。
   burst: Object.freeze({ headS: 0.18, headShare: 0.7 }),
+  // 颜色（sRGB）：分镜 02 是棕色湿土、灰褐木屑、褐灰尘团；不要近黑（逆光读成黑剪影）也不要浅米黄（读成方糖 / 砖粉）。
+  colors: Object.freeze({ mudWet: 0x4a3b2c, mudLight: 0x76624d, clodDark: 0x4a3c2f, clodDry: 0x6f5e4a, wood: 0x6a5846, woodDark: 0x3e342b,
+    mist: 0x857460, dust: 0x9a876c, dustDense: 0x74644f }),
+});
+
+// ---------------------------------------------------------------------------
+// 布景材质（2026-09-28 3A 迭代 B5）：掩蔽部与前沟的木料、弹药箱
+// ---------------------------------------------------------------------------
+// 分镜 01/02/03A/04A：灰褐风化旧木（开裂、泥污、边角磨圆），不是程序化 WoodBeam 那种橙黄新木；弹药箱是灰褐旧板箱。
+// recipe 是按需材质集（Lovart 源图经 _import/Script_BakePbrTexture.py 烘成 Texture_Opening*{Base,Normal,Orm}.webp，
+// 登记在 Data_TextureManifest），**不进开机清单**；材质库里还没有这一套（按需集没下完 / 纯 node / 编辑器预览）就用
+// fallback 程序化配方并染 fallbackColor（把橙黄压成灰褐），套下来之后 Script_OpeningSet 把已建网格换过去。
+// color 是新贴图上再乘的色（1 = 原样）。
+export const SET_MATERIALS = Object.freeze({
+  timber: Object.freeze({ recipe: "OpeningTimber", options: Object.freeze({ color: 0xd6d0c6 }),
+    fallback: "WoodBeam", fallbackOptions: Object.freeze({ color: 0x8e8474 }) }),
+  crate: Object.freeze({ recipe: "OpeningCrate", options: Object.freeze({ color: 0xe0dad0 }),
+    fallback: "WoodCrate", fallbackOptions: Object.freeze({ color: 0x9d9486 }) }),
+});
+
+// ---------------------------------------------------------------------------
+// 洞内环境光（2026-09-28 3A 迭代 B5）：镜头进了掩蔽部就把全场环境光压暗
+// ---------------------------------------------------------------------------
+// 实拍取证（Gap3A_After/B5/Probe）：01 洞里亮成跟洞外一样，**全是环境光**（天空 IBL + 全局 SH + AmbientLight）——关掉太阳
+// 洞里几乎不变，关掉环境光洞里全黑、只剩洞口一块太阳与马灯。探针体 GI 默认关（开了也是 4 m 一格，分不出这个 4 m 的洞），
+// 地形又不进 GI 代理盒，所以「土顶挡天光」这件事没有系统替我们算。这里是**布景级**手段：出画镜头（vfx.eye）在下面这只盒子里时，
+// 把 scene.environmentIntensity、LightRig 的全局 SH 与 AmbientLight 按权重乘 ambientScale（洞口外 featherMouthM 米淡完，
+// 其余三面 featherM 米），离开盒子原样还回去（谁中途改了基准——换天光 / GI 开关——就以它的新值为准）。
+// 洞外的东西主要吃太阳直射，所以从洞里看出去洞口仍然亮（分镜 01「昏暗土洞、洞口外亮」）。
+// 通用的室内压暗（按区域、按表面）归渲染侧（3A 迭代 B4），集成时这一条可以换成那套机制，数据留在这里。
+// box：世界 x/z，top 是离洞底（FLOOR）的高（洞顶梁下沿约 2.1 m）。
+export const INTERIOR = Object.freeze({
+  box: Object.freeze({ x0: -3.4, x1: 1.0, z0: -128.2, z1: -123.8, top: 2.1 }),
+  featherMouthM: 1.0, featherM: 0.3,
+  ambientScale: 0.45,
 });
 
 // ---------------------------------------------------------------------------
@@ -434,8 +481,8 @@ export const DESIGNED_CONTACTS = Object.freeze({
     why: "SB03/03A：死川军背靠门框边的板墙；近爆时他就是被摔在这面北壁上（BlastSlamBuried）" }),
 });
 
-export const OPENING_SET = Object.freeze({ version: "20260925OpeningSetV2", stages: SET_STAGES, PROPS, BLAST, SMOKE, FLYOVER, FLYOVER_TRIGGER, sky,
-  frontStages: FRONT_SET_STAGES, FRONT_PROPS, DESIGNED_CONTACTS });
+export const OPENING_SET = Object.freeze({ version: "20260928OpeningSetV3", stages: SET_STAGES, PROPS, BLAST, SMOKE, FLYOVER, FLYOVER_TRIGGER, sky,
+  frontStages: FRONT_SET_STAGES, FRONT_PROPS, DESIGNED_CONTACTS, SET_MATERIALS, INTERIOR });
 
 // ---------------------------------------------------------------------------
 // 占地（纯数学，Script_OpeningSet 与测试共用）：每件道具拆成若干只朝向盒

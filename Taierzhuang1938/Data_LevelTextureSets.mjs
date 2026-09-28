@@ -18,7 +18,11 @@
 /** 关卡 id 与 Notes/<Level>/、关卡编排工作台同一套（第一关 = "FirstLevel"）。 */
 export const LEVEL_TEXTURE_SETS = Object.freeze({
   // 阶段 B（2026-09-28 3A 迭代）各包往这里加条目；现有贴图的加载时机不在此表管理。
-  FirstLevel: Object.freeze([]),
+  FirstLevel: Object.freeze([
+    // B5 开场布景（Data_OpeningSet0103.SET_MATERIALS）：掩蔽部 / 前沟的风化旧木、旧弹药箱板。
+    Object.freeze({ name: "OpeningTimber", v: "20260928", fallback: "WoodBeam" }),
+    Object.freeze({ name: "OpeningCrate", v: "20260928", fallback: "WoodCrate" }),
+  ]),
 });
 
 /** 每关按需集合计上限（字节）。第一关 6 MB ≈ 线上 0.5 MB/s 下 12 s，分摊在建场过程里。 */

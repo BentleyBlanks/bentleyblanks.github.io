@@ -29,8 +29,13 @@ import { TRENCH_SURFACE } from "./Data_TrenchSurface.mjs";
 import { LoadTrenchSurface, BuildTrenchSurface, PaintTrenchBatch } from "./Script_TrenchSurface.mjs";
 import { MakeTrenchSurfacePatch } from "./Script_TrenchSurfaceMaterial.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
+import { SET_MATERIALS as OPENING_SET_MATERIALS } from "./Data_OpeningSet0103.mjs";
 import { TerrainContactField } from "./Script_TerrainContact.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
+import { LoadFirstLevelPropDressing, AddFirstLevelPropDressing } from "./Script_FirstLevelPropDressing.mjs";
+import { FirstLevelVegetation, LoadFirstLevelVegetationAtlas } from "./Script_FirstLevelVegetation.mjs";
+import { BuildInteriorVolumes } from "./Data_FirstLevelInteriors.mjs";
+import { SetInteriorVolumes } from "./Script_InteriorSkyOcclusion.mjs";
 
 export function IsP012TrainBlock(id) { return /^Station(?:Car\d|Engine|ExitStep)/.test(id); }
 /** 跟着车厢一起平移的那两扇门（SetTrainOffset 每帧改它们的 z）。 */
@@ -172,6 +177,9 @@ export class FirstLevelWhiteboxField {
   StaticGroundHeight(x,z){return SampleWhiteboxSurface(this.staticWalkableSurfaces,x,z,this.terrain?.SampleHeight(x,z)??0);}
 
   async PrepareAssets() {
+    // 第一关按需贴图集（Data_LevelTextureSets，docs/Data_TextureAssetStandard.md §6）：造任何网格之前下完。
+    // 永不 reject，失败的套退回程序化配方；同一个 library 只下一次（别处再调也不重复下）。
+    if (/^FirstLevelMission/.test(this.layout.id || "") && typeof document !== "undefined") await this.library.LoadLevelSets?.("FirstLevel");
     if (this.layout.ground?.terrainLayers && this.layout.SampleGroundSurface && typeof document !== "undefined") {
       // Splat-weighted texture-array terrain (docs/Data_TerrainLayers.md). A failed
       // download falls back to the single tiled soil below; the level still builds.
@@ -223,6 +231,8 @@ export class FirstLevelWhiteboxField {
     }
     if(this.layout.fortifications)this.fortificationModels=await LoadMissionFortifications(this.library);
     if(this.layout.fortifications)this.breakableTrees=await BreakableTrees.Load(this);
+    // 道具换模型 + 植被图集（docs/Data_FirstLevelVegetationProps.md）。
+    if(this.layout.fortifications)[this.propDressing,this.vegetationAtlas]=await Promise.all([LoadFirstLevelPropDressing(this.library),LoadFirstLevelVegetationAtlas(this.library)]);
   }
 
   BuildWhiteBoxes() {
@@ -252,16 +262,18 @@ export class FirstLevelWhiteboxField {
       if (this.SampleGroundSurface) {
         // One corridor walk per vertex yields the layered tint and the splat weights.
         const positions=mesh.geometry.attributes.position, colors=new Float32Array(positions.count*3);
-        const layers=new Float32Array(positions.count*3), rgb=[0,0,0], weights=[0,0,0];
+        const layers=new Float32Array(positions.count*4), rgb=[0,0,0], weights=[0,0,0,1];
         const color=new THREE.Color();
         for(let i=0;i<positions.count;i++) {
+          weights[3]=1;
           this.SampleGroundSurface(positions.getX(i),positions.getZ(i),rgb,weights);
           color.setRGB(rgb[0],rgb[1],rgb[2],THREE.SRGBColorSpace).toArray(colors,i*3);
-          layers[i*3]=weights[0]; layers[i*3+1]=weights[1]; layers[i*3+2]=weights[2];
+          layers[i*4]=weights[0]; layers[i*4+1]=weights[1]; layers[i*4+2]=weights[2]; layers[i*4+3]=weights[3];
         }
         mesh.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
         // Float32 on purpose: the crater cutter copies every attribute into Float32 arrays.
-        mesh.geometry.setAttribute('terrainLayers',new THREE.BufferAttribute(layers,3));
+        // w = rut lateral coordinate (Data_Tuning_Terrain.TERRAIN_RUTS; 1 = no road).
+        mesh.geometry.setAttribute('terrainLayers',new THREE.BufferAttribute(layers,4));
         mesh.material.vertexColors=true; mesh.material.color.setHex(0xffffff);
       } else if (this.layout.SampleGroundColor) {
         const positions=mesh.geometry.attributes.position, colors=new Float32Array(positions.count*3);
@@ -313,6 +325,10 @@ export class FirstLevelWhiteboxField {
       ? AddMissionFortifications(sink,this.layout,this.fortificationModels,(x,z)=>this.GroundHeight(x,z),this.materials)
       : {replaced:new Set(),placements:[]};
     this.fortificationPlacements=defenses.placements;
+    // 平色道具盒 / 散块 / foliage 盒换成模型、碎砖瓦与植被：只换外观，碰撞与掩体仍由下面的原块登记。
+    this.propDressingStats=this.propDressing?AddFirstLevelPropDressing(sink,this.layout,this.propDressing,(x,z)=>this.StaticGroundHeight(x,z),this.materials,this.library,{scene:this.scene,meshes:this.meshes}):null;
+    this.vegetation=this.vegetationAtlas?new FirstLevelVegetation(this.scene,this.layout,this.library,this.vegetationAtlas,(x,z)=>this.TerrainHeight(x,z),this.quality):null;
+    for(const id of [...(this.propDressingStats?.replaced||[]),...(this.vegetation?.plan.replaced||[])])defenses.replaced.add(id);
     for(const [key,material] of this.materials)if(key.startsWith("MissionDefenseMaterial_"))this.sharedFortificationMaterials.add(material);
     const trainSink = new BuildSink(),derailSink=new BuildSink();
     for (const block of this.layout.blocks) {
@@ -466,6 +482,8 @@ export class FirstLevelWhiteboxField {
   *BuildSteps() {
     yield { label: T("p012.whitebox.build.ground"), progress: 0.24 };
     this.BuildWhiteBoxes();
+    // 室内天光遮蔽（Script_InteriorSkyOcclusion）：屋子与门窗口子按本关布局现算，别的布局返回空表。
+    SetInteriorVolumes(BuildInteriorVolumes(this.layout, (x, z) => this.TerrainHeight(x, z)));
     yield { label: T("p012.whitebox.build.blocks"), progress: 0.62 };
     this.BuildGates();
     this.SetScenarioState(this.layout.scenario?.states[0]);
@@ -538,6 +556,11 @@ export class FirstLevelWhiteboxField {
 
   ScenarioMaterial(key, stateId) {
     if(key==="OpeningEarth")return this.library.Get("Adobe",{color:0x777064,repeat:2});
+    // 3A 迭代 B5（2026-09-28）：掩蔽部两态的木料（洞顶、南护壁、门柱、门楣）与开场布景同一份风化旧木
+    // （Data_OpeningSet0103.SET_MATERIALS.timber，第一关按需贴图集）；没下到就还是下面原来的程序化木梁。
+    const weathered=OPENING_SET_MATERIALS.timber;
+    if(stateId!=="NightGate"&&this.library.baked?.has?.(weathered.recipe)&&(key==="OpeningWood"||(this.layout.legend===false&&key==="timber")))
+      return this.library.Get(weathered.recipe,weathered.options);
     if(key==="OpeningWood")return this.library.Get("WoodBeam",{color:0x706351,repeat:2});
     if(this.layout.legend===false&&stateId!=="NightGate"&&key==="timber")return this.library.Get("WoodBeam",{color:0x766957,repeat:2});
     if(this.layout.legend===false&&stateId!=="NightGate"&&key==="earthDark")return this.library.Get("Adobe",{color:0x777064,repeat:2});
@@ -817,7 +840,9 @@ export class FirstLevelWhiteboxField {
   }
 
   Dispose() {
+    SetInteriorVolumes(null);
     this.breakableTrees?.Dispose(); this.breakableTrees=null;
+    this.vegetation?.Dispose(); this.vegetation=null; this.vegetationAtlas?.dispose(); this.vegetationAtlas=null;
     this.legend?.remove(); this.legend = null;
     for(const texture of this.labelTextures||[])texture.dispose();
     const disposedMaterials = new Set();

@@ -65,6 +65,12 @@ uniform float uSmokeHeight;
 // Scale, low/high density thresholds, and minimum cloud cover. Defaults retain
 // the existing skies; the first-level cloud deck also fills the gaps between billows.
 uniform vec4 uCloudShape;
+// 结构化阴天云层（2026-09-28 第一关）。x = 结构总闸（0 = 走上面那条旧云项，
+// 其余预设逐比特不变）、y = 云底压暗、z = 云缝亮度、w = 太阳侧银边；
+// Shape：x = 云盘频率、y = 覆盖率 0–1、z = 边缘软度（σ 单位）、w = 域扭曲量。
+uniform vec4 uCloudDeck;
+uniform vec4 uCloudDeckShape;
+uniform vec3 uCloudShade;
 uniform float uStars;
 uniform float uTime;
 // 物理天空之上的美术层强度：LUT 里已经有真的前向散射，这一层只补"辉光多亮"。
@@ -94,6 +100,73 @@ float Fbm3(vec3 p) {
   float v = 0.0, a = 0.5;
   for (int i = 0; i < 5; i++) { v += a * Noise3(p); p *= 2.02; a *= 0.5; }
   return v;
+}
+
+// --- 结构化阴天云层（uCloudDeck.x > 0 才走）------------------------------------
+// 参考图（概念 05/06/11/12/18、分镜 07）的天不是一张白纸：层积云有团块、云底发暗、
+// 团块之间露出更亮的高层薄云。做法是把视线投到一块「云盘」上（平面投影 = 近大远小、
+// 越靠地平线团块越扁越密，这正是云层的透视），在盘上取域扭曲的二维 fbm 当覆盖，
+// 再朝太阳方向多取一次密度估「上游有多厚」来给云底上明暗。二维值噪声比 Fbm3 省一半。
+float Hash21(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+
+float Noise2(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(Hash21(i), Hash21(i + vec2(1.0, 0.0)), f.x),
+             mix(Hash21(i + vec2(0.0, 1.0)), Hash21(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+// 五倍频二维 fbm。每一级转 37° 再放大，避免值噪声的格线在天上排成横竖条纹。
+// 取值集中在 0.484 ± 0.10（与 Fbm3 那条事故同理：阈值必须落在分布里，
+// 所以 CloudDeckDensity 先按这组均值/标准差归一化再切）。
+float Fbm2(vec2 p, int octaves) {
+  float v = 0.0, a = 0.5;
+  const mat2 R = mat2(1.60, 1.20, -1.20, 1.60);
+  for (int i = 0; i < 5; i++) {
+    if (i >= octaves) break;
+    v += a * Noise2(p);
+    p = R * p + vec2(17.3, 9.1);
+    a *= 0.5;
+  }
+  return v;
+}
+
+// 返回 x = 覆盖（0–1，边缘已软化）、y = 厚度（阈值之上还高出多少，0–1）。
+vec2 CloudDeckDensity(vec2 p) {
+  // 扭曲场的频率要低、幅度要小：幅度一大，fbm 会被拉成大理石纹那种放射状长条
+  //（第一版 1.4 实拍就是满天「刷子印」），层积云要的是团块而不是流线。
+  vec2 warp = vec2(Fbm2(p * 0.30 + vec2(13.1, 7.7), 3), Fbm2(p * 0.30 + vec2(3.3, 21.9), 3)) - 0.44;
+  float z = (Fbm2(p + warp * uCloudDeckShape.w, 5) - 0.484) / 0.10;
+  float edge = mix(1.7, -1.7, clamp(uCloudDeckShape.y, 0.0, 1.0));
+  float soft = max(uCloudDeckShape.z, 0.05);
+  return vec2(smoothstep(edge - soft, edge + soft, z), clamp((z - edge) / 2.2, 0.0, 1.0));
+}
+
+vec3 CloudDeck(vec3 dir, vec3 sunDir, float sunDot, vec3 skyBehind) {
+  float up = dir.y;
+  // 地平线附近团块被投影压成亚像素的横纹，交给下面那条贴地霾带吃掉
+  float fade = smoothstep(0.012, 0.30, up);
+  if (fade <= 0.0) return skyBehind;
+  vec2 p = dir.xz / (up + 0.10) * uCloudDeckShape.x + vec2(uTime * 0.0040, uTime * 0.0026);
+  vec2 deck = CloudDeckDensity(p);
+  // 上游厚度：朝太阳方向挪一步再取一次。那边更厚 = 这里的云底被挡着，发暗；
+  // 那边在变薄 = 光从侧面透进来，这一块的边亮起来（团块才有体积）。
+  vec2 toward = sunDir.xz / max(length(sunDir.xz), 1.0e-3);
+  float upstream = CloudDeckDensity(p + toward * 0.30).y;
+  float lit = clamp(0.62 + (deck.y - upstream) * 1.6 - deck.y * 0.35, 0.0, 1.0);
+  vec3 body = mix(uCloudShade, uSmokeColor, lit);
+  // 云底：越厚越暗（阴天照片里云团中心是最暗的灰）
+  body = mix(body, uCloudShade * (1.0 - uCloudDeck.y * 0.55), pow(deck.y, 0.8) * uCloudDeck.y);
+  // 太阳侧银边：只在薄边上，而且只在太阳附近那一片
+  float rim = (1.0 - deck.y) * deck.x * pow(max(sunDot, 0.0), 5.0);
+  body += uSunColor * rim * uCloudDeck.w;
+  // 云缝里是更亮的高层薄幕（不是蓝天：浮尘大，缝里仍是白的）
+  vec3 gap = skyBehind * uCloudDeck.z;
+  return mix(skyBehind, mix(gap, body, clamp(deck.x * uCloudDeck.x, 0.0, 1.0)), fade);
 }
 
 vec3 SkyRadiance(vec3 dir, float sunDiskGain) {
@@ -157,7 +230,11 @@ vec3 SkyRadiance(vec3 dir, float sunDiskGain) {
   }
 
   // --- 高空烟／云：拉长的 fbm，越靠地平线越压扁 ---
-  if (uSmoke > 0.001) {
+  // 有结构化云层的预设（第一关）改走 CloudDeck，旧云项整段跳过；
+  // uCloudDeck.x = 0 的预设走原来这一支，逐比特不变。
+  if (uCloudDeck.x > 0.001) {
+    sky = CloudDeck(dir, sunDir, sunDot, sky);
+  } else if (uSmoke > 0.001) {
     vec3 p = dir / max(abs(up) + 0.12, 0.06);
     // 事故：原来是 Fbm3(p * 0.9) 配 smoothstep(0.42, 0.86)。五倍频 fbm 的取值
     // 实际集中在 0.48 ± 0.08，0.86 这个上限相当于 +4.7σ —— 云项恒等于 0，
@@ -255,20 +332,41 @@ export const SKY_PRESETS = {
   // Notion "游戏概念参考图", 06 / 06_B (2026-09-26): pale cloud cover,
   // warm gray smoke and a veiled sun. Only the playable first level uses this;
   // shared model/range daylight and the final night transition stay independent.
+  //
+  // 2026-09-28 对标 3A 迭代（B4，docs/Data_TechRenderPipeline.md §2.10）。先量再调：
+  // `_import/Script_FrameGradeStats.py` 对 28 个概念机位 + 9 个分镜机位量「参考 / 改前」，
+  // 差距落在三处 —— ① 天：参考天空区亮度标准差 25（有云团），实机 14（一张白纸）；
+  // ② 天地比：参考 11–14 : 1，实机 4.5–6 : 1 —— 是**地太亮**，不是天太亮（天的显示亮度
+  // 参考 178 / 实机 175 几乎一样），所以天不压，压的是地上的填充光；③ 色偏：参考高光近
+  // 中性（R−B ≈ 2–6），实机高光偏暖 12–13（天是暖的 skyTint），暗部参考略暖（泥土）。
+  // 平均亮度参考 64–70 / 实机 98–110 的大头是白盒体块的反照率（B1/B2 在换），调色不去追它，
+  // 只把对比与填充光拉开，免得材质换完之后整体再黑一截。
+  //   · cloudDeck：结构化层积云（见 SkyRadiance 的 CloudDeck），云底压暗、云缝提亮；
+  //   · skyTint 去暖（→ 近中性略冷）：天、雾色、IBL 一起从米黄变成阴天的冷灰；
+  //   · envIntensity .45→.34、shProbe .50→.42、ambient .22→.18、平行光 4.2→4.6：
+  //     阴影侧更暗、迎光面略亮 —— 局部对比从填充光里来，不是靠调暗整幅；
+  //   · contrast 1.02→1.10、saturation .94→.92、exposure .82→.78；
+  //   · fog.grade：分离调色减半（暗部少一点青蓝、亮部几乎不加暖），色偏交给天与材质。
+  // 雾（density / falloff / max）一个字没动 ——「先别动雾」，70 m 透过率与改前相同。
   firstLevelBattleDay: {
     sunElevation: 52, sunAzimuth: 35,
     zenith: [1.15, 1.20, 1.25], horizon: [1.60, 1.60, 1.58], ground: [0.30, 0.28, 0.25],
     sunColor: [1.0, 0.97, 0.91], sunIntensity: 1.2, sunSize: 0.000012, glow: 0.12, glowSpread: 10,
     smoke: 1.0, smokeColor: [1.05, 1.02, 0.96], smokeHeight: 0.18, stars: 0,
     cloudShape: [3.2, 0.30, 0.68, 0.35],
-    lightColor: 0xfff2df, lightIntensity: 4.2,
-    envIntensity: 0.45, shProbeIntensity: 0.50, ambientColor: 0xe5e2dc, ambientIntensity: 0.22,
+    cloudDeck: { structure: 0.95, underside: 0.5, gap: 1.40, silver: 0.35,
+      scale: 1.1, coverage: 0.62, softness: 0.5, warp: 0.35, shade: [0.50, 0.50, 0.52] },
+    lightColor: 0xfff2df, lightIntensity: 4.6,
+    envIntensity: 0.34, shProbeIntensity: 0.42, ambientColor: 0xe5e2dc, ambientIntensity: 0.18,
     fog: { density: 0.0032, falloff: 45, max: 0.72,
       sky: [0.60, 0.60, 0.59], ground: [0.45, 0.43, 0.40], sunGain: 0.08,
-      desat: 0.16, flatten: 0.03 },
-    exposure: 0.82, godStrength: 0, bloom: 0.04, lensFlare: 0, saturation: 0.94, contrast: 1.02,
+      desat: 0.16, flatten: 0.03,
+      // contrastCurve "soft"：对比 1.10 走幂形 S 曲线 —— 线性拉伸会把 sRGB < 0.045 整块裁成 0
+      //（掩蔽部 SB01 实拍 7–10% 的像素死黑），S 曲线在中灰斜率相同、两端只压不裁。
+      grade: { shadow: 0.45, highlight: 0.25, shadowTint: [0.93, 0.98, 1.08], contrastCurve: "soft" } },
+    exposure: 0.78, godStrength: 0, bloom: 0.04, lensFlare: 0, saturation: 0.92, contrast: 1.10,
     atmosphere: { mie: 8, rayleigh: 0.30, groundAlbedo: 0.2, sunIrradiance: 12,
-      skyTint: [1.0, 0.92, 0.84], skyFloor: [0.95, 0.95, 0.92],
+      skyTint: [0.97, 0.97, 1.0], skyFloor: [0.95, 0.95, 0.92],
       aerialBlend: 0.5, aerialGain: 0.4, artGlow: 0.15 },
   },
   // Keep saved editor/debug preset names on the same calibration.
@@ -644,6 +742,24 @@ export const SKY_PRESETS = {
   },
 };
 
+// 第一关关尾《夜入北门》（NightMarch，2026-09-28 B4）。以 `night` 为底另起一档而不是改 `night`：
+// `night` 的星、1/20 白天亮度等口径被 AtmosphereTest 与旧夜战关钉着。概念图 31（Stage 18_B）
+// 是压着的阴云夜：暗蓝灰的云团、没有星，人物靠城门的灯火与冷月光分出来；旧 `night` 在这一关
+// 实拍是一片发亮的蓝天配白色积云（旧云项被月色加亮后 ×3.6 曝光），读成黄昏。
+//   · cloudDeck 高覆盖、云底近黑、云缝略暗于天 —— 云是比天暗的团块，不是白棉花；
+//   · stars 0（阴云夜看不见星；旧云项之后才叠星，星会浮在云前面）；
+//   · exposure 3.6 → 2.7：整幅压一档，城门灯火（别的包）才读得出暖光池。
+// 雾与 `night` 完全相同（另拷一份对象：体积雾按 fog 对象反查预设名，共用会串到 night 那一行）。
+SKY_PRESETS.firstLevelNight = {
+  ...SKY_PRESETS.night,
+  fog: { ...SKY_PRESETS.night.fog },
+  smokeColor: [0.050, 0.056, 0.074], stars: 0,
+  cloudDeck: { structure: 1.0, underside: 0.6, gap: 0.85, silver: 0.0,
+    scale: 1.0, coverage: 0.80, softness: 0.5, warp: 0.35, shade: [0.012, 0.014, 0.020] },
+  exposure: 2.7,
+  atmosphere: { ...SKY_PRESETS.night.atmosphere, skyTint: [0.90, 0.92, 1.14] },
+};
+
 // ---------------------------------------------------------------------------
 // 天空取证探针（回归测试与标定脚本共用）
 //
@@ -787,6 +903,9 @@ export class SkyDome {
       uSmokeColor: { value: new THREE.Vector3(0.45, 0.4, 0.36) },
       uSmokeHeight: { value: 0.25 },
       uCloudShape: { value: new THREE.Vector4(5.5, 0.445, 0.615, 0) },
+      uCloudDeck: { value: new THREE.Vector4(0, 0, 1, 0) },
+      uCloudDeckShape: { value: new THREE.Vector4(1.6, 0.7, 0.8, 1.2) },
+      uCloudShade: { value: new THREE.Vector3(0.5, 0.5, 0.5) },
       uStars: { value: 0 },
       uTime: { value: 0 },
       uArtGlow: { value: 0.35 },
@@ -863,6 +982,11 @@ export class SkyDome {
     U.uSmokeColor.value.copy(Vec3(preset.smokeColor));
     U.uSmokeHeight.value = preset.smokeHeight;
     U.uCloudShape.value.fromArray(preset.cloudShape ?? [5.5, 0.445, 0.615, 0]);
+    // 结构化云层：没写 cloudDeck 的预设 structure = 0，着色器走旧云项（逐比特不变）
+    const deck = preset.cloudDeck || null;
+    U.uCloudDeck.value.set(deck?.structure ?? 0, deck?.underside ?? 0, deck?.gap ?? 1, deck?.silver ?? 0);
+    U.uCloudDeckShape.value.set(deck?.scale ?? 1.6, deck?.coverage ?? 0.7, deck?.softness ?? 0.8, deck?.warp ?? 1.2);
+    U.uCloudShade.value.fromArray(deck?.shade ?? [0.5, 0.5, 0.5]);
     U.uStars.value = preset.stars;
 
     const atmo = MakeAtmospherePreset(preset.atmosphere);
