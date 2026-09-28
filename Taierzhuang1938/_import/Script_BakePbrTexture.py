@@ -469,6 +469,44 @@ def Bake(args):
     return 1 if problems and args.strict else 0
 
 
+def Audit(args):
+    """--audit：不烘，只量仓库里已有的一套（例如地形层、旧素材），写一份 generator=audit 的记录，
+    让门禁对它做同样的 sha256 / 平铺 / 定色核对。源图与参数未知的字段记 null。"""
+    presets = json.load(open(PRESETS_PATH, encoding="utf-8"))
+    channel = "Orm" if args.pack == "orm" else "Orh"
+    stem_name = f"Texture_{args.name}"
+    paths = {ch: os.path.join(args.out, f"{stem_name}{ch}.webp") for ch in ("Base", "Normal", channel)}
+    paths = {ch: p for ch, p in paths.items() if os.path.exists(p)}
+    if "Base" not in paths:
+        raise SystemExit(f"找不到 {stem_name}Base.webp")
+    saved = np.asarray(Image.open(paths["Base"]).convert("RGB")).astype(np.float64) / 255
+    metrics = {**ToneMetrics(saved), **TileMetrics(saved),
+               "texelsPerMeter": round(saved.shape[1] / args.tile_m, 1) if args.tile_m else None}
+    outputs = []
+    for ch, path in paths.items():
+        with Image.open(path) as im:
+            w, h = im.size
+        outputs.append({"channel": ch, "file": os.path.basename(path), "width": w, "height": h,
+                        "bytes": os.path.getsize(path), "sha256": Sha256(path)})
+    total = sum(o["bytes"] for o in outputs)
+    cls = presets["classes"].get(args.preset) if args.preset_given else None
+    problems = CheckGates(metrics, total, outputs, presets["gates"], cls) if cls else []
+    record = {"generator": "audit", "date": datetime.date.today().isoformat(), "name": args.name,
+              "preset": args.preset if cls else None, "source": None, "heightSource": None,
+              "params": {"tileM": args.tile_m, "pack": args.pack, "normalConvention": args.normal_convention},
+              "outputs": outputs, "totalBytes": total, "metrics": metrics, "gateProblems": problems}
+    record_path = os.path.join(RECORD_DIR, f"{stem_name}.json")
+    os.makedirs(RECORD_DIR, exist_ok=True)
+    with open(record_path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(record, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    print(f"{args.name}（audit）: total={total} luma={metrics['luma']} std={metrics['lumaStd']} sat={metrics['sat']} "
+          f"border={metrics['border']} swing={metrics['swing']} seamRatio={metrics['seamRatio']} → {Rel(record_path)}")
+    for p_ in problems:
+        print(f"    - {p_}")
+    return 0
+
+
 def CheckGates(metrics, total, outputs, gates, cls):
     out = []
     lo, hi = cls["lumaRange"]
@@ -493,7 +531,7 @@ def CheckGates(metrics, total, outputs, gates, cls):
     if metrics["lowFreq"] > gates["lowFreqMax"]:
         out.append(f"lowFreq {metrics['lowFreq']} > {gates['lowFreqMax']}（大块明暗 = 烘进去的光影）")
     lo, hi = gates["texelsPerMeter"]
-    if not lo <= metrics["texelsPerMeter"] <= hi:
+    if metrics["texelsPerMeter"] is not None and not lo <= metrics["texelsPerMeter"] <= hi:
         out.append(f"纹素密度 {metrics['texelsPerMeter']} px/m 不在 [{lo}, {hi}]")
     if total > gates["setBudgetBytes"]:
         out.append(f"整套 {total} B > {gates['setBudgetBytes']} B")
@@ -578,7 +616,14 @@ def ParseArgs(argv):
     ap.add_argument("--no-record", action="store_true")
     ap.add_argument("--strict", action="store_true", help="门槛未过时退出码 1")
     ap.add_argument("--rebake", help="按烘焙记录原样重烘（源图须仍在记录的路径且 sha256 一致）")
+    ap.add_argument("--audit", action="store_true",
+                    help="不烘：量 Texture/ 里已有的 Texture_<Name>{Base,Normal,Orm|Orh}.webp，写 generator=audit 的记录")
     args = ap.parse_args(argv)
+    args.preset_given = any(a == "--preset" or a.startswith("--preset=") for a in argv)
+    if args.audit:
+        if not args.name:
+            ap.error("--audit 需要 --name")
+        return args
     if args.rebake:
         rec = json.load(open(args.rebake, encoding="utf-8"))
         prm = rec["params"]
@@ -614,4 +659,5 @@ if __name__ == "__main__":
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
-    sys.exit(Bake(ParseArgs(sys.argv[1:])))
+    parsed = ParseArgs(sys.argv[1:])
+    sys.exit(Audit(parsed) if parsed.audit else Bake(parsed))

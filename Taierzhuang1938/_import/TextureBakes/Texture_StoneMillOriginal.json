@@ -1,0 +1,60 @@
+{
+  "generator": "audit",
+  "date": "2026-09-28",
+  "name": "StoneMillOriginal",
+  "preset": null,
+  "source": null,
+  "heightSource": null,
+  "params": {
+    "tileM": null,
+    "pack": "orm",
+    "normalConvention": "gl"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_StoneMillOriginalBase.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 57546,
+      "sha256": "f3b8c53eef1783ea242d7326fb5b8e988f522f0c2d8d5061aaa9aed55d786998"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_StoneMillOriginalNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 119418,
+      "sha256": "33f2d50f4d49290ff5d837f04333262d38dc2d10555fa53e62c38b9b7500fdd3"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_StoneMillOriginalOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 43874,
+      "sha256": "86e3cb3d6db5d649730a0c719e3c22d76e5ce3acc7eb22101aac0f76f7bb9f55"
+    }
+  ],
+  "totalBytes": 220838,
+  "metrics": {
+    "meanSrgb": [
+      0.4066,
+      0.3563,
+      0.295
+    ],
+    "luma": 0.3526,
+    "lumaStd": 0.0618,
+    "sat": 0.2746,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0907,
+    "seam": 0.0496,
+    "interior": 0.023,
+    "seamRatio": 2.16,
+    "border": 0.427,
+    "swing": 0.1519,
+    "texelsPerMeter": null
+  },
+  "gateProblems": []
+}
