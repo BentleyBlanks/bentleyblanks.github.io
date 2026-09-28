@@ -1,0 +1,119 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-09-28",
+  "name": "VillageLimePlaster",
+  "preset": "limePlaster",
+  "source": {
+    "path": "_shots/Gap3A_Source/B1/Gen_VillageLimePlaster2Roll.png",
+    "sha256": "2d783a4ee064802804910546f31929e557f6b35ab2de58d932df8bd749466cf3",
+    "metrics": {
+      "meanSrgb": [
+        0.7548,
+        0.7287,
+        0.6971
+      ],
+      "luma": 0.7269,
+      "lumaStd": 0.0547,
+      "sat": 0.0764,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0272
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.63,
+      0.615,
+      0.58
+    ],
+    "contrast": 0.06,
+    "lumaRange": [
+      0.5,
+      0.75
+    ],
+    "satRange": [
+      0.0,
+      0.16
+    ],
+    "stdRange": [
+      0.03,
+      0.1
+    ],
+    "reliefM": 0.004,
+    "rough": 0.9,
+    "roughVar": 0.04,
+    "roughLumaK": 0.0,
+    "ao": 0.4,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.088,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 3.6,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_VillageLimePlasterBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 179224,
+      "sha256": "2f412d4f1999975c443fba83923a484c726f5619b7169117d465b1dafed402f0"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_VillageLimePlasterNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 35792,
+      "sha256": "408197c74a46a5289b2cb6b40d6d1ed26a3494e9150e369068270bb2f0334c09"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_VillageLimePlasterOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 55854,
+      "sha256": "69f04bc7b40876ae172ee59aaa7512b4eb38cf1ce458c120c6ca945cf76d5709"
+    }
+  ],
+  "totalBytes": 270870,
+  "metrics": {
+    "meanSrgb": [
+      0.6298,
+      0.616,
+      0.5796
+    ],
+    "luma": 0.6084,
+    "lumaStd": 0.0598,
+    "sat": 0.0797,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0142,
+    "seam": 0.0283,
+    "interior": 0.0276,
+    "seamRatio": 1.025,
+    "border": 1.014,
+    "swing": 0.0054,
+    "aoMean": 0.929,
+    "roughMean": 0.902,
+    "texelsPerMeter": 284.4
+  },
+  "gateProblems": []
+}

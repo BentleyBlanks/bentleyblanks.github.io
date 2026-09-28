@@ -1,0 +1,7 @@
+Generate ONE square 1:1 image (2048x2048): a seamless tileable albedo (base colour) texture for a realistic 3D video game.
+Subject: railway track ballast bed in rural southern Shandong, China, March 1938, overcast day: a layer of crushed angular grey stone gravel (pieces 3 to 6 cm), packed, with fine grey dust and some dry dirt between the stones, a few rust-brown stains and small bits of coal cinder. Old and dusty.
+Colours: neutral to slightly warm grey stone, low saturation, muted. NOT white, NOT blue.
+Scale: the image covers 1.5 m x 1.5 m of ground.
+Camera: perfectly orthographic top-down view straight onto the ground, no perspective.
+Lighting: completely flat, even, shadowless diffuse light (de-lit albedo). No cast shadows, no specular highlights, no vignette, no light gradient.
+The texture must tile seamlessly on all four edges. Fill the entire frame with gravel only: no rails, no sleepers, no text, no watermark, no border, no frame, no plants, no objects.

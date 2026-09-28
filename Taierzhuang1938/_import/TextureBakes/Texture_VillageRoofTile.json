@@ -1,0 +1,119 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-09-28",
+  "name": "VillageRoofTile",
+  "preset": "roofTile",
+  "source": {
+    "path": "_shots/Gap3A_Source/B1/Gen_VillageRoofTile.png",
+    "sha256": "ab695c07696f09c67f0498fa662eef4025f6b62338593f5962a7c3cf2f78b98e",
+    "metrics": {
+      "meanSrgb": [
+        0.3134,
+        0.3166,
+        0.3258
+      ],
+      "luma": 0.3186,
+      "lumaStd": 0.0912,
+      "sat": 0.0379,
+      "clipLow": 0.0006,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0229
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.3,
+      0.305,
+      0.31
+    ],
+    "contrast": 0.07,
+    "lumaRange": [
+      0.2,
+      0.38
+    ],
+    "satRange": [
+      0.0,
+      0.08
+    ],
+    "stdRange": [
+      0.04,
+      0.13
+    ],
+    "reliefM": 0.02,
+    "rough": 0.84,
+    "roughVar": 0.06,
+    "roughLumaK": 0.0,
+    "ao": 0.6,
+    "metal": 0.0,
+    "seamless": "weld",
+    "rowFlatten": false,
+    "flattenSigma": 0.15,
+    "isotropic": false,
+    "heightFromLuma": "direct",
+    "tileM": 2.0,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_VillageRoofTileBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 140444,
+      "sha256": "ceb1f8b7b7e3801d595d92489ad313eafcc45f36eb2f677599acc2340a7d7a00"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_VillageRoofTileNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 135938,
+      "sha256": "92691e7e20b750d96937999ba57f3355fb7d87f2f8368d901464f96ffec56c83"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_VillageRoofTileOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 58334,
+      "sha256": "46f1e64b0947e2f7c5c7f8ec2dbd07c2a85bbef8b5e35d81b21e4d25c66661a7"
+    }
+  ],
+  "totalBytes": 334716,
+  "metrics": {
+    "meanSrgb": [
+      0.2997,
+      0.3058,
+      0.3095
+    ],
+    "luma": 0.305,
+    "lumaStd": 0.0697,
+    "sat": 0.0314,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0144,
+    "seam": 0.0073,
+    "interior": 0.0221,
+    "seamRatio": 0.329,
+    "border": 0.612,
+    "swing": 0.231,
+    "aoMean": 0.876,
+    "roughMean": 0.827,
+    "texelsPerMeter": 512.0
+  },
+  "gateProblems": []
+}

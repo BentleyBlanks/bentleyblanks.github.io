@@ -164,6 +164,25 @@ const WATER_PRESETS = {
     foamStrength: 1.0,
     detailStrength: 0.36,
   },
+  // 第一关北沙河（2026-09-28 B1）：三月枯水、泥沙重的缓流。吸收快（一米多深就看不见底）、
+  // 几乎没有浪尖泡沫，只在岸线与桥墩脚留一圈；颜色往灰褐泥水压，天光反射给出灰蓝。
+  muddyRiver: {
+    waves: [
+      { dir: [0.99, 0.12], len: 14.0, amp: 0.018 },
+      { dir: [-0.62, 0.78], len: 7.4, amp: 0.009 },
+      { dir: [0.7, -0.71], len: 4.3, amp: 0.005 },
+    ],
+    chop: 0.35,
+    timeScale: 0.8,
+    flow: [0.3, 0.0],
+    absorb: 0.9,
+    shallowColor: 0x6E6A5A,
+    deepColor: 0x363730,
+    foamColor: 0x9E998A,
+    foamWidth: 0.28,
+    foamStrength: 0.35,
+    detailStrength: 0.26,
+  },
 };
 
 // ---------------------------------------------------------------------------

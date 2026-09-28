@@ -32,6 +32,8 @@ import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { SET_MATERIALS as OPENING_SET_MATERIALS } from "./Data_OpeningSet0103.mjs";
 import { TerrainContactField } from "./Script_TerrainContact.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
+import { WhiteboxLooks, LoadWhiteboxTextureSets, BuildWhiteboxWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
+import { WHITEBOX_RAILWAY_LOOKS } from "./Data_FirstLevelWhiteboxMaterials.mjs";
 import { LoadFirstLevelPropDressing, AddFirstLevelPropDressing } from "./Script_FirstLevelPropDressing.mjs";
 import { FirstLevelVegetation, LoadFirstLevelVegetationAtlas } from "./Script_FirstLevelVegetation.mjs";
 import { BuildInteriorVolumes } from "./Data_FirstLevelInteriors.mjs";
@@ -154,6 +156,10 @@ export class FirstLevelWhiteboxField {
     for (const [semantic, color] of Object.entries(this.layout.semanticColors || {})) {
       this.materials.set(semantic, MakeSemanticMaterial(`FirstLevelWhitebox_${semantic}`, color));
     }
+    // 2026-09-28 B1：布局写了 materialLooks 才按外观表画 PBR（PrepareAssets 里建）；
+    // 归档夹具与 Node 测试保持平色语义材质。
+    this.looks = null;
+    this.waterMesh = null;
     this.trainOffsetM = 0; this.trainMeshes = []; this.trainColliders = [];
     this.gates = new Map();
     this.scenarioMeshes = [];
@@ -180,6 +186,23 @@ export class FirstLevelWhiteboxField {
     // 第一关按需贴图集（Data_LevelTextureSets，docs/Data_TextureAssetStandard.md §6）：造任何网格之前下完。
     // 永不 reject，失败的套退回程序化配方；同一个 library 只下一次（别处再调也不重复下）。
     if (/^FirstLevelMission/.test(this.layout.id || "") && typeof document !== "undefined") await this.library.LoadLevelSets?.("FirstLevel");
+    // 白盒体块的 PBR 外观（Data_FirstLevelWhiteboxMaterials）。LoadWhiteboxTextureSets 再问一次加载器
+    // （同一 library 取回上面那次的结果），拿到退回了 fallback 的套名。
+    if (this.layout.materialLooks && this.library?.Get && typeof document !== "undefined") {
+      this.looks = new WhiteboxLooks(this.library, await LoadWhiteboxTextureSets(this.library));
+      // 语义键的兼容位：铁路样条按语义键进 BuildSink（UV 是它自己的格子），
+      // 其余语义给「这类体块的缺省外观」（Script_FirstLevelFrontBreakables 退路用）。
+      for (const semantic of ["plaster", "cover", "structure", "roof", "earthDark", "canvas", "step", "coping", "void"]) {
+        const look = this.looks.LookOf({ id: "", semantic });
+        if (!look) continue;
+        this.materials.get(semantic)?.dispose();
+        this.materials.set(semantic, this.looks.Material(look));
+      }
+      for (const key of Object.keys(WHITEBOX_RAILWAY_LOOKS)) {
+        this.materials.get(key)?.dispose();
+        this.materials.set(key, this.looks.RailwayMaterial(key));
+      }
+    }
     if (this.layout.ground?.terrainLayers && this.layout.SampleGroundSurface && typeof document !== "undefined") {
       // Splat-weighted texture-array terrain (docs/Data_TerrainLayers.md). A failed
       // download falls back to the single tiled soil below; the level still builds.
@@ -331,18 +354,29 @@ export class FirstLevelWhiteboxField {
     for(const id of [...(this.propDressingStats?.replaced||[]),...(this.vegetation?.plan.replaced||[])])defenses.replaced.add(id);
     for(const [key,material] of this.materials)if(key.startsWith("MissionDefenseMaterial_"))this.sharedFortificationMaterials.add(material);
     const trainSink = new BuildSink(),derailSink=new BuildSink();
+    // 外观合批（Script_FirstLevelWhiteboxLooks）：静态体块按外观分桶，带风化属性自己合并；
+    // 碰撞与 cover 仍走 sink。水盒收成一条连续水面。
+    const lookBuckets = new Map(), waterBlocks = [];
+    const terrainAt = (x, z) => this.TerrainHeight(x, z);
     for (const block of this.layout.blocks) {
       if(block.dynamic || block.treeModel)continue;
       const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? (this.layout.fortifications && block.id.startsWith(`StationCar${this.layout.derailCar}`) ? derailSink : trainSink) : sink;
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
       const seamOwner=block.id.includes("BagSeam")?block.id.split("BagSeam")[0]:null;
       // visual:false —— 只要碰撞，画面由模型负责（例：接收院的空担架摞）。
-      if(block.visual!==false && !defenses.replaced.has(block.id) && !defenses.replaced.has(seamOwner))targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
-        x: block.x,
-        y: block.y,
-        z: block.z,
-        ry: block.ry || 0,
-      }));
+      const look = this.looks && targetSink === sink ? this.looks.LookOf(block) : null;
+      if(block.visual!==false && !defenses.replaced.has(block.id) && !defenses.replaced.has(seamOwner)) {
+        if (this.looks && targetSink === sink && block.semantic === "water") waterBlocks.push(block);
+        else if (look) {
+          if (!lookBuckets.has(look)) lookBuckets.set(look, []);
+          lookBuckets.get(look).push(this.looks.BoxGeometry(block, look, terrainAt));
+        } else targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
+          x: block.x,
+          y: block.y,
+          z: block.z,
+          ry: block.ry || 0,
+        }));
+      }
       if (block.solid !== false) {
         targetSink.Solid(block.x, block.y, block.z, block.w * 0.5, block.h * 0.5,
           block.d * 0.5, block.tag, block.ry || 0, WhiteboxSurface(block, this.layout));
@@ -366,6 +400,15 @@ export class FirstLevelWhiteboxField {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       this.meshes.push(mesh);
+    }
+    if (this.looks) {
+      // 名字沿用 StaticWhiteBoxes：Script_FirstLevelFrontBreakables 按这个名字找静态合批塌顶点。
+      this.meshes.push(...this.looks.FlushBuckets(lookBuckets, this.scene, "FirstLevelWhitebox_StaticWhiteBoxes"));
+      this.waterMesh = BuildWhiteboxWater(waterBlocks, this.scene);
+      if (this.waterMesh) this.meshes.push(this.waterMesh);
+      this.stats.looks = { ...this.looks.stats.looks };
+      this.stats.lookFallbackSets = this.looks.stats.fallbackSets.slice();
+      this.stats.waterBlocks = waterBlocks.length;
     }
     this.derailMeshes=derailSink.Flush(this.scene,{Get:key=>this.materials.get(key)||this.whiteMaterial});
     this.derailColliders=derailSink.colliders;
@@ -455,11 +498,16 @@ export class FirstLevelWhiteboxField {
 
   BuildGates() {
     for (const spec of this.layout.gates) {
-      const material = this.layout.semanticColors?.[spec.semantic]
+      // 外观表管得到的门/桥件共用外观材质（位姿在 mesh 上，几何留局部系）。
+      const look = this.looks && !IsTrainGate(spec) ? this.looks.LookOf(spec) : null;
+      const material = look ? this.looks.Material(look)
+        : this.layout.semanticColors?.[spec.semantic]
         ? MakeSemanticMaterial(`FirstLevelWhitebox_${spec.semantic}_${spec.id}`,
           this.layout.semanticColors[spec.semantic])
         : MakeWhiteMaterial(`FirstLevelWhitebox_${spec.id}`);
-      const mesh = new THREE.Mesh(MakeBox(spec.w, spec.h, spec.d, 1, spec.id), material);
+      const geometry = look ? this.looks.BoxGeometry(spec, look, (x, z) => this.TerrainHeight(x, z), { place: false })
+        : MakeBox(spec.w, spec.h, spec.d, 1, spec.id);
+      const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(spec.x, spec.y, spec.z);
       mesh.rotation.y = spec.ry || 0;
       mesh.castShadow = true;
@@ -531,8 +579,13 @@ export class FirstLevelWhiteboxField {
     }
     const sink = new BuildSink();
     sink.SetSector("FirstLevelWhiteboxScenario");
+    const lookBuckets = new Map();
     for (const block of state.blocks) {
-      sink.Add(block.semantic, PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), block));
+      const look = this.ScenarioLook(block, state.id);
+      if (look) {
+        if (!lookBuckets.has(look)) lookBuckets.set(look, []);
+        lookBuckets.get(look).push(this.looks.BoxGeometry(block, look, (x, z) => this.TerrainHeight(x, z)));
+      } else sink.Add(block.semantic, PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), block));
       if (block.solid !== false) sink.Solid(block.x, block.y, block.z, block.w / 2, block.h / 2, block.d / 2, block.tag, block.ry || 0,
         WhiteboxSurface(block, this.layout));
       // Scenario covers (the 02 mouth spoil) join the AI cover table like static blocks do.
@@ -546,12 +599,37 @@ export class FirstLevelWhiteboxField {
       this.scenarioCovers = sink.covers.slice();
     }
     this.scenarioMeshes = sink.Flush(this.scene, { Get: key => this.ScenarioMaterial(key, state.id) });
+    if (lookBuckets.size) this.scenarioMeshes.push(...this.looks.FlushBuckets(lookBuckets, this.scene, `FirstLevelWhitebox_Hub_${state.id}`));
     for (const mesh of this.scenarioMeshes) { mesh.name = `FirstLevelWhitebox_Hub_${state.id}`; mesh.castShadow = true; mesh.receiveShadow = true; this.meshes.push(mesh); }
     this.scenarioColliders = sink.colliders;
     for (const collider of this.scenarioColliders) { this.colliders.push(collider); if (this.physics) this.physics.AddSolid(collider); }
     this.scenarioState = state.id;
     this.BuildCollisionGrid();
     return true;
+  }
+
+  /**
+   * 前沿可破坏块（Script_FirstLevelFrontBreakables）的一段：按被接管那块的外观取材质与带风化属性的
+   * 局部系几何（位姿由调用方设在 mesh 上）。没有外观表（归档夹具 / Node）时返回 null，调用方走老路。
+   * @param {{id:string, semantic?:string}} block 被接管的体块（或只有 id/semantic 的描述）
+   * @param {{x,y,z,w,h,d,ry}} box 这一段的外廓（世界系中心）
+   */
+  WhiteboxPiece(block, box) {
+    const look = this.looks?.LookOf(block);
+    if (!look) return null;
+    return {
+      material: this.looks.Material(look),
+      geometry: this.looks.BoxGeometry({ ...box, id: block.id }, look, (x, z) => this.TerrainHeight(x, z), { place: false }),
+    };
+  }
+
+  /**
+   * 关尾北门夜景（NightGate）的 scenario 体块走外观表，与静态体块同一套材质；
+   * 掩蔽部两态归开场布景（B5，下面 ScenarioMaterial 的风化旧木 / 土坯），不接外观。
+   */
+  ScenarioLook(block, stateId) {
+    if (!this.looks || stateId !== "NightGate") return null;
+    return this.looks.LookOf(block);
   }
 
   ScenarioMaterial(key, stateId) {
@@ -579,7 +657,8 @@ export class FirstLevelWhiteboxField {
     const seen = new Set(this.scenarioMeshes.flatMap(mesh => Array.isArray(mesh.material) ? mesh.material : [mesh.material]));
     const geometry = new THREE.BoxGeometry(0.01, 0.01, 0.01);
     for (const state of states) for (const block of state.blocks) {
-      const material = this.ScenarioMaterial(block.semantic, state.id);
+      const look = this.ScenarioLook(block, state.id);
+      const material = look ? this.looks.Material(look) : this.ScenarioMaterial(block.semantic, state.id);
       if (!material || seen.has(material)) continue;
       seen.add(material);
       const mesh = new THREE.Mesh(geometry, material);
@@ -836,6 +915,9 @@ export class FirstLevelWhiteboxField {
         colliding: this.colliders.includes(gate.collider),
       })),
       externalAssets: this.fortificationPlacements.length,
+      looks: this.stats.looks || null,
+      lookFallbackSets: this.stats.lookFallbackSets || null,
+      water: this.waterMesh ? this.waterMesh.name : null,
     };
   }
 
@@ -858,6 +940,7 @@ export class FirstLevelWhiteboxField {
       }
     }
     this.meshes.length = 0;
+    this.looks?.Dispose(); this.looks = null; this.waterMesh = null;
     this.trenchSurface?.Dispose(); this.trenchSurface = null;
     this.terrainContact?.Dispose(); this.terrainContact = null;
     this.fortificationModels=null;this.fortificationPlacements=[];this.sharedFortificationMaterials.clear();

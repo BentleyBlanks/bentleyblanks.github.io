@@ -1,0 +1,7 @@
+Generate ONE square 1:1 image (2048x2048): a seamless tileable albedo (base colour) texture for a realistic 3D video game.
+Subject: a traditional northern Chinese village house roof covered with small grey fired-clay roof tiles (small curved grey tiles laid overlapping in long straight channels, like a Shandong farmhouse roof in 1938). The tile channels run exactly vertically from the top edge to the bottom edge of the image, perfectly parallel to the image sides; each channel is a column of overlapping curved tiles, about 10 columns across the image. Old and weathered: dust, a few cracked or chipped tiles, some dark grime in the gaps, a little dry debris, slight colour variation between tiles. No moss, no snow.
+Colours: dark grey to blue-grey clay, low saturation, muted. NOT black, NOT brown, NOT red terracotta.
+Scale: the image covers 2.0 m x 2.0 m of roof.
+Camera: perfectly orthographic top-down view looking straight onto the roof plane, no perspective.
+Lighting: completely flat, even, shadowless diffuse light (de-lit albedo). No cast shadows, no specular highlights, no vignette, no light gradient.
+The texture must tile seamlessly on all four edges. Fill the entire frame with tiles only: no text, no watermark, no border, no frame, no ridge, no eaves, no sky, no objects.
