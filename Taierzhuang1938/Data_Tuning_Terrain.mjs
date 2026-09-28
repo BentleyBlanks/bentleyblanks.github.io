@@ -189,6 +189,32 @@ export const TERRAIN_WATER = Object.freeze({
 });
 
 /**
+ * 01–05 前沿湿泥区（2026-09-28 第二轮，对标过场分镜 03–06：沟壁、沟沿、土堆是深冷灰褐的湿泥，沟底积水、泥浆）。
+ * 07 以后的交通沟对的是概念图 07（干一些的灰褐土壁），不进这个区。
+ * 一个世界轴对齐矩形 + 羽化；区里的翻土（壕沟土壁 / 沟底 / 抛土、沟沿碎土块）乘 soilTint、整体变湿，沟底水位抬高。
+ *   box          [minX, minZ, maxX, maxZ]（米）。北到前沿外，南停在 06 集结洼地以北（羽化完 z ≈ −108）
+ *   featherM     羽化宽度
+ *   soilTint     翻土层线性反照率逐通道倍率：压暗，并把画面里偏品红/橙的土拉回灰褐（在天光与调色之后量：
+ *                分镜沟壁/沟底 色相 20–26°、饱和 0.18–0.23，见 docs/Data_TerrainLayers.md §9）
+ *   wallDamp     区内翻土的底湿度（沟壁也是湿的：压暗、粗糙度降、饱和度升 —— TERRAIN_WATER 的湿痕那一套）
+ *   floorWater   区内沟底的积水倍率（TERRAIN_WATER.site.trenchFloor 之上再乘）
+ *   floorRaise   区内沟底水位额外抬高（高度单位）
+ *   trackDamp    区内车道/场坪的底湿度
+ *   rubble       开场布景的土皮 / 土堆 / 垫木土块（Script_OpeningSet 的 GroundRubble，贴图是 MissionSoil）：
+ *                color = 线性颜色倍率（把 MissionSoil 的均色拉到区内湿泥的颜色），roughness = 湿泥粗糙度
+ */
+export const TERRAIN_MUD_ZONE = Object.freeze({
+  box: Object.freeze([-80, -250, 90, -116]),
+  featherM: 8,
+  soilTint: Object.freeze([0.56, 0.66, 0.64]),
+  wallDamp: 0.9,
+  floorWater: 2.2,
+  floorRaise: 0.5,
+  trackDamp: 0.5,
+  rubble: Object.freeze({ color: Object.freeze([0.26, 0.3, 0.27]), roughness: 0.55 }),
+});
+
+/**
  * 地表图层怎么读白盒地形修饰（Data_FirstLevelWhiteboxTerrain 的形状；
  * 只改 SampleMissionGroundSurface 的权重输出，不碰高度）。
  *   wallSlope     形状最陡处坡度 1.5·dy/feather 超过它，羽化带（土壁）铺裸土 [起, 满]

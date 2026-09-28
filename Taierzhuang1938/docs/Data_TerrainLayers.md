@@ -2,7 +2,7 @@
 
 2026-09-26：翻土层 SpoilEarth 已按[概念图 07 通用壕沟](Data_TrenchReference07.md)更新，使用新的内置 imagegen 源图与烘焙参数。其余三层、四层数组结构、采样器及高度场保持不变；下文翻土图的 Lovart 来源与旧标定值属于 2026-09-17 历史。
 
-2026-09-28：对标 3A 参考图的色调、湿泥积水与车辙见 §8（`terrainLayers` 改为 4 个分量）。
+2026-09-28：对标 3A 参考图的色调、湿泥积水与车辙见 §8（`terrainLayers` 改为 4 个分量）；01–05 前沿湿泥区见 §9。
 
 第一关《往南的路》地面的唯一现状文档。实现：`Script_TerrainMaterial.mjs`；数值：`Data_Tuning_Terrain.mjs`；
 splat 权重：`Data_FirstLevelMissionTerrain.SampleMissionGroundSurface`；贴图烘焙：`_import/Script_BakeTerrainLayers.py`；
@@ -261,3 +261,29 @@ node Taierzhuang1938/Script_ModuleGraphTest.mjs
 - 车辙只沿 `MISSION_TERRAIN.roads` 的折线：没有登记成道路的巷子、院子没有车辙；道路交叉处横向坐标跳变，交叉口一格里车辙会乱。
 - 积水不随脚步/车轮溅起，也没有雨滴涟漪；low 画质没有 SSR 时水面只反射环境图。
 - 碎砖屑只在车道贴图里（平面）；立体的碎砖瓦散布归 B6。
+
+## 9. 2026-09-28 第二轮：01–05 前沿湿泥区（对标过场分镜 03–06）
+
+集成后复查：01–05 开场段（SB03–SB06）的沟壁、沟沿、土堆仍读作暖橙棕、偏亮，分镜是深冷灰褐的湿泥、沟底积水。
+**橙色的来源**：大面积的沟壁、沟底、抛土都是地形翻土层（`SampleMissionGroundSurface` 在 (0, −124) 一带全是 spoil，走壕沟补丁的
+`TrenchPom`）；贴图本身已是灰褐（色相 33°），画面偏橙偏品红是打光（偏暖的主光 + 偏蓝的天光把 G 相对压下去）叠加调色，
+同一张贴图在 01–05 的机位下量出来色相 6–22°、饱和 0.22–0.32、亮度约为分镜的 1.5 倍。土皮 / 土堆 / 垫木土块
+（`Script_OpeningSet` 的 `GroundRubble` = `MissionSoil` 贴图，偏黄）是第二个来源，面积小。陡坡侧投影与它无关。
+
+做法（不改贴图、不加采样器、不动位置与碰撞）：`Data_Tuning_Terrain.TERRAIN_MUD_ZONE` 一个世界矩形（北到前沿外、南停在
+06 集结洼地以北，羽化 8 m，07 以后不受影响），区内：
+
+- 翻土乘 `soilTint`（线性逐通道：压暗并把 G 相对抬回来，抵掉打光的品红偏色）；
+- 翻土整体变湿（`wallDamp` 进 `TerrainWater` 的底湿度：压暗、粗糙度降、饱和度按湿度加）——沟壁也是湿泥；
+- 沟底积水倍率 `floorWater`、水位再抬 `floorRaise`：踏板两侧与沟底低处成片积水，SSR 反射天空与人；
+- 车道 / 场坪底湿度 `trackDamp`；
+- 开场布景的 `GroundRubble` 换成 `library.Get("GroundRubble", {color, roughness})`（`rubble` 两个数），与区内湿泥同色
+  （`Script_OpeningSet` 一处建材质、一处垫木土块的 resolve，B5 的文件只动这两行）。
+
+同机位同口径（分镜取样 沟壁 / 沟底：亮度 0.031–0.046、色相 20–26°、饱和 0.18–0.23）：改后沟壁亮度 0.037–0.054、
+色相 12–22°、饱和 0.17–0.22，SB05 沟底 0.040 / 21° / 0.20。整幅均值亮度 −1% ~ −7%（相对集成版），暗部堆积 ≤ 0.9%。
+剩下的差距主要是整幅曝光与主光偏暖（分镜整幅亮度约为实机一半），属于天空 / 调色，不在地面这边压。
+取样框与脚本在 B2 报告里；再调按同一口径量。调试：`?terrainView=7` 看积水 / 湿痕，区内翻土整片应是蓝（湿痕）。
+
+门禁：`Script_OpeningStoryboardShots.mjs --quality=high --shots=SB03,SB03A,SB04,SB04A,SB05,SB05A,SB06`（带判据，退出码 0）、
+`Script_OpeningSetTest`、`Script_TerrainLayersTest`、`Script_TrenchSurfaceTest`、`Script_TextureStandardsTest`、`Script_ModuleGraphTest`。
