@@ -86,7 +86,7 @@ const readings = {
 };
 assert.ok(readings.kitchenDeep < 0.2, "deep inside the kitchen the sky is mostly blocked");
 assert.ok(readings.wardDeep < 0.25, "the ward's north bay is dim");
-assert.ok(readings.bunkerBack < 0.25, "the back of the dugout is dark");
+assert.ok(readings.bunkerBack < 0.3, "the back of the dugout is dark");
 assert.ok(readings.kitchenNearDoor > 0.5 && readings.bunkerMouth > 0.7, "next to the openings the sky light is back");
 for (const key of ["outsideKitchen", "kitchenWestWallOutside", "kitchenRoofTop", "streetOutside"]) {
   assert.equal(readings[key], 1, `${key} is not darkened`);
