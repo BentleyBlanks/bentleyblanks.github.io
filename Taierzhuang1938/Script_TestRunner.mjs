@@ -332,7 +332,8 @@ export const testDefs = {
   FirstLevelMissionMusicTest: { file: "Script_FirstLevelMissionMusicTest.mjs", desc: "Seven first-level score assets, story transitions and silence rules" },
   FirstLevelBattleSoundTest: { file: "Script_FirstLevelBattleSoundTest.mjs", desc: "第一关 01–05 声景：远处扇区交火、场外近落弹、防炮洞环境、壕沟/洞室判据、压制喘息心跳、耳鸣两档、配乐让位（纯 Node）" },
   CartCorpseBumpTest: { file: "Script_CartCorpseBumpTest.mjs", desc: "牛马车压过尸体：轮子滚上尸体顶面的抬升曲线、顶面格烘焙、命中体胶囊、软弹簧起伏/俯仰/侧倾、封顶与回零、帧率无关（纯 Node）" },
-  FirstLevelAirRaidTest: { file: "Script_FirstLevelAirRaidTest.mjs", desc: "第一关 01–06 中远处日机轮番轰炸：FrontPass 起点、多轮次间隔、中远处落区与避人、炸弹航迹、落弹留位与共享声部账、震屏封顶、07 以后不起（纯 Node）" },
+  FirstLevelAirRaidTest: { file: "Script_FirstLevelAirRaidTest.mjs", desc: "第一关 01–06 中远处日机轮番轰炸：FrontPass 起点、多轮次间隔、中远处落区与按弹型避人、阻力外弹道与投弹解算、中队规模、离场协调转弯与上浮、过顶、落弹留位与共享声部账、比例距离震屏封顶、07 以后不起（纯 Node）" },
+  BombBallisticsTest: { file: "Script_BombBallisticsTest.mjs", desc: "航空炸弹：二次阻力外弹道（真空一致、RK4 收敛、落后机身）、地面交点、尾翼摆动、立方根落地尺度、Vfx.BombBlast 专用池与延时出生的抛射土柱、SetBombs 实例化（纯 Node）" },
   FirstLevelMissionMusicBrowserTest: { file: "Script_FirstLevelMissionMusicBrowserTest.mjs", timeoutMs: 600000, desc: "First-level score playback, stage jumps, dialogue mix and lazy-load races" },
   AudioTest: { file: "Script_AudioTest.mjs", desc: "音频资产与烘焙管线" },
   FirstLevelAudioNodeBudgetTest: { file: "Script_FirstLevelAudioNodeBudgetTest.mjs", timeoutMs: 900000,
@@ -526,6 +527,7 @@ export const tier0Fast = [
   "CameraShakeTest",
   "FirstLevelBattleSoundTest",
   "FirstLevelAirRaidTest",
+  "BombBallisticsTest",
   "CartCorpseBumpTest",
   "FractureBakeTest",
   "CutsceneControlTest",
@@ -642,7 +644,7 @@ export const domains = {
     // 所以也挂在这个域下。
     tests: ["CarryTest", "EmplacementTest", "EmplacementViewBrowserTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
-  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "FirstLevelAirRaidTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest", "FirstLevelAudioNodeBudgetTest"] },
+  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "FirstLevelAirRaidTest", "BombBallisticsTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest", "FirstLevelAudioNodeBudgetTest"] },
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
@@ -763,6 +765,9 @@ const changedDomainRules = [
   // 2026-09-23：场外近落弹与离图前线也要拉上第一关域（它们只在 01–06 的任务相位里开）。
   // 2026-09-26：01–06 中远处轮番轰炸（FirstLevelAirRaid）同理。
   { domain: "firstLevel", pattern: /BattleArtillery|FirstLevelBattleSound|FirstLevelAirRaid/ },
+  // 2026-09-28：航空炸弹的外弹道与落地尺度（Data_AerialBombs / Script_BombBallistics）只有空袭在用，
+  // 改了跑空袭那两条门禁（audio 域里都有）；BombBlast 在 Script_Vfx 里，Vfx 的改动本来就走 render 域。
+  { domain: "audio", pattern: /AerialBombs|BombBallistics/ },
   { domain: "voice", pattern: /Script_Audio\.mjs|Data_Voice|Script_VoiceBake|Script_FirstLevelMissionVoice|Script_DialoguePlayer|FirstLevelDialogueDirection|SeedAudioCastBake|SeedAudioSquadBarkBake|SeedAudioVoiceKit/ },
   // 2026.09.19 第三波：`FirstLevelMeal`（腊肉分食）与 `CarriageSoundscape`（车厢试听导出）
   // 两个关键词随模块删除一并摘掉。`BaconHandoff` / `FirstLevelTrain` / `FirstLevelCarriage`

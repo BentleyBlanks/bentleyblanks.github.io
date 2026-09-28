@@ -40,6 +40,8 @@ import { VEHICLE_TRACER, HARD_SURFACE_SPARKS } from "./Data_Tuning_BulletVisual.
 import { BloodEffects } from "./Script_BloodEffects.mjs";
 import { BattleSmoke } from "./Script_BattleSmoke.mjs";
 import { BATTLE_FIRE_QUALITY, BATTLE_FIRE } from "./Data_Tuning_BattleSmoke.mjs";
+import { BOMB_BLAST_VFX } from "./Data_AerialBombs.mjs";
+import { BlastScale, LinearDragAt } from "./Script_BombBallistics.mjs";
 
 // ---------------------------------------------------------------------------
 // 色板：全部来自 docs/Data_HistoryMaterial.md 的考据表。
@@ -911,6 +913,11 @@ const SPAWN = {
 };
 
 
+// BombBlast 的抛射土团：与着色器同一条「重力 + 线性阻尼」闭式解（Script_BombBallistics.LinearDragAt）。
+const BOMB_GRAVITY_G = 9.81;
+const BOMB_GRAVITY = Object.freeze({ x: 0, y: -BOMB_GRAVITY_G, z: 0 });
+const BOMB_HEAD = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 };
+
 // 碎块的生成描述符，同样只有一份（爆炸一次要塞 20 个，别在这儿制造垃圾）
 const DEBRIS_SPAWN = {
   x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
@@ -1386,6 +1393,9 @@ const EXPLOSION_KINDS = {
   launcher: { flash: 0.85, fire: 4, smoke: 7, chunks: 10, sparks: 3, sooty: 0.1, column: 0.8 },
   shell: { flash: 1.4, fire: 9, smoke: 14, chunks: 20, sparks: 8, sooty: 0.35, column: 1.5 },
   tank: { flash: 1.7, fire: 14, smoke: 18, chunks: 22, sparks: 16, sooty: 0.8, column: 2.2 },
+  // 航空炸弹（BombBlast 的火球那一层）：只要闪光、火球与一圈尘环。烟、土块另由 BombBlast
+  // 按装药画进专用池 —— 两三百米外那一撮小碎块与火星本来就不到一个像素，却会挤掉近处手榴弹的碎块。
+  bomb: { flash: 1.6, fire: 9, smoke: 0, chunks: 0, sparks: 0, sooty: 0.55, column: 1.8, rings: 1 },
 };
 
 // 四套爆炸序列帧共用同一套粒子 API，但不能共用一个材质：一次炮击的烟尾还没散，
@@ -1600,6 +1610,12 @@ export class VfxSystem {
       star: new ParticlePool(cap(POOL_SHARE.star, 24), {
         shape: "star", orient: "billboard", blending: THREE.AdditiveBlending,
         softRange: 0.2, renderOrder: 10,
+      }, this.shared),
+      // 航空炸弹的土柱与烟团（BombBlast）：与 smoke 同一种片子（同一个着色器程序，不多编），
+      // 容量按画质档固定、不吃战斗烟池 —— 一轮几十颗不会把手榴弹、炮击的烟挤掉。只画活着的格子。
+      bombSmoke: new ParticlePool(BOMB_BLAST_VFX.poolCapacity[this.quality] ?? BOMB_BLAST_VFX.poolCapacity.high, {
+        shape: "puff", orient: "billboard", blending: THREE.NormalBlending,
+        lit: true, aerial: true, softRange: 0.45, renderOrder: 6, fadeOutStart: BOMB_BLAST_VFX.fadeOutStart,
       }, this.shared),
       // 贴面的环：爆炸尘环、水花圈
       ring: new ParticlePool(cap(POOL_SHARE.ring, 16), {
@@ -2332,7 +2348,7 @@ export class VfxSystem {
     }
 
     // 3) 贴地尘环（两圈错开，前一圈快、后一圈慢）
-    for (let i = 0; i < 2; i += 1) {
+    for (let i = 0; i < (profile.rings ?? 2); i += 1) {
       const s = ResetSpawn();
       s.x = position.x; s.y = ground + 0.08 + i * 0.05; s.z = position.z;
       s.nx = 0; s.ny = 1; s.nz = 0;
@@ -2411,6 +2427,171 @@ export class VfxSystem {
     // after excavation its depth tolerance cuts concentric bands into the pit
     // walls, and repeated blasts stack those slices at successive heights.
     // Impact() still uses small surface decals for ordinary bullet holes.
+  }
+
+  /**
+   * 航空炸弹落地（2026-09-28；第一关轮番轰炸经 BattleSound.BombVisual 调）。尺度全按装药立方根
+   *（Script_BombBallistics.BlastScale，数在 Data_AerialBombs）：闪光、火球与一圈尘环走 Explosion 的 bomb 档，
+   * 其余五层画在 bombSmoke 专用池里 ——
+   *   冲击环    地面上一圈极快外扩的浮土，差不多音速，到 shockR = 18·∛W 处消失；
+   *   抛射土柱   倒锥形抛射幕：每条的头是一团沿弹道飞的土（重力 + 线性阻尼，与着色器同一条闭式解），
+   *             沿途按它**那一刻的位置**预排几团土（延时出生），连起来就是一条条弯下去的土柱；
+   *             斜着砸进去的弹，下游一侧抛得多；
+   *   中心土柱   竖直冲上去的尘土，阻尼减速、重的往回落；
+   *   底涌尘浪   贴地向外滚的一圈尘，外沿到 surgeR；
+   *   久留烟团   一两秒后在土柱半高处成形、慢慢上浮随风飘十几二十秒，一轮炸完落区上空压着一片。
+   * budget < 1 时每层团数按比例摊薄（一轮几十颗时由调用方给）。返回这一颗的取证。
+   */
+  BombBlast(position, { chargeKg = 22, groundY = null, budget = 1, dirX = 0, dirZ = 0 } = {}) {
+    const V = BOMB_BLAST_VFX, S = BlastScale(chargeKg);
+    const ground = groundY ?? position.y;
+    const cx = position.x, cz = position.z, now = this.time;
+    const pool = this.pools.bombSmoke;
+    const rel = S.cube / 2.8;                           // 相对 50 kg 级
+    const scale = this.spawnScale * Math.max(0.05, Math.min(1, budget));
+    const count = (base) => Math.max(1, Math.round(base * scale));
+    const h = Math.hypot(dirX, dirZ), fx = h > 1e-3 ? dirX / h : 0, fz = h > 1e-3 ? dirZ / h : 0;
+    const wind = this.wind;
+
+    // 0) 闪光、火球、尘环。
+    this.Explosion({ x: cx, y: ground + 0.3 * rel, z: cz }, { radius: S.visualRadius, kind: "bomb", groundY: ground });
+
+    // 1) 冲击环：尘环的可见半径约是半宽的 0.72 倍；寿命按音速跑完 shockR 再留一点收尾。
+    {
+      const s = ResetSpawn();
+      s.x = cx; s.y = ground + 0.12; s.z = cz;
+      s.nx = 0; s.ny = 1; s.nz = 0;
+      s.life = Math.max(0.18, 1.5 * S.shockR / 340);
+      s.sizeStart = S.craterR; s.sizeEnd = S.shockR / 0.72;
+      s.opacity = 0.42; s.fadeIn = 0.01;
+      s.angle = this._Range(0, 3.14);
+      s.colorA = VFX_PALETTE.dustPale; s.colorB = VFX_PALETTE.dust;
+      s.seed = this.random();
+      this.pools.ring.Spawn(s, now);
+    }
+
+    // 2) 抛射土柱。
+    const streamers = count(V.streamerBase + V.streamerPerCube * S.cube);
+    const trail = Math.max(1, Math.round(V.trailPuffs * Math.min(1, scale + 0.3)));
+    const gravity = BOMB_GRAVITY, head = BOMB_HEAD;
+    const a0 = this.random() * Math.PI * 2;
+    for (let i = 0; i < streamers; i += 1) {
+      const az = a0 + (i + this._Signed(0.35)) * (Math.PI * 2 / streamers);
+      let hx = Math.cos(az) + fx * V.downrangeBias, hz = Math.sin(az) + fz * V.downrangeBias;
+      const hl = Math.hypot(hx, hz) || 1; hx /= hl; hz /= hl;
+      const el = this._Range(V.elevationDeg[0], V.elevationDeg[1]) * Math.PI / 180;
+      const v = this._Range(S.ejectaV[0], S.ejectaV[1]);
+      const p0 = { x: cx + hx * S.craterR * 0.4, y: ground + 0.4, z: cz + hz * S.craterR * 0.4 };
+      const v0 = { x: hx * Math.cos(el) * v, y: Math.sin(el) * v, z: hz * Math.cos(el) * v };
+      const k = V.clodDrag;
+      // 头：一团暗土沿弹道飞，落回地面那一刻熄掉（烟池没有地面回弹）。牛顿迭代求落地时刻。
+      let flight = 2 * v0.y / BOMB_GRAVITY_G;
+      for (let it = 0; it < 4; it += 1) {
+        LinearDragAt(p0, v0, gravity, k, flight, head);
+        flight = Math.max(0.3, flight - (head.y - ground) / Math.min(-1, head.vy));
+      }
+      {
+        const s = ResetSpawn();
+        s.x = p0.x; s.y = p0.y; s.z = p0.z;
+        s.vx = v0.x; s.vy = v0.y; s.vz = v0.z;
+        s.ay = gravity.y; s.drag = k;
+        s.life = flight;
+        const size = this._Range(V.clodM[0], V.clodM[1]) * rel;
+        s.sizeStart = size; s.sizeEnd = size * 1.5;
+        s.opacity = 0.92; s.fadeIn = 0.02;
+        s.stretch = 0.4;
+        s.colorA = VFX_PALETTE.blackCore; s.colorB = VFX_PALETTE.woodBurnt;
+        s.seed = this.random();
+        pool.Spawn(s, now);
+      }
+      // 尾：沿途几团土，头飞到哪儿才在哪儿出生（延时出生），带走一小截速度，随后慢慢沉、随风散。
+      // 头一团贴着弹坑，其余沿整条弧线铺开（头在烟池里过半寿命就开始淡，弧线靠尾巴画出来）。
+      for (let m = 0; m < trail; m += 1) {
+        const tau = 0.04 + flight * V.trailSpan * (m / trail) * this._Range(0.85, 1.1);
+        if (tau >= flight) break;
+        const at = LinearDragAt(p0, v0, gravity, k, tau, head);
+        const s = ResetSpawn();
+        s.x = at.x; s.y = at.y; s.z = at.z;
+        s.vx = at.vx * 0.22 + wind.x; s.vy = at.vy * 0.22; s.vz = at.vz * 0.22 + wind.z;
+        s.ax = wind.x * 0.3; s.ay = -0.6; s.az = wind.z * 0.3;
+        s.drag = 1.1;
+        s.life = this._Range(4, 6.5) * (0.8 + 0.2 * rel);
+        s.sizeStart = V.trailSizeM[0] * (1 + m * 0.25) * rel;
+        s.sizeEnd = V.trailSizeM[1] * this._Range(0.75, 1.15) * rel * (1 + m * 0.12);
+        s.opacity = V.trailOpacity - m * 0.07; s.fadeIn = 0.05;
+        s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.4);
+        s.colorA = m === 0 ? VFX_PALETTE.blackCore : VFX_PALETTE.dustDense; s.colorB = VFX_PALETTE.soil;
+        s.seed = this.random();
+        pool.Spawn(s, now + tau);
+      }
+    }
+
+    // 3) 中心土柱：竖直冲上去，阻尼减速（终速 ay/drag 往下），扩散曲线放慢，免得在半空堆成一颗球。
+    const columnN = count(V.columnBase + S.cube);
+    for (let i = 0; i < columnN; i += 1) {
+      const u = i / Math.max(1, columnN - 1);
+      const s = ResetSpawn();
+      s.x = cx + this._Signed(S.craterR * 0.5); s.y = ground + 0.5 + u * 2; s.z = cz + this._Signed(S.craterR * 0.5);
+      s.vx = this._Signed(2.5) + fx * 2; s.vy = this._Range(S.columnV[0], S.columnV[1]); s.vz = this._Signed(2.5) + fz * 2;
+      s.ax = wind.x * 0.4; s.ay = -2.2; s.az = wind.z * 0.4;
+      s.drag = 0.85;
+      s.life = this._Range(5, 8) * (0.85 + 0.15 * rel);
+      s.sizeStart = (1.8 + u * 1.2) * rel; s.sizeEnd = this._Range(V.columnSizeM[0], V.columnSizeM[1]) * rel;
+      s.opacity = V.columnOpacity; s.fadeIn = 0.03;
+      s.stretch = 1.3;
+      s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.3);
+      s.colorA = i % 2 === 0 ? VFX_PALETTE.blackCore : VFX_PALETTE.dustDense; s.colorB = VFX_PALETTE.soil;
+      s.seed = this.random();
+      pool.Spawn(s, now + i * 0.02);
+    }
+
+    // 4) 底涌尘浪：贴地向外滚，阻尼 0.9 下滚出 v/0.9 ≈ surgeR。
+    const surgeN = count(V.surgeBase + S.cube);
+    const b0 = this.random() * Math.PI * 2;
+    for (let i = 0; i < surgeN; i += 1) {
+      const az = b0 + (i + this._Signed(0.3)) * (Math.PI * 2 / surgeN);
+      const c = Math.cos(az), sn = Math.sin(az), speed = S.surgeR * 0.9 * this._Range(0.8, 1.15);
+      const s = ResetSpawn();
+      s.x = cx + c * S.craterR; s.y = ground + 0.8 * rel; s.z = cz + sn * S.craterR;
+      s.vx = c * speed + wind.x; s.vy = 0.4; s.vz = sn * speed + wind.z;
+      s.ax = wind.x * 0.3; s.ay = 0.15; s.az = wind.z * 0.3;
+      s.drag = 0.9;
+      s.life = this._Range(5, 8);
+      s.sizeStart = 1.6 * rel; s.sizeEnd = S.surgeR * this._Range(0.4, 0.55);
+      s.opacity = 0.45; s.fadeIn = 0.05;
+      s.stretch = 1.2;
+      s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.25);
+      s.colorA = VFX_PALETTE.soilAir; s.colorB = VFX_PALETTE.dust;
+      s.seed = this.random();
+      pool.Spawn(s, now + this._Range(0.05, 0.15));
+    }
+
+    // 5) 久留烟团：土柱半高处成形，缓缓上浮（终速 ay/drag ≈ 0.7 m/s），随风飘。
+    const capN = count(V.capPerCube * S.cube);
+    const top = S.columnV[1] / 0.85;
+    for (let i = 0; i < capN; i += 1) {
+      const delay = this._Range(0.9, 1.8);
+      const s = ResetSpawn();
+      const spread = S.craterR * V.capSpreadCrater;
+      s.x = cx + this._Signed(spread) + wind.x * delay; s.y = ground + top * this._Range(V.capHeightU[0], V.capHeightU[1]);
+      s.z = cz + this._Signed(spread) + wind.z * delay;
+      s.vx = wind.x * 1.2 + this._Signed(0.8); s.vy = this._Range(0.2, 0.7); s.vz = wind.z * 1.2 + this._Signed(0.8);
+      s.ax = wind.x * 0.25; s.ay = 0.3; s.az = wind.z * 0.25;
+      s.drag = 0.5;
+      s.life = this._Range(V.capLifeS[0], V.capLifeS[1]);
+      s.sizeStart = 5 * rel; s.sizeEnd = this._Range(V.capSizeM[0], V.capSizeM[1]) * rel;
+      s.opacity = V.capOpacity; s.fadeIn = 0.12;
+      s.stretch = 0.8;
+      s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.12);
+      s.colorA = VFX_PALETTE.dustDense; s.colorB = VFX_PALETTE.dust;
+      s.seed = this.random();
+      pool.Spawn(s, now + delay);
+    }
+
+    this.bombBlasts = (this.bombBlasts || 0) + 1;
+    this.lastBombBlast = { chargeKg: S.chargeKg, budget, radius: S.visualRadius, shockR: S.shockR, surgeR: S.surgeR,
+      ejectaV: S.ejectaV, streamers, trail, column: columnN, surge: surgeN, cap: capN };
+    return this.lastBombBlast;
   }
 
   /**
