@@ -18,8 +18,7 @@ import { MakeWhiteboxWeatherPatch, MakeWhiteboxWeatherUniforms } from "./Script_
 import { WHITEBOX_WEATHERING } from "./Data_Tuning_Materials.mjs";
 import { CreateWaterSurface } from "./Script_Water.mjs";
 import {
-  WHITEBOX_MATERIAL_VERSION, WHITEBOX_TEXTURE_SETS, WHITEBOX_LOOKS, WHITEBOX_RAILWAY_LOOKS,
-  ResolveWhiteboxLook, WhiteboxTint,
+  WHITEBOX_LOOKS, WHITEBOX_RAILWAY_LOOKS, ResolveWhiteboxLook, WhiteboxTint,
 } from "./Data_FirstLevelWhiteboxMaterials.mjs";
 
 /** 单位盒子的 uv（每面四角 0/1），面内米坐标由它乘面尺寸得到。面序 +x,-x,+y,-y,+z,-z。 */
@@ -100,23 +99,13 @@ function MakeTrussTexture(spec, heightM = 2.4) {
 }
 
 /**
- * 下第一关按需贴图套。已经在库里的（重建关卡）直接算成功。返回下成功的套名集合。
- * 各套独立：一套失败只让用它的外观退回 fallback。
+ * 下第一关按需贴图集（阶段 A 的 MaterialLibrary.LoadLevelSets，永不 reject）。
+ * 返回退回了 fallback 的套名集合（外观据此改用 fallbackTint）。没有加载口的库（Node 替身）返回空集。
  */
-export async function LoadWhiteboxTextureSets(library, { timeoutMs = 20000 } = {}) {
-  const loaded = new Set();
-  if (!library?.LoadExternalSet || !library.baked) return loaded;
-  const V = (url) => `${url}?v=${WHITEBOX_MATERIAL_VERSION}`;
-  await Promise.all(Object.entries(WHITEBOX_TEXTURE_SETS).map(async ([name, set]) => {
-    if (library.baked.has(name)) { loaded.add(name); return; }
-    try {
-      await library.LoadExternalSet(name, { albedo: V(set.albedo), normal: V(set.normal), orm: V(set.orm) }, { timeoutMs });
-      loaded.add(name);
-    } catch (error) {
-      console.warn(`[WhiteboxLooks] ${name} unavailable, falling back to ${set.fallback}:`, String(error).slice(0, 160));
-    }
-  }));
-  return loaded;
+export async function LoadWhiteboxTextureSets(library) {
+  if (typeof library?.LoadLevelSets !== "function") return new Set();
+  const report = await library.LoadLevelSets("FirstLevel");
+  return new Set((report?.failed || []).map((item) => item.name));
 }
 
 /** 按外观合并一串带风化属性的几何（位置已在世界系）。 */
@@ -146,14 +135,14 @@ export function MergeWhiteboxGeometries(list) {
 export class WhiteboxLooks {
   /**
    * @param {object} library MaterialLibrary
-   * @param {Set<string>} loadedSets LoadWhiteboxTextureSets 的结果
+   * @param {Set<string>} failedSets LoadWhiteboxTextureSets 的结果（退回了 fallback 的按需套）
    */
-  constructor(library, loadedSets = new Set()) {
+  constructor(library, failedSets = new Set()) {
     this.library = library;
-    this.loaded = loadedSets;
+    this.failed = failedSets;
     this.weather = MakeWhiteboxWeatherUniforms(WHITEBOX_WEATHERING);
     this.cache = new Map();
-    this.stats = { looks: {}, fallbackSets: Object.keys(WHITEBOX_TEXTURE_SETS).filter((name) => !loadedSets.has(name)) };
+    this.stats = { looks: {}, fallbackSets: [...failedSets] };
   }
 
   /** 这块该用哪个外观（null = 不归外观表管）。 */
@@ -174,9 +163,9 @@ export class WhiteboxLooks {
     if (look.plain) {
       material = CloneLibraryMaterial(this.library.Plain(`FirstLevelWhitebox_${lookName}`, look.plain));
     } else {
-      const setSpec = WHITEBOX_TEXTURE_SETS[look.set];
-      const fallback = !!setSpec && !this.loaded.has(look.set);
-      const setName = fallback ? setSpec.fallback : look.set;
+      // 按需套失败时加载器已把 fallback 借给同名（Script_LevelTextureSets），名字不变、只换 tint。
+      const fallback = this.failed.has(look.set);
+      const setName = look.set;
       const tint = fallback ? (look.fallbackTint ?? look.tint ?? 0xffffff) : (look.tint ?? 0xffffff);
       let base;
       try {

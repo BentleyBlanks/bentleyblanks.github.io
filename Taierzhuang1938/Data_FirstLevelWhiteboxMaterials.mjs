@@ -16,43 +16,16 @@
 // 单位：`tileM` = 一张贴图在世界里铺多少米（白盒体块的 UV 是按世界米算的，见 Script_Geo.ScaleBoxUv）。
 // 颜色：sRGB 十六进制，是乘在贴图反照率上的 tint，不是最终屏幕色。
 
-/** 按需贴图的版本戳（改了图就改它；拼在 URL 的 ?v= 上）。 */
-export const WHITEBOX_MATERIAL_VERSION = "b1wb20260928";
-
 /**
- * 第一关按需加载的贴图套（开机清单 PBR_SETS 已满额，这几套只在建第一关时下）。
- * 下不到时退回 `fallback`（开机就有的配方/外部套）并改用外观里的 `fallbackTint`，
- * 建场不会因此卡住（每张图带超时，见 Script_Materials._LoadExternalImage）。
- * 源图、提示词、Lovart thread 与烘焙参数登记在 Data_TextureManifest（阶段 A 清单）。
- */
-export const WHITEBOX_TEXTURE_SETS = Object.freeze({
-  VillageMudPlaster: Object.freeze({ fallback: "Adobe",
-    albedo: "./Texture/Texture_VillageMudPlasterBase.webp",
-    normal: "./Texture/Texture_VillageMudPlasterNormal.webp",
-    orm: "./Texture/Texture_VillageMudPlasterOrm.webp" }),
-  VillageLimePlaster: Object.freeze({ fallback: "TemplePlaster",
-    albedo: "./Texture/Texture_VillageLimePlasterBase.webp",
-    normal: "./Texture/Texture_VillageLimePlasterNormal.webp",
-    orm: "./Texture/Texture_VillageLimePlasterOrm.webp" }),
-  VillageRoofTile: Object.freeze({ fallback: "GateRoofTile",
-    albedo: "./Texture/Texture_VillageRoofTileBase.webp",
-    normal: "./Texture/Texture_VillageRoofTileNormal.webp",
-    orm: "./Texture/Texture_VillageRoofTileOrm.webp" }),
-  VillageTimber: Object.freeze({ fallback: "HandcartWood",
-    albedo: "./Texture/Texture_VillageTimberBase.webp",
-    normal: "./Texture/Texture_VillageTimberNormal.webp",
-    orm: "./Texture/Texture_VillageTimberOrm.webp" }),
-  RailBallast: Object.freeze({ fallback: "GroundRubble",
-    albedo: "./Texture/Texture_RailBallastBase.webp",
-    normal: "./Texture/Texture_RailBallastNormal.webp",
-    orm: "./Texture/Texture_RailBallastOrm.webp" }),
-});
-
-/**
+ * 贴图套：第一关按需集（Data_LevelTextureSets.FirstLevel：VillageMudPlaster / VillageLimePlaster /
+ * VillageRoofTile / VillageTimber / RailBallast，建场前 MaterialLibrary.LoadLevelSets("FirstLevel")）
+ * 或开机就有的套。按需套下不到时加载器把 fallback 那套借给同名，外观改用 `fallbackTint`。
+ * 源图、提示词、Lovart thread 与烘焙参数登记在 Data_TextureManifest。
+ *
  * 外观表。字段：
- *   set          材质库里的套名（WHITEBOX_TEXTURE_SETS 的键，或开机就有的配方/外部套）
+ *   set          材质库里的套名
  *   tileM        一张贴图铺多少米
- *   tint         乘在反照率上的 sRGB 色（缺省白）；`fallbackTint` = 退回 fallback 套时用的 tint
+ *   tint         乘在反照率上的 sRGB 色（缺省白）；`fallbackTint` = 按需套退回 fallback 时用的 tint
  *   normalScale / roughness / metalness   交给 MaterialLibrary.Get 的标量
  *   uv           "roof"：±y 面把瓦垄转到顺坡（沿盒子水平短边）；"grain"：木纹顺盒子最长边
  *   weather      风化补丁的总强度 0..1（墙根潮湿、檐下雨痕、棱角磨损、大尺度色斑、倒角）
