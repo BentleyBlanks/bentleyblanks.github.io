@@ -271,7 +271,9 @@ export const SET_MATERIALS = Object.freeze({
 export const INTERIOR = Object.freeze({
   box: Object.freeze({ x0: -3.4, x1: 1.0, z0: -128.2, z1: -123.8, top: 2.1 }),
   featherMouthM: 1.0, featherM: 0.3,
-  ambientScale: 0.45,
+  // 2026-09-28 集成：B4 的室内遮蔽体（Data_FirstLevelInteriors「Bunker」，乘进 AO）同样压掩蔽部，两层叠起来 SB01 只剩 30（分镜 50）。
+  // 通用机制归 B4，这里退成 1.0（不再额外压）；数据与入口保留，需要单独调掩蔽部时再动。
+  ambientScale: 1.0,
 });
 
 // ---------------------------------------------------------------------------

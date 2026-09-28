@@ -28,14 +28,17 @@ export const FIRST_LEVEL_INTERIORS = Object.freeze({
   layoutId: "FirstLevelMissionSeptember19",
   rooms: Object.freeze([
     // 09 灶屋与连屋（Village Roof("Kitchen"/"ConnectedHouse"), 中间一段有顶的过道）
-    { id: "Kitchen", box: { x: 58, z: -9, w: 12, d: 15 }, ceil: 2.95, dark: 0.10 },
-    { id: "KitchenLink", box: { x: 58, z: -0.5, w: 12, d: 2 }, ceil: 2.9, dark: 0.10 },
-    { id: "ConnectedHouse", box: { x: 58, z: 8, w: 12, d: 15 }, ceil: 2.95, dark: 0.10 },
-    { id: "MachineGunHouse", box: { x: 43, z: 8, w: 12, d: 15 }, ceil: 2.95, dark: 0.10 },
+    { id: "Kitchen", box: { x: 58, z: -9, w: 12, d: 15 }, ceil: 2.95, dark: 0.15 },
+    { id: "KitchenLink", box: { x: 58, z: -0.5, w: 12, d: 2 }, ceil: 2.9, dark: 0.15 },
+    { id: "ConnectedHouse", box: { x: 58, z: 8, w: 12, d: 15 }, ceil: 2.95, dark: 0.15 },
+    { id: "MachineGunHouse", box: { x: 43, z: 8, w: 12, d: 15 }, ceil: 2.95, dark: 0.15 },
     // 09_3 侧间：朝街一面是带柱的敞口，采光比灶屋好得多
-    { id: "SideRoom", box: { x: 68, z: 10.65, w: 8, d: 10.3 }, ceil: 2.95, dark: 0.12, wall: 0.65 },
+    { id: "SideRoom", box: { x: 68, z: 10.65, w: 8, d: 10.3 }, ceil: 2.95, dark: 0.18, wall: 0.65 },
+    // 2026-09-28 集成：B1 材质合入后 dark 0.10 让 09 三机位整幅只剩 21–27（参考 35–53）、16_2 只剩 27（参考 52），
+    // 且暗部发紫；在 Script_FirstLevelSkyGradeTest 的「深处天光 < 0.2 / 厢房北间 < 0.25」之内抬到 0.15 / 侧间 0.18 / 厢房 0.18，
+    // 室内整体亮度主要交给自动曝光的进屋适应（SKY_EXPOSURE.firstLevelBattleDay.evUp）。
     // 16–17 厢房（Rear Gable("ReceptionWard")），南门 + 西窗 + 东侧敞口
-    { id: "ReceptionWard", box: { x: -26, z: 234, w: 14, d: 18 }, ceil: 2.9, dark: 0.10 },
+    { id: "ReceptionWard", box: { x: -26, z: 234, w: 14, d: 18 }, ceil: 2.9, dark: 0.18 },
     // 01 掩蔽部：坑底 = 自然地面 − 2.0 m，顶是 BunkerRoof（底面在自然地面 −0.15）。
     // 三面是坑壁（地形，不在体块表里），只有东面的洞口采光，所以口子写死。
     // dark 0.38：坑只有 4 m 见方、洞口 3 m 宽，洞外晒着的沟底把光弹进来。SB01 坐在坑底往洞口看，
