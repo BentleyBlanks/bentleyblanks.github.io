@@ -318,7 +318,7 @@ export class FirstLevelWhiteboxField {
       : {replaced:new Set(),placements:[]};
     this.fortificationPlacements=defenses.placements;
     // 平色道具盒 / 散块 / foliage 盒换成模型、碎砖瓦与植被：只换外观，碰撞与掩体仍由下面的原块登记。
-    this.propDressingStats=this.propDressing?AddFirstLevelPropDressing(sink,this.layout,this.propDressing,(x,z)=>this.StaticGroundHeight(x,z),this.materials,this.library):null;
+    this.propDressingStats=this.propDressing?AddFirstLevelPropDressing(sink,this.layout,this.propDressing,(x,z)=>this.StaticGroundHeight(x,z),this.materials,this.library,{scene:this.scene,meshes:this.meshes}):null;
     this.vegetation=this.vegetationAtlas?new FirstLevelVegetation(this.scene,this.layout,this.library,this.vegetationAtlas,(x,z)=>this.TerrainHeight(x,z),this.quality):null;
     for(const id of [...(this.propDressingStats?.replaced||[]),...(this.vegetation?.plan.replaced||[])])defenses.replaced.add(id);
     for(const [key,material] of this.materials)if(key.startsWith("MissionDefenseMaterial_"))this.sharedFortificationMaterials.add(material);

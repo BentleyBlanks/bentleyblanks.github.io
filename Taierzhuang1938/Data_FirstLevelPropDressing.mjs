@@ -18,8 +18,11 @@
 // 离路线走廊与交互点有退让。
 
 export const PROP_DRESSING_VERSION = "first-level-prop-dressing-20260928";
-/** 道具与碎砖瓦按这个边长分区合批（BuildSink 分区）。道具稀疏、材质种类多（每区每材质一个 draw，还要乘预通道与阴影），96 m 一区：村子只占 2×2 区。 */
-export const PROP_DRESSING_SECTOR_M = 96;
+/**
+ * 道具与碎砖瓦按这个边长分区合批（BuildSink 分区）。道具稀疏、材质种类多（每区每材质一个 draw，还要乘预通道），
+ * 192 m 一区：村子只落在一两区里。2026-09-28 同页开关实测 64 m 一区时本包在村里多出 130 多个 draw。
+ */
+export const PROP_DRESSING_SECTOR_M = 192;
 /** 外观与原盒的允许误差：逐轴 max(相对 tolerance, 绝对 toleranceM)。 */
 export const PROP_FIT_TOLERANCE = Object.freeze({ relative: 0.3, absoluteM: 0.12 });
 /** 贴地：盒底离中心地面这么近就当「落在地上」，按脚印四角取最低点再压进土里 embedM。 */
@@ -49,14 +52,14 @@ export const PROP_DRESSING = Object.freeze([
   P("RightEntryCrate", "marketBox03"),
   P("SouthRoadWreckWheel0", "ryCartWheel", WHEEL),
   P("SouthRoadWreckWheel1", "ryCartWheel", WHEEL),
-  P("CollectionNorthFootStack", "militaryCrateClosed", { tile: [1, 2, 1], maxStretch: 1.6 }),
+  P("CollectionNorthFootStack", "crate", { tile: [1, 2, 1], maxStretch: 1.6 }),
   P("CollectionWestPack0", "marketRiceSack02"),
   P("CollectionWestPack1", "marketRiceSack02"),
   P("CollectionWestPack2", "marketRiceSack02"),
   P("CollectionShedCrate0", "crate"),
   P("CollectionShedCrate1", "marketBox02"),
   P("CollectionShedCrate2", "crate"),
-  P("SouthTrenchCrate", "militaryCrateClosed", { tile: [1, 2, 1], maxStretch: 1.6 }),
+  P("SouthTrenchCrate", "crate", { tile: [1, 2, 1], maxStretch: 1.6 }),
   // —— 07_2 村北口 / 08 担架停靠处与主街 ——
   P("VillageMouthHaystack", "ryHayStack", { hide: Tiers("VillageMouthHaystack"), ...STRAW }),
   P("VillageMouthHaystackSmall", "ryHayStack", { hide: Tiers("VillageMouthHaystackSmall"), ...STRAW }),
@@ -65,12 +68,12 @@ export const PROP_DRESSING = Object.freeze([
   P("StreetLeanToBasket0", "wovenBasket", BASKET),
   P("StreetLeanToBasket1", "wovenBasket", BASKET),
   P("StreetLeanToBasket2", "wovenBasket", BASKET),
-  P("StreetLeanToFaggots", "phFirewoodBranches", { hide: Logs("StreetLeanToFaggots"), tile: [1, 3, 1], maxStretch: 1.6 }),
+  P("StreetLeanToFaggots", "ryFirewoodStack", { hide: Logs("StreetLeanToFaggots"), tile: [1, 2, 1], maxStretch: 1.6 }),
   P("StreetEastJar0", "clayWaterVat", { hide: Rim("StreetEastJar0") }),
   P("StreetEastBasket0", "wovenBasket", BASKET),
   P("StreetWestHouseJar", "clayRoundVat", { hide: Rim("StreetWestHouseJar") }),
   P("StreetWestHouseBasket", "wovenBasket", BASKET),
-  P("StreetEastNorthFaggots", "phFirewoodBranches", { hide: Logs("StreetEastNorthFaggots"), tile: [1, 3, 2], maxStretch: 1.6 }),
+  P("StreetEastNorthFaggots", "ryFirewoodStack", { hide: Logs("StreetEastNorthFaggots"), tile: [1, 2, 2], maxStretch: 1.6 }),
   P("StreetCartWheel78.3", "ryCartWheel", WHEEL),
   P("StreetCartWheel80.7", "ryCartWheel", WHEEL),
   P("StreetBlockCartWheel", "ryCartWheel", WHEEL),
@@ -172,7 +175,7 @@ export const PROP_DRESSING_ASSETS = Object.freeze([...new Set(PROP_DRESSING.map(
 // ---------------------------------------------------------------------------
 export const PROP_RUBBLE = Object.freeze({
   seed: 20260928,
-  maxPieces: 2600,
+  maxPieces: 1800,
   maxHeightM: 0.25,
   routeClearM: 0.9,
   anchorClearM: 1.6,
@@ -182,7 +185,7 @@ export const PROP_RUBBLE = Object.freeze({
     excludePattern: /(Step|Sill|Plinth|Kerb|Curb|Post|Rail|Pier|Slab)/,
     semantics: Object.freeze(["earthDark", "plaster", "structure", "railBallast"]),
     maxFootprintM: 1.3, maxHeightM: 0.45, groundSnapM: 0.5,
-    piecesPerM2: 9, minPieces: 2, maxPiecesPerBlock: 9,
+    piecesPerM2: 7, minPieces: 2, maxPiecesPerBlock: 7,
   }),
   /** 残墙、倒墙、塌落的矮墙脚下补撒（块 id 命中即算「残」）。 */
   ruin: Object.freeze({
@@ -193,7 +196,7 @@ export const PROP_RUBBLE = Object.freeze({
   wallFoot: Object.freeze({
     idPattern: /(Body|YardWall|Wall[A-Z]?\w*)$/,
     semantics: Object.freeze(["plaster", "structure"]),
-    minHeightM: 1.6, perM: 0.22, bandM: 0.7,
+    minHeightM: 1.6, perM: 0.14, bandM: 0.7,
   }),
   /** 弹坑沿：土块与石块。 */
   crater: Object.freeze({ minRadiusM: 1.0, perM: 1.1, bandM: 1.3 }),

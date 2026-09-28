@@ -13,6 +13,7 @@
 import * as THREE from "three";
 import { InstantiateExternalProp, ExternalPropCatalog } from "./Script_ExternalProps.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
+import { BuildSink } from "./Script_World.mjs";
 import {
   PROP_DRESSING_ASSETS, PROP_DRESSING_SECTOR_M, PROP_MATERIAL_TINT, PlanPropDressing, PlanRubbleScatter, Rng,
 } from "./Data_FirstLevelPropDressing.mjs";
@@ -145,7 +146,7 @@ function SectorKey(x, z) {
  *   replaced —— 不再画的白盒块 id（调用方并进 fortifications 的 replaced）；
  *   placements / rubble / missing —— 给测试与调试面板看。
  */
-export function AddFirstLevelPropDressing(sink, layout, dressing, groundAt, materials, library) {
+export function AddFirstLevelPropDressing(sink, layout, dressing, groundAt, materials, library, { scene = null, meshes = null } = {}) {
   const started = typeof performance !== "undefined" ? performance.now() : 0;
   const sizes = new Map([...dressing.models].map(([id, model]) => [id, model.size]));
   const plan = PlanPropDressing(layout.blocks, groundAt, sizes);
@@ -192,11 +193,18 @@ export function AddFirstLevelPropDressing(sink, layout, dressing, groundAt, mate
       if (!bySector.has(key)) bySector.set(key, []);
       bySector.get(key).push(piece);
     }
+    // 碎块不投影（每块比鞋小，三级阴影各画一遍只是白费三角形）：自己一只 BuildSink，不进场地那只全投影的。
+    const own = scene ? new BuildSink() : sink;
     for (const [key, pieces] of bySector) {
       const geometry = BakeRubble(pieces);
       rubbleTriangles += geometry.index.count / 3;
-      sink.SetSector(key);
-      sink.Add("FirstLevelRubble", geometry);
+      own.SetSector(key);
+      own.Add("FirstLevelRubble", geometry);
+    }
+    if (scene) for (const mesh of own.Flush(scene, { Get: () => materials.get("FirstLevelRubble") },
+      { castShadow: false, receiveShadow: true })) {
+      mesh.name = "FirstLevelRubble";
+      meshes?.push(mesh);
     }
   }
   sink.SetSector("FirstLevelWhitebox");

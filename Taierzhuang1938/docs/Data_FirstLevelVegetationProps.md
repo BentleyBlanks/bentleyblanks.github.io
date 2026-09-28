@@ -26,7 +26,7 @@
 - 贴地：盒底在地面 0.2 m 以内的，按并集脚印四角 + 中心取最低地面再压进土 3 cm（`PROP_GROUND`）；架在别的东西上的（车上的筐、摞着的箱）按盒底放。
 - 调色 `PROP_MATERIAL_TINT`：只作用于本模块克隆的材质（键 `PropDressingMaterial_<uuid>`，随场地释放），木箱去橙、陶缸压成深褐灰、柳条褪色；
   没调色的库共享材质用 `MissionDefenseMaterial_<uuid>` 键，场地 `Dispose` 当共享件跳过。
-- 合批：96 m 分区（`PROP_DRESSING_SECTOR_M`），每区每材质一个 draw。网格名仍归 `FirstLevelWhitebox_StaticWhiteBoxes`，
+- 合批：192 m 分区（`PROP_DRESSING_SECTOR_M`），每区每材质一个 draw（道具材质约 8 种，村子只落在一两区；64 m 一区时同页开关实测本包在村里多出 130 多个 draw）。网格名仍归 `FirstLevelWhitebox_StaticWhiteBoxes`，
   所以 `Script_FirstLevelFrontBreakables.TakeOverStatic` 塌块时同一处的模型顶点一起塌。
 - 没换的（有意）：灶台、锅、炕、车身 / 车板（`StreetBlockCart`、`*CartBed`，只换了车轮）、担架摞（`visual:false`）、带标签的领枪 / 领弹箱
   （`missionRoute` 语义）与物资箱 `MISSION_SUPPLIES` 本身。
@@ -38,7 +38,7 @@
   地形表 `steps` 里半径 ≥ 1 m 的坑沿撒石块。
 - 纯视觉、不登记碰撞；单件高 ≤ 0.25 m；补撒的离路线 0.9 m、锚点 1.6 m 以外（换掉的散块在原位，本来就在那儿）。
 - 几何是削角扁盒 / 扰动二十面体，按区预先并好（位置 / 法线 / 三平面米制 UV / 顶点色）一份交给 BuildSink（它自己的合并会丢顶点色）；
-  材质 `Stone` 的克隆 + 顶点色（`FirstLevelRubble`）。
+  材质 `Stone` 的克隆 + 顶点色（`FirstLevelRubble`）。碎块自己一只 BuildSink、**不投影**（比鞋小的碎块在三级阴影里各画一遍只是白费三角形），网格交给场地的 `meshes` 统一释放。
 
 ## 4 植被
 
