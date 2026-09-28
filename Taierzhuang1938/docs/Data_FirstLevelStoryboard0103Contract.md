@@ -150,7 +150,7 @@
 
 对照分镜 01/02/03A/04/04A/05 与 `Gap3A_Before` 实拍补的是「看起来」：布景位置、碰撞、导演站位与判据一个没动（`Script_OpeningStoryboardShots` 六镜判据照旧通过）。
 
-- **木料与弹药箱**：程序化 `WoodBeam`（橙黄新木）→ 关卡按需集 `OpeningTimber`（Lovart 风化灰褐旧木，1 m 一张）；`WoodCrate` → `OpeningCrate`（旧弹药箱板，0.6 m 四块板）。两套登记在 `Data_TextureManifest` 与 `Data_LevelTextureSets.FirstLevel`（`fallback` 仍是程序化配方），`Script_FirstLevelWhiteboxField.PrepareAssets` 建场前 `await library.LoadLevelSets("FirstLevel")`；掩蔽部两态的洞顶、南护壁、门柱、门楣（`ScenarioMaterial`）用同一份材质。选哪套、染什么色在 `Data_OpeningSet0103.SET_MATERIALS`；套没下到时 `Script_OpeningSet` 先用回退配方，下到后把已建网格换过去（`SyncSetMaterials`）。木料盒子走 `TimberBox`（每面 V 轴转到木料长边，木纹顺着木料走）、圆木走按周长 / 长度换算的世界米 UV。
+- **木料与弹药箱**：程序化 `WoodBeam`（橙黄新木）→ 关卡按需集 `OpeningTimber`（Lovart 风化灰褐旧木，1 m 一张）；`WoodCrate` → `OpeningCrate`（旧弹药箱板，0.6 m 四块板）。两套登记在 `Data_TextureManifest` 与 `Data_LevelTextureSets.FirstLevel`（`fallback` 仍是程序化配方），`Script_FirstLevelWhiteboxField.PrepareAssets` 建场前 `await library.LoadLevelSets("FirstLevel")`；掩蔽部两态的洞顶、南护壁、门柱、门楣（`ScenarioMaterial`）用同一份材质，开场动作库里被踢开的断木道具（`Script_OpeningProps` 的 `beam`）也是。选哪套、染什么色在 `Data_OpeningSet0103.SET_MATERIALS`；套没下到时 `Script_OpeningSet` 先用回退配方，下到后把已建网格换过去（`SyncSetMaterials`）。木料盒子走 `TimberBox`（每面 V 轴转到木料长边，木纹顺着木料走）、圆木走按周长 / 长度换算的世界米 UV。
 - **洞内环境光**：取证见 `_shots/Gap3A_After/B5/Probe`——01 洞里的亮全是环境光（关太阳洞里几乎不变）。`Data_OpeningSet0103.INTERIOR`：出画镜头（`vfx.eye`，过场独立机位也算）在洞内盒子里时，`scene.environmentIntensity`、LightRig 的全局 SH 与 AmbientLight 乘 `ambientScale`，洞口外 `featherMouthM`、其余三面 `featherM` 淡完；离开原样还回去（别处中途重设过基准就以新值为准）。这是布景级手段；通用的按区域 / 按表面室内压暗归渲染侧，集成时可替换，数据留在这里。探针体 GI 开着时它的漫反射不在这三项里（GI 默认关）。
 - **马灯**：`bunkerLantern.light` 强度、半径、色温上调，洞内压暗后暖光池读得出来；仍是簇光（不加 PointLight、不投影，没有做假阴影）。
 - **标语做旧**：`bunkerPoster.aging`（受潮发黄、四边水渍、水迹线、泥点），装载时画布叠层（`OpeningSet.AgePoster`），字的区域压得很淡。
