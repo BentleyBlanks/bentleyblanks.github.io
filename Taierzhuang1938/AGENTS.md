@@ -6,7 +6,7 @@
 
 ## 当前入口与任务范围
 
-- **第一关任务走廊与「离开战场区域 · 返回」（2026-09-28）**：每个内部步骤一条走廊（`Data_FirstLevelMissionArea`）+ 纯规则计时（`Script_MissionAreaGuard`，数值 `Data_Tuning_MissionArea`），出界 1.5 s 亮一行倒计时、10 s 走完按阵亡走既有检查点重试；`?airWalls=1` 把空气墙画成半透明红板。口径、半宽定法与验收见 [场景引导 §3.3.1](docs/Data_FirstLevelGuidance20260928.md)，门禁 `Script_MissionAreaGuardTest` / `Script_MissionAreaGuardBrowserTest`。
+- **第一关场景引导：空气墙 / 灯光 / 阻挡 / 路（2026-09-28）**：口径在 [场景引导](docs/Data_FirstLevelGuidance20260928.md)。工具三件：各区地形表的 `paths`（踩出来的小路，只染地表纹理不改高度）、`tag:"airWall"` + `visual:false` 的空气墙（只挡角色控制器，子弹 / 视线 / 手榴弹穿过，不派生掩体，`?airWalls=1` 画成半透明红板）、每个内部步骤一条任务走廊（`Data_FirstLevelMissionArea` + `Script_MissionAreaGuard`，出界 1.5 s 亮「离开战场区域 · 返回 · N 秒」、10 s 走完按阵亡走既有检查点重试）。四区各自的引导账（路 / 挡 / 光 / 人 / 界）在该文 §5；地标烟柱 `Data_FirstLevelDistantSmoke.LANDMARK_COLUMNS`、08 标记「先看见街堵了再进灶屋」（`MISSION_LEADER_STAGES` 的 `holdMode` / `holdCue` / `afterHoldCue`）在 §3.5。门禁 `Script_FirstLevelWhiteboxTerrainTest`（含小路）、`Script_MissionAreaGuardTest` / `…BrowserTest`、`Script_FirstLevelLeaderGuideTest`，引导机位 `G<阶段>_<n>` 用 `Script_FirstLevelWhitebox0518Shots` 出图。
 
 - **过场人物动作自然化（2026-09-28）**：开场动作层的姿态混合挪到说话表演与握枪修正之后（起点是最终显示的姿态）、换根只混骨盆以下、混合选定弧线不换边、交还 AI 也过渡、每帧开头还原原生姿态（three `PropertyMixer` 不重写常量轨道），加定格保活层（呼吸/侧摆/视线）与自由走位的起停、转身缓动；全游戏共用的脚底松锁改为抬脚后衰减、P012 站定钉帧不再被 `aim 0.18` 打断。口径与改前改后数字见 [开场动作库 §9](docs/Data_OpeningClipLibrary20260923.md)、[位移与步态同步「松锁」](docs/Data_ActorLocomotion.md)；动作库里 IK 换分支的帧还没重烘（同 §9 末）。门禁 `Script_ActorLocomotionTest`、`Script_OpeningStoryboardsTest`、`Script_OpeningActorPerformanceBrowserTest`、`--campaign --stage-to=3`。
 
