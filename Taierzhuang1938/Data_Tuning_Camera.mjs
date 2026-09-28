@@ -158,7 +158,7 @@ export const EXPOSURE_ANCHORS = {
   CH0_Chuchuan: { logLum: -0.13 },       // chuchuanDay
   CH1_NanLu: { logLum: 1.29 },           // smokyDay
   CH2_Shouliudan: { logLum: 0.77 },      // smokyDay
-  CH3_Jiuhusuo: { logLum: 1.47 },        // smokyDay
+  CH3_Jiuhusuo: { logLum: 1.42 },        // smokyDay（2026-09-28 3A 迭代人物军装/皮肤压暗后出生机位 avgLog 低 0.05，1.47 → 1.42）
   CH4_DongguanYe: { logLum: -3.13 },     // night
   CH5_Chengqiang: { logLum: 0.59 },      // dawn
   CH6_Zuihou: { logLum: 0.54 },          // burningStreet
