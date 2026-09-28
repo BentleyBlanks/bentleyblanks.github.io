@@ -239,6 +239,47 @@ const WorldPose=(id,asset,clip,t)=>{
   };
   return asset.bones.map(name=>W(byName.get(name)));
 };
+// ---- IK branch (2026-09-28, docs/Data_OpeningClipLibrary20260923.md §10): no limb bone turns about its own axis by
+// more than 70 deg between two frames, in any clip on any rig. A two-bone IK that switches branch shows as exactly that
+// (a forearm, a hand, a calf or a foot half a turn round in one frame and staying there: 140-178 deg in the 09-23..27
+// bakes); after the 09-28 rebake the largest is 61 deg (the vaults' airborne thighs). World rotations, split into the
+// swing of the bone's direction and the twist about it (a fast swing -- a chop, a flung arm -- is not a branch).
+let twistWorst=0,twistAt="";
+{
+  const LIMBS=["Thigh","Calf","Foot","UpperArm","Forearm","Hand"].flatMap(b=>["L","R"].map(s=>`${s} ${b}`));
+  const CHILD={"Thigh":"Calf","Calf":"Foot","Foot":"Toe0","UpperArm":"Forearm","Forearm":"Hand","Hand":"Finger2"};
+  for(const [id,asset] of assets){
+    const {json,parent,byName}=Glb(id),stride=asset.bones.length*7,prefix=asset.bones.find(n=>/ Pelvis$/.test(n)).split(" ")[0];
+    const boneIndex=new Map(asset.bones.map((n,i)=>[byName.get(n),i]));
+    const limbs=LIMBS.map(role=>{
+      const [side,part]=role.split(" "),child=json.nodes[byName.get(`${prefix} ${side} ${CHILD[part]}`)].translation,n=Math.hypot(...child);
+      return {role,node:byName.get(`${prefix} ${role}`),axis:child.map(v=>v/n)};
+    });
+    for(const [clip,c] of Object.entries(asset.clips)){
+      const Frame=f=>{
+        const memo=new Map();
+        const W=node=>{
+          if(memo.has(node))return memo.get(node);
+          const i=boneIndex.get(node),r=i==null?json.nodes[node].rotation||[0,0,0,1]:c.values.slice(f*stride+i*7+3,f*stride+i*7+7);
+          const q=parent[node]<0?r:QMul(W(parent[node]),r);memo.set(node,q);return q;
+        };
+        return limbs.map(l=>W(l.node));
+      };
+      let prev=Frame(0);
+      for(let f=1;f<c.frameCount;f++){
+        const cur=Frame(f);
+        limbs.forEach((l,k)=>{
+          const a=prev[k],b=cur[k],r=QMul([-a[0],-a[1],-a[2],a[3]],b);
+          let twist=Math.abs(2*Math.atan2(r[0]*l.axis[0]+r[1]*l.axis[1]+r[2]*l.axis[2],r[3])*180/Math.PI);
+          twist=Math.min(twist,360-twist);
+          if(twist>twistWorst){twistWorst=twist;twistAt=`${id} ${clip} ${l.role} @${(f/manifest.fps).toFixed(2)}s`;}
+        });
+        prev=cur;
+      }
+    }
+  }
+  assert.ok(twistWorst<=70,`a limb turns ${twistWorst.toFixed(0)} deg about its own axis in one frame (${twistAt}): an IK branch switch`);
+}
 // ---- 2026-09-25 storyboard clips (Data_FirstLevelStoryboard0103Contract.md §4.1) -----------------------
 const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort"];
 {
@@ -689,7 +730,7 @@ if(rebake){
   assert.deepEqual(off,[],"the repository bake script reproduces the committed clips");
   console.log(`ok rebake: ${compared} rig clips from ${rebake} equal the committed ones (<=0.5 deg, 1 mm)`);
 }
-console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips (${NEW.length} authored 2026-09-23/25, ${paired} paired contacts cross-checked, ${chains} same-root hand-overs, ${seams} hold-loop seams), ${frames} normalized frames, director phase table and marks`);
+console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips (${NEW.length} authored 2026-09-23/25, ${paired} paired contacts cross-checked, ${chains} same-root hand-overs, ${seams} hold-loop seams), ${frames} normalized frames, director phase table and marks; largest own-axis limb turn in a frame ${twistWorst.toFixed(0)} deg (${twistAt})`);
 
 // Interpreter entry: swept bodies stop a crossing even when one frame would clear the far side.
 {

@@ -6,7 +6,9 @@
 
 ## 当前入口与任务范围
 
-- **过场人物动作自然化（2026-09-28）**：开场动作层的姿态混合挪到说话表演与握枪修正之后（起点是最终显示的姿态）、换根只混骨盆以下、混合选定弧线不换边、交还 AI 也过渡、每帧开头还原原生姿态（three `PropertyMixer` 不重写常量轨道），加定格保活层（呼吸/侧摆/视线）与自由走位的起停、转身缓动；全游戏共用的脚底松锁改为抬脚后衰减、P012 站定钉帧不再被 `aim 0.18` 打断。口径与改前改后数字见 [开场动作库 §9](docs/Data_OpeningClipLibrary20260923.md)、[位移与步态同步「松锁」](docs/Data_ActorLocomotion.md)；动作库里 IK 换分支的帧还没重烘（同 §9 末）。门禁 `Script_ActorLocomotionTest`、`Script_OpeningStoryboardsTest`、`Script_OpeningActorPerformanceBrowserTest`、`--campaign --stage-to=3`。
+- **开场动作库 IK 换分支重烘（2026-09-28）**：烘焙端（`_import/Script_OpeningStoryboardBake.py`）加 `LegRoll`（膝盖朝向落回弯曲平面）、`LimitSwivel`（肘/膝绕肩—腕、髋—踝连线每帧 ≤ 30°）、前臂扭转展开上限 `TWIST_MAX`（320°，spec `twistMax` 另设）、spec `seedAnyHand`（混合接入的 clip 取上一条结尾的扭转分支）、俘虏库 Author 摆出的旧 clip 补同样的连续性处理；十来条 clip 的关键帧（抓握开关一帧切换、手的轨迹穿过肩关节）逐条放慢。重烘 19 条（含五套骨架的 `ButtThreat`/`ShotCollapse`，manifest `20260928OpeningStoryboardsV15IkBranch`），任何 clip 四肢绕自身轴一帧 ≤ 70°（原来最大 178°）。口径、清单与剩下的快动作见 [开场动作库 §10](docs/Data_OpeningClipLibrary20260923.md)；门禁 `Script_OpeningStoryboardsTest`（新增绕自身轴 ≤ 70° 检查）、`Script_OpeningClipsBrowserTest`、`Script_OpeningActorPerformanceBrowserTest`、`--campaign --stage-to=3`。
+
+- **过场人物动作自然化（2026-09-28）**：开场动作层的姿态混合挪到说话表演与握枪修正之后（起点是最终显示的姿态）、换根只混骨盆以下、混合选定弧线不换边、交还 AI 也过渡、每帧开头还原原生姿态（three `PropertyMixer` 不重写常量轨道），加定格保活层（呼吸/侧摆/视线）与自由走位的起停、转身缓动；全游戏共用的脚底松锁改为抬脚后衰减、P012 站定钉帧不再被 `aim 0.18` 打断。口径与改前改后数字见 [开场动作库 §9](docs/Data_OpeningClipLibrary20260923.md)、[位移与步态同步「松锁」](docs/Data_ActorLocomotion.md)；动作库里 IK 换分支的帧已重烘（下一条）。门禁 `Script_ActorLocomotionTest`、`Script_OpeningStoryboardsTest`、`Script_OpeningActorPerformanceBrowserTest`、`--campaign --stage-to=3`。
 
 - **18 北沙河铁路桥与奉令毁桥（2026-09-28）**：白盒桥换成 BlenderMCP 程序建的单孔钢桁架桥 + 料石桥台（`_blender/Script_BuildRailBridge.py` → `Model/Model_RailBridge.glb` + `Model/Data_RailBridge.json`），坍塌关键帧在 Blender 里算好（落在导出的真实地形上）；起爆改成「人走净 → 等玩家看桥 → 爆破手压杆」，`Script_RailBridgeSet` 演分段药包、火球、水柱、两个半孔折进河、断口长烟与看桥时的视野收窄，爆炸感知仍只走一次 `Combat.BlastFeedback`。碰撞与信号生命周期不动。口径、重建与验收见 [铁路桥](docs/Data_RailBridge.md)，门禁 `Script_RailBridgeTest`，实拍 `Script_RailBridgeShots`。
 

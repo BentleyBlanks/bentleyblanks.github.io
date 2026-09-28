@@ -635,8 +635,17 @@ class Toolkit:
         forward = basis @ Vector(palmF) if palmF is not None else None
         normal = basis @ Vector(palmN) if palmN is not None else None
         if world is not None and weight < 1.0:
-            # Hand-over between a world target (a wall, the ground) and the body frame.
-            target = Vector(world).lerp(target, weight)
+            # Hand-over between a world target (a wall, the ground) and the body frame. Either end out of reach is taken
+            # where the straight arm already points (the same pose at weight 0 or 1): blended from a hand flung out 1.7
+            # arm lengths away, the arm stayed straight for 60 % of the blend and crossed to the head in three frames
+            # (BlastDazedStir, 2026-09-28).
+            reach = K['armLen']
+            ends = []
+            for end in (Vector(world), target):
+                if (end - shoulder).length > reach:
+                    end = shoulder + (end - shoulder).normalized() * reach
+                ends.append(end)
+            target = ends[0].lerp(ends[1], weight)
             if worldPole is not None:
                 pole = Vector(worldPole).lerp(pole, weight)
             if worldPalm[0] is not None and forward is not None:
@@ -1215,7 +1224,9 @@ def StoopBase(T):
 
 
 def StoopRifle(T):
-    return T.Rifle((-(T.H + .04), -.44, T.P - .10), (.64, -.22, .74))
+    # (2026-09-28: axis (.64, -.22, .74) put the handguard 13 cm in front of the left shoulder: the left arm folded to
+    # 170 deg and its elbow whipped round as the hand came onto the rifle at the end of WoundedRiseWall)
+    return T.Rifle((-(T.H + .04), -.44, T.P - .10), (.60, -.45, .66))
 
 
 SIDE_WALL_X = .47            # the dugout mouth's side wall on his left (source metres)
@@ -1257,7 +1268,9 @@ def BuildRiseWall(T, name):
                 'head': (.32, .24, .22), 'twist': .14, 'hand.L': wallHigh}),
         (1.45, {'pelvis': (0, -.17, .48), 'shrug': .16, 'head': (.26, .15, .16), 'twist': .10, 'hand.L': wallHigh}),
         (1.85, {'pelvis': (0, -.24, P - .22), 'pelvisTilt': (.30, 0, .06), 'bend': .42, 'shrug': .12,
-                'head': (-.10, 0, .05), 'twist': 0.0, 'hand.L': (SX + .12, -.30, P + .05), 'curl.L': .45,
+                # (2026-09-28: off the wall the hand comes round in front of the shoulder -- from under it (-.30, P + .05) the
+                # reach for the handguard passed the shoulder joint and the elbow whipped round)
+                'head': (-.10, 0, .05), 'twist': 0.0, 'hand.L': (SX + .10, -.58, P + .12), 'curl.L': .45,
                 'palmF.L': (-.3, -.6, .2), 'palmN.L': (-.6, 0, .2)}),
         (2.10, {'palmF.L': stoop['palmF.L'], 'palmN.L': stoop['palmN.L'], 'curl.L': .8,
                 'palmF.R': sit['palmF.R'], 'palmN.R': sit['palmN.R'], 'curl.R': 1.0}),
@@ -1272,7 +1285,7 @@ def BuildRiseWall(T, name):
         rifle = RifleAt(t)
         slide = Smooth((t - 2.10) / .40)
         out = {'R': T.Along(rifle, Mix(.66, WEAPONS[T.gun]['butt'], slide))}
-        if t >= 2.10:
+        if t >= 2.10 - 1e-6:
             out['L'] = T.Along(rifle, .80)
         return out
 
@@ -1280,7 +1293,12 @@ def BuildRiseWall(T, name):
         f = anim(t)
         g = Grips(t)
         f['grip.R'], f['grip.L'] = g['R'], g.get('L')
+        if t >= REACH_L[0] and g.get('L') is None:
+            # 2026-09-28: the left hand reaches the handguard over the 0.2 s before it closes on it (it
+            # arrived in one frame at 2.10 s: the forearm turned over 119 deg between two frames).
+            f['grip.L'], f['gripW.L'] = T.Along(RifleAt(t), .80), Smooth((t - REACH_L[0]) / (REACH_L[1] - REACH_L[0]))
         return T.Nest(f)
+    REACH_L = (1.90, 2.10)
     return {'pose': Pose, 'props': lambda t: {'weapon': T.Track(RifleAt(t), up=(0, 1, 0) if t < 1.5 else (0, 0, 1))},
             'plants': [('L', .45, 2.8), ('R', .45, 2.8)], 'check': Grips,
             'walls': [((0, .385, 0), (0, -1, 0)), ((SIDE_WALL_X, 0, 0), (-1, 0, 0))],
@@ -1443,11 +1461,20 @@ def BuildBlastSlam(T, name):
         axis = Unit(Lerp3(tuple(spin @ Vector(start['axis'])), ground['axis'], Smooth((u - .6) / .4)))
         return T.Rifle(o, axis)
 
+    held = RifleAt(.05)
+    release = (.05, .20)
+
     def Pose(t):
         f = OnBank(T, anim(t), onBank(t))
-        if t <= .05:
+        if t <= release[0]:
             r = RifleAt(t)
             f['grip.R'], f['grip.L'] = r['gripR'], T.Along(r, .80)
+        elif t < release[1]:
+            # 2026-09-28: the hands fly open from where they held the rifle (they went to the hips for one frame
+            # and then up: the left forearm turned 166 deg between two frames at 0.08 s).
+            w = 1 - Smooth((t - release[0]) / (release[1] - release[0]))
+            f['grip.R'], f['grip.L'] = held['gripR'], T.Along(held, .80)
+            f['gripW.R'] = f['gripW.L'] = w
         else:
             f['grip.R'] = f['grip.L'] = None
         return T.Nest(f)
@@ -1456,7 +1483,11 @@ def BuildBlastSlam(T, name):
             'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + BankReview(T),
             'reviewViews': [('side', (-3.2, -.35, .8), (.2, -.1, .55)), ('q', (-2.3, -2.6, 1.6), (.2, -.1, .5)),
                             ('back', (-1.5, 2.8, 1.6), (.2, 0, .5))],
-            'reviewFrames': lambda n: [0, int(n * .12), int(n * .2), int(n * .4), n - 1], 'reviewScale': 2.6}
+            'reviewFrames': lambda n: [0, int(n * .12), int(n * .2), int(n * .4), n - 1], 'reviewScale': 2.6,
+            # (2026-09-28) the forearm twist back within +-200 deg during the blast (Script_OpeningStoryboardBake ArmRoll):
+            # the heap and everything after it hold the arms the way the old one-frame snap left them, but turned over in
+            # six frames of the blast instead of one
+            'twistMax': 200}
 
 
 # ---------------------------------------------------------------------------------
@@ -1781,7 +1812,17 @@ def BuildDazedStir(T, name):
     x0, y0 = .30, .22
     # Right hand to the ringing head: a body-frame wrist target at the side of the head, blended in
     # from where it lies in the dirt (handRelW.R 0 = BuriedBase's world hand, palm and pole).
-    base.update({'handRel.R': (.05, -.07, .09), 'poleRel.R': (-.45, .05, -.20), 'handRelW.R': 0.0,
+    # (2026-09-28: 0.05 -0.07 0.09 folded the elbow to 163 deg, the wrist 12 cm off the shoulder: the elbow
+    # swung round the shoulder as the hand came up and went down, 48-55 deg in a frame.)
+    HEAD_R = (.08, -.04, .15)
+    # (2026-09-28) The hand's way up and down: blended straight between the dirt and the head in 0.4 s the wrist passed
+    # the shoulder and the elbow swung round it. It now rises over 0.5 s (2.10-2.60) and drops over 0.4 s (3.45-3.85)
+    # through a point in front of the chest (FRONT_R); the other channels keep their keys.
+    FRONT_R = (.03, -.36, .00)
+    handPath = Channel([(2.10, HEAD_R), (2.38, FRONT_R), (2.50, (.06, -.22, .08)), (2.60, HEAD_R), (3.45, HEAD_R),
+                        (3.68, FRONT_R), (3.85, FRONT_R)])
+    handWeight = lambda t: Smooth((t - 2.10) / .50) if t < 3.0 else 1 - Smooth((t - 3.45) / .40)
+    base.update({'handRel.R': HEAD_R, 'poleRel.R': (-.45, .05, -.20), 'handRelW.R': 0.0,
                  'palmFw.R': base['palmF.R'], 'palmNw.R': base['palmN.R'],
                  'palmF.R': (.05, -.10, 1), 'palmN.R': (1, 0, .10)})
     # The left palm flat on the bank beside the hip, fingers forward-left: the push to sit up.
@@ -1819,6 +1860,8 @@ def BuildDazedStir(T, name):
 
     def Pose(t):
         f = anim(t)
+        f['handRelW.R'] = handWeight(t)
+        f['handRel.R'] = handPath(t) if 2.10 <= t <= 3.85 else HEAD_R
         breath = math.sin(Tau * t / 1.6)         # four heavy breaths a loop
         f['bend'] += .03 * breath
         f['shrug'] += .025 * breath
@@ -2106,6 +2149,16 @@ def BuildWallBrace(T, name):
     start['palmF.L'], start['palmN.L'] = (0, -.2, -1), (-1, 0, 0)
     # Wrist target: the palm and fingers lie on the planks in front of it (they lean back with height).
     wallY = lambda z: R3WallY(T, z) - .055
+    # 2026-09-28: the left hand reaches for the planks from the hanging arm over 0.22 s (0.32-0.54), the
+    # world target already on the planks: it went there in two frames (0.36 m in one at 0.46 s, the forearm
+    # turned 98 deg) from a world seed left at the drag's heap.
+    start['hand.L'], start['armPole.L'] = (.24, wallY(kz + .30) - .03, kz + .30), (.55, -.20, kz)
+    start['palmFw.L'], start['palmNw.L'] = (0, .2, 1), (0, 1, 0)
+    # The blend weights of both hands are set in the pose (a key row would pin every other channel too): the left
+    # hand leaves the hanging arm for the planks over 0.32-0.54 s and comes back into the body frame over 1.35-1.70 s,
+    # the right one comes off the drag's world seed onto the bandage over 0.9-1.45 s (it went in 0.15 s).
+    weightL = lambda t: 1 - Smooth(Clamp((t - .32) / .22)) if t < 1.0 else Smooth(Clamp((t - 1.35) / .35))
+    weightR = lambda t: Smooth(Clamp((t - .90) / .55))
     rows = [
         (0.00, {}),
         (0.26, {'head': (.25, 0, .05)}),
@@ -2130,7 +2183,12 @@ def BuildWallBrace(T, name):
         (2.00, dict(end)),
     ]
     anim = Keys(start, rows, lag={'head': .05, 'neck': .03})
-    return R3Clip(T, {'pose': lambda t: T.Nest(R3OnBank(T, anim(t))), 'kneePlants': [('L', .62, 2.0), ('R', .62, 2.0)],
+
+    def Pose(t):
+        f = anim(t)
+        f['handRelW.L'], f['handRelW.R'] = weightL(t), weightR(t)
+        return T.Nest(R3OnBank(T, f))
+    return R3Clip(T, {'pose': Pose, 'kneePlants': [('L', .62, 2.0), ('R', .62, 2.0)],
                       'reviewViews': R3_VIEWS,
                       'reviewFrames': lambda n: [0, int(n * .17), int(n * .26), int(n * .45), n - 1], 'reviewScale': 2.2})
 
@@ -3539,7 +3597,8 @@ def BuildSlingRifle(T, name):
     base = HairHoldPose(T)
     base.update({'bend': .12, 'head': (.10, 0, 0), 'ankle.L': IjaABase(T)['ankle.L'], 'pelvis': IjaABase(T)['pelvis']})
     ready = LowReady(T)
-    lifted = T.Rifle((-(SX + .06), -.10, P + .32), Unit((-.05, -.25, .97)))
+    # (2026-09-28: at -.10 the fist on the rifle sat on the shoulder, the elbow folded 179 deg and flipped over)
+    lifted = T.Rifle((-(SX + .06), -.22, P + .28), Unit((-.05, -.25, .97)))
     w = WEAPONS[T.gun]
     hung = SlungSideNominal(T)
 
@@ -3561,8 +3620,8 @@ def BuildSlingRifle(T, name):
         rifle = RifleAt(t)
         if rifle:
             palms = T.Palms(rifle['axis'])
-            f['grip.R'] = T.Along(rifle, Mix(w['butt'], .55, Smooth(t / .30)))
-            f['gripW.R'] = 1.0 if t <= .40 else 1 - Smooth((t - .40) / .10)
+            f['grip.R'] = T.Along(rifle, Mix(w['butt'], .45, Smooth(t / .30)))
+            f['gripW.R'] = 1.0 if t <= .30 else 1 - Smooth((t - .30) / .18)
             f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
             f['armPole.R'] = (-(SX + .45), .15, P + .15)
             f['handRel.R'] = None
@@ -4337,7 +4396,7 @@ def BuildChopRear(T, name):
         (0.25, (-(SX + .05), .02, SZ + .26), (-.15, .60, .79), (-1, 0, 0)),      # wind-up, weight back
         (0.38, (-(SX - .05), -.25, SZ + .20), (.05, -.70, .71), (-.8, 0, -.2)),  # coming over
         (0.45, (0, -.40, SZ - .10), (.35, -.80, -.48), (-.6, 0, -.8)),          # through the neck (solved)
-        (0.60, (SX - .02, -.28, P - .05), (.35, -.20, -.92), (-.2, -.2, -.95)),  # follow-through low left
+        (0.66, (SX - .02, -.28, P - .05), (.35, -.20, -.92), (-.2, -.2, -.95)),  # follow-through low left (0.60 until 2026-09-28)
         (0.90, (-.05, -.22, P + .10), (.10, -.75, -.65), (-.3, 0, -.95)),
         (1.30, (-(SX - .05), -.20, P + .25), (.05, -.80, .60), (-1, 0, 0)),      # guard
     ]
@@ -4350,7 +4409,7 @@ def BuildChopRear(T, name):
         'bend': [(0.0, .12), (.25, .02), (.45, .35), (.60, .42), (1.3, .20)],
         'head': [(0.0, (.10, 0, .20)), (.25, (.05, 0, .30)), (.45, (.30, 0, .05)), (1.3, (.15, 0, 0))],
     }, lag={'head': .05})
-    both = Channel([(0.0, 1.0), (.36, 1.0), (.42, 0.0), (.62, 0.0), (.80, 1.0), (1.3, 1.0)])
+    both = Channel([(0.0, 1.0), (.28, 1.0), (.44, 0.0), (.62, 0.0), (.84, 1.0), (1.3, 1.0)])
     spec = ChopSpec(T, 'chopRear', 'luo', 'ijaB', 'neckSideR', .45, blade, body, 1.3, twoHand=both)
     spec.update({'plants': [('R', 0, 1.3), ('L', .45, 1.3)],
                  'reviewFrames': lambda n: [0, int(n * .19), int(n * .3), int(n * .35), int(n * .46), n - 1]})
@@ -4415,14 +4474,16 @@ def BuildParriedFall(T, name):
         f = anim(t)
         rifle = RifleAt(t)
         if .10 < t <= .80:
-            w = Smooth((t - .10) / .12)
+            w = Smooth((t - .10) / .16)
             palms = T.Palms(rifle['axis'])                     # body frame: Nest turns them for the grips
             world = World(rifle, t)
             f['grip.R'], f['gripW.R'] = world['gripR'], w
             f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
             # The beat tears the forward hand off the handguard (0.40-0.52 s); the rifle is
             # left in the right fist and the left arm is flung out.
-            wL = w if t <= .40 else w * (1 - Smooth((t - .40) / .12))
+            # (2026-09-28: the left hand takes the handguard once the rifle is off the shoulder, 0.18-0.34 s: from 0.10
+            # it reached across the chest for the right shoulder and the arm folded flat)
+            wL = Smooth((t - .18) / .16) if t <= .40 else w * (1 - Smooth((t - .40) / .18))
             if wL > 1e-3:
                 f['grip.L'], f['gripW.L'] = world['gripL'], wL
                 f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
@@ -4458,10 +4519,10 @@ def BuildParriedFall(T, name):
         r = RifleWorld(t)
         return {'muzzle': (Vector(r['muzzle']), Vector((0, 0, 1)))}
     def Check(t):
-        if not (.22 < t <= .80):
+        if not (.26 < t <= .80):
             return {}
         w = World(RifleAt(t), t)
-        return {'R': w['gripR'], 'L': w['gripL']} if t <= .40 else {'R': w['gripR']}
+        return {'R': w['gripR'], 'L': w['gripL']} if .34 <= t <= .40 else {'R': w['gripR']}
     spec = {'pose': Pose, 'props': Props, 'points': Points, 'plants': [('L', .45, .78), ('R', .45, .78)], 'check': Check,
             'reviewProps': lambda t: [('cyl', RifleWorld(t)['butt'], RifleWorld(t)['muzzle'], .018)],
             'reviewFrames': lambda n: [0, int(n * .12), int(n * .17), int(n * .25), int(n * .33), int(n * .6), n - 1]}
@@ -4498,7 +4559,9 @@ def BuildParryChop(T, name):
     }, lag={'head': .05})
     # The left fist closes on the long grip at the top of the lift and leaves it as the blade
     # drops past the shoulder (the cut itself is one-handed, the reach of the right arm).
-    both = Channel([(0.0, 0.0), (.50, 0.0), (.58, 1.0), (.64, 1.0), (.72, 0.0), (1.0, 0.0), (1.2, 1.0), (1.5, 1.0)])
+    # (2026-09-28: it joined over 0.08 s and left over 0.08 s -- the wrist 0.46 and 0.61 m in a frame; now 0.30-0.55 on,
+    # 0.62-0.82 off)
+    both = Channel([(0.0, 0.0), (.30, 0.0), (.55, 1.0), (.62, 1.0), (.82, 0.0), (1.0, 0.0), (1.2, 1.0), (1.5, 1.0)])
     spec = ChopSpec(T, 'chopParry', 'heyoutian', 'ijaA', 'neckSideL', 19 / 24, blade, body, 1.5, twoHand=both,
                     contacts=[(10 / 24, 'muzzle'), (19 / 24, 'neckSideL')])
 
@@ -4550,7 +4613,10 @@ def BuildSwap(T, name):
     ready = T.Rifle((-(H + .02), -.16, P + .15), Unit((.16, -.90, -.40)))
     backRifle = T.Rifle((.107, .20, P + .16), Unit((-.37, .05, .93)))
     lifted = T.Rifle((-.20, .15, P + .25), Unit((-.20, -.35, .91)))
-    rifles = [(0.0, backRifle), (.70, backRifle), (.98, lifted), (1.30, ready), (1.6, ready)]
+    # (2026-09-28: the rifle comes off the back over 0.32 s, not 0.28, and to ready by 1.34 s; the right hand lets go of
+    # the planted hilt over 0.18 s and takes the rifle over 0.16 s, the left over 0.30 s -- each was a one- or two-frame
+    # switch, the forearm turning 111-160 deg in a frame)
+    rifles = [(0.0, backRifle), (.72, backRifle), (1.04, lifted), (1.34, ready), (1.6, ready)]
 
     def RifleAt(t):
         for (t0, a), (t1, b) in zip(rifles, rifles[1:]):
@@ -4558,7 +4624,7 @@ def BuildSwap(T, name):
                 u = Smooth((t - t0) / max(1e-6, t1 - t0))
                 return T.Rifle(Lerp3(a['origin'], b['origin'], u), Unit(Lerp3(a['axis'], b['axis'], u)))
         return ready
-    along = Channel([(0.0, .92), (.70, .92), (.98, .70), (1.15, .45), (1.35, WEAPONS[T.gun]['butt']), (1.6, WEAPONS[T.gun]['butt'])])
+    along = Channel([(0.0, .92), (.72, .92), (1.04, .70), (1.20, .45), (1.38, WEAPONS[T.gun]['butt']), (1.6, WEAPONS[T.gun]['butt'])])
 
     def BladeAt(t):
         if t >= .45:
@@ -4580,19 +4646,27 @@ def BuildSwap(T, name):
             f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R']
             f['handRel.L'] = (.08, -.14, -.45)
         elif t < .70:
-            f['handRel.R'] = (-.10, .02, .05)
+            # up over the right shoulder for the rifle on his back (the wrist a hand above the shoulder: at
+            # -.10 .02 .05 it sat on the shoulder, the elbow folded 155 deg)
+            f['handRel.R'] = (-.06, .05, .17)
             f['palmF.R'], f['palmN.R'], f['curl.R'] = (0, .3, 1), (0, 1, 0), .6
+            if t < .68:
+                f['grip.R'], f['gripW.R'] = planted['gripR'], 1 - Smooth((t - .50) / .18)
+            f['handRelW.R'] = 1.0
         else:
             rifle = RifleAt(t)
             palms = T.Palms(rifle['axis'])
             f['grip.R'] = T.Along(rifle, along(t))
             f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
-            f['gripW.R'] = Smooth((t - .70) / .06)
-            if t >= 1.05:
+            f['gripW.R'] = Smooth((t - .70) / .16)
+            if t >= 1.00:
                 f['grip.L'] = rifle['gripL']
-                f['gripW.L'] = Smooth((t - 1.05) / .12)
+                f['gripW.L'] = Smooth((t - 1.00) / .30)
                 f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
-            f['handRel.R'] = None
+            if f['gripW.R'] < 1.0:
+                f['handRel.R'], f['handRelW.R'] = (-.06, .05, .17), 1.0
+            else:
+                f['handRel.R'] = None
         f['armPole.R'] = (-(SX + .45), .20, P + .10)
         return T.Nest(f)
 
@@ -4842,6 +4916,10 @@ def BuildButtStrikeCollar(T, name):
     spec = AReview(spec)
     # the storyboard camera: Shunzi's eye, pitched up 32 deg toward ijaA (SB04 30-38 deg), rolled -4 deg
     spec['reviewViews'].append(FirstPersonView(head, lambda t: Add3(head(t), (-.10, .91, .41)), roll=-4.0))
+    # (2026-09-28) the right forearm starts on the twist branch IjaHaulForearmUnder ends on although the hand is not the
+    # same (the director blends the two): on the other branch it turned 153 deg in that blend. The club hand's twist is
+    # past the bake's TWIST_MAX in the apex hold loop: it keeps the unwrapped branch (the seam is one pose).
+    spec['seedAnyHand'], spec['twistMax'] = 'R', 400
     return spec
 
 
@@ -6002,13 +6080,15 @@ def BuildVaultTimberIn(T, name):
     # air both are drawn up under the hips, the soles over the top (0.80) while they are over the timber (d .47-.77)
     G = lambda d, l: (Q(d, l)[0], Q(d, l)[1], A)
     U = lambda d, l, h: (Q(d, l)[0], Q(d, l)[1], R(h))
+    # (2026-09-28: the feet 1-8 cm lower over the top of the hop than they were -- at 0.97-1.00 the heels were at the
+    # hips, the knees folded 165 deg and the thighs and calves spun round them; they still clear the top by 5 cm)
     footR = [(0.0, G(.06, -.10), True), (.14, G(.06, -.10), True), (.34, G(.31, .02), True), (.53, G(.31, .02), True),
-             (.62, U(.42, .12, .70), False), (.70, U(.54, .14, .98), False), (.78, U(.70, .13, 1.00), False),
-             (.86, U(.88, .12, .78), False), (.92, U(1.00, .16, .30), False), (.96, G(1.00, .20), True), (1.26, G(1.00, .20), True),
+             (.62, U(.42, .12, .70), False), (.70, U(.54, .14, .98), False), (.78, U(.70, .13, .92), False),
+             (.86, U(.88, .12, .76), False), (.92, U(1.00, .16, .30), False), (.96, G(1.00, .20), True), (1.26, G(1.00, .20), True),
              (1.46, G(.98, -.28), True), (1.58, G(.98, -.28), True), (1.76, G(.97, -.58), True), (VIN_T, G(.97, -.58), True)]
     footL = [(0.0, G(-.02, .09), True), (.04, G(-.02, .09), True), (.22, G(.16, -.07), True), (.49, G(.16, -.07), True),
-             (.62, U(.34, .08, .66), False), (.70, U(.46, .10, .92), False), (.78, U(.62, .10, .97), False),
-             (.86, U(.84, .10, .95), False), (.94, U(.88, .12, .40), False), (1.00, G(.88, .14), True), (1.10, G(.88, .14), True),
+             (.62, U(.34, .08, .66), False), (.70, U(.46, .10, .92), False), (.78, U(.62, .10, .92), False),
+             (.86, U(.84, .10, .90), False), (.94, U(.88, .12, .40), False), (1.00, G(.88, .14), True), (1.10, G(.88, .14), True),
              (1.30, G(.87, -.14), True), (1.50, G(.87, -.14), True), (1.66, G(.89, -.39), True), (VIN_T, G(.89, -.39), True)]
     ankles = {'L': Channel(Swing(footL)), 'R': Channel(Swing(footR))}
     plantWin = {'L': VaultFeetPlants(footL), 'R': VaultFeetPlants(footR)}
@@ -6029,10 +6109,10 @@ def BuildVaultTimberIn(T, name):
         'foot.L': [(0.0, (0, 8, 0)), (.49, (0, 8, 0)), (.70, (-18, 0, 0)), (.86, (-8, 0, 0)), (1.00, (0, 8, 0))],
     }, lag={'head': .05})
     tuck = lambda t: Window(t, .50, .62, .86, .96)
-    carry = lambda t: Window(t, .12, .30, 1.02, 1.30)      # 1 = the rifle up in the left fist alone
+    carry = lambda t: Window(t, .06, .34, 1.02, 1.30)      # 1 = the rifle up in the left fist alone (from .12-.30, 2026-09-28)
     low = LowReady(T)
     lifted = Unit((.08, -.20, .98))
-    fist = Vector((SX + .08, -.04, P + .24))
+    fist = Vector((SX + .10, -.16, P + .20))       # (2026-09-28: -.04/.24 folded the left arm flat under the shoulder)
     high = T.Rifle(tuple(fist - Vector(lifted) * T.R(WEAPONS[T.gun]['gripL'])), lifted)   # the left fist on the handguard
     hand = RootPoint(T, mid + .04, -.03, VAULT_TOP + .015)  # right palm on the top, just behind his right hip
     palmF, palmN, _ = TimberPalm((0, -1, 0))
@@ -6111,12 +6191,12 @@ def BuildVaultTimberOut(T, name):
     # side-on facing south the LEFT foot is the timber (east) side; drawn up under the hips over the top
     footL = [(0.0, kl, True), (.30, kl, True), (.52, G(-.02, .42), True), (.60, G(-.02, .42), True), (.76, G(-.06, lane - .02), True),
              (.98, G(-.06, lane - .02), True), (1.04, U(-.09, lane + .06, .64), False), (1.08, U(-.17, lane + .10, .92), False),
-             (1.14, U(-.30, lane + .12, .98), False),
-             (1.22, U(-.46, lane + .11, .96), False), (1.30, U(-.62, lane + .08, .60), False), (1.36, G(-.76, lane + .02), True),
+             (1.14, U(-.30, lane + .12, .92), False),
+             (1.22, U(-.46, lane + .11, .90), False), (1.30, U(-.62, lane + .08, .60), False), (1.36, G(-.76, lane + .02), True),
              (1.50, G(-.76, lane + .02), True), (1.74, last['ankle.L'], True), (VOUT_T, last['ankle.L'], True)]
     footR = [(0.0, kr, True), (.14, kr, True), (.36, G(.08, .18), True), (.56, G(.08, .18), True), (.72, G(.07, lane - .12), True),
-             (.96, G(.07, lane - .12), True), (1.06, U(-.04, lane + .08, .70), False), (1.14, U(-.18, lane + .10, .97), False),
-             (1.22, U(-.36, lane + .10, .97), False), (1.30, U(-.52, lane + .07, .70), False), (1.40, G(-.62, lane + .08), True),
+             (.96, G(.07, lane - .12), True), (1.06, U(-.04, lane + .08, .70), False), (1.14, U(-.18, lane + .10, .94), False),
+             (1.22, U(-.36, lane + .10, .96), False), (1.30, U(-.52, lane + .07, .70), False), (1.40, G(-.62, lane + .08), True),
              (1.60, G(-.62, lane + .08), True), (1.84, last['ankle.R'], True), (VOUT_T, last['ankle.R'], True)]
     ankles = {'L': Channel(Swing(footL)), 'R': Channel(Swing(footR))}
     plantWin = {'L': VaultFeetPlants(footL), 'R': VaultFeetPlants(footR)}
@@ -6142,7 +6222,7 @@ def BuildVaultTimberOut(T, name):
     # one hand, as over the way in: the left palm (his timber side) on the far half, just behind his left hip
     hands = {'L': RootPoint(T, -(mid + .06), lane - .12, VAULT_TOP + .015)}
     palmF, palmN, _ = TimberPalm((0, 1, 0))           # fingers across the top toward its far (east) side
-    woods = {'L': lambda t: Window(t, .80, .92, 1.08, 1.18), 'R': lambda t: 0.0}
+    woods = {'L': lambda t: Window(t, .72, .92, 1.08, 1.18), 'R': lambda t: 0.0}   # (.80 until 2026-09-28: 0.12 s from the hip)
     wood = woods['L']
     kickPoles = kick['poles']
     hang = lambda t: .55 * Window(t, .80, 1.00, 1.30, 1.50)
@@ -7004,3 +7084,16 @@ for _name, _row in CLIPS.items():
     if _row.get('legacy'):
         continue
     _row.setdefault('rigs', IJA_BOTH if _name in SHARED_IJA else RIGS_BY_ROLE.get(_row.get('role'), ['TengxianNra02']))
+
+
+# Bake order (2026-09-28): a clip takes its arm seeds only from a `prev` that bakes before it, and IjaButtStrikeCollar
+# continues IjaHaulForearmUnder (the 2026-09-27 vault/haul clips are declared after it): they bake just before it.
+def _BakeBefore(names, anchor):
+    rows = list(CLIPS.items())
+    moved, rest = [r for r in rows if r[0] in names], [r for r in rows if r[0] not in names]
+    at = [name for name, _ in rest].index(anchor)
+    CLIPS.clear()
+    CLIPS.update(rest[:at] + moved + rest[at:])
+
+
+_BakeBefore(('IjaVaultTimberIn', 'IjaVaultTimberOut', 'IjaHaulForearmUnder'), 'IjaButtStrikeCollar')
