@@ -86,9 +86,28 @@
 - 常驻：道具约 6.1 万三角（约 150 件），碎砖瓦约 2.3 万三角（1800 件，不投影），植被约 3 万件 × 8 三角分在 54 个 64 m 区里，
   近档一般 3–4 区、远档 8–10 区在画。
 
+## 6.6 第二轮（2026-09-28，集成后主会话点名）
+
+- **草垛**：`ryHayStack` 从纯色 `VillageStraw`（橙黄多面体）换成 Lovart 秸秆平铺 `HaystackStraw`（thread `5bd6317f-3d31-4ea4-838a-a3f86e22ee03`，
+  提示词 `_import/Prompts/Texture_HaystackStraw.txt`，`Script_BakePbrTexture --preset fabric --tile-m 1.5 --mean 0.47,0.43,0.355 --contrast 0.085 --row-flatten on`），
+  走第一关按需集（`Data_LevelTextureSets.FirstLevel`，fallback Sandbag），并把低模的硬边法线按同位置顶点平均（`smoothNormals`），读成圆的一垛。
+- **木箱 / 市场箱**：换 B5 的 `OpeningCrate`（灰褐旧板箱），不再是新木的橙色。两条都在 `PROP_MATERIAL_OVERRIDE`。
+- **担架**：`Script_StretcherAsset` 读 GLB 顶点色时按 `Data_Tuning_Materials.STRETCHER_COLOR_GRADE` 去饱和（饱和度 × 0.5、亮度 × 0.82、略压蓝），
+  全游戏唯一的竹竿担架从亮黄变成旧竹的灰黄，布兜变灰褐。
+- **08 障碍**：`StreetBlockCart` 的平色盒换成撤运牛车（`Script_DraftCartModel` 的 GLB，关里本来就下，不多下载）的静态几何，
+  去掉左轮、朝缺轮一侧歪 14°（`PROP_SPECIAL_ASSETS.evacCartWreck`、`rollDeg`）；八块碎土坡 `StreetObstacleRubble0–7` 换成城墙缺口包的残砖簇（整件换成灰褐 GroundRubble，不要城砖 / 夯土的橙红）。
+  碰撞仍是原盒。
+- **植被加密**：网格 1.6 → 1.25 m、簇 3–6 张、墙根带 1.6 m、路肩 / 路边 / 河岸概率全面上调，高档约 8.3 万件（上限 9 万）；
+  新增「低矮灌木丛」（离路线 11–48 m、前沿以北、一丛 5–8 张、≤ 0.62 m）与「坎上」矮草（土坎肩 / 坡脚平台顶面，≤ 0.22 m）；
+  簇成员逐个复核实体 / 沟 / 坑 / 路面禁区（`MemberClear`）；芦苇顶点色压暗（`VEGETATION_CARDS` 的 `shade`）。视线门槛与通行禁区不变。
+
+- **代价（交替 A/B，集成 tip 9ad460bf vs 本轮，各 3 次取中位，high，同机争用）**：整帧三角形 07_2 +13 万（+4.1%）、08_1 +16 万（+3.1%）、
+  13_1 +11 万（+3.4%）、18_1 +17 万（+2.7%，6.69 M，红线 8.1 M 以内）；draw call 0 ～ +19（植被仍是一区一个 draw，残骸车 5 种材质
+  + 残砖簇合进同区）；帧时差在噪声内（两边中位数谁高谁低不一致）；植被建场 0.2–0.3 s → 0.45–0.8 s（高档约 8.3 万件）。
+
 ## 7 遗留
 
-- 车身 / 车板、灶台、锅仍是平色盒（没有合适的现成模型；翻倒木车要做一件专门的残车模型）。
-- 草垛用的 `ryHayStack` 是纯色 `VillageStraw` 材质，近看没有秸秆纹理。
+- 灶台、锅、其余车板（`*CartBed`）仍是平色盒；08 的倒墙本身（`StreetBlockFallenWall`）归 B1 的墙体材质。
+- 田坎（地形上的埂）没有专门的撒点规则，只吃「田里底子」那一档。
 - 风摆（见 §4 MotionVector）；远档切换是整区跳变，没有逐件淡出。
 - 图集只有漫反射 + alpha，没有法线 / 透光。

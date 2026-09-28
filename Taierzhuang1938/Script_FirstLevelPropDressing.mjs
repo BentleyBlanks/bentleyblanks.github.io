@@ -12,10 +12,12 @@
 
 import * as THREE from "three";
 import { InstantiateExternalProp, ExternalPropCatalog } from "./Script_ExternalProps.mjs";
+import { LoadDraftCartAssets } from "./Script_DraftCartModel.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import {
-  PROP_DRESSING_ASSETS, PROP_DRESSING_SECTOR_M, PROP_MATERIAL_TINT, PlanPropDressing, PlanRubbleScatter, Rng,
+  PROP_DRESSING_ASSETS, PROP_DRESSING_SECTOR_M, PROP_MATERIAL_TINT, PROP_MATERIAL_OVERRIDE, PROP_SPECIAL_ASSETS,
+  PlanPropDressing, PlanRubbleScatter, Rng,
 } from "./Data_FirstLevelPropDressing.mjs";
 import { MissionDressingContext } from "./Data_FirstLevelVegetation.mjs";
 
@@ -28,7 +30,24 @@ export async function LoadFirstLevelPropDressing(library) {
   await Promise.all(PROP_DRESSING_ASSETS.map(async (id) => {
     const root = await InstantiateExternalProp(id, library);
     if (!root) { console.warn(`[FirstLevelPropDressing] ${id} 没有加载到，这几件保留平色盒`); return; }
-    const tint = PROP_MATERIAL_TINT[catalog.get(id)?.material];
+    const override = PROP_MATERIAL_OVERRIDE[id];
+    if (override) {
+      const key = `override:${override.recipe}:${JSON.stringify(override.options)}`;
+      if (!tinted.has(key)) {
+        const has = library.baked?.has?.(override.recipe);
+        const clone = CloneShadedMaterial(library.Get(has ? override.recipe : override.fallback,
+          { ...(has ? override.options : override.fallbackOptions), metalness: 0 }));
+        clone.userData.propDressingClone = true;
+        tinted.set(key, clone);
+      }
+      root.traverse((mesh) => {
+        if (!mesh.isMesh || Array.isArray(mesh.material)) return;
+        mesh.material = tinted.get(key);
+        // 几何是 ExternalProps 缓存里共用的，改法线前先拷一份。
+        if (override.smoothNormals) mesh.geometry = SmoothNormals(mesh.geometry.clone());
+      });
+    }
+    const tint = override ? null : PROP_MATERIAL_TINT[catalog.get(id)?.material];
     if (tint) root.traverse((mesh) => {
       if (!mesh.isMesh || Array.isArray(mesh.material)) return;
       if (!tinted.has(mesh.material.uuid)) {
@@ -43,7 +62,87 @@ export async function LoadFirstLevelPropDressing(library) {
     const box = new THREE.Box3().setFromObject(root), size = box.getSize(new THREE.Vector3());
     models.set(id, { root, size: size.toArray(), box });
   }));
+  const wreck = await EvacCartWreck().catch((error) => {
+    console.warn("[FirstLevelPropDressing] 撤运车模型没加载到，08 障碍车身保留平色盒", error);
+    return null;
+  });
+  if (wreck) models.set("evacCartWreck", wreck);
   return { models };
+}
+
+/**
+ * 坏在街上的撤运车：Script_DraftCartModel 的车（一只蒙皮网格、按材质分图元），取绑定姿势的静态几何，
+ * 丢掉主要蒙在 dropBone 上的三角形（那只轮子），落地、XZ 居中。只搬 position / normal / uv：
+ * 没有 uv 的漆面图元（COLOR_0）补零 uv、顶点色的平均值折进材质颜色（BuildSink 合并不带顶点色）。
+ */
+async function EvacCartWreck() {
+  const spec = PROP_SPECIAL_ASSETS.evacCartWreck;
+  const assets = await LoadDraftCartAssets();
+  const root = new THREE.Group();
+  root.name = "evacCartWreck_Grounded";
+  const holder = new THREE.Group();
+  root.add(holder);
+  assets.cart.scene.updateMatrixWorld(true);
+  assets.cart.scene.traverse((mesh) => {
+    if (!mesh.isMesh || Array.isArray(mesh.material)) return;
+    const source = mesh.geometry, position = source.attributes.position, normal = source.attributes.normal;
+    const skinIndex = source.attributes.skinIndex, skinWeight = source.attributes.skinWeight;
+    const drop = mesh.skeleton?.bones.findIndex((bone) => bone.name === spec.dropBone) ?? -1;
+    const Dominant = (i) => {
+      let best = -1, weight = -1;
+      for (let c = 0; c < 4; c++) if (skinWeight.getComponent(i, c) > weight) { weight = skinWeight.getComponent(i, c); best = skinIndex.getComponent(i, c); }
+      return best;
+    };
+    const index = source.index ? source.index.array : Array.from({ length: position.count }, (_, i) => i);
+    const kept = [];
+    for (let t = 0; t < index.length; t += 3) {
+      const tri = [index[t], index[t + 1], index[t + 2]];
+      if (drop >= 0 && skinIndex && tri.every((i) => Dominant(i) === drop)) continue;
+      kept.push(...tri);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", position.clone());
+    geometry.setAttribute("normal", normal.clone());
+    geometry.setAttribute("uv", source.attributes.uv ? source.attributes.uv.clone() : new THREE.BufferAttribute(new Float32Array(position.count * 2), 2));
+    geometry.setIndex(kept);
+    geometry.applyMatrix4(mesh.matrixWorld);
+    const material = mesh.material.clone();
+    const colors = source.attributes.color;
+    if (colors) {
+      const mean = [0, 0, 0];
+      for (let i = 0; i < colors.count; i++) { mean[0] += colors.getX(i); mean[1] += colors.getY(i); mean[2] += colors.getZ(i); }
+      material.color.multiply(new THREE.Color(mean[0] / colors.count, mean[1] / colors.count, mean[2] / colors.count));
+      material.vertexColors = false;
+    }
+    material.color.multiply(new THREE.Color(...spec.tint));
+    material.userData.propDressingClone = true;
+    material.needsUpdate = true;
+    holder.add(new THREE.Mesh(geometry, material));
+  });
+  holder.updateMatrixWorld(true);
+  const raw = new THREE.Box3().setFromObject(holder);
+  holder.position.set(-(raw.min.x + raw.max.x) / 2, -raw.min.y, -(raw.min.z + raw.max.z) / 2);
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  return { root, size: box.getSize(new THREE.Vector3()).toArray(), box };
+}
+
+/** 同位置顶点的法线取平均（面积加权的面法线已经在各自顶点上），硬边多面体读成圆滑的一团。 */
+function SmoothNormals(geometry) {
+  const position = geometry.attributes.position, normal = geometry.attributes.normal;
+  if (!position || !normal) return geometry;
+  const sums = new Map(), key = (i) => `${position.getX(i).toFixed(4)},${position.getY(i).toFixed(4)},${position.getZ(i).toFixed(4)}`;
+  for (let i = 0; i < position.count; i++) {
+    const k = key(i), sum = sums.get(k) || [0, 0, 0];
+    sum[0] += normal.getX(i); sum[1] += normal.getY(i); sum[2] += normal.getZ(i);
+    sums.set(k, sum);
+  }
+  for (let i = 0; i < position.count; i++) {
+    const [x, y, z] = sums.get(key(i)), length = Math.hypot(x, y, z) || 1;
+    normal.setXYZ(i, x / length, y / length, z / length);
+  }
+  normal.needsUpdate = true;
+  return geometry;
 }
 
 // 碎块模板（单位尺寸，底面贴 y=0）：砖 / 半砖 / 瓦片是削过角的扁盒，石块是扰动过的二十面体。
@@ -155,10 +254,12 @@ export function AddFirstLevelPropDressing(sink, layout, dressing, groundAt, mate
   let triangles = 0;
   for (const placement of plan.placements) {
     const model = dressing.models.get(placement.asset);
-    // 放倒的件（平躺的车轮）：先绕 Z 转 90° 并把底面挪回 y=0，再按盒子缩放。
-    if (placement.roll) {
-      const [mx, my] = model.size;
-      roll.makeRotationZ(Math.PI / 2).premultiply(new THREE.Matrix4().makeTranslation(my / 2, mx / 2, 0));
+    // 歪倒的件（平躺的车轮、缺了轮子的车）：先绕自身 Z 轴转 rollDeg，再把歪倒后包围盒的底面挪回 y=0、X 居中。
+    if (placement.rollDeg) {
+      const [mx, my] = model.size, a = placement.rollDeg * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
+      const xs = [], ys = [];
+      for (const [px, py] of [[-mx / 2, 0], [mx / 2, 0], [-mx / 2, my], [mx / 2, my]]) { xs.push(px * c - py * sn); ys.push(px * sn + py * c); }
+      roll.makeRotationZ(a).premultiply(new THREE.Matrix4().makeTranslation(-(Math.min(...xs) + Math.max(...xs)) / 2, -Math.min(...ys), 0));
     } else roll.identity();
     // scale 是放倒之后那一帧里的逐轴缩放（FitPropToBox 的约定）。
     matrix.compose(position.set(placement.x, placement.y, placement.z), q.setFromAxisAngle(up, placement.yaw),

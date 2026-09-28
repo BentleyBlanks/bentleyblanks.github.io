@@ -682,6 +682,22 @@ export const TEXTURE_MANIFEST = Object.freeze([
     ],
   },
   {
+    // 第一关草垛秸秆（docs/Data_FirstLevelVegetationProps.md）：ryHayStack 原来是纯色 VillageStraw（橙黄多面体）。
+    id: "HaystackStraw", kind: "material", tier: "level:FirstLevel",
+    toneClass: "fabric",
+    metersPerTile: 1.5,
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_HaystackStraw.json",
+    source: { provider: "lovart", date: "2026-09-28", ref: "thread 5bd6317f-3d31-4ea4-838a-a3f86e22ee03（generate_image_nano_banana_pro）",
+      prompt: "_import/Prompts/Texture_HaystackStraw.txt", note: "源图 _shots/Gap3A_Source/B6/straw_v1（不进仓库）；烘焙 --mean 0.47,0.43,0.355 --contrast 0.085 --row-flatten on" },
+    consumers: [{ file: "Data_LevelTextureSets.mjs", token: "HaystackStraw" }, { file: "Data_FirstLevelPropDressing.mjs", token: "HaystackStraw" }],
+    files: [
+      ["Texture_HaystackStrawBase.webp", "Base", 1024, 1024],
+      ["Texture_HaystackStrawNormal.webp", "Normal", 512, 512],
+      ["Texture_HaystackStrawOrm.webp", "Orm", 512, 512],
+    ],
+  },
+  {
     // 第一关植被卡片图集（docs/Data_FirstLevelVegetationProps.md）：8 格干草 / 枯蒿 / 荆棘 / 芦苇 / 绿芽，Base 的 A = 镂空。
     // 品红底生成、脚本键出 alpha（不信生成器的透明通道）；卡片 UV 照抄进 Data_FirstLevelVegetation.VEGETATION_CARDS。
     id: "FirstLevelVegetationAtlas", kind: "decal", tier: "level:FirstLevel",

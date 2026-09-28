@@ -522,3 +522,14 @@ export const WHITEBOX_WEATHERING = {
   edgeWidthM: 0.045, edgeLighten: 0.14, bevelM: 0.035, bevelTilt: 0.55,
   macroScaleM: 6.5, macroStrength: 0.13, undersideDarken: 0.12,
 };
+
+/**
+ * 竹竿布兜担架（Script_StretcherAsset，全游戏唯一的担架）的顶点色调色（2026-09-28 3A 迭代 B6）。
+ * 烘进 GLB 的竹竿是饱和亮黄（线性 ≈ 0.25/0.15/0.05），阴天下读成新竹；参考图是旧竹 / 旧木的灰黄、布兜灰褐。
+ * 线性空间：c' = (L + (c − L) × saturation) × gain × tint，L 为亮度（Rec.709）。
+ */
+export const STRETCHER_COLOR_GRADE = {
+  saturation: 0.5,
+  gain: 0.82,
+  tint: [1.0, 0.98, 0.92],
+};

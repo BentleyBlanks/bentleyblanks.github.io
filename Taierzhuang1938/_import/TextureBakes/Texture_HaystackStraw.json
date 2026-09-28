@@ -1,0 +1,119 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-09-28",
+  "name": "HaystackStraw",
+  "preset": "fabric",
+  "source": {
+    "path": "_shots/Gap3A_Source/B6/straw_v1/lovart_f0d2c2d67cc3.png",
+    "sha256": "ac2d944a30e53b222bc85baa6a59fb2cbe50b8f326882bd6eaab281f4ea7b46c",
+    "metrics": {
+      "meanSrgb": [
+        0.5184,
+        0.4896,
+        0.4583
+      ],
+      "luma": 0.4888,
+      "lumaStd": 0.1999,
+      "sat": 0.1158,
+      "clipLow": 0.0004,
+      "clipHigh": 0.0004,
+      "lowFreq": 0.0156
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.47,
+      0.43,
+      0.355
+    ],
+    "contrast": 0.085,
+    "lumaRange": [
+      0.32,
+      0.52
+    ],
+    "satRange": [
+      0.1,
+      0.38
+    ],
+    "stdRange": [
+      0.03,
+      0.1
+    ],
+    "reliefM": 0.008,
+    "rough": 0.95,
+    "roughVar": 0.03,
+    "roughLumaK": 0.0,
+    "ao": 0.35,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.088,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 1.5,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_HaystackStrawBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 302612,
+      "sha256": "e2e0028ce845ad41f99b8483d4d89db4c3d3887f48ea9f39268d5e1d471245c9"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_HaystackStrawNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 115482,
+      "sha256": "273590d6d2a1cf7e32ef1dc51fac477ede55a8d81bbbe4c135e6cba71fa10566"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_HaystackStrawOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 61912,
+      "sha256": "502ee1f13b0f77809f3c310d62fabb7dba5a8bd0581ef57b8662e80328b891d8"
+    }
+  ],
+  "totalBytes": 480006,
+  "metrics": {
+    "meanSrgb": [
+      0.4698,
+      0.4308,
+      0.3543
+    ],
+    "luma": 0.4183,
+    "lumaStd": 0.0852,
+    "sat": 0.2458,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0032,
+    "seam": 0.0549,
+    "interior": 0.0596,
+    "seamRatio": 0.921,
+    "border": 0.971,
+    "swing": 0.0044,
+    "aoMean": 0.912,
+    "roughMean": 0.946,
+    "texelsPerMeter": 682.7
+  },
+  "gateProblems": []
+}
