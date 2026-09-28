@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import {
-  PROP_DRESSING, PROP_DRESSING_ASSETS, PROP_FIT_TOLERANCE, PROP_RUBBLE,
+  PROP_DRESSING, PROP_DRESSING_ASSETS, PROP_FIT_TOLERANCE, PROP_RUBBLE, PROP_SPECIAL_ASSETS, PROP_MATERIAL_OVERRIDE,
   PlanPropDressing, PlanRubbleScatter, FitPropToBox, RouteIndex, PointIndex,
 } from "./Data_FirstLevelPropDressing.mjs";
 import { MissionDressingContext } from "./Data_FirstLevelVegetation.mjs";
@@ -98,7 +98,39 @@ function MeasureAsset(spec) {
 }
 const sizes = new Map();
 for (const id of PROP_DRESSING_ASSETS) if (catalog.has(id)) sizes.set(id, MeasureAsset(catalog.get(id)));
-Check([...sizes.values()].every((size) => size.every((v) => v > 0.05 && v < 5)), "资产尺寸是米制、非退化（0.05–5 m）");
+/** 特殊件（撤运车残骸）：按运行时同一口径量 —— 去掉主要蒙在 dropBone 上的三角形之后的顶点包围盒。 */
+function MeasureWreck(spec) {
+  const glb = ReadGlb(path.join(root, spec.url.replace(/^\.\//, "")));
+  const skin = glb.json.skins[0], drop = skin.joints.findIndex((j) => glb.json.nodes[j].name === spec.dropBone);
+  const Reader = (ai) => {
+    const a = glb.json.accessors[ai], v = glb.json.bufferViews[a.bufferView];
+    const comps = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 }[a.type], size = { 5126: 4, 5123: 2, 5121: 1, 5125: 4 }[a.componentType];
+    const stride = v.byteStride || comps * size, start = glb.bin + (v.byteOffset || 0) + (a.byteOffset || 0);
+    const read = (o) => a.componentType === 5126 ? glb.bytes.readFloatLE(o) : a.componentType === 5123 ? glb.bytes.readUInt16LE(o)
+      : a.componentType === 5125 ? glb.bytes.readUInt32LE(o) : glb.bytes[o];
+    return { count: a.count, get: (i, c = 0) => read(start + i * stride + c * size) };
+  };
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  let dropped = 0;
+  for (const mesh of glb.json.meshes) for (const primitive of mesh.primitives) {
+    const P = Reader(primitive.attributes.POSITION), J = Reader(primitive.attributes.JOINTS_0), W = Reader(primitive.attributes.WEIGHTS_0);
+    const I = Reader(primitive.indices);
+    const Dominant = (i) => { let best = -1, w = -1; for (let c = 0; c < 4; c++) if (W.get(i, c) > w) { w = W.get(i, c); best = J.get(i, c); } return best; };
+    for (let t = 0; t < I.count; t += 3) {
+      const tri = [I.get(t), I.get(t + 1), I.get(t + 2)];
+      if (tri.every((i) => Dominant(i) === drop)) { dropped++; continue; }
+      for (const i of tri) for (let k = 0; k < 3; k++) { min[k] = Math.min(min[k], P.get(i, k)); max[k] = Math.max(max[k], P.get(i, k)); }
+    }
+  }
+  Check(dropped > 100, `${spec.url}: 去掉了 ${spec.dropBone} 那只轮子（${dropped} 个三角形）`);
+  return max.map((v, k) => v - min[k]);
+}
+for (const [id, spec] of Object.entries(PROP_SPECIAL_ASSETS)) {
+  Check(fs.existsSync(path.join(root, spec.url.replace(/^\.\//, ""))), `特殊件 ${id} 的模型文件存在`);
+  sizes.set(id, MeasureWreck(spec));
+}
+Check([...sizes.values()].every((size) => size.every((v) => v > 0.05 && v < 7)), "资产尺寸是米制、非退化（0.05–7 m）");
+Check(Object.keys(PROP_MATERIAL_OVERRIDE).every((id) => PROP_DRESSING.some((e) => e.asset === id)), "换材质表的资产都在替换表里");
 
 // ---- 3. 外观与碰撞盒 --------------------------------------------------------
 const plan = PlanPropDressing(blocks, SampleMissionTerrain, sizes);
@@ -125,7 +157,7 @@ Check(solidReplaced.length > 40 && solidReplaced.every((block) => block.w > 0 &&
 // 放倒 / 转向的配法自洽：一只扁盒配车轮取「薄轴对薄轴」。
 const wheel = FitPropToBox([0.543, 1.1, 1.065], { w: 1.25, h: 1.25, d: 0.12 }, { maxStretch: 3.2 });
 Check(wheel.swap && Math.abs(wheel.visual[2] - 0.12) < 1e-6, "车轮薄轴转到盒子的薄轴上");
-const lying = FitPropToBox([0.543, 1.1, 1.065], { w: 1.1, h: 0.12, d: 1.1 }, { maxStretch: 3.2, roll: true });
+const lying = FitPropToBox([0.543, 1.1, 1.065], { w: 1.1, h: 0.12, d: 1.1 }, { maxStretch: 3.2, rollDeg: 90 });
 Check(Math.abs(lying.visual[1] - 0.12) < 1e-6, "平躺的车轮先放倒再配");
 
 // ---- 4. 碎砖瓦 --------------------------------------------------------------

@@ -1,0 +1,8 @@
+Generate ONE square image, 2048x2048. Use case: production game PBR albedo texture (base color only).
+A strictly front-on orthographic photographic texture scan of a 1.5 metre by 1.5 metre patch of the side of an old weathered wheat-straw stack (a farmyard haystack of threshed wheat straw),
+in a rural village near Tengxian, southern Shandong, North China, March 1938, overcast early spring. Dense loose straw stalks about 3-6 mm thick lying mostly downward at slightly varying angles, a few broken and bent stalks, faded after a winter outdoors: dull grey-beige and pale grey-brown with some darker weathered greyish straw, a little dust, no fresh golden straw.
+Low saturation, grey-beige / grey-brown, not orange, not yellow. Lighting: completely flat, even, shadowless overcast diffuse light like a
+delit photogrammetry albedo; no cast shadows, no directional sunlight, no specular highlights, no vignetting, no perspective,
+no camera tilt. Uniform overall brightness with no large stains, gradients or dominant single features, because the texture
+will be tiled many times. The image must tile seamlessly left-right and top-bottom.
+No text, no labels, no borders, no frames, no objects, no people.

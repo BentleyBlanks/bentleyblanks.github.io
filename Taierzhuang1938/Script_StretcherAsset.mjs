@@ -9,6 +9,7 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { STRETCHER_COLOR_GRADE as GRADE } from "./Data_Tuning_Materials.mjs";
 
 const URL = "./Model/Model_BambooStretcher.glb?v=stretcher20260927";
 const loader = new GLTFLoader();
@@ -28,8 +29,13 @@ export function LoadStretcherAsset() {
       // colour attribute would switch the material into its vertex-alpha variant.
       const rgba = source.attributes.color;
       const rgb = new Float32Array(rgba.count * 3);
+      // 竹竿 / 布兜去饱和成旧竹的灰黄（Data_Tuning_Materials.STRETCHER_COLOR_GRADE）。
       for (let i = 0; i < rgba.count; i++) {
-        rgb[i * 3] = rgba.getX(i); rgb[i * 3 + 1] = rgba.getY(i); rgb[i * 3 + 2] = rgba.getZ(i);
+        const r = rgba.getX(i), g = rgba.getY(i), b = rgba.getZ(i);
+        const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        rgb[i * 3] = (luma + (r - luma) * GRADE.saturation) * GRADE.gain * GRADE.tint[0];
+        rgb[i * 3 + 1] = (luma + (g - luma) * GRADE.saturation) * GRADE.gain * GRADE.tint[1];
+        rgb[i * 3 + 2] = (luma + (b - luma) * GRADE.saturation) * GRADE.gain * GRADE.tint[2];
       }
       source.setAttribute("color", new THREE.BufferAttribute(rgb, 3));
       for (const name of Object.keys(source.attributes))

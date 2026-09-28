@@ -74,6 +74,11 @@ export const PROP_DRESSING = Object.freeze([
   P("StreetWestHouseJar", "clayRoundVat", { hide: Rim("StreetWestHouseJar") }),
   P("StreetWestHouseBasket", "wovenBasket", BASKET),
   P("StreetEastNorthFaggots", "ryFirewoodStack", { hide: Logs("StreetEastNorthFaggots"), tile: [1, 2, 2], maxStretch: 1.6 }),
+  // 08 主街障碍（概念图 08：倒墙碎砖堆 + 翻倒木车）：车身换成撤运牛车（掉了左轮、朝缺轮一侧歪 14°），
+  // 两侧的碎土坡换成城墙缺口包的残砖簇。碰撞仍是原来那只 4.55 × 1.6 × 2.6 的盒子与各块土坡。
+  P("StreetBlockCart", "evacCartWreck", { rollDeg: 14 }),
+  ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => P(`StreetObstacleRubble${i}`, i % 2 ? "cityWallBreachBrickCluster02" : "cityWallBreachBrickCluster01",
+    { maxStretch: 2.2, jitterYaw: 0.6 })),
   P("StreetCartWheel78.3", "ryCartWheel", WHEEL),
   P("StreetCartWheel80.7", "ryCartWheel", WHEEL),
   P("StreetBlockCartWheel", "ryCartWheel", WHEEL),
@@ -125,7 +130,7 @@ export const PROP_DRESSING = Object.freeze([
   P("TransferYardCrate0", "crate"),
   P("TransferYardCrate1", "marketBox02"),
   // 平躺在地上的车轮：先把轮子放倒（绕 Z 转 90°），再按盒子配。
-  P("TransferYardWheel", "ryCartWheel", { ...WHEEL, roll: true }),
+  P("TransferYardWheel", "ryCartWheel", { ...WHEEL, rollDeg: 90 }),
   P("TransferYardBasket", "wovenBasket", BASKET),
   P("TransferYardSack", "marketRiceSack01"),
   P("TransferTriageCrate", "crate"),
@@ -167,8 +172,40 @@ export const PROP_MATERIAL_TINT = Object.freeze({
   Sandbag: Object.freeze([0.92, 0.9, 0.84]),
 });
 
+/**
+ * 换材质（优先于上面的调色）：按资产整件换成第一关按需材质集里的一套（Data_LevelTextureSets.FirstLevel），
+ * 建场前 MaterialLibrary.LoadLevelSets 已下完；那一套不在库里（纯 node / 按需集缺失）就用 fallback 配方 + fallbackOptions。
+ * repeat = 外部件盒投影 UV 的一格米数（Script_ExternalProps.RuntimeTileMeters）÷ 贴图一格米数。
+ * smoothNormals：把硬边多面体的法线按同位置顶点平均（草垛是低模多面体，平着色读成一只橙色鼓）。
+ *   · 木箱 / 市场箱 → B5 的 OpeningCrate（灰褐旧板箱，0.6 m 一格；外部件木料盒投影 1.0 m 一格）；
+ *   · 草垛 → HaystackStraw（Lovart 秸秆，1.5 m 一格；VillageStraw 走 cloth 0.6 m 一格）。
+ */
+const OLD_CRATE = Object.freeze({ recipe: "OpeningCrate", options: Object.freeze({ color: 0xd8d2c8, repeat: 1.6 }),
+  fallback: "WoodCrate", fallbackOptions: Object.freeze({ color: 0x9d9486 }) });
+// 城墙缺口包的残砖簇自带四种材质（城砖 / 夯土 / 条石 / 碎砖地），夯土与城砖在村里读成橙红碎片；
+// 08 障碍的碎砖堆整件换成一种灰褐碎砖瓦（GroundRubble 盒投影 2.6 m 一格，残砖簇保留作者 UV，repeat 1）。
+const OLD_RUBBLE = Object.freeze({ recipe: "GroundRubble", options: Object.freeze({ color: 0x8e8b84, repeat: 1 }),
+  fallback: "GroundRubble", fallbackOptions: Object.freeze({ color: 0x8e8b84 }) });
+export const PROP_MATERIAL_OVERRIDE = Object.freeze({
+  crate: OLD_CRATE, marketBox02: OLD_CRATE, marketBox03: OLD_CRATE,
+  cityWallBreachBrickCluster01: OLD_RUBBLE, cityWallBreachBrickCluster02: OLD_RUBBLE,
+  ryHayStack: Object.freeze({ recipe: "HaystackStraw", options: Object.freeze({ color: 0xe6e0d4, repeat: 0.4, normalScale: 0.8 }),
+    fallback: "Sandbag", fallbackOptions: Object.freeze({ color: 0x9a8f78 }), smoothNormals: true }),
+});
+
+/**
+ * 不在 Script_ExternalProps 目录里的现成模型（由各自的加载器给几何）：
+ *   evacCartWreck —— 12/13 撤运牛车（Script_DraftCartModel 的 Model_WoodenEvacCart.glb，关里本来就下），
+ *   取绑定姿势的静态几何、去掉 dropBone 那只轮子的三角形，当作坏在街上的车。材质克隆，不与蒙皮车共用。
+ */
+export const PROP_SPECIAL_ASSETS = Object.freeze({
+  evacCartWreck: Object.freeze({ url: "./Model/OxCart/Model_WoodenEvacCart.glb", loader: "Script_DraftCartModel.LoadDraftCartAssets",
+    dropBone: "WheelLeft", tint: Object.freeze([0.8, 0.77, 0.72]) }),
+});
+
 /** 替换表用到的外部资产（Script_ExternalProps 的 ASSETS 键），开机按它预载。 */
-export const PROP_DRESSING_ASSETS = Object.freeze([...new Set(PROP_DRESSING.map((entry) => entry.asset))].sort());
+export const PROP_DRESSING_ASSETS = Object.freeze([...new Set(PROP_DRESSING.map((entry) => entry.asset))]
+  .filter((id) => !PROP_SPECIAL_ASSETS[id]).sort());
 
 // ---------------------------------------------------------------------------
 // 碎砖瓦
@@ -230,12 +267,17 @@ export function Rng(seed) {
 
 /**
  * 模型尺寸（归一化后：底面中心为原点，[x, y, z] 米）配到一只盒子（块自身轴 w, h, d）。
- * 候选朝向：原样 / 绕 Y 转 90°（长边、薄边对上盒子的那一边）；`roll` 先把模型放倒（绕 Z 90°）。
+ * 候选朝向：原样 / 绕 Y 转 90°（长边、薄边对上盒子的那一边）；`rollDeg` 先把模型绕自身 Z 轴歪倒这么多度
+ * （90 = 放倒；外观按歪倒后的包围盒四角算，比真实轮廓略大一点）。
  * 逐轴缩放 s_i = box_i / model_i，再按几何平均把压扁/拉长收进 maxStretch 以内，取变形最小的朝向。
  * 返回模型轴上的缩放、附加偏航、以及外观在盒子轴上的实际尺寸（测试拿它和碰撞盒比）。
  */
-export function FitPropToBox(modelSize, box, { maxStretch = 1.35, roll = false } = {}) {
-  const base = roll ? [modelSize[1], modelSize[0], modelSize[2]] : modelSize;
+export function RolledSize(modelSize, rollDeg = 0) {
+  const a = rollDeg * Math.PI / 180, c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a));
+  return [modelSize[0] * c + modelSize[1] * s, modelSize[0] * s + modelSize[1] * c, modelSize[2]];
+}
+export function FitPropToBox(modelSize, box, { maxStretch = 1.35, rollDeg = 0 } = {}) {
+  const base = rollDeg ? RolledSize(modelSize, rollDeg) : modelSize;
   let best = null;
   for (const swap of [false, true]) {
     const model = swap ? [base[2], base[1], base[0]] : base;
@@ -281,7 +323,7 @@ function UnionBox(main, parts) {
 /**
  * 按替换表出摆位。`modelSizes`：Map / 对象，资产 id → 归一化尺寸 [x, y, z]。
  * 返回 { placements, replaced, missing }；placements 每件：
- *   { id, block, asset, x, y（底）, z, yaw, roll, scale:[模型轴], visual:[w,h,d], box:{w,h,d} }
+ *   { id, block, asset, x, y（底）, z, yaw, rollDeg, scale:[歪倒后的模型轴], visual:[w,h,d], box:{w,h,d} }
  */
 export function PlanPropDressing(blocks, groundAt, modelSizes, entries = PROP_DRESSING) {
   const byId = new Map(blocks.map((block) => [block.id, block]));
@@ -310,7 +352,7 @@ export function PlanPropDressing(blocks, groundAt, modelSizes, entries = PROP_DR
       placements.push({
         id: `${entry.block}#${ix}${iy}${iz}`, block: entry.block, asset: entry.asset,
         x: union.x + lx * c + lz * s, y: bottom + iy * cell.h, z: union.z - lx * s + lz * c,
-        yaw: union.ry + fit.yaw + jitter, roll: !!entry.roll, scale: fit.scale, visual: fit.visual,
+        yaw: union.ry + fit.yaw + jitter, rollDeg: entry.rollDeg || 0, scale: fit.scale, visual: fit.visual,
         box: { ...cell },
       });
     }
