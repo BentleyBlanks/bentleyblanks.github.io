@@ -125,6 +125,10 @@ node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-
 走廊太窄的症状是连续驾驭里多一次阵亡（`CAMPAIGN_DEATH` 那一行 `activity` 正常、`lastHits` 为空）或 `State().missionArea.log` 里有出界记录：
 放宽那一步的走廊，别调计时。
 
+2026-09-28 实测（读 `State().missionArea.log`）：`--campaign --stage-from=4 --stage-to=6` 到 07、`--stage-jumps --stage-from=8` 走到 17、
+`--stage-jumps --stage-from=18` 到 Complete，全程 0 次出界。`--stage-from=6` 在 07→08 被 VillageCorner 刺死、`--stage-jumps --stage-from=15`
+卡在 17（幺娃不拉覆盖物，`coverS` 恒 0），这两条在未改的 60166b9f 上同样红，与走廊无关。
+
 ### 3.4 阻挡与光的词汇（体块包里的写法）
 
 - **倒墙 + 碎砖坡**（08 已有）、**翻倒的车 / 大车横在路上**、**铁丝网**（`MISSION_DEFENSE_POSTS` 有带模型的 fence）、
