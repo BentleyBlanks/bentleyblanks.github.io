@@ -18,7 +18,7 @@
       "mean": [0.365, 0.362, 0.352], "contrast": 0.075,
       "lumaRange": [0.26, 0.46], "satRange": [0.0, 0.1], "stdRange": [0.045, 0.13],
       "reliefM": 0.01, "rough": 0.86, "roughVar": 0.06, "roughLumaK": 0.0, "ao": 0.55, "metal": 0.0,
-      "seamless": "weld", "rowFlatten": false, "flattenSigma": 0.12, "isotropic": false, "heightFromLuma": "invert"
+      "seamless": "courses", "rowFlatten": false, "flattenSigma": 0.12, "isotropic": false, "heightFromLuma": "invert"
     },
     "rammedEarth": {
       "label": "夯土 / 土坯 / 黄泥抹面",

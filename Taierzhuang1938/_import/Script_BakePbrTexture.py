@@ -143,6 +143,21 @@ def ApplyBlend(img, t):
     return np.clip(mixed + mean, 0, 1)
 
 
+def WeldEdges1D(img, band, axis):
+    """只焊一个方向的两条边（axis=1：左右）。"""
+    out = img.copy()
+    size = img.shape[axis]
+    for i in range(band):
+        a = [slice(None)] * img.ndim
+        b = [slice(None)] * img.ndim
+        a[axis], b[axis] = i, size - 1 - i
+        a, b = tuple(a), tuple(b)
+        first, last = out[a].copy(), out[b].copy()
+        t = 0.5 * (1 - i / band) ** 2
+        out[a], out[b] = first * (1 - t) + last * t, last * (1 - t) + first * t
+    return out
+
+
 def WeldEdges(img, band):
     """只羽化四边（与 Script_BakeTrenchPom.WeldEdges 同法）：成行成列的结构（砖、瓦、木纹）不能半图偏移混合，
     那会在交界处错缝。前提是源图本身已按提示词画成近似无缝，这里只把最后几十像素焊上。"""
@@ -158,6 +173,36 @@ def WeldEdges(img, band):
             t = 0.5 * (1 - i / band) ** 2
             out[a], out[b] = first * (1 - t) + last * t, last * (1 - t) + first * t
     return out
+
+
+def ResizeRows(img, rows, size):
+    """把 rows 这一段行（浮点边界）重采样回 size×size（逐通道 PIL 'F' 双三次）。"""
+    top, bottom = int(round(rows[0])), int(round(rows[1]))
+    band = img[top:bottom]
+    chans = [band] if band.ndim == 2 else [band[..., c] for c in range(band.shape[2])]
+    out = [np.asarray(Image.fromarray(c.astype(np.float32), "F").resize((size, size), Image.BICUBIC)) for c in chans]
+    return np.clip(out[0] if band.ndim == 2 else np.stack(out, -1), 0, 1).astype(np.float64)
+
+
+def FindCourses(lin, size, mortar_bright):
+    """砖缝 / 瓦垄的行周期与相位：行均值去趋势后自相关取周期 P，再找砖缝行的相位 r0。
+    返回 (r0, r0 + n·P)：从一条砖缝的中心起、正好 n 层，裁出来上下相接就不错层。"""
+    lum = LinearLuminance(lin)
+    prof = lum.mean(1) * (1 if mortar_bright else -1)
+    win = max(5, size // 8)
+    prof = prof - np.convolve(np.concatenate([prof[-win:], prof, prof[:win]]), np.ones(win) / win, mode="same")[win:-win]
+    ac = np.real(np.fft.ifft(np.abs(np.fft.fft(prof)) ** 2))
+    lo, hi = max(4, size // 80), size // 3
+    lag = lo + int(np.argmax(ac[lo:hi]))
+    period = float(lag)
+    a, b, c = ac[lag - 1], ac[lag], ac[lag + 1]
+    if a - 2 * b + c < 0:  # 抛物线细化到亚像素
+        period += 0.5 * (a - c) / (a - 2 * b + c)
+    scores = [np.mean([prof[int(round(o + k * period)) % size] for k in range(int(size / period))])
+              for o in np.arange(0, period, 0.5)]
+    r0 = float(np.arange(0, period, 0.5)[int(np.argmax(scores))])
+    n = int((size - 1 - r0) // period)
+    return period, (r0, r0 + n * period), n
 
 
 def MatchTone(lin, mean_srgb, contrast, strength=1.0):
@@ -346,6 +391,20 @@ def Bake(args):
             height_src = WeldEdges(height_src, band)
         if src_alpha is not None:
             src_alpha = WeldEdges(src_alpha, band)
+    elif mode == "courses":
+        # 成层材质（砖、瓦）：生成图说「无缝」，上下边往往各切在半层上，焊边会糊出一层双高的砖。
+        # 按砖缝周期裁出整数层（从砖缝中心起），拉回正方形（竖向 ≤ 一层的形变），左右再焊边。
+        period, rows, n = FindCourses(lin, size, p.get("heightFromLuma") == "invert")
+        lin = ResizeRows(lin, rows, size)
+        if height_src is not None:
+            height_src = ResizeRows(height_src, rows, size)
+        if src_alpha is not None:
+            src_alpha = ResizeRows(src_alpha, rows, size)
+        band = max(8, size // 32)
+        lin = WeldEdges1D(lin, band, axis=1)
+        if height_src is not None:
+            height_src = WeldEdges1D(height_src, band, axis=1)
+        print(f"  courses：周期 {period:.1f} px，取 {n} 层（行 {rows[0]:.1f}–{rows[1]:.1f}），竖向缩放 {size / (rows[1] - rows[0]):.3f}")
     elif mode != "none":
         raise SystemExit(f"未知 seamless 模式 {mode}")
 
@@ -602,7 +661,7 @@ def ParseArgs(argv):
     ap.add_argument("--pack", choices=("orm", "orh"), default="orm", help="orm：R=AO G=粗糙 B=金属；orh：B=高度（地形/壕沟数组）")
     ap.add_argument("--size", type=int, default=1024, help="Base 边长（2 的幂，≤1024；2048 须在清单写 sizeReason）")
     ap.add_argument("--data-size", type=int, default=0, help="Normal / Orm 边长（默认 size/2）")
-    ap.add_argument("--seamless", choices=("blend", "weld", "none"), help="覆盖预设的无缝方式")
+    ap.add_argument("--seamless", choices=("blend", "weld", "courses", "none"), help="覆盖预设的无缝方式（courses：按砖缝周期裁整层，砖墙用）")
     ap.add_argument("--row-flatten", choices=("on", "off"), help="覆盖预设的行列拉平（砖/瓦/木纹要 off）")
     ap.add_argument("--flattenSigma", "--flatten-sigma", dest="flattenSigma", type=float, help="低频拉平 σ（相对边长的比例）")
     ap.add_argument("--no-flatten", action="store_true", help="跳过低频与行列拉平")
