@@ -266,4 +266,9 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
 - **语义修正**：门窗 `Void` 盒改 `void`、墙头压顶改 `coping`（原来都借 `roof`）。只改助手里的语义参数；07+ 指纹因语义字段变了按口径重生，把 void/coping 映回 roof 逐位得到旧基线 `8e5277e874f90e43`（见指纹 JSON 的 note）。
 - **新贴图**（Lovart 源图 → `_import/Script_BakePbrTexture.py` → `Data_TextureManifest` + `Data_LevelTextureSets.FirstLevel`）：`VillageMudPlaster`、`VillageLimePlaster`、`VillageRoofTile`、`VillageTimber`、`RailBallast`；其余外观复用开机就有的 BrickWall / BrickWallSooty / CityWallBrickPbr / Stone / Ground / ShopDoorPbr / Sandbag / WattleFence / WaterVatCeramic / CarriageCeilingSteel / GatePaintedWood。
 - **门禁**：`Script_TextureStandardsTest`、`Script_ModuleGraphTest`、`Script_FirstLevelSpaceTest`（07+ 指纹）、`Script_SamplerBudgetTest`（浏览器，含 `?whitebox=p012`）；对照出图 `Script_FirstLevelWhitebox0518Shots.mjs --quality=high --out=_shots/Gap3A_After/B1`。
-- **仍差**：屋顶还是阶梯盒（瓦面只是贴上去，没有真的坡与瓦当）；墙面没有真的破口 / 缺角几何；灶屋等室内偏暗偏平（室内光归 B4）；地面与路面（归 B2）仍是亮米色，和墙根返潮接不上色。
+- **第二轮（同日）**：
+  - 抹面剥落：风化补丁升到 `wbWeather2`，外观可带 `peel`（`flatten` 把墙中部贴图自带的剥落斑往均色收、`amount` 程序剥落强度、`substrate` 露出土坯或青砖）。剥落只长在墙根（带宽随墙高收窄）/ 竖棱（门洞边就是墙段的竖棱）/ 块顶一带，边缘噪声不规则、带一圈抹面厚度的暗边；白灰墙中部不再是迷彩圆斑。均色取同一采样器的末级 mip，零新增采样器。
+  - 坡顶外壳：`PlanRoofShells` 认出每个台阶屋顶（RidgeCap + Eave/Slope/Ridge 或 Roof0..3），在上面盖两片沿坡的薄瓦面 + 一道脊（坡度取盖住所有台阶外角的最陡值），只是外观几何，碰撞 / 遮挡仍是原来的盒子，台阶留作山墙那头的填充。陡过 40° 的窄顶（门楼、窄厢房）保留台阶。
+  - 06 补给点（`Script_FirstLevelMissionView.BuildSupplies`）从米白平色盒换成旧弹药箱材质（开场布景的 `OpeningCrate`，退回 `WoodCrate`），可交互的呼吸发光不变。
+  - 青砖整体提亮（`brightness`），门窗楣 / 窗台 / 外皮与所在墙同组同外观；桥头墩改条石，13 河岸残段改夯土。
+- **仍差**：屋顶外壳是平直坡面（没有瓦当、屋脊起翘）；墙面没有真的破口 / 缺角几何；灶屋等室内偏暗偏平（室内光归 B4）；地面与路面（归 B2）仍是亮米色，和墙根返潮接不上色。
