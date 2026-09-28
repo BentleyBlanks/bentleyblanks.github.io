@@ -14,7 +14,7 @@ import { RayAabb, MakeBox, PlaceGeometry } from "./Script_Geo.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { DeriveCoversFromColliders } from "./Script_AiCover.mjs";
 import { BuildRailwayFromSpec } from "./Script_RoadSpline.mjs";
-import { MarkDynamicPrepass } from "./Script_Post.mjs";
+import { MarkDynamicPrepass, MarkNoPrepass } from "./Script_Post.mjs";
 import { T } from "./Script_Text.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { LoadMissionFortifications, AddMissionFortifications } from "./Script_FirstLevelMissionFortifications.mjs";
@@ -108,10 +108,13 @@ function ColliderRecord(spec) {
 }
 
 export class FirstLevelWhiteboxField {
-  constructor(scene, _library, { bounds = null, zones = [], levelId = null, whiteboxLayout = null, quality = "high" } = {}) {
+  constructor(scene, _library, { bounds = null, zones = [], levelId = null, whiteboxLayout = null, quality = "high", debugAirWalls = false } = {}) {
     this.scene = scene;
     this.library = _library;
     this.quality = quality;
+    // ?airWalls=1（Script_Main 传进来）：tag:"airWall" 的体块另画一层半透明红板，核对空气墙摆在哪
+    //（docs/Data_FirstLevelGuidance20260928.md §3.2）。默认不画，碰撞照旧。
+    this.debugAirWalls = !!debugAirWalls;
     // Layered terrain (Script_TerrainMaterial) once PrepareAssets loads it; null keeps the single-PBR path.
     this.terrainLayers = null;
     this.SampleGroundSurface = null;
@@ -314,11 +317,13 @@ export class FirstLevelWhiteboxField {
       : {replaced:new Set(),placements:[]};
     this.fortificationPlacements=defenses.placements;
     for(const [key,material] of this.materials)if(key.startsWith("MissionDefenseMaterial_"))this.sharedFortificationMaterials.add(material);
-    const trainSink = new BuildSink(),derailSink=new BuildSink();
+    const trainSink = new BuildSink(),derailSink=new BuildSink(),airWallSink=this.debugAirWalls?new BuildSink():null;
     for (const block of this.layout.blocks) {
       if(block.dynamic || block.treeModel)continue;
       const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? (this.layout.fortifications && block.id.startsWith(`StationCar${this.layout.derailCar}`) ? derailSink : trainSink) : sink;
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
+      if(airWallSink&&block.tag==="airWall")airWallSink.Add("AirWallDebug",PlaceGeometry(MakeBox(block.w,block.h,block.d,1,block.id),
+        {x:block.x,y:block.y,z:block.z,ry:block.ry||0}));
       const seamOwner=block.id.includes("BagSeam")?block.id.split("BagSeam")[0]:null;
       // visual:false —— 只要碰撞，画面由模型负责（例：接收院的空担架摞）。
       if(block.visual!==false && !defenses.replaced.has(block.id) && !defenses.replaced.has(seamOwner))targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
@@ -350,6 +355,15 @@ export class FirstLevelWhiteboxField {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       this.meshes.push(mesh);
+    }
+    if(airWallSink){
+      // 半透明、不写深度、不投影、不进预通道（运动矢量契约：半透明对象 MarkNoPrepass）。只在 ?airWalls=1 时存在。
+      const airWallMaterial=MarkNoPrepass(new THREE.MeshBasicMaterial({name:"FirstLevelAirWallDebug",color:0xd8281c,
+        transparent:true,opacity:.32,depthWrite:false,side:THREE.DoubleSide}));
+      for(const mesh of airWallSink.Flush(this.scene,{Get:()=>airWallMaterial})){
+        mesh.name="FirstLevelWhitebox_AirWallDebug";mesh.castShadow=false;mesh.receiveShadow=false;mesh.renderOrder=10;
+        this.meshes.push(mesh);
+      }
     }
     this.derailMeshes=derailSink.Flush(this.scene,{Get:key=>this.materials.get(key)||this.whiteMaterial});
     this.derailColliders=derailSink.colliders;

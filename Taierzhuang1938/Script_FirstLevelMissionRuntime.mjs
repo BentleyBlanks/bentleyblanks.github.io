@@ -13,6 +13,10 @@ import { CompactGuideRoute } from "./Script_NpcMissionGuide.mjs";
 import { MISSION_GUIDE_TUNING as GUIDE } from "./Data_Tuning_MissionGuide.mjs";
 import { MissionReturn } from "./Script_MissionReturn.mjs";
 import { MISSION_RETURN } from "./Data_Tuning_FirstLevel.mjs";
+// 任务走廊与「离开战场区域 · 返回 · N 秒」（S 包，docs/Data_FirstLevelGuidance20260928.md §3.3）。
+import { MissionAreaGuard, ResolveMissionAreas, DistanceToArea } from "./Script_MissionAreaGuard.mjs";
+import { MISSION_AREA_GUARD } from "./Data_Tuning_MissionArea.mjs";
+import { MISSION_AREA_STEPS } from "./Data_FirstLevelMissionArea.mjs";
 import { FRONT_BATTLE_TUNING as FB, FRONT_TUNING as FT } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MID_TUNING } from "./Data_Tuning_FirstLevelMid.mjs";
 import { MISSION_RETURN_ROUTES, MISSION_RETURN_PERSON_STAGES, MISSION_RETURN_SQUAD_STAGES, MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
@@ -152,6 +156,9 @@ export class FirstLevelMissionRuntime {
     this.host = host;
     this.time = 0;
     this.missionReturn = new MissionReturn(MISSION_RETURN);
+    // 每一步一条走廊（开机解析一次，键写错当场抛）；出界倒计时走完按阵亡走 OnPlayerDown → Retry。
+    this.missionAreas = ResolveMissionAreas(MISSION_AREA_STEPS, { routes: MISSION_ROUTES, anchors: A });
+    this.areaGuard = new MissionAreaGuard(MISSION_AREA_GUARD);
     this.enemies = new Map();
     this.spawned = new Set();
     this.spawnQueue = [];
@@ -2424,6 +2431,26 @@ export class FirstLevelMissionRuntime {
   ClearReturnWarning() {
     this.missionReturn.Reset();
     this.hud.SetMissionReturn?.(null);
+    this.areaGuard?.Reset();
+    this.hud.SetMissionArea?.(null);
+  }
+  /**
+   * 任务走廊软边界（S 包，docs/Data_FirstLevelGuidance20260928.md §3.3）：出了这一步的走廊亮一行倒计时，
+   * 走完按阵亡处理 —— player.Kill() 之后装配层照常走 OnPlayerDown → 死亡菜单 → 从检查点重来，不另起一套。
+   * 受控演出、抬担架、倒地、豁免步不判；规则与计时在 Script_MissionAreaGuard。
+   */
+  UpdateMissionArea(dt) {
+    if(!this.areaGuard)return;   // 测试夹具直接借原型方法、没走构造
+    const step=this.flow.stage.id, area=this.missionAreas[step]||null;
+    const view=this.areaGuard.Update(dt,{step,point:this.player.position,area,
+      controlled:!!this.controls||!!this.carry?.Active||!this.player.alive||(!!area?.exemptUntil&&!this.Has(area.exemptUntil))});
+    this.hud.SetMissionArea?.(view.warning?view:null);
+    if(view.failed)this.player.Kill();
+  }
+  /** 人在这一步的走廊里（豁免步、没有走廊的步算在里面）。 */
+  InsideMissionArea(point=this.player.position){
+    const area=this.missionAreas?.[this.flow?.stage?.id];
+    return !area||area.exempt||DistanceToArea(point,area)<=0;
   }
   UpdateReturnWarning(dt) {
     const stage=this.flow.stage,guide=this.CurrentGuide();
@@ -2726,6 +2753,7 @@ export class FirstLevelMissionRuntime {
     this.flow.Update(dt);
     this.leaderGuide?.Update();
     this.hud.SetMissionReturn?.(this.UpdateReturnWarning(dt));
+    this.UpdateMissionArea(dt);
     prof?.E("story/mission/other");
   }
   SaveCheckpoint() {
@@ -2736,6 +2764,8 @@ export class FirstLevelMissionRuntime {
     // exposed near-fatal player can overwrite safety while a rifleman fires
     // from beyond the passage radius.
     const threatRange=FirstLevelCheckpointThreatRange(this.player,this.ai);
+    // 有旧存档点时，人在走廊外不覆盖它：不然出界倒计时判负之后会重生在走廊外面。
+    if(this.safePoint&&!this.InsideMissionArea())return false;
     if(!FirstLevelCheckpointIsSafe(this.player,
       this.Threatens(this.player.position,null,targetHeight,threatRange)))return false;
     this.safePoint = {
@@ -2858,6 +2888,7 @@ export class FirstLevelMissionRuntime {
       ...this.flow.State(),
       missionVersion: MISSION_VERSION,
       returnWarning: this.missionReturn.result,
+      missionArea: this.areaGuard?.State() ?? null,
       transferBeats:this.transferBeats || null,
       melee:{actors:MISSION_ENCOUNTERS.melee.map(spec=>{
         const actor=this.enemies.get(spec.id);
