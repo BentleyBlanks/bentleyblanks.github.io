@@ -16,20 +16,44 @@
 //      这一段往东偏 0.5 m，让西壁让开 Aftermath7_0 那具遗体（遗体落在沟沿上而不是沟壁上）。
 //   05 只动体块（Data_FirstLevelWhiteboxFront）：投掷位 K8/K9 视线、战车路线、护送坑都被 01–06
 //      门禁锁着，路面与路肩不下沉也不抬高。
+//
+// 2026-09-28 引导轮（docs/Data_FirstLevelGuidance20260928.md）：
+//   小路 paths 三条：06 出坡、06B 小道 + 07 沟底 + 出沟过大车路到村北口（一条连着画）、05 旧院里去弹药屋后门。
+//   South07 框改成 x −40…20、z −84…−18：出沟那一段 (−6,−32)→(12,−24)→(20,−23.5) 原来不在任何一区的框里
+//   （村落区框从 x 20 起），岔口（沟口正压在 southTraffic 大车路上）就画不了路。原框 x 20…60 那一半
+//   原样留作 South07East（没有形状），与村落区框 x ≥ 20、z ≥ −30 只贴边不重叠。
+//   06 FrontCommunication 出洼地往南那段沟口外 (−38.2,−90.2) 一个弹坑：塌方（体块包 CollectionTrenchSlump*）的来由。
 const Pt = (x, z, dy) => Object.freeze(dy === undefined ? { x, z } : { x, z, dy });
 
 export const WHITEBOX_TERRAIN_FRONT = Object.freeze({
   id: "Front0507",
   stages: Object.freeze([5, 6, 7]),
   // 踩出来的小路（只染色不改高度）：{ id, points, width, wear?, note }，口径见 Data_FirstLevelWhiteboxTerrain 文件头。
-  paths: Object.freeze([]),
+  paths: Object.freeze([
+    // 06：借火后担架队从洼地东南角上坡。洼地场坪本身已经按 pad 染成路面，这条从坡脚画到坡顶，
+    // 让「上坡那一口」比往南平着出去的交通沟更像路。连染色边止于 z −84（Collection06 框）。
+    Object.freeze({ id: "CollectionRampTread", points: Object.freeze([Pt(-31.2, -96.6), Pt(-26, -92), Pt(-22.9, -87)]),
+      width: 2.4, wear: .9, note: "06 出坡：坡脚 → 坡顶，担架队并排上坡的那一口" }),
+    // 07：06B 院墙与挡土墙夹着的小道 → 沟北口 → 沟底（沟底原是田地贴图，概念图 07_1 是踩实的土）→
+    // 南口出坡 → 斜穿 southTraffic 大车路 → 沿 southWalk 往东到村北口前（x 17，村落区框从 x 20 起）。
+    // 出沟正压在大车路上：大车路 6 m 宽、往南（绕村西），这条要读成「往东拐」的那一岔。
+    Object.freeze({ id: "SouthWalkTread", points: Object.freeze([Pt(-19.15, -81.05), Pt(-16, -76), Pt(-16, -69.5),
+      Pt(-15.8, -52.5), Pt(-10.05, -41.2), Pt(-7.2, -34.2), Pt(-6, -32), Pt(12, -24), Pt(17, -23.72)]),
+      width: 2.2, wear: .9, note: "07 小路：06B 小道、沟底、出沟过大车路往东到村北口（southWalk 第 2–7 点，沟里走沟中线）" }),
+    // 05：旧院北门进来绕过车挡、贴弹药屋西墙到后门（FRONT_SORTIE.route 末 6 点），返程同一条。
+    Object.freeze({ id: "OldYardTread", points: Object.freeze([Pt(41.6, -120.8), Pt(41.2, -118.6), Pt(39.6, -117.4),
+      Pt(39.6, -114.2), Pt(41.4, -112.6), Pt(42.4, -111)]),
+      width: 1.4, wear: .9, note: "05 旧院：北门 → 车挡西侧 → 弹药屋后门" }),
+  ]),
   boxes: Object.freeze([
     // 05：攻击支路、投掷位、战车 Block 停车点与旧院（01–06 空间重排的东半，Data_FirstLevelSpace0106_20260923）。
     Object.freeze({ id: "Tank05", minX: 15, maxX: 65, minZ: -175, maxZ: -100 }),
     // 06：背坡集结处场坪 pad (-36,-100, 26×18) 与西侧反坡。
     Object.freeze({ id: "Collection06", minX: -62, maxX: -15, minZ: -118, maxZ: -84 }),
-    // 07：southWalk 中后段到村北口之前（z=-30 以南归村落区）。
-    Object.freeze({ id: "South07", minX: -40, maxX: 60, minZ: -84, maxZ: -30 }),
+    // 07：southWalk 中后段到村北口之前：沟、出沟与岔口（x ≥ 20 / z ≥ −30 归村落区）。
+    Object.freeze({ id: "South07", minX: -40, maxX: 20, minZ: -84, maxZ: -18 }),
+    // 07：原 South07 框的东半（x 20…60、z −84…−30），目前没有形状。
+    Object.freeze({ id: "South07East", minX: 20, maxX: 60, minZ: -84, maxZ: -30 }),
   ]),
   shapes: Object.freeze([
     // ── 06 背坡洼地 ───────────────────────────────────────────────────────────
@@ -62,6 +86,14 @@ export const WHITEBOX_TERRAIN_FRONT = Object.freeze({
       points: Object.freeze([Pt(-25.8, -105.5), Pt(-16.8, -105.5), Pt(-16.8, -85.5),
         Pt(-17.46, -85.5), Pt(-22.78, -94.01), Pt(-25.8, -96.5)]),
       note: "06 东侧高地：洼地东壁 3 m、出坡与南行路起点左手的土壁（06B 左侧挡土墙）" }),
+    // 06 引导轮：FrontCommunication 出洼地往南的那段沟（沟底与洼地齐平，比上坡更像出口）在 z −90 被炮弹炸塌。
+    // 弹坑在沟西沿，唇上一圈抛土；沟里的塌方土堆是体块（CollectionTrenchSlump*，有碰撞）。
+    Object.freeze({ id: "CollectionTrenchCraterRim", kind: "disc", op: "raise", dy: 0.35, feather: 1.2,
+      x: -38.2, z: -90.2, radius: 2.3,
+      note: "06 沟西沿弹坑的抛土圈（塌方的来由）" }),
+    Object.freeze({ id: "CollectionTrenchCrater", kind: "disc", op: "cut", dy: 1.0, feather: 1.0,
+      x: -38.2, z: -90.2, radius: 1.3,
+      note: "06 沟西沿弹坑：坑底比田面低约 0.65 m" }),
 
     // ── 07 南行交通沟 ─────────────────────────────────────────────────────────
     // 沟：底宽 3.4（halfW 1.7，≥ SquadMarchAi 的 3.24），cut 2.05 − 抛土 0.35 = 沟底比地面低 1.7 m。
