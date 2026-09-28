@@ -41,7 +41,7 @@ export const WHITEBOX_LOOKS = Object.freeze({
     normalScale: 1.1, weather: 1, jitter: 0.09, peel: Object.freeze({ flatten: 0.35, amount: 0.6, substrate: 0 }) }),
   // 白灰抹面：贴图自带的剥落斑按格子重复会成迷彩圆斑 —— 墙中部收掉七成对比，剥落交给墙根 / 墙角 / 檐下
   limePlaster: Object.freeze({ set: "VillageLimePlaster", tileM: 3.6, tint: 0xe2dfd8, fallbackTint: 0xb7b2a7,
-    normalScale: 0.9, weather: 1, jitter: 0.07, peel: Object.freeze({ flatten: 0.7, amount: 1, substrate: 0.2 }) }),
+    normalScale: 0.9, weather: 1, jitter: 0.07, peel: Object.freeze({ flatten: 0.82, amount: 1, substrate: 0.2 }) }),
   // 青砖：BrickWall 底色是中灰，往暖灰拉一点、整体提一档（参考图 08 的砖是灰褐，不是蓝黑）
   greyBrick: Object.freeze({ set: "BrickWall", tileM: 1.2, tint: 0xf2ece2, brightness: 1.18, weather: 1, jitter: 0.08 }),
   gateBrick: Object.freeze({ set: "BrickWall", tileM: 1.1, tint: 0xe2ddd4, brightness: 1.1, weather: 1, jitter: 0.06 }),
