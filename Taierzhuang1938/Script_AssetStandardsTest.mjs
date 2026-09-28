@@ -31,7 +31,7 @@ Check(TRIANGLE_RULES.weapon.limit === 30000, "枪械仅在选定源几何 > 30,0
 Check(TRIANGLE_RULES.vehicle.limit === 80000, "战车仅在选定源几何 > 80,000 时减面");
 Check(MIN_DECIMATION_REDUCTION === 0.05 && /MIN_DECIMATION_REDUCTION\s*=\s*0\.05/.test(pythonRules),
   "降幅 5% 及以下时浏览器规范与 Blender 都保留原始拓扑");
-Check(SCENE_RENDER_LIMITS.drawCalls === 5000 && SCENE_RENDER_LIMITS.triangles === 8700000
+Check(SCENE_RENDER_LIMITS.drawCalls === 5000 && SCENE_RENDER_LIMITS.triangles === 9000000
   && /SCENE_RENDER_LIMITS/.test(sceneEditorSource) && /SCENE_RENDER_LIMITS/.test(bootTestSource),
 "恢复原模后的全场红线由规范、编辑器与开机门禁共用");
 Check(/WEAPON_TRIANGLE_LIMIT\s*=\s*30000/.test(pythonRules)

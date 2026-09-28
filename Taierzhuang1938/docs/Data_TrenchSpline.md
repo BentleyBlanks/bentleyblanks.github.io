@@ -326,8 +326,8 @@ id 是 `<段名>TrenchBay<n>`，段名在前。
 - 代价：约 8000 格、+12.8 万地形三角；沟壁误差中位 0.09 → 0.04 m、p90 0.31 → 0.07 m。
   门槛 4 cm 时是 1.3 万格、+21 万三角，误差只再好 1 cm，不值。
 - 整帧预算：地形投影、每帧画好几遍，新增三角被放大。前线 RightNestShortRetreat 那一帧
-  原本 8.046M（上限 8.1M），细分后实测 8.31–8.50M；经用户同意，`SCENE_RENDER_LIMITS.triangles`
-  放宽到 8.7M（`Data_AssetStandards.mjs`）。
+  原本 8.046M（上限 8.1M；05 战车战合批 f46c630d 之后 master 自己就到 8.31M），叠上细分实测
+  8.62–8.76M；经用户同意，`SCENE_RENDER_LIMITS.triangles` 放宽到 9.0M（`Data_AssetStandards.mjs`）。
   同一轮把烘焙里用不上的旧 P012 公式、每次调用新建的常量数组和道路/踏步坑的远距离计算去掉了
   （粗格高度逐位不变），整张烘焙反而从约 2.5 s 降到约 1.8 s。
 
