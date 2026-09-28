@@ -578,13 +578,15 @@ const Samples = (route) => {
 // vfx 在 node 里建不起来（要 document），用一个假的：只录下生了什么，锥形速度借真的 _ConeVelocity。
 function FakeVfx() {
   let seed = 7;
-  const log = { smoke: [], debris: [], sources: new Map(), removed: [], next: 1 };
+  const log = { smoke: [], mud: [], debris: [], sources: new Map(), removed: [], next: 1 };
   return {
     log, time: 0, spawnScale: 1, wind: { x: 0.35, z: -0.15 },
     random: () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; },
     _ConeVelocity: VfxSystem.prototype._ConeVelocity,
-    _SpawnDebris(x, y, z, vx, vy, vz, sx, sy, sz, color, life, groundY) { log.debris.push({ x, y, z, vx, vy, vz, sx, sy, sz, life, groundY, t: this.time }); },
-    pools: { smoke: { Spawn: (s, time) => log.smoke.push({ ...s, t: time }) } },
+    _SpawnDebris(x, y, z, vx, vy, vz, sx, sy, sz, color, life, groundY) { log.debris.push({ kind: "box", x, y, z, vx, vy, vz, sx, sy, sz, life, groundY, t: this.time }); },
+    // 2026-09-28：开场近爆的土块 / 木片 / 碎渣走不规则碎块池，泥浆走泥浆池（Script_Vfx）。
+    SpawnChunk(kind, x, y, z, vx, vy, vz, sx, sy, sz, color, life, groundY) { log.debris.push({ kind, x, y, z, vx, vy, vz, sx, sy, sz, color, life, groundY, t: this.time }); },
+    pools: { smoke: { Spawn: (s, time) => log.smoke.push({ ...s, t: time }) }, mud: { Spawn: (s, time) => log.mud.push({ ...s, t: time }) } },
     SmokeSource(position, opts) { const id = log.next++; log.sources.set(id, { position: { ...position }, opts }); return id; },
     RemoveSmokeSource(id) { log.removed.push(id); log.sources.delete(id); },
   };
@@ -611,13 +613,19 @@ function FakeVfx() {
   assert.ok(BLAST.clods >= 12 && BLAST.clods <= 18 && BLAST.splinters > 0 && BLAST.dust > 0, "about fifteen clods, splinters and dust");
   const vfx = FakeVfx(), fx = new OpeningBlastFx({ vfx });
   fx.DirectionalBlast({ x: BLAST.at.x, y: 0, z: BLAST.at.z }, BLAST.dir, { groundY: -2 });
-  const counts = () => ({ debris: vfx.log.debris.length, smoke: vfx.log.smoke.length });
+  const counts = () => ({ debris: vfx.log.debris.length, smoke: vfx.log.smoke.length, mud: vfx.log.mud.length });
   let t = 0, head = null;
   while (t < BLAST.seconds + 0.2) { fx.Update(1 / 60); t += 1 / 60; if (head == null && t >= BLAST.burst.headS) head = counts(); }
   const total = counts(), stats = fx.Stats();
   report.blast = { head, total, active: stats.active };
-  assert.equal(total.debris, BLAST.clods + BLAST.splinters, "every clod and splinter is spawned");
-  assert.equal(total.smoke, BLAST.spray + BLAST.dust, "every spray and dust puff is spawned");
+  assert.equal(total.debris, BLAST.clods + BLAST.splinters + BLAST.grit, "every clod, splinter and grit bit is spawned");
+  assert.equal(total.mud, BLAST.spray, "every mud glob goes to the mud pool (not the smoke puffs: the black discs, 3A B5)");
+  assert.equal(total.smoke, BLAST.mist + BLAST.dust, "every mist and dust puff is spawned");
+  // 3A 迭代 B5：土块 / 碎渣是不规则土块池、木片是木片池，不再是方块；泥浆与土块不是近黑色（SB02 的黑圆片 / 黑方块）。
+  assert.deepEqual([...new Set(vfx.log.debris.map((d) => d.kind))].sort(), ["clod", "splinter"], "clods and grit are clods, splinters are splinters (no cubes)");
+  const Luma = (c) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
+  assert.ok(vfx.log.mud.every((m) => Luma(m.colorA) > 0.03 && m.opacity < 0.95 && m.stretch > 0), "mud globs are brown, a little see-through at the rim, and streak along their velocity");
+  assert.ok(vfx.log.debris.every((d) => Luma(d.color) > 0.03), "no near-black debris (the old woodBurnt is 0.024)");
   assert.ok(head.debris >= 0.65 * total.debris, `most of the burst is out by ${BLAST.burst.headS} s: ${JSON.stringify(head)}`);
   assert.equal(stats.active, 0, "the emitter retires after its seconds");
   const cone = Math.cos(BLAST.spreadRad * 1.8 + 0.25);
@@ -646,7 +654,7 @@ function FakeVfx() {
         const s = At(d, age, -9.8).project(cam);
         if (s.z < 1 && Math.abs(s.x) < 1 && Math.abs(s.y) < 1) { out.clodsInFrame += 1; if ((s.x + 1) / 2 > 2 / 3) out.rightThird += 1; }
       }
-      for (const p of v3.log.smoke) {
+      for (const p of [...v3.log.smoke, ...v3.log.mud]) {
         const age = since - p.t; if (age < 0 || age > p.life) continue;
         out.alive += 1;
         const s = At({ ...p, vx: p.vx, vy: p.vy, vz: p.vz }, age, p.ay || 0, p.drag || 0).project(cam);

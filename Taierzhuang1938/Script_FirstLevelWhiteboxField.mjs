@@ -29,6 +29,7 @@ import { TRENCH_SURFACE } from "./Data_TrenchSurface.mjs";
 import { LoadTrenchSurface, BuildTrenchSurface, PaintTrenchBatch } from "./Script_TrenchSurface.mjs";
 import { MakeTrenchSurfacePatch } from "./Script_TrenchSurfaceMaterial.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
+import { SET_MATERIALS as OPENING_SET_MATERIALS } from "./Data_OpeningSet0103.mjs";
 import { TerrainContactField } from "./Script_TerrainContact.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
 
@@ -538,6 +539,11 @@ export class FirstLevelWhiteboxField {
 
   ScenarioMaterial(key, stateId) {
     if(key==="OpeningEarth")return this.library.Get("Adobe",{color:0x777064,repeat:2});
+    // 3A 迭代 B5（2026-09-28）：掩蔽部两态的木料（洞顶、南护壁、门柱、门楣）与开场布景同一份风化旧木
+    // （Data_OpeningSet0103.SET_MATERIALS.timber，第一关按需贴图集）；没下到就还是下面原来的程序化木梁。
+    const weathered=OPENING_SET_MATERIALS.timber;
+    if(stateId!=="NightGate"&&this.library.baked?.has?.(weathered.recipe)&&(key==="OpeningWood"||(this.layout.legend===false&&key==="timber")))
+      return this.library.Get(weathered.recipe,weathered.options);
     if(key==="OpeningWood")return this.library.Get("WoodBeam",{color:0x706351,repeat:2});
     if(this.layout.legend===false&&stateId!=="NightGate"&&key==="timber")return this.library.Get("WoodBeam",{color:0x766957,repeat:2});
     if(this.layout.legend===false&&stateId!=="NightGate"&&key==="earthDark")return this.library.Get("Adobe",{color:0x777064,repeat:2});

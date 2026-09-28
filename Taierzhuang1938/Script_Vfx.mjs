@@ -331,6 +331,9 @@ void main() {
   // 展开。常驻火灾烟如果沿用爆炸烟的急速膨胀，会在柱顶堆成一颗遮天黑球。
   // stretch / decal 池各自复用这条属性，受自己的预处理分支约束，不受影响。
   float growthPower = iExtra.x > 0.0 ? iExtra.x : 2.0;
+#ifdef SHAPE_MUD
+  growthPower = 1.6;             // 泥浆池的 iExtra.x 是快门时长，不是扩散曲线
+#endif
   float grow = 1.0 - pow(1.0 - t01, growthPower);
   float size = mix(iSize.x, iSize.y, grow);
   vec2 corner = position.xy;
@@ -356,14 +359,20 @@ void main() {
 #elif defined(ORIENT_STRETCH)
   // 沿飞行方向拉长：曳光弹与火星。头在 corner.x = +1 处。
   vec3 toCam = cameraPosition - world;
-#ifdef SHAPE_BLOODDROP
+#if defined(SHAPE_BLOODDROP) || defined(SHAPE_MUD)
   vec3 instant=iVelocity*exp(-k*age)+iAccel*((1.0-exp(-k*age))/k);
   vec3 dir=normalize(instant+vec3(0.0,1e-5,0.0));
 #else
   vec3 dir = normalize(iVelocity + vec3(0.0, 1e-5, 0.0));
 #endif
   vec3 side = normalize(cross(dir, normalize(toCam + vec3(1e-5))));
+#ifdef SHAPE_MUD
+  // 泥浆：拖尾 = 瞬时速度 × 快门（iExtra.x 秒），越飞越慢拖尾越短；下限是一颗泥团自己的长度
+  float streakLen = max(size * 1.5, length(instant) * iExtra.x);
+  vec3 along = dir * ((corner.x - 1.0) * 0.5 * streakLen);
+#else
   vec3 along = dir * ((corner.x - 1.0) * 0.5 * iExtra.x);
+#endif
   float halfWidth = size;
 #if defined(SHAPE_STREAK) || defined(SHAPE_BEAM)
   // 像素保底（iExtra.w > 0 才开；旧的曳光/火星写 0，行为不变）。按**这个顶点自己**
@@ -381,6 +390,12 @@ void main() {
   }
 #endif
   offset = along + side * (corner.y * halfWidth);
+  #ifdef LIT
+    // 受光的拉伸片（泥浆池）：假圆柱法线 —— 横向两侧往外、中间朝相机，略朝上
+    vec3 camDir = normalize(toCamOrZ(world));
+    vLitNormal = normalize(side * corner.y * 0.8 + camDir * 0.7 + vec3(0.0, 0.25, 0.0));
+    vViewDir = -camDir;
+  #endif
 #else
   // 面向相机：从 viewMatrix 取相机的右/上轴（比 modelViewMatrix 稳，
   // 因为整个池挂在 root 上、模型矩阵是单位阵）
@@ -536,6 +551,19 @@ void main() {
   float tail=(1.0-smoothstep(.08,.38,abs(p.y)))*smoothstep(-1.0,.55,p.x);
   mask=max(head,tail*.6)*(1.0-smoothstep(.8,1.0,abs(p.x)));
   color*=uSkyColor+uSunColor*.5;
+#elif defined(SHAPE_MUD)
+  // 近爆甩出来的湿泥（开场 SB02）：头是一团不规则的泥，身后一条被运动拉开的涂抹拖尾。
+  // vShape.x：-1 拖尾末端，+1 泥团前沿；y 横向。两层噪声啃边，边是软的但团是实的。
+  vec2 flow = vec2(vSeed * 41.0, vSeed * 17.0);
+  float lump = Vnoise(p * vec2(2.3, 4.1) + flow);
+  float grit = Vnoise(p * vec2(6.0, 11.0) + flow.yx);
+  float headR = length(vec2((p.x - 0.5) * 1.7, p.y * (1.0 + lump * 0.35)));
+  float head = 1.0 - smoothstep(0.30 + lump * 0.28, 0.92, headR);
+  float taper = mix(0.18, 0.78, smoothstep(-1.0, 0.55, p.x));
+  float tail = (1.0 - smoothstep(taper * (0.45 + lump * 0.35), taper, abs(p.y)))
+    * smoothstep(-1.0, -0.15, p.x) * (0.35 + 0.4 * grit);
+  mask = max(head, tail) * (0.78 + 0.22 * grit);
+  color = mix(vColor, vColorAlt, grit * 0.55);
 #elif defined(SHAPE_PUFF)
   // 烟/尘：两层不同尺度的噪声让每一片都是一团卷起来的絮，而不是一张
   // 单调的柔边圆盘。只啃外轮廓仍会读成“半透明云”；要让中心密度也有起伏，
@@ -702,7 +730,10 @@ void main() {
   vec3 lit = uSkyColor + uSunColor * (0.34 + 0.66 * wrapped);
   // 前向散射：视线越接近太阳方向，边缘越透亮（逆光的烟会"发光"）
   float forward = pow(max(dot(vViewDir, uSunDirection), 0.0), 4.0);
+#ifndef SHAPE_MUD
+  // 湿泥是实的，不透光：前向散射只给烟尘
   lit += uSunColor * forward * 0.55 * (1.0 - mask * 0.75);
+#endif
   color *= lit;
 #endif
 #ifdef SHAPE_DECAL
@@ -1074,6 +1105,7 @@ class ParticlePool {
     this.mesh.castShadow = false;
     this.mesh.receiveShadow = false;
     this.mesh.matrixAutoUpdate = false;
+    if (config.hideWhenIdle) this.mesh.visible = false;
   }
 
   /** 环形分配：满了就覆盖最老的那个（弹孔的先进先出也靠这条）。 */
@@ -1127,6 +1159,9 @@ class ParticlePool {
       if (death[i] > now) { last = i; break; }
     }
     this.geometry.instanceCount = last + 1;
+    // 只在一次演出里用得到的池（开场近爆的泥浆）：空着就整只藏起来，不占每帧的 program 绑定。
+    // 关卡预热的「全场强制出画」会把藏着的网格翻出来画一帧，着色器照样在加载画面后面编掉。
+    if (this.config.hideWhenIdle) this.mesh.visible = last >= 0;
   }
 
   Clear() {
@@ -1147,18 +1182,25 @@ class ParticlePool {
 // 碎块池：真几何小方块，会翻滚会弹跳。砖块/木屑/弹壳共用。
 // ---------------------------------------------------------------------------
 class DebrisPool {
-  constructor(capacity, shared) {
+  /**
+   * @param {object} [options]
+   *   shape：换掉单位方块的源几何（约 1 m 见方、有 position/normal，可带索引），着色器不变 ——
+   *     与方块池共用同一个 program，不多一次编译。开场近爆的土块/木片用（MakeClodGeometry / MakeSplinterGeometry）。
+   *   hideWhenIdle：空着时藏起整只网格（只在一场演出里用的池，不占每帧的绑定）。
+   */
+  constructor(capacity, shared, { shape = null, hideWhenIdle = false } = {}) {
     this.capacity = Math.max(4, capacity | 0);
     this.cursor = 0;
     this.deathTime = new Float32Array(this.capacity);
     this.dirtyMin = Infinity;
     this.dirtyMax = -Infinity;
+    this.hideWhenIdle = hideWhenIdle;
 
-    const box = new THREE.BoxGeometry(1, 1, 1);
+    const box = shape || new THREE.BoxGeometry(1, 1, 1);
     const geometry = new THREE.InstancedBufferGeometry();
     geometry.setAttribute("position", box.getAttribute("position"));
     geometry.setAttribute("normal", box.getAttribute("normal"));
-    geometry.setIndex(box.getIndex());
+    if (box.getIndex()) geometry.setIndex(box.getIndex());
     // 只是借它的 position/normal/index，**不能 dispose**：dispose 会把这几个
     // attribute 从渲染器的缓冲表里摘掉，而它们现在归这张实例化几何所有。
     // 源几何本身没上过 GPU，交给 GC 就行。
@@ -1203,6 +1245,7 @@ class DebrisPool {
     this.mesh.castShadow = false;
     this.mesh.receiveShadow = false;
     this.mesh.matrixAutoUpdate = false;
+    if (hideWhenIdle) this.mesh.visible = false;
   }
 
   Spawn(d, now) {
@@ -1238,6 +1281,7 @@ class DebrisPool {
       if (this.deathTime[i] > now) { last = i; break; }
     }
     this.geometry.instanceCount = last + 1;
+    if (this.hideWhenIdle) this.mesh.visible = last >= 0;
   }
 
   Clear() {
@@ -1248,6 +1292,50 @@ class DebrisPool {
   }
 
   Dispose() { this.geometry.dispose(); this.material.dispose(); }
+}
+
+/**
+ * 土块：二十面体的顶点各自往里外推一点（固定种子），再拆成独立三角面算平面法线 ——
+ * 翻滚时一面亮一面暗，读得出是一块不规则的湿土，不是方糖。约 1 m 见方，按 iScale 缩放。
+ */
+export function MakeClodGeometry(seed = "Taierzhuang.Vfx.Clod") {
+  const random = Mulberry32(HashString(seed));
+  const ico = new THREE.IcosahedronGeometry(0.5, 0);
+  const pos = ico.getAttribute("position");
+  // 同一个角点在非索引几何里出现多次：按坐标记住推过的量，面才不会裂开。
+  const pushed = new Map();
+  for (let i = 0; i < pos.count; i += 1) {
+    const key = `${pos.getX(i).toFixed(4)},${pos.getY(i).toFixed(4)},${pos.getZ(i).toFixed(4)}`;
+    if (!pushed.has(key)) pushed.set(key, 0.72 + random() * 0.5);
+    const k = pushed.get(key);
+    pos.setXYZ(i, pos.getX(i) * k, pos.getY(i) * k * 0.82, pos.getZ(i) * k);
+  }
+  const flat = ico.index ? ico.toNonIndexed() : ico;
+  flat.computeVertexNormals();
+  return flat;
+}
+
+/**
+ * 木片：沿 z 的细长楔子，一头削尖、断口歪斜（碎木劈开的样子），拆面算平面法线。约 1 m 长，按 iScale 缩放。
+ */
+export function MakeSplinterGeometry(seed = "Taierzhuang.Vfx.Splinter") {
+  const random = Mulberry32(HashString(seed));
+  const box = new THREE.BoxGeometry(1, 1, 1, 1, 1, 2);
+  const pos = box.getAttribute("position");
+  // BoxGeometry 每个面各有一份角点：按坐标缓存变换，相邻面的同一个角落到同一处，不裂缝。
+  const moved = new Map();
+  for (let i = 0; i < pos.count; i += 1) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), key = `${x},${y},${z}`;
+    if (!moved.has(key)) {
+      if (z > 0.49) moved.set(key, [x * 0.22 + 0.12, y * 0.35, z + (y > 0 ? 0.12 : 0)]);                 // 削尖的一头
+      else if (Math.abs(z) < 0.01) moved.set(key, [x * (0.85 + random() * 0.2), y * 0.9, z + (random() - 0.5) * 0.08]);
+      else moved.set(key, [x, y, z + (x > 0 ? 0.08 : -0.04)]);                                            // 歪斜的断口
+    }
+    pos.setXYZ(i, ...moved.get(key));
+  }
+  const flat = box.toNonIndexed();
+  flat.computeVertexNormals();
+  return flat;
 }
 
 // ---------------------------------------------------------------------------
@@ -1635,9 +1723,23 @@ export class VfxSystem {
     this.pools.bloodDrop=this.bloodEffects.drops;
     this.bloodSpurts=this.bloodEffects.sources;
     this.debris = new DebrisPool(cap(POOL_SHARE.debris, 48), this.shared);
+    // 开场近爆（Script_OpeningBlastFx，SB02）专用的三只池：甩出来的湿泥（沿速度拉伸、受光、软边）、
+    // 不规则土块、劈开的木片。容量固定、空着就整只藏起来（hideWhenIdle）—— 不吃画质档预算、
+    // 不占每帧的绑定，也不改手榴弹 / 炮弹的碎块与烟（那些仍走 debris / smoke）。
+    // 土块与木片池和 debris 是同一份着色器（只换源几何），泥浆池的 program 由开场布景装载时
+    // 生的一颗预热粒子在关卡预热里真画一次（Script_OpeningBlastFx.Warm）。
+    this.pools.mud = new ParticlePool(128, {
+      shape: "mud", orient: "stretch", blending: THREE.NormalBlending,
+      lit: true, softRange: 0.08, renderOrder: 6, hideWhenIdle: true,
+    }, this.shared);
+    this.chunks = {
+      clod: new DebrisPool(96, this.shared, { shape: MakeClodGeometry(), hideWhenIdle: true }),
+      splinter: new DebrisPool(48, this.shared, { shape: MakeSplinterGeometry(), hideWhenIdle: true }),
+    };
 
     for (const pool of Object.values(this.pools)) this.root.add(pool.mesh);
     this.root.add(this.debris.mesh);
+    for (const pool of Object.values(this.chunks)) this.root.add(pool.mesh);
 
     this.dust = null;
     this.dustBox = null;
@@ -1851,6 +1953,7 @@ export class VfxSystem {
 
     for (const pool of Object.values(this.pools)) pool.Flush(this.time);
     this.debris.Flush(this.time);
+    for (const pool of Object.values(this.chunks)) pool.Flush(this.time);
   }
 
   // --- 效果 -----------------------------------------------------------------
@@ -2688,6 +2791,7 @@ export class VfxSystem {
     // next live update, using its clock (including a checkpoint's reset clock).
     for (const source of this.smokeSources.values()) {source.prewarmPending = source.prewarm;source.firePrewarm=!!source.backdrop;}
     this.debris?.Clear?.();
+    for (const pool of Object.values(this.chunks || {})) pool.Clear();
     // 血源与 smokeSources 不同：它挂在一根**已经不在场上**的骨头上，清粒子那一刻
     // 那个断口八成也随着换关拆掉了，留着只会在下一关的原点冒血。
     this.bloodEffects.Clear();
@@ -2703,6 +2807,7 @@ export class VfxSystem {
     this.scene.remove(this.root);
     for (const pool of Object.values(this.pools)) pool.Dispose();
     this.debris.Dispose();
+    for (const pool of Object.values(this.chunks)) pool.Dispose();
     if (this.dust) this.dust.Dispose();
     for (const texture of this.explosionSpriteTextures.values()) texture.dispose();
     this.explosionSpriteTextures.clear();
@@ -2767,6 +2872,23 @@ export class VfxSystem {
     d.bounce = bounce; d.drag = 0.55; d.seed = this.random();
     d.rx = this._Signed(spinRate); d.ry = this._Signed(spinRate); d.rz = this._Signed(spinRate);
     this.debris.Spawn(d, this.time);
+  }
+
+  /**
+   * 一块不规则碎块（开场近爆）：kind = "clod"（土块）/ "splinter"（木片），参数与 _SpawnDebris 相同。
+   * 没有这只池（或 kind 写错）就退回方块池，调用方不用分情况。
+   */
+  SpawnChunk(kind, x, y, z, vx, vy, vz, sx, sy, sz, color, life, groundY, bounce, spinRate) {
+    const pool = this.chunks?.[kind];
+    if (!pool) { this._SpawnDebris(x, y, z, vx, vy, vz, sx, sy, sz, color, life, groundY, bounce, spinRate); return; }
+    const d = DEBRIS_SPAWN;
+    d.x = x; d.y = y; d.z = z;
+    d.vx = vx; d.vy = vy; d.vz = vz;
+    d.sx = sx; d.sy = sy; d.sz = sz;
+    d.color = color; d.life = life; d.groundY = groundY;
+    d.bounce = bounce; d.drag = 0.55; d.seed = this.random();
+    d.rx = this._Signed(spinRate); d.ry = this._Signed(spinRate); d.rz = this._Signed(spinRate);
+    pool.Spawn(d, this.time);
   }
 
   /** 弹孔贴花：原位贴面；polygonOffset 负责防 z-fighting，深度预通道负责裁悬空边。 */
