@@ -114,6 +114,15 @@ export const SKY_EXPOSURE = {
   // 夜战：钳位特别紧。evUp 0.6 = 自动曝光最多把夜景提亮 1.5 倍，
   // 绝不可能被拉成白天（用户明确要求）。
   night: { logLum: null, evBias: 0, evUp: 0.6, evDown: 0.8 },
+  // 第一关白天（2026-09-28 B4）。锚点逐关（EXPOSURE_ANCHORS.FirstLevelP012Whitebox），这里只管钳位：
+  //   evUp 0.6（最多 ×1.52）：进灶屋、厢房、掩蔽部时眼睛只适应一半 —— 参考图里屋里就是明显比屋外暗，
+  //     全量适应会把室内天光遮蔽（Script_InteriorSkyOcclusion）整个抵消掉；
+  //   evDown 0.25（最多 ×0.84）：抬头看天、看空旷的桥头场地时只压一点，地面不跟着天乱跳
+  //     （0.35 那一版实拍天空区显示亮度从 173 掉到 162，比参考 178 还暗）。
+  firstLevelBattleDay: { logLum: null, evBias: 0, evUp: 0.6, evDown: 0.25 },
+  // 第一关关尾夜行军（Script_Sky.firstLevelNight）：钳位照抄夜战（同一条「不许把夜拉成白天」的口径）。
+  // 过场式换天（cutsceneSky）不传逐关锚点，这一档只测不调。
+  firstLevelNight: { logLum: null, evBias: 0, evUp: 0.6, evDown: 0.8 },
   // 下面这些不在正片七关的出生机位上（过场自带天空、白盒、编辑器、靶场），
   // 没有可复现的「默认机位」可标定，一律留 null = 只测量不作用。
   dusk: { logLum: null, evBias: 0, evUp: 1.4, evDown: 1.2 },
@@ -152,6 +161,12 @@ export const EXPOSURE_ANCHORS = {
   CH4_DongguanYe: { logLum: -3.13 },     // night
   CH5_Chengqiang: { logLum: 0.59 },      // dawn
   CH6_Zuihou: { logLum: 0.54 },          // burningStreet
+  // 第一关《往南的路》（firstLevelBattleDay，2026-09-28 B4）。**不按出生机位标** —— 出生在掩蔽部里
+  // （坑底、头顶是顶板），拿它当「增益 1」的点等于把整关室外按室内的亮度往下压。
+  // 取 05–18 对照机位里 11 个室外机位（05_1 05_2 06_1 06_2 07_2 08_1 11_1 12_1 13_2 15_1 18_1）实测
+  // avgLog 的中位数（high / 1280×720，Script_FirstLevelSkyGradeBrowserTest 会重量并在偏差 > 0.3 EV 时报红）。
+  // **白盒体块换材质（反照率变了）之后要重标**：跑那个测试，照它打印的中位数改这里。
+  FirstLevelP012Whitebox: { logLum: -0.90 },   // firstLevelBattleDay
 };
 
 /**
@@ -198,6 +213,26 @@ export const TONEMAP = { default: "aces" };
  *   maxCache  同时缓存几张烘好的 LUT（换时段来回切不重烘）。
  */
 export const LUT = { size: 64, amount: 1.0, maxCache: 4 };
+
+/**
+ * 分级的出厂值（lift/gain + 分离调色）。时段预设可以在 `fog.grade` 里逐项覆盖
+ * （`Script_PostComposite` 每帧按「预设值 ?? 这里」现取）；**没写的预设吃这一份**，
+ * 所以一关写了分级、换到另一关不会把上一关的色偏带过去（2026-09-28 之前 uniform 只在
+ * 有 grade 时写、没有时保持，是个潜在的串色口子，当时没有预设写 grade 所以没暴露）。
+ *
+ *   lift / gain     线性域全局加 / 乘（出厂几乎是恒等式）
+ *   shadowTint      暗部乘的色（青蓝），shadow = 它的权重（0 = 不染）
+ *   highlightTint   亮部乘的色（暖黄），highlight = 它的权重
+ * 数值与 2026-09 之前着色器 uniform 的出厂值逐位相同（其余预设逐比特不变）。
+ */
+export const GRADE_DEFAULTS = Object.freeze({
+  lift: Object.freeze([0.006, 0.004, 0.012]),
+  gain: Object.freeze([1.02, 1.0, 0.965]),
+  shadowTint: Object.freeze([0.855, 0.975, 1.170]),
+  highlightTint: Object.freeze([1.105, 1.015, 0.880]),
+  shadow: 1.0,
+  highlight: 1.0,
+});
 
 /**
  * 泛光的物理化口径。
@@ -292,6 +327,6 @@ export const LENS_FLARE = {
 export const OUTPUT = { dither: 0.0 };
 
 export default {
-  AUTO_EXPOSURE, SKY_EXPOSURE, SkyExposureFor, TONEMAP, TONEMAP_MODES, LUT, BLOOM,
+  AUTO_EXPOSURE, SKY_EXPOSURE, SkyExposureFor, TONEMAP, TONEMAP_MODES, LUT, GRADE_DEFAULTS, BLOOM,
   LENS_FLARE, OUTPUT,
 };

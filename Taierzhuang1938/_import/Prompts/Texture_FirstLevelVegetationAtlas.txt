@@ -1,0 +1,23 @@
+IMPORTANT: deliver a fully OPAQUE image. Keep the solid pure magenta #FF00FF background in the final file. Do NOT remove the background, do NOT make anything transparent, do NOT run any background-removal or cut-out step - I will key out the magenta myself.
+
+Generate ONE square 1:1 image (2048x2048): a game-texture sprite sheet of 8 separate plant cards for a WW2 FPS (rural southern Shandong, China, March 1938, end of winter, overcast day).
+
+Background: perfectly flat, uniform pure magenta #FF00FF everywhere between and around the plants. No gradient, no shadow, no floor, no horizon, no texture in the background. The gaps between individual grass blades, stems and twigs must also show the pure magenta background: the plants are see-through between stems, not filled silhouettes.
+
+Layout: a strict 4 columns x 2 rows grid of equal square cells (each cell 512x512 px). Exactly one plant clump per cell, centred horizontally, its base touching the bottom edge of its cell, never crossing into a neighbouring cell. Leave at least 16 px of magenta margin at the left, right and top of every plant. No grid lines, no borders, no labels, no text.
+
+View: straight side-on orthographic view (camera level with the ground), like a botanical cut-out photo. Lighting: flat, soft, shadowless, delit albedo (no cast shadows, no specular highlights, no vignette, no rim light). Colours: realistic, low-saturation, dusty.
+
+Cells, left to right:
+Row 1:
+1. Tall clump of dead winter grass, thin pale straw-beige and grey-brown blades, some bent and broken, about 0.6 m tall.
+2. Low tuft of dry matted grass, straw and dull brown, wide and short, about 0.25 m tall.
+3. Dead weed stalks (withered mugwort / wormwood), a few thin dark grey-brown stems with small dry seed heads, about 0.8 m tall, sparse and airy.
+4. Leafless thorny bramble scrub, a tangle of thin dark red-brown twigs, about 0.9 m tall and 1 m wide.
+Row 2:
+5. River-bank reeds (Phragmites) in late winter: tall straight pale tan stems with faded feathery grey-beige plumes, about 1.8 m tall, several stems.
+6. Small clump of fresh early-spring green grass sprouts mixed with a few dry blades, muted olive green, about 0.2 m tall.
+7. Mixed clump: mostly dry beige grass with a few new green blades at the base, about 0.4 m tall.
+8. Low leafless twiggy shrub, grey-brown thin branches spreading in a fan, about 0.7 m tall.
+
+Photorealistic plant detail with thin individual blades, crisp edges against the magenta. No people, no objects, no ground patch, no soil.

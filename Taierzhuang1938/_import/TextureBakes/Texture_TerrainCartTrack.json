@@ -1,14 +1,71 @@
 {
-  "generator": "audit",
+  "generator": "Script_BakePbrTexture.py@1",
   "date": "2026-09-28",
   "name": "TerrainCartTrack",
   "preset": "drySoil",
-  "source": null,
+  "source": {
+    "path": "_shots/Gap3A_Source/B2Ground/CartTrack/lovart_7e04807493ff.png",
+    "sha256": "c91601eaaa17222e7d5c49f9c366d2f278ca32f331adabb225920e693366d35d",
+    "metrics": {
+      "meanSrgb": [
+        0.4165,
+        0.3698,
+        0.3253
+      ],
+      "luma": 0.3705,
+      "lumaStd": 0.0929,
+      "sat": 0.2189,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0163
+    }
+  },
   "heightSource": null,
   "params": {
+    "mean": [
+      0.44,
+      0.38,
+      0.3
+    ],
+    "contrast": 0.08,
+    "lumaRange": [
+      0.28,
+      0.46
+    ],
+    "satRange": [
+      0.18,
+      0.42
+    ],
+    "stdRange": [
+      0.05,
+      0.12
+    ],
+    "reliefM": 0.009,
+    "rough": 0.84,
+    "roughVar": 0.06,
+    "roughLumaK": 0.0,
+    "ao": 0.32,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.088,
+    "isotropic": true,
+    "heightFromLuma": "direct",
     "tileM": 3.1,
+    "size": 1024,
+    "dataSize": 512,
     "pack": "orh",
-    "normalConvention": "terrain"
+    "normalConvention": "terrain",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false
   },
   "outputs": [
     {
@@ -16,44 +73,46 @@
       "file": "Texture_TerrainCartTrackBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 371906,
-      "sha256": "1be6c66f0c8c15544cc52d96527b9cc4eb79dd79fef188b7968c6338b29160df"
+      "bytes": 335748,
+      "sha256": "25a799f601595202725b8e1b62e56b604ce51d4c624013ebc5234d4098b9d0f5"
     },
     {
       "channel": "Normal",
       "file": "Texture_TerrainCartTrackNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 104534,
-      "sha256": "6c9506ad3bd40e178f13aceba53dc37674e6b903fc4fe538bd1fa54b109dd711"
+      "bytes": 98400,
+      "sha256": "43b9934f5a71171227320503d58b7b2f0a31626307515d1d07d2cecd37eb6561"
     },
     {
       "channel": "Orh",
       "file": "Texture_TerrainCartTrackOrh.webp",
       "width": 512,
       "height": 512,
-      "bytes": 92262,
-      "sha256": "07f90f55e2dea6a4595a51164ff6c26cd13a56d428a63c64563c037e67163ddf"
+      "bytes": 77592,
+      "sha256": "d4bfde9bb7fb873ae6908f42dc8846547a6243ab5e84d38dfb0d58fa1e83d8e7"
     }
   ],
-  "totalBytes": 568702,
+  "totalBytes": 511740,
   "metrics": {
     "meanSrgb": [
-      0.4776,
-      0.4338,
-      0.3518
+      0.4398,
+      0.3807,
+      0.2996
     ],
-    "luma": 0.4211,
-    "lumaStd": 0.074,
-    "sat": 0.2634,
+    "luma": 0.3734,
+    "lumaStd": 0.0811,
+    "sat": 0.3186,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0012,
-    "seam": 0.0644,
-    "interior": 0.064,
-    "seamRatio": 1.006,
-    "border": 0.976,
-    "swing": 0.0019,
+    "lowFreq": 0.0051,
+    "seam": 0.0481,
+    "interior": 0.0507,
+    "seamRatio": 0.95,
+    "border": 0.954,
+    "swing": 0.0052,
+    "aoMean": 0.933,
+    "roughMean": 0.82,
     "texelsPerMeter": 330.3
   },
   "gateProblems": []

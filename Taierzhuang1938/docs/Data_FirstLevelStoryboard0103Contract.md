@@ -91,7 +91,7 @@
 - `OpeningSet.Enter(stage)` / `Update(dt, stage, phase, flags)` / `Exit()`；01–03 之外全部收走（BuildSink 或显式 dispose），离开后场景里不得残留（有断言）。
 - 道具 id（数据在 `Data_OpeningSet0103.PROPS`）：`bunkerSandbagWallN`、`bunkerPoster`、`bunkerLantern`（带暖色点光、闪烁，只在 01 亮）、`bunkerCrateStackN`、`bunkerCrateFront`、`fallenLintel`（Blast 时从门楣落下并常驻至 02 结束）、`roofTimberDown`（SB03A 画面上沿的塌下洞顶木料）、`trenchFacadeN`（北壁木框洞口立面）、`duckboardsFront`、`duckboardsSSW`、`revetmentFront`、`revetmentSSW`、`sandbagStakesSouth`、`flagTrench`、`flagRC`、`flagSkyline*`、`deadTreeRim*`、`plankDebrisButt`（SB04 前景断木板）；03：`nestBrickWall*`（阵位破砖墙外观）、`gapWallCollapsed`、`gapRevetment`、`nestAmmoBoxes`。
 - 烟火与飞机：`Data_OpeningSet0103.SMOKE`（`{id, stage, x, z, kind, scale, fire}`）、`FLYOVER`（03 开头两架日机的航线与时刻，用 `aircraft.SetManualPose`）。
-- `OpeningBlastFx.DirectionalBlast(position, direction, {clods, splinters, dust, seconds})`：锥形定向喷土、土块、碎木与扬尘（SB02 从洞口南沿约 (1.2,−124.5) 向西北喷入洞内）；`OpeningSet.FallLintel(progress)` 或 `fallenLintel` 的落下轨（0.3–0.5 s）。
+- `OpeningBlastFx.DirectionalBlast(position, direction, {clods, splinters, grit, spray, mist, dust, seconds})`（2026-09-28 起泥浆 / 碎块走 `Script_Vfx` 的专用池，见 §9）：锥形定向喷土、土块、碎木与扬尘（SB02 从洞口南沿约 (1.2,−124.5) 向西北喷入洞内）；`OpeningSet.FallLintel(progress)` 或 `fallenLintel` 的落下轨（0.3–0.5 s）。
 - 洞口塌土（Space 体块 `BunkerMouthRubbleS` 等）改形：SB03 视线上不高于约 0.35 m，同时在 SB06 坐位西侧给出靠背与对 F 的遮挡；带碰撞与掩体标签照旧。
 - `Data_OpeningSet0103.sky.overcast`（默认 false）：01–03 阴天开关。
 
@@ -145,3 +145,14 @@
   8. Space 旧锚点（`MISSION_PLACEMENT.bunker.player/rifle/rifleMouth`、`FRONT_SPACE.shunziDragged`）第二波**同步到新值**，不标废弃。
   9. 第二波起点：`pendingWiring` 42 条 + 本条 2、8 + Set/Dir 道具与站位的 16 处重叠（`OpeningSetTest` 合并后红在这里，预期内）。
 - v1.2（2026-09-26，推 master 前的集成修复）：洞口塌落后导演路线不再从洞口正中穿木料——`foundRoute`/`dragOutRoute` 走断板南侧、离门楣 ≥ 0.5 m；`dragCoverRoute` 沿塌土与靠背之间的窄道往东再北上坐位；踢枪起点 (1.45,−126.25)、枪先放 (1.43,−125.75)；`withdraw.lane` 首点 (3.05,−124.5)（保住回头看追兵）。布景：还权靠背缩为坐位西北小堆（v1.1 起不要求遮 F）；北壁立面第一口门改 x 2.7–3.5、离地 0.3 m 以上后仰 20°（川军的头不再顶进门柱）；SB08 视线上的缺口东沿倒墙片、碎砖、护壁压到视线以下（外观件，碰撞与射界不变）。**遗留**：01 日兵甲从洞内拖人到洞口那一段、SB04A 的 `ija.dragAway.route` 仍穿过塌顶木与门楣（代码算出的站位与嵌套路线，测试没覆盖），第二波从北侧通道重编或给塌顶木加「被清开」状态；v1.1 第 2 条（南护壁东端）未做。
+
+## 9. 2026-09-28 3A 画面迭代（B5：开场布景材质、洞内光、近爆碎屑）
+
+对照分镜 01/02/03A/04/04A/05 与 `Gap3A_Before` 实拍补的是「看起来」：布景位置、碰撞、导演站位与判据一个没动（`Script_OpeningStoryboardShots` 六镜判据照旧通过）。
+
+- **木料与弹药箱**：程序化 `WoodBeam`（橙黄新木）→ 关卡按需集 `OpeningTimber`（Lovart 风化灰褐旧木，1 m 一张）；`WoodCrate` → `OpeningCrate`（旧弹药箱板，0.6 m 四块板）。两套登记在 `Data_TextureManifest` 与 `Data_LevelTextureSets.FirstLevel`（`fallback` 仍是程序化配方），`Script_FirstLevelWhiteboxField.PrepareAssets` 建场前 `await library.LoadLevelSets("FirstLevel")`；掩蔽部两态的洞顶、南护壁、门柱、门楣（`ScenarioMaterial`）用同一份材质，开场动作库里被踢开的断木道具（`Script_OpeningProps` 的 `beam`）也是。选哪套、染什么色在 `Data_OpeningSet0103.SET_MATERIALS`；套没下到时 `Script_OpeningSet` 先用回退配方，下到后把已建网格换过去（`SyncSetMaterials`）。木料盒子走 `TimberBox`（每面 V 轴转到木料长边，木纹顺着木料走）、圆木走按周长 / 长度换算的世界米 UV。
+- **洞内环境光**：取证见 `_shots/Gap3A_After/B5/Probe`——01 洞里的亮全是环境光（关太阳洞里几乎不变）。`Data_OpeningSet0103.INTERIOR`：出画镜头（`vfx.eye`，过场独立机位也算）在洞内盒子里时，`scene.environmentIntensity`、LightRig 的全局 SH 与 AmbientLight 乘 `ambientScale`，洞口外 `featherMouthM`、其余三面 `featherM` 淡完；离开原样还回去（别处中途重设过基准就以新值为准）。这是布景级手段；通用的按区域 / 按表面室内压暗归渲染侧，集成时可替换，数据留在这里。探针体 GI 开着时它的漫反射不在这三项里（GI 默认关）。
+- **马灯**：`bunkerLantern.light` 强度、半径、色温上调，洞内压暗后暖光池读得出来；仍是簇光（不加 PointLight、不投影，没有做假阴影）。
+- **标语做旧**：`bunkerPoster.aging`（受潮发黄、四边水渍、水迹线、泥点），装载时画布叠层（`OpeningSet.AgePoster`），字的区域压得很淡。
+- **近爆碎屑（SB02「黑圆片」）**：泥浆不再进烟团池（不透明近黑圆盘），改走 `Script_Vfx` 的 `pools.mud`（`SHAPE_MUD`：沿瞬时速度拉拖尾、受光、软边的湿泥团）；土块、碎渣走 `vfx.chunks.clod`（不规则二十面体）、木片走 `vfx.chunks.splinter`（削尖楔子），不再是方块；另加一溜细尘团（`mist`）。三只池容量固定、空着就藏（不占每帧绑定、不吃画质档预算），手榴弹 / 炮弹仍走原来的 `debris` / `smoke`。泥浆池是新着色器：`OpeningBlastFx.Warm` 在布景装载时生一颗看不见的粒子，关卡预热真画一次。个数、尺寸、快门、颜色在 `Data_OpeningSet0103.BLAST`（`grit` `mist` `mudSize` `gritSize` `shutterS` `dustOpacity` `colors`）。
+- 门禁：`Script_OpeningSetTest`（泥浆进泥浆池、碎块不是方块、颜色不近黑）、`Script_TextureStandardsTest`、`Script_OpeningStoryboardShots.mjs --shots=SB01,SB02,SB03A,SB04,SB04A,SB05`（判据 + 并排图）。

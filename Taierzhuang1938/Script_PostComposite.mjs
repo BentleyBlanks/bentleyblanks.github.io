@@ -51,7 +51,7 @@ import { VOLUMETRIC_SAMPLE_GLSL, BindVolumetricUniforms } from "./Script_PostVol
 // 2026-09 相机曝光轮（子系统 B6a）：tonemap 曲线、3D LUT、相机数值表。
 import { TONEMAP_GLSL } from "./Script_PostExposure.mjs";
 import { LUT_GLSL, GradeLutCache, GradeFromUniforms } from "./Script_PostGrade.mjs";
-import { LENS_FLARE, OUTPUT, LUT as LUT_TUNING } from "./Data_Tuning_Camera.mjs";
+import { LENS_FLARE, OUTPUT, LUT as LUT_TUNING, GRADE_DEFAULTS } from "./Data_Tuning_Camera.mjs";
 
 // ## 2026-09 相机曝光轮：四段换了实现，接口与默认值一个都没动
 //   · SEGMENT exposure —— `uExposureTex` 的**生产者接上了**（Script_PostExposure
@@ -136,6 +136,8 @@ uniform float uDirtHigh;
 // --- SEGMENT color-grade ----------------------------------------------------
 uniform float uSaturation;
 uniform float uContrast;
+// 0 = 围绕 sRGB 0.5 的线性拉伸（出厂，其余预设逐比特不变）；1 = 幂形 S 曲线（两端渐近，不硬裁）
+uniform float uContrastCurve;
 uniform vec3 uLift;
 uniform vec3 uGain;
 // 分离调色（split toning）：**这是「整体偏单色土黄」的最后一道闸门**。
@@ -453,7 +455,15 @@ vec3 GradeMath(vec3 color) {
   // 转到 sRGB 后再围绕 0.5 调对比，等价黑位只到约 0.0026 线性亮度；暗部层次
   // 保留下来，亮部和中间调仍维持原来的感知对比意图。
   vec3 perceptual = LinearToSrgb(color);
-  perceptual = clamp((perceptual - 0.5) * uContrast + 0.5, 0.0, 1.0);
+  if (uContrastCurve > 0.5) {
+    // 幂形 S 曲线（2026-09-28 第一关）：线性拉伸在 1.10 时把 sRGB < 0.045 的暗部整块裁成 0
+    //（SB01 掩蔽部门柱内侧 8% 的像素死黑）；这一支在 0.5 处斜率同样是 uContrast，两端渐近 0 / 1。
+    vec3 lo = 0.5 * pow(max(perceptual * 2.0, vec3(0.0)), vec3(uContrast));
+    vec3 hi = 1.0 - 0.5 * pow(max((1.0 - perceptual) * 2.0, vec3(0.0)), vec3(uContrast));
+    perceptual = mix(lo, hi, step(vec3(0.5), perceptual));
+  } else {
+    perceptual = clamp((perceptual - 0.5) * uContrast + 0.5, 0.0, 1.0);
+  }
   return SrgbToLinear(perceptual);
 }
 
@@ -603,8 +613,9 @@ export class CompositePass {
       uBloomStrength: { value: 0.55 }, uGodStrength: { value: 0.0 },
       uVignette: { value: 0.42 }, uAberration: { value: 0.0022 }, uGrain: { value: 0.014 },
       uFrame: { value: 0 }, uSaturation: { value: 0.94 }, uContrast: { value: 1.06 },
-      uLift: { value: new THREE.Vector3(0.006, 0.004, 0.012) },
-      uGain: { value: new THREE.Vector3(1.02, 1.0, 0.965) },
+      uContrastCurve: { value: 0 },
+      uLift: { value: new THREE.Vector3().fromArray(GRADE_DEFAULTS.lift) },
+      uGain: { value: new THREE.Vector3().fromArray(GRADE_DEFAULTS.gain) },
       uMotionScale: { value: 0.6 }, uInvProjection: { value: new THREE.Matrix4() },
       uPrevViewProjection: { value: new THREE.Matrix4() }, uInvView: { value: new THREE.Matrix4() },
       uProjScale: { value: new THREE.Vector2(1, 1) },
@@ -632,9 +643,10 @@ export class CompositePass {
       // 暗部往青蓝推、亮部往暖黄推。幅度看着小，但它作用在**每一个像素**上：
       // 实测把街景阴影的 B−R 从 +3 拉到 +12，中性水泥/石头的 RGB 不再相等。
       // 别再加大：超过 1.20/0.86 这一档，青砖会开始读成蓝砖，史实色 #7E8388 就走样了。
-      uShadowTint: { value: new THREE.Vector3(0.855, 0.975, 1.170) },
-      uHighlightTint: { value: new THREE.Vector3(1.105, 1.015, 0.880) },
-      uSplitShadow: { value: 1.0 }, uSplitHighlight: { value: 1.0 },
+      // 出厂值在 Data_Tuning_Camera.GRADE_DEFAULTS（时段预设可在 fog.grade 里逐项覆盖）。
+      uShadowTint: { value: new THREE.Vector3().fromArray(GRADE_DEFAULTS.shadowTint) },
+      uHighlightTint: { value: new THREE.Vector3().fromArray(GRADE_DEFAULTS.highlightTint) },
+      uSplitShadow: { value: GRADE_DEFAULTS.shadow }, uSplitHighlight: { value: GRADE_DEFAULTS.highlight },
       // --- 2026-09 相机曝光轮 ---
       // 三位全部「关 = 与改动前逐比特相同」：tonemap 默认 ACES、LUT 混合量 0、
       // 光晕/脏污强度 0、抖动 0。任何一位被打开才会改动像素。
@@ -666,8 +678,8 @@ export class CompositePass {
     this.lutCache = new GradeLutCache(LUT_TUNING.size, LUT_TUNING.maxCache);
     this.lutAmount = LUT_TUNING.amount;
     this._lutTexture = null;
-    this._gradeSig = new Float64Array(15).fill(NaN);   // NaN 保证第一帧一定判「变了」
-    this._gradeNext = new Float64Array(15);
+    this._gradeSig = new Float64Array(16).fill(NaN);   // NaN 保证第一帧一定判「变了」
+    this._gradeNext = new Float64Array(16);
   }
 
   /** 外部 LUT（.cube 重采样后的条带纹理）；传 null 恢复内部烘焙。 */
@@ -694,6 +706,7 @@ export class CompositePass {
     next[12] = U.uSplitShadow.value;
     next[13] = U.uSplitHighlight.value;
     next[14] = U.uContrast.value;
+    next[15] = U.uContrastCurve.value;
     const sig = this._gradeSig;
     for (let i = 0; i < next.length; i += 1) {
       if (sig[i] !== next[i]) { sig.set(next); return true; }
@@ -727,8 +740,22 @@ export class CompositePass {
     U.uGrain.value = options.grain ?? 0.014;
     U.uSaturation.value = options.saturation ?? 0.94;
     U.uContrast.value = options.contrast ?? 1.06;
+    // 分离调色 + lift/gain。Script_Main / Script_Probe 的调用点只透传 `preset.fog`，
+    // 所以时段档要改这一组就把 grade 挂在 preset.fog 里带过来（大气与调色本来同源）。
+    // **每一项每帧现取「预设值 ?? 出厂值」**：没写 grade 的预设逐比特吃出厂值，
+    // 写了 grade 的那一档离开之后也不会把色偏留在 uniform 里（2026-09-28 之前是
+    // 「有才写、没有就保持」，换预设会串色）。options.lift / gain 仍优先（向后兼容）。
+    const grade = options.grade ?? options.fog?.grade ?? null;
+    const G = GRADE_DEFAULTS;
     if (options.lift) U.uLift.value.copy(options.lift);
+    else U.uLift.value.fromArray(grade?.lift ?? G.lift);
     if (options.gain) U.uGain.value.copy(options.gain);
+    else U.uGain.value.fromArray(grade?.gain ?? G.gain);
+    U.uShadowTint.value.fromArray(grade?.shadowTint ?? G.shadowTint);
+    U.uHighlightTint.value.fromArray(grade?.highlightTint ?? G.highlightTint);
+    U.uSplitShadow.value = grade?.shadow ?? G.shadow;
+    U.uSplitHighlight.value = grade?.highlight ?? G.highlight;
+    U.uContrastCurve.value = grade?.contrastCurve === "soft" ? 1 : 0;
     if (options.fog) {
       U.uFogDensity.value = options.fog.density ?? 0.013;
       U.uFogFalloff.value = options.fog.falloff ?? 18;
@@ -739,16 +766,6 @@ export class CompositePass {
       U.uFogSunGain.value = options.fog.sunGain ?? 0.28;
       U.uDepthDesat.value = options.fog.desat ?? 0.48;
       U.uDepthFlatten.value = options.fog.flatten ?? 0.14;
-    }
-    // 分离调色。Script_Main / Script_Probe 的调用点只透传 `preset.fog`，
-    // 所以时段档要改这一组就把 grade 挂在 preset.fog 里带过来（大气与调色本来同源）。
-    // 两边都没给就吃上面那组默认值 —— 默认值必须自己就是对的。
-    const grade = options.grade ?? options.fog?.grade;
-    if (grade) {
-      if (grade.shadowTint) U.uShadowTint.value.fromArray(grade.shadowTint);
-      if (grade.highlightTint) U.uHighlightTint.value.fromArray(grade.highlightTint);
-      U.uSplitShadow.value = grade.shadow ?? 1.0;
-      U.uSplitHighlight.value = grade.highlight ?? 1.0;
     }
     if (options.sunDirection) U.uSunDir.value.copy(options.sunDirection);
     if (options.sunColor) U.uSunColorFog.value.fromArray(options.sunColor);

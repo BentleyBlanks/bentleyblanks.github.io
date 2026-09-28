@@ -2,13 +2,17 @@ import * as THREE from 'three';
 import { MakeTerrainPatch } from './Script_TerrainMaterial.mjs';
 import { TerrainBlendUniforms, TERRAIN_BLEND_GLSL } from './Script_TerrainBlend.mjs';
 import { SurfacePatchEnd } from './Script_MaterialPatches.mjs';
-import { TerrainQualityOf } from './Data_Tuning_Terrain.mjs';
+import { TerrainQualityOf, TERRAIN_WATER as W } from './Data_Tuning_Terrain.mjs';
 import { TERRAIN_CONTACT_GLSL } from './Script_TerrainContact.mjs';
 import { TRENCH_SURFACE as C } from './Data_TrenchSurface.mjs';
 
+// 基础地形那段 GLSL 被包进下面的非一致分支（纯沟土像素跳过它），导数在分支外求好；
+// 湿泥/积水等壕沟这一路（沟底凹度只有这里有接触高度场）算完再统一上。
 const Common = /* glsl */`
-
+#define TERRAIN_HOISTED_DERIVATIVES
+#define TERRAIN_WATER_EXTERNAL
 uniform vec4 uTrenchMud;
+uniform vec4 uTrenchWater;   // x 沟底积水 y 沟底底湿度 z,w 凹度（米）[起, 满]
 uniform float uTrenchPom;
 float gTrenchWet=0.0;
 float gTrenchContact=0.0;
@@ -81,8 +85,10 @@ void SoilPlane(vec3 world,vec3 geomN,vec3 dx,vec3 dy,int axis,float weight,vec3 
   perturb=axis==0?vec3(n.x,0,n.y):axis==1?vec3(0,-n.y,n.x):vec3(n.x,-n.y,0);
   perturb-=geomN*dot(geomN,perturb);
 }
-float SoilHorizon(vec3 world,vec3 normalW) {
-  float sum=0.0;
+// 世界高度遮蔽；顺带给出「沟底凹度」low：四个方向 1.2 / 3.2 m 处比这里高多少的均值
+//（沟底两侧是沟壁 → 大；沟沿与抛土顶四周更低 → 0），积水只落在沟底，不落在沟沿上。
+float SoilHorizon(vec3 world,vec3 normalW,out float low) {
+  float sum=0.0,rise=0.0;
   for(int i=0;i<4;i++){
     vec2 direction=i==0?vec2(1,0):i==1?vec2(-1,0):i==2?vec2(0,1):vec2(0,-1);
     float nearH=ContactSurface(world.xz+direction*1.2).w;
@@ -90,14 +96,19 @@ float SoilHorizon(vec3 world,vec3 normalW) {
     vec3 nearRay=normalize(vec3(direction.x*1.2,nearH-world.y-.03,direction.y*1.2));
     vec3 farRay=normalize(vec3(direction.x*3.2,farH-world.y-.03,direction.y*3.2));
     sum+=max(0.0,max(dot(normalW,nearRay),dot(normalW,farRay)));
+    rise+=max(0.0,max(nearH,farH)-world.y);
   }
+  low=smoothstep(uTrenchWater.z,uTrenchWater.w,rise*.25);
   return clamp(1.0-sum*.32,.48,1.0);
 }`;
 const Evaluate = /* glsl */`
 {
   vec3 geomN=normalize(transpose(mat3(viewMatrix))*normalize(vNormal));
-  vec3 worldDx=dFdx(vTerrainWorld),worldDy=dFdy(vTerrainWorld);
-  float spoil=clamp(vTerrainLayers.g,0.0,1.0);
+  vec3 worldDx=trenchWorldDx,worldDy=trenchWorldDy;
+  // 翻土让位给车道/场坪（与基础地形 wSpoil = g·(1−r) 同一口径）：沟真切断路的地方，
+  // SampleMissionGroundSurface 已经把车道权重收掉了（2026-09-28，06 集结洼地不再是一片沟底土）。
+  float spoil=clamp(vTerrainLayers.g,0.0,1.0)*(1.0-clamp(vTerrainLayers.r,0.0,1.0));
+  float trenchLow=0.0;
   if(spoil>.001) {
   vec3 w=pow(abs(geomN),vec3(4));w/=max(dot(w,vec3(1)),.001);
   vec3 ca,cb,cc,na,nb,nc;vec3 ra,rb,rc;float sa,sb,sc;
@@ -118,14 +129,20 @@ const Evaluate = /* glsl */`
   gTerrainNormalW=normalize(mix(gTerrainNormalW,normalize(geomN+na*w.y+nb*w.x+nc*w.z),spoil));
   gTerrainRough=mix(gTerrainRough,clamp(surface.x,.76,.96),spoil);
   gMaterialAo=mix(gMaterialAo,mix(.25,1.0,surface.y),spoil);
-  float pooling=smoothstep(.65,.97,geomN.y);
-  float damp=smoothstep(.46,.72,TerrainNoise(vTerrainWorld.xz*.57));
-  float lowSpots=1.0-smoothstep(.25,.58,surface.z);
-  gTrenchWet=spoil*damp*pooling*lowSpots;
-  diffuseColor.rgb*=1.0-${C.mud.darken.toFixed(3)}*gTrenchWet;
-  gTerrainRough=mix(gTerrainRough,uTrenchMud.w,gTrenchWet);
-  gMaterialAo*=SoilHorizon(vTerrainWorld,geomN);
+  gTerrainHeight=mix(gTerrainHeight,surface.z,spoil);
+  gMaterialAo*=SoilHorizon(vTerrainWorld,geomN,trenchLow);
   }
+#ifndef TRENCH_STONE
+  {
+    // 湿泥与积水（Script_TerrainMaterial.TerrainWater）：车道照常；沟底（翻土 × 凹度）更湿、积水更多。
+    float floorSite=spoil*trenchLow;
+    vec3 wetColor=diffuseColor.rgb;
+    TerrainWater(wetColor,vTerrainWorld.xz,geomN,max(gTerrainWeights.y*uTerrainWaterD.x,floorSite*uTrenchWater.x),
+      trenchLow*spoil,max(gTerrainWeights.y*uTerrainWaterD.w,floorSite*uTrenchWater.y));
+    diffuseColor.rgb=wetColor;
+    gTrenchWet=max(gTerrainWet,gTerrainWater);
+  }
+#endif
 }`;
 const Stone = /* glsl */`
 {
@@ -154,7 +171,9 @@ const Stone = /* glsl */`
   vec3 stoneColor=mix(soilColor*1.18,stoneA.rgb*vec3(.65,.58,.46),.72);
   diffuseColor.rgb=mix(stoneColor,soilColor,gTrenchContact);
   gTerrainRough=mix(clamp(stoneS.b,.82,.96),soilRough,gTrenchContact);
-  vec2 n=stoneS.rg*2.0-1.0;
+  // Texture_TrenchStoneNormal is Poly Haven nor_gl (green = image up); the terrain arrays sample
+  // with flipY=false where image down = +v, so flip green here (docs/Data_TextureAssetStandard.md §3.2).
+  vec2 n=(stoneS.rg*2.0-1.0)*vec2(1.0,-1.0);
   vec3 stonePerturb=an.y>.6?vec3(n.x,0,n.y):(an.x>an.z?vec3(0,-n.y,n.x):vec3(n.x,-n.y,0));
   stonePerturb-=geomN*dot(stonePerturb,geomN);
   gTerrainNormalW=normalize(mix(normalize(geomN+stonePerturb*.32),soilNormal,gTrenchContact));
@@ -168,11 +187,12 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
   const bind=patch.uniforms;
   // Runtime diagnostic for same-frame POM A/B; normal/colour/lighting stay fixed.
   const pom={value:1};patch.trenchPomUniform=pom;
-  patch.key+=stone?':trenchStoneContact7Gbuffer':':trenchWetHeight7';
+  patch.key+=stone?':trenchStoneContact8Gbuffer':':trenchWetHeight8';
   patch.uniforms=(uniforms,shader)=>{
     bind(uniforms,shader);
 
-    uniforms.uTrenchMud={value:new THREE.Vector4(C.mud.tileM,C.mud.reliefM,C.mud.roughDry,C.mud.roughWet)};
+    uniforms.uTrenchMud={value:new THREE.Vector4(C.mud.tileM,C.mud.reliefM,C.mud.roughDry,W.waterRough)};
+    uniforms.uTrenchWater={value:new THREE.Vector4(W.site.trenchFloor,W.damp.trenchFloor,W.lowRiseM[0],W.lowRiseM[1])};
     uniforms.uTrenchPom=pom;
     if(stone){
       for(const key of ['uTerrainBlendValid','uTerrainBlendColor','uTerrainBlendNormalDepth','uTerrainBlendSize'])uniforms[key]=TerrainBlendUniforms[key];
@@ -181,16 +201,18 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
     uniforms.uContactHeight={value:contact.texture};uniforms.uContactGrid={value:contact.grid};
   };
   patch.fragment=patch.fragment.map(([anchor,glsl])=>{
-    if(anchor==='#include <common>')glsl+='\n'+TERRAIN_CONTACT_GLSL+'\n'+Common+(stone?'\n'+TERRAIN_BLEND_GLSL+'\nuniform sampler2D uTerrainBlendColor;':'\nuniform float uTerrainCapture;\nlayout(location=1) out vec4 oTerrainNormalDepth;');
+    if(anchor==='#include <common>')glsl+='\n'+TERRAIN_CONTACT_GLSL+'\n'+(stone?'#define TRENCH_STONE\n':'')+Common+(stone?'\n'+TERRAIN_BLEND_GLSL+'\nuniform sampler2D uTerrainBlendColor;':'\nuniform float uTerrainCapture;\nlayout(location=1) out vec4 oTerrainNormalDepth;');
     if(anchor==='#include <map_fragment>') {
       // Fully excavated pixels use the coherent soil path only. Derivatives stay
-      // outside the varying branch, including those consumed by the base terrain.
-      glsl=glsl.replace(SurfacePatchEnd(anchor),'').replace('vec3 twDx = dFdx(tw), twDy = dFdy(tw);',
-        'vec3 twDx = trenchWorldDx, twDy = trenchWorldDy;');
-      glsl='vec3 trenchWorldDx=dFdx(vTerrainWorld),trenchWorldDy=dFdy(vTerrainWorld);\nif(vTerrainLayers.g<.999){'+glsl+'}\n'
+      // outside the varying branch, including those consumed by the base terrain
+      // (TERRAIN_HOISTED_DERIVATIVES in Script_TerrainMaterial's GLSL_EVALUATE).
+      glsl=glsl.replace(SurfacePatchEnd(anchor),'');
+      glsl='vec3 trenchWorldDx=dFdx(vTerrainWorld),trenchWorldDy=dFdy(vTerrainWorld);\n'
+        +'vec2 trenchRutD=vec2(dFdx(vTerrainLayers.w),dFdy(vTerrainLayers.w));\n'
+        +'if(vTerrainLayers.g*(1.0-vTerrainLayers.r)<.999){'+glsl+'}\n'
         +Evaluate+(stone?'\n'+Stone:'')+'\n'+SurfacePatchEnd(anchor);
     }
-    if(anchor==='#include <dithering_fragment>')glsl+=`\nif(uTerrainDebug>3.5)gl_FragColor=vec4(vec3(uTerrainDebug<4.5?gTrenchWet:uTerrainDebug<5.5?gTerrainRough:gTrenchContact),1.0);`;
+    if(anchor==='#include <dithering_fragment>')glsl+=`\nif(uTerrainDebug>3.5&&uTerrainDebug<6.5)gl_FragColor=vec4(vec3(uTerrainDebug<4.5?gTrenchWet:uTerrainDebug<5.5?gTerrainRough:gTrenchContact),1.0);`;
     if(anchor==='#include <dithering_fragment>' && !stone)glsl+='\noTerrainNormalDepth=vec4(normalize(normal),vViewPosition.z);\nif(uTerrainCapture>.5)gl_FragColor=vec4(diffuseColor.rgb,roughnessFactor);';
     return [anchor,glsl];
   });

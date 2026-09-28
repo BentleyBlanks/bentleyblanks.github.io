@@ -2077,7 +2077,8 @@ export class FirstLevelMissionRuntime {
       this.Defend(actor, actor.position);
     }
     // 夜景与夜天空都藏在黑屏里换；退出/重试时宿主还原（RestoreLevelSky）。
-    this.ApplySky?.("night");
+    // 第一关专用夜档（Script_Sky.firstLevelNight：阴云夜，2026-09-28 B4）
+    this.ApplySky?.("firstLevelNight");
     this.column.active = false;
     if (this.controls) { this.controls.yaw = this.player.yaw; this.controls.pitch = 0; }
     this.Record("nightArrivalPlaced", { x: point.x, z: point.z });

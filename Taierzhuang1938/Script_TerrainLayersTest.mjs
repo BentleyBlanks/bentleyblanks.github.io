@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { TERRAIN_SETS, TERRAIN_QUALITY, TerrainLayerUrls, TerrainQualityOf } from "./Data_Tuning_Terrain.mjs";
+import { TERRAIN_SETS, TERRAIN_QUALITY, TERRAIN_RUTS, TerrainLayerUrls, TerrainQualityOf } from "./Data_Tuning_Terrain.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_TERRAIN } from "./Data_FirstLevelMissionTerrain.mjs";
 
@@ -107,6 +107,33 @@ Check(() => assert.equal(TERRAIN_QUALITY.low.antiTile, false));
   checks += 1;
   Check(() => assert.ok(seen.every((n) => n > 50), `三路权重都应在地块上出现：${seen}`));
   console.log(`ok  MissionPlain splat: track ${seen[0]} / spoil ${seen[1]} / open ${seen[2]} samples (3 m grid)`);
+}
+
+// --- 6. 2026-09-28 地面：洼地是场地、白盒交通沟是裸土、车辙横向坐标（docs/Data_TerrainLayers.md §8） ------
+{
+  const Sample = MISSION_LAYOUT.SampleGroundSurface;
+  const color = [0, 0, 0], layers = [0, 0, 0, 1];
+  // 06 集结洼地：壕沟 CollectionLink 穿进来，但洼地底是踩实的场地，不是沟底土。
+  Sample(-36, -100, color, layers);
+  Check(() => assert.ok(layers[0] > 0.99 && layers[1] < 0.01, `06 洼地应为车道层 ${layers}`));
+  // 07 白盒交通沟（SouthWalkCut）沟底：裸土，不长草茬。
+  Sample(-15.8, -52, color, layers);
+  Check(() => assert.ok(layers[1] > 0.99 && layers[2] < 0.01 && layers[0] < 0.01, `07 交通沟沟底应为翻土层 ${layers}`));
+  // 车辙：道路中线上横向坐标 0，偏 halfGaugeM 处正好在槽心；ruts:false 的村落场坪与开阔地写 1。
+  const [a, b] = MISSION_TERRAIN.roads[0].points;
+  const len = Math.hypot(b.x - a.x, b.z - a.z), nx = -(b.z - a.z) / len, nz = (b.x - a.x) / len;
+  const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+  Sample(mx, mz, color, layers);
+  Check(() => assert.ok(Math.abs(layers[3]) < 1e-6, `路中线横向坐标应为 0：${layers[3]}`));
+  Sample(mx + nx * TERRAIN_RUTS.halfGaugeM, mz + nz * TERRAIN_RUTS.halfGaugeM, color, layers);
+  Check(() => assert.ok(Math.abs(Math.abs(layers[3] * TERRAIN_RUTS.encodeRangeM) - TERRAIN_RUTS.halfGaugeM) < 1e-6, `槽心横向坐标 ${layers[3]}`));
+  const village = MISSION_TERRAIN.pads.find((p) => p.ruts === false);
+  Sample(village.x, village.z, color, layers);
+  Check(() => assert.ok(Math.abs(layers[3]) > 0.999, `村落场坪里不画车辙：${layers[3]}`));
+  layers[3] = 0.5;
+  Sample(-150, -60, color, layers);
+  Check(() => assert.equal(layers[3], 1, "开阔地横向坐标写 1"));
+  console.log("ok  2026-09-28 ground: 06 hollow = yard, 07 cut = bare earth, rut lateral coordinate");
 }
 
 console.log(`TerrainLayersTest: ${checks} checks passed`);

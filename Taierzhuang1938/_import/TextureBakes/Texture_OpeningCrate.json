@@ -1,0 +1,119 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-09-28",
+  "name": "OpeningCrate",
+  "preset": "weatheredWood",
+  "source": {
+    "path": "_shots/Gap3A_Source/B5/Source_OpeningCrate_Prepped.png",
+    "sha256": "1a536f3c1ce931c83940486e09895344a933de1454e2fa9c8906017ec94e8a90",
+    "metrics": {
+      "meanSrgb": [
+        0.4334,
+        0.3746,
+        0.3181
+      ],
+      "luma": 0.3754,
+      "lumaStd": 0.0856,
+      "sat": 0.2659,
+      "clipLow": 0.0082,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0519
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.42,
+      0.38,
+      0.33
+    ],
+    "contrast": 0.07,
+    "lumaRange": [
+      0.26,
+      0.5
+    ],
+    "satRange": [
+      0.06,
+      0.3
+    ],
+    "stdRange": [
+      0.03,
+      0.11
+    ],
+    "reliefM": 0.004,
+    "rough": 0.88,
+    "roughVar": 0.05,
+    "roughLumaK": 0.0,
+    "ao": 0.45,
+    "metal": 0.0,
+    "seamless": "weld",
+    "rowFlatten": false,
+    "flattenSigma": 0.15,
+    "isotropic": false,
+    "heightFromLuma": "direct",
+    "tileM": 0.6,
+    "size": 512,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_OpeningCrateBase.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 65020,
+      "sha256": "59526d35f32505335179089f25d98fa1a78c400c6e8b7594dee3d1ce62ec7b09"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_OpeningCrateNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 101256,
+      "sha256": "1931a77c17beeb5f06deb3068f46aa75c8634a07b13eb78caf97af0219707a24"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_OpeningCrateOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 52878,
+      "sha256": "ebf1bd080cd384fa4d57bee4f5436a625b9932af738e24338595ae3f111e606a"
+    }
+  ],
+  "totalBytes": 219154,
+  "metrics": {
+    "meanSrgb": [
+      0.4197,
+      0.3807,
+      0.3302
+    ],
+    "luma": 0.3769,
+    "lumaStd": 0.0708,
+    "sat": 0.2132,
+    "clipLow": 0.0001,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0269,
+    "seam": 0.0116,
+    "interior": 0.0336,
+    "seamRatio": 0.345,
+    "border": 0.872,
+    "swing": 0.1486,
+    "aoMean": 0.92,
+    "roughMean": 0.882,
+    "texelsPerMeter": 853.3
+  },
+  "gateProblems": []
+}

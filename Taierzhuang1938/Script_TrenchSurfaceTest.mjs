@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { TerrainContactField } from './Script_TerrainContact.mjs';
 import { TRENCH_SURFACE as C } from './Data_TrenchSurface.mjs';
+import { TERRAIN_WATER } from './Data_Tuning_Terrain.mjs';
 import * as THREE from 'three';
 import { BuildTrenchSurface } from './Script_TrenchSurface.mjs';
 
@@ -36,7 +37,9 @@ for(const [kind,url] of Object.entries(C.models)){
 }
 const map=fs.readFileSync(new URL(C.mudMap,import.meta.url));
 assert.equal(map.readUInt32BE(16),512);assert.equal(map.readUInt32BE(20),512);
-assert.ok(C.mud.roughWet<.3&&C.mud.roughDry>.8,'separate wet/dry PBR ranges');
+// 2026-09-28: wet mud / standing water moved to the shared terrain water model (Data_Tuning_Terrain.TERRAIN_WATER).
+assert.ok(TERRAIN_WATER.waterRough<.3&&C.mud.roughDry>.8,'separate wet/dry PBR ranges');
+assert.ok(TERRAIN_WATER.site.trenchFloor>0&&TERRAIN_WATER.lowRiseM[1]>TERRAIN_WATER.lowRiseM[0],'trench floors pool water, lips stay dry');
 for(const url of [...Object.values(C.stoneLayer),...Object.values(C.mudLayer)])
   assert.ok(fs.statSync(new URL(url,import.meta.url)).size>1000);
 // A bent bank fixture exercises footprint conformance on both sides, rather than

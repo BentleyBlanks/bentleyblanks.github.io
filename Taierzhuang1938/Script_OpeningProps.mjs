@@ -7,6 +7,7 @@
 // 0.28 s pose blend when a clip changes (BeginBlend + mix), an owned bayonet rides its scabbard
 // mount between clips, and a weapon a clip throws away can be left in the world (DropWeapon).
 import * as THREE from "three";
+import { SET_MATERIALS as OPENING_SET_MATERIALS } from "./Data_OpeningSet0103.mjs";
 
 const Clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const SOURCE_AXIS = new THREE.Vector3();
@@ -130,14 +131,18 @@ function BeamGeometry(spec) {
   merged.computeVertexNormals();
   const uv = new Float32Array(merged.getAttribute("position").count * 2);
   const p = merged.getAttribute("position");
-  for (let i = 0; i < p.count; i++) { uv[i * 2] = p.getX(i) / .5; uv[i * 2 + 1] = (p.getY(i) + p.getZ(i)) / .5; }
+  // 世界米 UV、木纹沿长边（x）：开场木料贴图的木纹沿 V（Data_OpeningSet0103.SET_MATERIALS.timber）。
+  for (let i = 0; i < p.count; i++) { uv[i * 2] = p.getY(i) + p.getZ(i); uv[i * 2 + 1] = p.getX(i); }
   merged.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
   return merged;
 }
 
 function BeamMesh(actor, spec) {
   const materials = actor.materials || {};
-  const mesh = new THREE.Mesh(BeamGeometry(spec), materials.wood || materials.steel);
+  // 与掩蔽部布景同一份风化旧木（第一关按需集 OpeningTimber，2026-09-28 3A 迭代 B5）；没下到就用人物的木料。
+  const library = actor.factory?.library, timber = OPENING_SET_MATERIALS.timber;
+  const wood = library?.baked?.has?.(timber.recipe) ? library.Get(timber.recipe, timber.options) : materials.wood;
+  const mesh = new THREE.Mesh(BeamGeometry(spec), wood || materials.steel);
   mesh.name = "OpeningProp_Beam";
   mesh.castShadow = true;
   mesh.receiveShadow = true;

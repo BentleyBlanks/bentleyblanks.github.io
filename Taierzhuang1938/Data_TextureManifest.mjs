@@ -571,9 +571,10 @@ export const TEXTURE_MANIFEST = Object.freeze([
     toneClass: "drySoil",
     metersPerTile: 3.1,
     normalConvention: "terrain",
-    bake: "_import/Script_BakeTerrainLayers.py",
+    bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "_import/TextureBakes/Texture_TerrainCartTrack.json",
-    source: { provider: "lovart", date: "2026-09-17", ref: "Lovart 项目 oKHfWa1O2A，每层一个新会话（thread 未单列）", prompt: "docs/Data_TerrainLayers.md" },
+    // 2026-09-28 B2 地面：压实湿泥车道（碎砖瓦、蹄印；车辙与积水由 Script_TerrainMaterial 画）。
+    source: { provider: "lovart", date: "2026-09-28", ref: "841fdeb9-9e70-4710-a6ba-c8bd751f0eec", prompt: "_import/Prompts/Texture_TerrainCartTrack.txt" },
     consumers: [{ file: "Data_Tuning_Terrain.mjs", token: "CartTrack" }],
     files: [
       ["Texture_TerrainCartTrackBase.webp", "Base", 1024, 1024],
@@ -611,17 +612,52 @@ export const TEXTURE_MANIFEST = Object.freeze([
       ["Texture_TerrainSpoilEarthOrh.webp", "Orh", 512, 512],
     ],
   },
+  // 3A 迭代 B5（2026-09-28）：01–04 开场布景的风化旧木与旧弹药箱板（分镜 01/02/03A/04A 的灰褐旧木，替换程序化橙黄 WoodBeam / WoodCrate）。
+  {
+    id: "OpeningTimber", kind: "material", tier: "level:FirstLevel",
+    toneClass: "weatheredWood",
+    metersPerTile: 1.0,
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_OpeningTimber.json",
+    source: { provider: "lovart", date: "2026-09-28", ref: "Lovart 项目 oKHfWa1O2A thread 14a400f5-1849-415f-871e-d16ebd50c4a3", prompt: "_import/Prompts/Texture_OpeningTimber.txt",
+      note: "源图 _shots/Gap3A_Source/B5/Source_OpeningTimber_Lovart.png（不进仓库）；木纹沿 V，Script_OpeningSet.TimberBox 把 V 转到木料长边" },
+    consumers: [{ file: "Data_LevelTextureSets.mjs", token: "OpeningTimber" }, { file: "Data_OpeningSet0103.mjs", token: "OpeningTimber" }],
+    files: [
+      ["Texture_OpeningTimberBase.webp", "Base", 512, 512],
+      ["Texture_OpeningTimberNormal.webp", "Normal", 512, 512],
+      ["Texture_OpeningTimberOrm.webp", "Orm", 512, 512],
+    ],
+  },
+  {
+    id: "OpeningCrate", kind: "material", tier: "level:FirstLevel",
+    toneClass: "weatheredWood",
+    metersPerTile: 0.6,
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_OpeningCrate.json",
+    source: { provider: "lovart", date: "2026-09-28", ref: "Lovart 项目 oKHfWa1O2A thread 4e8e5e9f-ca62-4a84-a599-ad641b434457", prompt: "_import/Prompts/Texture_OpeningCrate.txt",
+      note: "源图 _shots/Gap3A_Source/B5/Source_OpeningCrate_Lovart.png 先过 _import/Script_PrepBoardSeamSource.py --seam-row 1027（第四道板缝劈在上下边上，卷 256 行后补一道整缝）再烘" },
+    consumers: [{ file: "Data_LevelTextureSets.mjs", token: "OpeningCrate" }, { file: "Data_OpeningSet0103.mjs", token: "OpeningCrate" }],
+    files: [
+      ["Texture_OpeningCrateBase.webp", "Base", 512, 512],
+      ["Texture_OpeningCrateNormal.webp", "Normal", 512, 512],
+      ["Texture_OpeningCrateOrm.webp", "Orm", 512, 512],
+    ],
+  },
   {
     id: "TrenchPom", kind: "terrainLayer", tier: "level:FirstLevel",
+    toneClass: "drySoil",
+    metersPerTile: 1.5,
     normalConvention: "terrain",
-    bake: "_import/Script_BakeTrenchPom.py",
-    source: { provider: "imagegen", date: "2026-09-26", prompt: "docs/Data_TrenchPomPrompt.md" },
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_TrenchPom.json",
+    // 2026-09-28 B2 地面：冷灰棕湿黄土（土块、细根、小石子），替掉偏红橙的 2026-09-26 imagegen 版
+    //（均色饱和 0.53 → 0.36，整套 2.0 MB → 0.6 MB；高度改由亮度带通推，Orh 半分辨率有损）。
+    source: { provider: "lovart", date: "2026-09-28", ref: "0d1b846e-7b95-4baa-9caf-83b03f63b6ed", prompt: "_import/Prompts/Texture_TrenchPom.txt" },
     consumers: [{ file: "Data_TrenchSurface.mjs", token: "Texture_TrenchPom" }],
-    legacy: "Base 644 KB > 单张 600 KB、整套 2.0 MB > 1 MB（Normal/Orh 存无损）",
     files: [
       ["Texture_TrenchPomBase.webp", "Base", 1024, 1024],
       ["Texture_TrenchPomNormal.webp", "Normal", 512, 512],
-      ["Texture_TrenchPomOrh.webp", "Orh", 1024, 1024],
+      ["Texture_TrenchPomOrh.webp", "Orh", 512, 512],
     ],
   },
   {
@@ -629,7 +665,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     bake: "_import/Script_ImportTrenchMaterials.py",
     source: { provider: "polyhaven", date: "2026-09-26", ref: "https://polyhaven.com/a/rock_boulder_dry", license: "CC0" },
     consumers: [{ file: "Data_TrenchSurface.mjs", token: "Texture_TrenchStone" }],
-    legacy: "Poly Haven nor_gl（gl 约定）进了 terrain 约定的数组，法线绿通道方向相反；Orm 的 B 是金属却被当高度用",
+    legacy: "Poly Haven nor_gl（gl 约定）进了 terrain 约定的数组（2026-09-28 起 Script_TrenchSurfaceMaterial 的 Stone 段在着色器里翻绿补偿，文件未重烘）；Orm 的 B 是金属，进数组后落在 alpha（石材那段不读它）",
     files: [
       ["Texture_TrenchStoneBase.webp", "Base", 1024, 1024],
       ["Texture_TrenchStoneNormal.webp", "Normal", 512, 512],
@@ -643,6 +679,20 @@ export const TEXTURE_MANIFEST = Object.freeze([
     legacy: "1254² 不是 2 的幂（2026-09-28 已转 webp）",
     files: [
       ["Texture_TrenchRootMat.webp", "Base", 1254, 1254],
+    ],
+  },
+  {
+    // 第一关植被卡片图集（docs/Data_FirstLevelVegetationProps.md）：8 格干草 / 枯蒿 / 荆棘 / 芦苇 / 绿芽，Base 的 A = 镂空。
+    // 品红底生成、脚本键出 alpha（不信生成器的透明通道）；卡片 UV 照抄进 Data_FirstLevelVegetation.VEGETATION_CARDS。
+    id: "FirstLevelVegetationAtlas", kind: "decal", tier: "level:FirstLevel",
+    bake: "_import/Script_BakeVegetationAtlas.py",
+    bakeRecord: "_import/TextureBakes/Texture_FirstLevelVegetationAtlas.json",
+    source: { provider: "lovart", date: "2026-09-28",
+      ref: "thread a97e84e9-d6af-432d-9fcd-44e7d3347a58（generate_image_nano_banana_pro，品红底 8 格）",
+      prompt: "_import/Prompts/Texture_FirstLevelVegetationAtlas.txt" },
+    consumers: [{ file: "Data_FirstLevelVegetation.mjs", token: "Texture_FirstLevelVegetationAtlas" }],
+    files: [
+      ["Texture_FirstLevelVegetationAtlas.webp", "Base", 1024, 1024],
     ],
   },
   {

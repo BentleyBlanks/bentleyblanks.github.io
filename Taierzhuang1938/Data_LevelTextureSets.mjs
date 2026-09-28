@@ -25,6 +25,9 @@ export const LEVEL_TEXTURE_SETS = Object.freeze({
     Object.freeze({ name: "VillageRoofTile", v: "b1wb20260928", fallback: "GateRoofTile" }),
     Object.freeze({ name: "VillageTimber", v: "b1wb20260928", fallback: "HandcartWood" }),
     Object.freeze({ name: "RailBallast", v: "b1wb20260928", fallback: "GroundRubble" }),
+    // B5 开场布景（Data_OpeningSet0103.SET_MATERIALS）：掩蔽部 / 前沟的风化旧木、旧弹药箱板。
+    Object.freeze({ name: "OpeningTimber", v: "20260928", fallback: "WoodBeam" }),
+    Object.freeze({ name: "OpeningCrate", v: "20260928", fallback: "WoodCrate" }),
   ]),
 });
 

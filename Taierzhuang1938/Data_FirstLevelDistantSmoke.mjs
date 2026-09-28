@@ -17,11 +17,23 @@ export const DISTANT_SMOKE_REGIONS = Object.freeze([
   { id: "CollectionEastRidge", x: 129, z: -57, spread: 4, height: 46, dustHeight: 12, reference: "06 background haze" },
 ].map(Object.freeze));
 
+// 2026-09-28 远景烟柱（B4，对标分镜 07 / 概念 05、08、13）：原来的柱子只有四十来米高、
+// 几团圆球叠起来 —— 实拍读作「棉花团」。现在两种柱子加高一半多、漂移加大，并带一组
+// `plume` 参数（Script_BattleSmoke 的 iPlume 属性，只有远景柱带，路边烟逐比特不变）：
+//   shear    漂移随年龄的指数（路边烟 1.3）。越大 = 根部越直、上部越往下风横着拉开
+//   flatten  上部横向拉宽 / 纵向压扁的量（被风拉成的烟幕，而不是一团团圆球）
+//   baseDark 根部压黑、上部按年龄稀释成灰（燃烧点附近的黑烟最浓）；同时打开受光面暖、背光面冷
+//   erosion  噪声侵蚀边缘的倍率（棉花团的圆边被撕成絮状）
+// 数量、位置、随机序列一概不动（叙事用的烟源点保持；BuildDistantSmoke 抽随机数的顺序不变）。
+// 漂移上限 40：driftZ = sin(风角 ≤ 0.28)·drift 要 < 12（DistantSmokeTest「共用主导风向」）。
 export const DISTANT_SMOKE_TYPES = Object.freeze({
-  sootColumn: Object.freeze({ frame: 0, height: 1, baseWidth: 4.5, crownWidth: 23, aspect: 1.02, opacity: 0.30, life: 27, drift: 25 }),
-  billowColumn: Object.freeze({ frame: 1, height: 0.72, baseWidth: 5, crownWidth: 26, aspect: 0.92, opacity: 0.36, life: 19, drift: 31 }),
+  sootColumn: Object.freeze({ frame: 0, height: 1.6, baseWidth: 4.5, crownWidth: 26, aspect: 1.02, opacity: 0.30, life: 27, drift: 38,
+    plume: Object.freeze([2.1, 0.7, 0.5, 0.8]) }),
+  billowColumn: Object.freeze({ frame: 1, height: 1.15, baseWidth: 5, crownWidth: 28, aspect: 0.92, opacity: 0.36, life: 19, drift: 40,
+    plume: Object.freeze([1.9, 0.55, 0.35, 0.6]) }),
   dustBank: Object.freeze({ frame: 2, height: 0.16, baseWidth: 8, crownWidth: 24, aspect: 0.55, opacity: 0.22, life: 16, drift: 19 }),
-  windShear: Object.freeze({ frame: 3, height: 0.42, baseWidth: 9, crownWidth: 31, aspect: 0.40, opacity: 0.21, life: 21, drift: 35 }),
+  windShear: Object.freeze({ frame: 3, height: 0.55, baseWidth: 9, crownWidth: 34, aspect: 0.40, opacity: 0.21, life: 21, drift: 40,
+    plume: Object.freeze([1.7, 0.6, 0.2, 0.7]) }),
 });
 
 const ROAD_STYLES = Object.freeze([
@@ -132,6 +144,7 @@ export function BuildDistantSmoke(seed = DISTANT_SMOKE_SEED) {
       aspect: profile.aspect, opacity: profile.opacity * Between(0.93, 1.08),
       life: profile.life * Between(0.92, 1.12), spread: type === "dustBank" ? 4 : 3.4, nearFade: 9,
       driftX: -Math.cos(windAngle) * profile.drift, driftZ: Math.sin(windAngle) * profile.drift,
+      ...(profile.plume ? { plume: profile.plume } : {}),
     });
     return Object.freeze({
       id: region.id + "_" + type, region: region.id, reference: region.reference, tier: "far",

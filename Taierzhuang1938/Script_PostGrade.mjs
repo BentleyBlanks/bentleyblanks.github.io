@@ -92,6 +92,7 @@ function Clamp01(x) { return x < 0 ? 0 : (x > 1 ? 1 : x); }
  */
 export function GradeMathJs(rgb, grade) {
   const { lift, gain, shadowTint, highlightTint, splitShadow, splitHighlight, contrast } = grade;
+  const soft = (grade.contrastCurve ?? 0) > 0.5;
   let r = Clamp01(rgb[0] * gain[0] + lift[0]);
   let g = Clamp01(rgb[1] * gain[1] + lift[1]);
   let b = Clamp01(rgb[2] * gain[2] + lift[2]);
@@ -102,10 +103,14 @@ export function GradeMathJs(rgb, grade) {
   r = Clamp01(r * (1 + (shadowTint[0] - 1) * sw) * (1 + (highlightTint[0] - 1) * hw));
   g = Clamp01(g * (1 + (shadowTint[1] - 1) * sw) * (1 + (highlightTint[1] - 1) * hw));
   b = Clamp01(b * (1 + (shadowTint[2] - 1) * sw) * (1 + (highlightTint[2] - 1) * hw));
-  // 对比度是**感知域**操作：线性域围绕 0.5 拉伸会把暗部直接裁成纯黑
-  const cr = Clamp01((LinearToSrgbJs(r) - 0.5) * contrast + 0.5);
-  const cg = Clamp01((LinearToSrgbJs(g) - 0.5) * contrast + 0.5);
-  const cb = Clamp01((LinearToSrgbJs(b) - 0.5) * contrast + 0.5);
+  // 对比度是**感知域**操作：线性域围绕 0.5 拉伸会把暗部直接裁成纯黑。
+  // contrastCurve = 1（「soft」）：幂形 S 曲线，两端渐近 0 / 1，与 GLSL 那一支逐项同式。
+  const Curve = (v) => (soft
+    ? (v < 0.5 ? 0.5 * Math.pow(Math.max(v * 2, 0), contrast) : 1 - 0.5 * Math.pow(Math.max((1 - v) * 2, 0), contrast))
+    : Clamp01((v - 0.5) * contrast + 0.5));
+  const cr = Curve(LinearToSrgbJs(r));
+  const cg = Curve(LinearToSrgbJs(g));
+  const cb = Curve(LinearToSrgbJs(b));
   return [SrgbToLinearJs(cr), SrgbToLinearJs(cg), SrgbToLinearJs(cb)];
 }
 
@@ -119,6 +124,7 @@ export function GradeFromUniforms(U) {
     splitShadow: U.uSplitShadow.value,
     splitHighlight: U.uSplitHighlight.value,
     contrast: U.uContrast.value,
+    contrastCurve: U.uContrastCurve ? U.uContrastCurve.value : 0,
   };
 }
 
@@ -129,6 +135,8 @@ export function GradeKey(grade) {
     grade.lift.map(N).join(","), grade.gain.map(N).join(","),
     grade.shadowTint.map(N).join(","), grade.highlightTint.map(N).join(","),
     N(grade.splitShadow), N(grade.splitHighlight), N(grade.contrast),
+    // 旧键逐字不变（contrastCurve = 0 时不追加），其余预设的缓存命中不受影响
+    ...(grade.contrastCurve ? [`c${grade.contrastCurve}`] : []),
   ].join("|");
 }
 
