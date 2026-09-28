@@ -1,9 +1,14 @@
-"""Rebuild the CC0 natural stone and scanned mud materials; run with Python + Pillow.
+"""Rebuild the CC0 natural stone (and, on request, scanned mud) materials; run with Python + Pillow.
 Source: https://polyhaven.com/a/rock_boulder_dry
 Authors: Dimitrios Savva (photography), Rico Cilliers (processing).
 Mud: https://polyhaven.com/a/brown_mud_02 by Rob Tuytel (CC0).
+
+2026-09-28: the scanned-mud trio (Texture_TrenchMud{Base,Normal,Orh}.webp) lost its last consumer when
+Data_TrenchSurface.mudLayer switched to the generated TrenchPom set, and was deleted under the texture
+standard (docs/Data_TextureAssetStandard.md). Pass --mud to rebuild it; register the files in
+Data_TextureManifest.mjs with a real consumer before committing them.
 """
-import io, json, urllib.request
+import io, json, sys, urllib.request
 from pathlib import Path
 from PIL import Image
 
@@ -20,16 +25,17 @@ for kind, channel in [('Base', 'Diffuse'), ('Normal', 'nor_gl'), ('Orm', 'arm')]
     image.resize((size, size), Image.Resampling.LANCZOS).save(
         project / 'Texture' / ('Texture_TrenchStone' + kind + '.webp'), quality=90 if kind == 'Base' else 96)
 
-# Scanned mud: retain the captured normal and roughness; do not infer either from diffuse.
-metadata = json.load(Download('https://api.polyhaven.com/files/brown_mud_02'))
-maps = {}
-for kind, channel in [('Base', 'Diffuse'), ('Normal', 'nor_gl'), ('Orm', 'arm'), ('Height', 'Displacement')]:
-    with Download(metadata[channel]['1k']['png']['url']) as response:
-        maps[kind] = Image.open(io.BytesIO(response.read())).convert('RGB')
-for kind in ['Base', 'Normal']:
-    size = 1024 if kind == 'Base' else 512
-    maps[kind].resize((size, size), Image.Resampling.LANCZOS).save(
-        project / 'Texture' / ('Texture_TrenchMud' + kind + '.webp'), quality=90 if kind == 'Base' else 96)
-ao, rough, _ = maps['Orm'].resize((512, 512), Image.Resampling.LANCZOS).split()
-height = maps['Height'].resize((512, 512), Image.Resampling.LANCZOS).getchannel('R')
-Image.merge('RGB', (ao, rough, height)).save(project / 'Texture' / 'Texture_TrenchMudOrh.webp', quality=96)
+if '--mud' in sys.argv:
+    # Scanned mud: retain the captured normal and roughness; do not infer either from diffuse.
+    metadata = json.load(Download('https://api.polyhaven.com/files/brown_mud_02'))
+    maps = {}
+    for kind, channel in [('Base', 'Diffuse'), ('Normal', 'nor_gl'), ('Orm', 'arm'), ('Height', 'Displacement')]:
+        with Download(metadata[channel]['1k']['png']['url']) as response:
+            maps[kind] = Image.open(io.BytesIO(response.read())).convert('RGB')
+    for kind in ['Base', 'Normal']:
+        size = 1024 if kind == 'Base' else 512
+        maps[kind].resize((size, size), Image.Resampling.LANCZOS).save(
+            project / 'Texture' / ('Texture_TrenchMud' + kind + '.webp'), quality=90 if kind == 'Base' else 96)
+    ao, rough, _ = maps['Orm'].resize((512, 512), Image.Resampling.LANCZOS).split()
+    height = maps['Height'].resize((512, 512), Image.Resampling.LANCZOS).getchannel('R')
+    Image.merge('RGB', (ao, rough, height)).save(project / 'Texture' / 'Texture_TrenchMudOrh.webp', quality=96)

@@ -109,18 +109,8 @@ def build_damage_variant(stem: str, *, regions: list[tuple[float, float, float, 
     )
 
 
-def export_standalone_metallic_roughness(stem: str) -> None:
-    """Export inspector-friendly PBR channels while runtime keeps compact ORM."""
-    packed = TEXTURE / f"Texture_{stem}Orm.webp"
-    if not packed.is_file():
-        return
-    orm = np.asarray(Image.open(packed).convert("RGB"))
-    Image.fromarray(orm[:, :, 1], "L").save(
-        TEXTURE / f"Texture_{stem}Roughness.webp", "WEBP", quality=92, method=6
-    )
-    Image.fromarray(orm[:, :, 2], "L").save(
-        TEXTURE / f"Texture_{stem}Metallic.webp", "WEBP", quality=92, method=6
-    )
+# 2026-09-28：不再额外导出 Texture_<Stem>Roughness/Metallic.webp。它们只是 ORM 的 G/B 拆出来给人看，
+# 运行时从没读过，按贴图规范（docs/Data_TextureAssetStandard.md）连同已提交的 30 张一并删除。
 
 
 if __name__ == "__main__":
@@ -133,6 +123,8 @@ if __name__ == "__main__":
     # normal/ORM maps stay deterministic so every channel remains aligned.
     build_if_source("TreeBark", normal_strength=4.0, metalness=0, rough_min=176, rough_max=238)
     build_if_source("BrickWall", normal_strength=3.6, metalness=0, rough_min=158, rough_max=224)
+    # Ground 的 Base/Normal 已无消费方（运行时 Ground 套用 MissionSoil，2026-09-28 删除）；
+    # 只剩 Texture_GroundOrm.webp 被 PloughedSoil 借用。源图回来重烘时，Base/Normal 要么接上消费方、要么别提交。
     build_if_source("Ground", normal_strength=2.8, metalness=0, rough_min=178, rough_max=244)
     build_if_source("RoofTile", normal_strength=3.0, metalness=0, rough_min=126, rough_max=208)
     build_if_source("Sandbag", normal_strength=1.8, metalness=0, rough_min=208, rough_max=255)
@@ -175,10 +167,3 @@ if __name__ == "__main__":
     build_if_source("PrisonBrick", normal_strength=3.6, metalness=0, rough_min=170, rough_max=232)
     build_if_source("TemplePlaster", normal_strength=3.0, metalness=0, rough_min=200, rough_max=252)
     build_if_source("ChurchPlaster", normal_strength=2.6, metalness=0, rough_min=190, rough_max=248)
-    for stem in (
-        "TreeBark", "BrickWall", "Ground", "RoofTile", "Sandbag", "WattleFence", "WoodCrate",
-        "BrickWallSooty", "BuildingDamageEarly", "BuildingDamageSevere", "Adobe",
-        "Stone", "GateBrick", "GatePaintedWood", "GateRoofTile",
-        "ShopDoorPbr",
-    ):
-        export_standalone_metallic_roughness(stem)

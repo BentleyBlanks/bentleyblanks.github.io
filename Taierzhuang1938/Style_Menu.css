@@ -137,7 +137,7 @@
 .mnPanel.on { display: flex; }
 .mnPanel::before {
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: url("./Texture/Menu/Texture_MissionCh1NanLu.png") center 58% / cover;
+  background: url("./Texture/Menu/Texture_MissionCh1NanLu.webp?v=20260928") center 58% / cover;
   filter: grayscale(1) blur(5px) brightness(0.36); opacity: 0.76;
 }
 .mnPanel::after {
