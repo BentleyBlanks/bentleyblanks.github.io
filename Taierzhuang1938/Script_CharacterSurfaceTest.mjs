@@ -138,6 +138,48 @@ Check(Object.keys(CHARACTER_SURFACE_PARTS).filter((id) => id.startsWith("Tengxia
   .every((id) => Object.values(CHARACTER_SURFACE_PARTS[id]).some((p) => p.role === "skin")
     && Object.values(CHARACTER_SURFACE_PARTS[id]).some((p) => p.role === "ijaWool")), "每款日军都有皮肤与呢子部件");
 
+// ---- 覆盖面：第一关 01–06 实际在场的每个人物模型都有部件表，每只 GLB 的每个材质都有着落 -------------
+// 在场的人 = 选模清单的全部外观（匿名池、具名说话人、远景人群）+ 带脸皮的骨骼口型模型（清单 facialUrl，
+// 材质按名字绑回基础 GLB 的同名材质）+ 第一人称双臂 / 汉阳造手 / 身体。每个材质要么在部件表里，
+// 要么在下面这张「有意不动」表里（写理由）—— 重建模型改了材质名、或者新加一款外观没登记，这里就红。
+const selection = await import("./Data_CharacterSelection.mjs");
+const manifest = JSON.parse(fs.readFileSync(path.join(here, "Model/Character/Data_TengxianCharacterManifest.json"), "utf8"));
+const ModelId = (kind, variant) => `Tengxian${kind.startsWith("ija") ? "Ija" : "Nra"}${String(variant + 1).padStart(2, "0")}`;
+const onField = new Set(["FpsArms", "FpsHanYang", "FirstPersonBody"]);
+for (const [kind, list] of Object.entries(selection.CHARACTER_MODEL_VARIANTS_BY_KIND)) for (const v of list) onField.add(ModelId(kind, v));
+for (const [kind, list] of Object.entries(selection.CHARACTER_RANDOM_VARIANTS_BY_KIND)) for (const v of list) onField.add(ModelId(kind, v));
+for (const [kind, table] of Object.entries(selection.CHARACTER_CAST_VARIANTS_BY_KIND)) for (const v of Object.keys(table)) onField.add(ModelId(kind, Number(v)));
+for (const [kind, v] of Object.entries(selection.CHARACTER_CROWD_VARIANT_BY_KIND)) onField.add(ModelId(kind, v));
+const UNTOUCHED = {
+  // 眼球、帽徽、NRA02 的毛巾 / 枪套：平铺着色，与帽徽同签名（尸体层合批），不上皮肤 / 布的补丁。
+  TengxianNra02: ["Material #1721585343", "Material #29", "Material_NraEyes", "Material #1721585500"],
+  TengxianNra05: ["Material #1721585500"],
+  // 翻译的便服只在具名镜头里出现，单为他编一类带泥污的程序不值（程序数与进关预热的账）。
+  TengxianNra06: ["Material_InterpreterGarb", "Material_NraEyes", "Material #1721585500"],
+};
+const FACIAL_ONLY = new Set(["Material_FacialOral"]); // 口腔：顶点色是颜色，不动
+for (const modelId of onField) {
+  const table = CHARACTER_SURFACE_PARTS[modelId];
+  Check(!!table, `在场模型 ${modelId} 有部件表`);
+  if (!table) continue;
+  const parts = Object.values(table);
+  // 第一人称身体只有军装（低头看见的上衣、裤腿、鞋），手在双臂模型里。
+  if (modelId !== "FirstPersonBody") Check(parts.some((p) => p.role === "skin"), `${modelId} 至少有一份皮肤部件`);
+  if (!["TengxianNra06"].includes(modelId) && !modelId.startsWith("Fps")) {
+    Check(parts.some((p) => p.role === "nraCloth" || p.role === "ijaWool"), `${modelId} 至少有一份军装部件`);
+  }
+  const files = [GlbPath(modelId)];
+  const record = manifest.models.find((r) => r.id === modelId);
+  if (record?.facialUrl) files.push(path.join(here, record.facialUrl));
+  for (const file of files) {
+    const { json } = ReadGlb(file);
+    const missing = (json.materials || []).map((m) => m.name)
+      .filter((name) => !(name in table) && !(UNTOUCHED[modelId] || []).includes(name) && !FACIAL_ONLY.has(name));
+    Check(missing.length === 0, `${path.basename(file)} 的每个材质都有着落（部件表或有意不动）`, missing.join("、"));
+  }
+}
+Check(onField.has("TengxianIja06") && onField.has("TengxianNra06") && onField.size >= 10, "在场模型清单", [...onField].join(","));
+
 // ---- 数值自洽 -------------------------------------------------------------------------
 const G = CHARACTER_GRIME;
 Check(G.mudTop > 0.1 && G.mudTop + G.mudEdge < G.knee[1] && G.splashTop < 1.3, "泥线在膝下、溅点在腰下",

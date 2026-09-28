@@ -299,8 +299,13 @@ float charMud = 0.0, charWet = 0.0, charWear = vCharGrime.z, charDust = vCharGri
 }
 
 /** 皮肤：去粉偏黄褐、微细节（毛孔 / 皮纹）、褶皱积泥、污渍、脸上的汗。 */
-function SkinPatch(tile) {
-  const uniforms = { uCharSkinTile: { value: tile } };
+function SkinPatch(tile, part) {
+  const H = CHARACTER_SKIN.hands;
+  const uniforms = {
+    uCharSkinTile: { value: tile },
+    // 逐部件（手那份皮更脏更暗）：x 污渍倍率、y 明度倍率。uniform，不分程序。
+    uCharSkinPart: { value: new THREE.Vector2(part.hands ? H.dirt : 1, part.hands ? H.value : 1) },
+  };
   return MakePatch({
     key: CHARACTER_SURFACE_PATCH_KEYS.skin,
     uniforms: (target) => { Object.assign(target, Shared().skin, uniforms); },
@@ -323,6 +328,7 @@ function SkinPatch(tile) {
 uniform sampler2D uCharSkinDetailMap;
 #endif
 uniform float uCharSkinTile;
+uniform vec2 uCharSkinPart;
 uniform vec3 uCharSkinTone, uCharSkinDirtTint;
 uniform vec4 uCharSkinGrade, uCharSkinNormal, uCharSkinDirt;
 uniform vec2 uCharSkinSweat;
@@ -340,16 +346,16 @@ float charSkinDirt = 0.0, charSkinSweat = 0.0;
   float L = dot(c, CHAR_LUMA);
   vec3 toneN = uCharSkinTone / max(dot(uCharSkinTone, CHAR_LUMA), 1e-3);
   c = mix(c, L * toneN, uCharSkinGrade.x);
-  c = mix(vec3(dot(c, CHAR_LUMA)), c, 1.0 - uCharSkinGrade.y) * uCharSkinGrade.z;
+  c = mix(vec3(dot(c, CHAR_LUMA)), c, 1.0 - uCharSkinGrade.y) * uCharSkinGrade.z * uCharSkinPart.y;
   c *= 1.0 + (charSkinTexel.b - 0.5) * 2.0 * uCharSkinGrade.w * charSkinFade;
   // 褶皱积泥：atlas 比它自己的模糊 mip 暗的地方（指缝、指甲缝、关节纹、鼻翼）。
   #ifdef USE_MAP
     vec3 charBlur = texture2D(map, vMapUv, uCharSkinDirt.y).rgb;
     float charCavity = dot(sampledDiffuseColor.rgb - charBlur, CHAR_LUMA);
-    charSkinDirt = smoothstep(-0.008, -0.06, charCavity) * uCharSkinDirt.x;
+    charSkinDirt = smoothstep(-0.008, -0.06, charCavity) * uCharSkinDirt.x * uCharSkinPart.x;
   #endif
   // 大块污渍（泥手印、硝烟）与脸上的汗：顶点里算好的低频场。
-  charSkinDirt = max(charSkinDirt, vCharSkin.x * uCharSkinDirt.z);
+  charSkinDirt = clamp(max(charSkinDirt, vCharSkin.x * uCharSkinDirt.z * uCharSkinPart.x), 0.0, 1.0);
   c = mix(c, uCharSkinDirtTint * (0.7 + 0.6 * charSkinTexel.b), charSkinDirt * 0.75);
   charSkinSweat = vCharSkin.y * uCharSkinSweat.x;
   diffuseColor.rgb = c;
@@ -543,7 +549,7 @@ export function CharacterSurfaceMaterial(material, { rigid = false } = {}) {
       const k = Math.fround(part.normalScale);
       variant.normalScale.set(Math.sign(variant.normalScale.x || 1) * k, Math.sign(variant.normalScale.y || 1) * k);
     }
-    mine.push(SkinPatch((part.uvMeters || 1) / S.tileMeters));
+    mine.push(SkinPatch((part.uvMeters || 1) / S.tileMeters, part));
   } else if (part.role === "ijaWool") {
     variant.roughness = IJA_WOOL_DETAIL.roughness;
     if (variant.isMeshPhysicalMaterial && variant.sheen > 0) {

@@ -105,46 +105,48 @@ const IjaWoolPart = (extra = {}) => Object.freeze({ role: "ijaWool", cls: "cloth
 // 着色签名也相同 —— 尸体层把呢子与装具拼成一只图集网格（合批变体不做钢盔 / 细节 / 装具开关，见补丁）。
 const GEAR_PART = IjaWoolPart({ gear: true, wool: 0x85754b });
 const NOT_SKIN = Object.freeze({ role: null, cls: "none" });
+// 手 / 前臂 / 脖颈那份皮（国军的 John_All Body、日军的 #25、第一人称手）：比脸更脏、更暗（CHARACTER_SKIN.hands）。
+const HANDS = Object.freeze({ hands: true });
 // 九〇式钢盔圆盘（IJA01/02/03 共用这一块 atlas 布局；IJA06 在同一位置换成了九八式略帽的布面）。
 const IJA_HELMET_DISC = Object.freeze([0.861, 0.350, 0.138]);
 export const CHARACTER_SURFACE_PARTS = Object.freeze({
   TengxianIja01: Object.freeze({
-    "Material #54": SkinPart(0.475), "Material #25": SkinPart(0.475), "Material #45": NOT_SKIN, "Material #47": NOT_SKIN,
+    "Material #54": SkinPart(0.475), "Material #25": SkinPart(0.475, HANDS), "Material #45": NOT_SKIN, "Material #47": NOT_SKIN,
     "Material #57": IjaWoolPart({ wool: 0x594a29, officer: true, helmet: IJA_HELMET_DISC }),
   }),
   TengxianIja02: Object.freeze({
     // 脸的法线强度 0.35 → 0.3，与手（#25）一致：尸体层按着色签名把脸和手拼成一只网格（少一组 draw）。
-    "Material #48": SkinPart(0.475, { normalScale: 0.3 }), "Material #25": SkinPart(0.475),
+    "Material #48": SkinPart(0.475, { normalScale: 0.3 }), "Material #25": SkinPart(0.475, HANDS),
     "Material #55": IjaWoolPart({ wool: 0x938049, helmet: IJA_HELMET_DISC }), "Material #164": GEAR_PART,
   }),
   TengxianIja03: Object.freeze({
-    "Material #26": SkinPart(0.525), "Material #25": SkinPart(0.479), "Material #29": NOT_SKIN,
+    "Material #26": SkinPart(0.525), "Material #25": SkinPart(0.479, HANDS), "Material #29": NOT_SKIN,
     "Material #55": IjaWoolPart({ wool: 0x938049, helmet: IJA_HELMET_DISC }),
     // 挂在 Spine2 骨上的刚体小件（非蒙皮，位置是骨局部坐标）：只换色，不按高度上泥。
     "Material #55.001": IjaWoolPart({ wool: 0x938049 }),
     "Material #164": GEAR_PART,
   }),
   TengxianIja06: Object.freeze({
-    "Material #48": SkinPart(0.477, { normalScale: 0.3 }), "Material #25": SkinPart(0.475),
+    "Material #48": SkinPart(0.477, { normalScale: 0.3 }), "Material #25": SkinPart(0.475, HANDS),
     "Material #55": IjaWoolPart({ wool: 0x94814a }), "Material #164": GEAR_PART,
   }),
   // NRA02 的毛巾与枪套（Material #1721585343 / #29）不打部件：它们与帽徽、眼球是同一种平铺着色，
   // 尸体层 / 任务人物按着色签名合成一只图集网格；单独打成装具就多一个 draw（第一关 CPU 提交瓶颈）。
   TengxianNra02: Object.freeze({
-    "Material #9": SkinPart(0.502), "John_All Body": SkinPart(1.879), "Material #1721585337": NraClothPart(),
+    "Material #9": SkinPart(0.502), "John_All Body": SkinPart(1.879, HANDS), "Material #1721585337": NraClothPart(),
   }),
   TengxianNra05: Object.freeze({
-    "Material #26": SkinPart(0.486), "John_All Body": SkinPart(1.879), "战士1_头部": NOT_SKIN,
+    "Material #26": SkinPart(0.486), "John_All Body": SkinPart(1.879, HANDS), "战士1_头部": NOT_SKIN,
     "Material #1721585337": NraClothPart(),
   }),
-  TengxianNra06: Object.freeze({ "Material #9": SkinPart(0.508), "John_All Body": SkinPart(1.879) }),
+  TengxianNra06: Object.freeze({ "Material #9": SkinPart(0.508), "John_All Body": SkinPart(1.879, HANDS) }),
   // 第一人称：默认骨骼双臂、汉阳造双手（第一关全程用它）、低头看见的身体。
   // 汉阳造手的网格比身体大 1.36 倍、视模再缩 0.7，屏幕上的 UV 密度与身体的 John_Color 相当。
-  FpsArms: Object.freeze({ "John_All Body": SkinPart(1.93), "Material #1721585337": NraClothPart() }),
+  FpsArms: Object.freeze({ "John_All Body": SkinPart(1.93, HANDS), "Material #1721585337": NraClothPart() }),
   FpsHanYang: Object.freeze({
-    "Material_HanYangSkin": SkinPart(1.9),
+    "Material_HanYangSkin": SkinPart(1.9, HANDS),
     // 腕环那 160 个三角的 UV 横跨 atlas 的手背、脚掌与底色，贴不了图：改成与前臂同色的皮肤。
-    "Material_HanYangWrist": SkinPart(1.9, { noMap: true }),
+    "Material_HanYangWrist": SkinPart(1.9, { ...HANDS, noMap: true }),
     "Material #1721585337": NraClothPart({ elbowX: 0.555, cuffX: 0.92 }),
   }),
   FirstPersonBody: Object.freeze({ "Material #1721585337": NraClothPart() }),
@@ -213,29 +215,34 @@ export const CHARACTER_GRIME = Object.freeze({
  *   creaseDirt / creaseBias  褶皱积泥：atlas 本身与它 creaseBias 级 mip 的亮度差 < 0 的地方（指缝、指甲缝、关节纹）
  *   dirtTint        积泥与污渍的颜色；smudge / smudgeScale 大块污渍的覆盖与频率（每米周期数）
  *   sweat / sweatRoughness  脸上汗湿的面积与汗湿处的粗糙度
- *   wristColor      腕环（noMap）用的前臂均色（John_Color 前臂区实测，sRGB）
+ *   wristColor      腕环（noMap）用的前臂均色（按调色后的前臂取，sRGB）
+ *   hands           手那份皮（部件表 hands: true）的倍率：污渍与褶皱积泥 × dirt、明度 × value。
+ *                   2026-09-28 第二轮：开场近景里日兵伸向镜头的手、第一人称手仍读成粉白（集成实拍），
+ *                   调色加重（toneMix .5 → .78、value .92 → .84）并给手单独加脏
  */
 export const CHARACTER_SKIN = Object.freeze({
   detailTexture: "./Texture/Texture_CharacterSkinDetail.webp?v=20260928",
   tileMeters: 0.06,
-  normalStrength: 0.42,
+  normalStrength: 0.55,
   fade: Object.freeze([0.4, 2.8]),
-  cavityAlbedo: 0.20,
+  cavityAlbedo: 0.28,
   oilRoughness: 0.10,
-  tone: 0xa8845e,
-  toneMix: 0.5,
-  desat: 0.10,
-  value: 0.92,
-  roughness: 0.6,
-  specularIntensity: 0.7,
+  tone: 0xa07a52,
+  toneMix: 0.78,
+  desat: 0.04,
+  value: 0.84,
+  roughness: 0.66,
+  specularIntensity: 0.55,
   creaseDirt: 0.45,
   creaseBias: 3.5,
   dirtTint: 0x4a3c2d,
-  smudge: 0.3,
+  smudge: 0.34,
   smudgeScale: 12,
   sweat: 0.35,
   sweatRoughness: 0.4,
-  wristColor: 0xc98863,
+  wristColor: 0xb07e5a,
+  // 手那份皮的倍率：[污渍 / 褶皱积泥, 明度]（分镜 01/02/04A/05：手是脏的、黄褐的，最近处最显）。
+  hands: Object.freeze({ dirt: 2.0, value: 0.8 }),
 });
 
 /**
@@ -243,7 +250,8 @@ export const CHARACTER_SKIN = Object.freeze({
  * 下半身湿泥；钢盔漆面磨损、雨水湿亮。atlas 原色是饱和的土黄（色相 43°、饱和 50%），
  * 换成去饱和、压暗的橄榄褐，亮度起伏（褶皱）保留 atlas 的。
  *   wool / officerWool   士兵 / 军官（IJA01）呢子的目标反照率（sRGB）。比分镜里看到的颜色暖一档、
- *                        饱和一档：阴天偏蓝的天光与绒光都会把它往灰绿推（第一版 0x6c6649 渲出来像国军灰绿）
+ *                        饱和一档：阴天偏蓝的天光与绒光都会把它往灰绿推（第一版 0x6c6649 渲出来像国军灰绿）；
+ *                        第二版 0x75623d 在 01–05 开场的暖光近景里又读成芥末黄（集成实拍），压暗、往橄榄偏一点
  *   helmetPaint / helmetSteel  钢盔漆色与磨出来的钢色
  *   helmetEdge     [开始磨损, 圆盘边]（圆盘半径的比例）：帽檐一圈磨出金属
  *   helmetChips    漆面崩口的覆盖；helmetRoughness / helmetWetRoughness 漆面与雨水湿亮处
@@ -251,8 +259,8 @@ export const CHARACTER_SKIN = Object.freeze({
  *   leather*       皮革（子弹盒、皮带、军靴）：压暗、去一点饱和、略亮一点的粗糙度
  */
 export const IJA_UNIFORM_COLORS = Object.freeze({
-  wool: 0x75623d,
-  officerWool: 0x5f5033,
+  wool: 0x625a3b,
+  officerWool: 0x544d33,
   helmetPaint: 0x4d4530,
   helmetSteel: 0x57544e,
   helmetEdge: Object.freeze([0.84, 0.985]),
