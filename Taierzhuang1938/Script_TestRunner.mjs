@@ -813,7 +813,8 @@ const changedDomainRules = [
   // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。
   { domain: "editor", pattern: /Trench(es|Plan|Spline|Editor)/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
-  { domain: 'animation', pattern: /ProneCrawl|BackRifleRun|RelaxedGait|IjaAlertGait|Melee.*Animation|MeleeAnimation|Infantry/i },
+  // LayeredGait（2026-09-28 NPC 脚步与位移同步的分层步态）由 ActorLocomotionTest 看着，归动画域。
+  { domain: 'animation', pattern: /ProneCrawl|BackRifleRun|RelaxedGait|IjaAlertGait|LayeredGait|Melee.*Animation|MeleeAnimation|Infantry/i },
   // 背枪走 / 空手走目前只在 01–02 开场导演里用（日兵甲乙、纵深日兵、翻译）：改它要连开场一起验。
   { domain: 'openingStoryboards', pattern: /RelaxedGait|IjaAlertGait|Data_Tuning_ActorLocomotion/i },
   // 站立待机叠加层与它的旋钮表：装在第一关每个兵身上，验收在 FirstLevelP012AnimationTest（ai 域）。
