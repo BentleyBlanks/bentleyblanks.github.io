@@ -1393,7 +1393,7 @@ const EXPLOSION_KINDS = {
 // sprite 总预算的四分之一，显存/实例总量不增加，只多三个很便宜的 draw call。
 const EXPLOSION_SPRITE_VARIANTS = Object.freeze({
   legacy: Object.freeze({
-    pool: "spriteLegacy", path: "./Texture/Texture_ExplosionFire_01.png",
+    pool: "spriteLegacy", path: "./Texture/Texture_ExplosionFire_01.webp?v=20260928",
     grid: [4, 4], frames: 16, authoredColor: false, blending: "additive",
     emission: 1, aerial: false, fadeOutStart: 0.82,
     life: [0.40, 0.52], mainSize: [0.55, 1.45], secondarySize: [0.30, 0.85],

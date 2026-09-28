@@ -2,18 +2,20 @@
 
 The height source is an authored imagegen estimate, not measured displacement.
 Normal and AO are derived from that SAME height field. No extra GPU sampler.
-Run with Python, Pillow and numpy; source PNGs stay beside the runtime textures.
+Run with Python, Pillow and numpy; the two source PNGs live in _import/Source/TrenchPom/
+(moved out of the served Texture/ folder on 2026-09-28, docs/Data_TextureAssetStandard.md).
 """
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageFilter
 
 root = Path(__file__).resolve().parents[1] / 'Texture'
+source = Path(__file__).resolve().parent / 'Source' / 'TrenchPom'
 size = 1024
 tileM, reliefM = 1.5, .05
 
 def Read(name):
-    return np.asarray(Image.open(root / name).convert('RGB').resize((size, size), Image.Resampling.LANCZOS), dtype=np.float32) / 255
+    return np.asarray(Image.open(source / name).convert('RGB').resize((size, size), Image.Resampling.LANCZOS), dtype=np.float32) / 255
 
 def WeldEdges(data):
     data = data.copy()

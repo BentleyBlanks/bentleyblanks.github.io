@@ -569,6 +569,17 @@ export class MaterialLibrary {
   }
 
   /**
+   * 关卡按需贴图集（Data_LevelTextureSets.LEVEL_TEXTURE_SETS[levelId]）：新贴图默认走这里，不进开机
+   * PBR_SETS。每套独立超时/失败、失败留程序化或 fallback，永不 reject；必须在建网格之前 await。
+   * 口径与预算：docs/Data_TextureAssetStandard.md §6。加载器按需动态载入，开机模块图不变。
+   * @returns {Promise<{levelId: string, loaded: string[], failed: object[]}>}
+   */
+  async LoadLevelSets(levelId, options = {}) {
+    const { LoadLevelTextureSets } = await import("./Script_LevelTextureSets.mjs");
+    return LoadLevelTextureSets(this, levelId, options);
+  }
+
+  /**
    * 取一份材质。同一个 name + 同一组 options 只建一次。
    * @param {string} name 配方名
    * @param {object} options repeat / normalScale / roughness / metalness / color / side / transparent

@@ -189,8 +189,9 @@ def bake_runtime_textures():
     # Shared neutral maps keep albedo-only source materials inside the normal
     # PBR loading path without inventing surface detail that was not authored.
     solid_runtime_image("Texture_LugouqiaoFlatNormal.png", (0.5, 0.5, 1.0, 1.0))
-    solid_runtime_image("Texture_LugouqiaoMetalOrm.png", (1.0, 0.42, 0.88, 1.0))
-    solid_runtime_image("Texture_LugouqiaoWoodOrm.png", (1.0, 0.78, 0.0, 1.0))
+    # 2026-09-28: Texture_LugouqiaoMetalOrm.png / WoodOrm.png were never read at runtime (Script_Main's
+    # Lugouqiao sets borrow their ORM from the same-named TexBake recipes via `fallback`); deleted under
+    # docs/Data_TextureAssetStandard.md, so they are no longer written here.
 
 
 copy_source_textures()

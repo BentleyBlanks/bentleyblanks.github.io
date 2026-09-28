@@ -1,0 +1,60 @@
+{
+  "generator": "audit",
+  "date": "2026-09-28",
+  "name": "StoneWellOriginal",
+  "preset": null,
+  "source": null,
+  "heightSource": null,
+  "params": {
+    "tileM": null,
+    "pack": "orm",
+    "normalConvention": "gl"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_StoneWellOriginalBase.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 44078,
+      "sha256": "83b1aa2869bd6aa4508c960132896542222d248f6d414c307fa6377e280e5fde"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_StoneWellOriginalNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 47746,
+      "sha256": "80f519902b23012ccaf3113c2b43b52eb8fa848175f08e3ea91c475a65592723"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_StoneWellOriginalOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 26714,
+      "sha256": "883810cf325be77845d592ee2b917904d4b0fc704d53e66e33984f0072b06aae"
+    }
+  ],
+  "totalBytes": 118538,
+  "metrics": {
+    "meanSrgb": [
+      0.3652,
+      0.3623,
+      0.3089
+    ],
+    "luma": 0.3455,
+    "lumaStd": 0.1479,
+    "sat": 0.1541,
+    "clipLow": 0.0574,
+    "clipHigh": 0.0,
+    "lowFreq": 0.1798,
+    "seam": 0.0414,
+    "interior": 0.017,
+    "seamRatio": 2.44,
+    "border": 0.133,
+    "swing": 0.2428,
+    "texelsPerMeter": null
+  },
+  "gateProblems": []
+}

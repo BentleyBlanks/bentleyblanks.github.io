@@ -19,7 +19,7 @@
 
 ## 模型、许可与重建
 
-`Model_TrenchStone.glb` 为 80 三角的原创破碎石块。`Model_TrenchDryGrass.glb` 为 1040 三角、带细侧枝的根束，仅少量布设并和碎土共用分区；导出顶点云为 Y 向上、下垂方向为局部 -Z。主要覆盖沿用 `Texture_TrenchRootMat.png`：内置 imagegen 单张生成、保留真实 alpha，8×6 网格逐点贴合坡面，随机尺度与左右镜像；alphaTest 0.42，不使用半透明排序。构建时为冠部土块和上坡皮建立临时三角形高度索引，让两片较小根毯贴到实际可见的土层上，间隙为 1.8–4.8 cm。所有网格走 BuildSink，无逐簇 Mesh。本轮没有修改 Blender 几何；土壁位图按上文重新生成。
+`Model_TrenchStone.glb` 为 80 三角的原创破碎石块。`Model_TrenchDryGrass.glb` 为 1040 三角、带细侧枝的根束，仅少量布设并和碎土共用分区；导出顶点云为 Y 向上、下垂方向为局部 -Z。主要覆盖沿用 `Texture_TrenchRootMat.png`（2026-09-28 转 `Texture_TrenchRootMat.webp`：有损 q95、alpha 无损，2.34 MB → 0.79 MB）：内置 imagegen 单张生成、保留真实 alpha，8×6 网格逐点贴合坡面，随机尺度与左右镜像；alphaTest 0.42，不使用半透明排序。构建时为冠部土块和上坡皮建立临时三角形高度索引，让两片较小根毯贴到实际可见的土层上，间隙为 1.8–4.8 cm。所有网格走 BuildSink，无逐簇 Mesh。本轮没有修改 Blender 几何；土壁位图按上文重新生成。
 
 枯草根毯的完整生成提示词见 [Data_TrenchRootMatPrompt.md](Data_TrenchRootMatPrompt.md)。PNG 是运行资产，源图同时保留于生成工具的本地输出目录；不依赖外部素材站授权。
 

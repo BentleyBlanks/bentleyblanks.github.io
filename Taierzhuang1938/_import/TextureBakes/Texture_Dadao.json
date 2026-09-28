@@ -1,0 +1,60 @@
+{
+  "generator": "audit",
+  "date": "2026-09-28",
+  "name": "Dadao",
+  "preset": null,
+  "source": null,
+  "heightSource": null,
+  "params": {
+    "tileM": null,
+    "pack": "orm",
+    "normalConvention": "gl"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_DadaoBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 168504,
+      "sha256": "7b748152f52a02946f114bf84517a3299b6874c617c548efa675acc019c1570a"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_DadaoNormal.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 237680,
+      "sha256": "c83461bddf4931f99092761c1d33f5a4fa894645e210171474d53bf518b18baa"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_DadaoOrm.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 201784,
+      "sha256": "f0f959d820b06e90cb9d315c5fd1d02bd7b547618da46a109bc3ae1da1f321d2"
+    }
+  ],
+  "totalBytes": 607968,
+  "metrics": {
+    "meanSrgb": [
+      0.3923,
+      0.3668,
+      0.3555
+    ],
+    "luma": 0.3715,
+    "lumaStd": 0.1051,
+    "sat": 0.0937,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.1555,
+    "seam": 0.1594,
+    "interior": 0.0108,
+    "seamRatio": 14.802,
+    "border": 0.565,
+    "swing": 0.2906,
+    "texelsPerMeter": null
+  },
+  "gateProblems": []
+}

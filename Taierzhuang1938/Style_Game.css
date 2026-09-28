@@ -45,7 +45,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudDamage::before {
   content: ""; position: absolute; inset: 0;
-  background: url("./Texture/Hud/Texture_HudCriticalBlood.png?v=20260911a") center / var(--blood-size) var(--blood-size) no-repeat;
+  background: url("./Texture/Hud/Texture_HudCriticalBlood.webp?v=20260928") center / var(--blood-size) var(--blood-size) no-repeat;
   opacity: 0.88;
 }
 /* 只动画化子层 opacity，不对全屏纹理逐帧做 brightness/filter。 */
@@ -69,7 +69,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   opacity: 0; visibility: hidden;
   background:
     url("./Texture/Hud/Texture_HudMeleeKillBloodRightBurst.webp?v=20260914d") center / 100% 100% no-repeat,
-    url("./Texture/Hud/Texture_HudCriticalBlood.png?v=20260911a") center / 110% 110% no-repeat,
+    url("./Texture/Hud/Texture_HudCriticalBlood.webp?v=20260928") center / 110% 110% no-repeat,
     radial-gradient(ellipse at 45% 48%, rgba(125,5,8,.18), rgba(89,0,4,.72));
 }
 .hudStoryBlood.on { visibility: visible; }
@@ -567,7 +567,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudGrenadeWarning .ico i {
   display: block; width: 30px; height: 30px; background: currentColor;
-  mask: url("./Texture/Icon_GrenadeWarning.png") center / contain no-repeat;
+  mask: url("./Texture/Icon_GrenadeWarning.webp?v=20260928") center / contain no-repeat;
 }
 .hudGrenadeWarning .direction {
   position: absolute; inset: 0; transform: rotate(var(--grenade-direction, 0deg));
