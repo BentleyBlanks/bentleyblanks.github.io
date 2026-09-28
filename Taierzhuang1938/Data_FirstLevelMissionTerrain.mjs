@@ -28,7 +28,7 @@ export function MissionPathDistance(point, route) {
 export const MISSION_TERRAIN = Object.freeze({
   cellM: 0.75,
   // 沟壁这类一格采不住的地方往下细分（Data_FirstLevelP012Terrain.RefineCells）。
-  refine: { subdivisions: 3, errorM: 0.04, screenM: 0.1 },
+  refine: { subdivisions: 3, errorM: 0.08, screenM: 0.1 },
   textureTileM: 2,
   // Full-cover trench floor below natural soil; firing steps and mouths remain raised.
   // Historical basis and exceptions: docs/Data_TrenchTerrainPbr.md.

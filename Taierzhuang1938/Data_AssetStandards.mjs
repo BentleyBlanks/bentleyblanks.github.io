@@ -19,11 +19,13 @@ export const TRIANGLE_RULES = Object.freeze({
 
 export const MIN_DECIMATION_REDUCTION = 0.05;
 
-// 恢复外部 GLB 面数后，七关 high 档实测峰值为 7.842M。保留约 3.3% 工程余量，
-// 仍由 BootTest 逐关量；编辑器与门禁必须共用这一份数值。
+// 恢复外部 GLB 面数后，七关 high 档实测峰值为 7.842M，当时取 8.1M。
+// 2026-09-28 第一关沟壁高度场细分（docs/Data_TrenchSpline.md「高度场在沟壁上细分」）：
+// 前线 RightNestShortRetreat 那一帧原本就到 8.046M，细分后实测 8.31–8.50M，经用户同意放宽到 8.7M。
+// 仍由 BootTest 与第一关各前线门禁逐帧量；编辑器与门禁必须共用这一份数值。
 export const SCENE_RENDER_LIMITS = Object.freeze({
   drawCalls: 5000,
-  triangles: 8100000,
+  triangles: 8700000,
 });
 
 export const SPECIAL_TRIANGLE_TARGETS = Object.freeze({
