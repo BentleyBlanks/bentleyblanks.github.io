@@ -19,6 +19,12 @@
 export const LEVEL_TEXTURE_SETS = Object.freeze({
   // 阶段 B（2026-09-28 3A 迭代）各包往这里加条目；现有贴图的加载时机不在此表管理。
   FirstLevel: Object.freeze([
+    // B1 建筑材质（Data_FirstLevelWhiteboxMaterials 的外观表；消费方 Script_FirstLevelWhiteboxLooks）
+    Object.freeze({ name: "VillageMudPlaster", v: "b1wb20260928", fallback: "Adobe" }),
+    Object.freeze({ name: "VillageLimePlaster", v: "b1wb20260928", fallback: "TemplePlaster" }),
+    Object.freeze({ name: "VillageRoofTile", v: "b1wb20260928", fallback: "GateRoofTile" }),
+    Object.freeze({ name: "VillageTimber", v: "b1wb20260928", fallback: "HandcartWood" }),
+    Object.freeze({ name: "RailBallast", v: "b1wb20260928", fallback: "GroundRubble" }),
     // B5 开场布景（Data_OpeningSet0103.SET_MATERIALS）：掩蔽部 / 前沟的风化旧木、旧弹药箱板。
     Object.freeze({ name: "OpeningTimber", v: "20260928", fallback: "WoodBeam" }),
     Object.freeze({ name: "OpeningCrate", v: "20260928", fallback: "WoodCrate" }),

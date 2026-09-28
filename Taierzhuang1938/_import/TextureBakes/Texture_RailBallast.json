@@ -1,0 +1,119 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-09-28",
+  "name": "RailBallast",
+  "preset": "stone",
+  "source": {
+    "path": "_shots/Gap3A_Source/B1/Gen_RailBallast.png",
+    "sha256": "821d41f67d418dd85d1b651132795d3627c840e8819f85c152fe2033c073a176",
+    "metrics": {
+      "meanSrgb": [
+        0.473,
+        0.4442,
+        0.412
+      ],
+      "luma": 0.4431,
+      "lumaStd": 0.1141,
+      "sat": 0.129,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0107
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.45,
+      0.44,
+      0.42
+    ],
+    "contrast": 0.08,
+    "lumaRange": [
+      0.38,
+      0.66
+    ],
+    "satRange": [
+      0.0,
+      0.16
+    ],
+    "stdRange": [
+      0.04,
+      0.13
+    ],
+    "reliefM": 0.012,
+    "rough": 0.82,
+    "roughVar": 0.06,
+    "roughLumaK": 0.0,
+    "ao": 0.5,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.1,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 1.5,
+    "size": 512,
+    "dataSize": 256,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_RailBallastBase.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 93212,
+      "sha256": "2013637e4f753d9e97a3cb846724adb7cf718622fdce847d5ab69e727e22a39a"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_RailBallastNormal.webp",
+      "width": 256,
+      "height": 256,
+      "bytes": 39946,
+      "sha256": "df0436936de971a9f5090b74ad024fe0c78e962f90e2ef5d637775e7fcfac7dc"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_RailBallastOrm.webp",
+      "width": 256,
+      "height": 256,
+      "bytes": 30702,
+      "sha256": "ddf3c1b9d9d9cf22609e6b935f036e91f08d8782d5fd9df933b71972636a8902"
+    }
+  ],
+  "totalBytes": 163860,
+  "metrics": {
+    "meanSrgb": [
+      0.4496,
+      0.4409,
+      0.4194
+    ],
+    "luma": 0.4366,
+    "lumaStd": 0.0799,
+    "sat": 0.0671,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.004,
+    "seam": 0.057,
+    "interior": 0.0587,
+    "seamRatio": 0.971,
+    "border": 0.959,
+    "swing": 0.0036,
+    "aoMean": 0.875,
+    "roughMean": 0.808,
+    "texelsPerMeter": 341.3
+  },
+  "gateProblems": []
+}

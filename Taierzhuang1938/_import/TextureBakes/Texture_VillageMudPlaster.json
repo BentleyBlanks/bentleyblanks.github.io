@@ -1,0 +1,119 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-09-28",
+  "name": "VillageMudPlaster",
+  "preset": "rammedEarth",
+  "source": {
+    "path": "_shots/Gap3A_Source/B1/Gen_VillageMudPlaster.png",
+    "sha256": "1243aa740bbd1a36fc0bd4a0763ed17c202ce37019ee65ba93a6abc4f61e0b06",
+    "metrics": {
+      "meanSrgb": [
+        0.5497,
+        0.4695,
+        0.3833
+      ],
+      "luma": 0.4675,
+      "lumaStd": 0.0931,
+      "sat": 0.3027,
+      "clipLow": 0.0001,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0207
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.46,
+      0.425,
+      0.37
+    ],
+    "contrast": 0.055,
+    "lumaRange": [
+      0.32,
+      0.52
+    ],
+    "satRange": [
+      0.12,
+      0.38
+    ],
+    "stdRange": [
+      0.035,
+      0.11
+    ],
+    "reliefM": 0.008,
+    "rough": 0.93,
+    "roughVar": 0.04,
+    "roughLumaK": 0.0,
+    "ao": 0.45,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.088,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 2.8,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_VillageMudPlasterBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 307544,
+      "sha256": "688a053abb2cf6c38a0a297c0719069ac51bbbefa8db7fa26cf354edbe84ddca"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_VillageMudPlasterNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 98626,
+      "sha256": "9f9fa10d35891faf74e3667877929d967175a8140071646521b18ae511abe315"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_VillageMudPlasterOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 68416,
+      "sha256": "76d6bb2ed87ebea00a3dae0ded91045dbd5ef7627da4a89f8a759adb7f1db0b8"
+    }
+  ],
+  "totalBytes": 474586,
+  "metrics": {
+    "meanSrgb": [
+      0.4597,
+      0.4259,
+      0.3696
+    ],
+    "luma": 0.4184,
+    "lumaStd": 0.0558,
+    "sat": 0.196,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0056,
+    "seam": 0.0407,
+    "interior": 0.0411,
+    "seamRatio": 0.989,
+    "border": 0.95,
+    "swing": 0.0045,
+    "aoMean": 0.919,
+    "roughMean": 0.933,
+    "texelsPerMeter": 365.7
+  },
+  "gateProblems": []
+}

@@ -1,0 +1,7 @@
+Generate ONE square 1:1 image (2048x2048): a seamless tileable albedo (base colour) texture for a realistic 3D video game.
+Subject: the surface of an old weathered wooden beam / door post from a poor village house in southern Shandong, China, March 1938, overcast day. Sun- and rain-bleached timber: grey-brown silvered wood with long drying cracks and checks following the grain, a few knots, dark water stains, dust and grime in the cracks, rough splintery surface. The wood grain runs exactly vertically, parallel to the left and right image edges. One continuous piece of wood, no plank gaps, no nails, no paint.
+Colours: desaturated grey-brown and ash grey, low saturation. NOT orange, NOT honey-coloured new wood, NOT red-brown varnish.
+Scale: the image covers 1.0 m x 1.0 m of wood.
+Camera: perfectly orthographic, straight-on view of a flat surface, no perspective.
+Lighting: completely flat, even, shadowless diffuse light (de-lit albedo). No cast shadows, no specular highlights, no vignette, no light gradient.
+The texture must tile seamlessly on all four edges. Fill the entire frame with the wood surface only: no text, no watermark, no border, no frame, no objects.

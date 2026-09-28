@@ -120,7 +120,7 @@ export function BuildVillageWhitebox(groundAt) {
       ...(solid ? {} : { solid: false }) });
   }
   function Door(id, f, at, width = 1.1, height = 2.1, steps = 1) {
-    OnFace(`${id}Void`, f, at, width, 0, height, "roof", .05);
+    OnFace(`${id}Void`, f, at, width, 0, height, "void", .05);
     for (const s of [-1, 1])
       OnFace(`${id}Jamb${s}`, f, at + s * (width / 2 + .07), .14, 0, height + .12, "timber", .1);
     OnFace(`${id}Head`, f, at, width + .44, height, .18, "timber", .12);
@@ -130,7 +130,7 @@ export function BuildVillageWhitebox(groundAt) {
         .34 * (steps - k + 1));
   }
   function Window(id, f, at, width = .95, sill = 1.05, height = .85, bars = true) {
-    OnFace(`${id}Void`, f, at, width, sill, height, "roof", .05);
+    OnFace(`${id}Void`, f, at, width, sill, height, "void", .05);
     OnFace(`${id}Sill`, f, at, width + .2, sill - .08, .08, "timber", .12);
     OnFace(`${id}Head`, f, at, width + .2, sill + height, .1, "timber", .1);
     if (bars) for (const b of [-1, 0, 1])
@@ -154,8 +154,8 @@ export function BuildVillageWhitebox(groundAt) {
     House(id, x, z, w, d, h);
   }
   function Coping(id, x, z, w, d, top) {
-    Detail(`${id}Coping`, x, z, w + .22, .16, d + .3, "roof", { y: top + .08 });
-    Detail(`${id}CopingRidge`, x, z, w > d ? w + .1 : .14, .1, w > d ? .14 : d + .1, "roof",
+    Detail(`${id}Coping`, x, z, w + .22, .16, d + .3, "coping", { y: top + .08 });
+    Detail(`${id}CopingRidge`, x, z, w > d ? w + .1 : .14, .1, w > d ? .14 : d + .1, "coping",
       { y: top + .21 });
   }
   // Yard wall with a tile coping (压顶) that overhangs both faces.

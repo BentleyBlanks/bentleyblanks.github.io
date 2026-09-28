@@ -68,8 +68,8 @@ export function BuildRearWhitebox(groundAt) {
   // Tile coping on a wall top (non-solid): a slab that overhangs both faces and a ridge.
   function Coping(id, x, z, len, thick, top, ry = 0) {
     const g = groundAt(x, z);
-    Detail(`${id}Coping`, x, z, thick + .26, .12, len + .1, "roof", { y: g + top + .06, ry });
-    Detail(`${id}CopingRidge`, x, z, .22, .1, len + .1, "roof", { y: g + top + .17, ry });
+    Detail(`${id}Coping`, x, z, thick + .26, .12, len + .1, "coping", { y: g + top + .06, ry });
+    Detail(`${id}CopingRidge`, x, z, .22, .1, len + .1, "coping", { y: g + top + .17, ry });
   }
   // Deterministic scatter of small broken brick / stone / earth pieces (non-solid).
   let seed = 1518;

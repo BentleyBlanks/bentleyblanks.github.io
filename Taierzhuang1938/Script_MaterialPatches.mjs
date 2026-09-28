@@ -847,6 +847,153 @@ export function MakeClusteredLightsPatch() {
   });
 }
 
+/** sRGB 0..1 → 线性（风化补丁的泥色 uniform 要线性值，diffuseColor 是线性的）。 */
+function SrgbToLinear01(c) {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+/**
+ * 白盒风化补丁的共享 uniform 包（全场一份，调一个数所有白盒材质一起变）。
+ * 值用普通数组：three 的 vec3/vec4 uniform 上传接受数组，本模块因此不必引 three。
+ * @param {object} tuning Data_Tuning_Materials.WHITEBOX_WEATHERING
+ */
+export function MakeWhiteboxWeatherUniforms(tuning) {
+  const t = tuning;
+  return {
+    uWbDamp: { value: [t.dampHeightM, t.dampRaggedM, t.dampDarken, t.dampRoughness] },
+    uWbSplash: { value: [t.splashHeightM, t.splashStrength, 0, 0] },
+    uWbSplashColor: { value: t.splashColor.map(SrgbToLinear01) },
+    uWbStreak: { value: [t.streakLengthM, t.streakStrength, t.streakFrequency, 0] },
+    uWbEdge: { value: [t.edgeWidthM, t.edgeLighten, t.bevelM, t.bevelTilt] },
+    uWbMacro: { value: [t.macroScaleM, t.macroStrength, t.undersideDarken, 0] },
+  };
+}
+
+/**
+ * 第一关白盒体块的风化（2026-09-28 B1）：墙根返潮与溅泥、檐下雨痕、棱角磨损与倒角法线、
+ * 大尺度色斑、朝下面压暗。**零采样器**：只用世界坐标上的程序噪声，加三组顶点属性 ——
+ *   `wbFace` vec4 = (面内 u 米, 面内 v 米, 面宽, 面高)，算离棱多远；
+ *   `wbSpan` vec2 = (顶点处地面高, 块顶高)，算离地多高、离块顶多远；
+ *   `color`（three 的顶点色）= 同一外观内按建筑组的明度抖动。
+ * 缺属性的几何（前沿可破坏块、铁路样条）读材质的 `defaultAttributeValues`
+ * （Script_FirstLevelWhiteboxLooks 设成「离棱 1 m、离地 1 万米」），只剩色斑与朝下面压暗。
+ *
+ * 挂在表面补丁那一格（`MaterialLibrary.InjectSurface`）：它改的是反照率 / 粗糙度 / 法线，
+ * 与 ORM 三合一共存（ORM 在它之后声明 gOrmTexel，互不读写）。不编 SSR。
+ * 数值口径：Data_Tuning_Materials.WHITEBOX_WEATHERING；`strength` 是每个外观自己的倍率。
+ * @param {object} shared MakeWhiteboxWeatherUniforms 的返回值（全场共用）
+ * @param {number} strength 0..1
+ */
+export function MakeWhiteboxWeatherPatch(shared, strength = 1) {
+  const strengthUniform = { value: strength };
+  return MakePatch({
+    key: "wbWeather1",
+    uniforms: (uniforms) => {
+      Object.assign(uniforms, shared);
+      uniforms.uWbStrength = strengthUniform;
+    },
+    vertex: [
+      ["#include <common>", /* glsl */`
+        attribute vec4 wbFace;
+        attribute vec2 wbSpan;
+        varying vec3 vWbWorld;
+        varying vec3 vWbNormal;
+        varying vec4 vWbFace;
+        varying vec2 vWbSpan;`],
+      ["#include <project_vertex>", /* glsl */`
+        vWbWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        vWbNormal = normalize(mat3(modelMatrix) * objectNormal);
+        vWbFace = wbFace;
+        vWbSpan = wbSpan;`],
+    ],
+    fragment: [
+      ["#include <common>", /* glsl */`
+        uniform vec4 uWbDamp;
+        uniform vec4 uWbSplash;
+        uniform vec3 uWbSplashColor;
+        uniform vec4 uWbStreak;
+        uniform vec4 uWbEdge;
+        uniform vec4 uWbMacro;
+        uniform float uWbStrength;
+        varying vec3 vWbWorld;
+        varying vec3 vWbNormal;
+        varying vec4 vWbFace;
+        varying vec2 vWbSpan;
+        float gWbDamp = 0.0;
+        float WbHash(vec2 p) {
+          vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+          p3 += dot(p3, p3.yzx + 33.33);
+          return fract((p3.x + p3.y) * p3.z);
+        }
+        float WbNoise(vec2 p) {
+          vec2 i = floor(p), f = fract(p);
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(WbHash(i), WbHash(i + vec2(1.0, 0.0)), u.x),
+            mix(WbHash(i + vec2(0.0, 1.0)), WbHash(i + vec2(1.0, 1.0)), u.x), u.y);
+        }`],
+      ["#include <color_fragment>", /* glsl */`
+        {
+          float wbS = uWbStrength;
+          vec3 wbN = normalize(vWbNormal);
+          float wbWall = 1.0 - abs(wbN.y);
+          vec2 wbT = abs(wbN.y) > 0.7 ? vec2(1.0, 0.0) : normalize(vec2(-wbN.z, wbN.x) + vec2(1e-5, 0.0));
+          float wbAlong = dot(vWbWorld.xz, wbT);
+          float wbH = vWbWorld.y - vWbSpan.x;
+          float wbBelowTop = vWbSpan.y - vWbWorld.y;
+          float wbNear = 1.0 - smoothstep(18.0, 45.0, length(vViewPosition));
+          // 大尺度色斑（斜着投影，墙面与顶面都有，不按面对齐成条）
+          vec2 wbMacroP = (vWbWorld.xz + vec2(vWbWorld.y * 0.61, -vWbWorld.y * 0.37)) / uWbMacro.x;
+          float wbMacro = WbNoise(wbMacroP) * 0.65 + WbNoise(wbMacroP * 2.7 + 11.3) * 0.35;
+          diffuseColor.rgb *= 1.0 + (wbMacro - 0.5) * 2.0 * uWbMacro.y * wbS;
+          // 墙根返潮：上沿锯齿
+          float wbRag = WbNoise(vec2(wbAlong * 1.3, 17.0)) * 0.7 + WbNoise(vec2(wbAlong * 4.1, 3.0)) * 0.3;
+          float wbDampTop = uWbDamp.x + (wbRag - 0.5) * 2.0 * uWbDamp.y;
+          float wbDamp = (1.0 - smoothstep(wbDampTop * 0.45, wbDampTop, wbH)) * wbS;
+          gWbDamp = wbDamp;
+          diffuseColor.rgb *= 1.0 - uWbDamp.z * wbDamp;
+          // 溅泥：离地一拃之内的斑点
+          float wbSpeck = smoothstep(0.42, 0.78, WbNoise(vec2(wbAlong * 7.0, vWbWorld.y * 9.0)) * 0.6
+            + WbNoise(vec2(wbAlong * 23.0, vWbWorld.y * 27.0)) * 0.4);
+          float wbSplash = (1.0 - smoothstep(0.0, uWbSplash.x, wbH)) * wbSpeck * wbWall;
+          diffuseColor.rgb = mix(diffuseColor.rgb, uWbSplashColor, clamp(wbSplash * uWbSplash.y * wbS, 0.0, 1.0));
+          // 檐下雨痕：块顶往下的竖向暗纹
+          float wbStreakZone = wbWall * (1.0 - smoothstep(0.0, uWbStreak.x, wbBelowTop)) * step(0.0, wbBelowTop);
+          float wbStreak = smoothstep(0.5, 0.85, WbNoise(vec2(wbAlong * uWbStreak.z, vWbWorld.y * 0.45)))
+            * (0.4 + 0.6 * WbNoise(vec2(wbAlong * uWbStreak.z * 0.31 + 5.0, 2.0)));
+          diffuseColor.rgb *= 1.0 - uWbStreak.y * wbStreakZone * wbStreak * wbS;
+          // 棱角磨损：棱边一窄条提亮，宽度随噪声缺口
+          float wbEdgeDist = min(min(vWbFace.x, vWbFace.z - vWbFace.x), min(vWbFace.y, vWbFace.w - vWbFace.y));
+          float wbChip = WbNoise(vec2(wbAlong * 13.0 + vWbWorld.y * 5.0, vWbWorld.y * 13.0));
+          float wbEdge = 1.0 - smoothstep(0.0, uWbEdge.x * (0.35 + 1.3 * wbChip), wbEdgeDist);
+          diffuseColor.rgb *= 1.0 + uWbEdge.y * wbEdge * wbS * wbNear;
+          // 朝下的面（檐底、梁底、窗楣底）
+          diffuseColor.rgb *= 1.0 - uWbMacro.z * clamp(-wbN.y, 0.0, 1.0) * wbS;
+        }`],
+      ["#include <roughnessmap_fragment>", /* glsl */`
+        roughnessFactor *= mix(1.0, uWbDamp.w, gWbDamp);`],
+      // 倒角：离棱 bevelM 以内把法线往棱外掰。切线基用屏幕导数现算（面内坐标 wbFace.xy 当 uv），
+      // 导数必须在分支外取（非一致控制流里的 dFdx 未定义）。
+      ["#include <normal_fragment_maps>", /* glsl */`
+        {
+          vec3 wbP = -vViewPosition;
+          vec3 wbDp1 = dFdx(wbP), wbDp2 = dFdy(wbP);
+          vec2 wbDuv1 = dFdx(vWbFace.xy), wbDuv2 = dFdy(vWbFace.xy);
+          float wbBw = max(uWbEdge.z, 1e-4);
+          float wbTx = (1.0 - smoothstep(0.0, wbBw, vWbFace.x)) - (1.0 - smoothstep(0.0, wbBw, vWbFace.z - vWbFace.x));
+          float wbTy = (1.0 - smoothstep(0.0, wbBw, vWbFace.y)) - (1.0 - smoothstep(0.0, wbBw, vWbFace.w - vWbFace.y));
+          vec3 wbDp2perp = cross(wbDp2, nonPerturbedNormal);
+          vec3 wbDp1perp = cross(nonPerturbedNormal, wbDp1);
+          vec3 wbTan = wbDp2perp * wbDuv1.x + wbDp1perp * wbDuv2.x;
+          vec3 wbBit = wbDp2perp * wbDuv1.y + wbDp1perp * wbDuv2.y;
+          float wbTilt = uWbEdge.w * uWbStrength * (1.0 - smoothstep(18.0, 45.0, length(vViewPosition)));
+          if (dot(wbTan, wbTan) > 1e-24 && dot(wbBit, wbBit) > 1e-24 && abs(wbTx) + abs(wbTy) > 0.0 && wbTilt > 0.0) {
+            normal = normalize(normal - (normalize(wbTan) * wbTx + normalize(wbBit) * wbTy) * wbTilt);
+          }
+        }`],
+    ],
+  });
+}
+
 /**
  * 现役间接光补丁组：顺序固定 **ORM → AO → GI → CSM → SSR → 簇光 → 破口**。
  * 新补丁插在哪儿要想清楚：

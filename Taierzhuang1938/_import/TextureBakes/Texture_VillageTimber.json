@@ -1,0 +1,119 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-09-28",
+  "name": "VillageTimber",
+  "preset": "weatheredWood",
+  "source": {
+    "path": "_shots/Gap3A_Source/B1/Gen_VillageTimber.png",
+    "sha256": "c6f2c9bd2a8a74e3e19444ee12ba749112f5f3950dc9532b3d7183e4bc8bb37b",
+    "metrics": {
+      "meanSrgb": [
+        0.4318,
+        0.4051,
+        0.3782
+      ],
+      "luma": 0.405,
+      "lumaStd": 0.1225,
+      "sat": 0.1242,
+      "clipLow": 0.0052,
+      "clipHigh": 0.0,
+      "lowFreq": 0.035
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.42,
+      0.38,
+      0.33
+    ],
+    "contrast": 0.07,
+    "lumaRange": [
+      0.26,
+      0.5
+    ],
+    "satRange": [
+      0.06,
+      0.3
+    ],
+    "stdRange": [
+      0.03,
+      0.11
+    ],
+    "reliefM": 0.004,
+    "rough": 0.88,
+    "roughVar": 0.05,
+    "roughLumaK": 0.0,
+    "ao": 0.45,
+    "metal": 0.0,
+    "seamless": "weld",
+    "rowFlatten": false,
+    "flattenSigma": 0.15,
+    "isotropic": false,
+    "heightFromLuma": "direct",
+    "tileM": 1.0,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_VillageTimberBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 271344,
+      "sha256": "66cbaf0af4b899099a273ce5112c2ede85bc398ce6b853e673573eab74f5080b"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_VillageTimberNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 101154,
+      "sha256": "7659ba854cfd248b2e1a9edf7c31cec92b9333a18acf880749c8e8bf8b3c456a"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_VillageTimberOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 58506,
+      "sha256": "0e6ea691332037f9b6d443c5883bd6e162f35d2423446eb0856286d8e38e78ad"
+    }
+  ],
+  "totalBytes": 431004,
+  "metrics": {
+    "meanSrgb": [
+      0.4194,
+      0.3809,
+      0.3296
+    ],
+    "luma": 0.3766,
+    "lumaStd": 0.0697,
+    "sat": 0.2142,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.016,
+    "seam": 0.0088,
+    "interior": 0.0424,
+    "seamRatio": 0.208,
+    "border": 0.651,
+    "swing": 0.0941,
+    "aoMean": 0.907,
+    "roughMean": 0.881,
+    "texelsPerMeter": 1024.0
+  },
+  "gateProblems": []
+}

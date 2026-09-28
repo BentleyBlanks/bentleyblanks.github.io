@@ -1300,7 +1300,13 @@ export const MISSION_LAYOUT = Object.freeze({
     earthDark: "dirt", OpeningEarth: "dirt", ground: "dirt", railBallast: "dirt", step: "dirt",
     water: "water",
   },
+  // 2026-09-28 B1：体块按 Data_FirstLevelWhiteboxMaterials 的外观表画 PBR 材质（语义色只剩图例、
+  // 编排工作台地图与没接外观的语义用）。
+  materialLooks: true,
   semanticColors: {
+    // 门窗洞里的暗面（Village Door/Window 的 Void 盒）与墙头压顶瓦：原来都借 roof。
+    void: 0x2a2724,
+    coping: 0x5f625f,
     railBallast: 0x5a5750,
     foliage: 0x68715f,
     timber: 0x746956,

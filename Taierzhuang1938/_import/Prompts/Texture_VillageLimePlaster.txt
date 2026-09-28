@@ -1,0 +1,8 @@
+Generate ONE square 1:1 image (2048x2048): a seamless tileable albedo (base colour) texture for a realistic 3D video game.
+Subject: an old lime-washed wall of a village house in southern Shandong, China, March 1938, overcast day. Mostly broad, calm areas of dirty off-white / pale warm-grey lime wash with soft grey water stains and faint vertical dirt streaks, a fine network of hairline cracks, and only two or three larger irregular patches where the lime coat has flaked off to show grey-brown mud render underneath (one of them exposing a few grey bricks). The surface should read as smooth and quiet from a distance.
+Avoid: small dark holes, pits, speckles, spots, dots, bullet holes, black flecks, high-contrast blotches, mould.
+Colours: muted dirty grey-white and warm light grey; grey-brown only inside the peeled patches; low saturation. NOT bright white, NOT yellow, NOT orange.
+Scale: the image covers 3 m x 3 m of wall.
+Camera: perfectly orthographic, straight-on front view of a flat wall, no perspective, no curvature.
+Lighting: completely flat, even, shadowless diffuse light (de-lit albedo). No cast shadows, no specular highlights, no vignette, no light gradient from one side to the other.
+The texture must tile seamlessly on all four edges. Fill the entire frame with the wall surface only: no text, no watermark, no border, no frame, no objects, no windows, no doors, no ground, no sky, no plants.
