@@ -38,6 +38,8 @@ export const TEXT = Object.freeze({
   "firstLevel.interaction.place": "将老周放在军医旁",
   "firstLevel.interaction.supply": "补充弹药、手榴弹和绷带",
   "firstLevel.hint.melee": "V 拔刀 · F 拨推 · 左键挥刀",
+  // 09 进门遭伏击，死在刀下、检查点重来之后给一次（COD5 死在万岁冲锋下也有这一句）。
+  "firstLevel.hint.kitchenAmbushRetry": "被扑倒压住时，看准了按 F 反刺",
   "firstLevel.hint.trapped": "被压住了，动不了。只能转头看。",
   "firstLevel.guide.distance": "{label} · {distance} 米",
   "firstLevel.guide.rescue": "掩蔽部门口",

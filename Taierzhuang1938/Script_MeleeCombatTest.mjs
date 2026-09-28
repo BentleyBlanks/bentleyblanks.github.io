@@ -319,6 +319,45 @@ Test('losing the scripted ground struggle applies the shared ground failure dama
   assert.equal(damage,Q.groundFailureDamage,'the shared rule, not a beat-local number');
   assert.equal(c.Fighter(p).state,'rise');
 });
+Test('press input: one F press wins the scripted ground bind, with no progress to build or decay',()=>{
+  const {p,e,c}=Make('Bayonet',1);
+  c.ScriptedKnockDown(p,e,9);Step(c,R.knockdownS+.05);
+  assert(c.BeginScriptedGround(p,e,{windowS:1.8,input:'press',reason:'kitchenAmbush'}));
+  assert.equal(c.qte.active.input,'press');
+  assert.equal(c.View().input,'press');
+  assert.equal(c.View().prompt,'按 F · 反击');
+  Step(c,1);
+  assert(c.Active,'no decay: a second later the window is still open');
+  assert(Math.abs(c.View().progress-(1-1/1.8))<.02,'progress reads as window left');
+  c.qte.Press(true,false);
+  assert.equal(c.qte.active.phase,'resolve');assert.equal(c.qte.active.success,true);
+  assert.equal(c.Fighter(e).state,'qte');
+  e.alive=false;Step(c,.1);
+  assert(c.Active,'a won press bind finishes its resolve even when the attacker died in it');
+  StepUntil(c,()=>!c.Active,2);
+  assert.equal(c.Fighter(p).state,'rise','the shared rise follows');
+  assert.equal(e.position.z,-1,'nobody pushes the corpse');
+});
+Test('press input: letting the window run out fails, and the man on top keeps pressing',()=>{
+  const {p,e,c}=Make('Bayonet',1);
+  let damage=0;c.host.Damage=(_t,_a,amount)=>{damage+=amount;};
+  c.ScriptedKnockDown(p,e,9);Step(c,R.knockdownS+.05);
+  assert(c.BeginScriptedGround(p,e,{windowS:1.2,input:'press'}));
+  c.qte.Press(true,true);
+  assert.equal(c.qte.active.phase,'input','an OS key repeat is not a press');
+  Step(c,1.25);
+  assert.equal(c.qte.active.success,false);
+  assert.equal(damage,Q.groundFailureDamage,'the shared ground failure damage');
+  assert.equal(c.Pose(c.Fighter(e)).action,'Pressure','he stabs down, he is not pushed off');
+});
+Test('press input: auto assist presses for the player shortly after the ring opens',()=>{
+  const {p,e,c}=Make('Bayonet',1);
+  c.ScriptedKnockDown(p,e,9);Step(c,R.knockdownS+.05);
+  c.SetAssist('auto');
+  assert(c.BeginScriptedGround(p,e,{windowS:1.8,input:'press'}));
+  Step(c,Q.pressAutoS-.05);assert.equal(c.qte.active.phase,'input');
+  Step(c,.1);assert.equal(c.qte.active.success,true);
+});
 console.log(`${count} melee rule tests passed`);
 
 assert.deepEqual(failures,[]);

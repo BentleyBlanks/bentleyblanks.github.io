@@ -11,16 +11,20 @@
 //   2. 担架队**真的停进遮挡**（LitterHoldCover 后面的 litterWait 车位），
 //      而不是「离 litterHold 三十六米以内」；停好了还要两条射线都被切断才算数。
 //   3. 罗班长真的走去查看相邻房屋，回来才喊 KitchenDetour；何有田真的留在外头看着。
-//   4. 09 连屋来敌由「玩家进了灶屋」放出；贴上身才走共用白刃（Script_MeleeCombat），
-//      提前打掉就没有僵持。10 开院门之后担架**真的从等待点走过来**，穿院子接回主街。
+//   4. 09 进门遭伏击（2026-09-28，照 COD5 万岁冲锋的一次性按键 QTE）：领头那个藏在
+//      灶屋—连屋过道里，玩家出灶屋南门就扑上来撞翻、压刀，按上 F 反刺、漏掉被捅死；
+//      冲锋途中被打死就不进 QTE。编排在 Script_FirstLevelKitchenAmbush，这里只做副作用。
+//      那一拍收尾后其余三个才从东巷那扇门进来，贴上身走共用白刃（Script_MeleeCombat）。
+//      10 开院门之后担架**真的从等待点走过来**，穿院子接回主街。
 //
 // 玩家可见中文一律走文本表/台词表（Script_TextTest 的闸门模块清单里有这一份）。
 // ===========================================================================
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
-import { MISSION_ENCOUNTER_ACTIVATION } from "./Data_FirstLevelMissionGates.mjs";
 import { MID_TUNING as M, MidLitterHoldSlots, MidWalkerHoldSlots } from "./Data_Tuning_FirstLevelMid.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
+import { T as Text } from "./Script_Text.mjs";
+import { FirstLevelKitchenAmbush, KitchenAmbushTriggered, KitchenAmbushLungeTarget } from "./Script_FirstLevelKitchenAmbush.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
@@ -46,7 +50,11 @@ export class FirstLevelVillageBlock {
     this.bystanders = [];
     this.holding = false;
     this.released = false;
-    this.breachAt = null;
+    // 进门遭伏击：纯规则在 Script_FirstLevelKitchenAmbush，钩子是下面 09 那一段的方法。
+    this.ambush = new FirstLevelKitchenAmbush(this.AmbushHooks(), M.kitchenAmbush);
+    this.ambushQteSerial = null;
+    this.releaseAt = null;
+    this.retryHintPending = false;
   }
 
   // -------------------------------------------------------------------------
@@ -58,7 +66,8 @@ export class FirstLevelVillageBlock {
       this.HoldColumn();
       this.WatchOutside();
     }
-    if (stageId === "Melee") this.breachAt = null;
+    // 08 里就可能已经走出灶屋南门、那一拍已经演过：不重置。
+    if (stageId === "Village" || (stageId === "Melee" && this.ambush.Phase === "hidden")) this.HideAmbushLead();
   }
 
   /** 前队与退回守军：真人、不参战、不会被当成普通阵亡拖累编排。 */
@@ -109,6 +118,9 @@ export class FirstLevelVillageBlock {
   Update(dt) {
     const stage = this.r.flow.stage.id;
     if (stage === "Village") this.UpdateVillage(dt);
+    // 进门遭伏击在 08 进了灶屋之后就上膛：08 的三条事实常常是「进灶屋」最后落，但也可能
+    // 玩家先冲过去、担架还没停好 —— 那一拍照样得演，不能等 09 开了才补。
+    if (stage === "Melee" || (stage === "Village" && this.r.Has?.("kitchenEntered"))) this.UpdateKitchenAmbush(dt);
     if (stage === "Melee") this.UpdateMeleeBeat();
     if (stage === "Courtyard") this.UpdateCourtyard();
   }
@@ -157,24 +169,311 @@ export class FirstLevelVillageBlock {
   }
 
   // -------------------------------------------------------------------------
-  // 09：连屋来敌
+  // 09：进门遭伏击 + 连屋来敌
   // -------------------------------------------------------------------------
-  /** 连屋那一组：玩家进了灶屋、走到连屋这个半径里，他们才从东巷那扇门进来。 */
-  UpdateMeleeBeat() {
-    const r = this.r, wake = MISSION_ENCOUNTER_ACTIVATION.melee.wake;
-    const ambushers = MISSION_ENCOUNTERS.melee.map((spec) => r.enemies.get(spec.id)).filter(Boolean);
-    if (!r.Has("meleeBreachStarted")) {
-      if (!r.Has("kitchenEntered") || Distance(r.player.position, A.melee) >= wake.radiusM) return;
-      for (const actor of ambushers) { actor.missionDormant = false; actor.scriptedNoncombatant = false; }
-      r.Record("meleeBreachStarted", { woke: ambushers.length });
-      this.breachAt = r.time;
-      return;
+  get Ambushers() {
+    return MISSION_ENCOUNTERS.melee.map((spec) => this.r.enemies.get(spec.id)).filter(Boolean);
+  }
+  /** 藏在过道里的那个（MISSION_ENCOUNTERS.melee 第一个）。 */
+  AmbushLead() { return this.r.enemies.get(MISSION_ENCOUNTERS.melee[0].id) || null; }
+
+  AmbushHooks() {
+    const r = () => this.r;
+    return {
+      Record: (id, detail) => r().Record(id, detail),
+      // 「右手！」「滚你妈的！」都是那一瞬吼出来的：插队，不排在别的台词后面。
+      Say: (id) => r().Say(id, { urgent: true }),
+      Spring: () => this.SpringAmbushLead(),
+      Tackle: () => this.TackleAmbush(),
+      BeginPress: () => this.BeginAmbushPress(),
+      Counter: () => this.CounterAmbush(),
+      Stab: () => this.StabAmbush(),
+      EndPin: () => r().meleeCombat?.EndScriptedGround?.(r().player, this.AmbushLead()),
+      Rise: () => r().meleeCombat?.ScriptedRise?.(r().player),
+      Unlock: () => this.UnlockAmbush(),
+      Release: () => this.ReleaseMeleeGroup(),
+    };
+  }
+
+  /**
+   * 回到藏身点装睡：进 08/09、检查点重放这一拍时。
+   * 装睡就是村里那套旗（missionDormant + scriptedNoncombatant），另加 meleeDormant ——
+   * 不然共用白刃层会在 5.5 m 内把他认领过去（MeleeCombat.Step 的 managed）。
+   */
+  HideAmbushLead({ place = false } = {}) {
+    const lead = this.AmbushLead(), T = M.kitchenAmbush;
+    if (!lead?.alive) return false;
+    lead.missionDormant = true;
+    lead.scriptedNoncombatant = true;
+    lead.meleeDormant = true;
+    lead.meleeTraining = null;
+    lead.missionSurfaceRest = false;
+    lead.scriptEssential = false;
+    lead.wakeOnThreat = false;
+    if (place && this.r.PlaceActor) {
+      this.r.PlaceActor(lead, T.hide);
+      lead.health = Math.max(lead.health, 100);
     }
-    // 「右手！」是发现人影那一瞬吼的，所以压到破门之后、不在 Enter 里自动播。
-    if (r.time - (this.breachAt ?? r.time) >= M.meleeBreachHoldS) r.Say("MeleeRight");
-    // 真贴上白刃（共用 Script_MeleeCombat 的僵持/推架）才骂那一句；提前打掉就没有。
+    lead.yaw = T.hideYaw;
+    lead.actor?.SetWeaponDetail?.(false);
+    return true;
+  }
+
+  /** 这一拍自己开的那一次共用倒地僵持（按 serial 认，别的僵持不算）。 */
+  AmbushQte() {
+    const active = this.r.meleeCombat?.qte?.active;
+    return active && active.serial === this.ambushQteSerial ? active : null;
+  }
+
+  UpdateKitchenAmbush(dt) {
+    const r = this.r, T = M.kitchenAmbush, lead = this.AmbushLead(), player = r.player;
+    if (!lead || !player) return;
+    const qte = this.AmbushQte();
+    this.ambush.Update(dt, {
+      leadAlive: !!lead.alive,
+      playerAlive: player.alive !== false,
+      triggered: KitchenAmbushTriggered(player.position, T),
+      reachM: Distance(lead.position, player.position),
+      qte: qte ? { phase: qte.phase, success: qte.success } : null,
+      risen: !["fall", "down", "rise", "qte"].includes(r.meleeCombat?.Fighter?.(player)?.state),
+    });
+    if (this.ambush.Phase === "lunge" && lead.alive) this.DriveLunge(lead);
+    if (this.ambush.Scripted) this.HoldAmbushFrame(lead);
+    else this.SetAmbushHands(false);
+    // 重来这一拍的那一下提示（Main 在 Retry 返回后会用自己的提示盖一次，所以晚一帧再给）。
+    if (this.retryHintPending && player.alive !== false && !r.failed) {
+      this.retryHintPending = false;
+      r.hud?.Hint?.(Text("firstLevel.hint.kitchenAmbushRetry"), T.retryHintS);
+    }
+    this.UpdateRelease();
+  }
+
+  /** 玩家进了过道：他从墙根跨出来，嚎一声「突撃！」。扳机整段不扣（missionSurfaceRest），刺刀一直在枪上。 */
+  SpringAmbushLead() {
+    const r = this.r, lead = this.AmbushLead();
+    if (!lead?.alive) return false;
+    lead.missionDormant = false;
+    lead.scriptedNoncombatant = false;
+    lead.missionSurfaceRest = true;
+    lead.meleeDormant = true;
+    lead.bayonetFixed = true;
+    r.ai?.SetStance?.(lead, 0, 3, true);
+    // 他整段都在一米多外怼着镜头：刺刀走 TZM 模型，不走低画质那根方块刀片（Actor.SetWeaponDetail）。
+    lead.actor?.SetWeaponDetail?.(true);
+    r.audio?.Bark?.("rally", { key: "ija_rally_charge", side: "ija", priority: true,
+      position: r.Point ? r.Point(lead.position, 1.5) : null });
+    return true;
+  }
+
+  /** 冲锋：每帧把目标重设到玩家（或先到门洞口），用剧本步速跑。 */
+  DriveLunge(lead) {
+    const r = this.r, T = M.kitchenAmbush;
+    lead.bayonetFixed = true;
+    if (this.ambush.sincePhase < T.emergeS) r.MoveActor?.(lead, lead.position, 0);
+    else r.MoveActor?.(lead, KitchenAmbushLungeTarget(lead.position, r.player.position, T), T.lungeMps);
+    r.ai?.ReleaseCover?.(lead);
+  }
+
+  /**
+   * 撞上：撞翻（共用剧本倒地，down 状态 + 地面镜头），他骑上来压刀（共用 Pressure 姿势）。
+   * 撞之前把刺刀挂到 player.meleeWeapon 上：共用倒地／地面僵持／地面镜头都要求「手里有一把
+   * 白刃武器」，而这一刻顺子手里多半是拉栓步枪 —— 顶住那把刀的就是这支枪。起完身摘掉。
+   */
+  TackleAmbush() {
+    const r = this.r, T = M.kitchenAmbush, lead = this.AmbushLead(), player = r.player, combat = r.meleeCombat;
+    if (!lead?.alive || !player || !combat) return false;
+    // 手上正在做的动作（换弹、拉栓、上刺刀）当场收尾：共用层 CanUse 看 Viewmodel.IsBusy，
+    // 忙着的话地面镜头落不下来、压刀姿势画不出来。
+    r.viewmodel?.CompleteAction?.();
+    combat.Damage(player, lead, T.tackleDamage, "qte", { yaw: lead.yaw, reach: T.tackleReachM });
+    if (player.alive === false) return false;
+    this.borrowedWeapon = player.meleeWeapon ?? null;
+    player.meleeWeapon = "Bayonet";
+    // 从这一刻起交给共用白刃层摆姿势（他的整帧走 StepMeleeCombat，不走导航、不开枪）。
+    lead.meleeDormant = false;
+    lead.meleeTraining = { passive: true };
+    lead.scriptEssential = true;
+    combat.ScriptedKnockDown(player, lead, T.lockMaxS, "kitchenAmbush");
+    combat.HoldScriptedGround(player, lead, T.lockMaxS);
+    // 这一帧就把姿势交给他，别让 AI 再跑一帧 Think（他这会儿已经不是剧本旗单位了）。
+    lead.meleeCombat = combat.Pose?.(combat.Fighter(lead)) || lead.meleeCombat;
+    r.BeginControl?.("ambush", T.lockMaxS, { lookAt: this.AmbushFacePoint(lead), lookSeconds: T.lookSeconds });
+    return true;
+  }
+
+  /** 倒地镜头落稳：开一次性按键（共用倒地僵持的 input "press"）。 */
+  BeginAmbushPress() {
+    const r = this.r, T = M.kitchenAmbush, lead = this.AmbushLead(), combat = r.meleeCombat;
+    if (!lead?.alive || !combat) return false;
+    const started = combat.BeginScriptedGround(r.player, lead, { windowS: T.windowS, reason: "kitchenAmbush", input: "press" });
+    if (started) this.ambushQteSerial = combat.qte.active.serial;
+    return started;
+  }
+
+  /** 反刺：他死在这一下上。走共用白刃伤害链（血、击杀回执、尸体），先摘掉叙事保护。 */
+  CounterAmbush() {
+    const r = this.r, T = M.kitchenAmbush, lead = this.AmbushLead();
+    if (!lead?.alive) return false;
+    lead.scriptEssential = false;
+    r.meleeCombat?.Damage?.(lead, r.player, T.counterDamage, "heavy", { yaw: r.player.yaw, reach: T.tackleReachM });
+    this.LevelAmbushGaze();
+    return true;
+  }
+
+  /**
+   * 他倒了，视线不能还锁在他脸原来那个位置上 —— 起完身人就是仰着头看天花板的。
+   * 朝原来的方向、平视远处（站姿眼高、50 m 外）平滑转回去，跟着结算与起身一起走完。
+   */
+  LevelAmbushGaze() {
+    const r = this.r, player = r.player, yaw = player.yaw;
+    const far = { x: player.position.x - Math.sin(yaw) * 50, y: player.position.y + (player.eyeHeight ?? 1.6),
+      z: player.position.z - Math.cos(yaw) * 50 };
+    return r.AimControl?.("ambush", far, M.kitchenAmbush.levelGazeS) === true;
+  }
+
+  /**
+   * 漏掉：刀捅进去。控制锁期间玩家挂着保护（HoldAmbushFrame 续的 spawnGrace），共用倒地失败的
+   * 那一份伤害已经被它吞掉 —— 这一刀先摘保护再下，满血也死。
+   */
+  StabAmbush() {
+    const r = this.r, T = M.kitchenAmbush, lead = this.AmbushLead(), player = r.player;
+    if (!player || player.alive === false) return false;
+    player.spawnGrace = 0;
+    const from = lead?.position?.clone?.() || null;
+    const delta = from && player.position.clone ? player.position.clone().sub(from).setY(0).normalize() : null;
+    player.TakeHit?.(T.failDamage, "torso", delta, { melee: true, from });
+    // 无敌档／血量调过头没死：照样起身，视线也得转回来。
+    if (player.alive !== false) this.LevelAmbushGaze();
+    return true;
+  }
+
+  UnlockAmbush() {
+    const r = this.r;
+    this.SetAmbushHands(false);
+    this.RestoreBorrowedWeapon();
+    if (r.controls?.kind !== "ambush") return false;
+    r.controls = null;
+    r.Control?.(false, "ambush");
+    return true;
+  }
+
+  RestoreBorrowedWeapon() {
+    if (this.borrowedWeapon === undefined) return false;
+    this.r.player.meleeWeapon = this.borrowedWeapon;
+    this.borrowedWeapon = undefined;
+    return true;
+  }
+
+  /**
+   * 锁着的这几拍每帧要做的事：视线跟着他被画出来的脸走（倒地那半秒眼位正从 1.6 m 掉到地板上，
+   * 落点算一次就成了看地板）、第一人称的枪和手挪开、玩家挂着保护（别的枪别在这时候把人打死）。
+   */
+  HoldAmbushFrame(lead) {
+    const r = this.r, player = r.player, phase = this.ambush.Phase;
+    if (lead?.alive) r.TrackControl?.("ambush", this.AmbushFacePoint(lead));
+    this.SetAmbushHands(phase === "pinned" || phase === "prompt");
+    if (phase !== "failed" && player) player.spawnGrace = Math.max(player.spawnGrace || 0, 0.25);
+  }
+
+  /** 第一人称那把枪连同两只手整体挪开（Viewmodel.SetScriptedHandOffset）。幂等。 */
+  SetAmbushHands(on) {
+    const view = this.r.viewmodel, want = on === true;
+    if (typeof view?.SetScriptedHandOffset !== "function" || this.handOffset === want) return false;
+    this.handOffset = want;
+    view.SetScriptedHandOffset(want ? M.kitchenAmbush.grappleHandM : null);
+    return true;
+  }
+
+  /**
+   * 他**被画出来**的脸在哪：头骨的世界位置。拿 position 加高度不行 —— 压刀姿势是弓着腰的，
+   * 脸在脚底往前半米。取不到头骨退回 lookHeightM。
+   */
+  AmbushFacePoint(lead) {
+    const head = lead?.actor?.characterRig?.bones?.head;
+    if (head?.getWorldPosition && head.position?.clone) {
+      head.updateWorldMatrix?.(true, false);
+      const point = head.getWorldPosition(head.position.clone());
+      if (Number.isFinite(point.x) && Number.isFinite(point.y)) return point;
+    }
+    return lead && this.r.Point ? this.r.Point(lead.position, M.kitchenAmbush.lookHeightM) : null;
+  }
+
+  /** 屏幕上那个环（只读快照）。装配层（runtime.AmbushPromptView）补键面字与屏幕锚点。 */
+  AmbushPromptView() {
+    const qte = this.AmbushQte();
+    return this.ambush.PromptView(qte ? this.r.meleeCombat.qte.View() : null);
+  }
+
+  /** 这一拍正占着屏幕（HUD 整个让位，只剩字幕与提示环）。 */
+  get AmbushCinematic() { return this.ambush.Scripted && this.r.controls?.kind === "ambush"; }
+
+  /**
+   * 那一拍收尾（反杀 / 先手打掉 / 旁路）：剩下的人错峰放出来。领头那个要是还活着
+   *（旁路收尾），当场转普通白刃兵。
+   */
+  ReleaseMeleeGroup() {
+    const r = this.r, T = M.kitchenAmbush, lead = this.AmbushLead();
+    if (lead?.alive) {
+      lead.scriptEssential = false;
+      lead.missionDormant = false;
+      lead.scriptedNoncombatant = false;
+      lead.missionSurfaceRest = false;
+      lead.meleeDormant = false;
+      lead.meleeTraining = null;
+      lead.bayonetFixed = true;
+      lead.actor?.SetWeaponDetail?.(false);
+    }
+    const rest = MISSION_ENCOUNTERS.melee.slice(1);
+    this.releaseAt = rest.map((spec, i) => ({ id: spec.id, at: r.time + (T.releaseDelaysS[i] ?? T.releaseDelaysS.at(-1)) }));
+    this.UpdateRelease();
+    // 那一拍用过的僵持配额与冷却清掉：接下来真实几何撞出来的僵持照常可以发生。
+    r.meleeCombat?.ClearQteBudget?.(this.Ambushers.filter((actor) => actor.alive));
+    return true;
+  }
+
+  UpdateRelease() {
+    const r = this.r;
+    if (!this.releaseAt?.length) return;
+    const due = this.releaseAt.filter((entry) => r.time >= entry.at);
+    if (!due.length) return;
+    this.releaseAt = this.releaseAt.filter((entry) => r.time < entry.at);
+    for (const entry of due) {
+      const actor = r.enemies.get(entry.id);
+      if (!actor?.alive) continue;
+      actor.missionDormant = false;
+      actor.scriptedNoncombatant = false;
+      actor.meleeDormant = false;
+      actor.bayonetFixed = true;
+    }
+    if (!r.Has("meleeBreachStarted")) r.Record("meleeBreachStarted", { woke: due.length });
+  }
+
+  /**
+   * 检查点重试落在这一拍里（死在刀下，或者他还没被放倒）：他回到过道里装睡，玩家回到灶屋。
+   * @returns {{x:number,z:number,yaw:number}|null} 玩家该从哪儿重来；null = 这一拍不重放
+   */
+  RearmAmbush() {
+    if (!this.ambush.Rearm()) return null;
+    this.ambushQteSerial = null;
+    this.releaseAt = null;
+    this.SetAmbushHands(false);
+    this.RestoreBorrowedWeapon();
+    this.HideAmbushLead({ place: true });
+    this.retryHintPending = true;
+    // 重来这一拍，那两句也要重新吼（台词是一次性的，已播过的不再进队）。
+    for (const id of ["MeleeRight", "MeleeCurse"]) { this.r.voice?.played?.delete(id); this.r.voice?.finished?.delete(id); }
+    return M.kitchenAmbush.retryPoint;
+  }
+
+  /**
+   * 连屋那一组的收尾台词：真贴上白刃（共用僵持/推架）才骂那一句；近战结束、窗口火力仍封锁院口
+   * 才喊分工。放人与「右手！」归上面那一拍。
+   */
+  UpdateMeleeBeat() {
+    const r = this.r;
     const bound = r.meleeCombat?.Active
-      || ambushers.some((actor) => actor.alive && Distance(actor.position, r.player.position) <= M.meleeCurseReachM);
+      || this.Ambushers.some((actor) => actor.alive && !actor.missionDormant
+        && Distance(actor.position, r.player.position) <= M.meleeCurseReachM);
     if (bound) r.Say("MeleeCurse");
     // 近战结束，窗口火力仍封锁院口。
     if (r.Has("meleeResolved") && this.WindowHoldsYard()) {

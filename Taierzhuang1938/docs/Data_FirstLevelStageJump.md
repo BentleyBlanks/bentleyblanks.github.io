@@ -32,7 +32,7 @@ await debug.FirstLevelJump("Handover"); // 等同第 16 阶段
 | 6 回到伤员集结处，接下后送 | `Orders` | `Orders` |
 | 7 沿沟南行 | `South` | `South` |
 | 8 主街受阻 | `Village` | `Village` |
-| 9 灶屋—连屋近战 | `Melee` | `Melee` |
+| 9 灶屋—连屋近战 | `Melee` | `Melee`（起点在灶屋正中、面朝南：进门遭伏击要玩家自己走出南门；2026-09-28 前落在连屋正中） |
 | 10 打开内院，放行担架 | `Courtyard` | `Courtyard` |
 | 11 抵达桥头接运点 | `TransferApproach` | `TransferApproach` |
 | 12 掩护装载与离开 | `Transfer` | `Transfer` → `CartRide` |

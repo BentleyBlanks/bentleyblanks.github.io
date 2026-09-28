@@ -2301,6 +2301,17 @@ export class Viewmodel {
     return true;
   }
 
+  /**
+   * 剧本打断（第一关 09 进门被撞翻）：手上正在做的动作当场收尾，走正常的收尾回调
+   *（换弹就算换完、拉栓就算拉完），不留半截状态。没有动作返回 false。
+   */
+  CompleteAction() {
+    const a = this.action;
+    if (!a || !this.rig) return false;
+    this._EndAction(a);
+    return true;
+  }
+
   IsBusy() {
     if (!this.action) return false;
     return this.action.kind === "bolt" || this.action.kind === "reload"

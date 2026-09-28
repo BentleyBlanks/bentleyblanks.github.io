@@ -48,6 +48,8 @@ export const MELEE_QTE_RULES = Object.freeze({
   // Guarantee a completed get-up and a short actionable window; incoming damage still applies.
   controlRecoveryS: 1, recoveryPoise: 65,
   recoveryAdvantageS: 0.65, cooldownS: 14, perOpponentLimit: 1, contactHoldS: 0.14,
+  // 一次性按键（input "press"，第一关 09 灶屋伏击）：辅助档「自动」在窗口开出来多久后替玩家按下。
+  pressAutoS: 0.35,
 });
 export const MELEE_ANIMATION_ACTIONS = Object.freeze([
   "Guard", "Advance", "Retreat", "Light", "LightAlt", "Charge", "Heavy",

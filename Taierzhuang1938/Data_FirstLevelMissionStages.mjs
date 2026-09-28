@@ -15,7 +15,8 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(6, "Orders", "回到伤员集结处，接下后送", ["Orders"], A.collection),
   Phase(7, "South", "沿沟南行", ["South"], A.collection),
   Phase(8, "Village", "主街受阻", ["Village"], Routes.village[0]),
-  Phase(9, "Melee", "灶屋—连屋近战", ["Melee"], A.melee),
+  // 09 从灶屋正中那间起、面朝南（进门遭伏击要玩家自己走出南门；落在连屋里就当场扑上来了）。
+  Phase(9, "Melee", "灶屋—连屋近战", ["Melee"], { x: 58, z: -6, yaw: Math.PI }),
   Phase(10, "Courtyard", "打开内院，放行担架", ["Courtyard"], A.melee),
   Phase(11, "TransferApproach", "抵达桥头接运点", ["TransferApproach"], {x:53,z:40}),
   Phase(12, "Transfer", "掩护装载与离开", ["Transfer", "CartRide"], {x:94,z:101}),
