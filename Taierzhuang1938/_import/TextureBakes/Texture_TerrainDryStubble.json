@@ -1,0 +1,60 @@
+{
+  "generator": "audit",
+  "date": "2026-09-28",
+  "name": "TerrainDryStubble",
+  "preset": "drySoil",
+  "source": null,
+  "heightSource": null,
+  "params": {
+    "tileM": 2.3,
+    "pack": "orh",
+    "normalConvention": "terrain"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_TerrainDryStubbleBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 437990,
+      "sha256": "4fb4b40953b5be1ecce7fc78ba39d99f7b070bd1aef746cb6f57a5e693123804"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_TerrainDryStubbleNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 171084,
+      "sha256": "01f1a32eed0a04f219e15dfc5f5eaab30d6bb2926737528ae0fb84d9eab7c6e4"
+    },
+    {
+      "channel": "Orh",
+      "file": "Texture_TerrainDryStubbleOrh.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 114586,
+      "sha256": "c44457128374bc686e0e1802c0207ae6c072818f9b3ee9cb0aaa4a89f1f60b13"
+    }
+  ],
+  "totalBytes": 723660,
+  "metrics": {
+    "meanSrgb": [
+      0.4137,
+      0.3698,
+      0.2594
+    ],
+    "luma": 0.3476,
+    "lumaStd": 0.1018,
+    "sat": 0.3731,
+    "clipLow": 0.0001,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0022,
+    "seam": 0.0855,
+    "interior": 0.0851,
+    "seamRatio": 1.006,
+    "border": 0.988,
+    "swing": 0.0029,
+    "texelsPerMeter": 445.2
+  },
+  "gateProblems": []
+}

@@ -81,6 +81,8 @@
     **所有现有及新增 renderer 统一遵守 [MotionVector 接入规范](docs/Data_MotionVectorContract.md)**：世界 Mesh / SkinnedMesh（SkinnedMeshRenderer）和骨骼挂件自动写真实运动；前景根的后续子孙继承明确零速度；透明 / 天空按约定排除。不能以逐件手动标记决定是否接入，不得覆盖对象原有 draw 钩子。未实现历史的移动实例、morph / 自定义形变不得直接用于新增近景角色与挂件。`Script_MotionVectorContractTest.mjs` 是独立 GPU 门禁，Script / Data / GLB 变更在 prepush 自动选中；改预通道或近景移动道具还须通过 `Script_CarriagePropVelocityTest.mjs` 的 high 画质真实资产检查 —— 它的被测对象随军列开场下线换成了 12/13 牛马车上老周的担架与车上近景件（名字里的 Carriage 是历史遗留）。不得以 low 画质、整屏占比或关闭后期代替，也不得随关卡重构删除门禁。历史原因见 [车厢复发调查](docs/Data_CarriagePropVelocity.md)。
 13. **带路跑采用跨关卡共用的 NPC 跑停节奏。** 普通随队士兵跑出几步后自然减速，短停喘息、左右观察，再继续跑；每人的首次停步、停留时长与再次起跑独立错峰，不能只错开动画相位却让全队同时停走。班长不参加普通队员的随机喘息停步，按带路、回看、等候和战术职责行动。战斗、避险、通行及协作搬运优先；不得用喘息阻塞窄口、拖断队伍或锁住玩家。规则由共享行为与数据驱动，关卡只配置路线、角色职责和情境覆盖，不按关卡号或角色姓名复制特例。完整要求与后续验收见 [NPC 带路跑通用设计](docs/Data_NpcGuideCadence.md)；共享入口为 `SquadMarchAi`，可视化工具为「小队行进」；接入方式与分项验收状态见该文档第 8–9 节。
 
+14. **贴图资产规范（2026-09-28）**：`Texture/` 下每个文件都登记在 `Data_TextureManifest.mjs`（套名、通道打包、加载层、来源与提示词、消费方）；新贴图按 `Texture_<PascalCase><Base|Normal|Orm|Orh…>.webp` 命名，经 `_import/Script_BakePbrTexture.py` 烘焙（写 `_import/TextureBakes/` 记录），默认进关卡按需集（`Data_LevelTextureSets` + `MaterialLibrary.LoadLevelSets`），不进开机 `PBR_SETS`；运行时 URL 带 `?v=`；legacy 名单只许变短。口径 [贴图资产规范](docs/Data_TextureAssetStandard.md)，验收 `Script_TextureStandardsTest.mjs`。
+
 人物外观必须遵循[用户确认的选模清单](docs/Data_CharacterSelection.md)，运行时与编辑器共用 `Data_CharacterSelection.mjs`；保留的源模型或动作参考不等于允许重新启用其人物外观。
 
 士兵资产采用 [Tengxian 共用身体骨架与重建契约](docs/Data_CharacterStandard.md)：五款外观、53 根共同身体骨骼、米制与相同绑定；旧来源模型从 Git 历史读取，不恢复已删除的五款弃用外观。

@@ -23,5 +23,5 @@ export const TRENCH_SURFACE = Object.freeze({
   },
   models: { grass: './Model/Model_TrenchDryGrass.glb', stone: './Model/Model_TrenchStone.glb' },
   mudMap: './Texture/Texture_TrenchMudHeightMask.png',
-  rootMap: './Texture/Texture_TrenchRootMat.png',
+  rootMap: './Texture/Texture_TrenchRootMat.webp',
 });
