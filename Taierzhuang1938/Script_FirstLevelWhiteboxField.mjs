@@ -173,6 +173,9 @@ export class FirstLevelWhiteboxField {
   StaticGroundHeight(x,z){return SampleWhiteboxSurface(this.staticWalkableSurfaces,x,z,this.terrain?.SampleHeight(x,z)??0);}
 
   async PrepareAssets() {
+    // 第一关按需贴图集（Data_LevelTextureSets，docs/Data_TextureAssetStandard.md §6）：造任何网格之前下完。
+    // 永不 reject，失败的套退回程序化配方；同一个 library 只下一次（别处再调也不重复下）。
+    if (/^FirstLevelMission/.test(this.layout.id || "") && typeof document !== "undefined") await this.library.LoadLevelSets?.("FirstLevel");
     if (this.layout.ground?.terrainLayers && this.layout.SampleGroundSurface && typeof document !== "undefined") {
       // Splat-weighted texture-array terrain (docs/Data_TerrainLayers.md). A failed
       // download falls back to the single tiled soil below; the level still builds.

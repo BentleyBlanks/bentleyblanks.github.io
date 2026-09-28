@@ -1,0 +1,9 @@
+Generate ONE square 1:1 image (2048x2048): a seamless tileable PBR base-color (albedo) texture of OLD WEATHERED TIMBER for a WWII-era game, used on dugout posts, roof beams, trench revetment boards and duckboards.
+
+Setting: a frontline dugout and trench in rural southern Shandong, China, March 1938, overcast wet spring. The wood is old reused rough-sawn pine/elm beams that have been rained on and caked with mud for months.
+
+Content: a single continuous close-up face of an old rough-sawn wooden beam filling the whole frame, orthographic front view, perfectly flat-on. Wood grain runs strictly VERTICAL (top to bottom), straight and consistent across the whole image. Colour: desaturated grey-brown and ashy dark brown (NOT orange, NOT yellow, NOT fresh new wood), silvery-grey weathered fibres on raised grain, darker brown in the grooves. Details: long thin drying cracks (checks) following the grain, a few small dark knots, rough saw marks, splintery fibres, patches of dried grey-brown mud and wet dark mud smears concentrated in some areas, faint water stains and dark rot streaks, a little grime. Keep the overall value medium-dark and even across the image so it tiles.
+
+Physical size: the image represents 1.0 m x 1.0 m of timber surface.
+
+Hard requirements: delit flat lighting (no shadows cast across the image, no specular highlights, no vignette, no directional light, no ambient-occlusion darkening at the borders); seamless tileable on all four edges; no plank seams, no gaps, no nails, no metal, no text, no border, no frame, no objects, no perspective, no background. Photographic material-scan look.

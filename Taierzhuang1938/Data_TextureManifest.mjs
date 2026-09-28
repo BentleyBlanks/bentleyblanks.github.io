@@ -611,6 +611,37 @@ export const TEXTURE_MANIFEST = Object.freeze([
       ["Texture_TerrainSpoilEarthOrh.webp", "Orh", 512, 512],
     ],
   },
+  // 3A 迭代 B5（2026-09-28）：01–04 开场布景的风化旧木与旧弹药箱板（分镜 01/02/03A/04A 的灰褐旧木，替换程序化橙黄 WoodBeam / WoodCrate）。
+  {
+    id: "OpeningTimber", kind: "material", tier: "level:FirstLevel",
+    toneClass: "weatheredWood",
+    metersPerTile: 1.0,
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_OpeningTimber.json",
+    source: { provider: "lovart", date: "2026-09-28", ref: "Lovart 项目 oKHfWa1O2A thread 14a400f5-1849-415f-871e-d16ebd50c4a3", prompt: "_import/Prompts/Texture_OpeningTimber.txt",
+      note: "源图 _shots/Gap3A_Source/B5/Source_OpeningTimber_Lovart.png（不进仓库）；木纹沿 V，Script_OpeningSet.TimberBox 把 V 转到木料长边" },
+    consumers: [{ file: "Data_LevelTextureSets.mjs", token: "OpeningTimber" }, { file: "Data_OpeningSet0103.mjs", token: "OpeningTimber" }],
+    files: [
+      ["Texture_OpeningTimberBase.webp", "Base", 512, 512],
+      ["Texture_OpeningTimberNormal.webp", "Normal", 512, 512],
+      ["Texture_OpeningTimberOrm.webp", "Orm", 512, 512],
+    ],
+  },
+  {
+    id: "OpeningCrate", kind: "material", tier: "level:FirstLevel",
+    toneClass: "weatheredWood",
+    metersPerTile: 0.6,
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_OpeningCrate.json",
+    source: { provider: "lovart", date: "2026-09-28", ref: "Lovart 项目 oKHfWa1O2A thread 4e8e5e9f-ca62-4a84-a599-ad641b434457", prompt: "_import/Prompts/Texture_OpeningCrate.txt",
+      note: "源图 _shots/Gap3A_Source/B5/Source_OpeningCrate_Lovart.png 先过 _import/Script_PrepBoardSeamSource.py --seam-row 1027（第四道板缝劈在上下边上，卷 256 行后补一道整缝）再烘" },
+    consumers: [{ file: "Data_LevelTextureSets.mjs", token: "OpeningCrate" }, { file: "Data_OpeningSet0103.mjs", token: "OpeningCrate" }],
+    files: [
+      ["Texture_OpeningCrateBase.webp", "Base", 512, 512],
+      ["Texture_OpeningCrateNormal.webp", "Normal", 512, 512],
+      ["Texture_OpeningCrateOrm.webp", "Orm", 512, 512],
+    ],
+  },
   {
     id: "TrenchPom", kind: "terrainLayer", tier: "level:FirstLevel",
     normalConvention: "terrain",

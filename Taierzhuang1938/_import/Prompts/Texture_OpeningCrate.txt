@@ -1,0 +1,9 @@
+Generate ONE square 1:1 image (2048x2048): a seamless tileable PBR base-color (albedo) texture of the SIDE of an OLD WOODEN AMMUNITION CRATE for a WWII-era game.
+
+Setting: Chinese army ammunition crates stacked in a muddy frontline dugout, rural southern Shandong, China, March 1938, overcast wet spring. The crates are months old, reused, handled with muddy hands.
+
+Content: orthographic front view, perfectly flat-on, of weathered wooden crate boards that fill the whole frame. Exactly 4 horizontal boards stacked top to bottom, each board the same height, separated by thin dark gaps (straight horizontal seams), wood grain running HORIZONTALLY along each board. Colour: desaturated grey-brown and dull khaki-brown weathered wood (NOT orange, NOT yellow, NOT fresh pine), slightly darker and dirtier toward the bottom edge of each board. Details: dents, scuffs, worn rounded board edges, small splits, a few nail holes with faint rust bleed, smudges of dried grey-brown mud and dark finger-smear grime, faint water stains. Keep the overall value medium and even across the image so it tiles.
+
+Physical size: the image represents 0.6 m x 0.6 m of crate side (so each board is 15 cm tall).
+
+Hard requirements: delit flat lighting (no cast shadows, no specular highlights, no vignette, no directional light, no darkening at the image borders); seamless tileable on all four edges (the board seams must line up when tiled vertically); no text, no stencil letters, no numbers, no metal corners, no rope handles, no border, no frame, no objects, no perspective, no background. Photographic material-scan look.

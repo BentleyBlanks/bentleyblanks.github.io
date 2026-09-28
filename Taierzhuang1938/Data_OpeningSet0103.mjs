@@ -271,7 +271,7 @@ export const SET_MATERIALS = Object.freeze({
 export const INTERIOR = Object.freeze({
   box: Object.freeze({ x0: -3.4, x1: 1.0, z0: -128.2, z1: -123.8, top: 2.1 }),
   featherMouthM: 1.0, featherM: 0.3,
-  ambientScale: 0.4,
+  ambientScale: 0.45,
 });
 
 // ---------------------------------------------------------------------------
