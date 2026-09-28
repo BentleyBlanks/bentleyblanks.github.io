@@ -135,9 +135,11 @@ export class FirstLevelFrontBreakables {
       group.visible = false;
       const boxes = profile.map((segment) => SegmentBox(spec, [segment[0], segment[1], segment[2] + lift], base));
       for (const box of boxes) {
-        const geometry = new THREE.BoxGeometry(box.w, box.h, box.d);
+        // 第一关白盒外观表（Script_FirstLevelWhiteboxField.WhiteboxPiece）：与被接管块同一种 PBR 外观。
+        const piece = this.battlefield.WhiteboxPiece?.(block || { id: raw.id, semantic }, box);
+        const geometry = piece?.geometry || new THREE.BoxGeometry(box.w, box.h, box.d);
         this.geometries.push(geometry);
-        const mesh = new THREE.Mesh(geometry, material);
+        const mesh = new THREE.Mesh(geometry, piece?.material || material);
         mesh.position.set(box.x, box.y, box.z); mesh.rotation.y = box.ry;
         mesh.castShadow = true; mesh.receiveShadow = true;
         group.add(mesh);

@@ -131,6 +131,13 @@ export const SURFACE_RECIPES = {
   CarriageCeilingSteel: { detailWeight: 0.4, detailTile: 10, microShadow: 0.6 },
   ClothNra: { detailWeight: 0.6, detailTile: 10, microShadow: 0.7 },
   ClothIja: { detailWeight: 0.6, detailTile: 10, microShadow: 0.7 },
+  // ——— 第一关白盒按需套（2026-09-28 B1，Data_FirstLevelWhiteboxMaterials）：法线图无 A 通道高度，
+  //     不给 POM；抹面/瓦/木料的起伏靠法线 + 细节法线 ———
+  VillageMudPlaster: { detailWeight: 0.75, detailTile: 9, microShadow: 1 },
+  VillageLimePlaster: { detailWeight: 0.65, detailTile: 9, microShadow: 1 },
+  VillageRoofTile: { detailWeight: 0.45, detailTile: 7, microShadow: 1 },
+  VillageTimber: { detailWeight: 0.8, detailTile: 10, microShadow: 0.9 },
+  RailBallast: { detailWeight: 0.7, detailTile: 9, microShadow: 1 },
 };
 
 /** 表里没有的配方按这个走：不编 POM，只给一点细节法线。 */
@@ -286,4 +293,25 @@ export const MATERIAL_DEBUG_VIEWS = {
   detailNormal: 3,   // 细节法线的切线空间 xy（灰底 = 无扰动）
   microShadow: 4,    // 微阴影因子（白 = 不压，黑 = 全压）
   skinCurvature: 5,  // 皮肤曲率（进 LUT 的那一轴）
+};
+
+/**
+ * 第一关白盒体块的风化补丁（2026-09-28 B1，`Script_MaterialPatches.MakeWhiteboxWeatherPatch`）。
+ * 零新增采样器：全部是世界坐标上的程序噪声 + 建网格时写进顶点的「离地高 / 块顶 / 面内坐标」。
+ * 每个外观再乘自己的 `weather`（Data_FirstLevelWhiteboxMaterials.WHITEBOX_LOOKS）。
+ *   damp*     墙根返潮：离地 heightM 以下变暗、变光滑（阴天湿泥地上的土墙根都是深一截的）；
+ *             raggedM 是上沿的锯齿幅度，darken 是反照率压暗量，roughness 是粗糙度乘子。
+ *   splash*   溅泥：离地 heightM 以内斑驳地混进泥色 color（sRGB），strength 是混合量。
+ *   streak*   檐下雨痕：块顶往下 lengthM 以内的竖向暗纹；frequency 是每米几道。
+ *   edge*     棱角：widthM 内提亮（磨掉的灰皮露出浅色），bevelM / bevelTilt 是把法线往外掰出的倒角
+ *             （盒子的棱不再是一条刀切的线，而是有一道受光的圆角）。
+ *   macro*    大尺度色斑：scaleM 一个斑，strength 是明度起伏；underside 压暗朝下的面（檐底、梁底）。
+ * 出处：墙根返潮 / 溅泥带高度按华北土坯房常见的 0.3–0.6 m；雨痕长度按檐下 1–1.5 m 的挂流带。
+ */
+export const WHITEBOX_WEATHERING = {
+  dampHeightM: 0.55, dampRaggedM: 0.22, dampDarken: 0.34, dampRoughness: 0.78,
+  splashHeightM: 0.3, splashColor: [0.33, 0.29, 0.24], splashStrength: 0.5,
+  streakLengthM: 1.3, streakStrength: 0.2, streakFrequency: 3.2,
+  edgeWidthM: 0.045, edgeLighten: 0.14, bevelM: 0.035, bevelTilt: 0.55,
+  macroScaleM: 6.5, macroStrength: 0.13, undersideDarken: 0.35,
 };
