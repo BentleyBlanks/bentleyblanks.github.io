@@ -164,8 +164,13 @@ float CharFbm(vec3 p) {
 `;
 
 const COMMON_FRAGMENT = /* glsl */`
-varying vec3 vCharRest;
-varying vec3 vCharRestN;
+// 三个 vec4 varying 装下全部低频场（顶点里算好，D3D 按寄存器打包，少一个是一个）：
+//   vCharRest   xyz 绑定姿势位置，w 皮肤污渍
+//   vCharGrime  x 到泥线的有符号距离（米，负 = 线下）, y 湿, z 膝肘磨损, w 落灰
+//   vCharGrime2 x 溅点覆盖, y 膝上的泥 / 袖口蹭脏, z 低频噪声, w 脸上的汗
+varying vec4 vCharRest;
+varying vec4 vCharGrime;
+varying vec4 vCharGrime2;
 const vec3 CHAR_LUMA = vec3(0.2126, 0.7152, 0.0722);
 // 点：每个单位格一个随机大小、随机偏移的圆点（一次散列），density 是有点的格子比例。溅泥、漆面崩口用它。
 float CharDots(vec3 p, float density) {
@@ -200,9 +205,9 @@ mat3 CharTangentFrame(vec3 n, vec2 uv) {
 const COMMON_PATCH = MakePatch({
   key: CHARACTER_SURFACE_PATCH_KEYS.common,
   vertex: [
-    ["#include <common>", `varying vec3 vCharRest;\nvarying vec3 vCharRestN;\n${NOISE_GLSL}`],
+    ["#include <common>", `varying vec4 vCharRest;\nvarying vec4 vCharGrime;\nvarying vec4 vCharGrime2;\n${NOISE_GLSL}`],
     // 蒙皮之前的 position / normal：泥跟着布走，不随动作滑；不改 transformed，运动矢量不受影响。
-    ["#include <begin_vertex>", "vCharRest = position;\nvCharRestN = normal;"],
+    ["#include <begin_vertex>", "vCharRest = vec4(position, 0.0);\nvCharGrime = vec4(1.0, 0.0, 0.0, 0.0);\nvCharGrime2 = vec4(0.0);"],
   ],
   // 函数形式：编译那一刻按参数写 CHAR_BATCHED（BatchedMesh 的 USE_BATCHING 只进顶点着色器）。
   fragment: (shader) => [["#include <common>", (shader?.batching ? "#define CHAR_BATCHED\n" : "") + NOISE_GLSL + COMMON_FRAGMENT]],
@@ -223,9 +228,7 @@ uniform vec4 uCharGrimeShape;   // x 泥线高, y 泥线起伏, z 溅点最高, 
 uniform vec2 uCharGrimeScale;   // x 噪声频率, y 溅点频率
 uniform vec3 uCharWear;         // x 提亮, y 去饱和, z 泥里湿的比例
 uniform vec4 uCharGrimeRole;    // x 泥, y 膝, z 肘, w 落灰
-uniform vec4 uCharGrimeSeed;    // xyz 噪声错位, w 高度偏移（刚体小件 = 抬走）
-varying vec4 vCharGrime;        // x 到泥线的有符号距离（米，负 = 线下）, y 湿, z 膝肘磨损, w 落灰
-varying vec4 vCharGrime2;       // x 溅点覆盖, y 膝上的泥 / 袖口蹭脏, z 低频噪声`;
+uniform vec4 uCharGrimeSeed;    // xyz 噪声错位, w 高度偏移（刚体小件 = 抬走）`;
   return MakePatch({
     key: CHARACTER_SURFACE_PATCH_KEYS.grime,
     uniforms: (target) => { Object.assign(target, Shared().grime, uniforms); },
@@ -258,7 +261,7 @@ uniform vec3 uCharElbow;`],
   // 溅点：线以上稀疏的小泥点，越高越少（点本身在片元里画）。
   float chance = uCharGrimeShape.w * (1.0 - smoothstep(edge, uCharGrimeShape.z, h));
   vCharGrime = vec4(h - edge, wetLevel, max(knee, elbow), dust);
-  vCharGrime2 = vec4(chance, max(kneeMud * 0.4, cuff * 0.55), n, 0.0);
+  vCharGrime2.xyz = vec3(chance, max(kneeMud * 0.4, cuff * 0.55), n);
 }`],
     ],
     fragment: [
@@ -271,7 +274,7 @@ float charMud = 0.0, charWet = 0.0, charWear = vCharGrime.z, charDust = vCharGri
   float n = vCharGrime2.z;
   // 线以下是整片泥（有符号距离插值下来再切，边是利的）。
   float solid = 1.0 - smoothstep(-0.04, 0.02, vCharGrime.x);
-  float splash = CharDots((vCharRest + uCharGrimeSeed.xyz) * uCharGrimeScale.y, vCharGrime2.x);
+  float splash = CharDots((vCharRest.xyz + uCharGrimeSeed.xyz) * uCharGrimeScale.y, vCharGrime2.x);
   charMud = max(solid, splash * 0.75) * uCharGrimeRole.x;
   charWet = max(solid * vCharGrime.y, splash * 0.3) * uCharGrimeRole.x;
   charMud = max(charMud, vCharGrime2.y);
@@ -311,12 +314,13 @@ function SkinPatch(tile, part) {
     uniforms: (target) => { Object.assign(target, Shared().skin, uniforms); },
     // 污渍与汗是十厘米 / 几厘米的低频场：顶点里算（脸上 2114 个三角，点距一两厘米）。
     vertex: [
-      ["#include <common>", "uniform vec4 uCharSkinDirt;\nvarying vec2 vCharSkin;   // x 污渍, y 汗（已乘脸部遮罩）"],
+      ["#include <common>", "uniform vec4 uCharSkinDirt;"],
       ["#include <begin_vertex>", /* glsl */`
 {
   float smudge = smoothstep(0.44, 0.7, CharFbm(position * uCharSkinDirt.w + 5.3));
   float face = smoothstep(1.45, 1.55, position.y) * (1.0 - smoothstep(0.1, 0.2, abs(position.x))) * smoothstep(-0.1, 0.4, normal.z);
-  vCharSkin = vec2(smudge, smoothstep(0.5, 0.78, CharNoise(position * 28.0 + 1.7)) * face);
+  vCharRest.w = smudge;
+  vCharGrime2.w = smoothstep(0.5, 0.78, CharNoise(position * 28.0 + 1.7)) * face;
 }`],
     ],
     fragment: [
@@ -331,8 +335,7 @@ uniform float uCharSkinTile;
 uniform vec2 uCharSkinPart;
 uniform vec3 uCharSkinTone, uCharSkinDirtTint;
 uniform vec4 uCharSkinGrade, uCharSkinNormal, uCharSkinDirt;
-uniform vec2 uCharSkinSweat;
-varying vec2 vCharSkin;`],
+uniform vec2 uCharSkinSweat;`],
       ["#include <color_fragment>", /* glsl */`
 #ifdef CHAR_BATCHED
   vec4 charSkinTexel = vec4(0.5);
@@ -355,9 +358,9 @@ float charSkinDirt = 0.0, charSkinSweat = 0.0;
     charSkinDirt = smoothstep(-0.008, -0.06, charCavity) * uCharSkinDirt.x * uCharSkinPart.x;
   #endif
   // 大块污渍（泥手印、硝烟）与脸上的汗：顶点里算好的低频场。
-  charSkinDirt = clamp(max(charSkinDirt, vCharSkin.x * uCharSkinDirt.z * uCharSkinPart.x), 0.0, 1.0);
+  charSkinDirt = clamp(max(charSkinDirt, vCharRest.w * uCharSkinDirt.z * uCharSkinPart.x), 0.0, 1.0);
   c = mix(c, uCharSkinDirtTint * (0.7 + 0.6 * charSkinTexel.b), charSkinDirt * 0.75);
-  charSkinSweat = vCharSkin.y * uCharSkinSweat.x;
+  charSkinSweat = vCharGrime2.w * uCharSkinSweat.x;
   diffuseColor.rgb = c;
 }`],
       ["#include <roughnessmap_fragment>", /* glsl */`

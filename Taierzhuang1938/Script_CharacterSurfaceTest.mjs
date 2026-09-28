@@ -213,7 +213,7 @@ Check(TagBefore(source("Script_FirstPersonBody.mjs")), "第一人称身体：打
 Check(/source\.userData\.characterSurface\?\.cls/.test(source("Script_Materials.mjs")), "_UpgradeExternal 优先读部件标签");
 Check(/"\.\/Script_CharacterSurface\.mjs": "\.\/Script_CharacterSurface\.mjs\?v=\d+"/.test(source("index.html")), "新模块登记进 import map");
 const surface = source("Script_CharacterSurface.mjs");
-Check(/vCharRest = position;/.test(surface) && !/transformed\s*=/.test(surface), "泥污读蒙皮前的 position、不改顶点（运动矢量不变）");
+Check(/vCharRest = vec4\(position, 0\.0\);/.test(surface) && !/transformed\s*=/.test(surface), "泥污读蒙皮前的 position、不改顶点（运动矢量不变）");
 Check(/#ifndef CHAR_BATCHED\s+uniform sampler2D uCharSkinDetailMap;/.test(surface)
   && /#ifndef CHAR_BATCHED\s+uniform sampler2D uIjaWoolDetailMap;/.test(surface)
   && /#ifndef NRA_CLOTH_BATCHED\s+uniform sampler2D uNraClothDetailMap;/.test(source("Script_UniformColors.mjs")),
