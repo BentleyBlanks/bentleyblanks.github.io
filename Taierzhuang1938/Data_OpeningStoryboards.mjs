@@ -89,6 +89,22 @@ export const OPENING_STORYBOARDS = Object.freeze({
   blackoutRecovery:Object.freeze({ fadeS:5.2, eyelidS:4.2, closeS:.16 }),
   interpreterClearanceM:.72,
   walkMps:2.3, turnRps:4.5, poseBlendS:.28, cameraBlendS:.65, cameraTurnRps:3.5,
+  // A man going from an authored pose into native combat (handed back and raising his rifle) blends this fast.
+  combatBlendS:.12,
+  // Free walks (a Move with no clip: the native or relaxed gait) set off and pull up instead of stepping from a
+  // stand straight to full pace and stopping dead on the mark: pace changes by at most accelMps2 / decelMps2 and
+  // slows into the last mark of a route (sqrt(2 a d)), never below minMps short of it. Turns speed up at
+  // turnAccelRps2 to turnRps and ease into the facing instead of starting and stopping at full rate.
+  pace:Object.freeze({ accelMps2:4, decelMps2:4, minMps:.3 }), turnAccelRps2:24,
+  // Held-pose life (Script_OpeningActorPerformance.OpeningHeldLife): a man the director holds on a still frame
+  // (Luo kneeling at the mouth through all of Banter, ijaB on the ready through 02's Hold, a collar held on a hold
+  // loop) with no dialogue acting on him breathes, sways and lets his eyes wander instead of standing as a statue.
+  // Starts once the pose's watched bones turn slower than stillRadS, fades in over inS and out over outS as soon as
+  // the clip moves again. Radians and hertz; the head's share is cut to faceAimedShare on clips whose face is aimed
+  // at the first-person eye inside the clip.
+  heldLife:Object.freeze({ stillRadS:.35, inS:.6, outS:.12,
+    breathRad:.018, breathHz:.28, swayRad:.012, swayHz:.11,
+    headYawRad:.12, headYawHz:[.07,.19], headPitchRad:.03, headPitchHz:.13, neckShare:.5, faceAimedShare:.25 }),
   // Eye closure at and over which the view is not eased or rate-limited but put on the shot (unseen).
   cameraShutSnap:.95,
   // The look up at a man over the lying eye (01 Found to DragOut, LookAtBody): the bearing is his hips', his head's

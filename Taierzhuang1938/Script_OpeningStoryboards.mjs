@@ -386,9 +386,9 @@ export class FirstLevelBunkerShow {
       &&(shift>.01||Number.isFinite(point.yaw)&&Math.abs(Wrap(point.yaw-shownYaw))>.01));
     const keep=moved?KeepSkeleton(actor):null;
     this.r.PlaceActor(actor,point);actor.openingStoryboardLast={x:point.x,z:point.z,time:this.r.time};
-    if(Number.isFinite(point.yaw)){actor.yaw=point.yaw;actor.actor.root.rotation.y=point.yaw;}
+    if(Number.isFinite(point.yaw)){actor.yaw=point.yaw;actor.actor.root.rotation.y=point.yaw;actor.openingTurnRate=0;}
     actor.openingStoryboardYaw=actor.yaw;
-    actor.openingStoryboardTravel=0;
+    actor.openingStoryboardTravel=0;actor.openingPace=0;
     if(keep){keep();actor.openingRerooted=true;if(noBlend)actor.openingNoBlend=true;}
   }
   /** A re-root under the pelvis at a root-motion clip's hand-over to the native gait (no pose blend:
@@ -413,7 +413,7 @@ export class FirstLevelBunkerShow {
    * turnRps toward `face` (a point, a yaw, or the direction of travel), and pose `clip`.
    * The unpaired interpreter waits at occupied body space. Returns true when within arriveM.
    */
-  Move(actor,point,face,clip,speed=C.speed.walk,{seconds=null,upperBody=false,holdUntil=null,additive=null,aim=0}={}){
+  Move(actor,point,face,clip,speed=C.speed.walk,{seconds=null,upperBody=false,holdUntil=null,additive=null,aim=0,ease=true,remainingM=null}={}){
     if(!actor)return false;
     const dt=this.delta||0;
     actor.openingStoryboardHidden=false;actor.actor.root.visible=true;
@@ -422,11 +422,20 @@ export class FirstLevelBunkerShow {
     const last=stale?null:actor.openingStoryboardLast,from=last?{x:last.x,z:last.z}:{x:actor.position.x,z:actor.position.z};
     // The facing the director showed last frame (the AI may have turned him since): turn from there.
     if(last&&Number.isFinite(actor.openingStoryboardYaw))actor.yaw=actor.openingStoryboardYaw;
-    const distance=Distance(from,point),step=Math.min(distance,speed*dt);
+    const distance=Distance(from,point);
+    // A free walk accelerates from the pace he had and slows into the route's last mark (C.pace); clip-driven
+    // travel (drags, paired stages) and Settle keep their exact speed so partners stay on their contacts.
+    let pace=speed;
+    if(ease&&!clip&&speed>0&&dt>0){
+      const prior=Number.isFinite(actor.openingPace)?actor.openingPace:0,remaining=Number.isFinite(remainingM)?remainingM:distance;
+      const want=Math.min(speed,Math.max(C.pace.minMps,Math.sqrt(2*C.pace.decelMps2*remaining)));
+      pace=prior+Math.max(-C.pace.decelMps2*dt,Math.min(C.pace.accelMps2*dt,want-prior));
+    }
+    const step=Math.min(distance,pace*dt);
     const to=distance>1e-5?{x:from.x+(point.x-from.x)*step/distance,z:from.z+(point.z-from.z)*step/distance}:{x:point.x,z:point.z};
     if(actor===this.cast.interpreter&&step>0)this.AvoidInterpreterOverlap(from,to,actor);
     const travel=dt>0?Distance(from,to)/dt:0;
-    actor.openingStoryboardTravel=travel;
+    actor.openingStoryboardTravel=travel;actor.openingPace=ease&&!clip&&speed>0?pace:travel;
     actor.openingStoryboardLast={...to,time:this.r.time};
     if(actor.alive&&!actor.openingDoomed){
       actor.scriptedNoncombatant=true;actor.missionDormant=false;actor.scriptEssential=true;
@@ -437,7 +446,12 @@ export class FirstLevelBunkerShow {
     if(typeof face==="number")desired=face;
     else if(face&&Distance(to,face)>.02)desired=Face(to,face);
     else if(!face&&distance>.05)desired=Face(from,point);
-    actor.yaw+=Math.max(-C.turnRps*dt,Math.min(C.turnRps*dt,Wrap(desired-actor.yaw)));
+    // Turn with an angular speed that builds up and eases off into the facing (at most turnRps).
+    const error=Wrap(desired-actor.yaw),prior=Number.isFinite(actor.openingTurnRate)?actor.openingTurnRate:0;
+    const wanted=Math.sign(error)*Math.min(C.turnRps,Math.sqrt(2*C.turnAccelRps2*Math.abs(error)));
+    let rate=prior+Math.max(-C.turnAccelRps2*dt,Math.min(C.turnAccelRps2*dt,wanted-prior)),turn=rate*dt;
+    if(Math.abs(turn)>=Math.abs(error)||Math.abs(error)<1e-4){turn=error;rate=0;}
+    actor.yaw+=turn;actor.openingTurnRate=rate;
     actor.watchYaw=actor.yaw;actor.watchUntil=this.r.ai.time+1;
     if(clip){
       const age=this.PlayClip(actor,clip,{holdUntil,additive});
@@ -483,7 +497,8 @@ export class FirstLevelBunkerShow {
     const at=actor.openingStoryboardLast||actor.position;
     while(walk.index<route.length-1&&Distance(at,route[walk.index])<(options.cornerM??.3))walk.index++;
     const last=walk.index===route.length-1;
-    const arrived=this.Move(actor,route[walk.index],last&&Distance(at,route[walk.index])<.3?faceEnd:null,clip,speed,options);
+    let remainingM=Distance(at,route[walk.index]);for(let i=walk.index+1;i<route.length;i++)remainingM+=Distance(route[i-1],route[i]);
+    const arrived=this.Move(actor,route[walk.index],last&&Distance(at,route[walk.index])<.3?faceEnd:null,clip,speed,{remainingM,...options});
     return last&&arrived;
   }
   /** Land on a stage root without a jump: an arrival gate leaves up to ~0.15 m, walked here at run speed. */
@@ -491,7 +506,7 @@ export class FirstLevelBunkerShow {
     if(!actor)return;
     const at=actor.openingStoryboardLast||actor.position;
     if(Distance(at,root)<.01){this.Put(actor,root);return;}
-    this.Move(actor,root,Number.isFinite(root.yaw)?root.yaw:null,null,C.speed.run);
+    this.Move(actor,root,Number.isFinite(root.yaw)?root.yaw:null,null,C.speed.run,{ease:false});
   }
   /** Stationary pose on the current root (no travel). */
   Pose(actor,clip,options={}){

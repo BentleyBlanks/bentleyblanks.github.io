@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **过场人物动作自然化（2026-09-28）**：开场动作层的姿态混合挪到说话表演与握枪修正之后（起点是最终显示的姿态）、换根只混骨盆以下、混合选定弧线不换边、交还 AI 也过渡、每帧开头还原原生姿态（three `PropertyMixer` 不重写常量轨道），加定格保活层（呼吸/侧摆/视线）与自由走位的起停、转身缓动；全游戏共用的脚底松锁改为抬脚后衰减、P012 站定钉帧不再被 `aim 0.18` 打断。口径与改前改后数字见 [开场动作库 §9](docs/Data_OpeningClipLibrary20260923.md)、[位移与步态同步「松锁」](docs/Data_ActorLocomotion.md)；动作库里 IK 换分支的帧还没重烘（同 §9 末）。门禁 `Script_ActorLocomotionTest`、`Script_OpeningStoryboardsTest`、`Script_OpeningActorPerformanceBrowserTest`、`--campaign --stage-to=3`。
+
 - **NPC 脚步与位移同步（2026-09-28）**：播放速率钳制 + 步幅缩放 + 骨盆下沉（UE5 Lyra 式），日军快速蹲姿移动改播共用骨架蹲走、机枪手蹲着移动不再平移，担架员与跛行伤员移动时按骨骼分层（下半身标定走路片）。口径、实机取证与门禁见 [位移与步态同步](docs/Data_ActorLocomotion.md)「速度分摊」，门禁 `Script_ActorLocomotionTest`。
 
 - **沙袋只有一种（2026-09-27）**：全项目沙袋只用战场包 `battlefieldSandbag01/02/03`，最底层按脚印贴地、袋底压进土，材质接地形融合；程序化椭圆袋、`Model_Sandbag.glb`、画袋缝的白盒块不再用来画沙袋。选哪个入口、贴地与融合参数见 [沙袋标准](docs/Data_SandbagStandard.md)，门禁 `Script_SandbagStandardTest`、`Script_FirstLevelMissionFortificationsTest`。

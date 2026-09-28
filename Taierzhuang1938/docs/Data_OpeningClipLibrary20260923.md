@@ -82,3 +82,18 @@
 `IjaHairGrabPull` 保留冻结的 clip 名，实际接触改为前领。日兵甲在川军右前方约半米处跨步抓领，随后拔刺刀、割喉、擦刀并退回持枪站姿；五段沿用同一演员根。旧正面 0.28 m 的根距离让两人胸腹重叠，旧抓发动作在拉开距离后又够不到头顶。川军的防御手势降到胸前，空出刀刃和喉部；`CaptiveHeadPulledBack`、`CaptiveThroatCut`、`CaptiveClutchThroat` 与日兵甲动作均由独立 Blender 源工程重烘。
 
 检查以正式模型和实际导演镜头为准：`Script_OpeningStoryboardsTest` 核对五段逐骨交接，`Script_OpeningClipsBrowserTest --clip=IjaHairGrabPull,IjaDrawBayonet,IjaThroatSlash,IjaWipeSheathBayonet,IjaReadyRifle,CaptiveHeadPulledBack,CaptiveThroatCut,CaptiveClutchThroat` 核对接触、脚滑和人体净空；`Script_OpeningStoryboardShots --shots=SB03_Blade,SB03_Slash` 与连续 01–03 验收实际镜头。源工程位于 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningExecution_20260926`，不入库。
+
+## 9. 运行时播放层：过场动作自然化（2026-09-28）
+
+用户反馈「过场里人物动作全都不太自然」。先用逐帧探针真实播放 01–02（每帧记录每个人的骨骼帧间转角、骨盆高度、朝向、着地脚位移，每 0.25 s 截图），按来源分类后改运行时，动作库数据本身不动。改前 → 改后（01–02 全程，活人、30 m 内）：单帧 ≥25° 的骨骼跳变 446 → 211 帧（腿部 187 → 48），≥60° 122 → 28，骨盆单帧高度跳 172 → 84；剩下的 ≥60° 大多在下面「还没做的」烘焙数据里。
+
+- **混合在所有叠加层之后做**（`Script_OpeningStoryboardAnimation`）：姿态混合从「clip 采样之后、说话表演与握枪修正之前」挪到这两层之后，起点是上一帧**最终显示**的姿态。之前这两层在换 clip 那一帧整层开/关，手和前臂单帧拧 90–150°（罗班长指点进出、传令兵、战友起身）。握枪修正开关、受保护/只动头切换、加性动作（`BanterLaugh` 等）换条，即使 clip 没换也重启混合。
+- **换根只混骨盆以下**：`RerootUnderPelvis`（`noBlend`）的根与骨盆直接用新 clip，四肢、脊柱、头照样混（原来整段不混，战友起身接走路手腕 123°、罗班长放下拖人前臂 69°）。骨盆旋转不能在局部空间混：换根前后根的朝向可差 180°（翻译逃跑）。
+- **选弧不换边**：混合开始时按最短弧定下每根骨头走哪边，之后不再换（`SlerpArc`）。three 的 slerp 每帧都取短弧，两端接近相反时目标一动就换边（日兵乙端枪转背枪走，手腕 99°）。
+- **交还 AI 也混**：导演放手（无 pose、无位移、无表演）后，原生姿态从最后显示的姿态用 `poseBlendS` 过渡；交还后立刻端枪的（`nativeCombat`）用 `combatBlendS` 0.12 s，不再一帧切过去（罗班长交还时前臂 146°）。
+- **每帧开头还原原生姿态**：three 的 `PropertyMixer` 只在自己算出的值变化时才写骨头，常量轨道（背枪走/空手走的手、手指）写过一次就不再写；这一层在 mixer 之后改过骨头又不还原，旧值就一直留着——翻译站着时手腕停在某次混合留下的姿态，一起步 mixer 的值「变了」才写回，手腕一帧拧 148°。现在每帧开头把骨头还原成上一帧 `original.call` 之后的原生姿态（`baseBuffer`），与代码库其余层「mixer 采样前撤掉叠加」的约定一致。
+- **定格保活**（`Script_OpeningActorPerformance.OpeningHeldLife`，数在 `Data_OpeningStoryboards.heldLife`）：导演用固定帧长时间摆着、又没有说话表演的人（Banter 全段 53 s 跪在洞口的罗班长、02 Hold 端枪站 10 s 的日兵乙、揪领的 holdLoop）自动加呼吸、胸口侧摆和慢速视线漂移；看守骨骼角速度低于 `stillRadS` 才淡入，clip 一动 0.12 s 内退出；脸在 clip 里对准第一人称的动作头部幅度只给 `faceAimedShare`。说话表演层的手势按「站定」权重淡入淡出（约 0.3 s），不再在起步那一帧消失。
+- **走位缓动**（`Script_OpeningStoryboards.Move`，数在 `Data_OpeningStoryboards.pace` / `turnAccelRps2`）：不带 clip 的自由走动按加速度起步、按 `sqrt(2ad)` 减速停在路线**末点**（`Follow` 传剩余路程，拐角不减速）；转身有角加速度、到角度前收住，最高仍是 `turnRps`。带 clip 的位移（拖人、成对站位）与 `Settle` 不缓动，保证接触对位。
+- 全游戏共用的两处也在这一轮修：脚底锁定松锁（[位移与步态同步](Data_ActorLocomotion.md)「松锁」）；P012 站定钉帧不再被 `aim 0.18` 打断（原来洞外背景兵、喊话兵每 2.9 s 原地「上前两步」再弹回，`Script_FirstLevelP012CastAppearance`）。
+
+**还没做的**：动作库里仍有 IK 解中途换分支的帧（前臂/手/小腿绕自身轴约 180°，烘焙端已有扭转展开与 30°/帧滚转限速，但求解器仍会换分支）。本轮探针在 01–02 里看到的：`BlastSlamBuried` 左手、`BlastDazedStir` 右前臂、`CaptiveDraggedFromDirt` 左脚、`CaptiveWallBrace` 头、`IjaSlingRifle` 右前臂、`IjaCollarDragSnag` 左上臂、`IjaVaultTimberIn/Out` 小腿与脚、`IjaParriedChoppedFall` 左上臂、`HeSwapDadaoRifle` 右手、`HeDadaoParryChop`、`LuoDadaoChopRear` 左前臂、`WoundedRiseWall` 左手；未用到的 `ButtThreat` 五套骨架都有。要逐条回 Blender 重烘并重跑 §6 的接触门禁。
