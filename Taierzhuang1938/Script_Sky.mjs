@@ -361,7 +361,9 @@ export const SKY_PRESETS = {
     fog: { density: 0.0032, falloff: 45, max: 0.72,
       sky: [0.60, 0.60, 0.59], ground: [0.45, 0.43, 0.40], sunGain: 0.08,
       desat: 0.16, flatten: 0.03,
-      grade: { shadow: 0.45, highlight: 0.25, shadowTint: [0.93, 0.98, 1.08] } },
+      // contrastCurve "soft"：对比 1.10 走幂形 S 曲线 —— 线性拉伸会把 sRGB < 0.045 整块裁成 0
+      //（掩蔽部 SB01 实拍 7–10% 的像素死黑），S 曲线在中灰斜率相同、两端只压不裁。
+      grade: { shadow: 0.45, highlight: 0.25, shadowTint: [0.93, 0.98, 1.08], contrastCurve: "soft" } },
     exposure: 0.78, godStrength: 0, bloom: 0.04, lensFlare: 0, saturation: 0.92, contrast: 1.10,
     atmosphere: { mie: 8, rayleigh: 0.30, groundAlbedo: 0.2, sunIrradiance: 12,
       skyTint: [0.97, 0.97, 1.0], skyFloor: [0.95, 0.95, 0.92],

@@ -1290,9 +1290,13 @@ node Taierzhuang1938/Script_PostFrameGraphTest.mjs        # 帧图顺序（atmos
 2. **调色按预设**：`fog.grade` 现在认 `lift / gain / shadowTint / highlightTint / shadow /
    highlight` 全部六项；**没写的项每帧回落 `Data_Tuning_Camera.GRADE_DEFAULTS`**（2026-09-28 之前
    uniform 只在有 grade 时写，换预设会把上一档的色偏留下）。第一关：分离调色减半、暗部少一点青蓝。
+   新增 `grade.contrastCurve: "soft"`（`uContrastCurve`）：对比度改走幂形 S 曲线
+   `v<.5 ? .5(2v)^c : 1−.5(2−2v)^c` —— 中灰斜率同样是 c，两端渐近不硬裁。线性拉伸在 c = 1.10 时把
+   sRGB < 0.045 整块裁成 0（SB01 掩蔽部门柱内侧 7–10% 死黑）。`GradeMathJs` 与 LUT 缓存键同步；
+   没写的预设仍是线性拉伸，逐比特不变。
 3. **填充光与对比**：envIntensity / shProbe / ambient 下调、平行光略抬、contrast 1.10、
    skyTint 去暖（数与理由在 `SKY_PRESETS.firstLevelBattleDay` 的注释里）。
-4. **曝光**：`SKY_EXPOSURE.firstLevelBattleDay`（evUp 0.5 / evDown 0.25：进屋只适应一半，
+4. **曝光**：`SKY_EXPOSURE.firstLevelBattleDay`（evUp 0.6 / evDown 0.25：进屋只适应一半，
    看天几乎不压）+ `EXPOSURE_ANCHORS.FirstLevelP012Whitebox`。锚点**不取出生机位**（出生在掩蔽部里），
    取 11 个室外对照机位 avgLog 的中位数；`Script_FirstLevelSkyGradeBrowserTest` 每次重量，
    偏差 > 0.3 EV 报红 —— 白盒换材质之后照它打印的中位数重标。

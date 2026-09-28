@@ -478,7 +478,8 @@ export function ConeBoundingSphere(range, cosHalfAngle) {
 export const INTERIOR_SKY = Object.freeze({
   strength: 1.0,
   gain: 1.0,
-  cosFloor: 0.2,
+  // 0.2 → 0.3：洞口 / 门框两侧朝里的面（与口子几乎平行）在 0.2 时只分到一成，SB01 的门柱内侧压成死黑
+  cosFloor: 0.3,
   soften: 0.35,
   featherH: 0.5,
   featherTop: 0.25,

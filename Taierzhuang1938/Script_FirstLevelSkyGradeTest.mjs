@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
 import { SkyExposureFor, GRADE_DEFAULTS } from "./Data_Tuning_Camera.mjs";
+import { GradeMathJs, SrgbToLinearJs, LinearToSrgbJs } from "./Script_PostGrade.mjs";
 import {
   MakeVolumetricParams, AnalyticTransmittance, FroxelTransmittance, VISIBILITY_REFERENCE,
 } from "./Data_Tuning_Volumetrics.mjs";
@@ -52,14 +53,24 @@ assert.ok(day.cloudDeck?.structure > 0 && night.cloudDeck?.structure > 0, "both 
 const decks = Object.entries(SKY_PRESETS).filter(([, p]) => p.cloudDeck).map(([name]) => name).sort();
 assert.deepEqual(decks, ["firstLevelBattleDay", "firstLevelNight"], "no other preset changes its clouds");
 assert.equal(night.stars, 0, "overcast night hides the stars");
-console.log("ok grade: defaults unchanged, grade + cloud deck limited to the first level");
+// 对比 S 曲线：中灰不动、暗部只压不裁（线性拉伸 1.10 把 sRGB 0.03 裁成 0）、高光不溢出
+const neutral = { lift: [0, 0, 0], gain: [1, 1, 1], shadowTint: [1, 1, 1], highlightTint: [1, 1, 1],
+  splitShadow: 0, splitHighlight: 0, contrast: day.contrast };
+const Grade = (srgb, curve) => LinearToSrgbJs(GradeMathJs([SrgbToLinearJs(srgb), SrgbToLinearJs(srgb), SrgbToLinearJs(srgb)],
+  { ...neutral, contrastCurve: curve })[0]);
+assert.equal(day.fog.grade.contrastCurve, "soft");
+assert.equal(Grade(0.03, 0), 0, "linear stretch crushes sRGB 0.03 at the first-level contrast (why the soft curve exists)");
+assert.ok(Grade(0.03, 1) > 0.01 && Grade(0.03, 1) < 0.03, "soft curve deepens the shadow without clipping it");
+assert.ok(Math.abs(Grade(0.5, 1) - 0.5) < 1e-6 && Grade(0.98, 1) < 1, "soft curve keeps mid grey and rolls off the top");
+console.log("ok grade: defaults unchanged, grade + cloud deck limited to the first level, soft contrast curve",
+  `0.03→${Grade(0.03, 1).toFixed(4)}`);
 
 // ③ 曝光：第一关 id 的锚点登记、室内提亮最多半档、看天最多压 0.35 EV。
 assert.equal(FIRST_LEVEL_MISSION_PHASE.id, "FirstLevelP012Whitebox");
 assert.equal(FIRST_LEVEL_MISSION_PHASE.sky, "firstLevelBattleDay");
 const exposure = SkyExposureFor("firstLevelBattleDay", FIRST_LEVEL_MISSION_PHASE.id);
 assert.ok(Number.isFinite(exposure.logLum), "first level has a measured exposure anchor");
-assert.ok(exposure.evUp <= 0.5 && exposure.evDown <= 0.35, "auto exposure only half-adapts indoors and barely reacts to the sky");
+assert.ok(exposure.evUp <= 0.6 && exposure.evDown <= 0.35, "auto exposure only half-adapts indoors and barely reacts to the sky");
 assert.equal(SkyExposureFor("firstLevelNight").evUp, SkyExposureFor("night").evUp, "night clamp copied from night");
 console.log("ok exposure: anchor", exposure.logLum, "evUp", exposure.evUp, "evDown", exposure.evDown);
 
@@ -86,7 +97,7 @@ const readings = {
 };
 assert.ok(readings.kitchenDeep < 0.2, "deep inside the kitchen the sky is mostly blocked");
 assert.ok(readings.wardDeep < 0.25, "the ward's north bay is dim");
-assert.ok(readings.bunkerBack < 0.4, "the back of the dugout is dim");
+assert.ok(readings.bunkerBack < 0.55, "the back of the dugout is dim");
 assert.ok(readings.kitchenNearDoor > 0.5 && readings.bunkerMouth > 0.7, "next to the openings the sky light is back");
 for (const key of ["outsideKitchen", "kitchenWestWallOutside", "kitchenRoofTop", "streetOutside"]) {
   assert.equal(readings[key], 1, `${key} is not darkened`);

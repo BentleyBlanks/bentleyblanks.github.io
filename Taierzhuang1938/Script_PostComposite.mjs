@@ -136,6 +136,8 @@ uniform float uDirtHigh;
 // --- SEGMENT color-grade ----------------------------------------------------
 uniform float uSaturation;
 uniform float uContrast;
+// 0 = 围绕 sRGB 0.5 的线性拉伸（出厂，其余预设逐比特不变）；1 = 幂形 S 曲线（两端渐近，不硬裁）
+uniform float uContrastCurve;
 uniform vec3 uLift;
 uniform vec3 uGain;
 // 分离调色（split toning）：**这是「整体偏单色土黄」的最后一道闸门**。
@@ -453,7 +455,15 @@ vec3 GradeMath(vec3 color) {
   // 转到 sRGB 后再围绕 0.5 调对比，等价黑位只到约 0.0026 线性亮度；暗部层次
   // 保留下来，亮部和中间调仍维持原来的感知对比意图。
   vec3 perceptual = LinearToSrgb(color);
-  perceptual = clamp((perceptual - 0.5) * uContrast + 0.5, 0.0, 1.0);
+  if (uContrastCurve > 0.5) {
+    // 幂形 S 曲线（2026-09-28 第一关）：线性拉伸在 1.10 时把 sRGB < 0.045 的暗部整块裁成 0
+    //（SB01 掩蔽部门柱内侧 8% 的像素死黑）；这一支在 0.5 处斜率同样是 uContrast，两端渐近 0 / 1。
+    vec3 lo = 0.5 * pow(max(perceptual * 2.0, vec3(0.0)), vec3(uContrast));
+    vec3 hi = 1.0 - 0.5 * pow(max((1.0 - perceptual) * 2.0, vec3(0.0)), vec3(uContrast));
+    perceptual = mix(lo, hi, step(vec3(0.5), perceptual));
+  } else {
+    perceptual = clamp((perceptual - 0.5) * uContrast + 0.5, 0.0, 1.0);
+  }
   return SrgbToLinear(perceptual);
 }
 
@@ -603,6 +613,7 @@ export class CompositePass {
       uBloomStrength: { value: 0.55 }, uGodStrength: { value: 0.0 },
       uVignette: { value: 0.42 }, uAberration: { value: 0.0022 }, uGrain: { value: 0.014 },
       uFrame: { value: 0 }, uSaturation: { value: 0.94 }, uContrast: { value: 1.06 },
+      uContrastCurve: { value: 0 },
       uLift: { value: new THREE.Vector3().fromArray(GRADE_DEFAULTS.lift) },
       uGain: { value: new THREE.Vector3().fromArray(GRADE_DEFAULTS.gain) },
       uMotionScale: { value: 0.6 }, uInvProjection: { value: new THREE.Matrix4() },
@@ -667,8 +678,8 @@ export class CompositePass {
     this.lutCache = new GradeLutCache(LUT_TUNING.size, LUT_TUNING.maxCache);
     this.lutAmount = LUT_TUNING.amount;
     this._lutTexture = null;
-    this._gradeSig = new Float64Array(15).fill(NaN);   // NaN 保证第一帧一定判「变了」
-    this._gradeNext = new Float64Array(15);
+    this._gradeSig = new Float64Array(16).fill(NaN);   // NaN 保证第一帧一定判「变了」
+    this._gradeNext = new Float64Array(16);
   }
 
   /** 外部 LUT（.cube 重采样后的条带纹理）；传 null 恢复内部烘焙。 */
@@ -695,6 +706,7 @@ export class CompositePass {
     next[12] = U.uSplitShadow.value;
     next[13] = U.uSplitHighlight.value;
     next[14] = U.uContrast.value;
+    next[15] = U.uContrastCurve.value;
     const sig = this._gradeSig;
     for (let i = 0; i < next.length; i += 1) {
       if (sig[i] !== next[i]) { sig.set(next); return true; }
@@ -743,6 +755,7 @@ export class CompositePass {
     U.uHighlightTint.value.fromArray(grade?.highlightTint ?? G.highlightTint);
     U.uSplitShadow.value = grade?.shadow ?? G.shadow;
     U.uSplitHighlight.value = grade?.highlight ?? G.highlight;
+    U.uContrastCurve.value = grade?.contrastCurve === "soft" ? 1 : 0;
     if (options.fog) {
       U.uFogDensity.value = options.fog.density ?? 0.013;
       U.uFogFalloff.value = options.fog.falloff ?? 18;
