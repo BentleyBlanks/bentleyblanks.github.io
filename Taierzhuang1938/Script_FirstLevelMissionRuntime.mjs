@@ -763,7 +763,10 @@ export class FirstLevelMissionRuntime {
     if(actor.castId)actor.scriptCoverMaxRiseM=R.companionCoverMaxRiseM;
     actor.goal.set(point.x, 0, point.z);
   }
-  Guide(route, { fromStart = false, resumeAfter = null } = {}) {
+  // leaderOnlyRoute：只给班长走的折线（例：08 先带到主街口看见街堵了再折回灶屋），其余队员照 route 走。
+  // 2026-09-28 实测：整队都走那道折回线时，两名队员会顶在主街西墙北端的墙角上（(72,−22)）一动不动，
+  // 队尾刘文财到不了院门以南，10 的 rearCoverDisengaged 永远落不下。
+  Guide(route, { fromStart = false, resumeAfter = null, leaderOnlyRoute = null } = {}) {
     this.squadMarch?.Dispose();
     this.guideRoute = route;
     const stations=route===MISSION_ROUTES.support?TC.support:
@@ -771,7 +774,8 @@ export class FirstLevelMissionRuntime {
     this.squadCoverBounds=stations?new SquadCoverBounds(stations,route):null;
     for (const actor of this.squad) {
       const naturalMarch=!stations&&[MISSION_ROUTES.support,MISSION_ROUTES.southWalk].includes(route);
-      const personalRoute = naturalMarch ? MissionSquadRoute(route,this.squad.indexOf(actor)) : route;
+      const personalRoute = leaderOnlyRoute && actor===this.squad[GUIDE.leaderIndex] ? leaderOnlyRoute
+        : naturalMarch ? MissionSquadRoute(route,this.squad.indexOf(actor)) : route;
       actor.missionNaturalMarch = naturalMarch;
       actor.missionWatch=null;
       // Optional guide detours belong to one route, not the next stage's approach.
@@ -1567,9 +1571,10 @@ export class FirstLevelMissionRuntime {
         this.audio.Ambience("firstLevelFront");
         // 2026-09-28 引导轮：班长先带到主街口（`streetBlockSeen` 只在那个 box 里落，见 Gates 表），
         // 看见倒墙横车再折回灶屋北门；一开始就往灶屋走的话玩家跟着进屋，08 永远过不了。
-        // 折回那一段贴村北口的巷子走（G08 脚径 KitchenDoorTread 就画在这条线上）。
-        this.Guide([MISSION_ROUTES.village[0], {x:75.5,z:-22.5}, {x:66,z:-21.5}, {x:60.4,z:-19.9},
-          MISSION_ROUTES.village[1], MISSION_ROUTES.village[2]]);
+        // 只有班长走这道折线（leaderRoute），其余队员照旧直接进灶屋：整队折回会顶在主街西墙北端
+        // (72,−22) 的墙角上。停点 (76,−24) 在 streetBlockSeen 的 box 里，离墙角 2 m；来回都走巷子北侧 z≈−24。
+        this.Guide(MISSION_ROUTES.village.slice(0, 3), { leaderOnlyRoute: [MISSION_ROUTES.village[0],
+          {x:66,z:-23.8}, {x:76,z:-24}, {x:68,z:-23.8}, {x:60.4,z:-20.5}, MISSION_ROUTES.village[1], MISSION_ROUTES.village[2]] });
         this.column.active = true;
         this.village.Enter(stage.id);
         break;

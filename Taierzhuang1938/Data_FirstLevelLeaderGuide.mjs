@@ -16,7 +16,7 @@ export const MISSION_LEADER_STAGES = Object.freeze({
   // `streetBlockSeen` 只在主街北口那个 box 里落（Gates 表），标记与班长若一开始就指灶屋，玩家跟着进屋
   // 就永远过不了 08。所以落下之前标记指主街口（动作词仍是「前往」、不喊灶屋那句），落下之后才指灶屋、喊 GuideKitchen。
   Village: Entry("move", "Kitchen", {x:58,z:-9}, {story: true,
-    holdTarget: {x:76,z:-22.5}, holdUntil: "streetBlockSeen", holdMode: "move", holdCue: null, afterHoldCue: "GuideKitchen"}),
+    holdTarget: {x:76,z:-24}, holdUntil: "streetBlockSeen", holdMode: "move", holdCue: null, afterHoldCue: "GuideKitchen"}),
   Melee: Entry("clear", "Melee", A.melee),
   Courtyard: Entry("clear", "Gate", P.sideRoomGunner),
   TransferApproach: Entry("follow", "Follow", null, {rejoinRoute: true}),
