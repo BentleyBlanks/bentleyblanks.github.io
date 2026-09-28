@@ -33,7 +33,7 @@ def Main():
             print(output, image.size)
     # Source has diffuse + tangent normal, no authored ORM. Use a uniform dry
     # nonmetal surface rather than borrowing unrelated helmet rust/occlusion.
-    Image.new("RGB", (4, 4), (255, 235, 0)).save(args.output / "Texture_Type89Orm.png")
+    Image.new("RGB", (4, 4), (255, 235, 0)).save(args.output / "Texture_Type89Orm.webp", lossless=True)
 
 
 if __name__ == "__main__":

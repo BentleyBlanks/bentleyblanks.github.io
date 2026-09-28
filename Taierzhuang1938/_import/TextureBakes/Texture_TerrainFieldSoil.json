@@ -1,0 +1,60 @@
+{
+  "generator": "audit",
+  "date": "2026-09-28",
+  "name": "TerrainFieldSoil",
+  "preset": "drySoil",
+  "source": null,
+  "heightSource": null,
+  "params": {
+    "tileM": 2.0,
+    "pack": "orh",
+    "normalConvention": "terrain"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_TerrainFieldSoilBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 211182,
+      "sha256": "e7ad88eb6a8f801f0295a59bf57e8f921742247dba3a87df22acc6e4be827f28"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_TerrainFieldSoilNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 150108,
+      "sha256": "513b12b01d0559bbaaa7f6ad3f46d6fd13be3435f86441fa9b14148e70113104"
+    },
+    {
+      "channel": "Orh",
+      "file": "Texture_TerrainFieldSoilOrh.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 87588,
+      "sha256": "6737ee139c64675e37f1deb54d04725c069ce290327f142c0e6c78cf30c99ec7"
+    }
+  ],
+  "totalBytes": 448878,
+  "metrics": {
+    "meanSrgb": [
+      0.416,
+      0.3627,
+      0.2676
+    ],
+    "luma": 0.3487,
+    "lumaStd": 0.1004,
+    "sat": 0.3568,
+    "clipLow": 0.0003,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0071,
+    "seam": 0.0407,
+    "interior": 0.0476,
+    "seamRatio": 0.855,
+    "border": 0.977,
+    "swing": 0.007,
+    "texelsPerMeter": 512.0
+  },
+  "gateProblems": []
+}

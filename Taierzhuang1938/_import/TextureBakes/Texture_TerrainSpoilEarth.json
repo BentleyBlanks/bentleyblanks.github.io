@@ -1,0 +1,60 @@
+{
+  "generator": "audit",
+  "date": "2026-09-28",
+  "name": "TerrainSpoilEarth",
+  "preset": "drySoil",
+  "source": null,
+  "heightSource": null,
+  "params": {
+    "tileM": 2.1,
+    "pack": "orh",
+    "normalConvention": "terrain"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_TerrainSpoilEarthBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 354946,
+      "sha256": "1a60ed8d39a17eaa744d8512af12a1fc2b0640ebed066a03e09e05802d18fa21"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_TerrainSpoilEarthNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 201896,
+      "sha256": "6d89aeffc5955c9d6b81c3c6b9e89c2eea9c56fb9be252b215488e1a85fdc4c5"
+    },
+    {
+      "channel": "Orh",
+      "file": "Texture_TerrainSpoilEarthOrh.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 97434,
+      "sha256": "9bacb0e6559892e8c8a0883cccb0e32808ae8765a7a9caa3c2d03a4aceb15464"
+    }
+  ],
+  "totalBytes": 654276,
+  "metrics": {
+    "meanSrgb": [
+      0.3799,
+      0.3186,
+      0.2365
+    ],
+    "luma": 0.3117,
+    "lumaStd": 0.0862,
+    "sat": 0.3774,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0085,
+    "seam": 0.0561,
+    "interior": 0.0595,
+    "seamRatio": 0.944,
+    "border": 0.988,
+    "swing": 0.0052,
+    "texelsPerMeter": 487.6
+  },
+  "gateProblems": []
+}

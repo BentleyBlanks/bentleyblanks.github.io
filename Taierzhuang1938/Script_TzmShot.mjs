@@ -65,7 +65,7 @@ const result = await page.evaluate(async ({ id, outDir }) => {
     await library.LoadExternalSet(`Type89${part}`, {
       albedo: `./Texture/Texture_Type89${part}Base.webp`,
       normal: `./Texture/Texture_Type89${part}Normal.webp`,
-      orm: "./Texture/Texture_Type89Orm.png",
+      orm: "./Texture/Texture_Type89Orm.webp",
     });
   }
   const Plain = (name, color, roughness, doubleSide) => library.Plain(name, {
