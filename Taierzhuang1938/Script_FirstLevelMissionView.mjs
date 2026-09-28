@@ -194,8 +194,12 @@ export class FirstLevelMissionView {
     for(const spec of [...MISSION_SUPPLIES,{id:"Bundle",x:13,z:-118,supportHeight:.5}]){
       const size=MISSION_SUPPLY_COLLIDER;
       const y=this.battlefield.GroundHeight(spec.x,spec.z)+(spec.supportHeight||0)+.25;
-      const material=new THREE.MeshStandardMaterial({color:0x9b927b,roughness:.88,
-        metalness:0,emissive:0xffeac8,emissiveIntensity:0});
+      // 2026-09-28 B1：补给点画成旧弹药箱（开场布景的箱板贴图，第一关按需集；没下到用开机的 WoodCrate），
+      // 不再是一块米白平色盒。每个补给点一份克隆：可交互时的呼吸发光是逐个点亮的。
+      const crateSet=this.library?.baked?.has?.("OpeningCrate")?"OpeningCrate":this.library?.baked?.has?.("WoodCrate")?"WoodCrate":null;
+      const material=crateSet?CloneShadedMaterial(this.library.Get(crateSet,{color:0xc9c0b0,metalness:0})):
+        new THREE.MeshStandardMaterial({color:0x9b927b,roughness:.88,metalness:0});
+      material.emissive.setHex(0xffeac8);material.emissiveIntensity=0;
       const geometry=PlaceGeometry(new THREE.BoxGeometry(size.w,size.h,size.d),{x:spec.x,y,z:spec.z});
       const center=[spec.x,y,spec.z],half=[size.w/2,size.h/2,size.d/2];
       const collider={c:center,h:half,min:center.map((v,i)=>v-half[i]),max:center.map((v,i)=>v+half[i]),tag:"missionSupply",ry:0};

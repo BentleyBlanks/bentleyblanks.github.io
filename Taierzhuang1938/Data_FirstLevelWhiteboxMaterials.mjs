@@ -31,17 +31,20 @@
  *   weather      风化补丁的总强度 0..1（墙根潮湿、檐下雨痕、棱角磨损、大尺度色斑、倒角）
  *   jitter       同一外观内按建筑组的明度抖动幅度（写进顶点色，不多一个材质）
  *   plain        无贴图的纯色件（门窗洞里的黑、电线）：{ color, roughness, metalness }
+ *   peel         抹面剥落（风化补丁）：flatten = 墙中部把贴图自带斑块往均色收多少（0..1），
+ *                amount = 墙根 / 竖棱 / 块顶一带程序剥落的强度，substrate = 露出的底层（0 土坯、1 青砖）
+ *   brightness   反照率整体倍率（tint 最多到白；贴图偏暗的套用它提亮）
  */
 export const WHITEBOX_LOOKS = Object.freeze({
   // 墙：泥抹面 / 青砖 / 白灰抹面（1938 鲁南村落三种主墙面，参考图 05/08/10/12/16）
   mudPlaster: Object.freeze({ set: "VillageMudPlaster", tileM: 2.8, tint: 0xecece4, fallbackTint: 0x958b7c,
-    normalScale: 1.1, weather: 1, jitter: 0.09 }),
-  // 白灰抹面的剥落斑铺得稀一点（3.6 m 一张）才不像一格格印上去的
+    normalScale: 1.1, weather: 1, jitter: 0.09, peel: Object.freeze({ flatten: 0.35, amount: 0.6, substrate: 0 }) }),
+  // 白灰抹面：贴图自带的剥落斑按格子重复会成迷彩圆斑 —— 墙中部收掉七成对比，剥落交给墙根 / 墙角 / 檐下
   limePlaster: Object.freeze({ set: "VillageLimePlaster", tileM: 3.6, tint: 0xe2dfd8, fallbackTint: 0xb7b2a7,
-    normalScale: 0.9, weather: 1, jitter: 0.07 }),
-  // 青砖：BrickWall 底色是中灰，往暖灰拉一点（参考图 08 的砖是灰褐，不是蓝黑）
-  greyBrick: Object.freeze({ set: "BrickWall", tileM: 1.2, tint: 0xe9e3d9, weather: 1, jitter: 0.08 }),
-  gateBrick: Object.freeze({ set: "BrickWall", tileM: 1.1, tint: 0xd6d1c8, weather: 1, jitter: 0.06 }),
+    normalScale: 0.9, weather: 1, jitter: 0.07, peel: Object.freeze({ flatten: 0.7, amount: 1, substrate: 0.2 }) }),
+  // 青砖：BrickWall 底色是中灰，往暖灰拉一点、整体提一档（参考图 08 的砖是灰褐，不是蓝黑）
+  greyBrick: Object.freeze({ set: "BrickWall", tileM: 1.2, tint: 0xf2ece2, brightness: 1.18, weather: 1, jitter: 0.08 }),
+  gateBrick: Object.freeze({ set: "BrickWall", tileM: 1.1, tint: 0xe2ddd4, brightness: 1.1, weather: 1, jitter: 0.06 }),
   // 县城城墙与瓮城（关尾北门夜景）：城砖
   cityBrick: Object.freeze({ set: "CityWallBrickPbr", tileM: 1.6, tint: 0xd8d4cc, weather: 1, jitter: 0.05 }),
   // 城楼的木构（旧漆木）
@@ -107,7 +110,9 @@ export const WHITEBOX_LOOK_RULES = Object.freeze([
   { id: /Door\d+Void$/, look: "doorLeaf" },
   { id: /^MissionCourtyardGate$/, look: "doorLeaf" },
   // 铁路桥：条石墩台、木桥面；钢桁架走 metal 的缺省
-  { id: /RailBridge(Pier|Abutment)/, look: "stone" },
+  { id: /RailBridge(Pier|Abutment)|BridgeheadPier/, look: "stone" },
+  // 13 桥头河岸那截残墙：夯土残段（参考图 12/13 的土墙，一截孤立的青砖柱在背光里读成黑方块）
+  { id: /^TransferBankRuin/, semantic: /^(plaster|cover|structure)$/, look: "mudPlaster" },
   { id: /^(TemporaryBridge|RailBridgeDeck)$/, look: "timber" },
   { id: /RailBridgeWreckSpan/, look: "steel" },
   { id: /RailBridge(Wreck)?Truss/, look: "steelTruss" },
@@ -168,7 +173,7 @@ export function WhiteboxHash01(text, salt = 0) {
  * 建筑组：同一栋房子 / 同一道院墙的各段共用一个键（去掉末尾的方位、部件词与编号）。
  * `VillageEdgeHouseWest` → `VillageEdgeHouse`，`KitchenSouthLeft` → `Kitchen`。
  */
-const GROUP_SUFFIX = /(North|South|East|West|Left|Right|Front|Back|Body|Wing|Low|High|Gable|Peak|Lintel|Top|Stub|Mid|Foot|Infill|Link|Window|Door|Screen|Half|Inner|Outer|Corner|End|Cap|\d|-|\.)+$/;
+const GROUP_SUFFIX = /(North|South|East|West|Left|Right|Front|Back|Body|Wing|Low|High|Gable|Peak|Lintel|Top|Stub|Mid|Foot|Infill|Link|Window|Door|Screen|Half|Inner|Outer|Corner|End|Cap|Sill|Head|Skin|\d|-|\.)+$/;
 export function WhiteboxGroupKey(id) {
   const text = String(id || "");
   const key = text.replace(GROUP_SUFFIX, "");
@@ -214,4 +219,58 @@ export function WhiteboxTint(block, look) {
   const value = 1 + (WhiteboxHash01(key, 0x7a11) - 0.5) * 2 * amount;
   const warm = (WhiteboxHash01(key, 0x3c0d) - 0.5) * 2 * amount / 3;
   return [value * (1 + warm), value, value * (1 - warm)];
+}
+
+/**
+ * 坡顶外壳（2026-09-28 第二轮）：白盒屋顶是一层层轴对齐的 roof 盒（Village/Front/Transfer 的
+ * Soffit/Eave±/Slope±/Ridge±/RidgeCap，Rear/北门夜景的 Roof0..3/RidgeCap），远看是台阶。
+ * 在台阶上面盖两片沿坡的薄瓦面 + 一道脊，只是外观：碰撞、可走面、遮挡仍是原来的盒子，台阶盒留着
+ * 当山墙那头的填充。
+ *   thick 瓦面厚、lift 压在台阶外角上方的余量、overhang 檐口再出挑、ridgeW/ridgeH 脊的宽高（米）
+ */
+export const WHITEBOX_ROOF_SHELL = Object.freeze({ thick: 0.14, lift: 0.02, overhang: 0.12, ridgeW: 0.34, ridgeH: 0.22 });
+
+const ROOF_TIER = /(Eave-?1|Slope-?1|Ridge-?1|RidgeCap|Roof\d)$/;
+
+/**
+ * 从一组 roof 体块里认出一个个坡顶，给出外壳的坡面：
+ *   a = 离脊线的水平距离；坡面 y(a) = eaveTop + slope·(outerA − a)，
+ *   slope 取「从檐口外角看过去，盖住所有台阶外角」需要的最陡值（台阶本来就大致排在一条线上）。
+ * 纯函数（无 three）。转了角度的屋顶（ry ≠ 0）与没有 RidgeCap 的组跳过。
+ * @param {Array<{id,x,y,z,w,h,d,ry?,semantic}>} blocks
+ * @returns {Array<{id,alongZ,cx,cz,len,outerA,eaveTop,slope}>}
+ */
+export function PlanRoofShells(blocks) {
+  const groups = new Map();
+  for (const b of blocks) {
+    if (b.semantic !== "roof" || (b.ry || 0) !== 0 || !ROOF_TIER.test(b.id)) continue;
+    const key = b.id.replace(ROOF_TIER, "");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(b);
+  }
+  const shells = [];
+  for (const [id, list] of groups) {
+    const cap = list.find((b) => /RidgeCap$/.test(b.id));
+    const tiers = list.filter((b) => b !== cap);
+    if (!cap || tiers.length < 2) continue;
+    const alongZ = cap.d >= cap.w;
+    const Across = (b) => (alongZ ? b.x - cap.x : b.z - cap.z);
+    const Half = (b) => (alongZ ? b.w / 2 : b.d / 2);
+    const Len = (b) => (alongZ ? b.d : b.w);
+    let outerA = 0, eaveTop = Infinity;
+    for (const b of tiers) {
+      const o = Math.abs(Across(b)) + Half(b), top = b.y + b.h / 2;
+      if (o > outerA + 1e-3 || (Math.abs(o - outerA) <= 1e-3 && top < eaveTop)) { outerA = o; eaveTop = top; }
+    }
+    let slope = 0;
+    for (const b of tiers) {
+      const c = Math.abs(Across(b)), half = Half(b), top = b.y + b.h / 2;
+      const corners = c < 0.01 ? [half] : [c - half, c + half];
+      for (const a of corners) if (a < outerA - 0.05) slope = Math.max(slope, (top - eaveTop) / (outerA - a));
+    }
+    // 太窄的顶（门楼、窄厢房：固定 0.8 m 的脊台阶一直挤到檐口）盖上去会陡过 40°，保留台阶
+    if (slope < 0.05 || slope > 0.8 || outerA < 1) continue;
+    shells.push({ id, alongZ, cx: cap.x, cz: cap.z, len: Math.max(...tiers.map(Len)) + 0.02, outerA, eaveTop, slope });
+  }
+  return shells;
 }

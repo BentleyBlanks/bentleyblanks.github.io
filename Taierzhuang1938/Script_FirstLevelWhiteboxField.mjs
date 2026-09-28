@@ -33,7 +33,7 @@ import { SET_MATERIALS as OPENING_SET_MATERIALS } from "./Data_OpeningSet0103.mj
 import { TerrainContactField } from "./Script_TerrainContact.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
 import { WhiteboxLooks, LoadWhiteboxTextureSets, BuildWhiteboxWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
-import { WHITEBOX_RAILWAY_LOOKS } from "./Data_FirstLevelWhiteboxMaterials.mjs";
+import { WHITEBOX_RAILWAY_LOOKS, PlanRoofShells } from "./Data_FirstLevelWhiteboxMaterials.mjs";
 import { LoadFirstLevelPropDressing, AddFirstLevelPropDressing } from "./Script_FirstLevelPropDressing.mjs";
 import { FirstLevelVegetation, LoadFirstLevelVegetationAtlas } from "./Script_FirstLevelVegetation.mjs";
 import { BuildInteriorVolumes } from "./Data_FirstLevelInteriors.mjs";
@@ -356,7 +356,7 @@ export class FirstLevelWhiteboxField {
     const trainSink = new BuildSink(),derailSink=new BuildSink();
     // 外观合批（Script_FirstLevelWhiteboxLooks）：静态体块按外观分桶，带风化属性自己合并；
     // 碰撞与 cover 仍走 sink。水盒收成一条连续水面。
-    const lookBuckets = new Map(), waterBlocks = [];
+    const lookBuckets = new Map(), waterBlocks = [], roofBlocks = [];
     const terrainAt = (x, z) => this.TerrainHeight(x, z);
     for (const block of this.layout.blocks) {
       if(block.dynamic || block.treeModel)continue;
@@ -370,6 +370,7 @@ export class FirstLevelWhiteboxField {
         else if (look) {
           if (!lookBuckets.has(look)) lookBuckets.set(look, []);
           lookBuckets.get(look).push(this.looks.BoxGeometry(block, look, terrainAt));
+          if (look === "roofTile" && block.semantic === "roof") roofBlocks.push(block);
         } else targetSink.Add(block.semantic || "Whitebox", PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), {
           x: block.x,
           y: block.y,
@@ -402,6 +403,10 @@ export class FirstLevelWhiteboxField {
       this.meshes.push(mesh);
     }
     if (this.looks) {
+      // 坡顶外壳：台阶 roof 盒上面盖两片斜瓦面 + 脊，只是外观（Data_FirstLevelWhiteboxMaterials.PlanRoofShells）
+      const shells = PlanRoofShells(roofBlocks);
+      for (const shell of shells) lookBuckets.get("roofTile").push(...this.looks.RoofShellGeometries(shell, terrainAt));
+      this.stats.roofShells = shells.length;
       // 名字沿用 StaticWhiteBoxes：Script_FirstLevelFrontBreakables 按这个名字找静态合批塌顶点。
       this.meshes.push(...this.looks.FlushBuckets(lookBuckets, this.scene, "FirstLevelWhitebox_StaticWhiteBoxes"));
       this.waterMesh = BuildWhiteboxWater(waterBlocks, this.scene);
@@ -598,6 +603,8 @@ export class FirstLevelWhiteboxField {
       this.covers = [...(this.covers || []).filter((cover) => !was.includes(cover)), ...sink.covers];
       this.scenarioCovers = sink.covers.slice();
     }
+    if (lookBuckets.has("roofTile")) for (const shell of PlanRoofShells(state.blocks))
+      lookBuckets.get("roofTile").push(...this.looks.RoofShellGeometries(shell, (x, z) => this.TerrainHeight(x, z)));
     this.scenarioMeshes = sink.Flush(this.scene, { Get: key => this.ScenarioMaterial(key, state.id) });
     if (lookBuckets.size) this.scenarioMeshes.push(...this.looks.FlushBuckets(lookBuckets, this.scene, `FirstLevelWhitebox_Hub_${state.id}`));
     for (const mesh of this.scenarioMeshes) { mesh.name = `FirstLevelWhitebox_Hub_${state.id}`; mesh.castShadow = true; mesh.receiveShadow = true; this.meshes.push(mesh); }

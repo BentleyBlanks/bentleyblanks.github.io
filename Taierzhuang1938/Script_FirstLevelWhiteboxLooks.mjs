@@ -18,7 +18,7 @@ import { MakeWhiteboxWeatherPatch, MakeWhiteboxWeatherUniforms } from "./Script_
 import { WHITEBOX_WEATHERING } from "./Data_Tuning_Materials.mjs";
 import { CreateWaterSurface } from "./Script_Water.mjs";
 import {
-  WHITEBOX_LOOKS, WHITEBOX_RAILWAY_LOOKS, ResolveWhiteboxLook, WhiteboxTint,
+  WHITEBOX_LOOKS, WHITEBOX_RAILWAY_LOOKS, WHITEBOX_ROOF_SHELL as ROOF_SHELL, ResolveWhiteboxLook, WhiteboxTint,
 } from "./Data_FirstLevelWhiteboxMaterials.mjs";
 
 /** 单位盒子的 uv（每面四角 0/1），面内米坐标由它乘面尺寸得到。面序 +x,-x,+y,-y,+z,-z。 */
@@ -180,7 +180,9 @@ export class WhiteboxLooks {
       material = CloneLibraryMaterial(base);
       material.vertexColors = true;
       material.defaultAttributeValues = { ...DEFAULT_ATTRIBUTES };
-      this.library.InjectSurface(material, MakeWhiteboxWeatherPatch(this.weather, look.weather ?? 1));
+      this.library.InjectSurface(material, MakeWhiteboxWeatherPatch(this.weather, look.weather ?? 1, look.peel || null));
+      // 贴图本身偏暗的套（青砖）整体提一档：tint 是十六进制、最多到白，提亮只能乘在克隆体的颜色上
+      if (look.brightness) material.color.multiplyScalar(look.brightness);
       if (look.truss && typeof document !== "undefined") {
         // 桁架：反照率换成运行时画的镂空节（alphaTest）；双面，从一侧的空当看得见另一片桁的背面。
         material.map = MakeTrussTexture(look.truss);
@@ -282,6 +284,45 @@ export class WhiteboxLooks {
     }
     buckets.clear();
     return meshes;
+  }
+
+  /**
+   * 一个坡顶的两片斜瓦面 + 一道脊（只是外观几何，见 PlanRoofShells）。产物是世界系、带风化属性，
+   * 直接进 "roofTile" 外观的桶。瓦面是一块薄板把顶点按坡面抬起：顶 / 底面的法线跟着坡倾斜，
+   * 两个端面（山墙那头）仍是竖直的，法线不变。
+   */
+  RoofShellGeometries(shell, groundAt) {
+    const { alongZ, cx, cz, len, outerA, eaveTop, slope } = shell;
+    const thick = ROOF_SHELL.thick, lift = ROOF_SHELL.lift;
+    const Plane = (a) => eaveTop + slope * (outerA - a) + lift;
+    const out = [];
+    for (const side of [-1, 1]) {
+      const half = (outerA + ROOF_SHELL.overhang) / 2, offset = side * half;
+      const block = { id: `${shell.id}Shell${side}`, y: 0, h: thick,
+        x: alongZ ? cx + offset : cx, z: alongZ ? cz : cz + offset,
+        w: alongZ ? half * 2 : len, d: alongZ ? len : half * 2 };
+      const geometry = this.BoxGeometry(block, "roofTile", groundAt);
+      const position = geometry.attributes.position, normal = geometry.attributes.normal, span = geometry.attributes.wbSpan;
+      // 坡面法线：y = Plane(a)，a 沿外侧方向 u 增大，dy/da = -slope → n ∝ (slope·u, 1)
+      const inv = 1 / Math.hypot(slope, 1), nu = slope * side * inv, ny = inv;
+      for (let i = 0; i < position.count; i += 1) {
+        const px = position.getX(i), pz = position.getZ(i), top = position.getY(i) > 0;
+        const a = Math.min(outerA + ROOF_SHELL.overhang, Math.abs(alongZ ? px - cx : pz - cz));
+        position.setY(i, Plane(a) + (top ? thick : 0));
+        const n = normal.getY(i);
+        if (Math.abs(n) > 0.5) {
+          const s = n > 0 ? 1 : -1;
+          normal.setXYZ(i, alongZ ? s * nu : 0, s * ny, alongZ ? 0 : s * nu);
+        }
+        span.setY(i, Plane(0) + thick);
+      }
+      out.push(geometry);
+    }
+    // 脊：两片瓦面在 a = 0 处相交，上面压一道筒瓦脊
+    const ridgeY = Plane(0) + thick - 0.04;
+    out.push(this.BoxGeometry({ id: `${shell.id}ShellRidge`, y: ridgeY + ROOF_SHELL.ridgeH / 2, h: ROOF_SHELL.ridgeH,
+      x: cx, z: cz, w: alongZ ? ROOF_SHELL.ridgeW : len + 0.1, d: alongZ ? len + 0.1 : ROOF_SHELL.ridgeW }, "roofTile", groundAt));
+    return out;
   }
 
   Dispose() {
