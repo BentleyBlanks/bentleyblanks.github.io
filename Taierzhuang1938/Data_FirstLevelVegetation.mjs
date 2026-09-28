@@ -71,6 +71,10 @@ export const VEGETATION = Object.freeze({
   tallRouteClearM: 9,
   /** 视线门槛：路边的卡片不高过这个。 */
   sightMaxHeightM: 0.58,
+  /** 壕沟沟沿：人站在沟里眼睛就在沟沿上方几十厘米，沿上只长矮草，不挡从沟里往外看。 */
+  trenchLipMaxHeightM: 0.3,
+  /** 01–06 前沿交战区（z 小于这个）：墙根以外一律压到 frontMaxHeightM，不让草里藏得住趴着的敌人。 */
+  frontZ: -95, frontMaxHeightM: 0.4,
   wallFootBandM: 1.2,
   trenchLipBandM: 2.4,
   trackMax: 0.3,
@@ -356,8 +360,12 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
     if (card === CARD_INDEX.Reeds && zone !== "bank") card = CARD_INDEX.TallGrass;
     stats[zone]++;
     const count = rules.clusterMin + Math.floor(rng() * (rules.clusterMax - rules.clusterMin + 1));
-    // 路边 3 m 以内就算是矮卡也压到视线门槛以下（0.62 m 的枯草放大 1.2 倍就过了 0.6）。
-    Push(rng, x, z, card, count, dRoute < 3 + rules.clusterSpreadM ? rules.sightMaxHeightM : Infinity);
+    // 路边 3 m 以内就算是矮卡也压到视线门槛以下（0.62 m 的枯草放大 1.2 倍就过了 0.6）；
+    // 沟沿与前沿交战区另有更低的门槛（见 VEGETATION 注释）。
+    let maxHeight = dRoute < 3 + rules.clusterSpreadM ? rules.sightMaxHeightM : Infinity;
+    if (lip) maxHeight = Math.min(maxHeight, rules.trenchLipMaxHeightM);
+    if (z < rules.frontZ && zone !== "wallFoot") maxHeight = Math.min(maxHeight, rules.frontMaxHeightM);
+    Push(rng, x, z, card, count, maxHeight);
   }
   stats.planned = instances.length;
   if (instances.length > q.maxInstances) {

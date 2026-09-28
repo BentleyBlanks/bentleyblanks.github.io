@@ -62,7 +62,7 @@ const NearWall = (it, band) => walls.some((b) => {
 const foliageIds = new Set(MISSION_LAYOUT.blocks.filter((b) => b.semantic === "foliage").map((b) => b.id));
 const nearFoliage = (it) => MISSION_LAYOUT.blocks.some((b) => foliageIds.has(b.id) && Math.hypot(it.x - b.x, it.z - b.z) < Math.max(b.w, b.d) / 2 + 1.6);
 const layers = [0, 0, 0], color = [0, 0, 0];
-const bad = { route: 0, anchor: 0, solid: 0, roof: 0, trench: 0, track: 0, crater: 0, tall: 0, anchorTall: 0 };
+const bad = { route: 0, anchor: 0, solid: 0, roof: 0, trench: 0, track: 0, crater: 0, tall: 0, anchorTall: 0, lipTall: 0, frontTall: 0 };
 const examples = {};
 const Mark = (key, it) => { bad[key]++; examples[key] ||= `${it.x.toFixed(1)},${it.z.toFixed(1)}`; };
 for (const it of high.instances) {
@@ -89,6 +89,11 @@ for (const it of high.instances) {
     if (!bank && dRoute < 3 - clusterSlack) Mark("tall", it);
   }
   if (dAnchor < VEGETATION.lowNearAnchorM - clusterSlack - 0.5 && height > VEGETATION.lowMaxHeightM * 1.25 && !nearFoliage(it)) Mark("anchorTall", it);
+  // 沟沿（离沟边 1 m 以内）与前沿交战区的高度门槛。
+  if (corridor && corridor.d < corridor.halfFloor + corridor.bank + 1 - clusterSlack && height > VEGETATION.trenchLipMaxHeightM + 1e-6
+    && !NearWall(it, VEGETATION.wallFootBandM + clusterSlack)) Mark("lipTall", it);
+  if (it.z < VEGETATION.frontZ - clusterSlack && height > VEGETATION.frontMaxHeightM + 1e-6
+    && !NearWall(it, VEGETATION.wallFootBandM + clusterSlack)) Mark("frontTall", it);
 }
 for (const [key, value] of Object.entries(bad)) Check(value === 0, `禁区 ${key}：${value} 件${value ? `（例 ${examples[key]}）` : ""}`);
 
