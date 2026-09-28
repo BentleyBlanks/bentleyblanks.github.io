@@ -259,7 +259,7 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
 白盒体块原来是按语义的平色 `MeshStandardMaterial`（没贴图、不走材质库、没有 AO/GI/细节补丁，cover 画成调试蓝灰）。本轮只改「看起来」：坐标、尺寸、碰撞、cover 语义、体块数一个不动。
 
 - **语义 → 外观**：`Data_FirstLevelWhiteboxMaterials.mjs`（纯数据）。先按体块 id 规则（`WHITEBOX_LOOK_RULES`：门洞门板、桥墩条石、墙裙青砖碱脚、灶台泥抹、土工事、病房白灰、北门城砖……），再按语义缺省（`WHITEBOX_SEMANTIC_LOOKS`；plaster / cover 墙身按「建筑组」哈希在泥抹面 / 青砖 / 白灰三种里挑，同一栋房子各面同一种），外观参数（套名、每张铺几米、tint、UV 方向、风化强度、明度抖动）在 `WHITEBOX_LOOKS`。布局写 `materialLooks: true` 才启用；归档夹具与 Node 测试仍是平色。
-- **运行时**：`Script_FirstLevelWhiteboxLooks.mjs`。`PrepareAssets` 开头 `LoadLevelSets("FirstLevel")`（阶段 A 的按需集；失败的套借 fallback 并换 `fallbackTint`），外观材质走 `MaterialLibrary.Get` 再克隆、挂风化补丁；体块按外观合批（一外观一只网格，名字仍是 `FirstLevelWhitebox_StaticWhiteBoxes`，前沿可破坏块照旧能塌顶点）；瓦垄转成顺坡、木纹顺长边；gate（桥面、桁架、院门）、scenario（掩蔽部、北门夜景）与前沿可破坏块（`WhiteboxPiece`）用同一套外观。铁路样条的道砟 / 枕木 / 钢轨按语义键换成道砟、风化木、旧钢外观。
+- **运行时**：`Script_FirstLevelWhiteboxLooks.mjs`。`PrepareAssets` 开头 `LoadLevelSets("FirstLevel")`（阶段 A 的按需集；失败的套借 fallback 并换 `fallbackTint`），外观材质走 `MaterialLibrary.Get` 再克隆、挂风化补丁；体块按外观合批（一外观一只网格，名字仍是 `FirstLevelWhitebox_StaticWhiteBoxes`，前沿可破坏块照旧能塌顶点）；瓦垄转成顺坡、木纹顺长边；gate（桥面、桁架、院门）、北门夜景 scenario 与前沿可破坏块（`WhiteboxPiece`）用同一套外观；掩蔽部两态归开场布景（B5 的 `OpeningTimber` / 土坯，`ScenarioMaterial`），不接外观表。铁路样条的道砟 / 枕木 / 钢轨按语义键换成道砟、风化木、旧钢外观。
 - **风化补丁**：`Script_MaterialPatches.MakeWhiteboxWeatherPatch`（挂在表面补丁那格，零新增采样器）：墙根返潮与溅泥（按顶点处地面高）、块顶往下的雨痕、棱角磨损提亮 + 倒角法线、大尺度色斑、朝下面压暗。数值在 `Data_Tuning_Materials.WHITEBOX_WEATHERING`，每个外观再乘自己的 `weather`。
 - **铁路桥桁架**：`steelTruss` 外观，运行时画一节华伦桁架（alphaTest 镂空、双面），不下载贴图；炸桥逻辑与碰撞不变（上面「18 铁路桥仍是实心桁架板」这条差距就此收掉）。
 - **北沙河**：52 块示意水盒收成一条连续水带（相邻段接缝取两段的平均高），走 `Script_Water` 新预设 `muddyRiver`（浑、吸收快、泡沫少）。水盒本来就 `solid:false`，碰撞与净空不变。
