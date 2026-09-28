@@ -6,17 +6,19 @@
 //   3. 河槽与浅滩：RiverCutAt>0 的点不受修饰影响（河归 Topology）。
 //   4. 钩子本身：自造表验证 level/raise/cut 的叠加（同 op 取最大不相加）、折线逐点 dy 插值、box 硬裁剪。
 //   5. Front 体块包（05–07）不挡任何冻结路线（0.35 m 胶囊）；06 担架点位 0.625 m 净空。
+//   6. 小路（各区 paths，2026-09-28 引导轮）：字段合法、连 1.8 m 染色边落在本区 box 内；只进地表纹理层
+//      （track 层在路心 = wear、路外 0；麦茬退让），高度采样 Apply 不读它。
 //   --digest 打印 05–18 采样网格的 sha256（给后续「不该改变地形」的重构自查用）。
 // 用法：node Taierzhuang1938/Script_FirstLevelWhiteboxTerrainTest.mjs [--digest]
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { MISSION_TERRAIN, SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { MISSION_TERRAIN, SampleMissionTerrain, SampleMissionGroundSurface } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_NORTH_RIVER, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_ROUTES as routes, MISSION_PLACEMENT as placement } from "./Data_FirstLevelMissionLayout.mjs";
 import { BuildFrontWhitebox } from "./Data_FirstLevelWhiteboxFront.mjs";
 import {
   WHITEBOX_TERRAIN, WHITEBOX_TERRAIN_REGIONS as REGIONS, WHITEBOX_TERRAIN_KINDS as KINDS, WHITEBOX_TERRAIN_OPS as OPS,
-  WhiteboxShapeBounds, CompileWhiteboxTerrain,
+  WhiteboxShapeBounds, CompileWhiteboxTerrain, WhiteboxPathBounds, WHITEBOX_PATH_DEFAULT_WEAR,
 } from "./Data_FirstLevelWhiteboxTerrain.mjs";
 
 let checks = 0;
@@ -129,6 +131,42 @@ ok(riverPts > 1000, `river channel untouched (${riverPts} samples)`);
   for (const p of placement.collection.litters) ok(!front.blocks.some((b) => Hits(p, b, .625)), `06 litter at ${p.x},${p.z} clear of Front masses`);
 }
 
-console.log(`FirstLevelWhiteboxTerrainTest: ${checks} checks passed · ${shapeCount} shapes in ${REGIONS.length} regions · `
+// 6. 小路 -----------------------------------------------------------------------
+let pathCount = 0;
+for (const region of REGIONS) {
+  const ids = new Set();
+  for (const p of region.paths || []) {
+    pathCount++;
+    const tag = `${region.id}/path ${p.id}`;
+    ok(typeof p.id === "string" && !ids.has(p.id), `${tag}: id present and unique in region`); ids.add(p.id);
+    ok(p.points?.length >= 2 && p.points.every((q) => Finite(q.x) && Finite(q.z)), `${tag}: >= 2 finite points`);
+    ok(Finite(p.width) && p.width >= 0.8 && p.width <= 8, `${tag}: width 0.8…8 m (got ${p.width})`);
+    if (p.wear != null) ok(Finite(p.wear) && p.wear > 0 && p.wear <= 1, `${tag}: wear in (0,1]`);
+    const b = WhiteboxPathBounds(p);
+    ok(region.boxes.some((box) => b.minX >= box.minX && b.maxX <= box.maxX && b.minZ >= box.minZ && b.maxZ <= box.maxZ),
+      `${tag}: path incl. its 1.8 m tint edge lies inside one ${region.id} box (bounds ${[b.minX, b.maxX, b.minZ, b.maxZ].map((v) => v.toFixed(1))})`);
+  }
+}
+ok(WHITEBOX_TERRAIN.paths.length === pathCount, `compiled hook carries every path (${pathCount})`);
+for (const p of WHITEBOX_TERRAIN.paths) ok(p.note === undefined && Finite(p.wear) && typeof p.region === "string", `compiled path ${p.id}: note stripped, wear defaulted, region tagged`);
+{
+  // 自造一条小路：Apply（高度）逐位不变；地表纹理层路心 = wear、路外 0；麦茬退让在路心为 0。
+  const region = [{ id: "T", stages: [0], boxes: [{ id: "B", minX: 0, maxX: 100, minZ: 0, maxZ: 100 }], shapes: [],
+    paths: [{ id: "p", points: [{ x: 20, z: 50 }, { x: 60, z: 50 }], width: 2, note: "test" }] }];
+  const H = CompileWhiteboxTerrain(region);
+  ok(H.paths.length === 1 && H.paths[0].wear === WHITEBOX_PATH_DEFAULT_WEAR && H.paths[0].note === undefined, "path compiled with default wear, note stripped");
+  ok(H.bounds === null && H.Apply(40, 50, 2.25, 0) === 2.25, "a path alone never touches the height sampler");
+  const spec = { ...MISSION_TERRAIN, roads: [], pads: [], trenches: [], whiteboxTerrain: H };
+  const layers = [0, 0, 0];
+  SampleMissionGroundSurface(40, 50, [0, 0, 0], layers, spec);
+  ok(Math.abs(layers[0] - WHITEBOX_PATH_DEFAULT_WEAR) < 1e-9 && layers[2] === 0, `path centre: track = wear (${layers[0].toFixed(3)}), stubble cleared`);
+  SampleMissionGroundSurface(40, 56, [0, 0, 0], layers, spec);
+  ok(layers[0] === 0 && layers[2] === 1, "5 m off the path: no track, stubble untouched");
+  const wornSpec = { ...spec, whiteboxTerrain: CompileWhiteboxTerrain([{ ...region[0], paths: [{ ...region[0].paths[0], wear: .4 }] }]) };
+  SampleMissionGroundSurface(40, 50, [0, 0, 0], layers, wornSpec);
+  ok(Math.abs(layers[0] - .4) < 1e-9, "wear scales the track weight");
+}
+
+console.log(`FirstLevelWhiteboxTerrainTest: ${checks} checks passed · ${shapeCount} shapes, ${pathCount} paths in ${REGIONS.length} regions · `
   + `${sampled} samples, ${insideChanged} modified (max |dh| ${maxAbs.toFixed(3)} m)`);
 if (process.argv.includes("--digest")) console.log("05-18 terrain digest (1 m grid over region boxes):", digest.digest("hex"));

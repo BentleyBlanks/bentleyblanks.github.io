@@ -21,6 +21,8 @@ const Pt = (x, z, dy) => Object.freeze(dy === undefined ? { x, z } : { x, z, dy 
 export const WHITEBOX_TERRAIN_FRONT = Object.freeze({
   id: "Front0507",
   stages: Object.freeze([5, 6, 7]),
+  // 踩出来的小路（只染色不改高度）：{ id, points, width, wear?, note }，口径见 Data_FirstLevelWhiteboxTerrain 文件头。
+  paths: Object.freeze([]),
   boxes: Object.freeze([
     // 05：攻击支路、投掷位、战车 Block 停车点与旧院（01–06 空间重排的东半，Data_FirstLevelSpace0106_20260923）。
     Object.freeze({ id: "Tank05", minX: 15, maxX: 65, minZ: -175, maxZ: -100 }),

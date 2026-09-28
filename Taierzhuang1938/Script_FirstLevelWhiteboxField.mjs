@@ -761,6 +761,8 @@ export class FirstLevelWhiteboxField {
           if (!list) continue;
           for (const box of list) {
             if (options?.excludeCollider === box) continue;
+            // 空气墙只挡人不挡射线（与 Script_Physics 的 IG_AIR_WALL 同口径）。
+            if (box.tag === "airWall") continue;
             const hit = RayAabb(origin, direction, box, maxDist);
             if (hit !== null && (best === null || hit.t < best.t)) best = hit;
           }

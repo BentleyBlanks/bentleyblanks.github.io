@@ -18,6 +18,8 @@
 export const WHITEBOX_TERRAIN_REAR = Object.freeze({
   id: "Rear1518",
   stages: Object.freeze([15, 16, 17, 18]),
+  // 踩出来的小路（只染色不改高度）：{ id, points, width, wear?, note }，口径见 Data_FirstLevelWhiteboxTerrain 文件头。
+  paths: Object.freeze([]),
   boxes: Object.freeze([
     Object.freeze({ id: "Reception15", minX: -50, maxX: 70, minZ: 150, maxZ: 260 }),
     Object.freeze({ id: "Bridge18", minX: -100, maxX: -50, minZ: 110, maxZ: 260 }),

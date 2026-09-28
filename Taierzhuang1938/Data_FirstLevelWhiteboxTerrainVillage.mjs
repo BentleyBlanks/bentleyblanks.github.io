@@ -4,6 +4,8 @@
 export const WHITEBOX_TERRAIN_VILLAGE = Object.freeze({
   id: "Village0810",
   stages: Object.freeze([8, 9, 10]),
+  // 踩出来的小路（只染色不改高度）：{ id, points, width, wear?, note }，口径见 Data_FirstLevelWhiteboxTerrain 文件头。
+  paths: Object.freeze([]),
   boxes: Object.freeze([
     // 村北口 z=-30 起（07 南行末段 30..48,-20 在本区），南到 x76 车路 z=75 交给接运区。
     Object.freeze({ id: "Village", minX: 20, maxX: 120, minZ: -30, maxZ: 75 }),

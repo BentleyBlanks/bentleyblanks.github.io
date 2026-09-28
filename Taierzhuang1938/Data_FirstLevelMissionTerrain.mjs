@@ -310,6 +310,13 @@ export function SampleMissionGroundColor(x, z, out = [0, 0, 0]) {
     const t=1-Smooth((d-road.width/2)/1.8);
     r+=(1-r)*t; g+=(.97-g)*t; b+=(.90-b)*t;
   }
+  // 白盒小路（Data_FirstLevelWhiteboxTerrain 各区 paths）：只染色不改高度，踩实程度 wear 打折。
+  for(const path of MISSION_TERRAIN.whiteboxTerrain?.paths || []) {
+    const d=RouteDistanceWithin(x,z,path.points,path.width/2+PATH_EDGE_M);
+    if(d===Infinity)continue;
+    const t=(1-Smooth((d-path.width/2)/PATH_EDGE_M))*path.wear;
+    r+=(1-r)*t; g+=(.97-g)*t; b+=(.90-b)*t;
+  }
   for(const pad of MISSION_TERRAIN.pads) {
     const ex=Math.abs(x-pad.x)-pad.w/2, ez=Math.abs(z-pad.z)-pad.d/2;
     if(ex>=3||ez>=3)continue;
@@ -343,9 +350,12 @@ export function SampleMissionGroundColor(x, z, out = [0, 0, 0]) {
 // how much dry stubble the shader may grow here. Stubble keeps a clear margin
 // around every worked surface; the shader's macro noise decides the rest.
 const STUBBLE_CLEAR_M = 3.5;
-export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0, 0, 0]) {
+// 白盒小路的染色边，与 Data_FirstLevelWhiteboxTerrain.WHITEBOX_PATH_EDGE_M 同值（那边是纯数据表，
+// 这边不反向 import 它，免得地形采样器多一层依赖）。
+const PATH_EDGE_M = 1.8;
+export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0, 0, 0], spec = MISSION_TERRAIN) {
   let track = 0, spoil = 0, worked = 0;
-  for (const road of MISSION_TERRAIN.roads) {
+  for (const road of spec.roads) {
     const d = RouteDistanceWithin(x, z, road.points, road.width / 2 + STUBBLE_CLEAR_M);
     if (d === Infinity) continue;
     const t = 1 - Smooth((d - road.width / 2) / 1.8);
@@ -353,7 +363,17 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
     const w = 1 - Smooth((d - road.width / 2) / STUBBLE_CLEAR_M);
     if (w > worked) worked = w;
   }
-  for (const pad of MISSION_TERRAIN.pads) {
+  // 白盒小路（各区 paths，docs/Data_FirstLevelGuidance20260928.md §3）：踩出来的路只进纹理层，
+  // 路面权重按 wear 打折，麦茬照旧退让 3.5 m —— 高度采样不读它（SampleMissionTerrain 逐位不变）。
+  for (const path of spec.whiteboxTerrain?.paths || []) {
+    const d = RouteDistanceWithin(x, z, path.points, path.width / 2 + STUBBLE_CLEAR_M);
+    if (d === Infinity) continue;
+    const t = (1 - Smooth((d - path.width / 2) / PATH_EDGE_M)) * path.wear;
+    if (t > track) track = t;
+    const w = 1 - Smooth((d - path.width / 2) / STUBBLE_CLEAR_M);
+    if (w > worked) worked = w;
+  }
+  for (const pad of spec.pads) {
     const ex = Math.abs(x - pad.x) - pad.w / 2, ez = Math.abs(z - pad.z) - pad.d / 2;
     if (ex >= STUBBLE_CLEAR_M || ez >= STUBBLE_CLEAR_M) continue;
     const dx = ex > 0 ? ex : 0, dz = ez > 0 ? ez : 0, d = Math.sqrt(dx * dx + dz * dz);
@@ -365,12 +385,12 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
   // 壕沟翻土层跟着样条计划的**实际**沟沿走（带噪声的 halfFloor / bank，分桶网格只碰
   // 同一格里的边），沿沟沿再多铺 0.8 m —— 挖出来的土就堆在唇上。Corridor 的可见范围
   // 到坡顶外 bermW 为止，够这一层用；麦茬的 3.5 m 退让带比它远，照旧按标称折线量。
-  const corridor = TrenchPlanFor(MISSION_TERRAIN).Corridor(x, z);
+  const corridor = TrenchPlanFor(spec).Corridor(x, z);
   if (corridor) {
     const t = 1 - Smooth((corridor.d - corridor.halfFloor - corridor.bank * 0.5) / (corridor.bank * 0.5 + 0.8));
     if (t > spoil) spoil = t;
   }
-  for (const trench of MISSION_TERRAIN.trenches) {
+  for (const trench of spec.trenches) {
     const d = RouteDistanceWithin(x, z, trench.points, trench.bottom / 2 + trench.bank + STUBBLE_CLEAR_M);
     if (d === Infinity) continue;
     const w = 1 - Smooth((d - trench.bottom / 2) / (trench.bank + STUBBLE_CLEAR_M));
