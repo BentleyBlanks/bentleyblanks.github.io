@@ -313,5 +313,5 @@ export const WHITEBOX_WEATHERING = {
   splashHeightM: 0.3, splashColor: [0.33, 0.29, 0.24], splashStrength: 0.5,
   streakLengthM: 1.3, streakStrength: 0.2, streakFrequency: 3.2,
   edgeWidthM: 0.045, edgeLighten: 0.14, bevelM: 0.035, bevelTilt: 0.55,
-  macroScaleM: 6.5, macroStrength: 0.13, undersideDarken: 0.35,
+  macroScaleM: 6.5, macroStrength: 0.13, undersideDarken: 0.12,
 };
