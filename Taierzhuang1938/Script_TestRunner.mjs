@@ -51,6 +51,8 @@ export const testDefs = {
   AllyGaitMissionTest: {file:"Script_AllyGaitMissionTest.mjs",timeoutMs:900000,desc:"Ordinary 06–07 escort: real cast selects carry, dialogue palm contact and fire priority"},
   AllyGaitBrowserTest: {file:"Script_AllyGaitBrowserTest.mjs",timeoutMs:300000,desc:"Real NRA rigs and weapons: crouched ready/carry, free left hand, threat transition and rendered review"},
   BreakableTreesTest: {file:"Script_BreakableTreesTest.mjs",desc:"Seeded tree clearance, blast falloff and shipped split GLB budget"},
+  FirstLevelPropDressingTest: {file:"Script_FirstLevelPropDressingTest.mjs",desc:"第一关平色道具盒换模型：替换表块都在、外观与碰撞盒误差、资产已登记；碎砖瓦撒点禁区与确定性（纯 Node）"},
+  FirstLevelVegetationTest: {file:"Script_FirstLevelVegetationTest.mjs",desc:"第一关植被撒点：不进路线/锚点/实体/沟底/路面、高卡视线门槛、实例上限、确定性、图集卡片表与烘焙记录一致（纯 Node）"},
   BreakableTreesBrowserTest: {file:"Script_BreakableTreesBrowserTest.mjs",timeoutMs:300000,desc:"Actual first-level trees: explosion, collider removal, falling, grounding and disposal"},
   FirstLevelDistantSmokeTest: {file:"Script_FirstLevelDistantSmokeTest.mjs",desc:"Reference smoke districts: clear routes, layered 04–06 views, bounded density and combat particle isolation"},
   FirstLevelSmokeOriginsTest: {file:"Script_FirstLevelSmokeOriginsTest.mjs",desc:"Burning wrecks: actual engine outlets, clear routes, terrain, fire budget and lifecycle"},
@@ -495,6 +497,8 @@ export const browserTests = new Set([
 
 export const tier0Fast = [
   "BreakableTreesTest",
+  "FirstLevelPropDressingTest",
+  "FirstLevelVegetationTest",
   "FacialReviewTest",
   "CharacterSpeechTest",
   "SpeakerGestureTest",
@@ -570,6 +574,7 @@ export const tier2 = [
 export const domains = {
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
+  firstLevelDressing: {label:"第一关道具换模型、碎砖瓦与植被",tests:["FirstLevelPropDressingTest","FirstLevelVegetationTest","FirstLevelWhiteboxBrowserTest","SamplerBudgetTest","MotionVectorContractTest","ModuleGraphTest"]},
   distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest","FirstLevelSmokeOriginsTest","FirstLevelDistantSmokeBrowserTest"]},
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest","OpeningStoryboardShotsTest"]},
   facialEditor: {label:"人物面部可视化编辑器",tests:["FacialReviewTest","FacialEditorBrowserTest","ModuleGraphTest"]},
@@ -688,6 +693,8 @@ const changedDomainRules = [
   // 06 集结处救护动作（docs/Data_CollectionCare20260927.md）：动作库、烘焙脚本与播放层的文件名里没有 FirstLevel。
   {domain:"firstLevel",pattern:/CollectionCare/},
   {domain:"breakableTrees",pattern:/BreakableTree|Script_Combat|Script_FirstLevelWhiteboxField/},
+  // 第一关道具换模型 / 碎砖瓦 / 植被（docs/Data_FirstLevelVegetationProps.md）：图集烘焙脚本与白盒场地接线点也算。
+  {domain:"firstLevelDressing",pattern:/FirstLevel(PropDressing|Vegetation)|BakeVegetationAtlas|Script_FirstLevelWhiteboxField/},
   {domain:"distantSmoke",pattern:/FirstLevelDistantSmoke|FirstLevelSmokeOrigins|BattleSmoke|Script_Vfx/},
   {domain:"facialEditor",pattern:/FacialReview|EditorFacial|FacialEditor/},
   {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear|Front|Terrain|0518)/},
