@@ -15,12 +15,41 @@
 //     之后，所以院心仍回到自然地面，高一级读在院门与厢房一带。
 //   · BridgeBankBerm*：南岸沿河口的岸垄，两段在 x≈-80…-69 断开（铁路桥头与尾队的路），
 //     中心线离 BridgeSouthCoverWest/East 的中心 ≥ 1.5 m：胸墙高度与蹲姿断线不受影响。
+//
+// 2026-09-28 场景引导轮（docs/Data_FirstLevelGuidance20260928.md §3.1 小路）：
+//   · paths 沿冻结路线画踩出来的路（只染色）：沟尾爬坡 → 夹道 → 院门（15），后门 → 田地 → 爆破安全区
+//     → 南岸射位（18 toBridge），安全区 → 行军路（18 marchOut）。院子里不画：院子整片是场坪
+//     （MISSION_TERRAIN.pads，track 层已经是 1），画了也看不出来；院里的「往哪个门」靠门本身（见体块包）。
+//   · Reception15 / Bridge18 两个框的分界从 x=-50 挪到 x=-41（院西墙外皮）：一条小路（连 1.8 m 染色边）
+//     只能落在一个框里，原来的分界正好横在出后门那 10 m 田地上，toBridge 那条路在那儿会断一截。
+//     两个框都属本区，挪分界不改任何形状的裁剪（院地 ReceptionYardFloor 羽化止于 x -40.65，
+//     岸垄东段止于 x -56.05），也不碰别区的框。
 export const WHITEBOX_TERRAIN_REAR = Object.freeze({
   id: "Rear1518",
   stages: Object.freeze([15, 16, 17, 18]),
+  // 踩出来的小路（只染色不改高度）：{ id, points, width, wear?, note }，口径见 Data_FirstLevelWhiteboxTerrain 文件头。
+  paths: Object.freeze([
+    Object.freeze({ id: "WallPathTread", width: 1.6, wear: 0.9,
+      points: Object.freeze([
+        Object.freeze({ x: 56, z: 201.5 }), Object.freeze({ x: 56, z: 207 }), Object.freeze({ x: 36, z: 211 }),
+        Object.freeze({ x: 16, z: 211 }), Object.freeze({ x: 16, z: 220 }), Object.freeze({ x: 12, z: 230 }),
+        Object.freeze({ x: 6, z: 237 }), Object.freeze({ x: 2, z: 240 }),
+      ]), note: "15A→15C 沟尾爬坡出沟、沿院墙夹道、左拐、到院门（wallPath 全程，前面接沟尾 5.5 m）" }),
+    Object.freeze({ id: "ToBridgeTread", width: 1.6, wear: 0.88,
+      points: Object.freeze([
+        Object.freeze({ x: -43.8, z: 244 }), Object.freeze({ x: -49, z: 236 }), Object.freeze({ x: -58, z: 222 }),
+        Object.freeze({ x: -66, z: 210 }), Object.freeze({ x: -66, z: 201 }), Object.freeze({ x: -74, z: 199 }),
+        Object.freeze({ x: -78, z: 190 }), Object.freeze({ x: -81, z: 180.6 }),
+      ]), note: "18 出后门穿田地到爆破安全区、再到南岸射位（toBridge 全程；撤回 bridgeWithdraw 走的也是这一条）" }),
+    Object.freeze({ id: "MarchOutTread", width: 2.2, wear: 0.72,
+      points: Object.freeze([
+        Object.freeze({ x: -66, z: 204 }), Object.freeze({ x: -64, z: 216 }), Object.freeze({ x: -62, z: 232 }),
+        Object.freeze({ x: -61.4, z: 240 }),
+      ]), note: "18 炸桥后随队南下（marchOut），行军队踩得宽一点；过了淡出点再延 8 m，路不在脚下断掉" }),
+  ]),
   boxes: Object.freeze([
-    Object.freeze({ id: "Reception15", minX: -50, maxX: 70, minZ: 150, maxZ: 260 }),
-    Object.freeze({ id: "Bridge18", minX: -100, maxX: -50, minZ: 110, maxZ: 260 }),
+    Object.freeze({ id: "Reception15", minX: -41, maxX: 70, minZ: 150, maxZ: 260 }),
+    Object.freeze({ id: "Bridge18", minX: -100, maxX: -41, minZ: 110, maxZ: 260 }),
     Object.freeze({ id: "Night18", minX: -185, maxX: -135, minZ: 280, maxZ: 360 }),
   ]),
   shapes: Object.freeze([

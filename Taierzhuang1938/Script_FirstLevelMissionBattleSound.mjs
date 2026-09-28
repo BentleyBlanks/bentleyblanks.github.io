@@ -70,14 +70,14 @@ export class FirstLevelMissionBattleSound {
       Listener: () => audio?.listenerPos || null,
       Ground: (x, z) => host?.battlefield?.GroundHeight?.(x, z) ?? 0,
       Zone: () => audio?.ListenerZone?.() || null,
-      Visual: (at, radius, d, column) => this.BombVisual(at, radius, column),
+      Visual: (at, blast, d, column) => this.BombVisual(at, blast, column),
       RemoveVisual: (handle) => host?.vfx?.RemoveSmokeSource?.(handle),
       Shake: (trauma) => host?.player?.shake?.AddTrauma?.(trauma),
       Blocked: (at, clearM) => this.ShellBlocked(at, clearM),
       // 自己放声时按「别人 + 本层真在响」算：落弹留位是给前线看的，不挡空袭自己。
       SharedRoom: (n) => this.frontVoices.length + this.artillery.Busy() + this.airRaid.Active() + n <= D.front.sharedMaxVoices,
       Formation: (poses) => host?.aircraft?.SetFormation?.(AIR_RAID_KEY, poses),
-      Bombs: (list) => host?.aircraft?.SetBombs?.(AIR_RAID_KEY, list, FIRST_LEVEL_AIR_RAID.bomb),
+      Bombs: (list) => host?.aircraft?.SetBombs?.(AIR_RAID_KEY, list),
     }, (this.seed ^ 0xb0b1938) >>> 0);
   }
 
@@ -95,16 +95,29 @@ export class FirstLevelMissionBattleSound {
     return !!this.host?.frontShow?.bunker?.beats?.has?.(S.phase);
   }
 
-  /** 空袭落地：火球与尘环 +（column 时）一根升得过房顶的大土柱；返回土柱烟源句柄（到点由空袭层撤源）。 */
-  BombVisual(at, radius, column = true) {
+  /**
+   * 空袭落地：按装药缩放的航空炸弹爆炸（vfx.BombBlast：火球、冲击环、抛射土柱、底涌、久留烟团）+
+   *（column 时）一根升得过房顶的常驻土柱；返回土柱烟源句柄（到点由空袭层撤源）。
+   * blast = { chargeKg, cube, radius, budget, dirX, dirZ }（Script_FirstLevelAirRaid.Impact）；宿主的 vfx
+   * 没有 BombBlast（测试夹具）就退回一团 shell 档爆炸。
+   */
+  BombVisual(at, blast, column = true) {
     const vfx = this.host?.vfx;
     if (!vfx) return null;
-    // origin 只给取证 / 测试认「这是空袭那一团」（Vfx.Explosion 不读它）。
-    vfx.Explosion?.({ x: at.x, y: at.y + 0.3, z: at.z }, { radius, kind: "shell", groundY: at.y, origin: "airRaid" });
-    const C = FIRST_LEVEL_AIR_RAID.impact.column;
+    const b = typeof blast === "number" ? { radius: blast } : (blast || {});
+    // origin 只给取证 / 测试认「这是空袭那一团」（Vfx 不读它）。
+    if (typeof vfx.BombBlast === "function" && b.chargeKg) {
+      vfx.BombBlast({ x: at.x, y: at.y, z: at.z }, { chargeKg: b.chargeKg, groundY: at.y, budget: b.budget ?? 1,
+        dirX: b.dirX ?? 0, dirZ: b.dirZ ?? 0, origin: "airRaid" });
+    } else {
+      vfx.Explosion?.({ x: at.x, y: at.y + 0.3, z: at.z }, { radius: b.radius ?? 12, kind: "shell", groundY: at.y, origin: "airRaid" });
+    }
+    const I = FIRST_LEVEL_AIR_RAID.impact, C = I.column;
     if (!column || typeof vfx.SmokeSource !== "function") return null;
+    // 装药大一级，土柱粗一圈、高一截（立方根）。
+    const k = b.cube ? Math.max(1, b.cube / I.columnRefCube) : 1;
     return vfx.SmokeSource({ x: at.x, y: at.y + 1, z: at.z }, {
-      kind: "dust", rate: C.rate, radius: C.radius, rise: C.rise, sizeStart: C.sizeStart, sizeEnd: C.sizeEnd,
+      kind: "dust", rate: C.rate, radius: C.radius * k, rise: C.rise * k, sizeStart: C.sizeStart * k, sizeEnd: C.sizeEnd * k,
       life: C.life, opacity: C.opacity, light: false, origin: "airRaid",
     }) ?? null;
   }

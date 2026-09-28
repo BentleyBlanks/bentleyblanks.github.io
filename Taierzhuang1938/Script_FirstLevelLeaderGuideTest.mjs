@@ -125,6 +125,18 @@ assert.equal(holdView.mode,"cover");assert.equal(holdView.cue,"GuideBridge");
 assert.equal(holdView.target.x,MISSION_ANCHORS.bridgeCover.x);assert.equal(holdView.target.z,MISSION_ANCHORS.bridgeCover.z);
 r.Has=id=>id==="bridgeFireBroken";holdView=guide.View();
 assert.equal(holdView.cue,null,"'hold the south bank' is not repeated once the fire is broken");
+// 08 Village（2026-09-28 引导轮）：看见街堵了之前标记指主街口、动作词是「前往」、不喊灶屋那句；
+// streetBlockSeen 落下之后才指灶屋、喊 GuideKitchen。
+r.flow.stage={id:"Village",objective:"kitchen"};r.Has=()=>false;r.voice.queue=[];r.voice.current=null;
+guide.Enter(r.flow.stage);
+let villageView=guide.View();
+assert.equal(villageView.mode,"move","the street mouth is a place to go, not a position to hold");
+assert.equal(villageView.cue,null,"the kitchen order waits until the block has been seen");
+assert.equal(villageView.target.x,MISSION_LEADER_STAGES.Village.holdTarget.x);assert.equal(villageView.target.z,MISSION_LEADER_STAGES.Village.holdTarget.z);
+assert.ok(villageView.target.x>72.6&&villageView.target.x<81.4&&villageView.target.z>-30&&villageView.target.z<-6,"the hold target sits inside the streetBlockSeen box");
+r.Has=id=>id==="streetBlockSeen";villageView=guide.View();
+assert.equal(villageView.cue,"GuideKitchen");assert.equal(villageView.mode,"move");
+assert.equal(villageView.target.x,MISSION_LEADER_STAGES.Village.target.x);assert.equal(villageView.target.z,MISSION_LEADER_STAGES.Village.target.z,"once the block is seen the marker moves to the kitchen");
 // Running ahead of a marching leader: one "等到" after a short hold, then a cooldown.
 r.flow.stage={id:"BridgeCover",objective:"bridge"};r.Has=()=>false;r.voice.queue=[];r.voice.current=null;
 r.squadRoutes=new Map([[actor.id,[{x:0,z:-40}]]]);actor.position={x:0,y:0,z:0};

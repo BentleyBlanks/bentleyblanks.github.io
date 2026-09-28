@@ -1,19 +1,25 @@
-// Data_FirstLevelAirRaid.mjs — 第一关 01–06 中远处的日机轮番轰炸（2026-09-26）。
+// Data_FirstLevelAirRaid.mjs — 第一关 01–06 中远处的日机轮番轰炸（2026-09-26；2026-09-28 物理化 + 中队规模）。
 //
-// 用户要求：「从日军先头兵开始，中远处安排多轮次的飞机炸弹轰炸，增加战场氛围」。
+// 用户要求：「从日军先头兵开始，中远处安排多轮次的飞机炸弹轰炸，增加战场氛围」（09-26）；
+// 「给飞机的轰炸做得更基于物理、场面更宏大一点」（09-28）。
 // 起点 = 01 的 FrontPass 相位（先头兵沿交通壕经过洞口，Data_OpeningStoryboards.phases.Trapped）；
 // 02 以后的步骤（阶段跳转 / 检查点直接进来）一律算已经开始。终点 = 06 Orders 结束，07 以后不起新的一轮。
 //
-// **纯氛围层**：不伤人、不改地形、不进压制账与 TTK、不记任务事实。炸点离听者 minM–maxM、
-// 离任何活人与战车 bombClearM 以外（运行时逐发查）。导演在 Script_FirstLevelAirRaid（纯规则），
+// **纯氛围层**：不伤人、不改地形、不进压制账与 TTK、不记任务事实。炸点离听者、离任何活人与战车
+// 都有下限（按弹型，Data_AerialBombs；运行时逐发查）。导演在 Script_FirstLevelAirRaid（纯规则），
 // 挂在 Script_FirstLevelMissionBattleSound 下与前线床、场外炮击共用一本声部账
-//（MISSION_BATTLE_SOUND.front.sharedMaxVoices）；飞机与炸弹的画面在 Script_Aircraft 的编队克隆层。
+//（MISSION_BATTLE_SOUND.front.sharedMaxVoices）；飞机与炸弹的画面在 Script_Aircraft 的编队克隆层，
+// 落地画面在 Script_Vfx.BombBlast。
+//
+// 09-28 物理化：炸弹带着飞机的速度离机，外弹道按二次空气阻力积分（Script_BombBallistics）；
+// 投弹手按这条航迹的「前冲距离」提前投弹，落点是积出来的；落地尺度按装药立方根缩放；
+// 投完弹飞机变轻上浮几米，再压坡度协调转弯离场（转弯半径 v²/(g·tanφ)）。
 //
 // 坐标是世界系（X 东、Z 南、米）。落区都在 P012 外圈地面（Data_FirstLevelP012Horizon）上，
 // 避开外圈的土丘体块（炸点落进土丘里只剩一根烟柱）。日机从北、东北（日军一侧）进场，
 // 炸的是我方两翼阵地与后方 —— 一轮一个落区、一条直线航路、每架一串炸弹。
 
-/** 编队：机型（Data_AircraftAssets 的 id）、高度、速度、每架几颗、队形（side 右正、back 向后、up 向上，米）。 */
+/** 编队：机型（Data_AircraftAssets 的 id）、高度、速度、载弹、队形（side 右正、back 向后、up 向上，米）。 */
 const V_SHAPE = Object.freeze([
   Object.freeze({ side: 0, back: 0, up: 0 }),
   Object.freeze({ side: -38, back: 30, up: 6 }),
@@ -23,9 +29,17 @@ const PAIR = Object.freeze([
   Object.freeze({ side: 0, back: 0, up: 0 }),
   Object.freeze({ side: 32, back: 24, up: 4 }),
 ]);
+/** 一个三机楔形整体挪到 (side, back, up)：拼中队队形用。 */
+function Vic(side, back, up) {
+  return V_SHAPE.map((s) => Object.freeze({ side: s.side + side, back: s.back + back, up: s.up + up }));
+}
+// 九机「品」字（中队基本队形）：长机楔形在前，左右两个楔形各退后七八十米、一高一低错开尾流。
+const VIC_OF_VICS = Object.freeze([...V_SHAPE, ...Vic(-104, 74, 14), ...Vic(104, 80, -9)]);
+// 六机两个楔形梯次：后一个楔形在左后、高一些（重轰拉得更开）。
+const TWO_VICS = Object.freeze([...V_SHAPE, ...Vic(-92, 104, 18)]);
 
 export const FIRST_LEVEL_AIR_RAID = Object.freeze({
-  version: "20260926-airRaid",
+  version: "20260928-airRaidPhysics",
   /** 从哪一刻起：Trapped 这一步要等导演走到这个相位；其余步骤进来就算开始。 */
   start: Object.freeze({ stage: "Trapped", phase: "FrontPass" }),
   /**
@@ -55,18 +69,44 @@ export const FIRST_LEVEL_AIR_RAID = Object.freeze({
   exitM: 1700,
   /** 航向在落区给的来向上左右随机偏多少度。 */
   headingJitterDeg: 22,
+  /**
+   * 过顶：有 chance 的机会把航向对准「听者 → 瞄准点」，让编队从头顶偏 missM 以内压过去 ——
+   * 只在这样飞仍是从北边来（航向与正南的夹角不超过 maxFromNorthDeg，日军一侧）时才这么做，
+   * 实际上就是瞄后方两块落区的那几轮。投弹点在瞄准点前六七百米，炸弹是从头顶往前飞着落下去的。
+   */
+  overhead: Object.freeze({ chance: 0.5, maxFromNorthDeg: 65, missM: 90 }),
+  /**
+   * 编队。载弹 load = { bomb（Data_AerialBombs 的 id）, count（每架一串几颗） }；
+   *   intervalS   一串里相邻两颗的投放间隔（地面上 ≈ intervalS·speed 米一颗）
+   *   dropLagS    僚机跟长机投弹的反应迟差 [最小, 最大]（看见长机投弹才按电门）
+   *   balloonM    投完弹变轻、上浮多少米（按载弹占全重的比例估），balloonS 是它的时间常数
+   *   bankDeg     离场转弯的坡度（协调转弯：转弯角速度 = g·tanφ / v）
+   *   droneGain   引擎声的音量倍率（一条声部代表整队；机多、声厚）
+   */
   formations: Object.freeze({
-    // 九七式轻轰（Ki-30）三机楔形：华北战场近距支援轰炸的主力。
-    lightVic: Object.freeze({ aircraft: "MitsubishiKi30", altitudeM: 230, speedMps: 88, bombs: 4, slots: V_SHAPE }),
-    // 九七式重轰（Ki-21）三机楔形：高一些、慢一些、每架一串更长。
-    heavyVic: Object.freeze({ aircraft: "MitsubishiKi21Ia", altitudeM: 320, speedMps: 80, bombs: 6, slots: V_SHAPE }),
-    lightPair: Object.freeze({ aircraft: "MitsubishiKi30", altitudeM: 200, speedMps: 92, bombs: 4, slots: PAIR }),
+    // 九七式轻轰（Ki-30）三机楔形：正常载弹 300 kg，六颗 50 kg 级。
+    lightVic: Object.freeze({ aircraft: "MitsubishiKi30", altitudeM: 230, speedMps: 88,
+      load: Object.freeze({ bomb: "Bomb50kg", count: 6 }), slots: V_SHAPE,
+      intervalS: 0.26, dropLagS: Object.freeze([0.12, 0.45]), balloonM: 3.5, balloonS: 1.8, bankDeg: 24, droneGain: 1 }),
+    // 九七式重轰（Ki-21）六机两个楔形：每架三颗 250 kg 级，高、慢、一串拉得开。
+    heavySquadron: Object.freeze({ aircraft: "MitsubishiKi21Ia", altitudeM: 380, speedMps: 82,
+      load: Object.freeze({ bomb: "Bomb250kg", count: 3 }), slots: TWO_VICS,
+      intervalS: 0.5, dropLagS: Object.freeze([0.15, 0.5]), balloonM: 5, balloonS: 2.4, bankDeg: 20, droneGain: 1.3 }),
+    // Ki-30 双机：低一点、快一点。
+    lightPair: Object.freeze({ aircraft: "MitsubishiKi30", altitudeM: 200, speedMps: 92,
+      load: Object.freeze({ bomb: "Bomb50kg", count: 6 }), slots: PAIR,
+      intervalS: 0.26, dropLagS: Object.freeze([0.12, 0.4]), balloonM: 3.5, balloonS: 1.8, bankDeg: 26, droneGain: 0.9 }),
+    // Ki-30 九机「品」字：远程出击每架只挂四颗，整队铺出一片。
+    lightSquadron: Object.freeze({ aircraft: "MitsubishiKi30", altitudeM: 260, speedMps: 90,
+      load: Object.freeze({ bomb: "Bomb50kg", count: 4 }), slots: VIC_OF_VICS,
+      intervalS: 0.24, dropLagS: Object.freeze([0.12, 0.5]), balloonM: 2.5, balloonS: 1.8, bankDeg: 22, droneGain: 1.4 }),
   }),
-  /** 轮换顺序（循环）。 */
-  order: Object.freeze(["lightVic", "heavyVic", "lightPair", "lightVic", "heavyVic", "lightPair"]),
+  /** 轮换顺序（循环）：小队与中队交替，一分多钟一轮。 */
+  order: Object.freeze(["lightVic", "heavySquadron", "lightPair", "lightSquadron", "heavySquadron", "lightVic"]),
   /**
    * 落区：矩形 + 日机的来向（from：从落区指向飞机来的方向，单位向量，北 = (0, −1)）。
    * 按 01–06 玩家活动范围（x −40…70、z −220…−30）量过：每块中心离那一片 200–300 m。
+   * 矩形只管瞄准点（落区中心）；中队一片落弹铺得比矩形大，每一颗另查避人、离听者与土丘。
    */
   zones: Object.freeze([
     // 西翼阵地：土坎西端再往西，外圈 WestNorth 土丘（z ≤ −242）以南。
@@ -81,34 +121,36 @@ export const FIRST_LEVEL_AIR_RAID = Object.freeze({
   /** 落区中心离听者的距离（中远处）。 */
   minM: 170,
   maxM: 470,
-  /** 每一颗炸点离活人、战车至少多远（米）。 */
-  bombClearM: 28,
-  /** 挑落区最多试几次，挑不到这一轮推后 retryS 秒。 */
-  pickTries: 12,
+  /** 炸点离外圈土丘体块至少多远（米，按体块外沿算）。 */
+  hillClearM: 4,
+  /** 挑落区最多试几次，挑不到这一轮推后 retryS 秒（中队一片铺得大，要多试几次）。 */
+  pickTries: 24,
   retryS: 4,
   /**
-   * 投弹：每架一串，相邻两颗间隔 intervalS；炸弹带着飞机的前进速度下落（落地时正在机腹下方），
-   * 只是比飞机落后 trailM 米（空气阻力）。g 用 9.8。
+   * 投弹：弹从机腹弹舱（机身中心下 bayDropM 米）离开，带飞机的速度 + 向下 ejectMps 的弹射速度；
+   * 外弹道按 Data_AerialBombs 的弹体积分。dispersionM：一颗弹落地时相对理想航迹的散布（米，横 / 纵，
+   * 来自离机扰动与尾翼公差），按 (t/T)² 从零长起。
    */
-  bomb: Object.freeze({ intervalS: 0.34, trailM: 45, gravity: 9.8, jitterM: 6,
-    // 画面上的炸弹：三百米外一颗 1 m 长的炸弹不到一个像素，放大到 visualScale 倍才看得出一串黑点往下掉。
-    lengthM: 1.1, radiusM: 0.17, visualScale: 2.6 }),
+  bomb: Object.freeze({ bayDropM: 1.4, ejectMps: 0.8, dispersionM: Object.freeze([5, 7]),
+    // 画面上的炸弹：真实尺寸；远到不足 minAngularRad（约 1.5 个像素宽）时按距离放大补上，最多 maxScale 倍。
+    minAngularRad: 0.0026, maxScale: 4.5 }),
   /**
-   * 落地画面：vfx.Explosion 的半径（远一些略放大，封顶）+ 土柱。
-   * 土柱每 columnEvery 颗给一根（一串挨得近，相邻两根本来就连成一片）：烟源粒子池在低画质只有六十来格
-   *（Script_Vfx POOL_SHARE.sourceSmoke），一颗一根会把别处的烟挤掉。2026-09-26 实拍（04，300 m 外）：
-   * 旧的 1.6 s × 6 / 8 s 只剩一道二十米高的淡黄土，改成更粗、更高、活得更久的一根。
+   * 落地画面（Script_Vfx.BombBlast，尺度全按装药立方根，Data_AerialBombs）。
+   *   detailBombs  一轮落得多于这么多颗时按比例摊薄每颗的烟团（专用池一轮装得下）
+   *   maxColumns   一轮最多几根常驻土柱烟源（每架那一串的头一颗给一根；烟源池在低画质只有六十来格）
+   *   column       那根土柱（SmokeSource）的参数，按 ∛W / columnRefCube 放大
    */
-  impact: Object.freeze({ radiusM: 12, radiusPerM: 0.012, radiusFromM: 200, radiusMaxM: 15, columnEvery: 2,
+  impact: Object.freeze({ detailBombs: 14, maxColumns: 6, columnRefCube: 2.8,
     column: Object.freeze({ emitS: 2.2, rate: 5, radius: 6, rise: 6.5, sizeStart: 7, sizeEnd: 30, life: 11, opacity: 0.62 }) }),
   /**
    * 声音。爆炸走 soundField（参考距离 64 m、1000 m 内不剔除），引擎按距离自动延迟 d/340；
    * 一串十几颗只给其中几颗出声（相邻两声至少隔 minGapS），滚成一片闷雷。
+   * 音量按装药 (W / chargeRefKg)^(1/6) 放大、封顶 volumeMaxGain（250 kg 级约大 1.3 倍）。
    * 低频层：一轮的第一颗再叠一条压到 thumpAirCutHz 以下的远爆（胸口那一下）；每架一条太挤，声部让给爆炸本体。
    * 引擎声：整轮一条合成持续音挂在长机上，逐帧搬位置 + 多普勒（与扫射航线同一条 cue）。
    */
   audio: Object.freeze({
-    cue: "explosionFar", volume: 1.5, minGapS: 0.4,
+    cue: "explosionFar", volume: 1.5, minGapS: 0.4, chargeRefKg: 22, volumeMaxGain: 1.35,
     thumpCue: "explosionFar", thumpVolume: 1.1, thumpAirCutHz: 320, thumpDelayS: 0.03,
     droneCue: "planeDrone", droneVolume: 1.0, droneSizeM: 70, droneStopFadeS: 1.5, droneRetryS: 0.5,
     /** 长机离听者多近才起引擎声（米）：1400 m 上约 −25 dB，之后一路涨到头顶。 */
@@ -134,9 +176,11 @@ export const FIRST_LEVEL_AIR_RAID = Object.freeze({
     dugoutDirtVolume: 0.26, dugoutDirtAirCutHz: 2600, trenchDirtVolume: 0.14, trenchDirtAirCutHz: 1900,
   }),
   /**
-   * 震屏：跟着声音到的一记轻震，直接往创伤桶里加（与场外炮击同一条路，BATTLE_ARTILLERY 的头注）。
-   * near–far 之间线性插值；一串十几颗连着到，windowS 秒里合计不超过 windowMax（幅度 = 创伤²）。
+   * 震屏：往创伤桶里加（与场外炮击同一条路，BATTLE_ARTILLERY 的头注）。强弱按**比例距离** Z = d / ∛W
+   * 在 zNear–zFar 之间线性插值（50 kg 级在 170 m / 470 m 上与旧版 0.22 / 0.08 一致；250 kg 级同样距离上重一截）。
+   * 两记：先是地震波（d / groundWaveMps，seismicFraction 那么重），再是跟着声音到的气浪（d / 340）。
+   * 一串十几颗连着到，windowS 秒里合计不超过 windowMax（幅度 = 创伤²）。
    */
-  shake: Object.freeze({ nearM: 170, farM: 470, traumaNear: 0.22, traumaFar: 0.08, dugoutScale: 1.35,
-    windowS: 1.2, windowMax: 0.34 }),
+  shake: Object.freeze({ zNear: 61, zFar: 168, traumaNear: 0.22, traumaFar: 0.08, dugoutScale: 1.35,
+    seismicFraction: 0.35, windowS: 1.2, windowMax: 0.34 }),
 });

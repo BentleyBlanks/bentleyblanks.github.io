@@ -198,7 +198,8 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
 - `--digest` 打印 05–18 分区框内 1 m 网格的地面 sha256。本次实装前后：0.5 m 网格 240526 个采样逐位相同（钩子接入前后 sha256 均为 `13189e2c…`），`MISSION_LAYOUT.blocks`/gates/scenario/壕沟布设 JSON 摘要在拆出 Front 包前后相同。
 - 改完地形必看 `Map_<区>.png` 的挖/填等值线，再跑 §2 的门禁；07+ 指纹变红按 §2 最后一行处理。
 
-**已知限制**：纹理层（路面/抛土/麦茬，`SampleMissionGroundSurface`）不读修饰，下沉路的路面仍按 `MISSION_TERRAIN.roads` 着色；
+**已知限制**：纹理层（路面/抛土/麦茬，`SampleMissionGroundSurface`）不读 shapes，下沉路的路面仍按 `MISSION_TERRAIN.roads` 着色
+（2026-09-28 起各区表另有 `paths`：只染路面纹理、不改高度，见 [场景引导](Data_FirstLevelGuidance20260928.md) §3.1）；
 高度场格距 0.75 m，窄于 ~1.5 m 的台阶/门槛/路沿用体块；壕沟抛土 `bermMask` 只认 roads/pads，不认修饰。
 
 ## 4. 分区与并行方案
@@ -210,7 +211,7 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
 | A Front0507 | 05–07 | Tank05 x15…65 z−175…−100；Collection06 x−62…−15 z−118…−84；South07 x−40…60 z−84…−30 | `Data_FirstLevelWhiteboxFront.mjs`（本次从 Village 拆出 06/07 四块，合并顺序不变） | `Data_FirstLevelWhiteboxTerrainFront.mjs` | FrontTopologyTest、SpaceTest --rear-only（06 背坡、07 长度）、TerrainTest |
 | B Village0810 | 08–10（含 07 末段村北口） | Village x20…120 z−30…75 | `Data_FirstLevelWhiteboxVillage.mjs` | `…TerrainVillage.mjs` | VillageTest、SpaceTest 08 |
 | C Transfer1114 | 11–14（含西沟北段） | Transfer x25…125 z75…150 | `Data_FirstLevelWhiteboxTransfer.mjs` | `…TerrainTransfer.mjs` | TransferTest、SpaceTest 12/侧巷/北沙河 |
-| D Rear1518 | 15–18 | Reception15 x−50…70 z150…260；Bridge18 x−100…−50 z110…260；Night18 x−185…−135 z280…360 | `Data_FirstLevelWhiteboxRear.mjs` | `…TerrainRear.mjs` | SpaceTest 15B/15C/18/夜景、MissionTopologyTest --rear-only、EndTest |
+| D Rear1518 | 15–18 | Reception15 x−41…70 z150…260；Bridge18 x−100…−41 z110…260（2026-09-28 引导轮把分界从 x=−50 挪到院西墙外皮 −41：去桥的小路不能跨框）；Night18 x−185…−135 z280…360 | `Data_FirstLevelWhiteboxRear.mjs` | `…TerrainRear.mjs` | SpaceTest 15B/15C/18/夜景、MissionTopologyTest --rear-only、EndTest |
 
 **衔接点**（两区都要对得上的地方，边界两侧各留 2 m 不做高差，或双方约定同一高度）：
 

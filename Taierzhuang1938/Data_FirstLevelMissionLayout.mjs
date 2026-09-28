@@ -457,11 +457,13 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
   }
   // 桥台做成两侧的翼墙而不是一整道：桥面下的实心盒会被路线净空判成「挡住尾队」
   // （可走面只豁免甲板本身），翼墙让开 x=-77 的中线。
+  // 外观由 Model_RailBridge 的料石桥台接管（Script_RailBridgeSet）；这两块只剩碰撞，
+  // 顶收到桥座面 abutmentTopY 以下，整块埋在模型的墙身里。
   for (const [i, az] of B.abutmentZ.entries()) for (const side of [-1, 1]) {
     const ax = B.x + side * (B.abutmentW / 2 - 1);
     const foot = SampleMissionTerrain(ax, az) - 0.3;
     Block(`RailBridgeAbutment${i ? "South" : "North"}${side < 0 ? "West" : "East"}`, ax, az, 2,
-      deckBottom - foot, B.abutmentD, "structure", { y: (deckBottom + foot) / 2 });
+      B.abutmentTopY - foot, B.abutmentD, "structure", { y: (B.abutmentTopY + foot) / 2 });
   }
   const floor = SampleMissionTerrain(B.x, B.z);
   gates.push({ id: "RailBridgeWreckSpan", x: B.x, y: floor + 0.7, z: B.z, w: B.deckW, h: 1.4, d: 16,
@@ -1115,7 +1117,7 @@ for (const part of whiteboxPackages) {
 }
 // r3（2026-09-27）：12 掩护装载改守来时路 —— 村口低墙两头残墙、墙外两栋残屋与门楼前空场的掩体、
 // 东巷院墙（docs/Data_FirstLevelTransferCover20260927.md）。
-export const MISSION_WHITEBOX_VERSION = "first-level-20260927-whitebox-05-18-r3";
+export const MISSION_WHITEBOX_VERSION = "first-level-20260928-guidance-r1";
 export const MISSION_TRENCH_PLACEMENTS = (() => {
   const shared = { groundAt: SampleMissionTerrain, laneCuts: FrontAssaultLaneCuts };
   const handPlaced = blocks.filter((block) => block.solid !== false)

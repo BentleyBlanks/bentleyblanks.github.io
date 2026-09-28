@@ -14,7 +14,7 @@ import { RayAabb, MakeBox, PlaceGeometry } from "./Script_Geo.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { DeriveCoversFromColliders } from "./Script_AiCover.mjs";
 import { BuildRailwayFromSpec } from "./Script_RoadSpline.mjs";
-import { MarkDynamicPrepass } from "./Script_Post.mjs";
+import { MarkDynamicPrepass, MarkNoPrepass } from "./Script_Post.mjs";
 import { T } from "./Script_Text.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { LoadMissionFortifications, AddMissionFortifications } from "./Script_FirstLevelMissionFortifications.mjs";
@@ -115,10 +115,13 @@ function ColliderRecord(spec) {
 }
 
 export class FirstLevelWhiteboxField {
-  constructor(scene, _library, { bounds = null, zones = [], levelId = null, whiteboxLayout = null, quality = "high" } = {}) {
+  constructor(scene, _library, { bounds = null, zones = [], levelId = null, whiteboxLayout = null, quality = "high", debugAirWalls = false } = {}) {
     this.scene = scene;
     this.library = _library;
     this.quality = quality;
+    // ?airWalls=1（Script_Main 传进来）：tag:"airWall" 的体块另画一层半透明红板，核对空气墙摆在哪
+    //（docs/Data_FirstLevelGuidance20260928.md §3.2）。默认不画，碰撞照旧。
+    this.debugAirWalls = !!debugAirWalls;
     // Layered terrain (Script_TerrainMaterial) once PrepareAssets loads it; null keeps the single-PBR path.
     this.terrainLayers = null;
     this.SampleGroundSurface = null;
@@ -353,7 +356,7 @@ export class FirstLevelWhiteboxField {
     this.vegetation=this.vegetationAtlas?new FirstLevelVegetation(this.scene,this.layout,this.library,this.vegetationAtlas,(x,z)=>this.TerrainHeight(x,z),this.quality):null;
     for(const id of [...(this.propDressingStats?.replaced||[]),...(this.vegetation?.plan.replaced||[])])defenses.replaced.add(id);
     for(const [key,material] of this.materials)if(key.startsWith("MissionDefenseMaterial_"))this.sharedFortificationMaterials.add(material);
-    const trainSink = new BuildSink(),derailSink=new BuildSink();
+    const trainSink = new BuildSink(),derailSink=new BuildSink(),airWallSink=this.debugAirWalls?new BuildSink():null;
     // 外观合批（Script_FirstLevelWhiteboxLooks）：静态体块按外观分桶，带风化属性自己合并；
     // 碰撞与 cover 仍走 sink。水盒收成一条连续水面。
     const lookBuckets = new Map(), waterBlocks = [], roofBlocks = [];
@@ -362,6 +365,8 @@ export class FirstLevelWhiteboxField {
       if(block.dynamic || block.treeModel)continue;
       const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? (this.layout.fortifications && block.id.startsWith(`StationCar${this.layout.derailCar}`) ? derailSink : trainSink) : sink;
       if (this.layout.scenario?.replaceBlockIds.includes(block.id)) continue;
+      if(airWallSink&&block.tag==="airWall")airWallSink.Add("AirWallDebug",PlaceGeometry(MakeBox(block.w,block.h,block.d,1,block.id),
+        {x:block.x,y:block.y,z:block.z,ry:block.ry||0}));
       const seamOwner=block.id.includes("BagSeam")?block.id.split("BagSeam")[0]:null;
       // visual:false —— 只要碰撞，画面由模型负责（例：接收院的空担架摞）。
       const look = this.looks && targetSink === sink ? this.looks.LookOf(block) : null;
@@ -414,6 +419,15 @@ export class FirstLevelWhiteboxField {
       this.stats.looks = { ...this.looks.stats.looks };
       this.stats.lookFallbackSets = this.looks.stats.fallbackSets.slice();
       this.stats.waterBlocks = waterBlocks.length;
+    }
+    if(airWallSink){
+      // 半透明、不写深度、不投影、不进预通道（运动矢量契约：半透明对象 MarkNoPrepass）。只在 ?airWalls=1 时存在。
+      const airWallMaterial=MarkNoPrepass(new THREE.MeshBasicMaterial({name:"FirstLevelAirWallDebug",color:0xd8281c,
+        transparent:true,opacity:.32,depthWrite:false,side:THREE.DoubleSide}));
+      for(const mesh of airWallSink.Flush(this.scene,{Get:()=>airWallMaterial})){
+        mesh.name="FirstLevelWhitebox_AirWallDebug";mesh.castShadow=false;mesh.receiveShadow=false;mesh.renderOrder=10;
+        this.meshes.push(mesh);
+      }
     }
     this.derailMeshes=derailSink.Flush(this.scene,{Get:key=>this.materials.get(key)||this.whiteMaterial});
     this.derailColliders=derailSink.colliders;
@@ -870,6 +884,8 @@ export class FirstLevelWhiteboxField {
           if (!list) continue;
           for (const box of list) {
             if (options?.excludeCollider === box) continue;
+            // 空气墙只挡人不挡射线（与 Script_Physics 的 IG_AIR_WALL 同口径）。
+            if (box.tag === "airWall") continue;
             const hit = RayAabb(origin, direction, box, maxDist);
             if (hit !== null && (best === null || hit.t < best.t)) best = hit;
           }

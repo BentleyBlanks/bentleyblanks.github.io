@@ -405,7 +405,9 @@ export const MISSION_TUNING = Object.freeze({
   bridgeColumnCount: 6,
   bridgeColumnSpeedMps: 1.9,
   bridgeColumnSpacingM: 3.4,
-  bridgeBlastRadiusM: 12,
+  // 18 毁桥的共用爆炸感知半径（Combat.BlastFeedback：震屏外沿 × 6.1 ≈ 97 m，48 m 外创伤约 0.5；
+  // 耳鸣伸不到安全区）。火球、水柱、烟柱的尺寸在 Data_RailBridgeDemolition，与它无关。
+  bridgeBlastRadiusM: 16,
   // —— 18 夜行军黑屏字幕（沿用旧南行转场的 1/4/1）。
   nightTransition: Object.freeze({ fadeOutS: 1, holdS: 4, fadeInS: 1 }),
   // 夜景段：淡入点到北门的行军速度（队列小跑不上，按 walkSpeedMps）。

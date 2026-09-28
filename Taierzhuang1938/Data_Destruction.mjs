@@ -130,9 +130,11 @@ const TAG_PROFILE = Object.freeze({
   fieldBank: "earth",
 });
 
-/** 未登记的新布景默认可破坏；只有显式承重 tag 才能豁免。 */
+/** 未登记的新布景默认可破坏；只有显式承重 tag 才能豁免。
+ *  空气墙（tag airWall，docs/Data_FirstLevelGuidance20260928.md §3.2）看不见也打不着，按承重处理：
+ *  不能被炸出缺口，否则空中会掉一堆砖。 */
 export function DestructionProfileForTag(tag) {
-  if (STRUCTURAL_SET.has(tag)) return DESTRUCTION_PROFILES.structural;
+  if (tag === "airWall" || STRUCTURAL_SET.has(tag)) return DESTRUCTION_PROFILES.structural;
   return DESTRUCTION_PROFILES[TAG_PROFILE[tag] || "masonry"];
 }
 

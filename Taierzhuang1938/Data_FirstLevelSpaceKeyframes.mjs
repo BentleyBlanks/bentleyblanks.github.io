@@ -9,10 +9,7 @@
 import { FRONT_SORTIE as S, FRONT_SPACE as SP, FRONT_TANK_PATH as TP, FrontTankIndex } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_STAGE_ANCHORS as A } from "./Data_FirstLevelMissionTopology.mjs";
 import { FRONT_GUARD_POSTS, FRONT_FLANK_GROUP, FRONT_GUARD_MG_GROUP } from "./Data_FirstLevelMissionFront.mjs";
-import { OPENING_STORYBOARDS as Storyboards } from "./Data_OpeningStoryboards.mjs";
 
-// Wave 1 of the 2026-09-25 storyboard round: the blocks K2 looks past (Data_OpeningStoryboards.wave1Allowances).
-const WAVE1_IGNORE = [Storyboards.wave1Allowances?.revetment].filter(Boolean);
 
 const W = (id) => TP[FrontTankIndex(id)];
 /** The guards that hold the scrape through 03: every FRONT_GUARD_POSTS index except the backslope LMG pair's. */
@@ -26,17 +23,17 @@ const T = TANK_HEIGHTS;
 const Stand = [1.6, 1.2], Kneel = [1.0, 0.75], Crouch = [1.0, 0.7];
 
 export const SPACE_KEYFRAMES = Object.freeze([
-  // 2026-09-25 storyboard round (contract docs/Data_FirstLevelStoryboard0103Contract.md §2.1, SB03): Shunzi is pinned
-  // in the dugout mouth itself (Data_OpeningStoryboards.shunzi.trap), the eye just inside the door posts and low
-  // over the mud. The interrogation is at the comrade's wall root on the north wall 3.8 m out, J and F beyond it.
-  { id: "K1", label: "01 dugout mouth, pinned low view (SB03)", state: "BunkerCollapsed",
-    camera: { x: 0.35, z: -125.15, eyeM: 0.26 }, look: { x: 4.1, z: -125.6, h: 0.9 },
+  // 2026-09-27 rework (docs/Data_OpeningPinnedRescue20260927.md): Shunzi lies pinned under the roof timber across the
+  // dugout doorway, chest and head outside (Data_OpeningStoryboards.shunzi.witnessEye), low over the mud. The interrogation
+  // is at the comrade's wall root on the north wall 2.3 m out, J and F beyond it; the rifle lies at his left front.
+  { id: "K1", label: "01 pinned in the doorway, low view (SB03)", state: "BunkerCollapsed",
+    camera: { x: 1.85, z: -125.25, eyeM: 0.28 }, look: { x: 4.1, z: -125.6, h: 0.9 },
     targets: [
       { name: "ijaA holding the comrade (standing)", at: { x: 4.1, z: -125.63 }, heights: Stand, need: 2 },
       { name: "comrade kneeling at the north wall", at: { x: 4.06, z: -125.9 }, heights: [1.0, 0.7], need: 2 },
       { name: "junction J (ijaD standing)", at: SP.bunkerJunction, heights: Stand, need: 2 },
       { name: "fold F (ijaC standing)", at: SP.bunkerFold, heights: Stand, need: 2 },
-      { name: "rifle in the mouth mud", at: { x: 1.25, z: -125.75 }, heights: [0.08], need: 1 },
+      { name: "rifle in the mud at his left front", at: { x: 2.6, z: -125.95 }, heights: [0.08], need: 1 },
     ] },
   // C's intact-state check: before the collapse, sitting at the back of the dugout (SB01 seat), the roof must not
   // hide the trench.
@@ -46,15 +43,13 @@ export const SPACE_KEYFRAMES = Object.freeze([
       { name: "trench floor outside the mouth", at: SP.bunkerBend, heights: [0.6], need: 1 },
       { name: "a runner coming down the trench (J)", at: SP.bunkerJunction, heights: [1.5, 1.2], need: 2 },
     ] },
-  // 2026-09-25 storyboard round (contract §2.6, SB05): held up by the collar Shunzi looks down the straight SSW leg past
-  // ijaA's shoulder to Luo creeping up its west wall and He behind him. 2026-09-27: the circle closes 2.3 m down the leg
-  // past BunkerMouthSpoil (Data_OpeningStoryboards.shunzi.dragged; it used to close in the leg's north mouth, inside
-  // BunkerSouthRevetment and against the spoil). WAVE1_IGNORE stays for the revetment behind the eye.
-  { id: "K2", label: "02 past ijaA's shoulder down the SSW leg to the leader (SB05)", state: "BunkerCollapsed",
-    camera: { x: -0.3, z: -121.5, eyeM: 0.75 }, look: { x: -3.1, z: -116.9, h: 1.0 },
+  // 02 (2026-09-27): held up by the hair where he lies, he sees the men come over the crater step (Charge) and the fights in
+  // the front trench (ijaB's post, the depth man's post east of it).
+  { id: "K2", label: "02 lifted head: the charge over the crater step and the fights in the trench", state: "BunkerCollapsed",
+    camera: { x: 1.85, z: -125.25, eyeM: 0.44 }, look: { x: 3.3, z: -122.8, h: 1.0 },
     targets: [
-      { name: "Luo creeping up the SSW leg's west wall", at: { x: -3.1, z: -116.9 }, heights: Crouch, need: 2, ignore: WAVE1_IGNORE },
-      { name: "ijaB standing guard in the leg", at: { x: -1.8, z: -118.1 }, heights: Stand, need: 2, ignore: WAVE1_IGNORE },
+      { name: "the men coming down the crater step", at: { x: 3.3, z: -123.2 }, heights: Stand, need: 2 },
+      { name: "ijaB watching east (Luo's cut)", at: { x: 5.2, z: -124.7 }, heights: Stand, need: 2 },
     ] },
   // 02 hand-back seat (contract §2.9, SB06: Data_OpeningStoryboards.shunzi.cover) east of the mouth rubble: J is in view
   // (its man is down by then, Liu's shot) and so is F -- a known exposure, recorded here as a need row: from the seat F is

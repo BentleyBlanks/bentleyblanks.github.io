@@ -125,6 +125,9 @@ export const testDefs = {
   FirstLevelCasualtyBrowserTest:{file:"Script_FirstLevelCasualtyBrowserTest.mjs",timeoutMs:360000,desc:"Ordinary squad death uses real damage, retains the mission and reports local casualties"},
   MissionReturnTest: {file:"Script_MissionReturnTest.mjs",desc:"Soft return boundaries, escort separation, hysteresis and stage corridors"},
   FirstLevelMissionReturnBrowserTest: {file:"Script_FirstLevelMissionReturnBrowserTest.mjs",timeoutMs:300000,desc:"Real first-level return overlay, input, recovery and stage lifecycle"},
+  // 任务走廊与「离开战场区域 · 返回 · N 秒」（docs/Data_FirstLevelGuidance20260928.md §3.3）。
+  MissionAreaGuardTest: {file:"Script_MissionAreaGuardTest.mjs",desc:"Mission corridors cover every step's routes, anchors, placements and campaign waypoints; out-of-area countdown; air-wall debug plates"},
+  MissionAreaGuardBrowserTest: {file:"Script_MissionAreaGuardBrowserTest.mjs",timeoutMs:300000,desc:"Real 07 run west: out-of-area warning line, countdown, death and checkpoint retry back inside the corridor"},
   FirstLevelMissionTest: {file:'Script_FirstLevelMissionTest.mjs',desc:'新版第一关完整事实门、共享地形、实际担架队列和往返撤离'},
   FirstLevelEndTest: {file:'Script_FirstLevelEndTest.mjs',desc:'第一关 15–18：降压段无战斗、换手与静默行走、院门盘问与入院、门槛与最后一句、死亡段与接收处继续工作、尾队过桥与爆破清场、夜景与天空还原（纯 Node，毫秒级）'},
   MissionGatesTest: {file:'Script_MissionGatesTest.mjs',desc:'第一关编排表：事实门覆盖、按表生成与激活规则、运行时源码对账、编排模型'},
@@ -145,6 +148,7 @@ export const testDefs = {
   TextGatherCheck: { file: "Script_TextGather.mjs", args: ["--check"], desc: "内容文本清单：id 全局唯一、无空文本、与运行时 Localize 同一口径（纯 Node，毫秒级）" },
   TextTest: { file: "Script_TextTest.mjs", desc: "文本数据驱动闸门：语言表键/占位符、T() 静态引用、闸门模块零中文字面量（纯 Node，毫秒级）" },
   MovementRangeTest: { file: "Script_MovementRangeTest.mjs", timeoutMs: 240000, desc: "操作白盒：实体标尺、真实跳跃跑跳、翻越边界、姿态通行与复位" },
+  RailBridgeTest: {file:"Script_RailBridgeTest.mjs",desc:"18 rail bridge: baked GLB/sidecar/terrain agreement, debris at rest, real GLB detonation timeline (spans move, cues, wreck merge, reset/restore), particle budget"},
   Type89DamageTest: {file:"Script_Type89DamageTest.mjs",desc:"Blender tank fracture geometry, both struck sides, terrain contact and smoke lifecycle"},
   FirstLevelTankProbeTest: {file:"Script_FirstLevelTankProbe.mjs",timeoutMs:1800000,desc:"第一关战车专项探针：03→06 真实输入开声音跑一趟，记露面/每发主炮预兆与落点/机枪点射/05 攻击路线威胁窗口/反应/毁伤序列/常驻循环数与电平，并摆位拍五张关键画面（人工审）"},
   FirstLevelTankBrainTest: {file:"Script_FirstLevelTankBrainTest.mjs",desc:"第一关战车纯规则大脑：驾驶加减速/原地转、预兆链、目标过滤、散布收敛、机枪走进来、死角、反应、护兵槽、两段毁伤（纯 Node，秒级）"},
@@ -338,7 +342,8 @@ export const testDefs = {
   FirstLevelMissionMusicTest: { file: "Script_FirstLevelMissionMusicTest.mjs", desc: "Seven first-level score assets, story transitions and silence rules" },
   FirstLevelBattleSoundTest: { file: "Script_FirstLevelBattleSoundTest.mjs", desc: "第一关 01–05 声景：远处扇区交火、场外近落弹、防炮洞环境、壕沟/洞室判据、压制喘息心跳、耳鸣两档、配乐让位（纯 Node）" },
   CartCorpseBumpTest: { file: "Script_CartCorpseBumpTest.mjs", desc: "牛马车压过尸体：轮子滚上尸体顶面的抬升曲线、顶面格烘焙、命中体胶囊、软弹簧起伏/俯仰/侧倾、封顶与回零、帧率无关（纯 Node）" },
-  FirstLevelAirRaidTest: { file: "Script_FirstLevelAirRaidTest.mjs", desc: "第一关 01–06 中远处日机轮番轰炸：FrontPass 起点、多轮次间隔、中远处落区与避人、炸弹航迹、落弹留位与共享声部账、震屏封顶、07 以后不起（纯 Node）" },
+  FirstLevelAirRaidTest: { file: "Script_FirstLevelAirRaidTest.mjs", desc: "第一关 01–06 中远处日机轮番轰炸：FrontPass 起点、多轮次间隔、中远处落区与按弹型避人、阻力外弹道与投弹解算、中队规模、离场协调转弯与上浮、过顶、落弹留位与共享声部账、比例距离震屏封顶、07 以后不起（纯 Node）" },
+  BombBallisticsTest: { file: "Script_BombBallisticsTest.mjs", desc: "航空炸弹：二次阻力外弹道（真空一致、RK4 收敛、落后机身）、地面交点、尾翼摆动、立方根落地尺度、Vfx.BombBlast 专用池与延时出生的抛射土柱、SetBombs 实例化（纯 Node）" },
   FirstLevelMissionMusicBrowserTest: { file: "Script_FirstLevelMissionMusicBrowserTest.mjs", timeoutMs: 600000, desc: "First-level score playback, stage jumps, dialogue mix and lazy-load races" },
   AudioTest: { file: "Script_AudioTest.mjs", desc: "音频资产与烘焙管线" },
   FirstLevelAudioNodeBudgetTest: { file: "Script_FirstLevelAudioNodeBudgetTest.mjs", timeoutMs: 900000,
@@ -433,6 +438,7 @@ export const browserTests = new Set([
   "FirstLevelLeaderGuideBrowserTest",
   "FirstLevelMissionTopologyBrowserTest",
   "FirstLevelMissionReturnBrowserTest",
+  "MissionAreaGuardBrowserTest",
   "MuzzleFlashTest", "HeadshotTest",
   "SquadMarchCoverBrowserTest",
   "FirearmHandlingBrowserTest",
@@ -537,6 +543,7 @@ export const tier0Fast = [
   "CameraShakeTest",
   "FirstLevelBattleSoundTest",
   "FirstLevelAirRaidTest",
+  "BombBallisticsTest",
   "CartCorpseBumpTest",
   "FractureBakeTest",
   "CutsceneControlTest",
@@ -592,7 +599,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest','DraftCartEditorTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','RailBridgeTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -655,7 +662,7 @@ export const domains = {
     // 所以也挂在这个域下。
     tests: ["CarryTest", "EmplacementTest", "EmplacementViewBrowserTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
-  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "FirstLevelAirRaidTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest", "FirstLevelAudioNodeBudgetTest"] },
+  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "FirstLevelAirRaidTest", "BombBallisticsTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest", "FirstLevelAudioNodeBudgetTest"] },
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
@@ -717,6 +724,8 @@ const changedDomainRules = [
   {domain:"render",pattern:/InteriorSkyOcclusion/},
   {domain:"facialEditor",pattern:/FacialReview|EditorFacial|FacialEditor/},
   {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear|Front|Terrain|0518)/},
+  // 任务走廊软边界：Data_FirstLevelMissionArea / Data_Tuning_MissionArea / Script_MissionAreaGuard*（后两个文件名里没有 FirstLevel）。
+  {domain:"firstLevel",pattern:/MissionArea/},
   {domain:"menu",pattern:/PlayerDeath/},
   {domain:"combat",pattern:/PlayerDeath/},
   {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningClips|OpeningStoryboardBake|OpeningStoryboardClips|OpeningProps|OpeningActorPerformance|OpeningFirstPerson|OpeningHandback|FirstLevelCampaignOpening|OpeningSet|OpeningBlastFx|BunkerPoster|OpeningLens|OpeningStoryboardShots/},
@@ -770,6 +779,9 @@ const changedDomainRules = [
   // End 包（阶段 15–18）的新模块：文件名里同样没有「Mission」。
   {domain:"firstLevel",pattern:/FirstLevelEndCast|FirstLevelQuietMarch|FirstLevelReception|FirstLevelBridge|FirstLevelNightGate|FirstLevelNightLights|Data_Tuning_FirstLevelEnd/},
   {domain:"firstLevelTail",pattern:/FirstLevelQuietMarch|FirstLevelReception|FirstLevelBridge|FirstLevelNightGate|FirstLevelNightLights|Data_Tuning_FirstLevelEnd|FirstLevelCampaignEnd/},
+  // 18 铁路桥的模型与毁桥演出（Blender 烘焙产物 + 运行时 + 地形快照）：文件名里没有 FirstLevel。
+  {domain:"firstLevel",pattern:/RailBridge/},
+  {domain:"firstLevelTail",pattern:/RailBridge/},
   // 第二波玩法包的新模块（阶段 1–7 / 8–14 / 15–18）：文件名不带 FirstLevelMission 前缀，单列一条。
   {domain:"firstLevel",pattern:/FirstLevel(Bunker|Collection|BorrowLight|VillageBlock|TransferCart|QuietMarch|Bridge|NightGate)|Data_Tuning_FirstLevel(Front|Mid|End)|FirstLevel(Front|Mid|End)Test/},
   // 屋内伏击那一拍 2026.09.19 下线（09 改成连屋近战，担架不进屋）：采样器与它的门禁已删，
@@ -793,6 +805,9 @@ const changedDomainRules = [
   // 2026-09-23：场外近落弹与离图前线也要拉上第一关域（它们只在 01–06 的任务相位里开）。
   // 2026-09-26：01–06 中远处轮番轰炸（FirstLevelAirRaid）同理。
   { domain: "firstLevel", pattern: /BattleArtillery|FirstLevelBattleSound|FirstLevelAirRaid/ },
+  // 2026-09-28：航空炸弹的外弹道与落地尺度（Data_AerialBombs / Script_BombBallistics）只有空袭在用，
+  // 改了跑空袭那两条门禁（audio 域里都有）；BombBlast 在 Script_Vfx 里，Vfx 的改动本来就走 render 域。
+  { domain: "audio", pattern: /AerialBombs|BombBallistics/ },
   { domain: "voice", pattern: /Script_Audio\.mjs|Data_Voice|Script_VoiceBake|Script_FirstLevelMissionVoice|Script_DialoguePlayer|FirstLevelDialogueDirection|SeedAudioCastBake|SeedAudioSquadBarkBake|SeedAudioVoiceKit/ },
   // 2026.09.19 第三波：`FirstLevelMeal`（腊肉分食）与 `CarriageSoundscape`（车厢试听导出）
   // 两个关键词随模块删除一并摘掉。`BaconHandoff` / `FirstLevelTrain` / `FirstLevelCarriage`
@@ -828,7 +843,8 @@ const changedDomainRules = [
   // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。
   { domain: "editor", pattern: /Trench(es|Plan|Spline|Editor)/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
-  { domain: 'animation', pattern: /ProneCrawl|BackRifleRun|RelaxedGait|IjaAlertGait|Melee.*Animation|MeleeAnimation|Infantry/i },
+  // LayeredGait（2026-09-28 NPC 脚步与位移同步的分层步态）由 ActorLocomotionTest 看着，归动画域。
+  { domain: 'animation', pattern: /ProneCrawl|BackRifleRun|RelaxedGait|IjaAlertGait|LayeredGait|Melee.*Animation|MeleeAnimation|Infantry/i },
   // 背枪走 / 空手走目前只在 01–02 开场导演里用（日兵甲乙、纵深日兵、翻译）：改它要连开场一起验。
   { domain: 'openingStoryboards', pattern: /RelaxedGait|IjaAlertGait|Data_Tuning_ActorLocomotion/i },
   // 站立待机叠加层与它的旋钮表：装在第一关每个兵身上，验收在 FirstLevelP012AnimationTest（ai 域）。

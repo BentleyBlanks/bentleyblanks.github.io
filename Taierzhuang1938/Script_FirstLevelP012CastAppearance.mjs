@@ -114,9 +114,12 @@ export function InstallP012ActorMotion(soldier) {
       else if(id==='CarryStretcherFront'||id==='CarryStretcherRear')rate=speed<.08?0:Math.min(1.6,speed/1.35);
       else if(id==='WoundedLimp')rate=Math.min(1.5,speed/1.1);
       // Shared CharacterModel locomotion owns all run/crouch/back-rifle clocks.
-      else if(id==='AdvanceFire'&&next.moveSpeed<.025&&!state.firing&&!(state.aim>.1)){
+      else if(id==='AdvanceFire'&&next.moveSpeed<.025&&!state.firing){
         // 定格帧必须落在 clip 后段那一截静止的据枪上。前 1.2 s 是「上前」的跨步：
         // 定在那里的人会单脚悬空站一整关（实测踝骨抬到 0.42 m，rate=0 之后再也放不下来）。
+        // 端着枪（aim>0）也照样定格：抬枪由 Actor 的瞄准层做，clip 不定格就整条循环，
+        // 站着的人每 2.9 s 原地「上前两步」再弹回（2026-09-28 开场探针：导演给持枪站着的人
+        // aim 0.18，原来的 aim>0.1 闸让洞外背景兵和喊话兵整场原地踏步）。
         action.time=action.getClip().duration*STAND_IDLE.advanceFireHold;rate=0;
       }
       action.setEffectiveTimeScale(rate);
@@ -124,7 +127,8 @@ export function InstallP012ActorMotion(soldier) {
     }
     const result=original.call(this,dt,next);
     // 定格帧上的待机。carry 的 rate 也是 0，但那两只手钉在担架杆上，不能挪骨盆。
-    if(action&&rate===0&&!state.carryRole&&StandIdleAllowed(soldier,next))standIdle.Apply(dt,next);
+    // 真在瞄准（aim>0.5）时不叠扫视与重心倒换：枪口跟着视线走。
+    if(action&&rate===0&&!state.carryRole&&!(state.aim>.5)&&StandIdleAllowed(soldier,next))standIdle.Apply(dt,next);
     return result;
   };
   return true;

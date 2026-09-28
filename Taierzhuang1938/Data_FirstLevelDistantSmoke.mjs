@@ -132,6 +132,29 @@ function BuildRoadsideSmoke(random) {
   return result;
 }
 
+// 引导地标（2026-09-28，docs/Data_FirstLevelGuidance20260928.md §3.4「光」）：固定位置、不抖动的近处烟柱，
+// 底下是 Data_FirstLevelSmokeOrigins 按 kind 摆的着火残骸。08 主街障碍：从村北口 42 m 外看，倒墙横车
+// 只是街尽头的一块黑；横车上一根 9 m 的黑烟柱把「大路在这儿断了」抬到天际线上。
+// 位置离所有任务路线 ≥ 13 m（DistantSmokeTest 的低烟净空）；残骸的实心盒（半径 1.3 m）落在横车里，
+// 离人缝 x 76.225…77.125 还有 1.9 m。
+export const LANDMARK_COLUMNS = Object.freeze([
+  Object.freeze({ id: "StreetBlockFire", x: 80.4, z: 21.4, frame: 0, kind: "timber", scale: 1,
+    reference: "08 street block landmark: soot column over the overturned cart" }),
+  // 07 出沟那一眼（A 区 G07_4）：迎面是大车路和往南走的难民，村子在左边 40 m 外没有任何抬头的东西。
+  // 村北口路北土埂后一垛着火的柴（路北碎石矮墙 VillageMouthNorthBerm 的北面），黑烟柱把「往东拐进村」抬到天际线上；
+  // 离 southWalk 末段 9 m，3 m 内没有实心体块。
+  // scale 1.5：从出沟点看它在 45 m 外、房子后面，只露烟柱；1.0 的 9 m 柱子在灰天上只是一小抹，13.5 m 才够抬头。
+  Object.freeze({ id: "VillageMouthFire", x: 40, z: -30.5, frame: 0, kind: "timber", scale: 1.5,
+    reference: "07 village mouth landmark: burning woodpile north of the lane" }),
+]);
+function BuildLandmarkSmoke(random) {
+  return LANDMARK_COLUMNS.map((mark) => Object.freeze({
+    id: mark.id, region: mark.id, reference: mark.reference, tier: "near", kind: mark.kind, x: mark.x, z: mark.z,
+    heightOffset: .2, options: Object.freeze({ kind: "black", rate: 0, fire: 0,
+      backdrop: RoadProfile(ROAD_STYLES[mark.frame], mark.scale, random) }),
+  }));
+}
+
 export function BuildDistantSmoke(seed = DISTANT_SMOKE_SEED) {
   const random = Mulberry32(seed);
   const Between = (a, b) => a + (b - a) * random();
@@ -155,7 +178,9 @@ export function BuildDistantSmoke(seed = DISTANT_SMOKE_SEED) {
       options: Object.freeze({ kind: "black", rate: 0, fire: 0, backdrop }),
     });
   }));
-  return [...distant,...BuildRoadsideSmoke(random)];
+  // 地标烟放在路边散点之后：它们不吃随机数，散点的位置与改前逐位相同。
+  const roadside = BuildRoadsideSmoke(random);
+  return [...distant, ...roadside, ...BuildLandmarkSmoke(random)];
 }
 
 export const FIRST_LEVEL_DISTANT_SMOKE = Object.freeze(BuildDistantSmoke());

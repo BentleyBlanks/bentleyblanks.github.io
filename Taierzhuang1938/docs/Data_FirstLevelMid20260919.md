@@ -10,7 +10,8 @@
 
 | 文件 | 管什么 |
 | --- | --- |
-| `Script_FirstLevelVillageBlock.mjs` | 08/09/10：街上的人、担架停进遮挡、班长查看房屋、连屋来敌、开院门放行 |
+| `Script_FirstLevelVillageBlock.mjs` | 08/09/10：街上的人、担架停进遮挡、班长查看房屋、进门遭伏击的副作用、连屋来敌、开院门放行 |
+| `Script_FirstLevelKitchenAmbush.mjs` | 09 进门遭伏击的拍表（纯规则，不碰场景）：藏 → 扑 → 撞翻 → 一次性按键 → 反刺／被捅 |
 | `Script_FirstLevelTransferCart.mjs` | 11/12/13/14：四类人流分流、辨认三样、装载额度、上车与停车、卸回担架、进沟 |
 | `Data_Tuning_FirstLevelMid.mjs` | 这一段的全部数值（每条带出处）与三个摆位生成函数 |
 | `Script_FirstLevelMissionColumn.mjs` | 担架队与车：新增停靠/放行、预留上车的车、装载额度、散开 |
@@ -44,15 +45,34 @@
 
 ### 09 灶屋—连屋近战
 
-- **玩家先进**：`melee` 组生成即装睡；`kitchenEntered` 落下、而且玩家走到连屋
-  （`A.melee`）`wake.radiusM`(26 m) 以内，才 `meleeBreachStarted` 并解除装睡 ——
-  激活表 `MISSION_ENCOUNTER_ACTIVATION.melee.wake` 已经写成这条口径。
-- **「右手！」压到破门之后**：`Melee` 加进了 `Enter` 的「不自动播 cue」名单，
-  破门 + `meleeBreachHoldS` 才 `Say("MeleeRight")`。
-- **不强制固定 QTE**：这一层一次都不调 `BeginBind` / `BeginScriptedGround`。
-  敌人真贴上来时，共用 `Script_MeleeCombat` 自己在 `StepFighter` 的 `contact` 出口开僵持；
-  玩家先手打掉就什么都不发生（`meleeEngaged` 也不落）。贴上身（或 `meleeCombat.Active`）
-  才 `Say("MeleeCurse")`。
+#### 进门遭伏击（2026-09-28 用户：「我进屋子的时候怎么被日军偷袭的 QTE 没有！具体形式就参考 COD5 里的 QTE」）
+
+照《使命召唤：战争世界》（COD5）的万岁冲锋：藏着的日军嚎一声扑出来把人撞翻、骑上来举刺刀往下捅，
+屏幕上只剩一个按键，窗口里按一下就反手捅死他，漏掉就是被捅死、回检查点重来这一拍。
+Notion 09 原文「提前击败近战敌人则不强制播放固定 QTE」照旧成立：他冲过来那半秒里被打死就不进 QTE。
+
+| 拍 | 发生什么 | 数（`MID_TUNING.kitchenAmbush`） |
+| --- | --- | --- |
+| 藏 | `MeleeLead` 装睡在灶屋与连屋之间那条带顶过道（x 52.3–63.7、z −1.2–0.2，两头封死）的西段 `hide` (54,−0.5)。灶屋南门洞只有两米宽，灶屋里任何一处都看不见他（`FirstLevelMidTest` 用布局体块逐条连线量过）。另加 `meleeDormant`，免得共用白刃层在 5.5 m 内把他认领过去 | `hide` `hideYaw` |
+| 扑 | 玩家**真的跨进过道**（门框墙厚里不算：站在门框里往西看被门框挡着）或从别处绕进连屋，就触发：他嚎「突撃！」（`ija_rally_charge`），罗班长插队吼「右手！」（`MeleeRight`，往南走时右手就是西），`emergeS` 之后以 `lungeMps` 冲。扳机整段不扣（`missionSurfaceRest`），刺刀一直在枪上。人在过道里、目标在过道外时先冲门洞口再拐（`KitchenAmbushLungeTarget`） | `triggers` `emergeS` 0.22 s、`lungeMps` 6.2 |
+| 先手打掉 | 冲锋途中被打死：记 `kitchenAmbushPreempted`，不撞、不锁、不开僵持，其余三人照常放出 | — |
+| 追不上 | 冲了 `lungeMaxS` 还够不着（玩家从连屋深处触发一路往外跑）：这一拍作罢（`kitchenAmbushBroken`），他当场转普通白刃兵，不隔着几米把人「撞」翻 | `lungeMaxS` 1.4 s |
+| 撞翻 | 够到 `tackleReachM`：掉 `tackleDamage`，手上的换弹／拉栓当场收尾（`Viewmodel.CompleteAction`，不然地面镜头落不下来），借一把刺刀给 `player.meleeWeapon`，共用 `ScriptedKnockDown` 真的倒地 + `HoldScriptedGround` 摆 `Pressure`，锁控制 `ambush`、HUD 整个让位（只留字幕与血）。视线每帧跟着他**头骨**的世界位置走（`TrackControl`，倒地那半秒眼位从 1.6 m 掉到地板上），第一人称的枪和手整体挪开（`grappleHandM`），他的刺刀走近景档（`Actor.SetWeaponDetail`）。锁着的这几拍玩家挂着保护，别的枪不在这时候把人打死 | `tackleReachM` 1.25、`tackleDamage` 8、`grappleHandM` |
+| 按键 | 撞上 `promptDelayS` 后开共用倒地僵持的一次性按键（`input: "press"`，见 [白刃战说明](Data_MeleeQte.md)）：屏幕中间一个 F 环钉在他握枪处，弧在 `windowS` 里漏完。F 由 `runtime.AmbushInput` 先于共用白刃层与键位表接走 | `promptDelayS` 0.85 s、`windowS` 1.8 s |
+| 反刺 | 按上了：他死在这一下上（摘掉叙事保护、走共用白刃伤害链，血与击杀回执照常），顺子插队骂「滚你妈的！」（`MeleeCurse`）。共用结算（`GroundWin`）0.6 s + 起身 1.05 s，视线同时从他脸上转回平视远处（`levelGazeS`），起完身还权、借的刺刀还回去 | `counterDamage` 200、`levelGazeS` 1.65 s |
+| 被捅 | 漏掉了：先摘保护再补一刀 `failDamage`，满血也死（「体验」档 0.8 倍受伤率下仍是 320）。检查点重试时 `VillageBlock.RearmAmbush` 把他摆回过道里装睡、把「右手！」「滚你妈的！」两句放回可播，玩家从灶屋正中 `retryPoint` 重来（不是原地复活在他脚下），晚一帧给一行「被扑倒压住时，看准了按 F 反刺」 | `failDamage` 400、`retryPoint`、`retryHintS` |
+| 收尾 | 反刺／先手打掉／作罢之后，其余三人按 `releaseDelaysS` 错峰醒来从东巷那扇门压进来（落 `meleeBreachStarted`），真贴上身走共用白刃僵持（`Script_MeleeCombat` 自己开）。那一拍用过的僵持配额清掉（`ClearQteBudget`） | `releaseDelaysS` 0.4/1.2/2.0 s |
+
+- **在 08 就可能演**：「进灶屋」常常是 08 最后落的那条事实，但玩家也可能先冲过去、担架还没停好。
+  所以这一拍在 08 记下 `kitchenEntered` 之后就上膛，不等 09 开了才补；09 的 `Enter` 只在它还藏着时重置。
+- **09 调试跳转的起点**改到灶屋正中、面朝南（原来落在连屋正中，一跳过去就当场扑上来）。
+- **`MeleeLead` 不挂战术折线**：冲锋归这一拍驱动，折线会跟冲锋抢着下命令。
+- **「右手！」只剩这一处喊**：原来破门 + `meleeBreachHoldS` 那一拍（与这个数）删了。
+- 还权后 `UpdateMelee` 只给**醒着的**人装刺刀：剧本旗单位每拍会被 AI 摘刺刀，再每帧装回去等于每拍重建一次手持武器；
+  「全灭」的判定仍数所有活人（装睡的也算活着）。
+
+#### 窗口火力
+
 - **窗口火力仍封锁院口**：`meleeResolved` 之后，若 `VillageGunner` 还活着**且**它到院门
   `A.gate` 的射线是通的，记 `windowFireHolding` 并 `Say("WindowOrder")`。
 
@@ -180,6 +200,8 @@ Blender 导出的时间轴从 1/30 s 起，加载时挪到 0（不挪的话循�
 
 契约 §2 允许实现包增加内部事实。这一段加了 13 条，全部登记进 `MISSION_FACT_GATES`
 （工作台照它讲人话）：`houseChecked` `outsideWatched` `meleeBreachStarted` `windowFireHolding`
+（2026-09-28 进门遭伏击再加 7 条：`kitchenAmbushSprung` `kitchenAmbushTackled` `kitchenAmbushPrompted`
+`kitchenAmbushCountered` `kitchenAmbushFailed` `kitchenAmbushPreempted` `kitchenAmbushBroken`）
 `rearCoverDisengaged` `transferSorted` `bridgeHeadSeen` `villageRoadWatched`
 `transferPostsManned` `escortRelieved` `luoAtHalt` `ditchSheltered` `columnOffRoad`。
 **`MISSION_STAGES` 的 requirements 一条没动**（08–14 仍是 29 条）。

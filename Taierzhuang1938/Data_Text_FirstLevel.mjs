@@ -27,6 +27,8 @@ export const TEXT = Object.freeze({
   "firstLevel.return.route": "你已偏离行动路线。",
   "firstLevel.return.squad": "你已远离小队。",
   "firstLevel.return.boundary": "你已离开作战区域。",
+  // 任务走廊出界倒计时（docs/Data_FirstLevelGuidance20260928.md §3.3，Script_Hud.SetMissionArea）。
+  "firstLevel.area.warning": "离开战场区域 · 返回 · {seconds} 秒",
 
   "firstLevel.casualty.speaker": "战友",
   "firstLevel.casualty.reaction": "有弟兄倒下了！守住掩体，继续掩护！",
@@ -38,6 +40,8 @@ export const TEXT = Object.freeze({
   "firstLevel.interaction.place": "将老周放在军医旁",
   "firstLevel.interaction.supply": "补充弹药、手榴弹和绷带",
   "firstLevel.hint.melee": "V 拔刀 · F 拨推 · 左键挥刀",
+  // 09 进门遭伏击，死在刀下、检查点重来之后给一次（COD5 死在万岁冲锋下也有这一句）。
+  "firstLevel.hint.kitchenAmbushRetry": "被扑倒压住时，看准了按 F 反刺",
   "firstLevel.hint.trapped": "被压住了，动不了。只能转头看。",
   "firstLevel.guide.distance": "{label} · {distance} 米",
   "firstLevel.guide.rescue": "掩蔽部门口",

@@ -1,25 +1,44 @@
-// Script_FirstLevelAirRaid.mjs — 第一关 01–06 中远处的日机轮番轰炸（2026-09-26）。
+// Script_FirstLevelAirRaid.mjs — 第一关 01–06 中远处的日机轮番轰炸（2026-09-26；2026-09-28 物理化 + 中队规模）。
 //
-// 从 01 先头兵经过洞口（FrontPass）起，一轮接一轮：三架（或两架）日机从北、东北进场，
-// 直线飞过一块中远处的落区（离听者 170–470 m，我方两翼阵地与后方），每架投一串炸弹，
-// 落地是火球 + 土柱，声音按距离后到、滚成一片闷雷，脚下跟着一记轻震；飞机离场后隔十几二十秒下一轮。
+// 从 01 先头兵经过洞口（FrontPass）起，一轮接一轮：两架到九架日机从北、东北进场，
+// 直线平飞到投弹点，每架投一串炸弹，投完弹飞机变轻上浮，再压坡度转弯离场；
+// 炸弹带着飞机的速度离机，按二次空气阻力的外弹道往前飞着落下去（Script_BombBallistics），
+// 落在离听者 125 m 以外的中远处（我方两翼阵地与后方）。落地是按装药立方根缩放的爆炸
+//（Script_Vfx.BombBlast：火球、冲击环、抛射土柱、底涌尘浪、久留烟团），声音按距离后到、滚成一片闷雷，
+// 脚下先是地震波的一抖、再是跟着声音到的气浪；飞机离场后隔十几二十秒下一轮。
 //
-// 一轮的时间线（t 从进场起算，tc = 长机飞到落区中心的时刻 = approachM / speed）：
-//   0            引擎声起（一条，挂在长机上，逐帧搬位置 + 多普勒）
-//   tImpact − fall  第 j 架第 k 颗离机（fall = √(2h/g)），画面上一颗黑点带着前进速度往下掉
-//   tImpact      落地：画面先到；爆炸声由引擎按 d/340 延迟；震屏、洞顶掉土跟着声音到
+// 一轮的时间线（t 从进场起算，tc = 长机飞到瞄准点正上方的时刻 = approachM / speed）：
+//   0                引擎声起（一条，挂在长机上，逐帧搬位置 + 多普勒）
+//   tc − 前冲/speed   长机投下一串的中间那颗（前冲距离 = 这一高度、这一速度下炸弹飞过的水平距离）；
+//                    僚机看见长机投弹才按电门，晚零点几秒
+//   tImpact          落地：画面先到；地震波 d/600 后一抖；爆炸声由引擎按 d/340 延迟，气浪跟着声音到
+//   最后一颗离机后      上浮几米，压坡度协调转弯（角速度 g·tanφ / v）
 //   (approachM + exitM) / speed  离场，编队收起，引擎声淡出
 //
-// **纯氛围层**：不伤人、不改地形、不记任务事实；落点离活人与战车 bombClearM 以外。
+// **纯氛围层**：不伤人、不改地形、不记任务事实；落点离活人与战车、离听者都有下限（按弹型）。
 // **纯规则，不 import three**：宿主把世界能力用函数交进来（地面、听者、空间档、画面、震屏、避人、
 // 共享声部、编队与炸弹的摆位），测试用假宿主直接跑。随机走 Mulberry32，逐轮可复现。
-// 数全在 Data_FirstLevelAirRaid；挂在 Script_FirstLevelMissionBattleSound 下，与前线床、
-// 场外炮击共用 sharedMaxVoices 那一本声部账。
+// 数全在 Data_FirstLevelAirRaid / Data_AerialBombs；挂在 Script_FirstLevelMissionBattleSound 下，
+// 与前线床、场外炮击共用 sharedMaxVoices 那一本声部账。
 
 import { Mulberry32, Clamp01 } from "./Script_Noise.mjs";
 import { FIRST_LEVEL_AIR_RAID } from "./Data_FirstLevelAirRaid.mjs";
+import { BOMB_PHYSICS } from "./Data_AerialBombs.mjs";
+import { P012_HORIZON_BLOCKS } from "./Data_FirstLevelP012Horizon.mjs";
+import { BombSpec, DragK, DropTrajectory, FlatDrop, TrajectoryAt, GroundImpact, BombAttitude, BlastScale }
+  from "./Script_BombBallistics.mjs";
 
 const DEG = Math.PI / 180;
+/** 最后一颗离机后多久开始压坡度、压到位要多久（秒）。 */
+const TURN_DELAY_S = 1.2;
+const ROLL_IN_S = 3.5;
+/** 转弯航迹的积分步长（秒）。 */
+const TURN_STEP_S = 0.05;
+/** 外圈的土丘与农舍（落进去的炸弹只剩一根烟柱）。 */
+const HORIZON_SOLIDS = P012_HORIZON_BLOCKS.filter((b) => b.solid && b.semantic === "structure");
+
+function Smooth(u) { const x = Clamp01(u); return x * x * (3 - 2 * x); }
+function WrapAngle(a) { return Math.atan2(Math.sin(a), Math.cos(a)); }
 
 export class FirstLevelAirRaid {
   /**
@@ -28,7 +47,8 @@ export class FirstLevelAirRaid {
    * @param {function} [host.Listener]     () → {x,y,z}（缺省读 audio.listenerPos）
    * @param {function} [host.Ground]       (x, z) → 地面高度
    * @param {function} [host.Zone]         () → 听者空间档（"trench" / "dugout" / …）
-   * @param {function} [host.Visual]       (at, radius, d, column) → 落地那一团画面（column：要不要土柱）；返回烟源句柄（可空）
+   * @param {function} [host.Visual]       (at, blast, d, column) → 落地那一团画面（blast：弹型、装药、画面半径、
+   *                                       摊薄系数、弹着方向；column：要不要常驻土柱）；返回土柱烟源句柄（可空）
    * @param {function} [host.RemoveVisual] (handle) → 撤掉土柱烟源
    * @param {function} [host.Shake]        (trauma) → 往创伤桶里加
    * @param {function} [host.Blocked]      (at, clearM) → true 表示这里有人 / 有车
@@ -59,6 +79,7 @@ export class FirstLevelAirRaid {
     this.speaking = false;
     this.airCut = 0;
     this.zoneOverride = null;
+    this.trajectories = new Map();   // `${bomb}|${speed}` → 相对航迹（同一种编队每轮都一样，算一次留着）
     // 取证
     this.waves = 0;
     this.bombsDropped = 0;
@@ -164,7 +185,7 @@ export class FirstLevelAirRaid {
       const cx = this.R(zone.xMin, zone.xMax), cz = this.R(zone.zMin, zone.zMax);
       const d = Math.hypot(cx - L.x, cz - L.z);
       if (d < D.minM || d > D.maxM) continue;
-      const plan = this.PlanWave(key, F, zone, cx, cz);
+      const plan = this.PlanWave(key, F, zone, cx, cz, L);
       if (!plan) continue;
       this.wave = plan;
       this.waveIndex += 1;
@@ -172,7 +193,8 @@ export class FirstLevelAirRaid {
       this.nextAt = null;
       this.StartDrone(plan);
       this.events.push({ at: +this.time.toFixed(2), wave: key, zone: zone.id, x: +cx.toFixed(1), z: +cz.toFixed(1),
-        d: +d.toFixed(1), bombs: plan.bombs.length });
+        d: +d.toFixed(1), planes: F.slots.length, bombs: plan.bombs.length, bomb: plan.spec.id, overhead: plan.overhead,
+        nearestM: +plan.nearestM.toFixed(1) });
       if (this.events.length > 12) this.events.shift();
       this.UpdateWave(0);
       return true;
@@ -181,7 +203,7 @@ export class FirstLevelAirRaid {
   }
 
   /**
-   * 引擎声：一条挂在长机上（三架的合声在几百米外听不出是几条，省两条声部）。
+   * 引擎声：一条挂在长机上（一整队的合声在几百米外听不出是几条，省声部；机多就按 droneGain 加厚）。
    * 长机进到 droneStartM 以内才起（再远只剩 −25 dB 以下，04 激战时引擎节点预算贴着 120，
    * 两公里外那一条既听不见、又一定被预算闸饿死 —— 2026-09-26 实机取证）。起了走 priority：
    * 整轮只有这一条（与扫射航线的引擎声同一个口径），声部数由本层自己数。
@@ -193,17 +215,46 @@ export class FirstLevelAirRaid {
     const at = this.LeadPoint(plan, plan.t), L = this.Listener();
     if (!L || Math.hypot(at.x - L.x, at.y - L.y, at.z - L.z) > A.droneStartM) return;
     if (!this.Room(1)) { this.layersDropped += 1; return; }
+    const F = this.D.formations[plan.key];
     plan.drone = this.host.audio?.Play?.(A.droneCue, {
-      position: at, volume: A.droneVolume, sourceSizeM: A.droneSizeM, priority: true, selfCapped: true,
-      airCut: this.airCut > 0 ? this.airCut : undefined,
+      position: at, volume: A.droneVolume * (F?.droneGain ?? 1), sourceSizeM: A.droneSizeM * Math.sqrt(plan.slots.length / 3),
+      priority: true, selfCapped: true, airCut: this.airCut > 0 ? this.airCut : undefined,
     }) || null;
   }
 
-  /** 排一轮；有一颗炸点离人 / 车太近就整轮作废（换一块落区再挑）。 */
-  PlanWave(key, F, zone, cx, cz) {
+  /** 这一种弹、这一速度的相对航迹（一轮里所有弹共用；按键缓存）。 */
+  Trajectory(spec, speed, dropM) {
+    const key = `${spec.id}|${speed}`;
+    let traj = this.trajectories.get(key);
+    const need = dropM + 60;
+    if (!traj || -traj.y[traj.y.length - 1] < need) {
+      traj = DropTrajectory(speed, DragK(spec), need + 80, { vDown: this.D.bomb.ejectMps });
+      this.trajectories.set(key, traj);
+    }
+    return traj;
+  }
+
+  /**
+   * 排一轮。瞄准点 = 落区里随机的一点；航向 = 落区的来向 ± 抖动（有一半机会改成从听者头顶压过去）。
+   * 投弹手在平地上算前冲距离，长机在差这段距离时投下一串的中间那颗；每颗弹的落点从离机那一刻积出来。
+   * 有一颗落点离人 / 车、离听者太近，或者砸进外圈土丘与农舍，就整轮作废（换一块落区再挑）。
+   */
+  PlanWave(key, F, zone, cx, cz, L) {
     const D = this.D, B = D.bomb;
+    const spec = BombSpec(F.load.bomb);
+    if (!spec) return null;
     const fromLen = Math.hypot(zone.from.x, zone.from.z) || 1;
-    const a = Math.atan2(-zone.from.x / fromLen, -zone.from.z / fromLen) + this.R(-1, 1) * D.headingJitterDeg * DEG;
+    const nominal = Math.atan2(-zone.from.x / fromLen, -zone.from.z / fromLen);
+    let a = nominal + this.R(-1, 1) * D.headingJitterDeg * DEG;
+    let overhead = false;
+    const O = D.overhead;
+    if (O && L && this.rng() < O.chance) {
+      // 把航向对准「听者 → 瞄准点」，再偏一个让航迹从头顶 missM 以内擦过去的小角；
+      // 这样飞还得是从北边来（航向偏正南不超过 maxFromNorthDeg）。
+      const toC = Math.hypot(cx - L.x, cz - L.z);
+      const over = Math.atan2(cx - L.x, cz - L.z) + Math.asin(Math.max(-0.95, Math.min(0.95, this.R(-1, 1) * O.missM / Math.max(1, toC))));
+      if (toC > 1 && Math.abs(WrapAngle(over)) <= O.maxFromNorthDeg * DEG) { a = over; overhead = true; }
+    }
     const dir = { x: Math.sin(a), z: Math.cos(a) };
     const right = { x: -dir.z, z: dir.x };
     const groundC = this.Ground(cx, cz);
@@ -211,27 +262,84 @@ export class FirstLevelAirRaid {
     const tCenter = D.approachM / speed;
     const plan = { key, zone: zone.id, aircraft: F.aircraft, center: { x: cx, y: groundC, z: cz }, dir, right, speed,
       altitude: groundC + F.altitudeM, tCenter, endT: (D.approachM + D.exitM) / speed, t: 0,
-      slots: F.slots, bombs: [], drone: null };
+      slots: F.slots, bombs: [], drone: null, spec, overhead, columns: 0, nearestM: Infinity,
+      balloonM: F.balloonM ?? 0, balloonS: F.balloonS ?? 2, lastRelease: [], turn: null };
+    // 投弹手：这一高度（弹舱离地）、这一速度下，炸弹沿航向要飞多远才落地。
+    const dropM = F.altitudeM - B.bayDropM;
+    const traj = plan.traj = this.Trajectory(spec, speed, F.altitudeM + 30);
+    const aim = FlatDrop(traj, dropM);
+    plan.aimRangeM = aim.rangeM;
+    plan.aimFallS = aim.fallS;
+    // 一串中间那颗的离机时刻：长机离瞄准点还差前冲距离。
+    const n = F.load.count;
+    const tMid = tCenter - aim.rangeM / speed;
+    // 先按平地粗排一遍（不查地面）：离人、离听者、砸土丘，有一颗不行就整轮作废 ——
+    // 挑落区时大半的候选在这一步就被否掉，省下逐颗求地面交点的几百次地面查询。
+    const bad = (at, margin) => !!this.host.Blocked?.({ x: at.x, z: at.z }, spec.clearM)
+      || this.InSolid(at) || (L && Math.hypot(at.x - L.x, at.z - L.z) < spec.minListenerM - margin);
     for (let j = 0; j < F.slots.length; j += 1) {
-      const slot = F.slots[j];
-      for (let k = 0; k < F.bombs; k += 1) {
-        const tImpact = tCenter + slot.back / speed + (k - (F.bombs - 1) / 2) * B.intervalS + this.R(-0.05, 0.05);
-        const plane = this.PlanePoint(plan, j, tImpact);
-        const ix = plane.x - dir.x * B.trailM + this.R(-1, 1) * B.jitterM;
-        const iz = plane.z - dir.z * B.trailM + this.R(-1, 1) * B.jitterM;
-        const iy = this.Ground(ix, iz);
-        if (this.host.Blocked?.({ x: ix, z: iz }, D.bombClearM)) return null;
-        const fallS = Math.sqrt(2 * Math.max(10, plane.y - iy) / B.gravity);
-        const tRelease = tImpact - fallS;
-        const from = this.PlanePoint(plan, j, tRelease);
-        plan.bombs.push({ plane: j, index: k, tRelease, tImpact, fallS, from, at: { x: ix, y: iy, z: iz },
-          released: false, landed: false, first: k === 0, lead: j === 0 && k === 0 });
+      const lag = j === 0 ? 0 : this.R(F.dropLagS[0], F.dropLagS[1]);
+      let last = -Infinity;
+      for (let k = 0; k < n; k += 1) {
+        const tRelease = tMid + (k - (n - 1) / 2) * F.intervalS + lag;
+        last = Math.max(last, tRelease);
+        const plane = this.PlanePoint(plan, j, tRelease);
+        const from = { x: plane.x, y: plane.y - B.bayDropM, z: plane.z };
+        const lat = this.R(-1, 1) * B.dispersionM[0], lon = this.R(-1, 1) * B.dispersionM[1];
+        const b = { plane: j, index: k, tRelease, from, lat, lon, seed: this.rng(), fallS: 0, tImpact: 0,
+          at: null, released: false, landed: false, first: k === 0, lead: j === 0 && k === 0 };
+        if (bad(this.BombPlace(plan, b, aim.fallS, aim.fallS), 10)) return null;
+        plan.bombs.push(b);
       }
+      plan.lastRelease[j] = last;
+    }
+    // 再逐颗求真的落点：离机点 + 航迹（带散布）与地面的交点。
+    for (const b of plan.bombs) {
+      const fallS = GroundImpact(traj, (u) => this.BombPlace(plan, b, u, aim.fallS), (x, z) => this.Ground(x, z),
+        { originY: b.from.y, guessGround: groundC });
+      b.fallS = fallS;
+      b.tImpact = b.tRelease + fallS;
+      b.at = this.BombPlace(plan, b, fallS, fallS);
+      b.at.y = this.Ground(b.at.x, b.at.z);
+      if (bad(b.at, 0)) return null;
+      if (L) plan.nearestM = Math.min(plan.nearestM, Math.hypot(b.at.x - L.x, b.at.z - L.z));
     }
     plan.bombs.sort((p, q) => p.tImpact - q.tImpact);
     plan.firstImpact = plan.bombs[0].tImpact;
     plan.lastImpact = plan.bombs[plan.bombs.length - 1].tImpact;
+    plan.turn = this.BuildTurn(plan, F, L);
     return plan;
+  }
+
+  /** 落点在外圈土丘 / 农舍的体块里（外扩 hillClearM）吗。 */
+  InSolid(at) {
+    const m = this.D.hillClearM ?? 0;
+    return HORIZON_SOLIDS.some((b) => Math.abs(at.x - b.x) < b.w / 2 + m && Math.abs(at.z - b.z) < b.d / 2 + m);
+  }
+
+  /**
+   * 离场转弯：最后一颗离机后 TURN_DELAY_S 起压坡度，ROLL_IN_S 压到 bankDeg；协调转弯角速度 g·tanφ / v。
+   * 往远离听者的一侧转（听者就在航迹下面时随机）。长机的转弯航迹积一次存表，编队整体跟着转。
+   */
+  BuildTurn(plan, F, L) {
+    const start = Math.max(...plan.lastRelease) + TURN_DELAY_S;
+    if (!(F.bankDeg > 0) || start >= plan.endT) return null;
+    const lat = L ? (L.x - plan.center.x) * plan.right.x + (L.z - plan.center.z) * plan.right.z : 0;
+    const sign = Math.abs(lat) < 40 ? (this.rng() < 0.5 ? -1 : 1) : (lat > 0 ? -1 : 1);
+    const g = BOMB_PHYSICS.gravity, v = plan.speed, phi = F.bankDeg * DEG;
+    const count = Math.ceil((plan.endT - start) / TURN_STEP_S) + 2;
+    const s = new Float64Array(count), l = new Float64Array(count), psi = new Float64Array(count), bank = new Float64Array(count);
+    let S = 0, Lat = 0, P = 0;
+    for (let i = 0; i < count; i += 1) {
+      const b = phi * Smooth((i * TURN_STEP_S) / ROLL_IN_S);
+      s[i] = S; l[i] = Lat; psi[i] = P; bank[i] = b;
+      const rate = sign * g * Math.tan(b) / v;
+      const mid = P + rate * TURN_STEP_S / 2;
+      S += v * Math.cos(mid) * TURN_STEP_S;
+      Lat += v * Math.sin(mid) * TURN_STEP_S;
+      P += rate * TURN_STEP_S;
+    }
+    return { start, sign, s, l, psi, bank, radiusM: v * v / (g * Math.tan(phi)) };
   }
 
   Ground(x, z) {
@@ -239,34 +347,86 @@ export class FirstLevelAirRaid {
     return Number.isFinite(y) ? y : 0;
   }
 
+  /** 长机在 t 时刻：位置（地面投影）、航向、坡度。转弯之前是直线。 */
+  LeadTrack(plan, t) {
+    const turn = plan.turn;
+    const straight = ((turn ? Math.min(t, turn.start) : t) - plan.tCenter) * plan.speed;
+    let x = plan.center.x + plan.dir.x * straight, z = plan.center.z + plan.dir.z * straight;
+    if (!turn || t <= turn.start) return { x, z, hx: plan.dir.x, hz: plan.dir.z, bank: 0 };
+    const u = (t - turn.start) / TURN_STEP_S;
+    const i = Math.min(turn.s.length - 2, Math.floor(u)), f = Math.min(1, u - i);
+    const sR = turn.s[i] + (turn.s[i + 1] - turn.s[i]) * f;
+    const lR = turn.l[i] + (turn.l[i + 1] - turn.l[i]) * f;
+    const psi = turn.psi[i] + (turn.psi[i + 1] - turn.psi[i]) * f;
+    const bank = turn.bank[i] + (turn.bank[i + 1] - turn.bank[i]) * f;
+    x += plan.dir.x * sR + plan.right.x * lR;
+    z += plan.dir.z * sR + plan.right.z * lR;
+    const c = Math.cos(psi), s = Math.sin(psi);
+    // 右转（sign +1）= 右翼压下 = 绕机首轴负转（机首朝 -Z 时，正的 rotation.z 抬起右翼）。
+    return { x, z, hx: plan.dir.x * c + plan.right.x * s, hz: plan.dir.z * c + plan.right.z * s, bank: -turn.sign * bank };
+  }
+
   LeadPoint(plan, t) { return this.PlanePoint(plan, 0, t); }
 
-  /** 第 j 架在 t 时刻的位置（直线平飞）。 */
+  /** 第 j 架投完弹之后的上浮（米）与此刻的爬升角。 */
+  Balloon(plan, j, t) {
+    const since = t - (plan.lastRelease[j] ?? Infinity);
+    if (!(since > 0) || !(plan.balloonM > 0)) return { h: 0, climb: 0 };
+    const e = Math.exp(-since / plan.balloonS);
+    return { h: plan.balloonM * (1 - e), climb: Math.atan2(plan.balloonM / plan.balloonS * e, plan.speed) };
+  }
+
+  /** 第 j 架在 t 时刻的位置：长机航迹 + 队形偏移（随航向一起转）+ 投弹后的上浮。 */
   PlanePoint(plan, j, t) {
-    const s = plan.slots[j];
-    const along = (t - plan.tCenter) * plan.speed - s.back;
+    const s = plan.slots[j], lead = this.LeadTrack(plan, t);
+    const rx = -lead.hz, rz = lead.hx;
     return {
-      x: plan.center.x + plan.dir.x * along + plan.right.x * s.side,
-      y: plan.altitude + s.up,
-      z: plan.center.z + plan.dir.z * along + plan.right.z * s.side,
+      x: lead.x + rx * s.side - lead.hx * s.back,
+      y: plan.altitude + s.up + this.Balloon(plan, j, t).h,
+      z: lead.z + rz * s.side - lead.hz * s.back,
     };
   }
 
-  /** 炸弹在空中的位置：水平带着离机时的前进速度、落后 trailM（u² 项），竖直自由落体。 */
-  BombPose(plan, b, t) {
-    const u = Clamp01((t - b.tRelease) / b.fallS);
-    const vx = plan.dir.x * plan.speed * b.fallS, vz = plan.dir.z * plan.speed * b.fallS;
-    const ex = b.at.x - b.from.x - vx, ez = b.at.z - b.from.z - vz;
-    const drop = b.from.y - b.at.y;
-    const hx = vx + 2 * ex * u, hz = vz + 2 * ez * u;
-    const h = Math.hypot(hx, hz) || 1;
+  /** 编队层要的姿态：位置 + 航向 + 爬升角 + 坡度。 */
+  PlanePose(plan, j, t) {
+    const p = this.PlanePoint(plan, j, t), lead = this.LeadTrack(plan, t);
+    return { id: plan.aircraft, x: p.x, y: p.y, z: p.z, dirX: lead.hx, dirZ: lead.hz,
+      climb: this.Balloon(plan, j, t).climb, bank: lead.bank };
+  }
+
+  /**
+   * 离机 u 秒时弹的世界位置：离机点 + 相对航迹（沿航向）+ 散布（按 (u/T)² 长起来，T 是这颗的落地时间；
+   * 排弹时还不知道，先用平地估的 aimFallS）。投弹全部发生在转弯之前，所以沿航向就是这一轮的直线航向。
+   */
+  BombPlace(plan, b, u, T, out = {}) {
+    const r = TrajectoryAt(plan.traj, u, this._traj ||= {});
+    const q = Math.min(1, (u / Math.max(1e-3, T)) ** 2);
+    const along = r.s + b.lon * q, side = b.lat * q;
+    out.x = b.from.x + plan.dir.x * along + plan.right.x * side;
+    out.y = b.from.y + r.y;
+    out.z = b.from.z + plan.dir.z * along + plan.right.z * side;
+    return out;
+  }
+
+  /**
+   * 炸弹在空中的姿态：航迹上的位置、尾翼拉向来流的风标振荡；画面尺寸是真尺寸，
+   * 远到不足 minAngularRad 时按距离放大补足（最多 maxScale 倍）。
+   */
+  BombPose(plan, b, t, L = this.Listener()) {
+    const B = this.D.bomb, spec = plan.spec;
+    const u = Math.max(0, Math.min(b.fallS, t - b.tRelease));
+    const p = u >= b.fallS ? { x: b.at.x, y: b.at.y, z: b.at.z } : this.BombPlace(plan, b, u, b.fallS);
+    const r = TrajectoryAt(plan.traj, u, {});
+    const att = BombAttitude(r.vs, r.vy, u, b.seed);
+    const c = Math.cos(att.yaw), s = Math.sin(att.yaw);
+    const d = L ? Math.hypot(p.x - L.x, p.y - L.y, p.z - L.z) : 0;
     return {
-      x: b.from.x + vx * u + ex * u * u,
-      y: b.from.y - drop * u * u,
-      z: b.from.z + vz * u + ez * u * u,
-      dirX: hx / h, dirZ: hz / h,
-      // 机头朝下的角：dy/du 与水平 dH/du 之比（离机时平躺，越落越竖）。
-      pitch: Math.atan2(2 * drop * u, h),
+      x: p.x, y: p.y, z: p.z,
+      dirX: plan.dir.x * c + plan.right.x * s, dirZ: plan.dir.z * c + plan.right.z * s,
+      // 机头朝下的角（离机时平躺，越落越竖）；pathPitch 是不带摆动的航迹倾角。
+      pitch: att.pitch, pathPitch: att.pathPitch,
+      bomb: spec.id, lengthM: spec.lengthM, radiusM: spec.diameterM / 2,
+      scale: Math.max(1, Math.min(B.maxScale, B.minAngularRad * d / spec.diameterM)),
     };
   }
 
@@ -276,27 +436,25 @@ export class FirstLevelAirRaid {
     const t = plan.t;
     // 编队。
     const poses = [];
-    for (let j = 0; j < plan.slots.length; j += 1) {
-      const p = this.PlanePoint(plan, j, t);
-      poses.push({ id: plan.aircraft, x: p.x, y: p.y, z: p.z, dirX: plan.dir.x, dirZ: plan.dir.z, climb: 0, bank: 0 });
-    }
+    for (let j = 0; j < plan.slots.length; j += 1) poses.push(this.PlanePose(plan, j, t));
     this.host.Formation?.(t < plan.endT ? poses : []);
     // 引擎声跟着长机（没起来的、被引擎偷掉的，飞机还没离场就隔一会儿再试）。
     if (plan.drone && this.host.audio?.pendingVoices?.has?.(plan.drone) === false) plan.drone = null;
     if (!plan.drone && t < plan.endT && t >= (plan.droneTryAt ?? 0)) this.StartDrone(plan);
     if (plan.drone) {
-      const lead = poses[0];
+      const lead = poses[0], ahead = this.PlanePoint(plan, 0, t + 0.1);
       this.host.audio?.MoveVoice?.(plan.drone, { x: lead.x, y: lead.y, z: lead.z },
-        { velocity: { x: plan.dir.x * plan.speed, y: 0, z: plan.dir.z * plan.speed } });
+        { velocity: { x: (ahead.x - lead.x) * 10, y: (ahead.y - lead.y) * 10, z: (ahead.z - lead.z) * 10 } });
     }
     // 炸弹：离机的画出来，到点的落地。
     const falling = [];
+    const L = this.Listener();
     for (const b of plan.bombs) {
       if (b.landed) continue;
       if (t < b.tRelease) continue;
       if (!b.released) { b.released = true; this.bombsDropped += 1; }
       if (t >= b.tImpact) { b.landed = true; this.Impact(plan, b); continue; }
-      falling.push(this.BombPose(plan, b, t));
+      falling.push(this.BombPose(plan, b, t, L));
     }
     this.host.Bombs?.(falling);
     if (t >= plan.endT && plan.bombs.every((b) => b.landed)) this.EndWave();
@@ -319,32 +477,36 @@ export class FirstLevelAirRaid {
   // 落地
   // ===========================================================================
 
-  VisualRadius(d) {
-    const I = this.D.impact;
-    return Math.min(I.radiusMaxM, I.radiusM + I.radiusPerM * Math.max(0, d - I.radiusFromM));
-  }
-
-  ShakeTrauma(d, zone) {
+  /** 比例距离 Z = d / ∛W 上的一记创伤（Data_FirstLevelAirRaid.shake 的头注）。 */
+  ShakeTrauma(d, zone, cube = Math.cbrt(this.D.audio.chargeRefKg)) {
     const S = this.D.shake;
-    const u = Clamp01((d - S.nearM) / Math.max(1, S.farM - S.nearM));
+    const z = d / Math.max(0.5, cube);
+    const u = Clamp01((z - S.zNear) / Math.max(1, S.zFar - S.zNear));
     return (S.traumaNear + (S.traumaFar - S.traumaNear) * u) * (zone === "dugout" ? S.dugoutScale : 1);
   }
 
   ListenerZone() { return this.zoneOverride || this.host.Zone?.() || null; }
 
-  /** 落地那一刻：画面先到；声音由引擎按 d/340 延迟；震屏与掉土排到声音到达之后。 */
+  /** 落地那一刻：画面先到；地震波与声音按距离后到，震屏与掉土排在它们到达之后。 */
   Impact(plan, b) {
     const D = this.D, A = D.audio;
     const L = this.Listener();
     this.impacts += 1;
     if (!L) return;
-    const at = b.at;
+    const at = b.at, spec = plan.spec;
     const d = Math.hypot(at.x - L.x, at.y - L.y, at.z - L.z);
-    const arrive = d / 340;
-    const column = b.index % Math.max(1, D.impact.columnEvery ?? 1) === 0;
-    const handle = this.host.Visual?.({ x: at.x, y: at.y, z: at.z }, this.VisualRadius(d), d, column);
+    const arrive = d / BOMB_PHYSICS.soundMps;
+    const scale = BlastScale(spec.chargeKg);
+    const column = b.first && plan.columns < (D.impact.maxColumns ?? Infinity);
+    if (column) plan.columns += 1;
+    const end = TrajectoryAt(plan.traj, b.fallS, {});
+    const blast = { bomb: spec.id, chargeKg: spec.chargeKg, cube: scale.cube, radius: scale.visualRadius,
+      budget: Math.min(1, (D.impact.detailBombs ?? Infinity) / plan.bombs.length),
+      dirX: plan.dir.x, dirZ: plan.dir.z, impactPitch: Math.atan2(-end.vy, end.vs) };
+    const handle = this.host.Visual?.({ x: at.x, y: at.y, z: at.z }, blast, d, column);
     if (handle != null) this.columns.push({ handle, until: this.time + D.impact.column.emitS });
-    const speech = this.speaking ? A.speechGain : 1;
+    const gain = Math.min(A.volumeMaxGain ?? 1, Math.max(1, (spec.chargeKg / (A.chargeRefKg || spec.chargeKg)) ** (1 / 6)));
+    const speech = (this.speaking ? A.speechGain : 1) * gain;
     const cut = (hz) => (this.airCut > 0 ? Math.min(hz || 20000, this.airCut) : hz || undefined);
     const pos = { x: at.x, y: at.y + 2, z: at.z };
     // 一串十几颗只给其中几颗出声：相邻两声至少隔 minGapS，声部满了就这一颗不出声。
@@ -372,7 +534,12 @@ export class FirstLevelAirRaid {
         this.pending.push({ at: this.time + arrive + this.R(A.dirtDelayS[0], A.dirtDelayS[1]), kind: "dirt", zone });
       }
     }
-    this.pending.push({ at: this.time + arrive, kind: "shake", d });
+    // 两记震：地震波先到（轻），气浪跟着声音到（重）。
+    const S = D.shake;
+    if (S.seismicFraction > 0) {
+      this.pending.push({ at: this.time + d / BOMB_PHYSICS.groundWaveMps, kind: "shake", d, cube: scale.cube, frac: S.seismicFraction });
+    }
+    this.pending.push({ at: this.time + arrive, kind: "shake", d, cube: scale.cube, frac: 1 });
   }
 
   Voice(v, activeS = this.D.audio.voiceActiveS) {
@@ -396,7 +563,8 @@ export class FirstLevelAirRaid {
         // 一串连着到：windowS 秒里合计不超过 windowMax（不然十几颗叠满创伤桶，远处的炸弹震得像在脚下）。
         this.shakes = this.shakes.filter((s) => this.time - s.at < S.windowS);
         const spent = this.shakes.reduce((n, s) => n + s.trauma, 0);
-        const trauma = Math.min(this.ShakeTrauma(p.d, this.ListenerZone()), Math.max(0, S.windowMax - spent));
+        const want = this.ShakeTrauma(p.d, this.ListenerZone(), p.cube) * (p.frac ?? 1);
+        const trauma = Math.min(want, Math.max(0, S.windowMax - spent));
         if (trauma > 1e-3) { this.host.Shake?.(trauma); this.shakes.push({ at: this.time, trauma }); }
       } else if (p.kind === "dirt" && L) {
         if (!this.Room(1)) { this.layersDropped += 1; continue; }
@@ -431,7 +599,9 @@ export class FirstLevelAirRaid {
       reserving: this.Reserving(),
       nextInS: this.nextAt === null ? null : +(this.nextAt - this.time).toFixed(2),
       wave: w ? { key: w.key, zone: w.zone, t: +w.t.toFixed(2), tCenter: +w.tCenter.toFixed(2), endT: +w.endT.toFixed(2),
-        bombs: w.bombs.length, landed: w.bombs.filter((b) => b.landed).length, drone: !!w.drone,
+        planes: w.slots.length, bomb: w.spec.id, bombs: w.bombs.length, landed: w.bombs.filter((b) => b.landed).length,
+        drone: !!w.drone, overhead: w.overhead, aimRangeM: +w.aimRangeM.toFixed(1), aimFallS: +w.aimFallS.toFixed(2),
+        turn: w.turn ? { start: +w.turn.start.toFixed(2), sign: w.turn.sign, radiusM: Math.round(w.turn.radiusM) } : null,
         lead: (() => { const p = this.LeadPoint(w, w.t); return { x: +p.x.toFixed(1), y: +p.y.toFixed(1), z: +p.z.toFixed(1) }; })() } : null,
       recent: this.events.slice(-6),
     };

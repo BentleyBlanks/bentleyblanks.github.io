@@ -3,6 +3,7 @@
 import { Quaternion, Vector3 } from "three";
 import { OpeningActorAnatomy, SolveOpeningActorArm, CurlOpeningActorFingers, OpeningActorPalm } from "./Script_OpeningFirstPerson.mjs";
 import { SpeakerLookAngles } from "./Script_SpeakerHeadLayer.mjs";
+import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
 
 const Clamp=(value,low=0,high=1)=>Math.max(low,Math.min(high,value));
 const Smooth=value=>{value=Clamp(value);return value*value*(3-2*value);};
@@ -20,16 +21,24 @@ const ContactClips=new Set(["DuckBlast","BayonetClearWood","CollarDrag","ButtThr
   "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
   // 2026-09-27: over the fallen roof timber in and out, and the haul out from under it (the face on the eye).
   "IjaVaultTimberIn","IjaVaultTimberOut","IjaHaulForearmUnder",
+  // 2026-09-27 pinned rescue: the jeering walk (upper body), the find, the hair hold and the slaps (the face on the pinned
+  // eye inside the clip), He heaving the roof timber (hands on it).
+  "IjaTauntWalk","IjaFoundLook","IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","HeLiftTimber",
   // hands on the post, the rifle or held out to Shunzi, faces aimed inside the clip: no dialogue gestures or the
   // Banter/Orders MessengerReport substitution on top (the runner and Yaowa talk in those phases)
   "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad",
   // SB05A alternative to IjaChoppedFallWall (the dadao cut and the fall backwards keep their authored timing)
   "IjaChoppedFallBack"]);
+// Clips whose face is aimed at the first-person eye inside the clip (listed with ContactClips above) or whose
+// hands follow Shunzi's body track: held-pose life keeps their head nearly where the clip put it.
+const FaceAimedClips=new Set(["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
+  "IjaVaultTimberIn","IjaVaultTimberOut","IjaHaulForearmUnder","LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad",
+  "IjaCollarDragSnag","IjaKickBeam","IjaButtStrike","IjaDragByForearm","IjaHoldCollarUp","LuoDragToCover","InterpreterCrouchAsk","InterpreterGrabCollar"]);
 const Guards=new Set(["ijaA","ijaB","guard","heyoutian","liuwencai"]);
 const Hash=value=>[...String(value)].reduce((sum,char)=>(sum*31+char.charCodeAt(0))>>>0,7);
 const HandClips=new Set(["ButtThreat","InterrogateCrouch","InterpreterPoint","MessengerReport","PointBlockade"]);
 // Phases in which the interpreter questions a prisoner (01 comrade, 02 Shunzi), 09.23 phase table.
-const Interrogating=new Set(["CaptiveWall","Interrogation","Slash","Taunt","Hold","Ask","KickShunzi","Glimpse","Collar"]);
+const Interrogating=new Set(["CaptiveWall","Interrogation","Slash","Taunt","Hold","Ask"]);
 
 export function SettleOpeningCaptive(soldier,pose){
   if(soldier.alive!==false||pose?.clip!=="ShotCollapse")return;
@@ -139,14 +148,14 @@ export function ResolveOpeningActorPose(soldier,pose,clock,record){
 export class OpeningActorPerformance {
   constructor(soldier){
     this.soldier=soldier;this.actor=soldier.actor;this.rig=this.actor.characterRig;
-    this.saved=new Map();this.pool=[];this.clock=0;this.speech=0;this.lookYaw=0;this.lookPitch=0;
+    this.saved=new Map();this.pool=[];this.clock=0;this.speech=0;this.lookYaw=0;this.lookPitch=0;this.still=null;
     this.rootQ=new Quaternion();this.parentQ=new Quaternion();this.turnQ=new Quaternion();
     this.axis=new Vector3();this.right=new Vector3();this.forward=new Vector3();this.up=new Vector3(0,1,0);
     this.origin=new Vector3();this.target=new Vector3();this.local=new Vector3();this.lookAngles={yaw:0,pitch:0};
     this.phase=(Hash(soldier.missionId||soldier.id||this.rig.modelId)%997)/157;
   }
   Restore(){for(const [bone,q] of this.saved){bone.quaternion.copy(q);this.pool.push(q);}this.saved.clear();}
-  Reset(){this.Restore();this.speech=0;this.lookYaw=0;this.lookPitch=0;this.rig.openingActorPerformanceState=null;}
+  Reset(){this.Restore();this.speech=0;this.lookYaw=0;this.lookPitch=0;this.still=null;this.rig.openingActorPerformanceState=null;}
   Turn(bone,axis,angle){
     if(!bone?.parent||Math.abs(angle)<1e-6)return;
     if(!this.saved.has(bone))this.saved.set(bone,(this.pool.pop()||new Quaternion()).copy(bone.quaternion));
@@ -174,6 +183,10 @@ export class OpeningActorPerformance {
     const desired=talking?Smooth(lineAge/.22)*voice:0;
     this.speech+=(desired-this.speech)*(1-Math.exp(-dt*9));
     const moving=(this.soldier.openingStoryboardTravel||Math.abs(state.moveSpeed||0)*4.2)>.1;
+    // Standing still as a weight (about 0.3 s to change): the free-hand gestures and the full chest turns ease
+    // out as a man sets off and back in as he stops, instead of dropping in one frame (a 17-33 deg upper-arm jump).
+    this.still=this.still==null?(moving?0:1):this.still+((moving?0:1)-this.still)*(1-Math.exp(-dt*7));
+    const still=this.still;
     // The wounded comrade is "comrade" in the 09.23 cast (captiveHelper was the 09.21 name).
     const guard=Guards.has(context.role),captive=context.role==="captiveHelper"||context.role==="comrade";
     const interrogating=Interrogating.has(context.phase);
@@ -189,8 +202,8 @@ export class OpeningActorPerformance {
     // Spine-only weight redistribution keeps both authored soles exactly where
     // they were. Actors in motion retain their existing gait and arm swing.
     if(!headOnly){
-      this.Turn(chest,this.right,(.016*breath-.035*emphasis)*(moving?.45:1));
-      this.Turn(chest,this.forward,.027*sway*(moving?.3:1));
+      this.Turn(chest,this.right,(.016*breath-.035*emphasis)*(.45+.55*still));
+      this.Turn(chest,this.forward,.027*sway*(.3+.7*still));
     }
     let yaw=guard?.22*Math.sin(time*.57):.075*Math.sin(time*.69);
     let pitch=.02*breath;
@@ -215,35 +228,80 @@ export class OpeningActorPerformance {
     }
     // Free hands give the line a beginning, emphasis and release. Rifle hands
     // stay attached; their entire chest/weapon follows the same breathing turn.
-    if(!moving&&!headOnly){
+    if(still>.001&&!headOnly){
+      const G=(bone,axis,angle)=>this.Turn(bone,axis,angle*still);
       if(context.role==="yaowa"&&["Banter","Orders"].includes(context.phase)){
-        this.Turn(bones.upperArmR,this.right,-.16+.32*emphasis);
-        this.Turn(bones.forearmR,this.forward,.10*this.speech*Math.sin(lineAge*2.4));
+        G(bones.upperArmR,this.right,-.16+.32*emphasis);
+        G(bones.forearmR,this.forward,.10*this.speech*Math.sin(lineAge*2.4));
       }else if(context.role==="interpreter"&&interrogating){
-        this.Turn(bones.upperArmR,this.right,-.58*(1-this.speech)+.22*emphasis);
-        this.Turn(bones.upperArmR,this.up,.10*this.speech*Math.sin(lineAge*2.2));
-        this.Turn(bones.forearmR,this.right,.12*emphasis);
-        this.Turn(chest,this.right,-.065*this.speech-.02*emphasis);
+        G(bones.upperArmR,this.right,-.58*(1-this.speech)+.22*emphasis);
+        G(bones.upperArmR,this.up,.10*this.speech*Math.sin(lineAge*2.2));
+        G(bones.forearmR,this.right,.12*emphasis);
+        G(chest,this.right,-.065*this.speech-.02*emphasis);
       }else if(captive&&interrogating&&talking){
         // The kneeling comrade pleads with his free left hand while he answers (「我不晓得……」), on top of the kneel.
-        this.Turn(bones.upperArmL,this.right,-.42*this.speech+.2*emphasis);
-        this.Turn(bones.forearmL,this.right,-.25*this.speech);
-        this.Turn(chest,this.right,-.04*this.speech);
+        G(bones.upperArmL,this.right,-.42*this.speech+.2*emphasis);
+        G(bones.forearmL,this.right,-.25*this.speech);
+        G(chest,this.right,-.04*this.speech);
       }else if(context.role==="ijaA"&&pose?.clip==="InterrogateCrouch"){
-        this.Turn(bones.upperArmR,this.right,-.32*(1-this.speech)+.24*emphasis);
-        this.Turn(chest,this.right,-.055*emphasis);
+        G(bones.upperArmR,this.right,-.32*(1-this.speech)+.24*emphasis);
+        G(chest,this.right,-.055*emphasis);
       }else if(context.role==="luo"&&pose?.clip==="PointBlockade"){
-        this.Turn(bones.upperArmL,this.right,-.30+.34*emphasis);
-        this.Turn(bones.upperArmL,this.up,.12*Math.sin(lineAge*2)*this.speech);
+        G(bones.upperArmL,this.right,-.30+.34*emphasis);
+        G(bones.upperArmL,this.up,.12*Math.sin(lineAge*2)*this.speech);
       }else if(context.role==="runner"&&pose?.clip==="MessengerReport"){
-        this.Turn(chest,this.right,-.04-.025*breath);
-        this.Turn(bones.upperArmL,this.right,.45*this.speech+.22*emphasis);
-        this.Turn(bones.upperArmL,this.forward,-.22*this.speech);
+        G(chest,this.right,-.04-.025*breath);
+        G(bones.upperArmL,this.right,.45*this.speech+.22*emphasis);
+        G(bones.upperArmL,this.forward,-.22*this.speech);
       }
     }
     this.rig.root.updateMatrixWorld(true);
     this.rig.openingActorPerformanceState={role:context.role,phase:context.phase,cue:context.cue,line:context.line,
       speaking:talking,speech:this.speech,emphasis,clock:time,lookYaw:this.lookYaw,lookPitch:this.lookPitch,
       clip:pose?.clip||"Native",moving,headOnly,protected:false};
+  }
+}
+
+/** Life on a held pose (Data_OpeningStoryboards.heldLife). The director holds men on still frames for long stretches
+ * (Luo kneeling at the mouth for 53 s of Banter, ijaB on the ready for 10 s of 02's Hold, a collar held on a hold
+ * loop), and a contact clip there carries no dialogue acting, so they stood as statues. Once the pose's watched
+ * bones have gone still this adds breathing, a slow sway and a wandering look on the spine, neck and head; it
+ * fades out in a few frames as soon as the clip moves again. Hands follow the chest by millimetres. */
+export class OpeningHeldLife {
+  constructor(soldier){
+    this.soldier=soldier;this.rig=soldier.actor.characterRig;this.weight=0;this.clock=0;this.primed=false;
+    this.phase=(Hash(soldier.missionId||soldier.id||this.rig.modelId)%997)/61;
+    const b=this.rig.bones;
+    this.watch=[b.pelvis,b.spine,b.chest,b.neck,b.head,b.upperArmL,b.upperArmR,b.thighL,b.thighR].filter(Boolean);
+    this.previous=this.watch.map(()=>new Quaternion());
+    this.saved=new Map();this.pool=[];this.rootQ=new Quaternion();this.parentQ=new Quaternion();this.turnQ=new Quaternion();
+    this.axis=new Vector3();this.right=new Vector3();this.forward=new Vector3();this.up=new Vector3(0,1,0);
+  }
+  Restore(){for(const [bone,q] of this.saved){bone.quaternion.copy(q);this.pool.push(q);}this.saved.clear();}
+  Turn(bone,axis,angle){return OpeningActorPerformance.prototype.Turn.call(this,bone,axis,angle);}
+  /** active: nothing else animates this man's spine and head this frame (no dialogue acting, alive, not in melee). */
+  Apply(dt,pose,active){
+    const L=OPENING_STORYBOARDS.heldLife,step=Math.max(0,dt);
+    let motion=0;
+    for(let i=0;i<this.watch.length;i++){motion=Math.max(motion,this.watch[i].quaternion.angleTo(this.previous[i]));this.previous[i].copy(this.watch[i].quaternion);}
+    const still=active&&this.primed&&step>0&&motion/step<L.stillRadS;
+    this.primed=true;this.clock+=step;
+    if(step>0)this.weight+=((still?1:0)-this.weight)*(1-Math.exp(-step/(still?L.inS:L.outS)));
+    if(!active)this.weight=0;
+    if(this.weight<.001)return false;
+    const b=this.rig.bones,chest=b.chest||b.spine,neck=b.neck||b.head,w=this.weight,t=this.clock+this.phase,Tau=Math.PI*2;
+    const face=FaceAimedClips.has(pose?.clip)?L.faceAimedShare:1;
+    this.soldier.actor.root.getWorldQuaternion(this.rootQ);
+    this.right.set(1,0,0).applyQuaternion(this.rootQ);this.forward.set(0,0,-1).applyQuaternion(this.rootQ);
+    const breath=Math.sin(Tau*L.breathHz*t),sway=Math.sin(Tau*L.swayHz*t)*Math.sin(Tau*.043*t+1.3);
+    const yaw=L.headYawRad*(.65*Math.sin(Tau*L.headYawHz[0]*t)+.35*Math.sin(Tau*L.headYawHz[1]*t+2.1))*face;
+    const pitch=L.headPitchRad*Math.sin(Tau*L.headPitchHz*t+.7)*face;
+    this.Turn(chest,this.right,L.breathRad*breath*w);
+    this.Turn(chest,this.forward,L.swayRad*sway*w);
+    this.Turn(neck,this.up,yaw*L.neckShare*w);
+    this.Turn(b.head,this.up,yaw*(1-L.neckShare)*w);
+    this.Turn(b.head,this.right,(pitch-.4*L.breathRad*breath)*w);
+    this.rig.root.updateMatrixWorld(true);
+    return true;
   }
 }

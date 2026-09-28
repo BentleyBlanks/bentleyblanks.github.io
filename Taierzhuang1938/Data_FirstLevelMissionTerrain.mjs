@@ -28,6 +28,8 @@ export function MissionPathDistance(point, route) {
 }
 export const MISSION_TERRAIN = Object.freeze({
   cellM: 0.75,
+  // 沟壁这类一格采不住的地方往下细分（Data_FirstLevelP012Terrain.RefineCells）。
+  refine: { subdivisions: 3, errorM: 0.08, screenM: 0.1 },
   textureTileM: 2,
   // Full-cover trench floor below natural soil; firing steps and mouths remain raised.
   // Historical basis and exceptions: docs/Data_TrenchTerrainPbr.md.
@@ -179,6 +181,9 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
     if (factor < bermMask) bermMask = factor;
   }
   for (const road of spec.roads) {
+    // Beyond width/2 + 3 m the factor is exactly 1; the box test skips the polyline walk.
+    const reach = road.width / 2 + 3, box = RoadBounds(road);
+    if (x < box.minX - reach || x > box.maxX + reach || z < box.minZ - reach || z > box.maxZ + reach) continue;
     const d = MissionPathDistance({ x, z }, road.points);
     const factor = 0.15 + 0.85 * Smooth((d - road.width / 2) / 3);
     height = height * factor;
@@ -191,11 +196,14 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
   // 挖下去的部分照旧取 min；抬起来的那部分（抛土）乘上面那张掩码。
   const applied = TrenchPlanFor(spec).Apply(x, z, height, natural);
   height = applied > height ? height + (applied - height) * bermMask : applied;
+  // Each blend below is exactly zero past its reach; the squared test skips the hypot.
   for (const breach of FRONT_BREACHES) {
+    if((x-breach.x)**2+(z-breach.z)**2>=breach.radius**2)continue;
     const blend=1-Smooth(Math.hypot(x-breach.x,z-breach.z)/breach.radius);
     if(blend>0)height=Math.max(height,height+(natural-breach.depth-height)*blend);
   }
   for (const step of spec.steps) {
+    if ((x - step.x) ** 2 + (z - step.z) ** 2 >= (step.radius + 1.3) ** 2) continue;
     const d = Math.hypot(x - step.x, z - step.z),
       t = 1 - Smooth((d - step.radius) / 1.3);
     if (t > 0) height = height * (1 - t) + (natural - step.depth) * t;
@@ -211,7 +219,30 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
     const cut = RiverCutAt(x, z, river);
     if (cut > 0) height = Math.min(height, natural - cut);
   }
-  for (const point of [
+  for (const point of NATURAL_RAMPS) {
+    if ((x - point.x) ** 2 + (z - point.z) ** 2 >= 81) continue;
+    const distance = Math.hypot(x - point.x, z - point.z);
+    const blend = 1 - Smooth(distance / 9);
+    height = height * (1 - blend) + natural * blend;
+  }
+  return height;
+}
+const roadBounds = new WeakMap();
+function RoadBounds(road) {
+  let box = roadBounds.get(road);
+  if (!box) {
+    box = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+    for (const p of road.points) {
+      box.minX = Math.min(box.minX, p.x); box.maxX = Math.max(box.maxX, p.x);
+      box.minZ = Math.min(box.minZ, p.z); box.maxZ = Math.max(box.maxZ, p.z);
+    }
+    roadBounds.set(road, box);
+  }
+  return box;
+}
+// Ramps that blend the cut back to natural soil (9 m radius). Hoisted: the heightfield
+// bake calls SampleMissionTerrain for every lattice node.
+const NATURAL_RAMPS = Object.freeze([
     { x: -62, z: 64 },
     { x: 54, z: 114 },
     // 西沟南端（15A→15B）：沟在 (56,207) 到头，接的是 2.8 m 宽的靠墙夹道。
@@ -221,13 +252,7 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
     // 抬出地面 —— 那是「路线被踏板挡住」那条红的来源。
     { x: 52, z: 209.5 },
     MISSION_RECEPTION_SPACE.entry,
-  ]) {
-    const distance = Math.hypot(x - point.x, z - point.z);
-    const blend = 1 - Smooth(distance / 9);
-    height = height * (1 - blend) + natural * blend;
-  }
-  return height;
-}
+]);
 
 // PBR surface tint uses the same authored road and trench corridors.
 //
@@ -285,6 +310,13 @@ export function SampleMissionGroundColor(x, z, out = [0, 0, 0]) {
     const d=RouteDistanceWithin(x,z,road.points,road.width/2+1.8);
     if(d===Infinity)continue;
     const t=1-Smooth((d-road.width/2)/1.8);
+    r+=(1-r)*t; g+=(.97-g)*t; b+=(.90-b)*t;
+  }
+  // 白盒小路（Data_FirstLevelWhiteboxTerrain 各区 paths）：只染色不改高度，踩实程度 wear 打折。
+  for(const path of MISSION_TERRAIN.whiteboxTerrain?.paths || []) {
+    const d=RouteDistanceWithin(x,z,path.points,path.width/2+PATH_EDGE_M);
+    if(d===Infinity)continue;
+    const t=(1-Smooth((d-path.width/2)/PATH_EDGE_M))*path.wear;
     r+=(1-r)*t; g+=(.97-g)*t; b+=(.90-b)*t;
   }
   for(const pad of MISSION_TERRAIN.pads) {
@@ -376,10 +408,13 @@ function WhiteboxSurfaceShapes() {
 // Stubble keeps a clear margin around every worked surface; the shader's macro
 // noise decides the rest. Heights never read this: it is shading only.
 const STUBBLE_CLEAR_M = 3.5;
-export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0, 0, 0, 1]) {
+// 白盒小路的染色边，与 Data_FirstLevelWhiteboxTerrain.WHITEBOX_PATH_EDGE_M 同值（那边是纯数据表，
+// 这边不反向 import 它，免得地形采样器多一层依赖）。
+const PATH_EDGE_M = 1.8;
+export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0, 0, 0, 1], spec = MISSION_TERRAIN) {
   let track = 0, spoil = 0, worked = 0, rut = 1, rutDist = Infinity, padTrack = 0, padNoRuts = 0;
   const rutRange = TERRAIN_RUTS.encodeRangeM;
-  for (const road of MISSION_TERRAIN.roads) {
+  for (const road of spec.roads) {
     const d = RouteDistanceWithin(x, z, road.points, road.width / 2 + STUBBLE_CLEAR_M);
     if (d === Infinity) continue;
     const t = 1 - Smooth((d - road.width / 2) / 1.8);
@@ -391,7 +426,17 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
       if (s !== null) { rutDist = d; rut = Math.max(-1, Math.min(1, s / rutRange)); }
     }
   }
-  for (const pad of MISSION_TERRAIN.pads) {
+  // 白盒小路（各区 paths，docs/Data_FirstLevelGuidance20260928.md §3）：踩出来的路只进纹理层，
+  // 路面权重按 wear 打折，麦茬照旧退让 3.5 m —— 高度采样不读它（SampleMissionTerrain 逐位不变）。
+  for (const path of spec.whiteboxTerrain?.paths || []) {
+    const d = RouteDistanceWithin(x, z, path.points, path.width / 2 + STUBBLE_CLEAR_M);
+    if (d === Infinity) continue;
+    const t = (1 - Smooth((d - path.width / 2) / PATH_EDGE_M)) * path.wear;
+    if (t > track) track = t;
+    const w = 1 - Smooth((d - path.width / 2) / STUBBLE_CLEAR_M);
+    if (w > worked) worked = w;
+  }
+  for (const pad of spec.pads) {
     const ex = Math.abs(x - pad.x) - pad.w / 2, ez = Math.abs(z - pad.z) - pad.d / 2;
     if (ex >= STUBBLE_CLEAR_M || ez >= STUBBLE_CLEAR_M) continue;
     const dx = ex > 0 ? ex : 0, dz = ez > 0 ? ez : 0, d = Math.sqrt(dx * dx + dz * dz);
@@ -407,12 +452,12 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
   // 壕沟翻土层跟着样条计划的**实际**沟沿走（带噪声的 halfFloor / bank，分桶网格只碰
   // 同一格里的边），沿沟沿再多铺 0.8 m —— 挖出来的土就堆在唇上。Corridor 的可见范围
   // 到坡顶外 bermW 为止，够这一层用；麦茬的 3.5 m 退让带比它远，照旧按标称折线量。
-  const corridor = TrenchPlanFor(MISSION_TERRAIN).Corridor(x, z);
+  const corridor = TrenchPlanFor(spec).Corridor(x, z);
   if (corridor) {
     const t = 1 - Smooth((corridor.d - corridor.halfFloor - corridor.bank * 0.5) / (corridor.bank * 0.5 + 0.8));
     if (t > spoil) spoil = t;
   }
-  for (const trench of MISSION_TERRAIN.trenches) {
+  for (const trench of spec.trenches) {
     const d = RouteDistanceWithin(x, z, trench.points, trench.bottom / 2 + trench.bank + STUBBLE_CLEAR_M);
     if (d === Infinity) continue;
     const w = 1 - Smooth((d - trench.bottom / 2) / (trench.bank + STUBBLE_CLEAR_M));
@@ -421,7 +466,7 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
   const G = TERRAIN_GROUND_SURFACE;
   // 壕沟真的切断了路/场坪：沟底与沟壁不画路面（shader 里翻土层让位给车道，见 Script_TrenchSurfaceMaterial）。
   if (track > 0) {
-    const dig = -TrenchPlanFor(MISSION_TERRAIN).Apply(x, z, 0, 0);
+    const dig = -TrenchPlanFor(spec).Apply(x, z, 0, 0);
     if (dig > G.digTrackM[0]) track *= 1 - Smooth((dig - G.digTrackM[0]) / (G.digTrackM[1] - G.digTrackM[0]));
   }
   // 白盒地形修饰：陡土壁 / 交通沟 → 裸土；下沉洼地的底 → 踩实的场地（车道层），把穿进来的壕沟翻土盖掉。

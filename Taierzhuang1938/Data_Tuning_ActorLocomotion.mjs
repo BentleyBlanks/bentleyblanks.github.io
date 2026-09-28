@@ -6,6 +6,11 @@ export const ACTOR_LOCOMOTION = Object.freeze({
   maximumMps: 10,
   maximumGapS: .4,
   contactBlendS: .035,
+  // What a stance leaves of the lock correction eases out in the air with this time constant (95 % in
+  // 0.2 s, inside a walk's or a run's swing); it used to be dropped over contactBlendS and the foot
+  // jumped up to 28 cm in a frame at every lift-off.
+  contactReleaseS: .07,
+  // Beyond this a stance lets go as if the foot lifted early (eased out like any release); the next locks afresh.
   maximumCorrectionM: .28,
   minimumReachM: .001,
   // Speed matching split the way UE5 Lyra does it (docs/Data_ActorLocomotion.md §速度分摊):

@@ -146,7 +146,9 @@ export function BuildTrenchSurface(sink,plan,groundAt,assets) {
           }
         }
         if(i%C.grass.stride!==0||random()>C.grass.chance)continue;
-        const crest=st.halfFloor+st.bank*(.91+random()*.12);
+        // Hang over the lip: past ~0.92 of the bank the refined heightfield is already the flat
+        // top, where the mat is only seen edge-on from the trench (a thin black line).
+        const crest=st.halfFloor+st.bank*(.80+random()*.12);
         const x=st.x+st.nx*side*crest,z=st.z+st.nz*side*crest;
         if(groundAt(x,z)-floor<.8||plan.Depth(x,z)>st.depth-.8)continue;
         const cell=`${Math.round(x*2)}:${Math.round(z*2)}`;if(occupied.has(cell))continue;occupied.add(cell);

@@ -13,6 +13,8 @@
 export const WHITEBOX_TERRAIN_TRANSFER = Object.freeze({
   id: "Transfer1114",
   stages: Object.freeze([11, 12, 13, 14]),
+  // 踩出来的小路（只染色不改高度）：{ id, points, width, wear?, note }，口径见 Data_FirstLevelWhiteboxTerrain 文件头。
+  paths: Object.freeze([]),
   boxes: Object.freeze([
     Object.freeze({ id: "Transfer", minX: 25, maxX: 125, minZ: 75, maxZ: 150 }),
   ]),

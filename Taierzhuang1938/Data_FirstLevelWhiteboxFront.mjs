@@ -21,7 +21,9 @@ export function BuildFrontWhitebox(groundAt) {
   const STONE = "railBallast";
   // The shoulders Layout lays along southWalk sat on the open field; the 07 trench
   // walls and spoil now do that job, and three of them would stand on its rim.
-  const replaceBlockIds = ["SouthWalkShoulder0", "SouthWalkShoulder2", "SouthWalkShoulder3"];
+  // CollectionLitterWall (06 hollow's low south wall) is re-issued below with the same box and cover face
+  // but earth-coloured: as a blue cover slab it was the brightest thing in the hollow (guidance squint test).
+  const replaceBlockIds = ["SouthWalkShoulder0", "SouthWalkShoulder2", "SouthWalkShoulder3", "CollectionLitterWall"];
   function Block(id, x, z, w, h, d, semantic = "plaster", extra = {}) {
     const block = { id, x, z, w, h, d, y: groundAt(x, z) + h / 2,
       semantic, tag: "whiteboxWall", ...extra };
@@ -136,7 +138,26 @@ export function BuildFrontWhitebox(groundAt) {
     Detail(`SouthRoadWreckWheel${i}`, 49.2 + dx, -143.6 + dz, .14, 1.1, 1.1, "timber", { ry: .5 });
   Detail("SouthRoadWreckShaft", 50.3, -145.6, .12, .12, 2.4, "timber", { ry: .9 });
 
+  // 2026-09-28 guidance: the old yard's east gate (gap z −111…−107 in the x 54 wall) lined up with the ammo
+  // house's east door, so a player who kept walking after taking the bundle came straight out onto the south
+  // road and the open field east of it. The gate is shut and barred from inside; the way back is the way in
+  // (north gate, marked by OldYardTread in the terrain table).
+  for (const [n, z, h] of [["N", -110.02, 2.25], ["S", -107.98, 2.15]])
+    Footed(`OldYardEastGateLeaf${n}`, 54.0, z, .16, h, 1.98, "timber");
+  Detail("OldYardEastGateBar", 53.8, -109, .12, .14, 4.2, "timber", { y: groundAt(53.8, -109) + 1.25 });
+  for (const [i, x, z, w, h, d, y] of [[0, 52.95, -110.3, .9, .7, .8, 0], [1, 52.9, -108.4, .8, .6, .75, 0],
+    [2, 52.95, -109.9, .7, .5, .6, .7]])
+    Detail(`OldYardEastGateCrate${i}`, x, z, w, h, d, "timber", { ry: i * .2, ...(y ? { y: Low(x, z, w, d) + y + h / 2 } : {}) });
+
   // ── 06 casualty collection: the sunken hollow ─────────────────────────────
+  // The hollow's low south wall, exactly Layout's GroundedWall("CollectionLitterWall",-40,-95,9,1.1,0.7)
+  // (Zhou reclines against its north face: Script_FirstLevelCollectionCareTest) with the same AI cover
+  // face, only earthDark instead of the blue cover colour.
+  {
+    const x = -40, z = -95, w = 9, h = 1.1, d = .7, top = groundAt(x, z) + h;
+    const base = Math.min(...[-1, 0, 1].flatMap(a => [-1, 0, 1].map(b => groundAt(x + a * w / 2, z + b * d / 2)))) - .1;
+    Block("CollectionLitterWall", x, z, w, top - base, d, "earthDark", { y: (top + base) / 2, cover: { faceX: 0, faceZ: -1 } });
+  }
   // Stone revetments along the foot of the west, north and east walls (the lower
   // half of the 3 m back slope in 06B), then the upper half is earth.
   WallAlong("CollectionWestRevetA", { x: -45.8, z: -107.2 }, { x: -45.8, z: -103.2 }, .6, 1.6);
@@ -170,6 +191,49 @@ export function BuildFrontWhitebox(groundAt) {
   for (const [i, x, z, w, h, d] of [[0, -44.2, -95.9, .5, .25, .4], [1, -30.6, -105.4, .45, .22, .4],
     [2, -42.8, -96.0, .35, .2, .3]])
     Detail(`CollectionFloorStone${i}`, x, z, w, h, d, STONE, { ry: i });
+
+  // 2026-09-28 guidance: the hollow has two ways south. The FrontCommunication trench leaves its south edge
+  // level with the floor (x −36…−33) while the litter column climbs the 1.8 m ramp at the south-east corner,
+  // so from the borrow-light spot the trench looked like the exit. A shell (crater on the west lip, terrain
+  // table CollectionTrenchCrater*) has brought the trench wall down 9 m south of the hollow: an earth slump
+  // 2.1 m over the trench floor, too high to vault, with the revetment timbers it tore out lying on top.
+  {
+    const x = -33.6, z = -90.3, ry = Math.atan2(13, 41); // FrontCommunication (-37,-101)->(-24,-60)
+    const ux = Math.sin(ry), uz = Math.cos(ry), At = (along, across) => ({ x: x + ux * along + uz * across, z: z + uz * along - ux * across });
+    Topped("CollectionTrenchSlump", x, z, 6.2, 2.1, 2.4, "earthDark", { ry });
+    // Two slumped lumps on the hollow side, skewed off the trench axis so the face is ragged, not a
+    // staircase: both stand ≥ 1.55 m over the trench floor, above the 1.2 m vault, so none of them is a
+    // step up onto the heap (a lower spill in r1 read as stairs).
+    for (const [i, along, across, w, top, d, yaw] of [[0, -1.3, .9, 2.6, 1.55, 1.4, .35], [1, -1.0, -1.6, 2.0, 1.7, 1.2, -.3]]) {
+      const p = At(along, across);
+      Topped(`CollectionTrenchSlumpLump${i}`, p.x, p.z, w, top + (groundAt(x, z) - groundAt(p.x, p.z)), d, "earthDark", { ry: ry + yaw });
+    }
+    // Torn revetment: two planks across the heap and one post standing out of it.
+    const top = groundAt(x, z) + 2.1;
+    for (const [i, along, across, len, yaw] of [[0, -.4, -.6, 3.1, .5], [1, .5, .9, 2.6, -.35]]) {
+      const p = At(along, across);
+      Detail(`CollectionTrenchSlumpPlank${i}`, p.x, p.z, .22, .09, len, "timber", { ry: ry + Math.PI / 2 + yaw, y: top + .05 + i * .05 });
+    }
+    { const p = At(-.6, -1.9); Detail("CollectionTrenchSlumpPost", p.x, p.z, .16, 1.25, .16, "timber", { y: top - .1 }); }
+    for (const [i, along, across, s] of [[0, -3.6, -1.0, .45], [1, -3.3, .9, .35], [2, -4.4, .1, .3]]) {
+      const p = At(along, across);
+      Detail(`CollectionTrenchSlumpClod${i}`, p.x, p.z, s, s * .6, s * .8, "earthDark", { ry: i * 1.1 });
+    }
+  }
+
+  // 2026-09-28 guidance, 02: at the support junction SJ (−29,−110) the 02 withdrawal has to turn south-west
+  // down CollectionLink into the hollow, not north up the support sap. An aid-post flag (off-white cloth,
+  // red-brown cross) on a 3.6 m pole on the bank beside the link's mouth stands over the trench lips: from
+  // the rear-trench corner RC 25 m away it already shows where the wounded are, and at SJ it hangs over the
+  // left-hand branch (at 4.2 m the cloth left the top of the frame 7 m short of SJ). All non-solid (no
+  // collider, so no 01–06 sight or fire line changes); 3 m off the route.
+  {
+    const x = -28.5, z = -106.3, g = groundAt(x, z), H = 3.6;
+    Detail("CollectionAidFlagPole", x, z, .12, H, .12, "timber", { y: g + H / 2 });
+    Detail("CollectionAidFlagCloth", x, z - .66, .04, .8, 1.2, "canvas", { y: g + H - .5 });
+    Detail("CollectionAidFlagCrossV", x, z - .66, .07, .58, .18, "danger", { y: g + H - .5 });
+    Detail("CollectionAidFlagCrossH", x, z - .66, .07, .18, .58, "danger", { y: g + H - .5 });
+  }
 
   // Ruined farmhouse on the west back slope's crest ("high ground with ruins" in 06).
   RuinHouse("CollectionWestRuin", -54.5, -101.5, 5, 6.5, [2.9, 2.3, 1.8, 2.6], { gable: -1 });
@@ -268,6 +332,30 @@ export function BuildFrontWhitebox(groundAt) {
   // village approach. The centre route and its existing excavation stay open.
   Bank("SouthVillageBankWest", 17, -29.4, 12, 1.7, 2.4);
   Bank("SouthVillageBankEast", 33.5, -17.5, 11, 1.55, 2.2);
+
+  // 2026-09-28 guidance: the trench's south ramp comes up onto the southTraffic cart road, which runs on
+  // south (round the west of the village) 6 m wide and pale; southWalk turns left across it to the village
+  // mouth over bare field. A line of telegraph poles 2.4–2.8 m north of southWalk starts right at the ramp
+  // head and runs east into the village's own pole line (VillagePole6/0, x 25–47): "the road goes this way"
+  // before the trodden path (SouthWalkTread) is even in view. Poles stand clear of the cart road (≥ 5 m
+  // from its centre line) and of SouthWalkShoulder5.
+  {
+    const poles = [];
+    const Pole = (id, x, z, h = 6.6) => {
+      Block(id, x, z, .22, h, .22, "timber");
+      Detail(`${id}Arm`, x, z, 1.4, .1, .1, "timber", { y: groundAt(x, z) + h - .35 });
+      poles.push({ id, x, z, top: groundAt(x, z) + h - .3 });
+    };
+    Pole("SouthExitPole0", 1.99, -31.51);
+    Pole("SouthExitPole1", 9.59, -27.69);
+    Pole("SouthExitPole2", 18.53, -26.04);
+    for (let i = 1; i < poles.length; i++) {
+      const a = poles[i - 1], b = poles[i], len = Math.hypot(b.x - a.x, b.z - a.z), ry = Math.atan2(b.x - a.x, b.z - a.z);
+      for (const s of [-.5, .5])
+        Detail(`${a.id}Wire${b.id}${s}`, (a.x + b.x) / 2 + Math.cos(ry) * s, (a.z + b.z) / 2 - Math.sin(ry) * s,
+          .03, .03, len, "metal", { ry, y: (a.top + b.top) / 2 - .35 });
+    }
+  }
 
   return { replaceBlockIds, blocks };
 }

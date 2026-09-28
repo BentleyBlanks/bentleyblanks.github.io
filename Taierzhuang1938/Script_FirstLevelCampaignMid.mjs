@@ -113,7 +113,46 @@ export async function Drive(ctx) {
     assert.ok(held.village.held.every((litter) => litter.held), "每一副活着的担架都停到位了");
     assert.ok(held.facts.includes("houseChecked"), "班长真的查看过相邻房屋（KitchenDetour 的前提）");
     if (held.village.held[0]) await CaptureFocus("LittersInCover", held.village.held[0]);
-    await Route([{ x: 58, z: -4 }, { x: 58, z: 0 }], "ConnectedHouseDoor", { fight: true });
+    // 09 进门遭伏击（2026-09-28，COD5 万岁冲锋式一次性按键）：跨出灶屋南门进过道，
+    // 过道西段藏着的那个扑出来把顺子撞翻、压刀。这一段不开枪（fight:false）——
+    // 要验的是按键反刺那条路；「提前击败」「被捅死重来」「追不上作罢」在 Script_FirstLevelMidTest。
+    await Route([{ x: 58, z: -4 }, { x: 58, z: 0.2 }], "KitchenLink", { fight: false, stopFact: "kitchenAmbushSprung" });
+    const pinned = await page.evaluate(() => {
+      const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
+      for (const key of ["KeyW", "KeyS", "KeyA", "KeyD", "ShiftLeft"]) g.Debug.Key(key, false);
+      for (let i = 0; i < 300 && r.village.ambush.Phase !== "prompt" && g.player.alive; i++) g.StepFrames(1, 1 / 60, false);
+      g.StepFrames(6, 1 / 60, false);
+      g.StepFrames(1, 1 / 60, true);
+      return { phase: r.village.ambush.Phase, prompt: r.AmbushPromptView(), cinematic: r.AmbushCinematic,
+        drop: +(g.player.meleeCameraDrop || 0).toFixed(3), alive: g.player.alive, hud: document.getElementById("hud")?.className,
+        facts: g.Debug.FirstLevelMission().facts.filter((fact) => /kitchenAmbush/.test(fact)) };
+    });
+    console.log("KITCHEN_AMBUSH_PROMPT", JSON.stringify(pinned));
+    assert.equal(pinned.phase, "prompt", "进过道就被扑倒压住、屏幕上给出按键环：" + JSON.stringify(pinned));
+    assert.ok(pinned.cinematic && pinned.prompt?.mode === "press" && pinned.prompt.key === "F" && pinned.drop > 0.9,
+      "HUD 让位、倒地镜头、一次性按键环（F）：" + JSON.stringify(pinned));
+    await page.screenshot({ path: path.join(output, "Scene_KitchenAmbushPrompt.png") });
+    const countered = await page.evaluate(() => {
+      const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
+      g.Debug.Key("KeyF");
+      g.StepFrames(12, 1 / 60, false);
+      const mid = { phase: r.village.ambush.Phase, lead: !!r.village.AmbushLead()?.alive };
+      g.StepFrames(1, 1 / 60, true);
+      return mid;
+    });
+    await page.screenshot({ path: path.join(output, "Scene_KitchenAmbushCounter.png") });
+    const risen = await page.evaluate(() => {
+      const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
+      for (let i = 0; i < 300 && r.village.ambush.Phase !== "done" && g.player.alive; i++) g.StepFrames(1, 1 / 60, false);
+      return { phase: r.village.ambush.Phase, control: r.controls?.kind || null, alive: g.player.alive,
+        pitch: +g.player.pitch.toFixed(3), weapon: g.player.meleeWeapon ?? null,
+        facts: g.Debug.FirstLevelMission().facts.filter((fact) => /kitchenAmbush/.test(fact)) };
+    });
+    console.log("KITCHEN_AMBUSH_COUNTER", JSON.stringify({ countered, risen }));
+    assert.ok(countered.phase === "countered" && !countered.lead, "按上 F：他死在反刺这一下上：" + JSON.stringify(countered));
+    assert.ok(risen.phase === "done" && risen.control === null && risen.alive, "起完身还权：" + JSON.stringify(risen));
+    assert.ok(Math.abs(risen.pitch) < 0.2, "起完身是平视的，不是仰着头看屋顶：" + risen.pitch);
+    await Capture("KitchenAmbushRisen");
     const breach = await page.evaluate(async () => {
       const g = window.Tengxian;
       for (let i = 0; i < 1800; i++) {
@@ -122,13 +161,13 @@ export async function Drive(ctx) {
       }
       return g.Debug.FirstLevelMission();
     });
-    assert.ok(breach.facts.includes("meleeBreachStarted"), "连屋那一组真的从东巷进来了");
+    assert.ok(breach.facts.includes("meleeBreachStarted"), "那一拍收尾后连屋那一组其余三个真的从东巷进来了");
     await Capture("ConnectedHouseBreach");
     await WaitStage("Courtyard", 240, { fight: true });
     const melee = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission());
     assert.ok(melee.facts.includes("meleeResolved"), "连屋近处威胁解除");
-    // 先手打掉就不该有固定 QTE：僵持只在真贴上身时发生。
     await fs.writeFile(path.join(output, "Data_MeleeBeat.json"), JSON.stringify({
+      ambush: { pinned, countered, risen },
       engaged: melee.facts.includes("meleeEngaged"),
       windowHolding: melee.facts.includes("windowFireHolding"),
       melee: melee.melee,
