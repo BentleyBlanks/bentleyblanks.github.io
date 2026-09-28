@@ -320,7 +320,10 @@ export class MaterialLibrary {
     if (source.isMeshPhysicalMaterial && source.userData.externalMaterialClass) return source;
     const existing = this.upgradedExternal.get(source);
     if (existing) return existing;
-    const kind = ClassifyExternalMaterial(source.name);
+    // 人物部件表（Data_Tuning_Materials.CHARACTER_SURFACE_PARTS，Script_CharacterSurface.TagCharacterSurface
+    // 打的标）优先于按名字猜：日军材质全叫 `Material #NN`，NRA05 的眼球反倒叫「头部」。"none" = 不分类。
+    const tagged = source.userData.characterSurface?.cls;
+    const kind = tagged === "none" ? null : (tagged || ClassifyExternalMaterial(source.name));
     if (!kind || (kind === "skin" && !this.shading)) {
       source.userData.externalMaterialClass = kind || "";
       this.upgradedExternal.set(source, source);

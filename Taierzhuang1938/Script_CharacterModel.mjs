@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND, CharacterClipModelId, IsApprovedCharacterVariant } from "./Data_CharacterSelection.mjs";
 import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
+import { TagCharacterSurface } from "./Script_CharacterSurface.mjs";
 import { DEATH_POSE } from "./Data_DeathPose.mjs";
 import { DEATH_CONTACT } from "./Data_Tuning_ActorDeath.mjs";
 import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION_LABELS, INFANTRY_ONCE_IDS } from "./Script_InfantryAnimation.mjs";
@@ -878,6 +879,10 @@ export class LugouCharacterRig {
     });
     const skinnedParts = [];
     this.infantryGroundProbes = [];
+    // 人物表面部件按「模型 id × 材质名」查表（Data_Tuning_Materials.CHARACTER_SURFACE_PARTS）：
+    // 日军材质名是流水号，按名字分类认不出皮肤与呢子。必须在 ConfigureExternalPbr 之前打标
+    // （_UpgradeExternal 读标签决定换不换类）；带脸的皮与基础皮共用同一批材质，打一次即可。
+    TagCharacterSurface(this.root, this.modelId);
     this.root.traverse((object) => {
       if (!object.isMesh) return;
       // 枪械稍后才会挂进骨骼插槽；保留这个边界标记，让诊断与测试只审计

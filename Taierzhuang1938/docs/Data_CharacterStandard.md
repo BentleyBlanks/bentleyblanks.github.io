@@ -163,3 +163,51 @@ $env:STANDARDIZE_PASS = 'libraries'; blender --background --factory-startup --py
   以及 `BootTest` 日军远景材质标记缺失。本轮 Boot 门禁另达到 240 s 超时；不将这些报告为通过。
   全套 EditorTest 在音效配方说明缺失后继续到旧 Timeline 段时未完成，已停止；本轮只以人物与面部编辑器
   的定向回归作为已通过证据，不宣称整套编辑器全绿。截图、完整日志与比较检出不提交仓库。
+
+## 人物表面（2026-09-28，3A 迭代 B3）
+
+目标照分镜 01/02/04A/05/05A/06：日军旧橄榄褐呢子、钢盔漆面磨损湿亮、下半身湿泥；国军布军装绑腿沾泥；
+皮肤偏黄褐不粉、有毛孔与污渍；第一人称手脏、有褶皱积泥。只改「看起来」，不动几何、骨骼、动画与选模。
+
+**入口**：`Script_CharacterSurface.mjs`（补丁与变体）→ `Script_UniformColors.ApplyNraUniform`（唯一的挂接点，
+国军布军装换色补丁后面接泥污段，其它部件出各自变体；palette 为 null 的日军也走这里）。
+数值全在 `Data_Tuning_Materials`：`CHARACTER_SURFACE_PARTS`（部件表）、`CHARACTER_GRIME`（泥污 / 磨损 / 落灰）、
+`CHARACTER_SKIN`、`IJA_UNIFORM_COLORS`、`IJA_WOOL_DETAIL`。
+
+- **部件按「模型 id × 材质名」查表**，不按材质名猜：日军材质全叫 `Material #NN`（同名在不同模型里是不同的东西），
+  NRA05 的眼球叫「头部」、脸叫 `Material #26`，NRA02/06 的脸叫 `Material #9`——旧的名字分类把它们都漏了（没有皮肤散射）。
+  `TagCharacterSurface(root, modelId)` 必须在 `ConfigureExternalPbr` **之前**调（人物、第一人称双臂、第一人称身体三处），
+  `_UpgradeExternal` 优先读标签的 `cls`。第一人称双臂按有没有 `Material_HanYangSkin` 分 `FpsHanYang` / `FpsArms`。
+- **泥污 / 磨损 / 落灰**是程序化的（零采样器）：读**蒙皮前**的 `position` / `normal`（Tengxian 共用骨架的绑定姿势是米制、
+  脚底 0、膝 (±0.10, 0.53)、肘 (±0.42, 1.45)、正面 +Z），不改顶点，蒙皮运动矢量不变。泥线以下湿泥 / 干壳按噪声成片，
+  线以上溅点；膝正面磨白 + 一块软边泥，肘磨白，袖口往里蹭脏，朝上的面落灰。挂在骨头上的非蒙皮小件（IJA03 的
+  `Material #55.001`）高度那一路整个抬走。远景人群 / 尸体层烘的是摆好姿势的几何：卧倒、跪姿的人在那两层里整身沾泥，接受。
+- **日军呢子**：按色相 / 饱和 / 明度在 atlas 上分出呢子、皮革（子弹盒、皮带、军靴）与九〇式钢盔（atlas 上一块俯视投影的圆盘，
+  圆盘外缘 = 帽檐；IJA06 那块是九八式略帽的布面，不算钢盔）。呢子换成去饱和橄榄褐（亮度起伏留 atlas 的）+ Lovart 呢子细节包；
+  钢盔换橄榄漆、帽檐一圈与崩口露钢（金属度）、雨水湿斑低粗糙度，五角星（饱和黄）留原色。绒光弱于棉布、颜色贴布色。
+  目标色比分镜看到的暖一档、饱和一档：阴天偏蓝的天光与绒光会把它往灰绿推（第一版 `0x6c6649` 渲出来像国军灰绿）。
+- **皮肤**：色相拉向黄褐、去一点饱和、压暗；Lovart 皮肤微距烘的细节包（毛孔法线 / 凹处明暗 / 皮脂粗糙度，6 cm 一格，
+  0.4–2.8 m 淡出）；atlas 比它自己的模糊 mip 暗的地方积泥（指缝、指甲缝、关节纹）；大块污渍；脸上汗湿低粗糙度。
+  日军 GLB 的 `specularFactor` 是 0（完全没有高光，塑料面具感的来源之一），变体统一给 0.7。汉阳造腕环（160 个三角，
+  UV 横跨手背、脚掌与底色）贴不了图，改成与前臂同色的无贴图皮肤。
+- **采样器**：皮肤变体摘掉 GLB 的 `specularIntensityMap`——three 只读它的 **alpha**，人物的 spec 图全是 RGB WebP（alpha 恒 1），
+  逐像素无差（`Script_CharacterSurfaceTest` 逐张查），腾出的槽给皮肤细节包，皮肤仍 ≤ 16；顺带省下显存（每份 GLB 一张 2048² 的
+  `John_Sp` 不再上传）。呢子 14。远景合批（BatchedMesh）比蒙皮多一个采样器，皮肤与国军军装的合批变体不采细节包
+  （片元里用 `CHAR_BATCHED` / `NRA_CLOTH_BATCHED`，three 的 `USE_BATCHING` 只进顶点着色器）——这顺手修掉了 2026-09-28
+  人群合批上线后 `SamplerBudgetTest` 的两条 17。
+- **Program**：日军按部件拆开、腕环与 NRA05/NRA02 的脸改成皮肤，第一关 ultra|gi=1 程序 219 → 234（+15，全在进关人物预热
+  `WarmActorShaders` 里编掉，换人不现编）；国军军装只是在键尾多一段常数 `charGrime1`，不多程序。
+
+**贴图**（烘焙 `_import/Script_BakeCharacterDetail.py`，源图不入库、落 `_shots/Gap3A_Source/B3/`；清单 `Data_TextureManifest`）：
+
+| 文件 | 尺寸 | 通道 | 来源 |
+|---|---|---|---|
+| `Texture/Texture_CharacterSkinDetail.webp` | 512² | RG 毛孔法线、B 凹处明暗、A 皮脂 | Lovart thread `1e919f94-dd3c-4960-ac27-65fb9b9cea34`，提示词 `_import/Prompts/Texture_CharacterSkin.txt` |
+| `Texture/Texture_IjaUniformWoolDetail.webp` | 512² | RG 斜纹法线、B 斜纹明暗、A 污渍 | Lovart thread `6d31d311-6887-426c-b194-ea67ec861b42`（布纹）+ 国军布细节的污渍源图，提示词 `_import/Prompts/Texture_IjaUniformWool.txt` |
+
+两张都是 `lazy`：第一个人物造出来时才下（先挂中性 1×1，到了原地换，不重编译），URL 带 `?v=`。
+
+**门禁**：`Script_CharacterSurfaceTest`（纯 Node：部件表对得上 GLB 材质名、spec 图无 alpha、细节包规格、打标先于 PBR 接入）、
+`Script_SamplerBudgetTest`、`Script_CharacterModelTest`、`Script_MaterialUpgradeTest`、`Script_MotionVectorContractTest`、
+`Script_RespawnShaderWarmTest`。对照出图 `Script_CharacterSurfaceShots.mjs`（六款外观全身、头肩、膝下、第一人称手；
+`--root=` 指向改前的检出拍基线）。

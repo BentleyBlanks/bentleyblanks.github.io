@@ -12,6 +12,7 @@
 
 import * as THREE from "three";
 import { ApplyNraUniform } from "./Script_UniformColors.mjs";
+import { TagCharacterSurface } from "./Script_CharacterSurface.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } from "./Data_FpsArmPoses.mjs";
@@ -214,6 +215,15 @@ export class FpsArmRig {
       throw new Error(`第一人称蒙皮双臂契约不完整：${this.report.missing.join(", ") || "no SkinnedMesh"}`);
     }
 
+    // 人物表面部件（Data_Tuning_Materials.CHARACTER_SURFACE_PARTS）：汉阳造双手与默认骨骼双臂
+    // 是两份不同的 GLB（腕环、袖长不同），按有没有汉阳造的皮肤材质分。要在 ConfigureExternalPbr 之前打标。
+    let hanYangHands = false;
+    this.root.traverse((object) => {
+      for (const material of object.isMesh ? [].concat(object.material) : []) {
+        if (material?.name === "Material_HanYangSkin") hanYangHands = true;
+      }
+    });
+    TagCharacterSurface(this.root, hanYangHands ? "FpsHanYang" : "FpsArms");
     this.root.traverse((object) => {
       if (!object.isMesh) return;
       object.frustumCulled = false;

@@ -4,10 +4,15 @@
 // The same mask carries the cloth detail layer (NRA_CLOTH_DETAIL): a twill weave
 // normal/value and a grime pass sampled at a high repeat on the atlas UV, so the
 // recolored cloth no longer reads as flat stretched blocks up close.
+// 2026-09-28: ApplyNraUniform is also the entry of the character surface layer
+// (Script_CharacterSurface): the NRA cloth variant appends its mud / wear / dust
+// section, and every other tagged part (IJA wool, skin, gear, garb) gets its own
+// variant here, palette or not (IJA passes a null palette).
 import * as THREE from "three";
 import { NRA_UNIFORM_COLORS, NRA_CLOTH_DETAIL, CLOTH_SHEEN } from "./Data_Tuning_Materials.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
+import { CharacterClothPatches, CharacterSurfaceMaterial, CharacterSurfaceOf } from "./Script_CharacterSurface.mjs";
 
 const sourceMaterials = new WeakMap();
 const variants = new WeakMap();
@@ -76,10 +81,17 @@ function UniformMaterial(material, palette) {
       uniforms.uNraClothGrimeOffset = { value: grimeOffset };
       Object.assign(uniforms, detail);
     },
-    fragment: [
-      ["#include <common>", `uniform vec3 uNraClothTarget;
+    // 远景人群 / 尸体层的 BatchedMesh 比蒙皮多一个采样器（batchingTexture + batchingIdTexture），
+    // 军装再挂细节包就是 17 —— 超预算（2026-09-28 合批上线时的 SamplerBudgetTest 红）。远看布纹与污渍
+    // 早被 mip 平均掉，合批变体不采这张图（不声明 = 不占纹理单元），换色照旧。three 的 USE_BATCHING
+    // 只进顶点着色器，所以片元这边按编译参数自己写一个 NRA_CLOTH_BATCHED（函数形式，编译那一刻现读）。
+    fragment: (shader) => [
+      ["#include <common>", `${shader?.batching ? "#define NRA_CLOTH_BATCHED" : ""}
+uniform vec3 uNraClothTarget;
 uniform float uNraClothBaseLuma;
+#ifndef NRA_CLOTH_BATCHED
 uniform sampler2D uNraClothDetailMap;
+#endif
 uniform vec4 uNraClothDetailTile;
 uniform vec2 uNraClothDetailFade;
 uniform vec3 uNraClothDetailAlbedo;
@@ -103,10 +115,16 @@ uniform vec4 uNraClothRoughness;`],
           #endif
         #endif
         diffuseColor.rgb = mix(diffuseColor.rgb, uNraClothTarget * nraClothDetail, nraClothMask);
+        #ifdef NRA_CLOTH_BATCHED
+          vec4 nraWeave = vec4(0.5);
+          float nraGrime = 0.0;
+          float nraMottle = 0.0;
+        #else
         vec4 nraWeave = texture2D(uNraClothDetailMap, nraUv * uNraClothDetailTile.x);
         float nraGrime = texture2D(uNraClothDetailMap, nraUv * uNraClothDetailTile.y + uNraClothGrimeOffset).a - 0.5;
         // Rotated so the two grime octaves never line up into a visible lattice.
         float nraMottle = texture2D(uNraClothDetailMap, mat2(0.8, -0.6, 0.6, 0.8) * nraUv * uNraClothDetailTile.w + uNraClothGrimeOffset.yx).a - 0.5;
+        #endif
         float nraWeaveValue = nraWeave.b - 0.5;
         // Thread crowns/gaps, then dust (darker, pulled toward loess) and sun-faded patches (lighter).
         vec3 nraCloth = diffuseColor.rgb * (1.0 + nraWeaveValue * 2.0 * uNraClothDetailAlbedo.x)
@@ -155,7 +173,8 @@ uniform vec4 uNraClothRoughness;`],
     const k = NRA_CLOTH_DETAIL.atlasNormalScale;
     tinted.normalScale.set(Math.sign(tinted.normalScale.x || 1) * k, Math.sign(tinted.normalScale.y || 1) * k);
   }
-  ApplyPatches(tinted, [...(PatchesOf(tinted) || []), patch]);
+  ApplyPatches(tinted, [...(PatchesOf(tinted) || []), patch,
+    ...CharacterClothPatches(CharacterSurfaceOf(source), NRA_CLOTH_DETAIL.grimeOffset[palette] || [0, 0])]);
   tinted.userData.nraUniformPalette = palette;
   sourceMaterials.set(tinted, source);
   choices.set(palette, tinted);
@@ -163,12 +182,14 @@ uniform vec4 uNraClothRoughness;`],
 }
 
 export function ApplyNraUniform(root, palette = "grayBlue") {
-  if (!root || !palette) return;
+  if (!root) return;
   root.traverse((mesh) => {
     if (!mesh.isMesh || !(mesh.userData.characterPbrSurface
       || mesh.userData.firstPersonPbrSurface || mesh.userData.firstPersonBody)) return;
-    mesh.material = Array.isArray(mesh.material)
-      ? mesh.material.map((material) => UniformMaterial(material, palette))
-      : UniformMaterial(mesh.material, palette);
+    const rigid = !mesh.isSkinnedMesh;
+    const Pick = (material) => (material?.name === NRA_UNIFORM_COLORS.materialName
+      ? (palette ? UniformMaterial(material, palette) : material)
+      : CharacterSurfaceMaterial(material, { rigid }));
+    mesh.material = Array.isArray(mesh.material) ? mesh.material.map(Pick) : Pick(mesh.material);
   });
 }

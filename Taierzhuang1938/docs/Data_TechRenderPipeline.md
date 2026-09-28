@@ -523,6 +523,9 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
 | 人物 GLB・布（sheen） | 19 | **15** | 同上去掉皮肤 LUT（外部 GLB 一律不吃细节法线，atlas UV） |
 | 第一人称视模 | 19 | **15** | 同上，把 uSsrMap 换成 uFirstPersonShadowMap（视模不挂 SSR，见坑表） |
 | 国军军装（`Material #1721585337`，2026-09-27 布细节层） | 15 | **16** | 人物 GLB・布那一排（boneTexture / map / normalMap / roughnessMap(=ORM) …）+ `uNraClothDetailMap`（布纹/污渍包，`Script_UniformColors`）。**贴线**：再给军装加一路之前先腾一个；第一人称那份不挂 SSR，是 15 |
+| 人物皮肤（2026-09-28 人物表面层 B3） | 16 | **16** | 摘掉 `specularIntensityMap`（three 只读它的 alpha，人物 spec 图全是 RGB WebP = 恒 1，逐像素无差；`Script_CharacterSurfaceTest` 逐张查），腾出的槽给 `uCharSkinDetailMap`（毛孔 / 皮纹包）。第一人称手同样 16 |
+| 日军呢子（`ijaWool`，2026-09-28） | — | **14** | 人物 GLB・布那一排 + `uIjaWoolDetailMap`（呢子细节包）；日军 atlas 没有法线 / 粗糙度图，所以比国军军装宽裕 |
+| 远景人群 / 尸体层的 BatchedMesh（皮肤、国军军装） | 17 | **16** | `batchingTexture` + `batchingIdTexture` 比蒙皮的 `boneTexture` 多一个。合批变体不采细节包（皮肤细节、军装布纹）：three 的 `USE_BATCHING` 只进顶点着色器，补丁按编译参数 `parameters.batching` 在片元写 `CHAR_BATCHED` / `NRA_CLOTH_BATCHED`。2026-09-28 合批上线时这两类是 17（门禁红），同一轮修掉；同批还剩一只静态库材质（`[ormma…mat0r0dmh]`，细节法线 + 合批）是 17，未处理 |
 
 **八轮实测的上界**（`Script_SamplerBudgetTest`）：low 11 / medium・high・ultra `gi=0` 14 /
 medium・high・ultra `gi=1` **16**。gi=1 那三档是贴着上限跑的 —— 再加一路采样器

@@ -2,6 +2,7 @@
 // World-space body follows feet/yaw, never camera pitch or weapon FOV compression.
 import * as THREE from "three";
 import { ApplyNraUniform } from "./Script_UniformColors.mjs";
+import { TagCharacterSurface } from "./Script_CharacterSurface.mjs";
 import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 
 export class FirstPersonBody {
@@ -17,6 +18,8 @@ export class FirstPersonBody {
       action.setEffectiveWeight(0);
       this.actions[clip.name.replace(/^FirstPerson/, "")] = action;
     }
+    // 人物表面部件（泥污 / 磨损，Script_CharacterSurface）：打在共用源材质上，下面逐件 clone 会带过去。
+    TagCharacterSurface(this.root, "FirstPersonBody");
     this.root.traverse((node) => {
       if (!node.isMesh) return;
       node.frustumCulled = false;

@@ -229,6 +229,7 @@ export const testDefs = {
   FacialReviewTest: { file: "Script_FacialReviewTest.mjs", desc: "面部编辑器说话人隔离、关键帧与草稿校验" },
   FacialEditorBrowserTest: { file: "Script_FacialEditorBrowserTest.mjs", timeoutMs: 240000, desc: "真实面部与录音时钟、逐帧、草稿及缺失绑定状态" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：19 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
+  CharacterSurfaceTest: { file: "Script_CharacterSurfaceTest.mjs", desc: "人物表面层：部件表对得上 GLB 材质、spec 图无 alpha、细节包规格、打标先于 PBR 接入（纯 Node）" },
   DeathCollapseTest: { file: "Script_DeathCollapseTest.mjs", timeoutMs: 300000,
     desc: "Kimodo受击倒下：两军四候选、稳定随机、全身贴地与终帧保持" },
   CharacterHitboxMathTest: { file: "Script_CharacterHitboxMathTest.mjs", desc: "人物子弹代理：精确球/胶囊首交点（纯 Node）" },
@@ -519,6 +520,7 @@ export const tier0Fast = [
   "HudPromptTest",
   "RiggedModelTest",
   "CharacterModelTest",
+  "CharacterSurfaceTest",
   "CharacterHitboxMathTest",
   "PlayerHitboxTest",
   "PlayerActorBlockTest",
@@ -661,7 +663,7 @@ export const domains = {
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
     // 开机顺序（存档画质何时套上）与关卡预热的改动连着 SavedGraphicsWarmTest 跑（约一分半）。
-    tests: ["MuzzleFlashTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest"],
+    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -719,6 +721,9 @@ const changedDomainRules = [
   {domain:'render',pattern:/TerrainBlend|TrenchSurfaceMaterial/},
   {domain:'motionVector',pattern:/MotionVector|PostPrepass|Script_Post\.mjs|Actor|Skinn|Skeleton|Viewmodel|FpsArm|BackRifle|Binoculars|Data_Tuning_Graphics/},
   { domain: "render", pattern: /UniformColors/ },
+  // 人物表面层（2026-09-28 B3）：补丁读蒙皮前的 position（运动矢量）、改人物材质（采样器 / 预热 / 远景合批）。
+  { domain: "render", pattern: /CharacterSurface|BakeCharacterDetail|Texture_(CharacterSkinDetail|IjaUniformWoolDetail)/ },
+  { domain: "motionVector", pattern: /CharacterSurface/ },
   // 蒙皮克隆共用骨骼 / 阴影趟按对象种类共用深度材质：两条都改渲染提交。
   // Script_SkinnedClone 还被 /Skinn/ 那条拉进 motionVector（骨骼历史按 Skeleton 记）。
   // Script_ShadowSkip 是阴影烘焙那一趟的子树跳过包装（ShadowSkipTest 是它的纯 Node 门禁）。

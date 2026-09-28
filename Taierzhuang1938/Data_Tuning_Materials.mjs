@@ -76,6 +76,213 @@ export const NRA_CLOTH_DETAIL = Object.freeze({
   grimeRoughness: 0.06,
 });
 
+// ——— 2026-09-28 人物表面（3A 迭代 B3，口径 docs/Data_CharacterStandard.md「人物表面」）———
+//
+// 人物 GLB 的材质**按「模型 id × 材质名」分部件**，不按材质名猜：日军四款的材质全叫
+// `Material #NN`，同一个名字在不同模型里是不同的东西（IJA01 的 #45 是眼球，IJA03 的 #26 是脸），
+// 国军 NRA05 的脸叫 `Material #26`、眼球反倒叫 `战士1_头部`（按名字会把眼球当皮肤、把脸漏掉）。
+// 每条部件写三件事：
+//   cls   外部材质分类（Script_Materials._UpgradeExternal 优先读它）："skin" 接预积分散射、
+//         "cloth" 换 MeshPhysicalMaterial 加绒光、"none" 不分类（压掉按名字的误判）；
+//   role  人物表面补丁（Script_CharacterSurface）："nraCloth" 国军布军装（换色补丁之上再叠泥污）、
+//         "ijaWool" 日军呢子（换色 + 呢子细节 + 皮革 / 钢盔分区）、"skin"、"gear" 装具、"garb" 便服；
+//   其余  逐模型参数：uvMeters 这份 atlas 一个 UV 单位多少米（三角形面积加权中位数，
+//         皮肤细节按它换算平铺）、wool 呢子 atlas 的布面均色、helmet 钢盔在 atlas 上的圆盘
+//         [u, v, 半径]（IJA01/02/03 的九〇式钢盔是一块俯视投影的圆盘，圆盘外缘就是帽檐）、
+//         elbowX / cuffX 绑定姿势下肘与袖口的 |x|（第一人称汉阳造手臂比身体骨架长）、noMap 腕部那种无贴图的皮。
+// 没列进表的材质按旧规矩：名字分类、不挂人物表面补丁。
+const SkinPart = (uvMeters, extra = {}) => Object.freeze({ role: "skin", cls: "skin", uvMeters, ...extra });
+const NraClothPart = (extra = {}) => Object.freeze({ role: "nraCloth", cls: "cloth", ...extra });
+const IjaWoolPart = (extra = {}) => Object.freeze({ role: "ijaWool", cls: "cloth", ...extra });
+const GEAR_PART = Object.freeze({ role: "gear", cls: "none" });
+const NOT_SKIN = Object.freeze({ role: null, cls: "none" });
+// 九〇式钢盔圆盘（IJA01/02/03 共用这一块 atlas 布局；IJA06 在同一位置换成了九八式略帽的布面）。
+const IJA_HELMET_DISC = Object.freeze([0.861, 0.350, 0.138]);
+export const CHARACTER_SURFACE_PARTS = Object.freeze({
+  TengxianIja01: Object.freeze({
+    "Material #54": SkinPart(0.475), "Material #25": SkinPart(0.475), "Material #45": NOT_SKIN,
+    "Material #57": IjaWoolPart({ wool: 0x594a29, officer: true, helmet: IJA_HELMET_DISC }),
+  }),
+  TengxianIja02: Object.freeze({
+    "Material #48": SkinPart(0.475), "Material #25": SkinPart(0.475),
+    "Material #55": IjaWoolPart({ wool: 0x938049, helmet: IJA_HELMET_DISC }), "Material #164": GEAR_PART,
+  }),
+  TengxianIja03: Object.freeze({
+    "Material #26": SkinPart(0.525), "Material #25": SkinPart(0.479), "Material #29": NOT_SKIN,
+    "Material #55": IjaWoolPart({ wool: 0x938049, helmet: IJA_HELMET_DISC }),
+    // 挂在 Spine2 骨上的刚体小件（非蒙皮，位置是骨局部坐标）：只换色，不按高度上泥。
+    "Material #55.001": IjaWoolPart({ wool: 0x938049 }),
+    "Material #164": GEAR_PART,
+  }),
+  TengxianIja06: Object.freeze({
+    "Material #48": SkinPart(0.477), "Material #25": SkinPart(0.475),
+    "Material #55": IjaWoolPart({ wool: 0x94814a }), "Material #164": GEAR_PART,
+  }),
+  // NRA02 的毛巾与枪套（Material #1721585343 / #29）不打部件：它们与帽徽、眼球是同一种平铺着色，
+  // 尸体层 / 任务人物按着色签名合成一只图集网格；单独打成装具就多一个 draw（第一关 CPU 提交瓶颈）。
+  TengxianNra02: Object.freeze({
+    "Material #9": SkinPart(0.502), "John_All Body": SkinPart(1.879), "Material #1721585337": NraClothPart(),
+  }),
+  TengxianNra05: Object.freeze({
+    "Material #26": SkinPart(0.486), "John_All Body": SkinPart(1.879), "战士1_头部": NOT_SKIN,
+    "Material #1721585337": NraClothPart(),
+  }),
+  TengxianNra06: Object.freeze({
+    "Material #9": SkinPart(0.508), "John_All Body": SkinPart(1.879),
+    "Material_InterpreterGarb": Object.freeze({ role: "garb", cls: "none" }),
+  }),
+  // 第一人称：默认骨骼双臂、汉阳造双手（第一关全程用它）、低头看见的身体。
+  // 汉阳造手的网格比身体大 1.36 倍、视模再缩 0.7，屏幕上的 UV 密度与身体的 John_Color 相当。
+  FpsArms: Object.freeze({ "John_All Body": SkinPart(1.93), "Material #1721585337": NraClothPart() }),
+  FpsHanYang: Object.freeze({
+    "Material_HanYangSkin": SkinPart(1.9),
+    // 腕环那 160 个三角的 UV 横跨 atlas 的手背、脚掌与底色，贴不了图：改成与前臂同色的皮肤。
+    "Material_HanYangWrist": SkinPart(1.9, { noMap: true }),
+    "Material #1721585337": NraClothPart({ elbowX: 0.555, cuffX: 0.92 }),
+  }),
+  FirstPersonBody: Object.freeze({ "Material #1721585337": NraClothPart() }),
+});
+
+/**
+ * 泥污 / 磨损 / 落灰（所有人物部件共用一层，程序化，**零采样器**）。
+ * 位置取**绑定姿势**（蒙皮之前的 `position`）：泥跟着布走，不随动作滑动，也不改顶点 ——
+ * 蒙皮运动矢量不受影响（Data_MotionVectorContract，与 Script_CharacterFaceBlood 同一做法）。
+ * Tengxian 共用骨架的绑定姿势：米制、Y 向上、脚底 y≈0、膝 (±0.10, 0.53)、胯 0.95、
+ * T-pose 双臂平举，肘 (±0.42, 1.45)，正面 +Z。远景人群 / 尸体层烘的是**摆好姿势**的几何，
+ * 卧倒、跪姿的人在那两层里整身沾泥 —— 远处看是趴在泥里，接受。
+ *   mudTop / mudEdge   泥线的平均高度与噪声起伏（米）；泥线以下是湿泥（暗、粗糙度低）
+ *   splashTop          溅点最高到哪（米）；splashDensity 溅点覆盖率
+ *   noiseScale         泥线 / 落灰噪声的频率（每米周期数）；splashScale 溅点频率
+ *   knee / elbow       [|x|, y, 半径]：跪、趴磨出来的发白 + 一块泥
+ *   cuff               [|x|, 宽度]：袖口往里这一段蹭脏（手总在泥里、枪上）
+ *   mudWet / mudDry    湿泥与干泥结壳的反照率（sRGB，干壳取鲁南黄土地面色），dustTint 落灰色
+ *   wetShare           泥里湿的比例（脚面几乎全湿，往上干壳渐多，中间按噪声成片）
+ *   rough*             湿泥 / 干泥 / 落灰 / 磨损处的粗糙度
+ *   wearLift / wearDesat  磨损处提亮与去饱和
+ *   roles              逐部件的强度：mud 下半身泥、knee / elbow 磨损、dust 肩背落灰、cuff 袖口
+ */
+export const CHARACTER_GRIME = Object.freeze({
+  mudTop: 0.32,
+  mudEdge: 0.10,
+  splashTop: 0.95,
+  splashDensity: 0.42,
+  noiseScale: 9,
+  splashScale: 30,
+  knee: Object.freeze([0.10, 0.52, 0.12]),
+  elbow: Object.freeze([0.42, 1.447, 0.10]),
+  cuff: Object.freeze([0.63, 0.10]),
+  mudWet: 0x3a3024,
+  mudDry: 0x7a6a52,
+  wetShare: 0.55,
+  dustTint: 0x9a8a6c,
+  roughWet: 0.36,
+  roughDry: 0.93,
+  roughDust: 0.95,
+  roughWear: 0.97,
+  wearLift: 0.16,
+  wearDesat: 0.35,
+  roles: Object.freeze({
+    nraCloth: Object.freeze({ mud: 1, knee: 1, elbow: 0.8, dust: 0.4, cuff: 0.55 }),
+    ijaWool: Object.freeze({ mud: 1, knee: 1, elbow: 0.8, dust: 0.55, cuff: 0.55 }),
+    garb: Object.freeze({ mud: 0.8, knee: 0.6, elbow: 0.4, dust: 0.45, cuff: 0.4 }),
+    gear: Object.freeze({ mud: 0.9, knee: 0, elbow: 0, dust: 0.5, cuff: 0 }),
+    skin: Object.freeze({ mud: 0, knee: 0, elbow: 0, dust: 0.3, cuff: 0 }),
+  }),
+});
+
+/**
+ * 皮肤（所有 role = skin 的部件）：去粉、偏黄褐，脸与手加微细节 / 脏 / 汗。
+ * 目标出自分镜 01/02/04A/05：「脸有毛孔、汗、泥、胡茬，肤色偏黄褐不粉；手是脏的、有纹理与关节褶皱」。
+ *   detailTexture   平铺微细节包（Lovart 皮肤微距 → `_import/Script_BakeCharacterDetail.py`：
+ *                   RG 毛孔/皮纹法线、B 凹处明暗、A 皮脂/粗糙度起伏）
+ *   tileMeters      一格代表多少米（源图 3 cm，放大一倍：真尺度的毛孔在 1080p 一米外不到一个像素）
+ *   normalStrength / fade  细节法线权重与淡出带 [满强度, 完全淡出]（米）
+ *   cavityAlbedo    凹处压暗幅度；oilRoughness 皮脂起伏
+ *   tone / toneMix  往哪个肤色拉、拉多少（只拉色相，亮度保留 atlas 的）；desat 去饱和；value 整体压暗
+ *   roughness / specularIntensity  皮肤的粗糙度与高光强度（F0 = 0.04 × 它；日军 GLB 里写的是 0 = 完全没有高光）
+ *   creaseDirt / creaseBias  褶皱积泥：atlas 本身与它 creaseBias 级 mip 的亮度差 < 0 的地方（指缝、指甲缝、关节纹）
+ *   dirtTint        积泥与污渍的颜色；smudge / smudgeScale 大块污渍的覆盖与频率（每米周期数）
+ *   sweat / sweatRoughness  脸上汗湿的面积与汗湿处的粗糙度
+ *   wristColor      腕环（noMap）用的前臂均色（John_Color 前臂区实测，sRGB）
+ */
+export const CHARACTER_SKIN = Object.freeze({
+  detailTexture: "./Texture/Texture_CharacterSkinDetail.webp",
+  version: 1,
+  tileMeters: 0.06,
+  normalStrength: 0.42,
+  fade: Object.freeze([0.4, 2.8]),
+  cavityAlbedo: 0.20,
+  oilRoughness: 0.10,
+  tone: 0xa8845e,
+  toneMix: 0.5,
+  desat: 0.10,
+  value: 0.92,
+  roughness: 0.6,
+  specularIntensity: 0.7,
+  creaseDirt: 0.45,
+  creaseBias: 3.5,
+  dirtTint: 0x4a3c2d,
+  smudge: 0.26,
+  smudgeScale: 12,
+  sweat: 0.35,
+  sweatRoughness: 0.4,
+  wristColor: 0xc98863,
+});
+
+/**
+ * 日军九八式呢子军装（role = ijaWool）。分镜 04A/05：旧的橄榄土黄呢子、褶深、膝肘磨白、
+ * 下半身湿泥；钢盔漆面磨损、雨水湿亮。atlas 原色是饱和的土黄（色相 43°、饱和 50%），
+ * 换成去饱和、压暗的橄榄褐，亮度起伏（褶皱）保留 atlas 的。
+ *   wool / officerWool   士兵 / 军官（IJA01）呢子的目标反照率（sRGB）。比分镜里看到的颜色暖一档、
+ *                        饱和一档：阴天偏蓝的天光与绒光都会把它往灰绿推（第一版 0x6c6649 渲出来像国军灰绿）
+ *   helmetPaint / helmetSteel  钢盔漆色与磨出来的钢色
+ *   helmetEdge     [开始磨损, 圆盘边]（圆盘半径的比例）：帽檐一圈磨出金属
+ *   helmetChips    漆面崩口的覆盖；helmetRoughness / helmetWetRoughness 漆面与雨水湿亮处
+ *   gear*          装具（背包、卷毯、子弹盒）：往橄榄褐去饱和、压暗
+ *   leather*       皮革（子弹盒、皮带、军靴）：压暗、去一点饱和、略亮一点的粗糙度
+ */
+export const IJA_UNIFORM_COLORS = Object.freeze({
+  wool: 0x75623d,
+  officerWool: 0x5f5033,
+  helmetPaint: 0x4d4530,
+  helmetSteel: 0x57544e,
+  helmetEdge: Object.freeze([0.84, 0.985]),
+  helmetChips: 0.35,
+  helmetRoughness: 0.55,
+  helmetWetRoughness: 0.24,
+  gearTint: 0x6f6a50,
+  gearDesat: 0.5,
+  gearValue: 0.86,
+  leatherValue: 0.86,
+  leatherDesat: 0.2,
+  leatherRoughness: 0.58,
+});
+
+/**
+ * 呢子细节包（同 NRA_CLOTH_DETAIL 的布局与意义，源图是 Lovart 九八式呢子微距）。
+ * 呢子 atlas 的 UV 密度与国军军装相当（约 2.3 米 / UV 单位），平铺倍数照搬：
+ * weaveTile 10 ≈ 23 cm 一格、斜纹约 3 mm 一道（比真呢子粗一倍，理由同国军那段）。
+ * sheen / sheenLift：呢子的绒光比棉布弱、颜色更贴布色（CLOTH_SHEEN 的全局值会把橄榄褐刷成一层灰白）。
+ */
+export const IJA_WOOL_DETAIL = Object.freeze({
+  texture: "./Texture/Texture_IjaUniformWoolDetail.webp",
+  version: 1,
+  weaveTile: 10,
+  grimeTile: 3.3,
+  mottleTile: 13,
+  normalStrength: 0.8,
+  normalFade: Object.freeze([1.5, 9]),
+  weaveAlbedo: 0.14,
+  grimeAlbedo: 0.34,
+  mottleAlbedo: 0.2,
+  grimeTint: 0x8c7a5c,
+  roughness: 0.9,
+  weaveRoughness: 0.06,
+  grimeRoughness: 0.05,
+  sheen: 0.3,
+  sheenLift: 0.25,
+});
+
 /**
  * 逐配方的表面参数。`Script_Materials` 按配方名查这张表决定编哪几个 define。
  *
