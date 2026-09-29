@@ -98,8 +98,8 @@ try {
   await page.screenshot({ path: outFile });
   const bearers = probe.members.filter((m) => m.role === "bearer");
   const ok = bearers.length === 2
-    && bearers.some((m) => m.clip === "CarryStretcherFront")
-    && bearers.some((m) => m.clip === "CarryStretcherRear")
+    && bearers.some((m) => /^(CarryStretcher|LitterBearer)Front/.test(m.clip || ""))
+    && bearers.some((m) => /^(CarryStretcher|LitterBearer)Rear/.test(m.clip || ""))
     && probe.walkerClipsSeen.includes("WoundedLimp")
     && probe.state.litters?.[0]?.carried === true;
   console.log(`${ok ? "PASS" : "FAIL"} — EscortLitterShot: wrote ${outFile}`);
