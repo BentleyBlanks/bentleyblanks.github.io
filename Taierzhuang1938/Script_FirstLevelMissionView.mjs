@@ -8,8 +8,33 @@ import { CreateStretcherGeometry } from "./Script_StretcherAsset.mjs";
 import { STRETCHER_PATIENT_LIFT_M } from "./Data_Carry.mjs";
 // 地上平放的担架（MISSION_PLACEMENT.groundStretchers）：按 z 分簇的簇宽、伤员报画的距离。
 const GROUND_STRETCHER_CLUSTER_M = 60, GROUND_STRETCHER_PATIENT_DRAW_M = 70;
+// 老周的挎包平放在担架 +Z 端的布兜上（担架自己的坐标系，布兜面约 y 0.1）。老周躺上去头朝 +Z，
+// 所以包在他头边、像垫着的（2026-09-30 实拍核过不穿头、不压竹竿）。
+const ZHOU_KIT_LOCAL = {x: 0.07, y: 0.105, z: 0.86, yaw: 0.32};
+/**
+ * 老周的帆布挎包：扁的软包身（顶面鼓、四边收）+ 盖到前沿垂下来的包盖 + 一段折在包上的背带。
+ * 原点在包底中心，平放，长边沿 X。原来是一块 0.32×0.43×0.21 竖着立的卡其方块，看不出是什么。
+ */
+function HaversackGeometry() {
+  const w = .28, h = .06, d = .2;
+  const body = new THREE.BoxGeometry(w, h, d, 6, 2, 6), p = body.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const u = p.getX(i) / (w / 2), v = p.getZ(i) / (d / 2), t = (p.getY(i) + h / 2) / h;
+    const fall = (1 - u * u) * (1 - v * v);
+    // 顶面鼓起、底面贴平；侧面往中间收一点，棱就软了。
+    const pinch = 1 - .12 * Math.abs(t - .5) * 2;
+    p.setXYZ(i, p.getX(i) * pinch, t * h + t * .028 * fall, p.getZ(i) * pinch);
+  }
+  body.computeVertexNormals();
+  const flapTop = PlaceGeometry(new THREE.BoxGeometry(w * .96, .008, d * .62), {x: 0, y: h + .03, z: d * .19, rx: -.08});
+  const flapFront = PlaceGeometry(new THREE.BoxGeometry(w * .96, h * .8, .008), {x: 0, y: h * .62, z: d * .5 + .004});
+  const strap = PlaceGeometry(new THREE.BoxGeometry(.03, .006, .34), {x: -w * .3, y: h + .036, z: -.02, ry: .18});
+  const geometry = MergeGeometries([body.toNonIndexed(), flapTop, flapFront, strap]);
+  geometry.computeBoundingBox();
+  return geometry;
+}
 import { BuildSink } from "./Script_World.mjs";
-import { PlaceGeometry } from "./Script_Geo.mjs";
+import { MergeGeometries, PlaceGeometry } from "./Script_Geo.mjs";
 import { ApplyShadowDepth, AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { MISSION_PLACEMENT, MISSION_SUPPLIES, MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { Type89Damage } from "./Script_Type89Damage.mjs";
@@ -51,7 +76,7 @@ export class FirstLevelMissionView {
     this.draftCartModels = new DraftCartModels(this.root);
     this.personColor = new THREE.Color();
     for (const [key, geometry, color, count] of [
-      ["fieldPack",new THREE.BoxGeometry(.32,.43,.21),0x857a56,4],
+      ["fieldPack", HaversackGeometry(), 0x6c6547, 4],
       ["body", new THREE.BoxGeometry(0.42, 0.65, 0.25), 0x87958d, 160],
       ["head", new THREE.SphereGeometry(0.13, 7, 5), 0xc9bda7, 160],
       ["limb", new THREE.BoxGeometry(0.13, 0.64, 0.14), 0x747c72, 640],
@@ -393,7 +418,7 @@ export class FirstLevelMissionView {
   Person(x,z,yaw,time,options={}) {
     return this.people.Person(options.id||("Person"+x+"_"+z),x,z,yaw,options);
   }
-  RigidProp(key, id, x, y, z, yaw) {
+  RigidProp(key, id, x, y, z, yaw, quaternion = null) {
     const identity=key+':'+id;
     let mesh=this.rigidProps.get(identity);
     if(!mesh){
@@ -403,7 +428,7 @@ export class FirstLevelMissionView {
       mesh.name='Mission_'+identity;mesh.castShadow=true;mesh.receiveShadow=true;
       this.rigidProps.set(identity,mesh);this.rigidParts[key].push(mesh);this.root.add(mesh);
     }
-    mesh.position.set(x,y,z);mesh.rotation.set(0,yaw,0);mesh.visible=true;
+    mesh.position.set(x,y,z);if(quaternion)mesh.quaternion.copy(quaternion);else mesh.rotation.set(0,yaw,0);mesh.visible=true;
   }
   /**
    * 这辆车周围「尸体比地面高多少」：静态顶面格 + 车周 dynamicRangeM 内倒下的人
@@ -477,8 +502,13 @@ export class FirstLevelMissionView {
         // 老周担架上的近景件（他的挎包）。**身份稳定的普通 Mesh**，不是实例 ——
         // 逐实例形变不在 MotionVector 契约内（见 Script_PostPrepass 抬头），
         // 12/13 这副担架会跟着牛马车走、相机也跟着走，正是那类近景移动件。
-        this.RigidProp("fieldPack", "ZhouKit",
-          litter.x + Math.cos(yaw) * .34, ground + height + .1, litter.z - Math.sin(yaw) * .34, yaw);
+        // 挎包跟着担架一起歪（落地、过门槛、车上颠），平放在头边布兜上。
+        // 挎包与担架同挂在 this.root 下：用担架的局部矩阵换算就够，不必刷整棵树。
+        this.zhouRoot.updateMatrix();
+        const kit = this.zhouKitScratch ||= {p: new THREE.Vector3(), q: new THREE.Quaternion(), turn: new THREE.Quaternion()};
+        kit.p.set(ZHOU_KIT_LOCAL.x, ZHOU_KIT_LOCAL.y, ZHOU_KIT_LOCAL.z).applyMatrix4(this.zhouRoot.matrix);
+        kit.q.copy(this.zhouRoot.quaternion).multiply(kit.turn.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, ZHOU_KIT_LOCAL.yaw));
+        this.RigidProp("fieldPack", "ZhouKit", kit.p.x, kit.p.y, kit.p.z, yaw, kit.q);
       } else {
         this.Instance("bed", litter.x, ground + height, litter.z, yaw);
       }
