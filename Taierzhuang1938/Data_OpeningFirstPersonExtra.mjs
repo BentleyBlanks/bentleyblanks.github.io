@@ -159,11 +159,14 @@ export const FP_PROPS = Freeze({
   // The seated fill clip (ShunziSitFillCharger, 09-27): the charger in the left hand filling up (`fill`: its rounds show
   // one by one at the clip's roundIn events, none after chargerStowed, the charger itself hidden in the pocket until
   // chargerDrawn), a loose round pinched in the right hand from roundPicked to roundIn (kind "round": its long axis
-  // `axis` in the palm frame), and the rifle across both thighs (no `thigh`: hips to the knees' midpoint).
+  // `axis` in the palm frame), and the rifle on the right thigh.
   fillCharger: Freeze({ kind: "clip", hand: "l", offset: V(.012, -.026, .035), yawDeg: 0, fill: true }),
   fillRound: Freeze({ kind: "round", hand: "r", offset: V(.02, -.03, .055), axis: V(0, 0, 1) }),
-  // Across the thighs, muzzle out to his left and a little forward, lying on its side with the bolt up and towards him.
-  fillRifle: Freeze({ kind: "rifle", along: .55, lift: .07, gripAheadM: .05, muzzle: V(-.95, 0, -.3), up: V(0, .55, .83) }),
+  // SB01 (review 09-29 「画面里怎么没有枪」: across both thighs it lay under the forearms, off the bottom of the frame): its
+  // fore-end on the right knee, muzzle forward-left and up towards the dugout mouth (in frame looking ahead), butt low
+  // beside the hip, bolt towards him. Between rounds the fill clip's right hand rests on it behind the knee
+  // (_import/Script_OpeningStoryboardClips.py FILL_RIFLE_REST, measured against this placement: moving it means rebaking).
+  fillRifle: Freeze({ kind: "rifle", thigh: "r", along: 1, lift: .06, gripAheadM: .12, muzzle: V(-.42, .2, -.88), up: V(-.3, 1, .2) }),
   // The ammo crate he sits on: its size is the clip's (manifest clips.<fill>.seat.crateM: across, deep, high; sizeM only
   // if that is missing), under the pelvis `backM` towards the wall, a darker lid band on top.
   fillSeat: Freeze({ kind: "crate", sizeM: V(.44, .30, .28), backM: .03, color: 0x6e5337, lidColor: 0x4f3b27 }),

@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260928OpeningStoryboardsV15IkBranch",
+ "version": "20260929OpeningStoryboardsV16FirstPersonRifle",
  "fps": 24,
  "actorForward": [
   0,
@@ -2402,7 +2402,7 @@
      "kind": "chargerDrawn"
     }
    ],
-   "notes": "SB01 first person (2026-09-27): seated on an ammo crate (seat.crateM, drawn at runtime) against the back wall, feet on the floor, rifle across the thighs (runtime prop), the charger held in the left hand over the lap. Five rounds from the right front belt pouch pressed into it one after the other (events roundPicked / roundIn n), then the full charger looked over, into the left breast pocket (chargerStowed) and an empty one out (chargerDrawn). Hands in the torso frame. Played on the player body in Banter / Orders until the order to leave.",
+   "notes": "SB01 first person (2026-09-27): seated on an ammo crate (seat.crateM, drawn at runtime) against the back wall, feet on the floor, rifle along the right thigh (runtime prop; the right hand rests on it between rounds), the charger held in the left hand over the lap. Five rounds from the right front belt pouch pressed into it one after the other (events roundPicked / roundIn n), then the full charger looked over, into the left breast pocket (chargerStowed) and an empty one out (chargerDrawn). Hands in the torso frame. Played on the player body in Banter / Orders until the order to leave.",
    "rigs": [
     "TengxianNra02"
    ]
@@ -3280,7 +3280,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "b07888e38602c55ba43bbe00acf2458a5beb817b782a6e6a5b1d478d4701aa07",
+   "sha256": "7de2c0edaad116a16913972084454e5b7306aeb11697de41984d2ff6ff8edc0f",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
@@ -3512,7 +3512,7 @@
      ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningPinnedRescue_20260927\\Scene_TengxianNra02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningFirstPersonRifle_20260929\\Scene_TengxianNra02OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
