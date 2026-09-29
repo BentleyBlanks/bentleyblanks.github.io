@@ -26,10 +26,12 @@ function Ok(name) { passed += 1; console.log(`ok  ${name}`); }
 function FakeAudio({ listener = { x: 0, y: 1.6, z: -150 }, life = 2.0, zone = "open" } = {}) {
   const a = {
     listenerPos: listener, battleIntensity: 0, pendingVoices: new Set(), ambiencePreset: "smokyDay",
-    clock: 0, calls: [], ambience: [], zone, timers: [],
+    clock: 0, calls: [], ambience: [], zone, timers: [], ducks: [], shapes: [],
     Play(cue, o = {}) { const v = { cue }; a.calls.push({ t: a.clock, cue, ...o }); a.pendingVoices.add(v); a.timers.push([a.clock + life, v]); return v; },
     Ambience(p, o = {}) { a.ambiencePreset = p; a.ambience.push({ t: a.clock, p, ...o }); },
     ListenerZone() { return a.zone; },
+    Duck(seconds, amount) { a.ducks.push({ t: a.clock, seconds, amount }); },
+    ShapeFarBeds(shape) { a.shapes.push({ t: a.clock, ...shape }); return 2; },
     Tick(dt) { a.clock += dt; a.timers = a.timers.filter(([at, v]) => (at <= a.clock ? (a.pendingVoices.delete(v), false) : true)); },
   };
   return a;
@@ -38,13 +40,24 @@ function Run(sound, audio, stage, seconds, { dt = 1 / 30, speaking = false } = {
   for (let t = 0; t < seconds; t += dt) { audio.Tick(dt); sound.Update(dt, stage, speaking); }
 }
 const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
+/**
+ * 假宿主：任务事实 + 开场导演（只读相位与 beats）+ 地面。director = true 给一个停在 Banter 的导演（01 的显现兜底走导演相位；
+ * 卡住的保险是 stuckS，比测试跑的时间长），false 没有导演（兜底走 stageS）。
+ */
+function FakeHost({ facts = new Set(), director = true, soldiers = [] } = {}) {
+  const bunker = { phase: "Banter", beats: new Set(["Banter"]) };
+  return { facts, bunker, Has: (id) => facts.has(id), ai: { soldiers }, battlefield: { GroundHeight: () => 0 },
+    ...(director ? { frontShow: { bunker } } : {}),
+    Phase(name) { bunker.phase = name; bunker.beats.add(name); } };
+}
 
 // ---------------------------------------------------------------------------
 // 1) 远处交火生成器
 // ---------------------------------------------------------------------------
 {
+  // 显现之前（导演停在 Banter、传令兵还没开口）的 01：一分钟里全部隔着土、远、走远声组。显现之后的样子见「01 显现」那一节。
   const audio = FakeAudio();
-  const sound = new FirstLevelMissionBattleSound(audio, null);
+  const sound = new FirstLevelMissionBattleSound(audio, FakeHost(), 0x19380923);
   Run(sound, audio, "Trapped", 1.3);
   const first = audio.calls.filter((c) => c.soundField);
   assert.ok(first.length > 0 && first[0].t <= D.front.firstWithinS + 0.05,
@@ -84,135 +97,350 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   Ok(`前线 ${front.length} 声全带 selfCapped；拒收 ${f.refused} 单独记账，plays ${f.plays} 只数收下的`);
 }
 {
-  // 【2026-09-24 恢复】01 被压着时前线渐强（front.stages.Trapped.swell）。旧断言在 09-23 换声景时删了，
-  // 用户拍板「恢复」。逐秒量 State().front.swell：从底单调爬到顶（顶 = stages.Trapped 的 intensity / gain），
-  // 到顶后不回落；近爆事实一来 catchUpS 内补完；其它步骤恒为 1。
-  const P = D.front.stages.Trapped, S = P.swell;
-  assert.ok(S && S.riseS > 0 && S.intensityFrom < 1 && S.gainFrom < 1, "01 有渐强数据");
-  const facts = new Set();
-  const audio = FakeAudio();
-  const sound = new FirstLevelMissionBattleSound(audio, { Has: (id) => facts.has(id) }, 0x19380924);
-  const curve = [];
-  for (let second = 1; second <= S.riseS + 40; second += 1) {
-    Run(sound, audio, "Trapped", 1);
-    const f = sound.State().front;
-    curve.push({ t: f.stageTime, u: f.swell.u, intensity: P.intensity * f.swell.intensity, gain: P.gain * f.swell.gain });
-  }
-  for (let i = 1; i < curve.length; i += 1) {
-    assert.ok(curve[i].intensity >= curve[i - 1].intensity - 1e-9 && curve[i].gain >= curve[i - 1].gain - 1e-9,
-      `01 前线强度只升不降：${JSON.stringify(curve[i - 1])} → ${JSON.stringify(curve[i])}`);
-  }
-  const rising = curve.filter((c) => c.t < S.riseS - 0.5);
-  for (let i = 1; i < rising.length; i += 1) {
-    assert.ok(rising[i].intensity > rising[i - 1].intensity && rising[i].gain > rising[i - 1].gain,
-      `到顶之前每一秒都在涨（${rising[i].t} s）`);
-  }
-  const first = curve[0], atPeak = curve.find((c) => c.t >= S.riseS - 1e-6), last = curve.at(-1);
-  assert.ok(first.intensity < P.intensity * 0.5 && first.gain < P.gain * 0.35,
-    `开头远而轻：强度 ${first.intensity.toFixed(3)}、音量 ${first.gain.toFixed(3)}`);
-  assert.ok(Math.abs(atPeak.intensity - P.intensity) < 1e-9 && Math.abs(atPeak.gain - P.gain) < 1e-9,
-    `${S.riseS} s 到顶：强度 ${atPeak.intensity}、音量 ${atPeak.gain}`);
-  assert.ok(curve.filter((c) => c.t >= S.riseS).every((c) => c.intensity === P.intensity && c.gain === P.gain),
-    "到顶之后整段 01 停在顶上，不回落");
-  // 实际播出来的音量也跟着涨：每一声相对自己的 cueVolume，头 15 s 与到顶前后 15 s 比。
-  const Norm = (a, b) => audio.calls.filter((c) => c.soundField && c.t >= a && c.t < b).map((c) => c.volume / D.front.cueVolume[c.cue]);
-  const Mean = (xs) => xs.reduce((x, y) => x + y, 0) / Math.max(1, xs.length);
-  const early = Norm(0, 15), late = Norm(S.riseS - 5, S.riseS + 10);
-  assert.ok(early.length > 0 && late.length > 0 && Mean(late) > Mean(early) * 2,
-    `播出来的前线由轻到响：头 15 s ${early.length} 声 均 ${Mean(early).toFixed(3)}，到顶前后 ${late.length} 声 均 ${Mean(late).toFixed(3)}`);
-  // 由稀到密：单个种子里一个窗口只有四五场交火，看不出来；十六个种子平均。
-  const Density = (a, b) => {
-    let n = 0;
-    for (let seed = 1; seed <= 16; seed += 1) {
-      const ad = FakeAudio(), sd = new FirstLevelMissionBattleSound(ad, { Has: () => false }, seed);
-      Run(sd, ad, "Trapped", b);
-      n += ad.calls.filter((c) => c.soundField && c.t >= a && c.t < b).length;
-    }
-    return n / 16;
+  // 【2026-09-29】01 的前线跟着剧情走（用户：「传令兵说话的那一刻，外围的战场的声音就应该要显现了」）。
+  // 旧的计时渐强（09-24 恢复的那一条：进 01 起 50 s 到顶，与剧情节点无关）换成三段：
+  //   显现前（洞里战斗间隙）：稀、低、闷；传令兵开口（任务事实 runnerCallHeard）：1–3 s 内低通打开、交火翻倍、
+  //   中距离圈起、床拉开、一段设计好的序列；之后 buildS 秒推到顶，近爆事实来了 catchUpS 内补完。
+  // 逐项量 State().front.reveal / swell 与 Play 出来的每一声。浏览器里的电平、频谱与录音见 docs/Data_AudioWiring.md 3d。
+  const P = D.front.stages.Trapped, S = P.swell, R = P.reveal;
+  assert.ok(S && R && R.fact === "runnerCallHeard" && R.riseS >= 1 && R.riseS <= 3, "01 有渐强与显现数据，显现在 1–3 s 里完成");
+  const Rel = (c) => c.volume / D.front.cueVolume[c.cue];
+  const Mean = (xs) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+  const Db = (x) => 20 * Math.log10(x);
+  const Front = (audio, a, b) => audio.calls.filter((c) => c.soundField && c.t >= a && c.t < b);
+  const Make = (seed = 0x19380929, opts = {}) => {
+    const facts = opts.facts || new Set(), host = FakeHost({ facts, director: opts.director !== false });
+    const audio = FakeAudio({ zone: "dugout" });
+    return { facts, host, audio, sound: new FirstLevelMissionBattleSound(audio, host, seed) };
   };
-  const sparse = Density(0, 20), dense = Density(S.riseS - 10, S.riseS + 10);
-  assert.ok(dense > sparse * 1.2, `由稀到密（16 个种子平均）：头 20 s ${sparse.toFixed(1)} 声 → 到顶前后 20 s ${dense.toFixed(1)} 声`);
-  // 【2026-09-24 审查补】频次那一半单独钉住：上面的密度对比只靠「首场往后摊 + 等待按涨幅缩短」
-  // 也过得去（把 rate 上的 swell.intensity 倍率拿掉，16 种子仍是 26.4 → 37.6）。这里直接量每一场
-  // 交火排下一场时用的频次：等待 = R(gapS) / (P.intensity × swell.intensity × 扇区权重) + 排队余量。
+
+  // ① 显现之前：lull。
+  const { facts, host, audio, sound } = Make();
+  Run(sound, audio, "Trapped", 30);
   {
-    // 包住 StartExchange 之后的第一次 R（就是 gapS 那一抽）与紧跟着的 QueueSpanS，
-    // 在排下的那一帧读 nextAt（下一帧的「按涨幅缩短」会再改它，所以只对照刚排下的那一刻）。
-    const ag = FakeAudio(), sg = new FirstLevelMissionBattleSound(ag, { Has: () => false }, 0x5e11);
-    const R1 = sg.R.bind(sg), Q1 = sg.QueueSpanS.bind(sg), X1 = sg.StartExchange.bind(sg);
-    let armed2 = false, gap2 = null, pending = null;
-    const got = [];
-    sg.StartExchange = (sector) => { const r = X1(sector); armed2 = true; return r; };
-    sg.R = (a, b) => { const v = R1(a, b); if (armed2) { gap2 = v; armed2 = false; } return v; };
-    sg.QueueSpanS = (sector) => { const q = Q1(sector); pending = { sector, gap: gap2, q, now: sg.frontTime, intensity: sg.swellScale.intensity }; return q; };
-    for (let t = 0; t < S.riseS + 10; t += 1 / 30) {
-      ag.Tick(1 / 30);
-      sg.Update(1 / 30, "Trapped", false);
-      if (pending) { got.push({ ...pending, wait: pending.sector.nextAt - pending.now - pending.q }); pending = null; }
-    }
-    const earlyN = got.filter((g) => g.intensity < 0.7).length;
-    assert.ok(got.length >= 10 && earlyN >= 3, `量到 ${got.length} 场交火（其中 ${earlyN} 场在渐强前段）`);
-    for (let i = 0; i < got.length; i += 1) {
-      const g = got[i], weight = (P.weights?.[g.sector.spec.id] ?? 1) * g.sector.spec.weight;
-      const expected = g.gap / Math.max(0.05, P.intensity * g.intensity * weight);
-      assert.ok(Math.abs(g.wait - expected) < 1e-6,
-        `第 ${i + 1} 场（${g.now.toFixed(2)} s，渐强强度 ×${g.intensity.toFixed(3)}）排下一场的等待 ${g.wait.toFixed(3)} s，应为 ${expected.toFixed(3)} s`);
-    }
-    Ok(`01 渐强的频次：${got.length} 场交火排下一场的等待都按 P.intensity × 渐强倍率 × 权重算（渐强前段 ${earlyN} 场）`);
+    const f = sound.State().front;
+    assert.ok(f.reveal.source === null && f.reveal.open === 0 && f.reveal.beats === 0, `显现前没有显现：${JSON.stringify(f.reveal)}`);
+    assert.ok(f.swell.u <= R.lullU + 1e-9, `显现前 u 只爬到 lullU ${R.lullU}：${f.swell.u}`);
+    assert.equal(f.reveal.cutHz, P.airCut, "显现前低通就是「隔着土」");
+    assert.ok(Front(audio, 0, 1e9).every((c) => c.airCut <= P.airCut), "显现前每一声都闷");
+    assert.equal(audio.ducks.length, 0, "显现前不动配乐");
+    assert.equal(audio.shapes.length, 0, "显现前不动远声组的床");
+    assert.ok(sound.State().front.sectors.filter((s) => /^Mid/.test(s.id)).every((s) => s.exchanges === 0), "显现前中距离圈不起");
   }
-  Ok(`01 渐强：强度 ${first.intensity.toFixed(2)}→${P.intensity}、音量 ${first.gain.toFixed(2)}→${P.gain}（${S.riseS} s 到顶）；`
-    + `每声相对音量 ${Mean(early).toFixed(3)}→${Mean(late).toFixed(3)}，20 s 声数 ${sparse.toFixed(1)}→${dense.toFixed(1)}`);
+  const lullGain = sound.State().front.swell.gain * P.gain, lullIntensity = sound.State().front.swell.intensity * P.intensity;
 
-  // 近爆来得比 riseS 早：catchUpS 内补到顶，补的过程也只升不降。
-  const facts2 = new Set(), a2 = FakeAudio();
-  const s2 = new FirstLevelMissionBattleSound(a2, { Has: (id) => facts2.has(id) }, 0x19380924);
-  Run(s2, a2, "Trapped", 20);
-  const before = s2.State().front.swell;
-  facts2.add(S.peakFact);
-  let prev = before.u, topAt = null;
+  // ② 传令兵开口：事实一记，序列排进队列，配乐让一下，床拉开。
+  const t0 = audio.clock;
+  facts.add(R.fact);
+  Run(sound, audio, "Trapped", 0.1);
+  {
+    const f = sound.State().front;
+    assert.ok(f.reveal.source === "fact" && f.reveal.beats >= 5, `事实一到就显现：${JSON.stringify(f.reveal)}`);
+    assert.ok(audio.ducks.length === 1 && audio.ducks[0].seconds === R.musicDuck.seconds && audio.ducks[0].amount === R.musicDuck.amount,
+      "显现那一刻配乐让一下（Duck 一次）");
+    assert.deepEqual(audio.shapes.map((x) => [x.level, x.cut, x.rampS]), [[R.beds.level, R.beds.cut, R.riseS]], "远声组的床在 riseS 里拉开");
+  }
+  let prevOpen = -1;
+  for (let t = 0; t < R.riseS + 0.3; t += 0.1) {
+    Run(sound, audio, "Trapped", 0.1);
+    const o = sound.State().front.reveal.open;
+    assert.ok(o >= prevOpen - 1e-9, "open 只升不降");
+    prevOpen = o;
+  }
+  assert.equal(sound.State().front.reveal.open, 1, `${R.riseS} s 之后完全打开`);
+  Run(sound, audio, "Trapped", R.holdS + 0.5);
+  // 序列（头 4.5 s）：机枪一梭、步枪连成片、日军炮口 + 落点、一发近落弹（啸声 + 爆炸），全部低通开到 cut.open。
+  {
+    const seq = audio.calls.filter((c) => c.t >= t0 && c.t < t0 + R.holdS + 0.6);
+    const sf = seq.filter((c) => c.soundField);
+    const mg = sf.filter((c) => c.cue === "type92Far" && c.burst >= 8);
+    const answer = sf.filter((c) => c.cue === "zb26Far" && c.burst >= 3);
+    const rifles = sf.filter((c) => c.cue === "rifleNraFar" || c.cue === "rifleIjaFar");
+    const crackle = R.beats.find((b) => b.kind === "crackle");
+    assert.ok(mg.length >= 1 && answer.length >= 1, `序列有日军九二式一梭与我方捷克式回击：${mg.length}/${answer.length}`);
+    assert.ok(rifles.length >= crackle.shots * 0.7, `步枪噼啪连成片：${rifles.length}/${crackle.shots} 发`);
+    assert.ok(sf.some((c) => c.cue === "amb.cannonFar") && sf.some((c) => c.cue === "explosionFar"), "日军炮口一声，炮弹落在我方一线");
+    const shell = seq.filter((c) => !c.soundField && c.cue === "shellIncoming");
+    assert.ok(shell.length === 1 && seq.some((c) => !c.soundField && /^explosion(Mid|Far)$/.test(c.cue) && c.airCut > 900),
+      "序列里一发场外近落弹：先有啸声，爆炸的低通也打开了");
+    // 啸声摆在「听者 → 落点」连线上（incomingShare），不在 100 m 外的落点上空。
+    const L = audio.listenerPos, wd = Math.hypot(shell[0].position.x - L.x, shell[0].position.z - L.z);
+    assert.ok(wd < 80, `啸声摆在头顶一侧（离听者 ${wd.toFixed(0)} m），不是落点上空`);
+    assert.ok(sound.artillery.State().scripted === 1 && sound.State().front.reveal.shells === 1, "近落弹是剧本点名的一发");
+    assert.ok(sf.every((c) => c.selfCapped === true && c.yieldFirst === true), "序列的声也走前线的声部账（selfCapped / yieldFirst）");
+    const scripted = [...mg, ...answer, ...rifles];
+    assert.ok(scripted.every((c) => c.airCut <= R.cut.open + 1) && scripted.some((c) => c.airCut === R.cut.open),
+      `序列的低通开到 ${R.cut.open} Hz`);
+    // 比显现前响得多：序列每一声相对自己 cueVolume 的平均 vs 显现前那一分钟。
+    const before = Front(audio, 0, t0).map(Rel);
+    assert.ok(Mean(rifles.map(Rel)) >= Mean(before) * 1.6,
+      `序列的步枪比显现前响 ≥ 4 dB（另有低通打开、更近的距离，远声组整体的台阶见浏览器实测）：${Db(Mean(rifles.map(Rel)) / Mean(before)).toFixed(1)} dB`);
+    // 声部：序列最多同时 scriptedMaxVoices 条前线声，合计不过共享账。
+    assert.ok(sound.frontPeakShared <= D.front.sharedMaxVoices, `序列期间前线 + 落土 + 炮击合计峰值 ${sound.frontPeakShared} ≤ ${D.front.sharedMaxVoices}`);
+  }
+  // 显现完成后（open = 1，u 从 lull 爬到 revealU）：音量台阶、频次翻倍、随机交火的低通、中距离圈。
+  {
+    const f = sound.State().front;
+    const after = f.swell.gain * P.gain, afterIntensity = f.swell.intensity * P.intensity;
+    assert.ok(Db(after / lullGain) >= 8, `显现前后音量台阶 ${Db(after / lullGain).toFixed(1)} dB（≥ 8）`);
+    assert.ok(afterIntensity >= lullIntensity * 1.6, `交火频次 ×${(afterIntensity / lullIntensity).toFixed(2)}（≥ 1.6）`);
+    assert.equal(f.reveal.cutHz, R.cut.open, "显现之后随机交火的低通是 cut.open");
+  }
+  Run(sound, audio, "Trapped", 24);
+  {
+    const mids = sound.State().front.sectors.filter((s) => /^Mid/.test(s.id));
+    assert.ok(mids.length === 2 && mids.every((s) => s.exchanges > 0 && s.plays > 0), `中距离两圈都起了：${JSON.stringify(mids)}`);
+    const midCfg = D.front.sectors.filter((s) => s.ring === "mid"), L = audio.listenerPos;
+    for (const s of midCfg) for (const side of ["nra", "ija"]) {
+      const d = Math.hypot(s[side].x - L.x, s[side].z - L.z);
+      assert.ok(d >= 150 && d <= 320, `${s.id}.${side} 离 01 听者 ${d.toFixed(0)} m（中距离 150–320 m）`);
+    }
+    assert.ok(sound.frontRecent.filter((r) => /^Mid/.test(r.sector)).every((r) => r.distance >= 120 && r.distance <= 360), "中距离圈的实际落点在 120–360 m");
+    const roof = audio.calls.filter((c) => c.cue === D.front.roofDirt.cue && c.t >= t0 && Math.hypot(c.position.x - L.x, c.position.z - L.z) < 1);
+    assert.ok(roof.length >= 1 && roof.every((c) => c.position.y > L.y), `前线的炮落下来洞顶掉土 ${roof.length} 次，都在头顶上`);
+  }
+  Ok(`01 显现：事实一记 ${R.riseS} s 打开，序列（机枪 / 噼啪 / 炮 / 近落弹）、音量台阶 ≥ 8 dB、频次 ×1.6、中距离圈、低通 ${P.airCut}→${R.cut.open} Hz、配乐让一下、床拉开`);
+
+  // ③ 往近爆推高：u 单调不降，近爆事实一到 catchUpS 内补到 1，低通在 afterBlastS 秒里滑回 afterBlast。
+  // 新起一局：显现后 10 s 时近爆（这时 u 还在 revealU 与 1 之间；buildS 26 s 才推到顶）。
+  const g3 = Make(0x19380930), sound3 = g3.sound, audio3 = g3.audio, facts3 = g3.facts;
+  Run(sound3, audio3, "Trapped", 20);
+  facts3.add(R.fact);
+  Run(sound3, audio3, "Trapped", 10);
+  const uBefore = sound3.State().front.swell.u;
+  assert.ok(uBefore >= R.revealU - 1e-9 && uBefore < 1, `显现后 u 在 revealU ${R.revealU} 与 1 之间：${uBefore}`);
+  facts3.add(S.peakFact);
+  let prevU = uBefore, topAt = null;
   for (let t = 0; t < S.catchUpS + 1; t += 0.1) {
-    Run(s2, a2, "Trapped", 0.1);
-    const w = s2.State().front.swell;
-    assert.ok(w.u >= prev - 1e-9, "补到顶的过程只升不降");
-    prev = w.u;
-    if (topAt === null && w.u >= 1) topAt = t + 0.1;
+    Run(sound3, audio3, "Trapped", 0.1);
+    const u = sound3.State().front.swell.u;
+    assert.ok(u >= prevU - 1e-9, "补到顶的过程只升不降");
+    prevU = u;
+    if (topAt === null && u >= 1) topAt = t + 0.1;
   }
-  assert.ok(before.u < 0.5 && topAt !== null && topAt <= S.catchUpS + 0.15,
-    `第 20 s 近爆（u ${before.u}）→ ${topAt?.toFixed(1)} s 补到顶（≤ ${S.catchUpS} s）`);
-  // 从近爆之后进 01（调试入口 / 读档）：进步骤第一帧就在顶上，不再从底补 catchUpS 秒
-  //（2026-09-24 审查：原断言等 catchUpS + 0.2 s 才看，测的是「2 s 内补满」，实际头两秒轻 7 dB 上下）。
-  const a3 = FakeAudio(), s3 = new FirstLevelMissionBattleSound(a3, { Has: () => true }, 0x19380924);
-  for (let t = 0; t < 5; t += 1 / 30) {
-    a3.Tick(1 / 30);
-    s3.Update(1 / 30, "Trapped", false);
-    const w = s3.State().front.swell;
-    assert.ok(w.u === 1 && w.intensity === 1 && w.gain === 1, `近爆已经发生过的 01：第 ${a3.clock.toFixed(2)} s 倍率 ${JSON.stringify(w)}，应一直是顶`);
+  assert.ok(topAt !== null && topAt <= S.catchUpS + 0.15, `近爆 → ${topAt?.toFixed(1)} s 补到顶（≤ ${S.catchUpS} s）`);
+  Run(sound3, audio3, "Trapped", R.cut.afterBlastS + 0.5);
+  {
+    const f = sound3.State().front, m = audio3.calls.length;
+    assert.ok(Math.abs(f.reveal.cutHz - R.cut.afterBlast) <= 1, `近爆之后低通滑回 ${R.cut.afterBlast} Hz：${f.reveal.cutHz}`);
+    assert.ok(f.swell.gain === 1 && f.swell.intensity === 1, "近爆之后停在顶上，不回落");
+    Run(sound3, audio3, "Trapped", 20);
+    assert.ok(audio3.calls.slice(m).filter((c) => c.sound3Field).every((c) => c.airCut <= R.cut.afterBlast + 1), "近爆之后每一声的低通都在 afterBlast 以下");
   }
-  // 播出来的也是顶上的音量：16 个种子，进步骤头 2 s（原来补到顶的那段）与 5–30 s 比。
-  // 实测：现在 0.683 / 0.715 = 0.95；改之前从底补起是 0.341 / 0.712 = 0.48。
-  const reentry = [], settled = [];
-  for (let seed = 1; seed <= 16; seed += 1) {
-    const ar = FakeAudio(), sr = new FirstLevelMissionBattleSound(ar, { Has: () => true }, seed);
-    Run(sr, ar, "Trapped", 30);
-    const Rel = (c) => c.volume / D.front.cueVolume[c.cue];
-    reentry.push(...ar.calls.filter((c) => c.soundField && c.t < S.catchUpS).map(Rel));
-    settled.push(...ar.calls.filter((c) => c.soundField && c.t >= 5).map(Rel));
-  }
-  assert.ok(reentry.length >= 10 && Mean(reentry) >= Mean(settled) * 0.8,
-    `近爆后再进 01：头 ${S.catchUpS} s ${reentry.length} 声相对音量均 ${Mean(reentry).toFixed(3)}，5–30 s 均 ${Mean(settled).toFixed(3)}`);
-  Ok(`01 渐强：近爆早到 ${topAt.toFixed(1)} s 补到顶；近爆后再进 01 第一帧就在顶上（头 ${S.catchUpS} s 相对音量 ${Mean(reentry).toFixed(3)} / 5–30 s ${Mean(settled).toFixed(3)}）`);
+  Ok(`01 近爆：${topAt.toFixed(1)} s 补到顶，低通 ${R.cut.open}→${R.cut.afterBlast} Hz，之后不回落`);
 
-  // 其它步骤不受影响：进步骤第一帧起倍率就是 1；01 之后接 02 也是。
+  // ④ 接 02：床收回预设原样，02 用自己的基线、中距离圈不再起。
+  const midPlays = () => sound.State().front.sectors.filter((s) => /^Mid/.test(s.id)).reduce((n, s) => n + s.plays, 0);
+  const midBefore = midPlays();
+  Run(sound, audio, "BunkerRescue", 30);
+  assert.deepEqual([audio.shapes.at(-1).level, audio.shapes.at(-1).cut, audio.shapes.at(-1).rampS], [1, 1, R.beds.releaseS], "01 → 02：床在 releaseS 里收回");
+  assert.ok(sound.State().front.swell.intensity === 1 && sound.State().front.swell.gain === 1, "02 用自己的基线");
+  assert.equal(midPlays(), midBefore, "02 里中距离圈不起");
+  Ok("01 → 02：远声组的床收回预设原样，中距离圈不再起");
+}
+{
+  // 触发的几条路：事实 / 导演相位兜底 / 没有导演的时间兜底 / 导演卡住的保险 / 近爆先到 / 进来时已显现。
+  const P = D.front.stages.Trapped, R = P.reveal, S = P.swell;
+  const Src = (sound) => sound.State().front.reveal;
+  // 兜底一：导演相位进了 Orders 之后 afterS 秒。
+  {
+    const { host, audio, sound } = { host: FakeHost(), audio: FakeAudio({ zone: "dugout" }) };
+    const s = new FirstLevelMissionBattleSound(audio, host, 1);
+    Run(s, audio, "Trapped", 25);
+    assert.equal(Src(s).source, null, "导演还在 Banter：不显现");
+    host.Phase("Orders");
+    Run(s, audio, "Trapped", R.fallback.afterS - 0.3);
+    assert.equal(Src(s).source, null, `Orders 之后 ${R.fallback.afterS} s 之内还不显现`);
+    Run(s, audio, "Trapped", 0.6);
+    assert.equal(Src(s).source, "phase", `Orders 之后 ${R.fallback.afterS} s：兜底显现`);
+    assert.ok(Src(s).beats > 0 && audio.ducks.length === 1, "兜底显现也演序列、也让配乐");
+  }
+  // 兜底二：没有导演（夹具）进 01 后 stageS 秒；有导演但卡住时 stuckS 秒。
+  {
+    const host = FakeHost({ director: false }), audio = FakeAudio({ zone: "dugout" });
+    const s = new FirstLevelMissionBattleSound(audio, host, 2);
+    Run(s, audio, "Trapped", R.fallback.stageS - 1);
+    assert.equal(Src(s).source, null);
+    Run(s, audio, "Trapped", 2);
+    assert.equal(Src(s).source, "time", `没有导演：进 01 后 ${R.fallback.stageS} s 兜底`);
+    const host2 = FakeHost(), audio2 = FakeAudio({ zone: "dugout" });
+    const s2 = new FirstLevelMissionBattleSound(audio2, host2, 2);
+    Run(s2, audio2, "Trapped", R.fallback.stageS + 5);
+    assert.equal(Src(s2).source, null, "有导演时不按 stageS 显现（导演的节奏可能比它长）");
+    Run(s2, audio2, "Trapped", R.fallback.stuckS - R.fallback.stageS - 5 + 1);
+    assert.equal(Src(s2).source, "time", `导演卡住：${R.fallback.stuckS} s 保险`);
+  }
+  // 近爆事实先到（导演走得快 / 调试入口）：不演序列，直接显现。
+  {
+    const facts = new Set(), host = FakeHost({ facts }), audio = FakeAudio({ zone: "dugout" });
+    const s = new FirstLevelMissionBattleSound(audio, host, 3);
+    Run(s, audio, "Trapped", 20);
+    facts.add(S.peakFact);
+    Run(s, audio, "Trapped", 0.2);
+    assert.ok(Src(s).source === "peak" && Src(s).beats === 0 && audio.ducks.length === 0 && Src(s).open >= 0.99, `近爆先到：直接显现（${JSON.stringify(Src(s))}）`);
+  }
+  // 进来时事实已经在（跳阶段进 Orders 以后导演会补记）：第一帧就是「已显现」，不演序列。
+  {
+    const facts = new Set([R.fact]), host = FakeHost({ facts }), audio = FakeAudio({ zone: "dugout" });
+    const s = new FirstLevelMissionBattleSound(audio, host, 4);
+    Run(s, audio, "Trapped", 0.1);
+    const r = Src(s), w = s.State().front.swell;
+    assert.ok(r.source === "enter" && r.beats === 0 && audio.ducks.length === 0 && r.open >= 0.99 && w.u >= R.revealU - 1e-9,
+      `进来时已显现：${JSON.stringify(r)} u ${w.u}`);
+    assert.ok(audio.shapes.length === 1 && audio.shapes[0].level === R.beds.level, "床直接拉开");
+  }
+  // 检查点重来：近爆 / 传令兵的事实被删掉，前线回到显现之前，床收回；事实若仍留着，等它被删了再认。
+  {
+    const facts = new Set(), host = FakeHost({ facts }), audio = FakeAudio({ zone: "dugout" });
+    const s = new FirstLevelMissionBattleSound(audio, host, 5);
+    Run(s, audio, "Trapped", 10);
+    facts.add(R.fact);
+    Run(s, audio, "Trapped", 8);
+    assert.ok(Src(s).source === "fact" && Src(s).open === 1);
+    facts.delete(R.fact);
+    host.bunker.beats.delete("Orders");
+    Run(s, audio, "Trapped", 0.2);
+    assert.ok(Src(s).source === null && Src(s).open === 0 && s.State().front.swell.u < 0.05, `事实被删：回到显现之前 ${JSON.stringify(Src(s))}`);
+    assert.deepEqual([audio.shapes.at(-1).level, audio.shapes.at(-1).cut], [1, 1], "床收回");
+    facts.add(R.fact);
+    Run(s, audio, "Trapped", 0.2);
+    assert.equal(Src(s).source, "fact", "再记一次事实又显现（序列重演）");
+    assert.ok(audio.ducks.length === 2, "序列重演时配乐再让一下");
+    // 事实留着不删（近爆的事实被删了）：重来后不立刻显现。
+    facts.add(S.peakFact);
+    Run(s, audio, "Trapped", 3);
+    facts.delete(S.peakFact);
+    Run(s, audio, "Trapped", 0.2);
+    assert.equal(Src(s).source, null, "近爆事实被删 = 整拍重来");
+    Run(s, audio, "Trapped", 2);
+    assert.equal(Src(s).source, null, "传令兵的事实还留着（没被删）：不立刻再显现");
+    facts.delete(R.fact);
+    Run(s, audio, "Trapped", 0.2);
+    facts.add(R.fact);
+    Run(s, audio, "Trapped", 0.2);
+    assert.equal(Src(s).source, "fact", "被删过再记：认");
+  }
+  Ok("01 显现的触发：事实 / 导演相位 / 时间 / 卡住保险 / 近爆先到 / 进来已显现 / 检查点重来");
+}
+{
+  // 显现与说话（传令兵那句、BunkerOrders 的台词）：序列里的大件让一句话过去再响（最多 deferS 秒）、回击跟在机枪一梭后面、
+  // 新起的前线声压低 dipDb、远声组的床压到 speechScale 倍并在话停后放回；显现之前不动（lull 本来就轻）。
+  const P = D.front.stages.Trapped, R = P.reveal, SP = R.speech;
+  const Run2 = (sound, audio, seconds, speaking) => Run(sound, audio, "Trapped", seconds, { speaking });
+  const Big = (audio) => audio.calls.find((c) => c.soundField && c.cue === "type92Far" && c.burst >= 8 && c.position.x > 100);
+  // ① 一直说着话：机枪一梭等 deferS 秒后照响，回击跟在它后面 gap 秒。
+  {
+    const facts = new Set(), host = FakeHost({ facts }), audio = FakeAudio({ zone: "dugout" });
+    const s = new FirstLevelMissionBattleSound(audio, host, 0x5e11);
+    Run2(s, audio, 20, false);
+    const t0 = audio.clock;
+    facts.add(R.fact);
+    Run2(s, audio, SP.deferS - 0.4, true);
+    const early = audio.calls.filter((c) => c.t >= t0 && c.soundField && c.cue === "type92Far" && c.burst >= 8 && c.position.x > 200 && c.position.x < 300);
+    assert.equal(early.length, 0, `一直说着话：机枪一梭在 deferS ${SP.deferS} s 之前不响`);
+    assert.equal(audio.calls.filter((c) => c.t >= t0 && !c.soundField && c.cue === "shellIncoming").length, 0, "近落弹的啸声也等着");
+    Run2(s, audio, 1.2, true);
+    const mg = audio.calls.find((c) => c.t >= t0 && c.soundField && c.cue === "type92Far" && c.burst >= 8 && c.position.x > 200 && c.position.x < 300);
+    assert.ok(mg && mg.t - t0 <= SP.deferS + 0.2, `说了 ${SP.deferS} s 还没停：照响（${mg ? (mg.t - t0).toFixed(2) : "没响"} s）`);
+    Run2(s, audio, 3, true);
+    const reply = audio.calls.find((c) => c.t >= t0 && c.soundField && c.cue === "zb26Far" && c.burst >= 3 && c.t > mg.t);
+    assert.ok(reply && reply.t - mg.t >= R.beats.find((b) => b.after === "mg").gap - 0.1, `回击跟在机枪一梭后面 ≥ ${R.beats.find((b) => b.after === "mg").gap} s：${reply ? (reply.t - mg.t).toFixed(2) : "没响"} s`);
+  }
+  // ② 话在 deferS 内停了：大件在话停（+ holdS）之后马上响。
+  {
+    const facts = new Set(), host = FakeHost({ facts }), audio = FakeAudio({ zone: "dugout" });
+    const s = new FirstLevelMissionBattleSound(audio, host, 0x5e12);
+    Run2(s, audio, 20, false);
+    const t0 = audio.clock;
+    facts.add(R.fact);
+    Run2(s, audio, 1.0, true);
+    Run2(s, audio, 3, false);
+    const mg = audio.calls.find((c) => c.t >= t0 && c.soundField && c.cue === "type92Far" && c.burst >= 8 && c.position.x > 200 && c.position.x < 300);
+    assert.ok(mg && mg.t - t0 >= 1.0 + SP.holdS - 0.1 && mg.t - t0 <= 1.0 + SP.holdS + 0.5, `话停之后（+ ${SP.holdS} s）机枪一梭响：${mg ? (mg.t - t0).toFixed(2) : "没响"} s`);
+  }
+  // ③ 床跟着说话让：说话时压到 speechScale 倍，话停后（+ holdS）放回；显现之前说话不动床。
+  {
+    const facts = new Set(), host = FakeHost({ facts }), audio = FakeAudio({ zone: "dugout" });
+    const s = new FirstLevelMissionBattleSound(audio, host, 0x5e13);
+    Run2(s, audio, 10, true);
+    assert.equal(audio.shapes.length, 0, "显现之前说话不动床");
+    facts.add(R.fact);
+    Run2(s, audio, 0.3, true);
+    Run2(s, audio, 2, true);
+    const last = () => audio.shapes.at(-1);
+    assert.ok(Math.abs(last().level - R.beds.level * R.beds.speechScale) < 1e-9, `说话时床 ×${R.beds.level * R.beds.speechScale}：${JSON.stringify(last())}`);
+    Run2(s, audio, SP.holdS + 0.5, false);
+    assert.ok(Math.abs(last().level - R.beds.level) < 1e-9 && last().cut === R.beds.cut, `话停之后床放回 ×${R.beds.level}：${JSON.stringify(last())}`);
+  }
+  // ④ 新起的前线声说话时压低 dipDb：同一个种子、同一段，说话与不说话每一声相对音量的均值之比。
+  {
+    const Mean = (xs) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+    const rel = (speaking) => {
+      const out = [];
+      for (let seed = 1; seed <= 8; seed += 1) {
+        const facts = new Set([R.fact]), host = FakeHost({ facts }), audio = FakeAudio({ zone: "dugout" });
+        const s = new FirstLevelMissionBattleSound(audio, host, seed);
+        Run2(s, audio, 30, speaking);
+        out.push(...audio.calls.filter((c) => c.soundField && c.t > 12).map((c) => c.volume / D.front.cueVolume[c.cue]));
+      }
+      return Mean(out);
+    };
+    const talk = rel(true), quiet = rel(false);
+    const db = 20 * Math.log10(talk / quiet);
+    assert.ok(db < SP.dipDb * 0.6 && db > SP.dipDb * 1.6, `说话时每一声轻 ${db.toFixed(1)} dB（数据 ${SP.dipDb} dB）`);
+  }
+  // ⑤ 回声：显现之后（open ≥ fromOpen）有；显现之前没有。回声比原声轻 gainDb、更闷、在另一个方位、晚 delayS。
+  {
+    const E = D.front.echo;
+    const facts = new Set(), host = FakeHost({ facts }), audio = FakeAudio({ zone: "dugout" });
+    const s = new FirstLevelMissionBattleSound(audio, host, 0x5e14);
+    Run(s, audio, "Trapped", 40);
+    assert.equal(s.State().front.echoes, 0, "显现之前没有回声");
+    facts.add(R.fact);
+    Run(s, audio, "Trapped", 40);
+    const n = s.State().front.echoes;
+    assert.ok(n >= 3, `显现之后有回声：${n} 条`);
+    assert.ok(Object.keys(E.chance).every((cue) => D.front.cueVolume[cue] != null), "回声的 cue 都在 cueVolume 表里");
+    // 一条回声的几何：从一场固定的爆炸算出来。
+    const s2 = new FirstLevelMissionBattleSound(FakeAudio({ zone: "dugout" }), FakeHost({ facts: new Set([R.fact]) }), 7);
+    s2.frontTime = 100;
+    s2.rng = () => 0.1;   // chance 判定通过，逆时针转，延迟取小端
+    s2.MaybeEcho({ cue: "explosionFar", sector: "X", side: "impact", pos: { x: 300, z: -126 }, gainDb: 0 });
+    const echo = s2.frontQueue.at(-1), L = s2.audio.listenerPos;
+    const d1 = Math.hypot(300 - L.x, -126 - L.z), d2 = Math.hypot(echo.pos.x - L.x, echo.pos.z - L.z);
+    const a1 = Math.atan2(300 - L.x, -126 - L.z), a2 = Math.atan2(echo.pos.x - L.x, echo.pos.z - L.z);
+    let turn = Math.abs((a2 - a1) * 180 / Math.PI); if (turn > 180) turn = 360 - turn;
+    assert.ok(echo && echo.echo && echo.gainDb === E.gainDb && echo.at >= 100 + E.delayS[0] && echo.at <= 100 + E.delayS[1] + 1e-9
+      && Math.abs(d2 / d1 - E.distanceScale) < 1e-6 && turn >= E.turnDeg[0] - 1e-6 && turn <= E.turnDeg[1] + 1e-6,
+    `回声几何：${JSON.stringify({ gain: echo?.gainDb, delay: echo && +(echo.at - 100).toFixed(2), dist: +(d2 / d1).toFixed(2), turn: +turn.toFixed(1) })}`);
+  }
+  Ok("01 显现与说话：大件让一句话（最多 deferS）、回击跟在后面、新起的声压低、床跟着让并放回；回声：显现后有、几何对");
+}
+{
+  // 由稀到密：16 个种子平均，显现前 20 s 的前线声数 vs 显现完成（序列过后）20 s 的声数。
+  const R = D.front.stages.Trapped.reveal;
+  let lull = 0, open = 0;
+  for (let seed = 1; seed <= 16; seed += 1) {
+    const facts = new Set(), host = FakeHost({ facts }), audio = FakeAudio({ zone: "dugout" });
+    const s = new FirstLevelMissionBattleSound(audio, host, seed);
+    Run(s, audio, "Trapped", 30);
+    const t0 = audio.clock;
+    facts.add(R.fact);
+    Run(s, audio, "Trapped", 40);
+    lull += audio.calls.filter((c) => c.soundField && c.t >= 10 && c.t < 30).length;
+    open += audio.calls.filter((c) => c.soundField && c.t >= t0 + R.holdS + 1 && c.t < t0 + R.holdS + 21).length;
+  }
+  assert.ok(open > lull * 1.6, `由稀到密（16 个种子平均）：显现前 20 s ${(lull / 16).toFixed(1)} 声 → 显现后 20 s ${(open / 16).toFixed(1)} 声`);
+  // 其它步骤不受影响：没有渐强、没有显现，进步骤第一帧起倍率就是 1；01 之后接 02 也是。
   for (const stage of Object.keys(D.front.stages).filter((id) => id !== "Trapped")) {
     assert.equal(D.front.stages[stage].swell, undefined, `${stage} 没有渐强数据`);
+    assert.equal(D.front.stages[stage].reveal, undefined, `${stage} 没有显现数据`);
     const a4 = FakeAudio(), s4 = new FirstLevelMissionBattleSound(a4, null);
     Run(s4, a4, stage, 0.1);
     const w = s4.State().front.swell;
     assert.ok(w.intensity === 1 && w.gain === 1, `${stage} 一进来强度就是本档基线`);
   }
-  Run(sound, audio, "BunkerRescue", 0.1);
-  assert.ok(sound.State().front.swell.intensity === 1 && sound.State().front.swell.gain === 1, "01 之后接 02：02 用自己的基线");
-  Ok("渐强只作用于 01，其余 01–06 步骤进来就是本档基线");
+  Ok(`01 由稀到密：显现前 20 s ${(lull / 16).toFixed(1)} 声 → 显现后 ${(open / 16).toFixed(1)} 声；其余 01–06 步骤进来就是本档基线`);
 }
 {
   const audio = FakeAudio();
@@ -488,7 +716,11 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   bs.artillery.T = { ...BATTLE_ARTILLERY };
   Run(bs, a2, "Trapped", 200);
   const trappedShells = a2.calls.filter((c) => !c.soundField && /explosion/.test(c.cue));
-  assert.ok(trappedShells.length > 0 && trappedShells.every((c) => c.airCut <= D.artillery.stages.Trapped.airCut), "01 的近落弹全部隔着土");
+  // 显现之前（没有导演的夹具：进 01 后 stageS 秒）用 lull 的低通，之后按 open 滑到 open.airCut；每一声都还是隔着土的（不高于 open.airCut）。
+  const AT = D.artillery.stages.Trapped, revealS = D.front.stages.Trapped.reveal.fallback.stageS;
+  assert.ok(trappedShells.length > 0 && trappedShells.every((c) => c.airCut <= AT.open.airCut), "01 的近落弹全部隔着土");
+  const lullShells = trappedShells.filter((c) => c.t < revealS - 1);
+  assert.ok(lullShells.length > 0 && lullShells.every((c) => c.airCut <= AT.lull.airCut), `显现之前 ${lullShells.length} 发近落弹的低通不高于 ${AT.lull.airCut} Hz`);
   collapsed = true;
   const mark = a2.calls.length, t0 = a2.clock;
   Run(bs, a2, "Trapped", D.artillery.stages.Trapped.quietAfter.seconds - 0.5);

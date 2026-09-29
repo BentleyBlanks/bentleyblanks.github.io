@@ -1154,8 +1154,11 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
 
 
 {
- const calls=[], sound=new FirstLevelMissionBattleSound({Play:(cue,options)=>{calls.push({cue,...options});return null;},
-   listenerPos:{x:0,y:1.6,z:-150}});
+ // 【2026-09-29】01 的前线跟着剧情走：传令兵开口（任务事实 runnerCallHeard）之前是洞里战斗间隙（稀、低、闷），之后外面的仗显现
+ // （低通打开、交火翻倍、中距离圈、一段序列）。这里放一个停在 Banter 的导演与一份任务事实表；逐项断言在 Script_FirstLevelBattleSoundTest。
+ const facts=new Set(), calls=[], sound=new FirstLevelMissionBattleSound({Play:(cue,options)=>{calls.push({cue,...options});return null;},
+   listenerPos:{x:0,y:1.6,z:-150}},{Has:id=>facts.has(id),frontShow:{bunker:{phase:"Banter",beats:new Set(["Banter"])}}},0x19380923);
+ // （第三个参数是种子：给了宿主时运行时每局另抽，夹具要固定，否则「1.2 s 内第一声」这类断言按种子时灵时不灵。）
  // 【2026-09-23 改了口径】原来断言「01 头 24 秒一声都不许有」—— 那是沿用军列的旧数，
  // 正是用户报的「01 远处前线等 24 s 才出声」。现在 01 一进来远处就在打，但隔着土：
  //   1. 1.2 s 内就有第一声（Data_FirstLevelMissionBattleSound.front.firstWithinS）；
@@ -1164,24 +1167,29 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
  // 生成器本身（扇区、交火来回、让位、炮击、防炮洞环境）的逐条断言在 Script_FirstLevelBattleSoundTest。
  for(let i=0;i<3;i++)sound.Update(.4,"Trapped");
  assert.ok(calls.length>0,"the front is already firing when 01 begins");
- // 【2026-09-24 恢复】4. 被压着的这一分钟里前线**渐强**（旧断言「the front grows while the man lies pinned」，
- //   09-23 换声景时随 24 s 静默一起删了；用户拍板恢复）：头 21 s 与近爆前后的 39–61 s 比，
- //   每一声相对自己的基础音量（cueVolume）平均更响、交火更密。曲线本身在 BattleSoundTest 逐秒断言。
+ // 【2026-09-24 恢复 → 2026-09-29 改口径】4. 被压着的时候前线**由弱到强**（旧断言「the front grows while the man lies pinned」）：
+ //   原来是进 01 起 50 s 的计时渐强；现在按剧情 —— 传令兵开口之前每一声相对自己的基础音量（cueVolume）轻、之后平均更响、交火更密。
+ //   曲线与序列本身在 BattleSoundTest 逐项断言。
  const Norm=rows=>rows.filter(c=>c.soundField).map(c=>c.volume/D_BATTLE.front.cueVolume[c.cue]);
  const Mean=xs=>xs.reduce((a,b)=>a+b,0)/Math.max(1,xs.length);
+ for(let i=0;i<70;i++)sound.Update(.5,"Trapped");
+ const swellEarly=Norm(calls);
+ const earlyCount=calls.length;
+ facts.add("runnerCallHeard");
+ for(let i=0;i<6;i++)sound.Update(.5,"Trapped");
+ const swellMark=calls.length;
  for(let i=0;i<40;i++)sound.Update(.5,"Trapped");
- const swellEarly=Norm(calls);let swellMark=calls.length;
- for(let i=0;i<36;i++)sound.Update(.5,"Trapped");swellMark=calls.length;
- for(let i=0;i<44;i++)sound.Update(.5,"Trapped");
  const swellLate=Norm(calls.slice(swellMark));
- assert.ok(swellEarly.length>0&&swellLate.length>swellEarly.length&&Mean(swellLate)>Mean(swellEarly)*1.8,
-   "the front grows while the man lies pinned: "+JSON.stringify({early:{n:swellEarly.length,mean:+Mean(swellEarly).toFixed(3)},
+ assert.ok(swellEarly.length>0&&swellLate.length>swellEarly.length*0.5&&Mean(swellLate)>Mean(swellEarly)*1.8,
+   "the front comes up when the runner calls: "+JSON.stringify({early:{n:swellEarly.length,mean:+Mean(swellEarly).toFixed(3)},
      late:{n:swellLate.length,mean:+Mean(swellLate).toFixed(3)}}));
- const early=calls.slice();
+ assert.ok(calls.slice(earlyCount).some(c=>c.soundField&&c.airCut>D_BATTLE.front.stages.Trapped.airCut),"the low-pass opens after the call");
+ const early=calls.slice(0,earlyCount);
  // 洞顶掉土（debrisFall）是洞里的声音，不算「外面的炮弹」：01 整段按洞里算（artillery.stages.Trapped.listenerZone），
  // 每一发落地之后头顶上掉一次土。【2026-09-24 审查后】原来这条夹具没给空间档，01 一次土都不掉。
  const front=early.filter(c=>c.soundField), ceiling=early.filter(c=>c.cue==="debrisFall"),
-   shells=early.filter(c=>!c.soundField&&c.cue!=="debrisFall");
+   // 来袭啸声（shellIncoming）摆在「听者 → 落点」连线上 25 % 处（2026-09-29 incomingShare），离听者不到 70 m，另算；这里量爆炸本体与低频层。
+   shells=early.filter(c=>!c.soundField&&/^explosion/.test(c.cue));
  assert.ok(front.length>10&&front.every(c=>c.airCut<=450&&c.bus==="sfx"&&Math.hypot(c.position.x,c.position.z+150)>250),
    "the distant front heard from inside the bunker is far and muffled: "+JSON.stringify(front.find(c=>!(c.airCut<=450))||front[0]));
  assert.ok(shells.length>0&&shells.every(c=>c.airCut<=900&&Math.hypot(c.position.x,c.position.z+150)>=70),
@@ -1196,7 +1204,7 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
  const supportVolume=Math.max(...calls.filter(c=>c.cue==="rifleNraFar").map(c=>c.volume)), count=calls.length;
  for(let i=0;i<120;i++)sound.Update(.5,"South",true);
  const south=calls.slice(count);
- assert.ok(south.length>8&&south.every(c=>c.bus==="ambience")&&south.find(c=>c.cue==="rifleNraFar").volume<supportVolume,
+ assert.ok(south.length>8&&south.every(c=>c.bus==="far")&&south.find(c=>c.cue==="rifleNraFar").volume<supportVolume,
    "07+ keeps the legacy fixed-source front, quieter than 03");
  const frozen=sound.State();sound.Update(10,"Complete");
  assert.deepEqual(sound.State(),frozen);

@@ -3267,6 +3267,7 @@ function SampleRecipe(buffers, name) {
   const wet = SAMPLE_WET[name];
   const cycle = SAMPLE_CYCLE.has(name);
   let turn = 0;                      // 轮播游标；重载音效包时随配方一起重建
+  let last = -1;                     // 随机挑的上一条变体（下面：多变体的 cue 不连着出两次同一条）
   return (A, v) => {
     const shots = interval ? Clamp(v.burst ?? 1, 1, 14) : 1;
     for (let i = 0; i < shots; i += 1) {
@@ -3275,9 +3276,12 @@ function SampleRecipe(buffers, name) {
         buf = buffers[turn];
         turn = (turn + 1) % buffers.length;
       } else {
-        buf = buffers.length === 1
-          ? buffers[0]
-          : buffers[Math.min(buffers.length - 1, Math.floor(v.rng() * buffers.length))];
+        // 【2026-09-29】随机挑，但不连着出两次同一条：两条变体的 cue（explosionFar、zb26Far、type92Far）随机挑时一半的相邻两声是同一条录音，
+        // 远处的炮一分钟响十几次，耳朵认得出「又是那一发」。多出来的那一次抽样只在撞上一条时才耗（每条 voice 自己的 rng，不影响别处的序列）。
+        let k = buffers.length === 1 ? 0 : Math.min(buffers.length - 1, Math.floor(v.rng() * buffers.length));
+        if (buffers.length > 1 && k === last) k = (k + 1 + Math.floor(v.rng() * (buffers.length - 1))) % buffers.length;
+        last = k;
+        buf = buffers[k];
       }
       const src = v.Own(A.ctx.createBufferSource());
       src.buffer = buf;
@@ -3822,6 +3826,12 @@ class LoopLayer {
      */
     this.cut = cfg.cut || 0;
     this.filter = null;
+    /**
+     * 【2026-09-29】远声组的床（bus: "far"）的整体调形（AudioEngine.ShapeFarBeds）：shapeLevel 乘在电平上，cutScale 乘在自己的低通截止上。
+     * 01 传令兵开口那一刻，洞里那两层远处战场床从闷响拉开。与战场强度的涨落（SetLevel 的 scale）是两条互不相干的旋钮。
+     */
+    this.shapeLevel = 1;
+    this.cutScale = 1;
   }
 
   /** @param {number} [fadeInS] 组增益从零淡进来的秒数（环境换档时的交叉，0 = 直接到位）。 */
@@ -3830,15 +3840,15 @@ class LoopLayer {
     if (!ctx) return;
     // 组增益：一层一个常驻节点，所有播放头都接它。SetLevel 只动这一个。
     this.group = ctx.createGain();
-    this.group.gain.value = Math.max(FLOOR, this.levelScale);
+    this.group.gain.value = Math.max(FLOOR, this.levelScale * this.shapeLevel);
     if (fadeInS > 0) {
       this.group.gain.setValueAtTime(FLOOR, ctx.currentTime);
-      this.group.gain.linearRampToValueAtTime(Math.max(FLOOR, this.levelScale), ctx.currentTime + fadeInS);
+      this.group.gain.linearRampToValueAtTime(Math.max(FLOOR, this.levelScale * this.shapeLevel), ctx.currentTime + fadeInS);
     }
     if (this.cut > 0) {
       this.filter = ctx.createBiquadFilter();
       this.filter.type = "lowpass";
-      this.filter.frequency.value = Clamp(this.cut, 80, 20000);
+      this.filter.frequency.value = Clamp(this.cut * this.cutScale, 80, 20000);
       this.filter.Q.value = 0.7;
       this.group.connect(this.filter).connect(this.engine.Bus(this.busName));
       this.engine.liveNodes += 2;
@@ -3862,7 +3872,26 @@ class LoopLayer {
     const t = ctx.currentTime;
     g.cancelScheduledValues(t);
     g.setValueAtTime(Math.max(FLOOR, g.value), t);
-    g.linearRampToValueAtTime(Math.max(FLOOR, this.levelScale), t + Math.max(0.05, rampS));
+    g.linearRampToValueAtTime(Math.max(FLOOR, this.levelScale * this.shapeLevel), t + Math.max(0.05, rampS));
+  }
+
+  /** 远声组的床调形（见 shapeLevel）：电平与低通截止在 rampS 秒里滑到新值；没有 cut 的层只动电平。 */
+  SetShape(level, cutScale, rampS = 1.5) {
+    this.shapeLevel = Math.max(0, level);
+    this.cutScale = Math.max(0.05, cutScale);
+    const ctx = this.engine.ctx;
+    if (!this.group || !ctx) return;
+    const t = ctx.currentTime, ramp = Math.max(0.05, rampS);
+    const g = this.group.gain;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(Math.max(FLOOR, g.value), t);
+    g.linearRampToValueAtTime(Math.max(FLOOR, this.levelScale * this.shapeLevel), t + ramp);
+    if (this.filter) {
+      const f = this.filter.frequency;
+      f.cancelScheduledValues(t);
+      f.setValueAtTime(Math.max(80, f.value), t);
+      f.exponentialRampToValueAtTime(Clamp(this.cut * this.cutScale, 80, 20000), t + ramp);
+    }
   }
 
   /** 起一条新播放头，并把下一条排进日程。 */
@@ -4081,6 +4110,7 @@ export class AudioEngine {
     this.ambBuffers = new Map();     // 床名 -> AudioBuffer
     this.ambLayers = [];             // 当前这一档正在放的床
     this.ambienceLayerLevels = new Map();
+    this.farBedShape = null;          // ShapeFarBeds 的当前调形 { level, cut }（没调过 = null）
     this.ambErrors = [];
     this.ambReady = false;
     this.ambManifest = null;
@@ -6367,6 +6397,8 @@ export class AudioEngine {
       // 否则新起的战斗床会先满音量响一下再被斜坡拉回去。
       if (inst.battle) inst.levelScale = this.battleBedApplied;
       if(this.ambienceLayerLevels.has(layer.bed))inst.levelScale=this.ambienceLayerLevels.get(layer.bed);
+      // 远声组的床沿用当前的调形（换档交叉时新起的床不从预设原样起跳，见 ShapeFarBeds）。
+      if (inst.busName === "far" && this.farBedShape) { inst.shapeLevel = this.farBedShape.level; inst.cutScale = this.farBedShape.cut; }
       inst.Start(fadeS);
       this.ambLayers.push(inst);
     }
@@ -6443,6 +6475,18 @@ export class AudioEngine {
       }
       this.ScheduleAmbienceEvent();
     });
+  }
+
+  /**
+   * 【2026-09-29】远声组的床（bus: "far" 的层）整体调形：level = 电平倍数，cut = 层自己低通截止的倍数。
+   * 01 传令兵开口那一刻，洞里那两层远处战场床（shellingFar / battleFar）随「洞口打开」拉开；02 起收回。
+   * 按总线而不是按床名找层：换候选床（battleFar 换素材）不会让这一条悄悄失效。level = cut = 1 且没有层被调过时不留状态。
+   * 记在 farBedShape 上：换档交叉（Ambience）新起的层沿用，不从预设原样起跳再滑过去。
+   */
+  ShapeFarBeds({ level = 1, cut = 1, rampS = 1.5 } = {}) {
+    this.farBedShape = level === 1 && cut === 1 ? null : { level, cut };
+    for (const layer of this.ambLayers) if (layer.busName === "far") layer.SetShape(level, cut, rampS);
+    return this.ambLayers.filter((layer) => layer.busName === "far").length;
   }
 
   SetAmbienceLayerLevel(bed, scale, rampS=1) {

@@ -923,3 +923,15 @@ AnalyserNode，每 50 ms 取峰值 / RMS；另挂主输出、远声组（`farGai
 - **缓存戳**：清单加了 `bedVariants`，`AMB_PACK_VERSION` 抬到 `20260929battlebeds`，`index.html` import map 登记了 `Script_AmbBedVariant.mjs`。
 - **验收**：`Script_AmbBedVariantTest`（纯 node，桩 fetch + 桩 AudioContext 跑真的 `PrefetchPacks` / `LoadAmbPack` 并记下每个请求）、
   `Script_AmbBedVariantBrowserTest`（真浏览器、第一关入口、听者在玩家头上）。
+
+## 14. 远声组床调形与多变体不连出（2026-09-29，01「战场声随传令兵显现」那一轮）
+
+口径与实测在 [Data_AudioWiring.md 3d](Data_AudioWiring.md)；这里只记引擎侧多出来的三样接口 / 行为。
+
+| 项 | 内容 | 位置 |
+| --- | --- | --- |
+| `ShapeFarBeds({ level, cut, rampS })` | 给所有 `bus: "far"` 的环境床层整体调形：电平 × `level`、层自己低通截止（预设里的 `cut`）× `cut`，`rampS` 秒里滑过去。按总线找层、不按床名（换候选床素材不会让它悄悄失效）；没有 `cut` 的层只动电平。`level = cut = 1` 收回并清掉 `farBedShape`。换档交叉（`Ambience`）新起的远声层沿用当前调形，不从预设原样起跳再滑。取证：`audio.farBedShape`、层上的 `shapeLevel` / `cutScale`。与战场强度的涨落（`SetLevel` 的 scale）互不相干，两者相乘写在同一个组增益上 | `LoopLayer.SetShape` / `AudioEngine.ShapeFarBeds` |
+| 多变体的 cue 不连出两次同一条 | `SampleRecipe` 随机挑变体时记住上一条，撞上就换一条。原来两条变体的 cue（`explosionFar`、`zb26Far`、`type92Far`）随机挑时一半的相邻两声是同一条录音，远处的炮一分钟响十几次，耳朵认得出「又是那一发」；一梭机枪里相邻两发也不再同一条。多出来的那次抽样只在撞上时才耗，每条 voice 自己的随机流，不影响别处的序列。轮播的 cue（`SAMPLE_CYCLE`）与单变体不动 | `SampleRecipe` |
+| `Play` 的 `occlusion` 覆盖值 | 早就有（不给 = 探针射线）；新用法：场外近落弹在 01 洞里给来袭啸声与低频层传 0.15（加分区边界 0.35 = 0.5，−6 dB + 3.2 kHz），因为洞里射线被土挡死判 1.0（−12 dB + 800 Hz），而 `explosionFar` 不在「爆炸封顶」表里（`explosionNear` / `explosionMid` / `shellImpact` 才封 0.25） | `Script_BattleArtillery` |
+
+门禁：`Script_AudioTest` 三条（`ShapeFarBeds` 的电平与低通倍数、风不动；换档交叉沿用调形；收回清记录）。

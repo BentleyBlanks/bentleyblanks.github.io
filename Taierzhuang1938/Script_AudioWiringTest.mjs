@@ -513,16 +513,31 @@ const fire = await page.evaluate(async rescanS => {
   for (let i = 0; i < frames; i += 1) { w.Update(1 / 60, T.state.frame + i); await sleep(16); }
   const started = a.RequestedCount("fireSpot") - before;
   const voices = w.fireVoices.size;
+  // 续接周期（2026-09-29）：实录版按素材自己的长度续（清单 seconds 10 − sampleOverlapS），不再按合成配方的 1.9 s。
+  // 起播后再走 3 s（按接线层自己的时钟量：页面里游戏循环也在推同一个接线，帧数换不成秒）：实录版每处火一条也不该再续
+  //（原来每 1.9 s 每处火续一条，同一处火同时叠五六条 10 s 的同一段素材）；合成版（实录没载到）仍按 1.9 s 续。
+  // 数「不同的 voice」而不是 Play 请求数：请求数里有被 22 ms 去重窗拒收、下一帧重试的。
+  const sampled = a.sampleCues.has("fireSpot"), sampleS = Number(a.sfxManifest?.cues?.fireSpot?.seconds) || 0;
+  const seen = new Set();
+  const Look = () => { for (const e of w.fireVoices.values()) if (e.voice) seen.add(e.voice); };
+  Look();
+  const seenFirst = seen.size, t1 = w.time;
+  for (let i = 0; w.time - t1 < 3 && i < 900; i += 1) { w.Update(1 / 60, T.state.frame + frames + i); Look(); await sleep(16); }
+  const again = seen.size - seenFirst;
+  const liveCopies = [...a.activeVoices].filter((v) => v.name === "fireSpot" && v.nodes?.length).length;
   // 摘掉火头之后声音要跟着停
   for (const h of handles) T.vfx.RemoveSceneEffect(h);
   w.fireRescanAt = 0;
   w.Update(1 / 60, T.state.frame + 99);
   const after = w.fireVoices.size;
-  return { started, voices, after };
+  return { started, voices, after, sampled, sampleS, again, liveCopies };
 }, FIRE_SPOT.rescanS);
 Check("火场挂上循环点声源，同时最多四条", fire.voices === 4 && fire.started >= 1,
   `起了 ${fire.started} 条、在挂 ${fire.voices} 条`);
 Check("火头被摘掉之后声音跟着停", fire.after === 0, `还剩 ${fire.after} 条`);
+Check("火场实录版按素材长度续接：起播后 4 s 不再起、同时活着的不叠成一堆",
+  !fire.sampled || (fire.sampleS > FIRE_SPOT.sampleOverlapS + 1 && fire.again === 0 && fire.liveCopies <= FIRE_SPOT.maxVoices + 1),
+  `实录 ${fire.sampled}（${fire.sampleS} s）、再续 ${fire.again} 条、同时活着 ${fire.liveCopies} 条`);
 
 // ---------------------------------------------------------------------------
 // 8.6) 遮挡只算一层：起伏地面上的炮弹必须响，而且不许被压两遍

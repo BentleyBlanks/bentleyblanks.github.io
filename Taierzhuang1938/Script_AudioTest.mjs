@@ -430,6 +430,53 @@ if (cross.mid < 1 || cross.late < 1) {
   Fail(`床的播放头越积越多（${cross.late} 个），旧的没回收`);
 } else Ok(`床跨过两个 ${cross.seg.toFixed(1)}s 周期仍在响（播放头 ${cross.first}→${cross.mid}→${cross.late}）`);
 
+// 远声组的床调形（2026-09-29，ShapeFarBeds）：01 传令兵开口那一刻，洞里 bus: "far" 的两层远处战场床随「洞口打开」拉开 ——
+// 电平乘 level、层自己的低通截止乘 cut；不写 bus 的层（风）不动；换档交叉时新起的层沿用当前调形；level = cut = 1 收回并清掉记录。
+const shapeBeds = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const Read = () => ({
+    far: a.ambLayers.filter((l) => l.busName === "far").map((l) => ({ bed: l.bed, gain: l.group.gain.value, cut: l.filter?.frequency.value ?? 0, cfgCut: l.cut })),
+    other: a.ambLayers.filter((l) => l.busName !== "far").map((l) => ({ bed: l.bed, gain: l.group.gain.value })),
+  });
+  a.Ambience("firstLevelOpeningDugout");
+  await sleep(500);
+  const base = Read();
+  const touched = a.ShapeFarBeds({ level: 2.5, cut: 3, rampS: 0.15 });
+  await sleep(600);
+  const shaped = Read();
+  const shapeState = a.farBedShape ? { ...a.farBedShape } : null;
+  // 换档：新起的远声层沿用调形（不从预设原样起跳）。
+  a.Ambience("firstLevelOpeningFront");
+  await sleep(700);
+  const crossed = a.ambLayers.filter((l) => l.busName === "far").map((l) => ({ shapeLevel: l.shapeLevel, cutScale: l.cutScale }));
+  a.ShapeFarBeds({ level: 1, cut: 1, rampS: 0.1 });
+  await sleep(500);
+  const restored = Read();
+  const after = { shape: a.farBedShape, layers: a.ambLayers.filter((l) => l.busName === "far").map((l) => ({ shapeLevel: l.shapeLevel, cutScale: l.cutScale })) };
+  a.Ambience("silence");
+  await sleep(300);
+  return { base, touched, shaped, shapeState, crossed, restored, after };
+});
+{
+  const R = shapeBeds;
+  const ratio = (x, y) => x / Math.max(1e-9, y);
+  const gainOk = R.shaped.far.every((l, i) => Math.abs(ratio(l.gain, R.base.far[i].gain) - 2.5) < 0.05);
+  const cutOk = R.shaped.far.every((l, i) => R.base.far[i].cut > 0 && Math.abs(ratio(l.cut, R.base.far[i].cut) - 3) < 0.1);
+  const otherOk = R.shaped.other.every((l, i) => Math.abs(l.gain - R.base.other[i].gain) < 1e-6);
+  if (R.touched !== 2 || R.base.far.length !== 2) Fail(`远声组床调形：洞里预设应有两层 bus:far，调到 ${R.touched} 层（${R.base.far.length}）`);
+  else if (!gainOk || !cutOk) Fail(`远声组床调形没到位：电平 ×${R.shaped.far.map((l, i) => ratio(l.gain, R.base.far[i].gain).toFixed(2)).join("/")}（要 2.5），低通 ×${R.shaped.far.map((l, i) => ratio(l.cut, R.base.far[i].cut).toFixed(2)).join("/")}（要 3）`);
+  else if (!otherOk) Fail("远声组床调形动到了不走远声组的层（风）");
+  else Ok("ShapeFarBeds：bus:far 的层电平 ×2.5、低通 ×3，风不动");
+  if (!R.shapeState || R.shapeState.level !== 2.5 || R.shapeState.cut !== 3) Fail(`farBedShape 没记下：${JSON.stringify(R.shapeState)}`);
+  else if (!R.crossed.length || !R.crossed.every((l) => l.shapeLevel === 2.5 && l.cutScale === 3)) Fail(`换档交叉时新起的远声层没沿用调形：${JSON.stringify(R.crossed)}`);
+  else Ok("换档交叉：新起的远声层沿用调形，不从预设原样起跳");
+  const back = R.after.shape === null && R.after.layers.every((l) => l.shapeLevel === 1 && l.cutScale === 1);
+  const gainBack = R.restored.far.every((l) => l.gain > 0);
+  if (!back || !gainBack) Fail(`level = cut = 1 没收回：${JSON.stringify(R.after)}`);
+  else Ok("ShapeFarBeds(1, 1) 收回并清掉调形记录");
+}
+
 // 听者有没有跟着相机走。
 //
 // 这一条是补的：SetListener 写好之后**全仓库零调用点**，WebAudio 的 listener

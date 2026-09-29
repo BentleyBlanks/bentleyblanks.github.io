@@ -58,6 +58,13 @@ export class BattleArtillery {
     this.peakVoices = 0;        // 取证：本层同时在响的峰值
     this.refused = 0;           // 取证：Play 返回空的声数（引擎预算 / 去重 / 距离闸）
     this.selfCapped = false;    // 这一步的档标了 selfCapped：按整份预算进门（见 Update）
+    this.gain = 1;              // 这一步整体的音量倍数（档的 gain；01 洞里的近落弹要抬，见 Data_..BattleSound.artillery.stages.Trapped）
+    this.midM = tuning.midM;    // 这之内走 explosionMid（档的 midM 可改：01 洞里 150，见同一处）
+    this.incomingShare = 0;     // 来袭啸声摆在「听者 → 落点」连线上的比例（0 = 摆在落点上空，原来的样子）
+    this.incomingGain = 1;      // 啸声自己的音量倍数（在 gain 之外再乘；01 洞里啸声 100 m 外只剩 −40 dB）
+    this.incomingOcclusion = null; // 啸声 / 低频层的遮挡覆盖值（null = 交给引擎的射线；洞里射线被土挡死判 1.0：−12 dB + 800 Hz）
+    this.thumpOcclusion = null;
+    this.scripted = 0;          // 取证：剧本点名落了几发
     this.events = [];           // 最近几发（取证）
     this.stage = null;
     this.firstOfStage = false;
@@ -100,6 +107,7 @@ export class BattleArtillery {
     // 的 0.62 天花板饿死（drops.starved），前线又比它远、比它响，偷无可偷。只在数据里标了的步骤生效。
     this.selfCapped = !!profile?.selfCapped;
     this.zoneOverride = profile?.listenerZone || null;
+    this.ApplyProfile(profile);
     // 声部按可听时长算（until），不等引擎回收（见 FirstLevelMissionBattleSound 同一条注释）。
     this.voices = this.voices.filter((e) => this.time < e.until && this.host.audio?.pendingVoices?.has?.(e.v) !== false);
     this.RunPending();
@@ -149,21 +157,59 @@ export class BattleArtillery {
     return null;
   }
 
+  /** 这一步的档里影响声音的几项（Update / Scripted 共用）。 */
+  ApplyProfile(profile) {
+    this.gain = Number.isFinite(profile?.gain) ? profile.gain : 1;
+    this.midM = Number.isFinite(profile?.midM) ? profile.midM : this.T.midM;
+    this.incomingShare = Number.isFinite(profile?.incomingShare) ? profile.incomingShare : 0;
+    this.incomingGain = Number.isFinite(profile?.incomingGain) ? profile.incomingGain : 1;
+    this.incomingOcclusion = Number.isFinite(profile?.incomingOcclusion) ? profile.incomingOcclusion : null;
+    this.thumpOcclusion = Number.isFinite(profile?.thumpOcclusion) ? profile.thumpOcclusion : null;
+  }
+
+  /**
+   * 剧本点名的一发（01 传令兵开口那一刻的「显现」序列用）：不看频次、不抽稀、不看 quiet，落点照旧避人避车、声部账照旧
+   * （放不下就返回 null，不硬挤）。incoming 缺省 true：一定先有啸声。返回落点。
+   */
+  Scripted(profile, zones, { incoming = true, tries = 3 } = {}) {
+    this.airCut = profile?.airCut || 0;
+    this.selfCapped = !!profile?.selfCapped;
+    this.zoneOverride = profile?.listenerZone || this.zoneOverride;
+    this.ApplyProfile(profile);
+    // 挑落点一次只试 pickTries 次，运气不好会整发落空；剧本点名的这一发多给两轮机会（声部放不下就不再试）。
+    let at = null;
+    for (let i = 0; i < tries && !at; i += 1) {
+      if (!this.Room(SHELL_SLOTS)) break;
+      at = this.Fire(profile, zones, { incoming });
+    }
+    if (at) this.scripted += 1;
+    return at;
+  }
+
   /**
    * 落一发。有来袭啸声的那一发先放啸声、incomingLeadS 之后才落地（落地要的两条声部
    * 从这一刻起就留着）；其余立刻落地。返回落点（测试用）。
+   * incoming：null = 按 incomingChance 抽；true / false = 剧本指定。
    */
-  Fire(profile, zones) {
+  Fire(profile, zones, { incoming = null } = {}) {
     const T = this.T;
     if (!this.Room(SHELL_SLOTS)) { this.skipped += 1; return null; }
     const at = this.PickPoint(profile, zones);
     if (!at) { this.skipped += 1; return null; }
     this.shells += 1;
-    if (this.rng() < T.incomingChance && this.Room(SHELL_SLOTS + 1)) {
+    const wantIncoming = incoming ?? (this.rng() < T.incomingChance);
+    if (wantIncoming && this.Room(SHELL_SLOTS + 1)) {
       // 啸声在落点上空，比落地早 incomingLeadS 起播（引擎另按距离给它 d/340 的延迟）。
       // 它只算到落地那一刻：之后那一截是爆炸本体盖住的。
+      // incomingShare > 0：摆在听者到落点的连线上这一比例处（炮弹是从头顶飞过去的，飞过时最响；摆在 100 m 外的落点上空
+      // 实测有效电平 −40 dB，什么也听不见）。
+      const L = this.Listener(), k = this.incomingShare;
+      const wp = k > 0 && L ? { x: L.x + (at.x - L.x) * k, z: L.z + (at.z - L.z) * k } : at;
       this.Voice(this.host.audio?.Play?.("shellIncoming", {
-        position: { x: at.x, y: at.y + T.incomingHeightM, z: at.z }, volume: T.incomingVolume, selfCapped: this.selfCapped,
+        position: { x: wp.x, y: at.y + T.incomingHeightM, z: wp.z }, volume: T.incomingVolume * this.gain * this.incomingGain, selfCapped: this.selfCapped,
+        // 啸声只有一条录音：每一发变一点调（±8 %），不然一分钟四五发听的是同一声。
+        pitch: 1 + (this.rng() - 0.5) * (T.incomingPitchSpread ?? 0),
+        ...(this.incomingOcclusion != null ? { occlusion: this.incomingOcclusion } : {}),
         // 整段隔着土的步骤（01）：啸声也闷（2026-09-24 补：原来只有爆炸与低频层吃 airCut）。
         airCut: this.airCut > 0 ? this.airCut : undefined,
       }), T.incomingLeadS);
@@ -202,13 +248,13 @@ export class BattleArtillery {
     const radius = this.VisualRadius(d);
     this.host.Visual?.({ x: at.x, y: at.y, z: at.z }, radius, d);
     // 爆炸 cue 由引擎按 d/340 自己延迟（IsPropagated：explosion* 与 shellImpact 都在表里）。
-    const cue = d < T.midM ? "explosionMid" : "explosionFar";
+    const cue = d < this.midM ? "explosionMid" : "explosionFar";
     const pos = { x: at.x, y: at.y + 1.2, z: at.z };
     const cut = (hz) => (this.airCut > 0 ? Math.min(hz || 20000, this.airCut) : hz || undefined);
     // 爆炸本体：Fire 时已留了位（留过的不再看 SharedRoom —— 前线看得见留位，不会占它）。
     if (reserved > 0 || this.Room(1)) {
       this.Voice(audio?.Play?.(cue, {
-        position: pos, volume: d < T.midM ? T.midVolume : T.farVolume, sourceSizeM: T.vfxRadiusM, selfCapped: this.selfCapped,
+        position: pos, volume: (d < this.midM ? T.midVolume : T.farVolume) * this.gain, sourceSizeM: T.vfxRadiusM, selfCapped: this.selfCapped,
         airCut: cut(0),
       }));
     } else this.layersDropped += 1;
@@ -216,8 +262,8 @@ export class BattleArtillery {
     // 晚 30 ms 起：同名 cue 在 22 ms 去重窗里只活得下来一条（远档那一发本身就是 explosionFar）。
     if (reserved > 0 || this.Room(1)) {
       this.Voice(audio?.Play?.(T.thumpCue, {
-        position: pos, volume: T.thumpVolume, airCut: cut(T.thumpAirCutHz), sourceSizeM: T.vfxRadiusM, selfCapped: this.selfCapped,
-        delay: T.thumpDelayS,
+        position: pos, volume: T.thumpVolume * this.gain, airCut: cut(T.thumpAirCutHz), sourceSizeM: T.vfxRadiusM, selfCapped: this.selfCapped,
+        delay: T.thumpDelayS, ...(this.thumpOcclusion != null ? { occlusion: this.thumpOcclusion } : {}),
       }));
     } else this.layersDropped += 1;
     this.pending.push({ at: this.time + arrive, kind: "shake", d });
@@ -282,7 +328,7 @@ export class BattleArtillery {
   }
 
   State() {
-    return { shells: this.shells, skipped: this.skipped, thinned: this.thinned, refused: this.refused, pending: this.pending.length,
+    return { shells: this.shells, scripted: this.scripted, skipped: this.skipped, thinned: this.thinned, refused: this.refused, pending: this.pending.length,
       voices: this.voices.length, reserved: this.reserved, peakVoices: this.peakVoices, layersDropped: this.layersDropped,
       nextInS: this.nextAt === null ? null : +(this.nextAt - this.time).toFixed(2),
       recent: this.events.slice(-6) };
