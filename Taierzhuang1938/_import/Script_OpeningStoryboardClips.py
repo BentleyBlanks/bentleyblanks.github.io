@@ -7103,6 +7103,998 @@ def BuildHeLiftTimber(T, name):
 
 
 # =================================================================================
+# 2026-09-29 Luo picks up the rifle, pulls Shunzi out by the armpits and hands it to him.
+# User: 「班长把我拖出来有穿模，而且这一段做的有点垃圾……完全可以让我仰头被拉出来啊，看到自己的脚从倒塌的房子里被拖出来」,
+# 「在开局的过场动画里我要你在这里直接做一个班长把枪递交到我手上然后直接开打的动作，而不是要我自己还要捡起来；最后这里结束动画
+# 的时候玩家应该是站立的而不是半蹲」. Three NRA05 clips: LuoPickUpRifleSling, LuoRescueDrag (+ `player` body), LuoHandRifle
+# (+ `player` body and rifle points). Numbers named RT* are RUNTIME metres in Luo's root frame at the start of the clip
+# (the manifest's three.js actor frame: +x right, +y up, +z BACK, -z forward); RT() turns them into this rig's source
+# metres (Blender axes: +X left, +Y back, +Z up).
+# =================================================================================
+def RT(T, x, y, z):
+    """Runtime actor metres (x right, y up, z back) -> this rig's source metres."""
+    return Vector((-x / T.s, z / T.s, y / T.s))
+
+
+def RTd(x, y, z):
+    """A direction in the runtime actor frame -> source axes, unit length."""
+    v = Vector((-x, z, y))
+    return v.normalized() if v.length > 1e-9 else v
+
+
+def RTs(T, p):
+    """Source metres -> runtime actor metres (x right, y up, z back)."""
+    return Vector((-p[0] * T.s, p[2] * T.s, p[1] * T.s))
+
+
+HANYANG_HALF = (WEAPONS['HanYang']['muzzle'] - WEAPONS['HanYang']['butt']) / 2      # rifle centre, real m ahead of the right-hand grip
+
+
+def RifleAtCentre(T, centre, axis):
+    """The HanYang whose centre (butt plate and muzzle tip half way) sits at `centre` (source m) and points along `axis`."""
+    a = Vector(axis).normalized()
+    return T.Rifle(tuple(Vector(centre) - a * T.R(HANYANG_HALF)), tuple(a))
+
+
+def RifleCentre(T, rifle):
+    return Vector(rifle['origin']) + Vector(rifle['axis']) * T.R(HANYANG_HALF)
+
+
+def RifleSlerp(T, a, b, w):
+    """Rifle pose between two rifles: the grip origin by straight line, the bore direction by the shortest arc."""
+    origin = Vector(a['origin']).lerp(Vector(b['origin']), w)
+    va, vb = Vector(a['axis']).normalized(), Vector(b['axis']).normalized()
+    axis = va.slerp(vb, w) if va.dot(vb) > -.98 else va.lerp(vb, w).normalized()
+    return T.Rifle(tuple(origin), tuple(axis))
+
+
+def RiflePath(T, rows):
+    """rows [(t, rifle)] -> f(t) the rifle between them: smoothstep in time, arc in direction (a hand-held carry keeps
+    the grip origin on a smooth path: PCHIP through the origins, the bore by shortest arcs)."""
+    ts = [r[0] for r in rows]
+    origins = Channel([(r[0], tuple(r[1]['origin'])) for r in rows])
+
+    def At(t):
+        if t <= ts[0]:
+            return rows[0][1]
+        if t >= ts[-1]:
+            return rows[-1][1]
+        i = max(j for j in range(len(ts) - 1) if ts[j] <= t)
+        w = (t - ts[i]) / max(1e-6, ts[i + 1] - ts[i])
+        rifle = RifleSlerp(T, rows[i][1], rows[i + 1][1], Smooth(w))
+        return T.Rifle(tuple(origins(t)), rifle['axis'])
+    return At
+
+
+LUO_GROUND_RIFLE = ((.70, .04, .05), (-.5, 0.0, .87))      # centre, bore (muzzle) direction: runtime m, root frame of LuoPickUpRifleSling
+LUO_SHUNZI_EYE0 = (0.0, .28, -.70)                         # Shunzi's prone eye in that frame (the first-person camera)
+
+
+def LuoStand(T):
+    """Luo standing at his root, hands hanging: frame 0 of LuoPickUpRifleSling is it (dadao in the belt), the last frame
+    of LuoPickUpRifleSling (rifle slung) and frame 0 of LuoRescueDrag are it."""
+    f = Standing(T)
+    f.update({'lookW': 0.0, 'curl.L': .45, 'curl.R': .45})
+    return f
+
+
+LUO_PICK_T = 43 / 24                 # 1.79 s
+LUO_PICK_EVENTS = {'lifted': .72, 'slung': 1.46}
+Meta('LuoPickUpRifleSling', LUO_PICK_T, False, 'free', role='luo', rig='TengxianNra05', props=['rifle'], rootMotion=False,
+     weapon='Dadao', weaponState='dadaoInBelt',
+     contacts=[{'t': .58, 'limb': 'handsLR', 'action': 'grip', 'target': 'rifle'},
+               {'t': 1.50, 'limb': 'handsLR', 'action': 'release', 'target': 'rifle'}],
+     events=[{'t': LUO_PICK_EVENTS['lifted'], 'kind': 'rifleLifted'}, {'t': LUO_PICK_EVENTS['slung'], 'kind': 'rifleSlung'}],
+     prev=['LuoDadaoChopRear'], next=['LuoRescueDrag'],
+     notes='2026-09-29: from standing (dadao in the belt) steps his right foot out, stoops and takes the Hanyang lying 0.7 m to '
+           'his right (prop `rifle`: on the ground at frame 0, centre (+.70, .04, +.05), muzzle toward (-.5, 0, +.87) in the root '
+           'frame), stands with it, swings it over the right shoulder onto his back and lets go; the last frame is the standing '
+           'pose with the rifle slung (SlungRifle back) = LuoRescueDrag frame 0.')
+
+def LuoPickPath(T):
+    """The pick-up and sling of LuoPickUpRifleSling: (stand, RifleAt(t), along(t), alongL(t), the rifle on the ground, ready, slung).
+    along / alongL: where the right / left fist holds the rifle, real metres from the butt plate."""
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    stand = LuoStand(T)
+    gr = RifleAtCentre(T, RT(T, *LUO_GROUND_RIFLE[0]), RTd(*LUO_GROUND_RIFLE[1]))
+    ready = T.Rifle((-.17, -.32, P + .02), Unit((.55, -.18, .82)))     # port arms: muzzle up over his left shoulder, not at Shunzi's camera
+    swung = T.Rifle((-.20, -.30, P + .22), Unit((.22, -.82, .52)))
+    lifted = T.Rifle((-.20, .15, P + .25), Unit((-.20, -.35, .91)))
+    slung = T.Rifle((.107, .20, P + .16), Unit((-.37, .05, .93)))
+    up = T.Rifle(tuple(gr['origin'][:2]) + (gr['origin'][2] + T.R(.16),), gr['axis'])
+    mid = RifleAtCentre(T, RT(T, .26, .84, -.02), RTd(-.30, .55, .78))    # off the ground and up against his right side, the muzzle swinging up
+    rifleAt = RiflePath(T, [(0.0, gr), (.62, gr), (.72, up), (.88, mid), (1.06, ready), (1.16, swung), (1.32, lifted), (1.50, slung)])
+    w = WEAPONS[T.gun]
+    along = Channel([(0.0, .60), (.62, .60), (.72, .58), (.88, .46), (1.06, w['butt']), (1.16, .45), (1.32, .70), (1.50, .92)])
+    alongL = Channel([(0.0, w['gripL'] + w['butt']), (1.10, w['gripL'] + w['butt'])])
+    return stand, rifleAt, along, alongL, gr, ready, slung
+
+
+@Builder('LuoPickUpRifleSling')
+def BuildLuoPickUp(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    stand, rifleAt, along, alongL, gr, ready, slung = LuoPickPath(T)
+    Foot = lambda x, z: (RT(T, x, 0, z).x, RT(T, x, 0, z).y, A)
+    footR, footL = Foot(.52, .02), Foot(.13, .0)
+    lift = lambda a, b: (Vector(a).lerp(Vector(b), .5).x, Vector(a).lerp(Vector(b), .5).y, A + .08)
+    sR, sL = stand['ankle.R'], stand['ankle.L']
+    body = Tracks(stand, {
+        'pelvis': [(0.0, stand['pelvis']), (.24, Add3(stand['pelvis'], (-.10, 0, -.04))), (.44, tuple(RT(T, .36, .52, .06))),
+                   (.62, tuple(RT(T, .36, .48, .05))), (.90, tuple(RT(T, .16, .76, .0))), (1.20, tuple(RT(T, .05, .84, .0))),
+                   (LUO_PICK_T, stand['pelvis'])],
+        'bend': [(0.0, stand['bend']), (.24, .30), (.44, .92), (.62, .98), (.90, .40), (1.20, .12), (LUO_PICK_T, stand['bend'])],
+        'lean': [(0.0, 0.0), (.44, -.26), (.62, -.30), (.90, -.10), (1.20, 0.0)],
+        'twist': [(0.0, 0.0), (.44, -.22), (.62, -.24), (.90, -.08), (1.20, 0.0)],
+        'pelvisTilt': [(0.0, stand['pelvisTilt']), (.44, (.30, 0, 0)), (.62, (.34, 0, 0)), (.90, (.12, 0, 0)), (1.20, stand['pelvisTilt'])],
+        'head': [(0.0, (0, 0, 0)), (1.0, (0, 0, 0))],
+        'ankle.R': [(0.0, sR), (.10, sR), (.21, lift(sR, footR)), (.32, footR), (1.00, footR), (1.12, lift(footR, sR)), (1.24, sR), (LUO_PICK_T, sR)],
+        'ankle.L': [(0.0, sL), (.22, sL), (.31, lift(sL, footL)), (.40, footL), (1.10, footL), (1.22, lift(footL, sL)), (1.36, sL), (LUO_PICK_T, sL)],
+        'legPole.R': [(0.0, stand['legPole.R']), (.32, (footR[0] - .30, -.95, .50)), (1.00, (footR[0] - .30, -.95, .50)), (1.24, stand['legPole.R'])],
+        'legPole.L': [(0.0, stand['legPole.L']), (.40, (footL[0] + .22, -.95, .50)), (1.10, (footL[0] + .22, -.95, .50)), (1.36, stand['legPole.L'])],
+        'foot.R': [(0.0, stand['foot.R']), (.32, (0, -14, 0)), (1.00, (0, -14, 0)), (1.24, stand['foot.R'])],
+        'foot.L': [(0.0, stand['foot.L']), (.40, (0, 8, 0)), (1.36, stand['foot.L'])],
+    }, lag={'head': .05})
+    seeRifle = Channel([(0.0, 0.0), (.16, 0.0), (.40, .85), (.62, .85), (.90, .30), (1.04, 0.0)])
+    braceL = Channel([(0.0, 0.0), (.30, 1.0), (.66, 1.0), (.90, 0.0), (LUO_PICK_T, 0.0)])     # the free left hand on his thigh
+
+    def Pose(t):
+        f = body(t)
+        rifle = rifleAt(t)
+        palms = T.Palms(rifle['axis'])
+        held = Smooth((t - .40) / .18) if t < .70 else 1.0
+        # right fist: near the balance of the rifle while it is picked up, on the neck once it is up, then up the barrel as it
+        # goes over the shoulder and off it
+        if t >= .40 and t < 1.56:
+            off = 1 - Smooth((t - 1.44) / .12) if t > 1.44 else 1.0
+            EaseGrip(f, 'R', T.Along(rifle, along(t)), min(held, off), palms['R'][0], palms['R'][1], .95)
+            f['armPole.R'] = (-(SX + .50), .20, P - .10)
+        # left fist: hangs on his thigh while the right hand takes the rifle off the ground, joins on the handguard once it is
+        # up (0.78-0.94 s) and lets go before it goes over the shoulder (1.10-1.24 s)
+        if .78 <= t < 1.26:
+            offL = 1 - Smooth((t - 1.10) / .14) if t > 1.10 else 1.0
+            EaseGrip(f, 'L', T.Along(rifle, alongL(t)), min(Smooth((t - .78) / .16), offL), palms['L'][0], palms['L'][1], .85)
+        # eyes: on Shunzi, then on the rifle while he stoops for it, then back
+        aim = Vector(RifleCentre(T, gr)) + Vector((0, 0, .0))
+        f['look'] = tuple(Vector(RT(T, *LUO_SHUNZI_EYE0)).lerp(aim, seeRifle(t)))
+        f['lookW'] = .6 if t <= 1.3 else .6 * (1 - Smooth((t - 1.3) / .3))
+        f['handRel.L'] = tuple(Vector(stand['handRel.L']).lerp(Vector((.07, -.22, -.40)), braceL(t)))
+        return T.Nest(f)
+
+    def Props(t):
+        # the last 0.2 s the rifle settles onto SlungRifle(back) evaluated on the posed body: LuoRescueDrag's frame 0 (and LuoHandRifle's)
+        # is that same rifle, so the hand-over does not move it
+        rifle, up, w = rifleAt(t), Vector((0, 0, 1)), Smooth((t - 1.30) / .20)
+        if w > 0:
+            actual, actualUp = SlungRifle(T, 'back')
+            origin = Vector(rifle['origin']).lerp(Vector(actual['origin']), w)
+            axis = Vector(rifle['axis']).slerp(Vector(actual['axis']), w) if w < 1 else Vector(actual['axis'])
+            rifle, up = T.Rifle(tuple(origin), tuple(axis)), up.lerp(Vector(actualUp), w)
+        return {'rifle': (rifle['origin'], rifle['axis'], tuple(up), True)}
+
+    def Check(t):
+        out = {}
+        rifle = rifleAt(t)
+        if .58 <= t <= 1.44:
+            out['R'] = T.Along(rifle, along(t))
+        if .94 <= t <= 1.10:
+            out['L'] = T.Along(rifle, alongL(t))
+        return out
+    spec = {'pose': Pose, 'props': Props, 'check': Check,
+            'plants': [('L', 0, .22), ('L', .40, 1.10), ('L', 1.36, LUO_PICK_T), ('R', 0, .10), ('R', .32, 1.00), ('R', 1.24, LUO_PICK_T)],
+            'reach': {'fraction': .80, 'travel': .14, 'bend': .55, 'sink': .20},
+            'reviewProps': lambda t: T.RifleProps(rifleAt(t)) + [('cyl', tuple(RT(T, 0, .05, -.70)), tuple(RT(T, 0, .28, -.70)), .07)],
+            'reviewFrames': lambda n: [0, int(n * .16), int(n * .30), int(n * .42), int(n * .58), int(n * .72), int(n * .86), n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = [('side', (-3.2, -.4, 1.0), (0, -.1, .6)), ('q', (-2.3, -2.9, 1.8), (0, -.1, .55)),
+                           FirstPersonView(tuple(RT(T, *LUO_SHUNZI_EYE0)), tuple(RT(T, 0, .95, .15)), fov=70.0)]
+    return spec
+
+
+# ---- Shunzi's body for the first person: one rigid figure, runtime metres in the root frame of LuoRescueDrag -----------------
+# (`player` track: eye, gaze, crown, chest, chestUp, pelvis, kneeL/R, heelL/R). The figure is the brief's numbers made
+# rigid: the pelvis, the trunk (0.64 m pelvis to chest centre), the thighs and shins keep their lengths through the roll, the
+# lift and the drag, the head turns on a neck pivot. Prone / supine key states match the brief within ~2 cm. Left / right
+# are HIS: prone his left is +x, supine -x.
+SZ_AXIS_Y = .125                        # the body's axis over the ground while he lies
+SZ_PELVIS = (0.0, SZ_AXIS_Y, -1.60)
+SZ_TRUNK = .64
+SZ_NECK = ((.209, -.037), (.149, .067))  # neck pivot from the chest centre (cranial, ventral m): prone, supine
+SZ_GAZE0 = math.radians(15.0)           # the prone gaze: 15 deg over the ground, toward Luo (+z)
+SZ_LIFT_DEG, SZ_LOW_DEG = 25.0, 5.0
+
+
+def _Rx(v, a):
+    c, s = math.cos(a), math.sin(a)
+    return Vector((v.x, v.y * c - v.z * s, v.y * s + v.z * c))
+
+
+def _Ry(v, a):
+    c, s = math.cos(a), math.sin(a)
+    return Vector((v.x * c + v.z * s, v.y, -v.x * s + v.z * c))
+
+
+def _Rz(v, a):
+    c, s = math.cos(a), math.sin(a)
+    return Vector((v.x * c - v.y * s, v.x * s + v.y * c, v.z))
+
+
+def ShunziFigure(roll, lift, dz, pitch, headRoll, bob=0.0, yaw=0.0):
+    """Shunzi lying, as Vectors (runtime m, Luo's root frame).
+    roll: 0 prone .. pi supine, about the body axis (+ = his left side, +x prone, rises first: the chest normal goes down, +x, up);
+    lift: the trunk raised about the hips (rad, + = the head up); dz: the drag along +z; pitch: the gaze elevation over the prone
+    15 deg (rad; the camera turns about +x); headRoll: the head's roll about its own gaze (rad, the camera's roll); bob / yaw:
+    the eye's rise (m) and a swing of the gaze about the vertical (rad) with each pull."""
+    s = (1 - math.cos(roll)) / 2
+    P = Vector((0.0, SZ_AXIS_Y, SZ_PELVIS[2] + dz))
+    a = _Rx(Vector((0, 0, 1)), -lift)
+    v = _Rx(_Rz(Vector((0, -1, 0)), roll), -lift)                   # ventral (chest normal)
+    l = _Rx(_Rz(Vector((1, 0, 0)), roll), -lift)                    # his left
+    C = P + a * SZ_TRUNK
+    Na = SZ_NECK[0][0] + (SZ_NECK[1][0] - SZ_NECK[0][0]) * s
+    Nv = SZ_NECK[0][1] + (SZ_NECK[1][1] - SZ_NECK[0][1]) * s
+    N = C + a * Na + v * Nv
+    g0 = Vector((0, math.sin(SZ_GAZE0), math.cos(SZ_GAZE0)))
+    c0 = Vector((0, math.cos(SZ_GAZE0), -math.sin(SZ_GAZE0)))
+    g, c = g0, Quaternion(g0, headRoll) @ c0
+    g, c = _Rx(g, -pitch), _Rx(c, -pitch)
+    if yaw:
+        g, c = _Ry(g, yaw), _Ry(c, yaw)
+    eye = N + g * .10 + c * .10 + Vector((0, bob, 0))
+    kneeY = .07 + .03 * s + .05 * math.sin(roll)
+    heelY = .12 - .07 * s + .04 * math.sin(roll)
+    x = math.cos(roll)
+    return {'P': P, 'a': a, 'v': v, 'l': l, 'C': C, 'N': N, 'g': g, 'c': c, 'eye': eye,
+            'kneeL': Vector((.11 * x, kneeY, P.z - .48)), 'kneeR': Vector((-.11 * x, kneeY, P.z - .48)),
+            'heelL': Vector((.12 * x, heelY, P.z - .95)), 'heelR': Vector((-.12 * x, heelY, P.z - .95))}
+
+
+def ShunziPoints(fig):
+    """The `player` parts of a figure: eye, gaze (1.0 m along the head), crown (0.2 m toward the top of the head), chest (the
+    breastbone centre), chestUp (0.25 m along the chest normal), pelvis, knees, heels."""
+    eye = fig['eye']
+    return {'eye': eye, 'gaze': eye + fig['g'], 'crown': eye + fig['c'] * .2, 'chest': fig['C'], 'chestUp': fig['C'] + fig['v'] * .25,
+            'pelvis': fig['P'], 'kneeL': fig['kneeL'], 'kneeR': fig['kneeR'], 'heelL': fig['heelL'], 'heelR': fig['heelR']}
+
+
+def ShunziShoulder(fig, sign=1.0, out=.0):
+    """His left (sign 1) or right (-1) shoulder joint (m), `out` further out."""
+    return fig['C'] + fig['a'] * .12 + fig['l'] * (sign * (.19 + out))
+
+
+RD_T = 120 / 24                                       # LuoRescueDrag: 5.0 s
+RD_ROLL = (.50, 1.30)                                 # the roll onto his back
+RD_LIFT = (1.30, 1.90)                                # the trunk raised about the hips
+RD_HEAD = (1.60, 2.10)                                # the head goes over from looking back at Luo to looking down his body at his feet
+RD_LOWER = (4.10, 4.60)                               # let down to 12 deg
+RD_PULLS = [(1.90 + .44 * k, 2.20 + .44 * k) for k in range(5)]        # five pulls of 0.29 m, 0.14 s rests: haulStart 1.9, haulEnd 4.1
+RD_PULL_M = 1.45 / 5
+
+
+def RdDrag(t):
+    return sum(RD_PULL_M * Smooth((t - t0) / (t1 - t0)) for t0, t1 in RD_PULLS)
+
+
+def RdPull(t):
+    """(k, u): which pull is on and how far through it, or None."""
+    for k, (t0, t1) in enumerate(RD_PULLS):
+        if t0 <= t <= t1:
+            return k, (t - t0) / (t1 - t0)
+    return None
+
+
+def RdFigure(t):
+    roll = math.pi * Smooth((t - RD_ROLL[0]) / (RD_ROLL[1] - RD_ROLL[0]))
+    lift = math.radians(SZ_LIFT_DEG) * Smooth((t - RD_LIFT[0]) / (RD_LIFT[1] - RD_LIFT[0])) \
+        - math.radians(SZ_LIFT_DEG - SZ_LOW_DEG) * Smooth((t - RD_LOWER[0]) / (RD_LOWER[1] - RD_LOWER[0]))
+    # gaze elevation: 15 -> 50 deg over the roll (he looks up at Luo), over the top to 210 deg (the direction of his feet, 30 deg
+    # down along his body), a little less while he is hauled (207), 200 when he is let down
+    pitch = math.radians(35) * Smooth((t - RD_ROLL[0]) / (RD_ROLL[1] - RD_ROLL[0])) \
+        + math.radians(160) * Smooth((t - RD_HEAD[0]) / (RD_HEAD[1] - RD_HEAD[0])) \
+        - math.radians(3) * Smooth((t - 2.10) / 1.0) - math.radians(7) * Smooth((t - RD_LOWER[0]) / (RD_LOWER[1] - RD_LOWER[0]))
+    bob, yaw, pull = 0.0, 0.0, RdPull(t)
+    if pull:
+        k, u = pull
+        bob = .03 * math.sin(math.pi * u)
+        yaw = math.radians(4) * math.sin(math.pi * u) * (1 if k % 2 == 0 else -1)
+    return ShunziFigure(roll, lift, RdDrag(t), pitch, roll, bob, yaw)
+
+
+def ViewRoll(direction, up):
+    """The roll (deg) that puts a review camera looking along `direction` with `up` overhead (Blender's track quaternion keeps
+    the camera's up toward world +Z; the bake turns it by this much about the view axis)."""
+    d = Vector(direction).normalized()
+    q = d.to_track_quat('-Z', 'Y')
+    up0, right0 = q @ Vector((0, 1, 0)), q @ Vector((1, 0, 0))
+    u = Vector(up) - d * Vector(up).dot(d)
+    return math.degrees(math.atan2(-u.dot(right0), u.dot(up0)))
+
+
+def SegmentDistance(p1, q1, p2, q2):
+    """Smallest distance between segments p1-q1 and p2-q2."""
+    d1, d2, r = q1 - p1, q2 - p2, p1 - p2
+    a, e, f = d1.dot(d1), d2.dot(d2), d2.dot(r)
+    if a <= 1e-12 and e <= 1e-12:
+        return r.length
+    if a <= 1e-12:
+        s, t = 0.0, Clamp(f / e)
+    else:
+        c = d1.dot(r)
+        if e <= 1e-12:
+            s, t = Clamp(-c / a), 0.0
+        else:
+            b = d1.dot(d2)
+            den = a * e - b * b
+            s = Clamp((b * f - c * e) / den) if den > 1e-12 else 0.0
+            t = (b * s + f) / e
+            if t < 0:
+                t, s = 0.0, Clamp(-c / a)
+            elif t > 1:
+                t, s = 1.0, Clamp((b - c) / a)
+    return ((p1 + d1 * s) - (p2 + d2 * t)).length
+
+
+RD_HOOK_Z = -.10                 # Luo's pelvis (runtime z) when he hooks his arms in behind Shunzi's head
+RD_END_BACK = .78                # Luo stands this far behind Shunzi's eye at the end (the brief: 0.75 +- 0.1)
+RD_GRIP_ON, RD_GRIP_OFF = (.40, .52), (4.50, 4.70)
+RD_ROLL_HANDS_OFF = .78          # the hands let go of the shoulder over the top of the roll (the body finishes it)
+
+
+def RdEndZ():
+    return RdFigure(RD_T)['eye'].z + RD_END_BACK
+
+
+Meta('LuoRescueDrag', RD_T, False, 'free', role='luo', rig='TengxianNra05', props=['rifle'], rootMotion=True, player=True,
+     weapon='Dadao', weaponState='dadaoInBelt',
+     contacts=[{'t': .50, 'limb': 'handsLR', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'shoulderL'},
+               {'t': 1.80, 'limb': 'handsLR', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'armpitsChest'},
+               {'t': 4.50, 'limb': 'handsLR', 'action': 'release'}],
+     events=[{'t': 1.30, 'kind': 'rolled'}, {'t': 1.80, 'kind': 'hooked'}, {'t': 1.90, 'kind': 'haulStart'},
+             {'t': 4.10, 'kind': 'haulEnd'}],
+     prev=['LuoPickUpRifleSling'], next=['LuoHandRifle'],
+     notes='2026-09-29: Luo (rifle slung on his back, dadao in the belt) squats at the head of the prone Shunzi, rolls him onto his back '
+           'by the left shoulder, hooks both forearms under his armpits from behind the head, lifts his trunk and hauls him '
+           '1.45 m (five pulls, feet planted) out from under the roof timber, lets him down and stands 0.78 m behind his eye. '
+           '`player`: his rigid body in Luo\'s root frame at frame 0 -- eye, gaze (1.0 m along the head), crown (0.2 m toward the top '
+           'of the head: the camera\'s up is crown - eye), chest (breastbone centre), chestUp (0.25 m along the chest normal), '
+           'pelvis, kneeL/R, heelL/R (his left/right). The root is pinned at frame 0 and the pelvis carries the root motion.')
+
+
+def SlungBack(T, hang=0.0):
+    """SlungRifle(T, 'back') whose barrel swings back toward the vertical as he bends (hang 0..1): on the back of a bent-over man
+    the rifle hangs from the sling, it does not point over his head at what he looks at. The sling's shoulder end stays put."""
+    rifle, up = SlungRifle(T, 'back')
+    if hang <= 1e-4:
+        return rifle, up
+    axis = Unit(Lerp3(rifle['axis'], (0, .0, 1), hang))
+    top = Vector(rifle['origin']) + Vector(rifle['axis']) * T.R(.55)
+    return T.Rifle(tuple(top - Vector(axis) * T.R(.55)), axis), up
+
+
+def SzGhost(T, fig):
+    """His body as review shapes (source metres): trunk, neck, head, thighs, shins, the arms along his sides."""
+    r = lambda p: tuple(RT(T, p.x, p.y, p.z))
+    s = T.s
+    head = fig['N'] + fig['c'] * .07 + fig['g'] * .03
+    rows = [('cyl', r(fig['P']), r(fig['C']), .11 / s), ('cyl', r(fig['C']), r(fig['N']), .05 / s), ('point', r(head), None, .09 / s),
+            ('cyl', r(fig['P']), r(fig['kneeL']), .07 / s), ('cyl', r(fig['P']), r(fig['kneeR']), .07 / s),
+            ('cyl', r(fig['kneeL']), r(fig['heelL']), .05 / s), ('cyl', r(fig['kneeR']), r(fig['heelR']), .05 / s)]
+    for sign in (1, -1):
+        sh = ShunziShoulder(fig, sign)
+        rows.append(('cyl', r(sh), r(sh - fig['a'] * .50 + fig['l'] * (sign * .06)), .04 / s))
+    return rows
+
+
+def RdHand(fig, side, t, figAt):
+    """The world point (runtime m) Luo's hand `side` closes on at clip time t. Roll: on the shoulder that goes up (his left, +x
+    prone) -- the right hand on its outer top, the left inside it -- until the top of the roll; then across to his armpit
+    on its own side, then in over the chest to the breastbone (right hand on his right, left on his left)."""
+    outer = side == 'R'
+
+    def Body(f, a, l, v):
+        return f['C'] + f['a'] * a + f['l'] * l + f['v'] * v
+    if t <= RD_ROLL_HANDS_OFF:
+        return Body(fig, .12 if outer else .10, .24 if outer else .13, -.10)
+    top = Body(figAt(RD_ROLL_HANDS_OFF), .12 if outer else .10, .24 if outer else .13, -.10)
+    sign = -1 if outer else 1                               # Luo's right hand on his right (-l), left on his left (+l)
+    armpit = Body(fig, .08, sign * .18, .03)
+    chest = Body(fig, .10, sign * .13, .10)                  # the upper chest under the collarbone: 'armpitsChest'
+    if t <= 1.45:
+        return top.lerp(armpit, Smooth((t - RD_ROLL_HANDS_OFF) / (1.45 - RD_ROLL_HANDS_OFF)))
+    return armpit.lerp(chest, Smooth((t - 1.45) / .40))
+
+
+def RdPalm(fig, side, t):
+    """(fingers, palm normal, curl) in source axes: on the shoulder top the fingers reach across his back; on the chest they
+    point down the body, the palm on the breastbone."""
+    dorsal = -fig['v']
+    across = -fig['l']
+    top = (RTd(*across), RTd(*(-dorsal)), .9)
+    chest = (RTd(*(-fig['a'])), RTd(*(-fig['v'])), 1.0)
+    w = Smooth((t - RD_ROLL_HANDS_OFF) / (1.75 - RD_ROLL_HANDS_OFF))
+    f = Vector(top[0]).lerp(Vector(chest[0]), w).normalized()
+    n = Vector(top[1]).lerp(Vector(chest[1]), w).normalized()
+    return tuple(f), tuple(n), Mix(top[2], chest[2], w)
+
+
+@Builder('LuoRescueDrag')
+def BuildLuoRescueDrag(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    s = T.s
+    stand = LuoStand(T)
+    zEnd = RdEndZ()
+    shift = Vector((0.0, zEnd / s, 0.0))                       # the standing pose he ends in: LuoStand carried back
+    endStand = {k: (Add3(v, tuple(shift)) if (v is not None and (k == 'pelvis' or k.startswith(POSITION_CHANNELS))) else v)
+                for k, v in stand.items()}
+    # Luo's pelvis over the ground (runtime m): x, z; height h
+    px = Channel([(0.0, 0.0), (.42, .46), (.70, .46), (1.10, .08), (1.30, .04), (1.45, .03), (1.80, 0.0), (RD_T, 0.0)])
+    zBase = Channel([(0.0, stand['pelvis'][1] * s), (.20, -.06), (.42, -.26), (1.00, -.24), (1.30, -.12), (1.45, -.10), (1.90, RD_HOOK_Z),
+                     (4.10, RD_HOOK_Z), (4.60, RD_HOOK_Z + .01), (RD_T, zEnd - 1.45 + stand['pelvis'][1] * s)])
+    ph = Channel([(0.0, stand['pelvis'][2] * s), (.20, .80), (.42, .50), (.90, .50), (1.30, .46), (1.45, .46), (1.90, .58), (4.10, .58),
+                  (4.40, .50), (4.60, .54), (RD_T, stand['pelvis'][2] * s)])
+
+    def PelvisRT(t):
+        dip = .0
+        pull = RdPull(t)
+        if pull:
+            dip = -.02 * math.sin(math.pi * pull[1])
+        return (px(t), ph(t) + dip, zBase(t) + RdDrag(t))
+
+    def PelvisSrc(t):
+        x, h, z = PelvisRT(t)
+        return (-x / s, z / s, h / s)
+
+    bend = Channel([(0.0, stand['bend']), (.20, .30), (.42, .95), (1.00, .95), (1.30, 1.25), (1.45, 1.35), (1.90, 1.15), (2.20, 1.2), (4.10, 1.2),
+                    (4.40, 1.3), (4.60, .90), (RD_T, stand['bend'])])
+    tilt = Channel([(0.0, stand['pelvisTilt']), (.42, (.30, 0, 0)), (1.00, (.30, 0, 0)), (1.80, (.34, 0, 0)), (4.10, (.34, 0, 0)),
+                    (4.60, (.30, 0, 0)), (RD_T, stand['pelvisTilt'])])
+    # feet (source): approach and squat, the step round behind his head, the five hauling steps, then home
+    Foot = lambda x, z: (RT(T, x, 0, z).x, RT(T, x, 0, z).y, A)
+    sL, sR = stand['ankle.L'], stand['ankle.R']
+    L1, R1 = Foot(.28, -.20), Foot(.70, -.26)
+    L2, R2 = Foot(-.20, -.12), Foot(.22, -.10)
+    lift = lambda a, b: (Vector(a).lerp(Vector(b), .5).x, Vector(a).lerp(Vector(b), .5).y, A + .08)
+    LS1, RS1, RS2, LS2 = (.14, .30), (.24, .40), (.72, .90), (.82, 1.00)        # the steps in: L, R; the steps round behind his head: R, L
+    rowsL = [(0.0, sL), (LS1[0], sL), ((LS1[0] + LS1[1]) / 2, lift(sL, L1)), (LS1[1], L1), (LS2[0], L1), ((LS2[0] + LS2[1]) / 2, lift(L1, L2)), (LS2[1], L2)]
+    rowsR = [(0.0, sR), (RS1[0], sR), ((RS1[0] + RS1[1]) / 2, lift(sR, R1)), (RS1[1], R1), (RS2[0], R1), ((RS2[0] + RS2[1]) / 2, lift(R1, R2)), (RS2[1], R2)]
+    plants = {'L': [(0.0, LS1[0]), (LS1[1], LS2[0]), (LS2[1], None)], 'R': [(0.0, RS1[0]), (RS1[1], RS2[0]), (RS2[1], None)]}
+    at = {'L': L2, 'R': R2}
+    rows = {'L': rowsL, 'R': rowsR}
+    stanceX = {'L': .21, 'R': -.21}
+    for k, (t0, t1) in enumerate(RD_PULLS):
+        side = 'L' if k % 2 == 0 else 'R'
+        a, b = t0 + .02, t1 - .02
+        px_, py_, _ = PelvisSrc(t1)
+        to = (stanceX[side] / s, py_ - .10 / s, A)
+        rows[side] += [(a, at[side]), ((a + b) / 2, lift(at[side], to)), (b, to)]
+        plants[side][-1] = (plants[side][-1][0], a)
+        plants[side].append((b, None))
+        at[side] = to
+    # home: two small steps into the standing stance carried back, R first
+    homeL, homeR = endStand['ankle.L'], endStand['ankle.R']
+    rows['R'] += [(4.60, at['R']), (4.72, lift(at['R'], homeR)), (4.84, homeR), (RD_T, homeR)]
+    rows['L'] += [(4.72, at['L']), (4.84, lift(at['L'], homeL)), (4.96, homeL), (RD_T, homeL)]
+    plants['R'][-1] = (plants['R'][-1][0], 4.60)
+    plants['R'].append((4.84, RD_T))
+    plants['L'][-1] = (plants['L'][-1][0], 4.72)
+    plants['L'].append((4.96, RD_T))
+    plantList = [(side, a, b) for side in 'LR' for a, b in plants[side] if b is not None and b - a > .03]
+    poleL = Channel([(0.0, stand['legPole.L']), (LS1[1], (L1[0] + .22, L1[1] - .95, .50)), (LS2[1], (L2[0] + .22, L2[1] - .95, .50)),
+                     (RD_T - .30, (L2[0] + .22, L2[1] - .95, .50)), (RD_T, endStand['legPole.L'])])
+    poleR = Channel([(0.0, stand['legPole.R']), (RS1[1], (R1[0] - .22, R1[1] - .95, .50)), (RS2[1], (R2[0] - .22, R2[1] - .95, .50)),
+                     (RD_T - .30, (R2[0] - .22, R2[1] - .95, .50)), (RD_T, endStand['legPole.R'])])
+    channels = {
+        'pelvis': [(t, PelvisSrc(t)) for t in [round(.05 * i, 2) for i in range(0, int(RD_T / .05) + 1)]],
+        'bend': [(t, bend(t)) for t in [round(.05 * i, 2) for i in range(0, int(RD_T / .05) + 1)]],
+        'pelvisTilt': [(t, tilt(t)) for t in [round(.1 * i, 2) for i in range(0, int(RD_T / .1) + 1)]],
+        'ankle.L': rows['L'], 'ankle.R': rows['R'],
+        'legPole.L': [(t, poleL(t)) for t in (0.0, LS1[1], LS2[1], RD_T - .3, RD_T)], 'legPole.R': [(t, poleR(t)) for t in (0.0, RS1[1], RS2[1], RD_T - .3, RD_T)],
+        'foot.L': [(0.0, stand['foot.L']), (LS1[1], (0, 8, 0)), (RD_T - .3, (0, 8, 0)), (RD_T, stand['foot.L'])],
+        'foot.R': [(0.0, stand['foot.R']), (RS1[1], (0, -14, 0)), (RD_T - .3, (0, -14, 0)), (RD_T, stand['foot.R'])],
+        'twist': [(0.0, 0.0), (.42, .45), (.78, .45), (1.20, 0.0), (RD_T, 0.0)],
+        'head': [(0.0, (0, 0, 0)), (.42, (-.30, 0, 0)), (1.0, (-.30, 0, 0)), (1.30, (-.40, 0, 0)), (4.40, (-.40, 0, 0)),
+                 (4.60, (-.10, 0, 0)), (RD_T, (0, 0, 0))],
+        'neck': [(0.0, (0, 0, 0)), (.42, (-.30, 0, 0)), (1.0, (-.30, 0, 0)), (1.30, (-.90, 0, 0)),
+                 (4.40, (-.90, 0, 0)), (4.60, (0, 0, 0)), (RD_T, (0, 0, 0))],
+    }
+    for key in ('hand.L', 'hand.R', 'armPole.L', 'armPole.R'):        # world targets of the free hands: carried back with the standing pose
+        channels[key] = [(0.0, stand[key]), (RD_T, endStand[key])]
+    body = Tracks(stand, channels, lag={'head': .05})
+    figAt = RdFigure
+    palmOn = Channel([(0.0, 0.0), (RD_GRIP_ON[0], 0.0), (RD_GRIP_ON[1], 1.0), (RD_GRIP_OFF[0], 1.0), (RD_GRIP_OFF[1], 0.0), (RD_T, 0.0)])
+    K_ = T.K
+    ARCH = .6
+    archExt = Channel([(0.0, 0.0), (1.20, 0.0), (1.50, ARCH), (4.40, ARCH), (4.60, 0.0), (RD_T, 0.0)])
+
+    def Pose(t):
+        f = body(t)
+        fig = figAt(t)
+        w = palmOn(t)
+        for side in LR:
+            if w > 1e-4:
+                point = RdHand(fig, side, t, figAt)
+                palmF, palmN, curl = RdPalm(fig, side, t)
+                EaseGrip(f, side, tuple(RT(T, point.x, point.y, point.z)), Smooth(w), palmF, palmN, curl)
+                sign = 1 if side == 'L' else -1
+                pel = PelvisSrc(t)
+                f['armPole.' + side] = (pel[0] + sign * .55, pel[1] + .15, pel[2] + .45)
+        f['lookW'] = 0.0
+        p = T.Nest(f)
+        # the upper back arches (Spine2 back over the flexed lower spine): with the arms at full reach the shoulders cannot come
+        # nearer, so this is what lifts his head and face off Shunzi's (the neck joint sits a hand's width in front of the chest)
+        arch = archExt(t)
+        if arch > 1e-4:
+            inner = p['post']
+
+            def Post(inner=inner, arch=arch):
+                inner()
+                K_['Tilt'](K_['Bone']('Spine2'), x=-arch)
+                K_['Update']()
+            p['post'] = Post
+        return p
+
+    def Props(t):
+        bendNow = bend(t)
+        rifle, up = SlungBack(T, Clamp((bendNow - .15) / .7))
+        return {'rifle': (rifle['origin'], rifle['axis'], up, True)}
+
+    def Check(t):
+        out = {}
+        if RD_GRIP_ON[1] <= t <= RD_GRIP_OFF[0]:
+            fig = figAt(t)
+            for side in LR:
+                p = RdHand(fig, side, t, figAt)
+                out[side] = tuple(RT(T, p.x, p.y, p.z))
+        return out
+
+    def Player(t):
+        pts = ShunziPoints(figAt(t))
+        return {k: tuple(RT(T, v.x, v.y, v.z)) for k, v in pts.items()}
+    K = T.K
+    minima = {'torso': [9.0, 0.0], 'forearm': [9.0, 0.0], 'trunkClear': [9.0, 0.0]}
+    debug = __import__('os').environ.get('OPENING_LUODBG')
+
+    def Probe(t):
+        """Luo against Shunzi's eye every frame (source metres -> runtime): trunk / head / legs >= 0.30 m, forearm and hand >= 0.12 m;
+        and the forearms against his trunk (the axis pelvis-chest, radius 0.11). Debug numbers only (OPENING_LUODBG=1 prints one
+        LUOCLEAR line a frame and the minima at the end); nothing is written to the manifest."""
+        if not debug:
+            return {}
+        fig = figAt(t)
+        eye = RT(T, fig['eye'].x, fig['eye'].y, fig['eye'].z)
+        Pt = lambda role: K['Point'](K['Bone'](role))
+        names = ('Pelvis', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head')
+        chain = [Pt(r) for r in names]
+        chain.append(chain[-1] + (chain[-1] - chain[-2]).normalized() * T.R(.12))
+        near = ('', 9.0)
+        for i, (a, b) in enumerate(zip(chain, chain[1:])):
+            d = SegmentDistance(a, b, eye, eye) * s
+            if d < near[1]:
+                near = ((names + ('HeadTop',))[i] + '>' + (names + ('HeadTop',))[i + 1], d)
+        torso = near[1]
+        for side in LR:
+            th = [Pt(side + ' Thigh'), Pt(side + ' Calf'), Pt(side + ' Foot')]
+            for i, (a, b) in enumerate(zip(th, th[1:])):
+                d = SegmentDistance(a, b, eye, eye) * s
+                if d < near[1]:
+                    near = (side + ('Thigh>Calf', 'Calf>Foot')[i], d)
+            torso = near[1]
+        arm = 9.0
+        clear = 9.0
+        P0, C0 = RT(T, fig['P'].x, fig['P'].y, fig['P'].z), RT(T, fig['C'].x, fig['C'].y, fig['C'].z)
+        for side in LR:
+            fa = [Pt(side + ' Forearm'), Pt(side + ' Hand'), K['GripPoint'](side)]
+            arm = min(arm, min(SegmentDistance(a, b, eye, eye) for a, b in zip(fa, fa[1:])) * s)
+            clear = min(clear, min(SegmentDistance(a, b, P0, C0) for a, b in zip(fa, fa[1:])) * s - .11)
+        for key, value in (('torso', torso), ('forearm', arm), ('trunkClear', clear)):
+            if value < minima[key][0]:
+                minima[key] = [value, t]
+        if debug:
+            hd, sh = RTs(T, Pt('Head')), RTs(T, Pt('Spine2'))
+            ey = RTs(T, eye)
+            print('LUOCLEAR RD t=%.2f torso %.3f (%s) forearm %.3f trunkClear %.3f | eye (%.2f,%.2f,%.2f) head (%.2f,%.2f,%.2f) chest (%.2f,%.2f,%.2f)' % (
+                t, torso, near[0], arm, clear, ey.x, ey.y, ey.z, hd.x, hd.y, hd.z, sh.x, sh.y, sh.z), flush=True)
+            if t >= RD_T - 1e-6:
+                print('LUOCLEAR_MIN RD', {k: [round(v[0], 3), round(v[1], 2)] for k, v in minima.items()}, flush=True)
+        return {}
+
+    def Review(t):
+        fig = figAt(t)
+        rifle, _ = SlungBack(T, Clamp((bend(t) - .15) / .7))
+        rows_ = T.RifleProps(rifle) + SzGhost(T, fig)
+        for side in LR:
+            if palmOn(t) > .5:
+                p = RdHand(fig, side, t, figAt)
+                rows_.append(('point', tuple(RT(T, p.x, p.y, p.z)), None, .03))
+        return rows_
+
+    def EyeAt(t):
+        e = figAt(t)['eye']
+        return tuple(RT(T, e.x, e.y, e.z))
+
+    def GazeAt(t):
+        f = figAt(t)
+        p = f['eye'] + f['g']
+        return tuple(RT(T, p.x, p.y, p.z))
+
+    def RollAt(t):
+        f = figAt(t)
+        return ViewRoll(RTd(*f['g']), RTd(*f['c']))
+    spec = {'pose': Pose, 'props': Props, 'check': Check, 'player': Player, 'probes': Probe, 'plants': plantList,
+            'reach': {'fraction': .97, 'travel': .06, 'bend': .90, 'sink': .08},
+            'reviewProps': Review,
+            'reviewFrames': lambda n: [0, int(n * .08), int(n * .16), int(n * .22), int(n * .28), int(n * .36), int(n * .42), int(n * .5),
+                                       int(n * .62), int(n * .8), int(n * .9), n - 1]}
+    spec = AReview(spec)
+
+    def Mid(t):
+        c = figAt(t)['C']
+        return (PelvisSrc(t)[1] + RT(T, c.x, c.y, c.z).y) / 2
+    spec['reviewViews'] = [('side', lambda t: (-3.6, Mid(t), 1.0), lambda t: (0, Mid(t), .45)),
+                           ('q', lambda t: (-2.6, Mid(t) - 2.4, 2.0), lambda t: (0, Mid(t), .45)),
+                           ('top', lambda t: (.02, Mid(t), 3.6), lambda t: (0, Mid(t), .1)),
+                           ('fp', EyeAt, GazeAt, 75.0, RollAt)]
+    spec['reviewScale'] = 3.4
+    return spec
+
+
+# ---- LuoHandRifle: Luo unslings the rifle, kneels in front of Shunzi, offers it, hauls him up by the strap and steps aside ------
+# Root frame R_C = Luo's pelvis ground point at the end of LuoRescueDrag, his facing (-z). Shunzi (`player`) starts where that
+# clip left him (lying, head bowed to his feet, 0.78 m off), looks back up at Luo, rolls back onto his belly, pushes up to all
+# fours, kneels upright (eye 1.10 m), takes the rifle, is hauled to his feet (eye 1.62 m) and stands facing +z (the front trench).
+HR_T = 114 / 24                        # 4.75 s
+HR_HOLD = (1.9, 2.9)
+HR_OFFER = (1.50, 1.75)                # the rifle turns across him and stops in front of his chest (settled a good 0.15 s before the hold loop)
+HR_GRIP = 2.9                          # Shunzi's hands close on it (rifle prop hidden from 3.1 on: the director's rifle takes over)
+HR_HIDE = 3.1
+HR_KNEEL_LIFT = .0                     # (source m) pelvis raised over LuoKneelReach's kneel
+HR_KNEEL_INSTEP = .0                   # (source m) the right instep raised over K.kneelAnkle
+HR_KNEEL_LDROP = .026                  # (source m) the standing left foot is authored this far into the ground: the kneecap is 2.6 cm in it, and the grounding lift that
+#                                        raises the whole body by that much would otherwise float the left foot
+HR_STRAP = (3.2, 4.2)                  # Luo's left fist on Shunzi's right shoulder strap
+HR_RISE = (3.3, 4.2)                   # both come up to their feet
+HR_EYE = {'kneel': (0.0, 1.10, -.80), 'stand': (0.0, 1.62, -.85), 'fours': (0.0, .62, -.72)}
+HR_OFFER_CENTRE = (0.0, .85, -.52)     # the rifle's centre at the offer (0.30 m off his chest), the muzzle to Shunzi's left (+x), raised 10 deg
+HR_LOW_CENTRE = (0.0, 1.05, -.55)      # low carry once he is up: the muzzle forward (+z), a little to his left, 15 deg down
+
+Meta('LuoHandRifle', HR_T, False, 'free', role='luo', rig='TengxianNra05', props=['rifle'], rootMotion=True, player=True,
+     holdLoop=list(HR_HOLD),
+     holdExit='pose.holdUntil: the loop lets go at that clip time and plays on through the 2.9-3.3 hand-over and the 3.3-4.2 haul to his feet',
+     contacts=[{'t': HR_GRIP, 'limb': 'handsLR', 'action': 'release', 'partnerRole': 'shunzi', 'part': 'rifle'},
+               {'t': HR_STRAP[0], 'limb': 'handL', 'action': 'grip', 'partnerRole': 'shunzi', 'part': 'shoulderStrapR'},
+               {'t': HR_STRAP[1], 'limb': 'handL', 'action': 'release'}],
+     events=[{'t': .40, 'kind': 'unslung'}, {'t': HR_HOLD[0], 'kind': 'offered'}, {'t': HR_HIDE, 'kind': 'handed'}, {'t': HR_RISE[0], 'kind': 'hauling'},
+             {'t': HR_STRAP[1], 'kind': 'stood'}],
+     prev=['LuoRescueDrag'], next=[],
+     notes='2026-09-29: from the standing pose LuoRescueDrag ends in (rifle slung; root R_C = its root.end) Luo pulls the rifle off his back '
+           'over the right shoulder into both hands, kneels on his right knee 0.75 m in front of Shunzi (who rolls back onto his belly, '
+           'pushes up and kneels), holds the Hanyang across his chest height (1.9-2.9 s seamless hold loop: "还能打不？" and the nod), lets go '
+           'as Shunzi\'s hands close on it (2.9-3.1 s; the `rifle` prop is hidden after 3.1 s), takes Shunzi\'s right shoulder strap in his left '
+           'fist and hauls him to his feet (3.3-4.2 s), lets go and steps round to his right side (-x, 0.8 m) turning to face +z, left arm '
+           'pointing down the front trench. `player`: eye, gaze, crown, chest, chestUp, pelvis, kneeL/R, heelL/R (his left/right) plus '
+           'gripR (neck of the rifle), gripL (handguard), rifle (centre), rifleMuzzle (0.4 m along the bore), rifleUp (0.1 m along the sights) '
+           'for the whole clip -- after 3.1 s they follow Shunzi\'s hands -- and shoulderStrapR (where the left fist closes).')
+
+
+def Hr3Head(t):
+    """Head roll / pitch of the rigid figure: back to Luo (gaze 45 deg up), then level."""
+    return Channel([(0.0, math.radians(185)), (.50, math.radians(29.6)), (1.00, math.radians(-9.3)), (HR_T, math.radians(-9.3))])(t)
+
+
+def Hr3Rigid(t, shift):
+    """The rigid figure of LuoRescueDrag's end, rolled back onto his belly (.50-.95 s) and sliding away as he goes."""
+    u = Smooth((t - .50) / .45)
+    roll = math.pi * (1 - u)
+    lift = math.radians(SZ_LOW_DEG) * (1 - u)
+    dz = 1.45 - shift - .20 * Smooth((t - .50) / .50)
+    return ShunziFigure(roll, lift, dz, Hr3Head(t), roll)
+
+
+def Hr3Keyed(name):
+    """The brief's key states of one exported point (R_C, runtime m): all fours 1.2 s, kneeling upright 1.7-3.3 s, hauled up 4.2 s."""
+    E = HR_EYE
+    kz = E['kneel'][2]
+    rows = {
+        'eye': [(1.2, E['fours']), (1.7, E['kneel']), (3.3, E['kneel']), (3.75, (0.0, 1.38, -.83)), (4.2, E['stand']), (HR_T, E['stand'])],
+        'gaze': [(1.2, (0.0, .72, .275)), (1.7, (0.0, 1.10, .20)), (3.3, (0.0, 1.10, .20)), (3.75, (0.0, 1.38, .17)), (4.2, (0.0, 1.62, .15)), (HR_T, (0.0, 1.62, .15))],
+        'crown': [(1.2, (0.0, .819, -.74)), (1.7, (0.0, 1.30, kz)), (3.3, (0.0, 1.30, kz)), (3.75, (0.0, 1.58, -.83)), (4.2, (0.0, 1.82, -.85)), (HR_T, (0.0, 1.82, -.85))],
+        'chest': [(1.2, (0.0, .55, -1.0)), (1.7, (0.0, .82, -.78)), (3.3, (0.0, .82, -.78)), (3.75, (0.0, 1.08, -.80)), (4.2, (0.0, 1.33, -.83)), (HR_T, (0.0, 1.33, -.83))],
+        'chestUp': [(1.2, (0.0, .30, -1.0)), (1.7, (0.0, .82, -.53)), (3.3, (0.0, .82, -.53)), (3.75, (0.0, 1.08, -.55)), (4.2, (0.0, 1.33, -.58)), (HR_T, (0.0, 1.33, -.58))],
+        'pelvis': [(1.2, (0.0, .62, -1.35)), (1.7, (0.0, .55, -.95)), (3.3, (0.0, .55, -.95)), (3.75, (0.0, .78, -.90)), (4.2, (0.0, .95, -.85)), (HR_T, (0.0, .95, -.85))],
+        'kneeL': [(1.2, (.12, .06, -1.30)), (1.7, (.12, .06, -.95)), (3.3, (.12, .06, -.95)), (3.75, (.11, .30, -.88)), (4.2, (.10, .50, -.83)), (HR_T, (.10, .50, -.83))],
+        'kneeR': [(1.2, (-.12, .06, -1.30)), (1.7, (-.12, .06, -.95)), (3.3, (-.12, .06, -.95)), (3.75, (-.11, .30, -.88)), (4.2, (-.10, .50, -.83)), (HR_T, (-.10, .50, -.83))],
+        'heelL': [(1.2, (.12, .15, -1.75)), (1.7, (.12, .10, -1.42)), (3.3, (.12, .10, -1.42)), (3.75, (.11, .08, -1.10)), (4.2, (.10, .06, -.85)), (HR_T, (.10, .06, -.85))],
+        'heelR': [(1.2, (-.12, .15, -1.75)), (1.7, (-.12, .10, -1.42)), (3.3, (-.12, .10, -1.42)), (3.75, (-.11, .08, -1.10)), (4.2, (-.10, .06, -.85)), (HR_T, (-.10, .06, -.85))],
+    }
+    return Channel([(t, tuple(v)) for t, v in rows[name]])
+
+
+def HrRiflePoints(T, rifle):
+    """A rifle's `player` points (source metres): centre, muzzle (0.4 m along the bore), the neck (gripR) and the handguard (gripL)."""
+    a = Vector(rifle['axis'])
+    centre = RifleCentre(T, rifle)
+    return {'rifle': centre, 'rifleMuzzle': centre + a * T.R(.4), 'gripR': Vector(rifle['origin']),
+            'gripL': Vector(rifle['origin']) + a * T.R(WEAPONS['HanYang']['gripL'])}
+
+
+def HrGhost(T, pts, t):
+    """Shunzi as review shapes from his exported points: trunk, neck, head, thighs, shins."""
+    s = T.s
+    r = lambda p: tuple(RT(T, p.x, p.y, p.z))
+    head = pts['eye'] - (pts['gaze'] - pts['eye']) * .07 - (pts['crown'] - pts['eye']) * .3          # the head centre sits behind and under the eye
+    return [('cyl', r(pts['pelvis']), r(pts['chest']), .11 / s), ('cyl', r(pts['chest']), r(head), .05 / s), ('point', r(head), None, .08 / s),
+            ('cyl', r(pts['pelvis']), r(pts['kneeL']), .07 / s), ('cyl', r(pts['pelvis']), r(pts['kneeR']), .07 / s),
+            ('cyl', r(pts['kneeL']), r(pts['heelL']), .05 / s), ('cyl', r(pts['kneeR']), r(pts['heelR']), .05 / s)]
+
+
+@Builder('LuoHandRifle')
+def BuildLuoHandRifle(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    s, K = T.s, T.K
+    stand = LuoStand(T)
+    shift = RdEndZ() + stand['pelvis'][1] * s                  # LuoRescueDrag's root.end z, runtime m (its frame): the origin of this clip
+    kz, ky = K['kneelPelvisZ'], K['kneelPelvisY']
+    kp = K['toeKneelPitch'] - K['toeStandPitch']
+    w = WEAPONS[T.gun]
+    K['Reset']()
+    K['ApplyPose'](T.Nest(dict(stand)), 0.0)
+    slungNom, slungUpNom = SlungRifle(T, 'back')
+    K['Reset']()
+    # ---- the rifle ---------------------------------------------------------------------------------------------------------
+    # port arms (muzzle up over his left shoulder): he does not aim the rifle at Shunzi on the way to him
+    ready = T.Rifle((-.17, -.32, P + .02), Unit((.55, -.18, .82)))
+    lifted = T.Rifle((-.20, .15, P + .25), Unit((-.20, -.35, .91)))
+    swung = T.Rifle((-.20, -.30, P + .22), Unit((.22, -.82, .52)))
+    carry = T.Rifle(tuple(Add3(ready['origin'], (.02, -.10, -.20))), ready['axis'])
+    turn = RifleAtCentre(T, RT(T, .0, .98, -.40), RTd(.05, .99, -.10))
+    offer = RifleAtCentre(T, RT(T, *HR_OFFER_CENTRE), RTd(.985, .174, 0.0))
+    low = RifleAtCentre(T, RT(T, *HR_LOW_CENTRE), RTd(.25, -.26, .93))
+    rifleAt = RiflePath(T, [(0.0, slungNom), (.15, lifted), (.32, swung), (.50, ready), (1.20, ready), (1.45, carry), (HR_OFFER[0], turn),
+                            (HR_OFFER[1], offer), (HR_STRAP[0], offer), (HR_RISE[1], low), (HR_T, low)])
+    # where the two fists are on it (real metres from the butt plate): the right one up the barrel to take it off the back, at the neck
+    # once it is in front, at the balance (0.60) while it turns, at the fore-end (0.95) for the offer; the left one on the handguard
+    # (0.555), then at the butt end (0.12): so the hands never cross
+    alongR = Channel([(0.0, .60), (.15, .60), (.32, .50), (.50, w['butt']), (1.36, w['butt']), (1.45, .60), (1.72, .95), (HR_T, .95)])
+    alongL = Channel([(0.0, w['butt'] + w['gripL']), (1.30, w['butt'] + w['gripL']), (1.50, .12), (HR_T, .12)])
+    onR = Channel([(0.0, 0.0), (.06, 0.0), (.20, 1.0), (HR_GRIP, 1.0), (HR_HIDE, 0.0), (HR_T, 0.0)])
+    onL_rifle = Channel([(0.0, 0.0), (.30, 0.0), (.45, 1.0), (1.32, 1.0), (1.40, 0.0), (1.50, 0.0), (1.72, 1.0), (HR_GRIP, 1.0), (HR_HIDE, 0.0), (HR_T, 0.0)])
+    onL_strap = Channel([(0.0, 0.0), (HR_HIDE, 0.0), (HR_STRAP[0] + .05, 1.0), (HR_STRAP[1], 1.0), (HR_STRAP[1] + .15, 0.0), (HR_T, 0.0)])
+    # ---- Shunzi -----------------------------------------------------------------------------------------------------------
+    keyed = {n: Hr3Keyed(n) for n in ('eye', 'gaze', 'crown', 'chest', 'chestUp', 'pelvis', 'kneeL', 'kneeR', 'heelL', 'heelR')}
+
+    def Shunzi(t):
+        """Shunzi's points at clip time t (runtime m, R_C): the rigid figure, then the brief's key states (blend .80-1.25 s)."""
+        rigid = ShunziPoints(Hr3Rigid(t, shift))
+        wgt = Smooth((t - .80) / .45)
+        out = {k: (rigid[k].lerp(Vector(keyed[k](t)), wgt) if wgt > 0 else rigid[k]) for k in rigid}
+        if HR_HOLD[0] - .2 <= t <= HR_STRAP[0]:                               # breathing: one per second, periodic over the hold loop
+            breath = .004 * math.sin(Tau * (t - HR_HOLD[0]) / 1.0) * Smooth((t - (HR_HOLD[0] - .2)) / .2) \
+                * (1 - Smooth((t - HR_GRIP) / (HR_STRAP[0] - HR_GRIP)))
+            for k in ('eye', 'gaze', 'crown', 'chest', 'chestUp'):
+                out[k] = out[k] + Vector((0, breath, 0))
+        return out
+
+    def Strap(t):
+        """Where his right shoulder strap is (runtime m): the shoulder is a hand's width under and to the right of the eye."""
+        return Shunzi(t)['eye'] + Vector((-.19, -.19, -.02))
+
+    def HrUp(t):
+        """The rifle's sights direction (source axes): up while he holds it low, up and back to the 10 deg raise at the offer."""
+        return Vector((0, 0, 1)).lerp(Vector(RTd(0, .96, .27)), Smooth((t - HR_STRAP[0]) / (HR_RISE[1] - HR_STRAP[0]))).normalized()
+
+    def Player(t):
+        pts = Shunzi(t)
+        out = {k: tuple(RT(T, v.x, v.y, v.z)) for k, v in pts.items()}
+        rifle = rifleAt(t)
+        rp = HrRiflePoints(T, rifle)
+        out.update({'gripR': tuple(rp['gripR']), 'gripL': tuple(rp['gripL']), 'rifle': tuple(rp['rifle']), 'rifleMuzzle': tuple(rp['rifleMuzzle']),
+                    'rifleUp': tuple(rp['rifle'] + HrUp(t) * T.R(.1))})
+        sp = Strap(t)
+        out['shoulderStrapR'] = tuple(RT(T, sp.x, sp.y, sp.z))
+        return out
+    # ---- Luo's body ---------------------------------------------------------------------------------------------------------
+    standH, standY = stand['pelvis'][2] * s, stand['pelvis'][1] * s
+    kneelH = kz * s + HR_KNEEL_LIFT
+    Foot = lambda x, z: (RT(T, x, 0, z).x, RT(T, x, 0, z).y, A)
+    sL, sR = stand['ankle.L'], stand['ankle.R']
+    kneelL = (H + .08, ky - .58, A - HR_KNEEL_LDROP)
+    kneelR = tuple(Add3(K['kneelAnkle'](-1), (0, 0, HR_KNEEL_INSTEP)))
+    upL, upR = Foot(-.135, -.40), Foot(.135, -.44)              # standing in front of Shunzi (his left foot on the -x side)
+    pel = [(0.0, (0.0, standH, standY)), (.50, (0.0, standH - .01, standY - .01)), (1.20, (0.0, standH - .02, standY - .02)),
+           (1.45, (0.0, .60, -.06)), (1.70, (0.0, kneelH, (ky - .16) * s)), (HR_GRIP, (0.0, kneelH, (ky - .16) * s)),
+           (3.30, (0.0, kneelH + .02, -.22)), (3.75, (0.0, .66, -.30)), (4.20, (0.0, standH - .04, -.38)),
+           (4.42, (-.30, standH, -.55)), (4.62, (-.66, standH, -.72)), (HR_T, (-.80, standH, -.80))]
+    pelvisSrc = Channel([(t, (-x / s, z / s, h / s)) for t, (x, h, z) in pel])
+    bendC = Channel([(0.0, stand['bend']), (.30, .14), (.50, .12), (1.20, .12), (1.45, .40), (1.70, .52), (HR_GRIP, .52), (3.30, .70), (3.75, .45),
+                     (4.20, .14), (HR_T, stand['bend'])])
+    tiltC = Channel([(0.0, stand['pelvisTilt']), (1.45, (.14, 0, 0)), (1.70, (.08, 0, 0)), (HR_GRIP, (.08, 0, 0)), (3.30, (.20, 0, 0)),
+                     (4.20, stand['pelvisTilt']), (HR_T, stand['pelvisTilt'])])
+    turnC = Channel([(0.0, 0.0), (4.25, 0.0), (HR_T, math.pi)])
+
+    def Stance(side, t):
+        """Where his `side` foot stands when he stands at clip time t (source m): the standing stance about the pelvis, turned by the
+        yaw he has then."""
+        pl = pelvisSrc(t)
+        off = Vector((stand['ankle.' + side][0] - stand['pelvis'][0], stand['ankle.' + side][1] - stand['pelvis'][1], 0))
+        off = Quaternion((0, 0, 1), turnC(t)) @ off
+        return (pl[0] + off.x, pl[1] + off.y, A)
+    # the feet: (start, end, landing spot) swings; the right one back onto its knee, the left one forward; up again; round to his side
+    kneelLup = (kneelL[0], kneelL[1], A)                         # the left foot comes up out of the 2.6 cm it is sunk while he kneels
+    swingsL = [(1.24, 1.50, kneelL), (3.28, 3.72, kneelLup), (4.20, 4.34, None), (4.46, 4.62, None)]
+    swingsR = [(1.28, 1.62, kneelR), (3.32, 3.68, upR), (4.32, 4.46, None), (4.58, 4.72, None)]
+    footRows, plants = {}, []
+    for side, swings, start in (('L', swingsL, sL), ('R', swingsR, sR)):
+        rows, at, last = [(0.0, start)], start, 0.0
+        for a, b, to in swings:
+            to = to or Stance(side, b + .0)
+            if a - last > .03:
+                plants.append((side, last, a))
+            mid = Vector(at).lerp(Vector(to), .5)
+            rows += [(a, at), ((a + b) / 2, (mid.x, mid.y, mid.z if (Vector(at) - Vector(to)).xy.length < .02 else A + .08)), (b, to)]
+            at, last = to, b
+        rows.append((HR_T, at))
+        plants.append((side, last, HR_T))
+        footRows[side] = rows
+    # knee poles: keyed while he kneels and stands up; from the strap's release on they turn with him (each knee a step in front of its foot
+    # and out to its side, in the frame of his yaw then): keys that carry a pole round the pelvis in a single step spun the thigh 71 deg
+    ankleAt = {'L': Channel([(t, v) for t, v in footRows['L']]), 'R': Channel([(t, v) for t, v in footRows['R']])}
+
+    def TurnPole(side, t):
+        a = Vector(ankleAt[side](t))
+        r = Quaternion((0, 0, 1), turnC(t)) @ Vector(((.22 if side == 'L' else -.22), -.95, 0.0))
+        return (a.x + r.x, a.y + r.y, .50)
+    turnStart = 4.20
+    samples = [round(turnStart + .0417 * i, 4) for i in range(0, int((HR_T - turnStart) / .0417) + 1)] + [HR_T]
+    blend = lambda t, keyed, turned: tuple(Vector(keyed).lerp(Vector(turned), Smooth((t - turnStart) / .12)))
+    poleL = [(0.0, stand['legPole.L']), (1.24, stand['legPole.L']), (1.50, (kneelL[0] + .30, -1.2, .9)), (turnStart, (kneelL[0] + .30, -1.2, .9))]         + [(t, blend(t, (kneelL[0] + .30, -1.2, .9), TurnPole('L', t))) for t in samples[1:]]
+    poleR = [(0.0, stand['legPole.R']), (1.28, stand['legPole.R']), (1.62, tuple(K['kneelPole'](-1))), (3.32, tuple(K['kneelPole'](-1))),
+             (3.68, (upR[0] - .22, upR[1] - .95, .50)), (turnStart, (upR[0] - .22, upR[1] - .95, .50))]         + [(t, blend(t, (upR[0] - .22, upR[1] - .95, .50), TurnPole('R', t))) for t in samples[1:]]
+    times = [round(.05 * i, 2) for i in range(0, int(HR_T / .05) + 1)] + [HR_T]
+    body = Tracks(stand, {
+        'pelvis': [(t, tuple(pelvisSrc(t))) for t in times],
+        'bend': [(t, bendC(t)) for t in times],
+        'pelvisTilt': [(t, tuple(tiltC(t))) for t in times],
+        'ankle.L': footRows['L'], 'ankle.R': footRows['R'],
+        'legPole.L': poleL, 'legPole.R': poleR,
+        'foot.L': [(0.0, stand['foot.L']), (1.24, stand['foot.L']), (1.50, (0, 12, 0)), (4.20, (0, 12, 0)), (HR_T, stand['foot.L'])],
+        'foot.R': [(0.0, stand['foot.R']), (1.28, stand['foot.R']), (1.62, (kp, 0, 0)), (3.32, (kp, 0, 0)), (3.68, (0, -12, 0)), (4.20, (0, -12, 0)),
+                   (HR_T, stand['foot.R'])],
+        'head': [(0.0, (0, 0, 0)), (HR_T, (0, 0, 0))],
+    }, lag={'head': .05})
+    # (the planted windows: where the grounding lift has settled -- it moves while the knee goes down and while he comes up)
+    plants = [('L', 0.0, 1.24), ('L', 1.80, 3.28), ('L', 3.80, 4.20), ('L', 4.62, HR_T), ('R', 0.0, 1.28), ('R', 1.80, 3.28), ('R', 3.80, 4.30), ('R', 4.72, HR_T)]
+    plantSides = {'L': [(a, b) for sd, a, b in plants if sd == 'L'], 'R': [(a, b) for sd, a, b in plants if sd == 'R']}
+    kneePlants = [('R', 1.72, 3.05)]
+
+    def Pose(t):
+        f = body(t)
+        rifle = rifleAt(t)
+        palms = T.Palms(rifle['axis'])
+        wR = onR(t)
+        if wR > 1e-4:
+            EaseGrip(f, 'R', T.Along(rifle, alongR(t)), Smooth(wR), palms['R'][0], palms['R'][1], .95)
+            f['armPole.R'] = (-(SX + .50), .10, P - .05)
+        wL = onL_rifle(t)
+        wS = onL_strap(t)
+        if wL > 1e-4:
+            # from the re-grip at the butt end (1.55 s) the left palm goes on the stock from above (fingers forward over it): with the palm
+            # under it the left forearm sat on the +-180 deg edge of its twist and the breathing tipped it over (the hold-loop seam: 145 deg)
+            pf, pn = (tuple(-Vector(palms['L'][0])), tuple(-Vector(palms['L'][1]))) if t >= 1.45 else (palms['L'][0], palms['L'][1])
+            EaseGrip(f, 'L', T.Along(rifle, alongL(t)), Smooth(wL), pf, pn, .85)
+        elif wS > 1e-4:
+            sp = Strap(t)
+            palmF, palmN, _ = Grab(RTd(-1, .2, 0), RTd(0, -1, 0), .9)
+            EaseGrip(f, 'L', tuple(RT(T, sp.x, sp.y, sp.z)), Smooth(wS), palmF, palmN, .95)
+            f['armPole.L'] = (SX + .45, .10, P - .05)
+        e = Shunzi(t)['eye']
+        f['look'] = tuple(RT(T, e.x, e.y, e.z))
+        f['lookW'] = .7 * Smooth((t - .30) / .3) * (1 - Smooth((t - 4.25) / .25))
+        psi = turnC(t)
+        PlantedFeet(f, t, turnC, plantSides)
+        if psi:
+            f = Turned(f, psi)
+        if HR_HOLD[0] - .3 <= t <= HR_STRAP[0]:                               # breathing, one per second: periodic over 1.9-2.9
+            b = math.sin(Tau * (t - HR_HOLD[0]) / 1.0) * Smooth((t - (HR_HOLD[0] - .3)) / .3) * (1 - Smooth((t - HR_GRIP) / (HR_STRAP[0] - HR_GRIP)))
+            f['bend'] += .012 * b
+            f['shrug'] += .015 * b
+        return T.Nest(f)
+
+    def Props(t):
+        rifle = rifleAt(t)
+        upv = Vector((0, 0, 1))
+        if t < .5:
+            actual, actualUp = SlungBack(T, 0.0)
+            wgt = 1 - Smooth(t / .12)
+            origin = Vector(rifle['origin']).lerp(Vector(actual['origin']), wgt)
+            axis = Vector(rifle['axis']).slerp(Vector(actual['axis']), wgt) if wgt < 1 else Vector(actual['axis'])
+            rifle = T.Rifle(tuple(origin), tuple(axis))
+            upv = Vector((0, 0, 1)).lerp(Vector(actualUp), 1 - Smooth(t / .4))
+        return {'rifle': (rifle['origin'], rifle['axis'], tuple(upv), t < HR_HIDE)}
+
+    def Check(t):
+        out = {}
+        rifle = rifleAt(t)
+        if .45 <= t <= 1.32:
+            out['L'] = T.Along(rifle, alongL(t))
+        if 1.72 <= t <= HR_GRIP:
+            out['L'] = T.Along(rifle, alongL(t))
+        if .20 <= t <= HR_GRIP:
+            out['R'] = T.Along(rifle, alongR(t))
+        if HR_STRAP[0] + .05 <= t <= HR_STRAP[1]:
+            sp = Strap(t)
+            out['L'] = tuple(RT(T, sp.x, sp.y, sp.z))
+        return out
+
+    def EyeAt(t):
+        return tuple(RT(T, *Shunzi(t)['eye']))
+
+    def GazeAt(t):
+        return tuple(RT(T, *Shunzi(t)['gaze']))
+
+    def RollAt(t):
+        pts = Shunzi(t)
+        return ViewRoll(RTd(*(pts['gaze'] - pts['eye'])), RTd(*(pts['crown'] - pts['eye'])))
+    minima = {'torso': [9.0, 0.0], 'forearm': [9.0, 0.0]}
+    debug = __import__('os').environ.get('OPENING_LUODBG')
+
+    def Probe(t):
+        """Luo against Shunzi's eye every frame (debug print only): trunk / head / legs and forearm / hand."""
+        if not debug:
+            return {}
+        e = Shunzi(t)['eye']
+        eye = RT(T, e.x, e.y, e.z)
+        Pt = lambda role: K['Point'](K['Bone'](role))
+        names = ('Pelvis', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head')
+        chain = [Pt(r) for r in names]
+        chain.append(chain[-1] + (chain[-1] - chain[-2]).normalized() * T.R(.12))
+        torso, near = 9.0, ''
+        for i, (a, b) in enumerate(zip(chain, chain[1:])):
+            d = SegmentDistance(a, b, eye, eye) * s
+            if d < torso:
+                torso, near = d, (names + ('HeadTop',))[i]
+        for side in LR:
+            th = [Pt(side + ' Thigh'), Pt(side + ' Calf'), Pt(side + ' Foot')]
+            for i, (a, b) in enumerate(zip(th, th[1:])):
+                d = SegmentDistance(a, b, eye, eye) * s
+                if d < torso:
+                    torso, near = d, side + ('Thigh', 'Calf')[i]
+        arm = 9.0
+        for side in LR:
+            fa = [Pt(side + ' Forearm'), Pt(side + ' Hand'), K['GripPoint'](side)]
+            arm = min(arm, min(SegmentDistance(a, b, eye, eye) for a, b in zip(fa, fa[1:])) * s)
+        for key, value in (('torso', torso), ('forearm', arm)):
+            if value < minima[key][0]:
+                minima[key] = [value, t]
+        print('LUOCLEAR HR t=%.2f torso %.3f (%s) forearm %.3f | eye (%.2f,%.2f,%.2f)' % (t, torso, near, arm, e.x, e.y, e.z), flush=True)
+        if t >= HR_T - 1e-6:
+            print('LUOCLEAR_MIN HR', {k: [round(v[0], 3), round(v[1], 2)] for k, v in minima.items()}, flush=True)
+        if __import__('os').environ.get('LUODBG_LOW'):
+            import bpy
+            dg = bpy.context.evaluated_depsgraph_get()
+            best = (9.0, None, None)
+            for o in K['meshes']:
+                ev = o.evaluated_get(dg)
+                mesh = ev.to_mesh()
+                groups = {g.index: g.name for g in o.vertex_groups}
+                for v in mesh.vertices:
+                    z = (ev.matrix_world @ v.co).z
+                    if z < best[0]:
+                        best = (z, o.name, groups.get(max(v.groups, key=lambda g: g.weight).group) if v.groups else None)
+                ev.to_mesh_clear()
+            print('LUOLOW t=%.2f z %.3f mesh %s bone %s' % (t, best[0], best[1], best[2]), flush=True)
+        return {}
+    spec = {'pose': Pose, 'props': Props, 'check': Check, 'player': Player, 'plants': plants, 'kneePlants': kneePlants, 'probes': Probe,
+            'reach': {'fraction': .92, 'travel': .10, 'bend': .60, 'sink': 0.0},
+            'reviewProps': lambda t: T.RifleProps(rifleAt(t)) + HrGhost(T, Shunzi(t), t),
+            'reviewFrames': lambda n: [0, int(n * .05), int(n * .10), int(n * .18), int(n * .27), int(n * .36), int(n * .42), int(n * .5),
+                                       int(n * .6), int(n * .7), int(n * .8), int(n * .9), n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = [('side', (-3.4, -.5, 1.0), (0, -.5, .8)), ('q', (-2.6, -3.6, 1.9), (0, -.5, .8)), ('top', (.02, -.5, 3.6), (0, -.5, .1)),
+                           ('fp', EyeAt, GazeAt, 75.0, RollAt)]
+    spec['reviewScale'] = 3.4
+    return spec
+
+
+# =================================================================================
 # which rigs bake which clip (manifest `rigs`). Every 2026-09-23 clip is baked only on the
 # rigs its role can wear (contract §5.1: comrade/interpreter/He/Liu/yaowa = NRA02, Luo =
 # NRA05, ijaA = IJA02, ijaB = IJA01, ijaC/ijaD = IJA01 or IJA02); the legacy 0922 clips stay

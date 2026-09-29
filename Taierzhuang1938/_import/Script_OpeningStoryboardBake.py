@@ -1252,14 +1252,15 @@ def RenderReview(clip, frame, t, spec, modelId):
     for row in spec.get('reviewViews') or [('side', (-3.4, -.35, 1.05), (0, -.25, .75)),
                                            ('q', (-2.3, -2.9, 1.9), (0, -.25, .65))]:
         # (name, location, target) = orthographic review; (name, location, target, vfovDeg[, rollDeg])
-        # = a perspective camera, e.g. the storyboard's first-person eye. location/target may be
+        # = a perspective camera, e.g. the storyboard's first-person eye. location/target/roll may be
         # functions of the clip time (a camera riding the player track).
         view, location, target = row[:3]
         location = location(t) if callable(location) else location
         target = target(t) if callable(target) else target
         q = (Vector(target) - Vector(location)).to_track_quat('-Z', 'Y')
-        if len(row) > 4 and row[4]:
-            q = q @ Quaternion((0, 0, 1), math.radians(row[4]))
+        roll = row[4](t) if len(row) > 4 and callable(row[4]) else (row[4] if len(row) > 4 else 0)   # deg; a function of the clip time for a rolling camera
+        if roll:
+            q = q @ Quaternion((0, 0, 1), math.radians(roll))
         reviewCamera.location = location
         reviewCamera.rotation_euler = q.to_euler()
         if len(row) > 3:
