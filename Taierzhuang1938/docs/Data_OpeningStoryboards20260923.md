@@ -143,6 +143,8 @@
 - **SB01 判据**：传令兵 `x` 由 [0.2, 0.5]（北门柱内侧）改为 [0.55, 0.75]，加 `distM` [4.5, 6.2]（实测 0.641、5.30 m），加 `actorSeparation`（罗 / 传令兵头部横向间距 ≥ 0.06、根距 ≥ 1.2 m，实测 0.098 / 1.77 m）；抓帧时刻由 `BunkerOrders.01` 后 1.2 s 改为 2.2 s（三名川军是在传令兵第 2 句时出发，过了约 2 s 才有两个越过罗班长背影露出来）；新增 `SB01_Call`（远喊开口后 0.8 s，传令兵 `absent`，不在画内）。`pendingWiring` 里传令兵那条改成「洞口外、罗班长身边」的说法（`RunnerLeanPostCall` 原来是扶北门柱内侧，第二波要重对）。
 - **验收**：`Script_OpeningStoryboardsTest`、`Script_FirstLevelVoiceTest`（含 `--audio`：契约 15 场、`gainDb` 合法与乘法、覆盖录音间隔的句子多了 `BunkerRunnerCall.02`）、`Script_MissionGatesTest`（事实门 146 条，`runnerCallHeard` 是第 146 条）、`Script_FirstLevelMissionTest`（`OrdersRunner` 新路线在每个场景态下净空；此测试在 1199 行「07+ keeps the legacy fixed-source front」是改前就红的基线，干净基线同样红）、`Script_ModuleGraphTest`、`Script_OpeningStoryboardShots.mjs --shots=SB01_Call,SB01`。
 
+- **集成验收（2026-09-29，与顺子收拾装备、战场声显现、环境床候选三包合并后）**：实时跑一趟（真实钩子，不模拟）：Orders 起 0.52 s 记下 `runnerCallHeard`，Banter 渐亮到近爆 70.9 s（改前约 50 s，多出的是传令兵跑来的 9 s 与收拾装备）。战场显现以后，罗班长两句压嗓盘算（`BunkerOrders` .02 / .04，整段母带后片段 RMS 比 .01 / .05 低 16 dB）在听者处 −35.7 / −35.1 dBFS，远声组 250 Hz–4 kHz −42 / −40，逐句平均余量只剩 6.6 / 4.8 dB；导演表给这两句 `gainDb` +7 后是 11.0 / 13.1 dB，整场逐句余量 11–21 dB。第一人称连拍与录音不进仓库。
+
 ## 5. 02 撤离与接上 03
 
 - 拾枪（`rifleRecovered`）时生成 `bunkerPursuit`（据守 1 + 跟进 3）。跟进组的 `delayS` 乘 `pursuit.delayScale`（0.35），好让玩家在后折角回头时看见追兵已经进了刚离开的那段沟。追兵都不越过弯角 M。
