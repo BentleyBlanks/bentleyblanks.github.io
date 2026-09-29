@@ -10,7 +10,7 @@ const here=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(here);
 const common=path.resolve(root,execFileSync('git',['rev-parse','--git-common-dir'],{cwd:root,encoding:'utf8'}).trim());
 const {chromium}=createRequire(path.join(path.dirname(common),'package.json'))('playwright-core');
 const url=process.argv.find(a=>a.startsWith('--url='))?.slice(6)||'http://127.0.0.1:8096/EarSpa3D/';
-const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--mute-audio']});
 const page=await browser.newPage({viewport:{width:1100,height:1000}}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 let result;

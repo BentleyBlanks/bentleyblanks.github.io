@@ -12,7 +12,7 @@ const common=path.resolve(root,execFileSync('git',['rev-parse','--git-common-dir
 const require=createRequire(path.join(path.dirname(common),'package.json')),{chromium}=require('playwright-core');
 const url=process.argv.find(a=>a.startsWith('--url='))?.slice(6)||'http://127.0.0.1:8082/EarSpa3D/';
 export async function RunDirectional({profiles=[[1000,900,false],[390,844,true],[320,568,true],[844,390,true]],detail=false}={}){
- const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--disable-background-timer-throttling','--disable-renderer-backgrounding']});
+ const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--mute-audio','--disable-background-timer-throttling','--disable-renderer-backgrounding']});
  const reports=[];await fs.mkdir(path.join(here,'_dev'),{recursive:true});
  try{for(const [width,height,touch] of profiles){
   const page=await browser.newPage({viewport:{width,height},hasTouch:touch,isMobile:touch,deviceScaleFactor:touch?2:1,userAgent:touch?'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36':undefined});

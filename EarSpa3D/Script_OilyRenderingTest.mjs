@@ -5,7 +5,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
 const here=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(here),common=path.resolve(root,execFileSync('git',['rev-parse','--git-common-dir'],{cwd:root,encoding:'utf8'}).trim()),require=createRequire(path.join(path.dirname(common),'package.json')),{chromium}=require('playwright-core');
-const url=process.argv.find(a=>a.startsWith('--url='))?.slice(6)||'http://127.0.0.1:8110/EarSpa3D/',browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true}),report={checks:[],errors:[]};
+const url=process.argv.find(a=>a.startsWith('--url='))?.slice(6)||'http://127.0.0.1:8110/EarSpa3D/',browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--mute-audio']}),report={checks:[],errors:[]};
 await fs.mkdir(path.join(here,'_dev'),{recursive:true});const page=await browser.newPage({viewport:{width:1000,height:900}});
 page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)report.errors.push(r.status()+' '+r.url());});
 const Check=(ok,label)=>{assert.ok(ok,label);report.checks.push(label);};

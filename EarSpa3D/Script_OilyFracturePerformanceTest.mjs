@@ -8,7 +8,7 @@ const here=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(here),
 const require=createRequire(path.join(path.dirname(common),'package.json')),{chromium}=require('playwright-core');
 const url=process.argv.find(a=>a.startsWith('--url='))?.slice(6)||'http://127.0.0.1:8157/EarSpa3D/',label=process.argv.find(a=>a.startsWith('--label='))?.slice(8)||'Current';
 const touch=process.argv.includes('--touch'),width=touch?390:1000,height=touch?844:900,inputX=width*.7,inputY=height*5/9;
-const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true}),report={checks:[],errors:[],bites:[]};
+const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--mute-audio']}),report={checks:[],errors:[],bites:[]};
 await fs.mkdir(path.join(here,'_dev'),{recursive:true});
 const page=await browser.newPage({viewport:{width,height},isMobile:touch,hasTouch:touch}),cdp=await page.context().newCDPSession(page);
 page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)report.errors.push(r.status()+' '+r.url());});

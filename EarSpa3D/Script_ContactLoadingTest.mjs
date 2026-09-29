@@ -8,7 +8,7 @@ const here=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(here),
 const require=createRequire(path.join(path.dirname(common),'package.json')),{chromium}=require('playwright-core');
 const url=process.argv.find(a=>a.startsWith('--url='))?.slice(6)||'http://127.0.0.1:8081/EarSpa3D/';
 const compare=process.argv.find(a=>a.startsWith('--compare='))?.slice(10);
-const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--disable-background-timer-throttling','--disable-renderer-backgrounding']});
+const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--mute-audio','--disable-background-timer-throttling','--disable-renderer-backgrounding']});
 const report={checks:[],runs:[]},captures=[],Check=(ok,label)=>{assert.ok(ok,label);report.checks.push(label);};
 await fs.mkdir(path.join(here,'_dev'),{recursive:true});
 try{

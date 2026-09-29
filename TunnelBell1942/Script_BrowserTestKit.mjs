@@ -6,6 +6,11 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 
+// Playwright 无头模式自带 --mute-audio；TEST_AUDIBLE=1（专门听音频时）才把它去掉。
+function withAudioPolicy(options) {
+  return process.env.TEST_AUDIBLE ? { ...options, ignoreDefaultArgs: ["--mute-audio"] } : options;
+}
+
 export async function LaunchBrowser() {
   const playwright = await import("playwright-core").catch(() => null);
   if (!playwright) {
@@ -13,7 +18,8 @@ export async function LaunchBrowser() {
     process.exit(2);
   }
   const { chromium } = playwright;
-  const commonArgs = ["--no-sandbox", "--disable-dev-shm-usage"];
+  // 无头测试默认静音；只有专门听音频时才设 TEST_AUDIBLE=1 放开。
+  const commonArgs = ["--no-sandbox", "--disable-dev-shm-usage", ...(process.env.TEST_AUDIBLE ? [] : ["--mute-audio"])];
   const attempts = [];
   if (process.env.TB_BROWSER_PATH) {
     attempts.push({ executablePath: process.env.TB_BROWSER_PATH, args: commonArgs });
@@ -33,7 +39,7 @@ export async function LaunchBrowser() {
   attempts.push({ args: commonArgs });
   for (const options of attempts) {
     try {
-      return await chromium.launch(options);
+      return await chromium.launch(withAudioPolicy(options));
     } catch { /* 换下一个候选 */ }
   }
   console.error("找不到可用浏览器：设 TB_BROWSER_PATH 指向 chrome 可执行文件");

@@ -11,7 +11,7 @@ const here=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(here);
 const common=path.resolve(root,execFileSync('git',['rev-parse','--git-common-dir'],{cwd:root,encoding:'utf8'}).trim());
 const require=createRequire(path.join(path.dirname(common),'package.json'));
 const {chromium}=require('playwright-core');
-const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--disable-background-timer-throttling','--disable-renderer-backgrounding']});
+const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--mute-audio','--disable-background-timer-throttling','--disable-renderer-backgrounding']});
 const touch=process.argv.includes('--touch'),width=touch?390:1000,height=touch?844:900;
 const page=await browser.newPage({viewport:{width,height},hasTouch:touch,isMobile:touch,deviceScaleFactor:touch?2:1});
 const cdp=await page.context().newCDPSession(page),report={touch,checks:[],errors:[]};

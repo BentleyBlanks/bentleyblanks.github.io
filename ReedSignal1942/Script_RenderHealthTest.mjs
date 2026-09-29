@@ -50,10 +50,16 @@ function ServeRepository() {
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
 }
 
+// Playwright 无头模式自带 --mute-audio；TEST_AUDIBLE=1（专门听音频时）才把它去掉。
+function withAudioPolicy(options) {
+  return process.env.TEST_AUDIBLE ? { ...options, ignoreDefaultArgs: ["--mute-audio"] } : options;
+}
+
 async function LaunchBrowser() {
   const playwright = await import("playwright-core").catch(() => null);
   if (!playwright) throw new Error("缺少 playwright-core；运行 npm install --no-save --no-package-lock playwright-core");
-  const commonArgs = ["--no-sandbox", "--disable-dev-shm-usage"];
+  // 无头测试默认静音；只有专门听音频时才设 TEST_AUDIBLE=1 放开。
+  const commonArgs = ["--no-sandbox", "--disable-dev-shm-usage", ...(process.env.TEST_AUDIBLE ? [] : ["--mute-audio"])];
   const attempts = [];
   if (process.env.REED_SIGNAL_BROWSER_PATH) attempts.push({ executablePath: process.env.REED_SIGNAL_BROWSER_PATH, args: commonArgs });
   attempts.push({ channel: "msedge", args: commonArgs });
@@ -61,7 +67,7 @@ async function LaunchBrowser() {
   attempts.push({ args: commonArgs });
   for (const options of attempts) {
     try {
-      return await playwright.chromium.launch(options);
+      return await playwright.chromium.launch(withAudioPolicy(options));
     } catch { /* try the next locally installed browser */ }
   }
   throw new Error("找不到可用 Chromium；可用 REED_SIGNAL_BROWSER_PATH 指向浏览器可执行文件");

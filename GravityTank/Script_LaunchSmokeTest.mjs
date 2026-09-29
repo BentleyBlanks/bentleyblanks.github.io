@@ -11,7 +11,7 @@ const { chromium } = require("playwright-core");
 const url = process.argv[2] || "http://127.0.0.1:8080/GravityTank/";
 const output = new URL("../tmp/GravityTankQa/", import.meta.url);
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ channel: process.env.GRAVITY_TANK_BROWSER || "msedge", headless: true });
+const browser = await chromium.launch({ channel: process.env.GRAVITY_TANK_BROWSER || "msedge", headless: true, args: ["--mute-audio"] });
 const errors = [];
 
 async function OpenPage(options = {}, setup = async () => {}) {
