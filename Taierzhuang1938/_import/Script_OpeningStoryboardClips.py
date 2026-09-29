@@ -5717,7 +5717,14 @@ def BuildShunziSitFillCharger(T, name):
         return T.Nest(f)
     # twistMax: the pocket tuck turns the left palm over past the forearm's half turn; unwrapped (the 09-28 default, 320 deg)
     # the twist never came back and the loop's seam copy snapped the left forearm 180 deg on its last frame.
+    # twistSplit (2026-09-29 「手的模型扭曲成这样了」): the skeleton binds the hand 81 deg off the forearm round its axis,
+    # and the twist was halved without it: the palm-up left hand sat 81 deg at the elbow and 162 deg at the wrist (244 deg
+    # of turn against its bind pose, on the long way round -- the tuck's turn to the pocket ran on to 425), where a
+    # two-bone skin pinches shut at a 160 deg turn (the first person sees the wrist, at the bottom of the frame). Now the
+    # turn is kept on the branch nearest the bind pose (-116 deg at the hold, +65 at the pocket) and shared shoulder .35 /
+    # elbow .35 / wrist .30 (41 / 41 / 35 deg at the hold: the wrist is the joint on screen, the shoulder is not).
     spec = {'pose': Pose, 'plants': [('L', 0, FILL_T), ('R', 0, FILL_T)], 'look': lambda t: lookAt, 'twistMax': 180,
+            'twistSplit': (.35, .35, .30),
             'walls': SIT_WALL, 'reviewFrames': lambda n: [0, int(n * .06), int(n * .08), int(n * .12), int(n * .14), int(n * .87), int(n * .93)],
             'reviewProps': lambda t: [('box', (0, .06, seatZ / 2), (T.R(FILL_SEAT[0]), T.R(FILL_SEAT[1]), seatZ), 0)]}
     spec['reviewViews'] = list(SIT_VIEWS)

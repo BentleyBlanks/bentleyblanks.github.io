@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260929OpeningStoryboardsV16FirstPersonRifle",
+ "version": "20260929OpeningStoryboardsV17WristTwist",
  "fps": 24,
  "actorForward": [
   0,
@@ -3280,7 +3280,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "7de2c0edaad116a16913972084454e5b7306aeb11697de41984d2ff6ff8edc0f",
+   "sha256": "a678b7c8967b97f8aa01b2815471ec68aec11f2c98ea808c34da78a956dfdeed",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
@@ -3512,7 +3512,7 @@
      ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningFirstPersonRifle_20260929\\Scene_TengxianNra02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningHandWristTwist_20260929\\Scene_TengxianNra02OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",

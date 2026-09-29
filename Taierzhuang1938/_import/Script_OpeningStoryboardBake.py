@@ -47,6 +47,8 @@ knee's bend plane where the IK leaves it far off), LimitSwivel (elbow and knee t
 hip-ankle line at most SWIVEL_STEP a frame), KeepGripBranch and the arm passes for the captives-authored legacy
 clips. Spec keys: `seedAnyHand` ('L' / 'R': the twist branch of the `prev` clip's end even when the hand is not the
 same) and `twistMax` (deg: the forearm twist unwraps only that far, then the principal branch).
+`twistSplit` ((shoulder, forearm, wrist) shares of the arm's twist against the bind pose, 2026-09-29, ArmRoll): spreads a
+turned-over palm over three joints instead of two so the wrist skin does not pinch shut.
 
 It reuses the production-rig importer, two-bone IK, palm solver and original-local-frame
 exporter of `_import/Script_MachineGunCaptivesBake.py`; meshes, skins and inverse binds are
@@ -286,6 +288,17 @@ def BakeRig(ctx):
         ua = Bone(s + ' UpperArm')
         u = (Point(Bone(s + ' Forearm')) - Point(ua)).normalized()
         restHinge[s] = BWorld(ua).to_3x3().normalized().inverted() @ u.cross(Vector((0, -1, 0))).normalized()
+    # How far the hand bone's bind orientation sits round the forearm's own axis from the forearm bone's (rad, in the
+    # convention of ArmRoll's `twist`): the shared skeleton binds the hand 81 deg off the forearm (L -81, R +81), so a
+    # hand at rest measures that as twist, and the skin -- which deforms by pose x inverse bind -- twists by
+    # `twist - restTwist` between forearm and hand.
+    restTwist = {}
+    for s in 'LR':
+        fa0, hd0 = Bone(s + ' Forearm'), Bone(s + ' Hand')
+        Fq0 = BWorld(fa0).to_quaternion()
+        rel0 = Fq0.inverted() @ BWorld(hd0).to_quaternion()
+        axis0 = Fq0.inverted() @ (Point(hd0) - Point(fa0)).normalized()
+        restTwist[s] = (2 * math.atan2(Vector((rel0.x, rel0.y, rel0.z)).dot(axis0), rel0.w) + math.pi) % (2 * math.pi) - math.pi
     # The same for each knee in the thigh's own frame: the calf folds backward (+Y), and the rest
     # direction of the thigh as its parent (the pelvis) carries it (LegRoll's conditioning).
     legHinge, thighRest = {}, {}
@@ -298,6 +311,7 @@ def BakeRig(ctx):
     twistPrev, twistNow, twistSeed = {}, {}, {}
     uaPrev, uaNow, faPrev, faNow = {}, {}, {}, {}
     uaSeed, faSeed = {}, {}
+    extraNow = {}     # side -> the shoulder's share of the arm's twist (rad) this frame's ArmRoll has put on the upper arm
     ROLL_STEP = math.radians(float(os.environ.get('OPENING_ROLL_STEP') or 30))
     TWIST_MAX = math.radians(float(os.environ.get('OPENING_TWIST_MAX') or 320))   # a clip's spec twistMax overrides it
 
@@ -311,11 +325,26 @@ def BakeRig(ctx):
         elbow and wrist positions and the hand's world orientation are kept; the upper arm is
         rolled so its elbow hinge is normal to the plane the arm bends in, the forearm is
         re-aimed from straight (a pure hinge bend) and takes half of the hand's twist about
-        the forearm (pronation), the wrist the other half."""
+        the forearm (pronation), the wrist the other half.
+
+        Spec `twistSplit` (shoulder, forearm, wrist; sums to 1; 2026-09-29) splits the turn the SKIN sees instead:
+        the hand's twist against its bind pose (`twist - restTwist`; the halves above ignore the 81 deg the skeleton
+        binds the hand off the forearm, so a palm-up left hand left 162 deg between forearm and hand and 81 at the
+        elbow, and a two-bone skin with no twist joints pinches to a thread at 160 deg), taken on the branch nearest
+        the bind pose and unwrapped from there. Each joint gets its share of that turn: the wrist keeps `wrist` of
+        it, the forearm rolls the rest, and the upper arm rolls `shoulder` of it about its own axis with the forearm
+        and the hand held in the world (the elbow keeps the difference). A clip after one that has the key cannot
+        seed its twist branch from it (the carried twist is the raw one). Without the key every number is the old one."""
         ua, fa, hd = Bone(side + ' UpperArm'), Bone(side + ' Forearm'), Bone(side + ' Hand')
         S, E, Wr = Point(ua), Point(fa), Point(hd)
         Hloc, Hq, Hs = BWorld(hd).decompose()
         u = (E - S).normalized()
+        split = solveState.get('twistSplit')
+        rho = restTwist[side] if split else 0.0
+        if split and side in extraNow:
+            # this frame's earlier call left the shoulder's share on the upper arm: off it first (same axis, same
+            # shoulder), so a second call starts from the pose the first started from
+            ctx['Put'](ua, Matrix.Translation(S) @ Quaternion(u, -extraNow.pop(side)).to_matrix().to_4x4() @ Matrix.Translation(-S) @ BWorld(ua))
         v = Wr - E
         d = v - u * v.dot(u)
         weight = Smooth01(d.length / (.08 * max(v.length, 1e-6)))
@@ -355,6 +384,10 @@ def BakeRig(ctx):
         axis = Fq.inverted() @ a
         twist = 2 * math.atan2(Vector((rel.x, rel.y, rel.z)).dot(axis), rel.w)
         twist = (twist + math.pi) % (2 * math.pi) - math.pi
+        if split:
+            # the turn against the bind pose, whose principal value is the shortest way round for the skin (a turn
+            # kept to +-180 deg of the bind, not of the forearm's own frame): the unwrapping below then runs in it
+            twist = (twist - rho + math.pi) % (2 * math.pi) - math.pi
         # Unwrapped against the previous frame: the twist crosses +-180 deg for a turned-over
         # palm, and the wrapped value would swing the forearm half a turn in one frame.
         # ... as far as TWIST_MAX (2026-09-28, 320 deg; a clip's spec twistMax overrides it): past it the principal
@@ -368,14 +401,15 @@ def BakeRig(ctx):
             unwrapped = twist + 2 * math.pi * round((prev - twist) / (2 * math.pi))
             if abs(unwrapped) <= solveState.get('twistMax', TWIST_MAX):
                 twist = unwrapped
-        elif side in twistSeed:
+        elif side in twistSeed and not split:
             turns = round((twistSeed[side] - twist) / (2 * math.pi))
             # (spec seedAnyHand, the sides: the branch nearest the previous clip's even when the hand is not the same -- a
             # clip the director blends into from its `prev`)
             if abs(twistSeed[side] - twist - 2 * math.pi * turns) < math.radians(20) or side in solveState.get('seedAnyHand', ''):
                 twist += 2 * math.pi * turns
         twistNow[side] = twist
-        ctx['Put'](fa, Matrix.Translation(E) @ Quaternion(a, twist * ARM_TWIST_SHARE).to_matrix().to_4x4()
+        roll = twist * ARM_TWIST_SHARE if not split else (1 - split[2]) * twist
+        ctx['Put'](fa, Matrix.Translation(E) @ Quaternion(a, roll).to_matrix().to_4x4()
                    @ Matrix.Translation(-E) @ BWorld(fa))
         # The same per-frame limit on the forearm's roll about its own axis (the wrist takes the
         # rest for that frame; the hand keeps its world orientation).
@@ -393,6 +427,15 @@ def BakeRig(ctx):
                 ctx['Put'](fa, Matrix.Translation(E) @ back.to_matrix().to_4x4() @ Matrix.Translation(-E) @ BWorld(fa))
         faNow[side] = (BWorld(fa).to_quaternion(), a.copy())
         ctx['Put'](hd, Matrix.LocRotScale(Wr, Hq, Hs))
+        if split and split[0]:
+            # the shoulder's share: the upper arm rolls about its axis, the forearm and the hand stay where they were in
+            # the world (uaNow / faNow above are the states without it: the roll limits never see it)
+            share = split[0] * twist
+            Fw, Hw = BWorld(fa), BWorld(hd)
+            ctx['Put'](ua, Matrix.Translation(S) @ Quaternion(u, share).to_matrix().to_4x4() @ Matrix.Translation(-S) @ BWorld(ua))
+            ctx['Put'](fa, Fw)
+            ctx['Put'](hd, Hw)
+            extraNow[side] = share
 
     # LegRoll (2026-09-28). The two-bone leg IK aims the thigh with the smallest rotation from where the pelvis
     # carries its rest direction, so the thigh's roll about its own axis -- where the kneecap faces -- does not
@@ -793,6 +836,7 @@ def BakeRig(ctx):
         spec['twoHand'] = meta.get('weaponHold') == 'twoHand'
         solveState['seedAnyHand'] = spec.get('seedAnyHand') or ''      # the sides ('L', 'R', 'LR')
         solveState['twistMax'] = math.radians(spec['twistMax']) if spec.get('twistMax') else TWIST_MAX
+        solveState['twistSplit'] = tuple(spec['twistSplit']) if spec.get('twistSplit') else None
         duration, loop = meta['duration'], meta['loop']
         count = math.ceil(duration * FPS) + 1
         action = bpy.data.actions.new(clip)
@@ -857,6 +901,7 @@ def BakeRig(ctx):
             arm.animation_data.action = None
             t = frame * duration / (count - 1)
             ctx['overreach'].clear()
+            extraNow.clear()
             lift, errors = Solve(spec, t)
             for side in 'LR':
                 handPrev[side] = BWorld(Bone(side + ' Hand')).to_quaternion()
