@@ -1,4 +1,6 @@
 // 《台儿庄：血战滕县》画质档位表（纯数据，零 three 依赖 —— 契约 2）。
+// 默认呈现配置见 Data_Tuning_Whitebox：whitebox 复用 high 资产预算，以允许表关闭高级渲染。
+// 美术验收显式 ?quality=high/ultra；查询 Tengxian.GraphicsProfile.Inspect()。
 //
 // **口径文档：`docs/Data_TechRenderPipeline.md` §1.10「Data_Tuning_Graphics 结构」**
 // （这张表在帧图里的角色），分档实测与自动降档在 §17，逐子系统的档位表在各自那一章

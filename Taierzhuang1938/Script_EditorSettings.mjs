@@ -24,6 +24,8 @@
 import { Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note } from "./Script_EditorUi.mjs";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
+import { BuildWhiteboxQualityUi } from "./Script_EditorWhiteboxQuality.mjs";
+import { SaveGraphicsProfile } from "./Script_GraphicsProfile.mjs";
 
 
 // 可热调参数的范围、标签和默认值共用；旧存档缺项时沿用默认值。
@@ -111,6 +113,8 @@ export function LoadSavedGraphics(graphics) {
   if (!gfx || !graphics) return null;
   let changed = 0;
   for (const key of Object.keys(graphics)) {
+    if (key === "profile") continue;
+    if (graphics.profile === "whitebox" && !["fov", "gore"].includes(key)) continue;
     if (typeof gfx[key] === typeof graphics[key] && gfx[key] != null && graphics[key] !== gfx[key]) {
       graphics[key] = gfx[key];
       changed += 1;
@@ -173,6 +177,10 @@ export class GraphicsSettings {
   }
 
   Save() {
+    if (this.gfx.profile === "whitebox") {
+      WriteJson(KEY_GFX, { ...ReadJson(KEY_GFX), fov: this.gfx.fov, gore: this.gfx.gore });
+      return;
+    }
     WriteJson(KEY_GFX, { ...this.gfx });
   }
 
@@ -183,6 +191,7 @@ export class GraphicsSettings {
 
   BuildUi(body) {
     const gfx = this.gfx;
+    if (BuildWhiteboxQualityUi(this, body)) return;
 
     const controls = GraphicsDetailControls(this.host.post);
     const Details = (parent, group) => {
@@ -457,14 +466,6 @@ export class GraphicsSettings {
     Note(content, "关掉之后子弹与爆炸不再卸掉肢体，断肢音效也一并不响；血迹与倒地不受影响。"
       + "带 ?gore=0 打开时这一位被强制关掉（出图与回归要确定的画面）。");
 
-    const level = Section(body, "画质档位（切换将刷新）");
-    ButtonRow(level, [
-      { label: "low", onClick: () => this.Reload("low") },
-      { label: "medium", onClick: () => this.Reload("medium") },
-      { label: "high", onClick: () => this.Reload("high") },
-      { label: "ultra", onClick: () => this.Reload("ultra") },
-    ]);
-
     const stat = Section(body, "读数");
     this.facts = Facts(stat, ["帧率（渲染）"]);
     ButtonRow(stat, [
@@ -473,12 +474,14 @@ export class GraphicsSettings {
   }
 
   Reload(quality) {
+    SaveGraphicsProfile(quality);
     const params = new URLSearchParams(location.search);
     params.set("quality", quality);
     location.search = params.toString();
   }
 
   Reset() {
+    if (this.gfx.profile === "whitebox") { this.host.game.GraphicsProfile.ResetWhitebox({ reload: true }); return; }
     const gfx = this.gfx;
     // 渲染分辨率的出厂值跟画质档走（TAAU：medium 0.75 / high 0.8 / ultra 1.0），
     // 不是固定的 1 —— 「恢复出厂」要回到这一档真正的出厂设置。
@@ -542,6 +545,11 @@ export class GraphicsSettings {
   }
 
   Update(dt) {
+    if (this.whiteboxReadout) {
+      const state = this.host.game.GraphicsProfile?.Inspect();
+      this.whiteboxReadout.textContent = `实际运行：${state?.renderedPasses.join(" → ") || "等待渲染"}`;
+      return;
+    }
     // 帧率：设置面板里唯一有意义的反馈就是「我改完之后是不是真的快了」。
     // 玩法是停的，但渲染照跑，所以这个数量的是**合成链**的成本，正好是这一栏管的东西。
     this.fps.frames += 1;

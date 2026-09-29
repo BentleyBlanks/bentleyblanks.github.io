@@ -203,7 +203,7 @@ export class FxaaPass {
     this.uniforms.uSource.value = source.texture;
     this.uniforms.uTexel.value.set(1 / source.width, 1 / source.height);
     this.uniforms.uSharpen.value = ctx.options.sharpen ?? P.sharpenStrength;
-    this.uniforms.uFxaa.value = ctx.taaActive ? 0 : 1;
+    this.uniforms.uFxaa.value = ctx.taaActive || (P.whiteboxConfig && !P.whiteboxConfig.fxaa) ? 0 : 1;
     ctx.blitter.Blit(this.material, null);
   }
 

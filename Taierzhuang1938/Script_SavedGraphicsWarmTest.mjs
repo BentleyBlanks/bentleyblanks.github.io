@@ -58,7 +58,7 @@ const Report = (ok, name, detail) => {
 
 try {
   const port = server.address().port;
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=p012&missionStage=4&manual=1&scale=small`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=p012&quality=high&missionStage=4&manual=1&scale=small`,
     { waitUntil: "domcontentloaded", timeout: 240000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 400000 });
 

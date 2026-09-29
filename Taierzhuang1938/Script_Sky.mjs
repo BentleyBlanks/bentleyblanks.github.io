@@ -880,14 +880,14 @@ function UrlFlag(name) {
 }
 
 export class SkyDome {
-  constructor(renderer, { radius = 4000, quality = null } = {}) {
+  constructor(renderer, { radius = 4000, quality = null, environment = true, atmosphere = true } = {}) {
     this.renderer = renderer;
     const qualityName = quality || UrlFlag("quality") || "high";
     this.atmosphere = new Atmosphere(renderer, { quality: qualityName });
     // 一页只有一台天空。合成 pass 的大气透视 pass 通过这个登记点找到它
     // （与 Script_Water 的 SetWaterSkyUniforms 同一个先例：借同一批 uniform 对象）。
     SetActiveAtmosphere(this.atmosphere);
-    this.legacy = UrlFlag("skyLegacy") === "1";
+    this.legacy = !atmosphere || UrlFlag("skyLegacy") === "1";
     this.atmosphereEnabled = !this.legacy;
     this.atmosphere.sampleUniforms.uAtmoEnabled.value = this.atmosphereEnabled ? 1 : 0;
     if (UrlFlag("aerial") === "full") this.forceAerialMode = 1;
@@ -945,7 +945,7 @@ export class SkyDome {
     // 真正生效的是这一行：PostPipeline 的预通道会把标了它的对象整个藏掉。
     this.mesh.userData.skipNormalDepth = true;
 
-    this.pmrem = renderer ? new THREE.PMREMGenerator(renderer) : null;
+    this.pmrem = renderer && environment ? new THREE.PMREMGenerator(renderer) : null;
     if (this.pmrem) this.pmrem.compileEquirectangularShader();
     this.envTarget = null;
     this.presetName = null;
@@ -1001,7 +1001,7 @@ export class SkyDome {
     if (this.forceAerialMode != null) tuned.aerialMode = this.forceAerialMode;
     // **同步**算三张 LUT：紧接着的 BakeEnvironment 要拿本预设的天去烘 PMREM，
     // 慢一帧的话进关第一次的 IBL 是上一档的天（换时段时肉眼可见地闪一下）。
-    this.atmosphere.ApplyPreset(tuned, { sunDirection: this.sunDirection, fog: preset.fog });
+    if (this.atmosphereEnabled) this.atmosphere.ApplyPreset(tuned, { sunDirection: this.sunDirection, fog: preset.fog });
 
     this.physicalSun = PhysicalSunLight(
       { ...ATMOSPHERE_EARTH }, preset.sunElevation, preset.lightIntensity);
@@ -1019,6 +1019,7 @@ export class SkyDome {
     if (want === this.atmosphereEnabled) return false;
     this.atmosphereEnabled = want;
     this.atmosphere.sampleUniforms.uAtmoEnabled.value = want ? 1 : 0;
+    if (want && this.preset) this.Apply(this.presetName === "custom" ? this.preset : this.presetName);
     return true;
   }
 

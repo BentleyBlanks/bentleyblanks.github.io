@@ -82,10 +82,10 @@
 | `BunkerSearch` | 01 ijaC 「前へ！急げ！」（往前！快！）02 ijaD 「止まるな！」（别停！）——02 压住 01 尾音，允许重叠 |
 | `InterpreterCall` | 01 ijaB 「通訳！通訳はどこだ！さっさと来い！」（翻译！翻译呢！快给我滚过来！）02 interpreter 「はい！はい！ただいま！」（是！是！这就来！，二十米外应声、边跑边喊）——2026-09-26 用户追加，不在 Notion 原稿里 |
 | `CaptiveDragged` | 01 comrade 狗日的……你妈的……02 ijaA 「立て！」（起来！）03 comrade 日你……先人……04 ijaC 「右だ！撃て！」（右边！开火！） |
-| `CaptiveInterrogation` | 01 ijaA 「部隊はどこへ退いた！聞け！」02 interpreter 「はい！」03 interpreter 你们的人往哪儿撤了？04 comrade ……啥子？05 interpreter 你们大队！往哪儿撤了！06 ijaB 「この支那野郎！早く言え！」07 comrade 滚……二鬼子。08 ijaA 「何と言った！」09 interpreter 「何も話しません！悪態ばかりです！」10 comrade 老子骂的就是你们……狗日的。11 comrade 小日本。 |
+| `CaptiveInterrogation` | 01 ijaA 「部隊はどこへ退いた！聞け！」02 interpreter 「はい！」03 interpreter 你们的人往哪儿撤了？说了，太君饶你一条狗命！04 comrade ……啥子？05 interpreter 你们大队！往哪儿撤了！不说，今天就叫你死在这沟里！06 ijaB 「この支那野郎！早く言え！」07 comrade 滚……二鬼子。08 ijaA 「何と言った！」09 interpreter 「何も話しません！悪態ばかりです！」10 comrade 老子骂的就是你们……狗日的。11 comrade 小日本。 |
 | `CaptiveTaunt` | 01 ijaA 「どうした、支那野郎！」02 ijaA 「その口で、まだ罵ってみろ！」03 ijaB 「馬鹿野郎。」04 ijaC 「前へ！急げ！」（远处） |
 | `ShunziFound` | 01 ijaA 「まだいたか、この支那野郎。」 |
-| `RescueInterrogation` | 01 ijaA 「こいつにも聞け！」02 interpreter 「はい！」03 interpreter 醒醒！你们的人往哪儿撤了？04 interpreter 听见没有？你们长官在哪儿？05 ijaB 「早くしろ！」06 interpreter 说话！ |
+| `RescueInterrogation` | 01 ijaA 「こいつにも聞け！」02 interpreter 「はい！」03 interpreter 醒醒！你们的人往哪儿撤了？说了，太君饶你不死，还赏你口饭吃！04 interpreter 听见没有？你们长官在哪儿？不说？刚才那个就是你的下场！05 ijaB 「早くしろ！」06 interpreter 说话！ |
 | `RescueFlee` | 01 interpreter 「敵だ！」 |
 | `RescueCheck` | 01 luo 还能打不？ |
 | `CollectionMeet` | 01 yaowa 顺哥！你脸咋了？02 shunzi 还能走。03 luo 莫堵到！ |

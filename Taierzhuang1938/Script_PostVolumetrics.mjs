@@ -710,7 +710,8 @@ export class VolumetricsPass {
     // 三行共用这一个实例：状态、靶与雾体表都只有一份。
     this.name = "volumetricInject";
     this.pipeline = pipeline;
-    this.grid = VOLUMETRIC_GRIDS[pipeline.quality] || null;
+    this.grid = pipeline.whiteboxConfig && !pipeline.whiteboxConfig.volumetrics
+      ? null : VOLUMETRIC_GRIDS[pipeline.quality] || null;
     this.gridKey = this.grid ? `${this.grid.x}x${this.grid.y}x${this.grid.z}` : "";
 
     this.noise = null;

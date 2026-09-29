@@ -35,3 +35,14 @@ node scripts/Script_BlenderMcp.mjs start --task OpeningFirstPersonLoad
 重建：BlenderMCP 起实例后，`exec` 一段设好环境变量再 `runpy` 跑 `_import/Script_OpeningStoryboardBake.py` 的脚本：`OPENING_MODEL=TengxianNra02`、`OPENING_CLIPS=ShunziSitFillCharger`、`OPENING_VERSION=20260929OpeningStoryboardsV16FirstPersonRifle`、`OPENING_BLEND_DIR=C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OpeningFirstPersonRifle_20260929`（先放入 `OpeningIkBranch_20260928` 的三份 partner track）。清单只合并版本号、这条动作的 notes 和 NRA02 行的 sha256/blend，其他行不动。
 
 验收：`Script_OpeningStoryboardsTest`（最大单帧自转仍是 61°，这条不在前面）、`Script_OpeningFirstPersonTest`（手掌每帧 3.7 cm、8.8°，下令衔接 10°）、`Script_OpeningStoryboardShots --shots=SB01` 全部判据通过；探针量到压弹时手指骨离枪轴 ≥ 7.5 cm（不穿枪），停手时掌心在枪轴上方 6 cm（搭在枪上）。实拍图只留本地 `_shots/`。
+
+## 2026-09-29 补：手腕捏成一条线
+
+用户反馈（实机截图，Banter 里低头看左手）：「开局动画里主人公的手的模型扭曲成这样了」。左手掌心朝上托着桥夹，手腕蒙皮缩成一条细线，前臂像被拧过的糖纸。
+
+- **原因**：共用骨架（TengxianHumanoidV1）把手骨的绑定朝向绕前臂轴转了 81°（左 −81°、右 +81°），身体又没有扭转骨，前臂到手腕只有两块蒙皮。`Script_OpeningStoryboardBake.ArmRoll` 把手相对前臂的扭转对半分给前臂和手腕，没有扣掉这 81°：左手掌心朝上时蒙皮实际是肘 81°、腕 162°（相对绑定姿势合计 244°，塞口袋那一下走到 425°）。两块蒙皮之间转 160° 时，交界处半径只剩 cos 80° ≈ 0.17，手腕就是一条线。第一人称正好把手腕放在画面下沿。
+- **修法**：新的动作 spec 键 `twistSplit`（肩、前臂、腕三个份额，和为 1；`ArmRoll`）。带这个键的 clip 里扭转改按「相对绑定姿势」量，取离绑定姿势最近的那一支再往下展开（左手托夹 −116°、塞口袋 +65°，全程连续），按份额分给三个关节；肩那一份是上臂绕自身轴转，前臂和手在世界里不动（肘留下差额）。肘、腕的位置和手的世界朝向一点没动，手掌轨迹、接触点、道具挂点都不变。`ShunziSitFillCharger` 用 `(.35, .35, .30)`：腕是画面里看得见的关节，份额最小。别的 clip 不带这个键，走原来的对半分，输出逐位不变。
+- **实测**（Blender 里逐帧量蒙皮矩阵的扭转，峰值）：左腕 176° → 35°，左肘 85° → 44°，右腕 78° → 22°，左肩 59° → 83°（塞口袋那几帧，肩在画面外）；相邻帧扭转变化最大 17°（肩）/10°（肘）/7°（腕），没有回卷。游戏内实拍（`FillWrist_a/b`，机位对准左前臂）手腕和前臂粗细正常。
+- **重烘**：BlenderMCP 起实例，`exec` 一段设好环境变量再 `runpy` 跑 `_import/Script_OpeningStoryboardBake.py`：`OPENING_MODEL=TengxianNra02`、`OPENING_CLIPS=ShunziSitFillCharger`、`OPENING_VERSION=20260929OpeningStoryboardsV17WristTwist`、`OPENING_BLEND_DIR=C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OpeningHandWristTwist_20260929`（先放入 `OpeningFirstPersonRifle_20260929` 的三份 partner track）。清单只合并版本号和 NRA02 行的 sha256/blend，其他行不动；动画 JSON 里只有这一条 clip 变了。
+- **验收**：`Script_OpeningStoryboardsTest`（最大单帧自转仍是 61°）、`Script_OpeningFirstPersonTest`（手掌每帧 3.7 cm、8.8°，下令衔接 10°，与改前一致）、`Script_OpeningStoryboardShots --shots=SB01`。另选 6 条不带该键的 NRA02 clip（`BanterPatRifle`、`BlastSlamBuried`、`CaptiveWallBrace`、`InterpreterGrabCollar`、`YaowaSitLoad`、`HeLiftTimber`）用新旧烘焙脚本各 verify 一遍，逐位相同。`Script_OpeningStoryboardsTest --rebake` 对这 6 条局部重烘与提交文件有 3 处差（`InterpreterGrabCollar`、`YaowaSitLoad`、`HeLiftTimber`），改前的脚本同样产出，与本次无关，没有追查。
+- **限制**：带 `twistSplit` 的 clip 不能给后面的 clip 当 `prev` 来接扭转分支（接续的扭转值是原始扭转，域不同）；目前没有 clip 接在它后面。

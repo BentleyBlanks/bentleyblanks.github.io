@@ -1,6 +1,6 @@
 {
   "about": "片段的人工转写核对（VoiceSync §0.3）。放行「只超字错率、逐字核过只差同音/近音字或四川话口语读法」的片段；needsListening 标的是 whisper 转不出来、我们没法确认的句子，要人工试听。sha256 与转写原文必须等于清单里当前那一片，重录即失效。核对人读的是 whisper 转写与台词的逐字对照，不是听音频。",
-  "reviewedAt": "2026-09-27",
+  "reviewedAt": "2026-09-29",
   "lines": {
     "BunkerBanter.01": {
       "sha256": "b35277010a3be1ec861940f3e0922ee1abfbdc0966148e6585bbd659a2aa5995",
@@ -245,29 +245,17 @@
       "note": "催命嗦→随你所谓（cui-ming-suo/sui-ni-suo-wei），近音，含着烟的嘟囔。"
     },
     "CaptiveDragged.01": {
-      "sha256": "27e99dd1ed6f804896f75d5ae93ef21e0f3d38e5ede2baf13bb8cd94198bfe08",
-      "transcript": "狗子嘞!你妈嘞!",
+      "sha256": "f5f871ed4cca6a36a31ff373905971a548a3c5f7cf953e187197cc6aa753ec29",
+      "transcript": "搞砸了!你妈的!",
       "cer": 0.5,
-      "note": "稿面『狗日的……你妈的……』被识别成四川尾音『狗子嘞！你妈嘞！』；转写文本核对，未人工试听。"
-    },
-    "CaptiveDragged.03": {
-      "sha256": "2d86ed836304d10245278ad4e62c2e99b1265d490e18ab8508f9f40821ee33b4",
-      "transcript": "你 闲人?",
-      "cer": 0.5,
-      "note": "转写仍有不确定处，已保留当前原片供试听；不得据此宣称逐字听验通过。",
+      "note": "2026-09-29 重伤腔重录：稿面「狗日的……你妈的……」；「你妈的」逐字对上，「狗日的」写成「搞砸了」（gou ri de → gao za le 近音，嘶哑带血沫的读法），字数语序一致；前面的痛哼不计。",
       "needsListening": true
     },
-    "CaptiveInterrogation.01": {
-      "sha256": "7050528105773083aeb304e323ece607c1078d1062189629a40cc56e90dd3e6b",
-      "transcript": "へへへへへ、舞台は、どこへ引いた?引け!",
-      "cer": 0.3636,
-      "note": "2026-09-27 合并重录（日兵癫狂腔 + 翻译汉奸腔）：句前的「へへへへへ」是导演表写的怪笑；部隊→舞台、退いた→引いた 同音异写，聞け→引け k/h 近音；字数差 1，语序一致。"
-    },
-    "CaptiveInterrogation.02": {
-      "sha256": "5053deebd26b7d3ad1f459abd3087984f4ac4240b5a921769f54e8af0609c9f4",
-      "transcript": "は、はい",
-      "cer": 0.5,
-      "note": "2026-09-27 合并重录：「はい！」念成「は、はい」——导演表写的又怕又巴结，吓得打了个磕巴；不是念错别的词。0.8 s 短句，建议试听确认口吃听起来像谄媚而不是卡顿。",
+    "CaptiveDragged.03": {
+      "sha256": "5387d0b7a773086e39ea8eee4c68c277b2ca1a60a7c8bdd19d13de4777d7c13e",
+      "transcript": "这是你先生!",
+      "cer": 0.75,
+      "note": "2026-09-29 重伤腔重录：稿面「日你……先人……」；四川话「日」读 zi/ri 被写成「这是」（多一字，含句前倒抽气），先人→先生 近音；字数差 1。句前是导演表写的痛哼，嗓子向量因此偏低（本人 0.19、日兵甲 0.19，不是串嗓）。",
       "needsListening": true
     },
     "TankHeard.01": {
@@ -307,6 +295,25 @@
       "transcript": "三星那边,简体中文怎么砸锅?",
       "cer": 0.75,
       "note": "山西→三星/陕西（同音异调）、见弟兄们→简体中文（whisper 臆写；另两次解码都是「见弟兄们」）、这么炸过→怎么砸锅；字数语序一致。"
+    },
+    "CaptiveInterrogation.01": {
+      "sha256": "adf0a3e5cb472dab5ddefb6e0b842cc5c03928a755882474ebe47954f1c57348",
+      "transcript": "舞台はどこへ引いた? 引け!",
+      "cer": 0.3636,
+      "note": "2026-09-29 翻译提速+川军重伤腔合并重录，这句单句补录（整段里像翻译的嗓子）：部隊→舞台、退いた→引いた 同音异写，聞け→引け k/h 近音；字数对得上，语序一致。"
+    },
+    "CaptiveInterrogation.02": {
+      "sha256": "d265eccaed2ddce68ca901a3c514f537d61accc06f7ec101db1b4b5b891cfbac",
+      "transcript": "は、はい!",
+      "cer": 0.5,
+      "note": "2026-09-29 合并重录：「はい！」念成「は、はい」——导演表写的又怕又巴结，吓得打了个磕巴；不是念错别的词。",
+      "needsListening": true
+    },
+    "CaptiveInterrogation.04": {
+      "sha256": "4788418649d37a3335ee0f39be3e99e0a435aba13bfa371681499afaabb5a723",
+      "transcript": "傻子?",
+      "cer": 0.5,
+      "note": "2026-09-29 合并重录：「……啥子？」重伤腔嘶哑，whisper 写成近音「傻子」（sha/sa 平翘舌）；两个字对两个字，不是念错。"
     }
   }
 }

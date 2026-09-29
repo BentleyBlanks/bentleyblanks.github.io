@@ -131,6 +131,9 @@ import { BREATH_HOLD, FREE_AIM } from "./Data_Tuning_Player.mjs";
 import { EMPLACEMENT_VIEW } from "./Data_Tuning_Interact.mjs";
 import { FpsMountedPoseKey } from "./Data_FpsArmPoses.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
+import { WhiteboxGraphicsOverrides, WhiteboxPostOptions } from "./Data_Tuning_Whitebox.mjs";
+import { LoadGraphicsProfile, LoadWhiteboxConfig, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
+import { WhiteboxSceneRenderer } from "./Script_WhiteboxRendering.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
 import { AddTrimProps, ClearTrimProps } from "./Script_TrimProps.mjs";
@@ -236,7 +239,10 @@ window.__bootMainAlive = true;
 window.__bootGuardDismiss?.();
 
 const params = new URLSearchParams(location.search);
-const QUALITY = params.get("quality") || "high";
+const GRAPHICS_PROFILE = LoadGraphicsProfile(location.search);
+// Tier controls geometry/asset budgets; presentation is independently editable.
+const QUALITY = GRAPHICS_PROFILE === "whitebox" ? "high" : GRAPHICS_PROFILE;
+const WHITEBOX_CONFIG = GRAPHICS_PROFILE === "whitebox" ? LoadWhiteboxConfig() : null;
 const SCALE = SCALE_PRESETS[params.get("scale") || "medium"] || SCALE_PRESETS.medium;
 const SHOT = params.get("shot");                 // 出图模式：不进指针锁、固定机位
 // 空气墙调试显示：第一关白盒把 tag:"airWall" 的体块画成半透明红板（docs/Data_FirstLevelGuidance20260928.md §3.2）。
@@ -483,6 +489,7 @@ const destructionUniforms = MakeDestructionUniforms();
 const post = new PostPipeline(renderer, {
   width: window.innerWidth, height: window.innerHeight, quality: QUALITY,
   destruction: destructionUniforms,
+  whitebox: WHITEBOX_CONFIG,
 });
 // AO / SSIL 的材质端 uniform 包。**构造与同步都走 Script_PostGtao 的共用工厂**
 // （探针页用的是同一份），免得两边各写一套分辨率：材质里的取样是
@@ -523,6 +530,7 @@ const autoQuality = new AutoQuality();
  * 关掉 TAA（或 low 档）时退回老行为：末趟送屏做一次双线性放大。
  */
 const graphics = {
+  profile: GRAPHICS_PROFILE,
   renderScale: post.preset.renderScale ?? 1.0,
   // 自动降档总闸（docs §13）。出厂开；面板可关，关掉时阶梯立刻收回第 0 级。
   // 它必须是 `graphics` 上的一位，`ApplySavedSettings` 才认得（那边只回灌
@@ -609,6 +617,7 @@ const graphics = {
   gore: IsGoreEnabled(),
 };
 NormalizeGraphicsDetails(graphics, post);
+if (WHITEBOX_CONFIG) Object.assign(graphics, WhiteboxGraphicsOverrides(WHITEBOX_CONFIG));
 // 本档位到底编没编接触阴影那段材质 GLSL（编译期，见 Script_Csm.SetCsmContactCompiled）。
 // 面板那个开关只能在「编过」的档位上生效；low 档打开也没用，所以两者取与。
 const CONTACT_SHADOWS_SUPPORTED = !!post.preset.contactShadows;
@@ -657,7 +666,9 @@ InstallShadowCasterBatch(renderer, shadowCasterBatch);
 // 它自己按平面反射假设采同一条 Hi-Z，见 Script_PostSsr.SsrSurfaceGlsl。
 // 必须排在任何水面材质建出来之前（材质按预设缓存，建完就定型）。
 SetWaterSsr(ssrUniforms ? post.ssrPass.trace : null);
-const sky = new SkyDome(renderer, { quality: QUALITY });
+const sky = new SkyDome(renderer, { quality: QUALITY,
+  environment: !WHITEBOX_CONFIG || WHITEBOX_CONFIG.environment,
+  atmosphere: !WHITEBOX_CONFIG || WHITEBOX_CONFIG.atmosphere });
 scene.add(sky.mesh);
 // 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）
 SetWaterSkyUniforms(sky.uniforms);
@@ -665,6 +676,20 @@ SetWaterSkyUniforms(sky.uniforms);
 // BasicShadowMap（PCSS 的 blocker search 必须读到裸深度；采样器类型必须与
 // Script_Csm.SHADOW_MAP_TYPE 一致，不一致是未定义行为）。
 const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66, renderer });
+if (WHITEBOX_CONFIG) {
+  renderer.shadowMap.enabled = graphics.shadows;
+  lights.SetShadowsEnabled(graphics.shadows);
+  lights.SetClusteredEnabled(graphics.clusteredLights);
+}
+const whiteboxRenderer = WHITEBOX_CONFIG ? new WhiteboxSceneRenderer(scene, WHITEBOX_CONFIG, {
+  sky: sky.mesh,
+  prepareMaterial: (material, source) => {
+    if (WHITEBOX_CONFIG.firstPersonShadow && source.userData.firstPersonSelfShadow) firstPersonSelfShadow?.PatchPresentationMaterial(material);
+  },
+}) : null;
+post.whiteboxScene = whiteboxRenderer;
+const graphicsProfileApi = CreateGraphicsProfileApi({ profile: GRAPHICS_PROFILE,
+  config: WHITEBOX_CONFIG || LoadWhiteboxConfig(), post, renderer: whiteboxRenderer });
 // 接主相机：级联按真实视锥切片的包围球拟合（半径只依赖 fov/aspect/分割距离，
 // 不依赖相机位姿 —— 转头不沸腾）。开镜压 fov 用基准 FOV，不然阴影边缘随开镜呼吸。
 lights.SetViewCamera(camera);
@@ -2106,7 +2131,7 @@ async function Boot() {
   // 预热全编成了用不上的变体，第一颗手榴弹炸出弹坑、断肢那一帧再现编（实测 3 s + 9 s）。
   // 编辑器那次再套是同一组值，编译期开关不变就不重编。
   try {
-    if (LoadSavedGraphics(graphics)) ApplyGraphics();
+    if (LoadSavedGraphics(graphics) || WHITEBOX_CONFIG) ApplyGraphics();
   } catch (error) {
     console.warn("[Main] 预热前套用存档画质失败（退回编辑器建好后再套）", error);
   }
@@ -2149,7 +2174,7 @@ async function Boot() {
     // 或者走 story.Signal("<名字>") 让登记表去派发 —— 两条路同一个实现。
     PlayMidCutscene,
     // FrameProfileTest 的 GI 消融走设置面板同一条路（graphics.gi + ApplyGraphics）
-    graphics, ApplyGraphics, autoQuality,
+    graphics, ApplyGraphics, autoQuality, GraphicsProfile: graphicsProfileApi,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
     Debug: {
       Reload, DoMelee, CallMortar, EndBattle,
@@ -2927,7 +2952,7 @@ async function Boot() {
     ReturnToMainMenu: MENU_AT_BOOT ? () => OpenMenu() : null,
     game: {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
-      state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, autoQuality,
+      state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, autoQuality, GraphicsProfile: graphicsProfileApi,
       GetFpsVisible: () => hud.FpsVisible(),
       SetFpsVisible: (on) => hud.SetFpsVisible(on),
       // 材质着色升级那一包：Debug Rendering 的「材质细节」组按它设假彩色编号。
@@ -9252,7 +9277,7 @@ function RenderScene(dt) {
   const openingLens = missionRuntime?.Perception().lens || null;
   hud.SetLens(openingLens);
   profiler.B("post");
-  post.Render(scene, camera, ApplyLensToPost({
+  post.Render(scene, camera, WhiteboxPostOptions(WHITEBOX_CONFIG, ApplyLensToPost({
     sunDirection: sky.sunDirection,
     sunColor: preset.sunColor,
     fog: preset.fog,
@@ -9306,7 +9331,7 @@ function RenderScene(dt) {
     nearDofRange: ADS_NEAR_DOF_RANGE_M,
     nearDofMaxPx: ADS_NEAR_DOF_MAX_PX,
     nearDofSightUv: adsNearDof > 0 && !WEAPON_RANGE ? AdsSightUv() : null,
-  }, openingLens));
+  }, openingLens)));
   profiler.E("post");
   profiler.GpuFrameEnd();
   skeletonPassGuard = false;
@@ -9456,6 +9481,7 @@ function RecompileAllMaterials() {
 
 function ApplyGraphics() {
   NormalizeGraphicsDetails(graphics, post);
+  if (WHITEBOX_CONFIG) Object.assign(graphics, WhiteboxGraphicsOverrides(WHITEBOX_CONFIG));
   // 断肢内容开关。`?gore=0` 压过面板与存档那一位 —— 出图与回归靠这个参数
   // 拿确定的画面，不能被上一次存下的偏好推翻（见 GORE_FORCED_OFF）。
   // 关掉时 `GoreSystem.SetEnabled` 会顺手 ReleaseAll：场上已经飞出去的肢块

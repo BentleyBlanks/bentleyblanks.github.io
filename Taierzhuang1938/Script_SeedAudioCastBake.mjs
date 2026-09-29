@@ -19,8 +19,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner } from "./Data_FirstLevelVoiceCast.mjs";
-import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Sha256, Pool, requestStats, SEED_AUDIO_MODEL, Transcribe }
+import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Sha256, Pool, requestStats, SEED_AUDIO_MODEL, Transcribe, DecodePcm }
   from "./Script_SeedAudioVoiceKit.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -41,8 +42,18 @@ export function CastPrompt(who) {
   const c = FIRST_LEVEL_VOICE_CAST[who];
   // sampleDelivery 缺省时提示词与原来逐字相同（已选定的定妆音不受影响）。
   const delivery = c.sampleDelivery || "按这个人物自己的性格自然地说话，情绪平稳、带一点性格色彩，不要喊叫也不要耳语，语速自然";
-  return `${DRY_VOICE_RULE}角色：${c.persona}。${VOICE_LANG_RULE[c.lang]}`
+  // voiceOf：同一个人的另一种状态，@音频1 是他平时的定妆音（缺省时提示词与原来逐字相同）。
+  const same = c.voiceOf ? "@音频1 是这个人平时的声音：必须是同一个人，严格保持他的音色、年龄感和口音，只是此刻的身体和情绪状态完全不同。" : "";
+  return `${DRY_VOICE_RULE}${same}角色：${c.persona}。${VOICE_LANG_RULE[c.lang]}`
     + "这是用来固定角色嗓音的定妆录音：" + delivery + "，一口气念完，不念任何说明。台词：“" + c.sample + "”";
+}
+/** voiceOf 那个人已选定的定妆音（没有就不能生成这种状态的定妆音）。 */
+function BaseVoiceFile(who) {
+  const base = FIRST_LEVEL_VOICE_CAST[who].voiceOf;
+  if (!base) return null;
+  const entry = ReadManifest().cast[base];
+  if (!entry) throw new Error(`${who}: pick a cast voice for ${base} first (voiceOf)`);
+  return path.join(here, "Audio", "FirstLevel", entry.file);
 }
 const ReadManifest = () => fs.existsSync(manifestPath)
   ? JSON.parse(fs.readFileSync(manifestPath, "utf8")) : { model: SEED_AUDIO_MODEL, cast: {} };
@@ -53,12 +64,54 @@ async function Generate(roles) {
   const { errors } = await Pool(jobsList, jobs, async ({ who, n }) => {
     const raw = path.join(work, `${who}_${n}.raw.mp3`);
     if (fs.existsSync(raw) && !process.argv.includes("--force")) return;
-    const { bytes, subtitle } = await SeedAudioSpeak({ prompt: CastPrompt(who), label: `cast ${who}#${n}` });
+    const base = BaseVoiceFile(who);
+    const { bytes, subtitle } = await SeedAudioSpeak({ prompt: CastPrompt(who), references: base ? [base] : [], label: `cast ${who}#${n}` });
     fs.writeFileSync(raw, bytes);
     fs.writeFileSync(raw.replace(/\.raw\.mp3$/, ".subtitle.json"), JSON.stringify(subtitle || null));
     console.log(`cast ${who}#${n}: ${bytes.length} bytes`);
   });
   for (const e of errors) console.error(e.message);
+}
+
+/**
+ * 定妆表 maxGapS：按逐字时间戳把字与字之间（含开口前）长于 maxGapS 的空当从中间剪短到 maxGapS，
+ * 两头各留一半（上一句的出气、下一句前的吸气），接缝 20 ms 交叉淡化。重伤状态的独白满是喘和痛哼，
+ * 整条常超过参考音的 29.5 s 上限（ReferencePayload 截断），剪短空当才能让最后吼的几句也进参考。
+ */
+function ShortenGaps(raw, maxGapS) {
+  const subtitle = JSON.parse(fs.readFileSync(raw.replace(/\.raw\.mp3$/, ".subtitle.json"), "utf8") || "null");
+  const words = (subtitle?.sentences || []).flatMap((s) => s.words || []).filter((w) => /[\p{L}\p{N}]/u.test(w.text || ""));
+  if (!words.length) return raw;
+  const rate = 44100, pcm = DecodePcm(raw, rate), fade = Math.round(0.02 * rate), half = maxGapS / 2;
+  const keep = [];   // [起, 止) 采样
+  let from = 0, prevEnd = 0;
+  for (const w of words) {
+    const gap = w.start_time / 1000 - prevEnd;
+    if (gap > maxGapS) {
+      keep.push([from, Math.round((prevEnd + half) * rate)]);
+      from = Math.round((w.start_time / 1000 - half) * rate);
+    }
+    prevEnd = Math.max(prevEnd, w.end_time / 1000);
+  }
+  keep.push([from, pcm.length]);
+  const total = keep.reduce((t, [a, b]) => t + (b - a), 0) - fade * (keep.length - 1);
+  const outPcm = new Float32Array(total);
+  let at = 0;
+  keep.forEach(([a, b], k) => {
+    for (let i = a; i < b; i++, at++) {
+      const x = pcm[i] ?? 0;
+      if (k > 0 && i - a < fade) outPcm[at] += x * ((i - a) / fade);
+      else if (k < keep.length - 1 && b - i <= fade) outPcm[at] = x * ((b - i) / fade);
+      else outPcm[at] = x;
+    }
+    if (k < keep.length - 1) at -= fade;
+  });
+  const out = raw.replace(/\.raw\.mp3$/, ".gaps.wav");
+  const result = spawnSync(process.env.FFMPEG || "ffmpeg", ["-v", "error", "-y", "-f", "f32le", "-ar", String(rate), "-ac", "1", "-i", "-", out],
+    { input: Buffer.from(outPcm.buffer), windowsHide: true });
+  if (result.status !== 0) throw new Error(`ShortenGaps failed for ${path.basename(raw)}`);
+  console.log(`${path.basename(raw)}: ${keep.length - 1} gaps shortened to ${maxGapS} s, ${(pcm.length / rate).toFixed(1)} → ${(total / rate).toFixed(1)} s`);
+  return out;
 }
 
 export async function Score(roles) {
@@ -67,7 +120,8 @@ export async function Score(roles) {
     const raw = path.join(work, `${who}_${n}.raw.mp3`);
     if (!fs.existsSync(raw)) break;
     const file = path.join(work, `${who}_${n}.mp3`);
-    const { measure } = MasterLine(raw, file, { targetDb: CAST_TARGET_DB, padS: 0.08 });
+    const source = FIRST_LEVEL_VOICE_CAST[who].maxGapS ? ShortenGaps(raw, FIRST_LEVEL_VOICE_CAST[who].maxGapS) : raw;
+    const { measure } = MasterLine(source, file, { targetDb: CAST_TARGET_DB, padS: 0.08 });
     candidates.push({ who, n, file, measure });
   }
   const manifest = ReadManifest();
@@ -91,6 +145,13 @@ export async function Score(roles) {
     if (vectors) for (const other of chosen) {
       if (other.who === c.who || FIRST_LEVEL_VOICE_CAST[other.who]?.faction !== cast.faction) continue;
       const sim = CenteredCosine(vectors[c.file], vectors[other.file]);
+      // 同一个人的另一种状态：要像本人（低于 0.45 罚），不算撞嗓。
+      if (other.who === cast.voiceOf) {
+        c.sameAsBase = +sim.toFixed(3);
+        if (sim < 0.45) { score += (0.45 - sim) * 20; why.push(`不像 ${other.who} 本人 ${sim.toFixed(2)}`); }
+        continue;
+      }
+      if (FIRST_LEVEL_VOICE_CAST[other.who]?.voiceOf === c.who) continue;
       c.clash.push([other.who, +sim.toFixed(3)]);
       if (sim > 0.55) { score += (sim - 0.55) * 20; why.push(`与 ${other.who} 撞嗓 ${sim.toFixed(2)}`); }
     }
@@ -104,7 +165,7 @@ export async function Score(roles) {
   }
   const report = candidates.map(({ vector, ...rest }) => ({ ...rest, file: path.relative(worktree, rest.file).replaceAll("\\", "/") }));
   fs.writeFileSync(path.join(work, "Data_CastCandidates.json"), JSON.stringify(report, null, 2));
-  for (const c of report) console.log(`${c.who}#${c.n} score ${c.score} | ${c.measure.seconds}s F0 ${c.measure.f0.median} (${c.measure.f0.p10}-${c.measure.f0.p90}) SNR ${c.measure.snrDb} CER ${c.cer} ${c.why.join("; ")}`);
+  for (const c of report) console.log(`${c.who}#${c.n} score ${c.score} | ${c.measure.seconds}s F0 ${c.measure.f0.median} (${c.measure.f0.p10}-${c.measure.f0.p90}) SNR ${c.measure.snrDb} CER ${c.cer}${c.sameAsBase != null ? ` same-as-base ${c.sameAsBase}` : ""} ${c.why.join("; ")}`);
   return report;
 }
 

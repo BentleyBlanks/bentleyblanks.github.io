@@ -81,6 +81,7 @@ export class RangeField {
     mesh.receiveShadow = true;
     mesh.castShadow = false;
     mesh.name = "RangeGround";
+    mesh.userData.whiteboxTerrain = true;
     this.scene.add(mesh);
     this.meshes.push(mesh);
     this.stats.groundChunks = 1;

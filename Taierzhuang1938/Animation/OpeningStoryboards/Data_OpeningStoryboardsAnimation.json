@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260929OpeningStoryboardsV16FirstPersonRifle",
+ "version": "20260929OpeningStoryboardsV18SlapWindup",
  "fps": 24,
  "actorForward": [
   0,
@@ -2785,7 +2785,7 @@
    ]
   },
   "IjaSlapForehand": {
-   "duration": 1.25,
+   "duration": 1.5,
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
@@ -2798,7 +2798,7 @@
    "player": true,
    "contacts": [
     {
-     "t": 0.34,
+     "t": 0.58,
      "limb": "handR",
      "action": "slap",
      "partnerRole": "shunzi",
@@ -2814,7 +2814,11 @@
    ],
    "events": [
     {
-     "t": 0.34,
+     "t": 0.3,
+     "kind": "windUp"
+    },
+    {
+     "t": 0.58,
      "kind": "slap",
      "side": 1
     }
@@ -2825,13 +2829,13 @@
    "next": [
     "IjaCrouchHairHold"
    ],
-   "notes": "2026-09-27: from the hair hold (frame 0 and the last frame = IjaCrouchHairHold at its hold-loop start, the left fist in the hair). 0-0.22 s the right arm winds out to his right and back, the trunk turned into it; the open right PALM cracks across the man's LEFT cheek (0.34 s: on ijaA's right), right to left across his body, the shoulder and trunk turning through; follow-through to his left; the head knocked away in his fist; back to the hold by 1.2 s.",
+   "notes": "2026-09-29: from the hair hold (frame 0 and the last frame = IjaCrouchHairHold at its hold-loop start, the left fist in the hair). 0-0.30 s the open right hand goes up high over his right shoulder (1.1 m up: from the pinned eye it stands against the sky), the trunk wound back to his right, and hangs there cocked to 0.42 s; 0.50-0.58 s it cracks down, the PALM across the man's LEFT cheek (0.58 s: on ijaA's right), the shoulder and trunk turning through; follow-through wide to his left; the head knocked away in his fist and held there a moment; back to the hold by 1.3 s.",
    "rigs": [
     "TengxianIja02"
    ]
   },
   "IjaSlapBackhand": {
-   "duration": 1.25,
+   "duration": 1.5,
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
@@ -2844,7 +2848,7 @@
    "player": true,
    "contacts": [
     {
-     "t": 0.34,
+     "t": 0.58,
      "limb": "handR",
      "action": "slap",
      "partnerRole": "shunzi",
@@ -2860,7 +2864,11 @@
    ],
    "events": [
     {
-     "t": 0.34,
+     "t": 0.3,
+     "kind": "windUp"
+    },
+    {
+     "t": 0.58,
      "kind": "slap",
      "side": -1
     }
@@ -2871,7 +2879,7 @@
    "next": [
     "IjaCrouchHairHold"
    ],
-   "notes": "2026-09-27: the mirror of IjaSlapForehand: the right hand wound across to his left (0.22 s), the BACK of the hand lashes across the man's RIGHT cheek left to right (0.34 s), follow-through to his right; back to the hold by 1.2 s.",
+   "notes": "2026-09-29: the mirror of IjaSlapForehand: the right hand goes up in front of his left shoulder (0.30 s, cocked to 0.42 s), the BACK of the hand lashes down across the man's RIGHT cheek left to right (0.58 s), follow-through wide to his right; back to the hold by 1.3 s.",
    "rigs": [
     "TengxianIja02"
    ]
@@ -3280,7 +3288,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "7de2c0edaad116a16913972084454e5b7306aeb11697de41984d2ff6ff8edc0f",
+   "sha256": "a678b7c8967b97f8aa01b2815471ec68aec11f2c98ea808c34da78a956dfdeed",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
@@ -3512,7 +3520,7 @@
      ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningFirstPersonRifle_20260929\\Scene_TengxianNra02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningHandWristTwist_20260929\\Scene_TengxianNra02OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
@@ -7260,9 +7268,9 @@
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "067b3cdb69652d1589c05c94b54ec48ec1005551809b2b0732a0c9d549397f71",
+   "sha256": "a5834e38147dfa84db3994dd9813e1af860927263df208c242a9bf841315d407",
    "originalModelSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61",
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningPinnedRescue_20260927\\Scene_TengxianIja02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningSlapWindup_20260929\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
      "bone": "Bip001 Head",
@@ -9321,11 +9329,11 @@
     },
     {
      "clip": "IjaSlapForehand",
-     "frames": 31,
+     "frames": 37,
      "footSlideM": 0.0,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.0395,
+     "pelvisMaxStepM": 0.0723,
      "floorCorrectionMin": 0.01772,
      "floorCorrectionMax": 0.01772,
      "root": {
@@ -9348,32 +9356,32 @@
       [
        "L",
        0,
-       1.25
+       1.5
       ],
       [
        "R",
        0,
-       1.25
+       1.5
       ]
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0,
-     "lookErrorDeg": 1.94,
-     "headTurnDeg": 31.31,
+     "lookErrorDeg": 2.0,
+     "headTurnDeg": 50.01,
      "probes": {
       "palmOnCheek": [
-       0.0139,
-       0.3333
+       0.0063,
+       0.5833
       ]
      }
     },
     {
      "clip": "IjaSlapBackhand",
-     "frames": 31,
+     "frames": 37,
      "footSlideM": 0.0,
      "contactErrorM": 0.0,
-     "gripSolveErrorM": 0.02601,
-     "pelvisMaxStepM": 0.0925,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0848,
      "floorCorrectionMin": 0.01772,
      "floorCorrectionMax": 0.01772,
      "root": {
@@ -9396,22 +9404,22 @@
       [
        "L",
        0,
-       1.25
+       1.5
       ],
       [
        "R",
        0,
-       1.25
+       1.5
       ]
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0,
-     "lookErrorDeg": 3.36,
-     "headTurnDeg": 31.78,
+     "lookErrorDeg": 1.84,
+     "headTurnDeg": 23.16,
      "probes": {
       "backOnCheek": [
-       0.0149,
-       0.3333
+       0.0074,
+       0.5833
       ]
      }
     },

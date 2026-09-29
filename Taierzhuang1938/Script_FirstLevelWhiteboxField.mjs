@@ -343,6 +343,8 @@ export class FirstLevelWhiteboxField {
         // They never survive as a floating crust over a newly excavated crater.
         mesh.userData.deformableTerrain = true;
         mesh.userData.trenchEarth = true;
+        // Crater clipping also owns dressing; only physical soil is a texture exception.
+        mesh.userData.whiteboxTerrain = mesh.material === this.materials.get(ground.semantic);
         this.meshes.push(mesh);
       }
     }

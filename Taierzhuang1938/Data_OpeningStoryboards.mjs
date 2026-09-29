@@ -18,7 +18,7 @@ const REVETMENT = "BunkerSouthRevetment";
 // Everyone who leaves after Luo's order (banter.exitRoute; the runner's own is the same without its first point).
 const BANTER_EXIT = Route([2.1,-125.2],[3.4,-123.6],[3.1,-121.6],[1.2,-120.6],[-1,-118.5],[-4,-113],[-9,-111.3]);
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260929OpeningStoryboardsV16FirstPersonRifle", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260929OpeningStoryboardsV18SlapWindup", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
@@ -404,14 +404,22 @@ export const OPENING_STORYBOARDS = Object.freeze({
     interpreterReturn:Route([4.2,-124.25]),
     interpreterClearanceM:.44,
     ijaBGuard:P(5.2,-124.7,-Math.PI/2),
-    // Slaps (ijaA, crouched, the left fist in the hair): the right hand swings in over raiseS, lands at hitS, the head
-    // is snapped aside yawDeg / rollDeg away from the blow and eases back over recoverS; the struck side of the picture
-    // swims (lens `slap`, Data_OpeningLens) for dizzyS. `side` +1: struck on the left cheek (forehand, the view flung
-    // right); -1: backhand on the right cheek. at: the line whose start cues it (RescueInterrogation), plus delayS.
-    slap:Object.freeze({ sound:"slap", raiseS:.28, hitS:.34, yawDeg:24, rollDeg:9, pitchDeg:-5, dropM:.05, recoverS:1.1, dizzyS:2.4,
+    // Slaps (ijaA, crouched, the left fist in the hair): the right hand goes up high over raiseS (IjaSlapForehand /
+    // IjaSlapBackhand play from their first frame: raiseS = the clip's contact), cracks down at hitS; the head is flung
+    // yawDeg / rollDeg away from the blow (and shiftM sideways, dropM down), hangs there hangS and eases back over
+    // recoverS -- the aim stays on where ijaA's face was at the blow, so the whole turn is the head's; the struck side of
+    // the picture swims (lens `slap`, Data_OpeningLens) for dizzyS. `side` +1: struck on the left cheek (forehand, the
+    // view flung right); -1: backhand on the right cheek.
+    // 2026-09-29 (user: 「应该是看见我了就扇巴掌，等翻译问了一句主角还没说话就再来了一巴掌」): the first blow as soon as
+    // he has the head up by the hair (`grab`: delayS after the Hold begins, the hold clip at its loop start), and
+    // 「这个也问！」 waits for it; the second in the silence after the interpreter's first question (`line` .03: hit
+    // afterEndS after the line ends) and 「听见没有？」 (.04) waits for it. `then` / `thenAfterS`: the line held back
+    // until thenAfterS after the blow lands.
+    slap:Object.freeze({ sound:"slap", raiseS:.58, hitS:.58, yawDeg:44, rollDeg:12, pitchDeg:-7, dropM:.06, shiftM:.05,
+      hangS:.35, recoverS:1.2, dizzyS:2.4,
       blows:Object.freeze([
-        Object.freeze({ line:"RescueInterrogation.03", delayS:.05, side:1 }),
-        Object.freeze({ line:"RescueInterrogation.05", delayS:.35, side:-1 }),
+        Object.freeze({ at:"grab", delayS:.75, side:1, then:"RescueInterrogation.01", thenAfterS:.4 }),
+        Object.freeze({ line:"RescueInterrogation.03", afterEndS:1.1, side:1, then:"RescueInterrogation.04", thenAfterS:.6 }),
       ]),
       // 「说话！」 (.06): the hand goes up for a third -- and the charge breaks in before it lands.
       raiseLine:"RescueInterrogation.06", raiseAfterS:.2, chargeAfterRaiseS:.55 }),
@@ -549,11 +557,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // 「还藏着一个」: ijaA walking off from the kill stops over the pinned man.
     Object.freeze({id:"SB04_Found",when:"s.flags.foundAt!=null&&r.time-s.flags.foundAt>=.5",
       judge:{camera:{eyeM:[.2,.4]},actors:{ijaA:{x:[.25,.75],distM:[.6,1.6]}}}}),
+    // The first slap (2026-09-29: the moment the head is up in his fist, before 「这个也问！」): the view flung to the
+    // right, the left of the picture swimming.
+    Object.freeze({id:"SB05_Slap",when:"s.flags.slapAt!=null&&r.time-s.flags.slapAt>=.12",judge:{camera:{eyeM:[.25,.55]}}}),
     // Held up by the hair: ijaA's face close above the middle, the interpreter squatting at the right.
     Object.freeze({id:"SB05_Held",phase:"Ask",age:1,
       judge:{camera:{eyeM:[.3,.55],pitchDeg:[5,42]},actors:{ijaA:{x:[.25,.7],distM:[.3,1]},interpreter:{x:[.45,1],distM:[.8,1.8]}}}}),
-    // The first slap: the view flung to the right, the left of the picture swimming.
-    Object.freeze({id:"SB05_Slap",when:"s.flags.slapAt!=null&&r.time-s.flags.slapAt>=.12",judge:{camera:{eyeM:[.25,.55]}}}),
     // The charge over the crater step (right of the picture).
     Object.freeze({id:"SB05A_Charge",phase:"Charge",age:1.6,judge:{camera:{eyeM:[.2,.45]},inFrameAtLeast:[{ roles:["luo","heyoutian","Charge"], count:2 }]}}),
     // He's parry and cut on ijaA beside him.

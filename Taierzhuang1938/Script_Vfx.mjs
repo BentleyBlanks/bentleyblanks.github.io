@@ -1852,7 +1852,7 @@ export class VfxSystem {
       if (typeof this.previousSceneHook === "function") {
         this.previousSceneHook.call(hookScene, renderer, hookScene, camera, target);
       }
-      this.root.visible = !hookScene.overrideMaterial;
+      this.root.visible = !hookScene.overrideMaterial && hookScene.userData.whiteboxEffects !== false;
     };
     scene.onBeforeRender = this.sceneHook;
   }

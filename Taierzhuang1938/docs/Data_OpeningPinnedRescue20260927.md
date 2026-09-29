@@ -30,7 +30,7 @@
 
 - 日兵甲蹲在头前，左手揪住头发把头提起来（`IjaCrouchHairHold`；眼位抬 `rescue.holdShot.liftM` 0.16 m、仰看他的脸），顺子右手去抓他的前臂（`gripForearm`）。
 - 「这个也问！」；翻译从 SB03 的位置小跑过来蹲在右前 `rescue.interpreter`（离眼 1.3 m），日兵乙站到 `rescue.ijaBGuard` 朝东望着前沟。
-- 耳光（`rescue.slap`）：翻译「醒醒！……」一开口正手一记（打左脸，视线被甩向右），日兵乙「快点！」后反手一记（打右脸，甩向左）；「说话！」时抬手要打第三下。每一记：头甩开 24°、横滚 9°、下沉 5 cm，1.1 s 回正，眨一下眼；被打那半边屏幕发晕——模糊、重影朝那边拖、发暗泛血红，2.4 s 退掉（`Data_OpeningLens` 的 `held.slap` → `Script_OpeningLens` 的 `slap` → `Script_PostComposite` 的 `uSideDaze`/`SideDaze`，量为 0 时与原来逐像素相同）；另叠一层短促的震荡峰值（`perception.kick`）、听觉闷 0.35、嘴角血（HUD 血层 0.55）。音效是 Sonniss 的真实耳光录音（`Data_SfxSources` FaceSlap → `AudioSfx_Slap_01`，`Script_Audio` 有同名合成退路）。
+- 耳光（`rescue.slap`，2026-09-29 改：用户「看不出来是扇巴掌的动作，扇了巴掌我应该头也会自然的被转动才对，而且应该是看见我了就扇巴掌，等翻译问了一句主角还没说话就再来了一巴掌」）：揪起头（Hold 0.75 s，抓发的保持循环起点）就是一记正手（打左脸，视线被甩向右），「这个也问！」等这一下落地 0.4 s 后才开口；翻译问完「醒醒！你们的人往哪儿撤了？」、顺子不吭声，句尾后 1.1 s 再一记正手，「听见没有？……」等它落地 0.6 s 后才接（对白播放器的 `hold`，`HeldBySlap`；没配音时按估计时长顺推）；「说话！」时抬手要打第三下。两记都是正手：反手的举手在顺子眼里被日兵甲自己揪头发的左臂整个挡住，看不出是扇。每一记：手先高举过肩停一拍（压在天空上是剪影），0.58 s 抽下；头甩开 44°、横滚 12°、下沉 6 cm、朝甩去的一侧挪 5 cm，停 0.35 s 再用 1.2 s 回正——甩头期间视线钉在挨打那一刻他脸的位置，转过去的全是头，不被他收势的上身带回来；眼睛只抽一下（0.45，不黑屏），0.5 s 后再慢眨一下；被打那半边屏幕发晕——模糊、重影朝那边拖、发暗泛血红，2.4 s 退掉（`Data_OpeningLens` 的 `held.slap` → `Script_OpeningLens` 的 `slap` → `Script_PostComposite` 的 `uSideDaze`/`SideDaze`，量为 0 时与原来逐像素相同）；另叠一层短促的震荡峰值（`perception.kick`）、听觉闷 0.35、嘴角血（HUD 血层 0.55）。音效是 Sonniss 的真实耳光录音（`Data_SfxSources` FaceSlap → `AudioSfx_Slap_01`，`Script_Audio` 有同名合成退路）。
 
 ## 5. 反冲锋、白刃战、拖出来（Charge / Melee / Lift）
 
@@ -46,7 +46,7 @@
 
 ## 6. 动作（Blender）
 
-新动作与重做的割喉链在 `_import/Script_OpeningStoryboardClips.py`，只烘 IJA02 / NRA02（manifest `20260928OpeningStoryboardsV14PinnedRescue`；烘焙 spec 新增 `sink`：贴近时骨盆下沉量，割喉链为 0，免得日兵甲被拽进川军身体里；站位新增 `yM`：两人脚下的高差）：`IjaTauntWalk`、`IjaFoundLook`、`IjaCrouchHairHold`、`IjaSlapForehand`、`IjaSlapBackhand`、`IjaSlapRaise`、`HeLiftTimber`，割喉链 `IjaHairGrabPull` / `IjaDrawBayonet` / `IjaThroatSlash` 与 `CaptiveHeadPulledBack` / `CaptiveThroatCut` / `CaptiveClutchThroat` / `CaptiveWallSlideTwitch` 按新站位重做。导演在某条动作还没烘进 manifest 时用最接近的旧动作顶替（`OpeningClipMeta(name)` 为空）。`IjaWipeSheathBayonet` 停用（`retired`）；翻越/倒拖三条仍在库里但不再播放。已知小账：何有田的抬木保持循环只有 1.0–1.5 s、松手最多比木头落下晚 0.5 s；耳光实际打中在 0.333 s（清单写 0.34）；`IjaTauntWalk` 是从右肩回头（川军在他右后方）。割喉后的揪发保持里日兵甲胯部只前探 0.5 cm（前探 3 cm 时胸口顶到川军的头，2.9–3.2 cm 穿插）。可编辑工程在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningPinnedRescue_20260927`。
+新动作与重做的割喉链在 `_import/Script_OpeningStoryboardClips.py`，只烘 IJA02 / NRA02（manifest `20260928OpeningStoryboardsV14PinnedRescue`；烘焙 spec 新增 `sink`：贴近时骨盆下沉量，割喉链为 0，免得日兵甲被拽进川军身体里；站位新增 `yM`：两人脚下的高差）：`IjaTauntWalk`、`IjaFoundLook`、`IjaCrouchHairHold`、`IjaSlapForehand`、`IjaSlapBackhand`、`IjaSlapRaise`、`HeLiftTimber`，割喉链 `IjaHairGrabPull` / `IjaDrawBayonet` / `IjaThroatSlash` 与 `CaptiveHeadPulledBack` / `CaptiveThroatCut` / `CaptiveClutchThroat` / `CaptiveWallSlideTwitch` 按新站位重做。导演在某条动作还没烘进 manifest 时用最接近的旧动作顶替（`OpeningClipMeta(name)` 为空）。`IjaWipeSheathBayonet` 停用（`retired`）；翻越/倒拖三条仍在库里但不再播放。已知小账：何有田的抬木保持循环只有 1.0–1.5 s、松手最多比木头落下晚 0.5 s；耳光 2026-09-29 重做（manifest `20260929OpeningStoryboardsV18SlapWindup`，只烘 IJA02 两条耳光，可编辑工程在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningSlapWindup_20260929`）：长 1.5 s，0–0.30 s 手举到肩上 1.1 m、0.42 s 前停住蓄力，0.58 s 打中（实际 0.583，清单写 0.58），1.3 s 回到抓发姿势；反手也重烘了（举在左肩前上方，原先举到左耳后够不着、把揪头发的左手扯脱 8 cm），导演现在不用它；`IjaTauntWalk` 是从右肩回头（川军在他右后方）。割喉后的揪发保持里日兵甲胯部只前探 0.5 cm（前探 3 cm 时胸口顶到川军的头，2.9–3.2 cm 穿插）。可编辑工程在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningPinnedRescue_20260927`。
 
 ## 7. 验收
 

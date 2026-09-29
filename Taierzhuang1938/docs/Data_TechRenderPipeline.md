@@ -78,6 +78,8 @@ function generateShadowMapTypeDefine( parameters ) {
 
 ## 1. 帧图与模块契约（现役）
 
+**2026-09-29 默认表现入口**：[白盒画质](Data_WhiteboxQuality.md) 默认只跑 main + whiteboxOutput，Feature/Pass 从 `Data_Tuning_Whitebox` 显式允许表接入。下文四档美术管线仍然保留，验收它们需显式 `?quality=high`（或相应档位）；`Tengxian.GraphicsProfile.Inspect()` 查询当前实际运行的 Pass。
+
 > **这一节是渲染侧唯一的接入说明。** 后续所有子系统（CSM/接触阴影、GTAO+SSIL、SSR、
 > froxel 体积雾、物理大气、曝光/镜头/LUT、TAAU/运动模糊/DoF、材质升级、簇状多光源）
 > 按这里定的契约接入。下面的 附录 A.1 起是设计期草案与专题深挖，**现状以本节为准**。

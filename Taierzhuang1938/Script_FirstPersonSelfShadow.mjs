@@ -286,6 +286,9 @@ export class FirstPersonSelfShadow {
     return owned;
   }
 
+  /** Preserve the same depth-map contract on temporary presentation materials. */
+  PatchPresentationMaterial(material) { this._PatchMaterial(material); }
+
   _PatchMaterial(material) {
     if (!material || this.patchedMaterials.has(material)) return;
     const previousCompile = material.onBeforeCompile;
