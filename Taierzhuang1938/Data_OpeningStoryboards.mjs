@@ -18,7 +18,7 @@ const REVETMENT = "BunkerSouthRevetment";
 // Everyone who leaves after Luo's order (banter.exitRoute; the runner's own is the same without its first point).
 const BANTER_EXIT = Route([2.1,-125.2],[3.4,-123.6],[3.1,-121.6],[1.2,-120.6],[-1,-118.5],[-4,-113],[-9,-111.3]);
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260929OpeningStoryboardsV20PullCutSheathe", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260930OpeningStoryboardsV21CollarQuestion", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
@@ -61,7 +61,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // kneeling (Animation/OpeningStoryboards, docs/Data_OpeningClipLibrary20260923.md; the director wires them).
       "LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle",
       // 2026-09-29 「朝着玩家走过来的时候没有收起来的小刀」: he lets go and sheathes the bayonet before he walks off.
-      "IjaReleaseSheathe"],
+      "IjaReleaseSheathe",
+      // 2026-09-30 「日军的动作有问题」: the questioning at the collar (was the legacy CollarControl: the rifle in his hand, the fist a hand's breadth off the collar).
+      "IjaCollarQuestion"],
   },
   // The NRA02 comrade is clean in SB01; the shell that buries him wounds him, and he is bloodied from the
   // black after it through the drag and the interrogation (2026-09-27 review: 「应该是在爆炸后才变得伤痕累累」).
@@ -394,9 +396,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // ---- 01 comrade chain ----------------------------------------------------------------
   // Offsets are the manifest stages (anchor frame +x right, -z forward). The interrogation
   // extras stand where the chain leaves room (the comrade kneels back to the north wall).
-  // ijaAHold: his collar hold through the questioning. 2026-09-27: at the comrade's left front, a step short of the throat
+  // ijaAHold: his collar hold through the questioning (IjaCollarQuestion, manifest stage collarQuestion). 2026-09-30: at arm's
+  // length from the comrade's front collar (0.5 m; the 09-27 mark, 0.86 m off it, was out of reach), a few cm short of the throat
   // cut's stance at his left shoulder (manifest stage slashGrab), which he takes before the grab (PhaseSlash).
-  interrogation:Object.freeze({ ijaAHold:Object.freeze([-.4,-.45,-150]),
+  interrogation:Object.freeze({ ijaAHold:Object.freeze([-.26,-.17,-150]),
     // SB03 (contract §5): the interpreter crouches side-on to the comrade east of the group, ijaB behind him; world marks.
     interpreterAt:P(4.9,-124.05,25*Math.PI/180), ijaBAt:P(6.05,-125.0,55*Math.PI/180),
     // 2026-09-27 rework: first person all through (user: 「保持第一人称，不在切换视角」). From the pinned eye the group is

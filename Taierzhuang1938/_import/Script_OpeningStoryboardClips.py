@@ -3188,6 +3188,121 @@ def BuildHairGrab(T, name):
     return SlashReview(T, 'slashGrab', SlashGroundSpec(T, 'slashGrab', spec))
 
 
+# ---- the questioning (2026-09-30): ijaA's left fist in the comrade's front collar -----------------------------------
+# User: 「日军的动作有问题」 (the first-person picture of CaptiveInterrogation). The interrogation played the 09-22 legacy
+# CollarControl: a standing pose that kept the Type 38 in his right hand with the muzzle in the kneeling man's chest, the
+# left hand open in the air (the mark, 0.86 m off the collar, was out of reach of a 0.45 m arm), the feet on flat ground and
+# the trunk nearly upright over a man kneeling on a bank. Now he stands at arm's length on the bank at the comrade's left
+# front (Data_OpeningStoryboards.interrogation.ijaAHold), the rifle already slung across his back (as IjaShoveToWall before
+# it and IjaHairGrabPull after it: no rifle jumping from the hand to the back at the cut), bent over him with the left fist
+# closed in the front collar and the face on his face; the right fist hangs in front of his chest and jabs at the man on the
+# beats of the shouted questions, shaking the collar. Lead-in 0-0.5 s (from the shove's pose), then a 3.0 s hold loop in step
+# with CaptiveKneelMud's (the collar is read at the loop time, so the fist rides his breathing).
+COLLAR_LEAD = .5
+COLLAR_LOOP = 3.0
+COLLAR_T = COLLAR_LEAD + COLLAR_LOOP
+COLLAR_HOLD = (COLLAR_LEAD, COLLAR_T)
+COLLAR_AT = {'x': -.26, 'z': -.17, 'yawDeg': -150}
+COLLAR_YM = -.1153                 # R3GroundRT(.26, -.17): the bank's ground under his root (SlashGroundSpec checks it)
+STAGES['collarQuestion'] = {
+    'anchor': 'comrade',
+    'notes': "CaptiveKneelMud (3.0 s loop) and IjaCollarQuestion's hold loop run together (ijaA's clip time - 0.5 s). ijaA at "
+             "interrogation.ijaAHold: the comrade's left front at arm's length, on the bank (yM: his root's ground under R3's).",
+    'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveKneelMud', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+               'ijaA': dict(COLLAR_AT, yM=COLLAR_YM, rig='TengxianIja02', clip='IjaCollarQuestion')}}
+PARTNER_SOURCES['TengxianNra02'].setdefault('CaptiveKneelMud', ['collarFront'])
+COLLAR_JABS = ((.55, .95), (1.75, 2.15))          # the right fist's two jabs (and the collar shakes), seconds into the hold loop
+COLLAR_FIST = (-.16, .26, .12)                    # right fist over the collar: (his right, back toward him, up), runtime m
+COLLAR_JAB = (.02, -.13, .01)                     # ... and at the jab's peak: the fist goes this far toward the man
+COLLAR_DOWN = (0, 1, -.3)                         # the left fist's fingers over the collar (as IjaWipeSheathBayonet's frame 0)
+
+
+def CollarBase(T):
+    """ijaA planted at the comrade's left front: the left foot a half step out toward him, the weight on it, bent over him."""
+    f = IjaABase(T)
+    f.update({'ankle.L': Add3(f['ankle.L'], (-.10, .12, 0)), 'legPole.L': Add3(f['legPole.L'], (-.06, .06, 0)),
+              'ankle.R': Add3(f['ankle.R'], (-.03, .04, 0)),
+              'pelvis': Add3(f['pelvis'], (-.04, .08, -.01)),
+              'bend': .70, 'pelvisTilt': (.06, 0, 0), 'head': (.30, 0, 0), 'twist': .0, 'lookW': 1.0,
+              'protract.L': HAIR_PROTRACT})
+    return f
+
+
+@Builder('IjaCollarQuestion')
+def BuildCollarQuestion(T, name):
+    stage, base = 'collarQuestion', CollarBase(T)
+    ground = StageGround(T, stage, 'ijaA')
+
+    def Hit(t):
+        """The collar patch (point, normal) in his frame at his clip time t: the hold loop's time on the comrade's loop."""
+        return PartnerPoint(T, stage, 'ijaA', 'comrade', 'collarFront', (t - COLLAR_LEAD) % COLLAR_LOOP, .03)
+
+    def Collar(t):
+        hit = Hit(t)
+        return Vector(hit[0]) if hit else Vector((0, -T.R(.5), T.R(1.0)))
+
+    def Jab(t):
+        u = t - COLLAR_LEAD
+        return sum(Bump(u, a, b) for a, b in COLLAR_JABS)
+
+    def Body(t):
+        f = dict(base)
+        u = t - COLLAR_LEAD
+        e = Smooth(t / COLLAR_LEAD)             # 0 -> 1 over the lead-in: from the shove's stoop into the hold
+        breath = math.sin(Tau * u / COLLAR_LOOP * 2)
+        jab = Jab(t)
+        f['bend'] = Lerp3((.10, 0, 0), (base['bend'], 0, 0), e)[0] + .012 * breath + .05 * jab
+        # (the legs are the hold's from the first frame: he walks to the mark on the runtime's travel legs)
+        f['pelvis'] = Lerp3(Add3(base['pelvis'], (0, 0, T.R(.03))), base['pelvis'], e)
+        f['shrug'] = f.get('shrug', 0.0) + .02 * breath + .03 * jab
+        f['twist'] = f['twist'] - .05 * jab
+        f['head'] = (base['head'][0] + .03 * breath - .05 * jab, 0, .03 * math.sin(Tau * u / COLLAR_LOOP))
+        f['look'] = tuple(Collar(t) + Vector((0, 0, T.R(.13))))
+        return GroundFeet(T, f, ground)
+
+    def FistAt(t):
+        fist = Collar(t) + Vector((-T.R(COLLAR_FIST[0]), T.R(COLLAR_FIST[1]), T.R(COLLAR_FIST[2])))
+        return fist + Vector((T.R(COLLAR_JAB[0]), T.R(COLLAR_JAB[1]), T.R(COLLAR_JAB[2]))) * Jab(t)
+
+    def GripL(t):
+        """The left fist's grip point: on the collar, shaken with the jabs (a few cm each way along the arm)."""
+        u = t - COLLAR_LEAD
+        shake = sum(Bump(u, a, b) * math.sin(Tau * (u - a) / .16) for a, b in COLLAR_JABS)
+        return Collar(t) + Vector((T.R(.012) * shake, T.R(.020) * shake, T.R(.006) * abs(shake)))
+
+    def Pose(t):
+        f = Body(t)
+        hit = Hit(t)
+        if hit:
+            palmF, palmN, _ = Grab(hit[1], COLLAR_DOWN)
+            EaseGrip(f, 'L', tuple(GripL(t)), Smooth((t - .04) / .30), palmF, palmN, 1.1)
+        EaseGrip(f, 'R', tuple(FistAt(t)), Smooth((t - .10) / .40), Unit((0, -.7, -.7)), Unit((1, 0, 0)), KNIFE_CURL)
+        f['armPole.R'] = (-(T.SX + T.R(.50)), T.R(.05), T.P + T.R(.05))
+        # both fists closed (the grip curl leaves the finger tips straight: an open claw)
+        return WithFist(T, WithFist(T, T.Nest(f), 'L', thumb=1.0), 'R', thumb=1.0)
+    props, review = SlungProps(T)
+
+    def Check(t):
+        return {'L': tuple(GripL(t))} if t >= .34 else {}
+    spec = {'pose': Pose, 'check': Check, 'props': props, 'plants': [('R', COLLAR_LEAD, COLLAR_T), ('L', COLLAR_LEAD, COLLAR_T)],
+            'look': lambda t: Body(t)['look'],
+            'reviewProps': lambda t: review(t) + [('point', tuple(GripL(t)), None, .03)]
+            + PartnerGhost(T, stage, 'ijaA', 'comrade', (t - COLLAR_LEAD) % COLLAR_LOOP),
+            'reviewFrames': lambda n: [0, 6, int(n * .3), int(n * .45), int(n * .7)]}
+    return SlashReview(T, stage, SlashGroundSpec(T, stage, AReview(spec)))
+
+
+Meta('IjaCollarQuestion', COLLAR_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
+     stage='collarQuestion', weaponState='slungBack', holdLoop=list(COLLAR_HOLD),
+     holdExit='pose.holdUntil: the loop lets go at that clip time and plays on to the end (the director just switches to IjaHairGrabPull)',
+     contacts=[{'t': COLLAR_LEAD, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'collarFront', 'standoffM': .03}],
+     prev=['IjaShoveToWall'], next=['IjaHairGrabPull'],
+     notes="2026-09-30 (the questioning, replaces the legacy CollarControl there): at arm's length at the comrade's left front on "
+           "the bank, rifle slung across the back, bent over him with the left fist closed in his front collar, the face on "
+           "his face; the right fist in front of his chest jabs at him twice a loop (hold-loop seconds 0.55-0.95, 1.75-2.15), "
+           "shaking the collar. 0-0.5 s lead-in from IjaShoveToWall's stoop, 0.5-3.5 s seamless hold loop.")
+
+
 # The pull cut (2026-09-29, user: 「割喉的日军动作还有点问题，比如割喉的时候的手部动作……帮我做的更写实更物理一些」).
 # The old stroke cocked the reversed blade away from the throat and swept it out across the front of the neck toward the
 # eye: the arm ran out of reach (the fist 20 cm off its path at 0.33 s), the open hand dragged over the dying man's jaw

@@ -48,6 +48,15 @@
 
 新动作与重做的割喉链在 `_import/Script_OpeningStoryboardClips.py`，只烘 IJA02 / NRA02（manifest `20260928OpeningStoryboardsV14PinnedRescue`；烘焙 spec 新增 `sink`：贴近时骨盆下沉量，割喉链为 0，免得日兵甲被拽进川军身体里；站位新增 `yM`：两人脚下的高差）：`IjaTauntWalk`、`IjaFoundLook`、`IjaCrouchHairHold`、`IjaSlapForehand`、`IjaSlapBackhand`、`IjaSlapRaise`、`HeLiftTimber`，割喉链 `IjaHairGrabPull` / `IjaDrawBayonet` / `IjaThroatSlash` 与 `CaptiveHeadPulledBack` / `CaptiveThroatCut` / `CaptiveClutchThroat` / `CaptiveWallSlideTwitch` 按新站位重做。导演在某条动作还没烘进 manifest 时用最接近的旧动作顶替（`OpeningClipMeta(name)` 为空）。`IjaWipeSheathBayonet` 停用（`retired`）；翻越/倒拖三条仍在库里但不再播放。已知小账：何有田的抬木保持循环只有 1.0–1.5 s、松手最多比木头落下晚 0.5 s；耳光 2026-09-29 重做（manifest `20260929OpeningStoryboardsV18SlapWindup`，只烘 IJA02 两条耳光，可编辑工程在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningSlapWindup_20260929`）：长 1.5 s，0–0.30 s 手举到肩上 1.1 m、0.42 s 前停住蓄力，0.58 s 打中（实际 0.583，清单写 0.58），1.3 s 回到抓发姿势；反手也重烘了（举在左肩前上方，原先举到左耳后够不着、把揪头发的左手扯脱 8 cm），导演现在不用它；`IjaTauntWalk` 是从右肩回头（川军在他右后方）。割喉后的揪发保持里日兵甲胯部只前探 0.5 cm（前探 3 cm 时胸口顶到川军的头，2.9–3.2 cm 穿插）。可编辑工程在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningPinnedRescue_20260927`。
 
+### 6.2 审问时的揪领动作（2026-09-30）
+
+用户原话：「日军的动作有问题 修（BlenderMCP）」（截图：第一人称看 CaptiveInterrogation 那一拍，日兵甲直挺挺站着，双手叠在胸前，步枪枪口顶在川军胸口）。manifest `20260930OpeningStoryboardsV21CollarQuestion`，可编辑工程与伙伴轨在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningCollarQuestion_20260930`。
+
+- 改前的问题（实拍核对）：审问一拍（CaptiveWall 起、Interrogation 全程）导演放的是 09-22 的旧 `CollarControl`：站姿参数化动作，步枪一直在右手里（`oneHandRight`）枪口顶进川军胸口，左手张开悬在半空、离领口一掌远——站位 (−0.40, −0.45) 离领口 0.86 m，臂长才 0.45 m，根本够不着；脚踩平地，躯干几乎直立；接着 Slash 里步枪又跳回背上（IjaShoveToWall / IjaHairGrabPull 都是 `slungBack`）。
+- 新 `IjaCollarQuestion`（IJA02，stage `collarQuestion`：川军 `CaptiveKneelMud` + 日兵甲）：站位改到臂长之内 `interrogation.ijaAHold` (−0.26, −0.17, −150°)（与割喉站位 (−0.23, −0.175) 只差几厘米，Slash 那一步几乎不用挪）；步枪一直背着（`slungBack`，前后动作一致，不再手→背跳变）；髋部后退、上身前倾 0.7 rad 压在川军上方（腿站直，膝盖不顶到他的大腿——曾经膝盖下沉、左膝进他髋部 15 cm），左拳攥紧他的前领口（`collarFront`，拳到领口 ≤ 3 cm，`WithFist` 握拳，指尖合拢），脸对着他的脸；右拳举在胸前，随喊问的节拍向他戳两下（保持循环第 0.55–0.95 s、1.75–2.15 s），同时把领口摇一摇。
+- 时长 3.5 s：0–0.5 s 从推墙后的姿势进入，0.5–3.5 s 是保持循环（`holdLoop`，接缝 0，与 `CaptiveKneelMud` 的 3.0 s 呼吸同步，拳跟着领口起伏）。导演的 `QuestionClip()` 在 CaptiveWall（推完后走到站位）和 Interrogation 都用它；没烘进 manifest 时退回旧 `CollarControl`。
+- 人与人不穿插（`Script_OpeningClipsBrowserTest`）：大腿对大腿 7.0 cm（限 8）、躯干/头 0.0 cm；SB03 判据（ijaA 头 x、川军距离等）全过。
+
 ### 6.1 割喉拉割与收刀（2026-09-29）
 
 用户原话：「割喉的日军动作还有点问题，比如割喉的时候的手部动作，朝着玩家走过来的时候没有收起来的小刀等，帮我做的更写实更物理一些，BlenderMCP」。manifest `20260929OpeningStoryboardsV19PullCutSheathe`，可编辑工程与伙伴轨在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningThroatCutSheathe_20260929`。

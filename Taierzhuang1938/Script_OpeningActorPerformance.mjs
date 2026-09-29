@@ -25,7 +25,7 @@ const ContactClips=new Set(["LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle"
   // eye inside the clip), He heaving the roof timber (hands on it).
   "IjaTauntWalk","IjaFoundLook","IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","HeLiftTimber",
   // 2026-09-29: the release and the sheathe after the throat cut (hands on the hair, the knife and the scabbard)
-  "IjaReleaseSheathe",
+  "IjaReleaseSheathe","IjaCollarQuestion",
   // hands on the post, the rifle or held out to Shunzi, faces aimed inside the clip: no dialogue gestures or the
   // Banter/Orders MessengerReport substitution on top (the runner and Yaowa talk in those phases)
   "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad",

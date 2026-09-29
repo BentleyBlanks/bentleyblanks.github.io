@@ -433,6 +433,22 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   assert.ok(sheathe&&sheathe.props.includes("bayonet")&&sheathe.prev.includes("IjaThroatSlash")&&sheathe.next.includes("IjaTauntWalk")
     &&sheathe.contacts.some(c=>c.action==="sheathe")&&sheathe.contacts.some(c=>c.limb==="handL"&&c.action==="release"),
     "IjaReleaseSheathe: lets go of the hair, sheathes the bayonet, then the walk");
+  // 2026-09-30 (「日军的动作有问题」): the questioning is IjaCollarQuestion, not the legacy CollarControl (the rifle in his
+  // hand, the fist a hand's breadth off a collar 0.86 m from the mark): at the director's mark (ijaAHold = the stage row),
+  // the left fist on the comrade's front collar within 3 cm, the rifle slung as before and after, a hold loop to the end.
+  {
+    const q=manifest.clips.IjaCollarQuestion,row=manifest.stages.collarQuestion.actors.ijaA,mark=C.interrogation.ijaAHold;
+    assert.ok(q&&q.weaponState==="slungBack"&&q.props.includes("weapon")&&q.prev.includes("IjaShoveToWall")&&q.next.includes("IjaHairGrabPull")
+      &&q.contacts.some(c=>c.limb==="handL"&&c.part==="collarFront"&&c.action==="hold")&&q.holdLoop&&q.holdLoop[1]===q.duration&&!q.loop,
+      "IjaCollarQuestion: the left fist in the front collar, the rifle slung, a hold loop to the end");
+    for(const v of [q.duration,...q.holdLoop])assert.ok(Math.abs(v*manifest.fps-Math.round(v*manifest.fps))<1e-6,`IjaCollarQuestion: ${v} s is whole frames`);
+    assert.deepEqual([row.x,row.z,row.yawDeg],[...mark],"IjaCollarQuestion: baked at the director's ijaAHold mark");
+    assert.ok(row.yM<0&&row.yM>-.3,`IjaCollarQuestion: ijaA's root ground under the kneel spot (${row.yM})`);
+    const r=reportOf("TengxianIja02","IjaCollarQuestion");
+    assert.ok(r.contactErrorM<=.03&&r.gripSolveErrorM<=.03&&r.footSlideM<=.02&&Math.abs(r.floorCorrectionMin)<=.04&&Math.abs(r.floorCorrectionMax)<=.04,
+      `IjaCollarQuestion: fist ${r.contactErrorM} m off the collar, foot slide ${r.footSlideM}, lift ${r.floorCorrectionMin}..${r.floorCorrectionMax}`);
+    assert.ok(ijaA.clips.IjaCollarQuestion.props?.weapon,"IjaCollarQuestion: a weapon track (the rifle rides his back)");
+  }
   // the tauntHoldS release lands on IjaThroatSlash's hold-loop start (the cut + tauntHoldS)
   {
     const cut=manifest.clips.IjaThroatSlash.contacts.find(c=>c.action==="cut").t;

@@ -1161,6 +1161,8 @@ export class FirstLevelBunkerShow {
   RetireDepthIja(id=null){
     for(const m of OPENING_DEPTH_IJA.members)if(id==null||m.id===id){this.flags["retired:"+m.id]=true;this.RetireWalker(m.id);}
   }
+  /** His collar hold through the questioning: the authored one (2026-09-30), the legacy CollarControl while it is not baked. */
+  QuestionClip(){return OpeningClipMeta("IjaCollarQuestion")?"IjaCollarQuestion":"CollarControl";}
   PhaseCaptiveWall(age){
     const r=this.r,comrade=this.Comrade,ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB"),interp=this.cast.interpreter,m=this.InterrogationMarks();
     if(!this.phaseEntered){this.phaseEntered=true;this.Put(comrade,m.wall);this.Put(ijaA,m.ijaA);this.PlayClip(comrade,"CaptiveWallBrace",{restart:true});this.PlayClip(ijaA,"IjaShoveToWall",{restart:true});
@@ -1168,7 +1170,7 @@ export class FirstLevelBunkerShow {
       SetRelaxedGait(ijaB,null);}
     this.VanguardFront(this.flags.vanguardAt);
     if(age<2)this.Pose(comrade,"CaptiveWallBrace");else this.Pose(comrade,"CaptiveKneelMud");
-    if(age<1)this.Pose(ijaA,"IjaShoveToWall");else this.Hold(ijaA,m.ijaAHold,"CollarControl");
+    if(age<1)this.Pose(ijaA,"IjaShoveToWall");else this.Hold(ijaA,m.ijaAHold,this.QuestionClip());
     this.Hold(ijaB,m.ijaB,age<1.1?"IjaReadyRifle":null,{speed:C.speed.walk,seconds:age<1.1?age:undefined});
     const interpIn=this.InterpreterIn(m);
     if(age>=2&&(this.SceneDone("CaptiveDragged")&&(interpIn||age>C.timeouts.walkInS)||age>this.SceneLength("CaptiveDragged")+C.timeouts.walkInS))this.Stage("Interrogation");
@@ -1182,7 +1184,7 @@ export class FirstLevelBunkerShow {
     }
     this.VanguardFront(this.flags.vanguardAt);
     this.Pose(comrade,"CaptiveKneelMud");
-    this.Hold(ijaA,m.ijaAHold,"CollarControl");
+    this.Hold(ijaA,m.ijaAHold,this.QuestionClip());
     this.Hold(ijaB,m.ijaB,null);
     this.InterpreterIn(m);
     if(this.SceneDone("CaptiveInterrogation")||age>this.interrogationLength+C.timeouts.interrogationExtraS)this.Stage("Slash");

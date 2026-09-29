@@ -14,7 +14,7 @@ const CAPTIVES_REUSED = ["IjaBayonetGuard","CaptiveStandToKneel","CaptiveHandsUp
   "IjaKickPrisoner","IjaShoveForward","IjaTauntGesture","CaptiveKneelFlinch","CaptiveShovedStumble"];
 // Stationary clips a man may be asked to play while the director walks him a few steps: his legs are the
 // native gait's while he travels (the clip's standing legs would glide along the ground).
-const TRAVEL_LEGS_CLIPS = ["CollarControl","CollarDrag","MessengerReport","CreepDadao","RifleDeflect","IjaBayonetGuard","IjaReadyRifle"];
+const TRAVEL_LEGS_CLIPS = ["CollarControl","CollarDrag","MessengerReport","CreepDadao","RifleDeflect","IjaBayonetGuard","IjaReadyRifle","IjaCollarQuestion"];
 const LegBone = bone => /Thigh|Calf|Foot|Toe/.test(bone.name);
 const Quat = new Quaternion(), QuatRef = new Quaternion(), QuatAdd = new Quaternion();
 const SlungLocal = new Matrix4(), SlungScale = new Vector3();

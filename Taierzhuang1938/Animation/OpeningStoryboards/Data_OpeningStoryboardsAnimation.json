@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260929OpeningStoryboardsV20PullCutSheathe",
+ "version": "20260930OpeningStoryboardsV21CollarQuestion",
  "fps": 24,
  "actorForward": [
   0,
@@ -1298,6 +1298,44 @@
    "notes": "Pulls the rifle off the back over the right shoulder, left hand catches the handguard, right hand slides to the wrist of the stock; ends at low ready (native two-hand mount matches).",
    "rigs": [
     "TengxianIja01",
+    "TengxianIja02"
+   ]
+  },
+  "IjaCollarQuestion": {
+   "duration": 3.5,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "TengxianIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "stage": "collarQuestion",
+   "weaponState": "slungBack",
+   "holdLoop": [
+    0.5,
+    3.5
+   ],
+   "holdExit": "pose.holdUntil: the loop lets go at that clip time and plays on to the end (the director just switches to IjaHairGrabPull)",
+   "contacts": [
+    {
+     "t": 0.5,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "comrade",
+     "part": "collarFront",
+     "standoffM": 0.03
+    }
+   ],
+   "prev": [
+    "IjaShoveToWall"
+   ],
+   "next": [
+    "IjaHairGrabPull"
+   ],
+   "notes": "2026-09-30 (the questioning, replaces the legacy CollarControl there): at arm's length at the comrade's left front on the bank, rifle slung across the back, bent over him with the left fist closed in his front collar, the face on his face; the right fist in front of his chest jabs at him twice a loop (hold-loop seconds 0.55-0.95, 1.75-2.15), shaking the collar. 0-0.5 s lead-in from IjaShoveToWall's stoop, 0.5-3.5 s seamless hold loop.",
+   "rigs": [
     "TengxianIja02"
    ]
   },
@@ -3396,6 +3434,27 @@
      "yawDeg": 165,
      "rig": "TengxianIja02",
      "clip": "IjaWipeSheathBayonet"
+    }
+   }
+  },
+  "collarQuestion": {
+   "anchor": "comrade",
+   "notes": "CaptiveKneelMud (3.0 s loop) and IjaCollarQuestion's hold loop run together (ijaA's clip time - 0.5 s). ijaA at interrogation.ijaAHold: the comrade's left front at arm's length, on the bank (yM: his root's ground under R3's).",
+   "actors": {
+    "comrade": {
+     "rig": "TengxianNra02",
+     "clip": "CaptiveKneelMud",
+     "x": 0.0,
+     "z": 0.0,
+     "yawDeg": 0
+    },
+    "ijaA": {
+     "x": -0.26,
+     "z": -0.17,
+     "yawDeg": -150,
+     "yM": -0.1153,
+     "rig": "TengxianIja02",
+     "clip": "IjaCollarQuestion"
     }
    }
   },
@@ -7765,7 +7824,7 @@
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "e023b408aaf198951629e5375cba9b8bfb3c272a8d1656ef0cdbf579337e32ca",
+   "sha256": "d7cc857a141398a6f86f860f5738c0626d91e879a18718f7c451232c83866f16",
    "originalModelSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningThroatCutSheathe_20260929\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
@@ -8927,6 +8986,49 @@
      "kneeSlideM": 0
     },
     {
+     "clip": "IjaCollarQuestion",
+     "frames": 85,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0,
+     "pelvisMaxStepM": 0.0491,
+     "floorCorrectionMin": 0.0211,
+     "floorCorrectionMax": 0.02362,
+     "root": {
+      "start": [
+       0.0365,
+       0.0913,
+       0.0,
+       0.825
+      ],
+      "end": [
+       0.0332,
+       0.0001,
+       0.0,
+       0.7421
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0.5,
+       3.5
+      ],
+      [
+       "L",
+       0.5,
+       3.5
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 4.08,
+     "headTurnDeg": 26.94
+    },
+    {
      "clip": "IjaCornerFire",
      "frames": 64,
      "footSlideM": 0,
@@ -10035,6 +10137,7 @@
     "IjaReleaseSheathe",
     "IjaWipeSheathBayonet",
     "IjaReadyRifle",
+    "IjaCollarQuestion",
     "IjaCornerFire",
     "IjaJunctionPeek",
     "IjaSlingRifle",

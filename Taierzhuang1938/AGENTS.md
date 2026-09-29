@@ -38,7 +38,7 @@
 
 - **02 拖出与递枪、站姿还权（2026-09-29 改稿，覆盖下一条第 5 节的拖出与之后的 Check / KickRifle / 捡枪）**：[拖出与递枪](docs/Data_OpeningRescueHandover20260929.md)。罗班长先捡起泥里的枪背上（`LuoPickUpRifleSling`），把顺子翻成仰面、从头后架腋倒拖出来（`LuoRescueDrag`），第一人称镜头骑在 clip 的 `player` 轨上（`eye`/`gaze`/`crown` 定位置、朝向与横滚：仰头看倒着的班长，再顺着自己身体看脚从塌顶木下出来），腿和上衣按轨迹摆、脖子钉在眼下后方；然后顺子跪起、班长横端着枪递到手里（「还能打不？」）并把他拽起来站直（`LuoHandRifle`），还权即站姿、枪在手里、记 `rifleRecovered`（过场事实，`MissionRifle` 交互删了）。phase：BunkerRescue Hold→Ask→Charge→Melee→Lift→Check→Released。三条 clip 只在 TengxianNra05，未烘时导演按 `rescue.drag.standIn` / `rescue.hand.standIn` 顶着跑。
 
-- **01–02 压在塌木下原地审问、反冲锋白刃战（2026-09-27 改稿，覆盖下面两条的 Slash 以后部分）**：[改稿口径](docs/Data_OpeningPinnedRescue20260927.md)。顺子趴在洞口塌顶木下、半身在外，全程第一人称（独立机位已删）；割喉改成从川军左肩揪发、正握拉割（2026-09-29，§6.1）、割中即嘲弄、松手后原地收刀再走，日兵甲边骂边走发现顺子，原地审问扇两记耳光（被扇那半边屏幕发晕：`uSideDaze`），第三下抬手时枪炮与四川话喊杀四起，罗班长带一帮人冲下弹坑台阶白刃战，何有田掀木、罗班长把人拖出来，再接「还能打不？」→踢枪→还权。phase：Trapped …Slash→Taunt→Found；BunkerRescue Hold→Ask→Charge→Melee→Lift→Check→KickRifle→Released。
+- **01–02 压在塌木下原地审问、反冲锋白刃战（2026-09-27 改稿，覆盖下面两条的 Slash 以后部分）**：[改稿口径](docs/Data_OpeningPinnedRescue20260927.md)。顺子趴在洞口塌顶木下、半身在外，全程第一人称（独立机位已删）；割喉改成从川军左肩揪发、正握拉割（2026-09-29，§6.1）、割中即嘲弄、松手后原地收刀再走，日兵甲边骂边走发现顺子，原地审问扇两记耳光（被扇那半边屏幕发晕：`uSideDaze`），第三下抬手时枪炮与四川话喊杀四起，罗班长带一帮人冲下弹坑台阶白刃战，何有田掀木、罗班长把人拖出来，再接「还能打不？」→踢枪→还权。phase：Trapped …Slash→Taunt→Found；BunkerRescue Hold→Ask→Charge→Melee→Lift→Check→KickRifle→Released。；审问那一拍的日兵甲（揪领、背枪、前倾）用 `IjaCollarQuestion`，标记 `interrogation.ijaAHold`（2026-09-30，见改稿口径 §6.2）
 
 - **01 洞口过场 2026-09-26 现场修订**（CaptiveDragged 起的独立机位已由上一条取消）：[渐显、翻译避让、踹国军旗与独立摄影机](docs/Data_OpeningCinematic20260926.md)。CaptiveDragged→Wipe 使用独立机位，Reach 回到第一人称；这段覆盖旧 SB03 倒地旁观镜头与人物旧站位。同文第二轮：日军走动背枪、翻译空手走/小跑（`Script_RelaxedGait` + `Animation/RelaxedGait`，门禁 `Script_RelaxedGaitTest`），日兵乙发现伤兵后喊翻译（`InterpreterCall`）。
 
