@@ -266,10 +266,14 @@ export function MasterSceneWav(raw, wav, { targetDb, padS = 0.08, ceilingDb = -1
   return { trimStartS: +start.toFixed(3), gainDb: +gainDb.toFixed(2), seconds: +length.toFixed(3), rawMeasure: before };
 }
 
-/** 从 wav 的 [startS, endS] 编一段 mp3（两端各 fadeS 淡入淡出；整段就传 0 与全长）。 */
-export function EncodeSegment(wav, output, { startS = 0, endS = null, fadeS = 0.01, bitrate = "96k" } = {}) {
+/**
+ * 从 wav 的 [startS, endS] 编一段 mp3（两端各 fadeS 淡入淡出；整段就传 0 与全长）。
+ * tempo > 1：切出来再不变调压快（atempo），给导演表写了 tempo 的句子用（片段时长 = 区间 / tempo）。
+ */
+export function EncodeSegment(wav, output, { startS = 0, endS = null, fadeS = 0.01, bitrate = "96k", tempo = 1 } = {}) {
   const parts = [];
   if (startS > 0 || endS != null) parts.push(`atrim=start=${startS.toFixed(4)}${endS != null ? `:end=${endS.toFixed(4)}` : ""}`, "asetpts=PTS-STARTPTS");
+  if (tempo !== 1) parts.push(`atempo=${tempo.toFixed(4)}`);
   if (fadeS > 0) parts.push(`afade=t=in:d=${fadeS}`, "areverse", `afade=t=in:d=${fadeS}`, "areverse");
   const temp = output + ".tmp.mp3";
   const args = ["-y", "-v", "error", "-i", wav, "-map_metadata", "-1", ...(parts.length ? ["-af", parts.join(",")] : []),

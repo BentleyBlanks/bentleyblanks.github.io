@@ -1131,7 +1131,9 @@ export function CampaignActions(ctx) {
         query = g.Debug.Interact();
       const interaction=g.interact.Query(g.player);
       if(interaction?.point?.tag==="FirstLevelMission"){
-        g.StepFrames(1,1/60,true);
+        // 情境提示每 6 帧才重算一次（Script_Main UpdateContextualActionPrompts）：只推 1 帧时过不过全看帧号相位，
+        // 前面台词长短一变就翻红（2026-09-29 翻译提速那轮）。推满一个刷新周期再判。
+        for(let i=0;i<6&&!g.hud.actionPrompts.some(p=>p.label===interaction.label);i++)g.StepFrames(1,1/60,true);
         const prompt=g.hud.actionPrompts.find(p=>p.label===interaction.label);
         if(!prompt||!document.querySelector(".actionText")?.textContent)throw Error("mission interaction needs a visible action label");
       }

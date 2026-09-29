@@ -295,6 +295,25 @@
       "transcript": "三星那边,简体中文怎么砸锅?",
       "cer": 0.75,
       "note": "山西→三星/陕西（同音异调）、见弟兄们→简体中文（whisper 臆写；另两次解码都是「见弟兄们」）、这么炸过→怎么砸锅；字数语序一致。"
+    },
+    "CaptiveInterrogation.01": {
+      "sha256": "adf0a3e5cb472dab5ddefb6e0b842cc5c03928a755882474ebe47954f1c57348",
+      "transcript": "舞台はどこへ引いた? 引け!",
+      "cer": 0.3636,
+      "note": "2026-09-29 翻译提速+川军重伤腔合并重录，这句单句补录（整段里像翻译的嗓子）：部隊→舞台、退いた→引いた 同音异写，聞け→引け k/h 近音；字数对得上，语序一致。"
+    },
+    "CaptiveInterrogation.02": {
+      "sha256": "d265eccaed2ddce68ca901a3c514f537d61accc06f7ec101db1b4b5b891cfbac",
+      "transcript": "は、はい!",
+      "cer": 0.5,
+      "note": "2026-09-29 合并重录：「はい！」念成「は、はい」——导演表写的又怕又巴结，吓得打了个磕巴；不是念错别的词。",
+      "needsListening": true
+    },
+    "CaptiveInterrogation.04": {
+      "sha256": "4788418649d37a3335ee0f39be3e99e0a435aba13bfa371681499afaabb5a723",
+      "transcript": "傻子?",
+      "cer": 0.5,
+      "note": "2026-09-29 合并重录：「……啥子？」重伤腔嘶哑，whisper 写成近音「傻子」（sha/sa 平翘舌）；两个字对两个字，不是念错。"
     }
   }
 }

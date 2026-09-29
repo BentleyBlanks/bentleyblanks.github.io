@@ -129,12 +129,14 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["comrade", "日你……先人……"],
     ["ijaC", "右边！开火！", JA],
   ]),
+  // 2026-09-29 用户追加（不在 Notion 原稿里）：「完全也听不出威胁感，或者可以饶他一命的这种好处诱惑」。
+  // 翻译的中文逼问各补半句：先拿「饶你一命」利诱，再拿死来威胁；原稿的问句一字不动留在句首。
   PerLine("CaptiveInterrogation", [
     ["ijaA", "他们的部队往哪儿撤了！问他！", JA],
     ["interpreter", "是！", JA],
-    ["interpreter", "你们的人往哪儿撤了？"],
+    ["interpreter", "你们的人往哪儿撤了？说了，太君饶你一条狗命！"],
     ["comrade", "……啥子？"],
-    ["interpreter", "你们大队！往哪儿撤了！"],
+    ["interpreter", "你们大队！往哪儿撤了！不说，今天就叫你死在这沟里！"],
     ["ijaB", "你这支那混蛋！快说！", JA],
     ["comrade", "滚……二鬼子。"],
     ["ijaA", "他说什么！", JA],
@@ -149,11 +151,12 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["ijaC", "往前！快！", JA],
   ]),
   PerLine("ShunziFound", [["ijaA", "还藏着一个，支那混蛋。", JA]]),
+  // 03/04 同上（2026-09-29 用户追加利诱与威胁；「刚才那个」是顺子眼看着被割喉的川军）。
   PerLine("RescueInterrogation", [
     ["ijaA", "这个也问！", JA],
     ["interpreter", "是！", JA],
-    ["interpreter", "醒醒！你们的人往哪儿撤了？"],
-    ["interpreter", "听见没有？你们长官在哪儿？"],
+    ["interpreter", "醒醒！你们的人往哪儿撤了？说了，太君饶你不死，还赏你口饭吃！"],
+    ["interpreter", "听见没有？你们长官在哪儿？不说？刚才那个就是你的下场！"],
     ["ijaB", "快点！", JA],
     ["interpreter", "说话！"],
   ]),

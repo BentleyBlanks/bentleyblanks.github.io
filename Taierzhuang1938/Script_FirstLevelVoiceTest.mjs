@@ -12,6 +12,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
+import os from "node:os";
+import path from "node:path";
 import {
   MISSION_DIALOGUE, MISSION_VOICE_CAST, MissionVoicePrompt, MissionVoiceSpoken,
   MissionVoiceSubtitle, MissionVoiceScriptJson, MissionVoiceSoundscape, MissionLineId, MissionLineFile,
@@ -295,6 +297,7 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
       assert.ok(PROJECTION_DB[d.projection] != null, line.id + " projection 合法");
       assert.ok(d.intensity >= 0 && d.intensity <= 1, line.id + " intensity 0–1");
       assert.ok(["self", "head", "offscreen"].includes(d.spatial), line.id + " spatial 合法");
+      assert.ok(d.tempo == null || (d.tempo > 1 && d.tempo <= 1.35), line.id + " tempo 缺省不压快，写了就在 1–1.35（不变调压快，压过头会发虚）");
       if (line.who === "shunzi") assert.equal(d.spatial, "self", line.id + " 顺子是第一人称");
       if (index === 0) assert.ok(d.after !== "prev", line.id + " 第一句不能等上一句");
     });
@@ -626,11 +629,32 @@ const FakeAudio = () => {
 }
 
 if (process.argv.includes("--audio")) {
-  const { MeasureVoice, TruePeakDb, FrameRms, DecodePcm } = await import("./Script_SeedAudioVoiceKit.mjs");
+  const { MeasureVoice, TruePeakDb, FrameRms, DecodePcm, EncodeSegment } = await import("./Script_SeedAudioVoiceKit.mjs");
   const { ScenePrompt, SceneReferences, SCENE_CHECK } = await import("./Script_SeedAudioFirstLevelBake.mjs");
   const Local = (url) => decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, "$1");
   // 片段与整段同一段的波形相关（±20 ms 找对齐）与电平差。
-  const CompareToScene = (slice, scene, startS, endS) => {
+  // 压快过的句子（清单 tempo）：拿整段那一段照样压快再比 10 ms 能量包络——atempo 的拼接点随输入的细微差别
+  // （切句时压的是母带 wav，这里只有装上的 mp3）挪位，波形相关只剩 0.92 左右；包络相关同一段 ≥ 0.99、别的录音 < 0.75。
+  const CompareToScene = (slice, scene, startS, endS, tempo = 1) => {
+    if (tempo !== 1) {
+      const ref = EncodeSegment(scene, path.join(os.tmpdir(), `tempo-ref-${process.pid}-${path.basename(slice)}`), { startS, endS, fadeS: 0, tempo });
+      try {
+        const Env = (pcm, hop = 160) => Float32Array.from({ length: Math.floor(pcm.length / hop) }, (_, f) => {
+          let e = 0;
+          for (let i = f * hop; i < (f + 1) * hop; i++) e += pcm[i] * pcm[i];
+          return Math.sqrt(e / hop);
+        });
+        const a = Env(DecodePcm(slice)), b = Env(DecodePcm(ref)), n = Math.min(a.length, b.length);
+        let best = -1, bestLevel = 0;
+        for (let lag = -5; lag <= 5; lag++) {
+          let xy = 0, xx = 0, yy = 0;
+          for (let i = 3; i < n - 3; i++) { const x = a[i], y = b[i + lag] || 0; xy += x * y; xx += x * x; yy += y * y; }
+          const c = xy / Math.sqrt(xx * yy + 1e-12);
+          if (c > best) { best = c; bestLevel = 10 * Math.log10((xx + 1e-12) / (yy + 1e-12)); }
+        }
+        return { correlation: +best.toFixed(3), levelDb: +bestLevel.toFixed(2) };
+      } finally { fs.rmSync(ref, { force: true }); }
+    }
     const sr = 16000, a = DecodePcm(slice, sr), whole = DecodePcm(scene, sr);
     const s0 = Math.round(startS * sr), n = Math.min(a.length, Math.round((endS - startS) * sr));
     let best = -1, bestLevel = 0;
@@ -725,7 +749,8 @@ if (process.argv.includes("--audio")) {
           assert.equal(entry.source, "scene", line.id + " 来源");
           assert.equal(entry.metrics.sceneGainDb, scene.gainDb, line.id + " 电平是整段一次母带的结果（片段不单独归一）");
           // 片段就是整段里那一段：同一段解码出来波形相关 ≥ 0.98、电平差 ≤ 0.5 dB。
-          const same = CompareToScene(file, scenePath, entry.sceneStartS, entry.sceneEndS);
+          assert.equal(entry.tempo ?? 1, LineDirection(cue, index).tempo ?? 1, line.id + " 片段压快的倍率与导演表一致");
+          const same = CompareToScene(file, scenePath, entry.sceneStartS, entry.sceneEndS, entry.tempo ?? 1);
           assert.ok(same.correlation >= 0.98 && Math.abs(same.levelDb) <= 0.5, `${line.id} 片段与整段 ${entry.sceneStartS}–${entry.sceneEndS} s 对不上（相关 ${same.correlation}、电平差 ${same.levelDb} dB）`);
         }
         // 嗓子：够长的片段与本场挂了参考音的其他人比，不许明显更像别人。

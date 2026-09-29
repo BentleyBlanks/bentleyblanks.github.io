@@ -59,7 +59,7 @@
 
 **默认沿用整段录音里的原始间隔**（清单 `gapBeforeS`：模型一次演出来的轮替节奏，全量中位数 0.34 s），导演表只覆盖稿里要等动作、被打断、压尾音的 8 句：`BunkerSearch.02`（−0.3 s 丁压丙的尾音）、`CaptiveInterrogation.06`（−0.25 s 日兵乙压着翻译骂进来）、`BorrowLight.06/07`（借火两处动作空当 2 s / 3 s，沿用事件 `BorrowLightMatchesPocketed` / `BorrowLightCigaretteOffered`）、`RescueInterrogation.06` `FrontApproach.02` `BundleProne.02` `BundleAttack.02`（`gate`：等导演）；另有首句的 `event:ThroatCut`（割喉后才嘲弄）与 `BunkerIncoming.01` 的 `cutAtS` + `cutEvent`（句尾前 0.35 s 被爆炸截断、发 `BunkerBlast`）。
 
-每句字段：`{ after: "prev"|"start"|"event:<名>"|"gate", offsetS（缺省 null = 录音间隔）, projection, intensity, spatial: "self"|"head"|"offscreen", cutAtS?, cutEvent?, stopOn?, emit?, context?, delivery?, effort?, pauseBeforeS? }`；`context/delivery/effort/pauseBeforeS/projection/intensity` 只进整段提示词。`PlaybackOffset(direction, gapBeforeS)` 给出播放间隔（没录音时兜底 0.3 s）。
+每句字段：`{ after: "prev"|"start"|"event:<名>"|"gate", offsetS（缺省 null = 录音间隔）, projection, intensity, spatial: "self"|"head"|"offscreen", cutAtS?, cutEvent?, stopOn?, emit?, context?, delivery?, effort?, pauseBeforeS?, tempo? }`；`context/delivery/effort/pauseBeforeS/projection/intensity` 只进整段提示词；`tempo` 只管切句时把这一片不变调压快（§0.12）。`PlaybackOffset(direction, gapBeforeS)` 给出播放间隔（没录音时兜底 0.3 s）。
 
 ### 0.5 运行时（`Script_DialoguePlayer.mjs` + `Script_FirstLevelMissionVoice`）
 
@@ -118,6 +118,19 @@
 - **导演表**：场景级新字段 `voices: { comrade: "comradeWounded" }`（`Script_SeedAudioFirstLevelBake.SceneVoice`：这一场这个人用哪条参考音、哪份人设；判嗓子、补录也按它）；两场的场景说明写明他刚被炮弹炸伤、满脸满嘴是血、喘、嗓子被硝烟呛哑，但对日兵和汉奸只有愤怒、厌恶、仇恨；他的 6 句每句先写身体（倒抽气、痛哼、带血沫的喘）再写恨。`CaptiveInterrogation.04`「……啥子？」改 low（故意装没听清、冷冷挤出来的鄙夷），其余喊。
 - **生成**：`CaptiveDragged` 2 次整段，#1 #2 都是逐字时间把日兵甲的「たて」挤进 0.12 s、切句把「立」切进上一句（原检查全放过：片段太短不判）。两处修在切句上、不重抽：两个字的句子时长 < 0.2 s 也算「逐字时间不可信」，改按静音与预计时长切；太短不判的片段转写一个字都对不上（字错率 ≥ 1）算「切句错位」硬错误。按静音重切后装 #1（「立て！」字错率 0）。`CaptiveInterrogation` 3 次整段：#2 满场串嗓念错，#1 日兵 3 句串嗓，装 #3（日兵甲 `.01` `.08` 像翻译），补录这两句（各 2 条 take，选 0.74 / 0.73）。川军 4 句离重伤定妆音 0.42–0.82、转写逐字对上（`.11`「小日本。」#1 转成「小子呗」）。另修切句逐字时间的夹取：末字起点落在切点之后时起点也夹进片段（`.09`「す」）。两场共 2 + 2 + 3 + 4 = 11 次请求（含定妆 2 次、补录 4 次）。
 - **需人工试听**：川军的重伤腔与恨意够不够，机器判不了；`CaptiveDragged.01`「狗日的」转成「搞砸了」、`.03`「日你先人」转成「这是你先生」（句前痛哼压低了嗓子向量：本人 0.19，同场日兵甲也只有 0.19，不是串嗓），核对记录标了 `needsListening`。
+
+### 0.12 2026-09-29 翻译逼问提速 1.25 倍以上，加利诱与威胁
+
+- **用户原话**：「翻译的声音音调还可以，但语速太慢了，我们审问起码再快1.25x这样，而且完全也听不出威胁感，或者可以饶他一命的这种好处诱惑」。
+- **慢的根子**：导演表给翻译写的是「拖着长腔逼问」「拖着腔冷笑着威胁」，人设（`Data_FirstLevelVoiceCast.interpreter`）也写了「爱拖长腔」。人设进了 `InterpreterCall` `RescueFlee` 的提示词，不动它；两场审问的 `scene.context` 写明「这场审问里翻译不拖腔，语速很快，像连珠炮」，逐句 delivery 去掉拖腔。
+- **台词**（09.23 稿文档与契约 §5.2 记为用户追加，原稿问句一字不动留在句首，只补后半句）：`CaptiveInterrogation.03`「你们的人往哪儿撤了？说了，太君饶你一条狗命！」、`.05`「你们大队！往哪儿撤了！不说，今天就叫你死在这沟里！」；`RescueInterrogation.03`「醒醒！你们的人往哪儿撤了？说了，太君饶你不死，还赏你口饭吃！」、`.04`「听见没有？你们长官在哪儿？不说？刚才那个就是你的下场！」（「刚才那个」= 顺子眼看着被割喉的川军）。逐句表演：先逼问 → 压低一点假惺惺地许活路 → 翻脸咬牙砸下威胁。`RescueInterrogation.04` 改 shout、句前停顿 1.2 → 0.8 s。
+- **提示词只快到一部分**：按逐字时间戳量「首字开头到末字结尾」（不算句前句后的笑），旧录音四句 4.52 / 3.31 / 4.33 / 4.10 字/秒，新录音 5.28 / 4.28 / 4.55 / 4.96，只到 1.05–1.29 倍。所以导演表新增 `tempo`：切句时把这一片不变调压快（`atempo`，整段录音不动，逐字时间跟着缩，清单 `lines[id].tempo`）。救援两句压 1.24 / 1.08，压完 5.64 / 5.35 字/秒 = 旧录音的 **1.30 / 1.30 倍**；关押审问与 §0.11 川军重伤腔合并后重录，03 本身就到 6.13 字/秒（**1.36 倍**，不压），05 压 1.05 到 4.37 字/秒（**1.32 倍**）。日兵、川军和翻译对日兵说的日语句不压。
+- **门禁跟着改**：压快过的片段拿整段那一段照样压快，比 10 ms 能量包络（同一段 0.995–0.9998；补录片这类别的录音 0.34–0.71），电平差仍 ≤ 0.5 dB；波形相关不适用——切句压的是母带 wav、门禁手里只有装上的 mp3，atempo 的拼接点随之挪位，波形相关只剩 0.92。`tempo` 写了就在 1–1.35，清单与导演表一致。
+- **生成**：`RescueInterrogation` 第一版导演表 2 次生成都把最后一句「说话！」吞进日兵乙踹完的怪笑里，03 句前单独的冷笑把「醒醒」挤进「はい」那一片（同 §0.9 `CaptiveInterrogation` 的教训）；03 的冷笑与 05 的怪笑改进句子里演（`delivery`），新导演表 3 次生成，装 #3（翻译各句离定妆音 0.91–0.92，「说话！」0.72 s 完整），日兵甲 `.01` 三次都像日兵乙（前两轮也是），单句补录 2 条候选，第 1 条峰值太尖、压到 −1 dBTP 以下比原那一片低 1.9 dB，装第 2 条（−18.1 / 原 −17.68 dB）。`CaptiveInterrogation` 先在旧川军定妆音上录过一版（3 次生成 + 1 次补录），rebase 时撞上同日 §0.11 的川军重伤腔重录，作废；按合并后的导演表（川军重伤腔 + 翻译连珠炮）重录 3 次：#2 #3 切句整体错位，装 #1（翻译四句全对：离定妆音 0.69–0.89），日兵甲 `.01` `.08`、日兵乙 `.06` 像别人，且「滚！二鬼」被切进了 `.06`、`.07` 只剩「子」，这四句单句补录；`.07` 重伤嗓的「滚」峰值尖，第 1 条候选比原那一片低 7 dB，加到 3 条装第 3 条（−21.87 / 原 −21.43 dB）。清单记 `RescueInterrogation` 5 次、`CaptiveInterrogation` 9 次请求（作废的导演表版本的生成不计入清单）。
+- **切句与补录顺手修的三处**：逐字时间的开头没夹进片段（两句贴着切时末字开头落在切点之后，`CaptiveInterrogation.02` 的「い」0.43 s > 片段 0.39 s）；同一句第二次补录加候选时，`patch.replacedSha256` 记成了上一条补录的 sha、场景请求数把旧候选又算一遍；补录挑选把电平对不齐整段（差 > 1.5 dB，门禁红线）的候选排到后面。
+- **whisper 的坑**：`RescueInterrogation.03` 未压快的片段带「以下是简体中文的句子。」提示词时 whisper 两次都原样吐回提示词（去掉提示词能转对，但出繁体）；压快后的片段正常转写（字错率 0.08）。以后长句带狞笑又遇到「字错率 1 + 转写是提示词」时，先当评分器幻觉查，别急着重抽。
+- **口型**：新字「叫吃君场太条赏饭饶」补进 `Data_FaceTrackPhonemes`，两场重烘。
+- **需人工试听**：利诱那半句「压低一点、假惺惺」有没有演出来、威胁够不够狠，机器判不了；`CaptiveInterrogation.02`「はい」打了个磕巴（「は、はい」）；四句补录与整段是不同的录音环境，接缝要听。
 
 ## 1. 一句话口径（旧整段格式：07–18 与待下线的 09.21 旧 cue）
 

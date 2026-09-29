@@ -208,7 +208,9 @@ function SceneUpToDate(cue, manifest) {
   const entry = manifest.scenes?.[cue.id];
   return !force && entry && entry.promptHash === Hash(ScenePrompt(cue))
     && entry.castKey === SceneReferences(cue).map((r) => r.sha256).join(",")
-    && fs.existsSync(path.join(out, cue.file)) && cue.lines.every((line) => fs.existsSync(path.join(out, line.file)));
+    && fs.existsSync(path.join(out, cue.file)) && cue.lines.every((line) => fs.existsSync(path.join(out, line.file)))
+    && cue.lines.every((line, i) => manifest.lines?.[line.id]?.source === "patch"
+      || (manifest.lines?.[line.id]?.tempo ?? 1) === (LineDirection(cue, i).tempo ?? 1));
 }
 
 /** 生成一次整段。 */
@@ -270,7 +272,7 @@ function Cut(cue, n) {
     }
     const sceneMp3 = EncodeSegment(wav, path.join(dir, "scene.mp3"), { fadeS: 0 });
     files = slices.map((s, i) => EncodeSegment(wav, path.join(dir, `line_${String(i + 1).padStart(2, "0")}.mp3`),
-      { startS: s.startS, endS: s.endS, fadeS: LINE_MASTER.crossfadeS }));
+      { startS: s.startS, endS: s.endS, fadeS: LINE_MASTER.crossfadeS, tempo: LineDirection(cue, i).tempo ?? 1 }));
     const peaks = [sceneMp3, ...files].map(TruePeakDb);
     const worst = Math.max(...peaks);
     master.measure = { ...measure, truePeakDb: +peaks[0].toFixed(2) };
@@ -283,9 +285,12 @@ function Cut(cue, n) {
   slices.forEach((s, i) => {
     if (s.tightStart || s.tightEnd) flags.push(`${cue.lines[i].id} 与邻句贴着，在能量最低处切（10 ms 淡入淡出）`);
     s.file = files[i];
-    // 起点也要夹进片段：末字的时间戳可能落在切点之后（2026-09-29 CaptiveInterrogation.09 的「す」起点比片段长 0.01 s）。
-    s.chars = mapped[i].chars.map(([c, a, b]) => [c, +Math.min(s.endS - s.startS, Math.max(0, a - master.trimStartS - s.startS)).toFixed(3),
-      +Math.min(s.endS - s.startS, Math.max(0, b - master.trimStartS - s.startS)).toFixed(3)]);
+    // 压快过的句子：逐字时间跟着缩（片段里的秒 = 整段区间里的秒 / tempo）。
+    const tempo = LineDirection(cue, i).tempo ?? 1;
+    if (tempo !== 1) s.tempo = tempo;
+    // 首尾两头都夹进片段：末字的时间戳可能落在切点之后（2026-09-29 CaptiveInterrogation.09 的「す」起点比片段长 0.01 s）。
+    const len = s.endS - s.startS, Clamp = (t) => Math.min(len, Math.max(0, t - master.trimStartS - s.startS)) / tempo;
+    s.chars = mapped[i].chars.map(([c, a, b]) => [c, +Clamp(a).toFixed(3), +Clamp(b).toFixed(3)]);
     s.coverage = mapped[i].coverage;
   });
   return { cue, n, hard, flags, mapped, slices, master, sceneFile: path.join(dir, "scene.mp3") };
@@ -406,7 +411,9 @@ async function BakeScenes(manifest) {
   const results = [];
   for (const cue of pending) for (const n of ValidAttempts(cue)) {
     const judged = ReadJson(path.join(AttemptDir(cue, n), "judge.json"));
-    if (judged && !rescore && fs.existsSync(path.join(AttemptDir(cue, n), "scene.wav"))) {
+    // 导演表的 tempo 改过：切好的片段作废，重切重打分（不用重新生成）。
+    const sameTempo = judged?.lines?.every((s, i) => (s.tempo ?? 1) === (LineDirection(cue, i).tempo ?? 1)) ?? true;
+    if (judged && sameTempo && !rescore && fs.existsSync(path.join(AttemptDir(cue, n), "scene.wav"))) {
       results.push({ cue, n, hard: judged.hard, flags: judged.flags, master: judged.master, cached: true,
         slices: judged.lines?.map((s, i) => ({ ...s, file: path.join(AttemptDir(cue, n), `line_${String(i + 1).padStart(2, "0")}.mp3`) })) || null,
         sceneFile: path.join(AttemptDir(cue, n), "scene.mp3") });
@@ -464,6 +471,7 @@ function Install(cue, best, all, manifestLines, scenes, timings, manifest, picke
       seconds: s.measure.seconds, bytes: fs.statSync(target).size, sha256, source: "scene",
       sceneSha256: sceneSha, sceneStartS: s.startS, sceneEndS: s.endS, gapBeforeS: s.gapBeforeS,
       tight: [!!s.tightStart, !!s.tightEnd], edgeDb: s.edgeDb, cutMethod: best.master.cutMethod || "subtitle",
+      ...(s.tempo ? { tempo: s.tempo } : {}),
       castOwner: own?.owner || CastVoiceOwner(SceneVoice(cue, line.who)), castSha256: own?.sha256 || null, referenced: RefIndex(refs, line.who) >= 0,
       metrics: { activeRmsDb: s.measure.activeRmsDb, truePeakDb: s.measure.truePeakDb, snrDb: s.measure.snrDb,
         voicedS: s.measure.voicedS, lowShare: s.measure.lowShare, f0: s.measure.f0, cer: s.cer, transcript: s.transcript,
@@ -564,7 +572,10 @@ async function PatchLines(manifest) {
         .map((w) => [w, CastReference(SceneVoice(t.cue, w))]).filter(([, r]) => r && r.owner !== own.owner && vectors[r.file])
         .map(([w, r]) => [w, +CenteredCosine(vectors[t.file], vectors[r.file]).toFixed(3)]).sort((a, b) => b[1] - a[1])[0] || null;
       t.cer = texts[t.file]?.cer ?? null; t.transcript = texts[t.file]?.text ?? null;
-      t.score = (t.cer ?? 0.5) * 10 + (1 - t.speakerCos) * 6;
+      // 电平对不齐整段里原来那一片（峰值太尖、压到 −1 dBTP 以下就够不着目标）的排到后面：门禁只容 1.5 dB。
+      const entry = manifest.lines[t.line.id], targetDb = entry.patch?.targetDb ?? entry.metrics.activeRmsDb;
+      t.levelOff = Math.abs(t.master.measure.activeRmsDb - targetDb) > 1.5;
+      t.score = (t.cer ?? 0.5) * 10 + (1 - t.speakerCos) * 6 + (t.levelOff ? 100 : 0);
       return t;
     }).sort((a, b) => a.score - b.score);
     if (!mine.length) continue;
@@ -574,9 +585,11 @@ async function PatchLines(manifest) {
     fs.copyFileSync(best.file, target);
     const sha256 = Sha256(target);
     const m = best.master.measure;
+    // 同一句再补录一次（加候选）时：被替换的仍是整段切出来的那一片，请求数只加这次新发的。
+    const previous = entry.source === "patch" ? entry.patch : null;
     Object.assign(entry, { sha256, seconds: m.seconds, bytes: fs.statSync(target).size, source: "patch",
       patch: { reason: "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
-        replacedSha256: entry.sha256, targetDb: entry.patch?.targetDb ?? entry.metrics.activeRmsDb, takes: mine.length, take: best.n,
+        replacedSha256: previous?.replacedSha256 ?? entry.sha256, targetDb: entry.patch?.targetDb ?? entry.metrics.activeRmsDb, takes: mine.length, take: best.n,
         promptHash: Hash(LinePrompt(job.cue, job.index)) },
       metrics: { ...entry.metrics, activeRmsDb: m.activeRmsDb, truePeakDb: m.truePeakDb, snrDb: m.snrDb, voicedS: m.voicedS,
         lowShare: m.lowShare, f0: m.f0, cer: best.cer, transcript: best.transcript, speakerCos: best.speakerCos, nearestOther: best.nearestOther } });
@@ -585,7 +598,7 @@ async function PatchLines(manifest) {
       chars: words.map((w) => [w.text, +Math.max(0, w.start_time / 1000 - best.master.trimStartS).toFixed(3),
         +Math.max(0, w.end_time / 1000 - best.master.trimStartS).toFixed(3)]) };
     const scene = manifest.scenes?.[job.cue.id];
-    if (scene) { scene.requests = (scene.requests || 0) + mine.length; (scene.patched ||= []).includes(job.line.id) || scene.patched.push(job.line.id); }
+    if (scene) { scene.requests = (scene.requests || 0) + mine.length - (previous?.takes || 0); (scene.patched ||= []).includes(job.line.id) || scene.patched.push(job.line.id); }
     console.log(`${job.line.id}: patched take ${best.n} cos ${best.speakerCos} other ${best.nearestOther?.join(":")} cer ${best.cer} 「${best.transcript}」`);
   }
   manifest.updatedAt = new Date().toISOString();
