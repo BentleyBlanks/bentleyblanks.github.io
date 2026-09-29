@@ -50,6 +50,8 @@
 - `Script_OpeningStoryboardsTest`：`followTo` 在洞口两柱之间、跑速 1.4–2 m/s、到位时间和负伤川军出洞时间对得上、各条曲线按时间排序、动作从座位那一帧起步、终点在 `followTo`。
 - 浏览器：`Script_OpeningStoryboardShots --shots=SB01,SB02`；一次性探针（`tmp/A2Probe.mjs`，不入库）从下令到近爆每 0.15–0.25 s 截一张第一人称画面并记每帧眼位 / 朝向 / 速度 / 手到目标的误差（实测跑速 1.9 m/s，手抓着东西的帧误差 0 mm）；`Script_FirstLevelMissionBrowserTest --campaign --stage-to=3`。
 
+- 整关驾驶器的「零瞬移」探针（`Script_FirstLevelCampaignOpening.mjs`，我改了一行）：转身背包期间眼睛背对负伤川军，AI 把他剔出场景（`renderLod "culled"`、根节点脱离场景），原来对这种人退回去量**根节点**；他站起后导演把根节点挪到骨盆下面（`RerootUnderPelvis`，骨盆纹丝不动、根节点挪 0.25 m）被算成瞬移，整关红。现在被导演摆着姿势的人即使被剔出场景也照样量**骨盆**（他的骨骼一直在动，实测这一步骨盆只动 1 mm）。没有摆姿势的被剔者仍量根节点。
+
 ## 遗留
 
 - 眼高降到 0.76 m 是蹲到底：第一人称的肩根固定在镜头上，低头看地面时手臂够不到，所以背包要几乎贴脚下才够得着。
