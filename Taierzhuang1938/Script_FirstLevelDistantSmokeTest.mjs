@@ -28,14 +28,16 @@ for (const source of smoke) {
       const t=Math.min(1,age/.85),growth=p.frame===5?Math.pow(age,.4):t*t*(3-2*t);
       // 远景柱的 plume（2026-09-28）：漂移指数与上部横向拉宽照 Script_BattleSmoke 的顶点着色器算
       const [shear,flatten]=p.plume||[1.3,0],u=Math.min(1,Math.max(0,(age-.25)/.75)),spread=flatten*u*u*(3-2*u);
-      const size=(p.baseWidth+(p.crownWidth-p.baseWidth)*growth)*1.24*(1+spread);
+      const baseSize=(p.baseWidth+(p.crownWidth-p.baseWidth)*growth)*1.24;
+      // 顶点着色器把烟团散在柱轴四周（按本团大小的一个比例，路边烟只散 0.4）、上部每团再宽 0.45·spread
+      const scatter=(0.13+(0.30-0.13)*growth)*(1+0.7*spread)*(p.plume?1:0.4),size=baseSize*(1+0.45*spread);
       const center={x:x+p.driftX*Math.pow(age,shear),z:z+p.driftZ*Math.pow(age,shear)};
       const routeGround=Math.max(Ground(route[i-1].x,route[i-1].z),Ground(route[i].x,route[i].z));
       const bottom=Ground(x,z)+source.heightOffset+p.height*age-size*p.aspect*0.5;
       if(bottom>routeGround+4) continue;
       const margin=source.tier==="far"?10:2.5;
       const sway=BATTLE_SMOKE_STYLES[p.frame].motion[2]*Math.hypot(1,.7);
-      assert.ok(DistanceToSegment(center,route[i-1],route[i])>size*(.5+sway)+p.spread*(0.15+age*age)+margin,
+      assert.ok(DistanceToSegment(center,route[i-1],route[i])>size*(.5+sway)+baseSize*scatter*Math.SQRT2+p.spread*(0.15+age*age)+margin,
         source.id+" keeps low smoke clear of "+name+" age="+age);
     }
   }

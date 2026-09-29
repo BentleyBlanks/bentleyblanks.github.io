@@ -86,6 +86,13 @@ void main() {
   center.xz += iLobe.xy * iFlow.w * (0.15 + age * age);
   center.x += sin(age * 5.0 + uTime * 0.19 + iShape.w * 31.0) * size * iMotion.z;
   center.z += cos(age * 4.0 + uTime * 0.16 + iShape.w * 19.0) * size * iMotion.z * .7;
+  // 烟团不再同轴叠放：同轴时每团的圆边一层套一层（洋葱圈），上部又被压成一摞飞碟。
+  // 让它们按本团大小的一个比例散在柱轴四周、高度也错开，柱子才读成一团团翻滚的烟。
+  // 上部拉宽主要靠这个散布，不靠把每团压扁（iPlume.y > 0 才是远景柱；路边烟只散一小部分）。
+  float spreadT = iPlume.y * smoothstep(0.25, 1.0, age);
+  float scatter = mix(0.13, 0.30, growth) * (1.0 + 0.7 * spreadT) * (iPlume.y > 0.0 ? 1.0 : 0.4);
+  center.xz += iLobe.xy * size * scatter;
+  center.y += (iShape.w - 0.5) * size * 0.22;
   vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
   vec3 upv = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
   vRight = right;
@@ -93,10 +100,9 @@ void main() {
   vToward = normalize(cameraPosition - center);
   vTint = iTint;
   vMotion = iMotion;
-  // 上部被风拉成横向的烟幕：越老越宽、越扁（iPlume.y = 0 时两项都是 ×1，逐比特不变）
-  float spreadT = iPlume.y * smoothstep(0.25, 1.0, age);
-  vec3 world = center + right * position.x * size * (1.0 + spreadT)
-    + upv * position.y * size * iShape.x * (1.0 - 0.2 * spreadT);
+  // 上部被风拉宽：每团略宽、略扁（大头在上面的散布里）
+  vec3 world = center + right * position.x * size * (1.0 + 0.45 * spreadT)
+    + upv * position.y * size * iShape.x * (1.0 - 0.08 * spreadT);
   vec4 viewPos = viewMatrix * vec4(world, 1.0);
   vViewDepth = -viewPos.z;
   gl_Position = projectionMatrix * viewPos;
@@ -155,11 +161,14 @@ float Density(vec3 p, vec3 flow) {
   vec2 noise = texture(uDensity, curl * 0.68 + flow).rg;
   // Broad cavities break the contour; small eddies erode it without photograph
   // grain, hard sprite borders or the repeated silhouette of an atlas stamp.
-  float body = 1.04 - dot(p, p);
+  float r2p = dot(p, p);
+  float body = 1.04 - r2p;
+  // 球面边上密度必须收到 0：否则噪声在边缘仍为正，被四边形的圆边硬切成一道道正圆弧
+  float rim = 1.0 - smoothstep(0.28, 1.0, r2p);
   // 远景柱多一份侵蚀：圆边被撕成絮（vPlume.w = 0 时乘 1，逐比特不变）
   float erode = 1.0 + vPlume.w;
   float field = body + (noise.r - 0.5) * 1.2 * erode + (noise.g - 0.52) * 1.9 * erode;
-  return smoothstep(0.0, 0.56, field) * (0.75 + noise.g * 0.25);
+  return smoothstep(-0.06, 0.62, field) * (0.75 + noise.g * 0.25) * rim;
 }
 void main() {
   float r2 = dot(vUv, vUv);
@@ -174,7 +183,9 @@ void main() {
   if (vPlume.z > 0.0) {
     float thin = smoothstep(0.08, 0.95, vSmoke.w);
     base = mix(vTint * (1.0 - vPlume.z), uPlumeDilute, clamp(thin * vPlume.z * 2.0, 0.0, 1.0));
-    sunHue = mix(vec3(1.0), uSunColorFog / max(dot(uSunColorFog, vec3(0.2126, 0.7152, 0.0722)), 1.0e-3), uPlumeLight.x);
+    // 黄昏的太阳色很饱和，整根烟会染成酱红：先把太阳色的色度压掉三成再按 warm 混
+    vec3 sunRaw = uSunColorFog / max(dot(uSunColorFog, vec3(0.2126, 0.7152, 0.0722)), 1.0e-3);
+    sunHue = mix(vec3(1.0), mix(sunRaw, vec3(1.0), 0.3), uPlumeLight.x);
     skyHue = mix(vec3(1.0), vec3(0.90, 0.96, 1.08), uPlumeLight.y);
   }
   // 烟的光照是按白天标的绝对量，夜里（×2.7–3.6 的曝光）会整团发白。按本时段雾色（= 天光）的亮度
@@ -195,7 +206,8 @@ void main() {
     float alongLight = dot(p, light);
     float lightPath = max(0.0, sqrt(max(0.0, alongLight * alongLight + 1.0 - dot(p,p))) - alongLight);
     float lightDensity = (density + Density(p + light * lightPath * .5, flow)) * .5;
-    float transmittance = exp(-lightDensity * lightPath * uSmokeLighting.z);
+    // 多次散射的粗略补偿：厚芯不至于一团团发黑成豹斑
+    float transmittance = mix(exp(-lightDensity * lightPath * uSmokeLighting.z), 1.0, 0.16);
     vec3 lit = base * (uSmokeLighting.x * skyHue + uSmokeLighting.y * transmittance * sunHue);
     float a = 1.0 - exp(-density * halfRay * vSmoke.x * 9.0 / float(SMOKE_STEPS));
     sum.rgb += (1.0 - sum.a) * a * lit;
