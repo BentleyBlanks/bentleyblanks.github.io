@@ -1482,6 +1482,8 @@ export class AudioWiring {
     if (!audio || !vfx || !vfx.smokeSources) return;
 
     // 每帧重挑「最近四个」是白花的：火不会跑，玩家半秒也走不出去。
+    // 听者在防炮洞里：火在洞外几十米、隔着土（实测有效电平 −32 dB），同时最多 dugoutMaxVoices 处，把节点让给洞外的仗。
+    const maxVoices = audio.ListenerZone?.() === "dugout" ? Math.min(FIRE_SPOT.maxVoices, FIRE_SPOT.dugoutMaxVoices) : FIRE_SPOT.maxVoices;
     if (this.time >= this.fireRescanAt) {
       this.fireRescanAt = this.time + FIRE_SPOT.rescanS;
       const want = [];
@@ -1492,16 +1494,23 @@ export class AudioWiring {
         want.push({ handle, source, d });
       }
       want.sort((a, b) => a.d - b.d);
-      const keep = new Set(want.slice(0, FIRE_SPOT.maxVoices).map((e) => e.handle));
+      const keep = new Set(want.slice(0, maxVoices).map((e) => e.handle));
       for (const [handle, entry] of [...this.fireVoices]) {
         if (keep.has(handle) && vfx.smokeSources.has(handle)) continue;
         if (entry.voice) audio.StopVoice?.(entry.voice, 0.5);
         this.fireVoices.delete(handle);
       }
-      for (const e of want.slice(0, FIRE_SPOT.maxVoices)) {
+      for (const e of want.slice(0, maxVoices)) {
         if (!this.fireVoices.has(e.handle)) this.fireVoices.set(e.handle, { voice: null, until: 0 });
       }
     }
+
+    // 续接周期：实录版按素材自己的长度（清单 seconds）续，合成版按配方的 loopS 续（见 FIRE_SPOT 的抬头）。
+    const F = FIRE_SPOT;
+    const sampleS = audio.sampleCues?.has?.("fireSpot") ? Number(audio.sfxManifest?.cues?.fireSpot?.seconds) : 0;
+    const sampled = sampleS > F.sampleOverlapS + 1;
+    const loopS = sampled ? sampleS - F.sampleOverlapS : F.loopS;
+    const gain = sampled ? F.sampleGain : 1;
 
     // 续接与跟位。**一帧只起一条** —— 同名 cue 在 22 ms 去重窗里只活得下来一条，
     // 四条一起起等于白起三条（而且那三条会被记成 drops.dedupe，查起来像在丢音）。
@@ -1515,10 +1524,12 @@ export class AudioWiring {
       }
       if (started) continue;
       started = true;
-      entry.until = this.time + FIRE_SPOT.loopS;
+      entry.until = this.time + loopS;
+      // 新的一条起播时老的一条淡出（实录版的两条重叠 sampleOverlapS 秒；合成版本来就到点自己收，不动它）。
+      if (sampled && entry.voice) audio.StopVoice?.(entry.voice, F.sampleFadeS);
       entry.voice = audio.Play("fireSpot", {
         position: { x: source.position.x, y: source.position.y + 0.4, z: source.position.z },
-        volume: FIRE_SPOT.volume * Clamp01(0.4 + (source.fire || 0) * 0.5),
+        volume: F.volume * gain * Clamp01(0.4 + (source.fire || 0) * 0.5),
       });
     }
   }

@@ -478,8 +478,18 @@ export const SUPPRESSION_DIRT = Object.freeze({
  */
 export const FIRE_SPOT = Object.freeze({
   maxVoices: 4,
+  dugoutMaxVoices: 2,       // 听者在防炮洞里（01–02）：火在洞外几十米、隔着土，同时最多这么多处（2026-09-29）
   audibleM: 55,
-  loopS: 1.9,               // 一条 fireSpot 的续接周期（配方 2.2 s，留 0.3 s 交叠）
+  loopS: 1.9,               // 合成配方（2.2 s）的续接周期，留 0.3 s 交叠；实录没载到时用它
+  // 【2026-09-29】实录版（Audio/Sfx/AudioSfx_FireSpot_01，清单 seconds = 10 的一整段稳态火声）原来也按 loopS 1.9 s 续接：
+  // 每处火同时叠着五六条 10 s 的同一段素材，四处火就是 16–20 条、约 96–120 个节点。实测 01 防炮洞里（离火 29–34 m、
+  // 干声 −32 dB 上下、听不见）它们占着 60–108 / 120 的节点预算，把远处前线饿死 45 %（机枪 zb26Far / type11Far 一声没收下）、
+  // 洞顶掉土 10 条里拒收 9 条。实录版改成「放到只剩 sampleOverlapS 秒时续下一条」，老的一条 sampleFadeS 淡掉；
+  // 同一处火同时最多两条、一般一条。音量按同一口径补回：五条互不相关的同一段叠着比一条响 √(10/1.9) ≈ 2.3 倍，
+  // 现在平均并发 ≈ 1.1 条（√1.1 ≈ 1.05），sampleGain = 2.3 / 1.05 ≈ 2.2，其余各关的火声总电平不变。
+  sampleOverlapS: 1.0,
+  sampleFadeS: 0.9,
+  sampleGain: 2.2,
   volume: 0.55,
   minFire: 0.2,             // vfx 烟源的 fire 强度低于此当作只冒烟不着火
   rescanS: 0.5,             // 重新挑「最近四个」的间隔；每帧挑是白花的
@@ -658,6 +668,8 @@ export const BATTLE_ARTILLERY = Object.freeze({
   incomingChance: 0.35,
   incomingLeadS: 1.15,
   incomingVolume: 0.42,
+  /** 啸声逐发变调的幅度（总宽，±一半）：素材只有一条。 */
+  incomingPitchSpread: 0.16,
   /** 啸声摆在落点上空多高（米）。 */
   incomingHeightM: 18,
   /**
