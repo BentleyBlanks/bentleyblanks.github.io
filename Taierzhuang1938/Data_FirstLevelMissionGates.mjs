@@ -211,6 +211,13 @@ export const MISSION_SCENARIO_SIGNALS = Object.freeze({
 const Gate = (entry) => Object.freeze(entry);
 export const MISSION_FACT_GATES = Object.freeze({
   // --- Trapped -----------------------------------------------------------
+  // 2026-09-29: not a requirement of the step (Trapped's are the three below): the opening director records it the moment
+  // the runner's far call (BunkerRunnerCall.01) really starts, and on every start / jump / checkpoint that is past it
+  // (BuildFirstLevelCheckpoint for 02 onward). Nothing waits for it to end the step; the battlefield sound of 01 comes up on it.
+  runnerCallHeard: Gate({
+    kind: "scripted", step: "Trapped", source: "FirstLevelBunkerShow.PhaseOrders",
+    text: "传令兵还在后交通壕里、离洞口二十多米时就边跑边喊班长（BunkerRunnerCall 第 01 句开口），坐在洞里的顺子听得见；外围战场的声音从这一刻起显现",
+  }),
   bunkerCollapsed: Gate({
     kind: "scripted", step: "Trapped", source: "FirstLevelOpening.BunkerBlast",
     text: "洞外士兵「炮弹！趴下——！」被近失弹截断，防炮洞口局部塌方把顺子压住（控制接管 trapped）",

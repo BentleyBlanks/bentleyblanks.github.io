@@ -360,11 +360,13 @@ export async function DriveOpening(ctx){
   for(const phase of DIRECTOR_PHASES)assert.ok(show.beats.includes(phase),`storyboard performed: ${phase}`);
   const firsts=[];for(const e of show.events)if(DIRECTOR_PHASES.includes(e.phase)&&!firsts.includes(e.phase))firsts.push(e.phase);
   assert.deepEqual(firsts,DIRECTOR_PHASES.filter(p=>firsts.includes(p)),"phases start in contract §5.3 order");
-  for(const fact of ["bunkerCollapsed","captivesKilled","playerSlapped","doorSearchStarted","rescueCallHeard","vanguardMeleeResolved","junctionShot","luoRescueComplete","playerDraggedFromWreck"])
+  for(const fact of ["runnerCallHeard","bunkerCollapsed","captivesKilled","playerSlapped","doorSearchStarted","rescueCallHeard","vanguardMeleeResolved","junctionShot","luoRescueComplete","playerDraggedFromWreck"])
     assert.ok(state.facts.includes(fact),`observed event: ${fact}`);
   assert.ok(show.captives.length===1&&show.captives.every(a=>!a.alive),"the comrade dies at the wall");
   // ---- physical events: ijaA / ijaB cut down, ijaD shot, before Check -------------------------
   const eventTime=phase=>show.events.find(e=>e.phase===phase)?.time;
+  // 2026-09-29: the runner calls from far off inside Orders (beat RunnerCall; the fact runnerCallHeard is in the facts above), before he reports.
+  assert.ok(show.beats.includes("RunnerCall")&&eventTime("RunnerCall")>=eventTime("Orders")&&eventTime("RunnerCall")<eventTime("Incoming"),"the runner's far call comes inside Orders");
   for(const id of Storyboards.vanguardIds){
     const actor=show.vanguard.find(a=>a.id===id);
     assert.ok(actor&&!actor.alive&&actor.health<=0&&!actor.essential,`${id} is really dead at the hand-back`);

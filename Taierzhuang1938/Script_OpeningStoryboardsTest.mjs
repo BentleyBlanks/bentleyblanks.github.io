@@ -676,6 +676,19 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   for(const [name,route] of [["runner",C.banter.runnerRoute],["exit",C.banter.exitRoute],["walkIn",C.ija.walkIn],["taunt",C.ija.tauntWalk],
     ["charge",R.chargeRoute],["flee",C.ija.interpreterFlee],["withdraw",C.withdraw.lane]])
     assert.ok(route.length>=1&&route.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.z)),`${name} route is a finite polyline`);
+  // 2026-09-29 (docs/Data_OpeningStoryboards20260923.md §4b): the runner starts 20-35 m from the seat (heard from afar, never seen), runs the
+  // rear trench, calls out twice on the way (the second once he is within secondWithinM), and reports OUTSIDE the mouth beside Luo.
+  {
+    const B=C.banter,seat=S.seat,first=B.runnerRoute[0],post=B.runnerRoute.at(-1),call=B.runnerCall;
+    assert.ok(D(first,seat)>=20&&D(first,seat)<=35,`the runner starts 20-35 m from the seat (${D(first,seat).toFixed(1)} m)`);
+    assert.ok(post.x>B.luo.x+.8&&D(post,B.luo)>=1.2&&D(post,B.luo)<=2.4,"he reports outside the mouth, 1.2-2.4 m from Luo");
+    assert.ok(call.secondWithinM<D(first,seat)&&call.secondWithinM>D(post,seat),"the second call opens between his start and the post");
+    assert.ok(call.afterS>=0&&call.afterS<=1.5&&call.holdMaxS>0&&call.holdMaxS<=3,"the far call opens within 1.5 s of Orders; the report waits for it at most 3 s");
+    assert.ok(C.timeouts.runnerArriveS>=B.runnerRoute.reduce((total,p,i,a)=>i?total+D(a[i-1],p):0,0)/C.speed.run+call.afterS,"runnerArriveS covers the run");
+    assert.deepEqual(B.runnerExitRoute.map(p=>[p.x,p.z]),B.exitRoute.slice(1).map(p=>[p.x,p.z]),"the runner leaves by the exit route without its first point (behind Luo's kneel)");
+    const order=C.storyboardShots.map(s=>s.id);
+    assert.ok(order.indexOf("SB01_Call")>=0&&order.indexOf("SB01_Call")<order.indexOf("SB01"),"SB01_Call (the far call) is judged before SB01 (shots run in flow order)");
+  }
   // Every director wait has a finite timeout (the show can never stall).
   assert.ok(Object.values(C.timeouts).every(v=>Number.isFinite(v)&&v>0),"all director timeouts are finite and positive");
   assert.deepEqual([...C.vanguardIds].sort(),["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowB"],"hand-back waits for ijaA, ijaB and ijaD only");

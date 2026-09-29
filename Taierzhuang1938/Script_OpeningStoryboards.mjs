@@ -228,6 +228,9 @@ export class FirstLevelBunkerShow {
       for(const m of OPENING_DEPTH_WALKERS.members)this.Put(this.Spawn(m.id,"nra",m.start),{...m.start,yaw:-Math.PI/2});
       this.Stage("Banter");return;
     }
+    // Every start past Orders (a checkpoint after the near miss, a jump into 02 or later) has had the runner's call: 09-29's
+    // fact runnerCallHeard and the RunnerCall beat are made true here too, so what waits for them is the same on every path.
+    this.NoteRunnerCall({skipped:stage});
     if(stage==="Trapped"){this.Stage("Wake");return;}
     // A checkpoint / stage jump into 02: the 01 aftermath is already true.
     if(stage==="BunkerRescue"){this.StageRescue();return;}
@@ -515,6 +518,29 @@ export class FirstLevelBunkerShow {
   Started(id){return this.flags["scene:"+id]!=null;}
   SceneDone(id){const h=this.scenes[id];return !h||h.done||h.stopped;}
   SceneLine(id){return this.scenes[id]?.playing||[];}
+  /**
+   * The runner's far call (BunkerRunnerCall) has begun: the moment its first line really starts to play (onLine), and on every
+   * path that never plays it (no voice layer; a start, checkpoint or jump past Orders; a blast from Banter / Orders) at the moment
+   * that path is taken. Records the fact runnerCallHeard once (frozen name, docs/Data_OpeningStoryboards20260923.md §4b: the
+   * battlefield sound comes up on it) and the RunnerCall beat / event once; `flags.runnerCallAt` is its time.
+   */
+  NoteRunnerCall(detail={}){
+    const r=this.r;
+    if(!this.beats.has("RunnerCall")){
+      this.beats.add("RunnerCall");
+      this.events.push({phase:"RunnerCall",time:+r.time.toFixed(3),stage:r.flow.stage.id});
+      if(this.events.length>200)this.events.shift();
+    }
+    this.flags.runnerCallAt??=r.time;
+    if(r.Has("runnerCallHeard"))return false;
+    const runner=this.cast.runner,seat=C.shunzi.seat,at=runner&&!runner.openingStoryboardHidden?runner.openingStoryboardLast||runner.position:null;
+    return r.Record("runnerCallHeard",{...detail,distM:at?+Distance(at,seat).toFixed(1):null});
+  }
+  /** The runner is within `metres` of the seat (the listener), on the plane. */
+  RunnerWithin(metres){
+    const runner=this.cast.runner;if(!runner||runner.openingStoryboardHidden)return false;
+    return Distance(runner.openingStoryboardLast||runner.position,C.shunzi.seat)<=metres;
+  }
   Speakers(){
     const who=role=>()=>this.HeadPoint(this.SpeakerActor(role));
     const out={};for(const role of ["luo","yaowa","heyoutian","liuwencai","comrade","runner","shouter","interpreter","ijaA","ijaB","ijaC","ijaD","guard"])out[role]=who(role);
@@ -557,6 +583,7 @@ export class FirstLevelBunkerShow {
   Blast(){
     if(!["Banter","Orders","Incoming"].includes(this.phase))return;
     const r=this.r,b=C.banter;
+    this.NoteRunnerCall({skipped:this.phase});   // a blast from Banter / Orders (a debug or timeout path) skipped the call
     this.blastFrom=this.FollowPoint();
     this.Stage("Blast");
     r.voice?.Signal?.("Blast");
@@ -679,14 +706,32 @@ export class FirstLevelBunkerShow {
     if(!this.phaseEntered){this.phaseEntered=true;this.flags.exitAt=null;this.Show(runner);}
     for(const role of ["ijaA","ijaB","ijaC","ijaD"])this.Hide(this.Ija(role));
     this.DepthWalkers();
-    const post=b.runnerRoute.at(-1),seat=C.shunzi.seat;
-    // BunkerOrders.01 is shouted at Luo (「班长！……」), not at the camera: the runner turns to Luo's back in the mouth.
-    // Luo keeps looking down the front trench while he thinks it over (.02–.04, Yaowa asks in between; user 09-27:
-    // he must not order the instant he hears it) and only turns round to the room with the order itself (.05).
+    const post=b.runnerRoute.at(-1),seat=C.shunzi.seat,call=b.runnerCall;
+    // 2026-09-29 (user: 「传令兵应该是老远就喊话（玩家就能听到），然后在地道门外就和班长可以说话了」): the runner is on the run from
+    // the first frame of Orders, 23 m off in the rear trench; call.afterS in, Banter's last line long over, he calls out to
+    // Luo (BunkerRunnerCall, from his own moving head: heard in the dugout at that distance). The moment line 1 really begins
+    // is the fact runnerCallHeard (and the RunnerCall beat); line 2 waits until he is within call.secondWithinM of the seat.
+    if(this.flags.exitAt==null&&!this.Started("BunkerRunnerCall")&&age>=call.afterS){
+      const handle=r.voice?.PlayScene("BunkerRunnerCall",{speakers:this.Speakers(),gate:(lineId)=>lineId!=="BunkerRunnerCall.02"||this.RunnerWithin(call.secondWithinM),
+        onLine:(lineId)=>{if(lineId==="BunkerRunnerCall.01")this.NoteRunnerCall({line:lineId});else this.flags.walkersAt??=r.time;}});
+      this.Scene("BunkerRunnerCall",handle);
+      // No voice layer to say it: the call still counts, at the moment it would have opened.
+      if(!handle)this.NoteRunnerCall({line:null});
+    }
+    // BunkerOrders.01 is shouted at Luo (「班长！……」), not at the camera: the runner turns to Luo's back from outside the mouth
+    // (09-29: he stops on the trench floor beside Luo instead of running in). Luo keeps looking down the front trench while he
+    // thinks it over (.02–.04, Yaowa asks in between; user 09-27: he must not order the instant he hears it) and only turns
+    // round to the room with the order itself (.05).
     const runnerIn=this.flags.exitAt==null&&this.Follow(runner,"orders",b.runnerRoute,C.speed.run,null,b.luo);
     if(this.flags.exitAt==null){
       if(runnerIn||Distance(runner.position,post)<.4)this.Hold(runner,{...post,yaw:Face(post,b.luo)},"MessengerReport");
-      if(!this.Started("BunkerOrders")&&(runnerIn||age>C.timeouts.runnerArriveS)){
+      if(runnerIn){this.flags.runnerInAt??=r.time;this.flags.walkersAt??=r.time;}
+      // He reports the moment he is at the post; the far call's last line is let finish first, but never held past holdMaxS.
+      const callDone=this.Started("BunkerRunnerCall")&&this.SceneDone("BunkerRunnerCall");
+      const arrived=runnerIn&&(callDone||r.time-this.flags.runnerInAt>=call.holdMaxS);
+      if(!this.Started("BunkerOrders")&&(arrived||age>C.timeouts.runnerArriveS)){
+        this.flags.runnerInAt??=r.time;this.flags.walkersAt??=r.time;   // (the timeout path)
+        this.scenes.BunkerRunnerCall?.Stop();
         this.Scene("BunkerOrders",r.voice?.PlayScene("BunkerOrders",{speakers:this.Speakers(),onLine:(lineId)=>{if(lineId==="BunkerOrders.05")this.flags.luoTurnAt=r.time;}}));
       }
       // Kneeling, looking out, while he thinks it over; up, round to the room and pointing with the order.
@@ -703,7 +748,8 @@ export class FirstLevelBunkerShow {
       ["he",he,.9,C.speed.walk],["liu",liu,1.3,C.speed.walk]]){
       if(!actor)continue;
       if(since<delay){this.Pose(actor,null);continue;}
-      if(this.Follow(actor,"exit",b.exitRoute,speed,null))this.Hide(actor);
+      // The runner leaves from his post outside the mouth (banter.runnerExitRoute), not from the mouth like the others.
+      if(this.Follow(actor,"exit",id==="runner"?b.runnerExitRoute:b.exitRoute,speed,null))this.Hide(actor);
     }
     Equip(yaowa,yaowa?.weaponId||"HanYang");
     // The wounded comrade braces on the wall, stands (rise clip), then squeezes out of the mouth.
@@ -727,8 +773,9 @@ export class FirstLevelBunkerShow {
     const r=this.r,b=C.banter;
     if(!this.phaseEntered){
       this.phaseEntered=true;
-      // Straight into Incoming (a stage jump): he is already up and following, the rifle loaded.
+      // Straight into Incoming (a stage jump): he is already up and following, the rifle loaded, the runner has come and gone.
       this.flags.exitAt??=r.time-C.firstPerson.followUp.rifle.at(-1)[0];
+      this.NoteRunnerCall({skipped:"Incoming"});
       this.Scene("BunkerIncoming",r.voice?.PlayScene("BunkerIncoming",{speakers:this.Speakers()}));
     }
     this.Hold(this.Comrade,b.comradeBlast,null);
@@ -742,14 +789,18 @@ export class FirstLevelBunkerShow {
     for(const [id,actor,speed] of [["luo",this.Squad("luo"),C.speed.walk],["runner",this.cast.runner,C.speed.run],["yaowa",this.Squad("yaowa"),C.speed.walk],
       ["he",this.Squad("heyoutian"),C.speed.walk],["liu",this.Squad("liuwencai"),C.speed.walk]]){
       if(!actor||actor.openingStoryboardHidden)continue;
-      if(this.Follow(actor,"exit",b.exitRoute,speed,null))this.Hide(actor);
+      if(this.Follow(actor,"exit",id==="runner"?b.runnerExitRoute:b.exitRoute,speed,null))this.Hide(actor);
     }
   }
   /** SB01's men going up to the front (Data_FirstLevelBackdropSquads.OPENING_DEPTH_WALKERS): standing in the
    *  trench facing east during the talk, walking off east from Orders + delayS, retired at the end of the route
    *  once out of the shot (at the latest in the black after the blast). */
   DepthWalkers(){
-    const D=OPENING_DEPTH_WALKERS,go=this.phase==="Banter"?-1:this.phase==="Orders"?this.Age-D.delayS:Infinity;
+    // 2026-09-29: Orders now opens with the runner still 23 m out (banter.runnerCall), so they are clocked on his second call
+    // (flags.walkersAt: line 2 opening, or his arrival if that comes first), not on Orders' start: they set off delayS after it
+    // and are 3 s under way when he reports, as before (the old runner took 4.4 s to arrive, they left 1.4 s in).
+    const D=OPENING_DEPTH_WALKERS,setOff=this.flags.walkersAt,
+      go=this.phase==="Banter"?-1:this.phase==="Orders"?(setOff==null?-1:this.r.time-setOff-D.delayS):Infinity;
     D.members.forEach((m,i)=>{
       const actor=this.cast[m.id];if(!actor)return;
       if(go<i*D.staggerS){this.Hold(actor,{...m.start,yaw:-Math.PI/2},null);return;}
