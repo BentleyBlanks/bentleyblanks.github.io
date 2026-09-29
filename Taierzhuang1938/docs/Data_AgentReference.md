@@ -61,6 +61,8 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 与 [渲染管线](Data_TechRenderPipeline.md) §17.11；
 调试页 `Probe.html` 把材质 / 光照 / 后处理单独摆出来看。
 
+**单帧绘制调试器**：同组的 **Frame Debugger** 独立窗口捕获并冻结完整渲染帧，逐 DC/Pass 回放，查看 CPU/GPU 耗时、MRT/深度输出、网格、Shader/状态/纹理；关闭恢复模拟。入口、计时口径、WebGL 平台边界和回归命令见 [Frame Debugger](Data_FrameDebugger.md)。核心为 `Script_FrameDebugger` / `Script_FrameDebugGl`，窗口为 `Script_EditorFrameDebugger`；`Script_FrameDebuggerTest` 验证真实 GPU 像素回放与恢复。
+
 
 ## 路由表：改哪个系统，动哪些文件，先读哪份分册
 

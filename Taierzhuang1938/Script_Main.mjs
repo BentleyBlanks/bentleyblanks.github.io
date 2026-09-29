@@ -125,6 +125,7 @@ import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
+import { FrameDebugger } from "./Script_FrameDebugger.mjs";
 import { AutoQuality } from "./Script_AutoQuality.mjs";
 import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
 import { BREATH_HOLD, FREE_AIM } from "./Data_Tuning_Player.mjs";
@@ -509,6 +510,28 @@ const ssrUniforms = post.SsrUniforms;
 // scene 给「场景节点普查」用；Object3D.prototype 是矩阵/遍历计数要包的那一层
 //（剖析器自己不 import three，所以由装配层交给它，Disable 时原样还回去）。
 const profiler = new FrameProfiler(renderer, { post, scene, object3D: THREE.Object3D.prototype });
+let frameDebugAudioPaused = true;
+let frameDebugVoicePaused = true;
+const ReleaseFrameBeforeEditing = event => {
+  if (event.target.closest?.('.edPanel, .edGear')) frameDebugger.Resume();
+};
+const frameDebugger = new FrameDebugger(renderer, { post, profiler,
+  onFreeze: () => {
+    ReleasePointerLock();
+    frameDebugAudioPaused = audio.paused;
+    frameDebugVoicePaused = missionRuntime?.voice.paused ?? true;
+    missionRuntime?.voice.Pause();
+    audio.SetPaused(true);
+    document.addEventListener('pointerdown', ReleaseFrameBeforeEditing, true);
+    document.addEventListener('keydown', ReleaseFrameBeforeEditing, true);
+  },
+  onResume: () => {
+    document.removeEventListener('pointerdown', ReleaseFrameBeforeEditing, true);
+    document.removeEventListener('keydown', ReleaseFrameBeforeEditing, true);
+    if (!frameDebugAudioPaused) audio.SetPaused(false);
+    if (!frameDebugVoicePaused) missionRuntime?.voice.Resume?.();
+  },
+});
 // 自动降档（docs §13）。出厂开、画质面板可关；只在**真实 rAF 帧**上喂数据，
 // StepFrames（出图 / 测试 / 过场手动步进）一律不喂 —— 那些帧的间隔不是帧率。
 const autoQuality = new AutoQuality();
@@ -2146,7 +2169,7 @@ async function Boot() {
   window.Taierzhuang = {
     // gi 是取值器：探针体默认不构造，运行时打开（ApplyGraphics）才补建，
     // 拷值出去的话冒烟与剖析脚本拿到的永远是 boot 时那个 null
-    renderer, scene, camera, post, sky, lights, library, profiler,
+    renderer, scene, camera, post, sky, lights, library, profiler, FrameDebugger: frameDebugger,
     // 阴影烘焙子树跳过（Script_ShadowSkip）：取证脚本读登记数、同页 A/B 开关
     shadowSkip: { Count: ShadowSkipCount, SetEnabled: SetShadowSkipEnabled },
     // 骨头子树遍历剪枝（Script_BonePrune）：同页 A/B 开关、剪掉的根数与节点数
@@ -2952,7 +2975,7 @@ async function Boot() {
     ReturnToMainMenu: MENU_AT_BOOT ? () => OpenMenu() : null,
     game: {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
-      state, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, autoQuality, GraphicsProfile: graphicsProfileApi,
+      state, FrameDebugger: frameDebugger, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, autoQuality, GraphicsProfile: graphicsProfileApi,
       GetFpsVisible: () => hud.FpsVisible(),
       SetFpsVisible: (on) => hud.SetFpsVisible(on),
       // 材质着色升级那一包：Debug Rendering 的「材质细节」组按它设假彩色编号。
@@ -3641,6 +3664,7 @@ function ClearRuntime() {
  *                      过场的临时布景有近三百个网格，另在过场检查里验）
  */
 async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump = null, stageJumpMidCutscenes = false } = {}) {
+  if (frameDebugger.frozen || frameDebugger.state === "armed") frameDebugger.Resume();
   state.advancing = true;
   state.phaseIndex = Clamp(index, 0, PHASE_TABLE.length - 1);
   const phase = PHASE_TABLE[state.phaseIndex];
@@ -5111,6 +5135,7 @@ async function AdvanceLevel(opts = {}) {
 
 /** 调试口：直接跳到某一关（不播过场）。出图与自检走这条。 */
 function JumpToLevel(index) {
+  if (frameDebugger.frozen || frameDebugger.state === "armed") frameDebugger.Resume();
   return EnterLevel(index, { cutscenes: false });
 }
 
@@ -6255,6 +6280,7 @@ if (PREVIEW_AUTOPLAY) {
  *      而兵员池是关卡状态，玩家还没按开始就被消耗掉是说不通的）。
  */
 function OpenMenu() {
+  if (frameDebugger.frozen || frameDebugger.state === "armed") frameDebugger.Resume();
   if (!menu) return;
   state.running = false;
   state.menu = true;
@@ -6338,6 +6364,7 @@ async function StartLevel(index, { cutscenes = false, stageJump = null, stageJum
  * 人跳到 04 就是冲着那一段去的）；测试夹具走 Debug.FirstLevelJump，默认跳过，免得被导演扣住。
  */
 async function JumpFirstLevelStage(value, { midCutscenes = false } = {}) {
+  if (frameDebugger.frozen || frameDebugger.state === "armed") frameDebugger.Resume();
   const stage = ResolveFirstLevelStage(value);
   if (state.advancing) throw new Error("Level loading is already in progress");
   const index = PHASE_TABLE.findIndex(phase => phase.whitebox?.fullMission);
@@ -6679,6 +6706,7 @@ const router = new InputRouter({
   Context: () => (state.ordersOpen ? "orders" : "world"),
   // 没拿到指针锁的第一次点击只用来抢锁，不该同时打出一枪
   Guard: (e) => {
+    if (frameDebugger.frozen) return false;
     if (!state.running) return false;
     // 编辑器开着：这一下鼠标是在点面板/摆东西，不是在抢指针锁开枪
     if (editor && editor.Capturing) return false;
@@ -6687,6 +6715,7 @@ const router = new InputRouter({
   },
   // 白刃输入先于 KEYMAP；QTE 接管抵抗输入，避免 F 同时触发拾枪。
   Capture: (_event, detail) => {
+    if (frameDebugger.frozen) return false;
     if(detail.code==='Blur')return !!meleeCombat?.HandleInput('Blur',false);
     if(!state.ready || !state.running || state.menu || state.cutscene || editor?.Capturing)return false;
     // 剧本提示环（第一关屋内伏击的抓枪与反捅）先于共用白刃层与 KEYMAP：
@@ -6697,6 +6726,7 @@ const router = new InputRouter({
     return !!meleeCombat?.HandleInput(detail.code,detail.down,detail.repeat);
   },
   OnAction: (action, detail) => {
+    if (frameDebugger.frozen) return;
     if(missionRuntime?.controls)return;
     if (missionRuntime?.ReceivingFood && (["crouch","prone","traverse"].includes(action) || action.startsWith("stance:"))) return;
     if (state.cutscene) return; // 过场只由 CutsceneDirector 接收 Look/Esc
@@ -9129,6 +9159,15 @@ if (!Object.getOwnPropertyDescriptor(THREE.BatchedMesh.prototype, "colorTexture"
  * 必然抄漏（夜战预设 exposure 是 3.6，抄成 0.5 整帧就是纯黑）。
  */
 function RenderScene(dt) {
+  if (frameDebugger.frozen) return;
+  const capturing = frameDebugger.BeginRender();
+  let failure = null;
+  try { RenderSceneContent(dt); }
+  catch (error) { failure = error; throw error; }
+  finally { if (capturing) frameDebugger.EndRender(failure); }
+}
+
+function RenderSceneContent(dt) {
   missionRuntime?.frontShow?.bunker.BeforeRender();
   const openingBody=player?.Alive && missionRuntime?.frontShow?.bunker.CameraActive;
   if(openingBody&&viewmodel)viewmodel.root.visible=false;
@@ -9361,6 +9400,9 @@ function EndBattle(outcome) {
  * 而那正是 OpenMenu 花力气避免的事（见那里第三条）。
  */
 function StepFrames(count = 1, dt = 1 / 60, render = true) {
+  frameDebugger.Poll();
+  if (frameDebugger.frozen) return;
+  if (frameDebugger.state === "armed" && render && !state.warming) { RenderScene(0); return; }
   for (let i = 0; i < count; i += 1) {
     profiler.BeginFrame(performance.now());
     // 编辑器接管时必须压过主菜单。否则从菜单打开场景编辑器后，
@@ -9417,6 +9459,9 @@ function Loop(now) {
   // Script_CutsceneShot 的 manual=1 是一个明确的时钟所有权切换：只允许
   // window.Taierzhuang.StepFrames() 推进，不能让 rAF 在两次截图之间偷偷加
   // 时间。普通 ?shot 页面不带 manual，仍按实时循环运行。
+  frameDebugger.Poll();
+  if (frameDebugger.frozen) return;
+  if (frameDebugger.state === "armed" && state.ready && !state.warming) { RenderScene(0); return; }
   if (MANUAL_STEP) return;
   // 自动降档只吃**玩法帧**：菜单/加载/暂停帧要么便宜得离谱要么长得离谱，
   // 混进窗口只会让阶梯在进出菜单时来回跳。跳过的那一帧留下的长间隔会被
@@ -9481,6 +9526,7 @@ function RecompileAllMaterials() {
 }
 
 function ApplyGraphics() {
+  if (frameDebugger.frozen || frameDebugger.state === "armed") frameDebugger.Resume();
   NormalizeGraphicsDetails(graphics, post);
   if (WHITEBOX_CONFIG) Object.assign(graphics, WhiteboxGraphicsOverrides(WHITEBOX_CONFIG));
   // 断肢内容开关。`?gore=0` 压过面板与存档那一位 —— 出图与回归靠这个参数

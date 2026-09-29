@@ -44,6 +44,7 @@ import { DebugRenderingEditor } from "./Script_EditorDebugRendering.mjs";
 import { WorldInfoEditor } from "./Script_EditorWorldInfo.mjs";
 import { PlayerStateEditor } from "./Script_EditorPlayerState.mjs";
 import { ProfilerEditor } from "./Script_EditorProfiler.mjs";
+import { FrameDebuggerEditor } from "./Script_EditorFrameDebugger.mjs";
 import { AiEditor } from "./Script_EditorAi.mjs";
 import { OrchestrationEditor } from "./Script_EditorOrchestration.mjs";
 import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
@@ -69,7 +70,7 @@ const ALL = [...SETTINGS, ...EDITORS];
 // 性能剖析同理：它甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
 // 关卡编排工作台也在这一组：它是独立窗口里的 2D 俯视图 + 流程/时间轴，
 // 既不碰 three 场景也不接管相机，「边打边看走到哪一步」正是它的主用例。
-const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor, OrchestrationEditor];
+const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor, OrchestrationEditor];
 // 面板上的**分组**与上面那条「叠加语义」是两件事。关卡编排在语义上仍是叠加层
 // （独立窗口、不接管相机、keepOnClose，走 ToggleOverlay），但用户去找它的时候
 // 想的是「我要编关卡」，不是「我要调试」—— 所以按钮画进「编辑器」组。
@@ -156,6 +157,7 @@ export class EditorSuite {
       Close: () => suite.Close(),
       CloseDebugRendering: () => suite.CloseOverlay(DebugRenderingEditor.id),
       CloseProfiler: () => suite.CloseOverlay(ProfilerEditor.id),
+      CloseFrameDebugger: () => suite.CloseOverlay(FrameDebuggerEditor.id),
       CloseWorldInfo: () => suite.CloseOverlay(WorldInfoEditor.id),
       ClosePlayerState: () => suite.CloseOverlay(PlayerStateEditor.id),
       CloseAi: () => suite.CloseOverlay(AiEditor.id),
@@ -347,6 +349,7 @@ export class EditorSuite {
 
   /** 叠加工具不参与 active 的互斥规则；切换场景/地形等工具时必须留下它。 */
   ToggleOverlay(id) {
+    if (id !== FrameDebuggerEditor.id && this.host.game.FrameDebugger?.frozen) this.host.game.FrameDebugger.Resume();
     if (this.overlays.has(id)) {
       this.CloseOverlay(id);
       return null;
@@ -379,6 +382,7 @@ export class EditorSuite {
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
     const Editor = ALL.find((e) => e.id === id);
     if (!Editor) return null;
+    if (this.host.game.FrameDebugger?.frozen) this.host.game.FrameDebugger.Resume();
     // 换编辑器不算结束会话，不能半路把之前的菜单重新盖回来。
     if (this.active) this.Close({ switching: true });
     // 设置可以留在暂停菜单上调；真正的编辑器必须接管整张画面。
@@ -405,6 +409,7 @@ export class EditorSuite {
   }
 
   Close({ switching = false, all = false } = {}) {
+    if (this.active && this.host.game.FrameDebugger?.frozen) this.host.game.FrameDebugger.Resume();
     if (this.active) {
       try { this.active.Exit(); } catch (error) { console.error("[Editor] 关闭出错：", error); }
     }

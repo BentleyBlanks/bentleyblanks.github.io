@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **Frame Debugger（2026-09-30）**：编辑器「渲染调试」组的独立窗口；捕获冻结完整帧，按 DC/Pass 检查和回放。计时、资源恢复、MSAA/mip/合批契约与平台边界见 [单帧绘制调试器](docs/Data_FrameDebugger.md)，回归 `Script_FrameDebuggerTest`。普通运行不装逐绘制钩子；改捕获/回放必须验证捕获前后像素、逆向步进和退出恢复，GPU 不可用不得用 CPU 或 0 冒充。
+
 - **默认白盒画质（2026-09-29）**：进入游戏默认 `quality=whitebox`，场景采用参考图式的灰色米制网格材质；地形、角色（含敌军）、第一人称身体/手及手持装备默认保留贴图，高级 Feature/Pass 关闭。现有「画质 → 编辑白盒画质」可调整网格大小/线宽/颜色、独立人物贴图开关并保存；查询 `Tengxian.GraphicsProfile.Inspect()`。**美术表现迭代与验收必须自行显式打开 `?quality=high` / `ultra`**，不能拿默认白盒截图判断美术效果失效。配置/API/材质例外与回归见 [白盒画质](docs/Data_WhiteboxQuality.md)，数据源 `Data_Tuning_Whitebox.mjs`；新 Pass 默认不进入白盒，需显式登记。
 
 - **第一关对标参考图的 3A 画面迭代（2026-09-28）**：七个包的口径各在自己的分册 —— 白盒体块 PBR 外观 / 风化 / 坡顶外壳 / 河水 [05–18 差距 §6](docs/Data_FirstLevelWhitebox0518Gap.md)（`Data_FirstLevelWhiteboxMaterials` + `Script_FirstLevelWhiteboxLooks`）；地面冷灰褐湿泥、积水、车辙、01–05 湿泥区 [分层地形 §8–§9](docs/Data_TerrainLayers.md)；人物军装/皮肤/泥污/头盔/第一人称手 [人物表面](docs/Data_CharacterStandard.md)（`Script_CharacterSurface`）；第一关云层、调色（lift 归零）、曝光锚点、室内天光遮蔽与暖反弹、远景烟柱 [渲染管线](docs/Data_TechRenderPipeline.md)（`Data_FirstLevelInteriors` + `Script_InteriorSkyOcclusion`）；掩蔽部木料/马灯/近爆泥浆碎屑 [分镜契约 §9](docs/Data_FirstLevelStoryboard0103Contract.md)；道具换模型、冬末植被、碎砖瓦 [植被与道具](docs/Data_FirstLevelVegetationProps.md)。新贴图一律走下文契约 14（Lovart 源图 → `Script_BakePbrTexture.py` → 清单 → 第一关按需集）。对照出图 `Script_FirstLevelWhitebox0518Shots.mjs --quality=high` 与 `Script_OpeningStoryboardShots.mjs --side-by-side=<分镜目录>`；门禁 `Script_TextureStandardsTest`、`Script_FirstLevelSkyGradeTest`（+BrowserTest）、`Script_CharacterSurfaceTest`、`Script_FirstLevelVegetationTest`、`Script_FirstLevelPropDressingTest`、`Script_SamplerBudgetTest`。

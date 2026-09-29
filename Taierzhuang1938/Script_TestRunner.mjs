@@ -368,6 +368,7 @@ export const testDefs = {
   ActorCrowdTest: { file: "Script_ActorCrowdTest.mjs", timeoutMs: 10 * 60 * 1000,
     desc: "远景人群姿势层：站/跪/卧/跑步翻页/尸体各归各桶 + 像素级剪影变矮 + 提交量增量" },
   PropInstancingTest: { file: "Script_PropInstancingTest.mjs", desc: "外部布设实例化：逐像素无损 + 真省 draw call + 流送自洽" },
+  FrameDebuggerTest: { file: "Script_FrameDebuggerTest.mjs", timeoutMs: 15 * 60 * 1000, desc: "单帧绘制调试：逐 DC/GPU 计时、MRT/深度回放像素、钩子还原与游戏独立窗口" },
   ProfilerTest: { file: "Script_ProfilerTest.mjs", desc: "运行时性能剖析器：开关接线、CPU 子桶、GPU 分段与提交量、矩阵计数与钩子还原" },
   ProfilerRecordingTest: { file: "Script_ProfilerRecordingTest.mjs", desc: "剖析器录制与回放：逐实例时间轴、暂停/接缝帧、按帧号汇总与尖峰、录制存读往返、命令行读录制（纯 Node）" },
   // 命令行剖析要真起一次浏览器把第一关建起来（与面板同一份汇总口径），
@@ -431,6 +432,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "FrameDebuggerTest",
   "WhiteboxQualityBrowserTest",
   "AllyGaitBrowserTest",
   "AllyGaitMissionTest",
@@ -692,7 +694,7 @@ export const domains = {
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
     // 开机顺序（存档画质何时套上）与关卡预热的改动连着 SavedGraphicsWarmTest 跑（约一分半）。
-    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest"],
+    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -884,7 +886,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /(Menu|Style_Interface|BootProp|index\.html|Font_Title|\/Font\/)/i },
   { domain: "editor", pattern: /(Editor|Style_Interface|AssetStandards|Pcg|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|Data_Script|TengxianScript|Mission|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
-  { domain: "render", pattern: /(CharacterWounds|Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Blood|SurfaceDecals|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Atmosphere|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
+  { domain: "render", pattern: /(CharacterWounds|Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Blood|SurfaceDecals|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Atmosphere|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|FrameDebug|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
   // Data_Tuning_Graphics 是渲染帧图的档位表（不是玩法数值）：它同时命中 text 的
   // Data_Tuning_ 那条，这里再补一条把 render 域也拉进来。
   { domain: "render", pattern: /Data_Tuning_Graphics/i },
