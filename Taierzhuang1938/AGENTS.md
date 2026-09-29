@@ -105,6 +105,8 @@
 
 14. **贴图资产规范（2026-09-28）**：`Texture/` 下每个文件都登记在 `Data_TextureManifest.mjs`（套名、通道打包、加载层、来源与提示词、消费方）；新贴图按 `Texture_<PascalCase><Base|Normal|Orm|Orh…>.webp` 命名，经 `_import/Script_BakePbrTexture.py` 烘焙（写 `_import/TextureBakes/` 记录），默认进关卡按需集（`Data_LevelTextureSets` + `MaterialLibrary.LoadLevelSets`），不进开机 `PBR_SETS`；运行时 URL 带 `?v=`；legacy 名单只许变短。口径 [贴图资产规范](docs/Data_TextureAssetStandard.md)，验收 `Script_TextureStandardsTest.mjs`。
 
+15. **拾枪 / 换枪 / 拿弹药一律单击 F（tap），不按住（2026-09-29 用户定，通用机制）。** 内建拾枪（`Script_Interact.PickupCandidate`）只有 tap、`Press` 按下即完成，没有进度环，`INTERACT.weaponPickupHoldS` 已删；注册点里凡是「拿起 / 换上一件武器」的交互同样写 `gesture: "tap"`，提示条写「F」而不是「按住 F」。按住（hold / confirm）只留给止血、搬运、补给、拆板、接线这类过程。口径见 [系统参考](docs/Data_AgentReference.md) 的武器槽一节，验收 `Script_CarryTest.mjs`、`Script_WeaponPickupTest.mjs`、`Script_HudPromptTest.mjs`。
+
 人物外观必须遵循[用户确认的选模清单](docs/Data_CharacterSelection.md)，运行时与编辑器共用 `Data_CharacterSelection.mjs`；保留的源模型或动作参考不等于允许重新启用其人物外观。
 
 士兵资产采用 [Tengxian 共用身体骨架与重建契约](docs/Data_CharacterStandard.md)：五款外观、53 根共同身体骨骼、米制与相同绑定；旧来源模型从 Git 历史读取，不恢复已删除的五款弃用外观。

@@ -4,9 +4,11 @@
 //
 // 【一】**内建分支**（ER2 式的「按上下文挑一件事做」，原样保留）：
 //   · 拾枪拾弹 —— 2 m 内最近的一把枪（尸体身上掉的，或玩家换枪时丢在地上的），
-//               按**枪躺在哪**算距离，不按尸体脚底；同型的枪不换，只拿弹药（点按）；
-//               拾起 / 换上是**按住型**（COD 的「Hold F to swap」，时长 INTERACT.weaponPickupHoldS）；
+//               按**枪躺在哪**算距离，不按尸体脚底；同型的枪不换，只拿弹药；
+//               拾起 / 换上 / 拿弹药**一律单击 F，按下即完成**（2026-09-29 用户定，通用机制：
+//               切换 / 捡枪都只需要单击 F，不再有进度环；2026-09-15 起的「Hold F to swap」按住 0.35 s 作废）；
 //               换枪时手里那把放回刚才那把枪的位置，捡走的那把从地上消失。
+//               内建分支没有注册点可查判据，所以**只有 tap**：Press 当场做完，不进 hold 状态。
 //               进哪个槽、换掉哪一支是装配层的账（Script_Main.PickUpWeapon），这里只问 hooks。
 //   · 分弹药   —— 2.5 m 内弹打光的弟兄，分一个桥夹过去。
 //   这两条不查注册表，因为它们的「交互点」是活的战场对象（谁倒下了、谁打光了），
@@ -20,7 +22,9 @@
 //   章节/集成批调 `Register(spec)` 摆点，引擎只负责判定与推进。
 //
 // ── 三种手势 ────────────────────────────────────────────────────────────────
-//   tap      按一下就完成（拾传单、递纱布、拆门板）。
+//   tap      按一下就完成（拾枪 / 换枪、拾传单、递纱布）。
+//            **凡是「拿起 / 换上一件武器」的交互一律用 tap**（2026-09-29 用户定的通用机制），
+//            注册点里摆武器拾取也照此写；按住只留给止血、搬运、补给、拆板、接线这类「过程」。
 //   hold     按住，进度环走满才完成；**中途松手进度会退回去，但不清零** ——
 //            按住止血这种事，手抖一下不该从头再来。
 //   confirm  长按确认；**中途松手直接清零**。用在不可逆的决定上
@@ -51,12 +55,11 @@ function AnchorOf(point) {
 }
 
 /**
- * 按住型手势认「还是不是刚才那一件」的钥匙：注册点认 id（同 id 重注册照样续上），
- * 内建的拾枪认那一条地上的枪 / 那一具尸体本身。
+ * 按住型手势认「还是不是刚才那一件」的钥匙：认注册点的 id（同 id 重注册照样续上）。
+ * 只有注册点会按住；内建的拾枪 / 分弹一律 tap（见 Press），不需要钥匙。
  */
 function HoldKeyOf(candidate) {
-  if (candidate?.point) return `point:${candidate.point.id}`;
-  return candidate?.ground || candidate?.soldier || null;
+  return candidate?.point ? `point:${candidate.point.id}` : null;
 }
 
 /** Keep whole clips in reserve; loose rounds top up the held gun without discarding leftovers. */
@@ -171,7 +174,7 @@ export class InteractSystem {
       this.points.delete(id);
       removed += 1;
     }
-    if (this.hold && !this.hold.builtin && !this.points.has(this.hold.id)) this.CancelHold("cleared");
+    if (this.hold && !this.points.has(this.hold.id)) this.CancelHold("cleared");
     return removed;
   }
 
@@ -201,7 +204,6 @@ export class InteractSystem {
     const index = this.groundWeapons.indexOf(item);
     if (index < 0) return false;
     this.groundWeapons.splice(index, 1);
-    if (this.hold?.key === item) this.CancelHold("gone");
     this.hooks.GroundWeaponRemoved?.(item);
     return true;
   }
@@ -209,14 +211,13 @@ export class InteractSystem {
   /** 换关：地上的枪一把不留（模型一并交回装配层拆掉）。 */
   ClearGroundWeapons() {
     const items = this.groundWeapons.splice(0);
-    if (this.hold?.builtin && items.includes(this.hold.key)) this.CancelHold("cleared");
     for (const item of items) this.hooks.GroundWeaponRemoved?.(item);
     return items.length;
   }
 
   /** 捡这把枪会发生什么：换枪 / 拾起 / 只拿弹药。null = 同型而且没有弹药可拿，或者这件武器停用了。 */
   PickupCandidate(source, dist, extra) {
-    // 停用的武器（手枪）躺在地上也不给拾：按住读完条再说「拿不起来」比不提示更糟。
+    // 停用的武器（手枪）躺在地上也不给拾：按下去才说「拿不起来」比不提示更糟。
     if (WeaponShelved(source.weaponId)) return null;
     const name = WeaponName(source.weaponId) || T("interact.pickup.unknownWeapon");
     const melee = WEAPONS[source.weaponId]?.kind === "melee";
@@ -236,8 +237,10 @@ export class InteractSystem {
       // 换枪 / 拾起时 HUD 在提示下面画这把枪的剪影；只拿弹药不画。
       weaponId: ammoOnly ? null : source.weaponId,
       priority: INTERACT.builtinPriority,
-      // COD 式：拾起 / 换上要按住（会丢下手里那支），只拿弹药点一下就行。
-      gesture: ammoOnly ? "tap" : "hold", seconds: ammoOnly ? 0 : INTERACT.weaponPickupHoldS,
+      // 拾起 / 换上 / 拿弹药一律单击 F 即完成（2026-09-29 用户定；此前拾起 / 换上要按住 0.35 s）。
+      // 换枪会把手里那支放回原位、走回去还能换回来，误按的代价只是再按一下；
+      // 与推架 / 救护点抢键由优先级与「正看着的枪」（pickupAimDot）分流，见 Query。
+      gesture: "tap", seconds: 0,
       ...extra,
     };
   }
@@ -363,24 +366,24 @@ export class InteractSystem {
 
   /**
    * F 按下。tap 立刻做完；hold/confirm 开始按住，由 Update 推进度。
+   * **内建分支（拾枪 / 分弹）一律按下即做**：它们没有注册点，Update 没有判据可每帧复核，
+   * 所以即使哪天有人把内建候选写成 hold，也是当 tap 处理，而不是留一条读不满的死进度。
    * @returns 执行/开始的那一条，或者 null。
    */
   Press(player) {
     const candidate = this.Query(player);
     if (!candidate) return null;
-    if (candidate.gesture === "tap") return this.Complete(candidate, player) ? candidate : null;
+    if (candidate.gesture === "tap" || !candidate.point) return this.Complete(candidate, player) ? candidate : null;
     // 换目标就重开一条进度；同一个点接着按则续上刚才退掉一半的那截。
     const key = HoldKeyOf(candidate);
     if (!this.hold || this.hold.key !== key) {
       // 上一条没退干净就被换掉时也要回一次 OnCancel —— 章节侧靠它收演出。
       if (this.hold) this.CancelHold("switched");
       this.hold = {
-        id: candidate.point?.id ?? null, key, t: 0, holding: true,
-        // builtin = 内建的拾枪：没有注册点，每帧重新 Query 确认眼前还是这一把。
-        builtin: !candidate.point, kind: candidate.kind, weaponId: candidate.weaponId ?? null,
+        id: candidate.point.id, key, t: 0, holding: true,
         gesture: candidate.gesture, seconds: candidate.seconds, label: candidate.label,
       };
-      candidate.point?.OnBegin?.(this.Context(candidate.point, player, candidate.dist));
+      candidate.point.OnBegin?.(this.Context(candidate.point, player, candidate.dist));
     } else {
       this.hold.holding = true;
       this.hold.label = candidate.label;
@@ -417,7 +420,6 @@ export class InteractSystem {
     }
     const hold = this.hold;
     if (!hold) return null;
-    if (hold.builtin) return this.UpdateBuiltinHold(step, player);
     const point = this.points.get(hold.id);
     if (!point) return this.CancelHold("gone");
     if (!player?.Alive) return this.CancelHold("playerDown");
@@ -434,33 +436,6 @@ export class InteractSystem {
           kind: point.kind, point, dist, priority: point.priority,
           gesture: point.gesture, seconds: point.seconds, label: this.LabelOf(point, ctx),
         };
-        this.hold = null;
-        this.Complete(candidate, player);
-        return candidate;
-      }
-    } else {
-      hold.t -= step * INTERACT.holdDecayPerS / hold.seconds;
-      if (hold.t <= 0) return this.CancelHold("decayed");
-    }
-    return null;
-  }
-
-  /**
-   * 按住拾枪的那一条。没有注册点可查判据，所以**每帧重新 Query**：
-   * 走开、转头看向另一把、那把被别人拿走，排第一的就不再是它 —— 进度当场作废，
-   * 与注册点「走开一步进度就断」同一个口径。
-   */
-  UpdateBuiltinHold(step, player) {
-    const hold = this.hold;
-    if (!player?.Alive) return this.CancelHold("playerDown");
-    const candidate = this.Query(player);
-    if (!candidate || HoldKeyOf(candidate) !== hold.key || candidate.gesture === "tap") {
-      return this.CancelHold("outOfReach");
-    }
-    hold.label = candidate.label;
-    if (hold.holding) {
-      hold.t = Clamp01(hold.t + step / hold.seconds);
-      if (hold.t >= 1) {
         this.hold = null;
         this.Complete(candidate, player);
         return candidate;
@@ -547,13 +522,12 @@ export class InteractSystem {
   View() {
     const hold = this.hold;
     if (!hold) return null;
-    const point = hold.builtin ? null : this.points.get(hold.id);
-    if (!hold.builtin && !point) return null;
+    const point = this.points.get(hold.id);
+    if (!point) return null;
     // label 是按下那一刻算好存进 hold 的，不在这里现算 —— 现算要一份带 player 的
     // ctx，而 HUD 每帧都调 View()，让它去构造上下文等于把渲染层拖进规则层。
     return {
-      id: hold.builtin ? (hold.key?.id ?? null) : hold.id, kind: point ? point.kind : hold.kind,
-      ...(hold.weaponId ? { weaponId: hold.weaponId } : {}), gesture: hold.gesture,
+      id: hold.id, kind: point.kind, gesture: hold.gesture,
       t: Clamp01(hold.t), seconds: hold.seconds, holding: !!hold.holding,
       label: hold.label ?? "",
     };

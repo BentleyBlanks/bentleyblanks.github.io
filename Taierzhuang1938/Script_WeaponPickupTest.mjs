@@ -1,23 +1,24 @@
 // 拾枪（COD 式主 / 副武器）真浏览器回归：靶场（?range=1）里走真键位链。
 //
-// 口径（2026-09-15 用户定，对标 COD）：
+// 口径（2026-09-15 用户定，对标 COD；2026-09-29 用户改口径：拾起 / 换上单击 F）：
 //   · 数字键 1 主武器 / 2 副武器 / 3 大刀 / 4 投掷物；
-//   · 地上的枪要**按住 F** 才拾起 / 换上（点一下不算）；提示「[F] 长按拾起 / 换上 …」带那把枪的剪影；
+//   · 地上的枪**单击 F** 就拾起 / 换上（不再按住，没有进度环；此前是按住 0.35 s、点一下不算）；
+//     提示「[F] 拾起 / 换上 …」带那把枪的剪影；
 //   · 有空枪槽先填空槽，捡起来直接端在手上，主武器原封不动；
 //   · 两个枪槽都满：换掉手里那支，换下的丢在原地、弹仓跟着走，走回去还能换回来；
 //     手里是大刀时换掉最后端过的那支；
-//   · 主 / 副武器各记各的弹仓和刺刀；同型的枪只补给对应那个槽的弹药（点按）。
+//   · 主 / 副武器各记各的弹仓和刺刀；同型的枪只补给对应那个槽的弹药（同样单击）；
+//   · 按住 F 不放（键盘自动重复）只算按下那一次，不会把刚换下的枪又换回来。
 //
 // 输入全走 Debug.Key（键位表 → OnAction → InteractSystem），不直调 PickUpWeapon / SwitchSlot。
 // 采样在同一个 page.evaluate 里同步跑完（rAF 不许插队）。
-// --shot：把「长按换上」那一帧拍到系统临时目录，给人看提示与剪影。
+// --shot：把「换上」提示那一帧拍到系统临时目录，给人看提示与剪影。
 
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
-import { INTERACT } from "./Data_Tuning_Interact.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
@@ -47,8 +48,7 @@ try {
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
-  const holdFrames = Math.ceil((INTERACT.weaponPickupHoldS + 0.15) * 60);
-  const result = await page.evaluate(({ holdFrames }) => {
+  const result = await page.evaluate(() => {
     const T = window.Taierzhuang;
     const D = T.Debug;
     const out = {};
@@ -61,8 +61,9 @@ try {
     T.StepFrames(10);
     const Snap = () => ({ ...D.Slots(), viewmodel: T.viewmodel.weaponId, ground: D.Interact().groundWeapons });
     const Prompts = () => D.Prompts();
-    const HoldF = () => { D.Key("KeyF", true); T.StepFrames(holdFrames); D.Key("KeyF", false); T.StepFrames(2); };
-    const TapF = () => { D.Key("KeyF", true); T.StepFrames(1); D.Key("KeyF", false); T.StepFrames(40); };
+    // 单击 F：按下、一帧、松开，再走两帧。按下那一刻就完成，不需要按住。
+    const TapF = () => { D.Key("KeyF", true); T.StepFrames(1); D.Key("KeyF", false); T.StepFrames(2); };
+    const RingOn = () => document.querySelector(".hudInteractRing")?.classList.contains("on") || false;
     const Idle = (frames = 90) => T.StepFrames(frames);   // 刺刀 / 拉栓播完，SwitchSlot 才放行
     const Ahead = (m) => ({ x: spot.x, z: spot.z - m });
 
@@ -70,15 +71,21 @@ try {
     T.state.ammo = 3; T.state.clips = 4;
     out.start = Snap();
 
-    // --- 1) 空副武器槽：「长按拾起」+ 剪影；点按不算，按住才拾 ------------------
+    // --- 1) 空副武器槽：「拾起」+ 剪影；单击 F 当场拾起，没有进度环 --------------
     const typeA = D.DropWeapon("Type38", { ...Ahead(1.1), yaw: Math.PI / 2, ammo: 4 });
     T.StepFrames(8);
     out.takePrompt = Prompts().find((p) => p.kind === "pickup") || null;
     out.takeQuery = D.Interact();
-    TapF();
-    out.afterTap = Snap();
-    HoldF();
+    out.takeRow = (() => {
+      const row = document.querySelector(".hudAction.pickup");
+      return row && { key: row.querySelector("kbd")?.textContent, text: row.querySelector(".actionText")?.textContent };
+    })();
+    // 按下的那一帧就该拾起（不许要求按住）：只推一帧，松手前看槽位。
+    D.Key("KeyF", true); T.StepFrames(1);
+    out.takeOnPress = { ...Snap(), ring: RingOn(), view: T.interact.View() };
+    D.Key("KeyF", false); T.StepFrames(2);
     out.afterTake = Snap();
+    out.takeRing = { ring: RingOn(), view: T.interact.View() };
 
     // --- 2) 1 / 2 / 3 / 4 真键位切换，弹仓各记各的 ------------------------------
     D.Key(D.SlotKey("primary")); T.StepFrames(4);
@@ -99,7 +106,7 @@ try {
     D.Key(D.SlotKey("primary")); T.StepFrames(4);
     out.bayonetBackOnPrimary = Snap().bayonetFixed;
 
-    // --- 4) 两个枪槽都满、手里是副武器：「长按换上」换掉手里那支，丢在原地 --------
+    // --- 4) 两个枪槽都满、手里是副武器：「换上」换掉手里那支，丢在原地 ------------
     D.Key(D.SlotKey("secondary")); T.StepFrames(4);
     T.state.ammo = 2;                              // 三八式打掉两发，换下时要带着这个数
     const lmg = D.DropWeapon("Type11", { ...Ahead(1.0), yaw: Math.PI / 2, ammo: 30 });
@@ -111,40 +118,44 @@ try {
         icon: row.querySelector("img.actionWeapon")?.getAttribute("src") || null };
     })();
     out.lmgId = lmg;
-    // 按住到一半：进度环亮着、还没换
-    D.Key("KeyF", true); T.StepFrames(Math.floor(holdFrames / 3));
-    out.midHold = { ring: document.querySelector(".hudInteractRing")?.classList.contains("on") || false,
-      view: T.interact.View(), slots: Snap().slots };
+    // 提示条在、还没按 F：槽位原封不动（换枪只发生在按下那一刻）
+    out.beforeSwap = { ...Snap(), ring: RingOn() };
     window.__pickupShotReady = true;
     return out;
-  }, { holdFrames });
+  });
 
   if (process.argv.includes("--shot")) {
     await page.evaluate(() => window.Taierzhuang.StepFrames(1, 1 / 60, true));
-    const shot = path.join(os.tmpdir(), "TaierzhuangWeaponPickupHold.png");
+    const shot = path.join(os.tmpdir(), "TaierzhuangWeaponPickupSwapPrompt.png");
     await page.screenshot({ path: shot, timeout: 90000 });
     console.log(`shot: ${shot}`);
   }
 
-  const rest = await page.evaluate(({ holdFrames }) => {
+  const rest = await page.evaluate(() => {
     const T = window.Taierzhuang;
     const D = T.Debug;
     const out = {};
     const Snap = () => ({ ...D.Slots(), viewmodel: T.viewmodel.weaponId, ground: D.Interact().groundWeapons });
-    const HoldF = () => { D.Key("KeyF", true); T.StepFrames(holdFrames); D.Key("KeyF", false); T.StepFrames(2); };
-    // 接着第 4 步没松开的 F 按满
-    T.StepFrames(holdFrames);
+    const TapF = () => { D.Key("KeyF", true); T.StepFrames(1); D.Key("KeyF", false); T.StepFrames(2); };
+    const RingOn = () => document.querySelector(".hudInteractRing")?.classList.contains("on") || false;
+    // 接着第 4 步：现在才按 F。按下那一帧就该换好（不许要求按住）；
+    // 再补两条自动重复的 keydown 并多走 40 帧（键盘按着不放），输入层只认按下那一次，不会把刚换下的枪换回来。
+    D.Key("KeyF", true); T.StepFrames(1);
+    out.swapOnPress = { ...Snap(), ring: RingOn(), view: T.interact.View() };
+    D.Key("KeyF", true); D.Key("KeyF", true);
+    T.StepFrames(40);
     D.Key("KeyF", false); T.StepFrames(2);
     out.afterSwap = Snap();
+    out.afterSwapRing = RingOn();
 
     // --- 5) 手里是大刀、两个枪槽都满：换掉最后端过的那支（副武器） ----------------
     D.Key(D.SlotKey("melee")); T.StepFrames(4);
     out.meleeBeforeSwapBack = Snap();
     out.swapBackPrompt = D.Prompts().find((p) => p.kind === "pickup") || null;
-    HoldF();
+    TapF();
     out.afterSwapBack = Snap();
 
-    // --- 6) 同型的枪只补弹药（点按），补到对应的槽上：手里是三八式，补的是背着的汉阳造 --
+    // --- 6) 同型的枪只补弹药（单击），补到对应的槽上：手里是三八式，补的是背着的汉阳造 --
     for (const item of [...T.interact.groundWeapons]) T.interact.RemoveGroundWeapon(item);
     const mags = D.Slots().mags;
     out.primaryMagBefore = mags.primary;
@@ -166,7 +177,7 @@ try {
     D.Key(D.SlotKey("secondary")); T.StepFrames(4);
     out.reloadCancelBack = Snap();
     return out;
-  }, { holdFrames });
+  });
 
   const r = { ...result, ...rest };
   const typeName = WEAPONS.Type38.name;
@@ -176,14 +187,21 @@ try {
   Check("开局：1 汉阳造 / 2 空 / 3 大刀，数字键顺序是 主 / 副 / 大刀 / 投掷物",
     r.start.slots.primary === "HanYang" && !r.start.slots.secondary && r.start.slots.melee === "Dadao"
       && r.start.order.join() === "primary,secondary,melee,throwable", JSON.stringify(r.start));
-  Check("空副武器槽：提示「按住 F · 拾起 三八式」并带剪影 id",
-    r.takePrompt?.keys === "按住 F" && r.takePrompt.label === `拾起 ${typeName}` && r.takePrompt.weaponId === "Type38",
-    JSON.stringify(r.takePrompt));
-  Check("点按 F 不拾枪", r.afterTap.slots.secondary == null && r.afterTap.active === "primary", JSON.stringify(r.afterTap));
-  Check("按住 F：三八式进 2 号副武器并直接端在手上",
+  // 2026-09-29 用户改口径：拾起 / 换上单击 F。此前这里断言的是「按住 F · 拾起 三八式」「点按 F 不拾枪」
+  // 「按住 F：三八式进 2 号副武器」，现在提示条只写「F」、按下那一帧就拾起、没有进度环。
+  Check("空副武器槽：提示「F · 拾起 三八式」（不再写按住 / 长按）并带剪影 id",
+    r.takePrompt?.keys === "F" && r.takePrompt.label === `拾起 ${typeName}` && r.takePrompt.weaponId === "Type38"
+      && r.takeRow?.key === "F" && r.takeRow.text === `拾起 ${typeName}`,
+    JSON.stringify({ p: r.takePrompt, row: r.takeRow }));
+  Check("拾起候选是点按型（gesture: tap），不是按住型",
+    r.takeQuery.kind === "pickup" && r.takeQuery.gesture === "tap", JSON.stringify({ kind: r.takeQuery.kind, gesture: r.takeQuery.gesture }));
+  Check("单击 F 按下那一帧就拾起，没有进度环", r.takeOnPress.slots.secondary === "Type38" && r.takeOnPress.active === "secondary"
+    && r.takeOnPress.ring === false && r.takeOnPress.view === null, JSON.stringify(r.takeOnPress));
+  Check("单击 F：三八式进 2 号副武器并直接端在手上",
     r.afterTake.slots.secondary === "Type38" && r.afterTake.active === "secondary"
-      && r.afterTake.weapon === "Type38" && r.afterTake.viewmodel === "Type38" && r.afterTake.ammo === 4,
-    JSON.stringify(r.afterTake));
+      && r.afterTake.weapon === "Type38" && r.afterTake.viewmodel === "Type38" && r.afterTake.ammo === 4
+      && r.takeRing.ring === false && r.takeRing.view === null,
+    JSON.stringify({ a: r.afterTake, ring: r.takeRing }));
   Check("有空槽时不丢枪：主武器汉阳造原封不动（弹仓 3 + 4 个桥夹），地上没多出枪",
     r.afterTake.slots.primary === "HanYang" && r.afterTake.mags.primary.ammo === 3 && r.afterTake.mags.primary.clips === 4
       && r.afterTake.ground.length === 0, JSON.stringify(r.afterTake));
@@ -195,17 +213,20 @@ try {
   Check("刺刀跟着枪走：汉阳造装上、三八式收着、切回汉阳造还在",
     r.bayonetOnPrimary === true && r.bayonetOnSecondary === false && r.bayonetBackOnPrimary === true,
     JSON.stringify({ a: r.bayonetOnPrimary, b: r.bayonetOnSecondary, c: r.bayonetBackOnPrimary }));
-  Check("两个枪槽都满：提示变成「长按换上 十一年式轻机枪」，下面画剪影",
-    r.swapPrompt?.keys === "按住 F" && r.swapPrompt.label === `换上 ${lmgName}`
-      && r.swapPromptRow?.key === "F" && r.swapPromptRow.text === `长按换上 ${lmgName}`
+  Check("两个枪槽都满：提示变成「F · 换上 十一年式轻机枪」（不再写长按），下面画剪影",
+    r.swapPrompt?.keys === "F" && r.swapPrompt.label === `换上 ${lmgName}`
+      && r.swapPromptRow?.key === "F" && r.swapPromptRow.text === `换上 ${lmgName}`
       && r.swapPromptRow.icon === "Texture/Hud/Texture_HudWeapon_Type11.png", JSON.stringify({ p: r.swapPrompt, row: r.swapPromptRow }));
-  Check("按住到一半：进度环亮着、还没换",
-    r.midHold.ring && r.midHold.view?.kind === "pickup" && r.midHold.view.t > 0 && r.midHold.view.t < 1
-      && r.midHold.slots.secondary === "Type38", JSON.stringify(r.midHold));
-  Check("按满：换掉手里的三八式，主武器不动，三八式带着剩下 2 发丢在原地",
+  Check("提示条亮着还没按 F：枪槽原封不动、没有进度环",
+    r.beforeSwap.slots.secondary === "Type38" && r.beforeSwap.ring === false, JSON.stringify(r.beforeSwap));
+  Check("单击 F 按下那一帧就换好，没有进度环",
+    r.swapOnPress.slots.secondary === "Type11" && r.swapOnPress.active === "secondary"
+      && r.swapOnPress.ring === false && r.swapOnPress.view === null, JSON.stringify(r.swapOnPress));
+  Check("换掉手里的三八式，主武器不动，三八式带着剩下 2 发丢在原地；F 按着不放（自动重复）也只换这一次",
     r.afterSwap.slots.secondary === "Type11" && r.afterSwap.active === "secondary" && r.afterSwap.weapon === "Type11"
       && r.afterSwap.slots.primary === "HanYang"
-      && r.afterSwap.ground.length === 1 && r.afterSwap.ground[0].weaponId === "Type38" && r.afterSwap.ground[0].ammo === 2,
+      && r.afterSwap.ground.length === 1 && r.afterSwap.ground[0].weaponId === "Type38" && r.afterSwap.ground[0].ammo === 2
+      && r.afterSwapRing === false,
     JSON.stringify(r.afterSwap));
   Check("手里是大刀时仍提示换上三八式（记得最后端的是副武器）",
     r.meleeBeforeSwapBack.active === "melee" && r.meleeBeforeSwapBack.lastGunSlot === "secondary"
@@ -215,7 +236,7 @@ try {
       && r.afterSwapBack.active === "secondary" && r.afterSwapBack.ammo === 2
       && r.afterSwapBack.ground.length === 1 && r.afterSwapBack.ground[0].weaponId === "Type11",
     JSON.stringify(r.afterSwapBack));
-  Check("同型的枪是点按「补充弹药」，不画剪影",
+  Check("同型的枪也是单击「补充弹药」，不画剪影",
     r.ammoPrompt?.keys === "F" && new RegExp(`补充 ${hanName} 弹药`).test(r.ammoPrompt.label) && !r.ammoPrompt.weaponId,
     JSON.stringify(r.ammoPrompt));
   Check("补的是背着的汉阳造：主武器备弹 +3 个桥夹，手里的三八式不变",
@@ -233,5 +254,5 @@ try {
   await browser.close();
   server.close();
 }
-console.log(failed ? `FAIL  拾枪 ${failed} 条未过` : "ok  拾枪：COD 式主副武器、按住拾取、换下留地、各槽弹仓与刺刀、换弹中拔刀取消换弹");
+console.log(failed ? `FAIL  拾枪 ${failed} 条未过` : "ok  拾枪：COD 式主副武器、单击拾取、换下留地、各槽弹仓与刺刀、换弹中拔刀取消换弹");
 process.exit(failed ? 1 : 0);

@@ -152,7 +152,7 @@ export const P012_WAVES = Object.freeze([
  *   kind          交互种类（preset 为 null 时才写；预制自己带）
  *   labelKey      标签文案键；带 {…} 的动态标签由回调表的 Label() 出，见 dynamicLabel
  *   dynamicLabel  true = 标签每次由回调表算（箱内剩几个桥夹这种）
- *   gesture/seconds/once  手势、按住秒数、是否只做一次
+ *   gesture/seconds/once  手势、按住秒数（tap 型不写）、是否只做一次
  *   secondsPath   秒数改由配置读（写在这里的 seconds 是缺省值）
  *   position      锚点在 config 里的路径；anchorFallback / pointFallback 是它的退路
  *   anchor        true = 位置每帧由回调表的 Anchor() 给（跟着人 / 跟着队头走的点）
@@ -161,8 +161,9 @@ export const P012_WAVES = Object.freeze([
  *   itemKey       preset 用：交付物名字
  */
 export const P012_INTERACTION_SPECS = Object.freeze([
+  // 领步枪 = 拿起一件武器：2026-09-29 起单击 F 即完成（用户定的通用机制，拾枪 / 换枪 / 领枪都不按住）。
   { id: "p012_weaponCheck", kind: "supply", labelKey: "p012.point.weaponCheck",
-    gesture: "hold", seconds: 2.4, position: "activities.weaponReceiveAnchor", once: false },
+    gesture: "tap", position: "activities.weaponReceiveAnchor", once: false },
   { id: "p012_ammoIssue", kind: "supply", labelKey: "p012.point.ammoIssue",
     gesture: "hold", seconds: 1.8, position: "activities.weaponIssueAnchor", once: false },
   { id: "p012_woundedCheck", kind: "bandage", labelKey: "p012.point.woundedCheck",

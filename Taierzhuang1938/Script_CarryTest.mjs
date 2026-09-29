@@ -54,13 +54,14 @@ function Step(system, seconds, player) {
 }
 
 /**
- * 按住 F 把眼前的武器拾起 / 换上（COD 式按住型），返回按下那一刻的候选。
- * 只拿同型弹药是点按，Press 当场就做完，后面那段 Step 是空推。
+ * 单击 F 把眼前的武器拾起 / 换上，返回按下那一刻的候选。
+ * 2026-09-29 用户改口径：拾起 / 换上与拿弹药一样按下即完成（此前是 COD 式「按住 0.35 s」，
+ * 这个助手曾经要按住读条）；后面的 Update 是空推，用来证明松手与多推几帧都不会再做一次。
  */
-function HoldPickup(system, player) {
+function TapPickup(system, player) {
   const candidate = system.Press(player);
-  Step(system, INTERACT.weaponPickupHoldS + 0.1, player);
   system.Release();
+  Step(system, 0.2, player);
   return candidate;
 }
 
@@ -485,26 +486,37 @@ console.log(`ok  交互框架：注册/清理、三种手势、距离朝向、�
   Check(system.Query(player)===null&&system.Press(player)===null,"实体遮挡时不显示或执行隔墙拾枪");
   Check(taken.length===0&&!corpse.drop.taken,"遮挡不会消耗原枪械");
   system.hooks.CanReachActor=()=>true;
-  // COD 的「Hold F to swap」：点一下不算，按住读满才拾起。
+  // 2026-09-29 用户改口径：拾起 / 换上单击 F 即完成，不再按住。此前（2026-09-15 起）是 COD 的
+  // 「Hold F to swap」—— 点一下不算、按住 0.35 s 才拾起，这里的断言原本是「点一下就松手：不拾」
+  // 与「按住中进度环读得到那把枪」；现在改成：按下当场拾起，没有读条、没有进度环。
+  const query = system.Query(player);
+  Check(query.kind === "pickup" && query.gesture === "tap" && query.seconds === 0, "拾枪是点按型，没有按住时长");
+  Check(!("weaponPickupHoldS" in INTERACT), "调参表里的拾枪按住时长已删");
   const pressed = system.Press(player);
-  Check(pressed.kind === "pickup" && pressed.gesture === "hold", "拾枪是按住型");
-  Check(pressed.seconds === INTERACT.weaponPickupHoldS, "按住时长取调参表");
+  Check(pressed.kind === "pickup" && pressed.weaponId === "Type38", "按一下 F 捡起来，候选仍带着那把枪的 id（HUD 画剪影用）");
+  Check(taken.length === 1 && taken[0][1] === 2, "按下当场拾起，桥夹数如实传给装配层");
+  Check(system.View() === null && system.hold === null, "拾起没有进度环，也不留按住状态");
   system.Release();
   Step(system, 1.0, player);
-  Check(taken.length === 0 && !corpse.drop.taken && system.View() === null, "点一下就松手：不拾、进度退干净");
-  system.Press(player);
-  Step(system, INTERACT.weaponPickupHoldS * 0.5, player);
-  const view = system.View();
-  Check(view?.kind === "pickup" && view.weaponId === "Type38" && view.t > 0.3 && view.t < 0.8,
-    `按住中进度环读得到那把枪：${JSON.stringify(view)}`);
-  Check(taken.length === 0, "读条没满不拾");
-  const moved = MakePlayer({ z: 3 });
-  system.Update(0.05, moved);
-  Check(system.View() === null && taken.length === 0, "走开一步进度当场作废");
-  Check(HoldPickup(system, player).kind === "pickup", "按住 F 捡起来");
-  Check(taken.length === 1 && taken[0][1] === 2, "桥夹数如实传给装配层");
-  Check(corpse.drop.taken === true && system.pickups === 1, "同一具尸体不许捡两次");
+  Check(taken.length === 1 && system.pickups === 1 && system.View() === null, "松手与后面推的帧都不再多拾一次");
+  Check(corpse.drop.taken === true && system.Press(player) === null, "同一具尸体不许捡两次");
   Check(hints.some((t) => /桥夹/.test(t)), "缴获提示还在");
+}
+{
+  // 内建分支只有 tap：即使哪天候选被写成 hold，Press 也是按下即做，不留一条读不满的死进度（按了没反应）。
+  const taken = [];
+  const corpse = {
+    alive: false, position: { x: 0, y: 0, z: -1 },
+    drop: { weaponId: "Type38", clips: 0, taken: false },
+  };
+  const system = new InteractSystem({ ai: { soldiers: [corpse] } },
+    { HasWeapon: () => true, TakeWeapon: (id) => { taken.push(id); return true; } });
+  const original = system.PickupCandidate.bind(system);
+  system.PickupCandidate = (...args) => ({ ...original(...args), gesture: "hold", seconds: 0.35 });
+  const player = MakePlayer();
+  Check(system.Query(player).gesture === "hold", "夹具：内建候选被改写成 hold");
+  Check(system.Press(player)?.kind === "pickup" && taken.length === 1, "内建候选就算写成 hold 也按下即做");
+  Check(system.View() === null && system.hold === null, "没有留下按住状态");
 }
 {
   // 停用的武器（手枪）躺在地上也不给拾：否则按住读满条之后装配层才说「拿不起来」。
@@ -574,7 +586,7 @@ console.log("ok  拾枪/分弹药两条内建分支迁进框架后无回归");
     const q = system.Query(player);
     Check(q.kind === "pickup" && q.soldier === b, "按枪实际躺的位置挑，不按尸体脚底");
     Check(/^换上 /.test(q.label), "手里有枪时是「换上」");
-    HoldPickup(system, player);
+    TapPickup(system, player);
     Check(kit.primary === "Type11" && b.drop.taken && kit.hidden.includes(b), "捡走的那把从尸体上拆掉");
     Check(system.groundWeapons.length === 1, "手里那把没有凭空消失");
     const dropped = system.groundWeapons[0];
@@ -582,7 +594,7 @@ console.log("ok  拾枪/分弹药两条内建分支迁进框架后无回归");
     Check(Math.hypot(dropped.position.x - 0.1, dropped.position.z + 1.0) < 1e-9, "放回刚才那把枪的位置");
     const back = system.Query(player);
     Check(back.ground === dropped && /^换上 /.test(back.label), "走回去还能换回来");
-    HoldPickup(system, player);
+    TapPickup(system, player);
     Check(kit.primary === "HanYang" && kit.ammo === 3 && kit.clips === 4, "换回来弹药一发不少");
     Check(kit.drops.includes(dropped.id) && system.groundWeapons.length === 1
       && system.groundWeapons[0].weaponId === "Type11", "地上那把被拿走，Type11 放回原处");
@@ -596,7 +608,7 @@ console.log("ok  拾枪/分弹药两条内建分支迁进框架后无回归");
     system.ctx.ai.soldiers.push(mate);
     const player = MakePlayer();
     Check(/弹药/.test(system.Query(player).label), "同型的枪提示拿弹药，不是换上");
-    Check(system.Query(player).gesture === "tap", "只拿弹药不丢东西，点按就行");
+    Check(system.Query(player).gesture === "tap", "拿弹药与拾起 / 换上一样，单击就行");
     system.Press(player);
     Check(kit.primary === "HanYang" && kit.ammo === 3 && kit.clips === 7, "同型只加桥夹（2 个 + 满仓那一个），弹仓不清零");
     Check(system.Query(player) === null, "拿空了就不再提示同型的空枪");

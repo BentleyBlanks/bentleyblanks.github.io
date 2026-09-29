@@ -735,7 +735,8 @@ async function PlayFrontline() {
               &&scav.confirmFrames>=(perception?.confirmationFrames??23)&&!game.viewmodel.IsBusy?.()){
               Key("KeyW",false);
               const before={ammo:game.state.ammo,clips:game.state.clips,pickups:game.interact.pickups,taken:corpse.drop.taken};
-              // 拾起 / 换上武器是按住型（按住时长就是候选的 seconds）；只拿弹药仍是点按。
+              // 拾起 / 换上武器与拿弹药一样是单击 F（2026-09-29 起，按下即完成）；仍留着 hold 分支
+              // 只是给按住型的注册点用（按住时长就是候选的 seconds）。
               Key("KeyF",true);
               if(query.gesture==="hold")game.StepFrames(Math.ceil((query.seconds+.1)*30),1/30,false);
               Key("KeyF",false);
