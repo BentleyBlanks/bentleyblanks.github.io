@@ -64,10 +64,10 @@
     },
     "CarryZhou": {
       "file": "AudioVoice_FirstLevelCarryZhou.mp3",
-      "seconds": 8.046,
-      "bytes": 97220,
-      "promptHash": "7b861a324a7c61ab0ba67d6d211aa01f5482a3f10faff900c339507740582c32",
-      "sha256": "4b08357c34fad12038201df683a9b8f134c26958b78e9279625a7e2eb7093396",
+      "seconds": 5.721,
+      "bytes": 69321,
+      "promptHash": "d6caeef33e370525b828f45dec7eda9aa43284c20ed3970e3a9fbf67407cd028",
+      "sha256": "33086b6dc6a082fdb14d431e070d95f797f3740f288bbb3d8003bd0da2fdd799",
       "lineCount": 3,
       "requests": 1,
       "speechRate": 0,
@@ -100,10 +100,10 @@
     },
     "ZhouDeath": {
       "file": "AudioVoice_FirstLevelZhouDeath.mp3",
-      "seconds": 13.845,
-      "bytes": 166810,
-      "promptHash": "71bedfa9e9e545122ed8f94d63ea85ff482495f5aea3ff23ce3543c7ac0816a2",
-      "sha256": "dff2e60ff89d573624157690e64bb5d09422f9f1420e86257bc1892d38eb750d",
+      "seconds": 15.647,
+      "bytes": 188440,
+      "promptHash": "810aa17b0688923f4aab24c3410834c72694810d7ac67a3d1aa69c88a952aa70",
+      "sha256": "fdccb96bb8513e2f1dac53c1671f145e42f161b5ca13ead31e6a09afab167ede",
       "lineCount": 7,
       "requests": 1,
       "speechRate": 0,
@@ -328,10 +328,10 @@
     },
     "SouthWhisper": {
       "file": "AudioVoice_FirstLevelSouthWhisper.mp3",
-      "seconds": 12.931,
-      "bytes": 155839,
-      "promptHash": "e5797f49946cb559af0f84610d76bff0a62bf29dade70976be55fdb2ffc9b85d",
-      "sha256": "2715d5ddb6da9ba101cea9dd6c68f45ad00408b70f4943497c85a8b5efcda1a0",
+      "seconds": 12.826,
+      "bytes": 154585,
+      "promptHash": "cfa9c4c27bfa5e4290c1c8e19d6a2336c0a7e73d5d04228d438cd15fd72eaf3b",
+      "sha256": "30774a733a27a1ff3df047dfb586224b8ea22fbe3591383c6ac0ba8b1bcc6391",
       "lineCount": 6,
       "requests": 1,
       "speechRate": 0,
@@ -388,10 +388,10 @@
     },
     "MeleeCurse": {
       "file": "AudioVoice_FirstLevelMeleeCurse.mp3",
-      "seconds": 2.116,
-      "bytes": 26063,
-      "promptHash": "83e47bcfe6d318c2f41141e46b6f482348ecb191f8377d07e5575dee78339eca",
-      "sha256": "afd7cfb766e3b1c96dfd8531d7c222da7d9ed78e38a1a1b1aacca21bb620e91f",
+      "seconds": 3.03,
+      "bytes": 37034,
+      "promptHash": "55265b9e9bb10a81e24566460c59e994b45525e7ae883f4c189b280291d49540",
+      "sha256": "cd44cc4ee79573f33da897c63297bb4d6cbdccf118c85f66cf71d6b33117a967",
       "lineCount": 1,
       "requests": 1,
       "speechRate": 0,
@@ -460,10 +460,10 @@
     },
     "EscortZhou": {
       "file": "AudioVoice_FirstLevelEscortZhou.mp3",
-      "seconds": 9.43,
-      "bytes": 113834,
-      "promptHash": "b1a623e5436c5b473096f85dac8096f6fc37628bfe427d6fa64ff0dc817b96ab",
-      "sha256": "cea1ec53fbf4b325489ec09fe6692fcd64de172c00ca4dbc426d1d4152a43334",
+      "seconds": 8.411,
+      "bytes": 101609,
+      "promptHash": "b942628ba4eb5bf2e4bf2768b48408431eab2d6ce0b6ee0cc5e7b24261e1ee6f",
+      "sha256": "55cb4bbe255c43fab290160fd91698b0b9f32445b972ec750e640cdb3f489a71",
       "lineCount": 3,
       "requests": 1,
       "speechRate": 0,
@@ -472,10 +472,10 @@
     },
     "CartTalk": {
       "file": "AudioVoice_FirstLevelCartTalk.mp3",
-      "seconds": 12.826,
-      "bytes": 154585,
-      "promptHash": "845cbe61140e30bf881423fefc910668ab9a54719be65628bd35479705c6c9af",
-      "sha256": "15725d8dddd05128c91636f66d31aed63b1564ba467c4c4d282d05a9d22b52a6",
+      "seconds": 10.632,
+      "bytes": 128254,
+      "promptHash": "7371c4740ee3eb3e49d459da9b45bb81438ab02ca60fc1972c94adcae1476889",
+      "sha256": "86dcada7cc3028f8d322e8458d7408c6b76228c6e4683fb0633b7114fc67e875",
       "lineCount": 5,
       "requests": 1,
       "speechRate": 0,
@@ -508,10 +508,10 @@
     },
     "Headcount": {
       "file": "AudioVoice_FirstLevelHeadcount.mp3",
-      "seconds": 7.027,
-      "bytes": 84995,
-      "promptHash": "bc8c8efa2a585e50a3a4885f69969a96c6aa73fede9db3d844eabf3b98e800b5",
-      "sha256": "52f37e31e16b82d7a3bb258a2b29d7c1dacf0211a113c455f034ba08e9445dda",
+      "seconds": 6.113,
+      "bytes": 74023,
+      "promptHash": "eb51cfc194c2cd9bfeb705fd8d75185cddea013a44c0105e7fc20feabdbc3d41",
+      "sha256": "ed4735cdbd7c604ed4e24c5671677e201db50f4945434716e6def0cbce6f0d82",
       "lineCount": 6,
       "requests": 1,
       "speechRate": 0,
@@ -532,10 +532,10 @@
     },
     "CartAbandon": {
       "file": "AudioVoice_FirstLevelCartAbandon.mp3",
-      "seconds": 5.93,
-      "bytes": 71829,
-      "promptHash": "b877c7af3b6e96392bcb97de75c7b5d7586503ad6599fec2742b3b1096b08197",
-      "sha256": "c88824d85752c41f31272b383daeecb29f5c537fe7698f32be924bb5955be075",
+      "seconds": 6.713,
+      "bytes": 81233,
+      "promptHash": "df83a156f3ab8dec82c6a494d93703a1f261e075901d92bdd555d593c3940235",
+      "sha256": "bf8a7ef4e9e4a4d23314893eec702ed49a0e8b1069a80cd58a2de8cdce0d4841",
       "lineCount": 2,
       "requests": 1,
       "speechRate": 0,
@@ -544,10 +544,10 @@
     },
     "CarrySwap": {
       "file": "AudioVoice_FirstLevelCarrySwap.mp3",
-      "seconds": 10.423,
-      "bytes": 125746,
-      "promptHash": "5240ed3d7e5be21d4682b43ae3d312ba9ee4d9af16d1d31fb61d8dd17679a7e9",
-      "sha256": "009d2140333f97544d0cfa9e0ee95232b2bdf37842eeeb23eded7afa80668b76",
+      "seconds": 10.919,
+      "bytes": 131702,
+      "promptHash": "3f90067f561a6e4c95d86a92d195de039f323012b3a1b5837e977c590f432921",
+      "sha256": "74b49883e529dabedb749e51b13dfa24ae79d261ba7d678102097c95600fa254",
       "lineCount": 7,
       "requests": 1,
       "speechRate": 0,
@@ -556,10 +556,10 @@
     },
     "RoadBump": {
       "file": "AudioVoice_FirstLevelRoadBump.mp3",
-      "seconds": 5.224,
-      "bytes": 63365,
-      "promptHash": "0a47f53272ca59a71d28a62f3b9866d499b61a01cbb1608b5dd42d6796a4f101",
-      "sha256": "c1f92f4a1c4b24d508aec83ab42dd826adc5f39202575e8fd0f58197f06ca569",
+      "seconds": 4.232,
+      "bytes": 51454,
+      "promptHash": "74ca95bae5da71a9f42f3a0fd618b6b62d5d023974d7811410556b6c4fe51485",
+      "sha256": "cd4116c57574d545af969502b877c2b2bf70243ae1ecf2176d89f68d888c1354",
       "lineCount": 2,
       "requests": 1,
       "speechRate": 0,
@@ -568,10 +568,10 @@
     },
     "HandsShake": {
       "file": "AudioVoice_FirstLevelHandsShake.mp3",
-      "seconds": 4.937,
-      "bytes": 59917,
-      "promptHash": "18019af9b39bfbda2280dd405352181430a26a75cefacc819e695c0c7b88f3bf",
-      "sha256": "b6fc414ec148cbe7036be3768732e0f13018e65f4e6e9c1900f39838bb508e5c",
+      "seconds": 4.441,
+      "bytes": 53961,
+      "promptHash": "f5b679ff7a4f7301ef459adb7422d135a048f91b306d3d799bfc5b6f543ed194",
+      "sha256": "7b528c634380c5fce67f2e4f0907fb730888915b050841a2c86d1352802d382a",
       "lineCount": 2,
       "requests": 1,
       "speechRate": 0,
@@ -616,10 +616,10 @@
     },
     "Threshold": {
       "file": "AudioVoice_FirstLevelThreshold.mp3",
-      "seconds": 9.639,
-      "bytes": 116342,
-      "promptHash": "416c93f6b9c87f476d526fbcffc904f112c410b486ffaf9dfe48a43596dc4b31",
-      "sha256": "00308ae4359b91976a2e0555f20f61bce3102b8bc2798977bd56ab7e0fb3ffd5",
+      "seconds": 8.908,
+      "bytes": 107565,
+      "promptHash": "4ac9c1233a9f3be5449323abd4ea842ff9096eeda9d81d5dbb56be10aa27cd51",
+      "sha256": "81b3daa085a4992424509e32347c1168ed5771a32512a6ee5903f8df3c6ee9f5",
       "lineCount": 3,
       "requests": 1,
       "speechRate": 0,
@@ -628,10 +628,10 @@
     },
     "PlaceLitter": {
       "file": "AudioVoice_FirstLevelPlaceLitter.mp3",
-      "seconds": 8.725,
-      "bytes": 105370,
-      "promptHash": "0d17062dc0a7597fcadce1951233ec0c7d9e6b03187d1297e9973079387eb13e",
-      "sha256": "95197cf095e10cc5f2bac5900260b6342b71559081a3e6cb2db2bade65dc1d7a",
+      "seconds": 4.232,
+      "bytes": 51454,
+      "promptHash": "2ac804c446e0ab1fc5fb7d1f99af0738571afddeb63422c13cc06e4b51e7a2bc",
+      "sha256": "623921f0c58b4c12bb7c47180f9496ed0fbe7730b290363c5afce7bd3bb4ebfa",
       "lineCount": 3,
       "requests": 1,
       "speechRate": 0,
@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-29T08:20:31.915Z",
+  "updatedAt": "2026-09-29T18:45:19.791Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -864,52 +864,52 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "low",
-      "seconds": 4.91,
-      "bytes": 59604,
-      "sha256": "b35277010a3be1ec861940f3e0922ee1abfbdc0966148e6585bbd659a2aa5995",
+      "seconds": 6.95,
+      "bytes": 84368,
+      "sha256": "0146c7d6694cdafdfa3a83ba7be0c8e4ecffde48c540a105ed96b546e52272ce",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 0,
-      "sceneEndS": 4.91,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 0.03,
+      "sceneEndS": 6.98,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -20.3,
-        -47.4
+        -84.2,
+        -82.2
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -30.7,
-        "truePeakDb": -11.66,
-        "snrDb": 29.44,
-        "voicedS": 3.42,
-        "lowShare": 0.406,
+        "activeRmsDb": -22.6,
+        "truePeakDb": -7.09,
+        "snrDb": 43.86,
+        "voicedS": 4.1,
+        "lowShare": 0.272,
         "f0": {
-          "median": 103,
-          "p10": 93,
-          "p90": 119,
-          "frames": 41
+          "median": 225,
+          "p10": 133,
+          "p90": 296,
+          "frames": 94
         },
-        "cer": 0.4118,
-        "transcript": "妈妈屁,老子还没买,分头图线给我改起了。",
-        "speakerCos": 0.678,
+        "cer": 0.5294,
+        "transcript": "马买皮,老子还没买,分头秃物先给我改起喽。",
+        "speakerCos": 0.819,
         "nearestOther": [
           "comrade",
-          0.64
+          0.535
         ],
         "referencedOther": [
           "comrade",
-          0.64
+          0.535
         ],
-        "lengthDiff": 0,
+        "lengthDiff": 1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -920,52 +920,52 @@
       "who": "yaowa",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.335,
-      "bytes": 28884,
-      "sha256": "8ae0e88954ed9dc751ffcb150d77f3215b8c0aed9428c2419eb435868c0e0aad",
+      "seconds": 2.7,
+      "bytes": 33272,
+      "sha256": "4b1f9d9de1024e21658411a0f0920950e35bb42dce965e12bc3f08d74a1036f7",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 4.955,
-      "sceneEndS": 7.29,
-      "gapBeforeS": 0.045,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 7.08,
+      "sceneEndS": 9.78,
+      "gapBeforeS": 0.1,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -62.4,
-        -76.6
+        -62.6,
+        -76.8
       ],
       "cutMethod": "subtitle",
       "castOwner": "yaowa",
       "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -22.27,
-        "truePeakDb": -2.95,
-        "snrDb": 86.35,
-        "voicedS": 1.88,
-        "lowShare": 0.162,
+        "activeRmsDb": -21.51,
+        "truePeakDb": -3.89,
+        "snrDb": 85.05,
+        "voicedS": 2.16,
+        "lowShare": 0.131,
         "f0": {
-          "median": 211,
-          "p10": 165,
-          "p90": 254,
-          "frames": 48
+          "median": 203,
+          "p10": 155,
+          "p90": 246,
+          "frames": 68
         },
-        "cer": 0.4167,
-        "transcript": "生死而生,等它死了都不用挖坑。",
-        "speakerCos": 0.834,
+        "cer": 0.3333,
+        "transcript": "生死塞,等它死了都不用挖坑。",
+        "speakerCos": 0.837,
         "nearestOther": [
           "shunzi",
-          0.409
+          0.446
         ],
         "referencedOther": [
           "shunzi",
-          0.409
+          0.446
         ],
-        "lengthDiff": 1,
+        "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -975,53 +975,53 @@
       "index": 2,
       "who": "shunzi",
       "lang": "zh",
-      "projection": "low",
-      "seconds": 0.25,
-      "bytes": 3806,
-      "sha256": "86f34c24b6cecfeb6fecbe64d7e6262bffb05abe961271bc5233d9880060f382",
+      "projection": "normal",
+      "seconds": 0.48,
+      "bytes": 6627,
+      "sha256": "66a861d2bce4033783dfefcedd48228e232db021acd9fb8a16aa5153888f4ee2",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 7.49,
-      "sceneEndS": 7.74,
-      "gapBeforeS": 0.2,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 10.03,
+      "sceneEndS": 10.51,
+      "gapBeforeS": 0.25,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -43.6,
-        -35.2
+        -68.1,
+        -78.8
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -29.48,
-        "truePeakDb": -16.57,
-        "snrDb": 33.25,
-        "voicedS": 0.14,
-        "lowShare": 0.693,
+        "activeRmsDb": -18.75,
+        "truePeakDb": -6.83,
+        "snrDb": 83.46,
+        "voicedS": 0.34,
+        "lowShare": 0.591,
         "f0": {
-          "median": 110,
-          "p10": 87,
-          "p90": 120,
-          "frames": 5
+          "median": 246,
+          "p10": 195,
+          "p90": 258,
+          "frames": 11
         },
         "cer": 1,
-        "transcript": "关 。",
-        "speakerCos": 0.393,
+        "transcript": "君。",
+        "speakerCos": 0.05,
         "nearestOther": [
-          "comrade",
-          0.291
+          "yaowa",
+          0.102
         ],
         "referencedOther": [
-          "comrade",
-          0.291
+          "yaowa",
+          0.102
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1032,52 +1032,56 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 3.73,
-      "bytes": 45498,
-      "sha256": "5ac354d4a81d0bf66142e49ad182e34f223702e57331e4c400c39201c7f4dff9",
+      "seconds": 3.59,
+      "bytes": 43930,
+      "sha256": "2a0cf15b0816f4eea381beef00d34377569f341aa14c0de697a850dde700d9d1",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 7.82,
-      "sceneEndS": 11.55,
-      "gapBeforeS": 0.08,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 10.6,
+      "sceneEndS": 14.19,
+      "gapBeforeS": 0.09,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -24.8,
-        -48.1
+        -87.6,
+        -72.8
       ],
       "cutMethod": "subtitle",
       "castOwner": "comrade",
       "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.42,
-        "truePeakDb": -4.01,
-        "snrDb": 37.73,
-        "voicedS": 2.82,
-        "lowShare": 0.353,
+        "activeRmsDb": -21.45,
+        "truePeakDb": -3.3,
+        "snrDb": 36.32,
+        "voicedS": 2.62,
+        "lowShare": 0.341,
         "f0": {
-          "median": 131,
-          "p10": 111,
-          "p90": 213,
-          "frames": 78
+          "median": 133,
+          "p10": 106,
+          "p90": 193,
+          "frames": 73
         },
-        "cer": 0.5,
-        "transcript": "哈哈,别试试,山东的土老子谁不管。",
-        "speakerCos": 0.813,
+        "cer": 0.4286,
+        "transcript": "模式在这,山东的土老子睡不管。",
+        "speakerCos": 0.855,
         "nearestOther": [
           "shunzi",
-          0.665
+          0.686
         ],
         "referencedOther": [
           "shunzi",
-          0.665
+          0.686
         ],
-        "lengthDiff": 0,
+        "lengthDiff": -1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78,
+        "speakerSpanS": [
+          0.66,
+          3.59
+        ]
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1088,52 +1092,52 @@
       "who": "yaowa",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 1.57,
-      "bytes": 19793,
-      "sha256": "8b9da8e47c0694bdf930dcdccc50b6deb5fadbef69907b869c4a12554a108a4c",
+      "seconds": 1.42,
+      "bytes": 17912,
+      "sha256": "96067932030790df03f4db9dfec48af756c64f6da9ad453f4e7f206240959633",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 11.56,
-      "sceneEndS": 13.13,
-      "gapBeforeS": 0.01,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 14.34,
+      "sceneEndS": 15.76,
+      "gapBeforeS": 0.15,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -50.2,
-        -50.3
+        -61.2,
+        -76.5
       ],
       "cutMethod": "subtitle",
       "castOwner": "yaowa",
       "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -19.95,
-        "truePeakDb": -3.05,
-        "snrDb": 40.48,
-        "voicedS": 1.36,
-        "lowShare": 0.117,
+        "activeRmsDb": -21.54,
+        "truePeakDb": -4.41,
+        "snrDb": 50.12,
+        "voicedS": 1.22,
+        "lowShare": 0.156,
         "f0": {
-          "median": 229,
-          "p10": 198,
-          "p90": 276,
-          "frames": 35
+          "median": 195,
+          "p10": 170,
+          "p90": 281,
+          "frames": 30
         },
-        "cer": 0.3333,
-        "transcript": "私人还挑敌方?",
-        "speakerCos": 0.686,
+        "cer": 0.6667,
+        "transcript": "私人还挑底一发?",
+        "speakerCos": 0.828,
         "nearestOther": [
-          "comrade",
-          0.482
+          "shunzi",
+          0.472
         ],
         "referencedOther": [
-          "comrade",
-          0.482
+          "shunzi",
+          0.472
         ],
-        "lengthDiff": 0,
+        "lengthDiff": 1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1144,52 +1148,52 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.71,
-      "bytes": 33272,
-      "sha256": "e0b694c6e0ad152a8e79b735a88091d8a28ce0f7a169f8d39b0a9441c5162835",
+      "seconds": 3.32,
+      "bytes": 40796,
+      "sha256": "9c55af39e974ba514f421473c23be5b457604aee862b1dfef0f8ec9dc78e85b6",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 13.29,
-      "sceneEndS": 16,
-      "gapBeforeS": 0.16,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 16.04,
+      "sceneEndS": 19.36,
+      "gapBeforeS": 0.28,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -48.1,
-        -35.8
+        -58.6,
+        -37.2
       ],
       "cutMethod": "subtitle",
       "castOwner": "comrade",
       "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -17.95,
-        "truePeakDb": -1.8,
-        "snrDb": 51.3,
-        "voicedS": 2.06,
-        "lowShare": 0.297,
+        "activeRmsDb": -21.52,
+        "truePeakDb": -4.03,
+        "snrDb": 46.99,
+        "voicedS": 2.64,
+        "lowShare": 0.259,
         "f0": {
-          "median": 140,
-          "p10": 99,
-          "p90": 193,
-          "frames": 53
+          "median": 133,
+          "p10": 105,
+          "p90": 174,
+          "frames": 67
         },
-        "cer": 0.4286,
-        "transcript": "杂个不挑,老子咬丝叶棍回四川市。",
-        "speakerCos": 0.827,
+        "cer": 0.2857,
+        "transcript": "咋个不挑,老子要失业归回四川市。",
+        "speakerCos": 0.862,
         "nearestOther": [
           "shunzi",
-          0.703
+          0.678
         ],
         "referencedOther": [
           "shunzi",
-          0.703
+          0.678
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1199,53 +1203,53 @@
       "index": 6,
       "who": "shunzi",
       "lang": "zh",
-      "projection": "low",
-      "seconds": 1.99,
-      "bytes": 24809,
-      "sha256": "c3ba54379ba7178a0bb34cc00ceed5f0252d296d1b8e0a5e4e4398607bc6a408",
+      "projection": "normal",
+      "seconds": 3.13,
+      "bytes": 38288,
+      "sha256": "2c7ce13d4cfc412b4ddca0d070a2e8e9008759c8883f46ea7d21653652dab42b",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 16.09,
-      "sceneEndS": 18.08,
-      "gapBeforeS": 0.09,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 19.53,
+      "sceneEndS": 22.66,
+      "gapBeforeS": 0.17,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -36.8,
-        -37.3
+        -59.1,
+        -33.4
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -28.82,
-        "truePeakDb": -10.38,
-        "snrDb": 32.48,
-        "voicedS": 1.46,
-        "lowShare": 0.552,
+        "activeRmsDb": -22.11,
+        "truePeakDb": -8.23,
+        "snrDb": 43.42,
+        "voicedS": 2.44,
+        "lowShare": 0.237,
         "f0": {
-          "median": 110,
-          "p10": 86,
-          "p90": 121,
-          "frames": 26
+          "median": 232,
+          "p10": 143,
+          "p90": 258,
+          "frames": 63
         },
         "cer": 0.0833,
         "transcript": "你想的还多,先把今天混过去。",
-        "speakerCos": 0.732,
+        "speakerCos": 0.782,
         "nearestOther": [
-          "comrade",
-          0.595
+          "yaowa",
+          0.557
         ],
         "referencedOther": [
-          "comrade",
-          0.595
+          "yaowa",
+          0.557
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1256,52 +1260,52 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.115,
-      "bytes": 26063,
-      "sha256": "516c44663cb2550fa2d369c0b097d853c3031fba47e993eb54f643bc0bce6a68",
+      "seconds": 2.3,
+      "bytes": 28570,
+      "sha256": "c8a8b8a5c3b8b7a8055787e5c0272abfa9ad1efc12bcd794bea933eacae2a62a",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 18.295,
-      "sceneEndS": 20.41,
-      "gapBeforeS": 0.215,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 22.91,
+      "sceneEndS": 25.21,
+      "gapBeforeS": 0.25,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -42.5,
-        -72.8
+        -49.6,
+        -44.5
       ],
       "cutMethod": "subtitle",
       "castOwner": "comrade",
       "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.06,
-        "truePeakDb": -4.51,
-        "snrDb": 38.49,
-        "voicedS": 1.5,
-        "lowShare": 0.486,
+        "activeRmsDb": -22.26,
+        "truePeakDb": -4.33,
+        "snrDb": 46.42,
+        "voicedS": 1.62,
+        "lowShare": 0.426,
         "f0": {
-          "median": 144,
-          "p10": 98,
-          "p90": 225,
-          "frames": 43
+          "median": 121,
+          "p10": 96,
+          "p90": 155,
+          "frames": 49
         },
-        "cer": 0.4444,
-        "transcript": "哪肯定,老子明硬的恨。",
-        "speakerCos": 0.755,
+        "cer": 0.2222,
+        "transcript": "那肯定,老子名应得很。",
+        "speakerCos": 0.825,
         "nearestOther": [
           "shunzi",
-          0.668
+          0.591
         ],
         "referencedOther": [
           "shunzi",
-          0.668
+          0.591
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1312,52 +1316,52 @@
       "who": "yaowa",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 1.26,
-      "bytes": 16031,
-      "sha256": "31d9b01905b3d3beca6429c1ad39f7f8975e50df09340080836b2c89ba56b13a",
+      "seconds": 1.37,
+      "bytes": 17285,
+      "sha256": "3d9100a678451b091081a20a5eff857a20d90fdc86b1b9caadacf7878344a47a",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 20.47,
-      "sceneEndS": 21.73,
-      "gapBeforeS": 0.06,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 25.38,
+      "sceneEndS": 26.75,
+      "gapBeforeS": 0.17,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -46.2,
-        -62.2
+        -57.1,
+        -73.9
       ],
       "cutMethod": "subtitle",
       "castOwner": "yaowa",
       "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.85,
-        "truePeakDb": -2.67,
-        "snrDb": 33.71,
-        "voicedS": 1.18,
-        "lowShare": 0.189,
+        "activeRmsDb": -23.75,
+        "truePeakDb": -5.6,
+        "snrDb": 52.2,
+        "voicedS": 1.24,
+        "lowShare": 0.182,
         "f0": {
-          "median": 182,
-          "p10": 165,
-          "p90": 267,
-          "frames": 44
+          "median": 174,
+          "p10": 158,
+          "p90": 232,
+          "frames": 50
         },
         "cer": 0.8333,
-        "transcript": "明明还爱抢。",
-        "speakerCos": 0.682,
+        "transcript": "民营和爱一腔。",
+        "speakerCos": 0.718,
         "nearestOther": [
           "shunzi",
-          0.313
+          0.347
         ],
         "referencedOther": [
           "shunzi",
-          0.313
+          0.347
         ],
-        "lengthDiff": -1,
+        "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1368,52 +1372,52 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 1.42,
-      "bytes": 17912,
-      "sha256": "e058a65d9b84827f432f54756cb0d31dd693fbe4e87a8b74c18431b5a7284688",
+      "seconds": 1.6,
+      "bytes": 20107,
+      "sha256": "7ab8e84c2d43544d14b684b763e157267f2c08295720a4c2be46e34cefaadc0f",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 22.62,
-      "sceneEndS": 24.04,
-      "gapBeforeS": 0.89,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 26.99,
+      "sceneEndS": 28.59,
+      "gapBeforeS": 0.24,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -59.7,
-        -43.2
+        -70.5,
+        -78
       ],
       "cutMethod": "subtitle",
       "castOwner": "comrade",
       "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.41,
-        "truePeakDb": -1.56,
-        "snrDb": 42.1,
-        "voicedS": 1.24,
-        "lowShare": 0.319,
+        "activeRmsDb": -20.56,
+        "truePeakDb": -4.06,
+        "snrDb": 45.6,
+        "voicedS": 1.44,
+        "lowShare": 0.333,
         "f0": {
-          "median": 119,
-          "p10": 99,
-          "p90": 172,
-          "frames": 43
+          "median": 120,
+          "p10": 94,
+          "p90": 168,
+          "frames": 36
         },
-        "cer": 0.5,
-        "transcript": "桂儿子枪发屁了诶。",
-        "speakerCos": 0.694,
+        "cer": 0.25,
+        "transcript": "归儿子枪法撇了撒。",
+        "speakerCos": 0.744,
         "nearestOther": [
           "yaowa",
-          0.586
+          0.629
         ],
         "referencedOther": [
           "yaowa",
-          0.586
+          0.629
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1423,53 +1427,53 @@
       "index": 10,
       "who": "shunzi",
       "lang": "zh",
-      "projection": "low",
-      "seconds": 0.9,
-      "bytes": 11643,
-      "sha256": "68a0a682a149c16a36b0a7c554c61a171720c673bf33cc3ea818489a9f9b3ce1",
+      "projection": "normal",
+      "seconds": 2.18,
+      "bytes": 27003,
+      "sha256": "6d7d4dc99f7ef3949225ea39d4152dbf710ecd0b344b48c6cc946d876a265870",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 24.34,
-      "sceneEndS": 25.24,
-      "gapBeforeS": 0.3,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 28.77,
+      "sceneEndS": 30.95,
+      "gapBeforeS": 0.18,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -37.9,
-        -37.5
+        -62.3,
+        -74
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -29.77,
-        "truePeakDb": -12.78,
-        "snrDb": 32.94,
-        "voicedS": 0.78,
-        "lowShare": 0.409,
+        "activeRmsDb": -21.84,
+        "truePeakDb": -6.44,
+        "snrDb": 39.51,
+        "voicedS": 2.02,
+        "lowShare": 0.179,
         "f0": {
-          "median": 101,
-          "p10": 94,
-          "p90": 106,
-          "frames": 12
+          "median": 160,
+          "p10": 115,
+          "p90": 213,
+          "frames": 65
         },
-        "cer": 0.5714,
-        "transcript": "那你还得写一下它。",
-        "speakerCos": 0.636,
+        "cer": 0.1429,
+        "transcript": "你还得谢谢他。",
+        "speakerCos": 0.562,
         "nearestOther": [
-          "comrade",
-          0.479
+          "yaowa",
+          0.604
         ],
         "referencedOther": [
-          "comrade",
-          0.479
+          "yaowa",
+          0.604
         ],
-        "lengthDiff": 1,
+        "lengthDiff": -1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1480,52 +1484,52 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 1.8,
-      "bytes": 22301,
-      "sha256": "120403bfa6170369458871216a60832051927c1e38c41fc191d6ccb5fa68e52e",
+      "seconds": 1.92,
+      "bytes": 23868,
+      "sha256": "545b2b142a795c2922fb948dead74a19ddb4219a3c26ef1159c50673154b6154",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 25.5,
-      "sceneEndS": 27.3,
-      "gapBeforeS": 0.26,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 31.08,
+      "sceneEndS": 33,
+      "gapBeforeS": 0.13,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -36.6,
-        -82.4
+        -85.5,
+        -32.7
       ],
       "cutMethod": "subtitle",
       "castOwner": "comrade",
       "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.45,
-        "truePeakDb": -1.18,
-        "snrDb": 41.36,
-        "voicedS": 1.24,
-        "lowShare": 0.312,
+        "activeRmsDb": -20.67,
+        "truePeakDb": -3.16,
+        "snrDb": 37.9,
+        "voicedS": 1.4,
+        "lowShare": 0.359,
         "f0": {
-          "median": 130,
-          "p10": 99,
+          "median": 128,
+          "p10": 95,
           "p90": 200,
-          "frames": 25
+          "frames": 31
         },
         "cer": 0.2222,
         "transcript": "等下碰到,老子当面写。",
-        "speakerCos": 0.789,
+        "speakerCos": 0.832,
         "nearestOther": [
           "shunzi",
-          0.748
+          0.626
         ],
         "referencedOther": [
           "shunzi",
-          0.748
+          0.626
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1536,52 +1540,52 @@
       "who": "yaowa",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 0.88,
-      "bytes": 11329,
-      "sha256": "6d348270af24d324508e7f8fd830c57a4921e4c43453e754904fe87d48bf3a65",
+      "seconds": 0.89,
+      "bytes": 11643,
+      "sha256": "c75382062c6dc33e8bbf1bbc33960346cb2b249889ab6b417a03a94c8d07e9c9",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 27.35,
-      "sceneEndS": 28.23,
-      "gapBeforeS": 0.05,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 33.74,
+      "sceneEndS": 34.63,
+      "gapBeforeS": 0.74,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -65.3,
-        -67.4
+        -46.5,
+        -47.4
       ],
       "cutMethod": "subtitle",
       "castOwner": "yaowa",
       "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -22.15,
-        "truePeakDb": -4.18,
-        "snrDb": 65.65,
+        "activeRmsDb": -23.46,
+        "truePeakDb": -3.96,
+        "snrDb": 46.73,
         "voicedS": 0.76,
-        "lowShare": 0.096,
+        "lowShare": 0.108,
         "f0": {
-          "median": 151,
-          "p10": 133,
-          "p90": 180,
-          "frames": 16
+          "median": 116,
+          "p10": 113,
+          "p90": 184,
+          "frames": 13
         },
-        "cer": 0.25,
-        "transcript": "拿啥子写?",
-        "speakerCos": 0.73,
+        "cer": 0.5,
+        "transcript": "那啥子写?",
+        "speakerCos": 0.625,
         "nearestOther": [
-          "shunzi",
-          0.369
+          "comrade",
+          0.484
         ],
         "referencedOther": [
-          "shunzi",
-          0.369
+          "comrade",
+          0.484
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1592,52 +1596,56 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 1.39,
-      "bytes": 17599,
-      "sha256": "328f71692133599fa1cba5a6e280ba5e69b64ac89ac529fb84aaaa53ee1a1107",
+      "seconds": 1.422,
+      "bytes": 17912,
+      "sha256": "1ecbf2c18516d23a49c0aa75342008dc228c422efff405b6e671ff58f4e4fc59",
       "source": "scene",
-      "sceneSha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "sceneStartS": 29.79,
-      "sceneEndS": 31.18,
-      "gapBeforeS": 1.56,
+      "sceneSha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "sceneStartS": 35.58,
+      "sceneEndS": 37.002,
+      "gapBeforeS": 0.95,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -52.2,
-        -67.5
+        -47.3,
+        -5.3
       ],
       "cutMethod": "subtitle",
       "castOwner": "comrade",
       "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -23.16,
-        "truePeakDb": -5.62,
-        "snrDb": 65.89,
-        "voicedS": 1.14,
-        "lowShare": 0.356,
+        "activeRmsDb": -21.43,
+        "truePeakDb": -1.05,
+        "snrDb": 84.46,
+        "voicedS": 1.1,
+        "lowShare": 0.364,
         "f0": {
-          "median": 126,
-          "p10": 103,
-          "p90": 142,
+          "median": 116,
+          "p10": 101,
+          "p90": 281,
           "frames": 23
         },
-        "cer": 0.5,
-        "transcript": "那这个是……",
-        "speakerCos": 0.612,
+        "cer": 1,
+        "transcript": "拉直嘢个声。",
+        "speakerCos": 0.715,
         "nearestOther": [
-          "yaowa",
-          0.529
+          "shunzi",
+          0.498
         ],
         "referencedOther": [
-          "yaowa",
-          0.529
+          "shunzi",
+          0.498
         ],
-        "lengthDiff": 0,
+        "lengthDiff": 1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.98
+        "sceneGainDb": 0.78,
+        "speakerSpanS": [
+          0,
+          0.94
+        ]
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -3543,52 +3551,52 @@
       "who": "yaowa",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 2.15,
-      "bytes": 26689,
-      "sha256": "5af894cc03d747b2643ef7f17e44189e6fab909915fcf4d757ba0bbc3ef2d63d",
+      "seconds": 2.75,
+      "bytes": 33899,
+      "sha256": "3a2afa1c24087c8ac501d8e566bd9818e88d838e9430bbf556ed07301a7db50a",
       "source": "scene",
-      "sceneSha256": "1a4a4c2e4b235a58e9f1f0718b7721d7e0b14fe7eaa5d85a32b26dc8658e7d80",
-      "sceneStartS": 0.01,
-      "sceneEndS": 2.16,
+      "sceneSha256": "079767a5b1fc950cfada2425bb42e3d9ce6a4f488ff55c161f3cf12cc221cf35",
+      "sceneStartS": 0,
+      "sceneEndS": 2.75,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -89.3,
-        -46
+        -35.9,
+        -41.4
       ],
       "cutMethod": "subtitle",
       "castOwner": "yaowa",
       "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.09,
-        "truePeakDb": -5.99,
-        "snrDb": 93.58,
-        "voicedS": 1.26,
-        "lowShare": 0.108,
+        "activeRmsDb": -18.14,
+        "truePeakDb": -3.28,
+        "snrDb": 90.36,
+        "voicedS": 1.34,
+        "lowShare": 0.099,
         "f0": {
           "median": 239,
-          "p10": 188,
-          "p90": 320,
-          "frames": 42
+          "p10": 174,
+          "p90": 291,
+          "frames": 43
         },
         "cer": 0.1667,
         "transcript": "孙哥,你脸咋了?",
-        "speakerCos": 0.827,
+        "speakerCos": 0.776,
         "nearestOther": [
           "luo",
-          0.632
+          0.524
         ],
         "referencedOther": [
           "luo",
-          0.632
+          0.524
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": -2.78
+        "sceneGainDb": 0.2
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -3598,53 +3606,53 @@
       "index": 1,
       "who": "shunzi",
       "lang": "zh",
-      "projection": "low",
-      "seconds": 0.52,
-      "bytes": 6941,
-      "sha256": "6bb853799f788f02a537232d363c983623836d0f1c626680a7073d4b1da990d6",
+      "projection": "normal",
+      "seconds": 0.62,
+      "bytes": 8195,
+      "sha256": "3a0f8dad9597825806ed6642836a551326cb7ed97a3b3563a88e6751a09a8af5",
       "source": "scene",
-      "sceneSha256": "1a4a4c2e4b235a58e9f1f0718b7721d7e0b14fe7eaa5d85a32b26dc8658e7d80",
-      "sceneStartS": 2.69,
-      "sceneEndS": 3.21,
-      "gapBeforeS": 0.53,
+      "sceneSha256": "079767a5b1fc950cfada2425bb42e3d9ce6a4f488ff55c161f3cf12cc221cf35",
+      "sceneStartS": 3.8,
+      "sceneEndS": 4.42,
+      "gapBeforeS": 1.05,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -40,
-        -39.5
+        -53.6,
+        -37.8
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -30.27,
-        "truePeakDb": -11.91,
-        "snrDb": 29.08,
-        "voicedS": 0.44,
-        "lowShare": 0.456,
+        "activeRmsDb": -20.51,
+        "truePeakDb": -6.96,
+        "snrDb": 36.48,
+        "voicedS": 0.5,
+        "lowShare": 0.344,
         "f0": {
-          "median": 131,
-          "p10": 119,
-          "p90": 145,
-          "frames": 13
+          "median": 186,
+          "p10": 163,
+          "p90": 225,
+          "frames": 18
         },
         "cer": 0,
         "transcript": "还能走?",
-        "speakerCos": 0.641,
+        "speakerCos": 0.572,
         "nearestOther": [
-          "luo",
-          0.347
+          "yaowa",
+          0.368
         ],
         "referencedOther": [
-          "luo",
-          0.347
+          "yaowa",
+          0.368
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": -2.78
+        "sceneGainDb": 0.2
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -3655,52 +3663,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 0.934,
-      "bytes": 11956,
-      "sha256": "0a9467415b74f23e6b103bb6e842542667ad38c38f6839ce51dfc9b5511e8804",
+      "seconds": 0.633,
+      "bytes": 8508,
+      "sha256": "6a90e347bb376075d74f8ee582370348bbf210df12c5a6ca2277a91803e20130",
       "source": "scene",
-      "sceneSha256": "1a4a4c2e4b235a58e9f1f0718b7721d7e0b14fe7eaa5d85a32b26dc8658e7d80",
-      "sceneStartS": 4.2,
-      "sceneEndS": 5.134,
-      "gapBeforeS": 0.99,
+      "sceneSha256": "079767a5b1fc950cfada2425bb42e3d9ce6a4f488ff55c161f3cf12cc221cf35",
+      "sceneStartS": 5.48,
+      "sceneEndS": 6.113,
+      "gapBeforeS": 1.06,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -81.5,
-        -17.5
+        -77.7,
+        -18.3
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -16.74,
-        "truePeakDb": -6.32,
-        "snrDb": 50.96,
-        "voicedS": 0.8,
-        "lowShare": 0.13,
+        "activeRmsDb": -14.48,
+        "truePeakDb": -1.69,
+        "snrDb": 44.76,
+        "voicedS": 0.54,
+        "lowShare": 0.204,
         "f0": {
-          "median": 267,
-          "p10": 213,
-          "p90": 296,
-          "frames": 28
+          "median": 308,
+          "p10": 232,
+          "p90": 340,
+          "frames": 16
         },
         "cer": 0.6667,
-        "transcript": "模涂到。",
-        "speakerCos": 0.597,
+        "transcript": "我读到。",
+        "speakerCos": 0.568,
         "nearestOther": [
           "yaowa",
-          0.586
+          0.497
         ],
         "referencedOther": [
           "yaowa",
-          0.586
+          0.497
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": -2.78
+        "sceneGainDb": 0.2
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -3711,52 +3719,52 @@
       "who": "guard",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 3.86,
-      "bytes": 47065,
-      "sha256": "a7dca98e75f680d5ce3970f60ce94c3e18f7af797d8f8af50e382209d3ed1626",
+      "seconds": 4.96,
+      "bytes": 60231,
+      "sha256": "d97abecbb7739b249f11e6e8ef4ce4c1249cd70887a051900bb972411ab8e6ea",
       "source": "scene",
-      "sceneSha256": "c089f65bad96b84cfa040fd4ffc4e5fd3074f8d03f1a0adc07b25bf126331ed6",
-      "sceneStartS": 0.03,
-      "sceneEndS": 3.89,
+      "sceneSha256": "0fe312e8e85a89a2746cdf7842c2f86286bfd8837c2c5572760c39d5f10100b7",
+      "sceneStartS": 0,
+      "sceneEndS": 4.96,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -60.4,
-        -51.5
+        -20.1,
+        -74
       ],
       "cutMethod": "subtitle",
       "castOwner": "guard",
       "castSha256": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -19.93,
-        "truePeakDb": -3.65,
-        "snrDb": 48.21,
-        "voicedS": 3.02,
-        "lowShare": 0.107,
+        "activeRmsDb": -20.02,
+        "truePeakDb": -2.5,
+        "snrDb": 53.87,
+        "voicedS": 3.12,
+        "lowShare": 0.135,
         "f0": {
           "median": 320,
-          "p10": 276,
+          "p10": 271,
           "p90": 348,
-          "frames": 88
+          "frames": 92
         },
         "cer": 0.2105,
-        "transcript": "东头丢了,西边机枪还在盯,前头的几个瞎不赖。",
-        "speakerCos": 0.904,
+        "transcript": "东头丢了,西边机枪还在定,前头的机构下不来。",
+        "speakerCos": 0.922,
         "nearestOther": [
           "luo",
-          0.517
+          0.506
         ],
         "referencedOther": [
           "luo",
-          0.517
+          0.506
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.13
+        "sceneGainDb": 2.95
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -3767,52 +3775,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 1.03,
-      "bytes": 13210,
-      "sha256": "9bbdc8fbbcb36bcbc4dc3b281be28c97d5db461ba688dd1bb356e971ea22b8ae",
+      "seconds": 1.15,
+      "bytes": 14778,
+      "sha256": "66461d4c71347fb5cf0e636ff6b2ce2cdbd44c00c9dc7d5ed4962664366b2b2b",
       "source": "scene",
-      "sceneSha256": "c089f65bad96b84cfa040fd4ffc4e5fd3074f8d03f1a0adc07b25bf126331ed6",
-      "sceneStartS": 4.01,
-      "sceneEndS": 5.04,
-      "gapBeforeS": 0.12,
+      "sceneSha256": "0fe312e8e85a89a2746cdf7842c2f86286bfd8837c2c5572760c39d5f10100b7",
+      "sceneStartS": 5.21,
+      "sceneEndS": 6.36,
+      "gapBeforeS": 0.25,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -94.2,
-        -34.1
+        -80.4,
+        -50.2
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -14.51,
-        "truePeakDb": -2.72,
-        "snrDb": 45.18,
-        "voicedS": 0.48,
-        "lowShare": 0.12,
+        "activeRmsDb": -17.21,
+        "truePeakDb": -2.58,
+        "snrDb": 73.03,
+        "voicedS": 0.64,
+        "lowShare": 0.148,
         "f0": {
-          "median": 232,
+          "median": 213,
           "p10": 160,
-          "p90": 239,
+          "p90": 229,
           "frames": 12
         },
-        "cer": 1,
-        "transcript": "我走了。",
-        "speakerCos": 0.689,
+        "cer": 0.6667,
+        "transcript": "老总呢?",
+        "speakerCos": 0.691,
         "nearestOther": [
           "guard",
-          0.681
+          0.676
         ],
         "referencedOther": [
           "guard",
-          0.681
+          0.676
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.13
+        "sceneGainDb": 2.95
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -3823,52 +3831,52 @@
       "who": "guard",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 2.44,
-      "bytes": 30138,
-      "sha256": "c991fa793295565a2eeb612d95e7c7e26952c146e0b81c541509b1f10bb5b7ec",
+      "seconds": 2.29,
+      "bytes": 28257,
+      "sha256": "7081d24b4c881fa586fbe8607c85cebfac4686eb8a524a0d3232f72d320f8915",
       "source": "scene",
-      "sceneSha256": "c089f65bad96b84cfa040fd4ffc4e5fd3074f8d03f1a0adc07b25bf126331ed6",
-      "sceneStartS": 5.57,
-      "sceneEndS": 8.01,
-      "gapBeforeS": 0.53,
+      "sceneSha256": "0fe312e8e85a89a2746cdf7842c2f86286bfd8837c2c5572760c39d5f10100b7",
+      "sceneStartS": 6.73,
+      "sceneEndS": 9.02,
+      "gapBeforeS": 0.37,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -58,
-        -39.8
+        -60.5,
+        -69.6
       ],
       "cutMethod": "subtitle",
       "castOwner": "guard",
       "castSha256": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -19.15,
-        "truePeakDb": -2.93,
-        "snrDb": 51.07,
-        "voicedS": 1.72,
+        "activeRmsDb": -18.64,
+        "truePeakDb": -2.7,
+        "snrDb": 52.19,
+        "voicedS": 1.64,
         "lowShare": 0.106,
         "f0": {
-          "median": 308,
-          "p10": 271,
+          "median": 302,
+          "p10": 281,
           "p90": 340,
-          "frames": 56
+          "frames": 52
         },
         "cer": 0.4,
-        "transcript": "还在前头,即将压倒起来!",
-        "speakerCos": 0.882,
+        "transcript": "还在前头,即将压倒起来。",
+        "speakerCos": 0.863,
         "nearestOther": [
           "luo",
-          0.474
+          0.451
         ],
         "referencedOther": [
           "luo",
-          0.474
+          0.451
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.13
+        "sceneGainDb": 2.95
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -3879,52 +3887,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 3,
-      "bytes": 36720,
-      "sha256": "6611736afcaf74c996242363f54b5868b39e6cc7ab62f73477baec0c420f2edd",
+      "seconds": 2.97,
+      "bytes": 36407,
+      "sha256": "8f6d54f27bc6f4496a51fcf029fa89268333197212c51266da1534ddd75db26d",
       "source": "scene",
-      "sceneSha256": "c089f65bad96b84cfa040fd4ffc4e5fd3074f8d03f1a0adc07b25bf126331ed6",
-      "sceneStartS": 8.75,
-      "sceneEndS": 11.75,
-      "gapBeforeS": 0.74,
+      "sceneSha256": "0fe312e8e85a89a2746cdf7842c2f86286bfd8837c2c5572760c39d5f10100b7",
+      "sceneStartS": 9.45,
+      "sceneEndS": 12.42,
+      "gapBeforeS": 0.43,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -49.6,
-        -48.9
+        -45.6,
+        -46.1
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -15.73,
-        "truePeakDb": -1.23,
-        "snrDb": 68.58,
-        "voicedS": 1.86,
+        "activeRmsDb": -14.65,
+        "truePeakDb": -1.87,
+        "snrDb": 83.45,
+        "voicedS": 1.66,
         "lowShare": 0.152,
         "f0": {
-          "median": 258,
-          "p10": 205,
-          "p90": 333,
-          "frames": 37
+          "median": 222,
+          "p10": 174,
+          "p90": 457,
+          "frames": 36
         },
-        "cer": 0.3333,
-        "transcript": "何有天,收喉头,孙子,跟老子走!",
-        "speakerCos": 0.75,
+        "cer": 0.5,
+        "transcript": "和尤铁收喉头,孙子,跟老子走!",
+        "speakerCos": 0.772,
         "nearestOther": [
           "guard",
-          0.77
+          0.728
         ],
         "referencedOther": [
           "guard",
-          0.77
+          0.728
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.13
+        "sceneGainDb": 2.95
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -3934,53 +3942,53 @@
       "index": 4,
       "who": "shunzi",
       "lang": "zh",
-      "projection": "low",
-      "seconds": 0.88,
-      "bytes": 11329,
-      "sha256": "66aaa30ca2f8d10f583276661249f5931607c95944b80e8921aba4374eecf2e2",
+      "projection": "normal",
+      "seconds": 1.11,
+      "bytes": 14151,
+      "sha256": "cbb22bcf575b553a08b228bd52469c37fa2cda67ac4b56949d0dd234ceeee706",
       "source": "scene",
-      "sceneSha256": "c089f65bad96b84cfa040fd4ffc4e5fd3074f8d03f1a0adc07b25bf126331ed6",
-      "sceneStartS": 12.18,
-      "sceneEndS": 13.06,
-      "gapBeforeS": 0.43,
+      "sceneSha256": "0fe312e8e85a89a2746cdf7842c2f86286bfd8837c2c5572760c39d5f10100b7",
+      "sceneStartS": 12.73,
+      "sceneEndS": 13.84,
+      "gapBeforeS": 0.31,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -40.6,
-        -36.9
+        -80.5,
+        -43.4
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -22.2,
-        "truePeakDb": -7.44,
-        "snrDb": 34.81,
-        "voicedS": 0.74,
-        "lowShare": 0.215,
+        "activeRmsDb": -18.75,
+        "truePeakDb": -4.69,
+        "snrDb": 38.33,
+        "voicedS": 0.98,
+        "lowShare": 0.157,
         "f0": {
-          "median": 142,
-          "p10": 118,
-          "p90": 155,
-          "frames": 18
+          "median": 145,
+          "p10": 127,
+          "p90": 157,
+          "frames": 31
         },
         "cer": 0.5,
-        "transcript": "不是车咯。",
-        "speakerCos": 0.623,
+        "transcript": "不是车啦!",
+        "speakerCos": 0.508,
         "nearestOther": [
           "luo",
-          0.326
+          0.445
         ],
         "referencedOther": [
           "luo",
-          0.326
+          0.445
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.13
+        "sceneGainDb": 2.95
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -3991,52 +3999,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 1.08,
-      "bytes": 13837,
-      "sha256": "4cb5c3b3eb09d5fa9b6c28c7d68b0ecdf10abfdb1b9f23b79378e2d1b9ea1bd8",
+      "seconds": 1.29,
+      "bytes": 16345,
+      "sha256": "79e3ad8228eac0ad5d4493c46d3178e99c7eef714b3495883a0ac3835e3df7fd",
       "source": "scene",
-      "sceneSha256": "c089f65bad96b84cfa040fd4ffc4e5fd3074f8d03f1a0adc07b25bf126331ed6",
-      "sceneStartS": 13.44,
-      "sceneEndS": 14.52,
-      "gapBeforeS": 0.38,
+      "sceneSha256": "0fe312e8e85a89a2746cdf7842c2f86286bfd8837c2c5572760c39d5f10100b7",
+      "sceneStartS": 14.13,
+      "sceneEndS": 15.42,
+      "gapBeforeS": 0.29,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -63.1,
-        -75.1
+        -77.1,
+        -49.1
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -17.62,
-        "truePeakDb": -3.39,
-        "snrDb": 48.79,
-        "voicedS": 0.9,
-        "lowShare": 0.114,
+        "activeRmsDb": -15.81,
+        "truePeakDb": -1.33,
+        "snrDb": 41.83,
+        "voicedS": 1.14,
+        "lowShare": 0.109,
         "f0": {
-          "median": 167,
-          "p10": 144,
-          "p90": 176,
-          "frames": 6
+          "median": 186,
+          "p10": 180,
+          "p90": 213,
+          "frames": 16
         },
-        "cer": 0.25,
-        "transcript": "先把你几个结下来。",
-        "speakerCos": 0.679,
+        "cer": 0.125,
+        "transcript": "先把那几个截下来。",
+        "speakerCos": 0.688,
         "nearestOther": [
           "guard",
-          0.515
+          0.585
         ],
         "referencedOther": [
           "guard",
-          0.515
+          0.585
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.13
+        "sceneGainDb": 2.95
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -4753,52 +4761,52 @@
       "who": "guard",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 4.62,
-      "bytes": 56156,
-      "sha256": "b1bd8c9e164108d6d329775e246b0080d08898cb69b835053c0ed2db6fd7c7f8",
+      "seconds": 4.53,
+      "bytes": 55215,
+      "sha256": "43aa1b0423405783da1440f36ed645f5ad6a29f2f25f28a296e0039f7db5b282",
       "source": "scene",
-      "sceneSha256": "b468c41559c8ae347bed58351ad59ecadb4fa08ccad99a17046f9212252a7d4e",
+      "sceneSha256": "4b5581c32af3e5a10bddf39385f6aa6cedd84828fb6b6565c689f46e48a133f9",
       "sceneStartS": 0.02,
-      "sceneEndS": 4.64,
+      "sceneEndS": 4.55,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -87.9,
-        -47.9
+        -87.5,
+        -73
       ],
       "cutMethod": "subtitle",
       "castOwner": "guard",
       "castSha256": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.63,
-        "truePeakDb": -5.31,
-        "snrDb": 53.45,
-        "voicedS": 3.54,
-        "lowShare": 0.119,
+        "activeRmsDb": -17.69,
+        "truePeakDb": -3.03,
+        "snrDb": 79.05,
+        "voicedS": 3.24,
+        "lowShare": 0.078,
         "f0": {
-          "median": 333,
-          "p10": 262,
-          "p90": 372,
-          "frames": 127
+          "median": 372,
+          "p10": 308,
+          "p90": 390,
+          "frames": 109
         },
-        "cer": 0.5625,
-        "transcript": "外边酒弹药物还有急速弹,好勾人果却。",
-        "speakerCos": 0.895,
+        "cer": 0.625,
+        "transcript": "外边酒蛋药物,还有激素丹,好够冷过气。",
+        "speakerCos": 0.827,
         "nearestOther": [
           "luo",
-          0.527
+          0.475
         ],
         "referencedOther": [
           "luo",
-          0.527
+          0.475
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.16
+        "sceneGainDb": 2.22
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -4809,57 +4817,58 @@
       "who": "luo",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 3.26,
-      "bytes": 39855,
-      "sha256": "71c8feff4e633e50c549fb91c98e66fd864fb876fcf2999db05ec12fb475d7a7",
+      "seconds": 2.94,
+      "bytes": 36094,
+      "sha256": "3bcc04da98fe4211c9ab8a99f2d4ea2d04640a077457336292ae39b1356561ea",
       "source": "patch",
-      "sceneSha256": "b468c41559c8ae347bed58351ad59ecadb4fa08ccad99a17046f9212252a7d4e",
-      "sceneStartS": 4.9,
-      "sceneEndS": 9.09,
-      "gapBeforeS": 0.26,
+      "sceneSha256": "4b5581c32af3e5a10bddf39385f6aa6cedd84828fb6b6565c689f46e48a133f9",
+      "sceneStartS": 4.78,
+      "sceneEndS": 8.9,
+      "gapBeforeS": 0.23,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -90.7,
-        -38.8
+        -90.8,
+        -44.9
       ],
+      "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.64,
-        "truePeakDb": -6.08,
-        "snrDb": 65.08,
-        "voicedS": 2.1,
-        "lowShare": 0.253,
+        "activeRmsDb": -18.94,
+        "truePeakDb": -5.28,
+        "snrDb": 62.96,
+        "voicedS": 1.82,
+        "lowShare": 0.209,
         "f0": {
-          "median": 178,
-          "p10": 144,
-          "p90": 262,
-          "frames": 41
+          "median": 242,
+          "p10": 139,
+          "p90": 327,
+          "frames": 28
         },
-        "cer": 0.4286,
-        "transcript": "文采,看着狗扣,何又天,前头交给你。",
-        "speakerCos": 0.882,
+        "cer": 0.2857,
+        "transcript": "文采,看住狗扣,何有天,前头交给你。",
+        "speakerCos": 0.86,
         "nearestOther": [
           "guard",
-          0.705
+          0.689
         ],
         "referencedOther": [
           "guard",
-          0.869
+          0.886
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.16
+        "sceneGainDb": 2.22
       },
       "mastering": "SliceOfWholeSceneMaster",
       "patch": {
         "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
-        "replacedSha256": "5f9c7ed308a9a130afab3cac00f96e90f7923242114c70b0c802f52512a57c29",
-        "targetDb": -20.19,
+        "replacedSha256": "fa1b08fab46e99fe8d927e4c93e77331032c3c2dba48ec306833813e29a3ebf5",
+        "targetDb": -18.5,
         "takes": 1,
         "take": 1,
         "promptHash": "f6b3c8f4693dc6922a438032f66a4c5fad60437b4134715dc9e571417debe3c5"
@@ -4872,52 +4881,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.36,
-      "bytes": 29197,
-      "sha256": "ee358f07a11d404ccd6f658bc36deba3df9c3deaa58cadf0531af2d9e761df00",
+      "seconds": 2.19,
+      "bytes": 27003,
+      "sha256": "c60139dd5b8a81223b786f7ffa0b36275dd3571eeeed6e7373e39257d952123b",
       "source": "scene",
-      "sceneSha256": "b468c41559c8ae347bed58351ad59ecadb4fa08ccad99a17046f9212252a7d4e",
-      "sceneStartS": 9.37,
-      "sceneEndS": 11.73,
-      "gapBeforeS": 0.28,
+      "sceneSha256": "4b5581c32af3e5a10bddf39385f6aa6cedd84828fb6b6565c689f46e48a133f9",
+      "sceneStartS": 9.12,
+      "sceneEndS": 11.31,
+      "gapBeforeS": 0.22,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -51.6,
-        -52.8
+        -83.1,
+        -45
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.79,
-        "truePeakDb": -4.72,
-        "snrDb": 70.26,
-        "voicedS": 1.3,
-        "lowShare": 0.149,
+        "activeRmsDb": -17.91,
+        "truePeakDb": -3.58,
+        "snrDb": 73,
+        "voicedS": 1.26,
+        "lowShare": 0.134,
         "f0": {
-          "median": 132,
-          "p10": 112,
-          "p90": 157,
-          "frames": 11
+          "median": 225,
+          "p10": 162,
+          "p90": 246,
+          "frames": 20
         },
         "cer": 0.3,
-        "transcript": "孙子,跟我走后沟,去捞胆。",
-        "speakerCos": 0.895,
+        "transcript": "孙子,跟我走后沟,去拉档。",
+        "speakerCos": 0.788,
         "nearestOther": [
           "guard",
-          0.635
+          0.76
         ],
         "referencedOther": [
           "guard",
-          0.635
+          0.76
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.16
+        "sceneGainDb": 2.22
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -4928,52 +4937,52 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 1.07,
-      "bytes": 13524,
-      "sha256": "dc48c26d34551291d3e301ebda19bcfc1f844de3d5d3c951e8d01a1258813567",
+      "seconds": 1.76,
+      "bytes": 21987,
+      "sha256": "81f17737d175caa26137d3f46477056a95c69538646e1f0edde436879c46c2fa",
       "source": "scene",
-      "sceneSha256": "b468c41559c8ae347bed58351ad59ecadb4fa08ccad99a17046f9212252a7d4e",
-      "sceneStartS": 12.08,
-      "sceneEndS": 13.15,
-      "gapBeforeS": 0.35,
+      "sceneSha256": "4b5581c32af3e5a10bddf39385f6aa6cedd84828fb6b6565c689f46e48a133f9",
+      "sceneStartS": 11.62,
+      "sceneEndS": 13.38,
+      "gapBeforeS": 0.31,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -44.1,
-        -40.7
+        -49.7,
+        -52.3
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.97,
-        "truePeakDb": -5.08,
-        "snrDb": 39.34,
-        "voicedS": 0.94,
-        "lowShare": 0.24,
+        "activeRmsDb": -18.03,
+        "truePeakDb": -5.24,
+        "snrDb": 41.78,
+        "voicedS": 1.54,
+        "lowShare": 0.223,
         "f0": {
-          "median": 176,
-          "p10": 145,
-          "p90": 239,
-          "frames": 36
+          "median": 198,
+          "p10": 152,
+          "p90": 229,
+          "frames": 60
         },
         "cer": 0.3333,
-        "transcript": "前头还砸个锅。",
-        "speakerCos": 0.676,
+        "transcript": "前头还扎个果?",
+        "speakerCos": 0.667,
         "nearestOther": [
-          "luo",
-          0.334
+          "guard",
+          0.475
         ],
         "referencedOther": [
-          "luo",
-          0.334
+          "guard",
+          0.475
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.16
+        "sceneGainDb": 2.22
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -4984,52 +4993,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.109,
-      "bytes": 26063,
-      "sha256": "77bc135a750b7014b9c2961bc6012edf23e481fb6027970e877d09975bfdfc64",
+      "seconds": 2.21,
+      "bytes": 27316,
+      "sha256": "32d2ba099a414bdd5f57ae75380a915cc96b91fc2f7504e4daf30e070a74a6f3",
       "source": "scene",
-      "sceneSha256": "b468c41559c8ae347bed58351ad59ecadb4fa08ccad99a17046f9212252a7d4e",
-      "sceneStartS": 13.38,
-      "sceneEndS": 15.489,
-      "gapBeforeS": 0.23,
+      "sceneSha256": "4b5581c32af3e5a10bddf39385f6aa6cedd84828fb6b6565c689f46e48a133f9",
+      "sceneStartS": 13.87,
+      "sceneEndS": 16.08,
+      "gapBeforeS": 0.49,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -85.3,
-        -55.1
+        -85.8,
+        -50.3
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -17.16,
-        "truePeakDb": -1.32,
-        "snrDb": 84.57,
-        "voicedS": 1.3,
-        "lowShare": 0.176,
+        "activeRmsDb": -17.4,
+        "truePeakDb": -4.12,
+        "snrDb": 88.58,
+        "voicedS": 1.22,
+        "lowShare": 0.149,
         "f0": {
-          "median": 239,
-          "p10": 114,
-          "p90": 262,
-          "frames": 33
+          "median": 250,
+          "p10": 222,
+          "p90": 286,
+          "frames": 29
         },
         "cer": 0.125,
         "transcript": "我走路上,跟到老子。",
-        "speakerCos": 0.805,
+        "speakerCos": 0.744,
         "nearestOther": [
           "guard",
-          0.658
+          0.754
         ],
         "referencedOther": [
           "guard",
-          0.658
+          0.754
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.16
+        "sceneGainDb": 2.22
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -5962,52 +5971,52 @@
       "who": "runner",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 5.06,
-      "bytes": 61485,
-      "sha256": "8136bf55550c0b5a51290fa51e90aba5e61eb035a065c9a06390e35e2d720455",
+      "seconds": 6.83,
+      "bytes": 82800,
+      "sha256": "5be0e2a00467413509894e552199eb7f9b22ae9e80a50c3acd92479611f149d3",
       "source": "scene",
-      "sceneSha256": "5e20e55db0b8efadd29480a132787a5b6754ae0297a0cedacc6ff5a46be085d9",
-      "sceneStartS": 0.01,
-      "sceneEndS": 5.07,
+      "sceneSha256": "08912d5a6bc6e7bb5633a37ffc45d08edff288895b03410a49554e72e13e12c3",
+      "sceneStartS": 0.03,
+      "sceneEndS": 6.86,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -61.9,
-        -44.8
+        -85.1,
+        -45.7
       ],
       "cutMethod": "subtitle",
       "castOwner": "runner",
       "castSha256": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -19.8,
-        "truePeakDb": -5.25,
-        "snrDb": 45.34,
-        "voicedS": 3.2,
-        "lowShare": 0.114,
+        "activeRmsDb": -17.87,
+        "truePeakDb": -4.34,
+        "snrDb": 45.08,
+        "voicedS": 4.42,
+        "lowShare": 0.09,
         "f0": {
-          "median": 340,
-          "p10": 291,
-          "p90": 372,
-          "frames": 119
+          "median": 410,
+          "p10": 208,
+          "p90": 432,
+          "frames": 176
         },
-        "cer": 0.3333,
-        "transcript": "这里有人接,你们帮辅助上远往南,送到桥头接云店。",
-        "speakerCos": 0.681,
+        "cer": 0.2381,
+        "transcript": "这里有人接!你们帮人护着伤员王们,送到桥头接运店!",
+        "speakerCos": 0.633,
         "nearestOther": [
-          "luo",
-          0.483
+          "shunzi",
+          0.351
         ],
         "referencedOther": [
-          "luo",
-          0.483
+          "shunzi",
+          0.351
         ],
-        "lengthDiff": 0,
+        "lengthDiff": 1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.8
+        "sceneGainDb": 1.56
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6018,52 +6027,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 0.85,
-      "bytes": 11016,
-      "sha256": "6a02d5fc7c34b4916055cb0692fe789034cc68114bc9b2d465b2ea2600f626ba",
+      "seconds": 0.87,
+      "bytes": 11329,
+      "sha256": "a0ea5d3b6968d231bd78752bb8f719d5c3713ae3f0d2fd0d843003b98f574793",
       "source": "scene",
-      "sceneSha256": "5e20e55db0b8efadd29480a132787a5b6754ae0297a0cedacc6ff5a46be085d9",
-      "sceneStartS": 5.69,
-      "sceneEndS": 6.54,
-      "gapBeforeS": 0.62,
+      "sceneSha256": "08912d5a6bc6e7bb5633a37ffc45d08edff288895b03410a49554e72e13e12c3",
+      "sceneStartS": 7.19,
+      "sceneEndS": 8.06,
+      "gapBeforeS": 0.33,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -74.1,
-        -49.4
+        -42.6,
+        -47.7
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -16.23,
-        "truePeakDb": -4.9,
-        "snrDb": 47.15,
-        "voicedS": 0.7,
-        "lowShare": 0.111,
+        "activeRmsDb": -18.31,
+        "truePeakDb": -4.31,
+        "snrDb": 43.5,
+        "voicedS": 0.74,
+        "lowShare": 0.114,
         "f0": {
-          "median": 211,
-          "p10": 200,
-          "p90": 250,
-          "frames": 19
+          "median": 167,
+          "p10": 133,
+          "p90": 186,
+          "frames": 12
         },
-        "cer": 0.6,
-        "transcript": "交换人去了啊!",
-        "speakerCos": 0.674,
+        "cer": 1,
+        "transcript": "把人踢到哪里?",
+        "speakerCos": 0.592,
         "nearestOther": [
           "runner",
-          0.433
+          0.485
         ],
         "referencedOther": [
           "runner",
-          0.433
+          0.485
         ],
         "lengthDiff": 1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.8
+        "sceneGainDb": 1.56
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6074,52 +6083,52 @@
       "who": "runner",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.73,
-      "bytes": 33586,
-      "sha256": "3fa38f07687cfc6453feed8bf412569c8d41474e4fb2e8474173e9e34820b277",
+      "seconds": 1.13,
+      "bytes": 14464,
+      "sha256": "e39c010486b1447221e4c6dc8293a19e499383d7e4919dddd89ce54f2c5f2bf4",
       "source": "scene",
-      "sceneSha256": "5e20e55db0b8efadd29480a132787a5b6754ae0297a0cedacc6ff5a46be085d9",
-      "sceneStartS": 7.13,
-      "sceneEndS": 9.86,
-      "gapBeforeS": 0.59,
+      "sceneSha256": "08912d5a6bc6e7bb5633a37ffc45d08edff288895b03410a49554e72e13e12c3",
+      "sceneStartS": 8.81,
+      "sceneEndS": 9.94,
+      "gapBeforeS": 0.75,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -49.4,
-        -38.1
+        -43.2,
+        -44.3
       ],
       "cutMethod": "subtitle",
       "castOwner": "runner",
       "castSha256": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -21.47,
-        "truePeakDb": -4.43,
-        "snrDb": 39.76,
-        "voicedS": 1.18,
-        "lowShare": 0.165,
+        "activeRmsDb": -20.02,
+        "truePeakDb": -6.94,
+        "snrDb": 36.91,
+        "voicedS": 1,
+        "lowShare": 0.153,
         "f0": {
-          "median": 327,
-          "p10": 262,
-          "p90": 356,
-          "frames": 41
+          "median": 372,
+          "p10": 308,
+          "p90": 400,
+          "frames": 38
         },
-        "cer": 0.5,
-        "transcript": "有人在跟你们自怒!",
-        "speakerCos": 0.639,
+        "cer": 0.375,
+        "transcript": "有人在给你们自卢!",
+        "speakerCos": 0.531,
         "nearestOther": [
           "shunzi",
-          0.405
+          0.268
         ],
         "referencedOther": [
           "shunzi",
-          0.405
+          0.268
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.8
+        "sceneGainDb": 1.56
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6130,52 +6139,52 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 0.97,
-      "bytes": 12583,
-      "sha256": "9a630acaed89375c528b4c4d8b25581a5a1023d40652ebbef2debd636d699225",
+      "seconds": 0.83,
+      "bytes": 10703,
+      "sha256": "7e66ad0ca5d2ee54ddcc4d7494dfdc9a806ca0a9612640fd79ddc1fab373fe8f",
       "source": "scene",
-      "sceneSha256": "5e20e55db0b8efadd29480a132787a5b6754ae0297a0cedacc6ff5a46be085d9",
-      "sceneStartS": 10.96,
-      "sceneEndS": 11.93,
-      "gapBeforeS": 1.1,
+      "sceneSha256": "08912d5a6bc6e7bb5633a37ffc45d08edff288895b03410a49554e72e13e12c3",
+      "sceneStartS": 10.28,
+      "sceneEndS": 11.11,
+      "gapBeforeS": 0.34,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -50.3,
-        -43.5
+        -46.7,
+        -39.1
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.32,
-        "truePeakDb": -6.72,
-        "snrDb": 48.3,
-        "voicedS": 0.84,
-        "lowShare": 0.247,
+        "activeRmsDb": -20.46,
+        "truePeakDb": -5.18,
+        "snrDb": 42.87,
+        "voicedS": 0.7,
+        "lowShare": 0.297,
         "f0": {
-          "median": 219,
-          "p10": 167,
-          "p90": 276,
+          "median": 176,
+          "p10": 128,
+          "p90": 254,
           "frames": 29
         },
-        "cer": 0,
-        "transcript": "我跟后送队。",
-        "speakerCos": 0.433,
+        "cer": 0.4,
+        "transcript": "我跟侯松队。",
+        "speakerCos": 0.567,
         "nearestOther": [
           "runner",
-          0.464
+          0.461
         ],
         "referencedOther": [
           "runner",
-          0.464
+          0.461
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.8
+        "sceneGainDb": 1.56
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6186,52 +6195,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 4.48,
+      "seconds": 4.478,
       "bytes": 54588,
-      "sha256": "39a0419de25fc8990cbedc20f211eede39857251fa4622085384a07120cda938",
+      "sha256": "284921fae1b641e7d7a8f2c9899f0268d30b7afbac4575eb4e71166120a5812c",
       "source": "scene",
-      "sceneSha256": "5e20e55db0b8efadd29480a132787a5b6754ae0297a0cedacc6ff5a46be085d9",
-      "sceneStartS": 12.94,
-      "sceneEndS": 17.42,
-      "gapBeforeS": 1.01,
+      "sceneSha256": "08912d5a6bc6e7bb5633a37ffc45d08edff288895b03410a49554e72e13e12c3",
+      "sceneStartS": 11.77,
+      "sceneEndS": 16.248,
+      "gapBeforeS": 0.66,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -67.1,
-        -52.9
+        -45,
+        -40.3
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -16.84,
-        "truePeakDb": -2.79,
-        "snrDb": 83.69,
-        "voicedS": 2.84,
-        "lowShare": 0.184,
+        "activeRmsDb": -18.5,
+        "truePeakDb": -3.31,
+        "snrDb": 45.1,
+        "voicedS": 2.66,
+        "lowShare": 0.171,
         "f0": {
-          "median": 200,
-          "p10": 168,
-          "p90": 254,
-          "frames": 80
+          "median": 182,
+          "p10": 147,
+          "p90": 239,
+          "frames": 48
         },
-        "cer": 0.25,
-        "transcript": "你跟我走前头,何有天文采看猴头,鸭娃早看周哥。",
-        "speakerCos": 0.836,
+        "cer": 0.2,
+        "transcript": "你跟我走前头,何有铁文采看后头,姚瓦照看周哥。",
+        "speakerCos": 0.702,
         "nearestOther": [
           "runner",
-          0.516
+          0.685
         ],
         "referencedOther": [
           "runner",
-          0.516
+          0.685
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.8
+        "sceneGainDb": 1.56
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6242,52 +6251,52 @@
       "who": "zhou",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.08,
-      "bytes": 25749,
-      "sha256": "8739ec92ab8c11f0fc5c77668bcf125d6e0cf075adc3d35e2a14b8189e8f7c8f",
+      "seconds": 1.74,
+      "bytes": 21674,
+      "sha256": "f7c645f832d40f1e8f22a577c3adbcf406b4bdc02d38f3fb1b9a4303438ea428",
       "source": "scene",
-      "sceneSha256": "69139532f02166efb8a56e42994962832458cf9ec4c85f96edab191df9aed500",
+      "sceneSha256": "143c2ce83bb7c83c5d2ebaedec1e315db01a4ae81c4cb57a415f40beca0c4f91",
       "sceneStartS": 0,
-      "sceneEndS": 2.08,
+      "sceneEndS": 1.74,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -71.2,
-        -44.1
+        -52.8,
+        -53.4
       ],
       "cutMethod": "subtitle",
       "castOwner": "zhou",
       "castSha256": "1c7a96ad905af020a01e9a6d0a7ede031b09292f8f9351d4838835500502e3ee",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.53,
-        "truePeakDb": -3.96,
-        "snrDb": 45.15,
-        "voicedS": 1.08,
-        "lowShare": 0.394,
+        "activeRmsDb": -22.99,
+        "truePeakDb": -6.48,
+        "snrDb": 52.3,
+        "voicedS": 1.04,
+        "lowShare": 0.383,
         "f0": {
-          "median": 160,
-          "p10": 127,
-          "p90": 184,
-          "frames": 15
+          "median": 115,
+          "p10": 92,
+          "p90": 128,
+          "frames": 22
         },
         "cer": 0.1667,
-        "transcript": "兄弟,有活没得?",
-        "speakerCos": 0.626,
+        "transcript": "兄弟,有活没得。",
+        "speakerCos": 0.814,
         "nearestOther": [
           "shunzi",
-          0.576
+          0.366
         ],
         "referencedOther": [
           "shunzi",
-          0.576
+          0.366
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.65
+        "sceneGainDb": 2.26
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6297,55 +6306,63 @@
       "index": 1,
       "who": "shunzi",
       "lang": "zh",
-      "projection": "low",
-      "seconds": 0.54,
-      "bytes": 7254,
-      "sha256": "3a7fb73f40ece6cdd10b9fb3cf02b1409cd5bc26bbdf9adc8f4672838fa7b034",
-      "source": "scene",
-      "sceneSha256": "69139532f02166efb8a56e42994962832458cf9ec4c85f96edab191df9aed500",
-      "sceneStartS": 2.44,
-      "sceneEndS": 2.98,
-      "gapBeforeS": 0.36,
+      "projection": "normal",
+      "seconds": 0.64,
+      "bytes": 8508,
+      "sha256": "1b1a1ed8f65ec9d60c04d3f9e398d8bab9620cffd9f4627fb3ad6861c34db58a",
+      "source": "patch",
+      "sceneSha256": "143c2ce83bb7c83c5d2ebaedec1e315db01a4ae81c4cb57a415f40beca0c4f91",
+      "sceneStartS": 1.92,
+      "sceneEndS": 2.54,
+      "gapBeforeS": 0.18,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -41.1,
-        -37.1
+        -55.2,
+        -50.6
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -31.94,
-        "truePeakDb": -17.48,
-        "snrDb": 32.07,
-        "voicedS": 0.44,
-        "lowShare": 0.34,
+        "activeRmsDb": -19.41,
+        "truePeakDb": -6.03,
+        "snrDb": 53.08,
+        "voicedS": 0.52,
+        "lowShare": 0.137,
         "f0": {
-          "median": 129,
-          "p10": 120,
-          "p90": 130,
-          "frames": 4
+          "median": 225,
+          "p10": 123,
+          "p90": 250,
+          "frames": 14
         },
         "cer": 1,
-        "transcript": "严难。",
-        "speakerCos": 0.364,
+        "transcript": "什么?",
+        "speakerCos": 0.551,
         "nearestOther": [
           "zhou",
-          0.31
+          0.17
         ],
         "referencedOther": [
           "zhou",
-          0.31
+          0.371
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.65
+        "sceneGainDb": 2.26
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "patch": {
+        "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
+        "replacedSha256": "960dd3d2dfa0dede14534d0ff0eee47efb121a771287c1ff4ad7a286fb3d3541",
+        "targetDb": -18.96,
+        "takes": 1,
+        "take": 1,
+        "promptHash": "6ffa37c2ea5f78410b6bee01cd8c182a43dd30ed4d6c6da525659eb300ebcee2"
+      }
     },
     "BorrowLight.03": {
       "file": "Lines/AudioVoice_FirstLevelBorrowLight_03.mp3",
@@ -6354,52 +6371,52 @@
       "who": "zhou",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 0.98,
-      "bytes": 12583,
-      "sha256": "9283fc219c83e7d555b27a24f7bd5f00445087aeea514c250f09b1d1204eddfd",
+      "seconds": 1.1,
+      "bytes": 14151,
+      "sha256": "04c24bb47ad8b21a7068a5584e5ff881b0577915601499aaf421881cf484b6e1",
       "source": "scene",
-      "sceneSha256": "69139532f02166efb8a56e42994962832458cf9ec4c85f96edab191df9aed500",
-      "sceneStartS": 3.57,
-      "sceneEndS": 4.55,
-      "gapBeforeS": 0.59,
+      "sceneSha256": "143c2ce83bb7c83c5d2ebaedec1e315db01a4ae81c4cb57a415f40beca0c4f91",
+      "sceneStartS": 2.93,
+      "sceneEndS": 4.03,
+      "gapBeforeS": 0.39,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -32.6,
-        -37
+        -55.3,
+        -52.8
       ],
       "cutMethod": "subtitle",
       "castOwner": "zhou",
       "castSha256": "1c7a96ad905af020a01e9a6d0a7ede031b09292f8f9351d4838835500502e3ee",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -19.95,
-        "truePeakDb": -4.55,
-        "snrDb": 40.63,
-        "voicedS": 0.82,
-        "lowShare": 0.461,
+        "activeRmsDb": -25.75,
+        "truePeakDb": -7.1,
+        "snrDb": 39.51,
+        "voicedS": 0.96,
+        "lowShare": 0.418,
         "f0": {
-          "median": 148,
-          "p10": 106,
-          "p90": 163,
-          "frames": 19
+          "median": 115,
+          "p10": 75,
+          "p90": 126,
+          "frames": 14
         },
-        "cer": 0.4,
-        "transcript": "嘴里不识所。",
-        "speakerCos": 0.587,
+        "cer": 0.2,
+        "transcript": "嘴里不是锁。",
+        "speakerCos": 0.766,
         "nearestOther": [
           "shunzi",
-          0.544
+          0.382
         ],
         "referencedOther": [
           "shunzi",
-          0.544
+          0.382
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.65
+        "sceneGainDb": 2.26
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6409,53 +6426,53 @@
       "index": 3,
       "who": "shunzi",
       "lang": "zh",
-      "projection": "low",
-      "seconds": 1.18,
-      "bytes": 15091,
-      "sha256": "515a1eb1dc369d296ed15cfead74968a2c0f7d0c677558fd2cdd37644edbe65b",
+      "projection": "normal",
+      "seconds": 1.29,
+      "bytes": 16345,
+      "sha256": "69f1306a333e65c51cd20523aeaa77a4b5b620ee356377e29ce1e8d20a86cd80",
       "source": "scene",
-      "sceneSha256": "69139532f02166efb8a56e42994962832458cf9ec4c85f96edab191df9aed500",
-      "sceneStartS": 4.73,
-      "sceneEndS": 5.91,
-      "gapBeforeS": 0.18,
+      "sceneSha256": "143c2ce83bb7c83c5d2ebaedec1e315db01a4ae81c4cb57a415f40beca0c4f91",
+      "sceneStartS": 4.3,
+      "sceneEndS": 5.59,
+      "gapBeforeS": 0.27,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -37.7,
-        -36.1
+        -55.6,
+        -52.6
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -31.25,
-        "truePeakDb": -12.06,
-        "snrDb": 27.91,
-        "voicedS": 1,
-        "lowShare": 0.025,
+        "activeRmsDb": -16.6,
+        "truePeakDb": -4.32,
+        "snrDb": 55.82,
+        "voicedS": 1.12,
+        "lowShare": 0.262,
         "f0": {
-          "median": 0,
-          "p10": 0,
-          "p90": 0,
-          "frames": 0
+          "median": 225,
+          "p10": 137,
+          "p90": 254,
+          "frames": 38
         },
-        "cer": 0.6,
-        "transcript": "老子所窝里。",
-        "speakerCos": 0.235,
+        "cer": 0.2,
+        "transcript": "老子说我呢?",
+        "speakerCos": 0.487,
         "nearestOther": [
           "zhou",
-          0.224
+          0.399
         ],
         "referencedOther": [
           "zhou",
-          0.224
+          0.399
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.65
+        "sceneGainDb": 2.26
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6466,52 +6483,52 @@
       "who": "zhou",
       "lang": "zh",
       "projection": "low",
-      "seconds": 1.1,
-      "bytes": 14151,
-      "sha256": "2d440e6dcf04a8c70b193d96ea0e0433abeb1f692970dae71205c3750d6c3c67",
+      "seconds": 1.22,
+      "bytes": 15405,
+      "sha256": "e13e6c3487869347a5101d8a99d2f803c44dc6c1000a76b334bbf3f19d5f5e8f",
       "source": "scene",
-      "sceneSha256": "69139532f02166efb8a56e42994962832458cf9ec4c85f96edab191df9aed500",
-      "sceneStartS": 6.76,
-      "sceneEndS": 7.86,
-      "gapBeforeS": 0.85,
+      "sceneSha256": "143c2ce83bb7c83c5d2ebaedec1e315db01a4ae81c4cb57a415f40beca0c4f91",
+      "sceneStartS": 5.89,
+      "sceneEndS": 7.11,
+      "gapBeforeS": 0.3,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -37.2,
-        -40.4
+        -53.9,
+        -40.3
       ],
       "cutMethod": "subtitle",
       "castOwner": "zhou",
       "castSha256": "1c7a96ad905af020a01e9a6d0a7ede031b09292f8f9351d4838835500502e3ee",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -26.68,
-        "truePeakDb": -5.55,
-        "snrDb": 35.03,
-        "voicedS": 0.92,
-        "lowShare": 0.323,
+        "activeRmsDb": -24.56,
+        "truePeakDb": -8.3,
+        "snrDb": 39.02,
+        "voicedS": 1.04,
+        "lowShare": 0.513,
         "f0": {
-          "median": 95,
-          "p10": 70,
-          "p90": 105,
-          "frames": 10
+          "median": 82,
+          "p10": 77,
+          "p90": 120,
+          "frames": 15
         },
         "cer": 0,
         "transcript": "就剩这一根了。",
-        "speakerCos": 0.598,
+        "speakerCos": 0.778,
         "nearestOther": [
           "shunzi",
-          0.512
+          0.413
         ],
         "referencedOther": [
           "shunzi",
-          0.512
+          0.413
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.65
+        "sceneGainDb": 2.26
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6522,52 +6539,52 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "low",
-      "seconds": 0.77,
-      "bytes": 10076,
-      "sha256": "cf92d556e8514df0aab09eaef9a263e8c6caf56ac5140e25e78c11d6f85a65be",
+      "seconds": 1.36,
+      "bytes": 17285,
+      "sha256": "965f3fd76b99972ebd20e27193e6a6271370aed5f18fef2b375fec65b900898b",
       "source": "scene",
-      "sceneSha256": "69139532f02166efb8a56e42994962832458cf9ec4c85f96edab191df9aed500",
-      "sceneStartS": 8.1,
-      "sceneEndS": 8.87,
-      "gapBeforeS": 0.24,
+      "sceneSha256": "143c2ce83bb7c83c5d2ebaedec1e315db01a4ae81c4cb57a415f40beca0c4f91",
+      "sceneStartS": 7.43,
+      "sceneEndS": 8.79,
+      "gapBeforeS": 0.32,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -37.8,
-        -39.8
+        -55.7,
+        -33.3
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -30.22,
-        "truePeakDb": -11.77,
-        "snrDb": 31.52,
-        "voicedS": 0.64,
-        "lowShare": 0.328,
+        "activeRmsDb": -19.99,
+        "truePeakDb": -5.65,
+        "snrDb": 37,
+        "voicedS": 1.24,
+        "lowShare": 0.227,
         "f0": {
-          "median": 121,
-          "p10": 112,
-          "p90": 143,
-          "frames": 8
+          "median": 211,
+          "p10": 121,
+          "p90": 242,
+          "frames": 34
         },
-        "cer": 0.2,
-        "transcript": "那你先调到。",
-        "speakerCos": 0.626,
+        "cer": 0.6,
+        "transcript": "拿利先雕到。",
+        "speakerCos": 0.583,
         "nearestOther": [
           "zhou",
-          0.389
+          0.52
         ],
         "referencedOther": [
           "zhou",
-          0.389
+          0.52
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.65
+        "sceneGainDb": 2.26
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6578,52 +6595,52 @@
       "who": "zhou",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 3.23,
-      "bytes": 39542,
-      "sha256": "21b963b90382860e8140ee47b1c894b05517230511eb7663b2d0d8b46a42df72",
+      "seconds": 2.79,
+      "bytes": 34213,
+      "sha256": "ab4f33e07de489fed30ee71bcafd1a4f12d49579e5c345ad554ca4f776a91b3e",
       "source": "scene",
-      "sceneSha256": "69139532f02166efb8a56e42994962832458cf9ec4c85f96edab191df9aed500",
-      "sceneStartS": 9.27,
-      "sceneEndS": 12.5,
-      "gapBeforeS": 0.4,
+      "sceneSha256": "143c2ce83bb7c83c5d2ebaedec1e315db01a4ae81c4cb57a415f40beca0c4f91",
+      "sceneStartS": 9.28,
+      "sceneEndS": 12.07,
+      "gapBeforeS": 0.49,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -34.9,
-        -42
+        -46.4,
+        -49.9
       ],
       "cutMethod": "subtitle",
       "castOwner": "zhou",
       "castSha256": "1c7a96ad905af020a01e9a6d0a7ede031b09292f8f9351d4838835500502e3ee",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.05,
-        "truePeakDb": -2.95,
-        "snrDb": 38.73,
-        "voicedS": 1.8,
-        "lowShare": 0.333,
+        "activeRmsDb": -22.91,
+        "truePeakDb": -5.1,
+        "snrDb": 52.65,
+        "voicedS": 1.68,
+        "lowShare": 0.362,
         "f0": {
-          "median": 129,
-          "p10": 102,
-          "p90": 154,
-          "frames": 29
+          "median": 95,
+          "p10": 85,
+          "p90": 128,
+          "frames": 27
         },
-        "cer": 0.2727,
-        "transcript": "拿去,结你个货,还要打根烟。",
-        "speakerCos": 0.678,
+        "cer": 0.1818,
+        "transcript": "拿去,解你个火,还要打根烟。",
+        "speakerCos": 0.878,
         "nearestOther": [
           "shunzi",
-          0.675
+          0.438
         ],
         "referencedOther": [
           "shunzi",
-          0.675
+          0.438
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.65
+        "sceneGainDb": 2.26
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6633,53 +6650,53 @@
       "index": 7,
       "who": "shunzi",
       "lang": "zh",
-      "projection": "low",
-      "seconds": 1.21,
-      "bytes": 15405,
-      "sha256": "880f13c4567ec50ed35e3aab05bdc54b282560fff74b2ab750b28e277eaf4ed5",
+      "projection": "normal",
+      "seconds": 1.28,
+      "bytes": 16031,
+      "sha256": "4305eb9ffb016417f716e13b0f3fe8f97890c0bbd6faf4e7deaecd0c15197066",
       "source": "scene",
-      "sceneSha256": "69139532f02166efb8a56e42994962832458cf9ec4c85f96edab191df9aed500",
-      "sceneStartS": 13.01,
-      "sceneEndS": 14.22,
-      "gapBeforeS": 0.51,
+      "sceneSha256": "143c2ce83bb7c83c5d2ebaedec1e315db01a4ae81c4cb57a415f40beca0c4f91",
+      "sceneStartS": 12.39,
+      "sceneEndS": 13.67,
+      "gapBeforeS": 0.32,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -40.1,
-        -36.3
+        -51.7,
+        -48.2
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -27.87,
-        "truePeakDb": -12.74,
-        "snrDb": 32.6,
-        "voicedS": 1.08,
-        "lowShare": 0.043,
+        "activeRmsDb": -19.58,
+        "truePeakDb": -6.44,
+        "snrDb": 52.78,
+        "voicedS": 1.14,
+        "lowShare": 0.373,
         "f0": {
-          "median": 0,
-          "p10": 0,
-          "p90": 0,
-          "frames": 0
+          "median": 216,
+          "p10": 165,
+          "p90": 235,
+          "frames": 34
         },
-        "cer": 0.1667,
-        "transcript": "不是最后一竿。",
-        "speakerCos": 0.289,
+        "cer": 0,
+        "transcript": "不是最后一根。",
+        "speakerCos": 0.523,
         "nearestOther": [
           "zhou",
-          0.29
+          0.549
         ],
         "referencedOther": [
           "zhou",
-          0.29
+          0.549
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.65
+        "sceneGainDb": 2.26
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6690,52 +6707,52 @@
       "who": "zhou",
       "lang": "zh",
       "projection": "low",
-      "seconds": 0.909,
-      "bytes": 11643,
-      "sha256": "a96e8f2ce9676a7c8018a69828d24cc5b2fa980497a3dbbdd73f2db7a6a8bef4",
+      "seconds": 0.857,
+      "bytes": 11016,
+      "sha256": "4db138fa23f8c4975c73843efbdcf7f3496f17c93be93126c7f1785c315e561d",
       "source": "scene",
-      "sceneSha256": "69139532f02166efb8a56e42994962832458cf9ec4c85f96edab191df9aed500",
-      "sceneStartS": 14.78,
-      "sceneEndS": 15.689,
-      "gapBeforeS": 0.56,
+      "sceneSha256": "143c2ce83bb7c83c5d2ebaedec1e315db01a4ae81c4cb57a415f40beca0c4f91",
+      "sceneStartS": 14.05,
+      "sceneEndS": 14.907,
+      "gapBeforeS": 0.38,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -39.8,
-        -13.5
+        -48.6,
+        -62.2
       ],
       "cutMethod": "subtitle",
       "castOwner": "zhou",
       "castSha256": "1c7a96ad905af020a01e9a6d0a7ede031b09292f8f9351d4838835500502e3ee",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -19.95,
-        "truePeakDb": -2.62,
-        "snrDb": 33.58,
-        "voicedS": 0.84,
-        "lowShare": 0.201,
+        "activeRmsDb": -24.09,
+        "truePeakDb": -3.73,
+        "snrDb": 44.87,
+        "voicedS": 0.76,
+        "lowShare": 0.175,
         "f0": {
-          "median": 138,
-          "p10": 101,
-          "p90": 500,
-          "frames": 12
+          "median": 101,
+          "p10": 95,
+          "p90": 471,
+          "frames": 6
         },
         "cer": 0.25,
         "transcript": "这下死了。",
-        "speakerCos": 0.595,
+        "speakerCos": 0.578,
         "nearestOther": [
           "shunzi",
-          0.487
+          0.407
         ],
         "referencedOther": [
           "shunzi",
-          0.487
+          0.407
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.65
+        "sceneGainDb": 2.26
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7082,52 +7099,52 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 1.09,
-      "bytes": 13837,
-      "sha256": "d666344d7d9fb4a603a9e5c07ef308e38929768dfcb37f3c8ec6c6cde8134cdf",
+      "seconds": 0.84,
+      "bytes": 11016,
+      "sha256": "c7336a38a92ecfde60ccaaa19bd515d80d9e64ddc486a3bef5f3e662f0779c42",
       "source": "scene",
-      "sceneSha256": "c6fa88e2cc70067d09cbe739e44b9e6f178b702629efaa7c2374fe14b7ea4170",
+      "sceneSha256": "3f46d9e012dff177e4abed129f42d367cf4f9bee290d17958986c1530a8512b7",
       "sceneStartS": 0,
-      "sceneEndS": 1.09,
+      "sceneEndS": 0.84,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -28.5,
-        -33
+        -55.6,
+        -46.1
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -31.16,
-        "truePeakDb": -13.07,
-        "snrDb": 16.23,
-        "voicedS": 1.08,
-        "lowShare": 0.329,
+        "activeRmsDb": -23.02,
+        "truePeakDb": -6.47,
+        "snrDb": 41.51,
+        "voicedS": 0.72,
+        "lowShare": 0.206,
         "f0": {
-          "median": 148,
-          "p10": 128,
-          "p90": 158,
-          "frames": 7
+          "median": 176,
+          "p10": 172,
+          "p90": 250,
+          "frames": 9
         },
-        "cer": 1,
-        "transcript": "撒泽大侠。",
-        "speakerCos": 0.536,
+        "cer": 0.25,
+        "transcript": "啥子在想?",
+        "speakerCos": 0.601,
         "nearestOther": [
           "luo",
-          0.239
+          0.339
         ],
         "referencedOther": [
           "luo",
-          0.239
+          0.339
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1
+        "sceneGainDb": 1.9
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7138,52 +7155,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 3.36,
-      "bytes": 41109,
-      "sha256": "fe884180cd8e7053c43cd2553d7673a1073f6697b93d79d4c7884c4aa2e501ba",
+      "seconds": 3.44,
+      "bytes": 42049,
+      "sha256": "bd652c46bf7f8a131d860c8312bec6f26ed2e371d83dcc9d0fa79d7e72f67d91",
       "source": "scene",
-      "sceneSha256": "c6fa88e2cc70067d09cbe739e44b9e6f178b702629efaa7c2374fe14b7ea4170",
-      "sceneStartS": 2.17,
-      "sceneEndS": 5.53,
-      "gapBeforeS": 1.08,
+      "sceneSha256": "3f46d9e012dff177e4abed129f42d367cf4f9bee290d17958986c1530a8512b7",
+      "sceneStartS": 1.3,
+      "sceneEndS": 4.74,
+      "gapBeforeS": 0.46,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -64.8,
-        -53.4
+        -76.9,
+        -51.6
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -15.66,
-        "truePeakDb": -3.25,
-        "snrDb": 84.23,
-        "voicedS": 2,
-        "lowShare": 0.129,
+        "activeRmsDb": -16.12,
+        "truePeakDb": -2.6,
+        "snrDb": 81.96,
+        "voicedS": 1.9,
+        "lowShare": 0.125,
         "f0": {
-          "median": 250,
-          "p10": 168,
-          "p90": 308,
-          "frames": 48
+          "median": 271,
+          "p10": 242,
+          "p90": 356,
+          "frames": 53
         },
-        "cer": 0.0769,
-        "transcript": "暂车,还在路那头,先把人接下来。",
-        "speakerCos": 0.793,
+        "cer": 0.3846,
+        "transcript": "暂车!还在录哪头?先发声接下来!",
+        "speakerCos": 0.688,
         "nearestOther": [
           "shunzi",
-          0.377
+          0.379
         ],
         "referencedOther": [
           "shunzi",
-          0.377
+          0.379
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1
+        "sceneGainDb": 1.9
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7294,52 +7311,52 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 3.45,
-      "bytes": 42363,
-      "sha256": "7377d79e0a9d79351a68d8f9cc5cfe56fd9118aa76901c86d24eb169da416d65",
+      "seconds": 3.95,
+      "bytes": 48319,
+      "sha256": "f7b709841d08369cbb153ed9cc0696703fc4ce2f6151d08abcf80bd03cb35cb7",
       "source": "scene",
-      "sceneSha256": "96d3a115b3d415a8a804e4eed0821bf9190cd829203e6fd1cc01fa78fa6f2cd8",
-      "sceneStartS": 0.03,
-      "sceneEndS": 3.48,
+      "sceneSha256": "7afccc12db36f197c292f6021fb3e4cf168828b6366f8f0926e3488d80b18b0a",
+      "sceneStartS": 0.02,
+      "sceneEndS": 3.97,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -54.4,
-        -30.8
+        -85.1,
+        -32.4
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.22,
-        "truePeakDb": -4.09,
-        "snrDb": 35.82,
-        "voicedS": 1.8,
-        "lowShare": 0.177,
+        "activeRmsDb": -18.96,
+        "truePeakDb": -4.71,
+        "snrDb": 39.79,
+        "voicedS": 2.38,
+        "lowShare": 0.237,
         "f0": {
-          "median": 216,
-          "p10": 186,
-          "p90": 262,
-          "frames": 56
+          "median": 163,
+          "p10": 125,
+          "p90": 213,
+          "frames": 70
         },
-        "cer": 0.25,
-        "transcript": "班长,手里的弹炸得动了,铁家伙。",
-        "speakerCos": 0.554,
+        "cer": 0.1667,
+        "transcript": "班长,手榴弹炸的动了铁家伙。",
+        "speakerCos": 0.575,
         "nearestOther": [
           "luo",
-          0.433
+          0.57
         ],
         "referencedOther": [
           "luo",
-          0.433
+          0.57
         ],
-        "lengthDiff": 1,
+        "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.26
+        "sceneGainDb": 2.84
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7350,52 +7367,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 5.99,
-      "bytes": 72769,
-      "sha256": "7c8265f46788cfca8d949b564733c90e95bc586d5dd8ad62b20824ed495c2de3",
+      "seconds": 5.33,
+      "bytes": 64933,
+      "sha256": "ba432fa294812797b3687fa5d68c766eeacaa7b8b90089ff22bb3e7adc0bd8f4",
       "source": "scene",
-      "sceneSha256": "96d3a115b3d415a8a804e4eed0821bf9190cd829203e6fd1cc01fa78fa6f2cd8",
-      "sceneStartS": 4.2,
-      "sceneEndS": 10.19,
-      "gapBeforeS": 0.72,
+      "sceneSha256": "7afccc12db36f197c292f6021fb3e4cf168828b6366f8f0926e3488d80b18b0a",
+      "sceneStartS": 6.61,
+      "sceneEndS": 11.94,
+      "gapBeforeS": 2.64,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -61.8,
-        -51.5
+        -41.8,
+        -39.2
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -22.19,
-        "truePeakDb": -3.47,
-        "snrDb": 43.77,
-        "voicedS": 2.9,
-        "lowShare": 0.257,
+        "activeRmsDb": -20.06,
+        "truePeakDb": -1.89,
+        "snrDb": 50.91,
+        "voicedS": 2.56,
+        "lowShare": 0.282,
         "f0": {
-          "median": 143,
-          "p10": 118,
-          "p90": 203,
-          "frames": 40
+          "median": 160,
+          "p10": 119,
+          "p90": 186,
+          "frames": 45
         },
-        "cer": 0.5556,
-        "transcript": "以可不得行,无可捆一脱,以气象,才死得开他。",
-        "speakerCos": 0.869,
+        "cer": 0.3889,
+        "transcript": "一磕不得行,五磕坤一坨,以七箱才四得开它。",
+        "speakerCos": 0.829,
         "nearestOther": [
           "shunzi",
-          0.441
+          0.411
         ],
         "referencedOther": [
           "shunzi",
-          0.441
+          0.411
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.26
+        "sceneGainDb": 2.84
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7406,52 +7423,52 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 1.89,
-      "bytes": 23555,
-      "sha256": "d22c45b94f8bfece2c0e4515dcb334f8b3ea40b2634e8d5cd34a3ba4382163dc",
+      "seconds": 1.11,
+      "bytes": 14151,
+      "sha256": "2eab2c66a7b6f2a8087be00c7de3c3bac12778c90bee033dfc04aac72e9c4666",
       "source": "scene",
-      "sceneSha256": "96d3a115b3d415a8a804e4eed0821bf9190cd829203e6fd1cc01fa78fa6f2cd8",
-      "sceneStartS": 10.72,
-      "sceneEndS": 12.61,
-      "gapBeforeS": 0.53,
+      "sceneSha256": "7afccc12db36f197c292f6021fb3e4cf168828b6366f8f0926e3488d80b18b0a",
+      "sceneStartS": 13.53,
+      "sceneEndS": 14.64,
+      "gapBeforeS": 1.59,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -54.1,
-        -30.5
+        -68.5,
+        -32.2
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -16.05,
-        "truePeakDb": -5.09,
-        "snrDb": 38.1,
-        "voicedS": 0.88,
-        "lowShare": 0.378,
+        "activeRmsDb": -19.11,
+        "truePeakDb": -6.05,
+        "snrDb": 32.42,
+        "voicedS": 0.94,
+        "lowShare": 0.422,
         "f0": {
-          "median": 232,
-          "p10": 216,
-          "p90": 286,
-          "frames": 31
+          "median": 184,
+          "p10": 172,
+          "p90": 246,
+          "frames": 34
         },
         "cer": 0,
-        "transcript": "屋头有现成的。",
-        "speakerCos": 0.463,
+        "transcript": "屋头有现成的?",
+        "speakerCos": 0.409,
         "nearestOther": [
           "luo",
-          0.425
+          0.393
         ],
         "referencedOther": [
           "luo",
-          0.425
+          0.393
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.26
+        "sceneGainDb": 2.84
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7462,52 +7479,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 3.73,
-      "bytes": 45498,
-      "sha256": "9fd8634a9bb93aa7a3dc54e0bdcaeaba93beb15de32365346e4fee937687c14d",
+      "seconds": 2.5,
+      "bytes": 30765,
+      "sha256": "f86f2244586ad92db3fc678494ed01254caf4661e4cc779b6756c78481b8c23f",
       "source": "scene",
-      "sceneSha256": "96d3a115b3d415a8a804e4eed0821bf9190cd829203e6fd1cc01fa78fa6f2cd8",
-      "sceneStartS": 13.33,
-      "sceneEndS": 17.06,
-      "gapBeforeS": 0.72,
+      "sceneSha256": "7afccc12db36f197c292f6021fb3e4cf168828b6366f8f0926e3488d80b18b0a",
+      "sceneStartS": 16.98,
+      "sceneEndS": 19.48,
+      "gapBeforeS": 2.34,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -31.9,
-        -32.6
+        -58.2,
+        -34
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.11,
-        "truePeakDb": -3.03,
-        "snrDb": 44.18,
-        "voicedS": 1.94,
-        "lowShare": 0.191,
+        "activeRmsDb": -19.61,
+        "truePeakDb": -2.64,
+        "snrDb": 51.31,
+        "voicedS": 1.58,
+        "lowShare": 0.258,
         "f0": {
-          "median": 140,
-          "p10": 127,
-          "p90": 174,
-          "frames": 31
+          "median": 124,
+          "p10": 114,
+          "p90": 208,
+          "frames": 37
         },
         "cer": 0.1667,
         "transcript": "前几天就困好了,专门等他的。",
         "speakerCos": 0.851,
         "nearestOther": [
           "shunzi",
-          0.432
+          0.443
         ],
         "referencedOther": [
           "shunzi",
-          0.432
+          0.443
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.26
+        "sceneGainDb": 2.84
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7518,52 +7535,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 4.33,
-      "bytes": 52707,
-      "sha256": "9f0dacb9da9691757589513dca75b6bd5e2eff09958ffaeb5c98afbd2f0d2b20",
+      "seconds": 3.78,
+      "bytes": 46125,
+      "sha256": "aa20abc89d195459d130bb8566015d39d3b87075e978a7ee3861e0b30c7ebb11",
       "source": "scene",
-      "sceneSha256": "edc2bdba7ffa4496ba1daa24ace6633f3ea023aab57dbd8e224559efa54ebb61",
+      "sceneSha256": "29bf990f1dda6190dfece4bf5a4276eb2c1e3195cedc6c686d27b54e9bda0be0",
       "sceneStartS": 0,
-      "sceneEndS": 4.33,
+      "sceneEndS": 3.78,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -26.7,
-        -41.6
+        -29.3,
+        -50.6
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18,
-        "truePeakDb": -2.1,
-        "snrDb": 48.76,
-        "voicedS": 2.18,
-        "lowShare": 0.192,
+        "activeRmsDb": -18.37,
+        "truePeakDb": -2.84,
+        "snrDb": 52.66,
+        "voicedS": 2,
+        "lowShare": 0.201,
         "f0": {
-          "median": 136,
-          "p10": 125,
-          "p90": 229,
-          "frames": 48
+          "median": 134,
+          "p10": 110,
+          "p90": 188,
+          "frames": 37
         },
-        "cer": 0.5385,
-        "transcript": "听好,莫望他脸丧帅,前头贴嘴喉。",
-        "speakerCos": 0.845,
+        "cer": 0.3846,
+        "transcript": "听好,莫望他脸上帅,前头贴嘴厚。",
+        "speakerCos": 0.891,
         "nearestOther": [
           "shunzi",
-          0.512
+          0.448
         ],
         "referencedOther": [
           "shunzi",
-          0.512
+          0.448
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.45
+        "sceneGainDb": 2.66
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7574,52 +7591,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 3.78,
-      "bytes": 46125,
-      "sha256": "465511b2914ce68bcaab8b4428d294663b28508fb9d9f071aa6ababda3fb5c84",
+      "seconds": 4.14,
+      "bytes": 50513,
+      "sha256": "cc64495bde987f59d4f18cb7ba98750b8c83ffb5569cca5a5a3c34a77f7b8fc7",
       "source": "scene",
-      "sceneSha256": "edc2bdba7ffa4496ba1daa24ace6633f3ea023aab57dbd8e224559efa54ebb61",
-      "sceneStartS": 5.01,
-      "sceneEndS": 8.79,
-      "gapBeforeS": 0.68,
+      "sceneSha256": "29bf990f1dda6190dfece4bf5a4276eb2c1e3195cedc6c686d27b54e9bda0be0",
+      "sceneStartS": 4.39,
+      "sceneEndS": 8.53,
+      "gapBeforeS": 0.61,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -54.5,
-        -41.8
+        -59,
+        -35.1
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -19.14,
-        "truePeakDb": -2.11,
-        "snrDb": 48.24,
-        "voicedS": 2.36,
-        "lowShare": 0.206,
+        "activeRmsDb": -18.93,
+        "truePeakDb": -2.35,
+        "snrDb": 47.45,
+        "voicedS": 2.42,
+        "lowShare": 0.189,
         "f0": {
-          "median": 142,
-          "p10": 111,
-          "p90": 193,
-          "frames": 30
+          "median": 148,
+          "p10": 119,
+          "p90": 235,
+          "frames": 38
         },
-        "cer": 0.3125,
-        "transcript": "摔到绿带边上,帘子一短,他就走不动了。",
-        "speakerCos": 0.883,
+        "cer": 0.375,
+        "transcript": "摔到绿带边上,帘子一短,他就揍不动了。",
+        "speakerCos": 0.868,
         "nearestOther": [
           "shunzi",
-          0.442
+          0.425
         ],
         "referencedOther": [
           "shunzi",
-          0.442
+          0.425
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.45
+        "sceneGainDb": 2.66
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7630,52 +7647,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 5.74,
-      "bytes": 69635,
-      "sha256": "9a4c2c9321408352c8cfe01be178dfb86f68aebf8c9f282e1ba3bf26459601c1",
+      "seconds": 5.78,
+      "bytes": 70262,
+      "sha256": "6ab75bf42b7096be683ada14433fb17c20a54978a8aa4d47d2e522effb90f374",
       "source": "scene",
-      "sceneSha256": "edc2bdba7ffa4496ba1daa24ace6633f3ea023aab57dbd8e224559efa54ebb61",
-      "sceneStartS": 9.39,
-      "sceneEndS": 15.13,
-      "gapBeforeS": 0.6,
+      "sceneSha256": "29bf990f1dda6190dfece4bf5a4276eb2c1e3195cedc6c686d27b54e9bda0be0",
+      "sceneStartS": 9.36,
+      "sceneEndS": 15.14,
+      "gapBeforeS": 0.83,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -73.7,
-        -51.4
+        -84.7,
+        -33.4
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.32,
-        "truePeakDb": -2.17,
-        "snrDb": 49.06,
-        "voicedS": 3.42,
-        "lowShare": 0.182,
+        "activeRmsDb": -18.87,
+        "truePeakDb": -2.65,
+        "snrDb": 51.52,
+        "voicedS": 3.5,
+        "lowShare": 0.203,
         "f0": {
-          "median": 113,
-          "p10": 104,
-          "p90": 178,
-          "frames": 36
+          "median": 152,
+          "p10": 134,
+          "p90": 229,
+          "frames": 59
         },
-        "cer": 0.2917,
-        "transcript": "还在打,就再不一困,丢上皮骨喉头拿块铁板,以下是发动机。",
-        "speakerCos": 0.895,
+        "cer": 0.3333,
+        "transcript": "还在打,就在布衣困,丢上皮骨喉头那块铁板,以下是发动机。",
+        "speakerCos": 0.863,
         "nearestOther": [
           "shunzi",
-          0.483
+          0.442
         ],
         "referencedOther": [
           "shunzi",
-          0.483
+          0.442
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.45
+        "sceneGainDb": 2.66
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7686,52 +7703,52 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 1.84,
-      "bytes": 22928,
-      "sha256": "bd798f22a22fd52f4b585208e738c7fbe8ea4df0292d29e4910a6a1c304baa66",
+      "seconds": 2.26,
+      "bytes": 27943,
+      "sha256": "042ea4b76a65786027a5eee45e275567a40ee0deff3dac455e12022de8f9b325",
       "source": "scene",
-      "sceneSha256": "edc2bdba7ffa4496ba1daa24ace6633f3ea023aab57dbd8e224559efa54ebb61",
+      "sceneSha256": "29bf990f1dda6190dfece4bf5a4276eb2c1e3195cedc6c686d27b54e9bda0be0",
       "sceneStartS": 15.48,
-      "sceneEndS": 17.32,
-      "gapBeforeS": 0.35,
+      "sceneEndS": 17.74,
+      "gapBeforeS": 0.34,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -45,
-        -34.8
+        -30.7,
+        -42.2
       ],
       "cutMethod": "subtitle",
       "castOwner": "shunzi",
-      "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.69,
-        "truePeakDb": -2.47,
-        "snrDb": 34.67,
-        "voicedS": 0.82,
-        "lowShare": 0.28,
+        "activeRmsDb": -24.15,
+        "truePeakDb": -5.15,
+        "snrDb": 32.9,
+        "voicedS": 1.04,
+        "lowShare": 0.365,
         "f0": {
-          "median": 180,
-          "p10": 132,
-          "p90": 208,
-          "frames": 24
+          "median": 145,
+          "p10": 113,
+          "p90": 286,
+          "frames": 15
         },
         "cer": 0,
         "transcript": "你咋晓得这些?",
-        "speakerCos": 0.663,
+        "speakerCos": 0.538,
         "nearestOther": [
           "luo",
-          0.441
+          0.56
         ],
         "referencedOther": [
           "luo",
-          0.441
+          0.56
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.45
+        "sceneGainDb": 2.66
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -7742,52 +7759,52 @@
       "who": "luo",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.607,
-      "bytes": 32018,
-      "sha256": "29db46c627ceab26a31ca2b3dee1945847269180dccd901ed53de6e9d6b33ea9",
+      "seconds": 2.729,
+      "bytes": 33586,
+      "sha256": "4767ada31be5fd17bb1609dc7fc8cf638ce8942dcbc77fe76a45707ac48edc82",
       "source": "scene",
-      "sceneSha256": "edc2bdba7ffa4496ba1daa24ace6633f3ea023aab57dbd8e224559efa54ebb61",
-      "sceneStartS": 17.75,
-      "sceneEndS": 20.357,
-      "gapBeforeS": 0.43,
+      "sceneSha256": "29bf990f1dda6190dfece4bf5a4276eb2c1e3195cedc6c686d27b54e9bda0be0",
+      "sceneStartS": 18.62,
+      "sceneEndS": 21.349,
+      "gapBeforeS": 0.88,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -78.7,
-        -43.6
+        -49.7,
+        -67.9
       ],
       "cutMethod": "subtitle",
       "castOwner": "luo",
       "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -21.43,
-        "truePeakDb": -3.47,
-        "snrDb": 43.65,
-        "voicedS": 1.76,
-        "lowShare": 0.171,
+        "activeRmsDb": -24.02,
+        "truePeakDb": -4.66,
+        "snrDb": 49.39,
+        "voicedS": 1.92,
+        "lowShare": 0.184,
         "f0": {
-          "median": 110,
+          "median": 127,
           "p10": 96,
           "p90": 139,
-          "frames": 26
+          "frames": 15
         },
-        "cer": 0.75,
-        "transcript": "三星那边,简体中文怎么砸锅?",
+        "cer": 0.3333,
+        "transcript": "三西那边,见弟兄们怎么砸锅?",
         "speakerCos": 0.879,
         "nearestOther": [
           "shunzi",
-          0.483
+          0.45
         ],
         "referencedOther": [
           "shunzi",
-          0.483
+          0.45
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.45
+        "sceneGainDb": 2.66
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -8063,18 +8080,18 @@
   "scenes": {
     "BunkerBanter": {
       "file": "AudioVoice_FirstLevelBunkerBanter.mp3",
-      "sha256": "4fd9060464b877ef59a3c98bb29cb8332d3a36e0e7b3a18b2d4b802bc297b445",
-      "seconds": 31.2,
-      "bytes": 375267,
-      "promptHash": "0de24fcf7c4a607f419f9689c34638a5697256da14176957c87e2655d7fb971c",
-      "castKey": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54,1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706,88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
+      "sha256": "05f14f5e92e39c9387f0432a57e6dec5d2a4a633f15c7cf812f0e06150db8770",
+      "seconds": 37.002,
+      "bytes": 444858,
+      "promptHash": "1265ab7ab36b2bd4b403a728d97424d57d4b00e4448cc955b5a5d83826eff405",
+      "castKey": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1,1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706,88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
       "references": [
         {
           "who": [
             "shunzi"
           ],
           "owner": "shunzi",
-          "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54"
+          "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
         },
         {
           "who": [
@@ -8107,37 +8124,41 @@
         "BunkerBanter.13",
         "BunkerBanter.14"
       ],
-      "attempt": 1,
+      "attempt": 2,
       "pickedBy": "check",
-      "requests": 1,
+      "requests": 2,
       "attempts": [
         {
           "n": 1,
-          "hard": [],
+          "hard": [
+            "BunkerBanter.11 像幺娃的嗓子（本人 0.452 / yaowa 0.685）"
+          ],
           "flags": 11
+        },
+        {
+          "n": 2,
+          "hard": [],
+          "flags": 8
         }
       ],
       "hard": [],
       "flags": [
-        "BunkerBanter.01 字错率 0.4118 待逐字核对「妈妈屁,老子还没买,分头图线给我改起了。」",
-        "BunkerBanter.02 字错率 0.4167 待逐字核对「生死而生,等它死了都不用挖坑。」",
-        "BunkerBanter.03 有声 0.14 s，太短不判嗓子与字错率",
-        "BunkerBanter.03 字错率 1 待逐字核对「关 。」",
-        "BunkerBanter.04 字错率 0.5 待逐字核对「哈哈,别试试,山东的土老子谁不管。」",
-        "BunkerBanter.06 字错率 0.4286 待逐字核对「杂个不挑,老子咬丝叶棍回四川市。」",
-        "BunkerBanter.08 字错率 0.4444 待逐字核对「哪肯定,老子明硬的恨。」",
-        "BunkerBanter.09 字错率 0.8333 待逐字核对「明明还爱抢。」",
-        "BunkerBanter.10 字错率 0.5 待逐字核对「桂儿子枪发屁了诶。」",
-        "BunkerBanter.11 字错率 0.5714 待逐字核对「那你还得写一下它。」",
-        "BunkerBanter.14 字错率 0.5 待逐字核对「那这个是……」"
+        "BunkerBanter.01 字错率 0.5294 待逐字核对「马买皮,老子还没买,分头秃物先给我改起喽。」",
+        "BunkerBanter.03 有声 0.34 s，太短不判嗓子与字错率",
+        "BunkerBanter.03 字错率 1 待逐字核对「君。」",
+        "BunkerBanter.04 字错率 0.4286 待逐字核对「模式在这,山东的土老子睡不管。」",
+        "BunkerBanter.05 字错率 0.6667 待逐字核对「私人还挑底一发?」",
+        "BunkerBanter.09 字错率 0.8333 待逐字核对「民营和爱一腔。」",
+        "BunkerBanter.13 字错率 0.5 待逐字核对「那啥子写?」",
+        "BunkerBanter.14 字错率 1 待逐字核对「拉直嘢个声。」"
       ],
-      "targetDb": -20.21,
-      "gainDb": 1.98,
-      "trimStartS": 0.2,
+      "targetDb": -19.55,
+      "gainDb": 0.78,
+      "trimStartS": 0.04,
       "measure": {
-        "activeRmsDb": -20.51,
-        "truePeakDb": -1.21,
-        "snrDb": 41.45
+        "activeRmsDb": -21.26,
+        "truePeakDb": -1.08,
+        "snrDb": 47.06
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },
@@ -8767,11 +8788,11 @@
     },
     "CollectionMeet": {
       "file": "AudioVoice_FirstLevelCollectionMeet.mp3",
-      "sha256": "1a4a4c2e4b235a58e9f1f0718b7721d7e0b14fe7eaa5d85a32b26dc8658e7d80",
-      "seconds": 5.134,
-      "bytes": 62425,
-      "promptHash": "63e57f95c33a0ba8e0a8a8f2d8eb5cfb0f83076354d9def26e8a5a522deedc98",
-      "castKey": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706,ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
+      "sha256": "079767a5b1fc950cfada2425bb42e3d9ce6a4f488ff55c161f3cf12cc221cf35",
+      "seconds": 6.113,
+      "bytes": 74337,
+      "promptHash": "0e6e354cf971c20efd41405e3ee8c57dccbedc388723aa93b2663e359bf22387",
+      "castKey": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706,149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "references": [
         {
           "who": [
@@ -8785,7 +8806,7 @@
             "shunzi"
           ],
           "owner": "shunzi",
-          "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54"
+          "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
         },
         {
           "who": [
@@ -8800,45 +8821,39 @@
         "CollectionMeet.02",
         "CollectionMeet.03"
       ],
-      "attempt": 2,
+      "attempt": 1,
       "pickedBy": "check",
-      "requests": 2,
+      "requests": 1,
       "attempts": [
         {
           "n": 1,
-          "hard": [
-            "CollectionMeet.01 字错率 1「孙哥,你脸咋了?你们晓得不?」"
-          ],
-          "flags": 1
-        },
-        {
-          "n": 2,
           "hard": [],
-          "flags": 2
+          "flags": 3
         }
       ],
       "hard": [],
       "flags": [
-        "CollectionMeet.02 有声 0.44 s，太短不判嗓子与字错率",
-        "CollectionMeet.03 字错率 0.6667 待逐字核对「模涂到。」"
+        "CollectionMeet.02 有声 0.5 s，太短不判嗓子与字错率",
+        "CollectionMeet.03 有声 0.54 s，太短不判嗓子与字错率",
+        "CollectionMeet.03 字错率 0.6667 待逐字核对「我读到。」"
       ],
-      "targetDb": -17.75,
-      "gainDb": -2.78,
-      "trimStartS": 0.3,
+      "targetDb": -16.75,
+      "gainDb": 0.2,
+      "trimStartS": 0,
       "measure": {
-        "activeRmsDb": -17.75,
-        "truePeakDb": -6.01,
-        "snrDb": 47.87
+        "activeRmsDb": -16.75,
+        "truePeakDb": -1.8,
+        "snrDb": 90.7
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },
     "SupportOrder": {
       "file": "AudioVoice_FirstLevelSupportOrder.mp3",
-      "sha256": "c089f65bad96b84cfa040fd4ffc4e5fd3074f8d03f1a0adc07b25bf126331ed6",
-      "seconds": 14.52,
-      "bytes": 174960,
-      "promptHash": "cb529dcefbdc64d7e4f574df7de1b7dea462a55324c47f9aec01eace1cd684cf",
-      "castKey": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be,ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "sha256": "0fe312e8e85a89a2746cdf7842c2f86286bfd8837c2c5572760c39d5f10100b7",
+      "seconds": 15.42,
+      "bytes": 185932,
+      "promptHash": "80d2188a61317cde2e61fd6b2f69a594030698de14c4758e30ef65b92f437281",
+      "castKey": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be,149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "references": [
         {
           "who": [
@@ -8859,7 +8874,7 @@
             "shunzi"
           ],
           "owner": "shunzi",
-          "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54"
+          "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
         }
       ],
       "lines": [
@@ -8882,18 +8897,18 @@
       ],
       "hard": [],
       "flags": [
-        "SupportOrder.02 有声 0.48 s，太短不判嗓子与字错率",
-        "SupportOrder.02 字错率 1 待逐字核对「我走了。」",
-        "SupportOrder.03 字错率 0.4 待逐字核对「还在前头,即将压倒起来!」",
-        "SupportOrder.05 字错率 0.5 待逐字核对「不是车咯。」"
+        "SupportOrder.02 字错率 0.6667 待逐字核对「老总呢?」",
+        "SupportOrder.03 字错率 0.4 待逐字核对「还在前头,即将压倒起来。」",
+        "SupportOrder.04 字错率 0.5 待逐字核对「和尤铁收喉头,孙子,跟老子走!」",
+        "SupportOrder.05 字错率 0.5 待逐字核对「不是车啦!」"
       ],
-      "targetDb": -17.1,
-      "gainDb": 2.13,
-      "trimStartS": 0.36,
+      "targetDb": -16.81,
+      "gainDb": 2.95,
+      "trimStartS": 0,
       "measure": {
-        "activeRmsDb": -17.51,
-        "truePeakDb": -1.19,
-        "snrDb": 56.31
+        "activeRmsDb": -16.81,
+        "truePeakDb": -1.52,
+        "snrDb": 60.52
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },
@@ -9245,11 +9260,11 @@
     },
     "BundleOrder": {
       "file": "AudioVoice_FirstLevelBundleOrder.mp3",
-      "sha256": "b468c41559c8ae347bed58351ad59ecadb4fa08ccad99a17046f9212252a7d4e",
-      "seconds": 15.489,
-      "bytes": 186559,
-      "promptHash": "04ca465b583bc8dcebe5157067b44b1ebea0fb0bebf4ed044b4b4fcc7754477a",
-      "castKey": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be,ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "sha256": "4b5581c32af3e5a10bddf39385f6aa6cedd84828fb6b6565c689f46e48a133f9",
+      "seconds": 16.08,
+      "bytes": 193769,
+      "promptHash": "5c32b03d07881c90194a748a60c4b134deb9b885fc9834a84e589f2e97d6a849",
+      "castKey": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be,149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "references": [
         {
           "who": [
@@ -9270,7 +9285,7 @@
             "shunzi"
           ],
           "owner": "shunzi",
-          "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54"
+          "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
         }
       ],
       "lines": [
@@ -9283,50 +9298,51 @@
       "attempt": 2,
       "pickedBy": "check",
       "requests": 4,
-      "patched": [
-        "BundleOrder.02"
-      ],
       "attempts": [
         {
           "n": 1,
           "hard": [
-            "BundleOrder.02 像守军的嗓子（本人 0.546 / guard 0.917）",
-            "BundleOrder.05 像守军的嗓子（本人 0.56 / guard 0.833）"
+            "BundleOrder.02 像守军的嗓子（本人 0.582 / guard 0.913）",
+            "BundleOrder.03 像守军的嗓子（本人 0.644 / guard 0.89）",
+            "BundleOrder.04 像守军的嗓子（本人 0.351 / guard 0.545）",
+            "BundleOrder.05 像守军的嗓子（本人 0.642 / guard 0.776）"
           ],
-          "flags": 1
+          "flags": 2
         },
         {
           "n": 2,
           "hard": [
-            "BundleOrder.02 像守军的嗓子（本人 0.581 / guard 0.869）"
+            "BundleOrder.02 像守军的嗓子（本人 0.644 / guard 0.886）"
           ],
           "flags": 2
         },
         {
           "n": 3,
           "hard": [
-            "BundleOrder.02 像守军的嗓子（本人 0.606 / guard 0.871）",
-            "BundleOrder.04 像守军的嗓子（本人 0.467 / guard 0.562）"
+            "BundleOrder.02 像守军的嗓子（本人 0.686 / guard 0.851）"
           ],
-          "flags": 1
+          "flags": 2
         }
       ],
       "hard": [
-        "BundleOrder.02 像守军的嗓子（本人 0.581 / guard 0.869）"
+        "BundleOrder.02 像守军的嗓子（本人 0.644 / guard 0.886）"
       ],
       "flags": [
-        "BundleOrder.01 字错率 0.5625 待逐字核对「外边酒弹药物还有急速弹,好勾人果却。」",
-        "BundleOrder.02 字错率 0.4286 待逐字核对「文采,看着勾勾,何又天,前头交给你。」"
+        "BundleOrder.01 字错率 0.625 待逐字核对「外边酒蛋药物,还有激素丹,好够冷过气。」",
+        "BundleOrder.02 字错率 0.5 待逐字核对「文采,砍住狗扣!霍佑天,前头交给你!」"
       ],
       "targetDb": -17.36,
-      "gainDb": 1.16,
-      "trimStartS": 0.42,
+      "gainDb": 2.22,
+      "trimStartS": 0.28,
       "measure": {
-        "activeRmsDb": -18.5,
-        "truePeakDb": -1.13,
-        "snrDb": 62.8
+        "activeRmsDb": -17.36,
+        "truePeakDb": -3.17,
+        "snrDb": 79.46
       },
-      "mastering": "WholeSceneOnceRmsTruePeakMinus1"
+      "mastering": "WholeSceneOnceRmsTruePeakMinus1",
+      "patched": [
+        "BundleOrder.02"
+      ]
     },
     "BundleGo": {
       "file": "AudioVoice_FirstLevelBundleGo.mp3",
@@ -9740,11 +9756,11 @@
     },
     "Volunteer": {
       "file": "AudioVoice_FirstLevelVolunteer.mp3",
-      "sha256": "5e20e55db0b8efadd29480a132787a5b6754ae0297a0cedacc6ff5a46be085d9",
-      "seconds": 17.42,
-      "bytes": 209756,
-      "promptHash": "9350d3f0c5a303cefa80a28b20ec9fc92a051b933f09cf8f8d2f8f8244e08671",
-      "castKey": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be,ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "sha256": "08912d5a6bc6e7bb5633a37ffc45d08edff288895b03410a49554e72e13e12c3",
+      "seconds": 16.248,
+      "bytes": 195649,
+      "promptHash": "c78358dc7630fec0958a048efe7b76844fa961f1d9459373724cf553d49235e9",
+      "castKey": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be,149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "references": [
         {
           "who": [
@@ -9765,7 +9781,7 @@
             "shunzi"
           ],
           "owner": "shunzi",
-          "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54"
+          "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
         }
       ],
       "lines": [
@@ -9775,38 +9791,46 @@
         "Volunteer.04",
         "Volunteer.05"
       ],
-      "attempt": 1,
+      "attempt": 2,
       "pickedBy": "check",
-      "requests": 1,
+      "requests": 2,
       "attempts": [
         {
           "n": 1,
+          "hard": [
+            "Volunteer.02 像传令兵的嗓子（本人 0.513 / runner 0.619）"
+          ],
+          "flags": 3
+        },
+        {
+          "n": 2,
           "hard": [],
-          "flags": 2
+          "flags": 3
         }
       ],
       "hard": [],
       "flags": [
-        "Volunteer.02 字错率 0.6 待逐字核对「交换人去了啊!」",
-        "Volunteer.03 字错率 0.5 待逐字核对「有人在跟你们自怒!」"
+        "Volunteer.02 字错率 1 待逐字核对「把人踢到哪里?」",
+        "Volunteer.03 字错率 0.375 待逐字核对「有人在给你们自卢!」",
+        "Volunteer.04 字错率 0.4 待逐字核对「我跟侯松队。」"
       ],
       "targetDb": -17.96,
-      "gainDb": 1.8,
-      "trimStartS": 0.4,
+      "gainDb": 1.56,
+      "trimStartS": 0,
       "measure": {
         "activeRmsDb": -17.96,
-        "truePeakDb": -2.55,
-        "snrDb": 50.29
+        "truePeakDb": -3.25,
+        "snrDb": 44.69
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },
     "BorrowLight": {
       "file": "AudioVoice_FirstLevelBorrowLight.mp3",
-      "sha256": "69139532f02166efb8a56e42994962832458cf9ec4c85f96edab191df9aed500",
-      "seconds": 15.689,
-      "bytes": 189067,
-      "promptHash": "37db85332f9c90771717e983f047a79837e5d771cd874e1a3e6e24c92e6bc556",
-      "castKey": "1c7a96ad905af020a01e9a6d0a7ede031b09292f8f9351d4838835500502e3ee,ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "sha256": "143c2ce83bb7c83c5d2ebaedec1e315db01a4ae81c4cb57a415f40beca0c4f91",
+      "seconds": 14.907,
+      "bytes": 179663,
+      "promptHash": "e871618e7e1aee0bed5c8e872ab3398c058fa04aa4123c47bfd1a90c91b59fc3",
+      "castKey": "1c7a96ad905af020a01e9a6d0a7ede031b09292f8f9351d4838835500502e3ee,149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "references": [
         {
           "who": [
@@ -9820,7 +9844,7 @@
             "shunzi"
           ],
           "owner": "shunzi",
-          "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54"
+          "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
         }
       ],
       "lines": [
@@ -9836,30 +9860,50 @@
       ],
       "attempt": 1,
       "pickedBy": "check",
-      "requests": 1,
+      "requests": 4,
       "attempts": [
         {
           "n": 1,
-          "hard": [],
-          "flags": 4
+          "hard": [
+            "BorrowLight.02 只切到 0.46 s 且转写对不上「言呢?」，切句错位"
+          ],
+          "flags": 3
+        },
+        {
+          "n": 2,
+          "hard": [
+            "BorrowLight.02 字错率 2.5「Yenna」"
+          ],
+          "flags": 3
+        },
+        {
+          "n": 3,
+          "hard": [
+            "BorrowLight.02 只切到 0.52 s 且转写对不上「人呢?」，切句错位"
+          ],
+          "flags": 3
         }
       ],
-      "hard": [],
-      "flags": [
-        "BorrowLight.02 有声 0.44 s，太短不判嗓子与字错率",
-        "BorrowLight.02 字错率 1 待逐字核对「严难。」",
-        "BorrowLight.03 字错率 0.4 待逐字核对「嘴里不识所。」",
-        "BorrowLight.04 字错率 0.6 待逐字核对「老子所窝里。」"
+      "hard": [
+        "BorrowLight.02 只切到 0.46 s 且转写对不上「言呢?」，切句错位"
       ],
-      "targetDb": -21.25,
-      "gainDb": 2.65,
-      "trimStartS": 0.22,
+      "flags": [
+        "BorrowLight.02 有声 0.46 s，太短不判嗓子与字错率",
+        "BorrowLight.02 字错率 1 待逐字核对「言呢?」",
+        "BorrowLight.06 字错率 0.6 待逐字核对「拿利先雕到。」"
+      ],
+      "targetDb": -20.25,
+      "gainDb": 2.26,
+      "trimStartS": 0.14,
       "measure": {
-        "activeRmsDb": -21.25,
-        "truePeakDb": -2.55,
-        "snrDb": 38.88
+        "activeRmsDb": -20.25,
+        "truePeakDb": -3.73,
+        "snrDb": 54.44
       },
-      "mastering": "WholeSceneOnceRmsTruePeakMinus1"
+      "mastering": "WholeSceneOnceRmsTruePeakMinus1",
+      "patched": [
+        "BorrowLight.02"
+      ]
     },
     "ZhouLift": {
       "file": "AudioVoice_FirstLevelZhouLift.mp3",
@@ -9971,18 +10015,18 @@
     },
     "TankHeard": {
       "file": "AudioVoice_FirstLevelTankHeard.mp3",
-      "sha256": "c6fa88e2cc70067d09cbe739e44b9e6f178b702629efaa7c2374fe14b7ea4170",
-      "seconds": 5.54,
-      "bytes": 67440,
-      "promptHash": "196cbe13de7dc518b2cddd5dc22babd77ffc737dedb30bcc5596dc94d04332f4",
-      "castKey": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
+      "sha256": "3f46d9e012dff177e4abed129f42d367cf4f9bee290d17958986c1530a8512b7",
+      "seconds": 4.76,
+      "bytes": 58036,
+      "promptHash": "e7d9b2e70cc1a6637c34fc94ee605b6df45c2b843a666c31d64228bbfbccc466",
+      "castKey": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "references": [
         {
           "who": [
             "shunzi"
           ],
           "owner": "shunzi",
-          "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54"
+          "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
         },
         {
           "who": [
@@ -9996,27 +10040,34 @@
         "TankHeard.01",
         "TankHeard.02"
       ],
-      "attempt": 1,
+      "attempt": 2,
       "pickedBy": "check",
-      "requests": 1,
+      "requests": 2,
       "attempts": [
         {
           "n": 1,
+          "hard": [
+            "TankHeard.02 像顺子的嗓子（本人 0.429 / shunzi 0.65）"
+          ],
+          "flags": 0
+        },
+        {
+          "n": 2,
           "hard": [],
           "flags": 1
         }
       ],
       "hard": [],
       "flags": [
-        "TankHeard.01 字错率 1 待逐字核对「撒泽大侠。」"
+        "TankHeard.02 字错率 0.3846 待逐字核对「暂车!还在录哪头?先发声接下来!」"
       ],
       "targetDb": -16.71,
-      "gainDb": 1,
-      "trimStartS": 0.14,
+      "gainDb": 1.9,
+      "trimStartS": 0.18,
       "measure": {
         "activeRmsDb": -16.71,
-        "truePeakDb": -3.25,
-        "snrDb": 64.99
+        "truePeakDb": -2.42,
+        "snrDb": 65.5
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },
@@ -10067,18 +10118,18 @@
     },
     "BundleWhy": {
       "file": "AudioVoice_FirstLevelBundleWhy.mp3",
-      "sha256": "96d3a115b3d415a8a804e4eed0821bf9190cd829203e6fd1cc01fa78fa6f2cd8",
-      "seconds": 17.06,
-      "bytes": 205680,
-      "promptHash": "44a8f0880594d8268334d00a9f99aab4fa022c84b06350e892c09681f51aba28",
-      "castKey": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
+      "sha256": "7afccc12db36f197c292f6021fb3e4cf168828b6366f8f0926e3488d80b18b0a",
+      "seconds": 19.48,
+      "bytes": 234520,
+      "promptHash": "24fc66736553315880e683a8096a8e0d1ef6332f699a9a828c1a9f7b8392931c",
+      "castKey": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1,65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
       "references": [
         {
           "who": [
             "shunzi"
           ],
           "owner": "shunzi",
-          "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54"
+          "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
         },
         {
           "who": [
@@ -10106,25 +10157,25 @@
       ],
       "hard": [],
       "flags": [
-        "BundleWhy.02 字错率 0.5556 待逐字核对「以可不得行,无可捆一脱,以气象,才死得开他。」"
+        "BundleWhy.02 字错率 0.3889 待逐字核对「一磕不得行,五磕坤一坨,以七箱才四得开它。」"
       ],
       "targetDb": -19,
-      "gainDb": 1.26,
-      "trimStartS": 1.56,
+      "gainDb": 2.84,
+      "trimStartS": 0.32,
       "measure": {
         "activeRmsDb": -19,
-        "truePeakDb": -3.05,
-        "snrDb": 41.01
+        "truePeakDb": -1.79,
+        "snrDb": 47.07
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },
     "BundleBrief": {
       "file": "AudioVoice_FirstLevelBundleBrief.mp3",
-      "sha256": "edc2bdba7ffa4496ba1daa24ace6633f3ea023aab57dbd8e224559efa54ebb61",
-      "seconds": 20.357,
-      "bytes": 245178,
-      "promptHash": "b3329ce097d4e5dd045773e7b610b61b715ef79dc4b7984c28d81b418ba7ffb0",
-      "castKey": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be,ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
+      "sha256": "29bf990f1dda6190dfece4bf5a4276eb2c1e3195cedc6c686d27b54e9bda0be0",
+      "seconds": 21.349,
+      "bytes": 257089,
+      "promptHash": "b9f022b84aa1181f82d9d36642790070cc546cc4a783d5e703e3e2bd14faafea",
+      "castKey": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be,149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "references": [
         {
           "who": [
@@ -10138,7 +10189,7 @@
             "shunzi"
           ],
           "owner": "shunzi",
-          "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54"
+          "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
         }
       ],
       "lines": [
@@ -10148,35 +10199,28 @@
         "BundleBrief.04",
         "BundleBrief.05"
       ],
-      "attempt": 2,
+      "attempt": 1,
       "pickedBy": "check",
-      "requests": 2,
+      "requests": 1,
       "attempts": [
         {
           "n": 1,
-          "hard": [
-            "BundleBrief.01 像顺子的嗓子（本人 0.601 / shunzi 0.69）"
-          ],
-          "flags": 2
-        },
-        {
-          "n": 2,
           "hard": [],
           "flags": 2
         }
       ],
       "hard": [],
       "flags": [
-        "BundleBrief.01 字错率 0.5385 待逐字核对「听好,莫望他脸丧帅,前头贴嘴喉。」",
-        "BundleBrief.05 字错率 0.75 待逐字核对「三星那边,简体中文怎么砸锅?」"
+        "BundleBrief.01 字错率 0.3846 待逐字核对「听好,莫望他脸上帅,前头贴嘴厚。」",
+        "BundleBrief.02 字错率 0.375 待逐字核对「摔到绿带边上,帘子一短,他就揍不动了。」"
       ],
       "targetDb": -19,
-      "gainDb": 2.45,
+      "gainDb": 2.66,
       "trimStartS": 0.28,
       "measure": {
         "activeRmsDb": -19,
-        "truePeakDb": -2.05,
-        "snrDb": 45.53
+        "truePeakDb": -2.25,
+        "snrDb": 49.06
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },

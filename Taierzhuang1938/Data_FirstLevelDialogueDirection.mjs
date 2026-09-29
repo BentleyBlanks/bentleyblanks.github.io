@@ -65,17 +65,17 @@ const FRONT = "前沿机枪位后面的土墙与交通沟里，枪声很密，�
 export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   // —— 01 炮击间隙：坟头土打趣。一边干活一边接话，节奏快。
   BunkerBanter: Scene(true, "前沿交通壕侧壁的小防炮洞里，炮击间隙。顺子、幺娃挤在洞里一边往弹夹里压子弹一边斗嘴，肩膀挂彩的川军靠在洞口，三个人相距一两米，彼此看得见，压着嗓子说话、带笑，是苦中作乐的打趣，不是表演", {
-    "01": P("low", 0.45, { context: "几块土掉进衣领，伸手往外掏", delivery: "压着嗓子骂一句，带点自嘲" }),
+    "01": P("low", 0.65, { context: "几块土掉进衣领，伸手往外掏", delivery: "江湖油子的腔调，压着嗓子骂一句，先是一声带鼻音的狠骂，再带笑自嘲，尾音上挑拖长，有劲儿不淡" }),
     "02": P("normal", 0.5, { context: "蹲在旁边压子弹", delivery: "接话快，嘴贫，带笑" }),
-    "03": P("low", 0.4, { delivery: "一个字，懒得理他" }),
+    "03": P("normal", 0.6, { delivery: "一个字，又冲又痞，笑骂一样甩出去，不是冷淡" }),
     "04": P("normal", 0.5, { context: "靠在洞口，听笑了", delivery: "带笑的嘴硬", effort: { before: "先短短笑一声" } }),
     "05": P("normal", 0.5, { delivery: "抬杠，尾音往上挑" }),
     "06": P("normal", 0.55, { delivery: "认真起来的嘴硬" }),
-    "07": P("low", 0.4, { delivery: "低头装弹，随口一句" }),
+    "07": P("normal", 0.6, { delivery: "低头装弹，江湖油子的腔调，过来人的口气，挖苦里带点老练，语调有起伏" }),
     "08": P("normal", 0.5, { delivery: "得意" }),
     "09": P("normal", 0.55, { delivery: "马上拆台，憋着笑" }),
     "10": P("normal", 0.45, { context: "低头看了一眼自己的肩膀", delivery: "满不在乎地损人", pauseBeforeS: 0.6 }),
-    "11": P("low", 0.45, { delivery: "阴阳怪气" }),
+    "11": P("normal", 0.6, { delivery: "江湖油子的腔调，阴阳怪气、带笑损人，尾音往上挑" }),
     "12": P("normal", 0.5, { delivery: "一本正经地发狠" }),
     "13": P("normal", 0.5, { delivery: "好奇地追问" }),
     "14": P("normal", 0.55, { context: "拍了拍自己的枪", delivery: "得意，嘴角带笑", pauseBeforeS: 0.4,
@@ -183,7 +183,7 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   }),
   CollectionMeet: Scene(true, "后交通壕的伤员集结处，幺娃从侧后赶到顺子身边，罗班长在旁边一两米指挥伤员通过", {
     "01": P("shout", 0.7, { delivery: "又惊又急" }),
-    "02": P("low", 0.4, { context: "抹了一把嘴角", delivery: "喘着，简短" }),
+    "02": P("normal", 0.6, { context: "抹了一把嘴角", delivery: "喘着，但嘴硬有劲，江湖油子的腔调，不是虚弱，简短" }),
     "03": P("shout", 0.6, { context: "把幺娃往土壁边拨开，让伤员先过", delivery: "催", pauseBeforeS: 0.6 }),
   }),
   SupportOrder: Scene(true, "后交通壕支沟口，一名撤回的守军扶着沟壁向罗班长报告，顺子在罗班长身边，三个人相距一两米，远处枪声不断", {
@@ -191,7 +191,7 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "02": P("normal", 0.7, { delivery: "问得极短" }),
     "03": P("shout", 0.75, { delivery: "喘着" }),
     "04": P("shout", 0.75, { context: "看向支沟，抬手指过去", delivery: "两道命令，后半句压给顺子", pauseBeforeS: 0.6 }),
-    "05": P("low", 0.45, { context: "看了一眼往后撤的人", delivery: "不情愿" }),
+    "05": P("normal", 0.65, { context: "看了一眼往后撤的人", delivery: "不情愿，江湖油子的腔调，又冲又疑，尾音上挑" }),
     "06": P("normal", 0.7, { delivery: "不容商量" }),
   }),
 
@@ -209,7 +209,7 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   }),
   // 2026-09-27 用户追加（TankHeard / TankArmor / BundleWhy / BundleBrief）：战车怎么回事、为什么要集束弹、往哪扔。
   TankHeard: Scene(true, `${FRONT}。第一批守军刚撤下来，路那头传来发动机和履带声、残墙后闪过车影；顺子在夺下的机枪位上问，罗班长在他旁边两三米，认出是战车，压着他先顾眼前`, {
-    "01": P("normal", 0.6, { delivery: "竖着耳朵，心里发毛" }), "02": P("shout", 0.75, { delivery: "先认出来是什么，再把人拽回眼前的事" }),
+    "01": P("normal", 0.7, { delivery: "竖着耳朵，心里发毛，江湖油子的腔调，嗓门带劲，语速偏快" }), "02": P("shout", 0.75, { delivery: "先认出来是什么，再把人拽回眼前的事" }),
   }),
   TankRoadContact: Scene(true, `${FRONT}。何有田先看见路上开出来的日军战车，喊罗班长；罗班长隔着几米回喊`, {
     "01": P("shout", 0.9, { delivery: "吃惊的急喊" }), "02": P("shout", 0.8),
@@ -220,7 +220,7 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   TankTerror: Scene(true, `${FRONT}。战车的机枪扫过来，罗班长冲站起来的人吼`, { "01": P("shout", 1) }),
   BundleOrder: Scene(true, `${FRONT}。一名守军喊着报告旧弹药屋里还有集束手榴弹，罗班长分派人手，顺子在他身边问了一句`, {
     "01": P("shout", 0.8), "02": P("shout", 0.75), "03": P("normal", 0.7, { delivery: "转头对身边的顺子" }),
-    "04": P("normal", 0.6, { delivery: "有点发怵" }), "05": P("normal", 0.75, { delivery: "不耐烦地打断" }),
+    "04": P("normal", 0.7, { delivery: "嘴上发怵却硬撑着，江湖油子的腔调，语气冲，尾音上挑" }), "05": P("normal", 0.75, { delivery: "不耐烦地打断" }),
   }),
   BundleGo: Scene(true, `${FRONT}。何有田在机枪位顶着，催罗班长快走；罗班长带顺子下沟`, {
     "01": P("shout", 0.8), "02": P("normal", 0.7),
@@ -229,15 +229,15 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "01": P("low", 0.75), "02": P("low", 0.8, { after: "gate", offsetS: 0 }),
   }),
   BundleWhy: Scene(true, "交通沟里往旧弹药屋跑最后一段，刚打完岔口下沟的日兵；顺子跟在罗班长身后一两米，边跑边问，罗班长头也不回边跑边答，两人都喘", {
-    "01": P("normal", 0.6, { delivery: "喘着问，心里没底" }), "02": P("normal", 0.7, { delivery: "喘着，一句一顿，说得笃定" }),
-    "03": P("normal", 0.55, { delivery: "喘着追问" }), "04": P("normal", 0.6, { delivery: "喘着，理所当然" }),
+    "01": P("normal", 0.7, { delivery: "喘着问，心里没底，江湖油子的腔调，带质疑，咬字脆，尾音上挑" }), "02": P("normal", 0.7, { delivery: "喘着，一句一顿，说得笃定" }),
+    "03": P("normal", 0.65, { delivery: "喘着追问，江湖油子的腔调，又急又冲" }), "04": P("normal", 0.6, { delivery: "喘着，理所当然" }),
   }),
   BundleSupply: Scene(true, "旧弹药屋门口，守屋的老兵指着里面的箱子，罗班长接过来就催顺子往回走", {
     "01": P("normal", 0.6), "02": P("normal", 0.7),
   }),
   BundleBrief: Scene(true, "拿到集束弹沿原交通沟往回跑，罗班长在顺子前面一两米，边跑边回头交代怎么炸战车；顺子喘着问一句，罗班长答得短", {
     "01": P("normal", 0.7, { delivery: "回头压给顺子，要他记住" }), "02": P("normal", 0.7, { delivery: "喘着，一字一顿" }),
-    "03": P("normal", 0.75, { delivery: "喘着，说得急，一口气交代完" }), "04": P("normal", 0.55, { delivery: "喘着，有点佩服" }),
+    "03": P("normal", 0.75, { delivery: "喘着，说得急，一口气交代完" }), "04": P("normal", 0.65, { delivery: "喘着，有点佩服，江湖油子的腔调，尾音上挑" }),
     "05": P("normal", 0.6, { delivery: "喘着，轻描淡写，不想多说" }),
   }),
   BundleReturnCall: Scene(true, "何有田在二三十米外的机枪位上隔着枪声喊，罗班长在沟里回喊，再叮嘱身边的顺子", {
@@ -256,15 +256,15 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   // 06 集结处：说话慢下来；BorrowLight 两处动作空当原样保留（事件名沿用）。
   Volunteer: Scene(true, "背坡伤员集结处，传令兵跑过来传令，气还没匀；罗班长问得干脆；顺子那句是主动争取，说得比平时快半拍、还想显得随口；罗班长不接他的茬，直接排人。几个人站在一起，相距一两米", {
     "01": P("shout", 0.7), "02": P("normal", 0.6), "03": P("normal", 0.6),
-    "04": P("normal", 0.55), "05": P("normal", 0.65),
+    "04": P("normal", 0.7, { delivery: "主动争取，江湖油子的腔调，抢着说、语速快、还要显得随口" }), "05": P("normal", 0.65),
   }),
   BorrowLight: Scene(true, "背坡伤员集结处，老周靠在土壁边等担架，嘴里叼着一根没点着的纸烟，腿伤让他动一下就抽气；顺子蹲在他旁边一米。两人是刚混个脸熟的陌生人，互相占便宜、都不肯吃亏，语气是懒洋洋的斗嘴，不是温情；最后一句轻描淡写地认栽", {
-    "01": P("normal", 0.4), "02": P("low", 0.4), "03": P("normal", 0.4, { delivery: "叼着烟，含混" }),
-    "04": P("low", 0.4),
+    "01": P("normal", 0.4), "02": P("normal", 0.6, { delivery: "江湖油子的腔调，讨价还价的口气，尾音上挑，懒洋洋里带着不肯吃亏的劲儿" }), "03": P("normal", 0.4, { delivery: "叼着烟，含混" }),
+    "04": P("normal", 0.6, { delivery: "江湖油子的腔调，理直气壮地耍赖，带笑，咬字脆" }),
     "05": P("low", 0.35, { emit: [{ id: "BorrowLightMatchesPocketed", at: "end" }] }),
     // 两处动作空当：第五句后顺子把火柴往兜里一收（约 2 s）、第六句后老周摸出烟包递一根过去（约 3 s）。
-    "06": P("low", 0.35, { offsetS: 2.0, emit: [{ id: "BorrowLightCigaretteOffered", at: "end" }] }),
-    "07": P("normal", 0.4, { offsetS: 3.0 }), "08": P("low", 0.4), "09": P("low", 0.35),
+    "06": P("low", 0.5, { delivery: "江湖油子的腔调，半是占便宜半是让步，压着嗓子但有笑意", offsetS: 2.0, emit: [{ id: "BorrowLightCigaretteOffered", at: "end" }] }),
+    "07": P("normal", 0.4, { offsetS: 3.0 }), "08": P("normal", 0.6, { delivery: "江湖油子的腔调，故意挑理，带笑，尾音上挑" }), "09": P("low", 0.35),
   }),
   ZhouLift: Scene(true, "担架员走到老周跟前催他上担架，例行公事的大嗓门；老周含着刚点着的烟，含混、赖着不肯动，最后一句是嘟囔给自己听的", {
     "01": P("shout", 0.6), "02": P("low", 0.35, { delivery: "含着烟，含混" }), "03": P("shout", 0.6),

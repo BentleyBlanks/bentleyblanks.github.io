@@ -55,6 +55,9 @@
 8. **字错率怎么算、怎么核对**：标点、空白去掉；片假名折成平假名；日语行对稿面汉字和送 TTS 的假名各算一次取小。whisper medium 会把四川话按普通话同音字写（`拿啥子谢`→`那啥子写`）、会把「莫」改写成「别」，短句一个同音字就是 0.25–0.5；不到 1 秒的片段还会凭空写出「ご視聴ありがとうございました」。所以片段字错率 > 0.34 的，逐字核对后写进 `Audio/FirstLevel/Data_FirstLevelVoiceTranscriptReview.json`：`lines[<句 id>] = { sha256, transcript, cer, note, needsListening? }`，sha256 与转写原文都要和清单当前那一片一致（重录即失效）。whisper 根本转不出来、我们没法确认的句子标 `needsListening: true`（本轮 5 句：`CaptiveDragged.01–03` 神志不清的含糊骂与 0.24 s 的「たて！」、`RescueFlee.01`、`SupportOrder.02`），要人工试听。
 9. **笑声不算字、不算嗓子**（2026-09-26）：导演表写了句前句后 `effort`（狂笑、怪笑）的句子，whisper 会把笑声写成「アハハハ…」「ヘヘヘ」，字错率与字数差被撑爆；嗓子向量也会被笑声拉离定妆音。所以：字错率与 `lengthDiff` 去掉「同一个笑音节连着 ≥ 2 次、或笑音节连着 ≥ 4 个」的串（稿里本来就有的串不去；`Script_SeedAudioVoiceKit.StripLaughter` 与 `Script_FirstLevelVoiceAlign.py` 同一口径），这类句子转写多给 64 个 token；认嗓子只量逐字时间首字前 0.1 s 到末字后 0.2 s 那一段（清单 `metrics.speakerSpanS`；那一段不到 0.6 s 或占整片 85% 以上时仍量整片）。
 
+### 0.3a 顺子重录（2026-09-30）
+
+用户：顺子语气淡淡的，不像闯江湖跑生意的四川重庆人。根因是定妆音的表演说明缺省「情绪平稳」、独白是家常絮叨。改动：`FIRST_LEVEL_VOICE_CAST.shunzi` 人设改为重庆口音的码头江湖油子并写 `sampleDelivery`；导演表里顺子 16 句强度与表演说明上调；`MISSION_VOICE_CAST.shunzi` 描述同步（07–18 整段无参考音，靠描述）。不带参考直接生成的 9 条候选 F0 都被拔到 225–330 Hz（少年/女声），所以新增定妆表字段 `baseFile`：旧定妆音留档为 `Cast/AudioVoiceCastBase_Shunzi20260929.mp3`，重录时作 @音频1 只换劲头不换嗓子（F0 167 Hz）。顺子相关 22 场（逐句 9 + 整段 13）与 6 条班组喊话全部重录，另补录 `BundleOrder.02` `BorrowLight.02`；字错率核对记录与整段对齐已重写。转写与音色只是指标，腔调对不对要人耳定。
 ### 0.4 对白导演表（`Data_FirstLevelDialogueDirection.mjs`）
 
 **默认沿用整段录音里的原始间隔**（清单 `gapBeforeS`：模型一次演出来的轮替节奏，全量中位数 0.34 s），导演表只覆盖稿里要等动作、被打断、压尾音的 8 句：`BunkerSearch.02`（−0.3 s 丁压丙的尾音）、`CaptiveInterrogation.06`（−0.25 s 日兵乙压着翻译骂进来）、`BorrowLight.06/07`（借火两处动作空当 2 s / 3 s，沿用事件 `BorrowLightMatchesPocketed` / `BorrowLightCigaretteOffered`）、`RescueInterrogation.06` `FrontApproach.02` `BundleProne.02` `BundleAttack.02`（`gate`：等导演）；另有首句的 `event:ThroatCut`（割喉后才嘲弄）与 `BunkerIncoming.01` 的 `cutAtS` + `cutEvent`（句尾前 0.35 s 被爆炸截断、发 `BunkerBlast`）。

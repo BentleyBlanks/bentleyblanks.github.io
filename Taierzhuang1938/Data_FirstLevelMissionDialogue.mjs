@@ -13,7 +13,7 @@ import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 //   · lang     该行的语言，缺省 "zh"；"ja" 的行由 Data_FirstLevelJapaneseSpeech 提供假名。
 // 取用一律走 MissionVoiceSpoken() / MissionVoiceSubtitle()，别直接读 line.text 当「念的内容」。
 export const MISSION_VOICE_CAST = Object.freeze({
-  shunzi: ["顺子", "二十多岁四川男兵，嘴硬、精明，害怕时说话急，但不是喜剧腔"],
+  shunzi: ["顺子", "二十出头的四川（重庆一带口音）男兵，出身跑码头、做小买卖的江湖油子；嗓音偏亮、腔调冲、语速快，抑扬顿挫、尾音上挑，带痞气，爱挖苦人；嘴硬、精明，害怕时说话急，但不是喜剧腔；压着嗓子时也不平读、不淡，咬字脆、带劲儿"],
   yaowa: ["幺娃", "十八岁四川男兵，清亮年轻，嘴快，受到惊吓会结巴、重复，不能沉稳播音"],
   heyoutian: ["何有田", "二十多岁四川男兵，粗嗓门，生活化挖苦，战斗时短促直接"],
   liuwencai: ["刘文财", "二十多岁四川男兵，较细干嗓，认真计较弹药，报数清楚"],

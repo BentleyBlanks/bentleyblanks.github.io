@@ -43,13 +43,17 @@ export function CastPrompt(who) {
   // sampleDelivery 缺省时提示词与原来逐字相同（已选定的定妆音不受影响）。
   const delivery = c.sampleDelivery || "按这个人物自己的性格自然地说话，情绪平稳、带一点性格色彩，不要喊叫也不要耳语，语速自然";
   // voiceOf：同一个人的另一种状态，@音频1 是他平时的定妆音（缺省时提示词与原来逐字相同）。
-  const same = c.voiceOf ? "@音频1 是这个人平时的声音：必须是同一个人，严格保持他的音色、年龄感和口音，只是此刻的身体和情绪状态完全不同。" : "";
+  const same = c.voiceOf ? "@音频1 是这个人平时的声音：必须是同一个人，严格保持他的音色、年龄感和口音，只是此刻的身体和情绪状态完全不同。"
+    // baseFile：旧定妆音留档当参考（2026-09-30 顺子：新表演一抬劲头，模型把嗓子拔到 230–290 Hz 成了少年/女声）。
+    : c.baseFile ? "@音频1 是这个人此前的声音：必须是同一个人，严格保持他的音色、音高和年龄感，只是这次说话的劲头和腔调完全不同。" : "";
   return `${DRY_VOICE_RULE}${same}角色：${c.persona}。${VOICE_LANG_RULE[c.lang]}`
     + "这是用来固定角色嗓音的定妆录音：" + delivery + "，一口气念完，不念任何说明。台词：“" + c.sample + "”";
 }
 /** voiceOf 那个人已选定的定妆音（没有就不能生成这种状态的定妆音）。 */
 function BaseVoiceFile(who) {
-  const base = FIRST_LEVEL_VOICE_CAST[who].voiceOf;
+  const cast = FIRST_LEVEL_VOICE_CAST[who];
+  if (cast.baseFile) return path.join(here, "Audio", "FirstLevel", cast.baseFile);
+  const base = cast.voiceOf;
   if (!base) return null;
   const entry = ReadManifest().cast[base];
   if (!entry) throw new Error(`${who}: pick a cast voice for ${base} first (voiceOf)`);

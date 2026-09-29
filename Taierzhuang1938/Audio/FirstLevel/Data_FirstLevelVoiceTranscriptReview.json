@@ -1,66 +1,51 @@
 {
   "about": "片段的人工转写核对（VoiceSync §0.3）。放行「只超字错率、逐字核过只差同音/近音字或四川话口语读法」的片段；needsListening 标的是 whisper 转不出来、我们没法确认的句子，要人工试听。sha256 与转写原文必须等于清单里当前那一片，重录即失效。核对人读的是 whisper 转写与台词的逐字对照，不是听音频。",
-  "reviewedAt": "2026-09-29",
+  "reviewedAt": "2026-09-30",
   "lines": {
     "BunkerBanter.01": {
-      "sha256": "b35277010a3be1ec861940f3e0922ee1abfbdc0966148e6585bbd659a2aa5995",
-      "transcript": "妈妈屁,老子还没买,分头图线给我改起了。",
-      "cer": 0.4118,
-      "note": "逐字：妈卖批→妈妈屁（mai/ma）、埋→买、坟头土→分头图、先→线、盖→改，全是去声调后的同音/近音字；字数语序一致。"
-    },
-    "BunkerBanter.02": {
-      "sha256": "8ae0e88954ed9dc751ffcb150d77f3215b8c0aed9428c2419eb435868c0e0aad",
-      "transcript": "生死而生,等它死了都不用挖坑。",
-      "cer": 0.4167,
-      "note": "省事噻→生死而生（sheng-shi-sai 被写成四个近音字）、等哈→等它；后半句逐字对上。"
+      "sha256": "0146c7d6694cdafdfa3a83ba7be0c8e4ecffde48c540a105ed96b546e52272ce",
+      "transcript": "马买皮,老子还没买,分头秃物先给我改起喽。",
+      "cer": 0.5294,
+      "note": "逐字：妈→马、卖→买、批→皮、埋→买、坟→分、土→物、盖→改、了→喽；另有对位错开（∅→秃），是快读连读被吞或并字。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数差 1。"
     },
     "BunkerBanter.03": {
-      "sha256": "86f34c24b6cecfeb6fecbe64d7e6262bffb05abe961271bc5233d9880060f382",
-      "transcript": "关 。",
+      "sha256": "66a861d2bce4033783dfefcedd48228e232db021acd9fb8a16aa5153888f4ee2",
+      "transcript": "君。",
       "cer": 1,
-      "note": "滚→关（gun/guan），0.14 s 的单字。"
+      "note": "逐字：滚→君。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。",
+      "needsListening": true
     },
     "BunkerBanter.04": {
-      "sha256": "5ac354d4a81d0bf66142e49ad182e34f223702e57331e4c400c39201c7f4dff9",
-      "transcript": "哈哈,别试试,山东的土老子谁不管。",
-      "cer": 0.5,
-      "note": "开头「哈哈」是导演表写的句前短笑（effort）；莫死这儿噻→别试试（whisper 把「莫」按普通话改写成「别」、死这儿→试试）、睡不惯→谁不管，同音/近音。"
-    },
-    "BunkerBanter.06": {
-      "sha256": "e0b694c6e0ad152a8e79b735a88091d8a28ce0f7a169f8d39b0a9441c5162835",
-      "transcript": "杂个不挑,老子咬丝叶棍回四川市。",
+      "sha256": "2a0cf15b0816f4eea381beef00d34377569f341aa14c0de697a850dde700d9d1",
+      "transcript": "模式在这,山东的土老子睡不管。",
       "cer": 0.4286,
-      "note": "咋个→杂个、要死也滚回→咬丝叶棍回、死→市，同音/近音，字数一致。"
+      "note": "逐字：死→模、这→式、儿→在、噻→这、惯→管；另有对位错开（莫→∅），是快读连读被吞或并字。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数差 -1。"
     },
-    "BunkerBanter.08": {
-      "sha256": "516c44663cb2550fa2d369c0b097d853c3031fba47e993eb54f643bc0bce6a68",
-      "transcript": "哪肯定,老子明硬的恨。",
-      "cer": 0.4444,
-      "note": "那→哪、命→明、得很→的恨，同音字。"
+    "BunkerBanter.05": {
+      "sha256": "96067932030790df03f4db9dfec48af756c64f6da9ad453f4e7f206240959633",
+      "transcript": "私人还挑底一发?",
+      "cer": 0.6667,
+      "note": "逐字：死→私、地→一、方→发；另有对位错开（∅→底），是快读连读被吞或并字。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数差 1。"
     },
     "BunkerBanter.09": {
-      "sha256": "31d9b01905b3d3beca6429c1ad39f7f8975e50df09340080836b2c89ba56b13a",
-      "transcript": "明明还爱抢。",
+      "sha256": "3d9100a678451b091081a20a5eff857a20d90fdc86b1b9caadacf7878344a47a",
+      "transcript": "民营和爱一腔。",
       "cer": 0.8333,
-      "note": "命硬还挨一枪→明明还爱抢：命/硬→明明、挨→爱、一枪→抢（「一」与「枪」连读被并成一个字）；1.2 s 短句。"
+      "note": "逐字：命→民、硬→营、还→和、挨→爱、枪→腔。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。"
     },
-    "BunkerBanter.10": {
-      "sha256": "e058a65d9b84827f432f54756cb0d31dd693fbe4e87a8b74c18431b5a7284688",
-      "transcript": "桂儿子枪发屁了诶。",
+    "BunkerBanter.13": {
+      "sha256": "c75382062c6dc33e8bbf1bbc33960346cb2b249889ab6b417a03a94c8d07e9c9",
+      "transcript": "那啥子写?",
       "cer": 0.5,
-      "note": "龟→桂、法→发、撇→屁（四川话 pie/pi）、噻→诶，同音/近音。"
-    },
-    "BunkerBanter.11": {
-      "sha256": "68a0a682a149c16a36b0a7c554c61a171720c673bf33cc3ea818489a9f9b3ce1",
-      "transcript": "那你还得写一下它。",
-      "cer": 0.5714,
-      "note": "谢谢他→写一下它（xie-xie 被写成 xie-yi-xia），同音/近音。"
+      "note": "逐字：拿→那、谢→写。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。",
+      "needsListening": true
     },
     "BunkerBanter.14": {
-      "sha256": "328f71692133599fa1cba5a6e280ba5e69b64ac89ac529fb84aaaa53ee1a1107",
-      "transcript": "那这个是……",
-      "cer": 0.5,
-      "note": "拿→那、噻→是，同音；句尾省略号是随后的短笑。"
+      "sha256": "1ecbf2c18516d23a49c0aa75342008dc228c422efff405b6e671ff58f4e4fc59",
+      "transcript": "拉直嘢个声。",
+      "cer": 1,
+      "note": "逐字：拿→直、这→嘢、噻→声；另有对位错开（∅→拉），是快读连读被吞或并字。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数差 1。",
+      "needsListening": true
     },
     "BunkerOrders.01": {
       "sha256": "82d4a88f44d9f3650106fe2764073fffcb7a904c55a68b1a430ba9bef35be7c2",
@@ -87,6 +72,39 @@
       "cer": 0.5,
       "note": "炮→跑、趴→爬，同音。"
     },
+    "CaptiveDragged.01": {
+      "sha256": "f5f871ed4cca6a36a31ff373905971a548a3c5f7cf953e187197cc6aa753ec29",
+      "transcript": "搞砸了!你妈的!",
+      "cer": 0.5,
+      "note": "2026-09-29 重伤腔重录：稿面「狗日的……你妈的……」；「你妈的」逐字对上，「狗日的」写成「搞砸了」（gou ri de → gao za le 近音，嘶哑带血沫的读法），字数语序一致；前面的痛哼不计。",
+      "needsListening": true
+    },
+    "CaptiveDragged.03": {
+      "sha256": "5387d0b7a773086e39ea8eee4c68c277b2ca1a60a7c8bdd19d13de4777d7c13e",
+      "transcript": "这是你先生!",
+      "cer": 0.75,
+      "note": "2026-09-29 重伤腔重录：稿面「日你……先人……」；四川话「日」读 zi/ri 被写成「这是」（多一字，含句前倒抽气），先人→先生 近音；字数差 1。句前是导演表写的痛哼，嗓子向量因此偏低（本人 0.19、日兵甲 0.19，不是串嗓）。",
+      "needsListening": true
+    },
+    "CaptiveInterrogation.01": {
+      "sha256": "adf0a3e5cb472dab5ddefb6e0b842cc5c03928a755882474ebe47954f1c57348",
+      "transcript": "舞台はどこへ引いた? 引け!",
+      "cer": 0.3636,
+      "note": "2026-09-29 翻译提速+川军重伤腔合并重录，这句单句补录（整段里像翻译的嗓子）：部隊→舞台、退いた→引いた 同音异写，聞け→引け k/h 近音；字数对得上，语序一致。"
+    },
+    "CaptiveInterrogation.02": {
+      "sha256": "d265eccaed2ddce68ca901a3c514f537d61accc06f7ec101db1b4b5b891cfbac",
+      "transcript": "は、はい!",
+      "cer": 0.5,
+      "note": "2026-09-29 合并重录：「はい！」念成「は、はい」——导演表写的又怕又巴结，吓得打了个磕巴；不是念错别的词。",
+      "needsListening": true
+    },
+    "CaptiveInterrogation.04": {
+      "sha256": "4788418649d37a3335ee0f39be3e99e0a435aba13bfa371681499afaabb5a723",
+      "transcript": "傻子?",
+      "cer": 0.5,
+      "note": "2026-09-29 合并重录：「……啥子？」重伤腔嘶哑，whisper 写成近音「傻子」（sha/sa 平翘舌）；两个字对两个字，不是念错。"
+    },
     "CaptiveTaunt.03": {
       "sha256": "335532af6ea26a1389a95a67f247ddd1632e9f4830c2095ef0f766a66195d53e",
       "transcript": "ヘヘヘヘヘ、バカ野郎",
@@ -94,29 +112,37 @@
       "note": "句前「ヘヘヘヘヘ」是导演表写的怪笑（effort），字错率计算已剔除；剩下バカ野郎＝ばかやろう，只是写法不同（2026-09-26 审问重录）。"
     },
     "CollectionMeet.03": {
-      "sha256": "0a9467415b74f23e6b103bb6e842542667ad38c38f6839ce51dfc9b5511e8804",
-      "transcript": "模涂到。",
+      "sha256": "6a90e347bb376075d74f8ee582370348bbf210df12c5a6ca2277a91803e20130",
+      "transcript": "我读到。",
       "cer": 0.6667,
-      "note": "莫堵到→模涂到（du/tu 近音），同音/近音。"
+      "note": "逐字：莫→我、堵→读。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。",
+      "needsListening": true
     },
     "SupportOrder.02": {
-      "sha256": "9bbdc8fbbcb36bcbc4dc3b281be28c97d5db461ba688dd1bb356e971ea22b8ae",
-      "transcript": "我走了。",
-      "cer": 1,
-      "note": "老周喃→我走了：周→走（四川话 zh/z 不分）、喃→了；「老」→「我」不是近音。0.48 s 短问句，需要人工试听确认。",
+      "sha256": "66461d4c71347fb5cf0e636ff6b2ce2cdbd44c00c9dc7d5ed4962664366b2b2b",
+      "transcript": "老总呢?",
+      "cer": 0.6667,
+      "note": "逐字：周→总、喃→呢。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。",
       "needsListening": true
     },
     "SupportOrder.03": {
-      "sha256": "c991fa793295565a2eeb612d95e7c7e26952c146e0b81c541509b1f10bb5b7ec",
-      "transcript": "还在前头,即将压倒起来!",
+      "sha256": "7081d24b4c881fa586fbe8607c85cebfac4686eb8a524a0d3232f72d320f8915",
+      "transcript": "还在前头,即将压倒起来。",
       "cer": 0.4,
-      "note": "机枪→即将、压到起的→压倒起来（的/来）；字数一致。"
+      "note": "逐字：机→即、枪→将、到→倒、的→来。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。"
+    },
+    "SupportOrder.04": {
+      "sha256": "8f6d54f27bc6f4496a51fcf029fa89268333197212c51266da1534ddd75db26d",
+      "transcript": "和尤铁收喉头,孙子,跟老子走!",
+      "cer": 0.5,
+      "note": "逐字：何→和、有→尤、田→铁、守→收、后→喉、顺→孙。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。"
     },
     "SupportOrder.05": {
-      "sha256": "66aaa30ca2f8d10f583276661249f5931607c95944b80e8921aba4374eecf2e2",
-      "transcript": "不是车咯。",
+      "sha256": "cbb22bcf575b553a08b228bd52469c37fa2cda67ac4b56949d0dd234ceeee706",
+      "transcript": "不是车啦!",
       "cer": 0.5,
-      "note": "撤了→车咯，同音。"
+      "note": "逐字：撤→车、了→啦。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。",
+      "needsListening": true
     },
     "FrontBlockade.02": {
       "sha256": "ec5a3ebad4906fe4025f00012ff15aa1d7ff9155d689266f93afbedbd88a2ac8",
@@ -142,6 +168,25 @@
       "cer": 0.3571,
       "note": "田→天、接周哥→借走狗、幺→姚，同音/近音。"
     },
+    "TankHeard.02": {
+      "sha256": "bd652c46bf7f8a131d860c8312bec6f26ed2e371d83dcc9d0fa79d7e72f67d91",
+      "transcript": "暂车!还在录哪头?先发声接下来!",
+      "cer": 0.3846,
+      "note": "逐字：战→暂、路→录、那→哪、把→发、人→声。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。"
+    },
+    "TankArmor.01": {
+      "sha256": "5a6e673a555a7d40163f983e04ce93484539e71a865ac2067dd7993df1290a1d",
+      "transcript": "我打铁口子,强字钻不进去。",
+      "cer": 0.4167,
+      "note": "莫→我、壳子→口子、枪子儿→强字；带提示词重转写为「我打铁壳阵，枪字钻不进去」。字数语序一致。"
+    },
+    "TankArmor.02": {
+      "sha256": "d788c0f7aa608541219e7c18c53f9b00fd575b1732bb41d28d2185198cdb9be8",
+      "transcript": "大根猜猜!",
+      "cer": 1,
+      "note": "打跟车的→大根猜猜：打→大、跟→根、车的(che de)→猜猜；两种解码都一样，四个字对上，但「的」写成「猜」不是常见同音，0.74 s 短句，请人工试听。",
+      "needsListening": true
+    },
     "TankTerror.01": {
       "sha256": "f00c3db26553fbeae1f87d25c2d9a1345b27960727932ad44541825a7d8f7545",
       "transcript": "下来,摸在枪口上,推后枪。",
@@ -149,16 +194,10 @@
       "note": "莫站→摸在、退后墙→推后枪，同音/近音。"
     },
     "BundleOrder.01": {
-      "sha256": "b1bd8c9e164108d6d329775e246b0080d08898cb69b835053c0ed2db6fd7c7f8",
-      "transcript": "外边酒弹药物还有急速弹,好勾人果却。",
-      "cer": 0.5625,
-      "note": "旧弹药屋→酒弹药物、集束→急速、后沟能过去→好勾人果却，同音/近音，字数一致。"
-    },
-    "BundleOrder.02": {
-      "sha256": "71c8feff4e633e50c549fb91c98e66fd864fb876fcf2999db05ec12fb475d7a7",
-      "transcript": "文采,看着狗扣,何又天,前头交给你。",
-      "cer": 0.4286,
-      "note": "（单句补录）财→采、看住沟口→看着狗扣、何有田→何又天，同音/近音。"
+      "sha256": "43aa1b0423405783da1440f36ed645f5ad6a29f2f25f28a296e0039f7db5b282",
+      "transcript": "外边酒蛋药物,还有激素丹,好够冷过气。",
+      "cer": 0.625,
+      "note": "逐字：旧→酒、弹→蛋、屋→物、集→激、束→素、弹→丹、后→好、沟→够、能→冷、去→气。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。"
     },
     "BundleGo.02": {
       "sha256": "845ae0579f196903fdee874d27fe8eddf34215b4b31e97dba6b59025bccc2973",
@@ -166,11 +205,29 @@
       "cer": 0.6667,
       "note": "顺子→笋子、沟→钩、屋在墙后头→不再抢猴头（wu/bu、zai、qiang、hou），近音。"
     },
+    "BundleWhy.02": {
+      "sha256": "ba432fa294812797b3687fa5d68c766eeacaa7b8b90089ff22bb3e7adc0bd8f4",
+      "transcript": "一磕不得行,五磕坤一坨,以七箱才四得开它。",
+      "cer": 0.3889,
+      "note": "逐字：颗→磕、颗→磕、捆→坤、一→以、起→七、响→箱、撕→四。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。"
+    },
     "BundleSupply.02": {
       "sha256": "04ebd96f855f3428d117c0e81c6f4a5dc889ab70fd2727a79fef7f05b744512f",
       "transcript": "拿起,演刚才的勾汇。",
       "cer": 0.375,
       "note": "沿→演、沟回→勾汇，同音。"
+    },
+    "BundleBrief.01": {
+      "sha256": "aa20abc89d195459d130bb8566015d39d3b87075e978a7ee3861e0b30c7ebb11",
+      "transcript": "听好,莫望他脸上帅,前头贴嘴厚。",
+      "cer": 0.3846,
+      "note": "逐字：往→望、它→他、甩→帅、铁→贴、最→嘴。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。"
+    },
+    "BundleBrief.02": {
+      "sha256": "cc64495bde987f59d4f18cb7ba98750b8c83ffb5569cca5a5a3c34a77f7b8fc7",
+      "transcript": "摔到绿带边上,帘子一短,他就揍不动了。",
+      "cer": 0.375,
+      "note": "逐字：甩→摔、履→绿、链→帘、断→短、它→他、走→揍。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。"
     },
     "TankStopped.01": {
       "sha256": "fcd4745963a1c3790cc3ae4ee70f307b5c1c288ac799fde0fb81c21cb819bcbf",
@@ -191,34 +248,37 @@
       "note": "这批过了→贼屁股喽（zhe/zei、guo/gu、le/lou），近音。"
     },
     "Volunteer.02": {
-      "sha256": "6a02d5fc7c34b4916055cb0692fe789034cc68114bc9b2d465b2ea2600f626ba",
-      "transcript": "交换人去了啊!",
-      "cer": 0.6,
-      "note": "交完人去哪→交换人去了啊（wan/huan、na→la-a），近音。"
+      "sha256": "a0ea5d3b6968d231bd78752bb8f719d5c3713ae3f0d2fd0d843003b98f574793",
+      "transcript": "把人踢到哪里?",
+      "cer": 1,
+      "note": "逐字：交→把、完→人、人→踢、去→到；另有对位错开（∅→里），是快读连读被吞或并字。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数差 1。",
+      "needsListening": true
     },
     "Volunteer.03": {
-      "sha256": "3fa38f07687cfc6453feed8bf412569c8d41474e4fb2e8474173e9e34820b277",
-      "transcript": "有人在跟你们自怒!",
-      "cer": 0.5,
-      "note": "再给你们指路→在跟你们自怒（gei/gen、zhi-lu/zi-nu），近音。"
+      "sha256": "e39c010486b1447221e4c6dc8293a19e499383d7e4919dddd89ce54f2c5f2bf4",
+      "transcript": "有人在给你们自卢!",
+      "cer": 0.375,
+      "note": "逐字：再→在、指→自、路→卢。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。"
+    },
+    "Volunteer.04": {
+      "sha256": "7e66ad0ca5d2ee54ddcc4d7494dfdc9a806ca0a9612640fd79ddc1fab373fe8f",
+      "transcript": "我跟侯松队。",
+      "cer": 0.4,
+      "note": "逐字：后→侯、送→松。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。",
+      "needsListening": true
     },
     "BorrowLight.02": {
-      "sha256": "3a7fb73f40ece6cdd10b9fb3cf02b1409cd5bc26bbdf9adc8f4672838fa7b034",
-      "transcript": "严难。",
+      "sha256": "1b1a1ed8f65ec9d60c04d3f9e398d8bab9620cffd9f4627fb3ad6861c34db58a",
+      "transcript": "什么?",
       "cer": 1,
-      "note": "烟喃→严难，同音/近音。"
+      "note": "逐字：烟→什、喃→么。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。",
+      "needsListening": true
     },
-    "BorrowLight.03": {
-      "sha256": "9283fc219c83e7d555b27a24f7bd5f00445087aeea514c250f09b1d1204eddfd",
-      "transcript": "嘴里不识所。",
-      "cer": 0.4,
-      "note": "不是嗦→不识所，同音。"
-    },
-    "BorrowLight.04": {
-      "sha256": "515a1eb1dc369d296ed15cfead74968a2c0f7d0c677558fd2cdd37644edbe65b",
-      "transcript": "老子所窝里。",
+    "BorrowLight.06": {
+      "sha256": "965f3fd76b99972ebd20e27193e6a6271370aed5f18fef2b375fec65b900898b",
+      "transcript": "拿利先雕到。",
       "cer": 0.6,
-      "note": "说我的→所窝里（shuo/suo、de/li），近音。"
+      "note": "逐字：那→拿、你→利、叼→雕。都是去声调后的同音/近音字或四川话读法（平翘舌不分、f/h 不分、n/l 不分、起读 qi、一哈=一下）；字数语序一致。"
     },
     "ZhouLift.01": {
       "sha256": "83576ad526abe24c6165834e2355a94afdc90a9a18b28c9883d0eedda680551b",
@@ -243,77 +303,6 @@
       "transcript": "随你所谓。",
       "cer": 1.3333,
       "note": "催命嗦→随你所谓（cui-ming-suo/sui-ni-suo-wei），近音，含着烟的嘟囔。"
-    },
-    "CaptiveDragged.01": {
-      "sha256": "f5f871ed4cca6a36a31ff373905971a548a3c5f7cf953e187197cc6aa753ec29",
-      "transcript": "搞砸了!你妈的!",
-      "cer": 0.5,
-      "note": "2026-09-29 重伤腔重录：稿面「狗日的……你妈的……」；「你妈的」逐字对上，「狗日的」写成「搞砸了」（gou ri de → gao za le 近音，嘶哑带血沫的读法），字数语序一致；前面的痛哼不计。",
-      "needsListening": true
-    },
-    "CaptiveDragged.03": {
-      "sha256": "5387d0b7a773086e39ea8eee4c68c277b2ca1a60a7c8bdd19d13de4777d7c13e",
-      "transcript": "这是你先生!",
-      "cer": 0.75,
-      "note": "2026-09-29 重伤腔重录：稿面「日你……先人……」；四川话「日」读 zi/ri 被写成「这是」（多一字，含句前倒抽气），先人→先生 近音；字数差 1。句前是导演表写的痛哼，嗓子向量因此偏低（本人 0.19、日兵甲 0.19，不是串嗓）。",
-      "needsListening": true
-    },
-    "TankHeard.01": {
-      "sha256": "d666344d7d9fb4a603a9e5c07ef308e38929768dfcb37f3c8ec6c6cde8134cdf",
-      "transcript": "撒泽大侠。",
-      "cer": 1,
-      "note": "啥子在响→撒泽大侠：啥子(sa zi)→撒泽、在响→大侠；不带提示词重转写为「啥子在下」（响读 xiang/ha 近音）。四个字、语序对上；0.9 s 短问句。",
-      "needsListening": true
-    },
-    "TankArmor.01": {
-      "sha256": "5a6e673a555a7d40163f983e04ce93484539e71a865ac2067dd7993df1290a1d",
-      "transcript": "我打铁口子,强字钻不进去。",
-      "cer": 0.4167,
-      "note": "莫→我、壳子→口子、枪子儿→强字；带提示词重转写为「我打铁壳阵，枪字钻不进去」。字数语序一致。"
-    },
-    "TankArmor.02": {
-      "sha256": "d788c0f7aa608541219e7c18c53f9b00fd575b1732bb41d28d2185198cdb9be8",
-      "transcript": "大根猜猜!",
-      "cer": 1,
-      "note": "打跟车的→大根猜猜：打→大、跟→根、车的(che de)→猜猜；两种解码都一样，四个字对上，但「的」写成「猜」不是常见同音，0.74 s 短句，请人工试听。",
-      "needsListening": true
-    },
-    "BundleWhy.02": {
-      "sha256": "7c8265f46788cfca8d949b564733c90e95bc586d5dd8ad62b20824ed495c2de3",
-      "transcript": "以可不得行,无可捆一脱,以气象,才死得开他。",
-      "cer": 0.5556,
-      "note": "一颗→以可、五颗→无可、坨→脱、一起响→以气象、撕→死；带提示词重转写为「一颗不得行，五颗困一坨，以气象，才死得开沓」。字数语序一致。"
-    },
-    "BundleBrief.01": {
-      "sha256": "9f0dacb9da9691757589513dca75b6bd5e2eff09958ffaeb5c98afbd2f0d2b20",
-      "transcript": "听好,莫望他脸丧帅,前头贴嘴喉。",
-      "cer": 0.5385,
-      "note": "听好→秦昊/听号、往→望、上甩→丧帅、铁最厚→贴嘴喉；带提示词重转写为「听号；莫望他脸丧帅；前头贴嘴喉」。字数语序一致。"
-    },
-    "BundleBrief.05": {
-      "sha256": "29db46c627ceab26a31ca2b3dee1945847269180dccd901ed53de6e9d6b33ea9",
-      "transcript": "三星那边,简体中文怎么砸锅?",
-      "cer": 0.75,
-      "note": "山西→三星/陕西（同音异调）、见弟兄们→简体中文（whisper 臆写；另两次解码都是「见弟兄们」）、这么炸过→怎么砸锅；字数语序一致。"
-    },
-    "CaptiveInterrogation.01": {
-      "sha256": "adf0a3e5cb472dab5ddefb6e0b842cc5c03928a755882474ebe47954f1c57348",
-      "transcript": "舞台はどこへ引いた? 引け!",
-      "cer": 0.3636,
-      "note": "2026-09-29 翻译提速+川军重伤腔合并重录，这句单句补录（整段里像翻译的嗓子）：部隊→舞台、退いた→引いた 同音异写，聞け→引け k/h 近音；字数对得上，语序一致。"
-    },
-    "CaptiveInterrogation.02": {
-      "sha256": "d265eccaed2ddce68ca901a3c514f537d61accc06f7ec101db1b4b5b891cfbac",
-      "transcript": "は、はい!",
-      "cer": 0.5,
-      "note": "2026-09-29 合并重录：「はい！」念成「は、はい」——导演表写的又怕又巴结，吓得打了个磕巴；不是念错别的词。",
-      "needsListening": true
-    },
-    "CaptiveInterrogation.04": {
-      "sha256": "4788418649d37a3335ee0f39be3e99e0a435aba13bfa371681499afaabb5a723",
-      "transcript": "傻子?",
-      "cer": 0.5,
-      "note": "2026-09-29 合并重录：「……啥子？」重伤腔嘶哑，whisper 写成近音「傻子」（sha/sa 平翘舌）；两个字对两个字，不是念错。"
     }
   }
 }
