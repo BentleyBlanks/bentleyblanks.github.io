@@ -1048,7 +1048,8 @@ console.log(
   assert.equal(litter.dragging, false);
   litter.scriptedHandoffHold = false;
   litter.bearers[0] = 75;
-  handoff.Update(1 / 60, { moving: true, routeSafe: true });
+  // The team sets off from standstill (it accelerates and the queue keeps its gap), so give it a few seconds.
+  for (let i = 0; i < 60 * 4 && !(litter.progress > before.progress); i++) handoff.Update(1 / 60, { moving: true, routeSafe: true });
   assert.ok(litter.progress > before.progress, "the litter resumes after the player fills the handle");
 }
 // Survivor counts change the number of useful loads; missing people cannot fill a cart.

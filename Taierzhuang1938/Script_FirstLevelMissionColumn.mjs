@@ -3,6 +3,8 @@ import { MISSION_CROWD_AREAS } from "./Data_FirstLevelMissionCrowd.mjs";
 import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT } from "./Data_FirstLevelMissionLayout.mjs";
 import { MID_TUNING as MID, MidDraftKind, MidTransferScatterPlan, MidTransferRetreatJoin } from "./Data_Tuning_FirstLevelMid.mjs";
+import { LITTER_GAIT as GAIT } from "./Data_Tuning_SquadMarch.mjs";
+import { LitterGaitCreate, LitterGaitStep, LitterGaitGap, LitterGaitLane } from "./Script_LitterGait.mjs";
 export function MissionRouteLength(route) {
   return route.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - route[i].x, p.z - route[i].z), 0);
 }
@@ -590,7 +592,7 @@ export class FirstLevelMissionColumn {
       this.SyncAssignedBearers();
       return;
     }
-    const gateLimit = this.gateOpen ? Infinity : this.GateProgress() - 3;
+    const gateAt = this.GateProgress(), gateLimit = this.gateOpen ? Infinity : gateAt - 3;
     const queue = this.litters.filter(
       (litter) => litter.visible && !litter.evacuated && !litter.loaded && litter.health > 0,
     );
@@ -606,18 +608,40 @@ export class FirstLevelMissionColumn {
       const progressKey = litter.joinRoute ? "joinProgress" : "progress";
       const front = queue[i - 1],
         offset = litter.joinRoute ? ownLength - this.length : 0;
+      // 07 的南行：每副担架有自己的步子（快慢、偶尔停一下、在路上偏一点），不是一条线上的匀速队列。
+      // 只在没有 joinRoute 的南行段生效；08 以后各段的停放、散开、收拢仍是原来的确定走法。
+      const gait = this.mode === "south" && !litter.joinRoute
+        ? (litter.gait ||= LitterGaitCreate(litter.id, this.litters.indexOf(litter))) : null;
       let limit = Math.min(ownLength, gateLimit + offset, maxProgress + offset);
       if (front && !front.staging && !["fallen", "critical", "placed", "loading"].includes(front.state))
-        limit = Math.min(limit, front.progress + offset - R.litterSpacingM - (i%3)*.19);
+        limit = Math.min(limit, front.progress + offset - R.litterSpacingM - (gait ? LitterGaitGap(gait, this.elapsed) : (i%3)*.19));
       // Keep a real queue of separate litters at transfer, with room for player/NPC passage.
       if (!litter.joinRoute && this.mode!=="south") limit = Math.min(limit, this.length - i * R.queueSpacingM);
       if(!litter.joinRoute && this.mode==="south")for(const area of this.stagingAreas)
         if(!litter.stagedAreas?.includes(area.id))limit=Math.min(limit,area.progress);
-      const canMove = moving && SafeAt(litter) && litter[progressKey] < limit - 0.05;
-      const pace=this.LitterPace(litter, R.litterSpeedMps*(.94+(i%4)*.025));
-      if (canMove) litter[progressKey] = Math.min(limit, litter[progressKey] + pace * dt);
+      const room = limit - litter[progressKey];
+      const canMove = moving && SafeAt(litter) && room > 0.05;
+      let walking = canMove;
+      if (gait) {
+        // 门口和队尾不停步（窄处、排队处）；队里同时停的人数与相邻两次停步的间隔也有限额。
+        const canPause = SafeAt(litter) && Math.abs(litter.progress - gateAt) > GAIT.noPauseGateM
+          && this.length - litter.progress > GAIT.noPauseEndM && litter.bearers.every(health => health > 0);
+        const speed = LitterGaitStep(gait, dt, { time: this.elapsed, wantMove: canMove, canPause, room,
+          base: this.LitterPace(litter, R.litterSpeedMps),
+          peers: queue.filter(other => other !== litter && other.gait).map(other => other.gait) });
+        // 只往前走：队列限位比当前进度还靠后时（刚被前车挡住），原地不动，不往回缩。
+        litter[progressKey] = Math.max(litter[progressKey], Math.min(limit, litter[progressKey] + speed * dt));
+        walking = speed > GAIT.movingMps;
+      } else if (canMove) litter[progressKey] = Math.min(limit, litter[progressKey] + this.LitterPace(litter, R.litterSpeedMps*(.94+(i%4)*.025)) * dt);
       const at = MissionCarryRoutePoint(ownRoute, litter[progressKey]);
-      Object.assign(litter, at, { state: canMove ? "moving" : "waiting" });
+      if (gait) {
+        // 路中线两侧各偏一点，相邻两副偏向相反；进院门前收回中线，过了门不再偏。
+        const toGate = gateAt - litter[progressKey];
+        const lane = LitterGaitLane(gait, this.elapsed, Math.max(0, (toGate - GAIT.laneTaperInM) / GAIT.laneTaperOutM));
+        at.x += Math.cos(at.yaw) * lane;
+        at.z -= Math.sin(at.yaw) * lane;
+      }
+      Object.assign(litter, at, { state: walking ? "moving" : "waiting" });
       // 先把 joinRoute 的进度折算回主线，再判过没过院门 —— 10 放行之后每一副担架
       // 都是从自己停的地方接回来的（joinRoute），老写法让它们永远 passedGate=false。
       if (litter.joinRoute) litter.progress = this.length - (ownLength - litter.joinProgress);

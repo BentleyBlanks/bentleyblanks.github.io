@@ -33,6 +33,26 @@ export const SQUAD_MARCH_PRESETS = Object.freeze({
     runMinS: 1.6, runMaxS: 3.6, restMinS: .8, restMaxS: 1.6, stopGapS: .5, paceWobble: .05 }),
 });
 
+// User 2026-09-30: a stretcher column walking one exact line at one exact pace reads as a
+// parade. Each litter team (both bearers together — the pair is never split, see
+// docs/Data_NpcGuideCadence.md §5) gets its own stride, a slow pace drift, a short
+// stop now and then (shifting grip, catching breath) and a loose lane across the road.
+// Same cadence idea as the 'pause' preset above, but the unit is one litter, not one soldier.
+export const LITTER_GAIT = Object.freeze({
+  strideMin: .9, strideMax: 1.12,         // personal speed scale, replaces the fixed 4-step ladder
+  wobbleAmp: .07, wobbleHzMin: .06, wobbleHzMax: .16,
+  runMinS: 7, runMaxS: 16, firstRunScale: .4, // seconds of walking between stops
+  pauseMinS: .8, pauseMaxS: 2.2,
+  restFraction: .3, stopGapS: 1.4,        // at most 30% of the column stopped, new stops >= 1.4 s apart
+  retryMinS: .6, retryMaxS: 2.4,          // when a stop is refused, ask again this much later
+  accelMps2: 1.8, decelMps2: 3.2, brakeMarginM: .03, movingMps: .18,
+  reactBlockedS: .7, reactMinS: .15, reactMaxS: .75, // a team held up by the one ahead sets off late
+  staleS: .5,                             // the team was not driven this long: start again from standstill
+  gapJitterM: .7, gapBreatheM: .35, gapHzMin: .04, gapHzMax: .1, // extra room behind the team in front
+  laneMinM: .08, laneMaxM: .22, laneSwayM: .08, laneHzMin: .05, laneHzMax: .12, laneLimitM: .3,
+  noPauseGateM: 6, noPauseEndM: 8, laneTaperInM: 3, laneTaperOutM: 8,
+});
+
 export const SQUAD_MARCH_EDITOR = Object.freeze({
   count: 6, seed: 17, leaderIndex: 0, preset: 'guided', startYawJitterRad: .45,
   storageKey: 'tengxian1938_squad_march_v1',
