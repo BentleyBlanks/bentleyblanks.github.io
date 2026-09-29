@@ -313,7 +313,9 @@ const LookAt = (page, point, height = 1.2) => page.evaluate(({ point, height }) 
   g.StepFrames(4, 1 / 60, true);
   return previous;
 }, { point, height });
-const Restore = (page, view) => page.evaluate((view) => Object.assign(window.Tengxian.player, view), view);
+// Returns nothing: Object.assign would hand the whole player (and the scene graph hanging off it) back to node, which
+// past ~512 MB of serialised graph kills the Playwright pipe (ERR_STRING_TOO_LONG, 2026-09-29 once the gear-up pack joined it).
+const Restore = (page, view) => page.evaluate((view) => { Object.assign(window.Tengxian.player, view); }, view);
 
 export async function DriveOpening(ctx){
   const {page,output}=ctx,{Route,Interact,WaitStage,Capture}=CampaignActions(ctx);

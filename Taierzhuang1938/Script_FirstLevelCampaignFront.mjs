@@ -41,7 +41,7 @@ export async function Drive(ctx) {
       return previous;
     }, { x: point.x, z: point.z, height: point.height ?? 1.2 });
     await page.screenshot({ path: path.join(shots, `Scene_${name}.png`) });
-    await page.evaluate((view) => Object.assign(window.Tengxian.player, view), view);
+    await page.evaluate((view) => { Object.assign(window.Tengxian.player, view); }, view);   // no return: see Opening's Restore
   }
 
   if(ctx.stageFrom===1)await DriveOpening(ctx);
