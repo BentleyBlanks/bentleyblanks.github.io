@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260929OpeningStoryboardsV19LuoRescue",
+ "version": "20260929OpeningStoryboardsV20PullCutSheathe",
  "fps": 24,
  "actorForward": [
   0,
@@ -825,6 +825,12 @@
      "limb": "handR",
      "action": "draw",
      "target": "bayonet"
+    },
+    {
+     "t": 0.51,
+     "limb": "handR",
+     "action": "turnGrip",
+     "target": "bayonet"
     }
    ],
    "events": [
@@ -840,13 +846,13 @@
    "next": [
     "IjaThroatSlash"
    ],
-   "notes": "The left fist keeps the head wrenched back; the right hand crosses to the scabbard on the left hip and draws the bayonet out blade down (a reversed grip), brings it round the left side of the comrade's neck and lays the edge there (last frame = IjaThroatSlash frame 0).",
+   "notes": "The left fist keeps the head wrenched back; the right hand crosses to the scabbard on the left hip and draws the bayonet out blade down (reversed), brings it up in front of his chest and turns it over in the fist to a forward grip (0.44-0.58), then reaches round in front of the comrade's neck and lays the edge on the right of his throat, the fist in front of the neck (last frame = IjaThroatSlash frame 0). 2026-09-29: a closed fist round the handle.",
    "rigs": [
     "TengxianIja02"
    ]
   },
   "IjaThroatSlash": {
-   "duration": 4.0,
+   "duration": 5.0,
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
@@ -859,24 +865,23 @@
    "stage": "slashCut",
    "weaponState": "slungBack",
    "holdLoop": [
-    1.0,
-    4.0
+    2.0,
+    5.0
    ],
    "contacts": [
+    {
+     "t": 0,
+     "limb": "bayonet",
+     "action": "press",
+     "partnerRole": "comrade",
+     "part": "throat"
+    },
     {
      "t": 0.24,
      "limb": "bayonet",
      "action": "cut",
      "partnerRole": "comrade",
      "part": "throat"
-    },
-    {
-     "t": 0.16666666666666666,
-     "limb": "handR",
-     "action": "sweep",
-     "partnerRole": "comrade",
-     "part": "throat",
-     "standoffM": 0.016
     },
     {
      "t": 0,
@@ -893,6 +898,13 @@
      "partnerRole": "comrade",
      "part": "hairNape",
      "standoffM": 0.03
+    },
+    {
+     "t": 1.24,
+     "limb": "bayonet",
+     "action": "wipe",
+     "partnerRole": "comrade",
+     "part": "shoulderL"
     }
    ],
    "events": [
@@ -903,6 +915,10 @@
     {
      "t": 0.72,
      "kind": "hairShake"
+    },
+    {
+     "t": 1.24,
+     "kind": "bladeWipe"
     },
     {
      "t": 1.6,
@@ -919,9 +935,78 @@
     "IjaDrawBayonet"
    ],
    "next": [
+    "IjaReleaseSheathe"
+   ],
+   "notes": "2026-09-29 pull cut: the edge laid on the right of the throat and pressed in (0-0.12 s, a short push seats it), then one hard pull back toward his right hip draws it round the front of the neck -- the fist leads, the edge stays on the skin (it crosses the front of the throat at 0.24 s) and the blade slides through along its length; the trunk turns into the pull, the weight goes back. The pull runs out past his right hip and the bloody blade comes to rest low at his right side (0.4-1.0). The left fist keeps the head up and shakes it (0.72) while he leans in to jeer; 1.0-1.6 he lays the flat of the blade on the dying man's left shoulder and wipes it once along its length. 2.0-5.0 is a seamless hold loop with two more shakes (the director lets go at 2.0: ija.tauntHoldS after the cut).",
+   "rigs": [
+    "TengxianIja02"
+   ]
+  },
+  "IjaReleaseSheathe": {
+   "duration": 1.3333333333333333,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "TengxianIja02",
+   "props": [
+    "weapon",
+    "bayonet"
+   ],
+   "rootMotion": false,
+   "stage": "slashRelease",
+   "weaponState": "slungBack",
+   "contacts": [
+    {
+     "t": 0,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "comrade",
+     "part": "hairNape",
+     "standoffM": 0.03
+    },
+    {
+     "t": 0.05,
+     "limb": "handL",
+     "action": "release",
+     "partnerRole": "comrade"
+    },
+    {
+     "t": 0.37,
+     "limb": "handR",
+     "action": "turnGrip",
+     "target": "bayonet"
+    },
+    {
+     "t": 0.8,
+     "limb": "bayonet",
+     "action": "sheathe",
+     "target": "scabbard"
+    },
+    {
+     "t": 0.92,
+     "limb": "handR",
+     "action": "release",
+     "target": "bayonet"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "releaseHair"
+    },
+    {
+     "t": 0.8,
+     "kind": "bayonetSheathe",
+     "sound": "bladeSheath"
+    }
+   ],
+   "prev": [
+    "IjaThroatSlash"
+   ],
+   "next": [
     "IjaTauntWalk"
    ],
-   "notes": "2026-09-27: no pause: a short cock that lays the edge on the left of the throat, then one hard pull across the front of the throat to the comrade's right (the blade crosses at 0.24 s, 0.3 m of blade over the neck) and a follow-through out past his right side toward the pinned eye; the bloody blade comes down to the right hip. The left fist keeps the head up and shakes it at once (0.72 s) while he leans in to jeer; 1.0-4.0 s is a seamless hold loop with two more shakes on the taunt lines (the director holds 1.25 s after the cut, then lets go).",
+   "notes": "2026-09-29 (user: \u300c\u671d\u7740\u73a9\u5bb6\u8d70\u8fc7\u6765\u7684\u65f6\u5019\u6ca1\u6709\u6536\u8d77\u6765\u7684\u5c0f\u5200\u300d): frame 0 = IjaThroatSlash at 2.0 s (the start of its hold loop, where the director lets go). The fist opens with a shove off the head of the dying man; the wiped knife comes in front of his chest and is turned back over in the fist to the reversed grip (0.30-0.44, the turn of IjaDrawBayonet run backwards), goes down into the scabbard on his left hip and is pushed home (0.80), his eyes down on it; the hand comes off the handle and hangs free. Then he walks off empty-handed (IjaTauntWalk).",
    "rigs": [
     "TengxianIja02"
    ]
@@ -950,7 +1035,7 @@
     },
     {
      "t": 0.44,
-     "limb": "handsLR",
+     "limb": "handR",
      "action": "clutch",
      "target": "self.throat"
     }
@@ -973,7 +1058,7 @@
    "next": [
     "CaptiveClutchThroat"
    ],
-   "notes": "The cut lands: a full-body jolt, both hands drop off the fist and clamp on the throat, the legs go -- the seat sinks toward the heels (0.56 s) and he hangs from the fist in his hair, which keeps the face turned up toward the pinned eye (2026-09-27: his back no longer slams onto the planks; he falls back onto them when let go).",
+   "notes": "The cut lands: a full-body jolt, the right hand drops off the fist and clamps on the throat (2026-09-29: the left keeps clawing at the fist in his hair until ijaA lets go; in the old bake both hands came down and the left elbow went through ijaA), the legs go -- the seat sinks toward the heels (0.56 s) and he hangs from the fist in his hair, which keeps the face turned up toward the pinned eye (2026-09-27: his back no longer slams onto the planks; he falls back onto them when let go).",
    "rigs": [
     "TengxianNra02"
    ]
@@ -1021,7 +1106,7 @@
    "next": [
     "CaptiveWallSlideTwitch"
    ],
-   "notes": "Hands clamped on the throat, choking spasms, the head held up by the fist in his hair and shaken twice per loop (in step with the IjaThroatSlash hold window).",
+   "notes": "The right hand clamped on the throat, the left still on the fist in his hair, choking spasms, the head held up by the fist and shaken twice per loop (in step with the IjaThroatSlash hold window).",
    "rigs": [
     "TengxianNra02"
    ]
@@ -1085,7 +1170,7 @@
     "CaptiveClutchThroat"
    ],
    "next": [],
-   "notes": "Let go: the head drops, he falls back onto the planks (0.55 s), the seat sags to his right on his heels and he slides down the planks over to his right -- he dies kneeling on the bank; one hand slips off the throat, the legs jerk three times and stop. Last frame is the corpse (hold it; replaces ShotCollapse).",
+   "notes": "Let go: the head drops, his left hand comes off his hair to his throat (0.05-0.45 s), he falls back onto the planks (0.55 s), the seat sags to his right on his heels and he slides down the planks over to his right -- he dies kneeling on the bank; one hand slips off the throat, the legs jerk three times and stop. Last frame is the corpse (hold it; replaces ShotCollapse).",
    "rigs": [
     "TengxianNra02"
    ]
@@ -1827,6 +1912,175 @@
     "TengxianNra05"
    ]
   },
+  "IjaVaultTimberIn": {
+   "duration": 1.8333333333333333,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "TengxianIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "weaponState": "twoHand->highLeft->twoHand",
+   "obstacle": {
+    "kind": "roofTimberDown",
+    "nearM": 0.47,
+    "farM": 0.77,
+    "topM": 0.8
+   },
+   "contacts": [
+    {
+     "t": 0.4,
+     "limb": "handR",
+     "action": "plant",
+     "target": "timber"
+    },
+    {
+     "t": 0.72,
+     "limb": "handR",
+     "action": "release",
+     "target": "timber"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.54,
+     "kind": "takeoff"
+    },
+    {
+     "t": 0.96,
+     "kind": "land"
+    }
+   ],
+   "prev": [
+    "IjaBayonetGuard"
+   ],
+   "next": [
+    "BayonetClearWood"
+   ],
+   "notes": "Found (2026-09-27): comes up to the fallen roof timber (hip high, 0.47 m ahead), turns side-on to it (facing south), lets the wrist of the stock go and puts the right palm on its top, the rifle up in the left fist; loads, hops and swings both legs over drawn up under him, the hips 0.25 m over the top and the head leaned out over the landing side, lands in the pit south-west of Shunzi's eye (0.35 m off it), takes the rifle in both hands again and steps round to the snag root facing west (the clip ends standing on it: root motion). Frames 0.55-0.92 s are off the ground (bake spec groundWeight 0).",
+   "rigs": [
+    "TengxianIja02"
+   ]
+  },
+  "IjaVaultTimberOut": {
+   "duration": 1.9166666666666667,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "TengxianIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "weaponState": "slungRight",
+   "player": true,
+   "obstacle": {
+    "kind": "roofTimberDown",
+    "nearM": 0.144,
+    "farM": 0.444,
+    "topM": 0.8,
+    "laneM": 0.712
+   },
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "shunzi",
+     "part": "collarBack"
+    },
+    {
+     "t": 0.04,
+     "limb": "handL",
+     "action": "release"
+    },
+    {
+     "t": 0.92,
+     "limb": "handL",
+     "action": "plant",
+     "target": "timber"
+    },
+    {
+     "t": 1.18,
+     "limb": "handL",
+     "action": "release",
+     "target": "timber"
+    }
+   ],
+   "events": [
+    {
+     "t": 1.0,
+     "kind": "takeoff"
+    },
+    {
+     "t": 1.36,
+     "kind": "land"
+    }
+   ],
+   "prev": [
+    "IjaKickBeam"
+   ],
+   "next": [
+    "IjaHaulForearmUnder"
+   ],
+   "notes": "DragOut (2026-09-27): frame 0 = IjaKickBeam's last frame (same root, the left fist in the collar). Lets go, rises and turns left to face south, walks to the lane at the south end of the timber, the left palm on its top (the rifle slung on the right), vaults it the other way (0.98-1.36 s off the ground), lands outside and turns right to face Shunzi (west-north-west): the last frame is IjaHaulForearmUnder frame 0 at that clip's root (VAULT_OUT_END in this root).",
+   "rigs": [
+    "TengxianIja02"
+   ]
+  },
+  "IjaHaulForearmUnder": {
+   "duration": 2.75,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "TengxianIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "weaponState": "slungRight",
+   "player": true,
+   "contacts": [
+    {
+     "t": 0.375,
+     "limb": "handR",
+     "action": "grab",
+     "partnerRole": "shunzi",
+     "part": "forearmL"
+    },
+    {
+     "t": 2.54,
+     "limb": "handR",
+     "action": "release"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.5,
+     "kind": "yank"
+    },
+    {
+     "t": 0.75,
+     "kind": "haulStart"
+    },
+    {
+     "t": 2.5,
+     "kind": "haulStop"
+    }
+   ],
+   "prev": [
+    "IjaVaultTimberOut"
+   ],
+   "next": [
+    "IjaButtStrikeCollar"
+   ],
+   "notes": "DragOut (2026-09-27): at the timber's east face goes down on the right knee, the chest low, reaches down with the right hand to Shunzi's left wrist stretched out from under the timber, grabs it (0.375 s), yanks it up and toward him, comes off the knee and backs off bent low, seven short hauling steps, face on Shunzi, hauling him out from under the timber 1.8 m straight back (root motion along actor +z) to the trench edge; lets go at 2.56 s. Rifle slung on the right (hanging as he bends); the left hand swings free. Player track: forearmL (the grip) and head (his eye, 0.45 m behind the wrist).",
+   "rigs": [
+    "TengxianIja02"
+   ]
+  },
   "IjaButtStrikeCollar": {
    "duration": 2.125,
    "loop": false,
@@ -2460,175 +2714,6 @@
     "TengxianIja01"
    ]
   },
-  "IjaVaultTimberIn": {
-   "duration": 1.8333333333333333,
-   "loop": false,
-   "weaponHold": "track",
-   "role": "ijaA",
-   "rig": "TengxianIja02",
-   "props": [
-    "weapon"
-   ],
-   "rootMotion": true,
-   "weaponState": "twoHand->highLeft->twoHand",
-   "obstacle": {
-    "kind": "roofTimberDown",
-    "nearM": 0.47,
-    "farM": 0.77,
-    "topM": 0.8
-   },
-   "contacts": [
-    {
-     "t": 0.4,
-     "limb": "handR",
-     "action": "plant",
-     "target": "timber"
-    },
-    {
-     "t": 0.72,
-     "limb": "handR",
-     "action": "release",
-     "target": "timber"
-    }
-   ],
-   "events": [
-    {
-     "t": 0.54,
-     "kind": "takeoff"
-    },
-    {
-     "t": 0.96,
-     "kind": "land"
-    }
-   ],
-   "prev": [
-    "IjaBayonetGuard"
-   ],
-   "next": [
-    "BayonetClearWood"
-   ],
-   "notes": "Found (2026-09-27): comes up to the fallen roof timber (hip high, 0.47 m ahead), turns side-on to it (facing south), lets the wrist of the stock go and puts the right palm on its top, the rifle up in the left fist; loads, hops and swings both legs over drawn up under him, the hips 0.25 m over the top and the head leaned out over the landing side, lands in the pit south-west of Shunzi's eye (0.35 m off it), takes the rifle in both hands again and steps round to the snag root facing west (the clip ends standing on it: root motion). Frames 0.55-0.92 s are off the ground (bake spec groundWeight 0).",
-   "rigs": [
-    "TengxianIja02"
-   ]
-  },
-  "IjaVaultTimberOut": {
-   "duration": 1.9166666666666667,
-   "loop": false,
-   "weaponHold": "track",
-   "role": "ijaA",
-   "rig": "TengxianIja02",
-   "props": [
-    "weapon"
-   ],
-   "rootMotion": true,
-   "weaponState": "slungRight",
-   "player": true,
-   "obstacle": {
-    "kind": "roofTimberDown",
-    "nearM": 0.144,
-    "farM": 0.444,
-    "topM": 0.8,
-    "laneM": 0.712
-   },
-   "contacts": [
-    {
-     "t": 0.0,
-     "limb": "handL",
-     "action": "hold",
-     "partnerRole": "shunzi",
-     "part": "collarBack"
-    },
-    {
-     "t": 0.04,
-     "limb": "handL",
-     "action": "release"
-    },
-    {
-     "t": 0.92,
-     "limb": "handL",
-     "action": "plant",
-     "target": "timber"
-    },
-    {
-     "t": 1.18,
-     "limb": "handL",
-     "action": "release",
-     "target": "timber"
-    }
-   ],
-   "events": [
-    {
-     "t": 1.0,
-     "kind": "takeoff"
-    },
-    {
-     "t": 1.36,
-     "kind": "land"
-    }
-   ],
-   "prev": [
-    "IjaKickBeam"
-   ],
-   "next": [
-    "IjaHaulForearmUnder"
-   ],
-   "notes": "DragOut (2026-09-27): frame 0 = IjaKickBeam's last frame (same root, the left fist in the collar). Lets go, rises and turns left to face south, walks to the lane at the south end of the timber, the left palm on its top (the rifle slung on the right), vaults it the other way (0.98-1.36 s off the ground), lands outside and turns right to face Shunzi (west-north-west): the last frame is IjaHaulForearmUnder frame 0 at that clip's root (VAULT_OUT_END in this root).",
-   "rigs": [
-    "TengxianIja02"
-   ]
-  },
-  "IjaHaulForearmUnder": {
-   "duration": 2.75,
-   "loop": false,
-   "weaponHold": "track",
-   "role": "ijaA",
-   "rig": "TengxianIja02",
-   "props": [
-    "weapon"
-   ],
-   "rootMotion": true,
-   "weaponState": "slungRight",
-   "player": true,
-   "contacts": [
-    {
-     "t": 0.375,
-     "limb": "handR",
-     "action": "grab",
-     "partnerRole": "shunzi",
-     "part": "forearmL"
-    },
-    {
-     "t": 2.54,
-     "limb": "handR",
-     "action": "release"
-    }
-   ],
-   "events": [
-    {
-     "t": 0.5,
-     "kind": "yank"
-    },
-    {
-     "t": 0.75,
-     "kind": "haulStart"
-    },
-    {
-     "t": 2.5,
-     "kind": "haulStop"
-    }
-   ],
-   "prev": [
-    "IjaVaultTimberOut"
-   ],
-   "next": [
-    "IjaButtStrikeCollar"
-   ],
-   "notes": "DragOut (2026-09-27): at the timber's east face goes down on the right knee, the chest low, reaches down with the right hand to Shunzi's left wrist stretched out from under the timber, grabs it (0.375 s), yanks it up and toward him, comes off the knee and backs off bent low, seven short hauling steps, face on Shunzi, hauling him out from under the timber 1.8 m straight back (root motion along actor +z) to the trench edge; lets go at 2.56 s. Rifle slung on the right (hanging as he bends); the left hand swings free. Player track: forearmL (the grip) and head (his eye, 0.45 m behind the wrist).",
-   "rigs": [
-    "TengxianIja02"
-   ]
-  },
   "IjaTauntWalk": {
    "duration": 2.375,
    "loop": true,
@@ -2636,8 +2721,7 @@
    "role": "ijaA",
    "rig": "TengxianIja02",
    "props": [
-    "weapon",
-    "bayonet"
+    "weapon"
    ],
    "rootMotion": false,
    "upperBody": true,
@@ -2653,12 +2737,12 @@
     }
    ],
    "prev": [
-    "IjaThroatSlash"
+    "IjaReleaseSheathe"
    ],
    "next": [
     "IjaFoundLook"
    ],
-   "notes": "2026-09-27: upper body over the native walk (the director walks him west to ija.found at 1.05 m/s, seconds = time since he set off; loops): the bloody bayonet reversed in the right fist, low and out; head and shoulders turned back over his RIGHT shoulder at the dying man behind him (the spec said left: from the walk the comrade is behind his right shoulder, north-east of the trench floor he walks along), one backward jab of the blade per loop with a swaggering shrug, the left thumb in the belt; a glance ahead (1.1-1.7 s) where the pinned man lies.",
+   "notes": "2026-09-27: upper body over the native walk (the director walks him west to ija.found at 0.75 m/s, seconds = time since he set off; loops): head and shoulders turned back over his RIGHT shoulder at the dying man behind him (from the walk the comrade is behind his right shoulder, north-east of the trench floor he walks along), one contemptuous flick of the open right hand back at him per loop with a swaggering shrug, the left thumb in the belt; a glance ahead (1.1-1.7 s) where the pinned man lies. 2026-09-29: empty-handed, the bayonet already sheathed (IjaReleaseSheathe; the runtime shows it on its scabbard mount).",
    "rigs": [
     "TengxianIja02"
    ]
@@ -2670,8 +2754,7 @@
    "role": "ijaA",
    "rig": "TengxianIja02",
    "props": [
-    "weapon",
-    "bayonet"
+    "weapon"
    ],
    "rootMotion": false,
    "weaponState": "slungBack",
@@ -2679,29 +2762,10 @@
     1.625,
     2.25
    ],
-   "contacts": [
-    {
-     "t": 0.95,
-     "limb": "bayonet",
-     "action": "sheathe",
-     "target": "scabbard"
-    },
-    {
-     "t": 1.3,
-     "limb": "handR",
-     "action": "release",
-     "target": "bayonet"
-    }
-   ],
    "events": [
     {
      "t": 0.1,
      "kind": "stop"
-    },
-    {
-     "t": 1.15,
-     "kind": "bayonetSheathe",
-     "sound": "bladeSheath"
     }
    ],
    "prev": [
@@ -2710,7 +2774,7 @@
    "next": [
     "IjaCrouchHairHold"
    ],
-   "notes": "2026-09-27 ShunziFound: on ija.found facing west, the pinned man's eye 1.13 m ahead on the ground. He stops dead out of the walk (the weight onto the front foot, the back foot drawn up), bends a little and looks down into the man's face (the face on the eye: look); 0.7-1.6 s he sheathes the reversed bayonet on the left hip, the hands then free; 1.6-2.2 s is a seamless hold loop (breathing, looking down at him).",
+   "notes": "2026-09-27 ShunziFound: on ija.found facing west, the pinned man's eye 1.13 m ahead on the ground. He stops dead out of the walk (the weight onto the front foot, the back foot drawn up), bends a little and looks down into the man's face (the face on the eye: look); 1.6-2.2 s is a seamless hold loop (breathing, looking down at him). 2026-09-29: the hands are free (the bayonet went into its scabbard before the walk, IjaReleaseSheathe).",
    "rigs": [
     "TengxianIja02"
    ]
@@ -3294,6 +3358,27 @@
     }
    }
   },
+  "slashRelease": {
+   "anchor": "comrade",
+   "notes": "IjaReleaseSheathe and CaptiveWallSlideTwitch start together (the fist lets go at 0; IjaThroatSlash 2.0 s).",
+   "actors": {
+    "comrade": {
+     "rig": "TengxianNra02",
+     "clip": "CaptiveWallSlideTwitch",
+     "x": 0.0,
+     "z": 0.0,
+     "yawDeg": 0
+    },
+    "ijaA": {
+     "x": -0.23,
+     "z": -0.175,
+     "yawDeg": -128,
+     "yM": -0.117,
+     "rig": "TengxianIja02",
+     "clip": "IjaReleaseSheathe"
+    }
+   }
+  },
   "slashWipe": {
    "anchor": "comrade",
    "notes": "Retired 2026-09-27 (the director walks ijaA off from the taunt): IjaWipeSheathBayonet was baked against the old CaptiveWallSlideTwitch at the old spot in front of him and is kept as it was.",
@@ -3394,7 +3479,7 @@
    "model": "BayonetType30",
    "mesh": "Model_BayonetType38.tzm.json",
    "grip": "handle centre 0.062 m behind the socket ring (model +Z), blade along model -Z",
-   "scabbard": "left hip: pelvis + left 0.13 + forward 0.12 + up 0.04 (runtime metres), blade down-back",
+   "scabbard": "left hip: pelvis + left 0.13 + forward 0.12 + up 0.09 (runtime metres; 0.04 before 2026-09-29), blade down-back",
    "owner": "ijaA",
    "rifleBayonet": false,
    "notes": "ijaA carries his bayonet in the scabbard (roster must spawn his Type38 with bayonet:false); the prop track `bayonet` places it for every clip that touches it."
@@ -3466,7 +3551,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "a678b7c8967b97f8aa01b2815471ec68aec11f2c98ea808c34da78a956dfdeed",
+   "sha256": "447727161c1ac65a95e9775220c98d6637c5fb2df0de19b2224c7f41dcbe17bd",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
@@ -3698,7 +3783,7 @@
      ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningHandWristTwist_20260929\\Scene_TengxianNra02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningThroatCutSheathe_20260929\\Scene_TengxianNra02OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
@@ -7680,9 +7765,9 @@
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "a5834e38147dfa84db3994dd9813e1af860927263df208c242a9bf841315d407",
+   "sha256": "e023b408aaf198951629e5375cba9b8bfb3c272a8d1656ef0cdbf579337e32ca",
    "originalModelSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61",
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningSlapWindup_20260929\\Scene_TengxianIja02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningThroatCutSheathe_20260929\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
      "bone": "Bip001 Head",
@@ -8616,7 +8701,7 @@
      "frames": 21,
      "footSlideM": 0.0,
      "contactErrorM": 0.0,
-     "gripSolveErrorM": 0.05466,
+     "gripSolveErrorM": 0.00422,
      "wallPenetrationM": 0.0,
      "pelvisMaxStepM": 0.0,
      "floorCorrectionMin": 0.01711,
@@ -8651,17 +8736,17 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0,
-     "lookErrorDeg": 1.65,
-     "headTurnDeg": 25.3
+     "lookErrorDeg": 8.83,
+     "headTurnDeg": 30.7
     },
     {
      "clip": "IjaThroatSlash",
-     "frames": 97,
+     "frames": 121,
      "footSlideM": 0.0,
      "contactErrorM": 0.0,
-     "gripSolveErrorM": 0.17786,
+     "gripSolveErrorM": 0.0,
      "wallPenetrationM": 0.0,
-     "pelvisMaxStepM": 0.0076,
+     "pelvisMaxStepM": 0.0264,
      "floorCorrectionMin": 0.01711,
      "floorCorrectionMax": 0.01711,
      "root": {
@@ -8684,24 +8769,67 @@
       [
        "R",
        0,
-       4.0
+       5.0
       ],
       [
        "L",
        0,
-       4.0
+       5.0
       ]
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0,
-     "lookErrorDeg": 4.22,
-     "headTurnDeg": 40.02,
+     "lookErrorDeg": 2.58,
+     "headTurnDeg": 28.74,
      "probes": {
       "bladeOnThroat": [
-       0.0608,
+       0.0053,
        0.25
       ]
      }
+    },
+    {
+     "clip": "IjaReleaseSheathe",
+     "frames": 33,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.02972,
+     "wallPenetrationM": 0.0,
+     "pelvisMaxStepM": 0.0066,
+     "floorCorrectionMin": 0.01711,
+     "floorCorrectionMax": 0.01711,
+     "root": {
+      "start": [
+       0.0,
+       -0.0228,
+       0.0,
+       0.7751
+      ],
+      "end": [
+       0.0,
+       -0.0046,
+       0.0,
+       0.7843
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       1.3333
+      ],
+      [
+       "L",
+       0,
+       1.3333
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 1.99,
+     "headTurnDeg": 59.85
     },
     {
      "clip": "IjaWipeSheathBayonet",
@@ -9658,18 +9786,18 @@
     {
      "clip": "IjaFoundLook",
      "frames": 55,
-     "footSlideM": 0.0,
+     "footSlideM": 0.0001,
      "contactErrorM": 0.0,
-     "gripSolveErrorM": 0.02405,
-     "pelvisMaxStepM": 0.0806,
-     "floorCorrectionMin": 1e-05,
-     "floorCorrectionMax": 4e-05,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0312,
+     "floorCorrectionMin": -7e-05,
+     "floorCorrectionMax": 1e-05,
      "root": {
       "start": [
-       0.0398,
-       0.0052,
        0.0,
-       0.7034
+       0.0548,
+       0.0,
+       0.798
       ],
       "end": [
        -0.0,
@@ -9695,7 +9823,7 @@
      "kneePlants": [],
      "kneeSlideM": 0.0,
      "lookErrorDeg": 0.0,
-     "headTurnDeg": 36.58
+     "headTurnDeg": 37.82
     },
     {
      "clip": "IjaCrouchHairHold",
@@ -9904,6 +10032,7 @@
     "IjaHairGrabPull",
     "IjaDrawBayonet",
     "IjaThroatSlash",
+    "IjaReleaseSheathe",
     "IjaWipeSheathBayonet",
     "IjaReadyRifle",
     "IjaCornerFire",

@@ -67,6 +67,8 @@
 
 - 2026-09-27 开场改稿新增 `IjaTauntWalk`、`IjaFoundLook`、`IjaCrouchHairHold`、`IjaSlapForehand`、`IjaSlapBackhand`、`IjaSlapRaise`、`HeLiftTimber`，割喉链改到川军左肩后（新接触部位 `hairNape` / `crown` / `cheekL` / `cheekR`），口径见 [压木原地审问改稿](Data_OpeningPinnedRescue20260927.md) 第 6 节。
 
+- 2026-09-29 割喉改拉割、新增 `IjaReleaseSheathe`（松手后原地收刀，站位 `slashRelease`），`IjaTauntWalk` / `IjaFoundLook` 不再带刺刀，刀鞘握柄上移 5 cm，口径见 [压木原地审问改稿](Data_OpeningPinnedRescue20260927.md) §6.1。
+
 - 2026-09-27 新增 `IjaVaultTimberIn` / `IjaVaultTimberOut` / `IjaHaulForearmUnder`（只烘 IJA02）与 spec 键 `groundWeight(t)`（翻越离地、跪地那几帧不贴地），口径见 [翻越与倒拖](Data_OpeningVaultHaul20260927.md)。
 - `Script_OpeningStoryboardsTest.mjs`（纯 node）：每套骨架每个 clip 脚滑 ≤ 2 cm、接触误差 ≤ 3 cm、穿墙 ≤ 3 cm、骨盆每帧 ≤ 0.2 m、膝盖 ≤ 2 cm；
   任何一条 clip 里四肢的骨头（大腿、小腿、脚、上臂、前臂、手）相邻两帧绕自身轴转动 ≤ 70°（世界旋转拆成骨头方向的摆动和绕骨头的扭转，只量扭转；IK 换分支就是这个量 140–180°，见 §10）；

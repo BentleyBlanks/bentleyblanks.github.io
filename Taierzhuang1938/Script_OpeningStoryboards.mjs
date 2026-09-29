@@ -295,7 +295,7 @@ export class FirstLevelBunkerShow {
   StageRescue(){
     const r=this.r,R=C.rescue;
     this.StageAftermath();
-    this.flags.walkOffAt=r.time-10;this.flags.depthIjaAt=r.time-10;
+    this.flags.walkOffAt=this.flags.releasedAt=r.time-10;this.flags.depthIjaAt=r.time-10;
     if(this.cast.interpreter){this.Put(this.cast.interpreter,R.interpreter);this.cast.interpreter.openingWalk={key:"squat",index:0,done:true};}
     for(const role of ["ijaA","ijaB","ijaC","ijaD"])this.Show(this.Ija(role));
     if(this.Ija("ijaA"))this.Put(this.Ija("ijaA"),C.ija.crouch);
@@ -1255,13 +1255,23 @@ export class FirstLevelBunkerShow {
     }
     if(!this.flags.comradeDead){
       comrade.scriptEssential=false;this.PlayClip(comrade,"CaptiveWallSlideTwitch",{restart:true});this.Kill(comrade);
-      this.flags.comradeDead=true;this.flags.depthIjaAt??=r.time;this.flags.walkOffAt=r.time;
+      this.flags.comradeDead=true;this.flags.depthIjaAt??=r.time;this.flags.releasedAt=r.time;
+    }
+    this.Corpse(comrade,"CaptiveWallSlideTwitch");
+    if(r.time-this.flags.releasedAt>=ClipLength("CaptiveWallSlideTwitch",3.2)&&!r.Has("captivesKilled"))r.Record("captivesKilled",{count:1});
+    // 2026-09-29 (「朝着玩家走过来的时候没有收起来的小刀」): he lets go where he stands and puts the bayonet back in its
+    // scabbard (IjaReleaseSheathe) before he sets off; he walks with his hands free.
+    const sheathe=OpeningClipMeta("IjaReleaseSheathe")?ClipLength("IjaReleaseSheathe",0):0;
+    if(r.time-this.flags.releasedAt<sheathe){
+      this.Put(ijaA,this.StageRoot("slashGrab","ijaA",m.wall));this.Pose(ijaA,"IjaReleaseSheathe",{seconds:r.time-this.flags.releasedAt});
+      return;
+    }
+    if(this.flags.walkOffAt==null){
+      this.flags.walkOffAt=r.time;
       // The walk hands over from the slash root under the pelvis (the hold pose leans into the dying man).
       this.RerootUnderPelvis(ijaA,Face(ijaA.openingStoryboardLast||ijaA.position,J.found));
     }
-    this.Corpse(comrade,"CaptiveWallSlideTwitch");
-    if(r.time-this.flags.walkOffAt>=ClipLength("CaptiveWallSlideTwitch",3.2)&&!r.Has("captivesKilled"))r.Record("captivesKilled",{count:1});
-    // Taunting over his shoulder as he goes, the bayonet still in his fist (IjaTauntWalk over the walk).
+    // Taunting over his shoulder as he goes, the bayonet in its scabbard (IjaTauntWalk over the walk).
     const there=this.Follow(ijaA,"taunt",[...J.tauntWalk,J.found],J.tauntWalkMps,OpeningClipMeta("IjaTauntWalk")?"IjaTauntWalk":null,J.found.yaw,{upperBody:true});
     if(there||age>C.timeouts.tauntExtraS+4){this.flags.foundAt=r.time;this.Stage("Found");}
   }
@@ -1271,7 +1281,7 @@ export class FirstLevelBunkerShow {
     if(!this.phaseEntered){this.phaseEntered=true;r.Record("doorSearchStarted");this.flags.foundAt??=r.time;}
     this.VanguardFront(this.flags.vanguardAt);this.DepthIja();
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
-    if(r.time-this.flags.walkOffAt>=ClipLength("CaptiveWallSlideTwitch",3.2)&&!r.Has("captivesKilled"))r.Record("captivesKilled",{count:1});
+    if(r.time-this.flags.releasedAt>=ClipLength("CaptiveWallSlideTwitch",3.2)&&!r.Has("captivesKilled"))r.Record("captivesKilled",{count:1});
     this.HoldRear();
     // He sees the man under the timber and looks at him; his line waits for the taunt's last lines (ijaB's 「蠢货。」, the
     // far call) so they do not talk over each other.

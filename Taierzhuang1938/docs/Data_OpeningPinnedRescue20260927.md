@@ -21,10 +21,10 @@
 
 ## 3. 割喉、嘲弄、发现
 
-- Slash：审问时日兵甲已揪着衣领站在川军左前（`interrogation.ijaAHold`），开割前一步挪到川军**左肩**后面（manifest 站位 slashGrab，离眼远的一侧），揪住后脑头发往后扯、把脸往顺子这边拧 45–55°，喉咙朝着镜头；拔刺刀，刀从喉咙前面整条横拉过去（割中 0.24 s，刀身 0.08–0.30 s 走 ≥0.25 m），血朝顺子这一侧喷（动脉喷射 + 割中一团血雾）。镜头跟着川军的头（`interrogation.slashShot`，最多偏离主视线 18°），并从揪发起把视野收窄到 0.7（`interrogation.fixate`：眼睛盯住那一刀，仍是第一人称、不切镜），他走开后 1.2 s 放回。动作见第 6 节。
+- Slash：审问时日兵甲已揪着衣领站在川军左前（`interrogation.ijaAHold`），开割前一步挪到川军**左肩**后面（manifest 站位 slashGrab，离眼远的一侧），揪住后脑头发往后扯、把脸往顺子这边拧 45–55°，喉咙朝着镜头；从左胯反握拔出刺刀，在自己胸前把刀在拳里翻成正握，刀刃压在喉咙右侧、拳头在脖子前面；割中是朝自己右胯的一记拉割：拳头领先，刃口一路贴着脖子绕过喉咙前面，刀身顺着自己的长度滑过去（割中 0.24 s，0.12–0.40 s 刀走 ≥0.25 m；2026-09-29 改，见第 6 节），血朝顺子这一侧喷（动脉喷射 + 割中一团血雾）。川军割中后右手捂住喉咙，左手仍抠着揪头发的那只手，被松开后左手才落到喉咙上。镜头跟着川军的头（`interrogation.slashShot`，最多偏离主视线 18°），并从揪发起把视野收窄到 0.7（`interrogation.fixate`：眼睛盯住那一刀，仍是第一人称、不切镜），他走开后 1.2 s 放回。动作见第 6 节。
 - 割中那一帧就起 `CaptiveTaunt`，第一句（「怎么了，支那混蛋！」，录音开头带狂笑）在割中后 0.1 s 开口（导演表 `Data_FirstLevelDialogueDirection` 的 offsetS 0.7 → 0.1，录音不动）；血从脖子朝顺子这一侧喷。
-- Taunt：日兵甲揪着头发嘲弄 `ija.tauntHoldS` 1.6 s，松手（川军顺板墙滑下死去），然后提着带血的刺刀沿沟底慢慢往洞口晃过去（`ija.tauntWalk`，0.75 m/s），边走边回头骂（上身 `IjaTauntWalk`）；日兵乙「蠢货。」、远处「往前！快！」照旧。他的「还藏着一个」要等这几句说完才开口（不叠在一起）。
-- Found：走到 `ija.found` (2.98,−125.2) 看见脚下木头压着的顺子，停住、低头，「还藏着一个，支那混蛋。」（ShunziFound），收刀（`IjaFoundLook`），上前蹲到他头前 `ija.crouch` (2.45,−125.22)。记 `doorSearchStarted`（流程进 02）。
+- Taunt：日兵甲揪着头发嘲弄 `ija.tauntHoldS` 1.76 s（其间把刀身在川军左袖上擦一下），松手推开头（川军顺板墙滑下死去），原地把刺刀在拳里翻回反握、低头插回左胯刀鞘（`IjaReleaseSheathe` 1.33 s），然后空着手沿沟底慢慢往洞口晃过去（`ija.tauntWalk`，0.75 m/s），边走边回头骂、甩手（上身 `IjaTauntWalk`）；日兵乙「蠢货。」、远处「往前！快！」照旧。他的「还藏着一个」要等这几句说完才开口（不叠在一起）。
+- Found：走到 `ija.found` (2.98,−125.2) 看见脚下木头压着的顺子，停住、低头，「还藏着一个，支那混蛋。」（ShunziFound，`IjaFoundLook`，双手空着），上前蹲到他头前 `ija.crouch` (2.45,−125.22)。记 `doorSearchStarted`（流程进 02）。
 
 ## 4. 原地审问与耳光（Hold / Ask）
 
@@ -47,6 +47,18 @@
 ## 6. 动作（Blender）
 
 新动作与重做的割喉链在 `_import/Script_OpeningStoryboardClips.py`，只烘 IJA02 / NRA02（manifest `20260928OpeningStoryboardsV14PinnedRescue`；烘焙 spec 新增 `sink`：贴近时骨盆下沉量，割喉链为 0，免得日兵甲被拽进川军身体里；站位新增 `yM`：两人脚下的高差）：`IjaTauntWalk`、`IjaFoundLook`、`IjaCrouchHairHold`、`IjaSlapForehand`、`IjaSlapBackhand`、`IjaSlapRaise`、`HeLiftTimber`，割喉链 `IjaHairGrabPull` / `IjaDrawBayonet` / `IjaThroatSlash` 与 `CaptiveHeadPulledBack` / `CaptiveThroatCut` / `CaptiveClutchThroat` / `CaptiveWallSlideTwitch` 按新站位重做。导演在某条动作还没烘进 manifest 时用最接近的旧动作顶替（`OpeningClipMeta(name)` 为空）。`IjaWipeSheathBayonet` 停用（`retired`）；翻越/倒拖三条仍在库里但不再播放。已知小账：何有田的抬木保持循环只有 1.0–1.5 s、松手最多比木头落下晚 0.5 s；耳光 2026-09-29 重做（manifest `20260929OpeningStoryboardsV18SlapWindup`，只烘 IJA02 两条耳光，可编辑工程在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningSlapWindup_20260929`）：长 1.5 s，0–0.30 s 手举到肩上 1.1 m、0.42 s 前停住蓄力，0.58 s 打中（实际 0.583，清单写 0.58），1.3 s 回到抓发姿势；反手也重烘了（举在左肩前上方，原先举到左耳后够不着、把揪头发的左手扯脱 8 cm），导演现在不用它；`IjaTauntWalk` 是从右肩回头（川军在他右后方）。割喉后的揪发保持里日兵甲胯部只前探 0.5 cm（前探 3 cm 时胸口顶到川军的头，2.9–3.2 cm 穿插）。可编辑工程在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningPinnedRescue_20260927`。
+
+### 6.1 割喉拉割与收刀（2026-09-29）
+
+用户原话：「割喉的日军动作还有点问题，比如割喉的时候的手部动作，朝着玩家走过来的时候没有收起来的小刀等，帮我做的更写实更物理一些，BlenderMCP」。manifest `20260929OpeningStoryboardsV19PullCutSheathe`，可编辑工程与伙伴轨在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningThroatCutSheathe_20260929`。
+
+- 改前的问题（实拍核对）：握刀的手指只弯前两节、刀柄卡在指根，远看是一只摊开的手捏着刀；割法是反握刀先离开喉咙往外「蓄力」再横扫，右手够不到（手离轨迹 17.8 cm），手掌糊在川军下巴上，拖在后面的刀身穿进自己前臂；走过来时带血的刀一直攥在手里，停下后才收。
+- 握刀：`KNIFE_CURL` 1.55 弯前两节，`CloseFist` 把末节按中节的 0.8 合拢、正握时拇指扣在食指中指上，刀柄放在指根往掌心 1.6 cm 处（`FistKnife`）。
+- 拔刀（`IjaDrawBayonet`）：反握拔出（0.28–0.44 s），在自己胸前把刀在拳里翻成正握（0.44–0.58 s，手不动、刀在手里转，刀身从他自己这一侧翻过去，不扫到川军的脸），伸到川军脖子前面把刃压在喉咙右侧（0.80 s = `IjaThroatSlash` 第 0 帧）。掌心在刀转向时按刀的转动带过去（`CarryPalm`），不在 `KnifePalm` 换参考轴处跳。
+- 割（`IjaThroatSlash`）：刀身是一条从拳头出发、与（压进 6 mm 的）脖子相切的直线（`NeckBlade`），按 `SLASH_DRAW` 的「接触角、刀柄到接触点距离、拳高」走：0–0.12 s 压实（往他右边推一点让刃咬住），0.12–0.40 s 朝自己右胯一拉，接触点从喉咙右侧绕过前面到左侧、刀身顺长度滑过，0.40 s 刀尖离开，收到右胯低处刀尖朝前下。躯干只小转（大了他揪头发那侧的左肩会顶到川军抬起的左肘），重心后移。1.0–1.6 s 在川军左袖上把刀身平贴着拉一下（擦刀，接触 `shoulderL`），2.0–5.0 s 是保持循环。
+- 收刀（新 `IjaReleaseSheathe`，站位 `slashRelease`，第 0 帧 = `IjaThroatSlash` 2.0 s）：松手推开头，刀到胸前翻回反握（拔刀那一下倒放），弯腰看着插回左胯刀鞘（0.80 s 到位），手松开垂下。导演 `PhaseTaunt` 在松手后原地放完它再起步走；`IjaTauntWalk` / `IjaFoundLook` 不再带刺刀（刀按骨骼挂载显示在刀鞘里），走路时右手改成往后一甩。
+- 刀鞘握柄上移：`SCABBARD_UP` 0.04 → 0.09（Type 30 刀挂在腰带上时握柄高出腰带），原来的位置本 rig 的右手隔着身体够不到（差 9–12 cm）；运行时刀鞘挂载点随 `IjaDrawBayonet` 第 0 帧一起改。
+- 川军（NRA02）：捂喉的右手比 patch 低 3.8 cm（patch 挂在头骨上，头被扳后仰时原来的高度捂的是嘴）；割中后左手留在揪头发的拳上（`leftHair`），被松开（`CaptiveWallSlideTwitch` 0.05–0.45 s）才落到喉咙。原因：本仓库现在的烘焙代码已经复现不了 master 上提交的 `CaptiveHeadPulledBack`（肘部限速之后烘的结果不同），重烘时两手同时从头发落下，左肘会以限速慢慢划过站在他左肩的日兵甲胸口（浏览器审片 11–14 cm 穿插）；试过让左手去抓持刀手腕，同样撞，已放弃。
 
 ## 7. 验收
 

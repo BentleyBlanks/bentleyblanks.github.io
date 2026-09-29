@@ -18,7 +18,7 @@ const REVETMENT = "BunkerSouthRevetment";
 // Everyone who leaves after Luo's order (banter.exitRoute; the runner's own is the same without its first point).
 const BANTER_EXIT = Route([2.1,-125.2],[3.4,-123.6],[3.1,-121.6],[1.2,-120.6],[-1,-118.5],[-4,-113],[-9,-111.3]);
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260929OpeningStoryboardsV19LuoRescue", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260929OpeningStoryboardsV20PullCutSheathe", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
@@ -59,7 +59,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
       "IjaTauntWalk","IjaFoundLook","IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","HeLiftTimber",
       // 2026-09-29 Luo's rescue: he picks the rifle up and slings it, hauls Shunzi out by the armpits (`player` = his body) and hands him the rifle
       // kneeling (Animation/OpeningStoryboards, docs/Data_OpeningClipLibrary20260923.md; the director wires them).
-      "LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle"],
+      "LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle",
+      // 2026-09-29 「朝着玩家走过来的时候没有收起来的小刀」: he lets go and sheathes the bayonet before he walks off.
+      "IjaReleaseSheathe"],
   },
   // The NRA02 comrade is clean in SB01; the shell that buries him wounds him, and he is bloodied from the
   // black after it through the drag and the interrogation (2026-09-27 review: 「应该是在爆炸后才变得伤痕累累」).
@@ -370,10 +372,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
     ijaBWatchYaw:-Math.PI/2,
     // 2026-09-27 rework (user: 「一割马上就嚣张的说了那些台词；然后边说边走，看到了被木头压住的主角」): the taunt starts
     // on the cut; ijaA holds the dying man up by the hair for tauntHoldS (CaptiveTaunt.01), lets him drop and walks off
-    // west toward the mouth along tauntWalk (slowly, a swagger: .02 and ijaB's .03 on the way), taunting over his shoulder, the bayonet still in his hand -- and stops dead
+    // west toward the mouth along tauntWalk (slowly, a swagger: .02 and ijaB's .03 on the way), taunting over his shoulder -- and stops dead
     // at `found`, the pinned Shunzi 1.1 m ahead of him (ShunziFound). He steps up and squats at his head (`crouch`,
     // facing west onto him) for the questioning (02).
-    tauntHoldS:1.6, tauntWalkMps:.75,
+    // 2026-09-29 (「朝着玩家走过来的时候没有收起来的小刀」): the hold ends on IjaThroatSlash's hold-loop start (2.0 s = the cut
+    // 0.24 + tauntHoldS; he wipes the blade on the dying man's shoulder in it), and he sheathes it where he stands
+    // (IjaReleaseSheathe, 1.33 s) before he walks off with his hands free.
+    tauntHoldS:1.76, tauntWalkMps:.75,
     tauntWalk:Route([3.6,-125.28],[3.2,-125.22]),
     found:P(2.98,-125.2,Math.PI/2),
     crouch:P(2.45,-125.22,Math.PI/2),

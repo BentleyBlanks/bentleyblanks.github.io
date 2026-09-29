@@ -400,31 +400,44 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   assert.ok(cut.part==="throat"&&Math.abs(cut.t-.24)<1e-9,"IjaThroatSlash: the cut on the throat at 0.24 s");
   const blade=reportOf("TengxianIja02","IjaThroatSlash").probes?.bladeOnThroat;
   assert.ok(blade&&blade[0]<=.07&&Math.abs(blade[1]-cut.t)<=.03,`IjaThroatSlash: the blade at the throat at the cut (${blade})`);
-  // The blade sweeps across the neck: the bayonet track's origin moves >= 0.25 m between the cock (0.08 s) and the end of
-  // the stroke (0.30 s) (glTF scene space, shipped node units -> runtime by the pelvis height ratio).
+  // The blade is drawn across the neck: the bayonet track's origin moves >= 0.25 m through the pull (0.12 s, after the
+  // edge is seated, to 0.40 s, where the tip comes off) (glTF scene space, shipped node units -> runtime by the pelvis
+  // height ratio). (2026-09-29 pull cut; the old sweep was measured from its cock at 0.08 s to 0.30 s.)
   {
     const clip=ijaA.clips.IjaThroatSlash,v=clip.props.bayonet.values,fps=(clip.frameCount-1)/clip.duration;
     const f=t=>Math.round(t*fps),o=i=>v.slice(i*10,i*10+3);
     const r=reportOf("TengxianIja02","IjaThroatSlash"),pelvis=ijaA.bones.findIndex(n=>n.endsWith(" Pelvis"));
     const k=r.root.start[3]/WorldPose("TengxianIja02",ijaA,"IjaThroatSlash",0)[pelvis].p[1];
-    const travel=Math.hypot(...[0,1,2].map(i=>o(f(.30))[i]-o(f(.08))[i]))*k;
+    const travel=Math.hypot(...[0,1,2].map(i=>o(f(.40))[i]-o(f(.12))[i]))*k;
     assert.ok(travel>=.25,`IjaThroatSlash: the blade travels ${travel.toFixed(2)} m across the throat`);
   }
   // The chain hands over frame to frame on one root (comrade: HeadPulledBack -> ThroatCut -> ClutchThroat -> WallSlide is
   // checked above with the rest of the chains).
-  for(const [a,ta,b,tb] of [["IjaHairGrabPull",1.0,"IjaDrawBayonet",0],["IjaDrawBayonet",.8,"IjaThroatSlash",0]]){
+  for(const [a,ta,b,tb] of [["IjaHairGrabPull",1.0,"IjaDrawBayonet",0],["IjaDrawBayonet",.8,"IjaThroatSlash",0],
+    // 2026-09-29: the director lets go on IjaThroatSlash's hold-loop start and IjaReleaseSheathe takes over on that frame
+    ["IjaThroatSlash",manifest.clips.IjaThroatSlash.holdLoop[0],"IjaReleaseSheathe",0]]){
     const h=WorldHandOver("TengxianIja02",ijaA,a,ta,b,tb);
     assert.ok(h.angle<=2&&h.offset<=.01,`${a}@${ta} -> ${b}@${tb}: ${h.angle.toFixed(2)} deg at ${h.where}, ${(h.offset*100).toFixed(2)} cm`);
   }
-  // IjaTauntWalk: an upper-body loop with the bayonet; IjaFoundLook: a hold loop, the bayonet sheathed by its end.
-  for(const id of ["IjaTauntWalk","IjaFoundLook","IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","HeLiftTimber"]){
+  // 2026-09-29 (「朝着玩家走过来的时候没有收起来的小刀」): the bayonet goes back into its scabbard where he cut
+  // (IjaReleaseSheathe, before the walk); IjaTauntWalk is an empty-handed upper-body loop; IjaFoundLook a hold loop.
+  for(const id of ["IjaReleaseSheathe","IjaTauntWalk","IjaFoundLook","IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","HeLiftTimber"]){
     const spec=manifest.clips[id];
     for(const v of [spec.duration,...(spec.holdLoop||[])])assert.ok(Math.abs(v*manifest.fps-Math.round(v*manifest.fps))<1e-6,`${id}: ${v} s is whole frames`);
   }
   const walk=manifest.clips.IjaTauntWalk;
-  assert.ok(walk.upperBody===true&&walk.loop===true&&ijaA.clips.IjaTauntWalk.loop&&walk.props.includes("bayonet"),"IjaTauntWalk: an upper-body loop with the bayonet");
+  assert.ok(walk.upperBody===true&&walk.loop===true&&ijaA.clips.IjaTauntWalk.loop&&!walk.props.includes("bayonet"),"IjaTauntWalk: an empty-handed upper-body loop");
   const found=manifest.clips.IjaFoundLook;
-  assert.ok(found.holdLoop&&found.holdLoop[1]===found.duration&&found.contacts.some(c=>c.action==="sheathe"),"IjaFoundLook: sheathes, then a hold loop");
+  assert.ok(found.holdLoop&&found.holdLoop[1]===found.duration&&!found.props.includes("bayonet"),"IjaFoundLook: a hold loop, the hands free");
+  const sheathe=manifest.clips.IjaReleaseSheathe;
+  assert.ok(sheathe&&sheathe.props.includes("bayonet")&&sheathe.prev.includes("IjaThroatSlash")&&sheathe.next.includes("IjaTauntWalk")
+    &&sheathe.contacts.some(c=>c.action==="sheathe")&&sheathe.contacts.some(c=>c.limb==="handL"&&c.action==="release"),
+    "IjaReleaseSheathe: lets go of the hair, sheathes the bayonet, then the walk");
+  // the tauntHoldS release lands on IjaThroatSlash's hold-loop start (the cut + tauntHoldS)
+  {
+    const cut=manifest.clips.IjaThroatSlash.contacts.find(c=>c.action==="cut").t;
+    assert.ok(Math.abs(cut+C.ija.tauntHoldS-manifest.clips.IjaThroatSlash.holdLoop[0])<1e-6,"ija.tauntHoldS ends on IjaThroatSlash's hold-loop start");
+  }
   // IjaCrouchHairHold: the left fist on the crown from 0.25 s, the eye lifted 0.16 m by 0.70 s (player head track), a hold
   // loop to the end; the slaps start and end on its hold-loop start, slap contacts at 0.58 on the cheeks with the palm
   // (or the back of the hand) on the cheek at the hit (bake probes); 2026-09-29: the hand up high, cocked, before it.
