@@ -157,8 +157,6 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // 02 -> 03: Yaowa catches up (else the scene starts where he is), the guard's run up the sap.
     collectionMeetS:8, guardArriveS:10,
   }),
-  // The slap's blood layer (a split lip): opacity for holdS, settling to `settle` over settleS, then fading out over fadeS.
-  strikeBlood:{holdS:.15,opacity:.55,settleS:.9,settle:.2,fadeS:6},
   // ---- first person (Opening package item 2) -------------------------------------------
   // Shoulders sit behind the eye (the hidden sleeve roots). Poses are the RIGHT hand; the left hand
   // mirrors x. Frames: "cam" camera-local (x right, y up, +z back), "body" the eye with yaw-only axes,

@@ -423,7 +423,7 @@ function Dump({ warm, freeze, points }) {
       yawDeg: D(e.y), pitchDeg: D(e.x), rollDeg: D(e.z), fovV: cam.fov, aspect: R3(cam.aspect) },
     horizonY: Screen(flat).y, points: pointsOut,
     shot: window.__sbShots.lastShot, perception: s.perception ? { amount: R3(s.perception.amount), focus: R3(s.perception.focus) } : null,
-    eyeClosure: op?.eyeClosure ?? null, blackout:op?.blackout??null,bloodMask: s.bloodMask ?? null,
+    eyeClosure: op?.eyeClosure ?? null, blackout:op?.blackout??null,
     cinematic:!!s.CinematicActive,firstPersonVisible:!!s.playerBody?.root.visible,
     sceneFlags:[...(r.openingSet?.flags||[])].map(([id,f])=>({id,progress:f.progress,base:f.group.position.toArray().map(R3),tip:f.group.localToWorld(new T.Vector3(0,f.spec.poleM,0)).toArray().map(R3)})),
     flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number" || typeof v === "boolean").map(([k, v]) => [k, typeof v === "number" ? R3(v) : v])),

@@ -88,14 +88,16 @@ export const LOOKS = Freeze({
   // Held up by the hair (Hold / Ask): nearly clean; each slap swims the struck side of the frame (`slap`: the amount
   // on the slap clock; Script_OpeningLens hands the side over with it, Script_PostComposite SideDaze) and kicks the
   // aberration. 「被扇的单边的屏幕有眩晕效果」.
+  // 2026-09-30 「扇巴掌不需要出现血雾 Mask，应该是个眩晕的状态」: no blood here at all — the red corners fade out
+  // with the blend from `found`, the slap leaves no HUD blood layer (strikeBlood is gone) and SideDaze washes the
+  // struck side out instead of tinting it red; the blow itself is a short white flash (「眼冒金星」).
   held: Freeze({
     blendInS: 1.0,
     vignette: 0.5,
     desaturate: 0.12,
-    bloodEdge: Freeze({ strength: 0.1, tint: BLOOD_TINT, corners: WITNESS_CORNERS }),
-    storyBloodCap: 0.45,
     slap: K("slap", [[0, 0], [0.04, 1], [0.5, 0.8], [1.4, 0.45], [2.4, 0]], { before: 0 }),
     aberration: K("slap", [[0, 0.0022], [0.04, 0.012], [0.9, 0.0022]], { before: 0.0022 }),
+    flash: K("slap", [[0, 0], [0.03, 0.2], [0.3, 0]], { before: 0 }),
   }),
   // The charge and the cuts (Charge / Melee): the last slap's daze wears off, then clean.
   charge: Freeze({

@@ -524,11 +524,13 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
     color = mix(color, uBloodEdge.rgb * (.28 + .72 * Luma(color)), blood);
   }
 
-  // The slap: the struck side dims and goes blood red at the edge (SideDaze, 0 elsewhere).
+  // The slap: the struck side is dazed, not bloodied (2026-09-30) — it washes out towards a flat, slightly lifted
+  // grey (the blow's white still ringing in the eye) and the far edge dims a little (SideDaze, 0 elsewhere).
   float daze = SideDaze(uv);
   if (daze > 0.001) {
-    color = mix(color, vec3(0.55, 0.06, 0.05) * (.3 + .7 * Luma(color)), .32 * daze);
-    color *= 1.0 - .38 * daze;
+    float l = Luma(color);
+    color = mix(color, vec3(l * 1.12 + .02), .45 * daze);
+    color *= 1.0 - .16 * daze * daze;
   }
 
   // 暗角：别做成一圈发灰的环，压的是亮度不是加黑纱

@@ -644,10 +644,6 @@ export class FirstLevelBunkerShow {
       if(!this.savedMeleeDormancy){this.playerMeleeDormancy=r.player.meleeDormant;this.savedMeleeDormancy=true;}
       r.player.meleeDormant=true;
     }else this.ReleaseMeleeDormancy();
-    // The blow's blood layer: full for holdS, settles to `settle` over settleS (SB04A: about 0.3), then fades out.
-    const bloodAge=this.strikeAt==null?Infinity:r.time-this.strikeAt,SB=C.strikeBlood;
-    this.bloodMask=(SB.opacity+(SB.settle-SB.opacity)*Smooth((bloodAge-SB.holdS)/SB.settleS))*(1-Smooth((bloodAge-SB.holdS-SB.settleS)/SB.fadeS));
-    r.hud.SetStoryBlood?.(this.bloodMask);
     if(!this.ready)return;
     if(["Trapped","BunkerRescue","RearTrench"].includes(stage)||this.setup)this.Setup();
     if(!this.setup)return;
@@ -2641,7 +2637,7 @@ export class FirstLevelBunkerShow {
     this.cast={};this.captives=[];this.playerBody=null;this.setup=false;this.phase=null;this.at=this.r.time;this.started=this.r.time;
     this.scenes={};this.flags={};this.events=[];this.beats.clear();this.pursuit=null;this.pursuitSpawned=false;this.pursuitMissing=0;this.withdraw=null;
     this.firstPerson=null;this.firstPersonState=null;this.presentedAt=null;this.previousViewQuaternion=null;this.previousViewPosition=null;
-    this.strikeAt=null;this.bloodMask=0;this.cameraFrom=null;this.shownEyeClosure=null;this.presentedCamera=null;this.pointActor=null;this.phaseEntered=null;
+    this.strikeAt=null;this.cameraFrom=null;this.shownEyeClosure=null;this.presentedCamera=null;this.pointActor=null;this.phaseEntered=null;
     this.slaps=null;this.noiseDone=null;this.roofLift=0;
     this.perception=null;this.perceptionLevel=null;this.headFree=0;this.headLook=null;this.releaseAt=null;this.releaseLevel=null;this.releasePoint=null;
     this.meet=null;this.guardRoute=null;this.restRoute=null;this.clawPath=null;this.blastFrom=null;this.seatEyeM=null;

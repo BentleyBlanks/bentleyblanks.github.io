@@ -103,6 +103,8 @@ Check("the slap: the struck side swims for 2.4 s, the aberration kicks, the side
   assert.equal(at(2.5).slap.amount, 0, "gone after 2.4 s");
   assert.equal(Evaluate("Ask", 3, { now: 31, slapAt: 30, slapSide: -1 }).slap.side, -1, "backhand: the right of the frame");
   assert.ok(at(0.05).aberration > 0.01, "aberration kick");
+  assert.ok(at(0.03).flash > 0.15 && at(0.5).flash === 0, "a short white flash on the blow, gone by 0.3 s");
+  assert.equal(at(0.05).bloodEdge.strength, 0, "a daze, not blood (2026-09-30)");
   assert.ok(Evaluate("Charge", 0.5, { now: 30.5, slapAt: 30, slapSide: 1 }).slap.amount > 0, "the last slap's daze carries into the charge");
   const post = ApplyLensToPost({ vignette: 0.42 }, at(0.05));
   assert.equal(post.sideDaze.side, 1); assert.ok(post.sideDaze.amount > 0.9, "handed to the composite");
@@ -114,8 +116,7 @@ Check("found / held nearly clean; Lift, Check, Released clean", () => {
   assert.ok(found.mud > 0 && found.bloodEdge.strength <= 0.3, "found: still muddy");
   for (const phase of ["Hold", "Ask"]) {
     const held = Evaluate(phase, 1, { now: 99 });
-    assert.ok(held.bloodEdge.strength <= 0.1 && held.radialBlur === 0 && held.flash === 0 && held.mud === 0, phase);
-    assert.ok(held.storyBloodCap <= 0.5, `${phase}: the split lip's blood layer capped`);
+    assert.ok(held.bloodEdge.strength === 0 && held.radialBlur === 0 && held.flash === 0 && held.mud === 0, phase);
   }
   for (const phase of ["Lift", "Check", "Released", "Banter", "Orders", "Incoming"]) {
     const lens = Evaluate(phase, 1, { now: 99, blastAt: 98.8 });
@@ -140,7 +141,7 @@ Check("driver: crossfade between looks, idempotent per frame, null the moment 01
   assert.equal(d.Sample(14.6, null, 0, {}), null, "leaving 01–02: null at once");
   assert.equal(d.Sample(14.7, "Withdraw", 0, {}), null, "02→03 phases are outside");
   const again = d.Sample(20, "Hold", 0, {});
-  assert.equal(again.look, "held"); Near(again.bloodEdge.strength, 0.1, 1e-9, "no stale blend from before the gap");
+  assert.equal(again.look, "held"); Near(again.bloodEdge.strength, 0, 1e-9, "no stale blend from before the gap");
   // A snapshot older than a frame or two (frames stepped without rendering) is not a crossfade source.
   const s = new OpeningLensDriver();
   s.Sample(1.0, "Blast", 0.3, { blastAt: 0.7 });
@@ -185,7 +186,7 @@ Check("ApplyLensToPost: null leaves every parameter untouched; a lens lays over 
   const blast = ApplyLensToPost(Base(), Evaluate("Blast", 0.3, { now: 0.3, blastAt: 0 }));
   assert.ok(blast.radialBlur > 0.04 && blast.aberration > 0.015);
   const mix = BlendLens(Evaluate("Hold", 0), Evaluate("Wake", 0, { concussion: 1 }), 0.5);
-  Near(mix.bloodEdge.strength, (0.1 + 0.3) / 2, 1e-9, "blend");
+  Near(mix.bloodEdge.strength, (0 + 0.3) / 2, 1e-9, "blend");
 });
 
 Check("wiring: Main, Runtime, Composite and HUD use the lens; no new pass or sampler", () => {
