@@ -585,6 +585,25 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   const wall={x:4.0568,z:-125.7852};
   assert.ok(D(eye,wall)<2.5,`the comrade kneels ${D(eye,wall).toFixed(2)} m from the pinned eye (was 3.8 m)`);
   assert.ok(D(seat,Place.bunker.player)<1&&seat.x<S.trap.x-1.5,"SB01 seat at the back of the dugout, near the dugout anchor");
+  // 2026-09-29 the gear-up (Data_OpeningFirstPersonGear): after the order he takes up the pack at the west wall and hurries to the mouth,
+  // arriving as the wounded comrade squeezes out (Incoming) and well before the shell.
+  {
+    const {OPENING_GEAR_UP:GEAR}=await import("./Data_OpeningFirstPersonGear.mjs"),{GearArrivalS,GearCamera,GearPoint}=await import("./Script_OpeningFirstPersonGear.mjs");
+    const ctx={seat,followTo:S.followTo,seatEyeM:.97},run=GEAR.cam.moves.find(m=>m.mps),arrive=GearArrivalS(ctx);
+    assert.ok(S.followTo.x<postS.x-.3&&S.followTo.x>seat.x+1.5&&S.followTo.z>postN.z+.4&&S.followTo.z<postS.z-.4,`he stops inside the mouth, between the posts (${S.followTo.x},${S.followTo.z})`);
+    assert.ok(run.mps>=1.4&&run.mps<=2,`he hurries: ${run.mps} m/s run (it was 0.24 m/s, 6+ s for the ${D(seat,S.followTo).toFixed(1)} m)`);
+    // The comrade is out of the mouth at the rise (0.4 + 2.8 s) plus his walk to comradeBlast; Blast comes after Incoming has begun.
+    const comradeOut=.4+2.8+D(C.banter.comradeSeat,C.banter.comradeBlast)/C.speed.walk;
+    assert.ok(arrive<=comradeOut+.6&&arrive<GEAR.doneS&&GEAR.doneS<=C.timeouts.ordersExitS,`he is at the mouth (${arrive.toFixed(2)} s) as the comrade is out (${comradeOut.toFixed(2)} s), inside ordersExitS`);
+    assert.ok(GEAR.pack.rest.x<seat.x-.3&&D(GEAR.pack.rest,seat)<1.2&&GEAR.cam.pad.x<seat.x&&D(GEAR.cam.pad,GEAR.pack.rest)<.6,"the pack lies at the west wall within a step of the seat; he steps to it");
+    assert.ok(S.blastFall.x<S.followTo.x&&D(S.blastFall,S.followTo)<2,"the near miss throws him back from the mouth to blastFall");
+    // Every track is in time order; the eye sits where the seat's shot left it at the order (no jump into the first key).
+    for(const [name,keys] of [["yaw",GEAR.cam.yawDeg],["pitch",GEAR.cam.pitchDeg],["height",GEAR.cam.heightM],["roll",GEAR.cam.rollDeg],["rifle",GEAR.rifle.keys],["pack",GEAR.pack.keys],["left hand",GEAR.hands.l],["right hand",GEAR.hands.r],["cues",GEAR.cues]])
+      assert.ok(keys.every((k,i)=>!i||k[0]>keys[i-1][0]||name==="cues"&&k[0]>=keys[i-1][0]),`gear-up ${name} keys are in time order`);
+    assert.ok(Math.abs(GEAR.cam.yawDeg[0][1]-C.banter.seatShot.yawDeg)<1e-9&&Math.abs(GEAR.cam.pitchDeg[0][1]-C.banter.seatShot.pitchDeg)<3,"the gear-up starts on the seat's look");
+    const at0=GearCamera(0,ctx);assert.ok(Math.hypot(at0.x-seat.x,at0.z-seat.z)<1e-9&&at0.speed<1e-6,"and on the seat, standing still");
+    const p=GearPoint(GEAR.doneS,ctx);assert.ok(Math.hypot(p.x-S.followTo.x,p.z-S.followTo.z)<1e-9,"and ends on followTo");
+  }
   // The walk from the kill to the find stays on the trench floor and ends over his head; the squat is at his head.
   const J=C.ija;
   assert.ok(D(J.found,eye)>.9&&D(J.found,eye)<1.4&&D(J.crouch,eye)>.5&&D(J.crouch,eye)<.7,"ijaA stops 1.1 m off, then squats 0.6 m in front of his face");

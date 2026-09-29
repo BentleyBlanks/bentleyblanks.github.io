@@ -166,45 +166,15 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // Parry: the eye steps this far aside from ijaA's back so He (behind ijaA) is seen, and holds the
       // duel this long after the cut before following the interpreter.
       duelAsideM:.25, duelHoldS:.45 }),
-    // 「弹装起！往后沟撤！跟紧！」 (09-26 review: he sat on, then stood still with the rifle flat across the frame).
-    // From Luo's order (clock: flags.exitAt) through Incoming he finishes loading on his feet while following the
-    // others slowly to the mouth: stands (standS), thumbs the charger's rounds down into the magazine, closes the
-    // bolt (which throws the empty charger out), turns the rifle over once to look it over, then carries it and
-    // looks up at the men going out. Walk: shunzi.seat -> shunzi.followTo at walkMps from walkAtS (eased in over
-    // walkRampS, out over the last stopEaseM). pitch: extra look pitch (rad) while his eyes are on the rifle.
-    // rifle: [t, left palm (camera-local m), muzzle, top of the rifle (camera-local directions)]; the left hand holds
-    // it at grip (rifle-local, HanYang canonical: muzzle -z, top +y, bolt side +x). right: [t, point on the rifle,
-    // fingers, back of the hand (rifle-local), curl]. charger: the clip stands in the guide at chargerAt and goes
-    // down pressM over press (s) while the thumb works it (thumbM at thumbHz); the bolt strips it at chargerOffS.
+    // 「弹装起！往后沟撤！跟紧！」: from Luo's order (clock: flags.exitAt) through Incoming he gears up and hurries to the mouth --
+    // stands with the rifle, finishes loading, turns round to the pack at the west wall, puts it on, takes the rifle up again and runs
+    // to shunzi.followTo (2026-09-29, user: 「主角收拾装备增加一个转身背起自己的背包拿起枪然后匆匆往门口赶，不然现在的设定走的太慢了」;
+    // before, firstPerson.followUp walked the 1.5 m at 0.24 m/s). The whole action -- eye path, rifle, pack, both hands, sounds -- is
+    // Data_OpeningFirstPersonGear (evaluated by Script_OpeningFirstPersonGear; docs/Data_OpeningFirstPersonGear20260929.md).
     // The seated fill clip (hands.beats Banter / Orders `fill`): the body root stands at the seat facing shunzi.seat.yaw,
     // shifted once so the clip's eye is over shunzi.seat; the eye is the head bone plus eyeFromHeadM (body frame: x right,
     // y up, -z forward; the clip keeps the head bowed over the charger, eye to head measured in the bake, 09-27).
     fill:Object.freeze({ eyeFromHeadM:Object.freeze([0,.024,-.127]) }),
-    followUp:Object.freeze({
-      standS:1.2, walkAtS:1.1, walkMps:.24, walkRampS:.8, stopEaseM:.25, bobM:.016, stepHz:1.6, swayRad:.01,
-      pitch:Object.freeze([[0,0],[.6,-.42],[3.9,-.42],[4.8,-.04]]),
-      grip:Object.freeze([0,-.03,-.2]),
-      rifle:Object.freeze([
-        [0,[-.13,-.18,-.35],[-1,0,0],[0,1,0]],
-        [.7,[-.15,-.07,-.36],[-.85,.35,-.25],[.05,.75,.65]],
-        [1.8,[-.15,-.07,-.36],[-.85,.35,-.25],[.05,.75,.65]],
-        [2.3,[-.15,-.09,-.35],[-.9,.25,-.2],[0,.7,.7]],
-        [2.9,[-.12,-.06,-.36],[-.75,.3,-.55],[.35,.55,.75]],
-        [3.6,[-.15,-.08,-.33],[-.9,.35,.1],[-.25,.7,.65]],
-        [4.4,[-.15,-.16,-.33],[-.8,.45,-.2],[0,.5,.85]],
-      ].map(Object.freeze)),
-      left:Object.freeze({ f:[.2,.68,.55], n:[-1,-.3,0], curl:[45,67,37] }),
-      right:Object.freeze([
-        [0,[.1,-.05,.12],[.2,.68,-.3],[-1,-.3,0],[39,51,31]],
-        [.55,[.03,.075,.06],[-.3,0,-.95],[.5,.85,0],[45,60,45]],
-        [1.75,[.03,.075,.06],[-.3,0,-.95],[.5,.85,0],[45,60,45]],
-        [1.95,[.06,.05,.03],[.3,-.2,-.9],[-.3,.9,-.1],[50,64,42]],
-        [2.1,[.06,.05,-.04],[.3,-.2,-.9],[-.3,.9,-.1],[50,64,42]],
-        [2.25,[.07,.02,-.04],[.3,-.2,-.9],[-.3,.9,-.1],[50,64,42]],
-        [2.6,[.02,-.02,.1],[0,-.3,-.95],[.9,.4,0],[55,70,45]],
-      ].map(Object.freeze)),
-      charger:Object.freeze({ at:Object.freeze([0,.085,-.027]), pressM:.036, press:Object.freeze([.6,1.75]), thumbM:.01, thumbHz:2.2, offS:2.05 }),
-    }),
     hands:Object.freeze({
       poses:Object.freeze({
         rest:H("cam",[.18,-.46,-.15],[0,-.4,-1],[.25,.65,.1],[14,24,14]),
@@ -236,10 +206,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // _import/Script_OpeningStoryboardClips.py ShunziSitFillCharger) on an ammo crate at the seat -- the rounds one by one
       // from the belt pouch into the charger in the left hand, the rifle across the lap -- one clock from Banter on, so the hands never
       // stop at a phase change (09-27 review: the two held palm poses read as frozen hands). Orders' exit signal hands
-      // over to followUp's stand / load / bolt / look-over in OpeningFirstPerson.
+      // over to the gear-up (Data_OpeningFirstPersonGear) in OpeningFirstPerson.
       beats:Object.freeze({
-        Banter:Object.freeze({fill:"ShunziSitFillCharger",props:Object.freeze(["fillCharger","fillRound","fillRifle","fillSeat"])}),
-        Orders:Object.freeze({fill:"ShunziSitFillCharger",props:Object.freeze(["fillCharger","fillRound","fillRifle","fillSeat"])}),
+        Banter:Object.freeze({fill:"ShunziSitFillCharger",props:Object.freeze(["fillCharger","fillRound","fillRifle","fillSeat","packRest"])}),
+        Orders:Object.freeze({fill:"ShunziSitFillCharger",props:Object.freeze(["fillCharger","fillRound","fillRifle","fillSeat","packRest"])}),
         Blast:K([0,"protect","protect"],[.4,"protect","protect"],[.8,"limp","limp"]),
         Black:K([0,"limp","limp"]),
         // 「他试着撑起身体。背包带一下绷紧……又落回地面。手指在泥里抓出一道痕。」
@@ -306,11 +276,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // ---- 01 marks ------------------------------------------------------------------------
   shunzi:Object.freeze({
     // 2026-09-25 storyboard round (contract §2.1): he sits at the back of the dugout for the talk and the order
-    // (SB01), stands and follows the others slowly toward the mouth, working the rifle (after the order, through
-    // Incoming), and is knocked down by the near miss (SB02). The Space's MISSION_PLACEMENT.bunker.player (-1.3,-126.2)
+    // (SB01), then (after the order, through Incoming) gears up -- rifle, pack -- and hurries to the mouth
+    // (Data_OpeningFirstPersonGear), and is knocked down by the near miss (SB02). The Space's MISSION_PLACEMENT.bunker.player (-1.3,-126.2)
     // stays the dugout's anchor (A.bunker); the director's Shunzi marks are these.
     seat:P(-1.95,-126.25,-93*Math.PI/180),   // SB01 eye: back of the dugout, the mouth x 0.30–0.74 of the frame
-    followTo:P(-.45,-126.02),                // after the order: he follows the others slowly this far (firstPerson.followUp)
+    followTo:P(.35,-125.75),                 // after the order he gears up and runs here, just inside the mouth (Data_OpeningFirstPersonGear)
     blastFall:P(-.9,-126.0),                 // SB02: where the eye has dropped to at the end of the fall (thrown back)
     // 2026-09-27 rework (user: 「主角变成压在房梁下，半个身子在外面」, 「那个川兵应该离主角再近一点」): from the black on he
     // lies face down across the doorway, the fallen roof timber (Data_OpeningSet0103 roofTimberDown, down from the black)

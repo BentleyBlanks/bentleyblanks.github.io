@@ -10,7 +10,8 @@ import * as THREE from "three";
 import {OpeningFirstPerson,OpeningActorAnatomy,SolveOpeningActorArm,OpeningHandBeat,OPENING_HAND_POSES,TrimOpeningPlayerBody} from "./Script_OpeningFirstPerson.mjs";
 import {OPENING_STORYBOARDS as C} from "./Data_OpeningStoryboards.mjs";
 import {EXTRA_HAND_POSES,HAND_SHAPES,LEG_POSES,FP_PROPS,SHOULDER_BEHIND_MIN_M} from "./Data_OpeningFirstPersonExtra.mjs";
-const FOLLOW=C.firstPerson.followUp;
+import {OPENING_GEAR_UP as GEAR} from "./Data_OpeningFirstPersonGear.mjs";
+import {GearCamera,GearPoint,GearPose,GearPackRest,GearArrivalS,GearTrack,BuildGearPack} from "./Script_OpeningFirstPersonGear.mjs";
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const manifest=JSON.parse(fs.readFileSync(path.join(here,"Model/Character/Data_TengxianCharacterManifest.json"),"utf8"));
@@ -60,7 +61,7 @@ for(const [phase,beat] of Object.entries(C.firstPerson.hands.beats)){
   for(const name of beat.props||[])assert.ok(FP_PROPS[name],`${phase} names a known first-person prop (${name})`);
 }
 for(const phase of PHASES)assert.ok(C.firstPerson.hands.beats[phase]?.keys?.length||["Banter","Orders","Incoming"].includes(phase),`${phase} has hands (or holds the loading rifle)`);
-let followSamples=0,samples=0,maxBend=0,maxTwist=0,maxRotation=0,groundContacts=0,maxGroundError=0;
+let samples=0,maxBend=0,maxTwist=0,maxRotation=0,groundContacts=0,maxGroundError=0;
 // Hands resting on the mud must really touch it: the ground under the eye is 0.42 m down here.
 const GROUND_POSES=new Set(["flat","push","clawIn","clawOut","sit","brace","limp","scrape"]);
 for(const model of ["TengxianNra05","TengxianNra02"]){
@@ -71,22 +72,16 @@ for(const model of ["TengxianNra05","TengxianNra02"]){
     r,Ija:()=>({actor:other})};
   const firstPerson=new OpeningFirstPerson(show),lengths={};
   for(const phase of PHASES){
+    // Orders after the order is the gear-up: it needs the dugout (the pack at the wall, the moving eye) and has its own block below.
+    if(phase==="Orders")continue;
     show.phase=phase;
     const start=r.time,beat=C.firstPerson.hands.beats[phase];
     // Flag clocks start with the phase; supply overlays (dirt, bolt) likewise.
-    show.flags={dirtAt:phase==="Banter"?start:null,exitAt:phase==="Orders"?start:null,buttAt:start,collarReleasedAt:start,checkLineAt:start,kickRifleAt:start};
-    // Banter covers the collar/dig overlay; Orders (flags.exitAt at its start) the whole followUp after the order.
-    const frames=Math.max(50,Math.ceil(((beat?.keys?.at(-1)[0]||0)+.6)*60),phase==="Banter"?150:0,phase==="Orders"?Math.ceil((FOLLOW.rifle.at(-1)[0]+.6)*60):0);
+    show.flags={dirtAt:phase==="Banter"?start:null,exitAt:null,buttAt:start,collarReleasedAt:start,checkLineAt:start,kickRifleAt:start};
+    // Banter covers the collar/dig overlay.
+    const frames=Math.max(50,Math.ceil(((beat?.keys?.at(-1)[0]||0)+.6)*60),phase==="Banter"?150:0);
     for(let frame=0;frame<frames;frame++){
       show.Age=frame/60;r.time=start+frame/60;firstPerson.Update(1/60);
-      if(phase==="Orders"){
-        // 「弹装起」: both palms on the rifle once the hands have come to it; the charger stands in the guide until
-        // the bolt strips it.
-        const t=show.Age,hands=firstPerson.report.hands;
-        if(t>1)for(const side of ["l","r"])assert.ok(hands[side].contactError<.005,`${model} followUp ${side} palm on the rifle at ${t.toFixed(2)} s (${hands[side].contactError})`);
-        if(Math.abs(t-FOLLOW.charger.offS)>.02)assert.equal(show.clips[0].visible,t<FOLLOW.charger.offS,`${model} followUp charger shown only until the bolt strips it (${t.toFixed(2)} s)`);
-        followSamples++;
-      }
       if(frame===frames-1)for(const [side,hand] of Object.entries(firstPerson.report.hands))if(GROUND_POSES.has(hand.pose)){
         assert.ok(hand.contactError<.02,`${model} ${phase} ${side} ${hand.pose} palm reaches the mud (${hand.contactError})`);
         groundContacts++;maxGroundError=Math.max(maxGroundError,hand.contactError);
@@ -107,7 +102,6 @@ for(const model of ["TengxianNra05","TengxianNra02"]){
   }
 }
 assert.ok(groundContacts>=20,"ground beats were sampled at rest ("+groundContacts+")");
-assert.ok(followSamples>=500,"followUp sampled for both skins ("+followSamples+")");
 // Flag clocks: an unset flag holds the first key; the key after the flag follows it.
 {
   // 2026-09-27: Hold counts from the hair grab (holdGripAt): the right hand claws, then both hands push.
@@ -442,6 +436,9 @@ assert.equal(FP_PROPS[FP_PROPS.rifleSlide.prop]?.kind,"rifle","rifleSlide moves 
       maxEyeOff=Math.max(maxEyeOff,Math.hypot(F.eye[0]-seat.x,F.eye[2]-seat.z));
       assert.ok(F.eye[1]>.85&&F.eye[1]<1.05,`${model} a seated eye on the crate (SB01 eyeM) (${F.eye[1].toFixed(3)} m)`);
       roundsSeen=Math.max(roundsSeen,F.rounds);seen.add(F.rounds);if(!F.charger)hidden++;
+      // 2026-09-29: the pack he will put on at the order already lies at the foot of the west wall while he sits (the player may look round at it).
+      assert.ok(report.props.packRest?.visible,`${model} the pack lies at the wall while he sits (frame ${frame})`);
+      if(frame===0)assert.ok(new THREE.Vector3(...report.props.packRest.position).distanceTo(GearPackRest(()=>0,GEAR).position)<1e-4,`${model} at the pack's rest place (${report.props.packRest.position})`);
       for(const side of ["l","r"]){
         const hand=report.hands[side],palm=new THREE.Vector3(...hand.palm);
         if(last[side]){const step=palm.distanceTo(last[side]);maxStep=Math.max(maxStep,step);path[side]+=step;}
@@ -479,6 +476,113 @@ assert.equal(FP_PROPS[FP_PROPS.rifleSlide.prop]?.kind,"rifle","rifleSlide moves 
     console.log(JSON.stringify({fill:model,maxEyeOff,maxStep,maxTurn,pathR:path.r,pathL:path.l,roundsSeen,hidden,maxChargerGap,transitionStep,transitionTurn}));
     firstPerson.Dispose();
   }
+}
+// ---- 2026-09-29 the gear-up (Data_OpeningFirstPersonGear) ---------------------------------------------------------------------
+// 「主角收拾装备增加一个转身背起自己的背包拿起枪然后匆匆往门口赶，不然现在的设定走的太慢了」: from Luo's order he stands, finishes
+// loading, slings the rifle, turns round to the pack at the foot of the west wall, crouches for both shoulder loops, straightens up
+// and swings it onto his back, pulls the rifle off his shoulder, turns back and runs to the mouth. Run here on the real skeleton with
+// the real eye path over the measured pit (floor, west earth slope): the hands must be on what they hold whenever they are seen, the
+// eye must turn and travel at the speeds asked, and the pack must be where the hands take it.
+const gearReport={};
+{
+  const S=C.shunzi,ctx={seat:S.seat,followTo:S.followTo,seatEyeM:.97};
+  // The pit's height at z -125.8 (Data_FirstLevelMissionTerrain sampled through the terrain, 2026-09-29): floor, then the west slope.
+  const FLOOR=-1.93,SLOPE=[[-4,2],[-3.6,1.98],[-3.2,1.54],[-2.8,.67],[-2.4,.07],[-2,0]];
+  const Ground=x=>{if(x>=-2)return FLOOR;for(let i=0;i<SLOPE.length-1;i++)if(x>=SLOPE[i][0]&&x<=SLOPE[i+1][0])return FLOOR+SLOPE[i][1]+(SLOPE[i+1][1]-SLOPE[i][1])*(x-SLOPE[i][0])/(SLOPE[i+1][0]-SLOPE[i][0]);return FLOOR+2;};
+  const groundOf=(x)=>Ground(x);
+  const arrival=GearArrivalS(ctx);
+  assert.ok(arrival<GEAR.doneS-.2&&arrival>4,`the run arrives before the action is done (${arrival.toFixed(2)} s of ${GEAR.doneS})`);
+  // Where each hand is on an object: consecutive keys on the same object (rifle / pack) and the time after the last key.
+  const Holds=keys=>{const out=[];for(let i=0;i<keys.length;i++){const next=keys[i+1];if(keys[i][1]!=="cam"&&(!next||next[1]===keys[i][1]))out.push([keys[i][0],next?next[0]:Infinity,keys[i][1]]);}return out;};
+  const holds={l:Holds(GEAR.hands.l),r:Holds(GEAR.hands.r)};
+  assert.ok(holds.l.some(h=>h[2]==="pack")&&holds.r.some(h=>h[2]==="pack")&&holds.l.some(h=>h[2]==="rifle")&&holds.r.some(h=>h[2]==="rifle"),"both hands hold the rifle and the pack in turn");
+  for(const model of ["TengxianNra05","TengxianNra02"]){
+    const playerBody=Actor(model);playerBody.characterRig.modelId=model;playerBody.characterRig.clipModelId="TengxianNra02";playerBody.openingLegMeshes=[];
+    const eye=new THREE.PerspectiveCamera(65,16/9,.04,100);eye.rotation.order="YXZ";
+    const clip=new THREE.Group();clip.add(new THREE.Object3D());for(let i=0;i<5;i++)clip.add(new THREE.Object3D());
+    const r={player:{camera:eye},battlefield:{GroundHeight:groundOf},time:0};
+    const show={playerBody,ready:true,phase:"Orders",Age:0,flags:{exitAt:0},supplyRoot:new THREE.Group(),loadingRifle:new THREE.Group(),loadingRifleGrip:new THREE.Vector3(),clips:[clip,clip.clone()],r};
+    const firstPerson=new OpeningFirstPerson(show),lengths={};
+    const end=GEAR.doneS+.5,stat={yawRps:0,speed:0,step:0,minHeight:9,maxHeight:0,turnAway:0,seen:{l:0,r:0},worstSeen:{l:0,r:0},worstAll:{l:0,r:0},packSeen:0,packBackFacing:null};
+    let last=null,lastYaw=null,yaw0=null,packVisibleUntil=-1,packHiddenAfter=Infinity,firstOnBack=null;
+    for(let frame=0;frame*(1/60)<=end;frame++){
+      const t=frame/60,c=GearCamera(t,ctx);
+      eye.position.set(c.x,Ground(c.x)+c.height,c.z);eye.rotation.set(c.pitch,c.yaw,c.roll,"YXZ");eye.updateMatrixWorld(true);
+      r.time=t;show.Age=t;firstPerson.Update(1/60);
+      const rep=firstPerson.report,gear=rep.gear;
+      assert.equal(rep.phase,"Orders");assert.ok(gear&&Math.abs(gear.t-t)<1e-9,`${model} the gear-up runs on the clock since the order (${t.toFixed(2)})`);
+      // The eye: turn rate, speed, height, no jumps.
+      if(last){
+        const dy=Math.abs(((c.yaw-lastYaw+3*Math.PI)%(2*Math.PI))-Math.PI)*60;stat.yawRps=Math.max(stat.yawRps,dy);
+        const step=Math.hypot(eye.position.x-last.x,eye.position.y-last.y,eye.position.z-last.z);stat.step=Math.max(stat.step,step);
+      }
+      last={x:eye.position.x,y:eye.position.y,z:eye.position.z};lastYaw=c.yaw;yaw0??=c.yaw;
+      stat.speed=Math.max(stat.speed,c.speed);stat.minHeight=Math.min(stat.minHeight,c.height);stat.maxHeight=Math.max(stat.maxHeight,c.height);
+      stat.turnAway=Math.max(stat.turnAway,Math.abs(c.yaw-yaw0)*180/Math.PI);
+      for(const side of ["l","r"]){
+        const hand=rep.hands[side];
+        lengths[side]??=[hand.upperLength,hand.lowerLength];
+        assert.ok(Math.abs(hand.upperLength-lengths[side][0])<.00001&&Math.abs(hand.lowerLength-lengths[side][1])<.00001,`${model} gear-up ${side} keeps the arm bone lengths (${t.toFixed(2)})`);
+        assert.ok(hand.wristBend<=42.1,`${model} gear-up ${side} wrist bend ${hand.wristBend} at ${t.toFixed(2)}`);
+        assert.ok(Math.abs(hand.wristTwist)<.1,`${model} gear-up ${side} wrist twist ${hand.wristTwist} at ${t.toFixed(2)}`);
+        assert.ok(hand.reachRatio<=.971,`${model} gear-up ${side} reach ${hand.reachRatio} at ${t.toFixed(2)}`);
+        assert.ok(hand.shoulderBehind>.08,`${model} gear-up ${side} sleeve root behind the eye (${hand.shoulderBehind} at ${t.toFixed(2)})`);
+        if(t>.6)assert.ok(hand.rotationStepDegrees<12,`${model} gear-up ${side} palm turns continuously (${hand.rotationStepDegrees.toFixed(1)} deg at ${t.toFixed(2)})`);
+        // On what he holds: whenever the palm is in view and both keys around it are on the same object, it is on it.
+        const palm=new THREE.Vector3(...hand.palm),ndc=palm.clone().project(eye),inView=ndc.z<1&&ndc.z>-1&&Math.abs(ndc.x)<1&&Math.abs(ndc.y)<1;
+        const holding=holds[side].find(h=>t>=h[0]+.02&&t<=h[1]);
+        if(holding){
+          stat.worstAll[side]=Math.max(stat.worstAll[side],hand.contactError);
+          if(inView){stat.seen[side]++;stat.worstSeen[side]=Math.max(stat.worstSeen[side],hand.contactError);
+            assert.ok(hand.contactError<.005,`${model} gear-up: the ${side} hand is on the ${holding[2]} while seen (${(hand.contactError*1000).toFixed(1)} mm at ${t.toFixed(2)} s)`);}
+        }
+        maxBend=Math.max(maxBend,hand.wristBend);maxTwist=Math.max(maxTwist,Math.abs(hand.wristTwist));maxRotation=Math.max(maxRotation,hand.rotationStepDegrees);samples++;
+      }
+      // The charger stands in the guide until the bolt strips it; the rifle is drawn where the gear-up puts it.
+      if(Math.abs(t-GEAR.rifle.charger.offS)>.02)assert.equal(show.clips[0].visible,t<GEAR.rifle.charger.offS,`${model} gear-up charger shown only until the bolt strips it (${t.toFixed(2)} s)`);
+      assert.ok(show.loadingRifle.position.distanceTo(new THREE.Vector3(...gear.rifle.position))<1e-6&&show.supplyRoot.visible,`${model} the loading rifle is drawn where the gear-up has it`);
+      // The pack: seen at the wall until it is on his back, then gone (it is behind him: from the black on the timber lies on it).
+      const packProp=rep.props.packRest;
+      if(t<GEAR.pack.onBackS-.02){assert.ok(packProp?.visible,`${model} the pack is drawn until it is on his back (${t.toFixed(2)} s)`);packVisibleUntil=t;}
+      else if(t>GEAR.pack.onBackS+.02){assert.ok(!packProp?.visible,`${model} the pack is off the screen once it is on his back (${t.toFixed(2)} s)`);packHiddenAfter=Math.min(packHiddenAfter,t);}
+      // When the hands take the pack it is in the middle of the picture, its straps towards the eye, within reach.
+      if(Math.abs(t-(GEAR.hands.l.find(k=>k[1]==="pack")[0]+.15))<.009&&packProp?.visible){
+        const p=new THREE.Vector3(...packProp.position).project(eye),n=new THREE.Vector3(0,0,1).applyQuaternion(new THREE.Quaternion(...gear.pack.quaternion));
+        assert.ok(p.z<1&&Math.abs(p.x)<.6&&p.y<.4&&p.y>-1,`${model} the pack is in the picture as the hands take it (ndc ${p.x.toFixed(2)}, ${p.y.toFixed(2)})`);
+        assert.ok(n.dot(eye.position.clone().sub(new THREE.Vector3(...packProp.position)).normalize())>.3,`${model} the pack's strap side faces the eye`);
+        stat.packSeen++;stat.packBackFacing=+n.dot(eye.position.clone().sub(new THREE.Vector3(...packProp.position)).normalize()).toFixed(2);
+      }
+      if(gear.pack&&gear.pack.visible&&t<.02){
+        const rest=GearPackRest(groundOf,GEAR);
+        assert.ok(new THREE.Vector3(...gear.pack.position).distanceTo(rest.position)<1e-6,`${model} the pack starts where it lay in Banter`);
+        assert.ok(Math.hypot(rest.position.x-S.seat.x,rest.position.z-S.seat.z)<1.2&&rest.position.y-Ground(rest.position.x)<.4&&rest.position.y>Ground(rest.position.x),`${model} it lies within reach of the seat, on the ground (${rest.position.toArray().map(v=>v.toFixed(2))})`);
+      }
+    }
+    assert.ok(stat.turnAway>=140&&stat.turnAway<=185,`${model} he turns round to the pack (${stat.turnAway.toFixed(0)} deg)`);
+    assert.ok(stat.yawRps>1&&stat.yawRps<6,`${model} the turn is quick but not a spin (${stat.yawRps.toFixed(1)} rad/s)`);
+    assert.ok(stat.speed>=1.4&&stat.speed<=2.05,`${model} he runs to the mouth (${stat.speed.toFixed(2)} m/s; it was 0.24)`);
+    assert.ok(stat.step<.06,`${model} the eye never jumps (${stat.step.toFixed(3)} m in a frame)`);
+    assert.ok(stat.minHeight>=.7&&stat.minHeight<=.85&&stat.maxHeight<=C.shunzi.standEyeM+.05,`${model} the eye crouches to the pack and stands ${stat.minHeight.toFixed(2)}..${stat.maxHeight.toFixed(2)} m`);
+    assert.ok(stat.seen.l>=40&&stat.seen.r>=40,`${model} both hands are seen on their objects (${stat.seen.l}, ${stat.seen.r} frames)`);
+    assert.ok(stat.packSeen>=1&&packVisibleUntil>GEAR.pack.onBackS-.1&&packHiddenAfter<GEAR.pack.onBackS+.1,`${model} the pack is taken, shown and put on`);
+    // At the mouth: the eye has stopped on followTo, the rifle is in both hands.
+    const end0=GearCamera(GEAR.doneS,ctx),rep=firstPerson.report;
+    assert.ok(Math.hypot(end0.x-C.shunzi.followTo.x,end0.z-C.shunzi.followTo.z)<.03&&end0.speed<.05,`${model} he ends on followTo, standing`);
+    for(const side of ["l","r"])assert.ok(rep.hands[side].contactError<.005,`${model} both palms on the rifle at the mouth (${side} ${rep.hands[side].contactError})`);
+    gearReport[model]={arrival:+arrival.toFixed(2),turnDeg:+stat.turnAway.toFixed(0),yawRps:+stat.yawRps.toFixed(2),maxMps:+stat.speed.toFixed(2),minEyeM:+stat.minHeight.toFixed(2),seen:stat.seen,worstSeenMm:{l:+(stat.worstSeen.l*1000).toFixed(1),r:+(stat.worstSeen.r*1000).toFixed(1)},worstHeldMm:{l:+(stat.worstAll.l*1000).toFixed(0),r:+(stat.worstAll.r*1000).toFixed(0)},packFacing:stat.packBackFacing};
+    firstPerson.Dispose();
+  }
+  // The pack model builds without a factory (plain stand-in materials) and stays a small canvas pack with two loops.
+  {
+    const owned=[],pack=BuildGearPack(GEAR.pack,null,item=>owned.push(item));
+    const box=new THREE.Box3().setFromObject(pack),size=box.getSize(new THREE.Vector3());
+    assert.ok(size.x>.3&&size.x<.45&&size.y>.4&&size.y<.6&&size.z>.12&&size.z<.35,`the pack is a knapsack (${size.toArray().map(v=>v.toFixed(2))})`);
+    assert.equal(pack.children.filter(child=>child.name==="OpeningGearPack_Loop").length,2,"two shoulder loops on the back panel");
+    for(const item of owned)item.dispose?.();
+  }
+  // Tracks: monotone (no overshoot between two keys), flat over a hold.
+  assert.ok(Math.abs(GearTrack([[0,0],[1,10],[2,10],[3,0]],1.5)-10)<1e-9&&GearTrack([[0,0],[1,10],[2,20]],.5)>=0&&GearTrack([[0,0],[1,10],[2,20]],.5)<=10,"the eye tracks do not overshoot their keys");
+  console.log(JSON.stringify({gearUp:gearReport}));
 }
 console.log(JSON.stringify({samples,maxBend,maxTwist,maxRotation,groundContacts,maxGroundError,claspSamples,maxClaspError,minClaspAlignment,maxClaspBend,freeReachSamples,maxFreeFrameError}));
 console.log("ok production opening arms preserve anatomical length, wrist axes and hidden shoulder roots");

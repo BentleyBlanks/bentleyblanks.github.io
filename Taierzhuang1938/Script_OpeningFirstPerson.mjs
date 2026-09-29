@@ -7,6 +7,7 @@ import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 import { EXTRA_HAND_POSES, HAND_SHAPES, LEG_POSES, FP_PROPS, FIRST_PERSON_EXTRA as X } from "./Data_OpeningFirstPersonExtra.mjs";
 import { CutscenePerformer } from "./Script_CutscenePerformance.mjs";
 import { OpeningClipLibrary, OpeningClipMeta } from "./Script_OpeningStoryboardAnimation.mjs";
+import { GearPose, GearPackRest, GearData, BuildGearPack } from "./Script_OpeningFirstPersonGear.mjs";
 
 const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 const Q=()=>new THREE.Quaternion();
@@ -196,6 +197,12 @@ function ShapeOf(pose){
   const c=pose?.c||[14,24,14];
   return {fingers:[c,c,c,c,c],splay:[0,0,0,0,0],thumbDirection:DEFAULT_THUMB,thumbRoll:0};
 }
+/** A gear-up hand's finger shape: the mix of its two keys' shapes (a named HAND_SHAPES shape or a plain curl); null for plain curls. */
+function GearHandShape(hand){
+  if(!hand.shapeA&&!hand.shapeB)return null;
+  const Of=(name,curl)=>name?HAND_SHAPES[name]:ShapeOf({c:curl||[45,60,45]});
+  return MixShape(Of(hand.shapeA,hand.curlA),Of(hand.shapeB,hand.curlB),hand.shapeMix);
+}
 function MixShape(a,b,t){
   const L=(u,v)=>u+(v-u)*t;
   return {fingers:a.fingers.map((f,i)=>f.map((v,j)=>L(v,b.fingers[i][j]))),splay:a.splay.map((v,i)=>L(v,b.splay[i])),
@@ -369,36 +376,10 @@ const SUPPLY_PHASES=new Set(["Banter","Orders","Incoming"]);
 const HAND_BLEND_S=.5;
 /** Most the solved palm may turn in one 1/60 s frame (the continuity gate is 12°). */
 const HAND_TURN_DEG=10;
-// 「弹装起！往后沟撤！跟紧！」 (Data_OpeningStoryboards.firstPerson.followUp): the rifle and both hands on it after
-// the order, keyed on the rifle (rifle-local HanYang canonical: muzzle -z, top +y, bolt side +x).
-const FOLLOW=C.firstPerson.followUp;
+// 「弹装起！往后沟撤！跟紧！」: from Luo's order the rifle, the pack and both hands run on the gear-up clock (Data_OpeningFirstPersonGear,
+// evaluated by Script_OpeningFirstPersonGear.GearPose); this module poses the arms on those targets and places the props.
 /** The charger's rounds lie along the bore, stacked up (the procedural clip: rounds along y, stacked along x). */
 const CLIP_IN_RIFLE=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,-1),new THREE.Vector3(-1,0,0)));
-/** How far the thumb has pressed the charger's rounds down into the magazine at t. */
-function ChargerDepth(t){const c=FOLLOW.charger;return c.pressM*Smooth((t-c.press[0])/(c.press[1]-c.press[0]));}
-/**
- * The rifle at followUp clock t (seconds since the order): world quaternion, the left palm target and each hand's
- * target / fingers / back of the hand / curl. The right hand's keys are points on the rifle, so the hand goes
- * where the rifle goes; over the charger it rides the rounds down and the thumb works in short strokes.
- */
-function FollowRifle(t,cam){
-  const R=SampleKeys(FOLLOW.rifle,t),Frame=key=>FrameQuaternion(V(...key[2]).normalize().negate(),V(...key[3]).normalize());
-  const q=cam.quaternion.clone().multiply(Frame(R.a).slerp(Frame(R.b),R.mix));
-  const palm=V(...R.a[1]).lerp(V(...R.b[1]),R.mix).applyQuaternion(cam.quaternion).add(cam.position);
-  const origin=palm.clone().sub(V(...FOLLOW.grip).applyQuaternion(q));
-  const At=p=>V(...p).applyQuaternion(q).add(origin),Dir=p=>V(...p).applyQuaternion(q).normalize();
-  const Hand=side=>{
-    if(side==="l"){const L=FOLLOW.left;return {target:palm.clone(),forward:Dir(L.f),normal:Dir(L.n),curl:[...L.curl]};}
-    const k=SampleKeys(FOLLOW.right,t),m=k.mix,c=FOLLOW.charger;
-    const frame=FrameQuaternion(Dir(k.a[2]),Dir(k.a[3])).slerp(FrameQuaternion(Dir(k.b[2]),Dir(k.b[3])),m);
-    const target=At(k.a[1]).lerp(At(k.b[1]),m);
-    // Over the charger (its keys are the pressed-down point): ride the rounds down, the thumb in strokes.
-    const u=(t-c.press[0])/(c.press[1]-c.press[0]),thumb=u>0&&u<1?c.thumbM*Math.max(0,Math.sin(Math.PI*2*c.thumbHz*(t-c.press[0]))):0;
-    target.addScaledVector(Dir([0,1,0]),c.pressM-ChargerDepth(t)+thumb);
-    return {target,forward:V(0,0,1).applyQuaternion(frame),normal:V(0,1,0).applyQuaternion(frame),curl:k.a[4].map((v,i)=>v+(k.b[4][i]-v)*m)};
-  };
-  return {q,palm,Hand};
-}
 function Mirror(pose,side){
   if(!pose)return null;
   if(side==="r"||!pose.p)return pose;
@@ -666,6 +647,10 @@ export class OpeningFirstPerson{
         }
       }else if(spec.kind==="strap"){
         SetWorld(prop.object,cam.position,cam.quaternion);
+      }else if(spec.kind==="pack"){
+        // Lying where he left it, at the foot of the west earth wall (the gear-up takes it from there: UpdateGear).
+        const rest=GearPackRest(Ground,GearData());
+        SetWorld(prop.object,rest.position,rest.quaternion);
       }
       prop.object.visible=shown;
       report[name]={visible:shown,position:prop.object.getWorldPosition(V()).toArray()};
@@ -695,6 +680,13 @@ export class OpeningFirstPerson{
       return this.AdoptProp(name,object,spec,root,{size});
     }
     else if(spec.kind==="rifle")object=Source(s.loadingRifle,"loading rifle (show.loadingRifle)");
+    else if(spec.kind==="pack"){
+      // The pack he takes up at the order (Data_OpeningFirstPersonGear.pack): geometry made here, the canvas / wool / webbing / buckle
+      // materials are the NRA soldier's own (shared, not disposed) or plain stand-ins without a factory (node).
+      const factory=s.r?.actorFactory,materials=factory?.ActorMaterials?factory.ActorMaterials("nra",()=>.5):null;
+      object=BuildGearPack(GearData().pack,materials&&{canvas:materials.accessory,roll:materials.uniform,strap:materials.accessory,steel:materials.steel},
+        item=>{if(item?.isBufferGeometry)(Array.isArray(s.ownedGeometry)?s.ownedGeometry:this.owned).push(item);else if(item)(Array.isArray(s.owned)?s.owned:this.owned).push(item);});
+    }
     else if(spec.kind==="strap"){
       // A canvas ribbon along the points, facing the eye (camera-local, so it hangs from the camera frame):
       // three columns (hems darker than the middle), rows every ~1 cm with a darker stitched band every
@@ -793,7 +785,7 @@ export class OpeningFirstPerson{
   /**
    * The fill frame: the clip already posed the whole body (PoseFill). Banter's dirt in the collar is laid over the right
    * arm (the same keys as the hand-key path); the props follow the hands; the palms / frames / shoulders are remembered
-   * so the order's followUp eases in from where the hands were.
+   * so the order's gear-up eases in from where the hands were.
    */
   UpdateFill(dt,now){
     const s=this.show,r=s.r,p=s.phase,cam=r.player.camera,rig=this.rig,actor=s.playerBody,flags=s.flags||{},beat=this.FillBeat(p);
@@ -837,10 +829,37 @@ export class OpeningFirstPerson{
     const legReport={hip:At(B.pelvis),sides:{l:{hip:At(B.thighL),knee:At(B.calfL)},r:{hip:At(B.thighR),knee:At(B.calfR)}}};
     this.report.legs={pose:"fill",visible:true,...legReport};
     this.report.props=this.UpdateProps({props:beat.props},frames,now,legReport,false);
+    // Where the rifle lies on his lap: the order picks it up from there (the gear-up's first rifle key).
+    const lapObject=this.props.fillRifle?.object;
+    if(lapObject?.visible)this.lapPose={position:lapObject.getWorldPosition(V()),quaternion:lapObject.getWorldQuaternion(Q())};
     if(s.supplyRoot)s.supplyRoot.visible=false;
     if(r.bunkerRifle?.view)r.bunkerRifle.view.visible=false;
     this.report.worldRifleVisible=r.bunkerRifle?.view?false:null;
     actor.root.updateWorldMatrix(true,true);s.firstPersonState=this.report;
+  }
+  /** The gear-up at clock t (seconds since the order) for this frame's camera: objects and hand targets in world space. */
+  GearFrame(t,frames){
+    const fp=C.firstPerson;
+    return GearPose(Number.isFinite(t)?t:1e3,{cam:frames.cam,Ground:frames.Ground,lap:this.lapPose||null,shoulder:[fp.shoulderHalfWidthM,-fp.shoulderDropM,fp.shoulderBackM]},GearData());
+  }
+  /**
+   * The gear-up's props besides the rifle: the pack (lying at the wall, then in his hands, then on his back = gone) and the
+   * crate he sat on, left where the fill frame put it until he has walked away from it.
+   */
+  UpdateGear(gear,follow){
+    const s=this.show,root=s.playerBody?.root;
+    if(!root)return;
+    const pack=this.props.packRest ||= this.MakeProp("packRest",FP_PROPS.packRest,root);
+    if(pack?.object&&gear.pack){
+      SetWorld(pack.object,gear.pack.position,gear.pack.quaternion);pack.object.visible=gear.pack.visible;
+      this.report.props.packRest={visible:gear.pack.visible,position:gear.pack.position.toArray()};
+    }
+    const crate=this.props.fillSeat;
+    if(crate?.object)crate.object.visible=gear.crate.visible;
+    this.report.gear={t:follow,rifle:{position:gear.rifle.position.toArray(),quaternion:gear.rifle.quaternion.toArray()},
+      pack:gear.pack?{position:gear.pack.position.toArray(),quaternion:gear.pack.quaternion.toArray(),visible:gear.pack.visible}:null,
+      charger:{visible:gear.charger.visible,depth:gear.charger.depth},
+      hands:Object.fromEntries(["l","r"].map(side=>[side,{on:gear.hands[side].on,target:gear.hands[side].target.toArray()}]))};
   }
   Update(dt=1/60){
     const s=this.show,r=s.r,p=s.phase,a=s.Age,cam=r.player.camera,fp=C.firstPerson;
@@ -906,17 +925,20 @@ export class OpeningFirstPerson{
     const flags=s.flags||{};
     const dig=p==="Banter"&&flags.dirtAt!=null?now-flags.dirtAt:null;
     const digWeight=dig==null?0:Smooth((dig-.2)/.6)*(1-Smooth((dig-1.7)/.6));
-    // Supply: the rifle in his hands from Luo's order on (followUp, clock flags.exitAt; without it, loaded and carried).
+    // Supply: from Luo's order on the rifle, the pack and both hands run on the gear-up clock (clock flags.exitAt; without it the
+    // action is done: he is at the mouth with the pack on and the rifle at the ready).
     const follow=supply?(flags.exitAt!=null?now-flags.exitAt:Infinity):null;
-    const held=supply?FollowRifle(follow,cam):null;
+    const gear=supply?this.GearFrame(follow,frames):null;
     for(const side of ["l","r"]){
       const sign=side==="l"?-1:1;
       let shoulder=Local(sign*fp.shoulderHalfWidthM,-fp.shoulderDropM,fp.shoulderBackM);
       let target=Local(sign*.18,-.46,-.15),forward=Direction(0,-.4,-1),normal=Direction(sign*.25,.65,.1),curl=[14,24,14],grasp=false,shape=null,partner=null,partnerPose=null,poseName=null;
       const pole=Local(sign*.43,-.51,.1);
       if(supply){
-        const hand=held.Hand(side);
-        target=hand.target;forward=hand.forward;normal=hand.normal;curl=hand.curl;
+        const hand=gear.hands[side];
+        target=hand.target;forward=V(0,0,1).applyQuaternion(hand.frame);normal=V(0,1,0).applyQuaternion(hand.frame);curl=hand.curl||curl;shape=GearHandShape(hand);
+        poseName="gear:"+hand.on;
+        if(hand.sh)shoulder=Local(...hand.sh);
       }else if(beat){
         const pose=this.BeatPose(beat,side,frames,now);
         target=pose.target;forward=V(0,0,1).applyQuaternion(pose.frame);normal=V(0,1,0).applyQuaternion(pose.frame);curl=pose.curl;grasp=pose.grasp;shape=pose.shape;
@@ -1049,7 +1071,10 @@ export class OpeningFirstPerson{
       }else this.ReleasePartner(side,entry,frameClock,dt);
       this.report.hands[side]=entry;this.lastTargets[side]=player.palm.clone();this.lastFrames[side]=currentFrame;this.lastShoulders[side]=cam.worldToLocal(shoulder.clone());
     }
-    this.report.props=this.UpdateProps(bodyBeat,frames,bodyClock,legReport.sides?legReport:null,supply);
+    // The gear-up's own props (the pack, the crate) are placed by UpdateGear after this; the straps of the pack once it is on his back
+    // hang in the picture's lower corners with the camera.
+    this.report.props=this.UpdateProps(supply&&gear?{props:gear.pack?.onBack?["gearStrapL","gearStrapR"]:[]}:bodyBeat,frames,bodyClock,legReport.sides?legReport:null,supply);
+    if(supply)this.UpdateGear(gear,follow);
     if(s.supplyRoot)s.supplyRoot.visible=supply;
     // One loading rifle on screen at a time: in the hands (supply), on the legs (a lap prop), or the world rifle.
     // The world rifle (moved to rescue.rifleMouth when 01 starts) stays hidden through the loading phases and
@@ -1060,14 +1085,14 @@ export class OpeningFirstPerson{
     if(r.bunkerRifle?.view)r.bunkerRifle.view.visible=!worldRifleHidden;
     this.report.worldRifleVisible=r.bunkerRifle?.view?!worldRifleHidden:null;
     if(supply){
-      // Held at the left palm as solved (followUp.grip); the charger stands in the guide until the bolt strips it.
-      s.loadingRifle.quaternion.copy(held.q);
-      s.loadingRifle.position.copy(Palm(this.rig,"l")).sub(V(...FOLLOW.grip).applyQuaternion(held.q));
+      // The rifle where the gear-up has it (in his hands, against the wall, taken up again); the charger stands in the guide
+      // until the bolt strips it.
+      s.loadingRifle.position.copy(gear.rifle.position);s.loadingRifle.quaternion.copy(gear.rifle.quaternion);
       s.loadingRifle.updateMatrixWorld(true);
-      const charger=FOLLOW.charger;
-      s.clips[0].visible=follow<charger.offS;
-      s.clips[0].position.copy(V(...charger.at).addScaledVector(V(0,-1,0),ChargerDepth(follow))).applyMatrix4(s.loadingRifle.matrixWorld);
-      s.clips[0].quaternion.copy(held.q).multiply(CLIP_IN_RIFLE);
+      const charger=GearData().rifle.charger;
+      s.clips[0].visible=gear.charger.visible;
+      s.clips[0].position.copy(V(...charger.at).addScaledVector(V(0,-1,0),gear.charger.depth)).applyMatrix4(s.loadingRifle.matrixWorld);
+      s.clips[0].quaternion.copy(gear.rifle.quaternion).multiply(CLIP_IN_RIFLE);
       const yaowa=r.companion?.Handle?.("yaowa")?.actor?.characterRig?.bones?.handL;
       s.clips[1].visible=false; // Yaowa's baked rifle/charger action owns his hands.
       if(yaowa){yaowa.getWorldPosition(s.clips[1].position);s.clips[1].position.y+=.04;}

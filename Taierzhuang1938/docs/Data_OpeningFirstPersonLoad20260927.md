@@ -9,7 +9,7 @@
 - **道具**：`fillCharger`（左手里的桥夹，子弹按动作事件 `roundIn` 一颗颗出现，`chargerStowed` 到 `chargerDrawn` 之间在口袋里不画）、`fillRound`（右手捏着的那一发，`roundPicked` 到 `roundIn`）、`fillRifle`（09-29 起顺着右大腿放，见下节）、`fillSeat`（弹药箱，尺寸读动作清单的 `seat.crateM`）。
 - **掏衣领**：Banter 开头「几块土掉进衣领」仍保留，右臂先解到掏衣领的姿势，再按权重从动作的骨骼姿态平滑过去（直接按目标点插值会在第一帧转 15°）。镜头不再为这个动作自动低头，只保留缩脖子的高度变化。
 - **自由视角**：坐着的这两段（`FirstLevelBunkerShow.Seated`）视角左右各 1.75 rad、向下 0.95 rad、向上 1.15 rad（`firstPerson.headLook.seated`），任务运行时的受困视角钳制按同一范围放宽（`LookLimits`）；去掉了朝说话人转头（`seatShot.speakerTurnRad`）；自由视角期间不再走导演镜头的转速限制，鼠标 1:1。下令后视角在 1.1 s 内回到跟随镜头。
-- **下令后的衔接**：跟随镜头的起身高度从实际坐着的眼高起步；两只手从压弹动作的位置和朝向缓入 followUp 的拿枪、压弹入仓。
+- **下令后的衔接**：跟随镜头的起身高度从实际坐着的眼高起步；两只手从压弹动作的位置和朝向缓入下令后的收拾装备（2026-09-29 起是转身背包、拿枪、跑向洞口，见 [Data_OpeningFirstPersonGear20260929](Data_OpeningFirstPersonGear20260929.md)；腿上的枪在下令那一帧被双手拿起）。
 
 ## 重建
 
