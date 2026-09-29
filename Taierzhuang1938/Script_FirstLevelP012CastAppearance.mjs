@@ -84,7 +84,11 @@ export function InstallP012ActorMotion(soldier) {
     const distance=previous?Math.hypot(at.x-previous.x,at.z-previous.z):0;
     const measuredSpeed=previous&&step>0&&distance<Math.max(2,step*8)
       ? Math.min(6,distance/step):0;
-    const speed=soldier.p012OnMovingTrain?(soldier.missionTrainWalkSpeed||0):measuredSpeed;
+    // A caller that says the root is not to be tracked and gives the speed (the 01 director walking a man in the
+    // relaxed gait) is taken at its word: the root it holds on a mark still creeps a fraction of a millimetre a frame
+    // under the AI's body step, measured as ~0.04 m/s -- right on the walk / stand line (ijaA flicked, 09-29).
+    const given=state.locomotionTracked===false&&Number.isFinite(state.moveSpeedMps);
+    const speed=soldier.p012OnMovingTrain?(soldier.missionTrainWalkSpeed||0):given?Math.max(0,state.moveSpeedMps):measuredSpeed;
     this.p012ActualSpeedMps=speed;
     // Zero-dt pose reads (including stretcher sockets) must not consume motion.
     if(dt>0){previous={x:at.x,z:at.z};lastElapsed=elapsed;}

@@ -199,17 +199,22 @@ export class ActorLocomotion {
     for(const f of this.feet) {
       if(!f.toe||!f.thigh||!f.calf)continue;
       if(holding&&(!f.key||f.weight<.99)){f.key=null;f.weight=0;f.offset.set(0,0,0);f.residual.set(0,0,0);continue;}
-      const spans=profile?.contacts?.[f.side]||[],index=holding?0:spans.findIndex(([a,b])=>phase>=a&&phase<b);
+      const spans=profile?.contacts?.[f.side]||[],found=holding?0:spans.findIndex(([a,b])=>phase>=a&&phase<b);
+      // A stance across the loop seam (spans [.., 1] and [0, ..]) is one stance: same key, the lock carried on.
+      // Taken as a new one, the wrap dropped the whole correction in a frame (RelaxedWalk's right foot: 31 deg,
+      // 17 cm while ijaA turned on his taunt walk, 09-29 probe).
+      const seam=!holding&&found>=0&&found!==spans.length-1&&spans[found][0]<=1e-4&&spans.at(-1)[1]>=1-1e-4;
+      const index=seam?spans.length-1:found;
       const key=index<0?null:holding?f.key:rig.currentId+':'+index;
-      if(changed||wrapped||index<0)f.releasedKey=null;
+      if(changed||wrapped&&!seam||index<0)f.releasedKey=null;
       // In the air, or a stance let go early (below): ease the correction out.
       if(index<0||!holding&&key===f.releasedKey){this.Release(f,fade);continue;}
-      const [start]=spans[index]||[0,1];
+      const start=(spans[index]||[0,1])[0]-(seam?1:0);
       f.residual.multiplyScalar(fade);
       // Lock in from the carried-over residual (so a stance starts where the foot is shown), hold to the end.
       const weight=holding?1:Smooth((phase-start)*profile.duration/C.contactBlendS)*action.getEffectiveWeight();
       const toe=f.toe.getWorldPosition(this.v[0]);
-      if(changed||wrapped||f.key!==key){f.anchor.copy(toe).add(f.residual);f.key=key;}
+      if(changed||wrapped&&!seam||f.key!==key){f.anchor.copy(toe).add(f.residual);f.key=key;}
       const correction=this.v[1].subVectors(f.anchor,toe);
       // Keep authored heel/toe roll and terrain height; anchor only the sole's planar contact.
       correction.y=0;

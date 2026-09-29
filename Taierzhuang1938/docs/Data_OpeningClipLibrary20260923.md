@@ -102,6 +102,11 @@
 - **定格保活**（`Script_OpeningActorPerformance.OpeningHeldLife`，数在 `Data_OpeningStoryboards.heldLife`）：导演用固定帧长时间摆着、又没有说话表演的人（Banter 全段 53 s 跪在洞口的罗班长、02 Hold 端枪站 10 s 的日兵乙、揪领的 holdLoop）自动加呼吸、胸口侧摆和慢速视线漂移；看守骨骼角速度低于 `stillRadS` 才淡入，clip 一动 0.12 s 内退出；脸在 clip 里对准第一人称的动作头部幅度只给 `faceAimedShare`。说话表演层的手势按「站定」权重淡入淡出（约 0.3 s），不再在起步那一帧消失。
 - **走位缓动**（`Script_OpeningStoryboards.Move`，数在 `Data_OpeningStoryboards.pace` / `turnAccelRps2`）：不带 clip 的自由走动按加速度起步、按 `sqrt(2ad)` 减速停在路线**末点**（`Follow` 传剩余路程，拐角不减速）；转身有角加速度、到角度前收住，最高仍是 `turnRps`。带 clip 的位移（拖人、成对站位）与 `Settle` 不缓动，保证接触对位。
 - 全游戏共用的两处也在这一轮修：脚底锁定松锁（[位移与步态同步](Data_ActorLocomotion.md)「松锁」）；P012 站定钉帧不再被 `aim 0.18` 打断（原来洞外背景兵、喊话兵每 2.9 s 原地「上前两步」再弹回，`Script_FirstLevelP012CastAppearance`）。
+- **2026-09-29 审问前两个日兵脚步抽搐**（用户：「川军被审问之前两个日军的脚步动画在抽搐」；同一探针，60 fps 真实播放 Wake→Found，记日兵甲乙腿部骨骼帧间转角、着地脚位移、原生 clip）：
+  - 日兵甲背好枪站到拖人位后 0.5 s 里 `RelaxedWalk` / `RelaxedStand` 来回切了 5 次，腿在走路片的半步姿势和站姿之间跳（单帧 24°、脚 16 cm）。导演报的位移是 0，是 P012 动作层（`Script_FirstLevelP012CastAppearance` 的 `UpdateP012ActorMotion`）自己拿根节点位移重算速度：AI 的身体步进每帧把他挪零点几毫米、导演再放回去，量出来 0.03–0.05 m/s，正好压在走/站的线（`movingMps` 0.035）上。现在背枪/空手/警戒步态由导演带着时传 `locomotionTracked:false` + 导演的位移速度，P012 动作层照这个速度走，不再自己量。
+  - `CollarControl` 等「边走边做的站立片」（`TRAVEL_LEGS_CLIPS`）的腿原来按位移 > 0.05 m/s 一帧切到原生步态、一帧切回来：日兵甲走两步揪住川军衣领停下那一帧大腿 37°、脚 34 cm。现在腿在两者之间按 `poseBlendS` 渐变。`IjaReadyRifle` 加进这张表：日兵乙在 CaptiveWall 边走 1.6 m 边端枪，原来整段是站姿的腿贴地滑过去。
+  - 锁脚层循环接缝上的一步（[位移与步态同步](Data_ActorLocomotion.md)「跨接缝的一步」）。
+  - 改前 → 改后（审问前，日兵甲乙）：原生 clip 来回切换 日兵甲 FrontPass 8 → 3 次、CaptiveWall 6 → 2 次；腿部单帧最大转角 FrontPass 24° → 12°、揪领停步 37° → 7°、日兵乙端枪 17° → 12°。其余人物（翻译、战友、纵深日兵）各段逐项对照没有变差。
 
 **还没做的**（已在 §10 处理，2026-09-28）：动作库里仍有 IK 解中途换分支的帧（前臂/手/小腿绕自身轴约 180°，烘焙端已有扭转展开与 30°/帧滚转限速，但求解器仍会换分支）。本轮探针在 01–02 里看到的：`BlastSlamBuried` 左手、`BlastDazedStir` 右前臂、`CaptiveDraggedFromDirt` 左脚、`CaptiveWallBrace` 头、`IjaSlingRifle` 右前臂、`IjaCollarDragSnag` 左上臂、`IjaVaultTimberIn/Out` 小腿与脚、`IjaParriedChoppedFall` 左上臂、`HeSwapDadaoRifle` 右手、`HeDadaoParryChop`、`LuoDadaoChopRear` 左前臂、`WoundedRiseWall` 左手；未用到的 `ButtThreat` 五套骨架都有。
 

@@ -12,6 +12,10 @@ let library, pending;
 // clips the 0922 director already borrowed). Only the rigs that were baked with them get them.
 const CAPTIVES_REUSED = ["IjaBayonetGuard","CaptiveStandToKneel","CaptiveHandsUpWalk","CaptiveKneelPlead",
   "IjaKickPrisoner","IjaShoveForward","IjaTauntGesture","CaptiveKneelFlinch","CaptiveShovedStumble"];
+// Stationary clips a man may be asked to play while the director walks him a few steps: his legs are the
+// native gait's while he travels (the clip's standing legs would glide along the ground).
+const TRAVEL_LEGS_CLIPS = ["CollarControl","CollarDrag","MessengerReport","CreepDadao","RifleDeflect","IjaBayonetGuard","IjaReadyRifle"];
+const LegBone = bone => /Thigh|Calf|Foot|Toe/.test(bone.name);
 const Quat = new Quaternion(), QuatRef = new Quaternion(), QuatAdd = new Quaternion();
 const SlungLocal = new Matrix4(), SlungScale = new Vector3();
 // A clip name the director asks for that this rig was not baked with plays the native animation instead --
@@ -138,6 +142,10 @@ export function InstallOpeningStoryboardAnimation(soldier){
   // The prop set (and any weapon left in the world) goes with the rig.
   rig.Dispose=function(...args){rig.openingProps?.Dispose();rig.openingProps=null;return originalDispose?.apply(this,args);};
   let performer,clock=0,blendFrom,blendAt=0,lastKey,lastLayers=null,limbsOnly=false,travelClock=0,wasRescueReady=false,rescueHandoff=false;
+  // Share of the legs taken from the native gait under a TRAVEL_LEGS_CLIPS clip (1 while no clip is posed: the
+  // legs shown are the gait's). It eases over poseBlendS: switched on and off with the travel, ijaA's legs went
+  // from mid-stride to the collar hold in one frame when he stopped (37 deg, a foot 34 cm; 09-29 probe).
+  let travelLegs=1;
   // The director let go of him (released to the AI): the native pose eases in from the last one shown.
   let releaseFrom=null,releaseAt=0,releaseArcNew=false;
   // baseBuffer holds last frame's native pose (the mixer's output) when this layer drew over it: put back before
@@ -209,13 +217,18 @@ export function InstallOpeningStoryboardAnimation(soldier){
     // Front commands can occur while moving and firing. An explicit pointing
     // clip must not replace the weapon grip before head-only speech is applied.
     if(nativeCombat&&pose?.upperBody)pose=null;
+    if(!pose)travelLegs=1;
     // A relaxed gait (rifle slung, or no weapon: Script_RelaxedGait) walks at the director's real pace
     // (its clips are authored in metres per second; the foot contacts lock on it) with no aim layer.
     EnsureRelaxedGait(soldier);
     const gait=!!soldier.relaxedGait;
     soldier.relaxedGaitPaceMps=soldier.openingStoryboardTravel??undefined;
+    // The director's pace, not the measured root speed (locomotionTracked false; the P012 motion layer honours it
+    // too): a man held on his mark still creeps a fraction of a millimetre a frame under the AI's body step before
+    // the director puts him back -- read as ~0.04 m/s, right on the walk / stand line, ijaA's legs flicked between
+    // the walk and the stand on his mark for half a second (09-29 probe).
     if(soldier.openingStoryboardTravel!=null)state={...state,moveSpeed:soldier.openingStoryboardTravel/4.2,
-      ...(gait?{moveSpeedMps:soldier.openingStoryboardTravel}:{}),
+      ...(gait?{moveSpeedMps:soldier.openingStoryboardTravel,locomotionTracked:false}:{}),
       crouch:0,prone:0,kneel:0,lifePose:null,idleLife:!pose,aim:soldier.openingStoryboardAim||(!pose&&actor.weaponId&&!gait ? .18 : 0)};
     if(pose?.clip==="DadaoAmbush")state={...state,meleeCombat:{weapon:"Dadao",state:"attack",action:"Heavy",clip:"DadaoHeavy",
       normalized:Math.min(1,pose.seconds/C.ambushS),t:pose.seconds,weight:1}};
@@ -294,11 +307,16 @@ export function InstallOpeningStoryboardAnimation(soldier){
     const reference=record.clips[pose.clip]?.referenceSpeedMps;
     if(reference)travelClock+=dt*(soldier.openingStoryboardTravel||0)/(reference*performer.SourceScale());
     performer.Apply({clipId:pose.clip,t0:0,phase:0,speed:0,previous:null},reference?travelClock:pose.seconds);
-    if(soldier.openingStoryboardTravel>.05&&["CollarControl","CollarDrag","MessengerReport","CreepDadao","RifleDeflect","IjaBayonetGuard"].includes(pose.clip)){
-      for(let i=0;i<bones.length;i++)if(/Thigh|Calf|Foot|Toe/.test(bones[i].name)){
-        bones[i].position.copy(locomotion[i].p);bones[i].quaternion.copy(locomotion[i].q);
+    if(TRAVEL_LEGS_CLIPS.includes(pose.clip)){
+      const target=soldier.openingStoryboardTravel>.05?1:0;
+      travelLegs+=Math.max(-dt/C.poseBlendS,Math.min(dt/C.poseBlendS,target-travelLegs));
+      const w=travelLegs*travelLegs*(3-2*travelLegs);
+      if(w>0)for(let i=0;i<bones.length;i++)if(LegBone(bones[i])){
+        bones[i].position.lerp(locomotion[i].p,w);
+        blendTarget.copy(locomotion[i].q);if(blendTarget.dot(bones[i].quaternion)<0)blendTarget.set(-blendTarget.x,-blendTarget.y,-blendTarget.z,-blendTarget.w);
+        Quat.copy(bones[i].quaternion);SlerpArc(bones[i].quaternion,Quat,blendTarget,w);
       }
-    }
+    }else travelLegs=0;
     if(pose.upperBody)for(let i=0;i<bones.length;i++)if(!/UpperArm|Forearm|Hand|Finger|Clavicle|Neck|Head/.test(bones[i].name)){
       bones[i].position.copy(locomotion[i].p);bones[i].quaternion.copy(locomotion[i].q);
     }
