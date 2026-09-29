@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "character": "Middle-aged civilian woman 08",
+  "created": "2026-09-29",
+  "status": "Standalone reference model; not registered in the runtime cast",
+  "sourceRevision": "cadf4eb614100913d612a68a2036b80e6bd6a612",
+  "model": {
+    "file": "Model_TengxianCivilianWomanReference.glb",
+    "bytes": 23669260,
+    "sha256": "4a2fbb94d73683f71bd8b9e3fa12f7ded0f68e829b649ceea31f159532a3dab8"
+  },
+  "sources": [
+    {
+      "file": "Model_TengxianNra05.glb",
+      "bytes": 3611492,
+      "sha256": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72"
+    },
+    {
+      "file": "Model_TengxianNra05Facial.glb",
+      "bytes": 545832,
+      "sha256": "718fad28d54a90a0060301a18fe225565b0cf24a8e529580f6026c103ae43550"
+    }
+  ],
+  "references": [
+    {
+      "file": "三视图.png",
+      "bytes": 2075048,
+      "sha256": "5599b154ca0af2b7ed1357aefcaaff558ec87396b83a398f4bbbd829d646c4ad"
+    },
+    {
+      "file": "正面.png",
+      "bytes": 647014,
+      "sha256": "217e89b4d2a911d06a5f1ee0508c2a34a22c973e1e1781a933b5f51e6d7d9664"
+    },
+    {
+      "file": "侧面.png",
+      "bytes": 604438,
+      "sha256": "2bfa5929d0e0e5aad3a027a33c3b2b3681dbf68b839a173b04b4dc28d16531d8"
+    },
+    {
+      "file": "背面.png",
+      "bytes": 636583,
+      "sha256": "7ac6a281fa17bfed8056d2f89a03959b645049ef9c65edb41a5801b6da3122f1"
+    }
+  ],
+  "skeleton": {
+    "contract": "TengxianHumanoidV1",
+    "bodyBones": 53,
+    "faceBones": 13,
+    "maximumExportedInfluences": 4,
+    "morphTargets": false,
+    "bodyAnimationSource": "Model_TengxianNra05.glb",
+    "embeddedAnimations": [
+      "Animation_CivilianWomanFacialReview"
+    ]
+  },
+  "geometryReduction": {
+    "Mesh_CivilianWomanTunic": {
+      "sourceTriangles": 604656,
+      "exportTriangles": 55000,
+      "maximumSampledSurfaceErrorMetres": 0.00017654812836553901
+    },
+    "Mesh_CivilianWomanTrousersL": {
+      "sourceTriangles": 38656,
+      "exportTriangles": 12000,
+      "maximumSampledSurfaceErrorMetres": 0.00013147949357517064
+    },
+    "Mesh_CivilianWomanTrousersR": {
+      "sourceTriangles": 38656,
+      "exportTriangles": 12000,
+      "maximumSampledSurfaceErrorMetres": 0.00012656678154598922
+    }
+  },
+  "geometry": {
+    "triangles": 201070,
+    "meshes": 3,
+    "materials": 3
+  },
+  "textures": {
+    "embedded": 9,
+    "atlasSize": 2048,
+    "channels": [
+      "Base",
+      "Normal",
+      "Roughness"
+    ],
+    "groups": [
+      "Skin",
+      "Uniform",
+      "Equipment"
+    ]
+  },
+  "generatedTexture": {
+    "provider": "OpenAI built-in imagegen",
+    "source": {
+      "file": "Texture_CivilianWomanTextileAtlas.png",
+      "bytes": 3577140,
+      "sha256": "eeb7bfa30f173fbb7a22a906c7c3bd2da6a0d2dcc1119c06b23da0a48ef6817f"
+    },
+    "promptRecord": "References/Data_ImagegenPrompts.json",
+    "purpose": "Four flat textile quadrants: faded indigo jacket, dusty brown trousers, charcoal scarf/shoes, warm gray hemp sack. No clothing/accessory projections."
+  },
+  "editableSource": "Model_CivilianWomanReference.blend",
+  "bakedSource": "Model_CivilianWomanReferenceBaked.blend",
+  "sourceStorage": "Private Blender directory documented in docs/Data_CivilianWomanReference.md",
+  "rebuildScripts": [
+    "Script_BuildCivilianWomanReference.py",
+    "Script_ValidateCivilianWomanReference.py",
+    "Script_ExportCivilianWomanReference.py",
+    "Script_AuditCivilianWomanReference.py",
+    "Script_PackageCivilianWomanReference.py",
+    "Script_CivilianWomanTools.py"
+  ],
+  "verified": {
+    "bodyBindMatrixError": 0.0,
+    "bodyTranslationError": 7.068657612799983e-07,
+    "bodyQuaternionError": 1.5553086996078491e-06,
+    "facialPoses": [
+      "Rest",
+      "Open",
+      "Wide",
+      "Round",
+      "Blink",
+      "Close",
+      "BrowUp",
+      "Snarl",
+      "DeadSlack",
+      "Shock",
+      "Pain",
+      "Shout",
+      "Grit"
+    ],
+    "browser": {
+      "bones": 66,
+      "meshes": 3,
+      "triangles": 201070,
+      "animations": 1,
+      "runningBoneDelta": 0.1475917869265715,
+      "runSampleTimes": [
+        0,
+        0.15,
+        0.3,
+        0.45,
+        0.6
+      ],
+      "views": [
+        "front",
+        "side",
+        "back",
+        "face",
+        "collar",
+        "cap",
+        "pack",
+        "PlainFront",
+        "PlainSide"
+      ],
+      "facePoses": [
+        "Open",
+        "Blink",
+        "Shout"
+      ],
+      "bodyClip": "RifleRun",
+      "errors": []
+    }
+  },
+  "limitations": [
+    "Reference interpretation rather than a scan",
+    "No game LODs or live cast replacement",
+    "No cloth simulation; backpack and scarf follow existing body bones"
+  ]
+}
