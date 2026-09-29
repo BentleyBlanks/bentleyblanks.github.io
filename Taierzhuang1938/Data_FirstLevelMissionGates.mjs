@@ -250,8 +250,8 @@ export const MISSION_FACT_GATES = Object.freeze({
     text: "罗班长把顺子倒拖进洞口塌土与门柱后面（甲乙已死）",
   }),
   rifleRecovered: Gate({
-    kind: "interaction", step: "BunkerRescue", interaction: "MissionRifle", anchor: "bunkerDoor",
-    source: "Register", text: "在掩蔽部门口把掉在地上的步枪捡起来",
+    kind: "cutscene", step: "BunkerRescue", source: "FirstLevelBunkerShow.Release", requires: Object.freeze(["luoRescueComplete"]),
+    text: "罗班长把捡起来的步枪递到顺子手里、把他拽起来站直（还权那一刻记，枪回到手上）",
   }),
   // --- RearTrench --------------------------------------------------------
   rearTrenchEntered: Gate({

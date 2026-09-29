@@ -63,6 +63,8 @@
 
 ## 6. 回归口
 
+- 2026-09-29 新增罗班长三条（只烘 NRA05）：`LuoPickUpRifleSling`、`LuoRescueDrag`、`LuoHandRifle`，`player` 轨 part 有 `eye`/`gaze`/`crown`（第一人称镜头的位置、朝向、横滚）、`chest`/`chestUp`/`pelvis`/`kneeL/R`/`heelL/R`（第一人称的腿和上衣）、`rifle`/`rifleMuzzle`/`rifleUp`（递过来的枪），口径见 [拖出与递枪](Data_OpeningRescueHandover20260929.md)；manifest `20260929OpeningStoryboardsV19LuoRescue`。
+
 - 2026-09-27 开场改稿新增 `IjaTauntWalk`、`IjaFoundLook`、`IjaCrouchHairHold`、`IjaSlapForehand`、`IjaSlapBackhand`、`IjaSlapRaise`、`HeLiftTimber`，割喉链改到川军左肩后（新接触部位 `hairNape` / `crown` / `cheekL` / `cheekR`），口径见 [压木原地审问改稿](Data_OpeningPinnedRescue20260927.md) 第 6 节。
 
 - 2026-09-27 新增 `IjaVaultTimberIn` / `IjaVaultTimberOut` / `IjaHaulForearmUnder`（只烘 IJA02）与 spec 键 `groundWeight(t)`（翻越离地、跪地那几帧不贴地），口径见 [翻越与倒拖](Data_OpeningVaultHaul20260927.md)。

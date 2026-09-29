@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 import { OpeningHoldTime } from "./Script_OpeningProps.mjs";
+import { STANCE } from "./Data_Tuning_Player.mjs";
 const Read=file=>fs.readFileSync(new URL(file,import.meta.url));
 const Hash=bytes=>crypto.createHash("sha256").update(bytes).digest("hex");
 const manifest=JSON.parse(Read("Animation/OpeningStoryboards/Data_OpeningStoryboardsAnimation.json"));
@@ -566,7 +567,7 @@ assert.ok(["origin","axis","up"].every(k=>ijaA.propMounts?.bayonet?.[k]?.length=
 // ---- director data (2026-09-27 rework, docs/Data_OpeningPinnedRescue20260927.md; space §2.1/§3) ---------------
 assert.deepEqual([...C.phases.Trapped],["Banter","Orders","Incoming","Blast","Black","Wake","FrontPass","CaptiveDragged","CaptiveWall",
   "Interrogation","Slash","Taunt","Found"],"Trapped phases (2026-09-27 rework)");
-assert.deepEqual([...C.phases.BunkerRescue],["Hold","Ask","Charge","Melee","Lift","Check","KickRifle","Released"],"BunkerRescue phases (2026-09-27 rework)");
+assert.deepEqual([...C.phases.BunkerRescue],["Hold","Ask","Charge","Melee","Lift","Check","Released"],"BunkerRescue phases (2026-09-29: the kick and the pickup are gone)");
 assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","SupportOrder"],"contract §5.3 RearTrench phases");
 assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持第一人称，不在切换视角」)");
 {
@@ -620,8 +621,8 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   const heParry=Stage("chopParry","heyoutian",parry),luoChop=Stage("chopRear","luo",R.ijaBGuard);
   for(const [name,p,m] of [["ijaA's crouch",J.crouch,.1],["the interpreter's squat",R.interpreter,.1],["ijaB's guard",R.ijaBGuard,.3],
     ["He's parry mark",heParry,.2],["Luo's chop mark",luoChop,.3],["Liu's firing spot",R.liuShot,.2],["Liu's trench post",R.liuCover,.3],
-    ["He's timber spot",R.lift.heLift,.1],["Luo's check kneel",R.luoCheck,.3],["the hand-back seat",S.cover,.3],
-    ["Luo's kick spot",R.kickFrom,.2],["He's trench-edge post",R.heCover,.3]])
+    ["He's timber spot",R.lift.heLift,.1],["Luo's rescue root",{x:eye.x+R.drag.startBackM,z:eye.z},.3],
+    ["where he is set down",{x:eye.x+R.drag.startBackM+1.45,z:eye.z},.3],["He's trench-edge post",R.heCover,.3]])
     assert.ok(Clear(p,m),`02: ${name} (${p.x.toFixed(2)},${p.z.toFixed(2)}) stands clear of the mouth's collapse blocks`);
   assert.ok(D(R.interpreter,eye)>=1.2&&D(R.interpreter,J.crouch)>=.6,"the interpreter squats 1.2 m+ off the lens and clear of ijaA");
   // He's parry mark is off the line from the eye through ijaA (he shows beside him, not straight behind his back).
@@ -644,23 +645,31 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   assert.ok(R.slap.raiseS===hitT&&R.slap.hitS===hitT,"the slap clip plays from its first frame (the wind-up)");
   assert.ok(first.delayS>=manifest.clips.IjaCrouchHairHold.holdLoop[0],"the first slap starts once the head is up (the hold loop's start pose)");
   assert.ok(R.slap.hangS<R.slap.recoverS&&R.slap.recoverS<R.slap.dizzyS&&R.slap.yawDeg>=35&&R.slap.yawDeg<=55,"the head is flung aside, hangs, comes back; the struck side swims longer");
-  // The haul: from the pinned eye out onto the seat.
-  // LuoDragToCover's collar track at haulStopS: the eye comes out past the seat and he sits back onto it.
+  // 2026-09-29 haul and hand-over (docs/Data_OpeningRescueHandover20260929.md): Luo stands at his head, the haul takes the
+  // boots out past the timber, and he is got up standing where he was set down, off ijaA's body.
   {
-    const track=JSON.parse(Read("./Animation/OpeningStoryboards/Animation_TengxianNra05OpeningStoryboards.json")).clips.LuoDragToCover.player;
-    const k=Math.min(track.parts.collar.length/3-1,Math.round(R.lift.haulStopS*track.fps)),travel=track.parts.collar[k*3+2]-track.parts.collar[2];
-    const out=eye.x+travel;
-    assert.ok(out>S.cover.x&&out-S.cover.x<.6,`Luo hauls him out just past the seat (eye to x ${out.toFixed(2)}), he sits back onto it`);
-    const corpse=R.parryMeet;
-    assert.ok(D(corpse,S.cover)>.7&&Math.abs(corpse.z-eye.z)>.5,"ijaA dies down the trench, off the haul and the seat");
+    const Dr=R.drag,Hd=R.hand,body=Dr.standIn.body,root={x:eye.x+Dr.startBackM,z:eye.z};
+    const At=(keys,t)=>{let v=keys[0][1];for(const [k,p] of keys)if(k<=t)v=p;return v;};
+    assert.ok(Math.abs(At(body.eye,0)[2]+Dr.startBackM)<.02&&Math.abs(At(body.eye,0)[1]-S.lieEyeM)<.02,"the haul's first frame is the pinned eye (Luo startBackM beyond it)");
+    const travel=At(body.eye,Dr.standIn.dragS)[2]-At(body.eye,1.9)[2];
+    assert.ok(travel>1.3&&travel<1.7,`the haul drags him ${travel.toFixed(2)} m`);
+    const heelOut=root.x+Math.min(At(body.heelL,Dr.standIn.dragS)[2],At(body.heelR,Dr.standIn.dragS)[2]);
+    assert.ok(heelOut>=Dr.timberEastX+Dr.dropPastM,`the boots end past the timber (heels at x ${heelOut.toFixed(2)})`);
+    assert.ok(Math.abs(At(Hd.standIn.body.eye,Hd.standIn.durationS)[1]-STANCE.stand.eye)<.05,"the hand-over ends standing at the player's standing eye");
+    assert.ok(Hd.standIn.offerS<Hd.standIn.handedS&&Hd.standIn.holdLoop[0]>=Hd.standIn.offerS-.01&&Hd.standIn.holdLoop[1]<Hd.standIn.handedS,"the question is asked on the offered rifle, before it is handed");
+    assert.ok(Math.abs(R.parryMeet.z-eye.z)>.5,"ijaA dies off the haul's lane");
+    // The baked clips (Luo's rig) carry the body the camera rides.
+    for(const clip of ["LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle"])assert.ok(manifest.clips[clip],`${clip} is in the manifest`);
+    const luo=JSON.parse(Read("./Animation/OpeningStoryboards/Animation_TengxianNra05OpeningStoryboards.json")).clips;
+    const Part=(clip,part,t)=>{const tr=luo[clip]?.player,v=tr?.parts?.[part];if(!v)return null;const k=Math.max(0,Math.min(v.length/3-1,Math.round(t*tr.fps)));return [v[k*3],v[k*3+1],v[k*3+2]];};
+    for(const part of ["eye","gaze","crown","pelvis","heelL","heelR"])assert.ok(Part("LuoRescueDrag",part,0),`LuoRescueDrag's player track has ${part}`);
+    for(const part of ["eye","gaze","crown","rifle","rifleMuzzle"])assert.ok(Part("LuoHandRifle",part,0),`LuoHandRifle's player track has ${part}`);
+    const d0=Part("LuoRescueDrag","eye",0),p0=Part("LuoRescueDrag","pelvis",0),p1=Part("LuoRescueDrag","pelvis",manifest.clips.LuoRescueDrag.duration);
+    assert.ok(Math.abs(d0[1]-S.lieEyeM)<.06&&p1[2]-p0[2]>1.3,`LuoRescueDrag starts on the pinned eye and hauls him back (hips ${(p1[2]-p0[2]).toFixed(2)} m)`);
+    const end=Part("LuoHandRifle","eye",manifest.clips.LuoHandRifle.duration);
+    assert.ok(Math.abs(end[1]-STANCE.stand.eye)<.1,`LuoHandRifle ends with him standing (eye ${end[1].toFixed(2)} m)`);
+    assert.ok(manifest.clips.LuoHandRifle.holdLoop&&["offered","handed"].every(kind=>manifest.clips.LuoHandRifle.events?.some(e=>e.kind===kind)),"LuoHandRifle: hold loop for the question, offered / handed events");
   }
-  // The kicked rifle slides past his front to his right hand (clear of the collapse blocks).
-  const slide=[R.rifleMouth,R.rifleKickVia,R.rifleKicked];
-  for(let i=1;i<slide.length;i++)for(let k=0;k<=20;k++){
-    const p={x:slide[i-1].x+(slide[i].x-slide[i-1].x)*k/20,z:slide[i-1].z+(slide[i].z-slide[i-1].z)*k/20};
-    assert.ok(Clear(p,.05),`the kicked rifle's slide keeps clear of the collapse blocks at (${p.x.toFixed(2)},${p.z.toFixed(2)})`);
-  }
-  assert.ok(D(R.rifleKicked,S.cover)<Tune.interactionRangeM-1,"Luo's kick leaves the rifle within easy reach of the seat");
   assert.ok(D(R.rifleMouth,eye)>.8,"the rifle lies out of his reach while he is pinned");
   // SB02 (contract §2.2): the fall ends in the dugout, looking at the north post with the head rolled left.
   const B=C.banter.blastShot;
@@ -701,7 +710,10 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     assert.ok(W.heBackRoute.every((p,i)=>Same(p,W.lane[3+i]))&&Same(W.heBackRoute.at(-1),W.luoCover),"He's way back follows the lane to the first intact wall");
     assert.ok(W.liuBackRoute.slice(1).every((p,i)=>Same(p,W.lane[3+i])),"Liu's way back follows the lane from the crater step to RC");
   }
-  assert.ok(Math.abs(S.cover.yaw*180/Math.PI+94)<1&&R.checkShot.kickPitchDeg>=-15&&R.checkShot.kickPitchDeg<=5,"SB06: east down the trench; the hand-back view is not at the ground");
+  {
+    const released=C.storyboardShots.find(s=>s.id==="SB06_Released")?.judge?.camera;
+    assert.ok(released&&released.pitchDeg[0]>=-15&&released.pitchDeg[1]<=5&&released.eyeM[0]>=1.4,"SB06: the hand-back view is about level and standing");
+  }
   for(const [name,route] of [["runner",C.banter.runnerRoute],["exit",C.banter.exitRoute],["walkIn",C.ija.walkIn],["taunt",C.ija.tauntWalk],
     ["charge",R.chargeRoute],["flee",C.ija.interpreterFlee],["withdraw",C.withdraw.lane]])
     assert.ok(route.length>=1&&route.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.z)),`${name} route is a finite polyline`);

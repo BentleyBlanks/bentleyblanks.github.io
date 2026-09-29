@@ -69,8 +69,12 @@ const KEY_FRAMES = [
   { label: "HeParry", flag: "heChopAt", at: .42 },
   { label: "HeChop", flag: "heChopAt", at: .8 },
   { label: "LuoChop", flag: "luoChopAt", at: .5 },
-  { label: "Haul", flag: "haulAt", at: 1.2 },
-  { label: "KickRifle", phase: "KickRifle", flag: "kickRifleAt", at: .95 },
+  // 2026-09-29 (docs/Data_OpeningRescueHandover20260929.md): rolled over (up at Luo), hauled out (down at the boots), the
+  // rifle held out, in his hands.
+  { label: "RolledOver", flag: "dragAt", at: 1.45 },
+  { label: "Haul", flag: "dragAt", at: 3.0 },
+  { label: "RifleOffered", phase: "Check", flag: "handAt", at: 2.3 },
+  { label: "RifleHanded", flag: "handedAt", at: .4 },
 ];
 
 /** In-page per-frame probe. Installed once; `window.openingProbe` accumulates across evaluates. */
@@ -121,7 +125,7 @@ async function InstallProbe(page) {
         if (!a.alive && !P.deaths[id]) P.deaths[id] = { phase: s.phase, time: r.time, health: a.health };
       }
       // A required man still standing at the hand-back beats (one missing from the table cannot stand).
-      if (["Check", "KickRifle", "Released"].includes(s.phase) && C.vanguardIds.some((id) => r.enemies.get(id)?.alive === true) && P.violations.length < 30)
+      if (s.phase === "Released" && C.vanguardIds.some((id) => r.enemies.get(id)?.alive === true) && P.violations.length < 30)
         P.violations.push({ phase: s.phase, error: "hand-back beat while a required vanguard man is alive" });
       // Teleports: the pelvis (not the root: chained clips re-root with the pelvis held still) of
       // every shown living actor, per frame.
@@ -252,6 +256,9 @@ async function InstallProbe(page) {
           if (partner > P.maxPartnerHandRotationStep) { P.maxPartnerHandRotationStep = partner; P.maxPartnerHandRotationPhase = s.phase; }
         }
       }
+      // 2026-09-29: the pursuit's spawn fact (rifleRecovered) is recorded by the hand-back itself, in the frame control
+      // returns: count them only while the director still owns the view.
+      if (s.CameraActive) P.pursuitWhileDirected = Math.max(P.pursuitWhileDirected || 0, [...r.enemies.values()].filter((a) => a.missionEncounter === "bunkerPursuit").length);
       if (P.wasCameraActive && !s.CameraActive && P.cameraRotation) {
         P.releaseCameraTurn = cam.quaternion.angleTo(cam.quaternion.clone().fromArray(P.cameraRotation)) * 180 / Math.PI;
         const look = new cam.position.constructor(0, 0, -1).applyQuaternion(cam.quaternion);
@@ -301,7 +308,7 @@ const StepSampled = (page, frames) => Watch("StepSampled", page.evaluate((frames
   for (let i = 0; i < frames; i++) { g.StepFrames(1, 1 / 60, i === frames - 1); window.openingProbe.Sample(); }
   const r = g.Debug.FirstLevelMissionRuntime(), s = r.frontShow.bunker, m = g.Debug.FirstLevelMission();
   return { stage: m.stage, time: m.time, facts: m.facts, alive: g.player.alive, health: g.player.health,
-    phase: s.phase, phaseTime: s.Age, luoM: (() => { const l = s.Squad("luo"); return l && !l.openingStoryboardHidden ? Math.hypot(l.position.x - g.player.camera.position.x, l.position.z - g.player.camera.position.z) : null; })(), flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number")),
+    phase: s.phase, phaseTime: s.Age, released: s.releaseAt != null, luoM: (() => { const l = s.Squad("luo"); return l && !l.openingStoryboardHidden ? Math.hypot(l.position.x - g.player.camera.position.x, l.position.z - g.player.camera.position.z) : null; })(), flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number")),
     error: s.error };
 }, frames)).then((state) => (lastState = state));
 
@@ -342,13 +349,14 @@ export async function DriveOpening(ctx){
       phaseShots.add(state.phase);await page.screenshot({path:path.join(shots,`Phase_${state.phase}.png`)});
       console.log("STORYBOARD",state.stage,state.phase,state.time.toFixed(2));
     }
-    if(state.phase==="Released")break;
+    // 2026-09-29: the hand-back records rifleRecovered and the flow goes straight on to RearTrench in the same frame.
+    if(state.released)break;
   }
   const show=await page.evaluate(()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker;
     return {...s.State(),health:g.player.health,control:r.controls?.kind||null,playerShots:r.Inventory().shots,
       vanguard:[...r.enemies.values()].filter(a=>a.missionEncounter==="bunkerAssault").map(a=>({id:a.missionId,alive:a.alive,health:a.health,essential:a.scriptEssential})),
-      rifleInteraction:r.interact.points.get("MissionRifle")?.position?.toArray?.()||null};
+      stance:g.player.stance,eyeHeight:g.player.eyeHeight};
   });
   // The front's standing groups at the hand-back: the same entities must still be there when 03 begins.
   const presetIds=PRESET_GROUPS.flatMap(group=>(MISSION_ENCOUNTERS[group]||[]).map(spec=>spec.id));
@@ -362,7 +370,7 @@ export async function DriveOpening(ctx){
     maxWristBend:probe.maxWristBend,maxWristTwist:probe.maxWristTwist,maxReachRatio:probe.maxReachRatio,minShoulderBehind:probe.minShoulderBehind,
     releaseCameraTurn:probe.releaseCameraTurn,releasePitch:probe.releasePitch,releaseHealth:probe.releaseHealth,minHealth:probe.minHealth,kills:probe.kills,jaw:probe.jaw,violations:probe.violations.length}));
   // ---- phases: every director phase really started, in the table's order ---------------------
-  assert.equal(show.phase,"Released","the director reaches the hand-back");
+  assert.ok(show.beats.includes("Released")&&state.released,"the director reaches the hand-back");
   for(const phase of DIRECTOR_PHASES)assert.ok(show.beats.includes(phase),`storyboard performed: ${phase}`);
   const firsts=[];for(const e of show.events)if(DIRECTOR_PHASES.includes(e.phase)&&!firsts.includes(e.phase))firsts.push(e.phase);
   assert.deepEqual(firsts,DIRECTOR_PHASES.filter(p=>firsts.includes(p)),"phases start in contract §5.3 order");
@@ -376,7 +384,7 @@ export async function DriveOpening(ctx){
   for(const id of Storyboards.vanguardIds){
     const actor=show.vanguard.find(a=>a.id===id);
     assert.ok(actor&&!actor.alive&&actor.health<=0&&!actor.essential,`${id} is really dead at the hand-back`);
-    assert.ok(probe.deaths[id]?.time<=eventTime("Check"),`${id} died before Check (${JSON.stringify(probe.deaths[id])})`);
+    assert.ok(probe.deaths[id]?.time<=eventTime("Released"),`${id} died before the hand-back (${JSON.stringify(probe.deaths[id])})`);
   }
   const {ijaA,ijaB,ijaD}=Storyboards.cast;
   // The cuts land at the clips' contact frames in the charge (He's may land just after Melee has begun).
@@ -409,10 +417,14 @@ export async function DriveOpening(ctx){
   // The slaps fling the head aside on purpose (rescue.slap: 24 deg within ~0.07 s; those frames are left out); the rest stays smooth.
   assert.ok(probe.slapFrames>0,"the slaps were seen (their frames are left out of the continuity check)");
   assert.ok(probe.maxCameraTurn<10,`camera turns continuously (${probe.maxCameraTurn}° in ${probe.maxCameraTurnPhase})`);
-  // Luo hauling him out from under the timber: up at Luo, then round onto the seat facing down the trench (no spin).
-  const haul=probe.headingSweep?.Lift||{sweep:0,net:0};
+  // Luo hauling him out (2026-09-29): rolled over and looking back up at him, then down his body -- the look goes over the
+  // top, not round (the probe skips the near-vertical frames); got up facing Luo east again (no spin either way).
   console.log("HEADING",JSON.stringify(Object.fromEntries(Object.entries(probe.headingSweep||{}).map(([k,v])=>[k,{sweep:+v.sweep.toFixed(1),net:+v.net.toFixed(1)}]))));
-  assert.ok(haul.sweep<200&&Math.abs(haul.net)<90,"the haul out does not turn the eye round ("+haul.sweep.toFixed(0)+" deg swept, "+haul.net.toFixed(0)+" deg net)");
+  // Lift also watches Luo step aside to the rifle and back (~90 deg there and back) before the haul's heaves sway the look.
+  for(const [phase,most] of [["Lift",260],["Check",200]]){
+    const turn=probe.headingSweep?.[phase]||{sweep:0,net:0};
+    assert.ok(turn.sweep<most&&Math.abs(turn.net)<90,`${phase}: the eye does not turn round (${turn.sweep.toFixed(0)} deg swept, ${turn.net.toFixed(0)} deg net)`);
+  }
   // Nowhere does the eye spin: 443 deg one way in 4 s over DragCover, 232 over DragOut before 09-27.
   const spin=probe.headingWindow||{maxNet:0};
   console.log("HEADING_WINDOW",JSON.stringify({maxNet:+spin.maxNet.toFixed(1),at:spin.at}));
@@ -426,6 +438,8 @@ export async function DriveOpening(ctx){
   assert.ok(probe.releasePitch>=-15&&probe.releasePitch<=5,`the hand-back view is about level (${probe.releasePitch?.toFixed?.(1)}°)`);
   // ---- hand-back ----------------------------------------------------------------------------
   assert.equal(show.control,null,"movement returns at Released");
+  // 2026-09-29 (user: 「结束动画的时候玩家应该是站立的而不是半蹲」): standing, the handed rifle in his hands.
+  assert.ok(show.stance==="stand"&&Math.abs(show.eyeHeight-1.62)<.02,`the hand-back is standing (${show.stance}, eye ${show.eyeHeight})`);
   assert.equal(show.playerShots,0,"the player did not clear the vanguard");
   assert.ok(probe.releaseHealth>0,`health at the hand-back ${probe.releaseHealth}`);
   console.log("HANDBACK",JSON.stringify({health:probe.releaseHealth,minHealth:probe.minHealth,junctionBy:show.flags.junctionBy,
@@ -436,12 +450,9 @@ export async function DriveOpening(ctx){
   for(const [role,row] of spoken)assert.ok(row.speakingMax>=SPEAKING_JAW_RADIANS,`${role} opens the jaw while speaking (${row.speakingMax})`);
   for(const [role,row] of Object.entries(probe.jaw))if(row.silentFrames>10)
     assert.ok(row.silentMax<=SILENT_JAW_RADIANS,`${role} keeps the mouth closed while others speak (${row.silentMax} in ${row.silentMaxPhase})`);
-  // ---- rifle pickup and the withdrawal (ordinary input) ---------------------------------------
+  // ---- the withdrawal (ordinary input): Luo handed him the rifle, no pickup (2026-09-29) --------
   await page.evaluate(()=>window.Tengxian.StepFrames(2,1/60,true));
   await page.screenshot({path:path.join(shots,"Key_Released.png")});
-  const pickup=await page.evaluate(()=>window.Tengxian.interact.Query(window.Tengxian.player)?.point?.id||null);
-  if(pickup!=="MissionRifle")await Route([{x:show.rifleInteraction[0],z:show.rifleInteraction[2]}],"OpeningRifle",{stance:"crouch",arrivalM:.3});
-  await Interact();
   await WaitStage("RearTrench",5);
   // 02–03 speakers (the collection report, Luo's front commands) are watched from here on.
   await InstallSpeakerActing(page);
@@ -453,11 +464,11 @@ export async function DriveOpening(ctx){
   // Contract §2.9 (the SB06 seat looks down the front trench): no damage in the first HANDBACK_SAFE_S after the
   // hand-back, and the pursuit (bunkerPursuit) is not in the fight before the player has control.
   const safe=await page.evaluate(()=>{const P=window.openingProbe,now=window.Tengxian.Debug.FirstLevelMissionRuntime().time;
-    return {releaseTime:P.releaseTime,now,pursuitAtRelease:P.pursuitAtRelease,hits:P.hits.filter(h=>h.time>=P.releaseTime-1/60)};});
+    return {releaseTime:P.releaseTime,now,pursuitAtRelease:P.pursuitAtRelease,pursuitWhileDirected:P.pursuitWhileDirected||0,hits:P.hits.filter(h=>h.time>=P.releaseTime-1/60)};});
   console.log("HANDBACK_SAFE",JSON.stringify(safe));
   assert.ok(safe.now-safe.releaseTime>=HANDBACK_SAFE_S,`the hand-back window was watched (${(safe.now-safe.releaseTime).toFixed(2)} s)`);
   assert.deepEqual(safe.hits.filter(h=>h.time<=safe.releaseTime+HANDBACK_SAFE_S),[],`no damage in the first ${HANDBACK_SAFE_S} s after the hand-back`);
-  assert.equal(safe.pursuitAtRelease,0,"bunkerPursuit spawns only after the player has control");
+  assert.equal(safe.pursuitWhileDirected,0,"bunkerPursuit spawns only once the player has control (the hand-back's rifleRecovered)");
   // The seat sees F (Data_FirstLevelSpaceKeyframes K2b): every live Japanese within handbackHoldFireM hesitated for at
   // least HANDBACK_SAFE_S from the hand-back (the fold man ijaC among them when he lives).
   const hold=await page.evaluate(()=>window.openingProbe.holdFireAtRelease);
@@ -935,8 +946,6 @@ export async function CheckOpeningActing(ctx){
 
 // ---- non-ideal hand-back orders (contract v1.1 ③: 02 must never stall) -------------------------
 /** Where the junction man ducks for the "hide" variant: the depth sap past J, walled off from the rescue. */
-/** Luo's walk to the kick mark before the kick clock starts (PhaseKickRifle waits at most kickRifleS). */
-const C_KICK_WALK_S = Storyboards.timeouts.kickRifleS;
 export const HANDBACK_HIDE_POINT = Object.freeze({ x: FRONT_SPACE.pursuitFallback[0].x + .6, z: FRONT_SPACE.pursuitFallback[0].z + 3 });
 /**
  * Start at BunkerRescue (debug start 2, `missionStage=2`) and bend the long shot (it starts with the charge):
@@ -947,8 +956,9 @@ export const HANDBACK_HIDE_POINT = Object.freeze({ x: FRONT_SPACE.pursuitFallbac
  *   "early": the junction man is already dead when the charge begins (the backdrop fire got him);
  *            nobody shoots a dead man and the hand-back does not wait for a shot.
  *   "absent": the junction man is missing from the enemy table from Hold on (a spawn failure or a debug
- *            removal): nobody can see him dead, the kick still hands back after kickRifleS.
- * Each still reaches Released with ijaA/ijaB cut down, and the real F pickup still starts RearTrench.
+ *            removal): nobody can see him dead, the hand-over still hands back rescue.hand.releaseGraceS after
+ *            its clip ends.
+ * Each still reaches Released with ijaA/ijaB cut down, and the hand-back (the rifle already in his hands) starts RearTrench.
  */
 export async function DriveHandbackNegative(page,variant,output){
   await page.waitForFunction(()=>window.Tengxian.Debug.FirstLevelMissionRuntime()?.frontShow?.bunker?.ready,null,{timeout:120000});
@@ -988,12 +998,12 @@ export async function DriveHandbackNegative(page,variant,output){
     state=await StepSampled(page,15);
     assert.equal(state.error,undefined);
     assert.ok(state.alive,`${variant}: player survives`);
-    if(state.phase==="Released")break;
+    if(state.released)break;
   }
   const result=await page.evaluate(({ijaD})=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker,P=window.openingProbe;
     const a=r.enemies.get(ijaD);
-    return {phase:s.phase,events:s.events,flags:Object.fromEntries(Object.entries(s.flags).filter(([,v])=>typeof v!=="object")),
+    return {phase:s.releaseAt!=null?"Released":s.phase,events:s.events,flags:Object.fromEntries(Object.entries(s.flags).filter(([,v])=>typeof v!=="object")),
       fixture:window.handbackFixture,kills:P.kills,deaths:P.deaths,violations:P.violations,facts:[...r.flow.facts],
       ijaD:a?{alive:a.alive,x:a.position.x,z:a.position.z}:null,control:r.controls?.kind||null,health:g.player.health};
   },{ijaD:Storyboards.cast.ijaD});
@@ -1025,14 +1035,14 @@ export async function DriveHandbackNegative(page,variant,output){
   if(variant==="absent"){
     assert.ok(result.fixture.removed,"absent: the junction man was taken out of the enemy table");
     assert.equal(result.flags.releaseMissing,Storyboards.cast.ijaD,"absent: the hand-back records who was missing");
-    const kicked=at("Released")-at("KickRifle");
-    assert.ok(kicked<=1.2+Storyboards.timeouts.kickRifleS+C_KICK_WALK_S+.5,`absent: the kick hands back within its timeout (${kicked.toFixed(2)} s)`);
+    const handed=result.flags.handedAt!=null?at("Released")-result.flags.handedAt:Infinity;
+    assert.ok(handed<=6+Storyboards.rescue.hand.releaseGraceS,`absent: the hand-over hands back within its grace (${handed.toFixed(2)} s after the rifle is handed)`);
   }
   await page.screenshot({path:path.join(output,`Handback_${variant}_Released.png`)});
-  // The real F pickup hands 02 on to the withdrawal.
-  await page.evaluate(()=>{const g=window.Tengxian;g.StepFrames(2,1/60,true);g.Debug.Key("KeyF",true);g.StepFrames(90,1/60,false);g.Debug.Key("KeyF",false);g.StepFrames(10,1/60,true);});
+  // The hand-back itself (the rifle already in his hands) hands 02 on to the withdrawal.
+  await page.evaluate(()=>{const g=window.Tengxian;g.StepFrames(10,1/60,true);});
   const after=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
-  assert.ok(after.facts.includes("rifleRecovered")&&after.stage==="RearTrench",`${variant}: the rifle pickup hands 02 on to the withdrawal`);
+  assert.ok(after.facts.includes("rifleRecovered")&&after.stage==="RearTrench"&&after.emptyHands===false,`${variant}: the hand-back hands 02 on to the withdrawal, rifle in hand`);
   console.log(`ok hand-back (${variant}): Check ${waited.toFixed(2)} s after the long shot began, junction man down by ${result.flags.junctionBy||(variant==="absent"?"(absent from the table)":"(already dead)")}`);
   return result;
 }

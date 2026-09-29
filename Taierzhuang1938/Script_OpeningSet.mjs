@@ -56,9 +56,10 @@ export function InteriorWeight(eye, floorY, spec = INTERIOR) {
 }
 /** 01 的导演拍：任务步骤在「Found」前后就从 Trapped 切到 BunkerRescue 了，01/02 的界线要看导演 phase。 */
 const TRAPPED_PHASES = new Set(OPENING_STORYBOARDS.phases.Trapped);
-/** 还权坐位靠背那一组：罗班长把顺子从木头底下拖出来、坐上坐位（导演 Check）起才出现。2026-09-27 起顺子在 02 前半
- *  （Hold…Lift）还压在洞口、胸口正趴在靠背那块地上，早出现就会从他身下冒出来。 */
-const SEATED_PHASES = new Set(["Check", "KickRifle", "Released"]);
+/** 还权坐位靠背那一组：2026-09-27 起顺子在 02 前半（Hold…Lift）还压在洞口、胸口正趴在靠背那块地上，早出现就会从他身下
+ *  冒出来。2026-09-29 起罗班长把他从头那头架腋拖出来、在拖到的地方扶起来（Check），腿正拖过这块地：还权（Released）
+ *  才出现，那时他站在它东边 1 m 多、面朝东。 */
+const SEATED_PHASES = new Set(["Released"]);
 export function RescueShown(stageId, phase) {
   if (stageId === "Trapped") return false;
   if (stageId === "BunkerRescue") return !TRAPPED_PHASES.has(phase) && (phase == null || SEATED_PHASES.has(phase));

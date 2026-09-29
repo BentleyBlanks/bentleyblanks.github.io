@@ -114,7 +114,7 @@ export const PHASE_LOOKS = Freeze({
   Interrogation: "witness", Slash: "witness", Taunt: "witness",
   Found: "found", Hold: "held", Ask: "held",
   Charge: "charge", Melee: "charge", Lift: "clean",
-  Check: "clean", KickRifle: "clean", Released: "clean",
+  Check: "clean", Released: "clean",
 });
 
 // Reduced motion (prefers-reduced-motion): the white flash is capped, the radial blur is off.

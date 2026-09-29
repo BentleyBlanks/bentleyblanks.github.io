@@ -264,7 +264,7 @@ function LegRig(actor){
   const chain=new Set([bones.pelvis]);
   for(const e of rig.bindPose)if(/Spine|Clavicle|Neck/.test(e.object.name))chain.add(e.object);
   for(const side of ["L","R"])bones["thigh"+side].traverse(bone=>{if(bone.isBone)chain.add(bone);});
-  const legs={pelvis:bones.pelvis,pelvisFrame:FrameQuaternion(Local(bones.pelvis,front),Local(bones.pelvis,up)),
+  const legs={pelvis:bones.pelvis,neck:bones.neck||null,pelvisFrame:FrameQuaternion(Local(bones.pelvis,front),Local(bones.pelvis,up)),
     entries:rig.bindPose.filter(e=>chain.has(e.object)),sides:{}};
   for(const side of ["l","r"]){
     const S=side.toUpperCase(),thigh=bones["thigh"+S],calf=bones["calf"+S],foot=bones["foot"+S];
@@ -289,12 +289,13 @@ function RestoreLegs(legs){
 function LegSpec(pose){
   if(!pose)return null;
   const S=leg=>({ankle:[...leg.ankle],knee:[...leg.knee],flexDeg:leg.flexDeg||0});
-  return {hip:[...pose.hip],up:[...pose.up],l:S(pose.l),r:S(pose.r)};
+  return {hip:[...pose.hip],up:[...pose.up],...(pose.front?{front:[...pose.front]}:{}),...(pose.neck?{neck:[...pose.neck]}:{}),l:S(pose.l),r:S(pose.r)};
 }
 function MixLegSpec(a,b,t){
   if(!a)return b;if(!b||t<=0)return a;if(t>=1)return b;
   const L=(u,v)=>u.map((x,i)=>x+(v[i]-x)*t),S=(u,v)=>({ankle:L(u.ankle,v.ankle),knee:L(u.knee,v.knee),flexDeg:u.flexDeg+(v.flexDeg-u.flexDeg)*t});
-  return {hip:L(a.hip,b.hip),up:L(a.up,b.up),l:S(a.l,b.l),r:S(a.r,b.r)};
+  const front=a.front&&b.front?L(a.front,b.front):t<.5?a.front:b.front,neck=a.neck&&b.neck?L(a.neck,b.neck):t<.5?a.neck:b.neck;
+  return {hip:L(a.hip,b.hip),up:L(a.up,b.up),...(front?{front}:{}),...(neck?{neck}:{}),l:S(a.l,b.l),r:S(a.r,b.r)};
 }
 /**
  * Pose the legs: the pelvis at `hip` (tilted to `up`, facing the body's heading), then a two-bone solve per
@@ -305,11 +306,16 @@ function SolveLegs(legs,spec,frames){
   RestoreLegs(legs);
   const Dir=v=>V(...v).applyQuaternion(bodyQ);
   const Point=p=>{const t=V(p[0],0,p[2]).applyQuaternion(bodyQ).add(cam.position);t.y=Ground(t.x,t.z)+p[1];return t;};
-  const hip=Point(spec.hip),up=Dir(spec.up).normalize(),front=Dir([0,0,-1]);
+  // front: the way the pelvis faces (default the body's heading; a man on his back faces up: spec.front).
+  const hip=Point(spec.hip),up=Dir(spec.up).normalize(),front=Dir(spec.front||[0,0,-1]);
   // FrameQuaternion prioritizes its forward axis. Project forward onto the pelvis plane first so
   // the authored lean survives; otherwise the seated jacket stands upright in front of the eyes.
   front.addScaledVector(up,-front.dot(up)).normalize();
-  SetBoneWorld(legs.pelvis,FrameQuaternion(front,up).multiply(legs.pelvisFrame.clone().invert()),hip);
+  const pelvisQ=FrameQuaternion(front,up).multiply(legs.pelvisFrame.clone().invert());
+  SetBoneWorld(legs.pelvis,pelvisQ,hip);
+  // spec.neck: the neck is put there and the pelvis follows the (bind-pose) spine down from it -- a body looked down
+  // along from the eye (Luo's haul) keeps the jacket's cut collar behind and under the lens whatever its length.
+  if(spec.neck&&legs.neck){hip.add(Point(spec.neck).sub(Pos(legs.neck)));SetBoneWorld(legs.pelvis,pelvisQ,hip);}
   const out={hip:hip.toArray(),sides:{}};
   for(const side of ["l","r"]){
     const L=legs.sides[side],leg=spec[side];
@@ -331,6 +337,18 @@ function SolveLegs(legs,spec,frames){
       thighLength:T.distanceTo(Pos(L.calf)),calfLength:Pos(L.calf).distanceTo(Pos(L.foot))};
   }
   return out;
+}
+/**
+ * A leg spec from world points and directions (the director's player track: hip, up, front, per leg ankle / knee
+ * direction) in the body frame SolveLegs reads (the eye with yaw-only axes, y up from the ground under the point).
+ * World in, so it holds whatever way the eye has turned (rolled over and looking back up at Luo, the heading flips).
+ */
+function LegSpecFromWorld(w,frames){
+  const {cam,bodyQ,Ground}=frames,inv=bodyQ.clone().invert();
+  const P=p=>{const l=p.clone().sub(cam.position).applyQuaternion(inv);return [l.x,p.y-Ground(p.x,p.z),l.z];};
+  const D=d=>{const l=d.clone().applyQuaternion(inv);return [l.x,l.y,l.z];};
+  const S=leg=>({ankle:P(leg.ankle),knee:D(leg.knee),flexDeg:leg.flexDeg||0});
+  return {hip:P(w.hip),up:D(w.up),front:D(w.front),...(w.neck?{neck:P(w.neck)}:{}),l:S(w.l),r:S(w.r)};
 }
 /** Put an object at a world position / rotation under its parent (compensating the parent's scale). */
 function SetWorld(object,position,quaternion){
@@ -557,6 +575,26 @@ export class OpeningFirstPerson{
     const fp=C.firstPerson,base=[fp.shoulderHalfWidthM,-fp.shoulderDropM,fp.shoulderBackM].map((v,i)=>i===0&&side==="l"?-v:v);
     const a=pose?.shA||base,b=pose?.shB||base,m=pose?.mix??0;
     return Local(...a.map((v,i)=>v+(b[i]-v)*m));
+  }
+  /**
+   * The hand-over's rifle for the hands, in GearPose's shape: the gear-up's end (the rifle at the ready, both hands on it)
+   * moved onto the rifle's pose -- the one in Luo's hands while the palms reach for it (`reach`); from `handed` the pose it
+   * was taken at, kept camera-relative so it rises with him as he is hauled up, brought to the ready over rescue.hand.carryS
+   * (about where the game's own rifle comes up at the hand-back).
+   */
+  HeldRifleGear(h,frames){
+    const cam=frames.cam,ready=this.GearFrame(Infinity,frames),R=ready.rifle,none={crate:{visible:false},charger:{visible:false,depth:0},pack:null};
+    let q,p;
+    if(h.mode==="held"){
+      if(!this.handTaken){const q0=h.q||R.quaternion,p0=h.origin||R.position;this.handTaken={q:cam.quaternion.clone().invert().multiply(q0),p:cam.worldToLocal(p0.clone())};}
+      const w=Smooth((h.since||0)/C.rescue.hand.carryS);
+      q=cam.quaternion.clone().multiply(this.handTaken.q).slerp(R.quaternion,w);p=cam.localToWorld(this.handTaken.p.clone()).lerp(R.position,w);
+    }else if(h.q&&h.origin){q=h.q.clone();p=h.origin.clone();}
+    else return {...ready,...none};
+    // The ready hands ride with the rifle: world = pose * ready^-1 * hand.
+    const dq=q.clone().multiply(R.quaternion.clone().invert()),Move=v=>v.clone().sub(R.position).applyQuaternion(dq).add(p);
+    const hands={};for(const side of ["l","r"]){const k=ready.hands[side];hands[side]={...k,target:Move(k.target),frame:dq.clone().multiply(k.frame)};}
+    return {t:ready.t,rifle:{position:p,quaternion:q},hands,...none};
   }
   /** Legs for this frame: solve the named pose (eased from what was shown) or hide the leg meshes. */
   UpdateLegs(body,frames,clock){
@@ -888,7 +926,10 @@ export class OpeningFirstPerson{
     // director gives those phases hand keys (then the beat, e.g. palmClip with the rifle on his legs, rules).
     const legacySupply=phase=>SUPPLY_PHASES.has(phase)&&!HandKeys(HANDS.beats[phase]);
     const finishing=p==="Orders"&&s.flags?.exitAt!=null;
-    const supply=!override&&(finishing||legacySupply(p)||p==="Blast"&&a<.12&&legacySupply("Incoming")),body=s.playerBody.root;
+    // 2026-09-29 hand-over (Check): the rifle Luo holds out, then the one in his own hands (OpeningStoryboards.HeldRifle).
+    const heldRifle=override?null:s.HeldRifle?.()||null;
+    if(!heldRifle)this.handTaken=null;
+    const supply=!override&&(finishing||legacySupply(p)||p==="Blast"&&a<.12&&legacySupply("Incoming")||!!heldRifle),body=s.playerBody.root;
     body.visible=s.ready;body.position.copy(cam.position);body.quaternion.copy(cam.quaternion);body.updateWorldMatrix(true,true);
     const Local=(x,y,z)=>V(x,y,z).applyQuaternion(cam.quaternion).add(cam.position);
     const Direction=(x,y,z)=>V(x,y,z).applyQuaternion(cam.quaternion).normalize();
@@ -915,6 +956,9 @@ export class OpeningFirstPerson{
       beat=supply?null:OpeningHandBeat(s,p);
       bodyBeat=OpeningBodyBeat(s,p);
       if(finishing)bodyBeat=null;
+      // Luo's rescue: the legs and jacket follow the clip's player track while they are in view (RescueLegs, world).
+      const rescueLegs=s.RescueLegs?.();
+      if(rescueLegs){const spec=LegSpecFromWorld(rescueLegs,frames);bodyBeat={t:bodyBeat?.t??a,legs:{a:spec,b:spec,mix:0,name:"rescue"},props:bodyBeat?.props||[]};}
     }
     this.report={available:true,phase:p,pose:poseKey,age:a,beat:beat?.names||null,hands:{}};
     // Legs first: moving the pelvis moves every parent of the arms, whose shoulders are then placed in world.
@@ -928,7 +972,8 @@ export class OpeningFirstPerson{
     // Supply: from Luo's order on the rifle, the pack and both hands run on the gear-up clock (clock flags.exitAt; without it the
     // action is done: he is at the mouth with the pack on and the rifle at the ready).
     const follow=supply?(flags.exitAt!=null?now-flags.exitAt:Infinity):null;
-    const gear=supply?this.GearFrame(follow,frames):null;
+    // 2026-09-29 hand-over (Check): the gear-up's "at the ready" hands carried onto the rifle Luo holds out / hands over.
+    const gear=heldRifle?this.HeldRifleGear(heldRifle,frames):supply?this.GearFrame(follow,frames):null;
     for(const side of ["l","r"]){
       const sign=side==="l"?-1:1;
       let shoulder=Local(sign*fp.shoulderHalfWidthM,-fp.shoulderDropM,fp.shoulderBackM);
@@ -1075,13 +1120,15 @@ export class OpeningFirstPerson{
     // hang in the picture's lower corners with the camera.
     this.report.props=this.UpdateProps(supply&&gear?{props:gear.pack?.onBack?["gearStrapL","gearStrapR"]:[]}:bodyBeat,frames,bodyClock,legReport.sides?legReport:null,supply);
     if(supply)this.UpdateGear(gear,follow);
-    if(s.supplyRoot)s.supplyRoot.visible=supply;
+    // While the palms reach for the rifle Luo holds out, his prop is the one on screen (the hands' own copy from `handed`).
+    if(s.supplyRoot)s.supplyRoot.visible=supply&&heldRifle?.mode!=="reach";
     // One loading rifle on screen at a time: in the hands (supply), on the legs (a lap prop), or the world rifle.
     // The world rifle (moved to rescue.rifleMouth when 01 starts) stays hidden through the loading phases and
     // the first 0.12 s of Blast whoever owns the hands (the debug bench, hand keys), and while a lap rifle
     // shows; a rifleSlide hands over to it when Blast ends (the Black phase is black).
     const lapRifle=Object.values(this.props).some(prop=>prop?.kind==="rifle"&&prop.object?.visible);
-    const worldRifleHidden=supply||SUPPLY_PHASES.has(p)||p==="Blast"&&a<.12||lapRifle;
+    // From Luo picking it up (rescue, flags.rifleTaken) the rifle is his prop, then Shunzi's own copy in the hands.
+    const worldRifleHidden=supply||SUPPLY_PHASES.has(p)||p==="Blast"&&a<.12||lapRifle||s.flags?.rifleTaken!=null;
     if(r.bunkerRifle?.view)r.bunkerRifle.view.visible=!worldRifleHidden;
     this.report.worldRifleVisible=r.bunkerRifle?.view?!worldRifleHidden:null;
     if(supply){

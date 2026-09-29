@@ -113,6 +113,10 @@ export const EXTRA_HAND_POSES = Freeze({
   // about (0.35,0.78) at eye 0.18 / pitch +4° (storyboard (0.33,0.6); the task's ~0.55 m needs the shoulder
   // in front of the eye). Fingers turned out to the left so the back of the hand shows (dorsal·eye 0.33).
   reachLeft: H("ground", [.14, .05, -.44], [.6, -.1, -.8], [-.3, .7, .6], [10, 16, 12], { shape: "claw", sh: V(.19, -.16, .1) }),
+  // 2026-09-29 haul (LuoRescueDrag): Luo's forearms come in under the armpits from behind and cross the chest; each hand
+  // takes hold of the forearm on its own side (the right hand Luo's right, the left his left), low in the picture while
+  // the eye looks down the body. Shoulders low and behind the eye (the sleeve roots out of view).
+  gripLuoArms: G("luo", "forearmR", .45, { boneLeft: "forearmL", atLeft: .45, minEyeM: .16, slipM: .1, fallback: "limp", sh: V(.16, -.22, .1) }),
 });
 
 // Legs (the kept leg and boot triangles of the NRA02 body). Frame: the eye with yaw-only axes (x right,

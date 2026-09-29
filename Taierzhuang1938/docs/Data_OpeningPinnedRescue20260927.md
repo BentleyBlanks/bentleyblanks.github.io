@@ -9,7 +9,7 @@
 | 段 | phase |
 |---|---|
 | Trapped（01） | Banter → Orders → Incoming → Blast → Black → Wake → FrontPass → CaptiveDragged → CaptiveWall → Interrogation → Slash → Taunt → Found |
-| BunkerRescue（02） | Hold → Ask → Charge → Melee → Lift → Check → KickRifle → Released |
+| BunkerRescue（02） | Hold → Ask → Charge → Melee → Lift → Check → Released（2026-09-29 起 KickRifle 删掉，见 [拖出与递枪](Data_OpeningRescueHandover20260929.md)） |
 
 旧的 Wipe、Reach、Drag、Snag、KickBeam、DragOut、Butt、Boots、KickShunzi、Glimpse、Collar、Chop、Parry、Flee、DragCover、LongShot 下线。事实（`captivesKilled`、`doorSearchStarted`、`rescueCallHeard`、`vanguardMeleeResolved`、`junctionShot`、`luoRescueComplete`、`playerDraggedFromWreck`）名字与门槛不变，只是记在新的拍上；`playerButtStruck` 换成 `playerSlapped`。
 
@@ -42,7 +42,7 @@
   - 弟兄 ChargeA 把守在沟里的纵深日兵（`DepthIjaB`，停在 `rescue.depthPost`）劈倒；其余冲到沟里各自的位置朝东；还权后出了画面就收走（最迟 `extrasRetireS`）。
   - 刘文才下到台阶 `rescue.liuShot` 打岔口 J 的日兵丁（原 LongShotTick 规则与强制兜底不变），打完下沟到 `rescue.liuCover`。
 - Melee：两刀都落下、再看 `meleeHoldS` 后进 Lift；超时 `meleeS` 强制致死。
-- Lift：何有田到木头边 `rescue.lift.heLift` 把塌顶木抬起（`HeLiftTimber` + Set `LiftRoofTimber`），罗班长蹲到头前揪住衣领把他倒拖出来：罗的根由 `LuoDragToCover` 的 `player` 衣领轨迹第 0 帧对到顺子衣领上反解（`LuoGrabRoot`），眼位沿这条轨迹走到 `haulStopS` 1.4 s（拖出约 0.85 m），镜头朝下看泥地和罗往后退的两只脚（抬头看他会被他俯着的上身整个糊住镜头），然后撑起来坐回还权坐位 `shunzi.cover`；木头在他出来 0.4 s 后落回去。然后 Check「还能打不？」→ KickRifle → 还权，与以前相同（枪现在躺在他左前方泥里 `rescue.rifleMouth`，罗班长从西北把它踢到他右前方 `rifleKicked`）。
+- **（2026-09-29 起本条作废，见 [拖出与递枪](Data_OpeningRescueHandover20260929.md)：翻身架腋拖出、跪起递枪、站姿还权，不再踢枪和捡枪。以下保留当时的做法。）** - Lift：何有田到木头边 `rescue.lift.heLift` 把塌顶木抬起（`HeLiftTimber` + Set `LiftRoofTimber`），罗班长蹲到头前揪住衣领把他倒拖出来：罗的根由 `LuoDragToCover` 的 `player` 衣领轨迹第 0 帧对到顺子衣领上反解（`LuoGrabRoot`），眼位沿这条轨迹走到 `haulStopS` 1.4 s（拖出约 0.85 m），镜头朝下看泥地和罗往后退的两只脚（抬头看他会被他俯着的上身整个糊住镜头），然后撑起来坐回还权坐位 `shunzi.cover`；木头在他出来 0.4 s 后落回去。然后 Check「还能打不？」→ KickRifle → 还权，与以前相同（枪现在躺在他左前方泥里 `rescue.rifleMouth`，罗班长从西北把它踢到他右前方 `rifleKicked`）。
 
 ## 6. 动作（Blender）
 

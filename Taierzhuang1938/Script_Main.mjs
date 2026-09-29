@@ -4149,7 +4149,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
       return item;
     },
     RemoveMissionRifle:item=>DisposeGroundWeaponView(item),
-    RestoreRifle:()=>{if(!IsGunSlot(state.activeSlot))SwitchSlot(LastGunSlot());SyncMissionHands();viewmodel.root.visible=!carry?.Blocking;},
+    // instant: the rifle is already in his hands on screen (02's hand-over: Luo gave it to him in the cutscene) -- no draw.
+    RestoreRifle:({instant=false}={})=>{if(!IsGunSlot(state.activeSlot))SwitchSlot(LastGunSlot());SyncMissionHands({instant});viewmodel.root.visible=!carry?.Blocking;},
     Control:active=>{state.missionControl=active;state.cooking=null;state.cook=0;input.fire=false;input.ads=false;},
     // 关中过场：与关首/关末走同一条 RunCutscene（夺控制权、掐输入、Esc 跳过、
     // 播完还回来）。任务层只报「该播了」，不自己当导演。
@@ -5752,11 +5753,11 @@ function WeaponVariantFor(weaponId, value = 0) {
   return n >= 0 && n < variants.length ? n : 0;
 }
 
-function SyncMissionHands() {
+function SyncMissionHands({ instant = false } = {}) {
   if (!missionRuntime || !viewmodel || mountView.active) return;
   const weaponId = missionRuntime.EmptyHands ? null : currentWeapon;
   if (viewmodel.weaponId !== weaponId || viewmodel.armPoseKey !== weaponId) {
-    viewmodel.Equip(weaponId, weaponId ? SlotWeaponVariant(state.activeSlot) : 0);
+    viewmodel.Equip(weaponId, weaponId ? SlotWeaponVariant(state.activeSlot) : 0, { instant });
     SyncBayonet();
   }
 }

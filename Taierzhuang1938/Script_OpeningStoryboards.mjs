@@ -6,7 +6,7 @@ import { FRONT_SPACE } from "./Data_FirstLevelFrontRoute.mjs";
 import { LoadOpeningStoryboardAnimation, InstallOpeningStoryboardAnimation, SetOpeningActorPerformance, ClearOpeningActorPerformance,
   UpdateOpeningStoryboardCorpse, OpeningStage, OpeningClipMeta, OpeningClipRoot, OpeningPlayerPoint, OpeningPropConfig,
   OwnOpeningProp, DropOpeningWeapon, IsOpeningTerminalClip } from "./Script_OpeningStoryboardAnimation.mjs";
-import { OpeningPropSet } from "./Script_OpeningProps.mjs";
+import { OpeningPropSet, OpeningHoldTime } from "./Script_OpeningProps.mjs";
 import { OpeningFirstPerson, TrimOpeningPlayerBody } from "./Script_OpeningFirstPerson.mjs";
 import { GearCamera, GearPoint, GearData, GearArrivalS } from "./Script_OpeningFirstPersonGear.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
@@ -20,6 +20,7 @@ import { BuildSink } from "./Script_World.mjs";
 import { InCameraView } from "./Script_FirstLevelBackdropSquads.mjs";
 import { OPENING_DEPTH_WALKERS, OPENING_DEPTH_IJA } from "./Data_FirstLevelBackdropSquads.mjs";
 import { LoadRelaxedGait, SetRelaxedGait } from "./Script_RelaxedGait.mjs";
+import { STANCE } from "./Data_Tuning_Player.mjs";
 // ===========================================================================
 // 01–02 director (2026-09-23 draft, docs/Data_FirstLevelOpeningSource20260923.md).
 // Contract docs/Data_FirstLevel0105Refactor20260923Contract.md §5.3 phases, §5.4 clips,
@@ -82,7 +83,43 @@ const UP=new THREE.Vector3(0,1,0);
 const REAR_LANE=MISSION_STAGE_ROUTES.rearTrench,REAR_LANE_M=MissionRouteLength(REAR_LANE);
 const OPENING_MARK_STAGES=new Set(["Trapped","BunkerRescue","RearTrench","Support","MachineGun","Tank","Orders"]);
 // Player-track owners: the clips whose `player` track says where Shunzi's body is.
-const PLAYER_TRACK_CLIPS=new Set(["IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","IjaHoldCollarUp","LuoDragToCover","LuoKneelCheck","InterpreterCrouchAsk"]);
+const PLAYER_TRACK_CLIPS=new Set(["IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","IjaHoldCollarUp","LuoDragToCover","LuoKneelCheck","InterpreterCrouchAsk",
+  "LuoRescueDrag","LuoHandRifle"]);
+// 2026-09-29 rescue (docs/Data_OpeningRescueHandover20260929.md): Luo's clips are baked on his rig only; the parts of
+// Shunzi's body their `player` track carries (gaze / crown: points 1 m along the way the head faces / 0.2 m toward the
+// crown; chestUp 0.25 m out of the chest; rifle / rifleMuzzle / rifleUp: the handed rifle's centre, 0.4 m toward its
+// muzzle, 0.1 m toward its top).
+const LUO_MODEL="TengxianNra05";
+const RESCUE_PARTS=["eye","gaze","crown","chest","chestUp","pelvis","kneeL","kneeR","heelL","heelR","rifle","rifleMuzzle","rifleUp"];
+/** A part of Shunzi's body from a rescue clip's stand-in keys (clip root frame, runtime metres) while it is not baked. */
+function StandInPoint(clip,part,t){
+  const keys=(clip==="LuoRescueDrag"?C.rescue.drag.standIn:C.rescue.hand.standIn).body[part];
+  if(!keys)return null;
+  let a=keys[0],b=keys[0],k=0;
+  if(t>keys[0][0])for(let i=1;i<keys.length;i++){if(t<keys[i][0]){a=keys[i-1];b=keys[i];k=Smooth((t-a[0])/(b[0]-a[0]));break;}a=b=keys[i];}
+  const v=[0,1,2].map(i=>a[1][i]+(b[1][i]-a[1][i])*k);
+  // gaze / crown are keyed as directions from the eye.
+  if(part==="gaze"||part==="crown"){
+    const e=StandInPoint(clip,"eye",t),l=Math.hypot(...v)||1,m=(part==="gaze"?1:.2)/l;
+    return {x:e.x+v[0]*m,y:e.y+v[1]*m,z:e.z+v[2]*m};
+  }
+  return {x:v[0],y:v[1],z:v[2]};
+}
+/** [[t, v], ...] linear between keys, the identity outside them (a clip-time warp: v is the clip time sampled at t). */
+function SampleLinear(keys,t){
+  if(!keys?.length||t<=keys[0][0]||t>=keys.at(-1)[0])return t;
+  for(let i=1;i<keys.length;i++)if(t<keys[i][0]){const a=keys[i-1],b=keys[i];return a[1]+(b[1]-a[1])*(t-a[0])/(b[0]-a[0]);}
+  return t;
+}
+/** Camera rotation looking from `eye` at `gaze` with its up toward `crown` (world points). */
+function EyeQuaternion(eye,gaze,crown){
+  const forward=gaze.clone().sub(eye).normalize(),up=crown?crown.clone().sub(eye):new THREE.Vector3(0,1,0);
+  up.addScaledVector(forward,-up.dot(forward));
+  if(up.lengthSq()<1e-8)up.set(0,1,0).addScaledVector(forward,-forward.y);
+  up.normalize();
+  const back=forward.clone().negate(),right=new THREE.Vector3().crossVectors(up,back).normalize();
+  return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,up,back));
+}
 
 /** Normalize the random ±4 % body scale: paired contacts are authored at scale 1 (Anim report §3). */
 function PinOpeningScale(soldier){
@@ -277,7 +314,7 @@ export class FirstLevelBunkerShow {
       for(let i=0;i<5;i++){const round=new THREE.Mesh(new THREE.CylinderGeometry(.003,.004,.053,8),brass);round.position.x=(i-2)*.011;clip.add(round);this.ownedGeometry.push(round.geometry);}
     }
     this.loadingRifle=new THREE.Group();const built=this.r.actorFactory.WeaponGeometry("HanYang",0,{includeBayonet:false});
-    this.loadingRifleGrip=built.gripFront.clone();
+    this.loadingRifleGrip=built.gripFront.clone();this.loadingRifleMuzzle=built.muzzle?.clone()||new THREE.Vector3(0,0,-1);
     const materials=this.r.actorFactory.ActorMaterials("nra",()=>.5);
     for(const [key,geometry] of built.geometries)this.loadingRifle.add(new THREE.Mesh(geometry,materials[key]||materials.steel));
     this.supplyRoot.add(this.loadingRifle);
@@ -1559,12 +1596,14 @@ export class FirstLevelBunkerShow {
     else if(age>C.timeouts.meleeS){for(const role of ["ijaA","ijaB"])this.Kill(this.Ija(role));if(!r.Has("vanguardMeleeResolved"))r.Record("vanguardMeleeResolved",{forced:true});this.Stage("Lift");}
   }
   /**
-   * 「班长一把揪住他的衣领，把他从木头底下拖出来」: He goes to the timber and lifts it off his hips (the Set's roof timber toward
-   * its hang), Luo squats at his head, takes the collar (LuoDragToCover) and hauls him out backwards; he pushes himself up
-   * to sit on shunzi.cover. He lets the timber drop behind them.
+   * 2026-09-29 (user: 「完全可以让我仰头被拉出来啊，看到自己的脚从倒塌的房子里被拖出来」, docs/Data_OpeningRescueHandover20260929.md):
+   * He heaves the roof timber off his hips (HeTimber); Luo comes to his head, picks the rifle up out of the mud and slings it
+   * (LuoPickUpRifleSling), rolls him onto his back, hooks both arms under his armpits and drags him out backwards
+   * (LuoRescueDrag). The eye rides that clip's `player` track (RescueBody): up at Luo upside down as he is rolled over, then
+   * down his own body at his boots coming out from under the timber. He lets the timber drop once the boots are out.
    */
   PhaseLift(age){
-    const r=this.r,R=C.rescue,L=R.lift,luo=this.Squad("luo"),he=this.Squad("heyoutian");
+    const r=this.r,D=C.rescue.drag,L=C.rescue.lift,f=this.flags,luo=this.Squad("luo"),he=this.Squad("heyoutian");
     if(!this.phaseEntered){
       this.phaseEntered=true;
       // Their cuts carried them off their roots (root motion): the walks to the timber start from under their hips.
@@ -1572,60 +1611,151 @@ export class FirstLevelBunkerShow {
     }
     this.ChargeNoise();
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.UpdateFleeing();this.ChargeExtras();this.LongShotTick();
-    this.flags.heLiftGo=true;this.flags.luoLiftGo=true;
+    f.heLiftGo=true;f.luoLiftGo=true;
     this.Duels();
-    const heThere=this.flags.liftAt!=null||this.Hold(he,L.heLift,null,{speed:C.speed.brisk});
-    const grab=this.LuoGrabRoot();
-    const luoThere=this.flags.haulAt!=null||this.Hold(luo,grab,null,{speed:C.speed.brisk});
-    if(this.flags.liftAt==null&&(heThere&&luoThere||age>C.timeouts.luoArriveS)){
-      if(!heThere&&he){this.Show(he);this.Put(he,L.heLift);}if(!luoThere&&luo){this.Show(luo);this.Put(luo,grab);}
-      this.flags.liftAt=r.time;r.audio?.Play?.("debrisFall",{position:r.Point(C.shunzi.pinnedHips,.4),volume:.55});
+    const heThere=f.liftAt!=null||this.Hold(he,L.heLift,null,{speed:C.speed.brisk});
+    if(f.liftAt==null&&(heThere||age>C.timeouts.heArriveS)){
+      if(!heThere&&he){this.Show(he);this.Put(he,L.heLift);}
+      f.liftAt=r.time;r.audio?.Play?.("debrisFall",{position:r.Point(C.shunzi.pinnedHips,.4),volume:.55});
     }
-    if(this.flags.liftAt==null){this.RoofLift(0);return;}
-    const t=r.time-this.flags.liftAt;
-    // He heaves the timber up off him (a stand-in pose until HeLiftTimber is baked) and drops it after dropAfterS.
-    const heClip=OpeningClipMeta("HeLiftTimber")?"HeLiftTimber":"PullComrade";
-    const hauled=this.flags.haulAt!=null?r.time-this.flags.haulAt-C.rescue.lift.haulStopS:-1;
-    if(hauled>=L.dropAfterS&&this.flags.dropAt==null){this.flags.dropAt=r.time;this.flags.dropClipS=t;}
-    if(he){this.Put(he,L.heLift);this.Pose(he,heClip,{seconds:t,holdUntil:this.flags.dropClipS});}
-    const drop=this.flags.dropAt!=null?Smooth((r.time-this.flags.dropAt)/.25):0;
-    if(drop>0&&!this.flags.dropped&&drop>=.95){this.flags.dropped=true;r.audio?.Play?.("debrisFall",{position:r.Point(C.shunzi.pinnedHips,.3),volume:.7});}
-    this.RoofLift(Smooth((t-L.gripS)/L.raiseS)*(1-drop)*L.raise);
-    if(this.flags.haulAt==null){if(t>=L.haulAfterS){this.flags.haulAt=r.time;this.PlayClip(luo,"LuoDragToCover",{restart:true});}else{this.Put(luo,grab);this.Pose(luo,"LuoDragToCover",{seconds:0});}return;}
-    const h=r.time-this.flags.haulAt;
-    this.Put(luo,grab);this.Pose(luo,"LuoDragToCover",{seconds:Math.min(h,L.haulStopS)});
-    if(h>=L.haulStopS+L.sitS||t>C.timeouts.liftS){
-      this.RoofLift(0);
-      // The haul carried Luo 1.4 m back (root motion): his root goes under his hips before Check walks him on.
-      const pelvis=luo?.actor.characterRig?.bones?.pelvis?.getWorldPosition(new THREE.Vector3());
-      if(pelvis)this.Put(luo,{x:pelvis.x,z:pelvis.z,yaw:luo.yaw},{keep:true});
-      this.MudMarks(this.Densify([C.shunzi.pinnedHips,C.shunzi.cover]),{offsets:[-.12,.12],width:.09});
+    this.HeTimber();
+    // Luo: to his head, the rifle up out of the mud onto his back, then the roll and the haul.
+    const root=this.DragRoot();
+    if(f.pickAt==null){
+      if(this.Hold(luo,root,null,{speed:C.speed.brisk})||age>C.timeouts.luoArriveS){if(luo){this.Show(luo);this.Put(luo,root);}f.pickAt=r.time;}
+      return;
+    }
+    const pickClip=OpeningClipMeta("LuoPickUpRifleSling")?"LuoPickUpRifleSling":null,pickS=pickClip?ClipLength(pickClip,D.standIn.pickS):D.standIn.pickS;
+    const pickT=r.time-f.pickAt;
+    // The prop in his hands takes over from the rifle in the mud (its first frame lies where the mission rifle lies).
+    if(f.rifleTaken==null&&(pickClip||pickT>=pickS*.5))f.rifleTaken=r.time;
+    if(f.dragAt==null){
+      this.Put(luo,root);
+      if(pickClip)this.Pose(luo,pickClip,{seconds:Math.min(pickT,pickS)});else this.Pose(luo,null,{face:root.yaw});
+      // The haul waits for He's heave to have the timber up off him.
+      const lifted=f.liftAt!=null&&r.time-f.liftAt>=L.gripS+L.raiseS;
+      if(pickT>=pickS&&lifted||age>C.timeouts.liftS-D.standIn.dragS)f.dragAt=r.time;
+      else return;
+    }
+    const dragClip=OpeningClipMeta("LuoRescueDrag")?"LuoRescueDrag":null,dragS=ClipLength("LuoRescueDrag",D.standIn.dragS);
+    const h=Math.min(r.time-f.dragAt,dragS);
+    this.Put(luo,root);this.Pose(luo,dragClip||"LuoDragToCover",{seconds:dragClip?h:Math.min(h,2.6)});
+    const body=this.RescueBody();
+    if(body?.heelL&&body.heelR){
+      const out=Math.min(body.heelL.x,body.heelR.x);
+      f.heelFromX??=out;
+      if(f.dropAt==null&&out>=D.timberEastX+D.dropPastM){f.dropAt=r.time;f.dropClipS=r.time-(f.liftAt??r.time);}
+    }
+    if(h>=dragS||age>C.timeouts.liftS){
+      if(f.dropAt==null){f.dropAt=r.time;f.dropClipS=r.time-(f.liftAt??r.time);}
+      // The heels ploughed two furrows out of the doorway.
+      const z=C.shunzi.witnessEye.z,to=body?.heelL?Math.min(body.heelL.x,body.heelR.x):f.heelFromX??C.shunzi.pinnedHips.x;
+      this.MudMarks(this.Densify([{x:f.heelFromX??C.shunzi.pinnedHips.x-.9,z},{x:to,z}]),{offsets:[-.12,.12],width:.07});
       if(!r.Has("luoRescueComplete")&&r.Has("vanguardMeleeResolved"))r.Record("luoRescueComplete");
-      this.Stage("Check");
+      f.handAt=r.time;this.Stage("Check");
     }
+  }
+  /** He on the timber from the heave until he has let it drop (Lift and the start of Check): HeLiftTimber held until
+   *  dropClipS, then its release; the Set's timber rides up and falls back. */
+  HeTimber(){
+    const r=this.r,L=C.rescue.lift,f=this.flags,he=this.Squad("heyoutian");
+    if(f.liftAt==null){this.RoofLift(0);return;}
+    if(f.heTimberDone)return;
+    const t=r.time-f.liftAt,heClip=OpeningClipMeta("HeLiftTimber")?"HeLiftTimber":"PullComrade";
+    if(he){this.Put(he,L.heLift);this.Pose(he,heClip,{seconds:t,holdUntil:f.dropClipS});}
+    const drop=f.dropAt!=null?Smooth((r.time-f.dropAt)/.25):0;
+    if(drop>=.95&&!f.dropped){f.dropped=true;r.audio?.Play?.("debrisFall",{position:r.Point(C.shunzi.pinnedHips,.3),volume:.7});}
+    this.RoofLift(Smooth((t-L.gripS)/L.raiseS)*(1-drop)*L.raise);
+    if(f.dropAt!=null&&r.time-f.dropAt>=L.letGoS){f.heTimberDone=true;this.RoofLift(0);}
   }
   /** The roof timber lifted off him by `k` (0 on him .. 1 up at its hang): the Set poses it. */
   RoofLift(k){this.roofLift=k;this.r.openingSet?.LiftRoofTimber?.(k);}
-  /** Luo's root for the haul: facing the pinned man, LuoDragToCover's collar track at 0 s on his collar (behind the eye). */
-  LuoGrabRoot(){
-    const S=C.shunzi,L=C.rescue.lift,yaw=Math.PI/2;
-    const collar={x:S.witnessEye.x-L.collarBackM,z:S.witnessEye.z};
-    const p=OpeningPlayerPoint("TengxianNra05","LuoDragToCover","collar",0)||{x:0,z:-.61},o=Rot(yaw,p.x,p.z);
-    return {x:collar.x-o.x,z:collar.z-o.z,yaw};
+  /** Luo's root for the rifle pickup and the haul: rescue.drag.startBackM east of the pinned eye, facing him (west). */
+  DragRoot(){const S=C.shunzi.witnessEye;return {x:S.x+C.rescue.drag.startBackM,z:S.z,yaw:Math.PI/2};}
+  /** Luo's root for the hand-over: the haul's root chained onto LuoHandRifle's first frame (his pelvis stays put). */
+  HandRoot(){return this.ChainRoot(this.DragRoot(),LUO_MODEL,"LuoRescueDrag","LuoHandRifle");}
+  /** LuoHandRifle's clip time for `t` s on the director's clock (its hold loop until the nod lets it go). */
+  HandSeconds(t){
+    const meta=OpeningClipMeta("LuoHandRifle"),S=C.rescue.hand.standIn;
+    return OpeningHoldTime(meta?.holdLoop??S.holdLoop,meta?.duration??S.durationS,t,this.flags.handHoldUntil);
   }
-  /** The eye while Luo hauls him out (Lift): on LuoDragToCover's collar track (collarBackM ahead of it) until haulStopS,
-   *  then up and back onto the seat over sitS. `sit` 0..1. */
-  HaulEye(){
-    const L=C.rescue.lift,S=C.shunzi,f=this.flags,r=this.r;
-    if(f.haulAt==null)return {x:S.witnessEye.x,z:S.witnessEye.z,h:S.lieEyeM,sit:0};
-    const h=r.time-f.haulAt,root=this.LuoGrabRoot();
-    const Collar=t=>{const p=OpeningPlayerPoint("TengxianNra05","LuoDragToCover","collar",t)||{x:0,y:.28,z:-.61+t},o=Rot(root.yaw,p.x,p.z);
-      return {x:root.x+o.x+L.collarBackM,z:root.z+o.z,h:p.y+.06};};
-    const c0=Collar(0),c=Collar(Math.min(h,L.haulStopS)),settle=1-Smooth(h/.4);
-    // The track's first frame is on his collar; ease in from the lying eye so the grab does not jump the view.
-    const eye={x:c.x+(S.witnessEye.x-c0.x)*settle,z:c.z+(S.witnessEye.z-c0.z)*settle,h:c.h+(S.lieEyeM-c0.h)*settle};
-    const sit=Smooth((h-L.haulStopS)/L.sitS);
-    return {x:eye.x+(S.cover.x-eye.x)*sit,z:eye.z+(S.cover.z-eye.z)*sit,h:eye.h+(C.rescue.checkShot.eyeM-eye.h)*sit,sit};
+  /** The rescue clip whose `player` track holds Shunzi's body now: {clip, seconds, root}, or null (before the haul). */
+  RescueClip(){
+    const f=this.flags,t=this.r.time;
+    if(this.phase==="Check"&&f.handAt!=null)return {clip:"LuoHandRifle",seconds:this.HandSeconds(t-f.handAt),root:this.HandRoot()};
+    if(this.phase==="Lift"&&f.dragAt!=null)return {clip:"LuoRescueDrag",seconds:Math.min(t-f.dragAt,ClipLength("LuoRescueDrag",C.rescue.drag.standIn.dragS)),root:this.DragRoot()};
+    return null;
+  }
+  /**
+   * Shunzi's body on Luo's rescue clip, world: each part of the clip's `player` track (eye, gaze, crown, chest, chestUp,
+   * pelvis, knees, heels, rifle, rifleMuzzle, rifleUp) at the clip time, from the clip's root. Until a clip is baked its
+   * stand-in keys (rescue.drag.standIn / rescue.hand.standIn, the contract the clips were authored to) stand in.
+   */
+  RescueBody(){
+    const rc=this.RescueClip();if(!rc)return null;
+    const out={clip:rc.clip,seconds:rc.seconds,root:rc.root};
+    out.baked=!!OpeningPlayerPoint(LUO_MODEL,rc.clip,"eye",0);
+    for(const part of RESCUE_PARTS){const p=this.RescuePoint(rc,part,rc.seconds,out.baked);if(p)out[part]=p;}
+    return out;
+  }
+  /** One part of the rescue clip's player track at clip time `seconds`, world (null when the track has no such part). */
+  RescuePoint(rc,part,seconds,baked){
+    const p=baked?OpeningPlayerPoint(LUO_MODEL,rc.clip,part,seconds):StandInPoint(rc.clip,part,seconds);
+    if(!p)return null;
+    const o=Rot(rc.root.yaw,p.x,p.z);
+    return new THREE.Vector3(rc.root.x+o.x,this.r.battlefield.GroundHeight(rc.root.x,rc.root.z)+p.y,rc.root.z+o.z);
+  }
+  /**
+   * The eye's view on the rescue track (world eye / gaze / crown), with the director's framing over the clip's head:
+   * the look back up at Luo and the rolls are sped through (lookWarp: Luo is on top of the lens as he rolls him and
+   * hooks his arms, 0.12 m from it at the closest; the look is down the body by then); up at Luo's chest while he gets
+   * onto his knees in front of him (not level into his crotch); down at the rifle he holds out and hands over (out
+   * of the frame under a level look); the eye eased back as Luo stoops in close to haul him up by the strap.
+   */
+  RescueView(body){
+    const H=C.rescue.hand,V=C.rescue.view,rc={clip:body.clip,root:body.root},r=this.r,s=body.seconds;
+    const warp=body.clip==="LuoRescueDrag"?V.dragLookWarp:V.handLookWarp;
+    const w=SampleLinear(warp,s),eye=body.eye.clone();
+    let gaze=(w===s?body.gaze:this.RescuePoint(rc,"gaze",w,body.baked))||body.gaze;
+    const crown=(w===s?body.crown:this.RescuePoint(rc,"crown",w,body.baked))||body.crown;
+    const toward=(point,weight,maxDeg)=>{
+      if(!point||weight<=0)return;
+      const d=point.clone().sub(eye),level=Math.hypot(d.x,d.z),pitch=Math.min(maxDeg*DEG,Math.atan2(d.y,level));
+      const aim=eye.clone().add(new THREE.Vector3(d.x/level*Math.cos(pitch),Math.sin(pitch),d.z/level*Math.cos(pitch)));
+      const now=gaze.clone().sub(eye).normalize();gaze=eye.clone().add(now.lerp(aim.sub(eye),weight).normalize());
+    };
+    if(body.clip==="LuoHandRifle"){
+      const offered=EventAt("LuoHandRifle","offered",H.standIn.offerS),handed=EventAt("LuoHandRifle","handed",H.standIn.handedS);
+      const stood=EventAt("LuoHandRifle","stood",handed+1.1),head=this.HeadPoint(this.Squad("luo"));
+      if(head)toward(head.clone().addScaledVector(UP,-V.luoChestDropM),V.upAtLuo*Window(s,V.upAtLuoS[0],V.upAtLuoS[1],offered-.5,offered-.1),V.upAtLuoMaxDeg);
+      if(body.rifle)toward(body.rifle,V.atRifle*Window(s,offered-.4,offered,handed+.2,handed+.7),60);
+      const level=gaze.clone().sub(eye).setY(0);
+      if(level.lengthSq()>1e-6)eye.addScaledVector(level.normalize(),-V.haulBackM*Window(s,handed,handed+.25,stood-.1,stood+.4));
+    }
+    return {eye,gaze,crown};
+  }
+  /**
+   * Shunzi's legs (and jacket) for the first person from the rescue track, world: the pelvis, its up toward the chest,
+   * its front out of the belly, per leg the ankle over the heel and the way the knee bends. Null while they are out of
+   * view (before the head comes forward on the haul, after it tips back at the hand-over).
+   */
+  RescueLegs(){
+    const R=C.rescue.drag,b=this.RescueBody();
+    if(!b?.pelvis||!b.heelL||!b.heelR||!b.gaze||(b.clip==="LuoRescueDrag"?b.seconds<R.legsFromS:b.seconds>R.legsUntilS))return null;
+    // The neck under and behind the eye (world down, back along the level look), the spine from it down toward the hips:
+    // the chest passes far enough under the lens to be seen, not filled (at 0.13 m under it the lens was in the jacket).
+    const D=C.rescue.drag.neck,level=b.gaze.clone().sub(b.eye).setY(0);
+    if(level.lengthSq()<1e-6)level.set(0,0,-1);
+    const neck=b.eye.clone().add(new THREE.Vector3(0,-D.downM,0)).addScaledVector(level.normalize(),-D.backM);
+    const up=neck.clone().sub(b.pelvis).normalize();
+    const front=b.chestUp&&b.chest?b.chestUp.clone().sub(b.chest):new THREE.Vector3(0,1,0);
+    front.addScaledVector(up,-front.dot(up));if(front.lengthSq()<1e-6)front.set(0,1,0);front.normalize();
+    const Leg=(heel,knee)=>{
+      const ankle=heel.clone().addScaledVector(front,.06),mid=b.pelvis.clone().add(ankle).multiplyScalar(.5),bend=knee?knee.clone().sub(mid):front.clone();
+      if(bend.lengthSq()<4e-4)bend.copy(front);
+      return {ankle,knee:bend.normalize(),flexDeg:0};
+    };
+    return {hip:b.pelvis.clone(),up,front,neck,l:Leg(b.heelL,b.kneeL),r:Leg(b.heelR,b.kneeR)};
   }
   /** The charge's men and the dead on their clips from Check on; He goes to the right edge of SB06 with his rifle. */
   Aftercut(){
@@ -1635,8 +1765,11 @@ export class FirstLevelBunkerShow {
     const victim=this.cast.DepthIjaB;if(victim&&!victim.alive)this.Corpse(victim,"IjaChoppedFallWall");
     this.ChargeExtras();
     if(!r.Has("vanguardMeleeResolved")&&!this.Ija("ijaA")?.alive&&!this.Ija("ijaB")?.alive)r.Record("vanguardMeleeResolved");
+    // He is still on the timber (HeTimber) until he has let it drop.
+    if(this.flags.liftAt!=null&&!this.flags.heTimberDone)return;
     if(!this.flags.heSwapAt){
-      if(this.Follow(he,"heCover",[R.heCover],C.speed.walk,null,R.heCover.yaw)||r.time-(this.flags.checkAt??r.time)>6)this.flags.heSwapAt=r.time;
+      this.flags.heWalkAt??=r.time;
+      if(this.Follow(he,"heCover",[R.heCover],C.speed.walk,null,R.heCover.yaw)||r.time-this.flags.heWalkAt>6)this.flags.heSwapAt=r.time;
       return;
     }
     const s=r.time-this.flags.heSwapAt;
@@ -1749,44 +1882,63 @@ export class FirstLevelBunkerShow {
     return true;
   }
   /**
-   * SB06: Luo kneels at the left front of the seat facing Shunzi, 0.9 m off (his head in the upper left of the forward
-   * view). LuoKneelCheck's grip lands 0.35 m short of the shoulder there: pendingWiring SB06 (LuoKneelReach reaches).
+   * 2026-09-29 (user: 「班长把枪递交到我手上然后直接开打的动作……而不是要我自己还要捡起来」「结束动画的时候玩家应该是站立的」):
+   * LuoHandRifle from the haul's end. Shunzi rolls back onto his front and comes up onto his knees facing Luo, who unslings
+   * the rifle and holds it out across him (the clip's hold loop) for 「还能打不？」 and the nod; it goes into his hands at
+   * `handed` (the first person takes it over: HeldRifle), Luo hauls him to his feet by the shoulder strap and steps aside to
+   * his right. The hand-back follows the clip's end: standing, the rifle in his hands.
    */
-  CheckRoot(){
-    const S=C.shunzi.cover,L=C.rescue.luoCheck;
-    return {x:L.x,z:L.z,yaw:Face(L,S)};
-  }
   PhaseCheck(age){
-    const r=this.r,luo=this.Squad("luo");
-    this.Aftercut();this.UpdateFleeing();this.LongShotTick();
-    const root=this.CheckRoot();
-    if(this.flags.kneelAt==null){if(this.Hold(luo,root,null,{speed:C.speed.stroll})||age>1.5)this.flags.kneelAt=r.time;return;}
-    const t=r.time-this.flags.kneelAt;
-    if(t>=1&&!this.Started("RescueCheck"))this.Scene("RescueCheck",r.voice?.PlayScene("RescueCheck",{speakers:this.Speakers(),onEnd:()=>{this.flags.checkLineAt=r.time;}}));
-    if(this.flags.checkLineAt==null&&t>1+(this.SceneLength("RescueCheck")+2))this.flags.checkLineAt=r.time;
-    // Shunzi nods after the question; Luo lets go and rises (holdUntil).
-    const nodDone=this.flags.checkLineAt!=null&&r.time-this.flags.checkLineAt>=.8;
-    if(nodDone&&this.flags.releaseAt==null)this.flags.releaseAt=t;
-    this.Put(luo,root);this.Pose(luo,"LuoKneelCheck",{seconds:t,holdUntil:this.flags.releaseAt??undefined});
-    if(this.flags.releaseAt!=null&&t>=this.flags.releaseAt+.9||age>C.timeouts.checkS)this.Stage("KickRifle");
-  }
-  PhaseKickRifle(age){
-    const r=this.r,luo=this.Squad("luo"),R=C.rescue;
-    this.Aftercut();this.UpdateFleeing();this.LongShotTick();
-    // Luo goes round behind Shunzi to the trench floor north of the rifle (it lies in the mud just outside the choked
-    // mouth) and kicks it south; it glances off the mouth rubble and slides out past his right side (rescue.kickFrom/via).
-    const from={...R.kickFrom,yaw:Face(R.kickFrom,R.rifleMouth)};
-    if(this.flags.kickRifleAt==null){if(this.Hold(luo,from,null,{speed:C.speed.walk})||age>C.timeouts.kickRifleS)this.flags.kickRifleAt=r.time;return;}
-    const t=r.time-this.flags.kickRifleAt;
-    this.Put(luo,from);this.Pose(luo,"KickRifle",{seconds:t});
-    const slide=Smooth((t-.48)/.5),a=R.rifleMouth,v=R.rifleKickVia,b=R.rifleKicked,l1=Distance(a,v),l2=Distance(v,b),s=slide*(l1+l2);
-    const p=s<l1?{x:a.x+(v.x-a.x)*s/l1,z:a.z+(v.z-a.z)*s/l1}:{x:v.x+(b.x-v.x)*(s-l1)/l2,z:v.z+(b.z-v.z)*(s-l1)/l2};
-    this.MoveRifle({...p,yaw:a.yaw+Wrap(b.yaw-a.yaw)*slide});
+    const r=this.r,f=this.flags,H=C.rescue.hand,luo=this.Squad("luo");
+    this.HeTimber();this.Aftercut();this.UpdateFleeing();this.LongShotTick();
+    const clip=OpeningClipMeta("LuoHandRifle")?"LuoHandRifle":null,root=this.HandRoot();
+    f.handAt??=r.time;
+    // The haul's root motion carried him ~1.7 m: hand the body over to the new root where it is shown.
+    // The eye goes on along the same player track: no phase-start ease (an Euler blend of the upside-down look back at
+    // Luo would spin it).
+    if(!this.phaseEntered){this.phaseEntered=true;this.cameraFrom=null;if(luo)this.Put(luo,root,{keep:true});}
+    const t=r.time-f.handAt,s=this.HandSeconds(t);
+    this.Put(luo,root);this.Pose(luo,clip||"LuoKneelCheck",{seconds:t,holdUntil:f.handHoldUntil??undefined});
+    // 「还能打不？」 once the rifle is held out across him (`offered`); he nods after it and the loop lets go.
+    if(s>=EventAt("LuoHandRifle","offered",H.standIn.offerS)+H.lineDelayS&&!this.Started("RescueCheck"))
+      this.Scene("RescueCheck",r.voice?.PlayScene("RescueCheck",{speakers:this.Speakers(),onEnd:()=>{f.checkLineAt=r.time;}}));
+    if(f.checkLineAt==null&&this.Started("RescueCheck")&&r.time-this.flags["scene:RescueCheck"]>this.SceneLength("RescueCheck")+2)f.checkLineAt=r.time;
+    if(f.checkLineAt==null&&age>C.timeouts.checkS)f.checkLineAt=r.time;
+    if(f.checkLineAt!=null&&f.handHoldUntil==null&&r.time-f.checkLineAt>=H.nodS)f.handHoldUntil=t;
+    const handed=EventAt("LuoHandRifle","handed",H.standIn.handedS);
+    if(f.handedAt==null&&s>=handed)f.handedAt=r.time;
     // Never stall on the hand-back: a required vanguard man still standing here gets the lethal hit.
-    if(t>=1.2&&!this.VanguardCleared())for(const id of C.vanguardIds)this.Kill(this.r.enemies.get(id),id==="BunkerFollowB"?"bullet":"melee");
-    // A man missing from the enemy table (spawn failure, a debug removal) can never be seen dead:
-    // after kickRifleS the hand-back goes ahead and the absentees are written into the fact.
-    if(t>=1.2)this.Release({force:t>=1.2+C.timeouts.kickRifleS});
+    if(f.handedAt!=null&&!this.VanguardCleared())for(const id of C.vanguardIds)this.Kill(this.r.enemies.get(id),id==="BunkerFollowB"?"bullet":"melee");
+    // A man missing from the enemy table (spawn failure, a debug removal) can never be seen dead: past the clip's end by
+    // releaseGraceS the hand-back goes ahead and the absentees are written into the fact.
+    const end=ClipLength("LuoHandRifle",H.standIn.durationS);
+    if(s>=end-1e-3){f.handEndAt??=r.time;this.Release({force:r.time-f.handEndAt>=H.releaseGraceS});}
+  }
+  /**
+   * The rifle Luo hands over, for the first person (null outside the hand-over): before `handed` (from reachS ahead of it)
+   * the one in Luo's hands, which the palms reach for (`reach`); from `handed` it is Shunzi's (`held`, seconds since): the
+   * first person shows its own copy from the pose it was taken at and carries it up with him as he is hauled to his feet.
+   * `q` / `origin` are the world pose of the rifle model (the same HanYang geometry as the loading rifle).
+   */
+  HeldRifle(){
+    const r=this.r,f=this.flags,H=C.rescue.hand;
+    if(this.phase!=="Check"||f.handAt==null)return null;
+    const s=this.HandSeconds(r.time-f.handAt),handed=EventAt("LuoHandRifle","handed",H.standIn.handedS);
+    if(f.handedAt==null&&s<handed-H.reachS)return null;
+    const pose=this.LuoRiflePose();
+    return {mode:f.handedAt!=null?"held":"reach",since:f.handedAt!=null?r.time-f.handedAt:null,q:pose?.q||null,origin:pose?.origin||null};
+  }
+  /** World pose of the rifle in Luo's hands: his prop when it shows, else the clip's rifle points (stand-in keys). */
+  LuoRiflePose(){
+    const prop=this.Squad("luo")?.actor?.characterRig?.openingProps?.items?.get?.("rifle")?.object;
+    if(prop?.visible&&prop.parent){prop.updateWorldMatrix(true,false);return {q:prop.getWorldQuaternion(new THREE.Quaternion()),origin:prop.getWorldPosition(new THREE.Vector3())};}
+    const body=this.RescueBody();if(!body?.rifle||!body.rifleMuzzle||!this.loadingRifleMuzzle)return null;
+    const axis=body.rifleMuzzle.clone().sub(body.rifle).normalize(),up=(body.rifleUp?body.rifleUp.clone().sub(body.rifle):new THREE.Vector3(0,1,0));
+    up.addScaledVector(axis,-up.dot(axis)).normalize();
+    const Basis=(a,u)=>new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(u,a).normalize(),u,a);
+    const source=this.loadingRifleMuzzle.clone().normalize(),sourceUp=new THREE.Vector3(0,1,0).addScaledVector(source,-source.y).normalize();
+    const q=new THREE.Quaternion().setFromRotationMatrix(Basis(axis,up).multiply(Basis(source,sourceUp).invert()));
+    return {q,origin:body.rifle.clone()};
   }
   PhaseReleased(){
     this.Aftercut();this.UpdateFleeing();this.LongShotTick();
@@ -1794,7 +1946,7 @@ export class FirstLevelBunkerShow {
   /** Background every frame of 01–02: dead stay dead, ijaC/ijaD keep their loops. */
   Background(){
     const phase=this.phase;
-    if(RESCUE.has(phase)&&!["Charge","Melee","Lift","Check","KickRifle","Released"].includes(phase)){
+    if(RESCUE.has(phase)&&!["Charge","Melee","Lift","Check","Released"].includes(phase)){
       for(const role of ["ijaC","ijaD"]){const actor=this.Ija(role);if(actor?.alive&&!actor.openingCombatReleased){
         const spec=MISSION_ENCOUNTERS.bunkerAssault.find(s=>s.id===actor.missionId),post=spec?.enter?.at(-1)||actor.position;
         if(actor.openingStoryboardHidden)this.Put(actor,{...post,yaw:role==="ijaC"?-Math.PI/2:-1.1});
@@ -1833,10 +1985,13 @@ export class FirstLevelBunkerShow {
     if(missing.length)this.flags.releaseMissing=missing.join(",");
     this.ReleaseMeleeDormancy();
     this.releaseAt=r.time;this.releaseLevel=this.perception?.amount??C.perception.base.Released;
+    // Where he stands: under the eye Luo hauled him up to (the last placement of the rescue).
+    const at=this.lastPlayerPoint||C.shunzi.cover;this.releasePoint={x:at.x,z:at.z};
     this.Set("Released");
-    r.Record("playerDraggedFromWreck",missing.length?{to:C.shunzi.cover,missing}:{to:C.shunzi.cover});
+    r.Record("playerDraggedFromWreck",missing.length?{to:this.releasePoint,missing}:{to:this.releasePoint});
     if(!r.Has("luoRescueComplete"))r.Record("luoRescueComplete");
-    const kind=r.controls?.kind;r.controls=null;r.Control?.(false,kind);r.player.stance="crouch";
+    // 2026-09-29: standing (Luo hauled him to his feet), the rifle Luo handed him in his hands -- no pickup, no crouch.
+    const kind=r.controls?.kind;r.controls=null;r.Control?.(false,kind);r.player.stance="stand";r.player.eyeHeight=STANCE.stand.eye;
     const direction=new THREE.Vector3(0,0,-1).applyQuaternion(this.presentedCamera?.quaternion||r.player.camera.quaternion);
     r.player.yaw=Math.atan2(-direction.x,-direction.z);r.player.pitch=Math.asin(Math.max(-1,Math.min(1,direction.y)));
     if(this.presentedCamera)r.player.camera.quaternion.copy(this.presentedCamera.quaternion);
@@ -1851,7 +2006,12 @@ export class FirstLevelBunkerShow {
     for(const actor of r.enemies.values())if(actor?.alive&&Distance(actor.position,C.shunzi.cover)<R.handbackHoldFireM)
       actor.hesitateUntil=Math.max(actor.hesitateUntil??-99,r.ai.time+R.handbackHoldFireS);
     for(const actor of r.squad){actor.actor.root.visible=true;actor.openingStoryboardHidden=false;}
-    this.playerBody.root.visible=false;
+    this.playerBody.root.visible=false;if(this.supplyRoot)this.supplyRoot.visible=false;
+    // He may still be walking to his post or swapping the dadao for the rifle: he goes on with the rifle from there.
+    const he=this.Squad("heyoutian");
+    if(he&&!this.flags.heArmed){this.flags.heArmed=true;this.flags.heArmedAt=r.time;Equip(he,"HanYang");this.ReleaseSquad(he,R.heCover);r.ai.SetStance?.(he,1,6,true);}
+    // The rifle is his again: the world copy goes and the hands hold it (the flow goes on to the withdrawal).
+    if(!r.Has("rifleRecovered")){r.Record("rifleRecovered");r.RemoveBunkerRifle?.();r.RestoreRifle?.({instant:true});r.SaveCheckpoint?.();}
   }
   /** Hand a squad man back to the ordinary AI at a post (he fights from there). */
   ReleaseSquad(actor,post){
@@ -1920,6 +2080,10 @@ export class FirstLevelBunkerShow {
     this.pursuit=[];
     for(const spec of MISSION_ENCOUNTERS.bunkerPursuit){
       const actor=r.SpawnEncounterActor?.("bunkerPursuit",spec);
+      // 2026-09-29: they come on the hand-back's own rifleRecovered -- the same hesitation as everyone already there
+      // (rescue.handbackHoldFireS from the hand-back), or the fold man opens up on a standing player at once.
+      const R=C.rescue,held=this.releaseAt!=null?R.handbackHoldFireS-(r.time-this.releaseAt):0;
+      if(actor&&held>0&&Distance(actor.position,this.releasePoint||C.shunzi.cover)<R.handbackHoldFireM)actor.hesitateUntil=Math.max(actor.hesitateUntil??-99,r.ai.time+held);
       if(actor)this.pursuit.push({spec,actor,at:r.time,index:0});
       else this.pursuitMissing=(this.pursuitMissing||0)+1;
     }
@@ -2132,9 +2296,9 @@ export class FirstLevelBunkerShow {
     if(p==="Banter")return S.seat;
     if(p==="Orders"||p==="Incoming")return this.FollowPoint();
     if(p==="Blast")return this.BlastPoint();
-    // Hauled out from under the timber by Luo, then up onto the seat.
-    if(p==="Lift"){const e=this.HaulEye();return {x:e.x,z:e.z};}
-    if(["Check","KickRifle","Released"].includes(p))return S.cover;
+    // Hauled out from under the timber by Luo, up onto his knees and his feet: under the eye of the clip's player track.
+    if(p==="Lift"||p==="Check"){const e=this.RescueBody()?.eye;return e?{x:e.x,z:e.z}:p==="Check"&&this.lastPlayerPoint||S.trap;}
+    if(p==="Released")return this.releasePoint||S.cover;
     return S.trap;
   }
   PlacePlayer(){const r=this.r,point=this.lastPlayerPoint=this.PlayerPoint(),y=r.battlefield.GroundHeight(point.x,point.z);r.player.position.set(point.x,y,point.z);r.player.body?.Teleport(point.x,y,point.z);r.player.velocity.set(0,0,0);}
@@ -2144,7 +2308,7 @@ export class FirstLevelBunkerShow {
     const Head=actor=>this.HeadPoint(actor);
     const At=(point,h)=>r.Point(point,h);
     const ijaA=this.Ija("ijaA"),comrade=this.Comrade,luo=this.Squad("luo"),interp=this.cast.interpreter,L=C.firstPerson.look;
-    let eye=S.witnessEye,height=S.lieEyeM,target=At({x:4,z:-125.4},.9),roll=0,pitch=0,yaw=0,fovScale=1;
+    let eye=S.witnessEye,height=S.lieEyeM,target=At({x:4,z:-125.4},.9),roll=0,pitch=0,yaw=0,fovScale=1,quaternion=null,track=false;
     if(p==="Banter"||p==="Orders"&&this.flags.exitAt==null){
       // SB01: from the back of the dugout out through the mouth. The eye is the seated fill clip's (the body filling the
       // charger, Script_OpeningFirstPerson.PoseFill); where the player looks is his own (HeadLook / LookLimits): the view
@@ -2223,28 +2387,25 @@ export class FirstLevelBunkerShow {
       target=this.Aim(eye,height,Face(eye,point),Math.max(-6*DEG,Math.min(34*DEG,elev)));
       roll=.03*Math.sin(r.time*3.1);
     }
-    else if(p==="Lift"){
-      // Luo backs away with his fist in the collar: up at him as he hauls, then up onto the seat facing down the trench.
-      // Before the grab: up at Luo squatting to take the collar; hauled face down: the mud going by and Luo's boots backing
-      // away ahead (looking up he filled the lens: he is stooped right over the face); then up onto the seat.
-      const E=this.HaulEye(),K=C.rescue.checkShot;eye={x:E.x,z:E.z};height=E.h;
-      const since=this.flags.haulAt!=null?r.time-this.flags.haulAt:-1,down=Smooth((since-.1)/.35);
-      const up=this.LookAtBody(eye,height,luo,-8,26)||this.Aim(eye,height,-90*DEG,10*DEG);
-      const lead=up.lerp(this.Aim(eye,height,-90*DEG,-38*DEG),down);
-      target=lead.lerp(this.Aim(eye,height,K.yawDeg*DEG,K.pitchDeg*DEG),E.sit||0);
-      roll=L.dragRollRad*Math.sin(r.time*4.5)*(this.flags.haulAt!=null?1-(E.sit||0):0);
+    else if(p==="Lift"||p==="Check"){
+      const body=this.RescueBody();
+      if(body?.eye&&body.gaze){
+        // On Luo's clip the eye, the way the head faces and its roll are the player track's (docs/Data_OpeningRescueHandover
+        // 20260929.md): rolled over, up at Luo upside down; hauled, down his own body at his boots; then up onto his knees
+        // and his feet facing Luo.
+        const view=this.RescueView(body);
+        eye={x:view.eye.x,z:view.eye.z};height=view.eye.y-r.battlefield.GroundHeight(view.eye.x,view.eye.z);
+        target=view.gaze.clone();quaternion=EyeQuaternion(view.eye,view.gaze,view.crown);track=true;
+        // The nod after 「还能打不？」.
+        if(p==="Check"&&this.flags.checkLineAt!=null){const n=r.time-this.flags.checkLineAt;if(n<.8)pitch=-.2*Math.sin(Math.PI*n/.8);}
+      }else{
+        // Before the haul: Luo coming to his head and stooping for the rifle in the mud -- the look on his hands and
+        // chest, not up his legs from the low eye (at 26 deg over it the frame was his crotch).
+        const bones=luo?.actor?.characterRig?.bones,hand=this.flags.pickAt!=null&&bones?.handR?.getWorldPosition(new THREE.Vector3()),head=this.HeadPoint(luo);
+        target=hand&&head?this.LookClamped(eye,height,hand.lerp(head,.35),-8,10):this.LookAtBody(eye,height,luo,-8,10)||this.Aim(eye,height,-90*DEG,10*DEG);
+      }
     }
-    else if(p==="Check"){
-      // SB06 (contract §5): forward down the trench, Luo kneeling at the left front; the nod dips the head.
-      const K=C.rescue.checkShot;eye=S.cover;height=K.eyeM;target=this.Aim(eye,height,K.yawDeg*DEG,K.pitchDeg*DEG);
-      if(this.flags.checkLineAt!=null){const n=r.time-this.flags.checkLineAt;if(n<.8)pitch=-.2*Math.sin(Math.PI*n/.8);}}
-    else if(p==="KickRifle"){
-      // The rifle slides in past his right side: the eyes drop to it (kickPitchDeg) and stay there for the hand-back
-      // (Released keeps this view: pitch in -15..+5, contract §2.9).
-      const K=C.rescue.checkShot,t=this.flags.kickRifleAt!=null?r.time-this.flags.kickRifleAt:0,dip=Smooth((t-.3)/.5);
-      eye=S.cover;height=K.eyeM;target=this.Aim(eye,height,K.yawDeg*DEG,(K.pitchDeg+(K.kickPitchDeg-K.pitchDeg)*dip)*DEG);
-    }
-    return {eye,height,target,roll,pitch,yaw,fovScale};
+    return {eye,height,target,roll,pitch,yaw,fovScale,quaternion,track};
   }
   /** 「看不出来是割喉」: from the grab the pinned eye fixes on the throat (the view narrows to interrogation.fixate.scale,
    *  first person, no cut) and widens again once ijaA lets the dying man drop and walks off. */
@@ -2283,7 +2444,9 @@ export class FirstLevelBunkerShow {
       this.cinematicBaseFov??=cam.fov;cam.fov=shot.fov??this.cinematicBaseFov*(shot.fovScale??1);cam.updateProjectionMatrix();
       if(!shot.cinematic&&!narrowed){cam.fov=this.cinematicBaseFov;cam.updateProjectionMatrix();this.cinematicBaseFov=null;}
     }
-    cam.position.copy(r.Point(shot.eye,shot.height));cam.lookAt(shot.target);
+    cam.position.copy(r.Point(shot.eye,shot.height));
+    // A shot on a player track carries its own rotation (an eye rolled over upside down has no world up to look along).
+    if(shot.quaternion)cam.quaternion.copy(shot.quaternion);else cam.lookAt(shot.target);
     const yaw=shot.cinematic?0:head.yaw+(shot.yaw||0)+(still?0:sense.yaw);
     if(yaw)cam.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(UP,yaw));
     cam.rotateX((shot.pitch||0)+(shot.cinematic?0:head.pitch+(still?0:sense.pitch)));
@@ -2310,7 +2473,7 @@ export class FirstLevelBunkerShow {
     // The turn limit smooths the director's own cuts and swings; a free seated look is the player's mouse, 1:1.
     if(this.previousViewQuaternion&&!this.LookLimits()){
       const desiredQuaternion=cam.quaternion.clone();
-      cam.quaternion.copy(this.previousViewQuaternion).rotateTowards(desiredQuaternion,(shot.turnRps??C.cameraTurnRps)*(this.delta||0));
+      cam.quaternion.copy(this.previousViewQuaternion).rotateTowards(desiredQuaternion,(shot.turnRps??(shot.track?C.trackTurnRps:C.cameraTurnRps))*(this.delta||0));
     }
     cam.updateMatrixWorld(true);
     this.presentedCamera={position:cam.position.clone(),quaternion:cam.quaternion.clone()};
@@ -2470,7 +2633,7 @@ export class FirstLevelBunkerShow {
     this.firstPerson=null;this.firstPersonState=null;this.presentedAt=null;this.previousViewQuaternion=null;this.previousViewPosition=null;
     this.strikeAt=null;this.bloodMask=0;this.cameraFrom=null;this.shownEyeClosure=null;this.presentedCamera=null;this.pointActor=null;this.phaseEntered=null;
     this.slaps=null;this.noiseDone=null;this.roofLift=0;
-    this.perception=null;this.perceptionLevel=null;this.headFree=0;this.headLook=null;this.releaseAt=null;this.releaseLevel=null;
+    this.perception=null;this.perceptionLevel=null;this.headFree=0;this.headLook=null;this.releaseAt=null;this.releaseLevel=null;this.releasePoint=null;
     this.meet=null;this.guardRoute=null;this.restRoute=null;this.clawPath=null;this.blastFrom=null;this.seatEyeM=null;
     for(const actor of [...this.r.squad,...this.r.enemies.values()]){
       if(actor.openingCombatReleased)actor.missionFireHold=false;
