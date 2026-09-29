@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-27T15:04:34.747Z",
+  "updatedAt": "2026-09-29T06:34:21.127Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -2438,52 +2438,52 @@
       "who": "ijaC",
       "lang": "ja",
       "projection": "shout",
-      "seconds": 1.64,
-      "bytes": 20420,
-      "sha256": "7d660c90b616b8dab38df2fc1ee66be58c6141ee379f7a8508c323ece7ed8e86",
+      "seconds": 1.94,
+      "bytes": 24182,
+      "sha256": "f893ef2f3399efb3573f99e2a35275d3beb6e4b6e383fca2167dea9a9c371991",
       "source": "scene",
-      "sceneSha256": "5ea1e07b16f11fe36e4b5b4d736ec50f6c6bb7647b4ca9ffbb3393b6e0997c5a",
-      "sceneStartS": 0,
-      "sceneEndS": 1.64,
+      "sceneSha256": "f22455084163664fdc6eb28d0db0de6fc93eac42e9f8d4281634e53febf0ff06",
+      "sceneStartS": 0.03,
+      "sceneEndS": 1.97,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -71.7,
-        -52.5
+        -58.7,
+        -46.3
       ],
       "cutMethod": "subtitle",
       "castOwner": "ijaC",
       "castSha256": "f7568c88cbd41af1f5f9be411aba0453929088dba51c125a7fc031e305981db5",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -16.12,
-        "truePeakDb": -1.23,
-        "snrDb": 90.63,
-        "voicedS": 0.82,
-        "lowShare": 0.088,
+        "activeRmsDb": -15.92,
+        "truePeakDb": -1.35,
+        "snrDb": 46.78,
+        "voicedS": 1.12,
+        "lowShare": 0.074,
         "f0": {
-          "median": 286,
-          "p10": 222,
-          "p90": 308,
-          "frames": 19
+          "median": 340,
+          "p10": 281,
+          "p90": 356,
+          "frames": 18
         },
         "cer": 0,
         "transcript": "前へ!急げ!",
-        "speakerCos": 0.798,
+        "speakerCos": 0.717,
         "nearestOther": [
           "ijaD",
-          0.539
+          0.44
         ],
         "referencedOther": [
           "ijaD",
-          0.539
+          0.44
         ],
         "lengthDiff": -2,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.33
+        "sceneGainDb": 1.75
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -2494,52 +2494,56 @@
       "who": "ijaD",
       "lang": "ja",
       "projection": "shout",
-      "seconds": 0.72,
-      "bytes": 9449,
-      "sha256": "aed18d66440262ac824759c7c61fb58ad27a2dc26fb5befbb7a0496e2081c255",
+      "seconds": 1.644,
+      "bytes": 20420,
+      "sha256": "5448dba27f6bd354f6ce8234616a6111c7a058f2a81a3e4f648bb46f2f1601d7",
       "source": "scene",
-      "sceneSha256": "5ea1e07b16f11fe36e4b5b4d736ec50f6c6bb7647b4ca9ffbb3393b6e0997c5a",
-      "sceneStartS": 1.76,
-      "sceneEndS": 2.48,
-      "gapBeforeS": 0.12,
+      "sceneSha256": "f22455084163664fdc6eb28d0db0de6fc93eac42e9f8d4281634e53febf0ff06",
+      "sceneStartS": 2.28,
+      "sceneEndS": 3.924,
+      "gapBeforeS": 0.31,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -44,
-        -79.4
+        -53.5,
+        -63.9
       ],
       "cutMethod": "subtitle",
       "castOwner": "ijaD",
       "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -17.26,
-        "truePeakDb": -4.28,
-        "snrDb": 49.69,
-        "voicedS": 0.6,
-        "lowShare": 0.33,
+        "activeRmsDb": -19.89,
+        "truePeakDb": -2.14,
+        "snrDb": 33.3,
+        "voicedS": 1,
+        "lowShare": 0.321,
         "f0": {
-          "median": 195,
-          "p10": 109,
-          "p90": 222,
-          "frames": 18
+          "median": 213,
+          "p10": 119,
+          "p90": 235,
+          "frames": 15
         },
         "cer": 0,
         "transcript": "止まるな",
-        "speakerCos": 0.614,
+        "speakerCos": 0.761,
         "nearestOther": [
           "ijaC",
-          0.322
+          0.555
         ],
         "referencedOther": [
           "ijaC",
-          0.322
+          0.555
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.33
+        "sceneGainDb": 1.75,
+        "speakerSpanS": [
+          0,
+          0.94
+        ]
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6935,52 +6939,52 @@
       "who": "ijaB",
       "lang": "ja",
       "projection": "shout",
-      "seconds": 4.16,
-      "bytes": 50827,
-      "sha256": "2d95b0635d6bc894e8212e42bd0c4b27d97607191ac9489cf41d596da009561c",
+      "seconds": 4.886,
+      "bytes": 59604,
+      "sha256": "f3dce9ee9123fcce6e68b9e236f14939ca666ce07629ee860383c045ae027a24",
       "source": "scene",
-      "sceneSha256": "f80a78f7919af7024b09b7bba9e91ddac8cbee0b7898ff1617448efd1176b63b",
-      "sceneStartS": 0.01,
-      "sceneEndS": 4.17,
+      "sceneSha256": "88ec9e03e897d273f0ef71ac9b17b52470259eddbd371d8f818a2db1177cea26",
+      "sceneStartS": 0,
+      "sceneEndS": 4.885,
       "gapBeforeS": 0,
       "tight": [
         false,
-        false
+        true
       ],
       "edgeDb": [
-        -87.5,
-        -36
+        -11.9,
+        -90.2
       ],
       "cutMethod": "subtitle",
       "castOwner": "ijaB",
       "castSha256": "f9ba276de41ef0e4b9e6b98c1c10b7fb83d110825ad44cfe23ec3b61b7ff6040",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -17.53,
-        "truePeakDb": -1.16,
-        "snrDb": 88.26,
-        "voicedS": 2.28,
-        "lowShare": 0.226,
+        "activeRmsDb": -17.6,
+        "truePeakDb": -1.19,
+        "snrDb": 40.35,
+        "voicedS": 2.7,
+        "lowShare": 0.203,
         "f0": {
-          "median": 170,
-          "p10": 139,
-          "p90": 232,
-          "frames": 41
+          "median": 174,
+          "p10": 129,
+          "p90": 286,
+          "frames": 33
         },
         "cer": 0,
-        "transcript": "通訳 通訳はどこださっさと来い",
-        "speakerCos": 0.828,
+        "transcript": "通訳…通訳はどこだ!さっさと来い!",
+        "speakerCos": 0.773,
         "nearestOther": [
           "interpreter",
-          0.57
+          0.508
         ],
         "referencedOther": [
           "interpreter",
-          0.57
+          0.508
         ],
         "lengthDiff": -4,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.31
+        "sceneGainDb": 4.5
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -6991,52 +6995,52 @@
       "who": "interpreter",
       "lang": "ja",
       "projection": "shout",
-      "seconds": 2.2,
-      "bytes": 27316,
-      "sha256": "480b3c967d2075d58ffbec3d710dbff26dc7d19717882c4caaa4ea43ef7ef2f4",
+      "seconds": 2.135,
+      "bytes": 26376,
+      "sha256": "1b791b0d2f5c31fb2d9f8fcdae710d7cea7c0b7115e99ebb9badb5fa68affa32",
       "source": "scene",
-      "sceneSha256": "f80a78f7919af7024b09b7bba9e91ddac8cbee0b7898ff1617448efd1176b63b",
-      "sceneStartS": 4.71,
-      "sceneEndS": 6.91,
-      "gapBeforeS": 0.54,
+      "sceneSha256": "88ec9e03e897d273f0ef71ac9b17b52470259eddbd371d8f818a2db1177cea26",
+      "sceneStartS": 4.885,
+      "sceneEndS": 7.02,
+      "gapBeforeS": 0,
       "tight": [
-        false,
+        true,
         false
       ],
       "edgeDb": [
-        -87.8,
-        -5.6
+        -83.9,
+        -64.2
       ],
       "cutMethod": "subtitle",
       "castOwner": "interpreter",
       "castSha256": "cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.41,
-        "truePeakDb": -5.34,
-        "snrDb": 48.78,
-        "voicedS": 1.32,
-        "lowShare": 0.197,
+        "activeRmsDb": -16.29,
+        "truePeakDb": -5.37,
+        "snrDb": 86.82,
+        "voicedS": 1,
+        "lowShare": 0.212,
         "f0": {
           "median": 348,
-          "p10": 262,
+          "p10": 174,
           "p90": 372,
-          "frames": 26
+          "frames": 24
         },
-        "cer": 0.25,
-        "transcript": "はい、はい、ただいま、へへ",
-        "speakerCos": 0.801,
+        "cer": 0,
+        "transcript": "はいはいただいま",
+        "speakerCos": 0.758,
         "nearestOther": [
           "ijaB",
-          0.504
+          0.511
         ],
         "referencedOther": [
           "ijaB",
-          0.504
+          0.511
         ],
-        "lengthDiff": 2,
+        "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 2.31
+        "sceneGainDb": 4.5
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -8223,10 +8227,10 @@
     },
     "BunkerSearch": {
       "file": "AudioVoice_FirstLevelBunkerSearch.mp3",
-      "sha256": "5ea1e07b16f11fe36e4b5b4d736ec50f6c6bb7647b4ca9ffbb3393b6e0997c5a",
-      "seconds": 2.48,
-      "bytes": 30451,
-      "promptHash": "371b0d345d837ec1e132caf6f0e438f402fd7eec1e3720e7dd99c1536e5f7e16",
+      "sha256": "f22455084163664fdc6eb28d0db0de6fc93eac42e9f8d4281634e53febf0ff06",
+      "seconds": 3.924,
+      "bytes": 48005,
+      "promptHash": "9e282582ac5376c7f01ebe14e2877e9cd713c19f41e84ba2a5b2de469fcf5b1a",
       "castKey": "f7568c88cbd41af1f5f9be411aba0453929088dba51c125a7fc031e305981db5,1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
       "references": [
         {
@@ -8261,12 +8265,12 @@
       "hard": [],
       "flags": [],
       "targetDb": -16,
-      "gainDb": 2.33,
-      "trimStartS": 0.4,
+      "gainDb": 1.75,
+      "trimStartS": 1.3,
       "measure": {
-        "activeRmsDb": -16,
-        "truePeakDb": -1.23,
-        "snrDb": 67.45
+        "activeRmsDb": -16.49,
+        "truePeakDb": -1.47,
+        "snrDb": 46.2
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },
@@ -9761,10 +9765,10 @@
     },
     "InterpreterCall": {
       "file": "AudioVoice_FirstLevelInterpreterCall.mp3",
-      "sha256": "f80a78f7919af7024b09b7bba9e91ddac8cbee0b7898ff1617448efd1176b63b",
-      "seconds": 6.91,
-      "bytes": 83741,
-      "promptHash": "aec08deef97d93dbed5bc7d1c67911f3739296cbf15c912085d60870a8cebaf9",
+      "sha256": "88ec9e03e897d273f0ef71ac9b17b52470259eddbd371d8f818a2db1177cea26",
+      "seconds": 7.02,
+      "bytes": 84995,
+      "promptHash": "d85e1d05f3705d057dd6c9e41021c9f2f20fe35c656123a1a8f6da6fc37a4c01",
       "castKey": "f9ba276de41ef0e4b9e6b98c1c10b7fb83d110825ad44cfe23ec3b61b7ff6040,cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7",
       "references": [
         {
@@ -9793,18 +9797,21 @@
         {
           "n": 1,
           "hard": [],
-          "flags": 0
+          "flags": 2
         }
       ],
       "hard": [],
-      "flags": [],
+      "flags": [
+        "InterpreterCall.01 与邻句贴着，在能量最低处切（10 ms 淡入淡出）",
+        "InterpreterCall.02 与邻句贴着，在能量最低处切（10 ms 淡入淡出）"
+      ],
       "targetDb": -16,
-      "gainDb": 2.31,
-      "trimStartS": 0.3,
+      "gainDb": 4.5,
+      "trimStartS": 0,
       "measure": {
-        "activeRmsDb": -17.32,
-        "truePeakDb": -1.14,
-        "snrDb": 78.27
+        "activeRmsDb": -16.71,
+        "truePeakDb": -1.19,
+        "snrDb": 51.59
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },
