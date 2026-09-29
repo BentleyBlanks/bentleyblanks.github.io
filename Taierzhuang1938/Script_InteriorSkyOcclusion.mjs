@@ -163,6 +163,7 @@ export class InteriorSkyPass {
 
   /** 这一帧该不该出合成图（材质的 uniform 在 post.Render 之前同步，只看「有没有屋子」）。 */
   _Active() {
+    if (this.pipeline.whiteboxConfig && !this.pipeline.whiteboxConfig.interiorSky) return false;
     return state.roomCount > 0 && INTERIOR_SKY.strength > 0 && !!this.combined
       && this.pipeline.preset.ssao !== false && !!this.pipeline.preset.gtao;
   }

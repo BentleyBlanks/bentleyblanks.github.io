@@ -71,6 +71,8 @@
 import * as THREE from "three";
 import { Blitter, FrameContext, MakeRenderTarget, RenderTargetPool } from "./Script_PostCommon.mjs";
 import { MakeQualityPreset, POST_QUALITY_KEYS } from "./Data_Tuning_Graphics.mjs";
+import { MakeWhiteboxQualityPreset } from "./Data_Tuning_Whitebox.mjs";
+import { WhiteboxOutputPass, InstallWhiteboxPassPolicy } from "./Script_WhiteboxRendering.mjs";
 import {
   PrepassPass, MarkNoPrepass, MarkForegroundPrepass, MarkDynamicPrepass, FOREGROUND_VIEW_DEPTH,
   InvalidatePrepassSkip,
@@ -131,10 +133,13 @@ const OUTPUT_DOMAIN_PASSES = new Set([
 ]);
 
 export class PostPipeline {
-  constructor(renderer, { width, height, quality = "high", destruction = null } = {}) {
+  constructor(renderer, { width, height, quality = "high", destruction = null, whitebox = null } = {}) {
     this.renderer = renderer;
     this.quality = POST_QUALITY_KEYS.includes(quality) ? quality : "high";
     this.preset = MakeQualityPreset(this.quality);
+    if (whitebox) this.preset = MakeWhiteboxQualityPreset(this.preset, whitebox);
+    this.whiteboxConfig = whitebox;
+    this.lastRenderedPasses = [];
     this.frame = 0;
     this.width = Math.max(2, width | 0);
     this.height = Math.max(2, height | 0);
@@ -340,8 +345,10 @@ export class PostPipeline {
       // 镜头光晕读的是泛光那一趟提取好的亮部图，所以只能排在它后面
       this.lensFlarePass,
       this.compositePass,
+      ...(whitebox ? [new WhiteboxOutputPass(this)] : []),
       this.fxaaPass,
     ];
+    InstallWhiteboxPassPolicy(this, whitebox);
 
     // 旧名字的别名（测试与编辑器直接读它们，重构不许断）
     this.normalDepthMaterial = this.prepassPass.material;
@@ -681,7 +688,15 @@ export class PostPipeline {
    * @param {object} options sunDirection / exposure / damage / fade / bloom / godStrength / dt
    */
   Render(scene, camera, options = {}) {
+    // Every enabled pass must see the same whitebox silhouette/material. Restore
+    // before returning to simulation, even when a draw or diagnostic throws.
+    const restore = this.whiteboxScene?.Begin(scene);
+    try { this._RenderFrame(scene, camera, options); } finally { restore?.(); }
+  }
+
+  _RenderFrame(scene, camera, options) {
     this.frame += 1;
+    this.lastRenderedPasses.length = 0;
     const P = this.profiler;
     // FrameContext 必须在抖动写进 projectionMatrix **之前**建：它存的
     // projection / viewProjection 是干净矩阵（速度、运动模糊、太阳投影都要它）。
@@ -710,6 +725,7 @@ export class PostPipeline {
       if (pass === this.taaPass) this.taaPass.RemoveJitter(ctx);
       if (P) P.GpuPush(pass.name);
       pass.Render(ctx);
+      this.lastRenderedPasses.push(pass.name);
       if (P) P.GpuPop();
     }
     // 兜底：TAA 那一趟万一被跳过（将来有人给它加了别的 Enabled 条件），
@@ -725,6 +741,7 @@ export class PostPipeline {
   }
 
   Dispose() {
+    this.whiteboxScene?.Dispose();
     for (const pass of this.passes) pass.Dispose?.();
     this.shadowDebugViews?.Dispose?.();
     this.debugPass.Dispose();

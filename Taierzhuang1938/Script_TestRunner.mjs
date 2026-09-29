@@ -385,6 +385,9 @@ export const testDefs = {
     desc: "簇状前向光照：簇分配与暴力法逐簇相等（纯 Node）+ 24 盏彩色点光逐盏读回、聚光锥内外、不重编译（真浏览器）" },
   PostFrameGraphTest: { file: "Script_PostFrameGraphTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "渲染帧图地基契约：pass 顺序 / MRT 速度靶 / HZB / 太阳阴影接口 / 材质补丁三态 / 不重编译" },
+  WhiteboxQualityTest: { file: "Script_WhiteboxQualityTest.mjs", desc: "白盒画质默认、配置校验、依赖与存档隔离" },
+  WhiteboxQualityBrowserTest: { file: "Script_WhiteboxQualityBrowserTest.mjs", timeoutMs: 15 * 60 * 1000,
+    desc: "白盒实机：实际 Pass、地形例外、动态材质、编辑保存与美术模式切换" },
   SsrTest: { file: "Script_SsrTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "屏幕空间反射：受控场景倒影 / 置信度边界 / 粗糙度上限 / 时域收敛与拖影 / 三张调试图" },
   AtmosphereTest: { file: "Script_AtmosphereTest.mjs", timeoutMs: 15 * 60 * 1000,
@@ -425,6 +428,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "WhiteboxQualityBrowserTest",
   "AllyGaitBrowserTest",
   "AllyGaitMissionTest",
   "BreakableTreesBrowserTest",
@@ -586,6 +590,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  whiteboxQuality: { label: "白盒画质配置与实机", tests: ["WhiteboxQualityTest", "WhiteboxQualityBrowserTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   firstLevelDressing: {label:"第一关道具换模型、碎砖瓦与植被",tests:["FirstLevelPropDressingTest","FirstLevelVegetationTest","FirstLevelWhiteboxBrowserTest","SamplerBudgetTest","MotionVectorContractTest","ModuleGraphTest"]},
@@ -706,6 +711,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "whiteboxQuality", pattern: /WhiteboxQuality|WhiteboxRendering|GraphicsProfile|Tuning_Whitebox|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },
   // 贴图资产规范：Texture/ 下任何文件、清单、通用烘焙脚本与预设、烘焙记录、关卡按需集。
   {domain:"textureAssets",pattern:/\/Texture\/|Data_TextureManifest|Script_BakePbrTexture|Data_TextureBakePresets|\/TextureBakes\/|Script_TextureStandards|Data_LevelTextureSets|Script_LevelTextureSets/},
   {domain:"allyGait",pattern:/AllyGait|Script_FirstLevelP012CastAppearance/},

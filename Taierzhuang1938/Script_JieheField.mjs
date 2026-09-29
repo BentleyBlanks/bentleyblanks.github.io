@@ -283,6 +283,7 @@ export class JieheField {
         mesh.receiveShadow = true;
         mesh.castShadow = false;
         mesh.name = `JieheGround_${i0}_${j0}`;
+        mesh.userData.whiteboxTerrain = true;
         this.scene.add(mesh);
         this.meshes.push(mesh);
         this.stats.groundChunks += 1;

@@ -1,0 +1,44 @@
+import assert from "node:assert/strict";
+import { WHITEBOX_DEFAULTS, NormalizeWhiteboxConfig, WhiteboxPassPlan, ResolveGraphicsProfile,
+  WhiteboxGraphicsOverrides, WHITEBOX_STORAGE_KEY } from "./Data_Tuning_Whitebox.mjs";
+import { LoadWhiteboxConfig, SaveWhiteboxConfig, LoadGraphicsProfile, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
+import { LoadSavedGraphics } from "./Script_EditorSettings.mjs";
+
+assert.equal(ResolveGraphicsProfile(null, null), "whitebox");
+assert.equal(ResolveGraphicsProfile("high", "whitebox"), "high");
+assert.equal(ResolveGraphicsProfile(null, "ultra"), "ultra");
+assert.equal(ResolveGraphicsProfile("bad", "bad"), "whitebox");
+assert.deepEqual(WhiteboxPassPlan(), ["main", "wireframe", "debugOverlay", "whiteboxOutput"]);
+assert.deepEqual(NormalizeWhiteboxConfig({ terrainTextures: "false", ssr: 1, renderScale: NaN,
+  surfaceColor: "invalid", unexpected: true }), WHITEBOX_DEFAULTS);
+assert.equal(NormalizeWhiteboxConfig({ renderScale: 99 }).renderScale, 1.6);
+assert.ok(WhiteboxPassPlan({ ssr: true }).includes("prepass"));
+assert.ok(WhiteboxPassPlan({ ssr: true }).includes("hzb"));
+assert.ok(WhiteboxPassPlan({ interiorSky: true }).includes("gtao"));
+assert.ok(WhiteboxPassPlan({ lensFlare: true }).includes("bloom"));
+assert.ok(!WhiteboxPassPlan({ bloom: true }).includes("whiteboxOutput"));
+assert.ok(WhiteboxPassPlan({ volumetrics: true }).includes("volumetricInject"));
+assert.equal(WhiteboxGraphicsOverrides({}).shadows, false);
+assert.equal(WhiteboxGraphicsOverrides({}).taa, false);
+const memory = new Map();
+globalThis.localStorage = { getItem: (k) => memory.get(k), setItem: (k, v) => memory.set(k, v) };
+memory.set("tengxian1938_graphics_v1", JSON.stringify({ taa: true, gi: true, profile: "high" }));
+assert.equal(LoadGraphicsProfile(), "whitebox", "legacy graphics cannot change the new default");
+const graphics = { profile: "whitebox", taa: false, gi: false };
+assert.equal(LoadSavedGraphics(graphics), 0);
+assert.equal(graphics.taa, false);
+const art = { profile: "high", taa: false, gi: false };
+LoadSavedGraphics(art); assert.equal(art.taa, true); assert.equal(art.profile, "high");
+SaveWhiteboxConfig({ assetTextures: true });
+assert.equal(LoadWhiteboxConfig().assetTextures, true);
+const api = CreateGraphicsProfileApi({ profile: "whitebox", config: LoadWhiteboxConfig(), post: { quality: "high" } });
+assert.throws(() => api.ConfigureWhitebox({ unknown: true }), /Unknown/);
+assert.throws(() => api.ConfigureWhitebox({ ssao: "yes" }), /Invalid/);
+assert.equal(api.ConfigureWhitebox({ taa: true }).reloadRequired, true);
+assert.equal(LoadWhiteboxConfig().taa, true);
+memory.set(WHITEBOX_STORAGE_KEY, "corrupt");
+assert.deepEqual(LoadWhiteboxConfig(), WHITEBOX_DEFAULTS);
+globalThis.localStorage = { getItem() { throw new Error("denied"); }, setItem() { throw new Error("denied"); } };
+assert.equal(LoadGraphicsProfile(), "whitebox");
+assert.equal(SaveWhiteboxConfig({}), false);
+console.log("PASS whitebox default, migration, schema, dependency plan, persistence and agent API");
