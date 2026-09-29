@@ -330,7 +330,7 @@ export const testDefs = {
   FpsAnimationTest: {file:"Script_FpsAnimationTest.mjs",desc:"Blender第一人称骨骼片段完整性、旋转和循环接缝"},
   SprintMeleeTest: { file: "Script_SprintMeleeTest.mjs", desc: "冲刺白刃：左键挥得出、刀在画面里" },
   HudPromptBrowserTest: { file: "Script_HudPromptBrowserTest.mjs", desc: "HUD 提示真浏览器交互" },
-  WeaponPickupTest: { file: "Script_WeaponPickupTest.mjs", desc: "拾枪（COD 式）：1 主 / 2 副 / 3 大刀 / 4 投掷物、按住 F 拾起换上、换下留地、各槽弹仓与刺刀" },
+  WeaponPickupTest: { file: "Script_WeaponPickupTest.mjs", desc: "拾枪（COD 式）：1 主 / 2 副 / 3 大刀 / 4 投掷物、单击 F 拾起换上、换下留地、各槽弹仓与刺刀" },
   TargetInfoTest: { file: "Script_TargetInfoTest.mjs", desc: "准心目标识别：番号/姓名/距离、穿墙与雾外不认" },
   JieheTerrainTest: { file: "Script_JieheTerrainTest.mjs", desc: "界河高度图采样与贴地" },
   TengxianLayoutTest: { file: "Script_TengxianLayoutTest.mjs", desc: "滕县城防、街路与功能区布局（纯 Node）" },

@@ -457,13 +457,14 @@ const Samples = (route) => {
   set.Update(0.016, "BunkerRescue", "Hold", { collapsed: true, blastAge: null });
   assert.equal(set.Stats().lintelProgress, 1, "entering 02 without a blast shows the lintel already down");
   assert.ok(!set.lantern.light.visible && set.lantern.light.intensity === 0, "the lantern is out after 01");
-  // 2026-09-27: he lies across the backrest's patch until Luo hauls him out; it shows once he sits (Check).
-  for (const phase of ["Hold", "Ask", "Charge", "Melee", "Lift"]) {
+  // 2026-09-27: he lies across the backrest's patch until Luo hauls him out; 2026-09-29 his legs are dragged over it and
+  // he is got up there (Check): it shows from the hand-back (Released), behind him.
+  for (const phase of ["Hold", "Ask", "Charge", "Melee", "Lift", "Check"]) {
     set.Update(0.016, "BunkerRescue", phase, { collapsed: true, blastAge: null });
     assert.equal(set.Stats().rescueVisible, false, `${phase}: the backrest stays hidden (he lies on its patch)`);
   }
-  set.Update(0.016, "BunkerRescue", "Check", { collapsed: true, blastAge: null });
-  assert.equal(set.Stats().rescueVisible, true, "the hand-back backrest shows once he is sat on the seat (Check)");
+  set.Update(0.016, "BunkerRescue", "Released", { collapsed: true, blastAge: null });
+  assert.equal(set.Stats().rescueVisible, true, "the backrest shows from the hand-back (Released)");
   // 离开 01–03：场景零残留，几何与自有材质全部 dispose，共享库材质不碰。
   const geometries = new Set(), owned = [...set.ownedMaterials];
   set.root.traverse((o) => { if (o.geometry) geometries.add(o.geometry); });

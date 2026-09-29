@@ -31,7 +31,7 @@ export const TEXT = Object.freeze({
   "menu.condition.doorSearchStarted": "等门外的日军转向门内",
   "menu.condition.rescueCallHeard": "听到后侧交通壕传来的掩护火力",
   "menu.condition.luoRescueComplete": "接受罗班长救援，从坍塌的木架下出来",
-  "menu.condition.rifleRecovered": "捡起掉在门口的步枪",
+  "menu.condition.rifleRecovered": "从罗班长手里接过步枪",
   "menu.condition.rearTrenchEntered": "退进后交通壕",
   "menu.condition.cornerReached": "到达后交通壕折角",
   "menu.condition.collectionPointSeen": "路过背坡伤员集结处",

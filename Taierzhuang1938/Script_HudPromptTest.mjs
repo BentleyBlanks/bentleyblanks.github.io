@@ -10,7 +10,10 @@ import { CarrySystem, CARRY_KINDS } from "./Script_Carry.mjs";
 const guideText = CONTROL_GUIDE.flatMap((group) => group.rows)
   .map((row) => `${row.keys} ${row.label}`).join("\n");
 assert.match(guideText, /1 \/ 2 \/ 3 \/ 4 主武器 \/ 副武器 \/ 大刀 \/ 投掷物/);
-assert.match(guideText, /按住 F 拾枪、换枪/);
+// 2026-09-29 用户改口径：拾枪 / 换枪单击 F，不再写在「按住 F」那一行里（此前断言的是 /按住 F 拾枪、换枪/）。
+assert.match(guideText, /F 单击拾枪、换枪/);
+assert.doesNotMatch(guideText, /按住 F 拾枪|按住 F.*拾枪、换枪/, "操作说明不再说拾枪要按住");
+assert.match(guideText, /按住 F 止血、拆门板、接线/, "按住 F 只留给止血、拆板、接线这类过程");
 
 // 2026-09-15 对标 COD：1 主武器 / 2 副武器（捡来的第二支枪）/ 3 大刀 / 4 投掷物。
 const slotKeys = Object.fromEntries(KEYMAP
@@ -86,11 +89,14 @@ const stacked = ContextualActionPrompts({
 assert.deepEqual(stacked.map((prompt) => prompt.kind), ["pickup", "bandage"]);
 assert.equal(swap.weaponId, "Type38", "换枪候选带着地上那把枪的 id（HUD 画剪影用）");
 assert.equal(stacked[0].weaponId, "Type38");
-// COD 的「Hold F to swap」：拾起 / 换上是按住型，提示条写成「按住 F」（HUD 画成「[F] 长按……」）。
-assert.equal(swap.gesture, "hold");
-assert.equal(stacked[0].keys, "按住 F");
+// 2026-09-29 用户改口径：拾起 / 换上单击 F 即完成，提示条只写「F」（HUD 不再画「[F] 长按……」）。
+// 此前（2026-09-15 起）是 COD 的「Hold F to swap」：gesture 为 hold、keys 为「按住 F」。
+assert.equal(swap.gesture, "tap");
+assert.equal(stacked[0].keys, "F");
 assert.equal(ContextualActionPrompts({ interaction: { label: "补充 汉阳造 弹药（+5 发）", kind: "pickup", gesture: "tap" } })[0].keys,
-  "F", "只拿同型弹药仍是点按");
+  "F", "只拿同型弹药也是单击");
+assert.equal(ContextualActionPrompts({ interaction: { label: "按住出血口", kind: "bandage", gesture: "hold" } })[0].keys,
+  "按住 F", "止血等按住型仍写「按住 F」");
 const grenadePrompt = ContextualActionPrompts({ interaction: { label: "拾起并掷回 · 2.9秒", kind: "grenade" } });
 assert.deepEqual(grenadePrompt.map((prompt) => [prompt.kind, prompt.label]), [["grenade", "拾起并掷回 · 2.9秒"]]);
 

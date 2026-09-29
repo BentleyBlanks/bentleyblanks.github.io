@@ -34,7 +34,9 @@
 
 - **01 下令后顺子转身背起背包、拿枪、匆匆赶往洞口（2026-09-29）**：[口径](docs/Data_OpeningFirstPersonGear20260929.md)。原来下令后他站在座位边压完弹、翻枪看两面、以 0.24 m/s 挪 1.5 m；现在整段动作是数据（`Data_OpeningFirstPersonGear`：眼睛的偏航 / 俯仰 / 眼高曲线、走位、枪和背包的关键帧、两手的关键帧、声音）加求值器（`Script_OpeningFirstPersonGear`，不依赖 WebGL）：起身装弹收尾 → 枪挂左肩 → 向右转约 159° → 蹲到西墙脚背包旁（眼高 0.76 m）双手抓肩带 → 提起甩上右肩（眼睛被压低）→ 拽肩带 → 枪拉回手里 → 转回洞口 1.9 m/s 跑到 `followTo`（洞口里侧 (0.35,−125.75)，5.8 s 到位）。背包是程序生成的帆布包（`BuildGearPack`，没有新资产），下令前一直躺在西墙脚（第一人称道具 `packRest`，在座位背后 122°，坐着回头看会被自己的身体挡住一半）。`firstPerson.followUp` 已删。门禁 `Script_OpeningFirstPersonTest`（手抓着东西且在画面里的每一帧掌到目标 < 5 mm、转身 / 转速 / 跑速 / 蹲深 / 终点）、`Script_OpeningStoryboardsTest`。
 
-- **01–02 压在塌木下原地审问、反冲锋白刃战（2026-09-27 改稿，覆盖下面两条的 Slash 以后部分）**：[改稿口径](docs/Data_OpeningPinnedRescue20260927.md)。顺子趴在洞口塌顶木下、半身在外，全程第一人称（独立机位已删）；割喉改成从川军左肩揪发横拉、割中即嘲弄，日兵甲边骂边走发现顺子，原地审问扇两记耳光（被扇那半边屏幕发晕：`uSideDaze`），第三下抬手时枪炮与四川话喊杀四起，罗班长带一帮人冲下弹坑台阶白刃战，何有田掀木、罗班长把人拖出来，再接「还能打不？」→踢枪→还权。phase：Trapped …Slash→Taunt→Found；BunkerRescue Hold→Ask→Charge→Melee→Lift→Check→KickRifle→Released。
+- **02 拖出与递枪、站姿还权（2026-09-29 改稿，覆盖下一条第 5 节的拖出与之后的 Check / KickRifle / 捡枪）**：[拖出与递枪](docs/Data_OpeningRescueHandover20260929.md)。罗班长先捡起泥里的枪背上（`LuoPickUpRifleSling`），把顺子翻成仰面、从头后架腋倒拖出来（`LuoRescueDrag`），第一人称镜头骑在 clip 的 `player` 轨上（`eye`/`gaze`/`crown` 定位置、朝向与横滚：仰头看倒着的班长，再顺着自己身体看脚从塌顶木下出来），腿和上衣按轨迹摆、脖子钉在眼下后方；然后顺子跪起、班长横端着枪递到手里（「还能打不？」）并把他拽起来站直（`LuoHandRifle`），还权即站姿、枪在手里、记 `rifleRecovered`（过场事实，`MissionRifle` 交互删了）。phase：BunkerRescue Hold→Ask→Charge→Melee→Lift→Check→Released。三条 clip 只在 TengxianNra05，未烘时导演按 `rescue.drag.standIn` / `rescue.hand.standIn` 顶着跑。
+
+- **01–02 压在塌木下原地审问、反冲锋白刃战（2026-09-27 改稿，覆盖下面两条的 Slash 以后部分）**：[改稿口径](docs/Data_OpeningPinnedRescue20260927.md)。顺子趴在洞口塌顶木下、半身在外，全程第一人称（独立机位已删）；割喉改成从川军左肩揪发、正握拉割（2026-09-29，§6.1）、割中即嘲弄、松手后原地收刀再走，日兵甲边骂边走发现顺子，原地审问扇两记耳光（被扇那半边屏幕发晕：`uSideDaze`），第三下抬手时枪炮与四川话喊杀四起，罗班长带一帮人冲下弹坑台阶白刃战，何有田掀木、罗班长把人拖出来，再接「还能打不？」→踢枪→还权。phase：Trapped …Slash→Taunt→Found；BunkerRescue Hold→Ask→Charge→Melee→Lift→Check→KickRifle→Released。
 
 - **01 洞口过场 2026-09-26 现场修订**（CaptiveDragged 起的独立机位已由上一条取消）：[渐显、翻译避让、踹国军旗与独立摄影机](docs/Data_OpeningCinematic20260926.md)。CaptiveDragged→Wipe 使用独立机位，Reach 回到第一人称；这段覆盖旧 SB03 倒地旁观镜头与人物旧站位。同文第二轮：日军走动背枪、翻译空手走/小跑（`Script_RelaxedGait` + `Animation/RelaxedGait`，门禁 `Script_RelaxedGaitTest`），日兵乙发现伤兵后喊翻译（`InterpreterCall`）。
 
@@ -104,6 +106,8 @@
 13. **带路跑采用跨关卡共用的 NPC 跑停节奏。** 普通随队士兵跑出几步后自然减速，短停喘息、左右观察，再继续跑；每人的首次停步、停留时长与再次起跑独立错峰，不能只错开动画相位却让全队同时停走。班长不参加普通队员的随机喘息停步，按带路、回看、等候和战术职责行动。战斗、避险、通行及协作搬运优先；不得用喘息阻塞窄口、拖断队伍或锁住玩家。规则由共享行为与数据驱动，关卡只配置路线、角色职责和情境覆盖，不按关卡号或角色姓名复制特例。完整要求与后续验收见 [NPC 带路跑通用设计](docs/Data_NpcGuideCadence.md)；共享入口为 `SquadMarchAi`，可视化工具为「小队行进」；接入方式与分项验收状态见该文档第 8–9 节。
 
 14. **贴图资产规范（2026-09-28）**：`Texture/` 下每个文件都登记在 `Data_TextureManifest.mjs`（套名、通道打包、加载层、来源与提示词、消费方）；新贴图按 `Texture_<PascalCase><Base|Normal|Orm|Orh…>.webp` 命名，经 `_import/Script_BakePbrTexture.py` 烘焙（写 `_import/TextureBakes/` 记录），默认进关卡按需集（`Data_LevelTextureSets` + `MaterialLibrary.LoadLevelSets`），不进开机 `PBR_SETS`；运行时 URL 带 `?v=`；legacy 名单只许变短。口径 [贴图资产规范](docs/Data_TextureAssetStandard.md)，验收 `Script_TextureStandardsTest.mjs`。
+
+15. **拾枪 / 换枪 / 拿弹药一律单击 F（tap），不按住（2026-09-29 用户定，通用机制）。** 内建拾枪（`Script_Interact.PickupCandidate`）只有 tap、`Press` 按下即完成，没有进度环，`INTERACT.weaponPickupHoldS` 已删；注册点里凡是「拿起 / 换上一件武器」的交互同样写 `gesture: "tap"`，提示条写「F」而不是「按住 F」。按住（hold / confirm）只留给止血、搬运、补给、拆板、接线这类过程。口径见 [系统参考](docs/Data_AgentReference.md) 的武器槽一节，验收 `Script_CarryTest.mjs`、`Script_WeaponPickupTest.mjs`、`Script_HudPromptTest.mjs`。
 
 人物外观必须遵循[用户确认的选模清单](docs/Data_CharacterSelection.md)，运行时与编辑器共用 `Data_CharacterSelection.mjs`；保留的源模型或动作参考不等于允许重新启用其人物外观。
 

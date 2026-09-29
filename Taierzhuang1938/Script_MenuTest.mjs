@@ -15,7 +15,6 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
-import { INTERACT } from "./Data_Tuning_Interact.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -97,10 +96,11 @@ if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-v
         detonated:!!projectile&&!g.combat.projectiles.includes(projectile)&&projectile.fuse<=0};
     });
     await page.screenshot({path:path.join(os.tmpdir(),"Scene_P012SalvageGrenade.png")});
-    const pickup=await page.evaluate((holdFrames)=>{
+    const pickup=await page.evaluate(()=>{
       const g=window.Tengxian,{corpse}=window.p012SalvageFixture,walk=[];
-      // 拾起 / 换上武器是按住型（COD 的「Hold F to swap」）：按下、推满按住时长、再松手。
-      const HoldF=()=>{g.Debug.Key("KeyF",true);g.StepFrames(holdFrames);g.Debug.Key("KeyF",false);};
+      // 2026-09-29 用户改口径：拾起 / 换上单击 F 即完成（此前是按住型，COD 的「Hold F to swap」，
+      // 先点按确认没拾、再按住 0.35 s 才拾）。按下、一帧、松手。
+      const TapF=()=>{g.Debug.Key("KeyF",true);g.StepFrames(1);g.Debug.Key("KeyF",false);};
       const before={weapon:g.Debug.Interact().weapon,ammo:g.state.ammo,clips:g.state.clips,pickups:g.interact.pickups,taken:corpse.drop.taken};
       for(let i=0;i<360;i++){
         const delta=corpse.position.clone().sub(g.player.position),distance=Math.hypot(delta.x,delta.z);
@@ -113,26 +113,26 @@ if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-v
       const delta=target.clone().sub(eye),distance=delta.length(),hit=g.battlefield.Raycast(eye,delta.normalize(),distance);
       const query=g.interact.Query(g.player),clear=!hit||hit.t>=distance-.05;
       const tapped=clear&&query?.kind==="pickup"&&query.soldier===corpse;
-      // 点一下不算：先点按确认没拾，再按住拾起。
-      if(tapped){g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);g.StepFrames(holdFrames);}
-      const afterTap={taken:corpse.drop.taken,weapon:g.Debug.Interact().weapon};
-      if(tapped)HoldF();
+      // 单击一下就拾起：只推一帧、松手之前看结果（不许要求按住）。
+      if(tapped){g.Debug.Key("KeyF",true);g.StepFrames(1);}
+      const onPress={taken:corpse.drop.taken,weapon:g.Debug.Interact().weapon,gesture:query?.gesture,ring:g.interact.View()};
+      if(tapped)g.Debug.Key("KeyF",false);
       g.StepFrames(1);
       const Slots=()=>g.Debug.Slots();
       const after={weapon:g.Debug.Interact().weapon,ammo:g.state.ammo,clips:g.state.clips,pickups:g.interact.pickups,taken:corpse.drop.taken,slots:Slots().slots};
-      // 第二次按住 F：尸体已经空了；领到的汉阳造还在主武器槽（缴获的枪填的是空着的副武器槽），
+      // 第二次单击 F：尸体已经空了；领到的汉阳造还在主武器槽（缴获的枪填的是空着的副武器槽），
       // 地上没有换下来的枪 —— 什么都不该发生，身上与地上的弹药一发不许多出来。
       const RoundsInReach=()=>{const s=Slots();
         return Object.entries(s.mags).reduce((n,[slot,m])=>n+(slot===s.active?s.ammo+s.clips:m.ammo+m.clips),0)
           +g.interact.groundWeapons.reduce((n,w)=>n+w.ammo+w.clips,0);};
       const roundsAfter=RoundsInReach(),secondQuery=g.interact.Query(g.player);
-      HoldF();g.StepFrames(1);
+      TapF();g.StepFrames(1);
       const second={weapon:g.Debug.Interact().weapon,rounds:RoundsInReach(),soldierTarget:secondQuery?.soldier===corpse,
         ground:g.interact.groundWeapons.length,pickups:g.interact.pickups};
-      return {before,afterTap,after,second,roundsAfter,
+      return {before,onPress,after,second,roundsAfter,
         secondPickups:g.interact.pickups,secondAmmo:g.state.ammo,secondClips:g.state.clips,corpse:corpse.position.toArray(),drop:{...corpse.drop},
         player:g.player.position.toArray(),walk,clear,query:query?.kind,label:query?.label};
-    },Math.ceil((INTERACT.weaponPickupHoldS+0.15)*60));
+    });
     await page.screenshot({path:path.join(os.tmpdir(),"Scene_P012SalvagePickedUp.png")});
     const shot=await page.evaluate(()=>{
       const g=window.Tengxian;g.StepFrames(120);g.player.pitch=.65;
@@ -144,8 +144,9 @@ if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-v
     fs.writeFileSync(path.join(os.tmpdir(),"Data_P012SalvageFixture.json"),JSON.stringify(result,null,2));
     Check("空步枪仍可真实G投雷伤敌",setup.weapon==="HanYang"&&setup.ammo===0&&setup.clips===0&&grenade.grenades===1&&grenade.detonated
       &&grenade.after.some(a=>a.health<grenade.before.find(b=>b.id===a.id).health),JSON.stringify(grenade.effect));
-    Check("点按F不拾枪",!pickup.afterTap.taken&&pickup.afterTap.weapon==="HanYang",JSON.stringify(pickup.afterTap));
-    Check("真实走近可见尸体按住F缴获同一把枪，进空着的副武器槽并端在手上",pickup.walk.length>0&&pickup.clear&&pickup.after.taken
+    // 2026-09-29 用户改口径：原先这里断言「点按F不拾枪」，现在单击F按下那一帧就拾起。
+    Check("单击F按下那一帧就拾起（点按型、没有进度环）",pickup.onPress.gesture==="tap"&&pickup.onPress.taken&&pickup.onPress.ring===null,JSON.stringify(pickup.onPress));
+    Check("真实走近可见尸体单击F缴获同一把枪，进空着的副武器槽并端在手上",pickup.walk.length>0&&pickup.clear&&pickup.after.taken
       &&pickup.after.weapon===pickup.drop.weaponId&&pickup.after.ammo>0&&pickup.after.pickups===pickup.before.pickups+1
       &&pickup.after.slots.secondary===pickup.drop.weaponId&&pickup.after.slots.primary==="HanYang",JSON.stringify(pickup.after));
     Check("尸体单次领取，有空槽不丢旧枪、不复刷弹药",!pickup.second.soldierTarget&&pickup.second.ground===0

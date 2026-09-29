@@ -18,7 +18,7 @@ const REVETMENT = "BunkerSouthRevetment";
 // Everyone who leaves after Luo's order (banter.exitRoute; the runner's own is the same without its first point).
 const BANTER_EXIT = Route([2.1,-125.2],[3.4,-123.6],[3.1,-121.6],[1.2,-120.6],[-1,-118.5],[-4,-113],[-9,-111.3]);
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260929OpeningStoryboardsV18SlapWindup", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260929OpeningStoryboardsV20PullCutSheathe", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
@@ -56,7 +56,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
       "ShunziSitFillCharger",
       // 2026-09-27 pinned rescue (docs/Data_OpeningPinnedRescue20260927.md): ijaA walks off jeering, finds the pinned Shunzi,
       // lifts his head by the hair and slaps him; He heaves the roof timber off him.
-      "IjaTauntWalk","IjaFoundLook","IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","HeLiftTimber"],
+      "IjaTauntWalk","IjaFoundLook","IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","HeLiftTimber",
+      // 2026-09-29 Luo's rescue: he picks the rifle up and slings it, hauls Shunzi out by the armpits (`player` = his body) and hands him the rifle
+      // kneeling (Animation/OpeningStoryboards, docs/Data_OpeningClipLibrary20260923.md; the director wires them).
+      "LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle",
+      // 2026-09-29 「朝着玩家走过来的时候没有收起来的小刀」: he lets go and sheathes the bayonet before he walks off.
+      "IjaReleaseSheathe"],
   },
   // The NRA02 comrade is clean in SB01; the shell that buries him wounds him, and he is bloodied from the
   // black after it through the drag and the interrogation (2026-09-27 review: 「应该是在爆炸后才变得伤痕累累」).
@@ -81,16 +86,23 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // once by the taunt, ijaA walks off toward the mouth taunting and finds him there (Found); he is questioned where he
   // lies with slaps (no drag-out, no butt strike), until the charge breaks in (Charge / Melee) and Luo and He lift the
   // timber off him (Lift).
+  // 2026-09-29 (docs/Data_OpeningRescueHandover20260929.md): Lift = Luo picks the rifle up and slings it, rolls him onto
+  // his back and drags him out under the arms (the eye looks down his own body at his boots coming out from under the
+  // timber); Check = he gets up onto his knees, Luo hands him the rifle (「还能打不？」) and hauls him to his feet; the
+  // hand-back is standing with the rifle in his hands (KickRifle and the rifle pickup are gone).
   phases:Object.freeze({
     Trapped:Object.freeze(["Banter","Orders","Incoming","Blast","Black","Wake","FrontPass","CaptiveDragged","CaptiveWall",
       "Interrogation","Slash","Taunt","Found"]),
-    BunkerRescue:Object.freeze(["Hold","Ask","Charge","Melee","Lift","Check","KickRifle","Released"]),
+    BunkerRescue:Object.freeze(["Hold","Ask","Charge","Melee","Lift","Check","Released"]),
     RearTrench:Object.freeze(["Withdraw","Corner","Collection","SupportOrder"]),
   }),
   fps:24, fov:65, fadeInS:1.8,
   blackoutRecovery:Object.freeze({ fadeS:5.2, eyelidS:4.2, closeS:.16 }),
   interpreterClearanceM:.72,
   walkMps:2.3, turnRps:4.5, poseBlendS:.28, cameraBlendS:.65, cameraTurnRps:3.5,
+  // A shot on a clip's player track (Luo's rescue: rolled over, hauled, got up) is already smooth: its turn limit only
+  // catches a hand-over between shots (the rolled-over head coming forward over the top turns ~5.6 rad/s).
+  trackTurnRps:9,
   // A man going from an authored pose into native combat (handed back and raising his rifle) blends this fast.
   combatBlendS:.12,
   // Free walks (a Move with no clip: the native or relaxed gait) set off and pull up instead of stepping from a
@@ -138,9 +150,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // interpreterCallS: from ijaB's call (InterpreterCall) until the drag may start without it having ended.
     frontPassS:14, walkInS:12, interpreterCallS:6, interrogationExtraS:10, tauntExtraS:8, foundWalkS:10,
     // holdLineS: the questioning's lines (each gate); askS: the whole questioning; chargeS: the rescuers reach their marks
-    // (a late man is put there); meleeS: the cuts landed; liftS: the timber off him and the haul done.
-    holdLineS:8, askS:24, chargeS:4.5, meleeS:7, liftS:7, luoArriveS:7, heArriveS:7,
-    longShotRetryS:4, longShotForceS:8, checkS:9, kickRifleS:3, contactKillS:.35,
+    // (a late man is put there); meleeS: the cuts landed; liftS: Luo's walk, the rifle pickup and the haul done (a stalled
+    // clip is played out); checkS: the question and the nod before the hand-over goes on without them.
+    holdLineS:8, askS:24, chargeS:4.5, meleeS:7, liftS:16, luoArriveS:7, heArriveS:7,
+    longShotRetryS:4, longShotForceS:8, checkS:9, contactKillS:.35,
     // 02 -> 03: Yaowa catches up (else the scene starts where he is), the guard's run up the sap.
     collectionMeetS:8, guardArriveS:10,
   }),
@@ -230,10 +243,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
         // The charge: he is dropped (hair let go) and the hands go flat in the mud, then claw as he tries to see.
         Charge:K([0,"push","push"],[.25,"flat","flat"],[1.4,"flat","clawIn"]),
         Melee:K([0,"flat","clawIn"],[.8,"flat","flat"]),
-        // 「班长一把揪住他的衣领，把他从木头底下拖出来」: hauled backwards, the arms trail.
-        Lift:KC("haulAt",[-1,"push","push"],[0,"flat","flat"],[.35,"scrape","scrape"],[2.3,"flat","flat"],[3.1,"brace","brace"]),
-        Check:KC("checkLineAt",[-1,"sit","sit"],[.2,"sit","sit"],[.7,"sit","brace"]),
-        KickRifle:KC("kickRifleAt",[-1,"sit","brace"],[.6,"sit","brace"],[1.1,"sit","rifle"]),
+        // 2026-09-29 (docs/Data_OpeningRescueHandover20260929.md), clocks on LuoRescueDrag / LuoHandRifle: pinned, straining
+        // until the haul; rolled onto his back the arms fall loose, then both hands take hold of Luo's forearms under his
+        // armpits for the haul (gripLuoArms) and let go when he is set down. Getting up: flat, onto all fours (push), up on
+        // his knees (rest) -- from the hand-over the hands are on the rifle (OpeningStoryboards.HeldRifle, not a beat).
+        Lift:KC("dragAt",[-1,"push","push"],[0,"flat","flat"],[.5,"flat","flat"],[1.3,"limp","limp"],[1.65,"gripLuoArms","gripLuoArms"],
+          [4.4,"gripLuoArms","gripLuoArms"],[4.75,"limp","limp"]),
+        Check:KC("handAt",[0,"limp","limp"],[.5,"flat","flat"],[1.0,"push","push"],[1.5,"rest","rest"]),
       }),
     }),
   }),
@@ -249,7 +265,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // 2026-09-27: the witness phases stay dazed but readable (first person all through: the throat cut must read).
     base:Object.freeze({ Banter:0, Orders:0, Incoming:0, Blast:.95, Black:.95, Wake:.9, FrontPass:.72, CaptiveDragged:.6,
       CaptiveWall:.55, Interrogation:.5, Slash:.42, Taunt:.45, Found:.5, Hold:.48, Ask:.46, Charge:.42, Melee:.4,
-      Lift:.42, Check:.36, KickRifle:.34, Released:.32 }),
+      Lift:.42, Check:.34, Released:.32 }),
     riseRps:.8, fallRps:.25,
     focusScale:.3,
     // strike: the slap's share of the near-miss curve (it replays the curve from the slap, lighter than the blast);
@@ -272,7 +288,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     dragFurrows:Route([-29,-110],[-33,-106],[-36.5,-101.5]),   // 「有人拖着伤员往后走，靴子在泥里划出两道长痕」
     restPost:P(-31,-95.4),            // after the report the guard falls back to the collection (collection.runner)
   }),
-  // The vanguard that must really be down before Check / KickRifle (contract §2.1): ijaA and
+  // The vanguard that must really be down before the hand-back (contract §2.1): ijaA and
   // ijaB by the dadao, ijaD (the junction) by Liu Wencai. ijaC (the fold) may live.
   vanguardIds:["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowB"],
   cast:Object.freeze({ ijaA:"BunkerExecutionerA", ijaB:"BunkerExecutionerB", ijaC:"BunkerFollowA", ijaD:"BunkerFollowB" }),
@@ -294,8 +310,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     witnessEye:P(1.85,-125.25),
     seatEyeM:.95, standEyeM:1.32,   // seatEyeM: only without the fill clip (its eye is the clip's, ~0.7 m)
     lieEyeM:.28,
-    // SB06: where he sits after Luo has hauled him out from under the timber (rescue.lift), his back to the mouth,
-    // facing east down the front trench (J in view: its man is down by then; F in view too -- see rescue.handbackHoldFireS).
+    // SB06 until 2026-09-28: the seat he was hauled onto (his back to the mouth, facing east down the front trench). Since
+    // 09-29 he gets up where Luo sets him down (rescue.drag); kept as the hand-back's fallback spot and the mark the
+    // hand-back hold-fire radius (rescue.handbackHoldFireM) and the Set's backrest are measured from.
     cover:P(2.4,-125.2,-94*Math.PI/180),
   }),
   // Banter tableau inside the intact dugout (seated Shunzi at the pit's west end).
@@ -355,10 +372,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
     ijaBWatchYaw:-Math.PI/2,
     // 2026-09-27 rework (user: 「一割马上就嚣张的说了那些台词；然后边说边走，看到了被木头压住的主角」): the taunt starts
     // on the cut; ijaA holds the dying man up by the hair for tauntHoldS (CaptiveTaunt.01), lets him drop and walks off
-    // west toward the mouth along tauntWalk (slowly, a swagger: .02 and ijaB's .03 on the way), taunting over his shoulder, the bayonet still in his hand -- and stops dead
+    // west toward the mouth along tauntWalk (slowly, a swagger: .02 and ijaB's .03 on the way), taunting over his shoulder -- and stops dead
     // at `found`, the pinned Shunzi 1.1 m ahead of him (ShunziFound). He steps up and squats at his head (`crouch`,
     // facing west onto him) for the questioning (02).
-    tauntHoldS:1.6, tauntWalkMps:.75,
+    // 2026-09-29 (「朝着玩家走过来的时候没有收起来的小刀」): the hold ends on IjaThroatSlash's hold-loop start (2.0 s = the cut
+    // 0.24 + tauntHoldS; he wipes the blade on the dying man's shoulder in it), and he sheathes it where he stands
+    // (IjaReleaseSheathe, 1.33 s) before he walks off with his hands free.
+    tauntHoldS:1.76, tauntWalkMps:.75,
     tauntWalk:Route([3.6,-125.28],[3.2,-125.22]),
     found:P(2.98,-125.2,Math.PI/2),
     crouch:P(2.45,-125.22,Math.PI/2),
@@ -473,29 +493,78 @@ export const OPENING_STORYBOARDS = Object.freeze({
     }),
     // Melee: once both cuts have landed the view holds on the trench (meleeHoldS) before the haul.
     meleeHoldS:1.4,
-    // Lift: He lifts the timber off his hips (Set PoseRoofTimber toward its hang, raise .. of it) standing at heLift;
-    // Luo squats at his head, takes the collar (LuoDragToCover) and hauls him out backwards; he pushes himself up to sit
-    // on shunzi.cover over sitS. He drops the timber after dropAfterS.
-    // HeLiftTimber: his hands under the timber at gripS, the heave over raiseS; he holds it (the clip's hold loop) until
-    // the haul is done and lets it drop (holdUntil) dropAfterS after that.
-    // Luo: LuoDragToCover's `player` collar track (0.61 m in front of his root at 0 s, carried back under and behind him)
-    // is solved onto Shunzi's collar (collarBackM behind the eye) with Luo facing him (the root is the director's, see
-    // LuoGrabRoot); the eye rides the track until haulStopS (the collar ~0.25 m behind Luo's root: 0.85 m out from under
-    // the timber), then he pushes himself up and sits back onto shunzi.cover over sitS.
-    lift:Object.freeze({ heLift:P(1.45,-124.7,1.2), collarBackM:.16, raise:.55, gripS:.3, raiseS:.5,
-      haulAfterS:.6, haulStopS:1.4, sitS:1.1, dropAfterS:.4 }),
-    // SB06: Luo kneels at his left front, 0.9 m off, facing him (CheckRoot); He takes up his rifle at the right edge.
-    luoCheck:P(3.12,-125.73), heCover:P(3.6,-124.3,-1.3),
-    // SB06 camera from shunzi.cover: forward down the trench with Luo at the left; the kick brings the eye down to the
-    // rifle to kickPitchDeg and the hand-back keeps that (Released: pitch in -15..+5, contract §2.9).
-    checkShot:Object.freeze({ eyeM:.72, yawDeg:-94, pitchDeg:-8, kickPitchDeg:-13 }),
-    // The mission rifle lies in the mud at his left front out of reach (stock toward him). 「罗班长看见旁边的汉阳造，一脚把
-    // 枪踢过来。枪托滑过泥地，停在顺子手边。」: Luo kicks it from its north-west past his front to his right hand.
-    // Prop yaw: the muzzle points along (-sin yaw, -cos yaw).
+    // Lift: He lifts the timber off his hips (Set PoseRoofTimber toward its hang, raise .. of it) standing at heLift.
+    // HeLiftTimber: his hands under the timber at gripS, the heave over raiseS; he holds it (the clip's hold loop) until the
+    // boots are out (rescue.drag.dropPastM) and lets it drop, letting go of it letGoS after that.
+    lift:Object.freeze({ heLift:P(1.45,-124.7,1.2), raise:.55, gripS:.3, raiseS:.5, letGoS:.9 }),
+    // 2026-09-29 (user: 「完全可以让我仰头被拉出来啊，看到自己的脚从倒塌的房子里被拖出来」; docs/Data_OpeningRescueHandover20260929.md):
+    // Luo stands startBackM east of the pinned eye facing him (DragRoot), picks the rifle up out of the mud and slings it
+    // (LuoPickUpRifleSling), then rolls him onto his back and drags him out under the arms 1.45 m (LuoRescueDrag, rootMotion,
+    // player track). He drops the timber once both heels are dropPastM out past its east face (timberEastX).
+    // standIn: the contract the clips were baked to (clip root frame: +x Luo's right, -z in front of him, runtime metres;
+    // gaze / crown as directions from the eye), played while a clip is not in the manifest.
+    drag:Object.freeze({ startBackM:.70, timberEastX:.95, dropPastM:.3,
+      standIn:Object.freeze({ pickS:1.8, dragS:5.0, body:Object.freeze({
+        eye:[[0,[0,.28,-.70]],[.5,[0,.28,-.70]],[1.3,[0,.22,-.66]],[1.9,[0,.55,-.95]],[2.45,[0,.58,-.62]],[3.0,[0,.55,-.30]],[3.55,[0,.58,.02]],
+          [4.1,[0,.55,.50]],[4.6,[0,.35,.65]],[5,[0,.33,.67]]],
+        gaze:[[0,[0,.26,.97]],[.5,[0,.26,.97]],[.9,[0,.5,.87]],[1.3,[0,.77,.64]],[1.6,[0,.77,.64]],[1.85,[0,1,.05]],[2.1,[0,-.5,-.87]],
+          [4.1,[0,-.45,-.89]],[4.6,[0,-.34,-.94]]],
+        crown:[[0,[0,.97,-.26]],[.5,[0,.97,-.26]],[.9,[-1,0,-.1]],[1.3,[0,-.64,.77]],[1.6,[0,-.64,.77]],[1.85,[0,-.05,1]],[2.1,[0,.87,-.5]],
+          [4.1,[0,.89,-.45]],[4.6,[0,.94,-.34]]],
+        chest:[[0,[0,.12,-.98]],[1.3,[0,.14,-.95]],[1.9,[0,.31,-1.27]],[2.45,[0,.31,-.94]],[3.0,[0,.31,-.62]],[3.55,[0,.31,-.30]],[4.1,[0,.31,.18]],[4.6,[0,.2,.22]]],
+        pelvis:[[0,[0,.13,-1.60]],[1.9,[0,.12,-1.60]],[2.45,[0,.12,-1.27]],[3.0,[0,.12,-.95]],[3.55,[0,.12,-.63]],[4.1,[0,.12,-.15]]],
+        kneeL:[[0,[.11,.07,-2.08]],[.5,[.11,.07,-2.08]],[1.3,[-.11,.10,-2.08]],[1.9,[-.11,.12,-2.08]],[2.45,[-.11,.12,-1.75]],[3.0,[-.11,.12,-1.43]],
+          [3.55,[-.11,.12,-1.11]],[4.1,[-.11,.12,-.63]]],
+        kneeR:[[0,[-.11,.07,-2.08]],[.5,[-.11,.07,-2.08]],[1.3,[.11,.10,-2.08]],[1.9,[.11,.12,-2.08]],[2.45,[.11,.12,-1.75]],[3.0,[.11,.12,-1.43]],
+          [3.55,[.11,.12,-1.11]],[4.1,[.11,.12,-.63]]],
+        heelL:[[0,[.12,.12,-2.55]],[.5,[.12,.12,-2.55]],[1.3,[-.12,.05,-2.55]],[1.9,[-.12,.05,-2.55]],[2.45,[-.12,.05,-2.22]],[3.0,[-.12,.05,-1.90]],
+          [3.55,[-.12,.05,-1.58]],[4.1,[-.12,.05,-1.10]]],
+        heelR:[[0,[-.12,.12,-2.55]],[.5,[-.12,.12,-2.55]],[1.3,[.12,.05,-2.55]],[1.9,[.12,.05,-2.55]],[2.45,[.12,.05,-2.22]],[3.0,[.12,.05,-1.90]],
+          [3.55,[.12,.05,-1.58]],[4.1,[.12,.05,-1.10]]],
+      }) }),
+      // The first person shows his legs (and jacket) from legsFromS of the haul on (the head coming forward to look down
+      // his body) and into the hand-over until legsUntilS (the head tipping back to look at Luo).
+      legsFromS:1.7, legsUntilS:.3,
+      // The first person's neck sits downM under the eye and backM behind it along the level look (the spine hangs from
+      // it: the jacket's cut collar stays out of the lens, the chest ~0.17 m under it looking down the body).
+      neck:Object.freeze({ downM:.20, backM:.16 }) }),
+    // 2026-09-29 (user: 「在这里直接做一个班长把枪递交到我手上然后直接开打的动作……而不是要我自己还要捡起来」「结束动画的时候玩家
+    // 应该是站立的而不是半蹲」): LuoHandRifle (HandRoot = the haul's root chained onto it). 「还能打不？」 starts lineDelayS after the
+    // clip's "offered" event, he nods for nodS after it and the hold loop lets go; the palms reach for the rifle from reachS
+    // before "handed"; the hand-back follows the clip's end (releaseGraceS more for a vanguard man missing from the enemy
+    // table). standIn: as rescue.drag.standIn (its root is the haul's root while neither clip is baked).
+    // carryS: the taken rifle comes from where Luo held it to the gear-up's end (Data_OpeningFirstPersonGear: the rifle at the
+    // ready in both hands), about where the game's own rifle comes up at the hand-back, so the swap at Released does not throw
+    // the gun across the picture.
+    hand:Object.freeze({ lineDelayS:.2, nodS:.8, reachS:.3, carryS:.8, releaseGraceS:1,
+      standIn:Object.freeze({ durationS:4.8, offerS:1.9, handedS:3.1, holdLoop:Object.freeze([1.9,2.9]), body:Object.freeze({
+        eye:[[0,[0,.33,.67]],[.25,[0,.33,.67]],[.5,[0,.36,.67]],[1.2,[0,.62,.62]],[1.7,[0,1.10,.55]],[3.3,[0,1.10,.55]],[4.2,[0,1.62,.52]]],
+        gaze:[[0,[0,-.34,-.94]],[.25,[0,1,-.05]],[.5,[0,.7,.71]],[.85,[0,.45,.89]],[1.2,[0,.1,1]],[1.7,[0,0,1]],[3.3,[0,-.1,1]],[4.2,[0,-.05,1]]],
+        crown:[[0,[0,.94,-.34]],[.25,[0,.05,1]],[.5,[0,-.71,.7]],[.85,[-1,0,0]],[1.2,[0,1,-.1]],[1.7,[0,1,0]]],
+        chest:[[0,[0,.2,.22]]], pelvis:[[0,[0,.12,-.15]]],
+        kneeL:[[0,[-.11,.12,-.63]]], kneeR:[[0,[.11,.12,-.63]]], heelL:[[0,[-.12,.05,-1.10]]], heelR:[[0,[.12,.05,-1.10]]],
+        rifle:[[0,[.4,1.2,1.3]],[1.9,[0,.85,1.0]],[3.1,[0,.85,.95]],[4.2,[0,1.2,.9]]],
+        rifleMuzzle:[[0,[.8,1.27,1.3]],[1.9,[.4,.92,1.0]],[3.1,[.4,.92,.95]],[4.2,[.4,1.27,.9]]],
+        rifleUp:[[0,[.4,1.3,1.3]],[1.9,[0,.95,1.0]],[3.1,[0,.95,.95]],[4.2,[0,1.3,.9]]],
+      }) }) }),
+    // He goes to the trench edge east of the hand-back with his rifle once he has let the timber drop (Aftercut). 2026-09-29:
+    // 1.1 m further east than for the old seat -- the hand-back now stands at x ~3.3, and at (3.6,-124.3) He's raised rifle
+    // was across the right of the first view.
+    heCover:P(4.7,-124.25,-1.3),
+    // The director's framing over the rescue clips' player track (OpeningStoryboards.RescueView). lookWarp: [t, clip time]
+    // for the gaze and crown only (the eye stays on the clip): the drag's look back up at Luo and over the top to the boots
+    // goes by 1.75 s instead of 2.1 (Luo leans in 0.12 m over the lens to hook the arms at 1.8); the hand-over's head tipping
+    // back and the roll onto all fours by 0.7 s instead of 1.2 (up under Luo standing there). upAtLuo: the look lifts toward
+    // Luo's chest (luoChestDropM under his head, at most upAtLuoMaxDeg up) while Shunzi gets up onto his knees; atRifle: down
+    // at the rifle held out and taken; haulBackM: the eye eased back while Luo stoops in to haul him up by the strap (his
+    // head came to 0.2 m).
+    view:Object.freeze({ dragLookWarp:Object.freeze([[1.3,1.3],[1.75,2.1],[2.1,2.1]]),
+      handLookWarp:Object.freeze([[0,0],[.3,.5],[.7,1.2],[1.2,1.2]]),
+      upAtLuo:.7, upAtLuoS:Object.freeze([.6,1.0]), upAtLuoMaxDeg:35, luoChestDropM:.35, atRifle:.6, haulBackM:.14 }),
+    // The mission rifle lies in the mud at his left front, out of reach while he is pinned (stock toward him); Luo picks it
+    // up on his way to the haul (LuoPickUpRifleSling's prop starts where it lies). Prop yaw: the muzzle points along
+    // (-sin yaw, -cos yaw).
     rifleMouth:P(2.6,-125.95,-120*Math.PI/180),
-    kickFrom:P(2.2,-126.15),
-    rifleKickVia:P(2.95,-125.65),
-    rifleKicked:P(3.3,-125.4,-.6),
     // 「还权后 3 s 内玩家不掉血」 (contract §2.9): at the hand-back every live Japanese within handbackHoldFireM holds his fire
     // this long (the AI's hesitation: no fire, no move); Script_FirstLevelCampaignOpening asserts it.
     handbackHoldFireS:3.5, handbackHoldFireM:40,
@@ -567,25 +636,22 @@ export const OPENING_STORYBOARDS = Object.freeze({
     Object.freeze({id:"SB05A_Charge",phase:"Charge",age:1.6,judge:{camera:{eyeM:[.2,.45]},inFrameAtLeast:[{ roles:["luo","heyoutian","Charge"], count:2 }]}}),
     // He's parry and cut on ijaA beside him.
     Object.freeze({id:"SB05A_HeChop",when:"s.flags.heChopAt!=null&&r.time-s.flags.heChopAt>=.8",judge:{actors:{heyoutian:{distM:[.6,3]}}}}),
-    // Luo takes the collar and hauls him out from under the timber: face down, the mud going by, Luo's boots ahead.
-    Object.freeze({id:"SB05B_Haul",when:"s.flags.haulAt!=null&&r.time-s.flags.haulAt>=.9",judge:{camera:{pitchDeg:[-50,-20],eyeM:[.25,.5]}}}),
-    // SB06: Check (「还能打不？」): forward down the front trench from the seat east of the mouth rubble, Luo kneeling at the
-    // left, Liu right of centre, He at the right edge.
+    // 2026-09-29: rolled onto his back, up at Luo upside down as he hooks his arms under the armpits (no judge: the picture
+    // is looked at).
+    Object.freeze({id:"SB05B_RolledOver",when:"s.flags.dragAt!=null&&r.time-s.flags.dragAt>=1.45",judge:{camera:{eyeM:[.12,.6]}}}),
+    // Hauled out under the arms: down his own body at his boots coming out from under the timber He holds up.
+    Object.freeze({id:"SB05B_Haul",when:"s.flags.dragAt!=null&&r.time-s.flags.dragAt>=3.0",judge:{camera:{pitchDeg:[-50,-12],eyeM:[.35,.75]}}}),
+    // SB06 (Check, 「还能打不？」): up on his knees facing Luo, who holds the rifle out across him (the look down at it:
+    // rescue.view.atRifle).
     Object.freeze({ id:"SB06", storyboard:"Storyboard_06_RifleReturned.png",
-      when:"s.phase==='Check'&&s.flags.kneelAt!=null&&r.time-s.flags.kneelAt>=1.5",
-      judge:{ camera:{ eyeM:[.6,.85], pitchDeg:[-14,-2], yawDeg:[-104,-84] },
-        // Wave 1: LuoKneelCheck kneels upright and He stands (pendingWiring SB06: LuoKneelReach leans in low, He kneels):
-        // their heads may be above the frame.
-        // ijaD: 「J 处被击倒的日兵在正中远」 -- down on the trench floor, not standing (his pelvis near the ground).
-        actors:{ luo:{ x:[0,.3], distM:[.6,1.3], headOptional:true }, liuwencai:{ x:[.55,.85], distM:[2.6,4.6] },
-          heyoutian:{ x:[.7,1], distM:[.8,2.2], headOptional:true }, ijaD:{ x:[.35,.65], distM:[9,15], pelvisM:[null,.3], corpse:true } } } }),
-    // SB06 after the kick: the rifle has stopped at his hand, centre-low, ~0.85 m off.
-    Object.freeze({ id:"SB06_Kick", storyboard:"Storyboard_06_RifleReturned.png",
-      when:"s.phase==='KickRifle'&&s.flags.kickRifleAt!=null&&r.time-s.flags.kickRifleAt>=1",
-      judge:{ camera:{ eyeM:[.6,.85], pitchDeg:[-16,-6], yawDeg:[-104,-84] }, rifle:{ x:[.35,.8], y:[.6,.97] } } }),
-    // SB06 at the hand-back (the player's crouched view from here on): about level, not at the ground (contract §2.9).
-    Object.freeze({ id:"SB06_Released", storyboard:"Storyboard_06_RifleReturned.png", when:"s.phase==='Released'",
-      judge:{ camera:{ pitchDeg:[-15,5], yawDeg:[-104,-84] } } }),
+      when:"s.phase==='Check'&&s.flags.handAt!=null&&r.time-s.flags.handAt>=2.3",
+      judge:{ camera:{ eyeM:[.85,1.3], pitchDeg:[-35,8] }, actors:{ luo:{ distM:[.35,1.3], headOptional:true } } } }),
+    // The rifle in his hands, being hauled up.
+    Object.freeze({ id:"SB06_Hand", storyboard:"Storyboard_06_RifleReturned.png",
+      when:"s.flags.handedAt!=null&&r.time-s.flags.handedAt>=.4", judge:{ camera:{ eyeM:[.9,1.75] } } }),
+    // The hand-back: standing, about level, facing east down the trench (contract §2.9; 2026-09-29 standing, not crouched).
+    Object.freeze({ id:"SB06_Released", storyboard:"Storyboard_06_RifleReturned.png", when:"s.releaseAt!=null",
+      judge:{ camera:{ pitchDeg:[-15,5], yawDeg:[-110,-70], eyeM:[1.5,1.75] } } }),
   ]),
   // Wave 1 stand-ins (contract §3): where a clip, hand pose, lens effect, set piece or blast effect of another
   // package belongs, the director uses the nearest existing one and lists it here. Wave 2 wires each entry to
@@ -613,11 +679,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
       now:"protect/limp hand keys (beats.Blast); the loading rifle vanishes at 0.12 s; the mission rifle is hidden until Black (ApplyCamera)", wave2:"EXTRA_HAND_POSES.flingOpen, FP_PROPS.loadingRifleOnLegs.rifleSlide and LEG_POSES.sprawl in beats.Blast (Eye)"},
     {shot:"SB02", what:"sandbag wall, poster, lit lantern and crates on the dugout's north wall (left of the frame)",
       now:"nothing (bare earth)", wave2:"OpeningSet props bunkerSandbagWallN, bunkerPoster, bunkerLantern, bunkerCrateStackN (Set)"},
-    // SB06 (Check, KickRifle, Released)
+    // SB06 (Check, Released)
     {shot:"SB06", what:"Liu kneels aiming east at the trench edge; He kneels at the right edge with his rifle",
       now:"standing while the director poses them (the director's Move hands the native layer kneel:0); kneeling (AI stance 1) from the hand-back", wave2:"the Anim-owned kneel hook for director poses (as SB01's Luo) for Liu and He from their arrival"},
-    {shot:"SB06", what:"his own legs and boots at the lower right; the left hand toward Luo, the right hand toward the rifle",
-      now:"sit/brace/rifle hand keys (beats.Check/KickRifle), no legs", wave2:"LEG_POSES.sitCover and the swapped hands in beats.Check/KickRifle (Eye)"},
   ].map(Object.freeze)),
   // ---- 02 pursuit (bunkerPursuit, contract §5.8) -----------------------------------------
   // The roster's delayS (Space) are scaled so the three followers are in the trench the player just left
@@ -625,7 +689,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
   pursuit:Object.freeze({ delayScale:.35, speedMps:3.2, retireMps:3, retireMaxS:40 }),
   // ---- 02 withdrawal (RearTrench) --------------------------------------------------------
   withdraw:Object.freeze({
-    // The way out: seat -> crater step (exposed to F) -> SSW leg -> RC. lane[0] is Luo's (he comes from kickFrom round
+    // The way out: seat -> crater step (exposed to F) -> SSW leg -> RC. lane[0] is Luo's (he comes from the hand-over round
     // the north of the seat, past Shunzi's feet); the player (Script_FirstLevelCampaignOpening) walks from lane[1], which
     // sits on the straight line from the seat to the crater step: a first point further east (3.35,-124.9) walked him
     // into the open front trench, the pursuers took his last seen spot there (behind the spoil from RC) and the campaign's

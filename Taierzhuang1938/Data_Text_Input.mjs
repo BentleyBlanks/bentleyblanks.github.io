@@ -56,9 +56,10 @@ export const TEXT = Object.freeze({
   "input.guide.combat.throw.keys": "G / H",
   "input.guide.combat.throw.label": "投手榴弹 / 集束手榴弹",
   "input.guide.combat.interact.keys": "F",
-  "input.guide.combat.interact.label": "拾同型枪的弹药或给战友分弹",
+  // 2026-09-29 用户改口径：拾枪 / 换枪 / 拿弹药一律单击 F，不再按住；按住只留给止血、拆板、接线这类过程。
+  "input.guide.combat.interact.label": "单击拾枪、换枪（先填空枪槽，两支都满换掉手里那支）、拿同型枪的弹药，不用按住",
   "input.guide.combat.holdInteract.keys": "按住 F",
-  "input.guide.combat.holdInteract.label": "拾枪、换枪（先填空枪槽，两支都满换掉手里那支）、止血、拆门板、接线：按住到进度环走满",
+  "input.guide.combat.holdInteract.label": "止血、拆门板、接线、领补给：按住到进度环走满",
   "input.guide.combat.bandage.keys": "B",
   "input.guide.combat.bandage.label": "有绷带且流血时包扎止血",
 

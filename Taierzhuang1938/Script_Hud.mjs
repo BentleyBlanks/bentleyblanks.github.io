@@ -221,7 +221,8 @@ export function ContextualActionPrompts({
   }
   if (interaction?.label) {
     prompts.push({
-      // 按住型（拾起 / 换上武器、止血……）写成「[F] 长按……」，与任务分支同一个口径。
+      // 按住型（止血、拆门板……）写成「[F] 长按……」，与任务分支同一个口径；
+      // 拾起 / 换上武器是点按（2026-09-29 起），键帽只写 F，下面照旧画那把枪的剪影。
       keys: interaction.gesture === "hold" ? T("hud.key.holdF") : "F",
       label: interaction.label, kind: interaction.kind || "interact",
       ...(interaction.weaponId ? { weaponId: interaction.weaponId } : {}),

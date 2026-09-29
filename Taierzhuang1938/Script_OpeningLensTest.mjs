@@ -109,7 +109,7 @@ Check("the slap: the struck side swims for 2.4 s, the aberration kicks, the side
   assert.equal(ApplyLensToPost({ vignette: 0.42 }, at(3)).sideDaze, null, "no daze: no parameter");
 });
 
-Check("found / held nearly clean; Lift, Check, KickRifle, Released clean", () => {
+Check("found / held nearly clean; Lift, Check, Released clean", () => {
   const found = Evaluate("Found", 1);
   assert.ok(found.mud > 0 && found.bloodEdge.strength <= 0.3, "found: still muddy");
   for (const phase of ["Hold", "Ask"]) {
@@ -117,7 +117,7 @@ Check("found / held nearly clean; Lift, Check, KickRifle, Released clean", () =>
     assert.ok(held.bloodEdge.strength <= 0.1 && held.radialBlur === 0 && held.flash === 0 && held.mud === 0, phase);
     assert.ok(held.storyBloodCap <= 0.5, `${phase}: the split lip's blood layer capped`);
   }
-  for (const phase of ["Lift", "Check", "KickRifle", "Released", "Banter", "Orders", "Incoming"]) {
+  for (const phase of ["Lift", "Check", "Released", "Banter", "Orders", "Incoming"]) {
     const lens = Evaluate(phase, 1, { now: 99, blastAt: 98.8 });
     const { look, ...rest } = lens;
     assert.deepEqual(rest, { ...JSON.parse(JSON.stringify(LENS_DEFAULT)), slap: { side: 1, amount: 0 } }, `${phase} is clean`);

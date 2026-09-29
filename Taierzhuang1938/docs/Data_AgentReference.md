@@ -600,8 +600,14 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   规则在装配层 `Script_Main.PickUpWeapon`：地上捡的枪先填空枪槽、两个都满换掉**手里那支**（手里是大刀 / 手榴弹时换 `state.lastGunSlot`），
   捡起来直接端在手上；发枪、靶场取枪（不带 `at`）仍进主武器。主 / 副武器各记各的弹仓（`state.mags`）与刺刀（`state.bayonets`），
   换枪时 `StashActiveSlot` / `ActivateSlot` 对账；同型补弹与补给箱桥夹记到对应的槽（补给只给中方枪）。
-  拾起 / 换上是**按住型**（`INTERACT.weaponPickupHoldS`，内建候选每帧重新 Query、走开或换目标即作废），只拿弹药仍点按；
-  提示「[F] 长按拾起 / 换上 …」+ 剪影，**不常驻「1 / 2 切换」**。真浏览器回归 `Script_WeaponPickupTest.mjs`（靶场）。
+  **拾起 / 换上 / 拿弹药一律单击 F，按下即完成**（**2026-09-29 用户改口径，通用机制：切换 / 捡枪都只需要单击 F**；此前 2026-09-15 起
+  是按住 0.35 s 的「Hold F to swap」，`INTERACT.weaponPickupHoldS`、进度环、内建的按住读条 `UpdateBuiltinHold` 都已删）。
+  内建拾枪候选没有注册点、不做每帧复核，所以只有 tap；`Press` 对内建候选一律按下即做。换下的枪放回原位、走回去还能换回来，
+  误按的代价只是再按一下；与救护 / 推架 / 补给点抢 F 由优先级和 `INTERACT.pickupAimDot`（正看着的枪）分流，不靠按住时长；
+  键盘自动重复的 keydown 被输入层吃掉，按着 F 不放不会把刚换下的枪又换回来。
+  **注册点里凡是「拿起 / 换上一件武器」的交互也写 tap**（现有：靶场取枪本来就是 tap；P012 白盒 `p012_weaponCheck` 领步枪 2026-09-29 改 tap）；
+  按住只留给止血、搬运、补给、拆板、接线这类「过程」（`MissionRifle` 掩蔽部门口那支步枪另有过场改造，不在此列）。
+  提示条「[F] 拾起 / 换上 …」+ 剪影，**不常驻「1 / 2 切换」**。真浏览器回归 `Script_WeaponPickupTest.mjs`（靶场）。
 - `Script_Carry.mjs` —— 负重状态机（`CARRY_KINDS` 一张表）。三条卸载路径：F 放下、左键扔下、
   脚本 `ForceRelease`；`canDrop:false` 是「拒绝松手」变体（第四章抬罗班长）。与玩家控制器的
   接口只有 `player.carrySpeedScale`；「能不能开枪」在装配层 `TryFire` 读 `carry.Blocking`。

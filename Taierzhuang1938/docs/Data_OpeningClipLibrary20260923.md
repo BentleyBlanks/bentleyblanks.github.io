@@ -63,7 +63,11 @@
 
 ## 6. 回归口
 
+- 2026-09-29 新增罗班长三条（只烘 NRA05）：`LuoPickUpRifleSling`、`LuoRescueDrag`、`LuoHandRifle`，`player` 轨 part 有 `eye`/`gaze`/`crown`（第一人称镜头的位置、朝向、横滚）、`chest`/`chestUp`/`pelvis`/`kneeL/R`/`heelL/R`（第一人称的腿和上衣）、`rifle`/`rifleMuzzle`/`rifleUp`（递过来的枪），口径见 [拖出与递枪](Data_OpeningRescueHandover20260929.md)；manifest `20260929OpeningStoryboardsV19LuoRescue`。
+
 - 2026-09-27 开场改稿新增 `IjaTauntWalk`、`IjaFoundLook`、`IjaCrouchHairHold`、`IjaSlapForehand`、`IjaSlapBackhand`、`IjaSlapRaise`、`HeLiftTimber`，割喉链改到川军左肩后（新接触部位 `hairNape` / `crown` / `cheekL` / `cheekR`），口径见 [压木原地审问改稿](Data_OpeningPinnedRescue20260927.md) 第 6 节。
+
+- 2026-09-29 割喉改拉割、新增 `IjaReleaseSheathe`（松手后原地收刀，站位 `slashRelease`），`IjaTauntWalk` / `IjaFoundLook` 不再带刺刀，刀鞘握柄上移 5 cm，口径见 [压木原地审问改稿](Data_OpeningPinnedRescue20260927.md) §6.1。
 
 - 2026-09-27 新增 `IjaVaultTimberIn` / `IjaVaultTimberOut` / `IjaHaulForearmUnder`（只烘 IJA02）与 spec 键 `groundWeight(t)`（翻越离地、跪地那几帧不贴地），口径见 [翻越与倒拖](Data_OpeningVaultHaul20260927.md)。
 - `Script_OpeningStoryboardsTest.mjs`（纯 node）：每套骨架每个 clip 脚滑 ≤ 2 cm、接触误差 ≤ 3 cm、穿墙 ≤ 3 cm、骨盆每帧 ≤ 0.2 m、膝盖 ≤ 2 cm；

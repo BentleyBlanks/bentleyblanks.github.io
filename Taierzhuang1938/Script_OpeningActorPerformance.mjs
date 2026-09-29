@@ -7,7 +7,7 @@ import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
 
 const Clamp=(value,low=0,high=1)=>Math.max(low,Math.min(high,value));
 const Smooth=value=>{value=Clamp(value);return value*value*(3-2*value);};
-const ContactClips=new Set(["DuckBlast","BayonetClearWood","CollarDrag","ButtThreat","DadaoAmbush","RifleDeflect","PullComrade","KickRifle","ShotCollapse","CaptiveStandToKneel",
+const ContactClips=new Set(["LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle","DuckBlast","BayonetClearWood","CollarDrag","ButtThreat","DadaoAmbush","RifleDeflect","PullComrade","KickRifle","ShotCollapse","CaptiveStandToKneel",
   // 2026-09-23 library: every paired, contact or violent beat keeps its authored timing and
   // hands (no dialogue gestures or idle substitution on top of them).
   "WoundedRiseWall","BlastSlamBuried","BlastDazedStir","IjaDragCollarFromDirt","IjaPullArm","CaptiveDraggedFromDirt","CaptiveWallBrace",
@@ -24,6 +24,8 @@ const ContactClips=new Set(["DuckBlast","BayonetClearWood","CollarDrag","ButtThr
   // 2026-09-27 pinned rescue: the jeering walk (upper body), the find, the hair hold and the slaps (the face on the pinned
   // eye inside the clip), He heaving the roof timber (hands on it).
   "IjaTauntWalk","IjaFoundLook","IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","HeLiftTimber",
+  // 2026-09-29: the release and the sheathe after the throat cut (hands on the hair, the knife and the scabbard)
+  "IjaReleaseSheathe",
   // hands on the post, the rifle or held out to Shunzi, faces aimed inside the clip: no dialogue gestures or the
   // Banter/Orders MessengerReport substitution on top (the runner and Yaowa talk in those phases)
   "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad",

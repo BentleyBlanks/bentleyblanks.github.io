@@ -340,10 +340,11 @@ try {
     return { swap, pickup, silhouette, layout, rendered };
   });
   assert.ok(weaponPrompts);
-  // COD 的「Hold F to swap」：键帽 F + 「长按换上 三八式」。
-  assert.ok(weaponPrompts.swap.some((prompt) => prompt.keys === "按住 F" && /^换上 /.test(prompt.label)),
+  // 2026-09-29 用户改口径：拾起 / 换上单击 F，键帽 F + 「换上 三八式」（不再有「长按」）。
+  // 此前（2026-09-15 起）是 COD 的「Hold F to swap」：keys「按住 F」、渲染成 ["F", "长按换上 三八式"]。
+  assert.ok(weaponPrompts.swap.some((prompt) => prompt.keys === "F" && /^换上 /.test(prompt.label)),
     JSON.stringify(weaponPrompts.swap));
-  assert.deepEqual(weaponPrompts.rendered, ["F", "长按换上 三八式"]);
+  assert.deepEqual(weaponPrompts.rendered, ["F", "换上 三八式"]);
   assert.ok(weaponPrompts.swap.some((prompt) => prompt.weaponId === "Type38"), "换枪提示带着那把枪的 id");
   assert.equal(weaponPrompts.silhouette?.src, "Texture/Hud/Texture_HudWeapon_Type38.png", "换枪提示下面画那把枪的剪影");
   assert.ok(weaponPrompts.silhouette.width > weaponPrompts.silhouette.em * 6, `步枪剪影要约七个字宽：${JSON.stringify(weaponPrompts.silhouette)}`);
@@ -351,7 +352,7 @@ try {
     assert.ok(weaponPrompts.layout.targetTop >= weaponPrompts.layout.promptsBottom - 1,
       `识别卡要排在提示下面：${JSON.stringify(weaponPrompts.layout)}`);
   }
-  assert.ok(weaponPrompts.pickup.some((prompt) => prompt.keys === "按住 F" && /^拾起 /.test(prompt.label)));
+  assert.ok(weaponPrompts.pickup.some((prompt) => prompt.keys === "F" && /^拾起 /.test(prompt.label)));
 
   const cleared = await page.evaluate(() => {
     const T = window.Taierzhuang;

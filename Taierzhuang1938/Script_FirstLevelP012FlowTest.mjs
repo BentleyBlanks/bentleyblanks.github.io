@@ -354,6 +354,10 @@ assert.equal(flow.State().beat, "B01", "receiving a rifle still requires the sin
 assert.equal(points.get("p012_weaponCheck").Enabled(),false,"rifle issue cannot be repeated");
 assert.equal(points.get("p012_weaponCheck").OnComplete(),false,"stale repeated rifle completion is rejected");
 assert.equal(riflesReceived,1,"exactly one rifle reaches the inventory host");
+// 2026-09-29 user rule (single F tap for every weapon pickup / swap): taking the issued rifle is a tap, was a 2.4 s hold.
+// The ammunition issue that follows it is supplies, not a weapon, and stays a hold.
+assert.equal(points.get("p012_weaponCheck").gesture,"tap","taking the issued rifle is a single F tap");
+assert.equal(points.get("p012_ammoIssue").gesture,"hold","ammunition issue is supplies, not a weapon: still a hold");
 Use("p012_ammoIssue");
 assert.equal(points.get("p012_ammoIssue").Enabled(),false,"ammunition issue cannot be repeated");
 const issueCalls=checkWeaponCalls;

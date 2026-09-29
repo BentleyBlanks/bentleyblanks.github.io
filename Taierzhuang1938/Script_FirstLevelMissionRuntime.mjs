@@ -1352,21 +1352,9 @@ export class FirstLevelMissionRuntime {
         once: false,
         ...extra,
       });
-    // 01/02：掉在掩蔽部里的那支步枪（MISSION_PLACEMENT.bunker.rifle —— 受困时够不到，
-    // 离压住的位置 3.7 m）。拾起来才算真的回到战斗里。
-    Register(
-      "MissionRifle",
-      P.bunker.rifle,
-      () => this.Text("rifle"),
-      () => this.flow.stage.id === "BunkerRescue" && this.Has("luoRescueComplete") && !this.Has("rifleRecovered"),
-      () => {
-        this.Record("rifleRecovered");
-        this.RemoveBunkerRifle();
-        this.RestoreRifle();
-        this.SaveCheckpoint();
-        return true;
-      },
-    );
+    // 01/02 掉在掩蔽部门口那支步枪不再是交互点（2026-09-29 用户：「班长把枪递交到我手上……而不是要我自己还要捡起来」）：
+    // 罗班长在拖人前把它捡起来背上、扶顺子起来时递到他手里，还权那一刻记 rifleRecovered 并把枪还到手上
+    // （FirstLevelBunkerShow.Release，docs/Data_OpeningRescueHandover20260929.md）。
     // 13：顺子跟着老周那辆车走。
     Register(
       "MissionCart",
