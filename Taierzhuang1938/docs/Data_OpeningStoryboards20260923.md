@@ -2,6 +2,8 @@
 
 > **2026-09-27 改稿**：Slash 以后的 01 与整个 02 以 [压在塌木下原地审问、反冲锋白刃战](Data_OpeningPinnedRescue20260927.md) 为准（phase 表、眼位、审问、耳光、反冲锋、拖出、还权前的站位都在那里）；下文涉及 Wipe…Boots、KickShunzi…LongShot、救援圈、SB03 独立机位、SB03A–SB05A 的内容只作历史。
 
+2026-09-29：传令兵老远就喊话、在洞口外（不进屋）向班长报告，见 [§4b](#4b-2026-09-29-传令兵远喊--洞口外报告)；Orders 变长约 9 s，SB01 传令兵站位与判据随之改了。
+
 当前四项现场修订（缓慢渐显、翻译绕行、国军旗被踹倒、独立过场机位）见 [过场修订](Data_OpeningCinematic20260926.md)，覆盖下文 SB03 的旧第一人称机位与旧人物站位。
 
 2026-09-26 的首次爆炸、坐姿手部、愤怒配音与拖出近景细化见 [本轮记录](Data_OpeningPolish20260926.md)。
@@ -24,6 +26,7 @@
 | RearTrench（02 撤离） | Withdraw → Corner → Collection → SupportOrder |
 
 - 对白一律用 `voice.PlayScene` 播契约 §5.2 的 13 个场景。事件与动作对齐：`BunkerIncoming.01` 被近爆截断；「立て！」对上日兵甲 2.2 s 的猛拽（`IjaDragCollarFromDirt` 的 `jerkUp` 事件）；割喉接触帧发 `ThroatCut`，之后才嘲弄；「说话！」要等顺子抬眼、罗班长离刀位不到 3.6 m。
+- 2026-09-29：`beats` / `events` 在 Orders 里多记一拍 `RunnerCall`（传令兵远喊第 1 句开口那一刻；**不是 phase**，`phases` 表和驾驶器的 phase 顺序核对不变；跳过 Orders 的起点也补记），同一刻记事实 `runnerCallHeard`，见 §4b。
 - 成对动作按动作库 manifest 的 `stages` 相对站位摆位。接触时刻、事件时刻与 clip 时长都从 manifest 读（`ContactAt` / `EventAt` / `ClipLength`），Anim 包重烘后不用改导演。
 - 演员沿数据里的沟内折线走，转身限速。导演移动不走物理，所以不会被卡住。
 - 剔除：AI 在一帧里先按玩家自己的视角剔除人物（`Script_Main` 里 `ai.Update` 在任务的 `ApplyCamera` 之前），被剔掉的人整棵子树摘出场景、动画层不跑。导演镜头朝向和玩家视角不同，以前镜头正中的人会被摘掉（K2 时罗班长整个看不见）。现在导演在 `ApplyCamera` 之后按实际镜头再剔一次；导演正在摆姿势的人在镜头外也照样更新动画（根节点可见但不在场景里，什么都不画，跟 AI 对车厢乘客的做法一样）；其余被剔掉的人打上 `openingNotShown` 标记，下次回到画面时动画层不从旧姿态混合，也不按旧位置重新定根。
@@ -46,7 +49,7 @@
 | 等待 | 超时 | 超时后 |
 |---|---|---|
 | Banter 场景结束 | 场景时长 + `banterExtraS` 8 | 进 Orders |
-| 传令兵到位 / 出洞 | `runnerArriveS` 9 / `ordersExitS` 9 | 开对白 / 进 Incoming |
+| 传令兵到位 / 出洞 | `runnerArriveS` 16（2026-09-29 由 9 改，从 Orders 开始算，含远喊那一路）/ `ordersExitS` 9 | 开对白 / 进 Incoming |
 | 近爆事件 | `blastEventS` 3.5 | 导演自己放近爆；近爆已记但导演没切时直接切 |
 | 甲乙走到拖人位 | `frontPassS` 14 | 在场的人摆到位，拖人照演 |
 | 翻译走进来 / 拖人场景 | `walkInS` 12 / 场景时长 + 12 | 进审问 |
@@ -76,7 +79,7 @@
 - 抓帧与画面判据：`node Taierzhuang1938/Script_OpeningStoryboardShots.mjs [--shots=SB01,SB02] [--side-by-side=<分镜目录>]`（TestRunner 的 `OpeningStoryboardShotsTest`）。从 01 开场按真实流程推进，在 `Data_OpeningStoryboards.storyboardShots` 每镜的时刻截导演实际画面、写当帧 json，并判由站位与镜头决定的那部分画面判据（人物头部屏幕 x、距离、俯仰 / 横滚 / 眼高、地标屏幕 x、谁不许在画内）；`--side-by-side` 拼「分镜 | 实机」（分镜图不进仓库）。产物在 `_shots/OpeningStoryboards/`。
 - 顺子的位置分三段（`shunzi.*`）：Banter / Orders 坐在洞底 `seat` (−1.95,−126.25)，眼高 0.95，SB01 机位 yaw −93°、pitch −15°（`banter.seatShot`，Banter 里朝说话人转头不超过 0.14 rad）；罗班长下令（`flags.exitAt`）以后到 Incoming 结束，顺子**收拾装备后跑向洞口**（2026-09-29 用户：「主角收拾装备增加一个转身背起自己的背包拿起枪然后匆匆往门口赶，不然现在的设定走的太慢了」；口径与数字见 [下令之后：收拾装备](Data_OpeningFirstPersonGear20260929.md)，数据在 `Data_OpeningFirstPersonGear`，`firstPerson.followUp` 已删）：起身、把桥夹压进弹仓推上枪栓（原来的装弹，压到 1 s 内）、枪挂到左肩、向右转 159° 蹲到西墙脚的背包旁、双手各抓一条肩带提起来甩过右肩背上、枪从肩上拉回手里、转回洞口、以 1.9 m/s 跑 2.5 m 到 `followTo` (0.35,−125.75)（原来是 0.24 m/s 走到 (−0.45,−126.02)，1.5 m 走 6 s 多），5.8 s 到位，近爆之前站定；回归口 `Script_OpeningFirstPersonTest` 查两只手抓着东西时的每一帧都在东西上（误差 < 5 mm）。Blast 被掀倒（`banter.blastShot`：0.22 s 炮弹落地，0.22–0.65 s 眼高降到 0.75、转到 yaw −66°、pitch −6°（契约 −14±8；−14 时过梁在画外、北门柱上半截悬在洞外沟壁前，抬到 −6 后门柱整根和过梁框住右边的洞口）、头向左倒 17°，0.95 s 闭眼，1.0 s 进 Black）；从 Black 起压在洞口 `trap` (0.1,−125.45)。MISSION_PLACEMENT.bunker.player 仍是掩蔽部锚点，不再是受困位。
 - SB02 做镜像（契约 §2 第 2 条）：爆点与塌方在洞口南侧（世界不动），画面左侧是北门柱与洞里北壁，右侧是洞口。
-- SB01 站位：幺娃靠北壁、侧身；传令兵沿 `runnerRoute` 贴北壁进来，停在北门柱内侧朝洞里喊；罗班长在洞口跪着朝东（`LuoKneelCheck` 停在跪姿段；以前站着的原因：Banter/Orders 里 `ResolveOpeningActorPose` 会把静止的罗班长换成 `MessengerReport`/`PointBlockade` 站姿，只有 ContactClips 里的 clip 不换，而导演的 Move 给原生层的 kneel 恒为 0——原生跪姿要 Anim 包加钩子，见 pendingWiring），自己那句台词（BunkerOrders.02）时起身回头指路；负伤川军脸转向洞里（yaw +30°）；纵深三名往前沿去的川军（`Data_FirstLevelBackdropSquads.OPENING_DEPTH_WALKERS`）Banter 时站在东沟、Orders 后沿东沟走进连接支沟，走到末点又不在镜头里就收走，最迟 Black 收走。
+- SB01 站位：幺娃靠北壁、侧身；传令兵（2026-09-29 起，见 §4b）从后交通壕沿 `runnerRoute` 跑到洞口外沟底 (3.05,−124.5)、面朝罗班长报告（以前是贴北壁进洞、停在北门柱内侧）；罗班长在洞口跪着朝东（`LuoKneelCheck` 停在跪姿段；以前站着的原因：Banter/Orders 里 `ResolveOpeningActorPose` 会把静止的罗班长换成 `MessengerReport`/`PointBlockade` 站姿，只有 ContactClips 里的 clip 不换，而导演的 Move 给原生层的 kneel 恒为 0——原生跪姿要 Anim 包加钩子，见 pendingWiring），自己那句台词（BunkerOrders.02）时起身回头指路；负伤川军脸转向洞里（yaw +30°）；纵深三名往前沿去的川军（`Data_FirstLevelBackdropSquads.OPENING_DEPTH_WALKERS`）Banter 时站在东沟、Orders 后沿东沟走进连接支沟，走到末点又不在镜头里就收走，最迟 Black 收走。
 - 任务汉阳造：装填段手里拿的那支（supply）显示时它藏着；Blast 期间也藏着，从 Black 起才出现在洞口泥里（`rescue.rifleMouth`，枪口朝东南）。松动的断木从 Black 起压在背包上（不在睁眼时凭空出现）。
 - 洞外（SB03–SB04A）：
   - 趴着的眼位（契约 §2 第 1 条）：Black→Found 眼在 `shunzi.witnessEye` (0.35,−125.15)、离地 `lieEyeM` 0.26，比压住的身体（`trap`）靠前一点；Reach 开始 1 s 内沉到 `reachEye` (0.25,−125.25)、0.18。
@@ -102,6 +105,43 @@
   - 抓帧工具另判「头不在更近的人后面」（`coveredBy`，人物是蒙皮网格、射线穿过，所以只画人物到头部那一个像素判谁挡着）；第一波允许的遮挡写 `coverOk`：SB04A 翻译和日兵乙可能被近处的日兵甲挡住（仍挂在 SB04A 其余 pendingWiring 条目下）（SB05 的遮挡已靠 `ijaAStandoffM` 和 `ijaBWatch` 解决）。`BunkerSouthRevetment` 一处放行统一走 `wave1Allowances.revetment`（SB04A behindOk、空间 K2 ignore、测试的视线和拖行净空），第二波把它设成 null 一处删完。`wave` 设成 2 时 `Script_OpeningStoryboardsTest` 要求 pendingWiring 为空、不再有任何放行项。
   - SB06 另判 J 处被击倒的日兵躺在地上（骨盆 ≤ 0.3 m）：导演开枪或 `Kill` 时先撤掉他身上的站姿（`FallNatively`），以前 `IjaBayonetGuard` 一直留在尸体上，他死了还站着。
 - 第一波替身（`pendingWiring`）：别的包的新 clip、手势、腿、镜头后处理、布景、定向喷土还没接，导演先用最接近的现有 clip / 效果，逐条登记 `{shot, what, now, wave2}`，第二波接线后清空。
+
+## 4b. 2026-09-29 传令兵远喊 + 洞口外报告
+
+用户原话：「现在开局动画这里，传令兵应该是老远就喊话（玩家就能听到），然后在地道门外就和班长可以说话了，而不是一定要走到屋里才说话」。
+
+**以前**：Orders 一开始传令兵才露面，沿南南西沟跑进洞里、停在北门柱内侧（约 4.4 s），到位才开 `BunkerOrders.01`；玩家要等他进屋才听见他。
+
+**现在**：Orders 从 Banter 最后一句结束起算，传令兵一开始就在后交通壕里跑，边跑边喊，跑到洞口外沟底、罗班长身边停下报告，不再进洞。
+
+| 时刻（Orders 起算） | 发生什么 |
+|---|---|
+| 0 s | Banter 最后一句刚结束。传令兵在 (−19,−110.7)（后交通壕，离顺子 23.1 m，洞的南墙和土挡着，画面里看不见）显示、起跑，跑速 `speed.run` 3.2 m/s |
+| `runnerCall.afterS` 0.5 s | 第 1 句远喊 `BunkerRunnerCall.01`「班长——！罗班长——！」（3.0 s）。**此刻记事实 `runnerCallHeard`**、`beats` / `events` 记 `RunnerCall`（`flags.runnerCallAt`） |
+| 他离顺子 ≤ `runnerCall.secondWithinM` 12.5 m（过后交通壕折角 RC 一带） | 第 2 句 `BunkerRunnerCall.02`「罗班长！罗班长！」（3.2 s，导演表 `after:"gate"`、`offsetS:0`，一开门就喊）；同时前沿方向那三名往前沿去的川军出发（`flags.walkersAt`，原来钉在 Orders 开始 + 1.4 s） |
+| 约 9.3 s | 跑完 29.7 m，停在 `runnerRoute` 末点 (3.05,−124.5)：洞口外沟底，罗班长 (1.75,−125.7) 东南 1.77 m，面朝罗班长（`MessengerReport`）。从坐位透过洞口从右边进画，站在罗班长右手边 |
+| 到位且远喊说完 | 开 `BunkerOrders.01`（远喊没说完最多再等 `runnerCall.holdMaxS` 1.5 s，之后掐掉第 2 句）。往后的 02–05、下令、撤出都和原来一样 |
+
+- **听得见**：两句都挂在传令兵跑动中的头骨上（`spatial:"head"`，被 AI 剔掉时用身体位置 + `culledHeadM`），走引擎的距离衰减、HRTF / 声像、壕壁遮挡；方位是他在顺子右后方。听者相机就是顺子的头（坐位 (−1.95,−126.25)，眼高 0.97 m，实测偏差 0）。
+- **远喊补偿 `gainDb`**（导演表新字段，`Script_DialoguePlayer.StartVoice` 乘在音量上，缺省 0）：不补时第 1 句（22→15 m）比 `BunkerOrders.01`（5.3 m）低 15.6 dB（RMS）/ 17.4 dB（峰值），超过「不比报告低 12 dB」；补第 1 句 +9 dB、第 2 句 +3 dB。
+- **逐句取证**（无头浏览器实时跑、真解码真混音，每句在 `storyWorldGain` 之后测，即衰减、遮挡、声像之后的直达声，`tmp/ProbeRunnerCall.mjs`）：
+
+| 句 | 距离 | 峰值 dBFS | 有声段 RMS dBFS | 比 `BunkerOrders.01` |
+|---|---|---|---|---|
+| `BunkerRunnerCall.01`（+9 dB） | 22.5 → 15.4 m | −22.0 | −34.6 | 峰值 −8.5 dB / RMS −7.5 dB |
+| `BunkerRunnerCall.02`（+3 dB） | 12.4 → 6.8 m | −17.3 | −31.1 | −3.8 / −4.0 dB |
+| `BunkerOrders.01` | 5.3 m | −13.5 | −27.1 | — |
+| 同一洞里的 `BunkerBanter.14` | 3.2 m | −6.2 | −22.8 | （参照） |
+
+  上表是最后一次实时跑；四次跑（其中一次没补 `gainDb`）之间同一句差 ±1 dB，第 1 句比报告低的量在峰值 8.5–10.0 dB、RMS 7.5–8.4 dB 之间。
+
+  整个混音（最终输出总线）：远喊两句之间的间隙里只有前线背景那一路（`Trapped` 档，隔着土，450 Hz 低通），1–4 kHz 语音频段的中位功率 −61.1 dB，第 1 句期间 −45.0 dB，高出约 16 dB（100–450 Hz 段背景 −43.1 dB，对白侧链把它压到 −51.4 dB）；总 RMS 中位 −33.6 → −31.5 dBFS。也就是说远喊压在背景的上面而不是埋在里面。
+- **节奏**（无头浏览器实时跑四次）：Banter 场景结束 → 远喊开口 **0.53–0.56 s**；远喊场景结束 → 报告开口 1.0–1.1 s（他在最后一个弯里跑进画面）；Orders 开始 → 报告 9.4–9.7 s（原来约 4.4 s）；Orders 整段 33.9–34.1 s（同样方法量改前的基线：27.0 s，约 +7 s）。`runnerCallHeard` 与远喊第 1 句起播是同一次调用（播放器 `StartLine` 先起声源、再回调 `onLine`，导演在回调里记）：实测记录时的 `r.time` 与起播 `r.time` 相同，音频时钟差 −0.33 ms。
+- **配音**（`BunkerRunnerCall`，契约 §5.2 第 15 场，台词表登记为 2026-09-29 用户追加）：runner 定妆音做参考，整场一次请求；第一次生成第 2 句实际念成「罗班长罗班长」（与稿「班长！罗班长！」差一个字，自动硬错误规则漏掉，whisper 加提示词后也是这个结果），基频中位 400 Hz 以上、两句贴在一起；第二次把第 2 句稿改成「罗班长！罗班长！」（本来就是模型顺口念的），提示词加「成年男人洪亮的嗓门，用胸腔喊，不要尖细拔高」、第 2 句前停 1 秒：两句字错率 0、无提示、基频中位 271 / 276 Hz、句间干净（边缘 −44 / −38 dB）、整场 6.6 s。共 2 次 SeedAudio 请求。口型轨 `Data_FirstLevelFaceTracks.json` 新增两条（`Data_FaceTrackPhonemes` 补了「罗 luo」）。
+- **跳阶段 / 调试入口**：`NoteRunnerCall` 是记事实的唯一口（幂等）。导演 `Setup` 里凡是过了 Orders 的起点（Trapped 近爆之后的检查点、直接进 02 及之后）、`PhaseIncoming` 第一帧、Banter / Orders 里被直接 `Blast()`，都补记；`BuildFirstLevelCheckpoint` 对第 2 阶段起的调试起点也带上它；`ResetBunker`（检查点重试落在 01）把它和另外三项一起撤掉。它不是 Trapped 的过关条件（Trapped 仍是 `bunkerCollapsed` / `captivesKilled` / `doorSearchStarted`），没有菜单条件文案。
+- **出洞**：传令兵从自己的站位出发，走 `banter.runnerExitRoute`（`exitRoute` 去掉第一个点，那个点在罗班长膝下），其余人照旧走 `exitRoute`。
+- **SB01 判据**：传令兵 `x` 由 [0.2, 0.5]（北门柱内侧）改为 [0.55, 0.75]，加 `distM` [4.5, 6.2]（实测 0.641、5.30 m），加 `actorSeparation`（罗 / 传令兵头部横向间距 ≥ 0.06、根距 ≥ 1.2 m，实测 0.098 / 1.77 m）；抓帧时刻由 `BunkerOrders.01` 后 1.2 s 改为 2.2 s（三名川军是在传令兵第 2 句时出发，过了约 2 s 才有两个越过罗班长背影露出来）；新增 `SB01_Call`（远喊开口后 0.8 s，传令兵 `absent`，不在画内）。`pendingWiring` 里传令兵那条改成「洞口外、罗班长身边」的说法（`RunnerLeanPostCall` 原来是扶北门柱内侧，第二波要重对）。
+- **验收**：`Script_OpeningStoryboardsTest`、`Script_FirstLevelVoiceTest`（含 `--audio`：契约 15 场、`gainDb` 合法与乘法、覆盖录音间隔的句子多了 `BunkerRunnerCall.02`）、`Script_MissionGatesTest`（事实门 146 条，`runnerCallHeard` 是第 146 条）、`Script_FirstLevelMissionTest`（`OrdersRunner` 新路线在每个场景态下净空；此测试在 1199 行「07+ keeps the legacy fixed-source front」是改前就红的基线，干净基线同样红）、`Script_ModuleGraphTest`、`Script_OpeningStoryboardShots.mjs --shots=SB01_Call,SB01`。
 
 ## 5. 02 撤离与接上 03
 

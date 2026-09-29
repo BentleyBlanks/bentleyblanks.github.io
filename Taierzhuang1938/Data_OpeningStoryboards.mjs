@@ -15,6 +15,8 @@ const KC = (clock, ...keys) => Object.freeze({ clock, keys: Object.freeze(keys.m
 // through this one constant: storyboardShots SB04A behindOk, Data_FirstLevelSpaceKeyframes K2 ignore and
 // Script_OpeningStoryboardsTest's sight/drag checks. Wave 2 sets wave1Allowances.revetment to null.
 const REVETMENT = "BunkerSouthRevetment";
+// Everyone who leaves after Luo's order (banter.exitRoute; the runner's own is the same without its first point).
+const BANTER_EXIT = Route([2.1,-125.2],[3.4,-123.6],[3.1,-121.6],[1.2,-120.6],[-1,-118.5],[-4,-113],[-9,-111.3]);
 export const OPENING_STORYBOARDS = Object.freeze({
   version:"20260929OpeningStoryboardsV16FirstPersonRifle", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
@@ -131,7 +133,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // missed shot is fired again by another man, a contact that did not kill is made lethal).
   timeouts:Object.freeze({
     // ordersSlackS: past the runner's arrival timeout plus the whole BunkerOrders take, the squad leaves anyway.
-    banterExtraS:8, runnerArriveS:9, ordersSlackS:3, ordersExitS:9, blastEventS:3.5, blackS:3.0, wakeS:5.8,
+    // runnerArriveS: seconds into Orders (2026-09-29: the runner starts 23 m out and calls on the way, 9 -> 16).
+    banterExtraS:8, runnerArriveS:16, ordersSlackS:3, ordersExitS:9, blastEventS:3.5, blackS:3.0, wakeS:5.8,
     // interpreterCallS: from ijaB's call (InterpreterCall) until the drag may start without it having ended.
     frontPassS:14, walkInS:12, interpreterCallS:6, interrogationExtraS:10, tauntExtraS:8, foundWalkS:10,
     // holdLineS: the questioning's lines (each gate); askS: the whole questioning; chargeS: the rescuers reach their marks
@@ -317,10 +320,24 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // debrisS: the dirt and timber raining on him after the explosion (debrisFall; was played on the trigger frame, i.e.
     // before the shell landed -- 「先断木板，再出现炮弹的声音」, user 09-27).
     blastShot:Object.freeze({ fallStartS:.22, fallEndS:.65, eyeM:.75, yawDeg:-66, pitchDeg:-6, rollDeg:17, eyesCloseS:.84, phaseS:1.0, debrisS:.38 }),
-    // The runner comes down the SSW leg, round the bend and in along the north wall to the inside of the north post.
-    runnerRoute:Route([-1,-118.5],[1.2,-120.6],[3.0,-121.6],[3.3,-123.6],[2.2,-126.0],[.72,-127.0]),
+    // 2026-09-29 user: 「传令兵应该是老远就喊话（玩家就能听到），然后在地道门外就和班长可以说话了，而不是一定要走到屋里才说话」.
+    // He no longer runs into the dugout. He starts in the rear trench 23 m from the seat (west-south-west, behind the dugout's
+    // south wall: never in the shot), runs the rear trench and the SSW leg calling out (BunkerRunnerCall), comes into the
+    // mouth's view from the right round the bend (3.3,-123.6) and stops OUTSIDE the mouth on the trench floor at the last
+    // point (the report post: 1.8 m south-east of Luo's kneel at b.luo, 1.7 m from He, off the exit line's first metre),
+    // facing Luo; BunkerOrders.01 is shouted there. Every point is on the trench floor (ground -1.9 m, clear; the crater step
+    // from (1.2,-120.6) to (3.0,-121.6) is the route Luo, He and Liu already run).
+    runnerRoute:Route([-19,-110.7],[-14,-112.6],[-4,-113],[-1,-118.5],[1.2,-120.6],[3.0,-121.6],[3.3,-123.6],[3.05,-124.5]),
+    // BunkerRunnerCall (Data_FirstLevelDialogueDirection): line 1 opens afterS into Orders (Banter's last line has just
+    // ended; the runner runs from the first frame of Orders); line 2 opens once he is within secondWithinM of the seat;
+    // BunkerOrders.01 waits for him at the post, and for line 2 to end, but not longer than holdMaxS after he arrives.
+    // The three front-bound men (Data_FirstLevelBackdropSquads.OPENING_DEPTH_WALKERS) set off delayS after line 2 opens (or after
+    // the runner arrives, if that comes first): they used to be under way 3 s before the report, which line 2 -> arrival keeps.
+    runnerCall:Object.freeze({ afterS:.5, secondWithinM:12.5, holdMaxS:1.5 }),
     // Everyone who leaves after the order goes out of the mouth, down the SSW leg to RC and on west.
-    exitRoute:Route([2.1,-125.2],[3.4,-123.6],[3.1,-121.6],[1.2,-120.6],[-1,-118.5],[-4,-113],[-9,-111.3]),
+    exitRoute:BANTER_EXIT,
+    // The runner leaves from his post outside the mouth: the same way, without the first point (behind Luo's kneel).
+    runnerExitRoute:Route(...BANTER_EXIT.slice(1).map(p=>[p.x,p.z])),
     hide:Object.freeze({ luo:P(-12.5,-112.2), yaowa:P(-16,-112), he:P(-10.4,-111.6), liu:P(-14.6,-112.3), runner:P(-19,-111) }),
     comradeBlast:P(3.6,-125.85,-Math.PI/2),   // R0: just outside the mouth; the heap lies on the real bank below the planks (clip BANK_RAMP)
     shellFrom:P(9,-116), shellAt:P(2.8,-120.4), // near miss on the bend's inner corner = the crater step
@@ -485,13 +502,28 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // the 1280×720 frame (left -> right, top -> bottom), head points; points = world landmarks [x, h over
   // ground, z]; absent = roles that must be out of the picture; inFrameAtLeast = how many of a group are seen.
   storyboardShots:Object.freeze([
-    // SB01: the order comes in (BunkerOrders.01): mouth x 0.30–0.74, Yaowa left third, the runner at the
-    // north post left of centre, Luo's back in the middle, the wounded comrade right, men going away down the trench.
-    Object.freeze({ id:"SB01", storyboard:"Storyboard_01_CaveResupply.png",
-      when:"s.phase==='Orders'&&s.flags['scene:BunkerOrders']!=null&&r.time-s.flags['scene:BunkerOrders']>1.2",
+    // SB01 at the far call (BunkerRunnerCall.01 has been going 0.8 s; 2026-09-29): the runner is 20+ m off in the rear trench,
+    // out of the picture, heard and not seen; the dugout as in SB01 (the men who go up to the front still stand in the trench
+    // behind Luo, covered by him: not judged here). Shots are taken in flow order: this one first.
+    Object.freeze({ id:"SB01_Call", storyboard:"Storyboard_01_CaveResupply.png",
+      when:"s.phase==='Orders'&&s.flags.runnerCallAt!=null&&r.time-s.flags.runnerCallAt>=.8&&s.flags['scene:BunkerOrders']==null",
       judge:{ camera:{ eyeM:[.85,1.05], pitchDeg:[-20,-9], yawDeg:[-101,-85] }, horizonY:[.16,.34],
         points:{ mouthPostN:{ at:[1.05,1.0,-127.5], x:[.2,.4] }, mouthPostS:{ at:[1.05,1.0,-124.3], x:[.64,.84] } },
-        actors:{ yaowa:{ x:[0,.34] }, runner:{ x:[.2,.5] }, luo:{ x:[.4,.64] }, comrade:{ x:[.64,1],woundMax:0,faceBloodMax:0 } },
+        actors:{ yaowa:{ x:[0,.34] }, luo:{ x:[.4,.64] }, comrade:{ x:[.64,1],woundMax:0,faceBloodMax:0 } },
+        absent:["runner"], rifleHidden:true } }),
+    // SB01: the order comes in (BunkerOrders.01): mouth x 0.30–0.74, Yaowa left third, Luo's back in the middle, the wounded
+    // comrade right, men going away down the trench. 2026-09-29 (user: 「在地道门外就和班长可以说话了，而不是一定要走到屋里才说话」):
+    // the runner reports from OUTSIDE the mouth, on the trench floor at banter.runnerRoute's end (3.05,-124.5), 5.3 m from the
+    // eye, to the right of Luo (x 0.55–0.75, was 0.2–0.5 at the north post inside), clear of Luo's head (0.543) and of the south
+    // post (0.77); he faces Luo. Taken 2.2 s into BunkerOrders.01 (was 1.2 s): the men going up to the front set off on his
+    // second call, and only from about 2 s into the report do two of them show past Luo's back (1 s in, they are lined up
+    // behind each other and behind him: measured at 0.3–3.0 s, tmp plan, 09-29).
+    Object.freeze({ id:"SB01", storyboard:"Storyboard_01_CaveResupply.png",
+      when:"s.phase==='Orders'&&s.flags['scene:BunkerOrders']!=null&&r.time-s.flags['scene:BunkerOrders']>2.2",
+      judge:{ camera:{ eyeM:[.85,1.05], pitchDeg:[-20,-9], yawDeg:[-101,-85] }, horizonY:[.16,.34],
+        points:{ mouthPostN:{ at:[1.05,1.0,-127.5], x:[.2,.4] }, mouthPostS:{ at:[1.05,1.0,-124.3], x:[.64,.84] } },
+        actors:{ yaowa:{ x:[0,.34] }, runner:{ x:[.55,.75], distM:[4.5,6.2] }, luo:{ x:[.4,.64] }, comrade:{ x:[.64,1],woundMax:0,faceBloodMax:0 } },
+        actorSeparation:{ roles:["luo","runner"], headXMin:.06, rootMMin:1.2 },
         inFrameAtLeast:[{ roles:["DepthNra"], count:2, minDistM:8 }], rifleHidden:true } }),
     // SB02: the near miss, mirrored (contract §2.2): tilted ≥ 12° head to the left, low, the north post and the
     // dugout's north wall on the left, the mouth and the blast on the right; the eyes still open.
@@ -553,8 +585,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // SB01 (Banter / Orders)
     // 2026-09-26 user: the runner reports to Luo, not to Shunzi -- he faces Luo (PhaseOrders). RunnerLeanPostCall is
     // baked facing into the room (yaw 80 deg = at the camera); wiring it needs a take aimed at Luo in the mouth.
-    {shot:"SB01", what:"the runner leans on the north post and calls to Luo",
-      now:"MessengerReport at runnerRoute's end facing Luo (PhaseOrders)", wave2:"RunnerLeanPostCall holdLoop with its post contact (Anim), re-aimed at Luo"},
+    // 2026-09-29: he reports from outside the mouth, out in the open on the trench floor 1.8 m from Luo: there is no post at his
+    // mark for RunnerLeanPostCall's hand, so the entry is now a take of him catching his breath and calling to Luo in the open.
+    {shot:"SB01", what:"the runner, out of breath, calls to Luo outside the mouth (after the far call)",
+      now:"MessengerReport at runnerRoute's end (3.05,-124.5) facing Luo (PhaseOrders, BunkerRunnerCall before it)", wave2:"an Anim take of him bent over catching his breath and calling to Luo (RunnerLeanPostCall was baked leaning on a door post, facing the room)"},
     {shot:"SB01", what:"Luo kneels in the mouth looking out down the trench",
       now:"LuoKneelCheck held at banter.luoKneelS (its kneel loop; the reach arm shows) in Tableau/PhaseOrders", wave2:"a native kneel (KneelHold/RifleIdle, contract §4.1): needs an Anim-owned hook -- a director request that passes kneel:1 through Script_OpeningStoryboardAnimation's Move state (now forced to 0) and is exempt from ResolveOpeningActorPose's Banter/Orders Luo substitution"},
     {shot:"SB01", what:"north-wall crate stack, foreground crate, duckboards and revetment of the front trench",

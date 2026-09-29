@@ -17,6 +17,8 @@ export function BuildFirstLevelCheckpoint(value) {
   const facts = new Set(MISSION_STAGES.slice(0, index).flatMap(step => step.requirements));
   // 03 起前沿那一场已经打响过（跳进去就该有敌人）。
   if (n > 3) facts.add("frontBattleStarted");
+  // 02 起 01 的传令兵早已喊过话（2026-09-29 runnerCallHeard：开场导演在第 01 句开口那一刻记；不是 Trapped 的过关条件，所以这里补）。
+  if (n >= 2) facts.add("runnerCallHeard");
   // 05 起老周已经退出枪位，担架上那一个接手。契约 §2.6 以后 zhouGunWounded（走到集结处）是 05 的背景条件、
   // 03 只等他离枪 10 m：从 05 起跳的时候他已经在集结处了，这条事实要补上（否则 05 里没人再去记它）。
   // 04 起跳不补：老周还在枪上，何有田接枪后他照常走下去。

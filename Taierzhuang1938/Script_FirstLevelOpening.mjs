@@ -140,8 +140,9 @@ export class FirstLevelOpening {
   /** 检查点重试落在 01：整拍重来。 */
   ResetBunker(){
     const r=this.r;
-    for(const id of ["bunkerCollapsed","captivesKilled","doorSearchStarted"])r.flow.facts.delete(id);
-    r.flow.log=r.flow.log.filter(entry=>!(entry.kind==="fact"&&["bunkerCollapsed","captivesKilled","doorSearchStarted"].includes(entry.id)));
+    // runnerCallHeard (2026-09-29): the runner calls again on the way in when 01 is played over.
+    for(const id of ["runnerCallHeard","bunkerCollapsed","captivesKilled","doorSearchStarted"])r.flow.facts.delete(id);
+    r.flow.log=r.flow.log.filter(entry=>!(entry.kind==="fact"&&["runnerCallHeard","bunkerCollapsed","captivesKilled","doorSearchStarted"].includes(entry.id)));
     r.frontShow?.bunker.Reset();
     this.bunker=null;this.blastAt=null;
     this.BeginBunker();

@@ -3050,6 +3050,79 @@
    ]
   ]
  },
+ "757ac3080399fb72d00f88f23d3f2922902b76a260419aa04e7763e7b6fc384e": {
+  "lineId": "BunkerRunnerCall.01",
+  "who": "runner",
+  "lang": "zh",
+  "seconds": 3.01,
+  "source": "seedaudio-subtitle",
+  "chars": [
+   [
+    "班",
+    0.09,
+    0.13
+   ],
+   [
+    "长",
+    0.41,
+    0.45
+   ],
+   [
+    "罗",
+    1.49,
+    1.57
+   ],
+   [
+    "班",
+    1.97,
+    2.01
+   ],
+   [
+    "长",
+    2.21,
+    2.25
+   ]
+  ]
+ },
+ "40780d16e2b8b008e4fbe35c25282a017b34b6377c97220a38fdcfd2138305e2": {
+  "lineId": "BunkerRunnerCall.02",
+  "who": "runner",
+  "lang": "zh",
+  "seconds": 3.19,
+  "source": "seedaudio-subtitle",
+  "chars": [
+   [
+    "罗",
+    0.01,
+    0.21
+   ],
+   [
+    "班",
+    0.37,
+    0.41
+   ],
+   [
+    "长",
+    0.57,
+    0.61
+   ],
+   [
+    "罗",
+    1.69,
+    1.89
+   ],
+   [
+    "班",
+    2.01,
+    2.05
+   ],
+   [
+    "长",
+    2.21,
+    2.25
+   ]
+  ]
+ },
  "7d660c90b616b8dab38df2fc1ee66be58c6141ee379f7a8508c323ece7ed8e86": {
   "lineId": "BunkerSearch.01",
   "who": "ijaC",
