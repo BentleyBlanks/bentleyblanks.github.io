@@ -240,7 +240,9 @@ export class DialoguePlayer {
     const self = line.direction.spatial === "self" || line.who === "shunzi";
     const at = self ? null : this.SpeakerPosition(handle, line);
     const offscreen = !self && !at;
-    const volume = offscreen ? DbGain(PROJECTION_OFFSCREEN_DB) : 1;
+    // gainDb (direction, default 0): a mix decision on top of the distance falloff, for a line that must stay clear from far off
+    // (2026-09-29: the runner's far call, BunkerRunnerCall, 22 m out and behind earth, was 15.6 dB under his report at 5 m).
+    const volume = (offscreen ? DbGain(PROJECTION_OFFSCREEN_DB) : 1) * DbGain(line.direction.gainDb || 0);
     l.voice = line.key && audio?.PlayDialogueLine
       ? audio.PlayDialogueLine(line.key, { position: at, firstPerson: self, volume, offset: l.t })
       : null;

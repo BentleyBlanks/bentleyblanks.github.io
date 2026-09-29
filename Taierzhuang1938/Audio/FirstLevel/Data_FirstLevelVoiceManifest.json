@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-27T15:04:34.747Z",
+  "updatedAt": "2026-09-29T07:18:06.114Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -7923,6 +7923,106 @@
         "sceneGainDb": 1.58
       },
       "mastering": "SliceOfWholeSceneMaster"
+    },
+    "BunkerRunnerCall.01": {
+      "file": "Lines/AudioVoice_FirstLevelBunkerRunnerCall_01.mp3",
+      "scene": "BunkerRunnerCall",
+      "index": 0,
+      "who": "runner",
+      "lang": "zh",
+      "projection": "shout",
+      "seconds": 3.01,
+      "bytes": 37034,
+      "sha256": "757ac3080399fb72d00f88f23d3f2922902b76a260419aa04e7763e7b6fc384e",
+      "source": "scene",
+      "sceneSha256": "714ad8d86d8c0a2624f77e037bf8273a77c923898a06274771adb060397e7f26",
+      "sceneStartS": 0.01,
+      "sceneEndS": 3.02,
+      "gapBeforeS": 0,
+      "tight": [
+        false,
+        false
+      ],
+      "edgeDb": [
+        -44.3,
+        -38.4
+      ],
+      "cutMethod": "subtitle",
+      "castOwner": "runner",
+      "castSha256": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79",
+      "referenced": true,
+      "metrics": {
+        "activeRmsDb": -16.5,
+        "truePeakDb": -4.34,
+        "snrDb": 45.72,
+        "voicedS": 2.3,
+        "lowShare": 0.043,
+        "f0": {
+          "median": 271,
+          "p10": 127,
+          "p90": 500,
+          "frames": 80
+        },
+        "cer": 0,
+        "transcript": "班长!罗班长!",
+        "speakerCos": 0.478,
+        "nearestOther": null,
+        "referencedOther": null,
+        "lengthDiff": 0,
+        "subtitleCoverage": 1,
+        "sceneGainDb": 3.47
+      },
+      "mastering": "SliceOfWholeSceneMaster"
+    },
+    "BunkerRunnerCall.02": {
+      "file": "Lines/AudioVoice_FirstLevelBunkerRunnerCall_02.mp3",
+      "scene": "BunkerRunnerCall",
+      "index": 1,
+      "who": "runner",
+      "lang": "zh",
+      "projection": "shout",
+      "seconds": 3.19,
+      "bytes": 39228,
+      "sha256": "40780d16e2b8b008e4fbe35c25282a017b34b6377c97220a38fdcfd2138305e2",
+      "source": "scene",
+      "sceneSha256": "714ad8d86d8c0a2624f77e037bf8273a77c923898a06274771adb060397e7f26",
+      "sceneStartS": 3.41,
+      "sceneEndS": 6.6,
+      "gapBeforeS": 0.39,
+      "tight": [
+        false,
+        false
+      ],
+      "edgeDb": [
+        -42.4,
+        -70.7
+      ],
+      "cutMethod": "subtitle",
+      "castOwner": "runner",
+      "castSha256": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79",
+      "referenced": true,
+      "metrics": {
+        "activeRmsDb": -16.43,
+        "truePeakDb": -3.54,
+        "snrDb": 43.43,
+        "voicedS": 1.9,
+        "lowShare": 0.045,
+        "f0": {
+          "median": 276,
+          "p10": 138,
+          "p90": 500,
+          "frames": 57
+        },
+        "cer": 0,
+        "transcript": "罗班长!罗班长!",
+        "speakerCos": 0.448,
+        "nearestOther": null,
+        "referencedOther": null,
+        "lengthDiff": 0,
+        "subtitleCoverage": 1,
+        "sceneGainDb": 3.47
+      },
+      "mastering": "SliceOfWholeSceneMaster"
     }
   },
   "scenes": {
@@ -10016,6 +10116,48 @@
         "activeRmsDb": -19,
         "truePeakDb": -2.05,
         "snrDb": 45.53
+      },
+      "mastering": "WholeSceneOnceRmsTruePeakMinus1"
+    },
+    "BunkerRunnerCall": {
+      "file": "AudioVoice_FirstLevelBunkerRunnerCall.mp3",
+      "sha256": "714ad8d86d8c0a2624f77e037bf8273a77c923898a06274771adb060397e7f26",
+      "seconds": 6.607,
+      "bytes": 79979,
+      "promptHash": "c134965fe402280ddaa213671836492cdf85b05d86c4cb1d16b0f27bb25b4113",
+      "castKey": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79",
+      "references": [
+        {
+          "who": [
+            "runner"
+          ],
+          "owner": "runner",
+          "castSha256": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79"
+        }
+      ],
+      "lines": [
+        "BunkerRunnerCall.01",
+        "BunkerRunnerCall.02"
+      ],
+      "attempt": 1,
+      "pickedBy": "check",
+      "requests": 1,
+      "attempts": [
+        {
+          "n": 1,
+          "hard": [],
+          "flags": 0
+        }
+      ],
+      "hard": [],
+      "flags": [],
+      "targetDb": -16,
+      "gainDb": 3.47,
+      "trimStartS": 0.42,
+      "measure": {
+        "activeRmsDb": -16,
+        "truePeakDb": -3.48,
+        "snrDb": 44.23
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     }

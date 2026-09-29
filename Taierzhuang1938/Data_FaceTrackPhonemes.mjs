@@ -31,7 +31,7 @@ export const HAN_PINYIN = Object.freeze({
   ka: "卡", kai: "开", kan: "坎看槛", kao: "靠", ke: "磕壳颗", ken: "肯", keng: "坑", kong: "空",
   kou: "口", ku: "裤", kuai: "快块", kun: "捆",
   lai: "来", lao: "老", le: "了", li: "里利", lian: "连脸链", liang: "两", ling: "令", liu: "留榴",
-  lu: "路", luan: "乱", lv: "履",
+  lu: "路", luan: "乱", luo: "罗", lv: "履",
   ma: "妈麻骂", mai: "卖埋", man: "慢", mang: "忙", mao: "冒", me: "么", mei: "没", men: "们门",
   mian: "面", ming: "命", mo: "莫磨摸",
   na: "拿哪那", nan: "喃南", ne: "呢", neng: "能", ni: "你", nong: "弄",

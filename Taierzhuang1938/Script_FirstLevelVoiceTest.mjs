@@ -64,11 +64,11 @@ for (const cue of MISSION_DIALOGUE) {
 }
 console.log(`ok ${MISSION_DIALOGUE.length} cues（剧情 ${story.length} + 带路 ${guide.length}；逐句 ${perLine.length} 场 ${perLine.reduce((n, c) => n + c.lines.length, 0)} 句）id 唯一、演员齐全`);
 
-// 2a. 09.23 契约 §5.2：01–02 的 14 个场景（09.23 稿 13 场 + 2026-09-26 用户追加的 InterpreterCall）、逐句说话人与句数。
+// 2a. 09.23 契约 §5.2：01–02 的 15 个场景（09.23 稿 13 场 + 2026-09-26 用户追加的 InterpreterCall + 2026-09-29 追加的 BunkerRunnerCall）、逐句说话人与句数。
 const table0923 = contract0923.slice(contract0923.indexOf("### 5.2"), contract0923.indexOf("### 5.3"));
 const scenes0923 = [...table0923.matchAll(/^\| `([A-Za-z]+)` \| (.+) \|$/gm)].map(([, id, body]) =>
   [id, [...body.matchAll(/(?<!\d)(\d\d) ([a-zA-Z]+)\s/g)].map(([, n, who]) => [Number(n), who])]);
-assert.equal(scenes0923.length, 14, "契约 §5.2 解析出 14 个场景");
+assert.equal(scenes0923.length, 15, "契约 §5.2 解析出 15 个场景");
 for (const [id, rows] of scenes0923) {
   const cue = byId.get(id);
   assert.ok(cue?.perLine, `契约 §5.2 的场景 ${id} 必须是逐句格式`);
@@ -104,7 +104,7 @@ const ORDER0305 = ["FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdr
 const ORDER06 = ["Volunteer", "BorrowLight", "ZhouLift"];
 assert.deepEqual(perLine.map((cue) => cue.id).sort(), [...new Set([...ORDER0923, ...ORDER0305, ...ORDER06])].sort(),
   "01–06 的剧情 cue 全部是逐句格式，07 以后没有");
-console.log(`ok 契约对账：01–02 新 14 场、03 以后 ${contractCues.length} 条、待下线旧 cue ${RETIRE_PENDING.length} 条`);
+console.log(`ok 契约对账：01–02 新 15 场、03 以后 ${contractCues.length} 条、待下线旧 cue ${RETIRE_PENDING.length} 条`);
 
 // 3. 台词逐字对账。
 // 3a. 09.23 新稿：> **名字：**“中文” / > **名字：**「日语」 + > **中文：**“译文”；切到「## 分镜参考」为止。
@@ -295,6 +295,7 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
       assert.ok(PROJECTION_DB[d.projection] != null, line.id + " projection 合法");
       assert.ok(d.intensity >= 0 && d.intensity <= 1, line.id + " intensity 0–1");
       assert.ok(["self", "head", "offscreen"].includes(d.spatial), line.id + " spatial 合法");
+      assert.ok(d.gainDb == null || (Number.isFinite(d.gainDb) && Math.abs(d.gainDb) <= 12), line.id + " gainDb 缺省 0，写了就在 −12…+12 dB");
       if (line.who === "shunzi") assert.equal(d.spatial, "self", line.id + " 顺子是第一人称");
       if (index === 0) assert.ok(d.after !== "prev", line.id + " 第一句不能等上一句");
     });
@@ -310,7 +311,7 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   assert.equal(LineDirection(byId.get("CaptiveTaunt"), 0).after, "event:ThroatCut", "割喉后才嘲弄");
   assert.equal(LineDirection(byId.get("RescueInterrogation"), 5).after, "gate", "「说话！」等导演");
   // 默认沿用整段录音里的原始间隔：导演只覆盖稿里要等动作（gate / 事件 / 借火两处空当）与压尾音的几句。
-  assert.deepEqual(overrides.sort(), ["BorrowLight.06", "BorrowLight.07", "BundleAttack.02", "BundleProne.02", "BunkerSearch.02",
+  assert.deepEqual(overrides.sort(), ["BorrowLight.06", "BorrowLight.07", "BundleAttack.02", "BundleProne.02", "BunkerRunnerCall.02", "BunkerSearch.02",
     "CaptiveInterrogation.06", "FrontApproach.02", "RescueInterrogation.06"], "覆盖录音间隔的句子只有这几处");
   {
     const probe = new FirstLevelMissionVoice({ audio: { voiceBank: new Map() } });
@@ -414,6 +415,7 @@ const FakeAudio = () => {
   Step(1.3);
   assert.equal(audio.plays[1].key, "KT.02");
   assert.ok(audio.plays[1].volume < 1 && audio.plays[1].position == null, "视线外解析不到位置的人：非定位 + 降电平");
+  assert.equal(audio.plays[0].volume, 1, "缺省 gainDb 0：音量不变");
   handle.Pause(); const paused = handle.lines[1].t; Step(3);
   assert.equal(handle.lines[1].t, paused, "暂停不推进句内时间");
   handle.Resume();
@@ -445,7 +447,14 @@ const FakeAudio = () => {
   player.faceTrackSampler = (line, t) => ({ jaw: 0.25, wide: 0.1, round: 0.2, close: 0.3, stress: 1 });
   assert.equal(player.Speech("luo").jaw, 0.25, "注入口型轨后优先读口型轨");
   speaking.Stop(); Step(0.1);
-  console.log("ok 截断事件、等事件、等 gate、第一人称、视线外降电平、暂停续播、Skip、口型只给说话人");
+  // 2026-09-29 gainDb：导演表给的混音增益（远喊补偿）乘在音量上，缺省 0 不变。
+  {
+    const boosted = FakeAudio(), p2 = new DialoguePlayer({ audio: boosted, Clock: () => boosted.t });
+    p2.Play({ id: "G", priority: true, lines: [L("G.01", "ijaA", 1, { after: "start", offsetS: 0, spatial: "head", gainDb: 6 })] }, { speakers: { ijaA: () => ({ x: 1, y: 1.5, z: 1 }) } });
+    boosted.t += 1 / 60; p2.Update(1 / 60);
+    assert.ok(Math.abs(boosted.plays[0].volume - Math.pow(10, 6 / 20)) < 1e-9, "gainDb +6 dB 乘在音量上：" + boosted.plays[0].volume);
+  }
+  console.log("ok 截断事件、等事件、等 gate、第一人称、视线外降电平、暂停续播、Skip、口型只给说话人、gainDb");
 }
 {
   // 10c. 缺录音：逐句场景按估时走字幕与 Line 事件并 Done；旧整段 cue 照旧；未知 cue 只警告。

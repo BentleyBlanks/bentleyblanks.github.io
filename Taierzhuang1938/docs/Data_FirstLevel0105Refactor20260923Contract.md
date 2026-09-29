@@ -76,6 +76,7 @@
 | Scene | 行（who：原文，日语给「」原文，字幕为中文译文） |
 | --- | --- |
 | `BunkerBanter` | 01 shunzi 妈卖批。老子还没埋，坟头土先给我盖起了。02 yaowa 省事噻，等哈死了都不用挖坑。03 shunzi 滚。04 comrade 莫死这儿噻，山东的土老子睡不惯。05 yaowa 死人还挑地方？06 comrade 咋个不挑，老子要死也滚回四川死。07 shunzi 你想得还多，先把今天混过去。08 comrade 那肯定，老子命硬得很。09 yaowa 命硬还挨一枪？10 comrade 龟儿子枪法撇了噻。11 shunzi 那你还得谢谢他。12 comrade 等哈碰到，老子当面谢。13 yaowa 拿啥子谢？14 comrade 拿这个噻。 |
+| `BunkerRunnerCall` | 01 runner 班长——！罗班长——！02 runner 罗班长！罗班长！——2026-09-29 用户追加，不在 Notion 原稿里（传令兵远喊：还在后交通壕里、离洞口二三十米时边跑边喊，只喊称呼；导演在第 01 句开口那一刻记事实 `runnerCallHeard`，第 02 句等他跑近再喊，之后才是 `BunkerOrders` 01 在洞口外报告） |
 | `BunkerOrders` | 01 runner 班长！东头破了！鬼子的先头兵贴着炮上来了！02 luo 东头破了……那前沟一哈就要遭抄。03 yaowa 班长，那、那咋个整？04 luo 贴着炮上来的……炮一停就摸进沟了。这个洞守不住。05 luo 弹装起！往后沟撤！跟紧！——02–04 为 2026-09-27 用户追加（班长先盘算再下令），不在 Notion 原稿里 |
 | `BunkerIncoming` | 01 shouter 炮弹！趴下——！（被爆炸截断） |
 | `BunkerSearch` | 01 ijaC 「前へ！急げ！」（往前！快！）02 ijaD 「止まるな！」（别停！）——02 压住 01 尾音，允许重叠 |
@@ -98,6 +99,7 @@
 Trapped：`Banter → Orders → Incoming → Blast → Black → Wake → FrontPass → CaptiveDragged → CaptiveWall → Interrogation → Slash → Taunt → Wipe → Reach → Found → Drag → Snag → KickBeam → DragOut → Butt → Boots`
 BunkerRescue：`Hold → Ask → KickShunzi → Glimpse → Collar → Chop → Parry → Flee → DragCover → LongShot → Check → KickRifle → Released`
 RearTrench（可玩）：`Withdraw → Corner → Collection → SupportOrder`
+2026-09-29 新增事实 `runnerCallHeard`（Trapped 步，不是过关条件）：Orders 里传令兵远喊 `BunkerRunnerCall.01` 真正开口的那一刻由导演记（`r.Record("runnerCallHeard")`，导演 `beats` / `events` 同时记 `RunnerCall`；不是 phase）；跳过 Orders 的起点、02 起的调试起点也带上它；外围战场的声音以它为起点（B 包）。
 事实名沿用：Trapped `bunkerCollapsed`（Blast）/`captivesKilled`（Slash 后川军真实倒地）/`doorSearchStarted`（Found）；BunkerRescue `rescueCallHeard`（RescueInterrogation 开始）/`luoRescueComplete`（DragCover 完成且甲乙死亡）/`rifleRecovered`；RearTrench 四项不变。新增门：`vanguardMeleeResolved`（甲、乙死亡）、`junctionShot`（岔口日兵被刘文财击倒），二者是 `Check` 的前置；折角日兵与追兵不在门内。
 
 ### 5.4 开场动作 clip（Anim 包产出；五套骨架 Nra02/Nra05/Ija01/Ija02/Ija03 按需烘）
@@ -116,7 +118,7 @@ voice.Speech(who) → { jaw, wide, round, close, stress, active }   // 口型驱
 voice.Say(cueId)  // 兼容旧入口：新格式 cue 用默认时间轴播放；07–18 旧 cue 仍是整段
 ```
 
-每句一个独立声源，挂在说话人头骨（第一人称顺子走居中干声），默认按整段录音里的原始间隔排（清单 `lines[id].gapBeforeS`），导演表只覆盖等动作/gate/截断/压尾音的几句，允许重叠；字幕按每句自己的起止；对白窗口内对 ambience/music/远处战斗做侧链压低，非 priority 的自主喊话让路。时间轴数据 `Data_FirstLevelDialogueDirection.mjs`：每句 `{ after: "prev"|"event:<name>"|"gate", offsetS（缺省 null = 沿用录音间隔）, projection: "shout"|"normal"|"low"|"breath", intensity, spatial }`，另有只进整段提示词的 `context/delivery/effort/pauseBeforeS`。
+每句一个独立声源，挂在说话人头骨（第一人称顺子走居中干声），默认按整段录音里的原始间隔排（清单 `lines[id].gapBeforeS`），导演表只覆盖等动作/gate/截断/压尾音的几句，允许重叠；字幕按每句自己的起止；对白窗口内对 ambience/music/远处战斗做侧链压低，非 priority 的自主喊话让路。时间轴数据 `Data_FirstLevelDialogueDirection.mjs`：每句 `{ after: "prev"|"event:<name>"|"gate", offsetS（缺省 null = 沿用录音间隔）, projection: "shout"|"normal"|"low"|"breath", intensity, spatial, gainDb?（2026-09-29 新增：叠在距离衰减上的混音增益 dB，缺省 0，±12）}`，另有只进整段提示词的 `context/delivery/effort/pauseBeforeS`。
 
 ### 5.6 口型接口（Face 包）
 
