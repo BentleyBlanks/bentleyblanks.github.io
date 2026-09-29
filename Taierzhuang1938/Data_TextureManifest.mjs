@@ -628,6 +628,22 @@ export const TEXTURE_MANIFEST = Object.freeze([
       ["Texture_OpeningTimberOrm.webp", "Orm", 512, 512],
     ],
   },
+  // 2026-09-30 远景烟柱脚下的焦木堆（Script_FirstLevelSmokeOrigins）：烧黑龟裂的梁木，缝里只有零星暗红余烬。
+  {
+    id: "CharredTimber", kind: "material", tier: "level:FirstLevel",
+    toneClass: "charredWood",
+    metersPerTile: 1.0,
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_CharredTimber.json",
+    source: { provider: "lovart", date: "2026-09-30", ref: "Lovart 项目 oKHfWa1O2A thread ccbf0a40-1ea0-4ba6-8ad4-867c0e7d9706", prompt: "_import/Prompts/Texture_CharredTimber.txt",
+      note: "源图 _shots/Gap3A_Source/Smoke/lovart_36471cac5bb0.png（不进仓库）；木纹沿 V，焦木堆模型 UV 的 V 沿木料长度" },
+    consumers: [{ file: "Data_LevelTextureSets.mjs", token: "CharredTimber" }, { file: "Script_FirstLevelSmokeOrigins.mjs", token: "CharredTimber" }],
+    files: [
+      ["Texture_CharredTimberBase.webp", "Base", 1024, 1024],
+      ["Texture_CharredTimberNormal.webp", "Normal", 512, 512],
+      ["Texture_CharredTimberOrm.webp", "Orm", 512, 512],
+    ],
+  },
   {
     id: "OpeningCrate", kind: "material", tier: "level:FirstLevel",
     toneClass: "weatheredWood",

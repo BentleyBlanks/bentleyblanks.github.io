@@ -28,6 +28,8 @@ export const LEVEL_TEXTURE_SETS = Object.freeze({
     // B5 开场布景（Data_OpeningSet0103.SET_MATERIALS）：掩蔽部 / 前沟的风化旧木、旧弹药箱板。
     Object.freeze({ name: "OpeningTimber", v: "20260928", fallback: "WoodBeam" }),
     Object.freeze({ name: "OpeningCrate", v: "20260928", fallback: "WoodCrate" }),
+    // 远景烟柱脚下的焦木堆（Script_FirstLevelSmokeOrigins）。
+    Object.freeze({ name: "CharredTimber", v: "20260930", fallback: "WoodBeam" }),
     // B6 道具（Data_FirstLevelPropDressing.PROP_MATERIAL_OVERRIDE）：草垛秸秆。
     Object.freeze({ name: "HaystackStraw", v: "b6straw20260928", fallback: "Sandbag" }),
   ]),

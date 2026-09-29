@@ -1,0 +1,7 @@
+Generate ONE square 1:1 image (2048x2048): a seamless tileable PBR base-color (albedo) texture of HEAVILY CHARRED, BURNT TIMBER for a WWII-era game, used on the collapsed burnt beams of a burning ruin, in a dusty battlefield.
+
+Content: a single continuous close-up face of a burnt wooden beam filling the whole frame, orthographic front view, perfectly flat-on. The wood grain runs strictly VERTICAL (top to bottom). Surface is carbonised: matte black-brown charcoal with the typical "alligator skin" checked cracking pattern (small rectangular scaly blocks separated by fine deep cracks). Deep in a FEW of the cracks and along some grain lines there is a faint dull dark-orange and dark-red ember glow (small, thin, sparse, NOT bright, NOT yellow, well under 5% of the image area). Some patches of pale grey ash powder dusting the raised scales, a few areas where the char has flaked off showing dark brown scorched wood underneath. Overall value very dark (charcoal black, dark brown and warm grey), low saturation except the tiny ember cracks.
+
+Physical size: the image represents 1.0 m x 1.0 m of timber surface.
+
+Hard requirements: delit flat lighting (no shadows cast across the image, no specular highlights, no vignette, no directional light, no ambient-occlusion darkening at the borders); seamless tileable on all four edges; no plank seams, no nails, no metal, no flames, no smoke, no text, no border, no frame, no objects, no perspective, no background. Photographic material-scan look.

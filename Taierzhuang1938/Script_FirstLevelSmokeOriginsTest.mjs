@@ -49,7 +49,7 @@ assert.equal(BuildBattleSmokeInstances(sources,"low").length,780);   // 12 per s
 assert.equal(BuildBattleSmokeInstances(sources,"ultra").length,1300); // 20 per source × 65
 assert.ok(origins.meshes.length<=origins.materials.size,"wreck geometry is merged into one mesh per material: "+origins.meshes.length);
 const triangles=origins.meshes.reduce((n,m)=>n+m.geometry.index.count/3,0);
-assert.ok(triangles<100000,"origin triangle budget: "+triangles);
+assert.ok(triangles<110000,"origin triangle budget: "+triangles);
 // Image decoding is the browser gate; this fixture exercises actual pool allocation.
 const textureLoad=THREE.TextureLoader.prototype.load;
 THREE.TextureLoader.prototype.load=function(){return new THREE.Texture()};

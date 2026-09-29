@@ -48,6 +48,13 @@
       "reliefM": 0.004, "rough": 0.88, "roughVar": 0.05, "roughLumaK": 0.0, "ao": 0.45, "metal": 0.0,
       "seamless": "weld", "rowFlatten": false, "flattenSigma": 0.15, "isotropic": false, "heightFromLuma": "direct"
     },
+    "charredWood": {
+      "label": "焦炭木（烧黑的梁木、炭化龟裂；反照率整体很暗）",
+      "mean": [0.15, 0.135, 0.125], "contrast": 0.06,
+      "lumaRange": [0.08, 0.22], "satRange": [0.0, 0.4], "stdRange": [0.03, 0.12],
+      "reliefM": 0.008, "rough": 0.93, "roughVar": 0.05, "roughLumaK": 0.0, "ao": 0.5, "metal": 0.0,
+      "seamless": "weld", "rowFlatten": false, "flattenSigma": 0.15, "isotropic": false, "heightFromLuma": "direct"
+    },
     "drySoil": {
       "label": "干土 / 车道硬地 / 翻土",
       "mean": [0.416, 0.362, 0.268], "contrast": 0.1,

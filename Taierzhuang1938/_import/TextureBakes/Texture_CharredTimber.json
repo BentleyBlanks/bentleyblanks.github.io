@@ -1,0 +1,119 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-09-30",
+  "name": "CharredTimber",
+  "preset": "charredWood",
+  "source": {
+    "path": "_shots/Gap3A_Source/Smoke/lovart_36471cac5bb0.png",
+    "sha256": "7bb8a377b80474418f9be0b137bed65249f166b03055dfcfa70f5af7c11b3dfe",
+    "metrics": {
+      "meanSrgb": [
+        0.1402,
+        0.1324,
+        0.1322
+      ],
+      "luma": 0.1349,
+      "lumaStd": 0.0815,
+      "sat": 0.0571,
+      "clipLow": 0.0731,
+      "clipHigh": 0.0,
+      "lowFreq": 0.051
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.15,
+      0.135,
+      0.125
+    ],
+    "contrast": 0.06,
+    "lumaRange": [
+      0.08,
+      0.22
+    ],
+    "satRange": [
+      0.0,
+      0.4
+    ],
+    "stdRange": [
+      0.03,
+      0.12
+    ],
+    "reliefM": 0.008,
+    "rough": 0.93,
+    "roughVar": 0.05,
+    "roughLumaK": 0.0,
+    "ao": 0.5,
+    "metal": 0.0,
+    "seamless": "weld",
+    "rowFlatten": false,
+    "flattenSigma": 0.15,
+    "isotropic": false,
+    "heightFromLuma": "direct",
+    "tileM": 1.0,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_CharredTimberBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 297340,
+      "sha256": "36d2d8a877d510571d6d03845fe5f43c54577303605c7d19869407bea25ff196"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_CharredTimberNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 145760,
+      "sha256": "cc63850053d6625a206e9a071f9efa16ff9d0a6a5b6d0f2b6cefa0c7f7af447d"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_CharredTimberOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 66774,
+      "sha256": "c77a04b535cbf1ffbe8fc97b13aef05e7b619e3367e901fa55d6d9e7c5428d5c"
+    }
+  ],
+  "totalBytes": 509874,
+  "metrics": {
+    "meanSrgb": [
+      0.1493,
+      0.1358,
+      0.1243
+    ],
+    "luma": 0.1365,
+    "lumaStd": 0.0599,
+    "sat": 0.1675,
+    "clipLow": 0.0054,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0221,
+    "seam": 0.0092,
+    "interior": 0.0362,
+    "seamRatio": 0.255,
+    "border": 0.715,
+    "swing": 0.1305,
+    "aoMean": 0.89,
+    "roughMean": 0.908,
+    "texelsPerMeter": 1024.0
+  },
+  "gateProblems": []
+}

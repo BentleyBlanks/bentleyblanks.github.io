@@ -7,6 +7,17 @@ import { Mulberry32 } from "./Script_Noise.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ApplyShadowDepth } from "./Script_ShadowDepth.mjs";
 import { Type89Damage } from "./Script_Type89Damage.mjs";
+import { BURNT_TIMBER_PILE } from "./Data_BurntTimberPile.mjs";
+
+// 焦木堆几何（_blender/Script_BuildBurntTimberPile.py 建模导出：毫米整数位置、×127 法线、×1000 UV）。
+function PileGeometry(part) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(Float32Array.from(part.p, v => v / 1000), 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(Float32Array.from(part.n, v => v / 127), 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(Float32Array.from(part.uv, v => v / 1000), 2));
+  geometry.setIndex(part.i);
+  return geometry;
+}
 
 // Static wreckage is merged by sector/material. Only the existing VFX batches move.
 export class FirstLevelSmokeOrigins {
@@ -25,8 +36,15 @@ export class FirstLevelSmokeOrigins {
     Material("wood", "WoodBeam", 0x544333);
     Material("brick", "BrickWallSooty", 0x6b5744);
     Material("scorch", "CraterScorched", 0x26231f);
-    const coals = Material("coals", "WoodBeam", 0x351d10);
-    coals.emissive.setHex(0xce3708); coals.emissiveIntensity = .65;
+    // 焦木堆：烧黑龟裂的梁木（Lovart 焦炭木贴图，没烘出来就退回 WoodBeam）、只有缝里几块炭核带弱光。
+    // 旧版每四根木条整根平涂 0xce3708 自发光，泛光一推成了一条条纯红棒。
+    const charred = (() => { try { return library.Get("CharredTimber", { side: THREE.DoubleSide }); } catch { return library.Get("WoodBeam", { side: THREE.DoubleSide }); } })();
+    const charredMaterial = CloneShadedMaterial(charred); charredMaterial.color.setHex(0xd8d0c8); charredMaterial.roughness = .95; charredMaterial.metalness = 0;
+    this.materials.set("charred", charredMaterial);
+    const coals = CloneShadedMaterial(charred); coals.color.setHex(0x4a3020); coals.roughness = .9; coals.metalness = 0;
+    coals.emissive.setHex(0x7a2406); coals.emissiveIntensity = .16;
+    this.materials.set("coals", coals);
+    Material("ash", "CraterScorched", 0x5e5850);
     const sink = new BuildSink();
     for (const spec of FIRST_LEVEL_SMOKE_ORIGINS) this.Build(spec, sink, actorFactory);
     this.meshes = sink.Flush(this.root, { Get: key => this.materials.get(key) });
@@ -90,13 +108,15 @@ export class FirstLevelSmokeOrigins {
       firePoint.set(0,1.15,1.25); group.localToWorld(firePoint);
       half = [.99,1.0,2.5];
     } else {
-      for(let j=0;j<11;j++) Box(j%4===0?"coals":"wood",.18+random()*.18,.15,1.3+random()*1.7,(random()-.5)*2,.19+random()*.43,(random()-.5)*1.6,random()*.3,random()*Math.PI,(random()-.5)*.6);
+      // 塌落的焦木架（Blender 建模，A/B 两个全堆按 seed 轮换；油桶火堆用矮堆 C），木料、炭核、灰烬盘各一个材质键。
+      const variant = spec.kind === "barrels" ? "C" : spec.seed % 2 ? "A" : "B";
+      for (const [part, key] of [["wood", "charred"], ["coals", "coals"], ["ash", "ash"]]) Mesh(key, PileGeometry(BURNT_TIMBER_PILE[variant][part]));
       if(spec.kind === "barrels") for(let j=0;j<3;j++) {
         const x=(j-1)*.74,z=.45+(j%2)*.30;
         Mesh("steel",new THREE.CylinderGeometry(.3,.33,.86,12),x,.48,z,.15,0,(j-1)*.2);
         for(const y of [.20,.67]) Mesh("track",new THREE.TorusGeometry(.32,.025,4,12),x,y,z,Math.PI/2);
       }
-      firePoint.set(0,.35*spec.scale,0); half = [1.3,.28,1.3];
+      firePoint.set(0,.4*spec.scale,0); half = [1.4,.3,1.4];
     }
     group.position.set(spec.x-firePoint.x,0,spec.z-firePoint.z);
     // Four contact samples keep the long wreck body seated on sloping shared terrain.
@@ -124,9 +144,9 @@ export class FirstLevelSmokeOrigins {
     for(let j=0;j<15;j++) {
       const angle=random()*Math.PI*2,r=Math.sqrt(random())*2.5*spec.scale;
       const x=spec.x+Math.cos(angle)*r,z=spec.z+Math.sin(angle)*r;
-      const g=new THREE.IcosahedronGeometry(.15+random()*.35,0);
-      g.scale(1.3,.35+random()*.6,1);g.rotateY(angle);g.translate(x,groundAt(x,z)+.05,z);
-      sink.Add(j%3?"scorch":"brick",g);
+      const g=new THREE.IcosahedronGeometry(.08+random()*.2,0);
+      g.scale(1.3,.45+random()*.6,1);g.rotateY(angle);g.translate(x,groundAt(x,z)+.05,z);
+      sink.Add(j%3===0?"brick":j%3===1?"ash":"scorch",g);
     }
     // Low solid mass; an open cab/bed is not represented by an invisible full-height box.
     sink.Solid(group.position.x,group.position.y+half[1]*spec.scale,group.position.z,half[0]*spec.scale,half[1]*spec.scale,half[2]*spec.scale,"smokeWreck",spec.yaw,spec.kind==="timber"?"wood":"metal");
