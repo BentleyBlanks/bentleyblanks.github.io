@@ -904,3 +904,22 @@ AnalyserNode，每 50 ms 取峰值 / RMS；另挂主输出、远声组（`farGai
 `Script_AudioWiringTest` 8.8 的「150 m / 掠过 2 m 弹啸 ≤ 本体」余量变小：基线 −4.1 dB，改后两次 +0.7（红）/ −1.4
 （同一次运行里两行 150 m 的本体峰值能差 4 dB，远处本体的空气低通放开后随变体抖得更厉害）。`NEAR_MISS.overReportDb` 因此 −2 → −3 dB，改后四点 −9.5 / −13.6 / −5.2 / −3.6 dB，81/81。
 
+
+
+## 13. 环境床装载计划：战场远景床候选（2026-09-29）
+
+用户嫌默认环境里有「奇奇怪怪的人声」，第一关唯一的人声床是 `battleFar`（英语战斗人群录音）。
+无人声候选 A–E 的素材、口径与切换方法在 [音频资产「战场远景床：无人声候选」](Data_AudioAssets.md)；这里只记引擎侧怎么装。
+
+- **选哪一条**：`Script_AmbBedVariant.ResolveBattleBedChoice` —— URL 参数 `?ambBed=A|B|C|D|E|none` 优先于 `Data_Tuning_Audio.BATTLE_BED_VARIANT`，
+  都没给（或认不出）就是现行床。`Script_Audio.AmbBedChoice(manifest)` 把当前 `location.search`、调参口与清单里 `bedVariants` 的键喂给它。
+- **装载计划**：`BedLoadPlan(manifest, choice)` 只把 `battleFar` 这一个床名换成候选文件（`none` 是去掉），其余床原样；
+  `AmbFilesToFetch` 在此之上加一次性音。开机预取（`PrefetchPacks`）与解锁后装载（`LoadAmbPack`）用的是同一份计划，
+  所以被顶替的旧文件**不会**被请求、没选中的候选**不会**被下载，开机下载文件数与默认相同。
+- **预设一个字不用改**：候选被登记成同名床 `battleFar`，`AMBIENCE_PRESETS` 与 `OPENING_AMBIENCE_PRESETS` 里所有 `{ bed: "battleFar" }` 层照旧，
+  层增益、`battle` 强度倍率、`bus: "far"`、防炮洞低通都不变。`AudioEngine.ambBedChoice` 记这一局的选择（`{choice, source, variant, dropped, file}`），
+  `ambBuffers.get("battleFar")` 就是被选中的那条解码结果。
+- **认不出的值不静音**：拼错的 `?ambBed=`、旧清单里没有的候选键，都退回下一级直到现行，`LoadAmbPack` 里 `console.warn` 一声。
+- **缓存戳**：清单加了 `bedVariants`，`AMB_PACK_VERSION` 抬到 `20260929battlebeds`，`index.html` import map 登记了 `Script_AmbBedVariant.mjs`。
+- **验收**：`Script_AmbBedVariantTest`（纯 node，桩 fetch + 桩 AudioContext 跑真的 `PrefetchPacks` / `LoadAmbPack` 并记下每个请求）、
+  `Script_AmbBedVariantBrowserTest`（真浏览器、第一关入口、听者在玩家头上）。

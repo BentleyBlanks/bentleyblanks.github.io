@@ -2,7 +2,7 @@
 //
 //   node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs                 # 默认：只用存下的 take 重新混，不发任何请求
 //   node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs --variant=A,C    # 只混这几条
-//   node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs --force --stem=ThunderRoll   # 才会向 SeedAudio 再要一次（存成下一个 take 编号）
+//   node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs --force --stem=ThunderRoll   # 才会向 SeedAudio 再要一次（存成下一个 take 编号；不写 --stem 要显式 --all-stems）
 //   node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs --dry            # 只打印计划
 //   node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs --measure a.mp3 b.mp3    # 只量 RMS / 峰 / 波峰因数
 //   node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs --page           # 出本地对比页（_shots/AmbBedCandidates/，不提交）
@@ -59,6 +59,8 @@ function NextTake(stem) { let n = 1; while (fs.existsSync(TakePath(stem, n))) n 
 
 async function RequestTakes() {
   const only = (Option("stem") || "").split(",").filter(Boolean);
+  // 每条底要一次请求（6 条 = 6 次）；不写 --stem 就得明说 --all-stems，免得手滑把整批全抽一遍。
+  if (!only.length && !Flag("all-stems")) throw new Error("--force 要指明抽哪几条：--stem=<id[,id]>（可选 " + AMB_BED_STEMS.map((s) => s.id).join(" / ") + "），或 --all-stems");
   const wanted = AMB_BED_STEMS.filter((s) => !only.length || only.includes(s.id));
   if (!wanted.length) throw new Error(`没有这条底：${only.join(",")}`);
   fs.mkdirSync(takesDir, { recursive: true });

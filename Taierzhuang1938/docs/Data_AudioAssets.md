@@ -667,6 +667,131 @@ node Taierzhuang1938/Script_AmbBake.mjs --report      # 只打候选表，不落
 node Taierzhuang1938/Script_AmbBake.mjs --recut       # 不下载，只重切
 ```
 
+## 战场远景床：无人声候选（2026-09-29）
+
+用户原话（2026-09-29）：「当前默认游戏的环境音里有太多奇奇怪怪的人声，参考COD这类的操作给我重新生成几条给我选择」。
+
+**默认仍是现行 `battleFar`，一个字没动，等用户挑。** 候选是加进清单的另一批素材，
+用一个数（`Data_Tuning_Audio.BATTLE_BED_VARIANT`）或一个 URL 参数（`?ambBed=`）切换。
+
+### 审计：第一关默认环境里谁会出人声
+
+范围是环境层（`AMBIENCE_PRESETS` 与 `OPENING_AMBIENCE_PRESETS` 的床）和环境撒播事件；剧情对白与班组喊话不在内。
+「有效电平」= 素材成品 RMS（−27.4 dBFS）× 预设里的层增益 × 远声组 0.8 × 战场强度倍率（0.34–1），是床自己在远声组入口的 RMS，
+还没算远声组增益、对白侧链和防炮洞低通。筛查工具与判据见下面「人声筛查怎么做」。
+
+| 素材 / 事件 | 在哪播（第一关 `?whitebox=p012`） | 有效电平 | 客观证据 | 结论 |
+| --- | --- | --- | --- | --- |
+| `battleFar` 床（Coll Anderson 英语战斗人群，只低通到 110–1100 Hz）| 第一关每一档预设都有一层：`firstLevelOpeningDugout` / `firstLevelOpeningFront`（01–02 开场）、`firstLevelDugout`（洞口）、`firstLevelFront`（03 起大多数阶段）、`firstLevelSouth`（07 与安静行军）、`smokyDay`（关卡默认档）| 开场两档固定 −44.5 / −47.4 dBFS（480 / 1500 Hz 低通）；`firstLevelFront` −50.4（强度 0）… −41.1（强度 1）；`firstLevelSouth` −54.1 … −44.8；`firstLevelDugout` −52.7 … −43.3；`smokyDay` −51.1 … −41.8 | **suspect**：Silero VAD 0.5 阈值判语音 0.16 s、0.3 阈值 1.66 s（6.05–8.16 s）；6 段 0.24–0.58 s 的基频连续段（281–340 Hz，人声喊叫的基频）；Whisper 在开头吐「啊啊啊…」（no_speech 0.63，低置信）| **是。整个第一关默认环境里唯一的人声床**，正是「一群听不清在喊什么的人」 |
+| `crowdFar` 人群骚动 | 没有任何预设引用（08-29、09-09 两次明确不放）| 不播 | VAD 0.5 判语音 13.3 s / 19 s（**voice**）| 人声，但不在默认环境里 |
+| `amb.moanFar` 呻吟 ×2 | 没有预设调度（只在混音表里有条目）| 不播 | VAD 0.3 阈值 1.26 s / 0.42 s；第一条 2 段基频连续段（suspect）| 人声，但不在默认环境里 |
+| `carriageCrowd` 满员军列闲谈、`carriageRearCheer` | 只有 `firstLevelCarriage` 预设引用；军列开场下线后没有任何调用者 | 不播 | `carriageCrowd` VAD 0.5 判语音 38.4 s / 40 s（**voice**）| 人声，当前流程里没人调它 |
+| `trainInterior` 预设的 `coughLow` / `gearRustle` / `clothMove` 撒播 | 只有序章 `trainInterior` 预设 | 不在第一关 | 未筛（咳嗽是人发出的声音）| 不在第一关 |
+| `shellingFar` / `windPlain` / `windStreet` / `windNight` / `dawnField` / `fireNear` / `fireFar` 床 | 各档预设 | — | 全部 **clean**（VAD 0.5 判语音 0 s；`dawnField` 0.3 阈值下 0.39 s，未逐点复核，素材里是鸟鸣与公鸡）| 无人声 |
+| 撒播 `amb.cannonFar` ×3 / `crow` / `dogFar` / `planeFar` / `creak` / `debris` ×3 / `whizz` / `rooster`；远枪 `rifleNraFar` ×3 / `rifleIjaFar` / `zb26Far` ×2 / `type92Far` ×2 / `type11Far` ×3 / `explosionFar` / `launcherPop` | 各档预设与前线生成器 | — | 全部 **clean**（`rifleNraFar_01` 0.3 阈值下 0.2 s，整条文件就是一发枪响，未逐点复核）| 无人声 |
+
+**结论。** 环境层与环境撒播里，进第一关默认环境的人声素材只有 `battleFar` 一条。它自己就是一群人在喊，
+低通到 1.1 kHz 只是让词听不清，人群的「气」和喊声的基频还在（上表 6 段 281–340 Hz 的连续基频）。
+另外三条人声素材（`crowdFar`、`amb.moanFar`、`carriageCrowd`）不在默认环境里播。
+
+**不是这一层的人声（只报告，本包没动）：** AI 士兵的战场喊话（`Script_Audio.Bark`，`SHOUT_AUDIBILITY` 让喊话在 140 m 内都听得见，
+2026-09-27 特意抬过）、班组本人喊话、01 开场的 `chargeCrowd`（反冲锋一片喊杀）、日军审问台词。用户若听完候选床还嫌有怪人声，先查这几条。
+
+### 五条候选
+
+响度：每条按现行 `battleFar` **成品文件**的 RMS（−27.43 dBFS）对齐到 −27.4 ± 0.1，量的是编码后的 mp3；
+峰值天花板 −2.5 dBFS，超了由限幅器压（表里「限幅」是压掉的粗算量）。成品 80 kbps 立体声，各约 391 KB；
+现行 `battleFar` 是 23 s、90 KB。床没有循环点（引擎两条播放头从随机位置起播互相交叉淡），40 s 足够两条播放头挑不同的 11 s。
+
+| 键 | 文件 | 一句话风格 | 底（SeedAudio）| 补「炸」的实录单发（仓库里已有的成品）| RMS / 峰 / 波峰因数 | 人声筛查 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | `AudioAmb_BattleFarDistantThunder.mp3` | 远方炮群闷雷为主，缝里零星远枪；最稳的底，低频为主，不抢枪声脚步台词 | `ThunderRoll` 第 1 次抽，左右对调错开 2.4 s 叠两份 | 远炮 `amb.cannonFar`（Sonniss Pole Position）3 记、`rifleNraFar`（Sonniss FLYSOUND）3 发、`rifleIjaFar`（SeedAudio）2 发，带 0.4–0.9 s 回声 | −27.40 / −3.36 / 24.0 dB | clean |
+| B | `AudioAmb_BattleFarRifleCrackle.mp3` | 中远距离步枪与机枪交火，连绵噼啪、时疏时密，每声拖田野与土坡的回声尾巴 | `RifleCrackle` 第 1、2 次抽，左右对调错开 3.1 s 叠 | `rifleNraFar` 10、`rifleIjaFar` 12、`zb26Far`（Sonniss L7A2）3、`type92Far`（Sonniss M1919A4）3，都带 0.2–0.9 s 地形回声 | −27.45 / −2.34 / 25.1 dB | clean |
+| C | `AudioAmb_BattleFarHeavyBarrage.mp3` | 炮击一记紧接一记、地面在震，机枪不时一串长点射；压迫感最强，几乎没有安静的缝 | `BarrageShells` 第 1 次 + `MgLongBursts` 第 1 次（−13 dB、低通 2.4 kHz 推远）| 远炮 6 记、`rifleNraFar` 5 发 | −27.40 / −9.40 / 18.0 dB | clean |
+| D | `AudioAmb_BattleFarColdFrontline.mp3` | 风里几公里外的战线：稀疏、冷、空，大半时间只有低频余韵，偶尔一记远炮、几声几乎听不清的枪 | `ColdFront` 第 1 次（只留一层很轻的冷空气）| 远炮 2 记（低通 380 Hz）、`rifleNraFar` 3 发（低通 1.7 kHz、1 s 级回声）| −27.51 / −2.80 / 24.7 dB | clean |
+| E | `AudioAmb_BattleFarVillageEcho.mp3` | 仗在村子里打：枪声在砖墙土墙之间一层一层拍回来，回声叠回声 | `AlleyEcho` 第 1、2 次抽，左右对调错开 4.3 s 叠 | `rifleNraFar` 3、`rifleIjaFar` 3、`type92Far` 1（都带 70–470 ms 的墙面拍打回声）| −27.42 / −2.92 / 24.5 dB | clean |
+
+E 的第一版还撒了 4 处碎砖落屑（`amb.debris`，Sonniss Coll Anderson 的「碎砖与玻璃滑落」），成品在 0.3 阈值下有 0.19 s 被 VAD 判成语音
+（时间点落在一处落屑之后的低电平尾巴上，−43 dBFS）。那条素材单放是 clean，混进去后的尾巴在加严阈值下仍过线；不冒险，**整个撤掉**，
+撤掉后 0.3 阈值也是 0 s。
+
+来源与许可：底是 Volcengine SeedAudio 1.0 生成（`seed-audio-1.0`，受火山引擎条款约束）；
+撒进去的单发全是**仓库里已经在用的成品**（不新增第三方素材）：Sonniss GDC 免版税包（`amb.cannonFar` 2017 Pole Position、`rifleNraFar` 2020 FLYSOUND、
+`zb26Far` / `type92Far` 2016 Pole Position）与一条 SeedAudio 生成的 `rifleIjaFar`。
+清单里这五条的 `license` 写 `mixed`，`sources` / `scatter` 逐项列出用了哪些单发、各自许可。
+SeedAudio 请求共 **10 次**（6 条提示词各抽 1 次，其中 `RifleCrackle` / `AlleyEcho` / `MgLongBursts` / `ThunderRoll` 各再抽 1 次；0 次重试；预算 40 次）。
+`ThunderRoll` 第 2 次抽是一片 −39 dBFS 的中低频持续隆隆，方向不明确，没用；`MgLongBursts` 第 2 次只有 36.4 s，配方要 40 s，没用。
+
+候选**不在** `manifest.beds` 里，在 `manifest.bedVariants` 里：放进 `beds` 开机会把五条全下载。
+
+### 怎么切换
+
+优先级 URL 参数 > 调参口 > 默认：
+
+| 怎么切 | 效果 |
+| --- | --- |
+| 不带参数、`BATTLE_BED_VARIANT = null`（现状）| 现行 `battleFar`（23 s，英语战斗人群）|
+| `?ambBed=A` … `?ambBed=E`（大小写都行，例如 `?whitebox=p012&ambBed=b`）| 把**所有**预设里的 `battleFar` 层（含 01–02 开场两档）换成这一条 |
+| `?ambBed=none` | 不放这一层，方便和其它层对比 |
+| `Data_Tuning_Audio.BATTLE_BED_VARIANT = "B"` | 与 URL 参数同效；用户选定后**只改这一个数**（改完把 `index.html` import map 里 `Data_Tuning_Audio` 的 `?v=` +1）|
+| 认不出的值（拼错、旧清单里没有这条）| 退回下一级，最后退回现行；控制台 warn 一声，绝不因为拼错静音 |
+
+**只装载被选中的那一条**：`Script_AmbBedVariant.mjs` 决定装载计划，`Script_Audio.PrefetchPacks`（开机预取）与 `LoadAmbPack`（解锁后装载）用同一份计划。
+候选顶替 `battleFar` 这个床名，被顶替的旧文件**不再请求**，所以开机下载文件数与默认相同，也不用改任何一档预设的层表。
+清单缓存戳 `AMB_PACK_VERSION` 抬到 `20260929battlebeds`（清单加了 `bedVariants`，戳不动的话旧清单看不到候选）。
+
+### 怎么重烘
+
+```bash
+node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs                     # 默认：只用存下的 take 重混，不发任何请求；混完跑人声筛查、写清单
+node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs --variant=A,C --no-screen
+node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs --force --stem=ThunderRoll   # 才会向 SeedAudio 再要一次，存成下一个 take 编号
+node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs --measure a.mp3 b.mp3        # 只量 RMS / 峰 / 波峰因数
+node Taierzhuang1938/Script_SeedAudioBattleBedBake.mjs --page                       # 出本地对比页 _shots/AmbBedCandidates/（不提交）
+```
+
+素材表、提示词与混音配方在 `Data_AmbSources.mjs`（`AMB_BED_STEMS` / `AMB_BED_VARIANTS` / `AMB_BED_TARGET`）。
+原始 take 放 `--takes-dir`（默认 `tmp/AmbBedTakes/`，已忽略；本轮另存了一份到
+`C:\Users\Bentl\OneDrive\Sync\饮河\FPS\音频提取\滕县环境床候选_20260929\`），每次请求追加一行到 `Requests.jsonl`（不含密钥），总数超过 40 就拒绝。
+密钥只从环境变量 `VOLCENGINE_API_KEY` 读，经 `Script_SeedAudioVoiceKit.SeedAudioSpeak` 的 `X-Api-Key` 头发出。
+混音里所有随机走 Mulberry32（种子 = 候选键 + 撒播项名），同一批 take 重混结果逐字节相同；
+换一版撒播想重抽位置，改配方里的 `id`。全量 `Script_AmbBake.mjs` 重烘会把 `bedVariants` 原样带回清单，不会抹掉。
+
+### 人声筛查怎么做（没有耳朵，只有数）
+
+`Script_AmbBedVoiceScreen.py`（faster-whisper 缓存里的 medium 模型与 Silero VAD，onnxruntime，本机可跑）三道互相独立：
+
+1. **Silero VAD**：0.5 阈值判语音的秒数是标准口径，0.3 是加严口径。语音 ≥ 1 s 直接判 voice，任一道有提示判 suspect，候选要求 clean。
+2. **Whisper 转写**（中、英各跑一遍，不带上文）：Whisper 在噪声与音调声上会**幻觉出整句话**（「我最喜欢的一段视频」「Thanks for watching」，
+   还会给出超出片段时长的时间戳），所以只有「片段内、非套话、no_speech < 0.4 且 avg_logprob > −1.0」的文字才算证据；五条候选的可信转写词都是 0。
+3. **基频连续段**：先过 150–3400 Hz 人声带（不滤的话炮群的低频隆隆会让小滞后处的自相关恒高，第一版就这样误报了满屏），再看 85–380 Hz 的谐波性连续 ≥ 0.24 s。
+
+限度要老实写：加严阈值下 VAD 会把某些混合尾巴（E 第一版的碎砖落屑尾巴）与枪声瞬态偶尔判成语音，所以要看时间点再定，不是「命中就扔」也不是「0.5 阈值过了就算」；
+基频段对「没有基频的人群低语」不灵（`crowdFar` 基频段 0，靠 VAD 抓到）；工具没有代替耳朵。**请用户实听。**
+频谱图用 `showspectrumpic` 时不要用 `fscale=log`：它会在 500–900 Hz 附近画一条假的亮带，纯粉噪声也有，会被误读成一条持续的音调；对比页用线性频率。
+
+### 验收
+
+`Script_AmbBedVariantTest`（纯 node，30 项：选择与优先级、装载计划、清单与成品哈希 / RMS / 峰值 / 人声筛查记录、提示词禁人声、
+桩 fetch 下真的跑 `PrefetchPacks` 与 `LoadAmbPack`，记下每一个请求）；`Script_AmbBedVariantBrowserTest`（真浏览器，第一关默认入口只请求旧
+`AudioAmb_BattleFar.mp3` 且开机不碰候选，`?ambBed=B` 只请求 B 不请求旧的，`none` 都不请求；`battleFar` 层输出端 RMS 高于地板且与
+「素材 RMS + 层增益」相差不超过 8 dB；相机在玩家头部）。
+
+2026-09-29 实测（`?whitebox=p012&menu=0&intro=0&manual=1&quality=low`，点「开始」后推 3 s 再量 8 s；相机与玩家同处水平位置、高出脚底 0.93 m，听者距相机 0 m）：
+在场的是开场档 `firstLevelOpeningDugout`（`battleFar` 层增益 0.14、480 Hz 低通，在低通之前的组增益节点上量）。
+
+| 场景 | 开机与装载请求的战场床 | `battleFar` 层输出端 RMS | 远声组 / 环境总线 RMS | 床时长 |
+| --- | --- | --- | --- | --- |
+| 默认 | 只有 `AudioAmb_BattleFar.mp3`，一条候选都没有 | −44.6 dBFS（预期 −44.5）| −43.3 / −52.1 dBFS | 23 s |
+| `?ambBed=B` | 只有 `AudioAmb_BattleFarRifleCrackle.mp3`，旧的不请求 | −47.2 dBFS（预期 −44.5；8 s 窗口里稀疏的枪声晃几分贝）| −45.1 / −52.2 dBFS | 40 s |
+| `?ambBed=none` | 两者都不请求 | 没有这一层 | — | — |
+
+这些是数字，**没有人耳试听过**：候选进游戏后的响度与实际听感要用户挑的时候再确认；游戏里这一层还有战场强度倍率（0.34–1）、远声组增益和对白侧链。
+
+顺带一条只报告的观察：开机预取会把清单里**所有**床与一次性音都下载并解码，包括第一关没有任何预设引用的人声素材 ——
+`crowdFar`（76 KB）、`carriageCrowd`（642 KB，满员军列闲谈）、`carriageRearCheer`（113 KB）、`amb.moanFar` 两条（43 KB），合计约 0.87 MB，
+另有序章车厢用的 `trainInterior` / `trainCarriageOnly` 约 1.1 MB。它们在第一关都不播；哪天要省开机流量，可以让装载计划只取「被预设引用过的床」。
+
 ---
 
 # 音乐：从四条合成配方换成九段授权／生成曲
