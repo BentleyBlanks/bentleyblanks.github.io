@@ -1648,54 +1648,62 @@
       "who": "ijaA",
       "lang": "ja",
       "projection": "shout",
-      "seconds": 3.62,
-      "bytes": 44244,
-      "sha256": "7050528105773083aeb304e323ece607c1078d1062189629a40cc56e90dd3e6b",
-      "source": "scene",
-      "sceneSha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
+      "seconds": 2.372,
+      "bytes": 29197,
+      "sha256": "56417a844c4c1d7a9c86c63b9e221dc50b617dd236128e7979d5aea24503a789",
+      "source": "patch",
+      "sceneSha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
       "sceneStartS": 0,
-      "sceneEndS": 3.62,
+      "sceneEndS": 5.095,
       "gapBeforeS": 0,
       "tight": [
         false,
-        false
+        true
       ],
       "edgeDb": [
-        -23.4,
-        -69.3
+        -38.9,
+        -3.6
       ],
       "cutMethod": "subtitle",
       "castOwner": "ijaA",
       "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -15.88,
-        "truePeakDb": -1.24,
-        "snrDb": 30.39,
-        "voicedS": 2.76,
-        "lowShare": 0.215,
+        "activeRmsDb": -19.85,
+        "truePeakDb": -6.44,
+        "snrDb": 32.44,
+        "voicedS": 2,
+        "lowShare": 0.269,
         "f0": {
-          "median": 364,
-          "p10": 176,
-          "p90": 421,
-          "frames": 22
+          "median": 242,
+          "p10": 150,
+          "p90": 302,
+          "frames": 41
         },
-        "cer": 0.3636,
-        "transcript": "へへへへへ、舞台は、どこへ引いた?引け!",
-        "speakerCos": 0.435,
+        "cer": 0.2727,
+        "transcript": "舞台はどこへ引いた?聞け!",
+        "speakerCos": 0.74,
         "nearestOther": [
           "interpreter",
-          0.264
+          0.42
         ],
         "referencedOther": [
           "interpreter",
-          0.264
+          0.422
         ],
         "lengthDiff": -1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.79
+        "sceneGainDb": 0.71
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "patch": {
+        "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
+        "replacedSha256": "94f396105d8d725dbc788cdda89eb1321a8ba20f7380bb9e7d79655251b23423",
+        "targetDb": -19.41,
+        "takes": 2,
+        "take": 1,
+        "promptHash": "08602019c6f37d8422880929b2ada3a07afe8b0e09c5aaaf966d71c3348ec9d3"
+      }
     },
     "CaptiveInterrogation.02": {
       "file": "Lines/AudioVoice_FirstLevelCaptiveInterrogation_02.mp3",
@@ -1704,52 +1712,52 @@
       "who": "interpreter",
       "lang": "ja",
       "projection": "normal",
-      "seconds": 0.811,
-      "bytes": 10703,
-      "sha256": "5053deebd26b7d3ad1f459abd3087984f4ac4240b5a921769f54e8af0609c9f4",
+      "seconds": 0.725,
+      "bytes": 9449,
+      "sha256": "be79cd47fbff2318a6a17518d431527e6d61396d5a463a31694b09e5133cdc42",
       "source": "scene",
-      "sceneSha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
-      "sceneStartS": 3.66,
-      "sceneEndS": 4.47,
-      "gapBeforeS": 0.04,
+      "sceneSha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
+      "sceneStartS": 5.095,
+      "sceneEndS": 5.82,
+      "gapBeforeS": 0,
       "tight": [
-        false,
+        true,
         false
       ],
       "edgeDb": [
-        -81.8,
-        -55.1
+        -3.6,
+        -46.8
       ],
       "cutMethod": "subtitle",
       "castOwner": "interpreter",
       "castSha256": "cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -23.22,
-        "truePeakDb": -9.72,
-        "snrDb": 34.11,
-        "voicedS": 0.56,
-        "lowShare": 0.262,
+        "activeRmsDb": -21.73,
+        "truePeakDb": -8.66,
+        "snrDb": 32.73,
+        "voicedS": 0.58,
+        "lowShare": 0.39,
         "f0": {
-          "median": 168,
-          "p10": 163,
-          "p90": 327,
-          "frames": 4
+          "median": 235,
+          "p10": 186,
+          "p90": 258,
+          "frames": 14
         },
-        "cer": 0.5,
-        "transcript": "は、はい",
-        "speakerCos": 0.655,
+        "cer": 0,
+        "transcript": "はい!",
+        "speakerCos": 0.43,
         "nearestOther": [
-          "ijaB",
-          0.452
+          "ijaA",
+          0.302
         ],
         "referencedOther": [
           "ijaA",
-          0.202
+          0.302
         ],
-        "lengthDiff": 1,
+        "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.79
+        "sceneGainDb": 0.71
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1760,52 +1768,52 @@
       "who": "interpreter",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.19,
-      "bytes": 27003,
-      "sha256": "f3434e670d746b00d9994330079c4e0c03a0136fe0530f94f98fd8961f3435ab",
+      "seconds": 1.84,
+      "bytes": 22928,
+      "sha256": "6bf753faae2682ecf597ae1e5a19f3e912ba41d38de529158ee5dbfcd5ace85d",
       "source": "scene",
-      "sceneSha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
-      "sceneStartS": 5.57,
-      "sceneEndS": 7.76,
-      "gapBeforeS": 1.1,
+      "sceneSha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
+      "sceneStartS": 6.21,
+      "sceneEndS": 8.05,
+      "gapBeforeS": 0.39,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -87.6,
-        -50.9
+        -66.2,
+        -45.4
       ],
       "cutMethod": "subtitle",
       "castOwner": "interpreter",
       "castSha256": "cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.39,
-        "truePeakDb": -9.69,
-        "snrDb": 20.51,
-        "voicedS": 2.08,
-        "lowShare": 0.224,
+        "activeRmsDb": -18.86,
+        "truePeakDb": -7.18,
+        "snrDb": 49.08,
+        "voicedS": 1.54,
+        "lowShare": 0.264,
         "f0": {
-          "median": 250,
-          "p10": 205,
-          "p90": 327,
-          "frames": 89
+          "median": 267,
+          "p10": 213,
+          "p90": 333,
+          "frames": 53
         },
-        "cer": 0.1111,
-        "transcript": "你们的人往哪撤了?",
-        "speakerCos": 0.78,
+        "cer": 0,
+        "transcript": "你们的人往哪儿撤了?",
+        "speakerCos": 0.828,
         "nearestOther": [
           "ijaB",
-          0.478
+          0.503
         ],
         "referencedOther": [
           "comrade",
-          0.306
+          0.289
         ],
-        "lengthDiff": -1,
+        "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.79
+        "sceneGainDb": 0.71
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1815,53 +1823,57 @@
       "index": 3,
       "who": "comrade",
       "lang": "zh",
-      "projection": "normal",
-      "seconds": 0.59,
-      "bytes": 7881,
-      "sha256": "67a6346de5168cc88a254aedd01e0d565d52dddebd9aedf70f82c5e28156b726",
+      "projection": "low",
+      "seconds": 2.57,
+      "bytes": 31705,
+      "sha256": "08d2e4578d5e0b60d29349cf36a6d61b3021e9d8ab788197871e52eb97352835",
       "source": "scene",
-      "sceneSha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
-      "sceneStartS": 7.76,
-      "sceneEndS": 8.35,
-      "gapBeforeS": 0,
+      "sceneSha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
+      "sceneStartS": 8.33,
+      "sceneEndS": 10.9,
+      "gapBeforeS": 0.28,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -40.5,
-        -50.6
+        -34,
+        -30.1
       ],
       "cutMethod": "subtitle",
-      "castOwner": "comrade",
-      "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
+      "castOwner": "comradeWounded",
+      "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -21.85,
-        "truePeakDb": -8.31,
-        "snrDb": 46.38,
-        "voicedS": 0.46,
-        "lowShare": 0.345,
+        "activeRmsDb": -35.66,
+        "truePeakDb": -11.06,
+        "snrDb": 22.93,
+        "voicedS": 1.36,
+        "lowShare": 0.121,
         "f0": {
-          "median": 176,
-          "p10": 118,
-          "p90": 222,
-          "frames": 15
+          "median": 106,
+          "p10": 105,
+          "p90": 115,
+          "frames": 5
         },
         "cer": 0,
         "transcript": "啥子?",
-        "speakerCos": 0.524,
+        "speakerCos": 0.419,
         "nearestOther": [
           "ijaA",
-          0.504
+          0.39
         ],
         "referencedOther": [
           "ijaA",
-          0.504
+          0.39
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.79
+        "sceneGainDb": 0.71,
+        "speakerSpanS": [
+          1.75,
+          2.53
+        ]
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1872,52 +1884,52 @@
       "who": "interpreter",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 2.865,
-      "bytes": 35153,
-      "sha256": "88e2c3e09194e37f3f12b6d4824219d1beea0b94d459577109f426457bec5841",
+      "seconds": 3.505,
+      "bytes": 42990,
+      "sha256": "91e1159e1917155679163af93a67d42cea9d77d9336292ca7e3b7b994aaf42ed",
       "source": "scene",
-      "sceneSha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
-      "sceneStartS": 9.04,
-      "sceneEndS": 11.905,
-      "gapBeforeS": 0.69,
+      "sceneSha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
+      "sceneStartS": 11.26,
+      "sceneEndS": 14.765,
+      "gapBeforeS": 0.36,
       "tight": [
         false,
         true
       ],
       "edgeDb": [
-        -56.8,
-        0.9
+        -47.6,
+        -12.7
       ],
       "cutMethod": "subtitle",
       "castOwner": "interpreter",
       "castSha256": "cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.44,
-        "truePeakDb": -9.3,
-        "snrDb": 77.67,
-        "voicedS": 2.14,
-        "lowShare": 0.24,
+        "activeRmsDb": -20.11,
+        "truePeakDb": -6.2,
+        "snrDb": 45.17,
+        "voicedS": 2.56,
+        "lowShare": 0.255,
         "f0": {
-          "median": 291,
-          "p10": 176,
-          "p90": 432,
-          "frames": 75
+          "median": 222,
+          "p10": 134,
+          "p90": 444,
+          "frames": 73
         },
         "cer": 0,
         "transcript": "你们大队往哪儿撤了?",
-        "speakerCos": 0.845,
+        "speakerCos": 0.773,
         "nearestOther": [
           "ijaB",
-          0.516
+          0.489
         ],
         "referencedOther": [
           "comrade",
-          0.336
+          0.476
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.79
+        "sceneGainDb": 0.71
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -1928,62 +1940,58 @@
       "who": "ijaB",
       "lang": "ja",
       "projection": "shout",
-      "seconds": 1.621,
-      "bytes": 20420,
-      "sha256": "a5a253f9e201426dae8418ad52b0be8769d48f4aa889b138d977e2156bfe6cf9",
-      "source": "patch",
-      "sceneSha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
-      "sceneStartS": 11.905,
-      "sceneEndS": 16.125,
+      "seconds": 4.265,
+      "bytes": 52080,
+      "sha256": "09da8611a39b6fb7648311ea80f16adc68b22d1c518a86f94a3ae70923198b4e",
+      "source": "scene",
+      "sceneSha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
+      "sceneStartS": 14.765,
+      "sceneEndS": 19.03,
       "gapBeforeS": 0,
       "tight": [
         true,
-        true
+        false
       ],
       "edgeDb": [
-        1.3,
-        -54.4
+        -13.7,
+        -46.3
       ],
       "cutMethod": "subtitle",
       "castOwner": "ijaB",
       "castSha256": "f9ba276de41ef0e4b9e6b98c1c10b7fb83d110825ad44cfe23ec3b61b7ff6040",
       "referenced": false,
       "metrics": {
-        "activeRmsDb": -17.5,
-        "truePeakDb": -3.85,
-        "snrDb": 84.7,
-        "voicedS": 1.16,
-        "lowShare": 0.083,
+        "activeRmsDb": -16.97,
+        "truePeakDb": -1.23,
+        "snrDb": 29.68,
+        "voicedS": 3.12,
+        "lowShare": 0.09,
         "f0": {
-          "median": 203,
-          "p10": 114,
-          "p90": 410,
-          "frames": 15
+          "median": 381,
+          "p10": 211,
+          "p90": 421,
+          "frames": 36
         },
         "cer": 0.2,
-        "transcript": "この死な野郎早く言え",
-        "speakerCos": 0.742,
+        "transcript": "この死な野郎、早く言え!",
+        "speakerCos": 0.274,
         "nearestOther": [
           "interpreter",
-          0.565
+          0.345
         ],
         "referencedOther": [
-          "ijaA",
-          0.51
+          "interpreter",
+          0.345
         ],
         "lengthDiff": -2,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.79
+        "sceneGainDb": 0.71,
+        "speakerSpanS": [
+          0,
+          2.895
+        ]
       },
-      "mastering": "SliceOfWholeSceneMaster",
-      "patch": {
-        "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
-        "replacedSha256": "dc610b2b9535fefbb2c4ba766864ca322c7745540a63877058984c6f2244d8cc",
-        "targetDb": -17.06,
-        "takes": 1,
-        "take": 1,
-        "promptHash": "ceb4360aecf872b64f9efa780d8a4e2905925dad97b9ecdb0bc2562310b6c0c3"
-      }
+      "mastering": "SliceOfWholeSceneMaster"
     },
     "CaptiveInterrogation.07": {
       "file": "Lines/AudioVoice_FirstLevelCaptiveInterrogation_07.mp3",
@@ -1992,56 +2000,52 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 2.265,
-      "bytes": 27943,
-      "sha256": "cb186c02668fd8937899636959665481f4ee133bd71552ea6301261f85ab6a81",
+      "seconds": 3.92,
+      "bytes": 48005,
+      "sha256": "61f5799e09518deecc46c922652526ca24ef087ac7a31c8b1911904e7fd63dab",
       "source": "scene",
-      "sceneSha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
-      "sceneStartS": 16.125,
-      "sceneEndS": 18.39,
-      "gapBeforeS": 0,
+      "sceneSha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
+      "sceneStartS": 19.16,
+      "sceneEndS": 23.08,
+      "gapBeforeS": 0.13,
       "tight": [
-        true,
+        false,
         false
       ],
       "edgeDb": [
-        -16.5,
-        -36
+        -42,
+        -42.9
       ],
       "cutMethod": "subtitle",
-      "castOwner": "comrade",
-      "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
+      "castOwner": "comradeWounded",
+      "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -23.53,
-        "truePeakDb": -5.14,
-        "snrDb": 39.54,
-        "voicedS": 1.24,
-        "lowShare": 0.342,
+        "activeRmsDb": -27.09,
+        "truePeakDb": -8.04,
+        "snrDb": 29.7,
+        "voicedS": 1.9,
+        "lowShare": 0.311,
         "f0": {
-          "median": 148,
-          "p10": 119,
-          "p90": 163,
-          "frames": 32
+          "median": 158,
+          "p10": 129,
+          "p90": 198,
+          "frames": 27
         },
-        "cer": 0,
-        "transcript": "滚!二鬼子!",
-        "speakerCos": 0.611,
+        "cer": 0.25,
+        "transcript": "关二鬼子。",
+        "speakerCos": 0.689,
         "nearestOther": [
           "ijaA",
-          0.621
+          0.425
         ],
         "referencedOther": [
           "ijaA",
-          0.621
+          0.425
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.79,
-        "speakerSpanS": [
-          0,
-          1.915
-        ]
+        "sceneGainDb": 0.71
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -2052,54 +2056,62 @@
       "who": "ijaA",
       "lang": "ja",
       "projection": "shout",
-      "seconds": 1.275,
-      "bytes": 16031,
-      "sha256": "8b8dc900c1dd936d96caf6a64339af785e5a3aefe84d08ebb0bffbc0bf3dc648",
-      "source": "scene",
-      "sceneSha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
-      "sceneStartS": 18.57,
-      "sceneEndS": 19.845,
-      "gapBeforeS": 0.18,
+      "seconds": 2.44,
+      "bytes": 30138,
+      "sha256": "5801ef0f6496d942ad7d532ddac39ff6c0a4acdd95cec3f69722594c06dd9e66",
+      "source": "patch",
+      "sceneSha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
+      "sceneStartS": 23.34,
+      "sceneEndS": 24.645,
+      "gapBeforeS": 0.26,
       "tight": [
         false,
         true
       ],
       "edgeDb": [
-        -30.9,
-        -25.1
+        -35.5,
+        2.6
       ],
       "cutMethod": "subtitle",
       "castOwner": "ijaA",
       "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -16.92,
-        "truePeakDb": -2.36,
-        "snrDb": 32.83,
-        "voicedS": 1.02,
-        "lowShare": 0.159,
+        "activeRmsDb": -20.25,
+        "truePeakDb": -6.84,
+        "snrDb": 42.88,
+        "voicedS": 1.06,
+        "lowShare": 0.188,
         "f0": {
-          "median": 205,
-          "p10": 170,
-          "p90": 485,
-          "frames": 11
+          "median": 271,
+          "p10": 195,
+          "p90": 308,
+          "frames": 23
         },
-        "cer": 0.1667,
-        "transcript": "なんといた!",
-        "speakerCos": 0.515,
+        "cer": 0,
+        "transcript": "なんといったー!",
+        "speakerCos": 0.734,
         "nearestOther": [
           "comrade",
-          0.278
+          0.502
         ],
         "referencedOther": [
-          "comrade",
-          0.278
+          "interpreter",
+          0.355
         ],
-        "lengthDiff": -1,
+        "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.79
+        "sceneGainDb": 0.71
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "patch": {
+        "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
+        "replacedSha256": "e11bc67e5f150d2b5a426372f2b652f8335ad2de81df500722f85f77a972836f",
+        "targetDb": -19.81,
+        "takes": 2,
+        "take": 1,
+        "promptHash": "796cf62d9b6b27476481aa3f3aeb31fc677d2951234ab7af2beeb1257fa1e2cb"
+      }
     },
     "CaptiveInterrogation.09": {
       "file": "Lines/AudioVoice_FirstLevelCaptiveInterrogation_09.mp3",
@@ -2108,52 +2120,52 @@
       "who": "interpreter",
       "lang": "ja",
       "projection": "normal",
-      "seconds": 2.515,
-      "bytes": 31078,
-      "sha256": "c8804e66f2641ff565a6292e3e887d2a836ea402dc7d54ef614c493db503f52b",
+      "seconds": 4.085,
+      "bytes": 49886,
+      "sha256": "55c1922459102d71a6afbcbedb5f01cf58247fe5ae41f8495ccbe74cfbc4b014",
       "source": "scene",
-      "sceneSha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
-      "sceneStartS": 19.845,
-      "sceneEndS": 22.36,
+      "sceneSha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
+      "sceneStartS": 24.645,
+      "sceneEndS": 28.73,
       "gapBeforeS": 0,
       "tight": [
         true,
         false
       ],
       "edgeDb": [
-        -37.1,
-        -59.4
+        2.6,
+        -37.7
       ],
       "cutMethod": "subtitle",
       "castOwner": "interpreter",
       "castSha256": "cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -21.44,
-        "truePeakDb": -8.71,
-        "snrDb": 63.13,
-        "voicedS": 2.06,
-        "lowShare": 0.19,
+        "activeRmsDb": -20.17,
+        "truePeakDb": -4.51,
+        "snrDb": 43.34,
+        "voicedS": 3.34,
+        "lowShare": 0.213,
         "f0": {
-          "median": 400,
-          "p10": 320,
-          "p90": 471,
-          "frames": 69
+          "median": 286,
+          "p10": 203,
+          "p90": 356,
+          "frames": 67
         },
         "cer": 0.0714,
-        "transcript": "何も話しません!悪退ばかりです!",
-        "speakerCos": 0.775,
+        "transcript": "何も話しません悪体ばかりです",
+        "speakerCos": 0.669,
         "nearestOther": [
-          "ijaB",
-          0.503
+          "comrade",
+          0.456
         ],
         "referencedOther": [
-          "ijaA",
-          0.251
+          "comrade",
+          0.456
         ],
         "lengthDiff": -4,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.79
+        "sceneGainDb": 0.71
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -2164,52 +2176,56 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 3.2,
-      "bytes": 39228,
-      "sha256": "ee1b54774d4d74c8ddf70353e14fc285325e3abbd4d10c522f1f44d4216519c4",
+      "seconds": 5.07,
+      "bytes": 61798,
+      "sha256": "fce84914e13d392b6e3117f20ca93b7b0e45f3da2210260e9792c6906e87874d",
       "source": "scene",
-      "sceneSha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
-      "sceneStartS": 22.42,
-      "sceneEndS": 25.62,
-      "gapBeforeS": 0.06,
+      "sceneSha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
+      "sceneStartS": 29.27,
+      "sceneEndS": 34.34,
+      "gapBeforeS": 0.54,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -48.8,
-        -36.3
+        -32.9,
+        -34.5
       ],
       "cutMethod": "subtitle",
-      "castOwner": "comrade",
-      "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
+      "castOwner": "comradeWounded",
+      "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -22.8,
-        "truePeakDb": -2.77,
-        "snrDb": 40.6,
-        "voicedS": 2,
-        "lowShare": 0.171,
+        "activeRmsDb": -27.5,
+        "truePeakDb": -8.38,
+        "snrDb": 28.19,
+        "voicedS": 2.5,
+        "lowShare": 0.449,
         "f0": {
-          "median": 122,
-          "p10": 105,
-          "p90": 170,
-          "frames": 52
+          "median": 114,
+          "p10": 108,
+          "p90": 168,
+          "frames": 57
         },
-        "cer": 0,
-        "transcript": "老子骂的就是你们狗日的。",
-        "speakerCos": 0.783,
+        "cer": 0.0909,
+        "transcript": "老子骂的就是你们狗日子。",
+        "speakerCos": 0.816,
         "nearestOther": [
           "ijaA",
-          0.679
+          0.508
         ],
         "referencedOther": [
           "ijaA",
-          0.679
+          0.508
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.79
+        "sceneGainDb": 0.71,
+        "speakerSpanS": [
+          1.45,
+          5.07
+        ]
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -2220,52 +2236,56 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 1.17,
-      "bytes": 14778,
-      "sha256": "a03850eb88ad64ea39f4622bdd4572af09d6d38cd284763bec0837d98685d2de",
+      "seconds": 3.19,
+      "bytes": 39228,
+      "sha256": "a15f420f37233047feed8e1ef53b6bf27c680c0673d597e99e1db85d2e2f2d07",
       "source": "scene",
-      "sceneSha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
-      "sceneStartS": 26.65,
-      "sceneEndS": 27.82,
-      "gapBeforeS": 1.03,
+      "sceneSha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
+      "sceneStartS": 34.99,
+      "sceneEndS": 38.18,
+      "gapBeforeS": 0.65,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -46.2,
-        -21.4
+        -42.7,
+        -25.4
       ],
       "cutMethod": "subtitle",
-      "castOwner": "comrade",
-      "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
+      "castOwner": "comradeWounded",
+      "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -23.99,
-        "truePeakDb": -3.55,
-        "snrDb": 32.25,
-        "voicedS": 1.04,
-        "lowShare": 0.275,
+        "activeRmsDb": -23.77,
+        "truePeakDb": -6.58,
+        "snrDb": 27.7,
+        "voicedS": 1.4,
+        "lowShare": 0.312,
         "f0": {
-          "median": 148,
-          "p10": 110,
-          "p90": 176,
-          "frames": 25
+          "median": 152,
+          "p10": 137,
+          "p90": 167,
+          "frames": 26
         },
         "cer": 0,
         "transcript": "小日本。",
-        "speakerCos": 0.562,
+        "speakerCos": 0.458,
         "nearestOther": [
           "ijaA",
-          0.565
+          0.44
         ],
         "referencedOther": [
           "ijaA",
-          0.565
+          0.44
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.79
+        "sceneGainDb": 0.71,
+        "speakerSpanS": [
+          1.97,
+          3.11
+        ]
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -2554,52 +2574,56 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 4.23,
-      "bytes": 51453,
-      "sha256": "27e99dd1ed6f804896f75d5ae93ef21e0f3d38e5ede2baf13bb8cd94198bfe08",
+      "seconds": 4.06,
+      "bytes": 49573,
+      "sha256": "f5f871ed4cca6a36a31ff373905971a548a3c5f7cf953e187197cc6aa753ec29",
       "source": "scene",
-      "sceneSha256": "f559ea536e0053820b9841cea625f58c35c2109146b1e849767c90dad2c3a5df",
-      "sceneStartS": 0,
-      "sceneEndS": 4.23,
+      "sceneSha256": "3ecb7ae0da5d2151653ef422b42a7ab78afab2936c1497cc6c233ab0c6a2d34b",
+      "sceneStartS": 0.02,
+      "sceneEndS": 4.08,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -3,
-        -43.3
+        -88.1,
+        -44.3
       ],
-      "cutMethod": "subtitle",
-      "castOwner": "comrade",
-      "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
+      "cutMethod": "silence",
+      "castOwner": "comradeWounded",
+      "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -20.55,
-        "truePeakDb": -1.63,
-        "snrDb": 48.65,
-        "voicedS": 2.18,
-        "lowShare": 0.314,
+        "activeRmsDb": -20.89,
+        "truePeakDb": -4.99,
+        "snrDb": 35.04,
+        "voicedS": 1.8,
+        "lowShare": 0.499,
         "f0": {
-          "median": 151,
-          "p10": 105,
-          "p90": 193,
-          "frames": 69
+          "median": 232,
+          "p10": 144,
+          "p90": 246,
+          "frames": 32
         },
         "cer": 0.5,
-        "transcript": "狗子嘞!你妈嘞!",
-        "speakerCos": 0.786,
+        "transcript": "搞砸了!你妈的!",
+        "speakerCos": 0.741,
         "nearestOther": [
           "ijaA",
-          0.569
+          0.471
         ],
         "referencedOther": [
           "ijaA",
-          0.569
+          0.471
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.65
+        "sceneGainDb": 1.3,
+        "speakerSpanS": [
+          1.34,
+          4.06
+        ]
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -2610,52 +2634,52 @@
       "who": "ijaA",
       "lang": "ja",
       "projection": "shout",
-      "seconds": 0.7,
-      "bytes": 9134,
-      "sha256": "9b1624a16f26f495da597accf0a49f9bd67d8a481673395e376998e45e1e7a73",
+      "seconds": 0.59,
+      "bytes": 7881,
+      "sha256": "8f650c39a2f04aa59fd428877afbaa45a07b57180f4e9eb3fc8fa091a07ba506",
       "source": "scene",
-      "sceneSha256": "f559ea536e0053820b9841cea625f58c35c2109146b1e849767c90dad2c3a5df",
-      "sceneStartS": 4.48,
-      "sceneEndS": 5.18,
-      "gapBeforeS": 0.25,
+      "sceneSha256": "3ecb7ae0da5d2151653ef422b42a7ab78afab2936c1497cc6c233ab0c6a2d34b",
+      "sceneStartS": 4.29,
+      "sceneEndS": 4.88,
+      "gapBeforeS": 0.21,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -42.4,
-        -48.8
+        -40.4,
+        -53.8
       ],
-      "cutMethod": "subtitle",
+      "cutMethod": "silence",
       "castOwner": "ijaA",
       "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -27.34,
-        "truePeakDb": -13.86,
-        "snrDb": 31.98,
-        "voicedS": 0.62,
-        "lowShare": 0.072,
+        "activeRmsDb": -17.44,
+        "truePeakDb": -5.03,
+        "snrDb": 44.66,
+        "voicedS": 0.4,
+        "lowShare": 0.083,
         "f0": {
           "median": 314,
-          "p10": 291,
-          "p90": 320,
-          "frames": 11
+          "p10": 302,
+          "p90": 333,
+          "frames": 8
         },
         "cer": 0,
         "transcript": "立て!",
-        "speakerCos": 0.349,
+        "speakerCos": 0.236,
         "nearestOther": [
           "ijaC",
-          0.338
+          0.617
         ],
         "referencedOther": [
           "ijaC",
-          0.338
+          0.617
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.65
+        "sceneGainDb": 1.3
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -2666,52 +2690,52 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 2.72,
-      "bytes": 33585,
-      "sha256": "2d86ed836304d10245278ad4e62c2e99b1265d490e18ab8508f9f40821ee33b4",
+      "seconds": 1.52,
+      "bytes": 19166,
+      "sha256": "5387d0b7a773086e39ea8eee4c68c277b2ca1a60a7c8bdd19d13de4777d7c13e",
       "source": "scene",
-      "sceneSha256": "f559ea536e0053820b9841cea625f58c35c2109146b1e849767c90dad2c3a5df",
-      "sceneStartS": 5.62,
-      "sceneEndS": 8.34,
-      "gapBeforeS": 0.44,
+      "sceneSha256": "3ecb7ae0da5d2151653ef422b42a7ab78afab2936c1497cc6c233ab0c6a2d34b",
+      "sceneStartS": 5.04,
+      "sceneEndS": 6.56,
+      "gapBeforeS": 0.16,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -50.5,
-        -51.2
+        -48.7,
+        -43.2
       ],
-      "cutMethod": "subtitle",
-      "castOwner": "comrade",
-      "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
+      "cutMethod": "silence",
+      "castOwner": "comradeWounded",
+      "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -15.88,
+        "activeRmsDb": -16.92,
         "truePeakDb": -1.28,
-        "snrDb": 56.85,
-        "voicedS": 1.48,
-        "lowShare": 0.512,
+        "snrDb": 38.36,
+        "voicedS": 1.34,
+        "lowShare": 0.239,
         "f0": {
-          "median": 219,
-          "p10": 151,
-          "p90": 296,
-          "frames": 32
+          "median": 381,
+          "p10": 143,
+          "p90": 421,
+          "frames": 28
         },
-        "cer": 0.5,
-        "transcript": "你 闲人?",
-        "speakerCos": 0.569,
+        "cer": 0.75,
+        "transcript": "这是你先生!",
+        "speakerCos": 0.193,
         "nearestOther": [
           "ijaA",
-          0.526
+          0.185
         ],
         "referencedOther": [
           "ijaA",
-          0.526
+          0.185
         ],
-        "lengthDiff": -1,
+        "lengthDiff": 1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.65
+        "sceneGainDb": 1.3
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -2722,52 +2746,52 @@
       "who": "ijaC",
       "lang": "ja",
       "projection": "shout",
-      "seconds": 1.06,
-      "bytes": 13523,
-      "sha256": "c56a7108919183e8043dcfe152afc5530b5b94f5ed085fbc7d9af3f15d76f3e2",
+      "seconds": 1.527,
+      "bytes": 19166,
+      "sha256": "475013326e102c4edd24e5b9bdfc2e1ce712f8ebc5af2b8d248730fc209c1741",
       "source": "scene",
-      "sceneSha256": "f559ea536e0053820b9841cea625f58c35c2109146b1e849767c90dad2c3a5df",
-      "sceneStartS": 9.09,
-      "sceneEndS": 10.15,
-      "gapBeforeS": 0.75,
+      "sceneSha256": "3ecb7ae0da5d2151653ef422b42a7ab78afab2936c1497cc6c233ab0c6a2d34b",
+      "sceneStartS": 7.06,
+      "sceneEndS": 8.587,
+      "gapBeforeS": 0.5,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -63.1,
-        -45.9
+        -31.5,
+        -38.2
       ],
-      "cutMethod": "subtitle",
+      "cutMethod": "silence",
       "castOwner": "ijaC",
       "castSha256": "f7568c88cbd41af1f5f9be411aba0453929088dba51c125a7fc031e305981db5",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.34,
-        "truePeakDb": -3.36,
-        "snrDb": 43.87,
-        "voicedS": 0.72,
-        "lowShare": 0.124,
+        "activeRmsDb": -18.84,
+        "truePeakDb": -3.2,
+        "snrDb": 42.28,
+        "voicedS": 0.74,
+        "lowShare": 0.121,
         "f0": {
-          "median": 276,
-          "p10": 235,
-          "p90": 291,
-          "frames": 13
+          "median": 254,
+          "p10": 205,
+          "p90": 327,
+          "frames": 16
         },
         "cer": 0,
         "transcript": "右だ!撃て!",
-        "speakerCos": 0.777,
+        "speakerCos": 0.596,
         "nearestOther": [
-          "ijaA",
-          0.253
+          "comrade",
+          0.409
         ],
         "referencedOther": [
-          "ijaA",
-          0.253
+          "comrade",
+          0.409
         ],
         "lengthDiff": -1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 0.65
+        "sceneGainDb": 1.3
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -8012,11 +8036,11 @@
     },
     "CaptiveInterrogation": {
       "file": "AudioVoice_FirstLevelCaptiveInterrogation.mp3",
-      "sha256": "c52819460bf19aff74f15d4d7f001513d44b4b26e90db7bae994947492339d12",
-      "seconds": 27.82,
-      "bytes": 334516,
-      "promptHash": "496235b8cf5e72c417e3fa10fb72f344a408a7cf8151d2d2c092cc4bb6f14eb7",
-      "castKey": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41,cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7,88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
+      "sha256": "529bed8986c22f7af44ae1d5bd7235aa1ece10bfd1041df8c3ee2e6380fe9e87",
+      "seconds": 38.18,
+      "bytes": 458964,
+      "promptHash": "412fdc3d60386193784f3b0da6127273e6c6ac31927c4446670fb3b883ff65a2",
+      "castKey": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41,cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7,604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6",
       "references": [
         {
           "who": [
@@ -8036,8 +8060,8 @@
           "who": [
             "comrade"
           ],
-          "owner": "comrade",
-          "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341"
+          "owner": "comradeWounded",
+          "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6"
         }
       ],
       "lines": [
@@ -8054,70 +8078,74 @@
         "CaptiveInterrogation.11"
       ],
       "attempt": 3,
-      "pickedBy": "manual",
-      "requests": 4,
+      "pickedBy": "check",
+      "requests": 7,
+      "patched": [
+        "CaptiveInterrogation.01",
+        "CaptiveInterrogation.08"
+      ],
       "attempts": [
         {
           "n": 1,
           "hard": [
-            "CaptiveInterrogation.03 像日兵甲的嗓子（本人 0.239 / ijaA 0.512）",
-            "CaptiveInterrogation.04 像日兵甲的嗓子（本人 0.199 / ijaA 0.343）",
-            "CaptiveInterrogation.05 像日兵甲的嗓子（本人 0.256 / ijaA 0.54）",
-            "CaptiveInterrogation.05 字错率 1「是。」",
-            "CaptiveInterrogation.07 像翻译的嗓子（本人 0.396 / interpreter 0.799）",
-            "CaptiveInterrogation.07 字错率 2「你们的人往哪撤了?」",
-            "CaptiveInterrogation.08 像川军的嗓子（本人 0.52 / comrade 0.652）",
-            "CaptiveInterrogation.08 字错率 1「サーゼ」",
-            "CaptiveInterrogation.09 字错率 0.9286「みんな大隊!」",
-            "CaptiveInterrogation.10 像翻译的嗓子（本人 0.22 / interpreter 0.671）",
-            "CaptiveInterrogation.10 字错率 1「往哪儿撤啦!」"
+            "CaptiveInterrogation.01 像川军的嗓子（本人 0.389 / comrade 0.509）",
+            "CaptiveInterrogation.01 字错率 1.0833「フッフッフッフッフ、舞台はどこへ弾いた!聞け!」",
+            "CaptiveInterrogation.06 像翻译的嗓子（本人 0.331 / interpreter 0.419）",
+            "CaptiveInterrogation.08 像翻译的嗓子（本人 0.305 / interpreter 0.389）"
           ],
-          "flags": 15
+          "flags": 9
         },
         {
           "n": 2,
           "hard": [
-            "CaptiveInterrogation.05 像日兵甲的嗓子（本人 0.311 / ijaA 0.444）",
-            "CaptiveInterrogation.05 字错率 0.8889「你这个死小子!」",
-            "CaptiveInterrogation.06 像日兵甲的嗓子（本人 0.184 / ijaA 0.305）",
-            "CaptiveInterrogation.10 字错率 0.9091「骨子。」"
+            "CaptiveInterrogation.01 字错率 1「ヘヘヘヘヘヘヘヘ」",
+            "CaptiveInterrogation.02 像日兵甲的嗓子（本人 0.262 / ijaA 0.686）",
+            "CaptiveInterrogation.03 像日兵甲的嗓子（本人 0.299 / ijaA 0.445）",
+            "CaptiveInterrogation.04 像日兵甲的嗓子（本人 0.158 / ijaA 0.315）",
+            "CaptiveInterrogation.05 只切到 0.52 s 且转写对不上「嗨!」，切句错位",
+            "CaptiveInterrogation.06 只切到 0.12 s 且转写对不上「ヘッ」，切句错位",
+            "CaptiveInterrogation.07 像翻译的嗓子（本人 0.246 / interpreter 0.59）",
+            "CaptiveInterrogation.07 字错率 2「你们的人往哪撤了?」",
+            "CaptiveInterrogation.08 字错率 1「うっ…」",
+            "CaptiveInterrogation.09 只切到 0.42 s 且转写对不上「」，切句错位",
+            "CaptiveInterrogation.10 像日兵甲的嗓子（本人 0.472 / ijaA 0.641）",
+            "CaptiveInterrogation.10 字错率 0.9091「撒子,快说!」",
+            "CaptiveInterrogation.11 像日兵甲的嗓子（本人 0.292 / ijaA 0.395）",
+            "CaptiveInterrogation.11 字错率 1「哈哈哈哈哈哈!」"
           ],
-          "flags": 9
+          "flags": 12
         },
         {
           "n": 3,
           "hard": [
-            "CaptiveInterrogation.06 像日兵甲的嗓子（本人 0.348 / ijaA 0.51）"
+            "CaptiveInterrogation.01 像翻译的嗓子（本人 0.282 / interpreter 0.422）",
+            "CaptiveInterrogation.08 像翻译的嗓子（本人 0.202 / interpreter 0.355）"
           ],
-          "flags": 9
+          "flags": 7
         }
       ],
       "hard": [
-        "CaptiveInterrogation.06 像日兵甲的嗓子（本人 0.348 / ijaA 0.51）"
+        "CaptiveInterrogation.01 像翻译的嗓子（本人 0.282 / interpreter 0.422）",
+        "CaptiveInterrogation.08 像翻译的嗓子（本人 0.202 / interpreter 0.355）"
       ],
       "flags": [
+        "CaptiveInterrogation.01 与邻句贴着，在能量最低处切（10 ms 淡入淡出）",
+        "CaptiveInterrogation.02 与邻句贴着，在能量最低处切（10 ms 淡入淡出）",
         "CaptiveInterrogation.05 与邻句贴着，在能量最低处切（10 ms 淡入淡出）",
         "CaptiveInterrogation.06 与邻句贴着，在能量最低处切（10 ms 淡入淡出）",
-        "CaptiveInterrogation.07 与邻句贴着，在能量最低处切（10 ms 淡入淡出）",
         "CaptiveInterrogation.08 与邻句贴着，在能量最低处切（10 ms 淡入淡出）",
         "CaptiveInterrogation.09 与邻句贴着，在能量最低处切（10 ms 淡入淡出）",
-        "CaptiveInterrogation.01 字错率 0.3636 待逐字核对「へへへへへ、舞台は、どこへ引いた?引け!」",
-        "CaptiveInterrogation.02 有声 0.56 s，太短不判嗓子与字错率",
-        "CaptiveInterrogation.02 字错率 0.5 待逐字核对「は、はい」",
-        "CaptiveInterrogation.04 有声 0.46 s，太短不判嗓子与字错率"
+        "CaptiveInterrogation.02 有声 0.58 s，太短不判嗓子与字错率"
       ],
-      "targetDb": -17.04,
-      "gainDb": 0.79,
-      "trimStartS": 0,
+      "targetDb": -17.22,
+      "gainDb": 0.71,
+      "trimStartS": 0.46,
       "measure": {
-        "activeRmsDb": -18.44,
-        "truePeakDb": -1.24,
-        "snrDb": 46.66
+        "activeRmsDb": -19.2,
+        "truePeakDb": -1.26,
+        "snrDb": 34.7
       },
-      "mastering": "WholeSceneOnceRmsTruePeakMinus1",
-      "patched": [
-        "CaptiveInterrogation.06"
-      ]
+      "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },
     "BunkerOrders": {
       "file": "AudioVoice_FirstLevelBunkerOrders.mp3",
@@ -8276,18 +8304,18 @@
     },
     "CaptiveDragged": {
       "file": "AudioVoice_FirstLevelCaptiveDragged.mp3",
-      "sha256": "f559ea536e0053820b9841cea625f58c35c2109146b1e849767c90dad2c3a5df",
-      "seconds": 10.16,
-      "bytes": 122610,
-      "promptHash": "a4469f8fcf6905a24524533d446d671f5586abe133ae8b1119be91c3e714c9d7",
-      "castKey": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341,492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41,f7568c88cbd41af1f5f9be411aba0453929088dba51c125a7fc031e305981db5",
+      "sha256": "3ecb7ae0da5d2151653ef422b42a7ab78afab2936c1497cc6c233ab0c6a2d34b",
+      "seconds": 8.587,
+      "bytes": 103803,
+      "promptHash": "466564f84114aa113fa501b09b731559f6d1588419d99b5c39308964cd78ce40",
+      "castKey": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6,492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41,f7568c88cbd41af1f5f9be411aba0453929088dba51c125a7fc031e305981db5",
       "references": [
         {
           "who": [
             "comrade"
           ],
-          "owner": "comrade",
-          "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341"
+          "owner": "comradeWounded",
+          "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6"
         },
         {
           "who": [
@@ -8312,26 +8340,38 @@
       ],
       "attempt": 1,
       "pickedBy": "check",
-      "requests": 1,
+      "requests": 2,
       "attempts": [
         {
           "n": 1,
           "hard": [],
-          "flags": 2
+          "flags": 6
+        },
+        {
+          "n": 2,
+          "hard": [
+            "CaptiveDragged.01 字错率 1「站起来!」",
+            "CaptiveDragged.02 像川军的嗓子（本人 0.251 / comrade 0.42）"
+          ],
+          "flags": 7
         }
       ],
       "hard": [],
       "flags": [
-        "CaptiveDragged.01 字错率 0.5 待逐字核对「狗子嘞!你妈嘞!」",
-        "CaptiveDragged.03 字错率 0.5 待逐字核对「你 闲人?」"
+        "逐字时间戳不可信（字速过快），改按静音与预计时长切",
+        "逐字时间戳不可信（字速过快），改按静音与预计时长切",
+        "CaptiveDragged.01 字错率 0.5 待逐字核对「搞砸了!你妈的!」",
+        "CaptiveDragged.02 有声 0.4 s，太短不判嗓子与字错率",
+        "CaptiveDragged.02 与日兵丙的定妆音更近（本人 0.236 / 0.617；片段太短）",
+        "CaptiveDragged.03 字错率 0.75 待逐字核对「这是你先生!」"
       ],
       "targetDb": -16,
-      "gainDb": 0.65,
-      "trimStartS": 0,
+      "gainDb": 1.3,
+      "trimStartS": 0.06,
       "measure": {
-        "activeRmsDb": -17.78,
-        "truePeakDb": -1.21,
-        "snrDb": 52.48
+        "activeRmsDb": -17.25,
+        "truePeakDb": -1.31,
+        "snrDb": 40.21
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },

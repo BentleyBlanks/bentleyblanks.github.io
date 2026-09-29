@@ -105,6 +105,10 @@ export function CastReference(who) {
   return { owner, file: path.join(out, entry.file), sha256: entry.sha256 };
 }
 
+/** 这一场里 who 用哪条定妆音（导演表 scene.voices：同一个嗓子的另一种状态；缺省就是本人）。 */
+export function SceneVoice(cue, who) {
+  return FIRST_LEVEL_DIALOGUE_DIRECTION[cue.id]?.voices?.[who] || who;
+}
 /** 场上开口的人，台词字数多的在前。 */
 function SceneSpeakers(cue) {
   const chars = new Map();
@@ -115,7 +119,7 @@ function SceneSpeakers(cue) {
 export function SceneReferences(cue) {
   const refs = [];
   for (const who of SceneSpeakers(cue)) {
-    const ref = CastReference(who);
+    const ref = CastReference(SceneVoice(cue, who));
     if (!ref) continue;
     const have = refs.find((r) => r.owner === ref.owner);
     if (have) { have.who.push(who); continue; }
@@ -150,7 +154,7 @@ export function ScenePrompt(cue) {
     ? refs.map((r, i) => `@音频${i + 1} 是${r.who.map(Name).join("、")}的声音`).join("，")
       + (refs.length > 1 ? "；每个角色严格保持自己那条参考音的音色、年龄感和口音，谁的句子就用谁的嗓子，绝不串嗓。" : "；严格保持参考音的音色、年龄感和口音。")
     : "";
-  const cast = speakers.map((who) => `${Name(who)}：${FIRST_LEVEL_VOICE_CAST[who].persona}`).join("；");
+  const cast = speakers.map((who) => `${Name(who)}：${FIRST_LEVEL_VOICE_CAST[SceneVoice(cue, who)].persona}`).join("；");
   const langRules = [
     langs.has("zh") ? "川军都讲地道四川话，用四川方言的语调、声调与发音，不是普通话加几个四川词" : "",
     langs.has("zh-north") ? `翻译讲鲁南北方官话（山东口音），绝不说四川话${interpreterJa ? "；他说日语时带很重的中国北方口音，发音生硬" : ""}` : "",
@@ -250,7 +254,8 @@ function Cut(cue, n) {
     slices = SliceScene(framesInfo, lines, { activeRmsDb: measure.activeRmsDb, padS: LINE_MASTER.padS });
     // 逐字时间戳偶尔不可信（后几句的字被挤进一两百毫秒）：任何一句切出来太短、或时间戳给的字速快得不像人话，
     // 就改用「只看静音 + 预计时长占比」的切法；切得对不对由后面的逐句转写与嗓子检查兜底。
-    const tooFast = mapped.some((m) => m.total >= 3 && (m.end - m.start) < 0.06 * m.total);
+    // 两个字的短句（「たて」）也算：2026-09-29 CaptiveDragged 两次生成都把它挤进 0.12 s，按它切会把「立」切进上一句。
+    const tooFast = mapped.some((m) => (m.total >= 3 && (m.end - m.start) < 0.06 * m.total) || (m.total === 2 && m.end - m.start < 0.2));
     const tooShort = slices.some((s, i) => s.endS - s.startS < Math.min(0.35, 0.1 + 0.05 * mapped[i].total));
     cutMethod = "subtitle";
     if (tooFast || tooShort) {
@@ -278,7 +283,8 @@ function Cut(cue, n) {
   slices.forEach((s, i) => {
     if (s.tightStart || s.tightEnd) flags.push(`${cue.lines[i].id} 与邻句贴着，在能量最低处切（10 ms 淡入淡出）`);
     s.file = files[i];
-    s.chars = mapped[i].chars.map(([c, a, b]) => [c, +Math.max(0, a - master.trimStartS - s.startS).toFixed(3),
+    // 起点也要夹进片段：末字的时间戳可能落在切点之后（2026-09-29 CaptiveInterrogation.09 的「す」起点比片段长 0.01 s）。
+    s.chars = mapped[i].chars.map(([c, a, b]) => [c, +Math.min(s.endS - s.startS, Math.max(0, a - master.trimStartS - s.startS)).toFixed(3),
       +Math.min(s.endS - s.startS, Math.max(0, b - master.trimStartS - s.startS)).toFixed(3)]);
     s.coverage = mapped[i].coverage;
   });
@@ -289,7 +295,7 @@ function Cut(cue, n) {
 function Judge(results) {
   const cut = results.filter((r) => r.slices);
   const lineJobs = cut.flatMap((r) => r.slices.map((s, i) => ({ r, s, i, line: r.cue.lines[i] })));
-  const castFiles = [...new Set(lineJobs.map((j) => CastReference(j.line.who)?.file).filter(Boolean))];
+  const castFiles = [...new Set(lineJobs.map((j) => CastReference(SceneVoice(j.r.cue, j.line.who))?.file).filter(Boolean))];
   // 句前句后写了笑/喘（effort）的句子：嗓子只量念台词那一段（逐字时间首字前 0.1 s 到末字后 0.2 s）。
   // 狂笑、怪笑跟定妆独白的音色向量本来就远，整片去量会把本人的句子判成「像别人」。
   for (const j of lineJobs) {
@@ -318,10 +324,10 @@ function Judge(results) {
     s.cer = texts[s.file]?.cer ?? null;
     s.transcript = texts[s.file]?.text ?? null;
     if (r.master.cutMethod === "silence" && texts[s.file]?.chars?.length) { s.chars = texts[s.file].chars; s.charSource = "whisper-forced"; }
-    const own = CastReference(line.who);
+    const own = CastReference(SceneVoice(r.cue, line.who));
     s.speakerCos = own && vectors[voiceFile] && vectors[own.file] ? +CenteredCosine(vectors[voiceFile], vectors[own.file]).toFixed(3) : null;
-    const others = [...new Set(r.cue.lines.map((l) => l.who))].filter((who) => CastVoiceOwner(who) !== CastVoiceOwner(line.who))
-      .map((who) => [who, CastReference(who)]).filter(([, ref]) => ref && vectors[ref.file])
+    const others = [...new Set(r.cue.lines.map((l) => l.who))].filter((who) => who !== line.who)
+      .map((who) => [who, CastReference(SceneVoice(r.cue, who))]).filter(([, ref]) => ref && ref.owner !== own?.owner).filter(([, ref]) => ref && vectors[ref.file])
       .map(([who, ref]) => [who, +CenteredCosine(vectors[voiceFile], vectors[ref.file]).toFixed(3)]).sort((a, b) => b[1] - a[1]);
     s.nearestOther = others[0] || null;
     // 分错嗓子只跟本场挂了参考音的人比：没挂参考音的人（第 4 个说话人）这场里的嗓子本来就不是他的定妆音。
@@ -339,6 +345,9 @@ function Judge(results) {
     const got = [...StripLaughter(s.transcript || "", MissionVoiceSpoken(r.cue, i) + (JAPANESE_SPEECH[line.id]?.kanji || ""))]
       .filter((c) => /[\p{L}\p{N}]/u.test(c)).length;
     s.lengthDiff = got - want;
+    // 太短不判的片段也不能一个字都对不上：2026-09-29 CaptiveDragged 逐字时间把「たて」挤成 0.12 s，
+    // 「立」切进了上一句、这一片只剩「て」（0.24 s，转写「ヘッ」），原来的检查全放过去了。
+    if (!judged && want >= 2 && s.cer != null && s.cer >= 1) r.hard.push(`${line.id} 只切到 ${s.measure.voicedS} s 且转写对不上「${s.transcript}」，切句错位`);
     if (judged && s.cer != null && s.cer > SCENE_CHECK.reviewedMaxCer && Math.abs(got - want) > Math.max(2, 0.3 * want)) r.hard.push(`${line.id} 字错率 ${s.cer}「${s.transcript}」`);
     else if (s.cer != null && s.cer > SCENE_CHECK.maxCer) r.flags.push(`${line.id} 字错率 ${s.cer} 待逐字核对「${s.transcript}」`);
   }
@@ -362,7 +371,7 @@ async function BakeScenes(manifest) {
   const cues = SceneJobs();
   if (!cues.length) return;
   const maxAttempt = Math.min(SCENE_CHECK.maxAttempts, Math.max(1, Number.parseInt(Arg("attempts") ?? "1", 10) || 1));
-  const missingCast = [...new Set(cues.flatMap((cue) => cue.lines.map((l) => l.who)).filter((who) => !CastReference(who)))];
+  const missingCast = [...new Set(cues.flatMap((cue) => cue.lines.map((l) => SceneVoice(cue, l.who))).filter((who) => !CastReference(who)))];
   if (dry) {
     for (const cue of cues) {
       const refs = SceneReferences(cue);
@@ -449,13 +458,13 @@ function Install(cue, best, all, manifestLines, scenes, timings, manifest, picke
     fs.copyFileSync(s.file, target);
     const sha256 = Sha256(target);
     const d = LineDirection(cue, i);
-    const own = CastReference(line.who);
+    const own = CastReference(SceneVoice(cue, line.who));
     manifestLines[line.id] = {
       file: line.file, scene: cue.id, index: i, who: line.who, lang: line.lang || "zh", projection: d.projection,
       seconds: s.measure.seconds, bytes: fs.statSync(target).size, sha256, source: "scene",
       sceneSha256: sceneSha, sceneStartS: s.startS, sceneEndS: s.endS, gapBeforeS: s.gapBeforeS,
       tight: [!!s.tightStart, !!s.tightEnd], edgeDb: s.edgeDb, cutMethod: best.master.cutMethod || "subtitle",
-      castOwner: CastVoiceOwner(line.who), castSha256: own?.sha256 || null, referenced: RefIndex(refs, line.who) >= 0,
+      castOwner: own?.owner || CastVoiceOwner(SceneVoice(cue, line.who)), castSha256: own?.sha256 || null, referenced: RefIndex(refs, line.who) >= 0,
       metrics: { activeRmsDb: s.measure.activeRmsDb, truePeakDb: s.measure.truePeakDb, snrDb: s.measure.snrDb,
         voicedS: s.measure.voicedS, lowShare: s.measure.lowShare, f0: s.measure.f0, cer: s.cer, transcript: s.transcript,
         speakerCos: s.speakerCos, nearestOther: s.nearestOther, referencedOther: s.referencedOther ?? null,
@@ -488,7 +497,7 @@ function Install(cue, best, all, manifestLines, scenes, timings, manifest, picke
 
 /** 补录单句的提示词（旧逐句口径）。 */
 export function LinePrompt(cue, index) {
-  const line = cue.lines[index], cast = FIRST_LEVEL_VOICE_CAST[line.who];
+  const line = cue.lines[index], cast = FIRST_LEVEL_VOICE_CAST[SceneVoice(cue, line.who)];
   if (!cast) throw new Error(`${cue.id}: ${line.who} has no cast entry in Data_FirstLevelVoiceCast`);
   const direction = LineDirection(cue, index);
   const ja = line.lang === "ja";
@@ -526,7 +535,7 @@ async function PatchLines(manifest) {
     const todo = takes.filter((t) => force || !fs.existsSync(Raw(t)) || ReadJson(Meta(t))?.promptHash !== Hash(LinePrompt(t.cue, t.index)));
     console.log(`${todo.length} SeedAudio patch requests`);
     const { errors } = await Pool(todo, jobs, async (t) => {
-      const prompt = LinePrompt(t.cue, t.index), ref = CastReference(t.line.who);
+      const prompt = LinePrompt(t.cue, t.index), ref = CastReference(SceneVoice(t.cue, t.line.who));
       const result = await SeedAudioSpeak({ prompt, references: [ref.file], label: `patch ${t.line.id}#${t.n}` });
       fs.writeFileSync(Raw(t), result.bytes);
       fs.writeFileSync(Meta(t), JSON.stringify({ promptHash: Hash(prompt), castSha256: ref.sha256, subtitle: result.subtitle }));
@@ -541,7 +550,7 @@ async function PatchLines(manifest) {
     t.master = MasterLine(Raw(t), t.file, { targetDb: entry.patch?.targetDb ?? entry.metrics.activeRmsDb, padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb });
     t.meta = ReadJson(Meta(t));
   }
-  const castFiles = [...new Set(ready.flatMap((t) => [...new Set(t.cue.lines.map((l) => CastReference(l.who)?.file))]).filter(Boolean))];
+  const castFiles = [...new Set(ready.flatMap((t) => [...new Set(t.cue.lines.map((l) => CastReference(SceneVoice(t.cue, l.who))?.file))]).filter(Boolean))];
   const vectors = SpeakerEmbed([...ready.map((t) => t.file), ...castFiles]);
   const texts = Transcribe(ready.map((t) => ({ file: t.file, lang: t.line.lang === "ja" ? "ja" : "zh", text: MissionVoiceSpoken(t.cue, t.index),
     reference: t.line.lang === "ja" ? JAPANESE_SPEECH[t.line.id]?.kanji : MissionVoiceSpoken(t.cue, t.index) })));
@@ -549,10 +558,10 @@ async function PatchLines(manifest) {
   const timings = ReadJson(timingsPath, {});
   for (const job of jobsList) {
     const mine = ready.filter((t) => t.line.id === job.line.id).map((t) => {
-      const own = CastReference(t.line.who);
+      const own = CastReference(SceneVoice(t.cue, t.line.who));
       t.speakerCos = +CenteredCosine(vectors[t.file], vectors[own.file]).toFixed(3);
-      t.nearestOther = [...new Set(t.cue.lines.map((l) => l.who))].filter((w) => CastVoiceOwner(w) !== CastVoiceOwner(t.line.who))
-        .map((w) => [w, CastReference(w)]).filter(([, r]) => r && vectors[r.file])
+      t.nearestOther = [...new Set(t.cue.lines.map((l) => l.who))].filter((w) => w !== t.line.who)
+        .map((w) => [w, CastReference(SceneVoice(t.cue, w))]).filter(([, r]) => r && r.owner !== own.owner && vectors[r.file])
         .map(([w, r]) => [w, +CenteredCosine(vectors[t.file], vectors[r.file]).toFixed(3)]).sort((a, b) => b[1] - a[1])[0] || null;
       t.cer = texts[t.file]?.cer ?? null; t.transcript = texts[t.file]?.text ?? null;
       t.score = (t.cer ?? 0.5) * 10 + (1 - t.speakerCos) * 6;

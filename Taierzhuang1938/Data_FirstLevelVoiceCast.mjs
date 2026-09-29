@@ -14,6 +14,9 @@
 //   sampleRef   日语的稿面写法（汉字），只给转写字错率当参照
 //   f0          正常说话时基频中位数的合理区间（Hz），候选落在区间外不选
 //   projection  默认音量档：shout / normal / low / breath（逐句可在导演表里覆盖）
+//   voiceOf     可选：同一个人另一种身体/情绪状态的定妆音。生成时把 voiceOf 的定妆音作参考送进去，
+//               只换状态不换嗓子；导演表 scene.voices 指定哪几场用它（Script_SeedAudioFirstLevelBake.SceneVoice）
+//   maxGapS     可选：定妆候选按逐字时间把长于它的字间空当剪短（Script_SeedAudioCastBake.ShortenGaps）
 //   （选定哪条候选、指标与理由写在 Audio/FirstLevel/Data_FirstLevelVoiceCastManifest.json；
 //    文件名固定为 Cast/AudioVoiceCast_<Who>.mp3，见 Script_SeedAudioCastBake.CastFile）
 //
@@ -34,6 +37,24 @@ export const FIRST_LEVEL_VOICE_CAST = Object.freeze({
     faction: "nra", lang: "zh", projection: "normal", f0: [105, 170],
     persona: "二十七八岁四川男兵，肩膀挂彩、缠着渗血的布；豁达嘴硬爱开玩笑，嗓子偏沙，扯到伤口时会吸一口气；和幺娃、顺子明显不是同一个声音",
     sample: "这点伤算啥子嘛，擦破点皮皮。老子在屋头挑粪都比这个累。等打完仗，老子回去开个茶铺，门口摆两根板凳，一碗盖碗茶，天天听你们这些龟儿子吹牛。哪个吹得最凶，茶钱就算哪个的。",
+  }),
+  // 2026-09-29 用户：被审问的川军「完全听不出是一个刚被炮炸了、浑身是伤流着血的人，也听不出愤怒厌恶仇恨」。
+  // 原因之一是参考音：他的定妆音是打趣时的轻松独白，整段生成照着它的状态演。这里给同一个人录一条重伤状态的
+  // 定妆音（voiceOf：生成时把 comrade 的定妆音作 @音频1 送进去，保住同一个嗓子），被拖出、被审问两场
+  // （导演表 voices）用它当参考、用它的人设；防炮洞里打趣照旧用 comrade。不是台词里的说话人。
+  comradeWounded: Object.freeze({
+    // maxGapS：演出来满是喘和痛哼（第一次生成 37.7 s，开口前哼了 6.8 s），参考音只收 29.5 s；
+    // 定妆脚本把字间长于 0.8 s 的喘气空当从中间剪短，最后吼的几句才进得了参考。
+    faction: "nra", lang: "zh", projection: "shout", f0: [95, 200], voiceOf: "comrade", maxGapS: 0.8,
+    persona: "就是洞口那个二十七八岁的四川男兵，同一个嗓子；此刻刚被炮弹近炸震伤、埋进土里又被日本兵拖出来当俘虏，"
+      + "满脸满嘴是血，胸口和肩膀的伤一动就疼，嗓子被硝烟和土呛得嘶哑；喘得厉害，说几个字就要疼得吸一口气，声音发抖、带血沫的湿音和压不住的痛哼；"
+      + "可是对日本侵略者和汉奸的愤怒、厌恶、仇恨压过了疼：咬着牙、从牙缝里往外挤，恨到发抖，绝不哭、不求饶",
+    sample: "狗日的……炮弹落下来，把老子埋了半截……腿动不得了，嘴巴里头全是血……"
+      + "你们这些强盗，跑到我们的地方来杀人放火……老子恨不得一口一口咬死你们……"
+      + "来噻！有本事就过来！老子就算是爬，也要爬过去跟你们拼了！",
+    sampleDelivery: "重伤的状态：每说几个字就疼得吸一口气、喘一下，声音嘶哑发抖，带着血沫的湿音和压不住的痛哼，中间咬牙停顿；"
+      + "但字字都是愤怒、厌恶和刻骨的仇恨，从牙缝里挤出来，越说越狠，最后两句用尽力气吼出来；不是哭腔、不求饶，"
+      + "吼的时候也不要喊破成噪声，每个字都要听得出来",
   }),
   luo: Object.freeze({
     faction: "nra", lang: "zh", projection: "normal", f0: [85, 150],

@@ -26,7 +26,9 @@
 //      stopOn    "event:<name>"：导演发这个事件时立即掐掉这句
 //      emit      [{ id, at: "start"|"end"|秒 }]：播放器在这一刻发具名事件（给玩法包对动作）
 //
-// 场景级：priority（true = 对白窗口内自主喊话让路，01–06 剧情对白一律 true）。
+// 场景级：priority（true = 对白窗口内自主喊话让路，01–06 剧情对白一律 true）；
+//         voices（可选）{ 说话人: 定妆表 id }：这一场里这个人用另一条定妆音（同一个嗓子的另一种状态，
+//         定妆表 voiceOf）当参考、用它的人设写提示词；只影响生成，不影响谁说、从哪播。
 
 import { FIRST_LEVEL_VOICE_CAST } from "./Data_FirstLevelVoiceCast.mjs";
 
@@ -53,7 +55,7 @@ export const DIALOGUE_DUCK = Object.freeze({ ambienceDb: -6, farDb: -3, attackS:
 
 /** 一句的表演（projection, intensity）+ 其余字段。 */
 const P = (projection, intensity, more = {}) => Object.freeze({ projection, intensity, ...more });
-const Scene = (priority, context, lines) => Object.freeze({ priority, context, lines: Object.freeze(lines) });
+const Scene = (priority, context, lines, more = {}) => Object.freeze({ priority, context, lines: Object.freeze(lines), ...more });
 
 const FRONT = "前沿机枪位后面的土墙与交通沟里，枪声很密，几个人相距两三米，要喊着说才听得清";
 
@@ -104,29 +106,31 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "02": P("shout", 0.8, { context: "在支沟那头听见日本兵叫他，立刻应声，边小跑边喊回来", delivery: "奴才式的急切谄媚，一连两声「はい」抢着应，赔着小心、生怕慢了；跑动中带喘；日语带很重的中国北方口音",
       pauseBeforeS: 0.5, effort: { before: "小跑中急喘一口" } }),
   }),
-  CaptiveDragged: Scene(true, "两名日兵把被炸得神志不清的受伤川军从松土里拽出来，贴身拉扯；另一名日兵在前面十几米外喊", {
-    "01": P("shout", 0.95, { context: "重伤被日兵从土里拽出，疼得喘气，认出敌人后怒火猛冲上来", delivery: "极度愤怒、厌恶，嫉恶如仇，咬牙把骂声狠狠砸向日本侵略者；四川口音，字字清楚，受伤也绝不求饶", effort: { before: "疼得闷哼，紧接着猛吸气怒骂" } }),
+  // 2026-09-29 用户：川军「完全听不出是一个刚被炮炸了、浑身是伤流着血的人，也听不出愤怒厌恶仇恨」。
+  // 被拖出、被审问两场：川军换重伤状态的定妆音（voices），每句先写身体（喘、疼、血、哑）再写恨。
+  CaptiveDragged: Scene(true, "炮弹刚在洞口炸过。两名日兵把被炮弹震伤、半埋在松土里的川军伤兵拽出来，贴身拉扯；他满脸满嘴是血，胸口和肩膀的伤一扯就疼，嗓子被硝烟和土呛哑，喘得厉害，可一认出是日本兵就恨得咬牙切齿；另一名日兵在前面十几米外喊", {
+    "01": P("shout", 1, { context: "被日兵从土里拽出，疼得眼前发黑，睁眼认出是日本兵", delivery: "嘶哑、发抖、带着嘴里的血沫，疼得每个字都在抖；刻骨的仇恨和厌恶从牙缝里挤出来，两个词之间疼得吸一口气，第二个词更狠；受伤也绝不求饶；字要听得出来", effort: { before: "疼得一声压不住的闷哼，接着猛吸一口带血的气" } }),
     "02": P("shout", 0.8, { context: "抓住后领猛地一提", delivery: "短促粗暴" }),
-    "03": P("shout", 0.95, { context: "胳膊被扯到伤处，痛楚激起更强的反抗", delivery: "咬紧牙关又迸出怒骂，痛恨侵略者，狠而有力；不哭、不哀求、不软弱含糊", pauseBeforeS: 1.2, effort: { before: "忍痛猛吸一口气" } }),
+    "03": P("shout", 1, { context: "被提起来扯到了伤处，疼得身子一弓", delivery: "用尽力气咬着牙骂出来，恨到发抖，声音嘶哑带血；中间疼得断一下再接着骂，不哭、不哀求；字要听得出来", pauseBeforeS: 1.2, effort: { before: "疼得倒抽一口气、闷哼一声" } }),
     "04": P("shout", 0.8, { spatial: "offscreen", context: "前方枪声又起", delivery: "远处的急喊", pauseBeforeS: 1 }),
-  }),
+  }, { voices: { comrade: "comradeWounded" } }),
   // 翻译（2026-09-26 用户：「至少也是个汉奸语气、恶狠狠变态的语气」）：对发了疯的日兵点头哈腰、谄媚讨好（又怕又巴结）；
   // 一转回俘虏立刻变脸，恶狠狠、阴阳怪气、带冷笑狞笑、狐假虎威。日兵各句沿用同日「癫狂」口径（上面那条）。
-  CaptiveInterrogation: Scene(true, "交通壕里，两名日兵把受伤的川军俘虏按在沟壁上审问，翻译蹲在俘虏面前传话，几个人挤在一两米之内。审问的日兵像发了疯的变态：杀红了眼，喘着粗气，狂笑着贴脸嘶吼，情绪忽高忽低，笑着笑着突然暴怒。翻译是给日军卖命的汉奸：转向日本兵时点头哈腰、谄媚讨好，转回俘虏时立刻变脸，恶狠狠、阴阳怪气、狐假虎威", {
+  CaptiveInterrogation: Scene(true, "交通壕里，两名日兵把刚被炮弹炸伤、满脸满嘴是血、喘着粗气的川军俘虏按在沟壁上审问，翻译蹲在俘虏面前传话，几个人挤在一两米之内。俘虏伤得很重，每句话都在喘、都在疼，嗓子嘶哑带血，但对日本兵和汉奸只有愤怒、厌恶和仇恨。审问的日兵像发了疯的变态：杀红了眼，喘着粗气，狂笑着贴脸嘶吼，情绪忽高忽低，笑着笑着突然暴怒。翻译是给日军卖命的汉奸：转向日本兵时点头哈腰、谄媚讨好，转回俘虏时立刻变脸，恶狠狠、阴阳怪气、狐假虎威", {
     "01": P("shout", 1, { context: "揪着俘虏的头发往沟壁上撞，转头冲翻译狂吼", delivery: "发了疯一样的癫狂嘶吼，嗓音嘶哑，尾音带神经质的颤笑；不是居高临下地下命令，是失控的疯子", effort: { before: "喉咙里先挤出一串兴奋的怪笑" } }),
     // 02/03 前各留一口气、03 不再单独写句前冷笑（冷笑放进句尾）：日兵的怪笑、「はい」、翻译的冷笑挤在一起时
     // SeedAudio 的逐字时间戳塌成几十毫秒、静音切法也对不上（2026-09-27 五次生成都在这里连成一片）。
     "02": P("normal", 0.7, { context: "被发了疯的日兵吼得一哆嗦，等他吼完才冲他哈着腰", delivery: "马上应，又怕又巴结，奴才式的急切谄媚，赔着笑；单独一声，不和日兵的话连在一起", pauseBeforeS: 0.4 }),
     "03": P("normal", 0.8, { context: "转回脸凑到俘虏面前，脸几乎贴上去", delivery: "一变脸，嗓子一沉，恶狠狠地拖着长腔逼问，阴阳怪气，句尾从鼻子里哼出一声冷笑，狐假虎威", pauseBeforeS: 0.5 }),
-    "04": P("normal", 0.85, { context: "抬眼认出替日军传话的汉奸，怒目逼视他", delivery: "带着强烈鄙夷和憎恶，从牙缝里冷硬地吐出，不是神志不清的呢喃", pauseBeforeS: 0.9 }),
+    "04": P("low", 0.9, { context: "被按在沟壁上疼得直喘，慢慢抬起满是血的脸，认出凑过来的是替日军传话的汉奸", delivery: "嘶哑、喘着、带血沫；故意装没听清，拖着鄙夷反问，把厌恶和恨压在嗓子里冷冷地挤出来，像看一条狗", pauseBeforeS: 0.9, effort: { before: "两口带痛的粗喘" } }),
     "05": P("shout", 0.9, { context: "俘虏装傻，他一把揪住俘虏的衣领", delivery: "凶狠地吼，一字一顿、拖着腔，带着狞笑的威胁，得意又毒" }),
     "06": P("shout", 1, { delivery: "等不及，压着翻译的话疯狗一样扑进来狂吼，越吼越失控，嗓音嘶哑发颤", offsetS: -0.25, effort: { after: "吼完呼哧呼哧喘粗气，喉咙里咯咯怪笑" } }),
-    "07": P("shout", 1, { context: "被压着仍拼力抬头，怒斥眼前卖国的翻译", delivery: "极度愤怒厌恶，嫉恶如仇，四川话骂得短促、凶狠、字字带刺；中间咬牙停一下再爆发，绝不哀求", pauseBeforeS: 0.8, effort: { before: "两口压着怒火的粗喘" } }),
+    "07": P("shout", 1, { context: "被日兵吼着，还是拼力抬起头，冲着眼前卖国的翻译", delivery: "「滚」是恨到极点、疼得发抖、从牙缝里迸出来的，嘶哑带血；喘一口气，「二鬼子」压着满腔厌恶和仇恨狠狠吐出去，像往他脸上啐；绝不哀求", pauseBeforeS: 0.8, effort: { before: "疼得发抖的粗喘，压着怒火" } }),
     "08": P("shout", 1, { context: "猛地揪住衣领把人提起来，脸贴着脸", delivery: "先阴森森地笑着压低，下一瞬间暴怒狂吼，情绪像疯子一样失控", effort: { before: "神经质地短笑两声" } }),
     "09": P("normal", 0.75, { context: "赶紧转身冲日本兵哈腰", delivery: "告状的谄媚奴才腔，急着表功撇清自己，点头哈腰，带点委屈地数落俘虏" }),
-    "10": P("shout", 1, { context: "满嘴血仍抬头怒视日兵和翻译", delivery: "带着痛恨和蔑视一字一顿怒骂，重音锋利，喘息之间也不泄气；坚决抵抗到底", pauseBeforeS: 0.7 }),
-    "11": P("shout", 1, { context: "知道自己会死，仍直视敌人，把最后一口气顶上来", delivery: "决绝、愤怒、鄙夷，把对汉奸和日本侵略者的刻骨仇恨砸进最后一句；咬牙爆发，收尾硬而狠，绝不是平静交代遗言", pauseBeforeS: 1.2, emit: [{ id: "CaptiveLastWord", at: "end" }] }),
-  }),
+    "10": P("shout", 1, { context: "被揪着衣领提起来，满嘴是血，疼得直喘，仍盯着日兵和翻译", delivery: "嘶哑、带血、喘着，一字一顿地骂，每一顿都是咬着牙的仇恨；中间疼得喘一口再接着骂，后半句更狠，恨和厌恶压过了疼", pauseBeforeS: 0.7, effort: { before: "带血沫的一口喘气" } }),
+    "11": P("shout", 1, { context: "知道自己会死，喘着，把最后一口气顶上来，直视敌人", delivery: "先疼得吸一口气，再把全身剩下的力气和刻骨的仇恨、鄙夷一起吼出去；嗓子嘶哑带血，收尾硬而狠，绝不是平静交代遗言", pauseBeforeS: 1.2, effort: { before: "猛吸一口带血的气" }, emit: [{ id: "CaptiveLastWord", at: "end" }] }),
+  }, { voices: { comrade: "comradeWounded" } }),
   // 割喉之后：导演在刀划过那一刻发 ThroatCut。
   CaptiveTaunt: Scene(true, "日兵刚割了俘虏的喉，满手是血，兴奋得发了狂，抓着尸体的头发一边摇晃一边狂笑嘲弄；另一名日兵在旁边一两米跟着阴冷地怪笑；远处十几米外有日兵催促往前", {
     // 2026-09-27（用户：「一割马上就嚣张的说了那些台词」）：割中后 0.1 s 就开口（原 0.7 s）；录音不动。
