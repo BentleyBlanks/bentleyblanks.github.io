@@ -269,6 +269,11 @@
       "name": "Volcengine SeedAudio 1.0",
       "terms": "由本项目账户经火山引擎 API 生成；使用受该服务条款约束",
       "via": "https://openspeech.bytedance.com/api/v3/tts/create"
+    },
+    "mixed": {
+      "name": "Mixed: Volcengine SeedAudio 1.0 stems + Sonniss GDC single shots already shipped in this repository",
+      "terms": "战场远景床候选（bedVariants）：SeedAudio 生成的底（受火山引擎条款约束）叠上仓库里已有的 Sonniss 实录远枪 / 远炮单发（免版税）；每条候选的 sources 逐项写明用了哪些单发、各自的许可。",
+      "via": "Script_SeedAudioBattleBedBake.mjs"
     }
   },
   "normalization": {
@@ -326,6 +331,372 @@
       "rmsDbfs": -27.44477222299964,
       "peakDbfs": -6.83334366626973,
       "loopOverlapS": 0.4
+    }
+  },
+  "bedVariants": {
+    "A": {
+      "file": "AudioAmb_BattleFarDistantThunder.mp3",
+      "seconds": 40,
+      "channels": 2,
+      "label": "远方炮群闷雷",
+      "style": "炮群在地平线以外一记接一记地滚闷雷，间隔不匀；只在缝里落几声很远的枪。最稳的底：低频为主，不抢枪声、脚步和台词。",
+      "rmsDbfs": -27.4,
+      "peakDbfs": -3.36,
+      "crestDb": 24,
+      "bytes": 400763,
+      "sha256": "445419d07e35674e14abd51ac3c3fd1f12ea30222df8473126af35be5ea014f1",
+      "bitrate": "80k",
+      "credit": "Volcengine SeedAudio 1.0（ThunderRoll 炮群闷雷，两份错开叠）+ Sonniss 远炮 / 远枪单发",
+      "license": "mixed",
+      "licenses": [
+        "volcengine",
+        "sonniss"
+      ],
+      "stems": [
+        {
+          "id": "ThunderRoll",
+          "take": 1,
+          "sha256": "129e8d29b49e411d"
+        },
+        {
+          "id": "ThunderRoll",
+          "take": 1,
+          "sha256": "129e8d29b49e411d"
+        }
+      ],
+      "scatter": [
+        {
+          "id": "Cannon",
+          "cue": "ambCannonFar",
+          "events": 3,
+          "files": [
+            "Audio/Amb/AudioAmb_AmbCannonFar_01.mp3",
+            "Audio/Amb/AudioAmb_AmbCannonFar_02.mp3",
+            "Audio/Amb/AudioAmb_AmbCannonFar_03.mp3"
+          ],
+          "license": "sonniss",
+          "credit": "Pole Position Production · 远处的火炮 · Sonniss GDC 2017"
+        },
+        {
+          "id": "RifleNra",
+          "cue": "rifleNraFar",
+          "events": 3,
+          "files": [
+            "Audio/Sfx/AudioSfx_RifleNraFar_01.mp3",
+            "Audio/Sfx/AudioSfx_RifleNraFar_02.mp3",
+            "Audio/Sfx/AudioSfx_RifleNraFar_03.mp3"
+          ],
+          "license": "sonniss",
+          "credit": "FLYSOUND · 莫辛纳甘 50 m 外 · Sonniss GDC 2020"
+        },
+        {
+          "id": "RifleIja",
+          "cue": "rifleIjaFar",
+          "events": 2,
+          "files": [
+            "Audio/Sfx/AudioSfx_SeedAudioRifleIjaFar_01.mp3"
+          ],
+          "license": "volcengine",
+          "credit": "Volcengine SeedAudio 1.0 · rifleIjaFar · 2026-09-11"
+        }
+      ],
+      "voiceScreen": {
+        "verdict": "clean",
+        "vad50S": 0,
+        "vad30S": 0,
+        "pitchRunS": 0,
+        "confidentWords": 0,
+        "tool": "Script_AmbBedVoiceScreen.py（Silero VAD + faster-whisper medium + 基频连续段）"
+      },
+      "recipe": "Script_SeedAudioBattleBedBake.mjs（配方 Data_AmbSources.AMB_BED_VARIANTS）"
+    },
+    "B": {
+      "file": "AudioAmb_BattleFarRifleCrackle.mp3",
+      "seconds": 40,
+      "channels": 2,
+      "label": "步机枪交火纹理",
+      "style": "中远距离的步枪与机枪交火：连绵的噼啪、时疏时密，每一声都拖着田野与土坡的回声尾巴。像 COD 里隔着一片地打的那条战线。",
+      "rmsDbfs": -27.45,
+      "peakDbfs": -2.34,
+      "crestDb": 25.1,
+      "bytes": 400763,
+      "sha256": "d1a637526d42c7509f2b60f694c2879d5b35bcc42edc6190c48cb152ffb8177e",
+      "bitrate": "80k",
+      "credit": "Volcengine SeedAudio 1.0（RifleCrackle 交火纹理，两次抽错开叠）+ Sonniss / SeedAudio 远枪与机枪单发",
+      "license": "mixed",
+      "licenses": [
+        "volcengine",
+        "sonniss"
+      ],
+      "stems": [
+        {
+          "id": "RifleCrackle",
+          "take": 1,
+          "sha256": "1da9763d0dc131dc"
+        },
+        {
+          "id": "RifleCrackle",
+          "take": 2,
+          "sha256": "6eb8775adae84b00"
+        }
+      ],
+      "scatter": [
+        {
+          "id": "RifleNra",
+          "cue": "rifleNraFar",
+          "events": 10,
+          "files": [
+            "Audio/Sfx/AudioSfx_RifleNraFar_01.mp3",
+            "Audio/Sfx/AudioSfx_RifleNraFar_02.mp3",
+            "Audio/Sfx/AudioSfx_RifleNraFar_03.mp3"
+          ],
+          "license": "sonniss",
+          "credit": "FLYSOUND · 莫辛纳甘 50 m 外 · Sonniss GDC 2020"
+        },
+        {
+          "id": "RifleIja",
+          "cue": "rifleIjaFar",
+          "events": 12,
+          "files": [
+            "Audio/Sfx/AudioSfx_SeedAudioRifleIjaFar_01.mp3"
+          ],
+          "license": "volcengine",
+          "credit": "Volcengine SeedAudio 1.0 · rifleIjaFar · 2026-09-11"
+        },
+        {
+          "id": "Zb26",
+          "cue": "zb26Far",
+          "events": 3,
+          "files": [
+            "Audio/Sfx/AudioSfx_Zb26Far_01.mp3",
+            "Audio/Sfx/AudioSfx_Zb26Far_02.mp3"
+          ],
+          "license": "sonniss",
+          "credit": "Pole Position Production · L7A2 GPMG 7.62×51（50 m 后方机位）· Sonniss GDC 2016"
+        },
+        {
+          "id": "Type92",
+          "cue": "type92Far",
+          "events": 3,
+          "files": [
+            "Audio/Sfx/AudioSfx_Type92Far_01.mp3",
+            "Audio/Sfx/AudioSfx_Type92Far_02.mp3"
+          ],
+          "license": "sonniss",
+          "credit": "Pole Position Production · M1919A4 .30cal（枪架，300 m 正前）· Sonniss GDC 2016"
+        }
+      ],
+      "voiceScreen": {
+        "verdict": "clean",
+        "vad50S": 0,
+        "vad30S": 0,
+        "pitchRunS": 0,
+        "confidentWords": 0,
+        "tool": "Script_AmbBedVoiceScreen.py（Silero VAD + faster-whisper medium + 基频连续段）"
+      },
+      "recipe": "Script_SeedAudioBattleBedBake.mjs（配方 Data_AmbSources.AMB_BED_VARIANTS）"
+    },
+    "C": {
+      "file": "AudioAmb_BattleFarHeavyBarrage.mp3",
+      "seconds": 40,
+      "channels": 2,
+      "label": "密集弹幕",
+      "style": "炮击一记紧接一记、地面在震，机枪不时来一串长点射：压迫感最强，几乎没有安静的缝。",
+      "rmsDbfs": -27.4,
+      "peakDbfs": -9.4,
+      "crestDb": 18,
+      "bytes": 400763,
+      "sha256": "c753971d2d368fa5711e142c5e2796e1b96c7d76a409afef5f0aa8ea3e2f3864",
+      "bitrate": "80k",
+      "credit": "Volcengine SeedAudio 1.0（BarrageShells 炮击 + MgLongBursts 机枪长点射）+ Sonniss 远炮 / 远枪单发",
+      "license": "mixed",
+      "licenses": [
+        "volcengine",
+        "sonniss"
+      ],
+      "stems": [
+        {
+          "id": "BarrageShells",
+          "take": 1,
+          "sha256": "b72101a589581c9f"
+        },
+        {
+          "id": "MgLongBursts",
+          "take": 1,
+          "sha256": "d2f9fd351f364005"
+        }
+      ],
+      "scatter": [
+        {
+          "id": "Cannon",
+          "cue": "ambCannonFar",
+          "events": 6,
+          "files": [
+            "Audio/Amb/AudioAmb_AmbCannonFar_01.mp3",
+            "Audio/Amb/AudioAmb_AmbCannonFar_02.mp3",
+            "Audio/Amb/AudioAmb_AmbCannonFar_03.mp3"
+          ],
+          "license": "sonniss",
+          "credit": "Pole Position Production · 远处的火炮 · Sonniss GDC 2017"
+        },
+        {
+          "id": "RifleNra",
+          "cue": "rifleNraFar",
+          "events": 5,
+          "files": [
+            "Audio/Sfx/AudioSfx_RifleNraFar_01.mp3",
+            "Audio/Sfx/AudioSfx_RifleNraFar_02.mp3",
+            "Audio/Sfx/AudioSfx_RifleNraFar_03.mp3"
+          ],
+          "license": "sonniss",
+          "credit": "FLYSOUND · 莫辛纳甘 50 m 外 · Sonniss GDC 2020"
+        }
+      ],
+      "voiceScreen": {
+        "verdict": "clean",
+        "vad50S": 0,
+        "vad30S": 0,
+        "pitchRunS": 0,
+        "confidentWords": 0,
+        "tool": "Script_AmbBedVoiceScreen.py（Silero VAD + faster-whisper medium + 基频连续段）"
+      },
+      "recipe": "Script_SeedAudioBattleBedBake.mjs（配方 Data_AmbSources.AMB_BED_VARIANTS）"
+    },
+    "D": {
+      "file": "AudioAmb_BattleFarColdFrontline.mp3",
+      "seconds": 40,
+      "channels": 2,
+      "label": "克制的冷战线",
+      "style": "风里几公里外的战线：稀疏、冷、空，大半时间只有地平线下的低频余韵，偶尔一记远炮、几声几乎听不清的枪。",
+      "rmsDbfs": -27.51,
+      "peakDbfs": -2.8,
+      "crestDb": 24.7,
+      "bytes": 400763,
+      "sha256": "4e52a02fa032ecb5457a21e3ec1829ffc4e7bab38d99e43dea715bffd2d28e78",
+      "bitrate": "80k",
+      "credit": "Volcengine SeedAudio 1.0（ColdFront 冷空远景）+ Sonniss 远炮 / 远枪单发",
+      "license": "mixed",
+      "licenses": [
+        "volcengine",
+        "sonniss"
+      ],
+      "stems": [
+        {
+          "id": "ColdFront",
+          "take": 1,
+          "sha256": "f90e1d131a537d83"
+        }
+      ],
+      "scatter": [
+        {
+          "id": "Cannon",
+          "cue": "ambCannonFar",
+          "events": 2,
+          "files": [
+            "Audio/Amb/AudioAmb_AmbCannonFar_01.mp3",
+            "Audio/Amb/AudioAmb_AmbCannonFar_02.mp3",
+            "Audio/Amb/AudioAmb_AmbCannonFar_03.mp3"
+          ],
+          "license": "sonniss",
+          "credit": "Pole Position Production · 远处的火炮 · Sonniss GDC 2017"
+        },
+        {
+          "id": "RifleNra",
+          "cue": "rifleNraFar",
+          "events": 3,
+          "files": [
+            "Audio/Sfx/AudioSfx_RifleNraFar_01.mp3",
+            "Audio/Sfx/AudioSfx_RifleNraFar_02.mp3",
+            "Audio/Sfx/AudioSfx_RifleNraFar_03.mp3"
+          ],
+          "license": "sonniss",
+          "credit": "FLYSOUND · 莫辛纳甘 50 m 外 · Sonniss GDC 2020"
+        }
+      ],
+      "voiceScreen": {
+        "verdict": "clean",
+        "vad50S": 0,
+        "vad30S": 0,
+        "pitchRunS": 0,
+        "confidentWords": 0,
+        "tool": "Script_AmbBedVoiceScreen.py（Silero VAD + faster-whisper medium + 基频连续段）"
+      },
+      "recipe": "Script_SeedAudioBattleBedBake.mjs（配方 Data_AmbSources.AMB_BED_VARIANTS）"
+    },
+    "E": {
+      "file": "AudioAmb_BattleFarVillageEcho.mp3",
+      "seconds": 40,
+      "channels": 2,
+      "label": "村镇巷战回声",
+      "style": "仗在村子里打：步枪与短点射撞在砖墙、土墙之间，一层一层拍回来，回声一层叠一层。",
+      "rmsDbfs": -27.42,
+      "peakDbfs": -2.92,
+      "crestDb": 24.5,
+      "bytes": 400763,
+      "sha256": "301631d231fe385663f3726bfe1a79854562bcb58aa3734a12a03dd41e8f1155",
+      "bitrate": "80k",
+      "credit": "Volcengine SeedAudio 1.0（AlleyEcho 巷战回声，两次抽错开叠）+ Sonniss / SeedAudio 远枪单发",
+      "license": "mixed",
+      "licenses": [
+        "volcengine",
+        "sonniss"
+      ],
+      "stems": [
+        {
+          "id": "AlleyEcho",
+          "take": 1,
+          "sha256": "db8badd90932d3f2"
+        },
+        {
+          "id": "AlleyEcho",
+          "take": 2,
+          "sha256": "179dbff0a7ccc9e7"
+        }
+      ],
+      "scatter": [
+        {
+          "id": "RifleNra",
+          "cue": "rifleNraFar",
+          "events": 3,
+          "files": [
+            "Audio/Sfx/AudioSfx_RifleNraFar_01.mp3",
+            "Audio/Sfx/AudioSfx_RifleNraFar_02.mp3",
+            "Audio/Sfx/AudioSfx_RifleNraFar_03.mp3"
+          ],
+          "license": "sonniss",
+          "credit": "FLYSOUND · 莫辛纳甘 50 m 外 · Sonniss GDC 2020"
+        },
+        {
+          "id": "RifleIja",
+          "cue": "rifleIjaFar",
+          "events": 3,
+          "files": [
+            "Audio/Sfx/AudioSfx_SeedAudioRifleIjaFar_01.mp3"
+          ],
+          "license": "volcengine",
+          "credit": "Volcengine SeedAudio 1.0 · rifleIjaFar · 2026-09-11"
+        },
+        {
+          "id": "Type92",
+          "cue": "type92Far",
+          "events": 1,
+          "files": [
+            "Audio/Sfx/AudioSfx_Type92Far_01.mp3",
+            "Audio/Sfx/AudioSfx_Type92Far_02.mp3"
+          ],
+          "license": "sonniss",
+          "credit": "Pole Position Production · M1919A4 .30cal（枪架，300 m 正前）· Sonniss GDC 2016"
+        }
+      ],
+      "voiceScreen": {
+        "verdict": "clean",
+        "vad50S": 0,
+        "vad30S": 0,
+        "pitchRunS": 0,
+        "confidentWords": 0,
+        "tool": "Script_AmbBedVoiceScreen.py（Silero VAD + faster-whisper medium + 基频连续段）"
+      },
+      "recipe": "Script_SeedAudioBattleBedBake.mjs（配方 Data_AmbSources.AMB_BED_VARIANTS）"
     }
   }
 }

@@ -350,6 +350,9 @@ async function Main() {
   const manifest = { generated: "Script_AmbBake.mjs", sampleRate: SR, beds: {}, cues: {}, credits: {}, licenses: AMB_LICENSES };
   const retainedManifest=fs.existsSync(MANIFEST)?JSON.parse(fs.readFileSync(MANIFEST,"utf8")):{};
   if(retainedManifest.carriageSources)manifest.carriageSources=retainedManifest.carriageSources;
+  // 战场远景床的无人声候选（2026-09-29，Script_SeedAudioBattleBedBake.mjs 生成）：不在 AMB_SOURCES 里，
+  // 全量重烘时必须原样带回，否则清单里的候选与它们的人声筛查记录会被悄悄抹掉。
+  if(retainedManifest.bedVariants)manifest.bedVariants=retainedManifest.bedVariants;
   const groups = AMB_SOURCES.filter((g) => !only.length || only.includes(g.id));
   let files = 0, bytes = 0;
   const failures = [];

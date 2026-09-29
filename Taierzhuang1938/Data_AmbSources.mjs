@@ -60,7 +60,209 @@ export const AMB_LICENSES = {
     terms: "由本项目账户经火山引擎 API 生成；使用受该服务条款约束",
     via: "https://openspeech.bytedance.com/api/v3/tts/create",
   },
+  mixed: {
+    name: "Mixed: Volcengine SeedAudio 1.0 stems + Sonniss GDC single shots already shipped in this repository",
+    terms: "战场远景床候选（bedVariants）：SeedAudio 生成的底（受火山引擎条款约束）叠上仓库里已有的 Sonniss 实录远枪 / 远炮单发（免版税）；"
+      + "每条候选的 sources 逐项写明用了哪些单发、各自的许可。",
+    via: "Script_SeedAudioBattleBedBake.mjs",
+  },
 };
+
+// ---------------------------------------------------------------------------
+// 战场远景床的无人声候选（2026-09-29）
+//
+// 用户原话：「当前默认游戏的环境音里有太多奇奇怪怪的人声，参考 COD 这类的操作给我重新生成几条给我选择」。
+// 审计与结论见 docs/Data_AudioAssets.md「战场远景床：无人声候选（2026-09-29）」。
+//
+// 现行 `battleFar` 是 Coll Anderson 的英语战斗人群录音（低通到 1.1 kHz），
+// 听感就是「一群听不清在喊什么的人」。COD（WaW / WWII）的远方战场只有仗、没有人群：
+// 炮群闷雷、连绵的枪声和它们在地形上的回声。下面五条候选照这个口径做，**全程没有人声**。
+//
+// 做法（Script_SeedAudioBattleBedBake.mjs）：
+//   1. SeedAudio 生成「底」（stems）：持续型的炮群、枪声纹理。SeedAudio 做持续型难、做枪炮本体「实而不炸」，
+//      所以底只负责连绵与空间；
+//   2. 把仓库里已有的实录远枪 / 远炮单发（Sonniss，来源见 sfx 与 amb 清单）按固定种子随机撒进去补「炸」；
+//   3. 每条成品按 RMS 对齐到现行 battleFar 的成品响度（AMB_BED_TARGET），再过一遍人声筛查
+//      （Script_AmbBedVoiceScreen.py：Silero VAD + Whisper 转写 + 基频连续段）。
+//
+// 候选不进 manifest.beds（否则开机会把五条都下载）；它们在清单的 `bedVariants` 里，
+// 只有被选中的那一条才会被 Script_Audio 装载（Script_AmbBedVariant.mjs 决定装哪一条）。
+// 选定后改 Data_Tuning_Audio.BATTLE_BED_VARIANT 一个数即可，也可以用 ?ambBed=A|B|C|D|E|none 现场试听。
+// ---------------------------------------------------------------------------
+
+/** 现行 battleFar 成品实测：RMS −27.43 dBFS、峰 −7.4 dBFS（2026-09-29 ffmpeg astats）。候选按同一个 RMS 对齐。 */
+export const AMB_BED_TARGET = Object.freeze({ rmsDb: -27.4, rmsTolDb: 0.4, peakCeilingDb: -2.5, bitrate: "80k" });
+
+/**
+ * SeedAudio 生成的底。每条提示词都先写「全程没有任何人声」再描述拟音师会做的事：
+ * 频段、密度、距离感、回声；结尾再把禁止项列一遍（人声、喊叫、口哨、惨叫、音乐、动物、发动机、飞机）。
+ * 同一条提示词多次请求结果不同（没有固定种子），take 编号 = 第几次抽；采用哪一次写在 AMB_BED_VARIANTS 的 stems[].take。
+ */
+export const AMB_BED_STEMS = Object.freeze([
+  {
+    id: "ThunderRoll",
+    prompt: "生成一条约四十秒的连续写实远方炮击环境录音，纯战场音效，全程没有任何人声、喊叫、说话、口哨、呻吟、音乐。"
+      + "1938年华北平原，听者站在开阔的旷野上，炮群在四到八公里外的地平线以远持续射击：一记记低沉的炮口闷雷从远处滚来，间隔不均匀，"
+      + "有时两三记成串，有时隔好几秒才一记，每一记先是一下很闷的鼓动，再拖着一两秒从地面传来的隆隆余响，慢慢消散。"
+      + "偶尔有一记更远的沉闷爆炸使地面轻轻一颤。频段集中在四十到四百赫兹，高频几乎被距离吃光，整体宽阔、厚重、柔和，不刺耳；"
+      + "全程距离、方位和整体响度保持稳定，不靠近、不加速，没有近处的爆炸或啸叫。"
+      + "绝对没有人声、喊叫、说话、口哨、笑声、广播、音乐、旋律、鼓点、乐器、动物叫声、车辆引擎和飞机，只有远方炮火的闷雷和旷野里很轻的空气底噪。",
+  },
+  {
+    id: "RifleCrackle",
+    prompt: "生成一条约四十秒的连续写实战场环境录音，只有枪声，全程没有任何人声、喊叫、说话、口哨、惨叫、音乐。"
+      + "听者站在开阔地里，交战的战线在三四百米到一公里以外：老式栓动步枪的单发脆响此起彼伏，夹杂机枪三五发的短点射和几次长一些的点射，"
+      + "连绵不断的噼噼啪啪，密度时疏时密，从不完全停下。每一声枪响之后都能听到田野、土坡和远处村庄墙面反射出来的短促回声尾巴，"
+      + "约半秒到一秒半，枪声之间的空隙里是这些回声叠出来的沙沙的余响。距离感是中远距离，枪声干脆但不刺耳，没有近处的枪响，没有爆炸，没有炮声。"
+      + "绝对没有人声、喊叫、说话、口哨、惨叫、笑声、广播、音乐、鼓点、乐器、动物叫声、车辆引擎和飞机，只有远处交火的枪声与它们的回声。",
+  },
+  {
+    id: "BarrageShells",
+    prompt: "生成一条约四十秒的连续写实炮击环境录音，压迫感强，全程没有任何人声、喊叫、说话、口哨、呻吟、音乐。"
+      + "1938年，听者伏在开阔地里，火炮在两三公里外持续密集轰击：炮口的闷响一记紧接一记，中间夹着炮弹落地的沉重爆炸，"
+      + "隔着距离只剩低频的重击与地面的震动，大爆炸之后有一段回荡的隆隆声；节奏不规则，偶有一轮齐射连着五六记，也有短暂缓一两秒又接上，几乎没有真正的安静。"
+      + "低频厚重，高频柔和被距离削掉，整体像一堵持续推过来的声墙，但方位和距离全程保持稳定，没有炮弹划过头顶的尖啸，没有近处爆炸。"
+      + "绝对没有人声、喊叫、说话、口哨、笑声、广播、音乐、旋律、鼓点、乐器、动物叫声、车辆引擎和飞机，只有远方炮击的闷响、爆炸和大地的隆隆。",
+  },
+  {
+    id: "MgLongBursts",
+    prompt: "生成一条约四十秒的连续写实机枪射击环境录音，全程没有任何人声、喊叫、说话、口哨、惨叫、音乐。"
+      + "听者在开阔地里，一挺老式重机枪在五六百米外一次次长点射，每次连射十几发到三四十发，节奏快而有金属质感，点射之间隔两三秒到七八秒不等；"
+      + "远处另有一挺轻机枪在更远的方向不时回应几发短点射。每一次连射之后，空旷的田野和远处房屋反射出一层短短的回声。"
+      + "距离是中远距离，机枪声干燥、硬、不刺耳，没有近处枪响，没有爆炸和炮声。"
+      + "绝对没有人声、喊叫、说话、口哨、惨叫、笑声、广播、音乐、鼓点、乐器、动物叫声、车辆引擎和飞机，只有远处机枪长点射与它们的回声。",
+  },
+  {
+    id: "ColdFront",
+    prompt: "生成一条约四十秒的连续写实环境录音，冷、空、克制，全程没有任何人声、喊叫、说话、口哨、音乐。"
+      + "冬末清晨的华北平原，风很轻地掠过空旷的地面，几公里外的战线只剩下稀疏、模糊的动静：偶尔一记很远的炮声，像地平线下的一下闷震，"
+      + "偶尔几声小到几乎听不清的枪响，更多时候是几秒到十几秒的近乎寂静，只有极轻的空气与远处低频的余韵。"
+      + "声音全程柔和、空旷、遥远，动静稀疏、不连续，不制造紧张的节奏，没有近处的声音，没有爆炸的正面冲击。"
+      + "绝对没有人声、喊叫、说话、口哨、笑声、广播、音乐、旋律、鼓点、乐器、动物叫声、车辆引擎和飞机，只有很轻的风、远方零星的炮声枪声和它们的余音。",
+  },
+  {
+    id: "AlleyEcho",
+    prompt: "生成一条约四十秒的连续写实枪声环境录音，只有枪声与回声，全程没有任何人声、喊叫、说话、口哨、惨叫、音乐。"
+      + "听者站在村镇边缘的土路上，战斗发生在几百米外的村子里：步枪单发和短点射从砖墙、土墙、院落之间传出来，撞在密集的墙面上拍打出一层层短促的回声，"
+      + "先是清晰的一二百毫秒的拍打回声，再接一段较长的散射尾巴，偶尔有瓦片或碎砖掉落的细碎声响，偶尔一声闷闷的手榴弹爆炸从院墙后传出。"
+      + "枪声时疏时密，大部分是中远距离，干脆而带着墙面的硬回声。没有近处枪响，没有炮声。"
+      + "绝对没有人声、喊叫、说话、口哨、惨叫、笑声、广播、音乐、鼓点、乐器、动物叫声、车辆引擎和飞机，只有村子里传出的枪声、爆炸和墙面的回声。",
+  },
+]);
+
+// 撒进床里的实录单发（都是仓库里已经在用的成品，不新增素材；来源逐条写清）。
+const SHOT = Object.freeze({
+  cannonFar: Object.freeze({ cue: "ambCannonFar", license: "sonniss", credit: "Pole Position Production · 远处的火炮 · Sonniss GDC 2017",
+    files: ["Audio/Amb/AudioAmb_AmbCannonFar_01.mp3", "Audio/Amb/AudioAmb_AmbCannonFar_02.mp3", "Audio/Amb/AudioAmb_AmbCannonFar_03.mp3"] }),
+  rifleNraFar: Object.freeze({ cue: "rifleNraFar", license: "sonniss", credit: "FLYSOUND · 莫辛纳甘 50 m 外 · Sonniss GDC 2020",
+    files: ["Audio/Sfx/AudioSfx_RifleNraFar_01.mp3", "Audio/Sfx/AudioSfx_RifleNraFar_02.mp3", "Audio/Sfx/AudioSfx_RifleNraFar_03.mp3"] }),
+  rifleIjaFar: Object.freeze({ cue: "rifleIjaFar", license: "volcengine", credit: "Volcengine SeedAudio 1.0 · rifleIjaFar · 2026-09-11",
+    files: ["Audio/Sfx/AudioSfx_SeedAudioRifleIjaFar_01.mp3"] }),
+  zb26Far: Object.freeze({ cue: "zb26Far", license: "sonniss", credit: "Pole Position Production · L7A2 GPMG 7.62×51（50 m 后方机位）· Sonniss GDC 2016",
+    files: ["Audio/Sfx/AudioSfx_Zb26Far_01.mp3", "Audio/Sfx/AudioSfx_Zb26Far_02.mp3"] }),
+  type92Far: Object.freeze({ cue: "type92Far", license: "sonniss", credit: "Pole Position Production · M1919A4 .30cal（枪架，300 m 正前）· Sonniss GDC 2016",
+    files: ["Audio/Sfx/AudioSfx_Type92Far_01.mp3", "Audio/Sfx/AudioSfx_Type92Far_02.mp3"] }),
+});
+
+/**
+ * 五条候选的混音配方。字段：
+ *   stems[]   {id, take, hp, lp, gainDb, fromS, rotateS, swap}  底：哪条提示词的第几次抽、滤波与增益；
+ *             rotateS = 把这一份在时间上循环移位（0.35 s 等功率交叉接缝），swap = 左右对调 ——
+ *             同一条底叠两份就是两条互不同步的炮群
+ *   scatter[] {id, ...SHOT.x, perMin, peakOverBedDb, jitterDb, hp, lp, pan, pitch, echo, tailS, minGapS}
+ *             实录单发的撒播：指数间隔、固定种子；峰值 = 底的 RMS + peakOverBedDb；echo = aecho 的回声尾巴
+ *   finalHp / finalLp  整条最后的高低通
+ */
+export const AMB_BED_VARIANTS = [
+  {
+    key: "A", file: "AudioAmb_BattleFarDistantThunder.mp3", label: "远方炮群闷雷", durS: 40,
+    style: "炮群在地平线以外一记接一记地滚闷雷，间隔不匀；只在缝里落几声很远的枪。最稳的底：低频为主，不抢枪声、脚步和台词。",
+    credit: "Volcengine SeedAudio 1.0（ThunderRoll 炮群闷雷，两份错开叠）+ Sonniss 远炮 / 远枪单发",
+    stems: [
+      { id: "ThunderRoll", take: 1, hp: 28, lp: 700 },
+      { id: "ThunderRoll", take: 1, hp: 28, lp: 520, gainDb: -5, rotateS: 2.4, swap: true },
+    ],
+    scatter: [
+      { id: "Cannon", ...SHOT.cannonFar, perMin: 4, peakOverBedDb: 16, jitterDb: 3, hp: 40, lp: 650, pan: [-0.85, 0.85], pitch: [0.94, 1, 1.06], tailS: 3.4, minGapS: 2.5 },
+      { id: "RifleNra", ...SHOT.rifleNraFar, perMin: 4, peakOverBedDb: 4, jitterDb: 4, hp: 200, lp: 3000, pan: [-0.9, 0.9], pitch: [0.96, 1, 1.04],
+        echo: { delaysMs: [380, 820], decays: [0.3, 0.16], padS: 1.6, lp: 2200 }, tailS: 1.8, minGapS: 3 },
+      { id: "RifleIja", ...SHOT.rifleIjaFar, perMin: 3, peakOverBedDb: 3, jitterDb: 4, hp: 200, lp: 3000, pan: [-0.9, 0.9], pitch: [0.95, 1.05],
+        echo: { delaysMs: [420, 900], decays: [0.28, 0.14], padS: 1.6, lp: 2200 }, tailS: 1.8, minGapS: 3 },
+    ],
+    finalLp: 2600,
+  },
+  {
+    key: "B", file: "AudioAmb_BattleFarRifleCrackle.mp3", label: "步机枪交火纹理", durS: 40, poisson: true,
+    style: "中远距离的步枪与机枪交火：连绵的噼啪、时疏时密，每一声都拖着田野与土坡的回声尾巴。像 COD 里隔着一片地打的那条战线。",
+    credit: "Volcengine SeedAudio 1.0（RifleCrackle 交火纹理，两次抽错开叠）+ Sonniss / SeedAudio 远枪与机枪单发",
+    // 两次抽的 RifleCrackle 左右对调、错开 3.1 s 叠：SeedAudio 的枪声是一记一记隔着两秒的，两份叠起来才「连绵」。
+    stems: [
+      { id: "RifleCrackle", take: 1, hp: 60, lp: 6500, gainDb: -3 },
+      { id: "RifleCrackle", take: 2, hp: 60, lp: 6500, gainDb: 0, rotateS: 3.1, swap: true },
+    ],
+    scatter: [
+      { id: "RifleNra", ...SHOT.rifleNraFar, perMin: 20, peakOverBedDb: 6, jitterDb: 4, hp: 180, lp: 3600, pan: [-0.9, 0.9], pitch: [0.95, 1, 1.05],
+        echo: { delaysMs: [190, 430, 820], decays: [0.34, 0.22, 0.12], padS: 1.6, lp: 2600 }, tailS: 1.8, minGapS: 0.35 },
+      { id: "RifleIja", ...SHOT.rifleIjaFar, perMin: 14, peakOverBedDb: 5, jitterDb: 4, hp: 180, lp: 3600, pan: [-0.9, 0.9], pitch: [0.95, 1.05],
+        echo: { delaysMs: [210, 470, 900], decays: [0.32, 0.2, 0.1], padS: 1.6, lp: 2600 }, tailS: 1.8, minGapS: 0.35 },
+      { id: "Zb26", ...SHOT.zb26Far, perMin: 5, poisson: false, peakOverBedDb: 7, jitterDb: 3, hp: 150, lp: 3200, pan: [-0.7, 0.7], pitch: [0.97, 1.03],
+        echo: { delaysMs: [240, 520, 900], decays: [0.3, 0.18, 0.1], padS: 1.6, lp: 2400 }, tailS: 1.8, minGapS: 1 },
+      { id: "Type92", ...SHOT.type92Far, perMin: 4, poisson: false, peakOverBedDb: 7, jitterDb: 3, hp: 150, lp: 3200, pan: [-0.7, 0.7], pitch: [0.97, 1.03],
+        echo: { delaysMs: [260, 560, 950], decays: [0.3, 0.18, 0.1], padS: 1.6, lp: 2400 }, tailS: 1.8, minGapS: 1.5 },
+    ],
+    finalLp: 7000,
+  },
+  {
+    key: "C", file: "AudioAmb_BattleFarHeavyBarrage.mp3", label: "密集弹幕", durS: 40,
+    style: "炮击一记紧接一记、地面在震，机枪不时来一串长点射：压迫感最强，几乎没有安静的缝。",
+    credit: "Volcengine SeedAudio 1.0（BarrageShells 炮击 + MgLongBursts 机枪长点射）+ Sonniss 远炮 / 远枪单发",
+    stems: [
+      { id: "BarrageShells", take: 1, hp: 35, lp: 2000, gainDb: -2 },
+      { id: "MgLongBursts", take: 1, hp: 140, lp: 2400, gainDb: -13 },
+    ],
+    scatter: [
+      { id: "Cannon", ...SHOT.cannonFar, perMin: 9, peakOverBedDb: 14, jitterDb: 3, hp: 40, lp: 900, pan: [-0.85, 0.85], pitch: [0.92, 1, 1.08], tailS: 3.4, minGapS: 1.2 },
+      { id: "RifleNra", ...SHOT.rifleNraFar, perMin: 7, peakOverBedDb: 3, jitterDb: 4, hp: 200, lp: 3200, pan: [-0.9, 0.9], pitch: [0.96, 1, 1.04],
+        echo: { delaysMs: [300, 700], decays: [0.28, 0.14], padS: 1.5, lp: 2400 }, tailS: 1.8, minGapS: 1 },
+    ],
+    finalLp: 3200,
+  },
+  {
+    key: "D", file: "AudioAmb_BattleFarColdFrontline.mp3", label: "克制的冷战线", durS: 40,
+    style: "风里几公里外的战线：稀疏、冷、空，大半时间只有地平线下的低频余韵，偶尔一记远炮、几声几乎听不清的枪。",
+    credit: "Volcengine SeedAudio 1.0（ColdFront 冷空远景）+ Sonniss 远炮 / 远枪单发",
+    // ColdFront 原片是 −57 dBFS 的低频空气底噪加几处几乎听不见的远响。按 RMS 对齐时若把整条噪声抬 30 dB，
+    // 出来是一片恒定的嘶声（第一版就是这样：每半秒 RMS 都在 −29 dBFS，「稀疏」全没了）。
+    // 现在：底留一层很轻的冷空气（+8 dB 后仍比单发低约 20 dB；80 Hz 以下与 2.2 kHz 以上砍掉），撒播的单发按写死的参照 refRmsDb 摆，
+    // 抬 RMS 时是单发被抬起来、缝里仍然是空的。
+    refRmsDb: -30,
+    stems: [{ id: "ColdFront", take: 1, hp: 80, lp: 2200, gainDb: 13 }],
+    scatter: [
+      { id: "Cannon", ...SHOT.cannonFar, perMin: 3, peakOverBedDb: 9, jitterDb: 3, hp: 50, lp: 380, pan: [-0.8, 0.8], pitch: [0.94, 1, 1.06], tailS: 3.4, minGapS: 5 },
+      { id: "RifleNra", ...SHOT.rifleNraFar, perMin: 4, peakOverBedDb: 3, jitterDb: 4, hp: 220, lp: 1700, pan: [-0.9, 0.9], pitch: [0.96, 1, 1.04],
+        echo: { delaysMs: [520, 1100], decays: [0.26, 0.14], padS: 2.2, lp: 1400 }, tailS: 2.4, minGapS: 4 },
+    ],
+    finalLp: 2600,
+  },
+  {
+    key: "E", file: "AudioAmb_BattleFarVillageEcho.mp3", label: "村镇巷战回声", durS: 40, poisson: true,
+    style: "仗在村子里打：步枪与短点射撞在砖墙、土墙之间，一层一层拍回来，回声一层叠一层。",
+    credit: "Volcengine SeedAudio 1.0（AlleyEcho 巷战回声，两次抽错开叠）+ Sonniss / SeedAudio 远枪单发",
+    stems: [
+      { id: "AlleyEcho", take: 1, hp: 75, lp: 6500, gainDb: 3 },
+      { id: "AlleyEcho", take: 2, hp: 75, lp: 6500, gainDb: -1.5, rotateS: 4.3, swap: true },
+    ],
+    scatter: [
+      { id: "RifleNra", ...SHOT.rifleNraFar, perMin: 9, peakOverBedDb: 4, jitterDb: 4, hp: 200, lp: 4200, pan: [-0.9, 0.9], pitch: [0.96, 1, 1.04],
+        echo: { delaysMs: [70, 150, 250, 400], decays: [0.5, 0.38, 0.26, 0.16], padS: 1.4, lp: 4600 }, tailS: 1.6, minGapS: 0.5 },
+      { id: "RifleIja", ...SHOT.rifleIjaFar, perMin: 7, peakOverBedDb: 4, jitterDb: 4, hp: 200, lp: 4200, pan: [-0.9, 0.9], pitch: [0.95, 1.05],
+        echo: { delaysMs: [80, 165, 270, 420], decays: [0.48, 0.36, 0.24, 0.15], padS: 1.4, lp: 4600 }, tailS: 1.6, minGapS: 0.5 },
+      { id: "Type92", ...SHOT.type92Far, perMin: 2, peakOverBedDb: 6, jitterDb: 3, hp: 180, lp: 3800, pan: [-0.7, 0.7], pitch: [0.97, 1.03],
+        echo: { delaysMs: [90, 190, 310, 470], decays: [0.5, 0.36, 0.24, 0.14], padS: 1.6, lp: 4200 }, tailS: 1.8, minGapS: 2 },
+    ],
+    finalLp: 6500,
+  },
+];
 
 const ARCHIVE = "https://archive.org/download/";
 
