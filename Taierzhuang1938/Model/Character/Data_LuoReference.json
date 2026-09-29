@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "character": "Luo Maocai",
+  "created": "2026-09-29",
+  "status": "Standalone reference asset; not registered in the runtime cast",
+  "sourceRevision": "7ecf4201ef52d4d8f0417ef46c12b323971b22c4",
+  "model": {
+    "file": "Model_TengxianLuoReference.glb",
+    "bytes": 20208876,
+    "sha256": "a9d0e2e192927ef1ef7fec13646721124f3577f025dfee1262cf9448bd7807f7"
+  },
+  "sources": [
+    {
+      "file": "Model_TengxianNra05.glb",
+      "bytes": 3611492,
+      "sha256": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72"
+    },
+    {
+      "file": "Model_TengxianNra05Facial.glb",
+      "bytes": 545832,
+      "sha256": "718fad28d54a90a0060301a18fe225565b0cf24a8e529580f6026c103ae43550"
+    }
+  ],
+  "references": [
+    {
+      "file": "Image_ThreeView.png",
+      "bytes": 3810150,
+      "sha256": "e024d42635d92b77f67b575f6f116fefe7402ff1244b80f6c70bbba20c3c68d2"
+    },
+    {
+      "file": "Image_FrontView.png",
+      "bytes": 1390368,
+      "sha256": "dd0c6b3fdefdf34aab4ea300025358c439a54485847b29cc7e5d70d03ba733a7"
+    },
+    {
+      "file": "Image_SideView.png",
+      "bytes": 1201970,
+      "sha256": "b7789481bf9f0bc005b475f5fdbd3a402b2c084dee7d588692e464baa84948ef"
+    },
+    {
+      "file": "Image_BackView.png",
+      "bytes": 1418075,
+      "sha256": "63a25953f3862df1d0071c8a154b475225511210d4256671a9bb55a798eeee82"
+    }
+  ],
+  "skeleton": {
+    "contract": "TengxianHumanoidV1",
+    "bodyBones": 53,
+    "faceBones": 13,
+    "maximumExportedInfluences": 4,
+    "morphTargets": false,
+    "bodyAnimationSource": "Model_TengxianNra05.glb",
+    "embeddedAnimations": [
+      "Animation_LuoFacialReview"
+    ]
+  },
+  "geometry": {
+    "triangles": 144235,
+    "meshes": 3,
+    "materials": 3
+  },
+  "textures": {
+    "embedded": 9,
+    "resolution": [
+      2048,
+      2048
+    ],
+    "channels": [
+      "Base",
+      "Normal",
+      "Roughness"
+    ],
+    "groups": [
+      "Skin",
+      "Uniform",
+      "Equipment"
+    ]
+  },
+  "editableSource": "Model_LuoReference.blend",
+  "bakedSource": "Model_LuoReferenceBaked.blend",
+  "sourceStorage": "Private Blender source directory documented in docs/Data_LuoReference.md",
+  "rebuildScripts": [
+    "Script_BuildLuoReference.py",
+    "Script_ValidateLuoReference.py",
+    "Script_ExportLuoReference.py",
+    "Script_AuditLuoReference.py"
+  ],
+  "verified": {
+    "bodyBindMatrixError": 0.0,
+    "bodyTranslationError": 7.068657612799983e-07,
+    "bodyQuaternionError": 1.5553086996078491e-06,
+    "facialPoses": [
+      "Rest",
+      "Open",
+      "Wide",
+      "Round",
+      "Blink",
+      "Close",
+      "BrowUp",
+      "Snarl",
+      "DeadSlack",
+      "Shock",
+      "Pain",
+      "Shout",
+      "Grit"
+    ],
+    "browserViews": [
+      "Front",
+      "Side",
+      "Back",
+      "Face",
+      "Open",
+      "Blink",
+      "Shout",
+      "RifleRun"
+    ],
+    "browserErrors": []
+  }
+}
