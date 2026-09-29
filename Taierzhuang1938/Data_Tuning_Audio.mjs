@@ -6,15 +6,76 @@ export const AUDIO_MIX_DEFAULTS = Object.freeze({ sfx: 1, music: 1, ambience: 0.
 // live spatial send stays subtle; the player's own lines remain centred and dry.
 export const STORY_SPEECH = Object.freeze({ worldWet: 0.045, switchS: 0.018,
   concussionSpeechFloorHz: 4200 });
-// 战场远景床（AMBIENCE_PRESETS 里各层的 `bed: "battleFar"`）用哪一条素材（2026-09-29）。
-// 用户原话：「当前默认游戏的环境音里有太多奇奇怪怪的人声，参考 COD 这类的操作给我重新生成几条给我选择」。
-//   null   = 现行的 Coll Anderson 战斗人群录音（默认，等用户挑）
-//   "A"…"E" = 无人声候选（清单 Audio/Amb/Data_AmbManifest.json 的 bedVariants；风格见 docs/Data_AudioAssets.md
-//             「战场远景床：无人声候选」）：A 炮群闷雷 · B 步机枪交火纹理 · C 密集弹幕 · D 克制的冷战线 · E 村镇巷战回声
-//   "none" = 不放这一层（对比用）
-// 现场试听不用改代码：URL 加 ?ambBed=A|B|C|D|E|none，优先于这里。用户选定后只改这一个数。
-// 只有被选中的那一条会被下载（Script_AmbBedVariant.mjs 决定装载计划），其余候选不增加开机流量。
-export const BATTLE_BED_VARIANT = null;
+// 战场远景床（AMBIENCE_PRESETS 里各层的 `bed: "battleFar"`）怎么放（2026-09-29）。
+// 用户原话（2026-09-29，试听五条无人声候选 A–E 之后）：
+//   「整体A长期存在，B和C交替的随机叠加出现；E在玩家进入巷道/半室内阶段再播放（作为替换偶尔的B和C）」。
+// 上一轮用户嫌旧床（Coll Anderson 英语战斗人群录音）有「奇奇怪怪的人声」：
+//   「当前默认游戏的环境音里有太多奇奇怪怪的人声，参考 COD 这类的操作给我重新生成几条给我选择」。
+//
+// BATTLE_BED_VARIANT 的取值（?ambBed= 用同一组词，URL 优先于这里）：
+//   "layered" = **默认**。A 是长期底床（所有预设里的 battleFar 层都放 A），B 与 C 轮流、随机时刻偶尔叠在 A 上面；
+//               听者在巷道 / 院子 / 屋里（BATTLE_BED_LAYERS.enclosedZones）时，这层偶尔的叠加改用 E。null / 缺省 / 认不出 = 这一档。
+//   "legacy"  = 旧的英语战斗人群录音（对比用；默认不再请求、不再下载）
+//   "A"…"E"   = 只放这一条、不叠加（清单 Audio/Amb/Data_AmbManifest.json 的 bedVariants；风格见 docs/Data_AudioAssets.md
+//               「战场远景床：无人声候选」）：A 炮群闷雷 · B 步机枪交火纹理 · C 密集弹幕 · D 克制的冷战线（不用）· E 村镇巷战回声
+//   "none"    = 不放这一层（对比用）
+// 现场试听不用改代码：URL 加 ?ambBed=layered|legacy|A|B|C|D|E|none。
+// 下载：默认只在开机阻塞下载 A（顶替旧床）；B / C / E 在开机之后后台按需下载解码（Script_AmbBedVariant.mjs 决定计划），
+// 没解码好之前叠加层只是不出声，不拖 ambReady。
+export const BATTLE_BED_VARIANT = "layered";
+
+/**
+ * "layered" 的数（规则在 Script_BattleBedLayers.mjs，引擎接线在 Script_Audio.mjs 的 LoopLayer.PlayOverlay / AudioEngine.TickBedOverlay）。
+ * 时间单位都是秒（音频时钟）。
+ *
+ * 角色：`base` 是每个 battleFar 层本来播的那条；叠加层是伴随每个 battleFar 层的一个偶尔出声的声部，
+ * 走宿主层同一条链（同一条总线、同一个低通 `cut`、同一个组增益 —— 战场强度倍率与 ShapeFarBeds 调形都写在这个组增益上，
+ * 换档交叉也跟着宿主走），所以预设里各层的 gain / cut / bus / battle 一个字不用改。
+ *
+ * 电平 `gain`（叠加段峰值 = 宿主层电平 × 这个数）按听感定：五条成品的 RMS 是对齐的（−27.4 dBFS），但 K 加权响度（BS.1770，
+ * 对中高频更敏感）A −27.5 LUFS、B −23.6、C −26.1、E −23.9：A 全是低频闷雷，B / E 的能量在 250 Hz–4 kHz。
+ * 同电平叠上去是 RMS +3 dB、B / E 的响度 +4.6 / +5.3 LUFS，「突然多了一层」。按「A 上叠一段 X 之后，响度比单放 A 涨约 +1.8 LUFS」
+ * 反推（随机 12 s 窗口取 40 次平均，离线量的）：B 0.50（−6.0 dB，涨 +1.9）、E 0.50（涨 +2.0）、C 0.65（−3.7 dB，涨 +1.9；
+ * C 是压缩过的密集弹幕、波峰因数只有 18 dB，同电平下比 B 平）。RMS 只涨约 +1 dB，听起来是「远处那一片忽然密了一点」，不是新来一层。
+ *
+ * 时刻 / 时长：叠加段是「偶尔」—— 每段 9–20 s，段与段之间静 20–60 s（从上一段结束起算），大部分时间不出声（约 25 % 的时间有叠加）；
+ * 开局第一段 12–30 s 后来（不用等一分钟才知道有这一层）。淡入淡出各 2–4 s（平滑 S 曲线，不是指数式的「一下冲出来」）；
+ * 9 s ≥ 2 × 4 s + holdMinS，最短一段也有平台。随机全走 Mulberry32（seed 是字符串，HashString 取种子），同输入同输出。
+ *
+ * 巷道 / 半室内：听者所在区（引擎 ListenerZone，宿主 zone 探针，第一关实测村落巷子 street、院子 courtyard、残屋里 interior）
+ * ∈ enclosedZones 持续 enterHoldS 秒后，下一段改用 enclosed 里的键（E）；持续不在这几区 exitHoldS 秒后回到 open（B / C 交替）。
+ * 进得快（4 s，巷口一进去环境就变了）、出得慢（8 s，穿过墙缺口、院门、巷子里的空档时不来回跳）。
+ * 战壕（trench）和防炮洞（dugout）不算：那是露天沟 / 土洞，01–02 开场在洞里照样是 A 底 + B / C。
+ * 正在播的一段遇到切换不硬切：不属于新档的那一段在自己的淡出时长里淡出（已经在淡出的就让它播完）。
+ *
+ * 换档（Ambience 换预设）时正在播的叠加段由新宿主层接着播（同一条素材、接着往下放、joinFadeS 秒淡入，剩不到 joinMinRemainS 就不接），
+ * 旧宿主层淡出时它一起淡出。没有 battleFar 层的预设里调度器停表（不出声、不计时）。
+ *
+ * 节点：叠加段出声时占 2 个节点（source + gain，挂在宿主层的组增益上），不出声时 0 个；引擎离预算上限不足 nodeReserve 个时这一段往后推。
+ */
+export const BATTLE_BED_LAYERS = Object.freeze({
+  base: "A",
+  open: Object.freeze(["B", "C"]),
+  enclosed: Object.freeze(["E"]),
+  enclosedZones: Object.freeze(["street", "courtyard", "interior"]),
+  firstKey: "B",
+  gain: Object.freeze({ B: 0.5, C: 0.65, E: 0.5 }),
+  firstGapS: Object.freeze([12, 30]),
+  gapS: Object.freeze([20, 60]),
+  durS: Object.freeze([9, 20]),
+  fadeS: Object.freeze([2, 4]),
+  holdMinS: 0.5,
+  enterHoldS: 4,
+  exitHoldS: 8,
+  joinFadeS: 2,
+  joinMinRemainS: 3,
+  // 调度器时钟一次最多前进这么多秒：暂停 / 切后台之后回来那一拍不算作「过了很久」。
+  tickMaxS: 1,
+  nodeReserve: 8,
+  // 开机（ambReady）之后过这么多秒、且下载队列空了，才开始后台下载 B / C / E。
+  loadDelayS: 3,
+  seed: "battleBedLayers@taierzhuang",
+});
 //
 // **纯数据**：不 import three、不 import 规则代码、不含函数。规则在 `Script_AudioWiring.mjs`。
 //

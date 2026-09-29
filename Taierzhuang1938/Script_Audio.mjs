@@ -48,9 +48,11 @@ import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { OPENING_AMBIENCE_PRESETS } from "./Data_FirstLevelMissionBattleSound.mjs";
 import { AUDIO_MIX_DEFAULTS, STORY_SPEECH, TINNITUS } from "./Data_Tuning_Audio.mjs";
 import { BuildSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
-// 2026-09-29 战场远景床候选：选哪一条（?ambBed= / BATTLE_BED_VARIANT）与装载计划，纯函数在这个模块里。
-import { BATTLE_BED_VARIANT } from "./Data_Tuning_Audio.mjs";
-import { ResolveBattleBedChoice, BedLoadPlan, AmbFilesToFetch } from "./Script_AmbBedVariant.mjs";
+// 2026-09-29 战场远景床：选哪一档（?ambBed= / BATTLE_BED_VARIANT）与装载计划，纯函数在 Script_AmbBedVariant；
+// 「A 底床 + B/C 偶尔叠加（巷道里换 E）」的调度规则在 Script_BattleBedLayers，数在 BATTLE_BED_LAYERS。
+import { BATTLE_BED_VARIANT, BATTLE_BED_LAYERS } from "./Data_Tuning_Audio.mjs";
+import { ResolveBattleBedChoice, BedLoadPlan, AmbFilesToFetch, CHOICE_LAYERED } from "./Script_AmbBedVariant.mjs";
+import { BattleBedScheduler } from "./Script_BattleBedLayers.mjs";
 
 // 包络地板。低于这个值当作静音（见文件头坑 2）。
 const FLOOR = 1e-4;
@@ -585,6 +587,17 @@ function Swell(param, t, peak, attack, hold, release) {
   param.linearRampToValueAtTime(Math.max(peak, FLOOR * 2), t + attack);
   param.setValueAtTime(Math.max(peak, FLOOR * 2), t + attack + hold);
   param.exponentialRampToValueAtTime(FLOOR, t + attack + hold + release);
+}
+
+/**
+ * 平滑 S 曲线（smoothstep 3t²−2t³）的四段线性近似：t0 起 dur 秒里从 from 滑到 to。调用前 t0 处要已经有一个锚点值。
+ * 战场远景床叠加段的淡入淡出用它：指数式（setTargetAtTime）起头最陡，一层密集的枪声「一下冲出来」；S 曲线起头慢、中段快、收尾慢。
+ */
+const SMOOTH_STEPS = [0.15625, 0.5, 0.84375, 1];
+function SmoothRamp(param, from, to, t0, dur) {
+  for (let i = 0; i < SMOOTH_STEPS.length; i += 1) {
+    param.linearRampToValueAtTime(from + (to - from) * SMOOTH_STEPS[i], t0 + (dur * (i + 1)) / SMOOTH_STEPS.length);
+  }
 }
 
 /** 频率下滑（指数，听感才是线性的）。 */
@@ -2936,7 +2949,10 @@ export const MUSIC_BASE = "Audio/Music/";
 export const SFX_PACK_VERSION = "20260928slapchargecrowd";
 // 2026-09-29：清单加了 `bedVariants`（战场远景床的五条无人声候选），戳不动的话浏览器拿着旧清单永远看不到候选。
 export const AMB_PACK_VERSION = "20260929battlebeds";
-/** 这一局战场远景床用哪一条：?ambBed= 优先于 BATTLE_BED_VARIANT；认不出就退回现行（不静音）。 */
+/**
+ * 这一局战场远景床走哪一档：?ambBed= 优先于 BATTLE_BED_VARIANT；认不出就退回默认 layered（不静音；
+ * 清单里没有候选的旧清单再退回旧床）。取值见 Data_Tuning_Audio.BATTLE_BED_VARIANT。
+ */
 export function AmbBedChoice(manifest, search = typeof location !== "undefined" ? location.search : "") {
   return ResolveBattleBedChoice({ search, tuning: BATTLE_BED_VARIANT, keys: Object.keys(manifest?.bedVariants || {}) });
 }
@@ -2971,6 +2987,22 @@ function AudioFetchRelease() {
   const next = audioFetchWaiting.shift();
   if (next) next();                 // 名额直接交棒，不回落计数，否则会超发
   else audioFetchLive -= 1;
+}
+
+/**
+ * 等下载队列空下来（没有在下的、没有排队的）再往下走，最多等 maxWaitMs。
+ * 后台下载（战场远景床的 B / C / E 叠加素材）用它让路：别人的包、对白、音乐先拿满带宽，
+ * 这几条只在网络闲着的时候拉，且一次一条。
+ */
+export function AudioFetchIdle(maxWaitMs = 8000, pollMs = 150) {
+  const t0 = Date.now();
+  return new Promise((resolve) => {
+    const Check = () => {
+      if ((audioFetchLive === 0 && audioFetchWaiting.length === 0) || Date.now() - t0 >= maxWaitMs) resolve();
+      else setTimeout(Check, pollMs);
+    };
+    Check();
+  });
 }
 
 /** 把相对路径解析成绝对 URL，只用来写错误信息。 */
@@ -3469,6 +3501,9 @@ function IsFarBattleEvent(ev) { return !!ev && (!!ev.battle || FAR_BATTLE_EVENTS
  *   layers[].seg   一条播放头放多久再换到下一个随机位置（秒，默认 11）
  *   layers[].battle  这一层随**战场强度**涨落（BattleBedScale：强度 0 时剩 0.34，
  *                  1.4 s 斜坡，见 SetBattleIntensity）。不带这个标的层是固定电平。
+ *   layers[].overlay 【2026-09-29】`bed: "battleFar"` 的层默认带一个「偶尔叠加」的伴随声部（默认档 layered：底床 A，
+ *                  B 与 C 交替偶尔叠上来，听者在巷道 / 半室内时换 E；数据 Data_Tuning_Audio.BATTLE_BED_LAYERS）。
+ *                  叠加段挂在这一层的组增益上，同 bus / cut / battle 倍率 / ShapeFarBeds 调形。写 `overlay: false` 这一层不带。
  *   events[].perMin 一分钟平均响几次
  *   events[].battle  这一条撒播随强度涨落（频次 ×BattleEventRate、
  *                  音量 ×BattleEventVolume）。**强度 0 时不是零**，是「远处零星」。
@@ -3832,6 +3867,12 @@ class LoopLayer {
      */
     this.shapeLevel = 1;
     this.cutScale = 1;
+    /**
+     * 【2026-09-29】这一层是不是战场远景床叠加段的宿主（AudioEngine.Ambience 按「层是 battleFar 且这一局走 layered」写）。
+     * 叠加段是挂在这一层组增益上的一对 source + gain（PlayOverlay），和 heads 里的普通播放头放在同一个集合里
+     * （标着 overlay: 键），所以 Stop / Kill / 节点账都不用另开一套。
+     */
+    this.overlayHost = false;
   }
 
   /** @param {number} [fadeInS] 组增益从零淡进来的秒数（环境换档时的交叉，0 = 直接到位）。 */
@@ -3858,6 +3899,69 @@ class LoopLayer {
     }
     this.nextAt = ctx.currentTime + 0.05;
     this.Spawn(true);
+    // 换档时正在播的叠加段由新宿主接着播（没有在播的 / 不是宿主 / 素材还没解码好就什么也不做）。
+    if (this.overlayHost) this.engine.AttachBedOverlay?.(this, fadeInS);
+  }
+
+  /**
+   * 【2026-09-29】在这一层上起一段叠加（战场远景床的 B / C / E，规则见 Script_BattleBedLayers）。
+   * 一对 source + gain 挂在**这一层的组增益**上：战场强度倍率、ShapeFarBeds 的调形、这一层自己的低通（cut）、
+   * 总线（远声组 / 环境）全部与宿主同一条链，换档交叉也跟着宿主走。峰值 = 宿主层电平 × seg.gain；
+   * 淡入淡出是平滑 S 曲线（四段线性近似，不用指数式的「一下冲出来」）。出声时占 2 个节点，放完由计时器拆掉。
+   *
+   * @param {AudioBuffer} buffer
+   * @param {{key: string, offsetS: number, durS: number, fadeInS: number, fadeOutS: number, gain: number}} seg
+   * @returns {object|null} 播放头（登记在 heads 里，带 overlay 标记）
+   */
+  PlayOverlay(buffer, seg) {
+    const engine = this.engine;
+    const ctx = engine.ctx;
+    if (this.stopped || !ctx || !this.group || !buffer || !seg) return null;
+    const at = ctx.currentTime + 0.02;
+    const durS = Math.max(0.5, Math.min(seg.durS, buffer.duration - seg.offsetS - 0.05));
+    const fadeIn = Math.max(0.05, Math.min(seg.fadeInS, durS * 0.45));
+    const fadeOut = Math.max(0.05, Math.min(seg.fadeOutS, durS - fadeIn - 0.05));
+    const peak = Math.max(FLOOR, this.level * seg.gain);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(FLOOR, at);
+    SmoothRamp(g.gain, FLOOR, peak, at, fadeIn);
+    const outAt = at + durS - fadeOut;
+    g.gain.setValueAtTime(peak, outAt);
+    SmoothRamp(g.gain, peak, FLOOR, outAt, fadeOut);
+    src.connect(g).connect(this.group);
+    src.start(at, Math.max(0, seg.offsetS), durS + 0.05);
+    const head = { src, g, overlay: seg.key, releasing: false, endAt: at + durS };
+    this.heads.add(head);
+    engine.liveNodes += 2;
+    engine.stats.bedOverlaySegments = (engine.stats.bedOverlaySegments || 0) + 1;
+    head.timer = engine.Later((at + durS + 0.25 - ctx.currentTime) * 1000, () => this.Kill(head));
+    return head;
+  }
+
+  /** 叠加段提前收尾（切档）：从当前电平在 fadeS 秒里淡到零，淡完拆掉。已经在收尾的不动。返回处理了几段。 */
+  ReleaseOverlay(fadeS) {
+    const ctx = this.engine.ctx;
+    if (!ctx) return 0;
+    let n = 0;
+    for (const head of this.heads) {
+      if (!head.overlay || head.releasing) continue;
+      const t = ctx.currentTime;
+      const remain = head.endAt - t;
+      if (remain <= fadeS + 0.05) continue;                 // 已经在自己的淡出里了：让它播完
+      head.releasing = true;
+      const p = head.g.gain;
+      const from = Math.max(FLOOR, p.value);
+      p.cancelScheduledValues(t);
+      p.setValueAtTime(from, t);
+      SmoothRamp(p, from, FLOOR, t, Math.max(0.05, fadeS));
+      if (head.timer) { clearTimeout(head.timer); this.engine.timers.delete(head.timer); }
+      head.endAt = t + fadeS;
+      head.timer = this.engine.Later((fadeS + 0.25) * 1000, () => this.Kill(head));
+      n += 1;
+    }
+    return n;
   }
 
   /**
@@ -4035,6 +4139,8 @@ export class AudioEngine {
       // 取证靠它 —— 「远处怎么不响」有三种原因（强度没涨、床没接上、事件被闸掉），
       // 混在一起看不出是哪一件。
       battleIntensity: 0, battleBedScale: BattleBedScale(0), battleEvents: 0,
+      // 战场远景床叠加段起过几段（取证：床有没有在偶尔叠加）。
+      bedOverlaySegments: 0,
     };
     /**
      * 战场强度 0..1。**引擎不自己算它**（算它要读 AI 状态，那是接线层的账）——
@@ -4114,7 +4220,14 @@ export class AudioEngine {
     this.ambErrors = [];
     this.ambReady = false;
     this.ambManifest = null;
-    this.ambBedChoice = null;        // 战场远景床这一局用了哪一条（LoadAmbPack 写；{choice, source, variant, file}）
+    this.ambBedChoice = null;        // 战场远景床这一局走哪一档（LoadAmbPack 写；{choice, source, mode, variant, file, overlay, ...}）
+    // --- 战场远景床的偶尔叠加（2026-09-29，layered 才有；规则 Script_BattleBedLayers，数 BATTLE_BED_LAYERS）---
+    this.bedPlan = null;             // 这一局的装载计划（BedLoadPlan）
+    this.bedOverlaySched = null;     // 叠加段调度器；不是 layered 就是 null
+    this.bedOverlayBuffers = new Map();   // 叠加用的 B / C / E 解码结果（键 = 候选字母），开机之后后台装
+    this.bedOverlayLoading = null;   // 后台装载的 Promise（在装 = 非 null）
+    this.bedOverlayQueued = false;   // 已经排了一次后台装载
+    this.bedOverlayAutoLoad = true;  // LoadAmbPack 之后自动排后台装载；测试关掉，自己调 LoadBattleOverlayBeds
     // --- 实录（生成）音乐。没有合成兜底：载不到就是没有音乐 ---
     this.musicBuffers = new Map();   // cue -> AudioBuffer
     this.musicPending = new Map();
@@ -4395,7 +4508,8 @@ export class AudioEngine {
       .flatMap((entry) => entry.files || (entry.file ? [entry.file] : [])));
     await Promise.all([
       Pack(SFX_BASE, "Data_SfxManifest.json", SFX_PACK_VERSION, (m) => ManifestFiles([m.cues])),
-      // 床按装载计划取（战场远景床候选只下载被选中的那一条，旧的 battleFar 被顶替时也不下载）。
+      // 床按装载计划取：默认（layered）阻塞下载底床 A 顶替旧 battleFar，旧床与叠加用的 B / C / E 都不在这里
+      //（B / C / E 开机之后后台下载，见 LoadBattleOverlayBeds）；单选一条只下载那一条。
       Pack(AMB_BASE, "Data_AmbManifest.json", AMB_PACK_VERSION, (m) => AmbFilesToFetch(m, AmbBedChoice(m).choice)),
     ]);
     this.prefetchedCount = ok;
@@ -4444,6 +4558,8 @@ export class AudioEngine {
         if (n > 0 && this.ambiencePreset && this.ambiencePreset !== "silence") this.Ambience(this.ambiencePreset);
       }).catch(() => {}).then(() => { this.ambLoading = false; });
     }
+    // 战场远景床叠加用的 B / C / E：床装好之后还有没装成的（后台下载失败、被 ReloadPacks 重置）就补排一次。
+    if (this.ambReady && this.BedOverlayIncomplete()) this.QueueBedOverlayLoad();
     // 音乐 1.8 MB，最后拉。同样要在载完后补一次 —— 否则「进城前」那段
     // 永远赶不上开机那一刻。
     if (!this.musicReady && !this.musicLoading && a.music < PACK_ATTEMPTS) {
@@ -4734,12 +4850,20 @@ export class AudioEngine {
     this.ambManifest = manifest;
     let ok = 0;
 
-    // 战场远景床候选（2026-09-29）：候选被登记成同名床 battleFar，预设一个字不用改；旧床被顶替就不请求。
+    // 战场远景床（2026-09-29）：底床 A（或被选中的那一条）被登记成同名床 battleFar，预设一个字不用改；旧床被顶替就不请求。
+    // layered（默认）下叠加用的 B / C / E 不在这里装（不挡开机、不拖 ambReady），装载完床之后由 QueueBedOverlayLoad 后台排。
     const bedChoice = AmbBedChoice(manifest);
-    if (bedChoice.ignored) console.warn("ambBed 认不出，沿用现行战场远景床：", bedChoice.ignored);
-    const plan = BedLoadPlan(manifest, bedChoice.choice);
-    this.ambBedChoice = { ...bedChoice, variant: plan.variant, dropped: plan.dropped,
-      file: plan.beds.find((b) => b.bed === "battleFar")?.file ?? null };
+    if (bedChoice.ignored) console.warn("ambBed 认不出，退回默认 layered：", bedChoice.ignored);
+    const plan = BedLoadPlan(manifest, bedChoice.choice, BATTLE_BED_LAYERS);
+    if (plan.fellBack) console.warn("清单里没有 ambBed 要的床，退回旧 battleFar：", bedChoice.choice);
+    this.bedPlan = plan;
+    this.ambBedChoice = { ...bedChoice, mode: plan.mode, variant: plan.variant, dropped: plan.dropped, fellBack: plan.fellBack,
+      file: plan.beds.find((b) => b.bed === "battleFar")?.file ?? null, overlay: plan.overlay.map((o) => o.key) };
+    if (plan.mode === CHOICE_LAYERED && plan.overlay.length) {
+      this.bedOverlaySched ??= new BattleBedScheduler(BATTLE_BED_LAYERS);
+    } else {
+      this.bedOverlaySched = null;
+    }
     const beds = plan.beds.map((b) => [b.bed, { file: b.file }]);
     await Promise.all(beds.map(async ([bed, entry]) => {
       try {
@@ -4773,7 +4897,60 @@ export class AudioEngine {
     }));
 
     this.ambReady = this.ambBuffers.size > 0;
+    if (this.ambReady) this.QueueBedOverlayLoad();
     return ok;
+  }
+
+  /**
+   * 后台装载战场远景床的叠加素材（B / C / E），**在 ambReady 之后**、下载队列空下来才拉，一次一条。
+   * 不进 LoadAmbPack 的阻塞装载：不挡开机、不拖 ambReady；没解码好之前叠加层只是不出声（调度器按 available 选键）。
+   * 听者此刻已经在巷道 / 半室内（跳阶段进 08、读档）就先装 E，否则按配置顺序（B、C、E）。
+   * 失败进 ambErrors，不抛；LoadPacks 每次调用会补拉没装成的。
+   *
+   * @returns {Promise<number>} 这一趟新装成的条数
+   */
+  LoadBattleOverlayBeds(base = AMB_BASE) {
+    const plan = this.bedPlan;
+    if (!plan || !plan.overlay.length || !this.ctx || this.disposed) return Promise.resolve(0);
+    if (this.bedOverlayLoading) return this.bedOverlayLoading;
+    const ctx = this.ctx;
+    const enclosedFirst = this.bedOverlaySched?.mode === "enclosed" || this.bedOverlaySched?.IsEnclosedZone(this.ListenerZone());
+    const order = [...plan.overlay].sort((x, y) => (enclosedFirst ? (y.role === "enclosed") - (x.role === "enclosed") : 0));
+    this.bedOverlayLoading = (async () => {
+      let ok = 0;
+      for (const item of order) {
+        if (this.bedOverlayBuffers.has(item.key)) continue;
+        await AudioFetchIdle();
+        if (this.disposed || this.ctx !== ctx) break;
+        try {
+          const bytes = await FetchAudioAsset(base + item.file + "?v=" + AMB_PACK_VERSION);
+          const buf = await ctx.decodeAudioData(bytes);
+          if (this.disposed || this.ctx !== ctx) break;
+          this.bedOverlayBuffers.set(item.key, buf);
+          ok += 1;
+        } catch (err) {
+          this.ambErrors.push({ file: item.file, message: err && err.message });
+        }
+      }
+      return ok;
+    })().finally(() => { this.bedOverlayLoading = null; });
+    return this.bedOverlayLoading;
+  }
+
+  /** 叠加素材还有没装成的吗（LoadPacks 补拉用）。 */
+  BedOverlayIncomplete() {
+    return !!this.bedPlan && this.bedPlan.overlay.some((o) => !this.bedOverlayBuffers.has(o.key));
+  }
+
+  /** 排一次后台装载：ambReady 之后过 loadDelayS 秒再开始（那时开局那批下载多半已经走完）。已经排了 / 在装 / 不需要就什么也不做。 */
+  QueueBedOverlayLoad() {
+    if (!this.bedOverlayAutoLoad || this.bedOverlayQueued || this.bedOverlayLoading || !this.BedOverlayIncomplete()) return false;
+    this.bedOverlayQueued = true;
+    this.Later((BATTLE_BED_LAYERS.loadDelayS ?? 3) * 1000, () => {
+      this.bedOverlayQueued = false;
+      this.LoadBattleOverlayBeds(AMB_BASE).catch(() => {});
+    });
+    return true;
   }
 
   /**
@@ -6393,6 +6570,8 @@ export class AudioEngine {
       const buffer = this.ambBuffers.get(layer.bed);
       if (!buffer) continue;                       // 这一层没载到就少一层，其余照放
       const inst = new LoopLayer(this, buffer, layer);
+      // 战场远景床叠加段的宿主：layered 下每个 battleFar 层（预设里的 gain / cut / bus / battle 都沿用，叠加段跟着同一条链）。
+      inst.overlayHost = !!this.bedOverlaySched && layer.bed === "battleFar" && layer.overlay !== false;
       // 强度要在 Start **之前**写进去：组增益的初值就是它，
       // 否则新起的战斗床会先满音量响一下再被斜坡拉回去。
       if (inst.battle) inst.levelScale = this.battleBedApplied;
@@ -6451,6 +6630,8 @@ export class AudioEngine {
     this.ambienceTimer = this.Later(AMB_TICK_MS, () => {
       const c = AMBIENCE_PRESETS[this.ambiencePreset];
       if (!c) return;
+      // 战场远景床的偶尔叠加：借这个 0.4 s 的心跳问调度器一次（它自己吞异常，见 TickBedOverlay）。
+      this.TickBedOverlay();
       // 战斗类撒播随强度涨落。**两条曲线不同**：频次涨得比音量快
       // （打起来是「更密」，不是「更响」——更响那件事由床与真实交火自己完成）。
       const rateScale = BattleEventRate(this.battleIntensity);
@@ -6487,6 +6668,69 @@ export class AudioEngine {
     this.farBedShape = level === 1 && cut === 1 ? null : { level, cut };
     for (const layer of this.ambLayers) if (layer.busName === "far") layer.SetShape(level, cut, rampS);
     return this.ambLayers.filter((layer) => layer.busName === "far").length;
+  }
+
+  /**
+   * 【2026-09-29】战场远景床的偶尔叠加：每个环境心跳（0.4 s）问一次调度器（Script_BattleBedLayers）。
+   * 调度器说起一段，就在每个宿主层（battleFar 层，一般只有一个）上放一对 source + gain（LoopLayer.PlayOverlay）；
+   * 说切档要收尾，就让宿主层上正在放的那段淡出（LoopLayer.ReleaseOverlay）。
+   * 听者所在区问的是 ListenerZone（宿主 zone 探针，缓存 0.2 s；没注册探针 = null = 按开阔）。
+   * 只在有宿主时问（没有宿主时调度器停表，也就不去打探针）。任何异常记进 lastError，绝不打断环境撒播。
+   */
+  TickBedOverlay() {
+    const sched = this.bedOverlaySched;
+    if (!sched || !this.ctx || this.paused || this.disposed) return null;
+    try {
+      const hosts = this.ambLayers.filter((l) => l.overlayHost && l.group && !l.stopped);
+      const available = new Map();
+      for (const [key, buf] of this.bedOverlayBuffers) available.set(key, buf.duration);
+      const act = sched.Step({
+        now: this.ctx.currentTime,
+        zone: hosts.length ? this.ListenerZone() : null,
+        hosts: hosts.length,
+        available,
+        // 常驻床 + 前线声都吃节点：离预算上限不足 nodeReserve 个时这一段往后推（叠加是最低优先级）。
+        canStart: this.liveNodes + (BATTLE_BED_LAYERS.nodeReserve ?? 8) <= this.nodeBudget,
+      });
+      if (act.release) for (const l of hosts) l.ReleaseOverlay(act.release.fadeS);
+      if (act.start) {
+        const buffer = this.bedOverlayBuffers.get(act.start.key);
+        for (const l of hosts) l.PlayOverlay(buffer, act.start);
+      }
+      return act;
+    } catch (err) {
+      this.lastError = { name: "bedOverlay", message: err && err.message, at: this.ctx ? this.ctx.currentTime : 0 };
+      this.errorCount += 1;
+      return null;
+    }
+  }
+
+  /** 新宿主层起来（换预设）时调用：正在播的叠加段由它接着播，同一条素材、接着往下放；剩得太少不接。 */
+  AttachBedOverlay(layer, fadeInS = 0) {
+    const sched = this.bedOverlaySched;
+    if (!sched || !this.ctx || !layer?.overlayHost) return null;
+    const seg = sched.Resume(this.ctx.currentTime);
+    if (!seg) return null;
+    const buffer = this.bedOverlayBuffers.get(seg.key);
+    if (!buffer) return null;
+    return layer.PlayOverlay(buffer, { ...seg, fadeInS: Math.max(seg.fadeInS, Math.min(fadeInS, seg.durS * 0.4)) });
+  }
+
+  /** 调参口（测试 / 编辑器）：合并进叠加调度器的配置，例如 { firstGapS: [1, 2], gapS: [2, 4] } 把间隔压短。没有调度器返回 null。 */
+  ConfigureBedOverlay(patch) {
+    return this.bedOverlaySched ? this.bedOverlaySched.Configure(patch) : null;
+  }
+
+  /** 取证：战场远景床这一局的选择、叠加素材装载情况、调度器时间线。 */
+  BedOverlayState() {
+    return {
+      choice: this.ambBedChoice,
+      loaded: [...this.bedOverlayBuffers.keys()],
+      loading: !!this.bedOverlayLoading,
+      hosts: this.ambLayers.filter((l) => l.overlayHost).length,
+      playing: this.ambLayers.flatMap((l) => [...l.heads].filter((h) => h.overlay).map((h) => h.overlay)),
+      scheduler: this.bedOverlaySched ? this.bedOverlaySched.Snapshot() : null,
+    };
   }
 
   SetAmbienceLayerLevel(bed, scale, rampS=1) {

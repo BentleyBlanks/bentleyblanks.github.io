@@ -667,12 +667,25 @@ node Taierzhuang1938/Script_AmbBake.mjs --report      # 只打候选表，不落
 node Taierzhuang1938/Script_AmbBake.mjs --recut       # 不下载，只重切
 ```
 
-## 战场远景床：无人声候选（2026-09-29）
+## 战场远景床：无人声素材与分层方案（2026-09-29）
 
 用户原话（2026-09-29）：「当前默认游戏的环境音里有太多奇奇怪怪的人声，参考COD这类的操作给我重新生成几条给我选择」。
 
-**默认仍是现行 `battleFar`，一个字没动，等用户挑。** 候选是加进清单的另一批素材，
-用一个数（`Data_Tuning_Audio.BATTLE_BED_VARIANT`）或一个 URL 参数（`?ambBed=`）切换。
+试听五条无人声候选 A–E 之后，用户原话选定了用法（同日）：
+「整体A长期存在，B和C交替的随机叠加出现；E在玩家进入巷道/半室内阶段再播放（作为替换偶尔的B和C）」。
+
+**选定方案（默认档 `layered`）：**
+
+| 角色 | 素材 | 什么时候出声 |
+| --- | --- | --- |
+| 底床 | A `DistantThunder`（炮群闷雷）| 长期，所有预设里的 `battleFar` 层都放它（预设一个字没改，层的 gain / cut / bus / battle 倍率 / `ShapeFarBeds` 调形全沿用）|
+| 偶尔叠加（开阔）| B `RifleCrackle`、C `HeavyBarrage`，严格交替 | 每段 9–20 s，段与段之间静 20–60 s，开局 12–30 s 后第一段；淡入淡出各 2–4 s |
+| 偶尔叠加（巷道 / 院子 / 屋里）| E `VillageEcho`，替换 B/C | 听者所在区持续 4 s 在 `street` / `courtyard` / `interior` 之后，下一段起改用 E；离开 8 s 后回 B/C |
+| 不用 | D `ColdFrontline` | 文件与清单保留，不下载 |
+| 旧床 | `battleFar`（英语战斗人群录音）| 默认不播、不下载；`?ambBed=legacy` 才播（对比用）|
+
+规则、数值与理由在 `Data_Tuning_Audio.BATTLE_BED_LAYERS`（每个数带注释），调度规则在 `Script_BattleBedLayers.mjs`，
+引擎接线、装载与实测在 [音频引擎 §13 / §15](Data_AudioEngine.md)。下面的审计、五条素材的配方与人声筛查是选定之前的依据，仍然有效。
 
 ### 审计：第一关默认环境里谁会出人声
 
@@ -724,21 +737,28 @@ SeedAudio 请求共 **10 次**（6 条提示词各抽 1 次，其中 `RifleCrack
 
 候选**不在** `manifest.beds` 里，在 `manifest.bedVariants` 里：放进 `beds` 开机会把五条全下载。
 
-### 怎么切换
+用途（2026-09-29 选定）：A 底床、B / C 交替叠加、E 巷道叠加、D 不用。**开机阻塞下载只有 A**（400,763 B，顶替旧 `battleFar` 的 92,413 B，净增 308,350 B）；
+B / C / E（各 400,763 B，共 1,202,289 B）在开机之后后台下载（`ambReady` 之后 3 s 起、下载队列空了才拉、一次一条）。
 
-优先级 URL 参数 > 调参口 > 默认：
+### 怎么切换（试听）
+
+优先级 URL 参数 > 调参口 > 默认（`layered`）。地址后加 `?ambBed=…`（第一关入口例：`Taierzhuang1938/?whitebox=p012&ambBed=legacy`）：
 
 | 怎么切 | 效果 |
 | --- | --- |
-| 不带参数、`BATTLE_BED_VARIANT = null`（现状）| 现行 `battleFar`（23 s，英语战斗人群）|
-| `?ambBed=A` … `?ambBed=E`（大小写都行，例如 `?whitebox=p012&ambBed=b`）| 把**所有**预设里的 `battleFar` 层（含 01–02 开场两档）换成这一条 |
+| 不带参数、或 `?ambBed=layered`（`BATTLE_BED_VARIANT = "layered"`，现状）| **默认**：A 底床 + B/C 交替偶尔叠加、巷道里换 E；开机只阻塞下载 A |
+| `?ambBed=A` … `?ambBed=E`（大小写都行，例如 `?whitebox=p012&ambBed=b`）| 只放这一条、**不叠加**：把所有预设里的 `battleFar` 层（含 01–02 开场两档）换成这一条，只下载这一条 |
+| `?ambBed=legacy` | 旧的英语战斗人群床（23 s，90 KB），没有叠加；对比「以前什么样」用 |
 | `?ambBed=none` | 不放这一层，方便和其它层对比 |
-| `Data_Tuning_Audio.BATTLE_BED_VARIANT = "B"` | 与 URL 参数同效；用户选定后**只改这一个数**（改完把 `index.html` import map 里 `Data_Tuning_Audio` 的 `?v=` +1）|
-| 认不出的值（拼错、旧清单里没有这条）| 退回下一级，最后退回现行；控制台 warn 一声，绝不因为拼错静音 |
+| `Data_Tuning_Audio.BATTLE_BED_VARIANT = "legacy"` 等 | 与 URL 参数同效（改默认只改这一个数，改完把 `index.html` import map 里 `Data_Tuning_Audio` 的 `?v=` +1）；`null` / 缺省 = `layered` |
+| 认不出的值（拼错、旧清单里没有这条）| 退回下一级，最后退回默认 `layered`（旧清单连 A 都没有再退回旧床）；控制台 warn 一声，绝不因为拼错静音 |
 
-**只装载被选中的那一条**：`Script_AmbBedVariant.mjs` 决定装载计划，`Script_Audio.PrefetchPacks`（开机预取）与 `LoadAmbPack`（解锁后装载）用同一份计划。
-候选顶替 `battleFar` 这个床名，被顶替的旧文件**不再请求**，所以开机下载文件数与默认相同，也不用改任何一档预设的层表。
-清单缓存戳 `AMB_PACK_VERSION` 抬到 `20260929battlebeds`（清单加了 `bedVariants`，戳不动的话旧清单看不到候选）。
+想在一两分钟里听到叠加段：控制台 `Tengxian.audio.ConfigureBedOverlay({ firstGapS: [1, 2], gapS: [3, 5] }); Tengxian.audio.bedOverlaySched.Reset()`
+把间隔压短（线上不需要）；`Tengxian.audio.BedOverlayState()` 给出当前选择、B/C/E 是否装好、调度器时间线。
+
+**装载计划**：`Script_AmbBedVariant.mjs` 决定，`Script_Audio.PrefetchPacks`（开机预取）与 `LoadAmbPack`（解锁后装载）用同一份计划。
+A（或被选中的那一条）顶替 `battleFar` 这个床名，被顶替的旧文件**不再请求**，所以开机阻塞下载的文件数与旧默认相同，也不用改任何一档预设的层表。
+清单缓存戳 `AMB_PACK_VERSION` 是 `20260929battlebeds`（清单加了 `bedVariants`，戳不动的话旧清单看不到候选）。
 
 ### 怎么重烘
 

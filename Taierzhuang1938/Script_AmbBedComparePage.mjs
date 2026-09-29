@@ -70,7 +70,7 @@ export async function BuildComparePage({ takesDir, MeasureFile }) {
     const prompts = row.prompts.map((p) => `<details><summary>SeedAudio 提示词：${Esc(p.id)}</summary><p>${Esc(p.text)}</p></details>`).join("");
     const sources = row.sources.length ? `<details><summary>混入的实录单发（${row.sources.length} 组）</summary><ul>${row.sources.map((x) =>
       `<li>${Esc(x.id)} × ${x.events}：${Esc(x.credit)}（${Esc(x.license)}）</li>`).join("")}</ul></details>` : "";
-    const link = row.url ? `<a href="../../index.html${row.url}">用这一条进游戏试听（?ambBed=${row.key}）</a>` : "";
+    const link = row.url ? `<a href="../../index.html${row.url}">只放这一条进游戏试听（?ambBed=${row.key}）</a>` : `<a href="../../index.html?whitebox=p012&ambBed=legacy">用旧床进游戏（?ambBed=legacy）</a>`;
     return `<section id="v${Esc(row.key)}">
   <h2>${Esc(row.label)}</h2>
   <p class="style">${Esc(row.style)}</p>
@@ -107,8 +107,10 @@ export async function BuildComparePage({ takesDir, MeasureFile }) {
 <p class="note">2026-09-29 · 本页只在本地，不提交。用户原话：「当前默认游戏的环境音里有太多奇奇怪怪的人声，参考COD这类的操作给我重新生成几条给我选择」。
 五条候选全程没有人声（喊叫、说话、口哨、惨叫、音乐），COD（WaW / WWII）式「只有仗、没有人群」的远方战场；
 响度按现行 battleFar 成品的 RMS（${AMB_BED_TARGET.rmsDb} dBFS）对齐，量的是成品文件。
-选定后只改 <code>Data_Tuning_Audio.BATTLE_BED_VARIANT</code> 一个数（null = 现行，"A"…"E" = 候选，"none" = 不放这一层）；
-现场试听在游戏地址后加 <code>?ambBed=A|B|C|D|E|none</code>。
+用户已选定（2026-09-29 原话：「整体A长期存在，B和C交替的随机叠加出现；E在玩家进入巷道/半室内阶段再播放（作为替换偶尔的B和C）」）：
+默认档 <code>layered</code> = A 当长期底床，B 与 C 交替、随机时刻偶尔叠在 A 上面，听者在巷道 / 半室内时这层改用 E，D 不用（见 docs/Data_AudioEngine.md §15）。
+现场试听在游戏地址后加 <code>?ambBed=layered</code>（默认，可不写）、<code>?ambBed=A|B|C|D|E</code>（只放这一条、不叠加）、<code>?ambBed=legacy</code>（旧的英语战斗人群床）或 <code>?ambBed=none</code>；
+下面每张卡片的链接就是「只放这一条」。
 游戏里这一层还会被战场强度、远声组增益和防炮洞低通（480 / 1500 Hz）改变，单听文件与进游戏听会不同。</p>
 <p class="note">频谱图说明：ffmpeg showspectrumpic，线性频率；不用对数轴是因为它会在 500–900 Hz 附近画一条假的亮带。</p>
 ${rows.map(card).join("\n")}

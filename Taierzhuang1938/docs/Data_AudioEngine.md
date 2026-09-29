@@ -906,23 +906,28 @@ AnalyserNode，每 50 ms 取峰值 / RMS；另挂主输出、远声组（`farGai
 
 
 
-## 13. 环境床装载计划：战场远景床候选（2026-09-29）
+## 13. 环境床装载计划：战场远景床（2026-09-29）
 
-用户嫌默认环境里有「奇奇怪怪的人声」，第一关唯一的人声床是 `battleFar`（英语战斗人群录音）。
-无人声候选 A–E 的素材、口径与切换方法在 [音频资产「战场远景床：无人声候选」](Data_AudioAssets.md)；这里只记引擎侧怎么装。
+用户嫌默认环境里有「奇奇怪怪的人声」，第一关唯一的人声床是 `battleFar`（英语战斗人群录音）。无人声素材 A–E 的来历、口径在
+[音频资产「战场远景床：无人声候选」](Data_AudioAssets.md)；听完之后用户选定了分层方案（原话在 §15），这里只记引擎侧怎么选、怎么装。
 
-- **选哪一条**：`Script_AmbBedVariant.ResolveBattleBedChoice` —— URL 参数 `?ambBed=A|B|C|D|E|none` 优先于 `Data_Tuning_Audio.BATTLE_BED_VARIANT`，
-  都没给（或认不出）就是现行床。`Script_Audio.AmbBedChoice(manifest)` 把当前 `location.search`、调参口与清单里 `bedVariants` 的键喂给它。
-- **装载计划**：`BedLoadPlan(manifest, choice)` 只把 `battleFar` 这一个床名换成候选文件（`none` 是去掉），其余床原样；
-  `AmbFilesToFetch` 在此之上加一次性音。开机预取（`PrefetchPacks`）与解锁后装载（`LoadAmbPack`）用的是同一份计划，
-  所以被顶替的旧文件**不会**被请求、没选中的候选**不会**被下载，开机下载文件数与默认相同。
-- **预设一个字不用改**：候选被登记成同名床 `battleFar`，`AMBIENCE_PRESETS` 与 `OPENING_AMBIENCE_PRESETS` 里所有 `{ bed: "battleFar" }` 层照旧，
-  层增益、`battle` 强度倍率、`bus: "far"`、防炮洞低通都不变。`AudioEngine.ambBedChoice` 记这一局的选择（`{choice, source, variant, dropped, file}`），
-  `ambBuffers.get("battleFar")` 就是被选中的那条解码结果。
-- **认不出的值不静音**：拼错的 `?ambBed=`、旧清单里没有的候选键，都退回下一级直到现行，`LoadAmbPack` 里 `console.warn` 一声。
-- **缓存戳**：清单加了 `bedVariants`，`AMB_PACK_VERSION` 抬到 `20260929battlebeds`，`index.html` import map 登记了 `Script_AmbBedVariant.mjs`。
-- **验收**：`Script_AmbBedVariantTest`（纯 node，桩 fetch + 桩 AudioContext 跑真的 `PrefetchPacks` / `LoadAmbPack` 并记下每个请求）、
-  `Script_AmbBedVariantBrowserTest`（真浏览器、第一关入口、听者在玩家头上）。
+- **选哪一档**：`Script_AmbBedVariant.ResolveBattleBedChoice` —— URL 参数 `?ambBed=` 优先于 `Data_Tuning_Audio.BATTLE_BED_VARIANT`，
+  都没给（或认不出）就是默认 `layered`。取值：`layered`（默认：A 底床 + B/C 偶尔叠加、巷道里换 E）· `legacy`（旧英语战斗人群床，对比用）·
+  `A`…`E`（只放这一条、不叠加）· `none`（不放这一层）。`Script_Audio.AmbBedChoice(manifest)` 把当前 `location.search`、调参口与清单里 `bedVariants` 的键喂给它。
+- **装载计划**：`BedLoadPlan(manifest, choice)` 只把 `battleFar` 这一个床名换掉，其余床原样：`layered` 换成底床 A，`A`…`E` 换成那一条，`legacy` 不换，`none` 去掉。
+  `layered` 另给 `plan.overlay`（B、C、E，叠加用，不在阻塞装载里）。`AmbFilesToFetch` = 阻塞装载的床 + 一次性音，**不含**旧床与 B/C/E；`OverlayFilesToFetch` = 后台下载的 B/C/E。
+  开机预取（`PrefetchPacks`）与解锁后装载（`LoadAmbPack`）用同一份计划，所以默认开机只请求 A、旧床一次都不请求。
+- **预设一个字不用改**：A（或被选中的那一条）被登记成同名床 `battleFar`，`AMBIENCE_PRESETS` 与 `OPENING_AMBIENCE_PRESETS` 里所有 `{ bed: "battleFar" }` 层照旧，
+  层增益、`battle` 强度倍率、`bus: "far"`、防炮洞低通都不变。`AudioEngine.ambBedChoice` 记这一局的选择
+  （`{choice, source, mode, variant, dropped, fellBack, file, overlay}`），`ambBuffers.get("battleFar")` 就是被选中的那条解码结果。
+- **后台装载叠加素材**：`LoadAmbPack` 装完床（`ambReady` 为真）后 `QueueBedOverlayLoad` 排一次：过 `BATTLE_BED_LAYERS.loadDelayS`（3 s）、且下载队列空了（`AudioFetchIdle`，最多等 8 s）才开始，
+  一次一条下 B、C、E 并解码进 `bedOverlayBuffers`（键 = 候选字母）。不挡开机、不拖 `ambReady`；没解码好之前叠加层不出声。
+  听者此刻已经在巷道（跳阶段、读档）就先装 E。失败进 `ambErrors`、不抛，`LoadPacks` 每次调用会补拉没装成的。
+- **认不出的值不静音**：拼错的 `?ambBed=`、旧清单里没有的候选键，都退回下一级直到默认 `layered`，`LoadAmbPack` 里 `console.warn` 一声；
+  旧清单连底床 A 都没有就退回旧床（`ambBedChoice.fellBack`），也 warn。
+- **缓存戳**：清单加了 `bedVariants`，`AMB_PACK_VERSION` 是 `20260929battlebeds`；`index.html` import map 登记了 `Script_AmbBedVariant.mjs` 与 `Script_BattleBedLayers.mjs`。
+- **验收**：`Script_AmbBedVariantTest`（纯 node，桩 fetch + 桩 AudioContext 跑真的 `PrefetchPacks` / `LoadAmbPack` / `LoadBattleOverlayBeds` 并记下每个请求）、
+  `Script_BattleBedLayersTest`（调度规则 + 假 AudioContext 下的引擎接线）、`Script_AmbBedVariantBrowserTest`（真浏览器、第一关入口、听者在玩家头上）。
 
 ## 14. 远声组床调形与多变体不连出（2026-09-29，01「战场声随传令兵显现」那一轮）
 
@@ -935,3 +940,115 @@ AnalyserNode，每 50 ms 取峰值 / RMS；另挂主输出、远声组（`farGai
 | `Play` 的 `occlusion` 覆盖值 | 早就有（不给 = 探针射线）；新用法：场外近落弹在 01 洞里给来袭啸声与低频层传 0.15（加分区边界 0.35 = 0.5，−6 dB + 3.2 kHz），因为洞里射线被土挡死判 1.0（−12 dB + 800 Hz），而 `explosionFar` 不在「爆炸封顶」表里（`explosionNear` / `explosionMid` / `shellImpact` 才封 0.25） | `Script_BattleArtillery` |
 
 门禁：`Script_AudioTest` 三条（`ShapeFarBeds` 的电平与低通倍数、风不动；换档交叉沿用调形；收回清记录）。
+
+## 15. 战场远景床的偶尔叠加：A 底床 + B/C 交替，巷道里换 E（2026-09-29）
+
+用户原话（同日，试听五条无人声候选 A–E 之后）：**「整体A长期存在，B和C交替的随机叠加出现；E在玩家进入巷道/半室内阶段再播放（作为替换偶尔的B和C）」**。
+D 不用；旧 `battleFar`（英语战斗人群录音）默认不放、不下载。素材来历与人声筛查见 [音频资产](Data_AudioAssets.md)，怎么选、怎么装见 §13。
+
+### 结构
+
+| 一层 | 在哪 | 管什么 |
+| --- | --- | --- |
+| 数据 | `Data_Tuning_Audio.BATTLE_BED_LAYERS` | 角色（A 底、B/C 开阔叠加、E 巷道叠加）、电平、间隔 / 时长 / 淡入淡出、滞回、后台装载延迟；每个数带理由 |
+| 规则 | `Script_BattleBedLayers.mjs`（纯规则，假时钟能测）| `BattleBedScheduler`：什么时候起一段、用哪一条、放素材哪一截、放多久；巷道滞回；切档收尾；接着播 |
+| 放 | `Script_Audio.mjs`：`LoopLayer.PlayOverlay` / `ReleaseOverlay`，`AudioEngine.TickBedOverlay` / `AttachBedOverlay` | 一对 source + gain 挂在**宿主层（`battleFar` 层）的组增益**上；环境心跳（0.4 s）问一次调度器 |
+| 装载 | `AudioEngine.LoadBattleOverlayBeds` / `QueueBedOverlayLoad` | B/C/E 开机之后后台下载解码（§13）|
+| 取证 | `audio.BedOverlayState()`、`audio.ConfigureBedOverlay(patch)`、`audio.stats.bedOverlaySegments` | 当前选择 / 装载 / 时间线；调参（把间隔压短）|
+
+**宿主层与同一条链**：叠加段接在宿主层的组增益上，于是战场强度倍率（`SetBattleIntensity`）、`ShapeFarBeds` 的调形（电平与低通）、
+这一层自己的低通（`cut`，防炮洞 480 / 1500 Hz）、总线（远声组 / 环境）、换档交叉全部与宿主一样，预设里各层的 gain / cut / bus / battle 一个字没改。
+叠加段自己的增益只管「相对宿主层多大、怎么淡入淡出」：峰值 = 宿主层电平 × `gain[键]`，淡入淡出是平滑 S 曲线（四段线性近似）。
+预设里 `battleFar` 层默认都带；某层写 `overlay: false` 就不带（现在没有层这么写）。
+
+### 数值与理由（都在数据表里，这里列结论）
+
+| 项 | 数 | 理由 |
+| --- | --- | --- |
+| 叠加电平 `gain` | B 0.50 · C 0.65 · E 0.50（相对宿主层）| 五条成品 RMS 对齐（−27.4 dBFS），但 K 加权响度（BS.1770）A −27.5 LUFS、B −23.6、C −26.1、E −23.9：A 全是低频闷雷，B / E 的能量在 250 Hz–4 kHz。同电平叠上去 RMS +3 dB、B / E 的响度 +4.6 / +5.3 LUFS，「突然多了一层」。按「A 上叠一段 X 后响度比单放 A 涨约 +1.8 LUFS」反推（随机 12 s 窗口 40 次平均，离线量）：B 0.50 涨 +1.9、E 0.50 涨 +2.0、C 0.65 涨 +1.9（C 是压缩过的密集弹幕，波峰因数 18 dB，同电平下比 B 平）。RMS 只涨约 +1 dB |
+| 段间静默 `gapS` | 20–60 s（从上一段结束起算）| 「偶尔」：约四分之一的时间有叠加；开局第一段 12–30 s 后来（不用等一分钟才知道有这一层）|
+| 每段时长 `durS` | 9–20 s | 9 ≥ 2 × 4 + 0.5：最短一段也有平台；≤ 20 s 不让一段占满听觉 |
+| 淡入 / 淡出 `fadeS` | 各 2–4 s，S 曲线 | 「慢进慢出」；指数式起头最陡，密集枪声会「一下冲出来」|
+| 素材起播点 | 素材里随机，装得进 40 s 窗口；与同一条素材上一段的窗口重叠过半就重抽 | 同一条素材不连着放同一截 |
+| 进巷道 `enterHoldS` / 出巷道 `exitHoldS` | 4 s / 8 s | 进得快（巷口一进去环境就变了）、出得慢（穿墙缺口、院门、巷子里的空档不来回跳）|
+| 巷道 / 半室内的区 | `street`、`courtyard`、`interior` | 实测见下；`trench`（露天沟）与 `dugout`（01–02 的洞）不算，开场照样是 A 底 + B/C |
+| 接着播 `joinFadeS` / `joinMinRemainS` | 2 s / 3 s | 换档时新宿主接着播剩下的；剩不到 3 s 就不接 |
+| 节点余量 `nodeReserve` | 8 | 离 `NODE_BUDGET`（120）不足 8 个时这一段往后推 |
+| 后台装载 `loadDelayS` | 3 s | `ambReady` 之后再等 3 s、下载队列空了才拉 |
+| 种子 | `"battleBedLayers@taierzhuang"` → Mulberry32 | 每段固定按「时长、淡入、淡出、下一段间隔、起播点」取数，与 tick 落在哪个时刻无关；同输入同时间线 |
+
+### 调度器怎么走（规则）
+
+- 每个环境心跳（0.4 s）问一次；有宿主层才问，没有宿主（这一档预设里没有 `battleFar` 层）就停表，正在播的那一段随宿主一起结束、间隔从宿主回来后重新数。
+- **B 与 C 严格交替**（从 B 起）。巷道里用 E，离开后接着交替，不因为中间插了 E 重排。素材没解码好的键不选；同一档里别的键先到了就先用别的（B 没到 C 到了先放 C），
+  E 没到就不出（不拿 B/C 顶）。
+- **巷道判据**：听者所在区（`ListenerZone`，宿主 zone 探针，缓存 0.2 s；没注册探针 = 开阔）持续在 `enclosedZones` 里 4 s 进入 `enclosed`，持续不在 8 s 回到 `open`。
+  只影响**下一段**用哪条；正在播的、不属于新档的那一段在**它自己的淡出时长**里淡出（不硬切），已经在自己淡出里的让它播完。
+- **换宿主层**（换预设）：新宿主层起来时 `Resume` 正在播的那一段（同一条素材、起播点顺着往下、`joinFadeS` 淡入），旧宿主层的那一段随旧层交叉淡出或硬停。
+- 暂停 / 切后台回来那一拍：调度器时钟一次最多前进 `tickMaxS`（1 s），不算作「过了很久」。
+- 节点：叠加段出声时 +2 个节点（source + gain），放完由计时器拆掉，不出声时 0 个；账面与循环层同口径（`heads.size × 2 + 组增益 + 低通`）。
+
+### 第一关的 zone 实测（探针 `Script_AudioWiring.Zone`，听者眼高 = 地面 + 1.6 m，`?whitebox=p012` 跳阶段后静态扫；08 用 2 m 一格、06 用 4 m 一格）
+
+| 区域 | 采样 | open | street | courtyard | interior | trench | dugout |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 08 村落（x 30–110、z −30–50，1681 点）| 巷道、院子、残屋 | 65 | 495 | 1104 | 17 | 0 | 0 |
+| 06 集结处一带（±60 m，4 m 一格，961 点）| 田野、壕沟 | 758 | 105 | 17 | 0 | 80 | 1 |
+
+村落里巷子读 `street`、围墙院子读 `courtyard`（占大头）、有屋顶的残屋读 `interior`：三个都算「巷道 / 半室内」。田野与壕沟读 `open` / `trench`，不换 E。
+
+### 怎么试听
+
+- 默认就是分层方案：进第一关（`Taierzhuang1938/?whitebox=p012`），底下一直有 A 的远处炮群闷雷，隔一阵（头一段 12–30 s 后，之后每段静 20–60 s）叠上来 9–20 s 的 B（步机枪交火）或 C（密集弹幕），交替；
+  走进 08 村落的巷子 / 院子 / 屋里 4 s 之后，下一段叠加换成 E（枪声在砖墙之间拍回来）；走出去 8 s 之后回到 B / C。01–02 开场在洞里同样是 A 底 + B / C，跟着传令兵喊话那一刻「战场显现」一起打开。
+- 想在一两分钟里听到：控制台 `Tengxian.audio.ConfigureBedOverlay({ firstGapS: [1, 2], gapS: [3, 5] }); Tengxian.audio.bedOverlaySched.Reset()`；
+  想看时间线：`Tengxian.audio.BedOverlayState().scheduler.timeline`。
+- 对比：`?ambBed=legacy`（旧床）、`?ambBed=A`（只放 A，没有叠加）、`?ambBed=E` 等（只放这一条）、`?ambBed=none`。
+
+### 验收
+
+| 门 | 覆盖 |
+| --- | --- |
+| `Script_BattleBedLayersTest`（纯 node）| 数据表自检与用户口径（A 底、B/C 交替、E 巷道、D 不用）；B/C 严格交替、间隔 / 时长 / 淡入淡出落在数据表范围、起播点装得进素材且不与上一段重叠；同种子同时间线、tick 大小不影响时间线；进巷道后下一段是 E 且不再出 B/C、滞回（门口每 2 s 来回不切、进 4 s 出 8 s）、离开回 B/C 并接着交替；切档时正在播的一段淡出不硬切；素材没到不出声；没有宿主停表；节点不足往后推；换宿主时接着播。引擎接线（真 `AudioEngine` + 假 `AudioContext` + 手动推进的时钟与计时器）：叠加挂宿主组增益、峰值 = 层电平 × gain、S 曲线、+2 节点归还且账面对得上、跟战场强度与 `ShapeFarBeds`、zone 探针换 E / 回 B/C、换预设硬切与交叉都接着播、停掉后节点归零无计时器 |
+| `Script_AmbBedVariantTest`（纯 node）| 选择优先级与各档装载计划；默认阻塞下载只有 A（不含旧床与 B/C/D/E）、后台装 B/C/E、单选与 legacy 无叠加；清单 / 成品 / 人声筛查记录；引擎桩 fetch 下每档逐条对请求；后台装载失败只进 `ambErrors`、补拉只补没装成的 |
+| `Script_AmbBedVariantBrowserTest`（真浏览器）| 默认阻塞阶段只请求 A、`ambReady` 之后后台请求 B/C/E、从不请求旧床与 D；叠加段真的出声（输出端功率均值与「素材 RMS + 宿主层电平 × 叠加增益」对得上）；zone 探针改成 street 后调度器进入 enclosed、后面的段是 E，改回后回到 B/C；`?ambBed=B` / `legacy` / `none`；听者在玩家头上 |
+| `Script_FirstLevelAudioNodeBudgetTest`、`Script_AudioWiringTest`、`Script_AudioTest` | 01–06 实时节点峰值护栏 150 与账面差 0；接线层；引擎冒烟 |
+
+### 实测（2026-09-29）
+
+无头 Edge，`?whitebox=p012&menu=0&intro=0&quality=low&scale=small`，实时跑（游戏自己的主循环，不是手动推帧）。**每一段取证先断言听者在玩家头上**：相机与玩家头部同处（水平 0.00 m，高出脚底 1.62 m；01 趴着 0.93 m），`listenerPos` 每帧贴着相机（差 0）。
+
+**开机下载（`Audio/Amb/*.mp3`，按请求文件的字节算）**
+
+| | 旧默认（`?ambBed=legacy`）| 现默认（`layered`）|
+| --- | --- | --- |
+| 开机阻塞：预取 + 解锁后装载，`ambReady` 之前 | 37 个文件 3,360,829 B（`battleFar` 92,413 B）| 37 个文件 3,669,179 B（底床 A 400,763 B 顶替 `battleFar`）：**+308,350 B（+9.2 %）**，文件数不变 |
+| 后台：`ambReady` 之后 3.0–3.2 s 才发请求，一次一条 | 0 | B / C / E 各 400,763 B，共 1,202,289 B；`ambReady` 之后 3.4 s 内三条全部解码好 |
+
+按线上约 0.5 MB/s：阻塞多 ≈ 0.6 s，后台 ≈ 2.4 s（不挡开机）。阻塞包里还有第一关根本不用的床（`carriageCrowd` 641,611 B、`trainCarriageOnly` 635,341 B、`trainInterior` 481,115 B、`crowdFar` 76,426 B、`carriageRearCheer` 113,311 B，共 1,947,804 B），
+若要抵掉 A 的净增可以让它们改成按需装载（本次没动，不在范围内）。
+
+**三段实录**（`Taierzhuang1938/_shots/BattleBedLayers/`，不提交；每段三路：`*_main.wav` 主输出立体声、`*_bedlayer.wav` 宿主层组增益输出（A + 叠加）、`*_overlay.wav` 只有叠加段，48 kHz 16-bit；各配频谱图 `*_spectrogram.png`、包络图 `*_wave.png`、时间线 `*_timeline.json`）：
+
+| 场景 | 听者位置 / zone | 叠加段时间线（录音开始后第几秒）|
+| --- | --- | --- |
+| 开阔（`open`，120 s）| 06 集结处 (−37, −101)，zone 全程 `open`，预设 `firstLevelFront` | 14.5–28.2 s **B**（淡入 2.7 / 淡出 2.4 s）；75.3–94.4 s **C**（淡入 3.6 / 淡出 2.0 s）；段间静 47 s |
+| 村落巷子（`lane`，120 s）| 08 主街 (40, −12)，zone 全程 `street`，`enclosed` | 17.2–30.9 s **E**；77.7–96.8 s **E**；没有 B / C |
+| 进村再出来（`transition`，150 s，真 zone 探针）| 06 → 跳 08 传到巷子（录音 45 s 起，跳阶段耗 17 s）→ 跳回 06（100 s 起）| 14.6–28.3 s B（开阔）；听者到巷子后 4.9 s（67.5 s）进 `enclosed`；84.0–103.1 s **E**；回到开阔后 8.8 s（121.0 s）才回 `open`（滞回 8 s）；跳阶段那几秒预设换成 `smokyDay` 再换回，调度器不受影响 |
+
+叠加段单独一路（`*_overlay.wav`，宿主组增益之前）的平台 RMS：B −47.7、C −46.3、E −45.7 / −47.4 / −47.2 dBFS，与「素材 RMS −27.4 + 宿主层电平 0.208 × `gain`」的期望 −47.1（B、E）/ −44.8（C）相差 −0.6 / −1.5 / +1.4 / −0.3 / −0.1 dB（含 S 曲线与素材本身的起伏）。
+频谱图上叠加段（`*_overlay_spectrogram.png`）B / E 是宽带的枪声竖线、C 是低频为主的炮击；`*_bedlayer_spectrogram.png` 里 A 的低频闷雷一直在、叠加段前后没有咔哒或电平跳变。`liveNodes` 在 9–100 之间（最低是跳阶段预设换档那几秒），没有破 `NODE_BUDGET` 120。
+注意：宿主层一路的整体电平还要乘战场强度倍率（强度 0 时 ×0.34，叠加段跟着乘），所以 `*_bedlayer.wav` 里「有叠加」与「没叠加」的窗口 RMS 差主要来自 A 自己的起伏与强度变化，不能直接读作叠加的增益；叠加相对宿主的电平由构造（峰值 = 层电平 × `gain`）与单测保证，响度反推见上表「叠加电平」。
+
+**01 开场实时 100 s**（`?whitebox=p012` 点「进城」，01 Trapped）：听者 zone `dugout` 149 次、`trench` 52 次（每 0.5 s 一次），调度模式全程 `open`，叠加段 14.9–29.9 s **B**、51.8–65.4 s **C**，没有 E ——
+开场就是 A 底 + B / C，防炮洞低通（480 / 1500 Hz）与传令兵喊话那一刻的 `ShapeFarBeds` 拉开都作用在宿主的组增益 / 低通上，叠加段自动跟着。
+（跳阶段会让听者路过别处：`Debug.FirstLevelJump` 的过程中调度器可能读到路过的位置的档，之后按 4 s / 8 s 滞回回到当前位置的档；正常玩不会这样。）
+
+**压短间隔的浏览器门**（`Script_AmbBedVariantBrowserTest` default；首段 1–2 s、段间 3–5 s、每段 9–10 s）：开阔阶段叠加段 `BCB`，zone 探针改成 `street` 后 `CEEE`（第一段 C 是切档前起的，被收尾淡出），改回后 `BCB`；
+10 段叠加输出端全部高于地板，放满的 8 段功率均值与「素材 RMS + 宿主层电平 × `gain`」相差 −3.8…+1.7 dB；01–06 节点门峰值 131（≤ 150）、账面差 0、同步推 600 帧峰值 127。
+
+### 已知与遗留
+
+- 每个进程里叠加时间线是同一个种子、同一条序列（第一段总是 B，起播点 / 时长 / 间隔也一样）：这是项目「不许 Math.random」的口径，好处是能复现，代价是每局听起来一样。要每局不同，把种子并进局种子即可（改 `BATTLE_BED_LAYERS.seed` 的来源，一处）。
+- 08 村落一带（含院子）几乎处处读 `courtyard` / `street`，所以 08 以后的村落阶段叠加基本都是 E；`interior` 只占很小一块（有屋顶的连屋）。要让「院子」不算半室内，把它从 `enclosedZones` 拿掉即可。
+- 叠加素材第一次装好之前（后台装载头几秒）叠加不出声；最坏情况下 Pages 慢到 8 s 内队列不空，装载会照样开始（`AudioFetchIdle` 最多等 8 s）。

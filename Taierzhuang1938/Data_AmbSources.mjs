@@ -86,8 +86,10 @@ export const AMB_LICENSES = {
 //      （Script_AmbBedVoiceScreen.py：Silero VAD + Whisper 转写 + 基频连续段）。
 //
 // 候选不进 manifest.beds（否则开机会把五条都下载）；它们在清单的 `bedVariants` 里，
-// 只有被选中的那一条才会被 Script_Audio 装载（Script_AmbBedVariant.mjs 决定装哪一条）。
-// 选定后改 Data_Tuning_Audio.BATTLE_BED_VARIANT 一个数即可，也可以用 ?ambBed=A|B|C|D|E|none 现场试听。
+// 只有计划里要的才会被 Script_Audio 装载（Script_AmbBedVariant.mjs 决定）。
+// 2026-09-29 用户选定（原话：「整体A长期存在，B和C交替的随机叠加出现；E在玩家进入巷道/半室内阶段再播放（作为替换偶尔的B和C）」）：
+// 默认档 layered = A 当底床（开机阻塞下载）、B / C / E 叠加用（开机之后后台下载）、D 不用；
+// 数在 Data_Tuning_Audio.BATTLE_BED_LAYERS，改默认档改 BATTLE_BED_VARIANT，现场试听用 ?ambBed=layered|legacy|A|B|C|D|E|none。
 // ---------------------------------------------------------------------------
 
 /** 现行 battleFar 成品实测：RMS −27.43 dBFS、峰 −7.4 dBFS（2026-09-29 ffmpeg astats）。候选按同一个 RMS 对齐。 */
