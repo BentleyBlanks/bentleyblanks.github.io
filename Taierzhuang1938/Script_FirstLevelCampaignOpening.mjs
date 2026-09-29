@@ -133,7 +133,11 @@ async function InstallProbe(page) {
         if (eyesShut) { delete P.previous[id]; continue; }
         if (!a.alive || a.openingStoryboardHidden || !a.actor?.root?.visible) { delete P.previous[id]; continue; }
         const previous = P.previous[id], pelvis = a.actor.characterRig?.bones?.pelvis;
-        const src = pelvis && a.actor.poseVisible !== false ? "pelvis" : "root";
+        // A man the director is posing keeps animating while the AI has taken him out of the scene (culled: root detached, poseVisible
+        // false), so his pelvis is still the right thing to follow -- his root moves by the re-root the clip changes make. 2026-09-29: the
+        // gear-up turns the eye away from the wounded comrade while he rises and stands, and his re-root under the pelvis (0.25 m of root,
+        // pelvis held still) was counted as a teleport of his root.
+        const src = pelvis && (a.actor.poseVisible !== false || a.openingStoryboardPose) ? "pelvis" : "root";
         const at = src === "pelvis" ? pelvis.getWorldPosition(Vec()) : a.actor.root.position;
         if (previous?.src === src) {
           const step = Math.hypot(at.x - previous.x, at.z - previous.z);

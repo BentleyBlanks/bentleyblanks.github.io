@@ -171,6 +171,15 @@ export const FP_PROPS = Freeze({
   // if that is missing), under the pelvis `backM` towards the wall, a darker lid band on top.
   fillSeat: Freeze({ kind: "crate", sizeM: V(.44, .30, .28), backM: .03, color: 0x6e5337, lidColor: 0x4f3b27 }),
   rifleSlide: Freeze({ kind: "track", prop: "loadingRifleOnLegs", t0: .25, t1: .7, direction: V(-.45, 0, -.55), moveM: .4, spinDeg: 28, restM: .03 }),
+  // 2026-09-29: the pack he puts on at the order (Data_OpeningFirstPersonGear.pack): stood at the foot of the west earth wall while he
+  // sits (Banter, Orders until the order), in his hands and on his back through the gear-up. Placement and size are that module's.
+  packRest: Freeze({ kind: "pack" }),
+  // The two shoulder straps of that pack seen over his shoulders once it is on (the hands tug them at the lower corners of the
+  // picture), same canvas ribbon as packStrap; camera-local points from the top edge of the frame down to the chest.
+  gearStrapR: Freeze({ kind: "strap", widthM: .05, thickM: .006, color: 0x7a6a4a, hemShade: .62, stitchShade: .8, stitchEveryM: .035,
+    points: Freeze([V(.34, .04, -.06), V(.28, -.05, -.18), V(.22, -.15, -.3), V(.17, -.27, -.42)]) }),
+  gearStrapL: Freeze({ kind: "strap", widthM: .05, thickM: .006, color: 0x7a6a4a, hemShade: .62, stitchShade: .8, stitchEveryM: .035,
+    points: Freeze([V(-.34, .04, -.06), V(-.28, -.05, -.18), V(-.22, -.15, -.3), V(-.17, -.27, -.42)]) }),
   // Canvas olive-drab with darker hems and a stitched band every few centimetres (vertex shades), a steel
   // buckle at buckleAt (0–1 along); review 09-25: the flat 0x4a4031 read as a black bar.
   packStrap: Freeze({ kind: "strap", widthM: .05, thickM: .006, color: 0x7a6a4a, hemShade: .62, stitchShade: .8, stitchEveryM: .035,

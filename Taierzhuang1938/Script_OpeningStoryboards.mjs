@@ -8,6 +8,7 @@ import { LoadOpeningStoryboardAnimation, InstallOpeningStoryboardAnimation, SetO
   OwnOpeningProp, DropOpeningWeapon, IsOpeningTerminalClip } from "./Script_OpeningStoryboardAnimation.mjs";
 import { OpeningPropSet } from "./Script_OpeningProps.mjs";
 import { OpeningFirstPerson, TrimOpeningPlayerBody } from "./Script_OpeningFirstPerson.mjs";
+import { GearCamera, GearPoint, GearData, GearArrivalS } from "./Script_OpeningFirstPersonGear.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { CharacterFacial } from "./Script_CharacterFacialAnimation.mjs";
@@ -699,6 +700,7 @@ export class FirstLevelBunkerShow {
     }
     // Everyone leaves by the mouth and the south-south-west leg; they disappear beyond RC.
     const since=r.time-this.flags.exitAt;
+    this.GearCues();
     for(const [id,actor,delay,speed] of [["luo",luo,0,C.speed.walk],["runner",runner,.2,C.speed.run],["yaowa",yaowa,.5,C.speed.walk],
       ["he",he,.9,C.speed.walk],["liu",liu,1.3,C.speed.walk]]){
       if(!actor)continue;
@@ -727,12 +729,13 @@ export class FirstLevelBunkerShow {
     const r=this.r,b=C.banter;
     if(!this.phaseEntered){
       this.phaseEntered=true;
-      // Straight into Incoming (a stage jump): he is already up and following, the rifle loaded.
-      this.flags.exitAt??=r.time-C.firstPerson.followUp.rifle.at(-1)[0];
+      // Straight into Incoming (a stage jump): the gear-up is done, he is at the mouth with the pack on and the rifle at the ready.
+      this.flags.exitAt??=r.time-GearData().doneS;
       this.Scene("BunkerIncoming",r.voice?.PlayScene("BunkerIncoming",{speakers:this.Speakers()}));
     }
     this.Hold(this.Comrade,b.comradeBlast,null);
     this.Hold(this.cast.shouter,{...b.shouter,yaw:Face(b.shouter,b.shellFrom)},null);
+    this.GearCues();
     this.ExitSquad();this.DepthWalkers();
     // BunkerIncoming.01 is cut by the blast (its cutEvent BunkerBlast reaches FirstLevelOpening).
     if(age>C.timeouts.blastEventS){if(r.opening.blastAt!=null||r.opening.bunker?.blastAt!=null)this.Blast();else r.opening.BunkerBlast();}
@@ -762,38 +765,36 @@ export class FirstLevelBunkerShow {
     const actor=this.cast[id];if(!actor)return;
     this.Hide(actor);actor.scriptEssential=false;this.r.ai.Remove(actor);delete this.cast[id];
   }
-  /** Seconds since Luo's order (flags.exitAt), the clock of firstPerson.followUp; null before it. */
+  /** Seconds since Luo's order (flags.exitAt), the clock of the gear-up (Data_OpeningFirstPersonGear); null before it. */
   FollowAge(){const at=this.flags.exitAt;return at==null||!["Orders","Incoming","Blast"].includes(this.phase)?null:this.r.time-at;}
-  /** 「跟紧」: from the order on he follows the others slowly (seat -> followTo), easing in and to a stop. */
+  /** The gear-up's sounds (Data_OpeningFirstPersonGear.cues: cloth, buckles, rifle, strides), each once when its time comes. A start
+   *  in the middle of the action (a stage jump into Incoming) skips those already past. */
+  GearCues(){
+    const at=this.flags.exitAt;
+    if(at==null)return;
+    const t=this.r.time-at,cues=GearData().cues;
+    if(this.gearCueFor!==at){this.gearCueFor=at;this.gearCueIndex=cues.findIndex(c=>c[0]>t-.25);if(this.gearCueIndex<0)this.gearCueIndex=cues.length;}
+    while(this.gearCueIndex<cues.length&&cues[this.gearCueIndex][0]<=t){
+      const [,cue,volume,pitch]=cues[this.gearCueIndex++];
+      this.r.audio?.Play?.(cue,{volume,pitch});
+    }
+  }
+  /** What the gear-up's eye path needs: where he sat, where he runs to, how high the seated eye was. */
+  GearContext(){const S=C.shunzi;return {seat:S.seat,followTo:S.followTo,seatEyeM:this.seatEyeM??S.seatEyeM};}
+  /** 「弹装起！往后沟撤！跟紧！」: from the order on he gears up and hurries to the mouth (seat -> pack -> followTo). */
   FollowPoint(t=this.FollowAge()){
-    const S=C.shunzi,F=C.firstPerson.followUp,length=Distance(S.seat,S.followTo);
-    if(t==null)return S.seat;
-    const u=Math.max(0,t-F.walkAtS),E=F.stopEaseM;
-    let d=F.walkMps*(u<F.walkRampS?u*u/(2*F.walkRampS):u-F.walkRampS/2);
-    // The last stopEaseM: the pace falls to nothing at followTo (continuous speed, no snap).
-    const x=d-(length-E);if(x>0)d=x>=2*E?length:length-E+x-x*x/(4*E);
-    const w=d/length;
-    return {x:S.seat.x+(S.followTo.x-S.seat.x)*w,z:S.seat.z+(S.followTo.z-S.seat.z)*w};
+    if(t==null)return C.shunzi.seat;
+    return GearPoint(t,this.GearContext());
   }
-  /** Walking pace now as a share of walkMps (0 standing, 1 full pace): the gait's bob and sway scale with it. */
-  FollowPace(t=this.FollowAge()){
-    if(t==null)return 0;
-    const a=this.FollowPoint(t),b=this.FollowPoint(t+.05);
-    return Math.min(1,Distance(a,b)/.05/C.firstPerson.followUp.walkMps);
-  }
-  /** The look while he follows: the seat's look eased to the men going out of the mouth (in Incoming the wounded
-   *  comrade squeezing out), pitched down at the rifle while he works it (followUp.pitch), with a slow walker's bob. */
+  /** The look while he gears up and runs: the gear-up's own heading / pitch / height / roll, then (once he is on his way, from
+   *  lookOutS) eased to the men going out of the mouth (in Incoming the wounded comrade squeezing out). */
   FollowShot(){
-    const r=this.r,S=C.shunzi,b=C.banter,F=C.firstPerson.followUp,t=this.FollowAge()??0;
-    const eye=this.FollowPoint(t),pace=this.FollowPace(t),step=Math.PI*F.stepHz*Math.max(0,t-F.walkAtS);
-    const seated=this.seatEyeM??S.seatEyeM;
-    let height=seated+(S.standEyeM-seated)*Smooth(t/F.standS);
-    height+=F.bobM*pace*(Math.abs(Math.sin(step))*2-1);
+    const r=this.r,b=C.banter,G=GearData(),t=this.FollowAge()??0;
+    const cam=GearCamera(t,this.GearContext()),eye={x:cam.x,z:cam.z};
     const comrade=this.Comrade,out=r.Point(b.exitRoute[0],1.1);
     if(this.phase==="Incoming"&&comrade?.alive)out.lerp(r.Point(comrade.position,1.2),Smooth(this.Age/.8));
-    const seat=this.SeatAim(eye,height,b.seatShot.pitchDeg*DEG),w=Smooth(t/.8);
-    const k=SampleCurve(F.pitch,t);
-    return {eye,height,target:seat.lerp(out,w),pitch:k,roll:F.swayRad*pace*Math.sin(step)};
+    const target=this.Aim(eye,cam.height,cam.yaw,cam.pitch).lerp(out,Smooth((t-G.cam.lookOut[0])/G.cam.lookOut[1]));
+    return {eye,height:cam.height,target,pitch:0,roll:cam.roll,turnRps:G.turnRps};
   }
   /** SB02: the eye knocked down from where he had followed to (blastFrom) onto shunzi.blastFall over the fall. */
   BlastPoint(){
@@ -2222,7 +2223,7 @@ export class FirstLevelBunkerShow {
     // The turn limit smooths the director's own cuts and swings; a free seated look is the player's mouse, 1:1.
     if(this.previousViewQuaternion&&!this.LookLimits()){
       const desiredQuaternion=cam.quaternion.clone();
-      cam.quaternion.copy(this.previousViewQuaternion).rotateTowards(desiredQuaternion,C.cameraTurnRps*(this.delta||0));
+      cam.quaternion.copy(this.previousViewQuaternion).rotateTowards(desiredQuaternion,(shot.turnRps??C.cameraTurnRps)*(this.delta||0));
     }
     cam.updateMatrixWorld(true);
     this.presentedCamera={position:cam.position.clone(),quaternion:cam.quaternion.clone()};
