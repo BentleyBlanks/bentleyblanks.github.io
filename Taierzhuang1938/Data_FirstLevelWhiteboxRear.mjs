@@ -17,7 +17,7 @@
 //   Layout's blue legend walls in 15–18 are re-emitted as plaster / stone / earth (RESKIN, same
 //   geometry); a lantern pole marks the 15B square turn; a stone garden wall closes the lane exit's
 //   forecourt so it opens only on the gatehouse; the yard's unused south gate is shut and barred,
-//   the back door stands open, and the ward flies a red-cross flag. Trodden paths live in the
+//   the back door stands open (the ward flag pole was removed 2026-09-30, no source). Trodden paths live in the
 //   terrain table (Data_FirstLevelWhiteboxTerrainRear.paths).
 // Frozen: every anchor/route/placement, the 15B lane members, gate 4.0 m, ward threshold,
 // bedside tolerances, bridge four states, blast stand-off, night gate/wall sizes.
@@ -382,16 +382,7 @@ export function BuildRearWhitebox(groundAt) {
       { y: groundAt(-22 + dx, 251.9) + 1.15 });
   for (const [side, z] of [["North", 240.25], ["South", 247.75]])
     Detail(`ReceptionRearDoorLeaf${side}`, -41.46, z, .08, 2.3, 2.38, "timber", { y: groundAt(-41.46, z) + 1.17 });
-  {
-    // Against the ward's east wall, north of the (-5,240)→(-26,246) walker line (0.9 m clear).
-    const x = -18.35, z = 242.8, g = groundAt(x, z), ry = .8;
-    const off = (along) => ({ x: x + Math.cos(ry) * along, z: z - Math.sin(ry) * along });
-    Grounded("ReceptionWardFlagPole", x, z, .14, 5.7, .14, "timber");
-    const flag = off(.68), cross = off(.68);
-    Detail("ReceptionWardFlag", flag.x, flag.z, 1.24, .82, .04, "canvas", { y: g + 5.18, ry });
-    Detail("ReceptionWardFlagCrossV", cross.x, cross.z, .22, .62, .07, "danger", { y: g + 5.18, ry });
-    Detail("ReceptionWardFlagCrossH", cross.x, cross.z, .62, .22, .07, "danger", { y: g + 5.18, ry });
-  }
+  // 2026-09-30: the ward's red-cross flag pole (east wall, (-18.35,242.8)) was removed — no historical source for it.
   // Beyond the south wall: two ruined houses and spill, seen through the ward door (17).
   HouseMass("ReceptionSouthRuinA", -32.5, 258.5, 9, 6.5, 3.2, { alongX: true });
   Grounded("ReceptionSouthRuinAGable", -36.2, 258.5, .6, 4.5, 6.5, "plaster");

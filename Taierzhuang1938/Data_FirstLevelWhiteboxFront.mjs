@@ -221,19 +221,9 @@ export function BuildFrontWhitebox(groundAt) {
     }
   }
 
-  // 2026-09-28 guidance, 02: at the support junction SJ (−29,−110) the 02 withdrawal has to turn south-west
-  // down CollectionLink into the hollow, not north up the support sap. An aid-post flag (off-white cloth,
-  // red-brown cross) on a 3.6 m pole on the bank beside the link's mouth stands over the trench lips: from
-  // the rear-trench corner RC 25 m away it already shows where the wounded are, and at SJ it hangs over the
-  // left-hand branch (at 4.2 m the cloth left the top of the frame 7 m short of SJ). All non-solid (no
-  // collider, so no 01–06 sight or fire line changes); 3 m off the route.
-  {
-    const x = -28.5, z = -106.3, g = groundAt(x, z), H = 3.6;
-    Detail("CollectionAidFlagPole", x, z, .12, H, .12, "timber", { y: g + H / 2 });
-    Detail("CollectionAidFlagCloth", x, z - .66, .04, .8, 1.2, "canvas", { y: g + H - .5 });
-    Detail("CollectionAidFlagCrossV", x, z - .66, .07, .58, .18, "danger", { y: g + H - .5 });
-    Detail("CollectionAidFlagCrossH", x, z - .66, .07, .18, .58, "danger", { y: g + H - .5 });
-  }
+  // 2026-09-30: the 3.6 m aid-post flag pole that stood on the bank beside CollectionLink's mouth (added by the
+  // 2026-09-28 guidance pass as a landmark) was removed — no source for a front-line aid post flying a flag
+  // from a pole in this battle, and the cloth colours did not match the Geneva white-ground red cross.
 
   // Ruined farmhouse on the west back slope's crest ("high ground with ruins" in 06).
   RuinHouse("CollectionWestRuin", -54.5, -101.5, 5, 6.5, [2.9, 2.3, 1.8, 2.6], { gable: -1 });
