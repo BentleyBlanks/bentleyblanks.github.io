@@ -1195,7 +1195,8 @@ export class FirstLevelBunkerShow {
     if(this.Hold(ijaA,J.crouch,null,{speed:C.speed.stroll})){
       this.flags.crouchAt??=r.time;
       this.Pose(ijaA,clip,{seconds:0});
-      if(this.SceneDone("ShunziFound")||said>this.SceneLength("ShunziFound")+2)this.Stage("Hold");
+      // 「看见我了就扇巴掌」: the grab (and the first slap) as soon as he is down, the last second of his line over it.
+      if(this.SceneDone("ShunziFound")||said>this.SceneLength("ShunziFound")-1)this.Stage("Hold");
     }else if(age>C.timeouts.foundWalkS){this.Put(ijaA,J.crouch);this.Stage("Hold");}
   }
   // ---- 02 questioning where he lies, slaps, the charge, the haul out ------------------------------------------------
@@ -1216,7 +1217,9 @@ export class FirstLevelBunkerShow {
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     this.VanguardFront(this.flags.vanguardAt);this.DepthIja();
     this.Put(ijaA,C.ija.crouch);
-    const t=r.time-(this.flags.holdAt??r.time),slap=this.SlapClip();
+    const slap=this.SlapClip(),after=this.SlapEnd();
+    // After a slap the hold picks up at its loop start (the slap clips end on that pose).
+    const t=after!=null?(OpeningClipMeta(this.HoldClip())?.holdLoop?.[0]??0)+r.time-after:r.time-(this.flags.holdAt??r.time);
     if(slap)this.Pose(ijaA,slap.clip,{seconds:slap.seconds});
     else this.Pose(ijaA,this.HoldClip(),{seconds:t});
     this.InterpreterToSquat();
@@ -1236,9 +1239,27 @@ export class FirstLevelBunkerShow {
     if(!OpeningClipMeta(clip)||seconds>ClipLength(clip,1.4))return null;
     return {clip,seconds};
   }
-  /** Queue a slap `delayS` after now (the hit time); the blow lands in UpdateSlaps. */
-  QueueSlap(blow){
-    (this.slaps??=[]).push({at:this.r.time+blow.delayS+C.rescue.slap.hitS,side:blow.side,landed:false});
+  /** When the last slap clip that has played out ended (null: none yet). */
+  SlapEnd(){
+    const r=this.r,Q=C.rescue.slap;let end=null;
+    for(const s of this.slaps||[]){
+      const clip=s.side>0?"IjaSlapForehand":"IjaSlapBackhand";
+      const e=s.at-ContactAt(clip,"slap",Q.hitS)+ClipLength(clip,1.4);
+      if(OpeningClipMeta(clip)&&r.time>e)end=e;
+    }
+    return end;
+  }
+  /** Queue blow `index` of rescue.slap.blows: it lands `hitInS` from now (UpdateSlaps). */
+  QueueSlap(index,hitInS){
+    const blow=C.rescue.slap.blows[index];
+    (this.slaps??=[]).push({at:this.r.time+hitInS,side:blow.side,blow:index,landed:false});
+  }
+  /** A questioning line kept back until its slap has landed (rescue.slap.blows `then`); the dialogue player's hold. */
+  HeldBySlap(lineId){
+    const Q=C.rescue.slap,index=Q.blows.findIndex(b=>b.then===lineId);
+    if(index<0)return false;
+    const slap=this.slaps?.find(s=>s.blow===index);
+    return !slap?.landed||this.r.time<slap.at+Q.blows[index].thenAfterS;
   }
   UpdateSlaps(){
     const r=this.r;
@@ -1246,18 +1267,19 @@ export class FirstLevelBunkerShow {
       if(slap.landed||r.time<slap.at)continue;
       slap.landed=true;
       this.strikeAt=r.time;this.flags.slapAt=r.time;this.flags.slapSide=slap.side;this.flags.slapCount=(this.flags.slapCount||0)+1;
-      const head=this.HeadPoint(this.Ija("ijaA"))||r.Point(C.shunzi.witnessEye,.5);
+      // The view keeps aiming where his face was at the blow while the head is flung (Shot: Hold / Ask).
+      this.slapAim=this.HeadPoint(this.Ija("ijaA"))?.clone()||null;
       r.audio?.Play?.(C.rescue.slap.sound,{position:r.Point(C.shunzi.witnessEye,.45),volume:1});
       r.audio?.Deafen?.(.35);
       if(!r.Has("playerSlapped"))r.Record("playerSlapped");
     }
   }
-  /** The slap's snap of the head (0 -> 1 -> 0): fast out, eased back over recoverS. */
+  /** The slap's snap of the head (0 -> 1 -> 0): flung out in 0.06 s, hanging there hangS, eased back over recoverS. */
   SlapKick(){
     const at=this.flags.slapAt;if(at==null)return 0;
     const t=this.r.time-at,Q=C.rescue.slap;
-    if(t<0||t>Q.recoverS+.2)return 0;
-    return Smooth(t/.07)*(1-Smooth((t-.1)/Q.recoverS));
+    if(t<0||t>Q.hangS+Q.recoverS)return 0;
+    return Smooth(t/.06)*(1-Smooth((t-Q.hangS)/Q.recoverS));
   }
   /** Luo, He, Liu and the extra men wait out of sight in the SSW leg behind the spoil until the charge. */
   WaitingRescuers(){
@@ -1280,17 +1302,25 @@ export class FirstLevelBunkerShow {
     if(!this.phaseEntered){
       this.phaseEntered=true;r.Record("rescueCallHeard");
       this.flags.holdAt=r.time;this.flags.holdGripAt=r.time+.25;
-      const Q=C.rescue.slap;
+      const Q=C.rescue.slap,seconds=id=>r.voice?.manifest?.lines?.[id]?.seconds??1.5;
+      // The first blow the moment the head is up in his fist; the lines wait for their blows (HeldBySlap).
+      Q.blows.forEach((blow,i)=>{if(blow.at==="grab")this.QueueSlap(i,blow.delayS+Q.hitS);});
       this.Scene("RescueInterrogation",r.voice?.PlayScene("RescueInterrogation",{speakers:this.Speakers(),
+        hold:(line)=>this.HeldBySlap(line.id),
         onLine:(lineId)=>{
           if(lineId==="RescueInterrogation.02")this.flags.askAt??=r.time;
-          for(const blow of Q.blows)if(lineId===blow.line)this.QueueSlap(blow);
+          Q.blows.forEach((blow,i)=>{if(lineId===blow.line)this.QueueSlap(i,seconds(lineId)+blow.afterEndS);});
           if(lineId===Q.raiseLine)this.flags.raiseAt=r.time+Q.raiseAfterS;
         }}));
-      // No voice: the slaps and the raised hand at the lines' estimated starts.
+      // No voice: the slaps and the raised hand at the lines' estimated starts (each held line pushes the rest on).
       if(!this.scenes.RescueInterrogation){
-        for(const blow of Q.blows)this.slaps=[...(this.slaps||[]),{at:r.time+this.LineStart("RescueInterrogation",blow.line)+blow.delayS+Q.hitS,side:blow.side,landed:false}];
-        this.flags.raiseAt=r.time+this.LineStart("RescueInterrogation",Q.raiseLine)+Q.raiseAfterS;
+        const L=id=>this.LineStart("RescueInterrogation",id);let shift=0;
+        Q.blows.forEach((blow,i)=>{
+          const hit=blow.at==="grab"?blow.delayS+Q.hitS:shift+L(blow.line)+seconds(blow.line)+blow.afterEndS;
+          this.QueueSlap(i,hit);
+          if(blow.then)shift=Math.max(shift,hit+blow.thenAfterS-L(blow.then));
+        });
+        this.flags.raiseAt=r.time+shift+L(Q.raiseLine)+Q.raiseAfterS;
       }
     }
     this.Questioning();
@@ -2112,11 +2142,16 @@ export class FirstLevelBunkerShow {
       const H=C.rescue.holdShot,Q=C.rescue.slap,grip=this.flags.holdGripAt!=null?Smooth((r.time-this.flags.holdGripAt)/H.liftS):0;
       const back={x:Math.sin(S.trap.yaw)*H.backM*grip,z:Math.cos(S.trap.yaw)*H.backM*grip};
       eye={x:eye.x+back.x,z:eye.z+back.z};height+=H.liftM*grip;
-      const head=Head(ijaA);
+      // A slap flings the head: the aim holds on where his face was at the blow, so the whole turn is the head's (his
+      // trunk swinging through the follow-through would add to it or take it back).
+      const k=this.SlapKick(),side=this.flags.slapSide||1,live=Head(ijaA);
+      const head=live&&this.slapAim&&k>0?live.clone().lerp(this.slapAim,Math.min(1,k*1.5)):live;
+      // ...and the head goes over with the blow: the eye moves toward the side it is flung to.
+      const across=(head?Face(eye,head):-90*DEG)-side*Math.PI/2;
+      eye={x:eye.x-Math.sin(across)*Q.shiftM*k,z:eye.z-Math.cos(across)*Q.shiftM*k};
       if(head){const e=r.Point(eye,height),elev=Math.atan2(head.y-e.y,Math.hypot(head.x-e.x,head.z-e.z));
         target=this.Aim(eye,height,Face(eye,head),Math.min(H.maxPitchDeg*DEG,elev-H.headAboveDeg*DEG));}
       else target=this.Aim(eye,height,-90*DEG,20*DEG);
-      const k=this.SlapKick(),side=this.flags.slapSide||1;
       yaw=-side*Q.yawDeg*DEG*k;pitch=Q.pitchDeg*DEG*k;roll=side*Q.rollDeg*DEG*k;height-=Q.dropM*k;
     }
     else if(p==="Charge"||p==="Melee"){
@@ -2240,9 +2275,10 @@ export class FirstLevelBunkerShow {
     if(r.player?.hitMarks?.length)r.player.hitMarks.length=0;
     const opening=r.opening;
     const fade=p==="Banter"?1-Smooth((r.time-(this.started??r.time))/C.fadeInS):0;
-    // Each slap shuts the eyes for a moment.
+    // Each slap: a flinch that does not shut the eyes (the head being flung must be seen), then a slow dazed blink.
     const slap=this.flags.slapAt!=null?r.time-this.flags.slapAt:null;
-    const blink=slap==null||slap<0?0:.8*Smooth(slap/.04)*(1-Smooth((slap-.1)/.14));
+    const blink=slap==null||slap<0?0:Math.max(.45*Smooth(slap/.03)*(1-Smooth((slap-.06)/.1)),
+      .7*Smooth((slap-.5)/.12)*(1-Smooth((slap-.68)/.2)));
     const recovery=C.blackoutRecovery;
     opening.eyeClosure=this.shownEyeClosure=p==="Blast"?Smooth((a-C.banter.blastShot.eyesCloseS)/recovery.closeS):p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.eyelidS):Math.max(fade,blink);
     opening.blackout=p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.fadeS):0;

@@ -425,8 +425,8 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   const found=manifest.clips.IjaFoundLook;
   assert.ok(found.holdLoop&&found.holdLoop[1]===found.duration&&found.contacts.some(c=>c.action==="sheathe"),"IjaFoundLook: sheathes, then a hold loop");
   // IjaCrouchHairHold: the left fist on the crown from 0.25 s, the eye lifted 0.16 m by 0.70 s (player head track), a hold
-  // loop to the end; the slaps start and end on its hold-loop start, slap contacts at 0.34 on the cheeks with the palm
-  // (or the back of the hand) on the cheek at the hit (bake probes).
+  // loop to the end; the slaps start and end on its hold-loop start, slap contacts at 0.58 on the cheeks with the palm
+  // (or the back of the hand) on the cheek at the hit (bake probes); 2026-09-29: the hand up high, cocked, before it.
   const hold=manifest.clips.IjaCrouchHairHold,head=ijaA.clips.IjaCrouchHairHold.player.parts.head;
   assert.ok(hold.contacts.some(c=>c.action==="grab"&&c.part==="crown"&&Math.abs(c.t-.25)<1e-9),"IjaCrouchHairHold: grabs the crown at 0.25 s");
   const y=t=>head[Math.round(t*12)*3+1],rise=y(.75)-y(0);
@@ -435,7 +435,8 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   assert.ok(h0>=.7&&h0<=.8&&hold.holdLoop[1]===hold.duration,`IjaCrouchHairHold: hold loop from ${h0} s`);
   for(const [id,part,probe] of [["IjaSlapForehand","cheekL","palmOnCheek"],["IjaSlapBackhand","cheekR","backOnCheek"]]){
     const slap=manifest.clips[id].contacts.find(c=>c.action==="slap");
-    assert.ok(slap&&slap.t===.34&&slap.limb==="handR"&&slap.part===part&&slap.partnerRole==="shunzi",`${id}: slap contact on ${part} at 0.34 s`);
+    assert.ok(slap&&slap.t===.58&&slap.limb==="handR"&&slap.part===part&&slap.partnerRole==="shunzi",`${id}: slap contact on ${part} at 0.58 s`);
+    assert.ok(manifest.clips[id].events.some(e=>e.kind==="windUp"&&e.t<slap.t-.2),`${id}: the wind-up reads before the blow`);
     const p=reportOf("TengxianIja02",id).probes?.[probe];
     assert.ok(p&&p[0]<=.03&&Math.abs(p[1]-slap.t)<=.021,`${id}: the hand on the cheek at the hit (${p})`);
   }
@@ -612,9 +613,18 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   for(const [name,p] of [["Luo",R.luoStart],["He",R.heStart],["Liu",R.liuStart],...R.extras.map(e=>[e.id,e.start])])
     assert.ok([1.7,1.2].every(h=>Sight(Eye(eye,.44),Eye(p,h),{state:"BunkerCollapsed"})!=null)||Math.abs(Bearing(eye,p)-90)>60,`${name} waits out of the pinned man's view (bearing ${Bearing(eye,p).toFixed(0)})`);
   assert.equal(R.chargeRoute.at(-1).x,3.3,"the charge comes down the crater step into the front trench");
-  // Slaps: one each way, landing on the questioning's lines; the raised hand for the third before the charge.
-  assert.deepEqual(R.slap.blows.map(b=>b.side).sort(),[-1,1],"a forehand and a backhand");
-  assert.ok(R.slap.recoverS<R.slap.dizzyS&&R.slap.yawDeg>=15&&R.slap.yawDeg<=35,"the head snaps aside and back; the struck side swims longer");
+  // Slaps (2026-09-29 「看见我了就扇巴掌，等翻译问了一句主角还没说话就再来了一巴掌」): the first as soon as the head is up
+  // in his fist, 「这个也问！」 after it; the second in the silence after the interpreter's first question, the next
+  // question after it; the raised hand for the third before the charge. Both forehands: the backhand's wind-up is
+  // hidden from the pinned eye behind ijaA's own hair-holding arm.
+  const [first,second]=R.slap.blows;
+  assert.ok(first.at==="grab"&&first.then==="RescueInterrogation.01"&&second.line==="RescueInterrogation.03"&&second.afterEndS>=.6
+    &&second.then==="RescueInterrogation.04","slap on sight, then again after one unanswered question");
+  assert.ok(R.slap.blows.every(b=>b.side===1),"forehands (the wind-up in view)");
+  const hitT=manifest.clips.IjaSlapForehand.contacts.find(c=>c.action==="slap").t;
+  assert.ok(R.slap.raiseS===hitT&&R.slap.hitS===hitT,"the slap clip plays from its first frame (the wind-up)");
+  assert.ok(first.delayS>=manifest.clips.IjaCrouchHairHold.holdLoop[0],"the first slap starts once the head is up (the hold loop's start pose)");
+  assert.ok(R.slap.hangS<R.slap.recoverS&&R.slap.recoverS<R.slap.dizzyS&&R.slap.yawDeg>=35&&R.slap.yawDeg<=55,"the head is flung aside, hangs, comes back; the struck side swims longer");
   // The haul: from the pinned eye out onto the seat.
   // LuoDragToCover's collar track at haulStopS: the eye comes out past the seat and he sits back onto it.
   {

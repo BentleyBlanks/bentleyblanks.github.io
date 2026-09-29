@@ -6437,8 +6437,10 @@ FOUND_T = 54 / 24                  # 2.25 s
 FOUND_HOLD = (39 / 24, FOUND_T)    # 1.625-2.25 s
 CROUCH_HOLD = (18 / 24, 18 / 24 + 3.0)   # 0.75-3.75 s (the lift is up at 0.70: rescue.holdShot; whole 1/12 s for the player track)
 CROUCH_T = CROUCH_HOLD[1]
-SLAP_T = 30 / 24                   # 1.25 s
-SLAP_HIT = 8 / 24                  # the palm on the cheek on a baked frame (the manifest contact says .34)
+# 2026-09-29 (user: 「看不出来是扇巴掌的动作」): the hand goes up high over his shoulder -- against the sky from the pinned
+# eye, a silhouette -- hangs there cocked for a beat and cracks down across the face; the blow at 0.58 s, back by 1.3 s.
+SLAP_T = 36 / 24                   # 1.5 s
+SLAP_HIT = 14 / 24                 # the palm on the cheek on a baked frame (0.583 s; the manifest contact says .58)
 RAISE_HOLD = (10 / 24, 10 / 24 + 2.0)
 RAISE_T = RAISE_HOLD[1]
 LIFT_HOLD = (24 / 24, 36 / 24)     # 1.0-1.5 s
@@ -6479,23 +6481,25 @@ Meta('IjaCrouchHairHold', CROUCH_T, False, 'track', role='ijaA', rig='TengxianIj
            'closes in the hair).')
 Meta('IjaSlapForehand', SLAP_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='slungBack', player=True,
-     contacts=[{'t': .34, 'limb': 'handR', 'action': 'slap', 'partnerRole': 'shunzi', 'part': 'cheekL'},
+     contacts=[{'t': .58, 'limb': 'handR', 'action': 'slap', 'partnerRole': 'shunzi', 'part': 'cheekL'},
                {'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'crown'}],
-     events=[{'t': .34, 'kind': 'slap', 'side': 1}],
+     events=[{'t': .30, 'kind': 'windUp'}, {'t': .58, 'kind': 'slap', 'side': 1}],
      prev=['IjaCrouchHairHold'], next=['IjaCrouchHairHold'],
-     notes='2026-09-27: from the hair hold (frame 0 and the last frame = IjaCrouchHairHold at its hold-loop start, the left '
-           'fist in the hair). 0-0.22 s the right arm winds out to his right and back, the trunk turned into it; the open '
-           'right PALM cracks across the man\'s LEFT cheek (0.34 s: on ijaA\'s right), right to left across his body, the '
-           'shoulder and trunk turning through; follow-through to his left; the head knocked away in his fist; back to the '
-           'hold by 1.2 s.')
+     notes='2026-09-29: from the hair hold (frame 0 and the last frame = IjaCrouchHairHold at its hold-loop start, the left '
+           'fist in the hair). 0-0.30 s the open right hand goes up high over his right shoulder (1.1 m up: from the pinned '
+           'eye it stands against the sky), the trunk wound back to his right, and hangs there cocked to 0.42 s; 0.50-0.58 s '
+           'it cracks down, the PALM across the man\'s LEFT cheek (0.58 s: on ijaA\'s right), the shoulder and trunk turning '
+           'through; follow-through wide to his left; the head knocked away in his fist and held there a moment; back to '
+           'the hold by 1.3 s.')
 Meta('IjaSlapBackhand', SLAP_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='slungBack', player=True,
-     contacts=[{'t': .34, 'limb': 'handR', 'action': 'slap', 'partnerRole': 'shunzi', 'part': 'cheekR'},
+     contacts=[{'t': .58, 'limb': 'handR', 'action': 'slap', 'partnerRole': 'shunzi', 'part': 'cheekR'},
                {'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'crown'}],
-     events=[{'t': .34, 'kind': 'slap', 'side': -1}],
+     events=[{'t': .30, 'kind': 'windUp'}, {'t': .58, 'kind': 'slap', 'side': -1}],
      prev=['IjaCrouchHairHold'], next=['IjaCrouchHairHold'],
-     notes='2026-09-27: the mirror of IjaSlapForehand: the right hand wound across to his left (0.22 s), the BACK of the hand '
-           'lashes across the man\'s RIGHT cheek left to right (0.34 s), follow-through to his right; back to the hold by 1.2 s.')
+     notes='2026-09-29: the mirror of IjaSlapForehand: the right hand goes up in front of his left shoulder (0.30 s, cocked to 0.42 s), '
+           'the BACK of the hand lashes down across the man\'s RIGHT cheek left to right (0.58 s), follow-through wide to his '
+           'right; back to the hold by 1.3 s.')
 Meta('IjaSlapRaise', RAISE_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='slungBack', player=True, holdLoop=list(RAISE_HOLD),
      contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'crown'}],
@@ -6824,9 +6828,10 @@ def BuildCrouchHairHold(T, name):
 
 
 def SlapKnock(side, t):
-    """The head knocked aside in his fist by the slap (runtime m): away from the blow, and down; back by the end."""
-    k = Smooth((t - SLAP_HIT) / .07) * (1 - Smooth((t - SLAP_HIT - .10) / .70))
-    return (.045 * side * k, 0, -.03 * k)
+    """The head knocked aside in his fist by the slap (runtime m): away from the blow, and down; it hangs there a moment
+    (the director's camera kick, rescue.slap) and is back by the end."""
+    k = Smooth((t - SLAP_HIT) / .07) * (1 - Smooth((t - SLAP_HIT - .30) / .55))
+    return (.07 * side * k, 0, -.035 * k)
 
 
 def SlapBody(T, keys):
@@ -6875,28 +6880,40 @@ def SlapSpec(T, side, name):
     fore = side > 0
     cheek = Vector(SLAP_CHEEK['L' if fore else 'R'])
     hit = cheek + Vector(SLAP_FINGERS) * .045 + Vector((1, 0, 0)) * (-.02 if fore else .02)
-    hold = CrouchHoldPose(T, CROUCH_HOLD[0])
+    # Keys: rest (the hold's right hand) -> up high over the shoulder by 0.30 (cocked, drawn a little further to 0.42) ->
+    # the crack (0.50 -> the hit, two frames) -> the follow-through -> back onto the hold's hand (the weight fades 1.02-1.30:
+    # the bake turns a hand at most 30 deg a frame, so the palm keys turn in steps of < 30 deg a frame round the crack).
     if fore:
-        path = Channel([(0.0, (-.25, -.36, .50)), (.08, (-.30, -.30, .58)), (.22, (-.44, -.12, .74)), (SLAP_HIT, tuple(hit)),
-                        (.42, (.20, -.48, .42)), (.58, (.24, -.36, .52)), (.85, (-.10, -.36, .50)), (SLAP_T, (-.20, -.36, .50))])
-        twist = Channel([(0.0, 0.0), (.22, -.32), (SLAP_HIT, .06), (.42, .24), (.70, .08), (SLAP_T, 0.0)])
-        palmF = Channel([(0.0, (0, -.6, -.8)), (.22, (-.3, .1, .95)), (SLAP_HIT - .06, SLAP_FINGERS), (.42, (.2, -.6, .75)),
+        path = Channel([(0.0, (-.25, -.36, .50)), (.12, (-.34, -.28, .74)), (.30, (-.46, -.04, 1.08)), (.42, (-.48, .00, 1.12)),
+                        (.50, (-.40, -.16, .98)), (SLAP_HIT, tuple(hit)), (.66, (.14, -.56, .40)), (.80, (.26, -.44, .50)),
+                        (1.05, (.00, -.38, .52)), (1.30, (-.22, -.36, .50)), (SLAP_T, (-.25, -.36, .50))])
+        twist = Channel([(0.0, 0.0), (.30, -.46), (.42, -.50), (.50, -.40), (SLAP_HIT, .08), (.66, .26), (.80, .30),
+                         (1.05, .10), (SLAP_T, 0.0)])
+        palmF = Channel([(0.0, (0, -.6, -.8)), (.30, (-.1, .1, 1)), (.42, (-.1, .1, 1)), (.50, (0, -.2, 1)),
+                         (SLAP_HIT, SLAP_FINGERS), (.66, (.2, -.6, .75)), (.80, (.2, -.6, .75)), (1.30, (0, -.6, -.8)),
                          (SLAP_T, (0, -.6, -.8))])
-        palmN = Channel([(0.0, (0, -.2, -1)), (.22, (.6, -.8, 0)), (SLAP_HIT - .06, (1, 0, 0)), (.42, (.8, .2, -.2)),
+        palmN = Channel([(0.0, (0, -.2, -1)), (.30, (.7, -.65, -.2)), (.42, (.7, -.65, -.2)), (.50, (.85, -.45, -.15)),
+                         (SLAP_HIT, (1, 0, 0)), (.66, (.8, .2, -.2)), (.80, (.8, .2, -.2)), (1.30, (0, -.2, -1)),
                          (SLAP_T, (0, -.2, -1))])
+        protract = Channel([(0.0, 0.0), (.30, -.40), (.42, -.42), (SLAP_HIT, .50), (.70, .15), (SLAP_T, 0.0)])
     else:
-        path = Channel([(0.0, (-.25, -.36, .50)), (.08, (-.10, -.34, .58)), (.22, (.24, -.20, .72)), (SLAP_HIT, tuple(hit)),
-                        (.42, (-.30, -.46, .48)), (.58, (-.36, -.34, .56)), (.85, (-.28, -.36, .50)), (SLAP_T, (-.20, -.36, .50))])
-        twist = Channel([(0.0, 0.0), (.22, .26), (SLAP_HIT, -.04), (.42, -.24), (.70, -.08), (SLAP_T, 0.0)])
-        palmF = Channel([(0.0, (0, -.6, -.8)), (.22, (-.2, -.3, .93)), (SLAP_HIT - .06, SLAP_FINGERS), (.42, (-.2, -.6, .75)),
+        # (cocked up in front of his left shoulder, not by his ear: wound further across, the right hand could not reach and
+        # the trunk's turn pulled the left fist 8 cm out of the hair)
+        path = Channel([(0.0, (-.25, -.36, .50)), (.12, (-.10, -.34, .72)), (.30, (.08, -.26, 1.02)), (.42, (.10, -.24, 1.06)),
+                        (.50, (.08, -.34, .92)), (SLAP_HIT, tuple(hit)), (.66, (-.30, -.52, .44)), (.80, (-.40, -.40, .56)),
+                        (1.05, (-.30, -.36, .52)), (1.30, (-.23, -.36, .50)), (SLAP_T, (-.25, -.36, .50))])
+        twist = Channel([(0.0, 0.0), (.30, .20), (.42, .22), (.50, .16), (SLAP_HIT, -.06), (.66, -.26), (.80, -.30),
+                         (1.05, -.10), (SLAP_T, 0.0)])
+        palmF = Channel([(0.0, (0, -.6, -.8)), (.30, (-.1, 0, 1)), (.42, (-.1, 0, 1)), (.50, (0, -.2, 1)),
+                         (SLAP_HIT, SLAP_FINGERS), (.66, (-.2, -.6, .75)), (.80, (-.2, -.6, .75)), (1.30, (0, -.6, -.8)),
                          (SLAP_T, (0, -.6, -.8))])
-        palmN = Channel([(0.0, (0, -.2, -1)), (.22, (.8, .5, 0)), (SLAP_HIT - .06, (1, 0, 0)), (.42, (.9, -.3, -.2)),
+        palmN = Channel([(0.0, (0, -.2, -1)), (.30, (.8, .55, 0)), (.42, (.8, .55, 0)), (.50, (.95, .25, -.1)),
+                         (SLAP_HIT, (1, 0, 0)), (.66, (.9, -.3, -.2)), (.80, (.9, -.3, -.2)), (1.30, (0, -.2, -1)),
                          (SLAP_T, (0, -.2, -1))])
-    # (off the path by 0.95 s: the last frames let the hand turn back onto the hold's -- the bake turns a hand at most 30 deg a frame)
-    weight = lambda t: Smooth(t / .10) * (1 - Smooth((t - .72) / .23))
-    lean = Channel([(0.0, 0.0), (.22, -.04), (SLAP_HIT, .06), (.50, .03), (SLAP_T, 0.0)])
-    shrug = Channel([(0.0, 0.0), (.22, .06), (SLAP_HIT, .02), (SLAP_T, 0.0)])
-    protract = Channel([(0.0, 0.0), (.22, -.30 if fore else .35), (SLAP_HIT, .45 if fore else -.10), (.60, .10), (SLAP_T, 0.0)])
+        protract = Channel([(0.0, 0.0), (.30, .30), (.42, .32), (SLAP_HIT, -.10), (.70, -.15), (SLAP_T, 0.0)])
+    weight = lambda t: Smooth(t / .10) * (1 - Smooth((t - 1.02) / .28))
+    lean = Channel([(0.0, 0.0), (.30, -.08), (.42, -.09), (SLAP_HIT, .10), (.66, .08), (1.05, .02), (SLAP_T, 0.0)])
+    shrug = Channel([(0.0, 0.0), (.30, .10), (.42, .12), (SLAP_HIT, .02), (SLAP_T, 0.0)])
     body = SlapBody(T, lambda t: {'twist': twist(t), 'bend': lean(t), 'shrug': shrug(t), 'protract.R': protract(t)})
     right = SlapHand(T, path, lambda t: (palmF(t), palmN(t)), weight)
 
@@ -6906,7 +6923,7 @@ def SlapSpec(T, side, name):
         return {'palmOnCheek' if fore else 'backOnCheek': (tuple(SlapPalmPoint(T, side, back=not fore)), tuple(cheek / T.s))}
     spec = CrouchSpec(T, SLAP_T, body, lambda t: SlapKnock(side, t), right, headAt=lambda t: CROUCH_HOLD[0])
     spec['probes'] = Probe
-    spec['reviewFrames'] = lambda n: [0, 5, 7, 8, 10, 14, n - 1]
+    spec['reviewFrames'] = lambda n: [0, 7, 10, 12, 14, 16, 19, 25, n - 1]
     spec['reviewProps'] = (lambda rp: lambda t: rp(t) + [('point', tuple(cheek / T.s), None, .025)])(spec['reviewProps'])
     return spec
 
