@@ -672,6 +672,10 @@ def BakeRig(ctx):
         # from THIS point, not from the hand of the pose being corrected -- otherwise the goal
         # would sink with the body and the assist would run to its limit in a single frame.
         free = {side: ctx['GripPoint'](side).copy() for side in (p.get('grips') or {})}
+        # p['framedGrips'] (2026-09-30): the pose is authored in a turned frame (frameYaw / frameShift) and its grips are world
+        # points: the pelvis correction goes back into the frame, and the grip pass reads the elbow poles through it.
+        framedYaw = p.get('frameYaw', 0.0) if p.get('framedGrips') else 0.0
+        frameSpin = Quaternion((0, 0, 1), framedYaw)
         for _ in range(8):
             excess = Vector()
             for side, grip in (p.get('grips') or {}).items():
@@ -694,6 +698,8 @@ def BakeRig(ctx):
                     excess += want.normalized() * (want.length - start) * w
             if excess.length < .0015:
                 break
+            if framedYaw:
+                excess = frameSpin.inverted() @ excess
             px, py, pz = p['pelvis']
             # Only ever sink toward a low grip; lifting the pelvis would pull the planted feet
             # up, and more than ~10 cm of sideways travel straightens the planted legs.
@@ -742,6 +748,9 @@ def BakeRig(ctx):
                 target = ctx['GripPoint'](side).lerp(Vector(grip), w) if w < 1.0 else Vector(grip)
                 palm = (p.get('gripPalms') or {}).get(side) or p.get('palms', {}).get(side)
                 pole = Vector(p['armPoles'][side])
+                if p.get('framedGrips'):
+                    shift = p.get('frameShift', (0.0, 0.0))
+                    pole = frameSpin @ pole + Vector((shift[0], shift[1], lift))
                 relPole = (p.get('relPoles') or {}).get(side)
                 if relPole is not None:
                     # A reaching hand bends its elbow the way the free hand did and hands the

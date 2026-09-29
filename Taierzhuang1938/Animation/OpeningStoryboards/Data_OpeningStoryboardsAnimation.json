@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260930OpeningStoryboardsV21CollarQuestion",
+ "version": "20260930OpeningStoryboardsV22CollarLuoNoRollBack",
  "fps": 24,
  "actorForward": [
   0,
@@ -3192,7 +3192,7 @@
    ]
   },
   "LuoHandRifle": {
-   "duration": 4.75,
+   "duration": 5.416666666666667,
    "loop": false,
    "weaponHold": "free",
    "role": "luo",
@@ -3203,27 +3203,27 @@
    "rootMotion": true,
    "player": true,
    "holdLoop": [
-    1.9,
-    2.9
+    2.5666666666666664,
+    3.5666666666666664
    ],
-   "holdExit": "pose.holdUntil: the loop lets go at that clip time and plays on through the 2.9-3.3 hand-over and the 3.3-4.2 haul to his feet",
+   "holdExit": "pose.holdUntil: the loop lets go at that clip time and plays on through the 3.57-3.97 hand-over and the 3.97-4.87 haul to his feet",
    "contacts": [
     {
-     "t": 2.9,
+     "t": 3.5666666666666664,
      "limb": "handsLR",
      "action": "release",
      "partnerRole": "shunzi",
      "part": "rifle"
     },
     {
-     "t": 3.2,
+     "t": 3.8666666666666667,
      "limb": "handL",
      "action": "grip",
      "partnerRole": "shunzi",
      "part": "shoulderStrapR"
     },
     {
-     "t": 4.2,
+     "t": 4.866666666666667,
      "limb": "handL",
      "action": "release"
     }
@@ -3234,19 +3234,27 @@
      "kind": "unslung"
     },
     {
-     "t": 1.9,
+     "t": 0.85,
+     "kind": "satUp"
+    },
+    {
+     "t": 2.3666666666666667,
+     "kind": "kneeling"
+    },
+    {
+     "t": 2.5666666666666664,
      "kind": "offered"
     },
     {
-     "t": 3.1,
+     "t": 3.7666666666666666,
      "kind": "handed"
     },
     {
-     "t": 3.3,
+     "t": 3.9666666666666663,
      "kind": "hauling"
     },
     {
-     "t": 4.2,
+     "t": 4.866666666666667,
      "kind": "stood"
     }
    ],
@@ -3254,7 +3262,7 @@
     "LuoRescueDrag"
    ],
    "next": [],
-   "notes": "2026-09-29: from the standing pose LuoRescueDrag ends in (rifle slung; root R_C = its root.end) Luo pulls the rifle off his back over the right shoulder into both hands, kneels on his right knee 0.75 m in front of Shunzi (who rolls back onto his belly, pushes up and kneels), holds the Hanyang across his chest height (1.9-2.9 s seamless hold loop: \"\u8fd8\u80fd\u6253\u4e0d\uff1f\" and the nod), lets go as Shunzi's hands close on it (2.9-3.1 s; the `rifle` prop is hidden after 3.1 s), takes Shunzi's right shoulder strap in his left fist and hauls him to his feet (3.3-4.2 s), lets go and steps round to his right side (-x, 0.8 m) turning to face +z, left arm pointing down the front trench. `player`: eye, gaze, crown, chest, chestUp, pelvis, kneeL/R, heelL/R (his left/right) plus gripR (neck of the rifle), gripL (handguard), rifle (centre), rifleMuzzle (0.4 m along the bore), rifleUp (0.1 m along the sights) for the whole clip -- after 3.1 s they follow Shunzi's hands -- and shoulderStrapR (where the left fist closes).",
+   "notes": "2026-09-30 (was 2026-09-29): from the standing pose LuoRescueDrag ends in (rifle slung; root R_C = its root.end) Luo pulls the rifle off his back over the right shoulder into both hands (0-0.5 s) and walks round Shunzi's left at port arms (0.5-1.87 s: 1.65 m, turning 90 deg right to face +x) while Shunzi sits up and turns to his left onto his knees facing him (-x, the crater step: no roll back onto his belly); Luo kneels on his right knee 0.75 m in front of him, holds the Hanyang across his chest height (2.57-3.57 s seamless hold loop: \"\u8fd8\u80fd\u6253\u4e0d\uff1f\" and the nod), lets go as Shunzi's hands close on it (3.57-3.77 s; the `rifle` prop is hidden after 3.77 s), takes Shunzi's right shoulder strap in his left fist and hauls him to his feet (3.97-4.87 s), lets go and steps round to his right side (0.8 m) turning to face the way Shunzi faces. `player`: eye, gaze, crown, chest, chestUp, pelvis, kneeL/R, heelL/R (his left/right) plus gripR (neck of the rifle), gripL (handguard), rifle (centre), rifleMuzzle (0.4 m along the bore), rifleUp (0.1 m along the sights) for the whole clip -- after 3.77 s they follow Shunzi's hands -- and shoulderStrapR (where the left fist closes).",
    "rigs": [
     "TengxianNra05"
    ]
@@ -5440,7 +5448,7 @@
   {
    "id": "TengxianNra05",
    "file": "Animation_TengxianNra05OpeningStoryboards.json",
-   "sha256": "7b8a08e677e7b783dd926dfcbc7d6881dbba595f503486ff57c53439197cf342",
+   "sha256": "ae96e02d550b25758b8e32d37769f3f635653f57786b3f4e09e220946b5e59db",
    "originalModelSha256": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72",
    "clipIds": [
     "SupplyReceive",
@@ -5655,7 +5663,7 @@
      ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningLuoRescue_20260929\\Scene_TengxianNra05OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningLuoNoRollBack_20260930\\Scene_TengxianNra05OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
@@ -6592,10 +6600,10 @@
     },
     {
      "clip": "LuoHandRifle",
-     "frames": 115,
+     "frames": 131,
      "footSlideM": 0.0035,
-     "contactErrorM": 0.0223,
-     "gripSolveErrorM": 0.02231,
+     "contactErrorM": 0.026,
+     "gripSolveErrorM": 0.026,
      "pelvisMaxStepM": 0.0916,
      "floorCorrectionMin": -0.03501,
      "floorCorrectionMax": 0.06944,
@@ -6607,9 +6615,9 @@
        0.8371
       ],
       "end": [
-       -0.8,
-       -0.8,
-       -180.0,
+       -0.15,
+       -2.15,
+       90.0,
        0.8371
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
@@ -6619,49 +6627,79 @@
       [
        "L",
        0.0,
-       1.24
+       0.74
       ],
       [
        "L",
-       1.8,
-       3.28
+       1.02,
+       1.18
       ],
       [
        "L",
-       3.8,
-       4.2
+       1.46,
+       1.6
       ],
       [
        "L",
-       4.62,
-       4.75
+       1.8667,
+       1.9067
+      ],
+      [
+       "L",
+       2.4667,
+       3.9467
+      ],
+      [
+       "L",
+       4.4667,
+       4.8667
+      ],
+      [
+       "L",
+       5.2867,
+       5.4167
       ],
       [
        "R",
        0.0,
-       1.28
+       0.52
       ],
       [
        "R",
-       1.8,
-       3.28
+       0.8,
+       0.96
       ],
       [
        "R",
-       3.8,
-       4.3
+       1.24,
+       1.4
       ],
       [
        "R",
-       4.72,
-       4.75
+       1.66,
+       1.9467
+      ],
+      [
+       "R",
+       2.4667,
+       3.9467
+      ],
+      [
+       "R",
+       4.4667,
+       4.9667
+      ],
+      [
+       "R",
+       5.3867,
+       5.4167
       ]
      ],
      "kneePlants": [
       [
        "R",
-       1.72,
-       3.05
+       2.3867,
+       3.7167
       ]
      ],
      "kneeSlideM": 0.0042

@@ -16,7 +16,8 @@
 // the part of the contract's picture criteria that the staging and the camera decide (who is where on
 // screen, how far, pitch / roll / eye height, landmarks on screen, who must be out of the picture, and that
 // no scenery stands between the eye and a judged head -- a ray against the scene, named by the layout block
-// it hits; `behindOk:"<block>"` lets a wave-1 shot keep one listed blocker). People are skinned and the ray
+// it hits; `behindOk:"<block>"` lets a wave-1 shot keep one listed blocker). distM is to the actor's root, bodyDistM to his
+// pelvis (a root-motion clip can leave the root metres behind the body). People are skinned and the ray
 // skips them, so a head behind a nearer person is found apart (coveredBy: the people alone drawn flat into the
 // head's pixel after the screenshot); `coverOk:"<role>"` lets a wave-1 shot keep that one person in front.
 // hands.<l|r> judges a first-person palm on screen (pose, x, y, held: the partner grip is on that man), guardRifle ijaB's dropped rifle (x, y, distance),
@@ -109,6 +110,7 @@ export function JudgeShot(judge, dump) {
     if (want.x) out.push(Range(`${role} head x`, a.headPx?.x, want.x));
     if (want.y) out.push(Range(`${role} head y`, a.headPx?.y, want.y));
     if (want.distM) out.push(Range(`${role} distance (m)`, a.distM, want.distM));
+    if (want.bodyDistM) out.push(Range(`${role} body distance (m)`, a.bodyDistM, want.bodyDistM));
     if (want.clip) out.push({ label: `${role} clip`, ok: want.clip.includes(a.clip), value: a.clip, range: want.clip });
     if (want.pelvisM) out.push(Range(`${role} pelvis height (m)`, a.pelvisY, want.pelvisM));
     if (want.woundMin != null) out.push(Range(`${role} persistent stains`, a.woundCount, [want.woundMin, null]));
@@ -376,6 +378,7 @@ function Dump({ warm, freeze, points }) {
       hidden: !!a.openingStoryboardHidden, visible: !!a.actor.root.visible && !!a.actor.root.parent, lod: a.renderLod || null,
       x: R3(a.position.x), z: R3(a.position.z), yawDeg: D(a.yaw), clip: a.openingStoryboardPose?.clip || null,
       clipS: a.openingStoryboardPose?.seconds != null ? R3(a.openingStoryboardPose.seconds) : null, distM: R3(d),
+      bodyDistM: pelvis ? R3(Math.hypot(pelvis.x - cam.position.x, pelvis.z - cam.position.z)) : null,
       footR: bones?.footR?.getWorldPosition(new T.Vector3()).toArray().map(R3),
       pelvisY: pelvis ? R3(pelvis.y - feet.y) : null, headPx: head ? Screen(head) : null, feetPx: Screen(feet),
       jaw: jaw ? R3(jaw.bone.quaternion.angleTo(jaw.quaternion)) : null,

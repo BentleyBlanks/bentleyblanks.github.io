@@ -105,12 +105,6 @@ function StandInPoint(clip,part,t){
   }
   return {x:v[0],y:v[1],z:v[2]};
 }
-/** [[t, v], ...] linear between keys, the identity outside them (a clip-time warp: v is the clip time sampled at t). */
-function SampleLinear(keys,t){
-  if(!keys?.length||t<=keys[0][0]||t>=keys.at(-1)[0])return t;
-  for(let i=1;i<keys.length;i++)if(t<keys[i][0]){const a=keys[i-1],b=keys[i];return a[1]+(b[1]-a[1])*(t-a[0])/(b[0]-a[0]);}
-  return t;
-}
 /** Camera rotation looking from `eye` at `gaze` with its up toward `crown` (world points). */
 function EyeQuaternion(eye,gaze,crown){
   const forward=gaze.clone().sub(eye).normalize(),up=crown?crown.clone().sub(eye):new THREE.Vector3(0,1,0);
@@ -1473,7 +1467,7 @@ export class FirstLevelBunkerShow {
   PhaseCharge(age){
     const r=this.r,R=C.rescue,ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB"),interp=this.cast.interpreter;
     if(!this.phaseEntered){
-      this.phaseEntered=true;this.flags.chargeAt=r.time;
+      this.phaseEntered=true;this.flags.chargeAt=r.time;this.chargeLook=null;
       r.audio?.Play?.("bugleCharge",{position:r.Point({x:-6,z:-114},3),volume:.9});
       this.PlayClip(ijaA,"IjaStartleTurn",{restart:true});
       if(interp){this.Scene("RescueFlee",r.voice?.PlayScene("RescueFlee",{speakers:this.Speakers()}));this.PlayClip(interp,"InterpreterFlee",{restart:true});}
@@ -1607,8 +1601,9 @@ export class FirstLevelBunkerShow {
    * 2026-09-29 (user: 「完全可以让我仰头被拉出来啊，看到自己的脚从倒塌的房子里被拖出来」, docs/Data_OpeningRescueHandover20260929.md):
    * He heaves the roof timber off his hips (HeTimber); Luo comes to his head, picks the rifle up out of the mud and slings it
    * (LuoPickUpRifleSling), rolls him onto his back, hooks both arms under his armpits and drags him out backwards
-   * (LuoRescueDrag). The eye rides that clip's `player` track (RescueBody): up at Luo upside down as he is rolled over, then
-   * down his own body at his boots coming out from under the timber. He lets the timber drop once the boots are out.
+   * (LuoRescueDrag). The eye rides that clip's `player` track (RescueBody): as he is rolled over the look comes round, level,
+   * down his own body (2026-09-30: it used to roll over with him, upside down) to his boots coming out from under the timber.
+   * He lets the timber drop once the boots are out.
    */
   PhaseLift(age){
     const r=this.r,D=C.rescue.drag,L=C.rescue.lift,f=this.flags,luo=this.Squad("luo"),he=this.Squad("heyoutian");
@@ -1714,18 +1709,14 @@ export class FirstLevelBunkerShow {
     return new THREE.Vector3(rc.root.x+o.x,this.r.battlefield.GroundHeight(rc.root.x,rc.root.z)+p.y,rc.root.z+o.z);
   }
   /**
-   * The eye's view on the rescue track (world eye / gaze / crown), with the director's framing over the clip's head:
-   * the look back up at Luo and the rolls are sped through (lookWarp: Luo is on top of the lens as he rolls him and
-   * hooks his arms, 0.12 m from it at the closest; the look is down the body by then); up at Luo's chest while he gets
-   * onto his knees in front of him (not level into his crotch); down at the rifle he holds out and hands over (out
-   * of the frame under a level look); the eye eased back as Luo stoops in close to haul him up by the strap.
+   * The eye's view on the rescue track (world eye / gaze / crown), with the director's framing over the clip's head: up at
+   * Luo's chest as he comes round and kneels in front of him (not level into his crotch); down at the rifle he holds out
+   * and hands over (out of the frame under a level look); the eye eased back as Luo stoops in close to haul him up by the
+   * strap. (2026-09-30: the clips' own look no longer rolls over, so the look warps that sped the rolls through are gone.)
    */
   RescueView(body){
-    const H=C.rescue.hand,V=C.rescue.view,rc={clip:body.clip,root:body.root},r=this.r,s=body.seconds;
-    const warp=body.clip==="LuoRescueDrag"?V.dragLookWarp:V.handLookWarp;
-    const w=SampleLinear(warp,s),eye=body.eye.clone();
-    let gaze=(w===s?body.gaze:this.RescuePoint(rc,"gaze",w,body.baked))||body.gaze;
-    const crown=(w===s?body.crown:this.RescuePoint(rc,"crown",w,body.baked))||body.crown;
+    const H=C.rescue.hand,V=C.rescue.view,s=body.seconds,eye=body.eye.clone(),crown=body.crown;
+    let gaze=body.gaze;
     const toward=(point,weight,maxDeg)=>{
       if(!point||weight<=0)return;
       const d=point.clone().sub(eye),level=Math.hypot(d.x,d.z),pitch=Math.min(maxDeg*DEG,Math.atan2(d.y,level));
@@ -1750,9 +1741,12 @@ export class FirstLevelBunkerShow {
   RescueLegs(){
     const R=C.rescue.drag,b=this.RescueBody();
     if(!b?.pelvis||!b.heelL||!b.heelR||!b.gaze||(b.clip==="LuoRescueDrag"?b.seconds<R.legsFromS:b.seconds>R.legsUntilS))return null;
-    // The neck under and behind the eye (world down, back along the level look), the spine from it down toward the hips:
+    // The neck under and behind the eye (world down, back away from the hips), the spine from it down toward the hips:
     // the chest passes far enough under the lens to be seen, not filled (at 0.13 m under it the lens was in the jacket).
-    const D=C.rescue.drag.neck,level=b.gaze.clone().sub(b.eye).setY(0);
+    // Back from the hips, not from the look (2026-09-30): while the look pans round as he is rolled over, "behind the look"
+    // put the neck off to one side and drew the jacket out flat across the lens.
+    const D=C.rescue.drag.neck,level=b.pelvis.clone().sub(b.eye).setY(0);
+    if(level.lengthSq()<1e-6)level.copy(b.gaze).sub(b.eye).setY(0);
     if(level.lengthSq()<1e-6)level.set(0,0,-1);
     const neck=b.eye.clone().add(new THREE.Vector3(0,-D.downM,0)).addScaledVector(level.normalize(),-D.backM);
     const up=neck.clone().sub(b.pelvis).normalize();
@@ -1891,10 +1885,12 @@ export class FirstLevelBunkerShow {
   }
   /**
    * 2026-09-29 (user: 「班长把枪递交到我手上然后直接开打的动作……而不是要我自己还要捡起来」「结束动画的时候玩家应该是站立的」):
-   * LuoHandRifle from the haul's end. Shunzi rolls back onto his front and comes up onto his knees facing Luo, who unslings
-   * the rifle and holds it out across him (the clip's hold loop) for 「还能打不？」 and the nod; it goes into his hands at
-   * `handed` (the first person takes it over: HeldRifle), Luo hauls him to his feet by the shoulder strap and steps aside to
-   * his right. The hand-back follows the clip's end: standing, the rifle in his hands.
+   * LuoHandRifle from the haul's end. Shunzi sits up and, as Luo unslings the rifle and walks round his left (2026-09-30:
+   * user 「班长把人拖出来的镜头会转180度再转回来180度，太奇怪了」 -- he used to roll back onto his front to face Luo), turns
+   * onto his knees facing him; Luo kneels and holds the rifle out across him (the clip's hold loop) for 「还能打不？」 and the
+   * nod; it goes into his hands at `handed` (the first person takes it over: HeldRifle), Luo hauls him to his feet by the
+   * shoulder strap and steps aside to his right. The hand-back follows the clip's end: standing facing the crater step, the
+   * rifle in his hands.
    */
   PhaseCheck(age){
     const r=this.r,f=this.flags,H=C.rescue.hand,luo=this.Squad("luo");
@@ -2004,6 +2000,11 @@ export class FirstLevelBunkerShow {
     r.player.yaw=Math.atan2(-direction.x,-direction.z);r.player.pitch=Math.asin(Math.max(-1,Math.min(1,direction.y)));
     if(this.presentedCamera)r.player.camera.quaternion.copy(this.presentedCamera.quaternion);
     const luo=this.Squad("luo"),R=C.rescue;
+    // The hand-over's root motion (the walk round his left, the step aside) leaves Luo's pelvis 2.2 m off his root: re-root him
+    // under it, facing the way the clip leaves him, before the AI takes him (its pose blend dragged the pelvis back to the root
+    // at 0.16-0.19 m a frame, 2026-09-30).
+    const pelvis=luo?.actor?.characterRig?.bones?.pelvis?.getWorldPosition(new THREE.Vector3()),end=OpeningClipRoot(LUO_MODEL,"LuoHandRifle")?.end;
+    if(pelvis&&end)this.Put(luo,{x:pelvis.x,z:pelvis.z,yaw:this.HandRoot().yaw+end[2]*DEG},{noBlend:true,keep:true});
     this.ReleaseSquad(luo,{...C.withdraw.luoCover,yaw:Face(C.withdraw.luoCover,A.bunkerFold)});
     // SB06: Liu at the trench edge and He at the right edge kneel (the AI's stance; pendingWiring SB06 for the show).
     const liu=this.Squad("liuwencai");
@@ -2380,27 +2381,33 @@ export class FirstLevelBunkerShow {
       yaw=-side*Q.yawDeg*DEG*k;pitch=Q.pitchDeg*DEG*k;roll=side*Q.rollDeg*DEG*k;height-=Q.dropM*k;
     }
     else if(p==="Charge"||p==="Melee"){
-      // Let go, the head drops back into the mud; he turns to the noise and the men pouring down the crater step, then
-      // watches the two cuts in front of him and the fight going on down the trench.
-      const H=C.rescue.holdShot,drop=this.flags.chargeAt!=null?1-Smooth((r.time-this.flags.chargeAt-.12)/.3):1;
+      // Let go, the head drops back into the mud. 2026-09-30 (user: 「班长等人出现的太突兀了，现在一个镜头直接切过去很不自然，完全
+      // 可以镜头不动，但是前面的翻译或者日军被砍死倒下吧」): the eye stays on the man in front of him -- ijaA springing up off him
+      // and turning to the noise -- and the rescuers run into that picture from its right edge (the look used to whip ~100 deg
+      // round to He's head at the crater step, the moment he was shown there); then the two cuts in front of him and the fight
+      // going on down the trench. The look point eases (chargeView.lookS), so no cut in it turns the head faster than a glance.
+      const H=C.rescue.holdShot,Q=C.rescue.chargeView,drop=this.flags.chargeAt!=null?1-Smooth((r.time-this.flags.chargeAt-.12)/.3):1;
       height+=H.liftM*drop;
       const he=Head(this.Squad("heyoutian")),a1=Head(ijaA),luoH=Head(luo),ijaB=Head(this.Ija("ijaB"));
       const since=this.flags.heChopAt!=null?r.time-this.flags.heChopAt:-1,luoSince=this.flags.luoChopAt!=null?r.time-this.flags.luoChopAt:-1;
       let point;
-      if(since>=0&&since<1.6&&he&&a1)point=he.clone().lerp(a1,.5);
-      else if(luoSince>=0&&luoSince<2.2&&luoH&&ijaB)point=luoH.clone().lerp(ijaB,.5);
+      if(since>=0&&since<Q.heCutHoldS&&he&&a1)point=he.clone().lerp(a1,.5);
+      else if(luoSince>=0&&luoSince<Q.luoCutHoldS&&luoH&&ijaB)point=luoH.clone().lerp(ijaB,.5);
       else if(p==="Melee")point=At(A.bunkerJunction,1.3);
-      else point=he&&this.Squad("heyoutian")?.openingStoryboardHidden!==true?he:a1||At({x:3.3,z:-122.8},1.2);
+      // ijaA's upper body (his head over the low eye is 40-50 deg up once he stands), else where he meets the charge.
+      else point=a1?a1.clone().addScaledVector(UP,-Q.ijaChestDropM):At(C.rescue.parryMeet,1.1);
+      const k=this.chargeLook&&this.delta>0?1-Math.exp(-this.delta/Q.lookS):1;
+      point=this.chargeLook=this.chargeLook?this.chargeLook.lerp(point,k):point.clone();
       const e=r.Point(eye,height),elev=Math.atan2(point.y-e.y,Math.hypot(point.x-e.x,point.z-e.z));
-      target=this.Aim(eye,height,Face(eye,point),Math.max(-6*DEG,Math.min(34*DEG,elev)));
+      target=this.Aim(eye,height,Face(eye,point),Math.max(-6*DEG,Math.min(Q.maxPitchDeg*DEG,elev)));
       roll=.03*Math.sin(r.time*3.1);
     }
     else if(p==="Lift"||p==="Check"){
       const body=this.RescueBody();
       if(body?.eye&&body.gaze){
         // On Luo's clip the eye, the way the head faces and its roll are the player track's (docs/Data_OpeningRescueHandover
-        // 20260929.md): rolled over, up at Luo upside down; hauled, down his own body at his boots; then up onto his knees
-        // and his feet facing Luo.
+        // 20260929.md): rolled over, the look round down his own body; hauled, at his boots; sat up, round onto his knees and
+        // his feet facing Luo.
         const view=this.RescueView(body);
         eye={x:view.eye.x,z:view.eye.z};height=view.eye.y-r.battlefield.GroundHeight(view.eye.x,view.eye.z);
         target=view.gaze.clone();quaternion=EyeQuaternion(view.eye,view.gaze,view.crown);track=true;
@@ -2411,6 +2418,12 @@ export class FirstLevelBunkerShow {
         // chest, not up his legs from the low eye (at 26 deg over it the frame was his crotch).
         const bones=luo?.actor?.characterRig?.bones,hand=this.flags.pickAt!=null&&bones?.handR?.getWorldPosition(new THREE.Vector3()),head=this.HeadPoint(luo);
         target=hand&&head?this.LookClamped(eye,height,hand.lerp(head,.35),-8,10):this.LookAtBody(eye,height,luo,-8,10)||this.Aim(eye,height,-90*DEG,10*DEG);
+        // ...kept within pickLookDeg of where the haul's look starts (on Luo at his head): the rifle lies 43 deg to the left,
+        // and turning there and back before the haul's pan round added up to 205 deg one way in 4 s (2026-09-30; the spin
+        // gate is 200). Stooping for it he stays in the left of the picture.
+        const home=Face(eye,this.DragRoot()),e=r.Point(eye,height),d=target.clone().sub(e);
+        const off=Math.max(-C.rescue.view.pickLookDeg*DEG,Math.min(C.rescue.view.pickLookDeg*DEG,Wrap(Face(eye,{x:eye.x+d.x,z:eye.z+d.z})-home)));
+        target=this.Aim(eye,height,home+off,Math.atan2(d.y,Math.hypot(d.x,d.z)));
       }
     }
     return {eye,height,target,roll,pitch,yaw,fovScale,quaternion,track};

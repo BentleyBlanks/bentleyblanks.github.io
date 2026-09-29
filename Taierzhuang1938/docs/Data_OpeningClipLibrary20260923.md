@@ -63,6 +63,7 @@
 
 ## 6. 回归口
 
+- 2026-09-30 重烘罗班长的 `LuoRescueDrag`（翻身时视线水平扫、不再跟着身体滚）与 `LuoHandRifle`（坐起、罗班长绕到左边跪下递枪，5.42 s），manifest `20260930OpeningStoryboardsV22CollarLuoNoRollBack`（与同日的 V21CollarQuestion 合并），口径见 [拖出与递枪](Data_OpeningRescueHandover20260929.md) 第 0 节；烘焙器新增 spec/pose 标记 `framedGrips`（转过的坐标系里握世界坐标的道具）。
 - 2026-09-29 新增罗班长三条（只烘 NRA05）：`LuoPickUpRifleSling`、`LuoRescueDrag`、`LuoHandRifle`，`player` 轨 part 有 `eye`/`gaze`/`crown`（第一人称镜头的位置、朝向、横滚）、`chest`/`chestUp`/`pelvis`/`kneeL/R`/`heelL/R`（第一人称的腿和上衣）、`rifle`/`rifleMuzzle`/`rifleUp`（递过来的枪），口径见 [拖出与递枪](Data_OpeningRescueHandover20260929.md)；manifest `20260929OpeningStoryboardsV19LuoRescue`。
 
 - 2026-09-27 开场改稿新增 `IjaTauntWalk`、`IjaFoundLook`、`IjaCrouchHairHold`、`IjaSlapForehand`、`IjaSlapBackhand`、`IjaSlapRaise`、`HeLiftTimber`，割喉链改到川军左肩后（新接触部位 `hairNape` / `crown` / `cheekL` / `cheekR`），口径见 [压木原地审问改稿](Data_OpeningPinnedRescue20260927.md) 第 6 节。

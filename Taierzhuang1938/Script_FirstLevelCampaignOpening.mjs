@@ -417,13 +417,14 @@ export async function DriveOpening(ctx){
   // The slaps fling the head aside on purpose (rescue.slap: 24 deg within ~0.07 s; those frames are left out); the rest stays smooth.
   assert.ok(probe.slapFrames>0,"the slaps were seen (their frames are left out of the continuity check)");
   assert.ok(probe.maxCameraTurn<10,`camera turns continuously (${probe.maxCameraTurn}° in ${probe.maxCameraTurnPhase})`);
-  // Luo hauling him out (2026-09-29): rolled over and looking back up at him, then down his body -- the look goes over the
-  // top, not round (the probe skips the near-vertical frames); got up facing Luo east again (no spin either way).
+  // Luo hauling him out (2026-09-30, docs/Data_OpeningRescueHandover20260929.md §0): rolled over, the look pans round once,
+  // level, from Luo to his own feet (~180 deg net, the one turn round); sat up, it turns back ~90 deg to Luo coming round his
+  // left and stays on him (no second turn round, no roll back).
   console.log("HEADING",JSON.stringify(Object.fromEntries(Object.entries(probe.headingSweep||{}).map(([k,v])=>[k,{sweep:+v.sweep.toFixed(1),net:+v.net.toFixed(1)}]))));
-  // Lift also watches Luo step aside to the rifle and back (~90 deg there and back) before the haul's heaves sway the look.
-  for(const [phase,most] of [["Lift",260],["Check",200]]){
+  // Lift also watches Luo step aside to the rifle and back (~90 deg there and back) before the pan and the haul's heaves.
+  for(const [phase,most,net] of [["Lift",420,[150,210]],["Check",200,[0,120]]]){
     const turn=probe.headingSweep?.[phase]||{sweep:0,net:0};
-    assert.ok(turn.sweep<most&&Math.abs(turn.net)<90,`${phase}: the eye does not turn round (${turn.sweep.toFixed(0)} deg swept, ${turn.net.toFixed(0)} deg net)`);
+    assert.ok(turn.sweep<most&&Math.abs(turn.net)>=net[0]&&Math.abs(turn.net)<=net[1],`${phase}: the eye turns round no more than once (${turn.sweep.toFixed(0)} deg swept, ${turn.net.toFixed(0)} deg net)`);
   }
   // Nowhere does the eye spin: 443 deg one way in 4 s over DragCover, 232 over DragOut before 09-27.
   const spin=probe.headingWindow||{maxNet:0};
