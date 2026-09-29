@@ -6,6 +6,15 @@ export const AUDIO_MIX_DEFAULTS = Object.freeze({ sfx: 1, music: 1, ambience: 0.
 // live spatial send stays subtle; the player's own lines remain centred and dry.
 export const STORY_SPEECH = Object.freeze({ worldWet: 0.045, switchS: 0.018,
   concussionSpeechFloorHz: 4200 });
+// 战场远景床（AMBIENCE_PRESETS 里各层的 `bed: "battleFar"`）用哪一条素材（2026-09-29）。
+// 用户原话：「当前默认游戏的环境音里有太多奇奇怪怪的人声，参考 COD 这类的操作给我重新生成几条给我选择」。
+//   null   = 现行的 Coll Anderson 战斗人群录音（默认，等用户挑）
+//   "A"…"E" = 无人声候选（清单 Audio/Amb/Data_AmbManifest.json 的 bedVariants；风格见 docs/Data_AudioAssets.md
+//             「战场远景床：无人声候选」）：A 炮群闷雷 · B 步机枪交火纹理 · C 密集弹幕 · D 克制的冷战线 · E 村镇巷战回声
+//   "none" = 不放这一层（对比用）
+// 现场试听不用改代码：URL 加 ?ambBed=A|B|C|D|E|none，优先于这里。用户选定后只改这一个数。
+// 只有被选中的那一条会被下载（Script_AmbBedVariant.mjs 决定装载计划），其余候选不增加开机流量。
+export const BATTLE_BED_VARIANT = null;
 //
 // **纯数据**：不 import three、不 import 规则代码、不含函数。规则在 `Script_AudioWiring.mjs`。
 //

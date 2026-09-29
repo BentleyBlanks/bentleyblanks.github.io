@@ -340,6 +340,8 @@ export const testDefs = {
   SamplePointTest: { file: "Script_SamplePointTest.mjs", desc: "县城采样点覆盖率与位姿口径（纯 Node）" },
   HeightmapVerify: { file: "Script_HeightmapCli.mjs", args: ["verify"], desc: "SRTM 高度数据完整性（需先 download 过）" },
   FirstLevelMissionMusicTest: { file: "Script_FirstLevelMissionMusicTest.mjs", desc: "Seven first-level score assets, story transitions and silence rules" },
+  AmbBedVariantBrowserTest: { file: "Script_AmbBedVariantBrowserTest.mjs", timeoutMs: 900000, desc: "战场远景床候选真浏览器：第一关默认入口只请求旧 battleFar 且开机不碰候选、?ambBed=B 只请求 B 不请求旧的、none 都不请求；battleFar 层输出端 RMS 高于地板；相机在玩家头部" },
+  AmbBedVariantTest: { file: "Script_AmbBedVariantTest.mjs", desc: "战场远景床无人声候选：?ambBed= / BATTLE_BED_VARIANT 选择与装载计划、清单 bedVariants 与成品哈希 / RMS / 人声筛查记录、提示词禁人声、引擎桩 fetch 下默认只请求旧 battleFar、选中只请求那一条（纯 Node）" },
   FirstLevelBattleSoundTest: { file: "Script_FirstLevelBattleSoundTest.mjs", desc: "第一关 01–05 声景：远处扇区交火、场外近落弹、防炮洞环境、壕沟/洞室判据、压制喘息心跳、耳鸣两档、配乐让位（纯 Node）" },
   CartCorpseBumpTest: { file: "Script_CartCorpseBumpTest.mjs", desc: "牛马车压过尸体：轮子滚上尸体顶面的抬升曲线、顶面格烘焙、命中体胶囊、软弹簧起伏/俯仰/侧倾、封顶与回零、帧率无关（纯 Node）" },
   FirstLevelAirRaidTest: { file: "Script_FirstLevelAirRaidTest.mjs", desc: "第一关 01–06 中远处日机轮番轰炸：FrontPass 起点、多轮次间隔、中远处落区与按弹型避人、阻力外弹道与投弹解算、中队规模、离场协调转弯与上浮、过顶、落弹留位与共享声部账、比例距离震屏封顶、07 以后不起（纯 Node）" },
@@ -455,6 +457,7 @@ export const browserTests = new Set([
   "FirstLevelMachineGunCutsceneTest",
   "MachineGunCutsceneAudioTest",
   "FirstLevelAudioNodeBudgetTest",
+  "AmbBedVariantBrowserTest",
   "FirstLevelMissionAftermathTest",
   "SquadMarchEditorTest",
   "FirstLevelSquadMarchTest",
@@ -542,6 +545,7 @@ export const tier0Fast = [
   "NavRefreshSpreadTest",
   "CameraShakeTest",
   "FirstLevelBattleSoundTest",
+  "AmbBedVariantTest",
   "FirstLevelAirRaidTest",
   "BombBallisticsTest",
   "CartCorpseBumpTest",
@@ -662,7 +666,7 @@ export const domains = {
     // 所以也挂在这个域下。
     tests: ["CarryTest", "EmplacementTest", "EmplacementViewBrowserTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
-  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "FirstLevelAirRaidTest", "BombBallisticsTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest", "FirstLevelAudioNodeBudgetTest"] },
+  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "AmbBedVariantTest", "AmbBedVariantBrowserTest", "FirstLevelAirRaidTest", "BombBallisticsTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest", "FirstLevelAudioNodeBudgetTest"] },
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
@@ -801,7 +805,7 @@ const changedDomainRules = [
   // **选不中 voice**，`Data_Voice.mjs` 选得中 voice、**选不中 audio**。
   // 「改了 AudioEngine 的声库装载分叉却不跑 VoiceTest」就是这么漏过去的
   //（04 关中过场整条语音通道静音那一次）。这两条把交叉的一半补上。
-  { domain: "audio", pattern: /Script_Audio\.mjs|Script_AudioWiring|Data_Voice|Data_SfxSources|Data_AmbSources|Data_Tuning_Audio|BattleArtillery|FirstLevelMissionBattleSound|FirstLevelBattleSound|FirstLevelAirRaid/ },
+  { domain: "audio", pattern: /Script_Audio\.mjs|Script_AudioWiring|Script_AmbBedVariant|Script_AmbBedVoiceScreen|Script_SeedAudioBattleBedBake|Data_Voice|Data_SfxSources|Data_AmbSources|Data_Tuning_Audio|BattleArtillery|FirstLevelMissionBattleSound|FirstLevelBattleSound|FirstLevelAirRaid/ },
   // 2026-09-23：场外近落弹与离图前线也要拉上第一关域（它们只在 01–06 的任务相位里开）。
   // 2026-09-26：01–06 中远处轮番轰炸（FirstLevelAirRaid）同理。
   { domain: "firstLevel", pattern: /BattleArtillery|FirstLevelBattleSound|FirstLevelAirRaid/ },

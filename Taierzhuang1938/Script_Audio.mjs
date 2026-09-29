@@ -48,6 +48,9 @@ import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { OPENING_AMBIENCE_PRESETS } from "./Data_FirstLevelMissionBattleSound.mjs";
 import { AUDIO_MIX_DEFAULTS, STORY_SPEECH, TINNITUS } from "./Data_Tuning_Audio.mjs";
 import { BuildSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
+// 2026-09-29 战场远景床候选：选哪一条（?ambBed= / BATTLE_BED_VARIANT）与装载计划，纯函数在这个模块里。
+import { BATTLE_BED_VARIANT } from "./Data_Tuning_Audio.mjs";
+import { ResolveBattleBedChoice, BedLoadPlan, AmbFilesToFetch } from "./Script_AmbBedVariant.mjs";
 
 // 包络地板。低于这个值当作静音（见文件头坑 2）。
 const FLOOR = 1e-4;
@@ -2931,7 +2934,12 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-27：战车机枪单开 tankMg（Warfare Library 通用机枪三条），清单新增一个 cue。
 // 2026-09-27 开场改稿：耳光 slap、反冲锋一片喊杀 chargeCrowd。
 export const SFX_PACK_VERSION = "20260928slapchargecrowd";
-export const AMB_PACK_VERSION = "20260912trainonly";
+// 2026-09-29：清单加了 `bedVariants`（战场远景床的五条无人声候选），戳不动的话浏览器拿着旧清单永远看不到候选。
+export const AMB_PACK_VERSION = "20260929battlebeds";
+/** 这一局战场远景床用哪一条：?ambBed= 优先于 BATTLE_BED_VARIANT；认不出就退回现行（不静音）。 */
+export function AmbBedChoice(manifest, search = typeof location !== "undefined" ? location.search : "") {
+  return ResolveBattleBedChoice({ search, tuning: BATTLE_BED_VARIANT, keys: Object.keys(manifest?.bedVariants || {}) });
+}
 export const MUSIC_PACK_VERSION = "5";
 
 // ---- 采样取数：并发闸 + 重试 ----------------------------------------------
@@ -4076,6 +4084,7 @@ export class AudioEngine {
     this.ambErrors = [];
     this.ambReady = false;
     this.ambManifest = null;
+    this.ambBedChoice = null;        // 战场远景床这一局用了哪一条（LoadAmbPack 写；{choice, source, variant, file}）
     // --- 实录（生成）音乐。没有合成兜底：载不到就是没有音乐 ---
     this.musicBuffers = new Map();   // cue -> AudioBuffer
     this.musicPending = new Map();
@@ -4356,7 +4365,8 @@ export class AudioEngine {
       .flatMap((entry) => entry.files || (entry.file ? [entry.file] : [])));
     await Promise.all([
       Pack(SFX_BASE, "Data_SfxManifest.json", SFX_PACK_VERSION, (m) => ManifestFiles([m.cues])),
-      Pack(AMB_BASE, "Data_AmbManifest.json", AMB_PACK_VERSION, (m) => ManifestFiles([m.beds, m.cues])),
+      // 床按装载计划取（战场远景床候选只下载被选中的那一条，旧的 battleFar 被顶替时也不下载）。
+      Pack(AMB_BASE, "Data_AmbManifest.json", AMB_PACK_VERSION, (m) => AmbFilesToFetch(m, AmbBedChoice(m).choice)),
     ]);
     this.prefetchedCount = ok;
     return ok;
@@ -4694,7 +4704,13 @@ export class AudioEngine {
     this.ambManifest = manifest;
     let ok = 0;
 
-    const beds = Object.entries(manifest.beds || {});
+    // 战场远景床候选（2026-09-29）：候选被登记成同名床 battleFar，预设一个字不用改；旧床被顶替就不请求。
+    const bedChoice = AmbBedChoice(manifest);
+    if (bedChoice.ignored) console.warn("ambBed 认不出，沿用现行战场远景床：", bedChoice.ignored);
+    const plan = BedLoadPlan(manifest, bedChoice.choice);
+    this.ambBedChoice = { ...bedChoice, variant: plan.variant, dropped: plan.dropped,
+      file: plan.beds.find((b) => b.bed === "battleFar")?.file ?? null };
+    const beds = plan.beds.map((b) => [b.bed, { file: b.file }]);
     await Promise.all(beds.map(async ([bed, entry]) => {
       try {
         const bytes = await FetchAudioAsset(base + entry.file + "?v=" + AMB_PACK_VERSION);
