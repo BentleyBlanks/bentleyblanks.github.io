@@ -9,6 +9,7 @@ export class FirstPersonBody {
   constructor(gltf, library) {
     this.root = CloneSkinnedRig(gltf.scene);
     this.root.name = "FirstPersonBody";
+    this.root.userData.whiteboxCharacter = true;
     this.root.scale.setScalar(1.68 / 1.814391);
     this.root.visible = false;
     this.mixer = new THREE.AnimationMixer(this.root);

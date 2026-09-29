@@ -6,7 +6,9 @@
 
 游戏现有 **画质设置 → 白盒（默认） → 编辑白盒画质**。编辑区按材质、光照 Feature、渲染 Pass 分组，支持表面色、背景色、分辨率、恢复默认和导出 JSON。改动点击「保存并应用白盒」后刷新生效；未保存草稿不改当前画面。普通 low / medium / high / ultra 仍使用现有的画质调节页。
 
-白盒默认保留地形贴图，人物、第一人称手和武器、建筑、植被、道具、水面及后来生成的实体采用无贴图素色材质。地形以对象上的 `deformableTerrain`、`terrainTile` 或 `whiteboxTerrain` 标记识别；弹坑替换地块也保留贴图，不能用「材质名字带泥土」放行场景道具。透明粒子/贴花和天空默认不画；HUD 与任务系统继续工作。
+白盒采用用户参考图的 **灰色网格测试材质**，不是纯白。建筑、植被、场景道具、水面及后来生成的场景实体不使用原美术贴图，改为默认 1 米一格的灰色程序网格；线宽默认 12 毫米。网格按世界坐标三向投影，不依赖模型 UV，不随实例缩放拉伸；远处做导数抗锯齿与淡出。编辑区可调网格开关、大小、线宽、底色和线色，无需生成贴图资产。
+
+**地形、角色、敌军、第一人称身体/手和手持装备默认保留原材质与贴图。** 人物与装备由独立 `characterTextures` 开关控制，不依赖场景的 `assetTextures`。地形以对象上的 `deformableTerrain`、`terrainTile` 或 `whiteboxTerrain` 标记识别；弹坑替换地块也保留贴图，不能用「材质名字带泥土」放行场景道具。透明粒子/贴花和天空默认不画；HUD 与任务系统继续工作。
 
 默认每帧只运行 **main → whiteboxOutput**：中性基础灯光、几何深度测试、线性色转 sRGB 和剧情黑场/眼皮。高级效果与预通道/HZB、GTAO/SSIL、SSR、室内遮蔽、CSM、自阴影、GI、簇光、大气、体积雾、TAA/FXAA、Bloom、景深、运动模糊、自动曝光、调色均关闭。调试工具主动打开时仍允许线框/调试叠加。
 
@@ -26,6 +28,12 @@ Tengxian.GraphicsProfile.ConfigureWhitebox({ ssao: true, surfaceColor: '#cbd0d6'
 // 保存并立即以白盒重新载入
 Tengxian.GraphicsProfile.ConfigureWhitebox({ taa: true }, { reload: true })
 
+// 灰盒网格样式；人物及手持装备独立保留贴图
+Tengxian.GraphicsProfile.ConfigureWhitebox({
+  grid: true, gridSize: 1, gridLineWidth: 0.012,
+  surfaceColor: '#909397', gridColor: '#55585d', characterTextures: true
+}, { reload: true })
+
 // 显式恢复美术表现；保留任务、阶段等其他 URL 参数
 Tengxian.GraphicsProfile.Select('high')
 Tengxian.GraphicsProfile.Select('whitebox')
@@ -37,7 +45,9 @@ Tengxian.GraphicsProfile.ExportWhitebox()
 
 开关依赖会自动接入：SSR → 预通道/HZB/颜色历史；SSIL/室内天光 → GTAO；TAA/景深/运动模糊/雾 → 预通道；光晕 → Bloom；阴影/GI/簇光 → 关卡灯光。读取 `Inspect().renderedPasses` 区分「配置允许」与「场景满足条件，实际执行」。关闭白盒资产材质时保留破坏裁切与已启用的光照补丁，不保留纹理和风化；完整材质细节验收请恢复资产材质。
 
-新 Feature 必须登记数据与控件映射，新 Pass 必须显式加入白盒允许表，否则在白盒下默认关闭。新增物件自动服从材质替换；仅真正的地形可标 `whiteboxTerrain`。不对单个人物/武器维护例外名单。
+新 Feature 必须登记数据与控件映射，新 Pass 必须显式加入白盒允许表，否则在白盒下默认关闭。新增物件自动服从材质替换；仅真正的地形可标 `whiteboxTerrain`。人物工厂、第一人称身体/视模的共用根节点标 `userData.whiteboxCharacter = true`，后续骨骼挂件自动继承；ActorBatch / Crowd 的场景批次带同一标记。子树可用 `false` 明确回到场景类别（例如开场人物根下的坐箱），不按单个人物或武器维护名单。LOD 在材质替换前更新，避免新显示的档位漏用场景网格。
+
+旧配置缺少新字段时自动使用新默认；旧版默认表面色 `#d8dadd` 在缺少 `grid` 字段时迁移到灰色，用户自定义颜色保留。`Inspect().materials` 同时返回 `characterMeshes`、`terrainMeshes` 与 `whiteMeshes`，后者表示应用灰盒替代材质的数量。
 
 ## 验证
 
@@ -45,7 +55,8 @@ Tengxian.GraphicsProfile.ExportWhitebox()
 node Taierzhuang1938/Script_WhiteboxQualityTest.mjs
 node Taierzhuang1938/Script_WhiteboxQualityBrowserTest.mjs
 node Taierzhuang1938/Script_PostFrameGraphTest.mjs
+node Taierzhuang1938/Script_SamplerBudgetTest.mjs --only=whitebox
 node Taierzhuang1938/Script_EditorTest.mjs
 ```
 
-专项浏览器门禁实测默认实际 Pass、非地形贴图数量、地形贴图、蒙皮人物、后加入的物件与材质还原，点击编辑/保存/刷新，再显式切 high 验证原管线。截图与读数在忽略目录 `tmp/WhiteboxQuality/`，不提交。
+专项浏览器门禁检查实际提交的灰盒网格材质、人物贴图、场景零原贴图、地形保留、后加入的骨骼挂件、共享材质与还原；点击人物贴图开关并保存/刷新，再显式切 high 验证原管线。包括敌我双方持枪近景、场景和编辑面板截图；截图与读数在忽略目录 `tmp/WhiteboxQuality/`，不提交。

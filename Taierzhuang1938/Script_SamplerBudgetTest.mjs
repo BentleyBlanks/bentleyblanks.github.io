@@ -58,6 +58,7 @@ for (const quality of ["low", "medium", "high", "ultra"]) {
 for (const [quality, gi] of [["low", 0], ["medium", 1], ["ultra", 1]]) {
   CASES.push({ name: `firstLevel ${quality}|gi=${gi}`, quality, gi, firstLevel: true });
 }
+CASES.push({ name: "firstLevel whitebox|gi=0", quality: "whitebox", gi: 0, firstLevel: true });
 const cases = ONLY ? CASES.filter((c) => c.name.includes(ONLY)) : CASES;
 
 const server = await ServeRoot(rootDir, 0);
@@ -176,7 +177,11 @@ try {
           ? over.slice(0, 4).map((r) => `${r.name} ${r.samplers}: ${r.names.join(",")}`).join(" / ")
           : `最挤的是 ${worst ? `${worst.name} ${worst.samplers}` : "(无程序)"}`);
       Report(rows.length > 0, `${item.name} 真的编出了程序`, `${rows.length} 个`);
-      if (item.firstLevel) {
+      if (item.quality === "whitebox") {
+        const grid = rows.filter((row) => row.cacheKey.includes("whiteboxGrid1"));
+        Report(grid.length > 0, `${item.name} 灰盒网格材质实际编译`, `grid=${grid.length}`);
+        Report(rows.some((row) => /terrain\d/.test(row.cacheKey)), `${item.name} 保留地形材质`);
+      } else if (item.firstLevel) {
         // 砸坑变体由 TerrainDeformationView.Warm() 在进关时预编，不必真炸一次。
         const terrain = rows.filter((row) => /terrain\d/.test(row.cacheKey));
         const crater = terrain.filter((row) => /CraterSoilV4/.test(row.cacheKey));

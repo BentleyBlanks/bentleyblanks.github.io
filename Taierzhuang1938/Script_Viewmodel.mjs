@@ -1466,6 +1466,7 @@ export class Viewmodel {
       return MarkForegroundPrepass(this.root);
     };
     this.root.name = "Viewmodel";
+    this.root.userData.whiteboxCharacter = true;
     // 自由瞄准那一段偏移就画在 root 自己身上（原点＝相机原点，绕它转 θ
     // 等于整把枪在画面里挪过 θ 个视场角）。它必须在 fovRig **之上**：
     // fovRig 带一个非等比的深度压缩，转在它下面会把枪拧变形；

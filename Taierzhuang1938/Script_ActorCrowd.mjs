@@ -360,6 +360,7 @@ export class ActorCrowd {
       if(this.cellM>0){const detailed=geometry;geometry=ClusterDistantGeometry(detailed,this.cellM);detailed.dispose();}
       const mesh = new THREE.InstancedMesh(geometry, clone, this.capacity);
       mesh.name = `Crowd_${kind}_${PoseMeshName(pose.id)}`;
+      mesh.userData.whiteboxCharacter = true;
       // 自己做视锥剔除（Script_Ai 那边逐人判），而且实例散布在全场，
       // 用一个包围球去剔整批人只会在转身时整批闪掉
       mesh.frustumCulled = false;
@@ -435,6 +436,7 @@ export class ActorCrowd {
         }
         const mesh = new THREE.BatchedMesh(CROWD_BATCH_START, vertices, indices, clone);
         mesh.name = `Crowd_${kind}_Batch${this.batches.length}`;
+        mesh.userData.whiteboxCharacter = true;
         // 逐人视锥剔除已经在 Script_AI 那边做过；远景的人不投影（同 _Harvest 的注释）。
         mesh.frustumCulled = false; mesh.perObjectFrustumCulled = false; mesh.sortObjects = false;
         mesh.castShadow = false; mesh.receiveShadow = false;

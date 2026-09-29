@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { ApplyPatches, PatchesOf } from "./Script_MaterialPatches.mjs";
+import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { MakeFullscreenMaterial } from "./Script_PostCommon.mjs";
 import { WHITEBOX_LIGHTING, WhiteboxPassPlan } from "./Data_Tuning_Whitebox.mjs";
 
@@ -8,6 +8,67 @@ export function IsWhiteboxTerrain(object) {
   if (typeof object.userData?.whiteboxTerrain === "boolean") return object.userData.whiteboxTerrain;
   return object.userData?.deformableTerrain === true || object.userData?.terrainTile != null
     || object.userData?.whiteboxTerrain === true;
+}
+
+// Semantic roots cover current and future attachments, including bone children.
+// Batches carry the same marker because their meshes live outside actor roots.
+export function IsWhiteboxCharacter(object) {
+  for (let node = object; node; node = node.parent) {
+    if (typeof node.userData?.whiteboxCharacter === "boolean") return node.userData.whiteboxCharacter;
+  }
+  return false;
+}
+
+// Procedural metre grid: no bitmap/UV requirement, including scaled instances.
+// Derivative filtering fades sub-pixel cells to avoid distant grid shimmer.
+function MakeWhiteboxGridPatch(config) {
+  return MakePatch({
+    key: "whiteboxGrid1",
+    uniforms: (uniforms) => Object.assign(uniforms, {
+      uWhiteboxGridSize: { value: config.gridSize },
+      uWhiteboxGridWidth: { value: config.gridLineWidth },
+      uWhiteboxGridColor: { value: new THREE.Color(config.gridColor) },
+    }),
+    vertex: [
+      ["#include <common>", "varying vec3 vWhiteboxPosition;"],
+      ["#include <project_vertex>", `
+        vec4 whiteboxPosition = vec4(transformed, 1.0);
+        #ifdef USE_BATCHING
+          whiteboxPosition = batchingMatrix * whiteboxPosition;
+        #endif
+        #ifdef USE_INSTANCING
+          whiteboxPosition = instanceMatrix * whiteboxPosition;
+        #endif
+        vWhiteboxPosition = (modelMatrix * whiteboxPosition).xyz;
+      `],
+    ],
+    fragment: [
+      ["#include <common>", `
+        varying vec3 vWhiteboxPosition;
+        uniform float uWhiteboxGridSize;
+        uniform float uWhiteboxGridWidth;
+        uniform vec3 uWhiteboxGridColor;
+        float WhiteboxGrid(vec2 position) {
+          vec2 cell = position / uWhiteboxGridSize;
+          vec2 footprint = max(fwidth(cell), vec2(0.00001));
+          vec2 distanceToLine = abs(fract(cell + 0.5) - 0.5);
+          float halfWidth = min(uWhiteboxGridWidth / uWhiteboxGridSize * 0.5, 0.1);
+          vec2 line = 1.0 - smoothstep(vec2(halfWidth), vec2(halfWidth) + footprint, distanceToLine);
+          line *= 1.0 - smoothstep(vec2(0.25), vec2(0.5), footprint);
+          return max(line.x, line.y);
+        }
+      `],
+      ["#include <color_fragment>", `
+        vec3 gridNormal = abs(cross(dFdx(vWhiteboxPosition), dFdy(vWhiteboxPosition)));
+        gridNormal /= max(max(gridNormal.x, gridNormal.y), max(gridNormal.z, 0.000001));
+        vec3 gridWeight = pow(gridNormal, vec3(8.0));
+        gridWeight /= max(dot(gridWeight, vec3(1.0)), 0.000001);
+        float gridLine = dot(gridWeight, vec3(WhiteboxGrid(vWhiteboxPosition.yz),
+          WhiteboxGrid(vWhiteboxPosition.xz), WhiteboxGrid(vWhiteboxPosition.xy)));
+        diffuseColor.rgb = mix(diffuseColor.rgb, uWhiteboxGridColor, gridLine);
+      `],
+    ],
+  });
 }
 
 export class WhiteboxSceneRenderer {
@@ -47,7 +108,7 @@ export class WhiteboxSceneRenderer {
         const key = typeof patch.key === "function" ? patch.key() : patch.key;
         return /^destruction/.test(key) || (lighting && /^(gtao|gi\d|csm|ssr|clust)/.test(key));
       });
-      ApplyPatches(material, retained);
+      ApplyPatches(material, [c.grid ? MakeWhiteboxGridPatch(c) : null, ...retained]);
       this.prepareMaterial?.(material, source);
       this.materials.set(source, material);
       this.ownedMaterials.add(material);
@@ -63,8 +124,8 @@ export class WhiteboxSceneRenderer {
     return material;
   }
 
-  Begin(scene) {
-    const c = this.config, restore = [], stats = { meshes: 0, whiteMeshes: 0, terrainMeshes: 0, hiddenEffects: 0 };
+  Begin(scene, camera) {
+    const c = this.config, restore = [], stats = { meshes: 0, whiteMeshes: 0, terrainMeshes: 0, characterMeshes: 0, hiddenEffects: 0 };
     const Set = (object, key, value) => { restore.push([object, key, object[key]]); object[key] = value; };
     const sceneLighting = c.sceneLighting || c.shadows || c.firstPersonShadow || c.contactShadows || c.gi || c.clusteredLights;
     Set(scene, "background", c.sky ? scene.background : this.background);
@@ -73,6 +134,9 @@ export class WhiteboxSceneRenderer {
     Set(scene.userData, "whiteboxEffects", c.effects);
     if (this.sky && !c.sky) Set(this.sky, "visible", false);
     scene.traverseVisible((object) => {
+      // Three selects LOD children during render. Select them before material
+      // substitution too, so a newly visible distance bucket cannot escape it.
+      if (object.isLOD && object.autoUpdate && camera) object.update(camera);
       if (object.isLight && object !== this.ambient && object !== this.sun && !sceneLighting) Set(object, "visible", false);
       if (!c.effects && (object.isPoints || object.isSprite || object.userData?.whiteboxEffect)) {
         Set(object, "visible", false); stats.hiddenEffects++; return;
@@ -87,8 +151,10 @@ export class WhiteboxSceneRenderer {
         Set(object, "visible", false); stats.hiddenEffects++; return;
       }
       const terrain = IsWhiteboxTerrain(object);
+      const character = IsWhiteboxCharacter(object);
       stats.meshes++; if (terrain) stats.terrainMeshes++;
-      if (terrain ? c.terrainTextures : c.assetTextures) return;
+      if (character) stats.characterMeshes++;
+      if (terrain ? c.terrainTextures : character ? c.characterTextures : c.assetTextures) return;
       Set(object, "material", Array.isArray(object.material) ? sources.map((m) => this.Material(m)) : this.Material(object.material));
       if (object.instanceColor) Set(object, "instanceColor", null);
       stats.whiteMeshes++;

@@ -690,7 +690,7 @@ export class PostPipeline {
   Render(scene, camera, options = {}) {
     // Every enabled pass must see the same whitebox silhouette/material. Restore
     // before returning to simulation, even when a draw or diagnostic throws.
-    const restore = this.whiteboxScene?.Begin(scene);
+    const restore = this.whiteboxScene?.Begin(scene, camera);
     try { this._RenderFrame(scene, camera, options); } finally { restore?.(); }
   }
 

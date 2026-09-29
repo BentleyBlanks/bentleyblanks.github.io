@@ -765,6 +765,8 @@ export class OpeningFirstPerson{
   }
   AdoptProp(name,object,spec,root,extra={}){
     object.name=`OpeningFirstPerson_${name}`;object.visible=false;root.add(object);
+    // The seat is scenery even though its placement is owned by the player rig.
+    if(spec.kind==="crate")object.userData.whiteboxCharacter=false;
     return {object,kind:spec.kind,...extra};
   }
   /** The phase's seated fill beat (hands.beats[p].fill), Orders only until Luo's order; null otherwise. */

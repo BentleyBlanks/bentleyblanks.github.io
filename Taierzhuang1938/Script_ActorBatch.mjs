@@ -225,6 +225,7 @@ export class ActorBatcher {
       existing ? existing.instanceMatrix.count * 2 : 0);
     const mesh = new THREE.InstancedMesh(group.geometry, group.material, capacity);
     mesh.name = `ActorBatch_${group.key}_${kind}`;
+    mesh.userData.whiteboxCharacter = true;
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.castShadow = kind === "cast";
     mesh.receiveShadow = true;

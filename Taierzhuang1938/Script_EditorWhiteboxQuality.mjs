@@ -44,12 +44,16 @@ export function BuildWhiteboxQualityUi(settings, body) {
       }
     }
     const appearance = Section(editor, "基础外观");
-    for (const [key, label] of [["surfaceColor", "白盒表面色"], ["backgroundColor", "背景色"]]) {
+    for (const [key, label] of [["surfaceColor", "灰盒表面色"], ["gridColor", "网格线颜色"], ["backgroundColor", "背景色"]]) {
       const input = document.createElement("input"); input.type = "color"; input.value = draft[key];
       input.setAttribute("aria-label", label);
       input.addEventListener("input", () => { draft[key] = input.value; Changed(); });
       Row(appearance, label, input);
     }
+    Slider(appearance, { label: "网格大小（米）", min: 0.1, max: 10, step: 0.1, value: draft.gridSize,
+      format: (v) => `${v.toFixed(1)} m`, onInput: (v) => { draft.gridSize = v; Changed(); } });
+    Slider(appearance, { label: "网格线宽（毫米）", min: 2, max: 50, step: 1, value: draft.gridLineWidth * 1000,
+      format: (v) => `${v.toFixed(0)} mm`, onInput: (v) => { draft.gridLineWidth = v / 1000; Changed(); } });
     Slider(appearance, { label: "渲染分辨率", min: 0.4, max: 1.6, step: 0.05, value: draft.renderScale,
       format: (v) => `${Math.round(v * 100)}%`, onInput: (v) => { draft.renderScale = v; Changed(); } });
     editor.append(plan);

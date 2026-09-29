@@ -1297,6 +1297,7 @@ export class Actor {
 
     this.root = new THREE.Group();
     this.root.name = `Actor_${kind}_${options.seed ?? 0}`;
+    this.root.userData.whiteboxCharacter = true;
     this.root.scale.setScalar(this.sizeScale);
     // 挂点换算量的记忆（见 _SocketScaleCompensation）。root.scale 就在上一行写完，
     // 戳从 1 起：换 rig / 换 GLB / 换挂点时 +1。

@@ -8,7 +8,9 @@ export const GRAPHICS_PROFILE_STORAGE_KEY = "tengxian1938_graphics_profile_v1";
 // feature stays off until explicitly listed here and admitted by the pass policy.
 export const WHITEBOX_CONTROLS = [
   ["terrainTextures", "保留地形贴图", "材质与场景", true],
+  ["characterTextures", "保留人物、敌军与手持装备贴图", "材质与场景", true],
   ["assetTextures", "恢复场景资产材质与贴图", "材质与场景", false],
+  ["grid", "场景灰盒网格", "材质与场景", true],
   ["sceneLighting", "关卡灯光（关闭时用中性基础光）", "材质与场景", false],
   ["sky", "天空与云层", "材质与场景", false],
   ["effects", "粒子、烟火与贴花", "材质与场景", false],
@@ -39,7 +41,8 @@ export const WHITEBOX_CONTROLS = [
 ];
 export const WHITEBOX_DEFAULTS = Object.freeze({
   ...Object.fromEntries(WHITEBOX_CONTROLS.map(([key, , , value]) => [key, value])),
-  surfaceColor: "#d8dadd", backgroundColor: "#adb8c2", renderScale: 1,
+  surfaceColor: "#909397", gridColor: "#55585d", gridSize: 1, gridLineWidth: 0.012,
+  backgroundColor: "#adb8c2", renderScale: 1,
 });
 export const WHITEBOX_LIGHTING = Object.freeze({ ambient: 1.8, sun: 1.4, direction: [40, 70, 25] });
 
@@ -47,10 +50,12 @@ export function NormalizeWhiteboxConfig(value = {}) {
   const config = { ...WHITEBOX_DEFAULTS };
   if (!value || typeof value !== "object") return config;
   for (const [key] of WHITEBOX_CONTROLS) if (typeof value[key] === "boolean") config[key] = value[key];
-  for (const key of ["surfaceColor", "backgroundColor"]) {
+  for (const key of ["surfaceColor", "gridColor", "backgroundColor"]) {
     if (typeof value[key] === "string" && /^#[\da-f]{6}$/i.test(value[key])) config[key] = value[key];
   }
   if (Number.isFinite(value.renderScale)) config.renderScale = Math.min(1.6, Math.max(0.4, value.renderScale));
+  if (Number.isFinite(value.gridSize)) config.gridSize = Math.min(10, Math.max(0.1, value.gridSize));
+  if (Number.isFinite(value.gridLineWidth)) config.gridLineWidth = Math.min(0.05, Math.max(0.002, value.gridLineWidth));
   return config;
 }
 

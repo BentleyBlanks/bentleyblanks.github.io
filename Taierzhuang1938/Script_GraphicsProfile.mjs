@@ -13,7 +13,15 @@ function Write(key, value) {
 export function LoadGraphicsProfile(search = "") {
   return ResolveGraphicsProfile(new URLSearchParams(search).get("quality"), Read(GRAPHICS_PROFILE_STORAGE_KEY, null));
 }
-export function LoadWhiteboxConfig() { return NormalizeWhiteboxConfig(Read(WHITEBOX_STORAGE_KEY, null)); }
+export function LoadWhiteboxConfig() {
+  const saved = Read(WHITEBOX_STORAGE_KEY, null);
+  // Old exports saved every default, including the former white surface colour.
+  // Migrate only that old default; retain deliberately chosen custom colours.
+  if (saved && !("grid" in saved) && saved.surfaceColor === "#d8dadd") {
+    saved.surfaceColor = WHITEBOX_DEFAULTS.surfaceColor;
+  }
+  return NormalizeWhiteboxConfig(saved);
+}
 export function SaveWhiteboxConfig(config) { return Write(WHITEBOX_STORAGE_KEY, NormalizeWhiteboxConfig(config)); }
 export function SaveGraphicsProfile(profile) {
   if (!GRAPHICS_PROFILES.includes(profile)) throw new Error(`Unknown graphics profile: ${profile}`);
