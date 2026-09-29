@@ -41,8 +41,12 @@ for mesh in doc['meshes']:
         error=max(abs(sum(w)-1) for w in weights)
         assert error<.00001,(mesh.get('name'),error)
         assert all(math.isfinite(c) for p in positions for c in p)
+        normals=Accessor(doc,blob,attrs['NORMAL'])
+        assert all(math.isfinite(c) for normal in normals for c in normal)
+        normalError=max(abs(sum(c*c for c in normal)-1) for normal in normals)
+        assert normalError<.001,(mesh.get('name'),'Non-unit normals',normalError)
         joints=Accessor(doc,blob,attrs['JOINTS_0']);assert max(i for j in joints for i in j)<66
-        report['meshes'].append({'name':mesh.get('name'),'vertices':len(positions),'triangles':doc['accessors'][primitive['indices']]['count']//3,'maximumWeightError':error})
+        report['meshes'].append({'name':mesh.get('name'),'vertices':len(positions),'triangles':doc['accessors'][primitive['indices']]['count']//3,'maximumWeightError':error,'maximumNormalLengthSquaredError':normalError})
 assert all('bufferView' in im and not im.get('uri') for im in doc['images'])
 assert set(doc['extras']['facialRig']['bones'])=={n for n in dst if n.startswith('Face_')}
 report['materials']=len(doc['materials']);report['embeddedImages']=len(doc['images']);report['animations']=[a['name'] for a in doc.get('animations',[])]

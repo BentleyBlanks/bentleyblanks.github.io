@@ -28,6 +28,8 @@ def Relaxed():
     for b in rig.pose.bones:b.matrix_basis.identity()
     for side,sign in [('L',1),('R',-1)]:
         b=rig.pose.bones['Bip001 '+side+' UpperArm'];axis=b.bone.matrix_local.to_3x3().inverted()@Vector((0,1,0));b.rotation_mode='QUATERNION';b.rotation_quaternion=Quaternion(axis,math.radians(sign*77))
+    for name,q in json.loads(rig.get('LuoRestFingerRotations','{}')).items():
+        b=rig.pose.bones[name];b.rotation_mode='QUATERNION';b.rotation_quaternion=Quaternion(q)
     bpy.context.view_layer.update()
 
 def SetFace(name):
@@ -54,6 +56,26 @@ sourceBones=json.loads(rig['SourceBodyBind'])
 bodyErrors={b.name:max(abs(b.matrix_local[i][j]-sourceBones[b.name][i][j]) for i in range(4) for j in range(4)) for b in rig.data.bones if not b.name.startswith('Face_')}
 head=bpy.data.objects['Mesh_LuoHead'];rest=Vertices(head)
 report={'skeleton':'TengxianHumanoidV1','bodyBoneCount':len(bodyErrors),'faceBoneCount':len(facial['bones']),'maximumBodyBindMatrixError':max(bodyErrors.values()),'weights':{},'faceDeformation':{},'poseFrames':{}}
+projectionLeaks=[]
+for obj in bpy.context.scene.objects:
+    if obj.type!='MESH' or not obj.name.startswith('Mesh_Luo') or obj.name in ['Mesh_LuoHead','Mesh_LuoHands','Mesh_LuoEyes','Mesh_LuoOral']:continue
+    for material in obj.data.materials:
+        if not material or not material.use_nodes:continue
+        for node in material.node_tree.nodes:
+            if node.type=='TEX_IMAGE' and node.image and node.image.name in ['Image_FrontView.png','Image_SideView.png','Image_BackView.png']:
+                projectionLeaks.append([obj.name,material.name,node.image.name])
+assert not projectionLeaks,projectionLeaks
+report['appearanceAudit']={'dressedReferenceProjectionLeaks':projectionLeaks,'textileAtlas':'Texture_LuoTextileAtlas.png'}
+tunic=bpy.data.objects['Mesh_LuoTunic'];groupNames={g.index:g.name for g in tunic.vertex_groups}
+skin={p.name:p.matrix@p.bone.matrix_local.inverted() for p in rig.pose.bones}
+sleeveTorso=[]
+for v in tunic.data.vertices:
+    p=sum((skin[groupNames[g.group]]@v.co*g.weight for g in v.groups),Vector())
+    if .92<p.z<1.30 and abs(p.x)>.205:
+        sleeveTorso.append(sum(g.weight for g in v.groups if any(tag in groupNames[g.group] for tag in ['Pelvis','Spine','Neck'])))
+assert sleeveTorso and max(sleeveTorso)<1e-5,('Lower sleeves attached to torso',max(sleeveTorso,default=-1))
+report['appearanceAudit']['lowerSleeveVertices']=len(sleeveTorso)
+report['appearanceAudit']['maximumLowerSleeveTorsoInfluence']=max(sleeveTorso)
 for obj in bpy.context.scene.objects:
     if obj.type!='MESH' or not obj.name.startswith('Mesh_Luo'):continue
     valid={g.index:g.name for g in obj.vertex_groups if g.name in rig.data.bones}
@@ -64,6 +86,7 @@ assert max(bodyErrors.values())<1e-6,bodyErrors
 assert report['bodyBoneCount']==53,report['bodyBoneCount']
 assert all(v['unweighted']==0 and v['maximumNormalizationError']<1e-5 for v in report['weights'].values()),report['weights']
 assert all(report['faceInfluences'].values()),report['faceInfluences']
+bpy.context.scene.timeline_markers.clear()
 action=bpy.data.actions.new('Animation_LuoFacialReview');rig.animation_data_create();rig.animation_data.action=action
 for index,name in enumerate(facial['poses']):
     rig.animation_data.action=None

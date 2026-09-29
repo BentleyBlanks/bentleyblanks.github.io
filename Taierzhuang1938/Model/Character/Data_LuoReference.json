@@ -1,13 +1,15 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "revision": 2,
   "character": "Luo Maocai",
   "created": "2026-09-29",
+  "updated": "2026-09-30",
   "status": "Standalone reference asset; not registered in the runtime cast",
-  "sourceRevision": "7ecf4201ef52d4d8f0417ef46c12b323971b22c4",
+  "sourceRevision": "861e100e10e33e60ebb0b49130ebad9282a1164a",
   "model": {
     "file": "Model_TengxianLuoReference.glb",
-    "bytes": 20208876,
-    "sha256": "a9d0e2e192927ef1ef7fec13646721124f3577f025dfee1262cf9448bd7807f7"
+    "bytes": 43005828,
+    "sha256": "4358a5484d367c4f0a7f208b1d3732e9ad3a2d3a91d3523d4ad68ed6ac78b3c2"
   },
   "sources": [
     {
@@ -55,15 +57,108 @@
     ]
   },
   "geometry": {
-    "triangles": 144235,
+    "triangles": 365547,
     "meshes": 3,
     "materials": 3
   },
   "textures": {
     "embedded": 9,
-    "resolution": [
-      2048,
-      2048
+    "bakeResolutionByGroup": {
+      "Skin": [
+        2048,
+        2048
+      ],
+      "Uniform": [
+        4096,
+        4096
+      ],
+      "Equipment": [
+        4096,
+        4096
+      ]
+    },
+    "embeddedFiles": [
+      {
+        "name": "Texture_LuoEquipmentNormal",
+        "resolution": [
+          2048,
+          2048
+        ],
+        "mimeType": "image/png",
+        "bytes": 2934829
+      },
+      {
+        "name": "Texture_LuoEquipmentBase",
+        "resolution": [
+          4096,
+          4096
+        ],
+        "mimeType": "image/jpeg",
+        "bytes": 6289295
+      },
+      {
+        "name": "Texture_LuoEquipmentRoughness",
+        "resolution": [
+          4096,
+          4096
+        ],
+        "mimeType": "image/png",
+        "bytes": 601946
+      },
+      {
+        "name": "Texture_LuoSkinNormal",
+        "resolution": [
+          2048,
+          2048
+        ],
+        "mimeType": "image/png",
+        "bytes": 160506
+      },
+      {
+        "name": "Texture_LuoSkinBase",
+        "resolution": [
+          2048,
+          2048
+        ],
+        "mimeType": "image/png",
+        "bytes": 2303832
+      },
+      {
+        "name": "Texture_LuoSkinRoughness",
+        "resolution": [
+          2048,
+          2048
+        ],
+        "mimeType": "image/png",
+        "bytes": 159198
+      },
+      {
+        "name": "Texture_LuoUniformNormal",
+        "resolution": [
+          2048,
+          2048
+        ],
+        "mimeType": "image/png",
+        "bytes": 3872175
+      },
+      {
+        "name": "Texture_LuoUniformBase",
+        "resolution": [
+          4096,
+          4096
+        ],
+        "mimeType": "image/jpeg",
+        "bytes": 6398900
+      },
+      {
+        "name": "Texture_LuoUniformRoughness",
+        "resolution": [
+          4096,
+          4096
+        ],
+        "mimeType": "image/png",
+        "bytes": 673331
+      }
     ],
     "channels": [
       "Base",
@@ -76,6 +171,28 @@
       "Equipment"
     ]
   },
+  "generatedReferences": {
+    "provider": "OpenAI built-in imagegen",
+    "localDirectory": "References",
+    "promptRecord": "Data_ImagegenPrompts.json",
+    "files": [
+      {
+        "file": "Image_LuoPlainUniform.png",
+        "bytes": 2020361,
+        "sha256": "52a176b925e4ea7e1fd13311f505be94183d9b05e3da4117c912d824b7dba387"
+      },
+      {
+        "file": "Image_LuoEquipment.png",
+        "bytes": 1951505,
+        "sha256": "063dd0b10826a71f7c8b86ff91234b5d233034845ed2f2ed3e4284a2dc500cf8"
+      },
+      {
+        "file": "Texture_LuoTextileAtlas.png",
+        "bytes": 3745591,
+        "sha256": "33f435b80a24f1d6c49b6d0d1f77697a0dfeb54ba416e9653df1ad7514751bdc"
+      }
+    ]
+  },
   "editableSource": "Model_LuoReference.blend",
   "bakedSource": "Model_LuoReferenceBaked.blend",
   "sourceStorage": "Private Blender source directory documented in docs/Data_LuoReference.md",
@@ -83,7 +200,9 @@
     "Script_BuildLuoReference.py",
     "Script_ValidateLuoReference.py",
     "Script_ExportLuoReference.py",
-    "Script_AuditLuoReference.py"
+    "Script_AuditLuoReference.py",
+    "Script_LuoTailoring.py",
+    "Script_PackLuoTextures.py"
   ],
   "verified": {
     "bodyBindMatrixError": 0.0,
@@ -104,11 +223,22 @@
       "Shout",
       "Grit"
     ],
+    "appearanceAudit": {
+      "dressedReferenceProjectionLeaks": [],
+      "textileAtlas": "Texture_LuoTextileAtlas.png",
+      "lowerSleeveVertices": 15290,
+      "maximumLowerSleeveTorsoInfluence": 0
+    },
     "browserViews": [
       "Front",
       "Side",
       "Back",
       "Face",
+      "Collar",
+      "Cap",
+      "Pack",
+      "PlainFront",
+      "PlainSide",
       "Open",
       "Blink",
       "Shout",
