@@ -38,7 +38,7 @@ export async function BuildComparePage({ takesDir, MeasureFile }) {
 
   const rows = [{
     key: "现行", file: "AudioAmb_BattleFar.mp3", label: "现行 battleFar（Coll Anderson 战斗人群录音）",
-    style: "英语战斗人群录音低通到 1.1 kHz：听不清词，但听得出是一群人在喊。用户说的「奇奇怪怪的人声」就是它。",
+    style: "英语战斗人群录音低通到 1.1 kHz：听不清词，但听得出是一群人在喊。用户说的「奇奇怪怪的人声」多半就是它（审计结论见 docs/Data_AudioAssets.md）。",
     credit: "Coll Anderson · 持续交火中的人群 · Sonniss GDC 2015", prompts: [], sources: [], url: "",
   }];
   for (const v of AMB_BED_VARIANTS) {
