@@ -516,7 +516,7 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
   // x −140…−30 及两端各 20 m 过渡）水面按 RiverWaterAt 铺：水位在南岸自然地面下 1.25 m、宽约 66 m，
   // 水线取断面上正好没水的位置，边缘再各伸进岸里 0.5 m 埋住。每块的 x 宽（河段附近 4 m，其余 6 m）。
   const RIVER = MISSION_NORTH_RIVER, REACH = RIVER.reaches[0];
-  const Near = (x) => x > REACH.x0 - REACH.blendM - 6 && x < REACH.x1 + REACH.blendM + 6;
+  const Near = (x) => x > REACH.x0 - REACH.blendWestM - 6 && x < REACH.x1 + REACH.blendEastM + 6;
   for (let x = -192; x <= 132; x += Near(x) ? 4 : 6) {
     const water = RiverWaterAt(x, RIVER);
     if (!water) continue;                                   // 浅滩：露滩地，不铺水
@@ -548,7 +548,7 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
   // 每段 [中心 x, 宽]：4 m 一段（宽 4.4 互相咬合），铁路桥两侧的缺口（x −81.8…−74.2）里，桥面 x −79.7…−74.3 下面是净空不够的
   // 桥台/引桥，西侧 x −81.8…−79.7 那条 2 m 的露天窄缝（桥面边到墙之间）另补一段窄墙，否则人会从桥边溜进水里。
   const pieces = [];
-  for (let x = REACH.x0 - REACH.blendM; x <= REACH.x1 + REACH.blendM; x += 4)
+  for (let x = Math.ceil((REACH.x0 - REACH.blendWestM + 3) / 4) * 4; x <= REACH.x1 + REACH.blendEastM; x += 4)   // 首段 x −200，整段在关卡边界 −205 之内
     if (Math.abs(x - MISSION_RAIL_BRIDGE.x) >= 3.4) pieces.push([x, 4.4]);
   pieces.push([-80.75, 2.3]);
   for (const [i, [x, w]] of pieces.entries()) {

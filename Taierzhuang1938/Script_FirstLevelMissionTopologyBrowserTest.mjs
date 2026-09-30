@@ -61,22 +61,22 @@ try{
  // -------------------------------------------------------------------------
  const shore=await page.evaluate(async()=>{
   const g=window.Tengxian,rows=[],body=g.physics.MakeCharacter();
-  const {RiverReachAt}=await import('./Data_FirstLevelMissionTopology.mjs');
+  const {RiverReachAt,RiverWaterAt}=await import('./Data_FirstLevelMissionTopology.mjs');
   const Walk=(from,dir,frames)=>{
    body.Teleport(from.x,g.physics.groundAt(from.x,from.z)+.03,from.z);
    for(let i=0;i<frames;i++)body.Move(0,-.07,dir*.06);
    return {x:+body.position.x.toFixed(2),y:+body.position.y.toFixed(2),z:+body.position.z.toFixed(2)};
   };
   try{
-   for(const x of [-150,-128,-104,-90,-60,-46,-30])rows.push({kind:'beachNorthbound',x,end:Walk({x,z:165},-1,700)});
-   for(const x of [-80.8,-73.4])rows.push({kind:'underBridgeNorthbound',x,end:Walk({x,z:165},-1,700)});
+   for(const x of [-150,-128,-104,-90,-60,-46,-30])rows.push({kind:'beachNorthbound',x,waterZ1:RiverWaterAt(x)?.z1??160.5,end:Walk({x,z:Math.max(165,(RiverReachAt(x)?.shoreZ??167)+1)},-1,900)});
+   for(const x of [-80.8,-73.4])rows.push({kind:'underBridgeNorthbound',x,waterZ1:RiverWaterAt(x).z1,end:Walk({x,z:165},-1,700)});
    for(const x of [-150,-128,-104,-90,-60,-46,-30])rows.push({kind:'northBankSouthbound',x,crest:RiverReachAt(x)?.crestZ??138.8,end:Walk({x,z:Math.min(84,(RiverReachAt(x)?.crestZ??138.8)-6)},1,700)});
   }finally{body.Remove();}
   return rows;
  });
  await fs.writeFile(path.join(out,'Data_ShoreWalks.json'),JSON.stringify(shore,null,2));
  for(const row of shore.filter(r=>r.kind==='beachNorthbound'||r.kind==='underBridgeNorthbound'))
-  assert.ok(row.end.z>=158.2&&row.end.y>-1.6,'the shore keeps a walker out of the water at x='+row.x+': '+JSON.stringify(row.end));
+  assert.ok(row.end.z>=row.waterZ1-.3&&row.end.y>-1.6,'the shore keeps a walker out of the water at x='+row.x+': '+JSON.stringify(row.end));
  for(const row of shore.filter(r=>r.kind==='northBankSouthbound'))
   assert.ok(row.end.z<=row.crest+2.5&&row.end.y>-.6,'the north bank air wall keeps a walker on the bank at x='+row.x+': '+JSON.stringify(row.end));
  // -------------------------------------------------------------------------

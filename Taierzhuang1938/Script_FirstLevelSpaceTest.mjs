@@ -527,7 +527,8 @@ if (!rearOnly) {
   assert.ok(ridge && ridge.h >= 1.1 && ridge.h <= 1.7, `north ridge is a 1.1-1.6 m parapet: ${ridge?.h}`);
   assert.ok(SightBlocker(Eye(S.bridgeEnemy, 0.9), deckTop, blocks), "north ridge breaks a crouched line");
   // 南堤：堤顶比自然地面高 1.2–1.8 m，铁路桥头缺口（x −82.5…−70.5）里没有堤；水面离南岸自然地面 1.0–1.5 m。
-  const crest = Math.max(...[-120, -100, -60].map((x) => Ground(x, 173) - Natural(x, 173)));
+  const crest = Math.min(...[-120, -100, -60].map((x) => Math.max(...Array.from({ length: 45 }, (_, k) => 160 + k * 0.5)
+    .map((z) => Ground(x, z) - Natural(x, z)))));
   assert.ok(crest >= 1.2 && crest <= 1.8, `the south levee crest stands 1.2-1.8 m over natural ground: ${crest.toFixed(2)}`);
   for (const x of [-79, -76, -73]) assert.ok(Ground(x, 173) - Natural(x, 173) < 0.9,
     `the railway gap at x=${x} carries only the railbed (+0.62), no levee: ${(Ground(x, 173) - Natural(x, 173)).toFixed(2)}`);
@@ -667,7 +668,10 @@ if (!rearOnly) {
   assert.ok(Layout.gates.some((gate) => gate.id === "MissionBridgeWreck"
     && gate.appearSignal === "MissionBridgeDestroyed"), "the road wreck still appears on the same signal");
   // 原断面 x（拓宽段与两端过渡之外）逐位不变：过渡带内才有拓宽的影响。
-  for (const x of [reachDef.x0 - reachDef.blendM - 1, reachDef.x1 + reachDef.blendM + 1, 20, 60, 100])
+  // 东端过渡止于 x 30，不碰浅滩插值带 x 34…60 与路桥 x 76；西端过渡止于 MISSION_BOUNDS.minX −205。
+  assert.equal(reachDef.x0 - reachDef.blendWestM, Layout.bounds.minX, "the west transition ends exactly at the level bound");
+  assert.ok(reachDef.x1 + reachDef.blendEastM < River.fords[0].x - River.fords[0].halfW - River.fords[0].blend, "the east transition stays clear of the ford band");
+  for (const x of [reachDef.x0 - reachDef.blendWestM - 1, reachDef.x1 + reachDef.blendEastM + 1, 34, 60, 76, 100])
     assert.equal(RiverReachAt(x), null, `no widening at x=${x}`);
   console.log("ok North Sha He: 28.4 m channel elsewhere, 66 m widened reach at the rail bridge, impassable banks, one ford and two bridges",
     JSON.stringify({ widthM: report.riverWidthM, reachWaterM: report.reachWaterWidthM, reachMouthM: report.reachMouthWidthM,
@@ -742,7 +746,7 @@ if (!rearOnly) {
     wide.push({ id: block.id, freeboard, centreDepth, half: block.d / 2 });
     assert.ok(freeboard >= 1.0 && freeboard <= 1.5, `${block.id} sits 1.0-1.5 m under the south bank ground: ${freeboard.toFixed(2)}`);
     assert.ok(centreDepth >= 2.5, `${block.id} is at least 2.5 m deep mid-river: ${centreDepth.toFixed(2)}`);
-    assert.ok(block.d >= 60 && block.d <= 72, `${block.id} spans about 66 m: ${block.d.toFixed(1)}`);
+    assert.ok(block.d >= 50 && block.d <= 72, `${block.id} spans 50-72 m (66.7 m at the bridge, banks wander): ${block.d.toFixed(1)}`);
     assert.ok(Ground(block.x, block.z - block.d / 2 - 0.3) > top, `${block.id}: the north bank stands above the water`);
     assert.ok(Ground(block.x, block.z + block.d / 2 + 0.3) > top, `${block.id}: the south beach stands above the water`);
   }
@@ -751,7 +755,7 @@ if (!rearOnly) {
   const sorted = water.slice().sort((p, q) => p.x - q.x);
   for (let i = 1; i < sorted.length; i++) {
     const p = sorted[i - 1], q = sorted[i];
-    if (q.x - p.x > 8 || q.x < reachDef.x0 - reachDef.blendM - 6 || q.x > reachDef.x1 + reachDef.blendM + 6) continue;  // 只查拓宽段与两端过渡（原断面在浅滩前水位随槽底抬升，旧口径）
+    if (q.x - p.x > 8 || q.x < reachDef.x0 - reachDef.blendWestM - 6 || q.x > reachDef.x1 + reachDef.blendEastM) continue;  // 只查拓宽段与两端过渡（原断面在浅滩前水位随槽底抬升，旧口径）
     assert.ok(Math.abs((p.y + p.h / 2) - (q.y + q.h / 2)) < 0.6, `water level is continuous at x=${q.x}`);
     assert.ok(Math.abs(p.d - q.d) < 22, `water width is continuous at x=${q.x}: ${p.d.toFixed(1)} -> ${q.d.toFixed(1)}`);
   }

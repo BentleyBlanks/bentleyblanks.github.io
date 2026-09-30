@@ -24,6 +24,9 @@
 //     两个框都属本区，挪分界不改任何形状的裁剪（院地 ReceptionYardFloor 羽化止于 x -40.65，
 //     岸垄东段止于 x -56.05），也不碰别区的框。
 //
+// 2026-09-30 第二轮：河岸线起伏（Topology 的 wander），南堤跟着南水线走 —— 堤顶 z = shoreZ + 7（原 166 + 7 = 173），
+// 起伏出来后 z 由 Script 现算写进点表：堤脚（堤顶 − 7）恒在 shoreZ 之南 0…0.6 m，不吃进河槽。x −100…−88 与 −64 的点保持原值
+//（铁路桥一带地形逐位不变）。Script_FirstLevelWhiteboxTerrainTest 断言点表与 RiverReachAt 一致。
 // 2026-09-30 白盒 18 河拓宽（docs/Data_FirstLevelTopology20260919.md §2「拓宽河段」）：
 //   · 北沙河在 x −140…−30 拓宽到 ~66 m，南岸自然地面位置不动，水线以南是一片沙滩（RiverCutAt 的断面，
 //     在修饰之后取 min，本表不碰）。沙滩南端（shoreZ z 166）之外由本表接一道南堤：
@@ -54,7 +57,8 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
     Object.freeze({ id: "BankPathTread", width: 1.8, wear: 0.9,
       points: Object.freeze([
         Object.freeze({ x: -77, z: 169.5 }), Object.freeze({ x: -83, z: 172.2 }), Object.freeze({ x: -100, z: 173.2 }),
-        Object.freeze({ x: -120, z: 173.8 }), Object.freeze({ x: -134, z: 174.4 }),
+        Object.freeze({ x: -112, z: 172.61 }), Object.freeze({ x: -124, z: 170.72 }),
+        Object.freeze({ x: -134, z: 167.94 }),
       ]), note: "18 南岸沿堤顶内侧的踩出来的小路：铁路桥头缺口 → 向西沿岸（概念 18_1 尾队沿岸小路朝镜头跑）" }),
     Object.freeze({ id: "MarchOutTread", width: 2.2, wear: 0.72,
       points: Object.freeze([
@@ -79,12 +83,12 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
       dy: 1.0, feather: 1.4, note: "15_1 左侧石墙外低下去的菜园" }),
     Object.freeze({ id: "BridgeLeveeWest", kind: "line", op: "raise", halfW: 1.5, feather: 5.5, dy: 1.4,
       points: Object.freeze([
-        Object.freeze({ x: -136, z: 174.4 }), Object.freeze({ x: -120, z: 173.8 }), Object.freeze({ x: -100, z: 173.2 }),
-        Object.freeze({ x: -94, z: 173 }), Object.freeze({ x: -88, z: 173 }),
+        Object.freeze({ x: -136, z: 167.24 }), Object.freeze({ x: -128, z: 169.28 }), Object.freeze({ x: -120, z: 171.49 }), Object.freeze({ x: -112, z: 172.31 }), Object.freeze({ x: -104, z: 172.64 }),
+        Object.freeze({ x: -100, z: 173.2 }), Object.freeze({ x: -94, z: 173 }), Object.freeze({ x: -88, z: 173 }),
       ]), note: "18 南堤西段（河南岸的高堤，堤顶背后是南岸射位与小路）；核心止于 x −88，羽化到 x −82.5 为止：射位 (-81,179.4) 正对缺口" }),
     Object.freeze({ id: "BridgeLeveeEast", kind: "line", op: "raise", halfW: 1.5, feather: 5.5, dy: 1.4,
       points: Object.freeze([
-        Object.freeze({ x: -64, z: 173 }), Object.freeze({ x: -56, z: 173.2 }), Object.freeze({ x: -49, z: 173.8 }),
+        Object.freeze({ x: -64, z: 173 }), Object.freeze({ x: -56, z: 173.2 }), Object.freeze({ x: -49, z: 171.86 }),
       ]), note: "18 南堤东段；核心始于 x −64，与西段之间留出铁路与尾队的缺口；东端羽化止于 x −41.5（框边）之内" }),
   ]),
 });
