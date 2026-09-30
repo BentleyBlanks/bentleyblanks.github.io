@@ -24,11 +24,11 @@ import { TrenchPlanFor, SampleMissionGroundSurface } from "./Data_FirstLevelMiss
 import { MISSION_NORTH_RIVER, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
 import { HashSeed, Rng, RouteIndex, PointIndex } from "./Data_FirstLevelPropDressing.mjs";
 
-export const VEGETATION_VERSION = "first-level-vegetation-20260928";
+export const VEGETATION_VERSION = "first-level-vegetation-20260930";
 export const VEGETATION_ATLAS = Object.freeze({
   // 改图就改戳（清单 Data_TextureManifest 的 FirstLevelVegetationAtlas；Script_TextureStandardsTest 查戳）。
-  url: "./Texture/Texture_FirstLevelVegetationAtlas.webp?v=veg20260928b",
-  bytes: 267702,
+  url: "./Texture/Texture_FirstLevelVegetationAtlas.webp?v=veg20260930a",
+  bytes: 276920,
 });
 
 /**
@@ -37,7 +37,9 @@ export const VEGETATION_ATLAS = Object.freeze({
  */
 export const VEGETATION_CARDS = Object.freeze([
   { id: "TallGrass", uv: [0.00391, 0.50098, 0.24609, 0.90625], aspect: 0.5976, heightM: 0.62, tall: false },
-  { id: "LowTuft", uv: [0.25391, 0.50098, 0.49609, 0.61621], aspect: 2.1017, heightM: 0.26, tall: false },
+  // 2026-09-30 换成单独生成的一簇（旧卡是铺满格子的草垫，左右底三边切平，地上一张张直边方块）；
+  // 新图比别的干草卡亮一截（平均 sRGB 0.63 对 0.52），压一档跟 TallGrass / MixedClump 对齐。
+  { id: "LowTuft", uv: [0.25391, 0.50098, 0.49609, 0.63672], aspect: 1.7842, heightM: 0.26, tall: false, shade: [0.83, 0.83, 0.82] },
   { id: "WeedStalks", uv: [0.50391, 0.50098, 0.74609, 0.83008], aspect: 0.7359, heightM: 0.8, tall: true },
   { id: "Bramble", uv: [0.75391, 0.50098, 0.99609, 0.72656], aspect: 1.0736, heightM: 0.85, tall: true },
   // 芦苇穗在阴天调色下读成发白的一片：顶点色再压一档（shade 乘在 VEGETATION_TINT 与抖动之上）。

@@ -21,3 +21,13 @@ Row 2:
 8. Low leafless twiggy shrub, grey-brown thin branches spreading in a fan, about 0.7 m tall.
 
 Photorealistic plant detail with thin individual blades, crisp edges against the magenta. No people, no objects, no ground patch, no soil.
+
+--- 2026-09-30 LowTuft 单卡重生成（附 v2 主图作风格参考；lovart generate_image_nano_banana_pro，取三张里的第三张 lovart_dd9bb199850c） ---
+
+The attached sprite sheet is a style reference only (photorealistic dry winter grass on pure magenta). Generate ONE NEW image, fully OPAQUE, solid flat pure magenta #FF00FF background everywhere. Do NOT remove the background, nothing transparent, no background-removal step.
+
+Square 1:1 image, 2048x2048. Exactly ONE plant in the centre: a low, small tuft of dead dry winter grass, photographed side-on at ground level like a botanical cut-out photo, same photorealistic look, colours and lighting as the tall dry grass clump in the top-left of the reference (thin pale straw-beige and dull grey-brown blades).
+
+The tuft is about twice as wide as it is tall. All blades grow from ONE narrow root point at the bottom centre and fan outward and upward like a low fountain, some arching and drooping outward with their tips toward the sides. The outline is a soft irregular dome made of many separate pointed blade tips, with pure magenta visible between the blades everywhere, including between the lower blades near the base. It must NOT look like a mat, carpet, pile or hay heap and must NOT have a flat bottom edge or straight cut sides.
+
+The plant occupies the middle of the image: its root point touches a line at 80% of the image height; wide pure magenta margins on the left, right and above (the plant spans at most 70% of the image width). Nothing below the root except magenta. No soil, no ground, no shadow, no outline, no halo, no text. Flat soft shadowless delit lighting, low-saturation dusty colours, crisp sharp blade edges against the magenta.

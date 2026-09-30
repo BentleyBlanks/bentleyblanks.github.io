@@ -719,8 +719,8 @@ export const TEXTURE_MANIFEST = Object.freeze([
     id: "FirstLevelVegetationAtlas", kind: "decal", tier: "level:FirstLevel",
     bake: "_import/Script_BakeVegetationAtlas.py",
     bakeRecord: "_import/TextureBakes/Texture_FirstLevelVegetationAtlas.json",
-    source: { provider: "lovart", date: "2026-09-28",
-      ref: "thread a97e84e9-d6af-432d-9fcd-44e7d3347a58（generate_image_nano_banana_pro，品红底 8 格）",
+    source: { provider: "lovart", date: "2026-09-30",
+      ref: "thread a97e84e9-d6af-432d-9fcd-44e7d3347a58（generate_image_nano_banana_pro，品红底 8 格）；LowTuft 单卡 thread 8bcd6653-78c1-4e5b-8cfc-64bf14fc66e7（2026-09-30 重生成）",
       prompt: "_import/Prompts/Texture_FirstLevelVegetationAtlas.txt" },
     consumers: [{ file: "Data_FirstLevelVegetation.mjs", token: "Texture_FirstLevelVegetationAtlas" }],
     files: [
