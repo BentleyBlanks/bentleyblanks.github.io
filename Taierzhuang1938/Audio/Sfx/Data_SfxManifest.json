@@ -973,6 +973,15 @@
       "seconds": 2.78,
       "credit": "Volcengine SeedAudio 1.0 · 航空炸弹下落啸声（BombWhistle_take09.mp3） · 2026-09-30",
       "license": "volcengine"
+    },
+    "neckDeath": {
+      "files": [
+        "AudioSfx_NeckDeath_01.mp3",
+        "AudioSfx_NeckDeath_02.mp3"
+      ],
+      "seconds": 2.26,
+      "credit": "Volcengine SeedAudio 1.0 · 喉咙被割开/打穿时的窒息哽咽（NeckDeath_take02.mp3, NeckDeath_take07.mp3） · 2026-09-30",
+      "license": "volcengine"
     }
   },
   "bakedAt": "2026-09-28",

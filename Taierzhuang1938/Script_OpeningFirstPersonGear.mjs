@@ -183,7 +183,7 @@ function HandAt(keys, side, t, ctx, objects) {
 
 /**
  * Everything the body needs at t. ctx: { cam (position, quaternion), Ground(x, z), lap: { position, quaternion } | null }.
- * Returns { t, rifle: {position, quaternion}, pack: {position, quaternion, visible, onBack}, crate: {visible}, charger: {visible, depth,
+ * Returns { t, rifle: {position, quaternion}, pack: {position, quaternion, visible, onBack, straps}, crate: {visible}, charger: {visible, depth,
  * pressing}, hands: { l, r } } with world-space hand targets (target, frame quaternion, curl / shape).
  */
 export function GearPose(t, ctx, spec = GEAR) {
@@ -196,7 +196,8 @@ export function GearPose(t, ctx, spec = GEAR) {
   // Over the charger the right hand rides the rounds down (its keys are the pressed-down point) and the thumb works in short strokes.
   const ride = Smooth((t - ch.ride[0]) / ch.ride[1]) * (1 - Smooth((t - ch.ride[2]) / ch.ride[3])) * (ch.pressM - depth + thumb);
   if (rifle && hands.r && ride) hands.r.target.addScaledVector(V(0, 1, 0).applyQuaternion(rifle.quaternion), ride);
-  return { t, rifle, pack: pack && { ...pack, visible: t < spec.pack.onBackS, onBack: t >= spec.pack.onBackS },
+  return { t, rifle, pack: pack && { ...pack, visible: t < spec.pack.onBackS, onBack: t >= spec.pack.onBackS,
+    straps: t >= spec.pack.onBackS && t < spec.pack.strapsOffS },
     crate: { visible: t < spec.crate.hideS },
     charger: { visible: t < ch.offS, depth, pressing: u > 0 && u < 1, thumb, rideM: ride },
     hands };

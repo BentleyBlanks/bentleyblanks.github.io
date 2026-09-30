@@ -1,8 +1,13 @@
-import { CopyValue, SaveGlState, EnumName, ReadProgram, ReadDrawState, DescribeFramebuffer, CopyAttachment, ReadOutput } from './Script_FrameDebugGl.mjs';
+import { CopyValue, SaveGlState, EnumName, ReadProgram, ReadDrawState, DescribeFramebuffer, CopyAttachment, ReadOutput, ReadTexture } from './Script_FrameDebugGl.mjs';
 
 const DRAW = /^(drawArrays|drawElements|drawRangeElements)(Instanced)?$|^multiDraw/;
 const EVENT = /^(drawArrays|drawElements|drawRangeElements)(Instanced)?$|^multiDraw|^clear$|^clearBuffer|^blitFramebuffer$|^copyTex|^generateMipmap$/;
-const IGNORE = /^(get|is|create|delete|check|readPixels|finish|flush|beginQuery|endQuery|fenceSync|clientWaitSync|waitSync)/;
+// Program building and immutable texture allocation are one-time object setup,
+// not frame content. Replaying linkProgram invalidates every uniform location
+// three.js holds (the object then vanishes from replay AND from the live game
+// after Resume); replaying texStorage* on the now-immutable texture is
+// INVALID_OPERATION. The objects outlive the capture, so the replay never needs them.
+const IGNORE = /^(get|is|create|delete|check|readPixels|finish|flush|beginQuery|endQuery|fenceSync|clientWaitSync|waitSync|shaderSource|compileShader|attachShader|detachShader|linkProgram|validateProgram|bindAttribLocation|transformFeedbackVaryings|texStorage)/;
 const LIMIT_BYTES = 768 * 1024 * 1024;
 let nextCaptureId = 0;
 
@@ -14,9 +19,31 @@ function ObjectPath(object) {
 function TextureInfo(texture) {
   const image = texture?.image;
   return { id: texture.id, name: texture.name || `Texture#${texture.id}`, width: image?.width, height: image?.height,
-    depth: image?.depth, format: texture.format, type: texture.type, colorSpace: texture.colorSpace,
-    source: texture.userData?.source || image?.currentSrc || image?.src || null };
+    depth: image?.depth, format: texture.format, type: texture.type, colorSpace: texture.colorSpace, isDepth: !!texture.isDepthTexture,
+    mipmaps: !!texture.generateMipmaps, source: texture.userData?.source || image?.currentSrc || image?.src || null };
 }
+function NamedAncestor(object) {
+  for (let item = object.parent; item; item = item.parent) if (item.name && !item.isScene) return item.name;
+  return null;
+}
+// Unnamed full-screen materials are still reachable from the pass that owns
+// them (`materialCompose`, `blur.material`); that field name is the real name.
+function FieldName(owner, value) {
+  if (!owner || typeof owner !== 'object') return null;
+  for (const key of Object.keys(owner)) {
+    const field = owner[key];
+    if (field === value) return key;
+    if (!field || typeof field !== 'object' || field.isObject3D || field.isTexture || ArrayBuffer.isView(field)) continue;
+    if (Array.isArray(field)) { const i = field.indexOf(value); if (i >= 0) return `${key}[${i}]`; }
+    else if (Object.getPrototypeOf(field) === Object.prototype) for (const inner of Object.keys(field)) if (field[inner] === value) return `${key}.${inner}`;
+  }
+  return null;
+}
+function MaskLabel(gl, mask) {
+  const parts = [[gl.COLOR_BUFFER_BIT, 'Color'], [gl.DEPTH_BUFFER_BIT, 'Depth'], [gl.STENCIL_BUFFER_BIT, 'Stencil']].filter(([bit]) => mask & bit).map(([, name]) => name);
+  return `(${parts.join(' ') || 'nothing'})`;
+}
+const PHASE_GROUPS = { Skybox: 'DrawSkybox', Opaque: 'DrawOpaqueObjects', Transparent: 'DrawTransparentObjects' };
 
 function DrawInfo(gl, name, args) {
   if (!DRAW.test(name)) return null;
@@ -73,6 +100,7 @@ export class FrameDebugger {
     this._commands = []; this._events = []; this._passes = []; this._stack = []; this._copies = [];
     this._framebuffers = new Map(); this._programs = new Map(); this._buffers = new Map(); this._savedObjects = new Map();
     this._deletes = []; this._object = null; this._pendingTarget = this.renderer.getRenderTarget();
+    this._renders = []; this._owners = new Map(); this._replayedAt = null;
     this._initial = SaveGlState(gl);
     this._currentProgram = gl.getParameter(gl.CURRENT_PROGRAM);
     if (this._currentProgram) this._programs.set(this._currentProgram, ReadProgram(gl, this._currentProgram));
@@ -110,8 +138,26 @@ export class FrameDebugger {
         if (!this.renderer.shadowMap.enabled || !this.renderer.shadowMap.needsUpdate && !this.renderer.shadowMap.autoUpdate || !args[0]?.length) return original.apply(this.renderer.shadowMap, args);
         this.Push('shadow'); try { return original.apply(this.renderer.shadowMap, args); } finally { this.Pop(); }
       });
-      for (const pass of this.post?.passes || []) this._Hook(pass, 'Render', original => (...args) => {
-        this.Push(pass.name); try { return original.apply(pass, args); } finally { this.Pop(); }
+      for (const pass of this.post?.passes || []) {
+        this._Hook(pass, 'Render', original => (...args) => {
+          this.Push(pass.name, pass); try { return original.apply(pass, args); } finally { this.Pop(); }
+        });
+        // A disabled pass may still blit a neutral image (contactShadows.Idle);
+        // Prepare may upload. Without a scope those draws hang at the root.
+        for (const method of ['Idle', 'Prepare']) if (typeof pass[method] === 'function') this._Hook(pass, method, original => (...args) => {
+          this.Push(`${pass.name}.${method}`, pass, true); try { return original.apply(pass, args); } finally { this.Pop(); }
+        });
+      }
+      // Scene submissions become Unity-style groups (Render / DrawOpaqueObjects...)
+      // after capture; see _Organize. Only the span is recorded here.
+      this._Hook(this.renderer, 'render', original => (scene, camera) => {
+        const span = { scene: scene?.name || 'Scene', camera: camera?.name || camera?.type || 'Camera', parent: this._stack.at(-1)?.id ?? null,
+          commandStart: this._commands.length, start: performance.now(), overhead: this._overhead };
+        try { return original.call(this.renderer, scene, camera); }
+        finally {
+          span.commandEnd = this._commands.length; span.cpuMs = Math.max(0, performance.now() - span.start - (this._overhead - span.overhead));
+          delete span.start; delete span.overhead; this._renders.push(span);
+        }
       });
       // Covers GI / first-person self shadows outside PostPipeline as well.
       if (this.profiler) {
@@ -132,10 +178,12 @@ export class FrameDebugger {
       return true;
     } catch (error) { this.Abort(error); return false; }
   }
-  Push(name) {
+  Push(name, owner = null, transient = false) {
     const row = { id: this._passes.length, name, path: [...this._stack.map(p => p.name), name].join('/'),
       parent: this._stack.at(-1)?.id ?? null, first: this._events.length, last: -1, cpuMs: 0, gpuMs: null, draws: 0,
       start: performance.now(), overhead: this._overhead, commandStart: this._commands.length, commandEnd: -1 };
+    if (owner) this._owners.set(row.id, owner);
+    if (transient) row.transient = true;
     this._passes.push(row); this._stack.push(row);
   }
   Pop() {
@@ -145,6 +193,9 @@ export class FrameDebugger {
     row.cpuMs = Math.max(0, performance.now() - row.start - (this._overhead - row.overhead));
     row.draws = this._events.slice(row.first).filter(event => event.draw).length;
     delete row.start; delete row.overhead;
+    // Idle / Prepare that submitted nothing is not worth a tree node.
+    if (row.transient && row.last < row.first && row.id === this._passes.length - 1) { this._passes.pop(); this._owners.delete(row.id); return; }
+    delete row.transient;
   }
   _Budget(bytes) {
     this._bytes += bytes;
@@ -222,11 +273,12 @@ export class FrameDebugger {
         const program = draw ? ReadProgram(gl, gl.getParameter(gl.CURRENT_PROGRAM)) : null;
         const previous = this._events.findLast(e => e.draw);
         const state = ReadDrawState(gl);
-        event = { index: this._events.length, kind: draw ? 'Draw' : name.startsWith('clear') ? 'Clear' : name,
+        const { kind, label } = this._EventName(name, args, details, ref, program);
+        event = { index: this._events.length, kind, label,
           draw, api: name, args: args.map(value => typeof value === 'number' ? value : String(value)),
-          drawInfo: DrawInfo(gl, name, args),
+          drawInfo: DrawInfo(gl, name, args), shaderName: program?.name || null,
           pass: this._stack.at(-1)?.id ?? null, path: this._stack.map(p => p.name).join('/') || 'Render',
-          label: draw ? details?.object || name : name, target: target.name, targetId: target.id,
+          target: target.name, targetId: target.id, targetSize: [target.width, target.height],
           cpuMs: 0, gpuMs: null, details, state,
           uniforms: program?.uniforms || [], blocks: program?.blocks || [],
           programId: draw ? [...this._programs.keys()].indexOf(gl.getParameter(gl.CURRENT_PROGRAM)) : -1,
@@ -234,7 +286,7 @@ export class FrameDebugger {
             : previous.targetId !== target.id ? 'Render target changed' : previous.path !== (this._stack.map(p => p.name).join('/') || 'Render') ? 'Pass changed'
               : previous.details?.geometryId !== details?.geometryId ? 'Geometry / buffer changed' : 'Separate submission; WebGL exposes no engine batching decision',
           _target: target, _object: ref ? { ...ref } : null };
-        if (program) event.textures = this._Textures(program.uniforms, ref?.material);
+        if (program) { const handles = []; event.textures = this._Textures(program.uniforms, ref?.material, handles); event._textureHandles = handles; }
         this._events.push(event);
       }
       const copied = args.map(value => { if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) this._Budget(value.byteLength); return CopyValue(value); });
@@ -253,24 +305,61 @@ export class FrameDebugger {
     }
     return result;
   }
+  _EventName(name, args, details, ref, program) {
+    const gl = this.gl;
+    if (DRAW.test(name)) {
+      const fullscreen = !!ref && ref.object === this.post?.blitter?.mesh;
+      const kind = !ref ? 'Draw Procedural' : fullscreen ? 'Draw Fullscreen' : /^multiDraw/.test(name) ? 'Draw Batched'
+        : /Instanced/.test(name) ? 'Draw Mesh Instanced' : 'Draw Mesh';
+      const label = details?.nameSource === 'id' && fullscreen ? program?.name || this._stack.at(-1)?.name || details.name : details?.name || program?.name || name;
+      return { kind, label };
+    }
+    if (name === 'clear') return { kind: 'Clear', label: MaskLabel(gl, args[0]) };
+    if (name.startsWith('clearBuffer')) return { kind: 'Clear', label: `(${args[0] === gl.COLOR ? `Color ${args[1]}` : args[0] === gl.DEPTH ? 'Depth' : args[0] === gl.STENCIL ? 'Stencil' : 'Depth Stencil'})` };
+    if (name === 'blitFramebuffer') {
+      const source = this._framebuffers.get(gl.getParameter(gl.READ_FRAMEBUFFER_BINDING))?.name;
+      return { kind: 'Blit', label: `${MaskLabel(gl, args[8])}${source ? ` ${source} →` : ''}` };
+    }
+    if (name === 'generateMipmap') return { kind: 'Generate Mips', label: '' };
+    return { kind: 'Copy Texture', label: `(${name})` };
+  }
+  _ObjectName(object, geometry, material) {
+    if (object.name) return { name: object.name, source: 'Object3D.name' };
+    const owners = [...this._stack].reverse().map(row => this._owners.get(row.id)).filter(Boolean);
+    if (this.post) owners.push(this.post);
+    for (const owner of owners) {
+      const field = FieldName(owner, material);
+      if (field) return { name: `${owner.name || owner.constructor?.name || 'owner'}.${field}`, source: 'owner field' };
+    }
+    const part = geometry.name || material.name || (geometry.type !== 'BufferGeometry' ? geometry.type : null);
+    const ancestor = NamedAncestor(object);
+    if (ancestor) return { name: `${ancestor} › ${part || object.type}`, source: 'named ancestor' };
+    if (part) return { name: part, source: geometry.name ? 'geometry.name' : material.name ? 'material.name' : 'geometry.type' };
+    return { name: `${object.type}#${object.id}`, source: 'id' };
+  }
   _Details(ref) {
     if (!ref) return null;
     const { object, geometry, material, camera, group } = ref;
+    const naming = this._ObjectName(object, geometry, material);
     const attributes = Object.entries(geometry.attributes).map(([name, attribute]) => ({ name,
       count: attribute.count, itemSize: attribute.itemSize, normalized: attribute.normalized,
       type: (attribute.array || attribute.data?.array)?.constructor.name,
       bytes: (attribute.array || attribute.data?.array)?.byteLength, divisor: attribute.isInstancedBufferAttribute ? attribute.meshPerAttribute : 0 }));
-    return { object: object.name || `${object.type}#${object.id}`, objectId: object.id, path: ObjectPath(object),
-      geometry: geometry.name || `Geometry#${geometry.id}`, geometryId: geometry.id, vertices: geometry.attributes.position?.count || 0,
+    return { name: naming.name, nameSource: naming.source, object: object.name || `${object.type}#${object.id}`, objectId: object.id, objectType: object.type, path: ObjectPath(object),
+      phase: material.transparent ? 'Transparent' : /^Background/.test(material.name || '') ? 'Skybox' : 'Opaque',
+      renderOrder: object.renderOrder, layers: object.layers.mask, frustumCulled: object.frustumCulled, castShadow: object.castShadow, receiveShadow: object.receiveShadow,
+      geometry: geometry.name || `Geometry#${geometry.id}`, geometryType: geometry.type, geometryId: geometry.id, vertices: geometry.attributes.position?.count || 0,
       indices: geometry.index?.count || 0, instances: object.isInstancedMesh ? object.count : geometry.instanceCount || 1,
       group: group ? { ...group } : null, drawRange: { ...geometry.drawRange }, attributes,
       material: material.name || `${material.type}#${material.id}`, materialId: material.id, shader: material.type,
+      materialFlags: { transparent: material.transparent, side: ['Front', 'Back', 'Double'][material.side] ?? material.side, blending: material.blending,
+        depthTest: material.depthTest, depthWrite: material.depthWrite, alphaTest: material.alphaTest, opacity: material.opacity, toneMapped: material.toneMapped, fog: material.fog },
       camera: camera.name || `${camera.type}#${camera.id}`, keywords: { ...material.defines },
       textures: Object.entries(material).filter(([, value]) => value?.isTexture).map(([name, texture]) => ({ binding: name, ...TextureInfo(texture) })),
       worldMatrix: object.matrixWorld.toArray(), viewMatrix: camera.matrixWorldInverse.toArray(), projectionMatrix: camera.projectionMatrix.toArray(),
       source: object.userData?.source || geometry.userData?.source || null };
   }
-  _Textures(uniforms, material) {
+  _Textures(uniforms, material, handles = []) {
     const gl = this.gl, known = new Map();
     const Add = texture => {
       if (Array.isArray(texture)) { texture.forEach(Add); return; }
@@ -294,6 +383,7 @@ export class FrameDebugger {
           const texture = gl.getParameter(binding);
           textures.push({ uniform: uniform.name, arrayIndex: index, unit, sampler: uniform.type,
             ...(known.get(texture) || { name: texture ? 'GPU texture (no source asset)' : 'Unbound' }) });
+          handles.push(texture);
         }
       }
     } finally { gl.activeTexture(active); }
@@ -305,7 +395,8 @@ export class FrameDebugger {
     while (this._stack.length) this.Pop();
     this.capture.cpuMs = Math.max(0, performance.now() - this._start - (this._overhead - this._startOverhead));
     this._hooks.reverse().forEach(Restore => Restore()); this._hooks = [];
-    this.capture.programs = [...this._programs.values()].map(program => ({ sources: program?.sources || [] }));
+    try { this._Organize(); } catch (error) { this.Abort(error); return; }
+    this.capture.programs = [...this._programs.values()].map(program => ({ name: program?.name || null, sources: program?.sources || [] }));
     this._endState = SaveGlState(this.gl);
     this._endTarget = this.renderer.getRenderTarget();
     this._endFace = this.renderer.getActiveCubeFace(); this._endMip = this.renderer.getActiveMipmapLevel();
@@ -324,6 +415,66 @@ export class FrameDebugger {
       });
     }
     this.revision++; this.Poll();
+  }
+  // Unity-like hierarchy after the fact: scene submissions inside a pass get a
+  // Render group; opaque / skybox / transparent runs get Draw* groups; draws
+  // outside every pass get one group per target. Groups own the commands
+  // between their siblings, so their GPU segment includes state setup.
+  _Organize() {
+    const events = this._events, passes = this._passes;
+    const Inside = (row, start, end) => row.commandStart >= start && row.commandEnd <= end && row.commandEnd > row.commandStart;
+    const Items = (container, start = -Infinity, end = Infinity) => [
+      ...events.filter(event => event.pass === container && event.command >= start && event.command < end).map(event => ({ at: event.command, end: event.command + 1, event })),
+      ...passes.filter(pass => pass.parent === container && Inside(pass, start, end)).map(pass => ({ at: pass.commandStart, end: pass.commandEnd, pass }))].sort((a, b) => a.at - b.at);
+    const Group = (name, parent, commandStart, commandEnd, cpuMs, synthetic) => {
+      const members = events.filter(event => event.pass === parent && event.command >= commandStart && event.command < commandEnd);
+      const children = passes.filter(pass => pass.parent === parent && Inside(pass, commandStart, commandEnd));
+      const indices = [...members.map(event => event.index), ...children.filter(pass => pass.last >= pass.first).flatMap(pass => [pass.first, pass.last])];
+      if (!indices.length) return null;
+      const row = { id: passes.length, name, path: '', parent, first: Math.min(...indices), last: Math.max(...indices),
+        cpuMs: cpuMs ?? members.reduce((sum, event) => sum + event.cpuMs, 0) + children.reduce((sum, pass) => sum + pass.cpuMs, 0),
+        gpuMs: null, draws: 0, commandStart, commandEnd, synthetic };
+      passes.push(row);
+      for (const event of members) event.pass = row.id;
+      for (const pass of children) pass.parent = row.id;
+      return row;
+    };
+    const Phase = item => item.event?.draw ? item.event.details?.phase || 'Opaque' : null;
+    for (const span of [...this._renders].sort((a, b) => (a.commandEnd - a.commandStart) - (b.commandEnd - b.commandStart))) {
+      const inside = Items(span.parent, span.commandStart, span.commandEnd);
+      if (events.filter(event => event.command >= span.commandStart && event.command < span.commandEnd).length < 3) continue;
+      // A render call that is (apart from its clears) the whole pass needs no extra level.
+      const outside = Items(span.parent).filter(item => item.at < span.commandStart || item.end > span.commandEnd).some(item => item.pass || item.event.kind !== 'Clear');
+      let container = span.parent;
+      if (span.parent == null || outside) container = Group(`Render ${span.scene}`, span.parent, span.commandStart, span.commandEnd, span.cpuMs, 'render')?.id ?? span.parent;
+      const items = container === span.parent ? inside : Items(container, span.commandStart, span.commandEnd);
+      const draws = items.filter(Phase);
+      if (draws.length < 4 || new Set(draws.map(Phase)).size < 2) continue;
+      const runs = []; let cursor = span.commandStart, run = null;
+      for (const item of items) {
+        const phase = Phase(item);
+        if (phase && run?.phase === phase) run.end = item.end;
+        else if (phase) { run = { phase, start: cursor, end: item.end }; runs.push(run); }
+        else run = null;
+        cursor = item.end;
+      }
+      for (const run of runs) Group(PHASE_GROUPS[run.phase], container, run.start, run.end, null, 'phase');
+    }
+    const loose = []; let cursor = 0, run = null;
+    for (const item of Items(null)) {
+      if (item.event && run?.target === item.event.target) run.end = item.end;
+      else if (item.event) { run = { target: item.event.target, start: cursor, end: item.end }; loose.push(run); }
+      else run = null;
+      cursor = item.end;
+    }
+    for (const run of loose) Group(`(Unscoped) → ${run.target}`, null, run.start, run.end, null, 'unscoped');
+    const Path = row => row.parent == null ? row.name : `${Path(passes[row.parent])}/${row.name}`;
+    const Depth = row => row.parent == null ? 0 : Depth(passes[row.parent]) + 1;
+    for (const row of passes) { row.path = Path(row); row.depth = Depth(row); row.draws = 0; }
+    for (const event of events) {
+      event.path = event.pass == null ? 'Render' : passes[event.pass].path;
+      if (event.draw) for (let id = event.pass; id != null; id = passes[id].parent) passes[id].draws++;
+    }
   }
   _ResetReplay() {
     const gl = this.gl;
@@ -344,7 +495,7 @@ export class FrameDebugger {
   }
   _Run(command) { command.receiver[command.name](...command.args); }
   _MeasureReplay() {
-    this._queries = [];
+    this._queries = []; this._replayedAt = null;
     if (!this._timer) return;
     const gl = this.gl, cuts = new Set([0, this._commands.length]);
     for (const event of this._events) { cuts.add(event.command); cuts.add(event.command + 1); }
@@ -389,6 +540,7 @@ export class FrameDebugger {
     const event = this._events[this.selected]; if (!event) return null;
     this._ResetReplay();
     for (let i = 0; i <= event.command; i++) this._Run(this._commands[i]);
+    this._replayedAt = this.selected;
     this.revision++;
     return event;
   }
@@ -398,6 +550,15 @@ export class FrameDebugger {
     const attachment = target.attachments[attachmentIndex];
     if (!attachment || attachment.stencil) throw new Error('This attachment has no color/depth preview');
     return ReadOutput(this.gl, target.framebuffer, attachment, options);
+  }
+  // A sampled texture as the event's draw sees it (replay state after the draw).
+  TexturePreview(index, binding, options = {}) {
+    if (!this.frozen) throw new Error('Capture a frame first');
+    const event = this._events[index], texture = event?.textures?.[binding], handle = event?._textureHandles?.[binding];
+    if (!texture || !handle) throw new Error('Unbound texture');
+    if (!/^SAMPLER_2D(_SHADOW)?$/.test(texture.sampler)) throw new Error(`${texture.sampler} has no 2D preview`);
+    if (this._replayedAt !== index) this.Replay(index);
+    return ReadTexture(this.gl, handle, { sourceWidth: texture.width, sourceHeight: texture.height, depth: texture.isDepth || /SHADOW/.test(texture.sampler), ...options });
   }
   Present(output = null) {
     if (!output) { this._viewOverlay?.remove(); this._viewOverlay = null; return; }
@@ -418,7 +579,7 @@ export class FrameDebugger {
   Inspect() {
     if (!this.capture) return { state: this.state, error: this.error };
     return { state: this.state, selected: this.selected, error: this.error, ...this.capture,
-      events: this._events.map(({ _target, _object, _query, ...event }) => ({ ...event,
+      events: this._events.map(({ _target, _object, _query, _textureHandles, ...event }) => ({ ...event,
         attachments: _target.attachments.map(({ object, ...attachment }) => ({ ...attachment, format: EnumName(this.gl, attachment.format) })) })) };
   }
   Abort(error) { this.error = String(error?.message || error); this.Resume(); this.state = 'error'; this.revision++; }
@@ -444,7 +605,7 @@ export class FrameDebugger {
     this._copies = []; this._deletes = []; this._commands = []; this._events = []; this._programs?.clear(); this._buffers?.clear();
     this._framebuffers?.clear(); this._savedObjects?.clear(); this._profileStack = [];
     this._initial = null; this._endState = null; this._endTarget = null; this._pendingTarget = null;
-    this._passes = []; this._stack = []; this._object = null; this._drawScope = null;
+    this._passes = []; this._stack = []; this._object = null; this._drawScope = null; this._renders = []; this._owners?.clear(); this._replayedAt = null;
     this.capture = null; this.state = 'idle'; this.selected = -1;
     if (this._resumeProfiler) this.profiler?.Resume(); this._resumeProfiler = false;
     if (this._hostFrozen) { this._hostFrozen = false; this.onResume?.(); }

@@ -215,6 +215,9 @@ export const testDefs = {
     desc: "P012独立入口、真实行走交互与画面取证" },
   WallPlanTest: { file: "Script_WallPlanTest.mjs", desc: "样条围墙规划契约：贴地/缺口/闭环角搭/塌段/确定性（纯 Node，毫秒级）" },
   TerrainBlendTest: { file: "Script_TerrainBlendTest.mjs", timeoutMs: 180000, desc: "GPU terrain contact albedo/normal/roughness, depth mask and lifecycle" },
+  TerrainTrailRulesTest: { file: "Script_TerrainTrailRulesTest.mjs", desc: "地面脚印与痕迹规则层：印章图集（鞋纹/履带）、环形窗口露出条带暴力核对、历史回填与减淡、落脚判定（纯 Node）" },
+  TerrainTrailsTest: { file: "Script_TerrainTrailsTest.mjs", timeoutMs: 240000, desc: "脚印痕迹靶 GPU 夹具：写靶/左右镜像/减淡/滑窗回填/跨靶边/地形与壕沟着色/石材不编/履带车辆/采样器" },
+  TerrainTrailsBrowserTest: { file: "Script_TerrainTrailsBrowserTest.mjs", timeoutMs: 900000, desc: "第一关实机：真按 W 落印、班组真实脚骨落脚、开关痕迹 pass 印子处像素变化、程序链接与采样器" },
   TrenchSurfaceTest: { file: "Script_TrenchSurfaceTest.mjs", desc: "Wet trench assets and shared terrain contact update/reset" },
   SandbagStandardTest: { file: "Script_SandbagStandardTest.mjs", desc: "唯一沙袋模型：GLB 袋底实测、贴地数学、禁用旧沙袋画法（纯 Node）" },
   TrenchPlanTest: { file: "Script_TrenchPlanTest.mjs", desc: "壕沟样条规划契约：legacy 逐点等价/热路径/三岔口/并集抛土/宽深有界/布设/圆角（纯 Node，秒级）" },
@@ -247,6 +250,10 @@ export const testDefs = {
   DeathCollapseTest: { file: "Script_DeathCollapseTest.mjs", timeoutMs: 300000,
     desc: "Kimodo受击倒下：两军四候选、稳定随机、全身贴地与终帧保持" },
   CharacterHitboxMathTest: { file: "Script_CharacterHitboxMathTest.mjs", desc: "人物子弹代理：精确球/胶囊首交点（纯 Node）" },
+  NeckDeathTest: { file: "Script_NeckDeathTest.mjs", desc: "敌军喉咙窒息哽咽：脖子几何 / 刀·枪·阵营·距离·概率闸 / 抽签确定性 / 清单接线（纯 Node，毫秒级）" },
+  NeckDeathBrowserTest: { file: "Script_NeckDeathBrowserTest.mjs", timeoutMs: 300000, desc: "敌军喉咙窒息哽咽真引擎链：近处刀杀/脖子中弹放 neckDeath 并顶替日语痛呼，远/没抽中/让位/脚本 Kill/国军都不放" },
+  HitReactionTest: { file: "Script_HitReactionTest.mjs", desc: "受击物理反应规则层：冲量分配的符号与比例 / 弹簧积分稳定·限位·休眠 / 死亡包络 fadeEnd 归零 / 方向死亡选择 16 向 × 部位与库缺失退路 / Soldier 接线（纯 Node，毫秒级）" },
+  HitReactionBrowserTest: { file: "Script_HitReactionBrowserTest.mjs", timeoutMs: 600000, desc: "受击物理反应真引擎：NRA+IJA 真实 GLB 双胞胎对拍骨骼世界角度对上契约 §4、方向死亡 16 向倒向与接地、无 hit 老路不变、?hitreact=0、复用清零、30 人每帧耗时（--require-library 强制库内四族）" },
   PlayerDeathTest: {file:"Script_PlayerDeathTest.mjs",desc:"First-person collapse stance/slope/platform/wall continuity and held endpoint"},
   PlayerHitboxTest: { file: "Script_PlayerHitboxTest.mjs", desc: "玩家命中几何：三姿态分段 / 正面部位次序 / 卧倒藏躯干 / 瞄点 / 散点部位分布（纯 Node，毫秒级）" },
   PlayerActorBlockTest: { file: "Script_PlayerActorBlockTest.mjs", desc: "玩家走不进人物身体：正面挡/贴边滑/窄缝/被挤出/豁免（纯 Node）" },
@@ -361,7 +368,7 @@ export const testDefs = {
   VoiceTest: { file: "Script_VoiceTest.mjs", desc: "语音资产与降级链" },
   MenuTest: { file: "Script_MenuTest.mjs", desc: "主菜单接线 29 条" },
   DeathMenuTest: { file: "Script_DeathMenuTest.mjs", desc: "阵亡独立状态与检查点恢复" },
-  BootPropTest: { file: "Script_BootPropTest.mjs", desc: "开机陈设道具计数" },
+  BootPaperTest: { file: "Script_BootPaperTest.mjs", desc: "加载画面报纸剪报：清单 / 图 / 文本 / 贴图清单对齐" },
   // 现有套件已扩到 160 项，含音频试听、完整县城/车厢切换与三套 PBR 截图；
   // 实机约 12—14 分钟，继续吃 10 分钟默认值会在末段稳定误报 timeout。
   EditorTest: { file: "Script_EditorTest.mjs", timeoutMs: 16 * 60 * 1000,
@@ -500,16 +507,17 @@ export const browserTests = new Set([
   'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
   'ProneCrawlTest', 'ActorLocomotionTest', 'BackRifleRunTest', 'MeleeAnimationTest', 'DadaoSwingTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
+  "HitReactionBrowserTest",
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest",
-  "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
+  "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
   "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest",
-  "PerformanceTest", "PhysicsTest", "PostTest", "TerrainBlendTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
+  "PerformanceTest", "PhysicsTest", "PostTest", "TerrainBlendTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "TrenchEditorTest", "VisibilityTest", "VoiceTest",
@@ -542,6 +550,7 @@ export const tier0Fast = [
   "TextGatherCheck",
   "BootPayloadTest",
   "TerrainLayersTest",
+  "TerrainTrailRulesTest",
   "TextureStandardsTest",
   "AssetStandardsTest",
   "ModelFacingTest",
@@ -552,6 +561,8 @@ export const tier0Fast = [
   "CharacterModelTest",
   "CharacterSurfaceTest",
   "CharacterHitboxMathTest",
+  "NeckDeathTest",
+  "HitReactionTest",
   "PlayerHitboxTest",
   "PlayerActorBlockTest",
   "NavRefreshSpreadTest",
@@ -619,11 +630,11 @@ export const domains = {
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
   firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','FirstLevelFarBankTest','PontoonBridgeTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','LitterGaitTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
-  animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
+  animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest','HitReactionTest','HitReactionBrowserTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "TerrainLayersTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "TrenchPlanTest", "TrenchSurfaceTest", "PhysicsTest", "JumpTest", "DestructionTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "TerrainLayersTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "TrenchPlanTest", "TrenchSurfaceTest", "PhysicsTest", "JumpTest", "DestructionTest", "TerrainTrailRulesTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
@@ -633,7 +644,9 @@ export const domains = {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
-      "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
+      "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "ModelFacingTest",
+      // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
+      "HitReactionTest", "HitReactionBrowserTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
       // 两条都是纯 Node 毫秒级，碰伤害口径或相机的改动连着跑。
       "PlayerHitboxTest", "CameraShakeTest",
@@ -684,7 +697,7 @@ export const domains = {
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
-  menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "PlayerDeathTest", "BootPropTest"] },
+  menu: { label: "主菜单/加载画面", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
@@ -699,7 +712,7 @@ export const domains = {
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
     // 开机顺序（存档画质何时套上）与关卡预热的改动连着 SavedGraphicsWarmTest 跑（约一分半）。
-    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest"],
+    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -772,6 +785,9 @@ const changedDomainRules = [
   {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing|GrenadeThrow/},
   {domain:"combat",pattern:/HitDisorientation/},
   {domain:'render',pattern:/TerrainBlend|TrenchSurfaceMaterial/},
+  // 地面脚印与痕迹（docs/Data_TerrainTrails.md）：痕迹靶 pass、地形 / 壕沟 / 砸坑着色接入、人物骨架与战车登记。
+  {domain:'terrain',pattern:/TerrainTrail|Script_TerrainMaterial|Script_TerrainDeformationView/},
+  {domain:'render',pattern:/TerrainTrail/},
   {domain:'motionVector',pattern:/MotionVector|PostPrepass|Script_Post\.mjs|Actor|Skinn|Skeleton|Viewmodel|FpsArm|BackRifle|Binoculars|Data_Tuning_Graphics/},
   { domain: "render", pattern: /UniformColors/ },
   // 人物表面层（2026-09-28 B3）：补丁读蒙皮前的 position（运动矢量）、改人物材质（采样器 / 预热 / 远景合批）。
@@ -788,6 +804,9 @@ const changedDomainRules = [
   {domain:'propVelocity',pattern:/CarriagePropVelocity|CartCorpseBump|PostPrepass|FirstLevelMissionView|FirstLevelTransferCart|FirstLevelMissionColumn|DraftCartModel|StretcherAsset|StretcherBake|Model_(WoodenEvacCart|WorkingOx|WorkingHorse|BambooStretcher)|OxCartBake/},
   { domain: "render", pattern: /DeathPose|Data_Tuning_ActorDeath/ },
   { domain: "animation", pattern: /DeathCollapse|DeathPose|ActorDeath|MotionDeath/ },
+  // 受击物理反应（docs/Data_HitReaction.md）：规则 / 数值 / 弹簧层 / 方向死亡动作库，归 combat（挂在 TakeHit/Kill）也归 animation（改倒地动作）。
+  { domain: "combat", pattern: /HitReaction|DeathImpact/ },
+  { domain: "animation", pattern: /HitReaction|DeathImpact/ },
   {domain:"hud",pattern:/IncomingFire/},
   {domain:"squadMarch",pattern:/SquadMarch/},
   // 整关驾驶脚本拆成了「公共 Kit + 三段」（2026.09.19 重构，第二波三个玩法包各改一段）。
@@ -889,7 +908,7 @@ const changedDomainRules = [
   { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Telegraph|Whitebox|DebugOptions|Script_Input|Style_Game|index\.html)/i },
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },
   { domain: "voice", pattern: /(Voice|Dialogue|Speech)/i },
-  { domain: "menu", pattern: /(Menu|Style_Interface|BootProp|index\.html|Font_Title|\/Font\/)/i },
+  { domain: "menu", pattern: /(Menu|Style_Interface|BootPaper|index\.html|Font_Title|\/Font\/)/i },
   { domain: "editor", pattern: /(Editor|Style_Interface|AssetStandards|Pcg|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|Data_Script|TengxianScript|Mission|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
   { domain: "render", pattern: /(CharacterWounds|Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Blood|SurfaceDecals|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Atmosphere|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|FrameDebug|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },

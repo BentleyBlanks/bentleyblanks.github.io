@@ -237,6 +237,10 @@ export class FirstLevelWhiteboxField {
             surface: trench ? MakeTrenchSurfacePatch(this.terrainLayers, this.quality, this.trenchSurface, this.terrainContact) : null }));
         if(trench)this.materials.get(semantic).userData.terrainBlendSource=true;
         const scratch = [0, 0, 0];
+        // 地面脚印与痕迹（docs/Data_TerrainTrails.md）：脚离地多高按**地形**算（楼板、踏板、车上不算，不出印）。
+        const { TerrainTrailSystem } = await import("./Script_TerrainTrails.mjs");
+        this.trailSystem = TerrainTrailSystem;
+        TerrainTrailSystem.AttachGround(this, (x, z) => this.TerrainHeight(x, z));
         this.SampleGroundSurface = this.layout.SampleGroundSurface;
         this.SampleGroundColor = (x, z, out) => this.layout.SampleGroundSurface(x, z, out, scratch);
       } catch (error) {
@@ -948,6 +952,7 @@ export class FirstLevelWhiteboxField {
 
   Dispose() {
     SetInteriorVolumes(null);
+    this.trailSystem?.DetachGround(this); this.trailSystem = null;
     this.breakableTrees?.Dispose(); this.breakableTrees=null;
     this.vegetation?.Dispose(); this.vegetation=null; this.vegetationAtlas?.dispose(); this.vegetationAtlas=null;
     this.legend?.remove(); this.legend = null;

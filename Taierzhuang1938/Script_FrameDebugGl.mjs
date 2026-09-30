@@ -114,7 +114,9 @@ export function ReadProgram(gl, program) {
   }
   const sources = (gl.getAttachedShaders(program) || []).map(shader => ({
     stage: gl.getShaderParameter(shader, gl.SHADER_TYPE) === gl.VERTEX_SHADER ? 'Vertex' : 'Fragment', source: gl.getShaderSource(shader) }));
-  return { uniforms, blocks, sources, Restore() { gl.useProgram(program); for (const [name, args] of restore) gl[name](...args); } };
+  // three injects `#define SHADER_NAME <material.name>`; empty for unnamed materials.
+  const name = sources.map(source => source.source?.match(/^#define SHADER_NAME (.+)$/m)?.[1]?.trim()).find(Boolean) || null;
+  return { name, uniforms, blocks, sources, Restore() { gl.useProgram(program); for (const [name, args] of restore) gl[name](...args); } };
 }
 
 export function ReadDrawState(gl) {
@@ -127,7 +129,9 @@ export function ReadDrawState(gl) {
   for (const key of ['DEPTH_FUNC', 'CULL_FACE_MODE', 'FRONT_FACE', 'BLEND_SRC_RGB', 'BLEND_DST_RGB', 'BLEND_SRC_ALPHA', 'BLEND_DST_ALPHA',
     'BLEND_EQUATION_RGB', 'BLEND_EQUATION_ALPHA', 'STENCIL_FUNC', 'STENCIL_FAIL', 'STENCIL_PASS_DEPTH_FAIL', 'STENCIL_PASS_DEPTH_PASS',
     'STENCIL_BACK_FUNC', 'STENCIL_BACK_FAIL', 'STENCIL_BACK_PASS_DEPTH_FAIL', 'STENCIL_BACK_PASS_DEPTH_PASS']) out[key] = EnumName(gl, gl.getParameter(gl[key]));
-  for (const key of ['BLEND', 'CULL_FACE', 'DEPTH_TEST', 'STENCIL_TEST', 'SCISSOR_TEST', 'RASTERIZER_DISCARD']) out[key] = gl.isEnabled(gl[key]);
+  for (const key of ['BLEND', 'CULL_FACE', 'DEPTH_TEST', 'STENCIL_TEST', 'SCISSOR_TEST', 'RASTERIZER_DISCARD',
+    'POLYGON_OFFSET_FILL', 'SAMPLE_ALPHA_TO_COVERAGE', 'DITHER']) out[key] = gl.isEnabled(gl[key]);
+  out.DRAW_BUFFERS = Array.from({ length: gl.getParameter(gl.MAX_DRAW_BUFFERS) }, (_, i) => EnumName(gl, gl.getParameter(gl.DRAW_BUFFER0 + i))).filter(name => name !== 'NONE');
   return out;
 }
 
@@ -214,12 +218,38 @@ export function CopyAttachment(gl, source, attachment, asTexture = false) {
     Dispose() { gl.deleteFramebuffer(framebuffer); if (texture) gl.deleteTexture(texture); if (buffer) gl.deleteRenderbuffer(buffer); } };
 }
 
-export function ReadOutput(gl, source, attachment, { channel = 'rgba', black = 0, white = 1, exposure = 0, width = 960 } = {}) {
+export function ReadOutput(gl, source, attachment, options = {}) {
   const restore = SaveGlState(gl);
+  let input = null;
+  try {
+    input = CopyAttachment(gl, source, attachment, true);
+    return DrawPreview(gl, input.texture, attachment.width, attachment.height, attachment.depth, options);
+  } finally { input?.Dispose(); restore(); }
+}
+
+// Reads a texture exactly as the selected draw sees it (after replay). Only
+// float/normalized 2D textures: integer and cube/array/3D samplers are skipped.
+// Filtering and depth-compare are forced to NEAREST / NONE for the read and put back.
+export function ReadTexture(gl, texture, { sourceWidth, sourceHeight, depth = false, ...options } = {}) {
+  if (!texture) throw new Error('Texture is not bound');
+  const restore = SaveGlState(gl);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texture);
+  const saved = [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER, gl.TEXTURE_COMPARE_MODE].map(name => [name, gl.getTexParameter(gl.TEXTURE_2D, name)]);
+  try {
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.NONE);
+    return DrawPreview(gl, texture, sourceWidth || options.width || 64, sourceHeight || sourceWidth || options.width || 64, depth, options);
+  } finally {
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texture);
+    for (const [name, value] of saved) gl.texParameteri(gl.TEXTURE_2D, name, value);
+    restore();
+  }
+}
+
+function DrawPreview(gl, input, sourceWidth, sourceHeight, depth, { channel = 'rgba', black = 0, white = 1, exposure = 0, width = 960 } = {}) {
   const resources = [];
   try {
-    const input = CopyAttachment(gl, source, attachment, true); resources.push(() => input.Dispose());
-    const w = Math.min(width, attachment.width), h = Math.max(1, Math.round(attachment.height * w / attachment.width));
+    const w = Math.max(1, Math.min(width, sourceWidth)), h = Math.max(1, Math.round(sourceHeight * w / sourceWidth));
     const target = gl.createFramebuffer(), texture = gl.createTexture();
     resources.push(() => { gl.deleteFramebuffer(target); gl.deleteTexture(texture); });
     gl.bindTexture(gl.TEXTURE_2D, texture); gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, w, h);
@@ -233,10 +263,10 @@ export function ReadOutput(gl, source, attachment, { channel = 'rgba', black = 0
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
     const vao = gl.createVertexArray(); resources.push(() => gl.deleteVertexArray(vao)); gl.bindVertexArray(vao);
-    gl.useProgram(program); gl.activeTexture(gl.TEXTURE0); gl.bindSampler(0, null); gl.bindTexture(gl.TEXTURE_2D, input.texture);
+    gl.useProgram(program); gl.activeTexture(gl.TEXTURE0); gl.bindSampler(0, null); gl.bindTexture(gl.TEXTURE_2D, input);
     gl.uniform1i(gl.getUniformLocation(program, 'tex'), 0);
     gl.uniform3f(gl.getUniformLocation(program, 'levels'), black, white, exposure);
-    gl.uniform1i(gl.getUniformLocation(program, 'channel'), attachment.depth ? 1 : ({ rgba: -1, rgb: 0, r: 1, g: 2, b: 3, a: 4 })[channel] ?? 0);
+    gl.uniform1i(gl.getUniformLocation(program, 'channel'), depth ? 1 : ({ rgba: -1, rgb: 0, r: 1, g: 2, b: 3, a: 4 })[channel] ?? 0);
     for (const flag of [gl.DEPTH_TEST, gl.STENCIL_TEST, gl.CULL_FACE, gl.BLEND, gl.SCISSOR_TEST, gl.RASTERIZER_DISCARD]) gl.disable(flag);
     gl.colorMask(true, true, true, true); gl.viewport(0, 0, w, h);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -247,5 +277,5 @@ export function ReadOutput(gl, source, attachment, { channel = 'rgba', black = 0
     const flipped = new Uint8ClampedArray(pixels.length);
     for (let y = 0; y < h; y++) flipped.set(pixels.subarray(y * w * 4, (y + 1) * w * 4), (h - y - 1) * w * 4);
     return { width: w, height: h, pixels: flipped };
-  } finally { resources.reverse().forEach(Dispose => Dispose()); restore(); }
+  } finally { resources.reverse().forEach(Dispose => Dispose()); }
 }

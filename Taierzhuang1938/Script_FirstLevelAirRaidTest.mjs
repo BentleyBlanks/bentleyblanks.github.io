@@ -195,7 +195,7 @@ function WaveNow(raid, stage = "Support") {
   const dt = 1 / 30;
   let checked = 0, total = 0;
   for (const key of ["lightVic", "heavySquadron", "lightSquadron"]) {
-    const audio = FakeAudio({ zone: "trench" });
+    const audio = FakeAudio({ zone: "trench", life: 4 });   // 比啸声长：真引擎里它活到被 StopVoice 掐掉
     const { host } = RaidHost(audio);
     const raid = new FirstLevelAirRaid(host, 0x51ed);
     raid.waveIndex = R.order.indexOf(key);
@@ -225,12 +225,13 @@ function WaveNow(raid, stage = "Support") {
       assert.ok(c, `${key}：这颗的啸声起了`);
       const start = c.t - t0;
       assert.ok(start >= b.whistleAt - 1e-6 && start < b.whistleAt + dt + 1e-6, `${key}：落地前 ${(b.tImpact - start).toFixed(2)} s 起播`);
-      // 终点（变调后的剩余长度）落在这颗落地的那一帧上；两者都延迟同一个 d/340。
+      // 终点（变调后的剩余长度）落在这颗落地的那一帧上；不延迟（画面上砸到地的那一刻停）。
       const end = start + (W.durS - c.offset) / c.pitch;
       assert.ok(Math.abs(end - b.tImpact) < 1e-6, `${key}：啸声终点 ${end.toFixed(3)} = 落地 ${b.tImpact.toFixed(3)}`);
-      assert.ok(Math.abs(c.delay - arrive) < 1e-9 && c.propagate === false, `${key}：按落点距离延迟 ${arrive.toFixed(2)} s`);
+      assert.ok(!c.delay && c.propagate === false, `${key}：不按传播延迟（落地画面那一刻停）`);
       const pd = Math.hypot(c.position.x - L.x, c.position.z - L.z);
-      assert.ok(pd < flat(b) * (W.share + 0.01) && c.position.y > b.at.y + W.heightM - 1e-6, `${key}：摆在头顶这一侧（${pd.toFixed(0)} m）`);
+      assert.ok(c.position.y >= Math.max(L.y, b.at.y) + W.minHeightM - 1e-6, `${key}：声源不贴地（${c.position.y.toFixed(0)} m）`);
+      assert.ok(pd > 0 && pd < flat(b) * 3, `${key}：摆在听者与弹之间（${pd.toFixed(0)} m）`);
       assert.ok(c.selfCapped && c.bus === "sfx" && c.sourceSizeM === W.sizeM, `${key}：走 sfx / selfCapped / 声源尺寸`);
       // 啸声硬停之后一定有爆炸：落地那一帧给了本体，而且走 priority。
       const boom = audio.calls.find((x) => x.cue === R.audio.cue && !x.delay && Math.abs(x.position.x - b.at.x) < 1e-6 && Math.abs(x.position.z - b.at.z) < 1e-6);
@@ -238,10 +239,44 @@ function WaveNow(raid, stage = "Support") {
       checked += 1;
     }
     total += calls.length;
+    assert.ok(audio.stops >= calls.length, `${key}：落地那一帧掐掉啸声（StopVoice ${audio.stops} 次）`);
     assert.ok(raid.peakVoices <= R.audio.maxVoices, `${key}：本层声部峰值 ${raid.peakVoices} ≤ ${R.audio.maxVoices}`);
     assert.equal(raid.State().whistles, calls.length);
   }
-  Ok(`下落啸声：三种编队共 ${total} 条，全部在爆炸声到耳朵的那一刻停住、那一颗必出爆炸声`);
+  // 游戏时钟落后于音频时钟（帧封顶 0.05 s、卡顿）：变速把素材终点拉回到落地那一帧。
+  // 假引擎：音频时钟每帧走 1/20 s、游戏每帧只走 1/30 s（游戏跑在 0.67 倍速）——不变速的话 2.78 s 的素材在游戏里 1.85 s 就放完。
+  {
+    const audio = FakeAudio({ zone: "trench", life: 4 });
+    const voices = [];
+    const play = audio.Play;
+    audio.ctx = { currentTime: 0 };
+    audio.Play = (cue, o = {}) => {
+      const v = play(cue, o);
+      if (cue !== W.cue) return v;
+      const t0 = audio.ctx.currentTime;
+      let pos = o.offset || 0, last = t0, cur = o.pitch;
+      v.SamplePos = () => Math.min(W.durS, pos + (audio.ctx.currentTime - last) * cur);
+      v.SetRate = (m) => { pos = v.SamplePos(); last = audio.ctx.currentTime; cur = o.pitch * Math.max(W.rateMin, m); };
+      v.o = o; voices.push(v);
+      return v;
+    };
+    const { host } = RaidHost(audio);
+    const raid = new FirstLevelAirRaid(host, 0x51ed);
+    raid.waveIndex = R.order.indexOf("heavySquadron");
+    const wave = WaveNow(raid, "MachineGun");
+    const picked = wave.bombs.filter((b) => b.whistleAt != null);
+    const endPos = new Map();
+    const origImpact = raid.Impact.bind(raid);
+    raid.Impact = (plan, b) => { if (b.whistleVoice) endPos.set(b, b.whistleVoice.SamplePos()); return origImpact(plan, b); };
+    while (raid.wave) { audio.ctx.currentTime += 1 / 20; audio.Tick(1 / 30); raid.Update(1 / 30, "MachineGun", { started: true }); }
+    assert.equal(endPos.size, picked.length, "每条啸声都活到了落地那一帧");
+    for (const [b, pos] of endPos) {
+      // 实测游戏 0.67 倍速 → 起播往后推，耳朵里仍是整条 2.78 s，落地那一帧正好放到末尾（差不过两帧音频）。
+      assert.ok(pos >= W.durS - 0.1 && pos <= W.durS, `慢了 1.5 倍的游戏里，落地那一帧素材放到 ${pos.toFixed(2)} / ${W.durS} s`);
+      assert.ok(Math.abs(raid.gameSpeed - 2 / 3) < 0.02, `量到的游戏快慢 ${raid.gameSpeed.toFixed(3)}`);
+    }
+  }
+  Ok(`下落啸声：三种编队共 ${total} 条，全部在炸弹落地那一帧停住、那一颗必出爆炸声；游戏只有 2/3 速时起播推后、落地那一帧正好放完`);
 }
 
 // ---------------------------------------------------------------------------

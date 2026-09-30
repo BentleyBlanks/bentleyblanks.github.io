@@ -92,7 +92,8 @@ export const TEXTURE_BUDGETS = Object.freeze({
   tierBytes: Object.freeze({
     "level:FirstLevel": 12 * 1024 * 1024,
     fx: 6.5 * 1024 * 1024,
-    ui: 3.5 * 1024 * 1024,
+    // ui：2026-09-30 加载画面报纸剪报 11 张 ~2 MB 入库，玩家每次开机只下其中 1 张（~0.2 MB），所以整层上限抬到 5.5 MB。
+    ui: 5.5 * 1024 * 1024,
     lazy: 5 * 1024 * 1024,
     editor: 0.25 * 1024 * 1024,
   }),
@@ -142,7 +143,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     id: "Grenade", kind: "material", tier: "boot",
     bake: "_blender/Script_GrenadeDetail.py",
     source: { provider: "imagegen", date: "2026-09-06" },
-    consumers: [{ file: "Script_Main.mjs", token: "Texture_Grenade" }, { file: "Script_BootPropStage.mjs", token: "Texture_Grenade" }],
+    consumers: [{ file: "Script_Main.mjs", token: "Texture_Grenade" }],
     legacy: "1536×768 不是 2 的幂；提示词在仓库外（OneDrive 源工程目录）",
     files: [
       ["Texture_GrenadeBase.webp", "Base", 1536, 768],
@@ -158,7 +159,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     bake: "_import/Script_BakeDadaoPbr.py",
     bakeRecord: "_import/TextureBakes/Texture_Dadao.json",
     source: { provider: "sourcePack", date: "2026-08-26", ref: "CGMOL 逍姚子不逍遥《PBR 次世代二十九军战刀》，源包不分发（_import/Data_SourceLicenses.md）", license: "付费购买，页面声明不限用途" },
-    consumers: [{ file: "Script_Main.mjs", token: "Texture_DadaoBase" }, { file: "Script_BootPropStage.mjs", token: "Texture_DadaoBase" }],
+    consumers: [{ file: "Script_Main.mjs", token: "Texture_DadaoBase" }],
     files: [
       ["Texture_DadaoBase.webp", "Base", 1024, 1024],
       ["Texture_DadaoNormal.webp", "Normal", 1024, 1024],
@@ -719,8 +720,8 @@ export const TEXTURE_MANIFEST = Object.freeze([
     id: "FirstLevelVegetationAtlas", kind: "decal", tier: "level:FirstLevel",
     bake: "_import/Script_BakeVegetationAtlas.py",
     bakeRecord: "_import/TextureBakes/Texture_FirstLevelVegetationAtlas.json",
-    source: { provider: "lovart", date: "2026-09-28",
-      ref: "thread a97e84e9-d6af-432d-9fcd-44e7d3347a58（generate_image_nano_banana_pro，品红底 8 格）",
+    source: { provider: "lovart", date: "2026-09-30",
+      ref: "thread a97e84e9-d6af-432d-9fcd-44e7d3347a58（generate_image_nano_banana_pro，品红底 8 格）；LowTuft 单卡 thread 8bcd6653-78c1-4e5b-8cfc-64bf14fc66e7（2026-09-30 重生成）",
       prompt: "_import/Prompts/Texture_FirstLevelVegetationAtlas.txt" },
     consumers: [{ file: "Data_FirstLevelVegetation.mjs", token: "Texture_FirstLevelVegetationAtlas" }],
     files: [
@@ -1002,6 +1003,25 @@ export const TEXTURE_MANIFEST = Object.freeze([
       ["Menu/Texture_MissionCh4DongguanYe.webp", "Image", 1672, 941],
       ["Menu/Texture_MissionCh5Chengqiang.webp", "Image", 1672, 941],
       ["Menu/Texture_MissionCh6Zuihou.webp", "Image", 1672, 941],
+    ],
+  },
+  {
+    id: "BootPaper", kind: "menu", tier: "ui",
+    source: { provider: "lovart", date: "2026-09-30", ref: "Lovart 项目 oKHfWa1O2A：6 张无印刷的空白做旧纸底（横幅 L1/L2、近方 S1/S2、竖幅 R1/R2）；印刷内容是 Notion 史料页上的原图，由 _import/Script_ComposeBootPaper.py 正片叠底合成", prompt: "_import/Prompts/Texture_BootPaper.txt" },
+    consumers: [{ file: "Data_BootPapers.mjs", token: "Texture_BootPaper" }],
+    budgetReason: "11 张战前报纸剪报（原图印在做旧纸上），每次开机只按需下载其中 1 张（约 0.2 MB），其余 10 张不进玩家的下载量",
+    files: [
+      ["Menu/BootPaper/Texture_BootPaperChinaWeeklyReview19371106.webp", "Image", 1573, 1105],
+      ["Menu/BootPaper/Texture_BootPaperJiuGuoShiBao19371220.webp", "Image", 1569, 1075],
+      ["Menu/BootPaper/Texture_BootPaperLiBao19370709.webp", "Image", 1098, 1149],
+      ["Menu/BootPaper/Texture_BootPaperShenBao19370731.webp", "Image", 775, 1152],
+      ["Menu/BootPaper/Texture_BootPaperWenHui19380125.webp", "Image", 1569, 1075],
+      ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370820.webp", "Image", 754, 1152],
+      ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370906.webp", "Image", 1576, 1152],
+      ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370911.webp", "Image", 775, 1152],
+      ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371001.webp", "Image", 754, 1152],
+      ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371106.webp", "Image", 775, 1152],
+      ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371111.webp", "Image", 1573, 1105],
     ],
   },
   {

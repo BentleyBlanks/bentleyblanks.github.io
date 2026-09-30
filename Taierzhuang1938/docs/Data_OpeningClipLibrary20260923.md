@@ -63,6 +63,14 @@
 
 ## 6. 回归口
 
+- 2026-09-30 02 救援改稿的四条新动作（manifest `20260930OpeningStoryboardsV23WoundedRescue`，代码在烘焙脚本 `WOUNDED RESCUE` 段，可编辑工程 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningWoundedRescue_20260930`）：队友齐射先打伤审问的三个人的胳膊（不死），罗班长再用 `LuoDadaoChopRear` 砍，最后罗班长就地捡枪塞给顺子。
+  - `IjaShotStaggerAway`（IJA02，3.33 s，`holdLoop` 2.08–3.33）：第 0 帧 = `IjaCrouchHairHold` 0.75 s；0.04 s 左肩中弹，左拳松开头发、左臂甩开后软垂、右手按膝起身再攥住左上臂，向右转 180°、六步踉跄往东 1.5 m；根终点 x +0.10 / z +1.50（运行时米）；南墙在右手边 0.40 m（env `wallRightM`，起手的蹲姿本身就进 0.38 m 的墙 3 cm）。
+  - `IjaShotDropRifle`（IJA01，2.5 s，`holdLoop` 1.25–2.5）：第 0 帧 = `IjaReadyRifle` 末帧；0.04 s 右上臂中弹，0.10 s 起枪自由落体、0.46 s 落在右前方地上不动（`weapon` 轨；`weaponState` `twoHand->dropped`，`weaponDropFrom` 指自己），左手攥住右上臂、弓身左前一步；根终点 x −0.10 / z −0.35，转 19°。
+  - `InterpreterShotStagger`（NRA02，3.0 s，`holdLoop` 1.75–3.0）：第 0 帧 = `InterpreterCrouchAsk` 第 0 帧；0.04 s 左上臂中弹，坐倒、右手撑地、连滚带爬起身往右转 146°，沿北墙（0.40 m，斜线，只在烘焙里量）往东 1.35 m；根终点 x +0.75 / z +1.12。
+  - `LuoGrabRifleShove`（NRA05，3.17 s，`holdLoop` 0.5–1.5，`holdExit` 已写）：第 0 帧 = `LuoDadaoChopRear` 末帧；0–0.24 s 把大刀插进左腰带（`weapon` 轨跟手→腰带，`weaponState` `dadaoInBelt`），0.5–1.5 s 前倾 12° 盯顺子眼睛喘气；1.5–1.8 s 右脚出半步深蹲抓起地上的汉阳造（`rifle` 轨，第 0 帧躺在 (+0.40, 0.04, −0.28)，抓握接触 1.80 s），1.82–2.12 s 端到胸前、2.12–2.25 s 塞到 (0, 0.90, −0.58)（事件 `offered` 2.25）、2.42 s 松手（`handed`，`rifle` 轨从这一帧起隐藏），之后向左转 90° 并把刀从腰带拔回右手（`turned` 3.04 s）。
+  - 三条受伤动作的 holdLoop 里脖子比站姿低 ≤ 15 cm（实测低 0.07–0.11 m）；每条 holdLoop 1.0–1.25 s 整帧，接缝实测 ≤ 0.3°、0 cm。受伤三条和罗班长一条的起步帧与前一条终帧的交接：0.28°、0°、0.26°、2.86°。
+  - 烘焙脚本新增环境变量 `OPENING_PLANTDBG=1`（打印超过 1.2 cm 的落脚窗口）；新 clip 用 `FlatOf(T, 构造器, 名字, t)` 取前一条的平面姿态作起点。
+
 - 2026-09-30 重烘罗班长的 `LuoRescueDrag`（翻身时视线水平扫、不再跟着身体滚）与 `LuoHandRifle`（坐起、罗班长绕到左边跪下递枪，5.42 s），manifest `20260930OpeningStoryboardsV22CollarLuoNoRollBack`（与同日的 V21CollarQuestion 合并），口径见 [拖出与递枪](Data_OpeningRescueHandover20260929.md) 第 0 节；烘焙器新增 spec/pose 标记 `framedGrips`（转过的坐标系里握世界坐标的道具）。
 - 2026-09-29 新增罗班长三条（只烘 NRA05）：`LuoPickUpRifleSling`、`LuoRescueDrag`、`LuoHandRifle`，`player` 轨 part 有 `eye`/`gaze`/`crown`（第一人称镜头的位置、朝向、横滚）、`chest`/`chestUp`/`pelvis`/`kneeL/R`/`heelL/R`（第一人称的腿和上衣）、`rifle`/`rifleMuzzle`/`rifleUp`（递过来的枪），口径见 [拖出与递枪](Data_OpeningRescueHandover20260929.md)；manifest `20260929OpeningStoryboardsV19LuoRescue`。
 

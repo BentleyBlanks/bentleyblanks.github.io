@@ -11,7 +11,7 @@
 //   0                引擎声起（一条，挂在长机上，逐帧搬位置 + 多普勒）
 //   tc − 前冲/speed   长机投下一串的中间那颗（前冲距离 = 这一高度、这一速度下炸弹飞过的水平距离）；
 //                    僚机看见长机投弹才按电门，晚零点几秒
-//   tImpact − 2.8 s  长机头一颗与离听者最近的那一颗：下落啸声起（按落点距离延迟，最响处硬停在爆炸声到耳朵的那一刻）
+//   tImpact − 2.8 s  长机头一颗与离听者最近的那一颗：下落啸声起，跟着弹走、按游戏时钟变速，落地那一帧硬停
 //   tImpact          落地：画面先到；地震波 d/600 后一抖；爆炸声由引擎按 d/340 延迟，气浪跟着声音到
 //   最后一颗离机后      上浮几米，压坡度协调转弯（角速度 g·tanφ / v）
 //   (approachM + exitM) / speed  离场，编队收起，引擎声淡出
@@ -87,6 +87,8 @@ export class FirstLevelAirRaid {
     this.impacts = 0;
     this.sounds = 0;
     this.whistles = 0;
+    this.gameSpeed = 1;         // 游戏时钟 ÷ 音频时钟（TrackGameSpeed）
+    this.lastAudioAt = null;
     this.layersDropped = 0;
     this.skipped = 0;
     this.peakVoices = 0;
@@ -125,6 +127,23 @@ export class FirstLevelAirRaid {
     return this.host.SharedRoom ? this.host.SharedRoom(n) !== false : true;
   }
 
+  /**
+   * 游戏时钟相对音频时钟（真实时间）走多快：每帧 dt ÷ 这一帧的 AudioContext 时长，按 speedTauS 做指数平均。
+   * 游戏每帧封顶 0.05 s：帧率掉到 20 以下或卡一下，游戏里的 2.8 s 在耳朵里要 3–5 s（2026-09-30 实测 04 激战
+   * 无头 RTX：低画质 0.85 倍、高画质约 0.5 倍）。没有音频时钟（纯 Node 夹具）恒为 1。
+   */
+  TrackGameSpeed(dt) {
+    const now = this.host.audio?.ctx?.currentTime;
+    if (!Number.isFinite(now)) { this.gameSpeed = 1; return; }
+    const real = this.lastAudioAt == null ? 0 : now - this.lastAudioAt;
+    this.lastAudioAt = now;
+    if (!(real > 1e-4 && real < 0.5 && dt > 0)) return;
+    const W = this.D.audio.whistle;
+    const k = 1 - Math.exp(-real / W.speedTauS);
+    const ratio = Math.max(W.speedMin, Math.min(1.2, dt / real));
+    this.gameSpeed += (ratio - this.gameSpeed) * k;
+  }
+
   StageProfile(stage) { return (stage && this.D.stages[stage]) || null; }
 
   /**
@@ -138,6 +157,7 @@ export class FirstLevelAirRaid {
    */
   Update(dt, stage, { started = false, speaking = false, scripted = false } = {}) {
     this.time += Math.max(0, dt);
+    this.TrackGameSpeed(dt);
     this.speaking = !!speaking;
     const now = this.time;
     this.voices = this.voices.filter((e) => now < e.until && this.host.audio?.pendingVoices?.has?.(e.v) !== false);
@@ -336,8 +356,15 @@ export class FirstLevelAirRaid {
   }
 
   /**
-   * 起一条下落啸声。摆在听者到落点连线上 share 处、高出落点 heightM；延迟按**落点**的距离 d/340 给
-   *（不按摆出来的位置算 —— 要的是它在爆炸声到耳朵的那一刻停住）。晚了几帧就从素材里相应往后切，终点不动。
+   * 起一条下落啸声，**终点落在这颗弹落地（画面上砸到地面）的那一帧**。
+   * 【2026-09-30 改】第一版按落点距离 d/340 延迟、对齐爆炸声到耳朵的时刻，并且在起播时按真实时间一口气排好 2.78 s：
+   * ① 画面上炸弹已经炸开，啸声还要再响 0.5–1.4 s；② 游戏时钟每帧封顶 0.05 s，一卡就落后于音频时钟，
+   * 实测（无头 RTX、04 激战）2.8 s 里落后 0.1–0.2 s，帧率低的机器上啸声比炸弹先放完 —— 用户听到的就是这个。
+   * 现在：不延迟；起播时刻按实测的游戏快慢往后推（游戏半速时，离落地游戏里还剩 1.4 s 才起播 —— 耳朵里仍是 2.78 s），
+   * 起播后每帧按「素材还剩多少 ÷ 耳朵里离落地还剩多少秒」微调变速（Script_Audio 的 SAMPLE_VARISPEED），
+   * 落地那一帧硬停；爆炸声照旧按 d/340 后到（闪光先到、声音后到，与全场所有远爆一致）。
+   * 声源跟着这颗弹走：摆在「听者 → 弹此刻的位置」连线上 share 处（离得远的炸弹摆在真位置上听不见），
+   * 不低于听者与落点中较高者之上 minHeightM（贴地的话沟沿一挡就闷了）。
    * 声部账里这一格不按时间过期，落地那一帧由 Impact 直接移交给同一颗的爆炸本体（按时间过期的话，
    * 同一帧里先落地的别的弹会把刚空出来的这一格抢走，啸声硬停之后没了爆炸）。
    */
@@ -347,17 +374,41 @@ export class FirstLevelAirRaid {
     const remain = b.tImpact - plan.t;
     if (!L || !(remain > 0.2)) return;
     if (!this.Room(1)) { this.layersDropped += 1; return; }
-    const at = b.at, k = W.share;
-    const d = Math.hypot(at.x - L.x, at.y - L.y, at.z - L.z);
     const pitch = b.whistlePitch ?? 1;
-    const offset = Math.max(0, W.durS - remain * pitch);
     const v = this.Voice(this.host.audio?.Play?.(W.cue, {
-      position: { x: L.x + (at.x - L.x) * k, y: at.y + W.heightM, z: L.z + (at.z - L.z) * k },
-      volume: W.volume * (this.speaking ? A.speechGain : 1), pitch, offset, sourceSizeM: W.sizeM,
-      delay: Math.min(d / BOMB_PHYSICS.soundMps, 1.4), propagate: false, bus: "sfx", selfCapped: true,
+      position: this.WhistlePos(plan, b, L), volume: W.volume * (this.speaking ? A.speechGain : 1), pitch,
+      offset: Math.max(0, W.durS - (remain / this.gameSpeed) * pitch), sourceSizeM: W.sizeM, propagate: false, bus: "sfx", selfCapped: true,
       priority: !!A.leadPriority, airCut: this.airCut > 0 ? this.airCut : undefined,
     }), Infinity);
-    if (v) { this.whistles += 1; b.whistleVoice = v; }
+    if (v) { this.whistles += 1; b.whistleVoice = v; b.whistleMul = 1; }
+  }
+
+  /** 啸声此刻摆在哪儿（见 Whistle 头注）。 */
+  WhistlePos(plan, b, L) {
+    const W = this.D.audio.whistle, k = W.share;
+    const u = Math.max(0, Math.min(b.fallS, plan.t - b.tRelease));
+    const p = u >= b.fallS ? b.at : this.BombPlace(plan, b, u, b.fallS, this._whistleAt ||= {});
+    return { x: L.x + (p.x - L.x) * k, z: L.z + (p.z - L.z) * k,
+      y: Math.max(L.y + (p.y - L.y) * k, Math.max(L.y, b.at.y) + W.minHeightM) };
+  }
+
+  /** 每帧：啸声跟着弹走，变速让素材终点对上落地那一帧。 */
+  UpdateWhistle(plan, b, L) {
+    const v = b.whistleVoice, W = this.D.audio.whistle, audio = this.host.audio;
+    if (!v || !L) return;
+    if (audio?.pendingVoices?.has?.(v) === false) { b.whistleVoice = null; return; }
+    audio?.MoveVoice?.(v, this.WhistlePos(plan, b, L));
+    const remain = b.tImpact - plan.t;
+    if (typeof v.SetRate !== "function" || typeof v.SamplePos !== "function" || !(remain > W.syncMinS)) return;
+    const pos = v.SamplePos();
+    if (pos == null) return;
+    const pitch = b.whistlePitch ?? 1;
+    // 素材还剩多少 ÷ 耳朵里离落地还剩多少真实秒（游戏里剩 remain，按此刻的游戏快慢折算）。
+    const target = Math.max(W.rateMin, Math.min(W.rateMax, (W.durS - pos) / (remain / this.gameSpeed) / pitch));
+    const mul = b.whistleMul + (target - b.whistleMul) * W.rateFollow;
+    if (Math.abs(mul - b.whistleMul) < 0.002) return;
+    b.whistleMul = mul;
+    v.SetRate(mul);
   }
 
   /** 落点在外圈土丘 / 农舍的体块里（外扩 hillClearM）吗。 */
@@ -502,7 +553,8 @@ export class FirstLevelAirRaid {
       if (b.landed) continue;
       if (t < b.tRelease) continue;
       if (!b.released) { b.released = true; this.bombsDropped += 1; }
-      if (b.whistleAt != null && !b.whistled && t >= b.whistleAt) this.Whistle(plan, b, L);
+      if (b.whistleAt != null && !b.whistled && t >= b.tImpact - (b.tImpact - b.whistleAt) * this.gameSpeed) this.Whistle(plan, b, L);
+      else if (b.whistleVoice && t < b.tImpact) this.UpdateWhistle(plan, b, L);
       if (t >= b.tImpact) { b.landed = true; this.Impact(plan, b); continue; }
       falling.push(this.BombPose(plan, b, t, L));
     }
@@ -563,7 +615,12 @@ export class FirstLevelAirRaid {
     // 长机头一颗（一轮的第一声）与它的低频层走 priority：04 激战时引擎节点预算贴着上限，
     // 几百米外的远爆偷不到比它更轻的声部，不保这两条一轮就一声不响（2026-09-26 实机取证）。
     // 有下落啸声的那一颗同样保底：啸声硬停之后没有爆炸，比没有啸声更假。它占的那一格此刻移交给爆炸本体。
-    if (b.whistleVoice) { this.voices = this.voices.filter((e) => e.v !== b.whistleVoice); b.whistleVoice = null; }
+    if (b.whistleVoice) {
+      // 画面上砸到地的这一帧硬停（变速追不上时 —— 游戏比音频快 —— 剩下那一截在这里掐掉）。
+      this.host.audio?.StopVoice?.(b.whistleVoice, this.D.audio.whistle.stopFadeS);
+      this.voices = this.voices.filter((e) => e.v !== b.whistleVoice);
+      b.whistleVoice = null;
+    }
     const priority = !!((b.lead || b.whistleAt != null) && A.leadPriority);
     // 普通的那几声给「已经啸起来、还没落地、账上又没占着格」的弹留位（它的啸声被引擎提前回收或偷掉时）。
     const keyed = b.lead || b.whistleAt != null;
@@ -651,7 +708,7 @@ export class FirstLevelAirRaid {
     const w = this.wave;
     return {
       started: this.started, waves: this.waves, bombsDropped: this.bombsDropped, impacts: this.impacts, sounds: this.sounds,
-      whistles: this.whistles, skipped: this.skipped, layersDropped: this.layersDropped, voices: this.voices.length, peakVoices: this.peakVoices,
+      whistles: this.whistles, gameSpeed: +this.gameSpeed.toFixed(3), skipped: this.skipped, layersDropped: this.layersDropped, voices: this.voices.length, peakVoices: this.peakVoices,
       reserving: this.Reserving(),
       nextInS: this.nextAt === null ? null : +(this.nextAt - this.time).toFixed(2),
       wave: w ? { key: w.key, zone: w.zone, t: +w.t.toFixed(2), tCenter: +w.tCenter.toFixed(2), endT: +w.endT.toFixed(2),

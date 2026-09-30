@@ -35,6 +35,8 @@ import {
   TERRAIN_SETS, TERRAIN_DISTANCE, TERRAIN_MACRO, TERRAIN_STUBBLE, TERRAIN_BLEND,
   TERRAIN_AO_INTENSITY, TERRAIN_RUTS, TERRAIN_WATER, TERRAIN_MUD_ZONE, TerrainLayerUrls, TerrainQualityOf,
 } from "./Data_Tuning_Terrain.mjs";
+import { TerrainTrailGlsl, TerrainTrailUniforms, TRAIL_WATER_PER_M } from "./Script_TerrainTrails.mjs";
+import { TerrainTrailTierOf, TERRAIN_TRAIL_DEBUG_VIEW } from "./Data_Tuning_TerrainTrails.mjs";
 
 const SRGB_TO_LINEAR = (() => {
   const table = new Float32Array(256);
@@ -190,7 +192,7 @@ const GLSL_VERTEX_WORLD = /* glsl */`
 vTerrainLayers = terrainLayers;
 vTerrainWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`;
 
-function GlslCommon(quality) {
+function GlslCommon(quality, trails = null) {
   return /* glsl */`
 #define TERRAIN_LAYERS 4
 ${quality.antiTile ? "#define TERRAIN_ANTI_TILE" : ""}
@@ -237,6 +239,8 @@ float gTerrainHeight = 0.5;   // 混合后的材质高度（0..1），积水按�
 float gTerrainRut = 0.0;      // 车辙槽截面 0..1（已乘淡出与车道权重）
 float gTerrainWet = 0.0;      // 湿痕 0..1
 float gTerrainWater = 0.0;    // 积水 0..1
+vec3 gTerrainMeanOut = vec3(0.3); // 这一处地层的平均反照率（与输出同样乘过定色 / 宏观变化；脚印把土压平时往它收）
+float gTerrainPrint = 0.0;    // 脚印坑深（米，已乘淡出；Script_TerrainTrails）—— 积水按它往坑里灌
 
 float TerrainHash(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -278,7 +282,8 @@ void TerrainWater(inout vec3 albedo, vec2 xz, vec3 geomN, float site, float lowR
     float n = TerrainNoise(xz * uTerrainWaterA.x) * 0.62 + TerrainNoise(xz * uTerrainWaterA.y + 7.13) * 0.38;
     float level = (n - uTerrainWaterA.z) * uTerrainWaterA.w + gTerrainRut * uTerrainWaterD.y + lowRaise;
     // 材质高度只按比例参与（卵石级的起伏全额进来，水线会碎成一粒粒黑点）。
-    float h = 0.5 + (gTerrainHeight - 0.5) * uTerrainWaterE.x - gTerrainRut * 0.35;
+    float h = 0.5 + (gTerrainHeight - 0.5) * uTerrainWaterE.x - gTerrainRut * 0.35
+      - gTerrainPrint * ${TRAIL_WATER_PER_M.toFixed(3)};
     float above = level - h;
     float onFlat = smoothstep(uTerrainWaterB.x, uTerrainWaterB.y, geomN.y);   // 平地（坡上存不住水）
     water = smoothstep(-uTerrainWaterB.z, uTerrainWaterB.z, above) * onFlat * site;
@@ -325,7 +330,8 @@ void TerrainLayerSample(float layer, vec2 meters, vec2 dxM, vec2 dyM, float inv,
   albedo = textureGrad(uTerrainAlbedo, at, dx, dy);
   surface = textureGrad(uTerrainSurface, at, dx, dy);
 #endif
-}`;
+}
+${trails ? TerrainTrailGlsl(trails.parallaxSteps) : ""}`;
 }
 
 const LAYER_COUNT = 4;
@@ -464,21 +470,26 @@ ${PerLayer((c, i) => `    if (tB.${c} > 0.0) {
   float tContrast = mix(1.0, uTerrainContrast.z, smoothstep(uTerrainContrast.x, uTerrainContrast.y, tDist));
   tAlbedo = tMeanAlbedo + (tAlbedo - tMeanAlbedo) * tContrast;
   // 逐层定色（Data_Tuning_Terrain 层表的 tint，线性倍率；权重混合后的倍率 ≈ 逐层乘，各层 tint 相近）。
-  tAlbedo *= uTerrainTint[0] * tB.x + uTerrainTint[1] * tB.y + uTerrainTint[2] * tB.z + uTerrainTint[3] * tB.w;
+  vec3 tTint = uTerrainTint[0] * tB.x + uTerrainTint[1] * tB.y + uTerrainTint[2] * tB.z + uTerrainTint[3] * tB.w;
+  tAlbedo *= tTint;
+  vec3 tMeanOut = tMeanAlbedo * tTint;
 
   // --- 5. 宏观变化 ----------------------------------------------------------------
   float m0 = TerrainNoise(txz * uTerrainMacroScale.x + 3.7) - 0.5;
   float m1 = TerrainNoise(txz * uTerrainMacroScale.y + 17.31) - 0.5;
   float m2 = TerrainNoise(txz * uTerrainMacroScale.z + 41.7) - 0.5;
   gTerrainAlbedo = tAlbedo;
-  tAlbedo *= 1.0 + 2.0 * (m0 * uTerrainMacroAmp.x + m1 * uTerrainMacroAmp.y + m2 * uTerrainMacroAmp.z);
-  tAlbedo *= 1.0 + vec3(0.9, 0.25, -0.8) * m2 * 2.0 * uTerrainMacroScale.w;
+  vec3 tMacro = (1.0 + 2.0 * (m0 * uTerrainMacroAmp.x + m1 * uTerrainMacroAmp.y + m2 * uTerrainMacroAmp.z))
+    * (1.0 + vec3(0.9, 0.25, -0.8) * m2 * 2.0 * uTerrainMacroScale.w);
+  tAlbedo *= tMacro;
   float damp = smoothstep(0.12, 0.42, m1) * uTerrainMacroAmp.w;
   tAlbedo *= 1.0 - damp * 1.4;
   tAlbedo *= 1.0 - uTerrainRut2.z * gTerrainRut;
+  tMeanOut *= tMacro * (1.0 - damp * 1.4) * (1.0 - uTerrainRut2.z * gTerrainRut) * uTerrainAlbedoScale;
 
   // --- 6. 写出 ----------------------------------------------------------------------
   vec3 tOut = max(tAlbedo, vec3(0.0)) * uTerrainAlbedoScale;
+  gTerrainMeanOut = max(tMeanOut, vec3(0.0));
   // 远处法线淡出：一个像素盖住几十个纹素，法线的方差该表现成粗糙度，而不是一粒粒高光。
   float nFade = mix(1.0, uTerrainFade.x, smoothstep(uTerrainDistance.z, uTerrainDistance.w, tDist));
   tPerturb *= nFade;
@@ -487,6 +498,10 @@ ${PerLayer((c, i) => `    if (tB.${c} > 0.0) {
   gTerrainRough = clamp(tSurface.b - damp, 0.3, 1.0) * mix(1.0, uTerrainRut2.w, gTerrainRut);
   float tAo = clamp(tSurface.a, 0.0, 1.0);
   gMaterialAo = mix(tAo, 1.0 - (1.0 - tAo) * uTerrainFade.y, farT);
+#if defined(TERRAIN_TRAILS) && !defined(TERRAIN_TRAILS_EXTERNAL)
+  // 脚印与痕迹（Script_TerrainTrails）：积水之前，坑深要参与水线
+  TerrainTrailApply(tOut, tw, tGeomN, tB, TerrainMudZone(txz), max(length(twDx), length(twDy)), tDist);
+#endif
 #ifndef TERRAIN_WATER_EXTERNAL
   // 湿泥与积水：车道/场坪会积水；翻土层（无壕沟网时的沟底）按一半算；前沿湿泥区里翻土更暗更湿。
   float tMud = TerrainMudZone(txz);
@@ -512,9 +527,16 @@ if (uTerrainDebug > 0.5) {
     terrainDebug = vec3(gTerrainWet);
   } else if (uTerrainDebug < 6.5) {
     terrainDebug = vec3(gTerrainRough);
-  } else {
+  } else if (uTerrainDebug < 7.5) {
     // 7：红 = 车辙槽，绿 = 积水，蓝 = 湿痕
     terrainDebug = vec3(gTerrainRut, gTerrainWater, gTerrainWet);
+  } else {
+    // ${TERRAIN_TRAIL_DEBUG_VIEW}：脚印与痕迹 —— 红 = 坑深，绿 = 泥边，蓝 = 踩乱（已乘淡出）
+#ifdef TERRAIN_TRAILS
+    terrainDebug = gTerrainTrailDebug;
+#else
+    terrainDebug = vec3(0.0);
+#endif
   }
   gl_FragColor = vec4(terrainDebug, 1.0);
 }`;
@@ -561,8 +583,10 @@ function TerrainWaterUniforms() {
  * 造分层地形的表面补丁。
  * @param {object} pack LoadTerrainLayers() 的返回值
  * @param {{antiTile:boolean, biplanar:boolean}} quality TerrainQualityOf(档位)
+ * @param {{trails?: object|null}} options trails = Data_Tuning_TerrainTrails.TerrainTrailTierOf(档位)；
+ *   null 不编脚印（少一个采样器）。石材等不会被踩的变体传 null。
  */
-export function MakeTerrainPatch(pack, quality) {
+export function MakeTerrainPatch(pack, quality, { trails = null } = {}) {
   const set = TERRAIN_SETS[pack.setName];
   const layers = set.layers;
   const PerLayer = (fn) => new THREE.Vector4(...layers.map(fn));
@@ -602,16 +626,18 @@ export function MakeTerrainPatch(pack, quality) {
     // 全场共用一份，调试入口直接改它的 value（不重编译）
     uTerrainDebug: TERRAIN_DEBUG_UNIFORM,
     ...TerrainWaterUniforms(),
+    // 脚印与痕迹：同一组 uniform 对象挂进每个地形程序，帧图的 terrainTrails pass 每帧改 value
+    ...(trails ? TerrainTrailUniforms : {}),
   };
   const patch = MakePatch({
-    key: `terrain4${quality.antiTile ? "t" : ""}${quality.biplanar ? "b" : ""}`,
+    key: `terrain4${quality.antiTile ? "t" : ""}${quality.biplanar ? "b" : ""}${trails ? `tr${trails.parallaxSteps}` : ""}`,
     uniforms: (shaderUniforms) => { Object.assign(shaderUniforms, uniforms); },
     vertex: [
       ["#include <common>", GLSL_VERTEX_COMMON],
       ["#include <project_vertex>", GLSL_VERTEX_WORLD],
     ],
     fragment: [
-      ["#include <common>", GlslCommon(quality)],
+      ["#include <common>", GlslCommon(quality, trails)],
       ["#include <map_fragment>", Ended("#include <map_fragment>", GLSL_EVALUATE)],
       ["#include <roughnessmap_fragment>", Ended("#include <roughnessmap_fragment>", GLSL_ROUGHNESS)],
       ["#include <normal_fragment_maps>", Ended("#include <normal_fragment_maps>", GLSL_NORMAL)],
@@ -622,6 +648,7 @@ export function MakeTerrainPatch(pack, quality) {
   // 着色特性里 hasAoMap 按它算（材质上没有 roughnessMap，ORM 三合一不会发生）。
   patch.providesMaterialAo = true;
   patch.terrainUniforms = uniforms;
+  patch.terrainTrails = !!trails;
   return patch;
 }
 
@@ -645,6 +672,9 @@ export function CreateTerrainMaterial(library, pack, { quality = "high", name = 
   if (typeof location !== "undefined") {
     TERRAIN_DEBUG_UNIFORM.value = parseFloat(new URLSearchParams(location.search).get("terrainView") || "0") || 0;
   }
-  library.InjectSurface(material, surface || MakeTerrainPatch(pack, tier), { reflections });
+  const patch = surface || MakeTerrainPatch(pack, tier, { trails: TerrainTrailTierOf(quality) });
+  // 编进了脚印采样的材质（Script_TerrainTrails）。石材等变体的补丁不编，这里如实标。
+  material.userData.terrainTrails = !!patch.terrainTrails;
+  library.InjectSurface(material, patch, { reflections });
   return material;
 }

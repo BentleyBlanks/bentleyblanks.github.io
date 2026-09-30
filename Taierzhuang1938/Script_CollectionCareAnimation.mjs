@@ -124,16 +124,83 @@ function ClothMaterial(kind) {
   return material;
 }
 const clothGeometries = new Map();
-function ClothGeometry(length) {
-  const key = length.toFixed(3);
+/** 开口圆筒；+Y 端半径 radiusTop、−Y 端半径 radiusBottom（默认都是 1，由 mesh.scale 定粗细）。 */
+function ClothGeometry(length, radiusTop = 1, radiusBottom = 1) {
+  const key = [length, radiusTop, radiusBottom].map((n) => n.toFixed(4)).join("/");
   let geometry = clothGeometries.get(key);
-  if (!geometry) clothGeometries.set(key, geometry = new THREE.CylinderGeometry(1, 1, length, 14, 1, true));
+  if (!geometry) clothGeometries.set(key, geometry = new THREE.CylinderGeometry(radiusTop, radiusBottom, length, 14, 1, true));
   return geometry;
+}
+
+/**
+ * 这根肢体在几个位置 `ats`（沿骨的比例）处的袖筒横截面（骨局部单位、绑定姿态）：圈心（含沿骨的分量）与外接半径。
+ * 骨轴是骨点到子骨点的连线，不一定穿过袖子的中心 —— 灰军装的袖筒是一只比手臂大一圈的宽袖，
+ * 垂在骨轴下方 6–8 cm 且与骨轴斜着，袖标按骨轴居中就缩在袖子里、只露出一角。做法：用垂直骨轴、过 at 的平面去切
+ * 权重主要落在这根骨上的三角形，切出的点就是袖面的一圈（顶点稀疏，直接取顶点会漏掉整圈）。
+ * 离骨轴不到 LIMB_SECTION_CORE 的点是袖筒里贴着骨轴的细柱，不是袖面，丢掉。某个位置切不到就是 null。
+ */
+const LIMB_SECTION_CORE = 0.055;
+function LimbSections(rig, bone, axis, lengthLocal, ats) {
+  const root = rig?.root;
+  if (!root) return ats.map(() => null);
+  const matrix = new THREE.Matrix4(), point = new THREE.Vector3(), perpA = new THREE.Vector3(), perpB = new THREE.Vector3();
+  perpA.set(1, 0, 0); if (Math.abs(axis.x) > 0.9) perpA.set(0, 0, 1);
+  perpA.addScaledVector(axis, -perpA.dot(axis)).normalize();
+  perpB.crossVectors(axis, perpA);
+  const rings = ats.map(() => []);
+  root.traverse((mesh) => {
+    if (!mesh.isSkinnedMesh) return;
+    const index = mesh.skeleton.bones.indexOf(bone);
+    if (index < 0) return;
+    matrix.multiplyMatrices(mesh.skeleton.boneInverses[index], mesh.bindMatrix);
+    const { skinIndex, skinWeight, position } = mesh.geometry.attributes;
+    const count = position.count, along = new Float32Array(count), sideA = new Float32Array(count),
+      sideB = new Float32Array(count), weights = new Float32Array(count);
+    let any = false;
+    for (let i = 0; i < count; i++) {
+      for (let k = 0; k < 4; k++) if (skinIndex.getComponent(i, k) === index) weights[i] += skinWeight.getComponent(i, k);
+      if (weights[i] > 0) any = true;
+      point.fromBufferAttribute(position, i).applyMatrix4(matrix);
+      along[i] = point.dot(axis) / lengthLocal; sideA[i] = point.dot(perpA); sideB[i] = point.dot(perpB);
+    }
+    if (!any) return;
+    const indices = mesh.geometry.index, triangles = (indices ? indices.count : count) / 3;
+    for (let f = 0; f < triangles; f++) {
+      const v = [0, 1, 2].map((k) => indices ? indices.getX(f * 3 + k) : f * 3 + k);
+      if ((weights[v[0]] + weights[v[1]] + weights[v[2]]) / 3 < 0.5) continue;
+      for (let e = 0; e < 3; e++) {
+        const i = v[e], j = v[(e + 1) % 3];
+        if (along[i] === along[j]) continue;
+        for (const [n, at] of ats.entries()) {
+          if ((along[i] - at) * (along[j] - at) >= 0) continue;
+          const u = (at - along[i]) / (along[j] - along[i]);
+          const a = sideA[i] + (sideA[j] - sideA[i]) * u, b = sideB[i] + (sideB[j] - sideB[i]) * u;
+          if (Math.hypot(a, b) >= LIMB_SECTION_CORE) rings[n].push(a, b);
+        }
+      }
+    }
+  });
+  return rings.map((ring, n) => {
+    if (ring.length < 6) return null;
+    let minA = Infinity, maxA = -Infinity, minB = Infinity, maxB = -Infinity;
+    for (let i = 0; i < ring.length; i += 2) {
+      minA = Math.min(minA, ring[i]); maxA = Math.max(maxA, ring[i]);
+      minB = Math.min(minB, ring[i + 1]); maxB = Math.max(maxB, ring[i + 1]);
+    }
+    const centreA = (minA + maxA) / 2, centreB = (minB + maxB) / 2;
+    let radius = 0;
+    for (let i = 0; i < ring.length; i += 2) radius = Math.max(radius, Math.hypot(ring[i] - centreA, ring[i + 1] - centreB));
+    const centre = axis.clone().multiplyScalar(lengthLocal * ats[n]).addScaledVector(perpA, centreA).addScaledVector(perpB, centreB);
+    return { centre, radius };
+  });
 }
 
 /**
  * 在一根肢体骨上缠一圈布（绷带或袖标）。bone → child 是这根骨的方向；at 是沿骨的比例位置；
  * radiusM / lengthM 是世界米（按骨的世界缩放换成骨的局部单位）。返回挂上的网格。
+ * 袖标（kind "armband"）贴着袖筒：取布圈两端的袖筒截面（LimbSections），圈轴顺着两端圈心的连线、
+ * 两端半径各自取袖筒的粗细（袖口一头粗一头细，圆筒改成圆台）；两端任一切不到就退回按骨轴居中的 radiusM。
+ * 绷带仍按骨轴居中（大腿/小腿没有这个问题的实测，不动）。
  */
 export function WrapLimb(rig, boneRole, childRole, { kind = "bandage", at = 0.5, radiusM = 0.07, lengthM = 0.12 } = {}) {
   const bone = rig?.bones?.[boneRole], child = rig?.bones?.[childRole];
@@ -143,11 +210,31 @@ export function WrapLimb(rig, boneRole, childRole, { kind = "bandage", at = 0.5,
   const axis = child.position.clone();
   const lengthLocal = axis.length();
   axis.normalize();
-  const mesh = new THREE.Mesh(ClothGeometry(lengthM / scale), ClothMaterial(kind));
-  mesh.name = kind === "armband" ? "CollectionCareArmband" : "CollectionCareBandage";
-  mesh.scale.set(radiusM / scale, 1, radiusM / scale);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
-  mesh.position.copy(axis).multiplyScalar(lengthLocal * at);
+  const lengthLocalCloth = lengthM / scale, half = lengthLocalCloth / 2 / lengthLocal;
+  const spread = [-0.04, 0, 0.04];
+  const rings = kind === "armband" ? LimbSections(rig, bone, axis, lengthLocal, [at - half, at + half].flatMap((t) => spread.map((d) => t + d))) : null;
+  // 每端取邻近三处截面里最粗的（袖筒是棱柱，顶点稀疏，一处截面会漏掉鼓出来的那几条棱）。
+  const End = (from) => {
+    const list = rings?.slice(from, from + spread.length);
+    if (!list || list.some((ring) => !ring)) return null;
+    return { centre: list[1].centre, radius: Math.max(...list.map((ring) => ring.radius)) };
+  };
+  const near = End(0), far = End(spread.length);
+  const name = kind === "armband" ? "CollectionCareArmband" : "CollectionCareBandage";
+  let mesh;
+  if (near && far) {
+    // 布要包住袖子：两端半径 = 截面最远点到圈心的距离 ×1.05 + 4 mm（袖面是折面，棱之间会比实测的点再鼓一点）。
+    const margin = 0.004 / scale, direction = far.centre.clone().sub(near.centre);
+    mesh = new THREE.Mesh(ClothGeometry(direction.length(), far.radius * 1.05 + margin, near.radius * 1.05 + margin), ClothMaterial(kind));
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    mesh.position.copy(near.centre).add(far.centre).multiplyScalar(0.5);
+  } else {
+    mesh = new THREE.Mesh(ClothGeometry(lengthLocalCloth), ClothMaterial(kind));
+    mesh.scale.set(radiusM / scale, 1, radiusM / scale);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+    mesh.position.copy(axis).multiplyScalar(lengthLocal * at);
+  }
+  mesh.name = name;
   mesh.castShadow = false; mesh.receiveShadow = true;
   bone.add(mesh);
   return mesh;
@@ -183,7 +270,7 @@ export function StrawMaterial() {
 
 /** 医护：左上臂的红十字袖标。 */
 export function DressMedic(rig) {
-  return WrapLimb(rig, "upperArmL", "forearmL", { kind: "armband", at: 0.42, radiusM: 0.062, lengthM: 0.09 });
+  return WrapLimb(rig, "upperArmL", "forearmL", { kind: "armband", at: 0.5, radiusM: 0.062, lengthM: 0.06 });
 }
 /** 伤员：一条腿缠绷带（side "L" / "R"，part "thigh" / "calf"）。 */
 export function DressWound(rig, side = "L", part = "thigh") {

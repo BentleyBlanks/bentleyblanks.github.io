@@ -97,9 +97,11 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     // 比 .01 / .05（−17）低 16 dB。传令兵远喊起外面的仗「显现」之后（Data_FirstLevelMissionBattleSound 的 reveal），
     // 实机量这两句在听者处 −35.7 / −35.1 dBFS，远声组 250 Hz–4 kHz −42 / −40，余量只剩 6.6 / 4.8 dB，六七成的块被盖住。
     // 补 7 dB 后与幺娃那句低声问（.03，−26.9）同一档，仍是这一场最轻的两句，表演的压嗓音色不变。
-    "02": P("normal", 0.5, { gainDb: 7, context: "跪在洞口朝前沟看，没有回头", delivery: "自言自语地盘算，声音压着但实在、洞里的人都听得清，不是耳语气声；中间停一下", pauseBeforeS: 0.8 }),
+    // 2026-09-30 对白改用人声近场曲线（Data_Tuning_Audio.STORY_SPEECH.worldRefM 1.5 m）：班长跪在 4.1 m 外降 4.0 dB、
+    // 幺娃在 1.8 m 只降 0.6 dB，原来那一档差出 2.2 dB（外加传令兵显现后的余量），所以 +7 → +9 保住上面这条口径。
+    "02": P("normal", 0.5, { gainDb: 9, context: "跪在洞口朝前沟看，没有回头", delivery: "自言自语地盘算，声音压着但实在、洞里的人都听得清，不是耳语气声；中间停一下", pauseBeforeS: 0.8 }),
     "03": P("normal", 0.6, { context: "抱着枪坐在洞里，盯着班长的背", delivery: "压着嗓子，心里发慌，有点结巴", pauseBeforeS: 0.5 }),
-    "04": P("normal", 0.6, { gainDb: 7, context: "还是盯着前沟，没回头", delivery: "边想边说，声音沉、实在、听得清，不是耳语，不拖；最后半句下了决心，语气一沉", pauseBeforeS: 0.5 }),
+    "04": P("normal", 0.6, { gainDb: 9, context: "还是盯着前沟，没回头", delivery: "边想边说，声音沉、实在、听得清，不是耳语，不拖；最后半句下了决心，语气一沉", pauseBeforeS: 0.5 }),
     "05": P("shout", 0.8, { context: "一撑地站起来，回身朝洞里", delivery: "短促有力的命令，不拖音", pauseBeforeS: 0.3 }),
   }),
   // 被爆炸截断：句尾约 0.35 s 处硬掐（原文「炮弹！趴下——！（被爆炸截断）」），截断那一刻发 BunkerBlast。
@@ -177,6 +179,10 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   }),
   RescueFlee: Scene(true, "翻译（汉奸）看见同伴被大刀砍倒，吓破了胆，踉跄着往前沟逃，边逃边朝日兵喊", {
     "01": P("shout", 0.95, { delivery: "吓破胆的惊叫，嗓子尖得破音，慌不择路" }),
+  }),
+  // 2026-09-30 用户：「直接玩家自己往前用力一声腾挪就出来就行」。不是台词，是挣出来那一下的用力声。
+  RescueHeave: Scene(true, "顺子下半身被塌下来的房梁压着趴在泥里，战友刚把房梁撬起一点，他咬紧牙两手撑地，要一口气把自己从梁底下挣出来", {
+    "01": P("shout", 0.9, { spatial: "self", delivery: "不是在说话：咬着牙憋足一口气往前猛一挣，从喉咙里迸出一声短促有力的用力闷吼，紧接着一口粗重的喘气；不喊字、不拖长" }),
   }),
   RescueCheck: Scene(true, "罗班长刚把顺子拖到塌土后面，蹲到他跟前，脸对脸不到一米", {
     "01": P("low", 0.6, { delivery: "喘着气，低声但很硬，是在确认不是在安慰" }),

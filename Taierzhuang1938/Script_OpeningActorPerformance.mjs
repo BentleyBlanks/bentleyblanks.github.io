@@ -30,12 +30,16 @@ const ContactClips=new Set(["LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle"
   // Banter/Orders MessengerReport substitution on top (the runner and Yaowa talk in those phases)
   "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad",
   // SB05A alternative to IjaChoppedFallWall (the dadao cut and the fall backwards keep their authored timing)
-  "IjaChoppedFallBack"]);
+  "IjaChoppedFallBack",
+  // 2026-09-30 self rescue: the three shot in the arm (hand on the wound, the arm hanging), Luo snatching up the rifle and
+  // shoving it into Shunzi's hands (his face on the kneeling man's inside the clip).
+  "IjaShotStaggerAway","IjaShotDropRifle","InterpreterShotStagger","LuoGrabRifleShove"]);
 // Clips whose face is aimed at the first-person eye inside the clip (listed with ContactClips above) or whose
 // hands follow Shunzi's body track: held-pose life keeps their head nearly where the clip put it.
 const FaceAimedClips=new Set(["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
   "IjaVaultTimberIn","IjaVaultTimberOut","IjaHaulForearmUnder","LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad",
-  "IjaCollarDragSnag","IjaKickBeam","IjaButtStrike","IjaDragByForearm","IjaHoldCollarUp","LuoDragToCover","InterpreterCrouchAsk","InterpreterGrabCollar"]);
+  "IjaCollarDragSnag","IjaKickBeam","IjaButtStrike","IjaDragByForearm","IjaHoldCollarUp","LuoDragToCover","InterpreterCrouchAsk","InterpreterGrabCollar",
+  "LuoGrabRifleShove"]);
 const Guards=new Set(["ijaA","ijaB","guard","heyoutian","liuwencai"]);
 const Hash=value=>[...String(value)].reduce((sum,char)=>(sum*31+char.charCodeAt(0))>>>0,7);
 const HandClips=new Set(["ButtThreat","InterrogateCrouch","InterpreterPoint","MessengerReport","PointBlockade"]);

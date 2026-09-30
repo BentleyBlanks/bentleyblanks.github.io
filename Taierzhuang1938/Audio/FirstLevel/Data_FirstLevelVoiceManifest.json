@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-29T18:45:19.791Z",
+  "updatedAt": "2026-09-30T13:13:06.804Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -8075,6 +8075,56 @@
         "sceneGainDb": 3.47
       },
       "mastering": "SliceOfWholeSceneMaster"
+    },
+    "RescueHeave.01": {
+      "file": "Lines/AudioVoice_FirstLevelRescueHeave_01.mp3",
+      "scene": "RescueHeave",
+      "index": 0,
+      "who": "shunzi",
+      "lang": "zh",
+      "projection": "shout",
+      "seconds": 1.69,
+      "bytes": 21047,
+      "sha256": "2fbff6688aa59f67d12dfee50268147c80dc202d8a0d4aa72c26de243af8ab22",
+      "source": "scene",
+      "sceneSha256": "fefd739799b624bcb36bef98c5fcaaefba7777882161c26cad4ef8ecc6ac7f05",
+      "sceneStartS": 0.02,
+      "sceneEndS": 1.71,
+      "gapBeforeS": 0,
+      "tight": [
+        false,
+        false
+      ],
+      "edgeDb": [
+        -90.1,
+        -58.7
+      ],
+      "cutMethod": "subtitle",
+      "castOwner": "shunzi",
+      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
+      "referenced": true,
+      "metrics": {
+        "activeRmsDb": -16.44,
+        "truePeakDb": -5.97,
+        "snrDb": 30.26,
+        "voicedS": 0.92,
+        "lowShare": 0.133,
+        "f0": {
+          "median": 390,
+          "p10": 286,
+          "p90": 471,
+          "frames": 33
+        },
+        "cer": 1.5,
+        "transcript": "啊啊啊啊",
+        "speakerCos": 0.153,
+        "nearestOther": null,
+        "referencedOther": null,
+        "lengthDiff": 2,
+        "subtitleCoverage": 1,
+        "sceneGainDb": 0.51
+      },
+      "mastering": "SliceOfWholeSceneMaster"
     }
   },
   "scenes": {
@@ -10263,6 +10313,49 @@
         "activeRmsDb": -16,
         "truePeakDb": -3.48,
         "snrDb": 44.23
+      },
+      "mastering": "WholeSceneOnceRmsTruePeakMinus1"
+    },
+    "RescueHeave": {
+      "file": "AudioVoice_FirstLevelRescueHeave.mp3",
+      "sha256": "fefd739799b624bcb36bef98c5fcaaefba7777882161c26cad4ef8ecc6ac7f05",
+      "seconds": 1.71,
+      "bytes": 21360,
+      "promptHash": "dfc478a431b7c6ac969bf133a05374a6a90e8a042d3dd4a7c709b531581ae83b",
+      "castKey": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
+      "references": [
+        {
+          "who": [
+            "shunzi"
+          ],
+          "owner": "shunzi",
+          "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
+        }
+      ],
+      "lines": [
+        "RescueHeave.01"
+      ],
+      "attempt": 1,
+      "pickedBy": "check",
+      "requests": 1,
+      "attempts": [
+        {
+          "n": 1,
+          "hard": [],
+          "flags": 1
+        }
+      ],
+      "hard": [],
+      "flags": [
+        "RescueHeave.01 字错率 1.5 待逐字核对「啊啊啊啊」"
+      ],
+      "targetDb": -16,
+      "gainDb": 0.51,
+      "trimStartS": 0.04,
+      "measure": {
+        "activeRmsDb": -16,
+        "truePeakDb": -6.02,
+        "snrDb": 32.05
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     }

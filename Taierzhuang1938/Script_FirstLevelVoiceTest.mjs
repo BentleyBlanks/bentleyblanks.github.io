@@ -66,11 +66,11 @@ for (const cue of MISSION_DIALOGUE) {
 }
 console.log(`ok ${MISSION_DIALOGUE.length} cues（剧情 ${story.length} + 带路 ${guide.length}；逐句 ${perLine.length} 场 ${perLine.reduce((n, c) => n + c.lines.length, 0)} 句）id 唯一、演员齐全`);
 
-// 2a. 09.23 契约 §5.2：01–02 的 15 个场景（09.23 稿 13 场 + 2026-09-26 用户追加的 InterpreterCall + 2026-09-29 追加的 BunkerRunnerCall）、逐句说话人与句数。
+// 2a. 09.23 契约 §5.2：01–02 的 16 个场景（09.23 稿 13 场 + 2026-09-26 用户追加的 InterpreterCall + 2026-09-29 追加的 BunkerRunnerCall + 2026-09-30 追加的 RescueHeave）、逐句说话人与句数。
 const table0923 = contract0923.slice(contract0923.indexOf("### 5.2"), contract0923.indexOf("### 5.3"));
 const scenes0923 = [...table0923.matchAll(/^\| `([A-Za-z]+)` \| (.+) \|$/gm)].map(([, id, body]) =>
   [id, [...body.matchAll(/(?<!\d)(\d\d) ([a-zA-Z]+)\s/g)].map(([, n, who]) => [Number(n), who])]);
-assert.equal(scenes0923.length, 15, "契约 §5.2 解析出 15 个场景");
+assert.equal(scenes0923.length, 16, "契约 §5.2 解析出 16 个场景");
 for (const [id, rows] of scenes0923) {
   const cue = byId.get(id);
   assert.ok(cue?.perLine, `契约 §5.2 的场景 ${id} 必须是逐句格式`);
@@ -106,7 +106,7 @@ const ORDER0305 = ["FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdr
 const ORDER06 = ["Volunteer", "BorrowLight", "ZhouLift"];
 assert.deepEqual(perLine.map((cue) => cue.id).sort(), [...new Set([...ORDER0923, ...ORDER0305, ...ORDER06])].sort(),
   "01–06 的剧情 cue 全部是逐句格式，07 以后没有");
-console.log(`ok 契约对账：01–02 新 15 场、03 以后 ${contractCues.length} 条、待下线旧 cue ${RETIRE_PENDING.length} 条`);
+console.log(`ok 契约对账：01–02 新 16 场、03 以后 ${contractCues.length} 条、待下线旧 cue ${RETIRE_PENDING.length} 条`);
 
 // 3. 台词逐字对账。
 // 3a. 09.23 新稿：> **名字：**“中文” / > **名字：**「日语」 + > **中文：**“译文”；切到「## 分镜参考」为止。

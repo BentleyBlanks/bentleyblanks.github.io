@@ -1,12 +1,20 @@
 {
-  "generator": "Script_BakeVegetationAtlas.py@2",
+  "generator": "Script_BakeVegetationAtlas.py@3",
   "name": "FirstLevelVegetationAtlas",
-  "date": "2026-09-28",
-  "source": {
-    "path": "_shots/Gap3A_Source/B6/atlas_v2/lovart_376da24500f3.png",
-    "sha256": "386c8d11eef33154f7b9cb2280de31e2c7ff9f16d5167e38a97241f0e611502b",
-    "origin": "Lovart (generate_image_nano_banana_pro)",
-    "keyColour": "#FF00FF"
+  "date": "2026-09-30",
+  "sources": {
+    "sheet": {
+      "path": "_shots/Gap3A_Source/B6/atlas_v2/lovart_376da24500f3.png",
+      "sha256": "386c8d11eef33154f7b9cb2280de31e2c7ff9f16d5167e38a97241f0e611502b",
+      "origin": "Lovart (generate_image_nano_banana_pro)",
+      "keyColour": "#FF00FF"
+    },
+    "LowTuft": {
+      "path": "_shots/Gap3A_Source/B6/atlas_v3/lovart_dd9bb199850c.png",
+      "sha256": "6b15c4423284d24c9a0c06b4e988ace671d411974573a91c93b12499778c321c",
+      "origin": "Lovart (generate_image_nano_banana_pro)",
+      "keyColour": "#FF00FF"
+    }
   },
   "params": {
     "keyLo": 70.0,
@@ -28,8 +36,8 @@
     {
       "file": "Texture_FirstLevelVegetationAtlas.webp",
       "channel": "Base",
-      "sha256": "cdf6e2f4a9cb2ee42be8a46ed22b02e7ff213274f73a1cf02802193fa379b89f",
-      "bytes": 267702,
+      "sha256": "162b6d8d00f82195648f0f83883a23e420b3845790aebe6996b01fefdd3f4a51",
+      "bytes": 276920,
       "width": 1024,
       "height": 1024
     }
@@ -60,15 +68,15 @@
         0.25391,
         0.50098,
         0.49609,
-        0.61621
+        0.63672
       ],
-      "aspect": 2.1017,
+      "aspect": 1.7842,
       "heightM": 0.26,
-      "coverage": 0.636,
+      "coverage": 0.308,
       "meanSrgb": [
-        0.45399999618530273,
-        0.4020000100135803,
-        0.3409999907016754
+        0.6269999742507935,
+        0.5720000267028809,
+        0.5239999890327454
       ]
     },
     {

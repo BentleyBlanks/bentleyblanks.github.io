@@ -38,6 +38,7 @@ import {
   LoadLugouCharacterAssets,
 } from "./Script_CharacterModel.mjs";
 import { RaycastCapsule, RaycastShapes } from "./Script_CharacterHitboxMath.mjs";
+import { HitReactionOf, ChooseHitDeath } from "./Script_HitReactionLayer.mjs";
 import {
   ACTOR_MESH_BY_VARIANT,
   MESHES, MeshUrl, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID,
@@ -46,6 +47,10 @@ import {
 } from "./Data_Meshes.mjs";
 
 const Lerp = (a, b, t) => a + (b - a) * t;
+// 受击弹簧层带枪跟着上身走用的临时量（_ApplyHitReaction）。
+const HIT_Y_AXIS = new THREE.Vector3(0, 1, 0);
+const HIT_GUN_WORLD = new THREE.Matrix4(), HIT_GUN_LOCAL = new THREE.Matrix4();
+const HIT_GUN_POS = new THREE.Vector3(), HIT_GUN_SCALE = new THREE.Vector3(), HIT_GUN_Q = new THREE.Quaternion();
 
 // 车厢生活动作是附加层：所有量都保持 0 时，Update 的结果与旧版完全一致。
 // 这里不把动作拆成互斥枚举，导演可以同时给 sit + repairShoe，或 cleanRifle +
@@ -2096,8 +2101,10 @@ export class Actor {
    * 考据上不可能的姿势。这里走一段 0.8 秒的确定性姿态过渡：膝先软 → 上身前扑或
    * 后仰 → 最后贴地不再动。
    * @param {THREE.Vector3} dirVec3 世界空间的冲击方向（取子弹的飞行方向）
+   * @param {object|null} hit 致死那一下的 HitDescriptor（docs/Data_HitReaction.md §2.1）。给了就按冲量方向与部位
+   *   选倒地动作、叠一记死亡档的骨骼冲击；不给（剧本直杀、开场分镜、调试 Sever）行为不变：按 seed 抽 A–D，不转向、不加冲量。
    */
-  Ragdoll(dirVec3) {
+  Ragdoll(dirVec3, hit = null) {
     if (this.ragdollState) return this;
     this.pendingGrenadeThrow = null;
     if (this.grenadeGroup) this.grenadeGroup.visible = false;
@@ -2108,7 +2115,8 @@ export class Actor {
       this.tmpQuat.setFromRotationMatrix(this.root.matrixWorld).invert();
       local.applyQuaternion(this.tmpQuat).normalize();
     }
-    const deathDuration = this.characterRig?.BeginDeathPose() || .8;
+    const deathChoice = hit && this.characterRig ? ChooseHitDeath(this, hit) : null;
+    const deathDuration = this.characterRig?.BeginDeathPose(deathChoice) || .8;
     const random = Mulberry32(HashString(`${this.seed}|death-weapon`));
     this.ragdollState = {
       weaponSide: random() < .5 ? -1 : 1,
@@ -2127,7 +2135,48 @@ export class Actor {
       // 站直再倒 —— 殉国那一秒成了「尸体先站起来」（王铭章过场出图抓到的）。
       startY: this.body.position.y + this.hips.position.y,
     };
+    if (hit && this.characterRig) {
+      const layer = HitReactionOf(this);
+      if (layer) { layer.SetDeathChoice(deathChoice); layer.Receive(hit, { death: true }); }
+    }
     return this;
+  }
+
+  /**
+   * 活人挨了一下（HitDescriptor，世界系）：走骨骼弹簧层，方向和部位都由冲量算出来。
+   * 返回 { severity, zone, ... } 给 AI（推迟开火）；没有蒙皮骨架 / 层被 ?hitreact=0 关掉 / 已倒地返回 null，
+   * 调用方沿用原来的 hurt 后仰（程序化人物不变）。
+   */
+  ReceiveHit(hit) {
+    if (this.disposed || this.ragdollState || !this.characterRig) return null;
+    return HitReactionOf(this)?.Receive(hit) ?? null;
+  }
+
+  /** 演员回收 / 复用 / 换关：清零受击弹簧状态与死亡转向（骨头还回动画姿势）。 */
+  ResetHitReaction() {
+    this.characterRig?.hitReaction?.Reset();
+  }
+
+  /** 弹簧层在 Update 末尾叠完偏移后：把枪按手重摆，站姿库里靠 helper 摆的枪跟着上身走。 */
+  _ApplyHitReaction(dt, state) {
+    const rig = this.characterRig, layer = rig.hitReaction;
+    const gun = this.weaponGroup && !this.goreWeaponHold ? this.weaponGroup : null;
+    layer.RecordWeapon(gun);
+    if (!layer.ApplyLive(dt, Number.isFinite(state.elapsed) ? state.elapsed : null)) return;
+    this._UpdateRiggedWeaponMount();
+    this._UpdateInfantryProps();
+    if (gun && layer.torsoMoved && rig.infantryPropWeight > 0.001 && gun.parent) {
+      // 站姿库里枪由 helper 摆（不跟骨头走）：把上身的刚体增量按该权重也施加给枪，手和枪一起被打偏。
+      gun.updateWorldMatrix(true, false);
+      HIT_GUN_WORLD.multiplyMatrices(layer.torsoDelta, gun.matrixWorld);
+      gun.parent.updateWorldMatrix(true, false);
+      HIT_GUN_LOCAL.copy(gun.parent.matrixWorld).invert().multiply(HIT_GUN_WORLD);
+      HIT_GUN_LOCAL.decompose(HIT_GUN_POS, HIT_GUN_Q, HIT_GUN_SCALE);
+      const w = Math.min(1, rig.infantryPropWeight);
+      gun.position.lerp(HIT_GUN_POS, w);
+      gun.quaternion.slerp(HIT_GUN_Q, w);
+      gun.updateMatrix();
+    }
   }
 
   AddBulletWound(part, direction, info = {}) {
@@ -2145,6 +2194,8 @@ export class Actor {
 
   Update(dt, state = {}) {
     if (this.disposed) return;
+    // 受击弹簧层上一帧叠的偏移先还原（后进先出：它是每帧最后施加的一层，必须排在瞄准 / 匍匐修正的还原之前）。
+    this.characterRig?.hitReaction?.Restore();
     if (typeof state.bayonetFixed === "boolean" && state.bayonetFixed !== this.bayonetFixed) {
       this.bayonetFixed = state.bayonetFixed;
       if (this.weaponData?.bayonet) this.SetWeapon(this.weaponId);
@@ -2195,6 +2246,8 @@ export class Actor {
     if (this.ragdollState) {
       this.ragdollState.t = Math.min(1, this.ragdollState.t + dt / (this.ragdollState.duration || .8));
       this.PoseRagdoll(this.ragdollState, dying);
+      // 死亡档冲击：t ≥ fadeEndT 严格为 0（之后的接地拟合不许看见任何偏移）。
+      this.characterRig?.hitReaction?.ApplyDeath(dt, this.ragdollState.t, this.ragdollState.duration);
       return;
     }
 
@@ -2668,6 +2721,7 @@ export class Actor {
       // Stationary prone aiming is the last arm layer: terrain fitting must
       // not rotate the live barrel away from the requested yaw/pitch.
       this._ApplyRiggedAim(s);
+      if (this.characterRig.hitReaction?.active) this._ApplyHitReaction(dt, s);
     }
   }
 
@@ -3480,6 +3534,9 @@ export class Actor {
       const offsetBlend = SmoothStep(0, .28, t);
       this.body.position.set(0, baseY + (rag.rigBodyOffset || 0) * (1 - offsetBlend), 0);
       this.body.quaternion.identity();
+      // 方向死亡的剩余偏角：绕骨盆下方竖轴（body 原点）把可见朝向转过去；不改 AI 的 yaw。
+      const deathYaw = this.characterRig.hitReaction?.DeathYaw(t, rag.duration) || 0;
+      if (deathYaw) this.body.quaternion.setFromAxisAngle(HIT_Y_AXIS, deathYaw);
       this.characterRig.PoseDeath(t);
       if (rag.weaponStart && this.weaponGroup && !this.goreWeaponHold) {
         const drop = SmoothStep(.05, .85, t);
@@ -3557,6 +3614,7 @@ export class Actor {
     if (this.disposed) return;
     this.woundBlood?.Clear();
     if (this.factory && this.factory.batcher) this.factory.batcher.Remove(this);
+    this.characterRig?.hitReaction?.Reset();
     if (this.characterRig) this.characterRig.Dispose();
     if (this.root.parent) this.root.parent.remove(this.root);
     SetShadowSkip(this.root, false);

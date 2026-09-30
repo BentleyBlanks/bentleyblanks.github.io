@@ -790,29 +790,33 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudBrief .bLine { font-size: 17px; line-height: 2.0; }
 
 /* 加载 */
-/* 加载画面。版式：道具展示台占满整屏，字压在上下两端 ——
-   进度条挪到底部并加粗，是因为它是这张画面上唯一"还要等多久"的信息，
-   原来那条 300×2 px 的细线摆在正中间既不好读，又把视线从道具上抢走。 */
+/* 加载画面。版式参考 Notion「加载界面｜战前报纸剪报方案与史料库」：
+   黑底；左上标题与日期；右侧一张战前报纸剪报（Script_BootPaper，每次开机随机一张）；
+   左下「史料摘录 | 《报名》 日期」+ 简述；底部居中「进 城」、步骤行与进度条。
+   进度条仍在底部并加粗：它是这张画面上唯一"还要等多久"的信息。 */
 #boot {
   position: fixed; inset: 0; background: var(--ui-black); font-family: var(--ui-font); color: var(--paper);
   z-index: 10; overflow: hidden;
 }
 #boot.gone { display: none; }
-#bootProp {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  opacity: 0; transition: opacity 0.6s ease; cursor: grab; touch-action: none;
+/* 报纸图是「纸 + 一圈黑边」的紧裁图，横幅 / 近方 / 竖幅三种宽高比都有：按高度与宽度两头封顶、比例自动保持。
+   lighten 让图边的黑与页面黑融成一片，不留方框边。 */
+#bootPaper {
+  position: absolute; left: 63vw; top: 46%; width: auto; height: auto;
+  max-width: 62vw; max-height: 82vh;
+  transform: translate(-50%, -50%); mix-blend-mode: lighten;
+  opacity: 0; transition: opacity 1.1s ease; pointer-events: none; user-select: none;
+  animation: bootPaperDrift 70s ease-in-out infinite alternate;
 }
-#bootProp.on { opacity: 1; }
-#bootProp.dragging { cursor: grabbing; }
-/* 上下两道压暗：道具在中间最亮，字压在暗处才读得动。中间一段完全不挡。 */
-#bootVeil {
-  position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(to bottom,
-    rgba(8,8,10,0.92) 0%, rgba(8,8,10,0.35) 22%, rgba(8,8,10,0) 40%,
-    rgba(8,8,10,0) 55%, rgba(8,8,10,0.55) 78%, rgba(8,8,10,0.95) 100%);
+#bootPaper.on { opacity: 1; }
+/* 纸极缓地漂近一点点，像镜头在慢推；只动 transform，不触发布局。 */
+@keyframes bootPaperDrift {
+  from { transform: translate(-50%, -50%) scale(1); }
+  to { transform: translate(-50%, -50%) scale(1.04); }
 }
+@media (prefers-reduced-motion: reduce) { #bootPaper { animation: none; } }
 #bootHead {
-  position: absolute; left: 8%; right: 8%; top: 4vh; text-align: left; pointer-events: none;
+  position: absolute; left: 4vw; right: 4vw; top: 4vh; text-align: left; pointer-events: none;
 }
 #bootTitle {
   font-family: var(--ui-title-font);
@@ -820,14 +824,25 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 #bootSub { font-size: 12.5px; color: var(--dim); letter-spacing: 0.07em; margin-top: 10px; }
 
-/* 道具说明卡：贴左下，按 HUD 那套字距走，不做成商店里的装备卡。 */
+/* 史料说明：贴左下。第一行金色「史料摘录 | 《报名》」+ 日期，第二行简述。 */
 #bootCard {
-  position: absolute; left: 34px; bottom: 132px; max-width: min(38vw, 400px);
-  pointer-events: none; border-left: 2px solid var(--warn); padding: 2px 0 2px 12px;
+  position: absolute; left: 4vw; bottom: 132px; max-width: min(34vw, 420px);
+  pointer-events: none;
 }
-#bootPropName { font-size: 17px; font-weight: 700; color: var(--ui-gold); letter-spacing: 0.04em; }
-#bootPropNote {
-  font-size: 12px; line-height: 1.7; color: var(--dim); margin-top: 6px;
+#bootPaperName {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px;
+  font-size: 16px; color: var(--paper); letter-spacing: 0.04em;
+}
+#bootPaperName .kicker, #bootPaperName b { font-weight: 700; color: var(--ui-gold); }
+#bootPaperName i { width: 1px; height: 0.95em; background: rgba(230,223,205,0.4); align-self: center; }
+#bootPaperName .date { color: var(--paper); }
+#bootPaperNote {
+  font-size: 13px; line-height: 1.75; color: var(--dim); margin-top: 8px; letter-spacing: 0.03em;
+}
+/* 竖屏 / 窄屏：纸放大顶在上半屏，说明压在纸下方，不与纸叠字。 */
+@media (max-aspect-ratio: 1/1) {
+  #bootPaper { left: 50vw; top: 40%; max-width: 96vw; max-height: 58vh; }
+  #bootCard { max-width: 88vw; bottom: 150px; }
 }
 #bootFoot {
   position: absolute; left: 0; right: 0; bottom: 0;

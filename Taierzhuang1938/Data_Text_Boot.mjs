@@ -1,5 +1,5 @@
 // Data_Text_Boot.mjs — 开机加载画面（Script_Main 的 setStep / 开始按钮 / 预览终端）与
-// 加载画面上那台道具展示台（Script_BootPropStage）的文案。
+// 加载画面上那张战前报纸剪报（Script_BootPaper）的文案。
 // 纯数据，不 import three。键前缀 `boot.`，由 Data_Locale_zhCN.mjs 拼表；口径见 docs/Data_TextAndTuning.md。
 // 占位符写 {name}，代码侧 T("boot.xxx", { name })。同一句话只登记一次，多处复用同一键。
 export const TEXT = Object.freeze({
@@ -40,19 +40,58 @@ export const TEXT = Object.freeze({
 
   "boot.error.startFailed": "启动失败：{message}",
 
-  // --- 加载画面上那件转着的道具（Script_BootPropStage.SHOWCASE） -------------
-  // 键的后半段就是 Data_Meshes 里的模型 id，SHOWCASE 只存 id。
-  "boot.showcase.HanYang": "汉阳造 八八式步枪",
-  "boot.showcase.ZhongZheng": "中正式 步骑枪",
-  "boot.showcase.Zb26": "ZB-26 轻机枪",
-  "boot.showcase.Type38": "三八式 步枪",
-  "boot.showcase.ServicePistol": "外购九毫米 军用手枪",
-  "boot.showcase.Grenade": "木柄手榴弹",
-  "boot.showcase.Dadao": "大刀",
-  "boot.showcase.Type89Launcher": "八九式 重掷弹筒",
-  "boot.showcase.Type95HaGo": "九五式 轻战车 Ha-Go",
-  "boot.showcase.Type97ChiHa": "九七式 中战车 Chi-Ha",
-  "boot.showcase.Type89Tank": "八九式 中战车",
+  // --- 加载画面上的战前报纸剪报（Script_BootPaper + Data_BootPapers）----------------------
+  // 左下角：「史料摘录 | 《报名》 日期」+「简述：……」；左上角副题用汉字日期。
+  // 每期报纸的 name / date / dateCn / summary 按 Data_BootPapers 里的 id 拼键（`boot.paper.<id>.*`）。
+  // summary 是 Notion「加载界面｜战前报纸剪报方案与史料库」里「加载页摘要」的原文。
+  "boot.paper.kicker": "史料摘录",
+  "boot.paper.summaryLine": "简述：{summary}",
+  "boot.paper.subtitle": "{date} · 战前报讯",
+  "boot.paper.alt": "{name}，{date}",
+  "boot.paper.LiBao19370709.name": "《立报》",
+  "boot.paper.LiBao19370709.date": "1937年7月9日",
+  "boot.paper.LiBao19370709.dateCn": "一九三七年七月九日",
+  "boot.paper.LiBao19370709.summary": "卢沟桥一带爆发中日交战，中国守军还击，华北局势骤然紧张。",
+  "boot.paper.ShenBao19370731.name": "《申报》",
+  "boot.paper.ShenBao19370731.date": "1937年7月31日",
+  "boot.paper.ShenBao19370731.dateCn": "一九三七年七月三十一日",
+  "boot.paper.ShenBao19370731.summary": "天津失守，平津两地相继陷落，华北战局进一步恶化。",
+  "boot.paper.WenHui19380125.name": "《文汇报》",
+  "boot.paper.WenHui19380125.date": "1938年1月25日",
+  "boot.paper.WenHui19380125.dateCn": "一九三八年一月二十五日",
+  "boot.paper.WenHui19380125.summary": "津浦铁路沿线激战持续；据该报消息，中国军队正分两路向济宁进攻。",
+  "boot.paper.ZhanShiHuaKan19370820.name": "《战事画刊》第1期",
+  "boot.paper.ZhanShiHuaKan19370820.date": "1937年8月20日",
+  "boot.paper.ZhanShiHuaKan19370820.dateCn": "一九三七年八月二十日",
+  "boot.paper.ZhanShiHuaKan19370820.summary": "淞沪战事爆发，上海街区陷入交火，中国守军与日军展开战斗。",
+  "boot.paper.ZhanShiHuaKan19370906.name": "《战事画刊》第4期",
+  "boot.paper.ZhanShiHuaKan19370906.date": "1937年9月6日",
+  "boot.paper.ZhanShiHuaKan19370906.dateCn": "一九三七年九月六日",
+  "boot.paper.ZhanShiHuaKan19370906.summary": "上海南站遭日机轰炸，车站设施受损，聚集在站内的平民遭受伤亡。",
+  "boot.paper.ZhanShiHuaKan19370911.name": "《战事画刊》第5期",
+  "boot.paper.ZhanShiHuaKan19370911.date": "1937年9月",
+  "boot.paper.ZhanShiHuaKan19370911.dateCn": "一九三七年九月",
+  "boot.paper.ZhanShiHuaKan19370911.summary": "淞沪战场的交战也延伸到空中，中国空军出动迎击日机。",
+  "boot.paper.ZhanShiHuaKan19371001.name": "《战事画刊》第9期",
+  "boot.paper.ZhanShiHuaKan19371001.date": "1937年10月1日",
+  "boot.paper.ZhanShiHuaKan19371001.dateCn": "一九三七年十月一日",
+  "boot.paper.ZhanShiHuaKan19371001.summary": "前线士兵负伤，仍有人包扎伤口后继续作战；画刊记录他们的战时处境。",
+  "boot.paper.ZhanShiHuaKan19371106.name": "《战事画刊》第16期",
+  "boot.paper.ZhanShiHuaKan19371106.date": "1937年11月6日",
+  "boot.paper.ZhanShiHuaKan19371106.dateCn": "一九三七年十一月六日",
+  "boot.paper.ZhanShiHuaKan19371106.summary": "上海北站遭战火破坏，画刊刊出车站受损后的现场照片。",
+  "boot.paper.ZhanShiHuaKan19371111.name": "《战事画刊》第17期",
+  "boot.paper.ZhanShiHuaKan19371111.date": "1937年11月11日",
+  "boot.paper.ZhanShiHuaKan19371111.dateCn": "一九三七年十一月十一日",
+  "boot.paper.ZhanShiHuaKan19371111.summary": "上海主力部队撤退时，留守四行仓库的守军继续抵抗日军，掩护转移。",
+  "boot.paper.JiuGuoShiBao19371220.name": "《救国时报》",
+  "boot.paper.JiuGuoShiBao19371220.date": "1937年12月20日",
+  "boot.paper.JiuGuoShiBao19371220.dateCn": "一九三七年十二月二十日",
+  "boot.paper.JiuGuoShiBao19371220.summary": "南京失守后，日军杀害平民与俘虏；海外记者的见闻开始传到中文报纸上。",
+  "boot.paper.ChinaWeeklyReview19371106.name": "《密勒氏评论报》",
+  "boot.paper.ChinaWeeklyReview19371106.date": "1937年11月6日",
+  "boot.paper.ChinaWeeklyReview19371106.dateCn": "一九三七年十一月六日",
+  "boot.paper.ChinaWeeklyReview19371106.summary": "上海妇女向曾坚守四行仓库的第八十八师士兵送去慰劳品。",
   // 建城 / 城外原野的加载步骤（Script_TengxianCity / Script_TengxianOutfield 的 yield label，加载画面上显示）
   "boot.build.city.ground": "夯地：城内台地与濠外原野",
   "boot.build.city.moat": "挖濠：宽 10.5 深 4.8",
@@ -80,13 +119,12 @@ export const TEXT = Object.freeze({
 
 /** 这张表覆盖的代码模块。Script_Main 由 Data_Text_Hud 登记（它同时用三张表的键）。 */
 export const GATED_MODULES = Object.freeze([
-  "Script_BootPropStage.mjs",
-  "Script_BootProp.mjs",
+  "Script_BootPaper.mjs",
   "Script_TengxianCity.mjs",
   "Script_TengxianOutfield.mjs",
 ]);
 
-/** 展示品的名字按 Data_Meshes 的模型 id 拼键（Script_BootProp.ShowcaseName，主线程）。 */
+/** 报纸的名字 / 日期 / 简述按 Data_BootPapers 的 id 拼键（Script_BootPaper）。 */
 export const DYNAMIC_PREFIXES = Object.freeze([
-  "boot.showcase.",
+  "boot.paper.",
 ]);

@@ -74,11 +74,14 @@ export const OPENING_DEPTH_WALKERS = Object.freeze({
 // ---------------------------------------------------------------------------
 const IJA_DEPTH_ROUTE = Object.freeze([W(3.3, -123.6), W(6, -123.3), W(10, -123.35), W(13.6, -123.6), W(15.2, -118.5), W(17.5, -111)]);
 export const OPENING_DEPTH_IJA = Object.freeze({
-  afterWipeS: 3.6, speedMps: 1.4, staggerS: 1.7,
+  // retireFarM: a man walking on along offRoute (still in shot at his route's end) is retired this far from the player.
+  afterWipeS: 3.6, speedMps: 1.4, staggerS: 1.7, retireFarM: 40,
   members: Object.freeze([
     Object.freeze({ id: "DepthIjaA", start: W(7.8, -120.9),
       flagKick:Object.freeze({id:"flagTrench",root:W(9.95,-121.57),yawDeg:-62,contactS:.4,clipS:1.2,fallS:1.1}),
-      route:Object.freeze([W(11,-120.9),W(11,-116),W(12,-111),W(12,-106)]) }),
+      route:Object.freeze([W(11,-120.9),W(11,-116),W(12,-111),W(12,-106)]),
+      // 2026-09-30: (12,-106) is in the open field the pinned player looks across; still in shot there, he goes on east.
+      offRoute:Object.freeze([W(20,-105),W(32,-104),W(46,-103)]) }),
     Object.freeze({ id: "DepthIjaB", start: W(2.6, -120.8), route: IJA_DEPTH_ROUTE }),
   ]),
 });

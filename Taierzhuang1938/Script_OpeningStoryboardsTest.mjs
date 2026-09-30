@@ -646,17 +646,36 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   const Clear=(p,m)=>solid.every(b=>!(Math.abs(p.x-b.x)<b.w/2+m&&Math.abs(p.z-b.z)<b.d/2+m));
   const Rot=(y,x,z)=>({x:x*Math.cos(y)+z*Math.sin(y),z:-x*Math.sin(y)+z*Math.cos(y)});
   const Stage=(stage,role,anchor)=>{const a=manifest.stages[stage].actors[role],d=Rot(anchor.yaw,a.x,a.z);return {x:anchor.x+d.x,z:anchor.z+d.z};};
-  const parry={...J.crouch,yaw:J.crouch.yaw+R.parryTurnDeg*Math.PI/180};
-  const heParry=Stage("chopParry","heyoutian",parry),luoChop=Stage("chopRear","luo",R.ijaBGuard);
+  // 2026-09-30 self rescue (docs/Data_OpeningSelfRescue20260930.md): the volley's wounded end up east of the lane he heaves
+  // himself out along; each is cut down from his right rear (chopRear) by Luo or an NRA05 extra.
+  const Local=(a,x,z,dyaw=0)=>{const d=Rot(a.yaw,x,z);return {x:a.x+d.x,z:a.z+d.z,yaw:a.yaw+dyaw*Math.PI/180};};
+  const WoundStart={ijaA:J.crouch,ijaB:R.ijaBGuard,interpreter:R.interpreter};
+  const models=Object.fromEntries(manifest.models.map(m=>[m.id,m]));
+  const Model={ijaA:"TengxianIja02",ijaB:"TengxianIja01",interpreter:"TengxianNra02"};
+  const WoundBody=role=>{
+    const spec=R.wound.shots.find(s=>s.role===role),row=models[Model[role]],i=row?.clipIds?.indexOf(spec.clip),end=i>=0?row.clips[i]?.root?.end:null;
+    return end?Local(WoundStart[role],end[0],end[1],end[2]):Local(WoundStart[role],...spec.standIn);
+  };
+  const heaveRoot={x:eye.x,z:eye.z,yaw:-Math.PI/2},kneelKey=R.heave.body.eye.at(-1)[1],kneel=Local(heaveRoot,kneelKey[0],kneelKey[2]);
+  const handRoot=Local({...kneel,yaw:heaveRoot.yaw},0,-R.hand.frontM,180);
+  const cutMarks=R.cuts.map(c=>[c,Stage("chopRear","luo",WoundBody(c.victim))]);
   for(const [name,p,m] of [["ijaA's crouch",J.crouch,.1],["the interpreter's squat",R.interpreter,.1],["ijaB's guard",R.ijaBGuard,.3],
-    ["He's parry mark",heParry,.2],["Luo's chop mark",luoChop,.3],["Liu's firing spot",R.liuShot,.2],["Liu's trench post",R.liuCover,.3],
-    ["He's timber spot",R.lift.heLift,.1],["Luo's rescue root",{x:eye.x+R.drag.startBackM,z:eye.z},.3],
-    ["where he is set down",{x:eye.x+R.drag.startBackM+1.45,z:eye.z},.3],["He's trench-edge post",R.heCover,.3]])
+    ...cutMarks.map(([c,p])=>[`${c.by}'s cut mark behind ${c.victim}`,p,.2]),["Liu's firing spot",R.liuShot,.2],["Liu's trench post",R.liuCover,.3],
+    ["He's timber spot",R.lift.heLift,.1],["where he kneels up",kneel,.3],["Luo's hand-over root",handRoot,.3],["the rifle Luo snatches up",R.rifleMouth,.1],
+    ["He's trench-edge post",R.heCover,.3]])
     assert.ok(Clear(p,m),`02: ${name} (${p.x.toFixed(2)},${p.z.toFixed(2)}) stands clear of the mouth's collapse blocks`);
   assert.ok(D(R.interpreter,eye)>=1.2&&D(R.interpreter,J.crouch)>=.6,"the interpreter squats 1.2 m+ off the lens and clear of ijaA");
-  // He's parry mark is off the line from the eye through ijaA (he shows beside him, not straight behind his back).
+  // The volley first (「先开枪击伤」), the cuts after: every wounded man is hit before his cutter is out of cover, and nobody
+  // raises his rifle again (the wounded clips end with the arm hanging: checked in the clip library).
+  for(const c of R.cuts){
+    const shot=R.wound.shots.find(s=>s.role===c.victim),delay=c.by==="luo"?R.delayS.luo:R.extras.find(e=>e.id===c.by)?.delayS;
+    assert.ok(shot&&!shot.lethal&&shot.part==="arm"&&shot.at<delay,`${c.victim} is shot in the arm (${shot?.at} s) before ${c.by} comes over the step (${delay} s)`);
+    assert.ok(c.by==="luo"||R.extras.find(e=>e.id===c.by)?.modelVariant===4,`${c.by} has the NRA05 body LuoDadaoChopRear is baked on`);
+  }
+  assert.deepEqual(R.cuts.map(c=>c.victim).sort(),["ijaA","ijaB","interpreter"],"the two who questioned him and the interpreter are cut down");
+  assert.equal(R.cuts.find(c=>c.victim==="ijaA").by,"luo","Luo cuts down the man who slapped him");
+  // The Charge phase view needs the men to come into the picture from its right: the crater step is north of the eye.
   const Bearing=(a,b)=>Math.atan2(b.x-a.x,-(b.z-a.z))*180/Math.PI;
-  assert.ok(Math.abs(Bearing(eye,heParry)-Bearing(eye,J.crouch))>25,`He's parry shows beside ijaA from the eye (${(Bearing(eye,heParry)-Bearing(eye,J.crouch)).toFixed(0)} deg)`);
   // The charge comes over the crater step at the right of the pinned eye, from out of its sight.
   const {Sight,Eye}=await import("./Script_FirstLevelSpaceProbe.mjs");
   for(const [name,p] of [["Luo",R.luoStart],["He",R.heStart],["Liu",R.liuStart],...R.extras.map(e=>[e.id,e.start])])
@@ -674,30 +693,33 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   assert.ok(R.slap.raiseS===hitT&&R.slap.hitS===hitT,"the slap clip plays from its first frame (the wind-up)");
   assert.ok(first.delayS>=manifest.clips.IjaCrouchHairHold.holdLoop[0],"the first slap starts once the head is up (the hold loop's start pose)");
   assert.ok(R.slap.hangS<R.slap.recoverS&&R.slap.recoverS<R.slap.dizzyS&&R.slap.yawDeg>=35&&R.slap.yawDeg<=55,"the head is flung aside, hangs, comes back; the struck side swims longer");
-  // 2026-09-29 haul and hand-over (docs/Data_OpeningRescueHandover20260929.md): Luo stands at his head, the haul takes the
-  // boots out past the timber, and he is got up standing where he was set down, off ijaA's body.
+  // 2026-09-30 self rescue: he heaves himself out -- the boots come out past the timber, he ends on his knees east of the
+  // doorway, off the wounded men's bodies, and gets up standing; Luo asks on his hold loop, before the rifle is shoved over.
   {
-    const Dr=R.drag,Hd=R.hand,body=Dr.standIn.body,root={x:eye.x+Dr.startBackM,z:eye.z};
+    const H=R.heave,Hd=R.hand,body=H.body;
     const At=(keys,t)=>{let v=keys[0][1];for(const [k,p] of keys)if(k<=t)v=p;return v;};
-    assert.ok(Math.abs(At(body.eye,0)[2]+Dr.startBackM)<.02&&Math.abs(At(body.eye,0)[1]-S.lieEyeM)<.02,"the haul's first frame is the pinned eye (Luo startBackM beyond it)");
-    const travel=At(body.eye,Dr.standIn.dragS)[2]-At(body.eye,1.9)[2];
-    assert.ok(travel>1.3&&travel<1.7,`the haul drags him ${travel.toFixed(2)} m`);
-    const heelOut=root.x+Math.min(At(body.heelL,Dr.standIn.dragS)[2],At(body.heelR,Dr.standIn.dragS)[2]);
-    assert.ok(heelOut>=Dr.timberEastX+Dr.dropPastM,`the boots end past the timber (heels at x ${heelOut.toFixed(2)})`);
-    assert.ok(Math.abs(At(Hd.standIn.body.eye,Hd.standIn.durationS)[1]-STANCE.stand.eye)<.05,"the hand-over ends standing at the player's standing eye");
-    assert.ok(Hd.standIn.offerS<Hd.standIn.handedS&&Hd.standIn.holdLoop[0]>=Hd.standIn.offerS-.01&&Hd.standIn.holdLoop[1]<Hd.standIn.handedS,"the question is asked on the offered rifle, before it is handed");
-    assert.ok(Math.abs(R.parryMeet.z-eye.z)>.5,"ijaA dies off the haul's lane");
-    // The baked clips (Luo's rig) carry the body the camera rides.
-    for(const clip of ["LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle"])assert.ok(manifest.clips[clip],`${clip} is in the manifest`);
-    const luo=JSON.parse(Read("./Animation/OpeningStoryboards/Animation_TengxianNra05OpeningStoryboards.json")).clips;
-    const Part=(clip,part,t)=>{const tr=luo[clip]?.player,v=tr?.parts?.[part];if(!v)return null;const k=Math.max(0,Math.min(v.length/3-1,Math.round(t*tr.fps)));return [v[k*3],v[k*3+1],v[k*3+2]];};
-    for(const part of ["eye","gaze","crown","pelvis","heelL","heelR"])assert.ok(Part("LuoRescueDrag",part,0),`LuoRescueDrag's player track has ${part}`);
-    for(const part of ["eye","gaze","crown","rifle","rifleMuzzle"])assert.ok(Part("LuoHandRifle",part,0),`LuoHandRifle's player track has ${part}`);
-    const d0=Part("LuoRescueDrag","eye",0),p0=Part("LuoRescueDrag","pelvis",0),p1=Part("LuoRescueDrag","pelvis",manifest.clips.LuoRescueDrag.duration);
-    assert.ok(Math.abs(d0[1]-S.lieEyeM)<.06&&p1[2]-p0[2]>1.3,`LuoRescueDrag starts on the pinned eye and hauls him back (hips ${(p1[2]-p0[2]).toFixed(2)} m)`);
-    const end=Part("LuoHandRifle","eye",manifest.clips.LuoHandRifle.duration);
-    assert.ok(Math.abs(end[1]-STANCE.stand.eye)<.1,`LuoHandRifle ends with him standing (eye ${end[1].toFixed(2)} m)`);
-    assert.ok(manifest.clips.LuoHandRifle.holdLoop&&["offered","handed"].every(kind=>manifest.clips.LuoHandRifle.events?.some(e=>e.kind===kind)),"LuoHandRifle: hold loop for the question, offered / handed events");
+    for(const [part,keys] of Object.entries(body))assert.ok(keys.every((k,i)=>!i||k[0]>keys[i-1][0])&&keys.at(-1)[0]<=H.durationS,`heave ${part} keys in time order inside durationS`);
+    assert.ok(Math.abs(At(body.eye,0)[1]-S.lieEyeM)<.02&&Math.abs(At(body.eye,0)[2])<1e-9,"the heave starts on the pinned eye");
+    const hips=Local(heaveRoot,...[At(body.pelvis,0)[0],At(body.pelvis,0)[2]]);
+    assert.ok(D(hips,S.pinnedHips)<.1,`the heave starts with the hips under the timber (${D(hips,S.pinnedHips).toFixed(2)} m off)`);
+    const heelOut=Math.min(...["heelL","heelR"].map(k=>Local(heaveRoot,At(body[k],H.durationS)[0],At(body[k],H.durationS)[2]).x));
+    assert.ok(heelOut>=H.timberEastX+H.dropPastM,`the boots end past the timber (heels at x ${heelOut.toFixed(2)})`);
+    assert.ok(Math.abs(kneelKey[1]-1.12)<.1,`up on his knees (eye ${kneelKey[1]} m)`);
+    assert.ok(H.gruntS<0&&H.gruntS>-1,"the grunt's catch of breath leads the lunge");
+    for(const c of R.cuts)assert.ok(D(WoundBody(c.victim),kneel)>=.8,`${c.victim}'s body is clear of where he kneels up (${D(WoundBody(c.victim),kneel).toFixed(2)} m)`);
+    assert.ok(D(WoundBody("ijaA"),handRoot)>=.45,`Luo stands clear of ijaA's body (${D(WoundBody("ijaA"),handRoot).toFixed(2)} m)`);
+    assert.ok(Math.abs(Hd.rise.eye.at(-1)[1][1]-STANCE.stand.eye)<.05&&Math.abs(Hd.rise.eye[0][1][1]-kneelKey[1])<.02,"he gets up from the kneel to the player's standing eye");
+    const S0=Hd.standIn;
+    assert.ok(S0.holdLoop[1]<=S0.offerS&&S0.offerS<S0.handedS&&S0.handedS<S0.durationS,"the question is asked on the hold loop, before the rifle is shoved over");
+    const meta=manifest.clips.LuoGrabRifleShove;
+    if(meta){
+      assert.ok(meta.holdLoop&&["offered","handed"].every(kind=>meta.events?.some(e=>e.kind===kind))&&meta.props?.includes("rifle"),"LuoGrabRifleShove: hold loop for the question, offered / handed events, the rifle prop");
+      assert.ok(meta.holdLoop[1]-meta.holdLoop[0]<=1.2,"Luo's hold loop is short: he does not dawdle once the nod comes");
+    }
+    for(const shot of R.wound.shots.filter(s=>s.clip)){
+      const m=manifest.clips[shot.clip];
+      if(m)assert.ok(m.holdLoop&&m.rootMotion,`${shot.clip}: a hold loop to stand wounded on until the cut, root motion away from the pinned man`);
+    }
   }
   assert.ok(D(R.rifleMouth,eye)>.8,"the rifle lies out of his reach while he is pinned");
   // SB02 (contract §2.2): the fall ends in the dugout, looking at the north post with the head rolled left.
@@ -715,7 +737,7 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     }
     assert.ok(m.route.every((p,i,all)=>p.x>=(i?all[i-1].x:m.start.x)),`${m.id} walks away east`);
   }
-  assert.ok(R.extras.every(e=>!e.victim||R.depthPost[e.victim]),"a charging man's victim holds a post");
+  assert.ok(R.wound.shots.some(s=>s.role==="DepthIjaB"&&s.lethal)&&R.depthPost.DepthIjaB,"the depth man at his post is shot dead by the volley");
   // Storyboard shots and wave-1 stand-ins (contract §4.6).
   assert.ok(C.storyboardShots.length>=2&&C.storyboardShots.every(s=>/^SB0[1-9]/.test(s.id)&&(s.when||s.phase&&Number.isFinite(s.age))&&s.judge),"storyboard shots are well formed");
   for(const e of C.pendingWiring){

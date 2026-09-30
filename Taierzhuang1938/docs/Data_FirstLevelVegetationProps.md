@@ -44,6 +44,10 @@
 
 - **图集**：Lovart（nano_banana_pro）生成一张 2048² 品红底 8 格植物卡（提示词 `_shots/Gap3A_Source/B6/Prompt_VegetationAtlas_v2.txt`，thread
   `a97e84e9-d6af-432d-9fcd-44e7d3347a58`；第一次 thread `d5ea5e4a-dfe3-4eba-a9c6-08a0e8e5ab9c` 被后端自作主张去了背景、填成剪影，废弃）。
+  **LowTuft 单独重生成**（2026-09-30）：v2 主图里它画成一整块铺满格子的草垫，左右、底三边都被格子边切平，地上交叉面片读成一张张直边方块。
+  改用单张品红底一簇（thread `8bcd6653-78c1-4e5b-8cfc-64bf14fc66e7`，源 `_shots/Gap3A_Source/B6/atlas_v3/lovart_dd9bb199850c.png`，
+  提示词 `_import/Prompts/Texture_FirstLevelVegetationAtlas.txt` 末节），烘焙用 `--card-source LowTuft=…` 取它；新图偏亮，卡表 `shade` 压一档。
+  烘焙脚本现在检查每张卡在源矩形左 / 右 / 上边条里有没有实心像素（被格子切掉），有就拒绝烘焙。
   `Script_BakeVegetationAtlas.py` 按品红度键出 alpha、去溢色、粉紫压成米灰并降饱和（参考图的低饱和冷灰棕），每张卡按紧包围盒预乘 alpha
   缩进 256×512 格（根在格底），透明区推色防 mip 黑边。卡片的 UV / 宽高比 / 真实高度照抄烘焙脚本打印的表进 `VEGETATION_CARDS`。
 - **撒点**（`PlanFirstLevelVegetation`，确定性、格子哈希种子）：1.6 m 抖动网格，每个命中的格子长一簇 2–5 张同种卡。

@@ -286,7 +286,14 @@ function ConfigureCraterSurface(material, source, soil) {
         float soilDet = dot(soilDx, soilR1);
         vec3 soilGradient = sign(soilDet) * (dFdx(soilRelief) * soilR1 + dFdy(soilRelief) * soilR2);
         normal = normalize(max(abs(soilDet), 1e-8) * normal - soilGradient);
+#ifdef TERRAIN_TRAILS
+        // 地形材质编进了脚印采样（Script_TerrainTrails）时，坑土法线改采地形纹理数组的翻土层
+        //（同一套「xy → vec3(x, 0, y)」约定），省下 uCraterNormal 这个纹理单元：
+        // ANGLE-D3D11 上砸坑变体原来已经是 16/16（docs/Data_TerrainTrails.md §4）。
+        vec2 soilSlope = texture(uTerrainSurface, vec3(vSoilUv, 3.0)).xy * 2.0 - 1.0;
+#else
         vec2 soilSlope = texture2D(uCraterNormal, vSoilUv).xy * 2.0 - 1.0;
+#endif
         normal = normalize(normal + mat3(viewMatrix) * vec3(soilSlope.x, 0.0, soilSlope.y) * exposed * 0.52 * (1.0 - ash * 0.7));`);
     shader.fragmentShader = InsertAfterSurfacePatch(shader.fragmentShader, "#include <aomap_fragment>", `        float earthOcclusion = mix(1.0, (1.0 - fissure * 0.36) * mix(1.0, 0.76, cavity), exposed);
         reflectedLight.indirectDiffuse *= earthOcclusion;

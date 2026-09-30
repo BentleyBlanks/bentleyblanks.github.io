@@ -713,7 +713,11 @@ class Voice {
   /** 启动一个源节点（Osc / BufferSource），并把 voice 寿命推到它之后。 */
   Start(node, at, duration, offset = node.__offset || 0) {
     const t = at ?? this.t;
-    if (node.buffer) node.start(t, offset, duration ?? node.__dur ?? Math.max(0.01, node.buffer.duration - offset));
+    // duration 是**真实时间**（调用方按 buffer.duration / rate 算的）；BufferSource.start 的第三个参数却是**素材时间**。
+    // 【2026-09-30】原来直接传进去：变调 > 1 的采样按 rate² 截短 —— ±3 % 抖动的那一档每条尾巴丢 3 %，
+    // 炸弹啸声（变调 × 抖动到 1.06）最响的那一截被切掉 0.15 s。这里换算回素材时间。
+    const rate = node.playbackRate?.value ?? 1;
+    if (node.buffer) node.start(t, offset, duration != null ? duration * rate : node.__dur ?? Math.max(0.01, node.buffer.duration - offset));
     else node.start(t);
     const stop = t + (duration ?? node.__dur ?? 1);
     if (node.stop) node.stop(stop + 0.02);
@@ -1785,6 +1789,25 @@ const RECIPES = {
     v.Live(0.7);
   },
 
+  // 喉咙被割开/打穿的窒息哽咽（敌军刀杀 / 脖子中弹倒下，Script_NeckDeath 决定放不放）：
+  // 与 painMoan 同一条路子（低基频过两个共振峰当元音），再加一路慢速幅度抖动当喉头的「咯咯」，
+  // 两口气：一口带音的哽、一口漏气的泄。采样是主料（Script_SeedAudioNeckDeathBake），这里是盖不上时的回落。
+  neckDeath(A, v) {
+    const t = v.t;
+    const f0 = v.F(v.R(120, 150));
+    const src = v.Osc(A.Wave("string"), f0);
+    Glide(src.frequency, t, f0, f0 * 0.7, 1.9);
+    const band = v.Filter("bandpass", 560, 4.2);
+    const lp = v.Filter("lowpass", v.F(1100), 0.8);
+    const bus = v.Gain(FLOOR);
+    Swell(bus.gain, t, 0.3, 0.05, 0.5, 0.35);           // 第一口：带音的哽
+    Swell(bus.gain, t + 1.05, 0.14, 0.08, 0.35, 0.5);   // 第二口：漏气
+    src.connect(band).connect(lp).connect(bus).connect(v.out);
+    v.Start(src, t, 2.0);
+    v.wetGain.gain.value = 0.15;
+    v.Live(2.1);
+  },
+
   // 大出血伤员的持续低声痛呼：**闷的、压着的**，不是惨叫。
   // 低通 900 顶替素材那条「捂着嘴」的天然闷感；中间一次换气靠两段包络。
   painMoan(A, v) {
@@ -2700,6 +2723,43 @@ function IsVoiceCue(name) { return typeof name === "string" && name.startsWith("
 const OCCLUSION_MAX_VOICE = 0.5;
 
 /**
+ * 剧情对白的三条路（2026-09-30，数与理由在 Data_Tuning_Audio.STORY_SPEECH，口径 docs/Data_AudioEngine.md §16）：
+ *   "own"       主角自己：居中单声道干声 + 胸腔低频 + 略响（OwnVoiceTone 开着）
+ *   "world"     别人：世界声源（HRTF / 遮挡 / 人声距离曲线 / 房间混响）
+ *   "unplaced"  找不到人的别人：居中，但音色平直、照样送房间混响 —— 不许听成主角自己
+ * 一条对白声部同时建了居中与世界两路（整段录音要在两者之间切人），这里只拨增益，不断开重接。
+ */
+const OWN_VOICE_GAIN = DbGain(STORY_SPEECH.ownGainDb);
+
+/** 主角那一路的音色：低架（胸腔）+ 高架（略收齿音）。两只滤波器常建，别人的句子把增益拨回 0 dB = 直通。 */
+function OwnVoiceTone(v, input) {
+  const low = v.Filter("lowshelf", STORY_SPEECH.ownLowShelfHz, 0.7);
+  const high = v.Filter("highshelf", STORY_SPEECH.ownHighShelfHz, 0.7);
+  low.gain.value = STORY_SPEECH.ownLowShelfDb;
+  high.gain.value = STORY_SPEECH.ownHighShelfDb;
+  input.connect(low).connect(high);
+  v.ownTone = { low, high };
+  return high;
+}
+
+/** 按路由拨一条对白声部的居中/世界增益、主角音色、混响。t / tau 为 null 时立即赋值（起播那一刻）。 */
+function RouteStorySpeech(v, route, t = null, tau = 0) {
+  const own = route === "own", centred = route !== "world";
+  const Set = (param, value) => {
+    if (!param) return;
+    if (t == null) param.value = value; else param.setTargetAtTime(value, t, tau);
+  };
+  Set(v.storySelfGain?.gain, own ? OWN_VOICE_GAIN : centred ? 1 : 0);
+  Set(v.storyWorldGain?.gain, centred ? 0 : 1);
+  Set(v.ownTone?.low.gain, own ? STORY_SPEECH.ownLowShelfDb : 0);
+  Set(v.ownTone?.high.gain, own ? STORY_SPEECH.ownHighShelfDb : 0);
+  // 居中的两条路没有距离：主角干声；找不到人的照原配方的湿度（等于 1 m 内说话），不跟着上一个人的距离走。
+  if (centred && v.wetGain) Set(v.wetGain.gain, own ? 0 : Clamp01(v.wetBase ?? STORY_SPEECH.worldWet));
+  v.storyRoute = route;
+  v.storySpeakerFirstPerson = centred;
+}
+
+/**
  * 爆炸类 cue，以及它们的遮挡上限。
  *
  * 【2026-09-09 为什么爆炸要单开一条】用户第三次报「炮弹还是没有声音」，这次
@@ -2856,6 +2916,7 @@ const NODE_COST = {
   execScream: 9, flareLaunch: 9, flareIgnite: 9,
   flareBurn: 8, telegraphKey: 8, telegraphHum: 8, mgOverheat: 8,
   painMoan: 7, hitGrunt: 7, planeDive: 7, flareOut: 6,
+  neckDeath: 7,
   // 会飞的引擎持续声：三个振荡器 + 拍频 LFO + 滤波 + 两个 gain，整条航线只有一条。
   planeDrone: 9,
   bombWhistle: 8,
@@ -2972,7 +3033,8 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-27：战车机枪单开 tankMg（Warfare Library 通用机枪三条），清单新增一个 cue。
 // 2026-09-27 开场改稿：耳光 slap、反冲锋一片喊杀 chargeCrowd。
 // 2026-09-30：空袭炸弹下落啸声 bombWhistle，清单新增一个 cue。
-export const SFX_PACK_VERSION = "20260930bombwhistle";
+// 2026-09-30：敌军刀杀 / 脖子中弹的窒息哽咽 neckDeath（两变体），清单新增一个 cue。
+export const SFX_PACK_VERSION = "20260930neckdeath";
 // 2026-09-29：清单加了 `bedVariants`（战场远景床的五条无人声候选），戳不动的话浏览器拿着旧清单永远看不到候选。
 export const AMB_PACK_VERSION = "20260929battlebeds";
 /**
@@ -3147,6 +3209,8 @@ const SAMPLE_MIX = {
   // 那一声的作用是让玩家明白里面在干什么，不是展览）；
   // painMoan 更低：它是持续响着的背景，与枪声同量级的话整场只剩这个人在哼。
   hitGrunt: 0.8, execScream: 0.55, painMoan: 0.5,
+  // 敌军窒息哽咽：死在玩家十几米内才放，近处的一声细节，与 hurt 同一档偏下（不盖枪声，也不该听不见）。
+  neckDeath: 0.75,
   // 照明弹一个循环四条。燃烧那条**滞空好几十秒**，所以压到全表最低的一档
   // （比脚步略高）—— 一直在响的东西不能按「一次事件」配平；
   // 发射与点燃是事件，可以站高一点。
@@ -3205,7 +3269,7 @@ const SAMPLE_WET = {
   // 照明弹三条给得多：它们**在两百米的头顶上**，听到的几乎全是反射；
   // 处决那声隔着一堵墙与一个院子，同理。反过来，电键与拉柄就在你手底下，
   // 给了混响就变成「隔壁屋里有人在敲」——贴身的小动作一律近乎全干。
-  execScream: 0.5, painMoan: 0.3, hitGrunt: 0.12,
+  execScream: 0.5, painMoan: 0.3, hitGrunt: 0.12, neckDeath: 0.15,
   flareIgnite: 0.5, flareBurn: 0.45, flareOut: 0.45, flareLaunch: 0.4,
   telegraphKey: 0.06, telegraphHum: 0.05,
   // 远近是两条真的录音，湿度也要分开：300 m 外那一梭子的价值全在尾巴上。
@@ -3322,6 +3386,36 @@ const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraph
  * 走 RECIPES 而不是另开一条播放路径 —— 去重、预算闸、Panner、空气低通、
  * 混响 send、距离湿度加成这一整套原封不动地免费复用（与人声采样同一个理由）。
  */
+/**
+ * 跟着游戏时钟变速的采样（2026-09-30，炸弹下落啸声）。调用方每帧按「素材还剩多少 ÷ 游戏里还剩多少秒」
+ * 调 `v.SetRate(倍率)`，让素材的终点落在游戏里那一刻（落地）上。音频时钟按真实时间走，游戏时钟每帧封顶 0.05 s、
+ * 卡一下就落后 —— 按真实时间一口气排好的 2.8 s 在帧率低时比炸弹先放完（用户：「炸弹还没落地啸声就结束了」）。
+ * 这几条尊重 `offset`（晚了几帧就从素材里往后切）、不加 ±3 % 抖动；寿命按最慢倍率留足。
+ */
+const SAMPLE_VARISPEED = new Set(["bombWhistle"]);
+/** SetRate 允许的最慢倍率（寿命按它留）。与 Data_FirstLevelAirRaid.audio.whistle.rateMin 同一个数。 */
+const VARISPEED_MIN = 0.8;
+
+function VarispeedSample(A, v, src, buf, rate) {
+  const off = Math.min(Math.max(0, v.offset || 0), Math.max(0, buf.duration - 0.01));
+  v.Start(src, v.t, (buf.duration - off) / rate, off);
+  v.Live((buf.duration - off) / (rate * VARISPEED_MIN) + 0.1);
+  let pos = off, lastT = v.t, cur = rate;
+  /** 此刻播到素材的第几秒（还没起播返回 null）。 */
+  v.SamplePos = () => {
+    const now = A.ctx.currentTime;
+    return now < v.t ? null : Math.min(buf.duration, pos + (now - lastT) * cur);
+  };
+  v.SetRate = (mul) => {
+    const now = Math.max(A.ctx.currentTime, v.t);
+    pos = Math.min(buf.duration, pos + (now - lastT) * cur);
+    lastT = now;
+    cur = rate * Math.max(VARISPEED_MIN, mul);
+    src.playbackRate.setValueAtTime(cur, now);
+    try { src.stop(now + (buf.duration - pos) / cur + 0.02); } catch { /* 已经停了 */ }
+  };
+}
+
 function SampleRecipe(buffers, name) {
   const interval = SAMPLE_BURST[name] || 0;
   const wet = SAMPLE_WET[name];
@@ -3345,8 +3439,8 @@ function SampleRecipe(buffers, name) {
       }
       const src = v.Own(A.ctx.createBufferSource());
       src.buffer = buf;
-      // 逐发 ±3%：连打二十发不会听出是同一个 wav 在复读。轮播的那几条不掺。
-      const rate = cycle ? v.pitch : v.pitch * (0.97 + v.rng() * 0.06);
+      // 逐发 ±3%：连打二十发不会听出是同一个 wav 在复读。轮播的那几条、跟着游戏时钟变速的那几条不掺。
+      const rate = cycle || SAMPLE_VARISPEED.has(name) ? v.pitch : v.pitch * (0.97 + v.rng() * 0.06);
       src.playbackRate.value = rate;
       src.connect(v.out);
       if (name === "planeDrone") {
@@ -3357,6 +3451,8 @@ function SampleRecipe(buffers, name) {
         v.loop = true;
         v.Live(3600);
         v.SetDoppler = doppler => src.playbackRate.setTargetAtTime(rate * doppler, A.ctx.currentTime, 0.12);
+      } else if (SAMPLE_VARISPEED.has(name)) {
+        VarispeedSample(A, v, src, buf, rate);
       } else {
         v.Start(src, v.t + i * interval, buf.duration / Math.max(0.1, rate));
       }
@@ -5061,9 +5157,11 @@ export class AudioEngine {
    * （Data_FirstLevelVoiceCast.SQUAD_BARK_*，用他的定妆音录的）。没有本人版本的 TTS 句不说
    *（那是别人的嗓子），真人素材句（`sample`）照常可选；一条本人版本都没有才退回公用声库。
    * 本人版本不叠 ±4% 变调 —— 那是给公用嗓子摊成一个班用的，调一动就不是他了。
+   *
+   * `self: true` = 玩家自己喊的：不定位，走主角的嗓子那一路（Play 的 ownVoice，见 RouteStorySpeech）。
    */
   Bark(kind, { position = null, volume = 1, priority = false, seed = 0, key = null,
-    side = "nra", who = null } = {}) {
+    side = "nra", who = null, self = false } = {}) {
     // 章节可压低自主闲聊；具名脚本对白走 PlayStoryVoice，优先战术提示不受此闸影响。
     if (!priority && this.allowAutonomousBark?.() === false) return null;
     // 01–06 剧情对白正在说：自主喊话让路（契约 §5.5）。只有逐句对白播放器会置这一位，07 以后不受影响。
@@ -5139,6 +5237,10 @@ export class AudioEngine {
     // 剧情台词那一路早就抬了（Script_Companion.Locate → COMPANION_TUNING.mouthY = 1.52），
     // 喊话这一路一直没抬 —— 同一个人的两句话走两套坐标，这里补齐。
     const at = position ? { x: position.x, y: position.y + BARK_MOUTH_Y, z: position.z } : null;
+    // self：玩家自己喊的（下令、打空骂人）。2026-09-30 以前下令那句按玩家脚底 + 1.52 m 定位 —— 离耳朵十几厘米，
+    // 被极近场钳位推到一米外某个方向再过 HRTF、再送 0.25 的混响，听着像旁边另有个人在喊。
+    // 现在与剧情对白里主角那一路同一套（居中干声 + 胸腔音色，Play 的 ownVoice）。
+    if (self) return this.Play("voice." + pick.key, { volume, pitch, priority, ownVoice: true });
     // 喊话按「喊」配距离衰减（SHOUT_AUDIBILITY）：近处与说话同一条，远处衰减慢一半。
     return this.Play("voice." + pick.key, { position: at, volume, pitch, priority,
       rolloff: SHOUT_AUDIBILITY.rolloff });
@@ -5195,21 +5297,14 @@ export class AudioEngine {
 
   SetStoryVoiceSpeaker(voice, { position = null, firstPerson = false, who = null, speaking = true } = {}) {
     if (!voice?.storySelfGain || !this.ctx || voice.reclaimed || voice.stopping) return false;
-    const centred = firstPerson || !position;
-    const changed = centred !== voice.storySpeakerFirstPerson;
-    const t = this.ctx.currentTime, tau = STORY_SPEECH.switchS;
-    if (changed || voice.storySpeakerFirstPerson == null) {
-      voice.storySelfGain.gain.setTargetAtTime(centred ? 1 : 0, t, tau);
-      voice.storyWorldGain.gain.setTargetAtTime(centred ? 0 : 1, t, tau);
-    }
-    voice.storySpeakerFirstPerson = centred;
+    const route = this.StorySpeechRoute(position, firstPerson);
+    if (route !== voice.storyRoute) RouteStorySpeech(voice, route, this.ctx.currentTime, STORY_SPEECH.switchS);
     voice.storySpeaker = who;
     const speechChanged = voice.storySpeakerSpeaking !== speaking;
     voice.storySpeakerSpeaking = speaking;
     if (speechChanged && this.concussionAmount != null) this.SetConcussion(this.concussionAmount, this.concussionLowHz);
     if (speechChanged) this.RefreshDeafFloor();
-    if (centred) {
-      voice.wetGain.gain.setTargetAtTime(0, t, tau);
+    if (route !== "world") {
       voice.distance = 0;
       voice.effectiveGain = voice.baseGain;
     } else {
@@ -5219,35 +5314,37 @@ export class AudioEngine {
   }
 
   /**
+   * 这句对白走哪条路（RouteStorySpeech）：主角 → "own"；有位置且在人声半径 VOICE_CULL_M 内 → "world"；
+   * 其余（找不到这个人、太远）→ "unplaced"：不定位，但不是主角的嗓子。
+   */
+  StorySpeechRoute(position, firstPerson = false) {
+    if (firstPerson) return "own";
+    if (!position) return "unplaced";
+    const dx = position.x - this.listenerPos.x, dy = position.y - this.listenerPos.y, dz = position.z - this.listenerPos.z;
+    return dx * dx + dy * dy + dz * dz > VOICE_CULL_M * VOICE_CULL_M ? "unplaced" : "world";
+  }
+
+  /**
    * 01–06 逐句对白的一句（Script_DialoguePlayer 调）。与 PlayStoryVoice 的区别：
    *   · **不占单槽**：两句可以同时响（插话、压尾音），各自挂在各自说话人头上；
-   *   · 一句从头到尾只属于一个人：第一人称（顺子）或解析不到位置的句子走居中干声，
-   *     其余只走带 HRTF / 遮挡 / 距离的世界声，中途不在两路之间切换。
+   *   · 一句从头到尾只属于一个人、只走一条路（StorySpeechRoute）：第一人称（顺子）走主角的居中干声，
+   *     解析不到位置的别人走居中但平直、带房间声的 unplaced，其余只走带 HRTF / 遮挡 / 距离 / 混响的世界声，
+   *     中途不在几路之间切换。
    * 调用方逐帧 MoveVoice 跟头；停用 StopVoice。
    * @returns {object|null} Voice 句柄；没有这条录音或静音时 null（调用方照走字幕）。
    */
   PlayDialogueLine(key, { position = null, firstPerson = false, volume = 1, offset = 0 } = {}) {
     if (!this.ctx || this.disposed || this.voiceMute) return null;
     if (!key || !this.voiceBank.get(key)) return null;
-    let at = position;
-    if (at) {
-      const dx = at.x - this.listenerPos.x, dy = at.y - this.listenerPos.y, dz = at.z - this.listenerPos.z;
-      if (dx * dx + dy * dy + dz * dz > VOICE_CULL_M * VOICE_CULL_M) at = null;
-    }
-    const centred = firstPerson || !at;
-    const voice = this.Play("voice." + key, { position: at || this.listenerPos, volume, offset, pitch: 1,
-      priority: true, storySpeech: true });
+    const route = this.StorySpeechRoute(position, firstPerson);
+    const voice = this.Play("voice." + key, { position: route === "world" ? position : this.listenerPos,
+      volume, offset, pitch: 1, priority: true, storySpeech: true });
     if (!voice) return null;
     voice.dialogueLine = true;
-    voice.storySpeakerFirstPerson = centred;
     // 有逐句对白在响时，震荡低通保住辅音（与整段单槽同一个下限，见 SetConcussion）。
     (this.dialogueVoices ||= new Set()).add(voice);
     if (this.concussionAmount != null) this.SetConcussion(this.concussionAmount, this.concussionLowHz);
-    if (voice.storySelfGain) {
-      voice.storySelfGain.gain.value = centred ? 1 : 0;
-      voice.storyWorldGain.gain.value = centred ? 0 : 1;
-      if (centred && voice.wetGain) voice.wetGain.gain.value = 0;
-    }
+    if (voice.storySelfGain) RouteStorySpeech(voice, route);
     return voice;
   }
 
@@ -5627,7 +5724,9 @@ export class AudioEngine {
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
     bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null,
     weaponClass = null, sourceSizeM = 0, rolloff = null, storySpeech = false, selfCapped = false, yieldFirst = false, propagate = true,
-    blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false, occlusionExclude = null } = {}) {
+    blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false, occlusionExclude = null, ownVoice = false } = {}) {
+    // ownVoice：主角自己的嗓子（喊话 / 下令 / 打空骂人），走与剧情对白「own」同一套处理（见 RouteStorySpeech）。
+    if (ownVoice) position = null;
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
     // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
@@ -5693,10 +5792,12 @@ export class AudioEngine {
 
     // 有效电平：这一声在玩家耳朵里到底有多响。voice stealing 按它排序。
     const mix = MIX_GAIN[name] ?? 1;
-    const refDistance = soundField ? 64 : Math.max(3.5, sourceSizeM || 0,
+    // 剧情对白别人那一路有自己的近场曲线（STORY_SPEECH.worldRefM / worldRolloff）：3.5 m 以内不衰减的话，
+    // 洞里一圈人说话和主角自己一样响，谁近谁远、是不是自己在说都听不出来（2026-09-30）。
+    const refDistance = soundField ? 64 : storySpeech ? STORY_SPEECH.worldRefM : Math.max(3.5, sourceSizeM || 0,
       IsGunCue(name) ? GUN_AUDIBILITY.refDistanceM : 0);
     // rolloff：这一类声音自己的衰减斜率（喊话 0.45，见 SHOUT_AUDIBILITY；扩展声源 SOUND_FIELD_ROLLOFF）；其余都是 0.9。
-    const rolloffK = rolloff ?? (soundField ? SOUND_FIELD_ROLLOFF : 0.9);
+    const rolloffK = rolloff ?? (soundField ? SOUND_FIELD_ROLLOFF : storySpeech ? STORY_SPEECH.worldRolloff : 0.9);
     const effectiveGain = volume * mix * (position && !firstPerson ? DryFalloff(distance, refDistance, rolloffK) : 1);
 
     // 预算闸门：按实测开销**发声前**判断。
@@ -5858,9 +5959,10 @@ export class AudioEngine {
         const world = v.Gain(1), self = v.Gain(0);
         // Own speech must not inherit the world source's HRTF, occlusion,
         // distance or reverb. Downmix the recorded take to a centred voice.
+        // 居中那一路先过主角音色（OwnVoiceTone）：找不到人的别人也走居中，由 RouteStorySpeech 把音色拨平。
         self.channelCount = 1; self.channelCountMode = "explicit";
         panner.connect(world).connect(this.Bus(bus));
-        src.connect(self).connect(this.Bus(bus));
+        OwnVoiceTone(v, src).connect(self).connect(this.Bus(bus));
         v.storyWorldGain = world; v.storySelfGain = self;
       } else panner.connect(v.farGrouped ? this.farGain : this.Bus(bus));
       // MoveVoice 要搬的就是这几样：方位、空气低通、混响占比、遮挡。
@@ -5875,12 +5977,19 @@ export class AudioEngine {
       // 只能显式给一个上限频率。不给就是不滤（玩家自己的枪、回执、拉栓都在耳边）。
       let node = src;
       if (airCut) { const lp = v.Filter("lowpass", Clamp(airCut, 200, 20000), 0.7); node.connect(lp); node = lp; }
-      node.connect(wet);
-      if (pan !== 0 && ctx.createStereoPanner) {
+      if (ownVoice) {
+        // 主角自己的喊话：与剧情对白「own」同一套 —— 单声道居中、胸腔音色、略响、不送混响。
+        const own = v.Gain(OWN_VOICE_GAIN);
+        own.channelCount = 1; own.channelCountMode = "explicit";
+        OwnVoiceTone(v, node).connect(own).connect(this.Bus(bus));
+        v.storyRoute = "own";
+      } else if (pan !== 0 && ctx.createStereoPanner) {
+        node.connect(wet);
         const sp = v.Own(ctx.createStereoPanner());
         sp.pan.value = Clamp(pan, -1, 1);
         node.connect(sp).connect(this.Bus(bus));
       } else {
+        node.connect(wet);
         node.connect(this.Bus(bus));
       }
     }
@@ -5896,7 +6005,8 @@ export class AudioEngine {
       return null;
     }
     if (storySpeech) wet.gain.value = STORY_SPEECH.worldWet;
-    v.wetBase = wet.gain.value;                    // 配方给的干湿比；MoveVoice 按新距离重乘
+    if (ownVoice) wet.gain.value = 0;
+    v.wetBase = wet.gain.value;                   // 配方给的干湿比；MoveVoice 按新距离重乘
     wet.gain.value = Clamp01(wet.gain.value * v.wetScale);
     this.activeVoices.add(v);
     // 【2026-09-25】回收计时从**这一声开始响**的那一刻算，不从调用 Play 的这一刻算。
@@ -5966,6 +6076,8 @@ export class AudioEngine {
    */
   MoveVoice(voice, position, { velocity = null } = {}) {
     if (!voice || !voice.panner || !position || !this.ctx || this.disposed) return false;
+    // 居中的对白（主角 / 找不到人）没有距离可言：别让逐帧跟头把它的混响按距离改掉。
+    if (voice.storyRoute && voice.storyRoute !== "world") return false;
     const t = this.ctx.currentTime, tau = 0.04;
     const dx = position.x - this.listenerPos.x;
     const dy = position.y - this.listenerPos.y;

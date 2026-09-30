@@ -57,6 +57,8 @@ import { FirstLevelSmokeOrigins } from "./Script_FirstLevelSmokeOrigins.mjs";
 import { FRONT_BATTLE_TUNING } from "./Data_Tuning_FirstLevelFront.mjs";
 // 战车包（2026-09-23）：炮管运行时枢轴、履带滚动、按车体轴贴地、履带尘 / 排气。数值在 Data_Tuning_Tank.view。
 import { TANK } from "./Data_Tuning_Tank.mjs";
+import { TerrainTrailSystem } from "./Script_TerrainTrails.mjs";
+import { TERRAIN_TRAIL_VEHICLES } from "./Data_Tuning_TerrainTrails.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ApplyPatches, PatchesOf, MakeUvScrollPatch } from "./Script_MaterialPatches.mjs";
 import { DraftCartModels } from "./Script_DraftCartModel.mjs";
@@ -282,6 +284,8 @@ export class FirstLevelMissionView {
     const model=this.actorFactory.ModelInstance("Type89Tank",materials);
     if(!model)throw new Error("First level requires the existing Type89Tank model");
     this.tankModel=model;this.tank.add(model.root);
+    // 履带印（docs/Data_TerrainTrails.md §3.4）：两条履带按各自的轨迹连续盖印；车不可见 / 不在地形上时不盖。
+    TerrainTrailSystem.TrackVehicle(this.tank,TERRAIN_TRAIL_VEHICLES.type89);
     model.root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
     this.turret=model.nodes.get("turret");
     // 炮管枢轴：TZM 里炮管是炮塔下单独一块网格（type89Barrel），运行时挂到耳轴处的新节点上，
@@ -729,6 +733,7 @@ export class FirstLevelMissionView {
     bone.add(mesh);this.frontBandage=mesh;this.materials.push(material);
   }
   Dispose() {
+    if(this.tank)TerrainTrailSystem.UntrackVehicle(this.tank);
     this.smokeOrigins.Dispose();
     this.draftCartModels.Dispose();
     if(this.frontBandage){this.frontBandage.removeFromParent();this.frontBandage.geometry.dispose();}

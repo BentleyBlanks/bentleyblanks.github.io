@@ -404,7 +404,7 @@ export class FirstLevelMissionRuntime {
     this.nextCasualtyReactionAt=this.time+R.casualtyReactionGapS;
   }
   // Intact dialogue recordings follow the current speaker; overlapping Luo
-  // briefing keeps its own source. Unknown nearby voices stay in carriage space.
+  // briefing keeps its own source. A speaker with no body returns null (played unplaced, never from the player's head).
   VoicePosition(cue,line) {
     // 01-06: a speaker with a face talks from that face's head (same body the binder
     // animates). The binder returns null outside those steps.
@@ -442,8 +442,9 @@ export class FirstLevelMissionRuntime {
     if (who === "shunzi") return this.player.EyePosition.clone();
     const handled = this.companion.Handle(who)?.position;
     if (handled) return new THREE.Vector3(handled.x,handled.y+1.35,handled.z);
-    const at = this.player.position;
-    return new THREE.Vector3(at.x, at.y + 1.5, at.z);
+    // 找不到这个人：返回 null，由播放侧按「不定位、带房间声」播（Script_Audio.RouteStorySpeech 的 unplaced）。
+    // 2026-09-30 以前这里退回玩家自己头上 —— 别人的话从主角嘴里出来，是「听不出主角在说话」的一个来源。
+    return null;
   }
   get EmptyHands() {
     return this.controls?.kind === "death"

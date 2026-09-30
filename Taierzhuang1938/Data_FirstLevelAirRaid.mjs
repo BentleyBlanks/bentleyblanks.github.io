@@ -176,19 +176,26 @@ export const FIRST_LEVEL_AIR_RAID = Object.freeze({
     dugoutDirtVolume: 0.26, dugoutDirtAirCutHz: 2600, trenchDirtVolume: 0.14, trenchDirtAirCutHz: 1900,
     /**
      * 下落啸声（2026-09-30 用户：「飞机扔的炸弹应该有电影里常出现的那种啸声」）：一条往下滑的哨音，越落越响，
-     * 在最响处硬停 —— 硬停的那一刻就是这颗弹的爆炸声到耳朵的那一刻（两者都按落点距离 d/340 延迟，对齐到同一个时刻）。
+     * 在最响处硬停 —— 硬停在这颗弹**画面上砸到地面**的那一帧（爆炸声照旧 d/340 后到）。
+     * 【同日改】第一版对齐爆炸声到耳朵的时刻、按真实时间一次排好，用户：「炸弹还没掉地上啸声就结束了」——
+     * 游戏时钟一卡就落后于音频时钟。现在按游戏时钟每帧变速（Script_FirstLevelAirRaid.Whistle 头注）。
      *   durS         成品长度（Script_SeedAudioBombWhistleBake 的 BOMB_WHISTLE_PICK.durS）；落地前这么久起播
      *   perWave      一轮最多几颗有啸声：长机头一颗 + 离听者最近的那一颗（一串十几颗都啸就成了一片噪声，电影里也只听见一两声）
      *   gapS         两颗有啸声的弹落地至少隔多久（太近的第二声被第一声的爆炸盖住，不如不给）
-     *   share / heightM  啸声摆在「听者 → 落点」连线上这一比例处、高出落点这么多米（与场外炮击的 incomingShare 同一个道理：
-     *                摆在两三百米外的落点上，衰到几乎听不见；炸弹是从头顶斜着落下去的）
-     *   sizeM        声源尺寸（panner 的 refDistance）：三百米的落点摆在一百二十米外，按枪口的 3.5 m 衰减就没了
-     *   volume       按 300 m 落点算：啸声有效电平比同一颗的爆炸本体低约 3 dB（170 / 470 m 上 −3.7 / −2.9 dB）；
-     *                素材本身尾巴比有声段均值高十来 dB，所以最响那一截与爆炸一样响，接得上
-     *   pitchSpread  逐颗变调总宽（同一轮两声别一模一样）；变调后的长度按 durS / pitch 算，终点照样对齐
+     *   share        声源摆在「听者 → 弹此刻的位置」连线上这一比例处，跟着弹一起落（与场外炮击的 incomingShare 同一个道理：
+     *                摆在两三百米外的真位置上，衰到几乎听不见）
+     *   minHeightM   声源不低于听者与落点中较高者之上这么多米（贴地的话沟沿一挡就闷）
+     *   sizeM        声源尺寸（panner 的 refDistance）：三百米的落点摆在一百米外，按枪口的 3.5 m 衰减就没了
+     *   volume       按 300 m 落点算：啸声有效电平比同一颗的爆炸本体低约 3 dB；素材尾巴比有声段均值高十来 dB
+     *   pitchSpread  逐颗变调总宽（同一轮两声别一模一样）；变调后的长度按 durS / pitch 算
+     *   rateMin / rateMax  跟游戏时钟的变速倍率范围（rateMin 与 Script_Audio 的 VARISPEED_MIN 同一个数，寿命按它留）
+     *   rateFollow   每帧往目标倍率走多少（帧间隔抖动别变成音高抖动）；syncMinS 离落地这么近就不再调
+     *   stopFadeS    落地那一帧硬停的淡出（只防咔哒）
+     *   speedTauS / speedMin  游戏时钟相对音频时钟快慢的平均时间常数与下限（起播时刻按它往后推，见 TrackGameSpeed）
      */
-    whistle: Object.freeze({ cue: "bombWhistle", durS: 2.78, perWave: 2, gapS: 1.0, share: 0.35, heightM: 60, sizeM: 30,
-      volume: 0.65, pitchSpread: 0.06 }),
+    whistle: Object.freeze({ cue: "bombWhistle", durS: 2.78, perWave: 2, gapS: 1.0, share: 0.35, minHeightM: 25, sizeM: 30,
+      volume: 0.65, pitchSpread: 0.06, rateMin: 0.8, rateMax: 1.25, rateFollow: 0.25, syncMinS: 0.1, stopFadeS: 0.015,
+      speedTauS: 1.0, speedMin: 0.3 }),
   }),
   /**
    * 震屏：往创伤桶里加（与场外炮击同一条路，BATTLE_ARTILLERY 的头注）。强弱按**比例距离** Z = d / ∛W

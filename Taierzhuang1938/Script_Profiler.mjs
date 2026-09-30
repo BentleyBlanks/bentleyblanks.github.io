@@ -23,7 +23,7 @@
 //    见 Script_FrameProfileTest 的账），所以结果挂到几帧前的历史记录上，_Poll 每帧收。
 //    每段还记 renderer.info 的 draw call / 三角形增量 —— GPU 读数接近提交 CPU 时，
 //    说明这一趟 GPU 在等 CPU 喂 draw，那个 GPU 数字是提交时间的影子。
-// 3. **线程**：玩法期间本作没有 worker（Script_BootPropWorker 只活在加载画面），
+// 3. **线程**：玩法期间本作没有 worker（加载画面 2026-09-30 起是一张静图，也不再起 worker），
 //    WebAudio 跑在浏览器自己的音频线程、页面测不到 —— 所以「CPU 分线程」诚实的
 //    答案就是：主线程逐系统 + GPU 进程逐 pass + 长任务/GC 事件 + 浏览器侧那一段。
 //    「浏览器侧」= 整帧间隔 − 主线程工作，里面是样式/布局/绘制/合成与等 vsync；

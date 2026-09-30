@@ -1,0 +1,44 @@
+# Texture_BootPaper —— 加载画面战前报纸剪报（11 张）的来源与合成记录
+
+## 做法（2026-09-30 重做；此前 AI 直接生成「带内容的报纸」的版本因编造标题作废）
+报纸上的内容一律是 Notion「加载界面｜战前报纸剪报方案与史料库」页面上贴的**原图**，AI 只出**没有任何印刷的空白做旧纸底**。
+合成脚本 `_import/Script_ComposeBootPaper.py`：取原图红通道当亮度（红色馆藏水印淡出）→ 除以 97 分位纸白得到透光率 →
+按纸的旋转角等比缩放仿射到纸的印刷区 → 与纸底逐像素正片叠底 → 纸外压黑 → 按纸外接框加 6% 黑边裁出 → webp q82（长边 ≤ 1600）。
+供应商 Lovart（用户 2026-09-30 指定），项目 oKHfWa1O2A，模型 generate_image_gpt_image_2，每张纸底一个新会话。
+
+## 原图（不入库；从 Notion 页面下载，页面里每条都带来源链接）
+只收 Notion 里被标了颜色（黄 = 重大事件，蓝 = 有助于理解滕县战前局势与军民处境）且贴着原图的条目：
+  LiBao19370709            《立报》1937-07-09                    libao_19370709_lugouqiao_archive.jpg
+  ShenBao19370731          《申报》1937-07-31                    shenbao_19370731_tianjin.jpg
+  WenHui19380125           《文汇报》1938-01-25 第一版            wenhui_19380125_frontpage_archive.jpg
+  ZhanShiHuaKan19370820    《战事画刊》第 1 期  1937-08-20        zhanshihuakan_19370820_shanghai_battle.jpg
+  ZhanShiHuaKan19370906    《战事画刊》第 4 期  1937-09-06        zhanshihuakan_19370906_south_station.jpg
+  ZhanShiHuaKan19370911    《战事画刊》第 5 期  1937-09（9-11 初版）zhanshihuakan_19370911_airforce.jpg
+  ZhanShiHuaKan19371001    《战事画刊》第 9 期  1937-10-01        zhanshihuakan_19371001_wounded.jpg
+  ZhanShiHuaKan19371106    《战事画刊》第 16 期 1937-11-06        zhanshihuakan_19371106_north_station.jpg
+  ZhanShiHuaKan19371111    《战事画刊》第 17 期 1937-11-11        zhanshihuakan_19371111_sihang.jpg
+  JiuGuoShiBao19371220     《救国时报》1937-12-20                 jiuguoshibao_19371220_nanjing.jpg
+  ChinaWeeklyReview19371106《密勒氏评论报》1937-11-06            china_weekly_review_19371106_shanghai_relief.jpeg
+画刊图源：中国近现代新闻出版博物馆馆藏介绍页（https://www.publishingmuseum.net/historical_story/151.html）。
+页尾「其他已定位报纸」里同样被标色的 9 期南洋商报没有原图，不收。
+原图自带的第三方转载站水印（密勒氏评论报那张的「搜狐号 / 历史剪影」）无法干净去除，原样保留；馆藏红色水印在合成时淡出。
+
+## 纸底提示词（六张共用前缀 + 各自一句）
+
+===== L1  （Lovart thread d0a0c4e3-78bc-4c9d-b63d-fbb4f6c51f8c）=====
+Generate ONE landscape 16:9 image (2048x1152). A museum-artifact photograph of a single completely BLANK antique newsprint sheet from the 1930s, on a PURE BLACK (#000000) background: torn deckled edges with small missing chips, brown foxing and water stains, a deep vertical center fold with crease wear, warm yellowed pulp paper with visible fibre texture, slightly rotated (about 1.5 degrees), lit by a soft warm spotlight from the upper left with a dark vignette falling off toward the edges, a few floating dust specks. The sheet is COMPLETELY BLANK: absolutely NO printing, NO text, NO characters, NO letters, NO ruled lines, NO photographs, NO pictures, NO logos, NO stamps — only bare paper fibre, foxing, stains, edge wear and the fold. Nothing else in the image: no UI, no frame, no watermark, no text of any kind. The sheet must be fully inside the frame with black margin on all sides. The sheet is landscape, width:height about 1.35:1, and its height fills about 88% of the frame height.
+
+===== L2  （Lovart thread d5cfda19-43b1-4ff8-b18c-acb2abc14c51）=====
+Generate ONE landscape 16:9 image (2048x1152). A museum-artifact photograph of a single completely BLANK antique newsprint sheet from the 1930s, on a PURE BLACK (#000000) background: torn deckled edges with small missing chips, brown foxing and water stains, a deep vertical center fold with crease wear, warm yellowed pulp paper with visible fibre texture, slightly rotated (about 1.5 degrees), lit by a soft warm spotlight from the upper left with a dark vignette falling off toward the edges, a few floating dust specks. The sheet is COMPLETELY BLANK: absolutely NO printing, NO text, NO characters, NO letters, NO ruled lines, NO photographs, NO pictures, NO logos, NO stamps — only bare paper fibre, foxing, stains, edge wear and the fold. Nothing else in the image: no UI, no frame, no watermark, no text of any kind. The sheet must be fully inside the frame with black margin on all sides. The sheet is landscape, width:height about 1.35:1, and its height fills about 88% of the frame height. Slightly cleaner paper with a lighter fold crease and more edge chipping on the right side.
+
+===== S1  （Lovart thread ffeaaab1-2fb5-42f7-b229-3dfa8585e6cf）=====
+Generate ONE landscape 16:9 image (2048x1152). A museum-artifact photograph of a single completely BLANK antique newsprint sheet from the 1930s, on a PURE BLACK (#000000) background: torn deckled edges with small missing chips, brown foxing and water stains, a deep vertical center fold with crease wear, warm yellowed pulp paper with visible fibre texture, slightly rotated (about 1.5 degrees), lit by a soft warm spotlight from the upper left with a dark vignette falling off toward the edges, a few floating dust specks. The sheet is COMPLETELY BLANK: absolutely NO printing, NO text, NO characters, NO letters, NO ruled lines, NO photographs, NO pictures, NO logos, NO stamps — only bare paper fibre, foxing, stains, edge wear and the fold. Nothing else in the image: no UI, no frame, no watermark, no text of any kind. The sheet must be fully inside the frame with black margin on all sides. The sheet is nearly square, width:height about 1.0:1, and its height fills about 90% of the frame height.
+
+===== S2  （Lovart thread c469e9b7-fe9f-4d3e-85aa-0bb7a81e5890）=====
+Generate ONE landscape 16:9 image (2048x1152). A museum-artifact photograph of a single completely BLANK antique newsprint sheet from the 1930s, on a PURE BLACK (#000000) background: torn deckled edges with small missing chips, brown foxing and water stains, a deep vertical center fold with crease wear, warm yellowed pulp paper with visible fibre texture, slightly rotated (about 1.5 degrees), lit by a soft warm spotlight from the upper left with a dark vignette falling off toward the edges, a few floating dust specks. The sheet is COMPLETELY BLANK: absolutely NO printing, NO text, NO characters, NO letters, NO ruled lines, NO photographs, NO pictures, NO logos, NO stamps — only bare paper fibre, foxing, stains, edge wear and the fold. Nothing else in the image: no UI, no frame, no watermark, no text of any kind. The sheet must be fully inside the frame with black margin on all sides. The sheet is nearly square, width:height about 1.0:1, and its height fills about 90% of the frame height. Cleaner paper, lighter fold, more chipping on the left edge.
+
+===== R1  （Lovart thread b947daec-c70e-41e3-8456-b25d9c4afcd4）=====
+Generate ONE landscape 16:9 image (2048x1152). A museum-artifact photograph of a single completely BLANK antique newsprint sheet from the 1930s, on a PURE BLACK (#000000) background: torn deckled edges with small missing chips, brown foxing and water stains, a deep vertical center fold with crease wear, warm yellowed pulp paper with visible fibre texture, slightly rotated (about 1.5 degrees), lit by a soft warm spotlight from the upper left with a dark vignette falling off toward the edges, a few floating dust specks. The sheet is COMPLETELY BLANK: absolutely NO printing, NO text, NO characters, NO letters, NO ruled lines, NO photographs, NO pictures, NO logos, NO stamps — only bare paper fibre, foxing, stains, edge wear and the fold. Nothing else in the image: no UI, no frame, no watermark, no text of any kind. The sheet must be fully inside the frame with black margin on all sides. The sheet is portrait, width:height about 0.72:1 (like a tabloid page), and its height fills about 92% of the frame height, centered.
+
+===== R2  （Lovart thread 42cf00aa-4362-4a78-b8c8-0dcd595c9373）=====
+Generate ONE landscape 16:9 image (2048x1152). A museum-artifact photograph of a single completely BLANK antique newsprint sheet from the 1930s, on a PURE BLACK (#000000) background: torn deckled edges with small missing chips, brown foxing and water stains, a deep vertical center fold with crease wear, warm yellowed pulp paper with visible fibre texture, slightly rotated (about 1.5 degrees), lit by a soft warm spotlight from the upper left with a dark vignette falling off toward the edges, a few floating dust specks. The sheet is COMPLETELY BLANK: absolutely NO printing, NO text, NO characters, NO letters, NO ruled lines, NO photographs, NO pictures, NO logos, NO stamps — only bare paper fibre, foxing, stains, edge wear and the fold. Nothing else in the image: no UI, no frame, no watermark, no text of any kind. The sheet must be fully inside the frame with black margin on all sides. The sheet is portrait, width:height about 0.72:1 (like a tabloid page), and its height fills about 92% of the frame height, centered. Cleaner paper with a lighter fold and more chipping along the top edge.

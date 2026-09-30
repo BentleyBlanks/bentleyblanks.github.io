@@ -66,7 +66,7 @@
 
 ### 0.5 运行时（`Script_DialoguePlayer.mjs` + `Script_FirstLevelMissionVoice`）
 
-- 每句一个独立声源（`AudioEngine.PlayDialogueLine`），挂在说话人头骨上（`speakers[who]` = 演员 / 函数 / 坐标；缺的人退回运行时 `VoicePosition`），一句从头到尾只走一路：顺子（`spatial: "self"`）走居中干声，其余走带 HRTF / 遮挡 / 距离的世界声源；视线外且解析不到位置的人非定位播放、再降 4 dB。
+- 每句一个独立声源（`AudioEngine.PlayDialogueLine`），挂在说话人头骨上（`speakers[who]` = 演员 / 函数 / 坐标；缺的人退回运行时 `VoicePosition`），一句从头到尾只走一路：顺子（`spatial: "self"`）走主角的居中干声（`own`：胸腔低频、略响、无混响），其余走带 HRTF / 遮挡 / 人声近场距离曲线 / 房间混响的世界声源；视线外且解析不到位置的人非定位播放（`unplaced`：音色平直、带房间声，不会听成主角）、再降 4 dB。三条路的口径与实测见 [音频引擎 §16](Data_AudioEngine.md)（2026-09-30）。
 - `BuildScene` 把清单里的 `gapBeforeS` 填进每句的 `offsetS`（导演表写了的以导演表为准）；两句可以同时响；剧情语音同时 ≤ 3 路（契约 §6，`MAX_LIVE_DIALOGUE_LINES`）由播放器卡住：各场景正在出声的句子加旧整段单槽算总数，满了再开口时最早开口的那句淡出 0.12 s 让位（照常发它的句尾事件，玩法不会卡在等它说完；`stats.budgetCuts` 记账）。字幕逐句起止（`hud.SayLines`，先开口的那句作 aside 叠在上面），句尾多挂 0.35 s。
 - 侧链（`AudioEngine.SetDialogueDuck`）：priority 场景有句子在响（含句尾 0.6 s hold），环境床 + 音乐那一路压 −6 dB（`dialogueDuck` 节点）、远处战斗压 −3 dB（`dialogueFarDuck`，接在 `farGain` 后面，不跟开枪闪避抢节点）、SFX 不压；同时非 priority 的自主喊话让路（`drops.dialogue` 计数）。只有逐句播放器会置这一位，07 以后行为不变。
 - 震荡低通在有逐句对白在响时保住 4.2 kHz 辅音（与整段单槽同一个下限）。

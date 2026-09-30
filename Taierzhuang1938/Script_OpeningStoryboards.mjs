@@ -83,17 +83,16 @@ const UP=new THREE.Vector3(0,1,0);
 const REAR_LANE=MISSION_STAGE_ROUTES.rearTrench,REAR_LANE_M=MissionRouteLength(REAR_LANE);
 const OPENING_MARK_STAGES=new Set(["Trapped","BunkerRescue","RearTrench","Support","MachineGun","Tank","Orders"]);
 // Player-track owners: the clips whose `player` track says where Shunzi's body is.
-const PLAYER_TRACK_CLIPS=new Set(["IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","IjaHoldCollarUp","LuoDragToCover","LuoKneelCheck","InterpreterCrouchAsk",
-  "LuoRescueDrag","LuoHandRifle"]);
-// 2026-09-29 rescue (docs/Data_OpeningRescueHandover20260929.md): Luo's clips are baked on his rig only; the parts of
-// Shunzi's body their `player` track carries (gaze / crown: points 1 m along the way the head faces / 0.2 m toward the
-// crown; chestUp 0.25 m out of the chest; rifle / rifleMuzzle / rifleUp: the handed rifle's centre, 0.4 m toward its
-// muzzle, 0.1 m toward its top).
+const PLAYER_TRACK_CLIPS=new Set(["IjaCrouchHairHold","IjaSlapForehand","IjaSlapBackhand","IjaSlapRaise","IjaHoldCollarUp","LuoDragToCover","LuoKneelCheck","InterpreterCrouchAsk"]);
+// 2026-09-30 (docs/Data_OpeningSelfRescue20260930.md): Shunzi's body while he heaves himself out from under the timber and
+// gets up is keyed on the director's clock in the HeaveRoot frame (rescue.heave.body, rescue.hand.rise). The parts (gaze /
+// crown: points 1 m along the way the head faces / 0.2 m toward the crown).
 const LUO_MODEL="TengxianNra05";
+const SELF_TRACKS={ShunziHeave:()=>C.rescue.heave.body,ShunziRise:()=>C.rescue.hand.rise};
 const RESCUE_PARTS=["eye","gaze","crown","chest","chestUp","pelvis","kneeL","kneeR","heelL","heelR","rifle","rifleMuzzle","rifleUp"];
 /** A part of Shunzi's body from a rescue clip's stand-in keys (clip root frame, runtime metres) while it is not baked. */
 function StandInPoint(clip,part,t){
-  const keys=(clip==="LuoRescueDrag"?C.rescue.drag.standIn:C.rescue.hand.standIn).body[part];
+  const keys=SELF_TRACKS[clip]?.()?.[part];
   if(!keys)return null;
   let a=keys[0],b=keys[0],k=0;
   if(t>keys[0][0])for(let i=1;i<keys.length;i++){if(t<keys[i][0]){a=keys[i-1];b=keys[i];k=Smooth((t-a[0])/(b[0]-a[0]));break;}a=b=keys[i];}
@@ -1117,13 +1116,13 @@ export class FirstLevelBunkerShow {
       if(this.flags["retired:"+m.id])return;
       const start={...m.start,yaw:Face(m.start,m.route[0])};
       let actor=this.cast[m.id];
-      // 2026-09-27: one of them stops at a post down the trench and watches east until the charge cuts him down there
-      // (rescue.depthPost; ChargeExtras owns him from the cut). He wears IJA01, the body IjaChoppedFallWall is baked on.
+      // 2026-09-27: one of them stops at a post down the trench and watches east until the charge's volley shoots him dead
+      // there (rescue.depthPost, rescue.wound; 2026-09-30, he used to be cut down). He wears IJA01.
       const post=C.rescue.depthPost[m.id];
       // Going off after the killing, rifles slung (relaxed gait), not at the ready.
       if(!actor){actor=this.Spawn(m.id,"ija",m.start,{weapon:"Type38",...(post?{actorKind:"ija",modelVariant:0}:{})});this.Put(actor,start);SetRelaxedGait(actor,"slung");}
       if(post){
-        if(this.flags["cut:"+C.rescue.extras.find(e=>e.victim===m.id)?.id]!=null||!actor.alive)return;
+        if(this.flags["hit:"+m.id]!=null||!actor.alive)return;
         if(this.r.time<at+D.afterWipeS+i*D.staggerS){this.Hold(actor,start,null);return;}
         const there=actor.openingWalk?.key==="post"&&actor.openingWalk.done;
         if(!there){if(this.Follow(actor,"post",[m.route[0],{x:post.x-1.2,z:post.z},post],D.speedMps,null,post.yaw))actor.openingWalk.done=true;return;}
@@ -1132,8 +1131,14 @@ export class FirstLevelBunkerShow {
       }
       if(m.flagKick&&!this.KickBackdropFlag(actor,m.flagKick))return;
       if(!m.flagKick&&this.r.time<at+D.afterWipeS+i*D.staggerS){this.Hold(actor,start,null);return;}
-      if(!this.Follow(actor,"depth",m.route,D.speedMps,null))return;
-      if(!InCameraView(this.r.player.camera,this.r.Point(actor.position,1),10))this.RetireDepthIja(m.id);else this.Pose(actor,null);
+      if(!actor.depthIjaRouteDone){if(!this.Follow(actor,"depth",m.route,D.speedMps,null))return;actor.depthIjaRouteDone=true;}
+      if(!InCameraView(this.r.player.camera,this.r.Point(actor.position,1),10)){this.RetireDepthIja(m.id);return;}
+      // 2026-09-30「开局中间有个敌军不会动」: the bank route ends in the open field the pinned player looks across, so he
+      // stood there through the questioning and after the hand-back. Still in shot, he walks on away from the player
+      // (offRoute) and is retired once out of shot or past D.retireFarM.
+      if(!m.offRoute){this.Pose(actor,null);return;}
+      const done=this.Follow(actor,"off",m.offRoute,D.speedMps,null);
+      if(done||Distance(actor.position,this.r.player.position)>D.retireFarM)this.RetireDepthIja(m.id);
     });
   }
   KickBackdropFlag(actor,spec){
@@ -1263,32 +1268,56 @@ export class FirstLevelBunkerShow {
       // The walk hands over from the slash root under the pelvis (the hold pose leans into the dying man).
       this.RerootUnderPelvis(ijaA,Face(ijaA.openingStoryboardLast||ijaA.position,J.found));
     }
-    // Taunting over his shoulder as he goes, the bayonet in its scabbard (IjaTauntWalk over the walk).
-    const there=this.Follow(ijaA,"taunt",[...J.tauntWalk,J.found],J.tauntWalkMps,OpeningClipMeta("IjaTauntWalk")?"IjaTauntWalk":null,J.found.yaw,{upperBody:true});
-    if(there||age>C.timeouts.tauntExtraS+4){this.flags.foundAt=r.time;this.Stage("Found");}
+    // Taunting over his shoulder as he goes, the bayonet in its scabbard (IjaTauntWalk over the walk). 2026-09-30: paced to
+    // arrive as his own last jeer ends (TauntSaid), and he turns onto the pinned man from it -- no standing about.
+    const route=[...J.tauntWalk,J.found],at=ijaA?.openingStoryboardLast||ijaA?.position;
+    let leftM=at?Distance(at,route[0]):0;for(let i=1;i<route.length;i++)leftM+=Distance(route[i-1],route[i]);
+    const leftS=this.TauntSaidAt()-r.time,pace=leftS>.05?Math.max(J.tauntWalkMps,Math.min(J.tauntWalkMaxMps,leftM/leftS)):J.tauntWalkMaxMps;
+    const there=this.Follow(ijaA,"taunt",route,pace,OpeningClipMeta("IjaTauntWalk")?"IjaTauntWalk":null,J.found.yaw,{upperBody:true});
+    if(there&&this.TauntSaid()||age>C.timeouts.tauntExtraS+4){this.flags.foundAt=r.time;this.Stage("Found");}
   }
-  /** 「还藏着一个，支那混蛋。」: he stops over the pinned man, looks down at him, says it and squats at his head. */
+  /** ijaA's own taunt lines (CaptiveTaunt up to ija.tauntLastLine) are over (the rest are other men's). */
+  TauntSaid(){
+    const h=this.scenes.CaptiveTaunt;
+    if(!h)return this.r.time>=this.TauntSaidAt();
+    const last=h.lines?.find(l=>l.line.id===C.ija.tauntLastLine);
+    return h.done||h.stopped||!last||last.state==="done";
+  }
+  /** When ijaA's last taunt line should end (estimated from the manifest; the scene starts on the cut). */
+  TauntSaidAt(){
+    const J=C.ija,id=J.tauntLastLine,scene=id.split(".")[0],start=this.flags["scene:"+scene]??this.flags.throatCut??this.r.time;
+    const seconds=this.r.voice?.manifest?.lines?.[id]?.seconds??1.5;
+    return start+J.tauntLineOffsetS+this.LineStart(scene,id)+seconds;
+  }
+  /** 「还藏着一个，支那混蛋。」: he turns from his last jeer straight onto the pinned man (who shams dead: rescue.playDead),
+   *  says it, steps in and squats at his head, and takes the hair as soon as he is down (Hold). */
   PhaseFound(age){
     const r=this.r,ijaA=this.Ija("ijaA"),J=C.ija;
-    if(!this.phaseEntered){this.phaseEntered=true;r.Record("doorSearchStarted");this.flags.foundAt??=r.time;}
+    if(!this.phaseEntered){
+      this.phaseEntered=true;r.Record("doorSearchStarted");this.flags.foundAt??=r.time;
+      // The taunt's lines still to come (ijaB's 「蠢货。」, the far call) would talk over his find: dropped (2026-09-30). ijaB
+      // turns to the front as he did on the far call.
+      const taunt=this.scenes.CaptiveTaunt;
+      if(taunt&&!taunt.done&&!taunt.lines?.some(l=>l.state==="playing"))taunt.Stop();
+      this.flags.frontCallAt??=r.time;
+    }
     this.VanguardFront(this.flags.vanguardAt);this.DepthIja();
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     if(r.time-this.flags.releasedAt>=ClipLength("CaptiveWallSlideTwitch",3.2)&&!r.Has("captivesKilled"))r.Record("captivesKilled",{count:1});
     this.HoldRear();
-    // He sees the man under the timber and looks at him; his line waits for the taunt's last lines (ijaB's 「蠢货。」, the
-    // far call) so they do not talk over each other.
-    const taunted=this.SceneDone("CaptiveTaunt")||r.time-this.flags.throatCut>this.SceneLength("CaptiveTaunt")+C.timeouts.tauntExtraS;
-    if(age>=J.foundLookS&&taunted&&!this.Started("ShunziFound"))this.Scene("ShunziFound",r.voice?.PlayScene("ShunziFound",{speakers:this.Speakers()}));
+    // (A taunt line of another man already playing when he got here is let finish before his.)
+    const clear=this.SceneDone("CaptiveTaunt")||!this.scenes.CaptiveTaunt?.lines?.some(l=>l.state==="playing");
+    if(age>=J.foundLineS&&clear&&!this.Started("ShunziFound"))this.Scene("ShunziFound",r.voice?.PlayScene("ShunziFound",{speakers:this.Speakers()}));
+    if(age>=C.rescue.playDead.closeAtS)this.flags.playDeadAt??=r.time;
     const said=this.Started("ShunziFound")?r.time-this.flags["scene:ShunziFound"]:-1;
-    if(said<.9){this.Hold(ijaA,J.found,OpeningClipMeta("IjaFoundLook")?"IjaFoundLook":null,{speed:C.speed.stroll,seconds:age});return;}
+    if(said<J.foundStepS){this.Hold(ijaA,J.found,OpeningClipMeta("IjaFoundLook")?"IjaFoundLook":null,{speed:C.speed.stroll,seconds:age});return;}
     if(age>C.timeouts.foundWalkS+C.timeouts.tauntExtraS){this.Put(ijaA,J.crouch);this.Stage("Hold");return;}
-    // He steps up and squats at Shunzi's head (IjaCrouchHairHold's first frame is the squat).
-    const clip=this.HoldClip();
+    // He steps up and squats at Shunzi's head (IjaCrouchHairHold's first frame is the squat) and takes the hair at once;
+    // the first slap waits for the end of his line (rescue.slap.blows[0].afterLine).
     if(this.Hold(ijaA,J.crouch,null,{speed:C.speed.stroll})){
       this.flags.crouchAt??=r.time;
-      this.Pose(ijaA,clip,{seconds:0});
-      // 「看见我了就扇巴掌」: the grab (and the first slap) as soon as he is down, the last second of his line over it.
-      if(this.SceneDone("ShunziFound")||said>this.SceneLength("ShunziFound")-1)this.Stage("Hold");
+      this.Pose(ijaA,this.HoldClip(),{seconds:0});
+      this.Stage("Hold");
     }else if(age>C.timeouts.foundWalkS){this.Put(ijaA,J.crouch);this.Stage("Hold");}
   }
   // ---- 02 questioning where he lies, slaps, the charge, the haul out ------------------------------------------------
@@ -1308,16 +1337,21 @@ export class FirstLevelBunkerShow {
     const r=this.r,ijaA=this.Ija("ijaA"),R=C.rescue,Q=R.slap;
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     this.VanguardFront(this.flags.vanguardAt);this.DepthIja();
+    this.PoseHolder(ijaA);
+    this.InterpreterToSquat();
+    this.GuardHold(this.Ija("ijaB"),R.ijaBGuard);
+    this.WaitingRescuers();
+    this.UpdateSlaps();
+  }
+  /** ijaA squatting at the head with the hair in his fist: the hold clip, or the slap clip playing now. */
+  PoseHolder(ijaA){
+    const r=this.r;if(!ijaA)return;
     this.Put(ijaA,C.ija.crouch);
     const slap=this.SlapClip(),after=this.SlapEnd();
     // After a slap the hold picks up at its loop start (the slap clips end on that pose).
     const t=after!=null?(OpeningClipMeta(this.HoldClip())?.holdLoop?.[0]??0)+r.time-after:r.time-(this.flags.holdAt??r.time);
     if(slap)this.Pose(ijaA,slap.clip,{seconds:slap.seconds});
     else this.Pose(ijaA,this.HoldClip(),{seconds:t});
-    this.InterpreterToSquat();
-    this.GuardHold(this.Ija("ijaB"),R.ijaBGuard);
-    this.WaitingRescuers();
-    this.UpdateSlaps();
   }
   /** The slap clip playing now (null: the hold): IjaSlapForehand / IjaSlapBackhand from `raise` before the blow; the
    *  third raised hand (IjaSlapRaise) from raiseAt on. Stand-in before the bake: the hold clip. */
@@ -1341,6 +1375,14 @@ export class FirstLevelBunkerShow {
     }
     return end;
   }
+  /** Seconds from now to a `grab` blow's hit: delayS into the hold (the head up) and no earlier than afterLineS from the
+   *  end of `afterLine` (a scene playing now, by its manifest length). */
+  GrabBlowIn(blow){
+    const r=this.r,Q=C.rescue.slap;let hit=blow.delayS+Q.hitS;
+    if(blow.afterLine&&this.Started(blow.afterLine)&&!this.SceneDone(blow.afterLine))
+      hit=Math.max(hit,this.flags["scene:"+blow.afterLine]+this.SceneLength(blow.afterLine)+blow.afterLineS-r.time);
+    return hit;
+  }
   /** Queue blow `index` of rescue.slap.blows: it lands `hitInS` from now (UpdateSlaps). */
   QueueSlap(index,hitInS){
     const blow=C.rescue.slap.blows[index];
@@ -1359,6 +1401,8 @@ export class FirstLevelBunkerShow {
       if(slap.landed||r.time<slap.at)continue;
       slap.landed=true;
       this.strikeAt=r.time;this.flags.slapAt=r.time;this.flags.slapSide=slap.side;this.flags.slapCount=(this.flags.slapCount||0)+1;
+      // The first one ends his shamming (rescue.playDead): the eyes snap open, the hands go to the mud.
+      this.flags.wokenAt??=r.time;
       // The view keeps aiming where his face was at the blow while the head is flung (Shot: Hold / Ask).
       this.slapAim=this.HeadPoint(this.Ija("ijaA"))?.clone()||null;
       r.audio?.Play?.(C.rescue.slap.sound,{position:r.Point(C.shunzi.witnessEye,.45),volume:1});
@@ -1395,8 +1439,9 @@ export class FirstLevelBunkerShow {
       this.phaseEntered=true;r.Record("rescueCallHeard");
       this.flags.holdAt=r.time;this.flags.holdGripAt=r.time+.25;
       const Q=C.rescue.slap,seconds=id=>r.voice?.manifest?.lines?.[id]?.seconds??1.5;
-      // The first blow the moment the head is up in his fist; the lines wait for their blows (HeldBySlap).
-      Q.blows.forEach((blow,i)=>{if(blow.at==="grab")this.QueueSlap(i,blow.delayS+Q.hitS);});
+      // The first blow the moment the head is up in his fist -- and his find line said; the lines wait for their blows
+      // (HeldBySlap).
+      Q.blows.forEach((blow,i)=>{if(blow.at==="grab")this.QueueSlap(i,this.GrabBlowIn(blow));});
       this.Scene("RescueInterrogation",r.voice?.PlayScene("RescueInterrogation",{speakers:this.Speakers(),
         hold:(line)=>this.HeldBySlap(line.id),
         onLine:(lineId)=>{
@@ -1408,7 +1453,7 @@ export class FirstLevelBunkerShow {
       if(!this.scenes.RescueInterrogation){
         const L=id=>this.LineStart("RescueInterrogation",id);let shift=0;
         Q.blows.forEach((blow,i)=>{
-          const hit=blow.at==="grab"?blow.delayS+Q.hitS:shift+L(blow.line)+seconds(blow.line)+blow.afterEndS;
+          const hit=blow.at==="grab"?this.GrabBlowIn(blow):shift+L(blow.line)+seconds(blow.line)+blow.afterEndS;
           this.QueueSlap(i,hit);
           if(blow.then)shift=Math.max(shift,hit+blow.thenAfterS-L(blow.then));
         });
@@ -1424,14 +1469,115 @@ export class FirstLevelBunkerShow {
     const raised=this.flags.raiseAt!=null&&r.time>=this.flags.raiseAt+Q.chargeAfterRaiseS;
     if(raised||age>C.timeouts.askS)this.Stage("Charge");
   }
-  /** Marks of the charge's two cuts round the Japanese where they are: He's parry-and-cut behind ijaA's left (chopParry,
-   *  ijaA's crouch root), Luo's cut from ijaB's right rear (chopRear, ijaB watching east). */
-  ChopMarks(){
-    const a=this.ParryRoot(),b=C.rescue.ijaBGuard;
-    return {he:this.StageRoot("chopParry","heyoutian",a),luo:this.StageRoot("chopRear","luo",b)};
+  // ---- 02 the charge (2026-09-30, docs/Data_OpeningSelfRescue20260930.md) --------------------------------------------
+  // User: 「应该是队友们先开枪击伤日军，日军手已经抬不起来拿枪了，再是班长和队友冲上来一刀砍死了这几个审问的日军和翻译，才接下面班长
+  // 和主角的对话」. A volley from the crater step wounds the three over him (rescue.wound): each plays his wounded clip from the
+  // hit and stands on its hold loop with the arm hanging dead; Luo and two of the company run down and cut them down from
+  // behind (rescue.cuts, LuoDadaoChopRear round the wounded man's body); each falls the way the blade drives him.
+  /** A man of the volley or the cuts by role ("ijaA", "ijaB", "interpreter", "DepthIjaB"). */
+  Victim(role){return role==="interpreter"?this.cast.interpreter:role==="DepthIjaB"?this.cast.DepthIjaB:this.Ija(role);}
+  /** A cutter by id: one of the charge's extras (rescue.extras) or a squad man. */
+  Cutter(id){return C.rescue.extras.some(e=>e.id===id)?this.cast[id]:this.Squad(id);}
+  /** Where a man stood when the volley's shot took him (his questioning mark). */
+  WoundStart(role){const R=C.rescue;return role==="ijaA"?C.ija.crouch:role==="ijaB"?R.ijaBGuard:role==="interpreter"?R.interpreter:R.depthPost[role]||null;}
+  /**
+   * Where the shot has left him standing -- his body, round which his cut is staged: the start moved by his clip's root motion
+   * (the pelvis at its last frame; rescue.wound standIn [right, back, turn deg] before the bake). His root stays on WoundStart
+   * while the clip and its hold loop play; he is re-rooted under the pelvis when the blade takes him (CutDown).
+   */
+  WoundBody(role){
+    const spec=C.rescue.wound.shots.find(s=>s.role===role),start=this.WoundStart(role);
+    if(!start)return null;
+    if(!spec?.clip)return {...start};
+    const rig=this.Victim(role)?.actor?.characterRig,end=OpeningClipMeta(spec.clip)?OpeningClipRoot(rig?.clipModelId||rig?.modelId,spec.clip)?.end:null;
+    return end?Local(start,end[0],end[1],end[2]):Local(start,...spec.standIn);
   }
-  /** ijaA's root for the parry-and-cut: his crouch root turned rescue.parryTurnDeg (toward the crater step). */
-  ParryRoot(){const a=C.ija.crouch,m=C.rescue.parryMeet;return {x:m.x,z:m.z,yaw:a.yaw+C.rescue.parryTurnDeg*DEG};}
+  /** The wounded clip's hold loop starts this long after his hit (the cut lands no earlier). */
+  WoundHoldS(role){const spec=C.rescue.wound.shots.find(s=>s.role===role),meta=spec?.clip&&OpeningClipMeta(spec.clip);return meta?.holdLoop?.[0]??1.9;}
+  /**
+   * 「队友们先开枪击伤日军」: the volley's aimed shots on the charge's clock (rescue.wound.shots). A hit man plays his clip from the
+   * hit on his start root and stands on its hold loop (the arm hanging dead, the other hand on the wound) until the blade kills him
+   * (posed every frame to the last: left alone for the cut's first 0.45 s the AI turned him 70 deg toward the shooters); before
+   * the bake he limps to his wounded mark in the native gait.
+   */
+  Volley(){
+    const r=this.r,W=C.rescue.wound,t=r.time-this.flags.chargeAt;
+    for(const spec of W.shots){
+      const actor=this.Victim(spec.role),key="hit:"+spec.role;
+      if(this.flags[key]==null&&t>=spec.at&&actor?.alive&&!actor.openingStoryboardHidden){this.flags[key]=r.time;this.WoundShot(actor,spec);}
+      if(!spec.clip||!actor?.alive||this.flags[key]==null)continue;
+      if(OpeningClipMeta(spec.clip)){const start=this.WoundStart(spec.role);this.Put(actor,start);this.Pose(actor,spec.clip,{seconds:r.time-this.flags[key],face:start.yaw});}
+      else this.Hold(actor,this.WoundBody(spec.role),null,{speed:C.speed.creep});
+    }
+  }
+  /** One of the volley's shots: flash and report up on the crater step, the tracer into the arm, the wound; not lethal (the
+   *  narrative protection holds him for the cut) unless the spec says so. */
+  WoundShot(actor,spec){
+    const r=this.r,from=r.Point(spec.from,1.5),bone=actor.actor?.characterRig?.bones?.[spec.bone];
+    const shown=!actor.renderLod||actor.renderLod==="detail";
+    const aim=shown&&bone?bone.getWorldPosition(new THREE.Vector3()):this.AimPoint(actor),dir=aim.clone().sub(from).normalize();
+    r.vfx?.MuzzleFlash?.(from.clone().addScaledVector(dir,.8),dir,{kind:"boltRifle"});r.vfx?.Tracer?.(from,aim,{kind:"nra"});
+    r.audio?.PlayGunshot?.("rifleNra",{position:from,volume:1});
+    r.vfx?.Blood?.(aim,dir,1);
+    actor.openingDoomed=false;
+    if(spec.lethal){actor.scriptEssential=false;actor.scriptedNoncombatant=false;this.FallNatively(actor,true);actor.TakeHit(1000,spec.part,dir,{kind:"bullet",weaponId:"HanYang",point:aim});if(actor.alive)this.Kill(actor,"bullet");return;}
+    // Still the director's (scriptedNoncombatant): woken by the hit the AI turned him to face the shooters (09-30 run: his root
+    // swung from 90 to 161 deg and the clip's walk away east went south into the wall, the body falling on the pinned man).
+    actor.scriptEssential=true;actor.scriptedNoncombatant=true;
+    actor.TakeHit(C.rescue.wound.damage,spec.part,dir,{kind:"bullet",weaponId:"HanYang",point:aim});
+    actor.scriptedNoncombatant=true;actor.watchYaw=actor.yaw;actor.watchUntil=this.r.ai.time+30;
+  }
+  /**
+   * 「班长和队友冲上来一刀砍死」: each cutter (rescue.cuts) runs down the crater step to the chopRear mark behind his wounded man
+   * and cuts him down (LuoDadaoChopRear; its cut lands no earlier than the man's hold loop, so he has turned away with the arm
+   * hanging); the blade kills at the cut contact and he falls the way the blow drives him (CutDown).
+   */
+  Cuts(){
+    const r=this.r,R=C.rescue,contact=ContactAt("LuoDadaoChopRear","cut",.45),length=ClipLength("LuoDadaoChopRear",1.3);
+    for(const cut of R.cuts){
+      const actor=this.Cutter(cut.by),victim=this.Victim(cut.victim),key="cut:"+cut.victim;
+      if(!actor)continue;
+      const delay=cut.by==="luo"?R.delayS.luo:R.extras.find(e=>e.id===cut.by)?.delayS??1;
+      const body=this.WoundBody(cut.victim),mark=body&&this.StageRoot("chopRear","luo",body);
+      if(this.flags[key]==null){
+        if(!mark)continue;
+        const arrived=this.ChargeRun(actor,"charge:"+cut.by,mark,delay,{strike:true}),forced=this.flags.chargeForced!=null;
+        const shot=this.flags["hit:"+cut.victim],ready=!victim?.alive||shot!=null&&r.time-shot+contact>=this.WoundHoldS(cut.victim);
+        if(!(arrived||forced))continue;
+        if(!ready&&!forced){this.Settle(actor,mark);this.Pose(actor,null,{face:mark.yaw});continue;}
+        if(!arrived){this.Show(actor);this.Put(actor,mark);}
+        this.flags[key]=r.time;this.PlayClip(actor,"LuoDadaoChopRear",{restart:true});
+        continue;
+      }
+      const t=r.time-this.flags[key];
+      if(t<length){this.Settle(actor,mark);this.Pose(actor,"LuoDadaoChopRear",{seconds:t});}
+      else this.AfterCut(cut.by,actor);
+      if(t>=contact&&victim?.alive)this.CutDown(victim,actor,cut.victim);
+      if(t>=contact+C.timeouts.contactKillS&&victim?.alive)this.Kill(victim);
+    }
+    const a=this.Ija("ijaA"),b=this.Ija("ijaB");
+    if(a&&!a.alive&&b&&!b.alive&&!r.Has("vanguardMeleeResolved"))r.Record("vanguardMeleeResolved");
+  }
+  /** The blade takes him: re-rooted under his pelvis (his wounded clip carried him off his root), off the director's pose and
+   *  down on the native directional death (the blade's hit picks the fall, docs/Data_HitReaction.md). */
+  CutDown(victim,attacker,role){
+    const pelvis=victim.actor?.characterRig?.bones?.pelvis?.getWorldPosition(new THREE.Vector3()),body=this.WoundBody(role);
+    if(pelvis)this.Put(victim,{x:pelvis.x,z:pelvis.z,yaw:body?.yaw??victim.yaw},{noBlend:true,keep:true});
+    this.BladeKill(victim,attacker,{natural:true});this.Blood(victim,"neck");
+  }
+  /** A cutter once his cut has played out: Luo is the hand-over's (LuoToHand); an extra goes on to his post east down the
+   *  trench (rescue.extras post). */
+  AfterCut(id,actor){
+    if(id==="luo")return;
+    const spec=C.rescue.extras.find(e=>e.id===id);if(!spec)return;
+    if(!this.flags["rerooted:"+id]){this.flags["rerooted:"+id]=true;this.RerootUnderPelvis(actor,actor.yaw);}
+    const post=spec.post?{...spec.post,yaw:spec.post.yaw??-Math.PI/2}:null;
+    if(!post){this.Pose(actor,null);return;}
+    if(actor.openingWalk?.key!=="post"||!actor.openingWalk.done){if(this.Follow(actor,"post",[post],C.speed.run,null,post.yaw))actor.openingWalk.done=true;return;}
+    this.Pose(actor,null,{face:post.yaw});
+    const late=this.releaseAt!=null&&this.r.time-this.releaseAt>C.rescue.extrasRetireS;
+    if(this.phase==="Released"&&(!InCameraView(this.r.player.camera,this.r.Point(actor.position,1),10)||late))this.RetireCharge(id);
+  }
   /** A man running down the crater step to `mark`, `delay` s after the charge began; true once there. */
   ChargeRun(actor,key,mark,delay,{face=null,strike=false}={}){
     if(!actor)return true;
@@ -1464,80 +1610,37 @@ export class FirstLevelBunkerShow {
       done.yells++;
     }
   }
+  /** He runs down with the charge and on to the roof timber (lift.heLift), where he waits with his hands under it (HeLiftTimber's
+   *  first frame) until the lift (HeTimber owns him from then). */
+  HeToTimber(){
+    const he=this.Squad("heyoutian"),L=C.rescue.lift,f=this.flags;
+    if(!he||f.liftAt!=null)return f.heAtTimber!=null;
+    if(f.heAtTimber==null){if(this.ChargeRun(he,"charge",L.heLift,C.rescue.delayS.he))f.heAtTimber=this.r.time;return f.heAtTimber!=null;}
+    this.Put(he,L.heLift);this.Pose(he,OpeningClipMeta("HeLiftTimber")?"HeLiftTimber":null,{seconds:0,face:L.heLift.yaw});
+    return true;
+  }
   PhaseCharge(age){
-    const r=this.r,R=C.rescue,ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB"),interp=this.cast.interpreter;
+    const r=this.r,R=C.rescue,ijaA=this.Ija("ijaA"),interp=this.cast.interpreter;
     if(!this.phaseEntered){
       this.phaseEntered=true;this.flags.chargeAt=r.time;this.chargeLook=null;
       r.audio?.Play?.("bugleCharge",{position:r.Point({x:-6,z:-114},3),volume:.9});
-      this.PlayClip(ijaA,"IjaStartleTurn",{restart:true});
-      if(interp){this.Scene("RescueFlee",r.voice?.PlayScene("RescueFlee",{speakers:this.Speakers()}));this.PlayClip(interp,"InterpreterFlee",{restart:true});}
+      // 「有敌人！」 as the bugle goes (before the shot takes him).
+      if(interp)this.Scene("RescueFlee",r.voice?.PlayScene("RescueFlee",{speakers:this.Speakers()}));
       for(const blow of this.slaps||[])blow.landed=true;
     }
     this.ChargeNoise();
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     this.VanguardFront(this.flags.vanguardAt);this.DepthIja();
-    // The interpreter bolts: InterpreterFlee from his squat, then the run east (UpdateFleeing).
-    const fleeRoot={...R.interpreter,yaw:C.ija.interpreterFleeYawDeg*DEG};
-    if(interp&&this.flags.fleeAt==null){
-      const k=C.ija.interpreterFleeRate||1;
-      if(age*k<ClipLength("InterpreterFlee",1.6)){this.Put(interp,fleeRoot);this.Pose(interp,"InterpreterFlee",{seconds:age*k});}
-      else this.flags.fleeAt=r.time;
-    }
-    this.UpdateFleeing();
-    this.Duels();
+    // Until his shot each man keeps the questioning's pose: ijaA's hold (the raised hand for a third slap), the interpreter's
+    // squat, ijaB at the ready.
+    if(ijaA?.alive&&this.flags["hit:ijaA"]==null)this.PoseHolder(ijaA);
+    if(interp?.alive&&this.flags["hit:interpreter"]==null)this.InterpreterToSquat();
+    if(this.flags["hit:ijaB"]==null)this.GuardHold(this.Ija("ijaB"),R.ijaBGuard);
+    this.Volley();this.Cuts();this.HeToTimber();this.LuoToHand();
     this.ChargeExtras();
     this.LongShotTick();
-    if(this.flags.heChopAt!=null&&this.flags.luoChopAt!=null)this.Stage("Melee");
-    else if(age>C.timeouts.chargeS){
-      const marks=this.ChopMarks();
-      for(const [id,mark] of [["heyoutian",marks.he],["luo",marks.luo]]){const actor=this.Squad(id);if(actor){this.Show(actor);this.Put(actor,mark);}}
-      this.flags.chargeForced=r.time;this.Stage("Melee");
-    }
-  }
-  /**
-   * The two cuts in front of him: He runs down the step to his chopParry mark behind ijaA (ijaA, startled, has let go of
-   * the hair and turned: IjaStartleTurn, then IjaParriedChoppedFall from He's arrival), Luo to his chopRear mark at ijaB's
-   * right rear (LuoDadaoChopRear / IjaChoppedFallWall). Kills at the authored contacts (contactKillS makes them lethal).
-   */
-  Duels(){
-    const r=this.r,R=C.rescue,marks=this.ChopMarks(),ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB"),he=this.Squad("heyoutian"),luo=this.Squad("luo");
-    const age=r.time-this.flags.chargeAt;
-    // ijaA: startled on his crouch root, then up and running to meet the charge (parryMeet); the parry-and-cut on the
-    // turned parry root there.
-    if(this.flags.heChopAt==null){
-      const startle=ClipLength("IjaStartleTurn",.625),meet=this.ParryRoot();
-      if(ijaA?.alive&&age<startle){this.Put(ijaA,C.ija.crouch);this.Pose(ijaA,"IjaStartleTurn",{seconds:age});}
-      else if(ijaA?.alive){
-        if(!this.flags.ijaAUpAt){this.flags.ijaAUpAt=r.time;this.RerootUnderPelvis(ijaA,ijaA.yaw);SetRelaxedGait(ijaA,null);}
-        this.Hold(ijaA,meet,null,{speed:C.speed.run});
-      }
-      if(this.ChargeRun(he,"charge",marks.he,R.delayS.he,{strike:true})||this.flags.chargeForced!=null){this.flags.heChopAt=r.time;this.Put(ijaA,this.ParryRoot(),{keep:true});this.PlayClip(ijaA,"IjaParriedChoppedFall",{restart:true});this.PlayClip(he,"HeDadaoParryChop",{restart:true});}
-    }else{
-      this.Put(ijaA,this.ParryRoot());
-      const t=r.time-this.flags.heChopAt;
-      // (In Lift he leaves his mark for the timber: PhaseLift walks him.)
-      if(!this.flags.heLiftGo){this.Settle(he,marks.he);this.Pose(he,"HeDadaoParryChop",{seconds:Math.min(t,ClipLength("HeDadaoParryChop",1.5))});}
-      if(ijaA?.alive)this.Pose(ijaA,"IjaParriedChoppedFall",{seconds:t});else this.Corpse(ijaA,"IjaParriedChoppedFall");
-      const cut=ContactAt("HeDadaoParryChop","cut",.792);
-      if(t>=cut&&ijaA?.alive){this.BladeKill(ijaA,he);this.Blood(ijaA,"neck");}
-      if(t>=cut+C.timeouts.contactKillS&&ijaA?.alive)this.Kill(ijaA);
-    }
-    // ijaB (watching east with the rifle; he half turns at the noise: the head layer)
-    this.Put(ijaB,R.ijaBGuard);
-    if(this.flags.luoChopAt==null){
-      if(ijaB?.alive)this.GuardHold(ijaB,R.ijaBGuard);
-      if(this.ChargeRun(luo,"charge",marks.luo,R.delayS.luo,{strike:true})||this.flags.chargeForced!=null){this.flags.luoChopAt=r.time;this.PlayClip(luo,"LuoDadaoChopRear",{restart:true});this.PlayClip(ijaB,"IjaChoppedFallWall",{restart:true});}
-    }else{
-      const t=r.time-this.flags.luoChopAt;
-      if(!this.flags.luoLiftGo){this.Settle(luo,marks.luo);this.Pose(luo,"LuoDadaoChopRear",{seconds:Math.min(t,ClipLength("LuoDadaoChopRear",1.3))});}
-      if(ijaB?.alive)this.Pose(ijaB,"IjaChoppedFallWall",{seconds:t});else this.Corpse(ijaB,"IjaChoppedFallWall");
-      const cut=ContactAt("LuoDadaoChopRear","cut",.45);
-      if(t>=cut&&ijaB?.alive){this.BladeKill(ijaB,luo);this.Blood(ijaB,"neck");}
-      if(t>=cut+C.timeouts.contactKillS&&ijaB?.alive)this.Kill(ijaB);
-    }
-    if(ijaA&&!ijaA.alive&&ijaB&&!ijaB.alive&&!r.Has("vanguardMeleeResolved"))r.Record("vanguardMeleeResolved");
-    // Liu down the step to the firing spot over the trench (LongShotTick fires once he is there).
-    this.LiuWalk();
+    if(R.cuts.every(c=>this.flags["cut:"+c.victim]!=null||!this.Victim(c.victim)))this.Stage("Melee");
+    else if(age>C.timeouts.chargeS){this.flags.chargeForced=r.time;}
   }
   /** Liu runs down to the step and holds it facing J; LongShotTick fires once flags.liuAt is set. */
   LiuWalk(){
@@ -1553,26 +1656,13 @@ export class FirstLevelBunkerShow {
     }
     this.Put(liu,R.liuShot);this.Pose(liu,null,{face:Face(R.liuShot,A.bunkerJunction)});
   }
-  /** 「一大帮人」: the company's men run down the step and on east down the trench; ChargeA cuts down the depth man at
-   *  his post (chopRear round him), the others hold their posts facing east; out of sight later they are removed. */
+  /** 「一大帮人」: the company's men without a cut run down the step and on east to their posts facing east; out of sight
+   *  later they are removed (the cutters are Cuts'). */
   ChargeExtras(){
-    const r=this.r,R=C.rescue;
+    const R=C.rescue;
     if(this.flags.chargeAt==null)return;
     for(const spec of R.extras){
-      const actor=this.cast[spec.id];if(!actor)continue;
-      const key="cut:"+spec.id;
-      if(spec.victim){
-        const victim=this.cast[spec.victim],post=R.depthPost[spec.victim];
-        if(!victim?.alive&&this.flags[key]==null){this.ExtraPost(actor,spec,{...post,yaw:-Math.PI/2});continue;}
-        const mark=this.StageRoot("chopRear","luo",post);
-        if(this.flags[key]==null){if(this.ChargeRun(actor,"charge:"+spec.id,mark,spec.delayS,{strike:true})){this.flags[key]=r.time;this.PlayClip(actor,"LuoDadaoChopRear",{restart:true});this.PlayClip(victim,"IjaChoppedFallWall",{restart:true});}continue;}
-        const t=r.time-this.flags[key];
-        this.Settle(actor,mark);this.Pose(actor,"LuoDadaoChopRear",{seconds:Math.min(t,ClipLength("LuoDadaoChopRear",1.3))});
-        this.Put(victim,post);
-        if(victim.alive)this.Pose(victim,"IjaChoppedFallWall",{seconds:t});else this.Corpse(victim,"IjaChoppedFallWall");
-        if(t>=ContactAt("LuoDadaoChopRear","cut",.45)&&victim.alive){this.BladeKill(victim,actor);this.Blood(victim,"neck");}
-        continue;
-      }
+      const actor=this.cast[spec.id];if(!actor||R.cuts.some(c=>c.by===spec.id))continue;
       this.ExtraPost(actor,spec,spec.post);
     }
   }
@@ -1587,75 +1677,57 @@ export class FirstLevelBunkerShow {
   }
   RetireCharge(id){this.flags["gone:"+id]=true;this.RetireWalker(id);}
   PhaseMelee(age){
-    const r=this.r;
+    const r=this.r,R=C.rescue;
     this.ChargeNoise();
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     this.VanguardFront(this.flags.vanguardAt);this.DepthIja();
-    this.UpdateFleeing();this.Duels();this.ChargeExtras();this.LongShotTick();
-    const done=!this.Ija("ijaA")?.alive&&!this.Ija("ijaB")?.alive;
-    const last=Math.max(this.flags.heChopAt+ClipLength("HeDadaoParryChop",1.5),this.flags.luoChopAt+ClipLength("LuoDadaoChopRear",1.3));
-    if(done&&r.time>=last+C.rescue.meleeHoldS)this.Stage("Lift");
-    else if(age>C.timeouts.meleeS){for(const role of ["ijaA","ijaB"])this.Kill(this.Ija(role));if(!r.Has("vanguardMeleeResolved"))r.Record("vanguardMeleeResolved",{forced:true});this.Stage("Lift");}
+    this.Volley();this.Cuts();this.HeToTimber();this.LuoToHand();this.ChargeExtras();this.LongShotTick();
+    const done=R.cuts.every(c=>!this.Victim(c.victim)?.alive);
+    const last=Math.max(...R.cuts.map(c=>(this.flags["cut:"+c.victim]??r.time)+ContactAt("LuoDadaoChopRear","cut",.45)));
+    if(done&&r.time>=last+R.meleeHoldS)this.Stage("Lift");
+    else if(age>C.timeouts.meleeS){for(const c of R.cuts)this.Kill(this.Victim(c.victim));if(!r.Has("vanguardMeleeResolved"))r.Record("vanguardMeleeResolved",{forced:true});this.Stage("Lift");}
   }
   /**
-   * 2026-09-29 (user: 「完全可以让我仰头被拉出来啊，看到自己的脚从倒塌的房子里被拖出来」, docs/Data_OpeningRescueHandover20260929.md):
-   * He heaves the roof timber off his hips (HeTimber); Luo comes to his head, picks the rifle up out of the mud and slings it
-   * (LuoPickUpRifleSling), rolls him onto his back, hooks both arms under his armpits and drags him out backwards
-   * (LuoRescueDrag). The eye rides that clip's `player` track (RescueBody): as he is rolled over the look comes round, level,
-   * down his own body (2026-09-30: it used to roll over with him, upside down) to his boots coming out from under the timber.
-   * He lets the timber drop once the boots are out.
+   * 2026-09-30 (user: 「不要班长把玩家拖出来了，直接玩家自己往前用力一声腾挪就出来就行」): He heaves the roof timber off his hips
+   * (HeTimber); once it is up Shunzi braces on both hands and, with a grunt, heaves himself forward out from under it and up onto
+   * his knees (rescue.heave: his eye rides those keys, RescueBody). He lets the timber drop once the boots are out. Luo comes from
+   * his cut to stand in front of him (LuoToHand).
    */
   PhaseLift(age){
-    const r=this.r,D=C.rescue.drag,L=C.rescue.lift,f=this.flags,luo=this.Squad("luo"),he=this.Squad("heyoutian");
-    if(!this.phaseEntered){
-      this.phaseEntered=true;
-      // Their cuts carried them off their roots (root motion): the walks to the timber start from under their hips.
-      for(const actor of [he,luo])if(actor)this.RerootUnderPelvis(actor,actor.yaw);
-    }
+    const r=this.r,H=C.rescue.heave,L=C.rescue.lift,f=this.flags,he=this.Squad("heyoutian");
+    if(!this.phaseEntered)this.phaseEntered=true;
     this.ChargeNoise();
-    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.UpdateFleeing();this.ChargeExtras();this.LongShotTick();
-    f.heLiftGo=true;f.luoLiftGo=true;
-    this.Duels();
-    const heThere=f.liftAt!=null||this.Hold(he,L.heLift,null,{speed:C.speed.brisk});
+    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.Volley();this.Cuts();this.ChargeExtras();this.LongShotTick();this.DepthIja();
+    const heThere=this.HeToTimber();
     if(f.liftAt==null&&(heThere||age>C.timeouts.heArriveS)){
       if(!heThere&&he){this.Show(he);this.Put(he,L.heLift);}
       f.liftAt=r.time;r.audio?.Play?.("debrisFall",{position:r.Point(C.shunzi.pinnedHips,.4),volume:.55});
     }
     this.HeTimber();
-    // Luo: to his head, the rifle up out of the mud onto his back, then the roll and the haul.
-    const root=this.DragRoot();
-    if(f.pickAt==null){
-      if(this.Hold(luo,root,null,{speed:C.speed.brisk})||age>C.timeouts.luoArriveS){if(luo){this.Show(luo);this.Put(luo,root);}f.pickAt=r.time;}
-      return;
-    }
-    const pickClip=OpeningClipMeta("LuoPickUpRifleSling")?"LuoPickUpRifleSling":null,pickS=pickClip?ClipLength(pickClip,D.standIn.pickS):D.standIn.pickS;
-    const pickT=r.time-f.pickAt;
-    // The prop in his hands takes over from the rifle in the mud (its first frame lies where the mission rifle lies).
-    if(f.rifleTaken==null&&(pickClip||pickT>=pickS*.5))f.rifleTaken=r.time;
-    if(f.dragAt==null){
-      this.Put(luo,root);
-      if(pickClip)this.Pose(luo,pickClip,{seconds:Math.min(pickT,pickS)});else this.Pose(luo,null,{face:root.yaw});
-      // The haul waits for He's heave to have the timber up off him.
-      const lifted=f.liftAt!=null&&r.time-f.liftAt>=L.gripS+L.raiseS;
-      if(pickT>=pickS&&lifted||age>C.timeouts.liftS-D.standIn.dragS)f.dragAt=r.time;
-      else return;
-    }
-    const dragClip=OpeningClipMeta("LuoRescueDrag")?"LuoRescueDrag":null,dragS=ClipLength("LuoRescueDrag",D.standIn.dragS);
-    const h=Math.min(r.time-f.dragAt,dragS);
-    this.Put(luo,root);this.Pose(luo,dragClip||"LuoDragToCover",{seconds:dragClip?h:Math.min(h,2.6)});
+    const stepIn=f.heaveAt!=null&&r.time-f.heaveAt>=C.rescue.hand.stepInS;
+    this.LuoToHand(stepIn);
+    // 「还能打不？」 goes as he steps in: the take opens on his panting from the charge (1.4 s), the words land as he leans in.
+    if(stepIn)this.AskCheck();
+    // 「用力一声」: the grunt of the heave, his own (first person), timed off the heave (gruntS may lead it).
+    if(f.liftAt!=null&&!f.grunted&&r.time-f.liftAt>=L.gripS+L.raiseS+H.gruntS){f.grunted=true;
+      this.Scene("RescueHeave",r.voice?.PlayScene("RescueHeave",{speakers:this.Speakers()}));
+      if(!this.scenes.RescueHeave)r.audio?.Play?.("hitGrunt",{position:r.Point(C.shunzi.witnessEye,.4),volume:.9});}
+    if(f.liftAt!=null&&f.heaveAt==null&&r.time-f.liftAt>=L.gripS+L.raiseS)f.heaveAt=r.time;
+    if(f.heaveAt==null)return;
+    const h=r.time-f.heaveAt;
     const body=this.RescueBody();
     if(body?.heelL&&body.heelR){
       const out=Math.min(body.heelL.x,body.heelR.x);
       f.heelFromX??=out;
-      if(f.dropAt==null&&out>=D.timberEastX+D.dropPastM){f.dropAt=r.time;f.dropClipS=r.time-(f.liftAt??r.time);}
+      if(f.dropAt==null&&out>=H.timberEastX+H.dropPastM){f.dropAt=r.time;f.dropClipS=r.time-(f.liftAt??r.time);}
     }
-    if(h>=dragS||age>C.timeouts.liftS){
+    if(h>=H.durationS||age>C.timeouts.liftS){
       if(f.dropAt==null){f.dropAt=r.time;f.dropClipS=r.time-(f.liftAt??r.time);}
-      // The heels ploughed two furrows out of the doorway.
-      const z=C.shunzi.witnessEye.z,to=body?.heelL?Math.min(body.heelL.x,body.heelR.x):f.heelFromX??C.shunzi.pinnedHips.x;
+      // The knees ploughed two furrows out of the doorway.
+      const z=C.shunzi.witnessEye.z,to=body?.heelL?Math.min(body.heelL.x,body.heelR.x):C.shunzi.pinnedHips.x+.9;
       this.MudMarks(this.Densify([{x:f.heelFromX??C.shunzi.pinnedHips.x-.9,z},{x:to,z}]),{offsets:[-.12,.12],width:.07});
       if(!r.Has("luoRescueComplete")&&r.Has("vanguardMeleeResolved"))r.Record("luoRescueComplete");
-      f.handAt=r.time;this.Stage("Check");
+      this.Stage("Check");
     }
   }
   /** He on the timber from the heave until he has let it drop (Lift and the start of Check): HeLiftTimber held until
@@ -1673,105 +1745,117 @@ export class FirstLevelBunkerShow {
   }
   /** The roof timber lifted off him by `k` (0 on him .. 1 up at its hang): the Set poses it. */
   RoofLift(k){this.roofLift=k;this.r.openingSet?.LiftRoofTimber?.(k);}
-  /** Luo's root for the rifle pickup and the haul: rescue.drag.startBackM east of the pinned eye, facing him (west). */
-  DragRoot(){const S=C.shunzi.witnessEye;return {x:S.x+C.rescue.drag.startBackM,z:S.z,yaw:Math.PI/2};}
-  /** Luo's root for the hand-over: the haul's root chained onto LuoHandRifle's first frame (his pelvis stays put). */
-  HandRoot(){return this.ChainRoot(this.DragRoot(),LUO_MODEL,"LuoRescueDrag","LuoHandRifle");}
-  /** LuoHandRifle's clip time for `t` s on the director's clock (its hold loop until the nod lets it go). */
+  /** The heave's frame: the pinned eye, facing east down the trench (rescue.heave.body, rescue.hand.rise). */
+  HeaveRoot(){const S=C.shunzi.witnessEye;return {x:S.x,z:S.z,yaw:-Math.PI/2};}
+  /** Luo's root for the hand-over: rescue.hand.frontM in front of the kneeling man's eye (the heave's last key), facing him. */
+  HandRoot(){
+    const root=this.HeaveRoot(),end=C.rescue.heave.body.eye.at(-1)[1],eye=Local(root,end[0],end[2]);
+    return Local({x:eye.x,z:eye.z,yaw:root.yaw},0,-C.rescue.hand.frontM,180);
+  }
+  /** Luo from his cut to HandRoot, where he stands on LuoGrabRifleShove's first frame (the dadao still in his hand); true once
+   *  there. Until stepIn (the heave has brought the knees under him) he waits aside (hand.waitSide), facing him. */
+  LuoToHand(stepIn=false){
+    const luo=this.Squad("luo"),f=this.flags,H=C.rescue.hand,root=this.HandRoot();
+    if(!luo)return true;
+    const cut=f["cut:ijaA"];
+    if(cut==null||this.r.time-cut<ClipLength("LuoDadaoChopRear",1.3))return false;
+    if(!f.luoRerooted){f.luoRerooted=true;this.RerootUnderPelvis(luo,luo.yaw);}
+    const clip=OpeningClipMeta("LuoGrabRifleShove")?"LuoGrabRifleShove":null;
+    if(f.luoAtHand==null){
+      if(!stepIn){const wait=Local(root,-H.waitSide[0],H.waitSide[1]);this.Hold(luo,{...wait,yaw:Face(wait,Local(root,0,-H.frontM))},null,{speed:C.speed.walk});return false;}
+      if(this.Hold(luo,root,null,{speed:C.speed.walk}))f.luoAtHand=this.r.time;
+      else return false;
+    }
+    if(f.handAt==null){this.Put(luo,root);this.Pose(luo,clip,{seconds:0,face:root.yaw});}
+    // The rifle he will snatch up is his clip's prop from here (its first frame lies where the mission rifle lies).
+    if(clip&&this.r.bunkerRifle?.view)this.r.bunkerRifle.view.visible=false;
+    return true;
+  }
+  /** Luo's 「还能打不？」 (once); its end is the nod's cue (flags.checkLineAt). */
+  AskCheck(){
+    const r=this.r,f=this.flags,luo=this.Squad("luo");
+    // His eyes on Shunzi's from here (the speaker binder would put them on whoever else is talking -- the yells up and down
+    // the trench: 「眼珠子也不知道在动什么」).
+    if(luo)luo.voiceGaze??=()=>r.player.camera.getWorldPosition(new THREE.Vector3());
+    if(!this.Started("RescueCheck"))this.Scene("RescueCheck",r.voice?.PlayScene("RescueCheck",{speakers:this.Speakers(),onEnd:()=>{f.checkLineAt=r.time;}}));
+  }
+  /** LuoGrabRifleShove's clip time for `t` s on the director's clock (its hold loop until the nod lets it go). */
   HandSeconds(t){
-    const meta=OpeningClipMeta("LuoHandRifle"),S=C.rescue.hand.standIn;
+    const meta=OpeningClipMeta("LuoGrabRifleShove"),S=C.rescue.hand.standIn;
     return OpeningHoldTime(meta?.holdLoop??S.holdLoop,meta?.duration??S.durationS,t,this.flags.handHoldUntil);
   }
-  /** The rescue clip whose `player` track holds Shunzi's body now: {clip, seconds, root}, or null (before the haul). */
+  /** The self-rescue track whose keys hold Shunzi's body now: {clip, seconds, root} (Lift: the heave; Check: getting up). */
   RescueClip(){
-    const f=this.flags,t=this.r.time;
-    if(this.phase==="Check"&&f.handAt!=null)return {clip:"LuoHandRifle",seconds:this.HandSeconds(t-f.handAt),root:this.HandRoot()};
-    if(this.phase==="Lift"&&f.dragAt!=null)return {clip:"LuoRescueDrag",seconds:Math.min(t-f.dragAt,ClipLength("LuoRescueDrag",C.rescue.drag.standIn.dragS)),root:this.DragRoot()};
+    const f=this.flags,t=this.r.time,root=this.HeaveRoot();
+    if(this.phase==="Check")return {clip:"ShunziRise",seconds:f.handedAt!=null?Math.min(t-f.handedAt,C.rescue.hand.rise.durationS):0,root};
+    if(this.phase==="Lift")return {clip:"ShunziHeave",seconds:f.heaveAt!=null?Math.min(t-f.heaveAt,C.rescue.heave.durationS):0,root};
     return null;
   }
   /**
-   * Shunzi's body on Luo's rescue clip, world: each part of the clip's `player` track (eye, gaze, crown, chest, chestUp,
-   * pelvis, knees, heels, rifle, rifleMuzzle, rifleUp) at the clip time, from the clip's root. Until a clip is baked its
-   * stand-in keys (rescue.drag.standIn / rescue.hand.standIn, the contract the clips were authored to) stand in.
+   * Shunzi's body on the self-rescue track, world: each keyed part (eye, gaze, crown, chest, pelvis, knees, heels) at the track
+   * time, from HeaveRoot (rescue.heave.body / rescue.hand.rise; a part a track does not key is absent).
    */
   RescueBody(){
     const rc=this.RescueClip();if(!rc)return null;
     const out={clip:rc.clip,seconds:rc.seconds,root:rc.root};
-    out.baked=!!OpeningPlayerPoint(LUO_MODEL,rc.clip,"eye",0);
-    for(const part of RESCUE_PARTS){const p=this.RescuePoint(rc,part,rc.seconds,out.baked);if(p)out[part]=p;}
+    for(const part of RESCUE_PARTS){const p=this.RescuePoint(rc,part,rc.seconds);if(p)out[part]=p;}
     return out;
   }
-  /** One part of the rescue clip's player track at clip time `seconds`, world (null when the track has no such part). */
-  RescuePoint(rc,part,seconds,baked){
-    const p=baked?OpeningPlayerPoint(LUO_MODEL,rc.clip,part,seconds):StandInPoint(rc.clip,part,seconds);
+  /** One part of the self-rescue track at track time `seconds`, world (null when the track has no such part). */
+  RescuePoint(rc,part,seconds){
+    const p=StandInPoint(rc.clip,part,seconds);
     if(!p)return null;
     const o=Rot(rc.root.yaw,p.x,p.z);
     return new THREE.Vector3(rc.root.x+o.x,this.r.battlefield.GroundHeight(rc.root.x,rc.root.z)+p.y,rc.root.z+o.z);
   }
   /**
-   * The eye's view on the rescue track (world eye / gaze / crown), with the director's framing over the clip's head: up at
-   * Luo's chest as he comes round and kneels in front of him (not level into his crotch); down at the rifle he holds out
-   * and hands over (out of the frame under a level look); the eye eased back as Luo stoops in close to haul him up by the
-   * strap. (2026-09-30: the clips' own look no longer rolls over, so the look warps that sped the rolls through are gone.)
+   * The eye's view on the self-rescue track (world eye / gaze / crown). The heave's own look (down at the hands, ahead as he
+   * lunges); up on his knees it lifts to Luo coming to stand over him. Check: on Luo's face while he asks (the speaker's gaze
+   * is on the eye, VoiceGaze), down at the rifle as he snatches it up and shoves it over, level ahead as he gets up.
    */
   RescueView(body){
-    const H=C.rescue.hand,V=C.rescue.view,s=body.seconds,eye=body.eye.clone(),crown=body.crown;
-    let gaze=body.gaze;
-    const toward=(point,weight,maxDeg)=>{
+    const V=C.rescue.view,H=C.rescue.hand,eye=body.eye.clone(),ahead=Local(body.root,0,-1);
+    let gaze=body.gaze?.clone()||eye.clone().add(new THREE.Vector3(ahead.x-body.root.x,0,ahead.z-body.root.z));
+    const crown=body.crown?.clone()||eye.clone().add(new THREE.Vector3(0,.2,0));
+    const toward=(point,weight,maxDeg,minDeg=-70)=>{
       if(!point||weight<=0)return;
-      const d=point.clone().sub(eye),level=Math.hypot(d.x,d.z),pitch=Math.min(maxDeg*DEG,Math.atan2(d.y,level));
-      const aim=eye.clone().add(new THREE.Vector3(d.x/level*Math.cos(pitch),Math.sin(pitch),d.z/level*Math.cos(pitch)));
-      const now=gaze.clone().sub(eye).normalize();gaze=eye.clone().add(now.lerp(aim.sub(eye),weight).normalize());
+      const d=point.clone().sub(eye),level=Math.hypot(d.x,d.z);if(level<1e-4)return;
+      const pitch=Math.max(minDeg*DEG,Math.min(maxDeg*DEG,Math.atan2(d.y,level)));
+      const aim=new THREE.Vector3(d.x/level*Math.cos(pitch),Math.sin(pitch),d.z/level*Math.cos(pitch));
+      const now=gaze.clone().sub(eye).normalize();gaze=eye.clone().add(now.lerp(aim,weight).normalize());
     };
-    if(body.clip==="LuoHandRifle"){
-      const offered=EventAt("LuoHandRifle","offered",H.standIn.offerS),handed=EventAt("LuoHandRifle","handed",H.standIn.handedS);
-      const stood=EventAt("LuoHandRifle","stood",handed+1.1),head=this.HeadPoint(this.Squad("luo"));
-      if(head)toward(head.clone().addScaledVector(UP,-V.luoChestDropM),V.upAtLuo*Window(s,V.upAtLuoS[0],V.upAtLuoS[1],offered-.5,offered-.1),V.upAtLuoMaxDeg);
-      if(body.rifle)toward(body.rifle,V.atRifle*Window(s,offered-.4,offered,handed+.2,handed+.7),60);
-      const level=gaze.clone().sub(eye).setY(0);
-      if(level.lengthSq()>1e-6)eye.addScaledVector(level.normalize(),-V.haulBackM*Window(s,handed,handed+.25,stood-.1,stood+.4));
+    const head=this.HeadPoint(this.Squad("luo")),face=head?.clone().addScaledVector(UP,-V.luoFaceDropM);
+    if(body.clip==="ShunziHeave")toward(face,V.atLuo*Smooth((body.seconds-1.8)/.6),V.atLuoMaxDeg);
+    else if(body.clip==="ShunziRise"){
+      const f=this.flags,clip="LuoGrabRifleShove",s=f.handAt!=null?this.HandSeconds(this.r.time-f.handAt):0;
+      const offered=EventAt(clip,"offered",H.standIn.offerS),handed=EventAt(clip,"handed",H.standIn.handedS);
+      const stoop=(OpeningClipMeta(clip)?.holdLoop??H.standIn.holdLoop)[1];
+      const since=f.handedAt!=null?this.r.time-f.handedAt:-1,level=since<0?1:1-Smooth((since-.2)/.5);
+      // His face while he asks; his hands from the stoop (the grab, the swing up); the rifle as it comes into his own hands.
+      toward(face,V.atLuo*level*(1-Smooth((s-stoop)/.25)),V.atLuoMaxDeg);
+      const bones=this.Squad("luo")?.actor?.characterRig?.bones,hands=bones?.handL&&bones?.handR?bones.handL.getWorldPosition(new THREE.Vector3()).add(bones.handR.getWorldPosition(new THREE.Vector3())).multiplyScalar(.5):null;
+      toward(hands,V.atHands*Window(s,stoop-.05,stoop+.2,offered-.25,offered-.05),V.atLuoMaxDeg,V.handsMinDeg);
+      toward(this.LuoRiflePose()?.origin,V.atRifle*Window(s,offered-.25,offered-.05,handed+.15,handed+.55),60,V.rifleMinDeg);
+      // The look follows his hands with a lag (lookS): from the rifle on the ground to it held out, it swung 48 deg in 0.4 s.
+      const want=gaze.clone().sub(eye).normalize(),k=this.checkLook&&this.delta>0?1-Math.exp(-this.delta/V.lookS):1;
+      this.checkLook=this.checkLook?this.checkLook.lerp(want,k).normalize():want;
+      gaze=eye.clone().add(this.checkLook);
     }
     return {eye,gaze,crown};
   }
-  /**
-   * Shunzi's legs (and jacket) for the first person from the rescue track, world: the pelvis, its up toward the chest,
-   * its front out of the belly, per leg the ankle over the heel and the way the knee bends. Null while they are out of
-   * view (before the head comes forward on the haul, after it tips back at the hand-over).
-   */
-  RescueLegs(){
-    const R=C.rescue.drag,b=this.RescueBody();
-    if(!b?.pelvis||!b.heelL||!b.heelR||!b.gaze||(b.clip==="LuoRescueDrag"?b.seconds<R.legsFromS:b.seconds>R.legsUntilS))return null;
-    // The neck under and behind the eye (world down, back away from the hips), the spine from it down toward the hips:
-    // the chest passes far enough under the lens to be seen, not filled (at 0.13 m under it the lens was in the jacket).
-    // Back from the hips, not from the look (2026-09-30): while the look pans round as he is rolled over, "behind the look"
-    // put the neck off to one side and drew the jacket out flat across the lens.
-    const D=C.rescue.drag.neck,level=b.pelvis.clone().sub(b.eye).setY(0);
-    if(level.lengthSq()<1e-6)level.copy(b.gaze).sub(b.eye).setY(0);
-    if(level.lengthSq()<1e-6)level.set(0,0,-1);
-    const neck=b.eye.clone().add(new THREE.Vector3(0,-D.downM,0)).addScaledVector(level.normalize(),-D.backM);
-    const up=neck.clone().sub(b.pelvis).normalize();
-    const front=b.chestUp&&b.chest?b.chestUp.clone().sub(b.chest):new THREE.Vector3(0,1,0);
-    front.addScaledVector(up,-front.dot(up));if(front.lengthSq()<1e-6)front.set(0,1,0);front.normalize();
-    const Leg=(heel,knee)=>{
-      const ankle=heel.clone().addScaledVector(front,.06),mid=b.pelvis.clone().add(ankle).multiplyScalar(.5),bend=knee?knee.clone().sub(mid):front.clone();
-      if(bend.lengthSq()<4e-4)bend.copy(front);
-      return {ankle,knee:bend.normalize(),flexDeg:0};
-    };
-    return {hip:b.pelvis.clone(),up,front,neck,l:Leg(b.heelL,b.kneeL),r:Leg(b.heelR,b.kneeR)};
-  }
-  /** The charge's men and the dead on their clips from Check on; He goes to the right edge of SB06 with his rifle. */
+  /** The charge's men and the dead from Check on; He goes to the right edge of SB06 with his rifle. */
   Aftercut(){
     const r=this.r,R=C.rescue,he=this.Squad("heyoutian");
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
-    for(const [role,clip,root] of [["ijaA","IjaParriedChoppedFall",this.ParryRoot()],["ijaB","IjaChoppedFallWall",R.ijaBGuard]]){const a=this.Ija(role);if(a){this.Put(a,root);if(a.alive)this.Kill(a);this.Corpse(a,clip);}}
-    const victim=this.cast.DepthIjaB;if(victim&&!victim.alive)this.Corpse(victim,"IjaChoppedFallWall");
-    this.ChargeExtras();
+    // The cut men lie where they fell (native deaths); one still standing here gets the lethal hit.
+    for(const c of R.cuts){const a=this.Victim(c.victim);if(a?.alive)this.Kill(a);}
+    this.Cuts();this.ChargeExtras();
     if(!r.Has("vanguardMeleeResolved")&&!this.Ija("ijaA")?.alive&&!this.Ija("ijaB")?.alive)r.Record("vanguardMeleeResolved");
     // He is still on the timber (HeTimber) until he has let it drop.
     if(this.flags.liftAt!=null&&!this.flags.heTimberDone)return;
     if(!this.flags.heSwapAt){
       this.flags.heWalkAt??=r.time;
-      if(this.Follow(he,"heCover",[R.heCover],C.speed.walk,null,R.heCover.yaw)||r.time-this.flags.heWalkAt>6)this.flags.heSwapAt=r.time;
+      if(this.Follow(he,"heCover",[...R.heCoverVia,R.heCover],C.speed.walk,null,R.heCover.yaw)||r.time-this.flags.heWalkAt>6)this.flags.heSwapAt=r.time;
       return;
     }
     const s=r.time-this.flags.heSwapAt;
@@ -1785,7 +1869,6 @@ export class FirstLevelBunkerShow {
     const root=face?{...mark,yaw:Face(mark,face)}:mark,there=Distance(actor.openingStoryboardLast||actor.position,root)<.15;
     return this.Hold(actor,root,there?"IjaReadyRifle":null,there?{speed:C.speed.walk,seconds:ClipLength("IjaReadyRifle",1.1)}:{speed:C.speed.walk});
   }
-  /** Kill with the blade at the authored contact; if the hit did not kill, make it lethal. */
   /** A scripted death: drop the narrative protection first, then a lethal hit. */
   Kill(victim,kind="melee"){
     if(!victim?.alive)return;
@@ -1797,14 +1880,17 @@ export class FirstLevelBunkerShow {
    * A man the director kills while it holds him on a standing pose (IjaBayonetGuard, a loop, ...) falls on the native
    * death: the pose layer keeps any director pose over a dead body (authored falls finish that way), so a standing pose
    * left on him kept the corpse upright (09-25 review: ijaD at J, pelvis 0.68 m, in the middle of SB06). Authored
-   * terminal clips stay.
+   * terminal clips stay (unless `always`: the blade's directional death takes over from the wounded clip).
    */
-  FallNatively(victim){
-    if(victim&&!IsOpeningTerminalClip(victim.openingStoryboardPose?.clip)){victim.openingStoryboardPose=null;victim.openingStoryboardTravel=null;}
+  FallNatively(victim,always=false){
+    if(victim&&(always||!IsOpeningTerminalClip(victim.openingStoryboardPose?.clip))){victim.openingStoryboardPose=null;victim.openingStoryboardTravel=null;}
   }
-  BladeKill(victim,attacker){
+  /** Kill with the blade at the authored contact; if the hit did not kill, make it lethal. `natural`: the hit carries its
+   *  direction into the death (the directional fall, the neck death) instead of the scripted collapse. */
+  BladeKill(victim,attacker,{natural=false}={}){
     if(!victim?.alive)return;
-    victim.openingDoomed=true;victim.scriptEssential=false;victim.scriptedNoncombatant=false;
+    victim.scriptEssential=false;victim.scriptedNoncombatant=false;
+    if(natural){victim.openingDoomed=false;this.FallNatively(victim,true);}else victim.openingDoomed=true;
     const weapon=attacker?.weapon;if(attacker)attacker.weapon=WEAPONS.Dadao;
     try{this.r.meleeCombat?.Damage(victim,attacker,200,"heavy");}finally{if(attacker)attacker.weapon=weapon;}
     if(victim.alive)this.Kill(victim);
@@ -1813,20 +1899,6 @@ export class FirstLevelBunkerShow {
     const bone=actor?.actor?.characterRig?.bones?.[part==="neck"?"neck":"chest"]||actor?.actor?.characterRig?.bones?.head;
     const at=bone?.getWorldPosition(new THREE.Vector3());
     if(at)this.r.vfx?.BloodBurst?.(at,new THREE.Vector3(0,.3,1),1.4);
-  }
-  /** The interpreter runs down the front trench and into the depth sap; removed out of sight. */
-  UpdateFleeing(){
-    const r=this.r,interp=this.cast.interpreter;
-    if(!interp||this.flags.fleeAt==null||this.flags.interpreterGone)return;
-    // InterpreterFlee carries him ~1.3 m in root motion: hand the native run a root under the clip's
-    // last pelvis, or the blend back to the old root drags him backwards (0.15 m/frame, 09-24 probe).
-    if(!this.flags.fleeRooted){
-      this.flags.fleeRooted=true;
-      const rig=interp.actor.characterRig,end=OpeningClipRoot(rig?.clipModelId||rig?.modelId,"InterpreterFlee")?.end;
-      this.RerootUnderPelvis(interp,interp.yaw+(end?end[2]*DEG:0));
-    }
-    const end=this.Follow(interp,"flee",C.ija.interpreterFlee,C.speed.flee,null);
-    if(end||r.time-this.flags.fleeAt>12){this.flags.interpreterGone=true;interp.scriptEssential=false;this.Hide(interp);r.ai.Remove(interp);delete this.cast.interpreter;}
   }
   /** Liu Wencai's long shot at the junction man; fallbacks never leave the hand-back waiting. */
   LongShotTick(){
@@ -1884,68 +1956,63 @@ export class FirstLevelBunkerShow {
     return true;
   }
   /**
-   * 2026-09-29 (user: 「班长把枪递交到我手上然后直接开打的动作……而不是要我自己还要捡起来」「结束动画的时候玩家应该是站立的」):
-   * LuoHandRifle from the haul's end. Shunzi sits up and, as Luo unslings the rifle and walks round his left (2026-09-30:
-   * user 「班长把人拖出来的镜头会转180度再转回来180度，太奇怪了」 -- he used to roll back onto his front to face Luo), turns
-   * onto his knees facing him; Luo kneels and holds the rifle out across him (the clip's hold loop) for 「还能打不？」 and the
-   * nod; it goes into his hands at `handed` (the first person takes it over: HeldRifle), Luo hauls him to his feet by the
-   * shoulder strap and steps aside to his right. The hand-back follows the clip's end: standing facing the crater step, the
-   * rifle in his hands.
+   * 2026-09-30 (user: 「班长太磨叽了，眼珠子也不知道在动什么，就直接询问，得到肯定的点头以后，班长就地捡起一把枪，就塞给玩家」):
+   * up on his knees, Luo standing over him (HandRoot) plays LuoGrabRifleShove: the dadao into his belt, then its short hold loop
+   * leaning in with his eyes on Shunzi's (VoiceGaze) for 「还能打不？」; the nod lets it go -- he snatches up the rifle lying at
+   * his right front and shoves it into Shunzi's hands (`handed`: the first person takes it over, HeldRifle). Shunzi gets up
+   * (rescue.hand.rise) and the hand-back follows once he stands and Luo's clip has played out.
    */
   PhaseCheck(age){
     const r=this.r,f=this.flags,H=C.rescue.hand,luo=this.Squad("luo");
-    this.HeTimber();this.Aftercut();this.UpdateFleeing();this.LongShotTick();
-    const clip=OpeningClipMeta("LuoHandRifle")?"LuoHandRifle":null,root=this.HandRoot();
-    f.handAt??=r.time;
-    // The haul's root motion carried him ~1.7 m: hand the body over to the new root where it is shown.
-    // The eye goes on along the same player track: no phase-start ease (an Euler blend of the upside-down look back at
-    // Luo would spin it).
-    if(!this.phaseEntered){this.phaseEntered=true;this.cameraFrom=null;if(luo)this.Put(luo,root,{keep:true});}
+    this.HeTimber();this.Aftercut();this.LongShotTick();this.DepthIja();
+    if(!this.phaseEntered){this.phaseEntered=true;f.checkAt=r.time;this.checkLook=null;}
+    const clip=OpeningClipMeta("LuoGrabRifleShove")?"LuoGrabRifleShove":null,root=this.HandRoot();
+    // He is up on his knees; Luo comes to stand over him if he is not there yet.
+    if(f.handAt==null){
+      if(this.LuoToHand(true)&&f.luoAtHand!=null||age>C.timeouts.luoArriveS){if(luo&&f.luoAtHand==null){this.Show(luo);this.Put(luo,root);}f.handAt=r.time;}
+      else return;
+    }
     const t=r.time-f.handAt,s=this.HandSeconds(t);
-    this.Put(luo,root);this.Pose(luo,clip||"LuoKneelCheck",{seconds:t,holdUntil:f.handHoldUntil??undefined});
-    // 「还能打不？」 once the rifle is held out across him (`offered`); he nods after it and the loop lets go.
-    if(s>=EventAt("LuoHandRifle","offered",H.standIn.offerS)+H.lineDelayS&&!this.Started("RescueCheck"))
-      this.Scene("RescueCheck",r.voice?.PlayScene("RescueCheck",{speakers:this.Speakers(),onEnd:()=>{f.checkLineAt=r.time;}}));
-    if(f.checkLineAt==null&&this.Started("RescueCheck")&&r.time-this.flags["scene:RescueCheck"]>this.SceneLength("RescueCheck")+2)f.checkLineAt=r.time;
+    // The pose layer maps the hold loop itself (raw clock + holdUntil; HandSeconds is the same mapping for the director's own reads).
+    this.Put(luo,root);this.Pose(luo,clip,{seconds:t,holdUntil:f.handHoldUntil??undefined,face:root.yaw});
+    const loop=OpeningClipMeta(clip)?.holdLoop??H.standIn.holdLoop;
+    // 「还能打不？」 (started as he stepped in, AskCheck; at the latest as he leans in); the nod after it lets the loop go.
+    if(s>=loop[0]+H.lineDelayS)this.AskCheck();
+    if(f.checkLineAt==null&&this.Started("RescueCheck")&&r.time-this.flags["scene:RescueCheck"]>this.SceneLength("RescueCheck")+1)f.checkLineAt=r.time;
     if(f.checkLineAt==null&&age>C.timeouts.checkS)f.checkLineAt=r.time;
     if(f.checkLineAt!=null&&f.handHoldUntil==null&&r.time-f.checkLineAt>=H.nodS)f.handHoldUntil=t;
-    const handed=EventAt("LuoHandRifle","handed",H.standIn.handedS);
+    const handed=EventAt("LuoGrabRifleShove","handed",H.standIn.handedS);
     if(f.handedAt==null&&s>=handed)f.handedAt=r.time;
     // Never stall on the hand-back: a required vanguard man still standing here gets the lethal hit.
     if(f.handedAt!=null&&!this.VanguardCleared())for(const id of C.vanguardIds)this.Kill(this.r.enemies.get(id),id==="BunkerFollowB"?"bullet":"melee");
     // A man missing from the enemy table (spawn failure, a debug removal) can never be seen dead: past the clip's end by
     // releaseGraceS the hand-back goes ahead and the absentees are written into the fact.
-    const end=ClipLength("LuoHandRifle",H.standIn.durationS);
-    if(s>=end-1e-3){f.handEndAt??=r.time;this.Release({force:r.time-f.handEndAt>=H.releaseGraceS});}
+    const end=ClipLength("LuoGrabRifleShove",H.standIn.durationS),stood=f.handedAt!=null&&r.time-f.handedAt>=H.rise.durationS;
+    if(s>=end-1e-3&&stood){f.handEndAt??=r.time;this.Release({force:r.time-f.handEndAt>=H.releaseGraceS});}
   }
   /**
-   * The rifle Luo hands over, for the first person (null outside the hand-over): before `handed` (from reachS ahead of it)
+   * The rifle Luo shoves over, for the first person (null outside the hand-over): before `handed` (from reachS ahead of it)
    * the one in Luo's hands, which the palms reach for (`reach`); from `handed` it is Shunzi's (`held`, seconds since): the
-   * first person shows its own copy from the pose it was taken at and carries it up with him as he is hauled to his feet.
+   * first person shows its own copy from the pose it was taken at and carries it up with him as he gets to his feet.
    * `q` / `origin` are the world pose of the rifle model (the same HanYang geometry as the loading rifle).
    */
   HeldRifle(){
     const r=this.r,f=this.flags,H=C.rescue.hand;
     if(this.phase!=="Check"||f.handAt==null)return null;
-    const s=this.HandSeconds(r.time-f.handAt),handed=EventAt("LuoHandRifle","handed",H.standIn.handedS);
+    const s=this.HandSeconds(r.time-f.handAt),handed=EventAt("LuoGrabRifleShove","handed",H.standIn.handedS);
     if(f.handedAt==null&&s<handed-H.reachS)return null;
     const pose=this.LuoRiflePose();
     return {mode:f.handedAt!=null?"held":"reach",since:f.handedAt!=null?r.time-f.handedAt:null,q:pose?.q||null,origin:pose?.origin||null};
   }
-  /** World pose of the rifle in Luo's hands: his prop when it shows, else the clip's rifle points (stand-in keys). */
+  /** World pose of the rifle in Luo's hands (his prop, while it shows). */
   LuoRiflePose(){
     const prop=this.Squad("luo")?.actor?.characterRig?.openingProps?.items?.get?.("rifle")?.object;
-    if(prop?.visible&&prop.parent){prop.updateWorldMatrix(true,false);return {q:prop.getWorldQuaternion(new THREE.Quaternion()),origin:prop.getWorldPosition(new THREE.Vector3())};}
-    const body=this.RescueBody();if(!body?.rifle||!body.rifleMuzzle||!this.loadingRifleMuzzle)return null;
-    const axis=body.rifleMuzzle.clone().sub(body.rifle).normalize(),up=(body.rifleUp?body.rifleUp.clone().sub(body.rifle):new THREE.Vector3(0,1,0));
-    up.addScaledVector(axis,-up.dot(axis)).normalize();
-    const Basis=(a,u)=>new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(u,a).normalize(),u,a);
-    const source=this.loadingRifleMuzzle.clone().normalize(),sourceUp=new THREE.Vector3(0,1,0).addScaledVector(source,-source.y).normalize();
-    const q=new THREE.Quaternion().setFromRotationMatrix(Basis(axis,up).multiply(Basis(source,sourceUp).invert()));
-    return {q,origin:body.rifle.clone()};
+    if(!prop?.visible||!prop.parent)return null;
+    prop.updateWorldMatrix(true,false);
+    return {q:prop.getWorldQuaternion(new THREE.Quaternion()),origin:prop.getWorldPosition(new THREE.Vector3())};
   }
   PhaseReleased(){
-    this.Aftercut();this.UpdateFleeing();this.LongShotTick();
+    this.Aftercut();this.LongShotTick();
   }
   /** Background every frame of 01–02: dead stay dead, ijaC/ijaD keep their loops. */
   Background(){
@@ -1989,22 +2056,23 @@ export class FirstLevelBunkerShow {
     if(missing.length)this.flags.releaseMissing=missing.join(",");
     this.ReleaseMeleeDormancy();
     this.releaseAt=r.time;this.releaseLevel=this.perception?.amount??C.perception.base.Released;
-    // Where he stands: under the eye Luo hauled him up to (the last placement of the rescue).
+    // Where he stands: where he got up (the last placement of the rescue).
     const at=this.lastPlayerPoint||C.shunzi.cover;this.releasePoint={x:at.x,z:at.z};
     this.Set("Released");
     r.Record("playerDraggedFromWreck",missing.length?{to:this.releasePoint,missing}:{to:this.releasePoint});
     if(!r.Has("luoRescueComplete"))r.Record("luoRescueComplete");
-    // 2026-09-29: standing (Luo hauled him to his feet), the rifle Luo handed him in his hands -- no pickup, no crouch.
+    // Standing (2026-09-29; since 09-30 he gets up by himself), the rifle Luo shoved into his hands -- no pickup, no crouch.
     const kind=r.controls?.kind;r.controls=null;r.Control?.(false,kind);r.player.stance="stand";r.player.eyeHeight=STANCE.stand.eye;
     const direction=new THREE.Vector3(0,0,-1).applyQuaternion(this.presentedCamera?.quaternion||r.player.camera.quaternion);
     r.player.yaw=Math.atan2(-direction.x,-direction.z);r.player.pitch=Math.asin(Math.max(-1,Math.min(1,direction.y)));
     if(this.presentedCamera)r.player.camera.quaternion.copy(this.presentedCamera.quaternion);
     const luo=this.Squad("luo"),R=C.rescue;
-    // The hand-over's root motion (the walk round his left, the step aside) leaves Luo's pelvis 2.2 m off his root: re-root him
-    // under it, facing the way the clip leaves him, before the AI takes him (its pose blend dragged the pelvis back to the root
-    // at 0.16-0.19 m a frame, 2026-09-30).
-    const pelvis=luo?.actor?.characterRig?.bones?.pelvis?.getWorldPosition(new THREE.Vector3()),end=OpeningClipRoot(LUO_MODEL,"LuoHandRifle")?.end;
+    // The hand-over's root motion (the step for the rifle, the turn to the crater step) leaves Luo's pelvis off his root: re-root
+    // him under it, facing the way the clip leaves him, before the AI takes him (its pose blend dragged the pelvis back to the
+    // root at 0.16-0.19 m a frame, 2026-09-30).
+    const pelvis=luo?.actor?.characterRig?.bones?.pelvis?.getWorldPosition(new THREE.Vector3()),end=OpeningClipRoot(LUO_MODEL,"LuoGrabRifleShove")?.end;
     if(pelvis&&end)this.Put(luo,{x:pelvis.x,z:pelvis.z,yaw:this.HandRoot().yaw+end[2]*DEG},{noBlend:true,keep:true});
+    if(luo)luo.voiceGaze=null;
     this.ReleaseSquad(luo,{...C.withdraw.luoCover,yaw:Face(C.withdraw.luoCover,A.bunkerFold)});
     // SB06: Liu at the trench edge and He at the right edge kneel (the AI's stance; pendingWiring SB06 for the show).
     const liu=this.Squad("liuwencai");
@@ -2160,6 +2228,10 @@ export class FirstLevelBunkerShow {
       if(stage!=="RearTrench"||!InCameraView(r.player.camera,r.Point(actor.position,1),10))this.RetireCharge(spec.id);
       else if(actor.alive)this.Pose(actor,null,{face:-Math.PI/2});
     }
+    // DepthIja walks on through the withdrawal (a man still in shot at the hand-back goes on off the field); any later stage
+    // retires him outright ("at the latest when 02 begins" — the alive check keeps DepthIjaB's corpse).
+    if(stage==="RearTrench")this.DepthIja();
+    else for(const m of OPENING_DEPTH_IJA.members)if(this.cast[m.id]?.alive)this.RetireDepthIja(m.id);
     if(stage==="RearTrench"){
       const w=this.withdraw||(this.withdraw={step:0,at:r.time});
       const luo=this.Squad("luo"),he=this.Squad("heyoutian"),liu=this.Squad("liuwencai"),W=C.withdraw,p=r.player.position;
@@ -2198,7 +2270,6 @@ export class FirstLevelBunkerShow {
       if(r.Has("collectionPointSeen")&&this.phase!=="Collection"&&this.phase!=="SupportOrder"){this.meet=this.MeetMarks();this.Set("Collection");}
     }
     if(stage==="Support")this.GuardRest();
-    if(stage==="RearTrench")this.UpdateFleeing();
     if(this.pointActor){const elapsed=r.time-this.pointAt,blocker=r.enemies.get("FrontGunner");this.pointActor.openingStoryboardPose=elapsed<3?{clip:"PointBlockade",seconds:elapsed,upperBody:true}:null;
       if(blocker&&elapsed<3&&(this.pointActor.moveSpeed||0)<.03){this.pointActor.watchYaw=Face(this.pointActor.position,blocker.position);this.pointActor.watchUntil=r.ai.time+.2;}
       if(elapsed>=3)this.pointActor=null;}
@@ -2358,10 +2429,9 @@ export class FirstLevelBunkerShow {
     }
     else if(p==="Taunt"||p==="Found"){
       fovScale=this.FixateScale();
-      // He comes walking up the trench at the eye, taunting over his shoulder; over the pinned man he stops and looks down.
-      // Found: 「他试着撑起身体」 against the timber once he sees the boots coming (a small push-up that falls back).
+      // He comes walking up the trench at the eye, taunting over his shoulder; over the pinned man he turns and looks down.
+      // 2026-09-30: seen, Shunzi shams dead (no more push-up against the timber; the slit: ShamLook below).
       target=this.LookAtBody(eye,height,ijaA,-5,40)||this.Aim(eye,height,-90*DEG,12*DEG);
-      if(p==="Found")height+=L.pushUpM*.6*Smooth((a-.9)/.35)*(1-Smooth((a-1.5)/.2));
     }
     else if(p==="Hold"||p==="Ask"){
       // 「日兵甲揪住他的头发把头提起来」: the eye rises liftM and tips up at his face; the slaps fling the head aside.
@@ -2381,21 +2451,22 @@ export class FirstLevelBunkerShow {
       yaw=-side*Q.yawDeg*DEG*k;pitch=Q.pitchDeg*DEG*k;roll=side*Q.rollDeg*DEG*k;height-=Q.dropM*k;
     }
     else if(p==="Charge"||p==="Melee"){
-      // Let go, the head drops back into the mud. 2026-09-30 (user: 「班长等人出现的太突兀了，现在一个镜头直接切过去很不自然，完全
-      // 可以镜头不动，但是前面的翻译或者日军被砍死倒下吧」): the eye stays on the man in front of him -- ijaA springing up off him
-      // and turning to the noise -- and the rescuers run into that picture from its right edge (the look used to whip ~100 deg
-      // round to He's head at the crater step, the moment he was shown there); then the two cuts in front of him and the fight
-      // going on down the trench. The look point eases (chargeView.lookS), so no cut in it turns the head faster than a glance.
-      const H=C.rescue.holdShot,Q=C.rescue.chargeView,drop=this.flags.chargeAt!=null?1-Smooth((r.time-this.flags.chargeAt-.12)/.3):1;
-      height+=H.liftM*drop;
-      const he=Head(this.Squad("heyoutian")),a1=Head(ijaA),luoH=Head(luo),ijaB=Head(this.Ija("ijaB"));
-      const since=this.flags.heChopAt!=null?r.time-this.flags.heChopAt:-1,luoSince=this.flags.luoChopAt!=null?r.time-this.flags.luoChopAt:-1;
-      let point;
-      if(since>=0&&since<Q.heCutHoldS&&he&&a1)point=he.clone().lerp(a1,.5);
-      else if(luoSince>=0&&luoSince<Q.luoCutHoldS&&luoH&&ijaB)point=luoH.clone().lerp(ijaB,.5);
-      else if(p==="Melee")point=At(A.bunkerJunction,1.3);
-      // ijaA's upper body (his head over the low eye is 40-50 deg up once he stands), else where he meets the charge.
-      else point=a1?a1.clone().addScaledVector(UP,-Q.ijaChestDropM):At(C.rescue.parryMeet,1.1);
+      // 2026-09-30 (user: 「班长等人出现的太突兀了……完全可以镜头不动，但是前面的翻译或者日军被砍死倒下吧」; the same day: 「应该是队友们
+      // 先开枪击伤日军……再是班长和队友冲上来一刀砍死」): the eye stays on the man in front of him -- ijaA, shot, letting go (the head
+      // drops back into the mud), staggering up and away down the trench with the arm hanging -- and the rescuers run into that
+      // picture from its right edge; each cut is looked at for cutHoldS (between the cutter and the man he cuts down), then the
+      // fight going on down the trench. The look point eases (chargeView.lookS), so no change of subject whips the head round.
+      const H=C.rescue.holdShot,Q=C.rescue.chargeView,shotA=this.flags["hit:ijaA"];
+      height+=H.liftM*(shotA!=null?1-Smooth((r.time-shotA-.05)/.3):1);
+      const a1=Head(ijaA);
+      let point=null,latest=-Infinity;
+      for(const c of C.rescue.cuts){
+        const at=this.flags["cut:"+c.victim];if(at==null||r.time-at>=Q.cutHoldS||at<latest)continue;
+        const x=Head(this.Cutter(c.by)),y=Head(this.Victim(c.victim));if(x&&y){point=x.clone().lerp(y,.5);latest=at;}
+      }
+      if(!point&&p==="Melee")point=At(A.bunkerJunction,1.3);
+      // ijaA's upper body (his head over the low eye is 40-50 deg up once he stands), else where the shot leaves him.
+      if(!point)point=a1&&ijaA?.alive?a1.clone().addScaledVector(UP,-Q.ijaChestDropM):At(this.WoundBody("ijaA")||C.ija.crouch,1.1);
       const k=this.chargeLook&&this.delta>0?1-Math.exp(-this.delta/Q.lookS):1;
       point=this.chargeLook=this.chargeLook?this.chargeLook.lerp(point,k):point.clone();
       const e=r.Point(eye,height),elev=Math.atan2(point.y-e.y,Math.hypot(point.x-e.x,point.z-e.z));
@@ -2403,30 +2474,32 @@ export class FirstLevelBunkerShow {
       roll=.03*Math.sin(r.time*3.1);
     }
     else if(p==="Lift"||p==="Check"){
+      // 2026-09-30 (user: 「直接玩家自己往前用力一声腾挪就出来就行」): his own heave out from under the timber and up onto his knees
+      // (rescue.heave), then getting to his feet with the rifle (rescue.hand.rise); the look is RescueView's.
       const body=this.RescueBody();
-      if(body?.eye&&body.gaze){
-        // On Luo's clip the eye, the way the head faces and its roll are the player track's (docs/Data_OpeningRescueHandover
-        // 20260929.md): rolled over, the look round down his own body; hauled, at his boots; sat up, round onto his knees and
-        // his feet facing Luo.
+      if(body?.eye){
         const view=this.RescueView(body);
         eye={x:view.eye.x,z:view.eye.z};height=view.eye.y-r.battlefield.GroundHeight(view.eye.x,view.eye.z);
         target=view.gaze.clone();quaternion=EyeQuaternion(view.eye,view.gaze,view.crown);track=true;
         // The nod after 「还能打不？」.
         if(p==="Check"&&this.flags.checkLineAt!=null){const n=r.time-this.flags.checkLineAt;if(n<.8)pitch=-.2*Math.sin(Math.PI*n/.8);}
-      }else{
-        // Before the haul: Luo coming to his head and stooping for the rifle in the mud -- the look on his hands and
-        // chest, not up his legs from the low eye (at 26 deg over it the frame was his crotch).
-        const bones=luo?.actor?.characterRig?.bones,hand=this.flags.pickAt!=null&&bones?.handR?.getWorldPosition(new THREE.Vector3()),head=this.HeadPoint(luo);
-        target=hand&&head?this.LookClamped(eye,height,hand.lerp(head,.35),-8,10):this.LookAtBody(eye,height,luo,-8,10)||this.Aim(eye,height,-90*DEG,10*DEG);
-        // ...kept within pickLookDeg of where the haul's look starts (on Luo at his head): the rifle lies 43 deg to the left,
-        // and turning there and back before the haul's pan round added up to 205 deg one way in 4 s (2026-09-30; the spin
-        // gate is 200). Stooping for it he stays in the left of the picture.
-        const home=Face(eye,this.DragRoot()),e=r.Point(eye,height),d=target.clone().sub(e);
-        const off=Math.max(-C.rescue.view.pickLookDeg*DEG,Math.min(C.rescue.view.pickLookDeg*DEG,Wrap(Face(eye,{x:eye.x+d.x,z:eye.z+d.z})-home)));
-        target=this.Aim(eye,height,home+off,Math.atan2(d.y,Math.hypot(d.x,d.z)));
       }
     }
+    // Shamming dead (Found / Hold until the first slap): the look goes onto ijaA's face and tips up slitAboveDeg, so the face
+    // is in the slit between the lids (it lies below the middle of the picture).
+    const sham=this.Shamming(),face=sham>0&&(p==="Found"||p==="Hold")&&Head(ijaA);
+    if(face){
+      const e=r.Point(eye,height),to=face.clone().sub(e).normalize(),from=target.clone().sub(e).normalize();
+      target=e.clone().add(from.lerp(to,sham).normalize());pitch+=C.rescue.playDead.slitAboveDeg*DEG*sham;
+    }
     return {eye,height,target,roll,pitch,yaw,fovScale,quaternion,track};
+  }
+  /** 0..1: how far into shamming dead he is (rescue.playDead): up over closeS once ijaA has seen him, down over openS
+   *  on the first slap. */
+  Shamming(){
+    const D=C.rescue.playDead,f=this.flags,t=this.r.time;
+    if(f.playDeadAt==null)return 0;
+    return Smooth((t-f.playDeadAt)/D.closeS)*(f.wokenAt!=null?1-Smooth((t-f.wokenAt)/D.openS):1);
   }
   /** 「看不出来是割喉」: from the grab the pinned eye fixes on the throat (the view narrows to interrogation.fixate.scale,
    *  first person, no cut) and widens again once ijaA lets the dying man drop and walks off. */
@@ -2512,12 +2585,15 @@ export class FirstLevelBunkerShow {
     if(r.player?.hitMarks?.length)r.player.hitMarks.length=0;
     const opening=r.opening;
     const fade=p==="Banter"?1-Smooth((r.time-(this.started??r.time))/C.fadeInS):0;
-    // Each slap: a flinch that does not shut the eyes (the head being flung must be seen), then a slow dazed blink.
-    const slap=this.flags.slapAt!=null?r.time-this.flags.slapAt:null;
-    const blink=slap==null||slap<0?0:Math.max(.45*Smooth(slap/.03)*(1-Smooth((slap-.06)/.1)),
+    // Each slap: a flinch that does not shut the eyes (the head being flung must be seen), then a slow dazed blink. The
+    // first one snaps his shammed-dead slit open instead (rescue.playDead): no flinch on that one.
+    const slap=this.flags.slapAt!=null?r.time-this.flags.slapAt:null,waking=this.flags.slapCount===1;
+    const blink=slap==null||slap<0?0:Math.max(waking?0:.45*Smooth(slap/.03)*(1-Smooth((slap-.06)/.1)),
       .7*Smooth((slap-.5)/.12)*(1-Smooth((slap-.68)/.2)));
+    const D=C.rescue.playDead,sham=this.Shamming();
+    const squint=sham>0?sham*(D.squint+D.tremor*Math.sin(r.time*Math.PI*2*D.tremorHz)*Math.sin(r.time*Math.PI*2*D.tremorHz*.37)):0;
     const recovery=C.blackoutRecovery;
-    opening.eyeClosure=this.shownEyeClosure=p==="Blast"?Smooth((a-C.banter.blastShot.eyesCloseS)/recovery.closeS):p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.eyelidS):Math.max(fade,blink);
+    opening.eyeClosure=this.shownEyeClosure=p==="Blast"?Smooth((a-C.banter.blastShot.eyesCloseS)/recovery.closeS):p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.eyelidS):Math.max(fade,blink,squint);
     opening.blackout=p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.fadeS):0;
     // Blur / ghosting / imbalance follow one continuous curve (Perceive), no per-phase steps.
     opening.concussion=shot.cinematic?null:sense.amount>1e-3?{amount:sense.amount,focus:sense.focus,pitch:0,roll:0}:null;
@@ -2653,7 +2729,7 @@ export class FirstLevelBunkerShow {
     this.scenes={};this.flags={};this.events=[];this.beats.clear();this.pursuit=null;this.pursuitSpawned=false;this.pursuitMissing=0;this.withdraw=null;
     this.firstPerson=null;this.firstPersonState=null;this.presentedAt=null;this.previousViewQuaternion=null;this.previousViewPosition=null;
     this.strikeAt=null;this.cameraFrom=null;this.shownEyeClosure=null;this.presentedCamera=null;this.pointActor=null;this.phaseEntered=null;
-    this.slaps=null;this.noiseDone=null;this.roofLift=0;
+    this.slaps=null;this.noiseDone=null;this.roofLift=0;this.checkLook=null;
     this.perception=null;this.perceptionLevel=null;this.headFree=0;this.headLook=null;this.releaseAt=null;this.releaseLevel=null;this.releasePoint=null;
     this.meet=null;this.guardRoute=null;this.restRoute=null;this.clawPath=null;this.blastFrom=null;this.seatEyeM=null;
     for(const actor of [...this.r.squad,...this.r.enemies.values()]){

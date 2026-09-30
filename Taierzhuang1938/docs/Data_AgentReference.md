@@ -75,8 +75,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 ### 引导 / 主循环
 - `Script_Main.mjs` —— 装配层：启动顺序、关卡流程、每帧调度、输入接线。
   **任何规则不许写在这里**——规则在 Script_Ai / Script_Player / Script_Story / Data_*。
-- `Script_BootProp` / `BootPropStage` / `BootPropWorker` —— 加载画面的可转道具台
-  （转动跑在 worker 里，建关卡不掉帧）。
+- `Script_BootPaper` / `Data_BootPapers` —— 加载画面的战前报纸剪报（每次开机随机一张，左下角史料摘录）。
 - 先读：`docs/Data_TengxianIntegration.md`（模块契约与推定值索引）。
 
 ### 第一关《往南的路》
@@ -522,6 +521,13 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   不依赖内容开关，友军、炮击与剧情角色保留原伤害保护。详见断肢文档的当前行为节。
   开关：`?gore=0` / `Debug.Gore.SetEnabled(false)` / `Data_Tuning_Gore.ENABLED`。取证口 `Debug.Gore`，
   测试场 `?gore=1`。回归口 `Script_DismembermentTest.mjs`（纯 Node）；口径 `docs/Data_Dismemberment.md`。
+- **受击物理反应（2026-09-30）**：枪打 / 刀砍 / 爆炸在敌我士兵身上按**方向和部位**出反应。`Script_HitReaction.mjs`
+  （纯规则：冲量分配、弹簧积分、方向死亡选择）+ `Script_HitReactionLayer.mjs`（骨骼弹簧层，`rig.hitReaction`，
+  在 `Actor.Update` 末尾 `_ApplyRiggedAim` 之后施加）+ `Data_Tuning_HitReaction.mjs`（全部数值）；
+  入口 `Soldier.TakeHit` 组装 HitDescriptor → `Actor.ReceiveHit`（活人）/ `Kill(…, hit)` → `Actor.Ragdoll(dir, hit)`（致死，
+  按冲量方向选 `Animation/HitReaction` 动作库里的倒地动作，库缺失退 Kimodo A–D）。没有 `hit` 的 Kill 行为不变。
+  开关 `?hitreact=0` / `Debug.HitReaction.SetEnabled(false)`，取证口 `Debug.HitReaction.Hit/Impulse/State`。
+  回归口 `Script_HitReactionTest.mjs`（纯 Node）、`Script_HitReactionBrowserTest.mjs`（真实 GLB）；口径 `docs/Data_HitReaction.md`。
 - 先读：`docs/Data_GunFeelReview.md`（常设审查表，自由瞄准口径在末节）、`Data_Bayonet.md`、
   `Data_PlayerDamage.md`（挨打链，**别动 aiAccuracyBase**）、`Data_BattlefieldNumbers.md`。
 

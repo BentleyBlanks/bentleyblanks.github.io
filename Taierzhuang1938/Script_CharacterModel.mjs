@@ -13,6 +13,7 @@ import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION
 import { MeleeAnimationPlayer } from "./Script_MeleeAnimation.mjs";
 import { LoadProneCrawl, ProneGroundContact, PRONE_CRAWL } from './Script_ProneCrawl.mjs';
 import { ActorLocomotion } from "./Script_ActorLocomotion.mjs";
+import { TerrainTrailSystem } from "./Script_TerrainTrails.mjs";
 import { LayeredGaitId } from "./Script_LayeredGait.mjs";
 import { ACTOR_LOCOMOTION } from "./Data_Tuning_ActorLocomotion.mjs";
 import { CharacterFacialAnimation } from "./Script_CharacterFacialAnimation.mjs";
@@ -840,6 +841,8 @@ export class LugouCharacterRig {
     }
     this.locomotion = new ActorLocomotion(this, (HashString(`${seed}|gait`) % 1000) / 1000);
     this.proneContact = new ProneGroundContact(this);
+    // 地面脚印（docs/Data_TerrainTrails.md）：登记一下，按渲染后的真实脚骨判着地。Dispose 时注销。
+    TerrainTrailSystem.Register(this);
     this.locomotion.profiles = { ...this.locomotion.profiles, ProneCrawl: { duration: PRONE_CRAWL.duration, referenceMps: PRONE_CRAWL.referenceMps } };
     // Rigid carried equipment is parented to its authored bone in the GLB.
     this.sockets = {
@@ -973,7 +976,14 @@ export class LugouCharacterRig {
     return this;
   }
 
-  BeginDeathPose() {
+  /**
+   * @param {{id:string, clip?:THREE.AnimationClip|null, playbackRate?:number}|null} choice
+   *   方向死亡选择（Script_HitReactionLayer.ChooseHitDeath）：致死命中按冲量方向与部位挑的倒地动作。
+   *   clip 给了就播它（BlenderMCP 物理仿真库，按 playbackRate 实时播）；只给 id 就取这个人自己的 Kimodo A–D。
+   *   startS：从 clip 的这一秒开始播（跳过仿真里「中弹后还站着」的前段，Crumple2），倒地时长相应变短。
+   *   不给（剧本直杀、开场分镜、调试 Sever）= 老路：按 seed 抽 A–D，速率 DEATH_COLLAPSE_PLAYBACK_RATE。
+   */
+  BeginDeathPose(choice = null) {
     if (this.deathClipState || this.deathPose) return this.deathDuration || .8;
     this.locomotion.Restore(); this.locomotion.ResetContacts();
     this.infantry.Cancel(); this.meleeAnimation?.Restore();
@@ -984,22 +994,31 @@ export class LugouCharacterRig {
     this.root.traverse(mesh => {
       if (mesh.isMesh && mesh.userData.characterPbrSurface) this.deathGroundProbes.push(mesh);
     });
-    const deathClip = this.deathClipById.get(this.deathVariantId);
+    let deathClip = this.deathClipById.get(this.deathVariantId), deathRate = DEATH_COLLAPSE_PLAYBACK_RATE, deathStart = 0;
+    if (choice?.id) {
+      const chosen = choice.clip || this.deathClipById.get(choice.id);
+      if (chosen) {
+        deathClip = chosen; this.deathVariantId = choice.id;
+        deathRate = choice.playbackRate || (choice.clip ? 1 : DEATH_COLLAPSE_PLAYBACK_RATE);
+        deathStart = THREE.MathUtils.clamp(Number(choice.startS) || 0, 0, chosen.duration * .5);
+      }
+    }
     if (deathClip) {
       const previous = this.currentAction;
       const action = this.mixer.clipAction(deathClip);
       action.enabled = true;
-      action.reset().setEffectiveWeight(1).setEffectiveTimeScale(DEATH_COLLAPSE_PLAYBACK_RATE);
+      action.reset().setEffectiveWeight(1).setEffectiveTimeScale(deathRate);
       action.clampWhenFinished = true;
       action.setLoop(THREE.LoopOnce, 1).play();
+      action.time = deathStart;
       if (previous && previous !== action && previous.isScheduled()) {
         previous.crossFadeTo(action, DEATH_COLLAPSE_BLEND_SECONDS, false);
       } else if (previous && previous !== action) previous.stop();
       this.currentAction = action;
       this.currentId = this.deathVariantId;
       this.currentPlaybackId = this.deathVariantId;
-      this.deathDuration = deathClip.duration / DEATH_COLLAPSE_PLAYBACK_RATE;
-      this.deathClipState = { action, clip: deathClip, lastSample: 0 };
+      this.deathDuration = (deathClip.duration - deathStart) / deathRate;
+      this.deathClipState = { action, clip: deathClip, lastSample: 0, startS: deathStart };
       return this.deathDuration;
     }
     const nodes = [];
@@ -1052,7 +1071,8 @@ export class LugouCharacterRig {
       const previousSample = this.deathClipState.lastSample;
       if (sample >= previousSample) this.mixer.update((sample - previousSample) * this.deathDuration);
       else {
-        this.deathClipState.action.time = sample * this.deathClipState.clip.duration;
+        const start = this.deathClipState.startS || 0;
+        this.deathClipState.action.time = start + sample * (this.deathClipState.clip.duration - start);
         this.mixer.update(0);
       }
       this.deathClipState.lastSample = sample;
@@ -1334,6 +1354,8 @@ export class LugouCharacterRig {
     this.authoredPose?.Restore();
     this.locomotion.Restore();
     state = this.locomotion.Sample(dt, state);
+    // 受击弹簧层的偏移一般由 Actor.Update 开头还原过了；这里是 rig 被别处直接驱动时的保险（幂等）。
+    this.hitReaction?.Restore();
     this._RestoreHurtTilt();
     this.root.position.y -= this.infantryFloorOffset || 0;
     this.infantryFloorOffset = 0;
@@ -1356,7 +1378,8 @@ export class LugouCharacterRig {
     // 所以在 mixer 之后给胸/颈叠一记世界轴旋转；下一帧开头 _RestoreHurtTilt 先还原，
     // 没有旋转轨道的骨头也不会越叠越歪。
     const hurt = Math.min(1, Math.max(0, state.hurt || 0));
-    if (hurt > 0.001) this._ApplyHurtTilt(hurt, state.elapsed ?? 0);
+    // 有受击弹簧层时固定方向的旧后仰不再画（hurtPose 仍给 AI 逻辑用：压制、队形判据都读它）。
+    if (hurt > 0.001 && !this.hitReaction?.enabled) this._ApplyHurtTilt(hurt, state.elapsed ?? 0);
     // First-person cutscenes place the camera at the eye socket.  The source is
     // one combined SkinnedMesh, so there is no detachable head object; collapse
     // the head bone after mixer evaluation instead.  Doing it before mixer.update
@@ -1485,10 +1508,12 @@ export class LugouCharacterRig {
 
   Dispose() {
     if (this.disposed) return;
+    this.hitReaction?.Reset();
     this.facial?.Reset();
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
     if (this.root.parent) this.root.parent.remove(this.root);
+    TerrainTrailSystem.Unregister(this);
     this.disposed = true;
   }
 }

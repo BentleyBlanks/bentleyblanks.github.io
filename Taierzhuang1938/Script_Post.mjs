@@ -19,6 +19,7 @@
 //
 //   0) TAA 抖动             Script_PostTaa.ApplyJitter
 //   1) atmosphere           Script_Atmosphere      天空视图 + 大气透视两张 LUT
+//   1a) terrainTrails       Script_TerrainTrails   相机中心的环形痕迹靶（脚印坑深 / 泥边 / 踩乱），地形材质采
 //   1b) terrainBlend        Script_TerrainBlend    soil albedo/roughness + normal/depth for stone contacts
 //   2) prepass              Script_PostPrepass     MRT：RT0 法线+视深 / RT1 速度 / DepthTexture
 //   3) hzb                  Script_PostPrepass     线性视深 max-reduce 金字塔
@@ -78,6 +79,7 @@ import {
   InvalidatePrepassSkip,
 } from "./Script_PostPrepass.mjs";
 import { TerrainBlendPass } from './Script_TerrainBlend.mjs';
+import { TerrainTrailsPass } from './Script_TerrainTrails.mjs';
 import { GtaoPass } from "./Script_PostGtao.mjs";
 import { InteriorSkyPass } from "./Script_InteriorSkyOcclusion.mjs";
 import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
@@ -219,6 +221,8 @@ export class PostPipeline {
 
     // --- pass 实例 ---------------------------------------------------------
     this.terrainBlendPass = new TerrainBlendPass(this);
+    // 脚印与痕迹（docs/Data_TerrainTrails.md）：世界空间的环形痕迹靶，地形材质在 main（与 terrainBlend 的捕获）里采。
+    this.terrainTrailsPass = new TerrainTrailsPass(this);
     this.prepassPass = new PrepassPass(this, { destruction });
     this.ssrPass = new SsrPass(this);
     this.ssrColorPass = new SsrColorPass(this, this.ssrPass);
@@ -255,6 +259,8 @@ export class PostPipeline {
     // --- 有序帧图 ---------------------------------------------------------
     this.passes = [
       this.atmospherePass,
+      // 排在 terrainBlend 之前：那一趟捕获的就是地形材质本身，脚印要一起进去。
+      this.terrainTrailsPass,
       this.terrainBlendPass,
       this.prepassPass,
       {

@@ -38,6 +38,11 @@ import { TACTICS, INVESTIGATE, SQUAD_REACTION, CHARGE_FOLLOW, MELEE_STALL } from
 // 断肢只借一个数：被卸掉肢体的那一下死亡推力乘多少（docs/Data_Dismemberment.md §8.1）。
 // 判定与执行都在 ctx.gore 那一层，这里不认识 three 以外的任何断肢概念。
 import { DEATH_PUSH_SCALE as GORE_DEATH_PUSH_SCALE } from "./Data_Tuning_Gore.mjs";
+import { NECK_DEATH } from "./Data_NeckDeath.mjs";
+import { IsNeckHit, DecideNeckDeath, NeckDeathRoll } from "./Script_NeckDeath.mjs";
+// 受击物理反应（docs/Data_HitReaction.md）：这里只借「被打得多重 → 下一发推迟多久」那一个纯函数，
+// 冲量、骨骼弹簧与方向死亡都在 Actor 那一侧。
+import { AiHoldSeconds } from "./Script_HitReactionLayer.mjs";
 
 // 发现距离、班组队形、交火距离与人物 LOD 预算全在 `Data_Tuning_Ai.mjs`
 //（每一组的账跟着数搬过去了）。这里按原名 re-export —— 那两个名字是跨系统契约：
@@ -502,8 +507,12 @@ export class Soldier {
    * @param {{limbs:string[], kind?:string, point?:THREE.Vector3}|null} sever
    *   TakeHit 里 `gore.Resolve` 的结论。非空表示这一下要卸肢：`actor.Ragdoll`
    *   之后交给 GoreSystem 执行（口径 docs/Data_Dismemberment.md §8.1）。
+   * @param {{play:boolean, cause:string|null}|null} neckDeath TakeHit 里 `NeckDeathCause` 的结论：
+   *   放不放喉咙里那一声窒息哽咽（docs/Data_NeckDeath.md）。脚本直接 Kill 的不给，照旧走原来的痛呼。
+   * @param {object|null} hit TakeHit 组装的 HitDescriptor（docs/Data_HitReaction.md §2.1）：倒地动作按冲量方向与部位选、
+   *   骨骼再吃一记死亡档冲击。**不给（剧本直接杀、开场分镜、调试 Sever）行为完全不变**：按 seed 抽 A–D，不转向、不加冲量。
    */
-  Kill(direction, sever = null) {
+  Kill(direction, sever = null, neckDeath = null, hit = null) {
     if (this.state === STATE.DEAD) return false;
     this.state = STATE.DEAD;
     this.health = 0;
@@ -520,7 +529,7 @@ export class Soldier {
       clips: this.side === "ija" ? 0 : Math.floor(this.rnd() * 3),
       taken: false,
     };
-    if (this.actor) this.actor.Ragdoll(direction || new THREE.Vector3(0, 0, 1));
+    if (this.actor) this.actor.Ragdoll(direction || new THREE.Vector3(0, 0, 1), hit);
     // 断肢排在 Ragdoll **之后**：倒地姿态由 Actor.PoseRagdoll 管，被卸掉的骨头照常动，
     // 只是身上没有那一段三角形了（逐关节 ragdoll 不做，见 §1）。
     // **断肢层是死亡链上的旁支，不是主干。** 一个几何 bug 绝不能让敌人打不死、
@@ -557,10 +566,65 @@ export class Soldier {
     // 而中弹那句「我遭枪子了」在阵亡处被旁边活着的人认领时，就成了没挨枪的人喊自己中弹。
     const A2 = this.director && this.director.ctx && this.director.ctx.audio;
     if (A2) {
-      A2.Bark("hurt", { position: this.position.clone(), seed: (this.id | 0) + 7, side: this.side,
-        key: this.side === "nra" ? "hurt_scream" : null });
+      // 刀砍死 / 脖子中弹死、又死在玩家近处的日兵，部分会发出喉咙被割开/打穿的窒息哽咽 ——
+      // 那一声顶替原来的日语痛呼（喉咙坏了的人喊不出词）。两声之间隔一小段（minGapS），
+      // 扫倒一排人不至于「咯」成一片；没抢到档的照旧喊。
+      const dir = this.director;
+      if (neckDeath?.play && dir.time - (dir.neckDeathAt ?? -1e9) >= NECK_DEATH.minGapS) {
+        dir.neckDeathAt = dir.time;
+        this.neckDeathCause = neckDeath.cause;
+        const at = this.position.clone(); at.y += 1.45;
+        A2.Play("neckDeath", { position: at, volume: NECK_DEATH.volume });
+      } else {
+        A2.Bark("hurt", { position: this.position.clone(), seed: (this.id | 0) + 7, side: this.side,
+          key: this.side === "nra" ? "hurt_scream" : null });
+      }
     }
     return true;
+  }
+
+  /**
+   * 这一下的 HitDescriptor（世界系，docs/Data_HitReaction.md §2.1）。不进的：伤害 ≤ 0、没有方向（剧本里 TakeHit(…, null)）、
+   * 开场分镜里被安排死的（openingDoomed：动作是导演编好的，不许物理再改）。
+   * 部位倍率在 TakeHit 里已经乘过一次（damage 是乘后的有效伤害，rawDamage 是乘前的）：冲量按弹的动量算，不按打中哪一段算。
+   */
+  BuildHitDescriptor(damage, mult, part, direction, info, lethal) {
+    if (!(damage > 0) || !direction || this.openingDoomed) return null;
+    return {
+      kind: info?.kind || "bullet", part: part === "legs" ? "leg" : part,
+      shapeId: info?.shapeId || null, point: info?.point || null, pointExact: !!info?.pointExact,
+      direction, sweep: info?.sweep || null, blastOrigin: info?.blastOrigin || null,
+      damage: damage * mult, rawDamage: damage, weaponId: info?.weaponId || null, lethal,
+      seed: this.actor?.seed ?? this.id,
+    };
+  }
+
+  /** 活人挨打：骨骼弹簧层出反应；受击够重就把下一发推迟一会儿（人被打得后仰时不该还在稳稳开枪）。 */
+  ApplyHitReaction(hit) {
+    if (!hit || !this.actor?.ReceiveHit) return null;
+    const reaction = this.actor.ReceiveHit(hit);
+    const hold = reaction ? AiHoldSeconds(reaction.severity) : 0;
+    if (hold > 0) this.fireTimer = Math.max(this.fireTimer, hold);
+    return reaction;
+  }
+
+  /**
+   * 致死的这一下该不该带出喉咙里那一声（规则在 Script_NeckDeath.mjs）。
+   * 只认真实几何的命中：子弹要有命中体 id（AI 打 AI 那条链不做几何，判不了脖子）；
+   * 刀伤不看部位。剧情里被安排死的（开场分镜的刀杀）与叙事保护的不走这里。
+   */
+  NeckDeathCause(kind, info) {
+    if (this.openingDoomed || this.scriptEssential) return null;
+    const ctx = this.director?.ctx;
+    const from = ctx?.player?.position;
+    if (!ctx?.audio || !from) return null;
+    const neckHit = NECK_DEATH.bulletKinds.includes(kind)
+      && IsNeckHit(this.actor?.characterRig?.GetHitboxes?.(), info?.shapeId, info?.point);
+    const dx = this.position.x - from.x, dy = this.position.y - from.y, dz = this.position.z - from.z;
+    return DecideNeckDeath({
+      side: this.side, kind, neckHit, distanceM: Math.sqrt(dx * dx + dy * dy + dz * dz),
+      roll: NeckDeathRoll(this.id, this.damageSequence),
+    });
   }
 
   /**
@@ -617,7 +681,12 @@ export class Soldier {
       sever = null;
     }
     if (sever?.forceKill) this.health = 0;
-    if (this.health <= 0) return this.Kill(direction, sever);
+    // 受击物理反应：命中描述在扣血之后、Kill 之前组装。致死的交给 Kill → Ragdoll 选倒地方向；没死的走骨骼弹簧层。
+    // 这两处都只用 `this.xxx?.()`：P012ActorTest 把本方法源码抠出来在只有几个全局的沙箱里跑。
+    const lethal = this.health <= 0;
+    const hit = this.BuildHitDescriptor?.(damage, mult, part, direction, info, lethal) ?? null;
+    if (lethal) return this.Kill(direction, sever, this.NeckDeathCause?.(kind, info) ?? null, hit);
+    this.ApplyHitReaction?.(hit);
     // 中弹没死会喊。中日两侧各喊各的语言（side 由 Bark 侧过滤声库）。
     // 节流在引擎侧（全局 0.55 s / 同阵营同类 4.5 s）。
     const A = this.director && this.director.ctx && this.director.ctx.audio;
@@ -1300,9 +1369,11 @@ export class AiDirector {
       cover: "move_cover", fire: "rally_shoot",
     };
     if (this.ctx.audio && ORDER_LINE[orderId]) {
+      // self：玩家自己喊的令，走主角的嗓子（居中干声），不按脚底定位（2026-09-30）。
+      // position 仍给：第一关 01–06 的认人钩子拿它认出是顺子、挑他本人的版本。
       this.ctx.audio.Bark("rally", {
         key: ORDER_LINE[orderId], position: origin ? origin.clone() : null,
-        priority: true, volume: 1.1,
+        priority: true, volume: 1.1, self: true,
       });
     }
     // 绕行要分左右两半，所以先算一条从下令者指向瞄点的法线
@@ -1451,7 +1522,11 @@ export class AiDirector {
         // 否则以后走近、从 LOD 切回完整模型时会突然“复活”成站姿。
         // 尸体刚体还在（最多 8 秒，见 StepCorpse）也继续更新 —— 从坟顶滑到平地的
         // 途中肢体下垂量在变，姿势冻住的话滑到平地后手脚还保持着悬空下垂的角度。
-        if (s.actor && (s.deadTime <= 0.9 || s.corpse)) {
+        // 倒地动作没放完（ragdollState.t < 1）也继续更新：「0.9 s 收敛」是旧的 0.8 s 程序化倒地的账，
+        // Kimodo 库 1.6 倍速也要 1.7–1.9 s、物理仿真库 1.6–3.2 s。只按 0.9 s 截断的话尸体刚体一拆，
+        // 人就定在半跪 / 撑地的中间帧，枪悬在半空（2026-09-30 受击反应验收实拍：t 停在 0.47，枪最低点离地 0.15–0.38 m）。
+        // 放完那一帧（t 到 1）照常走一遍，接地拟合的终帧旋转就在那一帧写进去，之后才停。
+        if (s.actor && (s.deadTime <= 0.9 || s.corpse || (s.actor.ragdollState && s.actor.ragdollState.t < 1))) {
           s.actor.Update(dt, { dead: true, dying: Clamp01(s.deadTime / 0.9), elapsed: this.time });
         }
         profiler?.E("ai/corpse");
@@ -5114,6 +5189,8 @@ export class AiDirector {
         // AI 打 AI 仍按概率抽部位：那边的胶囊是给玩家的子弹用的，这条链一帧几十发不做几何。
         const part = s.rnd() < 0.08 ? "head" : s.rnd() < 0.6 ? "torso" : (s.rnd() < 0.5 ? "arm" : "leg");
         // shapeId 留空：这条链不做几何（一帧几十发），断肢规则层按部位与权重自己挑段。
+        // 受击反应同理：没有命中体 id 就**不信** point（它是瞄点，不是弹着点），按抽到的部位取受力点，
+        // 肢体取离射手近的那一侧（Script_HitReaction.ClassifyZone / DefaultPoint）。
         this.RememberIncomingFire(s.target.ref,fromV);
         const died = s.target.ref.TakeHit(s.weapon.damage, part, dir,
           { kind: s.weapon.rpm ? "hmg" : "bullet", weaponId: s.weaponId, point: aimV.clone() });

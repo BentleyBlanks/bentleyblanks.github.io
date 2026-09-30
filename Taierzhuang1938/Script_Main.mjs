@@ -52,6 +52,8 @@ import { MovementRange } from "./Script_MovementRange.mjs";
 import { GORE_RANGE_PHASE, GORE_RANGE_ID } from "./Data_GoreRange.mjs";
 import { GoreRangeField } from "./Script_GoreRangeField.mjs";
 import { GoreRange } from "./Script_GoreRange.mjs";
+import { HitReactionOf, HitReactionEnabled, SetHitReactionEnabled, PreloadDeathLibrary, DeathLibrary } from "./Script_HitReactionLayer.mjs";
+import { TerrainTrailSystem } from "./Script_TerrainTrails.mjs";
 import {
   RANGE_PHASE, RANGE_LEVEL_ID, RANGE_TARGETS, RANGE_STATIONS, RANGE_RESPAWN_S,
 } from "./Data_Range.mjs";
@@ -136,7 +138,7 @@ import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { WhiteboxGraphicsOverrides, WhiteboxPostOptions } from "./Data_Tuning_Whitebox.mjs";
 import { LoadGraphicsProfile, LoadWhiteboxConfig, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
 import { WhiteboxSceneRenderer } from "./Script_WhiteboxRendering.mjs";
-import { BootProp } from "./Script_BootProp.mjs";
+import { BootPaper } from "./Script_BootPaper.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
 import { AddTrimProps, ClearTrimProps } from "./Script_TrimProps.mjs";
 import { AircraftFlight, MakeAircraftStrafeHost } from "./Script_Aircraft.mjs";
@@ -376,17 +378,18 @@ const bootBar = document.querySelector("#bootBar i");
 const bootStep = document.getElementById("bootStep");
 const bootStart = document.getElementById("bootStart");
 
-// 加载画面的道具展示台。**开机就转起来**，不等主场景 —— 它自己一台小 renderer，
-// 与主渲染器无关；建关那十几秒里玩家能拖着它转。出图模式下不建（截图里不许有它）。
-const bootProp = SHOT ? null : new BootProp(
-  document.getElementById("bootProp"),
-  document.getElementById("bootPropName"),
-  document.getElementById("bootPropNote"),
-);
-/** 加载画面收放的唯一入口：`.gone` 与展示台的启停必须同步，否则它在游戏里空转。 */
+// 加载画面的战前报纸剪报（Script_BootPaper）。开机就亮，不等主场景；只拉一张图，几乎不占资源。
+// 出图模式下不建（截图里不许有它）。
+const bootPaper = SHOT ? null : new BootPaper({
+  img: document.getElementById("bootPaper"),
+  sub: document.getElementById("bootSub"),
+  name: document.getElementById("bootPaperName"),
+  note: document.getElementById("bootPaperNote"),
+});
+/** 加载画面收放的唯一入口：`.gone` 与报纸的显隐必须同步，下次再亮时才会换一张。 */
 function ShowBoot(on) {
   boot.classList.toggle("gone", !on);
-  if (on) bootProp?.Show(); else bootProp?.Hide();
+  if (on) bootPaper?.Show(); else bootPaper?.Hide();
 }
 
 /** 加载画面那行字与那条进度条。开机、换关、过场预热三条链共用这一只口。 */
@@ -431,7 +434,7 @@ function NextFrame() {
   });
 }
 
-bootProp?.Show();
+bootPaper?.Show();
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
@@ -488,6 +491,7 @@ camera.rotation.order = "YXZ";
 
 // 破口 uniform 同时喂主材质、阴影与深度法线预通道，三条链必须是一只洞。
 const destructionUniforms = MakeDestructionUniforms();
+const trailFocus = new THREE.Vector3();
 const post = new PostPipeline(renderer, {
   width: window.innerWidth, height: window.innerHeight, quality: QUALITY,
   destruction: destructionUniforms,
@@ -1507,9 +1511,22 @@ async function Boot() {
           if (shape?.type === "capsule") at.copy(shape.start).add(shape.end).multiplyScalar(0.5);
           else if (shape?.center) at.copy(shape.center);
         }
+        // 扫刀方向（受击反应用，docs/Data_HitReaction.md §2.1 sweep）：刀是横着扫过去的，力沿刀尖轨迹走。
+        // 优先取这一帧刀尖位移（end − previous）；刚出刀 previous 与 end 重合时按弧线切向：
+        // 刀尖 yaw = a.yaw + sweep·(1−2u)，dTip/du ∝ sign(sweep)·(cos yaw, 0, −sin yaw)。捅刺不带扫向。
+        let sweepDir = null;
+        if (bladed && contact.end && contact.previous) {
+          const sx = contact.end.x - contact.previous.x, sy = contact.end.y - contact.previous.y, sz = contact.end.z - contact.previous.z;
+          const sl = Math.hypot(sx, sy, sz);
+          if (sl > 0.02) sweepDir = new THREE.Vector3(sx / sl, sy / sl, sz / sl);
+        }
+        if (bladed && !sweepDir && contact.sweep && Number.isFinite(contact.yaw)) {
+          const sg = Math.sign(contact.sweep);
+          sweepDir = new THREE.Vector3(sg * Math.cos(contact.yaw), 0, -sg * Math.sin(contact.yaw));
+        }
         const died = target.TakeHit(amount, "torso", delta,
           { kind: bladed ? "blade" : "thrust", mode: bladed ? "slash" : "thrust",
-            weaponId: attackerWeapon?.id || null, shapeId, point: at.clone() });
+            weaponId: attackerWeapon?.id || null, shapeId, point: at.clone(), sweep: sweepDir });
         vfx?.Blood(at, delta, died ? 1 : 0.5);
         if (attacker === player) {
           ConfirmHit(died);
@@ -2858,6 +2875,52 @@ async function Boot() {
     SetForce: (kind) => gore?.SetForce(kind || null) ?? null,
     Reset: () => { gore?.ReleaseAll(); return gore?.State() || null; },
   };
+  // 地面脚印与痕迹取证口（docs/Data_TerrainTrails.md §6）。?trails=0 关采集。
+  // Read 同步读回痕迹靶一个世界点（0..255 的 [坑深, 泥边, 踩乱]），别在帧循环里用。
+  window.Taierzhuang.Debug.TerrainTrails = {
+    Describe: () => ({ ...TerrainTrailSystem.Describe(), pass: post.terrainTrailsPass?.Describe() ?? null,
+      preset: post.preset?.terrainTrails ?? null }),
+    Stamp: (o) => TerrainTrailSystem.Stamp(o),
+    Read: (x, z) => post.terrainTrailsPass?.ReadTexel(renderer, x, z) ?? null,
+    SetEnabled: (value) => TerrainTrailSystem.SetEnabled(value !== false),
+    Reset: () => TerrainTrailSystem.Reset(),
+  };
+  // 受击物理反应取证口（docs/Data_HitReaction.md §2.4）。**所有关卡都挂**；?hitreact=0 关整层。
+  // Hit 走正片 TakeHit 链（扣血、可致死、方向死亡）；Impulse 只打冲量不扣血（调参、拍对照图用）。
+  {
+    const Soldier = (id) => ai?.soldiers.find((s) => s.id === id) || null;
+    const Vec = (a) => (a ? new THREE.Vector3(a[0], a[1], a[2]) : null);
+    const Descriptor = (soldier, o, lethal) => ({
+      kind: o.kind || "bullet", part: o.part || "torso", shapeId: o.shapeId || null, point: Vec(o.point), pointExact: !!o.point,
+      direction: Vec(o.dir || [0, 0, 1]).normalize(), sweep: Vec(o.sweep), blastOrigin: Vec(o.blastOrigin),
+      damage: o.damage ?? 75, rawDamage: o.damage ?? 75, weaponId: o.weaponId || null, lethal, seed: soldier.actor?.seed ?? soldier.id,
+    });
+    window.Taierzhuang.Debug.HitReaction = {
+      Hit: (id, o = {}) => {
+        const s = Soldier(id);
+        if (!s) return null;
+        const dir = Vec(o.dir || [0, 0, 1]).normalize();
+        const died = s.TakeHit(o.damage ?? 75, o.part || "torso", dir,
+          { kind: o.kind || "bullet", shapeId: o.shapeId || null, point: Vec(o.point), pointExact: !!o.point,
+            sweep: Vec(o.sweep), blastOrigin: Vec(o.blastOrigin), weaponId: o.weaponId || null });
+        return { died: !!died, health: s.health };
+      },
+      Impulse: (id, o = {}) => {
+        const s = Soldier(id);
+        return s?.alive ? s.actor?.ReceiveHit(Descriptor(s, o, false)) ?? null : null;
+      },
+      State: (id) => {
+        const s = Soldier(id);
+        const layer = s?.actor?.characterRig?.hitReaction;
+        return layer ? layer.Describe() : { active: false, enabled: HitReactionEnabled(), layer: false };
+      },
+      SetEnabled: (value) => SetHitReactionEnabled(value !== false),
+      Enabled: () => HitReactionEnabled(),
+      Preload: () => PreloadDeathLibrary().then((lib) => !!lib),
+      Library: () => { const lib = DeathLibrary(); return lib ? { revision: lib.revision, clips: [...lib.clips.keys()], profiles: lib.profiles } : null; },
+      Layer: (id) => HitReactionOf(Soldier(id)?.actor)?.Describe() ?? null,
+    };
+  }
   if (RANGE) {
     const RangeTargetSnapshot = (entry) => {
       const s = entry.soldier;
@@ -8611,6 +8674,11 @@ function Frame(dt, render = true) {
   // 现在按脚下真实材质查（射线拿碰撞盒 tag + 水深），姿态与冲刺分别给音量与步距，
   // 姿态切换/翻越出布料声、冲刺出装具声、跑久了或伤重出喘息。
   audioWiring.Update(dt, state.frame, SURFACE_BY_TAG);
+
+  // 地面脚印与痕迹（docs/Data_TerrainTrails.md）：这里只收落脚（人物按真实脚骨、玩家按步距），
+  // 画进痕迹靶是帧图 terrainTrails 那一趟的事。过场里玩家不留印（机位在演，身子不在那）。
+  TerrainTrailSystem.Update(dt, { focus: camera.getWorldPosition(trailFocus),
+    player: state.cutscene || state.menu ? null : player, scene });
 
   // 情境操作提示：每六帧扫一次。F 查询会遍历全场士兵，0.1 s 一次已经足够跟手；
   // 同一轮也重算换枪与包扎条件，保证 HUD 不会提示一个实际做不了的动作。

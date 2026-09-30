@@ -1169,7 +1169,10 @@ def Validate(clip, spec, samples, lifts, gripErrors, seam, scale):
         for key in ('foot' + side, 'toe' + side):
             if len(window) >= 2:
                 a = Vector(window[0][key])
-                worst = max(worst, max((Vector(s[key]) - a).length for s in window) * scale)
+                here = max((Vector(s[key]) - a).length for s in window) * scale
+                worst = max(worst, here)
+                if os.environ.get('OPENING_PLANTDBG') and here > .012:
+                    print('PLANT %s %s %s %.2f-%.2f slide %.4f' % (clip, side, key, t0, t1, here), flush=True)
     report['footSlideM'] = round(worst, 4)
     # Knees on the ground (kneeling clips): the knee joint must hold inside each declared window.
     report['kneePlants'] = [[side, round(t0, 4), round(t1, 4)] for side, t0, t1 in spec.get('kneePlants', [])]

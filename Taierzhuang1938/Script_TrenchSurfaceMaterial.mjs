@@ -3,6 +3,7 @@ import { MakeTerrainPatch } from './Script_TerrainMaterial.mjs';
 import { TerrainBlendUniforms, TERRAIN_BLEND_GLSL } from './Script_TerrainBlend.mjs';
 import { SurfacePatchEnd } from './Script_MaterialPatches.mjs';
 import { TerrainQualityOf, TERRAIN_WATER as W } from './Data_Tuning_Terrain.mjs';
+import { TerrainTrailTierOf } from './Data_Tuning_TerrainTrails.mjs';
 import { TERRAIN_CONTACT_GLSL } from './Script_TerrainContact.mjs';
 import { TRENCH_SURFACE as C } from './Data_TrenchSurface.mjs';
 
@@ -11,6 +12,7 @@ import { TRENCH_SURFACE as C } from './Data_TrenchSurface.mjs';
 const Common = /* glsl */`
 #define TERRAIN_HOISTED_DERIVATIVES
 #define TERRAIN_WATER_EXTERNAL
+#define TERRAIN_TRAILS_EXTERNAL
 uniform vec4 uTrenchMud;
 uniform vec4 uTrenchWater;   // x 沟底积水 y 沟底底湿度 z,w 凹度（米）[起, 满]
 uniform float uTrenchPom;
@@ -137,6 +139,16 @@ const Evaluate = /* glsl */`
     // 湿泥与积水（Script_TerrainMaterial.TerrainWater）：车道照常；沟底（翻土 × 凹度）更湿、积水更多。
     // 01–05 前沿湿泥区（TERRAIN_MUD_ZONE）：翻土压暗转冷灰褐、沟壁也湿、沟底水更多更深。
     float mud=TerrainMudZone(vTerrainWorld.xz);
+#ifdef TERRAIN_TRAILS
+    // 脚印与痕迹（Script_TerrainTrails）：沟土算完、积水之前（坑深参与水线，沟底的脚印会汪水）
+    {
+      vec3 trailColor=diffuseColor.rgb;
+      // 压平的目标色：沟土那一路是翻土层均值（同 SoilPlane 的 0.88 混合与 albedoScale）
+      gTerrainMeanOut=mix(gTerrainMeanOut,uTerrainAlbedoMean[3].rgb*${C.mud.albedoScale.toFixed(3)},spoil);
+      TerrainTrailApply(trailColor,vTerrainWorld,geomN,gTerrainWeights,mud,max(length(worldDx),length(worldDy)),length(vViewPosition));
+      diffuseColor.rgb=trailColor;
+    }
+#endif
     float floorSite=spoil*trenchLow;
     vec3 wetColor=diffuseColor.rgb*mix(vec3(1.0),uTerrainMudB.xyz,spoil*mud);
     TerrainWater(wetColor,vTerrainWorld.xz,geomN,
@@ -185,7 +197,8 @@ const Stone = /* glsl */`
 }`;
 
 export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=false }={}) {
-  const patch=MakeTerrainPatch(pack,TerrainQualityOf(quality));
+  // 石材（沟边垒的石头）不会被踩：不编脚印，那一路的采样器本来就紧。
+  const patch=MakeTerrainPatch(pack,TerrainQualityOf(quality),{trails:stone?null:TerrainTrailTierOf(quality)});
   patch.terrainUniforms.uTerrainTileNear.value.w=1/C.mud.baseTileM;
   patch.terrainUniforms.uTerrainNormalScale.value.w=.65;
   const bind=patch.uniforms;
