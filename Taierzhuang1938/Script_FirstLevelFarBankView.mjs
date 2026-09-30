@@ -24,8 +24,9 @@ const HAZE_SPOTS = Object.freeze([[-104, 68], [-96, 58], [-88, 64], [-72, 56], [
 const HAZE_SOURCE = Object.freeze({ kind: "dust", rate: 3, radius: 11, rise: 0.4, sizeStart: 3.6, sizeEnd: 10, life: 7, opacity: 0.2, prewarm: true });
 
 export class FarBankTankView {
-  constructor({ root, battlefield, physics, actorFactory, library, vfx, audio = null }) {
-    Object.assign(this, { battlefield, physics, actorFactory, library, vfx, audio });
+  /** groundAt(x, z)：车轮下的地面高度（桥面上那辆要按桥面算，河床在桥面下几米）；不给就是地形。 */
+  constructor({ root, battlefield, physics, actorFactory, library, vfx, audio = null, groundAt = null }) {
+    Object.assign(this, { battlefield, physics, actorFactory, library, vfx, audio, groundAt });
     this.group = new THREE.Group();
     this.group.name = "FarBankTanks";
     root.add(this.group);
@@ -72,7 +73,7 @@ export class FarBankTankView {
   }
   /** 一辆车此刻的姿态（与 MissionView.SyncTank 同一套：按车体轴取四点地高）。 */
   Pose(entry, tank) {
-    const h = (x, z) => this.battlefield.GroundHeight(x, z), hullYaw = tank.hullYaw ?? Math.PI;
+    const h = (x, z) => (this.groundAt ? this.groundAt(x, z) : this.battlefield.GroundHeight(x, z)), hullYaw = tank.hullYaw ?? Math.PI;
     const fx = -Math.sin(hullYaw), fz = -Math.cos(hullYaw), rx = Math.cos(hullYaw), rz = -Math.sin(hullYaw);
     const front = h(tank.x + fx * 1.8, tank.z + fz * 1.8), rear = h(tank.x - fx * 1.8, tank.z - fz * 1.8);
     const right = h(tank.x + rx, tank.z + rz), left = h(tank.x - rx, tank.z - rz);

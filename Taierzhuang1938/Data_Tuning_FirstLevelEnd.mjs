@@ -266,6 +266,10 @@ export const END_TUNING = Object.freeze({
     // ---- 战车（傀儡：只动、转炮塔、炮击与机枪曳光，不可摧毁，不进 03–05 的战车运行时）-------------
     tankCruiseMps: 4.4, tankTurnRadPerS: 0.5, tankTurretRadPerS: 0.42, tankStartBackM: 140,
     tankShellFlightS: 1.5, tankShellRadiusM: 4.5,
+    // 开炮的炮口焰与尘环放大倍数（九十米外原尺寸只有几个像素）。
+    cannonFxScale: 1.7,
+    // 桥面上那辆战车（FarBankTankBridge）：起爆后等 blastAdvanceWaitS 秒、桥面上没有己方了再往前开到断口北侧（最多等 blastAdvanceMaxS）。
+    blastAdvanceWaitS: 5, blastAdvanceMaxS: 16,
     // 落点安全：离玩家 ≥ shellMinPlayerM、离任何己方（班里人、爆破人员、尾队…）≥ shellFriendlyM、离玩家要走的
     // 路线 ≥ shellRouteM；一炮到落地的预测点（PredictShellImpact）偏离目标超过 shellAimTolM 就放弃这个点。
     shellFriendlyM: 10, shellRouteM: 8, shellAimTolM: 4,
@@ -279,6 +283,32 @@ export const END_TUNING = Object.freeze({
     // 绕开土岗走空地的兜底是 dz ≥ outFallbackDzM。
     outDzM: 190, outFallbackDzM: 215, blindS: 1.5,
     // 黑屏里对岸单位撤场（Retire）；BridgeWithdraw 起己方桥头人员与已过桥尾队标 missionUntargetable。
+    // ---- 规模感：纯视觉的远景人群（2026-09-30 R2b，docs/Data_FirstLevelBridgeFarBank.md §10）------------
+    // 为什么：射位离北岸 83–90 m、水平视场 ≈100°，一个人只有十来个像素，30 个真 AI 读成「岸上有几个人」。
+    // 这批人不是 AI 兵：不进 ai.soldiers / r.enemies、不占 actorPool（ija:48），只在 AI 的远景批渲染层（ActorCrowd）
+    // 里按姿势桶（站 / 跪 / 卧 / 跑步翻页）画出来，打不中、不开真枪；枪口焰与曳光是事件，跟着单位走。
+    crowd: Object.freeze({
+      // 分拨：占名册的比例（trigger 是放行的时刻）。cover = BridgeCover 起；fire = bridgeFireBroken 或 cover 起 fireFallbackS 秒（先到者）；
+      // withdraw = BridgeWithdraw 起；blast = 起爆后 blastTrickleDelayS 秒（桥断后仍源源不断涌到岸边的那一拨）。
+      waves: Object.freeze([
+        Object.freeze({ id: "cover", share: 0.44, gapS: 0.22 }),
+        Object.freeze({ id: "fire", share: 0.24, gapS: 0.28 }),
+        Object.freeze({ id: "withdraw", share: 0.24, gapS: 0.22 }),
+        Object.freeze({ id: "blast", share: 0.08, gapS: 0.4 }),
+      ]),
+      fireFallbackS: 40, blastTrickleDelayS: 1.5,
+      // 赶路：奔跑速度 m/s（每人 ± jitter）；strideM = 一个跑步循环走的距离（RifleRun 2.042 m/s × 1.4667 s，翻页相位按它算，脚不打滑）。
+      runMps: 3.5, runJitterMps: 0.5, strideM: 2.995, paceMps: 1.5,
+      // 出发点在岸沿以北 spawnBackM 米（离射位 ≥ 170 m，一个人不到 5 px，且在 R2 的补员带之外）。
+      spawnBackM: 100,
+      // 起爆：这么远之内的人趴 duckS 秒（随机 ±duckJitterS）再爬起来接着打。
+      duckM: 90, duckS: 1.4, duckJitterS: 0.8,
+      // 枪口焰 / 曳光（每秒总数，按分档）：contact / mid / far / out。只挑上一帧在视锥里的人。
+      flashHz: Object.freeze({ contact: 9, mid: 6, far: 2.5, out: 0 }),
+      flashScale: 2.2, impactChance: 0.35,
+      // 溜达：留守的人每 pacePeriodS 秒在 paceRadiusM 内换个位置。
+      pacePeriodS: Object.freeze([5, 12]), paceRadiusM: 2.2,
+    }),
   }),
 });
 

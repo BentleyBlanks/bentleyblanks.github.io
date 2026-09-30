@@ -19,6 +19,8 @@ import {
   FarBankRushSlot, FAR_BANK_CROWD, FAR_BANK_FIRE_POINTS, FAR_BANK_FIRE_LISTS, FAR_BANK_TANKS, FAR_BANK_SHELL_SPOTS, FAR_BANK_REINFORCE, FAR_BANK_BLAST,
   FarBankShoreZ, FarBankPoint,
 } from "./Data_FirstLevelBridgeFarBank.mjs";
+import { CrowdGroundY, BuildFarBankCrowdRoster, AssignCrowdWaves, FAR_BANK_CROWD_AXIS_X, FAR_BANK_CROWD_SPAWN_Z } from "./Data_FirstLevelFarBankCrowd.mjs";
+import { FarBankCrowd } from "./Script_FirstLevelFarBankCrowd.mjs";
 import { FirstLevelFarBank, FarBankTier, FarBankFireList, ShellSpotVerdict, RouteDistance, FarBankWalkInVia, FarBankSpawnAt } from "./Script_FirstLevelBridgeFarBank.mjs";
 
 const T = E.farBank;
@@ -213,27 +215,39 @@ const Eye = (p, h) => ({ x: p.x, z: p.z, y: Ground(p.x, p.z) + h });
   Check(ShellSpotVerdict({ x: 0, z: 30 }, { player: { x: 100, z: 0 }, minPlayerM: 22, friendlies: [{ x: 50, z: 50 }], routes: [[{ x: -5, z: 0 }, { x: 5, z: 0 }]] }) === null, "全都够远 → 安全");
 }
 
-// 战车路线：从 shore − tankStartBackM 直线开到岸边，离实心体块 ≥ 3.5 m，地面起伏 < 1 m
+// 战车路线：从桥轴路堤（startX）出发，经 via 到停位；离实心体块 ≥ 2.6 m，地面起伏 < 1 m（桥面上那辆按桥面算，逐 0.5 m 坡度 ≤ 0.4）
 {
+  Check(FAR_BANK_TANKS.length === 3, "三辆傀儡战车");
+  Check(FAR_BANK_TANKS.filter((tank) => tank.kind === "bridge").length === 1, "其中一辆开上桥面（bridge）");
   for (const tank of FAR_BANK_TANKS) {
-    const shore = FarBankShoreZ(tank.x), to = shore - tank.pushBackM;
-    Check(tank.backM > tank.pushBackM, `${tank.id} 先停在 back ${tank.backM}，BridgeWithdraw 再推到 back ${tank.pushBackM}`);
-    // 路线折线：出发点 → via（绕开沟与院子）→ 停位 → 推到岸边的位置
-    const path = [{ x: tank.x, z: shore - T.tankStartBackM }, ...tank.via.map(([x, back]) => ({ x, z: FarBankShoreZ(x) - back })),
+    const shore = FarBankShoreZ(tank.x), to = shore - tank.pushBackM, bridgeTank = tank.kind === "bridge";
+    Check(tank.backM >= tank.pushBackM, `${tank.id} 先停在 back ${tank.backM}，BridgeWithdraw 起停位不更靠南 back ${tank.pushBackM}`);
+    Check(tank.enter === "BridgeCover", `${tank.id} BridgeCover 起就进场（射位站姿的视野里要看得见三辆）`);
+    const path = [{ x: tank.startX ?? tank.x, z: shore - T.tankStartBackM }, ...tank.via.map(([x, back]) => ({ x, z: FarBankShoreZ(x) - back })),
       { x: tank.x, z: shore - tank.backM }, { x: tank.x, z: to }];
-    let lo = Infinity, hi = -Infinity, hit = new Set();
+    let lo = Infinity, hi = -Infinity, hit = new Set(), maxStep = 0, lastY = null;
+    const Y = (x, z) => CrowdGroundY(x, z, Ground);
     for (let i = 1; i < path.length; i++) {
       const a = path[i - 1], b = path[i], L = Distance(a, b);
       for (let d = 0; d <= L; d += 0.5) {
-        const t = d / L, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t, y = Ground(x, z);
+        const t = L ? d / L : 0, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t, y = Y(x, z);
         lo = Math.min(lo, y); hi = Math.max(hi, y);
+        if (lastY != null) maxStep = Math.max(maxStep, Math.abs(y - lastY));
+        lastY = y;
         for (const dx of [-2.6, 0, 2.6]) for (const dz of [-2.6, 0, 2.6]) for (const id of Overlap(x + dx, z + dz, 0, solids)) hit.add(id);
       }
     }
     Check(hit.size === 0, `${tank.id} 路线净空（履带宽 2.2 m + 余量）：${[...hit]}`);
-    Check(hi - lo < 1.0 && lo > -0.6, `${tank.id} 路线地面平（${lo.toFixed(2)}…${hi.toFixed(2)}）`);
-    Check(Math.abs(tank.x - Bridge.x) >= 9, `${tank.id} 不压在桥轴的铁路上`);
-    Check(Distance({ x: tank.x, z: to }, { x: A.bridgeCover.x, z: A.bridgeCover.z }) >= 80, `${tank.id} 停位离射位 ≥ 80 m`);
+    Check(bridgeTank ? (maxStep <= 0.4 && lo > -0.6) : (hi - lo < 1.0 && lo > -0.6), `${tank.id} 路线地面平（${lo.toFixed(2)}…${hi.toFixed(2)}，逐 0.5 m 最大落差 ${maxStep.toFixed(2)}）`);
+    if (bridgeTank) {
+      Check(tank.x === Bridge.x && to >= 96 && to <= 112, `${tank.id} 停在桥北孔（SpanNorth z 86…112）的桥面上（z ${to}）`);
+      Check(tank.blastPostZ > to && tank.blastPostZ + 2.15 <= Bridge.spans[0].z1 + 0.01 && tank.blastPostZ + 2.15 >= 126, `${tank.id} 起爆后停在断口北侧：车头 ${(tank.blastPostZ + 2.15).toFixed(1)} 在 2 号墩（z 136）以北 ≤ 10 m`);
+      Check(Distance({ x: tank.x, z: to }, A.bridgeCover) >= 60, `${tank.id} 停位离射位 ≥ 60 m`);
+    } else {
+      Check(Math.abs(tank.x - Bridge.x) >= 9, `${tank.id} 不压在桥轴的铁路上`);
+      Check(Distance({ x: tank.x, z: to }, { x: A.bridgeCover.x, z: A.bridgeCover.z }) >= 80, `${tank.id} 停位离射位 ≥ 80 m`);
+      Check(to > 76 && to < shore - 2 && to - 2.15 > 82.8 - 0.01 - 2, `${tank.id} 在岸边空地上（岸沿以北 ${(shore - to).toFixed(1)} m）`);
+    }
   }
 }
 
@@ -366,7 +380,10 @@ const Run = (bank, r, seconds, step) => { for (let i = 0; i < Math.round(seconds
   Check(s.shore === 12 && s.standby === 10, `70 s 后第一拨到齐：岸线 ${s.shore} 待命 ${s.standby}`);
   Check(s.ijaCount <= T.ijaCap, "同屏日军不超上限");
   Check(bank.tanks.filter((t) => t.state === "posted").length >= 2, "T1、T2 到位停车");
-  Check(bank.tanks.every((t) => t.z < FarBankShoreZ(t.x) - 5), "战车停在岸沿以北");
+  Check(bank.tanks.filter((t) => t.spec.kind !== "bridge").every((t) => t.z < FarBankShoreZ(t.x) - 5), "岸边两辆停在岸沿以北");
+  const bt = bank.tanks.find((t) => t.spec.kind === "bridge");
+  Check(bt.state === "posted" && Math.abs(bt.x - Bridge.x) < 0.5 && bt.z >= 96 && bt.z <= 112, `桥面上那辆先停在桥北孔（z ${bt.z.toFixed(1)}）`);
+  Check(bank.tanks.every((t) => t.state === "posted"), "三辆都到位停车");
   // 岸线兵到了射位，环境射击授权点轮换：同时 ≤ ambientMax
   const armed = r.soldiers.filter((a) => a.ambientFirePoints);
   Check(armed.length > 0 && armed.length <= T.ambientMax, `环境射击同时 ${armed.length} 人（≤ ${T.ambientMax}）`);
@@ -379,7 +396,6 @@ const Run = (bank, r, seconds, step) => { for (let i = 0; i < Math.round(seconds
   // bridgeFireBroken → T3 进场、前锋上桥；rearColumnCrossed → 前锋回岸
   r.Record("bridgeFireBroken");
   Run(bank, r, 4, "BridgeCover");
-  Check(bank.tanks.find((t) => t.spec.enter === "bridgeFireBroken").state !== "queued", "T3 在 bridgeFireBroken 之后进场");
   Run(bank, r, 22, "BridgeCover");
   s = bank.State();
   Check(s.vanguard === 2, "两个前锋冲上桥");
@@ -521,6 +537,134 @@ const Run = (bank, r, seconds, step) => { for (let i = 0; i < Math.round(seconds
   const bank6 = new FirstLevelFarBank(FakeRuntime(), { vec: FakeVec });
   bank6.r.ai.spawnFailures = 6; bank6.Enter("BridgeCover"); Run(bank6, bank6.r, 60, "BridgeCover");
   Check(bank6.State().spawned === 22, `spawn 失败（满员）会重试，最后 22 个都放出来了（${bank6.State().spawned}）`);
+}
+
+// ---------------------------------------------------------------------------
+// 4. 规模感：纯视觉的远景人群（docs/Data_FirstLevelBridgeFarBank.md §10）
+// ---------------------------------------------------------------------------
+{
+  const K = E.farBank.crowd;
+  const roster = AssignCrowdWaves(BuildFarBankCrowdRoster(), K.waves);
+  const kinds = (kind) => roster.filter((u) => u.kind === kind);
+  Check(roster.length >= 300, `视觉人群名册 ${roster.length} ≥ 300（另有 R2 的真 AI 与脚本兵 ${FAR_BANK_REAL.length + FAR_BANK_SHORE_A.length + FAR_BANK_SHORE_B.length + FAR_BANK_STANDBY.length}）`);
+  Check(kinds("shore").length >= 150 && kinds("bridge").length >= 30 && kinds("reserve").length >= 40, `岸线 ${kinds("shore").length}、桥头纵队 ${kinds("bridge").length}、留守 ${kinds("reserve").length}`);
+  Check(new Set(roster.map((u) => u.id)).size === roster.length, "视觉人群 id 唯一");
+  Check(roster.filter((u) => u.flag).length >= 10 && roster.filter((u) => u.sword).length >= 6, `旗 ${roster.filter((u) => u.flag).length} 面、刀 ${roster.filter((u) => u.sword).length} 把`);
+  Check(roster.every((u) => ["cover", "fire", "withdraw", "blast"].includes(u.wave)), "每个人都分到一拨");
+  const waveShare = Object.fromEntries(K.waves.map((w) => [w.id, roster.filter((u) => u.wave === w.id).length / roster.length]));
+  Check(K.waves.every((w) => Math.abs(waveShare[w.id] - w.share) < 0.02), `分拨占比 ${JSON.stringify(waveShare)}`);
+  // 站位：站得住、不压真 AI 的名册位、不互相叠
+  const r2 = [...FAR_BANK_REAL, ...FAR_BANK_SHORE_A, ...FAR_BANK_SHORE_B, ...FAR_BANK_STANDBY];
+  const overlapBad = [], groundBad = [], r2Bad = [], packBad = [];
+  for (const u of roster) {
+    const g = CrowdGroundY(u.post.x, u.post.z, Ground);
+    if (Overlap(u.post.x, u.post.z, 0.4).length) overlapBad.push(`${u.id}@${u.post.x},${u.post.z}:${Overlap(u.post.x, u.post.z, 0.4)}`);
+    const around = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => CrowdGroundY(u.post.x + dx, u.post.z + dz, Ground));
+    if (g < -0.6 || (g !== Bridge.deckTopY && Math.max(g, ...around) - Math.min(g, ...around) > 0.9)) groundBad.push(`${u.id}:${g.toFixed(2)}`);
+    if (r2.some((p) => Distance(p, u.post) < 1.2)) r2Bad.push(u.id);
+  }
+  for (let i = 0; i < roster.length; i++) for (let j = i + 1; j < roster.length; j++) if (Distance(roster[i].post, roster[j].post) < 0.62) packBad.push(`${roster[i].id}/${roster[j].id}`);
+  Check(overlapBad.length === 0, `视觉人群站位不埋在实心体块里：${overlapBad.slice(0, 4)}（${overlapBad.length}）`);
+  Check(groundBad.length === 0, `视觉人群脚下地面平、不在壕里：${groundBad.slice(0, 4)}（${groundBad.length}）`);
+  Check(r2Bad.length === 0, `不压真 AI / 脚本兵的名册位：${r2Bad.slice(0, 4)}`);
+  Check(packBad.length === 0, `人与人间距 ≥ 0.62 m：${packBad.slice(0, 4)}（${packBad.length}）`);
+  // 战车让路：岸线几排不压两辆岸边战车的车体
+  for (const t of FAR_BANK_TANKS.filter((tank) => tank.kind !== "bridge")) {
+    const tz = FarBankShoreZ(t.x) - t.backM;
+    const clash = roster.filter((u) => Math.abs(u.post.x - t.x) < 1.6 && Math.abs(u.post.z - tz) < 2.9);
+    Check(clash.length === 0, `${t.id} 车体上没有人：${clash.map((u) => u.id)}`);
+  }
+  // 路线：逐 0.5 m 量净空（0.4 m 内无实心件、地面不低于 −0.6 m）
+  const routeBad = new Set();
+  let longest = 0;
+  for (const u of roster) {
+    const path = [{ x: FAR_BANK_CROWD_AXIS_X + u.lane, z: FAR_BANK_CROWD_SPAWN_Z }, ...u.route];
+    let L = 0;
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1], b = path[i], d = Distance(a, b); L += d;
+      for (let k = 0; k <= d; k += 0.5) {
+        const t = d ? k / d : 0, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+        if (Overlap(x, z, 0.4).length) routeBad.add(`${u.id}:${Overlap(x, z, 0.4)[0]}@${x.toFixed(0)},${z.toFixed(0)}`);
+        if (CrowdGroundY(x, z, Ground) < -0.6) routeBad.add(`${u.id}:trench@${x.toFixed(0)},${z.toFixed(0)}`);
+      }
+    }
+    longest = Math.max(longest, L);
+  }
+  Check(routeBad.size === 0, `视觉人群的路线畅通：${[...routeBad].slice(0, 5)}（${routeBad.size}）`);
+  Check(longest / K.runMps < 60, `最长的一条路跑 ${(longest / K.runMps).toFixed(0)} s < 60 s（第一拨在射位站姿的 60 s 观察点前到齐）`);
+  // 出生点在视线外：离射位 ≥ 150 m
+  Check(Distance({ x: FAR_BANK_CROWD_AXIS_X, z: FAR_BANK_CROWD_SPAWN_Z }, A.bridgeCover) >= 150, "出生点离射位 ≥ 150 m");
+  // 桥面上的人在桥面净宽里，z 在 SpanNorth / SpanMid（起爆杀伤圈 z ≥ 135 以北），排在 R2 人堆（z ≥ 120）之后
+  for (const u of kinds("bridge")) Check(Math.abs(u.post.x - Bridge.x) <= Bridge.deckW / 2 - 0.3 && u.post.z >= 92 && u.post.z < 118, `${u.id} 在桥面净宽里、桥北两孔、R2 人堆之后 (${u.post.x}, ${u.post.z})`);
+
+  // 替身宿主：时间线
+  const sink = { pushes: [], Push(kind, position, yaw, scale, prone, dead, pose) { this.pushes.push({ kind, x: position.x, y: position.y, z: position.z, pose }); } };
+  const view = { visible: () => true };
+  const crowd = new FarBankCrowd({ ground: Ground, targets: { west: [{ x: -100, z: 165, h: 0.4, r: 2 }], east: [{ x: -60, z: 165, h: 0.4, r: 2 }] } });
+  const dt = 1 / 20;
+  const Tick = (seconds, ctx) => { for (let i = 0; i < Math.round(seconds / dt); i++) { crowd.Update(dt, ctx); sink.pushes.length = 0; crowd.Draw(sink, view); } };
+  crowd.Update(dt, {});
+  Check(crowd.State().onField === 0, "没 Start 之前一个人也没有");
+  crowd.Start(false);
+  Tick(20, { tier: "contact" });
+  let cs = crowd.State();
+  Check(cs.onField > 60 && cs.running > 40, `Cover +20 s：上场 ${cs.onField}、在路上 ${cs.running}（纵队沿路堤涌来）`);
+  Check(sink.pushes.length === cs.onField && sink.pushes.every((p) => p.kind === "ija"), "每个上场的人这一帧 Push 一次（ija 姿势桶）");
+  Check(sink.pushes.some((p) => p.pose.moveSpeedMps > 1 && Number.isFinite(p.pose.phase)), "跑动的人带步态相位（跑步翻页桶）");
+  Tick(40, { tier: "contact" });
+  cs = crowd.State();
+  Check(cs.arrived >= 100 && cs.holding >= 100, `Cover +60 s：到位 ${cs.arrived}、在位 ${cs.holding}`);
+  const stances = new Set(sink.pushes.filter((p) => !(p.pose.moveSpeedMps > 0)).map((p) => p.pose.stance));
+  Check(stances.has(0) && stances.has(1) && stances.has(2), "在位的人有站、跪、卧三种姿势");
+  Check(cs.flashes > 100, `枪口焰事件 ${cs.flashes} 个（contact 档 ${K.flashHz.contact} Hz）`);
+  crowd.TakeShots();
+  Tick(3, { tier: "contact" });
+  const shots2 = crowd.TakeShots();
+  Check(shots2.length >= 15 && shots2.length <= 40, `contact 档 3 s 出 ${shots2.length} 个枪口焰事件`);
+  Check(shots2.every((e) => e.to.z > 150 && Math.abs(Math.hypot(e.dir.x, e.dir.y, e.dir.z) - 1) < 1e-6 && e.from.y > 0), "枪口焰朝南岸、方向是单位向量");
+  Tick(3, { tier: "far" }); const farShots = crowd.TakeShots();
+  Tick(3, { tier: "out" }); const outShots = crowd.TakeShots();
+  Check(farShots.length < shots2.length / 2 && outShots.length === 0, `far 档减半（${farShots.length}）、out 档不开火（${outShots.length}）`);
+  // 分拨：fire / withdraw 事实放行下一拨；blast 拨在起爆之后
+  Check(crowd.State().waves.fire != null, "fire 拨在 fireFallbackS 之后放行");
+  Check(crowd.State().waves.withdraw == null && crowd.State().waves.blast == null, "withdraw / blast 拨还没放");
+  Tick(2, { tier: "contact", withdraw: true });
+  Check(crowd.State().waves.withdraw != null, "BridgeWithdraw 放 withdraw 拨");
+  Tick(25, { tier: "contact", withdraw: true });
+  cs = crowd.State();
+  Check(cs.onField === roster.filter((u) => u.wave !== "blast").length, `起爆前上场 ${cs.onField} = 三拨 ${roster.filter((u) => u.wave !== "blast").length}`);
+  // 起爆：duckM 内的人趴下，随后爬起来；blast 拨在 blastTrickleDelayS 后放
+  crowd.OnBridgeBlast();
+  Check(crowd.State().ducked > 100, `起爆：${crowd.State().ducked} 人趴下`);
+  sink.pushes.length = 0; crowd.Draw(sink, view);
+  Check(sink.pushes.filter((p) => p.pose.stance === 2).length > 100, "趴下的人画成卧姿桶");
+  Tick(K.duckS + K.duckJitterS + 1, { tier: "contact", withdraw: true });
+  Check(crowd.units.filter((u) => u.mode === "duck").length === 0, "趴完了都爬起来接着打");
+  Tick(K.blastTrickleDelayS + 1, { tier: "contact", withdraw: true });
+  Check(crowd.State().waves.blast != null, "起爆之后最后一拨仍在涌来");
+  Tick(70, { tier: "contact", withdraw: true });
+  cs = crowd.State();
+  Check(cs.onField === roster.length && cs.running === 0, `桥断后 ${cs.onField}/${roster.length} 人全在位（还在路上 ${cs.running}）`);
+  Check(crowd.units.every((u) => u.z <= FarBankShoreZ(u.x) + 0.5 || u.kind === "bridge"), "没有人越过岸沿（桥头纵队在桥面上）");
+  Check(crowd.units.every((u) => u.z < 135.5), "没有人到被炸孔上（z ≥ 136）");
+  // 视野估计：射位站姿 1280×720、垂直视场 62°（水平 ≈ 96°）内，投影身高 ≥ 6 px 的人（身高 1.7 m，焦距 = 360 / tan(vfov/2)）
+  const cam = { x: A.bridgeCover.x, y: Ground(A.bridgeCover.x, A.bridgeCover.z) + 1.65, z: A.bridgeCover.z };
+  const yaw = Math.atan2(cam.x - (-77), cam.z - 86), vfov = 62 * Math.PI / 180, focal = 360 / Math.tan(vfov / 2), hHalf = Math.atan(Math.tan(vfov / 2) * 16 / 9);
+  const visible = (u) => {
+    const dx = u.x - cam.x, dz = u.z - cam.z, dist = Math.hypot(dx, dz);
+    const bearing = Math.atan2(-dx, -dz) - yaw, b = Math.atan2(Math.sin(bearing), Math.cos(bearing));
+    return Math.abs(b) < hHalf && 1.7 * focal / dist >= 6;
+  };
+  const shown = crowd.units.filter(visible).length;
+  Check(shown >= 60, `射位默认视野里 ≥ 6 px 高的视觉人群 ${shown} ≥ 60（另有真 AI 与脚本兵）`);
+  // 撤场：Retire 之后一个人也不画
+  crowd.Retire(); sink.pushes.length = 0; crowd.Draw(sink, view);
+  Check(sink.pushes.length === 0 && crowd.State().onField === 0, "Retire 之后一个人也不画");
+  // 阶段跳转直接落在 BridgeWithdraw：所有人直接在位
+  const inst = new FarBankCrowd({ ground: Ground, targets: { west: [], east: [] } });
+  inst.Start(true);
+  Check(inst.State().onField === inst.units.length && inst.State().running === 0, "instant：阶段跳转后所有人直接在位");
+  Check(inst.Bearers().length === inst.units.filter((u) => u.flag || u.sword).length, "旗与刀的持有人都在场上");
 }
 
 console.log(`ok 18 对岸步坦部队：数据几何、纯规则、替身宿主时间线（${checks} 项）`);

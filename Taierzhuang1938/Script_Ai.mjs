@@ -152,6 +152,7 @@ let nextId = 1;
 const _cullFrustum = new THREE.Frustum();
 const _cullMatrix = new THREE.Matrix4();
 const _cullSphere = new THREE.Sphere(new THREE.Vector3(), ACTOR_DETAIL.boundRadiusM);
+const _crowdSphere = new THREE.Sphere(new THREE.Vector3(), 1.6);
 
 /**
  * 屏幕上只有二十来像素高的人不需要 60 Hz 解十三个关节。位移与转向仍每帧同步，
@@ -636,6 +637,8 @@ export class AiDirector {
     this.ctx = ctx;
     this.soldiers = [];
     this.maxAlive = maxAlive;
+    /** 关卡往远景层里额外画人的口（纯视觉的人群，不进 soldiers、不占 actorPool）：AddCrowdProvider。 */
+    this.crowdProviders = new Set();
     /**
      * 城墙以内的可站矩形。**任何一侧的兵都不许被放到墙外去。**
      *
@@ -1822,7 +1825,24 @@ export class AiDirector {
         s.actor.SetCrowdHitboxes?.(bucket?.hitboxes, crowd.LastTransform);
       }
     }
+    // 关卡的纯视觉人群（18 对岸的步坦部队）：与 AI 兵共用同一层批渲染，在 End 之前把自己的人 Push 进来。
+    if (crowd && this.crowdProviders.size) {
+      const view = this._crowdView || (this._crowdView = { camera: null, time: 0, visible: (x, y, z, r = 1.6) => {
+        _crowdSphere.center.set(x, y, z); _crowdSphere.radius = r; return _cullFrustum.intersectsSphere(_crowdSphere);
+      } });
+      view.camera = camera; view.time = this.time;
+      for (const provide of this.crowdProviders) provide(crowd, view);
+    }
     if (crowd) crowd.End();
+  }
+
+  /**
+   * 远景层的额外供人口：provide(crowd, view) 在每帧 CullActors 的 Begin 与 End 之间被调用，
+   * crowd.Push(...) 放人；view.visible(x, y, z, r) 是这一帧的视锥判定。返回撤掉它的函数。
+   */
+  AddCrowdProvider(provide) {
+    this.crowdProviders.add(provide);
+    return () => this.crowdProviders.delete(provide);
   }
 
   /**
@@ -5304,6 +5324,7 @@ export class AiDirector {
     this.coversSource = null;
     if (this.crowd) this.crowd.Dispose();
     this.crowd = undefined;
+    this.crowdProviders.clear();
   }
 }
 

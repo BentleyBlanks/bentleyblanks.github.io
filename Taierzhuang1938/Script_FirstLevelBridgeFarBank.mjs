@@ -29,6 +29,7 @@ import {
   FAR_BANK_RUSH, FarBankRushSlot, FAR_BANK_FIRE_POINTS, FAR_BANK_FIRE_LISTS, FAR_BANK_TANKS, FAR_BANK_SHELL_SPOTS,
   FAR_BANK_REINFORCE, FAR_BANK_PLAYER_ROUTE_KEYS, FAR_BANK_BLAST, FarBankShoreZ, FarBankPoint,
 } from "./Data_FirstLevelBridgeFarBank.mjs";
+import { FarBankCrowd } from "./Script_FirstLevelFarBankCrowd.mjs";
 
 const T = END_TUNING.farBank;
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -142,6 +143,10 @@ export class FirstLevelFarBank {
   }
   Reset() {
     this.Clear();
+    // 纯视觉的远景人群（规模感，docs §10）：不占 actorPool；枪口焰 / 曳光朝南岸授权点里的岸边与堤顶点打。
+    this.crowd?.Dispose?.();
+    const targetsOf = (key) => FarBankFireList(key).filter((p) => !/^(deck|pier|axis)/.test(p.id));
+    this.crowd = new FarBankCrowd({ ground: (x, z) => this.Ground(x, z), targets: { west: targetsOf("west"), east: targetsOf("east") } });
     this.t = 0;
     this.step = null;
     this.started = false;
@@ -189,6 +194,7 @@ export class FirstLevelFarBank {
   /** 黑屏里对岸单位全部收走（PlaceNightArrival 调）。 */
   Retire() {
     this.Clear();
+    this.crowd.Retire();
     this.retired = true; this.phase = "retired";
   }
   /** 玩家阵亡重来：分档计时清零（单位不动，重来点仍在同一步骤里）。 */
@@ -214,6 +220,7 @@ export class FirstLevelFarBank {
   OnBridgeBlast() {
     if (this.blast || this.retired) return;
     this.blast = { at: this.t, killed: 0, prone: 0, done: false };
+    this.crowd.OnBridgeBlast();
   }
   RushUnits() { return this.units.filter((u) => u.rushSlot != null); }
 
@@ -223,6 +230,7 @@ export class FirstLevelFarBank {
   Start(instant) {
     if (this.started) return;
     this.started = true; this.startedAt = this.t; this.phase = "gather";
+    this.crowd.Start(instant);
     const stagger = T.waveStaggerS;
     let n = 0;
     const walkIn = (spec, kind, extra = {}) => {
@@ -242,7 +250,7 @@ export class FirstLevelFarBank {
     const pushGoal = { x: spec.x, z: shore - spec.pushBackM };
     const route = instant ? [] : (spec.via || []).map(([x, back]) => ({ x, z: FarBankShoreZ(x) - back }));
     const tank = {
-      id: spec.id, spec, index, x: spec.x, z: instant ? post.z : shore - T.tankStartBackM, hullYaw: Math.PI, turretYaw: Math.PI,
+      id: spec.id, spec, index, x: instant ? spec.x : (spec.startX ?? spec.x), z: instant ? post.z : shore - T.tankStartBackM, hullYaw: Math.PI, turretYaw: Math.PI,
       gunPitch: 0.03, recoil: 0, speed: 0, pivotRate: 0, rpm: 0, load: 0, hullPitch: 0,
       state: "queued", startAt: Infinity, route, post, pushGoal, pushed: false, visible: false,
       aim: { x: FAR_BANK_BLAST.centre.x, z: FAR_BANK_BLAST.centre.z + 20 }, pending: null,
@@ -278,6 +286,7 @@ export class FirstLevelFarBank {
     // 坦克推到岸边。
     for (const tank of this.tanks) {
       if (tank.state === "queued" && tank.spec.enter === "BridgeCover") { tank.startAt = this.t; }
+      if (tank.spec.kind === "bridge") continue;   // 桥面上那辆：起爆之后才往前开（UpdateBridgeTank）
       tank.pushed = true;
       if (tank.state === "posted") tank.state = "push";
     }
@@ -624,6 +633,19 @@ export class FirstLevelFarBank {
   // 战车
   // -------------------------------------------------------------------------
   Ground(x, z) { return this.r.battlefield?.GroundHeight?.(x, z) ?? 0; }
+  /**
+   * 桥面上那辆（spec.kind "bridge"）：BridgeCover 起停在桥北孔（z 100），起爆之后等 blastAdvanceWaitS 秒、
+   * 桥面上没有己方了（回岸边的冲桥组与人堆走清；最多等 blastAdvanceMaxS），再往前开到断口北侧（spec.blastPostZ）停下，炮口仍对着南岸。
+   */
+  UpdateBridgeTank(tank) {
+    if (tank.spec.kind !== "bridge" || tank.advanced || !this.blast?.done) return;
+    const waited = this.t - this.blast.at;
+    if (waited < T.blastAdvanceWaitS) return;
+    const onDeck = this.units.some((u) => u.actor?.alive && Math.abs(u.actor.position.x - AXIS_X) <= 3.4 && u.actor.position.z >= tank.z - 3 && u.actor.position.z <= tank.spec.blastPostZ + 5);
+    if (onDeck && waited < T.blastAdvanceMaxS) return;
+    tank.advanced = true; tank.pushGoal = { x: tank.spec.x, z: tank.spec.blastPostZ }; tank.pushed = true;
+    if (tank.state === "posted") tank.state = "push";
+  }
   StepTank(tank, dt) {
     if (tank.state === "queued") {
       if (this.t >= tank.startAt) { tank.state = "approach"; tank.visible = true; }
@@ -692,7 +714,8 @@ export class FirstLevelFarBank {
     const tier = this.tier;
     if (tier === "out") { tank.pending = null; return; }
     // ---- 主炮：BridgeWithdraw 起（推到岸边之后）炮击安全落点 ----
-    const shelling = this.withdrawBegun && step !== "BridgeOrders";
+    // 桥面上那辆（axisFire）在桁架里，主炮的弹道出不去（桥轴上南岸 10 m 内还站着己方），只打机枪曳光。
+    const shelling = this.withdrawBegun && step !== "BridgeOrders" && !tank.spec.axisFire;
     if (tank.pending) {
       const p = tank.pending;
       tank.aim = { x: p.spot.x, z: p.spot.z };
@@ -736,7 +759,15 @@ export class FirstLevelFarBank {
     const dir = this.vec(at.x - from.x, at.y - from.y, at.z - from.z);
     const len = Math.hypot(dir.x, dir.y, dir.z) || 1;
     if (dir.normalize) dir.normalize(); else { dir.x /= len; dir.y /= len; dir.z /= len; }
-    r.vfx?.MuzzleFlash?.(fromV, dir, { scale: TANK.view?.cannonMuzzleScale ?? 1, kind: "cannon" });
+    // 九十米外一团炮口焰只有几个像素：焰放大、炮口前一圈与车尾后各扬一圈尘（GroundDustRing，与 03–05 的战车同一套，放大到远处读得出）。
+    const V = TANK.view || {}, ring = V.groundRing, big = T.cannonFxScale;
+    r.vfx?.MuzzleFlash?.(fromV, dir, { scale: (V.cannonMuzzleScale ?? 1) * big, kind: "cannon" });
+    if (ring && r.vfx?.GroundDustRing) {
+      const fx = -Math.sin(tank.hullYaw), fz = -Math.cos(tank.hullYaw), ringOpts = { radius: ring.radiusM * big, life: ring.lifeS * 1.3, count: ring.count, minCount: ring.minCount,
+        opacity: Math.min(0.75, ring.opacity * 1.3), sizeStart: ring.sizeStart * big, sizeEnd: ring.sizeEnd.map((v) => v * big), rise: ring.rise, rings: ring.rings };
+      r.vfx.GroundDustRing(this.vec(from.x, this.Ground(from.x, from.z), from.z), dir, ringOpts);
+      r.vfx.GroundDustRing(this.vec(tank.x - fx * 2.6, this.Ground(tank.x, tank.z), tank.z - fz * 2.6), this.vec(-fx, 0, -fz), ringOpts);
+    }
     this.deps.sound?.OnCannon?.({ x: from.x, y: from.y, z: from.z }, { x: land.x, y: spotY, z: land.z }, T.tankShellFlightS);
     r.combat.FireShell(fromV, at, {
       flight: T.tankShellFlightS, kind: "Shell57", report: !this.deps.sound, radius: T.tankShellRadiusM, damage: 0, feedbackOnly: true,
@@ -772,7 +803,7 @@ export class FirstLevelFarBank {
     }
     if (this.t < tank.nextMgAt) return;
     // 新一串：朝南岸沙滩 / 堤顶的授权点（不打玩家附近的点：这些点都离射位 ≥ 12 m）
-    const west = tank.spec.x < AXIS_X, list = FarBankFireList(west ? "west" : "east");
+    const west = tank.spec.x < AXIS_X, list = FarBankFireList(tank.spec.axisFire ? "axis" : west ? "west" : "east");
     const p = list[Math.floor(this.rnd() * list.length)];
     tank.mgTarget = p; tank.aim = { x: p.x, z: p.z };
     if ((tank.aimGap ?? 1) > 0.3) { tank.nextMgAt = this.t + 0.4; return; }
@@ -845,7 +876,9 @@ export class FirstLevelFarBank {
     if (this.rush?.started && !this.crowdStarted && !this.blast && this.t >= this.rush.goAt + T.crowdDelayS) this.StartCrowd();
     for (const unit of this.units) this.UpdateUnit(unit, dt);
     this.UpdateBlast();
-    for (const tank of this.tanks) { this.StepTank(tank, dt); this.UpdateTankFire(tank, step); }
+    for (const tank of this.tanks) { this.UpdateBridgeTank(tank); this.StepTank(tank, dt); this.UpdateTankFire(tank, step); }
+    this.crowd.Update(dt, { tier: this.tier, fireBroken: !!r.Has?.("bridgeFireBroken"), withdraw: this.withdrawBegun });
+    for (const shot of this.crowd.TakeShots()) this.deps.crowdShot?.(shot);
     this.ApplyFlags();
     this.ApplyAmbient();
     this.UpdateReinforce();
@@ -893,7 +926,7 @@ export class FirstLevelFarBank {
       shells: { fired: this.shell.fired, withheld: this.shell.withheld, aborted: this.shell.aborted,
         minPlayerM: Number.isFinite(this.shell.minPlayerM) ? Number(this.shell.minPlayerM.toFixed(1)) : null,
         minFriendlyM: Number.isFinite(this.shell.minFriendlyM) ? Number(this.shell.minFriendlyM.toFixed(1)) : null, log: this.shell.log.slice(-12) },
-      mg: { ...this.mg },
+      mg: { ...this.mg }, crowd: this.crowd.State(),
       tanks: this.tanks.map((t) => ({ id: t.id, state: t.state, x: Number(t.x.toFixed(1)), z: Number(t.z.toFixed(1)), speed: Number(t.speed.toFixed(2)), shots: t.shots, mgBursts: t.mgBursts })),
       out: { ...this.out, blindS: Number(this.out.blindS.toFixed(1)), dz: Number((this.out.dz || 0).toFixed(1)) },
     };

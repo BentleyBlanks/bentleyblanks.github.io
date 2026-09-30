@@ -90,6 +90,8 @@ import { FirstLevelNightGate } from "./Script_FirstLevelNightGate.mjs";
 // 18 对岸日军步坦部队（规则零 three，傀儡战车表现层带 three）：docs/Data_FirstLevelBridgeFarBank.md。
 import { FirstLevelFarBank } from "./Script_FirstLevelBridgeFarBank.mjs";
 import { FarBankTankView } from "./Script_FirstLevelFarBankView.mjs";
+import { FarBankCrowdView } from "./Script_FirstLevelFarBankCrowdView.mjs";
+import { CrowdGroundY } from "./Data_FirstLevelFarBankCrowd.mjs";
 import { FirstLevelNightLights } from "./Script_FirstLevelNightLights.mjs";
 import { OpeningSet } from "./Script_OpeningSet.mjs";
 import { RailBridgeSet } from "./Script_RailBridgeSet.mjs";
@@ -266,13 +268,18 @@ export class FirstLevelMissionRuntime {
     this.nightGate = new FirstLevelNightGate(this);
     // 18 对岸的步坦部队：规则在 farBank（零 three），三辆傀儡战车画在 farBankView（挂在任务白盒根下）。
     this.farBankView = new FarBankTankView({ root: this.view.root, battlefield: this.battlefield, physics: this.physics,
-      actorFactory: this.actorFactory, library: this.library, vfx: this.vfx, audio: this.audio });
+      actorFactory: this.actorFactory, library: this.library, vfx: this.vfx, audio: this.audio,
+      groundAt: (x, z) => CrowdGroundY(x, z, (a, b) => this.battlefield.GroundHeight(a, b)) });
+    // 对岸的纯视觉人群（规模感）：旗 / 刀 / 枪口焰在 farBankCrowdView，人本身由 AI 的远景批渲染层画（不占 actorPool）。
+    this.farBankCrowdView = new FarBankCrowdView({ root: this.view.root, vfx: this.vfx });
     this.farBank = new FirstLevelFarBank(this, {
       vec: (x, y, z) => new THREE.Vector3(x, y, z),
+      crowdShot: (shot) => this.farBankCrowdView.Shot(shot, (x, y, z) => new THREE.Vector3(x, y, z)),
       muzzle: (tank, kind) => this.farBankView.Muzzle(tank, kind),
       tankCollider: (tank) => this.farBankView.Collider(tank),
       sound: this.audio ? { OnCannon: (from, at, flightS) => this.farBankView.Sound?.OnCannon(from, at, flightS) } : null,
     });
+    this.removeFarBankCrowd = this.ai.AddCrowdProvider?.((crowd, view) => this.farBank.crowd.Draw(crowd, view));
     this.leaderGuide = new FirstLevelLeaderGuide(this);
     this.Register();
     // 02 的交互点与玩家实际看到的是同一坐标、同一 HanYang 几何。它不另注册一条
@@ -2642,6 +2649,7 @@ export class FirstLevelMissionRuntime {
     // 对岸部队排在桥之前：Bridge.UpdateWithdraw 在按起爆器前要问 farBank.ReadyForBlast（冲桥组到位没有）。
     if (["BridgeCover", "BridgeWithdraw", "NightMarch"].includes(stage)) this.farBank.Update(dt, stage);
     this.farBankView.Sync(this.farBank.tanks, this.time, this.player.position);
+    this.farBankCrowdView.Sync(this.farBank.crowd, this.time);
     if (["BridgeOrders", "BridgeCover", "BridgeWithdraw"].includes(stage)) this.bridge.Update(dt, stage);
     // --- 18 夜入滕城：先随队走完 marchOut，黑屏里换天，再随队进北门 ---
     this.nightGate.Update(dt, stage);
@@ -2985,6 +2993,8 @@ export class FirstLevelMissionRuntime {
     this.extras.Clear();
     this.farBank?.Dispose();
     this.farBankView?.Dispose();
+    this.removeFarBankCrowd?.();
+    this.farBankCrowdView?.Dispose();
     this.nightLights?.Dispose();
     this.openingSet?.Exit();
     this.railBridgeSet?.Dispose();
