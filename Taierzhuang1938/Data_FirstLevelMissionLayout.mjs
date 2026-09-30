@@ -1,5 +1,5 @@
 import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH, FrontFieldBend } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_RAIL_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES, MISSION_NORTH_RIVER, RiverProfileAt, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_RAIL_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES, MISSION_NORTH_RIVER, RiverWaterAt, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
@@ -437,8 +437,9 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
       { y: (deckBottom + foot) / 2 });
   }
 }
-// 铁路桥（18）。完好件全部是 gate（signal），残骸件是 appearSignal —— 桥被破坏
-// 之后甲板连同可走面一起撤掉，人再也过不去（河槽底在 -4.2）。
+// 铁路桥（18）。2026-09-30 起是三孔桥（南桥台 → 1 号墩 → 2 号墩 → 3 号墩 → 北桥台，见 MISSION_RAIL_BRIDGE）。
+// 被炸的最南一孔（RailBridgeDeck / Truss / Rail 完好件全部是 gate，signal；残骸件是 appearSignal）：
+// 桥被破坏之后这一孔连同可走面一起撤掉，人再也过不去（河槽底在 -4.2）。另两孔、南引桥段与三个桥墩是永久体块。
 {
   const B = MISSION_RAIL_BRIDGE, deckBottom = B.deckTopY - B.deckH;
   const deck = Block("RailBridgeDeck", B.x, B.z, B.deckW, B.deckH, B.deckHalfD * 2, "structure",
@@ -450,10 +451,28 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
     gates.push({ id: `RailBridgeTruss${side < 0 ? "West" : "East"}`, x: B.x + side * B.trussOffsetX,
       y: B.deckTopY + B.trussH / 2, z: B.z, w: B.trussW, h: B.trussH, d: B.deckHalfD * 2 - 2,
       semantic: "metal", signal: B.signal });
-    // 桥面直轨：道砟与轨在 gapZ 断开，这两段把轨接过河。
+    // 桥面直轨：道砟与轨在 gapZ 断开，这两段把轨接过被炸的那一孔。
     gates.push({ id: `RailBridgeRail${side < 0 ? "West" : "East"}`, x: B.x + side * B.railGaugeHalf,
       y: B.deckTopY + 0.065, z: B.z, w: 0.08, h: 0.13, d: B.deckHalfD * 2 - 1,
       semantic: "metal", signal: B.signal });
+  }
+  // 永久部分：另两孔与南引桥段的桥面（可走）、桁架、直轨。
+  for (const [id, z0, z1, truss] of [["RailBridgeSpanMid", 136, 112, true], ["RailBridgeSpanNorth", 112, 86, true],
+    ["RailBridgeApproachSouth", B.approachSouth.z0, B.approachSouth.z1, false]]) {
+    const z = (z0 + z1) / 2, d = Math.abs(z1 - z0), north = id === "RailBridgeSpanNorth";
+    surfaces.push(Block(`${id}Deck`, B.x, z, B.deckW, B.deckH, d, "structure", { y: B.deckTopY - B.deckH / 2 }));
+    for (const side of [-1, 1]) {
+      const sideId = side < 0 ? "West" : "East";
+      // 北孔的桁架只盖 24 m 的钢梁段（z 88..112），台后那 2 m 引道没有桁架。
+      if (truss) Block(`${id}Truss${sideId}`, B.x + side * B.trussOffsetX, north ? 100 : z,
+        B.trussW, B.trussH, north ? 22 : d - 2, "metal", { y: B.deckTopY + B.trussH / 2 });
+      Block(`${id}Rail${sideId}`, B.x + side * B.railGaugeHalf, z, 0.08, 0.13, d - 1, "metal", { y: B.deckTopY + 0.065 });
+    }
+  }
+  // 三个石墩：永久实体，顶在桥面下（甲板上走人的净空不受影响）。1 号墩立在南岸沙滩水边。
+  for (const pier of B.piers) {
+    const foot = SampleMissionTerrain(B.x, pier.z) - 0.3, top = deckBottom - 0.02;
+    Block(`RailBridge${pier.id}`, B.x, pier.z, B.pierW, top - foot, B.pierD, "structure", { y: (top + foot) / 2 });
   }
   // 桥台做成两侧的翼墙而不是一整道：桥面下的实心盒会被路线净空判成「挡住尾队」
   // （可走面只豁免甲板本身），翼墙让开 x=-77 的中线。
@@ -470,8 +489,8 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
     semantic: "structure", appearSignal: B.signal });
   gates.push({ id: "RailBridgeWreckTruss", x: B.x - 2.4, y: floor + 1.5, z: B.z - 6, w: 0.6, h: 3, d: 12,
     semantic: "metal", appearSignal: B.signal });
-  // 北桥头的断板：炸完之后堵在引道上，人走到这儿就到头了（不是「走过去掉下河」）。
-  gates.push({ id: "RailBridgeWreckStub", x: B.x, y: deckBottom + 0.75, z: B.z - B.deckHalfD + 3.5,
+  // 被炸孔北端（2 号墩南面）的断板：炸完之后挂在中孔桥面的南头，人从北面走到这儿就到头了（不是「走过去掉下河」）。
+  gates.push({ id: "RailBridgeWreckStub", x: B.x, y: deckBottom + 0.75, z: B.z - B.deckHalfD + 1.5,
     w: B.deckW, h: 1.5, d: 3, semantic: "earthDark", appearSignal: B.signal });
 }
 // ---------------------------------------------------------------------------
@@ -491,21 +510,25 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
  * 两座桥下连续：路桥甲板底在 +0.0、铁路桥甲板底在 +0.11，水面在 −3 m 上下。
  */
 {
-  const RIVER = MISSION_NORTH_RIVER, SEG = 6, LEVEL = 1.2;
-  for (let x = -192; x <= 132; x += SEG) {
-    const profile = RiverProfileAt(x, RIVER);
-    if (profile.depth < 3) continue;                       // 浅滩：露滩地，不铺水
-    const halfW = Math.min(7.5, profile.floorHalfW - 3.5);
-    if (halfW < 1) continue;
+  // 水面：原断面沿槽底铺（枯水位 = 槽底以上 1.2 m，半宽 min(7.5, floorHalfW−3.5)）；拓宽河段（RailBridgeReach，
+  // x −140…−30 及两端各 20 m 过渡）水面按 RiverWaterAt 铺：水位在南岸自然地面下 1.25 m、宽约 66 m，
+  // 水线取断面上正好没水的位置，边缘再各伸进岸里 0.5 m 埋住。每块的 x 宽（河段附近 4 m，其余 6 m）。
+  const RIVER = MISSION_NORTH_RIVER, REACH = RIVER.reaches[0];
+  const Near = (x) => x > REACH.x0 - REACH.blendM - 6 && x < REACH.x1 + REACH.blendM + 6;
+  for (let x = -192; x <= 132; x += Near(x) ? 4 : 6) {
+    const water = RiverWaterAt(x, RIVER);
+    if (!water) continue;                                   // 浅滩：露滩地，不铺水
+    const seg = Near(x) ? 4 : 6, z0 = water.z0 - (water.reach ? 0.5 : 0), z1 = water.z1 + (water.reach ? 0.5 : 0);
+    const top = SampleMissionNaturalHeight(x, RIVER.z) + water.level;
     Block(`NorthRiverWater${Math.round(x) < 0 ? "W" : "E"}${Math.abs(Math.round(x))}`,
-      x, RIVER.z, SEG + 0.2, 0.14, halfW * 2, "water",
-      { y: SampleMissionTerrain(x, RIVER.z) + LEVEL, solid: false });
+      x, (z0 + z1) / 2, seg + 0.2, 0.14, z1 - z0, "water", { y: top - 0.07, solid: false });
   }
-  // 水边的芦苇丛：给河一条读得出来的边。踩在水线外 0.6 m 的干滩上、顶过水面
-  // 0.6 m（不然一丛比水面还矮的草在水边读不出来）。不带碰撞。
-  for (const [i, x] of [-150, -108, -60, 18, 66, 92, 118].entries()) for (const side of [-1, 1]) {
-    const halfW = Math.min(7.5, RiverProfileAt(x, RIVER).floorHalfW - 3.5);
-    const z = RIVER.z + side * (halfW + 0.6);
+  // 水边的芦苇丛：给河一条读得出来的边。踩在水线外 0.6 m、顶过水面 0.6 m（不然一丛比水面还矮的草
+  // 在水边读不出来）。不带碰撞。拓宽段的芦苇落在新水线外：北岸坡脚与南岸沙滩边。
+  for (const [i, x] of [-150, -132, -108, -92, -60, -44, 18, 66, 92, 118].entries()) for (const side of [-1, 1]) {
+    const water = RiverWaterAt(x, RIVER);
+    if (!water) continue;
+    const z = side < 0 ? water.z0 - 0.6 - (water.reach ? 0.6 : 0) : water.z1 + 0.6 + (water.reach ? 0.6 : 0);
     Detail(`NorthRiverReeds${i}${side < 0 ? "N" : "S"}`, x, z, 3.4, 1.9, 1.2, "foliage",
       { y: SampleMissionTerrain(x, z) + 0.95 });
   }
@@ -514,8 +537,9 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
 GroundedWall("BridgeSouthCoverWest", -82.5, 177.6, 9, 1.3, 0.8);
 GroundedWall("BridgeSouthCoverEast", -64.5, 178.4, 9, 1.45, 0.8);
 // 北岸土坎：敌军火力位（bridgeEnemy 在它北边，隔着土坎对射）。铁路那一段留缺口。
-GroundedWall("BridgeNorthRidgeWest", -87, 132.2, 10, 1.45, 1.2);
-GroundedWall("BridgeNorthRidgeEast", -66, 132.2, 12, 1.45, 1.2);
+// 2026-09-30 河拓宽：北岸北移 50 m，土坎跟着从 z 132.2 挪到 82.2（离新岸沿 z 90 约 8 m）。
+GroundedWall("BridgeNorthRidgeWest", -87, 82.2, 10, 1.45, 1.2);
+GroundedWall("BridgeNorthRidgeEast", -66, 82.2, 12, 1.45, 1.2);
 // 爆破安全区的遮挡：离桥心 48 m，站姿眼高 1.6 刚好越过它看见桥面。
 GroundedWall("BlastSafeBank", -66, 197.5, 7, 1.35, 0.9);
 // Three separate rearguard pockets turn south after the western ditch mouth.
@@ -617,7 +641,8 @@ FarmSilhouette('VillageEdgeHouse',106,40,16,12,4.4);
 FarmSilhouette('VillageRearHouse',39,65,13,11,4);
 FarmSilhouette('RearFarm',-66,27,13,11,4.1);
 FarmSilhouette('TransferFieldStore',120,126,13,12,4.6);
-FarmSilhouette('WestFieldHouse',-113,99,15,10,4.2);
+// WestFieldHouse 原在 (-113,99)：拓宽后的河槽正好占了那里（civilianAftermath 还按 id 引用它），挪进北岸村子。
+FarmSilhouette('WestFieldHouse',-121,67,15,10,4.2);
 FarmSilhouette('SouthFieldHouse',60,-60,12,9,4);
 FarmSilhouette('RearOrchardHouse',-120,-20,13,11,4.1);
 // Authored tree rows use the supplied dead-tree model, at the original anchors.
@@ -969,14 +994,14 @@ export const MISSION_PLACEMENT = Object.freeze({
   ],
   // 18 铁路桥。
   bridge: {
-    rearColumnForm: [{ x: -77, z: 122 }, { x: -79.4, z: 125.6 }, { x: -74.6, z: 126.4 }],
-    rearColumnGroups: [[{ x: -77, z: 128 }], [{ x: -78.2, z: 131.4 }], [{ x: -75.8, z: 131.8 }]],
+    rearColumnForm: [{ x: -77, z: 72 }, { x: -79.4, z: 75.6 }, { x: -74.6, z: 76.4 }],
+    rearColumnGroups: [[{ x: -77, z: 78 }], [{ x: -78.2, z: 81.4 }], [{ x: -75.8, z: 81.8 }]],
     officer: { x: -73.4, z: 173.6, yaw: Math.PI },
     demolition: [{ x: -80.4, z: 172.2, yaw: Math.PI }, { x: -74.2, z: 171.4, yaw: Math.PI }],
     luoCover: { x: -79.4, z: 180.2, yaw: Math.PI },
     heyoutianCover: { x: -84.2, z: 179, yaw: Math.PI },
-    enemyRidge: [{ x: -68, z: 130.5, yaw: 0 }, { x: -63.4, z: 131, yaw: 0 },
-      { x: -85.6, z: 130.8, yaw: 0 }, { x: -89.2, z: 131.2, yaw: 0 }],
+    enemyRidge: [{ x: -68, z: 80.5, yaw: 0 }, { x: -63.4, z: 81, yaw: 0 },
+      { x: -85.6, z: 80.8, yaw: 0 }, { x: -89.2, z: 81.2, yaw: 0 }],
   },
   // 关尾北门夜景（NightGateShown 之前这一片根本不存在）。
   night: {

@@ -102,7 +102,7 @@ export const MISSION_AREA_STEPS = Object.freeze({
     note: "18 接令：人在院里 / 厢房，令一下就沿 toBridge 出后门" }),
   BridgeCover: Area({ polygons: [RECEPTION_YARD], routes: [{ key: "toBridge" }],
     discs: [{ anchor: "bridgeCover", r: 35 }, { anchor: "railBridge", r: 22 }],
-    note: "18 南岸射位与铁路桥桥面（北岸土坎 z≈130 是敌人的，不在里面）" }),
+    note: "18 南岸射位与铁路桥桥面（北岸土坎 z≈80 是敌人的，不在里面；railBridge 盘是被炸那一孔的桥面）" }),
   BridgeWithdraw: Area({ routes: [{ key: "bridgeWithdraw" }, { key: "marchOut" }], discs: [{ anchor: "bridgeCover" }, { anchor: "blastSafe" }],
     note: "18 撤出爆破区到安全区，再随队往南" }),
   NightMarch: Exempt("18 夜行军：先随队走完 marchOut、黑屏里换到夜景、随队进北门"),

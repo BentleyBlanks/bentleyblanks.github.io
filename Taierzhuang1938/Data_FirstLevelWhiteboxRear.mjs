@@ -64,8 +64,8 @@ export function BuildRearWhitebox(groundAt) {
       ["BridgeSouthCoverWest", -82.5, 177.6, 9, 1.3, .8, true, "earthDark"],
       ["BridgeSouthCoverEast", -64.5, 178.4, 9, 1.45, .8, true, "earthDark"],
       ["BlastSafeBank", -66, 197.5, 7, 1.35, .9, true, "earthDark"],
-      ["BridgeNorthRidgeWest", -87, 132.2, 10, 1.45, 1.2, true, "earthDark"],
-      ["BridgeNorthRidgeEast", -66, 132.2, 12, 1.45, 1.2, true, "earthDark"]],
+      ["BridgeNorthRidgeWest", -87, 82.2, 10, 1.45, 1.2, true, "earthDark"],
+      ["BridgeNorthRidgeEast", -66, 82.2, 12, 1.45, 1.2, true, "earthDark"]],
   ];
   replaceBlockIds.push(...RESKIN.map(([id]) => id));
   function Box(list, id, x, z, w, h, d, semantic = "plaster", extra = {}) {
