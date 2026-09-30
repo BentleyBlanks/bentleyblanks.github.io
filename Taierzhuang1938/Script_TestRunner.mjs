@@ -243,6 +243,8 @@ export const testDefs = {
   DeathCollapseTest: { file: "Script_DeathCollapseTest.mjs", timeoutMs: 300000,
     desc: "Kimodo受击倒下：两军四候选、稳定随机、全身贴地与终帧保持" },
   CharacterHitboxMathTest: { file: "Script_CharacterHitboxMathTest.mjs", desc: "人物子弹代理：精确球/胶囊首交点（纯 Node）" },
+  NeckDeathTest: { file: "Script_NeckDeathTest.mjs", desc: "敌军喉咙窒息哽咽：脖子几何 / 刀·枪·阵营·距离·概率闸 / 抽签确定性 / 清单接线（纯 Node，毫秒级）" },
+  NeckDeathBrowserTest: { file: "Script_NeckDeathBrowserTest.mjs", timeoutMs: 300000, desc: "敌军喉咙窒息哽咽真引擎链：近处刀杀/脖子中弹放 neckDeath 并顶替日语痛呼，远/没抽中/让位/脚本 Kill/国军都不放" },
   PlayerDeathTest: {file:"Script_PlayerDeathTest.mjs",desc:"First-person collapse stance/slope/platform/wall continuity and held endpoint"},
   PlayerHitboxTest: { file: "Script_PlayerHitboxTest.mjs", desc: "玩家命中几何：三姿态分段 / 正面部位次序 / 卧倒藏躯干 / 瞄点 / 散点部位分布（纯 Node，毫秒级）" },
   PlayerActorBlockTest: { file: "Script_PlayerActorBlockTest.mjs", desc: "玩家走不进人物身体：正面挡/贴边滑/窄缝/被挤出/豁免（纯 Node）" },
@@ -548,6 +550,7 @@ export const tier0Fast = [
   "CharacterModelTest",
   "CharacterSurfaceTest",
   "CharacterHitboxMathTest",
+  "NeckDeathTest",
   "PlayerHitboxTest",
   "PlayerActorBlockTest",
   "NavRefreshSpreadTest",
@@ -629,7 +632,7 @@ export const domains = {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
-      "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
+      "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "ModelFacingTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
       // 两条都是纯 Node 毫秒级，碰伤害口径或相机的改动连着跑。
       "PlayerHitboxTest", "CameraShakeTest",

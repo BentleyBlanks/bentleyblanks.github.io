@@ -345,6 +345,15 @@ export const SFX_SOURCES = [
     license: "volcengine",
     cuts: [{ cue: "bombWhistle", files: ["AudioSfx_BombWhistle_01.mp3"], durS: 2.78 }],
   },
+  {
+    // 敌军刀杀 / 脖子中弹的窒息哽咽：八条候选里按频段与有声段结构选定 02 与 07（选法与落选理由在烘焙脚本的 NECK_DEATH_PICKS 头注）。
+    id: "NeckDeathSeedAudio",
+    seedAudio: true,
+    bake: "Script_SeedAudioNeckDeathBake.mjs",
+    credit: "Volcengine SeedAudio 1.0 · 喉咙被割开/打穿时的窒息哽咽（NeckDeath_take02.mp3, NeckDeath_take07.mp3） · 2026-09-30",
+    license: "volcengine",
+    cuts: [{ cue: "neckDeath", files: ["AudioSfx_NeckDeath_01.mp3", "AudioSfx_NeckDeath_02.mp3"], durS: 2.26 }],
+  },
   // 序章专用音：按 cue 独立生成，确保缺少外部素材时仍能稳定回退。
   {
     id: "PrologueTrainGenerated",

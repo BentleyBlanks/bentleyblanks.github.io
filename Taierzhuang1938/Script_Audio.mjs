@@ -1785,6 +1785,25 @@ const RECIPES = {
     v.Live(0.7);
   },
 
+  // 喉咙被割开/打穿的窒息哽咽（敌军刀杀 / 脖子中弹倒下，Script_NeckDeath 决定放不放）：
+  // 与 painMoan 同一条路子（低基频过两个共振峰当元音），再加一路慢速幅度抖动当喉头的「咯咯」，
+  // 两口气：一口带音的哽、一口漏气的泄。采样是主料（Script_SeedAudioNeckDeathBake），这里是盖不上时的回落。
+  neckDeath(A, v) {
+    const t = v.t;
+    const f0 = v.F(v.R(120, 150));
+    const src = v.Osc(A.Wave("string"), f0);
+    Glide(src.frequency, t, f0, f0 * 0.7, 1.9);
+    const band = v.Filter("bandpass", 560, 4.2);
+    const lp = v.Filter("lowpass", v.F(1100), 0.8);
+    const bus = v.Gain(FLOOR);
+    Swell(bus.gain, t, 0.3, 0.05, 0.5, 0.35);           // 第一口：带音的哽
+    Swell(bus.gain, t + 1.05, 0.14, 0.08, 0.35, 0.5);   // 第二口：漏气
+    src.connect(band).connect(lp).connect(bus).connect(v.out);
+    v.Start(src, t, 2.0);
+    v.wetGain.gain.value = 0.15;
+    v.Live(2.1);
+  },
+
   // 大出血伤员的持续低声痛呼：**闷的、压着的**，不是惨叫。
   // 低通 900 顶替素材那条「捂着嘴」的天然闷感；中间一次换气靠两段包络。
   painMoan(A, v) {
@@ -2856,6 +2875,7 @@ const NODE_COST = {
   execScream: 9, flareLaunch: 9, flareIgnite: 9,
   flareBurn: 8, telegraphKey: 8, telegraphHum: 8, mgOverheat: 8,
   painMoan: 7, hitGrunt: 7, planeDive: 7, flareOut: 6,
+  neckDeath: 7,
   // 会飞的引擎持续声：三个振荡器 + 拍频 LFO + 滤波 + 两个 gain，整条航线只有一条。
   planeDrone: 9,
   bombWhistle: 8,
@@ -2972,7 +2992,8 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-27：战车机枪单开 tankMg（Warfare Library 通用机枪三条），清单新增一个 cue。
 // 2026-09-27 开场改稿：耳光 slap、反冲锋一片喊杀 chargeCrowd。
 // 2026-09-30：空袭炸弹下落啸声 bombWhistle，清单新增一个 cue。
-export const SFX_PACK_VERSION = "20260930bombwhistle";
+// 2026-09-30：敌军刀杀 / 脖子中弹的窒息哽咽 neckDeath（两变体），清单新增一个 cue。
+export const SFX_PACK_VERSION = "20260930neckdeath";
 // 2026-09-29：清单加了 `bedVariants`（战场远景床的五条无人声候选），戳不动的话浏览器拿着旧清单永远看不到候选。
 export const AMB_PACK_VERSION = "20260929battlebeds";
 /**
@@ -3147,6 +3168,8 @@ const SAMPLE_MIX = {
   // 那一声的作用是让玩家明白里面在干什么，不是展览）；
   // painMoan 更低：它是持续响着的背景，与枪声同量级的话整场只剩这个人在哼。
   hitGrunt: 0.8, execScream: 0.55, painMoan: 0.5,
+  // 敌军窒息哽咽：死在玩家十几米内才放，近处的一声细节，与 hurt 同一档偏下（不盖枪声，也不该听不见）。
+  neckDeath: 0.75,
   // 照明弹一个循环四条。燃烧那条**滞空好几十秒**，所以压到全表最低的一档
   // （比脚步略高）—— 一直在响的东西不能按「一次事件」配平；
   // 发射与点燃是事件，可以站高一点。
@@ -3205,7 +3228,7 @@ const SAMPLE_WET = {
   // 照明弹三条给得多：它们**在两百米的头顶上**，听到的几乎全是反射；
   // 处决那声隔着一堵墙与一个院子，同理。反过来，电键与拉柄就在你手底下，
   // 给了混响就变成「隔壁屋里有人在敲」——贴身的小动作一律近乎全干。
-  execScream: 0.5, painMoan: 0.3, hitGrunt: 0.12,
+  execScream: 0.5, painMoan: 0.3, hitGrunt: 0.12, neckDeath: 0.15,
   flareIgnite: 0.5, flareBurn: 0.45, flareOut: 0.45, flareLaunch: 0.4,
   telegraphKey: 0.06, telegraphHum: 0.05,
   // 远近是两条真的录音，湿度也要分开：300 m 外那一梭子的价值全在尾巴上。

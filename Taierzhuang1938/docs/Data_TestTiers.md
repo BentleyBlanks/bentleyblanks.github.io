@@ -91,6 +91,7 @@ npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目
 | HudPromptTest | HUD 提示纯逻辑 |
 | RiggedModelTest | `.tzm.json` 绑定模型数据 |
 | CharacterModelTest / CharacterHitboxMathTest | 蒙皮角色资产与子弹代理数学 |
+| NeckDeathTest | 敌军喉咙窒息哽咽的规则层（纯 Node，毫秒级） |
 | FractureBakeTest | 预破碎离线数据 |
 | CutsceneControlTest | 过场导演机位与生命周期 |
 | GeoTest / RoadPathTest / WallPlanTest | 几何快路、道路与围墙规划契约；其中 GeoTest 需浏览器，只在门禁档运行 |

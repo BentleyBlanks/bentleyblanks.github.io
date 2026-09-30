@@ -38,6 +38,8 @@ import { TACTICS, INVESTIGATE, SQUAD_REACTION, CHARGE_FOLLOW, MELEE_STALL } from
 // 断肢只借一个数：被卸掉肢体的那一下死亡推力乘多少（docs/Data_Dismemberment.md §8.1）。
 // 判定与执行都在 ctx.gore 那一层，这里不认识 three 以外的任何断肢概念。
 import { DEATH_PUSH_SCALE as GORE_DEATH_PUSH_SCALE } from "./Data_Tuning_Gore.mjs";
+import { NECK_DEATH } from "./Data_NeckDeath.mjs";
+import { IsNeckHit, DecideNeckDeath, NeckDeathRoll } from "./Script_NeckDeath.mjs";
 
 // 发现距离、班组队形、交火距离与人物 LOD 预算全在 `Data_Tuning_Ai.mjs`
 //（每一组的账跟着数搬过去了）。这里按原名 re-export —— 那两个名字是跨系统契约：
@@ -502,8 +504,10 @@ export class Soldier {
    * @param {{limbs:string[], kind?:string, point?:THREE.Vector3}|null} sever
    *   TakeHit 里 `gore.Resolve` 的结论。非空表示这一下要卸肢：`actor.Ragdoll`
    *   之后交给 GoreSystem 执行（口径 docs/Data_Dismemberment.md §8.1）。
+   * @param {{play:boolean, cause:string|null}|null} neckDeath TakeHit 里 `NeckDeathCause` 的结论：
+   *   放不放喉咙里那一声窒息哽咽（docs/Data_NeckDeath.md）。脚本直接 Kill 的不给，照旧走原来的痛呼。
    */
-  Kill(direction, sever = null) {
+  Kill(direction, sever = null, neckDeath = null) {
     if (this.state === STATE.DEAD) return false;
     this.state = STATE.DEAD;
     this.health = 0;
@@ -557,10 +561,40 @@ export class Soldier {
     // 而中弹那句「我遭枪子了」在阵亡处被旁边活着的人认领时，就成了没挨枪的人喊自己中弹。
     const A2 = this.director && this.director.ctx && this.director.ctx.audio;
     if (A2) {
-      A2.Bark("hurt", { position: this.position.clone(), seed: (this.id | 0) + 7, side: this.side,
-        key: this.side === "nra" ? "hurt_scream" : null });
+      // 刀砍死 / 脖子中弹死、又死在玩家近处的日兵，部分会发出喉咙被割开/打穿的窒息哽咽 ——
+      // 那一声顶替原来的日语痛呼（喉咙坏了的人喊不出词）。两声之间隔一小段（minGapS），
+      // 扫倒一排人不至于「咯」成一片；没抢到档的照旧喊。
+      const dir = this.director;
+      if (neckDeath?.play && dir.time - (dir.neckDeathAt ?? -1e9) >= NECK_DEATH.minGapS) {
+        dir.neckDeathAt = dir.time;
+        this.neckDeathCause = neckDeath.cause;
+        const at = this.position.clone(); at.y += 1.45;
+        A2.Play("neckDeath", { position: at, volume: NECK_DEATH.volume });
+      } else {
+        A2.Bark("hurt", { position: this.position.clone(), seed: (this.id | 0) + 7, side: this.side,
+          key: this.side === "nra" ? "hurt_scream" : null });
+      }
     }
     return true;
+  }
+
+  /**
+   * 致死的这一下该不该带出喉咙里那一声（规则在 Script_NeckDeath.mjs）。
+   * 只认真实几何的命中：子弹要有命中体 id（AI 打 AI 那条链不做几何，判不了脖子）；
+   * 刀伤不看部位。剧情里被安排死的（开场分镜的刀杀）与叙事保护的不走这里。
+   */
+  NeckDeathCause(kind, info) {
+    if (this.openingDoomed || this.scriptEssential) return null;
+    const ctx = this.director?.ctx;
+    const from = ctx?.player?.position;
+    if (!ctx?.audio || !from) return null;
+    const neckHit = NECK_DEATH.bulletKinds.includes(kind)
+      && IsNeckHit(this.actor?.characterRig?.GetHitboxes?.(), info?.shapeId, info?.point);
+    const dx = this.position.x - from.x, dy = this.position.y - from.y, dz = this.position.z - from.z;
+    return DecideNeckDeath({
+      side: this.side, kind, neckHit, distanceM: Math.sqrt(dx * dx + dy * dy + dz * dz),
+      roll: NeckDeathRoll(this.id, this.damageSequence),
+    });
   }
 
   /**
@@ -617,7 +651,7 @@ export class Soldier {
       sever = null;
     }
     if (sever?.forceKill) this.health = 0;
-    if (this.health <= 0) return this.Kill(direction, sever);
+    if (this.health <= 0) return this.Kill(direction, sever, this.NeckDeathCause(kind, info));
     // 中弹没死会喊。中日两侧各喊各的语言（side 由 Bark 侧过滤声库）。
     // 节流在引擎侧（全局 0.55 s / 同阵营同类 4.5 s）。
     const A = this.director && this.director.ctx && this.director.ctx.audio;
