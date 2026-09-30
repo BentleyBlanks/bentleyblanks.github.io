@@ -109,7 +109,7 @@ export function BuildFarBankCrowdRoster(seed = 0x18B2B) {
     if (units.some((u) => Math.hypot(u.post.x - post.x, u.post.z - post.z) < 0.85)) return false;
     const lane = (rnd() - 0.5) * 4.8;
     units.push({ id: `FarBankCrowd${units.length}`, kind, pose, post: { x: +post.x.toFixed(2), z: +post.z.toFixed(2), yaw: post.yaw ?? Math.PI + (rnd() - 0.5) * 0.35 },
-      lane: +lane.toFixed(2), route: null, wave: null, order: 0, flag: false, sword: false, pace: false, scale: +(0.97 + rnd() * 0.08).toFixed(3), ...extra });
+      lane: +lane.toFixed(2), route: null, wave: null, order: 0, flag: false, sword: false, pace: false, scale: +(1.0 + rnd() * 0.1).toFixed(3), ...extra });
     return true;
   };
   // 岸线三排
@@ -139,7 +139,7 @@ export function BuildFarBankCrowdRoster(seed = 0x18B2B) {
   }
   // 旗与刀：旗一律举在站着的人手里（岸线第三排与留守里每隔几个挑一个，桥头前排一面）；刀在路堤顶、桥头前排、岸线正中
   const stand = units.filter((u) => u.pose === "stand" && (u.kind === "shore" || u.kind === "reserve"));
-  stand.forEach((u, i) => { if (i % 13 === 4) u.flag = true; });
+  stand.forEach((u, i) => { if (i % 11 === 4) u.flag = true; });
   const bridgeFront = units.filter((u) => u.kind === "bridge").sort((a, b) => b.post.z - a.post.z);
   if (bridgeFront[2]) bridgeFront[2].flag = true;
   for (const u of bridgeFront.slice(0, 2)) u.sword = true;

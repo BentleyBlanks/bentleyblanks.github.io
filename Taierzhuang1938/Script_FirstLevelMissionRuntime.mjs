@@ -270,8 +270,9 @@ export class FirstLevelMissionRuntime {
     this.farBankView = new FarBankTankView({ root: this.view.root, battlefield: this.battlefield, physics: this.physics,
       actorFactory: this.actorFactory, library: this.library, vfx: this.vfx, audio: this.audio,
       groundAt: (x, z) => CrowdGroundY(x, z, (a, b) => this.battlefield.GroundHeight(a, b)) });
-    // 对岸的纯视觉人群（规模感）：旗 / 刀 / 枪口焰在 farBankCrowdView，人本身由 AI 的远景批渲染层画（不占 actorPool）。
-    this.farBankCrowdView = new FarBankCrowdView({ root: this.view.root, vfx: this.vfx });
+    // 对岸的纯视觉人群（规模感）：人画在 farBankCrowdView 自己的一层批渲染里（ActorCrowd，粗聚类、提亮的军装；不进 ai.soldiers、不占 actorPool），
+    // 旗 / 刀是逐个 Mesh，枪口焰 / 曳光走共用 vfx。
+    this.farBankCrowdView = new FarBankCrowdView({ root: this.view.root, vfx: this.vfx, scene: this.scene, factory: this.actorFactory });
     this.farBank = new FirstLevelFarBank(this, {
       vec: (x, y, z) => new THREE.Vector3(x, y, z),
       crowdShot: (shot) => this.farBankCrowdView.Shot(shot, (x, y, z) => new THREE.Vector3(x, y, z)),
@@ -279,7 +280,6 @@ export class FirstLevelMissionRuntime {
       tankCollider: (tank) => this.farBankView.Collider(tank),
       sound: this.audio ? { OnCannon: (from, at, flightS) => this.farBankView.Sound?.OnCannon(from, at, flightS) } : null,
     });
-    this.removeFarBankCrowd = this.ai.AddCrowdProvider?.((crowd, view) => this.farBank.crowd.Draw(crowd, view));
     this.leaderGuide = new FirstLevelLeaderGuide(this);
     this.Register();
     // 02 的交互点与玩家实际看到的是同一坐标、同一 HanYang 几何。它不另注册一条
@@ -1696,6 +1696,7 @@ export class FirstLevelMissionRuntime {
     this.frontBattle.Enter(stage.id);
     // 18 的对岸：BridgeCover 起放兵与战车、BridgeWithdraw 放真 AI 与冲桥组；18 以外的步骤（含回跳）整个撤掉。
     this.farBank.Enter(stage.id);
+    if (stage.id === "BridgeOrders") this.farBankCrowdView.Prepare();   // 人群那一层的模型烘焙（约 0.2 s）放在接令这个平静的时刻
     // 在存档之前补：这一步的存档点记下补过的数，死了重来从这儿起也不少于它。
     this.TopUpStepBandages(stage.id);
     if (!["Trapped", "Dive", "Death", "NightMarch"].includes(stage.id)) this.SaveCheckpoint();
@@ -2649,7 +2650,7 @@ export class FirstLevelMissionRuntime {
     // 对岸部队排在桥之前：Bridge.UpdateWithdraw 在按起爆器前要问 farBank.ReadyForBlast（冲桥组到位没有）。
     if (["BridgeCover", "BridgeWithdraw", "NightMarch"].includes(stage)) this.farBank.Update(dt, stage);
     this.farBankView.Sync(this.farBank.tanks, this.time, this.player.position);
-    this.farBankCrowdView.Sync(this.farBank.crowd, this.time);
+    this.farBankCrowdView.Sync(this.farBank.crowd, this.time, this.camera);
     if (["BridgeOrders", "BridgeCover", "BridgeWithdraw"].includes(stage)) this.bridge.Update(dt, stage);
     // --- 18 夜入滕城：先随队走完 marchOut，黑屏里换天，再随队进北门 ---
     this.nightGate.Update(dt, stage);
@@ -2993,7 +2994,6 @@ export class FirstLevelMissionRuntime {
     this.extras.Clear();
     this.farBank?.Dispose();
     this.farBankView?.Dispose();
-    this.removeFarBankCrowd?.();
     this.farBankCrowdView?.Dispose();
     this.nightLights?.Dispose();
     this.openingSet?.Exit();

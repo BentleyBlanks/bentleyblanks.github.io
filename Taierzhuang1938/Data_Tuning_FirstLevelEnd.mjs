@@ -304,8 +304,8 @@ export const END_TUNING = Object.freeze({
       // 起爆：这么远之内的人趴 duckS 秒（随机 ±duckJitterS）再爬起来接着打。
       duckM: 90, duckS: 1.4, duckJitterS: 0.8,
       // 枪口焰 / 曳光（每秒总数，按分档）：contact / mid / far / out。只挑上一帧在视锥里的人。
-      flashHz: Object.freeze({ contact: 9, mid: 6, far: 2.5, out: 0 }),
-      flashScale: 2.2, impactChance: 0.35,
+      flashHz: Object.freeze({ contact: 24, mid: 14, far: 5, out: 0 }),
+      flashScale: 2.6, impactChance: 0.3,
       // 溜达：留守的人每 pacePeriodS 秒在 paceRadiusM 内换个位置。
       pacePeriodS: Object.freeze([5, 12]), paceRadiusM: 2.2,
     }),

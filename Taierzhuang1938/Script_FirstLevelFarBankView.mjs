@@ -22,6 +22,10 @@ const HALF = [1.075, 1.28, 2.15];
 // 集结地上空的烟尘源（世界 x, z）：岸线后二三十米的人堆与战车停位一带。
 const HAZE_SPOTS = Object.freeze([[-104, 68], [-96, 58], [-88, 64], [-72, 56], [-64, 66], [-56, 60], [-48, 66], [-80, 48], [-100, 46], [-60, 46]]);
 const HAZE_SOURCE = Object.freeze({ kind: "dust", rate: 3, radius: 11, rise: 0.4, sizeStart: 3.6, sizeEnd: 10, life: 7, opacity: 0.2, prewarm: true });
+// R2b 规模感：岸线人群身后一条贴地的浅色尘幕（岸沿以北 9–14 m，x −136…−44 每 9 m 一团）。人是深色的，站在浅色尘幕前才读得出成排的剪影；
+// 高度 1–3 m 的低尘、不遮人（人在尘幕前面 5–8 m）。
+const SHORE_DUST_SPOTS = Object.freeze(Array.from({ length: 11 }, (_, i) => [-136 + i * 9, 79 + ((i * 5) % 4)]));
+const SHORE_DUST_SOURCE = Object.freeze({ kind: "dust", rate: 4, radius: 5.5, rise: 0.3, sizeStart: 2.6, sizeEnd: 7.5, life: 6, opacity: 0.3, prewarm: true });
 
 export class FarBankTankView {
   /** groundAt(x, z)：车轮下的地面高度（桥面上那辆要按桥面算，河床在桥面下几米）；不给就是地形。 */
@@ -29,6 +33,8 @@ export class FarBankTankView {
     Object.assign(this, { battlefield, physics, actorFactory, library, vfx, audio, groundAt });
     this.group = new THREE.Group();
     this.group.name = "FarBankTanks";
+    // 白盒画质里战车也保持本色（与人物一样是运动的角色，不是灰盒子地物）：不然灰色的车混在灰色的房子里，几十米外认不出是坦克。
+    this.group.userData.whiteboxCharacter = true;
     root.add(this.group);
     this.entries = new Map();
     this.materials = [];
@@ -125,7 +131,8 @@ export class FarBankTankView {
    */
   UpdateHaze(active) {
     if (active && !this.haze) {
-      this.haze = HAZE_SPOTS.map(([x, z]) => this.vfx?.SmokeSource({ x, y: this.battlefield.GroundHeight(x, z) + 0.4, z }, HAZE_SOURCE) ?? null);
+      this.haze = [...HAZE_SPOTS.map(([x, z]) => this.vfx?.SmokeSource({ x, y: this.battlefield.GroundHeight(x, z) + 0.4, z }, HAZE_SOURCE) ?? null),
+        ...SHORE_DUST_SPOTS.map(([x, z]) => this.vfx?.SmokeSource({ x, y: this.battlefield.GroundHeight(x, z) + 0.3, z }, SHORE_DUST_SOURCE) ?? null)];
     } else if (!active && this.haze) {
       for (const handle of this.haze) if (handle != null) this.vfx?.RemoveSmokeSource(handle);
       this.haze = null;

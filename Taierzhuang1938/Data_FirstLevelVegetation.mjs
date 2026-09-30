@@ -87,6 +87,12 @@ export const VEGETATION = Object.freeze({
   /** 概率：田里底子（随离路线变远衰减） + 墙根 + 沟沿 + 河岸，再乘画质密度。 */
   /** 拓宽河段南岸带的卡片高度上限（R1c，见 mix.bankSouth）。 */
   southBankMaxHeightM: 0.6,
+  /**
+   * 拓宽河段北岸的岸沿带（岸沿以北 9 m）：18 对岸的部队一排排蹲跪站在这条带上（Data_FirstLevelFarBankCrowd 的岸线五排，back 1.7–6.6 m），
+   * 1.8 m 的芦苇与 0.8 m 的枯茎把人整个挡住（R2b 实拍：high 画质里岸上一个人也看不见，只剩几面旗）。这里所有卡片压到这个高度以下，
+   * 人（卧姿 0.35 / 跪姿 1.05 / 站姿 1.7 m）从草上露出来；带外的北岸（村子后面、田里）不动。
+   */
+  northBankMaxHeightM: 0.55,
   pOpenClose: 0.3, pOpenCloseM: 10, pOpen: 0.15, pOpenFar: 0.016, pOpenNearM: 24, pStubble: 0.06, pShoulder: 0.45, pWallFoot: 0.95, pTrenchLip: 0.7, pBank: 0.5,
   /** 一簇几张卡（同一种，小范围错开）。 */
   clusterMin: 3, clusterMax: 6, clusterSpreadM: 0.5,
@@ -412,6 +418,7 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
     if (lip) maxHeight = Math.min(maxHeight, rules.trenchLipMaxHeightM);
     if (z < rules.frontZ && zone !== "wallFoot") maxHeight = Math.min(maxHeight, rules.frontMaxHeightM);
     if (southBank) maxHeight = Math.min(maxHeight, rules.southBankMaxHeightM);
+    if (zone === "bank" && reach && z < reach.crestZ) maxHeight = Math.min(maxHeight, rules.northBankMaxHeightM);
     Push(rng, x, z, card, count, maxHeight, onTrack || atWall ? MemberClear : MemberClearOffTrack);
   }
   // 3) 坎上：土坎肩 / 坡脚平台（非掩体）的顶面，矮草贴着顶面长（y 取顶面，不取地形）。

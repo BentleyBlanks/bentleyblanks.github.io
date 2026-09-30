@@ -10,6 +10,15 @@
 // 材质是顶点色的 Lambert（无贴图，不占采样器）；挂在 whiteboxCharacter 根下，白盒画质里也保持本色。
 // ===========================================================================
 import * as THREE from "three";
+import { ActorCrowd } from "./Script_ActorCrowd.mjs";
+
+/**
+ * 人群这一层自己的 ActorCrowd（不与 AI 兵共用）：
+ *   · 粗聚类 cellM 0.07（AI 那层是 0.045、每人约 2.7 k 面，这里每人约 1.2 k 面：三百人 ≈ 0.4 M 面）；
+ *   · 军装提亮 LIFT 倍：一百米外的雾里，暗橄榄色的人是看不见的（R2b 实拍：high 画质里岸上只剩几面旗），
+ *     提亮只作用在这一层自己的材质克隆上（AI 的远景层与近景人物不动）。
+ */
+const CROWD_CELL_M = 0.07, CROWD_CAPACITY = 400, LIFT = 2.6;
 
 const CLOTH = [0.93, 0.91, 0.86], DISC = [0.74, 0.05, 0.06], POLE = [0.27, 0.19, 0.11], STEEL = [0.82, 0.85, 0.9];
 const UP = { x: 0, y: 1, z: 0 };
@@ -28,10 +37,10 @@ function Quad(positions, colors, indices, corners, color) {
 /** 日章旗：杆 + 旗面（白）+ 旗面正中的红圆（两面各一片，避免 z 冲突）。杆脚在原点，旗面朝 ±z，从杆顶向 +x 展开。 */
 export function BuildFlagGeometry() {
   const p = [], c = [], i = [];
-  Part(p, c, i, [-0.05, 0, -0.05, 0.05, 3.3, 0.05], POLE);
-  const w = 1.5, h = 1.0, y1 = 3.25, y0 = y1 - h;
+  Part(p, c, i, [-0.06, 0, -0.06, 0.06, 4.2, 0.06], POLE);
+  const w = 2.1, h = 1.4, y1 = 4.15, y0 = y1 - h;
   Quad(p, c, i, [[0.03, y0, 0], [0.03 + w, y0, 0], [0.03 + w, y1, 0], [0.03, y1, 0]], CLOTH);
-  const cx = 0.03 + w / 2, cy = (y0 + y1) / 2, r = 0.3, n = 14;
+  const cx = 0.03 + w / 2, cy = (y0 + y1) / 2, r = 0.42, n = 16;
   for (const zOff of [0.012, -0.012]) {
     const centre = p.length / 3; p.push(cx, cy, zOff); c.push(...DISC);
     for (let k = 0; k <= n; k++) { const a = (k / n) * Math.PI * 2; p.push(cx + Math.cos(a) * r, cy + Math.sin(a) * r, zOff); c.push(...DISC); }
@@ -57,8 +66,13 @@ export function BuildSwordGeometry() {
 }
 
 export class FarBankCrowdView {
-  constructor({ root, vfx }) {
+  constructor({ root, vfx, scene = null, factory = null }) {
     this.vfx = vfx;
+    this.scene = scene; this.factory = factory;
+    this.layer = null;            // 人群自己的 ActorCrowd（Prepare 时才烘）
+    this.frustum = new THREE.Frustum(); this.matrix = new THREE.Matrix4(); this.sphere = new THREE.Sphere(new THREE.Vector3(), 1.7);
+    this.drawn = false;
+    this.viewApi = { visible: (x, y, z, r = 1.7) => { this.sphere.center.set(x, y, z); this.sphere.radius = r; return this.frustum.intersectsSphere(this.sphere); } };
     this.group = new THREE.Group();
     this.group.name = "FarBankCrowdProps";
     this.group.userData.whiteboxCharacter = true;
@@ -67,6 +81,14 @@ export class FarBankCrowdView {
     this.flagGeometry = BuildFlagGeometry();
     this.swordGeometry = BuildSwordGeometry();
     this.props = new Map();     // 单位 id -> { flag?: Mesh, sword?: Mesh, phase }
+  }
+  /** 烘人群这一层的姿势桶（约 0.2 s）；没有场景 / 工厂（node 测试）就什么也不做。已经烘过直接返回。 */
+  Prepare() {
+    if (this.layer || !this.scene || !this.factory) return;
+    const layer = new ActorCrowd(this.scene, this.factory, { cellM: CROWD_CELL_M, capacity: CROWD_CAPACITY });
+    layer.Prepare(["ija"]);
+    for (const material of layer.materials) material.color?.multiplyScalar(LIFT);
+    this.layer = layer;
   }
   Prop(u) {
     let entry = this.props.get(u.id);
@@ -78,8 +100,18 @@ export class FarBankCrowdView {
     return entry;
   }
   /** 每帧：crowd = FarBankCrowd。没激活 / 没上场 / 上一帧不在视锥里的人，他的旗与刀就藏起来。 */
-  Sync(crowd, time) {
+  Sync(crowd, time, camera = null) {
     const live = crowd?.active;
+    if (live && !this.layer) this.Prepare();   // 阶段跳转直接落在 18 的后半：没经过 BridgeOrders，这时才烘
+    if (this.layer && camera && (live || this.drawn)) {
+      camera.updateWorldMatrix(true, false);
+      this.matrix.copy(camera.matrixWorld).invert().premultiply(camera.projectionMatrix);
+      this.frustum.setFromProjectionMatrix(this.matrix);
+      this.layer.Begin();
+      if (live) crowd.Draw(this.layer, this.viewApi);
+      this.layer.End();
+      this.drawn = !!live;
+    }
     for (const u of crowd?.units || []) {
       if (!u.flag && !u.sword) continue;
       const entry = this.Prop(u);
@@ -107,6 +139,7 @@ export class FarBankCrowdView {
     if (e.impact) this.vfx?.Impact?.(to, vec(UP.x, UP.y, UP.z), "dirt", { weaponKind: "rifle" });
   }
   Dispose() {
+    this.layer?.Dispose(); this.layer = null;
     this.flagGeometry.dispose(); this.swordGeometry.dispose(); this.material.dispose();
     this.group.removeFromParent();
     this.props.clear();
