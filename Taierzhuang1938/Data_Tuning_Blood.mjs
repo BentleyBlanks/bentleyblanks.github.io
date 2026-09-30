@@ -57,8 +57,10 @@ export const BLOOD_ARTERIAL = Object.freeze({
 //   farStartM / farScaleMax widen mist and drops with distance so a 60 m headshot still reads
 //   pump                    head-wound arterial source: seconds, drops/s, speed, splash decals
 export const BLOOD_HEADSHOT = Object.freeze({
-  exitMist: { count: 20, spread: .36, speed: [2.6, 7.5], radius: [.07, .62], life: [.45, 1.05], opacity: .66 },
-  backMist: { count: 6, spread: .6, speed: [.8, 2.6], radius: [.04, .24], life: [.25, .6], opacity: .5 },
+  // 2026-09-30 player feedback "爆头的血雾有点过了": plume trimmed from 20 puffs / 0.62 m / .66
+  // opacity / 1.05 s to the values below; drops, decals and the pump are unchanged.
+  exitMist: { count: 12, spread: .32, speed: [2.6, 7.5], radius: [.06, .4], life: [.35, .75], opacity: .5 },
+  backMist: { count: 4, spread: .6, speed: [.8, 2.6], radius: [.04, .18], life: [.2, .45], opacity: .4 },
   drops: { count: 30, spread: .42, speed: [3, 9.5], lift: [.1, 1.1], halfWidth: [.011, .024],
     stretchPerSpeed: .028, stretch: [.05, .26], decalRadius: [.08, .22], decalChance: .6 },
   farStartM: 18, farScaleMax: 3.2,

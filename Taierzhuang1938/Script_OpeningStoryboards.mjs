@@ -1132,8 +1132,14 @@ export class FirstLevelBunkerShow {
       }
       if(m.flagKick&&!this.KickBackdropFlag(actor,m.flagKick))return;
       if(!m.flagKick&&this.r.time<at+D.afterWipeS+i*D.staggerS){this.Hold(actor,start,null);return;}
-      if(!this.Follow(actor,"depth",m.route,D.speedMps,null))return;
-      if(!InCameraView(this.r.player.camera,this.r.Point(actor.position,1),10))this.RetireDepthIja(m.id);else this.Pose(actor,null);
+      if(!actor.depthIjaRouteDone){if(!this.Follow(actor,"depth",m.route,D.speedMps,null))return;actor.depthIjaRouteDone=true;}
+      if(!InCameraView(this.r.player.camera,this.r.Point(actor.position,1),10)){this.RetireDepthIja(m.id);return;}
+      // 2026-09-30「开局中间有个敌军不会动」: the bank route ends in the open field the pinned player looks across, so he
+      // stood there through the questioning and after the hand-back. Still in shot, he walks on away from the player
+      // (offRoute) and is retired once out of shot or past D.retireFarM.
+      if(!m.offRoute){this.Pose(actor,null);return;}
+      const done=this.Follow(actor,"off",m.offRoute,D.speedMps,null);
+      if(done||Distance(actor.position,this.r.player.position)>D.retireFarM)this.RetireDepthIja(m.id);
     });
   }
   KickBackdropFlag(actor,spec){
@@ -1648,7 +1654,7 @@ export class FirstLevelBunkerShow {
       for(const actor of [he,luo])if(actor)this.RerootUnderPelvis(actor,actor.yaw);
     }
     this.ChargeNoise();
-    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.UpdateFleeing();this.ChargeExtras();this.LongShotTick();
+    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.UpdateFleeing();this.ChargeExtras();this.LongShotTick();this.DepthIja();
     f.heLiftGo=true;f.luoLiftGo=true;
     this.Duels();
     const heThere=f.liftAt!=null||this.Hold(he,L.heLift,null,{speed:C.speed.brisk});
@@ -1929,7 +1935,7 @@ export class FirstLevelBunkerShow {
    */
   PhaseCheck(age){
     const r=this.r,f=this.flags,H=C.rescue.hand,luo=this.Squad("luo");
-    this.HeTimber();this.Aftercut();this.UpdateFleeing();this.LongShotTick();
+    this.HeTimber();this.Aftercut();this.UpdateFleeing();this.LongShotTick();this.DepthIja();
     const clip=OpeningClipMeta("LuoHandRifle")?"LuoHandRifle":null,root=this.HandRoot();
     f.handAt??=r.time;
     // The haul's root motion carried him ~1.7 m: hand the body over to the new root where it is shown.
@@ -2195,6 +2201,10 @@ export class FirstLevelBunkerShow {
       if(stage!=="RearTrench"||!InCameraView(r.player.camera,r.Point(actor.position,1),10))this.RetireCharge(spec.id);
       else if(actor.alive)this.Pose(actor,null,{face:-Math.PI/2});
     }
+    // DepthIja walks on through the withdrawal (a man still in shot at the hand-back goes on off the field); any later stage
+    // retires him outright ("at the latest when 02 begins" — the alive check keeps DepthIjaB's corpse).
+    if(stage==="RearTrench")this.DepthIja();
+    else for(const m of OPENING_DEPTH_IJA.members)if(this.cast[m.id]?.alive)this.RetireDepthIja(m.id);
     if(stage==="RearTrench"){
       const w=this.withdraw||(this.withdraw={step:0,at:r.time});
       const luo=this.Squad("luo"),he=this.Squad("heyoutian"),liu=this.Squad("liuwencai"),W=C.withdraw,p=r.player.position;
