@@ -17,9 +17,13 @@ const base = external || `http://127.0.0.1:${server.address().port}`;
 const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: { width: 1100, height: 760 } });
 const errors = [];
-if (process.argv.includes('--trace')) page.on('console', msg => { if (msg.type() === 'warning') console.log(msg.text().slice(0, 700)); });
-page.on('pageerror', error => errors.push(String(error)));
-page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text().slice(0, 500)); });
+const Watch = target => {
+  if (process.argv.includes('--trace')) target.on('console', msg => { if (msg.type() === 'warning') console.log(msg.text().slice(0, 700)); });
+  target.on('pageerror', error => errors.push(String(error)));
+  target.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text().slice(0, 500)); });
+};
+Watch(page);
+let gameBrowser = null;
 try {
   // Same-origin blank page. A 404 lands on Chrome's error page, whose late
   // navigation races setContent ("Execution context was destroyed").
@@ -119,13 +123,28 @@ try {
     const resizeReleased = debug.state === 'idle' && !document.querySelector('#frameDebuggerGameView') && debug._copies.length === 0;
     debug.RequestCapture(); debug.BeginRender(); debug._Budget = () => { throw new Error('Injected budget rejection'); }; Render(); debug.EndRender();
     const rejected = debug.state === 'error' && debug._hooks.length === 0 && debug._copies.length === 0;
+    // A program linked and a texture allocated (texStorage2D) for the first time
+    // INSIDE the captured frame: the replay and the live game after Resume must
+    // keep drawing it, without GL errors.
+    const freshTexture = new THREE.DataTexture(new Uint8Array([40, 255, 255, 255, 40, 255, 255, 255, 40, 255, 255, 255, 40, 255, 255, 255]), 2, 2);
+    freshTexture.needsUpdate = true;
+    const freshMaterial = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, uniforms: { freshMap: { value: freshTexture } },
+      vertexShader: 'void main(){gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+      fragmentShader: 'uniform sampler2D freshMap;layout(location=0) out vec4 a;layout(location=1) out vec4 b;void main(){a=texture(freshMap,vec2(.25));b=vec4(1.);}' });
+    const freshMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), freshMaterial); freshMesh.position.z = 0.8; scene.add(freshMesh);
+    delete debug._Budget; // undo the injected rejection above
+    debug.RequestCapture(); debug.BeginRender(); Render(); const freshLive = Screen(); debug.EndRender();
+    const freshTiming = Screen(); debug.Replay(debug._events.length - 1); const freshReplay = Screen();
+    debug.Resume(); Render(); const freshResumed = Screen();
+    const fresh = { visible: freshLive !== baseline, timing: freshTiming === freshLive, replay: freshReplay === freshLive, resumed: freshResumed === freshLive };
+    scene.remove(freshMesh);
     profiler.Disable();
     const restored = original.draw === gl.drawElements && original.render === renderer.renderBufferDirect && original.target === renderer.setRenderTarget;
     const glError = gl.getError(); debug.Dispose(); renderer.dispose();
     return { baseline, captured, beforeReplay, resumed, restored, glError, events: info.events.length, draws: info.events.filter(event => event.draw).length,
       multiDraw: multi?.drawInfo, hasMultiDraw: !!gl.getExtension('WEBGL_multi_draw'), instanced: instanced?.drawInfo,
       unsupported: { status: unsupported.gpuStatus, total: unsupported.gpuMs },
-      disjoint: disjoint ? { status: disjoint.gpuStatus, total: disjoint.gpuMs } : null, rejected, profilerPaused, profilerResumed, presented, resizeReleased,
+      disjoint: disjoint ? { status: disjoint.gpuStatus, total: disjoint.gpuMs } : null, rejected, fresh, profilerPaused, profilerResumed, presented, resizeReleased,
       passes: info.passes.map(pass => pass.name), organized, sampledLit, sampledSize: [sampled.width, sampled.height],
       groupTiming: timing.passes.filter(pass => pass.synthetic).map(pass => pass.gpuMs), firstHash: PixelHash(a.pixels), lastHash: PixelHash(b.pixels), repeatedHash: PixelHash(c.pixels),
       mrtHash: PixelHash(mrt.pixels), depthRange: [Math.min(...depth.pixels), Math.max(...depth.pixels)],
@@ -147,6 +166,7 @@ try {
   assert.deepEqual(result.unsupported, { status: 'unavailable', total: null });
   if (result.disjoint) assert.deepEqual(result.disjoint, { status: 'disjoint', total: null });
   assert.ok(result.rejected && result.profilerPaused && result.profilerResumed);
+  assert.deepEqual(result.fresh, { visible: true, timing: true, replay: true, resumed: true }, 'programs/textures created inside the capture must survive replay and Resume');
   assert.ok(result.presented && result.resizeReleased, 'resource mutation must release the capture and synchronized game preview');
   assert.deepEqual(result.organized.real, ['main', 'contact.Idle', 'output'], 'Idle draws get their own scope; empty hooks leave no node');
   assert.deepEqual(result.organized.mainChildren, ['DrawOpaqueObjects', 'DrawTransparentObjects']);
@@ -162,21 +182,38 @@ try {
   if (result.timing.status === 'ready') assert.ok(result.timing.values.every(value => Number.isFinite(value) && value >= 0));
   else assert.equal(result.timing.total, null, 'unsupported GPU timing must never report zero');
   if (!process.argv.includes('--core-only')) {
+    // The game frame's pixel check is exact. On the hardware path (ANGLE-D3D11 /
+    // NVIDIA) the same command stream is not bit-reproducible by itself: results
+    // move by one half-float ulp with GPU scheduling (live submission interleaves
+    // CPU work, the replay is back-to-back) and in a driver window after level
+    // load (docs/Data_FrameDebugger.md, 回放保真度). So whitebox runs on SwiftShader
+    // (deterministic; ~2 min to load). Full presets never finish warming shaders in
+    // software within the timeout, so they (and --gpu) stay on the GPU and the
+    // checked capture is serialized identically in both executions instead: a 1×1
+    // readPixels after every event of the live frame and of the timing replay.
+    const software = process.argv.includes('--software') || quality === 'whitebox' && !process.argv.includes('--gpu');
+    gameBrowser = software ? await LaunchBrowser({ extraArgs: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] }) : browser;
+    console.log('Game renderer', software ? 'SwiftShader' : 'hardware GPU, serialized pixel check');
+    const game = gameBrowser === browser ? page : await gameBrowser.newPage({ viewport: { width: 1100, height: 760 } });
+    if (game !== page) Watch(game);
     if (process.argv.includes('--bundle')) {
       const { BuildBrowserBundle } = await import('./Script_BuildBrowserBundle.mjs');
       const bundle = await BuildBrowserBundle();
-      await page.route('**/Taierzhuang1938/?*', route => route.fulfill({ contentType: 'text/html', body: bundle.html }));
-      await page.route('**/Script_BrowserBundle.mjs?*', route => route.fulfill({ contentType: 'text/javascript', body: bundle.code }));
+      await game.route('**/Taierzhuang1938/?*', route => route.fulfill({ contentType: 'text/html', body: bundle.html }));
+      await game.route('**/Script_BrowserBundle.mjs?*', route => route.fulfill({ contentType: 'text/javascript', body: bundle.code }));
       console.log('Production bundle', bundle.version, bundle.inputs);
     }
-    await page.goto(`${base}/Taierzhuang1938/?shot=1&manual=1&whitebox=p012&quality=${quality}&scale=small`, { waitUntil: 'load', timeout: 180000 });
-    await page.waitForFunction(() => window.Tengxian?.editor, null, { timeout: 300000 });
-    await page.evaluate(async () => { await Tengxian.Debug.FirstLevelJump(3); Tengxian.StepFrames(4); Tengxian.editor.ToggleOverlay('frameDebugger'); });
-    const popup = page.context().pages().find(candidate => candidate !== page);
+    await game.goto(`${base}/Taierzhuang1938/?shot=1&manual=1&whitebox=p012&quality=${quality}&scale=small`, { waitUntil: 'load', timeout: 180000 });
+    await game.waitForFunction(() => window.Tengxian?.editor, null, { timeout: 300000 });
+    await game.evaluate(async () => { await Tengxian.Debug.FirstLevelJump(3); Tengxian.StepFrames(4); Tengxian.editor.ToggleOverlay('frameDebugger'); });
+    // Hardware: the driver swaps shader code variants for ~9 s after a level load
+    // (plain re-renders of a frozen scene change bits only in that window).
+    if (!software) await game.waitForTimeout(12000);
+    const popup = game.context().pages().find(candidate => candidate !== game);
     assert.ok(popup, 'Frame Debugger must open from the existing editor');
     popup.on('pageerror', error => errors.push(String(error)));
     popup.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text().slice(0, 500)); });
-    await page.evaluate(() => {
+    await game.evaluate(serialize => {
       const d = Tengxian.FrameDebugger, end = d.EndRender.bind(d), gl = Tengxian.renderer.getContext();
       const Screen = () => {
         const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
@@ -184,28 +221,46 @@ try {
         gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels); gl.bindFramebuffer(gl.READ_FRAMEBUFFER, previous);
         let hash = 2166136261; for (const byte of pixels) hash = Math.imul(hash ^ byte, 16777619); return hash >>> 0;
       };
-      d.EndRender = (...args) => { const before = Screen(); end(...args); window.FrameDebuggerPixelCheck = { before, after: Screen() }; };
-    });
+      const call = d._Call, run = d._Run;
+      if (serialize) {
+        const EVENT = /^(drawArrays|drawElements|drawRangeElements)(Instanced)?$|^multiDraw|^clear$|^clearBuffer|^blitFramebuffer$|^copyTex|^generateMipmap$/;
+        const one = new Uint8Array(4);
+        const Sync = () => {
+          const read = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING), pack = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
+          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+          gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, one);
+          gl.bindFramebuffer(gl.READ_FRAMEBUFFER, read); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack);
+        };
+        d._Call = function (name, original, args, receiver) { const result = call.call(this, name, original, args, receiver); if (this.state === 'capturing' && !this._mute && EVENT.test(name)) this._Inspect(Sync); return result; };
+        d._Run = function (command) { run.call(this, command); if (EVENT.test(command.name)) Sync(); };
+      }
+      d.EndRender = (...args) => {
+        const before = Screen(), replayed = !!d._timer; end(...args);
+        window.FrameDebuggerPixelCheck = { before, after: Screen(), replayed, serialized: serialize };
+        delete d._Call; delete d._Run; delete d.EndRender; // back to the prototype methods
+      };
+    }, !software);
     await popup.locator('#capture').click();
-    await page.evaluate(() => Tengxian.StepFrames(1));
+    await game.evaluate(() => Tengxian.StepFrames(1));
     await popup.waitForFunction(() => document.querySelector('#events [data-event]'), null, { timeout: 60000 });
-    const actual = await page.evaluate(() => { const d = Tengxian.FrameDebugger; const elapsed = Tengxian.state.elapsed; Tengxian.StepFrames(3); return { state: d.state, error: d.error, events: d.capture?.events.length, frozenClock: elapsed === Tengxian.state.elapsed }; });
+    const actual = await game.evaluate(() => { const d = Tengxian.FrameDebugger; const elapsed = Tengxian.state.elapsed; Tengxian.StepFrames(3); return { state: d.state, error: d.error, events: d.capture?.events.length, frozenClock: elapsed === Tengxian.state.elapsed }; });
     console.log('Game', JSON.stringify(actual)); assert.equal(actual.state, 'frozen'); assert.ok(actual.frozenClock); assert.ok(actual.events > 0);
-    const pixelCheck = await page.evaluate(() => window.FrameDebuggerPixelCheck);
-    console.log('Game pixel replay', JSON.stringify(pixelCheck)); assert.equal(pixelCheck.before, pixelCheck.after);
-    await page.waitForFunction(() => Tengxian.FrameDebugger.capture.gpuStatus !== 'pending', null, { timeout: 20000 });
-    assert.ok(await page.locator('#frameDebuggerGameView').isVisible(), 'selected event output must appear in the game view');
-    await page.screenshot({ path: path.join(output, 'FrameDebugger_Synchronized.png'), fullPage: true });
+    const pixelCheck = await game.evaluate(() => window.FrameDebuggerPixelCheck);
+    console.log('Game pixel replay', JSON.stringify(pixelCheck));
+    assert.ok(pixelCheck.replayed, 'the timing replay must actually run (EXT_disjoint_timer_query_webgl2)'); assert.equal(pixelCheck.before, pixelCheck.after);
+    await game.waitForFunction(() => Tengxian.FrameDebugger.capture.gpuStatus !== 'pending', null, { timeout: 20000 });
+    assert.ok(await game.locator('#frameDebuggerGameView').isVisible(), 'selected event output must appear in the game view');
+    await game.screenshot({ path: path.join(output, 'FrameDebugger_Synchronized.png'), fullPage: true });
     await popup.screenshot({ path: path.join(output, 'FrameDebugger_Game.png'), fullPage: true });
-    const firstDraw = await page.evaluate(() => Tengxian.FrameDebugger._events.find(event => event.draw)?.index);
+    const firstDraw = await game.evaluate(() => Tengxian.FrameDebugger._events.find(event => event.draw)?.index);
     await popup.locator('#index').fill(String(firstDraw + 1)); await popup.locator('#index').press('Enter');
     await popup.locator('#view').selectOption('mesh');
     await popup.screenshot({ path: path.join(output, 'FrameDebugger_Mesh.png'), fullPage: true });
     assert.equal(await popup.locator('#previewError').textContent(), '');
     await popup.locator('#resume').click();
-    assert.equal(await page.evaluate(() => Tengxian.FrameDebugger.state), 'idle');
-    assert.equal(await page.locator('#frameDebuggerGameView').count(), 0);
-    const editorReleased = await page.evaluate(() => {
+    assert.equal(await game.evaluate(() => Tengxian.FrameDebugger.state), 'idle');
+    assert.equal(await game.locator('#frameDebuggerGameView').count(), 0);
+    const editorReleased = await game.evaluate(() => {
       const d = Tengxian.FrameDebugger;
       Tengxian.StepFrames(2); d.RequestCapture(); Tengxian.StepFrames(1);
       const frozen = d.frozen; Tengxian.editor.Open('graphics');
@@ -217,4 +272,4 @@ try {
   }
   assert.deepEqual(errors, [], 'browser errors');
   console.log('FrameDebuggerTest PASS');
-} finally { await browser.close(); if (server) await new Promise(resolve => server.close(resolve)); }
+} finally { if (gameBrowser && gameBrowser !== browser) await gameBrowser.close(); await browser.close(); if (server) await new Promise(resolve => server.close(resolve)); }

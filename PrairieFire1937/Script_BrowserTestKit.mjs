@@ -19,8 +19,9 @@ function withAudioPolicy(options) {
  *   2. 云端沙箱预装的 Chromium（本机不存在该路径时自动跳过）
  *   3. 系统安装的 Edge → Chrome
  *   4. Playwright 自带 Chromium（若曾 npx playwright install 过）
+ * extraArgs 追加到每个候选的启动参数（例：要逐位可复现的画面时传 --use-angle=swiftshader）。
  */
-export async function LaunchBrowser() {
+export async function LaunchBrowser({ extraArgs = [] } = {}) {
   const playwright = await import("playwright-core").catch(() => null);
   if (!playwright) {
     console.error("缺少 playwright-core：请先 npm i -D playwright-core");
@@ -28,7 +29,7 @@ export async function LaunchBrowser() {
   }
   const { chromium } = playwright;
   // 无头测试默认静音；只有专门听音频时才设 TEST_AUDIBLE=1 放开。
-  const commonArgs = ["--no-sandbox", "--disable-dev-shm-usage", ...(process.env.TEST_AUDIBLE ? [] : ["--mute-audio"])];
+  const commonArgs = ["--no-sandbox", "--disable-dev-shm-usage", ...(process.env.TEST_AUDIBLE ? [] : ["--mute-audio"]), ...extraArgs];
   const attempts = [];
   if (process.env.PF_BROWSER_PATH) {
     attempts.push({ executablePath: process.env.PF_BROWSER_PATH, args: commonArgs });

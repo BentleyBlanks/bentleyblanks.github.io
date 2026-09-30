@@ -35,9 +35,29 @@
 
 `Script_FrameDebugger` 仅在捕获时包装当前 renderer/context 实例的方法；普通运行不遍历 DC，不改全局原型或对象 draw 回调。捕获结束立即拆除逐调用钩子；冻结期间仅保留尺寸/渲染/配置变更的释放守卫，防止资源被外部编辑器替换。保存原始命令参数、初始 GL 状态/uniforms、动态 buffer、各靶首次写入之前的 GPU 内容；SSR 上一帧颜色图的生成 mip 链一并恢复。回放不调用模拟或 Post.Render，所以时域索引不重复推进。
 
+捕获帧里第一次出现的材质会在帧内编译链接着色器、第一次上传的纹理会 `texStorage2D` 分配。这些是对象的一次性建立，不是帧内容，**不录进命令流**（`shaderSource / compileShader / attachShader / linkProgram / texStorage*` 等与 `create*` 同列）：回放再 `linkProgram` 会让 three 手里所有 uniform 位置失效 —— 那个物体在回放里消失，Resume 之后游戏里也一直画不出来，并留下 INVALID_OPERATION；对已不可变的纹理再 `texStorage2D` 同样报错。核心夹具的 `fresh` 一项覆盖这条（2026-09-30 之前的代码在这里 glError 1282、回放和继续后都丢物体）。
+
 WebGL2 禁止向多重采样缓冲 blit。游戏的 MSAA Pass 以完整 Clear 开始，这些已失效的旧样本无需备份，回放同一个 Clear 重建它们。若未来新 Pass 要加载前一帧 MSAA 样本而非完整 Clear，捕获会明确失败并恢复运行，不能用单采样图扩展冒充原样本。GPU/参数备份上限为 768 MiB；超过时释放并提示减小视口/渲染比例，不静默截掉事件。
 
 关闭前完整回放到原帧末尾，恢复 renderer 状态并释放备份/查询，防止调试到半帧后直接把残留数据交给下一帧。窗口关闭、重复捕获、尺寸变化、上下文丢失也走释放流程。
+
+## 回放保真度（逐位比对）
+
+实机检查比较「捕获帧刚画完的 backbuffer」与「EndRender 计时回放之后的 backbuffer」，要求逐位相等。2026-09-30 在本机（RTX 4070 SUPER，驱动 595.71，ANGLE-D3D11）上偶发不等，查到的结论：
+
+- **回放没漏资源。** 这一帧（白盒 p012 第 3 步，217 事件 / 1201 条命令）帧内只有 7 次 `texSubImage2D`（骨骼纹理与一张 26×26 表），全部在第一次采样之前上传；没有 copyTex / generateMipmap / copyBufferSubData；靶都在首次写入前备份。high 档（544 事件）探针只报出 `ssrColor` 的 `generateMipmap` 在它被 `ssr.materialResolve` 采样之后，那张图正是 `_ResetReplay` 从恢复的 0 级重建 mip 的对象。
+- **是 GPU 这条栈本身不逐位可复现。** 两种表现，都与 Frame Debugger 无关：
+  1. **加载后的驱动窗口**：不经过 Frame Debugger，对冻结的同一场景反复 `renderer.render()` 进半精度靶，关卡加载后约 6–9 秒内浮点结果会在几种版本之间切换（每次 7–101 个分量、每个差 1 个半精度 ulp，像素集合成对固定；同步循环里也会切，说明不是 JS 改了东西），之后稳定。加载后空等 20 秒再测则完全稳定。
+  2. **随 GPU 调度变**：实时帧的提交夹着 three 的 CPU 工作，回放是连续提交；在 high 档两者的地形截取（`terrainAlbedoRoughness`）等多个 Pass 系统性地差 1 ulp（6/6 次），回放彼此之间却完全一致。第一个地形 DC 前比对了 467 项输入（全部 uniform、绘制状态、各纹理单元的纹理参数与采样器、顶点属性含 generic 当前值、采样到的 2D 纹理与目标的颜色/深度）全部相同；没有纹理同时被采样和写入。**实时帧与回放都在每个事件后插一次 1×1 readPixels（同样的串行化）时逐位相同**（high 6/6）。所以差异来自执行时序，不是回放缺数据；把地形改成常量色仍不消失，说明不止一个着色器。
+  分叉常落在共面 / 贴地的表面上（地形与壕沟土层、地上的枯草）。换 SwiftShader（`--use-angle=swiftshader`，计时扩展照样在、计时回放照样跑）时，实时帧与每次回放逐位相同。
+- **测试的做法（断言始终逐位相等，并断言计时回放确实执行了 `replayed`，不让「没回放所以相等」混过去）：**
+  - 白盒档默认跑 SwiftShader（约 2 分钟进关，整个测试约 3.5 分钟）。
+  - `--quality=high` 等完整档在 SwiftShader 上 300 秒内预热不完着色器，所以走硬件 GPU；`--gpu` 让白盒也走硬件。硬件路径下被检查的那次捕获**两边同样串行化**（实时帧每个事件后、计时回放每个事件命令后各一次 1×1 readPixels），并在进关后等 12 秒避开驱动窗口。本机 high 档实测：不串行 0/7，串行不等待 2/3，串行加等待 3/3。
+  - 只在测试里串行化；Frame Debugger 本身不加同步，GPU 计时照旧是连续提交。
+
+另外查到一个与此无关、但确实存在的着色器未定义行为：`Script_Csm.mjs` 的 `CsmSunVisibility` 在逐像素早退（`csmLevel < 0`）之后才对阴影坐标求 `dFdx/dFdy`。试改成先求导后并不消除上面的差异，所以没有随本次提交，单独作为后续任务。
+
+复现 / 取证用 `Script_FrameDebuggerReplayProbe.mjs`：按测试同样的顺序打开编辑器窗口捕获，再连续捕获若干帧；捕获期间每换一次绘制目标（或每 `--every=K` 个事件）在 GPU 上 blit 一份输出，不等时把第一份与 `Replay()` 结果不同的快照、差异像素数 / 最大差 / 范围 / 样本、以及那段事件列出来；也列出「先被采样、后被上传」的纹理。`--plain=30` 不碰 Frame Debugger，只反复重画冻结场景并打印浮点输出何时变化；`--angle=swiftshader` 换软件 GPU 对照。
 
 ## Unity 功能对应与平台边界
 
@@ -66,14 +86,16 @@ node Taierzhuang1938/Script_FrameDebuggerTest.mjs
 node Taierzhuang1938/Script_FrameDebuggerTest.mjs --quality=high
 node Taierzhuang1938/Script_FrameDebuggerTest.mjs --quality=high --bundle
 node Taierzhuang1938/Script_FrameDebuggerTest.mjs --core-only --samples=4
+node Taierzhuang1938/Script_FrameDebuggerTest.mjs --gpu            # 白盒实机段也走硬件 GPU（串行化比对，见「回放保真度」）
+node Taierzhuang1938/Script_FrameDebuggerReplayProbe.mjs --runs=3 --captures=4 [--every=4] [--angle=swiftshader] [--plain=30]
 ```
 
-核心 GPU 夹具验证逐事件差异/倒退确定性、MRT/深度、实例化/multi-draw、MSAA、GPU 扩展缺失、原始画面与回放/恢复逐像素相同、所有钩子归还；以及 Idle 分组、Opaque/Transparent 拆分、无散落事件、具名父节点与材质字段命名、采样纹理按 DC 读回、合成分组拿到 GPU 时间。夹具页用路由出的同源空白页，不再用 404 的 `/__preview/ping`（Chrome 错误页的延迟导航会撞上 setContent）。实机场景验证编辑器入口、冻结模拟时钟、捕获前后像素、网格视图及继续。截图仅存 `tmp/FrameDebugger/`，不提交。纯 JSON 报告无资源句柄，适合取证，不能当离线重放文件。
+核心 GPU 夹具验证逐事件差异/倒退确定性、MRT/深度、实例化/multi-draw、MSAA、GPU 扩展缺失、原始画面与回放/恢复逐像素相同、所有钩子归还；以及 Idle 分组、Opaque/Transparent 拆分、无散落事件、具名父节点与材质字段命名、采样纹理按 DC 读回、合成分组拿到 GPU 时间。夹具页用路由出的同源空白页，不再用 404 的 `/__preview/ping`（Chrome 错误页的延迟导航会撞上 setContent）。实机场景（白盒默认 SwiftShader，整个测试约 3.5 分钟；完整画质档与 `--gpu` 走硬件 GPU 并串行化比对）验证编辑器入口、冻结模拟时钟、捕获前后像素逐位相等且计时回放确实执行、网格视图及继续。截图仅存 `tmp/FrameDebugger/`，不提交。纯 JSON 报告无资源句柄，适合取证，不能当离线重放文件。
 
 ### 2026-09-30 界面细化
 
 - 右侧 Details 从 JSON 改成上面的分组卡片 / 表格；事件命名、Idle / Prepare 分组、合成分组、纹理缩略图与 Texture 预览见「使用」。`--core-only` 与默认白盒全流程通过。
-- 实机像素检查（捕获前的画面 vs 计时回放后的画面）偶发不一致：同一台机器上两次在白盒 p012 第 3 步各得到 `3863958859` ≠ 回放后值，改动前的 `0754dcc4` 同样复现；随后的两次（217 事件）逐像素相同。属于回放保真度的既有问题，没有改弱断言。
+- 实机像素检查（捕获前的画面 vs 计时回放后的画面）偶发不一致：同一台机器上两次在白盒 p012 第 3 步各得到 `3863958859` ≠ 回放后值，改动前的 `0754dcc4` 同样复现；随后的两次（217 事件）逐像素相同。属于回放保真度的既有问题，没有改弱断言。（已查清：不是回放漏资源，是硬件 GPU 这条栈本身不逐位可复现，见「回放保真度」。）
 
 - 合入 `175da4df` 后，用正式构建包（版本 `1467387267131688`）完成高画质专项：477 DC / 540 事件，捕获原始帧与计时回放的像素 hash 均为 `2099108382`。冻结时钟、窗口操作、同步游戏画面、网格预览、继续及编辑器切换释放均通过，浏览器无报错。此样本计时用于检验查询工作，不作为跨机器性能基准。
 - 新增专项的 4×MSAA 夹具通过，包括完整 uniform 数组、MRT/深度、multi-draw、GPU 扩展缺失/disjoint、超预算清理、尺寸变化释放、Profiler 暂停/恢复，GL error 为 0。

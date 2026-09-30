@@ -2,7 +2,12 @@ import { CopyValue, SaveGlState, EnumName, ReadProgram, ReadDrawState, DescribeF
 
 const DRAW = /^(drawArrays|drawElements|drawRangeElements)(Instanced)?$|^multiDraw/;
 const EVENT = /^(drawArrays|drawElements|drawRangeElements)(Instanced)?$|^multiDraw|^clear$|^clearBuffer|^blitFramebuffer$|^copyTex|^generateMipmap$/;
-const IGNORE = /^(get|is|create|delete|check|readPixels|finish|flush|beginQuery|endQuery|fenceSync|clientWaitSync|waitSync)/;
+// Program building and immutable texture allocation are one-time object setup,
+// not frame content. Replaying linkProgram invalidates every uniform location
+// three.js holds (the object then vanishes from replay AND from the live game
+// after Resume); replaying texStorage* on the now-immutable texture is
+// INVALID_OPERATION. The objects outlive the capture, so the replay never needs them.
+const IGNORE = /^(get|is|create|delete|check|readPixels|finish|flush|beginQuery|endQuery|fenceSync|clientWaitSync|waitSync|shaderSource|compileShader|attachShader|detachShader|linkProgram|validateProgram|bindAttribLocation|transformFeedbackVaryings|texStorage)/;
 const LIMIT_BYTES = 768 * 1024 * 1024;
 let nextCaptureId = 0;
 
