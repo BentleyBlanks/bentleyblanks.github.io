@@ -23,7 +23,8 @@ import { FirstLevelFarBank, FarBankTier, FarBankFireList, ShellSpotVerdict, Rout
 
 const T = E.farBank;
 let checks = 0;
-const Check = (condition, message) => { assert.ok(condition, message); checks += 1; };
+const SOFT = process.env.FARBANK_SOFT === "1", failures = [];
+const Check = (condition, message) => { if (SOFT) { if (!condition) { failures.push(message); console.log("FAIL", message); } } else assert.ok(condition, message); checks += 1; };
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 // ---------------------------------------------------------------------------

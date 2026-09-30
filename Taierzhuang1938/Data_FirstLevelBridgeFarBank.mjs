@@ -46,7 +46,7 @@ export const FAR_BANK_REAL = freeze([
   Unit("FarBankRealEast1", -62, 11, { weapon: "Type38" }),
   Unit("FarBankRealEastGun", -57, 10, { weapon: "Type11", role: "gunner" }),
   Unit("FarBankRealEast2", -52, 13, { weapon: "Type38" }),
-  Unit("FarBankRealOfficer", -73, 15, { weapon: "Type38", role: "officer" }),
+  Unit("FarBankRealOfficer", -65, 16, { weapon: "Type38", role: "officer" }),
 ]);
 /** 真 AI 走进来的出发点：射位往北 spawnBackM 米（岸沿以北很远，玩家看不见）。 */
 export const FAR_BANK_REAL_SPAWN_BACK_M = 60;
@@ -112,16 +112,16 @@ export const FarBankRushSlot = (i) => freeze({ lane: FAR_BANK_RUSH.lanes[i % 2],
 const FP = (x, z, h, r) => freeze({ x, z, h, r });
 export const FAR_BANK_FIRE_POINTS = freeze({
   // 南岸沙滩与堤前（z 158–170）：曳光打进沙里、溅一蓬土
-  beachW0: FP(-104, 162, 0.4, 2.6), beachW1: FP(-95, 163.5, 0.4, 2.2), beachW2: FP(-88, 165, 0.4, 2.0),
+  beachW0: FP(-104, 162, 0.4, 2.6), beachW1: FP(-94, 160.5, 0.4, 2.2), beachW2: FP(-101, 158.4, 0.4, 2.0),
   beachE0: FP(-66, 164.5, 0.4, 2.0), beachE1: FP(-58, 163, 0.4, 2.2), beachE2: FP(-50, 161.5, 0.4, 2.6),
   // 堤顶与堤后田地（z 168–176），离射位 ≥ 12 m
-  dikeW0: FP(-108, 171, 0.6, 2.4), dikeW1: FP(-98, 173, 0.6, 2.2),
+  dikeW0: FP(-118, 171.5, 0.6, 2.4), dikeW1: FP(-124, 172, 0.6, 2.2),
   dikeE0: FP(-56, 173.5, 0.6, 2.2), dikeE1: FP(-46, 171.5, 0.6, 2.4),
   // 桥面北段与桥墩（z 100–130）：打的是过桥的尾队与桥上的钢桁架（surface 是金属/木，会迸火星）
   deckN0: FP(-77, 102, 1.0, 1.2), deckN1: FP(-77, 114, 1.0, 1.2), deckN2: FP(-77, 126, 1.0, 1.4),
   pier2: FP(-77, 134, 0.8, 1.2),
   // 桥轴南端（1 号墩 z 160 与沙滩交接处）：冲桥组趴在被炸孔北半，顺桥轴往南打的点（桁架只留桥轴这条缝）
-  axisS: FP(-77, 162.5, 0.4, 1.6),
+  axisS: FP(-74, 162.5, 0.4, 1.6),
   // 河对岸的两片田（离玩家 ≥ 30 m 的空地，做「乱打」的远背景）
   fieldW: FP(-124, 184, 0.4, 4.0), fieldE: FP(-36, 186, 0.4, 4.0),
 });
