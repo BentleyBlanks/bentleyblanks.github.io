@@ -1487,7 +1487,11 @@ export class AiDirector {
         // 否则以后走近、从 LOD 切回完整模型时会突然“复活”成站姿。
         // 尸体刚体还在（最多 8 秒，见 StepCorpse）也继续更新 —— 从坟顶滑到平地的
         // 途中肢体下垂量在变，姿势冻住的话滑到平地后手脚还保持着悬空下垂的角度。
-        if (s.actor && (s.deadTime <= 0.9 || s.corpse)) {
+        // 倒地动作没放完（ragdollState.t < 1）也继续更新：「0.9 s 收敛」是旧的 0.8 s 程序化倒地的账，
+        // Kimodo 库 1.6 倍速也要 1.7–1.9 s、物理仿真库 1.6–3.2 s。只按 0.9 s 截断的话尸体刚体一拆，
+        // 人就定在半跪 / 撑地的中间帧，枪悬在半空（2026-09-30 受击反应验收实拍：t 停在 0.47，枪最低点离地 0.15–0.38 m）。
+        // 放完那一帧（t 到 1）照常走一遍，接地拟合的终帧旋转就在那一帧写进去，之后才停。
+        if (s.actor && (s.deadTime <= 0.9 || s.corpse || (s.actor.ragdollState && s.actor.ragdollState.t < 1))) {
           s.actor.Update(dt, { dead: true, dying: Clamp01(s.deadTime / 0.9), elapsed: this.time });
         }
         profiler?.E("ai/corpse");
