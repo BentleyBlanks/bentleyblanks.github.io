@@ -150,47 +150,61 @@ export function BuildTransferWhitebox(groundAt) {
   Pole("TransferPoleNorthWest", 57.6, 82.6);
 
   // ---------------------------------------------------------------------
-  // 2026-09-30 夹道高墙（12–18 白盒 C2 包，概念 13_3「仰看俯冲」、13_1、12_2 / 12_4；walls 数据在
-  // MID_TUNING.transferEvac.walls.westTall / eastTall，疏散遮挡点与撤退通道同表）。
-  //   · 西侧（路右，13_3 近处那道）：青砖高墙 3.7 m + 瓦压顶 + 四根壁柱，z 118.5–130 连续，只在 z 123.4–124.8
-  //     开一扇窗（窗台 1.1、窗顶 2.3，12_2 概念「墙上带窗洞」），墙脚是 0.75 m 深的路沟（地形表 RoadSideDitchWest）。
-  //     墙身底部沉进路沟 / 路堤坡下（y −0.8），顶高是相对路面（y≈0）的 3.7，从沟里量是 4.5 m。
-  //   · 东侧（路左）：夯土高墙 3 m，z 125.6–136.4 连续（北头 z 122.5 留给车位、上车位与 cartRide 的口子，
-  //     南头到桥头墩）。顶上是塌了一角的土冠，不带压顶。
-  //   · 墙净距 79.65 − 71.35 = 8.3 m（概念 8–10 m）；牛车盒 2.5 m 沿 cartRide 一路离墙 ≥ 1.2 m。
+  // 2026-09-30 夹道高墙（12–18 白盒 C2 包，概念 13_3「两道长墙夹着一条车路」、13_1、12_2 / 12_4；墙段、门洞与
+  // 疏散遮挡点、撤退通道同表：MID_TUNING.transferEvac.walls 的 westTall / eastTall / westDoor / eastGate）。
+  //   · 西侧（路右，13_3 近处那道）：青砖高墙 3.7 m + 瓦压顶 + 壁柱，z 103.6–129.6，只在 z 108.0–112.95 留一个
+  //     4.95 m 的门洞（两侧门垛），窗洞在 z 123.4–124.8（窗台 1.1、窗顶 2.3）；墙脚 z 118.4–130.8 是 0.75 m 深的路沟
+  //     （地形表 RoadSideDitchWest）。墙身底部沉进路沟 / 路堤坡下（y −0.8），顶高是相对路面（y≈0）的 3.7。
+  //   · 东侧（路左）：夯土高墙 3 m，x 81.7、z 117.85–136.4，北头是砖门垛，门垛以北到低墙端（z 104.2）是 13.65 m 的
+  //     院门式开口（cartRide 与 bay 车进路、追兵 / 撤退的口子都在里头，无门楣：车路上方开天）；窗洞在 z 129.2–130.6。
+  //     顶上是塌了一角的土冠。侧巷机枪 B 的射线要穿过 x 81.7 处 z 107–110.4，所以那一段不能砌墙（见 walls 注释）。
+  //   · 墙内皮净距 81.35 − 71.35 = 10.0 m（概念 8–10 m）。
   {
-    const wx = RoadWalls.westX, ex = RoadWalls.eastX, t = RoadWalls.thickTallM;
-    const [[wz0, wz1]] = RoadWalls.westTall, [[ez0, ez1]] = RoadWalls.eastTall;
+    const wx = RoadWalls.westX, ex = RoadWalls.eastTallX, t = RoadWalls.thickTallM, et = RoadWalls.eastThickTallM;
+    const [[wn0, wn1], [ws0, ws1]] = RoadWalls.westTall, [[es0, es1]] = RoadWalls.eastTall;
     const foot = -0.8, top = 3.7, winZ0 = 123.4, winZ1 = 124.8, sillTop = 1.1, headBottom = 2.3;
     const WestBody = (id, z0, z1, y0, y1) => At(id, wx, (z0 + z1) / 2, t, y1 - y0, z1 - z0, y0, "structure");
-    WestBody("TransferRoadWestWallA", wz0, winZ0, foot, top);
+    WestBody("TransferRoadWestWallN", wn0, wn1, foot, top);
+    WestBody("TransferRoadWestWallA", ws0, winZ0, foot, top);
     WestBody("TransferRoadWestWallSill", winZ0, winZ1, foot, sillTop);
     WestBody("TransferRoadWestWallLintel", winZ0, winZ1, headBottom, top);
-    WestBody("TransferRoadWestWallB", winZ1, wz1, foot, top);
+    WestBody("TransferRoadWestWallB", winZ1, ws1, foot, top);
     // 壁柱：路一侧凸出 0.3 m（离墙脚 WestFoot* 的蹲位 x 72.6 还有 ≥ 0.9 m）。
-    [119.5, 122.7, 125.9, 128.9].forEach((z, i) =>
+    [104.6, 106.4, 116.0, 119.5, 122.7, 125.9, 128.9].forEach((z, i) =>
       At(`TransferRoadWestWallPilaster${i}`, wx + .4, z, .5, top + .15 - foot, .9, foot, "structure"));
-    const zc = (wz0 + wz1) / 2, len = wz1 - wz0;
-    Detail("TransferRoadWestWallCoping", wx, zc, t + .36, .22, len + .3, "coping", { y: top + .11 });
-    Detail("TransferRoadWestWallCopingRidge", wx, zc, .22, .12, len + .2, "coping", { y: top + .28 });
-    // 窗洞里的窗棂：两根竖的、一根横的（不碰撞）。
+    // 门垛：宽 0.95、比墙身高 0.35，两侧各凸出 0.12，垛帽是瓦压顶。门洞净宽 = 门垛内皮之间。
+    for (const [id, zc] of [["N", wn1 - .45], ["S", ws0 + .45]]) {
+      At(`TransferRoadWestDoorPier${id}`, wx, zc, .95, top + .35 - foot, .9, foot, "structure");
+      Detail(`TransferRoadWestDoorPierCap${id}`, wx, zc, 1.25, .18, 1.2, "coping", { y: top + .35 + .09 });
+    }
+    for (const [id, z0, z1] of [["N", wn0, wn1], ["S", ws0, ws1]]) {
+      const zc = (z0 + z1) / 2, len = z1 - z0;
+      Detail(`TransferRoadWestWallCoping${id}`, wx, zc, t + .36, .22, len + .3, "coping", { y: top + .11 });
+      Detail(`TransferRoadWestWallCopingRidge${id}`, wx, zc, .22, .12, len + .2, "coping", { y: top + .28 });
+    }
+    // 窗洞里的窗棂：两根竖的（不碰撞）。
     for (const z of [winZ0 + .45, winZ0 + .95]) At(`TransferRoadWestWallBar${z.toFixed(2)}`, wx, z, .1, headBottom - sillTop, .1, sillTop, "timber", { solid: false });
-    // 东墙脚（路一侧）码两垛袋子（标准沙袋模型，Data_FirstLevelMissionFortifications.IsMissionSandbagBlock 认 id）：
-    // 离 cartRide 车身（z 128–132 处 x ≤ 77.9）≥ 0.5 m，朝西挡。西墙脚被侧翻残车 ConvoyWreck 和两个蹲位占了。
-    Block("TransferRoadFootBags0", 79.0, 128.6, .9, .9, 1.6, "cover", { cover: { faceX: -1, faceZ: 0 } });
-    Block("TransferRoadFootBags1", 79.0, 132.6, .9, .9, 1.6, "cover", { cover: { faceX: -1, faceZ: 0 } });
 
-    // 东墙也开一扇窗（12_2 概念：路两侧都是带窗洞的残墙）：z 129.2–130.6，窗台 1.0、窗顶 2.2。
-    const eastWinZ0 = 129.2, eastWinZ1 = 130.6, et = t + .05;
-    for (const [id, z0, z1, y0, y1] of [["TransferRoadEastWallTallA", ez0, eastWinZ0, -0.8, 3.05],
-      ["TransferRoadEastWallTallSill", eastWinZ0, eastWinZ1, -0.8, 1.0], ["TransferRoadEastWallTallLintel", eastWinZ0, eastWinZ1, 2.2, 3.05],
-      ["TransferRoadEastWallTallB", eastWinZ1, ez1, -0.8, 2.75]])
+    // 东墙：夯土，三段（北头 / 院门以南 / 窗洞两边）+ 院门两侧的砖门垛。
+    const eastWinZ0 = 129.2, eastWinZ1 = 130.6, eastTop = 3.05;
+    for (const [id, z0, z1, y0, y1] of [
+      ["TransferRoadEastWallTallA", es0, eastWinZ0, -0.8, eastTop],
+      ["TransferRoadEastWallTallSill", eastWinZ0, eastWinZ1, -0.8, 1.0], ["TransferRoadEastWallTallLintel", eastWinZ0, eastWinZ1, 2.2, eastTop],
+      ["TransferRoadEastWallTallB", eastWinZ1, es1, -0.8, 2.75]])
       At(id, ex, (z0 + z1) / 2, et, y1 - y0, z1 - z0, y0, "earthDark");
+    for (const [id, zc] of [["GateS", es0 + .45]]) {
+      At(`TransferRoadEast${id}Pier`, ex, zc, .95, 3.95 - foot, .9, foot, "structure");
+      Detail(`TransferRoadEast${id}PierCap`, ex, zc, 1.25, .18, 1.2, "coping", { y: 3.95 + .09 });
+    }
     // 土冠：几处高低不一的隆起（夯土墙顶被雨冲、被草根拱出来的样子），不碰撞。
-    [[0, 126.7, 1.9, .3], [1, 129.4, 2.4, .42], [2, 132.6, 1.6, .28], [3, 135.0, 1.9, .36]].forEach(([i, z, l, h]) =>
-      Detail(`TransferRoadEastWallCrown${i}`, ex, z, et + .1, h, l, "earthDark", { y: (z < 131 ? 3.05 : 2.75) + h / 2 - .02 }));
+    [[1, 121.6, 2.2, .38], [2, 126.7, 1.9, .3], [3, 129.4, 2.4, .42], [4, 132.6, 1.6, .28], [5, 135.0, 1.9, .36]].forEach(([i, z, l, h]) =>
+      Detail(`TransferRoadEastWallCrown${i}`, ex, z, et + .1, h, l, "earthDark", { y: (z < 131 ? eastTop : 2.75) + h / 2 - .02 }));
     // 墙脚碎土（路一侧，不碰撞）。
-    [[0, 127.4], [1, 130.4], [2, 134.3]].forEach(([i, z]) => Detail(`TransferRoadEastWallFoot${i}`, ex - .95, z, .7, .28, .9, "earthDark", { ry: i * .7 }));
+    [[1, 124.4], [2, 127.4], [3, 130.4], [4, 134.3]].forEach(([i, z]) => Detail(`TransferRoadEastWallFoot${i}`, ex - .95, z, .7, .28, .9, "earthDark", { ry: i * .7 }));
+    // 东墙脚（路一侧）码两垛袋子（标准沙袋模型，Data_FirstLevelMissionFortifications.IsMissionSandbagBlock 认 id）：
+    // 离 cartRide 车身（z 128–132 处 x ≤ 77.9）≥ 2 m，朝西挡。西墙脚被侧翻残车 ConvoyWreck 和两个蹲位占了。
+    Block("TransferRoadFootBags0", 80.85, 128.6, .9, .9, 1.6, "cover", { cover: { faceX: -1, faceZ: 0 } });
+    Block("TransferRoadFootBags1", 80.85, 132.6, .9, .9, 1.6, "cover", { cover: { faceX: -1, faceZ: 0 } });
   }
 
   // ---------------------------------------------------------------------

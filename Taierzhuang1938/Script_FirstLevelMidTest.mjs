@@ -763,6 +763,44 @@ const Step = (host, module, seconds, options = {}) => {
     }
     assert.deepEqual([...hits], [], `${post.cast} runs straight from the defence post to the ditch mouth`);
   }
+  // 14 救人（2026-09-30 第二轮）：刘文才 / 幺娃用 MoveActor 直线奔向老周。装载区东侧 (84,106) 一带出发的直线（0.35 m 胶囊）
+  // 要落在西门洞 / 东开口里 —— 第一版门洞只开 2.9 m，整关驾驶在 Rescue 里卡了 575 s，量出来就是刘文才的斜线擦墙，
+  // 门洞因此加宽到 4.95 m。从路中更靠南的地方出发的人，Rescue 里改由 RescueWaypoint 先带到门洞（下面单测）。
+  for (const start of [{ x: 84, z: 106 }, { x: 82, z: 108 }, { x: 79, z: 110 }])
+    for (const target of [E.ditchMouth, { x: 39, z: 116 }]) {
+      const hits = new Set(), length = Distance(start, target);
+      for (let d = 0; d <= length; d += .1) {
+        const box = Hit(start.x + (target.x - start.x) * d / length, start.z + (target.z - start.z) * d / length, .35);
+        if (box) hits.add(box.id);
+      }
+      assert.deepEqual([...hits], [], `rescuer straight line from ${start.x},${start.z} to ${target.x},${target.z} passes the walls`);
+    }
+  // RescueWaypoint（含人停在离折点 0.7 m 处的情形）：路上 z 98–134 任意一点出发，顺着「折点 → 折点」走到下沟口，每一段都不撞夹道的墙与门垛（沟边的房子另算），穿西墙只走门洞（AI 身体过不去 2.2 m 的窄缺口）。
+  {
+    const transfer = new FirstLevelTransferCart(MakeHost("Rescue"));
+    const goal = { x: 54, z: 114 }, bad = [];
+    for (let x = 72.5; x <= 79.5; x += 1.5) for (let z = 98; z <= 134; z += 2) {
+      if (Hit(x, z, .4)) continue;
+      let at = { x, z };
+      for (let step = 0; step < 12 && Distance(at, goal) > .5; step++) {
+        const next = transfer.RescueWaypoint(at, goal), length = Distance(at, next);
+        // MoveActor 的到达半径：人停在离折点 0.7 m 的地方就算到了。
+        const stop = length > 0.7 ? { x: at.x + (next.x - at.x) * (1 - 0.7 / length), z: at.z + (next.z - at.z) * (1 - 0.7 / length) } : next;
+        // 穿西墙只走门洞（或南头 129.6 以南）：AI 身体过不去 2.2 m 的窄缺口（整关驾驶里幺娃卡在 z 101.4–103.6 的缺口里）。
+        if (at.x > 71.35 && next.x < 70.65) {
+          const zc = at.z + (next.z - at.z) * (at.x - 71) / (at.x - next.x), [d0, d1] = M.transferEvac.walls.westDoor;
+          if (!((zc > d0 + .5 && zc < d1 - .5) || zc > 130.6 || zc < 90)) { bad.push(`${x},${z} crosses the west wall at z ${zc.toFixed(1)}, not a door`); step = 99; }
+        }
+        for (let d = 0; d <= length; d += .1) {
+          const box = Hit(at.x + (next.x - at.x) * d / (length || 1), at.z + (next.z - at.z) * d / (length || 1), .35);
+          if (box && /^TransferRoad(West|East)/.test(box.id)) { bad.push(`${x},${z} -> ${next.x.toFixed(1)},${next.z.toFixed(1)}: ${box.id}`); step = 99; break; }
+        }
+        at = step === 99 ? at : (next === goal ? next : stop);
+      }
+      if (Distance(at, goal) > 1.5 && !bad.length) bad.push(`${x},${z} stalls at ${at.x.toFixed(1)},${at.z.toFixed(1)}`);
+    }
+    assert.deepEqual(bad, [], "RescueWaypoint leads every road position through a door to the ditch");
+  }
   // 散开计划本身：路上的人分到同侧遮挡点，最后一点就是停车位；墙外的人不回头穿墙。
   const plans = MidTransferScatterPlan([{ x: 75, z: 100 }, { x: 78, z: 100 }, { x: 69.5, z: 100 }, { x: 88, z: 100 }]);
   Check(plans[0].route.at(-1).x < E.walls.westX && plans[1].route.at(-1).x > E.walls.eastX,
@@ -861,11 +899,17 @@ const Step = (host, module, seconds, options = {}) => {
   const W = M.transferEvac.walls;
   const westLen = W.westTall.reduce((sum, [z0, z1]) => sum + z1 - z0, 0);
   const eastLen = W.eastTall.reduce((sum, [z0, z1]) => sum + z1 - z0, 0);
-  Check(W.westTall.length === 1 && westLen >= 10, "西高墙是一整段 >= 10 m：" + westLen);
-  Check(W.eastTall.length === 1 && eastLen >= 10, "东高墙是一整段 >= 10 m：" + eastLen);
-  Check(Top("TransferRoadWestWallA") >= 3.5 && Top("TransferRoadWestWallB") >= 3.5, "西高墙顶高 >= 3.5 m（路面 y≈0）");
+  // 2026-09-30 第二轮：西高墙 z 103.6–129.6 只在一个门洞处断开；东高墙 z 117.85–136.4，北头是院门式开口。
+  Check(W.westTall.length === 2 && westLen >= 20, "西高墙两段合计 >= 20 m（只在一个门洞处断开）：" + westLen);
+  Check(W.eastTall.length === 1 && eastLen >= 18, "东高墙一整段 >= 18 m：" + eastLen);
+  Check(W.westDoor[1] - W.westDoor[0] >= 2.6 && Math.abs(W.westDoor[0] - W.westTall[0][1]) < 1e-6 && Math.abs(W.westDoor[1] - W.westTall[1][0]) < 1e-6,
+    "西墙门洞净宽 >= 2.6 m（担架 1.3 m + 两侧余量），两头正是两段墙的端点");
+  Check(W.eastGate[1] - W.eastGate[0] >= 6.1 && W.eastGate[1] === W.eastTall[0][0],
+    "东墙院门式开口净宽 >= 6.1 m（cartRide 车盒 2.5 x 2.9 加 1.25 / 1.45 余量）：" + (W.eastGate[1] - W.eastGate[0]));
+  Check(["N", "A", "B"].every((id) => Top("TransferRoadWestWall" + id) >= 3.5), "西高墙各段顶高 >= 3.5 m（路面 y≈0）");
+  Check(["N", "S"].every((id) => Top("TransferRoadWestDoorPier" + id) >= 3.9) && Top("TransferRoadEastGateSPier") >= 3.9, "门垛比墙身高");
   Check(Top("TransferRoadEastWallTallA") >= 2.8 && Top("TransferRoadEastWallTallB") >= 2.6, "东高墙顶高 >= 2.6–2.8 m");
-  const westFace = W.westX + W.thickTallM / 2, eastFace = W.eastX - (W.thickTallM + .05) / 2;
+  const westFace = W.westX + W.thickTallM / 2, eastFace = W.eastTallX - W.eastThickTallM / 2;
   Check(eastFace - westFace >= 8 && eastFace - westFace <= 10, "两墙内皮净距 8–10 m：" + (eastFace - westFace).toFixed(2));
   // 西高墙的窗：窗台之上、窗顶之下是空的（子弹与视线穿得过），窗台不高于 1.2 m（不能当矮墙翻）。
   const sill = solid.find((block) => block.id === "TransferRoadWestWallSill"), head = solid.find((block) => block.id === "TransferRoadWestWallLintel");

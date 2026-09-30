@@ -111,8 +111,8 @@ export class FirstLevelMissionView {
       ["medical", new THREE.BoxGeometry(0.24, 0.2, 0.12), 0xe1e2d5, 32],
       ["cart", new THREE.BoxGeometry(3, 0.38, 5.8), 0x8a7b69, 7],
       ["wheel", new THREE.CylinderGeometry(0.48, 0.48, 0.15, 10), 0x454a48, 28],
-      // 停滞车列车板上的麻袋（MID.transferConvoy）：一辆车 18 只，三辆。
-      ["cartSack", CartSackGeometry(), 0xa39a80, 96],
+      // 停滞车列车板上的麻袋（MID.transferConvoy）：一辆车 18 只，最多同时 6 辆（B C D 与 E E2 E3 替身）。
+      ["cartSack", CartSackGeometry(), 0xa39a80, 144],
     ]) {
       const material = new THREE.MeshStandardMaterial({ color, roughness: 0.92, vertexColors: key === "bed" });
       this.materials.push(material);

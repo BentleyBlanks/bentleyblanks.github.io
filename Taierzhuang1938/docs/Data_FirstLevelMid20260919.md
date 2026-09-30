@@ -280,3 +280,26 @@ node Taierzhuang1938/Script_MotionVectorContractTest.mjs
 **门禁与取证**：`Script_FirstLevelMidTest` / `Script_FirstLevelWhiteboxTransferTest` / `Script_FirstLevelWhiteboxTerrainTest` / `Script_FirstLevelMissionTest` / `Script_FirstLevelMissionTopologyTest --rear-only` / `Script_FirstLevelSpaceTest`（07+ 指纹红是预期：本包改了 z ≥ 100 的体块与地面，指纹由集成者重生）。整关驾驶 `Script_FirstLevelMissionBrowserTest --campaign --stage-jumps --stage-from=11 --stage-to=14`（`--stage-from=12` 不在 `CAMPAIGN_SEGMENT_STARTS`，从 11 起）在 13 停车后从机位表 13_1–13_4 各拍一张（`Kit.CapturePose`，证据在 `_shots/FirstLevelStageMiddle*/Scene_AirRaidView13_*.png`）；`CarryToDitch` 的路线改走南通道（卸车口 (72.8,133.4) → (64.6,125) → 沟口），老走法 (70,112) 会顶在西高墙上。
 
 **已知遗留**：① 14 的西沟本身（宽度、沟壁陡度）是壕沟样条，本包没动，14_2 / 14_4 的「窄陡泥沟」只靠沟沿外的残墙 / 山墙压出上方的高度感，沟底仍偏宽；② 概念图 13_3 左手的夯土墙是「很长一整道」，这里东高墙只有 z 125.6–136.4（车位与 cartRide 的车线占了北边）；③ 飞机、弹着、烟尘、路面尘土是运行时演出，不在白盒范围；④ 整关驾驶脚本 `--stage-from=11 --stage-to=14` 在 14 的 MedicalRescue 之后死于 playwright `ERR_STRING_TOO_LONG`（Node 把一条超长 CDP 消息转成字符串），改前基线 e080b510 同一位置同一报错，与本包无关；`Script_FirstLevelMissionFortificationsTest`（FrontCommunication 沟）、`Script_FirstLevelMissionStageJumpTest`、`Script_FirstLevelEndTest`（ZhouDeath 接管时长）、`Script_FirstLevelMissionPresentationTest`（抬担架握杆误差）同样在基线上就红。`Kit.CapturePose` 瞬移后先空转 60 帧再拍（紧接着拍会拍到旧位置的残影）。
+
+### 6.1 第二轮（集成者验收后）：两道长墙 + 门洞
+
+第一轮两道墙各 ~10 m、一前一后错开，尽头仍是空田野。第二轮改成一对长墙夹着车路，口子一律做成带门垛的门洞：
+
+- **西墙**（青砖 3.7 m，压顶、壁柱）：z 103.6–129.6，只在 z 108.0–112.95 留一个 4.95 m 门洞（两侧门垛、垛帽瓦压顶）。北撤退通道 (73.5,111) → (60,111)、幺娃 (79,110) 直奔沟口的斜线（x 71 处 z≈111.3）、刘文才从东侧 (84,106) 一带直奔沟口的斜线（x 71 处 z≈109.5）都从这里过（14 救人靠 MoveActor 直线走：门洞先开 2.9 m，整关驾驶卡在 Rescue 里 575 s 不动，量出来是刘文才的斜线擦墙，加宽到 4.95 m）。原来 z 103.6–108.4 的残墙并进这一道。南端 129.6 不动。
+- **东墙**（夯土 3 m，x 81.7）：z 117.85–136.4，北头一根砖门垛；门垛以北到低墙端 z 104.2 是一个 13.65 m 的院门式开口，cartRide 第一段 (85.6,113) → (82,113) → (79,118)（TransferTest 按车盒 2.5 × 2.9 + 1.25 / 1.45 余量扫，净宽 ≥ 6.1 m 才过得去）、bay 车去上车位（`approachRoute` 改从 x 82.6、z 116.6 进路，上车位从 (80,120) 西挪 1 m 到 (79,120)：车盒不压进东墙内皮，Kit 的「车挡子弹」射线验的起点也不能落在墙里；路线长度与原来 ±2 m）、幺娃 / 刘文才的斜线都在里头。开口上方不封顶（车路上方开天，8 m 净空）。
+- **没能做到的**：东墙拉不到 z 104–111。TransferTest「B covers departing carts」——侧巷机枪 B（`MISSION_TACTICS` transferAlley 最后一个折点 (94.3,67.15)，12 的敌军战术，本包不动）打上车位一带的射线穿 x 81.7 处 z≈107–110.4，一段 3 m 高的墙会把它挡掉；装载区人群口袋 (82,100)、(82,106) 也离 x 81.7 太近。所以东墙实长 18.55 m，北头的开口比要求的「只留一个院门」宽；画面里东墙从夹道中段才开始。
+- 疏散 / 撤退：`WalkRoute` 把东高墙当第三条墙线；东墙外的人从院门式开口进路（`eastGapZ` 97.6 / 106.4 / 114.6）；`triageGap` 关掉（西墙敞口收成门洞，墙后的人按墙外算）；`MISSION_PURSUIT_ROUTE` 改走「东开口 (86,117) → 西门洞 z 112 → (61,112)」。
+- 停滞车列：B、C 在桥面上；E、E2、E3 三辆替身排在停车处到夹道中段（(76,135)、(77.2,126.4)、(78.9,119)，只在没有 cartRide 时站着，真流程里它们撤，顺子那辆车走这条线）；残车在西墙脚路沟里；13 真实驱动里是顺子那辆车 + 空袭掀翻的 bay 车 + 残车。
+- 14 救人：幺娃 / 刘文才 MoveActor 直线奔向老周，没有寻路。墙连续之后从路上出发的直线会顶在墙上，所以 `Script_FirstLevelMissionRuntime` 的 Rescue 段（一行）改成先问 `TransferCart.RescueWaypoint`（`MidTransferWalkRoute` 的第一个折点，12 班里人上射位用的同一份），MidTest 从路上 x 72.5–79.5、z 104–134 的每个格点出发逐折点扫墙与门垛。
+- 13_3 机位：蹲姿站进夹道北口 (76.8,107.2)，视线落在桥头墩，两墙向桥头收拢。
+
+**第二轮约束变更**
+
+| 条 | 原值 → 新值 | 为什么 |
+| --- | --- | --- |
+| 西墙 | z 118.5–129.6 一段 → z 103.6–108.0 + 112.95–129.6 两段（一个 4.95 m 门洞） | 向北接长 |
+| 东墙 | x 80、z 125.6–136.4 → x 81.7、z 117.85–136.4 | 路更宽（内皮净距 9.975 m），贴到 bay 车进路的北头 |
+| `Middle` 之外的「北」通道口 | (73.5,111) 不变，但西墙在那里是门洞 z 108.0–112.95 | 门洞正对通道口 |
+| `MISSION_PURSUIT_ROUTE` | 第一轮 (100,120.5)→(84,117)→(74,114.8)→(61,114.8)；现在 (100,120.5)→(86,117)→(74,112)→(61,112) | 穿门洞，不穿墙 |
+| bay 车 `approachRoute` 与上车位 | 经 (86,123)、(80,123)，终点 (80,120) → 经 (82.6,116.6)、(79.4,117)，终点 (79,120) | 东墙 z ≥ 117.85 连续，车盒不能压进墙 |
+| `triageGap` | z 112–118 → 关闭 | 敞口收成门洞 |

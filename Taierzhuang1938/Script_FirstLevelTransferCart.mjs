@@ -398,6 +398,18 @@ export class FirstLevelTransferCart {
       r.Record("columnOffRoad", { zhou: zhou.x, player: r.player.position.x });
   }
 
+  /**
+   * 14 救人：幺娃 / 刘文才用 MoveActor 直线奔向老周（没有寻路）。夹道两侧是连续的高墙之后，从路上出发的直线会顶在墙上，
+   * 所以每帧先问一下「从这里到那儿的路上有没有墙、要不要先过门洞」，MoveActor 只朝第一个折点走（MidTransferWalkRoute，
+   * 12 班里人上射位用的同一份）。墙外 / 没有墙挡着时就是目标本身。
+   */
+  RescueWaypoint(from, to) {
+    // 已经走到（离 1 m 以内）的折点跳过：MoveActor 的到达半径内就算到了，人停在离折点 0.5–1 m 的地方，
+    // 再问一遍第一个折点还是它，不跳就在原地打转（整关驾驶里幺娃卡在 (72.6,102.4)，正是这样）。
+    const route = MidTransferWalkRoute(from, to, { minGapM: 3.5 });
+    return route.find((point, i) => i === route.length - 1 || Distance(from, point) > 1) || to;
+  }
+
   State() {
     return {
       walkers: this.walkers.map((walker) => ({ id: walker.id, x: walker.x, z: walker.z, sorted: !!walker.sorted })),

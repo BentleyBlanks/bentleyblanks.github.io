@@ -1309,6 +1309,15 @@ export function CampaignActions(ctx) {
         capturedActivities.add("MedicalRescue");await CaptureFocus("MedicalRescue",state.mission.column.litters.find(l=>l.zhou));
       }
       if(chunk%12===11)console.log("WAIT_PROGRESS",JSON.stringify({expected,stage:state.mission.stage,time:state.mission.time,health:state.health,remaining:state.mission.remaining}));
+      // 14 救人卡住时看谁在哪儿：两个救人的人、老周、还有没有威胁沟口的活敌人（2026-09-30 夹道砌墙后卡过一次）。
+      if(chunk%12===11&&state.mission.stage==="Rescue")console.log("RESCUE_STATE",JSON.stringify(await page.evaluate(()=>{
+        const g=window.Tengxian,m=g.Debug.FirstLevelMission(),zhou=m.column.litters.find(l=>l.zhou),fmt=p=>[+p.x.toFixed(1),+p.z.toFixed(1)];
+        return {zhou:zhou&&fmt(zhou),strafed:m.facts.includes("zhouStrafed"),
+          rescuers:["yaowa","liuwencai"].map(id=>{const a=g.ai.soldiers.find(s=>s.castId===id),rt=g.Debug.FirstLevelMissionRuntime();
+            return a&&{id,alive:a.alive,at:fmt(a.position),ready:!!a.missionRescueReady,waypoint:zhou&&fmt(rt.transferCart.RescueWaypoint(a.position,zhou)),
+              squadRoute:rt.squadRoutes?.get(a.id)?.length??null,goal:a.goal&&fmt(a.goal),order:a.order,speed:a.scriptMoveSpeedMps};}),
+          enemies:g.ai.soldiers.filter(s=>s.alive&&s.side==="ija").map(s=>({id:s.id,at:fmt(s.position)})).slice(0,8)};
+      })));
       if(!state.alive&&await RetryCampaign())continue;
       if (state.mission.stage === expected || !state.alive) break;
     }

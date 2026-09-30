@@ -117,7 +117,11 @@ export class FirstLevelMissionColumn {
       progress: 0,
       overturned: false,
       state: i === 0 ? "loading" : "waiting",
-      approachRoute: [point, { x: 86, z: 123 }, { x: 80, z: 123 }, { x: 80, z: 120 }],
+      // 2026-09-30：东高墙（x 81.7，z 117.85–136.4）之后 bay 车从它北头的院门式开口进路（x 81.7 处 z 116.6，离门垛 1.2 m），
+      // 再拐到上车位；上车位从 (80,120) 西挪 1 m 到 (79,120)：车盒（半宽 1.5）不再压进东墙内皮 x 81.325
+      // （驾驶脚本 Kit 拿车盒东沿 + 0.3 m 处朝西射线验「车是真的挡子弹」，起点不能落在墙里）；路线长度与原来
+      // （经 (86,123)、(80,123)）相差在 ±2 m 内，装载节奏不变。
+      approachRoute: [point, { x: 82.6, z: 116.6 }, { x: 79.4, z: 117 }, { x: 79, z: 120 }],
       approachProgress: 0,
     }));
     this.traffic = Array.from({ length: 3 }, (_, i) => ({
