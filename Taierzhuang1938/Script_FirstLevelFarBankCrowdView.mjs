@@ -1,8 +1,8 @@
 // ===========================================================================
 // Script_FirstLevelFarBankCrowdView.mjs —— 18 对岸纯视觉人群的表现层（带 three）
 //
-// 人本身由 AI 的远景批渲染层画（FarBankCrowd.Draw，见 Script_FirstLevelFarBankCrowd）。这里只管三样：
-//   · 旗：执旗的人手里的日章旗（白底红圆，杆 3.3 m、旗面 1.5×1.0 m，旗面朝南、随风摆）——远处成片的人里，旗是一眼能读出「军队」的剪影；
+// 人本身画在这里自己的一层批渲染里（ActorCrowd，见 Prepare；FarBankCrowd.Draw 每帧往里 Push）。另外管三样：
+//   · 旗：执旗的人手里的日章旗（白底红圆，杆 4.2 m、旗面 2.1×1.4 m，旗面朝南、随风摆）——远处成片的人里，旗是一眼能读出「军队」的剪影；
 //   · 刀：军官举起的指挥刀（细长的钢色片，边走边挥）；
 //   · 枪口焰 / 曳光 / 弹着：FarBankCrowd.TakeShots 的事件，用共用的 vfx 画（MuzzleFlash / Tracer / Impact）。
 // 旗与刀是**逐个普通 Mesh**（每个一个 draw，共 ≤ 16 个），不是 InstancedMesh：会动的实例没有前帧历史，

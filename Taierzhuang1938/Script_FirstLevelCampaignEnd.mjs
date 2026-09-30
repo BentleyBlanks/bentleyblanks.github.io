@@ -546,6 +546,13 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     assert.equal(fb.real, 8, "BridgeWithdraw 放出 8 个真 AI");
     assert.ok(fb.rushState?.started, "冲桥组起跑");
     assert.ok(fb.ijaCount <= fb.ijaCap, `同屏日军 ${fb.ijaCount} ≤ ${fb.ijaCap}（actorPool ija 预建 48）`);
+    // 规模感（R2b，docs §10）：纯视觉人群 ≥ 200 个在场（不占 ija 池）；三辆战车都在位，桥面上那辆停在桥中孔（z 112…126）。
+    console.log("FARBANK_CROWD_WITHDRAW", JSON.stringify(fb.crowd));
+    assert.ok(fb.crowd && fb.crowd.onField >= 200 && fb.crowd.flags >= 10, `BridgeWithdraw 起视觉人群 ${fb.crowd?.onField} ≥ 200、旗 ${fb.crowd?.flags}`);
+    assert.equal(fb.tanks.length, 3, "三辆傀儡战车");
+    assert.ok(fb.tanks.every(t => t.state === "posted"), `三辆都到位：${fb.tanks.map(t => t.id + ":" + t.state)}`);
+    const bridgeTank = fb.tanks.find(t => /Bridge$/.test(t.id));
+    assert.ok(bridgeTank && bridgeTank.z >= 112 && bridgeTank.z <= 126, `桥面上那辆先停在桥中孔（z ${bridgeTank?.z}）`);
     await CaptureLook(page, CaptureFocus, "FarBankWithdrawStand", FAR_BANK_LOOK, "stand");
     await CaptureLook(page, CaptureFocus, "FarBankWithdrawCrouch", FAR_BANK_LOOK, "crouch");
   }
@@ -633,6 +640,11 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     assert.ok(fb.shells.fired >= 1 && fb.shells.minPlayerM >= 22 && fb.shells.minFriendlyM >= 10,
       `战车炮击了 ${fb.shells.fired} 发，落点离玩家最近 ${fb.shells.minPlayerM} m、离己方最近 ${fb.shells.minFriendlyM} m`);
     assert.ok(fb.mg.rounds > 0, "战车机枪打过曳光");
+    // 规模感：桥断之后视觉人群全在位、没有人在被炸孔上；桥面上那辆战车已开到断口北侧（车头在 2 号墩 z 136 以北）。
+    console.log("FARBANK_CROWD_HALTED", JSON.stringify(fb.crowd));
+    assert.ok(fb.crowd.onField >= 280 && fb.crowd.holding >= 250, `桥断后视觉人群 ${fb.crowd.onField} 在场、${fb.crowd.holding} 在位`);
+    const bridgeTank = fb.tanks.find(t => /Bridge$/.test(t.id));
+    assert.ok(bridgeTank.z >= 126 && bridgeTank.z + 2.15 <= 136, `桥面上那辆停在断口北侧（z ${bridgeTank.z}，车头 ${(bridgeTank.z + 2.15).toFixed(1)}）`);
   }
 
   // --- 18 夜入滕城：先随队走完 marchOut，黑屏字幕，夜景，进北门 ---------------
