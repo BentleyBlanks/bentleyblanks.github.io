@@ -23,7 +23,7 @@ import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { FIRST_LEVEL_DIALOGUE_DIRECTION, PROJECTION_DB, DIALOGUE_DUCK, LineDirection, FALLBACK_GAP_S, MAX_LIVE_DIALOGUE_LINES } from "./Data_FirstLevelDialogueDirection.mjs";
 import { FIRST_LEVEL_VOICE_CAST, CastVoiceOwner, SQUAD_BARK_KEYS, SQUAD_BARK_CAST, SQUAD_BARK_STAGES, SquadBarkEntries, SquadBarkKey,
-  SquadBarkLive, SQUAD_BARK_RETIRED, SQUAD_BARK_RETIRED_TEXT }
+  SquadBarkLive, SQUAD_BARK_RETIRED, SQUAD_BARK_RETIRED_TEXT, SQUAD_BARK_TAKES, SQUAD_BARK_EXTRA_TAKES, BarkTakeVoice, PLAYER_VENT_TEXT, PLAYER_VENT_KEYS }
   from "./Data_FirstLevelVoiceCast.mjs";
 import { FirstLevelMissionVoice, BARK_SPEAKER_MATCH_M } from "./Script_FirstLevelMissionVoice.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
@@ -559,7 +559,16 @@ const FakeAudio = () => {
   assert.deepEqual([...SquadBarkLive("player")].sort(), [...new Set([...orders.matchAll(/: "(\w+)"/g)].map(([, key]) => key))].sort(),
     "玩家（顺子）下令喊的每条都有本人版本");
   // 本人版本录的是会被随机喊到的口令（非 event）；罗班长的战车预兆句例外：它们只由战车接线层点名，本来就标 event。
-  for (const { key } of SquadBarkEntries()) assert.ok(nra.some((line) => line.key === key && (!line.event || luoTank.includes(key))),
+  // 顺子打空弹药骂的那几句：只由 Script_PlayerVent 点名，不进 Data_Voice（随机口令表抽不中），原文在 PLAYER_VENT_TEXT。
+  assert.deepEqual([...SquadBarkLive("playerVent")].sort(), Object.keys(PLAYER_VENT_TEXT).sort(), "顺子打空骂的每句都录进另录的那一条");
+  assert.deepEqual([...PLAYER_VENT_KEYS.ammo, ...PLAYER_VENT_KEYS.grenade].sort(), Object.keys(PLAYER_VENT_TEXT).sort(), "骂的句子分成子弹 / 手榴弹两组，不漏不重");
+  assert.ok(PLAYER_VENT_KEYS.ammo.length >= 2 && PLAYER_VENT_KEYS.grenade.length >= 2, "每组至少两句（连着两次不骂同一句）");
+  for (const key of Object.keys(PLAYER_VENT_TEXT)) {
+    assert.ok(!VOICE_LINES.some((line) => line.key === key), key + " 不进 Data_Voice");
+    assert.ok(!PLAYER_VENT_TEXT[key].includes("咯"), key + " 不用「咯」");
+  }
+  for (const [take, { who }] of Object.entries(SQUAD_BARK_EXTRA_TAKES)) assert.ok(SQUAD_BARK_CAST[who] && !(take in SQUAD_BARK_CAST), take + " 是 " + who + " 另录的一条，不是另一个人");
+  for (const { key } of SquadBarkEntries().filter((e) => !PLAYER_VENT_TEXT[e.key])) assert.ok(nra.some((line) => line.key === key && (!line.event || luoTank.includes(key))),
     key + " 是 Data_Voice 里的中方口令（非 event，或罗班长点名的战车句；文本一字不改）");
   for (const who of Object.keys(SQUAD_BARK_CAST)) assert.ok(FIRST_LEVEL_VOICE_CAST[who] && !FIRST_LEVEL_VOICE_CAST[who].sharesWith, who + " 有自己的定妆音");
   assert.equal(new Set(SquadBarkEntries().map((e) => e.file)).size, SquadBarkEntries().length, "文件名不撞");
@@ -632,8 +641,54 @@ const FakeAudio = () => {
   assert.equal(Bark("spot", { seed: 3, who: "luo" }).name.includes("@luo"), true, "调用方直接给 who 也认");
   assert.equal(Bark("rally", { key: "rally_hold", priority: true }).name, "voice.rally_hold@shunzi", "玩家下令点名的那句用顺子自己的版本");
   assert.equal(Bark("rally", { key: "rally_follow", priority: true }).name, "voice.rally_follow", "点名的句子顺子没有本人版本：用公用那条");
+  // 只有本人版本、没有公用那条的句子（顺子打空骂的）：点名 key + who 直接用本人版本、不变调；不点名谁都抽不中。
+  bank.set(SquadBarkKey("vent_ammo_1", "shunzi"), { key: SquadBarkKey("vent_ammo_1", "shunzi"), kind: null, side: "nra", barkOf: "shunzi", base: "vent_ammo_1" });
+  const vent = Bark("vent", { key: "vent_ammo_1", who: "shunzi", priority: true });
+  assert.ok(vent && vent.name === "voice.vent_ammo_1@shunzi" && vent.pitch === 1, "点名顺子骂的那句：本人版本、不变调");
+  assert.equal(Bark("vent", { key: "vent_ammo_1", priority: true }), undefined, "不点名人：没有公用那条就不喊");
+  assert.equal(Bark("vent", { seed: 0, priority: true }), undefined, "骂的句子不进随机池子");
   engine.barkSpeaker = null;
   assert.ok(Many("spot", { seed: 7 }).every((p) => !p.name.includes("@")), "没装认人钩子（07 以后）：本人版本不进公用池子");
+  {
+    // 11d. Script_PlayerVent：每类第一次打空必骂（晚一拍、对白在说就等），之后按概率 + 冷却；没喊成不算骂过；连着两次不骂同一句。
+    const { PlayerVent, PLAYER_VENT } = await import("./Script_PlayerVent.mjs");
+    const said = [];
+    let blocked = false, bankReady = true, roll = 0.99;
+    const vent = new PlayerVent({ audio: { Bark: (kind, o) => { if (!bankReady) return null; said.push(o); return {}; } },
+      Random: () => roll, Blocked: () => blocked });
+    const Step = (seconds) => { for (let t = 0; t < seconds; t += 0.05) vent.Update(0.05); };
+    assert.ok(vent.Empty("ammo"), "第一次打空子弹：排上（概率抽不中也要骂）");
+    Step(PLAYER_VENT.delayS.ammo - 0.1);
+    assert.equal(said.length, 0, "晚一拍，枪声先响完");
+    blocked = true; Step(2);
+    assert.equal(said.length, 0, "对白在说：等着");
+    blocked = false; Step(0.1);
+    assert.equal(said.length, 1, "对白说完就骂");
+    assert.ok(PLAYER_VENT_KEYS.ammo.includes(said[0].key) && said[0].who === "shunzi" && said[0].priority, "骂的是子弹那组、点名顺子本人");
+    Step(PLAYER_VENT.cooldownS + 1);
+    assert.ok(!vent.Empty("ammo"), "第二次以后按概率：抽不中就不骂");
+    roll = 0;
+    assert.ok(vent.Empty("ammo"), "抽中了就骂");
+    Step(1);
+    assert.equal(said.length, 2);
+    assert.notEqual(said[1].key, said[0].key, "连着两次不骂同一句");
+    assert.ok(!vent.Empty("ammo"), "冷却内不骂");
+    bankReady = false;
+    assert.ok(vent.Empty("grenade"), "手榴弹第一次打空也必骂（与子弹分开算）");
+    Step(PLAYER_VENT.delayS.grenade + PLAYER_VENT.firstWaitS + 0.5);
+    assert.equal(said.length, 2, "声库没装：喊不出来，等过了时限就放弃");
+    bankReady = true; roll = 0.99;
+    assert.ok(vent.Empty("grenade"), "上次没喊成：下次打空仍算第一次，必骂");
+    Step(1);
+    assert.ok(said.length === 3 && PLAYER_VENT_KEYS.grenade.includes(said[2].key), "骂的是手榴弹那组");
+    // 两类同时排上（先扔最后一颗雷、又打光子弹）：各骂各的，不互相顶掉；Bark 的同类闸只放一句时后一句接着等。
+    const both = new PlayerVent({ audio: { Bark: (kind, o) => { said.push(o); return {}; } }, Random: () => 0.99 });
+    said.length = 0;
+    both.Empty("grenade"); both.Empty("ammo");
+    for (let t = 0; t < 2; t += 0.05) both.Update(0.05);
+    assert.deepEqual(said.map((o) => o.key.split("_")[1]).sort(), ["ammo", "grenade"], "两类第一次都骂到");
+    console.log("ok 顺子打空骂一句：第一次必骂、之后按概率与冷却、对白让路、没喊成不算");
+  }
   console.log(`ok 班组战斗短句：${SquadBarkEntries().length} 条本人版本覆盖 AI 会喊的与玩家下令的每一句；按位置认人；Bark 只在本人版本里挑、不变调`);
 }
 
@@ -853,27 +908,27 @@ if (process.argv.includes("--audio")) {
   // 字错率超门槛的要有绑定这条录音（sha256 + 转写原文）的逐字核对记录，与场景片段同一口径；重录即失效。
   const barkReviews = JSON.parse(Read("./Audio/FirstLevel/Data_FirstLevelSquadBarkTranscriptReview.json")).barks || {};
   const usedBarkReviews = new Set(), barkListen = [];
-  for (const who of Object.keys(SQUAD_BARK_CAST)) {
+  for (const who of SQUAD_BARK_TAKES) {
     const person = squad.people[who];
     assert.ok(person, who + " 的本人版本还没录（Script_SeedAudioSquadBarkBake.mjs）");
     assert.equal(person.promptHash, Hash(BarkPrompt(who)), who + " 录音对应当前提示词");
-    assert.equal(person.castSha256, castManifest.cast[who].sha256, who + " 用的是当前选定的定妆音");
+    assert.equal(person.castSha256, castManifest.cast[BarkTakeVoice(who)].sha256, who + " 用的是当前选定的定妆音");
     assert.ok(person.requests >= 1 && person.requests <= BARK_CHECK.maxAttempts && person.requests === person.attempts.length, who + " 请求次数 1–3 且与生成记录一致");
     assert.deepEqual(person.attempts.find((a) => a.n === person.picked)?.hard, [], who + " 装上的那次生成没有硬错误");
     squadRequests += person.requests;
     let wrong = 0, long = 0;
-    for (const entry of SquadBarkEntries().filter((e) => e.who === who)) {
+    for (const entry of SquadBarkEntries().filter((e) => e.take === who)) {
       const bark = squad.barks[entry.bank], url = new URL("./Audio/FirstLevel/" + entry.file, import.meta.url);
       assert.ok(bark && fs.existsSync(url), entry.bank + " 录音存在");
       assert.equal(bark.sha256, Hash(fs.readFileSync(url)), entry.bank + " 录音哈希");
-      assert.equal(bark.text, VOICE_LINES.find((line) => line.key === entry.key && (line.side || "nra") === "nra").text, entry.bank + " 念的是 Data_Voice 里那句");
+      assert.equal(bark.text, PLAYER_VENT_TEXT[entry.key] ?? VOICE_LINES.find((line) => line.key === entry.key && (line.side || "nra") === "nra").text, entry.bank + " 念的是 Data_Voice（或 PLAYER_VENT_TEXT）里那句");
       const m = MeasureVoice(Local(url)), tp = TruePeakDb(Local(url));
       assert.ok(m.seconds >= BARK_CHECK.minSeconds && m.seconds <= BARK_CHECK.maxSeconds, `${entry.bank} 时长 ${m.seconds} s（战斗 Bark 0.3–2.6 s）`);
       assert.ok(tp <= -0.9, `${entry.bank} 真峰值 ${tp.toFixed(2)} dBTP ≤ −1`);
       // 逐句齐平到 −16.1；喊得很冲的句子峰均比大，限幅先到，只许比目标低（最多 2.5 dB）。
       assert.ok(m.activeRmsDb <= BARK_CHECK.targetRmsDb + BARK_CHECK.rmsTolDb && m.activeRmsDb >= BARK_CHECK.targetRmsDb - 2.5,
         `${entry.bank} 有声段 ${m.activeRmsDb} dB（目标 ${BARK_CHECK.targetRmsDb}）`);
-      assert.ok(m.snrDb >= 30, `${entry.bank} 信噪比 ${m.snrDb} dB`);
+      assert.ok(m.snrDb >= BARK_CHECK.minSnrDb, `${entry.bank} 信噪比 ${m.snrDb} dB`);
       assert.ok(Number.isFinite(bark.cer) && Number.isFinite(bark.speakerCos), entry.bank + " 转写与嗓子量过");
       const want = [...bark.text].filter((c) => /[\p{L}\p{N}]/u.test(c)).length, got = [...(bark.transcript || "")].filter((c) => /[\p{L}\p{N}]/u.test(c)).length;
       if (bark.voicedS >= BARK_CHECK.judgeVoicedS && bark.cer > BARK_CHECK.reviewedMaxCer)

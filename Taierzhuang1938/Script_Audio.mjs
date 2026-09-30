@@ -5086,7 +5086,11 @@ export class AudioEngine {
     if (now - (this.lastBarkKindAt.get(kindKey) || -99) < 4.5) return null;
 
     let pool = [];
-    for (const e of this.voiceBank.values()) {
+    // 调用方点名了人和句子、这个人有本人版本：直接用它。只有本人版本、没有公用那条的句子（顺子打空弹药骂的那几句，
+    // Data_FirstLevelVoiceCast.PLAYER_VENT_TEXT）只能走这里。
+    const ownNamed = key && who ? this.voiceBank.get(key + "@" + who) : null;
+    if (ownNamed?.barkOf) pool.push(ownNamed);
+    else for (const e of this.voiceBank.values()) {
       // 某个人自己的版本（`<key>@<who>`）只在认出是他时挑，不进公用池子。
       if (e.barkOf) continue;
       // 阵营先过滤。声库里中日两套并存，挑错阵营就是日本兵喊中文（或反过来），
@@ -5107,8 +5111,8 @@ export class AudioEngine {
       if (e.kind === kind) pool.push(e);
     }
     if (!pool.length) return null;
-    const speaker = who ?? this.barkSpeaker?.({ seed, side, position, priority, kind, key }) ?? null;
-    let named = false;
+    const speaker = ownNamed?.barkOf ? null : who ?? this.barkSpeaker?.({ seed, side, position, priority, kind, key }) ?? null;
+    let named = !!ownNamed?.barkOf;
     if (speaker) {
       const own = [];
       for (const e of pool) {

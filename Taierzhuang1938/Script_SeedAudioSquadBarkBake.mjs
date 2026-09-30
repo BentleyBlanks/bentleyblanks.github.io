@@ -24,7 +24,7 @@ import { fileURLToPath } from "node:url";
 import { VOICE_LINES } from "./Data_Voice.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner, SQUAD_BARK_CAST, SquadBarkEntries, SquadBarkScript,
-  SQUAD_BARK_RETIRED_TEXT } from "./Data_FirstLevelVoiceCast.mjs";
+  SQUAD_BARK_RETIRED_TEXT, SQUAD_BARK_TAKES, BarkTakeVoice, BarkTakeSet, PLAYER_VENT_TEXT } from "./Data_FirstLevelVoiceCast.mjs";
 import { LINE_MASTER } from "./Data_FirstLevelDialogueDirection.mjs";
 import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, Pool, requestStats,
   SEED_AUDIO_MODEL, MasterSceneWav, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines }
@@ -44,6 +44,7 @@ export const CHECK = Object.freeze({
   maxSeconds: 2.6,        // Script_VoiceTest：战斗 Bark 0.3–2.6 s
   maxTempo: 1.08,         // 单句超长 ≤ 8% 时不变调压快，而不是整条重抽
   minSeconds: 0.3,
+  minSnrDb: 30,           // 逐句信噪比下限（FirstLevelVoiceTest --audio 同一道门）：句尾带进一口粗气就过不了
   noiseMaxDb: -48,        // 原始录音句间静音的底噪上限（Script_VoiceBake.FLOOR_MAX）
   minCoverage: 0.5,       // 逐字时间戳对上稿面的字少于一半 = 漏句
   extraChars: 0.25,       // 时间戳里的字比稿面多出这么多 = 多念
@@ -67,7 +68,7 @@ const forcedPicks = new Map((Arg("pick")?.split(",") || []).filter(Boolean).map(
 }));
 const Hash = (text) => crypto.createHash("sha256").update(text).digest("hex");
 const ReadJson = (file, fallback = null) => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : fallback;
-const Name = (who) => MISSION_VOICE_CAST[who]?.[0] || who;
+const Name = (who) => MISSION_VOICE_CAST[BarkTakeVoice(who)]?.[0] || BarkTakeVoice(who);
 const TEXT = new Map(VOICE_LINES.filter((l) => (l.side || "nra") === "nra" && l.kind !== "story").map((l) => [l.key, l.text]));
 const Letters = (text) => [...String(text)].filter((c) => /[\p{L}\p{N}]/u.test(c)).length;
 
@@ -81,33 +82,43 @@ const KEY_NOTES = Object.freeze({
   ammo_out: "子弹打光了，急着喊", ammo_reload: "边压子弹边喊弟兄掩护",
   tank_turret: "看见战车的炮塔朝这边转过来，急着叫弟兄低头", tank_window: "看准战车的炮正打别处，催顺子趁这个空当冲上去",
   tank_track: "战车履带炸断了却还在开火，急着叫顺子再补一捆集束弹",
+  vent_ammo_1: "扣扳机才发现最后一发打出去了，又气又急地骂出口", vent_ammo_2: "摸遍子弹盒一个桥夹都没有，火冒三丈地骂",
+  vent_ammo_3: "骂自己运气背，咬着牙自言自语", vent_grenade_1: "最后一颗手榴弹甩出去，手往腰上一摸是空的，骂出口",
+  vent_grenade_2: "对着鬼子那边恶狠狠地骂，又带点江湖人的痞气", vent_grenade_3: "气冲冲地骂，手榴弹没得扔了",
 });
 
 export function CastReference(who) {
-  const owner = CastVoiceOwner(who);
+  const owner = CastVoiceOwner(BarkTakeVoice(who));
   const entry = ReadJson(castManifestPath, { cast: {} }).cast[owner];
   return entry ? { owner, file: path.join(out, entry.file), sha256: entry.sha256 } : null;
 }
+/** 要烘的录音（一条 = 一次请求）：每人的主录音 + 另录的（SQUAD_BARK_EXTRA_TAKES，id 如 shunziVent）。 */
 function People() {
-  return Object.keys(SQUAD_BARK_CAST).filter((who) => !selected || selected.includes(who));
+  return SQUAD_BARK_TAKES.filter((who) => !selected || selected.includes(who));
 }
 /** 这个人录音稿里的句子：[{ who, key, bank, file, text }]，文本取自 Data_Voice（已删的撤下句取 SQUAD_BARK_RETIRED_TEXT）。 */
 export function BarkLines(who) {
   return SquadBarkScript(who).map((e) => {
-    const text = TEXT.get(e.key) ?? SQUAD_BARK_RETIRED_TEXT[e.key];
+    const text = TEXT.get(e.key) ?? SQUAD_BARK_RETIRED_TEXT[e.key] ?? PLAYER_VENT_TEXT[e.key];
     if (!text) throw new Error(`Data_Voice 没有中方口令 ${e.key}`);
     return { ...e, text };
   });
 }
 
+/** 另录的那几套换一句场景说明（主录音那几套仍用默认那句，提示词哈希不变）。 */
+const SCENE = Object.freeze({
+  playerVent: "他在前沿的战壕里，下面是 6 句互不相连的气话：子弹或手榴弹刚打光，他骂出口、半是骂鬼子半是自言自语，不是喊给谁听的命令："
+    + "要冲、要短、带火气和江湖人的痞气，咬字清楚，",
+});
+
 /** 这个人的整条提示词。参考音本身不进哈希（另记 castSha256）。 */
 export function BarkPrompt(who) {
-  const cast = FIRST_LEVEL_VOICE_CAST[who], lines = BarkLines(who);
+  const cast = FIRST_LEVEL_VOICE_CAST[BarkTakeVoice(who)], lines = BarkLines(who);
   const notes = lines.map((l, i) => `第${i + 1}句：${KEY_NOTES[l.key] || "战场急喊"}`).join("；");
   const script = lines.map((l) => `@音频1 ${Name(who)}：“${l.text}”`).join("\n");
   return `${DRY_VOICE_RULE}@音频1 是${Name(who)}的声音；严格保持参考音的音色、年龄感和口音。`
     + `人物：${Name(who)}，${cast.persona}。${VOICE_LANG_RULE[cast.lang] || VOICE_LANG_RULE.zh}`
-    + `他在前沿的战壕里，下面是 ${lines.length} 句互不相连的战场短喊，都是在枪声里喊给身边弟兄听的：要急、要短、要喊清楚，`
+    + (SCENE[BarkTakeSet(who)] || `他在前沿的战壕里，下面是 ${lines.length} 句互不相连的战场短喊，都是在枪声里喊给身边弟兄听的：要急、要短、要喊清楚，`)
     + "是喊话不是尖叫，不破成噪声；每句单独喊一次，喊完停顿约一秒再喊下一句，句与句不连读、不接上一句的情绪。"
     + `逐句表演（只照着演，不要念出来）：${notes}。`
     + `台词如下，按顺序念，不念 @音频1、角色名和编号，不加、不删、不改字：\n${script}`;
@@ -202,6 +213,7 @@ function Cut(who, n) {
     s.measure = mastered.measure;
     if (s.measure.seconds > CHECK.maxSeconds || s.measure.seconds < CHECK.minSeconds)
       hard.push(`${lines[i].key} 时长 ${s.measure.seconds} s（要 ${CHECK.minSeconds}–${CHECK.maxSeconds} s）`);
+    if (s.measure.snrDb < CHECK.minSnrDb) hard.push(`${lines[i].key} 信噪比 ${s.measure.snrDb} dB（要 ≥ ${CHECK.minSnrDb}）`);
   });
   fs.rmSync(wav, { force: true });
   return { who, n, lines, hard, flags, slices, cutMethod, raw: { noiseDb: rawMeasure.noiseDb, clipRuns: clip, seconds: rawMeasure.seconds } };
@@ -228,7 +240,7 @@ function Judge(results) {
       s.transcript = texts[s.file]?.text ?? null;
       const own = CastReference(r.who);
       s.speakerCos = own && vectors[s.file] && vectors[own.file] ? +CenteredCosine(vectors[s.file], vectors[own.file]).toFixed(3) : null;
-      const others = squad.filter((who) => CastVoiceOwner(who) !== CastVoiceOwner(r.who)).map((who) => [who, CastReference(who)])
+      const others = squad.filter((who) => CastVoiceOwner(who) !== CastVoiceOwner(BarkTakeVoice(r.who))).map((who) => [who, CastReference(who)])
         .filter(([, ref]) => ref && vectors[ref.file] && vectors[s.file])
         .map(([who, ref]) => [who, +CenteredCosine(vectors[s.file], vectors[ref.file]).toFixed(3)]).sort((a, b) => b[1] - a[1]);
       s.nearestOther = others[0] || null;
@@ -266,7 +278,7 @@ function Report(r) {
 
 function Install(r, manifest, attempts) {
   const barks = manifest.barks;
-  for (const key of Object.keys(barks)) if (barks[key].who === r.who) delete barks[key];
+  for (const key of Object.keys(barks)) if ((barks[key].take ?? barks[key].who) === r.who) delete barks[key];
   fs.mkdirSync(path.join(out, "Barks"), { recursive: true });
   // 录音稿里撤下的句子照样切、照样打分（整条的硬错误要算上它们），但不装。
   const live = new Set(SquadBarkEntries().map((e) => e.bank));
@@ -274,13 +286,13 @@ function Install(r, manifest, attempts) {
     const line = r.lines[i], dest = path.join(out, line.file);
     if (!live.has(line.bank)) continue;
     fs.copyFileSync(s.file, dest);
-    barks[line.bank] = { who: r.who, key: line.key, file: line.file, sha256: Sha256(dest), text: line.text,
+    barks[line.bank] = { who: line.who, ...(line.take !== line.who ? { take: line.take } : {}), key: line.key, file: line.file, sha256: Sha256(dest), text: line.text,
       seconds: s.measure.seconds, voicedS: s.measure.voicedS, activeRmsDb: s.measure.activeRmsDb, truePeakDb: s.measure.truePeakDb,
       noiseDb: s.measure.noiseDb, lowShare: s.measure.lowShare, f0: s.measure.f0.median, gainDb: s.gainDb, ...(s.tempo ? { tempo: s.tempo } : {}),
       takeStartS: s.startS, takeEndS: s.endS, tight: !!(s.tightStart || s.tightEnd),
       speakerCos: s.speakerCos, nearestOther: s.nearestOther, cer: s.cer, transcript: s.transcript };
   }
-  manifest.people[r.who] = { set: SQUAD_BARK_CAST[r.who], lines: r.lines.length, requests: attempts.length, picked: r.n,
+  manifest.people[r.who] = { set: BarkTakeSet(r.who), lines: r.lines.length, requests: attempts.length, picked: r.n,
     attempts: attempts.map((a) => ({ n: a.n, hard: a.hard, flags: a.flags })), cutMethod: r.cutMethod, raw: r.raw, loudnessRate: ReadJson(AttemptMeta(r.who, r.n))?.loudnessRate ?? 0,
     promptHash: Hash(BarkPrompt(r.who)), castSha256: CastReference(r.who).sha256, rawSha256: Sha256(AttemptRaw(r.who, r.n)) };
 }
@@ -332,7 +344,7 @@ async function Main() {
     console.log(`${who}: installed #${pickN} (${all.length} request${all.length > 1 ? "s" : ""})`);
   }
   const ordered = { ...manifest,
-    people: Object.fromEntries(Object.keys(SQUAD_BARK_CAST).filter((w) => manifest.people[w]).map((w) => [w, manifest.people[w]])),
+    people: Object.fromEntries(SQUAD_BARK_TAKES.filter((w) => manifest.people[w]).map((w) => [w, manifest.people[w]])),
     barks: Object.fromEntries(SquadBarkEntries().filter((e) => manifest.barks[e.bank]).map((e) => [e.bank, manifest.barks[e.bank]])) };
   fs.writeFileSync(SQUAD_BARK_MANIFEST, JSON.stringify(ordered, null, 1) + "\n");
   console.log(`requests ${requestStats.requests}, retries ${requestStats.retries}, failures ${requestStats.failures}`);

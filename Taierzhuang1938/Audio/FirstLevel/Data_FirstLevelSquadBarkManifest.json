@@ -225,6 +225,49 @@
    "promptHash": "b7bc21c7d2e0001e02beb40c947ff6a5d6ee417efc33a17813d99769841ebc4c",
    "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
    "rawSha256": "5b699ebee20d054643ab50c744bbbb5aa50b4c23c933573aa8ce0e2049fa4582"
+  },
+  "shunziVent": {
+   "set": "playerVent",
+   "lines": 6,
+   "requests": 2,
+   "picked": 2,
+   "attempts": [
+    {
+     "n": 1,
+     "hard": [
+      "vent_ammo_2 信噪比 24.7 dB（要 ≥ 30）",
+      "vent_ammo_3 信噪比 28.67 dB（要 ≥ 30）",
+      "vent_grenade_1 信噪比 28.06 dB（要 ≥ 30）",
+      "vent_grenade_3 信噪比 28.1 dB（要 ≥ 30）"
+     ],
+     "flags": [
+      "vent_grenade_1 字错率 0.75 待逐字核对「妈呀,收留档摔弯了。」",
+      "vent_grenade_2 字错率 0.5833 待逐字核对「鬼儿子,solo 胆都围给你们了。」",
+      "vent_grenade_3 字错率 0.625 待逐字核对「锤子。所有的弹幕带了。」"
+     ]
+    },
+    {
+     "n": 2,
+     "hard": [],
+     "flags": [
+      "vent_ammo_2 字错率 0.375 待逐字核对「翠子,一刻都没得了。」",
+      "vent_ammo_3 字错率 0.375 待逐字核对「呗死我,枪子打光了。」",
+      "vent_grenade_1 字错率 0.75 待逐字核对「妈啊哟,收留弹摔弯咯!」",
+      "vent_grenade_2 字错率 0.4167 待逐字核对「鬼儿子,搜留档都尾给你们了!」",
+      "vent_grenade_3 字错率 0.875 待逐字核对「翠子,收留的模特儿。」"
+     ]
+    }
+   ],
+   "cutMethod": "subtitle",
+   "raw": {
+    "noiseDb": -64.27,
+    "clipRuns": 0,
+    "seconds": 11.651
+   },
+   "loudnessRate": 0,
+   "promptHash": "50a160f63c3ae10eff663d1281128a734164611a90d08b84c1bd58a82642e142",
+   "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
+   "rawSha256": "c7aa75c7dfcc1f8fc2d8249e21ed80e70e0b4a69493162c9b2dbf70bb801333b"
   }
  },
  "barks": {
@@ -1202,6 +1245,162 @@
    ],
    "cer": 1,
    "transcript": "大 大 摩西齐"
+  },
+  "vent_ammo_1@shunzi": {
+   "who": "shunzi",
+   "take": "shunziVent",
+   "key": "vent_ammo_1",
+   "file": "Barks/AudioVoice_FirstLevelBarkShunziVentAmmo1.mp3",
+   "sha256": "27c55db76e8d28c430f2a4cb32d581b3f9a1207c148d5f27683ee4a751d51d82",
+   "text": "妈哟！子弹打光了！",
+   "seconds": 1.98,
+   "voicedS": 1.54,
+   "activeRmsDb": -16.55,
+   "truePeakDb": -2.81,
+   "noiseDb": -62.45,
+   "lowShare": 0.133,
+   "f0": 242,
+   "gainDb": 0.1,
+   "takeStartS": 0.02,
+   "takeEndS": 2.02,
+   "tight": false,
+   "speakerCos": 0.742,
+   "nearestOther": [
+    "yaowa",
+    0.397
+   ],
+   "cer": 0.2857,
+   "transcript": "马哟,子弹打光咯!"
+  },
+  "vent_ammo_2@shunzi": {
+   "who": "shunzi",
+   "take": "shunziVent",
+   "key": "vent_ammo_2",
+   "file": "Barks/AudioVoice_FirstLevelBarkShunziVentAmmo2.mp3",
+   "sha256": "e56c44979529a6e4d6cedb00687b438f156427998b87500507f1bc6d36031102",
+   "text": "锤子！一颗都莫得了！",
+   "seconds": 1.58,
+   "voicedS": 1.2,
+   "activeRmsDb": -16.54,
+   "truePeakDb": -3.92,
+   "noiseDb": -62.18,
+   "lowShare": 0.317,
+   "f0": 281,
+   "gainDb": -1.6,
+   "takeStartS": 2.22,
+   "takeEndS": 3.8,
+   "tight": false,
+   "speakerCos": 0.654,
+   "nearestOther": [
+    "yaowa",
+    0.392
+   ],
+   "cer": 0.375,
+   "transcript": "翠子,一刻都没得了。"
+  },
+  "vent_ammo_3@shunzi": {
+   "who": "shunzi",
+   "take": "shunziVent",
+   "key": "vent_ammo_3",
+   "file": "Barks/AudioVoice_FirstLevelBarkShunziVentAmmo3.mp3",
+   "sha256": "61edb077ff657397f8f7691a0a84494e2a3e6c51d668ab54326bc02d060f8e3b",
+   "text": "背时哦，枪子打光了！",
+   "seconds": 1.7,
+   "voicedS": 1.54,
+   "activeRmsDb": -16.85,
+   "truePeakDb": -1.87,
+   "noiseDb": -53.06,
+   "lowShare": 0.233,
+   "f0": 211,
+   "gainDb": 4.5,
+   "takeStartS": 3.93,
+   "takeEndS": 5.63,
+   "tight": false,
+   "speakerCos": 0.718,
+   "nearestOther": [
+    "yaowa",
+    0.422
+   ],
+   "cer": 0.375,
+   "transcript": "呗死我,枪子打光了。"
+  },
+  "vent_grenade_1@shunzi": {
+   "who": "shunzi",
+   "take": "shunziVent",
+   "key": "vent_grenade_1",
+   "file": "Barks/AudioVoice_FirstLevelBarkShunziVentGrenade1.mp3",
+   "sha256": "99f9a8ac99b2d7b1cb8deb392d490f488312a9e0b8b406f4e1d2fa4f2ba3a5ba",
+   "text": "妈哟，手榴弹甩完了！",
+   "seconds": 1.52,
+   "voicedS": 1.1,
+   "activeRmsDb": -16.59,
+   "truePeakDb": -1.93,
+   "noiseDb": -56.9,
+   "lowShare": 0.179,
+   "f0": 216,
+   "gainDb": 1.11,
+   "takeStartS": 5.9,
+   "takeEndS": 7.42,
+   "tight": false,
+   "speakerCos": 0.749,
+   "nearestOther": [
+    "yaowa",
+    0.348
+   ],
+   "cer": 0.75,
+   "transcript": "妈啊哟,收留弹摔弯咯!"
+  },
+  "vent_grenade_2@shunzi": {
+   "who": "shunzi",
+   "take": "shunziVent",
+   "key": "vent_grenade_2",
+   "file": "Barks/AudioVoice_FirstLevelBarkShunziVentGrenade2.mp3",
+   "sha256": "046513ac545728de5ac98a64ff3f1a8c414b859e71720f6e55e5127b91907ead",
+   "text": "龟儿子，手榴弹都喂给你们了！",
+   "seconds": 1.74,
+   "voicedS": 1.24,
+   "activeRmsDb": -16.54,
+   "truePeakDb": -3.37,
+   "noiseDb": -62.21,
+   "lowShare": 0.28,
+   "f0": 211,
+   "gainDb": 0.44,
+   "takeStartS": 7.58,
+   "takeEndS": 9.545,
+   "tight": true,
+   "speakerCos": 0.759,
+   "nearestOther": [
+    "yaowa",
+    0.391
+   ],
+   "cer": 0.4167,
+   "transcript": "鬼儿子,搜留档都尾给你们了!"
+  },
+  "vent_grenade_3@shunzi": {
+   "who": "shunzi",
+   "take": "shunziVent",
+   "key": "vent_grenade_3",
+   "file": "Barks/AudioVoice_FirstLevelBarkShunziVentGrenade3.mp3",
+   "sha256": "938a3eab913bb4fd6ac517d270629dc50400a6a7678d0a10c7d08e173110a9b5",
+   "text": "锤子，手榴弹莫得了！",
+   "seconds": 1.66,
+   "voicedS": 1.16,
+   "activeRmsDb": -16.55,
+   "truePeakDb": -3.93,
+   "noiseDb": -62.6,
+   "lowShare": 0.273,
+   "f0": 267,
+   "gainDb": -1.77,
+   "takeStartS": 9.545,
+   "takeEndS": 11.22,
+   "tight": true,
+   "speakerCos": 0.645,
+   "nearestOther": [
+    "yaowa",
+    0.343
+   ],
+   "cer": 0.875,
+   "transcript": "翠子,收留的模特儿。"
   }
  }
 }

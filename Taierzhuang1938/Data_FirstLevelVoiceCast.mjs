@@ -215,6 +215,8 @@ export const SQUAD_BARK_KEYS = Object.freeze({
   // 罗班长 = 班组那一套 + 03–05 战车预兆三句（2026-09-24 Front 包）。一人一次请求照旧：他的全部短句在同一条录音里念完。
   leader: Object.freeze([...SQUAD_SET, ...LEADER_TANK_BARK_KEYS]),
   player: Object.freeze(["rally_follow", "move_go", "rally_charge", "rally_hold", "move_flank", "move_cover", "rally_shoot"]),
+  // 顺子打空弹药时骂的那几句（PLAYER_VENT_TEXT，另录一条：SQUAD_BARK_EXTRA_TAKES.shunziVent）。
+  playerVent: Object.freeze(["vent_ammo_1", "vent_ammo_2", "vent_ammo_3", "vent_grenade_1", "vent_grenade_2", "vent_grenade_3"]),
 });
 /** 2026-09-27 撤下、但还在录音稿里的键（按套）。squad / leader 里的 rally_shoot、move_go 只是 AI 不再喊，玩家下令照旧用。 */
 const SQUAD_RETIRED = Object.freeze(["spot_east", "spot_gap", "spot_wall", "move_flank", "move_go", "warn_down", "rally_shoot",
@@ -241,12 +243,47 @@ export const SquadBarkKey = (key, who) => `${key}@${who}`;
 const Pascal = (text) => String(text).split("_").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("");
 /** 相对 Audio/FirstLevel/ 的文件名。 */
 export const SquadBarkFile = (key, who) => `Barks/AudioVoice_FirstLevelBark${Pascal(who)}${Pascal(key)}.mp3`;
-/** 运行时装的本人版本：[{ who, key, bank, file }]，按 SQUAD_BARK_CAST 的顺序。 */
+/**
+ * 顺子打空弹药时骂的一句（2026-09-30 用户：「每次子弹/手榴弹打完了主角应该会有一定概率骂人吐槽一下，第一次打完必触发」）。
+ * 只由 Script_PlayerVent 在真打空的那一刻点名喊（有前提的句子），所以不进 Data_Voice 的随机口令表，原文写在这里。
+ * 同一个人的**第二条录音**（SQUAD_BARK_EXTRA_TAKES）：一次请求念完这几句，不重录他已经装好的下令口令。
+ * 江湖油子的嘴：骂的是处境和鬼子，不骂自己人（「龟儿子」只对敌）；不用「咯」（Data_Voice 头注）。
+ */
+export const PLAYER_VENT_TEXT = Object.freeze({
+  vent_ammo_1: "妈哟！子弹打光了！",
+  vent_ammo_2: "锤子！一颗都莫得了！",
+  vent_ammo_3: "背时哦，枪子打光了！",
+  vent_grenade_1: "妈哟，手榴弹甩完了！",
+  vent_grenade_2: "龟儿子，手榴弹都喂给你们了！",
+  vent_grenade_3: "锤子，手榴弹莫得了！",
+});
+/** 按打空的是什么分组：Script_PlayerVent 在组里挑一句。 */
+export const PLAYER_VENT_KEYS = Object.freeze({
+  ammo: Object.freeze(Object.keys(PLAYER_VENT_TEXT).filter((key) => key.startsWith("vent_ammo_"))),
+  grenade: Object.freeze(Object.keys(PLAYER_VENT_TEXT).filter((key) => key.startsWith("vent_grenade_"))),
+});
+/**
+ * 同一个人另录的一条（录音 id → { who, set }）。录音 id 只在烘焙与清单 people 里出现；声库键、文件名仍按本人
+ * （`<key>@<who>`），Script_Audio.Bark 用 who 点名就能找到。不参与按位置认人（SQUAD_BARK_CAST 才是人）。
+ */
+export const SQUAD_BARK_EXTRA_TAKES = Object.freeze({
+  shunziVent: Object.freeze({ who: "shunzi", set: "playerVent" }),
+});
+/** 全部录音（一条 = 一次请求）：每个人的主录音 + 另录的。 */
+export const SQUAD_BARK_TAKES = Object.freeze([...Object.keys(SQUAD_BARK_CAST), ...Object.keys(SQUAD_BARK_EXTRA_TAKES)]);
+/** 这条录音是谁的嗓子。 */
+export const BarkTakeVoice = (take) => SQUAD_BARK_EXTRA_TAKES[take]?.who ?? take;
+/** 这条录音录哪一套。 */
+export const BarkTakeSet = (take) => SQUAD_BARK_EXTRA_TAKES[take]?.set ?? SQUAD_BARK_CAST[take];
+/** 运行时装的本人版本：[{ who, take, key, bank, file }]，按 SQUAD_BARK_TAKES 的顺序。 */
 export function SquadBarkEntries() {
-  return Object.entries(SQUAD_BARK_CAST).flatMap(([who, set]) => SquadBarkLive(set).map((key) =>
-    ({ who, key, bank: SquadBarkKey(key, who), file: SquadBarkFile(key, who) })));
+  return SQUAD_BARK_TAKES.flatMap((take) => SquadBarkLive(BarkTakeSet(take)).map((key) => SquadBarkEntry(take, key)));
 }
-/** 这个人录音稿里的全部句子（含撤下的，按录音顺序）：只给烘焙脚本重建提示词、切整条录音用。 */
-export function SquadBarkScript(who) {
-  return SQUAD_BARK_KEYS[SQUAD_BARK_CAST[who]].map((key) => ({ who, key, bank: SquadBarkKey(key, who), file: SquadBarkFile(key, who) }));
+/** 这条录音稿里的全部句子（含撤下的，按录音顺序）：只给烘焙脚本重建提示词、切整条录音用。 */
+export function SquadBarkScript(take) {
+  return SQUAD_BARK_KEYS[BarkTakeSet(take)].map((key) => SquadBarkEntry(take, key));
+}
+function SquadBarkEntry(take, key) {
+  const who = BarkTakeVoice(take);
+  return { who, take, key, bank: SquadBarkKey(key, who), file: SquadBarkFile(key, who) };
 }

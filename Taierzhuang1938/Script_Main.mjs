@@ -117,6 +117,7 @@ import { LoadMeleeAnimations, MeleeAnimationsLoaded } from "./Script_MeleeAnimat
 import { RadialWheel } from "./Script_Wheel.mjs";
 import { InteractSystem, ScavengeAmmoPlan } from "./Script_Interact.mjs";
 import { CarrySystem } from "./Script_Carry.mjs";
+import { PlayerVent } from "./Script_PlayerVent.mjs";
 import { PlayerHitboxes, RaycastPlayerHitboxes } from "./Script_PlayerHitbox.mjs";
 import { EmplacementSystem } from "./Script_Emplacement.mjs";
 import { IdentifySystem, IDENTIFY } from "./Script_Identify.mjs";
@@ -727,6 +728,8 @@ let gi = (GI_ON && graphics.gi)
 if (gi) gi.enabled = true;
 const hud = new Hud(hudRoot);
 const audio = new AudioEngine({ enabled: AUDIO_ENABLED });
+// 顺子打空弹药时骂一句（第一次必骂，之后按概率）。规则在 Script_PlayerVent；剧情对白在说、人倒了就等着。
+const playerVent = new PlayerVent({ audio, Blocked: () => !player?.Alive || !!audio.dialogueYield });
 audio.allowAutonomousBark = () => AllowAutonomousBark(PHASE_TABLE[state.phaseIndex],
   (signal) => story?.Signalled(signal) || false);
 /**
@@ -6971,9 +6974,13 @@ function ReleaseCook() {
   // 塞 state.cooking 的，绕开了那道闸。库存变负之后 HUD 会显示 −1 枚手榴弹，
   // 而且下一次 BeginCook 的 <= 0 判断照样过 —— 一个负数会一直负下去。
   if (kind === "Grenade") {
-    if (!EffectiveInfiniteGrenades()) state.grenades = Math.max(0, state.grenades - 1);
+    if (!EffectiveInfiniteGrenades()) {
+      state.grenades = Math.max(0, state.grenades - 1);
+      if (projectile && state.grenades === 0) playerVent.Empty("grenade");
+    }
   } else {
     state.bundles = Math.max(0, state.bundles - 1);
+    if (projectile && state.bundles === 0) playerVent.Empty("grenade");
   }
   viewmodel.TriggerThrow?.(power);
   state.cook = 0;
@@ -7737,6 +7744,7 @@ function TryFire(dt, returningGrenade = false) {
   // 分开）也搬过去了 —— 它现在是白刃起手的第一声。走到这里 ammo 一定 > 0。
   if (infiniteAmmo) state.ammo = Math.max(1, state.ammo);
   else state.ammo -= 1;
+  if (state.ammo <= 0 && state.clips <= 0) playerVent.Empty("ammo");
   const aimAtTrigger = player.AimDirection(_aimDir).clone();
   const spreadAtTrigger = player.SpreadDeg(weapon);
   state.playerShots += 1;
@@ -8535,6 +8543,7 @@ function Frame(dt, render = true) {
   // 负重必须排在 player.Update **之前**：它写的 carrySpeedScale 就是这一帧
   // 玩家要用的那个乘数，写晚一帧就会出现「刚抬起来还能冲刺一步」。
   carry?.Update(dt, player);
+  playerVent.Update(dt);
   profiler.B("player");
   input.diveSpeedMps = p012Runtime?.DiveSpeed(strafe?.View());
   player.meleePose = meleeCombat?.ViewPose();
