@@ -623,11 +623,11 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
   await WaitFact(page, "marchOrderHeard", "18 往滕县", 180);
   if (fbBlast) {
     // 桥断之后对岸全停在岸边隔河射击：没有一个日军过南水线，起爆 14 s 后活着的人都在岸沿以北 0.5 m 之内。
-    await WaitUntil(page, "18 桥断后对岸停在岸边", "fb.blast && fb.blastAgeS >= 15", 40);
+    await WaitUntil(page, "18 桥断后对岸停在岸边", "fb.blast && fb.blastAgeS >= 21", 40);
     const fb = await FarBankState(page);
     console.log("FARBANK_HALTED", JSON.stringify({ alive: fb.alive, real: fb.real, scripted: fb.scripted, bank: fb.bank, shells: fb.shells, mg: fb.mg, tanks: fb.tanks, reinforced: fb.reinforced, ija: fb.ijaCount, tier: fb.tier }));
     assert.equal(fb.bank.southBank, 0, "桥断后（其实是整趟）没有一个日军过河");
-    assert.equal(fb.bank.overNow, 0, "桥断 14 s 后对岸活着的人全在岸边");
+    assert.equal(fb.bank.overNow, 0, "桥断 20 s 后对岸活着的人全在岸边");
     assert.ok(fb.bank.southMostZ <= 148, `整趟里对岸最靠南的日军 z ${fb.bank.southMostZ}（冲桥组最远到被炸孔北半）`);
     assert.ok(fb.alive >= 16 && fb.real === 8, `桥断之后对岸仍有 ${fb.alive} 人，真 AI ${fb.real}`);
     assert.ok(fb.shells.fired >= 1 && fb.shells.minPlayerM >= 22 && fb.shells.minFriendlyM >= 10,

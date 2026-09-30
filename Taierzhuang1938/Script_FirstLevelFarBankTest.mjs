@@ -19,7 +19,7 @@ import {
   FarBankRushSlot, FAR_BANK_CROWD, FAR_BANK_FIRE_POINTS, FAR_BANK_FIRE_LISTS, FAR_BANK_TANKS, FAR_BANK_SHELL_SPOTS, FAR_BANK_REINFORCE, FAR_BANK_BLAST,
   FarBankShoreZ, FarBankPoint,
 } from "./Data_FirstLevelBridgeFarBank.mjs";
-import { FirstLevelFarBank, FarBankTier, FarBankFireList, ShellSpotVerdict, RouteDistance } from "./Script_FirstLevelBridgeFarBank.mjs";
+import { FirstLevelFarBank, FarBankTier, FarBankFireList, ShellSpotVerdict, RouteDistance, FarBankWalkInVia, FarBankSpawnAt } from "./Script_FirstLevelBridgeFarBank.mjs";
 
 const T = E.farBank;
 let checks = 0;
@@ -30,10 +30,13 @@ const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 // 0. 几何工具（与 Script_FirstLevelSpaceTest 同一口径）
 // ---------------------------------------------------------------------------
 const Scenario = Object.fromEntries(Layout.scenario.states.map((state) => [state.id, state.blocks]));
-const Solids = () => [...Layout.blocks.filter((b) => b.solid !== false), ...Scenario.BunkerCollapsed.filter((b) => b.solid !== false)];
+const Solids = () => [...Layout.blocks.filter((b) => b.solid !== false && !Layout.walkableSurfaces.some((surface) => surface.id === b.id)), ...Scenario.BunkerCollapsed.filter((b) => b.solid !== false)];
 const solids = Solids();
 function Overlap(x, z, margin, list = solids) {
-  const y = Ground(x, z), hits = [];
+  // 脚下：地面与桥面（可走面）取高者；三孔桥的桥面在河槽上方 4 m，桥上的点脚下是甲板
+  let y = Ground(x, z);
+  for (const surface of Layout.walkableSurfaces) if (Math.abs(x - surface.x) <= surface.w / 2 && Math.abs(z - surface.z) <= surface.d / 2) y = Math.max(y, surface.y + surface.h / 2);
+  const hits = [];
   for (const box of list) {
     const cos = Math.cos(box.ry || 0), sin = Math.sin(box.ry || 0), dx = x - box.x, dz = z - box.z;
     if (Math.abs(dx * cos - dz * sin) < box.w / 2 + margin && Math.abs(dx * sin + dz * cos) < box.d / 2 + margin
@@ -41,7 +44,9 @@ function Overlap(x, z, margin, list = solids) {
   }
   return hits;
 }
-function LineOfSight(from, to, list = solids) {
+// 空气墙（semantic airWall）只挡角色控制器，子弹与视线穿过：视线判定不算它。
+const sightSolids = solids.filter((b) => b.semantic !== "airWall");
+function LineOfSight(from, to, list = sightSolids) {
   const steps = Math.ceil(Math.hypot(to.x - from.x, to.z - from.z) * 2);
   for (let i = 1; i < steps; i++) {
     const t = i / steps, x = from.x + (to.x - from.x) * t, z = from.z + (to.z - from.z) * t, y = from.y + (to.y - from.y) * t;
@@ -88,6 +93,23 @@ const Eye = (p, h) => ({ x: p.x, z: p.z, y: Ground(p.x, p.z) + h });
   }
   for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++)
     Check(Distance(all[i], all[j]) >= 1.6 || all[i].name === "standby" && all[j].name === "standby", `${all[i].id} 与 ${all[j].id} 间距 ≥ 1.6 m`);
+  // 走进来的路（FarBankWalkInVia）：从桥轴上的出生点沿桥轴走下来、再横着走到自己的位置，全程 0.5 m 内没有实心件、
+  // 地面不低于 −0.5 m（前沿交通壕的尾巴 −2 m）。没有导航网格，直线走进院墙 / 壕沟的人会卡在半路（实拍：待命兵卡在 RearFarm 北墙前）。
+  for (const u of all) {
+    for (let n = 0; n < 5; n++) {
+      const path = [FarBankSpawnAt(n, 100), ...FarBankWalkInVia(u), { x: u.x, z: u.z }];
+      const bad = new Set();
+      for (let i = 1; i < path.length; i++) {
+        const a = path[i - 1], b = path[i], L = Distance(a, b);
+        for (let d = 0; d <= L; d += 0.5) {
+          const t = L ? d / L : 0, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+          for (const id of Overlap(x, z, 0.5)) bad.add(`${id}@${x.toFixed(0)},${z.toFixed(0)}`);
+          if (Ground(x, z) < -0.5) bad.add(`trench@${x.toFixed(0)},${z.toFixed(0)}`);
+        }
+      }
+      Check(bad.size === 0, `${u.id} 走进来的路（出生点 ${n}）畅通：${[...bad].slice(0, 3)}`);
+    }
+  }
   // 出生点（walk-in）：离桥头 ≥ 150 m（玩家在射位 z 179 看不见），落在平地上
   for (const u of [...FAR_BANK_REAL, ...FAR_BANK_SHORE_B]) {
     const at = { x: u.x, z: FarBankShoreZ(u.x) - FAR_BANK_REAL_SPAWN_BACK_M - 20 };
@@ -105,6 +127,34 @@ const Eye = (p, h) => ({ x: p.x, z: p.z, y: Ground(p.x, p.z) + h });
     Check(slot.endZ >= 136 && slot.endZ <= 148, `冲桥兵 ${i} 终点 z ${slot.endZ} 在被炸孔北半（2 号墩 z 136 以南）`);
     Check(Math.abs(slot.lane - Bridge.x) <= Bridge.deckW / 2 - 0.5, `冲桥兵 ${i} 在桥面净宽里`);
     Check(Distance({ x: slot.lane, z: slot.endZ }, FAR_BANK_BLAST.centre) <= T.blastKillM - 3, `冲桥兵 ${i} 离起爆中心在杀伤圈里`);
+  }
+  // 两条车道从岸沿到被炸孔北半一路没有实心件、空气墙的缺口够宽（桥墩顶在桥面下，脚下是甲板，不算挡路）
+  for (const lane of FAR_BANK_RUSH.lanes) {
+    const hits = new Set();
+    for (let z = FarBankShoreZ(lane) - 6; z <= 146; z += 0.5) for (const id of Overlap(lane, z, 0.35)) if (!/^RailBridgePier/.test(id)) hits.add(`${id}@${z}`);
+    Check(hits.size === 0, `车道 x ${lane} 从岸边到被炸孔一路畅通：${[...hits].slice(0, 4)}`);
+  }
+  // 冲桥组与人堆从待命位 / 岸线位走到车道起点（岸沿−12，土坎北面）：路上没有实心件
+  for (const [index, unitIndex] of FAR_BANK_RUSH.assign.entries()) {
+    const post = FAR_BANK_STANDBY[unitIndex], lane = FarBankRushSlot(index).lane, start = { x: lane, z: FarBankShoreZ(Bridge.x) - 12 };
+    const bad = new Set();
+    for (let d = 0; d <= Distance(post, start); d += 0.5) {
+      const t = d / Distance(post, start), x = post.x + (start.x - post.x) * t, z = post.z + (start.z - post.z) * t;
+      for (const id of Overlap(x, z, 0.5)) bad.add(`${id}@${x.toFixed(0)},${z.toFixed(0)}`);
+      if (Ground(x, z) < -0.5) bad.add(`trench@${x.toFixed(0)},${z.toFixed(0)}`);
+    }
+    Check(bad.size === 0, `冲桥兵 ${index} 从待命位到车道起点畅通：${[...bad].slice(0, 3)}`);
+  }
+  for (const c of FAR_BANK_CROWD) {
+    const post = FAR_BANK_STANDBY.find((s) => s.id === c.from);
+    if (!post) continue;
+    const start = { x: c.lane, z: FarBankShoreZ(Bridge.x) - 12 }, bad = new Set(), L = Distance(post, start);
+    for (let d = 0; d <= L; d += 0.5) {
+      const t = d / L, x = post.x + (start.x - post.x) * t, z = post.z + (start.z - post.z) * t;
+      for (const id of Overlap(x, z, 0.5)) bad.add(`${id}@${x.toFixed(0)},${z.toFixed(0)}`);
+      if (Ground(x, z) < -0.5) bad.add(`trench@${x.toFixed(0)},${z.toFixed(0)}`);
+    }
+    Check(bad.size === 0, `人堆 ${c.from} 从待命位到车道起点畅通：${[...bad].slice(0, 3)}`);
   }
   Check(FAR_BANK_RUSH.assign.length === 6 && FAR_BANK_RUSH.assign.every((n) => n >= 0 && n < FAR_BANK_STANDBY.length), "冲桥组由待命兵担任");
   Check(FAR_BANK_VANGUARD.every((v) => all.some((u) => u.id === v.from)), "前锋从岸线名册里出");

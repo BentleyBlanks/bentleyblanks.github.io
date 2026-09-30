@@ -36,16 +36,27 @@ try {
     const restore = T.post.whiteboxScene.Begin(T.scene);
     const firstPersonPreserved = fpsSources.length > 0 && fpsSources.every(([o, m]) => o.material === m);
     let texturedAssets = 0, terrainTextured = 0, skinnedTextured = 0, gridMaterials = 0;
+    // 2026-09-30：镂空卡片（植被、壕沟草）保留贴图 alpha 与 alphaTest（不再画成不透明白竖片）；水面画蓝灰水色 + 天空反光，不画网格。
+    let cutoutMaterials = 0, cutoutBroken = 0, waterMaterials = 0, waterGrid = 0, waterColors = new Set();
+    const stats = { ...T.post.whiteboxScene.stats };
     T.scene.traverseVisible((o) => {
       if (!o.isMesh || !o.material) return;
       const terrain = IsWhiteboxTerrain(o);
       for (const m of [o.material].flat()) {
         if (terrain && (m.map || m.userData.terrainLayers)) terrainTextured++;
-        if (!terrain && !IsWhiteboxCharacter(o) && Object.values(m).some((value) => value?.isTexture)) texturedAssets++;
+        const cutout = !terrain && !IsWhiteboxCharacter(o) && m.name.startsWith("Whitebox_Cutout_");
+        if (cutout) { cutoutMaterials++; if (!(m.alphaTest > 0 && m.map)) cutoutBroken++; }
+        if (!terrain && !IsWhiteboxCharacter(o) && !cutout && Object.values(m).some((value) => value?.isTexture)) texturedAssets++;
         if (o.isSkinnedMesh && m.map && IsWhiteboxCharacter(o)) skinnedTextured++;
         if (m.customProgramCacheKey().includes("whiteboxGrid1")) gridMaterials++;
+        if (m.name.startsWith("Whitebox_Water_")) {
+          waterMaterials++; waterColors.add(m.color.getHexString());
+          if (m.customProgramCacheKey().includes("whiteboxGrid1")) waterGrid++;
+          if (!m.customProgramCacheKey().includes("whiteboxWater1")) waterGrid++;
+        }
       }
     });
+    const sceneStats = { ...T.post.whiteboxScene.stats };
     restore();
     // Runtime-spawned meshes and instanced colors obey the same rule; restore
     // leaves original material references intact for simulation and art mode.
@@ -79,18 +90,25 @@ try {
         for (let node = object; node; node = node.parent) if (node === T.viewmodel.root) {
           draws.firstPerson++; break;
         }
-        if (!IsWhiteboxCharacter(object) && !IsWhiteboxTerrain(object)
+        if (!IsWhiteboxCharacter(object) && !IsWhiteboxTerrain(object) && !material.name.startsWith("Whitebox_Cutout_")
           && Object.values(material).some((v) => v?.isTexture)) draws.texturedScenery.push(object.name);
       }
       return originalDraw.apply(this, arguments);
     };
     try { T.StepFrames(2); } finally { T.renderer.renderBufferDirect = originalDraw; }
-    return { info, texturedAssets, terrainTextured, skinnedTextured, gridMaterials, spawnedWhite, restored, inherited, charactersCanBeGrey, firstPersonPreserved, draws,
+    return { info, cutoutMaterials, cutoutBroken, waterMaterials, waterGrid, waterColors: [...waterColors], sceneStats,
+      texturedAssets, terrainTextured, skinnedTextured, gridMaterials, spawnedWhite, restored, inherited, charactersCanBeGrey, firstPersonPreserved, draws,
       shadows: T.renderer.shadowMap.enabled, taa: T.post.taaEnabled, gl: T.renderer.getContext().getError() };
   });
   assert.equal(state.info.profile, "whitebox");
   assert.deepEqual(state.info.renderedPasses, ["main", "whiteboxOutput"]);
   assert.equal(state.texturedAssets, 0); assert.ok(state.terrainTextured > 0);
+  // 植被卡片 / 壕沟草保留 alpha 裁切；水面是蓝灰水色不是网格。
+  assert.ok(state.cutoutMaterials > 0 && state.sceneStats.cutoutMeshes > 0, "alpha-cut cards keep their cut-out in whitebox");
+  assert.equal(state.cutoutBroken, 0, "every whitebox cut-out material keeps alphaTest and its map");
+  assert.ok(state.waterMaterials > 0 && state.sceneStats.waterMeshes > 0, "the river surface is drawn with the whitebox water material");
+  assert.equal(state.waterGrid, 0, "the water surface has no grid, only the sheen patch");
+  assert.deepEqual(state.waterColors, ["4d6f86"], "the whitebox water colour is the agreed blue-grey");
   assert.ok(state.skinnedTextured > 0); assert.ok(state.gridMaterials > 0);
   assert.ok(state.spawnedWhite && state.restored && state.inherited && state.charactersCanBeGrey);
   assert.ok(state.firstPersonPreserved); assert.ok(state.draws.firstPerson > 0);

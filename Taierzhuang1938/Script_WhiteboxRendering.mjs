@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { MakeFullscreenMaterial } from "./Script_PostCommon.mjs";
-import { WHITEBOX_LIGHTING, WhiteboxPassPlan } from "./Data_Tuning_Whitebox.mjs";
+import { WHITEBOX_LIGHTING, WHITEBOX_WATER, WhiteboxPassPlan } from "./Data_Tuning_Whitebox.mjs";
 
 // Physical ground and replacement crater tiles, never a material-name whitelist.
 export function IsWhiteboxTerrain(object) {
@@ -71,12 +71,49 @@ function MakeWhiteboxGridPatch(config) {
   });
 }
 
+// 镂空卡片（植被十字面片、壕沟草、桁架镂空节）：alphaTest + 贴图 alpha。白盒替换材质不能丢掉裁切，
+// 否则卡片变成整块不透明竖片。保留 map / alphaMap 与 alphaTest，只把 rgb 换成表面色（再画网格）。
+export function IsWhiteboxCutout(source) {
+  return !!(source.alphaTest > 0 && (source.map || source.alphaMap));
+}
+export function IsWhiteboxWater(object) {
+  return object.userData?.whiteboxWater === true || /water/i.test(object.name || "");
+}
+function MakeWhiteboxCardPatch(config) {
+  return MakePatch({
+    key: "whiteboxCard1",
+    uniforms: (uniforms) => Object.assign(uniforms, { uWhiteboxCardColor: { value: new THREE.Color(config.surfaceColor) } }),
+    fragment: [
+      ["#include <common>", "uniform vec3 uWhiteboxCardColor;"],
+      ["#include <color_fragment>", "diffuseColor.rgb = uWhiteboxCardColor;"],
+    ],
+  });
+}
+// 白盒水面：蓝灰水色 + 掠射角天空色反光。没有环境贴图也成立（反光色是常量，靠菲涅耳权重）。
+function MakeWhiteboxWaterPatch() {
+  return MakePatch({
+    key: "whiteboxWater1",
+    uniforms: (uniforms) => Object.assign(uniforms, { uWhiteboxWaterSheen: { value: new THREE.Color(WHITEBOX_WATER.sheen) } }),
+    fragment: [
+      ["#include <common>", "uniform vec3 uWhiteboxWaterSheen;"],
+      ["#include <dithering_fragment>", `
+        {
+          float waterFresnel = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), ${WHITEBOX_WATER.sheenPower.toFixed(1)});
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, uWhiteboxWaterSheen,
+            clamp(waterFresnel * ${WHITEBOX_WATER.sheenStrength.toFixed(2)}, 0.0, ${WHITEBOX_WATER.sheenMax.toFixed(2)}));
+        }
+      `],
+    ],
+  });
+}
+
 export class WhiteboxSceneRenderer {
   constructor(scene, config, { sky = null, prepareMaterial = null } = {}) {
     this.config = config;
     this.sky = sky;
     this.prepareMaterial = prepareMaterial;
     this.materials = new WeakMap();
+    this.waterMaterials = new WeakMap();
     this.ownedMaterials = new Set();
     this.stats = {};
     this.background = new THREE.Color(config.backgroundColor);
@@ -89,15 +126,22 @@ export class WhiteboxSceneRenderer {
     this.sun.updateMatrixWorld(true);
   }
 
-  Material(source) {
-    let material = this.materials.get(source);
+  Material(source, { water = false } = {}) {
+    // 水面与普通材质共用一张 WeakMap 的话，同一个源材质既被当水又被当地面时会串；水面单独缓存。
+    const cache = water ? this.waterMaterials : this.materials;
+    let material = cache.get(source);
     if (!material) {
+      const cutout = !water && IsWhiteboxCutout(source);
       material = new THREE.MeshStandardMaterial({
-        name: `Whitebox_${source.name || source.type}`, color: this.config.surfaceColor,
-        roughness: 1, metalness: 0, side: source.side, wireframe: source.wireframe || false,
+        name: `Whitebox_${water ? "Water_" : cutout ? "Cutout_" : ""}${source.name || source.type}`,
+        color: water ? WHITEBOX_WATER.color : this.config.surfaceColor,
+        roughness: water ? WHITEBOX_WATER.roughness : 1, metalness: 0, side: water ? THREE.DoubleSide : source.side,
+        wireframe: source.wireframe || false,
         depthTest: source.depthTest, depthWrite: source.depthWrite,
         polygonOffset: source.polygonOffset, polygonOffsetFactor: source.polygonOffsetFactor,
         polygonOffsetUnits: source.polygonOffsetUnits, clippingPlanes: source.clippingPlanes,
+        ...(cutout ? { map: source.map, alphaMap: source.alphaMap, alphaTest: source.alphaTest,
+          alphaToCoverage: !!source.alphaToCoverage } : {}),
       });
       // White material still receives explicitly enabled lighting; surface texture,
       // blood/weather/POM patches are excluded. Destruction holes remain functional.
@@ -108,12 +152,13 @@ export class WhiteboxSceneRenderer {
         const key = typeof patch.key === "function" ? patch.key() : patch.key;
         return /^destruction/.test(key) || (lighting && /^(gtao|gi\d|csm|ssr|clust)/.test(key));
       });
-      ApplyPatches(material, [c.grid ? MakeWhiteboxGridPatch(c) : null, ...retained]);
+      ApplyPatches(material, water ? [MakeWhiteboxWaterPatch()]
+        : [cutout ? MakeWhiteboxCardPatch(c) : null, c.grid ? MakeWhiteboxGridPatch(c) : null, ...retained]);
       this.prepareMaterial?.(material, source);
-      this.materials.set(source, material);
+      cache.set(source, material);
       this.ownedMaterials.add(material);
       source.addEventListener("dispose", () => {
-        material.dispose(); this.materials.delete(source); this.ownedMaterials.delete(material);
+        material.dispose(); cache.delete(source); this.ownedMaterials.delete(material);
       });
     }
     // Source visibility can change during damage/death without replacing materials.
@@ -125,7 +170,7 @@ export class WhiteboxSceneRenderer {
   }
 
   Begin(scene, camera) {
-    const c = this.config, restore = [], stats = { meshes: 0, whiteMeshes: 0, terrainMeshes: 0, characterMeshes: 0, hiddenEffects: 0 };
+    const c = this.config, restore = [], stats = { meshes: 0, whiteMeshes: 0, terrainMeshes: 0, characterMeshes: 0, hiddenEffects: 0, cutoutMeshes: 0, waterMeshes: 0 };
     const Set = (object, key, value) => { restore.push([object, key, object[key]]); object[key] = value; };
     const sceneLighting = c.sceneLighting || c.shadows || c.firstPersonShadow || c.contactShadows || c.gi || c.clusteredLights;
     Set(scene, "background", c.sky ? scene.background : this.background);
@@ -155,7 +200,11 @@ export class WhiteboxSceneRenderer {
       stats.meshes++; if (terrain) stats.terrainMeshes++;
       if (character) stats.characterMeshes++;
       if (terrain ? c.terrainTextures : character ? c.characterTextures : c.assetTextures) return;
-      Set(object, "material", Array.isArray(object.material) ? sources.map((m) => this.Material(m)) : this.Material(object.material));
+      // 水面：蓝灰水色 + 天空反光（WHITEBOX_WATER），不画网格。人物与地形不可能是水，先判它们。
+      const water = !terrain && !character && IsWhiteboxWater(object);
+      if (water) stats.waterMeshes++;
+      else if (sources.some(IsWhiteboxCutout)) stats.cutoutMeshes++;
+      Set(object, "material", Array.isArray(object.material) ? sources.map((m) => this.Material(m, { water })) : this.Material(object.material, { water }));
       if (object.instanceColor) Set(object, "instanceColor", null);
       stats.whiteMeshes++;
     });

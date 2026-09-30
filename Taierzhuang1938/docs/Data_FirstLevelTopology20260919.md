@@ -1,5 +1,8 @@
 # 第一关空间拓扑 · 2026-09-19 采用稿
 
+> **2026-09-30（白盒 12–18 改造 R1a）：北沙河在铁路桥一带拓宽到 ~66 m、桥改三孔、南岸加高堤与沙滩，见 §2「拓宽河段」与「铁路桥」；
+> 本页 §2 里原断面（28.4 m）的数值仍然有效——只是 x −140…−30 一段（及两端各 20 m 过渡）被替换了。**
+
 > 2026-09-24：06–18建筑围合、遮挡和屋顶按[概念/拓扑白盒迭代](Data_FirstLevelWhitebox20260924.md)更新；本页锚点、路线和桥梁接口继续有效。
 
 > 2026-09-22 更新：03–05 的当前空间、事件门和对白以 [新采用稿](Data_FirstLevelFrontSource20260922.md) 与 [白盒契约](Data_FirstLevelFrontTopology20260922.md) 为准；本文其他阶段继续有效。
@@ -67,6 +70,54 @@ z 已经从旧版的 743 收到 370（军列进站跑道下线）；**x 没收**
 的 `MISSION_TERRAIN.rivers` 取 `min` 切进共享高度场。水面是示意体块（`semantic:"water"`、`solid:false`，
 52 块），不参与碰撞。
 
+### 拓宽河段 `RailBridgeReach`（2026-09-30，`MISSION_NORTH_RIVER.reaches[0]`）
+
+用户：「最后的炸桥，连条河都没有，要桥干什么用」。概念图 18_1 / 18_3 的河宽在 60 m 以上、水面离岸顶只有一两米、
+南岸是高堤 + 堤下沙滩、河上是多孔桁架桥。原来的 28.4 m 槽 + 槽底以上 1.2 m 的水面（比岸顶低约 3 m）从南岸射位
+根本望不见水，所以铁路桥这一段改成下面的断面。**旧数值（28.4 m 河口 138.8…167.2、水在 z 153 槽底 +1.2、单孔桥）
+在 x −140…−30 以内作废，以外不变**（浅滩 x=47、路桥 x=76 也不变）。
+
+| 项 | 值 |
+| --- | --- |
+| 范围 | x ∈ [−140, −30] 全宽；**第二轮（2026-09-30）过渡拉长**：西端 65 m（x −205…−140，正好止于 `MISSION_BOUNDS.minX`）、东端 60 m（x −30…30，不碰浅滩插值带 x 34…60 与路桥 x 76），按 smoothstep(x) 把六个位置参数混回原断面（第一轮是各 20 m 的直角收口，从高空看像一个长方形水池） |
+| 只往北拓宽 | 南岸自然地面位置不动：南沿 `shoreZ` 166（原 167.2）；北岸岸沿 `crestZ` 90（原 138.8），北移 ~49 m |
+| 北岸陡坡 | `crestZ` 90 → `floorZ` 94.5，一条 smoothstep，峰值斜率 1.5·4.2/4.5 = **1.40 > tan52°**，人爬不上来 |
+| 河底 | `floorZ` 94.5 → `dropZ` 156，深 4.2（水面下 2.95 m） |
+| 水下陡坎 | `dropZ` 156 → `waterZ` 158.6，深从 4.2 收到 `waterCut` 1.15：斜率 1.5·3.05/2.6 = **1.76**，下得去上不来 |
+| 南岸沙滩 | `waterZ` 158.6 → `shoreZ` 166，深 1.15 → 0：峰值斜率 0.23（13°），人走得上去 |
+| 水面 | 相对南岸自然地面 **−1.25 m**（`waterRel`），水线 z0 ≈ 91.6（北）… z1 ≈ 158.3（南），宽 **66.7 m**，河心水深 2.95 m |
+| 过渡 | 水位在两端按同一个权重从原低水位 −3.0 混到 −1.25；水线宽度同样混合，水面在 x 上连续 |
+| 岸线起伏 `wander` | 北岸线（`crestZ`/`floorZ` 同量平移）与南水线（`dropZ`/`waterZ`/`shoreZ` 同量平移）各叠三个正弦（波长 110/63/41 m 与 95/57/43 m，确定性，只依赖 x）。包络在 **x −95…−60 恰好为 0**（铁路桥一带断面不变），向两侧 30 m smoothstep 长到 1。北岸只往南缩 0…9 m（岸沿绝不比 z 90 更靠北，北岸村子与土坎安全），南水线只往北缩 0…7 m（沙滩水线绝不比 z 158.3 更靠南，南堤脚不被吃掉）；起伏与过渡权重相乘，过渡带里随权重收回原断面。函数 `RiverReachOffsets(x, reach)` |
+| 跟着岸线走的东西 | 空气墙（按断面「深度 1.05 / 0.9 m」现算）、芦苇（`RiverWaterAt` 水线外）、沙滩植被（`RiverReachAt` 的岸沿/沙滩南端）、水面块、南堤堤顶点表（堤顶 z = shoreZ + 7，点表在 `Data_FirstLevelWhiteboxTerrainRear`，`Script_FirstLevelWhiteboxTerrainTest` 断言与 `RiverReachAt` 一致）；北岸村子与土坎在北岸 z ≤ 84，岸线只往南缩，不受影响 |
+| 铁路桥一带不变的验证 | x −95…−60 的 `RiverReachAt` / `RiverWaterAt` / `RiverCutAt`（z 40…200 每 0.25 m，90 381 点）与 a35a763e 逐位相同（`Object.is`），地形高度场与第一轮（6b159cfd）逐位相同 |
+
+函数：`RiverReachAt(x)`（混合后的六个参数或 null）、`RiverCutAt`（全河槽下切深度，地形取 min 的接法不变）、
+`RiverWaterAt(x)`（水面剖面 {level, z0, z1}，Layout 铺水面与芦苇、测试都读它）、`RiverReachWeight`。
+`RiverProfileAt` 仍然只回原断面（含浅滩）参数，旧读者不受影响。
+
+**除铁路桥外处处过不去**（原口径保留，但**实现方式变了**）：纸面口径是「岸坡斜率 > tan52°（Rapier 爬坡上限）」——拓宽段北岸 1.40、水下陡坎 1.76、原断面 1.97。
+**实测这条口径拦不住真胶囊**：在 e080b510 基线上，把 Rapier 胶囊放进原 28 m 河槽，它 autostep + 贴地吸附把 smoothstep 岸坡（缓头缓尾）一节节爬掉，
+从北岸一路走到南岸（1500 帧，y 回到 0）。所以拓宽段（含两端 20 m 过渡）靠**空气墙**（`tag:"airWall"`+`visual:false`，`Data_FirstLevelMissionLayout` 里 `BridgeShoreAirWall*` / `BridgeNorthBankAirWall*`，每 4 m 一段）：
+南岸墙摆在沙滩上「深度到 1.05 m」处（离水线约 0.9 m）——沙滩可以走到水边（爆破手就在那儿），下不了水；北岸墙摆在岸沿外侧「深度到 0.9 m」的陡坡顶（岸沿以北约 1 m），下不去也就爬不上来。
+铁路桥两侧：|x−桥轴|<3.4 不摆，桥面 x −79.7…−74.3 下面是净空不够的桥台/引桥/1 号墩，西侧那条 2 m 露天窄缝另补一段窄墙（x −80.75）。
+墙只挡角色控制器，子弹与视线穿过。真胶囊实测（`Script_FirstLevelMissionTopologyBrowserTest` 的 shore 段）：从沙滩往北走停在 z≈161（水线南 ~0.9 m 处，过渡带停在岸坡顶），从北岸往南走停在岸沿。
+原断面（x < −160 与 x > −10）仍是旧口径，没动。
+
+**南堤**（白盒地形 `Data_FirstLevelWhiteboxTerrainRear` 的 `BridgeLeveeWest/East`）：堤顶 z≈173（核心 z 171.5…174.5）比自然地面高 **1.4 m**，
+北坡 5.5 m 从沙滩南端 z 166 起爬（斜率 0.38）、南坡 5.5 m 落回自然地面；堤在铁路桥头断开
+（西段止于 x −88，东段始于 x −64，缺口 x −82.5…−70.5 是路基 +0.62 的铁路与尾队的路，也是射位看河的缺口）。
+Bridge18 框西缘 −100 → −148，堤沿河向西伸到 x −136。旧岸垄 `BridgeBankBerm*`（0.85 m）删除。
+
+**南岸射位**（`bridgeCover` (−81,179.4)）：原来两道 1.3–1.45 m 的胸墙（离射位 1.4 m，把河挡在墙后）拆掉；缺口里只留一个土垄
+`BridgeSouthMound`（(−81,177.7)，3.2×0.9 m，顶 = 射位地面 + 1.25 m）和两段零星沙袋 `BridgeSouthSandbagsWest/East`。
+**蹲下（眼高 1.05）被土垄挡住，站起来（1.62）越得过它看见沙滩、河面和桥**（`Script_FirstLevelSpaceTest` 第 9 节）。
+几何上「蹲姿被挡」与「蹲姿看得见近水」互斥（挡住水平线就挡住向下的线），所以蹲姿只能看见远半边水面与桥桁架，近处的水与沙滩要站起来看。
+
+**对岸**：北岸整体北移 50 m —— 土坎 `BridgeNorthRidgeWest/East` 移到 z 82.2、`MISSION_PLACEMENT.bridge.rearColumn*`/`enemyRidge`、
+`MISSION_TACTICS.BridgeNorth*` 同量平移。机枪位 `bridgeEnemy` 挪到桥轴西侧 (−84.5, 80.5)：南岸射位到它的连线整段在西桁架（x −79.95）以西，
+不被三孔桥的桁架挡住（射位到机枪 99 m）。北岸 x −140…−100、z 40…90 是一小片村子（`NorthBankHouseA–D` + `WestFieldHouse`(−121,67) + 六棵枯树），
+**x −100…−40、z 20…90 留空**给 R2 摆日军步坦部队的进场地与岸边阵地。
+
 ### 路桥 `MISSION_SOUTH_BRIDGE`（x=76）
 
 甲板 `deck {x:76, z:153, w:8, d:32}`、`deckY 0.13`、`deckH 0.25`，桥面 z 137…169。
@@ -75,6 +126,21 @@ gate：`TemporaryBridge`，消失信号 `MissionBridgeDestroyed`，`walkableId "
 残骸 `MissionBridgeWreck`（8.8×4.4×6）按同一信号出现。13 的第一轮航过炸的就是它。
 
 ### 铁路桥 `MISSION_RAIL_BRIDGE`（x=−77）
+
+> **2026-09-30 起是三孔桥**（下表「新」列）；下面第二张表是旧单孔桥的历史数值，仅作对照（`deckHalfD 18`、`abutmentZ [140.5,165.5]`、`gapZ [137,169]` 全部作废）。
+> `x`,`z` 现在是**被炸那一孔的中心**（z 148；旧值 153 是单孔桥心），`RailBridgeDeck`/桁架/直轨这 5 个带 signal 的完好件就是这一孔。
+
+| 项 | 新（三孔） |
+| --- | --- |
+| 桥台 | 南桥台 z 165.5（坐在沙滩后的路基上）、北桥台 z 88（坐在北岸，`abutmentZ [88,165.5]`），仍是让开 x=−77 中线的翼墙 |
+| 桥墩 | `piers`：1 号墩 z 160（**沙滩水边**，墩脚是沙地）、2 号墩 z 136、3 号墩 z 112（水里）；`pierW 3.4 × pierD 3.6`，永久实体（`RailBridgePier1..3`），顶在桥面下 |
+| 三孔 | `spans`：SpanSouth 160→136（**要炸**，`RailBridgeDeck`，d 24，中心 148）、SpanMid 136→112、SpanNorth 112→86（含台后引道）；南引桥段 `approachSouth` 160→169；各孔 24 m，桁架 `trussH 2.4` |
+| 永久件 | 另两孔与南引桥段的桥面（`RailBridgeSpanMidDeck`/`SpanNorthDeck`/`ApproachSouthDeck`，进 walkableSurfaces）、桁架、直轨都是永久体块，炸后仍在 |
+| 断口 | `gapZ [86,169]`：道砟/枕木/钢轨样条在这一段断开；桥面分孔总长 83 m |
+| 起爆 | 1 号墩药包 + 跨中药包；`blast {spanId:"SpanSouth", centerZ:148, pierChargeZ:160}`；`blastSafe` 离 `railBridge`（=被炸孔中心）54.1 m ≥ 40 |
+| 完好 5 件 / 残骸 3 件 | 不变：`RailBridgeDeck`（可走面）、`RailBridgeTrussWest/East`、`RailBridgeRailWest/East` 带 signal；`RailBridgeWreckSpan/Truss/Stub` 带 appearSignal。残骸按新位置摆（Stub 挂在 2 号墩南面 z 137.5） |
+
+旧单孔桥（历史）：
 
 | 项 | 值 |
 | --- | --- |
@@ -103,11 +169,13 @@ bunkerRear(-40,-119)       rearCorner(-42,-113)        collection(-37,-101)
 streetBlock(76.65,15)      litterHold(66,-20)          eastAlley(88,11)
 streetRejoin(77,34)        cartBoard(85.6,113)         cartHalt(76,135)
 sideAlley(95.2,61)         wallPathStart(56,207)       wallPathEnd(16,220)
-receptionGate(2,240)       railBridge(-77,153)         bridgeNorthEnd(-77,136)
-bridgeSouthEnd(-77,170)    bridgeCover(-81,179.4)      bridgeEnemy(-68,130.5)
+receptionGate(2,240)       railBridge(-77,148)*        bridgeNorthEnd(-77,86)*
+bridgeSouthEnd(-77,170)    bridgeCover(-81,179.4)      bridgeEnemy(-84.5,80.5)*
 blastSafe(-66,201)         marchOut(-62,232)           nightSpawn(-160,292)
 northGateApproach(-160,318) northGate(-160,340)        gateInside(-160,352)
 ```
+
+带 * 的三个 2026-09-30 河拓宽后的新值（原 railBridge(-77,153)、bridgeNorthEnd(-77,136)、bridgeEnemy(-68,130.5)）。
 
 ### 沿用：`MISSION_REAR_ANCHORS`（11 个，在 `Data_FirstLevelMissionTopology.mjs`）
 
@@ -152,7 +220,7 @@ gate(53,34)     courtCover(67,24) transfer(95,103)   queue(74,111)
 | `cartRide` | 5 | 26.7 | (85.6,113) → (76,135) |
 | `wallPath` | 7 | 74.4 | (56,207) → (2,240) |
 | `toBridge` | 8 | 80.5 | (−41,244) → (−81,179.4) |
-| `bridgeCrossing` | 6 | 114.0 | (−77,120) → (−62,232) |
+| `bridgeCrossing` | 6 | 164.0 | (−77,70) → (−62,232)（2026-09-30 起点北移 50 m、桥长 83 m；旧 114.0） |
 | `bridgeWithdraw` | 4 | 27.1 | (−81,179.4) → (−66,201) |
 | `marchOut` | 3 | 31.3 | (−66,201) → (−62,232) |
 | `nightMarch` | 4 | 60.0 | (−160,292) → (−160,352) |

@@ -122,7 +122,7 @@
   跑到玩家 `runnerArriveM` 以内才 `BridgeOrders`（`bridgeRunnerArrived`）。
   HUD 目标是阶段 objective「掩护回援分队通过铁路桥」。罗班长沿 `toBridge` 带到南岸射位。
 * **回援尾队**：六个**真人实体**（`RearColumn0..5`），0 号扛 Zb26、1/2 号两人抬一根白盒炮管
-  （`dressing.Prop("limb", …)`）、其余步枪（背上一只白盒小件）。沿 `bridgeCrossing`（114 m）走。
+  （`dressing.Prop("limb", …)`）、其余步枪（背上一只白盒小件）。沿 `bridgeCrossing`（164 m；2026-09-30 河拓宽、桥改三孔 83 m 后，旧 114 m）走。
   * 火力没打断以前进度封在 `rearColumnHoldM`(13 m)，压在北引道上；
     被北岸看得见的人 `Defend` + 伏倒还击（真的会中弹）。
   * 尾队被顶住那一刻才起 `BridgeCover`（「别堵桥口」「北边土坎」）。
@@ -132,12 +132,14 @@
 * **撤出爆破区**：桥头军官喊 `BridgeWithdraw`（三句里没有「所有人都过来了」）；
   爆破人员是**此前就在场**的两个人，走到 `MISSION_PLACEMENT.bridge.demolition` 蹲 `demolitionSetS`(6 s)
   装药（`demolitionCharged`），然后沿 `demolitionPullback` / `officerPullback` 自己撤出去。
-  三条撤出折线都从西/东两道掩体墙之间那个 9 m 宽的口子（x −78..−69）走，终点在
+  三条撤出折线都从南堤缺口（x −82.5…−70.5，铁路桥头，2026-09-30 起南岸是高堤而不是两道胸墙）走，终点在
   `BlastSafeBank`（x −69.5..−62.5）西头以外；净空由 `Script_FirstLevelSpaceTest` 守着。
   **药装好之前不清场**：爆破人员的岗位就在爆破区里，这会儿把区里的人往南赶，
   赶的就是他们自己（见 §6）。桥头那三个人也不归清场管 —— 他们有自己的折线。
 * **爆破**：三个条件全满足才点火 ——
   ① `demolitionCharged`；② 玩家 `blastZoneCleared`（`blastSafe` 10 m 内，该点离桥心 48 m）；
+  （2026-09-30：桥是三孔，要炸的是最南一孔，`railBridge` 锚点 = 被炸孔中心 (−77,148)，`blastSafe` 离它 54.1 m，
+  1 号墩药包 + 跨中药包；见 [拓宽河段](Data_FirstLevelTopology20260919.md)。）
   ③ `BlastZoneOccupant()` 为空：玩家、班里人、桥头人员、尾队，**没有一个**在桥心
   `blastClearRadiusM`(30 m) 以内。有人就一直等（每次等都记一条 `blastHeldForFriendly` 取证），
   **不是到点就炸的计时器**。人走净之后再等玩家把脸转向桥（≤ `blastGazeWaitS` 3.5 s），
@@ -201,7 +203,7 @@
 | `silenceFromProgressM` / `silenceWalkM` | 46 / 14 | 夹道 74.4 m；采用稿要求真实无对白路段，按末段两道院墙之间的一跨量 14 m |
 | `woundedEnteringLitters` | 2 | `R.litterCount` 7 里先进院的头两副 |
 | `surgeonReachM` | 2.4 | 站位离放置点 1.65 m + 走位到达余量 0.5 m |
-| `rearColumnHoldM` | 13 | `bridgeCrossing` 起点到北桥头 16 m，停在离桥头 3 m |
+| `rearColumnHoldM` | 13 | `bridgeCrossing` 起点 (−77,70) 到北桥头 (−77,86) 16 m，停在离桥头 3 m（河拓宽后北岸北移 50 m，长度不变） |
 | `blastClearRadiusM` | 30 | 药包火球半径 9.5–13 m 的两倍多；`blastSafe` 离桥心 48 m，退到那儿一定算走净 |
 | `MISSION_TUNING.bridgeBlastRadiusM` | 16 | 共用爆炸感知半径：48 m 外震屏创伤约 0.5，耳鸣伸不到安全区（原 12） |
 | `blastGazeWaitS` / `exploderPressLeadS` / `marchOrderDelayS` | 3.5 / 0.45 / 6.5 | 等玩家看桥 / 压杆到起爆 / 起爆到「往滕县」（[铁路桥](Data_RailBridge.md) §3） |

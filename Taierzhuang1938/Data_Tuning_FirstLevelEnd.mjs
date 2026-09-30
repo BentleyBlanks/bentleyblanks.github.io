@@ -171,11 +171,13 @@ export const END_TUNING = Object.freeze({
   // 尾队真的过完桥：离 bridgeCrossing 末点这么近就算下了桥往南走了。
   rearColumnClearM: 2,
   // 桥头军官与爆破人员（MISSION_PLACEMENT.bridge.officer / .demolition）。
-  // demolition[1] (−74.2,171.4) 落在 RailBridgeDeck 上 —— 那正是南桥台，站得住。
+  // demolition[1] (−74.2,171.4)：2026-09-30 河拓宽后南引桥段止于 z 169，这个点在铁路桥头缺口的路基上（+0.7 m），站得住；
+  // R1b 会把工兵与药箱重摆到 1 号墩脚下的沙滩上（z 160–166，x −86…−70）。
   demolitionSetS: 6,
-  // 撤出折线都要从 BridgeSouthCoverWest(x −87..−78) 与 BridgeSouthCoverEast(x −69..−60)
-  // 之间那个 9 m 宽的口子走。西边那位原来的第一个点 (−80,178) **埋在西侧那道 1.47 m 的
-  // 掩体墙里**：他顶着墙走不到，停在离桥心 24 m 的爆破区里，桥只能靠
+  // 撤出折线都要从南堤的铁路桥头缺口（x −82.5…−70.5）走，避开缺口里的土垄 BridgeSouthMound（x −82.6..−79.4）。
+  //（2026-09-30 之前是 BridgeSouthCoverWest(x −87..−78) 与 BridgeSouthCoverEast(x −69..−60) 之间那个 9 m 宽的口子。）
+  // 西边那位原来的第一个点 (−80,178) **埋在西侧那道 1.47 m 的
+  // 掩体墙里**（旧胸墙，已拆）：他顶着墙走不到，停在离桥心 24 m 的爆破区里，桥只能靠
   // blastFriendlyStuck 兜底晚二十秒才炸（实拍 2026-09-20）。改成先往东挪到口子上。
   // 折线净空由 Script_FirstLevelSpaceTest 守着。
   // 东边那位的终点就是起爆器后面：他走到这儿蹲下，按起爆器的也是他
@@ -252,14 +254,14 @@ export const END_TUNING = Object.freeze({
     waveStaggerS: 0.9, tankStaggerS: 7,
     // BridgeWithdraw：第二拨（岸线补 6 + 冲桥组 6）与真 AI 8 个放出；冲桥组等 rushDelayS 才起跑，
     // 按下起爆器之前必须到位（到位最多等 rushWaitMaxS，再看 rushSettleS 让玩家看一眼）。
-    rushDelayS: 1.5, rushWaitMaxS: 16, rushSettleS: 1.2,
+    rushDelayS: 1.5, rushWaitMaxS: 22, rushSettleS: 1.2,
     // 桥头人堆（FAR_BANK_CROWD 八个）：待命位上的两个在冲桥组起跑 crowdDelayS 秒后上桥，第二拨补拨兵出生就直接上桥。
     crowdDelayS: 4,
     // 起爆：桥面 blastKillM 以内的日军当场炸死抛起（up/out 是初速 m/s），blastProneM 以内的趴 blastProneS 秒；
     // 尸体 corpseRemoveS 秒后移除（尸体刚体 ≤8 s 后冻结，桥没了它不会跟着落，必须自己收）。
     blastKillM: 13, blastProneM: 24, blastProneS: 1.6, throwUpMps: 6.2, throwOutMps: 2.2, corpseRemoveS: 8,
-    // 起爆后这么久，对岸活着的人必须都退回岸边（岸沿以南 0.5 m 之内）：冲桥组后排与前锋跑回去要几秒。
-    bankSettleS: 14,
+    // 起爆后这么久（20 s），对岸活着的人必须都退回岸边（岸沿以南 0.5 m 之内）：冲桥组后排与前锋跑回去要几秒。
+    bankSettleS: 20,
     // ---- 分档（dz，米）：contact < tierM[0] ≤ mid < tierM[1] ≤ far < tierM[2] ≤ out -------------
     // contact：2 个机枪手轮换真开火，其余真 AI 只压制；环境射击开；炮弹落点 ≥ shellMinPlayerM.contact；
     // mid：全体真 AI 只压制；far：环境射击停、炮弹改「远雷」；out：全停。

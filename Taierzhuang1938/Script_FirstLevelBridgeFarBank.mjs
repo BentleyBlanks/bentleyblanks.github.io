@@ -77,6 +77,30 @@ export function ShellSpotVerdict(spot, { player, friendlies = [], minPlayerM, fr
   return null;
 }
 
+/**
+ * 走进来的路（没有导航网格，AI 只会朝目标直走、顶到东西就卡）：所有人都先沿桥轴从北面走下来 ——
+ * 桥轴 x −77 两侧是 R1a 北岸土坎的缺口（BridgeNorthRidge 两段之间），北边一路没有院子、村子与前沿壕沟（RearFarm 院子在
+ * x −72.5…−59.5，前沿交通壕的尾巴在 x −58…−30，北岸西侧村子在 x −143…−102）；走到自己岸线位那一排的 z，再横着走过去。
+ * 岸线上（z ≥ 岸沿−8）的人要穿过两段土坎之间的缺口（先到岸沿−5）再横走。纯函数，测试逐条量净空。
+ */
+// 土坎与缺口是绝对坐标（BridgeNorthRidge 两段 z 81.6…82.8，缺口在桥轴两侧）：河岸沿（R1a 让它随 x 起伏）不能拿来算。
+const GATE_Z = () => FarBankShoreZ(AXIS_X) - 4.5;      // 缺口出口：土坎南脸之南 2.7 m（z 85.5）
+const NORTH_Z = () => FarBankShoreZ(AXIS_X) - 12;       // 土坎北面走廊：北脸之北 3.6 m（z 78）
+const RIDGE_SOUTH_Z = () => FarBankShoreZ(AXIS_X) - 8.5; // 位置 z 不小于它的算「岸线上」（土坎南面）
+export function FarBankWalkInVia(post) {
+  // 岸线上的人：走下缺口到 z 85.5，再沿这一排横着走到他那一列；土坎后面的人（真 AI、待命兵）：在北面走到自己那一排的 z（最多 78）再横着走。
+  if (post.z >= RIDGE_SOUTH_Z()) return [{ x: AXIS_X, z: GATE_Z() }, { x: post.x, z: GATE_Z() }];
+  return [{ x: AXIS_X, z: Math.min(post.z, NORTH_Z()) }];
+}
+/** 从桥轴缺口（z 85.5）出发到某个岸线位的路（退回岸边用；WalkInVia 去掉前面那段下坡）。 */
+export function FarBankBankVia(post) {
+  if (post.z >= RIDGE_SOUTH_Z()) return [{ x: post.x, z: GATE_Z() }];
+  return [{ x: AXIS_X, z: Math.min(post.z, NORTH_Z()) }];
+}
+/** 第 n 个走进来的人的出生点：桥轴上往北 back 米，左右错开一点（±3.2 m）。 */
+export function FarBankSpawnAt(n, back) {
+  return { x: AXIS_X + ((n % 5) - 2) * 1.6, z: FarBankShoreZ(AXIS_X) - back };
+}
 const FIRE_LIST_CACHE = new Map();
 /** 授权点表（带 id、冻结、同一 key 同一份引用：大脑按引用判断「换没换」）。 */
 export function FarBankFireList(key) {
@@ -203,7 +227,7 @@ export class FirstLevelFarBank {
     let n = 0;
     const walkIn = (spec, kind, extra = {}) => {
       const back = 100 + (n % 5) * 6;
-      this.Queue(spec, kind, { at: instant ? { x: spec.x, z: spec.z } : { x: spec.x + ((n % 3) - 1) * 4, z: FarBankShoreZ(spec.x) - back },
+      this.Queue(spec, kind, { at: instant ? { x: spec.x, z: spec.z } : FarBankSpawnAt(n, back), via: instant ? null : FarBankWalkInVia(spec),
         delay: instant ? 0 : n * stagger, post: { x: spec.x, z: spec.z }, ...extra });
       n += 1;
     };
@@ -242,7 +266,7 @@ export class FirstLevelFarBank {
     let n = 0;
     const late = (spec, kind, extra = {}) => {
       const back = FAR_BANK_REAL_SPAWN_BACK_M + (n % 4) * 5;
-      this.Queue(spec, kind, { at: { x: spec.x + ((n % 3) - 1) * 3, z: FarBankShoreZ(spec.x) - back - (kind === "shore" ? 20 : 0) },
+      this.Queue(spec, kind, { at: FarBankSpawnAt(n, back + (kind === "shore" ? 20 : 0)), via: FarBankWalkInVia(spec),
         delay: 0.4 + n * 0.7, post: { x: spec.x, z: spec.z }, ...extra });
       n += 1;
     };
@@ -293,7 +317,7 @@ export class FirstLevelFarBank {
       actor.scriptedNoncombatant = true;
       actor.missionUntargetable = true;   // 班里人不隔河点名（玩家照样打得到他们）
     }
-    const unit = { id: spec.id, kind: p.kind, spec, actor, mode: "walk", goal: p.post, post: p.post, alt: p.alt || null,
+    const unit = { id: spec.id, kind: p.kind, spec, actor, mode: "walk", goal: p.post, post: p.post, alt: p.alt || null, via: p.via ? p.via.map((v) => ({ ...v })) : null,
       rushSlot: Number.isInteger(p.rushSlot) && p.rushSlot >= 0 ? p.rushSlot : null, bornAt: this.t, stance: (this.units.length % 2) ? 0 : 1,
       fireKey: this.FireKeyFor(p.post.x), hopAt: this.t + T.standbyHopS * (0.6 + this.rnd()), fireList: null, deadAt: null, proneUntil: 0 };
     if (p.crowd) this.AssignCrowd(unit, p.crowd);
@@ -343,18 +367,20 @@ export class FirstLevelFarBank {
     if (unit.mode === "prone") {
       if (this.t < unit.proneUntil) { r.ai.SetStance(a, 2, 0.4, true); return; }
       // 趴完了：没被炸死的（冲桥组后排、前锋）回岸边
-      unit.goal = unit.bankPost || unit.post; unit.mode = "walk"; unit.dash = true;
-      unit.fireKey = this.FireKeyFor(unit.goal.x);
+      this.GoHome(unit);
     }
     if (unit.mode === "walk") {
-      if (Distance(a.position, unit.goal) < 1.0) {
+      // 途经点（从桥面退回岸边要先走出北桥台的空气墙缺口，直线斜插会顶在桁架与空气墙上）
+      while (unit.via?.length && Distance(a.position, unit.via[0]) < 1.6) unit.via.shift();
+      const goal = unit.via?.length ? unit.via[0] : unit.goal;
+      if (!unit.via?.length && Distance(a.position, unit.goal) < 1.0) {
         if (unit.goal === unit.bankPost) unit.post = unit.goal;   // 退回岸边的人以后就站这儿
         this.Arrive(unit);
         return;
       }
       a.ambientFirePoints = null; a.ambientFirePoint = null;
       r.ai.SetStance(a, 0, 0.4, true);
-      r.MoveActor(a, unit.goal, this.Speed(unit));
+      r.MoveActor(a, goal, this.Speed(unit));
       return;
     }
     if (unit.mode === "rush") { this.UpdateRush(unit); return; }
@@ -382,7 +408,7 @@ export class FirstLevelFarBank {
       if (!unit || !unit.actor?.alive) continue;
       const slot = FarBankRushSlot(index);
       unit.rushSlot = index; unit.slot = slot; unit.mode = "rush"; unit.kind = "rush";
-      unit.route = [{ x: slot.lane, z: FarBankShoreZ(slot.lane) - 4 }, { x: slot.lane, z: FAR_BANK_RUSH.deckStartZ }, { x: slot.lane, z: slot.endZ }];
+      unit.route = [{ x: slot.lane, z: NORTH_Z() }, { x: slot.lane, z: FAR_BANK_RUSH.deckStartZ }, { x: slot.lane, z: slot.endZ }];
       unit.routeIndex = 0; unit.fireKey = "rush";
     }
   }
@@ -402,11 +428,23 @@ export class FirstLevelFarBank {
     r.ai.SetStance(a, 0, 0.4, true);
     r.MoveActor(a, goal, T.rushMps);
   }
+  /** 回岸边：在桥面 / 桥台一带的人先沿车道走到桥台外沿再出缺口，其余直接回自己的岸线位。 */
+  GoHome(unit) {
+    const a = unit.actor, shore = FarBankShoreZ(a.position.x);
+    unit.bankPost = unit.bankPost || this.BankPostFor(unit);
+    unit.goal = unit.bankPost; unit.mode = "walk"; unit.dash = true; unit.via = null;
+    unit.fireKey = this.FireKeyFor(unit.bankPost.x);
+    if (Math.abs(a.position.x - AXIS_X) <= 6 && a.position.z > shore - 2) {
+      const lane = Clamp(a.position.x, FAR_BANK_RUSH.lanes[0], FAR_BANK_RUSH.lanes[1]);
+      // 桥面 → 桥台外沿 → 缺口出口（岸沿−4.5）→ 沿岸线横走 / 绕到土坎后面
+      unit.via = [{ x: lane, z: Math.min(a.position.z, FAR_BANK_RUSH.deckStartZ) }, { x: lane, z: GATE_Z() }, ...FarBankBankVia(unit.bankPost)];
+    } else if (a.position.z >= RIDGE_SOUTH_Z() && unit.bankPost.z < RIDGE_SOUTH_Z()) unit.via = [{ x: AXIS_X, z: GATE_Z() }, ...FarBankBankVia(unit.bankPost)];
+  }
   /** 桥头人堆：出生（或从待命位）之后沿 (车道, 岸沿−4) → 桥台外沿 → 车道上的位置，一路小跑上桥，到位单膝跪着打。 */
   AssignCrowd(unit, c) {
     unit.crowdPost = { x: c.lane, z: c.z };
     unit.bankPost = unit.bankPost || { ...unit.post };
-    unit.route = [{ x: c.lane, z: FarBankShoreZ(c.lane) - 4 }, { x: c.lane, z: FAR_BANK_RUSH.deckStartZ }, { x: c.lane, z: c.z }];
+    unit.route = [{ x: c.lane, z: NORTH_Z() }, { x: c.lane, z: FAR_BANK_RUSH.deckStartZ }, { x: c.lane, z: c.z }];
     unit.routeIndex = 0; unit.mode = "crowd"; unit.fireKey = "rush"; unit.dash = true;
   }
   StartCrowd() {
@@ -456,7 +494,7 @@ export class FirstLevelFarBank {
   RecallVanguard() {
     this.vanguardBack = true;
     for (const unit of this.units) {
-      if (unit.vanguardPost && unit.actor?.alive && unit.mode !== "dead") { unit.goal = unit.bankPost; unit.mode = "walk"; unit.dash = true; unit.fireKey = this.FireKeyFor(unit.bankPost.x); }
+      if (unit.vanguardPost && unit.actor?.alive && unit.mode !== "dead") this.GoHome(unit);
     }
   }
 
@@ -482,7 +520,7 @@ export class FirstLevelFarBank {
     // 没被炸到的冲桥组 / 前锋，都回岸边
     for (const unit of this.units) if ((unit.rushSlot != null && unit.slot) || unit.vanguardPost || unit.crowdPost) {
       if (unit.actor?.alive && unit.mode !== "prone") {
-        unit.bankPost = unit.bankPost || this.BankPostFor(unit); unit.goal = unit.bankPost; unit.mode = "walk"; unit.dash = true;
+        this.GoHome(unit);
         unit.fireKey = this.FireKeyFor(unit.bankPost.x);
       }
     }
@@ -561,13 +599,13 @@ export class FirstLevelFarBank {
     const r = this.r, eye = r.player?.position;
     for (let i = 0; i < T.reinforceBatch; i++) {
       const slot = (this.reinforced + i) % FAR_BANK_REINFORCE.xs.length;
-      const x = FAR_BANK_REINFORCE.xs[slot], at = FarBankPoint(x, FAR_BANK_REINFORCE.backM[slot]);
+      const at = FarBankSpawnAt(this.reinforced + i, FAR_BANK_REINFORCE.backM[slot]);
       // 玩家看不见的地方出生：离玩家远（≥ hiddenSpawnM）或不在镜头里
       if (eye && Distance(at, eye) < T.hiddenSpawnM && InView(r.camera, { x: at.x, y: 1.2, z: at.z })) continue;
       const shorePost = this.FreeShorePost();
       if (!shorePost) return;
       const id = `FarBankReinforce${this.reinforced + i}`;
-      this.Queue({ id, x: shorePost.x, z: shorePost.z }, "reinforce", { at, delay: 0, post: shorePost });
+      this.Queue({ id, x: shorePost.x, z: shorePost.z }, "reinforce", { at, via: FarBankWalkInVia(shorePost), delay: 0, post: shorePost });
       this.reinforced += 1;
     }
   }

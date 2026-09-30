@@ -59,13 +59,13 @@ export const FAR_BANK_SHORE_A = freeze([
   Unit("FarBankShoreA0", -108, 5), Unit("FarBankShoreA1", -103, 3), Unit("FarBankShoreA2", -98, 7, { weapon: "Type11" }),
   Unit("FarBankShoreA3", -94, 4), Unit("FarBankShoreA4", -89, 6),
   Unit("FarBankShoreA5", -71, 4), Unit("FarBankShoreA6", -67, 6), Unit("FarBankShoreA7", -63, 3, { weapon: "Type11" }),
-  Unit("FarBankShoreA8", -59, 7), Unit("FarBankShoreA9", -55, 4), Unit("FarBankShoreA10", -51, 6, { weapon: "Type11" }),
+  Unit("FarBankShoreA8", -59, 5), Unit("FarBankShoreA9", -55, 4), Unit("FarBankShoreA10", -51, 6, { weapon: "Type11" }),
   Unit("FarBankShoreA11", -47, 3),
 ]);
 // 岸线补拨（第二拨 6）：BridgeWithdraw 起涌到岸边，站在第一拨身后。
 export const FAR_BANK_SHORE_B = freeze([
   Unit("FarBankShoreB0", -112, 9), Unit("FarBankShoreB1", -97, 10), Unit("FarBankShoreB2", -92, 2),
-  Unit("FarBankShoreB3", -68, 9), Unit("FarBankShoreB4", -47.5, 9), Unit("FarBankShoreB5", -43, 5),
+  Unit("FarBankShoreB3", -68, 10), Unit("FarBankShoreB4", -47.5, 9), Unit("FarBankShoreB5", -43, 5),
 ]);
 // 待命兵（10）：BridgeCover 起就在岸线后面二三十米的空地上，来回踱两个点（人堆的纵深）。前六个靠桥轴，
 // BridgeWithdraw 起就是冲桥组（FAR_BANK_RUSH.assign）；后四个更深，一直踱到黑屏。
@@ -144,7 +144,7 @@ export const FAR_BANK_FIRE_LISTS = freeze({
 export const FAR_BANK_TANKS = freeze([
   freeze({ id: "FarBankTankEast", x: -66, backM: 16, pushBackM: 12, enter: "BridgeCover", delayKey: 0,
     via: freeze([freeze([-66, 80]), freeze([-80, 74]), freeze([-80, 50]), freeze([-66, 24])]) }),
-  freeze({ id: "FarBankTankWest", x: -104, backM: 13, pushBackM: 9, enter: "BridgeCover", delayKey: 1, via: freeze([]) }),
+  freeze({ id: "FarBankTankWest", x: -99, backM: 13, pushBackM: 9, enter: "BridgeCover", delayKey: 1, via: freeze([]) }),
   freeze({ id: "FarBankTankMid", x: -92, backM: 17, pushBackM: 13, enter: "bridgeFireBroken", delayKey: 2, via: freeze([]) }),
 ]);
 /** 炮击安全落点候选（南岸空地与沙滩，离桥头 12 m 以外）。运行时再按当下的玩家 / 己方位置过滤。 */
