@@ -1,10 +1,10 @@
 {
- "note": "01-06 rebuild guard: MISSION_LAYOUT.blocks, MISSION_TRENCH_PLACEMENTS, MISSION_AFTERMATH and SampleMissionTerrain south of z=-95 (07 onward). History: f581ac7dd (pre-rebuild) -> b3ba06096 (2026-09-24 06-18 whitebox) -> 12aa1e956 (2026-09-27 05-18 concept-frame whitebox rebuild, docs/Data_FirstLevelWhitebox0518Gap.md; user-authorised change of 07+ blocks, terrain and trench dressing) -> 8a83ab61 (kitchen door jambs flush with the infill; blocks only) -> 431a8795 (2026-09-27 stage 12 holds the road back into the village, docs/Data_FirstLevelTransferCover20260927.md; user-authorised ruins, plaza cover and east-lane wall; blocks only, ground unchanged). Regenerate only from the baseline: git archive <baseline> Taierzhuang1938, then Script_FirstLevelSpaceProbe.SouthFingerprint over its modules. 2026-09-27 user-authorised replacement of every primitive tree by the supplied dead-tree model; baseline ba95e821. Preserves the integrated stage-12 update; terrain, aftermath bodies and trench props unchanged. 2026-09-27 user-authorised sandbag standard (docs/Data_SandbagStandard.md): the three canvas course strips on ReceptionGateSandbags are removed (the block is filled with the standard sandbag model); blocks only, placements/bodies/ground unchanged. 2026-09-28 user-authorised rail bridge model (docs/Data_RailBridge.md): the six non-colliding whitebox RailBridgePier* details are removed (single-span truss, no river piers) and the four RailBridgeAbutment* colliders are capped at MISSION_RAIL_BRIDGE.abutmentTopY under the stone bridge seat; blocks only, placements/bodies/ground unchanged. 2026-09-28 guidance round (docs/Data_FirstLevelGuidance20260928.md): user-authorised guidance dressing in all four regions (trodden paths are texture-only; blocks, boundary walls, air walls and landmarks); ground samples expected unchanged unless a region table changed heights. -> guidance-20260928+3a-semantics (2026-09-28 3A visual iteration merged onto the guidance round: B1 gives window Void boxes semantic 'void' and wall-top copings 'coping' instead of 'roof'; nothing else changed - mapping void/coping back to roof reproduces the guidance-20260928 structuralBlocks, and placements, bodies and ground are identical).",
- "baseline": "guidance-20260928+3a-semantics",
+ "note": "01-06 rebuild guard: MISSION_LAYOUT.blocks, MISSION_TRENCH_PLACEMENTS, MISSION_AFTERMATH and SampleMissionTerrain south of z=-95 (07 onward). History: f581ac7dd (pre-rebuild) -> b3ba06096 (2026-09-24 06-18 whitebox) -> 12aa1e956 (2026-09-27 05-18 concept-frame whitebox rebuild, docs/Data_FirstLevelWhitebox0518Gap.md; user-authorised change of 07+ blocks, terrain and trench dressing) -> 8a83ab61 (kitchen door jambs flush with the infill; blocks only) -> 431a8795 (2026-09-27 stage 12 holds the road back into the village, docs/Data_FirstLevelTransferCover20260927.md; user-authorised ruins, plaza cover and east-lane wall; blocks only, ground unchanged). Regenerate only from the baseline: git archive <baseline> Taierzhuang1938, then Script_FirstLevelSpaceProbe.SouthFingerprint over its modules. 2026-09-27 user-authorised replacement of every primitive tree by the supplied dead-tree model; baseline ba95e821. Preserves the integrated stage-12 update; terrain, aftermath bodies and trench props unchanged. 2026-09-27 user-authorised sandbag standard (docs/Data_SandbagStandard.md): the three canvas course strips on ReceptionGateSandbags are removed (the block is filled with the standard sandbag model); blocks only, placements/bodies/ground unchanged. 2026-09-28 user-authorised rail bridge model (docs/Data_RailBridge.md): the six non-colliding whitebox RailBridgePier* details are removed (single-span truss, no river piers) and the four RailBridgeAbutment* colliders are capped at MISSION_RAIL_BRIDGE.abutmentTopY under the stone bridge seat; blocks only, placements/bodies/ground unchanged. 2026-09-28 guidance round (docs/Data_FirstLevelGuidance20260928.md): user-authorised guidance dressing in all four regions (trodden paths are texture-only; blocks, boundary walls, air walls and landmarks); ground samples expected unchanged unless a region table changed heights. -> guidance-20260928+3a-semantics (2026-09-28 3A visual iteration merged onto the guidance round: B1 gives window Void boxes semantic 'void' and wall-top copings 'coping' instead of 'roof'; nothing else changed - mapping void/coping back to roof reproduces the guidance-20260928 structuralBlocks, and placements, bodies and ground are identical). 2026-10-01 user-authorised 12-18 whitebox rebuild from the Notion concept frames plus the pontoon bridge replacing the steel rail bridge (docs/Data_FirstLevelWhitebox0518Gap.md sections 7-9; integration of R1 river/bridge, D reception yard and night gate, C1/C2 transfer lane, R2 far bank and north terraces, R3 pontoon). -> whitebox-12-18-20261001: structuralBlocks 2530 -> 3243 (sha 4617a3e028ccb1ca -> 798cd030b9d48cec; by id vs e080b510: +828 new, -106 removed, 335 changed), ground samples unchanged in count (56048) but 6669 of them changed (max |dh| 6.62 m; sha 03a67a21f813c6ee -> e87da9a0853b73fb), placements (2, 56ca4306fdf3e102) and bodies (191, b97f1a1cba28de6e) identical. Regenerated with Script_FirstLevelSpaceProbe.SouthFingerprint over the integrated modules (not from a git archive: the baseline is this integration itself).",
+ "baseline": "whitebox-12-18-20261001",
  "zMin": -95,
  "blocks": {
-  "count": 2530,
-  "sha": "4617a3e028ccb1ca"
+  "count": 3243,
+  "sha": "798cd030b9d48cec"
  },
  "placements": {
   "count": 2,
@@ -21,12 +21,12 @@
   "maxZ": 400,
   "stepM": 2,
   "count": 56048,
-  "sha": "03a67a21f813c6ee"
+  "sha": "e87da9a0853b73fb"
  },
- "previousBaseline": "guidance-20260928",
+ "previousBaseline": "guidance-20260928+3a-semantics",
  "structuralBlocks": {
-  "count": 2530,
-  "sha": "4617a3e028ccb1ca"
+  "count": 3243,
+  "sha": "798cd030b9d48cec"
  },
  "trenchArtRevision": "2026-09-26 concept 07 removes only generated non-solid Revetment<n>_<side>Post/Slat and Duckboard<n>; structuralBlocks excludes those ids."
 }

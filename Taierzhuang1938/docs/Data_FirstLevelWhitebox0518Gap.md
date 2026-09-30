@@ -164,7 +164,7 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
 | 18 桥 | 桥梁四态（`TemporaryBridge`/`MissionBridgeWreck`、`RailBridge*` 完好 5 件/残骸 3 件）；桥台 4 件是翼墙、让开 x=−77；五条视线全通（机枪手在桥轴西侧、桥头步枪手在桥轴上）；射位土垄顶高出射位地面 1.15–1.4 m（蹲姿眼高 1.05 断线、站姿 1.62 越过，原「胸墙 1.1–1.7」）；blastSafe ≥ 40（现 54.1，离被炸孔中心）；桥台翼墙北 z 88 / 南 z 165.5，三孔、三个桥墩（§7） | SpaceTest 18；TopologyBrowserTest |
 | 夜门 | 只属于 `NightGate` 态，不进 `blocks`/`gates`；城墙 8–10、门洞 3.6–4.2（现 3.8） | SpaceTest 夜景 |
 | 边界 | `MISSION_BOUNDS` minX −205 / maxX 137 / minZ −232 / maxZ 370；新件与锚点都在里面 | SpaceTest bounds |
-| 版本戳 | `MISSION_WHITEBOX_VERSION`（现 `first-level-20260924-whitebox-06-18-r1`）被 `MissionTopologyTest --rear-only` 硬断言；升版要同步那一行 | MissionTopologyTest |
+| 版本戳 | `MISSION_WHITEBOX_VERSION`（现 `first-level-20261001-whitebox-12-18-r4`）被 `MissionTopologyTest --rear-only` 硬断言；升版要同步那一行 | MissionTopologyTest |
 | **07+ 指纹** | `Data_FirstLevelSpaceSouthFingerprint.json` 冻结 z > −95 的 blocks / 壕沟布设 / 遗体 / **地面采样**（基线 b3ba06096）。05–18 的任何改动都会让 SpaceTest「07+ structure retained」变红——这是预期的；**只在集成时由集成者按文件 note 的办法重生一次**，各分区包不要各自改它 | SpaceTest（`Script_FirstLevelSpaceProbe.SouthFingerprint`） |
 | 浏览器模块 | 改任何 `Data_`/`Script_` 浏览器模块抬 `index.html` 的 `?v=`；新模块登记 import map | ModuleGraphTest |
 | AI 掩体 | 地形土坎不会自动成为 AI 掩体；要让 AI 用，加带 `cover:{faceX,faceZ}` 的体块 | Layout `cover` 约定 |
@@ -370,3 +370,12 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
 | 16_3 机位 | (−25.6,239.4)→(−26,247.5) → (−26.3,237.3)→(−26.3,247.5) | 站在北间透过隔墙洞口看南门，门左侧的铺草床（画面左下）、门右侧的药瓶马灯桌（画面右）都进画面 |
 
 走线复核（`P012SegmentClear`，只收 h > 0.55 的块，与 `Script_FirstLevelReception` 的走线图同口径）：wallPath / 撤离线 / 接收路线 / receptionApproach 在半径 0.625 全部畅通（撤离线在 0.8 被夹道挡，改前 0.8 通不通没量，0.625 才是两人抬的口径）；六个担架位、军医三处站位、`nextLitterRoute`、幺娃床边、`heDoorLook` 在 0.65 内畅通。第七个担架位 (−30,236.6) 不通：它被 Layout 的 `ReceptionMedicine` 挡着，改前就如此。
+
+## 9. 2026-10-01 12–18 白盒集成（版本 `first-level-20261001-whitebox-12-18-r4`）
+
+按 R1（河道与桥）→ D（15–17 接收院 / 18 夜门）→ C1（12 村口守线）→ C2（12 车行段 / 13 夹道 / 14 西沟）→ R2（对岸兵力、北岸台地、撤离土岗）→ R3（浮桥取代铁路桥）合入，再并入当时的 master。
+
+- **浮桥取代铁路桥**：18 的钢桁架铁路桥退出场景（`Model_RailBridge.glb` 与 `Script_RailBridgeTest` 保留，只当独立模型自检，在 TestRunner 里归 `railBridgeModel` 域）；尾队走木船浮桥，炸的是浮桥中段。桥梁四态、桥台、五条视线等 §2「18 桥」一行的口径以 `Data_FirstLevelTopology20260919.md` 与 `Script_PontoonBridgeTest` 为准。
+- **07+ 指纹重生**：`Data_FirstLevelSpaceSouthFingerprint.json` 基线换成 `whitebox-12-18-20261001`（旧 `guidance-20260928+3a-semantics`）。体块 2530 → 3243（按 id 对 e080b510：新增 828、删除 106、改动 335），地面采样数不变 56048 但其中 6669 个变了（最大 |dh| 6.62 m，来自北岸台地、撤离土岗、南堤与 C 区地形），壕沟布设 2 件与遗体 191 具不变。
+- **`MISSION_WHITEBOX_VERSION`**：`first-level-20260928-guidance-r1` → `first-level-20261001-whitebox-12-18-r4`，`Script_FirstLevelMissionTopologyTest --rear-only` 同步。
+- **测试口径更新**：`Script_BreakableTreesTest` 手摆树 51 → 58（接收院 / 接运场 +2、撤离土岗 `RetreatDeadTree0..4` +5）、总数 135 → 142，低矮植被白名单加 `BridgeMudReeds` / `RetreatGrass`。
