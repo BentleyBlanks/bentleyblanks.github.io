@@ -1941,6 +1941,30 @@ const RECIPES = {
     v.Live(dur + 0.2);
   },
 
+  // 航空炸弹下落啸声（空袭 01–06）：电影里那一声「呜——」——一条从高往下滑的哨音，越落越响、风噪越来越重，
+  // 在最响处硬停（终点就是落地那一刻，后面交给爆炸本体）。采样见 Script_SeedAudioBombWhistleBake；这是盖不上时的回落。
+  bombWhistle(A, v) {
+    const t = v.t, dur = 2.78;
+    const osc = v.Osc("sine", v.F(2000));
+    Glide(osc.frequency, t, v.F(2000), v.F(1240), dur);
+    const g = v.Gain(FLOOR);
+    g.gain.setValueAtTime(FLOOR, t);
+    g.gain.exponentialRampToValueAtTime(0.4, t + dur - 0.01);
+    g.gain.linearRampToValueAtTime(0, t + dur);
+    osc.connect(g).connect(v.out);
+    v.Start(osc, t, dur);
+    const air = v.Noise("pink", dur);
+    const ab = v.Filter("bandpass", v.F(900), 0.8);
+    const ag = v.Gain(FLOOR);
+    ag.gain.setValueAtTime(FLOOR, t);
+    ag.gain.exponentialRampToValueAtTime(0.22, t + dur - 0.01);
+    ag.gain.linearRampToValueAtTime(0, t + dur);
+    air.connect(ab).connect(ag).connect(v.out);
+    v.Start(air, t, dur);
+    v.wetGain.gain.value = 0.35;
+    v.Live(dur + 0.2);
+  },
+
   // 引擎持续声（**会飞的源**）：给 MoveVoice 逐帧搬位置、按径向速度变调的那一条。
   // 与 planeDive 分工：drone 从四五百米外一直响到离场，「由远及近、掠过、转弯」在耳朵里的
   // 全部来源就是它的方位、响度与音高一起变；压到头顶那一下再叠 planeDive（录好多普勒的通场）。
@@ -2834,6 +2858,7 @@ const NODE_COST = {
   painMoan: 7, hitGrunt: 7, planeDive: 7, flareOut: 6,
   // 会飞的引擎持续声：三个振荡器 + 拍频 LFO + 滤波 + 两个 gain，整条航线只有一条。
   planeDrone: 9,
+  bombWhistle: 8,
   // 第一关战车（合成回落那条路；采样盖上后由 LoadSfxPack 按层数重写）。三条循环常驻，合计 ≤ 20。
   tankEngine: 9, tankTracks: 7, tankTurret: 7,
   tankCannon: 10, tankCannonMid: 10, tankCannonFar: 10, tankTrackSqueal: 10, tankShellPass: 3,
@@ -2946,7 +2971,8 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-25：type11 去掉 SeedAudio 生成音、只留 MINIMI 1 m 两条（用户定，清单条目变了）。
 // 2026-09-27：战车机枪单开 tankMg（Warfare Library 通用机枪三条），清单新增一个 cue。
 // 2026-09-27 开场改稿：耳光 slap、反冲锋一片喊杀 chargeCrowd。
-export const SFX_PACK_VERSION = "20260928slapchargecrowd";
+// 2026-09-30：空袭炸弹下落啸声 bombWhistle，清单新增一个 cue。
+export const SFX_PACK_VERSION = "20260930bombwhistle";
 // 2026-09-29：清单加了 `bedVariants`（战场远景床的五条无人声候选），戳不动的话浏览器拿着旧清单永远看不到候选。
 export const AMB_PACK_VERSION = "20260929battlebeds";
 /**
@@ -3096,6 +3122,8 @@ const SAMPLE_MIX = {
   // 战车机枪：素材自带野地回声、>2.5 kHz 比十一年式少 3 dB（重），站得比步兵那挺轻机高一档。
   tankMg: 0.82,
   explosionFar: 0.5, rifleNraFar: 0.42, rifleIjaFar: 0.46, shellIncoming: 0.62,
+  // 炸弹下落啸声：成品有声段对齐 −25 dBFS 与全库同档；电平由 Data_FirstLevelAirRaid.audio.whistle 给。
+  bombWhistle: 1.0,
   bolt: 0.95, stripperLoad: 1.0, magIn: 1.0, grenadePin: 0.7, grenadeThrow: 0.5,
   // 汉阳造两条是 2026-09-13 用户试听确认过的一整条（混音 0.88、枪机段 +8.83 dB）拆出来的，
   // 拆开后各自归一化到 −25 dBFS，电平由这两个数复原：对照旧成品与原片量增益，
@@ -3169,7 +3197,7 @@ const SAMPLE_WET = {
   rifleNra: 0.42, rifleHanYang: 0.42, boltHanYang: 0.42, rifleIja: 0.38, rifleNraFar: 0.55, rifleIjaFar: 0.55,
   zb26: 0.36, type11: 0.32, type92: 0.42,
   tankMg: 0.26,   // 素材里已经有野地拖出来的尾巴，send 给少一点，别把一串点射糊成一片
-  explosionNear: 0.45, explosionFar: 0.55, shellImpact: 0.45, shellIncoming: 0.3,
+  explosionNear: 0.45, explosionFar: 0.55, shellImpact: 0.45, shellIncoming: 0.3, bombWhistle: 0.35,
   launcherPop: 0.35, bugleCharge: 0.55, whistle: 0.45,
   bolt: 0.08, stripperLoad: 0.08, magIn: 0.08,
   footstepDirt: 0.12, footstepRubble: 0.12, shellDrop: 0.12,

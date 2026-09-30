@@ -129,7 +129,8 @@ try {
         bombPool: g.vfx?.pools?.bombSmoke?.geometry?.instanceCount ?? null, bombBlasts: g.vfx?.bombBlasts ?? 0,
         lastBombBlast: g.vfx?.lastBombBlast ?? null,
         audio: { live: g.audio?.liveNodes, budget: g.audio?.nodeBudget, drops: { ...(g.audio?.drops || {}) },
-          ctx: g.audio?.ctx?.state ?? null, droneReq: g.audio?.playRequests?.get?.("planeDrone") ?? null },
+          ctx: g.audio?.ctx?.state ?? null, droneReq: g.audio?.playRequests?.get?.("planeDrone") ?? null,
+          whistleReq: g.audio?.playRequests?.get?.("bombWhistle") ?? null, sfxErrors: g.audio?.sfxErrors?.length ?? null },
         // 编队首次入画有没有现编着色器：开机预热（aircraft.WarmProxy）之后这个数在一轮里不该再涨。
         programs: g.renderer?.info?.programs?.length ?? null };
     });

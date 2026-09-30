@@ -11,6 +11,7 @@
 //   0                引擎声起（一条，挂在长机上，逐帧搬位置 + 多普勒）
 //   tc − 前冲/speed   长机投下一串的中间那颗（前冲距离 = 这一高度、这一速度下炸弹飞过的水平距离）；
 //                    僚机看见长机投弹才按电门，晚零点几秒
+//   tImpact − 2.8 s  长机头一颗与离听者最近的那一颗：下落啸声起（按落点距离延迟，最响处硬停在爆炸声到耳朵的那一刻）
 //   tImpact          落地：画面先到；地震波 d/600 后一抖；爆炸声由引擎按 d/340 延迟，气浪跟着声音到
 //   最后一颗离机后      上浮几米，压坡度协调转弯（角速度 g·tanφ / v）
 //   (approachM + exitM) / speed  离场，编队收起，引擎声淡出
@@ -85,6 +86,7 @@ export class FirstLevelAirRaid {
     this.bombsDropped = 0;
     this.impacts = 0;
     this.sounds = 0;
+    this.whistles = 0;
     this.layersDropped = 0;
     this.skipped = 0;
     this.peakVoices = 0;
@@ -308,7 +310,54 @@ export class FirstLevelAirRaid {
     plan.firstImpact = plan.bombs[0].tImpact;
     plan.lastImpact = plan.bombs[plan.bombs.length - 1].tImpact;
     plan.turn = this.BuildTurn(plan, F, L);
+    this.PickWhistles(plan, L);
     return plan;
+  }
+
+  /**
+   * 哪几颗有下落啸声：长机头一颗，再加离听者最近的那一颗（落地与已选的隔 gapS 以上），最多 perWave 颗。
+   * 每颗的变调取自它自己的 seed，起播时刻 = 落地 − durS / pitch。
+   */
+  PickWhistles(plan, L) {
+    const W = this.D.audio.whistle;
+    if (!W || !(W.perWave > 0)) return;
+    const near = (b) => (L ? Math.hypot(b.at.x - L.x, b.at.z - L.z) : 0);
+    const order = [plan.bombs.find((b) => b.lead), ...plan.bombs.filter((b) => !b.lead).sort((p, q) => near(p) - near(q))];
+    const picked = [];
+    for (const b of order) {
+      if (!b || picked.length >= W.perWave) continue;
+      if (picked.some((o) => Math.abs(o.tImpact - b.tImpact) < W.gapS)) continue;
+      picked.push(b);
+    }
+    for (const b of picked) {
+      b.whistlePitch = 1 + (b.seed - 0.5) * (W.pitchSpread ?? 0);   // 用这颗自己的种子，不动整轮的随机序列
+      b.whistleAt = b.tImpact - W.durS / b.whistlePitch;
+    }
+  }
+
+  /**
+   * 起一条下落啸声。摆在听者到落点连线上 share 处、高出落点 heightM；延迟按**落点**的距离 d/340 给
+   *（不按摆出来的位置算 —— 要的是它在爆炸声到耳朵的那一刻停住）。晚了几帧就从素材里相应往后切，终点不动。
+   * 声部账里这一格不按时间过期，落地那一帧由 Impact 直接移交给同一颗的爆炸本体（按时间过期的话，
+   * 同一帧里先落地的别的弹会把刚空出来的这一格抢走，啸声硬停之后没了爆炸）。
+   */
+  Whistle(plan, b, L) {
+    b.whistled = true;
+    const W = this.D.audio.whistle, A = this.D.audio;
+    const remain = b.tImpact - plan.t;
+    if (!L || !(remain > 0.2)) return;
+    if (!this.Room(1)) { this.layersDropped += 1; return; }
+    const at = b.at, k = W.share;
+    const d = Math.hypot(at.x - L.x, at.y - L.y, at.z - L.z);
+    const pitch = b.whistlePitch ?? 1;
+    const offset = Math.max(0, W.durS - remain * pitch);
+    const v = this.Voice(this.host.audio?.Play?.(W.cue, {
+      position: { x: L.x + (at.x - L.x) * k, y: at.y + W.heightM, z: L.z + (at.z - L.z) * k },
+      volume: W.volume * (this.speaking ? A.speechGain : 1), pitch, offset, sourceSizeM: W.sizeM,
+      delay: Math.min(d / BOMB_PHYSICS.soundMps, 1.4), propagate: false, bus: "sfx", selfCapped: true,
+      priority: !!A.leadPriority, airCut: this.airCut > 0 ? this.airCut : undefined,
+    }), Infinity);
+    if (v) { this.whistles += 1; b.whistleVoice = v; }
   }
 
   /** 落点在外圈土丘 / 农舍的体块里（外扩 hillClearM）吗。 */
@@ -453,6 +502,7 @@ export class FirstLevelAirRaid {
       if (b.landed) continue;
       if (t < b.tRelease) continue;
       if (!b.released) { b.released = true; this.bombsDropped += 1; }
+      if (b.whistleAt != null && !b.whistled && t >= b.whistleAt) this.Whistle(plan, b, L);
       if (t >= b.tImpact) { b.landed = true; this.Impact(plan, b); continue; }
       falling.push(this.BombPose(plan, b, t, L));
     }
@@ -512,9 +562,15 @@ export class FirstLevelAirRaid {
     // 一串十几颗只给其中几颗出声：相邻两声至少隔 minGapS，声部满了就这一颗不出声。
     // 长机头一颗（一轮的第一声）与它的低频层走 priority：04 激战时引擎节点预算贴着上限，
     // 几百米外的远爆偷不到比它更轻的声部，不保这两条一轮就一声不响（2026-09-26 实机取证）。
-    const priority = !!(b.lead && A.leadPriority);
-    if (b.lead || this.time - this.lastSoundAt >= A.minGapS) {
-      if (this.Room(1)) {
+    // 有下落啸声的那一颗同样保底：啸声硬停之后没有爆炸，比没有啸声更假。它占的那一格此刻移交给爆炸本体。
+    if (b.whistleVoice) { this.voices = this.voices.filter((e) => e.v !== b.whistleVoice); b.whistleVoice = null; }
+    const priority = !!((b.lead || b.whistleAt != null) && A.leadPriority);
+    // 普通的那几声给「已经啸起来、还没落地、账上又没占着格」的弹留位（它的啸声被引擎提前回收或偷掉时）。
+    const keyed = b.lead || b.whistleAt != null;
+    const owed = keyed ? 0 : plan.bombs.filter((o) => o !== b && !o.landed && o.whistled
+      && !this.voices.some((e) => e.v === o.whistleVoice)).length;
+    if (keyed || this.time - this.lastSoundAt >= A.minGapS) {
+      if (this.Room(1 + owed)) {
         this.lastSoundAt = this.time;
         this.Voice(this.host.audio?.Play?.(A.cue, { position: pos, volume: A.volume * speech, soundField: true, bus: "sfx",
           selfCapped: true, priority, airCut: cut(0) }));
@@ -595,7 +651,7 @@ export class FirstLevelAirRaid {
     const w = this.wave;
     return {
       started: this.started, waves: this.waves, bombsDropped: this.bombsDropped, impacts: this.impacts, sounds: this.sounds,
-      skipped: this.skipped, layersDropped: this.layersDropped, voices: this.voices.length, peakVoices: this.peakVoices,
+      whistles: this.whistles, skipped: this.skipped, layersDropped: this.layersDropped, voices: this.voices.length, peakVoices: this.peakVoices,
       reserving: this.Reserving(),
       nextInS: this.nextAt === null ? null : +(this.nextAt - this.time).toFixed(2),
       wave: w ? { key: w.key, zone: w.zone, t: +w.t.toFixed(2), tCenter: +w.tCenter.toFixed(2), endT: +w.endT.toFixed(2),

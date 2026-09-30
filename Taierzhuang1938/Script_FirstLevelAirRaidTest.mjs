@@ -188,6 +188,63 @@ function WaveNow(raid, stage = "Support") {
 }
 
 // ---------------------------------------------------------------------------
+// 2b) 下落啸声：长机头一颗 + 离听者最近的一颗；终点对齐这颗的爆炸声到耳朵的时刻；那一颗的爆炸一定出声
+// ---------------------------------------------------------------------------
+{
+  const W = R.audio.whistle;
+  const dt = 1 / 30;
+  let checked = 0, total = 0;
+  for (const key of ["lightVic", "heavySquadron", "lightSquadron"]) {
+    const audio = FakeAudio({ zone: "trench" });
+    const { host } = RaidHost(audio);
+    const raid = new FirstLevelAirRaid(host, 0x51ed);
+    raid.waveIndex = R.order.indexOf(key);
+    const wave = WaveNow(raid, "MachineGun");
+    assert.equal(wave.key, key);
+    const L = audio.listenerPos;
+    const picked = wave.bombs.filter((b) => b.whistleAt != null);
+    assert.ok(picked.length >= 1 && picked.length <= W.perWave, `${key}：${picked.length} 颗有啸声（≤ ${W.perWave}）`);
+    assert.ok(picked.some((b) => b.lead), `${key}：长机头一颗有啸声`);
+    const flat = (b) => Math.hypot(b.at.x - L.x, b.at.z - L.z);
+    // 另一颗：与长机那颗落地隔得开的弹里离听者最近的。
+    const lead = wave.bombs.find((b) => b.lead);
+    const eligible = wave.bombs.filter((b) => !b.lead && Math.abs(b.tImpact - lead.tImpact) >= W.gapS);
+    const other = picked.find((b) => !b.lead);
+    if (eligible.length) assert.ok(other && flat(other) <= Math.min(...eligible.map(flat)) + 1e-6, `${key}：另一颗是离听者最近的（${other && flat(other).toFixed(0)} m）`);
+    for (let i = 1; i < picked.length; i += 1) {
+      assert.ok(Math.abs(picked[i].tImpact - picked[0].tImpact) >= W.gapS - 1e-6, `${key}：两声落地隔 ≥ ${W.gapS} s`);
+    }
+    const t0 = audio.clock;
+    while (raid.wave) { audio.Tick(dt); raid.Update(dt, "MachineGun", { started: true }); }
+    const calls = audio.calls.filter((c) => c.cue === W.cue);
+    assert.equal(calls.length, picked.length, `${key}：啸声 ${calls.length} 条`);
+    for (const b of picked) {
+      const d = Math.hypot(b.at.x - L.x, b.at.y - L.y, b.at.z - L.z);
+      const arrive = Math.min(d / BOMB_PHYSICS.soundMps, 1.4);
+      const c = calls.find((x) => Math.abs(x.pitch - b.whistlePitch) < 1e-9);
+      assert.ok(c, `${key}：这颗的啸声起了`);
+      const start = c.t - t0;
+      assert.ok(start >= b.whistleAt - 1e-6 && start < b.whistleAt + dt + 1e-6, `${key}：落地前 ${(b.tImpact - start).toFixed(2)} s 起播`);
+      // 终点（变调后的剩余长度）落在这颗落地的那一帧上；两者都延迟同一个 d/340。
+      const end = start + (W.durS - c.offset) / c.pitch;
+      assert.ok(Math.abs(end - b.tImpact) < 1e-6, `${key}：啸声终点 ${end.toFixed(3)} = 落地 ${b.tImpact.toFixed(3)}`);
+      assert.ok(Math.abs(c.delay - arrive) < 1e-9 && c.propagate === false, `${key}：按落点距离延迟 ${arrive.toFixed(2)} s`);
+      const pd = Math.hypot(c.position.x - L.x, c.position.z - L.z);
+      assert.ok(pd < flat(b) * (W.share + 0.01) && c.position.y > b.at.y + W.heightM - 1e-6, `${key}：摆在头顶这一侧（${pd.toFixed(0)} m）`);
+      assert.ok(c.selfCapped && c.bus === "sfx" && c.sourceSizeM === W.sizeM, `${key}：走 sfx / selfCapped / 声源尺寸`);
+      // 啸声硬停之后一定有爆炸：落地那一帧给了本体，而且走 priority。
+      const boom = audio.calls.find((x) => x.cue === R.audio.cue && !x.delay && Math.abs(x.position.x - b.at.x) < 1e-6 && Math.abs(x.position.z - b.at.z) < 1e-6);
+      assert.ok(boom && boom.priority, `${key}：有啸声的那一颗爆炸出声且保底`);
+      checked += 1;
+    }
+    total += calls.length;
+    assert.ok(raid.peakVoices <= R.audio.maxVoices, `${key}：本层声部峰值 ${raid.peakVoices} ≤ ${R.audio.maxVoices}`);
+    assert.equal(raid.State().whistles, calls.length);
+  }
+  Ok(`下落啸声：三种编队共 ${total} 条，全部在爆炸声到耳朵的那一刻停住、那一颗必出爆炸声`);
+}
+
+// ---------------------------------------------------------------------------
 // 3) 外弹道与投弹：从机腹离开、带飞机速度、二次阻力、落在对得上的那一点；长机那一串的中点在瞄准点上
 // ---------------------------------------------------------------------------
 for (const seed of [7, 8]) {

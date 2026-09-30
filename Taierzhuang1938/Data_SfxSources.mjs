@@ -336,6 +336,15 @@ export const SFX_SOURCES = [
     bitrate: BITRATE_TRANSIENT,
     cuts: [{ cue: "bulletWhizz", files: ["AudioSfx_BulletWhizz_01.mp3","AudioSfx_BulletWhizz_02.mp3","AudioSfx_BulletWhizz_03.mp3","AudioSfx_BulletWhizz_04.mp3"], durS: 0.65 }],
   },
+  {
+    // 空袭 01–06 的炸弹下落啸声：十条候选里按音高轨迹选定 take09（选法与落选理由在烘焙脚本的 BOMB_WHISTLE_PICK 头注）。
+    id: "BombWhistleSeedAudio",
+    seedAudio: true,
+    bake: "Script_SeedAudioBombWhistleBake.mjs",
+    credit: "Volcengine SeedAudio 1.0 · 航空炸弹下落啸声（BombWhistle_take09.mp3） · 2026-09-30",
+    license: "volcengine",
+    cuts: [{ cue: "bombWhistle", files: ["AudioSfx_BombWhistle_01.mp3"], durS: 2.78 }],
+  },
   // 序章专用音：按 cue 独立生成，确保缺少外部素材时仍能稳定回退。
   {
     id: "PrologueTrainGenerated",

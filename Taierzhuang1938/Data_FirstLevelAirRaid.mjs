@@ -157,8 +157,8 @@ export const FIRST_LEVEL_AIR_RAID = Object.freeze({
     droneStartM: 1400,
     /** 对白播放时炸弹声的倍率（电平再交给对白侧链；这里只压一道）。 */
     speechGain: 0.6,
-    /** 本层同时在响的声部上限（引擎声也算一条）；与前线、场外炮击合计另有 sharedMaxVoices。 */
-    maxVoices: 5,
+    /** 本层同时在响的声部上限（引擎声、下落啸声都算）；与前线、场外炮击合计另有 sharedMaxVoices。 */
+    maxVoices: 6,
     /**
      * 落弹留位：第一颗落地前 reserveLeadS 秒起、到最后一颗落地后 reserveTailS 秒，在共享账里按 reserveVoices 条占着
      *（低频层 + 三声爆炸），前线床这几秒不起新声（它的声部 2.6 s 里自己走完），一串落地时有位置响。
@@ -174,6 +174,21 @@ export const FIRST_LEVEL_AIR_RAID = Object.freeze({
     /** 听者在洞里 / 沟里：离得不远的那一串之后，耳边掉一阵土（每架一串最多一次）。 */
     dirtWithinM: 300, dirtDelayS: Object.freeze([0.3, 0.8]), debrisActiveS: 2.2,
     dugoutDirtVolume: 0.26, dugoutDirtAirCutHz: 2600, trenchDirtVolume: 0.14, trenchDirtAirCutHz: 1900,
+    /**
+     * 下落啸声（2026-09-30 用户：「飞机扔的炸弹应该有电影里常出现的那种啸声」）：一条往下滑的哨音，越落越响，
+     * 在最响处硬停 —— 硬停的那一刻就是这颗弹的爆炸声到耳朵的那一刻（两者都按落点距离 d/340 延迟，对齐到同一个时刻）。
+     *   durS         成品长度（Script_SeedAudioBombWhistleBake 的 BOMB_WHISTLE_PICK.durS）；落地前这么久起播
+     *   perWave      一轮最多几颗有啸声：长机头一颗 + 离听者最近的那一颗（一串十几颗都啸就成了一片噪声，电影里也只听见一两声）
+     *   gapS         两颗有啸声的弹落地至少隔多久（太近的第二声被第一声的爆炸盖住，不如不给）
+     *   share / heightM  啸声摆在「听者 → 落点」连线上这一比例处、高出落点这么多米（与场外炮击的 incomingShare 同一个道理：
+     *                摆在两三百米外的落点上，衰到几乎听不见；炸弹是从头顶斜着落下去的）
+     *   sizeM        声源尺寸（panner 的 refDistance）：三百米的落点摆在一百二十米外，按枪口的 3.5 m 衰减就没了
+     *   volume       按 300 m 落点算：啸声有效电平比同一颗的爆炸本体低约 3 dB（170 / 470 m 上 −3.7 / −2.9 dB）；
+     *                素材本身尾巴比有声段均值高十来 dB，所以最响那一截与爆炸一样响，接得上
+     *   pitchSpread  逐颗变调总宽（同一轮两声别一模一样）；变调后的长度按 durS / pitch 算，终点照样对齐
+     */
+    whistle: Object.freeze({ cue: "bombWhistle", durS: 2.78, perWave: 2, gapS: 1.0, share: 0.35, heightM: 60, sizeM: 30,
+      volume: 0.65, pitchSpread: 0.06 }),
   }),
   /**
    * 震屏：往创伤桶里加（与场外炮击同一条路，BATTLE_ARTILLERY 的头注）。强弱按**比例距离** Z = d / ∛W

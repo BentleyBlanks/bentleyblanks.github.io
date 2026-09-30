@@ -965,6 +965,14 @@
       "seconds": 5.62,
       "credit": "Volcengine SeedAudio 1.0 · 四川口音的一片喊杀声 · 2026-09-27",
       "license": "volcengine"
+    },
+    "bombWhistle": {
+      "files": [
+        "AudioSfx_BombWhistle_01.mp3"
+      ],
+      "seconds": 2.78,
+      "credit": "Volcengine SeedAudio 1.0 · 航空炸弹下落啸声（BombWhistle_take09.mp3） · 2026-09-30",
+      "license": "volcengine"
     }
   },
   "bakedAt": "2026-09-28",
