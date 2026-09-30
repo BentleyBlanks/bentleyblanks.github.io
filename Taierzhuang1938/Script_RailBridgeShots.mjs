@@ -23,11 +23,20 @@ const Arg = (name, fallback = null) => {
 const OUT = path.join(here, "_shots", "RailBridge");
 const QUALITY = Arg("quality", "high");
 const [W, H] = (Arg("size", "1280x720")).split("x").map(Number);
-// 机位：safe = 爆破安全区（玩家被要求退到的地方）、cover = 南岸射位、side = 东南岸斜侧（看得见 V 形折断）。
+// 机位（三孔，被炸孔中心 (-77,148)）：safe = 爆破安全区（玩家被要求退到的地方）、cover = 南岸射位、
+// side = 东南岸斜侧（看得见 V 形折断）、pier = 18_3 的视角（南岸 1 号墩西侧沙地，看桥与墩脚的爆破手与药箱，
+// 起爆后看南半孔滑出墩顶）、wide = 东岸远景（三孔一起入画）。
 const VIEWS = {
-  safe: { eye: [-66, 201], target: [-77, 3.0, 153] },
-  cover: { eye: [-80.5, 181], target: [-77, 2.2, 153] },
-  side: { eye: [-44, 173], target: [-77, 1.0, 152] },
+  safe: { eye: [-66, 201], target: [-77, 3.0, 148] },
+  cover: { eye: [-80.5, 181], target: [-77, 2.2, 148] },
+  side: { eye: [-44, 173], target: [-77, 1.0, 150] },
+  pier: { eye: [-84.5, 167.5], target: [-75, 0.6, 156] },
+  wide: { eye: [-30, 168], target: [-77, 2.5, 130] },
+  // east = 18_3 概念图的机位一带（东南岸沙地、离 1 号墩东头 ~9 m），看墩脚的爆破手、药箱与被炸孔一起塌。
+  east: { eye: [-66.5, 168.5], target: [-79, 1.0, 152] },
+  // 桥面上的两个：站在北孔上看北桥台与断口、站在南引桥上看 1 号墩与被炸孔（核对桥面与轨道样条对得上）。
+  deckN: { eye: [-77, 100], target: [-77, 1.4, 78] },
+  deckS: { eye: [-77, 168], target: [-77, 1.0, 150] },
 };
 const TIMES = (Arg("times", "-0.3,0.05,0.15,0.3,0.6,1,1.4,2,3,4.5,6.5,10")).split(",").map(Number);
 

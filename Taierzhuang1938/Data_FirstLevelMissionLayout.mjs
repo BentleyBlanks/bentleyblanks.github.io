@@ -460,19 +460,21 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
   for (const [id, z0, z1, truss] of [["RailBridgeSpanMid", 136, 112, true], ["RailBridgeSpanNorth", 112, 86, true],
     ["RailBridgeApproachSouth", B.approachSouth.z0, B.approachSouth.z1, false]]) {
     const z = (z0 + z1) / 2, d = Math.abs(z1 - z0), north = id === "RailBridgeSpanNorth";
-    surfaces.push(Block(`${id}Deck`, B.x, z, B.deckW, B.deckH, d, "structure", { y: B.deckTopY - B.deckH / 2 }));
+    // visual:false —— 永久部分只留碰撞，画面由 Model_RailBridge 负责（三孔的桁架 / 桥面 / 钢轨 / 石墩 / 南引桥都在模型里；
+    // 不关掉的话灰盒子会盖住模型的钢梁与枕木、桥面还跟木板共面闪）。被炸孔那一孔的完好件是 gate，由 RailBridgeSet 摘外观。
+    surfaces.push(Block(`${id}Deck`, B.x, z, B.deckW, B.deckH, d, "structure", { y: B.deckTopY - B.deckH / 2, visual: false }));
     for (const side of [-1, 1]) {
       const sideId = side < 0 ? "West" : "East";
       // 北孔的桁架只盖 24 m 的钢梁段（z 88..112），台后那 2 m 引道没有桁架。
       if (truss) Block(`${id}Truss${sideId}`, B.x + side * B.trussOffsetX, north ? 100 : z,
-        B.trussW, B.trussH, north ? 22 : d - 2, "metal", { y: B.deckTopY + B.trussH / 2 });
-      Block(`${id}Rail${sideId}`, B.x + side * B.railGaugeHalf, z, 0.08, 0.13, d - 1, "metal", { y: B.deckTopY + 0.065 });
+        B.trussW, B.trussH, north ? 22 : d - 2, "metal", { y: B.deckTopY + B.trussH / 2, visual: false });
+      Block(`${id}Rail${sideId}`, B.x + side * B.railGaugeHalf, z, 0.08, 0.13, d - 1, "metal", { y: B.deckTopY + 0.065, visual: false });
     }
   }
   // 三个石墩：永久实体，顶在桥面下（甲板上走人的净空不受影响）。1 号墩立在南岸沙滩水边。
   for (const pier of B.piers) {
     const foot = SampleMissionTerrain(B.x, pier.z) - 0.3, top = deckBottom - 0.02;
-    Block(`RailBridge${pier.id}`, B.x, pier.z, B.pierW, top - foot, B.pierD, "structure", { y: (top + foot) / 2 });
+    Block(`RailBridge${pier.id}`, B.x, pier.z, B.pierW, top - foot, B.pierD, "structure", { y: (top + foot) / 2, visual: false });
   }
   // 桥台做成两侧的翼墙而不是一整道：桥面下的实心盒会被路线净空判成「挡住尾队」
   // （可走面只豁免甲板本身），翼墙让开 x=-77 的中线。
@@ -482,7 +484,7 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
     const ax = B.x + side * (B.abutmentW / 2 - 1);
     const foot = SampleMissionTerrain(ax, az) - 0.3;
     Block(`RailBridgeAbutment${i ? "South" : "North"}${side < 0 ? "West" : "East"}`, ax, az, 2,
-      B.abutmentTopY - foot, B.abutmentD, "structure", { y: (B.abutmentTopY + foot) / 2 });
+      B.abutmentTopY - foot, B.abutmentD, "structure", { y: (B.abutmentTopY + foot) / 2, visual: false });
   }
   const floor = SampleMissionTerrain(B.x, B.z);
   gates.push({ id: "RailBridgeWreckSpan", x: B.x, y: floor + 0.7, z: B.z, w: B.deckW, h: 1.4, d: 16,
@@ -997,7 +999,10 @@ export const MISSION_PLACEMENT = Object.freeze({
     rearColumnForm: [{ x: -77, z: 72 }, { x: -79.4, z: 75.6 }, { x: -74.6, z: 76.4 }],
     rearColumnGroups: [[{ x: -77, z: 78 }], [{ x: -78.2, z: 81.4 }], [{ x: -75.8, z: 81.8 }]],
     officer: { x: -73.4, z: 173.6, yaw: Math.PI },
-    demolition: [{ x: -80.4, z: 172.2, yaw: Math.PI }, { x: -74.2, z: 171.4, yaw: Math.PI }],
+    // 2026-09-30 三孔：两名爆破手蹲在 1 号墩（z 160，南岸沙滩水边）东头的沙地上装药，面朝墩、朝身边那堆木药箱
+    // （药箱与一卷线是 Model_RailBridge 的 Crates / CableGround，摆位跟着这两个点走，见 Script_ExportRailBridgeTerrain）。
+    // 墩心 (-77,160)、墩东头到 x≈-73.3；这两点离墩东头 2 m，落在白盒碰撞体（1 号墩 x −78.7..−75.3、南引桥面 x −79.7..−74.3）之外。
+    demolition: [{ x: -71.2, z: 159.4, yaw: Math.PI / 2 }, { x: -71.2, z: 161.3, yaw: Math.PI / 2 }],
     luoCover: { x: -79.4, z: 180.2, yaw: Math.PI },
     heyoutianCover: { x: -84.2, z: 179, yaw: Math.PI },
     enemyRidge: [{ x: -68, z: 80.5, yaw: 0 }, { x: -63.4, z: 81, yaw: 0 },

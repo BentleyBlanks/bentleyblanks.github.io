@@ -180,9 +180,11 @@ export const END_TUNING = Object.freeze({
   // 折线净空由 Script_FirstLevelSpaceTest 守着。
   // 东边那位的终点就是起爆器后面：他走到这儿蹲下，按起爆器的也是他
   //（起爆器在 exploderAt，模型里的 Exploder 节点摆在同一个点上）。
+  // 2026-09-30 三孔：两人从 1 号墩东头的沙地（(-71.2,159.4)、(-71.2,161.3)）出发，先沿东侧沙地走到 z 166，
+  // 再并入原来的折线；导线（CableGround）也是从墩东头沿这条沙地拉到起爆器。
   demolitionPullback: Object.freeze([
-    Object.freeze([{ x: -76, z: 176 }, { x: -74, z: 190 }, { x: -70.5, z: 200 }]),
-    Object.freeze([{ x: -73, z: 178.5 }, { x: -71.5, z: 190 }, { x: -72.6, z: 199.1 }]),
+    Object.freeze([{ x: -70.4, z: 166 }, { x: -73.5, z: 177 }, { x: -74, z: 190 }, { x: -70.5, z: 200 }]),
+    Object.freeze([{ x: -70.4, z: 167 }, { x: -72, z: 178.5 }, { x: -71.5, z: 190 }, { x: -72.6, z: 199.1 }]),
   ]),
   // 起爆器（Model_RailBridge 的 Exploder / ExploderHandle；_blender/Script_ExportRailBridgeTerrain 读它，
   // 改了要重导地形并重烘模型）。导线从南桥台背后顺着路堤肩拉过来。
