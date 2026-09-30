@@ -46,6 +46,11 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
         Object.freeze({ x: -66, z: 204 }), Object.freeze({ x: -64, z: 216 }), Object.freeze({ x: -62, z: 232 }),
         Object.freeze({ x: -61.4, z: 240 }),
       ]), note: "18 炸桥后随队南下（marchOut），行军队踩得宽一点；过了淡出点再延 8 m，路不在脚下断掉" }),
+    // 2026-09-30 D 包（概念 18_4）：夜行军的土路 —— 出生点 (-160,292) 到瓮城门前，一条被踩烂的宽路，让开阔泥地有方向。
+    Object.freeze({ id: "NightRoadTread", width: 4.6, wear: 0.9,
+      points: Object.freeze([
+        Object.freeze({ x: -161, z: 285 }), Object.freeze({ x: -160, z: 300 }), Object.freeze({ x: -160, z: 318 }),
+      ]), note: "18_4 夜行军的路：出生点以南的开阔泥地里一条宽土路，通向北门" }),
   ]),
   boxes: Object.freeze([
     Object.freeze({ id: "Reception15", minX: -41, maxX: 70, minZ: 150, maxZ: 260 }),
