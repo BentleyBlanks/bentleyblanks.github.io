@@ -21,7 +21,7 @@ import { MISSION_STEP_SPAWNS, MISSION_FACT_GATES, MISSION_SCENARIO_SIGNALS } fro
 import { MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
 import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_STAGES } from "./Data_FirstLevelMissionStages.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_RAIL_BRIDGE, MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE, MissionRegroupCorridor, RegroupGuideRoute } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_PONTOON_BRIDGE, PONTOON_HEADS, MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE, MissionRegroupCorridor, RegroupGuideRoute } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { FIRST_LEVEL_STAGE_MUSIC, FirstLevelMusicState } from "./Data_FirstLevelMissionMusic.mjs";
@@ -166,8 +166,8 @@ const VOICE_FACT = Object.freeze({
   // 18 只有北岸土坎那一组，而且是延后放出（不是一进阶段就在桥边冒出来）。
   Check(MISSION_STEP_SPAWNS.BridgeCover.length === 1 && MISSION_STEP_SPAWNS.BridgeCover[0] === "bridgeNorth",
     "18 只有 bridgeNorth 一组");
-  Check(MISSION_ENCOUNTERS.bridgeNorth.every(spec => spec.z <= A.railBridge.z - 18),
-    "北岸土坎那一组全部摆在河口以北的外围战场，不在桥边凭空生成");
+  Check(MISSION_ENCOUNTERS.bridgeNorth.every(spec => spec.z <= PONTOON_HEADS.north - 5),
+    "北岸土坎那一组全部摆在浮桥北头（岸沿）以北 5 m 之外的外围战场，不在桥边凭空生成");
   console.log("ok 15–17 无战斗；18 只有北岸土坎一组，且来自北侧外围");
 }
 
@@ -714,7 +714,7 @@ const VOICE_FACT = Object.freeze({
   r.Step(20, "BridgeOrders");
   Check(r.Has("bridgeRunnerArrived") && r.said.includes("BridgeOrders"), "跑到玩家跟前才喊");
   const stage = MISSION_STAGES.find(entry => entry.id === "BridgeOrders");
-  Check(stage.objective.includes("掩护回援分队通过铁路桥"), "HUD 目标是「掩护回援分队通过铁路桥」");
+  Check(stage.objective.includes("掩护回援分队通过浮桥"), "HUD 目标是「掩护回援分队通过浮桥」");
   console.log("ok 18 传令兵真人跑到接收处才接令");
 }
 
@@ -884,17 +884,17 @@ function BridgeRuntime() {
 }
 
 // ---------------------------------------------------------------------------
-// 12. 炸桥一次翻完八件，桥面退出可走面（不可逆）
+// 12. 炸浮桥一次翻完五件（被炸段桥面 + 两侧绳栏 + 断口两端空气墙），桥面退出可走面（不可逆）
 // ---------------------------------------------------------------------------
 {
-  const intact = MISSION_LAYOUT.gates.filter(gate => gate.signal === MISSION_RAIL_BRIDGE.signal);
-  const wreck = MISSION_LAYOUT.gates.filter(gate => gate.appearSignal === MISSION_RAIL_BRIDGE.signal);
-  Check(intact.length === 5 && wreck.length === 3,
-    `炸桥翻 5 个完好件 + 3 个残骸件，实际 ${intact.length} + ${wreck.length}`);
-  Check(intact.some(gate => gate.walkableId === "RailBridgeDeck"), "桥面跟着一起退出可走面");
+  const intact = MISSION_LAYOUT.gates.filter(gate => gate.signal === MISSION_PONTOON_BRIDGE.signal);
+  const wreck = MISSION_LAYOUT.gates.filter(gate => gate.appearSignal === MISSION_PONTOON_BRIDGE.signal);
+  Check(intact.length === 3 && wreck.length === 2,
+    `炸桥翻 3 个完好件（桥面 + 两侧绳栏）+ 2 个断口空气墙，实际 ${intact.length} + ${wreck.length}`);
+  Check(intact.some(gate => gate.walkableId === "PontoonBridgeDeck"), "桥面跟着一起退出可走面");
   Check(MISSION_SCENARIO_SIGNALS.RailBridgeDestroyed === "bridgeDestroyed",
     "RailBridgeDestroyed 这个信号由 bridgeDestroyed 这条事实驱动（回跳清事实，桥自己回来）");
-  console.log("ok 炸桥八件同翻、桥面退出可走面");
+  console.log("ok 炸浮桥五件同翻、桥面退出可走面");
 }
 
 // ---------------------------------------------------------------------------

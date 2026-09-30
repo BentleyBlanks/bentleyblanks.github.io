@@ -24,7 +24,7 @@ import { FIRST_LEVEL_STAGES, FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_STAGE_CLE
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FirstLevelMissionColumn, MissionRouteNextIndex, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
-import { MISSION_STAGE_ROUTES, MISSION_RAIL_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_STAGE_ROUTES, MISSION_PONTOON_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_RAILWAY,
   MISSION_SUPPLIES, MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
@@ -710,7 +710,7 @@ assert.ok(SampleMissionTerrain(135,90)>2.8 && SampleMissionTerrain(-204,90)>3.8,
 console.log("ok shared terrain, excavated trenches, structural floors only");
 // The railway is a PCG spec on the shared heightfield, not boxes at an absolute height
 // (the old rails sat at y=0.76 over ~0 m soil and floated 0.7 m above their sleepers).
-// 2026.09.19 第二波：军列与车站下线，轨只剩铁路桥（18）的南北引道，线上不再停车厢
+// 2026.09.19 第二波：军列与车站下线，轨只剩北沙河两岸的两段（浮桥取代铁路桥，铁路在河口前收尾），线上不再停车厢
 // —— 原来那条「每个车轮坐在轨顶」的断言随之下线，轨道本身仍按低 PCG 轨校验。
 {
   assert.equal(MISSION_LAYOUT.railway, MISSION_RAILWAY, "the whitebox field builds the layout's railway spec");
@@ -721,10 +721,10 @@ console.log("ok shared terrain, excavated trenches, structural floors only");
   const railway = MakeRailwayProfile(MISSION_RAILWAY, (x, z) => terrain.SampleHeight(x, z));
   for (let s = 0; s <= railway.path.length; s += 1) {
     const p = railway.path.At(s), soil = terrain.SampleHeight(p.x, p.z);
-    // 2026.09.19：北沙河的河槽在 z 138.8–167.2 把地面切下去，铁路桥在这一段是**桥**，
-    // 桥面自己跨过去（Data_FirstLevelMissionTopology.MISSION_RAIL_BRIDGE）。
+    // 2026.09.19：北沙河的河槽在 z 138.8–167.2 把地面切下去，河那一段（railGapZ）不铺轨，
+    // 河那一段不铺轨（Data_FirstLevelMissionTopology.MISSION_PONTOON_BRIDGE.railGapZ）。
     // 「轨面贴土」这条只对真正压在土上的路段成立，桥段跳过（连桥台前后 5 m）。
-    if (p.z > MISSION_RAIL_BRIDGE.gapZ[0] - 5 && p.z < MISSION_RAIL_BRIDGE.gapZ[1] + 5) continue;
+    if (p.z > MISSION_PONTOON_BRIDGE.railGapZ[0] - 5 && p.z < MISSION_PONTOON_BRIDGE.railGapZ[1] + 5) continue;
     const railTop = railway.RailTopAt(s) - soil;
     assert.ok(railTop > 0.2 && railTop < 0.42, `rail top stays low on the soil at z=${p.z.toFixed(1)}: ${railTop.toFixed(3)}`);
   }
@@ -734,15 +734,15 @@ console.log("ok shared terrain, excavated trenches, structural floors only");
     let bridged = 0;
     for (let s = 0; s <= railway.path.length; s += 1) {
       const p = railway.path.At(s);
-      if (p.z > MISSION_RAIL_BRIDGE.gapZ[0] && p.z < MISSION_RAIL_BRIDGE.gapZ[1]) bridged += 1;
+      if (p.z > MISSION_PONTOON_BRIDGE.railGapZ[0] && p.z < MISSION_PONTOON_BRIDGE.railGapZ[1]) bridged += 1;
     }
     assert.ok(bridged > 20, "the channel really does carry a bridged span of railway");
   }
-  // 轨只留铁路桥两头的引道：北端到田埂脚下当远景，南端过桥之后就收。
+  // 轨只留北沙河两岸的两段：北端到田埂脚下当远景，南端一小段（z 184…200）。
   const [north, south] = MISSION_RAILWAY.points;
   assert.ok(north[1] <= -184 && south[1] >= 180 && south[1] <= 200,
-    `the track is only the rail-bridge approach: z ${north[1]}..${south[1]}`);
-  console.log("ok railway is a low PCG track covering only the rail-bridge approach");
+    `the track is only the two river-bank stubs: z ${north[1]}..${south[1]}`);
+  console.log("ok railway is a low PCG track covering only the two river-bank stubs");
 }
 const tacticalRoutes = Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id, plan]) => [id,
   [Object.values(MISSION_ENCOUNTERS).flat().find(spec => spec.id === id), ...plan.points]]));

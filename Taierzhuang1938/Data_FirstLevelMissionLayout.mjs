@@ -1,5 +1,5 @@
 import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH, FrontFieldBend } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_RAIL_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES, MISSION_NORTH_RIVER, RiverWaterAt, RiverCutAt, RiverReachAt } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_PONTOON_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES, MISSION_NORTH_RIVER, RiverWaterAt, RiverCutAt, RiverReachAt } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
@@ -17,24 +17,26 @@ import { BuildRearWhitebox } from "./Data_FirstLevelWhiteboxRear.mjs";
 // x **不收**：−205 / 137 正是东西两道地形墙各自爬满的那条线
 //   （Data_FirstLevelMissionTerrain.SampleMissionNaturalHeight），再往里收就把墙削了。
 const MISSION_BOUNDS = Object.freeze({ minX: -205, maxX: 137, minZ: -232, maxZ: 370 });
-// 铁路桥（18）南北引道的一段低轨：两根钢轨坐在枕木上、枕木坐在跟着共享高度场
+// 2026-09-30 浮桥取代铁路桥：铁路在河口前 25–28 m 收尾（北段止于 z 66、南段从 z 184 起，中间是浮桥那一段，
+// 不铺道砟 / 枕木 / 钢轨），不再有轨道伸进河里；两个收尾处各有一处挡车桩（下面的 RailBufferNorth / South）。
+// 北沙河两岸的一段低轨：两根钢轨坐在枕木上、枕木坐在跟着共享高度场
 // 走的浅道砟上。Script_RoadSpline 照这份 spec 建（白盒场与场景样条编辑器共用），
 // 没有绝对高度的轨道盒。轨顶高出土面约 0.3 m。
 export const MISSION_RAILWAY = Object.freeze({
   id: "MissionRailway",
-  // 北端停在 3 m 田埂脚下（z < -184）当远景，不往上爬；南端到桥南 z=185 就收 ——
+  // 北端停在 3 m 田埂脚下（z < -184）当远景，不往上爬；南端到 z=200 就收 ——
   // 再往南是接收院与撤离线那一片，铺下去只是一条没人用的路基。
-  points: Object.freeze([[-77, -186], [-77, 185]]),
+  points: Object.freeze([[-77, -186], [-77, 200]]),
   gauge: 1.435,
   // Ballast top: soil smoothed over +/-24 m, then kept 0.06-0.18 m above the local soil.
   crown: Object.freeze({ step: 4, smooth: 6, lift: 0.1, clampLo: 0.06, clampHi: 0.18 }),
-  // 道砟/枕木/钢轨在铁路桥那一段断开。弧长 = z - 起点 z（这条线是一条直线，
+  // 道砟/枕木/钢轨在河那一段断开（z 66…184）。弧长 = z - 起点 z（这条线是一条直线，
   // s 与 z 一一对应）。不断开的话 crown 被 clampHi 钉在本地地面 +0.18，整条轨
-  // 会跟着河槽栽到 -4 m 去；桥面上的两段直轨在下面的 RailBridge* 里单摆。
-  sleeperGaps: Object.freeze([MISSION_RAIL_BRIDGE.gapZ.map((z) => z + 186)]),
-  railGaps: Object.freeze([MISSION_RAIL_BRIDGE.gapZ.map((z) => z + 186)]),
+  // 会跟着河槽栽到 -4 m 去。
+  sleeperGaps: Object.freeze([MISSION_PONTOON_BRIDGE.railGapZ.map((z) => z + 186)]),
+  railGaps: Object.freeze([MISSION_PONTOON_BRIDGE.railGapZ.map((z) => z + 186)]),
   bed: Object.freeze({ material: "railBallast", topHalf: 1.7, slope: 1.6, embed: 0.25, step: 4, chunkLen: 48,
-    gaps: Object.freeze([MISSION_RAIL_BRIDGE.gapZ.map((z) => z + 186)]) }),
+    gaps: Object.freeze([MISSION_PONTOON_BRIDGE.railGapZ.map((z) => z + 186)]) }),
   sleeper: Object.freeze({ material: "timber", along: 0.22, h: 0.14, length: 2.5, lift: 0.02,
     spacing: 0.75, jitter: 0.03, ryJitter: 0.02 }),
   // Rail foot rests on the sleeper top (crown + 0.09).
@@ -437,63 +439,42 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
       { y: (deckBottom + foot) / 2 });
   }
 }
-// 铁路桥（18）。2026-09-30 起是三孔桥（南桥台 → 1 号墩 → 2 号墩 → 3 号墩 → 北桥台，见 MISSION_RAIL_BRIDGE）。
-// 被炸的最南一孔（RailBridgeDeck / Truss / Rail 完好件全部是 gate，signal；残骸件是 appearSignal）：
-// 桥被破坏之后这一孔连同可走面一起撤掉，人再也过不去（河槽底在 -4.2）。另两孔、南引桥段与三个桥墩是永久体块。
+// 浮桥（18，2026-09-30 取代钢桁架铁路桥，docs/Data_PontoonBridge.md）。桥面三段（MISSION_PONTOON_BRIDGE.spans）：
+// 被炸段 PontoonBridgeDeck（连同两侧绳栏 PontoonBridgeRail* 全是 gate，signal RailBridgeDestroyed；起爆后与可走面一起撤掉，
+// 两端各出现一道空气墙 PontoonBridgeCutWall*，谁也走不进断口）；南北两截是永久体块。外观一律由 Model_PontoonBridge 接管
+//（Script_PontoonBridgeSet 摘掉 gate 网格，永久部分 visual:false）。桥面 2.8 m 宽，两侧的绳栏用空气墙（只挡角色，不挡子弹与视线）。
 {
-  const B = MISSION_RAIL_BRIDGE, deckBottom = B.deckTopY - B.deckH;
-  const deck = Block("RailBridgeDeck", B.x, B.z, B.deckW, B.deckH, B.deckHalfD * 2, "structure",
-    { y: B.deckTopY - B.deckH / 2, dynamic: true });
+  const B = MISSION_PONTOON_BRIDGE, deckY = B.deckTopY - B.deckH / 2, railY = B.deckTopY + 0.55;
+  const railX = B.deckW / 2 + 0.06;
+  const deck = Block("PontoonBridgeDeck", B.x, B.z, B.deckW, B.deckH, B.deckHalfD * 2, "structure",
+    { y: deckY, dynamic: true });
   surfaces.push(deck);
   gates.push({ ...deck, walkableId: deck.id, signal: B.signal });
   for (const side of [-1, 1]) {
-    // 桁架：甲板两侧的主梁，站在桥上视线被它夹住，从南岸看得见桥的轮廓。
-    gates.push({ id: `RailBridgeTruss${side < 0 ? "West" : "East"}`, x: B.x + side * B.trussOffsetX,
-      y: B.deckTopY + B.trussH / 2, z: B.z, w: B.trussW, h: B.trussH, d: B.deckHalfD * 2 - 2,
-      semantic: "metal", signal: B.signal });
-    // 桥面直轨：道砟与轨在 gapZ 断开，这两段把轨接过被炸的那一孔。
-    gates.push({ id: `RailBridgeRail${side < 0 ? "West" : "East"}`, x: B.x + side * B.railGaugeHalf,
-      y: B.deckTopY + 0.065, z: B.z, w: 0.08, h: 0.13, d: B.deckHalfD * 2 - 1,
-      semantic: "metal", signal: B.signal });
+    gates.push({ id: `PontoonBridgeRail${side < 0 ? "West" : "East"}`, x: B.x + side * railX, y: railY, z: B.z,
+      w: 0.12, h: 1.1, d: B.deckHalfD * 2, semantic: "timber", tag: "airWall", signal: B.signal });
   }
-  // 永久部分：另两孔与南引桥段的桥面（可走）、桁架、直轨。
-  for (const [id, z0, z1, truss] of [["RailBridgeSpanMid", 136, 112, true], ["RailBridgeSpanNorth", 112, 86, true],
-    ["RailBridgeApproachSouth", B.approachSouth.z0, B.approachSouth.z1, false]]) {
-    const z = (z0 + z1) / 2, d = Math.abs(z1 - z0), north = id === "RailBridgeSpanNorth";
-    // visual:false —— 永久部分只留碰撞，画面由 Model_RailBridge 负责（三孔的桁架 / 桥面 / 钢轨 / 石墩 / 南引桥都在模型里；
-    // 不关掉的话灰盒子会盖住模型的钢梁与枕木、桥面还跟木板共面闪）。被炸孔那一孔的完好件是 gate，由 RailBridgeSet 摘外观。
-    surfaces.push(Block(`${id}Deck`, B.x, z, B.deckW, B.deckH, d, "structure", { y: B.deckTopY - B.deckH / 2, visual: false }));
-    for (const side of [-1, 1]) {
-      const sideId = side < 0 ? "West" : "East";
-      // 北孔的桁架只盖 24 m 的钢梁段（z 88..112），台后那 2 m 引道没有桁架。
-      if (truss) Block(`${id}Truss${sideId}`, B.x + side * B.trussOffsetX, north ? 100 : z,
-        B.trussW, B.trussH, north ? 22 : d - 2, "metal", { y: B.deckTopY + B.trussH / 2, visual: false });
-      Block(`${id}Rail${sideId}`, B.x + side * B.railGaugeHalf, z, 0.08, 0.13, d - 1, "metal", { y: B.deckTopY + 0.065, visual: false });
-    }
+  // 永久两截：桥面（可走）+ 两侧绳栏。
+  for (const span of B.spans.filter((entry) => !entry.blasted)) {
+    const z = (span.z0 + span.z1) / 2, d = Math.abs(span.z1 - span.z0);
+    surfaces.push(Block(`PontoonBridge${span.id}Deck`, B.x, z, B.deckW, B.deckH, d, "structure", { y: deckY, visual: false }));
+    for (const side of [-1, 1])
+      Block(`PontoonBridge${span.id}Rail${side < 0 ? "West" : "East"}`, B.x + side * railX, z, 0.12, 1.1, d, "timber",
+        { y: railY, visual: false, tag: "airWall" });
   }
-  // 三个石墩：永久实体，顶在桥面下（甲板上走人的净空不受影响）。1 号墩立在南岸沙滩水边。
-  for (const pier of B.piers) {
-    const foot = SampleMissionTerrain(B.x, pier.z) - 0.3, top = deckBottom - 0.02;
-    Block(`RailBridge${pier.id}`, B.x, pier.z, B.pierW, top - foot, B.pierD, "structure", { y: (top + foot) / 2, visual: false });
-  }
-  // 桥台做成两侧的翼墙而不是一整道：桥面下的实心盒会被路线净空判成「挡住尾队」
-  // （可走面只豁免甲板本身），翼墙让开 x=-77 的中线。
-  // 外观由 Model_RailBridge 的料石桥台接管（Script_RailBridgeSet）；这两块只剩碰撞，
-  // 顶收到桥座面 abutmentTopY 以下，整块埋在模型的墙身里。
-  for (const [i, az] of B.abutmentZ.entries()) for (const side of [-1, 1]) {
-    const ax = B.x + side * (B.abutmentW / 2 - 1);
-    const foot = SampleMissionTerrain(ax, az) - 0.3;
-    Block(`RailBridgeAbutment${i ? "South" : "North"}${side < 0 ? "West" : "East"}`, ax, az, 2,
-      B.abutmentTopY - foot, B.abutmentD, "structure", { y: (B.abutmentTopY + foot) / 2, visual: false });
-  }
-  const floor = SampleMissionTerrain(B.x, B.z);
-  gates.push({ id: "RailBridgeWreckSpan", x: B.x, y: floor + 0.7, z: B.z, w: B.deckW, h: 1.4, d: 16,
-    semantic: "structure", appearSignal: B.signal });
-  gates.push({ id: "RailBridgeWreckTruss", x: B.x - 2.4, y: floor + 1.5, z: B.z - 6, w: 0.6, h: 3, d: 12,
-    semantic: "metal", appearSignal: B.signal });
-  // 被炸孔北端（2 号墩南面）的断板：炸完之后挂在中孔桥面的南头，人从北面走到这儿就到头了（不是「走过去掉下河」）。
-  gates.push({ id: "RailBridgeWreckStub", x: B.x, y: deckBottom + 0.75, z: B.z - B.deckHalfD + 1.5,
-    w: B.deckW, h: 1.5, d: 3, semantic: "earthDark", appearSignal: B.signal });
+  // 断口两端的空气墙：起爆后才出现（appearSignal），不然炸前桥面就被挡在中间了。
+  for (const [id, z] of [["South", B.spans[1].z0], ["North", B.spans[1].z1]])
+    gates.push({ id: `PontoonBridgeCutWall${id}`, x: B.x, y: B.deckTopY + 0.7, z: z + (id === "South" ? 0.35 : -0.35),
+      w: B.deckW + 0.4, h: 1.6, d: 0.5, semantic: "timber", tag: "airWall", appearSignal: B.signal });
+}
+// 收尾的铁路各有一处挡车桩（不带碰撞：坦克与尾队的路线都要从这一带过）：北段 z 66 之外、南段 z 184 之外，朝河的一面。
+for (const [id, z, face] of [["North", MISSION_PONTOON_BRIDGE.railGapZ[0], 1], ["South", MISSION_PONTOON_BRIDGE.railGapZ[1], -1]]) {
+  const bz = z + face * 0.7, ground = SampleMissionTerrain(-77, z + face * 0.7);
+  Detail(`RailBuffer${id}Beam`, -77, bz, 2.7, 0.34, 0.36, "timber", { y: ground + 0.72 });
+  for (const side of [-1, 1]) Detail(`RailBuffer${id}Post${side < 0 ? "W" : "E"}`, -77 + side * 1.05, bz, 0.34, 0.9, 0.34, "timber", { y: ground + 0.45 });
+  Detail(`RailBuffer${id}Mound`, -77, bz - face * 1.6, 3.4, 0.75, 2.4, "earthDark", { y: ground + 0.32 });
+  // 卸下来没运走的枕木：一小堆。
+  Detail(`RailBuffer${id}Ties`, -77 + 2.6, bz - face * 0.8, 2.4, 0.42, 0.9, "timber", { y: SampleMissionTerrain(-74.4, bz - face * 0.8) + 0.21 });
 }
 // ---------------------------------------------------------------------------
 // 北沙河的水面（2026.09.19 第二波）
@@ -509,7 +490,7 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
  * 浅滩（WestDitchFord，x≈47）那一段断面只有 1.05 m 深 —— 1.2 m 的水位会顶到
  * 自然地面之上，所以 `depth < 3` 的 x 一律不铺：撤离线过河踩的就是那片露出来的
  * 滩地，`floorHalfW` 一路收窄，水面在进浅滩之前先变窄、再断开。
- * 两座桥下连续：路桥甲板底在 +0.0、铁路桥甲板底在 +0.11，水面在 −3 m 上下。
+ * 两座桥下连续：路桥甲板底在 +0.0；浮桥的船漂在水面上（桥面顶 −0.23，舷缘顶 ≈ −0.55，水面顶 ≈ −1.07，拓宽河段水位在南岸自然地面下 1.1 m）。
  */
 {
   // 水面：原断面沿槽底铺（枯水位 = 槽底以上 1.2 m，半宽 min(7.5, floorHalfW−3.5)）；拓宽河段（RailBridgeReach，
@@ -530,7 +511,7 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
   for (const [i, x] of [-150, -132, -108, -92, -60, -44, 18, 66, 92, 118].entries()) for (const side of [-1, 1]) {
     const water = RiverWaterAt(x, RIVER);
     if (!water) continue;
-    if (side > 0 && water.reach && x > -100 && x < -50) continue;   // 桥头这一段南岸沙滩留成干净的沙地（爆破手、药箱、起爆线）
+    if (side > 0 && water.reach && x > -88 && x < -52) continue;   // 浮桥头这一段南岸烂泥滩不种芦苇丛盒（爆破手、药箱、起爆线；植被卡片另管）
     const z = side < 0 ? water.z0 - 0.6 - (water.reach ? 0.6 : 0) : water.z1 + 0.6 + (water.reach ? 0.6 : 0);
     Detail(`NorthRiverReeds${i}${side < 0 ? "N" : "S"}`, x, z, 3.4, 1.9, 1.2, "foliage",
       { y: SampleMissionTerrain(x, z) + 0.95 });
@@ -539,22 +520,24 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
 // 拓宽河段两岸的空气墙（docs/Data_FirstLevelGuidance20260928.md §3.2）。**陡坡本身拦不住真胶囊**：2026-09-30 实测
 // （Script_FirstLevelMissionTopologyBrowserTest「shore」），原 28 m 河槽的 63° 岸胶囊照样爬得上去，一路从北岸走到南岸
 //（斜率 > tan52° 只是纸面口径；autostep + 贴地吸附把 smoothstep 岸坡的缓头缓尾一节节爬掉）。所以这一段河靠墙：
-//   · 南岸：沙滩可以走到水边（爆破手就在那儿），但人不能下水涉过去 —— 墙摆在沙滩上「深度到 1.05 m」处（离水线约 0.9 m）；
+//   · 南岸：陡泥岸可以走到水边（射位与爆破手就在那儿），但人不能下水涉过去 —— 墙摆在泥岸上「深度到 0.98 m」处（离水线约 0.3 m）；
 //   · 北岸：墙摆在岸沿外侧「深度到 0.9 m」的陡坡顶（岸沿以北 ~1 m），谁也下不去、也就爬不上来。
-// 墙只挡角色控制器，子弹与视线照旧穿过；|x−桥轴| < 3.4 不摆（桥面、1 号墩与桥台本来就有实体，铁路桥是唯一的过河处）。
+// 墙只挡角色控制器，子弹与视线照旧穿过；|x−桥轴| < 3.4 不摆（桥面与两侧绳栏本来就有实体，浮桥是唯一的过河处）。
 // 范围 = 拓宽段加两端过渡；过渡带里南岸坡在 50° 上下，同样靠墙。
 {
   const RIVER = MISSION_NORTH_RIVER, REACH = RIVER.reaches[0];
-  // 每段 [中心 x, 宽]：4 m 一段（宽 4.4 互相咬合），铁路桥两侧的缺口（x −81.8…−74.2）里，桥面 x −79.7…−74.3 下面是净空不够的
-  // 桥台/引桥，西侧 x −81.8…−79.7 那条 2 m 的露天窄缝（桥面边到墙之间）另补一段窄墙，否则人会从桥边溜进水里。
+  // 每段 [中心 x, 宽]：4 m 一段（宽 4.4 互相咬合）。浮桥两侧 |x−桥轴| < 3.4 不摆，缺口 x −81.8…−74.2 里桥面 x −78.4…−75.6 + 两侧
+  // 0.12 m 的绳栏空气墙（PontoonBridge*Rail*，x ±1.46），栏外的空档由下面两段窄墙补上。
   const pieces = [];
   for (let x = Math.ceil((REACH.x0 - REACH.blendWestM + 3) / 4) * 4; x <= REACH.x1 + REACH.blendEastM; x += 4)   // 首段 x −200，整段在关卡边界 −205 之内
-    if (Math.abs(x - MISSION_RAIL_BRIDGE.x) >= 3.4) pieces.push([x, 4.4]);
-  pieces.push([-80.75, 2.3]);
+    if (Math.abs(x - MISSION_PONTOON_BRIDGE.x) >= 3.4) pieces.push([x, 4.4]);
+  // 4 m 一段的墙在桥两侧留下 x −81.8…−74.2 的缺口（7.6 m），浮桥桥面只有 x −78.4…−75.6，所以缺口里两边的空档另补两段窄墙（贴着绳栏空气墙，
+  // 胶囊挤不出去），否则人会从桥边溜进水里（TopologyBrowserTest 的 underBridgeNorthbound 踩过：x −80.8 一路走到河底）。
+  pieces.push([-80.3, 3.4], [-74.9, 1.6]);
   for (const [i, [x, w]] of pieces.entries()) {
-    // 南岸墙摆在水线以南 0.35 m 深处（cut 到 −waterRel − 0.35，水线以南约 1.6 m）；原来是「深度到 1.05 m」，水位 −1.25 时离水线 0.9 m，
-    // 水位压到 −3 之后同一个 1.05 会落在离水 6 m 的沙坡半腰，改成跟着水位走。
-    const limit = -(RiverReachAt(x, RIVER)?.waterRel ?? -1.4) - 0.35;
+    // 南岸墙摆在水线以南 0.12 m 深处（cut 到 −waterRel − 0.12，R3 第二轮的陡泥岸上离水线约 0.3 m：射位在水线以南 4.8 m、人下不了水）；
+    // 墙的位置跟着水位走（水位 −3 时同一个 1.05 落在离水 6 m 的沙坡半腰）。
+    const limit = -(RiverReachAt(x, RIVER)?.waterRel ?? -1.4) - 0.12;
     let z = 175;
     while (z > 150 && RiverCutAt(x, z, RIVER) < limit) z -= 0.1;
     Block(`BridgeShoreAirWall${i}`, x, z + 0.35, w, 3, 0.7, "airWall", { visual: false, tag: "airWall" });
@@ -563,21 +546,8 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
     Block(`BridgeNorthBankAirWall${i}`, x, north - 0.7, w, 3, 1.4, "airWall", { visual: false, tag: "airWall" });
   }
 }
-// 南岸遮挡（18 的射位）：中间留 x -77..-69 的缺口，爆破安全区从那儿看得见桥。
-// 2026-09-30 河拓宽：原来两道 1.3–1.45 m 的胸墙（离射位 1.4 m，把整条河挡在墙后）拆掉，射位改成「趴在南堤缺口后」：
-// 南堤（地形 BridgeLevee*，堤顶高出自然地面 1.4 m）在铁路桥头缺口 x −82.5…−70.5 处断开。
-// 2026-09-30 R1c：射位 bridgeCover 挪到南堤西段堤顶 (-97,173.5)（地面 1.5，原来在缺口路堤侧坡上、站着只看得见路堤），
-// 土垄 BridgeSouthMound（1.9 m 宽，顶面 = 射位地面 + 1.2 m）立在射位北偏东 2 m 的堤沿上：蹲姿眼高 1.05 时它盖住正北偏东 8°（对岸机枪）
-// 到 38°（桥面）的视线；站姿眼高 1.62 越过它看桥面与对岸；往东北 50°+ 向下看 1 号墩西侧沙滩上的爆破手、墩脚的线从土垄东侧过
-//（土垄挡不住向下的线，所以土垄不能横在射位与沙滩之间）；堤上两侧各一段零星沙袋（BridgeSouthSandbagsWest/East）。
-{
-  const cover = MISSION_STAGE_ANCHORS.bridgeCover, x = cover.x + 1.0, z = cover.z - 2.0, w = 1.9, d = 0.9;
-  const top = SampleMissionTerrain(cover.x, cover.z) + 1.2;
-  const base = Math.min(...[-1, 0, 1].flatMap(a => [-1, 0, 1].map(b => SampleMissionTerrain(x + a * w / 2, z + b * d / 2)))) - .1;
-  Block("BridgeSouthMound", x, z, w, top - base, d, "earthDark", { y: (top + base) / 2, cover: { faceX: 0, faceZ: -1 } });
-}
-GroundedWall("BridgeSouthSandbagsWest", -88.6, 178.4, 3.6, 1.0, 0.8);
-GroundedWall("BridgeSouthSandbagsEast", -68.6, 178.4, 3.4, 1.0, 0.8);
+// 南岸射位（18）：烂泥垄 BridgeMudRidge*（地形 raise 形状，Data_FirstLevelWhiteboxTerrainRear，高 0.8–1.3 m、不规则）盖在射位北面：
+// 蹲下被垄挡住、站起越过它看整座浮桥（概念 18_2）。垄是真地形，Rapier 与视线都读得到；没有另摆体块。
 // 北岸土坎：敌军火力位（bridgeEnemy 在它北边，隔着土坎对射）。铁路那一段留缺口。
 // 2026-09-30 河拓宽：北岸北移 50 m，土坎跟着从 z 132.2 挪到 82.2（离新岸沿 z 90 约 8 m）。
 GroundedWall("BridgeNorthRidgeWest", -87, 82.2, 10, 1.45, 1.2);
@@ -1059,21 +1029,21 @@ export const MISSION_PLACEMENT = Object.freeze({
     { id: "RearDitchWounded1", x: 57.4, z: 194.6, yaw: 0, patient: true },
     { id: "RearDitchWounded2", x: 54.6, z: 198.4, yaw: 0, patient: true },
   ],
-  // 18 铁路桥。
+  // 18 北沙河浮桥。
   bridge: {
     rearColumnForm: [{ x: -77, z: 72 }, { x: -79.4, z: 75.6 }, { x: -74.6, z: 76.4 }],
     rearColumnGroups: [[{ x: -77, z: 78 }], [{ x: -78.2, z: 81.4 }], [{ x: -75.8, z: 81.8 }]],
-    officer: { x: -73.4, z: 173.6, yaw: Math.PI },
-    // 2026-09-30 三孔：两名爆破手蹲在 1 号墩（z 160，南岸沙滩水边）脚下的沙地上装药，面朝墩对着身边那堆木药箱
-    // （药箱与一卷线是 Model_RailBridge 的 Crates / CableGround，摆位在 _blender/Script_BuildRailBridge.Charges，
-    // 与这两个点保持 1.5 m 左右；导出器把这两点写进地形快照的 crew，测试核对它们在干沙地上）。
-    // R1c：改到墩的**西侧**沙地（原来在东侧 (-70.3,162.6)）—— 射位 bridgeCover 在南堤西段堤顶 (-97,173.5)，东侧的沙被路堤脊与
-    // 南引桥料石实体挡住；西侧沙滩 x −86…−81、z 161…166 从堤顶一览无余（概念 18_3：镜头在桥西、爆破手在左前方沙滩上）。
-    // 空气墙（BridgeShoreAirWall*，水线以南 ~2 m，z≈158.3）在他们北面；离白盒碰撞体：1 号墩 x −78.7..−75.3、南引桥面 x −79.7..−74.3 都 ≥ 4 m。
-    // 朝东（yaw -π/2）看药箱与墩。
-    demolition: [{ x: -84.4, z: 163.6, yaw: -Math.PI / 2 }, { x: -84.4, z: 165.4, yaw: -Math.PI / 2 }],
-    luoCover: { x: -100.6, z: 175.4, yaw: Math.PI },
-    heyoutianCover: { x: -104, z: 175.6, yaw: Math.PI },
+    officer: { x: -70.4, z: 176.4, yaw: Math.PI },
+    // 2026-09-30 浮桥取代铁路桥（概念 18_1）：两名爆破手蹲在南岸浮桥头（木栈起点 z 159.4）**东侧**的泥地上、木药箱摞与铁丝网卷旁边
+    //（R3 第二轮：射位搬到水边桥头西侧的泥垄后，爆破手与药箱摞让到桥轴东侧，两拨人不挤在一起；
+    // 药箱、铁丝网卷、绳圈、起爆器与导线是 Model_PontoonBridge 的 Crates / WireCoil / RopeCoil / Exploder / CableGround，
+    // 摆位在 _blender/Script_BuildPontoonBridge.Charges，与这两个点保持 1–2 m；导出器把这两点写进地形快照的 crew，测试核对它们在干泥地上）。
+    // 离被炸段中心 (−77,122) 都在 43 m（blastClearRadiusM 30）之外：桥头这一带不在爆破清场圈里，爆破手压杆前不用再撤远，
+    // 但撤出折线（END_TUNING.demolitionPullback）仍把他们送到起爆器后面。空气墙（BridgeShoreAirWall*，水线以南 ~0.9 m，z≈158.1）在他们北面。
+    // 朝西（yaw π/2）看药箱与桥头。
+    demolition: [{ x: -71.4, z: 165.2, yaw: Math.PI / 2 }, { x: -71.4, z: 167.2, yaw: Math.PI / 2 }],
+    luoCover: { x: -87, z: 163.6, yaw: Math.PI },
+    heyoutianCover: { x: -89.4, z: 163.9, yaw: Math.PI },
     enemyRidge: [{ x: -68, z: 80.5, yaw: 0 }, { x: -63.4, z: 81, yaw: 0 },
       { x: -85.6, z: 80.8, yaw: 0 }, { x: -89.2, z: 81.2, yaw: 0 }],
   },

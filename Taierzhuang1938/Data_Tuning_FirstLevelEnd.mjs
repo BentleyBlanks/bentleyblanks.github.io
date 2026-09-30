@@ -161,9 +161,9 @@ export const END_TUNING = Object.freeze({
   runnerArriveM: 2.6,
   // 回援尾队：六个人（R.bridgeColumnCount）沿 MISSION_STAGE_ROUTES.bridgeCrossing
   // 过桥。速度 R.bridgeColumnSpeedMps 1.9、间距 R.bridgeColumnSpacingM 3.4。
-  // 火力压制时压在北引道上：bridgeCrossing 起点 (−77,120) 到北桥头 (−77,136) 共 16 m，
+  // 火力压制时压在北引道上：bridgeCrossing 起点 (−77,70) 到北桥头 (−77,90) 共 20 m，
   // 停在离桥头 3 m 的地方（不冲上桥面，也不缩回图外）。
-  rearColumnHoldM: 13,
+  rearColumnHoldM: 17,
   // 压制下伏倒的姿态保持时间（AI SetStance 的 hold；反复刷新）。
   rearColumnProneHoldS: 1.5,
   // 尾队带的东西：0 号扛机枪、1/2 号两人抬迫击炮部件，其余步枪。白盒小件。
@@ -171,23 +171,23 @@ export const END_TUNING = Object.freeze({
   // 尾队真的过完桥：离 bridgeCrossing 末点这么近就算下了桥往南走了。
   rearColumnClearM: 2,
   // 桥头军官与爆破人员（MISSION_PLACEMENT.bridge.officer / .demolition）。
-  // 2026-09-30 三孔 + R1c：两人从 1 号墩**西侧**沙地（(-84.4,163.6)、(-84.4,165.4)）出发，先往北穿过南堤西端与路堤脊之间的低口
-  //（x −83…−81、地面 0.1–0.5，堤顶 1.5 在它西边、路堤脊 1.2 在它东边）走到 z 168，再顺着路堤西脚往南折向起爆器；
-  // 折线离每个实心体 ≥ 0.35 m 由 Script_FirstLevelSpaceTest 守着。
-  // 东边那位（demolition[1]）的终点就是起爆器后面：他走到这儿蹲下，按起爆器的也是他
-  //（起爆器在 exploderAt，模型里的 Exploder 节点摆在同一个点上）；导线（CableGround）从墩西头沿沙地拉出、顺着路堤西脚到起爆器。
+  // 2026-09-30 浮桥取代铁路桥：两人蹲在南岸浮桥头西侧的烂泥滩上（R3 第二轮：(-71.4,165.2)、(-71.4,167.2)，桥轴东侧、木药箱摞与铁丝网卷旁），
+  // 装完药沿各自的折线往南退：北边那位（demolition[0]）退到 (-79,180) 一带，南边那位（demolition[1]）退到起爆器后面蹲下；
+  // 折线离每个实心体 ≥ 0.35 m 由 Script_FirstLevelSpaceTest 守着（南岸这一片没有实心体，只有地形）。
+  // 起爆器（exploderAt，模型里的 Exploder 节点摆在同一个点上）就在桥头这一带：按起爆器的是东边那位，他走到这儿蹲下，
+  // 导线（CableGround）从药箱旁的线卷沿泥地拉到它、另一头顺木栈与桥面拉到被炸段的药包。
   demolitionSetS: 6,
   demolitionPullback: Object.freeze([
-    Object.freeze([{ x: -82.6, z: 167.4 }, { x: -81.8, z: 178 }, { x: -78.8, z: 189 }, { x: -74, z: 197 }, { x: -70.5, z: 200 }]),
-    Object.freeze([{ x: -82.6, z: 168.6 }, { x: -81.6, z: 180 }, { x: -77.6, z: 190 }, { x: -72.6, z: 199.1 }]),
+    Object.freeze([{ x: -71.2, z: 168.8 }, { x: -70.4, z: 172 }, { x: -73.4, z: 176.5 }, { x: -79, z: 180 }]),
+    Object.freeze([{ x: -71.6, z: 168.9 }, { x: -73.1, z: 171.1 }]),
   ]),
-  // 起爆器（Model_RailBridge 的 Exploder / ExploderHandle；_blender/Script_ExportRailBridgeTerrain 读它，
-  // 改了要重导地形并重烘模型）。导线从南桥台背后顺着路堤肩拉过来。
-  exploderAt: Object.freeze({ x: -72.6, z: 198.3 }),
+  // 起爆器（Model_PontoonBridge 的 Exploder / ExploderHandle；_blender/Script_ExportPontoonBridgeTerrain 读它，
+  // 改了要重导地形并重烘模型）。距被炸段中心 (−77,122) 48 m，在 blastClearRadiusM 之外。
+  exploderAt: Object.freeze({ x: -73.6, z: 170.3 }),
   officerPullback: Object.freeze([{ x: -71.5, z: 182 }, { x: -71, z: 194 }, { x: -74.5, z: 200 }]),
   demolitionMps: 3.4,
   // 爆破安全：炸之前这个半径里不许有任何己方（玩家、班里人、军官、爆破手、尾队）。
-  // 药包火球半径 11–15 m（Data_RailBridgeDemolition）；安全判据取 30 m（blastSafe 离桥心 48 m）。
+  // 药包火球半径 11–15 m（Data_PontoonBridgeDemolition）；安全判据取 30 m（blastSafe 离被炸段中心 80 m，桥头爆破手 43 m）。
   blastClearRadiusM: 30,
   // 卡住的 NPC 不许把整关钉死：他连着这么久一步没挪、而且玩家早已退到安全区，
   // 就记一条 blastFriendlyStuck 取证并放行。**玩家在区里永远等**，这一条只对 NPC。

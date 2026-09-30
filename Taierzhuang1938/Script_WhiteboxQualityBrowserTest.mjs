@@ -37,7 +37,7 @@ try {
     const firstPersonPreserved = fpsSources.length > 0 && fpsSources.every(([o, m]) => o.material === m);
     let texturedAssets = 0, terrainTextured = 0, skinnedTextured = 0, gridMaterials = 0;
     // 2026-09-30：镂空卡片（植被、壕沟草）保留贴图 alpha 与 alphaTest（不再画成不透明白竖片）；水面画蓝灰水色 + 天空反光，不画网格。
-    let cutoutMaterials = 0, cutoutBroken = 0, waterMaterials = 0, waterGrid = 0, waterColors = new Set();
+    let cutoutMaterials = 0, cutoutBroken = 0, cutoutFlat = 0, cutoutGrid = 0, waterMaterials = 0, waterGrid = 0, waterColors = new Set();
     const stats = { ...T.post.whiteboxScene.stats };
     T.scene.traverseVisible((o) => {
       if (!o.isMesh || !o.material) return;
@@ -45,7 +45,12 @@ try {
       for (const m of [o.material].flat()) {
         if (terrain && (m.map || m.userData.terrainLayers)) terrainTextured++;
         const cutout = !terrain && !IsWhiteboxCharacter(o) && m.name.startsWith("Whitebox_Cutout_");
-        if (cutout) { cutoutMaterials++; if (!(m.alphaTest > 0 && m.map)) cutoutBroken++; }
+        if (cutout) {
+          cutoutMaterials++; if (!(m.alphaTest > 0 && (m.map || m.alphaMap))) cutoutBroken++;
+          // 2026-10-01：卡片保留原贴图色（白底乘贴图 / 暗橄榄），不是统一的亮灰表面色；卡片上不叠米制灰网格。
+          if (m.color.getHexString() === T.post.whiteboxScene.config.surfaceColor.slice(1).toLowerCase()) cutoutFlat++;
+          if (m.customProgramCacheKey().includes("whiteboxGrid1")) cutoutGrid++;
+        }
         if (!terrain && !IsWhiteboxCharacter(o) && !cutout && Object.values(m).some((value) => value?.isTexture)) texturedAssets++;
         if (o.isSkinnedMesh && m.map && IsWhiteboxCharacter(o)) skinnedTextured++;
         if (m.customProgramCacheKey().includes("whiteboxGrid1")) gridMaterials++;
@@ -96,7 +101,7 @@ try {
       return originalDraw.apply(this, arguments);
     };
     try { T.StepFrames(2); } finally { T.renderer.renderBufferDirect = originalDraw; }
-    return { info, cutoutMaterials, cutoutBroken, waterMaterials, waterGrid, waterColors: [...waterColors], sceneStats,
+    return { info, cutoutMaterials, cutoutBroken, cutoutFlat, cutoutGrid, waterMaterials, waterGrid, waterColors: [...waterColors], sceneStats,
       texturedAssets, terrainTextured, skinnedTextured, gridMaterials, spawnedWhite, restored, inherited, charactersCanBeGrey, firstPersonPreserved, draws,
       shadows: T.renderer.shadowMap.enabled, taa: T.post.taaEnabled, gl: T.renderer.getContext().getError() };
   });
@@ -106,6 +111,8 @@ try {
   // 植被卡片 / 壕沟草保留 alpha 裁切；水面是蓝灰水色不是网格。
   assert.ok(state.cutoutMaterials > 0 && state.sceneStats.cutoutMeshes > 0, "alpha-cut cards keep their cut-out in whitebox");
   assert.equal(state.cutoutBroken, 0, "every whitebox cut-out material keeps alphaTest and its map");
+  assert.equal(state.cutoutFlat, 0, "no cut-out card is painted the flat grey surface colour (that reads as white spikes under the neutral light)");
+  assert.equal(state.cutoutGrid, 0, "cut-out cards carry no metre grid");
   assert.ok(state.waterMaterials > 0 && state.sceneStats.waterMeshes > 0, "the river surface is drawn with the whitebox water material");
   assert.equal(state.waterGrid, 0, "the water surface has no grid, only the sheen patch");
   assert.deepEqual(state.waterColors, ["4d6f86"], "the whitebox water colour is the agreed blue-grey");

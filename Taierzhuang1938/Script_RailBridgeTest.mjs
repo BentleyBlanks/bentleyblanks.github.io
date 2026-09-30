@@ -1,5 +1,11 @@
 // ===========================================================================
-// Script_RailBridgeTest.mjs —— 北沙河铁路桥模型 + 18 毁桥时间线的门禁（纯 Node，秒级）
+// Script_RailBridgeTest.mjs —— 北沙河钢桁架铁路桥模型 + 毁桥时间线的自检（纯 Node，秒级）
+//
+// **2026-09-30 起 18 改用浮桥，这座桥退出关卡**（docs/Data_PontoonBridge.md；浮桥的门禁是 Script_PontoonBridgeTest）。
+// 模型 Model_RailBridge.glb、件表 Data_RailBridge.json、Script_BuildRailBridge.py、Script_RailBridgeSet.mjs 都留在仓库里，
+// 这里只剩「模型自己」的自检：烘焙产物、快照 sha（对的是 _blender/Data_RailBridgeTerrain.json 那份冻结的旧快照，不对游戏现在的地形）、
+// 碎件落稳、真 GLB 的起爆时间线与粒子预算。凡是绑着游戏现在的布局 / 地形 / 锚点 / 数值表的检查（白盒闸门、爆破手落位、药箱、
+// 桥墩碰撞盒、地形与快照逐点对账、安全区震感）都拿掉了：那些东西已经不是铁路桥的了。
 //
 //   node Taierzhuang1938/Script_RailBridgeTest.mjs
 //
@@ -33,11 +39,8 @@ const THREE = await import("three");
 const { GLTFLoader } = await import("./vendor/three/examples/jsm/loaders/GLTFLoader.js");
 const { RailBridgeSet } = await import("./Script_RailBridgeSet.mjs");
 const { RAIL_BRIDGE_MODEL: M, RAIL_BRIDGE_BLAST: FX } = await import("./Data_RailBridgeDemolition.mjs");
-const { MISSION_LAYOUT, MISSION_PLACEMENT: P } = await import("./Data_FirstLevelMissionLayout.mjs");
-const { MISSION_RAIL_BRIDGE: B, MISSION_STAGE_ANCHORS: A } = await import("./Data_FirstLevelMissionTopology.mjs");
+const { MISSION_RAIL_BRIDGE_LEGACY: B, MISSION_STAGE_ANCHORS: A } = await import("./Data_FirstLevelMissionTopology.mjs");
 const { END_TUNING: E } = await import("./Data_Tuning_FirstLevelEnd.mjs");
-const { MISSION_TUNING: R } = await import("./Data_Tuning_FirstLevel.mjs");
-const { SampleMissionTerrain } = await import("./Data_FirstLevelMissionTerrain.mjs");
 hooks.deregister();
 
 let checks = 0;
@@ -90,36 +93,13 @@ const terrain = JSON.parse(terrainText);
 // 按 LF 算：仓库开着 autocrlf，另一份检出里这个文件可能是 CRLF（Blender 那边同样先归一再算）。
 Check(data.terrainSha256 === crypto.createHash("sha256").update(terrainText.replace(/\r\n/g, "\n")).digest("hex"),
   "模型烘自当前这份地形快照（改了快照要重烘）");
-let worst = 0;
-for (let iz = 0; iz < terrain.heights.length; iz += 3) for (let ix = 0; ix < terrain.heights[0].length; ix += 3) {
-  const x = B.x + terrain.grid.x0 + ix * terrain.grid.step, z = B.z + terrain.grid.z0 + iz * terrain.grid.step;
-  worst = Math.max(worst, Math.abs(SampleMissionTerrain(x, z) - terrain.heights[iz][ix]));
-}
-Check(worst < 0.01, "地形快照与游戏地形一致（地形改了先重跑 Script_ExportRailBridgeTerrain）", `最大差 ${worst.toFixed(3)} m`);
-Check(data.origin.x === B.x && data.origin.z === B.z && M.origin.x === B.x && M.origin.z === B.z, "桥原点就是 MISSION_RAIL_BRIDGE");
+Check(data.origin.x === B.x && data.origin.z === B.z && M.origin.x === B.x && M.origin.z === B.z, "桥原点就是 MISSION_RAIL_BRIDGE_LEGACY（被炸孔中心）");
 Check(Math.abs(data.deckTopY - B.deckTopY) < 1e-6 && Math.abs(data.trussX - B.trussOffsetX) < 1e-6,
-  "桥面板顶与桁架中面对齐白盒碰撞（可走面 / 桁架挡板不动）");
-Check(Math.abs(terrain.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(terrain.exploder.z + B.z - E.exploderAt.z) < 1e-3
-  && Math.abs(data.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(data.exploder.z + B.z - E.exploderAt.z) < 1e-3,
-  "模型里的起爆器就摆在 E.exploderAt");
-// 1 号墩脚下（R1c：西侧）：爆破手蹲在墩西头干沙地上，木药箱堆在他们与墩之间，导线从墩顶翻下墩身、沿沙地拉向起爆器。
+  "桥面板顶与桁架中面对齐旧白盒常量（MISSION_RAIL_BRIDGE_LEGACY）");
+// 1 号墩脚下（R1c：西侧）：药箱、导线、墩顶药包、墩帽石与支座（只看模型自己的件表，不对游戏现在的布局）。
 {
-  const posts = P.bridge.demolition, pier1 = B.piers[0];
-  const dry = (x, z) => SampleMissionTerrain(x, z) > data.water.top + 0.1;
-  const rectGap = (b, x, z) => Math.hypot(Math.max(Math.abs(x - b.x) - b.w / 2, 0), Math.max(Math.abs(z - b.z) - b.d / 2, 0));
-  const solids = MISSION_LAYOUT.blocks.filter((b) => b.solid !== false && /^RailBridge/.test(b.id));
-  for (const [index, post] of posts.entries()) {
-    const d = Math.hypot(post.x - B.x, post.z - pier1.z);
-    Check(d > 3.5 && d < 10 && dry(post.x, post.z), `爆破手 ${index} 蹲在 1 号墩脚下西侧的干沙地上（离墩心 ${d.toFixed(1)} m）`);
-    Check(solids.every((b) => rectGap(b, post.x, post.z) >= 0.5), `爆破手 ${index} 离白盒桥体碰撞 ≥ 0.5 m`);
-    const start = E.demolitionPullback[index][0];
-    Check(Math.hypot(start.x - post.x, start.z - post.z) < 9, `爆破手 ${index} 的撤出折线从他脚下出发`);
-  }
   const crates = pieces.get("Crates");
   Check(crates?.kind === "charges", "木药箱在药包那一组（只在 18 前三步露面）");
-  const cc = [0, 2].map((i) => (crates.bounds.min[i] + crates.bounds.max[i]) / 2);
-  const nearest = Math.min(...posts.map((post) => Math.hypot(post.x - B.x - cc[0], post.z - B.z - cc[1])));
-  Check(nearest > 0.8 && nearest < 4, "药箱堆就在爆破手身边", `${nearest.toFixed(1)} m`);
   const cable = pieces.get("CableGround").bounds;
   Check(cable.min[2] < data.layout.piers.Pier1 + 1.5 && cable.max[2] > data.exploder.z - 0.7, "地面导线从墩脚一路拉到起爆器");
   const pierCharges = data.charges.filter((c) => c.z > 10);
@@ -131,21 +111,6 @@ Check(Math.abs(terrain.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(ter
   Check(caps.length >= 8 && caps.every((p) => p.kind === "debris"), "1 号墩的帽石层逐块成件、起爆时被掀飞");
   Check(data.pieces.filter((p) => /^Pier1Shoe/.test(p.name)).length === 2, "1 号墩的两副支座是碎件");
 }
-const kneel = E.demolitionPullback[1].at(-1);
-Check(Math.hypot(kneel.x - E.exploderAt.x, kneel.z - E.exploderAt.z) < 1.2 && kneel.z > E.exploderAt.z,
-  "东边爆破手撤到起爆器后面（面朝北、朝桥）");
-
-// 白盒：模型接管外观的闸门件都在；桥台碰撞盒埋在料石桥座下面。
-const gates = new Map(MISSION_LAYOUT.gates.map((gate) => [gate.id, gate]));
-for (const id of M.replacesGates) Check(gates.has(id), `模型接管的闸门件 ${id} 存在`);
-for (const block of MISSION_LAYOUT.blocks.filter((b) => /^RailBridgeAbutment/.test(b.id)))
-  Check(block.y + block.h / 2 <= B.abutmentTopY + 1e-6 && B.abutmentTopY < data.layout.pierTopY, `${block.id} 顶在桥座面以下`);
-// 三孔：三个白盒桥墩（碰撞）、模型里三个长圆料石墩的墩心对齐；碰撞盒 3.4 × 3.6 整个埋在长圆墩（半径 1.8、直边半长 1.9）里。
-const pierBlocks = MISSION_LAYOUT.blocks.filter((b) => /^RailBridgePier/.test(b.id));
-Check(pierBlocks.length === 3 && B.piers.every((p, i) => Math.abs(pierBlocks.find((b) => b.id === `RailBridge${p.id}`).z - p.z) < 1e-6
-  && Math.abs(data.layout.piers[p.id] - (p.z - B.z)) < 1e-6), "三个白盒桥墩与模型的墩心对齐");
-Check(B.pierW / 2 < data.layout.pierHalfLength + data.layout.pierRadius && B.pierD / 2 <= data.layout.pierRadius * 2 / 2 + 0.01,
-  "白盒桥墩碰撞盒整个埋在长圆料石墩里");
 Check(Math.abs(data.layout.spanCentres.SpanSouth - 0) < 1e-6 && Math.abs(data.layout.spanCentres.SpanMid + 24) < 1e-6
   && Math.abs(data.layout.spanCentres.SpanNorth + 48) < 1e-6, "三孔中心对上 MISSION_RAIL_BRIDGE 的 spans（被炸孔在原点）");
 
@@ -171,8 +136,6 @@ Check(E.marchOrderDelayS > Math.max(data.solved.northHit, data.solved.southHit) 
   "「往滕县！」在两个半孔都砸进河之后才喊");
 Check(E.exploderPressLeadS >= 0.18 && E.blastGazeWaitS <= 5 && E.blastGazeHalfAngleDeg <= 45,
   "压杆先于起爆、等玩家看桥最多几秒");
-Check(R.bridgeBlastRadiusM * 1.9 * 3.2 > Math.hypot(A.blastSafe.x - A.railBridge.x, A.blastSafe.z - A.railBridge.z),
-  "安全区也感觉得到爆破的震动（共用感知入口的震感外沿够得到 blastSafe）");
 
 // ---------------------------------------------------------------------------
 // 3. 特效预算（高画质 spawnScale 1，烟池 = 4000 × 0.22 = 880 片）
@@ -210,7 +173,7 @@ const vfx = {
 };
 const player = { position: new THREE.Vector3(A.blastSafe.x, 0.6, A.blastSafe.z), yaw: 0, Alive: true,
   get EyePosition() { return this.position.clone().setY(2.2); }, shake: { hits: 0, Explosion() { this.hits += 1; return 0.1; } } };
-player.yaw = Math.atan2(-(A.railBridge.x - A.blastSafe.x), -(A.railBridge.z - A.blastSafe.z));
+player.yaw = Math.atan2(-(B.x - A.blastSafe.x), -(B.z - A.blastSafe.z));
 const audio = { Play: (cue, options) => { log.audio.push({ cue, ...options }); return {}; } };
 const set = new RailBridgeSet({ scene, library, battlefield: { gates: gateMeshes }, vfx, audio, player });
 set.Build(gltf, data);

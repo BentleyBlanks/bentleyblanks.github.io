@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { MakeFullscreenMaterial } from "./Script_PostCommon.mjs";
-import { WHITEBOX_LIGHTING, WHITEBOX_WATER, WhiteboxPassPlan } from "./Data_Tuning_Whitebox.mjs";
+import { WHITEBOX_CARDS, WHITEBOX_LIGHTING, WHITEBOX_WATER, WhiteboxPassPlan } from "./Data_Tuning_Whitebox.mjs";
 
 // Physical ground and replacement crater tiles, never a material-name whitelist.
 export function IsWhiteboxTerrain(object) {
@@ -89,6 +89,22 @@ function MakeWhiteboxCardPatch(config) {
     ],
   });
 }
+// 镂空卡片（cardTextures 开）：保留原贴图色，略去饱和再按中性光折算提亮（WHITEBOX_CARDS）。只给有颜色贴图的卡片打这个补丁。
+function MakeWhiteboxCardTexturePatch() {
+  return MakePatch({
+    key: "whiteboxCard2",
+    uniforms: (uniforms) => Object.assign(uniforms, {
+      uWhiteboxCardDesat: { value: WHITEBOX_CARDS.desaturate }, uWhiteboxCardBright: { value: WHITEBOX_CARDS.brightness },
+    }),
+    fragment: [
+      ["#include <common>", "uniform float uWhiteboxCardDesat; uniform float uWhiteboxCardBright;"],
+      ["#include <color_fragment>", `
+        float whiteboxCardLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(whiteboxCardLuma), uWhiteboxCardDesat) * uWhiteboxCardBright;
+      `],
+    ],
+  });
+}
 // 白盒水面：蓝灰水色 + 掠射角天空色反光。没有环境贴图也成立（反光色是常量，靠菲涅耳权重）。
 function MakeWhiteboxWaterPatch() {
   return MakePatch({
@@ -132,9 +148,11 @@ export class WhiteboxSceneRenderer {
     let material = cache.get(source);
     if (!material) {
       const cutout = !water && IsWhiteboxCutout(source);
+      // 卡片保留原贴图色：有颜色贴图 → 白底乘贴图（补丁再略去饱和 / 折算提亮）；只有 alphaMap → 统一暗橄榄枯黄。
+      const cardTexture = cutout && this.config.cardTextures !== false;
       material = new THREE.MeshStandardMaterial({
         name: `Whitebox_${water ? "Water_" : cutout ? "Cutout_" : ""}${source.name || source.type}`,
-        color: water ? WHITEBOX_WATER.color : this.config.surfaceColor,
+        color: water ? WHITEBOX_WATER.color : cardTexture ? (source.map ? 0xffffff : WHITEBOX_CARDS.fallbackColor) : this.config.surfaceColor,
         roughness: water ? WHITEBOX_WATER.roughness : 1, metalness: 0, side: water ? THREE.DoubleSide : source.side,
         wireframe: source.wireframe || false,
         depthTest: source.depthTest, depthWrite: source.depthWrite,
@@ -153,7 +171,8 @@ export class WhiteboxSceneRenderer {
         return /^destruction/.test(key) || (lighting && /^(gtao|gi\d|csm|ssr|clust)/.test(key));
       });
       ApplyPatches(material, water ? [MakeWhiteboxWaterPatch()]
-        : [cutout ? MakeWhiteboxCardPatch(c) : null, c.grid ? MakeWhiteboxGridPatch(c) : null, ...retained]);
+        : [cutout ? (cardTexture ? (source.map ? MakeWhiteboxCardTexturePatch() : null) : MakeWhiteboxCardPatch(c)) : null,
+          c.grid && !cardTexture ? MakeWhiteboxGridPatch(c) : null, ...retained]);
       this.prepareMaterial?.(material, source);
       cache.set(source, material);
       this.ownedMaterials.add(material);

@@ -101,7 +101,7 @@ for (const it of high.instances) {
 for (const [key, value] of Object.entries(bad)) Check(value === 0, `禁区 ${key}：${value} 件${value ? `（例 ${examples[key]}）` : ""}`);
 
 // ---- foliage 盒接管 ---------------------------------------------------------
-Check(foliageIds.size === 40 && [...foliageIds].every((id) => high.replaced.has(id)), `40 个平色 foliage 盒由植被接管（${high.replaced.size}）`);
+Check(foliageIds.size === 37 && [...foliageIds].every((id) => high.replaced.has(id)), `37 个平色 foliage 盒由植被接管（${high.replaced.size}）`);
 
 // ---- 图集与烘焙记录 ----------------------------------------------------------
 const record = JSON.parse(fs.readFileSync(path.join(root, "_import/TextureBakes/Texture_FirstLevelVegetationAtlas.json"), "utf8"));

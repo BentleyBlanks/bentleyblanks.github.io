@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { WHITEBOX_DEFAULTS, NormalizeWhiteboxConfig, WhiteboxPassPlan, ResolveGraphicsProfile,
-  WhiteboxGraphicsOverrides, WHITEBOX_STORAGE_KEY } from "./Data_Tuning_Whitebox.mjs";
+  WhiteboxGraphicsOverrides, WHITEBOX_STORAGE_KEY, WHITEBOX_CARDS } from "./Data_Tuning_Whitebox.mjs";
 import { LoadWhiteboxConfig, SaveWhiteboxConfig, LoadGraphicsProfile, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
 import { LoadSavedGraphics } from "./Script_EditorSettings.mjs";
 
@@ -22,6 +22,15 @@ assert.equal(WhiteboxGraphicsOverrides({}).shadows, false);
 assert.equal(WhiteboxGraphicsOverrides({}).taa, false);
 assert.equal(WHITEBOX_DEFAULTS.characterTextures, true);
 assert.equal(WHITEBOX_DEFAULTS.assetTextures, false);
+assert.equal(WHITEBOX_DEFAULTS.cardTextures, true, "alpha-cut cards (foliage, grass) keep their texture colour in whitebox: no white-spike fields");
+assert.equal(NormalizeWhiteboxConfig({ cardTextures: false }).cardTextures, false, "the card switch can be turned off (back to the flat surface colour)");
+assert.ok(WHITEBOX_CARDS.desaturate >= 0 && WHITEBOX_CARDS.desaturate <= 0.8 && WHITEBOX_CARDS.brightness > 0.2 && WHITEBOX_CARDS.brightness < 1, "card tint numbers stay in a sane range");
+assert.match(WHITEBOX_CARDS.fallbackColor, /^#[\da-f]{6}$/i);
+{
+  // 卡片色不能比中性光下的白盒地面还亮（白刺）：fallback 暗橄榄的亮度低于表面色。
+  const luma = (hex) => { const n = parseInt(hex.slice(1), 16); return 0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255); };
+  assert.ok(luma(WHITEBOX_CARDS.fallbackColor) < luma(WHITEBOX_DEFAULTS.surfaceColor), "the fallback card colour is darker than the grey surface colour");
+}
 assert.equal(WHITEBOX_DEFAULTS.grid, true);
 assert.equal(NormalizeWhiteboxConfig({ gridSize: 0, gridLineWidth: 99 }).gridSize, 0.1);
 assert.equal(NormalizeWhiteboxConfig({ gridLineWidth: 99 }).gridLineWidth, 0.05);

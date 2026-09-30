@@ -12,7 +12,7 @@ import { MISSION_ANCHORS as A, MISSION_ROUTES as Routes,
 import { MISSION_RECEPTION_SPACE as Reception, MISSION_REGROUP_CORRIDORS as Corridors,
   MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes,
   MISSION_FRONT_COLLECTION_ROUTE as FrontCollectionRoute,
-  MISSION_NORTH_RIVER as River, MISSION_RAIL_BRIDGE as RailBridge,
+  MISSION_NORTH_RIVER as River, MISSION_PONTOON_BRIDGE as RailBridge,
   MISSION_TOPOLOGY_VERSION } from "./Data_FirstLevelMissionTopology.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_RETURN_ROUTES } from "./Data_FirstLevelMissionReturn.mjs";
@@ -38,7 +38,7 @@ const ZONES = [
     anchors: ["litterHold", "streetBlock", "eastAlley", "streetRejoin"] },
   { id: "C", label: "桥头接运与空袭 11-14", z: [86, 145],
     anchors: ["cartBoard", "cartHalt", "transferWall"] },
-  { id: "D", label: "桥南接收与回援 15-18（2026-09-30 marchOut 延到 z 295，撤离翻岗后才黑屏）", z: [165, 300],
+  { id: "D", label: "桥南接收与回援 15-18（2026-09-30 marchOut 延到 z 295，撤离翻岗后才黑屏；R3 第二轮射位与南桥头挪到水边：水线 z≈157.9，射位 z 162.7）", z: [158, 300],
     anchors: ["wallPathStart", "wallPathEnd", "receptionGate", "bridgeSouthEnd", "bridgeCover",
       "blastSafe", "marchOut"] },
 ];
@@ -103,7 +103,7 @@ for (const name of SOUTHBOUND) {
     `${name} makes real southward progress: ${route[0].z} -> ${route.at(-1).z}`);
 }
 assert.ok(StageRoutes.toBridge.at(-1).z < StageRoutes.toBridge[0].z - 40,
-  "18 is the one march back north, from the reception yard to the rail bridge");
+  "18 is the one march back north, from the reception yard to the pontoon bridge");
 assert.ok(StageRoutes.collectionReturn.at(-1).z > StageRoutes.collectionReturn[0].z,
   "05 returns south to the collection point rather than pressing on");
 // 尾队自北向南过桥，随后继续南下与小队汇合。
@@ -227,7 +227,7 @@ assert.ok(Blocked(A.retreatA, A.retreatB), "A to B long sightline is broken");
 assert.ok(Blocked(A.retreatB, A.retreatC), "B to C long sightline is broken");
 // 18：南岸射位、北岸土坎与桥面互相看得见（站姿）。
 assert.ok(!Blocked(S.bridgeCover, S.bridgeEnemy), "the south bank and the north ridge trade fire");
-// 桥心的「地面」在河槽底 -4.2，所以这条线量的是桥面而不是地面：
+// 桥心的「地面」在河槽底 -6，所以这条线量的是桥面而不是地面：
 // 爆破区要看得见的是那座桥，不是桥下的河床。
 assert.ok(!Blocked(S.blastSafe, S.bridgeSouthEnd), "the blast-safe position watches the span it is waiting on");
 {
@@ -255,13 +255,13 @@ console.log("ok sight rules: reverse slope both ways, covered litters, broken wi
 // 5. 两座桥的生命周期与后卫口袋
 // ---------------------------------------------------------------------------
 for (const [id, signal] of [["MissionBridgeWreck", "MissionBridgeDestroyed"],
-  ["RailBridgeWreckSpan", RailBridge.signal]]) {
+  ["PontoonBridgeCutWallSouth", RailBridge.signal]]) {
   const gate = Layout.gates.find((g) => g.id === id);
   assert.ok(gate, `${id} exists`);
   assert.equal(gate.appearSignal, signal, `${id} appears only once the bridge is destroyed`);
 }
 for (const [id, signal] of [["TemporaryBridge", "MissionBridgeDestroyed"],
-  ["RailBridgeDeck", RailBridge.signal]]) {
+  ["PontoonBridgeDeck", RailBridge.signal]]) {
   const gate = Layout.gates.find((g) => g.id === id);
   assert.equal(gate.signal, signal, `${id} disappears on its own signal`);
   assert.equal(gate.walkableId, id, `${id} leaves the walkable set with its mesh`);

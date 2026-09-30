@@ -1,12 +1,13 @@
 // ===========================================================================
 // Data_RailBridgeDemolition.mjs —— 北沙河铁路桥模型与「奉令毁桥」演出的数据表（零 three）
 //
+// （2026-09-30 起 18 改用浮桥，这份演出数据与 Script_RailBridgeSet 只留给退役的 Model_RailBridge 自检，游戏里没有东西读它们。）
 // 口径：docs/Data_RailBridge.md。模型与坍塌关键帧由 _blender/Script_BuildRailBridge.py
 // 烘成 Model/Model_RailBridge.glb + Model/Data_RailBridge.json；这里只放运行时要的
 // 地址、材质映射、替换哪些白盒件，以及起爆之后那几秒的特效分量。
 // 判定（等人走净、看着桥、按下起爆器）在 Script_FirstLevelBridge，数值在 Data_Tuning_FirstLevelEnd。
 // ===========================================================================
-import { MISSION_RAIL_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_RAIL_BRIDGE_LEGACY as MISSION_RAIL_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
 
 export const RAIL_BRIDGE_MODEL = Object.freeze({
   // 模型与件表各自一个戳：重烘之后两边一起 +1（Script_RailBridgeTest 核对两者出自同一次烘焙）。

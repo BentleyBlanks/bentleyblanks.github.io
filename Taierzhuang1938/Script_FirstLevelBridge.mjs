@@ -3,7 +3,7 @@
 //
 // Notion（docs/Data_FirstLevelRebuildSource20260919.md 的 18）：
 //   · 传令兵**跑到接收处**：外围部队奉命抽一部回援滕县，小队去接住桥上后队。
-//   · 回援尾队携带步枪、机枪或迫击炮部件从北岸过铁路桥；北岸土坎的火力妨碍他们
+//   · 回援尾队携带步枪、机枪或迫击炮部件从北岸过浮桥；北岸土坎的火力妨碍他们
 //     离桥，玩家与何有田协助打断。**不做多波守点**，敌人来自北侧外围战场。
 //     玩家不承担「杀光所有敌军」—— 压不住桥头的火力就算解除。
 //   · 桥头军官喊撤，玩家退到南岸掩护区；爆破由**此前就在场的人员**完成，
@@ -13,7 +13,7 @@
 //
 // 2026-09-28 毁桥大场面（docs/Data_RailBridge.md）：人走净之后再等玩家把脸转向桥
 // （≤ blastGazeWaitS），蹲在起爆器后面的爆破手压杆，exploderPressLeadS 之后起爆；
-// 桥的坍塌与特效由 railBridgeSet（Script_RailBridgeSet，带 three）演，这里仍只调一次
+// 桥的坍塌与特效由 pontoonBridgeSet（Script_PontoonBridgeSet，带 three）演，这里仍只调一次
 // Combat.BlastFeedback。「往滕县！跟上前队！」挪到桥身砸进河之后（marchOrderDelayS）。
 //
 // 零 three：node 里可以直接 import。
@@ -252,7 +252,7 @@ export class FirstLevelBridge {
     const r = this.runtime, state = this.blast;
     state.pressing = true; state.pressS = 0;
     r.Record("exploderPressed", { watching, gazeWaitS: Number(state.gazeS.toFixed(1)) });
-    r.railBridgeSet?.Press?.();
+    r.pontoonBridgeSet?.Press?.();
   }
   /**
    * 把还赖在爆破区里的自己人往南岸赶（「桥头撤！」就是这个意思），并盯着他到底
@@ -321,14 +321,14 @@ export class FirstLevelBridge {
     state.fired = true; state.pressing = false; state.sinceFireS = 0;
     const at = r.Point(A.railBridge, 1.2);
     // 桥的模型在场：分段药包、半空火球、水柱、两个半孔折进河里、烟柱与断口的火
-    // 都由 RailBridgeSet 按 Blender 烘的时间线演（docs/Data_RailBridge.md）。
+    // 都由 PontoonBridgeSet 按 Blender 烘的时间线演（docs/Data_PontoonBridge.md）。
     // 模型不在（node 替身、加载失败）就退回一发普通爆炸 —— 白盒桥照样翻闸门。
-    if (!r.railBridgeSet?.Detonate?.()) r.vfx.Explosion?.(at, { radius: R.bridgeBlastRadiusM });
+    if (!r.pontoonBridgeSet?.Detonate?.()) r.vfx.Explosion?.(at, { radius: R.bridgeBlastRadiusM });
     // 震屏、耳鸣与爆炸声只走这一次共用感知入口（docs/Data_BlastFeedback.md）。
     r.combat.BlastFeedback(at, R.bridgeBlastRadiusM);
-    // 桥上冲过来的日军：起爆后 0.25 s 被炸死抛起（farBank.UpdateBlast），跟着那一孔落河；对岸其余的人趴一下、退回岸边。
+    // 桥上冲过来的日军：起爆后 0.25 s 被炸死抛起（farBank.UpdateBlast），跟着那一段落河；对岸其余的人趴一下、退回岸边。
     r.farBank?.OnBridgeBlast?.();
-    // 桥面 / 桁架 / 钢轨的 5 个完好件与 3 个残骸件都挂在 RailBridgeDestroyed 这个信号上
+    // 被炸段桥面与两侧绳栏的 3 个完好件、断口两端的 2 个空气墙都挂在 RailBridgeDestroyed 这个信号上
     //（MISSION_SCENARIO_SIGNALS：信号 → bridgeDestroyed 这条事实）。一次翻完，不可逆。
     r.Record("bridgeDestroyed", { x: A.railBridge.x, z: A.railBridge.z, waitedS: Number(state.waitedS.toFixed(1)) });
   }

@@ -93,9 +93,9 @@ try {
       const Visible=id=>!!g.battlefield.gates.get(id)?.mesh.visible;
       return {stage:r.flow.stage.id,
         night:r.flow.facts.has("nightArrivalPlaced"),blown:r.flow.facts.has("bridgeDestroyed"),
-        deck:Visible("RailBridgeDeck"),
-        deckWalkable:g.battlefield.walkableSurfaces.some(s=>s.id==="RailBridgeDeck"),
-        wreck:Visible("RailBridgeWreckSpan"),
+        deck:Visible("PontoonBridgeDeck"),
+        deckWalkable:g.battlefield.walkableSurfaces.some(s=>s.id==="PontoonBridgeDeck"),
+        wreck:Visible("PontoonBridgeCutWallSouth"),
         lights:r.nightLights?.count??0,rear:(r.bridge.State().rearColumn||[]).length};
     });
     await Jump(18);

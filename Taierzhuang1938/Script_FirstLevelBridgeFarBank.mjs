@@ -287,7 +287,6 @@ export class FirstLevelFarBank {
     // 坦克推到岸边。
     for (const tank of this.tanks) {
       if (tank.state === "queued" && tank.spec.enter === "BridgeCover") { tank.startAt = this.t; }
-      if (tank.spec.kind === "bridge") continue;   // 桥面上那辆：起爆之后才往前开（UpdateBridgeTank）
       tank.pushed = true;
       if (tank.state === "posted") tank.state = "push";
     }
@@ -520,7 +519,7 @@ export class FirstLevelFarBank {
       const a = unit.actor;
       if (!a?.alive) continue;
       const d = Distance(a.position, centre);
-      const onBridge = Math.abs(a.position.x - AXIS_X) <= 5.5 && a.position.z >= FAR_BANK_BLAST.spanZ[0] - 0.5 && a.position.z <= FAR_BANK_BLAST.spanZ[1] + 0.5;
+      const onBridge = Math.abs(a.position.x - AXIS_X) <= 2.2 && a.position.z >= FAR_BANK_BLAST.spanZ[0] - 0.5 && a.position.z <= FAR_BANK_BLAST.spanZ[1] + 0.5;
       if (d <= T.blastKillM && onBridge) {
         this.Throw(unit, centre); b.killed += 1; this.counts.blastKilled += 1;
       } else if (d <= T.blastProneM) {
@@ -634,30 +633,6 @@ export class FirstLevelFarBank {
   // 战车
   // -------------------------------------------------------------------------
   Ground(x, z) { return this.r.battlefield?.GroundHeight?.(x, z) ?? 0; }
-  /**
-   * 桥面上那辆（spec.kind "bridge"）：BridgeCover 起停在桥北孔（z 100），起爆之后等 blastAdvanceWaitS 秒、
-   * 桥面上没有己方了（回岸边的冲桥组与人堆走清；最多等 blastAdvanceMaxS），再往前开到断口北侧（spec.blastPostZ）停下，炮口仍对着南岸。
-   */
-  UpdateBridgeTank(tank) {
-    const spec = tank.spec;
-    if (spec.kind !== "bridge") return;
-    const onDeck = (z0, z1) => this.units.some((u) => u.actor?.alive && Math.abs(u.actor.position.x - AXIS_X) <= 3.4 && u.actor.position.z >= z0 && u.actor.position.z <= z1);
-    if (!tank.onDeck) {
-      // 等在桥头以北：尾队过完桥（或已经起爆）、桥头没有己方了，才沿桥轴开上桥面。
-      if (tank.state !== "posted" || !(this.r.Has?.("rearColumnCrossed") || this.blast)) return;
-      const waited = this.t - (this.withdrawAt ?? this.t);
-      if (onDeck(86, 104) && waited < T.blastAdvanceMaxS) return;
-      tank.onDeck = true;
-      tank.route = [{ x: spec.deckX, z: FarBankShoreZ(spec.deckX) - 18 }, { x: spec.deckX, z: 96 }];
-      tank.pushGoal = { x: spec.deckX, z: spec.deckPostZ }; tank.pushed = true; tank.state = "push";
-    }
-    if (tank.advanced || !this.blast?.done) return;
-    const waited = this.t - this.blast.at;
-    if (waited < T.blastAdvanceWaitS) return;
-    if (onDeck(tank.z - 3, spec.blastPostZ + 5) && waited < T.blastAdvanceMaxS) return;
-    tank.advanced = true; tank.pushGoal = { x: spec.deckX, z: spec.blastPostZ }; tank.pushed = true;
-    if (tank.state === "posted") tank.state = "push";
-  }
   StepTank(tank, dt) {
     if (tank.state === "queued") {
       if (this.t >= tank.startAt) { tank.state = "approach"; tank.visible = true; }
@@ -726,8 +701,7 @@ export class FirstLevelFarBank {
     const tier = this.tier;
     if (tier === "out") { tank.pending = null; return; }
     // ---- 主炮：BridgeWithdraw 起（推到岸边之后）炮击安全落点 ----
-    // 桥面上那辆（axisFire）在桁架里，主炮的弹道出不去（桥轴上南岸 10 m 内还站着己方），只打机枪曳光。
-    const shelling = this.withdrawBegun && step !== "BridgeOrders" && !tank.spec.axisFire;
+    const shelling = this.withdrawBegun && step !== "BridgeOrders";
     if (tank.pending) {
       const p = tank.pending;
       tank.aim = { x: p.spot.x, z: p.spot.z };
@@ -815,7 +789,7 @@ export class FirstLevelFarBank {
     }
     if (this.t < tank.nextMgAt) return;
     // 新一串：朝南岸沙滩 / 堤顶的授权点（不打玩家附近的点：这些点都离射位 ≥ 12 m）
-    const west = tank.spec.x < AXIS_X, list = FarBankFireList(tank.spec.axisFire ? "axis" : west ? "west" : "east");
+    const west = tank.spec.x < AXIS_X, list = FarBankFireList(west ? "west" : "east");
     const p = list[Math.floor(this.rnd() * list.length)];
     tank.mgTarget = p; tank.aim = { x: p.x, z: p.z };
     if ((tank.aimGap ?? 1) > 0.3) { tank.nextMgAt = this.t + 0.4; return; }
@@ -888,7 +862,7 @@ export class FirstLevelFarBank {
     if (this.rush?.started && !this.crowdStarted && !this.blast && this.t >= this.rush.goAt + T.crowdDelayS) this.StartCrowd();
     for (const unit of this.units) this.UpdateUnit(unit, dt);
     this.UpdateBlast();
-    for (const tank of this.tanks) { this.UpdateBridgeTank(tank); this.StepTank(tank, dt); this.UpdateTankFire(tank, step); }
+    for (const tank of this.tanks) { this.StepTank(tank, dt); this.UpdateTankFire(tank, step); }
     this.crowd.Update(dt, { tier: this.tier, fireBroken: !!r.Has?.("bridgeFireBroken"), withdraw: this.withdrawBegun });
     for (const shot of this.crowd.TakeShots()) this.deps.crowdShot?.(shot);
     this.ApplyFlags();

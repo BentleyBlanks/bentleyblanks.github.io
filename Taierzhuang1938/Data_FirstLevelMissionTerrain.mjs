@@ -1,5 +1,5 @@
 import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_RECEPTION_SPACE, MISSION_NORTH_RIVER, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_RECEPTION_SPACE, MISSION_NORTH_RIVER, MISSION_PONTOON_BRIDGE, RiverCutAt, RiverMudAt } from "./Data_FirstLevelMissionTopology.mjs";
 // Authored soil, metres: natural ground, roads, rail berm and excavated trenches.
 // This function is baked once into the shared rendered/physical heightfield.
 import { FRONT_BREACHES, FRONT_BOUND_CRATERS } from "./Data_FirstLevelMissionFront.mjs";
@@ -11,6 +11,17 @@ const Smooth = (value) => {
   const t = Math.max(0, Math.min(1, value));
   return t * t * (3 - 2 * t);
 };
+/**
+ * 铁路路基（x −77 一线的 0.62 m 土垄）沿 z 的权重：1 = 有，0 = 没有。2026-09-30 浮桥取代铁路桥之后铁路在河口前收尾
+ * （MISSION_PONTOON_BRIDGE.railGapZ = [66, 184]，MISSION_RAILWAY 在这一段不铺道砟 / 枕木 / 钢轨），路基也跟着在挡车桩处收掉：
+ * 收尾处往河的方向 4 m 落到 0，河那一段（z 70…180）没有路基 —— 不然浮桥头前面还杵着一条没有铁轨的土垄。
+ */
+export const RAIL_BERM_FADE_M = 4;
+export function RailBermWeight(z) {
+  const [north, south] = MISSION_PONTOON_BRIDGE.railGapZ;
+  if (z <= north || z >= south) return 1;
+  return 1 - Smooth(Math.min((z - north) / RAIL_BERM_FADE_M, (south - z) / RAIL_BERM_FADE_M));
+}
 export function MissionPathDistance(point, route) {
   let best = Infinity;
   for (let i = 1; i < route.length; i++) {
@@ -191,7 +202,7 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
   }
   // A continuous rail embankment, never a box pretending to be soil.
   const rail = Math.abs(x + 77);
-  height += 0.62 * (1 - Smooth((rail - 2.4) / 4));
+  height += 0.62 * (1 - Smooth((rail - 2.4) / 4)) * RailBermWeight(z);
   // 开挖并集 + 沟沿抛土：旧的 `for (trench)` 循环搬进了 Script_TrenchPlan.Apply。
   // 挖下去的部分照旧取 min；抬起来的那部分（抛土）乘上面那张掩码。
   const applied = TrenchPlanFor(spec).Apply(x, z, height, natural);
@@ -302,6 +313,8 @@ function RouteDistanceWithin(x, z, route, reach) {
   }
   return best < reach * reach ? Math.sqrt(best) : Infinity;
 }
+/** 拓宽河段两岸烂泥滩的顶点色倍率（线性 rgb，乘在底图上）：被水泡烂的泥比干土暗、偏冷。 */
+export const RIVER_MUD_TINT = Object.freeze([0.58, 0.55, 0.5]);
 export function SampleMissionGroundColor(x, z, out = [0, 0, 0]) {
   const variation=.94+.06*Math.sin(x*.37)*Math.sin(z*.29);
   // Mild albedo multipliers: preserve generated soil detail without double-darkening.
@@ -340,8 +353,10 @@ export function SampleMissionGroundColor(x, z, out = [0, 0, 0]) {
     r+=(.98-r)*t; g+=(.96-g)*t; b+=(.88-b)*t;
   }
   const rail=Math.abs(x+77);
-  const railT=1-Smooth((rail-2.4)/1.5);
+  const railT=(1-Smooth((rail-2.4)/1.5))*RailBermWeight(z);
   if(railT>0){ r+=(.43-r)*railT; g+=(.44-g)*railT; b+=(.41-b)*railT; }
+  const mud=RiverMudAt(x,z);
+  if(mud>0){ r+=(RIVER_MUD_TINT[0]*r-r)*mud; g+=(RIVER_MUD_TINT[1]*g-g)*mud; b+=(RIVER_MUD_TINT[2]*b-b)*mud; }
   out[0]=r; out[1]=g; out[2]=b;
   return out;
 }
@@ -500,11 +515,19 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
     }
   }
   const rail = Math.abs(x + 77);
-  const railT = 1 - Smooth((rail - 2.4) / 1.5);
-  const railNear = 1 - Smooth((rail - 2.4) / STUBBLE_CLEAR_M);
+  const bermK = RailBermWeight(z);
+  const railT = (1 - Smooth((rail - 2.4) / 1.5)) * bermK;
+  const railNear = (1 - Smooth((rail - 2.4) / STUBBLE_CLEAR_M)) * bermK;
   if (railNear > worked) worked = railNear;
   let r = 1, g = 1, b = 1;
   if (railT > 0) { r += (.43 - r) * railT; g += (.44 - g) * railT; b += (.41 - b) * railT; }
+  // 拓宽河段两岸的烂泥滩：翻土层（裸土）铺满、麦茬退让、顶点色压暗（RIVER_MUD_TINT）。路面（小路 / 踩道）仍盖在上面。
+  const mud = RiverMudAt(x, z);
+  if (mud > 0) {
+    if (mud * 0.92 > spoil) spoil = mud * 0.92;
+    if (mud > worked) worked = mud;
+    r += (RIVER_MUD_TINT[0] - 1) * mud; g += (RIVER_MUD_TINT[1] - 1) * mud; b += (RIVER_MUD_TINT[2] - 1) * mud;
+  }
   color[0] = r; color[1] = g; color[2] = b;
   layers[0] = track; layers[1] = spoil; layers[2] = 1 - worked; layers[3] = rut;
   return color;

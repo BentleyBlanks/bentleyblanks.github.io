@@ -94,7 +94,7 @@ import { FarBankCrowdView } from "./Script_FirstLevelFarBankCrowdView.mjs";
 import { CrowdGroundY } from "./Data_FirstLevelFarBankCrowd.mjs";
 import { FirstLevelNightLights } from "./Script_FirstLevelNightLights.mjs";
 import { OpeningSet } from "./Script_OpeningSet.mjs";
-import { RailBridgeSet } from "./Script_RailBridgeSet.mjs";
+import { PontoonBridgeSet } from "./Script_PontoonBridgeSet.mjs";
 import { EmplacementInteraction } from "./Script_Emplacement.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { ActionKeyGlyph } from "./Script_Input.mjs";
@@ -257,11 +257,11 @@ export class FirstLevelMissionRuntime {
     // 03 开头的飞机、阴天开关也在里面。03 阵位的破砖墙外观装到 06 才收（它是 04–06 的战场）。
     this.openingSet = new OpeningSet({ scene: this.scene, library: this.library, groundAt: (x, z) => this.battlefield.GroundHeight(x, z),
       vfx: this.vfx, aircraft: this.aircraft, applySky: (name) => this.ApplySky?.(name), restoreSky: () => this.RestoreSky?.() });
-    // 北沙河铁路桥的模型与 18 毁桥的坍塌演出（docs/Data_RailBridge.md）。后台加载，
-    // 装好之前（或加载失败）白盒桥照旧；FirstLevelBridge.Fire 通过 railBridgeSet.Detonate 起爆。
-    this.railBridgeSet = new RailBridgeSet({ scene: this.scene, library: this.library, battlefield: this.battlefield,
+    // 北沙河浮桥的模型与 18 毁桥的坍塌演出（docs/Data_PontoonBridge.md）。后台加载，
+    // 装好之前（或加载失败）白盒桥照旧；FirstLevelBridge.Fire 通过 pontoonBridgeSet.Detonate 起爆。
+    this.pontoonBridgeSet = new PontoonBridgeSet({ scene: this.scene, library: this.library, battlefield: this.battlefield,
       vfx: this.vfx, audio: this.audio, player: this.player });
-    this.railBridgeSet.Load();
+    this.pontoonBridgeSet.Load();
     this.quietMarch = new FirstLevelQuietMarch(this);
     this.reception = new FirstLevelReception(this);
     this.bridge = new FirstLevelBridge(this);
@@ -332,7 +332,7 @@ export class FirstLevelMissionRuntime {
   }
   /**
    * 可见空间的换态信号（契约 §3 冻结的大写名）。装配层每帧把这个问给
-   * `battlefield.SyncScenario`：掩蔽部换坍塌态、铁路桥消失、北门夜景出现，
+   * `battlefield.SyncScenario`：掩蔽部换坍塌态、浮桥被炸段消失、北门夜景出现，
    * 全都由任务事实驱动 —— 所以检查点重试、阶段回跳把事实清掉的那一刻，
    * 空间自己就退回去了，不用另写一套还原代码。
    */
@@ -348,8 +348,8 @@ export class FirstLevelMissionRuntime {
    */
   NarrowFovDeg(baseFov, dt) {
     const fov = this.frontShow?.NarrowFovDeg(baseFov, dt) ?? baseFov;
-    // 18 毁桥：起爆后玩家看着桥的那几秒视野收一点（Data_RailBridgeDemolition.focus）。
-    return fov * (this.railBridgeSet?.FovScale?.(dt) ?? 1);
+    // 18 毁桥：起爆后玩家看着桥的那几秒视野收一点（Data_PontoonBridgeDemolition.focus）。
+    return fov * (this.pontoonBridgeSet?.FovScale?.(dt) ?? 1);
   }
   /**
    * 事实门的距离判定：点与半径一律从 MISSION_FACT_GATES 取，代码里不再写坐标与米数。
@@ -2529,7 +2529,7 @@ export class FirstLevelMissionRuntime {
     this.openingSet?.Update(dt, this.flow.stage.id, this.frontShow?.bunker?.phase ?? null,
       { collapsed: this.Has("bunkerCollapsed"), blastAge: this.opening.blastAt != null ? this.time - this.opening.blastAt : null, player: this.player?.position,
         flagFall:this.frontShow?.bunker?.flags?.flagFallProgress??0,breakables: this.tankRuntime?.breakables ?? null });
-    this.railBridgeSet?.Update(dt, this.flow.stage.id, { destroyed: this.Has("bridgeDestroyed"), night: this.Has("nightArrivalPlaced") });
+    this.pontoonBridgeSet?.Update(dt, this.flow.stage.id, { destroyed: this.Has("bridgeDestroyed"), night: this.Has("nightArrivalPlaced") });
     if(this.failed){prof?.E("story/mission/other");return;}
     prof?.E("story/mission/other");
     prof?.B("story/mission/spawns");
@@ -2644,7 +2644,7 @@ export class FirstLevelMissionRuntime {
     // 08–10 的演出（担架真的停进遮挡、班长查看相邻房屋、连屋来敌、开院门放行）。
     this.village.Update(dt);
     if (stage === "Melee") this.UpdateMelee();
-    // --- 18 铁路桥：接令、掩护尾队、撤出爆破区（演出与判定在 FirstLevelBridge）---
+    // --- 18 浮桥：接令、掩护尾队、撤出爆破区（演出与判定在 FirstLevelBridge）---
     if (stage === "BridgeCover" && this.GateNear("southBankReached")) this.Record("southBankReached");
     if (stage === "BridgeWithdraw" && this.GateNear("blastZoneCleared")) this.Record("blastZoneCleared");
     // 对岸部队排在桥之前：Bridge.UpdateWithdraw 在按起爆器前要问 farBank.ReadyForBlast（冲桥组到位没有）。
@@ -2997,7 +2997,7 @@ export class FirstLevelMissionRuntime {
     this.farBankCrowdView?.Dispose();
     this.nightLights?.Dispose();
     this.openingSet?.Exit();
-    this.railBridgeSet?.Dispose();
+    this.pontoonBridgeSet?.Dispose();
     this.opening.Dispose();
     this.frontShow?.Dispose();
     this.frontPressure?.Dispose();

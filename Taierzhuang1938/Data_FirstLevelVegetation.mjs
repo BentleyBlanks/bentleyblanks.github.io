@@ -88,6 +88,13 @@ export const VEGETATION = Object.freeze({
   /** 拓宽河段南岸带的卡片高度上限（R1c，见 mix.bankSouth）。 */
   southBankMaxHeightM: 0.6,
   /**
+   * 2026-09-30 R3（浮桥取代铁路桥，概念 18_1 / 18_2）：南岸不再是白沙滩，是烂泥滩（R3 第二轮：水线 → 岸沿 shoreZ 是 3.4 m 宽的陡泥岸，岸沿以南 14 m 的平地整片算泥滩）+ 泥滩上的芦苇。
+   * 泥滩上（水线以上、shoreZ + 14 以北）走 mix.mudFlat（芦苇为主），高度压到 mudFlatMaxHeightM：射位在泥垄后面站起来要越得过它们看浮桥。
+   * clearDiscs 是完全不长东西的圈：南栈头东侧爆破手 / 药箱 / 线卷 / 起爆器那一片踩实的泥地（桥轴东 4.4 m）。
+   */
+  mudFlatMaxHeightM: 1.05,
+  clearDiscs: Object.freeze([Object.freeze({ x: -72.6, z: 167, r: 6.5 })]),
+  /**
    * 拓宽河段北岸的岸沿带（岸沿以北 9 m）：18 对岸的部队一排排蹲跪站在这条带上（Data_FirstLevelFarBankCrowd 的岸线五排，back 1.7–6.6 m），
    * 1.8 m 的芦苇与 0.8 m 的枯茎把人整个挡住（R2b 实拍：high 画质里岸上一个人也看不见，只剩几面旗）。这里所有卡片压到这个高度以下，
    * 人（卧姿 0.35 / 跪姿 1.05 / 站姿 1.7 m）从草上露出来；带外的北岸（村子后面、田里）不动。
@@ -114,6 +121,8 @@ export const VEGETATION = Object.freeze({
     // 2026-09-30 R1c：拓宽河段的南岸（南堤、堤顶小路、沙滩以南）只长矮草 —— 概念 18_1 里从堤顶往东北看桥的视线
     //（堤顶小路、尾队沿右手小路朝镜头跑来）被 1.8 m 的芦苇和 0.8 m 的枯茎挡住，桥读不出来。高卡留给北岸。
     bankSouth: Object.freeze({ LowTuft: 3, MixedClump: 2.5, GreenSprouts: 1.5 }),
+    // R3：泥滩上的芦苇（枯黄的、被水泡得倒伏的一片）：芦苇为主，夹着枯草与枯茎。
+    mudFlat: Object.freeze({ Reeds: 4, TallGrass: 2, WeedStalks: 1.2, MixedClump: 1 }),
     far: Object.freeze({ Bramble: 1.2, TwigShrub: 1.2, WeedStalks: 1, TallGrass: 1.5 }),
     thicket: Object.freeze({ TwigShrub: 3, Bramble: 2.5, TallGrass: 1.5, WeedStalks: 1 }),
   }),
@@ -345,9 +354,10 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
     const x = (ix + rng()) * step, z = (iz + rng()) * step;
     const riverDz = river ? Math.abs(z - river.z) : Infinity;
     // 2026-09-30 拓宽河段（RailBridgeReach，x −140…−30 及过渡）：河岸带跟着新岸走 —— 北岸岸沿以北 9 m、南岸沙滩以南 9 m；
-    // 河口里（岸沿到沙滩南端）只要下切 > 0.2 m 一律不长（南岸沙滩要留成干净的沙地，概念 18_3）。
+    // R3：河口里只有**水面以下**（下切 > −waterRel − 0.12）才不长；水线以上的泥滩与北岸最上面一小截长芦苇（概念 18_1 / 18_2）。
     const reach = river && ctx.riverReachAt ? ctx.riverReachAt(x) : null;
-    const bankBand = reach ? ((z < reach.crestZ && z >= reach.crestZ - 9) || (z >= reach.shoreZ && z < reach.shoreZ + 9))
+    if (rules.clearDiscs.some((d) => (x - d.x) ** 2 + (z - d.z) ** 2 < d.r * d.r)) continue;
+    const bankBand = reach ? ((z < reach.crestZ && z >= reach.crestZ - 9) || (z >= reach.waterZ && z < reach.shoreZ + 14))
       : riverDz < 17 && riverDz >= 7.6;
     const coarse = far.Distance(x, z);
     const dRoute = coarse < 14 ? routes.Distance(x, z, coarse + 2) : coarse;
@@ -360,7 +370,7 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
     const pOpen = dRoute < rules.pOpenCloseM ? rules.pOpenClose : rules.pOpenFar + (rules.pOpen - rules.pOpenFar) * openFade;
     const crossing = bankBand && crossings.some((c) => Math.abs(x - c.x) < c.halfW + 3);
     const bank = bankBand && !crossing;
-    if (river && (reach ? z >= reach.crestZ - 0.5 && z <= reach.shoreZ : riverDz < 7.6) && ctx.riverCutAt(x, z) > 0.2) continue;       // 河槽底（水面与水里）
+    if (river && (reach ? z >= reach.crestZ - 0.5 && z <= reach.shoreZ : riverDz < 7.6) && ctx.riverCutAt(x, z) > (reach ? -reach.waterRel - 0.12 : 0.2)) continue;       // 河槽底（水面与水里）
     const hit = blocks.Query(x, z);
     if (hit.inside || hit.roofed || hit.water) continue;
     const wallFoot = hit.wallDistance < rules.wallFootBandM;
@@ -401,8 +411,9 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
       continue;
     }
     if (roll > p * q.density) continue;
-    const southBank = zone === "bank" && reach && z >= reach.shoreZ;
-    let card = WeightedPick(rng, southBank ? rules.mix.bankSouth : rules.mix[zone]);
+    const southBank = zone === "bank" && reach && z >= reach.shoreZ + 14;
+    const mudFlat = zone === "bank" && reach && z >= reach.waterZ && z < reach.shoreZ + 14;
+    let card = WeightedPick(rng, southBank ? rules.mix.bankSouth : mudFlat ? rules.mix.mudFlat : rules.mix[zone]);
     const spec = VEGETATION_CARDS[card];
     // 视线门槛：高卡只准贴墙、河岸或远离路线；锚点附近一律矮草。
     if (spec.tall && !(zone === "bank" || (zone === "wallFoot" && dRoute > 3) || dRoute > rules.tallRouteClearM)) card = CARD_INDEX.MixedClump;
@@ -418,6 +429,7 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
     if (lip) maxHeight = Math.min(maxHeight, rules.trenchLipMaxHeightM);
     if (z < rules.frontZ && zone !== "wallFoot") maxHeight = Math.min(maxHeight, rules.frontMaxHeightM);
     if (southBank) maxHeight = Math.min(maxHeight, rules.southBankMaxHeightM);
+    if (mudFlat) maxHeight = Math.min(maxHeight, rules.mudFlatMaxHeightM);
     if (zone === "bank" && reach && z < reach.crestZ) maxHeight = Math.min(maxHeight, rules.northBankMaxHeightM);
     Push(rng, x, z, card, count, maxHeight, onTrack || atWall ? MemberClear : MemberClearOffTrack);
   }

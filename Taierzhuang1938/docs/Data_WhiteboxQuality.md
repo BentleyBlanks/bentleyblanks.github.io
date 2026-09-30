@@ -15,8 +15,14 @@
   不画网格，也不依赖环境贴图 / 预通道（`Script_WhiteboxRendering.MakeWhiteboxWaterPatch`，缓存键 `whiteboxWater1`）。不是可编辑项，数值在 `Data_Tuning_Whitebox.WHITEBOX_WATER`。
   没选 muddyRiver 着色：那条河水着色靠预通道深度和 SSR，白盒帧图里都没有。
 * **镂空卡片**（植被十字面片、壕沟草、桁架镂空节 —— `alphaTest > 0` 且带 `map` / `alphaMap` 的材质）保留 alpha 裁切：白盒替换材质带上原来的
-  `map`/`alphaMap`/`alphaTest`/`alphaToCoverage`，只把 rgb 换成表面色（缓存键 `whiteboxCard1`，再叠灰盒网格），于是卡片是灰色的草叶剪影而不是整块不透明白竖片。
+  `map`/`alphaMap`/`alphaTest`/`alphaToCoverage`。**2026-10-01 起卡片保留原贴图色**（集成者验收：默认画质下 18_2 的芦苇 / 草是满地白刺 —— 旧做法把 rgb 换成表面色 `#909397`，
+  在白盒的中性光（ambient 1.8 + sun 1.4）下被照成近白，草叶剪影在深色泥地上像一地白刺）：白底乘原贴图，再按 `WHITEBOX_CARDS.desaturate`（0.4，0 = 原色、1 = 灰）略去饱和、
+  乘 `WHITEBOX_CARDS.brightness`（0.5，中性光下的提亮折算）；只有 `alphaMap`、没有颜色贴图的卡片统一成 `WHITEBOX_CARDS.fallbackColor`（暗橄榄枯黄 `#7a7547`）。
+  卡片上**不再叠米制灰网格**（网格线画在草叶上只是噪点）。缓存键 `whiteboxCard2`。
+  开关：`WHITEBOX_CONTROLS.cardTextures`（「镂空卡片保留原贴图色」，默认开；关 = 回到 2026-09-30 的统一表面色卡片 `whiteboxCard1`）。数值在 `Data_Tuning_Whitebox.WHITEBOX_CARDS`。
   `Inspect()` 之外可读 `post.whiteboxScene.stats.cutoutMeshes / waterMeshes`。
+  **例外清单的登记项**：植被 / 草卡片属于「场景零原贴图」规则的例外之一（另一个是水面）；`Script_WhiteboxQualityTest`（开关默认值、数值范围、fallback 比表面色暗）与
+  `Script_WhiteboxQualityBrowserTest --presentation-only`（每张卡片材质保留 alphaTest 与贴图、不是表面色、无网格）守着。
 
 **地形、角色、敌军、第一人称身体/手和手持装备默认保留原材质与贴图。** 人物与装备由独立 `characterTextures` 开关控制，不依赖场景的 `assetTextures`。地形以对象上的 `deformableTerrain`、`terrainTile` 或 `whiteboxTerrain` 标记识别；弹坑替换地块也保留贴图，不能用「材质名字带泥土」放行场景道具。透明粒子/贴花和天空默认不画；HUD 与任务系统继续工作。
 
@@ -69,4 +75,4 @@ node Taierzhuang1938/Script_SamplerBudgetTest.mjs --only=whitebox
 node Taierzhuang1938/Script_EditorTest.mjs
 ```
 
-专项浏览器门禁检查实际提交的灰盒网格材质、人物贴图、场景零原贴图（镂空卡片保留 alpha 例外、水面走蓝灰水色不画网格）、地形保留、后加入的骨骼挂件、共享材质与还原；点击人物贴图开关并保存/刷新，再显式切 high 验证原管线。包括敌我双方持枪近景、场景和编辑面板截图；截图与读数在忽略目录 `tmp/WhiteboxQuality/`，不提交。
+专项浏览器门禁检查实际提交的灰盒网格材质、人物贴图、场景零原贴图（镂空卡片保留 alpha 与原贴图色的例外、水面走蓝灰水色不画网格）、地形保留、后加入的骨骼挂件、共享材质与还原；点击人物贴图开关并保存/刷新，再显式切 high 验证原管线。包括敌我双方持枪近景、场景和编辑面板截图；截图与读数在忽略目录 `tmp/WhiteboxQuality/`，不提交。
