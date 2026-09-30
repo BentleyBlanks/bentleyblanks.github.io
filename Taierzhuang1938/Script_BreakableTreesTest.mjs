@@ -7,12 +7,13 @@ import { MISSION_LAYOUT, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.m
 const allPlacements=MakeTreePlacements(), placements=allPlacements.filter(p=>!p.authored);
 const authored=MakeAuthoredTreePlacements();
 // 2026-09-30：河拓宽后北岸 FieldPoplarWest7 落进河槽（−1）、北岸村子外围新增 6 棵（FieldPoplarWest*NB，+6）。
-assert.equal(authored.length,51,"all 35 former green trees and 11 primitive dead trees are replaced (minus one drowned by the widened river, plus six on the north bank)");
-assert.equal(allPlacements.length,135);
-assert.equal(new Set(allPlacements.map(p=>p.id)).size,135);
+// 2026-10-01 集成：12–18 白盒并入后 51 → 58：D/C 包在接收院与接运场补了 2 棵，R2 撤离土岗补 5 棵 RetreatDeadTree0..4。
+assert.equal(authored.length,58,"all 35 former green trees and 11 primitive dead trees are replaced (minus one drowned by the widened river, plus six on the north bank, plus two from the reception/transfer whitebox and five dead trees on the retreat rise)");
+assert.equal(allPlacements.length,142);
+assert.equal(new Set(allPlacements.map(p=>p.id)).size,142);
 assert.deepEqual(authored,allPlacements.filter(p=>p.authored));
 assert.ok(!MISSION_LAYOUT.blocks.some(b=>/(?:Tree|Poplar).*?(?:Crown|Branch)/.test(b.id)),"no old block crowns or branches survive");
-assert.ok(MISSION_LAYOUT.blocks.filter(b=>b.semantic==="foliage").every(b=>/^(NorthRiverReeds|TransferEastShrub|LaneHollowScrub|BridgeBankGrass)/.test(b.id)),"remaining foliage is low ground vegetation, never tree crowns");
+assert.ok(MISSION_LAYOUT.blocks.filter(b=>b.semantic==="foliage").every(b=>/^(NorthRiverReeds|TransferEastShrub|LaneHollowScrub|BridgeBankGrass|BridgeMudReeds|RetreatGrass)/.test(b.id)),"remaining foliage is low ground vegetation, never tree crowns");
 for(const p of authored){
   const b=MISSION_LAYOUT.blocks.find(b=>b.id===p.id);
   assert.deepEqual([p.x,p.z],[b.x,b.z]);
@@ -59,4 +60,4 @@ for(const source of report.sourceFiles){
   assert.deepEqual(source.textureSha256,report.sourceFiles[0].textureSha256);
 }
 assert.ok(bytes.length<14*1024*1024);
-console.log("PASS BreakableTreesTest: 84 reproducible clear placements + 51 authored replacements, blast falloff, actual split GLB budget");
+console.log("PASS BreakableTreesTest: 84 reproducible clear placements + 58 authored replacements, blast falloff, actual split GLB budget");
