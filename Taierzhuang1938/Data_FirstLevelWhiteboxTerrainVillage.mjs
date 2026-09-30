@@ -65,6 +65,13 @@ export const WHITEBOX_TERRAIN_VILLAGE = Object.freeze({
     // 08 主街街面下沉 0.2 m（障碍北段；障碍本体 z 17…23 不动，免得倒墙/木车悬空）。
     Object.freeze({ id: "StreetSunkNorth", kind: "box", op: "cut", x: 77.1, z: -2.25, w: 4.6, d: 35.5,
       feather: .75, dy: .2, note: "08_1 主街北段车辙低于两侧门前 0.2 m" }),
+    // 12（2026-09-30 二轮）：从守线往北 20 m 内路面再走低 0.45 m（居高临下）。z 70 起 0.25、z 64 起 0.45，一路压到门楼；
+    // 南端 z 70 是这一区能画到的极限（羽化 4.9 m 要落在框内，框到 z 75）。
+    Object.freeze({ id: "LaneDip", kind: "line", op: "cut", halfW: 3.4, feather: 1.5, dy: .45,
+      points: Object.freeze([
+        Object.freeze({ x: 77.0, z: 70.0, dy: .25 }), Object.freeze({ x: 77.2, z: 64 }), Object.freeze({ x: 77.4, z: 47 }),
+      ]),
+      note: "12 村路夹道往北走低 0.45 m" }),
     Object.freeze({ id: "StreetSunkSouth", kind: "box", op: "cut", x: 77.6, z: 27.5, w: 3.6, d: 8,
       feather: .75, dy: .18, note: "08 主街障碍以南到接回点前" }),
   ]),

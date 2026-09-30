@@ -221,7 +221,7 @@ export async function Drive(ctx) {
   // 2026.09.19 起内院门出来走绕回短巷（z≈39 的缺口）到障碍南侧 streetRejoin，
   // 再顺主街南下 —— 旧的 (64,52) 斜线现在压在短巷南墙上。
   await Route([{ x: 55, z: 39 }, { x: 66, z: 39 }, { x: 74, z: 39 }, { x: 77, z: 35 },
-    { x: 78, z: 50 }, { x: 78, z: 62 }, { x: 76, z: 85 }, { x: 84, z: 92 },
+    { x: 78, z: 50 }, { x: 78, z: 62 }, { x: 78.4, z: 74 }, { x: 79.3, z: 83.2 }, { x: 79.3, z: 87 }, { x: 84, z: 92 },
     { x: 90, z: 98 }, { x: 95, z: 103 }], "TransferApproachWalk", { fight: true });
   // 辨认三样：接运区（到位）、桥头方向与村路来路（朝向门）。
   await LookAt(page, M.bridgeHeadPoint);
@@ -253,7 +253,7 @@ export async function Drive(ctx) {
   await Route([{ x: 82, z: 97.6 }, { x: 78, z: 96 }, { x: 70, z: 88.5 }, { x: 64.4, z: 88.1 }],
     "TransferSupply", { fight: true });
   assert.equal((await Interact()).kind, "supply", "the transfer crate is actually within reach");
-  await Route([{ x: 71.3, z: 86.05 }], "TransferLowWallPost", { fight: true });
+  await Route([{ x: 75.7, z: 86.0 }], "TransferLowWallPost", { fight: true });
   await Capture("TransferLowWallPost");
   const posted = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().facts);
   assert.ok(posted.includes("transferArrived"), "顺子上了村口低墙的射位（transferArrived）");

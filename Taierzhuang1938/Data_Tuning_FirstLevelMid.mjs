@@ -163,26 +163,28 @@ export const MID_TUNING = Object.freeze({
   // -------------------------------------------------------------------------
   // 班里人的射位（2026-09-27 掩护装载重做，docs/Data_FirstLevelTransferCover20260927.md）：
   // 守来时路 —— 全在村口低墙（z≈84）背后一线，朝北对着门楼与主街，不站在伤员中间。
-  // 顺子在 A.transferWall（低墙射口 71.3,86.05，2026-09-30 从 67.5,86 挪来，顺着村路夹道看，见文档 §7）；
-  // 罗班长在他右手（72.6,85.8，紧挨路口西砖垛；13 直奔停车处的直线要从西墙北头 x 71 东面过）；刘文财在
-  // 左手、低墙西头（西巷绕过来的人钻西北残屋，他先看见）；何有田在右翼低墙东段，东巷口
+  // 顺子在 A.transferWall（低墙射口 75.7,86.0，夹道中线上，2026-09-30 二轮从 71.3,86.05 再挪来，正北顺路看，见文档 §7）；
+  // 罗班长在他左手（73.2,86.2；13 直奔停车处的直线要从西墙北头 x 71 东面过）；刘文财在
+  // 左手远处、低墙西段（西巷绕过来的人钻西北残屋，他先看见）；何有田在右翼低墙东段，东巷口
   // 就在他正前方（「右边有人！」）。幺娃不上墙，跟着担架在装载区（14 他从这里奔沟口救人）。
   // face：没有目标时脸朝哪儿（watchYaw），不写就不管。
   // 都在墙南侧：13/14 罗班长直奔停车处、幺娃刘文财直奔沟口都是直线（MidTest 量着），
   // 墙北侧的射位会让这几条直线穿墙。
   defencePosts: Object.freeze([
-    Object.freeze({ cast: "luo", x: 72.6, z: 85.8, face: Object.freeze({ x: 76.4, z: 58 }) }),
+    Object.freeze({ cast: "luo", x: 73.2, z: 86.2, face: Object.freeze({ x: 76.4, z: 58 }) }),
     Object.freeze({ cast: "heyoutian", x: 88.8, z: 85.6, face: Object.freeze({ x: 94.5, z: 70 }) }),
-    Object.freeze({ cast: "liuwencai", x: 60.6, z: 85.6, face: Object.freeze({ x: 62, z: 74 }) }),
+    Object.freeze({ cast: "liuwencai", x: 67.0, z: 86.0, face: Object.freeze({ x: 62, z: 74 }) }),
     Object.freeze({ cast: "yaowa", x: 79, z: 110 }),
   ]),
   defencePostArrivalM: 1.6,
   // 装载区受不受压的判定点（运行时 Threatens 的点）：村路进场院那一段排队道。
-  // 门楼北侧那挺机枪顺着车路往里扫的就是这里（29.5 m，在 passageRangeM 36 以内）。
-  loadingThreatPoint: Object.freeze({ x: 76.5, z: 96 }),
+  // 夹道里翻车后那挺机枪（74.6,68.5）顺着车路往里扫的就是这里（20 m，在 passageRangeM 36 以内）。
+  // 2026-09-30 二轮：胸墙横跨路口，判定点从 (76.5,96) 挪到通行口后面的路线上 (79.4,88.5)：机枪从夹道里
+  // 只能穿过通行口（x 78.1–81.0）看见它，压得住的是「进场的路」，符合「一夫当关」。
+  loadingThreatPoint: Object.freeze({ x: 79.4, z: 88.5 }),
   // 村口低墙一线（低墙 + 两头残墙 + 路口砖垛）：12 班里人走射位时直线要是从墙身穿过去，
   // 改走路口（MidTransferWalkRoute）。runs 是墙身的 x 区间，gapX 是路口中线。
-  villageWall: Object.freeze({ z: 84.05, thickM: .9, runs: Object.freeze([[55.4, 73.85], [78.7, 97.6]]), gapX: 76.2 }),
+  villageWall: Object.freeze({ z: 84.05, thickM: .9, runs: Object.freeze([[55.4, 78.1], [81.0, 97.6]]), gapX: 79.55 }),
   // 场院东头那道沙袋墙角 TransferCorner（x 91–99、z 96）：从 A.transfer 一带往北去低墙东段的人
   // 绕它的西头走（gapX 在墙头以西 1.6 m）。
   yardCorner: Object.freeze({ z: 96, thickM: .7, runs: Object.freeze([[91, 99]]), gapX: 89.4 }),

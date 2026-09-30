@@ -344,15 +344,14 @@ export const MISSION_TACTICS = Object.freeze({
   TransferRifleA: { fact: "transferArrived", delay: 2, mps: 3.2, points: [
     {x:75.4,z:42.0,holdS:0}, {x:76.4,z:49.3,holdS:0}, {x:75.2,z:53.2,holdS:0}, {x:68.0,z:54.9,holdS:0}, {x:60.8,z:55.2,holdS:0},
     {x:58.6,z:63.4,holdS:2.2}, {x:57.5,z:63.3,holdS:0}, {x:57.4,z:71.1,holdS:2.2}, {x:59.2,z:71.2,holdS:0},
-    {x:63.85,z:75.3,holdS:0},
-    {x:63.85,z:77.4,holdS:0}, {x:61.4,z:80.45}] },
+    {x:63.85,z:75.3,holdS:0}, {x:66.2,z:75.8,holdS:0}, {x:66.2,z:81.6,holdS:0}, {x:64.4,z:82.2}] },
   TransferRifleB: { fact: "transferArrived", delay: 4.5, mps: 3.2, points: [
     {x:75.8,z:42.6,holdS:0}, {x:76.8,z:49.4,holdS:0}, {x:75.6,z:53.6,holdS:0}, {x:67.0,z:55.8,holdS:0}, {x:61.4,z:56.6,holdS:0},
     {x:58.6,z:63.4,holdS:1.8}, {x:57.5,z:63.3,holdS:0}, {x:57.4,z:71.1,holdS:1.8}, {x:59.2,z:71.2,holdS:0},
-    {x:66.4,z:74.7}] },
+    {x:63.85,z:75.3,holdS:0}, {x:66.2,z:75.8,holdS:0}, {x:66.2,z:81.6,holdS:0}, {x:65.0,z:82.2}] },
   TransferRifleC: { fact: "transferArrived", delay: 3, mps: 3.2, points: [
     {x:75.5,z:42.2,holdS:0}, {x:76.2,z:49.2,holdS:0}, {x:73.6,z:54.35,holdS:1.8}, {x:74.7,z:54.35,holdS:0},
-    {x:77.1,z:59.0,holdS:0}, {x:77.1,z:73.8,holdS:0}, {x:74.6,z:78.25}] },
+    {x:77.1,z:59.0,holdS:0}, {x:77.1,z:73.8,holdS:0}, {x:74.6,z:80.35}] },
   TransferRifleD: { fact: "transferArrived", delay: 5.5, mps: 3.2, points: [
     {x:75.7,z:41.3,holdS:0}, {x:78.4,z:49.2,holdS:0}, {x:80.9,z:54.35,holdS:1.6}, {x:79.6,z:54.4,holdS:0},
     {x:79.3,z:57.4,holdS:0}, {x:78.9,z:66.0,holdS:0}, {x:78.9,z:67.15,holdS:0}, {x:81.0,z:67.15}] },
@@ -366,7 +365,7 @@ export const MISSION_TACTICS = Object.freeze({
     {x:95.85,z:70.6,holdS:0}, {x:97.9,z:72.5,holdS:0}, {x:97.9,z:77.2,holdS:0}, {x:98.9,z:79.45}] },
   TransferAlleyB: { delay: 3, mps: 3.2, points: [
     {x:94.9,z:56.0,holdS:0}, {x:95.85,z:66.8,holdS:1.2}, {x:95.85,z:70.6,holdS:0}, {x:92.6,z:73.6,holdS:0},
-    {x:91.7,z:78.4,holdS:0}, {x:89.4,z:79.4}] },
+    {x:91.7,z:78.4,holdS:0}, {x:90.7,z:79.4}] },
   AirPursuerA: { delay: 0, points: [{x:106,z:90},{x:102,z:92}] },
   AirPursuerB: { delay: 3, points: [{x:105,z:98},{x:104,z:111}] },
   AirPursuerC: { delay: 5, points: [{x:109,z:109},{x:100,z:114}] },

@@ -78,14 +78,17 @@ export function BuildTransferWhitebox(groundAt) {
   // 12_1 / 12_3: the village-facing low wall is dry-laid rubble in three staggered
   // courses, not a slab (2026-09-30 rebuild for the 12_3 "照门瞄准" concept). Courses
   // one and two (tops 0.36 / 0.70 m, faces stepping back) are 0.5–1.0 m stones laid on
-  // the joints; the top course is 0.5–1.0 m stones with tops 0.92–1.2 (the old 1.2 m
-  // envelope): a ragged top. The 0.65 m firing notch (top 0.7 = the two lower courses only) sits
-  // right of the post (transferWall 71.3,85.7), and the west pier beyond it is the
-  // 1.55 m corner the concept shows on the right. Loose capstones break the line
-  // of the top without leaving the envelope. Every top stone is an AI cover facing
-  // north. This is the squad's line (12 holds the road back into the village): a
-  // crouched player at the post loses the lane gunner behind these stones, a
-  // standing one engages him over them (TransferTest).
+  // the joints; the top course is 0.5–1.0 m stones, flat-topped at 1.0–1.1 (the old 1.2 m
+  // envelope). Second round (integrator review): the wall runs straight across the whole
+  // lane mouth (x 60–77.6), the post (transferWall 75.7,86.0) stands on the lane axis 2 m
+  // behind it and looks due north, so the wall only fills the bottom third of the frame;
+  // the 0.65 m firing notch (top 0.7 = the two lower courses only) is front-left of the post,
+  // out of the line to the lane gunner. The 2.9 m passage (x 78.1–81.0) between two 1.3 m piers
+  // on the east side (the west one starts at x 77.6, just outside the right edge of the 12_3
+  // frame) is how the litter column, the crowd and the passing carts enter the yard.
+  // Every top stone is an AI cover facing north. This is the squad's line (12 holds
+  // the road back into the village): a crouched player at the post loses the lane
+  // gunner behind these stones, a standing one engages him over them (TransferTest).
   const Hash = (n) => { const s = Math.sin(n * 12.9898 + 7.7) * 43758.5453; return s - Math.floor(s); };
   const courseTops = [.36, .70];
   // Random joints between x0 and x1 (steps of stepMin…stepMax, the last one absorbs the remainder).
@@ -131,10 +134,10 @@ export function BuildTransferWhitebox(groundAt) {
     capTops.forEach(([x, w, h, base, ry], i) =>
       At(`${prefix}Cap${i}`, x, z0 - .03, w, h, .55 * dMul, groundAt(x, z0) + base, "cover", { ry }));
   }
-  CourseWall("TransferVillageWallWest", 60.0, 73.05,
-    { notch: [71.75, 72.4], seed: 11, capTops: [[62.6, .8, .26, .9, .15], [66.2, .65, .22, .98, -.3], [69.4, .7, .24, .92, .2]] });
-  CourseWall("TransferVillageWallEast", 79.5, 94.5,
-    { seed: 71, topRange: [.9, 1.06], capTops: [[83.0, .8, .14, .9, .2], [88.2, .7, .12, .92, -.2], [92.4, .75, .14, .9, .3]] });
+  CourseWall("TransferVillageWallWest", 60.0, 77.6,
+    { notch: [74.4, 75.05], seed: 11, topRange: [1.0, 1.06], dMul: .8 });
+  CourseWall("TransferVillageWallEast", 81.8, 94.5,
+    { seed: 71, topRange: [.96, 1.06], dMul: .8 });
   // Rubble at the foot of the wall, a crate stack, a basket and a water jar on
   // the player's side (12_1 foreground), kept off the z=88 arrival lane.
   for (const [i, x, z, w, h, d, ry] of [
@@ -151,7 +154,7 @@ export function BuildTransferWhitebox(groundAt) {
   for (const [i, x, z, w, h, d] of [[0, 74.3, 76.8, .5, .35, .4], [1, 73.6, 80.6, .6, .3, .45],
     [2, 79.3, 77.6, .45, .4, .4], [3, 80.0, 81.9, .55, .3, .5]])
     Detail(`TransferRoadStoneNorth${i}`, x, z, w, h, d, "earthDark", { ry: i * .7 });
-  Pole("TransferPoleNorth", 79.6, 78.3);
+  Pole("TransferPoleNorth", 81.2, 79.2);
   // 路边的碎砖、断瓦（不实心）：房前墙脚与路肩一路撒到路口，眼睛顺着碎料走到胸墙；两棵秃树
   // （概念图两侧各一棵）站在房后的院子里，离路线 3 m 以上。
   for (const [i, x, z, w, h, d, ry] of [[0, 73.5, 60.2, .5, .22, .4, .3], [1, 79.4, 61.0, .45, .2, .4, -.5], [2, 73.4, 63.4, .6, .18, .45, .8],
@@ -236,20 +239,26 @@ export function BuildTransferWhitebox(groundAt) {
     Detail(`TransferNorthEastRuinRubble${i}`, x, z, w, h, d, i % 2 ? "plaster" : "earthDark", { ry });
   At("TransferNorthEastRuinBeam", 98.0, 78.3, .24, .2, 5.4, groundAt(98, 78.3) + 2.3, "timber", { solid: false, ry: .15 });
 
-  // 村路南段（z 75–83，2026-09-30 一夫当关）：村南门楼已北挪到 z 47.6，从射口顺村路能一直看进去。
-  // 两侧是房前墙夹出的夹道：路西 VillageLaneWestHouse（Village 包，东墙 x 72.8）后面留着
-  // southTraffic 过路车斜线（(55,57)→(76,85)）与几截破院墙；路东依次是 RowB 房、一个 3.5 m 的
-  // 大草垛（z 67.85–71.35，贴着路边）、RoadEast 房（z 72.6–77.6）、1.3 m 的巷口、最南一栋房。追兵在这一段
+  // 村路南段（z 75–84，2026-09-30 一夫当关，第二轮）：村南门楼在 z 47.6，顺子站在夹道中线 (76.2,86.2)，
+  // 正北看下去是一条 x 72.5–80.1 的笔直村路。路西一排房前墙贴到 x 72.5（RoadEast 对面：Village 包的
+  // VillageRoadWestHouse / VillageLaneWestHouse，本包补最南一栋 TransferLaneWestHouse，z 75–80.5：再往南不砌，
+  // 西北残屋那条侧翼的视线要从它南边过，不然第一拨甲钻进残屋后谁也看不见他），路东依次是 RowB 房、
+  // 3.6 m 的大草垛（z 67.85–71.35，贴着路边）、RoadEast 房（z 72.6–77.6）和最南一栋房（退到 x 82.6，给通行口让路）。
+  // 路西两栋房之间 z 74.4–77.6 的 3.2 m 巷口是过路车（southTraffic）横穿夹道的地方。追兵在这一段
   // 逐件躲：每件的「藏身点」在它北侧 0.65 m，MISSION_TACTICS 的中间折点就钉在那里（折点离掩体超过
-  // 0.9 m 会被拽回去，敌军 AI §19）。
-  // 路西：一道齐腰的院墙被过路大车压出一道豁口（车辙从两截中间斜穿过去，MissionTest 按 0.35 m 扫着），
-  // 路心偏西一堆塌下来的墙土；路东：大草垛（掩体点在它北侧，夹在 RowB 南墙与草垛之间 0.7 m 的缝里）。
-  // 两截都是碎石砌的院墙（两层底 + 一层参差的顶，同守线低墙的砌法），顶高 0.85–1.08。
-  const yardWall = { z0: 75.66, cTops: [.3, .58], topRange: [.85, 1.08], dMul: .78 };
-  CourseWall("TransferPlazaWallWestA", 65.55, 67.25, { seed: 23, ...yardWall });
-  CourseWall("TransferPlazaWallWestB", 70.15, 72.85, { seed: 29, ...yardWall, z0: 75.72,
-    capTops: [[71.4, .6, .16, .84, .25]] });
-  Block("TransferPlazaRubbleWest", 74.6, 79.3, 1.6, .88, .8, "earthDark", { ry: -.12, ...Face(0, -1) });
+  // 0.9 m 会被拽回去，敌军 AI §19）。路西：路心偏西一堆塌下来的墙土；路东：大草垛（掩体点在它北侧，
+  // 夹在 RowB 南墙与草垛之间 0.7 m 的缝里）。
+  House("TransferLaneWestHouse", 70.0, 77.75, 5.0, 5.5, 3.0);
+  Detail("TransferLaneWestHouseDoor", 72.56, 77.3, .12, 2.0, 1.1, "timber");
+  Detail("TransferLaneWestHouseWindow", 72.56, 79.3, .12, .8, .9, "void");
+  Detail("TransferLaneWestHouseWindowB", 72.56, 76.3, .12, .8, .9, "void");
+  // 屋檐下挂的玉米串和晾着的布（不实心），把整面山墙外的东墙分出节奏。
+  for (const [i, z, w, h, y] of [[0, 75.6, .3, .9, 1.9], [1, 78.3, .6, 1.0, 1.7], [2, 80.0, .3, .8, 1.9]])
+    Detail(`TransferLaneWestHouseHang${i}`, 72.62, z, .1, h, w, "canvas", { y: groundAt(72.6, z) + y });
+  Block("TransferPlazaRubbleWest", 74.6, 81.2, 1.6, .88, .8, "earthDark", { ry: -.12, ...Face(0, -1) });
+  // 西边那一拨（乙）的落脚：西北残屋东墙与路西最南一栋房之间的夹缝里，一截塌了的院墙。从低墙西段（刘文财）
+  // 和射口都看得见、打得到（甲钻进残屋，靠东南塌口那道缝露头）；不留它，乙躲在西巷碎砖堆后谁也看不见。
+  Block("TransferWestStub", 65.0, 82.95, 1.6, .9, .5, "earthDark", { ry: -.06, ...Face(0, -1) });
   Block("TransferPlazaHaystack", 81.9, 69.6, 3.6, 1.7, 3.6, "canvas",
     { cover: { faceX: 0, faceZ: -1, points: [{ x: 81.0, z: 67.15 }, { x: 82.9, z: 67.15 }] } });
   Detail("TransferPlazaHaystackMid", 81.9, 69.6, 2.9, 1.0, 2.9, "canvas", { y: groundAt(81.9, 69.6) + 2.2 });
@@ -257,31 +266,31 @@ export function BuildTransferWhitebox(groundAt) {
   // 第二拨（东巷）的落脚：RoadEast 房东南角与最南一栋房之间的小院里一截塌了的院墙。东巷那一拨沿房东墙
   // 摸过来躲在它后头，从低墙东段 (91.5,85.6) 看得见、打得到 —— 逼玩家沿墙往右挪，而不是钻到草垛后面
   // 去（草垛北侧被 RoadEast 房挡着，东段看不见；2026-09-30 整段实跑里第二拨乙躲在那儿，420 s 没打掉）。
-  Block("TransferAlleyStub", 89.4, 80.4, 1.8, .9, .6, "earthDark", { ry: .08, ...Face(0, -1) });
-  for (const [i, x, z, w, h, d, ry] of [[0, 88.3, 81.0, .5, .2, .4, .5], [1, 90.5, 81.1, .55, .24, .45, -.6], [2, 89.9, 79.0, .4, .18, .35, .9]])
+  Block("TransferAlleyStub", 90.7, 80.4, 1.8, .9, .6, "earthDark", { ry: .08, ...Face(0, -1) });
+  for (const [i, x, z, w, h, d, ry] of [[0, 89.6, 81.0, .5, .2, .4, .5], [1, 91.8, 81.1, .55, .24, .45, -.6], [2, 91.2, 79.0, .4, .18, .35, .9]])
     Detail(`TransferAlleyStubRubble${i}`, x, z, w, h, d, "earthDark", { ry });
-  // 贴路的一栋房（路东最南一栋，门向村路）：守线右手最近的房，把路口东侧围住。
-  House("TransferLaneEastHouse", 84.0, 81.05, 7.8, 4.3, 3.0, { alongX: true });
-  Detail("TransferLaneEastHouseDoor", 80.04, 81.4, .12, 2.0, 1.1, "timber");
-  Detail("TransferLaneEastHouseWindow", 80.04, 79.8, .12, .8, .9, "void");
+  // 路东最南一栋房（TransferLaneEastHouse，x 82.6–88.6）二轮实跑后拆了：何有田追东巷那拨时会翻过东段低墙，
+  // 到墙北这块空地上，回射位接岗的直线（MidTransferWalkRoute，没有寻路）要穿过这栋房，卡在房墙上，
+  // 「这边我看着！去搭把手！」永远等不到。空着，路口东侧由 RoadEast 房与草垛围。
   for (const [i, x, z, w, h, d, ry] of [[0, 70.2, 77.3, .5, .25, .4, .3], [1, 73.8, 76.2, .6, .2, .5, -.8],
-    [2, 79.1, 79.8, .5, .22, .4, 1.3], [3, 88.6, 82.2, .45, .2, .4, .2], [4, 66.9, 80.6, .6, .24, .45, -.4],
-    [5, 78.9, 82.2, .4, .18, .35, .9], [6, 75.0, 79.3, .55, .16, .4, .6], [7, 92.0, 82.6, .5, .22, .45, -.2]])
+    [2, 79.1, 79.8, .5, .22, .4, 1.3], [3, 88.6, 82.2, .45, .2, .4, .2], [4, 65.2, 80.8, .6, .24, .45, -.4],
+    [5, 78.9, 82.2, .4, .18, .35, .9], [6, 75.6, 82.4, .55, .16, .4, .6], [7, 92.0, 82.6, .5, .22, .45, -.2]])
     Detail(`TransferPlazaStone${i}`, x, z, w, h, d, "earthDark", { ry });
 
   // 守线两头的残墙与路口砖垛：低墙本身不动（TransferTest 的 ≤ 1.2 m 包络），
   // 西头接着场院西北角那段墙、东头接成一个塌了半截的墙角，路口两边各一根砖垛。
-  // 路口净宽 4.85 m（village 路线 0.625 m 担架走廊、southTraffic 车道都在里面）。
+  // 第二轮：胸墙横跨整个夹道路口，通行口 x 78.1–81.0（净宽 2.9 m）夹在两根 1.3 m 的砖垛之间，
+  // village 路线的担架走廊（0.625 m 半宽）、southTraffic 过路车都从这里进场院。
   Block("TransferWallWestRuin0", 56.3, 84.05, 1.8, 2.45, .5);
   Block("TransferWallWestRuinSill", 57.75, 84.05, 1.1, 1.1, .5);
   Block("TransferWallWestRuin1", 59.15, 84.05, 1.7, 1.85, .5);
-  Block("TransferWallPierWest", 73.45, 84.1, .8, 1.55, .9);
-  Block("TransferWallPierEast", 79.1, 84.1, .8, 2.05, .9);
+  Block("TransferWallPierWest", 77.85, 84.1, .5, 1.3, .9);
+  Block("TransferWallPierEast", 81.4, 84.1, .8, 1.3, .9);
   Block("TransferWallEastRuin0", 95.3, 84.0, 1.6, 2.2, .5);
   Block("TransferWallEastRuin1", 96.85, 84.0, 1.5, 1.45, .5);
   Block("TransferWallEastRuinStub", 97.35, 85.45, .5, 1.7, 2.4);
-  for (const [i, x, z, w, h, d, ry] of [[0, 56.9, 84.9, .6, .3, .5, .3], [1, 73.5, 85.0, .5, .25, .45, -.6],
-    [2, 79.3, 85.1, .55, .28, .5, .8], [3, 96.2, 84.8, .7, .3, .55, .2], [4, 95.7, 83.2, .6, .25, .5, -.4]])
+  for (const [i, x, z, w, h, d, ry] of [[0, 56.9, 84.9, .6, .3, .5, .3], [1, 77.4, 85.0, .5, .25, .45, -.6],
+    [2, 82.0, 85.1, .55, .28, .5, .8], [3, 96.2, 84.8, .7, .3, .55, .2], [4, 95.7, 83.2, .6, .25, .5, -.4]])
     Detail(`TransferWallFootRubble${i}`, x, z, w, h, d, "earthDark", { ry });
 
   // ---------------------------------------------------------------------

@@ -87,7 +87,7 @@ try {
     };
   });
 
-  const notch = { x: 71.3, z: 86.05 }, gateLook = { x: 77.4, z: 60 }, eastEnd = { x: 91.5, z: 85.8 }, laneLook = { x: 94.3, z: 66 };
+  const notch = { x: 75.7, z: 86.0 }, gateLook = { x: 76.5, z: 60 }, eastEnd = { x: 91.5, z: 85.8 }, laneLook = { x: 94.3, z: 66 };
   await page.evaluate(({ notch, gateLook }) => window.__place(notch, gateLook), { notch, gateLook });
   let elapsed = 0;
   for (const at of [9, 15, 22]) {
