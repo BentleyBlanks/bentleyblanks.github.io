@@ -1120,7 +1120,7 @@ export class OpeningFirstPerson{
     }
     // The gear-up's own props (the pack, the crate) are placed by UpdateGear after this; the straps of the pack once it is on his back
     // hang in the picture's lower corners with the camera.
-    this.report.props=this.UpdateProps(supply&&gear?{props:gear.pack?.onBack?["gearStrapL","gearStrapR"]:[]}:bodyBeat,frames,bodyClock,legReport.sides?legReport:null,supply);
+    this.report.props=this.UpdateProps(supply&&gear?{props:gear.pack?.straps?["gearStrapL","gearStrapR"]:[]}:bodyBeat,frames,bodyClock,legReport.sides?legReport:null,supply);
     if(supply)this.UpdateGear(gear,follow);
     // While the palms reach for the rifle Luo holds out, his prop is the one on screen (the hands' own copy from `handed`).
     if(s.supplyRoot)s.supplyRoot.visible=supply&&heldRifle?.mode!=="reach";

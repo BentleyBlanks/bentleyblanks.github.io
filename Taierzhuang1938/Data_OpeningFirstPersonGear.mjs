@@ -32,6 +32,10 @@ const R_WRIST = ["rifle", V(.02, -.02, .1), V(0, -.3, -.95), V(.9, .4, 0), V(55,
 const L_FORE = ["rifle", RIFLE_FORE, V(.2, .68, .55), V(-1, -.3, 0), V(45, 67, 37)];
 // The rifle in front of him at the ready (the old followUp's last key), and slung over the left shoulder behind him (out of view).
 const CARRY = ["cam", V(-.15, -.16, -.33), V(-.8, .45, -.2), V(0, .5, .85), RIFLE_FORE];
+// Low ready for the run and the wait at the mouth: muzzle ahead and a little left, below the middle of the view, the fore-end in the
+// left hand low in front, the butt at the right hip. CARRY held on (port arms, muzzle to the upper left a third of a metre from the
+// eye) laid the rifle across the whole left of the picture (review 09-30 「咋是这个画面」).
+const READY = ["cam", V(-.06, -.21, -.36), V(-.22, .08, -.97), V(.15, .98, .1), RIFLE_FORE];
 const SLUNG = ["cam", V(-.4, -.34, .36), V(0, -1, -.1), V(1, 0, 0), RIFLE_FORE];
 // Hands hanging low at the sides, below the frame while he looks ahead.
 const L_LOW = ["cam", V(-.2, -.34, -.28), V(.2, -.4, -.9), V(-.3, .9, .3), V(20, 30, 20)];
@@ -82,7 +86,7 @@ export const OPENING_GEAR_UP = Deep({
       [1.25, ...CARRY],
       [1.65, ...SLUNG],
       [3.6, ...SLUNG],
-      [4.1, ...CARRY],
+      [4.1, ...READY],
     ],
     // The charger stands in the guide, is pressed down by the thumb and thrown out by the bolt (seconds, depth m, rifle-local).
     // ride: [t the hand starts riding, over s, t it lets go, over s] (the right hand stays on the rounds while they go down).
@@ -107,6 +111,9 @@ export const OPENING_GEAR_UP = Deep({
       [3.46, "cam", V(.36, .18, .12), V(.6, .2, -.77), V(-.6, .6, .5)],
     ],
     onBackS: 3.46,
+    // The two shoulder straps (FP_PROPS.gearStrapL / R) are drawn only while the hands tug them: left on, they lie across the lower
+    // corners of the view as two dark bars all through the run and Incoming (review 09-30 「咋是这个画面」). Gone mid-turn back.
+    strapsOffS: 3.9,
   },
   // The ammunition crate he sat on stays under him until he has left it.
   crate: { hideS: 4.4 },
