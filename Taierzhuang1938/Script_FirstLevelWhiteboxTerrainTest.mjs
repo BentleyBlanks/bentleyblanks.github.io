@@ -78,7 +78,8 @@ if (shapeCount === 0) ok(insideChanged === 0 && WHITEBOX_TERRAIN.bounds === null
 
 // 3. 河槽 ---------------------------------------------------------------------
 let riverPts = 0;
-for (let z = MISSION_NORTH_RIVER.z - 15; z <= MISSION_NORTH_RIVER.z + 15; z += .5) for (let x = -100; x <= 125; x += 1) {
+// 2026-09-30：拓宽河段 z 90…166、x −140…−30（两端过渡到 −160/−10）也在扫描范围内。
+for (let z = 84; z <= 172; z += .5) for (let x = -165; x <= 125; x += 1) {
   if (RiverCutAt(x, z, MISSION_NORTH_RIVER) <= 0) continue;
   const h = SampleMissionTerrain(x, z), h0 = SampleMissionTerrain(x, z, bare);
   // River takes min(height, natural - cut) after the hook: modifiers may not dig below the channel profile.

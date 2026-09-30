@@ -8,11 +8,21 @@
 
 白盒采用用户参考图的 **灰色网格测试材质**，不是纯白。建筑、植被、场景道具、水面及后来生成的场景实体不使用原美术贴图，改为默认 1 米一格的灰色程序网格；线宽默认 12 毫米。网格按世界坐标三向投影，不依赖模型 UV，不随实例缩放拉伸；远处做导数抗锯齿与淡出。编辑区可调网格开关、大小、线宽、底色和线色，无需生成贴图资产。
 
+**水面与镂空卡片是两个例外（2026-09-30）：**
+
+* **水面**（网格名含 `water`，第一关的 `FirstLevelWhitebox_Water`）不再画成灰色米制网格 —— 灰网格读起来是一条灰公路。白盒画质下水面是固定的
+  **蓝灰水色**（`WHITEBOX_WATER.color #4d6f86`）+ 掠射角**天空色反光**（菲涅耳权重，反光色 `#c4d6e2`、幂 3、上限 0.72）+ 低粗糙度（0.14）的太阳高光；
+  不画网格，也不依赖环境贴图 / 预通道（`Script_WhiteboxRendering.MakeWhiteboxWaterPatch`，缓存键 `whiteboxWater1`）。不是可编辑项，数值在 `Data_Tuning_Whitebox.WHITEBOX_WATER`。
+  没选 muddyRiver 着色：那条河水着色靠预通道深度和 SSR，白盒帧图里都没有。
+* **镂空卡片**（植被十字面片、壕沟草、桁架镂空节 —— `alphaTest > 0` 且带 `map` / `alphaMap` 的材质）保留 alpha 裁切：白盒替换材质带上原来的
+  `map`/`alphaMap`/`alphaTest`/`alphaToCoverage`，只把 rgb 换成表面色（缓存键 `whiteboxCard1`，再叠灰盒网格），于是卡片是灰色的草叶剪影而不是整块不透明白竖片。
+  `Inspect()` 之外可读 `post.whiteboxScene.stats.cutoutMeshes / waterMeshes`。
+
 **地形、角色、敌军、第一人称身体/手和手持装备默认保留原材质与贴图。** 人物与装备由独立 `characterTextures` 开关控制，不依赖场景的 `assetTextures`。地形以对象上的 `deformableTerrain`、`terrainTile` 或 `whiteboxTerrain` 标记识别；弹坑替换地块也保留贴图，不能用「材质名字带泥土」放行场景道具。透明粒子/贴花和天空默认不画；HUD 与任务系统继续工作。
 
 默认每帧只运行 **main → whiteboxOutput**：中性基础灯光、几何深度测试、线性色转 sRGB 和剧情黑场/眼皮。高级效果与预通道/HZB、GTAO/SSIL、SSR、室内遮蔽、CSM、自阴影、GI、簇光、大气、体积雾、TAA/FXAA、Bloom、景深、运动模糊、自动曝光、调色均关闭。调试工具主动打开时仍允许线框/调试叠加。
 
-这是一项渲染表现配置，资产、骨骼、几何/碰撞与加载预算沿用 high。原始材质在出画后原样还回，材质切换不修改资产文件或模拟状态。现有后期管线的中间资源仍可预留，关闭表示不执行对应 Feature/Pass，不承诺免下载所有资产或零显存占用。无 alpha 贴图的植被卡片会显示其真实几何轮廓。
+这是一项渲染表现配置，资产、骨骼、几何/碰撞与加载预算沿用 high。原始材质在出画后原样还回，材质切换不修改资产文件或模拟状态。现有后期管线的中间资源仍可预留，关闭表示不执行对应 Feature/Pass，不承诺免下载所有资产或零显存占用。无 alpha 贴图的植被卡片会显示其真实几何轮廓；有 alpha 贴图的卡片按上面的规则保留裁切。
 
 ## Agent 查询与调整
 
@@ -59,4 +69,4 @@ node Taierzhuang1938/Script_SamplerBudgetTest.mjs --only=whitebox
 node Taierzhuang1938/Script_EditorTest.mjs
 ```
 
-专项浏览器门禁检查实际提交的灰盒网格材质、人物贴图、场景零原贴图、地形保留、后加入的骨骼挂件、共享材质与还原；点击人物贴图开关并保存/刷新，再显式切 high 验证原管线。包括敌我双方持枪近景、场景和编辑面板截图；截图与读数在忽略目录 `tmp/WhiteboxQuality/`，不提交。
+专项浏览器门禁检查实际提交的灰盒网格材质、人物贴图、场景零原贴图（镂空卡片保留 alpha 例外、水面走蓝灰水色不画网格）、地形保留、后加入的骨骼挂件、共享材质与还原；点击人物贴图开关并保存/刷新，再显式切 high 验证原管线。包括敌我双方持枪近景、场景和编辑面板截图；截图与读数在忽略目录 `tmp/WhiteboxQuality/`，不提交。

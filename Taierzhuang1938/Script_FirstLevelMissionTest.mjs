@@ -774,10 +774,12 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
       const t = d / distance,
         x = a.x + (b.x - a.x) * t,
         z = a.z + (b.z - a.z) * t,
-        y = SampleMissionTerrain(x, z);
+        // 2026-09-30：桥上的路线脚下量桥面（三孔桥的石墩在河床上立到桥面下，量河床会把桥墩当成挡路的体块）。
+        y = MISSION_LAYOUT.walkableSurfaces.reduce((top, surface) => Math.abs(x - surface.x) <= surface.w / 2
+          && Math.abs(z - surface.z) <= surface.d / 2 ? Math.max(top, surface.y + surface.h / 2) : top, SampleMissionTerrain(x, z));
       for (const box of MISSION_LAYOUT.blocks) {
         if (MISSION_LAYOUT.walkableSurfaces.some((surface) => surface.id === box.id)) continue;
-        // 不登记碰撞的示意件（北沙河水面、芦苇）挡不住人；桥上的路线脚下量到的是河床。
+        // 不登记碰撞的示意件（北沙河水面、芦苇）挡不住人。
         if (box.solid === false) continue;
         const dx=x-box.x, dz=z-box.z, cosine=Math.cos(box.ry||0), sine=Math.sin(box.ry||0);
         const blocked =
