@@ -228,12 +228,18 @@ export function BuildRearWhitebox(groundAt) {
   // ---------------------------------------------------------------------------
   // Left (east): stone wall with tile coping, 1.35 m, 1.65 m off the route centre; it joins
   // the low wall's west end and bends parallel to the (16,220)→(12,230) leg.
-  // 2026-09-30 D pack: 1.35 / 1.3 → 1.5 m (concept 15_1: "about 1.5 m stone wall with tile coping").
-  Grounded("RearLaneStoneWall", 17.65, 216.95, .55, 1.5, 8.5, "railBallast");
-  Coping("RearLaneStoneWall", 17.65, 216.95, 8.5, .55, 1.5);
+  // 2026-09-30 D pack, round 2 (integrator review of 15_1 / 15_4): the lane after the turn is a ~3.4 m path.
+  // The stone wall moves 0.33 m toward the lane (x 17.65 → 17.325, inner face 17.05; Layout's WallPathTurnWest
+  // face is 13.6, so 3.45 m clear), drops to 1.1 m (tile coping on top, you look over it) and the ground
+  // outside it is cut 1.8 m (terrain LaneHollowEast). The bend follows the axis (15.55,221)→(10.75,231.5) that
+  // both the wallPath and the evacuation line stay within ±0.8 m of, 1.7 m off it on each side.
+  Grounded("RearLaneStoneWall", 17.325, 217.05, .55, 1.1, 8.7, "railBallast");
+  Coping("RearLaneStoneWall", 17.325, 217.05, 8.7, .55, 1.1);
+  // Fills the 0.4 m slot between this wall and the low wall's west end (x 18.0).
+  Grounded("RearLaneStoneWallJoin", 17.8, 213, .5, 1.1, .7, "railBallast");
   {
-    const wall = Along("RearLaneStoneWallBend", 17.65, 221.2, 14.4, 229.5, 0, 1.5, "railBallast", .55);
-    Coping("RearLaneStoneWallBend", wall.x, wall.z, wall.d, .55, 1.5, wall.ry);
+    const wall = Along("RearLaneStoneWallBend", 17.325, 221.4, 12.6, 231.9, 0, 1.1, "railBallast", .55);
+    Coping("RearLaneStoneWallBend", wall.x, wall.z, wall.d, .55, 1.1, wall.ry);
   }
   // Right (west): a one-storey mud house whose street wall is Layout's WallPathTurnWest
   // (13.25,216.5, 2.8 m). It keeps x<6.7 free: the (-1,216)→(6,216)→(6,240) walk around the
@@ -251,9 +257,14 @@ export function BuildRearWhitebox(groundAt) {
   // 2026-09-30 D pack: the garden wall becomes the lane's right-hand mud wall (2.5 m, tile coping, window
   // holes) so 15_1 / 15_4 read as "a 3 m mud wall on the right all the way to the gate".
   {
-    const wall = Along("RearLaneWestGardenWall", 12.9, 222.3, 8.0, 230.2, 0, 2.5, "plaster", .5);
+    // Round 2: continues Layout's WallPathTurnWest line (x 13.25) and stays 1.7 m off the lane axis
+    // (was 2.3 m off the route); ends at (8.975,230.7), 3 m short of the x=6 walk.
+    // Round 3: it now ends at z 226.2 (was 230.7): from the lane a sight line to the gate (2,240) crosses this
+    // wall's inner face at z 227.4, so a longer wall hid everything of the gate below its roof; with the wall
+    // ending here the gatehouse stands at the lane's far end in both 15_1 and 15_4.
+    const wall = Along("RearLaneWestGardenWall", 13.25, 221.4, 11.05, 226.2, 0, 2.5, "plaster", .5);
     Coping("RearLaneWestGardenWall", wall.x, wall.z, wall.d, .5, 2.5, wall.ry);
-    LaneWindows("RearLaneWestGardenWindow", wall, [-2.4, 1.9]);
+    LaneWindows("RearLaneWestGardenWindow", wall, [-1.5, 1.1]);
   }
   // The same window holes on the lane face of Layout's WallPathTurnWest (x 13.25, its skin's east face x 13.7).
   for (const [i, z] of [214.2, 218.6].entries()) {
@@ -274,7 +285,7 @@ export function BuildRearWhitebox(groundAt) {
   }
   // Chips along both wall feet inside the turn leg (x 13.7–14.2 / 16.95–17.35).
   Rubble("LaneTurnWestFoot", 13.95, 216.5, 6, .08, 4.3, .3, "railBallast", .6);
-  Rubble("LaneTurnEastFoot", 17.15, 217, 5, .04, 3.6, .28, "railBallast", .5);
+  Rubble("LaneTurnEastFoot", 16.85, 217, 5, .04, 3.6, .28, "railBallast", .5);
   // Beyond the stone wall: the sunken garden (terrain LaneHollowEast) with an old cart,
   // a pile of broken brick and some scrub, so it reads as a drop, not an empty pit.
   Grounded("LaneHollowCartBed", 26.5, 219, 3.2, .7, 1.5, "timber", .35);
@@ -337,11 +348,11 @@ export function BuildRearWhitebox(groundAt) {
       Box(blocks, id, x, z, w, h, d, "plaster", { cover: { faceX: 0, faceZ: -1 } });
     // D pack 2026-09-30: a run of wall along x (alongX) or z with paper-window holes cut in
     // (sill 0.95 m, head from 2.3 m). windows = [[centre, width], …] sorted along the run.
-    const WallRun = (id, alongX, fixed, start, end, windows) => {
+    const WallRun = (id, alongX, fixed, start, end, windows, thick = .6) => {
       const put = (sid, a, b, h, y0, semantic, cover) => {
         if (b - a < .05) return;
         const c = (a + b) / 2, x = alongX ? c : fixed, z = alongX ? fixed : c;
-        Box(blocks, `${id}${sid}`, x, z, alongX ? b - a : .6, h, alongX ? .6 : b - a, semantic,
+        Box(blocks, `${id}${sid}`, x, z, alongX ? b - a : thick, h, alongX ? thick : b - a, semantic,
           { y: groundAt(x, z) + y0 + h / 2, ...(cover ? { cover: { faceX: 0, faceZ: -1 } } : {}) });
       };
       let cursor = start;
@@ -367,14 +378,14 @@ export function BuildRearWhitebox(groundAt) {
       for (const [i, f] of [1 / 3, 2 / 3].entries()) P(`MuntinH${i}`, c, sill + h * f, w, .05, .05);
     };
     // South wall (z 243): two paper windows either side of the 2.8 m door (door jambs x -27.4 / -24.6).
-    WallRun("ReceptionWardSouthWest", true, 243, -33, -27.4, [[-30.7, 1.6]]);
-    WallRun("ReceptionWardSouthEast", true, 243, -24.6, -19, [[-21.6, 1.6]]);
-    PaperWindow("ReceptionWardSouthWinW", true, 243, -30.7, 1.6, { face: -.3 });
-    PaperWindow("ReceptionWardSouthWinE", true, 243, -21.6, 1.6, { face: -.3 });
-    Box(blocks, "ReceptionWardSouthDoorHead", -26, 243, 2.8, .5, .6, "structure",
+    // Round 2: the south wall is 0.4 m thick (was 0.6) and the old 0.7 m deep door posts are gone, so the door
+    // no longer reads as a tunnel from outside; Layout's 0.7 m WardThreshold now sticks out as a stone sill.
+    WallRun("ReceptionWardSouthWest", true, 243, -33, -27.4, [[-30.7, 1.6]], .4);
+    WallRun("ReceptionWardSouthEast", true, 243, -24.6, -19, [[-21.6, 1.6]], .4);
+    PaperWindow("ReceptionWardSouthWinW", true, 243, -30.7, 1.6, { face: -.23 });
+    PaperWindow("ReceptionWardSouthWinE", true, 243, -21.6, 1.6, { face: -.23 });
+    Box(blocks, "ReceptionWardSouthDoorHead", -26, 243, 2.8, .5, .4, "structure",
       { y: groundAt(-26, 243) + 2.65 });
-    for (const [side, x] of [["West", -27.33], ["East", -24.67]])
-      Detail(`ReceptionWardDoorPost${side}`, x, 243, .14, 2.4, .7, "timber", { y: groundAt(x, 243) + 1.2 });
     // West wall with a window into the treatment bay (opening z 238.9…240.9, 0.95…2.3 m).
     // D pack: two more paper windows in the north bay's west wall (z 225…238.9 run).
     WallRun("ReceptionWardWestNorth", false, -33, 225, 238.9, [[228.8, 1.6], [233.8, 1.6]]);
@@ -403,38 +414,111 @@ export function BuildRearWhitebox(groundAt) {
     }
     Box(blocks, "ReceptionWardWashTable", -29.9, 238.85, .9, .75, .6, "timber");
     Detail("ReceptionWardBasin", -29.9, 238.85, .5, .12, .45, "metal", { y: groundAt(-29.9, 238.85) + .81 });
-    // D pack 2026-09-30 (concept 16_2 / 16_3 / 17_3): a medicine table with bottles and a stool in the
-    // south bay's west corner, ammunition/supply crates in the south-east corner, straw bedding on the
-    // floor (non-solid, < 0.1 m). Everything stays off the x -29.3…-23.5 litter corridor, the surgeon
-    // (-27.4,241.2), zhouPlaced (-26,239.4) and Yaowa's bedside (-23.1,241.5).
+    // D pack 2026-09-30, round 2 (integrator: "the ward is still one big empty hall"): every wall gets its
+    // own row of things (2-3+ per wall: beds, benches, crate stacks, shelves, vats, hanging clothes), the
+    // middle keeps only the litter corridor. Stay out of: the litter slots (x -30…-23.4, z 229 / 232.8) and
+    // their bearers (z 227.3…234.5), x -29.6…-23.3 at z 238…243 (bay opening, door, wardEntry (-26,240)),
+    // the surgeon spots (-27.4,241.2) (-27.1,240.6) (-26.6,241.6), zhouPlaced (-26,239.4), Yaowa (-23.1,241.5).
+    // Interior wall faces: north z 225.3, west x -32.7, east x -19.3, south z 242.8, bay z 237.85 / 238.15.
     {
-      const g = groundAt(-31.6, 242);
+      const fl = (x, z) => groundAt(x, z);
+      const Vat = (id, x, z, h = .7) => {
+        Box(blocks, id, x, z, .62, h, .62, "earthDark");
+        Detail(`${id}Rim`, x, z, .7, .06, .7, "earthDark", { y: fl(x, z) + h + .03 });
+      };
+      // rows of supply crates, stacked; turn = long side along z (for east / west walls)
+      const Crates = (id, x, z, rows, turn = false, cols = 1) => {
+        for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
+          const cx = turn ? x : x + c * .9, cz = turn ? z + c * .9 : z;
+          Box(blocks, `${id}${c}${r}`, cx, cz, .84, .5, .66, "timber",
+            { y: fl(cx, cz) + .25 + r * .51, ...(turn ? { ry: Math.PI / 2 } : {}) });
+        }
+      };
+      // bench: one solid seat block 0.45 m high; alongX = long side along x
+      const Bench = (id, x, z, len, alongX = false) =>
+        Box(blocks, id, x, z, alongX ? len : .4, .45, alongX ? .4 : len, "timber");
+      // medicine shelf on a wall (face = +1 / -1 along z: the side the boards face), 1.9 m high, 0.5 m deep
+      const Shelf = (id, x, z, w, face) => {
+        Box(blocks, id, x, z, w, 1.9, .5, "timber");
+        for (const [i, y] of [.55, 1.05, 1.55].entries()) {
+          Detail(`${id}Board${i}`, x, z + face * .27, w, .04, .12, "timber", { y: fl(x, z) + y });
+          Detail(`${id}Jars${i}`, x + (i - 1) * .5, z + face * .27, Math.max(.4, w * .4 - i * .15), .22, .1, "canvas",
+            { y: fl(x, z) + y + .13 });
+        }
+      };
+      // hanging clothes / blankets / bandoliers on a wall face (non-solid panels 0.5 x 1.0, hung at 1.3 m)
+      const Hang = (id, x, z, alongX, count, step = .7) => {
+        for (let i = 0; i < count; i++) {
+          const a = i * step, px = alongX ? x + a : x, pz = alongX ? z : z + a;
+          Detail(`${id}${i}`, px, pz, alongX ? .5 : .06, 1.0 - (i % 2) * .25, alongX ? .06 : .5, i % 2 ? "canvas" : "earthDark",
+            { y: fl(px, pz) + 1.75 - (i % 2) * .12 });
+        }
+      };
+      // -- north wall (z 225.3): vat, crates, a cabinet + crates that close the (unused) north door, shelf ---
+      Vat("ReceptionWardVatN", -30.9, 225.75);
+      Crates("ReceptionWardCrateN0", -29.15, 225.75, 2);
+      Crates("ReceptionWardCrateN1", -27.45, 225.75, 2);
+      Box(blocks, "ReceptionWardNorthCabinet", -26, 225.6, 2, 2.0, .55, "timber");
+      Detail("ReceptionWardNorthCabinetDoors", -26, 225.9, 1.9, 1.8, .04, "timber", { y: fl(-26, 225.9) + 1.05 });
+      Crates("ReceptionWardCrateN2", -24.55, 225.75, 2);
+      Shelf("ReceptionWardShelfN", -21.9, 225.6, 2.2, 1);
+      Hang("ReceptionWardHangN", -32.2, 225.34, true, 4, .6);
+      // -- west wall (x -32.7): 2 cots + a stretcher already; bench, vat, clothes over the cots --
+      Bench("ReceptionWardBenchW", -32.45, 236.5, 1.6);
+      Vat("ReceptionWardVatW", -32.35, 232.45);
+      Hang("ReceptionWardHangW0", -32.66, 226.6, false, 3, .55);
+      Hang("ReceptionWardHangW1", -32.66, 235.6, false, 2, .6);
+      // -- east wall (x -19.3): cot NE already; along the sill of the east opening, clothes over the cot --
+      Bench("ReceptionWardBenchE", -19.85, 231.4, 1.8);
+      Crates("ReceptionWardCrateE", -19.8, 233.4, 2, true);
+      Vat("ReceptionWardVatE", -19.75, 235.4);
+      Hang("ReceptionWardHangE0", -19.34, 226.7, false, 3, .55);
+      // -- bay wall, north face (z 237.85): a shelf on the west block, crates and a vat on the east one --
+      Shelf("ReceptionWardShelfB", -31.2, 237.6, 2.2, -1);
+      Crates("ReceptionWardCrateB", -23.2, 237.5, 2, false, 2);
+      Vat("ReceptionWardVatB", -20.75, 237.5);
+      // -- south bay -----------------------------------------------------------------------------------
+      // west corner: medicine table with bottles, crates under the window, a stool
       Box(blocks, "ReceptionWardMedicineTable", -32.15, 238.62, .9, .78, .6, "timber");
       for (const [i, dx, h] of [[0, -.3, .2], [1, -.08, .14], [2, .16, .24], [3, .32, .12]])
         Detail(`ReceptionWardMedicineJar${i}`, -32.15 + dx, 238.62, .09, h, .09, i % 2 ? "earthDark" : "canvas",
-          { y: groundAt(-32.15, 238.62) + .78 + h / 2 });
-      Detail("ReceptionWardStool", -30.4, 241.6, .36, .42, .36, "timber", { y: g + .21 });
-      // Crates in the south-WEST corner (the 16_2 camera stands in the south-east one), under the paper window.
-      for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++)
-        if (r < 2 || c === 0)
-          Box(blocks, `ReceptionWardCrate${r}${c}`, -32.15 + c * .95, 242.3, .84, .5, .66, "timber",
-            { y: groundAt(-32.15 + c * .95, 242.3) + .25 + r * .51 });
-      Detail("ReceptionWardCrateTarp", -31.2, 242.3, 1.0, .06, .7, "canvas", { y: groundAt(-31.2, 242.3) + 1.02 + .03 });
-    }
-    // Straw is scattered as many small overlapping bundles (own generator, so the shared Rand() sequence of
-    // the rubble below is unchanged), never as one flat board.
-    let strawSeed = 3011;
-    const StrawRand = () => (strawSeed = (strawSeed * 1103515245 + 12345) % 2147483648) / 2147483648;
-    for (const [i, x, z, w, d, count] of [[0, -32.1, 241.9, 1.6, 1.0, 4], [1, -31.6, 240, 1.2, 2.1, 5],
-      [2, -20.1, 240, 1.2, 2.1, 5], [3, -20.6, 242, 1.4, .9, 4],
-      [4, -30, 229, 1.4, 2.6, 5], [5, -26.7, 229, 1.4, 2.6, 5], [6, -23.4, 229, 1.4, 2.6, 5],
-      [7, -30, 232.8, 1.4, 2.6, 5], [8, -26.7, 232.8, 1.4, 2.6, 5], [9, -23.4, 232.8, 1.4, 2.6, 5],
-      [10, -31.7, 227.4, 1.2, 2.0, 4], [11, -20.2, 227.4, 1.2, 2.0, 4], [12, -31.7, 234.2, 1.2, 2.0, 4]])
-      for (let k = 0; k < count; k++) {
-        const px = x + (StrawRand() - .5) * w, pz = z + (StrawRand() - .5) * d;
-        Detail(`ReceptionWardStrawThatch${i}_${k}`, px, pz, .4 + StrawRand() * .45, .04 + StrawRand() * .04,
-          .3 + StrawRand() * .4, "thatch", { y: groundAt(px, pz) + .03, ry: StrawRand() * Math.PI });
+          { y: fl(-32.15, 238.62) + .78 + h / 2 });
+      Crates("ReceptionWardCrate", -32.15, 242.3, 2, false, 2);
+      Box(blocks, "ReceptionWardCrate02", -32.15, 242.3, .84, .5, .66, "timber", { y: fl(-32.15, 242.3) + .25 + 2 * .51 });
+      Detail("ReceptionWardCrateTarp", -31.2, 242.3, 1.0, .06, .7, "canvas", { y: fl(-31.2, 242.3) + 1.02 + .03 });
+      Detail("ReceptionWardStool", -29.9, 241.7, .36, .42, .36, "timber", { y: fl(-29.9, 241.7) + .21 });
+      // right of the door (west): a table with medicine jars and a lit hand lantern (16_3, door on the left)
+      Box(blocks, "ReceptionWardLanternTable", -28.6, 242.35, 1.0, .78, .6, "timber");
+      for (const [i, dx, h] of [[0, -.32, .2], [1, -.16, .14], [2, .32, .22]])
+        Detail(`ReceptionWardLanternTableJar${i}`, -28.6 + dx, 242.35, .09, h, .09, i % 2 ? "earthDark" : "canvas",
+          { y: fl(-28.6, 242.35) + .78 + h / 2 });
+      Detail("ReceptionWardTableLamp", -28.5, 242.3, .2, .34, .2, "metal", { y: fl(-28.5, 242.3) + .78 + .17 });
+      Detail("ReceptionWardTableLampGlass", -28.5, 242.3, .14, .24, .14, "canvas", { y: fl(-28.5, 242.3) + .78 + .17 });
+      // left of the door (east): a straw bed on the floor (frame, straw, blanket, pillow), 16_3's lower left
+      {
+        const bx = -23.9, bz = 241.6, g = fl(bx, bz);
+        for (const [i, dx, dz, w, d] of [[0, 0, -.7, 2.4, .1], [1, 0, .7, 2.4, .1], [2, -1.25, 0, .1, 1.5], [3, 1.25, 0, .1, 1.5]])
+          Detail(`ReceptionWardStrawBedFrame${i}`, bx + dx, bz + dz, w, .18, d, "timber", { y: g + .09 });
+        Detail("ReceptionWardStrawBedThatch", bx, bz, 2.3, .14, 1.3, "thatch", { y: g + .07 });
+        Detail("ReceptionWardStrawBedBlanket", bx + .3, bz, 1.2, .07, 1.05, "canvas", { y: g + .175, ry: .06 });
+        Detail("ReceptionWardStrawBedPillow", bx - .9, bz, .4, .1, .8, "canvas", { y: g + .19 });
       }
+      // south wall, east half: bench, vat and crates under / beside the window; east wall: crates, clothes
+      Bench("ReceptionWardBenchS", -22.5, 242.55, 1.7, true);
+      Vat("ReceptionWardVatS", -20.95, 242.35);
+      Crates("ReceptionWardCrateSE", -19.8, 242.2, 2, true);
+      Hang("ReceptionWardHangE1", -19.34, 241.0, false, 2, .6);
+      Hang("ReceptionWardHangS", -24.3, 242.76, true, 3, .6);
+    }
+    // Straw: big continuous thin mats (0.05 m), never scattered bits: under both litter rows, the cots and the
+    // stretchers lying in the strips beside them.
+    // (round 3: the two 8.6 m carpets read as a white floor in the grid; now three 6.9 m runners, one under each litter column.)
+    for (const [id, x, z, w, d] of [["RunnerW", -30, 231, 1.7, 6.9], ["RunnerC", -26.7, 231, 1.7, 6.9],
+      ["RunnerE", -23.4, 231, 1.7, 6.9], ["CotNW", -31.9, 227.2, 1.5, 2.6],
+      ["CotMW", -31.9, 234.1, 1.5, 2.6], ["CotNE", -20.1, 227.2, 1.5, 2.6], ["CotW", -31.8, 240, 1.6, 2.6],
+      ["CotE", -20.05, 239.95, 1.6, 2.6], ["WestStretcher", -31.9, 230.7, 1.4, 2.8], ["EastStretcherA", -21.9, 230.5, 1.4, 2.8],
+      ["EastStretcherB", -21.9, 234.7, 1.4, 2.8]])
+      Detail(`ReceptionWardStrawThatchMat${id}`, x, z, w, .05, d, "thatch", { y: groundAt(x, z) + .025 });
     // North bay: cots against the walls, clear of the six litter slots and their bearers.
     Cot("ReceptionWardCotNorthWest", -31.9, 227.2, true);
     Cot("ReceptionWardCotMiddleWest", -31.9, 234.1, false);
@@ -455,9 +539,12 @@ export function BuildRearWhitebox(groundAt) {
       Detail(`ReceptionWardPurlin${i}`, x, 234, .16, .16, 17.4, "timber", { y: wardG + 2.46 });
     for (const [i, x, z] of [[0, -28.75, 231], [1, -23.25, 235], [2, -26, 240.4], [3, -31.5, 240.4],
       [4, -20.5, 240.4], [5, -23.25, 227], [6, -28.75, 227]]) {
-      Detail(`ReceptionWardLampRope${i}`, x, z, .03, .18, .03, "metal", { y: wardG + 2.29 });
-      Detail(`ReceptionWardLamp${i}`, x, z, .2, .3, .2, "metal", { y: wardG + 2.05 });
-      Detail(`ReceptionWardLampGlass${i}`, x, z, .14, .2, .14, "canvas", { y: wardG + 2.05 });
+      // Round 2: the lamp body hangs at 2.0…2.34 m (was 1.9…2.2 and read as a small block up on the ceiling),
+      // a big lantern (0.3 x 0.34) with a lit glass core and a cap, on a short hook off the purlin.
+      Detail(`ReceptionWardLampRope${i}`, x, z, .03, .08, .03, "metal", { y: wardG + 2.34 });
+      Detail(`ReceptionWardLamp${i}`, x, z, .3, .34, .3, "metal", { y: wardG + 2.17 });
+      Detail(`ReceptionWardLampGlass${i}`, x, z, .22, .26, .22, "canvas", { y: wardG + 2.17 });
+      Detail(`ReceptionWardLampCap${i}`, x, z, .38, .05, .38, "roof", { y: wardG + 2.365 });
     }
     // Porch along the south front: eave and posts, the wide open bay east of the door.
     Box(blocks, "ReceptionWardPorchRoof", -26, 244.2, 14.8, .18, 2.6, "roof",
@@ -468,17 +555,19 @@ export function BuildRearWhitebox(groundAt) {
     // low stone steps down the porch in front of the door, and a stone porch strip along the front.
     {
       const tg = groundAt(-26, 243);
-      Detail("ReceptionWardThresholdBoard", -26, 243, 2.8, .05, .5, "timber", { y: tg + .15 + .025 });
+      // Round 2: a thicker timber sill board (0.12 m on the 0.15 m solid) so the threshold reads as a step.
+      Detail("ReceptionWardThresholdBoard", -26, 243, 2.8, .12, .36, "timber", { y: tg + .15 + .06 });
       Detail("ReceptionWardPorchStep0", -26, 243.75, 3.4, .09, .55, "step", { y: groundAt(-26, 243.75) + .045 });
       Detail("ReceptionWardPorchStep1", -26, 244.3, 3.6, .05, .55, "step", { y: groundAt(-26, 244.3) + .025 });
       Detail("ReceptionWardPorchStrip", -26, 244.2, 14.4, .04, 2.3, "step", { y: groundAt(-26, 244.2) + .02 });
-      // Heavy timber door frame proud of both wall faces (inside the wall's own x range: the 2.8 m opening is
-      // untouched) and both door leaves swung outward against the porch (x -27.36 / -24.64, z 243.3…244.7).
-      for (const [side, x] of [["West", -27.51], ["East", -24.49]]) {
-        Detail(`ReceptionWardDoorFrame${side}`, x, 243, .24, 2.4, .95, "timber", { y: tg + 1.2 });
-        Detail(`ReceptionWardDoorLeaf${side}`, x + (x < -26 ? .15 : -.15), 244.05, .07, 2.3, 1.4, "timber", { y: tg + 1.15 });
+      // Round 2: a slim timber door frame (two 0.2 m posts and ONE lintel beam, only 0.05 m proud of the 0.4 m wall,
+      // inside the wall's own x range so the 2.8 m opening is untouched) and two door leaves swung fully open and
+      // laid flat against the outside face of the wall (no deep boxes, no tunnel look from the porch).
+      for (const [side, x, lx] of [["West", -27.5, -28.1], ["East", -24.5, -23.3]]) {
+        Detail(`ReceptionWardDoorFrame${side}`, x, 243, .2, 2.4, .5, "timber", { y: tg + 1.2 });
+        Detail(`ReceptionWardDoorLeaf${side}`, lx, 243.28, 1.4, 2.3, .07, "timber", { y: tg + 1.15 });
       }
-      Detail("ReceptionWardDoorFrameHead", -26, 243, 3.2, .3, .95, "timber", { y: tg + 2.55 });
+      Detail("ReceptionWardDoorFrameHead", -26, 243, 3.0, .24, .5, "timber", { y: tg + 2.52 });
     }
     // No post in x -25.4…-20.8: runner route and walk line cross the eave there.
     for (const [side, x] of [["West", -32.2], ["West2", -29.9], ["West3", -27.6], ["East", -19.8]]) {

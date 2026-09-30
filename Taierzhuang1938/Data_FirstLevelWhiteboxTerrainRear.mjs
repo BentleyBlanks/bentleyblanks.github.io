@@ -65,8 +65,11 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
         Object.freeze({ x: -1, z: 208, dy: 0 }), Object.freeze({ x: 0, z: 199, dy: 1.4 }),
         Object.freeze({ x: 0, z: 186, dy: 1.4 }), Object.freeze({ x: 0.5, z: 180, dy: 1.0 }),
       ]), note: "15 夹道西北向河下降的河谷坡（离沟口缓坡 (52,209.5) 40 m 以上）" }),
-    Object.freeze({ id: "LaneHollowEast", kind: "box", op: "cut", x: 28.5, z: 218.75, w: 18, d: 7.1,
-      dy: 1.0, feather: 1.4, note: "15_1 左侧石墙外低下去的菜园" }),
+    // 2026-09-30 D 包二轮：1.0 m → 1.8 m、羽化 1.4 → 2.0（最陡 1.35，人不走这里），核心 x 19.5…39.5、z 215.4…221.5。
+    // 羽化停点：西 x 17.5（夹道石墙外皮 17.6 之外）、北 z 213.4（WallPathLowWall 南面 213.35 之外）、
+    // 南 z 223.5（BackyardWall 北面 223.65 之外），夹道、墙与走线的地面一厘米不动。
+    Object.freeze({ id: "LaneHollowEast", kind: "box", op: "cut", x: 29.5, z: 218.45, w: 20, d: 6.1,
+      dy: 1.8, feather: 2.0, note: "15_1 左侧石墙外低下去的菜园（墙外 1.8 m 低地）" }),
     Object.freeze({ id: "BridgeBankBermWest", kind: "line", op: "raise", halfW: 0.5, feather: 0.95, dy: 0.85,
       points: Object.freeze([Object.freeze({ x: -97, z: 176 }), Object.freeze({ x: -82.2, z: 176.1 })]),
       note: "18_1 南岸岸垄西段（胸墙北面）" }),
