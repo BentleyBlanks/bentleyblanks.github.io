@@ -69,6 +69,30 @@ export const MISSION_NORTH_RIVER = Object.freeze({
     Object.freeze({ id: "WestDitchFord", x: 47, halfW: 8, blend: 5,
       depth: 1.05, floorHalfW: 5, bankRun: 7 }),
   ]),
+  // 2026-09-30 白盒 18 拓宽河段 RailBridgeReach（docs/Data_FirstLevelTopology20260919.md §2）：
+  // 铁路桥一带的河只往**北**拓宽，南岸自然地面位置不动，多出来的是南侧一片沙滩。
+  // 断面（z 由北向南）分四段，每段一条 smoothstep（峰值斜率 = 1.5×落差/进深）：
+  //   北岸陡坡  crestZ（自然地面）→ floorZ（河底，深 depth）：1.5·4.2/4.5 = 1.4 > tan52°，人爬不上来；
+  //   河底平    floorZ → dropZ，深 depth；
+  //   水下陡坎  dropZ → waterZ，深从 depth 收到 waterCut：1.5·3.05/2.6 = 1.76，下不去也上不来；
+  //   沙滩      waterZ → shoreZ，深从 waterCut 收到 0：≤ 1.5·1.15/7.4 = 0.23（13°），人走得上去。
+  // waterRel 是水面相对自然地面的高度（负数）：水面在南岸自然地面下 1.25 m、河心水深 4.2−1.25 = 2.95 m。
+  // 段两端把六个位置参数按 smoothstep(x) 混回原断面：西端 blendWestM 65 m（x −205…−140，止于 MISSION_BOUNDS.minX，
+  // 到界上正好收完）、东端 blendEastM 60 m（x −30…30，不碰浅滩 WestDitchFord 的插值带 x 34…60，更不碰路桥 x 76）。
+  // 原断面等价于 waterZ=dropZ=164、waterCut=depth、shoreZ=167.2 的退化形，权重 0 时逐位等于旧公式。
+  // 2026-09-30 第二轮：岸线不再是两端直角的长方形水池。`wander` 给北岸线（crestZ、floorZ 同量平移）与南水线（dropZ、waterZ、
+  // shoreZ 同量平移）叠三个不同波长（41–110 m）的正弦起伏，包络 env 在 fixed 区间 x −95…−60（铁路桥一带，断面与 a35a763e
+  // 逐位相同）内**恰好为 0**，向两侧 rampM 30 m smoothstep 长到 1；振幅 = ampM·(1 + 三波加权和)：北岸只往南缩 0…9 m（岸沿绝不
+  // 比 z 90 更靠北，北岸村子与土坎安全），南水线只往北缩 0…7 m（沙滩水线绝不比 z 158.3 更靠南，南堤脚 z 166 不被吃掉）。
+  // 起伏与过渡权重相乘：过渡带里起伏随权重一起收回原断面。
+  reaches: Object.freeze([
+    Object.freeze({ id: "RailBridgeReach", x0: -140, x1: -30, blendWestM: 65, blendEastM: 60,
+      depth: 6, crestZ: 90, floorZ: 94.5, dropZ: 153.7, waterZ: 156.3, waterCut: 3, shoreZ: 166,
+      waterRel: -3,
+      wander: Object.freeze({ fixed: Object.freeze([-95, -60]), rampM: 30,
+        north: Object.freeze({ ampM: 4.5, waves: Object.freeze([[110, 0.5, 2.43], [63, 0.3, 5.97], [41, 0.2, 4.4]]) }),
+        south: Object.freeze({ ampM: 3.5, waves: Object.freeze([[95, 0.5, 4.55], [57, 0.3, 5.0], [43, 0.2, 3.1]]) }) }) }),
+  ]),
   // 允许横穿的位置（测试用）：浅滩与两座桥。半宽按各自的通行面给。
   crossings: Object.freeze([
     // 浅滩中心 x=47，halfW 13 = 断面插值带的全宽（x 34..60）：出了这一段断面就是
@@ -79,6 +103,28 @@ export const MISSION_NORTH_RIVER = Object.freeze({
   ]),
 });
 
+const SmoothStep = (t) => { const c = t <= 0 ? 0 : t >= 1 ? 1 : t; return c * c * (3 - 2 * c); };
+/** 拓宽河段在 x 处的混合权重：段内 1、西端 blendWestM / 东端 blendEastM 米 smoothstep、段外 0。 */
+export function RiverReachWeight(x, reach) {
+  if (x <= reach.x0 - reach.blendWestM || x >= reach.x1 + reach.blendEastM) return 0;
+  if (x >= reach.x0 && x <= reach.x1) return 1;
+  return SmoothStep(x < reach.x0 ? (x - (reach.x0 - reach.blendWestM)) / reach.blendWestM
+    : ((reach.x1 + reach.blendEastM) - x) / reach.blendEastM);
+}
+/**
+ * 岸线起伏（米）：{ north ≥ 0 北岸线往南缩多少, south ≤ 0 南水线往北缩多少 }。fixed 区间内恰好是 +0 / +0（整数 0，
+ * 与没有起伏时逐位相同），两侧 rampM 米 smoothstep 长出来。纯函数，确定性（只依赖 x）。
+ */
+export function RiverReachOffsets(x, reach) {
+  const wander = reach.wander;
+  if (!wander) return { north: 0, south: 0 };
+  const [f0, f1] = wander.fixed;
+  const env = x < f0 ? SmoothStep((f0 - x) / wander.rampM) : x > f1 ? SmoothStep((x - f1) / wander.rampM) : 0;
+  if (env <= 0) return { north: 0, south: 0 };
+  const Wave = (waves) => waves.reduce((sum, [len, amp, phase]) => sum + amp * Math.sin(2 * Math.PI * x / len + phase), 0);
+  return { north: wander.north.ampM * (1 + Wave(wander.north.waves)) * env,
+    south: -wander.south.ampM * (1 + Wave(wander.south.waves)) * env };
+}
 /** 断面参数按 x 插值（浅滩把参数拉向自己那一套）。纯函数，地形与测试共用。 */
 export function RiverProfileAt(x, river = MISSION_NORTH_RIVER) {
   let depth = river.depth, floorHalfW = river.floorHalfW, bankRun = river.bankRun;
@@ -92,13 +138,67 @@ export function RiverProfileAt(x, river = MISSION_NORTH_RIVER) {
   }
   return { depth, floorHalfW, bankRun };
 }
+/**
+ * 这个 x 上有效的拓宽断面（六个位置参数已按权重混合）。没有拓宽段覆盖时返回 null。
+ * 权重 0 的一端等于原对称断面的退化形（见 MISSION_NORTH_RIVER 注释）。
+ */
+export function RiverReachAt(x, river = MISSION_NORTH_RIVER) {
+  for (const reach of river.reaches || []) {
+    const w = RiverReachWeight(x, reach);
+    if (w <= 0) continue;
+    const base = RiverProfileAt(x, river);
+    const mix = (a, b) => a + (b - a) * w;
+    const south = river.z + base.floorHalfW, off = RiverReachOffsets(x, reach);
+    return { id: reach.id, w, depth: mix(base.depth, reach.depth),
+      crestZ: mix(river.z - base.floorHalfW - base.bankRun, reach.crestZ + off.north),
+      floorZ: mix(river.z - base.floorHalfW, reach.floorZ + off.north),
+      dropZ: mix(south, reach.dropZ + off.south), waterZ: mix(south, reach.waterZ + off.south), waterCut: mix(base.depth, reach.waterCut),
+      shoreZ: mix(south + base.bankRun, reach.shoreZ + off.south), waterRel: mix(-(base.depth - 1.2), reach.waterRel) };
+  }
+  return null;
+}
+/** 拓宽断面在 z 处的下切深度（RiverReachAt 的返回值）。 */
+export function RiverReachCutAt(section, z) {
+  if (z <= section.crestZ || z >= section.shoreZ) return 0;
+  if (z < section.floorZ) return section.depth * SmoothStep((z - section.crestZ) / (section.floorZ - section.crestZ));
+  if (z <= section.dropZ) return section.depth;
+  if (z < section.waterZ)
+    return section.waterCut + (section.depth - section.waterCut) * (1 - SmoothStep((z - section.dropZ) / (section.waterZ - section.dropZ)));
+  return section.waterCut * (1 - SmoothStep((z - section.waterZ) / (section.shoreZ - section.waterZ)));
+}
 /** 河槽在 (x,z) 的下切深度（相对自然地面）。槽外是 0。 */
 export function RiverCutAt(x, z, river = MISSION_NORTH_RIVER) {
+  const reach = RiverReachAt(x, river);
+  if (reach) return RiverReachCutAt(reach, z);
   const p = RiverProfileAt(x, river);
   const raw = (Math.abs(z - river.z) - p.floorHalfW) / p.bankRun;
   if (raw >= 1) return 0;
   const t = raw <= 0 ? 0 : raw * raw * (3 - 2 * raw);
   return p.depth * (1 - t);
+}
+/**
+ * 水面在 x 处的剖面：{ level（相对自然地面，米）、z0、z1（北、南水线）、reach（拓宽段 id 或 null）}。
+ * 拓宽段（含两端过渡）：水位 waterRel，水线是断面上深度 = −waterRel 的位置（数值二分）；
+ * 原断面：槽底以上 1.2 m 的低水位，半宽 min(7.5, floorHalfW−3.5)；浅滩（depth<3）没有水，返回 null。
+ * 两种水位在过渡段随权重线性混合，水面在 x 上连续。
+ */
+export function RiverWaterAt(x, river = MISSION_NORTH_RIVER) {
+  const reach = RiverReachAt(x, river), base = RiverProfileAt(x, river);
+  if (!reach) {
+    if (base.depth < 3) return null;
+    const halfW = Math.min(7.5, base.floorHalfW - 3.5);
+    return halfW < 1 ? null : { level: -(base.depth - 1.2), z0: river.z - halfW, z1: river.z + halfW, reach: null };
+  }
+  const target = -reach.waterRel;
+  let lo = reach.crestZ, hi = reach.floorZ;
+  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (RiverReachCutAt(reach, mid) < target) lo = mid; else hi = mid; }
+  const z0 = (lo + hi) / 2;
+  let a = reach.dropZ, b = reach.shoreZ;
+  for (let i = 0; i < 40; i++) { const mid = (a + b) / 2; if (RiverReachCutAt(reach, mid) > target) a = mid; else b = mid; }
+  // 过渡段（w<1）水线在原断面水边（半宽 7.5 与低水位）和拓宽水线之间按权重混合，水面宽度在 x 上连续。
+  const z1 = (a + b) / 2, baseHalf = Math.min(7.5, base.floorHalfW - 3.5), w = reach.w;
+  return { level: reach.waterRel, z0: river.z - baseHalf + (z0 - (river.z - baseHalf)) * w,
+    z1: river.z + baseHalf + (z1 - (river.z + baseHalf)) * w, reach: reach.id };
 }
 
 // ---------------------------------------------------------------------------
@@ -118,23 +218,46 @@ export const MISSION_SOUTH_BRIDGE = Object.freeze({
 /**
  * 北沙河铁路桥（18）。桥台/桥面/桁架全是白盒体块；桥面进 walkableSurfaces。
  * 道砟与轨在 `gapZ` 之间断开（弧长由 Data_FirstLevelMissionLayout 换算），桥面上另摆
- * 两段直轨 —— 不断开的话轨顶跟着 crown 一路栽进河槽里（crown 被 clampHi 钉在
- * 本地地面 +0.18）。
+ * 直轨 —— 不断开的话轨顶跟着 crown 一路栽进河槽里（crown 被 clampHi 钉在本地地面 +0.18）。
  * 完好件用 `signal:"RailBridgeDestroyed"`（信号到了就消失，桥面同时退出可走面），
  * 残骸件用 `appearSignal:"RailBridgeDestroyed"`（信号到之前根本不存在）。
+ *
+ * 2026-09-30 三孔改造（河拓宽到 ~66 m 之后单孔桥跨不过去，docs/Data_FirstLevelTopology20260919.md §2）：
+ *   南桥台 z 165.5（坐在沙滩后的路基上） → 1 号墩 z 160（沙滩水边） → 2 号墩 z 136 → 3 号墩 z 112（都在水里）
+ *   → 北桥台 z 88（坐在北岸）。三孔桁架各 24 m（沿用 Model_RailBridge 单孔 23.2 m 的设计）。
+ *   **要炸的是最南一孔**（1 号墩↔2 号墩，中心 z 148）：起爆时 1 号墩药包 + 跨中药包。
+ * 于是 `x`,`z` 现在是**被炸那一孔的中心**（旧值 z=153 是整座单孔桥的桥心）；`deckHalfD` 是这一孔的半长，
+ * `RailBridgeDeck` / 两根桁架碰撞 / 两根桥面直轨（都带 signal）就是这一孔。另两孔、南引桥段、
+ * 三个桥墩是永久体块（`spans` / `piers` / `approachSouth` 描述它们）。
  */
 export const MISSION_RAIL_BRIDGE = Object.freeze({
-  x: -77, z: 153,
-  deckHalfD: 18,            // 桥面 z 135..171，跨过 138.8..167.2 的河口
-  deckW: 5.4, deckTopY: 0.66, deckH: 0.55,
-  gapZ: Object.freeze([137, 169]),   // 道砟/枕木/钢轨在这一段断开
+  x: -77, z: 148,           // 被炸那一孔（SpanSouth）的中心
+  deckHalfD: 12,            // 这一孔 z 136..160
+  deckW: 5.4, deckTopY: 1.5, deckH: 0.55,      // 2026-09-30 R1c 抬高：桥面顶 0.66 → 1.5（南堤顶 1.4+0.1 齐平，水面 −3 在下方 4.5 m）
+  gapZ: Object.freeze([86, 169]),    // 道砟/枕木/钢轨在这一段断开（桥面 + 两端各伸出台外的引道）
   trussOffsetX: 2.95, trussW: 0.5, trussH: 2.4,
   railGaugeHalf: 0.7175,
-  abutmentZ: Object.freeze([140.5, 165.5]), abutmentW: 7, abutmentD: 3,
-  // 料石桥台的桥座面（Model_RailBridge：帽石顶 -0.47）。白盒桥台碰撞盒顶收到它下面，
+  // 桥台中心 z：[北, 南]。北桥台坐在北岸（岸沿 z 90），南桥台坐在沙滩后的路基上。
+  abutmentZ: Object.freeze([88, 165.5]), abutmentW: 7, abutmentD: 3,
+  // 料石桥台的桥座面（Model_RailBridge：帽石顶 = deckTopY−1.13 = 0.37）。白盒桥台碰撞盒顶收到它下面，
   // 模型装上之后那两块灰盒子整个埋在料石里，不会从支座旁边戳出来。
-  abutmentTopY: -0.55,
+  abutmentTopY: 0.29,
   signal: "RailBridgeDestroyed",
+  // 三个石墩（永久实体，顶在桥面下）：中心 z、x 向宽、z 向进深。1 号墩立在南岸沙滩水边，墩脚是沙地。
+  piers: Object.freeze([
+    Object.freeze({ id: "Pier1", z: 160 }), Object.freeze({ id: "Pier2", z: 136 }), Object.freeze({ id: "Pier3", z: 112 }),
+  ]),
+  pierW: 3.4, pierD: 3.6,
+  // 桥面分段（从南到北）：id、z0（南端）、z1（北端）。SpanSouth 是要炸的那孔；
+  // 南引桥 approachSouth 从 1 号墩到 gapZ 南端，北端 SpanNorth 从 3 号墩伸到 gapZ 北端（台后一段引道）。
+  spans: Object.freeze([
+    Object.freeze({ id: "SpanSouth", z0: 160, z1: 136, blasted: true }),
+    Object.freeze({ id: "SpanMid", z0: 136, z1: 112 }),
+    Object.freeze({ id: "SpanNorth", z0: 112, z1: 86 }),
+  ]),
+  approachSouth: Object.freeze({ z0: 160, z1: 169 }),
+  // 起爆：药包挂在 1 号墩顶和被炸孔跨中；安全区 blastSafe 离这个中心 ≥ 40 m。
+  blast: Object.freeze({ spanId: "SpanSouth", centerZ: 148, pierChargeZ: 160 }),
 });
 
 // ---------------------------------------------------------------------------
@@ -173,8 +296,15 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   // D 桥南：靠院墙夹道两端、接收院院门
   wallPathStart: {x:56,z:207}, wallPathEnd: {x:16,z:220}, receptionGate: {x:2,z:240},
   // 18 北沙河铁路桥：桥心、两端、南岸射位、北岸土坎、爆破安全区、淡出前的行军终点
-  railBridge: {x:-77,z:153}, bridgeNorthEnd: {x:-77,z:136}, bridgeSouthEnd: {x:-77,z:170},
-  bridgeCover: {x:-81,z:179.4}, bridgeEnemy: {x:-68,z:130.5}, blastSafe: {x:-66,z:201},
+  // 2026-09-30 河拓宽：railBridge = 被炸那一孔的中心（1 号墩↔2 号墩，z 148）；北桥头挪到新北岸（桥台 z 88 后），
+  // 南桥头不动。北岸整体北移 50 m（土坎、出生点、战术点同量平移）；机枪位 bridgeEnemy 挪到桥轴西侧 x -84.5：
+  // 南岸射位到它的连线整段在西桁架 (x -79.95) 以西，不被三孔桥的桁架挡住。
+  // 2026-09-30 R1c：桥面抬到 1.5、水面压到 −3 之后，旧射位 (-81,179.4)（地面 0.7，在缺口路堤的侧坡上）站着只能看见路堤；
+  // 挪到南堤西段堤顶 (-97,173.5)（地面 1.5）：站在堤沿往下看西侧沙滩上的爆破手、1 号墩脚、水面与整座桥 —— 概念 18_3 的构图
+  //（镜头在桥西、桥在右手边，爆破手蹲在左前方沙滩上）。爆破手（MISSION_PLACEMENT.bridge.demolition）相应落在 1 号墩西侧沙滩上。
+  // 不放桥台旁的缺口 / 东段：缺口堤顶到 1 号墩之间隔着 1.2 m 的路堤脊与南引桥料石实体；东段射位到机枪 bridgeEnemy（桥轴西侧）的连线要穿桁架。
+  railBridge: {x:-77,z:148}, bridgeNorthEnd: {x:-77,z:86}, bridgeSouthEnd: {x:-77,z:170},
+  bridgeCover: {x:-97,z:173.5}, bridgeEnemy: {x:-84.5,z:80.5}, blastSafe: {x:-66,z:201},
   marchOut: {x:-62,z:232},
   // 关尾夜景（白天不可见）：淡入点、瓮城外、门洞、门内终点
   nightSpawn: {x:-160,z:292}, northGateApproach: {x:-160,z:318},
@@ -237,11 +367,11 @@ export const MISSION_STAGE_ROUTES = Object.freeze({
     {x:12,z:230},{x:6,z:237},S.receptionGate],
   // 18：接收处 → 爆破安全区 → 南岸射位
   toBridge: [{x:-41,z:244},{x:-49,z:236},{x:-58,z:222},{x:-66,z:210},S.blastSafe,
-    {x:-74,z:199},{x:-78,z:190},S.bridgeCover],
+    {x:-74,z:199},{x:-78,z:190},{x:-90,z:182},S.bridgeCover],
   // 回援尾队：北岸 → 桥面 → 南岸 → 继续南下
-  bridgeCrossing: [{x:-77,z:120},S.bridgeNorthEnd,S.bridgeSouthEnd,{x:-76,z:182},
+  bridgeCrossing: [{x:-77,z:70},S.bridgeNorthEnd,S.bridgeSouthEnd,{x:-76,z:182},
     {x:-72,z:192},S.marchOut],
-  bridgeWithdraw: [S.bridgeCover,{x:-78,z:188},{x:-72,z:197},S.blastSafe],
+  bridgeWithdraw: [S.bridgeCover,{x:-90,z:182},{x:-78,z:188},{x:-72,z:197},S.blastSafe],
   marchOut: [S.blastSafe,{x:-64,z:216},S.marchOut],
   nightMarch: [S.nightSpawn,S.northGateApproach,S.northGate,S.gateInside],
 });

@@ -301,7 +301,8 @@ export class RailBridgeSet {
       Add(charge.t, () => this.vfx?.Explosion?.(this.World(charge.x, charge.y, charge.z), {
         radius: charge.main ? FX.mainRadiusM : charge.radius * FX.secondaryRadiusScale,
         kind: charge.main ? FX.mainKind : FX.secondaryKind,
-        groundY: charge.z > d.faceZ - 1.5 ? -0.77 : waterY,
+        // 三孔：药包自己带地面高度（1 号墩顶的那两包落在沙滩上，跨中的落在河面上）。
+        groundY: charge.groundY ?? waterY,
       }), charge.main ? "mainCharge" : "charge");
     }
     Add(FX.airburst.t, () => this.vfx?.Explosion?.(this.World(0, FX.airburst.rise, 0),
@@ -398,9 +399,10 @@ export class RailBridgeSet {
   /** 冲击波沿两岸地面推出去的尘环 + 河面上一圈水雾。 */
   GroundRings() {
     const P = FX.groundRing, d = this.data;
-    for (const sign of [-1, 1]) {
-      const bank = this.World(0, 0, sign * P.bankZ);
-      this.Ring(bank.x, 0.75, bank.z, P.radiusM, [VFX_PALETTE.dust, VFX_PALETTE.dustDense], { life: 1.8, opacity: 0.42 });
+    // 三孔：河宽 66 m，北岸在 57 m 之外够不到；只有 1 号墩这边的南岸沙滩吃到冲击波。
+    for (const bankSpec of P.banks) {
+      const bank = this.World(0, 0, bankSpec.z);
+      this.Ring(bank.x, bankSpec.y, bank.z, P.radiusM, [VFX_PALETTE.dust, VFX_PALETTE.dustDense], { life: 1.8, opacity: 0.42 });
     }
     const centre = this.World(0, d.water.top, 0);
     this.Ring(centre.x, d.water.top + 0.08, centre.z, P.radiusM * 1.1, [SPRAY_A, SPRAY_B], { life: 2.4, opacity: 0.5 });

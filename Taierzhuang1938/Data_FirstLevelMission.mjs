@@ -281,8 +281,8 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   // 18 北岸土坎的火力：来自北侧外围战场，不在桥边凭空生成。
   bridgeNorth: [
     { id: "BridgeNorthGunner", x: A.bridgeEnemy.x, z: A.bridgeEnemy.z, weapon: "Type11", hold: true },
-    { id: "BridgeNorthA", x: A.bridgeEnemy.x - 6, z: A.bridgeEnemy.z + 3 },
-    // 土坎（BridgeNorthRidgeEast，z≈132.2）在这一带是实心的：出生点要摆在坎**后面**
+    { id: "BridgeNorthA", x: A.bridgeEnemy.x + 6, z: A.bridgeEnemy.z - 1 },
+    // 土坎（BridgeNorthRidgeEast，z≈82.2，2026-09-30 河拓宽后整体北移 50 m）在这一带是实心的：出生点要摆在坎**后面**
     // （北侧，z 更小），摆到 z+2 就是摆在土里。
     { id: "BridgeNorthB", x: A.bridgeEnemy.x + 7, z: A.bridgeEnemy.z - 3 },
     { id: "BridgeNorthC", x: A.bridgeEnemy.x + 2, z: A.bridgeEnemy.z - 5 },
@@ -372,9 +372,9 @@ export const MISSION_TACTICS = Object.freeze({
   AirPursuerB: { delay: 3, points: [{x:105,z:98},{x:104,z:111}] },
   AirPursuerC: { delay: 5, points: [{x:109,z:109},{x:100,z:114}] },
   AirPursuerD: { delay: 8, points: [{x:106,z:113},{x:99,z:115}] },
-  BridgeNorthA: { delay: 2, points: [{x:-74,z:130},{x:-76,z:134}] },
-  BridgeNorthB: { delay: 6, points: [{x:-72,z:126.5},{x:-74,z:130}] },
-  BridgeNorthC: { delay: 10, points: [{x:-68,z:122},{x:-72,z:128}] },
+  BridgeNorthA: { delay: 2, points: [{x:-74,z:80},{x:-76,z:84}] },
+  BridgeNorthB: { delay: 6, points: [{x:-72,z:76.5},{x:-74,z:80}] },
+  BridgeNorthC: { delay: 10, points: [{x:-68,z:72},{x:-72,z:78}] },
 });
 export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   id: "FirstLevelP012Whitebox",

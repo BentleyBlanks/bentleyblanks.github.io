@@ -13,8 +13,7 @@
 //     (z 213.35) 与石墙东面之外 —— 15B 夹道被量的那几件墙的高度一厘米都不变。
 //   · ReceptionYardFloor：院地比院外高一级（+0.15）。入口 (-13,240) 的 9 m 回归缓坡在修饰
 //     之后，所以院心仍回到自然地面，高一级读在院门与厢房一带。
-//   · BridgeBankBerm*：南岸沿河口的岸垄，两段在 x≈-80…-69 断开（铁路桥头与尾队的路），
-//     中心线离 BridgeSouthCoverWest/East 的中心 ≥ 1.5 m：胸墙高度与蹲姿断线不受影响。
+//   · （已被 2026-09-30 的 BridgeLevee* 取代）BridgeBankBerm*：0.85 m 的窄岸垄。
 //
 // 2026-09-28 场景引导轮（docs/Data_FirstLevelGuidance20260928.md §3.1 小路）：
 //   · paths 沿冻结路线画踩出来的路（只染色）：沟尾爬坡 → 夹道 → 院门（15），后门 → 田地 → 爆破安全区
@@ -24,6 +23,20 @@
 //     只能落在一个框里，原来的分界正好横在出后门那 10 m 田地上，toBridge 那条路在那儿会断一截。
 //     两个框都属本区，挪分界不改任何形状的裁剪（院地 ReceptionYardFloor 羽化止于 x -40.65，
 //     岸垄东段止于 x -56.05），也不碰别区的框。
+//
+// 2026-09-30 第二轮：河岸线起伏（Topology 的 wander），南堤跟着南水线走 —— 堤顶 z = shoreZ + 7（原 166 + 7 = 173），
+// 起伏出来后 z 由 Script 现算写进点表：堤脚（堤顶 − 7）恒在 shoreZ 之南 0…0.6 m，不吃进河槽。x −100…−88 与 −64 的点保持原值
+//（铁路桥一带地形逐位不变）。Script_FirstLevelWhiteboxTerrainTest 断言点表与 RiverReachAt 一致。
+// 2026-09-30 白盒 18 河拓宽（docs/Data_FirstLevelTopology20260919.md §2「拓宽河段」）：
+//   · 北沙河在 x −140…−30 拓宽到 ~66 m，南岸自然地面位置不动，水线以南是一片沙滩（RiverCutAt 的断面，
+//     在修饰之后取 min，本表不碰）。沙滩南端（shoreZ z 166）之外由本表接一道南堤：
+//   · BridgeLeveeWest / East：堤顶 z≈173（核心 z 171.5…174.5）比自然地面高 1.4 m，北坡（河一侧）5.5 m 从 z 166 起爬
+//     （峰值斜率 1.5·1.4/5.5 = 0.38，人走得上去）、南坡 5.5 m 落回自然地面。堤在铁路桥头断开（西段核心止于
+//     x −88、东段核心始于 x −64，两头羽化后 x −82.5…−70.5 一带没有堤，那是路基 +0.62 的铁路与尾队的路，
+//     也是南岸射位 (-81,179.4) 看河、看桥、看沙滩的缺口）。
+//   · 框 Bridge18 的西缘从 −100 扩到 −148：堤沿河向西伸到河段之外（河段 x −140…−30，堤终于 x −136 + 7 m 羽化）。
+//     Night18 框在 z≥280，Reception15 框在 x≥−41：三框互不相交。
+//   · BankPathTread：沿堤顶内侧踩出来的小路（概念 18_1 里回援尾队沿岸朝镜头跑的那条），从铁路桥头缺口向西。
 export const WHITEBOX_TERRAIN_REAR = Object.freeze({
   id: "Rear1518",
   stages: Object.freeze([15, 16, 17, 18]),
@@ -39,8 +52,14 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
       points: Object.freeze([
         Object.freeze({ x: -43.8, z: 244 }), Object.freeze({ x: -49, z: 236 }), Object.freeze({ x: -58, z: 222 }),
         Object.freeze({ x: -66, z: 210 }), Object.freeze({ x: -66, z: 201 }), Object.freeze({ x: -74, z: 199 }),
-        Object.freeze({ x: -78, z: 190 }), Object.freeze({ x: -81, z: 180.6 }),
-      ]), note: "18 出后门穿田地到爆破安全区、再到南岸射位（toBridge 全程；撤回 bridgeWithdraw 走的也是这一条）" }),
+        Object.freeze({ x: -78, z: 190 }), Object.freeze({ x: -90, z: 182 }), Object.freeze({ x: -96.4, z: 175 }),
+      ]), note: "18 出后门穿田地到爆破安全区、再到南岸射位（R1c：射位在南堤西段堤顶 (-97,173.5)）（toBridge 全程；撤回 bridgeWithdraw 走的也是这一条）" }),
+    Object.freeze({ id: "BankPathTread", width: 1.8, wear: 0.9,
+      points: Object.freeze([
+        Object.freeze({ x: -77, z: 169.5 }), Object.freeze({ x: -83, z: 172.2 }), Object.freeze({ x: -100, z: 173.2 }),
+        Object.freeze({ x: -112, z: 172.61 }), Object.freeze({ x: -124, z: 170.72 }),
+        Object.freeze({ x: -134, z: 167.94 }),
+      ]), note: "18 南岸沿堤顶内侧的踩出来的小路：铁路桥头缺口 → 向西沿岸（概念 18_1 尾队沿岸小路朝镜头跑）" }),
     Object.freeze({ id: "MarchOutTread", width: 2.2, wear: 0.72,
       points: Object.freeze([
         Object.freeze({ x: -66, z: 204 }), Object.freeze({ x: -64, z: 216 }), Object.freeze({ x: -62, z: 232 }),
@@ -49,10 +68,22 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
   ]),
   boxes: Object.freeze([
     Object.freeze({ id: "Reception15", minX: -41, maxX: 70, minZ: 150, maxZ: 260 }),
-    Object.freeze({ id: "Bridge18", minX: -100, maxX: -41, minZ: 110, maxZ: 260 }),
+    Object.freeze({ id: "Bridge18", minX: -148, maxX: -41, minZ: 50, maxZ: 260 }),
     Object.freeze({ id: "Night18", minX: -185, maxX: -135, minZ: 280, maxZ: 360 }),
   ]),
   shapes: Object.freeze([
+    Object.freeze({ id: "RailEmbankmentSouth", kind: "line", op: "raise", halfW: 2.6, feather: 4.2, dy: 0.52,
+      points: Object.freeze([
+        Object.freeze({ x: -77, z: 166, dy: 0.52 }), Object.freeze({ x: -77, z: 169, dy: 0.52 }), Object.freeze({ x: -77, z: 182, dy: 0.2 }),
+        Object.freeze({ x: -77, z: 190, dy: 0.06 }), Object.freeze({ x: -77, z: 197, dy: 0 }),
+      ]), note: "18 南路堤：铁路桥头缺口里、桥台往南。轨道路基在轨道样条断口 z 169 顶到 deckTopY−0.25 = 1.25，从那儿以 ≤ 3% 的坡顺回原路基（0.62）" }),
+    Object.freeze({ id: "RailEmbankmentNorth", kind: "line", op: "raise", halfW: 2.6, feather: 3.2, dy: 0.63,
+      points: Object.freeze([
+        Object.freeze({ x: -77, z: 83.5, dy: 0.63 }), Object.freeze({ x: -77, z: 82.5, dy: 0.63 }), Object.freeze({ x: -77, z: 70, dy: 0.27 }),
+        Object.freeze({ x: -77, z: 62, dy: 0.08 }), Object.freeze({ x: -77, z: 56, dy: 0 }),
+      ]), note: "18 北路堤：从北桥台背墙（z 87.8）往北，轨道路基在断口 z 86 顶到 1.25，以 ≤ 3% 的坡顺回原路基" }),
+    Object.freeze({ id: "NorthAbutmentSeat", kind: "box", op: "cut", x: -77, z: 88.55, w: 6.6, d: 1.5, dy: 0.5, feather: 0.75,
+      note: "18 北桥台的桥座槽：钢梁端头与桥座（顶 deckTopY−1.13）落在这条槽里，两头是背墙与前墙；不挖的话北路堤的羽化把桥座埋进土里" }),
     Object.freeze({ id: "ReceptionYardFloor", kind: "box", op: "level", x: -19.5, z: 235, w: 40.8, d: 31.8,
       dy: 0.15, feather: 0.75, note: "16–17 院地 +0.15；羽化停在院墙内面，院墙（含量宽的院门两垛）高度不变" }),
     Object.freeze({ id: "ReceptionValleyNorth", kind: "line", op: "cut", halfW: 8, feather: 4.5, dy: 1.4,
@@ -62,11 +93,14 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
       ]), note: "15 夹道西北向河下降的河谷坡（离沟口缓坡 (52,209.5) 40 m 以上）" }),
     Object.freeze({ id: "LaneHollowEast", kind: "box", op: "cut", x: 28.5, z: 218.75, w: 18, d: 7.1,
       dy: 1.0, feather: 1.4, note: "15_1 左侧石墙外低下去的菜园" }),
-    Object.freeze({ id: "BridgeBankBermWest", kind: "line", op: "raise", halfW: 0.5, feather: 0.95, dy: 0.85,
-      points: Object.freeze([Object.freeze({ x: -97, z: 176 }), Object.freeze({ x: -82.2, z: 176.1 })]),
-      note: "18_1 南岸岸垄西段（胸墙北面）" }),
-    Object.freeze({ id: "BridgeBankBermEast", kind: "line", op: "raise", halfW: 0.5, feather: 0.95, dy: 0.75,
-      points: Object.freeze([Object.freeze({ x: -70.8, z: 176.5 }), Object.freeze({ x: -57.5, z: 177 })]),
-      note: "18_1 南岸岸垄东段；与西段之间留出铁路与尾队的缺口" }),
+    Object.freeze({ id: "BridgeLeveeWest", kind: "line", op: "raise", halfW: 1.5, feather: 5.5, dy: 1.4,
+      points: Object.freeze([
+        Object.freeze({ x: -136, z: 167.24 }), Object.freeze({ x: -128, z: 169.28 }), Object.freeze({ x: -120, z: 171.49 }), Object.freeze({ x: -112, z: 172.31 }), Object.freeze({ x: -104, z: 172.64 }),
+        Object.freeze({ x: -100, z: 173.2 }), Object.freeze({ x: -94, z: 173 }), Object.freeze({ x: -88, z: 173 }),
+      ]), note: "18 南堤西段（河南岸的高堤，堤顶背后是南岸射位与小路）；核心止于 x −88，羽化到 x −82.5 为止：射位 (-81,179.4) 正对缺口" }),
+    Object.freeze({ id: "BridgeLeveeEast", kind: "line", op: "raise", halfW: 1.5, feather: 5.5, dy: 1.4,
+      points: Object.freeze([
+        Object.freeze({ x: -64, z: 173 }), Object.freeze({ x: -56, z: 173.2 }), Object.freeze({ x: -49, z: 171.86 }),
+      ]), note: "18 南堤东段；核心始于 x −64，与西段之间留出铁路与尾队的缺口；东端羽化止于 x −41.5（框边）之内" }),
   ]),
 });

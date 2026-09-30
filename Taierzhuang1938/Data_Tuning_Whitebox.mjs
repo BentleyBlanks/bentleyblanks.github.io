@@ -44,6 +44,11 @@ export const WHITEBOX_DEFAULTS = Object.freeze({
   surfaceColor: "#909397", gridColor: "#55585d", gridSize: 1, gridLineWidth: 0.012,
   backgroundColor: "#adb8c2", renderScale: 1,
 });
+// 2026-09-30 白盒水面约定：白盒画质下水面不再画成灰色米制网格（读起来是一条灰公路），
+// 而是固定的蓝灰水色 + 掠射角天空色反光（菲涅耳）+ 一点太阳高光（粗糙度低）。不是可编辑项，
+// 也不画网格；水面判定 = 网格名含 water（Script_FirstLevelWhiteboxLooks.BuildWhiteboxWater 的 FirstLevelWhitebox_Water）。
+export const WHITEBOX_WATER = Object.freeze({ color: "#4d6f86", sheen: "#c4d6e2", sheenStrength: 0.85,
+  sheenPower: 3, sheenMax: 0.72, roughness: 0.14, metalness: 0 });
 export const WHITEBOX_LIGHTING = Object.freeze({ ambient: 1.8, sun: 1.4, direction: [40, 70, 25] });
 
 export function NormalizeWhiteboxConfig(value = {}) {
