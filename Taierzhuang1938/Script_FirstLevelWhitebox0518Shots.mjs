@@ -9,7 +9,9 @@
 //   另有 Top_<region>.png：游戏内高空俯拍（同一分区框，fov 自适应），看实际体块与地形。
 // 用法（从 worktree 根）：
 //   node Taierzhuang1938/Script_FirstLevelWhitebox0518Shots.mjs [--only=08_1,08_2] [--out=<dir>]
-//        [--no-shots] [--no-maps] [--no-top] [--scale=0.5] [--quality=low|medium|high|ultra]（默认 medium）
+//        [--no-shots] [--no-maps] [--no-top] [--scale=0.5] [--quality=whitebox|low|medium|high|ultra]（默认 medium）
+//   --quality=whitebox 就是用户进游戏默认看到的灰色米制网格画面（2026-09-29 起默认 quality=whitebox；URL 的 quality 优先于本地存档，
+//   新开的无头浏览器没有 tengxian1938_whitebox_v1，所以取到的是 WHITEBOX_DEFAULTS）；美术效果对照请另出 --quality=high。
 // 这是出图脚本不是门禁，不进 TestRunner；浏览器全局锁只在 TestRunner 里，单跑直接 node。
 import fs from "node:fs"; import path from "node:path"; import { pathToFileURL, fileURLToPath } from "node:url";
 const WT = fileURLToPath(new URL("../", import.meta.url)).replace(/\\/g, "/");
@@ -18,7 +20,7 @@ const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slic
 const flag = (name) => process.argv.includes(`--${name}`);
 const only = arg("only")?.split(",").filter(Boolean) || null;
 const out = path.resolve(arg("out") || WT + "Taierzhuang1938/_shots/Whitebox0518");
-const quality = ["low", "medium", "high", "ultra"].includes(arg("quality")) ? arg("quality") : "medium";
+const quality = ["whitebox", "low", "medium", "high", "ultra"].includes(arg("quality")) ? arg("quality") : "medium";
 fs.mkdirSync(out, { recursive: true });
 const { WHITEBOX_0518_CAMERAS: CAMERAS } = await import(U("Data_FirstLevelWhitebox0518Cameras.mjs"));
 const { WHITEBOX_TERRAIN_REGIONS: REGIONS } = await import(U("Data_FirstLevelWhiteboxTerrain.mjs"));
