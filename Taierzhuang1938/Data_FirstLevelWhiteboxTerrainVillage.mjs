@@ -36,6 +36,13 @@ export const WHITEBOX_TERRAIN_VILLAGE = Object.freeze({
         Object.freeze({ x: 78, z: 60 }), Object.freeze({ x: 76.6, z: 70.3 }),
       ]),
       note: "10→11 车辙：绕回巷往东、在主街口直接拐南（不回头去 streetRejoin 那一折）、穿村南门楼" }),
+    // 2026-09-30（12 一夫当关）：门楼北挪到 z 47.6，车辙沿夹道一路压到村口低墙（南段接 Transfer 区的 TransferLaneMud）。
+    Object.freeze({ id: "VillageLaneMud", width: 4.0, wear: .8,
+      points: Object.freeze([
+        Object.freeze({ x: 77.4, z: 50 }), Object.freeze({ x: 77.6, z: 58 }), Object.freeze({ x: 77.2, z: 66 }),
+        Object.freeze({ x: 76.8, z: 70.8 }),
+      ]),
+      note: "12 村路：夹道里的泥路，压到守线前" }),
   ]),
   boxes: Object.freeze([
     // 村北口 z=-30 起（07 南行末段 30..48,-20 在本区），南到 x76 车路 z=75 交给接运区。
@@ -58,6 +65,13 @@ export const WHITEBOX_TERRAIN_VILLAGE = Object.freeze({
     // 08 主街街面下沉 0.2 m（障碍北段；障碍本体 z 17…23 不动，免得倒墙/木车悬空）。
     Object.freeze({ id: "StreetSunkNorth", kind: "box", op: "cut", x: 77.1, z: -2.25, w: 4.6, d: 35.5,
       feather: .75, dy: .2, note: "08_1 主街北段车辙低于两侧门前 0.2 m" }),
+    // 12（2026-09-30 二轮）：从守线往北 20 m 内路面再走低 0.45 m（居高临下）。z 70 起 0.25、z 64 起 0.45，一路压到门楼；
+    // 南端 z 70 是这一区能画到的极限（羽化 4.9 m 要落在框内，框到 z 75）。
+    Object.freeze({ id: "LaneDip", kind: "line", op: "cut", halfW: 3.4, feather: 1.5, dy: .45,
+      points: Object.freeze([
+        Object.freeze({ x: 77.0, z: 70.0, dy: .25 }), Object.freeze({ x: 77.2, z: 64 }), Object.freeze({ x: 77.4, z: 47 }),
+      ]),
+      note: "12 村路夹道往北走低 0.45 m" }),
     Object.freeze({ id: "StreetSunkSouth", kind: "box", op: "cut", x: 77.6, z: 27.5, w: 3.6, d: 8,
       feather: .75, dy: .18, note: "08 主街障碍以南到接回点前" }),
   ]),

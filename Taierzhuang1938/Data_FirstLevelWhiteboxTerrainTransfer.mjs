@@ -14,11 +14,24 @@ export const WHITEBOX_TERRAIN_TRANSFER = Object.freeze({
   id: "Transfer1114",
   stages: Object.freeze([11, 12, 13, 14]),
   // 踩出来的小路（只染色不改高度）：{ id, points, width, wear?, note }，口径见 Data_FirstLevelWhiteboxTerrain 文件头。
-  paths: Object.freeze([]),
+  paths: Object.freeze([
+    // 2026-09-30（12 一夫当关）：村路（夹道）的泥路一直压到村口低墙的路口，再接进场院（车路本身在 MISSION_TERRAIN.roads 里）。
+    Object.freeze({ id: "TransferLaneMud", width: 4.0, wear: .8,
+      points: Object.freeze([
+        Object.freeze({ x: 76.6, z: 79.0 }), Object.freeze({ x: 76.3, z: 83 }), Object.freeze({ x: 76.2, z: 88 }),
+      ]),
+      note: "12 村路南段：泥路压到低墙路口（接 Village 区 VillageLaneMud）" }),
+  ]),
   boxes: Object.freeze([
     Object.freeze({ id: "Transfer", minX: 25, maxX: 125, minZ: 75, maxZ: 150 }),
   ]),
   shapes: Object.freeze([
+    // 12（2026-09-30 一夫当关）：守线后面这块（x 58.8–77.9、z 83.6–92.2，胸墙整条坐在上面）比村路高 0.4 m，
+    // 顺子的射口俯控来路；feather 2.5 = 坡 0.24，担架与班里人走得过。墙外（北）2.5 m 内落回路面，
+    // 从村路看胸墙比从射口看高出一截。通行口（x 77.9–81.0，village 路线与过路车 x 79.3）在台的东缘坡上，坡 ≤ 0.2。
+    Object.freeze({ id: "GuardPad", kind: "box", op: "raise", dy: 0.4, feather: 2.5,
+      x: 68.35, z: 87.9, w: 19.1, d: 8.6,
+      note: "12 守线台：x 58.8–77.9、z 83.6–92.2 抬 0.4，胸墙坐在台上" }),
     // 11：西侧土坎 + 坎顶平台（背景纵队）。两块 raise 取 max：Back 管平台与三面缓坡，
     // Scarp 只把东面做陡（feather 1.0 ≈ 一格），东坎脚落在 x 42.5，仓房西墙 x 43 贴坎。
     Object.freeze({ id: "WestTerraceBack", kind: "box", op: "raise", dy: 2.2, feather: 4.5,

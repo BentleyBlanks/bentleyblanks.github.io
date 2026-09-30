@@ -288,11 +288,12 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   // C 桥头接运：老周那辆车**旁边**的上车位（车位中心 (88,113) 让给车本身 ——
   //   牛车碰撞盒 3 m 宽，锚点摆在车位中心就等于摆在车肚子里）、空袭时车列停住的位置。
   // 12 掩护装载（2026-09-27 重做，docs/Data_FirstLevelTransferCover20260927.md）守的是来时路：
-  //   transferWall 是顺子在村口低墙上的射位（低墙射口，墙在 z≈84，朝北对着村南门楼与主街）；
+  //   transferWall 是顺子在村口低墙上的射位（低墙射口，墙在 z≈84，朝北顺着 x 72.8–80.1 的夹道看村路，
+  //   2026-09-30 二轮起是夹道中线上的 (75.7,86.0)，村南门楼在 z 47.6，见 docs/Data_FirstLevelTransferCover20260927.md §7）；
   //   sideAlley 是第二处威胁的「侧巷」—— 守线右手边那条东巷（街东房与东排房之间，
   //   Notion「村东突入部队沿既有东巷追出」）的巷身中心。原先装载区东南那条巷子（SideAlley* 墙）
   //   留作院墙，不再有人从那里出来。
-  cartBoard: {x:85.6,z:113}, cartHalt: {x:76,z:135}, transferWall: {x:67.5,z:86}, sideAlley: {x:95.2,z:61},
+  cartBoard: {x:85.6,z:113}, cartHalt: {x:76,z:135}, transferWall: {x:75.7,z:86.0}, sideAlley: {x:96.2,z:61},
   // D 桥南：靠院墙夹道两端、接收院院门
   wallPathStart: {x:56,z:207}, wallPathEnd: {x:16,z:220}, receptionGate: {x:2,z:240},
   // 18 北沙河铁路桥：桥心、两端、南岸射位、北岸土坎、爆破安全区、淡出前的行军终点

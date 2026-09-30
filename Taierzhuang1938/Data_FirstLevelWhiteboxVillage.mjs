@@ -557,23 +557,36 @@ export function BuildVillageWhitebox(groundAt) {
   // East frontage of the southern street and the road out of the village.
   House("StreetEastSouthRowA", 86.45, 51, 8.1, 10, 3.4, {
     doors: [["W", 2.5, 1.2, 2.2, 1]], windows: [["W", -2.2, 1, 1.15, .85]] });
-  House("StreetEastSouthRowB", 86.7, 62.5, 8.6, 8, 3.3, {
+  // 2026-09-30（12 一夫当关）：路东两栋房的西墙从 x≈82.4 提到 x 80.1，与路西房东墙 x 72.8 夹出
+  // 约 7.3 m 的村路（原先 9.6 m，且 z 66 以南整片空场）。房子向西加宽、东墙不动（东巷宽度不变：
+  // SpaceTest「侧巷」5–9 m 量的就是它们的东墙到 VillageEastLaneWall）。RoadEast 房整体南挪到
+  // z 72.6–77.6，腾出 RowB 与它之间放大草垛（Transfer 包里）；东墙缩到 x 90.6，东巷机枪 → 车位的射线要从它东面过。
+  House("StreetEastSouthRowB", 85.55, 62.5, 10.9, 8, 3.3, {
     doors: [["W", -1.2, 1.2, 2.2, 1]], windows: [["W", 2.4, 1, 1.15, .85]] });
   House("VillageRoadWestHouse", 68.5, 61.5, 8.6, 8, 3.3, { alongX: true,
     doors: [["E", 1, 1.1, 2.1, 1]], windows: [["S", -1.5, 1, 1.15, .8], ["S", 2.4, .9, 1.2, .7]] });
-  House("VillageRoadEastHouse", 87.5, 70.4, 9, 5, 3.1, { alongX: true,
+  House("VillageRoadEastHouse", 85.35, 75.1, 10.5, 5, 3.1, { alongX: true,
+    doors: [["W", 0, 1.1, 2.1, 1]],
     windows: [["S", -2, 1, 1.15, .8], ["S", 2, 1, 1.15, .8]] });
-  // South village gate (门楼) over the x76 road, visible from 12_1's low wall:
-  // 4.2 m clear between piers, beam at 2.85 m, tiled roof; wing walls.
-  for (const [s, x] of [["W", 74.7], ["E", 79.7]]) Bank(`VillageSouthGatePier${s}`, x, 70.5, .8, 3.0, 1.6, "plaster");
-  Block("VillageSouthGateBeam", 77.2, 70.5, 6.2, .4, .5, "timber", { y: groundAt(77.2, 70.5) + 3.05 });
-  Roof("VillageSouthGateRoof", 77.2, 70.5, 7.6, 2.6, 3.25, true, 1.3, true);
-  // 12 掩护装载（docs/Data_FirstLevelTransferCover20260927.md）：追兵从门楼北侧压过来，
-  // 两翼墙是他们贴着探头的地方（高墙 → 在墙头侧身探出），掩体点放在靠门洞和靠外的两头。
-  YardWall("VillageSouthGateWingW", 72.2, 70.5, 4.2, .5, 2.2,
-    { faceX: 0, faceZ: -1, points: [{ x: 73.7, z: 70.5 }, { x: 70.7, z: 70.5 }] });
-  YardWall("VillageSouthGateWingE", 81.6, 70.5, 3.0, .5, 2.2,
-    { faceX: 0, faceZ: -1, points: [{ x: 80.6, z: 70.5 }, { x: 82.6, z: 70.5 }] });
+  // 路西第二栋（12 夹道的西墙，二轮）：东墙贴到 x 72.5，与 VillageRoadWestHouse（东墙 x 72.8）排成一列，
+  // 进深 6.5 m（x 66–72.5）、面宽 z 66.6–72.4。与路西房之间留 1.1 m 的巷口（通西巷），与最南一栋
+  // （Transfer 包 TransferLaneWestHouse，z 75.0–83.4）之间留 2.6 m 的巷口：改道后的过路车 southTraffic
+  // 从西巷下来，横穿夹道再进胸墙东侧的通行口（MissionTest 按 0.35 m 扫；改道前的斜线是
+  // (55,57)→(76,85)，会穿过这一排房）。
+  House("VillageLaneWestHouse", 69.25, 69.5, 6.5, 5.8, 3.0, { pitch: 1.3,
+    doors: [["E", 1.5, 1.1, 2.1, 1]], windows: [["E", -1.8, 1, 1.1, .8], ["W", 0, 1, 1.1, .8]] });
+  // 村南门楼（门楼）：2026-09-30 从 z 70.5 北挪到 z 47.6，卡在主街南段两道墙（x 72 / x 82，z 45–52）
+  // 之间。原位置正好挡在 12 守线正前方，从射口看不见村路；现在它是村路尽头的剪影（12_1 概念图
+  // 远处那座门楼），10→11 的红匾地标不变。4.2 m 净宽、梁 2.85 m、瓦顶，两翼接墙。
+  const GATE_Z = 47.6;
+  for (const [s, x] of [["W", 74.1], ["E", 79.1]]) Bank(`VillageSouthGatePier${s}`, x, GATE_Z, .8, 3.0, 1.6, "plaster");
+  Block("VillageSouthGateBeam", 76.6, GATE_Z, 6.2, .4, .5, "timber", { y: groundAt(76.6, GATE_Z) + 3.05 });
+  Roof("VillageSouthGateRoof", 76.6, GATE_Z, 7.6, 2.6, 3.25, true, 1.3, true);
+  // 两翼各补一截接到街墙（x 72.35 / x 81.65）的短墙。
+  YardWall("VillageSouthGateWingW", 73.05, GATE_Z, 1.4, .5, 2.2,
+    { faceX: 0, faceZ: -1, points: [{ x: 73.05, z: GATE_Z }] });
+  YardWall("VillageSouthGateWingE", 80.6, GATE_Z, 2.2, .5, 2.2,
+    { faceX: 0, faceZ: -1, points: [{ x: 80.6, z: GATE_Z }] });
   // 12 追兵的跃进掩体（日军只认手工 cover 块）。每件的藏身点在它北侧 0.65 m，
   // MISSION_TACTICS 的折点钉在那里。这一段不调 Rand()：它是整个文件共用的确定性序列，
   // 中途多取几次，后面所有碎砖、柴垛、枯树枝的位置都会跟着挪。
@@ -581,17 +594,16 @@ export function BuildVillageWhitebox(groundAt) {
     Block(id, x, z, w, h, d, semantic, { cover: { faceX: 0, faceZ: -1 }, ...extra });
   const Bats = (id, list) => list.forEach(([x, z, w, h, d, ry], i) =>
     Detail(`${id}${i}`, x, z, w, h, d, i % 2 ? "plaster" : "earthDark", { ry, y: groundAt(x, z) + h / 2 - .03 }));
-  // 门楼北侧：一辆翻在路东的大车，第一拨的机枪趴在它后头顺着车路往接运场里扫。
-  // 两挺机枪的掩体都只到 0.7–0.75 m：跪着开火露出头肩，从低墙上打得到（0.95 m 的柴垛
-  // 把跪姿的人整个挡住，整段实跑里东巷机枪 420 s 没被打掉）。
-  // 离 village 路线 0.9 m 以上（VillageTest 按 0.625 m 担架走廊扫）。
-  Cover("VillageGateCartBed", 79.2, 66.55, 1.6, .75, .5, "timber");
-  Detail("VillageGateCartWheel", 80.35, 66.95, .12, 1.1, 1.1, "timber", { ry: .3 });
-  Detail("VillageGateCartShaft", 80.9, 64.6, .12, .12, 2.8, "timber", { ry: -.25, y: groundAt(80.9, 64.6) + .08 });
-  // 门楼东侧塌下来的一堆墙土。
-  Cover("VillageGateRubbleEast", 82.3, 73.4, 2.0, .82, 1.0, "earthDark", { ry: .1 });
-  Bats("VillageGateRubbleEastFoot", [[81.1, 74.3, .4, .2, .3, .5], [81.8, 74.45, .5, .16, .35, 1.9],
-    [82.6, 74.25, .3, .22, .3, .2], [83.3, 74.4, .45, .14, .3, 2.6]]);
+  // 村路中段（z 62–74，两侧房前墙夹出的夹道）：一辆翻在路西半边的大车，第一拨的机枪趴在它后头
+  // 顺着车路往接运场里扫。两挺机枪的掩体都只到 0.7–0.75 m：跪着开火露出头肩，从低墙上打得到
+  // （0.95 m 的柴垛把跪姿的人整个挡住，整段实跑里东巷机枪 420 s 没被打掉）。
+  // 离 village 路线（x≈77.2 @ z 69）1.6 m 以上（VillageTest 按 0.625 m 担架走廊扫），车辕朝路西。
+  Cover("VillageLaneCartBed", 74.6, 69.4, 1.8, .75, .5, "timber");
+  Detail("VillageLaneCartWheel", 75.75, 69.9, .12, 1.1, 1.1, "timber", { ry: .3 });
+  Detail("VillageLaneCartShaft", 73.9, 67.6, .12, .12, 2.8, "timber", { ry: .28, y: groundAt(73.9, 67.6) + .08 });
+  // 路东房 RoadEast 东南角塌下来的碎砖（只是脚下的碎料，不挡人；草垛在南面 Transfer 包里）。
+  Bats("VillageLaneRubbleEastFoot", [[79.9, 72.2, .4, .2, .3, .5], [80.6, 72.35, .5, .16, .35, 1.9],
+    [83.9, 72.15, .3, .22, .3, .2], [84.6, 72.3, .45, .14, .3, 2.6], [83.4, 71.9, .5, .2, .3, .9]]);
   // 主街南段：西巷口一摞木箱、路东一垛麻袋。
   Cover("VillageStreetCrates", 73.5, 55.4, 1.1, 1.1, .9, "timber");
   Detail("VillageStreetCratesTop", 73.45, 55.35, .75, .5, .6, "timber", { ry: .3, y: groundAt(73.5, 55.4) + 1.35 });
@@ -611,8 +623,13 @@ export function BuildVillageWhitebox(groundAt) {
       "timber", { y: groundAt(94.3, 67.95) + .78, ry });
   Cover("VillageEastLaneCrate", 97.4, 56.4, 1.0, 1.05, 1.0, "timber");
   Pole("VillagePole3", 80.9, 57.6);
-  Pole("VillagePole4", 81.3, 67.2);
+  Pole("VillagePole4", 79.7, 64.9);
   Wires("VillagePole3", "VillagePole4");
+  // 电线杆一路排远（12_3 概念图：杆线顺村路排到尽头）：门楼南、路东房前各加一根，接同一路线。
+  Pole("VillagePole9", 80.6, 51.6);
+  Wires("VillagePole9", "VillagePole3");
+  Pole("VillagePole10", 79.6, 71.4);
+  Wires("VillagePole4", "VillagePole10");
   Pole("VillagePole5", 96.6, 47.5);
   Wires("VillagePole5", "VillagePole3");
   // West lane between the gun house and the southTraffic road.
@@ -696,13 +713,13 @@ export function BuildVillageWhitebox(groundAt) {
   // 10→11 的地标：村南门楼加一层檐（重檐顶到约 5.8 m，高过两边屋脊 4.5–4.8 m），门梁正中挂红匾、
   // 两侧挂灯笼 —— 与灶屋门的红对联同一个意思：红的地方就是要穿过去的口。门洞净空与墙体不变。
   {
-    const g = groundAt(77.2, 70.5);
-    Detail("VillageSouthGateLoft", 77.2, 70.5, 4.4, 1.0, 1.3, "timber", { y: g + 4.02 });
-    Roof("VillageSouthGateUpper", 77.2, 70.5, 5.6, 2.0, 4.45, true, 1.3, true);
-    Detail("VillageSouthGatePlaque", 77.2, 70.22, 1.6, .36, .05, "danger", { y: g + 3.05 });
-    for (const x of [75.4, 79.0]) {
-      Detail(`VillageSouthGateLantern${x}`, x, 70.5, .34, .44, .34, "canvas", { y: g + 2.5 });
-      Detail(`VillageSouthGateLanternCap${x}`, x, 70.5, .42, .06, .42, "danger", { y: g + 2.75 });
+    const g = groundAt(76.6, GATE_Z);
+    Detail("VillageSouthGateLoft", 76.6, GATE_Z, 4.4, 1.0, 1.3, "timber", { y: g + 4.02 });
+    Roof("VillageSouthGateUpper", 76.6, GATE_Z, 5.6, 2.0, 4.45, true, 1.3, true);
+    Detail("VillageSouthGatePlaque", 76.6, GATE_Z - .28, 1.6, .36, .05, "danger", { y: g + 3.05 });
+    for (const x of [74.8, 78.4]) {
+      Detail(`VillageSouthGateLantern${x}`, x, GATE_Z, .34, .44, .34, "canvas", { y: g + 2.5 });
+      Detail(`VillageSouthGateLanternCap${x}`, x, GATE_Z, .42, .06, .42, "danger", { y: g + 2.75 });
     }
   }
   // 08 主街北口东侧：街东房与东北房之间 z −27…−24 那道 3 m 的口子，顺着巷子望过去像路还往东通。
