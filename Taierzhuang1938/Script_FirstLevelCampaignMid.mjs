@@ -253,7 +253,7 @@ export async function Drive(ctx) {
   await Route([{ x: 82, z: 97.6 }, { x: 78, z: 96 }, { x: 70, z: 88.5 }, { x: 64.4, z: 88.1 }],
     "TransferSupply", { fight: true });
   assert.equal((await Interact()).kind, "supply", "the transfer crate is actually within reach");
-  await Route([{ x: 71.3, z: 85.7 }], "TransferLowWallPost", { fight: true });
+  await Route([{ x: 71.3, z: 86.05 }], "TransferLowWallPost", { fight: true });
   await Capture("TransferLowWallPost");
   const posted = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().facts);
   assert.ok(posted.includes("transferArrived"), "顺子上了村口低墙的射位（transferArrived）");
