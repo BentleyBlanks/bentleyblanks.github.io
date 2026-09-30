@@ -225,6 +225,8 @@ const Eye = (p, h) => ({ x: p.x, z: p.z, y: Ground(p.x, p.z) + h });
     Check(tank.enter === "BridgeCover", `${tank.id} BridgeCover 起就进场（射位站姿的视野里要看得见三辆）`);
     const path = [{ x: tank.startX ?? tank.x, z: shore - T.tankStartBackM }, ...tank.via.map(([x, back]) => ({ x, z: FarBankShoreZ(x) - back })),
       { x: tank.x, z: shore - tank.backM }, { x: tank.x, z: to }];
+    // 桥面上那辆：等待位 → 桥轴（z 72）→ 桥台 → 桥中孔的停位 → 起爆后的停位（沿桥轴，桥面高度）
+    if (bridgeTank) path.push({ x: tank.deckX, z: FarBankShoreZ(tank.deckX) - 18 }, { x: tank.deckX, z: 96 }, { x: tank.deckX, z: tank.deckPostZ }, { x: tank.deckX, z: tank.blastPostZ });
     let lo = Infinity, hi = -Infinity, hit = new Set(), maxStep = 0, lastY = null;
     const Y = (x, z) => CrowdGroundY(x, z, Ground);
     for (let i = 1; i < path.length; i++) {
@@ -240,9 +242,13 @@ const Eye = (p, h) => ({ x: p.x, z: p.z, y: Ground(p.x, p.z) + h });
     Check(hit.size === 0, `${tank.id} 路线净空（履带宽 2.2 m + 余量）：${[...hit]}`);
     Check(bridgeTank ? (maxStep <= 0.4 && lo > -0.6) : (hi - lo < 1.0 && lo > -0.6), `${tank.id} 路线地面平（${lo.toFixed(2)}…${hi.toFixed(2)}，逐 0.5 m 最大落差 ${maxStep.toFixed(2)}）`);
     if (bridgeTank) {
-      Check(tank.x === Bridge.x && to >= 112 && to <= 126, `${tank.id} 停在桥中孔（SpanMid z 112…136）的桥面上（z ${to}）`);
-      Check(tank.blastPostZ > to && tank.blastPostZ + 2.15 <= Bridge.spans[0].z1 + 0.01 && tank.blastPostZ + 2.15 >= 126, `${tank.id} 起爆后停在断口北侧：车头 ${(tank.blastPostZ + 2.15).toFixed(1)} 在 2 号墩（z 136）以北 ≤ 10 m`);
-      Check(Distance({ x: tank.x, z: to }, A.bridgeCover) >= 45, `${tank.id} 停位离射位 ≥ 45 m（炮弹落点、机枪曳光另按分档避开玩家）`);
+      // 等待位：桥头以北、桥西侧路堤旁，离桥轴 ≥ 4.5 m（尾队沿桥轴 x −77 从北岸过桥，车不能挡他们的路）
+      Check(Math.abs(tank.x - Bridge.x) >= 4.5 && to >= 60 && to <= 76, `${tank.id} 先等在桥头以北的空地上（x ${tank.x}，z ${to}）`);
+      Check(Math.abs(tank.deckX - Bridge.x) < 0.01 && tank.deckPostZ >= 112 && tank.deckPostZ <= 126, `${tank.id} 尾队过完桥后开上桥中孔（SpanMid z 112…136）的桥面（z ${tank.deckPostZ}）`);
+      Check(tank.blastPostZ > tank.deckPostZ && tank.blastPostZ + 2.15 <= Bridge.spans[0].z1 + 0.01 && tank.blastPostZ + 2.15 >= 126, `${tank.id} 起爆后停在断口北侧：车头 ${(tank.blastPostZ + 2.15).toFixed(1)} 在 2 号墩（z 136）以北 ≤ 10 m`);
+      Check(Distance({ x: tank.deckX, z: tank.deckPostZ }, A.bridgeCover) >= 45, `${tank.id} 桥面停位离射位 ≥ 45 m（炮弹落点、机枪曳光另按分档避开玩家）`);
+      // 桥头以北的等待位不压尾队的路线（bridgeCrossing 前两个点 (−77,70)、北桥头）
+      Check(Distance({ x: tank.x, z: to }, Routes.bridgeCrossing[0]) >= 4.5, `${tank.id} 等待位离尾队起点 ≥ 4.5 m`);
     } else {
       Check(Math.abs(tank.x - Bridge.x) >= 9, `${tank.id} 不压在桥轴的铁路上`);
       Check(Distance({ x: tank.x, z: to }, { x: A.bridgeCover.x, z: A.bridgeCover.z }) >= 80, `${tank.id} 停位离射位 ≥ 80 m`);
@@ -382,7 +388,7 @@ const Run = (bank, r, seconds, step) => { for (let i = 0; i < Math.round(seconds
   Check(bank.tanks.filter((t) => t.state === "posted").length >= 2, "T1、T2 到位停车");
   Check(bank.tanks.filter((t) => t.spec.kind !== "bridge").every((t) => t.z < FarBankShoreZ(t.x) - 5), "岸边两辆停在岸沿以北");
   const bt = bank.tanks.find((t) => t.spec.kind === "bridge");
-  Check(bt.state === "posted" && Math.abs(bt.x - Bridge.x) < 0.5 && bt.z >= 112 && bt.z <= 126, `桥面上那辆先停在桥中孔（z ${bt.z.toFixed(1)}）`);
+  Check(bt.state === "posted" && Math.abs(bt.x - Bridge.x) >= 4.5 && bt.z < 76, `桥面上那辆先等在桥头以北，不挡尾队过桥（x ${bt.x.toFixed(1)}，z ${bt.z.toFixed(1)}）`);
   Check(bank.tanks.every((t) => t.state === "posted"), "三辆都到位停车");
   // 岸线兵到了射位，环境射击授权点轮换：同时 ≤ ambientMax
   const armed = r.soldiers.filter((a) => a.ambientFirePoints);
@@ -396,6 +402,7 @@ const Run = (bank, r, seconds, step) => { for (let i = 0; i < Math.round(seconds
   // bridgeFireBroken → T3 进场、前锋上桥；rearColumnCrossed → 前锋回岸
   r.Record("bridgeFireBroken");
   Run(bank, r, 4, "BridgeCover");
+  Check(bank.tanks.find((t) => t.spec.kind === "bridge").z < 76, "尾队还没过完桥，桥面上那辆仍等在桥头以北（不堵桥）");
   Run(bank, r, 22, "BridgeCover");
   s = bank.State();
   Check(s.vanguard === 2, "两个前锋冲上桥");
@@ -421,6 +428,8 @@ const Run = (bank, r, seconds, step) => { for (let i = 0; i < Math.round(seconds
   }
   Check(releasedAt != null && blockedFrames > 20, `起爆器被拦了 ${blockedFrames} 帧，放行时刻 ${releasedAt?.toFixed(1)}`);
   s = bank.State();
+  const deckTank = bank.tanks.find((t) => t.spec.kind === "bridge");
+  Check(deckTank.state === "posted" && Math.abs(deckTank.x - Bridge.x) < 0.5 && deckTank.z >= 112 && deckTank.z <= 126, `尾队过完桥后桥面上那辆开上桥中孔（x ${deckTank.x.toFixed(1)}, z ${deckTank.z.toFixed(1)}）`);
   Check(s.rushState.settled && !s.rushState.timedOut, "冲桥组是到位站稳放行的，不是超时放行");
   Check(s.real === 8 && s.shore === 12 + 6 || s.shore >= 16, `第二拨到位：真 AI ${s.real} 岸线 ${s.shore}`);
   Check(s.rushState.started && s.rush === 6, "冲桥组 6 人");
@@ -467,6 +476,7 @@ const Run = (bank, r, seconds, step) => { for (let i = 0; i < Math.round(seconds
   s = bank.State();
   Check(s.bank.southBank === 0 && s.bank.southMostZ <= FAR_BANK_BLAST.spanZ[1], `全程没有人过河：最南 z ${s.bank.southMostZ}`);
   Check(s.bank.overAfterSettle === 0, "桥断 14 s 后对岸活着的人全在岸沿以北（停在岸边隔河射击）");
+  Check(deckTank.advanced && deckTank.state === "posted" && deckTank.z >= 126 && deckTank.z + 2.15 <= 136, `桥断后桥面上那辆开到断口北侧停下（z ${deckTank.z.toFixed(1)}，车头 ${(deckTank.z + 2.15).toFixed(1)}）`);
   Check(s.alive >= T.scriptedKeepMin && s.real === 8, `对岸仍有 ${s.alive} 人（补员线 ${T.scriptedKeepMin}）`);
   Check(s.ijaCount <= T.ijaCap, "补员不越过 ijaCap");
   // 补员：死一批，从隐蔽点补

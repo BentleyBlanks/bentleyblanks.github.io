@@ -141,16 +141,18 @@ export const FAR_BANK_FIRE_LISTS = freeze({
 //    路线离实心体块 ≥ 3.5 m、地面起伏 < 1 m（Script_FirstLevelFarBankTest 量）。
 // ---------------------------------------------------------------------------
 // 2026-09-30 R2b 规模感：战车挪到看得见的地方。
-//   · Bridge：沿北岸铁路路堤（桥轴 x −77）开下来，BridgeCover 起停在桥中孔的桥面上（z 122，SpanMid，离射位 ≈ 52 m），
+//   · Bridge：沿桥西侧的路堤（x −82.5，桥轴以西 5.5 m）开下来，BridgeCover 起等在桥头以北的空地上（z 68，桥西边 x −82.5 处：从射位看
+//     在西土坎上方露出炮塔）—— **不能先上桥面**：我方尾队（bridgeCrossing 沿桥轴 x −77）要从北岸过桥，桥面上的车会把他们堵死（整趟驾驶实测）。
+//     尾队过完桥（rearColumnCrossed）、桥头没有己方了，才沿桥轴开上桥中孔的桥面（z 122，SpanMid，离射位 ≈ 55 m），
 //     起爆之后等桥面上没有己方 blastAdvanceWaitS 秒再往前开到断口北侧（blastPostZ，SpanMid 靠 2 号墩一端），炮口对着南岸。
-//     桥面两侧各留 ≥ 0.6 m 给冲桥组（车道 ±1.75）；桥面高度由 view 的 groundAt 给（桥面 deckTopY，不是河床）。
+//     桥面两侧各留 ≥ 0.4 m 给冲桥组（车道 ±1.75）；桥面高度由 view 的 groundAt 给（桥面 deckTopY，不是河床）。
 //   · West / East：岸边空地上一字展开，炮口对着南岸。West 在西土坎（x −92…−82）以西，East 在东土坎（x −72…−60）以东，
 //     都在岸沿以北 6 m，不需要穿土坎：三辆都先沿桥轴路堤开下来，在 z≈70 处分头（via 是 [x, 岸沿以北 back 米]）。
 //     BridgeNorthRidge 两段土坎（z 81.6…82.8，高 1.6 m）在这两处以外，桥轴缺口 x −82…−72。
 // startX：出发点的 x（都从桥轴上的路堤出发，避开 RearFarm 院子 x −72.8…−59.2 与前沿壕沟尾巴 x −58…−30）。
 export const FAR_BANK_TANKS = freeze([
-  freeze({ id: "FarBankTankBridge", kind: "bridge", x: -77, startX: -77, backM: -32, pushBackM: -32, enter: "BridgeCover", delayKey: 0,
-    via: freeze([freeze([-77, 24])]), blastPostZ: 128.5, axisFire: true }),
+  freeze({ id: "FarBankTankBridge", kind: "bridge", x: -82.5, startX: -82.5, backM: 22, pushBackM: 22, enter: "BridgeCover", delayKey: 0,
+    via: freeze([]), deckX: -77, deckPostZ: 122, blastPostZ: 128.5, axisFire: true }),
   freeze({ id: "FarBankTankWest", x: -98, startX: -77, backM: 6, pushBackM: 6, enter: "BridgeCover", delayKey: 1,
     via: freeze([freeze([-77, 24]), freeze([-96, 20])]) }),
   freeze({ id: "FarBankTankEast", x: -57, startX: -77, backM: 6, pushBackM: 6, enter: "BridgeCover", delayKey: 2,

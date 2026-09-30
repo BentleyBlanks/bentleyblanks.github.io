@@ -70,6 +70,8 @@ const RIDGES = [[-92, -82], [-72, -60]];
 const NearRidge = (x, z) => z > 80.6 && z < 83.8 && RIDGES.some(([a, b]) => x > a - 0.8 && x < b + 0.8);
 const R2_POSTS = [...FAR_BANK_REAL, ...FAR_BANK_SHORE_A, ...FAR_BANK_SHORE_B, ...FAR_BANK_STANDBY];
 const TANK_ZONES = FAR_BANK_TANKS.filter((t) => t.kind !== "bridge").map((t) => ({ x: t.x, z: FarBankShoreZ(t.x) - t.backM }));
+/** 三辆车的停位（桥面上那辆是桥头以北的等待位）：任何人不站在车体旁 3.4 m 内。 */
+const TANK_POSTS = FAR_BANK_TANKS.map((t) => ({ x: t.x, z: FarBankShoreZ(t.x) - t.backM }));
 
 const Pick = (rnd, table) => { let r = rnd() * table.reduce((a, [, w]) => a + w, 0); for (const [name, w] of table) { r -= w; if (r <= 0) return name; } return table[0][0]; };
 
@@ -105,6 +107,7 @@ export function BuildFarBankCrowdRoster(seed = 0x18B2B) {
   const add = (kind, post, pose, extra = {}) => {
     // 拒绝：压真 AI 名册位、贴土坎、与已有的人挤在 0.85 m 内（留守随机撒点，岸线 / 桥头按格子摆，间距本来就够）
     if (R2_POSTS.some((p) => Math.hypot(p.x - post.x, p.z - post.z) < 1.4) || NearRidge(post.x, post.z)) return false;
+    if (kind === "reserve" && TANK_POSTS.some((t) => Math.hypot(t.x - post.x, t.z - post.z) < 3.4)) return false;
     if (units.some((u) => Math.hypot(u.post.x - post.x, u.post.z - post.z) < 0.85)) return false;
     const lane = (rnd() - 0.5) * 4.8;
     units.push({ id: `FarBankCrowd${units.length}`, kind, pose, post: { x: +post.x.toFixed(2), z: +post.z.toFixed(2), yaw: post.yaw ?? Math.PI + (rnd() - 0.5) * 0.35 },

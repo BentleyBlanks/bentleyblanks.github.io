@@ -550,9 +550,10 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     console.log("FARBANK_CROWD_WITHDRAW", JSON.stringify(fb.crowd));
     assert.ok(fb.crowd && fb.crowd.onField >= 200 && fb.crowd.flags >= 10, `BridgeWithdraw 起视觉人群 ${fb.crowd?.onField} ≥ 200、旗 ${fb.crowd?.flags}`);
     assert.equal(fb.tanks.length, 3, "三辆傀儡战车");
-    assert.ok(fb.tanks.every(t => t.state === "posted"), `三辆都到位：${fb.tanks.map(t => t.id + ":" + t.state)}`);
+    assert.ok(fb.tanks.filter(t => !/Bridge$/.test(t.id)).every(t => t.state === "posted"), `岸边两辆到位：${fb.tanks.map(t => t.id + ":" + t.state)}`);
+    // 桥面上那辆：BridgeCover 全程等在桥头以北（不堵尾队过桥），BridgeWithdraw（尾队过完）后沿桥轴开上桥中孔的桥面。
     const bridgeTank = fb.tanks.find(t => /Bridge$/.test(t.id));
-    assert.ok(bridgeTank && bridgeTank.z >= 112 && bridgeTank.z <= 126, `桥面上那辆先停在桥中孔（z ${bridgeTank?.z}）`);
+    assert.ok(bridgeTank && bridgeTank.z >= 100 && bridgeTank.z <= 126 && Math.abs(bridgeTank.x + 77) < 1, `桥面上那辆开上了桥中孔（x ${bridgeTank?.x}，z ${bridgeTank?.z}）`);
     await CaptureLook(page, CaptureFocus, "FarBankWithdrawStand", FAR_BANK_LOOK, "stand");
     await CaptureLook(page, CaptureFocus, "FarBankWithdrawCrouch", FAR_BANK_LOOK, "crouch");
   }

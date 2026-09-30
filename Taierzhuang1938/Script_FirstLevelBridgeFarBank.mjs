@@ -262,7 +262,7 @@ export class FirstLevelFarBank {
   }
   BeginWithdraw() {
     if (this.withdrawBegun || this.retired) return;
-    this.withdrawBegun = true; this.phase = "withdraw";
+    this.withdrawBegun = true; this.phase = "withdraw"; this.withdrawAt = this.t;
     const r = this.r;
     // 己方桥头人员与已过桥尾队：对岸真 AI 不把他们当目标（爆破手被隔河打死，桥就永远炸不了）。
     for (const entry of r.extras?.State?.() || []) {
@@ -638,12 +638,23 @@ export class FirstLevelFarBank {
    * 桥面上没有己方了（回岸边的冲桥组与人堆走清；最多等 blastAdvanceMaxS），再往前开到断口北侧（spec.blastPostZ）停下，炮口仍对着南岸。
    */
   UpdateBridgeTank(tank) {
-    if (tank.spec.kind !== "bridge" || tank.advanced || !this.blast?.done) return;
+    const spec = tank.spec;
+    if (spec.kind !== "bridge") return;
+    const onDeck = (z0, z1) => this.units.some((u) => u.actor?.alive && Math.abs(u.actor.position.x - AXIS_X) <= 3.4 && u.actor.position.z >= z0 && u.actor.position.z <= z1);
+    if (!tank.onDeck) {
+      // 等在桥头以北：尾队过完桥（或已经起爆）、桥头没有己方了，才沿桥轴开上桥面。
+      if (tank.state !== "posted" || !(this.r.Has?.("rearColumnCrossed") || this.blast)) return;
+      const waited = this.t - (this.withdrawAt ?? this.t);
+      if (onDeck(86, 104) && waited < T.blastAdvanceMaxS) return;
+      tank.onDeck = true;
+      tank.route = [{ x: spec.deckX, z: FarBankShoreZ(spec.deckX) - 18 }, { x: spec.deckX, z: 96 }];
+      tank.pushGoal = { x: spec.deckX, z: spec.deckPostZ }; tank.pushed = true; tank.state = "push";
+    }
+    if (tank.advanced || !this.blast?.done) return;
     const waited = this.t - this.blast.at;
     if (waited < T.blastAdvanceWaitS) return;
-    const onDeck = this.units.some((u) => u.actor?.alive && Math.abs(u.actor.position.x - AXIS_X) <= 3.4 && u.actor.position.z >= tank.z - 3 && u.actor.position.z <= tank.spec.blastPostZ + 5);
-    if (onDeck && waited < T.blastAdvanceMaxS) return;
-    tank.advanced = true; tank.pushGoal = { x: tank.spec.x, z: tank.spec.blastPostZ }; tank.pushed = true;
+    if (onDeck(tank.z - 3, spec.blastPostZ + 5) && waited < T.blastAdvanceMaxS) return;
+    tank.advanced = true; tank.pushGoal = { x: spec.deckX, z: spec.blastPostZ }; tank.pushed = true;
     if (tank.state === "posted") tank.state = "push";
   }
   StepTank(tank, dt) {
