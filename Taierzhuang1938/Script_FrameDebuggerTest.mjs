@@ -21,7 +21,10 @@ if (process.argv.includes('--trace')) page.on('console', msg => { if (msg.type()
 page.on('pageerror', error => errors.push(String(error)));
 page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text().slice(0, 500)); });
 try {
-  await page.goto(`${base}/__preview/ping`).catch(() => {});
+  // Same-origin blank page. A 404 lands on Chrome's error page, whose late
+  // navigation races setContent ("Execution context was destroyed").
+  await page.route(`${base}/__frameDebuggerBlank`, route => route.fulfill({ contentType: 'text/html', body: '<html><body></body></html>' }));
+  await page.goto(`${base}/__frameDebuggerBlank`, { waitUntil: 'load' });
   await page.setContent(`<html><head><script type="importmap">{"imports":{"three":"${base}/Taierzhuang1938/vendor/three/build/three.module.js"}}</script></head><body></body></html>`);
   const result = await page.evaluate(async ({ base, samples }) => {
     const THREE = await import('three');
@@ -47,14 +50,24 @@ try {
     const geom = batch.addGeometry(tiny);
     batch.setMatrixAt(batch.addInstance(geom), matrix.makeTranslation(-1, -1, 0.3));
     batch.setMatrixAt(batch.addInstance(geom), matrix.makeTranslation(1, -1, 0.3)); scene.add(batch);
+    // Unnamed transparent mesh under a named group: exercises ancestor naming
+    // and the DrawOpaqueObjects / DrawTransparentObjects split.
+    const effects = new THREE.Group(); effects.name = 'Effects'; scene.add(effects);
+    const fadeMaterial = MakeMaterial(0x808080); fadeMaterial.transparent = true;
+    const fade = new THREE.Mesh(geometry, fadeMaterial); fade.position.z = 0.5; effects.add(fade);
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(4, 3)), quadScene = new THREE.Scene(); quadScene.add(quad);
+    const idleTarget = new THREE.WebGLRenderTarget(16, 16);
+    const contact = { name: 'contact', composeMaterial: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+      Idle() { quad.material = this.composeMaterial; renderer.setRenderTarget(idleTarget); renderer.render(quadScene, camera); }, Render() {} };
     const outputScene = new THREE.Scene();
     const outputMaterial = new THREE.MeshBasicMaterial({ map: target.textures[0], depthTest: false, depthWrite: false });
     outputScene.add(new THREE.Mesh(new THREE.PlaneGeometry(4, 3), outputMaterial));
-    const post = { targets: { normalDepth: target }, passes: [
+    const post = { targets: { normalDepth: target }, blitter: { mesh: quad }, passes: [
       { name: 'main', Render() { renderer.setRenderTarget(target); renderer.render(scene, camera); } },
+      contact,
       { name: 'output', Render() { renderer.setRenderTarget(null); renderer.render(outputScene, camera); } },
     ] };
-    const Render = () => post.passes.forEach(pass => pass.Render());
+    const Render = () => post.passes.forEach(pass => pass === contact ? pass.Idle() : pass.Render());
     const PixelHash = bytes => { let h = 2166136261; for (const byte of bytes) h = Math.imul(h ^ byte, 16777619); return h >>> 0; };
     const Screen = () => { const pixels = new Uint8Array(128 * 96 * 4); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, 128, 96, gl.RGBA, gl.UNSIGNED_BYTE, pixels); return PixelHash(pixels); };
     Render(); const baseline = Screen();
@@ -65,6 +78,19 @@ try {
     const info = debug.Inspect();
     const first = info.events.find(event => event.draw && event.details?.object === 'Left red').index;
     const last = info.events.length - 1;
+    const organized = {
+      real: info.passes.filter(pass => !pass.synthetic).map(pass => pass.name),
+      mainChildren: info.passes.filter(pass => pass.parent === info.passes.find(row => row.name === 'main').id).map(pass => pass.name),
+      loose: info.events.filter(event => event.pass == null).length,
+      fade: info.events.find(event => event.details?.objectId === fade.id)?.label,
+      fadePath: info.events.find(event => event.details?.objectId === fade.id)?.path,
+      idle: info.events.filter(event => event.path === 'contact.Idle' && event.draw).map(event => `${event.kind}|${event.label}`),
+      clear: info.events.find(event => event.kind === 'Clear')?.label,
+      named: info.events.find(event => event.details?.object === 'Left red')?.label,
+    };
+    const outputDraw = info.events.findLast(event => event.draw);
+    const sampled = debug.TexturePreview(outputDraw.index, outputDraw.textures.findIndex(texture => texture.name === 'TestColor'), { width: 32 });
+    const sampledLit = sampled.pixels.some((value, i) => i % 4 !== 3 && value > 0);
     const a = debug.Preview(first, 0, { width: 128 });
     const b = debug.Preview(last, 0, { width: 128 });
     const c = debug.Preview(first, 0, { width: 128 });
@@ -100,7 +126,8 @@ try {
       multiDraw: multi?.drawInfo, hasMultiDraw: !!gl.getExtension('WEBGL_multi_draw'), instanced: instanced?.drawInfo,
       unsupported: { status: unsupported.gpuStatus, total: unsupported.gpuMs },
       disjoint: disjoint ? { status: disjoint.gpuStatus, total: disjoint.gpuMs } : null, rejected, profilerPaused, profilerResumed, presented, resizeReleased,
-      passes: info.passes.map(pass => pass.name), firstHash: PixelHash(a.pixels), lastHash: PixelHash(b.pixels), repeatedHash: PixelHash(c.pixels),
+      passes: info.passes.map(pass => pass.name), organized, sampledLit, sampledSize: [sampled.width, sampled.height],
+      groupTiming: timing.passes.filter(pass => pass.synthetic).map(pass => pass.gpuMs), firstHash: PixelHash(a.pixels), lastHash: PixelHash(b.pixels), repeatedHash: PixelHash(c.pixels),
       mrtHash: PixelHash(mrt.pixels), depthRange: [Math.min(...depth.pixels), Math.max(...depth.pixels)],
       timing: { status: timing.gpuStatus, total: timing.gpuMs, values: timing.events.map(event => event.gpuMs) },
       uniforms: info.events[first].uniforms.length, uniformArray: info.events[first].uniforms.find(uniform => uniform.name === 'palette[0]')?.value, programSources: info.programs.length };
@@ -121,7 +148,17 @@ try {
   if (result.disjoint) assert.deepEqual(result.disjoint, { status: 'disjoint', total: null });
   assert.ok(result.rejected && result.profilerPaused && result.profilerResumed);
   assert.ok(result.presented && result.resizeReleased, 'resource mutation must release the capture and synchronized game preview');
-  assert.deepEqual(result.passes, ['main', 'output']);
+  assert.deepEqual(result.organized.real, ['main', 'contact.Idle', 'output'], 'Idle draws get their own scope; empty hooks leave no node');
+  assert.deepEqual(result.organized.mainChildren, ['DrawOpaqueObjects', 'DrawTransparentObjects']);
+  assert.equal(result.organized.loose, 0, 'every event belongs to a group');
+  assert.equal(result.organized.fade, 'Effects › PlaneGeometry');
+  assert.equal(result.organized.fadePath, 'main/DrawTransparentObjects');
+  assert.deepEqual(result.organized.idle, ['Draw Fullscreen|contact.composeMaterial']);
+  assert.match(result.organized.clear, /^\((Color|Depth|Stencil)( (Depth|Stencil))*\)$/);
+  assert.equal(result.organized.named, 'Left red');
+  assert.ok(result.sampledLit, 'a sampled texture must read back as the draw sees it');
+  assert.deepEqual(result.sampledSize, [32, 24]);
+  if (result.timing.status === 'ready') assert.ok(result.groupTiming.every(value => Number.isFinite(value) && value >= 0), 'synthetic groups must receive GPU time');
   if (result.timing.status === 'ready') assert.ok(result.timing.values.every(value => Number.isFinite(value) && value >= 0));
   else assert.equal(result.timing.total, null, 'unsupported GPU timing must never report zero');
   if (!process.argv.includes('--core-only')) {
