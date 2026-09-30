@@ -530,14 +530,49 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
   for (const [i, x] of [-150, -132, -108, -92, -60, -44, 18, 66, 92, 118].entries()) for (const side of [-1, 1]) {
     const water = RiverWaterAt(x, RIVER);
     if (!water) continue;
+    if (side > 0 && water.reach && x > -100 && x < -50) continue;   // 桥头这一段南岸沙滩留成干净的沙地（爆破手、药箱、起爆线）
     const z = side < 0 ? water.z0 - 0.6 - (water.reach ? 0.6 : 0) : water.z1 + 0.6 + (water.reach ? 0.6 : 0);
     Detail(`NorthRiverReeds${i}${side < 0 ? "N" : "S"}`, x, z, 3.4, 1.9, 1.2, "foliage",
       { y: SampleMissionTerrain(x, z) + 0.95 });
   }
 }
+// 拓宽河段两岸的空气墙（docs/Data_FirstLevelGuidance20260928.md §3.2）。**陡坡本身拦不住真胶囊**：2026-09-30 实测
+// （Script_FirstLevelMissionTopologyBrowserTest「shore」），原 28 m 河槽的 63° 岸胶囊照样爬得上去，一路从北岸走到南岸
+//（斜率 > tan52° 只是纸面口径；autostep + 贴地吸附把 smoothstep 岸坡的缓头缓尾一节节爬掉）。所以这一段河靠墙：
+//   · 南岸：沙滩可以走到水边（爆破手就在那儿），但人不能下水涉过去 —— 墙摆在沙滩上「深度到 1.05 m」处（离水线约 0.9 m）；
+//   · 北岸：墙摆在岸沿外侧「深度到 0.9 m」的陡坡顶（岸沿以北 ~1 m），谁也下不去、也就爬不上来。
+// 墙只挡角色控制器，子弹与视线照旧穿过；|x−桥轴| < 3.4 不摆（桥面、1 号墩与桥台本来就有实体，铁路桥是唯一的过河处）。
+// 范围 = 拓宽段加两端过渡；过渡带里南岸坡在 50° 上下，同样靠墙。
+{
+  const RIVER = MISSION_NORTH_RIVER, REACH = RIVER.reaches[0];
+  // 每段 [中心 x, 宽]：4 m 一段（宽 4.4 互相咬合），铁路桥两侧的缺口（x −81.8…−74.2）里，桥面 x −79.7…−74.3 下面是净空不够的
+  // 桥台/引桥，西侧 x −81.8…−79.7 那条 2 m 的露天窄缝（桥面边到墙之间）另补一段窄墙，否则人会从桥边溜进水里。
+  const pieces = [];
+  for (let x = REACH.x0 - REACH.blendM; x <= REACH.x1 + REACH.blendM; x += 4)
+    if (Math.abs(x - MISSION_RAIL_BRIDGE.x) >= 3.4) pieces.push([x, 4.4]);
+  pieces.push([-80.75, 2.3]);
+  for (const [i, [x, w]] of pieces.entries()) {
+    let z = 175;
+    while (z > 150 && RiverCutAt(x, z, RIVER) < 1.05) z -= 0.1;
+    Block(`BridgeShoreAirWall${i}`, x, z + 0.35, w, 3, 0.7, "airWall", { visual: false, tag: "airWall" });
+    let north = 60;
+    while (north < 150 && RiverCutAt(x, north, RIVER) < 0.9) north += 0.1;
+    Block(`BridgeNorthBankAirWall${i}`, x, north - 0.7, w, 3, 1.4, "airWall", { visual: false, tag: "airWall" });
+  }
+}
 // 南岸遮挡（18 的射位）：中间留 x -77..-69 的缺口，爆破安全区从那儿看得见桥。
-GroundedWall("BridgeSouthCoverWest", -82.5, 177.6, 9, 1.3, 0.8);
-GroundedWall("BridgeSouthCoverEast", -64.5, 178.4, 9, 1.45, 0.8);
+// 2026-09-30 河拓宽：原来两道 1.3–1.45 m 的胸墙（离射位 1.4 m，把整条河挡在墙后）拆掉，射位改成「趴在南堤缺口后」：
+// 南堤（地形 BridgeLevee*，堤顶高出自然地面 1.4 m）在铁路桥头缺口 x −82.5…−70.5 处断开，射位 bridgeCover 正对缺口；
+// 缺口里只留一个土垄 BridgeSouthMound（3.2 m 宽，顶面 = 射位地面 + 1.25 m）：蹲姿眼高 1.05 被它挡住，
+// 站姿眼高 1.62 越过它看得见河、沙滩和桥；两侧各一段零星沙袋（BridgeSouthSandbagsWest/East）。
+{
+  const cover = MISSION_STAGE_ANCHORS.bridgeCover, x = -81, z = 177.7, w = 3.2, d = 0.9;
+  const top = SampleMissionTerrain(cover.x, cover.z) + 1.25;
+  const base = Math.min(...[-1, 0, 1].flatMap(a => [-1, 0, 1].map(b => SampleMissionTerrain(x + a * w / 2, z + b * d / 2)))) - .1;
+  Block("BridgeSouthMound", x, z, w, top - base, d, "earthDark", { y: (top + base) / 2, cover: { faceX: 0, faceZ: -1 } });
+}
+GroundedWall("BridgeSouthSandbagsWest", -88.6, 178.4, 3.6, 1.0, 0.8);
+GroundedWall("BridgeSouthSandbagsEast", -68.6, 178.4, 3.4, 1.0, 0.8);
 // 北岸土坎：敌军火力位（bridgeEnemy 在它北边，隔着土坎对射）。铁路那一段留缺口。
 // 2026-09-30 河拓宽：北岸北移 50 m，土坎跟着从 z 132.2 挪到 82.2（离新岸沿 z 90 约 8 m）。
 GroundedWall("BridgeNorthRidgeWest", -87, 82.2, 10, 1.45, 1.2);
@@ -656,11 +691,13 @@ for(const [row,points] of [
   // 铁路南引道（桥南）：旧的一列一路排到进站跑道尽头 z=743，其中东侧那一半
   // （x=-47）还压在接收院与撤离线那一带。新范围只跟到 bounds 的南界，两列都
   // 让开 x -62…1 的接收院／撤离走廊。
+  // 2026-09-30 北岸（河拓宽后新岸沿 z 90 一带）的对岸村子外围几棵枯树：远景，不在 R2 的进场地 x −100…−40、z 20…90 里。
+  ['West',[[-133,87],[-124,88],[-114,86],[-141,61],[-118,52],[-108,66]].map(([x,z])=>({x,z}))],
   ['RailApproach',[200,224,248,272,296,320,344].map((z,i)=>({x:i%2?-105:-92,z}))],
 ]) for(const [i,p] of points.entries()) {
   // 河槽里不长树：断面在这儿把地面切下去 4.2 m，树会立在河床上。
   if (RiverCutAt(p.x, p.z) > 0.5) continue;
-  const id='FieldPoplar'+row+i, height=6+(i%3)*.7;
+  const id='FieldPoplar'+row+i+(points.length===6&&row==='West'?'NB':''), height=6+(i%3)*.7;
   Block(id+'Trunk',p.x,p.z,.28,height*.65,.3,'timber',
     {treeModel:{heightM:height,region:row},ry:i*2.399963229728653});
 }

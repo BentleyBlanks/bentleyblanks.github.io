@@ -16,7 +16,7 @@ import { MISSION_LAYOUT as Layout, MISSION_ANCHORS as A, MISSION_ROUTES as Route
   MISSION_PLACEMENT as P, MISSION_NIGHT_GATE_BLOCK_IDS as NightIds, MISSION_SUPPLIES,
   MISSION_SUPPLY_COLLIDER, MISSION_TRENCH_PLACEMENTS } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes,
-  MISSION_NORTH_RIVER as River, RiverCutAt, RiverProfileAt,
+  MISSION_NORTH_RIVER as River, RiverCutAt, RiverProfileAt, RiverReachAt, RiverWaterAt,
   MISSION_RAIL_BRIDGE as RailBridge, MISSION_SOUTH_BRIDGE as RoadBridge,
   MISSION_RECEPTION_SPACE as Reception } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_ENCOUNTERS, MISSION_TACTICS } from "./Data_FirstLevelMission.mjs";
@@ -83,6 +83,7 @@ function SightBlocker(from, to, blocks) {
       y = from.y + (to.y - from.y) * t;
     if (Ground(x, z) > y + 0.02) return "terrain";
     for (const box of blocks) {
+      if (box.tag === "airWall") continue;                 // 空气墙只挡角色控制器，射线与视线穿过（Guidance §3.2）
       const cos = Math.cos(box.ry || 0), sin = Math.sin(box.ry || 0), dx = x - box.x, dz = z - box.z;
       if (Math.abs(dx * cos - dz * sin) < box.w / 2 && Math.abs(dx * sin + dz * cos) < box.d / 2
         && y > box.y - box.h / 2 && y < box.y + box.h / 2) return box.id;
@@ -432,70 +433,111 @@ if (!rearOnly) {
 }
 
 // ---------------------------------------------------------------------------
-// 8. 铁路桥：可走、可炸、炸后不可通行
+// 8. 铁路桥：三孔、可走、最南一孔可炸、炸后不可通行（2026-09-30 河拓宽后的口径）
 // ---------------------------------------------------------------------------
 {
   const deck = Layout.walkableSurfaces.find((surface) => surface.id === "RailBridgeDeck");
-  assert.ok(deck, "the rail bridge deck is a walkable surface");
-  assert.ok(deck.z - deck.d / 2 <= River.z - River.floorHalfW - River.bankRun
-    && deck.z + deck.d / 2 >= River.z + River.floorHalfW + River.bankRun,
-  "the deck spans the whole channel mouth");
-  report.railBridgeSpanM = deck.d;
-  // 上下桥没有台阶。
-  for (const z of [deck.z - deck.d / 2 - 1, deck.z + deck.d / 2 + 1]) {
-    const step = Math.abs((deck.y + deck.h / 2) - Ground(deck.x, z));
+  assert.ok(deck, "the blasted span's deck is a walkable surface");
+  assert.ok(Math.abs(deck.z - RailBridge.blast.centerZ) < 0.01 && Math.abs(deck.d - 2 * RailBridge.deckHalfD) < 0.01,
+    "RailBridgeDeck is the blasted (south) span, centred where the charges are");
+  // 桥面整体（三孔 + 南引桥段）连续、无缝，从北头 gapZ 北端一直盖到南头，并且跨过整条拓宽的河口。
+  const decks = Layout.walkableSurfaces.filter((surface) => Math.abs(surface.x - RailBridge.x) < 0.01
+    && surface.id !== "TemporaryBridge").sort((a, b) => a.z - b.z);
+  assert.equal(decks.length, 4, "three spans plus the south approach carry the track");
+  for (let i = 1; i < decks.length; i++)
+    assert.ok(Math.abs((decks[i - 1].z + decks[i - 1].d / 2) - (decks[i].z - decks[i].d / 2)) < 0.01,
+      `decks ${decks[i - 1].id} and ${decks[i].id} meet without a gap`);
+  const north = decks[0].z - decks[0].d / 2, south = decks.at(-1).z + decks.at(-1).d / 2;
+  assert.deepEqual([north, south], RailBridge.gapZ, "the deck runs exactly over the ballast gap");
+  const reach = RiverReachAt(RailBridge.x);
+  assert.ok(reach, "the rail bridge stands in the widened reach");
+  assert.ok(north <= reach.crestZ && south >= reach.shoreZ, "the deck spans the whole widened channel, bank to shore");
+  report.railBridgeSpanM = south - north;
+  // 桥墩与桥台：1 号墩在沙滩水边，2、3 号墩在水里，三孔各 24 m。
+  assert.deepEqual(RailBridge.piers.map((pier) => pier.z), [160, 136, 112], "piers at z 160 / 136 / 112");
+  for (const [z0, z1] of RailBridge.spans.map((span) => [span.z0, span.z1]).slice(0, 2))
+    assert.ok(Math.abs(Math.abs(z0 - z1) - 24) < 0.01, "spans are 24 m");
+  assert.ok(Ground(RailBridge.x, 160) > Ground(RailBridge.x, 136) + 2.5, "pier 1 stands on the sand, pier 2 in deep water");
+  const water = RiverWaterAt(RailBridge.x);
+  assert.ok(water.z1 < RailBridge.piers[0].z && RailBridge.piers[0].z - water.z1 < 3,
+    `pier 1 stands just above the waterline (waterline z ${water.z1.toFixed(1)})`);
+  for (const pier of RailBridge.piers) assert.ok(Layout.blocks.some((b) => b.id === `RailBridge${pier.id}` && b.solid !== false),
+    `${pier.id} is a permanent solid`);
+  // 上下桥没有台阶（两个桥头）。
+  for (const z of [north - 1, south + 1]) {
+    const step = Math.abs(RailBridge.deckTopY - Ground(RailBridge.x, z));
     assert.ok(step < TRAVERSAL.stepMax, `stepping onto the deck at z=${z}: ${step.toFixed(2)} m`);
   }
   const intact = Layout.gates.filter((gate) => gate.signal === RailBridge.signal);
   const wreck = Layout.gates.filter((gate) => gate.appearSignal === RailBridge.signal);
-  assert.equal(intact.length, 5, "the intact railway bridge has all five gated pieces");
+  assert.equal(intact.length, 5, "the intact blasted span has all five gated pieces");
   assert.equal(wreck.length, 3, "the destroyed railway bridge has all three wreck pieces");
   assert.ok(intact.some((gate) => gate.walkableId === "RailBridgeDeck"),
-    "the deck leaves walkableSurfaces when the bridge goes");
-  // 炸后：河槽上没有任何别的可走面。
+    "the blasted span's deck leaves walkableSurfaces when the bridge goes");
+  // 炸后：被炸那一孔（z 136..160）上没有任何别的可走面；另两孔与南引桥段永久留着（桥不是整座消失）。
   const others = Layout.walkableSurfaces.filter((surface) => surface.id !== "RailBridgeDeck"
-    && Math.abs(surface.x - RailBridge.x) < 8 && Math.abs(surface.z - River.z) < River.floorHalfW);
-  assert.deepEqual(others.map((s) => s.id), [], "nothing else carries a man over the channel at x=-77");
+    && Math.abs(surface.x - RailBridge.x) < 8
+    && surface.z + surface.d / 2 > RailBridge.z - RailBridge.deckHalfD + 0.01
+    && surface.z - surface.d / 2 < RailBridge.z + RailBridge.deckHalfD - 0.01);
+  assert.deepEqual(others.map((s2) => s2.id), [], "nothing else carries a man over the blasted span at x=-77");
+  // 炸后从南岸走不到北岸：南引桥段的北端就是 1 号墩，之外是 24 m 的水。
+  const south1 = decks.at(-1);
+  assert.ok(south1.z - south1.d / 2 >= RailBridge.z + RailBridge.deckHalfD - 0.01, "the south stub ends at pier 1");
   // 道砟/轨在桥段断开，桥面上另摆直轨。
   const gaps = Layout.railway.railGaps[0];
   assert.deepEqual(gaps, RailBridge.gapZ.map((z) => z + 186), "the ballast and rails break over the span");
   assert.equal(intact.filter((gate) => /^RailBridgeRail/.test(gate.id)).length, 2,
-    "two straight rails carry the track across the deck");
-  console.log("ok rail bridge deck spans the channel, breaks the track and is destructible",
-    JSON.stringify({ spanM: deck.d, intact: intact.length, wreck: wreck.length }));
+    "two straight rails carry the track across the blasted span");
+  console.log("ok rail bridge: three spans over the widened channel, blasted south span is destructible",
+    JSON.stringify({ spanM: report.railBridgeSpanM, intact: intact.length, wreck: wreck.length }));
 }
 
 // ---------------------------------------------------------------------------
-// 9. 18 的三条视线与爆破安全距离
+// 9. 18 的视线与爆破安全距离（2026-09-30 河拓宽后：南堤缺口里的土垄替掉了两道胸墙）
 // ---------------------------------------------------------------------------
 {
   const blocks = Solids("BunkerCollapsed");
   const deckTop = { x: RailBridge.x, z: RailBridge.z, y: RailBridge.deckTopY + 0.8 };
-  const cover = Eye(S.bridgeCover, 1.6), blast = Eye(S.blastSafe, 1.6);
+  const cover = Eye(S.bridgeCover, 1.62), blast = Eye(S.blastSafe, 1.6);
+  // 桥头（北岸）土坎后面的机枪手在桥轴西侧：南岸射位到他的连线整段在西桁架（x −79.95）以西；
+  // 桥头的步枪手（BridgeNorthB 一带）站在桥轴上，沿桥面看得见桥心与南桥头（两片桁架之间）。
+  const axis = MISSION_ENCOUNTERS.bridgeNorth.find((member) => member.id === "BridgeNorthB");
   const sight = {
     coverToDeck: SightBlocker(cover, deckTop, blocks),
     coverToEnemy: SightBlocker(cover, Eye(S.bridgeEnemy, 1.6), blocks),
     blastToDeck: SightBlocker(blast, deckTop, blocks),
-    enemyToDeck: SightBlocker(Eye(S.bridgeEnemy, 1.6), deckTop, blocks),
-    enemyToSouthEnd: SightBlocker(Eye(S.bridgeEnemy, 1.6), Eye(S.bridgeSouthEnd, 1.2), blocks),
+    enemyToDeck: SightBlocker(Eye(axis, 1.6), deckTop, blocks),
+    enemyToSouthEnd: SightBlocker(Eye(axis, 1.6), Eye(S.bridgeSouthEnd, 1.2), blocks),
   };
   report.bridgeSight = sight;
   for (const [key, blocker] of Object.entries(sight))
     assert.equal(blocker, null, `${key} must be a clear line: blocked by ${blocker}`);
-  // 南岸射位躲在遮挡后面（躺/蹲下去就断线），北岸土坎同理。
+  // 南岸射位躲在缺口里的土垄后面：蹲下去（眼高 1.05）就断线，站起来（1.62）才越得过它打到对岸；
+  // 北岸土坎同理（机枪手蹲在西土坎后面）。土垄顶必须比射位地面高 1.15–1.4 m
+  //（蹲姿眼高 + 0.1 … 站姿眼高 − 0.2），原口径「胸墙 1.1–1.7」在河拓宽后按射位地面重量。
   const Named = (id) => Layout.blocks.find((box) => box.id === id);
-  for (const [label, eye, id] of [["south cover", S.bridgeCover, "BridgeSouthCoverWest"],
-    ["north ridge", S.bridgeEnemy, "BridgeNorthRidgeEast"]]) {
-    const wall = Named(id);
-    assert.ok(wall && wall.h >= 1.1 && wall.h <= 1.7, `${label} is a 1.1-1.6 m parapet: ${wall?.h}`);
-    assert.ok(SightBlocker(Eye(eye, 0.9), deckTop, blocks), `${label} breaks a crouched line`);
-  }
+  const mound = Named("BridgeSouthMound");
+  assert.ok(mound && mound.cover, "the south-bank firing mound is a cover block");
+  const moundOver = mound.y + mound.h / 2 - Ground(S.bridgeCover.x, S.bridgeCover.z);
+  report.southMoundOverGroundM = +moundOver.toFixed(2);
+  assert.ok(moundOver >= 1.15 && moundOver <= 1.4, `the mound is 1.15-1.4 m over the firing spot: ${moundOver.toFixed(2)}`);
+  assert.ok(SightBlocker(Eye(S.bridgeCover, 1.05), deckTop, blocks), "south cover breaks a crouched (1.05 m eye) line to the span");
+  assert.ok(SightBlocker(Eye(S.bridgeCover, 1.05), Eye(S.bridgeEnemy, 1.6), blocks), "south cover breaks a crouched line to the gunner");
+  const ridge = Named("BridgeNorthRidgeWest");
+  assert.ok(ridge && ridge.h >= 1.1 && ridge.h <= 1.7, `north ridge is a 1.1-1.6 m parapet: ${ridge?.h}`);
+  assert.ok(SightBlocker(Eye(S.bridgeEnemy, 0.9), deckTop, blocks), "north ridge breaks a crouched line");
+  // 南堤：堤顶比自然地面高 1.2–1.8 m，铁路桥头缺口（x −82.5…−70.5）里没有堤；水面离南岸自然地面 1.0–1.5 m。
+  const crest = Math.max(...[-120, -100, -60].map((x) => Ground(x, 173) - Natural(x, 173)));
+  assert.ok(crest >= 1.2 && crest <= 1.8, `the south levee crest stands 1.2-1.8 m over natural ground: ${crest.toFixed(2)}`);
+  for (const x of [-79, -76, -73]) assert.ok(Ground(x, 173) - Natural(x, 173) < 0.9,
+    `the railway gap at x=${x} carries only the railbed (+0.62), no levee: ${(Ground(x, 173) - Natural(x, 173)).toFixed(2)}`);
   const blastM = Distance(S.blastSafe, S.railBridge);
   report.blastSafeM = +blastM.toFixed(1);
-  assert.ok(blastM >= 40, `the blast-safe position is at least 40 m from the span: ${blastM.toFixed(1)}`);
+  assert.ok(blastM >= 40, `the blast-safe position is at least 40 m from the blasted span's centre: ${blastM.toFixed(1)}`);
   assert.ok(Named("BlastSafeBank"), "the blast-safe position has its own cover");
-  console.log("ok bridge firing lines, parapets and a 40 m blast stand-off", JSON.stringify(
-    { blastSafeM: report.blastSafeM, coverToEnemyM: +Distance(S.bridgeCover, S.bridgeEnemy).toFixed(1) }));
+  console.log("ok bridge firing lines, south mound (crouch cut), north ridge and a 40 m blast stand-off", JSON.stringify(
+    { blastSafeM: report.blastSafeM, moundOverM: report.southMoundOverGroundM, levee: +crest.toFixed(2),
+      coverToEnemyM: +Distance(S.bridgeCover, S.bridgeEnemy).toFixed(1) }));
 }
 
 // ---------------------------------------------------------------------------
@@ -532,22 +574,74 @@ if (!rearOnly) {
 }
 
 // ---------------------------------------------------------------------------
-// 11. 北沙河：浅滩与两座桥之外处处不可横穿
+// 11. 北沙河：浅滩与两座桥之外处处不可横穿（原断面 + 2026-09-30 拓宽河段 RailBridgeReach）
 // ---------------------------------------------------------------------------
 {
   assert.ok(Layout.terrainSpec.rivers?.includes(River), "the river is data on the terrain spec");
+  const reachDef = River.reaches[0];
+  // 原断面：全宽 24–34 m。拓宽河段：水面 60–70 m、河口（北岸沿→沙滩南端）70–85 m。
   const width = 2 * (River.floorHalfW + River.bankRun);
   report.riverWidthM = width;
-  assert.ok(width >= 24 && width <= 34, `the channel is 24-34 m wide: ${width}`);
+  assert.ok(width >= 24 && width <= 34, `the original channel is 24-34 m wide: ${width}`);
+  const reach = RiverReachAt(RailBridge.x);
+  const water = RiverWaterAt(RailBridge.x);
+  report.reachWaterWidthM = +(water.z1 - water.z0).toFixed(1);
+  report.reachMouthWidthM = +(reach.shoreZ - reach.crestZ).toFixed(1);
+  assert.ok(report.reachWaterWidthM >= 60 && report.reachWaterWidthM <= 70, `the widened reach carries 60-70 m of water: ${report.reachWaterWidthM}`);
+  assert.ok(report.reachMouthWidthM >= 70 && report.reachMouthWidthM <= 85, `the widened mouth is 70-85 m: ${report.reachMouthWidthM}`);
+  // 只往北拓宽：南岸自然地面位置（河口南沿）与原断面差 < 3 m。
+  assert.ok(Math.abs(reach.shoreZ - (River.z + River.floorHalfW + River.bankRun)) < 3, "the south bank does not move");
+  assert.ok(reach.crestZ < River.z - River.floorHalfW - River.bankRun - 40, "the north bank moved ~50 m north");
+  // 逐米扫：每个 x（浅滩与两桥除外）河槽的北岸都是一道斜率 > tan52° 且落差 ≥ 1.5 m 的坎（下去就上不来），
+  // 南侧同样是这样一道坎，**或者**该处水线有空气墙（拓宽段的南岸是缓沙滩，过渡带里南岸坡在 50°上下，
+  // 靠空气墙拦住下水）—— 所以任何一点都过不了河。原断面两侧都是 63° 的岸。
+  const TanOf = (x, z0, z1) => { let worst = 0, rise = 0, prev = RiverCutAt(x, z0);
+    for (let z = z0 + 0.25; z <= z1; z += 0.25) { const c = RiverCutAt(x, z), slope = Math.abs(c - prev) / 0.25;
+      if (slope > TAN52) rise += Math.abs(c - prev); worst = Math.max(worst, slope); prev = c; }
+    return { worst, rise }; };
   const soft = [];
   for (let x = Layout.bounds.minX + 6; x <= Layout.bounds.maxX - 6; x += 1) {
     if (River.crossings.some((crossing) => Math.abs(x - crossing.x) <= crossing.halfW)) continue;
-    const profile = RiverProfileAt(x);
-    // smoothstep 的峰值斜率是平均的 1.5 倍。
-    const slope = 1.5 * profile.depth / profile.bankRun;
-    if (RiverCutAt(x, River.z) < 3 || slope <= TAN52) soft.push(x);
+    // 槽底（最深处）的 z：取全断面最大 cut 的中点。
+    let deepest = 0, zBed = River.z;
+    for (let z = 60; z <= 180; z += 0.25) { const c = RiverCutAt(x, z); if (c > deepest + 1e-9) { deepest = c; zBed = z; } }
+    let north = TanOf(x, 60, zBed), south = TanOf(x, zBed, 180);
+    const Walled = (pattern) => Layout.blocks.some((box) => box.tag === "airWall" && pattern.test(box.id)
+      && Math.abs(box.x - x) <= box.w / 2);
+    const walled = Walled(/^BridgeShoreAirWall/) && Walled(/^BridgeNorthBankAirWall/);
+    if (deepest < 3 || north.rise < 1.5 || (south.rise < 1.5 && !walled)) soft.push(`${x}:${deepest.toFixed(1)}/${north.rise.toFixed(1)}/${south.rise.toFixed(1)}`);
   }
   assert.deepEqual(soft, [], "the channel is only crossable at the ford and the two bridges");
+  // 拓宽段南岸沙滩走得下去（缓坡），但水线以下是走不回来的陡坎，且水线有空气墙；北岸岸沿同样有墙
+  //（陡坡本身拦不住真胶囊，见 Layout 里空气墙那一段的注释与 TopologyBrowserTest 的 shore 实测）。
+  {
+    let beachWorst = 0, prev = RiverCutAt(RailBridge.x, reach.shoreZ);
+    for (let z = reach.shoreZ - 0.25; z >= reach.waterZ; z -= 0.25) {
+      const c = RiverCutAt(RailBridge.x, z); beachWorst = Math.max(beachWorst, Math.abs(c - prev) / 0.25); prev = c; }
+    report.beachWorstSlope = +beachWorst.toFixed(2);
+    assert.ok(beachWorst < TAN52 * 0.4, `the beach is a gentle walk to the waterline: worst slope ${beachWorst.toFixed(2)}`);
+    const walls = Layout.blocks.filter((box) => box.tag === "airWall" && /^BridgeShoreAirWall/.test(box.id));
+    const northWalls = Layout.blocks.filter((box) => box.tag === "airWall" && /^BridgeNorthBankAirWall/.test(box.id));
+    assert.ok(walls.length >= 25 && northWalls.length === walls.length, `the widened shore has a waterline air wall on both banks: ${walls.length} + ${northWalls.length} pieces`);
+    assert.ok(northWalls.every((box) => box.visual === false && RiverCutAt(box.x, box.z + box.d / 2 + 0.05) < 1.6),
+      "north bank air walls are invisible and stand on the bank top, not in the channel");
+    assert.ok(walls.every((box) => box.visual === false), "shore air walls are invisible");
+    // 水线南沿（z1）与墙之间是可走的沙，墙在水线南 0–3.5 m。
+    for (const wall of walls.filter((box) => Math.abs(box.x - RailBridge.x) < 30)) {
+      const z1 = RiverWaterAt(wall.x).z1, gap = (wall.z - wall.d / 2) - z1;
+      assert.ok(gap >= -0.3 && gap <= 2, `air wall ${wall.id} sits ${gap.toFixed(2)} m off the waterline`);
+    }
+    // 墙不横跨任何路线（尾队沿 x=−77 走桥面，桥下不摆墙）。
+    for (const [name, route] of Object.entries(Routes)) for (let i = 1; i < route.length; i++) {
+      const allWalls = [...walls, ...northWalls];
+      const a2 = route[i - 1], b2 = route[i], n = Math.ceil(Distance(a2, b2) / 0.5);
+      for (let k = 0; k <= n; k++) {
+        const p = { x: a2.x + (b2.x - a2.x) * k / (n || 1), z: a2.z + (b2.z - a2.z) * k / (n || 1) };
+        const hit = allWalls.find((wall) => Math.abs(p.x - wall.x) < wall.w / 2 + 0.35 && Math.abs(p.z - wall.z) < wall.d / 2 + 0.35);
+        assert.ok(!hit, `route ${name} crosses shore air wall ${hit?.id}`);
+      }
+    }
+  }
   // 浅滩真的走得下去（西沟的撤离线从那儿过河）。
   const ford = River.fords[0];
   const fordProfile = RiverProfileAt(ford.x);
@@ -569,11 +663,15 @@ if (!rearOnly) {
   const road = Layout.gates.find((gate) => gate.id === "TemporaryBridge");
   assert.equal(road.signal, "MissionBridgeDestroyed");
   assert.equal(road.walkableId, "TemporaryBridge");
-  assert.ok(road.d >= 2 * (River.floorHalfW + River.bankRun), "the road bridge spans the widened channel");
+  assert.ok(road.d >= 2 * (River.floorHalfW + River.bankRun), "the road bridge spans the original channel");
   assert.ok(Layout.gates.some((gate) => gate.id === "MissionBridgeWreck"
     && gate.appearSignal === "MissionBridgeDestroyed"), "the road wreck still appears on the same signal");
-  console.log("ok North Sha He: 28.4 m channel, impassable banks, one ford and two bridges",
-    JSON.stringify({ widthM: report.riverWidthM, evacuationWorstSlope: report.evacuationWorstSlope }));
+  // 原断面 x（拓宽段与两端过渡之外）逐位不变：过渡带内才有拓宽的影响。
+  for (const x of [reachDef.x0 - reachDef.blendM - 1, reachDef.x1 + reachDef.blendM + 1, 20, 60, 100])
+    assert.equal(RiverReachAt(x), null, `no widening at x=${x}`);
+  console.log("ok North Sha He: 28.4 m channel elsewhere, 66 m widened reach at the rail bridge, impassable banks, one ford and two bridges",
+    JSON.stringify({ widthM: report.riverWidthM, reachWaterM: report.reachWaterWidthM, reachMouthM: report.reachMouthWidthM,
+      beachWorstSlope: report.beachWorstSlope, evacuationWorstSlope: report.evacuationWorstSlope }));
 }
 
 // ---------------------------------------------------------------------------
@@ -614,16 +712,20 @@ if (!rearOnly) {
   const solids = Solids("BunkerCollapsed");
   assert.deepEqual(solids.filter((block) => block.semantic === "water").map((b) => b.id), [],
     "no water slab reaches the clearance / sightline set");
-  // 水位：槽底以上 1.0–1.4 m，且离自然河岸还有余量（不是一条漫出来的河）。
-  const depths = water.map((block) => {
+  const reachDef = River.reaches[0];
+  const InReach = (block) => block.x >= reachDef.x0 && block.x <= reachDef.x1;
+  const original = water.filter((block) => !RiverReachAt(block.x)), widened = water.filter(InReach);
+  assert.ok(widened.length >= 20, `the widened reach carries its own slabs: ${widened.length}`);
+  // 原断面：水位槽底以上 1.0–1.4 m（低水位），且离自然河岸还有余量（不是一条漫出来的河）。
+  const depths = original.map((block) => {
     const floor = Ground(block.x, block.z);
     return { id: block.id, level: block.y + block.h / 2 - floor, freeboard: Ground(block.x, River.z + River.floorHalfW + River.bankRun + 2) - (block.y + block.h / 2) };
   });
   report.waterLevelM = +Math.max(...depths.map((d) => d.level)).toFixed(2);
   for (const d of depths)
     assert.ok(d.level >= 1.0 && d.level <= 1.4, `${d.id} sits 1.0-1.4 m above the channel floor: ${d.level.toFixed(2)}`);
-  // 河面比槽窄，且浅滩处收窄／断开露出滩地。
-  const halfWidths = water.map((block) => block.d / 2);
+  // 原断面河面比槽窄，且浅滩处收窄／断开露出滩地。
+  const halfWidths = original.map((block) => block.d / 2);
   assert.ok(Math.max(...halfWidths) < River.floorHalfW,
     `March low water is narrower than the trough: ${Math.max(...halfWidths)} < ${River.floorHalfW}`);
   const ford = River.fords[0];
@@ -631,13 +733,36 @@ if (!rearOnly) {
     "the ford shows bare shoal, not water");
   assert.ok(halfWidths.some((half) => half < Math.max(...halfWidths) - 1),
     "the surface narrows on its way into the ford instead of stopping square");
+  // 拓宽段：水面在南岸自然地面下 1.0–1.5 m（从射位蹲姿/站姿都望得见），河心水深 ≥ 2.5 m，宽 60–70 m，
+  // 整段同一个水位（相对自然地面），且不漫出岸（北岸岸沿、南岸沙滩以上都在水面之上）。
+  const wide = [];
+  for (const block of widened) {
+    const top = block.y + block.h / 2, southNatural = Natural(block.x, reachDef.shoreZ + 4);
+    const centreDepth = top - Ground(block.x, block.z), freeboard = southNatural - top;
+    wide.push({ id: block.id, freeboard, centreDepth, half: block.d / 2 });
+    assert.ok(freeboard >= 1.0 && freeboard <= 1.5, `${block.id} sits 1.0-1.5 m under the south bank ground: ${freeboard.toFixed(2)}`);
+    assert.ok(centreDepth >= 2.5, `${block.id} is at least 2.5 m deep mid-river: ${centreDepth.toFixed(2)}`);
+    assert.ok(block.d >= 60 && block.d <= 72, `${block.id} spans about 66 m: ${block.d.toFixed(1)}`);
+    assert.ok(Ground(block.x, block.z - block.d / 2 - 0.3) > top, `${block.id}: the north bank stands above the water`);
+    assert.ok(Ground(block.x, block.z + block.d / 2 + 0.3) > top, `${block.id}: the south beach stands above the water`);
+  }
+  report.reachWaterFreeboardM = [+Math.min(...wide.map((d) => d.freeboard)).toFixed(2), +Math.max(...wide.map((d) => d.freeboard)).toFixed(2)];
+  // 相邻两块的水位与宽度在整条河上连续（过渡带里不出现断崖）。
+  const sorted = water.slice().sort((p, q) => p.x - q.x);
+  for (let i = 1; i < sorted.length; i++) {
+    const p = sorted[i - 1], q = sorted[i];
+    if (q.x - p.x > 8 || q.x < reachDef.x0 - reachDef.blendM - 6 || q.x > reachDef.x1 + reachDef.blendM + 6) continue;  // 只查拓宽段与两端过渡（原断面在浅滩前水位随槽底抬升，旧口径）
+    assert.ok(Math.abs((p.y + p.h / 2) - (q.y + q.h / 2)) < 0.6, `water level is continuous at x=${q.x}`);
+    assert.ok(Math.abs(p.d - q.d) < 22, `water width is continuous at x=${q.x}: ${p.d.toFixed(1)} -> ${q.d.toFixed(1)}`);
+  }
   // 两座桥下连续（桥墩之间不断流）。
   for (const [label, x] of [["road bridge", RoadBridge.deck.x], ["rail bridge", RailBridge.x]])
     assert.ok(water.some((block) => Math.abs(block.x - x) <= block.w / 2 + 3),
       `the water runs under the ${label}`);
-  report.waterHalfWidthM = [+Math.min(...halfWidths).toFixed(2), +Math.max(...halfWidths).toFixed(2)];
-  console.log("ok North Sha He reads as water: non-solid slabs, 1.2 m low water, dry ford, continuous under both bridges",
-    JSON.stringify({ slabs: water.length, levelM: report.waterLevelM, halfWidthM: report.waterHalfWidthM }));
+  report.waterHalfWidthM = [+Math.min(...halfWidths).toFixed(2), +Math.max(...wide.map((d) => d.half)).toFixed(2)];
+  console.log("ok North Sha He reads as water: non-solid slabs, 66 m widened low water 1.25 m under the south bank, dry ford, continuous under both bridges",
+    JSON.stringify({ slabs: water.length, widened: widened.length, levelM: report.waterLevelM,
+      freeboardM: report.reachWaterFreeboardM, halfWidthM: report.waterHalfWidthM }));
 }
 
 // ---------------------------------------------------------------------------
@@ -692,8 +817,9 @@ if (!rearOnly) {
   for (const collection of [Layout.blocks, Layout.gates, ...Layout.scenario.states.map((s) => s.blocks)])
     assert.deepEqual(collection.filter((item) => gone.test(item.id)).map((i) => i.id), [],
       "no train or unloading-platform geometry is left in the mission layout");
-  assert.deepEqual(Layout.walkableSurfaces.map((s) => s.id), ["TemporaryBridge", "RailBridgeDeck"],
-    "the only walkable surfaces left are the two bridge decks");
+  assert.deepEqual(Layout.walkableSurfaces.map((s) => s.id), ["TemporaryBridge", "RailBridgeDeck", "RailBridgeSpanMidDeck",
+    "RailBridgeSpanNorthDeck", "RailBridgeApproachSouthDeck"],
+  "the only walkable surfaces left are the road deck and the rail decks (blasted span, two more spans, south approach)");
   assert.equal(P.stationCasualties, undefined, "the station casualty placement is gone");
   assert.equal(Layout.derailCar, undefined, "the derailed-carriage hook is gone");
   // 铁路只剩铁路桥引道。

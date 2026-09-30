@@ -208,6 +208,7 @@ function Blocked(from, to, eye = 1.6) {
     const t = i / steps, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t, y = a.y + (b.y - a.y) * t;
     if (SampleMissionTerrain(x, z) > y + 0.02) return true;
     for (const box of solids) {
+      if (box.tag === "airWall") continue;
       const cos = Math.cos(box.ry || 0), sin = Math.sin(box.ry || 0), dx = x - box.x, dz = z - box.z;
       if (Math.abs(dx * cos - dz * sin) < box.w / 2 && Math.abs(dx * sin + dz * cos) < box.d / 2
         && y > box.y - box.h / 2 && y < box.y + box.h / 2) return true;
@@ -239,6 +240,7 @@ assert.ok(!Blocked(S.blastSafe, S.bridgeSouthEnd), "the blast-safe position watc
       y = from.y + (deck.y - from.y) * t;
     if (SampleMissionTerrain(x, z) > y + 0.02) { clear = false; break; }
     for (const box of solids) {
+      if (box.tag === "airWall") continue;
       const cos = Math.cos(box.ry || 0), sin = Math.sin(box.ry || 0), dx = x - box.x, dz = z - box.z;
       if (Math.abs(dx * cos - dz * sin) < box.w / 2 && Math.abs(dx * sin + dz * cos) < box.d / 2
         && y > box.y - box.h / 2 && y < box.y + box.h / 2) { clear = false; break; }

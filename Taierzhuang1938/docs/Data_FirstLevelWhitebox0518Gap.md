@@ -152,13 +152,13 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
 | 11–12 接运 | 4 个 cart bay、9 个人群 pocket、`transfer` entryZ 88 / exitZ 111 分流带、低墙蹲姿挡 A/站姿打 A、B 盯车、侧巷口射界；车路上方开天（open sky above cart lane） | TransferTest |
 | 牛车 | 车盒 2.5×2.9、净高 2.2 沿 `cartRide`；`cartHalt.z < 138.8` | SpaceTest 12 |
 | 侧巷 | 净宽 5–9 m（现 7.3）、两侧墙 ≥ 2.4、巷口西向四条视线；`SideAlleyNorthWall` 西端让开追兵线 | SpaceTest 侧巷 |
-| 北沙河 | 河宽 24–34（现 28.4），除浅滩与两桥外处处过不去；撤离线过河坡度 < tan52（现 0.53）；地形修饰在 RiverCut 之前，河岸以内改不了 | SpaceTest 北沙河；§3 |
+| 北沙河 | 原断面河宽 24–34（现 28.4）；**铁路桥一带 x −140…−30 拓宽到水面 66.7 m（§7）**，除浅滩与两桥外处处过不去（拓宽段与过渡带靠空气墙，坡度拦不住真胶囊）；撤离线过河坡度 < tan52（现 0.53）；地形修饰在 RiverCut 之前，河岸以内改不了 | SpaceTest 北沙河；§3；§7 |
 | 西沟浅滩 | `WestDitchFord` x=47 半宽 8、深 1.05、坡 0.225 | Topology `MISSION_NORTH_RIVER.fords` |
 | 壕沟 | 交通壕底宽下限 3.24（`SquadMarchAi.CanPause`），交通壕取 3.4；全高沟深 ≥ 1.83；壕沟走 `Data_FirstLevelMissionTrenches` 样条，改它要跑 `Script_TrenchPlanTest` | [壕沟样条](Data_TrenchSpline.md) |
 | 回归自然缓坡 | (−62,64)、(54,114)、(52,209.5)、接收院入口 (−13,240) 四处 9 m 内压回自然地面（沟口/院口可走坡） | `SampleMissionTerrain` 末段 |
 | 15B 夹道 | 净宽 2.5–3.0（现 2.80）、北侧院墙 ≥ 2.7、南侧矮墙 1.0–1.3、一处直角左拐、一道坎 0.22 m | SpaceTest 15B |
 | 15C–17 | 院门净宽 ≥ 3.2（现 4.0）；厢房门槛 0.12–0.18 且 < stepMax；`MISSION_RECEPTION_SPACE` 全部点位；床边 1.96 m / 0.2 m 容差；16–17 屋顶盖住工作面（wardCoveredSamples） | SpaceTest 15C/16；EndTest |
-| 18 桥 | 桥梁四态（`TemporaryBridge`/`MissionBridgeWreck`、`RailBridge*` 完好 5 件/残骸 3 件）；桥台 4 件是翼墙、让开 x=−77；五条视线全通；胸墙 1.1–1.7；blastSafe ≥ 40（现 49.2） | SpaceTest 18；TopologyBrowserTest |
+| 18 桥 | 桥梁四态（`TemporaryBridge`/`MissionBridgeWreck`、`RailBridge*` 完好 5 件/残骸 3 件）；桥台 4 件是翼墙、让开 x=−77；五条视线全通（机枪手在桥轴西侧、桥头步枪手在桥轴上）；射位土垄顶高出射位地面 1.15–1.4 m（蹲姿眼高 1.05 断线、站姿 1.62 越过，原「胸墙 1.1–1.7」）；blastSafe ≥ 40（现 54.1，离被炸孔中心）；桥台翼墙北 z 88 / 南 z 165.5，三孔、三个桥墩（§7） | SpaceTest 18；TopologyBrowserTest |
 | 夜门 | 只属于 `NightGate` 态，不进 `blocks`/`gates`；城墙 8–10、门洞 3.6–4.2（现 3.8） | SpaceTest 夜景 |
 | 边界 | `MISSION_BOUNDS` minX −205 / maxX 137 / minZ −232 / maxZ 370；新件与锚点都在里面 | SpaceTest bounds |
 | 版本戳 | `MISSION_WHITEBOX_VERSION`（现 `first-level-20260924-whitebox-06-18-r1`）被 `MissionTopologyTest --rear-only` 硬断言；升版要同步那一行 | MissionTopologyTest |
@@ -273,3 +273,33 @@ worktree 里缺 `three` / `playwright-core` 时（整批 ERR_MODULE_NOT_FOUND）
   - 06 补给点（`Script_FirstLevelMissionView.BuildSupplies`）从米白平色盒换成旧弹药箱材质（开场布景的 `OpeningCrate`，退回 `WoodCrate`），可交互的呼吸发光不变。
   - 青砖整体提亮（`brightness`），门窗楣 / 窗台 / 外皮与所在墙同组同外观；桥头墩改条石，13 河岸残段改夯土。
 - **仍差**：屋顶外壳是平直坡面（没有瓦当、屋脊起翘）；墙面没有真的破口 / 缺角几何；灶屋等室内偏暗偏平（室内光归 B4）；地面与路面（归 B2）仍是亮米色，和墙根返潮接不上色。
+
+## 7. 2026-09-30 18 北沙河拓宽（施工包 R1a，docs/Data_FirstLevelTopology20260919.md §2「拓宽河段」）
+
+用户：「最后的炸桥，连条河都没有，要桥干什么用」。概念 18_1 / 18_3：河面很宽、水离岸顶一两米、南岸高堤 + 堤下沙滩、多孔桁架桥 + 石墩、对岸有村子。
+
+| 项 | 改前 | 改后 |
+| --- | --- | --- |
+| 河（x −140…−30，两端各 20 m 过渡） | 28.4 m 槽、水在槽底 +1.2（岸顶下 3 m） | 岸沿 z 90…沙滩南端 z 166；水面 66.7 m（z 91.6…158.3），水位在南岸自然地面下 1.25 m，河心水深 2.95 m |
+| 南岸 | 平地 + 0.85 m 窄岸垄 | 沙滩（斜率 ≤ 0.23）→ 高 1.4 m 的南堤（z 171.5…174.5，铁路桥头缺口 x −82.5…−70.5）→ 缓坡回地面；`Bridge18` 框西缘 −100 → −148 |
+| 桥 | 单孔 36 m 桥面（z 135…171）、桥台 z 140.5/165.5 | 三孔（南桥台 165.5 → 墩 160/136/112 → 北桥台 88），要炸最南一孔（中心 148）；`x,z` = 被炸孔中心 |
+| 射位胸墙 | `BridgeSouthCoverWest/East`（1.3/1.45 m，离射位 1.4 m） | 拆；缺口里 `BridgeSouthMound`（顶 = 射位地面 + 1.25 m）+ 零星沙袋 `BridgeSouthSandbagsWest/East` |
+| 对岸 | 土坎 z 132.2、敌 z 130.5、无村 | 北岸整体北移 50 m：土坎 z 82.2、机枪位 (−84.5,80.5)；x −140…−100、z 40…90 一小片村子（4 栋 + `WestFieldHouse` + 6 棵枯树），x −100…−40、z 20…90 留空给 R2 |
+| 白盒画质 | 水面画灰网格，植被卡片是不透明白竖片 | 水面蓝灰 + 天空反光，卡片保留 alpha 裁切（[白盒画质](Data_WhiteboxQuality.md)） |
+
+约束变更逐条（原值 → 新值 → 为什么）：
+
+| 约束 | 原值 | 新值 | 为什么 |
+| --- | --- | --- | --- |
+| 北沙河河宽「24–34」 | 全河 28.4 | 原断面照旧；拓宽段水面 60–70、河口 70–85 | 概念图河宽 60 m 以上 |
+| 水位 | 槽底以上 1.0–1.4 | 原断面同；拓宽段南岸自然地面下 1.0–1.5、河心水深 ≥ 2.5 | 射位要望得见水 |
+| 桥面 | 单块 `RailBridgeDeck` 跨整个河口 | `RailBridgeDeck` 只是被炸孔；另两孔与南引桥段永久（`walkableSurfaces` 5 个）；炸后 z 136…160 上没有别的可走面 | 三孔桥，只炸一孔 |
+| 「除浅滩与两桥外处处过不去」 | 纸面：岸坡 > tan52° | 拓宽段与过渡带靠空气墙；SpaceTest 逐米扫要求「两道陡壁或有墙」；TopologyBrowserTest 真胶囊验证 | 实测坡度拦不住真胶囊（基线 e080b510 上原 28 m 槽也能走过去） |
+| 「五条视线全通、胸墙 1.1–1.7 蹲姿断线」 | 胸墙高度 1.1–1.7 | 土垄顶高出射位地面 1.15–1.4；北岸土坎仍 1.1–1.7；机枪手改在桥轴西侧、桥头步枪手在桥轴上 | 三孔桥桁架（2.4 m 高、贯穿 z 88…160）会挡住横穿桥轴的连线；南岸不再有胸墙 |
+| 尾队过桥 | `bridgeCrossing` 114 m | 164 m（桥 83 m） | 桥变长；`rearColumnHoldM` 13 仍是北岸 16 m 引道内的 3 m 余量 |
+| blastSafe ≥ 40 m | 离桥心 49.2 | 离被炸孔中心 54.1 | 桥心挪到 z 148 |
+| 路线净空测试的脚下高度 | MissionTest 量河床（桥上路线量到 −4.2） | 量桥面（可走面） | 三孔桥的石墩在河床上立到桥面下 |
+| `BreakableTreesTest` 计数 | 46 棵 authored / 130 | 51 / 135 | 北岸村子 +6、`FieldPoplarWest7` 落进河槽 −1 |
+
+07+ 指纹（`Data_FirstLevelSpaceSouthFingerprint.json`）：blocks（2530 → 2678）与地面采样都变了，「07+ structure retained」红是预期（归集成者重生成）。
+遗留：桥的 GLB `Model_RailBridge.glb` 仍是单孔，暂盖在被炸孔上（R1b 重建三孔）；`Script_RailBridgeTest` 的地形快照红（同上）。

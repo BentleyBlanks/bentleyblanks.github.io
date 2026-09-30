@@ -55,13 +55,41 @@ try{
  assert.deepEqual(frontReturn.map(r=>r.reverse).sort(),[false,true],
   '03/06 shared trench keeps explicit forward and reverse Rapier capsule coverage');
  // -------------------------------------------------------------------------
+ // 2026-09-30 拓宽河段的岸：真 Rapier 胶囊从南岸沙滩往北走，被水线空气墙拦在沙滩上（下不了水）；
+ // 从北岸岸沿往南走，被北岸空气墙拦在岸上；桥面与 1 号墩下面（|x−桥轴|<3.4 不摆墙）靠实体，同样走不进水。
+ // **陡坡本身拦不住真胶囊**（原 28 m 河槽的 63° 岸胶囊照样爬上去，实测见 docs §2）——所以靠墙，不靠坡度。
+ // -------------------------------------------------------------------------
+ const shore=await page.evaluate(async()=>{
+  const g=window.Tengxian,rows=[],body=g.physics.MakeCharacter();
+  const {RiverReachAt}=await import('./Data_FirstLevelMissionTopology.mjs');
+  const Walk=(from,dir,frames)=>{
+   body.Teleport(from.x,g.physics.groundAt(from.x,from.z)+.03,from.z);
+   for(let i=0;i<frames;i++)body.Move(0,-.07,dir*.06);
+   return {x:+body.position.x.toFixed(2),y:+body.position.y.toFixed(2),z:+body.position.z.toFixed(2)};
+  };
+  try{
+   for(const x of [-150,-128,-104,-90,-60,-46,-30])rows.push({kind:'beachNorthbound',x,end:Walk({x,z:165},-1,700)});
+   for(const x of [-80.8,-73.4])rows.push({kind:'underBridgeNorthbound',x,end:Walk({x,z:165},-1,700)});
+   for(const x of [-150,-128,-104,-90,-60,-46,-30])rows.push({kind:'northBankSouthbound',x,crest:RiverReachAt(x)?.crestZ??138.8,end:Walk({x,z:Math.min(84,(RiverReachAt(x)?.crestZ??138.8)-6)},1,700)});
+  }finally{body.Remove();}
+  return rows;
+ });
+ await fs.writeFile(path.join(out,'Data_ShoreWalks.json'),JSON.stringify(shore,null,2));
+ for(const row of shore.filter(r=>r.kind==='beachNorthbound'||r.kind==='underBridgeNorthbound'))
+  assert.ok(row.end.z>=158.2&&row.end.y>-1.6,'the shore keeps a walker out of the water at x='+row.x+': '+JSON.stringify(row.end));
+ for(const row of shore.filter(r=>r.kind==='northBankSouthbound'))
+  assert.ok(row.end.z<=row.crest+2.5&&row.end.y>-.6,'the north bank air wall keeps a walker on the bank at x='+row.x+': '+JSON.stringify(row.end));
+ // -------------------------------------------------------------------------
  // 水面是示意不是空间；军列几何真的从场上消失了
  // -------------------------------------------------------------------------
  const river=await page.evaluate(async()=>{
   const g=window.Tengxian,{Vector3}=await import('three');
   const {MISSION_LAYOUT}=await import('./Data_FirstLevelMissionLayout.mjs');
   const water=MISSION_LAYOUT.blocks.filter(b=>b.semantic==='water');
-  const sample=water[Math.floor(water.length/2)];
+  // 2026-09-30：河在铁路桥一带拓宽（水位在南岸自然地面下 1.25 m、河心水深 ~3 m），其余是槽底以上 1.0–1.4 m 的低水位。
+  // 两种断面各取一块实测：原断面取 x≈−185 那块，拓宽段取 x≈−104 那块（桥轴上量到的是桥面）。
+  const original=water.filter(b=>b.x<-170).sort((a,b)=>a.x-b.x)[0],widened=water.filter(b=>Math.abs(b.x+104)<3)[0];
+  const sample=original;
   // 实机射线穿过水面那一层：碰不到任何实体（水没有碰撞，子弹也不停）。
   const through=g.battlefield.Raycast(new Vector3(sample.x,sample.y,sample.z-6),
    new Vector3(0,0,1),12,{terrain:false});
@@ -69,6 +97,8 @@ try{
   const floorY=g.battlefield.GroundHeight(sample.x,sample.z);
   return {water:water.length,throughId:through?.box?.id||through?.box?.tag||null,
    waterTopY:+(sample.y+sample.h/2).toFixed(2),floorY:+floorY.toFixed(2),
+   wideTopY:+(widened.y+widened.h/2).toFixed(2),wideFloorY:+g.battlefield.GroundHeight(widened.x,widened.z).toFixed(2),
+   wideThrough:!!g.battlefield.Raycast(new Vector3(widened.x+6,widened.y+.5,widened.z-12),new Vector3(0,0,1),24,{terrain:false}),
    trainColliders:g.battlefield.colliders.filter(c=>/^Station|^TrainDoor/.test(c.id||'')).length,
    bounds:g.battlefield.bounds};
  });
@@ -78,6 +108,9 @@ try{
  assert.ok(river.waterTopY-river.floorY>=1&&river.waterTopY-river.floorY<=1.4,
   'the water stands 1.0-1.4 m over the channel floor, and the floor is still what you stand on: '
   +JSON.stringify({waterTopY:river.waterTopY,floorY:river.floorY}));
+ assert.ok(river.wideTopY-river.wideFloorY>=2.5&&river.wideTopY-river.wideFloorY<=3.5,
+  'the widened reach is 2.5-3.5 m deep mid-river: '+JSON.stringify({wideTopY:river.wideTopY,wideFloorY:river.wideFloorY}));
+ assert.equal(river.wideThrough,false,'a shot crosses the widened river surface without hitting anything');
  assert.equal(river.trainColliders,0,'no train or station collider survives in the live field');
  assert.ok(river.bounds.maxZ<=400&&river.bounds.minZ>=-245,
   'the live field uses the shrunken bounds: '+JSON.stringify(river.bounds));

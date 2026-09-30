@@ -3,7 +3,7 @@
 //   · 上限：每档不超过 maxInstances，低档不多于高档；高档不是空的；
 //   · 禁区：不进路线走廊、锚点 / 交互点、实体块脚印、屋顶下、水面、壕沟沟底与沟壁、弹坑、路面（track）；
 //   · 视线：高于 0.6 m 的卡片只在河岸、墙根（且离路线 ≥ 3 m）或离路线 ≥ tallRouteClearM；锚点附近只有矮草；
-//   · 原来的 25 个 foliage 盒全部由植被接管；
+//   · 所有 foliage 盒（原 25 个；2026-09-30 河拓宽后芦苇丛/岸草/沙滩草共 40 个）全部由植被接管；
 //   · 卡片表与图集烘焙记录（_import/TextureBakes）一致，图集是 2 的幂、单张 ≤ 600 KB。
 import fs from "node:fs";
 import path from "node:path";
@@ -101,7 +101,7 @@ for (const it of high.instances) {
 for (const [key, value] of Object.entries(bad)) Check(value === 0, `禁区 ${key}：${value} 件${value ? `（例 ${examples[key]}）` : ""}`);
 
 // ---- foliage 盒接管 ---------------------------------------------------------
-Check(foliageIds.size === 25 && [...foliageIds].every((id) => high.replaced.has(id)), `25 个平色 foliage 盒由植被接管（${high.replaced.size}）`);
+Check(foliageIds.size === 40 && [...foliageIds].every((id) => high.replaced.has(id)), `40 个平色 foliage 盒由植被接管（${high.replaced.size}）`);
 
 // ---- 图集与烘焙记录 ----------------------------------------------------------
 const record = JSON.parse(fs.readFileSync(path.join(root, "_import/TextureBakes/Texture_FirstLevelVegetationAtlas.json"), "utf8"));
