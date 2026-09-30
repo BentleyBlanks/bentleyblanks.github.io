@@ -65,6 +65,11 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
         Object.freeze({ x: -66, z: 204 }), Object.freeze({ x: -64, z: 216 }), Object.freeze({ x: -62, z: 232 }),
         Object.freeze({ x: -61.4, z: 240 }),
       ]), note: "18 炸桥后随队南下（marchOut），行军队踩得宽一点；过了淡出点再延 8 m，路不在脚下断掉" }),
+    // 2026-09-30 D 包（概念 18_4）：夜行军的土路 —— 出生点 (-160,292) 到瓮城门前，一条被踩烂的宽路，让开阔泥地有方向。
+    Object.freeze({ id: "NightRoadTread", width: 4.6, wear: 0.9,
+      points: Object.freeze([
+        Object.freeze({ x: -161, z: 285 }), Object.freeze({ x: -160, z: 300 }), Object.freeze({ x: -160, z: 318 }),
+      ]), note: "18_4 夜行军的路：出生点以南的开阔泥地里一条宽土路，通向北门" }),
   ]),
   boxes: Object.freeze([
     Object.freeze({ id: "Reception15", minX: -41, maxX: 70, minZ: 150, maxZ: 260 }),
@@ -91,8 +96,11 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
         Object.freeze({ x: -1, z: 208, dy: 0 }), Object.freeze({ x: 0, z: 199, dy: 1.4 }),
         Object.freeze({ x: 0, z: 186, dy: 1.4 }), Object.freeze({ x: 0.5, z: 180, dy: 1.0 }),
       ]), note: "15 夹道西北向河下降的河谷坡（离沟口缓坡 (52,209.5) 40 m 以上）" }),
-    Object.freeze({ id: "LaneHollowEast", kind: "box", op: "cut", x: 28.5, z: 218.75, w: 18, d: 7.1,
-      dy: 1.0, feather: 1.4, note: "15_1 左侧石墙外低下去的菜园" }),
+    // 2026-09-30 D 包二轮：1.0 m → 1.8 m、羽化 1.4 → 2.0（最陡 1.35，人不走这里），核心 x 19.5…39.5、z 215.4…221.5。
+    // 羽化停点：西 x 17.5（夹道石墙外皮 17.6 之外）、北 z 213.4（WallPathLowWall 南面 213.35 之外）、
+    // 南 z 223.5（BackyardWall 北面 223.65 之外），夹道、墙与走线的地面一厘米不动。
+    Object.freeze({ id: "LaneHollowEast", kind: "box", op: "cut", x: 29.5, z: 218.45, w: 20, d: 6.1,
+      dy: 1.8, feather: 2.0, note: "15_1 左侧石墙外低下去的菜园（墙外 1.8 m 低地）" }),
     Object.freeze({ id: "BridgeLeveeWest", kind: "line", op: "raise", halfW: 1.5, feather: 5.5, dy: 1.4,
       points: Object.freeze([
         Object.freeze({ x: -136, z: 167.24 }), Object.freeze({ x: -128, z: 169.28 }), Object.freeze({ x: -120, z: 171.49 }), Object.freeze({ x: -112, z: 172.31 }), Object.freeze({ x: -104, z: 172.64 }),

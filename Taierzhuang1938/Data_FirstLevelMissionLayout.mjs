@@ -1035,6 +1035,15 @@ export const MISSION_PLACEMENT = Object.freeze({
     { id: "TransferShelterStretcher1", x: 58.3, z: 128.3, yaw: .08 },
     ...[229.4, 231.1, 232.8].map((z, i) => ({ id: `ReceptionYardWounded${i}`, x: -16.4, z, yaw: Math.PI / 2, patient: true })),
     ...[236.6, 238.4].map((z, i) => ({ id: `ReceptionWestWounded${i}`, x: -38.2, z, yaw: Math.PI / 2, patient: true })),
+    // 2026-09-30 D pack: wounded on the floor of the ward's north bay (concept 16_4 "地上四五副担架"), in the
+    // strips beside the six runtime litter slots (x -30 / -26.7 / -23.4 at z 229 and 232.8), and on the west
+    // ditch floor south of the river (concept 15_3), beside the x=56 evacuation line.
+    { id: "ReceptionWardFloorWounded0", x: -31.9, z: 230.7, yaw: 0, patient: true },
+    { id: "ReceptionWardFloorWounded1", x: -21.9, z: 230.5, yaw: 0, patient: true },
+    { id: "ReceptionWardFloorWounded2", x: -21.9, z: 234.7, yaw: 0, patient: true },
+    { id: "RearDitchWounded0", x: 54.6, z: 190.5, yaw: 0, patient: true },
+    { id: "RearDitchWounded1", x: 57.4, z: 194.6, yaw: 0, patient: true },
+    { id: "RearDitchWounded2", x: 54.6, z: 198.4, yaw: 0, patient: true },
   ],
   // 18 铁路桥。
   bridge: {
