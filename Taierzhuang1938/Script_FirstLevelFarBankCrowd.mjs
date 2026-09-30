@@ -47,7 +47,7 @@ export class FarBankCrowd {
     const rnd = this.rnd = Rng(this.seed ^ 0xA5);
     this.roster = AssignCrowdWaves(BuildFarBankCrowdRoster(this.seed), C.waves);
     this.units = this.roster.map((spec) => {
-      const path = [{ x: FAR_BANK_CROWD_AXIS_X + spec.lane, z: FAR_BANK_CROWD_SPAWN_Z }, ...spec.route];
+      const path = [spec.spawn ?? { x: FAR_BANK_CROWD_AXIS_X + spec.lane, z: FAR_BANK_CROWD_SPAWN_Z }, ...spec.route];
       const cum = [0];
       for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + Math.hypot(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z));
       return { spec, id: spec.id, kind: spec.kind, pose: spec.pose, wave: spec.wave, flag: spec.flag, sword: spec.sword, pace: spec.pace, scale: spec.scale,
@@ -199,7 +199,7 @@ export class FarBankCrowd {
     return {
       active: this.active, t: Number(this.t.toFixed(1)), total: this.units.length,
       onField: by((u) => u.mode !== "wait"), running: by((u) => u.mode === "run"), holding: by((u) => u.mode === "hold" || u.mode === "pace" || u.mode === "duck"),
-      shore: by((u) => u.kind === "shore" && u.mode !== "wait"), bridge: by((u) => u.kind === "bridge" && u.mode !== "wait"), reserve: by((u) => u.kind === "reserve" && u.mode !== "wait"),
+      shore: by((u) => u.kind === "shore" && u.mode !== "wait"), slope: by((u) => u.kind === "slope" && u.mode !== "wait"), bridge: by((u) => u.kind === "bridge" && u.mode !== "wait"), reserve: by((u) => u.kind === "reserve" && u.mode !== "wait"),
       flags: by((u) => u.flag && u.mode !== "wait"), swords: by((u) => u.sword && u.mode !== "wait"),
       waves: { ...this.waveAt }, flashes: this.counts.flashes, arrived: this.counts.arrived, ducked: this.counts.ducked,
     };

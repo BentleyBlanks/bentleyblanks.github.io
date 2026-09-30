@@ -22,6 +22,10 @@ import { MISSION_STAGE_ROUTES as Routes } from "./Data_FirstLevelMissionTopology
 const argv = process.argv.slice(2);
 const arg = (name) => argv.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
 const perf = argv.includes("--perf");
+// --only=01,05,14 只拍名字以这些前缀开头的图；--until=cover|withdraw|blast 走到那一段就收（迭代画面时省时间，R2c）。
+const only = (arg("only") || "").split(",").filter(Boolean);
+const until = arg("until") || "";
+const WantShot = (name) => !only.length || only.some((prefix) => name.startsWith(prefix));
 const options = ParseCampaignArgs();
 options.suite = "FirstLevelFarBankShots";
 const ctx = await OpenCampaign(options);
@@ -49,6 +53,7 @@ async function Look(point) {
   }, point);
 }
 async function Shot(name, point = LOOK, stance = null) {
+  if (!WantShot(name)) return;
   if (perf) return;
   if (stance) await page.evaluate((s) => window.Tengxian.player.SetStance(s), stance);
   await Look(point);
@@ -58,6 +63,7 @@ async function Shot(name, point = LOOK, stance = null) {
 }
 /** 举枪瞄准（右键，铁瞄视野收窄）看对岸拍一张：玩家打对岸真会这么看。 */
 async function ShotAds(name, point = LOOK) {
+  if (!WantShot(name)) return;
   if (perf) return;
   await page.evaluate(() => { const g = window.Tengxian; g.player.SetStance("stand"); g.Debug.Mouse(2, true); });
   await Look(point);
@@ -76,7 +82,9 @@ async function Timing(label, frames = 24) {
     const rinfo = g.renderer.info, wasReset = rinfo.autoReset; rinfo.autoReset = false; rinfo.reset(); g.StepFrames(1, 1 / 60, true); const info = { calls: rinfo.render.calls, triangles: rinfo.render.triangles }; rinfo.autoReset = wasReset;
     let ija = 0; for (const s of g.ai.soldiers) if (s.alive && s.side === "ija") ija += 1;
     return { p50: +samples[Math.floor(samples.length / 2)].toFixed(2), p95: +samples[Math.floor(samples.length * 0.95)].toFixed(2),
-      mean: +(samples.reduce((a, b) => a + b, 0) / samples.length).toFixed(2), drawCalls: info.calls, triangles: info.triangles, ija, skinned: (() => { let n = 0; g.scene.traverse((o) => { if (o.isSkinnedMesh) n += 1; }); return n; })() };
+      mean: +(samples.reduce((a, b) => a + b, 0) / samples.length).toFixed(2), drawCalls: info.calls, triangles: info.triangles, ija, skinned: (() => { let n = 0; g.scene.traverse((o) => { if (o.isSkinnedMesh) n += 1; }); return n; })(),
+      // 谁在花：按场景根节点拆的可见三角形（A/B 两棵树各跑一遍，看是布景、人物还是植被在涨落）
+      roots: g.scene.children.map((c) => { let tris = 0, m = 0; c.traverse((o) => { if (o.isMesh && o.visible) { m++; const geo = o.geometry; const n = (geo.index ? geo.index.count : geo.attributes.position?.count || 0) / 3; tris += n * (o.isInstancedMesh ? o.count : 1); } }); return { name: c.name || c.type, m, tris: Math.round(tris) }; }).filter((r) => r.tris > 20000).sort((a, b) => b.tris - a.tris).slice(0, 10) };
   }, frames);
   timings[label] = t;
   console.log("FRAME", label, JSON.stringify(t));
@@ -106,6 +114,7 @@ try {
   await ShotAds("03b_CoverAds", LOOK);
   await page.evaluate(() => window.Tengxian.player.SetStance("stand"));
   await Timing("cover+60s");
+  if (until === "cover") throw new Error("__until__");
   // 2. 打断北岸火力 / 尾队过桥：强记，进 BridgeWithdraw
   await Record("bridgeFireBroken");
   await Step(20);
@@ -125,6 +134,7 @@ try {
   await ShotAds("07b_WithdrawAds", LOOK);
   await page.evaluate(() => window.Tengxian.player.SetStance("stand"));
   await Timing("withdraw+22s");
+  if (until === "withdraw") throw new Error("__until__");
   // 3. 起爆：玩家退到安全区，等 bridgeDestroyed
   await Place(A.blastSafe.x, A.blastSafe.z);
   await Look({ x: A.railBridge.x, z: A.railBridge.z, height: 2 });
@@ -166,6 +176,8 @@ try {
   await Shot("15_BeforeBlackout", LOOK, "stand");
   await fs.writeFile(path.join(out, "Data_FarBankShots.json"), JSON.stringify({ quality: options.quality || "low", perf, timings, notes }, null, 2));
   console.log("DONE", JSON.stringify(Object.fromEntries(Object.entries(timings).map(([k, v]) => [k, v.p50]))));
+} catch (error) {
+  if (error?.message !== "__until__") throw error;
 } finally {
   await CloseCampaign(ctx);
 }

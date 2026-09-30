@@ -684,20 +684,22 @@ FarmSilhouette('VillageRearHouse',39,65,13,11,4);
 FarmSilhouette('RearFarm',-66,27,13,11,4.1);
 FarmSilhouette('TransferFieldStore',120,126,13,12,4.6);
 // WestFieldHouse 原在 (-113,99)：拓宽后的河槽正好占了那里（civilianAftermath 还按 id 引用它），挪进北岸村子。
-FarmSilhouette('WestFieldHouse',-121,67,15,10,4.2);
+// R2c（2026-09-30 北岸坡地）：村子整体上了坡顶台地（z 3…26、+6.4 m），这一户在坡顶村的西头 (−141,19)。
+FarmSilhouette('WestFieldHouse',-141,19,15,10,4.2);
 FarmSilhouette('SouthFieldHouse',60,-60,12,9,4);
 FarmSilhouette('RearOrchardHouse',-120,-20,13,11,4.1);
 // Authored tree rows use the supplied dead-tree model, at the original anchors.
 // These trunk records reserve space for dressing; the field does not draw them.
 for(const [row,points] of [
   ['East',[-180,-151,-116,-81,-43,-5,36,71,104,142,167].map((z,i)=>({x:125+(i%3)*2,z}))],
-  ['West',[-165,-131,-97,-63,-29,6,84,122,151].map((z,i)=>({x:-117-(i%2)*5,z}))],
+  ['West',[-165,-131,-97,-63,-29,6,74.5,122,151].map((z,i)=>({x:-117-(i%2)*5,z}))],
   ['SouthRoad',[-83,-51,-20,12,43,71].map((z,i)=>({x:18+(i%2)*3,z}))],
   // 铁路南引道（桥南）：旧的一列一路排到进站跑道尽头 z=743，其中东侧那一半
   // （x=-47）还压在接收院与撤离线那一带。新范围只跟到 bounds 的南界，两列都
   // 让开 x -62…1 的接收院／撤离走廊。
   // 2026-09-30 北岸（河拓宽后新岸沿 z 90 一带）的对岸村子外围几棵枯树：远景，不在 R2 的进场地 x −100…−40、z 20…90 里。
-  ['West',[[-133,87],[-124,88],[-114,86],[-141,61],[-118,52],[-108,66]].map(([x,z])=>({x,z}))],
+  // R2c：六棵挪上坡地的台面（前几级的台面与坡顶前沿，坡顶村南侧），离人群的名册位 ≥ 2 m（Script_FirstLevelFarBankTest 量）。
+  ['West',[[-146,80],[-131,61.3],[-108,45.3],[-141,30.5],[-125,30.5],[-107,24.5]].map(([x,z])=>({x,z}))],
   ['RailApproach',[200,224,248,272,296,320,344].map((z,i)=>({x:i%2?-105:-92,z}))],
 ]) for(const [i,p] of points.entries()) {
   // 河槽里不长树：断面在这儿把地面切下去 4.2 m，树会立在河床上。

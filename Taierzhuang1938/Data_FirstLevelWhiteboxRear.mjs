@@ -453,14 +453,17 @@ export function BuildRearWhitebox(groundAt) {
   for (const [i, x, z, s] of [[0, -91, 164.6, .9], [1, -86.6, 165.2, .8], [2, -68, 165.4, .9], [3, -63.5, 164.4, .8]])
     Detail(`BridgeBankGrassBeach${i}`, x, z, s, s * .9, s * .8, "foliage", { y: groundAt(x, z) + s * .45 });
 
-  // 18 north bank (far side of the river, x −140…−100, z 40…90): a small village seen across the water in
-  // concept 18_3 — four one-storey houses (Layout adds WestFieldHouse at (−121,67)) and dead trees (Layout row).
-  // Keeps x −100…−40, z 20…90 empty: package R2 stages the Japanese infantry and tanks there.
-  for (const [id, x, z, w, d, h, alongX] of [["NorthBankHouseA", -138, 81, 9, 7, 3.2, true], ["NorthBankHouseB", -126, 84, 8, 6.5, 3, false],
-    ["NorthBankHouseC", -111, 79, 10, 8, 3.4, true], ["NorthBankHouseD", -107.5, 58, 9, 7, 3.1, false]])
+  // 18 north bank (far side of the river): a small village seen across the water in concept 18_3 — four one-storey
+  // houses (Layout adds WestFieldHouse) and dead trees (Layout row). R2c (2026-09-30): the village moved from the bank
+  // (x −140…−100, z 58…84) up onto the crest plateau of the north-bank terraces (terrain NorthTerrace4: x −150…−105,
+  // z 3…26, +6.4 m). On the bank it stood in front of the terraces and hid the whole slope; on the crest it is the
+  // skyline behind the soldiers. Two rows: (WestFieldHouse, A, B) at z 14…24, (C, D) at z 4.5…13; the lane x −121…−118
+  // between A and B is the gap the crowd columns come down through (terrain trail TerraceDescentA).
+  for (const [id, x, z, w, d, h, alongX] of [["NorthBankHouseA", -125.5, 20, 9, 7, 3.2, true], ["NorthBankHouseB", -114, 20.5, 8, 6.5, 3, false],
+    ["NorthBankHouseC", -131, 9, 10, 8, 3.4, true], ["NorthBankHouseD", -112, 8, 9, 7, 3.1, false]])
     HouseMass(id, x, z, w, d, h, { alongX });
-  Grounded("NorthBankYardWall", -133, 76, 6, 1.4, .5, "plaster");
-  Rubble("NorthBankSpill", -119, 78, 5, 8, 1.5, .4);
+  Grounded("NorthBankYardWall", -128, 14.2, 6, 1.4, .5, "plaster");
+  Rubble("NorthBankSpill", -119.5, 13.5, 5, 6, 1.2, .4);
   // The rail bridge is a single-span truss now (Model_RailBridge, docs/Data_RailBridge.md):
   // no river piers. The old non-colliding pier details were removed with the whitebox look.
 

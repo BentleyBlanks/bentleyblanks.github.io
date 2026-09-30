@@ -9,7 +9,9 @@
 //      桥断后没有一个人能过河 / 炮击安全落点 / retreatOutOfReach 与 Retire。
 import assert from "node:assert/strict";
 import { MISSION_LAYOUT as Layout, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
-import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
+import { SampleMissionTerrain as Ground, MISSION_TERRAIN } from "./Data_FirstLevelMissionTerrain.mjs";
+import { NORTH_TERRACES, NORTH_TERRACE_WEST } from "./Data_FirstLevelWhiteboxTerrainRear.mjs";
+import { CompileWhiteboxTerrain, WHITEBOX_TERRAIN_REGIONS } from "./Data_FirstLevelWhiteboxTerrain.mjs";
 import { MISSION_STAGE_ROUTES as Routes, MISSION_RAIL_BRIDGE as Bridge, MISSION_NORTH_RIVER, RiverWaterAt } from "./Data_FirstLevelMissionTopology.mjs";
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
@@ -17,9 +19,9 @@ import { MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import {
   FAR_BANK_REAL, FAR_BANK_REAL_SPAWN_BACK_M, FAR_BANK_SHORE_A, FAR_BANK_SHORE_B, FAR_BANK_STANDBY, FAR_BANK_VANGUARD, FAR_BANK_RUSH,
   FarBankRushSlot, FAR_BANK_CROWD, FAR_BANK_FIRE_POINTS, FAR_BANK_FIRE_LISTS, FAR_BANK_TANKS, FAR_BANK_SHELL_SPOTS, FAR_BANK_REINFORCE, FAR_BANK_BLAST,
-  FarBankShoreZ, FarBankPoint,
+  FarBankShoreZ, FarBankPoint, FarBankTankPostZ, FarBankTankPushZ, FarBankTankVia,
 } from "./Data_FirstLevelBridgeFarBank.mjs";
-import { CrowdGroundY, BuildFarBankCrowdRoster, AssignCrowdWaves, FAR_BANK_CROWD_AXIS_X, FAR_BANK_CROWD_SPAWN_Z } from "./Data_FirstLevelFarBankCrowd.mjs";
+import { CrowdGroundY, BuildFarBankCrowdRoster, AssignCrowdWaves, FAR_BANK_CROWD_AXIS_X, FAR_BANK_CROWD_SPAWN_Z, FAR_BANK_CROWD_SLOPE_RANKS, FAR_BANK_CROWD_KEEPOUT } from "./Data_FirstLevelFarBankCrowd.mjs";
 import { FarBankCrowd } from "./Script_FirstLevelFarBankCrowd.mjs";
 import { FirstLevelFarBank, FarBankTier, FarBankFireList, ShellSpotVerdict, RouteDistance, FarBankWalkInVia, FarBankSpawnAt } from "./Script_FirstLevelBridgeFarBank.mjs";
 
@@ -220,11 +222,12 @@ const Eye = (p, h) => ({ x: p.x, z: p.z, y: Ground(p.x, p.z) + h });
   Check(FAR_BANK_TANKS.length === 3, "三辆傀儡战车");
   Check(FAR_BANK_TANKS.filter((tank) => tank.kind === "bridge").length === 1, "其中一辆开上桥面（bridge）");
   for (const tank of FAR_BANK_TANKS) {
-    const shore = FarBankShoreZ(tank.x), to = shore - tank.pushBackM, bridgeTank = tank.kind === "bridge";
-    Check(tank.backM >= tank.pushBackM, `${tank.id} 先停在 back ${tank.backM}，BridgeWithdraw 起停位不更靠南 back ${tank.pushBackM}`);
+    const shore = FarBankShoreZ(tank.x), to = FarBankTankPushZ(tank), bridgeTank = tank.kind === "bridge", terrace = tank.z != null;
+    if (terrace) Check(tank.pushZ >= tank.z && tank.pushZ - tank.z <= 4, `${tank.id} 先停在台面 z ${tank.z}，BridgeWithdraw 起最多往南下压 4 m 到 ${tank.pushZ}`);
+    else Check(tank.backM >= tank.pushBackM, `${tank.id} 先停在 back ${tank.backM}，BridgeWithdraw 起停位不更靠南 back ${tank.pushBackM}`);
     Check(tank.enter === "BridgeCover", `${tank.id} BridgeCover 起就进场（射位站姿的视野里要看得见三辆）`);
-    const path = [{ x: tank.startX ?? tank.x, z: shore - T.tankStartBackM }, ...tank.via.map(([x, back]) => ({ x, z: FarBankShoreZ(x) - back })),
-      { x: tank.x, z: shore - tank.backM }, { x: tank.x, z: to }];
+    const path = [{ x: tank.startX ?? tank.x, z: shore - T.tankStartBackM }, ...FarBankTankVia(tank),
+      { x: tank.x, z: FarBankTankPostZ(tank) }, { x: tank.x, z: to }];
     // 桥面上那辆：等待位 → 桥轴（z 72）→ 桥台 → 桥中孔的停位 → 起爆后的停位（沿桥轴，桥面高度）
     if (bridgeTank) path.push({ x: tank.deckX, z: FarBankShoreZ(tank.deckX) - 18 }, { x: tank.deckX, z: 96 }, { x: tank.deckX, z: tank.deckPostZ }, { x: tank.deckX, z: tank.blastPostZ });
     let lo = Infinity, hi = -Infinity, hit = new Set(), maxStep = 0, lastY = null;
@@ -240,7 +243,13 @@ const Eye = (p, h) => ({ x: p.x, z: p.z, y: Ground(p.x, p.z) + h });
       }
     }
     Check(hit.size === 0, `${tank.id} 路线净空（履带宽 2.2 m + 余量）：${[...hit]}`);
-    Check(bridgeTank ? (maxStep <= 0.4 && lo > -0.6) : (hi - lo < 1.0 && lo > -0.6), `${tank.id} 路线地面平（${lo.toFixed(2)}…${hi.toFixed(2)}，逐 0.5 m 最大落差 ${maxStep.toFixed(2)}）`);
+    // 台地上的车：一路只越过坡地东端 ≤ 1.6 m 的缓坡，逐 0.5 m 落差 ≤ 0.13 m（≤ 14.6°），车在平台上（停位 ± 2.2 m 内地面落差 ≤ 0.5 m）
+    Check(bridgeTank ? (maxStep <= 0.4 && lo > -0.6) : terrace ? (maxStep <= 0.13 && lo > -0.6) : (hi - lo < 1.0 && lo > -0.6),
+      `${tank.id} 路线地面平（${lo.toFixed(2)}…${hi.toFixed(2)}，逐 0.5 m 最大落差 ${maxStep.toFixed(2)}）`);
+    if (terrace) for (const z of [FarBankTankPostZ(tank), tank.pushZ]) {
+      const ys = [-2.2, 0, 2.2].flatMap((dx) => [-2.2, 0, 2.2].map((dz) => Ground(tank.x + dx, z + dz)));
+      Check(Math.max(...ys) - Math.min(...ys) <= 0.75, `${tank.id} 停位 (${tank.x}, ${z}) 的车体下面地面落差 ${(Math.max(...ys) - Math.min(...ys)).toFixed(2)} ≤ 0.75 m（平台，不是陡坡）`);
+    }
     if (bridgeTank) {
       // 等待位：桥头以北、桥西侧路堤旁，离桥轴 ≥ 4.5 m（尾队沿桥轴 x −77 从北岸过桥，车不能挡他们的路）
       Check(Math.abs(tank.x - Bridge.x) >= 4.5 && to >= 60 && to <= 76, `${tank.id} 先等在桥头以北的空地上（x ${tank.x}，z ${to}）`);
@@ -252,7 +261,12 @@ const Eye = (p, h) => ({ x: p.x, z: p.z, y: Ground(p.x, p.z) + h });
     } else {
       Check(Math.abs(tank.x - Bridge.x) >= 9, `${tank.id} 不压在桥轴的铁路上`);
       Check(Distance({ x: tank.x, z: to }, { x: A.bridgeCover.x, z: A.bridgeCover.z }) >= 80, `${tank.id} 停位离射位 ≥ 80 m`);
-      Check(to > 76 && to < shore - 2 && to - 2.15 > 82.8 - 0.01 - 2, `${tank.id} 在岸边空地上（岸沿以北 ${(shore - to).toFixed(1)} m）`);
+      // R2c：台地上的车停在台面（不再是岸边空地）：第一级 / 第二级顶沿 ±4 m 内，离岸沿 20…45 m，炮口朝南岸的射线不被自己前面的台地挡住（车头前 10 m 内地面不高于炮口）
+      const level = Ground(tank.x, FarBankTankPostZ(tank));
+      Check(terrace && level > 1.0 && level < 4.5 && shore - to >= 20 && shore - to <= 45, `${tank.id} 在坡地台面上（地面 ${level.toFixed(2)} m，岸沿以北 ${(shore - to).toFixed(1)} m）`);
+      let muzzleY = level + 2.0, blocked = false;
+      for (let d = 3; d <= 12; d += 1) if (Ground(tank.x, to + d) > muzzleY - 0.3) blocked = true;
+      Check(!blocked, `${tank.id} 炮口前 12 m 内没有更高的地面挡着（台沿以南是下坡）`);
     }
   }
 }
@@ -557,7 +571,9 @@ const Run = (bank, r, seconds, step) => { for (let i = 0; i < Math.round(seconds
   const roster = AssignCrowdWaves(BuildFarBankCrowdRoster(), K.waves);
   const kinds = (kind) => roster.filter((u) => u.kind === kind);
   Check(roster.length >= 300, `视觉人群名册 ${roster.length} ≥ 300（另有 R2 的真 AI 与脚本兵 ${FAR_BANK_REAL.length + FAR_BANK_SHORE_A.length + FAR_BANK_SHORE_B.length + FAR_BANK_STANDBY.length}）`);
-  Check(kinds("shore").length >= 150 && kinds("bridge").length >= 30 && kinds("reserve").length >= 40, `岸线 ${kinds("shore").length}、桥头纵队 ${kinds("bridge").length}、留守 ${kinds("reserve").length}`);
+  Check(roster.length >= 380 && roster.length <= 512, `视觉人群名册 ${roster.length} 在 380…512（ActorCrowd 容量 512）`);
+  Check(kinds("shore").length >= 120 && kinds("slope").length >= 140 && kinds("bridge").length >= 30 && kinds("reserve").length >= 40,
+    `岸线 ${kinds("shore").length}、坡地 ${kinds("slope").length}、桥头纵队 ${kinds("bridge").length}、留守 ${kinds("reserve").length}`);
   Check(new Set(roster.map((u) => u.id)).size === roster.length, "视觉人群 id 唯一");
   Check(roster.filter((u) => u.flag).length >= 10 && roster.filter((u) => u.sword).length >= 6, `旗 ${roster.filter((u) => u.flag).length} 面、刀 ${roster.filter((u) => u.sword).length} 把`);
   Check(roster.every((u) => ["cover", "fire", "withdraw", "blast"].includes(u.wave)), "每个人都分到一拨");
@@ -578,17 +594,25 @@ const Run = (bank, r, seconds, step) => { for (let i = 0; i < Math.round(seconds
   Check(groundBad.length === 0, `视觉人群脚下地面平、不在壕里：${groundBad.slice(0, 4)}（${groundBad.length}）`);
   Check(r2Bad.length === 0, `不压真 AI / 脚本兵的名册位：${r2Bad.slice(0, 4)}`);
   Check(packBad.length === 0, `人与人间距 ≥ 0.62 m：${packBad.slice(0, 4)}（${packBad.length}）`);
-  // 战车让路：岸线几排不压两辆岸边战车的车体
+  // 战车让路：坡地与岸线几排不压台地上两辆车的车体（先停位与下压后的位置都算），也不贴车体 3.4 m 内（坡地与留守）
   for (const t of FAR_BANK_TANKS.filter((tank) => tank.kind !== "bridge")) {
-    const tz = FarBankShoreZ(t.x) - t.backM;
-    const clash = roster.filter((u) => Math.abs(u.post.x - t.x) < 1.6 && Math.abs(u.post.z - tz) < 2.9);
-    Check(clash.length === 0, `${t.id} 车体上没有人：${clash.map((u) => u.id)}`);
+    for (const tz of [FarBankTankPostZ(t), FarBankTankPushZ(t)]) {
+      const clash = roster.filter((u) => Math.abs(u.post.x - t.x) < 1.6 && Math.abs(u.post.z - tz) < 2.9);
+      Check(clash.length === 0, `${t.id} 车体上（z ${tz}）没有人：${clash.map((u) => u.id)}`);
+      const near = roster.filter((u) => (u.kind === "slope" || u.kind === "reserve") && Distance(u.post, { x: t.x, z: tz }) < 3.4);
+      Check(near.length === 0, `${t.id} 车体旁 3.4 m 内没有坡地 / 留守的人：${near.map((u) => u.id)}`);
+    }
+  }
+  // 桥面上那辆的等待位旁也不站人
+  for (const t of FAR_BANK_TANKS.filter((tank) => tank.kind === "bridge")) {
+    const clash = roster.filter((u) => u.kind !== "bridge" && Distance(u.post, { x: t.x, z: FarBankTankPostZ(t) }) < 2.9);
+    Check(clash.length === 0, `${t.id} 等待位上没有人：${clash.map((u) => u.id)}`);
   }
   // 路线：逐 0.5 m 量净空（0.4 m 内无实心件、地面不低于 −0.6 m）
   const routeBad = new Set();
   let longest = 0;
   for (const u of roster) {
-    const path = [{ x: FAR_BANK_CROWD_AXIS_X + u.lane, z: FAR_BANK_CROWD_SPAWN_Z }, ...u.route];
+    const path = [u.spawn ?? { x: FAR_BANK_CROWD_AXIS_X + u.lane, z: FAR_BANK_CROWD_SPAWN_Z }, ...u.route];
     let L = 0;
     for (let i = 1; i < path.length; i++) {
       const a = path[i - 1], b = path[i], d = Distance(a, b); L += d;
@@ -675,6 +699,107 @@ const Run = (bank, r, seconds, step) => { for (let i = 0; i < Math.round(seconds
   inst.Start(true);
   Check(inst.State().onField === inst.units.length && inst.State().running === 0, "instant：阶段跳转后所有人直接在位");
   Check(inst.Bearers().length === inst.units.filter((u) => u.flag || u.sword).length, "旗与刀的持有人都在场上");
+}
+
+// ---------------------------------------------------------------------------
+// 5. 北岸坡地（R2c，docs/Data_FirstLevelBridgeFarBank.md §11）：坡有多陡、画面里占多高、人在坡上分几排、村子与出生点在坡顶后面
+// ---------------------------------------------------------------------------
+{
+  // 「平地」= 同一份地形只拿掉四级台地（其余白盒地形——路堤、南堤、桥座槽、撤离土岗——照旧）
+  const flatSpec = { ...MISSION_TERRAIN, whiteboxTerrain: CompileWhiteboxTerrain(WHITEBOX_TERRAIN_REGIONS.map((region) => ({ ...region,
+    shapes: region.shapes.filter((shape) => !/^NorthTerrace\d$/.test(shape.id)) }))) };
+  const Flat = (x, z) => Ground(x, z, flatSpec);
+  const cover = A.bridgeCover, eyeY = Ground(cover.x, cover.z) + 1.62;
+  const roster = AssignCrowdWaves(BuildFarBankCrowdRoster(), E.farBank.crowd.waves);
+  const slope = roster.filter((u) => u.kind === "slope");
+
+  // (1) 台地的高度与坡度：四级台面 +1.6 / +3.2 / +4.8 / +6.4 m（±0.25），坡段（台地内部）最陡 ≤ 12.5°
+  for (const [i, t] of NORTH_TERRACES.entries()) {
+    const zFlat = i === 3 ? 14 : t.southZ - 1.5;    // 第 i 级顶面正中（坡顶那一级取台面深处）
+    const y = Ground(-125, zFlat) - Flat(-125, zFlat);
+    Check(Math.abs(y - t.dy) <= 0.25, `${t.id} 台面高出原地面 ${y.toFixed(2)} m ≈ ${t.dy}（x −125，z ${zFlat}）`);
+  }
+  let steepest = 0, steepAt = null;
+  for (let x = -140; x <= -106; x += 1.5) for (let z = 27; z <= 80; z += 1.5) {
+    const gx = (Ground(x + 0.75, z) - Ground(x - 0.75, z)) / 1.5, gz = (Ground(x, z + 0.75) - Ground(x, z - 0.75)) / 1.5, s = Math.hypot(gx, gz);
+    if (s > steepest) { steepest = s; steepAt = { x, z }; }
+  }
+  Check(steepest <= Math.tan(12.5 * Math.PI / 180), `坡地台阶内部最陡 ${(Math.atan(steepest) * 180 / Math.PI).toFixed(1)}° ≤ 12.5°（(${steepAt.x}, ${steepAt.z})）`);
+  Check(NORTH_TERRACES.every((t, i) => i === 0 || t.southZ < NORTH_TERRACES[i - 1].southZ - 11.5) && NORTH_TERRACES.at(-1).dy >= 5 && NORTH_TERRACES.at(-1).dy <= 8, "四级台地由南往北一级比一级高，坡顶在 +5…+8 m 之内");
+  Check(NORTH_TERRACE_WEST === -150, "台地西缘 −150（Bridge18 框西缘 −164 放得下 11.5 m 羽化）");
+
+  // (2) 不碰的地方：岸台（z ≥ 81.5）、桥轴铁路带（|x+77| ≤ 3、z 50…90）、北桥台桥座槽、两段土坎的地面
+  const moved = (x, z) => Math.abs(Ground(x, z) - Flat(x, z));
+  let worstShelf = 0, worstRail = 0, worstShoulder = 0;
+  for (let x = -146; x <= -80; x += 2) for (let z = 81.5; z <= 92; z += 1) worstShelf = Math.max(worstShelf, moved(x, z));
+  for (let x = -78.6; x <= -75.4; x += 0.4) for (let z = 50; z <= 90; z += 1) worstRail = Math.max(worstRail, moved(x, z));
+  for (let x = -80; x <= -74; x += 0.5) for (let z = 50; z <= 90; z += 1) worstShoulder = Math.max(worstShoulder, moved(x, z));
+  Check(worstShoulder <= 0.2, `桥轴路基肩（x −80…−74）最多被台地东端的羽化抬 ${worstShoulder.toFixed(3)} m ≤ 0.2`);
+  Check(worstShelf <= 0.02, `岸台（z ≥ 81.5）与原地面一致：最大差 ${worstShelf.toFixed(3)} m（岸沿、北岸空气墙、土坎脚下都在这里）`);
+  Check(worstRail <= 0.03, `铁轨与枕木所在（x −78.6…−75.4、z 50…90）与原地面一致：最大差 ${worstRail.toFixed(3)} m（铁轨不被台地抬歪）`);
+  Check(moved(-77, 88.55) === 0 && moved(-77, 86) === 0, "北桥台桥座槽与轨道断口处地面不动");
+
+  // (3) 画面里占多高：射位站姿、1280×720、垂直视场 55°、朝 (−77,86)。逐列（每 20 px）量「北岸岸沿 → 地形天际线」的角度差换成像素，
+  //     与同一份地形拿掉坡地（平地）比。平地也有 ≈ 12–20 px（岸沿到地平线之间那条细带）；坡地要在画面左半（岸沿在 x −128…−90 的一段）≥ 40 px、比平地多 ≥ 18 px。
+  const yaw = Math.atan2(-77 - cover.x, -(86 - cover.z));       // 0 = 朝北（−z），正 = 往东；LOOK 点 (−77, 86)
+  const vfov = 55, hfov = 2 * Math.atan(Math.tan(vfov * Math.PI / 360) * 16 / 9) * 180 / Math.PI, pxPerDeg = 720 / vfov;
+  const Band = (px, sample) => {
+    const bearing = ((px - 640) / 1280) * hfov, a = yaw + bearing * Math.PI / 180, dx = Math.sin(a), dz = -Math.cos(a);
+    let sky = -90, edge = null;
+    for (let d = 20; d < 330; d += 0.5) {
+      const x = cover.x + dx * d, z = cover.z + dz * d;
+      if (z < -20) break;
+      const h = sample(x, z), ang = Math.atan2(h - eyeY, d * Math.cos(bearing * Math.PI / 180)) * 180 / Math.PI;
+      if (edge == null && z <= FarBankShoreZ(x) && h > -1) edge = { ang, x };
+      if (edge != null && ang > sky) sky = ang;
+    }
+    return { px, x: edge?.x, band: edge ? (sky - edge.ang) * pxPerDeg : 0 };
+  };
+  const cols = [];
+  for (let px = 80; px <= 560; px += 20) cols.push({ now: Band(px, Ground), flat: Band(px, Flat) });
+  const good40 = cols.filter((c) => c.now.band >= 40).length, goodGain = cols.filter((c) => c.now.band - c.flat.band >= 18).length;
+  Check(good40 >= cols.length * 0.7, `画面左半（px 80…560，岸沿 x ${cols[0].now.x?.toFixed(0)}…${cols.at(-1).now.x?.toFixed(0)}）${good40}/${cols.length} 列坡面高 ≥ 40 px`);
+  Check(goodGain >= cols.length * 0.7, `其中 ${goodGain}/${cols.length} 列比平地多 ≥ 18 px（平地 ${Math.min(...cols.map((c) => c.flat.band)).toFixed(0)}–${Math.max(...cols.map((c) => c.flat.band)).toFixed(0)} px → 坡地 ${Math.min(...cols.map((c) => c.now.band)).toFixed(0)}–${Math.max(...cols.map((c) => c.now.band)).toFixed(0)} px）`);
+  Check(Math.max(...cols.map((c) => c.now.band)) >= 50, "最高一列坡面 ≥ 50 px");
+
+  // (4) 人在坡上：八排、每排 ≥ 12 人、脚下高度逐排往北升高；射位看得见的（没被地形挡、身高 ≥ 6 px）≥ 250 人；相邻两排在画面上错开 ≥ 2.5 px
+  const byRank = FAR_BANK_CROWD_SLOPE_RANKS.map((rank) => slope.filter((u) => Math.abs(u.post.z - rank.z) < 0.5));
+  Check(byRank.length === 8 && byRank.every((list) => list.length >= 12), `坡地八排每排 ≥ 12 人：${byRank.map((list) => list.length)}`);
+  Check(slope.every((u) => byRank.some((list) => list.includes(u))), "坡地的人都落在八排里");
+  const meanY = byRank.map((list) => list.reduce((s, u) => s + Ground(u.post.x, u.post.z), 0) / list.length);
+  Check(meanY.every((y, i) => i === 0 || y > meanY[i - 1] + 0.25), `逐排往北升高：${meanY.map((y) => y.toFixed(1))}`);
+  const footAngle = (u) => Math.atan2(Ground(u.post.x, u.post.z) - eyeY, Math.hypot(u.post.x - cover.x, u.post.z - cover.z)) * 180 / Math.PI;
+  const rankAngle = byRank.map((list) => list.map(footAngle).sort((a, b) => a - b)[Math.floor(list.length / 2)]);
+  Check(rankAngle.every((a, i) => i === 0 || (a - rankAngle[i - 1]) * pxPerDeg >= 2.5), `相邻两排的脚在画面上错开 ≥ 2.5 px（整片坡面高约 40 px，八排平均 5 px；身高 10–14 px，所以排与排叠成一片）：${rankAngle.map((a, i) => i ? ((a - rankAngle[i - 1]) * pxPerDeg).toFixed(1) : "-")}`);
+  const camEye = { x: cover.x, z: cover.z, y: eyeY };
+  let seen = 0, tall = 0;
+  for (const u of roster) {
+    const head = { x: u.post.x, z: u.post.z, y: Ground(u.post.x, u.post.z) + (u.pose === "stand" ? 1.7 : u.pose === "kneel" ? 1.1 : 0.4) * u.scale };
+    const dist = Math.hypot(u.post.x - cover.x, u.post.z - cover.z), bearing = Math.atan2(u.post.x - cover.x, -(u.post.z - cover.z)) - yaw;
+    const b = Math.atan2(Math.sin(bearing), Math.cos(bearing));
+    if (Math.abs(b) * 180 / Math.PI > hfov / 2) continue;
+    if (LineOfSight(camEye, head) !== null) continue;
+    seen += 1;
+    if ((head.y - Ground(u.post.x, u.post.z)) / dist * 180 / Math.PI * pxPerDeg >= 6) tall += 1;
+  }
+  Check(seen >= 300 && tall >= 250, `射位站姿的视野里没被地形挡住的视觉人群 ${seen}，其中身高 ≥ 6 px 的 ${tall}（≥ 250）`);
+
+  // (5) 出生点与村子在坡顶后面：出生点被坡顶挡着（射位看不见）；村子的体块都在坡顶前沿（z 26）之北，不挡射位到坡面的视线
+  for (const u of slope) Check(u.spawn && LineOfSight(camEye, { x: u.spawn.x, z: u.spawn.z, y: Ground(u.spawn.x, u.spawn.z) + 1.9 }) === "terrain", `${u.id} 的出生点 (${u.spawn?.x}, ${u.spawn?.z}) 被坡顶挡着`);
+  const village = Layout.blocks.filter((b) => /^(NorthBankHouse|WestFieldHouse)/.test(b.id));
+  Check(village.length >= 30, `坡顶村的体块 ${village.length} 件`);
+  Check(village.every((b) => b.z + b.d / 2 <= 27), "村子全在坡顶前沿（z 26）之北（最南的一件到 z " + Math.max(...village.map((b) => b.z + b.d / 2)).toFixed(1) + "）");
+  Check(village.every((b) => b.x - b.w / 2 >= -152 && b.x + b.w / 2 <= -100), "村子在坡顶台面的 x −150…−105 之内");
+  const crestY = Ground(-125, 14);
+  Check(village.filter((b) => !/Roof|Lintel|Gable|Ridge|Eave/.test(b.id)).every((b) => Math.abs(b.y - b.h / 2 - crestY) < 0.6), "村子的墙脚落在坡顶台面上");
+  // 坡地上的枯树干（Layout 的 FieldPoplarWest*）每一棵都在名册的避让表里（挪了树忘了改表，人会站进树里）
+  const trunks = Layout.blocks.filter((b) => /^FieldPoplarWest\d+(NB)?Trunk$/.test(b.id) && b.x > -152 && b.x < -100 && b.z > 0 && b.z < 100);
+  Check(trunks.length >= 7 && trunks.every((t) => FAR_BANK_CROWD_KEEPOUT.some(([x, z]) => Math.hypot(x - t.x, z - t.z) < 0.5)), `坡地上的 ${trunks.length} 根枯树干都在名册避让表里`);
+  // 台地上的真 AI（两名步枪手在第一级顶沿）与两辆车都站在平台上
+  for (const id of ["FarBankRealWest0", "FarBankRealWest1"]) {
+    const u = FAR_BANK_REAL.find((p) => p.id === id);
+    Check(Ground(u.x, u.z) > 1.0 && Ground(u.x, u.z) < 2.4, `${id} 站在第一级台地顶沿（地面 ${Ground(u.x, u.z).toFixed(2)} m）`);
+  }
 }
 
 console.log(`ok 18 对岸步坦部队：数据几何、纯规则、替身宿主时间线（${checks} 项）`);

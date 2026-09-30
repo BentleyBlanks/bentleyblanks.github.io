@@ -291,9 +291,9 @@ export const END_TUNING = Object.freeze({
       // 分拨：占名册的比例（trigger 是放行的时刻）。cover = BridgeCover 起；fire = bridgeFireBroken 或 cover 起 fireFallbackS 秒（先到者）；
       // withdraw = BridgeWithdraw 起；blast = 起爆后 blastTrickleDelayS 秒（桥断后仍源源不断涌到岸边的那一拨）。
       waves: Object.freeze([
-        Object.freeze({ id: "cover", share: 0.44, gapS: 0.22 }),
-        Object.freeze({ id: "fire", share: 0.24, gapS: 0.28 }),
-        Object.freeze({ id: "withdraw", share: 0.24, gapS: 0.22 }),
+        Object.freeze({ id: "cover", share: 0.44, gapS: 0.18 }),
+        Object.freeze({ id: "fire", share: 0.24, gapS: 0.24 }),
+        Object.freeze({ id: "withdraw", share: 0.24, gapS: 0.18 }),
         Object.freeze({ id: "blast", share: 0.08, gapS: 0.4 }),
       ]),
       fireFallbackS: 40, blastTrickleDelayS: 1.5,

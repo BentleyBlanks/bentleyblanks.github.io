@@ -20,11 +20,13 @@ import { TankAudio } from "./Script_TankAudio.mjs";
 
 const HALF = [1.075, 1.28, 2.15];
 // 集结地上空的烟尘源（世界 x, z）：岸线后二三十米的人堆与战车停位一带。
-const HAZE_SPOTS = Object.freeze([[-104, 68], [-96, 58], [-88, 64], [-72, 56], [-64, 66], [-56, 60], [-48, 66], [-80, 48], [-100, 46], [-60, 46]]);
+// R2c：西边的烟尘源从坡面挪到坡顶后面（z 12–30，被坡顶挡着，只有升起来的尘柱映在天上）：原来压在坡地那几排前面，把一排排的人洗成一片黄。
+const HAZE_SPOTS = Object.freeze([[-138, 16], [-126, 12], [-112, 14], [-102, 26], [-72, 56], [-64, 66], [-56, 60], [-48, 66], [-80, 48], [-60, 46]]);
 const HAZE_SOURCE = Object.freeze({ kind: "dust", rate: 3, radius: 11, rise: 0.4, sizeStart: 3.6, sizeEnd: 10, life: 7, opacity: 0.2, prewarm: true });
 // R2b 规模感：岸线人群身后一条贴地的浅色尘幕（岸沿以北 9–14 m，x −136…−44 每 9 m 一团）。人是深色的，站在浅色尘幕前才读得出成排的剪影；
 // 高度 1–3 m 的低尘、不遮人（人在尘幕前面 5–8 m）。
-const SHORE_DUST_SPOTS = Object.freeze(Array.from({ length: 11 }, (_, i) => [-136 + i * 9, 79 + ((i * 5) % 4)]));
+// R2c：只留 x ≥ −91 的（东边岸线仍是平的一条）；西边坡地一侧的岸线后面就是第一排坡地，这层尘会盖在坡地前几排上。
+const SHORE_DUST_SPOTS = Object.freeze(Array.from({ length: 6 }, (_, i) => [-91 + i * 9, 79 + ((i * 5) % 4)]));
 const SHORE_DUST_SOURCE = Object.freeze({ kind: "dust", rate: 4, radius: 5.5, rise: 0.3, sizeStart: 2.6, sizeEnd: 7.5, life: 6, opacity: 0.3, prewarm: true });
 
 export class FarBankTankView {

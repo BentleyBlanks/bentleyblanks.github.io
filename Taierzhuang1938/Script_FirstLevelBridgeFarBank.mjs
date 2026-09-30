@@ -28,6 +28,7 @@ import {
   FAR_BANK_REAL, FAR_BANK_REAL_SPAWN_BACK_M, FAR_BANK_SHORE_A, FAR_BANK_SHORE_B, FAR_BANK_STANDBY, FAR_BANK_VANGUARD, FAR_BANK_CROWD,
   FAR_BANK_RUSH, FarBankRushSlot, FAR_BANK_FIRE_POINTS, FAR_BANK_FIRE_LISTS, FAR_BANK_TANKS, FAR_BANK_SHELL_SPOTS,
   FAR_BANK_REINFORCE, FAR_BANK_PLAYER_ROUTE_KEYS, FAR_BANK_BLAST, FarBankShoreZ, FarBankPoint,
+  FarBankTankPostZ, FarBankTankPushZ, FarBankTankVia,
 } from "./Data_FirstLevelBridgeFarBank.mjs";
 import { FarBankCrowd } from "./Script_FirstLevelFarBankCrowd.mjs";
 
@@ -246,9 +247,9 @@ export class FirstLevelFarBank {
   }
   MakeTank(spec, index, instant) {
     const shore = FarBankShoreZ(spec.x);
-    const post = { x: spec.x, z: shore - spec.backM };
-    const pushGoal = { x: spec.x, z: shore - spec.pushBackM };
-    const route = instant ? [] : (spec.via || []).map(([x, back]) => ({ x, z: FarBankShoreZ(x) - back }));
+    const post = { x: spec.x, z: FarBankTankPostZ(spec) };
+    const pushGoal = { x: spec.x, z: FarBankTankPushZ(spec) };
+    const route = instant ? [] : FarBankTankVia(spec);
     const tank = {
       id: spec.id, spec, index, x: instant ? spec.x : (spec.startX ?? spec.x), z: instant ? post.z : shore - T.tankStartBackM, hullYaw: Math.PI, turretYaw: Math.PI,
       gunPitch: 0.03, recoil: 0, speed: 0, pivotRate: 0, rpm: 0, load: 0, hullPitch: 0,

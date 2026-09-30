@@ -32,6 +32,8 @@ export function FarBankShoreZ(x) {
 export const FarBankPoint = (x, back) => freeze({ x, z: FarBankShoreZ(x) - back });
 
 const Unit = (id, x, back, extra = {}) => freeze({ id, ...FarBankPoint(x, back), ...extra });
+/** 绝对坐标的单位（北岸坡地的台面是绝对 z，不随岸线起伏）。 */
+const UnitAt = (id, x, z, extra = {}) => freeze({ id, x, z, ...extra });
 
 // ---------------------------------------------------------------------------
 // 1. 真战斗 AI（8）：BridgeWithdraw 放出，从北面走到射位
@@ -40,8 +42,9 @@ const Unit = (id, x, back, extra = {}) => freeze({ id, ...FarBankPoint(x, back),
 // ---------------------------------------------------------------------------
 export const FAR_BANK_REAL = freeze([
   Unit("FarBankRealWestGun", -102, 9, { weapon: "Type11", role: "gunner" }),
-  Unit("FarBankRealWest0", -97, 12, { weapon: "Type38" }),
-  Unit("FarBankRealWest1", -91, 13, { weapon: "Type38" }),
+  // R2c：两名步枪手上了第一级台地顶沿（离射位 ≈ 105 m，超出步枪手的 defaultM 74，只 WATCH；机枪手仍在岸线上 90 m 内）。
+  UnitAt("FarBankRealWest0", -101, 71, { weapon: "Type38" }),
+  UnitAt("FarBankRealWest1", -113, 70.5, { weapon: "Type38" }),
   Unit("FarBankRealEast0", -68, 12, { weapon: "Type38" }),
   Unit("FarBankRealEast1", -62, 11, { weapon: "Type38" }),
   Unit("FarBankRealEastGun", -57, 10, { weapon: "Type11", role: "gunner" }),
@@ -70,7 +73,7 @@ export const FAR_BANK_SHORE_B = freeze([
 // 待命兵（10）：BridgeCover 起就在岸线后面二三十米的空地上，来回踱两个点（人堆的纵深）。前六个靠桥轴，
 // BridgeWithdraw 起就是冲桥组（FAR_BANK_RUSH.assign）；后四个更深，一直踱到黑屏。
 export const FAR_BANK_STANDBY = freeze([
-  Unit("FarBankStandby0", -92, 26, { to: FarBankPoint(-88, 31) }), Unit("FarBankStandby1", -86, 29, { to: FarBankPoint(-90, 24) }),
+  Unit("FarBankStandby0", -92, 26, { to: FarBankPoint(-88, 31) }), Unit("FarBankStandby1", -84, 29, { to: FarBankPoint(-89, 25) }),
   Unit("FarBankStandby2", -82, 25, { to: FarBankPoint(-84, 31) }), Unit("FarBankStandby3", -72, 27, { to: FarBankPoint(-69, 32) }),
   Unit("FarBankStandby4", -68, 30, { to: FarBankPoint(-66, 25) }), Unit("FarBankStandby5", -64, 26, { to: FarBankPoint(-70, 33) }),
   Unit("FarBankStandby6", -98, 46, { to: FarBankPoint(-102, 52) }), Unit("FarBankStandby7", -60, 44, { to: FarBankPoint(-56, 50) }),
@@ -150,14 +153,24 @@ export const FAR_BANK_FIRE_LISTS = freeze({
 //     都在岸沿以北 6 m，不需要穿土坎：三辆都先沿桥轴路堤开下来，在 z≈70 处分头（via 是 [x, 岸沿以北 back 米]）。
 //     BridgeNorthRidge 两段土坎（z 81.6…82.8，高 1.6 m）在这两处以外，桥轴缺口 x −82…−72。
 // startX：出发点的 x（都从桥轴上的路堤出发，避开 RearFarm 院子 x −72.8…−59.2 与前沿壕沟尾巴 x −58…−30）。
+// 2026-09-30 R2c 北岸坡地（docs/Data_FirstLevelBridgeFarBank.md §11）：另两辆车从岸边空地挪上坡地的台面，炮口朝下对着南岸。
+//   · FarBankTankTerraceLow：第一级台地（NorthTerrace1，顶面 z≈69.5 以北）顶沿的平台 (−108, 66.8)，BridgeWithdraw 起下压到台沿 (−108, 70.4)；
+//   · FarBankTankTerraceHigh：第二级台地（顶面 z≈55）顶沿的平台 (−127, 53.4)，下压到 (−127, 56.6)。
+//   这两辆车不按「离岸沿 back 米」摆（台地是绝对坐标，岸沿随 R1a 的岸线起伏）：z / pushZ 是绝对 z，via 的第二个数是绝对 z（viaAbs）。
+//   都从桥轴路堤（startX −77）出发，经 via 一个点（−77, 60 / 53.4）再斜 / 横着开到停位：一路只越过坡地东端那道 ≤ 1.6 m 的缓坡，
+//   避开 x −86 的电线杆（z 40、68）。
 export const FAR_BANK_TANKS = freeze([
   freeze({ id: "FarBankTankBridge", kind: "bridge", x: -82.5, startX: -82.5, backM: 22, pushBackM: 22, enter: "BridgeCover", delayKey: 0,
     via: freeze([]), deckX: -77, deckPostZ: 122, blastPostZ: 128.5, axisFire: true }),
-  freeze({ id: "FarBankTankWest", x: -98, startX: -77, backM: 6, pushBackM: 6, enter: "BridgeCover", delayKey: 1,
-    via: freeze([freeze([-77, 24]), freeze([-96, 20])]) }),
-  freeze({ id: "FarBankTankEast", x: -57, startX: -77, backM: 6, pushBackM: 6, enter: "BridgeCover", delayKey: 2,
-    via: freeze([freeze([-77, 24]), freeze([-57, 16])]) }),
+  freeze({ id: "FarBankTankTerraceLow", x: -108, z: 66.8, pushZ: 70.4, startX: -77, enter: "BridgeCover", delayKey: 1, viaAbs: true,
+    via: freeze([freeze([-77, 60])]) }),
+  freeze({ id: "FarBankTankTerraceHigh", x: -127, z: 53.4, pushZ: 56.6, startX: -77, enter: "BridgeCover", delayKey: 2, viaAbs: true,
+    via: freeze([freeze([-77, 62]), freeze([-127, 62])]) }),
 ]);
+/** 战车的停位 z / 下压后的 z / 途经点 z：台地上的车用绝对 z，其余仍是「离岸沿往北 back 米」。 */
+export const FarBankTankPostZ = (spec) => spec.z ?? FarBankShoreZ(spec.x) - spec.backM;
+export const FarBankTankPushZ = (spec) => spec.pushZ ?? FarBankShoreZ(spec.x) - spec.pushBackM;
+export const FarBankTankVia = (spec) => (spec.via || []).map(([x, v]) => ({ x, z: spec.viaAbs ? v : FarBankShoreZ(x) - v }));
 
 /** 炮击安全落点候选（南岸空地与沙滩，离桥头 12 m 以外）。运行时再按当下的玩家 / 己方位置过滤。 */
 export const FAR_BANK_SHELL_SPOTS = freeze([
