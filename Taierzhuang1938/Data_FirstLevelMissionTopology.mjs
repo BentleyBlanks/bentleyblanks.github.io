@@ -87,8 +87,8 @@ export const MISSION_NORTH_RIVER = Object.freeze({
   // 起伏与过渡权重相乘：过渡带里起伏随权重一起收回原断面。
   reaches: Object.freeze([
     Object.freeze({ id: "RailBridgeReach", x0: -140, x1: -30, blendWestM: 65, blendEastM: 60,
-      depth: 4.2, crestZ: 90, floorZ: 94.5, dropZ: 156, waterZ: 158.6, waterCut: 1.15, shoreZ: 166,
-      waterRel: -1.25,
+      depth: 6, crestZ: 90, floorZ: 94.5, dropZ: 153.7, waterZ: 156.3, waterCut: 3, shoreZ: 166,
+      waterRel: -3,
       wander: Object.freeze({ fixed: Object.freeze([-95, -60]), rampM: 30,
         north: Object.freeze({ ampM: 4.5, waves: Object.freeze([[110, 0.5, 2.43], [63, 0.3, 5.97], [41, 0.2, 4.4]]) }),
         south: Object.freeze({ ampM: 3.5, waves: Object.freeze([[95, 0.5, 4.55], [57, 0.3, 5.0], [43, 0.2, 3.1]]) }) }) }),
@@ -233,15 +233,15 @@ export const MISSION_SOUTH_BRIDGE = Object.freeze({
 export const MISSION_RAIL_BRIDGE = Object.freeze({
   x: -77, z: 148,           // 被炸那一孔（SpanSouth）的中心
   deckHalfD: 12,            // 这一孔 z 136..160
-  deckW: 5.4, deckTopY: 0.66, deckH: 0.55,
+  deckW: 5.4, deckTopY: 1.5, deckH: 0.55,      // 2026-09-30 R1c 抬高：桥面顶 0.66 → 1.5（南堤顶 1.4+0.1 齐平，水面 −3 在下方 4.5 m）
   gapZ: Object.freeze([86, 169]),    // 道砟/枕木/钢轨在这一段断开（桥面 + 两端各伸出台外的引道）
   trussOffsetX: 2.95, trussW: 0.5, trussH: 2.4,
   railGaugeHalf: 0.7175,
   // 桥台中心 z：[北, 南]。北桥台坐在北岸（岸沿 z 90），南桥台坐在沙滩后的路基上。
   abutmentZ: Object.freeze([88, 165.5]), abutmentW: 7, abutmentD: 3,
-  // 料石桥台的桥座面（Model_RailBridge：帽石顶 -0.47）。白盒桥台碰撞盒顶收到它下面，
+  // 料石桥台的桥座面（Model_RailBridge：帽石顶 = deckTopY−1.13 = 0.37）。白盒桥台碰撞盒顶收到它下面，
   // 模型装上之后那两块灰盒子整个埋在料石里，不会从支座旁边戳出来。
-  abutmentTopY: -0.55,
+  abutmentTopY: 0.29,
   signal: "RailBridgeDestroyed",
   // 三个石墩（永久实体，顶在桥面下）：中心 z、x 向宽、z 向进深。1 号墩立在南岸沙滩水边，墩脚是沙地。
   piers: Object.freeze([
@@ -298,9 +298,13 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   // 18 北沙河铁路桥：桥心、两端、南岸射位、北岸土坎、爆破安全区、淡出前的行军终点
   // 2026-09-30 河拓宽：railBridge = 被炸那一孔的中心（1 号墩↔2 号墩，z 148）；北桥头挪到新北岸（桥台 z 88 后），
   // 南桥头不动。北岸整体北移 50 m（土坎、出生点、战术点同量平移）；机枪位 bridgeEnemy 挪到桥轴西侧 x -84.5：
-  // 南岸射位 (-81,179.4) 到它的连线整段在西桁架 (x -79.95) 以西，不被三孔桥的桁架挡住。
+  // 南岸射位到它的连线整段在西桁架 (x -79.95) 以西，不被三孔桥的桁架挡住。
+  // 2026-09-30 R1c：桥面抬到 1.5、水面压到 −3 之后，旧射位 (-81,179.4)（地面 0.7，在缺口路堤的侧坡上）站着只能看见路堤；
+  // 挪到南堤西段堤顶 (-97,173.5)（地面 1.5）：站在堤沿往下看西侧沙滩上的爆破手、1 号墩脚、水面与整座桥 —— 概念 18_3 的构图
+  //（镜头在桥西、桥在右手边，爆破手蹲在左前方沙滩上）。爆破手（MISSION_PLACEMENT.bridge.demolition）相应落在 1 号墩西侧沙滩上。
+  // 不放桥台旁的缺口 / 东段：缺口堤顶到 1 号墩之间隔着 1.2 m 的路堤脊与南引桥料石实体；东段射位到机枪 bridgeEnemy（桥轴西侧）的连线要穿桁架。
   railBridge: {x:-77,z:148}, bridgeNorthEnd: {x:-77,z:86}, bridgeSouthEnd: {x:-77,z:170},
-  bridgeCover: {x:-81,z:179.4}, bridgeEnemy: {x:-84.5,z:80.5}, blastSafe: {x:-66,z:201},
+  bridgeCover: {x:-97,z:173.5}, bridgeEnemy: {x:-84.5,z:80.5}, blastSafe: {x:-66,z:201},
   marchOut: {x:-62,z:232},
   // 关尾夜景（白天不可见）：淡入点、瓮城外、门洞、门内终点
   nightSpawn: {x:-160,z:292}, northGateApproach: {x:-160,z:318},
@@ -363,11 +367,11 @@ export const MISSION_STAGE_ROUTES = Object.freeze({
     {x:12,z:230},{x:6,z:237},S.receptionGate],
   // 18：接收处 → 爆破安全区 → 南岸射位
   toBridge: [{x:-41,z:244},{x:-49,z:236},{x:-58,z:222},{x:-66,z:210},S.blastSafe,
-    {x:-74,z:199},{x:-78,z:190},S.bridgeCover],
+    {x:-74,z:199},{x:-78,z:190},{x:-90,z:182},S.bridgeCover],
   // 回援尾队：北岸 → 桥面 → 南岸 → 继续南下
   bridgeCrossing: [{x:-77,z:70},S.bridgeNorthEnd,S.bridgeSouthEnd,{x:-76,z:182},
     {x:-72,z:192},S.marchOut],
-  bridgeWithdraw: [S.bridgeCover,{x:-78,z:188},{x:-72,z:197},S.blastSafe],
+  bridgeWithdraw: [S.bridgeCover,{x:-90,z:182},{x:-78,z:188},{x:-72,z:197},S.blastSafe],
   marchOut: [S.blastSafe,{x:-64,z:216},S.marchOut],
   nightMarch: [S.nightSpawn,S.northGateApproach,S.northGate,S.gateInside],
 });

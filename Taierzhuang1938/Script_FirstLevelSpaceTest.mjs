@@ -459,7 +459,7 @@ if (!rearOnly) {
     assert.ok(Math.abs(Math.abs(z0 - z1) - 24) < 0.01, "spans are 24 m");
   assert.ok(Ground(RailBridge.x, 160) > Ground(RailBridge.x, 136) + 2.5, "pier 1 stands on the sand, pier 2 in deep water");
   const water = RiverWaterAt(RailBridge.x);
-  assert.ok(water.z1 < RailBridge.piers[0].z && RailBridge.piers[0].z - water.z1 < 3,
+  assert.ok(water.z1 < RailBridge.piers[0].z && RailBridge.piers[0].z - water.z1 < 4,
     `pier 1 stands just above the waterline (waterline z ${water.z1.toFixed(1)})`);
   for (const pier of RailBridge.piers) assert.ok(Layout.blocks.some((b) => b.id === `RailBridge${pier.id}` && b.solid !== false),
     `${pier.id} is a permanent solid`);
@@ -530,8 +530,9 @@ if (!rearOnly) {
   const crest = Math.min(...[-120, -100, -60].map((x) => Math.max(...Array.from({ length: 45 }, (_, k) => 160 + k * 0.5)
     .map((z) => Ground(x, z) - Natural(x, z)))));
   assert.ok(crest >= 1.2 && crest <= 1.8, `the south levee crest stands 1.2-1.8 m over natural ground: ${crest.toFixed(2)}`);
-  for (const x of [-79, -76, -73]) assert.ok(Ground(x, 173) - Natural(x, 173) < 0.9,
-    `the railway gap at x=${x} carries only the railbed (+0.62), no levee: ${(Ground(x, 173) - Natural(x, 173)).toFixed(2)}`);
+  // R1c：缺口里是路堤（路基 +0.62 再 raise 到 deckTopY−0.25 = 1.25，RailEmbankmentSouth），仍比堤顶低、没有堤。
+  for (const x of [-79, -76, -73]) assert.ok(Ground(x, 173) - Natural(x, 173) < Math.min(crest - 0.1, 1.25),
+    `the railway gap at x=${x} carries only the railway embankment, no levee: ${(Ground(x, 173) - Natural(x, 173)).toFixed(2)}`);
   const blastM = Distance(S.blastSafe, S.railBridge);
   report.blastSafeM = +blastM.toFixed(1);
   assert.ok(blastM >= 40, `the blast-safe position is at least 40 m from the blasted span's centre: ${blastM.toFixed(1)}`);
@@ -630,7 +631,7 @@ if (!rearOnly) {
     // 水线南沿（z1）与墙之间是可走的沙，墙在水线南 0–3.5 m。
     for (const wall of walls.filter((box) => Math.abs(box.x - RailBridge.x) < 30)) {
       const z1 = RiverWaterAt(wall.x).z1, gap = (wall.z - wall.d / 2) - z1;
-      assert.ok(gap >= -0.3 && gap <= 2, `air wall ${wall.id} sits ${gap.toFixed(2)} m off the waterline`);
+      assert.ok(gap >= -0.3 && gap <= 2.6, `air wall ${wall.id} sits ${gap.toFixed(2)} m off the waterline`);
     }
     // 墙不横跨任何路线（尾队沿 x=−77 走桥面，桥下不摆墙）。
     for (const [name, route] of Object.entries(Routes)) for (let i = 1; i < route.length; i++) {
@@ -693,8 +694,10 @@ if (!rearOnly) {
     assert.ok(Number.isFinite(point.x) && Number.isFinite(point.z), "every placement carries x and z");
   const blocks = Solids("BunkerCollapsed");
   // 桥头军官、爆破人员与罗/何都在南岸，不站在河槽里。
+  // R1c：水位压到 −3 之后南沙滩是一道 25° 的长坡，爆破手蹲在坡上；「不站在河槽里」改成「站在水线以上至少 0.5 m 的干沙上」
+  // （cut < −waterRel − 0.5；军官与罗/何在堤后，cut 为 0）。
   for (const point of [P.bridge.officer, P.bridge.luoCover, P.bridge.heyoutianCover, ...P.bridge.demolition])
-    assert.ok(RiverCutAt(point.x, point.z) < 0.6, "no bridgehead actor stands in the channel");
+    assert.ok(RiverCutAt(point.x, point.z) < -RiverReachAt(point.x).waterRel - 0.5, "no bridgehead actor stands in the channel or at the waterline");
   for (const point of [P.collection.zhouWall, P.receptionYard.receiver, P.streetBlock.windowShooter]) {
     const y = Walkable(point.x, point.z);
     assert.deepEqual(blocks.filter((box) => Hits(point.x, point.z, y, box, 0.3, 1.7)).map((b) => b.id),
@@ -737,14 +740,14 @@ if (!rearOnly) {
     "the ford shows bare shoal, not water");
   assert.ok(halfWidths.some((half) => half < Math.max(...halfWidths) - 1),
     "the surface narrows on its way into the ford instead of stopping square");
-  // 拓宽段：水面在南岸自然地面下 1.0–1.5 m（从射位蹲姿/站姿都望得见），河心水深 ≥ 2.5 m，宽 60–70 m，
+  // 拓宽段：水面在南岸自然地面下 2.7–3.3 m（R1c 由 1.0–1.5 压低；桥面在水上 4.5 m），河心水深 ≥ 2.5 m，宽 60–70 m，
   // 整段同一个水位（相对自然地面），且不漫出岸（北岸岸沿、南岸沙滩以上都在水面之上）。
   const wide = [];
   for (const block of widened) {
     const top = block.y + block.h / 2, southNatural = Natural(block.x, reachDef.shoreZ + 4);
     const centreDepth = top - Ground(block.x, block.z), freeboard = southNatural - top;
     wide.push({ id: block.id, freeboard, centreDepth, half: block.d / 2 });
-    assert.ok(freeboard >= 1.0 && freeboard <= 1.5, `${block.id} sits 1.0-1.5 m under the south bank ground: ${freeboard.toFixed(2)}`);
+    assert.ok(freeboard >= 2.7 && freeboard <= 3.3, `${block.id} sits 2.7-3.3 m under the south bank ground: ${freeboard.toFixed(2)}`);
     assert.ok(centreDepth >= 2.5, `${block.id} is at least 2.5 m deep mid-river: ${centreDepth.toFixed(2)}`);
     assert.ok(block.d >= 50 && block.d <= 72, `${block.id} spans 50-72 m (66.7 m at the bridge, banks wander): ${block.d.toFixed(1)}`);
     assert.ok(Ground(block.x, block.z - block.d / 2 - 0.3) > top, `${block.id}: the north bank stands above the water`);

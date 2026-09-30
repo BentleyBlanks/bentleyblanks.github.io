@@ -50,6 +50,10 @@ TERRAIN = json.loads(TERRAIN_TEXT)
 
 FPS = 30
 DURATION = 6.0
+
+# 桥面标高：2026-09-30 R1c 把 deckTopY 从 0.66 抬到 1.5（南堤顶齐平、水面在下方 4.5 m）。下面所有「桥面相对」的高度
+# （下弦、枕木、木板、横梁、桥座、帽石、墩顶）都是 旧值 + DY；墩身、桥台、桥头实体是从河床 / 沙滩一直立上来的。
+DY = TERRAIN["deck"]["topY"] - 0.66
 FRAMES = int(round(DURATION * FPS)) + 1
 
 # ---------------------------------------------------------------------------
@@ -62,18 +66,18 @@ FACE = 10.8                              # 桥台前墙 |z|
 NP = 6
 PANEL = 2 * BEAR / NP                    # 3.867
 NODE_Z = [-BEAR + i * PANEL for i in range(NP + 1)]
-YB = -0.10                               # 下弦中心
+YB = -0.10 + DY                        # 下弦中心
 TOPH = [None, 5.4, 6.0, 6.2, 6.0, 5.4, None]
 BC_W, BC_H = 0.40, 0.50
 TC_W, TC_H = 0.44, 0.46
-TIE_TOP, TIE_H, TIE_W, TIE_HALF = 0.53, 0.18, 0.22, 2.6
-PLANK_TOP = 0.66                         # = MISSION_RAIL_BRIDGE.deckTopY，桥面碰撞盒顶
-STR_X, STR_TOP, STR_D = 0.72, 0.35, 0.55
-FB_TOP, FB_D = 0.35, 0.70
+TIE_TOP, TIE_H, TIE_W, TIE_HALF = 0.53 + DY, 0.18, 0.22, 2.6
+PLANK_TOP = 0.66 + DY                    # = MISSION_RAIL_BRIDGE.deckTopY，桥面碰撞盒顶
+STR_X, STR_TOP, STR_D = 0.72, 0.35 + DY, 0.55
+FB_TOP, FB_D = 0.35 + DY, 0.70
 CUT = 1.933                              # 跨中被炸飞的那一节间半宽
 APPROACH = 99.0                          # 单孔时代 |z| 超过它的桥面属于桥台；三孔各孔自成一件，不再分区
-SEAT_Y = -0.47
-COPING_Y0 = -0.77
+SEAT_Y = -0.47 + DY
+COPING_Y0 = -0.77 + DY
 HALF_SPAN = 12.0                         # 墩心距的一半（24 m）
 
 # 三孔布局（局部 z，原点 = 被炸孔中心）：墩心与各孔中心都从游戏地形快照里的布局读，写死的只是校验
@@ -84,7 +88,9 @@ SPAN_A, SPAN_B, SPAN_C = (P1 + P2) / 2, (P2 + P3) / 2, P3 - HALF_SPAN     # 被�
 NORTH_GAP_Z, SOUTH_GAP_Z = TERRAIN["deck"]["gapZ"]                           # 道砟 / 枕木 / 钢轨断开的两端
 assert abs(SPAN_A) < 1e-6 and abs(P1 - P2 - 2 * HALF_SPAN) < 1e-6 and abs(P2 - P3 - 2 * HALF_SPAN) < 1e-6, PIER_Z
 PIER_R, PIER_HL = 1.8, 1.9               # 长圆墩：两端半径 1.8、直边半长 1.9（白盒碰撞盒 3.4 × 3.6 整个埋在里面）
-PIER_TOP_COURSE = -0.97                  # 帽石层的底（1 号墩被炸后剩下的墩顶）
+PIER_TOP_COURSE = -0.97 + DY             # 帽石层的底（1 号墩被炸后剩下的墩顶）
+PIER_FOOT = -7.8                         # 墩脚：河床（-6）以下埋 1.8 m
+PIER_WATER_COURSE = -4.2                 # 水下基础一皮的顶（水面 -3 以下 1.2 m，看不见）
 
 WATER_TOP = TERRAIN["water"]["top"]
 WATER_Z0 = TERRAIN["water"]["z0"]
@@ -335,10 +341,10 @@ def AbutmentNorthBuild():
         x = x1
     # 桥座与背墙、填心、道砟
     AxisBox(name, "Stone", -4.2, 4.2, COPING_Y0, SEAT_Y, Z(BEAR), Z(12.2))
-    AxisBox(name, "Stone", -4.2, 4.2, COPING_Y0, 0.12, Z(12.2), Z(17.0))
-    AxisBox(name, "Stone", -4.35, 4.35, 0.08, 0.2, Z(12.12), Z(12.34))          # 背墙顶的压顶石
-    ballast = [(-3.3, 0.1, 12.05), (3.3, 0.1, 12.05), (-2.75, 0.35, 12.05), (2.75, 0.35, 12.05),
-               (-3.3, 0.1, 14.5), (3.3, 0.1, 14.5), (-2.75, 0.35, 14.5), (2.75, 0.35, 14.5)]
+    AxisBox(name, "Stone", -4.2, 4.2, COPING_Y0, 0.12 + DY, Z(12.2), Z(17.0))
+    AxisBox(name, "Stone", -4.35, 4.35, 0.08 + DY, 0.2 + DY, Z(12.12), Z(12.34))          # 背墙顶的压顶石
+    ballast = [(-3.3, 0.1 + DY, 12.05), (3.3, 0.1 + DY, 12.05), (-2.75, 0.35 + DY, 12.05), (2.75, 0.35 + DY, 12.05),
+               (-3.3, 0.1 + DY, 14.5), (3.3, 0.1 + DY, 14.5), (-2.75, 0.35 + DY, 14.5), (2.75, 0.35 + DY, 14.5)]
     Hexa(name, "Stone", [Vector((x, y, Z(z))) for (x, y, z) in ballast])
     # 八字翼墙：从前墙两角斜着往后、往外张，顶面随岸坡降下去
     for side in (-1, 1):
@@ -348,7 +354,7 @@ def AbutmentNorthBuild():
         n = Vector((d.z, 0, -d.x))
         if n.x * side < 0:
             n = -n
-        t_front, t_back = -0.55, TerrainAt(b.x, b.z) + 0.38
+        t_front, t_back = -0.55 + DY, TerrainAt(b.x, b.z) + 0.38
         u_front, u_back = -4.62, TerrainAt(b.x, b.z) - 0.7
         corners = []
         for i in range(8):
@@ -371,14 +377,14 @@ def AbutmentNorthBuild():
 
 def Shoe(piece, xc, zb):
     """一副支座：床石 + 铸钢座，以支座中心 zb 为准（相邻两孔的支座在同一个墩上隔 0.8 m，所以只有 ±0.38 长）。"""
-    AxisBox(piece, "Stone", xc - 0.52, xc + 0.52, SEAT_Y, -0.40, zb - 0.38, zb + 0.38)
-    AxisBox(piece, "Steel", xc - 0.31, xc + 0.31, -0.40, -0.345, zb - 0.28, zb + 0.28)
-    AxisBox(piece, "Steel", xc - 0.36, xc + 0.36, -0.40, -0.37, zb - 0.34, zb + 0.34)
+    AxisBox(piece, "Stone", xc - 0.52, xc + 0.52, SEAT_Y, SEAT_Y + 0.07, zb - 0.38, zb + 0.38)
+    AxisBox(piece, "Steel", xc - 0.31, xc + 0.31, SEAT_Y + 0.07, SEAT_Y + 0.125, zb - 0.28, zb + 0.28)
+    AxisBox(piece, "Steel", xc - 0.36, xc + 0.36, SEAT_Y + 0.07, SEAT_Y + 0.10, zb - 0.34, zb + 0.34)
 
 
 # ---------------------------------------------------------------------------
-# 长圆墩（1/2/3 号）。**桥面标高是白盒定死的**（桥面顶 0.66、钢梁底 -0.375），水面在 -1.2 上下，
-# 所以墩身大半在水里 / 沙里，露出来的是帽石层与最上一两皮 —— 不要做成概念图里三米高的圆柱。
+# 长圆墩（1/2/3 号）。R1c 起桥面顶 1.5、钢梁底 0.465，水面在 -3 上下：墩从河床（-6）立起来，
+# 水面以上露出 3.4 m（七皮料石 + 帽石层），概念图 18_1 / 18_3 里的「高石墩」。
 # 墩心 zp。obround：两端半圆（半径 PIER_R），直边半长 PIER_HL。
 # ---------------------------------------------------------------------------
 def StadiumPoints(zp, n=6):
@@ -435,12 +441,14 @@ def Pier(zp, blasted=False):
     rng = random.Random(53 + int(zp))
     ymid = PIER_TOP_COURSE
     core_hw = PIER_HL + PIER_R * 0.62
-    AxisBox("Piers", "Stone", -core_hw, core_hw, -4.7, ymid, zp - 1.1, zp + 1.1)
-    # 露出水面 / 沙面的几皮：从 -2.6 起三皮到 PIER_TOP_COURSE
-    courses = 3
-    ch = (ymid - (-2.6)) / courses
+    AxisBox("Piers", "Stone", -core_hw, core_hw, PIER_FOOT, ymid, zp - 1.1, zp + 1.1)
+    # 水下的基础：一整皮高料石，埋在河床 / 沙里
+    StoneRing(zp, PIER_FOOT, PIER_WATER_COURSE, rng, lambda k: "Piers", stagger=False)
+    # 水面前后到 PIER_TOP_COURSE：七皮错缝料石
+    courses = 7
+    ch = (ymid - PIER_WATER_COURSE) / courses
     for c in range(courses):
-        StoneRing(zp, -2.6 + c * ch, -2.6 + (c + 1) * ch, rng, lambda k: "Piers", stagger=c % 2 == 1)
+        StoneRing(zp, PIER_WATER_COURSE + c * ch, PIER_WATER_COURSE + (c + 1) * ch, rng, lambda k: "Piers", stagger=c % 2 == 1)
     # 帽石层（PIER_TOP_COURSE → 桥座面 SEAT_Y）：芯板 + 一圈料石
     if blasted:
         n = StoneRing(zp, ymid, SEAT_Y, rng, lambda k: "Pier1Cap%d" % (k // 2), stagger=False, protrude=0.06)
@@ -578,7 +586,7 @@ def CrossMembers():
                 Member(FloorRule, "Steel", (x, y, za), (x, y, zb), 0.2, 0.03)
         # 下平联
         for e in (-1, 1):
-            Member(FloorRule, "Steel", (-e * (xin - 0.05), -0.3, NODE_Z[i]), (e * (xin - 0.05), -0.3, NODE_Z[i + 1]),
+            Member(FloorRule, "Steel", (-e * (xin - 0.05), -0.3 + DY, NODE_Z[i]), (e * (xin - 0.05), -0.3 + DY, NODE_Z[i + 1]),
                    0.1, 0.1, xaxis=(0, 1, 0))
     # 上平联：每个上弦节点一道缀条横撑，每个上弦节间一对交叉撑
     xin = TX - TC_W / 2
@@ -697,16 +705,18 @@ def ApproachSouth():
     z0, z1 = HALF_SPAN + 0.05, 19.0
     neck_end, half_w = 13.3, 3.2
     # 颈：从墩顶（-0.47）一直到道砟底
-    AxisBox(name, "Stone", -2.4, 2.4, SEAT_Y, 0.2, z0, neck_end)
-    # 桥头实体：向下埋进沙里
-    AxisBox(name, "Stone", -half_w + 0.15, half_w - 0.15, -1.9, 0.2, neck_end, z1)
-    # 两侧料石面：三皮，错缝，块面随机凸出 0–5 cm
-    courses = 3
-    ch = (0.2 - (-1.9)) / courses
+    TOP = 0.2 + DY                                      # 道砟底（= 枕木底 = 路堤顶，deckTopY − 0.31）
+    AxisBox(name, "Stone", -2.4, 2.4, SEAT_Y, TOP, z0, neck_end)
+    # 桥头实体：向下埋进沙里（R1c：沙滩在 -1.4…0，桥头从沙坡上立起 2.4 m 以上）
+    BODY_FOOT = -3.4
+    AxisBox(name, "Stone", -half_w + 0.15, half_w - 0.15, BODY_FOOT, TOP, neck_end, z1)
+    # 两侧料石面：五皮，错缝，块面随机凸出 0–5 cm
+    courses = 5
+    ch = (TOP - BODY_FOOT) / courses
     gap = 0.026
     for side in (-1, 1):
         for c in range(courses):
-            y0 = -1.9 + c * ch
+            y0 = BODY_FOOT + c * ch
             z = neck_end - (rng.uniform(0.2, 0.6) if c % 2 else 0)
             while z < z1:
                 length = rng.uniform(0.7, 1.35)
@@ -726,17 +736,17 @@ def ApproachSouth():
             zb = min(z1 - 0.3, z + length)
             drop = 0.0 if zb < z1 - 2.4 else (0.22 if zb < z1 - 1.2 else 0.45)
             xa, xb = sorted((side * 2.86, side * 3.2))
-            AxisBox(name, "Stone", xa, xb, 0.2, 0.85 - drop, z + gap / 2, zb - gap / 2)
+            AxisBox(name, "Stone", xa, xb, TOP, TOP + 0.65 - drop, z + gap / 2, zb - gap / 2)
             xa2, xb2 = sorted((side * 2.8, side * 3.27))
-            AxisBox(name, "Stone", xa2, xb2, 0.85 - drop, 0.93 - drop, z, zb)
+            AxisBox(name, "Stone", xa2, xb2, TOP + 0.65 - drop, TOP + 0.73 - drop, z, zb)
             z = zb
             k += 1
     # 道砟：梯形断面（底 ±3.0、顶 ±2.3），顶 0.35 = 枕木底；比桥面的木板宽一点
-    ballast = [(-2.85, 0.2, z0), (2.85, 0.2, z0), (-2.3, 0.35, z0), (2.3, 0.35, z0),
-               (-2.85, 0.2, z1), (2.85, 0.2, z1), (-2.3, 0.35, z1), (2.3, 0.35, z1)]
+    ballast = [(-2.85, TOP, z0), (2.85, TOP, z0), (-2.3, TOP + 0.15, z0), (2.3, TOP + 0.15, z0),
+               (-2.85, TOP, z1), (2.85, TOP, z1), (-2.3, TOP + 0.15, z1), (2.3, TOP + 0.15, z1)]
     Hexa(name, "Stone", [Vector(p) for p in ballast])
     # 墩顶到桥头之间那一小段的钢盖板（桥面钢梁到此为止，往南是实体）
-    AxisBox(name, "Steel", -2.4, 2.4, 0.2, 0.235, z0, z0 + 0.5)
+    AxisBox(name, "Steel", -2.4, 2.4, TOP, TOP + 0.035, z0, z0 + 0.5)
 
 
 # ---------------------------------------------------------------------------
@@ -763,7 +773,7 @@ def Polyline(piece, points, size=0.016):
 
 
 PIER_PACK_Z = (HALF_SPAN + 0.15, HALF_SPAN + 0.75)     # 墩顶上药包的 z：钢梁端头（11.95）与桥头颈（13.3）之间的空档
-PIER_GROUND_Y = -0.85                                   # 沙滩上爆炸尘环用的地面高度
+PIER_GROUND_Y = round(TerrainAt(3.6, HALF_SPAN + 1.6), 2)  # 沙滩上爆炸尘环用的地面高度（1 号墩东南的沙坡）
 
 
 def WoodCrate(centre, size, yaw, tint_straps=True):
@@ -787,55 +797,61 @@ def Charges():
         for dz in (-0.44, 0.44):
             Pack("Charges", x - 0.17, x + 0.17, top + 0.005, top + 0.29, dz - 0.22, dz + 0.22)
         xin = x - s * 0.16
-        Pack("Charges", xin - s * 0.27, xin, 1.0, 1.44, -0.13, 0.13, axis="y")
+        Pack("Charges", xin - s * 0.27, xin, 1.0 + DY, 1.44 + DY, -0.13, 0.13, axis="y")
         # 1 号墩顶上的药包：钢梁端头以南、桥头颈以北的那一格
         Pack("Charges", x - 0.25, x + 0.25, SEAT_Y + 0.005, SEAT_Y + 0.30, PIER_PACK_Z[0], PIER_PACK_Z[1])
         CHARGES.append({"t": 0.0, "x": x, "y": YB + 0.1, "z": 0.0, "radius": 12.0, "main": True, "groundY": WATER_TOP})
-        CHARGES.append({"t": 0.05, "x": xin - s * 0.13, "y": 1.22, "z": 0.0, "radius": 7.0, "main": False, "groundY": WATER_TOP})
+        CHARGES.append({"t": 0.05, "x": xin - s * 0.13, "y": 1.22 + DY, "z": 0.0, "radius": 7.0, "main": False, "groundY": WATER_TOP})
         CHARGES.append({"t": 0.12, "x": x, "y": SEAT_Y + 0.15, "z": (PIER_PACK_Z[0] + PIER_PACK_Z[1]) / 2, "radius": 11.0,
                         "main": False, "groundY": PIER_GROUND_Y})
         # 导爆索：跨中各药包沿下弦内侧上沿拉到南端，翻过端头落到墩顶
         cy = top + 0.02
         xi = x - s * (BC_W / 2 - 0.05)
-        Polyline("CableBridge", [(xin - s * 0.13, 1.0, 0.0), (xi, cy, 0.3), (xi, cy, 0.44)])
+        Polyline("CableBridge", [(xin - s * 0.13, 1.0 + DY, 0.0), (xi, cy, 0.3), (xi, cy, 0.44)])
         Polyline("CableBridge", [(xi, cy, -0.44), (xi, cy, 0.44), (xi, cy, BEAR - 0.72)])
-        Polyline("CableBridge", [(xi, cy, BEAR - 0.3), (xi, cy, BEAR + 0.3), (xi, 0.0, HALF_SPAN + 0.12),
+        Polyline("CableBridge", [(xi, cy, BEAR - 0.3), (xi, cy, BEAR + 0.3), (xi, 0.0 + DY, HALF_SPAN + 0.12),
                                  (x, SEAT_Y + 0.03, HALF_SPAN + 0.3), (x, SEAT_Y + 0.03, PIER_PACK_Z[0] + 0.02)])
-    # 墩顶横跨的一根：两个墩顶药包之间（钢梁端头正下方 0.1 m 的缝里），再从东端翻下墩身
-    zc = HALF_SPAN + 0.05
-    edge_x = PIER_HL + math.sqrt(max(0.05, PIER_R ** 2 - (zc - P1) ** 2))
-    Polyline("CableBridge", [(-TX, SEAT_Y + 0.03, PIER_PACK_Z[0] + 0.02), (-TX, SEAT_Y + 0.03, zc), (TX, SEAT_Y + 0.03, zc),
-                             (TX, SEAT_Y + 0.03, PIER_PACK_Z[0] + 0.02)])
-    ground_start = (edge_x + 0.05, TerrainAt(edge_x + 0.05, zc) + 0.02, zc)
-    Polyline("CableBridge", [(TX, SEAT_Y + 0.03, zc), (edge_x - 0.1, SEAT_Y + 0.03, zc), (edge_x + 0.04, SEAT_Y - 0.25, zc),
-                             (edge_x + 0.06, ground_start[1] + 0.4, zc), ground_start])
-    # 1 号墩脚下：爆破手蹲的地方 —— 木药箱堆在墩东头，一卷线放在沙地上
+    # 墩顶横跨的一根：两个墩顶药包之间（钢梁端头正下方 0.1 m 的缝里），再从爆破手那一侧的墩头翻下墩身
+    # （R1c：爆破手在墩西侧沙地上，side = -1；原来在东侧 side = +1）
     crew = TERRAIN["crew"]
     crew_x = sum(p["x"] for p in crew) / len(crew)
+    side = -1 if crew_x < 0 else 1
+    zc = HALF_SPAN + 0.05
+    edge_x = side * (PIER_HL + math.sqrt(max(0.05, PIER_R ** 2 - (zc - P1) ** 2)))
+    Polyline("CableBridge", [(-TX, SEAT_Y + 0.03, PIER_PACK_Z[0] + 0.02), (-TX, SEAT_Y + 0.03, zc), (TX, SEAT_Y + 0.03, zc),
+                             (TX, SEAT_Y + 0.03, PIER_PACK_Z[0] + 0.02)])
+    ground_start = (edge_x + side * 0.05, TerrainAt(edge_x + side * 0.05, zc) + 0.02, zc)
+    Polyline("CableBridge", [(side * TX, SEAT_Y + 0.03, zc), (edge_x - side * 0.1, SEAT_Y + 0.03, zc),
+                             (edge_x + side * 0.04, SEAT_Y - 0.25, zc), (edge_x + side * 0.06, ground_start[1] + 0.4, zc), ground_start])
+    # 1 号墩脚下：爆破手蹲的地方 —— 木药箱堆在墩与爆破手之间，一卷线放在沙地上
     g = lambda x, z: TerrainAt(x, z)
-    # 药箱堆在墩东头与南引桥东侧的交角（南岸沙滩水边的空气墙以南），爆破手蹲在它们东边 1.5 m 处（crew 落位，朝西）
-    bx = crew_x - 1.5
+    # 药箱堆在墩头与爆破手之间（南岸沙滩水边的空气墙以南），爆破手蹲在它们外侧 1.5 m 处（crew 落位，朝墩）
+    bx = crew_x - side * 1.5
     cz0 = crew[0]["z"] - 0.1
     WoodCrate((bx, g(bx, cz0) + 0.27, cz0), (0.92, 0.54, 0.6), 0.1)
     WoodCrate((bx + 0.06, g(bx, cz0 + 1.0) + 0.27, cz0 + 1.0), (0.88, 0.54, 0.58), -0.12)
     WoodCrate((bx + 0.02, g(bx, cz0) + 0.54 + 0.24, cz0 + 0.05), (0.78, 0.46, 0.5), 0.55)
     # 地面导线：从墩东头顺沙地拉到药箱旁、绕开桥头的石栏，再顺着路堤肩一路拉到起爆器
     ex, ez = TERRAIN["exploder"]["x"], TERRAIN["exploder"]["z"]
-    path = [(ground_start[0], ground_start[2]), (edge_x + 0.5, P1 + 0.7), (bx + 1.0, cz0 - 0.9), (crew_x - 0.4, cz0 + 0.6),
-            (crew_x - 0.6, 16.8), (5.0, 19.0), (4.2, 21.0),
-            (3.4, 21.5), (3.8, 24.5), (4.2, 28.0), (3.6, 31.0), (3.3, 34.5), (3.9, 38.0), (4.6, 42.0), (4.3, 46.0),
-            (ex + 0.4, ez - 0.6), (ex, ez)]
+    # 顺着路堤脚（爆破手那一侧）拉到起爆器；西侧时最后横过路堤肩到起爆器
+    run = [(5.0, 19.0), (4.2, 21.0), (3.4, 21.5), (3.8, 24.5), (4.2, 28.0), (3.6, 31.0), (3.3, 34.5), (3.9, 38.0), (4.6, 42.0), (4.3, 46.0)]
+    tail = [(ex + 0.4, ez - 0.6), (ex, ez)]
+    if side < 0:
+        run = [(-x - 0.6, z) for (x, z) in run]                                 # 路堤西脚（堤脊 x ±2.6 之外）
+        tail = [(-1.8, 48.6), (1.6, 49.6), (ex - 0.4, ez - 0.5), (ex, ez)]
+    path = [(ground_start[0], ground_start[2]), (edge_x + side * 0.5, P1 + 0.7), (bx + side * 1.0, cz0 - 0.9),
+            (crew_x - side * 0.4, cz0 + 0.6), (crew_x - side * 0.6, 16.8)] + run + tail
     pts = [(x, TerrainAt(x, z) + 0.02, z) for (x, z) in path]
     Polyline("CableGround", pts, 0.018)
     # 一卷线：三圈八边形，放在药箱旁的沙地上（导线的一头连着它）
-    coil_c = Vector((crew_x + 0.9, 0, 17.6))
+    coil_c = Vector((crew_x + side * 0.9, 0, 17.6))
     coil_c.y = TerrainAt(coil_c.x, coil_c.z) + 0.03
     for ring, (radius, dy) in enumerate(((0.36, 0.0), (0.30, 0.032), (0.24, 0.064))):
         ring_pts = [(coil_c.x + radius * math.cos(a * math.pi / 4), coil_c.y + dy, coil_c.z + radius * math.sin(a * math.pi / 4))
                     for a in range(9)]
         Polyline("CableGround", ring_pts, 0.03)
-    Polyline("CableGround", [(coil_c.x - 0.36, coil_c.y, coil_c.z), (coil_c.x - 0.6, coil_c.y - 0.01, coil_c.z - 0.5),
-                             (crew_x - 0.6, TerrainAt(crew_x - 0.6, 16.8) + 0.02, 16.8)], 0.018)
+    Polyline("CableGround", [(coil_c.x - side * 0.36, coil_c.y, coil_c.z), (coil_c.x - side * 0.6, coil_c.y - 0.01, coil_c.z - 0.5),
+                             (crew_x - side * 0.6, TerrainAt(crew_x - side * 0.6, 16.8) + 0.02, 16.8)], 0.018)
     g_ex = TerrainAt(ex, ez)
     AxisBox("Exploder", "Timber", ex - 0.17, ex + 0.17, g_ex - 0.02, g_ex + 0.22, ez - 0.13, ez + 0.13)
     AxisBox("Exploder", "Steel", ex - 0.178, ex + 0.178, g_ex + 0.2, g_ex + 0.235, ez - 0.138, ez + 0.138)
@@ -872,7 +888,7 @@ def GroundAt(x, z):
         if ax <= 2.85:
             h = max(h, TIE_TOP)
         elif ax <= 3.2 and z >= 13.3:
-            h = max(h, 0.85)
+            h = max(h, 0.85 + DY)
     return h
 
 
@@ -1051,18 +1067,18 @@ def Collapse():
     # 从南岸安全区看（几乎顺着桥轴），这一下才读得出来：离玩家最近的那座门架整个沉下去了；
     # 只让南半孔也绕南端铰折，门架原地不动，炸完的桥从南边看跟没炸一样（2026-09-28 实拍）。
     # 节奏故意放慢（真实下落约 0.7 s）：大结构看起来就该慢，而且要等火球散开一点才看得见。
-    north_pivot = Vector((0, -0.35, -BEAR))
+    north_pivot = Vector((0, -0.35 + DY, -BEAR))
     north_roll = 0.06
     nv = PieceVerts("NorthSpan", north_pivot)
     north_final = SolveSpanAngle(nv, north_pivot, 1, north_roll)
     north = SpanMotion(north_final, 0.3, 2.25, 0.006, 0.02, 0.012)
-    south_pivot = Vector((0, -0.35, BEAR + 0.35))     # 南端下弦底
+    south_pivot = Vector((0, -0.35 + DY, BEAR + 0.35))     # 南端下弦底
     sv = PieceVerts("SouthSpan", south_pivot)
     sfree = [v for v in sv if v.z < -6.0][::3]
     south_roll, south_yaw = -0.11, 0.035
     # 南端滑出墩顶 3 m（到墩的北面、水下陡坎上方），落到那儿的河底上方 0.15 m：3 m 水深里门架沉下去大半
     south_slide, south_land = 3.0, 1.75
-    south_drop = max(2.0, min(3.6, -0.35 - (TerrainAt(0.35, BEAR + 0.35 - south_slide) + 0.15)))
+    south_drop = max(2.0, min(8.0, -0.35 + DY - (TerrainAt(0.35, BEAR + 0.35 - south_slide) + 0.15)))
     g_eff = 2 * south_drop / (south_land - 0.4) ** 2
     pivots["NorthSpan"], pivots["SouthSpan"] = north_pivot, south_pivot
 
@@ -1070,7 +1086,7 @@ def Collapse():
         kick = 0.12 * math.sin(math.pi * min(1.0, (t - 0.12) / 0.36)) if 0.12 < t < 0.48 else 0.0
         fall = min(south_drop, 0.5 * g_eff * max(0.0, t - 0.4) ** 2)
         bounce = 0.1 * math.sin(math.pi * (t - south_land) / 0.3) if south_land < t < south_land + 0.3 else 0.0
-        return Vector((0.35 * Smooth((t - 0.4) / 1.4), -0.35 + kick - fall + bounce,
+        return Vector((0.35 * Smooth((t - 0.4) / 1.4), -0.35 + DY + kick - fall + bounce,
                        BEAR + 0.35 - south_slide * Smooth((t - 0.12) / 0.75)))
 
     def SouthRotation(t, pitch):
@@ -1362,9 +1378,9 @@ def RenderReview(collection):
     safe = TERRAIN["blastSafe"]
     views = {
         "BlastSafe": (Vector((safe["x"], TerrainAt(safe["x"], safe["z"]) + 1.65, safe["z"])), Vector((0, 1.0, 0))),
-        "EastBank": (Vector((36, 6.0, 26)), Vector((0, 0.0, -6))),
-        "SouthDeck": (Vector((1.2, 2.4, 30)), Vector((0, 1.5, 0))),
-        "Pier1": (Vector((12.5, 0.9, 19)), Vector((0.5, -0.3, 11))),
+        "EastBank": (Vector((36, 6.8, 26)), Vector((0, 0.0, -6))),
+        "SouthDeck": (Vector((1.2, 3.2, 30)), Vector((0, 2.3, 0))),
+        "Pier1": (Vector((12.5, 0.4, 19)), Vector((0.5, -0.9, 11))),
         "Aerial": (Vector((30, 60, 30)), Vector((0, 0, -22))),
     }
     shots = []

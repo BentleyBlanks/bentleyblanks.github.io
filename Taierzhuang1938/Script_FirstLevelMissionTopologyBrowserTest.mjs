@@ -76,7 +76,7 @@ try{
  });
  await fs.writeFile(path.join(out,'Data_ShoreWalks.json'),JSON.stringify(shore,null,2));
  for(const row of shore.filter(r=>r.kind==='beachNorthbound'||r.kind==='underBridgeNorthbound'))
-  assert.ok(row.end.z>=row.waterZ1-.3&&row.end.y>-1.6,'the shore keeps a walker out of the water at x='+row.x+': '+JSON.stringify(row.end));
+  assert.ok(row.end.z>=row.waterZ1-.3&&row.end.y>-2.85,'the shore keeps a walker out of the water at x='+row.x+': '+JSON.stringify(row.end));
  for(const row of shore.filter(r=>r.kind==='northBankSouthbound'))
   assert.ok(row.end.z<=row.crest+2.5&&row.end.y>-.6,'the north bank air wall keeps a walker on the bank at x='+row.x+': '+JSON.stringify(row.end));
  // -------------------------------------------------------------------------
@@ -86,7 +86,7 @@ try{
   const g=window.Tengxian,{Vector3}=await import('three');
   const {MISSION_LAYOUT}=await import('./Data_FirstLevelMissionLayout.mjs');
   const water=MISSION_LAYOUT.blocks.filter(b=>b.semantic==='water');
-  // 2026-09-30：河在铁路桥一带拓宽（水位在南岸自然地面下 1.25 m、河心水深 ~3 m），其余是槽底以上 1.0–1.4 m 的低水位。
+  // 2026-09-30：河在铁路桥一带拓宽（R1c：水位在南岸自然地面下 3 m、河心水深 ~3 m），其余是槽底以上 1.0–1.4 m 的低水位。
   // 两种断面各取一块实测：原断面取 x≈−185 那块，拓宽段取 x≈−104 那块（桥轴上量到的是桥面）。
   const original=water.filter(b=>b.x<-170).sort((a,b)=>a.x-b.x)[0],widened=water.filter(b=>Math.abs(b.x+104)<3)[0];
   const sample=original;

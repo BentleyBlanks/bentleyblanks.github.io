@@ -102,7 +102,7 @@ Check(Math.abs(data.deckTopY - B.deckTopY) < 1e-6 && Math.abs(data.trussX - B.tr
 Check(Math.abs(terrain.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(terrain.exploder.z + B.z - E.exploderAt.z) < 1e-3
   && Math.abs(data.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(data.exploder.z + B.z - E.exploderAt.z) < 1e-3,
   "模型里的起爆器就摆在 E.exploderAt");
-// 1 号墩脚下：爆破手蹲在墩东头干沙地上，木药箱堆在他们与墩之间，导线从墩顶翻下墩身、沿沙地拉向起爆器。
+// 1 号墩脚下（R1c：西侧）：爆破手蹲在墩西头干沙地上，木药箱堆在他们与墩之间，导线从墩顶翻下墩身、沿沙地拉向起爆器。
 {
   const posts = P.bridge.demolition, pier1 = B.piers[0];
   const dry = (x, z) => SampleMissionTerrain(x, z) > data.water.top + 0.1;
@@ -110,7 +110,7 @@ Check(Math.abs(terrain.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(ter
   const solids = MISSION_LAYOUT.blocks.filter((b) => b.solid !== false && /^RailBridge/.test(b.id));
   for (const [index, post] of posts.entries()) {
     const d = Math.hypot(post.x - B.x, post.z - pier1.z);
-    Check(d > 3.5 && d < 9 && dry(post.x, post.z), `爆破手 ${index} 蹲在 1 号墩脚下东侧的干沙地上（离墩心 ${d.toFixed(1)} m）`);
+    Check(d > 3.5 && d < 10 && dry(post.x, post.z), `爆破手 ${index} 蹲在 1 号墩脚下西侧的干沙地上（离墩心 ${d.toFixed(1)} m）`);
     Check(solids.every((b) => rectGap(b, post.x, post.z) >= 0.5), `爆破手 ${index} 离白盒桥体碰撞 ≥ 0.5 m`);
     const start = E.demolitionPullback[index][0];
     Check(Math.hypot(start.x - post.x, start.z - post.z) < 9, `爆破手 ${index} 的撤出折线从他脚下出发`);
@@ -123,8 +123,8 @@ Check(Math.abs(terrain.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(ter
   const cable = pieces.get("CableGround").bounds;
   Check(cable.min[2] < data.layout.piers.Pier1 + 1.5 && cable.max[2] > data.exploder.z - 0.7, "地面导线从墩脚一路拉到起爆器");
   const pierCharges = data.charges.filter((c) => c.z > 10);
-  Check(pierCharges.length === 2 && pierCharges.every((c) => Math.abs(c.x) === B.trussOffsetX && c.groundY < data.water.top + 0.5 && c.groundY > data.water.top),
-    "1 号墩顶两个药包落在沙滩上（groundY 在水面之上）");
+  Check(pierCharges.length === 2 && pierCharges.every((c) => Math.abs(c.x) === B.trussOffsetX && c.groundY > data.water.top + 0.05 && c.groundY < c.y),
+    "1 号墩顶两个药包落在沙滩上（groundY 在水面之上、在药包之下）");
   Check(data.charges.filter((c) => c.z < 1).every((c) => c.groundY === data.water.top), "跨中药包的地面是河面");
   Check(pieces.get("SouthSpan").final.position[2] < data.layout.piers.Pier1 - 2, "南半孔滑出了 1 号墩顶");
   const caps = data.pieces.filter((p) => /^Pier1Cap/.test(p.name));
@@ -139,7 +139,7 @@ Check(Math.hypot(kneel.x - E.exploderAt.x, kneel.z - E.exploderAt.z) < 1.2 && kn
 const gates = new Map(MISSION_LAYOUT.gates.map((gate) => [gate.id, gate]));
 for (const id of M.replacesGates) Check(gates.has(id), `模型接管的闸门件 ${id} 存在`);
 for (const block of MISSION_LAYOUT.blocks.filter((b) => /^RailBridgeAbutment/.test(b.id)))
-  Check(block.y + block.h / 2 <= B.abutmentTopY + 1e-6 && B.abutmentTopY < -0.47, `${block.id} 顶在桥座面以下`);
+  Check(block.y + block.h / 2 <= B.abutmentTopY + 1e-6 && B.abutmentTopY < data.layout.pierTopY, `${block.id} 顶在桥座面以下`);
 // 三孔：三个白盒桥墩（碰撞）、模型里三个长圆料石墩的墩心对齐；碰撞盒 3.4 × 3.6 整个埋在长圆墩（半径 1.8、直边半长 1.9）里。
 const pierBlocks = MISSION_LAYOUT.blocks.filter((b) => /^RailBridgePier/.test(b.id));
 Check(pierBlocks.length === 3 && B.piers.every((p, i) => Math.abs(pierBlocks.find((b) => b.id === `RailBridge${p.id}`).z - p.z) < 1e-6
@@ -155,8 +155,8 @@ for (const piece of data.pieces.filter((p) => p.kind === "debris")) {
   Check(gap > -0.1 && gap < 1.6, `${piece.name} 落稳了`, `离地 ${gap.toFixed(2)} m`);
 }
 const south = pieces.get("SouthSpan").final, north = pieces.get("NorthSpan").final;
-Check(south.position[1] < -3 && south.lowest[1] < data.water.top, "南半孔整孔落进河槽（从南岸看得出来：门架沉下去了）");
-Check(data.solved.northFinal > 0.25 && data.solved.northFinal < 0.6 && north.lowest[1] < data.water.top,
+Check(south.position[1] < -2 && south.lowest[1] < data.water.top - 2, "南半孔整孔落进河槽（从南岸看得出来：门架沉下去了）");
+Check(data.solved.northFinal > 0.25 && data.solved.northFinal < 0.85 && north.lowest[1] < data.water.top,
   "北半孔绕北桥台折进河里（V 的一条臂）", String(data.solved.northFinal));
 const events = data.events;
 Check(events.every((e, i) => i === 0 || events[i - 1].t <= e.t), "事件按时间排好");

@@ -171,20 +171,15 @@ export const END_TUNING = Object.freeze({
   // 尾队真的过完桥：离 bridgeCrossing 末点这么近就算下了桥往南走了。
   rearColumnClearM: 2,
   // 桥头军官与爆破人员（MISSION_PLACEMENT.bridge.officer / .demolition）。
-  // demolition[1] (−74.2,171.4) 落在 RailBridgeDeck 上 —— 那正是南桥台，站得住。
+  // 2026-09-30 三孔 + R1c：两人从 1 号墩**西侧**沙地（(-84.4,163.6)、(-84.4,165.4)）出发，先往北穿过南堤西端与路堤脊之间的低口
+  //（x −83…−81、地面 0.1–0.5，堤顶 1.5 在它西边、路堤脊 1.2 在它东边）走到 z 168，再顺着路堤西脚往南折向起爆器；
+  // 折线离每个实心体 ≥ 0.35 m 由 Script_FirstLevelSpaceTest 守着。
+  // 东边那位（demolition[1]）的终点就是起爆器后面：他走到这儿蹲下，按起爆器的也是他
+  //（起爆器在 exploderAt，模型里的 Exploder 节点摆在同一个点上）；导线（CableGround）从墩西头沿沙地拉出、顺着路堤西脚到起爆器。
   demolitionSetS: 6,
-  // 撤出折线都要从 BridgeSouthCoverWest(x −87..−78) 与 BridgeSouthCoverEast(x −69..−60)
-  // 之间那个 9 m 宽的口子走。西边那位原来的第一个点 (−80,178) **埋在西侧那道 1.47 m 的
-  // 掩体墙里**：他顶着墙走不到，停在离桥心 24 m 的爆破区里，桥只能靠
-  // blastFriendlyStuck 兜底晚二十秒才炸（实拍 2026-09-20）。改成先往东挪到口子上。
-  // 折线净空由 Script_FirstLevelSpaceTest 守着。
-  // 东边那位的终点就是起爆器后面：他走到这儿蹲下，按起爆器的也是他
-  //（起爆器在 exploderAt，模型里的 Exploder 节点摆在同一个点上）。
-  // 2026-09-30 三孔：两人从 1 号墩东头的沙地（(-70.3,162.6)、(-70.3,164.4)）出发，先沿东侧沙地走到 z 166，
-  // 再并入原来的折线；导线（CableGround）也是从墩东头沿这条沙地拉到起爆器。
   demolitionPullback: Object.freeze([
-    Object.freeze([{ x: -70.4, z: 166 }, { x: -73.5, z: 177 }, { x: -74, z: 190 }, { x: -70.5, z: 200 }]),
-    Object.freeze([{ x: -70.4, z: 167 }, { x: -72, z: 178.5 }, { x: -71.5, z: 190 }, { x: -72.6, z: 199.1 }]),
+    Object.freeze([{ x: -82.6, z: 167.4 }, { x: -81.8, z: 178 }, { x: -78.8, z: 189 }, { x: -74, z: 197 }, { x: -70.5, z: 200 }]),
+    Object.freeze([{ x: -82.6, z: 168.6 }, { x: -81.6, z: 180 }, { x: -77.6, z: 190 }, { x: -72.6, z: 199.1 }]),
   ]),
   // 起爆器（Model_RailBridge 的 Exploder / ExploderHandle；_blender/Script_ExportRailBridgeTerrain 读它，
   // 改了要重导地形并重烘模型）。导线从南桥台背后顺着路堤肩拉过来。

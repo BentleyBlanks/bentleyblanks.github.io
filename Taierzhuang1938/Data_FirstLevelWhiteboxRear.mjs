@@ -425,11 +425,13 @@ export function BuildRearWhitebox(groundAt) {
   }
   // The firing mound in the levee gap (Layout BridgeSouthMound) wears the same earth skin, with heaped clods.
   {
-    const top = groundAt(-81, 177.7) + 1.05;
-    Detail("BridgeSouthMoundSkin", -81, 177.7, 3.5, 1.25, 1.35, "earthDark", { y: top + .03 - 1.25 / 2 + .18 });
+    // 土垄在射位北面 2 m、偏东 1（Layout 的 BridgeSouthMound 跟着 bridgeCover 走）；R1c 射位挪到南堤西段堤顶 (-97,173.5)。
+    const mx = -96, mz = 171.5;
+    const top = groundAt(mx, mz) + 1.05;
+    Detail("BridgeSouthMoundSkin", mx, mz, 2.2, 1.25, 1.35, "earthDark", { y: top + .03 - 1.25 / 2 + .18 });
     for (let i = 0; i < 4; i++)
-      Detail(`BridgeSouthMoundClod${i}`, -82.4 + i * .95, 177.55, .6 + (i % 2) * .35, .14, .5, "earthDark",
-        { y: groundAt(-81, 177.7) + 1.3 + (i % 3) * .03, ry: i * .8 });
+      Detail(`BridgeSouthMoundClod${i}`, mx - 0.7 + i * .47, mz - .15, .6 + (i % 2) * .35, .14, .5, "earthDark",
+        { y: groundAt(mx, mz) + 1.3 + (i % 3) * .03, ry: i * .8 });
   }
   // Levee: stones on the river face and grass tufts along the crest (Bridge18 levee, terrain BridgeLevee*).
   Rubble("BridgeBankStones", -100, 168.4, 10, 12, .8, .4);

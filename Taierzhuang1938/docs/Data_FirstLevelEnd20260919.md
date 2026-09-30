@@ -134,6 +134,8 @@
   装药（`demolitionCharged`），然后沿 `demolitionPullback` / `officerPullback` 自己撤出去。
   （2026-09-30 三孔：两人的落位改到 **1 号墩东头的干沙地**（(−70.3,162.6)、(−70.3,164.4)，身边是木药箱与一卷线），
   折线先沿东侧沙地走到 z 166/167 再并入下面的口子；见 [Data_RailBridge §6](Data_RailBridge.md)。）
+  （2026-09-30 R1c：桥面抬高、射位挪到南堤西段堤顶 (−97,173.5) 后，两人改落在 **1 号墩西侧沙地**（(−84.4,163.6)、(−84.4,165.4)，朝东），
+  折线穿过南堤西端与路堤脊之间的低口（x −83…−81）再顺路堤西脚往南折向起爆器；`bridgeCover` 及 `toBridge` / `bridgeWithdraw` 末段同步，见 [Data_RailBridge §7](Data_RailBridge.md)。）
   三条撤出折线都从南堤缺口（x −82.5…−70.5，铁路桥头，2026-09-30 起南岸是高堤而不是两道胸墙）走，终点在
   `BlastSafeBank`（x −69.5..−62.5）西头以外；净空由 `Script_FirstLevelSpaceTest` 守着。
   **药装好之前不清场**：爆破人员的岗位就在爆破区里，这会儿把区里的人往南赶，
