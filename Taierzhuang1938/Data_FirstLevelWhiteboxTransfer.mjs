@@ -18,6 +18,12 @@
 // cart's straight run to the bridge cross it. The west terrace scarp stands
 // behind the farm store; an east levee ridge by the river carries the concept's
 // left-hand high ground. Non-solid dressing is allowed anywhere.
+//
+// 2026-09-30 C2 pass (12–18 whitebox, docs/Data_FirstLevelMid20260919.md §6): z 118.5–136.4 of the road is now a
+// walled lane (west: 3.7 m brick with coping, pilasters and one window; east: 3 m rammed earth with one window),
+// a drainage ditch runs along the west wall foot (terrain table), the river-lip balustrade runs west to x 55.6,
+// windowed ruin walls at the bay row (x 100.4) and the ditch's east lip. Wall extents and gaps are still
+// MID_TUNING.transferEvac.walls (westTall / eastTall); standing convoy carts are runtime props (transferConvoy).
 import { MID_TUNING } from "./Data_Tuning_FirstLevelMid.mjs";
 
 export function BuildTransferWhitebox(groundAt) {
@@ -176,7 +182,7 @@ export function BuildTransferWhitebox(groundAt) {
   // 墙后的担架、车与人流，拐角读成装载区的入口；13 躲在它背后的遮挡点（EastWallA）仍有 1.9 m 那一截。
   const courseOverride = { East0_0: 1.05 };
   let course = 0;
-  for (const [side, x, list] of [["West", RoadWalls.westX, RoadWalls.west], ["East", RoadWalls.eastX, RoadWalls.east]])
+  for (const [side, x, list] of [["West", RoadWalls.westX, RoadWalls.westLow], ["East", RoadWalls.eastX, RoadWalls.eastLow]])
     list.forEach(([z0, z1], i) => {
       const split = z0 + (z1 - z0) * (.45 + .1 * (i % 2));
       for (const [k, a, b] of [[0, z0, split], [1, split, z1]]) {
@@ -192,6 +198,64 @@ export function BuildTransferWhitebox(groundAt) {
       Detail(`TransferRoadWall${side}${i}_Rubble`, x + (side === "West" ? -.8 : .8), (z0 + z1) / 2, .6, .3, 1.4, "earthDark", { ry: .2 });
     });
   Pole("TransferPoleNorthWest", 57.6, 82.6);
+
+  // ---------------------------------------------------------------------
+  // 2026-09-30 夹道高墙（12–18 白盒 C2 包，概念 13_3「两道长墙夹着一条车路」、13_1、12_2 / 12_4；墙段、门洞与
+  // 疏散遮挡点、撤退通道同表：MID_TUNING.transferEvac.walls 的 westTall / eastTall / westDoor / eastGate）。
+  //   · 西侧（路右，13_3 近处那道）：青砖高墙 3.7 m + 瓦压顶 + 壁柱，z 103.6–129.6，只在 z 108.0–112.95 留一个
+  //     4.95 m 的门洞（两侧门垛），窗洞在 z 123.4–124.8（窗台 1.1、窗顶 2.3）；墙脚 z 118.4–130.8 是 0.75 m 深的路沟
+  //     （地形表 RoadSideDitchWest）。墙身底部沉进路沟 / 路堤坡下（y −0.8），顶高是相对路面（y≈0）的 3.7。
+  //   · 东侧（路左）：夯土高墙 3 m，x 81.7、z 117.85–136.4，北头是砖门垛，门垛以北到低墙端（z 104.2）是 13.65 m 的
+  //     院门式开口（cartRide 与 bay 车进路、追兵 / 撤退的口子都在里头，无门楣：车路上方开天）；窗洞在 z 129.2–130.6。
+  //     顶上是塌了一角的土冠。侧巷机枪 B 的射线要穿过 x 81.7 处 z 107–110.4，所以那一段不能砌墙（见 walls 注释）。
+  //   · 墙内皮净距 81.35 − 71.35 = 10.0 m（概念 8–10 m）。
+  {
+    const wx = RoadWalls.westX, ex = RoadWalls.eastTallX, t = RoadWalls.thickTallM, et = RoadWalls.eastThickTallM;
+    const [[wn0, wn1], [ws0, ws1]] = RoadWalls.westTall, [[es0, es1]] = RoadWalls.eastTall;
+    const foot = -0.8, top = 3.7, winZ0 = 123.4, winZ1 = 124.8, sillTop = 1.1, headBottom = 2.3;
+    const WestBody = (id, z0, z1, y0, y1) => At(id, wx, (z0 + z1) / 2, t, y1 - y0, z1 - z0, y0, "structure");
+    WestBody("TransferRoadWestWallN", wn0, wn1, foot, top);
+    WestBody("TransferRoadWestWallA", ws0, winZ0, foot, top);
+    WestBody("TransferRoadWestWallSill", winZ0, winZ1, foot, sillTop);
+    WestBody("TransferRoadWestWallLintel", winZ0, winZ1, headBottom, top);
+    WestBody("TransferRoadWestWallB", winZ1, ws1, foot, top);
+    // 壁柱：路一侧凸出 0.3 m（离墙脚 WestFoot* 的蹲位 x 72.6 还有 ≥ 0.9 m）。
+    [104.6, 106.4, 116.0, 119.5, 122.7, 125.9, 128.9].forEach((z, i) =>
+      At(`TransferRoadWestWallPilaster${i}`, wx + .4, z, .5, top + .15 - foot, .9, foot, "structure"));
+    // 门垛：宽 0.95、比墙身高 0.35，两侧各凸出 0.12，垛帽是瓦压顶。门洞净宽 = 门垛内皮之间。
+    for (const [id, zc] of [["N", wn1 - .45], ["S", ws0 + .45]]) {
+      At(`TransferRoadWestDoorPier${id}`, wx, zc, .95, top + .35 - foot, .9, foot, "structure");
+      Detail(`TransferRoadWestDoorPierCap${id}`, wx, zc, 1.25, .18, 1.2, "coping", { y: top + .35 + .09 });
+    }
+    for (const [id, z0, z1] of [["N", wn0, wn1], ["S", ws0, ws1]]) {
+      const zc = (z0 + z1) / 2, len = z1 - z0;
+      Detail(`TransferRoadWestWallCoping${id}`, wx, zc, t + .36, .22, len + .3, "coping", { y: top + .11 });
+      Detail(`TransferRoadWestWallCopingRidge${id}`, wx, zc, .22, .12, len + .2, "coping", { y: top + .28 });
+    }
+    // 窗洞里的窗棂：两根竖的（不碰撞）。
+    for (const z of [winZ0 + .45, winZ0 + .95]) At(`TransferRoadWestWallBar${z.toFixed(2)}`, wx, z, .1, headBottom - sillTop, .1, sillTop, "timber", { solid: false });
+
+    // 东墙：夯土，三段（北头 / 院门以南 / 窗洞两边）+ 院门两侧的砖门垛。
+    const eastWinZ0 = 129.2, eastWinZ1 = 130.6, eastTop = 3.05;
+    for (const [id, z0, z1, y0, y1] of [
+      ["TransferRoadEastWallTallA", es0, eastWinZ0, -0.8, eastTop],
+      ["TransferRoadEastWallTallSill", eastWinZ0, eastWinZ1, -0.8, 1.0], ["TransferRoadEastWallTallLintel", eastWinZ0, eastWinZ1, 2.2, eastTop],
+      ["TransferRoadEastWallTallB", eastWinZ1, es1, -0.8, 2.75]])
+      At(id, ex, (z0 + z1) / 2, et, y1 - y0, z1 - z0, y0, "earthDark");
+    for (const [id, zc] of [["GateS", es0 + .45]]) {
+      At(`TransferRoadEast${id}Pier`, ex, zc, .95, 3.95 - foot, .9, foot, "structure");
+      Detail(`TransferRoadEast${id}PierCap`, ex, zc, 1.25, .18, 1.2, "coping", { y: 3.95 + .09 });
+    }
+    // 土冠：几处高低不一的隆起（夯土墙顶被雨冲、被草根拱出来的样子），不碰撞。
+    [[1, 121.6, 2.2, .38], [2, 126.7, 1.9, .3], [3, 129.4, 2.4, .42], [4, 132.6, 1.6, .28], [5, 135.0, 1.9, .36]].forEach(([i, z, l, h]) =>
+      Detail(`TransferRoadEastWallCrown${i}`, ex, z, et + .1, h, l, "earthDark", { y: (z < 131 ? eastTop : 2.75) + h / 2 - .02 }));
+    // 墙脚碎土（路一侧，不碰撞）。
+    [[1, 124.4], [2, 127.4], [3, 130.4], [4, 134.3]].forEach(([i, z]) => Detail(`TransferRoadEastWallFoot${i}`, ex - .95, z, .7, .28, .9, "earthDark", { ry: i * .7 }));
+    // 东墙脚（路一侧）码两垛袋子（标准沙袋模型，Data_FirstLevelMissionFortifications.IsMissionSandbagBlock 认 id）：
+    // 离 cartRide 车身（z 128–132 处 x ≤ 77.9）≥ 2 m，朝西挡。西墙脚被侧翻残车 ConvoyWreck 和两个蹲位占了。
+    Block("TransferRoadFootBags0", 80.85, 128.6, .9, .9, 1.6, "cover", { cover: { faceX: -1, faceZ: 0 } });
+    Block("TransferRoadFootBags1", 80.85, 132.6, .9, .9, 1.6, "cover", { cover: { faceX: -1, faceZ: 0 } });
+  }
 
   // ---------------------------------------------------------------------
   // 12 村口残垣（2026-09-27 掩护装载重做，docs/Data_FirstLevelTransferCover20260927.md）。
@@ -353,6 +417,42 @@ export function BuildTransferWhitebox(groundAt) {
   }
   Detail("TransferShelterCrate0", 56.2, 126.6, .8, .6, .6);
   Detail("TransferShelterCrate1", 56.1, 130.2, .7, .55, .6, "timber", { ry: .25 });
+  // 12_4（备选 D「车尾回看」）：车位那一排东边一段带窗洞的无顶残砖墙（南北向，x 100.4、z 122.8–128.2）。
+  // 牛车起步（(88,113) → 西）时从车尾回看，它在装载区尽头。离车位 (94,126) 车盒 ≥ 3.4 m、离追兵线
+  // MISSION_PURSUIT_ROUTE 起点 (100,120.5) 2.3 m、离草房 (98.2,132) 4 m。
+  Block("TransferBayRuinA", 100.4, 124.1, .5, 3.0, 2.6, "structure");
+  Block("TransferBayRuinSill", 100.4, 126.0, .5, 1.0, 1.2, "structure");
+  At("TransferBayRuinHead", 100.4, 126.0, .5, .45, 1.2, groundAt(100.4, 126.0) + 2.3, "structure");
+  Block("TransferBayRuinB", 100.4, 127.5, .5, 2.2, 1.8, "structure");
+  for (const [i, x, z, w, h, d, ry] of [[0, 99.5, 124.9, .8, .3, .6, .3], [1, 101.3, 127.2, .7, .25, .5, -.6],
+    [2, 99.6, 127.9, .6, .22, .5, .9], [3, 101.0, 123.3, .5, .2, .4, .2]])
+    Detail(`TransferBayRuinRubble${i}`, x, z, w, h, d, i % 2 ? "plaster" : "earthDark", { ry });
+  // 14_1 / 14_2 / 14_4（2026-09-30 C2 包）：概念里沟沿外紧挨着残破砖房山墙、带窗。东沿这一带原来是空场，
+  // 站在沟底 / 沟口往左看只有天。沿沟东沿外 2.4 m（离抛土 ≥ 1.3 m，PlanTrenchDressing 的护壁 keepOut 之外）
+  // 补一段无顶的砖房山墙 z 119.6–127（x 42.9，3.3 / 2.6 m 两截、中间一扇 1.4 m 窗洞），墙脚碎砖；
+  // 沟口南侧 TransferDitchHouse 朝沟的北墙补两扇窗洞与窗框。
+  {
+    const rx = 42.9;
+    Block("TransferDitchLipRuinA", rx, 121.1, .5, 3.3, 3.0, "structure");
+    Block("TransferDitchLipRuinSill", rx, 123.3, .5, 1.0, 1.4, "structure");
+    At("TransferDitchLipRuinHead", rx, 123.3, .5, .5, 1.4, groundAt(rx, 123.3) + 2.3, "structure");
+    Block("TransferDitchLipRuinB", rx, 125.5, .5, 2.6, 3.0, "structure");
+    Block("TransferDitchLipRuinC", rx, 127.35, .5, 1.5, 0.7, "structure");
+    for (const [i, x, z, w, h, d, ry] of [[0, 43.7, 120.4, .9, .3, .7, .4], [1, 42.2, 123.9, .7, .25, .6, -.5],
+      [2, 43.6, 126.3, 1.0, .35, .8, .2], [3, 42.4, 119.4, .6, .22, .5, 1.0], [4, 43.5, 122.4, .5, .2, .45, .8]])
+      Detail(`TransferDitchLipRuinRubble${i}`, x, z, w, h, d, i % 2 ? "plaster" : "earthDark", { ry });
+    At("TransferDitchLipRuinBeam", rx - .5, 122.6, .2, .18, 4.4, groundAt(rx, 122.6) + 2.75, "timber", { solid: false, ry: .12 });
+    for (const [i, x] of [[0, 47.8], [1, 53.3]])
+      At(`TransferDitchHouseNorthWindow${i}`, x, 121.36, 1.0, 1.0, .12, groundAt(x, 121.4) + 1.3, "void", { solid: false });
+    for (const [i, x] of [[0, 47.8], [1, 53.3]])
+      At(`TransferDitchHouseNorthSill${i}`, x, 121.28, 1.3, .12, .3, groundAt(x, 121.4) + 1.2, "timber", { solid: false });
+  }
+  // 14_2：沿沟底往西南看，左前（东沿）该有一截高些的山墙压在沟上。TransferDitchLipHouse（3 m）南边补一段东西向的
+  // 无顶残山墙（z 134.6，x 40.6–45.4，4.2 / 3.2 m 两截，中间一扇窗洞），离沟沿抛土 ≥ 3.5 m。
+  Block("TransferDitchLipGableA", 41.6, 134.6, 2.0, 4.2, .5, "structure");
+  Block("TransferDitchLipGableSill", 43.25, 134.6, 1.3, 1.0, .5, "structure");
+  At("TransferDitchLipGableHead", 43.25, 134.6, 1.3, .5, .5, groundAt(43.25, 134.6) + 2.4, "structure");
+  Block("TransferDitchLipGableB", 44.7, 134.6, 1.6, 3.2, .5, "structure");
   // 14: telegraph poles over the ditch and loose stones on its east lip.
   Pole("TransferPoleDitchHouse", 45.3, 120.9);
   Pole("TransferPoleDitchWest", 28.8, 126.8);
@@ -455,8 +555,8 @@ export function BuildTransferWhitebox(groundAt) {
   for (const [i, x, z, w, h, d] of [[0, 81.3, 121.6, .45, .3, .4], [1, 81.6, 124.9, .55, .35, .45],
     [2, 81.2, 128.3, .4, .28, .4], [3, 81.7, 131.5, .6, .32, .5], [4, 82.0, 134.3, .5, .3, .4]])
     Detail(`TransferRoadStoneEast${i}`, x, z, w, h, d, "earthDark", { ry: i * .6 });
-  for (const [i, x, z, w, h, d] of [[0, 71.6, 122.4, .5, .3, .45], [1, 71.9, 125.8, .45, .35, .4],
-    [2, 71.5, 131.8, .55, .28, .5]])
+  for (const [i, x, z, w, h, d] of [[0, 73.9, 122.4, .5, .3, .45], [1, 74.2, 125.8, .45, .35, .4],
+    [2, 73.6, 131.8, .55, .28, .5]])
     Detail(`TransferRoadStoneWest${i}`, x, z, w, h, d, "earthDark", { ry: i * .8 });
   for (const [i, x, z, w, h, d] of [[0, 84.4, 131.2, 1.3, 1.2, 1.0], [1, 86.6, 134.6, 1.6, 1.4, 1.1],
     [2, 83.9, 136.9, 1.1, 1.0, .8], [3, 90.2, 137.2, 1.5, 1.3, 1.0]])
@@ -488,8 +588,11 @@ export function BuildTransferWhitebox(groundAt) {
   Block("TransferBankRuinStep", 89.7, ruinZ, .6, 1.1, .5);
   // 13_2: stone balustrade along the north lip of the river, west of the road,
   // over the 4.2 m channel (the lip z 138.8 itself is Topology's, untouched).
-  const railZ = 138.45, railPosts = [60.6, 63.1, 65.6, 68.1, 70.6];
-  for (const x of railPosts) Block(`TransferBankRailPost${x}`, x, railZ, .4, 1.15, .4, "plaster");
+  const railZ = 138.45, railPosts = [55.6, 58.1, 60.6, 63.1, 65.6, 68.1, 70.6];
+  for (const x of railPosts) {
+    Block(`TransferBankRailPost${x}`, x, railZ, .4, 1.15, .4, "plaster");
+    Detail(`TransferBankRailPostCap${x}`, x, railZ, .58, .13, .58, "coping", { y: groundAt(x, railZ) + 1.15 + .065 });
+  }
   for (let i = 1; i < railPosts.length; i++) {
     const x = (railPosts[i - 1] + railPosts[i]) / 2;
     Block(`TransferBankRailSlab${i}`, x, railZ, 2.1, .9, .28, "plaster");

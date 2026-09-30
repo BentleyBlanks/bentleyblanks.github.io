@@ -33,6 +33,21 @@ function HaversackGeometry() {
   geometry.computeBoundingBox();
   return geometry;
 }
+/**
+ * 车板上的麻袋（停滞车列，MID.transferConvoy.sacks）：软的、顶面鼓起、四边收，原点在袋底中心。
+ * 与 HaversackGeometry 同一路做法（一只带分段的盒子往里收），不是「画了袋缝的白盒块」。
+ */
+function CartSackGeometry() {
+  const { w, h, d } = MID.transferConvoy.sacks.size;
+  const body = new THREE.BoxGeometry(w, h, d, 4, 3, 5), p = body.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const u = p.getX(i) / (w / 2), v = p.getZ(i) / (d / 2), t = (p.getY(i) + h / 2) / h;
+    const belly = 1 - .16 * Math.pow(Math.abs(t - .5) * 2, 1.6);
+    p.setXYZ(i, p.getX(i) * belly, t * h + .05 * h * (1 - u * u) * (1 - v * v), p.getZ(i) * (1 - .06 * Math.abs(u)) * belly);
+  }
+  body.computeVertexNormals();
+  return body.toNonIndexed();
+}
 import { BuildSink } from "./Script_World.mjs";
 import { MergeGeometries, PlaceGeometry } from "./Script_Geo.mjs";
 import { ApplyShadowDepth, AttachShadowDepth } from "./Script_ShadowDepth.mjs";
@@ -96,6 +111,8 @@ export class FirstLevelMissionView {
       ["medical", new THREE.BoxGeometry(0.24, 0.2, 0.12), 0xe1e2d5, 32],
       ["cart", new THREE.BoxGeometry(3, 0.38, 5.8), 0x8a7b69, 7],
       ["wheel", new THREE.CylinderGeometry(0.48, 0.48, 0.15, 10), 0x454a48, 28],
+      // 停滞车列车板上的麻袋（MID.transferConvoy）：一辆车 18 只，最多同时 6 辆（B C D 与 E E2 E3 替身）。
+      ["cartSack", CartSackGeometry(), 0xa39a80, 144],
     ]) {
       const material = new THREE.MeshStandardMaterial({ color, roughness: 0.92, vertexColors: key === "bed" });
       this.materials.push(material);
@@ -399,6 +416,27 @@ export class FirstLevelMissionView {
     mesh.position.copy(this.position);mesh.quaternion.copy(this.rotation);mesh.scale.set(1,1,1);
     return mesh;
   }
+  /** 停滞车列车板上的麻袋（局部坐标 x 横向、z 沿车；layers 见 MID.transferConvoy.sacks）。 */
+  DrawCartSacks(cart,ground) {
+    const S=MID.transferConvoy.sacks;
+    let n=0;
+    S.layers.forEach((layer,li)=>{
+      for(const x of layer.xs)for(const z of layer.zs){
+        n++;
+        const j=Math.sin(n*12.9898+cart.z*.37)*.5, k=Math.sin(n*78.233+cart.x*.21)*.5;
+        // 局部 y 相对 ground+1：车板顶 deckTopM，往上一层一个袋高（第二层压在第一层的缝上）。
+        this.CartInstance("cartSack",cart,ground,x+j*.06,S.deckTopM-1+li*S.size.h*.86,z+k*.05,k*.08,j*.10);
+      }
+    });
+  }
+  /** 侧翻残车旁撒在地上的麻袋（MID.transferConvoy.sacks.spilled，车局部坐标）。 */
+  DrawSpilledSacks(cart) {
+    const c=Math.cos(cart.yaw),s=Math.sin(cart.yaw);
+    for(const [lx,lz,yaw,rx,rz] of MID.transferConvoy.sacks.spilled){
+      const x=cart.x+lx*c+lz*s,z=cart.z-lx*s+lz*c;
+      this.Instance("cartSack",x,this.battlefield.GroundHeight(x,z)-.03,z,cart.yaw+yaw,1,1,1,rx,rz);
+    }
+  }
   SyncCartCollider(cart,ground) {
     let box=this.cartColliders.get(cart.id);
     if(box&&box.overturned!==cart.overturned){
@@ -565,9 +603,10 @@ export class FirstLevelMissionView {
       });
     }
     const stableCartId=this.column.zhouRideCart?.id||null;
-    for (const cart of [...this.column.vehicles, ...this.column.traffic.filter((cart) => cart.visible)]) {
+    for (const cart of [...this.column.vehicles, ...this.column.traffic.filter((cart) => cart.visible), ...(this.column.convoy || []).filter((cart) => cart.visible)]) {
       if (cart.z > 178) continue;
-      const y = this.battlefield.GroundHeight(cart.x, cart.z);
+      // sinkM：侧翻残车压进土里一截（车心离地 1 m、侧倾 63°，不压低会悬着）。
+      const y = this.battlefield.GroundHeight(cart.x, cart.z) - (cart.sinkM || 0);
       this.SyncCartCollider(cart,y);
       this.cartSuspension.Step(cart,dt,this.CorpseHeightNear(cart,soldiers));
       const stable=cart.id===stableCartId;
@@ -577,7 +616,7 @@ export class FirstLevelMissionView {
       const team=cart.boltedTeam;
       const animalYaw=team?.yaw??cart.yaw,mc=Math.cos(animalYaw),ms=Math.sin(animalYaw);
       const offset=MID.draft.teamOffsetM,mx=team?.x??cart.x-s*offset,mz=team?.z??cart.z-c*offset,my=this.battlefield.GroundHeight(mx,mz);
-      const animalVisible=!cart.overturned || !!(team&&team.progress<team.length);
+      const animalVisible=(!cart.overturned || !!(team&&team.progress<team.length)) && !cart.abandoned;
       if(this.draftCartModels.ready){
         this.draftCartModels.Sync(cart,y,{x:mx,z:mz,ground:my,yaw:animalYaw,
           visible:animalVisible,moving:moving||!!team,travel:team?.progress??travel},
@@ -631,6 +670,8 @@ export class FirstLevelMissionView {
           }
         }
       }
+      if(cart.cargo==="sacks")this.DrawCartSacks(cart,y);
+      else if(cart.cargo==="spilled")this.DrawSpilledSacks(cart);
       if(animalVisible)this.Person(mx+mc*1.1,mz-ms*1.1,animalYaw,time,
         {id:cart.id+"Driver",kind:"medic",moving:moving||!!team});
       if (cart.id.startsWith("SouthCart")) {
@@ -648,7 +689,7 @@ export class FirstLevelMissionView {
       if (spec.patient && (!eye || Math.hypot(eye.x - spec.x, eye.z - spec.z) <= GROUND_STRETCHER_PATIENT_DRAW_M))
         this.people.Patient(spec.id, spec.x, spec.y + STRETCHER_PATIENT_LIFT_M, spec.z, spec.yaw, time);
     this.people.End();
-    const visibleCarts=new Set([...this.column.vehicles,...this.column.traffic.filter(c=>c.visible)].filter(c=>c.z<=178).map(c=>c.id));
+    const visibleCarts=new Set([...this.column.vehicles,...this.column.traffic.filter(c=>c.visible),...(this.column.convoy||[]).filter(c=>c.visible)].filter(c=>c.z<=178).map(c=>c.id));
     for(const [id,box] of this.cartColliders)if(!visibleCarts.has(id)){
       this.physics.RemoveSolid(box._physicsHandle);
       this.battlefield.colliders.splice(this.battlefield.colliders.indexOf(box),1);

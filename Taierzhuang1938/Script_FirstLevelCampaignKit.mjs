@@ -814,6 +814,38 @@ export function CampaignActions(ctx) {
     await Capture(name);
     await page.evaluate(view=>Object.assign(window.Tengxian.player,view),view);
   }
+  /**
+   * 站到指定位置朝指定点拍一张（拍完把玩家的位置与朝向还回去）。取证用：真实驱动到某一刻，再从概念图机位看。
+   * pose = { x, z, h（眼高，缺省 1.6）}，look = { x, z, height（看向的点离地高，缺省 1.2） }。
+   * 玩家必须没被 cartRide 之类的控制接管（停车之后控制权已还）；接管中位置会被下一帧改回去。
+   */
+  async function CapturePose(name,pose,look) {
+    assert.ok(pose&&Number.isFinite(pose.x)&&Number.isFinite(pose.z)&&look&&Number.isFinite(look.x)&&Number.isFinite(look.z),
+      `CapturePose(${name}) 需要有限的 pose / look，收到 ${JSON.stringify({pose,look})}`);
+    const saved=await page.evaluate(({pose,look})=>{
+      const g=window.Tengxian,pl=g.player,p=pl.position;
+      const previous={x:p.x,y:p.y,z:p.z,yaw:pl.yaw,pitch:pl.pitch};
+      const ground=g.battlefield.GroundHeight(pose.x,pose.z),eyeH=pose.h??1.6,rise=pl.EyePosition.y-p.y;
+      p.set(pose.x,ground+eyeH-rise,pose.z);pl.body?.Teleport(p.x,p.y,p.z);
+      pl.yaw=Math.atan2(pose.x-look.x,pose.z-look.z);
+      pl.pitch=Math.atan2(g.battlefield.GroundHeight(look.x,look.z)+(look.height??1.2)-(ground+eyeH),Math.hypot(pose.x-look.x,pose.z-look.z));
+      return previous;
+    },{pose,look});
+    // 瞬移之后先空转一秒：相机 / 物理 / 阴影与后期的历史帧要追上新位置，紧接着拍会拍到旧位置的残影。
+    await page.evaluate(()=>window.Tengxian.StepFrames(60,1/60,false));
+    await Capture(name);
+    // 拍的那一刻玩家 / 相机真在机位上吗（瞬移被别的系统顶回去时，图会拍成别处）。
+    console.log("CAPTURE_POSE",name,JSON.stringify(await page.evaluate(()=>{
+      const g=window.Tengxian,p=g.player.position,c=g.camera.position;
+      const f=new c.constructor(0,0,-1).applyQuaternion(g.camera.quaternion);
+      return {player:[+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2)],camera:[+c.x.toFixed(2),+c.y.toFixed(2),+c.z.toFixed(2)],
+        forward:[+f.x.toFixed(2),+f.y.toFixed(2),+f.z.toFixed(2)],yaw:+g.player.yaw.toFixed(3),pitch:+g.player.pitch.toFixed(3)};
+    })));
+    await page.evaluate(previous=>{
+      const pl=window.Tengxian.player;pl.position.set(previous.x,previous.y,previous.z);pl.body?.Teleport(previous.x,previous.y,previous.z);
+      pl.yaw=previous.yaw;pl.pitch=previous.pitch;
+    },saved);
+  }
   // How many checkpoint retries one leg may spend before the route is called
   // unwalkable. Two covers an unlucky firefight; a leg that needs more is telling
 
@@ -1277,6 +1309,15 @@ export function CampaignActions(ctx) {
         capturedActivities.add("MedicalRescue");await CaptureFocus("MedicalRescue",state.mission.column.litters.find(l=>l.zhou));
       }
       if(chunk%12===11)console.log("WAIT_PROGRESS",JSON.stringify({expected,stage:state.mission.stage,time:state.mission.time,health:state.health,remaining:state.mission.remaining}));
+      // 14 救人卡住时看谁在哪儿：两个救人的人、老周、还有没有威胁沟口的活敌人（2026-09-30 夹道砌墙后卡过一次）。
+      if(chunk%12===11&&state.mission.stage==="Rescue")console.log("RESCUE_STATE",JSON.stringify(await page.evaluate(()=>{
+        const g=window.Tengxian,m=g.Debug.FirstLevelMission(),zhou=m.column.litters.find(l=>l.zhou),fmt=p=>[+p.x.toFixed(1),+p.z.toFixed(1)];
+        return {zhou:zhou&&fmt(zhou),strafed:m.facts.includes("zhouStrafed"),
+          rescuers:["yaowa","liuwencai"].map(id=>{const a=g.ai.soldiers.find(s=>s.castId===id),rt=g.Debug.FirstLevelMissionRuntime();
+            return a&&{id,alive:a.alive,at:fmt(a.position),ready:!!a.missionRescueReady,waypoint:zhou&&fmt(rt.transferCart.RescueWaypoint(a.position,zhou)),
+              squadRoute:rt.squadRoutes?.get(a.id)?.length??null,goal:a.goal&&fmt(a.goal),order:a.order,speed:a.scriptMoveSpeedMps};}),
+          enemies:g.ai.soldiers.filter(s=>s.alive&&s.side==="ija").map(s=>({id:s.id,at:fmt(s.position)})).slice(0,8)};
+      })));
       if(!state.alive&&await RetryCampaign())continue;
       if (state.mission.stage === expected || !state.alive) break;
     }
@@ -1296,5 +1337,5 @@ export function CampaignActions(ctx) {
     return state;
   }
 
-  return { JumpStage, Capture, CaptureFocus, WaitOutCutscene, Route, Interact, InteractProbe, RetryCampaign, WaitStage };
+  return { JumpStage, Capture, CaptureFocus, CapturePose, WaitOutCutscene, Route, Interact, InteractProbe, RetryCampaign, WaitStage };
 }

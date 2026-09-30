@@ -117,7 +117,11 @@ export class FirstLevelMissionColumn {
       progress: 0,
       overturned: false,
       state: i === 0 ? "loading" : "waiting",
-      approachRoute: [point, { x: 86, z: 123 }, { x: 80, z: 123 }, { x: 80, z: 120 }],
+      // 2026-09-30：东高墙（x 81.7，z 117.85–136.4）之后 bay 车从它北头的院门式开口进路（x 81.7 处 z 116.6，离门垛 1.2 m），
+      // 再拐到上车位；上车位从 (80,120) 西挪 1 m 到 (79,120)：车盒（半宽 1.5）不再压进东墙内皮 x 81.325
+      // （驾驶脚本 Kit 拿车盒东沿 + 0.3 m 处朝西射线验「车是真的挡子弹」，起点不能落在墙里）；路线长度与原来
+      // （经 (86,123)、(80,123)）相差在 ±2 m 内，装载节奏不变。
+      approachRoute: [point, { x: 82.6, z: 116.6 }, { x: 79.4, z: 117 }, { x: 79, z: 120 }],
       approachProgress: 0,
     }));
     this.traffic = Array.from({ length: 3 }, (_, i) => ({
@@ -126,6 +130,12 @@ export class FirstLevelMissionColumn {
       draft: MidDraftKind("traffic", i),
       ...MissionCarryRoutePoint(MISSION_ROUTES.southTraffic, i * 32),
       visible: false,
+    }));
+    // 2026-09-30：桥头路上的停滞车列（布景车，Data_Tuning_FirstLevelMid.transferConvoy）。
+    // 不载人、不参与装载与翻车；visible / abandoned 由 Script_FirstLevelTransferCart.UpdateConvoy 按步骤写。
+    this.convoy = MID.transferConvoy.carts.map((cart) => ({
+      ...cart, state: "convoy", load: [], overturned: false, departed: false, progress: 0,
+      visible: false, abandoned: false, cargo: cart.cargo,
     }));
     // 12：威胁没解除以前装载额度是 0（由 Script_FirstLevelTransferCart 每帧写）。
     // 其余阶段不设限。

@@ -2692,7 +2692,7 @@ export class FirstLevelMissionRuntime {
           z:zhou.z-Math.sin(zhou.yaw)*side*R.rescuerLateralM};
         const arrived=actor?.alive&&Distance(actor.position,target)<R.rescuerArrivalM;
         if(arrived){this.MoveActor(actor,actor.position,0);this.ai.SetStance(actor,1,.5,true);actor.yaw=Math.atan2(actor.position.x-zhou.x,actor.position.z-zhou.z);}
-        else {this.MoveActor(actor,target,R.rescuerApproachMps);this.ai.SetStance(actor,0,.5,true);}
+        else {this.MoveActor(actor,actor?.alive?this.transferCart.RescueWaypoint(actor.position,target):target,R.rescuerApproachMps);this.ai.SetStance(actor,0,.5,true);}
         if(actor)actor.missionRescueReady=arrived;
       }
       if (

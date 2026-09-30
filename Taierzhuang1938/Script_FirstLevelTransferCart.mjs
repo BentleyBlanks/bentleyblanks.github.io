@@ -19,7 +19,7 @@
 // ===========================================================================
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
-import { MISSION_ENCOUNTERS, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
+import { MISSION_ENCOUNTERS, MISSION_STAGES, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as M, MidWalkingWounded, MidTransferScatterPlan, MidTransferWalkRoute } from "./Data_Tuning_FirstLevelMid.mjs";
 import { MissionRouteLength, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
@@ -102,6 +102,25 @@ export class FirstLevelTransferCart {
     if (stage === "AirFirst") this.UpdateAirGround(dt);
     if (["Carry", "Dive", "Rescue"].includes(stage)) this.UpdateDitch();
     this.UpdateUnload(dt);
+    this.UpdateConvoy(stage);
+  }
+
+  /**
+   * 桥头路上的停滞车列与残车（布景车，MID.transferConvoy）：默认从 TransferApproach 起出现；
+   * 桥面上的两辆等桥被炸（MissionBridgeDestroyed）或进 14 就撤掉；cartHalt 的替身 E 只在没有 cartRide 时站着；
+   * 进 14 起牲口跑了、车留在原地。
+   */
+  UpdateConvoy(stage) {
+    const column = this.r.column, C = M.transferConvoy;
+    if (!column.convoy?.length) return;
+    const order = MISSION_STAGES.map((entry) => entry.id), index = order.indexOf(stage);
+    const bridgeGone = index >= order.indexOf(C.bridgeGoneFrom) || this.r.Has("MissionBridgeDestroyed");
+    const abandoned = index >= order.indexOf(C.abandonedFrom);
+    for (const cart of column.convoy) {
+      const from = order.indexOf(cart.from || C.visibleFrom), until = cart.until ? order.indexOf(cart.until) : Infinity;
+      cart.visible = index >= from && index < until && !(cart.onBridge && bridgeGone) && !(cart.standIn && this.ride);
+      cart.abandoned = abandoned;
+    }
   }
 
   // --- 11 -------------------------------------------------------------------
@@ -377,6 +396,18 @@ export class FirstLevelTransferCart {
     if (!r.Has("columnOffRoad")
       && Math.abs(zhou.x - road) >= M.offRoadM && Math.abs(r.player.position.x - road) >= M.offRoadM)
       r.Record("columnOffRoad", { zhou: zhou.x, player: r.player.position.x });
+  }
+
+  /**
+   * 14 救人：幺娃 / 刘文才用 MoveActor 直线奔向老周（没有寻路）。夹道两侧是连续的高墙之后，从路上出发的直线会顶在墙上，
+   * 所以每帧先问一下「从这里到那儿的路上有没有墙、要不要先过门洞」，MoveActor 只朝第一个折点走（MidTransferWalkRoute，
+   * 12 班里人上射位用的同一份）。墙外 / 没有墙挡着时就是目标本身。
+   */
+  RescueWaypoint(from, to) {
+    // 已经走到（离 1 m 以内）的折点跳过：MoveActor 的到达半径内就算到了，人停在离折点 0.5–1 m 的地方，
+    // 再问一遍第一个折点还是它，不跳就在原地打转（整关驾驶里幺娃卡在 (72.6,102.4)，正是这样）。
+    const route = MidTransferWalkRoute(from, to, { minGapM: 3.5 });
+    return route.find((point, i) => i === route.length - 1 || Distance(from, point) > 1) || to;
   }
 
   State() {
