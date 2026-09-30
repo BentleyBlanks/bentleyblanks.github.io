@@ -87,6 +87,7 @@
 | `ShunziFound` | 01 ijaA 「まだいたか、この支那野郎。」 |
 | `RescueInterrogation` | 01 ijaA 「こいつにも聞け！」02 interpreter 「はい！」03 interpreter 醒醒！你们的人往哪儿撤了？说了，太君饶你不死，还赏你口饭吃！04 interpreter 听见没有？你们长官在哪儿？不说？刚才那个就是你的下场！05 ijaB 「早くしろ！」06 interpreter 说话！ |
 | `RescueFlee` | 01 interpreter 「敵だ！」 |
+| `RescueHeave` | 01 shunzi 呃啊——！（自己从塌顶木下挣出来那一声用力，不是台词）——2026-09-30 用户追加（docs/Data_OpeningSelfRescue20260930.md） |
 | `RescueCheck` | 01 luo 还能打不？ |
 | `CollectionMeet` | 01 yaowa 顺哥！你脸咋了？02 shunzi 还能走。03 luo 莫堵到！ |
 | `SupportOrder` | 01 guard 东头丢了！西边机枪还在顶，前头那几个下不来！02 luo 老周喃？03 guard 还在前头！机枪压到起的！04 luo 何有田守后头！顺子，跟老子走！05 shunzi 不是撤了？06 luo 先把那几个接下来！ |

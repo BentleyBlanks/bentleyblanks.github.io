@@ -66,14 +66,14 @@ const KEY_FRAMES = [
   { label: "Found", phase: "Found", age: 1.5 },
   { label: "Slap", flag: "slapAt", at: .15 },
   { label: "Charge", phase: "Charge", age: 1.5 },
-  { label: "HeParry", flag: "heChopAt", at: .42 },
-  { label: "HeChop", flag: "heChopAt", at: .8 },
-  { label: "LuoChop", flag: "luoChopAt", at: .5 },
-  // 2026-09-29 (docs/Data_OpeningRescueHandover20260929.md): rolled over (up at Luo), hauled out (down at the boots), the
-  // rifle held out, in his hands.
-  { label: "RolledOver", flag: "dragAt", at: 1.45 },
-  { label: "Haul", flag: "dragAt", at: 3.0 },
-  { label: "RifleOffered", phase: "Check", flag: "handAt", at: 2.3 },
+  // 2026-09-30 (docs/Data_OpeningSelfRescue20260930.md): the volley's shot, the cuts on the wounded, his own heave out onto his
+  // knees, Luo asking, the rifle in his hands.
+  { label: "ShotWounded", flag: "hit:ijaA", at: .35 },
+  { label: "LuoCut", flag: "cut:ijaA", at: .5 },
+  { label: "InterpreterCut", flag: "cut:interpreter", at: .5 },
+  { label: "Heave", flag: "heaveAt", at: .7 },
+  { label: "Kneel", flag: "heaveAt", at: 2.45 },
+  { label: "LuoAsks", phase: "Check", flag: "handAt", at: 1.0 },
   { label: "RifleHanded", flag: "handedAt", at: .4 },
 ];
 
@@ -190,13 +190,6 @@ async function InstallProbe(page) {
         if(head){const d=head.distanceTo(cam);if(d<(P.rescueInterpreterEyeMinM??Infinity)){P.rescueInterpreterEyeMinM=d;P.rescueInterpreterEyeMinAt={phase:s.phase,age:s.Age};}}
         if(head&&a?.alive&&["Hold","Ask"].includes(s.phase))
           P.rescueInterpreterIjaAMinM=Math.min(P.rescueInterpreterIjaAMinM??Infinity,Math.hypot(i.position.x-a.position.x,i.position.z-a.position.z));
-      }
-      // His run east down the front trench (after InterpreterFlee) crosses the charge coming down the crater step.
-      if(s.flags.fleeAt!=null&&!s.flags.interpreterGone&&s.cast.interpreter){
-        const i=s.cast.interpreter;
-        for(const id of ["luo","heyoutian","liuwencai"]){const o=s.Squad(id);if(!o||o.openingStoryboardHidden)continue;
-          const d=Math.hypot(i.position.x-o.position.x,i.position.z-o.position.z);
-          if(d<(P.rescueFleeSquadMinM??Infinity)){P.rescueFleeSquadMinM=d;P.rescueFleeSquadMinAt={who:id,phase:s.phase,age:s.Age};}}
       }
       if(s.phase==="Found")P.flagDown=r.openingSet?.flags?.get("flagTrench")?.progress;
       const shotId=(C.cinematic||{})[s.phase]?.id||"firstPerson";
@@ -387,7 +380,8 @@ export async function DriveOpening(ctx){
     assert.ok(probe.deaths[id]?.time<=eventTime("Released"),`${id} died before the hand-back (${JSON.stringify(probe.deaths[id])})`);
   }
   const {ijaA,ijaB,ijaD}=Storyboards.cast;
-  // The cuts land at the clips' contact frames in the charge (He's may land just after Melee has begun).
+  // 2026-09-30: shot in the arm by the volley first, then the cuts land at the chop's contact frame in the charge (the last may
+  // land just after Melee has begun).
   for(const id of [ijaA,ijaB])assert.ok(["Charge","Melee"].includes(probe.kills[id]?.phase)&&probe.kills[id].kind==="blade"&&probe.kills[id].weapon==="Dadao",
     `${id} falls to the dadao contact (${JSON.stringify(probe.kills[id])})`);
   assert.ok(["Charge","Melee","Lift"].includes(probe.kills[ijaD]?.phase)&&probe.kills[ijaD].kind==="bullet",`${ijaD} is shot at the junction (${JSON.stringify(probe.kills[ijaD])})`);
@@ -405,10 +399,9 @@ export async function DriveOpening(ctx){
   assert.ok(probe.interpreterMinM>=Storyboards.interpreterClearanceM-.025&&probe.interpreterAtMark,"interpreter passes soldiers without overlap and reaches his questioning mark");
   assert.ok(probe.flagKicked&&probe.flagDown===1,"the background soldier kicks the flag all the way down before ijaA finds Shunzi");
   assert.ok(probe.rescueInterpreterAtMark,"the interpreter trots over and squats at Shunzi's right front for the questioning");
-  console.log("RESCUE_INTERPRETER",JSON.stringify({eyeMin:probe.rescueInterpreterEyeMinM,at:probe.rescueInterpreterEyeMinAt,ijaAMin:probe.rescueInterpreterIjaAMinM,fleeSquadMin:probe.rescueFleeSquadMinM,fleeAt:probe.rescueFleeSquadMinAt}));
+  console.log("RESCUE_INTERPRETER",JSON.stringify({eyeMin:probe.rescueInterpreterEyeMinM,at:probe.rescueInterpreterEyeMinAt,ijaAMin:probe.rescueInterpreterIjaAMinM}));
   assert.ok(probe.rescueInterpreterEyeMinM>=.38,`the interpreter's head keeps off the lens in 02 (${probe.rescueInterpreterEyeMinM} m at ${JSON.stringify(probe.rescueInterpreterEyeMinAt)})`);
   assert.ok(probe.rescueInterpreterIjaAMinM>=.6,`the interpreter squats clear of the collar-holder (${probe.rescueInterpreterIjaAMinM} m)`);
-  assert.ok(probe.rescueFleeSquadMinM>=.6,`the fleeing interpreter runs clear of the squad (${probe.rescueFleeSquadMinM} m at ${JSON.stringify(probe.rescueFleeSquadMinAt)})`);
   // 2026-09-27 (user: 「保持第一人称，不在切换视角」): no cut-away shots any more.
   assert.deepEqual(probe.cameraCuts||[],[],"first person all through: the camera never cuts away");
   const fadeAt=t=>probe.wakeSamples?.find(s=>s.age>=t)?.blackout;
@@ -417,12 +410,10 @@ export async function DriveOpening(ctx){
   // The slaps fling the head aside on purpose (rescue.slap: 24 deg within ~0.07 s; those frames are left out); the rest stays smooth.
   assert.ok(probe.slapFrames>0,"the slaps were seen (their frames are left out of the continuity check)");
   assert.ok(probe.maxCameraTurn<10,`camera turns continuously (${probe.maxCameraTurn}° in ${probe.maxCameraTurnPhase})`);
-  // Luo hauling him out (2026-09-30, docs/Data_OpeningRescueHandover20260929.md §0): rolled over, the look pans round once,
-  // level, from Luo to his own feet (~180 deg net, the one turn round); sat up, it turns back ~90 deg to Luo coming round his
-  // left and stays on him (no second turn round, no roll back).
+  // His own heave (2026-09-30, docs/Data_OpeningSelfRescue20260930.md): the look stays ahead, east down the trench, from the
+  // lunge to his knees and on Luo standing over him there; getting up it stays that way (no turn round).
   console.log("HEADING",JSON.stringify(Object.fromEntries(Object.entries(probe.headingSweep||{}).map(([k,v])=>[k,{sweep:+v.sweep.toFixed(1),net:+v.net.toFixed(1)}]))));
-  // Lift also watches Luo step aside to the rifle and back (~90 deg there and back) before the pan and the haul's heaves.
-  for(const [phase,most,net] of [["Lift",420,[150,210]],["Check",200,[0,120]]]){
+  for(const [phase,most,net] of [["Lift",120,[0,60]],["Check",120,[0,60]]]){
     const turn=probe.headingSweep?.[phase]||{sweep:0,net:0};
     assert.ok(turn.sweep<most&&Math.abs(turn.net)>=net[0]&&Math.abs(turn.net)<=net[1],`${phase}: the eye turns round no more than once (${turn.sweep.toFixed(0)} deg swept, ${turn.net.toFixed(0)} deg net)`);
   }

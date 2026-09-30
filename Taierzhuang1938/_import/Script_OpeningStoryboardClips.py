@@ -8780,6 +8780,665 @@ def BuildLuoHandRifle(T, name):
     return spec
 
 
+# >>> WOUNDED RESCUE (2026-09-30)
+# ---------------------------------------------------------------------------------------------------------------------
+# 2026-09-30 wounded rescue (user: 「队友们先开枪击伤日军，日军手已经抬不起来拿枪了，再是班长和队友冲上来一刀砍死了这几个审问的日军
+# 和翻译，才接下面班长和主角的对话……班长就地捡起一把枪，就塞给玩家」). The volley of the charging company hits the three men over
+# Shunzi in the arm or the shoulder (they do not die): IjaShotStaggerAway (ijaA, left shoulder), IjaShotDropRifle (ijaB, right
+# upper arm, the rifle drops), InterpreterShotStagger (the interpreter, left upper arm); each ends on a hold loop of the wounded man
+# standing bent over, the ruined arm hanging, the other hand clamped on it (Luo's dadao cut, LuoDadaoChopRear, falls on him from the
+# right rear at 0.45 s: the neck stays within ~15 cm of standing height). LuoGrabRifleShove: Luo sheathes the dadao, leans in on
+# the kneeling Shunzi ("还能打不？"), grabs the Hanyang off the ground and shoves it into his hands. Director: rescue.wound /
+# rescue.handRifle (Script_OpeningStoryboards.mjs); docs/Data_OpeningClipLibrary20260923.md §6.
+# ---------------------------------------------------------------------------------------------------------------------
+WR_LOOP = 30 / 24                      # every hold loop here is 1.25 s (30 frames): two hurried breaths
+
+
+def FlatOf(T, builder, name, t):
+    """The flat pose dict (what T.Nest is given) that `builder`'s pose function makes at clip time t: a clip that
+    continues another starts from that clip's own numbers, not a retyped copy of them."""
+    seen = {}
+    real = T.Nest
+
+    def Spy(f):
+        seen.clear()
+        seen.update(f)
+        return real(f)
+    T.Nest = Spy
+    try:
+        builder(T, name)['pose'](t)
+    finally:
+        del T.Nest
+    return dict(seen)
+
+
+def WrChannel(points):
+    """Channel through (t, value) rows; a function of the clip time."""
+    return Channel(sorted(points, key=lambda p: p[0]))
+
+
+def WrDense(fn, duration, per=48):
+    """Rows (t, fn(t)) every 1/per s up to `duration` (a key list a Tracks channel interpolates through)."""
+    n = int(round(duration * per))
+    return [(min(duration, i / per), fn(min(duration, i / per))) for i in range(n + 1)]
+
+
+def WrPath(T, start, pelvisXY, turnAt, steps, stance, pole, duration, lift=.06, toeOut=(8.0, -8.0)):
+    """Feet that follow a travelling, turning pelvis, as Tracks channels (source m, the clip's frame).
+
+    pelvisXY(t) -> (x, y) and turnAt(t) -> yaw (rad, + = left) are the body's; steps [(side, t0, t1)] (each side's in order);
+    stance[side] = (dx, dy) in the body frame (x + = left, y + = back) where the foot lands from the pelvis at t1 (or a list of them, one per step);
+    pole(side, t) = (outward, forward, height) of the knee pole in the body frame. A foot between steps stays exactly
+    where it landed, its heading too (the yaw key is `heading - turn`: the body turning over a planted foot does not
+    turn the foot). Returns (channels, plants)."""
+    chan, plants = {}, []
+    for side in LR:
+        sign = 1 if side == 'L' else -1
+        at = tuple(start['ankle.' + side])
+        heading = turnAt(0.0) + math.radians((start.get('foot.' + side) or (0, 0, 0))[1])
+        pitch0, roll0 = (start.get('foot.' + side) or (0, 0, 0))[0], (start.get('foot.' + side) or (0, 0, 0))[2]
+        ankles, swings, last = [(0.0, at)], [], 0.0
+        for k, (s, t0, t1) in enumerate(sorted(x for x in steps if x[0] == side)):
+            px, py = pelvisXY(t1)
+            ps = turnAt(t1)
+            st = stance[side]
+            st = st[k] if isinstance(st[0], (tuple, list)) else st          # one stance for the side, or one per step
+            ox, oy = _Rot(st[0], st[1], ps)
+            to = (px + ox, py + oy, T.A)
+            want = ps + math.radians(toeOut[0 if side == 'L' else 1])
+            want = heading + math.atan2(math.sin(want - heading), math.cos(want - heading))
+            mid = Lerp3(at, to, .5)
+            if t0 - last > .03:
+                plants.append((side, last, t0))
+            ankles += [(t0, at), ((t0 + t1) / 2, (mid[0], mid[1], T.A + lift)), (t1, to)]
+            swings.append((t0, t1, heading, want))
+            at, heading, last = to, want, t1
+        if duration - last > .03:
+            plants.append((side, last, duration))
+        ankles.append((duration, at))
+        chan['ankle.' + side] = ankles
+
+        def Foot(t, side=side, swings=swings, heading0=turnAt(0.0) + math.radians((start.get('foot.' + side) or (0, 0, 0))[1]),
+                 pitch0=pitch0, roll0=roll0):
+            h, p = heading0, pitch0
+            for t0, t1, a, b in swings:
+                if t < t0:
+                    break
+                u = Clamp((t - t0) / max(1e-6, t1 - t0))
+                h = Mix(a, b, Smooth(u))
+                p = pitch0 - (8.0 * math.sin(math.pi * u) if u < 1.0 else 0.0)     # toes up through the swing (a toe dipping the ground lifts the whole body)
+                if t >= t1:
+                    h, p = b, pitch0
+            return (p, math.degrees(h - turnAt(t)), roll0)
+        chan['foot.' + side] = WrDense(Foot, duration)
+
+        def Pole(t, side=side, sign=sign):
+            out, fwd, z = pole(side, t)
+            px, py = pelvisXY(t)
+            ox, oy = _Rot(sign * out, -fwd, turnAt(t))
+            return (px + ox, py + oy, z)
+        chan['legPole.' + side] = WrDense(Pole, duration)
+    return chan, plants
+
+
+def WrPoleRel(start, pelvis=None):
+    """The knee poles of a flat pose as (outward, forward, height) in the body frame at its pelvis: a clip continuing another keeps
+    its poles, so the first frame is the other's."""
+    p = pelvis or start['pelvis']
+    return {s: ((1 if s == 'L' else -1) * (start['legPole.' + s][0] - p[0]), -(start['legPole.' + s][1] - p[1]), start['legPole.' + s][2]) for s in LR}
+
+
+def WrBreath(t, h0, span, per=2, ease=.4):
+    """A hold loop's breathing: `per` breaths a loop, zero (and its slope continuous) where the loop wraps, faded in over `ease`
+    s before the loop starts."""
+    return math.sin(Tau * per * (t - h0) / span) * Smooth((t - (h0 - ease)) / ease)
+
+
+def WrViews(pelXY, height=.7):
+    """Review cameras that ride the pelvis (source m, the clip's frame): from his initial left (+x), from the front left, the
+    rear left, and from above."""
+    at = lambda t: (pelXY(t)[0], pelXY(t)[1], height)
+    return [('left', lambda t: (pelXY(t)[0] + 3.4, pelXY(t)[1], 1.05), at),
+            ('front', lambda t: (pelXY(t)[0] + 2.2, pelXY(t)[1] - 2.6, 1.8), at),
+            ('rear', lambda t: (pelXY(t)[0] + 2.2, pelXY(t)[1] + 2.6, 1.8), at),
+            ('top', lambda t: (pelXY(t)[0] + .02, pelXY(t)[1] + .02, 4.0), lambda t: (pelXY(t)[0], pelXY(t)[1], 0.0))]
+
+
+# ---- A. IjaShotStaggerAway (IJA02, ijaA) -------------------------------------------------------------------------------
+WR_A_T = 80 / 24                       # 3.33 s
+WR_A_HOLD = (50 / 24, WR_A_T)          # 2.08-3.33 s
+WR_A_WALL = .40                        # runtime m: the south trench wall on his right at ija.crouch (z ~-125.6, root -125.22; the crouch itself is 3 cm into a wall at .38)
+WR_A_END = (.10, 1.50)                # runtime m, the root end (the pelvis's ground point: x right, z back)
+
+Meta('IjaShotStaggerAway', WR_A_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=True,
+     weaponState='slungBack', holdLoop=list(WR_A_HOLD), env={'wallRightM': WR_A_WALL},
+     contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'crown'},
+               {'t': .12, 'limb': 'handL', 'action': 'release'}],
+     events=[{'t': .04, 'kind': 'shot', 'at': 'shoulderL'}, {'t': .96, 'kind': 'up'}, {'t': 1.06, 'kind': 'turned'}],
+     prev=['IjaCrouchHairHold'], next=[],
+     notes='2026-09-30: frame 0 = IjaCrouchHairHold at its hold-loop start (0.75 s: squatting over the pinned man, the left fist in his '
+           'hair). 0.04 s the left shoulder is hit from his left front: the fist opens, the trunk is knocked round to his right, the '
+           'head snaps, the left arm is flung out and drops dead (the left shoulder lower: lean); the right hand keeps to the knee to '
+           'push him up (0.4-0.9 s) and then clamps on the left upper arm; he turns to his RIGHT over his planted feet and then by '
+           'two stumbling steps, six in all, 180 deg to face east (the south wall is on his right at ~0.4 m: he ends on his left '
+           'side of it) and runs bent over 1.5 m east (root end x +0.10 right, z +1.50 back in his frame). 2.08-3.33 s is a hold '
+           'loop: stood bent (the neck 25 cm under standing height), the left arm dead, the right hand on it, two breaths a '
+           'loop, one glance back over the left shoulder toward the gunmen (WNW).')
+
+
+@Builder('IjaShotStaggerAway')
+def BuildShotStaggerAway(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D, h0, h1 = WR_A_T, WR_A_HOLD[0], WR_A_HOLD[1]
+    start = FlatOf(T, BuildCrouchHairHold, 'IjaCrouchHairHold', CROUCH_HOLD[0])
+    eye, crown, n = CrouchHead(CROUCH_HOLD[0])
+    gripN = CrouchGrip(T, crown, n)
+    palmF, palmN, _ = Grab(n, CROWN_DOWN)
+    p0 = start['pelvis']
+    endY = T.R(WR_A_END[1])                   # (the root end is the pelvis's ground point: x right, z back, runtime m)
+    endX = -T.R(WR_A_END[0])
+    zStand = P - .13
+    # (spun toward the wall and bent over, the chest would be in it: the hips slide out to the left of the trench while he turns)
+    pelX = WrChannel([(0.0, p0[0]), (.36, p0[0]), (.60, p0[0] + .10), (.90, p0[0] + .26), (1.20, p0[0] + .24), (1.60, p0[0] + .08),
+                      (1.95, endX + .03), (2.08, endX), (D, endX)])
+    pelY = WrChannel([(0.0, p0[1]), (.36, p0[1]), (.54, p0[1] + .05), (1.06, p0[1] + .34), (1.58, p0[1] + (endY - p0[1]) * .62),
+                      (2.08, endY), (D, endY)])
+    pelZ = WrChannel([(0.0, p0[2]), (.04, p0[2]), (.16, p0[2] - .035), (.40, p0[2] - .03), (.62, p0[2] + .13), (.84, zStand - .10),
+                      (1.06, zStand - .10), (1.58, zStand - .06), (2.08, zStand), (D, zStand)])
+    turnAt = WrChannel([(0.0, 0.0), (.30, 0.0), (.54, -.40), (.80, -1.40), (1.06, -2.90), (1.22, -math.pi), (D, -math.pi)])
+    pelXY = lambda t: (pelX(t), pelY(t))
+    lead = lambda s: (H + .03) * (1 if s == 'L' else -1)
+    steps = [('L', .54, .80), ('R', .80, 1.06), ('L', 1.06, 1.32), ('R', 1.32, 1.58), ('L', 1.58, 1.84), ('R', 1.84, 2.08)]
+    stance = {'L': (H + .03, -.16), 'R': (-(H + .03), -.16)}
+    up = lambda t: Smooth((t - .36) / .80)
+    base = WrPoleRel(start)
+    pole = lambda s, t: (Mix(base[s][0], H + .24, up(t)), Mix(base[s][1], .95, up(t)), Mix(base[s][2], .50, up(t)))
+    feet, plants = WrPath(T, start, pelXY, turnAt, steps, stance, pole, D)
+    glance = lambda t: Bump(t, h0 + .45, h0 + .95)
+    anim = Tracks(start, dict(feet, **{
+        'pelvis': WrDense(lambda t: (pelX(t), pelY(t), pelZ(t) + (.012 * WrBreath(t, h0, WR_LOOP) if t > h0 - .4 else 0.0)), D),
+        'bend': [(0.0, start['bend']), (.04, start['bend']), (.14, .88), (.36, .86), (.60, .72), (1.06, .52), (1.60, .44), (h0, .40), (D, .40)],
+        'pelvisTilt': [(0.0, start['pelvisTilt']), (.04, start['pelvisTilt']), (.14, (.46, 0, 0)), (.36, (.42, 0, 0)), (.80, (.26, 0, 0)),
+                       (1.30, (.14, 0, 0)), (h0, (.12, 0, 0)), (D, (.12, 0, 0))],
+        'lean': [(0.0, 0.0), (.04, 0.0), (.14, .10), (.60, .12), (D, .12)],
+        'twist': [(0.0, start['twist']), (.04, start['twist']), (.14, -.50), (.36, -.36), (.70, -.20), (1.20, -.04), (1.70, .06), (D, .06)],
+        'shrug': [(0.0, start['shrug']), (.04, start['shrug']), (.14, .30), (.50, .16), (1.10, .08), (D, .08)],
+        'neck': [(0.0, start['neck']), (.04, start['neck']), (.12, (-.18, 0, -.15)), (.30, (.20, .10, .25)), (.80, (.10, .05, .25)),
+                 (1.50, (.06, 0, .30)), (D, (.06, 0, .30))],
+        'head': [(0.0, start['head']), (.04, start['head']), (.10, (-.30, .22, -.35)), (.28, (.32, .28, .45)), (.60, (.10, .20, .35)),
+                 (1.10, (-.05, .10, .40)), (1.60, (-.12, .05, .35)), (D, (-.12, .05, .35))],
+        'lookW': [(0.0, 1.0), (.04, 1.0), (.14, 0.0), (D, 0.0)],
+        'curl.L': [(0.0, start['curl.L']), (.04, start['curl.L']), (.14, .40), (.50, .30), (D, .30)],
+        # the left arm: flung out behind by the blow (0.14 s), then dead, swinging a little with the stumbling (sway below)
+        'handRel.L': [(0.0, start['handRel.L']), (.04, start['handRel.L']), (.14, (.30, .02, -.10)), (.30, (.20, .12, -.36)),
+                      (.52, (.12, .10, -.46)), (.80, (.10, .07, -.47)), (D, (.10, .07, -.47))],
+        'poleRel.L': [(0.0, (.35, .05, -.40)), (.14, (.45, .20, -.10)), (.40, (.36, .55, -.25)), (D, (.36, .55, -.25))],
+        'palmF.L': [(0.0, start['palmF.L']), (.10, start['palmF.L']), (.20, (0, -.2, -1)), (D, (0, -.2, -1))],
+        'palmN.L': [(0.0, start['palmN.L']), (.10, start['palmN.L']), (.20, (-1, 0, 0)), (D, (-1, 0, 0))],
+        # the right hand: on the knee to push up (0.36-0.7 s), then across onto the left upper arm
+        'handRel.R': [(0.0, start['handRel.R']), (.36, (.00, -.34, -.34)), (.70, (-.02, -.30, -.42)), (1.06, (.20, -.18, -.22)),
+                      (1.30, (.33, -.06, -.12)), (D, (.33, -.06, -.12))],
+        'poleRel.R': [(0.0, (-.35, .05, -.40)), (.70, (-.35, .05, -.45)), (1.30, (-.15, -.25, -.55)), (D, (-.15, -.25, -.55))],
+        'palmF.R': [(0.0, start['palmF.R']), (.80, start['palmF.R']), (1.30, (.40, .80, -.40)), (D, (.40, .80, -.40))],
+        'palmN.R': [(0.0, start['palmN.R']), (.80, start['palmN.R']), (1.30, (.85, -.40, -.30)), (D, (.85, -.40, -.30))],
+        'curl.R': [(0.0, start['curl.R']), (.80, start['curl.R']), (1.30, .95), (D, .95)],
+    }), lag={'head': .04, 'neck': .03})
+
+    def Pose(t):
+        f = anim(t)
+        w = 1 - Smooth((t - .04) / .08)
+        if w > 1e-4:
+            f['grip.L'], f['gripW.L'] = gripN, w
+        else:
+            f['grip.L'], f['gripW.L'] = None, None
+        u = t - h0
+        b = WrBreath(t, h0, WR_LOOP)
+        # the hold loop: two hurried breaths; the dead arm sways with them; one glance back over the left shoulder
+        f['bend'] += .03 * b
+        f['shrug'] += .02 * b
+        f['handRel.L'] = Add3(f['handRel.L'], (0, .015 * b, 0))
+        g = glance(t) if t > h0 - 1e-9 else 0.0
+        f['head'] = (f['head'][0], f['head'][1], f['head'][2] + .60 * g)
+        f['neck'] = (f['neck'][0], f['neck'][1], f['neck'][2] + .25 * g)
+        f['twist'] += .18 * g
+        f = Turned(f, turnAt(t))
+        return T.Nest(f)
+    props, review = SlungProps(T)
+    wallX = -T.R(WR_A_WALL)
+    spec = {'pose': Pose, 'props': props, 'plants': plants,
+            'check': lambda t: {'L': gripN} if 1 - Smooth((t - .04) / .08) >= .999 else {},
+            'walls': [((wallX, 0.0, 0.0), (1.0, 0.0, 0.0))],
+            'reviewProps': lambda t: review(t) + [('box', (wallX - .03, 1.0, .7), (.06, 4.0, 1.4), 0)],
+            'reviewFrames': lambda n: [0, 2, 4, 8, 14, 21, 27, 33, 40, 48, 54, n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = WrViews(pelXY)
+    spec['reviewScale'] = 2.5
+    return spec
+
+
+REACH_BY_CLIP['IjaShotStaggerAway'] = REACH_BY_CLIP['IjaCrouchHairHold']
+
+
+# ---- B. IjaShotDropRifle (IJA01, ijaB) ---------------------------------------------------------------------------------
+WR_B_T = 60 / 24                       # 2.5 s
+WR_B_HOLD = (30 / 24, WR_B_T)
+WR_B_END = (-.10, -.35)                # runtime m, the root end (x right, z back): a step to his left front
+
+Meta('IjaShotDropRifle', WR_B_T, False, 'track', role='ijaB', rig='TengxianIja01', props=['weapon'], rootMotion=True,
+     weaponState='twoHand->dropped', weaponDropFrom='IjaShotDropRifle', holdLoop=list(WR_B_HOLD),
+     contacts=[{'t': 0.0, 'limb': 'handsLR', 'action': 'hold', 'target': 'weapon'}, {'t': .12, 'limb': 'handsLR', 'action': 'release', 'target': 'weapon'}],
+     events=[{'t': .04, 'kind': 'shot', 'at': 'upperArmR'}, {'t': .10, 'kind': 'weaponLost'}, {'t': .46, 'kind': 'weaponLands'},
+             {'t': .98, 'kind': 'staggered'}],
+     prev=['IjaReadyRifle'], next=[],
+     notes='2026-09-30: frame 0 = IjaReadyRifle\'s last frame (low ready, root rescue.ijaBGuard facing east). 0.04 s the right upper '
+           'arm is hit from his right rear: the right arm jerks, the right hand opens (0.04-0.10 s) and the left lets go (0.06-0.14 s), '
+           'the rifle falls from 0.10 s (free fall, lands at 0.46 s on the ground at his right front and lies there: weapon track, '
+           'the director leaves it: weaponDropFrom) while he folds over to his left front and staggers one step to the left (pelvis '
+           'root end x -0.10 (left), z -0.35 (forward), turned <= 20 deg left); the left hand clamps the right upper arm. '
+           '1.25-2.5 s hold loop: bent, right arm dead, left hand on the wound, two breaths a loop.')
+
+
+@Builder('IjaShotDropRifle')
+def BuildShotDropRifle(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D, h0 = WR_B_T, WR_B_HOLD[0]
+    start = FlatOf(T, BuildReadyRifle, 'IjaReadyRifle', 1.1)
+    ready = LowReady(T)
+    p0 = start['pelvis']
+    end = (-T.R(WR_B_END[0]), T.R(WR_B_END[1]), 0)
+    zHold = p0[2] - .07
+    pelX = WrChannel([(0.0, p0[0]), (.14, p0[0] + .03), (.40, p0[0] + .04), (.96, end[0]), (D, end[0])])
+    pelY = WrChannel([(0.0, p0[1]), (.14, p0[1] + .03), (.40, p0[1]), (.96, end[1]), (D, end[1])])
+    pelZ = WrChannel([(0.0, p0[2]), (.04, p0[2]), (.16, p0[2] - .05), (.40, p0[2] - .09), (.70, zHold), (D, zHold)])
+    turnAt = WrChannel([(0.0, 0.0), (.14, .08), (.50, .22), (.96, .33), (D, .33)])
+    pelXY = lambda t: (pelX(t), pelY(t))
+    off = {s: (start['ankle.' + s][0] - p0[0], start['ankle.' + s][1] - p0[1]) for s in LR}
+    steps = [('L', .42, .72), ('R', .68, 1.00)]
+    feet, plants = WrPath(T, start, pelXY, turnAt, steps, off, lambda s, t: WrPoleRel(start)[s], D, lift=.05)
+    # ---- the rifle: held until 0.10 s, then in free fall to its right front (lands 0.46 s), a small bounce, lying still
+    landAt = 0.46
+    ground = T.Rifle(tuple(RT(T, .34, .04, -.50)), Unit(tuple(RTd(.10, 0.0, -1.0))))
+    fallFrom = T.Rifle(tuple(Add3(ready['origin'], (-.03, -.05, -.06))), ready['axis'])
+
+    def RifleAt(t):
+        if t <= .10:
+            return ready if t <= .06 else T.Rifle(tuple(Lerp3(ready['origin'], fallFrom['origin'], Smooth((t - .06) / .04))), ready['axis'])
+        u = Clamp((t - .10) / (landAt - .10))
+        xy = Lerp3(fallFrom['origin'], ground['origin'], u)
+        z = fallFrom['origin'][2] + (ground['origin'][2] - fallFrom['origin'][2]) * u * u
+        if t > landAt:
+            v = Clamp((t - landAt) / .10)
+            z = ground['origin'][2] + .025 * math.sin(math.pi * v)
+        axis = Unit(Lerp3(fallFrom['axis'], ground['axis'], Smooth(Clamp((t - .10) / (landAt - .10 + .06)))))
+        return T.Rifle((xy[0], xy[1], z), axis)
+    wR = lambda t: 1 - Smooth((t - .04) / .06)
+    wL = lambda t: 1 - Smooth((t - .06) / .08)
+    anim = Tracks(start, dict(feet, **{
+        'pelvis': WrDense(lambda t: (pelX(t), pelY(t), pelZ(t) + (.010 * WrBreath(t, h0, WR_LOOP) if t > h0 - .4 else 0.0)), D),
+        'bend': [(0.0, start['bend']), (.04, start['bend']), (.14, .34), (.40, .44), (.80, .40), (D, .40)],
+        'pelvisTilt': [(0.0, start['pelvisTilt']), (.04, start['pelvisTilt']), (.20, (.22, 0, 0)), (.80, (.18, 0, 0)), (D, (.18, 0, 0))],
+        'lean': [(0.0, 0.0), (.04, 0.0), (.14, .10), (.50, .12), (D, .12)],
+        'twist': [(0.0, start['twist']), (.04, start['twist']), (.14, .42), (.40, .34), (.90, .16), (1.15, .11), (h0, .10), (D, .10)],
+        'shrug': [(0.0, start['shrug']), (.04, start['shrug']), (.14, .26), (.50, .14), (1.0, .08), (D, .08)],
+        'neck': [(0.0, start['neck']), (.04, start['neck']), (.12, (-.12, 0, -.15)), (.40, (.20, -.10, -.28)), (D, (.20, -.10, -.28))],
+        'head': [(0.0, start['head']), (.04, start['head']), (.10, (-.26, -.12, -.22)), (.30, (.30, -.16, -.45)), (D, (.30, -.16, -.45))],
+        'handRel.R': [(0.0, (-.08, -.12, -.46)), (.04, (-.08, -.12, -.46)), (.12, (-.16, .10, -.28)), (.30, (-.08, .06, -.46)), (.80, (-.07, .06, -.47)), (h0, (-.07, .06, -.47)), (D, (-.07, .06, -.47))],
+        'poleRel.R': [(0.0, (-.45, .40, -.35)), (.14, (-.50, .30, -.15)), (.40, (-.40, .55, -.25)), (D, (-.40, .55, -.25))],
+        'palmF.R': [(0.0, start['palmF.R']), (.08, start['palmF.R']), (.18, (0, -.2, -1)), (D, (0, -.2, -1))],
+        'palmN.R': [(0.0, start['palmN.R']), (.08, start['palmN.R']), (.18, (1, 0, 0)), (D, (1, 0, 0))],
+        'curl.R': [(0.0, start['curl.R']), (.06, start['curl.R']), (.14, .30), (D, .30)],
+        'handRel.L': [(0.0, (.08, -.12, -.46)), (.06, (.08, -.12, -.46)), (.22, (-.18, -.14, -.30)), (.46, (-.32, -.06, -.14)), (D, (-.32, -.06, -.14))],
+        'poleRel.L': [(0.0, (.45, .40, -.35)), (.46, (.10, -.25, -.55)), (D, (.10, -.25, -.55))],
+        'palmF.L': [(0.0, start['palmF.L']), (.12, start['palmF.L']), (.24, (0, -.2, -1)), (.30, (0, -.2, -1)), (.50, (-.40, .80, -.40)),
+                    (D, (-.40, .80, -.40))],
+        'palmN.L': [(0.0, start['palmN.L']), (.12, start['palmN.L']), (.24, (-1, 0, 0)), (.30, (-1, 0, 0)), (.50, (-.85, -.40, -.30)),
+                    (D, (-.85, -.40, -.30))],
+        'curl.L': [(0.0, start['curl.L']), (.06, start['curl.L']), (.46, .95), (D, .95)],
+    }), lag={'head': .04, 'neck': .03})
+
+    def Pose(t):
+        f = anim(t)
+        a, b = wR(t), wL(t)
+        if a > 1e-4:
+            f['gripW.R'] = a
+        else:
+            f['grip.R'], f['gripW.R'] = None, None
+        if b > 1e-4:
+            f['gripW.L'] = b
+        else:
+            f['grip.L'], f['gripW.L'] = None, None
+        br = WrBreath(t, h0, WR_LOOP)
+        f['bend'] += .03 * br
+        f['shrug'] += .02 * br
+        f['handRel.R'] = Add3(f['handRel.R'], (0, .012 * br, 0))
+        f = Turned(f, turnAt(t))
+        return T.Nest(f)
+
+    def Props(t):
+        r = RifleAt(t)
+        return {'weapon': (r['origin'], r['axis'], (0, 0, 1), True)}
+    spec = {'pose': Pose, 'props': Props, 'plants': plants,
+            'check': lambda t: {'R': start['grip.R'], 'L': start['grip.L']} if t <= .05 else {},
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)),
+            'reviewFrames': lambda n: [0, 2, 4, 6, 10, 14, 19, 26, 34, 44, n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = WrViews(pelXY)
+    spec['reviewScale'] = 3.2
+    return spec
+
+# ---- C. InterpreterShotStagger (NRA02, the interpreter in NRA06 clothes) -----------------------------------------------
+WR_C_T = 72 / 24                       # 3.0 s
+WR_C_HOLD = (42 / 24, WR_C_T)          # 1.75-3.0 s
+WR_C_END = (.75, 1.12)                 # runtime m, the root end (x right, z back)
+WR_C_NORTH = .40                       # runtime m: the north trench wall from his root (z -124.1, root -124.5)
+
+Meta('InterpreterShotStagger', WR_C_T, False, 'free', role='interpreter', rig='TengxianNra02', rootMotion=True,
+     holdLoop=list(WR_C_HOLD),
+     events=[{'t': .04, 'kind': 'shot', 'at': 'upperArmL'}, {'t': .34, 'kind': 'down'}, {'t': 1.00, 'kind': 'up'}, {'t': 1.62, 'kind': 'turned'}],
+     prev=['InterpreterCrouchAsk'], next=[],
+     notes='2026-09-30: frame 0 = InterpreterCrouchAsk frame 0 (squatting at Shunzi\'s right front, facing WSW, unarmed). 0.04 s the LEFT '
+           'upper arm is hit from his left: knocked onto his seat and back on his right hand (0.04-0.4 s), the left arm flung out and '
+           'dead; 0.4-1.0 s scrambles and pushes himself up turning to his right over his braced hand, then four short stumbling '
+           'steps: 146 deg to the right in all (WSW to east) and 1.35 m east along the north side of the trench (root end x +0.75 '
+           'right, z +1.12 back in his frame). 1.75-3.0 s hold loop: stood bent, the right hand clamped on the left upper arm, the '
+           'left arm hanging, trembling, looking back over his left shoulder the way the charge comes from.')
+
+
+@Builder('InterpreterShotStagger')
+def BuildInterpreterShotStagger(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D, h0 = WR_C_T, WR_C_HOLD[0]
+    start = FlatOf(T, BuildCrouchAsk, 'InterpreterCrouchAsk', 0.0)
+    p0 = start['pelvis']
+    end = (-T.R(WR_C_END[0]), T.R(WR_C_END[1]))
+    zHold = P - .12
+    pelY = WrChannel([(0.0, p0[1]), (.16, p0[1] + .10), (.34, p0[1] + .24), (.70, p0[1] + .38), (.94, p0[1] + .50), (1.30, p0[1] + .86),
+                      (1.75, end[1]), (D, end[1])])
+    # along the trench: east is 0.67 right for every 1 back in his frame (the north wall is 0.4 m off his left and the crouch's back)
+    ratio = (end[0] - p0[0]) / (end[1] - p0[1])
+    pelX = lambda t: p0[0] + ratio * (pelY(t) - p0[1]) - .16 * Bump(t, .02, .90)       # (and bowed south away from the wall while he sits)
+    pelZ = WrChannel([(0.0, p0[2]), (.04, p0[2]), (.16, p0[2] - .08), (.34, .17), (.55, .20), (.85, .50), (1.10, P - .22), (1.75, zHold), (D, zHold)])
+    turnAt = WrChannel([(0.0, 0.0), (.04, 0.0), (.16, -.30), (.40, -.45), (.70, -1.05), (1.0, -1.80), (1.30, -2.35), (1.62, -math.radians(146)),
+                        (D, -math.radians(146))])
+    pelXY = lambda t: (pelX(t), pelY(t))
+    steps = [('L', .56, .80), ('R', .78, 1.02), ('L', 1.00, 1.24), ('R', 1.22, 1.44), ('L', 1.42, 1.60), ('R', 1.58, 1.72)]
+    stance = {'L': (H + .06, -.14), 'R': (-(H + .06), -.14)}
+    up = lambda t: Smooth((t - .60) / .60)
+    base = WrPoleRel(start)
+    pole = lambda s, t: (Mix(base[s][0], H + .24, up(t)), Mix(base[s][1], .95, up(t)), Mix(base[s][2], .50, up(t)))
+    feet, plants = WrPath(T, start, pelXY, turnAt, steps, stance, pole, D, lift=.05)
+    sway = lambda t: (math.sin(Tau * 4 * (t - h0) / WR_LOOP) * Smooth((t - (h0 - .3)) / .3) if t > h0 - .3 else 0.0)   # the tremble
+    glance = lambda t: Smooth((t - 1.1) / .5)
+    anim = Tracks(start, dict(feet, **{
+        'pelvis': WrDense(lambda t: (pelX(t), pelY(t), pelZ(t) + (.008 * WrBreath(t, h0, WR_LOOP) if t > h0 - .4 else 0.0)), D),
+        'bend': [(0.0, start['bend']), (.04, start['bend']), (.14, .58), (.30, .14), (.55, .18), (.80, .58), (1.10, .62), (1.50, .46), (h0, .40), (D, .40)],
+        'pelvisTilt': [(0.0, start['pelvisTilt']), (.04, start['pelvisTilt']), (.14, (.36, 0, 0)), (.30, (-.30, 0, 0)), (.55, (-.22, 0, 0)),
+                       (.85, (.32, 0, 0)), (1.30, (.16, 0, 0)), (h0, (.10, 0, 0)), (D, (.10, 0, 0))],
+        'lean': [(0.0, 0.0), (.04, 0.0), (.16, .18), (.50, .10), (1.0, .12), (D, .12)],
+        'twist': [(0.0, 0.0), (.04, 0.0), (.14, -.45), (.34, -.25), (.70, -.10), (1.30, .08), (h0, .16), (D, .16)],
+        'shrug': [(0.0, 0.0), (.04, 0.0), (.14, .30), (.50, .14), (1.2, .08), (D, .08)],
+        'neck': [(0.0, (0, 0, 0)), (.04, (0, 0, 0)), (.12, (-.22, .10, -.18)), (.34, (.05, .10, .20)), (1.0, (.05, .05, .25)), (1.6, (.08, 0, .34)),
+                 (D, (.08, 0, .34))],
+        'head': [(0.0, start['head']), (.04, start['head']), (.10, (-.34, .25, -.30)), (.30, (-.05, .22, .30)), (.80, (.05, .15, .40)),
+                 (1.40, (-.10, .06, .50)), (D, (-.10, .06, .50))],
+        'lookW': [(0.0, 0.0), (D, 0.0)],
+        'curl.L': [(0.0, start['curl.L']), (.04, start['curl.L']), (.14, .30), (D, .30)],
+        'handRel.L': [(0.0, start['handRel.L']), (.04, start['handRel.L']), (.14, (.32, .02, -.10)), (.34, (.18, .12, -.34)), (.60, (.12, .10, -.44)),
+                      (1.20, (.10, .07, -.46)), (D, (.10, .07, -.46))],
+        'poleRel.L': [(0.0, start['poleRel.L']), (.14, (.45, .20, -.10)), (.50, (.36, .55, -.25)), (D, (.36, .55, -.25))],
+        'palmF.L': [(0.0, start['palmF.L']), (.14, (0, -.2, -1)), (D, (0, -.2, -1))],
+        'palmN.L': [(0.0, start['palmN.L']), (.14, (-1, 0, 0)), (D, (-1, 0, 0))],
+        # the right hand: out in front; braced on the ground behind him while he sits and pushes up; then onto the left upper arm
+        'handRel.R': [(0.0, start['handRel.R']), (.04, start['handRel.R']), (.16, (-.12, .10, -.40)), (.34, (-.12, .34, -.50)), (.70, (-.10, .20, -.55)),
+                      (.98, (-.06, -.05, -.48)), (1.25, (.22, -.14, -.22)), (1.50, (.33, -.06, -.12)), (D, (.33, -.06, -.12))],
+        'poleRel.R': [(0.0, start['poleRel.R']), (.34, (-.50, .40, -.30)), (.98, (-.40, .30, -.45)), (1.50, (-.15, -.25, -.55)), (D, (-.15, -.25, -.55))],
+        'palmF.R': [(0.0, start['palmF.R']), (.14, start['palmF.R']), (.30, (0, .3, -1)), (.98, (0, .3, -1)), (1.50, (.40, .80, -.40)), (D, (.40, .80, -.40))],
+        'palmN.R': [(0.0, start['palmN.R']), (.14, start['palmN.R']), (.30, (0, 0, -1)), (.98, (0, 0, -1)), (1.50, (.85, -.40, -.30)), (D, (.85, -.40, -.30))],
+        'curl.R': [(0.0, start['curl.R']), (.98, .40), (1.50, .95), (D, .95)],
+    }), lag={'head': .04, 'neck': .03})
+
+    def Pose(t):
+        f = anim(t)
+        br = WrBreath(t, h0, WR_LOOP)
+        f['bend'] += .03 * br
+        f['shrug'] += .02 * br + .010 * sway(t)
+        g = glance(t)
+        f['twist'] += .14 * g
+        f['head'] = (f['head'][0], f['head'][1] + .04 * sway(t), f['head'][2])
+        f['handRel.L'] = Add3(f['handRel.L'], (0, .012 * br + .004 * sway(t), 0))
+        f = Turned(f, turnAt(t))
+        return T.Nest(f)
+    # the north wall: through this point (runtime m from his root, rotated into his frame), its inward normal toward the south
+    nrm = (-.829, -.559, 0.0)
+    wallPt = (T.R(.332), T.R(.224), 0.0)
+    spec = {'pose': Pose, 'plants': plants, 'walls': [(wallPt, nrm)],
+            'reviewFrames': lambda n: [0, 2, 4, 8, 12, 18, 24, 30, 36, 42, 54, n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = WrViews(pelXY)
+    spec['reviewScale'] = 2.5
+    return spec
+
+# ---- D. LuoGrabRifleShove (NRA05, Luo) ---------------------------------------------------------------------------------
+WR_D_T = 76 / 24                       # 3.17 s
+WR_D_HOLD = (12 / 24, 36 / 24)         # 0.5-1.5 s: the question, the nod (two breaths a loop)
+WR_D_EYE = (0.0, 1.12, -.95)           # Shunzi's eye, kneeling upright in front of Luo: runtime m in Luo's root frame (x right, y up, z back)
+WR_D_CHEST = (0.0, .88, -.85)
+WR_D_GROUND = ((.40, .04, -.28), (.8, 0.0, .6))        # the Hanyang on the ground: centre, bore (muzzle) direction, runtime m
+WR_D_CLOSE = ((0.0, .95, -.30), (.985, .174, 0.0))      # drawn up horizontal to his chest (muzzle to his right = Shunzi's left)
+WR_D_OFFER = ((0.0, .90, -.58), (.985, .174, 0.0))      # and shoved into Shunzi's hands
+WR_D_GRAB, WR_D_OFFERED, WR_D_HANDED = 1.80, 2.25, 2.42
+
+Meta('LuoGrabRifleShove', WR_D_T, False, 'track', role='luo', rig='TengxianNra05', props=['rifle', 'weapon'], rootMotion=True,
+     weapon='Dadao', weaponState='dadaoInBelt', holdLoop=list(WR_D_HOLD),
+     holdExit='pose.holdUntil: the loop lets go at that clip time and plays on through the stoop and the grab (1.5-1.80 s), the lift and '
+              'the shove (1.80-2.42 s) and the turn away drawing the dadao (2.42-3.17 s)',
+     contacts=[{'t': WR_D_GRAB, 'limb': 'handsLR', 'action': 'grip', 'target': 'rifle'},
+               {'t': WR_D_HANDED, 'limb': 'handsLR', 'action': 'release', 'target': 'rifle'}],
+     events=[{'t': .24, 'kind': 'sheathed'}, {'t': WR_D_GRAB, 'kind': 'grabbed'}, {'t': WR_D_OFFERED, 'kind': 'offered'},
+             {'t': WR_D_HANDED, 'kind': 'handed'}, {'t': 3.04, 'kind': 'turned'}],
+     prev=['LuoDadaoChopRear'], next=[],
+     notes='2026-09-30: from LuoDadaoChopRear\'s last frame (two-handed dadao guard; he has run up and stopped, root HandRoot 0.95 m from '
+           'Shunzi, who kneels upright in front of him: eye (0, 1.12, -0.95), chest (0, 0.88, -0.85) in this frame, runtime m). 0-0.14 s the '
+           'left hand comes off the dadao, 0.04-0.20 s the right hand pushes it through the belt at his left hip (`weapon` track: hand to belt, '
+           'weaponState dadaoInBelt), 0.5-1.5 s hold loop (empty hands, leaning 12 deg in, the face on his eye, blowing from the charge; '
+           '"还能打不？" and the nod, pose.holdUntil lets go). 1.5-1.78 s steps the right foot out to his right front and stoops, both fists on '
+           'the Hanyang (`rifle` prop: on the ground at frame 0, centre (+0.40, 0.04, -0.28), muzzle toward (+0.8, 0, +0.6) in the root frame; '
+           'grip contact 1.80 s), 1.82-2.12 s stands with it across his chest, muzzle to his right (as LuoHandRifle\'s offer), 2.12-2.25 s '
+           'shoves it out to (0, 0.90, -0.58) (`offered` 2.25 s), 2.42 s lets go (`handed`; the rifle prop is hidden from then on: the '
+           'director\'s HeldRifle takes Luo\'s hand rifle pose at that moment), then turns 90 deg to his LEFT and draws the dadao from the belt into '
+           'his right hand (2.5-3.05 s; `weapon` ends in the hand, guard; `turned` 3.04 s). Feet stay out of z < -0.45 (Shunzi\'s knees).')
+
+
+def WrHipFrame(K):
+    """The pelvis frame on the posed bones (source m): (position, left, back, up) -- the belt's."""
+    P, B = K['Point'], K['Bone']
+    pel = P(B('Pelvis'))
+    up = (P(B('Spine1')) - pel).normalized()
+    left = P(B('L Thigh')) - P(B('R Thigh'))
+    left = (left - up * left.dot(up)).normalized()
+    return pel, left, up.cross(left).normalized(), up
+
+
+@Builder('LuoGrabRifleShove')
+def BuildLuoGrabRifleShove(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    s, K, D = T.s, T.K, WR_D_T
+    h0, h1 = WR_D_HOLD
+    w = WEAPONS[T.gun]
+    start = FlatOf(T, BuildChopRear, 'LuoDadaoChopRear', 1.3)
+    p0 = start['pelvis']
+    g0 = tuple(start['grip.R'])
+    a0, u0 = Unit((.05, -.80, .60)), (-1.0, 0.0, 0.0)
+    hold = Add3(p0, (0.0, .08, .11))                       # stood up from the cut's lunge, the hips settled back under him
+    # ---- the rifle --------------------------------------------------------------------------------------------------------
+    At = lambda c, b: RifleAtCentre(T, RT(T, *c), RTd(*b))
+    ground, close, offer = At(*WR_D_GROUND), At(*WR_D_CLOSE), At(*WR_D_OFFER)
+    mid1 = At((.36, .22, -.27), (.85, .10, .50))
+    mid2 = At((.16, .62, -.30), (.95, .15, .22))
+    rifleAt = RiflePath(T, [(0.0, ground), (1.80, ground), (1.92, mid1), (2.04, mid2), (2.12, close), (2.25, offer), (D, offer)])
+    alongR = Channel([(0.0, .75), (1.80, .75), (2.04, .90), (2.12, .95), (D, .95)])
+    alongL = Channel([(0.0, .50), (1.80, .50), (2.04, .22), (2.12, .12), (D, .12)])
+    wRifleR = lambda t: Smooth((t - 1.56) / .24) * (1 - Smooth((t - WR_D_HANDED) / .10))
+    wRifleL = lambda t: Smooth((t - 1.58) / .22) * (1 - Smooth((t - WR_D_HANDED) / .10))
+    # ---- the body -------------------------------------------------------------------------------------------------------
+    stoop = tuple(RT(T, .20, .40, -.22))
+    pelX = WrChannel([(0.0, p0[0]), (.30, hold[0]), (h0, hold[0]), (1.50, hold[0]), (1.64, hold[0] + (stoop[0] - hold[0]) * .5), (1.78, stoop[0]),
+                      (1.88, stoop[0]), (2.06, stoop[0] * .4), (2.18, hold[0] + .02), (2.80, hold[0] + .03), (D, hold[0] + .03)])
+    pelY = WrChannel([(0.0, p0[1]), (.30, hold[1]), (h0, hold[1]), (1.50, hold[1]), (1.64, hold[1] + (stoop[1] - hold[1]) * .5), (1.78, stoop[1]),
+                      (1.88, stoop[1]), (2.06, stoop[1] * .5 + hold[1] * .5), (2.18, hold[1] - .04), (2.42, hold[1] - .06), (2.80, hold[1] + .02), (D, hold[1] + .04)])
+    pelZ = WrChannel([(0.0, p0[2]), (.30, hold[2] - .03), (h0, hold[2]), (1.50, hold[2]), (1.58, hold[2] - .05), (1.66, stoop[2] + .26), (1.74, stoop[2] + .08), (1.80, stoop[2]),
+                      (1.88, stoop[2] + .02), (2.02, stoop[2] + .20), (2.14, hold[2] - .03), (2.42, hold[2] - .02), (D, hold[2] + .01)])
+    turnAt = WrChannel([(0.0, 0.0), (2.42, 0.0), (2.58, .14), (2.84, .95), (3.06, math.pi / 2), (D, math.pi / 2)])
+    pelXY = lambda t: (pelX(t), pelY(t))
+    steps = [('L', .06, .36), ('R', 1.50, 1.76), ('L', 2.44, 2.72), ('R', 2.70, 2.98)]
+    footR = tuple(RT(T, .36, 0, -.16))
+    # (a step's stance is where the foot lands from the pelvis at its end: the settling step and the turn's two steps land square under him,
+    # the right foot's stoop step goes out to the rifle's side)
+    stance = {'L': [(H + .05, -.02), (H + .05, -.02)], 'R': [(footR[0] - stoop[0], footR[1] - stoop[1]), (-(H + .05), -.02)]}
+    feet, plants = WrPath(T, start, pelXY, turnAt, steps, stance, lambda s, t: WrPoleRel(start)[s], D, lift=.05)
+    # belt: the dadao's origin in the hip frame (left, back, up) and its blade direction there
+    BELT_AT, BELT_AXIS = (.08, -.14, .04), Unit((.10, .15, -.98))
+
+    def BeltWorld(t):
+        """Where the belt's dadao origin is on the authored body at clip time t (source m, the clip's frame; good to ~2 cm)."""
+        x, y = pelXY(t)
+        ox, oy = _Rot(BELT_AT[0], BELT_AT[1], turnAt(t))
+        return (x + ox, y + oy, pelZ(t) + BELT_AT[2]), tuple(Vector(_Rot(BELT_AXIS[0], BELT_AXIS[1], turnAt(t)) + (BELT_AXIS[2],)))
+    # ---- the dadao in the right hand: guard -> belt (0.10-0.40 s), belt -> guard (2.52-3.05 s) ------------------------------------
+    def DrawGuard(t):
+        """The guard of the last frame (hand, axis, up) in the turned body's frame."""
+        x, y = pelXY(t)
+        ox, oy = _Rot(-(SX - .05), -.10, turnAt(t))
+        ax, ay = _Rot(.05, -.80, turnAt(t))
+        ux, uy = _Rot(-1.0, 0.0, turnAt(t))
+        return (x + ox, y + oy, pelZ(t) + .36), Unit((ax, ay, .60)), (ux, uy, 0.0)
+
+    def Blade(t):
+        """(grip, axis, up, weight of the right fist on it) while the dadao is in the hand, else None."""
+        if t < .42:
+            c, au = BeltWorld(.40)
+            beltHand = Add3(c, (0, 0, .09))
+            rows = [(0.0, g0, a0, u0), (.04, g0, a0, u0), (.11, Add3(Lerp3(g0, beltHand, .55), (0, -.06, .10)), Unit(Lerp3(a0, au, .55)), u0),
+                    (.19, beltHand, au, u0), (.42, beltHand, au, u0)]
+            gr = Channel([(r[0], r[1]) for r in rows])(t)
+            ax = Channel([(r[0], r[2]) for r in rows])(t)
+            return gr, Unit(ax), u0, 1 - Smooth((t - .20) / .08) if t > .20 else 1.0
+        if t < 2.50:
+            return None
+        c, au = BeltWorld(2.52)
+        beltHand = Add3(c, (0, 0, .09))
+        gg, ga, gu = DrawGuard(3.06)
+        u = Smooth((t - 2.52) / .52)
+        mid = Add3(Lerp3(beltHand, gg, .5), (0, -.05, .12))
+        grip = tuple(Channel([(2.52, beltHand), (2.78, mid), (3.04, gg), (D, DrawGuard(D)[0])])(t))
+        axis = Unit(Lerp3(au, ga, u)) if u < 1 else ga
+        return grip, axis, gu, Smooth((t - 2.50) / .10)
+
+    def BladeProp(t):
+        """The `weapon` track: in the hand, then in the belt (the hip frame on the posed bones), then in the hand again."""
+        # 0 = in the hand, 1 = in the belt
+        u = 0.0 if t < .18 else Smooth((t - .18) / .06) if t < .24 else 1.0 if t < 2.50 else 1 - Smooth((t - 2.50) / .06) if t < 2.56 else 0.0
+        b = Blade(t)
+        hand = None
+        if b is not None:
+            d = Dadao(T, b[0], b[1], b[2])
+            hand = (Vector(d['origin']), Vector(d['axis']), Vector(d['up']))
+        if u <= 0.0 and hand is not None:
+            return tuple(hand[0]), tuple(hand[1]), tuple(hand[2])
+        pel, left, back, upv = WrHipFrame(K)
+        org = pel + left * BELT_AT[0] + back * BELT_AT[1] + upv * BELT_AT[2]
+        ax = (left * BELT_AXIS[0] + back * BELT_AXIS[1] + upv * BELT_AXIS[2]).normalized()
+        if u >= 1.0 or hand is None:
+            return tuple(org), tuple(ax), tuple(left)
+        return (tuple(hand[0].lerp(org, u)), tuple(hand[1].slerp(ax, u)), tuple(hand[2].lerp(left, u)))
+    # ---- the pose ---------------------------------------------------------------------------------------------------------
+    sig = lambda t, a, b: Smooth((t - a) / (b - a))
+    anim = Tracks(start, dict(feet, **{
+        'pelvis': WrDense(lambda t: (pelX(t), pelY(t), pelZ(t)), D),
+        'bend': [(0.0, start['bend']), (.30, .16), (.50, .14), (1.50, .14), (1.62, .50), (1.78, .98), (1.88, .94), (2.04, .52), (2.14, .28), (2.25, .30),
+                 (2.42, .26), (2.90, .12), (D, .12)],
+        'pelvisTilt': [(0.0, start['pelvisTilt']), (.30, (.08, 0, 0)), (.50, (.07, 0, 0)), (1.50, (.07, 0, 0)), (1.78, (.38, 0, 0)), (1.88, (.34, 0, 0)), (2.14, (.12, 0, 0)),
+                       (2.42, (.12, 0, 0)), (2.90, (.05, 0, 0)), (D, (.05, 0, 0))],
+        'twist': [(0.0, 0.0), (1.50, 0.0), (1.78, -.22), (1.88, -.20), (2.14, -.05), (2.42, 0.0), (D, 0.0)],
+        'lean': [(0.0, 0.0), (1.50, 0.0), (1.78, -.24), (1.88, -.22), (2.14, -.04), (2.42, 0.0), (D, 0.0)],
+        'shrug': [(0.0, 0.0), (.50, .02), (1.50, .02), (2.42, .04), (D, .0)],
+        'head': [(0.0, start['head']), (.40, (.10, 0, 0)), (1.50, (.10, 0, 0)), (1.78, (-.10, 0, 0)), (2.42, (.0, 0, 0)), (D, (.10, 0, 0))],
+        'lookW': [(0.0, 0.0), (.26, 0.0), (.50, .85), (2.50, .85), (2.85, 0.0), (D, 0.0)],
+        'handRel.L': [(0.0, (.07, -.10, -.47)), (D, (.07, -.10, -.47))], 'poleRel.L': [(0.0, (.45, .40, -.35)), (D, (.45, .40, -.35))],
+        'handRel.R': [(0.0, (-.07, -.10, -.47)), (D, (-.07, -.10, -.47))], 'poleRel.R': [(0.0, (-.45, .40, -.35)), (D, (-.45, .40, -.35))],
+        'palmF.L': [(0.0, (0, -.2, -1)), (D, (0, -.2, -1))], 'palmN.L': [(0.0, (-1, 0, 0)), (D, (-1, 0, 0))],
+        'palmF.R': [(0.0, (0, -.2, -1)), (D, (0, -.2, -1))], 'palmN.R': [(0.0, (1, 0, 0)), (D, (1, 0, 0))],
+        'curl.L': [(0.0, .45), (D, .45)], 'curl.R': [(0.0, .45), (D, .45)],
+    }), lag={'head': .05})
+    eyeSrc = tuple(RT(T, *WR_D_EYE))
+
+    def Pose(t):
+        f = anim(t)
+        f['look'] = eyeSrc
+        br = WrBreath(t, h0, h1 - h0, per=2, ease=.3) if h0 - .3 < t < 1.75 else 0.0
+        f['bend'] += .022 * br * (1 - sig(t, 1.50, 1.64))
+        f['shrug'] += .02 * br
+        f['framedGrips'] = True
+        # left fist: still on the dadao's grip at the start (frame 0 = the guard), off it by 0.14 s
+        for side in LR:
+            f['grip.' + side], f['gripW.' + side] = None, None
+        wl0 = 1 - Smooth((t - .02) / .10)
+        if wl0 > 1e-4 and start.get('grip.L') is not None:
+            f['grip.L'], f['gripW.L'] = start['grip.L'], wl0
+            f['palmF.L'], f['palmN.L'], f['curl.L'] = start['palmF.L'], start['palmN.L'], start['curl.L']
+        b = Blade(t)
+        if b is not None and b[3] > 1e-4:
+            grip, axis, up, wgt = b
+            palms = DadaoPalms(axis, up)
+            EaseGrip(f, 'R', grip, wgt, palms['R'][0], palms['R'][1], palms['R'][2])
+            f['armPole.R'] = start['armPole.R']
+        rifle = rifleAt(t)
+        palms = T.Palms(rifle['axis'])
+        wR, wL = wRifleR(t), wRifleL(t)
+        if wR > 1e-4:
+            EaseGrip(f, 'R', T.Along(rifle, alongR(t)), wR, palms['R'][0], palms['R'][1], .95)
+            f['armPole.R'] = (-(SX + .50), .10, P - .05)
+        if wL > 1e-4:
+            EaseGrip(f, 'L', T.Along(rifle, alongL(t)), wL, palms['L'][0], palms['L'][1], .85)
+            f['armPole.L'] = (SX + .45, .10, P - .05)
+        f['handRel.L'] = f['handRel.L'] if wL <= 1e-4 and wl0 <= 1e-4 else f['handRel.L']
+        f = Turned(f, turnAt(t))
+        return T.Nest(f)
+
+    def Props(t):
+        r = rifleAt(t)
+        o, a, u = BladeProp(t)
+        return {'rifle': (r['origin'], r['axis'], (0, 0, 1), t < WR_D_HANDED + .01), 'weapon': (o, a, u, True)}
+
+    def Check(t):
+        out = {}
+        rifle = rifleAt(t)
+        if WR_D_GRAB + .01 <= t <= WR_D_HANDED - .02:
+            out['R'] = T.Along(rifle, alongR(t))
+            out['L'] = T.Along(rifle, alongL(t))
+        return out
+
+    def Ghost(t):
+        """Shunzi kneeling upright in front of him, as review shapes (his reference points)."""
+        r = lambda p: tuple(RT(T, *p))
+        pts = [(0, .55, -.95), WR_D_CHEST, (0, 1.05, -.93), WR_D_EYE]
+        return [('cyl', r(pts[0]), r(pts[1]), .11 / s), ('cyl', r(pts[1]), r(pts[2]), .05 / s), ('point', r((0, 1.15, -.95)), None, .08 / s),
+                ('cyl', r(pts[0]), r((0, .06, -.95)), .07 / s)]
+    spec = {'pose': Pose, 'props': Props, 'check': Check, 'plants': plants,
+            'reach': {'fraction': lambda t: .92 - .12 * Smooth((t - 1.50) / .10), 'travel': .14, 'sink': lambda t: .20 * Smooth((t - 1.62) / .18),
+                      'bend': lambda t: .25 + .30 * Smooth((t - 1.62) / .18)},
+            'reviewProps': lambda t: T.RifleProps(rifleAt(t)) + Ghost(t) + [('cyl', tuple(Props(t)['weapon'][0]), tuple(Vector(Props(t)['weapon'][0]) + Vector(Props(t)['weapon'][1]) * T.R(.63)), .02)],
+            'reviewFrames': lambda n: [0, 3, 6, 9, 12, 24, 36, 40, 43, 45, 48, 52, 56, 58, 62, 66, 70, n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = [('right', lambda t: (-3.0, pelXY(t)[1] - .5, 1.0), lambda t: (0, pelXY(t)[1] - .5, .7)),
+                           ('front', lambda t: (2.0, -3.0, 1.7), lambda t: (-.1, -.6, .7)),
+                           ('left', lambda t: (3.0, -.6, 1.0), lambda t: (0, -.6, .7)),
+                           ('top', lambda t: (.02, -.5, 4.0), lambda t: (0, -.5, 0.0))]
+    spec['reviewScale'] = 2.6
+    return spec
+# <<< WOUNDED RESCUE (2026-09-30)
+
+
 # =================================================================================
 # which rigs bake which clip (manifest `rigs`). Every 2026-09-23 clip is baked only on the
 # rigs its role can wear (contract §5.1: comrade/interpreter/He/Liu/yaowa = NRA02, Luo =

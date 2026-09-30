@@ -5025,6 +5025,25 @@
    ]
   ]
  },
+ "2fbff6688aa59f67d12dfee50268147c80dc202d8a0d4aa72c26de243af8ab22": {
+  "lineId": "RescueHeave.01",
+  "who": "shunzi",
+  "lang": "zh",
+  "seconds": 1.69,
+  "source": "seedaudio-subtitle",
+  "chars": [
+   [
+    "呃",
+    0,
+    0.3
+   ],
+   [
+    "啊",
+    0.9,
+    1.1
+   ]
+  ]
+ },
  "ce5dcd10a22970ba50b2d32bc29f997c63b892573d8172da129dfc2d5c8d966a": {
   "lineId": "RescueInterrogation.01",
   "who": "ijaA",

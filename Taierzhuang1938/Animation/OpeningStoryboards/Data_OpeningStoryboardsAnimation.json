@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260930OpeningStoryboardsV22CollarLuoNoRollBack",
+ "version": "20260930OpeningStoryboardsV23WoundedRescue",
  "fps": 24,
  "actorForward": [
   0,
@@ -3266,6 +3266,222 @@
    "rigs": [
     "TengxianNra05"
    ]
+  },
+  "IjaShotStaggerAway": {
+   "duration": 3.3333333333333335,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "TengxianIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "weaponState": "slungBack",
+   "holdLoop": [
+    2.0833333333333335,
+    3.3333333333333335
+   ],
+   "env": {
+    "wallRightM": 0.4
+   },
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "shunzi",
+     "part": "crown"
+    },
+    {
+     "t": 0.12,
+     "limb": "handL",
+     "action": "release"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.04,
+     "kind": "shot",
+     "at": "shoulderL"
+    },
+    {
+     "t": 0.96,
+     "kind": "up"
+    },
+    {
+     "t": 1.06,
+     "kind": "turned"
+    }
+   ],
+   "prev": [
+    "IjaCrouchHairHold"
+   ],
+   "next": [],
+   "notes": "2026-09-30: frame 0 = IjaCrouchHairHold at its hold-loop start (0.75 s: squatting over the pinned man, the left fist in his hair). 0.04 s the left shoulder is hit from his left front: the fist opens, the trunk is knocked round to his right, the head snaps, the left arm is flung out and drops dead (the left shoulder lower: lean); the right hand keeps to the knee to push him up (0.4-0.9 s) and then clamps on the left upper arm; he turns to his RIGHT over his planted feet and then by two stumbling steps, six in all, 180 deg to face east (the south wall is on his right at ~0.4 m: he ends on his left side of it) and runs bent over 1.5 m east (root end x +0.10 right, z +1.50 back in his frame). 2.08-3.33 s is a hold loop: stood bent (the neck 25 cm under standing height), the left arm dead, the right hand on it, two breaths a loop, one glance back over the left shoulder toward the gunmen (WNW).",
+   "rigs": [
+    "TengxianIja02"
+   ]
+  },
+  "IjaShotDropRifle": {
+   "duration": 2.5,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaB",
+   "rig": "TengxianIja01",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "weaponState": "twoHand->dropped",
+   "weaponDropFrom": "IjaShotDropRifle",
+   "holdLoop": [
+    1.25,
+    2.5
+   ],
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handsLR",
+     "action": "hold",
+     "target": "weapon"
+    },
+    {
+     "t": 0.12,
+     "limb": "handsLR",
+     "action": "release",
+     "target": "weapon"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.04,
+     "kind": "shot",
+     "at": "upperArmR"
+    },
+    {
+     "t": 0.1,
+     "kind": "weaponLost"
+    },
+    {
+     "t": 0.46,
+     "kind": "weaponLands"
+    },
+    {
+     "t": 0.98,
+     "kind": "staggered"
+    }
+   ],
+   "prev": [
+    "IjaReadyRifle"
+   ],
+   "next": [],
+   "notes": "2026-09-30: frame 0 = IjaReadyRifle's last frame (low ready, root rescue.ijaBGuard facing east). 0.04 s the right upper arm is hit from his right rear: the right arm jerks, the right hand opens (0.04-0.10 s) and the left lets go (0.06-0.14 s), the rifle falls from 0.10 s (free fall, lands at 0.46 s on the ground at his right front and lies there: weapon track, the director leaves it: weaponDropFrom) while he folds over to his left front and staggers one step to the left (pelvis root end x -0.10 (left), z -0.35 (forward), turned <= 20 deg left); the left hand clamps the right upper arm. 1.25-2.5 s hold loop: bent, right arm dead, left hand on the wound, two breaths a loop.",
+   "rigs": [
+    "TengxianIja01"
+   ]
+  },
+  "InterpreterShotStagger": {
+   "duration": 3.0,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "interpreter",
+   "rig": "TengxianNra02",
+   "rootMotion": true,
+   "holdLoop": [
+    1.75,
+    3.0
+   ],
+   "events": [
+    {
+     "t": 0.04,
+     "kind": "shot",
+     "at": "upperArmL"
+    },
+    {
+     "t": 0.34,
+     "kind": "down"
+    },
+    {
+     "t": 1.0,
+     "kind": "up"
+    },
+    {
+     "t": 1.62,
+     "kind": "turned"
+    }
+   ],
+   "prev": [
+    "InterpreterCrouchAsk"
+   ],
+   "next": [],
+   "notes": "2026-09-30: frame 0 = InterpreterCrouchAsk frame 0 (squatting at Shunzi's right front, facing WSW, unarmed). 0.04 s the LEFT upper arm is hit from his left: knocked onto his seat and back on his right hand (0.04-0.4 s), the left arm flung out and dead; 0.4-1.0 s scrambles and pushes himself up turning to his right over his braced hand, then four short stumbling steps: 146 deg to the right in all (WSW to east) and 1.35 m east along the north side of the trench (root end x +0.75 right, z +1.12 back in his frame). 1.75-3.0 s hold loop: stood bent, the right hand clamped on the left upper arm, the left arm hanging, trembling, looking back over his left shoulder the way the charge comes from.",
+   "rigs": [
+    "TengxianNra02"
+   ]
+  },
+  "LuoGrabRifleShove": {
+   "duration": 3.1666666666666665,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "luo",
+   "rig": "TengxianNra05",
+   "props": [
+    "rifle",
+    "weapon"
+   ],
+   "rootMotion": true,
+   "weapon": "Dadao",
+   "weaponState": "dadaoInBelt",
+   "holdLoop": [
+    0.5,
+    1.5
+   ],
+   "holdExit": "pose.holdUntil: the loop lets go at that clip time and plays on through the stoop and the grab (1.5-1.80 s), the lift and the shove (1.80-2.42 s) and the turn away drawing the dadao (2.42-3.17 s)",
+   "contacts": [
+    {
+     "t": 1.8,
+     "limb": "handsLR",
+     "action": "grip",
+     "target": "rifle"
+    },
+    {
+     "t": 2.42,
+     "limb": "handsLR",
+     "action": "release",
+     "target": "rifle"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.24,
+     "kind": "sheathed"
+    },
+    {
+     "t": 1.8,
+     "kind": "grabbed"
+    },
+    {
+     "t": 2.25,
+     "kind": "offered"
+    },
+    {
+     "t": 2.42,
+     "kind": "handed"
+    },
+    {
+     "t": 3.04,
+     "kind": "turned"
+    }
+   ],
+   "prev": [
+    "LuoDadaoChopRear"
+   ],
+   "next": [],
+   "notes": "2026-09-30: from LuoDadaoChopRear's last frame (two-handed dadao guard; he has run up and stopped, root HandRoot 0.95 m from Shunzi, who kneels upright in front of him: eye (0, 1.12, -0.95), chest (0, 0.88, -0.85) in this frame, runtime m). 0-0.14 s the left hand comes off the dadao, 0.04-0.20 s the right hand pushes it through the belt at his left hip (`weapon` track: hand to belt, weaponState dadaoInBelt), 0.5-1.5 s hold loop (empty hands, leaning 12 deg in, the face on his eye, blowing from the charge; \"\u8fd8\u80fd\u6253\u4e0d\uff1f\" and the nod, pose.holdUntil lets go). 1.5-1.78 s steps the right foot out to his right front and stoops, both fists on the Hanyang (`rifle` prop: on the ground at frame 0, centre (+0.40, 0.04, -0.28), muzzle toward (+0.8, 0, +0.6) in the root frame; grip contact 1.80 s), 1.82-2.12 s stands with it across his chest, muzzle to his right (as LuoHandRifle's offer), 2.12-2.25 s shoves it out to (0, 0.90, -0.58) (`offered` 2.25 s), 2.42 s lets go (`handed`; the rifle prop is hidden from then on: the director's HeldRifle takes Luo's hand rifle pose at that moment), then turns 90 deg to his LEFT and draws the dadao from the belt into his right hand (2.5-3.05 s; `weapon` ends in the hand, guard; `turned` 3.04 s). Feet stay out of z < -0.45 (Shunzi's knees).",
+   "rigs": [
+    "TengxianNra05"
+   ]
   }
  },
  "stages": {
@@ -3618,7 +3834,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "447727161c1ac65a95e9775220c98d6637c5fb2df0de19b2224c7f41dcbe17bd",
+   "sha256": "d0588e671b32d3c532aa49cb868b685eef8b58efd3d6795055ec0c6975ea4538",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
@@ -3664,7 +3880,8 @@
     "InterpreterHurryReach",
     "YaowaSitLoad",
     "ShunziSitFillCharger",
-    "HeLiftTimber"
+    "HeLiftTimber",
+    "InterpreterShotStagger"
    ],
    "contactPoints": {
     "hairBack": {
@@ -3850,7 +4067,7 @@
      ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningThroatCutSheathe_20260929\\Scene_TengxianNra02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningWoundedRescue_20260930\\Scene_TengxianNra02OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
@@ -5442,13 +5659,84 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "InterpreterShotStagger",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0,
+     "pelvisMaxStepM": 0.0637,
+     "floorCorrectionMin": -0.00088,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0914,
+       0.0,
+       0.3289
+      ],
+      "end": [
+       0.75,
+       1.12,
+       -146.0,
+       0.7596
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.56
+      ],
+      [
+       "L",
+       0.8,
+       1.0
+      ],
+      [
+       "L",
+       1.24,
+       1.42
+      ],
+      [
+       "L",
+       1.6,
+       3.0
+      ],
+      [
+       "R",
+       0.0,
+       0.78
+      ],
+      [
+       "R",
+       1.02,
+       1.22
+      ],
+      [
+       "R",
+       1.44,
+       1.58
+      ],
+      [
+       "R",
+       1.72,
+       3.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ]
   },
   {
    "id": "TengxianNra05",
    "file": "Animation_TengxianNra05OpeningStoryboards.json",
-   "sha256": "ae96e02d550b25758b8e32d37769f3f635653f57786b3f4e09e220946b5e59db",
+   "sha256": "25bc110bb68b07f82ae5ee493360d76fa1821168a59e1c72bfa86a7d1a7c8111",
    "originalModelSha256": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72",
    "clipIds": [
     "SupplyReceive",
@@ -5477,7 +5765,8 @@
     "LuoKneelReach",
     "LuoPickUpRifleSling",
     "LuoRescueDrag",
-    "LuoHandRifle"
+    "LuoHandRifle",
+    "LuoGrabRifleShove"
    ],
    "contactPoints": {
     "hairBack": {
@@ -5663,7 +5952,7 @@
      ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningLuoNoRollBack_20260930\\Scene_TengxianNra05OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningWoundedRescue_20260930\\Scene_TengxianNra05OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
@@ -6703,15 +6992,75 @@
       ]
      ],
      "kneeSlideM": 0.0042
+    },
+    {
+     "clip": "LuoGrabRifleShove",
+     "frames": 77,
+     "footSlideM": 0.0027,
+     "contactErrorM": 0.0029,
+     "gripSolveErrorM": 0.0029,
+     "pelvisMaxStepM": 0.169,
+     "floorCorrectionMin": -0.00617,
+     "floorCorrectionMax": 0.00147,
+     "root": {
+      "start": [
+       0.0,
+       -0.1286,
+       0.0,
+       0.7223
+      ],
+      "end": [
+       -0.0276,
+       -0.0184,
+       90.0,
+       0.8325
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.06
+      ],
+      [
+       "L",
+       0.36,
+       2.44
+      ],
+      [
+       "L",
+       2.72,
+       3.1667
+      ],
+      [
+       "R",
+       0.0,
+       1.5
+      ],
+      [
+       "R",
+       1.76,
+       2.7
+      ],
+      [
+       "R",
+       2.98,
+       3.1667
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ]
   },
   {
    "id": "TengxianIja01",
    "file": "Animation_TengxianIja01OpeningStoryboards.json",
-   "sha256": "595372e3b327bf648e0998cdfb7d209189c6b19effa1966d8cdcf22235bcb384",
+   "sha256": "2bf948ca39551f261b2e6a4e6477f5c4156bce7ea18e38b8ba90a30911b5d933",
    "originalModelSha256": "0acb11411d2984cf7bd9dd578141ffcc8541e9bbe8c83b0cf3dcff76f3a2d9b1",
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\ComradeKneelBank_20260927\\Scene_TengxianIja01OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningWoundedRescue_20260930\\Scene_TengxianIja01OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
      "bone": "Bip001 Head",
@@ -7827,6 +8176,56 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0
+    },
+    {
+     "clip": "IjaShotDropRifle",
+     "frames": 61,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.001,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1002,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0001,
+     "root": {
+      "start": [
+       0.0538,
+       -0.1024,
+       0.0,
+       0.7204
+      ],
+      "end": [
+       -0.1,
+       -0.35,
+       18.91,
+       0.7239
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.42
+      ],
+      [
+       "L",
+       0.72,
+       2.5
+      ],
+      [
+       "R",
+       0.0,
+       0.68
+      ],
+      [
+       "R",
+       1.0,
+       2.5
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ],
    "clipIds": [
@@ -7856,15 +8255,16 @@
     "IjaJunctionPeek",
     "IjaChoppedFallWall",
     "IjaGuardPort",
-    "IjaChoppedFallBack"
+    "IjaChoppedFallBack",
+    "IjaShotDropRifle"
    ]
   },
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "d7cc857a141398a6f86f860f5738c0626d91e879a18718f7c451232c83866f16",
+   "sha256": "f97dbc525b8b16fb849b689fb37b47f503a3dc95dfadb083a5416fa803050385",
    "originalModelSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61",
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningThroatCutSheathe_20260929\\Scene_TengxianIja02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningWoundedRescue_20260930\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
      "bone": "Bip001 Head",
@@ -10144,6 +10544,77 @@
      "kneeSlideM": 0.0,
      "lookErrorDeg": 0.67,
      "headTurnDeg": 31.42
+    },
+    {
+     "clip": "IjaShotStaggerAway",
+     "frames": 81,
+     "footSlideM": 0.0001,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0092,
+     "pelvisMaxStepM": 0.0931,
+     "floorCorrectionMin": 0.01761,
+     "floorCorrectionMax": 0.01772,
+     "root": {
+      "start": [
+       0.0336,
+       -0.067,
+       0.0,
+       0.3809
+      ],
+      "end": [
+       0.1,
+       1.5,
+       -180.0,
+       0.7458
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.54
+      ],
+      [
+       "L",
+       0.8,
+       1.06
+      ],
+      [
+       "L",
+       1.32,
+       1.58
+      ],
+      [
+       "L",
+       1.84,
+       3.3333
+      ],
+      [
+       "R",
+       0.0,
+       0.8
+      ],
+      [
+       "R",
+       1.06,
+       1.32
+      ],
+      [
+       "R",
+       1.58,
+       1.84
+      ],
+      [
+       "R",
+       2.08,
+       3.3333
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ],
    "clipIds": [
@@ -10196,7 +10667,8 @@
     "IjaCrouchHairHold",
     "IjaSlapForehand",
     "IjaSlapBackhand",
-    "IjaSlapRaise"
+    "IjaSlapRaise",
+    "IjaShotStaggerAway"
    ]
   },
   {

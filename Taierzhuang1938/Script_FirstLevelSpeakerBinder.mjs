@@ -205,6 +205,9 @@ export class FirstLevelSpeakerBinder {
       let target = null;
       if (talking) target = this._Nearest(soldier, this.speaking.filter(item => item.soldier !== soldier)) || listener;
       else target = this._Nearest(soldier, this.speaking);
+      // A director that wants his eyes on someone (2026-09-30: Luo asking Shunzi 「还能打不？」 kept glancing at whoever
+      // was yelling down the trench) pins them: soldier.voiceGaze() -> world point.
+      if (typeof soldier.voiceGaze === "function") target = soldier.voiceGaze() || target;
       if (entry.layer) { entry.layer.speaking = !!talking; entry.layer.lookAt = target; }
       entry.facial.gaze = target;
     }

@@ -168,6 +168,8 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["interpreter", "说话！"],
   ]),
   PerLine("RescueFlee", [["interpreter", "有敌人！", JA]]),
+  // 2026-09-30 「直接玩家自己往前用力一声腾挪就出来就行」: his own grunt as he heaves himself out from under the roof timber.
+  PerLine("RescueHeave", [["shunzi", "呃啊——！"]]),
   PerLine("RescueCheck", [["luo", "还能打不？"]]),
   PerLine("CollectionMeet", [
     ["yaowa", "顺哥！你脸咋了？"],
