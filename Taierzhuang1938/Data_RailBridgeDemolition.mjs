@@ -10,8 +10,8 @@ import { MISSION_RAIL_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
 
 export const RAIL_BRIDGE_MODEL = Object.freeze({
   // 模型与件表各自一个戳：重烘之后两边一起 +1（Script_RailBridgeTest 核对两者出自同一次烘焙）。
-  url: "./Model/Model_RailBridge.glb?v=20260928a",
-  dataUrl: "./Model/Data_RailBridge.json?v=20260928a",
+  url: "./Model/Model_RailBridge.glb?v=20260930c",
+  dataUrl: "./Model/Data_RailBridge.json?v=20260930c",
   origin: Object.freeze({ x: MISSION_RAIL_BRIDGE.x, z: MISSION_RAIL_BRIDGE.z }),
   // GLB 里的材质名（RailBridge<Key>）→ 材质库配方 + 线性色调（乘在配方底图上，可以大于 1）。
   // **别用 "Steel"**：那是枪械的发蓝钢（底图均值 45/255、满金属度），挂到桥上在这条管线里是一片黑。
@@ -46,10 +46,11 @@ export const RAIL_BRIDGE_BLAST = Object.freeze({
   // 恰好把 1–2 s 桥身折进河里那一段整个盖住（2026-09-28 实拍）。黑的那一团只给半空火球，
   // 而且抬到桁架顶上面去（桁高 6.2 m），让它往上翻、别压在桥身上。
   mainKind: "shell", mainRadiusM: 9.5,
-  airburst: Object.freeze({ t: 0.06, rise: 7.5, radiusM: 13, kind: "tank" }),
+  // rise 是绝对高度（桥局部 y = 世界 y）：R1c 桥面抬高 0.84 m，7.5 → 8.4。
+  airburst: Object.freeze({ t: 0.06, rise: 8.4, radiusM: 13, kind: "tank" }),
   secondaryKind: "shell", secondaryRadiusScale: 0.8,
   // 药包下面的河面被冲击波掀起的两根水柱。
-  waterColumn: Object.freeze({ t: 0.03, count: 36, speed: [14, 30], spread: 3.4, life: [2.2, 3.4],
+  waterColumn: Object.freeze({ t: 0.03, count: 32, speed: [14, 30], spread: 3.4, life: [2.2, 3.4],
     size: [1.4, 5.2], ring: 18 }),
   // 钢件切断那一下的火星雨。
   sparks: Object.freeze({ count: 70, speed: [9, 27], life: [0.7, 1.9] }),
@@ -57,7 +58,7 @@ export const RAIL_BRIDGE_BLAST = Object.freeze({
   // （那样拍出来是半空一个糊的土球）。一个黑的从桥心往上冲，一个土黄的贴着河面铺开。
   bursts: Object.freeze([
     // 上升慢一点、喷得久一点：1.5 s 就停、每秒 5 m 往上冲的话，三四秒后是半空一个脱开的黑球。
-    Object.freeze({ t: 0.1, untilS: 2.2, at: Object.freeze([0, 2.0, 0]), kind: "black", rate: 22, radius: 4.5, rise: 4.0,
+    Object.freeze({ t: 0.1, untilS: 2.2, at: Object.freeze([0, 2.84, 0]), kind: "black", rate: 22, radius: 4.5, rise: 4.0,
       sizeStart: 2.4, sizeEnd: 10.5, life: 9, opacity: 0.5 }),
     Object.freeze({ t: 0.05, untilS: 2.4, at: Object.freeze([0, -2.4, 0]), kind: "dust", rate: 16, radius: 7, rise: 2.0,
       sizeStart: 2, sizeEnd: 8.5, life: 6.5, opacity: 0.42 }),
@@ -66,10 +67,11 @@ export const RAIL_BRIDGE_BLAST = Object.freeze({
   // 只乘在任务 FOV 上（Script_FirstLevelMissionRuntime.NarrowFovDeg），开镜、望远镜照旧优先。
   focus: Object.freeze({ scale: 0.76, holdS: 5.0, halfAngleDeg: 40, inRate: 3.2, outRate: 1.2 }),
   // 冲击波沿两岸地面推出去的尘环。
-  groundRing: Object.freeze({ t: 0.05, radiusM: 20, bankZ: 16.5 }),
+  // banks：受冲击波的岸边（桥局部 z 与地面高度）。三孔之后只剩 1 号墩这边的南岸沙滩（局部 z 16.5 = 世界 164.5）。
+  groundRing: Object.freeze({ t: 0.05, radiusM: 20, banks: Object.freeze([Object.freeze({ z: 16.5, y: -0.15 })]) }),
   // 入水 / 落地（件表 events）：size 是那一块的包围盒对角线。
-  splash: Object.freeze({ perSize: 2.4, min: 3, max: 14, bigSize: 5 }),
-  landPuff: Object.freeze({ count: 5 }),
+  splash: Object.freeze({ perSize: 2.0, min: 3, max: 14, bigSize: 5 }),
+  landPuff: Object.freeze({ count: 4 }),
   // 半孔砸到河底 / 南端砸到河滩：一记闷震（CameraShake.Explosion 的伤害外沿，48 m 外约 0.15 创伤）
   // 与钢件轰响；落在水里是一堵水墙，落在干滩上是一团土。
   slam: Object.freeze({ shakeReachM: 17, dustSize: 7, audio: Object.freeze([
@@ -83,7 +85,7 @@ export const RAIL_BRIDGE_BLAST = Object.freeze({
   // 坍塌之后一直留着的：断口处烧着的枕木黑烟、河面上的扬尘、落在岸上的木件小火。
   persistent: Object.freeze({
     t: 1.5,
-    wreck: Object.freeze({ at: Object.freeze([0, -2.0, -0.8]), kind: "black", rate: 7, radius: 2.4, rise: 2.4,
+    wreck: Object.freeze({ at: Object.freeze([0, -1.2, -0.8]), kind: "black", rate: 7, radius: 2.4, rise: 2.4,
       sizeStart: 1.6, sizeEnd: 9.5, life: 11, opacity: 0.5, fire: 0.9 }),
     haze: Object.freeze({ at: Object.freeze([0, -2.4, 2.4]), kind: "dust", rate: 4, radius: 3.2, rise: 1.2,
       sizeStart: 2, sizeEnd: 7.5, life: 9, opacity: 0.32, untilS: 26 }),

@@ -1,5 +1,5 @@
 import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH, FrontFieldBend } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_RAIL_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES, MISSION_NORTH_RIVER, RiverWaterAt, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_RAIL_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES, MISSION_NORTH_RIVER, RiverWaterAt, RiverCutAt, RiverReachAt } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
@@ -460,19 +460,21 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
   for (const [id, z0, z1, truss] of [["RailBridgeSpanMid", 136, 112, true], ["RailBridgeSpanNorth", 112, 86, true],
     ["RailBridgeApproachSouth", B.approachSouth.z0, B.approachSouth.z1, false]]) {
     const z = (z0 + z1) / 2, d = Math.abs(z1 - z0), north = id === "RailBridgeSpanNorth";
-    surfaces.push(Block(`${id}Deck`, B.x, z, B.deckW, B.deckH, d, "structure", { y: B.deckTopY - B.deckH / 2 }));
+    // visual:false —— 永久部分只留碰撞，画面由 Model_RailBridge 负责（三孔的桁架 / 桥面 / 钢轨 / 石墩 / 南引桥都在模型里；
+    // 不关掉的话灰盒子会盖住模型的钢梁与枕木、桥面还跟木板共面闪）。被炸孔那一孔的完好件是 gate，由 RailBridgeSet 摘外观。
+    surfaces.push(Block(`${id}Deck`, B.x, z, B.deckW, B.deckH, d, "structure", { y: B.deckTopY - B.deckH / 2, visual: false }));
     for (const side of [-1, 1]) {
       const sideId = side < 0 ? "West" : "East";
       // 北孔的桁架只盖 24 m 的钢梁段（z 88..112），台后那 2 m 引道没有桁架。
       if (truss) Block(`${id}Truss${sideId}`, B.x + side * B.trussOffsetX, north ? 100 : z,
-        B.trussW, B.trussH, north ? 22 : d - 2, "metal", { y: B.deckTopY + B.trussH / 2 });
-      Block(`${id}Rail${sideId}`, B.x + side * B.railGaugeHalf, z, 0.08, 0.13, d - 1, "metal", { y: B.deckTopY + 0.065 });
+        B.trussW, B.trussH, north ? 22 : d - 2, "metal", { y: B.deckTopY + B.trussH / 2, visual: false });
+      Block(`${id}Rail${sideId}`, B.x + side * B.railGaugeHalf, z, 0.08, 0.13, d - 1, "metal", { y: B.deckTopY + 0.065, visual: false });
     }
   }
   // 三个石墩：永久实体，顶在桥面下（甲板上走人的净空不受影响）。1 号墩立在南岸沙滩水边。
   for (const pier of B.piers) {
     const foot = SampleMissionTerrain(B.x, pier.z) - 0.3, top = deckBottom - 0.02;
-    Block(`RailBridge${pier.id}`, B.x, pier.z, B.pierW, top - foot, B.pierD, "structure", { y: (top + foot) / 2 });
+    Block(`RailBridge${pier.id}`, B.x, pier.z, B.pierW, top - foot, B.pierD, "structure", { y: (top + foot) / 2, visual: false });
   }
   // 桥台做成两侧的翼墙而不是一整道：桥面下的实心盒会被路线净空判成「挡住尾队」
   // （可走面只豁免甲板本身），翼墙让开 x=-77 的中线。
@@ -482,7 +484,7 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
     const ax = B.x + side * (B.abutmentW / 2 - 1);
     const foot = SampleMissionTerrain(ax, az) - 0.3;
     Block(`RailBridgeAbutment${i ? "South" : "North"}${side < 0 ? "West" : "East"}`, ax, az, 2,
-      B.abutmentTopY - foot, B.abutmentD, "structure", { y: (B.abutmentTopY + foot) / 2 });
+      B.abutmentTopY - foot, B.abutmentD, "structure", { y: (B.abutmentTopY + foot) / 2, visual: false });
   }
   const floor = SampleMissionTerrain(B.x, B.z);
   gates.push({ id: "RailBridgeWreckSpan", x: B.x, y: floor + 0.7, z: B.z, w: B.deckW, h: 1.4, d: 16,
@@ -550,8 +552,11 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
     if (Math.abs(x - MISSION_RAIL_BRIDGE.x) >= 3.4) pieces.push([x, 4.4]);
   pieces.push([-80.75, 2.3]);
   for (const [i, [x, w]] of pieces.entries()) {
+    // 南岸墙摆在水线以南 0.35 m 深处（cut 到 −waterRel − 0.35，水线以南约 1.6 m）；原来是「深度到 1.05 m」，水位 −1.25 时离水线 0.9 m，
+    // 水位压到 −3 之后同一个 1.05 会落在离水 6 m 的沙坡半腰，改成跟着水位走。
+    const limit = -(RiverReachAt(x, RIVER)?.waterRel ?? -1.4) - 0.35;
     let z = 175;
-    while (z > 150 && RiverCutAt(x, z, RIVER) < 1.05) z -= 0.1;
+    while (z > 150 && RiverCutAt(x, z, RIVER) < limit) z -= 0.1;
     Block(`BridgeShoreAirWall${i}`, x, z + 0.35, w, 3, 0.7, "airWall", { visual: false, tag: "airWall" });
     let north = 60;
     while (north < 150 && RiverCutAt(x, north, RIVER) < 0.9) north += 0.1;
@@ -560,12 +565,14 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
 }
 // 南岸遮挡（18 的射位）：中间留 x -77..-69 的缺口，爆破安全区从那儿看得见桥。
 // 2026-09-30 河拓宽：原来两道 1.3–1.45 m 的胸墙（离射位 1.4 m，把整条河挡在墙后）拆掉，射位改成「趴在南堤缺口后」：
-// 南堤（地形 BridgeLevee*，堤顶高出自然地面 1.4 m）在铁路桥头缺口 x −82.5…−70.5 处断开，射位 bridgeCover 正对缺口；
-// 缺口里只留一个土垄 BridgeSouthMound（3.2 m 宽，顶面 = 射位地面 + 1.25 m）：蹲姿眼高 1.05 被它挡住，
-// 站姿眼高 1.62 越过它看得见河、沙滩和桥；两侧各一段零星沙袋（BridgeSouthSandbagsWest/East）。
+// 南堤（地形 BridgeLevee*，堤顶高出自然地面 1.4 m）在铁路桥头缺口 x −82.5…−70.5 处断开。
+// 2026-09-30 R1c：射位 bridgeCover 挪到南堤西段堤顶 (-97,173.5)（地面 1.5，原来在缺口路堤侧坡上、站着只看得见路堤），
+// 土垄 BridgeSouthMound（1.9 m 宽，顶面 = 射位地面 + 1.2 m）立在射位北偏东 2 m 的堤沿上：蹲姿眼高 1.05 时它盖住正北偏东 8°（对岸机枪）
+// 到 38°（桥面）的视线；站姿眼高 1.62 越过它看桥面与对岸；往东北 50°+ 向下看 1 号墩西侧沙滩上的爆破手、墩脚的线从土垄东侧过
+//（土垄挡不住向下的线，所以土垄不能横在射位与沙滩之间）；堤上两侧各一段零星沙袋（BridgeSouthSandbagsWest/East）。
 {
-  const cover = MISSION_STAGE_ANCHORS.bridgeCover, x = -81, z = 177.7, w = 3.2, d = 0.9;
-  const top = SampleMissionTerrain(cover.x, cover.z) + 1.25;
+  const cover = MISSION_STAGE_ANCHORS.bridgeCover, x = cover.x + 1.0, z = cover.z - 2.0, w = 1.9, d = 0.9;
+  const top = SampleMissionTerrain(cover.x, cover.z) + 1.2;
   const base = Math.min(...[-1, 0, 1].flatMap(a => [-1, 0, 1].map(b => SampleMissionTerrain(x + a * w / 2, z + b * d / 2)))) - .1;
   Block("BridgeSouthMound", x, z, w, top - base, d, "earthDark", { y: (top + base) / 2, cover: { faceX: 0, faceZ: -1 } });
 }
@@ -1034,9 +1041,16 @@ export const MISSION_PLACEMENT = Object.freeze({
     rearColumnForm: [{ x: -77, z: 72 }, { x: -79.4, z: 75.6 }, { x: -74.6, z: 76.4 }],
     rearColumnGroups: [[{ x: -77, z: 78 }], [{ x: -78.2, z: 81.4 }], [{ x: -75.8, z: 81.8 }]],
     officer: { x: -73.4, z: 173.6, yaw: Math.PI },
-    demolition: [{ x: -80.4, z: 172.2, yaw: Math.PI }, { x: -74.2, z: 171.4, yaw: Math.PI }],
-    luoCover: { x: -79.4, z: 180.2, yaw: Math.PI },
-    heyoutianCover: { x: -84.2, z: 179, yaw: Math.PI },
+    // 2026-09-30 三孔：两名爆破手蹲在 1 号墩（z 160，南岸沙滩水边）脚下的沙地上装药，面朝墩对着身边那堆木药箱
+    // （药箱与一卷线是 Model_RailBridge 的 Crates / CableGround，摆位在 _blender/Script_BuildRailBridge.Charges，
+    // 与这两个点保持 1.5 m 左右；导出器把这两点写进地形快照的 crew，测试核对它们在干沙地上）。
+    // R1c：改到墩的**西侧**沙地（原来在东侧 (-70.3,162.6)）—— 射位 bridgeCover 在南堤西段堤顶 (-97,173.5)，东侧的沙被路堤脊与
+    // 南引桥料石实体挡住；西侧沙滩 x −86…−81、z 161…166 从堤顶一览无余（概念 18_3：镜头在桥西、爆破手在左前方沙滩上）。
+    // 空气墙（BridgeShoreAirWall*，水线以南 ~2 m，z≈158.3）在他们北面；离白盒碰撞体：1 号墩 x −78.7..−75.3、南引桥面 x −79.7..−74.3 都 ≥ 4 m。
+    // 朝东（yaw -π/2）看药箱与墩。
+    demolition: [{ x: -84.4, z: 163.6, yaw: -Math.PI / 2 }, { x: -84.4, z: 165.4, yaw: -Math.PI / 2 }],
+    luoCover: { x: -100.6, z: 175.4, yaw: Math.PI },
+    heyoutianCover: { x: -104, z: 175.6, yaw: Math.PI },
     enemyRidge: [{ x: -68, z: 80.5, yaw: 0 }, { x: -63.4, z: 81, yaw: 0 },
       { x: -85.6, z: 80.8, yaw: 0 }, { x: -89.2, z: 81.2, yaw: 0 }],
   },
