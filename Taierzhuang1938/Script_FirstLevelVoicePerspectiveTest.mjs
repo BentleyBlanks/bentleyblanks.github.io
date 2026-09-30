@@ -58,7 +58,13 @@ try {
   const split=a.ctx.createChannelSplitter(2);a.softClip.connect(split);
   const meters=[0,1].map(i=>{const meter=a.ctx.createAnalyser();meter.fftSize=2048;split.connect(meter,i);return meter;});
   const buffers=meters.map(m=>new Float32Array(m.fftSize));
-  window.Meter=()=>{meters.forEach((m,i)=>m.getFloatTimeDomainData(buffers[i]));let e=0,d=0;for(let i=0;i<buffers[0].length;i++){const l=buffers[0][i],r=buffers[1][i];e+=(l*l+r*r)/2;d+=(l-r)**2;}
+  // L−R 在音频图里算（右声道反相后与左声道相加进同一块表），逐样本对齐。原来分两块表先后读、在 JS 里相减：
+  // 主线程一忙，两次读取就落在不同的渲染块上，说话声自己的起伏被当成左右差 —— 改前的基线在负载下也红（2026-09-30）。
+  const inv=a.ctx.createGain();inv.gain.value=-1;split.connect(inv,1);
+  const diffMeter=a.ctx.createAnalyser();diffMeter.fftSize=2048;split.connect(diffMeter,0);inv.connect(diffMeter);
+  const diffBuffer=new Float32Array(diffMeter.fftSize);
+  window.Meter=()=>{meters.forEach((m,i)=>m.getFloatTimeDomainData(buffers[i]));diffMeter.getFloatTimeDomainData(diffBuffer);let e=0,d=0;
+    for(let i=0;i<buffers[0].length;i++){const l=buffers[0][i],r=buffers[1][i];e+=(l*l+r*r)/2;d+=diffBuffer[i]**2;}
     return {e,d,n:buffers[0].length};};
   // 混响回路单独一块表：别人那句的混响尾巴（open 档 IR 长 2.6 s）会拖进紧接着的顺子那句，
   // 量「居中」只取混响回路已经安静（比主输出低 46 dB 以上）的窗口，不靠猜一个保护时长。

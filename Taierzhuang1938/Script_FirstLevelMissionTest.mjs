@@ -53,7 +53,8 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
   const sources=[];
   const ctx={currentTime:0,listener:{setPosition(){},setOrientation(){}},
     createGain:()=>({...Node(),gain:Param()}),
-    createBiquadFilter:()=>({...Node(),frequency:Param(),Q:Param()}),
+    // gain：真 BiquadFilterNode 都有（架式滤波器用它）；对白的主角音色是两只架式滤波器（2026-09-30）。
+    createBiquadFilter:()=>({...Node(),frequency:Param(),Q:Param(),gain:Param()}),
     createPanner:()=>({...Node(),positionX:Param(),positionY:Param(),positionZ:Param()}),
     createBufferSource:()=>{const source={...Node(),playbackRate:Param(),
       start(...args){this.started=args;},stop(at){if(at==null)this.stopped=true;}};sources.push(source);return source;},

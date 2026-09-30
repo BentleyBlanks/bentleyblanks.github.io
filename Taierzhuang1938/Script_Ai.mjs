@@ -1334,9 +1334,11 @@ export class AiDirector {
       cover: "move_cover", fire: "rally_shoot",
     };
     if (this.ctx.audio && ORDER_LINE[orderId]) {
+      // self：玩家自己喊的令，走主角的嗓子（居中干声），不按脚底定位（2026-09-30）。
+      // position 仍给：第一关 01–06 的认人钩子拿它认出是顺子、挑他本人的版本。
       this.ctx.audio.Bark("rally", {
         key: ORDER_LINE[orderId], position: origin ? origin.clone() : null,
-        priority: true, volume: 1.1,
+        priority: true, volume: 1.1, self: true,
       });
     }
     // 绕行要分左右两半，所以先算一条从下令者指向瞄点的法线

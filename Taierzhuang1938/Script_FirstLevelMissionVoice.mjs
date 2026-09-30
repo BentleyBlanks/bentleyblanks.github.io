@@ -135,7 +135,8 @@ export class FirstLevelMissionVoice {
    * 这一嗓子是谁喊的（Script_Audio.Bark 的认人钩子）。Script_Ai 只给阵营、种子（士兵 id）和脚底位置，
    * 这里拿位置去对：玩家下令（种子 0、priority）对玩家本人；其余对班组每个人现在的位置（VoicePosition
    * 按 who 找人的那条通路），水平距离 ≤ BARK_SPEAKER_MATCH_M 的最近那个。VoicePosition 找不到人时
-   * 退回的是玩家身边那一点，先量出这一点，等于它的一律当「没找到」。认不出返回 null（用公用声库）。
+   * 返回 null（2026-09-30 以前退回玩家身边那一点，所以这里还先量一次兜底点、等于它的当「没找到」，两种都认）。
+   * 认不出返回 null（用公用声库）。
    * 只在 01–06（SQUAD_BARK_STAGES）认人，07 以后行为不变；已阵亡的人不认——Script_Ai.Kill 在阵亡处喊的
    * hurt 不能认成死者自己（中方那一声点名真人痛呼，不分人）。
    */

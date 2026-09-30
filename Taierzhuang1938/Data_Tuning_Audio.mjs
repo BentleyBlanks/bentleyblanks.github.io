@@ -2,10 +2,30 @@
 
 // 2026-09-11 用户要求：当前及后续环境床默认 10%；恢复默认使用同一份数值。
 export const AUDIO_MIX_DEFAULTS = Object.freeze({ sfx: 1, music: 1, ambience: 0.1 });
-// Whole dialogue takes already contain their recorded room/foley bed. Their
-// live spatial send stays subtle; the player's own lines remain centred and dry.
-export const STORY_SPEECH = Object.freeze({ worldWet: 0.045, switchS: 0.018,
-  concussionSpeechFloorHz: 4200 });
+// 剧情对白的三条路（2026-09-30 用户：「所有的角色说话我都听不出是谁说的……特别是主角，
+// 我根本听不出来是主角自己在说话」）。口径见 docs/Data_AudioEngine.md「对白的三条路」。
+//   · 主角自己（顺子）：居中、单声道、干声，加一点胸腔低频、比别人略响 —— 自己听自己的嗓子本来就更厚更近；
+//   · 别人：挂在头上的世界声源，有房间混响、1.5 m 起按距离变轻；
+//   · 找不到人的别人：不定位，但照样带房间混响、不加主角的音色，免得被听成主角自己。
+// 改之前实测（同一条录音，dugout）：正前方 1.8 m 的人与主角两耳都完全一样（相关度 1.00）、电平只差 2 dB、
+// 混响比直达声低 40 dB（worldWet 0.045 是整段录音还带着环境声那时定的，2026-09-23 改干声之后没跟着改）。
+export const STORY_SPEECH = Object.freeze({
+  /** 别人那一路送混响的量。0.6 ≈ 1.8 m 处混响比直达声低 17 dB（0.045 时低 40 dB，等于没有）。 */
+  worldWet: 0.6,
+  /** 别人那一路的距离衰减从多远开始（米）。原来与所有声音共用 3.5 m：3.5 m 以内的人一律和主角一样响。 */
+  worldRefM: 1.5,
+  /** 配 worldRefM 的衰减斜率：10 m 以外与原来那条曲线（3.5 m / 0.9）差不到 1 dB，已调好的远处喊话不用重配。 */
+  worldRolloff: 0.34,
+  /** 主角自己的嗓子：电平（dB）、胸腔低频（低架，Hz / dB）、略收齿音（高架，Hz / dB）。 */
+  ownGainDb: 1.5,
+  ownLowShelfHz: 280,
+  ownLowShelfDb: 4,
+  ownHighShelfHz: 4500,
+  ownHighShelfDb: -2,
+  /** 整段录音在两路之间切换的时间常数（秒）。 */
+  switchS: 0.018,
+  concussionSpeechFloorHz: 4200,
+});
 // 战场远景床（AMBIENCE_PRESETS 里各层的 `bed: "battleFar"`）怎么放（2026-09-29）。
 // 用户原话（2026-09-29，试听五条无人声候选 A–E 之后）：
 //   「整体A长期存在，B和C交替的随机叠加出现；E在玩家进入巷道/半室内阶段再播放（作为替换偶尔的B和C）」。

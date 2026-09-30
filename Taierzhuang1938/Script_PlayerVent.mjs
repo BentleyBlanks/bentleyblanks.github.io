@@ -3,7 +3,7 @@
 // 「打完」= 真没了：枪膛里最后一发打出去、身上也没有桥夹（不是每次换弹）；手榴弹 / 集束弹甩出最后一颗。
 // 每一类（子弹 / 手榴弹）第一次打空必喊；之后按 PLAYER_VENT.chance 抽，两次之间至少隔 cooldownS。
 // 骂的句子是顺子本人嗓子另录的一条（Data_FirstLevelVoiceCast.PLAYER_VENT_TEXT / SQUAD_BARK_EXTRA_TAKES.shunziVent），
-// 走 Script_Audio.Bark 点名（key + who）：不变调、不定位（玩家自己的嘴）。
+// 走 Script_Audio.Bark 点名（key + who）：不变调；self 走主角的嗓子那一路（居中干声 + 胸腔音色，不送混响）。
 //
 // 晚一拍再骂（delayS）：枪声 / 出手那一下先响完。剧情对白在说、人死了（宿主的 Blocked）就等着；
 // 第一次最多等 firstWaitS，之后的只等 laterWaitS —— 过了这个时间再骂就对不上画面了，不如不骂。
@@ -60,7 +60,7 @@ export class PlayerVent {
     // 同一类连着两次不骂同一句。
     const choices = keys.length > 1 ? keys.filter((key) => key !== this.lastKey[p.kind]) : keys;
     const key = choices[Math.floor(this.Random() * choices.length) % choices.length];
-    const voice = this.audio?.Bark?.("vent", { key, who: "shunzi", priority: true, volume: PLAYER_VENT.volume });
+    const voice = this.audio?.Bark?.("vent", { key, who: "shunzi", self: true, priority: true, volume: PLAYER_VENT.volume });
     if (!voice) return null;
     this.pending[p.kind] = null;
     this.said[p.kind] = true;

@@ -97,9 +97,11 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     // 比 .01 / .05（−17）低 16 dB。传令兵远喊起外面的仗「显现」之后（Data_FirstLevelMissionBattleSound 的 reveal），
     // 实机量这两句在听者处 −35.7 / −35.1 dBFS，远声组 250 Hz–4 kHz −42 / −40，余量只剩 6.6 / 4.8 dB，六七成的块被盖住。
     // 补 7 dB 后与幺娃那句低声问（.03，−26.9）同一档，仍是这一场最轻的两句，表演的压嗓音色不变。
-    "02": P("normal", 0.5, { gainDb: 7, context: "跪在洞口朝前沟看，没有回头", delivery: "自言自语地盘算，声音压着但实在、洞里的人都听得清，不是耳语气声；中间停一下", pauseBeforeS: 0.8 }),
+    // 2026-09-30 对白改用人声近场曲线（Data_Tuning_Audio.STORY_SPEECH.worldRefM 1.5 m）：班长跪在 4.1 m 外降 4.0 dB、
+    // 幺娃在 1.8 m 只降 0.6 dB，原来那一档差出 2.2 dB（外加传令兵显现后的余量），所以 +7 → +9 保住上面这条口径。
+    "02": P("normal", 0.5, { gainDb: 9, context: "跪在洞口朝前沟看，没有回头", delivery: "自言自语地盘算，声音压着但实在、洞里的人都听得清，不是耳语气声；中间停一下", pauseBeforeS: 0.8 }),
     "03": P("normal", 0.6, { context: "抱着枪坐在洞里，盯着班长的背", delivery: "压着嗓子，心里发慌，有点结巴", pauseBeforeS: 0.5 }),
-    "04": P("normal", 0.6, { gainDb: 7, context: "还是盯着前沟，没回头", delivery: "边想边说，声音沉、实在、听得清，不是耳语，不拖；最后半句下了决心，语气一沉", pauseBeforeS: 0.5 }),
+    "04": P("normal", 0.6, { gainDb: 9, context: "还是盯着前沟，没回头", delivery: "边想边说，声音沉、实在、听得清，不是耳语，不拖；最后半句下了决心，语气一沉", pauseBeforeS: 0.5 }),
     "05": P("shout", 0.8, { context: "一撑地站起来，回身朝洞里", delivery: "短促有力的命令，不拖音", pauseBeforeS: 0.3 }),
   }),
   // 被爆炸截断：句尾约 0.35 s 处硬掐（原文「炮弹！趴下——！（被爆炸截断）」），截断那一刻发 BunkerBlast。
