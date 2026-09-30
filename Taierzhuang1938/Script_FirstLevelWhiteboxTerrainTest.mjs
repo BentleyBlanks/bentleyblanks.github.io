@@ -13,7 +13,7 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { MISSION_TERRAIN, SampleMissionTerrain, SampleMissionGroundSurface } from "./Data_FirstLevelMissionTerrain.mjs";
-import { MISSION_NORTH_RIVER, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_NORTH_RIVER, RiverCutAt, RiverReachAt } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_ROUTES as routes, MISSION_PLACEMENT as placement } from "./Data_FirstLevelMissionLayout.mjs";
 import { BuildFrontWhitebox } from "./Data_FirstLevelWhiteboxFront.mjs";
 import {
@@ -79,7 +79,7 @@ if (shapeCount === 0) ok(insideChanged === 0 && WHITEBOX_TERRAIN.bounds === null
 // 3. 河槽 ---------------------------------------------------------------------
 let riverPts = 0;
 // 2026-09-30：拓宽河段 z 90…166、x −140…−30（两端过渡到 −160/−10）也在扫描范围内。
-for (let z = 84; z <= 172; z += .5) for (let x = -165; x <= 125; x += 1) {
+for (let z = 84; z <= 172; z += .5) for (let x = -205; x <= 125; x += 1) {
   if (RiverCutAt(x, z, MISSION_NORTH_RIVER) <= 0) continue;
   const h = SampleMissionTerrain(x, z), h0 = SampleMissionTerrain(x, z, bare);
   // River takes min(height, natural - cut) after the hook: modifiers may not dig below the channel profile.
@@ -87,6 +87,27 @@ for (let z = 84; z <= 172; z += .5) for (let x = -165; x <= 125; x += 1) {
   else assert.fail(`river channel at ${x},${z} changed by a whitebox modifier (${h0.toFixed(3)} -> ${h.toFixed(3)})`);
 }
 ok(riverPts > 1000, `river channel untouched (${riverPts} samples)`);
+
+// 3b. 南堤跟着南水线走（第二轮岸线起伏）：堤顶点表 z − 7 恒在 shoreZ 之南 0…1.2 m，堤脚与沙滩之间不出断崖 ----
+{
+  const rear = REGIONS.find((region) => region.id === "Rear1518");
+  const reach = MISSION_NORTH_RIVER.reaches[0];
+  let levee = 0;
+  for (const shape of rear.shapes.filter((s2) => /^BridgeLevee/.test(s2.id))) for (const p of shape.points) {
+    const foot = p.z - 7, shore = RiverReachAt(p.x, MISSION_NORTH_RIVER).shoreZ;
+    assert.ok(foot >= shore - 0.01 && foot <= shore + 1.2, `levee point (${p.x},${p.z}) foot z=${foot.toFixed(2)} vs shoreZ ${shore.toFixed(2)}`);
+    levee++;
+  }
+  let worstStep = 0;
+  for (let x = reach.x0 + 4; x <= -49; x += 2) {
+    if (Math.abs(x + 77) < 7) continue;   // 铁路路基（+0.62 m）在桥头被河槽切断，是原有的断面（a35a763e 起），不算
+    const shore = RiverReachAt(x, MISSION_NORTH_RIVER).shoreZ;
+    for (let z = shore - 2; z <= shore + 2; z += .25)
+      worstStep = Math.max(worstStep, Math.abs(SampleMissionTerrain(x, z + .25) - SampleMissionTerrain(x, z)));
+  }
+  assert.ok(worstStep < 0.45, `no cliff where the beach meets the levee foot: worst 0.25 m step ${worstStep.toFixed(2)} m`);
+  ok(levee >= 9, `south levee follows the wandering shoreline (${levee} crest points, worst step ${worstStep.toFixed(2)} m)`);
+}
 
 // 4. 钩子自检（自造表） --------------------------------------------------------
 {

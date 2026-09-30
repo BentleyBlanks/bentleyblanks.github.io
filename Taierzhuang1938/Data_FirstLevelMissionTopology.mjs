@@ -77,12 +77,21 @@ export const MISSION_NORTH_RIVER = Object.freeze({
   //   水下陡坎  dropZ → waterZ，深从 depth 收到 waterCut：1.5·3.05/2.6 = 1.76，下不去也上不来；
   //   沙滩      waterZ → shoreZ，深从 waterCut 收到 0：≤ 1.5·1.15/7.4 = 0.23（13°），人走得上去。
   // waterRel 是水面相对自然地面的高度（负数）：水面在南岸自然地面下 1.25 m、河心水深 4.2−1.25 = 2.95 m。
-  // 段两端各 blendM 米把六个位置参数按 smoothstep(x) 混回原断面：原断面等价于
-  // waterZ=dropZ=164、waterCut=depth、shoreZ=167.2 的退化形，权重 0 时逐位等于旧公式。
+  // 段两端把六个位置参数按 smoothstep(x) 混回原断面：西端 blendWestM 65 m（x −205…−140，止于 MISSION_BOUNDS.minX，
+  // 到界上正好收完）、东端 blendEastM 60 m（x −30…30，不碰浅滩 WestDitchFord 的插值带 x 34…60，更不碰路桥 x 76）。
+  // 原断面等价于 waterZ=dropZ=164、waterCut=depth、shoreZ=167.2 的退化形，权重 0 时逐位等于旧公式。
+  // 2026-09-30 第二轮：岸线不再是两端直角的长方形水池。`wander` 给北岸线（crestZ、floorZ 同量平移）与南水线（dropZ、waterZ、
+  // shoreZ 同量平移）叠三个不同波长（41–110 m）的正弦起伏，包络 env 在 fixed 区间 x −95…−60（铁路桥一带，断面与 a35a763e
+  // 逐位相同）内**恰好为 0**，向两侧 rampM 30 m smoothstep 长到 1；振幅 = ampM·(1 + 三波加权和)：北岸只往南缩 0…9 m（岸沿绝不
+  // 比 z 90 更靠北，北岸村子与土坎安全），南水线只往北缩 0…7 m（沙滩水线绝不比 z 158.3 更靠南，南堤脚 z 166 不被吃掉）。
+  // 起伏与过渡权重相乘：过渡带里起伏随权重一起收回原断面。
   reaches: Object.freeze([
-    Object.freeze({ id: "RailBridgeReach", x0: -140, x1: -30, blendM: 20,
+    Object.freeze({ id: "RailBridgeReach", x0: -140, x1: -30, blendWestM: 65, blendEastM: 60,
       depth: 4.2, crestZ: 90, floorZ: 94.5, dropZ: 156, waterZ: 158.6, waterCut: 1.15, shoreZ: 166,
-      waterRel: -1.25 }),
+      waterRel: -1.25,
+      wander: Object.freeze({ fixed: Object.freeze([-95, -60]), rampM: 30,
+        north: Object.freeze({ ampM: 4.5, waves: Object.freeze([[110, 0.5, 2.43], [63, 0.3, 5.97], [41, 0.2, 4.4]]) }),
+        south: Object.freeze({ ampM: 3.5, waves: Object.freeze([[95, 0.5, 4.55], [57, 0.3, 5.0], [43, 0.2, 3.1]]) }) }) }),
   ]),
   // 允许横穿的位置（测试用）：浅滩与两座桥。半宽按各自的通行面给。
   crossings: Object.freeze([
@@ -95,12 +104,26 @@ export const MISSION_NORTH_RIVER = Object.freeze({
 });
 
 const SmoothStep = (t) => { const c = t <= 0 ? 0 : t >= 1 ? 1 : t; return c * c * (3 - 2 * c); };
-/** 拓宽河段在 x 处的混合权重：段内 1、两端 blendM 米 smoothstep、段外 0。 */
+/** 拓宽河段在 x 处的混合权重：段内 1、西端 blendWestM / 东端 blendEastM 米 smoothstep、段外 0。 */
 export function RiverReachWeight(x, reach) {
-  if (x <= reach.x0 - reach.blendM || x >= reach.x1 + reach.blendM) return 0;
+  if (x <= reach.x0 - reach.blendWestM || x >= reach.x1 + reach.blendEastM) return 0;
   if (x >= reach.x0 && x <= reach.x1) return 1;
-  return SmoothStep(x < reach.x0 ? (x - (reach.x0 - reach.blendM)) / reach.blendM
-    : ((reach.x1 + reach.blendM) - x) / reach.blendM);
+  return SmoothStep(x < reach.x0 ? (x - (reach.x0 - reach.blendWestM)) / reach.blendWestM
+    : ((reach.x1 + reach.blendEastM) - x) / reach.blendEastM);
+}
+/**
+ * 岸线起伏（米）：{ north ≥ 0 北岸线往南缩多少, south ≤ 0 南水线往北缩多少 }。fixed 区间内恰好是 +0 / +0（整数 0，
+ * 与没有起伏时逐位相同），两侧 rampM 米 smoothstep 长出来。纯函数，确定性（只依赖 x）。
+ */
+export function RiverReachOffsets(x, reach) {
+  const wander = reach.wander;
+  if (!wander) return { north: 0, south: 0 };
+  const [f0, f1] = wander.fixed;
+  const env = x < f0 ? SmoothStep((f0 - x) / wander.rampM) : x > f1 ? SmoothStep((x - f1) / wander.rampM) : 0;
+  if (env <= 0) return { north: 0, south: 0 };
+  const Wave = (waves) => waves.reduce((sum, [len, amp, phase]) => sum + amp * Math.sin(2 * Math.PI * x / len + phase), 0);
+  return { north: wander.north.ampM * (1 + Wave(wander.north.waves)) * env,
+    south: -wander.south.ampM * (1 + Wave(wander.south.waves)) * env };
 }
 /** 断面参数按 x 插值（浅滩把参数拉向自己那一套）。纯函数，地形与测试共用。 */
 export function RiverProfileAt(x, river = MISSION_NORTH_RIVER) {
@@ -125,11 +148,12 @@ export function RiverReachAt(x, river = MISSION_NORTH_RIVER) {
     if (w <= 0) continue;
     const base = RiverProfileAt(x, river);
     const mix = (a, b) => a + (b - a) * w;
-    const south = river.z + base.floorHalfW;
+    const south = river.z + base.floorHalfW, off = RiverReachOffsets(x, reach);
     return { id: reach.id, w, depth: mix(base.depth, reach.depth),
-      crestZ: mix(river.z - base.floorHalfW - base.bankRun, reach.crestZ), floorZ: mix(river.z - base.floorHalfW, reach.floorZ),
-      dropZ: mix(south, reach.dropZ), waterZ: mix(south, reach.waterZ), waterCut: mix(base.depth, reach.waterCut),
-      shoreZ: mix(south + base.bankRun, reach.shoreZ), waterRel: mix(-(base.depth - 1.2), reach.waterRel) };
+      crestZ: mix(river.z - base.floorHalfW - base.bankRun, reach.crestZ + off.north),
+      floorZ: mix(river.z - base.floorHalfW, reach.floorZ + off.north),
+      dropZ: mix(south, reach.dropZ + off.south), waterZ: mix(south, reach.waterZ + off.south), waterCut: mix(base.depth, reach.waterCut),
+      shoreZ: mix(south + base.bankRun, reach.shoreZ + off.south), waterRel: mix(-(base.depth - 1.2), reach.waterRel) };
   }
   return null;
 }
