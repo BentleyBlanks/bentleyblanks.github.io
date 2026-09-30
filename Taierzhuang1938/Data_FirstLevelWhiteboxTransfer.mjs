@@ -98,15 +98,17 @@ export function BuildTransferWhitebox(groundAt) {
     }
     return edges;
   }
-  function CourseWall(prefix, x0, x1, { notch = null, seed = 0, capTops = [], topRange = [.92, 1.18] } = {}) {
+  // z0: wall centre line; cTops: tops of the two lower courses; dMul: thickness scale (yard walls are thinner).
+  function CourseWall(prefix, x0, x1, { notch = null, seed = 0, capTops = [], topRange = [.92, 1.18],
+    z0 = 84.05, cTops = courseTops, dMul = 1, face = { faceX: 0, faceZ: -1 } } = {}) {
     // Courses one and two run under the notch too.
-    for (const [c, d, s] of [[0, .92, 0], [1, .82, 300]]) {
-      const top = courseTops[c];
+    for (const [c, d, s] of [[0, .92 * dMul, 0], [1, .82 * dMul, 300]]) {
+      const top = cTops[c];
       const edges = Joints(x0, x1, seed + s, .55, 1.05);
       edges.forEach((b, i) => {
         if (!i) return;
-        const a = edges[i - 1], x = (a + b) / 2, z = 84.05 + (Hash(seed + s + 40 + i) - .5) * .08;
-        const bottomH = c ? courseTops[0] - .02 : 0, h = top - bottomH;
+        const a = edges[i - 1], x = (a + b) / 2, z = z0 + (Hash(seed + s + 40 + i) - .5) * .08;
+        const bottomH = c ? cTops[0] - .02 : 0, h = top - bottomH;
         const bottom = groundAt(x, z) + bottomH;
         if (c) At(`${prefix}B${i - 1}`, x, z, b - a, h, d, bottom, "structure", { ry: (Hash(seed + s + 80 + i) - .5) * .06 });
         else Block(`${prefix}A${i - 1}`, x, z, b - a, h, d, "structure", { ry: (Hash(seed + s + 80 + i) - .5) * .06 });
@@ -118,16 +120,16 @@ export function BuildTransferWhitebox(groundAt) {
       const edges = Joints(ra, rb, seed + 500 + r * 50, .55, 1.0);
       edges.forEach((b, i) => {
         if (!i) return;
-        const a = edges[i - 1], x = (a + b) / 2, z = 84.05 + (Hash(seed + 120 + n) - .5) * .1;
+        const a = edges[i - 1], x = (a + b) / 2, z = z0 + (Hash(seed + 120 + n) - .5) * .1;
         const top = topRange[0] + Hash(seed + 160 + n) * (topRange[1] - topRange[0]);
-        At(`${prefix}${n}`, x, z, b - a, top - courseTops[1] + .03, .7, groundAt(x, z) + courseTops[1] - .03, "cover",
-          { ry: (Hash(seed + 200 + n) - .5) * .07, cover: { faceX: 0, faceZ: -1 } });
+        At(`${prefix}${n}`, x, z, b - a, top - cTops[1] + .03, .7 * dMul, groundAt(x, z) + cTops[1] - .03, "cover",
+          { ry: (Hash(seed + 200 + n) - .5) * .07, cover: face });
         n++;
       });
     });
     // Capstones: solid, tops 1.08–1.2 above the ground, sitting on the top course.
     capTops.forEach(([x, w, h, base, ry], i) =>
-      At(`${prefix}Cap${i}`, x, 84.02, w, h, .55, groundAt(x, 84) + base, "cover", { ry }));
+      At(`${prefix}Cap${i}`, x, z0 - .03, w, h, .55 * dMul, groundAt(x, z0) + base, "cover", { ry }));
   }
   CourseWall("TransferVillageWallWest", 60.0, 73.05,
     { notch: [71.75, 72.4], seed: 11, capTops: [[62.6, .8, .26, .9, .15], [66.2, .65, .22, .98, -.3], [69.4, .7, .24, .92, .2]] });
@@ -150,6 +152,15 @@ export function BuildTransferWhitebox(groundAt) {
     [2, 79.3, 77.6, .45, .4, .4], [3, 80.0, 81.9, .55, .3, .5]])
     Detail(`TransferRoadStoneNorth${i}`, x, z, w, h, d, "earthDark", { ry: i * .7 });
   Pole("TransferPoleNorth", 79.6, 78.3);
+  // 路边的碎砖、断瓦（不实心）：房前墙脚与路肩一路撒到路口，眼睛顺着碎料走到胸墙；两棵秃树
+  // （概念图两侧各一棵）站在房后的院子里，离路线 3 m 以上。
+  for (const [i, x, z, w, h, d, ry] of [[0, 73.5, 60.2, .5, .22, .4, .3], [1, 79.4, 61.0, .45, .2, .4, -.5], [2, 73.4, 63.4, .6, .18, .45, .8],
+    [3, 79.5, 66.3, .5, .24, .4, .2], [4, 73.6, 67.6, .55, .2, .4, -.7], [5, 79.3, 69.2, .45, .22, .35, 1.1],
+    [6, 73.7, 71.2, .5, .16, .4, .4], [7, 79.6, 73.4, .6, .2, .45, -.3], [8, 73.8, 74.6, .45, .22, .4, .9],
+    [9, 78.8, 75.9, .5, .18, .4, .6], [10, 78.9, 80.3, .55, .2, .4, -.8], [11, 74.2, 82.2, .5, .24, .4, .2]])
+    Detail(`TransferLaneBrick${i}`, x, z, w, h, d, i % 2 ? "plaster" : "earthDark", { ry });
+  Detail("TransferLaneTreeEast", 87.4, 70.2, .3, 6.4 * .72, .3, "timber", { treeModel: { heightM: 6.4, region: "VillageAuthored" } });
+  Detail("TransferLaneTreeWest", 60.8, 69.2, .3, 6.9 * .72, .3, "timber", { treeModel: { heightM: 6.9, region: "VillageAuthored" } });
 
   // ---------------------------------------------------------------------
   // 11/12_2: broken brick walls lining the x76 road (1.6–2.5 m, segments of
@@ -227,19 +238,28 @@ export function BuildTransferWhitebox(groundAt) {
 
   // 村路南段（z 75–83，2026-09-30 一夫当关）：村南门楼已北挪到 z 47.6，从射口顺村路能一直看进去。
   // 两侧是房前墙夹出的夹道：路西 VillageLaneWestHouse（Village 包，东墙 x 72.8）后面留着
-  // southTraffic 过路车斜线（(55,57)→(76,85)）与几截破院墙，路东是 RoadEast 房、一个 3.5 m 的大草垛
-  // 和贴路的一栋房。追兵在这一段逐件躲：每件的「藏身点」在它北侧 0.65 m，MISSION_TACTICS 的中间
-  // 折点就钉在那里（折点离掩体超过 0.9 m 会被拽回去，敌军 AI §19）。
+  // southTraffic 过路车斜线（(55,57)→(76,85)）与几截破院墙；路东依次是 RowB 房、一个 3.5 m 的
+  // 大草垛（z 67.85–71.35，贴着路边）、RoadEast 房（z 72.6–77.6）、1.3 m 的巷口、最南一栋房。追兵在这一段
+  // 逐件躲：每件的「藏身点」在它北侧 0.65 m，MISSION_TACTICS 的中间折点就钉在那里（折点离掩体超过
+  // 0.9 m 会被拽回去，敌军 AI §19）。
   // 路西：一道齐腰的院墙被过路大车压出一道豁口（车辙从两截中间斜穿过去，MissionTest 按 0.35 m 扫着），
-  // 路心偏西一堆塌下来的墙土；路东：大草垛（掩体点在它北侧，离 RoadEast 房南墙 1.2 m 的缝）。
-  Block("TransferPlazaWallWest0", 66.4, 75.6, 1.7, 1.05, .7, "structure", Face(0, -1));
-  Block("TransferPlazaWallWest1", 70.9, 75.7, 1.5, .92, .65, "earthDark", { ry: .06, ...Face(0, -1) });
-  Block("TransferPlazaWallWest2", 72.35, 75.75, 1.0, .78, .6, "structure", Face(0, -1));
+  // 路心偏西一堆塌下来的墙土；路东：大草垛（掩体点在它北侧，夹在 RowB 南墙与草垛之间 0.7 m 的缝里）。
+  // 两截都是碎石砌的院墙（两层底 + 一层参差的顶，同守线低墙的砌法），顶高 0.85–1.08。
+  const yardWall = { z0: 75.66, cTops: [.3, .58], topRange: [.85, 1.08], dMul: .78 };
+  CourseWall("TransferPlazaWallWestA", 65.55, 67.25, { seed: 23, ...yardWall });
+  CourseWall("TransferPlazaWallWestB", 70.15, 72.85, { seed: 29, ...yardWall, z0: 75.72,
+    capTops: [[71.4, .6, .16, .84, .25]] });
   Block("TransferPlazaRubbleWest", 74.6, 79.3, 1.6, .88, .8, "earthDark", { ry: -.12, ...Face(0, -1) });
-  Block("TransferPlazaHaystack", 82.4, 76.6, 3.6, 1.7, 3.6, "canvas",
-    { cover: { faceX: 0, faceZ: -1, points: [{ x: 81.6, z: 74.1 }, { x: 83.3, z: 74.1 }] } });
-  Detail("TransferPlazaHaystackMid", 82.4, 76.6, 2.9, 1.0, 2.9, "canvas", { y: groundAt(82.4, 76.6) + 2.2 });
-  Detail("TransferPlazaHaystackTop", 82.4, 76.6, 1.5, .7, 1.5, "canvas", { y: groundAt(82.4, 76.6) + 3.05 });
+  Block("TransferPlazaHaystack", 81.9, 69.6, 3.6, 1.7, 3.6, "canvas",
+    { cover: { faceX: 0, faceZ: -1, points: [{ x: 81.0, z: 67.15 }, { x: 82.9, z: 67.15 }] } });
+  Detail("TransferPlazaHaystackMid", 81.9, 69.6, 2.9, 1.0, 2.9, "canvas", { y: groundAt(81.9, 69.6) + 2.2 });
+  Detail("TransferPlazaHaystackTop", 81.9, 69.6, 1.5, .7, 1.5, "canvas", { y: groundAt(81.9, 69.6) + 3.05 });
+  // 第二拨（东巷）的落脚：RoadEast 房东南角与最南一栋房之间的小院里一截塌了的院墙。东巷那一拨沿房东墙
+  // 摸过来躲在它后头，从低墙东段 (91.5,85.6) 看得见、打得到 —— 逼玩家沿墙往右挪，而不是钻到草垛后面
+  // 去（草垛北侧被 RoadEast 房挡着，东段看不见；2026-09-30 整段实跑里第二拨乙躲在那儿，420 s 没打掉）。
+  Block("TransferAlleyStub", 89.4, 80.4, 1.8, .9, .6, "earthDark", { ry: .08, ...Face(0, -1) });
+  for (const [i, x, z, w, h, d, ry] of [[0, 88.3, 81.0, .5, .2, .4, .5], [1, 90.5, 81.1, .55, .24, .45, -.6], [2, 89.9, 79.0, .4, .18, .35, .9]])
+    Detail(`TransferAlleyStubRubble${i}`, x, z, w, h, d, "earthDark", { ry });
   // 贴路的一栋房（路东最南一栋，门向村路）：守线右手最近的房，把路口东侧围住。
   House("TransferLaneEastHouse", 84.0, 81.05, 7.8, 4.3, 3.0, { alongX: true });
   Detail("TransferLaneEastHouseDoor", 80.04, 81.4, .12, 2.0, 1.1, "timber");

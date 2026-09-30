@@ -355,18 +355,18 @@ export const MISSION_TACTICS = Object.freeze({
     {x:77.1,z:59.0,holdS:0}, {x:77.1,z:73.8,holdS:0}, {x:74.6,z:78.25}] },
   TransferRifleD: { fact: "transferArrived", delay: 5.5, mps: 3.2, points: [
     {x:75.7,z:41.3,holdS:0}, {x:78.4,z:49.2,holdS:0}, {x:80.9,z:54.35,holdS:1.6}, {x:79.6,z:54.4,holdS:0},
-    {x:79.3,z:57.4,holdS:0}, {x:78.9,z:66.0,holdS:0}, {x:78.9,z:73.9,holdS:0}, {x:81.6,z:74.1}] },
+    {x:79.3,z:57.4,holdS:0}, {x:78.9,z:66.0,holdS:0}, {x:78.9,z:67.15,holdS:0}, {x:81.0,z:67.15}] },
   TransferRifleE: { fact: "transferArrived", delay: 8, mps: 3.2, points: [
     {x:74.8,z:41.6,holdS:0}, {x:78.2,z:49.2,holdS:0}, {x:80.9,z:54.35,holdS:1.2}, {x:79.6,z:54.4,holdS:0},
-    {x:79.3,z:57.4,holdS:0}, {x:78.9,z:66.0,holdS:0}, {x:78.9,z:73.9,holdS:0}, {x:83.3,z:74.1}] },
+    {x:79.3,z:57.4,holdS:0}, {x:78.9,z:66.0,holdS:0}, {x:78.9,z:67.15,holdS:0}, {x:82.9,z:67.15}] },
   // 第二拨放出来就跑（它本身就是第一拨解除 transferThreatGapS 之后才生成的）。
   TransferAlleyGunner: { delay: 0, mps: 3.0, points: [{x:94.6,z:56.0,holdS:.3}, {x:94.3,z:67.15}] },
   TransferAlleyA: { delay: 1.5, mps: 3.2, points: [
     {x:97.4,z:55.45,holdS:1.5}, {x:96.2,z:55.5,holdS:0}, {x:95.85,z:66.8,holdS:1.2},
     {x:95.85,z:70.6,holdS:0}, {x:97.9,z:72.5,holdS:0}, {x:97.9,z:77.2,holdS:0}, {x:98.9,z:79.45}] },
   TransferAlleyB: { delay: 3, mps: 3.2, points: [
-    {x:94.9,z:56.0,holdS:0}, {x:95.85,z:66.8,holdS:1.2}, {x:95.85,z:70.6,holdS:0},
-    {x:93.3,z:73.9,holdS:0}, {x:83.3,z:74.1}] },
+    {x:94.9,z:56.0,holdS:0}, {x:95.85,z:66.8,holdS:1.2}, {x:95.85,z:70.6,holdS:0}, {x:92.6,z:73.6,holdS:0},
+    {x:91.7,z:78.4,holdS:0}, {x:89.4,z:79.4}] },
   AirPursuerA: { delay: 0, points: [{x:106,z:90},{x:102,z:92}] },
   AirPursuerB: { delay: 3, points: [{x:105,z:98},{x:104,z:111}] },
   AirPursuerC: { delay: 5, points: [{x:109,z:109},{x:100,z:114}] },

@@ -558,12 +558,14 @@ export function BuildVillageWhitebox(groundAt) {
   House("StreetEastSouthRowA", 86.45, 51, 8.1, 10, 3.4, {
     doors: [["W", 2.5, 1.2, 2.2, 1]], windows: [["W", -2.2, 1, 1.15, .85]] });
   // 2026-09-30（12 一夫当关）：路东两栋房的西墙从 x≈82.4 提到 x 80.1，与路西房东墙 x 72.8 夹出
-  // 约 7.3 m 的村路（原先 9.6 m，且 z 66 以南整片空场）。RowB 的门窗随墙走，东巷一侧缩了 1.6 m。
+  // 约 7.3 m 的村路（原先 9.6 m，且 z 66 以南整片空场）。房子向西加宽、东墙不动（东巷宽度不变：
+  // SpaceTest「侧巷」5–9 m 量的就是它们的东墙到 VillageEastLaneWall）。RoadEast 房整体南挪到
+  // z 72.6–77.6，腾出 RowB 与它之间放大草垛（Transfer 包里）；东墙缩到 x 90.6，东巷机枪 → 车位的射线要从它东面过。
   House("StreetEastSouthRowB", 85.55, 62.5, 10.9, 8, 3.3, {
     doors: [["W", -1.2, 1.2, 2.2, 1]], windows: [["W", 2.4, 1, 1.15, .85]] });
   House("VillageRoadWestHouse", 68.5, 61.5, 8.6, 8, 3.3, { alongX: true,
     doors: [["E", 1, 1.1, 2.1, 1]], windows: [["S", -1.5, 1, 1.15, .8], ["S", 2.4, .9, 1.2, .7]] });
-  House("VillageRoadEastHouse", 86.05, 70.4, 11.9, 5, 3.1, { alongX: true,
+  House("VillageRoadEastHouse", 85.35, 75.1, 10.5, 5, 3.1, { alongX: true,
     doors: [["W", 0, 1.1, 2.1, 1]],
     windows: [["S", -2, 1, 1.15, .8], ["S", 2, 1, 1.15, .8]] });
   // 路西第二栋（12 夹道的西墙）：4.2 m 进深，东墙 x 72.8 贴路；西边让出 southTraffic 过路车斜线
@@ -601,8 +603,8 @@ export function BuildVillageWhitebox(groundAt) {
   Detail("VillageLaneCartWheel", 75.75, 69.9, .12, 1.1, 1.1, "timber", { ry: .3 });
   Detail("VillageLaneCartShaft", 73.9, 67.6, .12, .12, 2.8, "timber", { ry: .28, y: groundAt(73.9, 67.6) + .08 });
   // 路东房 RoadEast 东南角塌下来的碎砖（只是脚下的碎料，不挡人；草垛在南面 Transfer 包里）。
-  Bats("VillageLaneRubbleEastFoot", [[79.9, 73.6, .4, .2, .3, .5], [80.6, 73.75, .5, .16, .35, 1.9],
-    [81.6, 73.55, .3, .22, .3, .2], [82.3, 73.7, .45, .14, .3, 2.6], [83.4, 73.5, .5, .2, .3, .9]]);
+  Bats("VillageLaneRubbleEastFoot", [[79.9, 72.2, .4, .2, .3, .5], [80.6, 72.35, .5, .16, .35, 1.9],
+    [83.9, 72.15, .3, .22, .3, .2], [84.6, 72.3, .45, .14, .3, 2.6], [83.4, 71.9, .5, .2, .3, .9]]);
   // 主街南段：西巷口一摞木箱、路东一垛麻袋。
   Cover("VillageStreetCrates", 73.5, 55.4, 1.1, 1.1, .9, "timber");
   Detail("VillageStreetCratesTop", 73.45, 55.35, .75, .5, .6, "timber", { ry: .3, y: groundAt(73.5, 55.4) + 1.35 });
@@ -624,6 +626,11 @@ export function BuildVillageWhitebox(groundAt) {
   Pole("VillagePole3", 80.9, 57.6);
   Pole("VillagePole4", 79.7, 64.9);
   Wires("VillagePole3", "VillagePole4");
+  // 电线杆一路排远（12_3 概念图：杆线顺村路排到尽头）：门楼南、路东房前各加一根，接同一路线。
+  Pole("VillagePole9", 80.6, 51.6);
+  Wires("VillagePole9", "VillagePole3");
+  Pole("VillagePole10", 79.6, 71.4);
+  Wires("VillagePole4", "VillagePole10");
   Pole("VillagePole5", 96.6, 47.5);
   Wires("VillagePole5", "VillagePole3");
   // West lane between the gun house and the southTraffic road.
