@@ -204,8 +204,11 @@ const wrongWay = {
   Transfer: [{ x: 76, z: 160 }, { x: 130, z: 100 }, { x: 10, z: 100 }, { x: 76, z: 20 }],
   Regroup: [{ x: 110, z: 110 }, { x: 0, z: 190 }],
   WallPath: [{ x: 110, z: 200 }, { x: -40, z: 170 }],
-  BridgeCover: [{ x: -77, z: 115 }, { x: -140, z: 200 }, { x: 40, z: 240 }],
-  BridgeWithdraw: [{ x: -77, z: 125 }, { x: -140, z: 220 }],
+  // 2026-10-01 浮桥：被炸段中心 railBridge 北移到河心 z 122（r 14 盖住 z 108…136），原来的 (-77,115) 已在桥面区里；
+  // 「往对岸（敌岸）的桥面上走」的错误方向改取北半桥 z 100（离被炸段中心 22 m、北栈 z 88.2 以南）。
+  BridgeCover: [{ x: -77, z: 100 }, { x: -140, z: 200 }, { x: 40, z: 240 }],
+  // 2026-10-01 射位南移到水边 (-84.6,162.7)，(-77,125) 离它只有 38 m、在射位盘里；改取北半桥 z 110（离射位 53 m）。
+  BridgeWithdraw: [{ x: -77, z: 110 }, { x: -140, z: 220 }],
 };
 for (const [id, points] of Object.entries(wrongWay))
   for (const point of points) Check(DistanceToArea(point, AREAS[id]) > 0, `${id}: wrong way (${point.x},${point.z}) is outside`);
