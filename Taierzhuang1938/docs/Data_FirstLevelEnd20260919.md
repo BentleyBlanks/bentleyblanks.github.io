@@ -118,9 +118,15 @@
 
 ### 18 BridgeOrders → BridgeCover → BridgeWithdraw → NightMarch
 
+> **2026-09-30 R3：浮桥取代铁路桥**（用户拍板；口径、河岸重做、模型、起爆时间线与验收见 [Data_PontoonBridge.md](Data_PontoonBridge.md)）。本节下面凡「铁路桥 / 三孔 / 1 号墩 / 南堤 / 桁架 / 半孔」的说法都是钢桥时代的历史：
+> 现在尾队走 21 条木船的浮桥（`bridgeCrossing` (−77,70) → (−77,90) → (−77,165) → …），`railBridge` 锚点（键名沿用）= 被炸段中心 (−77,134)，被炸的是中间 5 条船 + 两侧各 2 条（桥面 z 120.5…147.5），
+> 射位 `bridgeCover` (−89.6,173.8) 在南岸烂泥垄后，两名爆破手蹲在南栈起点西侧的烂泥滩上（(−82.6,165.2)、(−82.6,167.2)，身边是药箱、铁丝网卷、绳圈），起爆器 `exploderAt` (−80.4,170.3) 就在桥头；
+> `blastSafe` (−66,201) 不动（离被炸段中心 76 m，仍 ≥ 40 m）；`rearColumnHoldM` 13 → 17；HUD 目标「掩护回援分队通过浮桥」；`pontoonBridgeSet.Detonate()` 演起爆。信号 `RailBridgeDestroyed` 保留：
+> 一次翻 **3 个完好件（被炸段桥面 + 两侧绳栏）+ 2 个断口空气墙**；`marchOrderDelayS` 6.5 s（最后一块木头落水在 ≈ 5.7 s 之前）不动。撤离路线与黑屏条件不动。
+
 * **接令**：`BridgeRunner` 是真人，从院门外 `E.runnerSpawn` 沿 `E.runnerRoute` 跑进来，
   跑到玩家 `runnerArriveM` 以内才 `BridgeOrders`（`bridgeRunnerArrived`）。
-  HUD 目标是阶段 objective「掩护回援分队通过铁路桥」。罗班长沿 `toBridge` 带到南岸射位。
+  HUD 目标是阶段 objective「掩护回援分队通过浮桥」（R3 前是铁路桥）。罗班长沿 `toBridge` 带到南岸射位。
 * **回援尾队**：六个**真人实体**（`RearColumn0..5`），0 号扛 Zb26、1/2 号两人抬一根白盒炮管
   （`dressing.Prop("limb", …)`）、其余步枪（背上一只白盒小件）。沿 `bridgeCrossing`（164 m；2026-09-30 河拓宽、桥改三孔 83 m 后，旧 114 m）走。
   * 火力没打断以前进度封在 `rearColumnHoldM`(13 m)，压在北引道上；
@@ -148,9 +154,9 @@
   `blastClearRadiusM`(30 m) 以内。有人就一直等（每次等都记一条 `blastHeldForFriendly` 取证），
   **不是到点就炸的计时器**。人走净之后再等玩家把脸转向桥（≤ `blastGazeWaitS` 3.5 s），
   蹲在起爆器后面的爆破手压杆（`exploderPressed`），`exploderPressLeadS` 之后点火 →
-  `railBridgeSet.Detonate()`（钢桁架桥分段起爆、两个半孔折进河里、水柱烟柱，见 [铁路桥](Data_RailBridge.md)）
+  `pontoonBridgeSet.Detonate()`（浮桥中段 5 条船分段起爆炸成碎块、两侧各 2 条倾斜下沉、水柱烟柱，见 [浮桥](Data_PontoonBridge.md)；钢桥时代是 `railBridgeSet`，见 [铁路桥](Data_RailBridge.md)）
   + 唯一一次 `Combat.BlastFeedback` → `bridgeDestroyed`
-  → 信号 `RailBridgeDestroyed` 一次翻完 **5 个完好件 + 3 个残骸件**（碰撞；外观归模型），桥面退出可走面（不可逆）
+  → 信号 `RailBridgeDestroyed` 一次翻完 **3 个完好件 + 2 个断口空气墙**（R3 浮桥；钢桥时代是 5 + 3；碰撞，外观归模型），桥面退出可走面（不可逆）
   → 起爆后 `marchOrderDelayS` 6.5 s 才 `MarchToTengxian`（两个半孔都砸进河之后）。爆破不造成己方剧情伤亡。
 * **对岸步坦部队（2026-09-30）**：河对岸有大量日军步兵与三辆傀儡战车（BridgeCover 起就在，BridgeWithdraw 放真 AI 与冲桥组，
   起爆时桥上的日军被炸死落河，桥断后全停在岸边隔河射击、没有一个能过河）。名册、时间线、分档伤害、性能与门禁全在
@@ -185,7 +191,7 @@
 
 | 换的东西 | 怎么回去 |
 | --- | --- |
-| 铁路桥（gate，5+3 件） | 事实 `bridgeDestroyed` 清掉 → `SyncScenario` 自动复原 |
+| 浮桥被炸段（gate，3+2 件；R3 前是铁路桥 5+3） | 事实 `bridgeDestroyed` 清掉 → `SyncScenario` 自动复原 |
 | 北门夜景（scenario 第三态） | 事实 `nightArrivalPlaced` 清掉 → 退回坍塌掩蔽部那一态 |
 | 夜间天空 | `RestoreSky()`（Retry / StageJump / Dispose 各一处） |
 | 夜景点光 | `nightLights.Sync([])`（同上三处） |

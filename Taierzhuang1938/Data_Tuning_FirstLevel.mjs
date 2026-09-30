@@ -401,7 +401,7 @@ export const MISSION_TUNING = Object.freeze({
   cartRideMaxS: 60,
   // 车真的离开装载位这么远才记 zhouCartDeparted（与 boardingWitnessM 同一把尺）。
   cartDepartedM: 6,
-  // —— 18 铁路桥。尾队沿 bridgeCrossing 过桥的人数与步速（走路 walkSpeedMps 1.7 略慢）。
+  // —— 18 浮桥。尾队沿 bridgeCrossing 过桥的人数与步速（走路 walkSpeedMps 1.7 略慢）。
   bridgeColumnCount: 6,
   bridgeColumnSpeedMps: 1.9,
   bridgeColumnSpacingM: 3.4,

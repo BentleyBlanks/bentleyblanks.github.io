@@ -145,10 +145,10 @@ try {
   }
   assert.ok(fired, "等不到 bridgeDestroyed");
   await Timing("blast+0.2s", 12);
-  await Shot("08_BlastMoment", { x: A.railBridge.x, z: 142, height: 2.5 }, "stand");
+  await Shot("08_BlastMoment", { x: A.railBridge.x, z: A.railBridge.z, height: 1.5 }, "stand");
   await Step(3);
   await Timing("blast+3s", 12);
-  await Shot("09_Blast3s", { x: A.railBridge.x, z: 142, height: 2.5 }, "stand");
+  await Shot("09_Blast3s", { x: A.railBridge.x, z: A.railBridge.z, height: 1.5 }, "stand");
   await Step(12);
   s = await State(); notes.blast = s.fb && { blast: s.fb.blast, blastKilled: s.fb.blastKilled, alive: s.fb.alive, bank: s.fb.bank, shells: s.fb.shells, mg: s.fb.mg };
   console.log("BLAST", JSON.stringify(notes.blast), "stage", s.stage, "hp", s.hp);

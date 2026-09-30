@@ -87,8 +87,8 @@ export const MISSION_NORTH_RIVER = Object.freeze({
   // 起伏与过渡权重相乘：过渡带里起伏随权重一起收回原断面。
   reaches: Object.freeze([
     Object.freeze({ id: "RailBridgeReach", x0: -140, x1: -30, blendWestM: 65, blendEastM: 60,
-      depth: 6, crestZ: 90, floorZ: 94.5, dropZ: 153.7, waterZ: 156.3, waterCut: 3, shoreZ: 166,
-      waterRel: -3,
+      depth: 6, crestZ: 90, floorZ: 94.5, dropZ: 151, waterZ: 156.3, waterCut: 1.35, shoreZ: 168,
+      waterRel: -1,
       wander: Object.freeze({ fixed: Object.freeze([-95, -60]), rampM: 30,
         north: Object.freeze({ ampM: 4.5, waves: Object.freeze([[110, 0.5, 2.43], [63, 0.3, 5.97], [41, 0.2, 4.4]]) }),
         south: Object.freeze({ ampM: 3.5, waves: Object.freeze([[95, 0.5, 4.55], [57, 0.3, 5.0], [43, 0.2, 3.1]]) }) }) }),
@@ -99,7 +99,7 @@ export const MISSION_NORTH_RIVER = Object.freeze({
     // 整深 4.2 的正槽。
     Object.freeze({ id: "WestDitchFord", x: 47, halfW: 13 }),
     Object.freeze({ id: "TemporaryBridge", x: 76, halfW: 5 }),
-    Object.freeze({ id: "RailBridge", x: -77, halfW: 4 }),
+    Object.freeze({ id: "PontoonBridge", x: -77, halfW: 4 }),
   ]),
 });
 
@@ -156,6 +156,18 @@ export function RiverReachAt(x, river = MISSION_NORTH_RIVER) {
       shoreZ: mix(south + base.bankRun, reach.shoreZ + off.south), waterRel: mix(-(base.depth - 1.2), reach.waterRel) };
   }
   return null;
+}
+/**
+ * 拓宽河段两岸烂泥滩的权重 0…1（只用来给地表着色 / 出图层，不碰高度）：南岸 = 水线（waterZ）往南到 shoreZ 再往南 5 m 淡出的那一片，
+ * 北岸 = 岸沿以北 6 m 淡入到河口。2026-09-30 浮桥取代铁路桥：南岸不再是白沙滩，是被水泡烂的泥滩（概念 18_1 / 18_2）。
+ * 拓宽段外（含过渡带外沿）是 0；过渡带里随拓宽权重淡出。
+ */
+export function RiverMudAt(x, z, river = MISSION_NORTH_RIVER) {
+  const reach = RiverReachAt(x, river);
+  if (!reach) return 0;
+  const north = z < reach.floorZ ? 1 - SmoothStep((reach.crestZ - z) / 6) : 0;
+  const south = z > reach.dropZ ? SmoothStep((z - (reach.waterZ - 1.5)) / 2) * (1 - SmoothStep((z - (reach.shoreZ - 2)) / 7)) : 0;
+  return Math.max(north, south) * reach.w;
 }
 /** 拓宽断面在 z 处的下切深度（RiverReachAt 的返回值）。 */
 export function RiverReachCutAt(section, z) {
@@ -216,7 +228,44 @@ export const MISSION_SOUTH_BRIDGE = Object.freeze({
 });
 
 /**
- * 北沙河铁路桥（18）。桥台/桥面/桁架全是白盒体块；桥面进 walkableSurfaces。
+ * 北沙河浮桥（18，2026-09-30 用户拍板：浮桥取代铁路桥，docs/Data_PontoonBridge.md）。
+ * 一串 21 条平底木船（长 6.6、宽 1.9，船身沿 x、间距 3 m 沿 z 并排拴住）、船上纵梁 + 横铺木板的桥面（宽 2.8、
+ * 顶比水面高 0.5 m），两岸各一段短木栈（南岸 z 162.6 起搭在烂泥滩上，北岸到 z 88.2）。桥轴仍是 x = −77。
+ * 水面在南岸自然地面下 1 m（RailBridgeReach.waterRel −1），所以 deckTopY = 水面顶 + 0.5 = −0.97 + 0.5 ≈ −0.47。
+ *
+ * 要炸的是**中段偏南**的 5 条船（船 5…9，z 140…128），两侧各两条（船 3、4 与 10、11）被冲击波掀得倾斜下沉：
+ * 被炸段 = 船 3…11 之上的桥面，z 147.5…120.5（长 27 m，中心 z 134 = `z`，即锚点 railBridge）。它的桥面碰撞块
+ * `PontoonBridgeDeck` 是 gate（signal），起爆后与桥面可走面一起撤掉；南截（z 162.6…147.5，船 0…2 加南栈）与
+ * 北截（z 120.5…89.5，船 12…20 加北栈）是永久体块，起爆后仍拴在各自那一岸、桥面断开（北截可以向下游摆几米，只是外观）。
+ * 信号名沿用 `RailBridgeDestroyed`（Gates / 测试 / 存档一大片都认它，不改名）；被炸段的桥面 gate 碰撞盒 id 是 `PontoonBridgeDeck`。
+ */
+export const MISSION_PONTOON_BRIDGE = Object.freeze({
+  x: -77, z: 134,           // 被炸段的中心（锚点 railBridge 的键名沿用）
+  deckHalfD: 13.5,          // 被炸段 z 120.5..147.5
+  deckW: 2.8, deckTopY: -0.47, deckH: 0.25,
+  signal: "RailBridgeDestroyed",
+  // 船：第 i 条（0 号最南）中心 z = firstZ − i·pitchZ；船身长 length 沿 x（以桥轴为中心）、宽 beam 沿 z。
+  boats: Object.freeze({ count: 21, firstZ: 155, pitchZ: 3, length: 6.6, beam: 1.9,
+    blasted: Object.freeze([5, 9]), sinking: Object.freeze([3, 4, 10, 11]) }),
+  // 桥面分段（从南到北）：z0 是南端、z1 是北端。SpanBlast 是要炸的那一段。
+  spans: Object.freeze([
+    Object.freeze({ id: "SpanSouth", z0: 162.6, z1: 147.5 }),
+    Object.freeze({ id: "SpanBlast", z0: 147.5, z1: 120.5, blasted: true }),
+    Object.freeze({ id: "SpanNorth", z0: 120.5, z1: 88.2 }),
+  ]),
+  // 起爆：药包在被炸段中间 5 条船上。安全区 blastSafe 离这个中心 ≥ 40 m。
+  blast: Object.freeze({ spanId: "SpanBlast", centerZ: 134 }),
+  // 铁路（MISSION_RAILWAY）在这两处收尾：北段停在 z 66（离北水线 25 m），南段从 z 184 起（离南水线 28 m）。
+  // 之间不铺道砟 / 枕木 / 钢轨（原来伸进河里的那段铁路已经不存在）。
+  railGapZ: Object.freeze([66, 184]),
+});
+/** 两岸桥头：桥面木栈与岸相接的位置（z）。 */
+export const PONTOON_HEADS = Object.freeze({ south: 162.6, north: 88.2 });
+
+/**
+ * （退役）北沙河钢桁架铁路桥（2026-09-28…09-30，docs/Data_RailBridge.md）。18 已经不用它：浮桥取代（用户 2026-09-30）。
+ * 这份常量只留给 Model_RailBridge 的模型自检（Script_RailBridgeTest）与它的地形导出 / Blender 脚本，游戏里没有任何东西读它。
+ * 桥台/桥面/桁架全是白盒体块；桥面进 walkableSurfaces。
  * 道砟与轨在 `gapZ` 之间断开（弧长由 Data_FirstLevelMissionLayout 换算），桥面上另摆
  * 直轨 —— 不断开的话轨顶跟着 crown 一路栽进河槽里（crown 被 clampHi 钉在本地地面 +0.18）。
  * 完好件用 `signal:"RailBridgeDestroyed"`（信号到了就消失，桥面同时退出可走面），
@@ -230,7 +279,7 @@ export const MISSION_SOUTH_BRIDGE = Object.freeze({
  * `RailBridgeDeck` / 两根桁架碰撞 / 两根桥面直轨（都带 signal）就是这一孔。另两孔、南引桥段、
  * 三个桥墩是永久体块（`spans` / `piers` / `approachSouth` 描述它们）。
  */
-export const MISSION_RAIL_BRIDGE = Object.freeze({
+export const MISSION_RAIL_BRIDGE_LEGACY = Object.freeze({
   x: -77, z: 148,           // 被炸那一孔（SpanSouth）的中心
   deckHalfD: 12,            // 这一孔 z 136..160
   deckW: 5.4, deckTopY: 1.5, deckH: 0.55,      // 2026-09-30 R1c 抬高：桥面顶 0.66 → 1.5（南堤顶 1.4+0.1 齐平，水面 −3 在下方 4.5 m）
@@ -296,16 +345,13 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   cartBoard: {x:85.6,z:113}, cartHalt: {x:76,z:135}, transferWall: {x:75.7,z:86.0}, sideAlley: {x:96.2,z:61},
   // D 桥南：靠院墙夹道两端、接收院院门
   wallPathStart: {x:56,z:207}, wallPathEnd: {x:16,z:220}, receptionGate: {x:2,z:240},
-  // 18 北沙河铁路桥：桥心、两端、南岸射位、北岸土坎、爆破安全区、淡出前的行军终点
-  // 2026-09-30 河拓宽：railBridge = 被炸那一孔的中心（1 号墩↔2 号墩，z 148）；北桥头挪到新北岸（桥台 z 88 后），
-  // 南桥头不动。北岸整体北移 50 m（土坎、出生点、战术点同量平移）；机枪位 bridgeEnemy 挪到桥轴西侧 x -84.5：
-  // 南岸射位到它的连线整段在西桁架 (x -79.95) 以西，不被三孔桥的桁架挡住。
-  // 2026-09-30 R1c：桥面抬到 1.5、水面压到 −3 之后，旧射位 (-81,179.4)（地面 0.7，在缺口路堤的侧坡上）站着只能看见路堤；
-  // 挪到南堤西段堤顶 (-97,173.5)（地面 1.5）：站在堤沿往下看西侧沙滩上的爆破手、1 号墩脚、水面与整座桥 —— 概念 18_3 的构图
-  //（镜头在桥西、桥在右手边，爆破手蹲在左前方沙滩上）。爆破手（MISSION_PLACEMENT.bridge.demolition）相应落在 1 号墩西侧沙滩上。
-  // 不放桥台旁的缺口 / 东段：缺口堤顶到 1 号墩之间隔着 1.2 m 的路堤脊与南引桥料石实体；东段射位到机枪 bridgeEnemy（桥轴西侧）的连线要穿桁架。
-  railBridge: {x:-77,z:148}, bridgeNorthEnd: {x:-77,z:86}, bridgeSouthEnd: {x:-77,z:170},
-  bridgeCover: {x:-97,z:173.5}, bridgeEnemy: {x:-84.5,z:80.5}, blastSafe: {x:-66,z:201},
+  // 18 北沙河浮桥：被炸段中心、两端桥头、南岸射位、北岸土坎、爆破安全区、淡出前的行军终点
+  // 2026-09-30 浮桥取代铁路桥（docs/Data_PontoonBridge.md）：railBridge（键名沿用）= 被炸段（中间 5 条船 + 两侧各 2 条）的中心 z 134；
+  // bridgeNorthEnd / bridgeSouthEnd = 两岸木栈与岸相接处（北栈终点 z 88.2 往桥上取 90，南栈起点 z 162.6 往岸上 2.4 m 取 165：站得住的点）。机枪位 bridgeEnemy 在桥轴西侧 x −84.5。
+  // 射位 bridgeCover (−89.6,173.8)：南岸烂泥滩后缘那道不规则的烂泥垄（BridgeMudRidge*，高 0.7–1.2 m）之后，蹲下被垄挡住、站起越过它看整座浮桥
+  //（概念 18_2）；离南桥头 (−77,162.6) 16.9 m（10–20 m）、离被炸段中心 42 m（起爆前玩家还要退到 blastSafe，离中心 76 m，见 docs §5）。
+  railBridge: {x:-77,z:134}, bridgeNorthEnd: {x:-77,z:90}, bridgeSouthEnd: {x:-77,z:165},
+  bridgeCover: {x:-89.6,z:173.8}, bridgeEnemy: {x:-84.5,z:80.5}, blastSafe: {x:-66,z:201},
   // 2026-09-30 对岸大部队（docs/Data_FirstLevelBridgeFarBank.md §5）：撤离路线从 (−62,232) 再往南延到 (−98,295)，
   // 翻过 z≈276 的缓坡土岗（Data_FirstLevelWhiteboxTerrainRear 的 RetreatRise）、离北岸 208 m、对岸看不见才黑屏。
   marchOut: {x:-98,z:295},
@@ -368,13 +414,13 @@ export const MISSION_STAGE_ROUTES = Object.freeze({
   // 15B：靠院墙夹道（向西一段 → 左拐 → 向南一段），与撤离线同一条走廊
   wallPath: [S.wallPathStart,{x:36,z:211},{x:16,z:211},S.wallPathEnd,
     {x:12,z:230},{x:6,z:237},S.receptionGate],
-  // 18：接收处 → 爆破安全区 → 南岸射位
+  // 18：接收处 → 爆破安全区 → 南岸射位（烂泥垄后）
   toBridge: [{x:-41,z:244},{x:-49,z:236},{x:-58,z:222},{x:-66,z:210},S.blastSafe,
-    {x:-74,z:199},{x:-78,z:190},{x:-90,z:182},S.bridgeCover],
-  // 回援尾队：北岸 → 桥面 → 南岸 → 继续南下
+    {x:-74,z:199},{x:-78,z:190},{x:-90,z:183},S.bridgeCover],
+  // 回援尾队：北岸 → 浮桥桥面 → 南岸 → 继续南下
   bridgeCrossing: [{x:-77,z:70},S.bridgeNorthEnd,S.bridgeSouthEnd,{x:-76,z:182},
     {x:-72,z:192},{x:-62,z:232}],
-  bridgeWithdraw: [S.bridgeCover,{x:-90,z:182},{x:-78,z:188},{x:-72,z:197},S.blastSafe],
+  bridgeWithdraw: [S.bridgeCover,{x:-90,z:183},{x:-78,z:188},{x:-72,z:197},S.blastSafe],
   // blastSafe → 原行军线 (−62,232) → 加长的南段：(−62,250) → (−68,268) → 土岗（z≈276）→ (−80,284) → 终点。
   marchOut: [S.blastSafe,{x:-64,z:216},{x:-62,z:232},{x:-62,z:250},{x:-68,z:268},{x:-80,z:284},S.marchOut],
   nightMarch: [S.nightSpawn,S.northGateApproach,S.northGate,S.gateInside],

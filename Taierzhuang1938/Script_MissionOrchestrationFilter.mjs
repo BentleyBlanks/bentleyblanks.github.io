@@ -72,7 +72,7 @@ export const ROUTE_LABELS = Object.freeze({
   courtyardBypass: "穿灶屋绕过主街障碍",
   cartRide: "老周那辆车走的路",
   wallPath: "靠院墙的小路",
-  toBridge: "去铁路桥南岸的路",
+  toBridge: "去浮桥南岸的路",
   bridgeCrossing: "回援尾队过桥的路",
   bridgeWithdraw: "撤出爆破区的路",
   marchOut: "炸桥后往滕县的行军路",

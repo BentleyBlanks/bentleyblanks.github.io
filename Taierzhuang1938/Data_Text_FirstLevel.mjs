@@ -1,6 +1,6 @@
 // Interaction strings for the September first-level replacement.
 // 2026.09.19 重构（docs/Data_FirstLevelRebuild20260919Contract.md）：军列开场的文案下线，
-// 新增掩蔽部、后交通壕、牛车、院墙夹道、接收院门与铁路桥几段。
+// 新增掩蔽部、后交通壕、牛车、院墙夹道、接收院门与浮桥几段。
 export const TEXT = Object.freeze({
   "firstLevel.guide.front": "掩护守军通过撤退缺口",
   "firstLevel.guide.tank": "右前方道路上的战车",
@@ -65,7 +65,7 @@ export const TEXT = Object.freeze({
   "firstLevel.guide.wallPath": "院墙夹道",
   "firstLevel.guide.receptionGate": "接收院院门",
   "firstLevel.guide.place": "军医接收位置",
-  "firstLevel.guide.bridge": "铁路桥南岸射位",
+  "firstLevel.guide.bridge": "浮桥南岸射位",
   "firstLevel.guide.withdraw": "爆破安全区",
   "firstLevel.guide.northGate": "滕城北门",
   "firstLevel.hint.guards": "压住火力，让眼前这组守军撤回，随后掩护下一组",

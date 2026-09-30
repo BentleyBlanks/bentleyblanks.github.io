@@ -1,5 +1,12 @@
 # 北沙河铁路桥：模型与 18「奉令毁桥」（2026-09-28）
 
+> **2026-09-30 起 18 改用浮桥，本模型退出 18，文件保留**（用户拍板：浮桥取代铁路桥，回援尾队走浮桥、奉令炸的也是浮桥）。
+> 新口径见 [Data_PontoonBridge.md](Data_PontoonBridge.md)。`Model/Model_RailBridge.glb`、`Model/Data_RailBridge.json`、`_blender/Script_BuildRailBridge.py`、
+> `Script_RailBridgeSet.mjs`、`Data_RailBridgeDemolition.mjs`、`Script_RailBridgeShots.mjs` 都不删，只是关卡不再实例化它（`MISSION_RAIL_BRIDGE` 改名 `MISSION_RAIL_BRIDGE_LEGACY`，游戏里没有任何东西读它）；
+> `Script_RailBridgeTest` 退役为「模型自检」（不再挂 firstLevel / firstLevelTail 域，不再对着游戏现在的布局 / 地形 / 数值表，快照 sha 对的是冻结的 `_blender/Data_RailBridgeTerrain.json`）；
+> `_blender/Script_ExportRailBridgeTerrain.mjs` 没有 `RAIL_BRIDGE_ALLOW_EXPORT=1` 不让跑（游戏地形已经换成浮桥版，再跑会覆盖冻结的旧快照）。
+> 下文是钢桥时代的历史口径，**不再描述游戏里的样子**。
+
 用户要求：把最后那座桥的模型（BlenderMCP）和炸桥场面做得宏大一点。
 本文件是这座桥**模型、坍塌动画与起爆演出**的唯一口径；18 的编排（等人走净、尾队、夜行军）仍以
 [15–18 口径](Data_FirstLevelEnd20260919.md) 为准，共用爆炸感知规则见 [通用近爆反馈](Data_BlastFeedback.md)。

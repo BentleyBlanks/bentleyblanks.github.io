@@ -1,6 +1,9 @@
 // ===========================================================================
 // Script_ExportRailBridgeTerrain.mjs —— 给 Script_BuildRailBridge.py 喂地形与桥位
 //
+// **退役（2026-09-30）**：18 改用浮桥（Script_ExportPontoonBridgeTerrain.mjs、docs/Data_PontoonBridge.md），钢桁架铁路桥退出关卡。
+// 游戏地形已经换成浮桥版（水面、南岸泥滩、去掉了路堤），这份导出器再跑会拿现在的地形覆盖冻结的旧快照
+// （Data_RailBridgeTerrain.json，退役的 Script_RailBridgeTest 对着它的 sha256 验模型），所以没有 RAIL_BRIDGE_ALLOW_EXPORT=1 不让跑。
 // 北沙河铁路桥的模型与坍塌动画在 Blender 里建（docs/Data_RailBridge.md）。
 // 坍塌时桥身、碎块要落在**游戏里真实的河槽与岸坡**上，Blender 读不到 JS 地形，
 // 所以这里把桥附近一片高度场按桥的局部坐标采出来（原点 = MISSION_RAIL_BRIDGE 的
@@ -15,10 +18,14 @@
 // ===========================================================================
 import fs from "node:fs";
 import { SampleMissionTerrain, SampleMissionNaturalHeight } from "../Data_FirstLevelMissionTerrain.mjs";
-import { MISSION_RAIL_BRIDGE, MISSION_NORTH_RIVER, MISSION_STAGE_ANCHORS, RiverWaterAt } from "../Data_FirstLevelMissionTopology.mjs";
+import { MISSION_RAIL_BRIDGE_LEGACY as MISSION_RAIL_BRIDGE, MISSION_NORTH_RIVER, MISSION_STAGE_ANCHORS, RiverWaterAt } from "../Data_FirstLevelMissionTopology.mjs";
 import { MISSION_PLACEMENT } from "../Data_FirstLevelMissionLayout.mjs";
 import { END_TUNING as E } from "../Data_Tuning_FirstLevelEnd.mjs";
 
+if (process.env.RAIL_BRIDGE_ALLOW_EXPORT !== "1") {
+  console.error("Script_ExportRailBridgeTerrain is retired (the pontoon bridge replaced the rail bridge); set RAIL_BRIDGE_ALLOW_EXPORT=1 to overwrite the frozen snapshot anyway.");
+  process.exit(1);
+}
 const B = MISSION_RAIL_BRIDGE;
 const GRID = { x0: -40, x1: 40, z0: -80, z1: 40, step: 1 };
 const heights = [];

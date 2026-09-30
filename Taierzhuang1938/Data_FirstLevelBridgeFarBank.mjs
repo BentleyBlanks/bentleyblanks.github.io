@@ -16,8 +16,11 @@
 // 摆位一律写成「离北岸岸沿往北 back 米」，岸沿 z 由 RiverReachAt 取（河拓宽后是 z 90）：
 // R1a 若再挪北岸，这里跟着走。x 范围留给对岸的是 −100…−40（R1a 的北岸西侧村子在 x −140…−100）。
 // 桥轴 x −77 一带 ±6 m 留空：尾队沿 bridgeCrossing 过来，冲桥组也走这条道。
+// 2026-09-30 R3 浮桥取代铁路桥：桥面只有 2.8 m 宽（x ±1.4），冲桥组 / 桥头人堆 / 前锋的两列车道从 ±1.75 收到 ±0.65；
+// 桥面在被炸段（z 120.5…147.5，船 3…11）之上：冲桥组冲到它的北半（z 123…129），桥头人堆在被炸段以北的北截上（z 112…119，起爆杀伤圈之外）；
+// 浮桥载不了战车，原来开上桥面的那辆改成停在北岸浮桥头西侧、土坎以北的一辆普通车（起爆后仍停在那儿，炮口对着南岸）。
 // ===========================================================================
-import { MISSION_NORTH_RIVER, MISSION_RAIL_BRIDGE, MISSION_STAGE_ANCHORS as S, RiverReachAt, RiverWaterAt } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_NORTH_RIVER, MISSION_PONTOON_BRIDGE, MISSION_STAGE_ANCHORS as S, RiverReachAt, RiverWaterAt } from "./Data_FirstLevelMissionTopology.mjs";
 
 const freeze = Object.freeze;
 
@@ -82,28 +85,28 @@ export const FAR_BANK_STANDBY = freeze([
 // 前锋（2）：bridgeFireBroken 之后（尾队正在过桥）岸线上靠桥轴的两个人（from = 岸线第一拨的 id）冲上桥北段，
 // 趴在北桥台后一小段甲板上朝尾队开火；尾队过完桥（rearColumnCrossed）就退回岸边。
 export const FAR_BANK_VANGUARD = freeze([
-  freeze({ from: "FarBankShoreA4", post: freeze({ x: -78.75, z: 99 }) }),
-  freeze({ from: "FarBankShoreA5", post: freeze({ x: -75.25, z: 103.5 }) }),
+  freeze({ from: "FarBankShoreA4", post: freeze({ x: -77.65, z: 99 }) }),
+  freeze({ from: "FarBankShoreA5", post: freeze({ x: -76.35, z: 103.5 }) }),
 ]);
-// 冲桥组（6）：BridgeWithdraw 起，靠桥轴的六个待命兵（assign 是待命兵下标）rushDelayS 后沿桥轴冲到被炸那一孔的
-// 北半（z 136…148，2 号墩 z 136 以南几米）趴下开火。起爆前必须到位（运行时 ReadyForBlast 拦着起爆器），
-// 起爆时被炸死抛起。两列各三人，前后错开；桁架内净宽 5.4 m，两列各占一侧。
+// 冲桥组（6）：BridgeWithdraw 起，靠桥轴的六个待命兵（assign 是待命兵下标）rushDelayS 后沿桥轴冲到被炸段
+// （z 120.5…147.5，中心 134）的北半趴下开火。起爆前必须到位（运行时 ReadyForBlast 拦着起爆器），
+// 起爆时被炸死抛起。两列各三人，前后错开；桥面 2.8 m 宽，两列各占一侧（±0.65）。
 export const FAR_BANK_RUSH = freeze({
   assign: freeze([0, 1, 2, 3, 4, 5]),
-  lanes: freeze([-78.75, -75.25]),
-  // 每一对的终点 z（被炸孔 z 136…160，中心 148；北半 136…148）：离起爆中心 4–9 m。
-  endZ: freeze([143.6, 141.4, 139.2]),
-  // 上桥前的集结点：北桥台外沿（桥台中心 z 88，岸沿 z 90）。
-  deckStartZ: 86,
+  lanes: freeze([-77.65, -76.35]),
+  // 每一对的终点 z（被炸段 z 120.5…147.5，中心 134；北半 120.5…134）：离起爆中心 5.6–9.6 m。
+  endZ: freeze([124.4, 126.4, 128.4]),
+  // 上桥前的集结点：北栈终点（浮桥北头 z 88.2，岸沿 z 90）以北一点。
+  deckStartZ: 86.5,
 });
-// 桥头人堆（8）：冲桥组上桥之后，第二拨的六个补拨兵与两个深处的待命兵（from = 名册 id）也涌上桥面北两孔，
-// 单膝跪在桥面上朝南开火（离玩家 50–90 m，比岸线上的人近一大截，挤在钢桁架里读得出「一大群」）。z 都在起爆杀伤圈
-// （离中心 13 m，z ≥ 135）之外：起爆时趴下，然后退回岸边。列：−78.4 / −75.6（与冲桥组同一对车道），每两人一排。
+// 桥头人堆（8）：冲桥组上桥之后，第二拨的六个补拨兵与两个深处的待命兵（from = 名册 id）也涌上桥面北截，
+// 单膝跪在桥面上朝南开火（离玩家 60–90 m，比岸线上的人近一大截，挤在窄桥面上读得出「一大群」）。z 都在起爆杀伤圈
+// （离中心 13 m，z ≤ 121）之外：起爆时趴下，然后退回岸边。列：−77.65 / −76.35（与冲桥组同一对车道），每两人一排。
 export const FAR_BANK_CROWD = freeze([
-  freeze({ from: "FarBankShoreB0", lane: -78.75, z: 132 }), freeze({ from: "FarBankShoreB1", lane: -75.25, z: 132 }),
-  freeze({ from: "FarBankShoreB2", lane: -78.75, z: 128 }), freeze({ from: "FarBankShoreB3", lane: -75.25, z: 128 }),
-  freeze({ from: "FarBankShoreB4", lane: -78.75, z: 124 }), freeze({ from: "FarBankShoreB5", lane: -75.25, z: 124 }),
-  freeze({ from: "FarBankStandby6", lane: -78.75, z: 120 }), freeze({ from: "FarBankStandby7", lane: -75.25, z: 120 }),
+  freeze({ from: "FarBankShoreB0", lane: -77.65, z: 118.8 }), freeze({ from: "FarBankShoreB1", lane: -76.35, z: 118.8 }),
+  freeze({ from: "FarBankShoreB2", lane: -77.65, z: 116.6 }), freeze({ from: "FarBankShoreB3", lane: -76.35, z: 116.6 }),
+  freeze({ from: "FarBankShoreB4", lane: -77.65, z: 114.4 }), freeze({ from: "FarBankShoreB5", lane: -76.35, z: 114.4 }),
+  freeze({ from: "FarBankStandby6", lane: -77.65, z: 112.2 }), freeze({ from: "FarBankStandby7", lane: -76.35, z: 112.2 }),
 ]);
 /** 第 i 个冲桥兵的列与终点 z。 */
 export const FarBankRushSlot = (i) => freeze({ lane: FAR_BANK_RUSH.lanes[i % 2], endZ: FAR_BANK_RUSH.endZ[Math.floor(i / 2)] });
@@ -120,11 +123,11 @@ export const FAR_BANK_FIRE_POINTS = freeze({
   // 堤顶与堤后田地（z 168–176），离射位 ≥ 12 m
   dikeW0: FP(-118, 171.5, 0.6, 2.4), dikeW1: FP(-124, 172, 0.6, 2.2),
   dikeE0: FP(-56, 173.5, 0.6, 2.2), dikeE1: FP(-46, 171.5, 0.6, 2.4),
-  // 桥面北段与桥墩（z 100–130）：打的是过桥的尾队与桥上的钢桁架（surface 是金属/木，会迸火星）
-  deckN0: FP(-77, 102, 1.0, 1.2), deckN1: FP(-77, 114, 1.0, 1.2), deckN2: FP(-77, 126, 1.0, 1.4),
-  pier2: FP(-77, 134, 0.8, 1.2),
-  // 桥轴南端（1 号墩 z 160 与沙滩交接处）：冲桥组趴在被炸孔北半，顺桥轴往南打的点（桁架只留桥轴这条缝）
-  axisS: FP(-74, 162.5, 0.4, 1.6), axisS2: FP(-72, 161.5, 0.4, 1.6),
+  // 桥面北段与被炸段中心（z 100–134）：打的是过桥的尾队与浮桥的木板 / 船帮（surface 是木，会迸木屑）
+  deckN0: FP(-77, 102, -0.3, 1.2), deckN1: FP(-77, 114, -0.3, 1.2), deckN2: FP(-77, 126, -0.3, 1.2),
+  pier2: FP(-77, 134, -0.4, 1.2),
+  // 桥轴南截（船 0…2 之上，z 147.5…155）：冲桥组趴在被炸段北半，顺桥轴往南打的点（离桥头爆破手 ≥ 12 m）
+  axisS: FP(-76, 152, 0.6, 1.6), axisS2: FP(-78, 148.6, 0.6, 1.6),
   // 河对岸的两片田（离玩家 ≥ 30 m 的空地，做「乱打」的远背景）
   fieldW: FP(-124, 184, 0.4, 4.0), fieldE: FP(-36, 186, 0.4, 4.0),
 });
@@ -160,11 +163,13 @@ export const FAR_BANK_FIRE_LISTS = freeze({
 //   都从桥轴路堤（startX −77）出发，经 via 一个点（−77, 60 / 53.4）再斜 / 横着开到停位：一路只越过坡地东端那道 ≤ 1.6 m 的缓坡，
 //   避开 x −86 的电线杆（z 40、68）。
 export const FAR_BANK_TANKS = freeze([
-  freeze({ id: "FarBankTankBridge", kind: "bridge", x: -82.5, startX: -82.5, backM: 22, pushBackM: 22, enter: "BridgeCover", delayKey: 0,
-    via: freeze([]), deckX: -77, deckPostZ: 122, blastPostZ: 128.5, axisFire: true }),
-  freeze({ id: "FarBankTankTerraceLow", x: -108, z: 66.8, pushZ: 70.4, startX: -77, enter: "BridgeCover", delayKey: 1, viaAbs: true,
+  // R3：浮桥载不了战车 —— 这辆不再开上桥面，停在北岸浮桥头东侧、东土坎（x −72…−60，z 82.2）以北的平地上（那一带是 MISSION_TERRAIN 的
+  // 场坪 pad (−71,74)，地面平），炮口朝南；起爆之后仍停在那儿。离桥轴 11 m，不挡尾队过桥。和台地上的两辆一样走绝对 z（z / pushZ / viaAbs）。
+  freeze({ id: "FarBankTankBridge", kind: "bank", x: -66, z: 73.5, pushZ: 76.5, startX: -77, enter: "BridgeCover", delayKey: 0, viaAbs: true,
+    via: freeze([freeze([-77, 62]), freeze([-66, 64.5])]) }),
+  freeze({ id: "FarBankTankTerraceLow", kind: "terrace", x: -108, z: 66.8, pushZ: 70.4, startX: -77, enter: "BridgeCover", delayKey: 1, viaAbs: true,
     via: freeze([freeze([-77, 60])]) }),
-  freeze({ id: "FarBankTankTerraceHigh", x: -127, z: 53.4, pushZ: 56.6, startX: -77, enter: "BridgeCover", delayKey: 2, viaAbs: true,
+  freeze({ id: "FarBankTankTerraceHigh", kind: "terrace", x: -127, z: 53.4, pushZ: 56.6, startX: -77, enter: "BridgeCover", delayKey: 2, viaAbs: true,
     via: freeze([freeze([-77, 62]), freeze([-127, 62])]) }),
 ]);
 /** 战车的停位 z / 下压后的 z / 途经点 z：台地上的车用绝对 z，其余仍是「离岸沿往北 back 米」。 */
@@ -193,14 +198,14 @@ export const FAR_BANK_REINFORCE = freeze({
 /** 撤离走廊：黑屏条件与炮击落点的「路线」都用这一串（玩家要走的路：toBridge / bridgeWithdraw / marchOut）。 */
 export const FAR_BANK_PLAYER_ROUTE_KEYS = freeze(["toBridge", "bridgeWithdraw", "marchOut"]);
 
-/** 桥的被炸孔中心与冲桥终点的几何（起爆杀伤按这个算）。 */
+/** 浮桥被炸段的中心与冲桥终点的几何（起爆杀伤按这个算）。 */
 export const FAR_BANK_BLAST = freeze({
-  centre: freeze({ x: MISSION_RAIL_BRIDGE.x, z: MISSION_RAIL_BRIDGE.blast.centerZ }),
-  spanZ: freeze([MISSION_RAIL_BRIDGE.spans[0].z1, MISSION_RAIL_BRIDGE.spans[0].z0]),   // 136…160
-  bridgeAxisX: MISSION_RAIL_BRIDGE.x,
+  centre: freeze({ x: MISSION_PONTOON_BRIDGE.x, z: MISSION_PONTOON_BRIDGE.blast.centerZ }),
+  spanZ: freeze([MISSION_PONTOON_BRIDGE.spans[1].z1, MISSION_PONTOON_BRIDGE.spans[1].z0]),   // 120.5…147.5
+  bridgeAxisX: MISSION_PONTOON_BRIDGE.x,
   /** 桥断了之后对岸单位允许停的最南 z：岸沿以南 0.5 m 以内（站在岸边隔河射击）。 */
   bankStopSouthM: 0.5,
   /** 桥轴 x 上的南水线 z（RiverWaterAt.z1；活着的日军越过它 = 过了河）。 */
-  waterSouthZ: RiverWaterAt(MISSION_RAIL_BRIDGE.x, MISSION_NORTH_RIVER).z1,
+  waterSouthZ: RiverWaterAt(MISSION_PONTOON_BRIDGE.x, MISSION_NORTH_RIVER).z1,
   coverAnchor: freeze({ x: S.bridgeCover.x, z: S.bridgeCover.z }),
 });

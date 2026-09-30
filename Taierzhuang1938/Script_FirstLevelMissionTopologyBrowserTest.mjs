@@ -55,8 +55,8 @@ try{
  assert.deepEqual(frontReturn.map(r=>r.reverse).sort(),[false,true],
   '03/06 shared trench keeps explicit forward and reverse Rapier capsule coverage');
  // -------------------------------------------------------------------------
- // 2026-09-30 拓宽河段的岸：真 Rapier 胶囊从南岸沙滩往北走，被水线空气墙拦在沙滩上（下不了水）；
- // 从北岸岸沿往南走，被北岸空气墙拦在岸上；桥面与 1 号墩下面（|x−桥轴|<3.4 不摆墙）靠实体，同样走不进水。
+ // 2026-09-30 拓宽河段的岸：真 Rapier 胶囊从南岸烂泥滩往北走，被水线空气墙拦在泥滩上（下不了水）；
+ // 从北岸岸沿往南走，被北岸空气墙拦在岸上；浮桥两侧（|x−桥轴|<3.4 不摆墙）靠桥面两侧的绳栏空气墙，同样走不进水。
  // **陡坡本身拦不住真胶囊**（原 28 m 河槽的 63° 岸胶囊照样爬上去，实测见 docs §2）——所以靠墙，不靠坡度。
  // -------------------------------------------------------------------------
  const shore=await page.evaluate(async()=>{
@@ -69,7 +69,7 @@ try{
   };
   try{
    for(const x of [-150,-128,-104,-90,-60,-46,-30])rows.push({kind:'beachNorthbound',x,waterZ1:RiverWaterAt(x)?.z1??160.5,end:Walk({x,z:Math.max(165,(RiverReachAt(x)?.shoreZ??167)+1)},-1,900)});
-   for(const x of [-80.8,-73.4])rows.push({kind:'underBridgeNorthbound',x,waterZ1:RiverWaterAt(x).z1,end:Walk({x,z:165},-1,700)});
+   for(const x of [-80.8,-73.4,-78.9,-75.1])rows.push({kind:'underBridgeNorthbound',x,waterZ1:RiverWaterAt(x).z1,end:Walk({x,z:165},-1,700)});
    for(const x of [-150,-128,-104,-90,-60,-46,-30])rows.push({kind:'northBankSouthbound',x,crest:RiverReachAt(x)?.crestZ??138.8,end:Walk({x,z:Math.min(84,(RiverReachAt(x)?.crestZ??138.8)-6)},1,700)});
   }finally{body.Remove();}
   return rows;
@@ -86,9 +86,9 @@ try{
   const g=window.Tengxian,{Vector3}=await import('three');
   const {MISSION_LAYOUT}=await import('./Data_FirstLevelMissionLayout.mjs');
   const water=MISSION_LAYOUT.blocks.filter(b=>b.semantic==='water');
-  // 2026-09-30：河在铁路桥一带拓宽（R1c：水位在南岸自然地面下 3 m、河心水深 ~3 m），其余是槽底以上 1.0–1.4 m 的低水位。
-  // 两种断面各取一块实测：原断面取 x≈−185 那块，拓宽段取 x≈−104 那块（桥轴上量到的是桥面）。
-  const original=water.filter(b=>b.x<-170).sort((a,b)=>a.x-b.x)[0],widened=water.filter(b=>Math.abs(b.x+104)<3)[0];
+  // 2026-09-30：河在浮桥一带拓宽（R3：水位在南岸自然地面下 1 m、河心水深 ~5 m），其余是槽底以上 1.0–1.4 m 的低水位。
+  // 两种断面各取一块实测：原断面取 x≈+90 那块（R3 起河在 x −205…−140 的西端过渡里水位从 −3 抬到 −1，x<−170 那块已经不是原断面），拓宽段取 x≈−104 那块（桥轴上量到的是桥面）。
+  const original=water.filter(b=>b.x>90).sort((a,b)=>a.x-b.x)[0],widened=water.filter(b=>Math.abs(b.x+104)<3)[0];
   const sample=original;
   // 实机射线穿过水面那一层：碰不到任何实体（水没有碰撞，子弹也不停）。
   const through=g.battlefield.Raycast(new Vector3(sample.x,sample.y,sample.z-6),
@@ -108,14 +108,14 @@ try{
  assert.ok(river.waterTopY-river.floorY>=1&&river.waterTopY-river.floorY<=1.4,
   'the water stands 1.0-1.4 m over the channel floor, and the floor is still what you stand on: '
   +JSON.stringify({waterTopY:river.waterTopY,floorY:river.floorY}));
- assert.ok(river.wideTopY-river.wideFloorY>=2.5&&river.wideTopY-river.wideFloorY<=3.5,
-  'the widened reach is 2.5-3.5 m deep mid-river: '+JSON.stringify({wideTopY:river.wideTopY,wideFloorY:river.wideFloorY}));
+ assert.ok(river.wideTopY-river.wideFloorY>=4.5&&river.wideTopY-river.wideFloorY<=5.5,
+  'the widened reach is 4.5-5.5 m deep mid-river: '+JSON.stringify({wideTopY:river.wideTopY,wideFloorY:river.wideFloorY}));
  assert.equal(river.wideThrough,false,'a shot crosses the widened river surface without hitting anything');
  assert.equal(river.trainColliders,0,'no train or station collider survives in the live field');
  assert.ok(river.bounds.maxZ<=400&&river.bounds.minZ>=-245,
   'the live field uses the shrunken bounds: '+JSON.stringify(river.bounds));
  // -------------------------------------------------------------------------
- // 两座桥的四态：路桥炸前/炸后 × 铁路桥炸前/炸后
+ // 两座桥的四态：路桥炸前/炸后 × 浮桥炸前/炸后
  // -------------------------------------------------------------------------
  const bridges=await page.evaluate(async()=>{
   const g=window.Tengxian,{Vector3}=await import('three');
@@ -126,45 +126,50 @@ try{
   const Snapshot=()=>({
    road:Visible('TemporaryBridge'),roadWalkable:Walkable('TemporaryBridge'),
    roadWreck:Visible('MissionBridgeWreck'),
-   rail:Visible('RailBridgeDeck'),railWalkable:Walkable('RailBridgeDeck'),
-   railWreck:Visible('RailBridgeWreckSpan'),
-   railDeckY:+DeckTop(-77,153).toFixed(2),roadDeckY:+DeckTop(76,153).toFixed(2),
+   rail:Visible('PontoonBridgeDeck'),railWalkable:Walkable('PontoonBridgeDeck'),
+   railWreck:Visible('PontoonBridgeCutWallSouth'),
+   railDeckY:+DeckTop(-77,134).toFixed(2),roadDeckY:+DeckTop(76,153).toFixed(2),
   });
   const states=[];
   states.push({phase:'intact',...Snapshot()});
   g.battlefield.OpenGate('TemporaryBridge');g.battlefield.CloseGate('MissionBridgeWreck');
   g.physics.RefreshStaticQueries();
   states.push({phase:'roadDestroyed',...Snapshot()});
-  for(const id of ['RailBridgeDeck','RailBridgeTrussWest','RailBridgeTrussEast',
-   'RailBridgeRailWest','RailBridgeRailEast'])g.battlefield.OpenGate(id);
-  for(const id of ['RailBridgeWreckSpan','RailBridgeWreckTruss','RailBridgeWreckStub'])
-   g.battlefield.CloseGate(id);
+  for(const id of ['PontoonBridgeDeck','PontoonBridgeRailWest','PontoonBridgeRailEast'])g.battlefield.OpenGate(id);
+  for(const id of ['PontoonBridgeCutWallSouth','PontoonBridgeCutWallNorth'])g.battlefield.CloseGate(id);
   g.physics.RefreshStaticQueries();
   states.push({phase:'bothDestroyed',...Snapshot()});
-  // 炸后桥面那一格必须是河槽，不是隐形的空中走道。
-  const blocked=!!g.battlefield.Raycast(new Vector3(-77,1,132),new Vector3(0,0,1),12,{terrain:true});
-  for(const id of ['RailBridgeWreckSpan','RailBridgeWreckTruss','RailBridgeWreckStub'])
+  // 炸后被炸段那一格必须是河槽，不是隐形的空中走道：真 Rapier 胶囊从北截往南走、从南截往北走，都被断口拦住（不掉进河里、也过不去）。
+  const body=g.physics.MakeCharacter(),walk=(x,z,dir)=>{
+   body.Teleport(x,g.battlefield.GroundHeight(x,z)+.03,z);
+   for(let i=0;i<900;i++)body.Move(0,-.07,dir*.06);
+   return {z:+body.position.z.toFixed(2),y:+body.position.y.toFixed(2)};
+  };
+  const cutNorth=walk(-77,112,1),cutSouth=walk(-77,156,-1);
+  body.Remove();
+  const blocked=cutNorth.z<121&&cutNorth.z>117&&cutNorth.y>-1&&cutSouth.z>147&&cutSouth.z<151&&cutSouth.y>-1;
+  for(const id of ['PontoonBridgeCutWallSouth','PontoonBridgeCutWallNorth'])
    g.battlefield.OpenGate(id);
-  for(const id of ['RailBridgeDeck','RailBridgeTrussWest','RailBridgeTrussEast',
-   'RailBridgeRailWest','RailBridgeRailEast'])g.battlefield.CloseGate(id);
+  for(const id of ['PontoonBridgeDeck','PontoonBridgeRailWest','PontoonBridgeRailEast'])
+   g.battlefield.CloseGate(id);
   g.battlefield.CloseGate('TemporaryBridge');g.battlefield.OpenGate('MissionBridgeWreck');
   g.physics.RefreshStaticQueries();
   states.push({phase:'restored',...Snapshot()});
-  return {states,blocked};
+  return {states,blocked,cutNorth,cutSouth};
  });
  await fs.writeFile(path.join(out,'Data_BridgeStates.json'),JSON.stringify(bridges,null,2));
  const byPhase=Object.fromEntries(bridges.states.map(s=>[s.phase,s]));
  assert.equal(byPhase.intact.roadWalkable,true,'the road bridge carries the column before the air strike');
- assert.equal(byPhase.intact.railWalkable,true,'the rail bridge deck carries the rear column');
- assert.ok(byPhase.intact.railDeckY>0.4,'the intact rail deck stands above the channel floor');
+ assert.equal(byPhase.intact.railWalkable,true,'the pontoon deck carries the rear column');
+ assert.ok(byPhase.intact.railDeckY>-1,'the intact pontoon deck stands on the water, far above the channel floor');
  assert.equal(byPhase.roadDestroyed.roadWalkable,false,'the road deck leaves the walkable set');
  assert.equal(byPhase.roadDestroyed.roadWreck,true,'the road wreck appears in its place');
- assert.equal(byPhase.roadDestroyed.railWalkable,true,'the rail bridge is independent of the road bridge');
- assert.equal(byPhase.bothDestroyed.railWalkable,false,'the demolished rail bridge carries nobody');
- assert.equal(byPhase.bothDestroyed.railWreck,true,'the fallen span is visible in the channel');
+ assert.equal(byPhase.roadDestroyed.railWalkable,true,'the pontoon bridge is independent of the road bridge');
+ assert.equal(byPhase.bothDestroyed.railWalkable,false,'the demolished pontoon bridge carries nobody');
+ assert.equal(byPhase.bothDestroyed.railWreck,true,'the cut walls stand at both ends of the gap');
  assert.ok(byPhase.bothDestroyed.railDeckY<-2,
-  'the destroyed span leaves a 4 m channel, not an invisible walkway: '+byPhase.bothDestroyed.railDeckY);
- assert.equal(bridges.blocked,true,'the wreckage physically obstructs the old crossing');
+  'the destroyed section leaves the deep channel, not an invisible walkway: '+byPhase.bothDestroyed.railDeckY);
+ assert.equal(bridges.blocked,true,'the two stubs stop a walker at the cut: '+JSON.stringify({north:bridges.cutNorth,south:bridges.cutSouth}));
  const Without=({phase,...rest})=>rest;
  assert.deepEqual(Without(byPhase.restored),Without(byPhase.intact),
   'checkpoint replay restores both bridges exactly');
@@ -214,7 +219,7 @@ try{
   {id:'SideAlleyAndBays',eye:[118,34,140],target:[86,0,118]},
   {id:'TransferAndRiver',eye:[76,62,88],target:[76,0,150]},
   {id:'RiverRoadBridge',eye:[76,10,132],target:[76,-3,168]},
-  {id:'RailBridge',eye:[-40,40,196],target:[-77,0,152]},
+  {id:'PontoonBridge',eye:[-40,40,196],target:[-77,0,134]},
   {id:'WallPathAndReception',eye:[30,44,196],target:[4,0,236]},
  ]){
   await page.evaluate(async view=>{

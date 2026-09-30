@@ -114,7 +114,7 @@ export const testDefs = {
   FirstLevelMissionStageContinueTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps"],timeoutMs:1800000,desc:"Play forward from each of the 18 debug starts through the next stage"},
   // End 包（阶段 15–18）的两个分段起点：15 是降压三步 + 交接 + 死亡，18 是桥与夜入城。
   FirstLevelMissionStageRegroupTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps","--stage-from=15"],timeoutMs:900000,desc:"Targeted stage 15 continuation: regroup, carry hand-over, reception gate, handover and Zhou's death"},
-  FirstLevelMissionStageTailTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps","--stage-from=18"],timeoutMs:600000,desc:"Targeted stage 18 continuation: rail bridge, demolition and the night march into Tengxian"},
+  FirstLevelMissionStageTailTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps","--stage-from=18"],timeoutMs:600000,desc:"Targeted stage 18 continuation: pontoon bridge, demolition and the night march into Tengxian"},
   FirstLevelMissionPresentationTest: {file:"Script_FirstLevelMissionPresentationTest.mjs",timeoutMs:240000,desc:"Real stretcher grip, idle feet, ADS fire and mounted recoil"},
   FirstLevelMissionFortificationsTest: {file:"Script_FirstLevelMissionFortificationsTest.mjs",timeoutMs:600000,desc:"Loaded field defenses, route clearance and merged scene screenshots"},
   FirstLevelMachineGunTest: {file:"Script_FirstLevelMachineGunTest.mjs",timeoutMs:240000,desc:"Finite gun-stage enemies, live NPC movement/fire, casualty continuation and retry"},
@@ -150,7 +150,10 @@ export const testDefs = {
   TextGatherCheck: { file: "Script_TextGather.mjs", args: ["--check"], desc: "内容文本清单：id 全局唯一、无空文本、与运行时 Localize 同一口径（纯 Node，毫秒级）" },
   TextTest: { file: "Script_TextTest.mjs", desc: "文本数据驱动闸门：语言表键/占位符、T() 静态引用、闸门模块零中文字面量（纯 Node，毫秒级）" },
   MovementRangeTest: { file: "Script_MovementRangeTest.mjs", timeoutMs: 240000, desc: "操作白盒：实体标尺、真实跳跃跑跳、翻越边界、姿态通行与复位" },
-  RailBridgeTest: {file:"Script_RailBridgeTest.mjs",desc:"18 rail bridge: baked GLB/sidecar/terrain agreement, debris at rest, real GLB detonation timeline (spans move, cues, wreck merge, reset/restore), particle budget"},
+  PontoonBridgeTest: {file:"Script_PontoonBridgeTest.mjs",desc:"18 pontoon bridge (replaced the rail bridge 2026-09-30): baked GLB/sidecar/terrain agreement, boats/sinking/north-swing/debris at rest, real GLB detonation timeline (boats fly, neighbours sink, north section swings, cues, wreck merge, reset/restore), particle budget"},
+  // Retired from 18 on 2026-09-30 (the steel truss bridge is not in the level any more); kept only as a self-check of the standalone Model_RailBridge.glb and its sidecar
+  // (no game layout / terrain binding), so it is not in the firstLevel / firstLevelTail domains any more.
+  RailBridgeTest: {file:"Script_RailBridgeTest.mjs",desc:"(retired from 18) standalone Model_RailBridge.glb self-check: baked GLB/sidecar/snapshot agreement, debris at rest, real GLB detonation timeline, particle budget"},
   Type89DamageTest: {file:"Script_Type89DamageTest.mjs",desc:"Blender tank fracture geometry, both struck sides, terrain contact and smoke lifecycle"},
   FirstLevelTankProbeTest: {file:"Script_FirstLevelTankProbe.mjs",timeoutMs:1800000,desc:"第一关战车专项探针：03→06 真实输入开声音跑一趟，记露面/每发主炮预兆与落点/机枪点射/05 攻击路线威胁窗口/反应/毁伤序列/常驻循环数与电平，并摆位拍五张关键画面（人工审）"},
   FirstLevelTankBrainTest: {file:"Script_FirstLevelTankBrainTest.mjs",desc:"第一关战车纯规则大脑：驾驶加减速/原地转、预兆链、目标过滤、散布收敛、机枪走进来、死角、反应、护兵槽、两段毁伤（纯 Node，秒级）"},
@@ -614,7 +617,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest','DraftCartEditorTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","LitterGaitTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','FirstLevelFarBankTest','RailBridgeTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','LitterGaitTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','FirstLevelFarBankTest','PontoonBridgeTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','LitterGaitTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -795,9 +798,10 @@ const changedDomainRules = [
   // End 包（阶段 15–18）的新模块：文件名里同样没有「Mission」。
   {domain:"firstLevel",pattern:/FirstLevelEndCast|FirstLevelQuietMarch|FirstLevelReception|FirstLevelBridge|FarBank|FirstLevelNightGate|FirstLevelNightLights|Data_Tuning_FirstLevelEnd/},
   {domain:"firstLevelTail",pattern:/FirstLevelQuietMarch|FirstLevelReception|FirstLevelBridge|FarBank|FirstLevelNightGate|FirstLevelNightLights|Data_Tuning_FirstLevelEnd|FirstLevelCampaignEnd/},
-  // 18 铁路桥的模型与毁桥演出（Blender 烘焙产物 + 运行时 + 地形快照）：文件名里没有 FirstLevel。
-  {domain:"firstLevel",pattern:/RailBridge/},
-  {domain:"firstLevelTail",pattern:/RailBridge/},
+  // 18 浮桥的模型与毁桥演出（Blender 烘焙产物 + 运行时 + 地形快照）：文件名里没有 FirstLevel。
+  // （钢桁架铁路桥 2026-09-30 退役：它的自检 RailBridgeTest 不再挂在 firstLevel / firstLevelTail 域里。）
+  {domain:"firstLevel",pattern:/PontoonBridge/},
+  {domain:"firstLevelTail",pattern:/PontoonBridge/},
   // 第二波玩法包的新模块（阶段 1–7 / 8–14 / 15–18）：文件名不带 FirstLevelMission 前缀，单列一条。
   {domain:"firstLevel",pattern:/FirstLevel(Bunker|Collection|BorrowLight|VillageBlock|TransferCart|QuietMarch|Bridge|NightGate)|Data_Tuning_FirstLevel(Front|Mid|End)|FirstLevel(Front|Mid|End)Test/},
   // 屋内伏击那一拍 2026.09.19 下线（09 改成连屋近战，担架不进屋）：采样器与它的门禁已删，

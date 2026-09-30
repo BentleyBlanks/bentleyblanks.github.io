@@ -201,7 +201,7 @@ export const MISSION_VOICE_FACTS = Object.freeze({
 // ---------------------------------------------------------------------------
 export const MISSION_SCENARIO_SIGNALS = Object.freeze({
   BunkerCollapsed: "bunkerCollapsed",       // 01 近爆之后换成坍塌态掩蔽部
-  RailBridgeDestroyed: "bridgeDestroyed",   // 18 炸桥：桥面 / 桁架 / 钢轨消失，残骸出现
+  RailBridgeDestroyed: "bridgeDestroyed",   // 18 炸桥：浮桥被炸段的桥面 / 绳栏消失，断口两端的空气墙出现
   NightGateShown: "nightArrivalPlaced",     // 18 黑屏里瞬移之后才画北门夜景那一片
 });
 
@@ -562,7 +562,7 @@ export const MISSION_FACT_GATES = Object.freeze({
     kind: "scripted", step: "BridgeWithdraw", source: "FirstLevelBridge.UpdateWithdraw",
     text: "爆破由此前就在场的人员完成（demolitionCharged），爆破区 "
       + END.blastClearRadiusM + " m 内一个己方都没有才点火 —— 不是到点就炸的计时器。"
-      + "玩家在安全距离看见桥被破坏：5 个完好件消失、3 个残骸件出现（信号 RailBridgeDestroyed，不可逆）",
+      + "玩家在安全距离看见浮桥被破坏：3 个完好件（桥面与两侧绳栏）消失、2 个断口空气墙出现（信号 RailBridgeDestroyed，不可逆）",
     requires: ["blastZoneCleared", "demolitionCharged"],
   }),
   marchOrderHeard: Gate({ kind: "voice", step: "BridgeWithdraw", cue: "MarchToTengxian", source: "VoiceDone" }),

@@ -88,25 +88,29 @@ for (let z = 84; z <= 172; z += .5) for (let x = -205; x <= 125; x += 1) {
 }
 ok(riverPts > 1000, `river channel untouched (${riverPts} samples)`);
 
-// 3b. 南堤跟着南水线走（第二轮岸线起伏）：堤顶点表 z − 7 恒在 shoreZ 之南 0…1.2 m，堤脚与沙滩之间不出断崖 ----
+// 3b. 烂泥垄在南岸河口之外（2026-09-30 R3 浮桥：原来的南堤 BridgeLevee* 撤掉，射位前改成不规则的烂泥垄）：垄的点全在 shoreZ 之南
+//     （河槽 cut 在修饰之后取 min，泥滩里的 raise 会被削回去），垄与泥滩之间不出断崖 ----
 {
   const rear = REGIONS.find((region) => region.id === "Rear1518");
   const reach = MISSION_NORTH_RIVER.reaches[0];
-  let levee = 0;
-  for (const shape of rear.shapes.filter((s2) => /^BridgeLevee/.test(s2.id))) for (const p of shape.points) {
-    const foot = p.z - 7, shore = RiverReachAt(p.x, MISSION_NORTH_RIVER).shoreZ;
-    assert.ok(foot >= shore - 0.01 && foot <= shore + 1.2, `levee point (${p.x},${p.z}) foot z=${foot.toFixed(2)} vs shoreZ ${shore.toFixed(2)}`);
-    levee++;
+  assert.equal(rear.shapes.filter((s2) => /^(BridgeLevee|RailEmbankment|NorthAbutmentSeat)/.test(s2.id)).length, 0,
+    "the levee, the rail embankments and the abutment seat of the steel bridge are gone");
+  let ridge = 0, top = 0;
+  for (const shape of rear.shapes.filter((s2) => /^BridgeMudRidge/.test(s2.id))) for (const p of shape.points) {
+    const shore = RiverReachAt(p.x, MISSION_NORTH_RIVER).shoreZ;
+    assert.ok(p.z >= shore + 0.5, `mud ridge point (${p.x},${p.z}) stands south of shoreZ ${shore.toFixed(2)}`);
+    assert.ok(p.dy >= 0.6 && p.dy <= 1.25, `mud ridge point (${p.x},${p.z}) is 0.6-1.25 m high: ${p.dy}`);
+    top = Math.max(top, p.dy);
+    ridge++;
   }
   let worstStep = 0;
   for (let x = reach.x0 + 4; x <= -49; x += 2) {
-    if (Math.abs(x + 77) < 7) continue;   // 铁路路基（+0.62 m）在桥头被河槽切断，是原有的断面（a35a763e 起），不算
     const shore = RiverReachAt(x, MISSION_NORTH_RIVER).shoreZ;
     for (let z = shore - 2; z <= shore + 2; z += .25)
       worstStep = Math.max(worstStep, Math.abs(SampleMissionTerrain(x, z + .25) - SampleMissionTerrain(x, z)));
   }
-  assert.ok(worstStep < 0.45, `no cliff where the beach meets the levee foot: worst 0.25 m step ${worstStep.toFixed(2)} m`);
-  ok(levee >= 9, `south levee follows the wandering shoreline (${levee} crest points, worst step ${worstStep.toFixed(2)} m)`);
+  assert.ok(worstStep < 0.45, `no cliff where the mud flat meets the natural ground: worst 0.25 m step ${worstStep.toFixed(2)} m`);
+  ok(ridge >= 7 && top >= 1.1, `the mud ridge is an irregular line south of the shoreline (${ridge} crest points, top ${top} m, worst step ${worstStep.toFixed(2)} m)`);
 }
 
 // 4. 钩子自检（自造表） --------------------------------------------------------

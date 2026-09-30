@@ -1,5 +1,11 @@
 # 第一关空间拓扑 · 2026-09-19 采用稿
 
+> **2026-09-30（R3）：浮桥取代铁路桥** —— 18 的桥不再是钢桁架铁路桥而是 21 条木船的浮桥（[Data_PontoonBridge.md](Data_PontoonBridge.md)）。本页 §2 的「铁路桥 `MISSION_RAIL_BRIDGE`」一节、
+> 「拓宽河段」里 R1c 的水位 / 南堤 / 路堤 / 桥台 / 射位数值**全部是历史**，现状：`MISSION_PONTOON_BRIDGE`（被炸段中心 (−77,134)，spans 南截 162.6→147.5 / 被炸段 147.5→120.5 / 北截 120.5→88.2，桥面顶 −0.47，宽 2.8）、
+> `reaches[0]` 水面 `waterRel −1`、`dropZ 151 / waterZ 156.3 / waterCut 1.35 / shoreZ 168`（水线 z 91.2…160.2）、南岸烂泥滩 + 泥垄 + 无堤、铁路在河口前收尾（`railGapZ [66,184]`）；
+> 锚点 `railBridge`(−77,134)（键名沿用）、`bridgeNorthEnd`(−77,90)、`bridgeSouthEnd`(−77,165)、`bridgeCover`(−89.6,173.8)、`blastSafe`(−66,201) 不动；`crossings` 的 `RailBridge` 改名 `PontoonBridge`；
+> 信号 `RailBridgeDestroyed` **保留**：被炸段桥面 + 两侧绳栏 3 个完好件消失、断口两端 2 个空气墙出现；`walkableSurfaces` = `["TemporaryBridge","PontoonBridgeDeck","PontoonBridgeSpanSouthDeck","PontoonBridgeSpanNorthDeck"]`。
+>
 > **2026-09-30（白盒 12–18 改造 R1a）：北沙河在铁路桥一带拓宽到 ~66 m、桥改三孔、南岸加高堤与沙滩，见 §2「拓宽河段」与「铁路桥」；
 > 本页 §2 里原断面（28.4 m）的数值仍然有效——只是 x −140…−30 一段（及两端各 20 m 过渡）被替换了。**
 
@@ -21,7 +27,7 @@
 
 ## 1. 四个分区与整关范围
 
-Z 一路向南单调递增，只有第 18 阶段回头向北过铁路桥。分区本身不是导出的数据，
+Z 一路向南单调递增，只有第 18 阶段回头向北过浮桥（R3 前是铁路桥）。分区本身不是导出的数据，
 只写在 `Script_FirstLevelMissionTopologyTest.mjs` 的 `ZONES` 表里（它按这张表核对锚点没有串区）：
 
 | 区 | 内容 | z 范围 | 这一区的新锚点 |
@@ -71,6 +77,12 @@ z 已经从旧版的 743 收到 370（军列进站跑道下线）；**x 没收**
 52 块），不参与碰撞。
 
 ### 拓宽河段 `RailBridgeReach`（2026-09-30，`MISSION_NORTH_RIVER.reaches[0]`）
+
+> **2026-09-30 R3 现状（浮桥，以此为准，下面 R1c 的数值都是历史）**：`waterRel −3 → −1`（水面顶 −0.97，南岸自然地面下 1 m）、`dropZ 153.7 → 151`、`waterCut 3 → 1.35`（水线落在泥滩上 z≈160.2，坡度 ≈ 0.15，水线处岸比水高，不再有共面闪烁）、`shoreZ 166 → 168`；
+> 河底深仍 6（河心水深 ≈ 5 m）；南岸不再是 25° 的沙滩而是 11.7 m 宽的烂泥滩（地表翻土层 + 暗色顶点色 `RiverMudAt` / `RIVER_MUD_TINT`，芦苇）。
+> 空气墙跟着水位走：`limit = −waterRel − 0.12`（水线南约 0.9 m），桥两侧 x −81.8…−74.2 的缺口里补两段窄墙（`(-80.3, 3.4)`、`(-74.9, 1.6)`），桥面两侧另有绳栏空气墙。
+> 南堤、两岸铁路路堤、北桥台桥座槽全部撤掉；射位前是不规则的烂泥垄（`BridgeMudRidge*`，raise，点高 0.7–1.2 m，**整个在 shoreZ 之南**，否则被河槽 cut 削出直崖）；北岸浮桥头一段低地 `NorthLanding`（level，dy −0.45）。
+> 铁路路基（x −77 的 0.62 m 土垄）在 `railGapZ` 之间收掉（`RailBermWeight`），铁路样条 `points` 变成 z −186 → 200、道砟 / 枕木 / 钢轨在 z 66…184 断开；两个收尾处各有挡车桩（Detail，不带碰撞）。
 
 > **2026-09-30 R1c（桥面抬高、水面压低）**：三孔桥建好后桥面顶只比水面高 1.9 m，墩身大半泡在水里，读起来像漫水堤，不是概念图里
 > 「高高架在宽河上的钢桁架桥 + 高石墩」。下表已按 R1c 的新值写；**R1c 之前的旧值**（水面 −1.25、河底深 4.2、`dropZ` 156、`waterZ` 158.6、
@@ -143,7 +155,9 @@ R1c 把射位从缺口路堤的侧坡（地面 0.7，桥面抬高后站着只看
 gate：`TemporaryBridge`，消失信号 `MissionBridgeDestroyed`，`walkableId "TemporaryBridge"`；
 残骸 `MissionBridgeWreck`（8.8×4.4×6）按同一信号出现。13 的第一轮航过炸的就是它。
 
-### 铁路桥 `MISSION_RAIL_BRIDGE`（x=−77）
+### （退役）钢桁架铁路桥 `MISSION_RAIL_BRIDGE_LEGACY`（x=−77）
+
+> **R3（2026-09-30）：18 不再用这座桥**，见 [Data_PontoonBridge.md §2](Data_PontoonBridge.md) 的 `MISSION_PONTOON_BRIDGE`。下面是钢桥时代的口径，留作历史（常量改名 `MISSION_RAIL_BRIDGE_LEGACY`，只有退役的模型自检读它）。
 
 > **2026-09-30 R1c 抬高**：`deckTopY` 0.66 → **1.5**（与南堤顶 1.4 + 自然地面 0.1 齐平，水面 −3 在下方 4.5 m）、`abutmentTopY` −0.55 → **0.29**（桥座面 = deckTopY − 1.13 = 0.37 以下 0.08）；
 > 桥墩（碰撞盒）仍是 `deckTopY − deckH − 0.02 = 0.93` 封顶、墩脚在河床，其余 `spans / piers / abutmentZ / gapZ / blast` 不变。
@@ -191,13 +205,13 @@ bunkerRear(-40,-119)       rearCorner(-42,-113)        collection(-37,-101)
 streetBlock(76.65,15)      litterHold(66,-20)          eastAlley(88,11)
 streetRejoin(77,34)        cartBoard(85.6,113)         cartHalt(76,135)
 sideAlley(95.2,61)         wallPathStart(56,207)       wallPathEnd(16,220)
-receptionGate(2,240)       railBridge(-77,148)*        bridgeNorthEnd(-77,86)*
-bridgeSouthEnd(-77,170)    bridgeCover(-97,173.5)*     bridgeEnemy(-84.5,80.5)*
+receptionGate(2,240)       railBridge(-77,134)*        bridgeNorthEnd(-77,90)*
+bridgeSouthEnd(-77,165)*   bridgeCover(-89.6,173.8)*   bridgeEnemy(-84.5,80.5)*
 blastSafe(-66,201)         marchOut(-62,232)           nightSpawn(-160,292)
 northGateApproach(-160,318) northGate(-160,340)        gateInside(-160,352)
 ```
 
-带 * 的四个 2026-09-30 后的新值（原 railBridge(-77,153)、bridgeNorthEnd(-77,136)、bridgeEnemy(-68,130.5)；R1c 起 bridgeCover 由 (-81,179.4) 挪到 (-97,173.5)）。
+带 * 的是 2026-09-30 后的新值（R3 浮桥：railBridge 键名沿用，= 浮桥被炸段中心 (-77,134)；bridgeNorthEnd 在北栈上 (-77,90)；bridgeSouthEnd 在南栈起点以南 2.4 m 的泥地上 (-77,165)；bridgeCover 在南岸烂泥垄后 (-89.6,173.8)。历史：原 railBridge(-77,153)、bridgeNorthEnd(-77,136)、bridgeEnemy(-68,130.5)；钢桥时代 railBridge(-77,148)、bridgeCover(-97,173.5)）。
 
 ### 沿用：`MISSION_REAR_ANCHORS`（11 个，在 `Data_FirstLevelMissionTopology.mjs`）
 
@@ -306,9 +320,9 @@ NightGateShown      → nightArrivalPlaced     （18 黑屏里瞬移到夜景）
 | --- | --- |
 | `MissionCourtyardGateOpen` | `MissionCourtyardGate`（10 的内院门） |
 | `MissionBridgeDestroyed` | 消失 `TemporaryBridge`（连可走面）；出现 `MissionBridgeWreck` |
-| `RailBridgeDestroyed` | 消失 5 件、出现 3 件（见第 2 节） |
+| `RailBridgeDestroyed` | 浮桥被炸段：消失 3 件（`PontoonBridgeDeck` 与两侧绳栏 `PontoonBridgeRailWest/East`）、出现 2 件（断口两端的空气墙 `PontoonBridgeCutWallSouth/North`） |
 
-可走面 `walkableSurfaces` 现在只剩两块桥面：`["TemporaryBridge", "RailBridgeDeck"]`。
+可走面 `walkableSurfaces` 现在是四块：`["TemporaryBridge", "PontoonBridgeDeck", "PontoonBridgeSpanSouthDeck", "PontoonBridgeSpanNorthDeck"]`（R3 前是路桥 + 铁路桥各段桥面）。
 
 ---
 

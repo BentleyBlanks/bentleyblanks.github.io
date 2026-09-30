@@ -23,17 +23,17 @@
 // 到 z≈72 处汇进桥轴缺口，再分头去自己的位。没有导航网格：每条路线都由 Script_FirstLevelFarBankTest 逐 0.5 m 量净空
 // （0.4 m 内无实心件、地面不低于 −0.5 m）。
 // ===========================================================================
-import { MISSION_RAIL_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_PONTOON_BRIDGE, PONTOON_HEADS } from "./Data_FirstLevelMissionTopology.mjs";
 import {
   FarBankShoreZ, FAR_BANK_REAL, FAR_BANK_SHORE_A, FAR_BANK_SHORE_B, FAR_BANK_STANDBY, FAR_BANK_TANKS, FarBankTankPostZ,
 } from "./Data_FirstLevelBridgeFarBank.mjs";
 import { NORTH_DESCENT_TRAIL } from "./Data_FirstLevelWhiteboxTerrainRear.mjs";
 
 const freeze = Object.freeze;
-export const FAR_BANK_CROWD_AXIS_X = MISSION_RAIL_BRIDGE.x;
+export const FAR_BANK_CROWD_AXIS_X = MISSION_PONTOON_BRIDGE.x;
 
-/** 桥面的范围：桥台北端 z 86 到 2 号墩以南（被炸孔 z 136 起是坍塌件，人群不上）。 */
-export const FAR_BANK_DECK = freeze({ x: MISSION_RAIL_BRIDGE.x, halfW: MISSION_RAIL_BRIDGE.deckW / 2, z0: 86.5, z1: 135.5, topY: MISSION_RAIL_BRIDGE.deckTopY });
+/** 桥面的范围：北栈终点 z 89.5 到被炸段北端 z 120.5（被炸段起是坍塌件，纯视觉人群不上）。 */
+export const FAR_BANK_DECK = freeze({ x: MISSION_PONTOON_BRIDGE.x, halfW: MISSION_PONTOON_BRIDGE.deckW / 2, z0: PONTOON_HEADS.north, z1: MISSION_PONTOON_BRIDGE.spans[1].z1, topY: MISSION_PONTOON_BRIDGE.deckTopY });
 
 /**
  * 站的地面高度：桥面上取桥面高度（河床在下面几米），其余走传进来的地形函数。纯函数。
@@ -80,8 +80,8 @@ export const FAR_BANK_CROWD_SLOPE_RANKS = freeze([
   freeze({ z: 33.2, gap: 1.8, scale: 1.24, xMax: -101, poses: freeze([["stand", 1]]) }),
   freeze({ z: 27.8, gap: 1.45, scale: 1.28, xMax: -104, poses: freeze([["stand", 1]]), crest: true }),
 ]);
-/** 桥头纵队：两列在桥面上，离桥轴 ±laneM；从 z 96 起每 1.25 m 一个，到 frontZ 为止（再往南是 R2 的桥头人堆与冲桥组）。 */
-export const FAR_BANK_CROWD_BRIDGE = freeze({ laneM: 2.15, z0: 94, frontZ: 117, gapM: 0.95 });
+/** 桥头纵队：两列在浮桥北截桥面上，离桥轴 ±laneM（桥面 2.8 m 宽）；从 z 93 起每 0.95 m 一个，到 frontZ 为止（再往南是 R2 的桥头人堆与冲桥组）。 */
+export const FAR_BANK_CROWD_BRIDGE = freeze({ laneM: 0.65, z0: 93, frontZ: 110.4, gapM: 0.95 });
 /** 留守：桥轴路堤东侧、土坎以北的几堆。[中心 x, 中心 z, 人数]。西侧的堆（x < −90）R2c 起由坡地八排取代。 */
 export const FAR_BANK_CROWD_RESERVE = freeze([
   freeze([-88, 74, 10]), freeze([-68, 73, 12]), freeze([-64, 70, 8]), freeze([-86, 58, 8]), freeze([-70, 56, 8]), freeze([-56, 73, 8]),

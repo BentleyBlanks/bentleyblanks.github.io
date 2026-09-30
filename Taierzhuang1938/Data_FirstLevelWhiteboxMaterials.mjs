@@ -109,13 +109,11 @@ export const WHITEBOX_LOOK_RULES = Object.freeze([
   // 门洞里那块是门板，窗洞里那块是黑的（Village Door()/Window() 的 Void 盒）
   { id: /Door\d+Void$/, look: "doorLeaf" },
   { id: /^MissionCourtyardGate$/, look: "doorLeaf" },
-  // 铁路桥：条石墩台、木桥面；钢桁架走 metal 的缺省
-  { id: /RailBridge(Pier|Abutment)|BridgeheadPier/, look: "stone" },
+  // 浮桥（2026-09-30 取代铁路桥）：白盒兜底件（模型没装好时的桥面 / 绳栏）都是木；BridgeheadPier 是路桥的桥头墩
+  { id: /BridgeheadPier/, look: "stone" },
   // 13 桥头河岸那截残墙：夯土残段（参考图 12/13 的土墙，一截孤立的青砖柱在背光里读成黑方块）
   { id: /^TransferBankRuin/, semantic: /^(plaster|cover|structure)$/, look: "mudPlaster" },
-  { id: /^(TemporaryBridge|RailBridgeDeck)$/, look: "timber" },
-  { id: /RailBridgeWreckSpan/, look: "steel" },
-  { id: /RailBridge(Wreck)?Truss/, look: "steelTruss" },
+  { id: /^(TemporaryBridge|PontoonBridgeDeck)$/, look: "timber" },
   // 台阶、门槛、窗台、井台、磨盘
   { id: /(Step\d*|Threshold|Bump)$/, semantic: /^(structure|step|plaster|cover)$/, look: "stone" },
   // 窗台：结构件的是石条；墙身语义的 WindowSill 是窗下那段墙，留给墙的外观

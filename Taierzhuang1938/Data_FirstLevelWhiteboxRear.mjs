@@ -61,8 +61,6 @@ export function BuildRearWhitebox(groundAt) {
       ["RearWallGapWest", 45, 184, 16, 2.8, .7], ["RearWallGapEast", 65, 184, 14, 2.8, .7],
       ["DrainSightBreak", 44, 160, 9, 2.8, 1]].map((row) => [...row, true, "plaster"]),
     ...[["WallPathLowWall", 27, 213, 18, 1.1, .7, true, "railBallast"],
-      ["BridgeSouthSandbagsWest", -88.6, 178.4, 3.6, 1.0, .8, true, "earthDark"],
-      ["BridgeSouthSandbagsEast", -68.6, 178.4, 3.4, 1.0, .8, true, "earthDark"],
       ["BlastSafeBank", -66, 197.5, 7, 1.35, .9, true, "earthDark"],
       ["BridgeNorthRidgeWest", -87, 82.2, 10, 1.45, 1.2, true, "earthDark"],
       ["BridgeNorthRidgeEast", -66, 82.2, 12, 1.45, 1.2, true, "earthDark"]],
@@ -645,14 +643,13 @@ export function BuildRearWhitebox(groundAt) {
   Rubble("ReceptionNorthRowSpill", -27.8, 214.4, 6, 3, .4, .35);
 
   // ---------------------------------------------------------------------------
-  // 18: south bank firing pocket, blast-safe cover, bridge piers
+  // 18: blast-safe cover, the south-bank mud flat, and the mud ridge in front of the firing spot (2026-09-30 R3, the pontoon bridge
+  // replaced the steel rail bridge, docs/Data_PontoonBridge.md). The ridge itself is terrain (BridgeMudRidge*, terrain table); everything
+  // here is non-solid dressing except the blast-safe bank.
   // ---------------------------------------------------------------------------
   Grounded("BlastSafeEastReturn", -58.5, 201, .8, 1.55, 6, "earthDark");
-  Box(blocks, "BridgeDemolitionStores", -89, 187, 2, .8, 1.4, "timber");
-  // Earth skins over the blast-safe bank (BlastSafeBank -66,197.5) and the south-bank sandbag rows
-  // (Layout BridgeSouthSandbagsWest/East, 2026-09-30 levee round). Non-solid.
-  for (const [id, x, z, w, d, h] of [["BridgeSouthSandbagsWest", -88.6, 178.4, 3.6, .8, 1.0],
-    ["BridgeSouthSandbagsEast", -68.6, 178.4, 3.4, .8, 1.0], ["BlastSafeBank", -66, 197.5, 7, .9, 1.35]]) {
+  // Earth skin over the blast-safe bank (BlastSafeBank -66,197.5). Non-solid.
+  for (const [id, x, z, w, d, h] of [["BlastSafeBank", -66, 197.5, 7, .9, 1.35]]) {
     const top = groundAt(x, z) + h;
     Detail(`${id}EarthSkin`, x, z, w + .3, h + .5, d + .5, "earthDark", { y: top + .03 - (h + .5) / 2 });
     // Stepped earth on the shooter's side so the parapet reads as a heaped bank, not a slab.
@@ -666,35 +663,28 @@ export function BuildRearWhitebox(groundAt) {
         { y: top + .08 + (i % 3) * .025, ry: i * .7 });
     }
   }
-  // The firing mound in the levee gap (Layout BridgeSouthMound) wears the same earth skin, with heaped clods.
+  // Beached skiff on the flat west of the bridgehead (a wreck half sunk in the mud): hull, a broken gunwale, two ribs.
   {
-    // 土垄在射位北面 2 m、偏东 1（Layout 的 BridgeSouthMound 跟着 bridgeCover 走）；R1c 射位挪到南堤西段堤顶 (-97,173.5)。
-    const mx = -96, mz = 171.5;
-    const top = groundAt(mx, mz) + 1.05;
-    Detail("BridgeSouthMoundSkin", mx, mz, 2.2, 1.25, 1.35, "earthDark", { y: top + .03 - 1.25 / 2 + .18 });
-    for (let i = 0; i < 4; i++)
-      Detail(`BridgeSouthMoundClod${i}`, mx - 0.7 + i * .47, mz - .15, .6 + (i % 2) * .35, .14, .5, "earthDark",
-        { y: groundAt(mx, mz) + 1.3 + (i % 3) * .03, ry: i * .8 });
+    const bx = -96.5, bz = 163.6, ry = .35, y = groundAt(bx, bz);
+    Detail("BridgeMudSkiffHull", bx, bz, 1.5, .5, 4.6, "timber", { y: y + .12, ry });
+    Detail("BridgeMudSkiffGunwaleA", bx + Math.cos(ry) * .8, bz - Math.sin(ry) * .8, .12, .16, 4.4, "timber", { y: y + .46, ry });
+    Detail("BridgeMudSkiffGunwaleB", bx - Math.cos(ry) * .8, bz + Math.sin(ry) * .8, .12, .16, 3.4, "timber", { y: y + .42, ry });
+    for (const [i, t] of [-1.2, 0.9].entries())
+      Detail(`BridgeMudSkiffRib${i}`, bx + Math.sin(ry) * t, bz + Math.cos(ry) * t, 1.45, .3, .1, "timber", { y: y + .5, ry });
   }
-  // Levee: stones on the river face and grass tufts along the crest (Bridge18 levee, terrain BridgeLevee*).
-  Rubble("BridgeBankStones", -100, 168.4, 10, 12, .8, .4);
-  Rubble("BridgeLeveeStonesWest", -124, 168.2, 8, 9, .8, .5);
-  Rubble("BridgeLeveeStonesEast", -56, 168.4, 6, 7, .8, .4);
-  for (const [i, x, z, s] of [[0, -132, 174.6, 1.2], [1, -122, 173.6, 1], [2, -113, 173.4, 1.3], [3, -103, 173.2, .9],
-    [4, -95, 173.1, 1.1], [5, -66, 173.3, 1.1], [6, -59.5, 173.4, .9], [7, -52, 173.8, 1.2], [8, -108, 171.5, 1],
-    [9, -90, 171.6, .9], [10, -61, 171.6, 1]])
-    Detail(`BridgeBankGrass${i}`, x, z, s, s * .6, s * .8, "foliage", { y: groundAt(x, z) + s * .3 });
-  // Beach dressing (south shore, z 159–166, x −90…−64): driftwood, stones and dry weed tufts; keeps the flat sand
-  // around pier 1 (x −82…−72, z 160.5…165.5) clear for the demolition party and the fuse.
-  for (let i = 0; i < 9; i++) {
-    const x = -92 + (i % 3) * 3.1 + Rand() * 2 + (i > 5 ? 22 : 0), z = 161.4 + Rand() * 3.4;
-    if (x > -83.5 && x < -70.5) continue;
-    Detail(`BridgeBeachDrift${i}`, x, z, 1.2 + Rand() * 1.6, .16, .26, "timber", { y: groundAt(x, z) + .07, ry: Rand() * Math.PI });
+  // Mud-flat dressing (z 158–167, x −108…−86 and the bridgehead's east side): driftwood, stakes at the waterline and a few reed clumps.
+  // The flat around the south head (x −86…−70, z 159…172) stays clear for the demolition party, the crates and the fuse.
+  for (let i = 0; i < 7; i++) {
+    const x = -108 + i * 3.3 + Rand() * 1.6, z = 160.2 + Rand() * 5.6;
+    if (x > -86.6) continue;
+    Detail(`BridgeMudDrift${i}`, x, z, 1.2 + Rand() * 1.6, .14, .22, "timber", { y: groundAt(x, z) + .06, ry: Rand() * Math.PI });
   }
-  Rubble("BridgeBeachPebbles", -92, 162.6, 8, 5, 1.2, .28, "earthDark");
-  Rubble("BridgeBeachPebblesEast", -62, 162.6, 6, 4, 1.2, .28, "earthDark");
-  for (const [i, x, z, s] of [[0, -91, 164.6, .9], [1, -86.6, 165.2, .8], [2, -68, 165.4, .9], [3, -63.5, 164.4, .8]])
-    Detail(`BridgeBankGrassBeach${i}`, x, z, s, s * .9, s * .8, "foliage", { y: groundAt(x, z) + s * .45 });
+  for (const [i, x, z] of [[0, -104, 159.8], [1, -99.6, 159.4], [2, -95, 159.9], [3, -90.6, 159.6], [4, -66.4, 160.2], [5, -62, 160.6]])
+    Detail(`BridgeMudStake${i}`, x, z, .14, .9 + (i % 3) * .25, .14, "timber", { y: groundAt(x, z) + .35 + (i % 3) * .12 });
+  for (const [i, x, z, s] of [[0, -102, 161.6, 1.2], [1, -93.4, 161.2, 1], [2, -108.6, 164.4, 1.3], [3, -65, 161.8, 1.1], [4, -60, 163.4, 1.2]])
+    Detail(`BridgeMudReeds${i}`, x, z, 3 * s, 1.5 * s, 1 * s, "foliage", { y: groundAt(x, z) + .7 * s });
+  Rubble("BridgeMudPebbles", -92, 163.4, 5, 5, 3, .25, "earthDark");
+  Rubble("BridgeMudPebblesEast", -63, 163.4, 4, 4, 2.5, .25, "earthDark");
 
   // 18 north bank (far side of the river): a small village seen across the water in concept 18_3 — four one-storey
   // houses (Layout adds WestFieldHouse) and dead trees (Layout row). R2c (2026-09-30): the village moved from the bank
@@ -707,8 +697,7 @@ export function BuildRearWhitebox(groundAt) {
     HouseMass(id, x, z, w, d, h, { alongX });
   Grounded("NorthBankYardWall", -128, 14.2, 6, 1.4, .5, "plaster");
   Rubble("NorthBankSpill", -119.5, 13.5, 5, 6, 1.2, .4);
-  // The rail bridge is a single-span truss now (Model_RailBridge, docs/Data_RailBridge.md):
-  // no river piers. The old non-colliding pier details were removed with the whitebox look.
+  // The pontoon bridge (Model_PontoonBridge, docs/Data_PontoonBridge.md) has no piers; the old rail bridge is gone from 18.
 
   // ---------------------------------------------------------------------------
   // 18 Retreat18 (2026-09-30, docs/Data_FirstLevelBridgeFarBank.md §5): the march-out route (marchOut, 113 m) climbs over the

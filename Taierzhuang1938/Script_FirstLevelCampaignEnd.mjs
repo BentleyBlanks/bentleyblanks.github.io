@@ -1,4 +1,4 @@
-// 第一关整关驾驶脚本 · 阶段 15–18（降压收拢 → 交接 → 老周死亡 → 铁路桥与夜入滕城）。
+// 第一关整关驾驶脚本 · 阶段 15–18（降压收拢 → 交接 → 老周死亡 → 浮桥与夜入滕城）。
 // 归第二波 End 包；公共部分在 Script_FirstLevelCampaignKit.mjs。
 //
 // 2026.09.19 重构把 15 改成**无战斗**的降压段（收拢、换手抬运、找到接收处），
@@ -441,8 +441,8 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     assert.ok(runner && runner.alive, "传令兵是真人实体");
     await CaptureFocus("BridgeRunner", runner);
     await WaitFact(page, "bridgeOrdersHeard", "18 接令", 180);
-    assert.ok((await page.locator("#hud").innerText()).includes("铁路桥"),
-      "HUD 目标更新为「掩护回援分队通过铁路桥」");
+    assert.ok((await page.locator("#hud").innerText()).includes("浮桥"),
+      "HUD 目标更新为「掩护回援分队通过浮桥」");
   }
   // 连续16/17可能仍站在床边；先经厢房南门，不能直接朝院墙后门穿过房墙。
   const insideWard = await page.evaluate(ward => {
@@ -503,7 +503,7 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
   {
     const shot = await Mission(page);
     assert.ok(shot.facts.includes("bridgeFireBroken") && shot.facts.includes("rearColumnCrossed"),
-      "威胁解除之后尾队真的通过了铁路桥");
+      "威胁解除之后尾队真的通过了浮桥");
     const alive = shot.enemies.filter(actor => /^BridgeNorth/.test(actor.id) && actor.alive).length;
     console.log("BRIDGE_NORTH_ALIVE", alive, "（玩家不承担杀光所有敌军）");
     await Capture("BridgeCrossed");
@@ -553,7 +553,7 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     assert.ok(fb.tanks.filter(t => !/Bridge$/.test(t.id)).every(t => t.state === "posted"), `岸边两辆到位：${fb.tanks.map(t => t.id + ":" + t.state)}`);
     // 桥面上那辆：BridgeCover 全程等在桥头以北（不堵尾队过桥），BridgeWithdraw（尾队过完）后沿桥轴开上桥中孔的桥面。
     const bridgeTank = fb.tanks.find(t => /Bridge$/.test(t.id));
-    assert.ok(bridgeTank && bridgeTank.z >= 100 && bridgeTank.z <= 126 && Math.abs(bridgeTank.x + 77) < 1, `桥面上那辆开上了桥中孔（x ${bridgeTank?.x}，z ${bridgeTank?.z}）`);
+    assert.ok(bridgeTank && bridgeTank.z >= 72 && bridgeTank.z <= 79 && Math.abs(bridgeTank.x + 77) > 9, `岸边那辆停在北岸浮桥头东侧的空地上（x ${bridgeTank?.x}，z ${bridgeTank?.z}）`);
     await CaptureLook(page, CaptureFocus, "FarBankWithdrawStand", FAR_BANK_LOOK, "stand");
     await CaptureLook(page, CaptureFocus, "FarBankWithdrawCrouch", FAR_BANK_LOOK, "crouch");
   }
@@ -597,13 +597,13 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     console.log("FARBANK_BLAST", JSON.stringify({ blast: fbBlast.blast, rush: fbBlast.rushState, alive: fbBlast.alive, real: fbBlast.real }));
     console.log("FARBANK_RUSH_AT_BLAST", JSON.stringify({ rush: fbBlast.rushState, units: fbBlast.rushUnits }));
     assert.ok(fbBlast.rushState?.settled, `冲桥组放行了起爆器：${JSON.stringify(fbBlast.rushState)}`);
-    await CaptureFocus("FarBankBlastBridge", { x: A.railBridge.x, z: 142, height: 2.5 });
+    await CaptureFocus("FarBankBlastBridge", { x: A.railBridge.x, z: A.railBridge.z, height: 1.5 });
     await StepSeconds(page, 3);
     const fb3 = await FarBankState(page);
     console.log("FARBANK_BLAST3S", JSON.stringify({ blast: fb3.blast, blastKilled: fb3.blastKilled, alive: fb3.alive, removed: fb3.removed, bank: fb3.bank }));
     assert.ok(fb3.blast?.done && fb3.blastKilled >= 3, `桥上的日军被炸死了 ${fb3.blastKilled} 个（冲桥组 6）`);
     await FrameTiming(page, "BridgeBlast+3s");
-    await CaptureFocus("FarBankBlast3s", { x: A.railBridge.x, z: 142, height: 2.5 });
+    await CaptureFocus("FarBankBlast3s", { x: A.railBridge.x, z: A.railBridge.z, height: 1.5 });
   }
   {
     const blast = await page.evaluate(() => {
@@ -621,12 +621,17 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     // 桥面真的不可走了：完好件的碰撞被撤掉，残骸出现。
     const gone = await page.evaluate(() => {
       const g = window.Tengxian;
-      const deck = g.battlefield.colliders.filter(box => /RailBridge(Deck|Truss|Rail)/.test(box.id || ""));
-      const wreck = g.battlefield.colliders.filter(box => /RailBridgeWreck/.test(box.id || ""));
-      return { deck: deck.length, wreck: wreck.length };
+      // gate.open：带 signal 的完好件 open = 已经消失（碰撞撤掉）；带 appearSignal 的断口空气墙 open = false 才是「在场」。
+      const gates = g.battlefield.gates;
+      const deck = ["PontoonBridgeDeck", "PontoonBridgeRailWest", "PontoonBridgeRailEast"].filter(id => !gates.get(id)?.open);
+      const wreck = ["PontoonBridgeCutWallSouth", "PontoonBridgeCutWallNorth"].filter(id => gates.get(id) && !gates.get(id).open);
+      const walkable = g.battlefield.walkableSurfaces.some(s => s.id === "PontoonBridgeDeck");
+      return { deck: deck.length, wreck: wreck.length, walkable };
     });
-    console.log("RAIL_BRIDGE_AFTER_BLAST", JSON.stringify(gone));
-    assert.equal(gone.deck, 0, "炸完桥面/桁架/钢轨的碰撞一件不剩");
+    console.log("PONTOON_BRIDGE_AFTER_BLAST", JSON.stringify(gone));
+    assert.equal(gone.deck, 0, "炸完被炸段桥面与两侧绳栏的碰撞一件不剩");
+    assert.equal(gone.wreck, 2, "断口两端的空气墙出现了");
+    assert.equal(gone.walkable, false, "被炸段桥面退出可走面");
   }
   await WaitFact(page, "marchOrderHeard", "18 往滕县", 180);
   if (fbBlast) {
@@ -636,7 +641,7 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     console.log("FARBANK_HALTED", JSON.stringify({ alive: fb.alive, real: fb.real, scripted: fb.scripted, bank: fb.bank, shells: fb.shells, mg: fb.mg, tanks: fb.tanks, reinforced: fb.reinforced, ija: fb.ijaCount, tier: fb.tier }));
     assert.equal(fb.bank.southBank, 0, "桥断后（其实是整趟）没有一个日军过河");
     assert.equal(fb.bank.overNow, 0, "桥断 20 s 后对岸活着的人全在岸边");
-    assert.ok(fb.bank.southMostZ <= 148, `整趟里对岸最靠南的日军 z ${fb.bank.southMostZ}（冲桥组最远到被炸孔北半）`);
+    assert.ok(fb.bank.southMostZ <= 135, `整趟里对岸最靠南的日军 z ${fb.bank.southMostZ}（冲桥组最远到被炸段北半）`);
     assert.ok(fb.alive >= 16 && fb.real === 8, `桥断之后对岸仍有 ${fb.alive} 人，真 AI ${fb.real}`);
     assert.ok(fb.shells.fired >= 1 && fb.shells.minPlayerM >= 22 && fb.shells.minFriendlyM >= 10,
       `战车炮击了 ${fb.shells.fired} 发，落点离玩家最近 ${fb.shells.minPlayerM} m、离己方最近 ${fb.shells.minFriendlyM} m`);
@@ -645,7 +650,7 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     console.log("FARBANK_CROWD_HALTED", JSON.stringify(fb.crowd));
     assert.ok(fb.crowd.onField >= 280 && fb.crowd.holding >= 250, `桥断后视觉人群 ${fb.crowd.onField} 在场、${fb.crowd.holding} 在位`);
     const bridgeTank = fb.tanks.find(t => /Bridge$/.test(t.id));
-    assert.ok(bridgeTank.z >= 126 && bridgeTank.z + 2.15 <= 136, `桥面上那辆停在断口北侧（z ${bridgeTank.z}，车头 ${(bridgeTank.z + 2.15).toFixed(1)}）`);
+    assert.ok(bridgeTank.z >= 72 && bridgeTank.z <= 79, `岸边那辆桥断后仍停在北岸浮桥头东侧（z ${bridgeTank.z}）`);
   }
 
   // --- 18 夜入滕城：先随队走完 marchOut，黑屏字幕，夜景，进北门 ---------------
