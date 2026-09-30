@@ -210,6 +210,8 @@ export const END_TUNING = Object.freeze({
   // 爆破之后先随队走一段（MISSION_STAGE_ROUTES.marchOut，blastSafe→marchOut 约 35 m），
   // 走到头画面才淡出。行军脚步在这一段一直响。
   marchOutArriveM: 8,
+  // 2026-09-30：marchOut 延到 (−98,295)（113 m，翻过 z≈276 的土岗）。走到终点、且对岸真 AI 连续
+  // `farBank.blindS` 秒看不见玩家才黑屏（retreatOutOfReach，见 farBank 块与 docs/Data_FirstLevelBridgeFarBank.md §5）。
   // 夜景火盆/马灯的点光。night 预设曝光低，没有点光的白盒糊成一团
   //（Data_CutsceneBeimenBreakout 文件头）。火盆体块在 MISSION_PLACEMENT.night.braziers，
   // 0.8 × 0.7 × 0.8、盆口约在地面 +0.7。**不投影**：一帧只烘一张阴影。
@@ -224,6 +226,63 @@ export const END_TUNING = Object.freeze({
   // 搬弹药的人来回走的一小段（MISSION_PLACEMENT.night.carriers 是他们的取货位）。
   nightCarrierLegM: 5,
   nightCarrierMps: 1.1,
+
+  // -------------------------------------------------------------------------
+  // 18 对岸日军步坦部队（2026-09-30 用户：炸桥时河对岸还有比较大量的步坦部队，只是桥断了过不来，
+  // 参考 COD5 第一关结尾；脱离战场后才黑屏）。口径与时间线 docs/Data_FirstLevelBridgeFarBank.md，
+  // 摆位与名册 Data_FirstLevelBridgeFarBank.mjs，运行时 Script_FirstLevelBridgeFarBank.mjs。
+  // 距离一律是 dz = 玩家 z − 北岸岸沿 z（岸沿由 RiverReachAt 取，河拓宽后是 z 90）：
+  //   bridgeCover 89 m、blastSafe 111 m、原 marchOut(−62,232) 142 m、新终点 (−98,295) 205 m。
+  // -------------------------------------------------------------------------
+  farBank: Object.freeze({
+    // ---- 兵力账（actorPool 预建 ija:48，超了运行时现建骨架最贵）----------------------------
+    // 日军同屏（bridgeNorth 4 个 + 真 AI 8 + 脚本兵）不超这个数；脚本兵少于 scriptedKeepMin 就补员。
+    ijaCap: 44,
+    scriptedKeepMin: 16,
+    // 补员：从北面视线外（离玩家 hiddenSpawnM 以外、或不在镜头里）走进来；一次一小拨，总数封顶。
+    reinforceEveryS: 3.5, reinforceBatch: 2, reinforceMaxTotal: 30, hiddenSpawnM: 150,
+    // 入场与行走速度（m/s）：赶路 / 岸边小跑 / 冲桥。
+    marchMps: 2.9, dashMps: 4.2, rushMps: 5.2,
+    // 环境射击：同时最多 ambientMax 人有授权点（声部预算；24 人齐射会把枪声节点占满），每 ambientRotateS 秒轮换一批；
+    // 待命兵每 standbyHopS 秒换一个踱步点。死了的脚本兵尸体留 deadKeepS 秒再收。
+    ambientMax: 12, ambientRotateS: 2, standbyHopS: 9, deadKeepS: 20,
+    // ---- 时间线 ------------------------------------------------------------------------
+    // BridgeCover：第一拨（岸线 12 + 待命 6）从北面走进来，错开 staggerS 秒；坦克 T1 立刻、T2 隔 tankStaggerS 起步，
+    // T3 等 bridgeFireBroken（尾队过桥那会儿）。
+    waveStaggerS: 0.9, tankStaggerS: 7,
+    // BridgeWithdraw：第二拨（岸线补 6 + 冲桥组 6）与真 AI 8 个放出；冲桥组等 rushDelayS 才起跑，
+    // 按下起爆器之前必须到位（到位最多等 rushWaitMaxS，再看 rushSettleS 让玩家看一眼）。
+    rushDelayS: 1.5, rushWaitMaxS: 16, rushSettleS: 1.2,
+    // 桥头人堆（FAR_BANK_CROWD 八个）：待命位上的两个在冲桥组起跑 crowdDelayS 秒后上桥，第二拨补拨兵出生就直接上桥。
+    crowdDelayS: 4,
+    // 起爆：桥面 blastKillM 以内的日军当场炸死抛起（up/out 是初速 m/s），blastProneM 以内的趴 blastProneS 秒；
+    // 尸体 corpseRemoveS 秒后移除（尸体刚体 ≤8 s 后冻结，桥没了它不会跟着落，必须自己收）。
+    blastKillM: 13, blastProneM: 24, blastProneS: 1.6, throwUpMps: 6.2, throwOutMps: 2.2, corpseRemoveS: 8,
+    // 起爆后这么久，对岸活着的人必须都退回岸边（岸沿以南 0.5 m 之内）：冲桥组后排与前锋跑回去要几秒。
+    bankSettleS: 14,
+    // ---- 分档（dz，米）：contact < tierM[0] ≤ mid < tierM[1] ≤ far < tierM[2] ≤ out -------------
+    // contact：2 个机枪手轮换真开火，其余真 AI 只压制；环境射击开；炮弹落点 ≥ shellMinPlayerM.contact；
+    // mid：全体真 AI 只压制；far：环境射击停、炮弹改「远雷」；out：全停。
+    tierM: Object.freeze([100, 130, 170]),
+    realShooters: 2,
+    shellMinPlayerM: Object.freeze({ contact: 22, mid: 32, far: 48 }),
+    // ---- 战车（傀儡：只动、转炮塔、炮击与机枪曳光，不可摧毁，不进 03–05 的战车运行时）-------------
+    tankCruiseMps: 4.4, tankTurnRadPerS: 0.5, tankTurretRadPerS: 0.42, tankStartBackM: 140,
+    tankShellFlightS: 1.5, tankShellRadiusM: 4.5,
+    // 落点安全：离玩家 ≥ shellMinPlayerM、离任何己方（班里人、爆破人员、尾队…）≥ shellFriendlyM、离玩家要走的
+    // 路线 ≥ shellRouteM；一炮到落地的预测点（PredictShellImpact）偏离目标超过 shellAimTolM 就放弃这个点。
+    shellFriendlyM: 10, shellRouteM: 8, shellAimTolM: 4,
+    // 节奏：全场每 shellGlobalGapS 秒最多 1 发、单车 shellTankGapS；离玩家 35 m 内的落点每 shellNearGapS 秒最多 1 发。
+    shellGlobalGapS: 3.5, shellTankGapS: 7, shellNearGapS: 7, shellNearM: 35,
+    // 车载机枪：只打曳光（damageScale 0），一串 mgRounds 发、间隔 mgIntervalS；contact / mid 档才打，
+    // southBankReached 之后 mgStartAfterS 秒起。
+    mgBurstGapS: Object.freeze([3.5, 7]), mgRounds: Object.freeze([4, 8]), mgIntervalS: 0.11, mgStartAfterS: 8,
+    // ---- 黑屏条件（retreatOutOfReach）---------------------------------------------------------
+    // dz ≥ outDzM 且对岸真 AI 连续 blindS 秒看不见玩家；眼位到最近对岸单位的视线被地形挡住才算「翻过岗」，
+    // 绕开土岗走空地的兜底是 dz ≥ outFallbackDzM。
+    outDzM: 190, outFallbackDzM: 215, blindS: 1.5,
+    // 黑屏里对岸单位撤场（Retire）；BridgeWithdraw 起己方桥头人员与已过桥尾队标 missionUntargetable。
+  }),
 });
 
 /** 15–18 用到的现成路线（避免各模块各写一份切片）。 */

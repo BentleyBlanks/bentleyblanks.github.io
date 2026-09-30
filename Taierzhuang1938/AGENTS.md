@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **18 对岸日军步坦部队与脱离战场后再黑屏（2026-09-30）**：炸桥时河对岸有大量日军与三辆傀儡八九式（BridgeCover 起就在，BridgeWithdraw 放真 AI 8 个与冲桥组，起爆时桥上的日军被炸死落河，桥断后全停在岸边隔河射击、没有一个能过河）；撤离路线延到 109 m、翻过缓坡土岗，走到离北岸 190 m 外、对岸真 AI 连续 1.5 s 看不见玩家才黑屏（`retreatOutOfReach`），`Retry()` 的 NightMarch 分支不再把 A 段阵亡送进夜景。口径、时间线、分档伤害、性能实测与门禁见 [对岸步坦部队](docs/Data_FirstLevelBridgeFarBank.md)（规则 `Script_FirstLevelBridgeFarBank`，纯 node 门 `Script_FirstLevelFarBankTest`，出图与 A/B 帧耗时 `Script_FirstLevelFarBankShots`）。
+
 - **Frame Debugger（2026-09-30）**：编辑器「渲染调试」组的独立窗口；捕获冻结完整帧，按 DC/Pass 检查和回放。计时、资源恢复、MSAA/mip/合批契约与平台边界见 [单帧绘制调试器](docs/Data_FrameDebugger.md)，回归 `Script_FrameDebuggerTest`。普通运行不装逐绘制钩子；改捕获/回放必须验证捕获前后像素、逆向步进和退出恢复，GPU 不可用不得用 CPU 或 0 冒充。
 
 - **默认白盒画质（2026-09-29）**：进入游戏默认 `quality=whitebox`，场景采用参考图式的灰色米制网格材质；地形、角色（含敌军）、第一人称身体/手及手持装备默认保留贴图，高级 Feature/Pass 关闭。现有「画质 → 编辑白盒画质」可调整网格大小/线宽/颜色、独立人物贴图开关并保存；查询 `Tengxian.GraphicsProfile.Inspect()`。**美术表现迭代与验收必须自行显式打开 `?quality=high` / `ultra`**，不能拿默认白盒截图判断美术效果失效。配置/API/材质例外与回归见 [白盒画质](docs/Data_WhiteboxQuality.md)，数据源 `Data_Tuning_Whitebox.mjs`；新 Pass 默认不进入白盒，需显式登记。

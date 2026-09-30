@@ -75,6 +75,106 @@ async function WaitVoiceFinished(page, cue, label, seconds = 60) {
   assert.fail(`${label}：对白 ${cue} 没有实际播完，现场 ${JSON.stringify(voice)}`);
 }
 
+// ---------------------------------------------------------------------------
+// 18 对岸步坦部队（docs/Data_FirstLevelBridgeFarBank.md §7）：驾驶脚本的观测与断言工具
+// ---------------------------------------------------------------------------
+const FarBankState = page => page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().end.farBank ?? null);
+/**
+ * 推帧到 `expr` 为真（fb = 对岸状态、m = 任务状态）。fight 时照常开火，射程放到 105 m：
+ * 对岸机枪位离南岸射位约 90–100 m，默认 90 m 够不着。
+ */
+async function WaitUntil(page, label, expr, seconds, { fight = false } = {}) {
+  // 基线树（没有对岸模块，A/B 帧耗时对照用同一份驾驶脚本）：这些等待整段跳过。
+  if (!(await FarBankState(page))) { console.log("FARBANK_ABSENT", label); return; }
+  let ok = false;
+  for (let chunk = 0; chunk < Math.ceil(seconds / 5) && !ok; chunk += 1) {
+    ok = await page.evaluate(({ expr, fight }) => {
+      const g = window.Tengxian, test = new Function("fb", "m", `return ${expr};`);
+      for (let i = 0; i < 300; i += 1) {
+        const m = g.Debug.FirstLevelMission();
+        if (test(m.end.farBank, m)) return true;
+        const foe = fight ? window.MissionInputDriver?.Target(105) : null;
+        if (foe) window.MissionInputDriver.Shoot(foe);
+        else { g.Debug.Mouse(0, false); g.Debug.Mouse(2, false); }
+        g.StepFrames(1, 1 / 60, false);
+      }
+      g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
+      const m = g.Debug.FirstLevelMission();
+      return test(m.end.farBank, m);
+    }, { expr, fight });
+    if (!ok) console.log("WAIT_DIAG", label, JSON.stringify(await page.evaluate(() => window.__farBankDiag?.() ?? null)));
+  }
+  assert.ok(ok, `${label}：等不到 ${expr}`);
+}
+/** 整趟里玩家掉血与开火的记录（每次 StepFrames 之后采样）：验收「玩家不会被隔河秒掉」与「BridgeCover 打得下来」。 */
+async function InstallFarBankProbe(page) {
+  await page.evaluate(() => {
+    const g = window.Tengxian, p = g.player;
+    if (window.__farBankProbe) return;
+    const probe = window.__farBankProbe = {
+      hp: { start: p.health, min: p.health, lost: 0, hits: 0, last: p.health, maxSuppression: 0, log: [] },
+      shots: { fired: 0, soldier: 0, wall: 0, none: 0, farSoldier: 0, maxSoldierDistM: 0 }, last: g.state.playerShots,
+    };
+    // 卡住时的现场（WaitUntil 每 5 s 报一次）：尾队的进度与对岸单位的位置。
+    window.__farBankDiag = () => {
+      const m = g.Debug.FirstLevelMission();
+      return { stage: m.stage, time: Number(m.time.toFixed(0)), hp: p.health, column: m.bridgeColumn.map((e) => `${e.id}:${e.progress}${e.crossed ? "X" : ""}${e.pinned ? "P" : ""}${e.alive ? "" : "dead"}`),
+        vanguard: g.ai.soldiers.filter((s) => s.farBank && s.alive && (s.farBank === "shore" || s.farBank === "vanguard") && s.position.z > 92).map((s) => `${s.missionId}@${s.position.x.toFixed(1)},${s.position.z.toFixed(1)}`),
+        facts: m.facts.filter((f) => /^(southBank|bridgeFire|rearColumn)/.test(f)) };
+    };
+    const step = g.StepFrames.bind(g);
+    g.StepFrames = (...args) => {
+      const result = step(...args);
+      const h = p.health;
+      if (h < probe.hp.last - 0.01) {
+        probe.hp.hits += 1; probe.hp.lost += probe.hp.last - h;
+        if (probe.hp.log.length < 40) probe.hp.log.push({ t: Number(g.Debug.FirstLevelMission().time.toFixed(1)), stage: g.Debug.FirstLevelMission().stage, lost: Number((probe.hp.last - h).toFixed(1)), hp: Number(h.toFixed(1)), stance: p.stance });
+      }
+      probe.hp.last = h; probe.hp.min = Math.min(probe.hp.min, h);
+      probe.hp.maxSuppression = Math.max(probe.hp.maxSuppression, p.suppression || 0);
+      if (g.state.playerShots > probe.last) {
+        probe.last = g.state.playerShots;
+        const shot = g.state.lastShot;
+        probe.shots.fired += 1;
+        if (shot) {
+          probe.shots[shot.hitKind] = (probe.shots[shot.hitKind] || 0) + 1;
+          if (shot.hitKind === "soldier") { probe.shots.maxSoldierDistM = Math.max(probe.shots.maxSoldierDistM, shot.dist || 0); if ((shot.dist || 0) > 70) probe.shots.farSoldier += 1; }
+        }
+      }
+      return result;
+    };
+  });
+}
+const FarBankProbe = page => page.evaluate(() => JSON.parse(JSON.stringify(window.__farBankProbe ?? null)));
+/** 连推 n 帧（带渲染与 gl.finish）取帧耗时中位数与 p95，另报 draw / 三角形（A/B 对照用，无对岸模块的基线树同样能跑）。 */
+async function FrameTiming(page, label, frames = 24) {
+  const timing = await page.evaluate((frames) => {
+    const g = window.Tengxian, gl = g.renderer.getContext(), samples = [];
+    for (let i = 0; i < frames + 4; i += 1) {
+      const start = performance.now(); g.StepFrames(1, 1 / 60, true); gl.finish();
+      if (i >= 4) samples.push(performance.now() - start);
+    }
+    samples.sort((a, b) => a - b);
+    const rinfo = g.renderer.info, wasReset = rinfo.autoReset; rinfo.autoReset = false; rinfo.reset(); g.StepFrames(1, 1 / 60, true); const info = { calls: rinfo.render.calls, triangles: rinfo.render.triangles }; rinfo.autoReset = wasReset;
+    const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+    return { p50: Number(samples[Math.floor(samples.length / 2)].toFixed(2)), p95: Number(samples[Math.floor(samples.length * 0.95)].toFixed(2)),
+      mean: Number(mean.toFixed(2)), drawCalls: info.calls, triangles: info.triangles };
+  }, frames);
+  console.log("FARBANK_FRAME", label, JSON.stringify(timing));
+  return timing;
+}
+/** 只推世界，不动玩家（对照树与本树在同一个游戏时间点量帧耗时用）。 */
+const StepSeconds = (page, seconds) => page.evaluate((seconds) => {
+  const g = window.Tengxian;
+  for (let i = 0; i < Math.round(seconds * 60); i += 1) g.StepFrames(1, 1 / 60, false);
+}, seconds);
+/** 玩家换个姿态原地看对岸拍一张（拍完姿态与视线原样还回去）。 */
+async function CaptureLook(page, CaptureFocus, name, point, stance = null) {
+  const before = stance ? await page.evaluate((s) => { const p = window.Tengxian.player, was = p.stance; p.SetStance(s); return was; }, stance) : null;
+  await CaptureFocus(name, point);
+  if (before) await page.evaluate((s) => window.Tengxian.player.SetStance(s), before);
+}
+
 /**
  * 阶段 15–18，走到 Complete。
  *
@@ -330,6 +430,8 @@ async function DriveDeath(ctx, { JumpStage, Capture, WaitStage }) {
 async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitStage }) {
   const { page, output } = ctx;
   await JumpStage(18);
+  await InstallFarBankProbe(page);
+  const FAR_BANK_LOOK = { x: A.railBridge.x, z: 86, height: 1.4 };   // 对岸人堆的中心（岸线一带）
   {
     // 传令兵真人跑进接收处，跑到跟前才开口。
     const before = await Mission(page);
@@ -371,9 +473,32 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
   }
   // 压住北岸土坎的火力（真开枪；不要求杀光）。
   await page.evaluate(() => { window.MissionInputDriver.blocked.clear(); });
+  // 对岸大部队（2026-09-30）：BridgeCover 起就看得见 —— 第一拨（岸线 12 + 待命 10）陆续走到位，战车开进来。
+  // 站在射位上一边打土坎一边等（fight），到位之后站 / 蹲各拍一张。
+  await WaitUntil(page, "18 对岸第一拨到位", "fb.shore + fb.standby >= 20", 120, { fight: true });
+  const fbCover = await FarBankState(page);
+  if (fbCover) {
+    const fb = fbCover;
+    console.log("FARBANK_COVER", JSON.stringify({ shore: fb.shore, standby: fb.standby, real: fb.real, ija: fb.ijaCount, tier: fb.tier, dz: fb.dz, tanks: fb.tanks, ambient: fb.ambientActive }));
+    assert.ok(fb.started && fb.shore + fb.standby >= 20, `BridgeCover 起对岸就有人：${JSON.stringify({ shore: fb.shore, standby: fb.standby })}`);
+    assert.equal(fb.real, 0, "真 AI（8 个）BridgeWithdraw 才放出");
+    assert.ok(fb.tanks.some(tank => tank.state !== "queued"), "战车已经开进来");
+    assert.ok(fb.ijaCount <= fb.ijaCap, `同屏日军 ${fb.ijaCount} ≤ ${fb.ijaCap}`);
+    await CaptureLook(page, CaptureFocus, "FarBankCoverStand", FAR_BANK_LOOK, "stand");
+    await CaptureLook(page, CaptureFocus, "FarBankCoverCrouch", FAR_BANK_LOOK, "crouch");
+  }
+  await WaitUntil(page, "18 战车停到岸边", "fb.tanks.filter(t => t.state === 'posted').length >= 2", 90, { fight: true });
   // 站在射位上真开枪压住土坎（不要再走路线：Route 的 fight 循环一看见敌人就松开
   // 前进键，脚下不动就被判成「这条路走不通」）。打断之后尾队自己过桥。
   await WaitFact(page, "bridgeFireBroken", "18 打断北岸火力", 420, { fight: true });
+  if (fbCover) {
+    // 打断之后：前锋冲上桥北段追尾队，T3 进场。
+    await WaitUntil(page, "18 前锋冲上桥", "fb.vanguard >= 1 || m.stage !== 'BridgeCover'", 60, { fight: true });
+    const fb = await FarBankState(page);
+    console.log("FARBANK_BROKEN", JSON.stringify({ vanguard: fb.vanguard, tanks: fb.tanks.map(t => t.id + ":" + t.state), mg: fb.mg }));
+    await CaptureFocus("FarBankVanguard", { x: A.railBridge.x, z: 100, height: 1.2 });
+  }
+  await WaitUntil(page, "18 尾队过桥", "m.stage !== 'BridgeCover'", 300, { fight: true });
   await WaitStage("BridgeWithdraw", 420, { fight: true, cover: true });
   {
     const shot = await Mission(page);
@@ -410,6 +535,21 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     });
     assert.ok(finite, "撤退起步时玩家速度必须是有限数（NaN 一旦混进来，八个方向都走不动）");
   }
+  // 对岸：BridgeWithdraw 起真 AI 8 个与第二拨走到岸边、冲桥组起跑。玩家在射位上原地等 20 s（不蹲不打：这也是「站在
+  // 射位上挨对岸火力」的实测，掉血记录在 probe 里），再量这一刻的帧耗时并拍站 / 蹲两张。基线树没有对岸，同样等 20 s。
+  await StepSeconds(page, 20);
+  const fbW = await FarBankState(page);
+  if (fbW) {
+    await WaitUntil(page, "18 真 AI 与第二拨到位", "fb.real >= 8 && fb.shore >= 16", 60);
+    const fb = await FarBankState(page);
+    console.log("FARBANK_WITHDRAW", JSON.stringify({ real: fb.real, shore: fb.shore, standby: fb.standby, rush: fb.rush, rushState: fb.rushState, rushUnits: fb.rushUnits, ija: fb.ijaCount, tier: fb.tier, tanks: fb.tanks, shells: fb.shells, mg: fb.mg }));
+    assert.equal(fb.real, 8, "BridgeWithdraw 放出 8 个真 AI");
+    assert.ok(fb.rushState?.started, "冲桥组起跑");
+    assert.ok(fb.ijaCount <= fb.ijaCap, `同屏日军 ${fb.ijaCount} ≤ ${fb.ijaCap}（actorPool ija 预建 48）`);
+    await CaptureLook(page, CaptureFocus, "FarBankWithdrawStand", FAR_BANK_LOOK, "stand");
+    await CaptureLook(page, CaptureFocus, "FarBankWithdrawCrouch", FAR_BANK_LOOK, "crouch");
+  }
+  await FrameTiming(page, "BridgeWithdrawSurge");
 
   // 撤是撤，不是边退边打：fight 会让 Route 一看见残敌就停下开枪，走不到掩护区。
   // 末段绕过 BlastSafeBank 那道 1.35 m 的土坎西头（(−69.5..−62.5, z≈197.5)），
@@ -441,7 +581,22 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     }
     assert.ok(held.fired, "18 爆破：等不到 bridgeDestroyed —— " + JSON.stringify(held));
   }
+  await FrameTiming(page, "BridgeBlastFire", 12);
   await Capture("BridgeBlast");
+  const fbBlast = await FarBankState(page);
+  if (fbBlast) {
+    // 起爆时桥上有正冲过来的日军（ReadyForBlast 等冲桥组到位才放行），被炸死抛起；跟着那一孔落河、落河后移除。
+    console.log("FARBANK_BLAST", JSON.stringify({ blast: fbBlast.blast, rush: fbBlast.rushState, alive: fbBlast.alive, real: fbBlast.real }));
+    console.log("FARBANK_RUSH_AT_BLAST", JSON.stringify({ rush: fbBlast.rushState, units: fbBlast.rushUnits }));
+    assert.ok(fbBlast.rushState?.settled, `冲桥组放行了起爆器：${JSON.stringify(fbBlast.rushState)}`);
+    await CaptureFocus("FarBankBlastBridge", { x: A.railBridge.x, z: 142, height: 2.5 });
+    await StepSeconds(page, 3);
+    const fb3 = await FarBankState(page);
+    console.log("FARBANK_BLAST3S", JSON.stringify({ blast: fb3.blast, blastKilled: fb3.blastKilled, alive: fb3.alive, removed: fb3.removed, bank: fb3.bank }));
+    assert.ok(fb3.blast?.done && fb3.blastKilled >= 3, `桥上的日军被炸死了 ${fb3.blastKilled} 个（冲桥组 6）`);
+    await FrameTiming(page, "BridgeBlast+3s");
+    await CaptureFocus("FarBankBlast3s", { x: A.railBridge.x, z: 142, height: 2.5 });
+  }
   {
     const blast = await page.evaluate(() => {
       const g = window.Tengxian, mission = g.Debug.FirstLevelMission();
@@ -466,16 +621,69 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     assert.equal(gone.deck, 0, "炸完桥面/桁架/钢轨的碰撞一件不剩");
   }
   await WaitFact(page, "marchOrderHeard", "18 往滕县", 180);
+  if (fbBlast) {
+    // 桥断之后对岸全停在岸边隔河射击：没有一个日军过南水线，起爆 14 s 后活着的人都在岸沿以北 0.5 m 之内。
+    await WaitUntil(page, "18 桥断后对岸停在岸边", "fb.blast && fb.blastAgeS >= 15", 40);
+    const fb = await FarBankState(page);
+    console.log("FARBANK_HALTED", JSON.stringify({ alive: fb.alive, real: fb.real, scripted: fb.scripted, bank: fb.bank, shells: fb.shells, mg: fb.mg, tanks: fb.tanks, reinforced: fb.reinforced, ija: fb.ijaCount, tier: fb.tier }));
+    assert.equal(fb.bank.southBank, 0, "桥断后（其实是整趟）没有一个日军过河");
+    assert.equal(fb.bank.overNow, 0, "桥断 14 s 后对岸活着的人全在岸边");
+    assert.ok(fb.bank.southMostZ <= 148, `整趟里对岸最靠南的日军 z ${fb.bank.southMostZ}（冲桥组最远到被炸孔北半）`);
+    assert.ok(fb.alive >= 16 && fb.real === 8, `桥断之后对岸仍有 ${fb.alive} 人，真 AI ${fb.real}`);
+    assert.ok(fb.shells.fired >= 1 && fb.shells.minPlayerM >= 22 && fb.shells.minFriendlyM >= 10,
+      `战车炮击了 ${fb.shells.fired} 发，落点离玩家最近 ${fb.shells.minPlayerM} m、离己方最近 ${fb.shells.minFriendlyM} m`);
+    assert.ok(fb.mg.rounds > 0, "战车机枪打过曳光");
+  }
 
   // --- 18 夜入滕城：先随队走完 marchOut，黑屏字幕，夜景，进北门 ---------------
   await WaitStage("NightMarch", 180, { fight: false });
-  // 走到离 marchOut 锚点 8 m（marchOutReached）编排就接管：黑屏一起、玩家交出控制权。
+  // 走到 marchOut 终点（marchOutReached）且脱离战场（retreatOutOfReach）编排就接管：黑屏一起、玩家交出控制权。
   // 驾驶器必须在这儿松手 —— 它要是攥着最后那个路点不放，黑屏里人被瞬移到
   // nightSpawn 之后，淡入一结束它就把人原路赶回 marchOut（实拍 2026-09-20）。
-  await Route(Points(MISSION_STAGE_ROUTES.marchOut), "NightMarchOut", { stopFact: "marchOutReached" });
+  // 2026-09-30：路线延到 113 m、翻岗子。分三段走，离北岸 ~120 m 与 ~160 m 处各回头看一眼对岸再拍。
+  const march = Points(MISSION_STAGE_ROUTES.marchOut);
+  await Route(march.slice(1, 2), "NightMarchOut120");
+  {
+    const fb = await FarBankState(page);
+    if (fb) {
+      console.log("FARBANK_RETREAT120", JSON.stringify({ dz: fb.dz, tier: fb.tier, alive: fb.alive, out: fb.out, shells: fb.shells.fired }));
+      assert.ok(fb.tier === "mid" || fb.tier === "far", `离北岸 ${fb.dz} m 是 mid / far 档`);
+      assert.equal(fb.out.recorded, false, "离北岸 120 m 还不算脱离战场");
+    }
+    await CaptureFocus("RetreatLook120", FAR_BANK_LOOK);
+    await FrameTiming(page, "Retreat120");
+  }
+  await Route(march.slice(2, 4), "NightMarchOut160");
+  {
+    const fb = await FarBankState(page);
+    if (fb) {
+      console.log("FARBANK_RETREAT160", JSON.stringify({ dz: fb.dz, tier: fb.tier, alive: fb.alive, out: fb.out, shells: fb.shells.fired }));
+      assert.ok(fb.tier === "far" || fb.tier === "out", `离北岸 ${fb.dz} m 是 far / out 档`);
+      assert.equal(fb.out.recorded, false, "离北岸 160 m 还没翻过岗，不算脱离战场");
+    }
+    await CaptureFocus("RetreatLook160", FAR_BANK_LOOK);
+  }
+  await Route(march.slice(4), "NightMarchOut", { stopFact: "marchOutReached" });
   await WaitFact(page, "marchOutReached", "18 走完 marchOut", 180);
+  {
+    const fb = await FarBankState(page);
+    if (fb) {
+      console.log("FARBANK_OUT", JSON.stringify({ dz: fb.dz, tier: fb.tier, out: fb.out, alive: fb.alive }));
+      assert.ok(fb.out.recorded && fb.out.dz >= 190, `黑屏是脱离战场之后：${JSON.stringify(fb.out)}`);
+      assert.ok(fb.out.hidden, "翻过土岗之后眼位到对岸单位的视线被地形挡住");
+      const facts = (await Mission(page)).facts;
+      assert.ok(facts.includes("retreatOutOfReach") && facts.includes("marchOutReached"), "两条事实都记了");
+    }
+  }
   await Capture("NightFadeOut");
   await WaitFact(page, "nightArrivalPlaced", "18 黑屏里换夜景", 180);
+  {
+    const fb = await FarBankState(page);
+    if (fb) {
+      const left = await page.evaluate(() => window.Tengxian.ai.soldiers.filter(s => s.farBank && s.alive).length);
+      assert.ok(fb.retired && fb.alive === 0 && left === 0, `黑屏里对岸全部收走：${JSON.stringify({ retired: fb.retired, alive: fb.alive, left })}`);
+    }
+  }
   {
     // 黑屏里那一下瞬移真的把**人**搬过去了（渲染位置与 Rapier 角色体同时过去）。
     const placed = await page.evaluate(() => {
@@ -516,4 +724,9 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
   }
   await Capture("NightGateEntered");
   await WaitStage("Complete", 180);
+  // 整趟 18 里玩家的掉血与开火记录（「玩家不会被隔河秒掉」「BridgeCover 打得下来」的实测）。
+  const probe = await FarBankProbe(page);
+  console.log("FARBANK_PROBE", JSON.stringify({ hp: { ...probe.hp, log: undefined }, hitLog: probe.hp.log, shots: probe.shots }));
+  await fs.writeFile(path.join(output, "Data_FarBankProbe.json"), JSON.stringify(probe, null, 2));
+  assert.ok(probe.hp.min >= 40, `整趟 18 玩家血量最低 ${probe.hp.min}（掉了 ${probe.hp.lost.toFixed(1)}，${probe.hp.hits} 次受伤），不许被隔河压得只剩半条命`);
 }

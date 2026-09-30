@@ -87,6 +87,8 @@ export function ParseCampaignArgs(argv = process.argv) {
     quietGuidanceInterruptProbe: Has("--probe-quiet-guidance-interrupt"),
     allowCheckpointRetry: Has("--allow-checkpoint-retry"),
     bombFirst, evidenceTag, reflexes,
+    // 出图 / 对照用：`--quality=whitebox|high|…` 或环境变量 CAMPAIGN_QUALITY；缺省仍是 low（OpenCampaign 的老口径，不改）。
+    quality: argv.find((arg) => arg.startsWith("--quality="))?.split("=")[1] || process.env.CAMPAIGN_QUALITY || undefined,
     stageFrom, stageTo,
     suite: stageFrom === 6 ? "FirstLevelWhitebox0618" : stageFrom === 3 ? "FirstLevelFrontTopology"
       : stageFrom === 4 || stageFrom === 5 ? `FirstLevelFrontCheckpoint0${stageFrom}${bombFirst ? "BombFirst" : ""}`

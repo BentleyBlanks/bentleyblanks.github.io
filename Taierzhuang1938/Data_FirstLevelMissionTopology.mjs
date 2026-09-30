@@ -277,7 +277,9 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   // 南岸射位 (-81,179.4) 到它的连线整段在西桁架 (x -79.95) 以西，不被三孔桥的桁架挡住。
   railBridge: {x:-77,z:148}, bridgeNorthEnd: {x:-77,z:86}, bridgeSouthEnd: {x:-77,z:170},
   bridgeCover: {x:-81,z:179.4}, bridgeEnemy: {x:-84.5,z:80.5}, blastSafe: {x:-66,z:201},
-  marchOut: {x:-62,z:232},
+  // 2026-09-30 对岸大部队（docs/Data_FirstLevelBridgeFarBank.md §5）：撤离路线从 (−62,232) 再往南延到 (−98,295)，
+  // 翻过 z≈276 的缓坡土岗（Data_FirstLevelWhiteboxTerrainRear 的 RetreatRise）、离北岸 208 m、对岸看不见才黑屏。
+  marchOut: {x:-98,z:295},
   // 关尾夜景（白天不可见）：淡入点、瓮城外、门洞、门内终点
   nightSpawn: {x:-160,z:292}, northGateApproach: {x:-160,z:318},
   northGate: {x:-160,z:340}, gateInside: {x:-160,z:352},
@@ -342,9 +344,10 @@ export const MISSION_STAGE_ROUTES = Object.freeze({
     {x:-74,z:199},{x:-78,z:190},S.bridgeCover],
   // 回援尾队：北岸 → 桥面 → 南岸 → 继续南下
   bridgeCrossing: [{x:-77,z:70},S.bridgeNorthEnd,S.bridgeSouthEnd,{x:-76,z:182},
-    {x:-72,z:192},S.marchOut],
+    {x:-72,z:192},{x:-62,z:232}],
   bridgeWithdraw: [S.bridgeCover,{x:-78,z:188},{x:-72,z:197},S.blastSafe],
-  marchOut: [S.blastSafe,{x:-64,z:216},S.marchOut],
+  // blastSafe → 原行军线 (−62,232) → 加长的南段：(−62,250) → (−68,268) → 土岗（z≈276）→ (−80,284) → 终点。
+  marchOut: [S.blastSafe,{x:-64,z:216},{x:-62,z:232},{x:-62,z:250},{x:-68,z:268},{x:-80,z:284},S.marchOut],
   nightMarch: [S.nightSpawn,S.northGateApproach,S.northGate,S.gateInside],
 });
 

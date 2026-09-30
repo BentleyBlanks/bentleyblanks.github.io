@@ -569,9 +569,9 @@ export const MISSION_FACT_GATES = Object.freeze({
   // --- NightMarch --------------------------------------------------------
   nightTransitionComplete: Gate({
     kind: "scripted", step: "NightMarch", source: "Update/controls(nightTransition)",
-    text: "先随队真的走完 marchOut 那一段（marchOutReached），行军脚步不停 → 淡出 → "
-      + "字幕「1938年3月15日 夜｜滕县」→ 黑屏里换夜间天空并瞬移 → 淡入北门外行军队列",
-    requires: ["marchOutReached"],
+    text: "先随队真的走完 marchOut 那一段（marchOutReached）并脱离战场（retreatOutOfReach），行军脚步不停 → 淡出 → "
+      + "字幕「1938年3月15日 夜｜滕县」→ 黑屏里换夜间天空并瞬移（对岸的步坦部队同时收走）→ 淡入北门外行军队列",
+    requires: ["marchOutReached", "retreatOutOfReach"],
   }),
   northGateReached: Gate({
     kind: "proximity", step: "NightMarch", anchor: "northGate", radiusM: 6, source: "Update",
@@ -730,7 +730,15 @@ export const MISSION_FACT_GATES = Object.freeze({
   marchOutReached: Gate({
     kind: "proximity", step: "NightMarch", anchor: "marchOut", radiusM: END.marchOutArriveM,
     source: "FirstLevelNightGate.UpdateMarchOut",
-    note: "爆破之后随队走完 marchOut 那一段，才起黑屏转场（不是进步骤就淡出）",
+    note: "爆破之后随队走完 marchOut 那一段（2026-09-30 起 113 m、翻过撤离土岗；沿路线的里程走完也算，走过头不卡），"
+      + "且 retreatOutOfReach 成立，才起黑屏转场（不是进步骤就淡出）。这条事实只在黑屏真的起来那一刻记，"
+      + "Retry() 的 NightMarch 分支据它分辨「A 段阵亡」与「黑屏之后阵亡」",
+  }),
+  retreatOutOfReach: Gate({
+    kind: "scripted", step: "NightMarch", source: "FirstLevelBridgeFarBank.UpdateOutOfReach",
+    text: "脱离战场（用户 2026-09-30：脱离战场后才黑幕进入下一幕）：玩家离北岸 ≥ END_TUNING.farBank.outDzM 米，"
+      + "对岸真 AI（含 bridgeNorth 幸存者）连续 blindS 秒看不见玩家，且眼位到最近几个对岸单位的视线被地形 / 地物挡住"
+      + "（绕开土岗走空地的兜底是 dz ≥ outFallbackDzM）。夜转场 nightTransitionComplete 要它",
   }),
   nightUsherLeading: Gate({
     kind: "scripted", step: "NightMarch", source: "FirstLevelNightGate.UpdateNight",

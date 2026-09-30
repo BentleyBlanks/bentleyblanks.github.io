@@ -281,7 +281,7 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   // 18 北岸土坎的火力：来自北侧外围战场，不在桥边凭空生成。
   bridgeNorth: [
     { id: "BridgeNorthGunner", x: A.bridgeEnemy.x, z: A.bridgeEnemy.z, weapon: "Type11", hold: true },
-    { id: "BridgeNorthA", x: A.bridgeEnemy.x - 6, z: A.bridgeEnemy.z + 3 },
+    { id: "BridgeNorthA", x: A.bridgeEnemy.x - 6, z: A.bridgeEnemy.z - 1 },
     // 土坎（BridgeNorthRidgeEast，z≈82.2，2026-09-30 河拓宽后整体北移 50 m）在这一带是实心的：出生点要摆在坎**后面**
     // （北侧，z 更小），摆到 z+2 就是摆在土里。
     { id: "BridgeNorthB", x: A.bridgeEnemy.x + 7, z: A.bridgeEnemy.z - 3 },

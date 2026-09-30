@@ -44,13 +44,22 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
     Object.freeze({ id: "MarchOutTread", width: 2.2, wear: 0.72,
       points: Object.freeze([
         Object.freeze({ x: -66, z: 204 }), Object.freeze({ x: -64, z: 216 }), Object.freeze({ x: -62, z: 232 }),
-        Object.freeze({ x: -61.4, z: 240 }),
-      ]), note: "18 炸桥后随队南下（marchOut），行军队踩得宽一点；过了淡出点再延 8 m，路不在脚下断掉" }),
+        Object.freeze({ x: -62, z: 250 }), Object.freeze({ x: -64, z: 256 }),
+      ]), note: "18 炸桥后随队南下（marchOut 前半）：行军队踩得宽一点；Bridge18 框北界 z 260，再往南接 RetreatTread" }),
+    // 2026-09-30 撤离路线南延（docs/Data_FirstLevelBridgeFarBank.md §5）：marchOut 从 (−62,232) 延到 (−98,295)，
+    // 后半段落在新框 Retreat18 里，翻过 RetreatRise 缓坡土岗，走到头再延 8 m 让路不在脚下断掉。
+    Object.freeze({ id: "RetreatTread", width: 2.2, wear: 0.66,
+      points: Object.freeze([
+        Object.freeze({ x: -66.4, z: 263.6 }), Object.freeze({ x: -68, z: 268 }), Object.freeze({ x: -80, z: 284 }),
+        Object.freeze({ x: -98, z: 295 }), Object.freeze({ x: -105, z: 300 }),
+      ]), note: "18 撤离（marchOut 后半）：(−68,268) → 土岗 → (−80,284) → 终点 (−98,295)" }),
   ]),
   boxes: Object.freeze([
     Object.freeze({ id: "Reception15", minX: -41, maxX: 70, minZ: 150, maxZ: 260 }),
     Object.freeze({ id: "Bridge18", minX: -100, maxX: -41, minZ: 110, maxZ: 260 }),
     Object.freeze({ id: "Night18", minX: -185, maxX: -135, minZ: 280, maxZ: 360 }),
+    // 撤离土岗与其后：Bridge18 南界 z 260 之南、Night18 东界 x −135 之东（三个框只在边线上相接、不重叠）。
+    Object.freeze({ id: "Retreat18", minX: -132, maxX: -30, minZ: 260, maxZ: 330 }),
   ]),
   shapes: Object.freeze([
     Object.freeze({ id: "ReceptionYardFloor", kind: "box", op: "level", x: -19.5, z: 235, w: 40.8, d: 31.8,
@@ -68,5 +77,20 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
     Object.freeze({ id: "BridgeBankBermEast", kind: "line", op: "raise", halfW: 0.5, feather: 0.95, dy: 0.75,
       points: Object.freeze([Object.freeze({ x: -70.8, z: 176.5 }), Object.freeze({ x: -57.5, z: 177 })]),
       note: "18_1 南岸岸垄东段；与西段之间留出铁路与尾队的缺口" }),
+    // ---- 撤离土岗（2026-09-30，docs/Data_FirstLevelBridgeFarBank.md §5）----------------------------
+    // 脱离战场要「翻过一道岗」而不是一条突兀的土墙：岗脊 z≈276（离北岸 186 m）、最高 2.7 m、每侧 13 m 缓坡
+    // （最陡 1.5·2.7/13 = 0.31，17°，人和担架都走得上），两头收成低缓的坡；脊线略弯，不是一条直线。
+    // 站在岗后 z ≥ 290 一带，眼高 1.65 m 的视线到对岸（z≈85）被岗脊挡住（Script_FirstLevelFarBankTest 量）。
+    // 岗上的枯树、残屋与坟包在 Data_FirstLevelWhiteboxRear 的 Retreat18 一节。
+    Object.freeze({ id: "RetreatRise", kind: "line", op: "raise", halfW: 3, feather: 13, dy: 2.7,
+      points: Object.freeze([
+        Object.freeze({ x: -116, z: 279, dy: 1.6 }), Object.freeze({ x: -100, z: 278, dy: 2.4 }),
+        Object.freeze({ x: -84, z: 276, dy: 2.7 }), Object.freeze({ x: -68, z: 276, dy: 2.7 }),
+        Object.freeze({ x: -52, z: 277, dy: 2.2 }), Object.freeze({ x: -46, z: 279, dy: 1.4 }),
+      ]), note: "撤离路线翻过的缓坡土岗（岗脊 2.7 m，两头收低）" }),
+    Object.freeze({ id: "RetreatKnollWest", kind: "disc", op: "raise", x: -112, z: 291, radius: 5, feather: 9, dy: 1.3,
+      note: "土岗西南的一个小土包，把岗后的空地读成有起伏的田" }),
+    Object.freeze({ id: "RetreatKnollEast", kind: "disc", op: "raise", x: -50, z: 292, radius: 4, feather: 8, dy: 1.1,
+      note: "土岗东南的小土包" }),
   ]),
 });

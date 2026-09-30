@@ -774,11 +774,14 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
       const t = d / distance,
         x = a.x + (b.x - a.x) * t,
         z = a.z + (b.z - a.z) * t,
-        y = SampleMissionTerrain(x, z);
+        y = SampleMissionTerrain(x, z),
+        // 桥面上的点：脚下是甲板，桥墩顶在甲板下面（2026-09-30 三孔桥），不是挡路的实心件。
+        onDeck = MISSION_LAYOUT.walkableSurfaces.some((surface) => Math.abs(x - surface.x) < surface.w / 2 && Math.abs(z - surface.z) < surface.d / 2);
       for (const box of MISSION_LAYOUT.blocks) {
         if (MISSION_LAYOUT.walkableSurfaces.some((surface) => surface.id === box.id)) continue;
         // 不登记碰撞的示意件（北沙河水面、芦苇）挡不住人；桥上的路线脚下量到的是河床。
         if (box.solid === false) continue;
+        if (onDeck && /^RailBridgePier/.test(box.id)) continue;
         const dx=x-box.x, dz=z-box.z, cosine=Math.cos(box.ry||0), sine=Math.sin(box.ry||0);
         const blocked =
           Math.abs(dx*cosine-dz*sine) < box.w / 2 + 0.35 &&

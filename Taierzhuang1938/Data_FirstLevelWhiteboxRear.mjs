@@ -433,6 +433,34 @@ export function BuildRearWhitebox(groundAt) {
   // no river piers. The old non-colliding pier details were removed with the whitebox look.
 
   // ---------------------------------------------------------------------------
+  // 18 Retreat18 (2026-09-30, docs/Data_FirstLevelBridgeFarBank.md §5): the march-out route (marchOut, 113 m) climbs over the
+  // gentle RetreatRise mound (terrain table, crest z≈276, 2.7 m) and the blackout waits until the far bank cannot see the player.
+  // The mound alone reads as a wall of earth; dead trees on the crest, two ruined huts behind it and a scatter of grave mounds
+  // break the sight lines the way a real field edge does. Route (-68,268)→(-80,284)→(-98,295): nothing solid within 3 m of it
+  // (Script_FirstLevelFarBankTest measures the capsule clearance). Trees are Layout-style authored trunks (treeModel).
+  // ---------------------------------------------------------------------------
+  for (const [id, x, z, h] of [["RetreatDeadTree0", -92, 277.5, 6.4], ["RetreatDeadTree1", -56, 274, 5.6],
+    ["RetreatDeadTree2", -101, 284, 5.9], ["RetreatDeadTree3", -73, 291, 5.2], ["RetreatDeadTree4", -110, 276.5, 6.1]])
+    Box(blocks, id, x, z, .3, h * .65, .3, "timber", { treeModel: { heightM: h, region: "RetreatAuthored" }, ry: x * .1 });
+  // Ruined hut west of the route end: a broken north wall, a west wall and a stub of the east wall, no roof.
+  Grounded("RetreatRuinWestNorth", -106, 285.2, 6.2, 2.1, .5, "plaster");
+  Grounded("RetreatRuinWestWall", -109.1, 288.2, .5, 2.6, 5.8, "plaster");
+  Grounded("RetreatRuinWestStub", -103, 289.8, .5, 1.2, 2.4, "plaster");
+  Rubble("RetreatRuinWestSpill", -106, 289, 9, 2.4, 2.2, .45);
+  // A second ruin east of the crest, a corner of two walls.
+  Grounded("RetreatRuinEastNorth", -52, 286, 5, 2.2, .5, "plaster");
+  Grounded("RetreatRuinEastWall", -54.4, 289, .5, 2.8, 5.2, "plaster");
+  Rubble("RetreatRuinEastSpill", -51.5, 289.5, 7, 2.2, 2, .4);
+  // Grave mounds (low earth, a slab at the head) scattered on the back slope and the field behind it.
+  for (const [i, x, z, ry] of [[0, -90, 282, .2], [1, -88.5, 285.5, -.3], [2, -66, 287, .1], [3, -62, 291, .4],
+    [4, -58, 284.5, -.2], [5, -94, 289, .6], [6, -113, 281, 0], [7, -116, 286, .3]]) {
+    Grounded(`RetreatGrave${i}`, x, z, 1.7, .5, .95, "earthDark", ry);
+    Detail(`RetreatGraveSlab${i}`, x - Math.sin(ry) * .95, z - Math.cos(ry) * .95, .5, .7, .12, "step", { y: groundAt(x, z) + .35, ry });
+  }
+  for (const [i, x, z, s] of [[0, -98, 279, 1.1], [1, -86, 278.5, 1.3], [2, -74, 279.5, 1], [3, -63, 279, 1.2], [4, -104, 288.5, .9], [5, -47, 281, 1]])
+    Detail(`RetreatGrass${i}`, x, z, s, s * .6, s * .8, "foliage", { y: groundAt(x, z) + s * .3 });
+
+  // ---------------------------------------------------------------------------
   // 18_2 NightGate only: street houses, ammunition stacks, arch haunches, flag poles.
   // The 4 m barbican door / 3.8 m city gate and 9 m walls stay Layout's; the column walks x=-160.
   // ---------------------------------------------------------------------------
