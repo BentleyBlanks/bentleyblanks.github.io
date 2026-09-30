@@ -193,5 +193,5 @@ node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs
 
 - 拓扑门禁 `Script_FirstLevelMissionTopologyTest --rear-only` 要求 `transferWall` 在 C 区 z ≥ 86，所以射口 z 取 86.05（不是 85.7）；胸墙在 z 84.05，射口离墙 2 m。
 - 整段实跑 `Script_FirstLevelMissionBrowserTest --campaign --stage-jumps --stage-from=11 --stage-to=14`（驾驶脚本 12 段的射位改到 (71.3,86.05)）：
-  第一处 0 → 42 s 解除、第一批装车 82 s、第二处 93.6 s 解除、何有田 167 s 接位，12 → 13 → 14 的 Carry 一路走通；跑到 14 的 Rescue 时 playwright 报
+  第一处约 36 s 解除（东巷那拨 48 s 出来）、第一批装车 77 s、第二处 84.5 s 解除，12 → 13 → 14 的 Carry 一路走通；跑到 14 的 Rescue 时 playwright 报
   `Cannot create a string longer than 0x1fffffe8 characters`，**基线 e080b510 上同一位置同样红**（与本次无关）。注意 `--stage-to` 只接受 2/3/6/7/14/18，没有 12。
