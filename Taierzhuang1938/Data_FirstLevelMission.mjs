@@ -332,34 +332,33 @@ export const MISSION_TACTICS = Object.freeze({
   MeleeSecond: { delay: 1.5, points: [{x:58.6,z:9},{x:59,z:4}] },
   MeleeThird: { delay: 3, points: [{x:55.5,z:7},{x:56,z:4}] },
   MeleeAlley: { delay: 5, points: [{x:62,z:17.5},{x:58,z:17},{x:58,z:13.5}] },
-  // 12 两拨追兵的跃进（docs/Data_FirstLevelTransferCover20260927.md §3）。
+  // 12 两拨追兵的跃进（docs/Data_FirstLevelTransferCover20260927.md §3；2026-09-30 一夫当关改路，见文末一节）。
   // fact：顺子上了村口低墙才开始压（之前是站在街里的普通守敌）。mps / holdS：跑步穿街、
   // 在掩体后停一两秒再跃进（默认 1.85 m/s 走、每点停 4.5 s，是给守区巡逻的节奏）。
   // 中间折点钉在掩体藏身点（掩体北侧 0.45 m），离开掩体绕它的一头走 —— 这层没有寻路，
   // 一条腿就是一条直线；每条腿离任何实心体块 ≥ 0.35 m（Script_FirstLevelMissionTest）。
+  // 村路是 x 72.8–80.1 的夹道（门楼在 z 47.6，净宽 x 75.1–79.3）：第一拨全部从门楼洞口出来，
+  // 沿路在木箱、麻袋、翻车、断墙、墙土、草垛之间逐段跃进；西边两个人拐进西巷绕到守线左手。
   TransferGunner: { fact: "transferArrived", delay: 1, mps: 3.0, points: [
-    {x:75.2,z:41.8,holdS:0}, {x:78.9,z:54.0,holdS:.3}, {x:79.2,z:65.85}] },
+    {x:75.2,z:41.8,holdS:0}, {x:77.2,z:49.4,holdS:.3}, {x:74.6,z:68.5}] },
   TransferRifleA: { fact: "transferArrived", delay: 2, mps: 3.2, points: [
-    {x:73.2,z:41.6,holdS:0}, {x:74.6,z:52.8,holdS:0}, {x:68.0,z:54.9,holdS:0}, {x:60.8,z:55.2,holdS:0},
+    {x:75.4,z:42.0,holdS:0}, {x:76.4,z:49.3,holdS:0}, {x:75.2,z:53.2,holdS:0}, {x:68.0,z:54.9,holdS:0}, {x:60.8,z:55.2,holdS:0},
     {x:58.6,z:63.4,holdS:2.2}, {x:57.5,z:63.3,holdS:0}, {x:57.4,z:71.1,holdS:2.2}, {x:59.2,z:71.2,holdS:0},
     {x:63.85,z:75.3,holdS:0},
     {x:63.85,z:77.4,holdS:0}, {x:61.4,z:80.45}] },
   TransferRifleB: { fact: "transferArrived", delay: 4.5, mps: 3.2, points: [
-    {x:73.0,z:42.4,holdS:0}, {x:75.8,z:53.6,holdS:0}, {x:67.0,z:55.8,holdS:0}, {x:61.4,z:56.6,holdS:0},
+    {x:75.8,z:42.6,holdS:0}, {x:76.8,z:49.4,holdS:0}, {x:75.6,z:53.6,holdS:0}, {x:67.0,z:55.8,holdS:0}, {x:61.4,z:56.6,holdS:0},
     {x:58.6,z:63.4,holdS:1.8}, {x:57.5,z:63.3,holdS:0}, {x:57.4,z:71.1,holdS:1.8}, {x:59.2,z:71.2,holdS:0},
-    {x:66.4,z:74.8}] },
+    {x:66.4,z:74.7}] },
   TransferRifleC: { fact: "transferArrived", delay: 3, mps: 3.2, points: [
-    {x:74.0,z:42.0,holdS:0}, {x:73.5,z:54.5,holdS:1.8}, {x:74.55,z:54.5,holdS:0}, {x:73.7,z:69.8,holdS:2.0}, {x:73.7,z:69.2,holdS:0},
-    {x:75.4,z:69.2,holdS:0}, {x:77.1,z:71.8,holdS:0}, {x:74.6,z:78.4}] },
+    {x:75.5,z:42.2,holdS:0}, {x:76.2,z:49.2,holdS:0}, {x:73.6,z:54.35,holdS:1.8}, {x:74.7,z:54.35,holdS:0},
+    {x:77.1,z:59.0,holdS:0}, {x:77.1,z:73.8,holdS:0}, {x:74.6,z:78.25}] },
   TransferRifleD: { fact: "transferArrived", delay: 5.5, mps: 3.2, points: [
-    {x:75.6,z:41.2,holdS:0}, {x:80.9,z:54.35,holdS:1.6}, {x:79.6,z:54.4,holdS:0}, {x:80.2,z:57.0,holdS:0},
-    {x:80.75,z:66.6,holdS:0}, {x:80.6,z:69.8,holdS:1.8}, {x:80.6,z:69.25,holdS:0},
-    {x:78.6,z:69.25,holdS:0}, {x:78.0,z:71.9,holdS:0}, {x:80.9,z:74.6,holdS:0}, {x:84.9,z:75.83}] },
+    {x:75.7,z:41.3,holdS:0}, {x:78.4,z:49.2,holdS:0}, {x:80.9,z:54.35,holdS:1.6}, {x:79.6,z:54.4,holdS:0},
+    {x:79.3,z:57.4,holdS:0}, {x:78.9,z:66.0,holdS:0}, {x:78.9,z:73.9,holdS:0}, {x:81.6,z:74.1}] },
   TransferRifleE: { fact: "transferArrived", delay: 8, mps: 3.2, points: [
-    {x:74.8,z:41.6,holdS:0}, {x:80.9,z:54.35,holdS:1.2}, {x:79.6,z:54.4,holdS:0}, {x:80.2,z:57.0,holdS:0},
-    {x:80.75,z:66.6,holdS:0}, {x:80.6,z:69.8,holdS:1.5}, {x:80.6,z:69.25,holdS:0},
-    {x:78.6,z:69.25,holdS:0}, {x:78.0,z:71.9,holdS:0}, {x:80.9,z:74.6,holdS:0},
-    {x:86.9,z:75.3,holdS:0}, {x:87.2,z:77.75}] },
+    {x:74.8,z:41.6,holdS:0}, {x:78.2,z:49.2,holdS:0}, {x:80.9,z:54.35,holdS:1.2}, {x:79.6,z:54.4,holdS:0},
+    {x:79.3,z:57.4,holdS:0}, {x:78.9,z:66.0,holdS:0}, {x:78.9,z:73.9,holdS:0}, {x:83.3,z:74.1}] },
   // 第二拨放出来就跑（它本身就是第一拨解除 transferThreatGapS 之后才生成的）。
   TransferAlleyGunner: { delay: 0, mps: 3.0, points: [{x:94.6,z:56.0,holdS:.3}, {x:94.3,z:67.15}] },
   TransferAlleyA: { delay: 1.5, mps: 3.2, points: [
@@ -367,7 +366,7 @@ export const MISSION_TACTICS = Object.freeze({
     {x:95.85,z:70.6,holdS:0}, {x:97.9,z:72.5,holdS:0}, {x:97.9,z:77.2,holdS:0}, {x:98.9,z:79.45}] },
   TransferAlleyB: { delay: 3, mps: 3.2, points: [
     {x:94.9,z:56.0,holdS:0}, {x:95.85,z:66.8,holdS:1.2}, {x:95.85,z:70.6,holdS:0},
-    {x:93.3,z:73.9,holdS:0}, {x:88.5,z:77.75}] },
+    {x:93.3,z:73.9,holdS:0}, {x:83.3,z:74.1}] },
   AirPursuerA: { delay: 0, points: [{x:106,z:90},{x:102,z:92}] },
   AirPursuerB: { delay: 3, points: [{x:105,z:98},{x:104,z:111}] },
   AirPursuerC: { delay: 5, points: [{x:109,z:109},{x:100,z:114}] },

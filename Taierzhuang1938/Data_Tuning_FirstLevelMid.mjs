@@ -170,7 +170,7 @@ export const MID_TUNING = Object.freeze({
   // 都在墙南侧：13/14 罗班长直奔停车处、幺娃刘文财直奔沟口都是直线（MidTest 量着），
   // 墙北侧的射位会让这几条直线穿墙。
   defencePosts: Object.freeze([
-    Object.freeze({ cast: "luo", x: 71.2, z: 85.75, face: Object.freeze({ x: 77.2, z: 70.5 }) }),
+    Object.freeze({ cast: "luo", x: 72.6, z: 85.8, face: Object.freeze({ x: 76.4, z: 58 }) }),
     Object.freeze({ cast: "heyoutian", x: 88.8, z: 85.6, face: Object.freeze({ x: 94.5, z: 70 }) }),
     Object.freeze({ cast: "liuwencai", x: 60.6, z: 85.6, face: Object.freeze({ x: 62, z: 74 }) }),
     Object.freeze({ cast: "yaowa", x: 79, z: 110 }),

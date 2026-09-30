@@ -75,45 +75,81 @@ export function BuildTransferWhitebox(groundAt) {
   }
 
   // ---------------------------------------------------------------------
-  // 12_1: the village-facing low wall is dry-laid rubble, not a slab. Stones
-  // 1.6–2.3 m long with tops 0.98–1.2 (the old 1.2 m envelope), a 0.6 m
-  // firing notch between the post (66.5,86) and the 12_1 eye (68,85.4); a few
-  // loose capstones break the line of the top without leaving the envelope. Every stone is an AI
-  // cover facing north. Since the 2026-09-27 cover rebuild this is the squad's line (12 holds
-  // the road back into the village): a crouched player at the notch loses the south-gate gunner
-  // (79.2,65.85) behind these stones, a standing one engages him over them (TransferTest).
-  const westEdges = [60.0, 61.9, 64.0, 66.2, 67.9, 68.5, 70.3, 71.9, 73.0];
-  const westStones = [[1.0, 84.05, .8, .03], [.86, 83.95, .85, -.02], [1.12, 84.1, .8, .04],
-    [.98, 84.0, .8, -.04], [.7, 84.15, .7, 0], [1.05, 83.95, .85, -.03], [.9, 84.05, .8, .02], [.98, 84.1, .75, -.05]];
-  westStones.forEach(([h, z, d, ry], i) => {
-    const a = westEdges[i], b = westEdges[i + 1];
-    Cover(`TransferVillageWallWest${i}`, (a + b) / 2, z, b - a, h, d, { ry });
-  });
-  // Capstones: solid, tops 1.08–1.2 above the ground, sitting on the lower stones.
-  for (const [i, x, z, w, h, d, base, ry] of [[0, 62.4, 84.0, .9, .3, .6, .86, .15], [1, 63.4, 83.95, .7, .25, .55, .86, -.3],
-    [2, 66.9, 84.0, .6, .2, .55, .98, .2], [3, 71.0, 84.05, .85, .28, .55, .9, .25]])
-    At(`TransferVillageWallCap${i}`, x, z, w, h, d, groundAt(x, z) + base, "cover", { ry });
-  const eastEdges = [79.5, 84.6, 89.4, 94.5];
-  [[1.06, 84.0, .8, 0], [1.12, 84.1, .8, .02], [.98, 83.95, .75, -.03]].forEach(([h, z, d, ry], i) => {
-    const a = eastEdges[i], b = eastEdges[i + 1];
-    Cover(`TransferVillageWallEast${i}`, (a + b) / 2, z, b - a, h, d, { ry });
-  });
+  // 12_1 / 12_3: the village-facing low wall is dry-laid rubble in three staggered
+  // courses, not a slab (2026-09-30 rebuild for the 12_3 "照门瞄准" concept). Courses
+  // one and two (tops 0.36 / 0.70 m, faces stepping back) are 0.5–1.0 m stones laid on
+  // the joints; the top course is 0.5–1.0 m stones with tops 0.92–1.2 (the old 1.2 m
+  // envelope): a ragged top. The 0.65 m firing notch (top 0.7 = the two lower courses only) sits
+  // right of the post (transferWall 71.3,85.7), and the west pier beyond it is the
+  // 1.55 m corner the concept shows on the right. Loose capstones break the line
+  // of the top without leaving the envelope. Every top stone is an AI cover facing
+  // north. This is the squad's line (12 holds the road back into the village): a
+  // crouched player at the post loses the lane gunner behind these stones, a
+  // standing one engages him over them (TransferTest).
+  const Hash = (n) => { const s = Math.sin(n * 12.9898 + 7.7) * 43758.5453; return s - Math.floor(s); };
+  const courseTops = [.36, .70];
+  // Random joints between x0 and x1 (steps of stepMin…stepMax, the last one absorbs the remainder).
+  function Joints(x0, x1, seed, stepMin, stepMax) {
+    const edges = [x0];
+    for (let x = x0, k = 0; x < x1 - 1e-6; k++) {
+      let next = Math.min(x + stepMin + Hash(seed + k) * (stepMax - stepMin), x1);
+      if (x1 - next < stepMin * .7) next = x1;
+      edges.push(+next.toFixed(2)); x = next;
+    }
+    return edges;
+  }
+  function CourseWall(prefix, x0, x1, { notch = null, seed = 0, capTops = [], topRange = [.92, 1.18] } = {}) {
+    // Courses one and two run under the notch too.
+    for (const [c, d, s] of [[0, .92, 0], [1, .82, 300]]) {
+      const top = courseTops[c];
+      const edges = Joints(x0, x1, seed + s, .55, 1.05);
+      edges.forEach((b, i) => {
+        if (!i) return;
+        const a = edges[i - 1], x = (a + b) / 2, z = 84.05 + (Hash(seed + s + 40 + i) - .5) * .08;
+        const bottomH = c ? courseTops[0] - .02 : 0, h = top - bottomH;
+        const bottom = groundAt(x, z) + bottomH;
+        if (c) At(`${prefix}B${i - 1}`, x, z, b - a, h, d, bottom, "structure", { ry: (Hash(seed + s + 80 + i) - .5) * .06 });
+        else Block(`${prefix}A${i - 1}`, x, z, b - a, h, d, "structure", { ry: (Hash(seed + s + 80 + i) - .5) * .06 });
+      });
+    }
+    const runs = notch ? [[x0, notch[0]], [notch[1], x1]] : [[x0, x1]];
+    let n = 0;
+    runs.forEach(([ra, rb], r) => {
+      const edges = Joints(ra, rb, seed + 500 + r * 50, .55, 1.0);
+      edges.forEach((b, i) => {
+        if (!i) return;
+        const a = edges[i - 1], x = (a + b) / 2, z = 84.05 + (Hash(seed + 120 + n) - .5) * .1;
+        const top = topRange[0] + Hash(seed + 160 + n) * (topRange[1] - topRange[0]);
+        At(`${prefix}${n}`, x, z, b - a, top - courseTops[1] + .03, .7, groundAt(x, z) + courseTops[1] - .03, "cover",
+          { ry: (Hash(seed + 200 + n) - .5) * .07, cover: { faceX: 0, faceZ: -1 } });
+        n++;
+      });
+    });
+    // Capstones: solid, tops 1.08–1.2 above the ground, sitting on the top course.
+    capTops.forEach(([x, w, h, base, ry], i) =>
+      At(`${prefix}Cap${i}`, x, 84.02, w, h, .55, groundAt(x, 84) + base, "cover", { ry }));
+  }
+  CourseWall("TransferVillageWallWest", 60.0, 73.05,
+    { notch: [71.75, 72.4], seed: 11, capTops: [[62.6, .8, .26, .9, .15], [66.2, .65, .22, .98, -.3], [69.4, .7, .24, .92, .2]] });
+  CourseWall("TransferVillageWallEast", 79.5, 94.5,
+    { seed: 71, topRange: [.9, 1.06], capTops: [[83.0, .8, .14, .9, .2], [88.2, .7, .12, .92, -.2], [92.4, .75, .14, .9, .3]] });
   // Rubble at the foot of the wall, a crate stack, a basket and a water jar on
   // the player's side (12_1 foreground), kept off the z=88 arrival lane.
   for (const [i, x, z, w, h, d, ry] of [
     [0, 62.5, 82.95, .55, .32, .45, .4], [1, 69.8, 83.05, .7, .28, .5, -.3], [2, 72.35, 82.85, .45, .35, .4, .9],
     [3, 88.2, 82.95, .6, .3, .45, .2], [4, 60.6, 85.0, .5, .25, .45, -.6],
+    [5, 66.5, 82.95, .6, .26, .5, .7], [6, 64.3, 83.1, .5, .3, .45, -.4], [7, 90.5, 83.0, .55, .28, .45, 1.1],
   ]) Detail(`TransferWallRubble${i}`, x, z, w, h, d, "earthDark", { ry });
   Detail("TransferWallCrateA", 61.3, 85.75, .8, .6, .6, "timber", { ry: .1 });
   Detail("TransferWallCrateB", 61.35, 85.75, .7, .5, .55, "timber", { ry: -.2, y: groundAt(61.3, 85.75) + .82 });
   Detail("TransferWallBasket", 63.3, 85.3, .6, .5, .6, "canvas");
-  Detail("TransferWallJar", 70.6, 85.15, .6, .75, .6, "earthDark");
+  Detail("TransferWallJar", 69.4, 85.15, .6, .75, .6, "earthDark");
   // Outside the wall (z 75–84, region B meets C at z 75): road-side stones and
   // the first telegraph pole of the line that runs past the yard.
   for (const [i, x, z, w, h, d] of [[0, 74.3, 76.8, .5, .35, .4], [1, 73.6, 80.6, .6, .3, .45],
     [2, 79.3, 77.6, .45, .4, .4], [3, 80.0, 81.9, .55, .3, .5]])
     Detail(`TransferRoadStoneNorth${i}`, x, z, w, h, d, "earthDark", { ry: i * .7 });
-  Pole("TransferPoleNorth", 81.0, 77.2);
+  Pole("TransferPoleNorth", 79.6, 78.3);
 
   // ---------------------------------------------------------------------
   // 11/12_2: broken brick walls lining the x76 road (1.6–2.5 m, segments of
@@ -189,25 +225,27 @@ export function BuildTransferWhitebox(groundAt) {
     Detail(`TransferNorthEastRuinRubble${i}`, x, z, w, h, d, i % 2 ? "plaster" : "earthDark", { ry });
   At("TransferNorthEastRuinBeam", 98.0, 78.3, .24, .2, 5.4, groundAt(98, 78.3) + 2.3, "timber", { solid: false, ry: .15 });
 
-  // 门楼前空场（z 75–83）里追兵跃进时躲的东西。每件的「藏身点」在它北侧 0.65 m，
-  // MISSION_TACTICS 的中间折点就钉在那里（折点离掩体超过 0.9 m 会被拽回去，敌军 AI §19）。
-  // 路西：一段断墙被过路大车压出一道豁口（southTraffic 车辙从两截中间斜穿过去，
-  // MissionTest 按 0.35 m 扫着）、车辙东边路口旁一堆塌下来的墙土；路东：一辆翻倒的大车、一个草垛。
+  // 村路南段（z 75–83，2026-09-30 一夫当关）：村南门楼已北挪到 z 47.6，从射口顺村路能一直看进去。
+  // 两侧是房前墙夹出的夹道：路西 VillageLaneWestHouse（Village 包，东墙 x 72.8）后面留着
+  // southTraffic 过路车斜线（(55,57)→(76,85)）与几截破院墙，路东是 RoadEast 房、一个 3.5 m 的大草垛
+  // 和贴路的一栋房。追兵在这一段逐件躲：每件的「藏身点」在它北侧 0.65 m，MISSION_TACTICS 的中间
+  // 折点就钉在那里（折点离掩体超过 0.9 m 会被拽回去，敌军 AI §19）。
+  // 路西：一道齐腰的院墙被过路大车压出一道豁口（车辙从两截中间斜穿过去，MissionTest 按 0.35 m 扫着），
+  // 路心偏西一堆塌下来的墙土；路东：大草垛（掩体点在它北侧，离 RoadEast 房南墙 1.2 m 的缝）。
   Block("TransferPlazaWallWest0", 66.4, 75.6, 1.7, 1.05, .7, "structure", Face(0, -1));
   Block("TransferPlazaWallWest1", 70.9, 75.7, 1.5, .92, .65, "earthDark", { ry: .06, ...Face(0, -1) });
+  Block("TransferPlazaWallWest2", 72.35, 75.75, 1.0, .78, .6, "structure", Face(0, -1));
   Block("TransferPlazaRubbleWest", 74.6, 79.3, 1.6, .88, .8, "earthDark", { ry: -.12, ...Face(0, -1) });
-  Block("TransferPlazaCartBed", 84.9, 76.5, 2.6, 1.1, .45, "timber", Face(0, -1));
-  // 车轮与车轴翻在南侧（车底朝守线），北侧车板后头是躲人的地方。
-  Detail("TransferPlazaCartWheel", 86.0, 77.05, 1.1, 1.1, .12, "timber");
-  Detail("TransferPlazaCartAxle", 84.9, 77.05, 2.4, .16, .16, "timber", { y: groundAt(84.9, 77.05) + .55 });
-  Detail("TransferPlazaCartShaft0", 82.6, 77.4, .12, .12, 2.6, "timber", { ry: .5 });
-  Detail("TransferPlazaCartShaft1", 83.3, 78.1, .12, .12, 2.4, "timber", { ry: .35 });
-  Block("TransferPlazaHaystack", 87.8, 79.6, 2.8, 1.3, 2.8, "canvas",
-    { cover: { faceX: 0, faceZ: -1, points: [{ x: 87.2, z: 78.2 }, { x: 88.5, z: 78.2 }] } });
-  Detail("TransferPlazaHaystackMid", 87.8, 79.6, 2.2, .75, 2.2, "canvas", { y: groundAt(87.8, 79.6) + 1.65 });
-  Detail("TransferPlazaHaystackTop", 87.8, 79.6, 1.2, .5, 1.2, "canvas", { y: groundAt(87.8, 79.6) + 2.25 });
+  Block("TransferPlazaHaystack", 82.4, 76.6, 3.6, 1.7, 3.6, "canvas",
+    { cover: { faceX: 0, faceZ: -1, points: [{ x: 81.6, z: 74.1 }, { x: 83.3, z: 74.1 }] } });
+  Detail("TransferPlazaHaystackMid", 82.4, 76.6, 2.9, 1.0, 2.9, "canvas", { y: groundAt(82.4, 76.6) + 2.2 });
+  Detail("TransferPlazaHaystackTop", 82.4, 76.6, 1.5, .7, 1.5, "canvas", { y: groundAt(82.4, 76.6) + 3.05 });
+  // 贴路的一栋房（路东最南一栋，门向村路）：守线右手最近的房，把路口东侧围住。
+  House("TransferLaneEastHouse", 84.0, 81.05, 7.8, 4.3, 3.0, { alongX: true });
+  Detail("TransferLaneEastHouseDoor", 80.04, 81.4, .12, 2.0, 1.1, "timber");
+  Detail("TransferLaneEastHouseWindow", 80.04, 79.8, .12, .8, .9, "void");
   for (const [i, x, z, w, h, d, ry] of [[0, 70.2, 77.3, .5, .25, .4, .3], [1, 73.8, 76.2, .6, .2, .5, -.8],
-    [2, 81.2, 79.8, .5, .22, .4, 1.3], [3, 87.4, 81.6, .45, .2, .4, .2], [4, 66.9, 80.6, .6, .24, .45, -.4],
+    [2, 79.1, 79.8, .5, .22, .4, 1.3], [3, 88.6, 82.2, .45, .2, .4, .2], [4, 66.9, 80.6, .6, .24, .45, -.4],
     [5, 78.9, 82.2, .4, .18, .35, .9], [6, 75.0, 79.3, .55, .16, .4, .6], [7, 92.0, 82.6, .5, .22, .45, -.2]])
     Detail(`TransferPlazaStone${i}`, x, z, w, h, d, "earthDark", { ry });
 
@@ -217,7 +255,7 @@ export function BuildTransferWhitebox(groundAt) {
   Block("TransferWallWestRuin0", 56.3, 84.05, 1.8, 2.45, .5);
   Block("TransferWallWestRuinSill", 57.75, 84.05, 1.1, 1.1, .5);
   Block("TransferWallWestRuin1", 59.15, 84.05, 1.7, 1.85, .5);
-  Block("TransferWallPierWest", 73.45, 84.1, .8, 1.75, .9);
+  Block("TransferWallPierWest", 73.45, 84.1, .8, 1.55, .9);
   Block("TransferWallPierEast", 79.1, 84.1, .8, 2.05, .9);
   Block("TransferWallEastRuin0", 95.3, 84.0, 1.6, 2.2, .5);
   Block("TransferWallEastRuin1", 96.85, 84.0, 1.5, 1.45, .5);

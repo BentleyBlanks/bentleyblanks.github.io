@@ -169,7 +169,7 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   //   sideAlley 是第二处威胁的「侧巷」—— 守线右手边那条东巷（街东房与东排房之间，
   //   Notion「村东突入部队沿既有东巷追出」）的巷身中心。原先装载区东南那条巷子（SideAlley* 墙）
   //   留作院墙，不再有人从那里出来。
-  cartBoard: {x:85.6,z:113}, cartHalt: {x:76,z:135}, transferWall: {x:67.5,z:86}, sideAlley: {x:95.2,z:61},
+  cartBoard: {x:85.6,z:113}, cartHalt: {x:76,z:135}, transferWall: {x:71.3,z:85.7}, sideAlley: {x:95.2,z:61},
   // D 桥南：靠院墙夹道两端、接收院院门
   wallPathStart: {x:56,z:207}, wallPathEnd: {x:16,z:220}, receptionGate: {x:2,z:240},
   // 18 北沙河铁路桥：桥心、两端、南岸射位、北岸土坎、爆破安全区、淡出前的行军终点

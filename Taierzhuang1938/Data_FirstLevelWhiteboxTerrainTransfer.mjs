@@ -14,7 +14,14 @@ export const WHITEBOX_TERRAIN_TRANSFER = Object.freeze({
   id: "Transfer1114",
   stages: Object.freeze([11, 12, 13, 14]),
   // 踩出来的小路（只染色不改高度）：{ id, points, width, wear?, note }，口径见 Data_FirstLevelWhiteboxTerrain 文件头。
-  paths: Object.freeze([]),
+  paths: Object.freeze([
+    // 2026-09-30（12 一夫当关）：村路（夹道）的泥路一直压到村口低墙的路口，再接进场院（车路本身在 MISSION_TERRAIN.roads 里）。
+    Object.freeze({ id: "TransferLaneMud", width: 4.0, wear: .8,
+      points: Object.freeze([
+        Object.freeze({ x: 76.6, z: 79.0 }), Object.freeze({ x: 76.3, z: 83 }), Object.freeze({ x: 76.2, z: 88 }),
+      ]),
+      note: "12 村路南段：泥路压到低墙路口（接 Village 区 VillageLaneMud）" }),
+  ]),
   boxes: Object.freeze([
     Object.freeze({ id: "Transfer", minX: 25, maxX: 125, minZ: 75, maxZ: 150 }),
   ]),
