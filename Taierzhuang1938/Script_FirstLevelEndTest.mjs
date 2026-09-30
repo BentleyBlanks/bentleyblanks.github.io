@@ -953,6 +953,34 @@ function BridgeRuntime() {
 }
 
 // ---------------------------------------------------------------------------
+// 13b. 黑屏要等「脱离战场」（2026-09-30：对岸有步坦部队，走到终点还要离北岸够远、对岸看不见才黑屏）
+// ---------------------------------------------------------------------------
+{
+  const r = FakeRuntime({ stage: "NightMarch" });
+  r.farBank = {};   // 有对岸模块的宿主：黑屏多一道 retreatOutOfReach
+  r.nightGate.Enter("NightMarch");
+  const route = MISSION_STAGE_ROUTES.marchOut;
+  Check(EndRouteLength(route) > 100 && EndRouteLength(route) < 130, `marchOut 延长到约 110 m（${EndRouteLength(route).toFixed(1)}）`);
+  Check(Distance(route.at(-1), A.marchOut) < 0.01, "路线终点就是 marchOut 锚点");
+  r.player.position.x = A.marchOut.x; r.player.position.z = A.marchOut.z;
+  r.Step(1, "NightMarch");
+  Check(!r.transition && !r.Has("marchOutReached"), "走到终点、对岸还没放行（retreatOutOfReach 未成立）→ 不黑屏、不记 marchOutReached");
+  // 走过头（不踩进 8 m 圈）也算走完：单调
+  r.player.position.x = A.marchOut.x - 9; r.player.position.z = A.marchOut.z + 6;
+  Check(Distance(r.player.position, A.marchOut) > E.marchOutArriveM, "（测试点在 8 m 圈外）");
+  r.facts.add("retreatOutOfReach");
+  r.Step(0.2, "NightMarch");
+  Check(r.Has("marchOutReached") && r.transition, "走过终点 + 脱离战场 → 黑屏（proximity 门是单调的）");
+  // 只到半路（离终点 60 m）不算，哪怕对岸看不见
+  const r2 = FakeRuntime({ stage: "NightMarch" });
+  r2.farBank = {}; r2.facts.add("retreatOutOfReach"); r2.nightGate.Enter("NightMarch");
+  r2.player.position.x = route[2].x; r2.player.position.z = route[2].z;
+  r2.Step(1, "NightMarch");
+  Check(!r2.transition, "对岸看不见但还在半路：不黑屏（不让玩家从桥边跑几步就到城门）");
+  console.log("ok 18 黑屏要等脱离战场：路线走完 + retreatOutOfReach，缺一不可");
+}
+
+// ---------------------------------------------------------------------------
 // 14. 空间与编排的静态对账（阶段 15–18）
 // ---------------------------------------------------------------------------
 {

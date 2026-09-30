@@ -696,16 +696,47 @@ export function BuildRearWhitebox(groundAt) {
   for (const [i, x, z, s] of [[0, -91, 164.6, .9], [1, -86.6, 165.2, .8], [2, -68, 165.4, .9], [3, -63.5, 164.4, .8]])
     Detail(`BridgeBankGrassBeach${i}`, x, z, s, s * .9, s * .8, "foliage", { y: groundAt(x, z) + s * .45 });
 
-  // 18 north bank (far side of the river, x −140…−100, z 40…90): a small village seen across the water in
-  // concept 18_3 — four one-storey houses (Layout adds WestFieldHouse at (−121,67)) and dead trees (Layout row).
-  // Keeps x −100…−40, z 20…90 empty: package R2 stages the Japanese infantry and tanks there.
-  for (const [id, x, z, w, d, h, alongX] of [["NorthBankHouseA", -138, 81, 9, 7, 3.2, true], ["NorthBankHouseB", -126, 84, 8, 6.5, 3, false],
-    ["NorthBankHouseC", -111, 79, 10, 8, 3.4, true], ["NorthBankHouseD", -107.5, 58, 9, 7, 3.1, false]])
+  // 18 north bank (far side of the river): a small village seen across the water in concept 18_3 — four one-storey
+  // houses (Layout adds WestFieldHouse) and dead trees (Layout row). R2c (2026-09-30): the village moved from the bank
+  // (x −140…−100, z 58…84) up onto the crest plateau of the north-bank terraces (terrain NorthTerrace4: x −150…−105,
+  // z 3…26, +6.4 m). On the bank it stood in front of the terraces and hid the whole slope; on the crest it is the
+  // skyline behind the soldiers. Two rows: (WestFieldHouse, A, B) at z 14…24, (C, D) at z 4.5…13; the lane x −121…−118
+  // between A and B is the gap the crowd columns come down through (terrain trail TerraceDescentA).
+  for (const [id, x, z, w, d, h, alongX] of [["NorthBankHouseA", -125.5, 20, 9, 7, 3.2, true], ["NorthBankHouseB", -114, 20.5, 8, 6.5, 3, false],
+    ["NorthBankHouseC", -131, 9, 10, 8, 3.4, true], ["NorthBankHouseD", -112, 8, 9, 7, 3.1, false]])
     HouseMass(id, x, z, w, d, h, { alongX });
-  Grounded("NorthBankYardWall", -133, 76, 6, 1.4, .5, "plaster");
-  Rubble("NorthBankSpill", -119, 78, 5, 8, 1.5, .4);
+  Grounded("NorthBankYardWall", -128, 14.2, 6, 1.4, .5, "plaster");
+  Rubble("NorthBankSpill", -119.5, 13.5, 5, 6, 1.2, .4);
   // The rail bridge is a single-span truss now (Model_RailBridge, docs/Data_RailBridge.md):
   // no river piers. The old non-colliding pier details were removed with the whitebox look.
+
+  // ---------------------------------------------------------------------------
+  // 18 Retreat18 (2026-09-30, docs/Data_FirstLevelBridgeFarBank.md §5): the march-out route (marchOut, 113 m) climbs over the
+  // gentle RetreatRise mound (terrain table, crest z≈276, 2.7 m) and the blackout waits until the far bank cannot see the player.
+  // The mound alone reads as a wall of earth; dead trees on the crest, two ruined huts behind it and a scatter of grave mounds
+  // break the sight lines the way a real field edge does. Route (-68,268)→(-80,284)→(-98,295): nothing solid within 3 m of it
+  // (Script_FirstLevelFarBankTest measures the capsule clearance). Trees are Layout-style authored trunks (treeModel).
+  // ---------------------------------------------------------------------------
+  for (const [id, x, z, h] of [["RetreatDeadTree0", -92, 277.5, 6.4], ["RetreatDeadTree1", -56, 274, 5.6],
+    ["RetreatDeadTree2", -101, 284, 5.9], ["RetreatDeadTree3", -73, 291, 5.2], ["RetreatDeadTree4", -110, 276.5, 6.1]])
+    Box(blocks, id, x, z, .3, h * .65, .3, "timber", { treeModel: { heightM: h, region: "RetreatAuthored" }, ry: x * .1 });
+  // Ruined hut west of the route end: a broken north wall, a west wall and a stub of the east wall, no roof.
+  Grounded("RetreatRuinWestNorth", -106, 285.2, 6.2, 2.1, .5, "plaster");
+  Grounded("RetreatRuinWestWall", -109.1, 288.2, .5, 2.6, 5.8, "plaster");
+  Grounded("RetreatRuinWestStub", -103, 289.8, .5, 1.2, 2.4, "plaster");
+  Rubble("RetreatRuinWestSpill", -106, 289, 9, 2.4, 2.2, .45);
+  // A second ruin east of the crest, a corner of two walls.
+  Grounded("RetreatRuinEastNorth", -52, 286, 5, 2.2, .5, "plaster");
+  Grounded("RetreatRuinEastWall", -54.4, 289, .5, 2.8, 5.2, "plaster");
+  Rubble("RetreatRuinEastSpill", -51.5, 289.5, 7, 2.2, 2, .4);
+  // Grave mounds (low earth, a slab at the head) scattered on the back slope and the field behind it.
+  for (const [i, x, z, ry] of [[0, -90, 282, .2], [1, -88.5, 285.5, -.3], [2, -66, 287, .1], [3, -62, 291, .4],
+    [4, -58, 284.5, -.2], [5, -94, 289, .6], [6, -113, 281, 0], [7, -116, 286, .3]]) {
+    Grounded(`RetreatGrave${i}`, x, z, 1.7, .5, .95, "earthDark", ry);
+    Detail(`RetreatGraveSlab${i}`, x - Math.sin(ry) * .95, z - Math.cos(ry) * .95, .5, .7, .12, "step", { y: groundAt(x, z) + .35, ry });
+  }
+  for (const [i, x, z, s] of [[0, -98, 279, 1.1], [1, -86, 278.5, 1.3], [2, -74, 279.5, 1], [3, -63, 279, 1.2], [4, -104, 288.5, .9], [5, -47, 281, 1]])
+    Detail(`RetreatGrass${i}`, x, z, s, s * .6, s * .8, "foliage", { y: groundAt(x, z) + s * .3 });
 
   // ---------------------------------------------------------------------------
   // 18_2 NightGate only: street houses, ammunition stacks, arch haunches, flag poles.

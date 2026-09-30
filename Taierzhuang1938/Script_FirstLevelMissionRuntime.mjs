@@ -87,6 +87,11 @@ import { FirstLevelQuietMarch, WallPathGuideRoute } from "./Script_FirstLevelQui
 import { FirstLevelReception, ReceptionBedGuideRoute, ReceptionBedGuideArrivalM, ReceptionDepartureRoute } from "./Script_FirstLevelReception.mjs";
 import { FirstLevelBridge } from "./Script_FirstLevelBridge.mjs";
 import { FirstLevelNightGate } from "./Script_FirstLevelNightGate.mjs";
+// 18 对岸日军步坦部队（规则零 three，傀儡战车表现层带 three）：docs/Data_FirstLevelBridgeFarBank.md。
+import { FirstLevelFarBank } from "./Script_FirstLevelBridgeFarBank.mjs";
+import { FarBankTankView } from "./Script_FirstLevelFarBankView.mjs";
+import { FarBankCrowdView } from "./Script_FirstLevelFarBankCrowdView.mjs";
+import { CrowdGroundY } from "./Data_FirstLevelFarBankCrowd.mjs";
 import { FirstLevelNightLights } from "./Script_FirstLevelNightLights.mjs";
 import { OpeningSet } from "./Script_OpeningSet.mjs";
 import { RailBridgeSet } from "./Script_RailBridgeSet.mjs";
@@ -261,6 +266,20 @@ export class FirstLevelMissionRuntime {
     this.reception = new FirstLevelReception(this);
     this.bridge = new FirstLevelBridge(this);
     this.nightGate = new FirstLevelNightGate(this);
+    // 18 对岸的步坦部队：规则在 farBank（零 three），三辆傀儡战车画在 farBankView（挂在任务白盒根下）。
+    this.farBankView = new FarBankTankView({ root: this.view.root, battlefield: this.battlefield, physics: this.physics,
+      actorFactory: this.actorFactory, library: this.library, vfx: this.vfx, audio: this.audio,
+      groundAt: (x, z) => CrowdGroundY(x, z, (a, b) => this.battlefield.GroundHeight(a, b)) });
+    // 对岸的纯视觉人群（规模感）：人画在 farBankCrowdView 自己的一层批渲染里（ActorCrowd，粗聚类、提亮的军装；不进 ai.soldiers、不占 actorPool），
+    // 旗 / 刀是逐个 Mesh，枪口焰 / 曳光走共用 vfx。
+    this.farBankCrowdView = new FarBankCrowdView({ root: this.view.root, vfx: this.vfx, scene: this.scene, factory: this.actorFactory });
+    this.farBank = new FirstLevelFarBank(this, {
+      vec: (x, y, z) => new THREE.Vector3(x, y, z),
+      crowdShot: (shot) => this.farBankCrowdView.Shot(shot, (x, y, z) => new THREE.Vector3(x, y, z)),
+      muzzle: (tank, kind) => this.farBankView.Muzzle(tank, kind),
+      tankCollider: (tank) => this.farBankView.Collider(tank),
+      sound: this.audio ? { OnCannon: (from, at, flightS) => this.farBankView.Sound?.OnCannon(from, at, flightS) } : null,
+    });
     this.leaderGuide = new FirstLevelLeaderGuide(this);
     this.Register();
     // 02 的交互点与玩家实际看到的是同一坐标、同一 HanYang 几何。它不另注册一条
@@ -1675,6 +1694,9 @@ export class FirstLevelMissionRuntime {
         break;
     }
     this.frontBattle.Enter(stage.id);
+    // 18 的对岸：BridgeCover 起放兵与战车、BridgeWithdraw 放真 AI 与冲桥组；18 以外的步骤（含回跳）整个撤掉。
+    this.farBank.Enter(stage.id);
+    if (stage.id === "BridgeOrders") this.farBankCrowdView.Prepare();   // 人群那一层的模型烘焙（约 0.2 s）放在接令这个平静的时刻
     // 在存档之前补：这一步的存档点记下补过的数，死了重来从这儿起也不少于它。
     this.TopUpStepBandages(stage.id);
     if (!["Trapped", "Dive", "Death", "NightMarch"].includes(stage.id)) this.SaveCheckpoint();
@@ -2090,6 +2112,9 @@ export class FirstLevelMissionRuntime {
     // 夜景与夜天空都藏在黑屏里换；退出/重试时宿主还原（RestoreLevelSky）。
     // 第一关专用夜档（Script_Sky.firstLevelNight：阴云夜，2026-09-28 B4）
     this.ApplySky?.("firstLevelNight");
+    // 对岸的步坦部队在黑屏里全部收走（玩家走出射程、看不见才黑屏，回头不会再看到）。
+    this.farBank.Retire();
+    this.farBankView.Sync([], this.time, this.player.position);
     this.column.active = false;
     if (this.controls) { this.controls.yaw = this.player.yaw; this.controls.pitch = 0; }
     this.Record("nightArrivalPlaced", { x: point.x, z: point.z });
@@ -2622,6 +2647,10 @@ export class FirstLevelMissionRuntime {
     // --- 18 铁路桥：接令、掩护尾队、撤出爆破区（演出与判定在 FirstLevelBridge）---
     if (stage === "BridgeCover" && this.GateNear("southBankReached")) this.Record("southBankReached");
     if (stage === "BridgeWithdraw" && this.GateNear("blastZoneCleared")) this.Record("blastZoneCleared");
+    // 对岸部队排在桥之前：Bridge.UpdateWithdraw 在按起爆器前要问 farBank.ReadyForBlast（冲桥组到位没有）。
+    if (["BridgeCover", "BridgeWithdraw", "NightMarch"].includes(stage)) this.farBank.Update(dt, stage);
+    this.farBankView.Sync(this.farBank.tanks, this.time, this.player.position);
+    this.farBankCrowdView.Sync(this.farBank.crowd, this.time, this.camera);
     if (["BridgeOrders", "BridgeCover", "BridgeWithdraw"].includes(stage)) this.bridge.Update(dt, stage);
     // --- 18 夜入滕城：先随队走完 marchOut，黑屏里换天，再随队进北门 ---
     this.nightGate.Update(dt, stage);
@@ -2827,7 +2856,7 @@ export class FirstLevelMissionRuntime {
     } else if (stage === "Trapped") {
       this.opening.ResetBunker();
       this.voice.Resume();
-    } else if (stage === "NightMarch") {
+    } else if (stage === "NightMarch" && this.Has("marchOutReached")) {
       // 夜景与夜天空都跟着 nightArrivalPlaced 走：清掉它，空间与天光自己退回白天，
       // 灯也一盏不留，然后把黑屏转场重演一遍（marchOutReached 已经记下，不重走那一段）。
       this.flow.facts.delete("nightArrivalPlaced");
@@ -2835,7 +2864,12 @@ export class FirstLevelMissionRuntime {
       this.RestoreSky?.();
       this.BeginNightTransition();
       this.voice.Resume();
-    } else this.voice.Resume();
+    } else {
+      // NightMarch 的 A 段（随队走 marchOut，还没到终点、还没黑屏）死了：和别的步骤一样在检查点重生、接着走，
+      // 不许直接黑屏跳夜景（2026-09-30 修：以前这个分支不看 marchOutReached，A 段阵亡也会被送进夜景）。
+      this.farBank?.OnRetry();
+      this.voice.Resume();
+    }
     this.UpdateMusic();
     return true;
   }
@@ -2897,6 +2931,7 @@ export class FirstLevelMissionRuntime {
         dressing:this.dressing.State(), extras:this.extras.State(),
         quietMarch:this.quietMarch.State(), reception:this.reception.State(),
         bridge:this.bridge.State(), nightGate:this.nightGate.State(),
+        farBank:this.farBank.State(),
       },
       bridgeColumn:this.bridge.State().rearColumn,
       missingCues:[...this.missingCues],
@@ -2957,6 +2992,9 @@ export class FirstLevelMissionRuntime {
     if(this.ai.ctx.onSoldierDeath===this.soldierDeath)this.ai.ctx.onSoldierDeath=this.oldSoldierDeath;
     this.transition.Dispose();
     this.extras.Clear();
+    this.farBank?.Dispose();
+    this.farBankView?.Dispose();
+    this.farBankCrowdView?.Dispose();
     this.nightLights?.Dispose();
     this.openingSet?.Exit();
     this.railBridgeSet?.Dispose();

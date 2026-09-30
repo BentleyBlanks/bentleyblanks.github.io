@@ -26,6 +26,8 @@ import { EndFacing, EndProjectOnto, EndRouteLength, EndRoutePoint } from "./Scri
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const NIGHT_ROUTE = MISSION_STAGE_ROUTES.nightMarch;
 const NIGHT_LENGTH = EndRouteLength(NIGHT_ROUTE);
+const MARCH_OUT = MISSION_STAGE_ROUTES.marchOut;
+const MARCH_OUT_LENGTH = EndRouteLength(MARCH_OUT);
 
 /** 夜景要挂的点光（纯数据，Script_FirstLevelNightLights 照它建 three 的灯）。 */
 export function NightLightSpecs(groundAt) {
@@ -59,10 +61,22 @@ export class FirstLevelNightGate {
     r.Guide(MISSION_STAGE_ROUTES.marchOut);
   }
 
+  /**
+   * 走过 marchOut 的终点了没有（单调）：到锚点 marchOutArriveM 以内，或者沿路线的里程已经走完
+   * （2026-09-30：路线延长到 113 m、翻岗子，走过头、抄近路擦过终点都算走完，不再要求正好踩进 8 m 圈）。
+   */
+  PastMarchOut() {
+    const r = this.runtime;
+    if (r.GateNear("marchOutReached")) return true;
+    return EndProjectOnto(MARCH_OUT, r.player.position).progress >= MARCH_OUT_LENGTH - E.marchOutArriveM;
+  }
   UpdateMarchOut() {
     const r = this.runtime, state = this.state;
     if (state.transitionStarted) return;
-    if (!r.GateNear("marchOutReached")) return;
+    if (!this.PastMarchOut()) return;
+    // 黑屏条件（2026-09-30 用户：脱离战场后才黑幕）：走到终点还不够，还要离北岸够远、对岸真 AI 连续看不见玩家
+    //（retreatOutOfReach，由对岸部队模块判）。没有对岸模块的替身宿主不受这条约束。
+    if (r.farBank && !r.Has("retreatOutOfReach")) return;
     state.marched = true;
     state.transitionStarted = true;
     r.Record("marchOutReached", { x: A.marchOut.x, z: A.marchOut.z });

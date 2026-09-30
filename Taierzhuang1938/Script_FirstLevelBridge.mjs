@@ -226,6 +226,10 @@ export class FirstLevelBridge {
       } else state.stuckS = 0;
       if (!state.overdue) return;
     }
+    // 3b. 对岸的冲桥组还没冲上被炸孔的北半就先等一等（2026-09-30：炸桥时桥上要有正冲过来的日军，
+    //     起爆时被炸死抛起；docs/Data_FirstLevelBridgeFarBank.md §3）。farBank 自己带超时（rushWaitMaxS），
+    //     没有冲桥组 / 全被打死了就直接放行，不会把起爆钉死。
+    if (!(r.farBank?.ReadyForBlast?.(dt) ?? true)) return;
     // 4. 人都走净了：等玩家把脸转向桥再按起爆器（最多等 blastGazeWaitS）。
     //    「玩家在安全距离看见通路发生不可逆变化」—— 背对着桥炸，这一场就白演了。
     state.gazeS += dt;
@@ -322,6 +326,8 @@ export class FirstLevelBridge {
     if (!r.railBridgeSet?.Detonate?.()) r.vfx.Explosion?.(at, { radius: R.bridgeBlastRadiusM });
     // 震屏、耳鸣与爆炸声只走这一次共用感知入口（docs/Data_BlastFeedback.md）。
     r.combat.BlastFeedback(at, R.bridgeBlastRadiusM);
+    // 桥上冲过来的日军：起爆后 0.25 s 被炸死抛起（farBank.UpdateBlast），跟着那一孔落河；对岸其余的人趴一下、退回岸边。
+    r.farBank?.OnBridgeBlast?.();
     // 桥面 / 桁架 / 钢轨的 5 个完好件与 3 个残骸件都挂在 RailBridgeDestroyed 这个信号上
     //（MISSION_SCENARIO_SIGNALS：信号 → bridgeDestroyed 这条事实）。一次翻完，不可逆。
     r.Record("bridgeDestroyed", { x: A.railBridge.x, z: A.railBridge.z, waitedS: Number(state.waitedS.toFixed(1)) });

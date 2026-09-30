@@ -37,11 +37,45 @@
 //   · 框 Bridge18 的西缘从 −100 扩到 −148：堤沿河向西伸到河段之外（河段 x −140…−30，堤终于 x −136 + 7 m 羽化）。
 //     Night18 框在 z≥280，Reception15 框在 x≥−41：三框互不相交。
 //   · BankPathTread：沿堤顶内侧踩出来的小路（概念 18_1 里回援尾队沿岸朝镜头跑的那条），从铁路桥头缺口向西。
+// 北岸坡地（R2c）的台阶表：level 盒，核心 x −146…east、z northZ…southZ，南缘往南羽化 feather m 落回原地面。
+export const NORTH_TERRACE_WEST = -150;
+export const NORTH_TERRACE_NORTH_Z = 3;
+export const NORTH_TERRACE_FEATHER_M = 11.5;
+export const NORTH_TERRACES = Object.freeze([
+  Object.freeze({ id: "NorthTerrace1", dy: 1.6, southZ: 69.5, east: -89, note: "北岸坡地第一级（+1.6 m）：岸沿以北 6 m 起爬，顶面 z 69.5 以北" }),
+  Object.freeze({ id: "NorthTerrace2", dy: 3.2, southZ: 55, east: -93, note: "第二级（+3.2 m）：顶面 z 55 以北" }),
+  Object.freeze({ id: "NorthTerrace3", dy: 4.8, southZ: 40.5, east: -97, note: "第三级（+4.8 m）：顶面 z 40.5 以北" }),
+  Object.freeze({ id: "NorthTerrace4", dy: 6.4, southZ: 26, east: -101, note: "第四级（+6.4 m，坡顶）：顶面 z 26 以北，再往北一道短背坡落回" }),
+]);
+
+/** 下坡的踩道（坡顶村两户之间的巷口 x −119.5 起，一路到岸线）：人群纵队沿它涌下来（Data_FirstLevelFarBankCrowd 读它）。 */
+export const NORTH_DESCENT_TRAIL = Object.freeze([Object.freeze({ x: -119.5, z: 3 }), Object.freeze({ x: -119.5, z: 26 }),
+  Object.freeze({ x: -121, z: 46 }), Object.freeze({ x: -117, z: 64 }), Object.freeze({ x: -113, z: 84 })]);
+
 export const WHITEBOX_TERRAIN_REAR = Object.freeze({
   id: "Rear1518",
   stages: Object.freeze([15, 16, 17, 18]),
   // 踩出来的小路（只染色不改高度）：{ id, points, width, wear?, note }，口径见 Data_FirstLevelWhiteboxTerrain 文件头。
   paths: Object.freeze([
+    // 北岸坡地（R2c）：各级台地顶沿的田埂路 + 两条下坡的踩道。从南岸射位平视，坡面几乎是掠射，
+    // 平坦的台面看不见，能读出「一层一层」的只有颜色：浅色的踩道横过每一级，再由两条竖道把它们串起来。
+    Object.freeze({ id: "TerraceTrail1", width: 3.2, wear: 0.86,
+      points: Object.freeze([Object.freeze({ x: -148, z: 68.6 }), Object.freeze({ x: -128, z: 69.4 }), Object.freeze({ x: -110, z: 68.2 }), Object.freeze({ x: -93, z: 69.2 })]),
+      note: "第一级台地顶沿的田埂路（z≈69）" }),
+    Object.freeze({ id: "TerraceTrail2", width: 3.2, wear: 0.84,
+      points: Object.freeze([Object.freeze({ x: -148, z: 54.2 }), Object.freeze({ x: -130, z: 54.8 }), Object.freeze({ x: -112, z: 53.6 }), Object.freeze({ x: -98, z: 54.4 })]),
+      note: "第二级台地顶沿（z≈54）" }),
+    Object.freeze({ id: "TerraceTrail3", width: 3.2, wear: 0.82,
+      points: Object.freeze([Object.freeze({ x: -148, z: 39.6 }), Object.freeze({ x: -128, z: 40.4 }), Object.freeze({ x: -112, z: 39.4 }), Object.freeze({ x: -102, z: 40 })]),
+      note: "第三级台地顶沿（z≈40）" }),
+    Object.freeze({ id: "TerraceTrail4", width: 3.2, wear: 0.8,
+      points: Object.freeze([Object.freeze({ x: -148, z: 25.4 }), Object.freeze({ x: -128, z: 26 }), Object.freeze({ x: -112, z: 25.2 }), Object.freeze({ x: -106, z: 25.6 })]),
+      note: "坡顶台地南沿（z≈26）：站着的人与旗排在这一线上，剪影映在天上" }),
+    Object.freeze({ id: "TerraceDescentA", width: 3.4, wear: 0.8, points: NORTH_DESCENT_TRAIL,
+      note: "下坡的踩道（后排纵队沿它涌下来，穿过坡顶村子两户之间的巷口 x −119.5）" }),
+    Object.freeze({ id: "TerraceDescentB", width: 3.0, wear: 0.76,
+      points: Object.freeze([Object.freeze({ x: -100, z: 44 }), Object.freeze({ x: -98, z: 60 }), Object.freeze({ x: -96, z: 72 }), Object.freeze({ x: -98, z: 85 })]),
+      note: "东侧的一条下坡踩道" }),
     Object.freeze({ id: "WallPathTread", width: 1.6, wear: 0.9,
       points: Object.freeze([
         Object.freeze({ x: 56, z: 201.5 }), Object.freeze({ x: 56, z: 207 }), Object.freeze({ x: 36, z: 211 }),
@@ -63,8 +97,15 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
     Object.freeze({ id: "MarchOutTread", width: 2.2, wear: 0.72,
       points: Object.freeze([
         Object.freeze({ x: -66, z: 204 }), Object.freeze({ x: -64, z: 216 }), Object.freeze({ x: -62, z: 232 }),
-        Object.freeze({ x: -61.4, z: 240 }),
-      ]), note: "18 炸桥后随队南下（marchOut），行军队踩得宽一点；过了淡出点再延 8 m，路不在脚下断掉" }),
+        Object.freeze({ x: -62, z: 250 }), Object.freeze({ x: -64, z: 256 }),
+      ]), note: "18 炸桥后随队南下（marchOut 前半）：行军队踩得宽一点；Bridge18 框北界 z 260，再往南接 RetreatTread" }),
+    // 2026-09-30 撤离路线南延（docs/Data_FirstLevelBridgeFarBank.md §5）：marchOut 从 (−62,232) 延到 (−98,295)，
+    // 后半段落在新框 Retreat18 里，翻过 RetreatRise 缓坡土岗，走到头再延 8 m 让路不在脚下断掉。
+    Object.freeze({ id: "RetreatTread", width: 2.2, wear: 0.66,
+      points: Object.freeze([
+        Object.freeze({ x: -66.4, z: 263.6 }), Object.freeze({ x: -68, z: 268 }), Object.freeze({ x: -80, z: 284 }),
+        Object.freeze({ x: -98, z: 295 }), Object.freeze({ x: -105, z: 300 }),
+      ]), note: "18 撤离（marchOut 后半）：(−68,268) → 土岗 → (−80,284) → 终点 (−98,295)" }),
     // 2026-09-30 D 包（概念 18_4）：夜行军的土路 —— 出生点 (-160,292) 到瓮城门前，一条被踩烂的宽路，让开阔泥地有方向。
     Object.freeze({ id: "NightRoadTread", width: 4.6, wear: 0.9,
       points: Object.freeze([
@@ -73,10 +114,23 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
   ]),
   boxes: Object.freeze([
     Object.freeze({ id: "Reception15", minX: -41, maxX: 70, minZ: 150, maxZ: 260 }),
-    Object.freeze({ id: "Bridge18", minX: -148, maxX: -41, minZ: 50, maxZ: 260 }),
+    // R2c（2026-09-30 北岸坡地）：西缘 −148 → −164、北界 50 → −10（北岸坡地 NorthTerrace1…4 与它们的羽化要放得下；
+    // 这一带没有别的框：South07 在 x ≥ −40，Collection06 在 z ≤ −84）。
+    Object.freeze({ id: "Bridge18", minX: -164, maxX: -41, minZ: -10, maxZ: 260 }),
     Object.freeze({ id: "Night18", minX: -185, maxX: -135, minZ: 280, maxZ: 360 }),
+    // 撤离土岗与其后：Bridge18 南界 z 260 之南、Night18 东界 x −135 之东（三个框只在边线上相接、不重叠）。
+    Object.freeze({ id: "Retreat18", minX: -132, maxX: -30, minZ: 260, maxZ: 330 }),
   ]),
   shapes: Object.freeze([
+    // ---- 北岸坡地（2026-09-30 R2c，docs/Data_FirstLevelBridgeFarBank.md §11）------------------------------
+    // 射位 (−97,173.5)、眼高 3.14 m 看对岸：北岸与南岸几乎等高，平地在画面里是地平线下一条细带，日军再多也只是「一条线」。
+    // 把北岸岸沿以北做成朝南的四级台地缓坡（level 逐级向 natural+dy 混合，每一级的坡段长 = 7.06 × 该级高差，
+    // 峰值斜率 1.5·Δ/f ≤ 12°，实测台阶内部最陡 12.2°（东端羽化 x −105…−80 一带最陡 23°，人与车穿过它时是斜着爬））：岸沿以北 9 m 起爬（z 81），到 z≈26 顶在 +6.4 m，台面向北 z 3 止（坡顶村在这块台面上），再一道短背坡落回。
+    // 台阶东端逐级往西错开（x −89 / −93 / −97 / −101，各加 11.5 m 羽化）：铁路（x −77）与老开场（01–02，已不是现在的 01）的壕沟、RailLock 兵位都在东边，
+    // 铁轨所在（x −78.6…−75.4）只吃到 ≤ 0.03 m，路基肩（x −80）≤ 0.2 m。全部落在 Bridge18 框内。台地上的兵与旗见 Data_FirstLevelFarBankCrowd。
+    ...NORTH_TERRACES.map((t) => Object.freeze({ id: t.id, kind: "box", op: "level", x: (NORTH_TERRACE_WEST + t.east) / 2,
+      z: (t.southZ + NORTH_TERRACE_NORTH_Z) / 2, w: t.east - NORTH_TERRACE_WEST, d: t.southZ - NORTH_TERRACE_NORTH_Z,
+      dy: t.dy, feather: NORTH_TERRACE_FEATHER_M, note: t.note })),
     Object.freeze({ id: "RailEmbankmentSouth", kind: "line", op: "raise", halfW: 2.6, feather: 4.2, dy: 0.52,
       points: Object.freeze([
         Object.freeze({ x: -77, z: 166, dy: 0.52 }), Object.freeze({ x: -77, z: 169, dy: 0.52 }), Object.freeze({ x: -77, z: 182, dy: 0.2 }),
@@ -101,6 +155,21 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
     // 南 z 223.5（BackyardWall 北面 223.65 之外），夹道、墙与走线的地面一厘米不动。
     Object.freeze({ id: "LaneHollowEast", kind: "box", op: "cut", x: 29.5, z: 218.45, w: 20, d: 6.1,
       dy: 1.8, feather: 2.0, note: "15_1 左侧石墙外低下去的菜园（墙外 1.8 m 低地）" }),
+    // ---- 撤离土岗（2026-09-30，docs/Data_FirstLevelBridgeFarBank.md §5）----------------------------
+    // 脱离战场要「翻过一道岗」而不是一条突兀的土墙：岗脊 z≈276（离北岸 186 m）、最高 2.7 m、每侧 13 m 缓坡
+    // （最陡 1.5·2.7/13 = 0.31，17°，人和担架都走得上），两头收成低缓的坡；脊线略弯，不是一条直线。
+    // 站在岗后 z ≥ 290 一带，眼高 1.65 m 的视线到对岸（z≈85）被岗脊挡住（Script_FirstLevelFarBankTest 量）。
+    // 岗上的枯树、残屋与坟包在 Data_FirstLevelWhiteboxRear 的 Retreat18 一节。
+    Object.freeze({ id: "RetreatRise", kind: "line", op: "raise", halfW: 3, feather: 13, dy: 2.7,
+      points: Object.freeze([
+        Object.freeze({ x: -116, z: 279, dy: 1.6 }), Object.freeze({ x: -100, z: 278, dy: 2.4 }),
+        Object.freeze({ x: -84, z: 276, dy: 2.7 }), Object.freeze({ x: -68, z: 276, dy: 2.7 }),
+        Object.freeze({ x: -52, z: 277, dy: 2.2 }), Object.freeze({ x: -46, z: 279, dy: 1.4 }),
+      ]), note: "撤离路线翻过的缓坡土岗（岗脊 2.7 m，两头收低）" }),
+    Object.freeze({ id: "RetreatKnollWest", kind: "disc", op: "raise", x: -112, z: 291, radius: 5, feather: 9, dy: 1.3,
+      note: "土岗西南的一个小土包，把岗后的空地读成有起伏的田" }),
+    Object.freeze({ id: "RetreatKnollEast", kind: "disc", op: "raise", x: -50, z: 292, radius: 4, feather: 8, dy: 1.1,
+      note: "土岗东南的小土包" }),
     Object.freeze({ id: "BridgeLeveeWest", kind: "line", op: "raise", halfW: 1.5, feather: 5.5, dy: 1.4,
       points: Object.freeze([
         Object.freeze({ x: -136, z: 167.24 }), Object.freeze({ x: -128, z: 169.28 }), Object.freeze({ x: -120, z: 171.49 }), Object.freeze({ x: -112, z: 172.31 }), Object.freeze({ x: -104, z: 172.64 }),

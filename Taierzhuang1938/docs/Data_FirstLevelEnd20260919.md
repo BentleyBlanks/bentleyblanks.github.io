@@ -152,10 +152,16 @@
   + 唯一一次 `Combat.BlastFeedback` → `bridgeDestroyed`
   → 信号 `RailBridgeDestroyed` 一次翻完 **5 个完好件 + 3 个残骸件**（碰撞；外观归模型），桥面退出可走面（不可逆）
   → 起爆后 `marchOrderDelayS` 6.5 s 才 `MarchToTengxian`（两个半孔都砸进河之后）。爆破不造成己方剧情伤亡。
+* **对岸步坦部队（2026-09-30）**：河对岸有大量日军步兵与三辆傀儡战车（BridgeCover 起就在，BridgeWithdraw 放真 AI 与冲桥组，
+  起爆时桥上的日军被炸死落河，桥断后全停在岸边隔河射击、没有一个能过河）。名册、时间线、分档伤害、性能与门禁全在
+  [对岸步坦部队](Data_FirstLevelBridgeFarBank.md)；本包只留两处接线（`Script_FirstLevelBridge` 按起爆器前问 `farBank.ReadyForBlast`、
+  `Fire()` 调 `farBank.OnBridgeBlast`）。
 * **夜入滕城**：
-  * 先随队沿 `marchOut` 真走一段（行军脚步不停），走到 `marchOutReached`
-    （锚点 `marchOut`，`marchOutArriveM` 8 m）才 `BeginNightTransition()` ——
-    Notion 明写「不让玩家从桥边跑几步就到城门」。
+  * 先随队沿 `marchOut` 真走一段（行军脚步不停）。**2026-09-30 起这一段是 109 m、翻过一道缓坡土岗**，走到终点
+    （锚点 `marchOut` (−98,295)，沿路线里程走完即算，走过头不卡）**且脱离战场**（`retreatOutOfReach`：离北岸 ≥ 190 m、
+    对岸真 AI 连续 1.5 s 看不见玩家、视线被地形挡住；见[对岸步坦部队](Data_FirstLevelBridgeFarBank.md) §5）才 `BeginNightTransition()` ——
+    Notion 明写「不让玩家从桥边跑几步就到城门」，用户 2026-09-30 加「脱离战场后才黑幕」。`marchOutReached` 只在黑屏真的起来那一刻记，
+    `Retry()` 的 NightMarch 分支据它分辨 A 段阵亡（正常重生接着走）与黑屏之后阵亡（重演黑屏）。
   * 黑屏 1 / 4 / 1 s，字幕「1938年3月15日 夜｜滕县」；黑屏里 `PlaceNightArrival()`
     瞬移到 `nightSpawn` 并 `ApplySky("night")`，记 `nightArrivalPlaced`
     → scenario 信号 `NightGateShown` → 北门夜景那一片才存在（白天它根本不画、不进碰撞）。
