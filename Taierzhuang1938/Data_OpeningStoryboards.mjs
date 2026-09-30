@@ -234,11 +234,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
         // SB03: the right hand slides forward into the lower right of the picture while he is dragged (flatFwd).
         CaptiveDragged:K([0,"flat","flat"],[1.2,"flat","flatFwd"]), CaptiveWall:K([0,"flat","flatFwd"]), Interrogation:K([0,"flat","flatFwd"]),
         Slash:K([0,"flat","flatFwd"]), Taunt:K([0,"flat","flatFwd"]),
-        // 2026-09-27 rework: ijaA walks up; the hands claw at the mud, pushing against the timber on his back.
-        Found:K([0,"flat","flatFwd"],[.8,"push","push"],[1.6,"flat","clawIn"]),
-        // Held up by the hair (ijaA's left fist), pinned at the hips: both hands strain against the mud, the fingers
-        // clawing (a hand held up to ijaA's forearm sat 0.2 m off the lens and filled a third of the picture).
-        Hold:KC("holdGripAt",[-1,"flat","clawIn"],[0,"push","clawIn"],[.35,"push","push"]),
+        // 2026-09-30: seen by ijaA he shams dead (rescue.playDead): the hands lie still in the mud (the 09-27 push against
+        // the timber and the clawing are gone).
+        Found:K([0,"flat","flatFwd"]),
+        // Held up by the hair (ijaA's left fist), pinned at the hips: still shamming, the hands lie where they are until the
+        // first slap wakes him (wokenAt); then both hands strain against the mud, the fingers clawing (a hand held up to
+        // ijaA's forearm sat 0.2 m off the lens and filled a third of the picture).
+        Hold:KC("wokenAt",[-1,"flat","flatFwd"],[0,"push","clawIn"],[.35,"push","push"]),
         Ask:K([0,"push","push"],[1.6,"push","clawIn"],[2.6,"clawIn","push"],[4,"push","push"]),
         // The charge: he is dropped (hair let go) and the hands go flat in the mud, then claw as he tries to see.
         Charge:K([0,"push","push"],[.25,"flat","flat"],[1.4,"flat","clawIn"]),
@@ -379,12 +381,18 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // 2026-09-29 (「朝着玩家走过来的时候没有收起来的小刀」): the hold ends on IjaThroatSlash's hold-loop start (2.0 s = the cut
     // 0.24 + tauntHoldS; he wipes the blade on the dying man's shoulder in it), and he sheathes it where he stands
     // (IjaReleaseSheathe, 1.33 s) before he walks off with his hands free.
-    tauntHoldS:1.76, tauntWalkMps:.75,
+    // 2026-09-30 (user: 「应该是一转身就看到了主角，而不是原地罚站了一会儿才动手」): he used to reach `found` 4.8 s after the cut
+    // and stand there 6.2 s until ijaB's 「蠢货。」 and the far call were over, then squat and wait 2.4 s more. Now the walk is
+    // paced (tauntWalkMps..tauntWalkMaxMps) to end as his own last jeer (tauntLastLine) does; he turns from it straight
+    // onto the pinned man (Found), and the taunt's lines still to come (ijaB's, the far call) are dropped.
+    // tauntLineOffsetS: CaptiveTaunt.01 starts this long after the cut (Data_FirstLevelDialogueDirection offsetS).
+    tauntHoldS:1.76, tauntWalkMps:.45, tauntWalkMaxMps:.75, tauntLastLine:"CaptiveTaunt.02", tauntLineOffsetS:.1,
     tauntWalk:Route([3.6,-125.28],[3.2,-125.22]),
     found:P(2.98,-125.2,Math.PI/2),
     crouch:P(2.45,-125.22,Math.PI/2),
-    // He looks down at him this long before the line (ShunziFound) and before he squats.
-    foundLookS:.7,
+    // Found: the line (ShunziFound, a giggle before the words) foundLineS after he turns onto him; he steps in to squat
+    // at foundStepS into it and takes the hair as soon as he is down (Hold) -- 「このしなやろう」 over the lifted head.
+    foundLineS:.15, foundStepS:.8,
     interpreterEnter:Route([23.5,-130],[20.1,-128],[18.7,-126.8],[17.45,-126.2],[16,-125.65],[14.2,-125.75],[13.2,-125.65],[12,-124.75],[8,-124.05],[6,-123.85],[4.9,-124.05]),
     // 「翻译踉跄着退开」 (Charge): turned to face west (onto the pinned man) InterpreterFlee carries him 1.3 m back east,
     // then he runs east down the north side of the front trench (between the dead comrade and ijaB, away from the crater
@@ -420,6 +428,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // Hold/Ask camera: ijaA's left fist lifts the head by the hair: the eye rises liftM over liftS and tips up at his face
     // (pitch capped at maxPitchDeg, the face a little above centre: headAboveDeg).
     holdShot:Object.freeze({ liftM:.16, liftS:.45, maxPitchDeg:40, headAboveDeg:6, backM:.04 }),
+    // 2026-09-30 (user: 「一看到主角主角就闭眼假装装死，眼睛开了一个小缝，随后被一巴掌扇眩晕+睁眼」): closeAtS into Found (ijaA has
+    // turned onto him) the eyes shut over closeS to a slit (eyeClosure `squint`; the lids meet at the picture's sides, a
+    // band in the lower middle stays open) with a faint tremor, the hands go still, and they stay so while he is grabbed
+    // and hauled up by the hair; the first slap snaps them open over openS (no flinch on that one) -- the daze after it
+    // as before. `slitAboveDeg`: the slit sits below the middle of the picture (0.62 of the height down at a 65 deg fov), so
+    // while he shams the look is on ijaA's face pitched up this much and the face falls into it.
+    playDead:Object.freeze({ closeAtS:.3, closeS:.14, squint:.84, tremor:.012, tremorHz:7, openS:.08, slitAboveDeg:9 }),
     // The interpreter squats at Shunzi's right front, 1.3 m from the eye, facing him; ijaB keeps watch east down the
     // trench 3.4 m off (「快点！」 over his shoulder).
     interpreter:P(2.92,-124.5,56*Math.PI/180),
@@ -439,8 +454,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // until thenAfterS after the blow lands.
     slap:Object.freeze({ sound:"slap", raiseS:.58, hitS:.58, yawDeg:44, rollDeg:12, pitchDeg:-7, dropM:.06, shiftM:.05,
       hangS:.35, recoverS:1.2, dizzyS:2.4,
+      // 2026-09-30: the grab now comes during 「还藏着一个，支那混蛋。」; the first blow waits for its words
+      // (afterLine: no earlier than afterLineS from the line's end -- its tail is a giggle) and wakes him (rescue.playDead).
       blows:Object.freeze([
-        Object.freeze({ at:"grab", delayS:.75, side:1, then:"RescueInterrogation.01", thenAfterS:.4 }),
+        Object.freeze({ at:"grab", delayS:.75, afterLine:"ShunziFound", afterLineS:-.55, side:1, then:"RescueInterrogation.01", thenAfterS:.4 }),
         Object.freeze({ line:"RescueInterrogation.03", afterEndS:1.1, side:1, then:"RescueInterrogation.04", thenAfterS:.6 }),
       ]),
       // 「说话！」 (.06): the hand goes up for a third -- and the charge breaks in before it lands.

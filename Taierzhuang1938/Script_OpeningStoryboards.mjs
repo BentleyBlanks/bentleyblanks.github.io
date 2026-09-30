@@ -1263,32 +1263,56 @@ export class FirstLevelBunkerShow {
       // The walk hands over from the slash root under the pelvis (the hold pose leans into the dying man).
       this.RerootUnderPelvis(ijaA,Face(ijaA.openingStoryboardLast||ijaA.position,J.found));
     }
-    // Taunting over his shoulder as he goes, the bayonet in its scabbard (IjaTauntWalk over the walk).
-    const there=this.Follow(ijaA,"taunt",[...J.tauntWalk,J.found],J.tauntWalkMps,OpeningClipMeta("IjaTauntWalk")?"IjaTauntWalk":null,J.found.yaw,{upperBody:true});
-    if(there||age>C.timeouts.tauntExtraS+4){this.flags.foundAt=r.time;this.Stage("Found");}
+    // Taunting over his shoulder as he goes, the bayonet in its scabbard (IjaTauntWalk over the walk). 2026-09-30: paced to
+    // arrive as his own last jeer ends (TauntSaid), and he turns onto the pinned man from it -- no standing about.
+    const route=[...J.tauntWalk,J.found],at=ijaA?.openingStoryboardLast||ijaA?.position;
+    let leftM=at?Distance(at,route[0]):0;for(let i=1;i<route.length;i++)leftM+=Distance(route[i-1],route[i]);
+    const leftS=this.TauntSaidAt()-r.time,pace=leftS>.05?Math.max(J.tauntWalkMps,Math.min(J.tauntWalkMaxMps,leftM/leftS)):J.tauntWalkMaxMps;
+    const there=this.Follow(ijaA,"taunt",route,pace,OpeningClipMeta("IjaTauntWalk")?"IjaTauntWalk":null,J.found.yaw,{upperBody:true});
+    if(there&&this.TauntSaid()||age>C.timeouts.tauntExtraS+4){this.flags.foundAt=r.time;this.Stage("Found");}
   }
-  /** 「还藏着一个，支那混蛋。」: he stops over the pinned man, looks down at him, says it and squats at his head. */
+  /** ijaA's own taunt lines (CaptiveTaunt up to ija.tauntLastLine) are over (the rest are other men's). */
+  TauntSaid(){
+    const h=this.scenes.CaptiveTaunt;
+    if(!h)return this.r.time>=this.TauntSaidAt();
+    const last=h.lines?.find(l=>l.line.id===C.ija.tauntLastLine);
+    return h.done||h.stopped||!last||last.state==="done";
+  }
+  /** When ijaA's last taunt line should end (estimated from the manifest; the scene starts on the cut). */
+  TauntSaidAt(){
+    const J=C.ija,id=J.tauntLastLine,scene=id.split(".")[0],start=this.flags["scene:"+scene]??this.flags.throatCut??this.r.time;
+    const seconds=this.r.voice?.manifest?.lines?.[id]?.seconds??1.5;
+    return start+J.tauntLineOffsetS+this.LineStart(scene,id)+seconds;
+  }
+  /** 「还藏着一个，支那混蛋。」: he turns from his last jeer straight onto the pinned man (who shams dead: rescue.playDead),
+   *  says it, steps in and squats at his head, and takes the hair as soon as he is down (Hold). */
   PhaseFound(age){
     const r=this.r,ijaA=this.Ija("ijaA"),J=C.ija;
-    if(!this.phaseEntered){this.phaseEntered=true;r.Record("doorSearchStarted");this.flags.foundAt??=r.time;}
+    if(!this.phaseEntered){
+      this.phaseEntered=true;r.Record("doorSearchStarted");this.flags.foundAt??=r.time;
+      // The taunt's lines still to come (ijaB's 「蠢货。」, the far call) would talk over his find: dropped (2026-09-30). ijaB
+      // turns to the front as he did on the far call.
+      const taunt=this.scenes.CaptiveTaunt;
+      if(taunt&&!taunt.done&&!taunt.lines?.some(l=>l.state==="playing"))taunt.Stop();
+      this.flags.frontCallAt??=r.time;
+    }
     this.VanguardFront(this.flags.vanguardAt);this.DepthIja();
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     if(r.time-this.flags.releasedAt>=ClipLength("CaptiveWallSlideTwitch",3.2)&&!r.Has("captivesKilled"))r.Record("captivesKilled",{count:1});
     this.HoldRear();
-    // He sees the man under the timber and looks at him; his line waits for the taunt's last lines (ijaB's 「蠢货。」, the
-    // far call) so they do not talk over each other.
-    const taunted=this.SceneDone("CaptiveTaunt")||r.time-this.flags.throatCut>this.SceneLength("CaptiveTaunt")+C.timeouts.tauntExtraS;
-    if(age>=J.foundLookS&&taunted&&!this.Started("ShunziFound"))this.Scene("ShunziFound",r.voice?.PlayScene("ShunziFound",{speakers:this.Speakers()}));
+    // (A taunt line of another man already playing when he got here is let finish before his.)
+    const clear=this.SceneDone("CaptiveTaunt")||!this.scenes.CaptiveTaunt?.lines?.some(l=>l.state==="playing");
+    if(age>=J.foundLineS&&clear&&!this.Started("ShunziFound"))this.Scene("ShunziFound",r.voice?.PlayScene("ShunziFound",{speakers:this.Speakers()}));
+    if(age>=C.rescue.playDead.closeAtS)this.flags.playDeadAt??=r.time;
     const said=this.Started("ShunziFound")?r.time-this.flags["scene:ShunziFound"]:-1;
-    if(said<.9){this.Hold(ijaA,J.found,OpeningClipMeta("IjaFoundLook")?"IjaFoundLook":null,{speed:C.speed.stroll,seconds:age});return;}
+    if(said<J.foundStepS){this.Hold(ijaA,J.found,OpeningClipMeta("IjaFoundLook")?"IjaFoundLook":null,{speed:C.speed.stroll,seconds:age});return;}
     if(age>C.timeouts.foundWalkS+C.timeouts.tauntExtraS){this.Put(ijaA,J.crouch);this.Stage("Hold");return;}
-    // He steps up and squats at Shunzi's head (IjaCrouchHairHold's first frame is the squat).
-    const clip=this.HoldClip();
+    // He steps up and squats at Shunzi's head (IjaCrouchHairHold's first frame is the squat) and takes the hair at once;
+    // the first slap waits for the end of his line (rescue.slap.blows[0].afterLine).
     if(this.Hold(ijaA,J.crouch,null,{speed:C.speed.stroll})){
       this.flags.crouchAt??=r.time;
-      this.Pose(ijaA,clip,{seconds:0});
-      // 「看见我了就扇巴掌」: the grab (and the first slap) as soon as he is down, the last second of his line over it.
-      if(this.SceneDone("ShunziFound")||said>this.SceneLength("ShunziFound")-1)this.Stage("Hold");
+      this.Pose(ijaA,this.HoldClip(),{seconds:0});
+      this.Stage("Hold");
     }else if(age>C.timeouts.foundWalkS){this.Put(ijaA,J.crouch);this.Stage("Hold");}
   }
   // ---- 02 questioning where he lies, slaps, the charge, the haul out ------------------------------------------------
@@ -1341,6 +1365,14 @@ export class FirstLevelBunkerShow {
     }
     return end;
   }
+  /** Seconds from now to a `grab` blow's hit: delayS into the hold (the head up) and no earlier than afterLineS from the
+   *  end of `afterLine` (a scene playing now, by its manifest length). */
+  GrabBlowIn(blow){
+    const r=this.r,Q=C.rescue.slap;let hit=blow.delayS+Q.hitS;
+    if(blow.afterLine&&this.Started(blow.afterLine)&&!this.SceneDone(blow.afterLine))
+      hit=Math.max(hit,this.flags["scene:"+blow.afterLine]+this.SceneLength(blow.afterLine)+blow.afterLineS-r.time);
+    return hit;
+  }
   /** Queue blow `index` of rescue.slap.blows: it lands `hitInS` from now (UpdateSlaps). */
   QueueSlap(index,hitInS){
     const blow=C.rescue.slap.blows[index];
@@ -1359,6 +1391,8 @@ export class FirstLevelBunkerShow {
       if(slap.landed||r.time<slap.at)continue;
       slap.landed=true;
       this.strikeAt=r.time;this.flags.slapAt=r.time;this.flags.slapSide=slap.side;this.flags.slapCount=(this.flags.slapCount||0)+1;
+      // The first one ends his shamming (rescue.playDead): the eyes snap open, the hands go to the mud.
+      this.flags.wokenAt??=r.time;
       // The view keeps aiming where his face was at the blow while the head is flung (Shot: Hold / Ask).
       this.slapAim=this.HeadPoint(this.Ija("ijaA"))?.clone()||null;
       r.audio?.Play?.(C.rescue.slap.sound,{position:r.Point(C.shunzi.witnessEye,.45),volume:1});
@@ -1395,8 +1429,9 @@ export class FirstLevelBunkerShow {
       this.phaseEntered=true;r.Record("rescueCallHeard");
       this.flags.holdAt=r.time;this.flags.holdGripAt=r.time+.25;
       const Q=C.rescue.slap,seconds=id=>r.voice?.manifest?.lines?.[id]?.seconds??1.5;
-      // The first blow the moment the head is up in his fist; the lines wait for their blows (HeldBySlap).
-      Q.blows.forEach((blow,i)=>{if(blow.at==="grab")this.QueueSlap(i,blow.delayS+Q.hitS);});
+      // The first blow the moment the head is up in his fist -- and his find line said; the lines wait for their blows
+      // (HeldBySlap).
+      Q.blows.forEach((blow,i)=>{if(blow.at==="grab")this.QueueSlap(i,this.GrabBlowIn(blow));});
       this.Scene("RescueInterrogation",r.voice?.PlayScene("RescueInterrogation",{speakers:this.Speakers(),
         hold:(line)=>this.HeldBySlap(line.id),
         onLine:(lineId)=>{
@@ -1408,7 +1443,7 @@ export class FirstLevelBunkerShow {
       if(!this.scenes.RescueInterrogation){
         const L=id=>this.LineStart("RescueInterrogation",id);let shift=0;
         Q.blows.forEach((blow,i)=>{
-          const hit=blow.at==="grab"?blow.delayS+Q.hitS:shift+L(blow.line)+seconds(blow.line)+blow.afterEndS;
+          const hit=blow.at==="grab"?this.GrabBlowIn(blow):shift+L(blow.line)+seconds(blow.line)+blow.afterEndS;
           this.QueueSlap(i,hit);
           if(blow.then)shift=Math.max(shift,hit+blow.thenAfterS-L(blow.then));
         });
@@ -2358,10 +2393,9 @@ export class FirstLevelBunkerShow {
     }
     else if(p==="Taunt"||p==="Found"){
       fovScale=this.FixateScale();
-      // He comes walking up the trench at the eye, taunting over his shoulder; over the pinned man he stops and looks down.
-      // Found: 「他试着撑起身体」 against the timber once he sees the boots coming (a small push-up that falls back).
+      // He comes walking up the trench at the eye, taunting over his shoulder; over the pinned man he turns and looks down.
+      // 2026-09-30: seen, Shunzi shams dead (no more push-up against the timber; the slit: ShamLook below).
       target=this.LookAtBody(eye,height,ijaA,-5,40)||this.Aim(eye,height,-90*DEG,12*DEG);
-      if(p==="Found")height+=L.pushUpM*.6*Smooth((a-.9)/.35)*(1-Smooth((a-1.5)/.2));
     }
     else if(p==="Hold"||p==="Ask"){
       // 「日兵甲揪住他的头发把头提起来」: the eye rises liftM and tips up at his face; the slaps fling the head aside.
@@ -2426,7 +2460,21 @@ export class FirstLevelBunkerShow {
         target=this.Aim(eye,height,home+off,Math.atan2(d.y,Math.hypot(d.x,d.z)));
       }
     }
+    // Shamming dead (Found / Hold until the first slap): the look goes onto ijaA's face and tips up slitAboveDeg, so the face
+    // is in the slit between the lids (it lies below the middle of the picture).
+    const sham=this.Shamming(),face=sham>0&&(p==="Found"||p==="Hold")&&Head(ijaA);
+    if(face){
+      const e=r.Point(eye,height),to=face.clone().sub(e).normalize(),from=target.clone().sub(e).normalize();
+      target=e.clone().add(from.lerp(to,sham).normalize());pitch+=C.rescue.playDead.slitAboveDeg*DEG*sham;
+    }
     return {eye,height,target,roll,pitch,yaw,fovScale,quaternion,track};
+  }
+  /** 0..1: how far into shamming dead he is (rescue.playDead): up over closeS once ijaA has seen him, down over openS
+   *  on the first slap. */
+  Shamming(){
+    const D=C.rescue.playDead,f=this.flags,t=this.r.time;
+    if(f.playDeadAt==null)return 0;
+    return Smooth((t-f.playDeadAt)/D.closeS)*(f.wokenAt!=null?1-Smooth((t-f.wokenAt)/D.openS):1);
   }
   /** 「看不出来是割喉」: from the grab the pinned eye fixes on the throat (the view narrows to interrogation.fixate.scale,
    *  first person, no cut) and widens again once ijaA lets the dying man drop and walks off. */
@@ -2512,12 +2560,15 @@ export class FirstLevelBunkerShow {
     if(r.player?.hitMarks?.length)r.player.hitMarks.length=0;
     const opening=r.opening;
     const fade=p==="Banter"?1-Smooth((r.time-(this.started??r.time))/C.fadeInS):0;
-    // Each slap: a flinch that does not shut the eyes (the head being flung must be seen), then a slow dazed blink.
-    const slap=this.flags.slapAt!=null?r.time-this.flags.slapAt:null;
-    const blink=slap==null||slap<0?0:Math.max(.45*Smooth(slap/.03)*(1-Smooth((slap-.06)/.1)),
+    // Each slap: a flinch that does not shut the eyes (the head being flung must be seen), then a slow dazed blink. The
+    // first one snaps his shammed-dead slit open instead (rescue.playDead): no flinch on that one.
+    const slap=this.flags.slapAt!=null?r.time-this.flags.slapAt:null,waking=this.flags.slapCount===1;
+    const blink=slap==null||slap<0?0:Math.max(waking?0:.45*Smooth(slap/.03)*(1-Smooth((slap-.06)/.1)),
       .7*Smooth((slap-.5)/.12)*(1-Smooth((slap-.68)/.2)));
+    const D=C.rescue.playDead,sham=this.Shamming();
+    const squint=sham>0?sham*(D.squint+D.tremor*Math.sin(r.time*Math.PI*2*D.tremorHz)*Math.sin(r.time*Math.PI*2*D.tremorHz*.37)):0;
     const recovery=C.blackoutRecovery;
-    opening.eyeClosure=this.shownEyeClosure=p==="Blast"?Smooth((a-C.banter.blastShot.eyesCloseS)/recovery.closeS):p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.eyelidS):Math.max(fade,blink);
+    opening.eyeClosure=this.shownEyeClosure=p==="Blast"?Smooth((a-C.banter.blastShot.eyesCloseS)/recovery.closeS):p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.eyelidS):Math.max(fade,blink,squint);
     opening.blackout=p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.fadeS):0;
     // Blur / ghosting / imbalance follow one continuous curve (Perceive), no per-phase steps.
     opening.concussion=shot.cinematic?null:sense.amount>1e-3?{amount:sense.amount,focus:sense.focus,pitch:0,roll:0}:null;
