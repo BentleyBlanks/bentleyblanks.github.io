@@ -26,6 +26,8 @@ export const WHITEBOX_CONTROLS = [
   ["contactShadows", "接触阴影", "渲染 Pass", false],
   ["interiorSky", "室内天光遮蔽", "渲染 Pass", false],
   ["terrainBlend", "地形接触融合", "渲染 Pass", false],
+  // 地面脚印与履带痕迹（docs/Data_TerrainTrails.md）。照白盒契约默认关；「编辑白盒画质」里可单独打开。
+  ["terrainTrails", "地面脚印与痕迹", "渲染 Pass", false],
   ["atmosphere", "物理大气 LUT", "渲染 Pass", false],
   ["volumetrics", "体积雾 / 体积光", "渲染 Pass", false],
   ["taa", "TAA 时域抗锯齿", "渲染 Pass", false],
@@ -70,6 +72,7 @@ export function WhiteboxPassPlan(value) {
   const passes = new Set(["main", "wireframe", "debugOverlay"]);
   const Add = (...names) => names.forEach((name) => passes.add(name));
   if (c.terrainBlend) Add("terrainBlend");
+  if (c.terrainTrails) Add("terrainTrails");
   if (c.ssao || c.ssil || c.interiorSky) Add("gtao");
   if (c.ssil) Add("ssilHistory");
   if (c.ssr) Add("ssr", "ssrColor", "hzb");
@@ -133,6 +136,7 @@ export function MakeWhiteboxQualityPreset(base, config) {
   return {
     ...base, ssao: c.ssao || c.ssil || c.interiorSky, ssil: c.ssil, ssr: c.ssr,
     velocity: c.taa || c.ssr || c.motionBlur, hzb: c.ssr, terrainBlend: c.terrainBlend,
+    terrainTrails: c.terrainTrails ? base.terrainTrails : false,
     taa: c.taa, taaUpscale: c.taa, msaa: 0, sharpen: 0, renderScale: c.renderScale,
     volumetrics: c.volumetrics, atmosphere: c.atmosphere, csm: c.shadows,
     contactShadows: c.contactShadows, clusteredLights: c.clusteredLights,

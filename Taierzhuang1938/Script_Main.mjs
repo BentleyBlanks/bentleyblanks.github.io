@@ -53,6 +53,7 @@ import { GORE_RANGE_PHASE, GORE_RANGE_ID } from "./Data_GoreRange.mjs";
 import { GoreRangeField } from "./Script_GoreRangeField.mjs";
 import { GoreRange } from "./Script_GoreRange.mjs";
 import { HitReactionOf, HitReactionEnabled, SetHitReactionEnabled, PreloadDeathLibrary, DeathLibrary } from "./Script_HitReactionLayer.mjs";
+import { TerrainTrailSystem } from "./Script_TerrainTrails.mjs";
 import {
   RANGE_PHASE, RANGE_LEVEL_ID, RANGE_TARGETS, RANGE_STATIONS, RANGE_RESPAWN_S,
 } from "./Data_Range.mjs";
@@ -490,6 +491,7 @@ camera.rotation.order = "YXZ";
 
 // 破口 uniform 同时喂主材质、阴影与深度法线预通道，三条链必须是一只洞。
 const destructionUniforms = MakeDestructionUniforms();
+const trailFocus = new THREE.Vector3();
 const post = new PostPipeline(renderer, {
   width: window.innerWidth, height: window.innerHeight, quality: QUALITY,
   destruction: destructionUniforms,
@@ -2872,6 +2874,16 @@ async function Boot() {
     },
     SetForce: (kind) => gore?.SetForce(kind || null) ?? null,
     Reset: () => { gore?.ReleaseAll(); return gore?.State() || null; },
+  };
+  // 地面脚印与痕迹取证口（docs/Data_TerrainTrails.md §6）。?trails=0 关采集。
+  // Read 同步读回痕迹靶一个世界点（0..255 的 [坑深, 泥边, 踩乱]），别在帧循环里用。
+  window.Taierzhuang.Debug.TerrainTrails = {
+    Describe: () => ({ ...TerrainTrailSystem.Describe(), pass: post.terrainTrailsPass?.Describe() ?? null,
+      preset: post.preset?.terrainTrails ?? null }),
+    Stamp: (o) => TerrainTrailSystem.Stamp(o),
+    Read: (x, z) => post.terrainTrailsPass?.ReadTexel(renderer, x, z) ?? null,
+    SetEnabled: (value) => TerrainTrailSystem.SetEnabled(value !== false),
+    Reset: () => TerrainTrailSystem.Reset(),
   };
   // 受击物理反应取证口（docs/Data_HitReaction.md §2.4）。**所有关卡都挂**；?hitreact=0 关整层。
   // Hit 走正片 TakeHit 链（扣血、可致死、方向死亡）；Impulse 只打冲量不扣血（调参、拍对照图用）。
@@ -8662,6 +8674,11 @@ function Frame(dt, render = true) {
   // 现在按脚下真实材质查（射线拿碰撞盒 tag + 水深），姿态与冲刺分别给音量与步距，
   // 姿态切换/翻越出布料声、冲刺出装具声、跑久了或伤重出喘息。
   audioWiring.Update(dt, state.frame, SURFACE_BY_TAG);
+
+  // 地面脚印与痕迹（docs/Data_TerrainTrails.md）：这里只收落脚（人物按真实脚骨、玩家按步距），
+  // 画进痕迹靶是帧图 terrainTrails 那一趟的事。过场里玩家不留印（机位在演，身子不在那）。
+  TerrainTrailSystem.Update(dt, { focus: camera.getWorldPosition(trailFocus),
+    player: state.cutscene || state.menu ? null : player, scene });
 
   // 情境操作提示：每六帧扫一次。F 查询会遍历全场士兵，0.1 s 一次已经足够跟手；
   // 同一轮也重算换枪与包扎条件，保证 HUD 不会提示一个实际做不了的动作。

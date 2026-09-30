@@ -211,6 +211,9 @@ export const testDefs = {
     desc: "P012独立入口、真实行走交互与画面取证" },
   WallPlanTest: { file: "Script_WallPlanTest.mjs", desc: "样条围墙规划契约：贴地/缺口/闭环角搭/塌段/确定性（纯 Node，毫秒级）" },
   TerrainBlendTest: { file: "Script_TerrainBlendTest.mjs", timeoutMs: 180000, desc: "GPU terrain contact albedo/normal/roughness, depth mask and lifecycle" },
+  TerrainTrailRulesTest: { file: "Script_TerrainTrailRulesTest.mjs", desc: "地面脚印与痕迹规则层：印章图集（鞋纹/履带）、环形窗口露出条带暴力核对、历史回填与减淡、落脚判定（纯 Node）" },
+  TerrainTrailsTest: { file: "Script_TerrainTrailsTest.mjs", timeoutMs: 240000, desc: "脚印痕迹靶 GPU 夹具：写靶/左右镜像/减淡/滑窗回填/跨靶边/地形与壕沟着色/石材不编/履带车辆/采样器" },
+  TerrainTrailsBrowserTest: { file: "Script_TerrainTrailsBrowserTest.mjs", timeoutMs: 900000, desc: "第一关实机：真按 W 落印、班组真实脚骨落脚、开关痕迹 pass 印子处像素变化、程序链接与采样器" },
   TrenchSurfaceTest: { file: "Script_TrenchSurfaceTest.mjs", desc: "Wet trench assets and shared terrain contact update/reset" },
   SandbagStandardTest: { file: "Script_SandbagStandardTest.mjs", desc: "唯一沙袋模型：GLB 袋底实测、贴地数学、禁用旧沙袋画法（纯 Node）" },
   TrenchPlanTest: { file: "Script_TrenchPlanTest.mjs", desc: "壕沟样条规划契约：legacy 逐点等价/热路径/三岔口/并集抛土/宽深有界/布设/圆角（纯 Node，秒级）" },
@@ -510,7 +513,7 @@ export const browserTests = new Set([
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
   "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest",
-  "PerformanceTest", "PhysicsTest", "PostTest", "TerrainBlendTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
+  "PerformanceTest", "PhysicsTest", "PostTest", "TerrainBlendTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "TrenchEditorTest", "VisibilityTest", "VoiceTest",
@@ -543,6 +546,7 @@ export const tier0Fast = [
   "TextGatherCheck",
   "BootPayloadTest",
   "TerrainLayersTest",
+  "TerrainTrailRulesTest",
   "TextureStandardsTest",
   "AssetStandardsTest",
   "ModelFacingTest",
@@ -626,7 +630,7 @@ export const domains = {
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "TerrainLayersTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "TrenchPlanTest", "TrenchSurfaceTest", "PhysicsTest", "JumpTest", "DestructionTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "TerrainLayersTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "TrenchPlanTest", "TrenchSurfaceTest", "PhysicsTest", "JumpTest", "DestructionTest", "TerrainTrailRulesTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
@@ -704,7 +708,7 @@ export const domains = {
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
     // 开机顺序（存档画质何时套上）与关卡预热的改动连着 SavedGraphicsWarmTest 跑（约一分半）。
-    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest"],
+    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -777,6 +781,9 @@ const changedDomainRules = [
   {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing|GrenadeThrow/},
   {domain:"combat",pattern:/HitDisorientation/},
   {domain:'render',pattern:/TerrainBlend|TrenchSurfaceMaterial/},
+  // 地面脚印与痕迹（docs/Data_TerrainTrails.md）：痕迹靶 pass、地形 / 壕沟 / 砸坑着色接入、人物骨架与战车登记。
+  {domain:'terrain',pattern:/TerrainTrail|Script_TerrainMaterial|Script_TerrainDeformationView/},
+  {domain:'render',pattern:/TerrainTrail/},
   {domain:'motionVector',pattern:/MotionVector|PostPrepass|Script_Post\.mjs|Actor|Skinn|Skeleton|Viewmodel|FpsArm|BackRifle|Binoculars|Data_Tuning_Graphics/},
   { domain: "render", pattern: /UniformColors/ },
   // 人物表面层（2026-09-28 B3）：补丁读蒙皮前的 position（运动矢量）、改人物材质（采样器 / 预热 / 远景合批）。

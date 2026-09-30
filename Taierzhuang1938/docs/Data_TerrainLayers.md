@@ -2,6 +2,8 @@
 
 2026-09-26：翻土层 SpoilEarth 已按[概念图 07 通用壕沟](Data_TrenchReference07.md)更新，使用新的内置 imagegen 源图与烘焙参数。其余三层、四层数组结构、采样器及高度场保持不变；下文翻土图的 Lovart 来源与旧标定值属于 2026-09-17 历史。
 
+2026-09-30：动态的脚印与战车履带印（痕迹靶，采样进本材质）见 [地面脚印与痕迹](Data_TerrainTrails.md)；本文 §8 的车辙是沿道路折线的静态车辙。
+
 2026-09-28：对标 3A 参考图的色调、湿泥积水与车辙见 §8（`terrainLayers` 改为 4 个分量）；01–05 前沿湿泥区见 §9。
 
 第一关《往南的路》地面的唯一现状文档。实现：`Script_TerrainMaterial.mjs`；数值：`Data_Tuning_Terrain.mjs`；

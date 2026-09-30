@@ -133,6 +133,7 @@ function generateShadowMapTypeDefine( parameters ) {
 ```
  0  （不是 pass）TaaPass.ApplyJitter —— Halton(2,3) 子像素抖动写进 projectionMatrix
  1  atmosphere            刷天空视图 LUT + 大气透视 froxel LUT（天穹与材质都要采）
+ 1a terrainTrails         相机中心的环形痕迹靶（脚印 / 履带印：坑深 / 泥边 / 踩乱），地形材质采（docs/Data_TerrainTrails.md）
  1b terrainBlend          地形线性 albedo/roughness + mapped normal/depth，供不透明碎石交界混合
  2  prepass               MRT：RT0 法线+线性视深 / RT1 屏幕空间速度 / DepthTexture
  3  hzb                   RT0.w 的 max-reduce 金字塔（SSR / 体积雾 / 接触阴影共用）

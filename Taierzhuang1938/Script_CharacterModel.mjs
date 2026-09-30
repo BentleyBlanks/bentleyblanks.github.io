@@ -13,6 +13,7 @@ import { InfantryAnimationController, INFANTRY_ANIMATION_IDS, INFANTRY_ANIMATION
 import { MeleeAnimationPlayer } from "./Script_MeleeAnimation.mjs";
 import { LoadProneCrawl, ProneGroundContact, PRONE_CRAWL } from './Script_ProneCrawl.mjs';
 import { ActorLocomotion } from "./Script_ActorLocomotion.mjs";
+import { TerrainTrailSystem } from "./Script_TerrainTrails.mjs";
 import { LayeredGaitId } from "./Script_LayeredGait.mjs";
 import { ACTOR_LOCOMOTION } from "./Data_Tuning_ActorLocomotion.mjs";
 import { CharacterFacialAnimation } from "./Script_CharacterFacialAnimation.mjs";
@@ -840,6 +841,8 @@ export class LugouCharacterRig {
     }
     this.locomotion = new ActorLocomotion(this, (HashString(`${seed}|gait`) % 1000) / 1000);
     this.proneContact = new ProneGroundContact(this);
+    // 地面脚印（docs/Data_TerrainTrails.md）：登记一下，按渲染后的真实脚骨判着地。Dispose 时注销。
+    TerrainTrailSystem.Register(this);
     this.locomotion.profiles = { ...this.locomotion.profiles, ProneCrawl: { duration: PRONE_CRAWL.duration, referenceMps: PRONE_CRAWL.referenceMps } };
     // Rigid carried equipment is parented to its authored bone in the GLB.
     this.sockets = {
@@ -1510,6 +1513,7 @@ export class LugouCharacterRig {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
     if (this.root.parent) this.root.parent.remove(this.root);
+    TerrainTrailSystem.Unregister(this);
     this.disposed = true;
   }
 }
