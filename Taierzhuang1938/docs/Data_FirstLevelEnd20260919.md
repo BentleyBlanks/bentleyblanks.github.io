@@ -132,6 +132,8 @@
 * **撤出爆破区**：桥头军官喊 `BridgeWithdraw`（三句里没有「所有人都过来了」）；
   爆破人员是**此前就在场**的两个人，走到 `MISSION_PLACEMENT.bridge.demolition` 蹲 `demolitionSetS`(6 s)
   装药（`demolitionCharged`），然后沿 `demolitionPullback` / `officerPullback` 自己撤出去。
+  （2026-09-30 三孔：两人的落位改到 **1 号墩东头的干沙地**（(−71.2,159.4)、(−71.2,161.3)，身边是木药箱与一卷线），
+  折线先沿东侧沙地走到 z 166/167 再并入下面的口子；见 [Data_RailBridge §6](Data_RailBridge.md)。）
   三条撤出折线都从西/东两道掩体墙之间那个 9 m 宽的口子（x −78..−69）走，终点在
   `BlastSafeBank`（x −69.5..−62.5）西头以外；净空由 `Script_FirstLevelSpaceTest` 守着。
   **药装好之前不清场**：爆破人员的岗位就在爆破区里，这会儿把区里的人往南赶，
