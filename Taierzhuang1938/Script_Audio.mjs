@@ -713,7 +713,11 @@ class Voice {
   /** 启动一个源节点（Osc / BufferSource），并把 voice 寿命推到它之后。 */
   Start(node, at, duration, offset = node.__offset || 0) {
     const t = at ?? this.t;
-    if (node.buffer) node.start(t, offset, duration ?? node.__dur ?? Math.max(0.01, node.buffer.duration - offset));
+    // duration 是**真实时间**（调用方按 buffer.duration / rate 算的）；BufferSource.start 的第三个参数却是**素材时间**。
+    // 【2026-09-30】原来直接传进去：变调 > 1 的采样按 rate² 截短 —— ±3 % 抖动的那一档每条尾巴丢 3 %，
+    // 炸弹啸声（变调 × 抖动到 1.06）最响的那一截被切掉 0.15 s。这里换算回素材时间。
+    const rate = node.playbackRate?.value ?? 1;
+    if (node.buffer) node.start(t, offset, duration != null ? duration * rate : node.__dur ?? Math.max(0.01, node.buffer.duration - offset));
     else node.start(t);
     const stop = t + (duration ?? node.__dur ?? 1);
     if (node.stop) node.stop(stop + 0.02);
@@ -3382,6 +3386,36 @@ const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraph
  * 走 RECIPES 而不是另开一条播放路径 —— 去重、预算闸、Panner、空气低通、
  * 混响 send、距离湿度加成这一整套原封不动地免费复用（与人声采样同一个理由）。
  */
+/**
+ * 跟着游戏时钟变速的采样（2026-09-30，炸弹下落啸声）。调用方每帧按「素材还剩多少 ÷ 游戏里还剩多少秒」
+ * 调 `v.SetRate(倍率)`，让素材的终点落在游戏里那一刻（落地）上。音频时钟按真实时间走，游戏时钟每帧封顶 0.05 s、
+ * 卡一下就落后 —— 按真实时间一口气排好的 2.8 s 在帧率低时比炸弹先放完（用户：「炸弹还没落地啸声就结束了」）。
+ * 这几条尊重 `offset`（晚了几帧就从素材里往后切）、不加 ±3 % 抖动；寿命按最慢倍率留足。
+ */
+const SAMPLE_VARISPEED = new Set(["bombWhistle"]);
+/** SetRate 允许的最慢倍率（寿命按它留）。与 Data_FirstLevelAirRaid.audio.whistle.rateMin 同一个数。 */
+const VARISPEED_MIN = 0.8;
+
+function VarispeedSample(A, v, src, buf, rate) {
+  const off = Math.min(Math.max(0, v.offset || 0), Math.max(0, buf.duration - 0.01));
+  v.Start(src, v.t, (buf.duration - off) / rate, off);
+  v.Live((buf.duration - off) / (rate * VARISPEED_MIN) + 0.1);
+  let pos = off, lastT = v.t, cur = rate;
+  /** 此刻播到素材的第几秒（还没起播返回 null）。 */
+  v.SamplePos = () => {
+    const now = A.ctx.currentTime;
+    return now < v.t ? null : Math.min(buf.duration, pos + (now - lastT) * cur);
+  };
+  v.SetRate = (mul) => {
+    const now = Math.max(A.ctx.currentTime, v.t);
+    pos = Math.min(buf.duration, pos + (now - lastT) * cur);
+    lastT = now;
+    cur = rate * Math.max(VARISPEED_MIN, mul);
+    src.playbackRate.setValueAtTime(cur, now);
+    try { src.stop(now + (buf.duration - pos) / cur + 0.02); } catch { /* 已经停了 */ }
+  };
+}
+
 function SampleRecipe(buffers, name) {
   const interval = SAMPLE_BURST[name] || 0;
   const wet = SAMPLE_WET[name];
@@ -3405,8 +3439,8 @@ function SampleRecipe(buffers, name) {
       }
       const src = v.Own(A.ctx.createBufferSource());
       src.buffer = buf;
-      // 逐发 ±3%：连打二十发不会听出是同一个 wav 在复读。轮播的那几条不掺。
-      const rate = cycle ? v.pitch : v.pitch * (0.97 + v.rng() * 0.06);
+      // 逐发 ±3%：连打二十发不会听出是同一个 wav 在复读。轮播的那几条、跟着游戏时钟变速的那几条不掺。
+      const rate = cycle || SAMPLE_VARISPEED.has(name) ? v.pitch : v.pitch * (0.97 + v.rng() * 0.06);
       src.playbackRate.value = rate;
       src.connect(v.out);
       if (name === "planeDrone") {
@@ -3417,6 +3451,8 @@ function SampleRecipe(buffers, name) {
         v.loop = true;
         v.Live(3600);
         v.SetDoppler = doppler => src.playbackRate.setTargetAtTime(rate * doppler, A.ctx.currentTime, 0.12);
+      } else if (SAMPLE_VARISPEED.has(name)) {
+        VarispeedSample(A, v, src, buf, rate);
       } else {
         v.Start(src, v.t + i * interval, buf.duration / Math.max(0.1, rate));
       }
