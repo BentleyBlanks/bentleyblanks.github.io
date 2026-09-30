@@ -116,7 +116,7 @@ npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目
 | ai | AiBehavior、Visibility |
 | hud | HudPrompt、HudPromptBrowser |
 | audio / voice | AudioTest / VoiceTest |
-| menu | MenuTest、BootPropTest |
+| menu | MenuTest、BootPaperTest |
 | editor | EditorTest、DestructionEditorTest |
 | cutscene | CutsceneControl、ActorPose |
 | render | 渲染子系统专项（下表）→ ActorBatch → PropInstancing → ExternalPropAsset → TownDressing → EastSuburbBlocks → EastSuburbNav → WestDistrictCoverage → WestSuburbBlocks → WestStation → DressingProbe → RespawnShaderWarm（换人 / 人物模型号首次进画面不现编着色器）；另提示相关 Tier 2 |

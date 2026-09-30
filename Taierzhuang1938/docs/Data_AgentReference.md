@@ -75,8 +75,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 ### 引导 / 主循环
 - `Script_Main.mjs` —— 装配层：启动顺序、关卡流程、每帧调度、输入接线。
   **任何规则不许写在这里**——规则在 Script_Ai / Script_Player / Script_Story / Data_*。
-- `Script_BootProp` / `BootPropStage` / `BootPropWorker` —— 加载画面的可转道具台
-  （转动跑在 worker 里，建关卡不掉帧）。
+- `Script_BootPaper` / `Data_BootPapers` —— 加载画面的战前报纸剪报（每次开机随机一张，左下角史料摘录）。
 - 先读：`docs/Data_TengxianIntegration.md`（模块契约与推定值索引）。
 
 ### 第一关《往南的路》

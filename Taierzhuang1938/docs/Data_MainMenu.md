@@ -198,51 +198,34 @@ Esc 在游戏里是暂停（继续 / 选章 / 回主菜单）。暂停会连背�
   可开无碰撞（仅跳过实体与人物碰撞，程序化地形及关卡边界保留）、快速移动、无敌、
   无限子弹和无限普通手榴弹。`DebugOptions()` / `SetDebugOption(id, on)` 是自动化取证口。
 
-## 加载画面（`Script_BootProp.mjs` + `Script_BootPropStage.mjs` + `Script_BootPropWorker.mjs`）
+## 加载画面（`Script_BootPaper.mjs` + `Data_BootPapers.mjs`）
 
 菜单背后是活场景，但**菜单之前还有一段谁都躲不掉的等待**：首关建场十几秒。
-ER2 拿装备展示台填这段时间，这里照办：
+这段时间给玩家读的是**这一仗之前的世道**：黑底上一张战前报纸剪报，左下角一句史料摘录。
+版式参考 Notion「加载界面｜战前报纸剪报方案与史料库」：
 
-- 屏幕中央是**游戏里真的那批模型**（`Model/*.tzm.json`），每次开机随机一件，
-  左下角给名字与一句史实注记（注记直接取 `Data_Meshes` 的 `note`，不另写一份）。
-  展示池里**没有士兵**：TZM 的人是绑定姿势，单摆出来像人体模型。
-- **鼠标可以拖着转**：横拖转 yaw、竖拖转 pitch（夹在 -0.55 ~ 0.85，转到正上方
-  会露出模型底面的空洞）、松手带惯性衰减，最后交回 0.28 rad/s 的匀速自转。
-  **屏幕上不写「拖动可转动」**：加载画面上除了名字、注记、进度就不该再有第四行字，
-  能转的东西自己会转，看见它在转的人自然会去拨它。
-- 进度条挪到**屏幕底部并加粗**（`min(74vw, 760px) × 6px`）。原来那条 300×2 px
-  摆在正中间，既不好读又和展示台抢中央那块地方。
+- **左上**：游戏名 `台儿庄：血战滕县`；副题是这期报纸的汉字日期 + `战前报讯`（`boot.paper.subtitle`）。
+- **右侧**：一张带撕边与折痕的老报纸（`#bootPaper`，`mix-blend-mode: lighten` 让图里的黑融进页面黑，
+  极慢地向前漂 4%，`prefers-reduced-motion` 下不动）。
+- **左下**：`史料摘录 | 《报名》 日期` 一行（金色）+ `简述：……`（`#bootCard`）。简述是 Notion 里「加载页摘要」原文。
+- **底部居中**：`进 城` 按钮、加载步骤行、加粗进度条（`min(74vw, 760px) × 6px`）——这一块与旧版一致，
+  三个冒烟脚本点的仍是 `#bootStart`。
 
-展示台自己开一台小 `WebGLRenderer` 画在 `#bootProp` 上，只依赖 three +
-`Script_MeshLoad` + `Data_Meshes`：它要在主场景还没建起来时就转，那时候
-`MaterialLibrary` 还不存在，材质因此在模块内现造（那台展示台没有深度法线预通道，
-不受「不许自己造材质」那条约束）。出图模式（`?shot=1`）下不建 —— 截图里不许有它。
+**清单只有一处**：`Data_BootPapers.BOOT_PAPERS`（id + 文件名）。名字 / 日期 / 汉字日期 / 简述在
+`Data_Text_Boot` 的 `boot.paper.<id>.name|date|dateCn|summary`。收录的是 Notion 里被标了颜色的 20 期
+（黄 = 重大事件，蓝 = 有助于理解滕县战前局势与军民处境）：立报 / 申报 / 文汇报 / 战时画刊六期 /
+救国时报 / 密勒氏评论报 / 南洋商报九期。
 
-### 它跑在 worker 里，不在主线程上
+- **每次开机随机一张，不与上一次重复**（`localStorage["tzBootPaperLast"]`，读写都包 try：隐私模式会抛，抛了就当没有上一次）。
+  同一次加载里不换；换关再亮加载画面时（`ShowBoot(true)`）会重新抽。
+- **只拉一张图**：每张 1600×900 webp 约 200–250 KB，其余十九张一个字节都不下。图没拉下来不影响文字。
+- 图是 Lovart 生的「博物馆文物摄影」式报纸，**报头与标题是为这一期写的，不是原报扫描件**；史料口径以简述为准。
+  提示词与来源见 `_import/Prompts/Texture_BootPaper.txt`。要换图：覆盖 webp、改 `BOOT_PAPER_STAMP`。
+- 出图模式（`?shot=1`）下不建，截图里不许有它。
+- 门禁：`Script_BootPaperTest.mjs`（`npm run test:taierzhuang1938:bootpaper`）逐张核对
+  清单 ↔ 磁盘图 ↔ 四条文本 ↔ 贴图清单登记，并测「不与上次重复」。
 
-**「分帧生成」只保证进度条会动，不保证帧率。** 实测（`?quality=low&scale=small`）
-建首关那 9.3 秒，主线程一共只交出去 26 帧：最长的一块（城外村落轮廓 + 树）
-一口气占住 3.08 秒，其次是河道 1.08 秒、烘 BrickWall 1.41 秒。一次 `yield`
-之间的那块活儿是不可分的，切得再细也是一块一块地卡 —— 留在主线程上，
-那件"能转的道具"就是一张幻灯片。
+**历史**：2026-09-30 前这里是一台能转的道具展示台（worker + OffscreenCanvas + TZM 模型）。
+它在加载最忙的那几秒自己也要争主线程与显存，且首屏要多拉三个模块、一个 worker 与若干模型，
+改成静图后一并退役（`Script_BootProp*` 已删，git 历史里还在）。
 
-所以展示台整个搬进 worker：
-
-| | 跑在哪 | 干什么 |
-|---|---|---|
-| `Script_BootPropStage.mjs` | 两边都能跑 | 场景、灯、机位、转动、加载一件模型。**不碰 DOM** |
-| `Script_BootPropWorker.mjs` | worker | 拿过继来的 `OffscreenCanvas` 跑 `PropStage`，16 ms 一拍（worker 里没有 rAF） |
-| `Script_BootProp.mjs` | 主线程 | 宿主：收 pointer、量尺寸、写卡片；worker 起不来时**换一张画布**退回主线程 |
-
-同一段加载，worker 侧探针 367–433 拍、超过 60 ms 的只有 2 拍。回归口
-`Script_BootPropTest.mjs`（`npm run test:taierzhuang1938:bootprop`）断言的就是这个数，
-谁把它挪回主线程都会当场红。
-
-一个连带约束：**worker 没有 import map**，所以这条链上（Stage / `Script_MeshLoad` /
-`Script_Noise` / `Data_Meshes` / three）一律不许写裸名 `"three"`，要走相对路径。
-页面那一侧靠 `index.html` 把这条相对路径映射到同一个带版本的 URL，
-所以页面上仍然只有一份 three（`import("three") === import("./vendor/.../three.module.js")`
-在实机上验过）；worker 是另一个 realm，本来就要自己再拿一份。
-
-`#boot` 的显隐从此**只走 `Script_Main.ShowBoot(on)`**：`.gone` 与展示台的启停要同步，
-漏一处它就会在游戏里空转一台渲染器。

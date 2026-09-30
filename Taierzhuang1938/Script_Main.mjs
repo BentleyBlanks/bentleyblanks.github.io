@@ -137,7 +137,7 @@ import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { WhiteboxGraphicsOverrides, WhiteboxPostOptions } from "./Data_Tuning_Whitebox.mjs";
 import { LoadGraphicsProfile, LoadWhiteboxConfig, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
 import { WhiteboxSceneRenderer } from "./Script_WhiteboxRendering.mjs";
-import { BootProp } from "./Script_BootProp.mjs";
+import { BootPaper } from "./Script_BootPaper.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
 import { AddTrimProps, ClearTrimProps } from "./Script_TrimProps.mjs";
 import { AircraftFlight, MakeAircraftStrafeHost } from "./Script_Aircraft.mjs";
@@ -377,17 +377,18 @@ const bootBar = document.querySelector("#bootBar i");
 const bootStep = document.getElementById("bootStep");
 const bootStart = document.getElementById("bootStart");
 
-// 加载画面的道具展示台。**开机就转起来**，不等主场景 —— 它自己一台小 renderer，
-// 与主渲染器无关；建关那十几秒里玩家能拖着它转。出图模式下不建（截图里不许有它）。
-const bootProp = SHOT ? null : new BootProp(
-  document.getElementById("bootProp"),
-  document.getElementById("bootPropName"),
-  document.getElementById("bootPropNote"),
-);
-/** 加载画面收放的唯一入口：`.gone` 与展示台的启停必须同步，否则它在游戏里空转。 */
+// 加载画面的战前报纸剪报（Script_BootPaper）。开机就亮，不等主场景；只拉一张图，几乎不占资源。
+// 出图模式下不建（截图里不许有它）。
+const bootPaper = SHOT ? null : new BootPaper({
+  img: document.getElementById("bootPaper"),
+  sub: document.getElementById("bootSub"),
+  name: document.getElementById("bootPaperName"),
+  note: document.getElementById("bootPaperNote"),
+});
+/** 加载画面收放的唯一入口：`.gone` 与报纸的显隐必须同步，下次再亮时才会换一张。 */
 function ShowBoot(on) {
   boot.classList.toggle("gone", !on);
-  if (on) bootProp?.Show(); else bootProp?.Hide();
+  if (on) bootPaper?.Show(); else bootPaper?.Hide();
 }
 
 /** 加载画面那行字与那条进度条。开机、换关、过场预热三条链共用这一只口。 */
@@ -432,7 +433,7 @@ function NextFrame() {
   });
 }
 
-bootProp?.Show();
+bootPaper?.Show();
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));

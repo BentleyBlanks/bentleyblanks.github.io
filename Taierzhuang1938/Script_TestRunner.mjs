@@ -361,7 +361,7 @@ export const testDefs = {
   VoiceTest: { file: "Script_VoiceTest.mjs", desc: "语音资产与降级链" },
   MenuTest: { file: "Script_MenuTest.mjs", desc: "主菜单接线 29 条" },
   DeathMenuTest: { file: "Script_DeathMenuTest.mjs", desc: "阵亡独立状态与检查点恢复" },
-  BootPropTest: { file: "Script_BootPropTest.mjs", desc: "开机陈设道具计数" },
+  BootPaperTest: { file: "Script_BootPaperTest.mjs", desc: "加载画面报纸剪报：清单 / 图 / 文本 / 贴图清单对齐" },
   // 现有套件已扩到 160 项，含音频试听、完整县城/车厢切换与三套 PBR 截图；
   // 实机约 12—14 分钟，继续吃 10 分钟默认值会在末段稳定误报 timeout。
   EditorTest: { file: "Script_EditorTest.mjs", timeoutMs: 16 * 60 * 1000,
@@ -503,7 +503,7 @@ export const browserTests = new Set([
   "HitReactionBrowserTest",
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest",
-  "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
+  "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
@@ -689,7 +689,7 @@ export const domains = {
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
-  menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "PlayerDeathTest", "BootPropTest"] },
+  menu: { label: "主菜单/加载画面", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
@@ -896,7 +896,7 @@ const changedDomainRules = [
   { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Telegraph|Whitebox|DebugOptions|Script_Input|Style_Game|index\.html)/i },
   { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },
   { domain: "voice", pattern: /(Voice|Dialogue|Speech)/i },
-  { domain: "menu", pattern: /(Menu|Style_Interface|BootProp|index\.html|Font_Title|\/Font\/)/i },
+  { domain: "menu", pattern: /(Menu|Style_Interface|BootPaper|index\.html|Font_Title|\/Font\/)/i },
   { domain: "editor", pattern: /(Editor|Style_Interface|AssetStandards|Pcg|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },
   { domain: "cutscene", pattern: /(Cutscene|Story|Data_Script|TengxianScript|Mission|ActorPose|Train|Data_MissionCh|Companion|Checkpoint)/i },
   { domain: "render", pattern: /(CharacterWounds|Render|Shader|Material|Texture|Model|Mesh|Geo|Landmark|Actor|Rigged|FirstLevelP012CarryView|Vfx|Blood|SurfaceDecals|Post|Light|Gi|GlobalShProbe|FirstPersonSelfShadow|Atmosphere|Smoke|Flare|Outfield|FarLand|JieheField|TengxianField|Water|Wheel|YardWall|Sky|Noise|Probe|Pcg|Dressing|LivedInProps|TrimProps|ExternalAssets|ExternalProps|WestSuburbBlocks|BuildingShot|TzmShot|Mocap|EscortLitter|TexBake|Pbr|PropBatch|PropStreaming|Profiler|FrameDebug|Style_Game|Scene|_import|vendor\/three|\.glsl|index\.html)/i },
