@@ -109,7 +109,7 @@ Check(JSON.stringify(data.layout.blasted) === JSON.stringify(Array.from({ length
 Check(Math.abs(terrain.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(terrain.exploder.z + B.z - E.exploderAt.z) < 1e-3
   && Math.abs(data.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(data.exploder.z + B.z - E.exploderAt.z) < 1e-3,
   "模型里的起爆器就摆在 E.exploderAt");
-// 南岸浮桥头：爆破手蹲在木栈起点西侧的烂泥滩上，药箱摞在他们身边，导线从药包沿桥面拉到栈头、沿泥地拉向起爆器。
+// 南岸浮桥头：爆破手蹲在木栈起点东侧的泥地上，药箱摞在他们身边，导线从药包沿桥面拉到栈头、沿泥地拉向起爆器。
 {
   const posts = P.bridge.demolition;
   const dry = (x, z) => SampleMissionTerrain(x, z) > data.water.top + 0.3;
@@ -117,7 +117,7 @@ Check(Math.abs(terrain.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(ter
   const solids = MISSION_LAYOUT.blocks.filter((b) => b.solid !== false && /^Pontoon/.test(b.id));
   for (const [index, post] of posts.entries()) {
     const d = Math.hypot(post.x - B.x, post.z - PONTOON_HEADS.south);
-    Check(d > 3 && d < 9 && dry(post.x, post.z), `爆破手 ${index} 蹲在南栈头西侧的干泥地上（离栈头 ${d.toFixed(1)} m）`);
+    Check(d > 3 && d < 10.5 && dry(post.x, post.z), `爆破手 ${index} 蹲在南栈头东侧的干泥地上（离栈头 ${d.toFixed(1)} m）`);
     Check(solids.every((b) => rectGap(b, post.x, post.z) >= 0.5), `爆破手 ${index} 离白盒桥体碰撞 ≥ 0.5 m`);
     const start = E.demolitionPullback[index][0];
     Check(Math.hypot(start.x - post.x, start.z - post.z) < 9, `爆破手 ${index} 的撤出折线从他脚下出发`);
@@ -126,7 +126,7 @@ Check(Math.abs(terrain.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(ter
   Check(crates?.kind === "static", "药箱 / 铁丝网卷 / 绳圈一直在（起爆后也在）");
   const cc = [0, 2].map((i) => (crates.bounds.min[i] + crates.bounds.max[i]) / 2);
   const nearest = Math.min(...posts.map((post) => Math.hypot(post.x - B.x - cc[0], post.z - B.z - cc[1])));
-  Check(nearest > 0.8 && nearest < 4.5, "药箱堆就在爆破手身边", `${nearest.toFixed(1)} m`);
+  Check(nearest > 0.8 && nearest < 6.5, "药箱堆就在爆破手身边", `${nearest.toFixed(1)} m`);
   const cable = pieces.get("CableGround").bounds;
   Check(cable.max[2] > data.exploder.z - 1.2 && cable.min[2] < PONTOON_HEADS.south - B.z + 1, "地面导线从栈头一路拉到起爆器");
   Check(pieces.get("CableBridge")?.kind === "charges", "桥面导爆索跟药包同一组（只在 18 前三步露面）");
@@ -144,7 +144,7 @@ for (const id of M.replacesGates) Check(gates.has(id), `模型接管的闸门件
   const boatZ = (i) => B.boats.firstZ - i * B.boats.pitchZ - B.z;
   Check(data.charges.length === 5 && data.charges.filter((c) => c.main).length === 3, "5 个药包、3 个主药包");
   const zs = data.charges.map((c) => c.z).sort((a, b) => a - b);
-  const want = [B.boats.blasted[0], 6, 7, 8, B.boats.blasted[1]].map(boatZ).sort((a, b) => a - b);
+  const want = Array.from({ length: B.boats.blasted[1] - B.boats.blasted[0] + 1 }, (_, k) => B.boats.blasted[0] + k).map(boatZ).sort((a, b) => a - b);
   Check(zs.every((z, i) => Math.abs(z - want[i]) < 0.6), "药包落在被炸的 5 条船上", JSON.stringify(zs));
   Check(data.charges.every((c) => c.t <= 0.2 && c.groundY === data.water.top && c.y > data.water.top && c.y < B.deckTopY - B.z * 0 + 0.3),
     "药包在水面与桥面之间、0.2 s 内全响、地面取河面");
@@ -160,13 +160,14 @@ for (const piece of data.pieces.filter((p) => p.kind === "debris")) {
   else Check(gap < 1.6, `${piece.name} 落岸上落稳了`, `离地 ${gap.toFixed(2)} m`);
 }
 {
-  const sunk = [3, 4, 10, 11].map((i) => pieces.get(`SinkBoat${i}`));
+  const sunkIdx = [...B.boats.sinking];
+  const sunk = sunkIdx.map((i) => pieces.get(`SinkBoat${i}`));
   Check(sunk.every((p) => p?.kind === "debris" && p.final.wet), "四条邻船是逐件节点、末态在水里");
-  for (const i of [3, 4, 10, 11]) Check(data.solved.sinkFinal[i].deckMeanY < data.water.top - 0.2, `${i} 号船沉下去了（桥面均值在水面下）`, String(data.solved.sinkFinal[i].deckMeanY));
+  for (const i of sunkIdx) Check(data.solved.sinkFinal[i].deckMeanY < data.water.top - 0.2, `${i} 号船沉下去了（桥面均值在水面下）`, String(data.solved.sinkFinal[i].deckMeanY));
   const northQ = pieces.get("NorthSection").final.quaternion, swing = 2 * Math.asin(Math.min(1, Math.abs(northQ[1]))) * 180 / Math.PI;
   Check(pieces.get("NorthSection").kind === "span" && swing > 2 && swing < 6, "北截缓缓向下游摆开 2°–6°", swing.toFixed(2));
   Check(pieces.get("SouthSection").kind === "static" && pieces.get("BankSouth").kind === "static" && pieces.get("BankNorth").kind === "static", "南截与两岸的栈永久不动");
-  const blasted = data.pieces.filter((p) => /^Boat[5-9](Bow|Stern|Keel)$/.test(p.name));
+  const blasted = data.pieces.filter((p) => new RegExp(`^Boat(${Array.from({ length: B.boats.blasted[1] - B.boats.blasted[0] + 1 }, (_, k) => B.boats.blasted[0] + k).join("|")})(Bow|Stern|Keel)$`).test(p.name));
   Check(blasted.length === 15 && blasted.every((p) => p.kind === "debris"), "被炸的 5 条船各掰成三块", String(blasted.length));
   Check(data.pieces.filter((p) => /^Deck/.test(p.name)).length >= 8, "桥面板成簇飞散");
 }
@@ -235,7 +236,7 @@ const Draws = (group) => { let n = 0; group.traverse((o) => { if (o.isMesh) n +=
 Check(Draws(set.groups.intact) <= 8 && Draws(set.groups.static) <= 8 && Draws(set.groups.wreck) <= 8,
   "完好桥身 / 岸栈与南截 / 残骸各合成按材质的几份（平时不按件出 draw call）");
 const Snapshot = (name) => { const node = set.nodes.get(name); return { p: node.position.clone(), q: node.quaternion.clone() }; };
-const northRest = Snapshot("NorthSection"), boatRest = Snapshot("Boat7Bow"), sinkRest = Snapshot("SinkBoat4"), deckRest = Snapshot("Deck7_1");
+const northRest = Snapshot("NorthSection"), boatRest = Snapshot("Boat11Bow"), sinkRest = Snapshot("SinkBoat8"), deckRest = Snapshot("Deck11_1");
 
 // 18 前三步：药包与导线在；起爆器从接令起一直在。
 set.Update(1 / 60, "BridgeCover", { destroyed: false });
@@ -255,7 +256,7 @@ const Run = (seconds, flags = { destroyed: true }) => {
   for (let t = 0; t < seconds; t += 1 / 60) { set.Update(1 / 60, "BridgeWithdraw", flags); fovMin = Math.min(fovMin, set.FovScale(1 / 60)); }
 };
 Run(1.0);
-const boat1 = Snapshot("Boat7Bow"), sink1 = Snapshot("SinkBoat4"), deck1 = Snapshot("Deck7_1");
+const boat1 = Snapshot("Boat11Bow"), sink1 = Snapshot("SinkBoat8"), deck1 = Snapshot("Deck11_1");
 Check(boat1.p.distanceTo(boatRest.p) > 2 || boat1.q.angleTo(boatRest.q) > 0.5, "炸飞的船体碎块 1 s 时已经飞出去了（动作没被 three 暂停）");
 Check(deck1.p.distanceTo(deckRest.p) > 2, "桥面板簇 1 s 时已经飞散");
 Check(sink1.q.angleTo(sinkRest.q) > 0.05 || sink1.p.distanceTo(sinkRest.p) > 0.1, "邻船在 1 s 时已经在倾斜下沉");

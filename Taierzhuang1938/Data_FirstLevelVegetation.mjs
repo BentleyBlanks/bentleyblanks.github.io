@@ -88,12 +88,12 @@ export const VEGETATION = Object.freeze({
   /** 拓宽河段南岸带的卡片高度上限（R1c，见 mix.bankSouth）。 */
   southBankMaxHeightM: 0.6,
   /**
-   * 2026-09-30 R3（浮桥取代铁路桥，概念 18_1 / 18_2）：南岸不再是白沙滩，是烂泥滩（水线 → shoreZ，坡度 ≤ 0.15）+ 泥滩上的芦苇。
-   * 泥滩上（水线以上、shoreZ 以北）走 mix.mudFlat（芦苇为主），高度压到 mudFlatMaxHeightM：射位在泥垄后面站起来要越得过它们看浮桥。
-   * clearDiscs 是完全不长东西的圈：南栈头爆破手 / 药箱 / 线卷 / 起爆器那一片踩实的泥地。
+   * 2026-09-30 R3（浮桥取代铁路桥，概念 18_1 / 18_2）：南岸不再是白沙滩，是烂泥滩（R3 第二轮：水线 → 岸沿 shoreZ 是 3.4 m 宽的陡泥岸，岸沿以南 14 m 的平地整片算泥滩）+ 泥滩上的芦苇。
+   * 泥滩上（水线以上、shoreZ + 14 以北）走 mix.mudFlat（芦苇为主），高度压到 mudFlatMaxHeightM：射位在泥垄后面站起来要越得过它们看浮桥。
+   * clearDiscs 是完全不长东西的圈：南栈头东侧爆破手 / 药箱 / 线卷 / 起爆器那一片踩实的泥地（桥轴东 4.4 m）。
    */
   mudFlatMaxHeightM: 1.05,
-  clearDiscs: Object.freeze([Object.freeze({ x: -80.2, z: 167, r: 6 })]),
+  clearDiscs: Object.freeze([Object.freeze({ x: -72.6, z: 167, r: 6.5 })]),
   /**
    * 拓宽河段北岸的岸沿带（岸沿以北 9 m）：18 对岸的部队一排排蹲跪站在这条带上（Data_FirstLevelFarBankCrowd 的岸线五排，back 1.7–6.6 m），
    * 1.8 m 的芦苇与 0.8 m 的枯茎把人整个挡住（R2b 实拍：high 画质里岸上一个人也看不见，只剩几面旗）。这里所有卡片压到这个高度以下，
@@ -357,7 +357,7 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
     // R3：河口里只有**水面以下**（下切 > −waterRel − 0.12）才不长；水线以上的泥滩与北岸最上面一小截长芦苇（概念 18_1 / 18_2）。
     const reach = river && ctx.riverReachAt ? ctx.riverReachAt(x) : null;
     if (rules.clearDiscs.some((d) => (x - d.x) ** 2 + (z - d.z) ** 2 < d.r * d.r)) continue;
-    const bankBand = reach ? ((z < reach.crestZ && z >= reach.crestZ - 9) || (z >= reach.waterZ && z < reach.shoreZ + 9))
+    const bankBand = reach ? ((z < reach.crestZ && z >= reach.crestZ - 9) || (z >= reach.waterZ && z < reach.shoreZ + 14))
       : riverDz < 17 && riverDz >= 7.6;
     const coarse = far.Distance(x, z);
     const dRoute = coarse < 14 ? routes.Distance(x, z, coarse + 2) : coarse;
@@ -411,8 +411,8 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
       continue;
     }
     if (roll > p * q.density) continue;
-    const southBank = zone === "bank" && reach && z >= reach.shoreZ;
-    const mudFlat = zone === "bank" && reach && z >= reach.waterZ && z < reach.shoreZ;
+    const southBank = zone === "bank" && reach && z >= reach.shoreZ + 14;
+    const mudFlat = zone === "bank" && reach && z >= reach.waterZ && z < reach.shoreZ + 14;
     let card = WeightedPick(rng, southBank ? rules.mix.bankSouth : mudFlat ? rules.mix.mudFlat : rules.mix[zone]);
     const spec = VEGETATION_CARDS[card];
     // 视线门槛：高卡只准贴墙、河岸或远离路线；锚点附近一律矮草。

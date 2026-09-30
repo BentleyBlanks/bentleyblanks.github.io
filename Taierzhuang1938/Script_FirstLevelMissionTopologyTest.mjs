@@ -38,7 +38,7 @@ const ZONES = [
     anchors: ["litterHold", "streetBlock", "eastAlley", "streetRejoin"] },
   { id: "C", label: "桥头接运与空袭 11-14", z: [86, 145],
     anchors: ["cartBoard", "cartHalt", "transferWall"] },
-  { id: "D", label: "桥南接收与回援 15-18（2026-09-30 marchOut 延到 z 295，撤离翻岗后才黑屏）", z: [165, 300],
+  { id: "D", label: "桥南接收与回援 15-18（2026-09-30 marchOut 延到 z 295，撤离翻岗后才黑屏；R3 第二轮射位与南桥头挪到水边：水线 z≈157.9，射位 z 162.7）", z: [158, 300],
     anchors: ["wallPathStart", "wallPathEnd", "receptionGate", "bridgeSouthEnd", "bridgeCover",
       "blastSafe", "marchOut"] },
 ];

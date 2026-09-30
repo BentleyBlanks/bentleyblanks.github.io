@@ -4,6 +4,7 @@
 > 「拓宽河段」里 R1c 的水位 / 南堤 / 路堤 / 桥台 / 射位数值**全部是历史**，现状：`MISSION_PONTOON_BRIDGE`（被炸段中心 (−77,134)，spans 南截 162.6→147.5 / 被炸段 147.5→120.5 / 北截 120.5→88.2，桥面顶 −0.47，宽 2.8）、
 > `reaches[0]` 水面 `waterRel −1`、`dropZ 151 / waterZ 156.3 / waterCut 1.35 / shoreZ 168`（水线 z 91.2…160.2）、南岸烂泥滩 + 泥垄 + 无堤、铁路在河口前收尾（`railGapZ [66,184]`）；
 > 锚点 `railBridge`(−77,134)（键名沿用）、`bridgeNorthEnd`(−77,90)、`bridgeSouthEnd`(−77,165)、`bridgeCover`(−89.6,173.8)、`blastSafe`(−66,201) 不动；`crossings` 的 `RailBridge` 改名 `PontoonBridge`；
+> **2026-10-01 R3 第二轮覆盖下面的浮桥数值**（被炸段中心 (−77,134) → (−77,122)，spans 南截 159.4→135.5 / 被炸段 135.5→108.5 / 北截 108.5→88.2，`bridgeCover` (−84.6,162.7)，`bridgeSouthEnd` (−77,162)，桥面顶 −0.47 → −0.23，水位 −1 → −1.1，`waterZ/waterCut/shoreZ` 157/1.4/160.4，爆破手与起爆器搬到桥轴东侧，冲桥终点 112.4/114.4/116.4，船宽 2.2）：以 [Data_PontoonBridge.md](Data_PontoonBridge.md) §11 的变更表为准。
 > 信号 `RailBridgeDestroyed` **保留**：被炸段桥面 + 两侧绳栏 3 个完好件消失、断口两端 2 个空气墙出现；`walkableSurfaces` = `["TemporaryBridge","PontoonBridgeDeck","PontoonBridgeSpanSouthDeck","PontoonBridgeSpanNorthDeck"]`。
 >
 > **2026-09-30（白盒 12–18 改造 R1a）：北沙河在铁路桥一带拓宽到 ~66 m、桥改三孔、南岸加高堤与沙滩，见 §2「拓宽河段」与「铁路桥」；

@@ -73,7 +73,7 @@ const Eye = (p, h) => ({ x: p.x, z: p.z, y: Ground(p.x, p.z) + h });
   Check(Math.abs(FarBankShoreZ(-77) - 90) < 1e-9, `北岸岸沿 z=${FarBankShoreZ(-77)}（R1a 把河往北拓宽后是 90）`);
   const water = RiverWaterAt(Bridge.x, MISSION_NORTH_RIVER);
   Check(Math.abs(FAR_BANK_BLAST.waterSouthZ - water.z1) < 1e-9 && FAR_BANK_BLAST.waterSouthZ > 150, "南水线取桥轴上的 RiverWaterAt.z1");
-  Check(FAR_BANK_BLAST.centre.z === Bridge.blast.centerZ && FAR_BANK_BLAST.spanZ[0] === 120.5 && FAR_BANK_BLAST.spanZ[1] === 147.5, "被炸段是 z 120.5…147.5、中心 134");
+  Check(FAR_BANK_BLAST.centre.z === Bridge.blast.centerZ && FAR_BANK_BLAST.spanZ[0] === 108.5 && FAR_BANK_BLAST.spanZ[1] === 135.5, "被炸段是 z 108.5…135.5、中心 122");
 
   const groups = { real: FAR_BANK_REAL, shoreA: FAR_BANK_SHORE_A, shoreB: FAR_BANK_SHORE_B, standby: FAR_BANK_STANDBY };
   const all = [];
@@ -129,14 +129,14 @@ const Eye = (p, h) => ({ x: p.x, z: p.z, y: Ground(p.x, p.z) + h });
   // 冲桥组：终点在被炸段的北半，起爆中心 5–10 m 之内；两列在浮桥桥面净宽里
   for (let i = 0; i < 6; i++) {
     const slot = FarBankRushSlot(i);
-    Check(slot.endZ >= 121 && slot.endZ <= 134, `冲桥兵 ${i} 终点 z ${slot.endZ} 在被炸段北半（z 120.5…134）`);
+    Check(slot.endZ >= 109 && slot.endZ <= 122, `冲桥兵 ${i} 终点 z ${slot.endZ} 在被炸段北半（z 108.5…122）`);
     Check(Math.abs(slot.lane - Bridge.x) <= Bridge.deckW / 2 - 0.5, `冲桥兵 ${i} 在桥面净宽里`);
     Check(Distance({ x: slot.lane, z: slot.endZ }, FAR_BANK_BLAST.centre) <= T.blastKillM - 3, `冲桥兵 ${i} 离起爆中心在杀伤圈里`);
   }
   // 两条车道从岸沿到被炸段北半一路没有实心件、空气墙的缺口够宽（脚下是桥面）
   for (const lane of FAR_BANK_RUSH.lanes) {
     const hits = new Set();
-    for (let z = FarBankShoreZ(lane) - 6; z <= 134; z += 0.5) for (const id of Overlap(lane, z, 0.35)) hits.add(`${id}@${z}`);
+    for (let z = FarBankShoreZ(lane) - 6; z <= 122; z += 0.5) for (const id of Overlap(lane, z, 0.35)) hits.add(`${id}@${z}`);
     Check(hits.size === 0, `车道 x ${lane} 从岸边到被炸段北半一路畅通：${[...hits].slice(0, 4)}`);
   }
   // 冲桥组与人堆从待命位 / 岸线位走到车道起点（岸沿−12，土坎北面）：路上没有实心件
@@ -168,7 +168,7 @@ const Eye = (p, h) => ({ x: p.x, z: p.z, y: Ground(p.x, p.z) + h });
   // 桥头人堆：名册在 B 拨与深处待命兵里，车道在桥面净宽内，z 在杀伤圈之外的浮桥北截
   for (const c of FAR_BANK_CROWD) {
     Check(all.some((u) => u.id === c.from) && !FAR_BANK_RUSH.assign.map((i) => FAR_BANK_STANDBY[i].id).includes(c.from), `人堆 ${c.from} 不与冲桥组重叠`);
-    Check(Math.abs(c.lane - Bridge.x) <= Bridge.deckW / 2 - 0.5 && c.z >= 105 && c.z <= 120, `人堆 ${c.from} 在浮桥北截桥面的净宽里`);
+    Check(Math.abs(c.lane - Bridge.x) <= Bridge.deckW / 2 - 0.5 && c.z >= 98 && c.z <= 108.5, `人堆 ${c.from} 在浮桥北截桥面的净宽里`);
     Check(Distance({ x: c.lane, z: c.z }, FAR_BANK_BLAST.centre) > T.blastKillM + 2, `人堆 ${c.from} 在起爆杀伤圈之外`);
   }
   Check(new Set(FAR_BANK_CROWD.map((c) => c.from)).size === FAR_BANK_CROWD.length, "人堆名册不重复");
@@ -444,11 +444,11 @@ Check(bank.tanks.every((t) => t.z < FarBankShoreZ(t.x) - 5), "三辆都停在岸
   Check(s.real === 8 && s.shore === 12 + 6 || s.shore >= 16, `第二拨到位：真 AI ${s.real} 岸线 ${s.shore}`);
   Check(s.rushState.started && s.rush === 6, "冲桥组 6 人");
   Check(s.rushState.arrived, `冲桥组到位（z ${s.rushState.minZ.toFixed(1)}…${s.rushState.maxZ.toFixed(1)}）`);
-  Check(s.rushState.maxZ <= 134 && s.rushState.minZ >= 121, "冲桥组停在被炸段北半 z 121…134");
+  Check(s.rushState.maxZ <= 122 && s.rushState.minZ >= 109, "冲桥组停在被炸段北半 z 109…122");
   // 桥头人堆：八个人涌上浮桥北截桥面，单膝跪着，全在起爆杀伤圈之外
   const crowd = bank.units.filter((u) => u.crowdPost && u.actor.alive);
   Check(crowd.length === 8 && crowd.every((u) => u.mode === "crowded"), `桥头人堆 8 人到位（${crowd.map((u) => u.mode)}）`);
-  Check(crowd.every((u) => u.actor.position.z >= 105 && u.actor.position.z <= 120 && u.actor.stance === 1), "人堆在浮桥北截桥面（z 105…120）单膝跪着");
+  Check(crowd.every((u) => u.actor.position.z >= 98 && u.actor.position.z <= 108.5 && u.actor.stance === 1), "人堆在浮桥北截桥面（z 98…108.5）单膝跪着");
   Check(s.ijaCount <= T.ijaCap, `同屏日军 ${s.ijaCount} ≤ ${T.ijaCap}`);
   // 真 AI 分档开火权
   const real = FAR_BANK_REAL.map((u) => bank.byId.get(u.id)?.actor).filter(Boolean);
@@ -568,7 +568,7 @@ Check(bank.tanks.every((t) => t.z < FarBankShoreZ(t.x) - 5), "三辆都停在岸
   const kinds = (kind) => roster.filter((u) => u.kind === kind);
   Check(roster.length >= 300, `视觉人群名册 ${roster.length} ≥ 300（另有 R2 的真 AI 与脚本兵 ${FAR_BANK_REAL.length + FAR_BANK_SHORE_A.length + FAR_BANK_SHORE_B.length + FAR_BANK_STANDBY.length}）`);
   Check(roster.length >= 380 && roster.length <= 512, `视觉人群名册 ${roster.length} 在 380…512（ActorCrowd 容量 512）`);
-  Check(kinds("shore").length >= 120 && kinds("slope").length >= 140 && kinds("bridge").length >= 30 && kinds("reserve").length >= 40,
+  Check(kinds("shore").length >= 120 && kinds("slope").length >= 140 && kinds("bridge").length >= 14 && kinds("reserve").length >= 40,
     `岸线 ${kinds("shore").length}、坡地 ${kinds("slope").length}、桥头纵队 ${kinds("bridge").length}、留守 ${kinds("reserve").length}`);
   Check(new Set(roster.map((u) => u.id)).size === roster.length, "视觉人群 id 唯一");
   Check(roster.filter((u) => u.flag).length >= 10 && roster.filter((u) => u.sword).length >= 6, `旗 ${roster.filter((u) => u.flag).length} 面、刀 ${roster.filter((u) => u.sword).length} 把`);
@@ -619,8 +619,8 @@ Check(bank.tanks.every((t) => t.z < FarBankShoreZ(t.x) - 5), "三辆都停在岸
   Check(longest / K.runMps < 60, `最长的一条路跑 ${(longest / K.runMps).toFixed(0)} s < 60 s（第一拨在射位站姿的 60 s 观察点前到齐）`);
   // 出生点在视线外：离射位 ≥ 150 m
   Check(Distance({ x: FAR_BANK_CROWD_AXIS_X, z: FAR_BANK_CROWD_SPAWN_Z }, A.bridgeCover) >= 150, "出生点离射位 ≥ 150 m");
-  // 桥面上的人在桥面净宽里，z 在浮桥北截（起爆杀伤圈 z ≥ 121 以北），排在 R2 人堆（z ≥ 112）之后
-  for (const u of kinds("bridge")) Check(Math.abs(u.post.x - Bridge.x) <= Bridge.deckW / 2 - 0.3 && u.post.z >= 92 && u.post.z < 112, `${u.id} 在浮桥北截桥面净宽里、R2 人堆（z ≥ 112）之后 (${u.post.x}, ${u.post.z})`);
+  // 桥面上的人在桥面净宽里，z 在浮桥北截（起爆杀伤圈 z ≥ 121 以北），排在 R2 人堆（z ≥ 99.8）之前
+  for (const u of kinds("bridge")) Check(Math.abs(u.post.x - Bridge.x) <= Bridge.deckW / 2 - 0.3 && u.post.z >= 88.5 && u.post.z < 99, `${u.id} 在浮桥北截桥面净宽里、R2 人堆（z ≥ 99.8）之前 (${u.post.x}, ${u.post.z})`);
 
   // 替身宿主：时间线
   const sink = { pushes: [], Push(kind, position, yaw, scale, prone, dead, pose) { this.pushes.push({ kind, x: position.x, y: position.y, z: position.z, pose }); } };

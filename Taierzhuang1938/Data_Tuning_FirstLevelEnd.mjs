@@ -171,23 +171,23 @@ export const END_TUNING = Object.freeze({
   // 尾队真的过完桥：离 bridgeCrossing 末点这么近就算下了桥往南走了。
   rearColumnClearM: 2,
   // 桥头军官与爆破人员（MISSION_PLACEMENT.bridge.officer / .demolition）。
-  // 2026-09-30 浮桥取代铁路桥：两人蹲在南岸浮桥头西侧的烂泥滩上（(-82.6,165.2)、(-82.6,167.2)，木药箱摞与铁丝网卷旁），
-  // 装完药沿各自的折线往南退：西边那位（demolition[0]）退到 (-75,180) 一带，东边那位（demolition[1]）退到起爆器后面蹲下；
+  // 2026-09-30 浮桥取代铁路桥：两人蹲在南岸浮桥头西侧的烂泥滩上（R3 第二轮：(-71.4,165.2)、(-71.4,167.2)，桥轴东侧、木药箱摞与铁丝网卷旁），
+  // 装完药沿各自的折线往南退：北边那位（demolition[0]）退到 (-79,180) 一带，南边那位（demolition[1]）退到起爆器后面蹲下；
   // 折线离每个实心体 ≥ 0.35 m 由 Script_FirstLevelSpaceTest 守着（南岸这一片没有实心体，只有地形）。
   // 起爆器（exploderAt，模型里的 Exploder 节点摆在同一个点上）就在桥头这一带：按起爆器的是东边那位，他走到这儿蹲下，
   // 导线（CableGround）从药箱旁的线卷沿泥地拉到它、另一头顺木栈与桥面拉到被炸段的药包。
   demolitionSetS: 6,
   demolitionPullback: Object.freeze([
-    Object.freeze([{ x: -82.8, z: 168.8 }, { x: -83.6, z: 172 }, { x: -80.6, z: 176.5 }, { x: -75, z: 180 }]),
-    Object.freeze([{ x: -82.4, z: 168.9 }, { x: -80.9, z: 171.1 }]),
+    Object.freeze([{ x: -71.2, z: 168.8 }, { x: -70.4, z: 172 }, { x: -73.4, z: 176.5 }, { x: -79, z: 180 }]),
+    Object.freeze([{ x: -71.6, z: 168.9 }, { x: -73.1, z: 171.1 }]),
   ]),
   // 起爆器（Model_PontoonBridge 的 Exploder / ExploderHandle；_blender/Script_ExportPontoonBridgeTerrain 读它，
-  // 改了要重导地形并重烘模型）。距被炸段中心 (−77,134) 36 m，在 blastClearRadiusM 之外。
-  exploderAt: Object.freeze({ x: -80.4, z: 170.3 }),
+  // 改了要重导地形并重烘模型）。距被炸段中心 (−77,122) 48 m，在 blastClearRadiusM 之外。
+  exploderAt: Object.freeze({ x: -73.6, z: 170.3 }),
   officerPullback: Object.freeze([{ x: -71.5, z: 182 }, { x: -71, z: 194 }, { x: -74.5, z: 200 }]),
   demolitionMps: 3.4,
   // 爆破安全：炸之前这个半径里不许有任何己方（玩家、班里人、军官、爆破手、尾队）。
-  // 药包火球半径 11–15 m（Data_PontoonBridgeDemolition）；安全判据取 30 m（blastSafe 离被炸段中心 76 m，桥头爆破手 31–34 m）。
+  // 药包火球半径 11–15 m（Data_PontoonBridgeDemolition）；安全判据取 30 m（blastSafe 离被炸段中心 80 m，桥头爆破手 43 m）。
   blastClearRadiusM: 30,
   // 卡住的 NPC 不许把整关钉死：他连着这么久一步没挪、而且玩家早已退到安全区，
   // 就记一条 blastFriendlyStuck 取证并放行。**玩家在区里永远等**，这一条只对 NPC。

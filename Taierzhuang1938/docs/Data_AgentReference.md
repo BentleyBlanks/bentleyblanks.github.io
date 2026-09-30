@@ -134,7 +134,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   `Script_FirstLevelQuietMarch`（15A/15B）、`Script_FirstLevelReception`（15C/16/17）、`Script_FirstLevelBridge`（18 桥头）、
   `Script_FirstLevelNightGate`（18 夜入北门）、`Script_FirstLevelNightLights`（夜景点光，唯一带 three 的一只）、
   `Data_Tuning_FirstLevelEnd`、`Script_FirstLevelEndTest`、`Script_FirstLevelCampaignEnd`。
-- 18 浮桥（[说明](Data_PontoonBridge.md)，2026-09-30 取代铁路桥）：`_blender/Script_BuildPontoonBridge.py` + `_blender/Script_ExportPontoonBridgeTerrain.mjs`
+- 18 浮桥（[说明](Data_PontoonBridge.md)，2026-09-30 取代铁路桥；2026-10-01 第二轮：船读得出来 / 射位挪到水边 / 被炸段北移到河心 z 122，见 §11）：`_blender/Script_BuildPontoonBridge.py` + `_blender/Script_ExportPontoonBridgeTerrain.mjs`
   （Blender 烘 `Model/Model_PontoonBridge.glb` + `Model/Data_PontoonBridge.json`）、`Script_PontoonBridgeSet`（模型 / 三态 / 起爆时间线，带 three）、
   `Data_PontoonBridgeDemolition`（地址、材质、特效分量）、`Script_PontoonBridgeTest`、`Script_PontoonBridgeShots`。钢桁架铁路桥（[说明](Data_RailBridge.md)）退出 18、文件保留：
   `Script_BuildRailBridge.py` / `Script_RailBridgeSet` / `Data_RailBridgeDemolition` / `Script_RailBridgeShots`，`Script_RailBridgeTest` 只剩模型自检。

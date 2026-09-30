@@ -9,7 +9,7 @@
 //
 //   node Taierzhuang1938/_blender/Script_ExportPontoonBridgeTerrain.mjs
 //
-// 高度场覆盖局部 x ±40、z −70…+50（世界 z 64…184：北岸缓坡、整条河、南岸烂泥滩与烂泥垄都在里面）。
+// 高度场覆盖局部 x ±40、z −70…+80（世界 z 52…202：北岸缓坡、整条河、南岸陡泥岸、烂泥垄与桥头药箱都在里面）。原点 = 被炸段中心 (−77,122)。
 // 地形、桥位、爆破手落位改了就重跑它，再重烘模型（Blender 脚本只认这份 JSON）。
 // ===========================================================================
 import fs from "node:fs";
@@ -19,7 +19,7 @@ import { MISSION_PLACEMENT } from "../Data_FirstLevelMissionLayout.mjs";
 import { END_TUNING as E } from "../Data_Tuning_FirstLevelEnd.mjs";
 
 const B = MISSION_PONTOON_BRIDGE;
-const GRID = { x0: -40, x1: 40, z0: -70, z1: 50, step: 1 };
+const GRID = { x0: -40, x1: 40, z0: -70, z1: 80, step: 1 };
 const heights = [];
 for (let z = GRID.z0; z <= GRID.z1; z += GRID.step) {
   const row = [];
@@ -44,7 +44,7 @@ const out = {
   // 布局（局部 z）：boats 是每条船的中心 z（0 号最南，往北减小）；blasted = 炸飞的船序号闭区间，sinking = 倾斜下沉的船；
   // spans 的 z0 是南端、z1 是北端；heads = 两岸木栈与岸相接处。
   layout: {
-    boat: { count: B.boats.count, length: B.boats.length, beam: B.boats.beam, pitch: B.boats.pitchZ, blasted: [...B.boats.blasted], sinking: [...B.boats.sinking] },
+    boat: { count: B.boats.count, length: B.boats.length, beam: B.boats.beam, pitch: B.boats.pitchZ, freeboard: B.boats.freeboard, blasted: [...B.boats.blasted], sinking: [...B.boats.sinking] },
     boats,
     spans: B.spans.map((s) => ({ id: s.id, z0: Lz(s.z0), z1: Lz(s.z1), blasted: !!s.blasted })),
     heads: { south: Lz(PONTOON_HEADS.south), north: Lz(PONTOON_HEADS.north) },

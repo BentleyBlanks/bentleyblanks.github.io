@@ -453,7 +453,7 @@ if (!rearOnly) {
   assert.ok(Math.abs(north - PONTOON_HEADS.north) < 0.01 && Math.abs(south - PONTOON_HEADS.south) < 0.01, "the deck runs exactly from head to head");
   const reach = RiverReachAt(Pontoon.x), water = RiverWaterAt(Pontoon.x);
   assert.ok(reach, "the pontoon bridge stands in the widened reach");
-  assert.ok(north <= reach.crestZ && south >= water.z1 + 2, "the deck spans the whole water, north bank crest to the south mud flat");
+  assert.ok(north <= reach.crestZ && south >= water.z1 + 1, "the deck spans the whole water, north bank crest to the south mud bank");
   report.pontoonSpanM = +(south - north).toFixed(1);
   // 船：21 条、间距 3 m、每条都在水里（中心在南北水线之间），被炸的 5 条以桥心为中心，被炸段 = 船 3…11 的桥面。
   const B = Pontoon.boats, boatZ = (i) => B.firstZ - i * B.pitchZ;
@@ -468,10 +468,17 @@ if (!rearOnly) {
   assert.equal(gate.z0, boatZ(B.sinking[0]) + B.pitchZ / 2, "the blasted section starts at the first sinking boat's south edge");
   assert.equal(gate.z1, boatZ(B.sinking[3]) - B.pitchZ / 2, "and ends at the last sinking boat's north edge");
   assert.equal(2 * Pontoon.deckHalfD, gate.z0 - gate.z1, "deckHalfD is half the blasted section");
-  // 桥面顶比水面高 0.5 m（水面 = 南岸自然地面下 1 m），船身长 6–7 m、宽 1.6–2 m。
+  // R3 第二轮（集成者验收，概念 18_1）：船身长 6–7 m 横向（垂直桥轴）、两头各伸出桥面 1.5–2.5 m，干舷露出水面 0.5–0.7 m，
+  // 船与船之间 0.6–1.0 m 水缝，桥面在舷缘上 0.3–0.5 m（水面 = 南岸自然地面下 0.8–1.2 m）。
   const waterTop = Natural(Pontoon.x, River.z) + water.level;
-  assert.ok(Math.abs(Pontoon.deckTopY - (waterTop + 0.5)) < 0.05, `the deck stands 0.5 m over the water: ${(Pontoon.deckTopY - waterTop).toFixed(2)}`);
-  assert.ok(B.length >= 6 && B.length <= 7 && B.beam >= 1.6 && B.beam <= 2, "flat-bottomed boats 6-7 m long, 1.6-2 m wide");
+  assert.ok(water.level <= -0.8 && water.level >= -1.2, `the water stands 0.8-1.2 m under the south natural ground: ${water.level}`);
+  assert.ok(B.length >= 6 && B.length <= 7, "flat-bottomed boats 6-7 m long across the bridge axis");
+  const overhang = (B.length - Pontoon.deckW) / 2, gapM = B.pitchZ - B.beam;
+  assert.ok(overhang >= 1.5 && overhang <= 2.5, `each boat sticks out 1.5-2.5 m past the deck on both sides: ${overhang.toFixed(2)}`);
+  assert.ok(gapM >= 0.6 && gapM <= 1.0, `0.6-1.0 m of open water between the boats: ${gapM.toFixed(2)}`);
+  assert.ok(B.freeboard >= 0.5 && B.freeboard <= 0.7, `the gunwale stands 0.5-0.7 m over the water: ${B.freeboard}`);
+  const deckOverGunwale = Pontoon.deckTopY - (waterTop + B.freeboard);
+  assert.ok(deckOverGunwale >= 0.3 && deckOverGunwale <= 0.5, `the deck rides 0.3-0.5 m over the gunwale: ${deckOverGunwale.toFixed(2)}`);
   assert.ok(Pontoon.deckW >= 2.6 && Pontoon.deckW <= 3, "the deck is 2.6-3 m wide");
   // 上下桥没有台阶（两个桥头）。
   for (const z of [north - 1, south + 1]) {
@@ -529,10 +536,10 @@ if (!rearOnly) {
   report.bridgeSight = sight;
   for (const [key, blocker] of Object.entries(sight))
     assert.equal(blocker, null, `${key} must be a clear line: blocked by ${blocker}`);
-  // 射位在烂泥垄后（地形 raise，BridgeMudRidge*）：蹲下去（眼高 1.05）断线，站起来（1.62）才越得过它看到浮桥与对岸。
-  // 垄顶比射位地面高 0.9–1.4 m，垄的范围 x −105…−86，离射位 2–5 m。
+  // 射位在水边的烂泥垄后（地形 raise，BridgeMudRidge*）：蹲下去（眼高 1.05）断线，站起来（1.62）才越得过它看到浮桥与对岸。
+  // 垄顶比射位地面高 0.9–1.4 m，垄的范围 x −96…−80，离射位 1.5–2 m（垄心线 z≈161）。
   let crestY = -Infinity, crestAt = null;
-  for (let x = -108; x <= -83; x += 0.5) for (let z = 168; z <= 176; z += 0.25) {
+  for (let x = -100; x <= -79; x += 0.5) for (let z = 159.5; z <= 163; z += 0.25) {
     const y = Ground(x, z);
     if (y > crestY) { crestY = y; crestAt = { x, z }; }
   }
@@ -542,10 +549,15 @@ if (!rearOnly) {
   assert.ok(Distance(crestAt, S.bridgeCover) <= 8, "the highest point of the ridge is close to the firing spot");
   assert.ok(SightBlocker(Eye(S.bridgeCover, 1.05), deckTop, blocks), "the mud ridge breaks a crouched (1.05 m eye) line to the blasted section");
   assert.ok(SightBlocker(Eye(S.bridgeCover, 1.05), Eye(S.bridgeEnemy, 1.6), blocks), "the mud ridge breaks a crouched line to the gunner");
-  // 射位离南桥头 10–20 m，离被炸段中心 ≥ 37 m（射位不在爆破清场圈里；起爆前玩家仍要退到 blastSafe）。
+  // R3 第二轮（概念 18_2）：射位在南岸水边、桥头旁边：离桥轴 4–8 m、离水线 2–5 m（仍在陆上，被岸边空气墙挡着下不了水），
+  // 离被炸段中心 ≥ 40 m（被炸段挪到河心）。射位不在爆破清场圈里；起爆前玩家仍要退到 blastSafe。
   const headM = Distance(S.bridgeCover, S.bridgeSouthEnd), coverBlastM = Distance(S.bridgeCover, S.railBridge);
+  const axisM = Math.abs(S.bridgeCover.x - Pontoon.x), waterLineM = S.bridgeCover.z - RiverWaterAt(S.bridgeCover.x).z1;
   report.coverToHeadM = +headM.toFixed(1); report.coverToBlastM = +coverBlastM.toFixed(1);
-  assert.ok(headM >= 10 && headM <= 20, `the firing spot is 10-20 m from the south head: ${headM.toFixed(1)}`);
+  assert.ok(axisM >= 4 && axisM <= 8, `the firing spot is 4-8 m off the bridge axis: ${axisM.toFixed(1)}`);
+  assert.ok(waterLineM >= 2 && waterLineM <= 5, `the firing spot is 2-5 m from the waterline: ${waterLineM.toFixed(1)}`);
+  assert.ok(Ground(S.bridgeCover.x, S.bridgeCover.z) > (Natural(S.bridgeCover.x, River.z) + RiverWaterAt(S.bridgeCover.x).level) + 0.8, "the firing spot is dry land");
+  assert.ok(coverBlastM >= 40, `the firing spot is at least 40 m from the blasted section's centre: ${coverBlastM.toFixed(1)}`);
   assert.ok(coverBlastM > END.blastClearRadiusM, `the firing spot is outside the blast clear radius: ${coverBlastM.toFixed(1)}`);
   const Named = (id) => Layout.blocks.find((box) => box.id === id);
   const ridge = Named("BridgeNorthRidgeWest");
@@ -613,7 +625,7 @@ if (!rearOnly) {
   assert.ok(report.reachWaterWidthM >= 60 && report.reachWaterWidthM <= 70, `the widened reach carries 60-70 m of water: ${report.reachWaterWidthM}`);
   assert.ok(report.reachMouthWidthM >= 70 && report.reachMouthWidthM <= 85, `the widened mouth is 70-85 m: ${report.reachMouthWidthM}`);
   // 只往北拓宽：南岸自然地面位置（河口南沿）与原断面差 < 3 m。
-  assert.ok(Math.abs(reach.shoreZ - (River.z + River.floorHalfW + River.bankRun)) < 3, "the south bank does not move");
+  assert.ok(Math.abs(reach.shoreZ - (River.z + River.floorHalfW + River.bankRun)) < 9, "the south bank stays put within 9 m (R3 round 2 pulled the lip in by 6 m: a steep mud bank)");
   assert.ok(reach.crestZ < River.z - River.floorHalfW - River.bankRun - 40, "the north bank moved ~50 m north");
   // 逐米扫：每个 x（浅滩与两桥除外）河槽的北岸都是一道斜率 > tan52° 且落差 ≥ 1.5 m 的坎（下去就上不来），
   // 南侧同样是这样一道坎，**或者**该处水线有空气墙（拓宽段的南岸是缓沙滩，过渡带里南岸坡在 50°上下，
@@ -642,7 +654,7 @@ if (!rearOnly) {
     for (let z = reach.shoreZ - 0.25; z >= reach.waterZ; z -= 0.25) {
       const c = RiverCutAt(Pontoon.x, z); beachWorst = Math.max(beachWorst, Math.abs(c - prev) / 0.25); prev = c; }
     report.beachWorstSlope = +beachWorst.toFixed(2);
-    assert.ok(beachWorst < TAN52 * 0.4, `the beach is a gentle walk to the waterline: worst slope ${beachWorst.toFixed(2)}`);
+    assert.ok(beachWorst < TAN52 * 0.6, `the mud bank is a short steep walk to the waterline (R3 round 2: 3.4 m wide): worst slope ${beachWorst.toFixed(2)}`);
     const walls = Layout.blocks.filter((box) => box.tag === "airWall" && /^BridgeShoreAirWall/.test(box.id));
     const northWalls = Layout.blocks.filter((box) => box.tag === "airWall" && /^BridgeNorthBankAirWall/.test(box.id));
     assert.ok(walls.length >= 25 && northWalls.length === walls.length, `the widened shore has a waterline air wall on both banks: ${walls.length} + ${northWalls.length} pieces`);

@@ -11,8 +11,8 @@ import { MISSION_PONTOON_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
 
 export const PONTOON_BRIDGE_MODEL = Object.freeze({
   // 模型与件表各自一个戳：重烘之后两边一起 +1（Script_PontoonBridgeTest 核对两者出自同一次烘焙）。
-  url: "./Model/Model_PontoonBridge.glb?v=20260930a",
-  dataUrl: "./Model/Data_PontoonBridge.json?v=20260930a",
+  url: "./Model/Model_PontoonBridge.glb?v=20261001a",
+  dataUrl: "./Model/Data_PontoonBridge.json?v=20261001a",
   origin: Object.freeze({ x: MISSION_PONTOON_BRIDGE.x, z: MISSION_PONTOON_BRIDGE.z }),
   // GLB 里的材质名（PontoonBridge<Key>）→ 材质库配方 + 线性色调（乘在配方底图上，可以大于 1）。
   // 船板取风化的手推车木（HandcartWood）：深一点是船体（焦油刷过的旧木），浅一点是桥面板；麻绳取沙袋布（Sandbag，土黄粗纹），
@@ -46,7 +46,7 @@ export const PONTOON_BRIDGE_MODEL = Object.freeze({
 export const PONTOON_BRIDGE_BLAST = Object.freeze({
   // 药包：中间三包（main）按炮弹档、两侧两包小一点 —— 浮桥的木头不该炸出满屏黑烟（黑烟只给半空那一团火球）。
   mainKind: "shell", mainRadiusM: 8.5,
-  // rise 是绝对高度（桥局部 y = 世界 y）：水面 −0.97，桥面 −0.47，半空火球在桥面上 4.5 m。
+  // rise 是绝对高度（桥局部 y = 世界 y）：水面 −1.12，桥面 −0.28，半空火球在桥面上 4.5 m。
   airburst: Object.freeze({ t: 0.06, rise: 4.2, radiusM: 10, kind: "tank" }),
   secondaryKind: "shell", secondaryRadiusScale: 0.7,
   // 药包下面的河面被冲击波掀起的水柱：每个药包一根（数据里 5 个药包），每根 count 片烟。

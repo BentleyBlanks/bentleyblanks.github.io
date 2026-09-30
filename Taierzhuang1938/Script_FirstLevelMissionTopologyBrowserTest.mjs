@@ -128,7 +128,7 @@ try{
    roadWreck:Visible('MissionBridgeWreck'),
    rail:Visible('PontoonBridgeDeck'),railWalkable:Walkable('PontoonBridgeDeck'),
    railWreck:Visible('PontoonBridgeCutWallSouth'),
-   railDeckY:+DeckTop(-77,134).toFixed(2),roadDeckY:+DeckTop(76,153).toFixed(2),
+   railDeckY:+DeckTop(-77,122).toFixed(2),roadDeckY:+DeckTop(76,153).toFixed(2),
   });
   const states=[];
   states.push({phase:'intact',...Snapshot()});
@@ -145,9 +145,9 @@ try{
    for(let i=0;i<900;i++)body.Move(0,-.07,dir*.06);
    return {z:+body.position.z.toFixed(2),y:+body.position.y.toFixed(2)};
   };
-  const cutNorth=walk(-77,112,1),cutSouth=walk(-77,156,-1);
+  const cutNorth=walk(-77,100,1),cutSouth=walk(-77,150,-1);
   body.Remove();
-  const blocked=cutNorth.z<121&&cutNorth.z>117&&cutNorth.y>-1&&cutSouth.z>147&&cutSouth.z<151&&cutSouth.y>-1;
+  const blocked=cutNorth.z<108.5&&cutNorth.z>104.5&&cutNorth.y>-1&&cutSouth.z>135.5&&cutSouth.z<139.5&&cutSouth.y>-1;
   for(const id of ['PontoonBridgeCutWallSouth','PontoonBridgeCutWallNorth'])
    g.battlefield.OpenGate(id);
   for(const id of ['PontoonBridgeDeck','PontoonBridgeRailWest','PontoonBridgeRailEast'])
@@ -219,7 +219,7 @@ try{
   {id:'SideAlleyAndBays',eye:[118,34,140],target:[86,0,118]},
   {id:'TransferAndRiver',eye:[76,62,88],target:[76,0,150]},
   {id:'RiverRoadBridge',eye:[76,10,132],target:[76,-3,168]},
-  {id:'PontoonBridge',eye:[-40,40,196],target:[-77,0,134]},
+  {id:'PontoonBridge',eye:[-40,40,184],target:[-77,0,122]},
   {id:'WallPathAndReception',eye:[30,44,196],target:[4,0,236]},
  ]){
   await page.evaluate(async view=>{

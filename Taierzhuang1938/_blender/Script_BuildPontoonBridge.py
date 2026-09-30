@@ -4,15 +4,16 @@
 取代铁路桥（Script_BuildRailBridge.py）：回援尾队走浮桥过北沙河，奉令炸掉的也是浮桥。结构、流程、件表口径
 照抄铁路桥脚本（Geo/Quad/Hexa/Box/Beam 几何收集、抛体+入水+停稳、Keyframe、glTF 导出、Data json），不同处：
 
-  · 21 条并排拴住的平底木船（长轴沿 x、垂直桥轴，中心 z = 21 − 3·i），船上 2 根纵梁 + 横铺木板窄桥面
-    （宽 2.8、顶 −0.47，比水面高 0.5 m），两侧绳栏（细木桩 + 两道粗绳 + 桩顶竹竿），船头绞盘 / 铁锚 / 芦苇束 / 绳圈；
-  · 两岸各一段木栈搭在入泥的木桩上（南 z 28.6、北 z −44.5），岸桩缠绳，上游缆斜拉到岸桩或入水的锚；
-  · 被炸的是 i=5…9 五条船（每条拆成 船头半 / 船尾半 / 船底中段 三块，桥面板成簇飞散，木屑碎片抛得更远），
-    i=3、4（南）与 i=10、11（北）被冲击波掀得翻倾、缆断、2–3 s 内沉下大半（脚本关键帧，不解算）；
-  · 南截（0/1/2 号船）不动；北截（12…20 号船）整体绕北端岸桩缓缓向下游（+x）摆到 ≈3.5°（外观）；
+  · 21 条并排拴住的平底木船（长 6.6、宽 2.2 沿 x、垂直桥轴，中心 z = 33 − 3·i，船间水缝 0.8 m、两头各伸出桥面 1.9 m，
+    干舷 0.52 m，船头朝上游 = −x，船头带绞盘 / 铁锚 / 缆桩），船上 2 根纵梁 + 横铺木板窄桥面
+    （宽 2.8、顶 −0.28，比舷缘高 0.32 m、比水面高 0.84 m），两侧绳栏（细木桩 + 两道粗绳 + 桩顶竹竿），芦苇束 / 绳圈；
+  · 两岸各一段短木栈搭在入泥的木桩上（南 z 37.4、北 z −33.8），岸桩缠绳，上游缆斜拉到岸桩或入水的锚；
+  · 被炸的是 i=9…13 五条船（河心偏北，中心船 i=11 在局部原点；每条拆成 船头半 / 船尾半 / 船底中段 三块，桥面板成簇飞散，
+    木屑碎片抛得更远），i=7、8（南）与 i=14、15（北）被冲击波掀得翻倾、缆断、2–3 s 内沉下大半（脚本关键帧，不解算）；
+  · 南截（0…6 号船）不动；北截（16…20 号船）整体绕北端岸桩缓缓向下游（+x）摆到 ≈3.5°（外观）；
   · 木件入水后减速、浮起、在水面停住并随水缓漂；铁件（绞盘、锚）沉底。
 
-全部坐标**直接按游戏轴建**（Y 上、X 东、Z 南，原点 = 世界 (-77, 0, 134) = 被炸段中心），导出时 export_yup=False ——
+全部坐标**直接按游戏轴建**（Y 上、X 东、Z 南，原点 = 世界 (-77, 0, 122) = 被炸段中心），导出时 export_yup=False ——
 在 Blender 视口里看模型是躺着的，这是刻意的（与 TzmCore / 铁路桥同一约定）。
 
 产物：
@@ -33,6 +34,7 @@ import math
 import os
 import random
 import hashlib
+import re
 from mathutils import Vector, Matrix, Quaternion
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -60,23 +62,32 @@ DECK_HALF = DECK_W / 2
 LAYOUT = TERRAIN["layout"]
 BOAT = LAYOUT["boat"]
 N_BOATS, BOAT_LEN, BOAT_BEAM, PITCH = BOAT["count"], BOAT["length"], BOAT["beam"], BOAT["pitch"]
+FREEBOARD = BOAT["freeboard"]
 BOAT_Z = [b["z"] for b in LAYOUT["boats"]]
-BLASTED = list(range(BOAT["blasted"][0], BOAT["blasted"][1] + 1))     # 5..9
-SINKING = list(BOAT["sinking"])                                        # 3, 4, 10, 11
-HEAD_S, HEAD_N = LAYOUT["heads"]["south"], LAYOUT["heads"]["north"]  # 28.6, -45.8
-assert N_BOATS == 21 and BLASTED == [5, 6, 7, 8, 9] and BOAT_Z[0] == 21 and PITCH == 3
+BLASTED = list(range(BOAT["blasted"][0], BOAT["blasted"][1] + 1))     # 9..13
+SINKING = list(BOAT["sinking"])                                        # 7, 8, 14, 15
+CI = (BLASTED[0] + BLASTED[-1]) // 2                                   # 中心船（局部 z = 0）：11
+SOUTH_LAST = min(SINKING) - 1                                          # 南截最后一条船：6
+NORTH_FIRST = max(SINKING) + 1                                         # 北截第一条船：16
+HEAD_S, HEAD_N = LAYOUT["heads"]["south"], LAYOUT["heads"]["north"]  # 37.4, -33.8
+assert N_BOATS == 21 and BLASTED == [9, 10, 11, 12, 13] and SINKING == [7, 8, 14, 15] and PITCH == 3
+assert BOAT_Z[0] == 33 and abs(BOAT_Z[CI]) < 1e-6, "桥局部原点必须是中心船的中心（被炸段中心）"
 
-HALF_L, HALF_W = BOAT_LEN / 2, BOAT_BEAM / 2          # 3.3, 0.95
+HALF_L, HALF_W = BOAT_LEN / 2, BOAT_BEAM / 2          # 3.3, 1.1
 Y_BOT = WATER_TOP - 0.28                              # 平底（吃水 0.28）
-Y_GUN = -0.58                                         # 舷缘顶（比桥面低 0.11：纵梁骑在舷上）
-STRINGER_X, STRINGER_W, STRINGER_H = 0.9, 0.16, 0.14
+Y_GUN = WATER_TOP + FREEBOARD                         # 舷缘顶（干舷 0.52 → −0.60；比桥面低 0.32：纵梁骑在舷上，桥面板再上去）
+STRINGER_X, STRINGER_W = 0.9, 0.18
 STRINGER_TOP = DECK_TOP - 0.05                         # 板厚 0.05
+STRINGER_H = STRINGER_TOP - Y_GUN + 0.02               # 纵梁从舷缘 −0.02 立到板底（0.29）
 PLANK_D, PLANK_GAP, PLANK_T = 0.22, 0.02, 0.05
 PLANK_PITCH = PLANK_D + PLANK_GAP
 RAIL_X = 1.46
 BREAK_S, BREAK_N = 13.5, -13.5                         # 南截 / 北截的断口 z（layout.spans）
+BANK_Z = BOAT_Z[0] + 1.6                               # 南栈从这里起（0 号船北端之外）；桥面板顶过了它要顺泥面爬起来
+NORTH_STUB_Z = BOAT_Z[-1] - 1.5                        # 北栈从末条船南端起
 NORTH_PIVOT = Vector((0.0, DECK_TOP, HEAD_N + 0.5))    # 北截摆动的铰（北端岸桩处）
 NORTH_SWING = math.radians(3.5)
+ZSH = 12.0                                             # 岸上杂物沿用旧局部坐标（原点世界 z 134）的 z，+12 = 现在的局部 z（同一世界位置）
 
 TILE = {"Timber": 1.0, "Hull": 1.1, "Rope": 0.4, "Reed": 0.5, "Iron": 0.9, "Crate": 0.6, "Charge": 0.6, "Cable": 0.5}
 MATERIAL_NAME = {k: "PontoonBridge" + k for k in TILE}
@@ -118,6 +129,11 @@ KIND = {}
 UV_RNG = random.Random(1938)
 HEXA_FACES = ((1, 3, 7, 5), (0, 4, 6, 2), (2, 6, 7, 3), (0, 1, 5, 4), (4, 5, 7, 6), (0, 2, 3, 1))
 # 面序号：0 = +x，1 = −x，2 = +y，3 = −y，4 = +z，5 = −z（按 Box 的三根轴，Beam 里指沿 xa/ya/zn 的三根轴）
+
+
+def BoatNo(name):
+    """'Boat11Stern' / 'Deck9_1' / 'SinkBoat7' 里的船号。"""
+    return int(re.match(r"(?:Boat|Deck|SinkBoat)(\d+)", name).group(1))
 
 
 def KindOf(name):
@@ -284,7 +300,7 @@ def PlanClusters():
     rng = random.Random(509)
     for b in BLASTED:
         zc = BOAT_Z[b]
-        if b in (6, 7, 8):
+        if abs(b - CI) <= 1:
             CLUSTER_CUTS[b] = [zc + 0.5 + rng.uniform(-0.2, 0.2), zc - 0.55 + rng.uniform(-0.2, 0.2)]
         else:
             CLUSTER_CUTS[b] = [zc + rng.uniform(-0.35, 0.35)]
@@ -301,7 +317,7 @@ def OwnerZ(z):
         return "BankSouth"
     if i > N_BOATS - 1:
         return "BankNorth"
-    if i <= 2:
+    if i <= SOUTH_LAST:
         return "SouthSection"
     if i in SINKING:
         return "SinkBoat%d" % i
@@ -319,8 +335,8 @@ def GroundMaxAcross(z):
 
 
 def DeckTopAt(z):
-    """桥面顶：只有南栈头一小截会被泥面顶上去（泥面比 −0.47 高）。"""
-    if z > 26.0:
+    """桥面顶：只有南栈头一小截会被泥岸顶上去（岸面比桥面高）。"""
+    if z > BANK_Z:
         return max(DECK_TOP, GroundMaxAcross(z) + 0.05)
     return DECK_TOP
 
@@ -506,7 +522,7 @@ def ReedHeap(pc, zc, rng):
 
 
 def Winch(piece, x, zc):
-    """船头小绞盘：木垫梁 + 铸铁立筒（半径 0.14、高 0.5）+ 箍 + 两根横杆 + 缠绳。"""
+    """船头小绞盘（x 是带符号的位置：−x = 船头朝西 / 上游）：木垫梁 + 铸铁立筒（半径 0.14、高 0.5）+ 箍 + 两根横杆 + 缠绳。"""
     yb = GunwaleY(x) - 0.02
     Beam(piece, "Timber", (x, yb + 0.03, zc - 0.85), (x, yb + 0.03, zc + 0.85), 0.2, 0.08, xaxis=(1, 0, 0))
     y0 = yb + 0.07
@@ -516,19 +532,26 @@ def Winch(piece, x, zc):
     Cylinder(piece, "Rope", x, zc, 0.155, y0 + 0.15, y0 + 0.34, n=6)
     Beam(piece, "Timber", (x, y0 + 0.4, zc - 0.44), (x, y0 + 0.4, zc + 0.44), 0.05, 0.05, xaxis=(1, 0, 0))
     Beam(piece, "Timber", (x - 0.33, y0 + 0.31, zc - 0.26), (x + 0.33, y0 + 0.31, zc + 0.26), 0.05, 0.05, xaxis=(0, 1, 0))
+    # 绞盘后面一根缆桩（船头柱旁的木墩）
+    sgn = 1 if x > 0 else -1
+    Cylinder(piece, "Timber", x - sgn * 0.55, zc + 0.5, 0.09, yb, yb + 0.42, n=6)
 
 
 def Anchor(piece, x, zc, side):
-    """铁锚：搁在船头舷上的锚杆 + 横档 + 两只锚爪，链子翻过艏柱垂进水里。"""
+    """铁锚：搁在船头舷上的锚杆 + 横档 + 两只锚爪，链子翻过艏柱垂进水里。x 带符号（−x = 船头朝西 / 上游）：
+    按 x 的符号把整套往船头那一头镜像。"""
+    sg = 1 if x > 0 else -1
+    ax = abs(x)
+    X = lambda d: sg * (ax + d)
     z0 = zc + side * 0.30
-    Beam(piece, "Iron", (x - 0.55, GunwaleY(x - 0.55) + 0.02, z0), (x + 0.45, GunwaleY(x + 0.45) + 0.05, z0), 0.06, 0.06)
-    Beam(piece, "Iron", (x - 0.5, GunwaleY(x - 0.5) + 0.05, z0 - 0.3), (x - 0.5, GunwaleY(x - 0.5) + 0.05, z0 + 0.3), 0.045, 0.045)
-    tip = (x + 0.45, GunwaleY(x + 0.45) + 0.05, z0)
-    Beam(piece, "Iron", tip, (x + 0.6, tip[1] - 0.12, z0 + 0.22), 0.05, 0.05)
-    Beam(piece, "Iron", tip, (x + 0.6, tip[1] - 0.12, z0 - 0.22), 0.05, 0.05)
-    chain = [(x - 0.55, GunwaleY(x - 0.55) + 0.05, z0), (x - 0.2, GunwaleY(x - 0.2) + 0.12, z0 + side * 0.1),
-             (HALF_L + 0.12, GunwaleY(HALF_L) + 0.02, z0 + side * 0.12), (HALF_L + 0.2, -0.85, z0 + side * 0.13),
-             (HALF_L + 0.24, -1.5, z0 + side * 0.14)]
+    Beam(piece, "Iron", (X(-0.55), GunwaleY(ax - 0.55) + 0.02, z0), (X(0.45), GunwaleY(ax + 0.45) + 0.05, z0), 0.06, 0.06)
+    Beam(piece, "Iron", (X(-0.5), GunwaleY(ax - 0.5) + 0.05, z0 - 0.3), (X(-0.5), GunwaleY(ax - 0.5) + 0.05, z0 + 0.3), 0.045, 0.045)
+    tip = (X(0.45), GunwaleY(ax + 0.45) + 0.05, z0)
+    Beam(piece, "Iron", tip, (X(0.6), tip[1] - 0.12, z0 + 0.22), 0.05, 0.05)
+    Beam(piece, "Iron", tip, (X(0.6), tip[1] - 0.12, z0 - 0.22), 0.05, 0.05)
+    chain = [(X(-0.55), GunwaleY(ax - 0.55) + 0.05, z0), (X(-0.2), GunwaleY(ax - 0.2) + 0.12, z0 + side * 0.1),
+             (sg * (HALF_L + 0.12), GunwaleY(HALF_L) + 0.02, z0 + side * 0.12), (sg * (HALF_L + 0.2), Y_GUN - 0.3, z0 + side * 0.13),
+             (sg * (HALF_L + 0.24), Y_GUN - 0.9, z0 + side * 0.14)]
     for a, b in zip(chain, chain[1:]):
         Tube(piece, "Iron", a, b, 0.035)
 
@@ -542,8 +565,8 @@ def BuildBoat(i, rng):
     zc = BOAT_Z[i]
     tris0 = TotalTris()
     off = (rng.random() * 4, rng.random() * 4)
-    winch = i in (1, 4, 7, 10, 13, 16, 19)
-    anchor = i in (2, 6, 11, 14, 18)
+    winch = i % 3 == 2                      # 2, 5, 8, 11（中心船）, 14, 17, 20
+    anchor = i in (1, 4, CI - 1, 13, 18)
     anchor_side = 1 if i % 2 else -1
     info = {"i": i, "z": zc, "winch": winch, "anchor": anchor}
     rib_xs = [-2.7, -1.8, -0.9, 0.0, 0.9, 1.8, 2.7]
@@ -552,7 +575,7 @@ def BuildBoat(i, rng):
         cut = 1.55 + jr.uniform(-0.08, 0.08)
 
         def pc(x):
-            return "Boat%dStern" % i if x < -1.7 else ("Boat%dBow" % i if x > 1.7 else "Boat%dKeel" % i)
+            return "Boat%dBow" % i if x < -1.7 else ("Boat%dStern" % i if x > 1.7 else "Boat%dKeel" % i)
         phase = jr.random() * 6.28
 
         def hm_keel(x):
@@ -563,8 +586,8 @@ def BuildBoat(i, rng):
             return 0.15 + 0.32 * (0.5 + 0.5 * math.sin(x * 5.3 + phase)) + 0.08 * math.sin(x * 13.0)
         co_hi = [jr.uniform(-0.3, 0.3) for _ in range(12)]     # 船头半 / 船底段的共用断口
         co_lo = [jr.uniform(-0.3, 0.3) for _ in range(12)]     # 船尾半 / 船底段的共用断口
-        HullShell("Boat%dBow" % i, zc, [cut, 2.2, 2.75, HALF_L], cut_lo=co_hi, cap_hi=True, off=off)
-        HullShell("Boat%dStern" % i, zc, [-HALF_L, -2.75, -2.2, -cut], cut_hi=co_lo, cap_lo=True, off=off)
+        HullShell("Boat%dStern" % i, zc, [cut, 2.2, 2.75, HALF_L], cut_lo=co_hi, cap_hi=True, off=off)      # 东半（船尾）
+        HullShell("Boat%dBow" % i, zc, [-HALF_L, -2.75, -2.2, -cut], cut_hi=co_lo, cap_lo=True, off=off)    # 西半（船头，朝上游）
         HullShell("Boat%dKeel" % i, zc, [-cut, -1.1, 0.0, 1.1, cut], hmax=hm_keel, cut_lo=co_lo, cut_hi=co_hi, off=off)
         Ribs(pc, zc, rib_xs, hmax=hm_keel)
         StemPosts(pc, zc)
@@ -575,7 +598,7 @@ def BuildBoat(i, rng):
         Ribs(pc, zc, rib_xs)
         StemPosts(pc, zc)
     else:
-        name = "SouthSection" if i <= 2 else "NorthSection"
+        name = "SouthSection" if i <= SOUTH_LAST else "NorthSection"
         pc = lambda x: name
         HullShell(name, zc, [-HALF_L, -2.75, -2.2, 0.0, 2.2, 2.75, HALF_L], cap_lo=True, cap_hi=True, off=off)
         Ribs(pc, zc, rib_xs)
@@ -584,10 +607,10 @@ def BuildBoat(i, rng):
     Reeds(pc, zc, fr, 2 if i % 2 else 3)
     RopeCoil(pc, zc, fr)
     ReedHeap(pc, zc, fr)
-    if winch:
-        Winch("Winch7" if i == 7 else pc(2.45), 2.45, zc)
+    if winch:                               # 船头朝上游（−x）：绞盘、铁锚都在西头
+        Winch("Winch%d" % CI if i == CI else pc(-2.45), -2.45, zc)
     if anchor:
-        Anchor("Anchor6" if i == 6 else pc(2.7), 2.6, zc, anchor_side)
+        Anchor("Anchor%d" % (CI - 1) if i == CI - 1 else pc(-2.7), -2.6, zc, anchor_side)
     info["triangles"] = TotalTris() - tris0
     return info
 
@@ -647,8 +670,8 @@ def StringerSegments(z_from, z_to, x, cuts):
 
 
 def AddStringer(owner, x, za, zb, ramp=False):
-    if ramp and za > 26.0:
-        z_mid = 26.0
+    if ramp and za > BANK_Z:
+        z_mid = BANK_Z
         Beam(owner, "Timber", (x, STRINGER_TOP - STRINGER_H / 2, zb), (x, STRINGER_TOP - STRINGER_H / 2, z_mid), STRINGER_W, STRINGER_H)
         yb = DeckTopAt(za) - PLANK_T - STRINGER_H / 2
         Beam(owner, "Timber", (x, STRINGER_TOP - STRINGER_H / 2, z_mid), (x, yb, za), STRINGER_W, STRINGER_H)
@@ -659,17 +682,17 @@ def AddStringer(owner, x, za, zb, ramp=False):
 def BuildStringers():
     rng = random.Random(31)
     for sx in (-STRINGER_X, STRINGER_X):
-        # 南栈：z 28.6 → 22.5（末端顺泥面爬起来）
-        AddStringer("BankSouth", sx, HEAD_S - 0.02, 22.5 + 0.02, ramp=True)
-        # 北栈：−40.5 → −44.5
-        AddStringer("BankNorth", sx, -40.5 - 0.02, HEAD_N + 0.02)
+        # 南栈：栈头 → 0 号船北端（末端顺泥岸爬起来）
+        AddStringer("BankSouth", sx, HEAD_S - 0.02, BANK_Z - 0.03, ramp=True)
+        # 北栈：末条船南端 → 栈头
+        AddStringer("BankNorth", sx, NORTH_STUB_Z - 0.02, HEAD_N + 0.02)
         for i in range(N_BOATS):
             zc = BOAT_Z[i]
             za, zb = zc + 1.5 + 0.03, zc - 1.5 - 0.03
-            if i == 2:                                     # 南截断口：西梁多伸出一截、东梁短
+            if i == SOUTH_LAST:                            # 南截断口：西梁多伸出一截、东梁短
                 zb = BREAK_S - (0.42 if sx < 0 else -0.18)
                 za += 0.0
-            if i == 12:                                    # 北截断口
+            if i == NORTH_FIRST:                           # 北截断口
                 za = BREAK_N + (0.30 if sx < 0 else -0.36)
             if i in BLASTED:
                 cuts = [c + (0.28 if sx > 0 else -0.22) for c in CLUSTER_CUTS[i]]
@@ -682,7 +705,7 @@ def BuildStringers():
             AddStringer(owner, sx, za, zb)
 
 
-POST_ZS = [HEAD_S - 0.4 - PITCH * k for k in range(25)] + [HEAD_N + 0.25]   # 28.2, 25.2, … , −43.8，最后一根钉在北栈头
+POST_ZS = [HEAD_S - 0.4 - PITCH * k for k in range(int((HEAD_S - HEAD_N) / PITCH))] + [HEAD_N + 0.25]   # 37.0, 34.0, … 最后一根钉在北栈头
 
 
 def ClipRail(owner, a, b):
@@ -770,8 +793,8 @@ def BigStake(piece, x, z, top, wraps, rng, sink=0.5):
 
 def TrestlePiles():
     rng = random.Random(21)
-    # 南栈：五对，桩头缠粗绳
-    for z in (27.5, 26.0, 24.6, 23.4, 22.7):
+    # 南栈：四对，桩头缠粗绳（从栈头往船方向，桩脚插进陡泥岸 / 浅水）
+    for z in (HEAD_S - 0.3, HEAD_S - 1.3, HEAD_S - 2.3, HEAD_S - 3.2):
         for sx in (-1.58, 1.58):
             x = sx + rng.uniform(-0.04, 0.04)
             g = TerrainAt(x, z)
@@ -779,7 +802,7 @@ def TrestlePiles():
             Band("BankSouth", "Rope", x, z, 0.135, DECK_TOP - 0.12, DECK_TOP + 0.05, n=6)
             Band("BankSouth", "Rope", x, z, 0.135, DECK_TOP - 0.28, DECK_TOP - 0.16, n=6)
     # 北栈：四对，坡下的两对插进水里
-    for z in (-41.2, -42.4, -43.6, -44.8, HEAD_N + 0.3):
+    for z in (-29.2, -30.4, -31.6, -32.8, HEAD_N + 0.3):
         for sx in (-1.58, 1.58):
             x = sx + rng.uniform(-0.04, 0.04)
             g = TerrainAt(x, z)
@@ -788,9 +811,14 @@ def TrestlePiles():
             Band("BankNorth", "Rope", x, z, 0.135, DECK_TOP - 0.30, DECK_TOP - 0.17, n=6)
 
 
+SHORE_STAKE_W = (-3.4, HEAD_S + 0.4)       # 南岸西边的缆桩（上游缆拴在这里；泥垄东端在 x −6.2 之外，桩不踩在垄上）
+SHORE_STAKE_E = (5.6, HEAD_S + 1.0)        # 东边的缆桩（下游缆）
+
+
 def BankStakes():
     rng = random.Random(23)
-    for (x, z, top) in ((-3.9, 27.0, 1.05), (3.8, 27.3, 0.95), (-7.4, 26.9, 1.15), (6.9, 27.6, 1.0)):
+    for (x, z, top) in ((-2.4, HEAD_S + 1.9, 1.05), (3.7, HEAD_S + 0.7, 0.95), (SHORE_STAKE_W[0], SHORE_STAKE_W[1], 1.15),
+                        (SHORE_STAKE_E[0], SHORE_STAKE_E[1], 1.0)):
         BigStake("BankSouth", x, z, top, rng.choice((3, 4, 5)), rng)
     for (x, z, top) in ((-2.6, HEAD_N - 1.7, 1.1), (2.9, HEAD_N - 1.1, 0.95), (-5.6, HEAD_N - 2.5, 1.05), (5.5, HEAD_N - 1.9, 1.0)):
         BigStake("BankNorth", x, z, top, rng.choice((3, 4, 5)), rng, sink=0.4)
@@ -812,22 +840,22 @@ def Mooring(piece, start, end, size=0.05, sag=0.16, n=4, name=""):
 
 def BuildMoorings():
     st = lambda i, side=0: Vector((-HALF_L - 0.04, Y_GUN + 0.22, BOAT_Z[i] + side))
-    # 南截：0 号船艉→西岸桩；1 号船艉→西岸桩；2 号船艉→入水的锚
-    Mooring("SouthSection", st(0, 0.2), (-7.4, TerrainAt(-7.4, 26.9) + 0.85, 26.9), name="shore")
-    Mooring("SouthSection", st(1, 0.25), (-9.5, -2.2, 22.5), name="anchor", sag=0.05)
-    Mooring("SouthSection", st(2, -0.2), (-9.4, -2.4, 10.8), name="anchor", sag=0.05)
-    # 北截：13、15、18 号船艉→入水的锚；20 号船艉→北岸桩
-    for i, (dx, dz) in ((13, (-8.6, -4.2)), (15, (-9.0, -3.6)), (18, (-8.8, 3.4))):
-        Mooring("NorthSection", st(i, 0.15), (-HALF_L + dx, -2.4, BOAT_Z[i] + dz), name="anchor", sag=0.05)
-    Mooring("NorthSection", st(20, -0.25), (-2.6, TerrainAt(-2.6, HEAD_N - 1.7) + 0.7, HEAD_N - 1.7), name="shore")
+    # 南截：0 号船艉→西岸桩；3 号船艉→入水的锚；6 号船艉→入水的锚
+    Mooring("SouthSection", st(0, 0.2), (SHORE_STAKE_W[0], TerrainAt(*SHORE_STAKE_W) + 0.85, SHORE_STAKE_W[1]), name="shore")
+    Mooring("SouthSection", st(3, 0.25), (-9.5, Y_GUN - 1.6, BOAT_Z[3] + 4.5), name="anchor", sag=0.05)
+    Mooring("SouthSection", st(SOUTH_LAST, -0.2), (-9.4, Y_GUN - 1.8, BOAT_Z[SOUTH_LAST] - 4.2), name="anchor", sag=0.05)
+    # 北截：17、19 号船艉→入水的锚；20 号船艉→北岸桩
+    for i, (dx, dz) in ((NORTH_FIRST + 1, (-8.6, -4.2)), (NORTH_FIRST + 3, (-9.0, 3.4))):
+        Mooring("NorthSection", st(i, 0.15), (-HALF_L + dx, Y_GUN - 1.8, BOAT_Z[i] + dz), name="anchor", sag=0.05)
+    Mooring("NorthSection", st(N_BOATS - 1, -0.25), (-2.6, TerrainAt(-2.6, HEAD_N - 1.7) + 0.7, HEAD_N - 1.7), name="shore")
     # 中间几条船（被炸区的邻船）的上游缆：崩断，只剩绳头挂在船艉上
     for i in SINKING + BLASTED:
-        piece = "SinkBoat%d" % i if i in SINKING else "Boat%dStern" % i
+        piece = "SinkBoat%d" % i if i in SINKING else "Boat%dBow" % i
         a = st(i, 0.1)
         Mooring(piece, a, a + Vector((-0.75, -0.22, -0.4 + 0.15 * (i % 3))), size=0.05, sag=0.05, n=2, name="snapped")
     # 岸桩上再拴一根东侧的下游缆（船头 → 岸桩）
-    Mooring("SouthSection", Vector((HALF_L + 0.04, Y_GUN + 0.22, BOAT_Z[0] + 0.3)), (6.9, TerrainAt(6.9, 27.6) + 0.7, 27.6),
-            name="shore-down")
+    Mooring("SouthSection", Vector((HALF_L + 0.04, Y_GUN + 0.22, BOAT_Z[0] + 0.3)),
+            (SHORE_STAKE_E[0], TerrainAt(*SHORE_STAKE_E) + 0.7, SHORE_STAKE_E[1]), name="shore-down")
 
 
 def WoodCrate(centre, size, yaw, piece="Crates"):
@@ -876,43 +904,43 @@ def RopeHeap(piece, cx, cz, radius, rng):
 def BuildCrates():
     rng = random.Random(57)
     g = TerrainAt
-    # 两摞药箱：crew 落位 x −5.6，z 31.2 / 33.2，朝东 —— 箱摞在他们东侧、桥头西侧
-    ax, az = -3.85, 30.5
+    # 两摞药箱：crew 落位 x +5.4（桥轴东侧），z 43.2 / 45.2（局部 = 世界 z 165.2 / 167.2），朝西 —— 箱摞在他们西侧、桥头东侧
+    ax, az = 3.85, 30.5 + ZSH
     WoodCrate((ax, g(ax, az) + 0.27, az), (0.92, 0.54, 0.6), 0.1)
-    WoodCrate((ax + 0.04, g(ax, az + 1.0) + 0.27, az + 1.0), (0.88, 0.54, 0.58), -0.12)
-    WoodCrate((ax + 0.02, g(ax, az) + 0.54 + 0.24, az + 0.05), (0.8, 0.46, 0.5), 0.5)
-    WoodCrate((ax - 0.05, g(ax, az + 1.0) + 0.54 + 0.24, az + 1.0), (0.76, 0.44, 0.5), -0.35)
-    bx, bz = -4.15, 33.4
+    WoodCrate((ax - 0.04, g(ax, az + 1.0) + 0.27, az + 1.0), (0.88, 0.54, 0.58), -0.12)
+    WoodCrate((ax - 0.02, g(ax, az) + 0.54 + 0.24, az + 0.05), (0.8, 0.46, 0.5), 0.5)
+    WoodCrate((ax + 0.05, g(ax, az + 1.0) + 0.54 + 0.24, az + 1.0), (0.76, 0.44, 0.5), -0.35)
+    bx, bz = 4.15, 33.4 + ZSH
     WoodCrate((bx, g(bx, bz) + 0.27, bz), (0.9, 0.54, 0.6), -0.08)
-    WoodCrate((bx + 0.05, g(bx, bz + 0.98) + 0.27, bz + 0.98), (0.86, 0.52, 0.58), 0.14)
-    WoodCrate((bx + 0.02, g(bx, bz + 0.5) + 0.54 + 0.23, bz + 0.5), (0.8, 0.46, 0.5), 0.6)
+    WoodCrate((bx - 0.05, g(bx, bz + 0.98) + 0.27, bz + 0.98), (0.86, 0.52, 0.58), 0.14)
+    WoodCrate((bx - 0.02, g(bx, bz + 0.5) + 0.54 + 0.23, bz + 0.5), (0.8, 0.46, 0.5), 0.6)
     # 一卷铁丝网、绳圈、木桩
-    WireCoil("Crates", -2.55, 32.6)
-    for (x, z, r) in ((-2.75, 29.5, 0.32), (-1.95, 35.0, 0.26), (2.2, 30.4, 0.3)):
+    WireCoil("Crates", 2.55, 32.6 + ZSH)
+    for (x, z, r) in ((2.75, 29.5 + ZSH, 0.32), (1.95, 35.0 + ZSH, 0.26), (-2.2, 30.4 + ZSH, 0.3)):
         RopeHeap("Crates", x, z, r, rng)
-    for (x, z, top, lean) in ((-2.35, 28.9, 0.9, 0.12), (2.1, 28.3, 0.75, -0.1), (-1.9, 27.4, 0.6, 0.18), (3.0, 29.6, 0.7, 0.05)):
+    for (x, z, top, lean) in ((2.35, 28.9 + ZSH, 0.9, -0.12), (-2.1, 28.3 + ZSH, 0.75, 0.1), (1.9, 27.4 + ZSH, 0.6, -0.18), (-3.0, 29.6 + ZSH, 0.7, -0.05)):
         gg = g(x, z)
         a = Vector((x, gg - 0.3, z))
         b = Vector((x + lean, gg + top, z + lean * 0.4))
         Beam("Crates", "Timber", a, b, 0.11, 0.11, xaxis=(0, 0, 1))
         Band("Crates", "Rope", b.x, b.z, 0.09, b.y - 0.2, b.y - 0.08, n=4)
-    # 水边立着的芦苇丛（南岸水线 z 26.2 以南的泥滩边）
+    # 水边立着的芦苇丛（南岸水线 z 35.9 以南的陡岸沿上）
     for k in range(7):
-        cx = rng.uniform(-9.5, 6.5)
-        cz = rng.uniform(26.6, 29.4)
+        cx = rng.uniform(-6.5, 9.5)
+        cz = rng.uniform(HEAD_S - 0.8, HEAD_S + 2.4)
         if abs(cx) < 2.3:
             cx += 3.4 * (1 if cx >= 0 else -1)
-        for s in range(5):
-            bx = cx + rng.uniform(-0.25, 0.25)
-            bz = cz + rng.uniform(-0.25, 0.25)
-            a = Vector((bx, g(bx, bz) - 0.05, bz))
-            tip = Vector((bx + rng.uniform(-0.35, 0.35), g(bx, bz) + rng.uniform(0.9, 1.5), bz + rng.uniform(-0.35, 0.35)))
+        for s_ in range(5):
+            bx_ = cx + rng.uniform(-0.25, 0.25)
+            bz_ = cz + rng.uniform(-0.25, 0.25)
+            a = Vector((bx_, g(bx_, bz_) - 0.05, bz_))
+            tip = Vector((bx_ + rng.uniform(-0.35, 0.35), g(bx_, bz_) + rng.uniform(0.9, 1.5), bz_ + rng.uniform(-0.25, 0.25)))
             Beam("Crates", "Reed", a, tip, 0.05, 0.03, xaxis=(1, 0, 0))
     # 泥滩上散着的芦苇束
     for k in range(10):
-        x = rng.uniform(-8.5, 5.0)
-        z = rng.uniform(23.6, 31.5)
-        if abs(x) < 1.7 and z < 29.0:
+        x = rng.uniform(-5.0, 8.5)
+        z = rng.uniform(HEAD_S + 1.0, HEAD_S + 8.0)
+        if abs(x) < 1.7 and z < HEAD_S + 3.0:
             x += 2.6 * (1 if x >= 0 else -1)
         ang = rng.uniform(0, math.pi)
         d = Vector((math.cos(ang), 0, math.sin(ang)))
@@ -922,11 +950,11 @@ def BuildCrates():
         c2 = c + Vector((0.02, 0.05, 0.03))
         Beam("Crates", "Reed", c2 - d * ln * 0.4, c2 + d * ln * 0.45, 0.1, 0.05, xaxis=(0, 1, 0), skip=(3,))
     # 桥面上、绳栏脚下堆的芦苇（南截 / 北截 / 栈桥各几束）
-    for (piece, z, side) in (("SouthSection", 18.6, -1), ("SouthSection", 15.4, 1), ("NorthSection", -17.6, -1),
-                             ("NorthSection", -26.5, 1), ("NorthSection", -33.4, -1), ("BankSouth", 24.9, 1),
-                             ("BankNorth", -42.0, -1)):
+    for (piece, z, side) in (("SouthSection", 29.6, -1), ("SouthSection", 20.4, 1), ("SouthSection", 17.0, -1),
+                             ("NorthSection", -17.6, -1), ("NorthSection", -22.5, 1), ("NorthSection", -28.6, -1),
+                             ("BankSouth", HEAD_S - 1.4, 1), ("BankNorth", -30.0, -1)):
         x = side * 1.15
-        c = Vector((x, DECK_TOP + 0.05, z))
+        c = Vector((x, DeckTopAt(z) + 0.05, z))
         d = Vector((0.15 * side, 0, 1)).normalized()
         Beam(piece, "Reed", c - d * 0.55, c + d * 0.55, 0.22, 0.1, xaxis=(1, 0, 0), skip=(3,))
         Beam(piece, "Reed", c + Vector((0.05, 0.07, 0.1)) - d * 0.4, c + Vector((0.05, 0.07, 0.1)) + d * 0.45, 0.14, 0.07, xaxis=(1, 0, 0), skip=(3,))
@@ -952,30 +980,37 @@ def Polyline(piece, points, size=0.018):
         Tube(piece, "Cable", a, b, size)
 
 
-CHARGE_T = {7: 0.0, 6: 0.04, 8: 0.04, 5: 0.08, 9: 0.08}
+CHARGE_T = {CI: 0.0, CI - 1: 0.04, CI + 1: 0.04, CI - 2: 0.08, CI + 2: 0.08}
 CHARGE_X = -1.55
 
 
 def BuildCharges():
+    cy0, cy1 = Y_GUN - 0.36, Y_GUN - 0.04                 # 药包吊在舷缘以下、船里侧
     for b in BLASTED:
         zc = BOAT_Z[b]
         # 药包吊在桥面西缘下面、船里侧（木箱药包 + 钢带），两根吊绳拴在纵梁上
-        Pack("Charges", CHARGE_X - 0.25, CHARGE_X + 0.25, -0.92, -0.60, zc - 0.22, zc + 0.22, straps=2, axis="x")
+        Pack("Charges", CHARGE_X - 0.25, CHARGE_X + 0.25, cy0, cy1, zc - 0.22, zc + 0.22, straps=2, axis="x")
         for dz in (-0.16, 0.16):
-            Tube("Charges", "Cable", (CHARGE_X + 0.2, -0.6, zc + dz), (-STRINGER_X + 0.05, STRINGER_TOP - 0.07, zc + dz), 0.02)
-        CHARGES.append({"t": CHARGE_T[b], "x": CHARGE_X, "y": -0.76, "z": zc, "radius": 12.0 if b in (6, 7, 8) else 8.0,
-                        "main": b in (6, 7, 8), "groundY": WATER_TOP})
+            Tube("Charges", "Cable", (CHARGE_X + 0.2, cy1, zc + dz), (-STRINGER_X + 0.05, STRINGER_TOP - 0.07, zc + dz), 0.02)
+        CHARGES.append({"t": CHARGE_T[b], "x": CHARGE_X, "y": round((cy0 + cy1) / 2, 3), "z": zc, "radius": 12.0 if abs(b - CI) <= 1 else 8.0,
+                        "main": abs(b - CI) <= 1, "groundY": WATER_TOP})
     CHARGES.sort(key=lambda c: (c["t"], -c["z"]))
     # 导爆索：从每个药包爬上桥面西缘（x −1.30），沿桥面往南拉到南栈头，一路翻下栈头接地面导线
     x = -1.30
     for b in BLASTED:
         zc = BOAT_Z[b]
-        Polyline("CableBridge", [(CHARGE_X, -0.60, zc), (CHARGE_X + 0.12, -0.5, zc), (x - 0.06, DECK_TOP + 0.02, zc + 0.05), (x, DECK_TOP + 0.02, zc + 0.3)])
-    zs = [BOAT_Z[9] + 0.3, BOAT_Z[5] + 0.3, 8.0, 12.0, 16.0, 20.0, 24.0, 27.0, HEAD_S - 0.3]
-    for a, b in zip(zs, zs[1:]):
+        Polyline("CableBridge", [(CHARGE_X, cy1, zc), (CHARGE_X + 0.12, cy1 + 0.1, zc), (x - 0.06, DECK_TOP + 0.02, zc + 0.05), (x, DECK_TOP + 0.02, zc + 0.3)])
+    zn, zs = BOAT_Z[BLASTED[-1]] + 0.3, BOAT_Z[BLASTED[0]] + 0.3
+    zs_list = [zn, zs]
+    z = zs + 4.0
+    while z < HEAD_S - 1.0:
+        zs_list.append(z)
+        z += 4.0
+    zs_list.append(HEAD_S - 0.3)
+    for a, b in zip(zs_list, zs_list[1:]):
         # 走一条略带曲折的线，每段抬高一点点，压在板缝上
         Polyline("CableBridge", [(x + 0.04 * math.sin(a), DeckTopAt(a) + 0.02, a), (x + 0.04 * math.sin(b), DeckTopAt(b) + 0.02, b)])
-    Polyline("CableBridge", [(x, DeckTopAt(BOAT_Z[9] + 0.3) + 0.02, BOAT_Z[9] + 0.3), (x, DECK_TOP + 0.02, BOAT_Z[9] - 0.3)])
+    Polyline("CableBridge", [(x, DeckTopAt(zn) + 0.02, zn), (x, DECK_TOP + 0.02, zn - 0.6)])
     top = DeckTopAt(HEAD_S - 0.3)
     Polyline("CableBridge", [(x, top + 0.02, HEAD_S - 0.3), (x - 0.1, top + 0.01, HEAD_S),
                              (x - 0.22, TerrainAt(x - 0.22, HEAD_S + 0.3) + 0.05, HEAD_S + 0.3)])
@@ -984,16 +1019,18 @@ def BuildCharges():
 def BuildGroundCable():
     ex, ez = TERRAIN["exploder"]["x"], TERRAIN["exploder"]["z"]
     g = TerrainAt
-    run = [(-1.55, HEAD_S + 0.5), (-1.85, 29.6), (-2.5, 30.6), (-2.05, 31.6), (-3.05, 33.9), (-3.25, 35.2), (ex + 0.05, ez - 0.35), (ex, ez)]
+    # 导线从栈头出来，沿泥地往东南拉到起爆器（桥轴东侧），路上绕过药箱与线卷
+    run = [(-1.55, HEAD_S + 0.5), (-1.0, HEAD_S + 1.9), (0.0, HEAD_S + 3.6), (1.0, HEAD_S + 5.2), (0.6, HEAD_S + 6.8),
+           (1.6, HEAD_S + 8.4), (ex - 1.2, ez - 0.9), (ex + 0.05, ez - 0.35), (ex, ez)]
     pts = [(x, g(x, z) + 0.02, z) for (x, z) in run]
     Polyline("CableGround", pts, 0.02)
-    # 线卷：药箱旁的沙地上一小卷（三圈八边形）
-    cx, cz = -2.05, 33.1
+    # 线卷：药箱旁的泥地上一小卷（三圈八边形）
+    cx, cz = 2.05, 33.1 + ZSH
     cy = g(cx, cz) + 0.03
     for ring, (radius, dy) in enumerate(((0.3, 0.0), (0.25, 0.032), (0.2, 0.064))):
         ring_pts = [(cx + radius * math.cos(a * math.pi / 4), cy + dy, cz + radius * math.sin(a * math.pi / 4)) for a in range(9)]
         Polyline("CableGround", ring_pts, 0.03)
-    Polyline("CableGround", [(cx + 0.3, cy, cz), (cx + 0.55, cy - 0.01, cz - 0.4), (-2.05, g(-2.05, 31.6) + 0.02, 31.6)], 0.02)
+    Polyline("CableGround", [(cx - 0.3, cy, cz), (cx - 0.55, cy - 0.01, cz - 0.4), (1.0, g(1.0, HEAD_S + 5.2) + 0.02, HEAD_S + 5.2)], 0.02)
     g_ex = g(ex, ez)
     AxisBox("Exploder", "Timber", ex - 0.17, ex + 0.17, g_ex - 0.02, g_ex + 0.22, ez - 0.13, ez + 0.13)
     AxisBox("Exploder", "Iron", ex - 0.178, ex + 0.178, g_ex + 0.2, g_ex + 0.235, ez - 0.138, ez + 0.138)
@@ -1028,7 +1065,7 @@ def GroundAt(x, z):
     h = TerrainAt(x, z)
     if abs(x) <= DECK_HALF + 0.1 and BREAK_S <= z <= HEAD_S:
         h = max(h, DeckTopAt(z))
-    if abs(x) <= DECK_HALF + 0.1 and HEAD_N <= z <= -40.5:
+    if abs(x) <= DECK_HALF + 0.1 and HEAD_N <= z <= NORTH_STUB_Z:
         h = max(h, DECK_TOP)
     return h
 
@@ -1189,11 +1226,12 @@ def SinkMotion(i):
     """被冲击波掀翻倾、缆崩断、2–3 s 沉下大半的邻船（脚本关键帧）。"""
     zc = BOAT_Z[i]
     south = zc > 0                              # 南侧船：断口在北（−z），向 −z 边翘起
-    spec = {3: (0.31, -0.21, 0.10, 0.85, 0.38, 0.50), 4: (0.46, 0.16, -0.09, 1.20, 0.34, 0.90),
-            10: (-0.47, -0.17, -0.12, 1.25, 0.36, 0.95), 11: (-0.30, 0.23, 0.09, 0.80, 0.32, 0.45)}[i]
+    # 按与中心船的序号差 k 取参数（−4、−3 南侧两条，+3、+4 北侧两条）
+    spec = {-4: (0.31, -0.21, 0.10, 1.12, 0.38, 0.50), -3: (0.46, 0.16, -0.09, 1.42, 0.34, 0.90),
+            3: (-0.47, -0.17, -0.12, 1.47, 0.36, 0.95), 4: (-0.30, 0.23, 0.09, 1.10, 0.32, 0.45)}[i - CI]
     roll_peak, pitch_f, yaw_f, drop_f, roll_frac, drift_z = spec
-    start = {3: 0.14, 4: 0.09, 10: 0.09, 11: 0.14}[i]
-    pivot = Vector((0.0, -0.85, zc))
+    start = {-4: 0.14, -3: 0.09, 3: 0.09, 4: 0.14}[i - CI]
+    pivot = Vector((0.0, Y_GUN - 0.27, zc))
     frames = []
     for f in range(FRAMES):
         t = f / FPS
@@ -1237,7 +1275,7 @@ def Collapse():
         p, q = frames[-1]
         sink_final[i] = round(p.y - pivot.y, 2)
         # 翘起那一舷拍水：一条 water 事件；艏艉先没的那头再补一条
-        tt = {3: 0.5, 4: 0.42, 10: 0.42, 11: 0.5}[i]
+        tt = {-4: 0.5, -3: 0.42, 3: 0.42, 4: 0.5}[i - CI]
         edge = -1 if BOAT_Z[i] > 0 else 1
         events.append({"t": tt, "type": "water", "x": 0.0, "y": round(WATER_TOP, 2), "z": round(BOAT_Z[i] + edge * 0.6, 2),
                        "size": 7.3, "speed": 4.0, "piece": name, "material": "Hull"})
@@ -1246,29 +1284,28 @@ def Collapse():
     def Launch(name):
         # 起爆错开：药包 t = 0 / 0.04 / 0.08，碎件在自己那条船的药包响后 0.02 s 起飞
         if name.startswith("Boat") or name.startswith("Deck"):
-            b = int(name[4] if name.startswith("Boat") else name[4])
+            b = BoatNo(name)
             start = CHARGE_T[b] + 0.02
-            if name.endswith("Bow"):
+            if name.endswith("Stern"):                 # 东半（船尾）往下游（+x）飞
                 return (rng.uniform(2.0, 5.0), rng.uniform(5.0, 10.0), rng.uniform(-2.8, 2.8)), rand_spin(3.0, 8.0), start
-            if name.endswith("Stern"):
+            if name.endswith("Bow"):                   # 西半（船头）往上游（−x）飞
                 return (-rng.uniform(2.0, 5.0), rng.uniform(5.0, 10.0), rng.uniform(-2.8, 2.8)), rand_spin(3.0, 8.0), start
             if name.endswith("Keel"):
                 return (rng.uniform(-1.2, 1.2), rng.uniform(4.5, 7.5), rng.uniform(-1.5, 1.5)), rand_spin(1.5, 4.0), start
             k = int(name.split("_")[1])
-            zsign = (k - 0.5) * 1.6 if b in (6, 7, 8) and False else (1 if BOAT_Z[b] > 0 else -1)
             zc = BOAT_Z[b]
             cuts = CLUSTER_CUTS[b]
             edges = [zc + 1.5] + cuts + [zc - 1.5]
             zmid = (edges[k] + edges[k + 1]) / 2 - zc
             return (rng.uniform(-4.0, 4.0), rng.uniform(8.0, 14.0), zmid * rng.uniform(1.6, 3.2) + rng.uniform(-1.0, 1.0)), \
                 rand_spin(3.0, 8.0), start
-        if name == "Winch7":
-            return (rng.uniform(2.0, 4.0), rng.uniform(5.0, 8.0), rng.uniform(-1.5, 1.5)), rand_spin(2.0, 4.0), 0.02
-        if name == "Anchor6":
-            return (rng.uniform(1.0, 3.0), rng.uniform(5.0, 8.0), rng.uniform(-1.5, 1.5)), rand_spin(2.0, 5.0), 0.06
+        if name == "Winch%d" % CI:
+            return (-rng.uniform(2.0, 4.0), rng.uniform(5.0, 8.0), rng.uniform(-1.5, 1.5)), rand_spin(2.0, 4.0), 0.02
+        if name == "Anchor%d" % (CI - 1):
+            return (-rng.uniform(1.0, 3.0), rng.uniform(5.0, 8.0), rng.uniform(-1.5, 1.5)), rand_spin(2.0, 5.0), 0.06
         if name.startswith("Splinter"):
             k = int(name[8:])
-            if k in (3, 6):                # 往南岸飞：落在射位（z 38.6）前面十来米的泥滩 / 浅水
+            if k in (3, 6):                # 往南岸飞：落在射位（z 40.7）北面十来米的浅水 / 陡岸
                 d = Vector((rng.uniform(-0.3, -0.1), 0.78, 0.62)).normalized()
                 speed = rng.uniform(16.8, 18.2)
             elif k == 1:
@@ -1470,16 +1507,17 @@ def RenderReview(collection):
         bg.inputs["Strength"].default_value = 0.9
     safe = TERRAIN["blastSafe"]
     cover = TERRAIN["cover"]
+    hs, bz0 = HEAD_S, BOAT_Z[0]
     views = {
-        "Head": (Vector((-1.5, TerrainAt(-1.5, 32) + 1.65, 32)), Vector((0, -0.4, -22)), 30),
+        "Head": (Vector((-1.5, TerrainAt(-1.5, hs + 3) + 1.65, hs + 3)), Vector((0, -0.4, -22)), 30),
         "Cover": (Vector((cover["x"], TerrainAt(cover["x"], cover["z"]) + 1.6, cover["z"])), Vector((1.5, -0.2, -4)), 30),
         "BlastSafe": (Vector((safe["x"], TerrainAt(safe["x"], safe["z"]) + 1.65, safe["z"])), Vector((0, 0.5, 0)), 30),
-        "Aerial": (Vector((22, 48, 46)), Vector((0, -1, -6)), 30),
+        "Aerial": (Vector((22, 48, 58)), Vector((0, -1, 4)), 30),
         "Side": (Vector((-30, 4.5, 6)), Vector((0, -0.6, 0)), 30),
-        "Close": (Vector((-6.5, 1.6, 8.5)), Vector((0, -0.6, 2)), 30),
-        "Detail": (Vector((6.5, 1.4, 22.5)), Vector((2.0, -0.8, 18.5)), 35),
-        "Bank": (Vector((-9.5, 2.4, 27.5)), Vector((0.0, -0.6, 30.0)), 30),
-        "NorthBank": (Vector((-9.0, 2.2, -36.0)), Vector((0.0, -0.8, -45.0)), 30),
+        "Close": (Vector((-6.5, 1.6, 20.5)), Vector((0, -0.6, 14)), 30),
+        "Detail": (Vector((6.5, 1.4, 34.5)), Vector((2.0, -0.8, 30.5)), 35),
+        "Bank": (Vector((-9.5, 2.4, hs + 6)), Vector((0.0, -0.6, hs + 2.5)), 30),
+        "NorthBank": (Vector((-9.0, 2.2, -24.0)), Vector((0.0, -0.8, -33.0)), 30),
         "Sink": (Vector((-14, 3.0, 20)), Vector((0, -1.2, 9)), 35),
         "BreakS": (Vector((-6.5, 2.6, 3.0)), Vector((0, -0.8, 14.0)), 35),
         "BreakN": (Vector((-6.5, 2.6, -4.0)), Vector((0, -0.8, -14.5)), 35),
@@ -1532,7 +1570,7 @@ def Main(render=True):
         p, q = tracks[name][-1]
         vs = [p + q @ (Vector(v) - pivots[name]) for v in PIECES[name].verts]
         sink_top[str(i)] = {"highestY": round(max(v.y for v in vs), 3), "lowestY": round(min(v.y for v in vs), 3),
-                            "deckMeanY": round(p.y + 0.38, 3)}
+                            "deckMeanY": round(p.y + (DECK_TOP - pivots[name].y), 3)}
     solved["sinkFinal"] = sink_top
     # 只有 CHARGES 排序后与 charges[] 一致；这里不再动
 

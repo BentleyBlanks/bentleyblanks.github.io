@@ -490,7 +490,7 @@ for (const [id, z, face] of [["North", MISSION_PONTOON_BRIDGE.railGapZ[0], 1], [
  * 浅滩（WestDitchFord，x≈47）那一段断面只有 1.05 m 深 —— 1.2 m 的水位会顶到
  * 自然地面之上，所以 `depth < 3` 的 x 一律不铺：撤离线过河踩的就是那片露出来的
  * 滩地，`floorHalfW` 一路收窄，水面在进浅滩之前先变窄、再断开。
- * 两座桥下连续：路桥甲板底在 +0.0；浮桥的船漂在水面上（桥面顶 −0.47，水面顶 −0.97，拓宽河段水位在南岸自然地面下 1 m）。
+ * 两座桥下连续：路桥甲板底在 +0.0；浮桥的船漂在水面上（桥面顶 −0.23，舷缘顶 ≈ −0.55，水面顶 ≈ −1.07，拓宽河段水位在南岸自然地面下 1.1 m）。
  */
 {
   // 水面：原断面沿槽底铺（枯水位 = 槽底以上 1.2 m，半宽 min(7.5, floorHalfW−3.5)）；拓宽河段（RailBridgeReach，
@@ -520,7 +520,7 @@ for (const [id, z, face] of [["North", MISSION_PONTOON_BRIDGE.railGapZ[0], 1], [
 // 拓宽河段两岸的空气墙（docs/Data_FirstLevelGuidance20260928.md §3.2）。**陡坡本身拦不住真胶囊**：2026-09-30 实测
 // （Script_FirstLevelMissionTopologyBrowserTest「shore」），原 28 m 河槽的 63° 岸胶囊照样爬得上去，一路从北岸走到南岸
 //（斜率 > tan52° 只是纸面口径；autostep + 贴地吸附把 smoothstep 岸坡的缓头缓尾一节节爬掉）。所以这一段河靠墙：
-//   · 南岸：沙滩可以走到水边（爆破手就在那儿），但人不能下水涉过去 —— 墙摆在沙滩上「深度到 1.05 m」处（离水线约 0.9 m）；
+//   · 南岸：陡泥岸可以走到水边（射位与爆破手就在那儿），但人不能下水涉过去 —— 墙摆在泥岸上「深度到 0.98 m」处（离水线约 0.3 m）；
 //   · 北岸：墙摆在岸沿外侧「深度到 0.9 m」的陡坡顶（岸沿以北 ~1 m），谁也下不去、也就爬不上来。
 // 墙只挡角色控制器，子弹与视线照旧穿过；|x−桥轴| < 3.4 不摆（桥面与两侧绳栏本来就有实体，浮桥是唯一的过河处）。
 // 范围 = 拓宽段加两端过渡；过渡带里南岸坡在 50° 上下，同样靠墙。
@@ -535,7 +535,7 @@ for (const [id, z, face] of [["North", MISSION_PONTOON_BRIDGE.railGapZ[0], 1], [
   // 胶囊挤不出去），否则人会从桥边溜进水里（TopologyBrowserTest 的 underBridgeNorthbound 踩过：x −80.8 一路走到河底）。
   pieces.push([-80.3, 3.4], [-74.9, 1.6]);
   for (const [i, [x, w]] of pieces.entries()) {
-    // 南岸墙摆在水线以南 0.12 m 深处（cut 到 −waterRel − 0.12，水线以南约 2.3 m：泥滩留给爆破手与药箱，人下不了水）；
+    // 南岸墙摆在水线以南 0.12 m 深处（cut 到 −waterRel − 0.12，R3 第二轮的陡泥岸上离水线约 0.3 m：射位在水线以南 4.8 m、人下不了水）；
     // 墙的位置跟着水位走（水位 −3 时同一个 1.05 落在离水 6 m 的沙坡半腰）。
     const limit = -(RiverReachAt(x, RIVER)?.waterRel ?? -1.4) - 0.12;
     let z = 175;
@@ -1033,16 +1033,17 @@ export const MISSION_PLACEMENT = Object.freeze({
   bridge: {
     rearColumnForm: [{ x: -77, z: 72 }, { x: -79.4, z: 75.6 }, { x: -74.6, z: 76.4 }],
     rearColumnGroups: [[{ x: -77, z: 78 }], [{ x: -78.2, z: 81.4 }], [{ x: -75.8, z: 81.8 }]],
-    officer: { x: -73.4, z: 173.6, yaw: Math.PI },
-    // 2026-09-30 浮桥取代铁路桥（概念 18_1）：两名爆破手蹲在南岸浮桥头（木栈起点 z 162.6）西侧的烂泥滩上、木药箱摞与铁丝网卷旁边
-    //（药箱、铁丝网卷、绳圈、起爆器与导线是 Model_PontoonBridge 的 Crates / WireCoil / RopeCoil / Exploder / CableGround，
+    officer: { x: -70.4, z: 176.4, yaw: Math.PI },
+    // 2026-09-30 浮桥取代铁路桥（概念 18_1）：两名爆破手蹲在南岸浮桥头（木栈起点 z 159.4）**东侧**的泥地上、木药箱摞与铁丝网卷旁边
+    //（R3 第二轮：射位搬到水边桥头西侧的泥垄后，爆破手与药箱摞让到桥轴东侧，两拨人不挤在一起；
+    // 药箱、铁丝网卷、绳圈、起爆器与导线是 Model_PontoonBridge 的 Crates / WireCoil / RopeCoil / Exploder / CableGround，
     // 摆位在 _blender/Script_BuildPontoonBridge.Charges，与这两个点保持 1–2 m；导出器把这两点写进地形快照的 crew，测试核对它们在干泥地上）。
-    // 离被炸段中心 (−77,134) 都在 30 m（blastClearRadiusM）之外：桥头这一带不在爆破清场圈里，爆破手压杆前不用再撤远，
-    // 但撤出折线（END_TUNING.demolitionPullback）仍把他们送到起爆器后面。空气墙（BridgeShoreAirWall*，水线以南 ~4 m，z≈160.9）在他们北面。
-    // 朝东（yaw -π/2）看药箱与桥头。
-    demolition: [{ x: -82.6, z: 165.2, yaw: -Math.PI / 2 }, { x: -82.6, z: 167.2, yaw: -Math.PI / 2 }],
-    luoCover: { x: -93.6, z: 176, yaw: Math.PI },
-    heyoutianCover: { x: -96.2, z: 176.8, yaw: Math.PI },
+    // 离被炸段中心 (−77,122) 都在 43 m（blastClearRadiusM 30）之外：桥头这一带不在爆破清场圈里，爆破手压杆前不用再撤远，
+    // 但撤出折线（END_TUNING.demolitionPullback）仍把他们送到起爆器后面。空气墙（BridgeShoreAirWall*，水线以南 ~0.9 m，z≈158.1）在他们北面。
+    // 朝西（yaw π/2）看药箱与桥头。
+    demolition: [{ x: -71.4, z: 165.2, yaw: Math.PI / 2 }, { x: -71.4, z: 167.2, yaw: Math.PI / 2 }],
+    luoCover: { x: -87, z: 163.6, yaw: Math.PI },
+    heyoutianCover: { x: -89.4, z: 163.9, yaw: Math.PI },
     enemyRidge: [{ x: -68, z: 80.5, yaw: 0 }, { x: -63.4, z: 81, yaw: 0 },
       { x: -85.6, z: 80.8, yaw: 0 }, { x: -89.2, z: 81.2, yaw: 0 }],
   },

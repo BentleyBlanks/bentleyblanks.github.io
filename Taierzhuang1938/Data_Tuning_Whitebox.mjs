@@ -10,6 +10,7 @@ export const WHITEBOX_CONTROLS = [
   ["terrainTextures", "保留地形贴图", "材质与场景", true],
   ["characterTextures", "保留人物、敌军与手持装备贴图", "材质与场景", true],
   ["assetTextures", "恢复场景资产材质与贴图", "材质与场景", false],
+  ["cardTextures", "镂空卡片（植被、草）保留原贴图色（略去饱和；关闭 = 统一表面色，亮灰剪影）", "材质与场景", true],
   ["grid", "场景灰盒网格", "材质与场景", true],
   ["sceneLighting", "关卡灯光（关闭时用中性基础光）", "材质与场景", false],
   ["sky", "天空与云层", "材质与场景", false],
@@ -49,6 +50,12 @@ export const WHITEBOX_DEFAULTS = Object.freeze({
 // 也不画网格；水面判定 = 网格名含 water（Script_FirstLevelWhiteboxLooks.BuildWhiteboxWater 的 FirstLevelWhitebox_Water）。
 export const WHITEBOX_WATER = Object.freeze({ color: "#4d6f86", sheen: "#c4d6e2", sheenStrength: 0.85,
   sheenPower: 3, sheenMax: 0.72, roughness: 0.14, metalness: 0 });
+// 2026-10-01 镂空卡片（植被十字面片、壕沟草）白盒着色（集成者验收：默认画质下 18_2 的芦苇 / 草是满地白色尖刺）：
+// 表面色 #909397 被白盒的中性光（ambient 1.8 + sun 1.4）照成近白，草叶剪影在深色泥地上像一地白刺。改成保留卡片原贴图的颜色，
+// 按 desaturate 略去饱和（0 = 原色，1 = 灰）再乘 brightness（中性光下的提亮折算）；没有颜色贴图、只有 alphaMap 的卡片统一成
+// fallbackColor（暗橄榄枯黄）。alpha 裁切照旧；卡片上不再叠米制灰网格（网格线画在草叶上只是噪点）。
+// 开关：WHITEBOX_CONTROLS.cardTextures（默认开；关 = 回到 2026-09-30 的统一表面色卡片）。缓存键 whiteboxCard2。
+export const WHITEBOX_CARDS = Object.freeze({ desaturate: 0.4, brightness: 0.5, fallbackColor: "#7a7547" });
 export const WHITEBOX_LIGHTING = Object.freeze({ ambient: 1.8, sun: 1.4, direction: [40, 70, 25] });
 
 export function NormalizeWhiteboxConfig(value = {}) {

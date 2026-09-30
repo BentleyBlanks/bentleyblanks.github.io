@@ -8,7 +8,7 @@
 // 之后逐帧步进，在每个时间点从指定机位出一张图，并记下桥的状态、粒子池与 draw call。
 // 一个机位拍完用事实回退把桥还原（PontoonBridgeSet 只看 bridgeDestroyed），再拍下一个机位。
 // 截图与日志只进忽略目录 _shots/PontoonBridge；这是取证工具，不是通关证据。
-// （改自退役的 Script_RailBridgeShots：机位按浮桥、被炸段中心 (−77,134)、射位 (−89.6,173.8) 重摆。）
+// （改自退役的 Script_RailBridgeShots：机位按浮桥、被炸段中心 (−77,122)、射位 (−84.6,162.7) 重摆。）
 // ===========================================================================
 import fs from "node:fs";
 import path from "node:path";
@@ -24,17 +24,17 @@ const Arg = (name, fallback = null) => {
 const OUT = path.join(here, "_shots", "PontoonBridge");
 const QUALITY = Arg("quality", "high");
 const [W, H] = (Arg("size", "1280x720")).split("x").map(Number);
-// 机位（被炸段中心 (-77,134)，桥面顶 −0.47）：cover = 南岸射位（泥垄后，站姿眼高 1.62，概念 18_2）、head = 南岸浮桥头（概念 18_1）、
+// 机位（被炸段中心 (-77,122)，桥面顶 −0.23）：cover = 南岸水边射位（泥垄后，站姿眼高 1.62，概念 18_2）、head = 南岸浮桥头（概念 18_1）、
 // safe = 爆破安全区（玩家被要求退到的地方）、side = 东南岸斜侧（看得见被炸段两头断开）、wide = 东岸远景（整座桥入画）、
 // deckN / deckS = 站在北截 / 南截桥面上看断口。
 const VIEWS = {
-  cover: { eye: [-89.6, 173.8], target: [-75.5, 1.2, 134] },
-  head: { eye: [-78.6, 168.6], target: [-76.2, 0.2, 138] },
-  safe: { eye: [-66, 201], target: [-77, 1.2, 134] },
-  side: { eye: [-44, 170], target: [-77, 0.6, 134] },
-  wide: { eye: [-30, 168], target: [-77, 0.6, 128] },
-  deckN: { eye: [-77, 100], target: [-77, 0.6, 134] },
-  deckS: { eye: [-77, 158], target: [-77, 0.6, 134] },
+  cover: { eye: [-84.6, 162.7], target: [-71, 1.0, 126] },
+  head: { eye: [-78.6, 162.6], target: [-77.2, 0.2, 128] },
+  safe: { eye: [-66, 201], target: [-77, 1.2, 122] },
+  side: { eye: [-44, 170], target: [-77, 0.6, 122] },
+  wide: { eye: [-30, 168], target: [-77, 0.6, 122] },
+  deckN: { eye: [-77, 98], target: [-77, 0.6, 122] },
+  deckS: { eye: [-77, 154], target: [-77, 0.6, 122] },
 };
 const TIMES = (Arg("times", "-0.3,0.05,0.15,0.3,0.6,1,1.4,2,3,4.5,6.5,10")).split(",").map(Number);
 

@@ -92,16 +92,16 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
       points: Object.freeze([
         Object.freeze({ x: -43.8, z: 244 }), Object.freeze({ x: -49, z: 236 }), Object.freeze({ x: -58, z: 222 }),
         Object.freeze({ x: -66, z: 210 }), Object.freeze({ x: -66, z: 201 }), Object.freeze({ x: -74, z: 199 }),
-        Object.freeze({ x: -78, z: 190 }), Object.freeze({ x: -90, z: 183 }), Object.freeze({ x: -89.2, z: 175.4 }),
-      ]), note: "18 出后门穿田地到爆破安全区、再到南岸射位（R3：射位在烂泥垄后 (-89.6,173.8)）（toBridge 全程；撤回 bridgeWithdraw 走的也是这一条）" }),
+        Object.freeze({ x: -78, z: 190 }), Object.freeze({ x: -84, z: 178 }), Object.freeze({ x: -84.6, z: 164 }),
+      ]), note: "18 出后门穿田地到爆破安全区、再到南岸射位（R3 第二轮：射位在水边烂泥垄后 (-84.6,162.7)）（toBridge 全程；撤回 bridgeWithdraw 走的也是这一条）" }),
     Object.freeze({ id: "BridgeHeadTread", width: 2.2, wear: 0.86,
       points: Object.freeze([
-        Object.freeze({ x: -77, z: 181 }), Object.freeze({ x: -77.4, z: 172 }), Object.freeze({ x: -77, z: 163.4 }),
-      ]), note: "18 浮桥南头的踩道：尾队过桥后上岸走的路（bridgeCrossing 南段），到木栈起点 (−77,162.6)" }),
+        Object.freeze({ x: -77, z: 181 }), Object.freeze({ x: -77.4, z: 172 }), Object.freeze({ x: -77, z: 160.6 }),
+      ]), note: "18 浮桥南头的踩道：尾队过桥后上岸走的路（bridgeCrossing 南段），到木栈起点 (−77,159.4)" }),
     Object.freeze({ id: "BridgeHeadYardTread", width: 2.6, wear: 0.8,
       points: Object.freeze([
-        Object.freeze({ x: -84.8, z: 168.6 }), Object.freeze({ x: -81.6, z: 166 }), Object.freeze({ x: -78.6, z: 163.6 }),
-      ]), note: "桥头西侧木箱与爆破手站的那一小片踩实的泥地（药箱摞在这里，概念 18_1 左前景）" }),
+        Object.freeze({ x: -69.4, z: 168.8 }), Object.freeze({ x: -72.4, z: 166.2 }), Object.freeze({ x: -75.2, z: 163.4 }),
+      ]), note: "桥头东侧木箱与爆破手站的那一小片踩实的泥地（药箱摞在这里，概念 18_1 右前景）" }),
     Object.freeze({ id: "MarchOutTread", width: 2.2, wear: 0.72,
       points: Object.freeze([
         Object.freeze({ x: -66, z: 204 }), Object.freeze({ x: -64, z: 216 }), Object.freeze({ x: -62, z: 232 }),
@@ -140,11 +140,11 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
       z: (t.southZ + NORTH_TERRACE_NORTH_Z) / 2, w: t.east - NORTH_TERRACE_WEST, d: t.southZ - NORTH_TERRACE_NORTH_Z,
       dy: t.dy, feather: NORTH_TERRACE_FEATHER_M, note: t.note })),
     // ---- 浮桥（2026-09-30 R3）：北岸浮桥头的低地 -------------------------------------------------------------------
-    // 桥面顶 −0.47、北栈到 z 88.2（PONTOON_HEADS.north）：核心 z 82…88.2（x ±2.6），向四周 1.6 m 落回自然地面（最陡 1.5·0.45/1.6 = 0.42，23°，人走得上）。
+    // 桥面顶 −0.23、北栈到 z 88.2（PONTOON_HEADS.north）：核心 z 82…88.2（x ±2.6），向四周 1.6 m 落回自然地面（最陡 1.5·0.23/1.6 = 0.22，12°，人走得上）。
     // **不许伸进河槽**：河槽 cut（岸沿 z 90 起）在修饰之后取 min，Script_FirstLevelWhiteboxTerrainTest 断言河槽里逐位不被修饰改动，
     // 所以南羽化止于 z 89.8。
-    Object.freeze({ id: "NorthLanding", kind: "box", op: "level", x: -77, z: 85.1, w: 5.2, d: 6.2, dy: -0.45, feather: 1.6,
-      note: "18 北岸浮桥头的低地：桥面顶 −0.47 比岸上低 0.5 m，尾队与冲桥的日军平缓走下 / 走上桥面" }),
+    Object.freeze({ id: "NorthLanding", kind: "box", op: "level", x: -77, z: 85.1, w: 5.2, d: 6.2, dy: -0.23, feather: 1.6,
+      note: "18 北岸浮桥头的低地：桥面顶 −0.23 比岸上低 0.23 m，尾队与冲桥的日军平缓走下 / 走上桥面" }),
     Object.freeze({ id: "ReceptionYardFloor", kind: "box", op: "level", x: -19.5, z: 235, w: 40.8, d: 31.8,
       dy: 0.15, feather: 0.75, note: "16–17 院地 +0.15；羽化停在院墙内面，院墙（含量宽的院门两垛）高度不变" }),
     Object.freeze({ id: "ReceptionValleyNorth", kind: "line", op: "cut", halfW: 8, feather: 4.5, dy: 1.4,
@@ -172,24 +172,23 @@ export const WHITEBOX_TERRAIN_REAR = Object.freeze({
       note: "土岗西南的一个小土包，把岗后的空地读成有起伏的田" }),
     Object.freeze({ id: "RetreatKnollEast", kind: "disc", op: "raise", x: -50, z: 292, radius: 4, feather: 8, dy: 1.1,
       note: "土岗东南的小土包" }),
-    // ---- 南岸射位前的烂泥垄（2026-09-30 R3，概念 18_2）--------------------------------------------------------------
-    // 射位 bridgeCover (−89.6,173.8) 在烂泥滩后缘（shoreZ 168）之南 5.8 m：一道不规则的泥垄从射位西北绕到东北（x −105…−86，z 170.4…171.6，
-    // 离射位 2.5–4 m），高 0.7–1.2 m，走向弯曲、顶高起伏；泥团把轮廓再打碎一点。raise 重叠取最大，不会叠成一堵墙。
-    // **垄（连羽化）必须整个在 shoreZ 之南**：河槽 cut 在修饰之后取 min（natural − cut），跨过岸线的 raise 会被它在岸线上一刀削平，
-    // 露出一道 0.9 m 的直崖（实测踩过），所以垄心线 z ≥ 168 + 半宽 0.7 + 羽化 1.6 = 170.3。
-    // 视线：蹲姿眼高 1.05（离垄 3 m，垄顶 ≈ 1.2）看不到垄后的河，站姿 1.62 越过它看桥头 (−77,162.6) 与被炸段 (−77,134)。
-    // 垄东端停在 x −86.4，不盖爆破手（(−82.6,165.2 / 167.2)）与药箱；峰值斜率 1.5·1.2/1.6 = 1.1（48°），人翻得过去（不必翻）。
-    Object.freeze({ id: "BridgeMudRidgeA", kind: "line", op: "raise", halfW: 0.7, feather: 1.6, dy: 1.0,
+    // ---- 南岸射位前的烂泥垄（2026-09-30 R3，概念 18_2；第二轮挪到水边）------------------------------------------------
+    // 南岸收成陡泥岸（Topology reach：水线 z≈157.9、岸沿 shoreZ 160.4）。射位 bridgeCover (−84.6,162.7) 在水线以南 4.8 m、离桥轴 7.6 m：
+    // 一道不规则的泥垄（x −95…−81、垄心线 z≈161，高 0.8–1.25 m，走向弯曲、顶高起伏）横在射位与水之间，泥团把轮廓打碎一点。
+    // 垄北脚被河槽 cut（修饰之后取 min(natural − cut)）在岸沿 z 160.4 一带削出一道 0.6 m 的陡泥岸 —— 这是对的（水边的泥岸本来就是这样），
+    // 人下不去也上不来；垄心线 z ≥ 160.5 + 半宽 0.5 + 羽化 1.2 − 1.2 已经让垄顶整块落在岸沿之南。
+    // 视线：垄顶 1.0–1.35（绝对高度，射位地面 0.09）。蹲姿眼高 1.05 看不到垄后的河与被炸段，站姿 1.62 越过它看整座浮桥。
+    // 射位离垄芯南缘 1.0 m（垄的羽化 1.2 m，射位地面基本没被垄抬起）。垄东端停在 x −83.2（羽化到 −82）：桥头踩道（x −77）、岸边缆桩（x −80.4）与东边的药箱、爆破手不受影响。
+    Object.freeze({ id: "BridgeMudRidgeA", kind: "line", op: "raise", halfW: 0.5, feather: 1.2, dy: 1.0,
       points: Object.freeze([
-        Object.freeze({ x: -105.5, z: 171.6, dy: 0.7 }), Object.freeze({ x: -102, z: 170.8, dy: 0.9 }), Object.freeze({ x: -98.5, z: 171.5, dy: 1.1 }),
-        Object.freeze({ x: -95.2, z: 170.6, dy: 1.2 }), Object.freeze({ x: -92, z: 171.3, dy: 1.05 }), Object.freeze({ x: -89, z: 170.4, dy: 1.2 }),
-        Object.freeze({ x: -86.4, z: 171.5, dy: 0.8 }),
-      ]), note: "18 南岸烂泥垄（射位北面，不规则，0.7–1.2 m）" }),
-    Object.freeze({ id: "BridgeMudLumpWest", kind: "disc", op: "raise", x: -100.6, z: 172.9, radius: 1.1, feather: 1.6, dy: 0.7,
-      note: "垄外侧（南面）的泥团（打碎轮廓）" }),
-    Object.freeze({ id: "BridgeMudLumpEast", kind: "disc", op: "raise", x: -93.4, z: 172.4, radius: 1.0, feather: 1.6, dy: 0.6,
-      note: "垄南面的泥团（打碎轮廓）" }),
-    Object.freeze({ id: "BridgeMudLumpBack", kind: "disc", op: "raise", x: -97.2, z: 176.4, radius: 0.9, feather: 1.7, dy: 0.5,
-      note: "垄后的泥堆：射位西侧的小遮挡" }),
+        Object.freeze({ x: -97.4, z: 161.9, dy: 0.65 }), Object.freeze({ x: -95, z: 161.5, dy: 0.8 }), Object.freeze({ x: -92.6, z: 160.9, dy: 1.0 }), Object.freeze({ x: -90, z: 161.3, dy: 1.15 }),
+        Object.freeze({ x: -87.4, z: 160.8, dy: 1.2 }), Object.freeze({ x: -85, z: 161.2, dy: 1.3 }), Object.freeze({ x: -83.2, z: 160.9, dy: 1.0 }),
+      ]), note: "18 南岸水边的烂泥垄（射位北面，不规则，0.8–1.3 m）" }),
+    Object.freeze({ id: "BridgeMudLumpWest", kind: "disc", op: "raise", x: -91.4, z: 163.4, radius: 0.8, feather: 1.3, dy: 0.55,
+      note: "垄外侧（南面）的泥团（打碎轮廓，离射位 6.8 m）" }),
+    Object.freeze({ id: "BridgeMudLumpFar", kind: "disc", op: "raise", x: -95.6, z: 163.0, radius: 0.9, feather: 1.4, dy: 0.6,
+      note: "垄西头外侧的泥团" }),
+    Object.freeze({ id: "BridgeMudLumpBack", kind: "disc", op: "raise", x: -89.2, z: 165.4, radius: 0.8, feather: 1.5, dy: 0.45,
+      note: "射位西南的小泥堆（读成被炮震起来的烂泥，离射位 5 m）" }),
   ]),
 });

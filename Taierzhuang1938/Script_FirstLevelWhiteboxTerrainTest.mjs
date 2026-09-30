@@ -98,13 +98,14 @@ ok(riverPts > 1000, `river channel untouched (${riverPts} samples)`);
   let ridge = 0, top = 0;
   for (const shape of rear.shapes.filter((s2) => /^BridgeMudRidge/.test(s2.id))) for (const p of shape.points) {
     const shore = RiverReachAt(p.x, MISSION_NORTH_RIVER).shoreZ;
-    assert.ok(p.z >= shore + 0.5, `mud ridge point (${p.x},${p.z}) stands south of shoreZ ${shore.toFixed(2)}`);
-    assert.ok(p.dy >= 0.6 && p.dy <= 1.25, `mud ridge point (${p.x},${p.z}) is 0.6-1.25 m high: ${p.dy}`);
+    assert.ok(p.z >= shore + 0.3, `mud ridge point (${p.x},${p.z}) stands south of shoreZ ${shore.toFixed(2)} (the ridge sits on the lip of the mud bank)`);
+    assert.ok(p.dy >= 0.6 && p.dy <= 1.35, `mud ridge point (${p.x},${p.z}) is 0.6-1.35 m high: ${p.dy}`);
     top = Math.max(top, p.dy);
     ridge++;
   }
   let worstStep = 0;
   for (let x = reach.x0 + 4; x <= -49; x += 2) {
+    if (x > -98 && x < -79) continue;                          // 泥垄所在的 x 段：垄北脚就是岸沿上的陡泥岸，这一段不是「缓滩接自然地面」
     const shore = RiverReachAt(x, MISSION_NORTH_RIVER).shoreZ;
     for (let z = shore - 2; z <= shore + 2; z += .25)
       worstStep = Math.max(worstStep, Math.abs(SampleMissionTerrain(x, z + .25) - SampleMissionTerrain(x, z)));
