@@ -21,7 +21,7 @@ import {
   MISSION_ROUTES, MISSION_PLACEMENT, MISSION_ANCHORS, MISSION_SUPPLIES,
 } from "./Data_FirstLevelMissionLayout.mjs";
 import { TrenchPlanFor, SampleMissionGroundSurface } from "./Data_FirstLevelMissionTerrain.mjs";
-import { MISSION_NORTH_RIVER, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_NORTH_RIVER, RiverCutAt, RiverReachAt } from "./Data_FirstLevelMissionTopology.mjs";
 import { HashSeed, Rng, RouteIndex, PointIndex } from "./Data_FirstLevelPropDressing.mjs";
 
 export const VEGETATION_VERSION = "first-level-vegetation-20260928";
@@ -150,7 +150,7 @@ export function MissionDressingContext(layout, groundAt) {
     bounds: layout.bounds,
     trenchCorridor: trench ? (x, z) => trench.Corridor(x, z) : () => null,
     surfaceAt: layout.SampleGroundSurface || SampleMissionGroundSurface,
-    river: MISSION_NORTH_RIVER, riverCutAt: RiverCutAt,
+    river: MISSION_NORTH_RIVER, riverCutAt: RiverCutAt, riverReachAt: RiverReachAt,
   };
 }
 
@@ -333,7 +333,11 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
     state = (Math.imul(ix, 73856093) ^ Math.imul(iz, 19349663) ^ 0x9e3779b9) >>> 0;
     const x = (ix + rng()) * step, z = (iz + rng()) * step;
     const riverDz = river ? Math.abs(z - river.z) : Infinity;
-    const bankBand = riverDz < 17 && riverDz >= 7.6;
+    // 2026-09-30 拓宽河段（RailBridgeReach，x −140…−30 及过渡）：河岸带跟着新岸走 —— 北岸岸沿以北 9 m、南岸沙滩以南 9 m；
+    // 河口里（岸沿到沙滩南端）只要下切 > 0.2 m 一律不长（南岸沙滩要留成干净的沙地，概念 18_3）。
+    const reach = river && ctx.riverReachAt ? ctx.riverReachAt(x) : null;
+    const bankBand = reach ? ((z < reach.crestZ && z >= reach.crestZ - 9) || (z >= reach.shoreZ && z < reach.shoreZ + 9))
+      : riverDz < 17 && riverDz >= 7.6;
     const coarse = far.Distance(x, z);
     const dRoute = coarse < 14 ? routes.Distance(x, z, coarse + 2) : coarse;
     if ((dRoute > rules.reachM && !bankBand) || dRoute < rules.routeClearM) continue;
@@ -345,7 +349,7 @@ export function PlanFirstLevelVegetation(ctx, quality = "high", rules = VEGETATI
     const pOpen = dRoute < rules.pOpenCloseM ? rules.pOpenClose : rules.pOpenFar + (rules.pOpen - rules.pOpenFar) * openFade;
     const crossing = bankBand && crossings.some((c) => Math.abs(x - c.x) < c.halfW + 3);
     const bank = bankBand && !crossing;
-    if (river && riverDz < 7.6 && ctx.riverCutAt(x, z) > 0.2) continue;       // 河槽底（水面与水里）
+    if (river && (reach ? z >= reach.crestZ - 0.5 && z <= reach.shoreZ : riverDz < 7.6) && ctx.riverCutAt(x, z) > 0.2) continue;       // 河槽底（水面与水里）
     const hit = blocks.Query(x, z);
     if (hit.inside || hit.roofed || hit.water) continue;
     const wallFoot = hit.wallDistance < rules.wallFootBandM;

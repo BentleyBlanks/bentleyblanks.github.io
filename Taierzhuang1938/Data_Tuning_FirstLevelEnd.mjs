@@ -171,11 +171,13 @@ export const END_TUNING = Object.freeze({
   // 尾队真的过完桥：离 bridgeCrossing 末点这么近就算下了桥往南走了。
   rearColumnClearM: 2,
   // 桥头军官与爆破人员（MISSION_PLACEMENT.bridge.officer / .demolition）。
-  // demolition[1] (−74.2,171.4) 落在 RailBridgeDeck 上 —— 那正是南桥台，站得住。
+  // demolition[1] (−74.2,171.4)：2026-09-30 河拓宽后南引桥段止于 z 169，这个点在铁路桥头缺口的路基上（+0.7 m），站得住；
+  // R1b 会把工兵与药箱重摆到 1 号墩脚下的沙滩上（z 160–166，x −86…−70）。
   demolitionSetS: 6,
-  // 撤出折线都要从 BridgeSouthCoverWest(x −87..−78) 与 BridgeSouthCoverEast(x −69..−60)
-  // 之间那个 9 m 宽的口子走。西边那位原来的第一个点 (−80,178) **埋在西侧那道 1.47 m 的
-  // 掩体墙里**：他顶着墙走不到，停在离桥心 24 m 的爆破区里，桥只能靠
+  // 撤出折线都要从南堤的铁路桥头缺口（x −82.5…−70.5）走，避开缺口里的土垄 BridgeSouthMound（x −82.6..−79.4）。
+  //（2026-09-30 之前是 BridgeSouthCoverWest(x −87..−78) 与 BridgeSouthCoverEast(x −69..−60) 之间那个 9 m 宽的口子。）
+  // 西边那位原来的第一个点 (−80,178) **埋在西侧那道 1.47 m 的
+  // 掩体墙里**（旧胸墙，已拆）：他顶着墙走不到，停在离桥心 24 m 的爆破区里，桥只能靠
   // blastFriendlyStuck 兜底晚二十秒才炸（实拍 2026-09-20）。改成先往东挪到口子上。
   // 折线净空由 Script_FirstLevelSpaceTest 守着。
   // 东边那位的终点就是起爆器后面：他走到这儿蹲下，按起爆器的也是他
