@@ -40,6 +40,9 @@ import { TACTICS, INVESTIGATE, SQUAD_REACTION, CHARGE_FOLLOW, MELEE_STALL } from
 import { DEATH_PUSH_SCALE as GORE_DEATH_PUSH_SCALE } from "./Data_Tuning_Gore.mjs";
 import { NECK_DEATH } from "./Data_NeckDeath.mjs";
 import { IsNeckHit, DecideNeckDeath, NeckDeathRoll } from "./Script_NeckDeath.mjs";
+// 受击物理反应（docs/Data_HitReaction.md）：这里只借「被打得多重 → 下一发推迟多久」那一个纯函数，
+// 冲量、骨骼弹簧与方向死亡都在 Actor 那一侧。
+import { AiHoldSeconds } from "./Script_HitReactionLayer.mjs";
 
 // 发现距离、班组队形、交火距离与人物 LOD 预算全在 `Data_Tuning_Ai.mjs`
 //（每一组的账跟着数搬过去了）。这里按原名 re-export —— 那两个名字是跨系统契约：
@@ -506,8 +509,10 @@ export class Soldier {
    *   之后交给 GoreSystem 执行（口径 docs/Data_Dismemberment.md §8.1）。
    * @param {{play:boolean, cause:string|null}|null} neckDeath TakeHit 里 `NeckDeathCause` 的结论：
    *   放不放喉咙里那一声窒息哽咽（docs/Data_NeckDeath.md）。脚本直接 Kill 的不给，照旧走原来的痛呼。
+   * @param {object|null} hit TakeHit 组装的 HitDescriptor（docs/Data_HitReaction.md §2.1）：倒地动作按冲量方向与部位选、
+   *   骨骼再吃一记死亡档冲击。**不给（剧本直接杀、开场分镜、调试 Sever）行为完全不变**：按 seed 抽 A–D，不转向、不加冲量。
    */
-  Kill(direction, sever = null, neckDeath = null) {
+  Kill(direction, sever = null, neckDeath = null, hit = null) {
     if (this.state === STATE.DEAD) return false;
     this.state = STATE.DEAD;
     this.health = 0;
@@ -524,7 +529,7 @@ export class Soldier {
       clips: this.side === "ija" ? 0 : Math.floor(this.rnd() * 3),
       taken: false,
     };
-    if (this.actor) this.actor.Ragdoll(direction || new THREE.Vector3(0, 0, 1));
+    if (this.actor) this.actor.Ragdoll(direction || new THREE.Vector3(0, 0, 1), hit);
     // 断肢排在 Ragdoll **之后**：倒地姿态由 Actor.PoseRagdoll 管，被卸掉的骨头照常动，
     // 只是身上没有那一段三角形了（逐关节 ragdoll 不做，见 §1）。
     // **断肢层是死亡链上的旁支，不是主干。** 一个几何 bug 绝不能让敌人打不死、
@@ -576,6 +581,31 @@ export class Soldier {
       }
     }
     return true;
+  }
+
+  /**
+   * 这一下的 HitDescriptor（世界系，docs/Data_HitReaction.md §2.1）。不进的：伤害 ≤ 0、没有方向（剧本里 TakeHit(…, null)）、
+   * 开场分镜里被安排死的（openingDoomed：动作是导演编好的，不许物理再改）。
+   * 部位倍率在 TakeHit 里已经乘过一次（damage 是乘后的有效伤害，rawDamage 是乘前的）：冲量按弹的动量算，不按打中哪一段算。
+   */
+  BuildHitDescriptor(damage, mult, part, direction, info, lethal) {
+    if (!(damage > 0) || !direction || this.openingDoomed) return null;
+    return {
+      kind: info?.kind || "bullet", part: part === "legs" ? "leg" : part,
+      shapeId: info?.shapeId || null, point: info?.point || null, pointExact: !!info?.pointExact,
+      direction, sweep: info?.sweep || null, blastOrigin: info?.blastOrigin || null,
+      damage: damage * mult, rawDamage: damage, weaponId: info?.weaponId || null, lethal,
+      seed: this.actor?.seed ?? this.id,
+    };
+  }
+
+  /** 活人挨打：骨骼弹簧层出反应；受击够重就把下一发推迟一会儿（人被打得后仰时不该还在稳稳开枪）。 */
+  ApplyHitReaction(hit) {
+    if (!hit || !this.actor?.ReceiveHit) return null;
+    const reaction = this.actor.ReceiveHit(hit);
+    const hold = reaction ? AiHoldSeconds(reaction.severity) : 0;
+    if (hold > 0) this.fireTimer = Math.max(this.fireTimer, hold);
+    return reaction;
   }
 
   /**
@@ -651,7 +681,12 @@ export class Soldier {
       sever = null;
     }
     if (sever?.forceKill) this.health = 0;
-    if (this.health <= 0) return this.Kill(direction, sever, this.NeckDeathCause(kind, info));
+    // 受击物理反应：命中描述在扣血之后、Kill 之前组装。致死的交给 Kill → Ragdoll 选倒地方向；没死的走骨骼弹簧层。
+    // 这两处都只用 `this.xxx?.()`：P012ActorTest 把本方法源码抠出来在只有几个全局的沙箱里跑。
+    const lethal = this.health <= 0;
+    const hit = this.BuildHitDescriptor?.(damage, mult, part, direction, info, lethal) ?? null;
+    if (lethal) return this.Kill(direction, sever, this.NeckDeathCause?.(kind, info) ?? null, hit);
+    this.ApplyHitReaction?.(hit);
     // 中弹没死会喊。中日两侧各喊各的语言（side 由 Bark 侧过滤声库）。
     // 节流在引擎侧（全局 0.55 s / 同阵营同类 4.5 s）。
     const A = this.director && this.director.ctx && this.director.ctx.audio;
@@ -5154,6 +5189,8 @@ export class AiDirector {
         // AI 打 AI 仍按概率抽部位：那边的胶囊是给玩家的子弹用的，这条链一帧几十发不做几何。
         const part = s.rnd() < 0.08 ? "head" : s.rnd() < 0.6 ? "torso" : (s.rnd() < 0.5 ? "arm" : "leg");
         // shapeId 留空：这条链不做几何（一帧几十发），断肢规则层按部位与权重自己挑段。
+        // 受击反应同理：没有命中体 id 就**不信** point（它是瞄点，不是弹着点），按抽到的部位取受力点，
+        // 肢体取离射手近的那一侧（Script_HitReaction.ClassifyZone / DefaultPoint）。
         this.RememberIncomingFire(s.target.ref,fromV);
         const died = s.target.ref.TakeHit(s.weapon.damage, part, dir,
           { kind: s.weapon.rpm ? "hmg" : "bullet", weaponId: s.weaponId, point: aimV.clone() });

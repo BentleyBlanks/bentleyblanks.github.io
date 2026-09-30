@@ -245,6 +245,8 @@ export const testDefs = {
   CharacterHitboxMathTest: { file: "Script_CharacterHitboxMathTest.mjs", desc: "人物子弹代理：精确球/胶囊首交点（纯 Node）" },
   NeckDeathTest: { file: "Script_NeckDeathTest.mjs", desc: "敌军喉咙窒息哽咽：脖子几何 / 刀·枪·阵营·距离·概率闸 / 抽签确定性 / 清单接线（纯 Node，毫秒级）" },
   NeckDeathBrowserTest: { file: "Script_NeckDeathBrowserTest.mjs", timeoutMs: 300000, desc: "敌军喉咙窒息哽咽真引擎链：近处刀杀/脖子中弹放 neckDeath 并顶替日语痛呼，远/没抽中/让位/脚本 Kill/国军都不放" },
+  HitReactionTest: { file: "Script_HitReactionTest.mjs", desc: "受击物理反应规则层：冲量分配的符号与比例 / 弹簧积分稳定·限位·休眠 / 死亡包络 fadeEnd 归零 / 方向死亡选择 16 向 × 部位与库缺失退路 / Soldier 接线（纯 Node，毫秒级）" },
+  HitReactionBrowserTest: { file: "Script_HitReactionBrowserTest.mjs", timeoutMs: 600000, desc: "受击物理反应真引擎：NRA+IJA 真实 GLB 双胞胎对拍骨骼世界角度对上契约 §4、方向死亡 16 向倒向与接地、无 hit 老路不变、?hitreact=0、复用清零、30 人每帧耗时（--require-library 强制库内四族）" },
   PlayerDeathTest: {file:"Script_PlayerDeathTest.mjs",desc:"First-person collapse stance/slope/platform/wall continuity and held endpoint"},
   PlayerHitboxTest: { file: "Script_PlayerHitboxTest.mjs", desc: "玩家命中几何：三姿态分段 / 正面部位次序 / 卧倒藏躯干 / 瞄点 / 散点部位分布（纯 Node，毫秒级）" },
   PlayerActorBlockTest: { file: "Script_PlayerActorBlockTest.mjs", desc: "玩家走不进人物身体：正面挡/贴边滑/窄缝/被挤出/豁免（纯 Node）" },
@@ -498,6 +500,7 @@ export const browserTests = new Set([
   'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
   'ProneCrawlTest', 'ActorLocomotionTest', 'BackRifleRunTest', 'MeleeAnimationTest', 'DadaoSwingTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
+  "HitReactionBrowserTest",
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
@@ -551,6 +554,7 @@ export const tier0Fast = [
   "CharacterSurfaceTest",
   "CharacterHitboxMathTest",
   "NeckDeathTest",
+  "HitReactionTest",
   "PlayerHitboxTest",
   "PlayerActorBlockTest",
   "NavRefreshSpreadTest",
@@ -618,7 +622,7 @@ export const domains = {
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
   firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','RailBridgeTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','LitterGaitTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
-  animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
+  animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest','HitReactionTest','HitReactionBrowserTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
@@ -633,6 +637,8 @@ export const domains = {
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "ModelFacingTest",
+      // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
+      "HitReactionTest", "HitReactionBrowserTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
       // 两条都是纯 Node 毫秒级，碰伤害口径或相机的改动连着跑。
       "PlayerHitboxTest", "CameraShakeTest",
@@ -787,6 +793,9 @@ const changedDomainRules = [
   {domain:'propVelocity',pattern:/CarriagePropVelocity|CartCorpseBump|PostPrepass|FirstLevelMissionView|FirstLevelTransferCart|FirstLevelMissionColumn|DraftCartModel|StretcherAsset|StretcherBake|Model_(WoodenEvacCart|WorkingOx|WorkingHorse|BambooStretcher)|OxCartBake/},
   { domain: "render", pattern: /DeathPose|Data_Tuning_ActorDeath/ },
   { domain: "animation", pattern: /DeathCollapse|DeathPose|ActorDeath|MotionDeath/ },
+  // 受击物理反应（docs/Data_HitReaction.md）：规则 / 数值 / 弹簧层 / 方向死亡动作库，归 combat（挂在 TakeHit/Kill）也归 animation（改倒地动作）。
+  { domain: "combat", pattern: /HitReaction|DeathImpact/ },
+  { domain: "animation", pattern: /HitReaction|DeathImpact/ },
   {domain:"hud",pattern:/IncomingFire/},
   {domain:"squadMarch",pattern:/SquadMarch/},
   // 整关驾驶脚本拆成了「公共 Kit + 三段」（2026.09.19 重构，第二波三个玩法包各改一段）。

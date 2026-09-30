@@ -92,6 +92,8 @@ npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目
 | RiggedModelTest | `.tzm.json` 绑定模型数据 |
 | CharacterModelTest / CharacterHitboxMathTest | 蒙皮角色资产与子弹代理数学 |
 | NeckDeathTest | 敌军喉咙窒息哽咽的规则层（纯 Node，毫秒级） |
+| HitReactionTest | 受击物理反应规则层：冲量分配符号与比例、弹簧稳定 / 限位 / 休眠、死亡包络归零、方向死亡选择、Soldier 接线（纯 Node，毫秒级；口径 [受击物理反应](Data_HitReaction.md)） |
+| HitReactionBrowserTest | 受击物理反应真引擎（NRA + IJA 真实 GLB，约 2 分钟）：骨骼世界角度对契约 §4、方向死亡 16 向、无 hit 老路、`?hitreact=0`、复用清零、30 人每帧耗时；`--require-library` 强制动作库四族，`--report` 打印全部实测值 |
 | FractureBakeTest | 预破碎离线数据 |
 | CutsceneControlTest | 过场导演机位与生命周期 |
 | GeoTest / RoadPathTest / WallPlanTest | 几何快路、道路与围墙规划契约；其中 GeoTest 需浏览器，只在门禁档运行 |

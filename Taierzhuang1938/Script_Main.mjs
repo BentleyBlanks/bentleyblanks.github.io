@@ -52,6 +52,7 @@ import { MovementRange } from "./Script_MovementRange.mjs";
 import { GORE_RANGE_PHASE, GORE_RANGE_ID } from "./Data_GoreRange.mjs";
 import { GoreRangeField } from "./Script_GoreRangeField.mjs";
 import { GoreRange } from "./Script_GoreRange.mjs";
+import { HitReactionOf, HitReactionEnabled, SetHitReactionEnabled, PreloadDeathLibrary, DeathLibrary } from "./Script_HitReactionLayer.mjs";
 import {
   RANGE_PHASE, RANGE_LEVEL_ID, RANGE_TARGETS, RANGE_STATIONS, RANGE_RESPAWN_S,
 } from "./Data_Range.mjs";
@@ -1507,9 +1508,22 @@ async function Boot() {
           if (shape?.type === "capsule") at.copy(shape.start).add(shape.end).multiplyScalar(0.5);
           else if (shape?.center) at.copy(shape.center);
         }
+        // 扫刀方向（受击反应用，docs/Data_HitReaction.md §2.1 sweep）：刀是横着扫过去的，力沿刀尖轨迹走。
+        // 优先取这一帧刀尖位移（end − previous）；刚出刀 previous 与 end 重合时按弧线切向：
+        // 刀尖 yaw = a.yaw + sweep·(1−2u)，dTip/du ∝ sign(sweep)·(cos yaw, 0, −sin yaw)。捅刺不带扫向。
+        let sweepDir = null;
+        if (bladed && contact.end && contact.previous) {
+          const sx = contact.end.x - contact.previous.x, sy = contact.end.y - contact.previous.y, sz = contact.end.z - contact.previous.z;
+          const sl = Math.hypot(sx, sy, sz);
+          if (sl > 0.02) sweepDir = new THREE.Vector3(sx / sl, sy / sl, sz / sl);
+        }
+        if (bladed && !sweepDir && contact.sweep && Number.isFinite(contact.yaw)) {
+          const sg = Math.sign(contact.sweep);
+          sweepDir = new THREE.Vector3(sg * Math.cos(contact.yaw), 0, -sg * Math.sin(contact.yaw));
+        }
         const died = target.TakeHit(amount, "torso", delta,
           { kind: bladed ? "blade" : "thrust", mode: bladed ? "slash" : "thrust",
-            weaponId: attackerWeapon?.id || null, shapeId, point: at.clone() });
+            weaponId: attackerWeapon?.id || null, shapeId, point: at.clone(), sweep: sweepDir });
         vfx?.Blood(at, delta, died ? 1 : 0.5);
         if (attacker === player) {
           ConfirmHit(died);
@@ -2858,6 +2872,42 @@ async function Boot() {
     SetForce: (kind) => gore?.SetForce(kind || null) ?? null,
     Reset: () => { gore?.ReleaseAll(); return gore?.State() || null; },
   };
+  // 受击物理反应取证口（docs/Data_HitReaction.md §2.4）。**所有关卡都挂**；?hitreact=0 关整层。
+  // Hit 走正片 TakeHit 链（扣血、可致死、方向死亡）；Impulse 只打冲量不扣血（调参、拍对照图用）。
+  {
+    const Soldier = (id) => ai?.soldiers.find((s) => s.id === id) || null;
+    const Vec = (a) => (a ? new THREE.Vector3(a[0], a[1], a[2]) : null);
+    const Descriptor = (soldier, o, lethal) => ({
+      kind: o.kind || "bullet", part: o.part || "torso", shapeId: o.shapeId || null, point: Vec(o.point), pointExact: !!o.point,
+      direction: Vec(o.dir || [0, 0, 1]).normalize(), sweep: Vec(o.sweep), blastOrigin: Vec(o.blastOrigin),
+      damage: o.damage ?? 75, rawDamage: o.damage ?? 75, weaponId: o.weaponId || null, lethal, seed: soldier.actor?.seed ?? soldier.id,
+    });
+    window.Taierzhuang.Debug.HitReaction = {
+      Hit: (id, o = {}) => {
+        const s = Soldier(id);
+        if (!s) return null;
+        const dir = Vec(o.dir || [0, 0, 1]).normalize();
+        const died = s.TakeHit(o.damage ?? 75, o.part || "torso", dir,
+          { kind: o.kind || "bullet", shapeId: o.shapeId || null, point: Vec(o.point), pointExact: !!o.point,
+            sweep: Vec(o.sweep), blastOrigin: Vec(o.blastOrigin), weaponId: o.weaponId || null });
+        return { died: !!died, health: s.health };
+      },
+      Impulse: (id, o = {}) => {
+        const s = Soldier(id);
+        return s?.alive ? s.actor?.ReceiveHit(Descriptor(s, o, false)) ?? null : null;
+      },
+      State: (id) => {
+        const s = Soldier(id);
+        const layer = s?.actor?.characterRig?.hitReaction;
+        return layer ? layer.Describe() : { active: false, enabled: HitReactionEnabled(), layer: false };
+      },
+      SetEnabled: (value) => SetHitReactionEnabled(value !== false),
+      Enabled: () => HitReactionEnabled(),
+      Preload: () => PreloadDeathLibrary().then((lib) => !!lib),
+      Library: () => { const lib = DeathLibrary(); return lib ? { revision: lib.revision, clips: [...lib.clips.keys()], profiles: lib.profiles } : null; },
+      Layer: (id) => HitReactionOf(Soldier(id)?.actor)?.Describe() ?? null,
+    };
+  }
   if (RANGE) {
     const RangeTargetSnapshot = (entry) => {
       const s = entry.soldier;

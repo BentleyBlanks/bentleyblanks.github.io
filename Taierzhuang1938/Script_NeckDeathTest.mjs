@@ -63,7 +63,8 @@ const cue = manifest.cues.neckDeath;
 assert.ok(cue && cue.files.length === 2, "清单里 neckDeath 有两个变体");
 for (const file of cue.files) assert.ok(fs.existsSync(new URL(`./Audio/Sfx/${file}`, import.meta.url)), `${file} 在盘上`);
 const ai = fs.readFileSync(new URL("./Script_Ai.mjs", import.meta.url), "utf8");
-assert.ok(/this\.Kill\(direction, sever, this\.NeckDeathCause\(kind, info\)\)/.test(ai), "TakeHit 致死时把喉音判定交给 Kill");
+// 受击物理反应（2026-09-30）给 Kill 加了第四个参数 hit，NeckDeathCause 也改成可选调用（P012ActorTest 的沙箱里没有它）。
+assert.ok(/this\.Kill\(direction, sever, this\.NeckDeathCause\?\.\(kind, info\) \?\? null, hit\)/.test(ai), "TakeHit 致死时把喉音判定交给 Kill");
 assert.ok(/A2\.Play\("neckDeath"/.test(ai), "Kill 里播 neckDeath");
 
 console.log("NeckDeathTest OK — neck geometry, kind/side/range/chance gates, deterministic roll, manifest wiring");

@@ -6,6 +6,7 @@
 
 ## 当前入口与任务范围
 
+- **受击物理反应（2026-09-30）**：枪打 / 刀砍 / 爆炸打在敌我士兵身上，人按**方向和部位**做物理反应：命中描述 `HitDescriptor` → 冲量按力臂 × 惯量分给骨链（`Script_HitReaction`，纯规则）→ 骨骼弹簧层在 `Actor.Update` 末尾叠在动画上（`Script_HitReactionLayer`，`rig.hitReaction`）；致死的一下按冲量方向从 `Animation/HitReaction` 动作库选倒地动作（库缺失退 Kimodo A–D），剩余偏角转可见朝向。**没有 `hit` 的 `Kill`（剧本直杀 / 开场分镜 / 调试 Sever）行为不变**；`?hitreact=0` 整层关；取证口 `Debug.HitReaction`。数值全在 `Data_Tuning_HitReaction.mjs`；口径、实测与缺口见 [受击物理反应](docs/Data_HitReaction.md)，门禁 `Script_HitReactionTest` / `Script_HitReactionBrowserTest`（`--require-library` 强制动作库四族）。
 - **Frame Debugger（2026-09-30）**：编辑器「渲染调试」组的独立窗口；捕获冻结完整帧，按 DC/Pass 检查和回放。计时、资源恢复、MSAA/mip/合批契约与平台边界见 [单帧绘制调试器](docs/Data_FrameDebugger.md)，回归 `Script_FrameDebuggerTest`。普通运行不装逐绘制钩子；改捕获/回放必须验证捕获前后像素、逆向步进和退出恢复，GPU 不可用不得用 CPU 或 0 冒充。
 
 - **对白听得出是谁在说、听得出是主角自己（2026-09-30）**：[音频引擎 §16](docs/Data_AudioEngine.md)。剧情对白分三条路（`Script_Audio.RouteStorySpeech`，数在 `Data_Tuning_Audio.STORY_SPEECH`）：主角 `own`（居中单声道干声 + 胸腔低频 + 略响；玩家下令与打空骂人走 `Bark` 的 `self: true`，不再按脚底定位）、别人 `world`（挂头上的 HRTF + 人声近场距离曲线 1.5 m 起 + 房间混响 0.6）、找不到人 `unplaced`（居中但平直、带房间声；`VoicePosition` 找不到人返回 null，不再退回玩家头上）。门禁 `Script_FirstLevelVoicePerspectiveTest`（居中的 L−R 改在音频图里算）、`Script_FirstLevelMissionTest`、`Script_AudioWiringTest`、`Script_AudioTest`、`Script_FirstLevelAudioNodeBudgetTest`。
