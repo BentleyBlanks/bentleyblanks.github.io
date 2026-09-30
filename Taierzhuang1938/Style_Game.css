@@ -799,18 +799,20 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   z-index: 10; overflow: hidden;
 }
 #boot.gone { display: none; }
-/* 报纸图是 16:9 的黑底图，纸只占中间约八成；lighten 让图里的黑与页面黑融成一片，不留方框边。 */
+/* 报纸图是「纸 + 一圈黑边」的紧裁图，横幅 / 近方 / 竖幅三种宽高比都有：按高度与宽度两头封顶、比例自动保持。
+   lighten 让图边的黑与页面黑融成一片，不留方框边。 */
 #bootPaper {
-  position: absolute; right: -1vw; top: 46%; width: min(68vw, 118vh); height: auto;
-  transform: translateY(-50%); mix-blend-mode: lighten;
+  position: absolute; left: 63vw; top: 46%; width: auto; height: auto;
+  max-width: 62vw; max-height: 82vh;
+  transform: translate(-50%, -50%); mix-blend-mode: lighten;
   opacity: 0; transition: opacity 1.1s ease; pointer-events: none; user-select: none;
   animation: bootPaperDrift 70s ease-in-out infinite alternate;
 }
 #bootPaper.on { opacity: 1; }
 /* 纸极缓地漂近一点点，像镜头在慢推；只动 transform，不触发布局。 */
 @keyframes bootPaperDrift {
-  from { transform: translateY(-50%) scale(1); }
-  to { transform: translateY(-50%) scale(1.04); }
+  from { transform: translate(-50%, -50%) scale(1); }
+  to { transform: translate(-50%, -50%) scale(1.04); }
 }
 @media (prefers-reduced-motion: reduce) { #bootPaper { animation: none; } }
 #bootHead {
@@ -839,7 +841,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 /* 竖屏 / 窄屏：纸放大顶在上半屏，说明压在纸下方，不与纸叠字。 */
 @media (max-aspect-ratio: 1/1) {
-  #bootPaper { right: -12vw; top: 42%; width: 124vw; }
+  #bootPaper { left: 50vw; top: 40%; max-width: 96vw; max-height: 58vh; }
   #bootCard { max-width: 88vw; bottom: 150px; }
 }
 #bootFoot {

@@ -27,7 +27,7 @@ const Check = (ok, label, detail = "") => {
 };
 
 console.log("清单");
-Check(BOOT_PAPERS.length === 20, "收录 20 期（Notion 里被标了颜色的那批）", String(BOOT_PAPERS.length));
+Check(BOOT_PAPERS.length === 11, "收录 11 期（Notion 里被标了颜色且贴着原图的那批）", String(BOOT_PAPERS.length));
 Check(new Set(BOOT_PAPERS.map((p) => p.id)).size === BOOT_PAPERS.length, "id 唯一");
 Check(new Set(BOOT_PAPERS.map((p) => p.file)).size === BOOT_PAPERS.length, "文件名唯一");
 
@@ -53,8 +53,8 @@ for (const paper of BOOT_PAPERS) {
       `${paper.id}: ${field} 已解析`, card[field]);
   }
   Check(card.summary.startsWith("简述：") && card.summary.length > 8, `${paper.id}: 简述行`);
-  Check(/^[〇一二三四五六七八九十]+年[〇一二三四五六七八九十]+月[〇一二三四五六七八九十]+日 · 战前报讯$/.test(card.subtitle),
-    `${paper.id}: 副题是汉字日期`, card.subtitle);
+  Check(/^[〇一二三四五六七八九十]+年[〇一二三四五六七八九十]+月([〇一二三四五六七八九十]+日)? · 战前报讯$/.test(card.subtitle),
+    `${paper.id}: 副题是汉字日期（第 5 期 Notion 只写到月）`, card.subtitle);
 }
 Check(T("boot.paper.kicker") === "史料摘录", "史料摘录 kicker");
 
@@ -66,7 +66,7 @@ for (let i = 0; i < 400; i++) {
   assert.notEqual(pick.id, last, "不许与上一次重复");
   seen.add(pick.id);
 }
-Check(seen.size === BOOT_PAPERS.length, "400 次抽签覆盖全部 20 期");
+Check(seen.size === BOOT_PAPERS.length, "400 次抽签覆盖全部 11 期");
 Check(PickBootPaper(null, () => 0.999999).id === BOOT_PAPERS.at(-1).id, "rand 上界不越界");
 Check(PickBootPaper("不存在的id", () => 0).id === BOOT_PAPERS[0].id, "上次 id 不在清单里照常抽");
 

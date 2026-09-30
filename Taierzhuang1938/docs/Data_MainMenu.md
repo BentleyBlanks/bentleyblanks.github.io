@@ -212,15 +212,20 @@ Esc 在游戏里是暂停（继续 / 选章 / 回主菜单）。暂停会连背�
   三个冒烟脚本点的仍是 `#bootStart`。
 
 **清单只有一处**：`Data_BootPapers.BOOT_PAPERS`（id + 文件名）。名字 / 日期 / 汉字日期 / 简述在
-`Data_Text_Boot` 的 `boot.paper.<id>.name|date|dateCn|summary`。收录的是 Notion 里被标了颜色的 20 期
-（黄 = 重大事件，蓝 = 有助于理解滕县战前局势与军民处境）：立报 / 申报 / 文汇报 / 战时画刊六期 /
-救国时报 / 密勒氏评论报 / 南洋商报九期。
+`Data_Text_Boot` 的 `boot.paper.<id>.name|date|dateCn|summary`。收录的是 Notion 页面里**被标了颜色且贴着原图**的 11 期
+（黄 = 重大事件，蓝 = 有助于理解滕县战前局势与军民处境）：立报 / 申报 / 文汇报 / 《战事画刊》六期 / 救国时报 / 密勒氏评论报。
+页尾「其他已定位报纸」里同样标了色的 9 期南洋商报**没有原图，不收**——报纸上的内容必须与 Notion 里贴的原图一致，不许自己写标题。
+刊名以 Notion 第四节的说明为准：《战事画刊》（不是「战时画刊」）。
 
 - **每次开机随机一张，不与上一次重复**（`localStorage["tzBootPaperLast"]`，读写都包 try：隐私模式会抛，抛了就当没有上一次）。
   同一次加载里不换；换关再亮加载画面时（`ShowBoot(true)`）会重新抽。
-- **只拉一张图**：每张 1600×900 webp 约 200–250 KB，其余十九张一个字节都不下。图没拉下来不影响文字。
-- 图是 Lovart 生的「博物馆文物摄影」式报纸，**报头与标题是为这一期写的，不是原报扫描件**；史料口径以简述为准。
-  提示词与来源见 `_import/Prompts/Texture_BootPaper.txt`。要换图：覆盖 webp、改 `BOOT_PAPER_STAMP`。
+- **只拉一张图**：每张 0.1–0.3 MB webp，其余十张一个字节都不下。图没拉下来不影响文字。
+- **图是原图印在空白做旧纸上，不是 AI 重画的**：纸底是 Lovart 出的、没有任何印刷的空白纸（横幅 / 近方 / 竖幅各两张），
+  原图由 `_import/Script_ComposeBootPaper.py` 逐像素正片叠底上去，所以报头、标题、照片与 Notion 上那张完全一致。
+  第一版让 AI 直接生成「带内容的报纸」，标题是它编的，作废。**换图或加期**：把原图下到本地，往脚本 `JOBS` 加一行，
+  重跑脚本，覆盖 webp，改 `BOOT_PAPER_STAMP`，同步 `Data_BootPapers` / `Data_Text_Boot` / 贴图清单。
+  原图自带的第三方转载站水印无法干净去除，原样保留；馆藏红色水印在合成时淡出。来源与纸底提示词见 `_import/Prompts/Texture_BootPaper.txt`。
+- 图是紧裁的（纸 + 一圈黑边），三种宽高比都有；CSS 用 `max-width: 62vw / max-height: 82vh` 封顶，比例自动保持。
 - 出图模式（`?shot=1`）下不建，截图里不许有它。
 - 门禁：`Script_BootPaperTest.mjs`（`npm run test:taierzhuang1938:bootpaper`）逐张核对
   清单 ↔ 磁盘图 ↔ 四条文本 ↔ 贴图清单登记，并测「不与上次重复」。
