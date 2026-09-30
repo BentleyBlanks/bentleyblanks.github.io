@@ -1036,10 +1036,12 @@ export const MISSION_PLACEMENT = Object.freeze({
     rearColumnForm: [{ x: -77, z: 72 }, { x: -79.4, z: 75.6 }, { x: -74.6, z: 76.4 }],
     rearColumnGroups: [[{ x: -77, z: 78 }], [{ x: -78.2, z: 81.4 }], [{ x: -75.8, z: 81.8 }]],
     officer: { x: -73.4, z: 173.6, yaw: Math.PI },
-    // 2026-09-30 三孔：两名爆破手蹲在 1 号墩（z 160，南岸沙滩水边）东头的沙地上装药，面朝墩、朝身边那堆木药箱
-    // （药箱与一卷线是 Model_RailBridge 的 Crates / CableGround，摆位跟着这两个点走，见 Script_ExportRailBridgeTerrain）。
-    // 墩心 (-77,160)、墩东头到 x≈-73.3；这两点离墩东头 2 m，落在白盒碰撞体（1 号墩 x −78.7..−75.3、南引桥面 x −79.7..−74.3）之外。
-    demolition: [{ x: -71.2, z: 159.4, yaw: Math.PI / 2 }, { x: -71.2, z: 161.3, yaw: Math.PI / 2 }],
+    // 2026-09-30 三孔：两名爆破手蹲在 1 号墩（z 160，南岸沙滩水边）脚下东侧的沙地上装药，面朝西对着身边那堆木药箱
+    // （药箱与一卷线是 Model_RailBridge 的 Crates / CableGround，摆位在 _blender/Script_BuildRailBridge.Charges，
+    // 与这两个点保持 1.5 m 左右；导出器把这两点写进地形快照的 crew，测试核对它们在干沙地上）。
+    // 南岸沙滩的空气墙（BridgeShoreAirWall*，z≈160.2–160.9）拦在水边，所以两人蹲在墙以南、墩东头与南引桥东侧交角的沙地上
+    // （墩心 (-77,160)、墩东头到 x≈-73.3；离白盒碰撞体：1 号墩 x −78.7..−75.3、南引桥面 x −79.7..−74.3 都 ≥ 3 m）。
+    demolition: [{ x: -70.3, z: 162.6, yaw: Math.PI / 2 }, { x: -70.3, z: 164.4, yaw: Math.PI / 2 }],
     luoCover: { x: -79.4, z: 180.2, yaw: Math.PI },
     heyoutianCover: { x: -84.2, z: 179, yaw: Math.PI },
     enemyRidge: [{ x: -68, z: 80.5, yaw: 0 }, { x: -63.4, z: 81, yaw: 0 },

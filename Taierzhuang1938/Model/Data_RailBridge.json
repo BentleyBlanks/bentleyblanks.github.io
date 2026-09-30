@@ -8,7 +8,7 @@
  "fps": 30,
  "duration": 6.0,
  "frames": 181,
- "terrainSha256": "ea0f498e747619f28c9b4b8ee1a7da8769707fe2ddf30dd7e073268799b567e3",
+ "terrainSha256": "a00687bb975bc50d6984f66f261487f8f036ae4d617c3b7f9469dba9ba45fc3c",
  "water": {
   "top": -1.218,
   "z0": -56.373,
@@ -40,13 +40,13 @@
   "blastedSpan": "SpanSouth",
   "crew": [
    {
-    "x": 5.8,
-    "z": 11.4,
+    "x": 6.7,
+    "z": 14.6,
     "yaw": 1.5707963267948966
    },
    {
-    "x": 5.8,
-    "z": 13.3,
+    "x": 6.7,
+    "z": 16.4,
     "yaw": 1.5707963267948966
    }
   ]
@@ -263,7 +263,7 @@
   {
    "name": "CableGround",
    "kind": "cable",
-   "triangles": 492,
+   "triangles": 504,
    "materials": [
     "Cable"
    ],
@@ -276,10 +276,10 @@
     "min": [
      3.291,
      -0.947,
-     12.042
+     12.044
     ],
     "max": [
-     6.023,
+     7.974,
      0.632,
      50.306
     ]
@@ -297,11 +297,11 @@
      1.0
     ],
     "lowest": [
-     3.755,
+     3.757,
      -0.947,
-     12.043
+     12.046
     ],
-    "groundBelowLowest": -0.959,
+    "groundBelowLowest": -0.958,
     "wet": false
    }
   },
@@ -547,14 +547,14 @@
    ],
    "bounds": {
     "min": [
-     3.962,
-     -1.015,
-     11.283
+     4.712,
+     -0.461,
+     14.133
     ],
     "max": [
-     4.981,
-     0.031,
-     12.841
+     5.732,
+     0.585,
+     15.841
     ]
    },
    "final": {
@@ -570,11 +570,11 @@
      1.0
     ],
     "lowest": [
-     4.184,
-     -1.015,
-     11.363
+     4.935,
+     -0.461,
+     14.213
     ],
-    "groundBelowLowest": -1.032,
+    "groundBelowLowest": -0.515,
     "wet": false
    }
   },
@@ -1236,22 +1236,22 @@
    },
    "final": {
     "position": [
-     9.9576,
-     0.1066,
-     33.2012
+     9.7035,
+     0.1134,
+     32.5546
     ],
     "quaternion": [
-     -0.0,
-     0.82232,
      0.0,
-     -0.56903
+     0.30022,
+     -0.0,
+     -0.95387
     ],
     "lowest": [
-     9.719,
-     -0.015,
-     33.26
+     9.702,
+     -0.008,
+     32.8
     ],
-    "groundBelowLowest": -0.015,
+    "groundBelowLowest": -0.012,
     "wet": false
    }
   },
@@ -2986,17 +2986,6 @@
    "material": "Steel"
   },
   {
-   "t": 2.713,
-   "type": "land",
-   "x": 8.32,
-   "y": 0.74,
-   "z": 28.93,
-   "size": 0.66,
-   "speed": 16.8,
-   "piece": "Fragment6",
-   "material": "Steel"
-  },
-  {
    "t": 2.733,
    "type": "water",
    "x": -0.5,
@@ -3005,6 +2994,17 @@
    "size": 7.08,
    "speed": 15.2,
    "piece": "CentreBracing",
+   "material": "Steel"
+  },
+  {
+   "t": 2.763,
+   "type": "land",
+   "x": 8.7,
+   "y": 0.06,
+   "z": 29.62,
+   "size": 0.66,
+   "speed": 17.1,
+   "piece": "Fragment6",
    "material": "Steel"
   },
   {
@@ -3030,5 +3030,5 @@
    "material": "Steel"
   }
  ],
- "triangles": 32820
+ "triangles": 32832
 }

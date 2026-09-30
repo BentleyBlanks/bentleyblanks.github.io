@@ -811,29 +811,31 @@ def Charges():
                              (edge_x + 0.06, ground_start[1] + 0.4, zc), ground_start])
     # 1 号墩脚下：爆破手蹲的地方 —— 木药箱堆在墩东头，一卷线放在沙地上
     crew = TERRAIN["crew"]
-    cx = sum(p["x"] for p in crew) / len(crew)
-    cz = sum(p["z"] for p in crew) / len(crew)
+    crew_x = sum(p["x"] for p in crew) / len(crew)
     g = lambda x, z: TerrainAt(x, z)
-    bx = edge_x + 0.75
-    WoodCrate((bx, g(bx, P1 - 0.35) + 0.27, P1 - 0.35), (0.92, 0.54, 0.6), 0.1)
-    WoodCrate((bx + 0.06, g(bx, P1 + 0.5) + 0.27, P1 + 0.5), (0.88, 0.54, 0.58), -0.12)
-    WoodCrate((bx + 0.02, g(bx, P1 - 0.35) + 0.54 + 0.24, P1 - 0.3), (0.78, 0.46, 0.5), 0.55)
-    # 地面导线：从墩东头顺沙地绕开桥头的石栏拉出去，再顺着路堤肩一路拉到起爆器
+    # 药箱堆在墩东头与南引桥东侧的交角（南岸沙滩水边的空气墙以南），爆破手蹲在它们东边 1.5 m 处（crew 落位，朝西）
+    bx = crew_x - 1.5
+    cz0 = crew[0]["z"] - 0.1
+    WoodCrate((bx, g(bx, cz0) + 0.27, cz0), (0.92, 0.54, 0.6), 0.1)
+    WoodCrate((bx + 0.06, g(bx, cz0 + 1.0) + 0.27, cz0 + 1.0), (0.88, 0.54, 0.58), -0.12)
+    WoodCrate((bx + 0.02, g(bx, cz0) + 0.54 + 0.24, cz0 + 0.05), (0.78, 0.46, 0.5), 0.55)
+    # 地面导线：从墩东头顺沙地拉到药箱旁、绕开桥头的石栏，再顺着路堤肩一路拉到起爆器
     ex, ez = TERRAIN["exploder"]["x"], TERRAIN["exploder"]["z"]
-    path = [(ground_start[0], ground_start[2]), (edge_x + 1.6, P1 + 1.1), (5.6, 14.2), (5.5, 16.6), (5.0, 19.0), (4.2, 21.0),
+    path = [(ground_start[0], ground_start[2]), (edge_x + 0.5, P1 + 0.7), (bx + 1.0, cz0 - 0.9), (crew_x - 0.4, cz0 + 0.6),
+            (crew_x - 0.6, 16.8), (5.0, 19.0), (4.2, 21.0),
             (3.4, 21.5), (3.8, 24.5), (4.2, 28.0), (3.6, 31.0), (3.3, 34.5), (3.9, 38.0), (4.6, 42.0), (4.3, 46.0),
             (ex + 0.4, ez - 0.6), (ex, ez)]
     pts = [(x, TerrainAt(x, z) + 0.02, z) for (x, z) in path]
     Polyline("CableGround", pts, 0.018)
     # 一卷线：三圈八边形，放在药箱旁的沙地上（导线的一头连着它）
-    coil_c = Vector((bx + 1.2, 0, P1 + 2.6))
+    coil_c = Vector((crew_x + 0.9, 0, 17.6))
     coil_c.y = TerrainAt(coil_c.x, coil_c.z) + 0.03
     for ring, (radius, dy) in enumerate(((0.36, 0.0), (0.30, 0.032), (0.24, 0.064))):
         ring_pts = [(coil_c.x + radius * math.cos(a * math.pi / 4), coil_c.y + dy, coil_c.z + radius * math.sin(a * math.pi / 4))
                     for a in range(9)]
         Polyline("CableGround", ring_pts, 0.03)
-    Polyline("CableGround", [(coil_c.x - 0.36, coil_c.y, coil_c.z), (coil_c.x - 0.9, coil_c.y - 0.01, coil_c.z - 0.9),
-                             (5.6, TerrainAt(5.6, 14.2) + 0.02, 14.2)], 0.018)
+    Polyline("CableGround", [(coil_c.x - 0.36, coil_c.y, coil_c.z), (coil_c.x - 0.6, coil_c.y - 0.01, coil_c.z - 0.5),
+                             (crew_x - 0.6, TerrainAt(crew_x - 0.6, 16.8) + 0.02, 16.8)], 0.018)
     g_ex = TerrainAt(ex, ez)
     AxisBox("Exploder", "Timber", ex - 0.17, ex + 0.17, g_ex - 0.02, g_ex + 0.22, ez - 0.13, ez + 0.13)
     AxisBox("Exploder", "Steel", ex - 0.178, ex + 0.178, g_ex + 0.2, g_ex + 0.235, ez - 0.138, ez + 0.138)

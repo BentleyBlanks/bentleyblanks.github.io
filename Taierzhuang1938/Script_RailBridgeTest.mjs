@@ -110,7 +110,7 @@ Check(Math.abs(terrain.exploder.x + B.x - E.exploderAt.x) < 1e-3 && Math.abs(ter
   const solids = MISSION_LAYOUT.blocks.filter((b) => b.solid !== false && /^RailBridge/.test(b.id));
   for (const [index, post] of posts.entries()) {
     const d = Math.hypot(post.x - B.x, post.z - pier1.z);
-    Check(d > 3.5 && d < 8 && dry(post.x, post.z), `爆破手 ${index} 蹲在 1 号墩东头的干沙地上（离墩心 ${d.toFixed(1)} m）`);
+    Check(d > 3.5 && d < 9 && dry(post.x, post.z), `爆破手 ${index} 蹲在 1 号墩脚下东侧的干沙地上（离墩心 ${d.toFixed(1)} m）`);
     Check(solids.every((b) => rectGap(b, post.x, post.z) >= 0.5), `爆破手 ${index} 离白盒桥体碰撞 ≥ 0.5 m`);
     const start = E.demolitionPullback[index][0];
     Check(Math.hypot(start.x - post.x, start.z - post.z) < 9, `爆破手 ${index} 的撤出折线从他脚下出发`);

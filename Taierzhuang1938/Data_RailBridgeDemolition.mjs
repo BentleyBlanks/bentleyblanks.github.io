@@ -10,8 +10,8 @@ import { MISSION_RAIL_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
 
 export const RAIL_BRIDGE_MODEL = Object.freeze({
   // 模型与件表各自一个戳：重烘之后两边一起 +1（Script_RailBridgeTest 核对两者出自同一次烘焙）。
-  url: "./Model/Model_RailBridge.glb?v=20260930a",
-  dataUrl: "./Model/Data_RailBridge.json?v=20260930a",
+  url: "./Model/Model_RailBridge.glb?v=20260930b",
+  dataUrl: "./Model/Data_RailBridge.json?v=20260930b",
   origin: Object.freeze({ x: MISSION_RAIL_BRIDGE.x, z: MISSION_RAIL_BRIDGE.z }),
   // GLB 里的材质名（RailBridge<Key>）→ 材质库配方 + 线性色调（乘在配方底图上，可以大于 1）。
   // **别用 "Steel"**：那是枪械的发蓝钢（底图均值 45/255、满金属度），挂到桥上在这条管线里是一片黑。
