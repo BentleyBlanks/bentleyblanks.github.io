@@ -294,8 +294,10 @@ export const MISSION_TRANSFER_THREATS = Object.freeze([
   Object.freeze({ id: "transfer", after: null, resolved: "loadingThreatResolved", hint: "transferEast" }),
   Object.freeze({ id: "transferAlley", after: "loadingThreatResolved", resolved: "alleyThreatResolved", hint: "transferAlley" }),
 ]);
+// 2026-09-30（12–18 白盒 C2 包）：西侧夹道高墙 z 118.5–129.6 连续，原来沿 z 120.5 横穿西墙的追兵线改走墙北头
+// 的敞口（西墙 z 108.4–118.5 那 10 m，分拣台入口）：z 114.8 一线过 x 74 → 61，夹在分拣桌 (66,116) 与物资箱 (63.1,113.5) 之间。
 export const MISSION_PURSUIT_ROUTE=Object.freeze([
-  {x:100,z:120.5},{x:74,z:120.5},{x:61,z:120.5},{x:60,z:114},...MISSION_ROUTES.evacuation,
+  {x:100,z:120.5},{x:84,z:117.0},{x:74,z:114.8},{x:61,z:114.8},{x:60,z:114},...MISSION_ROUTES.evacuation,
 ]);
 export const MISSION_GUIDANCE = Object.freeze({
   BunkerRescue:{label:'rescue'},

@@ -42,6 +42,15 @@ export const WHITEBOX_TERRAIN_TRANSFER = Object.freeze({
     Object.freeze({ id: "YardDipEastInner", kind: "box", op: "cut", dy: 1.0, feather: 5.5,
       x: 90.75, z: 131.9, w: 8.5, d: 2.8,
       note: "13 路东洼地内圈：x 86.5–99、z 130.5–133.3 降 1.0；x 81→86.5 是路堤东坡" }),
+    // 13_3 / 13_4（2026-09-30 C2 包）：西高墙（x 71，z 118.5–130）的墙脚一条路沟，底宽 1.6 m、深 0.75，
+    // 沟底约 −1.1…−1.4；人贴墙蹲在里头（WestFoot* 遮挡点在 x 72.6），13_4 的低位机位也在里头。
+    // 两端各 1.6 m 逐点 dy 0 收进路面；z 130.8 以南是卸车点 (72.6,135) 到沟口的斜向担架走廊，沟不进去。
+    Object.freeze({ id: "RoadSideDitchWest", kind: "line", op: "cut", dy: 0.75, feather: 1.2, halfW: 0.8,
+      points: Object.freeze([
+        Object.freeze({ x: 72.6, z: 118.4, dy: 0 }), Object.freeze({ x: 72.6, z: 120.2 }),
+        Object.freeze({ x: 72.6, z: 129.2 }), Object.freeze({ x: 72.6, z: 130.8, dy: 0 }),
+      ]),
+      note: "13 路右侧高墙墙脚的路沟：底宽 1.6、深 0.75，两端进出坡各 1.6 m" }),
     // 11_1 左手的高坎（概念图坎顶有行军纵队）：河口北侧、侧巷以南的一道堤，顶宽 ~9×4 m。
     // 从 11_1 北口隔着东墙缺口 z 95.6–99.6 看，坎顶要高过侧巷南墙（2.6 m）才入画，所以 3.6 m；坡面 feather 2 是陡的背景坎，
     // 不走人。南缘羽化正好止于河口 z 138.8；西缘 x 100 让开草房与牲口挣脱线 (94,134)→(119,169)。

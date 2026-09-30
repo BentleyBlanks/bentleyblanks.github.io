@@ -127,6 +127,12 @@ export class FirstLevelMissionColumn {
       ...MissionCarryRoutePoint(MISSION_ROUTES.southTraffic, i * 32),
       visible: false,
     }));
+    // 2026-09-30：桥头路上的停滞车列（布景车，Data_Tuning_FirstLevelMid.transferConvoy）。
+    // 不载人、不参与装载与翻车；visible / abandoned 由 Script_FirstLevelTransferCart.UpdateConvoy 按步骤写。
+    this.convoy = MID.transferConvoy.carts.map((cart) => ({
+      ...cart, state: "convoy", load: [], overturned: false, departed: false, progress: 0,
+      visible: false, abandoned: false, cargo: cart.cargo,
+    }));
     // 12：威胁没解除以前装载额度是 0（由 Script_FirstLevelTransferCart 每帧写）。
     // 其余阶段不设限。
     this.loadAllowance = Infinity;

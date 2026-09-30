@@ -19,7 +19,7 @@
 // ===========================================================================
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
-import { MISSION_ENCOUNTERS, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
+import { MISSION_ENCOUNTERS, MISSION_STAGES, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as M, MidWalkingWounded, MidTransferScatterPlan, MidTransferWalkRoute } from "./Data_Tuning_FirstLevelMid.mjs";
 import { MissionRouteLength, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
@@ -102,6 +102,25 @@ export class FirstLevelTransferCart {
     if (stage === "AirFirst") this.UpdateAirGround(dt);
     if (["Carry", "Dive", "Rescue"].includes(stage)) this.UpdateDitch();
     this.UpdateUnload(dt);
+    this.UpdateConvoy(stage);
+  }
+
+  /**
+   * 桥头路上的停滞车列与残车（布景车，MID.transferConvoy）：默认从 TransferApproach 起出现；
+   * 桥面上的两辆等桥被炸（MissionBridgeDestroyed）或进 14 就撤掉；cartHalt 的替身 E 只在没有 cartRide 时站着；
+   * 进 14 起牲口跑了、车留在原地。
+   */
+  UpdateConvoy(stage) {
+    const column = this.r.column, C = M.transferConvoy;
+    if (!column.convoy?.length) return;
+    const order = MISSION_STAGES.map((entry) => entry.id), index = order.indexOf(stage);
+    const bridgeGone = index >= order.indexOf(C.bridgeGoneFrom) || this.r.Has("MissionBridgeDestroyed");
+    const abandoned = index >= order.indexOf(C.abandonedFrom);
+    for (const cart of column.convoy) {
+      const from = order.indexOf(cart.from || C.visibleFrom), until = cart.until ? order.indexOf(cart.until) : Infinity;
+      cart.visible = index >= from && index < until && !(cart.onBridge && bridgeGone) && !(cart.standIn && this.ride);
+      cart.abandoned = abandoned;
+    }
   }
 
   // --- 11 -------------------------------------------------------------------

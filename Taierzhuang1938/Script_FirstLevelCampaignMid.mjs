@@ -67,7 +67,7 @@ async function FightUntilFact(page, fact, seconds) {
 /** 阶段 8–14。 */
 export async function Drive(ctx) {
   const { page, output } = ctx;
-  const { JumpStage, Capture, CaptureFocus, Route, Interact, WaitStage } = CampaignActions(ctx);
+  const { JumpStage, Capture, CaptureFocus, CapturePose, Route, Interact, WaitStage } = CampaignActions(ctx);
   const from = ctx.stageFrom;
 
   if (from <= 8) {
@@ -336,6 +336,15 @@ export async function Drive(ctx) {
   await Capture("AirRaidRoadAndCarts");
   await CaptureFocus("ZhouUnloaded",
     await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().column.litters.find((l) => l.zhou)));
+  // 2026-09-30（12–18 白盒 C2 包）：真实驱动到 13 停车之后，从概念图 13_1 / 13_2 / 13_3 / 13_4 的机位各拍一张
+  // （机位表 Data_FirstLevelWhitebox0518Cameras 同名条目）：车列、夹道高墙、墙脚路沟与残车都是真实流程里的样子。
+  {
+    const cams = (await import("./Data_FirstLevelWhitebox0518Cameras.mjs")).WHITEBOX_0518_CAMERAS;
+    for (const id of ["13_1", "13_2", "13_3", "13_4"]) {
+      const shot = cams.find((entry) => entry.id === id);
+      await CapturePose("AirRaidView" + id, { x: shot.camera.x, z: shot.camera.z, h: shot.camera.h }, { x: shot.look.x, z: shot.look.z });
+    }
+  }
 
   // --- 14 抬担架、扑沟、把老周拖回担架 -----------------------------------------
   // WestDitchOrder 是整段录音，播完才记 westDitchPointed —— 跟着换步一起等。
@@ -354,7 +363,10 @@ export async function Drive(ctx) {
     return g.state.playerShots === before;
   }), "Holding a patient prevents shooting");
   // 14 在同一段里，不跳 —— 跳一下会把人和担架重置回 14 的起点，扑沟就扑在车道上了。
-  await Route([{ x: 70, z: 112 }, { x: 63, z: 112 }, { x: 54, z: 114 }], "CarryToDitch");
+  // 2026-09-30：西侧夹道高墙 z 118.5–129.6 连续，卸车点 (72.6,135) 往北 (70,112) 的老走法会顶在墙上；
+  // 改走南通道（transferEvac.lanes 的 South：卸车点旁的口 (72.8,133.4) → (64.6,125) → 下沟口），
+  // 与 Script_FirstLevelMidTest 扫过的担架走廊是同一条。
+  await Route([{ x: 72.8, z: 133.4 }, { x: 64.6, z: 125 }, { x: 54, z: 114 }], "CarryToDitch");
   await WaitStage("Rescue", 120);
   assert.equal(await page.evaluate(() => window.Tengxian.carry.Active), false,
     "Dive releases the original stretcher");

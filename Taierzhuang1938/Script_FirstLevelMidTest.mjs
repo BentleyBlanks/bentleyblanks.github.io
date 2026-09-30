@@ -722,8 +722,10 @@ const Step = (host, module, seconds, options = {}) => {
     return [...hits];
   };
   const E = M.transferEvac;
+  // westOnly（2026-09-30）：口子在西高墙里的通道只给墙后的人走，从 westEntry.via 起扫；其余从车路一侧的口子起扫。
   for (const lane of E.lanes)
-    assert.deepEqual(Sweep([lane.gate, ...lane.points, E.ditchMouth]), [], `retreat lane ${lane.id} is a clear litter corridor`);
+    assert.deepEqual(Sweep([lane.westOnly ? lane.westEntry.via : lane.gate, ...lane.points, E.ditchMouth]), [],
+      `retreat lane ${lane.id} is a clear litter corridor`);
   for (const cover of E.covers) {
     assert.deepEqual(Sweep(cover.path), [], `scatter path to ${cover.id} is clear`);
     assert.ok(Math.abs(cover.path.at(-1).x - E.roadX) >= M.scatterCoverOffRoadM, `${cover.id} is off the carriageway`);
@@ -844,6 +846,86 @@ const Step = (host, module, seconds, options = {}) => {
   host.player.position.x = M.bridgeHeadPoint.x - M.offRoadM - 1;
   transfer.Update(1 / 60);
   Check(host.Has("columnOffRoad"), "老周与玩家都离开主车道");
+}
+
+// ---------------------------------------------------------------------------
+// 13 夹道高墙与停滞车列（2026-09-30，12–18 白盒 C2 包，概念 13_3「仰看俯冲」）
+// 墙：西侧青砖高墙（≥ 3.5 m、连续 ≥ 10 m、只开一扇窗）、东侧夯土高墙（≥ 2.8 m、连续 ≥ 10 m），
+//     两墙内皮净距 8–10 m（概念图 13_3 的路宽）；
+// 车列：三四辆停滞的牛马车（布景车）不与 cartRide 全程的整套车（车板 + 牲口）、
+//     撤退通道、卸车走廊、下沟口叠在一起。
+// ---------------------------------------------------------------------------
+{
+  const solid = MISSION_LAYOUT.blocks.filter((block) => block.solid !== false);
+  const Top = (id) => { const b = solid.find((block) => block.id === id); assert.ok(b, id + " exists"); return b.y + b.h / 2; };
+  const W = M.transferEvac.walls;
+  const westLen = W.westTall.reduce((sum, [z0, z1]) => sum + z1 - z0, 0);
+  const eastLen = W.eastTall.reduce((sum, [z0, z1]) => sum + z1 - z0, 0);
+  Check(W.westTall.length === 1 && westLen >= 10, "西高墙是一整段 >= 10 m：" + westLen);
+  Check(W.eastTall.length === 1 && eastLen >= 10, "东高墙是一整段 >= 10 m：" + eastLen);
+  Check(Top("TransferRoadWestWallA") >= 3.5 && Top("TransferRoadWestWallB") >= 3.5, "西高墙顶高 >= 3.5 m（路面 y≈0）");
+  Check(Top("TransferRoadEastWallTallA") >= 2.8 && Top("TransferRoadEastWallTallB") >= 2.6, "东高墙顶高 >= 2.6–2.8 m");
+  const westFace = W.westX + W.thickTallM / 2, eastFace = W.eastX - (W.thickTallM + .05) / 2;
+  Check(eastFace - westFace >= 8 && eastFace - westFace <= 10, "两墙内皮净距 8–10 m：" + (eastFace - westFace).toFixed(2));
+  // 西高墙的窗：窗台之上、窗顶之下是空的（子弹与视线穿得过），窗台不高于 1.2 m（不能当矮墙翻）。
+  const sill = solid.find((block) => block.id === "TransferRoadWestWallSill"), head = solid.find((block) => block.id === "TransferRoadWestWallLintel");
+  Check(sill && head && sill.y + sill.h / 2 <= 1.2 && head.y - head.h / 2 - (sill.y + sill.h / 2) >= 1.0, "西高墙的窗洞净高 >= 1.0 m");
+
+  // 车列布景车的整套（车板 + 牲口）矩形：局部 x ±1.4、z −5.4（牲口鼻尖）…+1.9（车尾），局部 -z 是车头。
+  const Rig = (cart) => {
+    const c = Math.cos(cart.yaw), s = Math.sin(cart.yaw);
+    return [[-1.4, -5.4], [1.4, -5.4], [1.4, 1.9], [-1.4, 1.9]].map(([lx, lz]) => ({
+      x: cart.x + lx * c + lz * s, z: cart.z - lx * s + lz * c }));
+  };
+  const Overlap = (a, b) => {
+    for (const poly of [a, b]) for (let i = 0; i < 4; i++) {
+      const p0 = poly[i], p1 = poly[(i + 1) % 4], nx = p1.z - p0.z, nz = p0.x - p1.x;
+      const range = (q) => { const v = q.map((pt) => pt.x * nx + pt.z * nz); return [Math.min(...v), Math.max(...v)]; };
+      const [a0, a1] = range(a), [b0, b1] = range(b);
+      if (a1 <= b0 + 1e-6 || b1 <= a0 + 1e-6) return false;
+    }
+    return true;
+  };
+  const convoy = M.transferConvoy.carts;
+  const standing = convoy.filter((cart) => !cart.overturned && !cart.standIn);
+  Check(standing.length >= 3 && standing.length <= 5 && convoy.some((cart) => cart.overturned), "停滞车列三四辆 + 一辆侧翻残车：" + standing.length);
+  Check(convoy.every((cart) => ["sacks", "spilled"].includes(cart.cargo) && ["ox", "horse"].includes(cart.draft)), "车板上码着麻袋（残车的撒在地上）、牲口是牛或马");
+  Check(convoy.some((cart) => cart.draft === "ox") && convoy.some((cart) => cart.draft === "horse"), "车列里牛车马车都有");
+  const ride = MISSION_ROUTES.cartRide, hits = [];
+  for (let leg = 1; leg < ride.length; leg++) {
+    const a = ride[leg - 1], b = ride[leg], length = Distance(a, b), yaw = Math.atan2(-(b.x - a.x), -(b.z - a.z));
+    for (let d = 0; d <= length; d += .25) {
+      const at = { x: a.x + (b.x - a.x) * d / length, z: a.z + (b.z - a.z) * d / length, yaw };
+      for (const cart of convoy.filter((entry) => !entry.standIn)) if (Overlap(Rig(at), Rig(cart))) hits.push(cart.id + "@" + leg + ":" + d.toFixed(2));
+    }
+  }
+  assert.deepEqual([...new Set(hits.map((h) => h.split("@")[0]))], [], "cartRide 全程的整套车不与停滞车列叠：" + hits.slice(0, 4));
+  checks += 1;
+  // 撤退通道、卸车走廊（1.3 m 宽）与下沟口：离每辆布景车的整套矩形 >= 0.5 m。
+  const Near = (point, cart) => Rig(cart).some((_, i, poly) => {
+    const p0 = poly[i], p1 = poly[(i + 1) % 4], len2 = (p1.x - p0.x) ** 2 + (p1.z - p0.z) ** 2;
+    const t = Math.max(0, Math.min(1, ((point.x - p0.x) * (p1.x - p0.x) + (point.z - p0.z) * (p1.z - p0.z)) / len2));
+    return Distance(point, { x: p0.x + (p1.x - p0.x) * t, z: p0.z + (p1.z - p0.z) * t }) < 0.5 + .65;
+  }) || (() => { // 点在矩形里面
+    const c = Math.cos(cart.yaw), s = Math.sin(cart.yaw), dx = point.x - cart.x, dz = point.z - cart.z;
+    const lx = dx * c - dz * s, lz = dx * s + dz * c;
+    return Math.abs(lx) <= 1.4 && lz >= -5.4 && lz <= 1.9;
+  })();
+  const E = M.transferEvac, unloadPoint = { x: A.cartHalt.x - M.unloadOffsetM, z: A.cartHalt.z };
+  const bad = [];
+  for (const line of [...E.lanes.map((lane) => [lane.westOnly ? lane.westEntry.via : lane.gate, ...lane.points, E.ditchMouth]), [unloadPoint, E.ditchMouth]])
+    for (let leg = 1; leg < line.length; leg++) {
+      const a = line[leg - 1], b = line[leg], length = Distance(a, b);
+      for (let d = 0; d <= length; d += .25) {
+        const point = { x: a.x + (b.x - a.x) * d / length, z: a.z + (b.z - a.z) * d / length };
+        for (const cart of convoy) if (Near(point, cart)) bad.push(cart.id + "@" + point.x.toFixed(1) + "," + point.z.toFixed(1));
+      }
+    }
+  assert.deepEqual([...new Set(bad)], [], "撤退通道 / 卸车走廊离停滞车列 >= 0.5 m");
+  checks += 1;
+  // 桥面上的两辆整套在甲板（x 72–80、z 137–169）之内。
+  for (const cart of convoy.filter((entry) => entry.onBridge))
+    Check(Rig(cart).every((pt) => pt.x > 72 && pt.x < 80 && pt.z > 137 && pt.z < 169), cart.id + " 整套在桥面上");
 }
 
 // ---------------------------------------------------------------------------

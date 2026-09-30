@@ -234,3 +234,47 @@ node Taierzhuang1938/Script_MotionVectorContractTest.mjs
 ```
 
 取证截图在 `Taierzhuang1938/_shots/L1Mid/`（忽略目录）。
+
+## 6. 2026-09-30 概念图 13 / 12 / 14 场景白盒（12–18 白盒改造 C2 包）
+
+对照概念图 12_2 / 12_4 / 13_1–13_4 / 14_1–14_4（机位表 `Data_FirstLevelWhitebox0518Cameras` 同名条目；引导机位 G13_1 / G13_2 / G13_3 / G14_1 不动）。玩法、事实名与通过条件一个字没改，改的是「夹道的样子」和它牵动的疏散 / 撤退通道。
+
+**夹道高墙**（`Data_FirstLevelWhiteboxTransfer`，墙的位置与缺口在 `MID_TUNING.transferEvac.walls` 的 `westTall` / `eastTall`）
+
+- 西侧（路右，13_3 近处那道）：青砖高墙 3.7 m + 瓦压顶 + 四根壁柱，z 118.5–129.6 连续，只在 z 123.4–124.8 开一扇窗（窗台 1.1、窗顶 2.3，12_2 概念「墙上带窗洞」），墙脚一条 0.75 m 深的路沟（地形表 `RoadSideDitchWest`，底宽 1.6，两端各 1.6 m 进出坡）。
+- 东侧（路左）：夯土高墙 3.05 / 2.75 m，z 125.6–136.4 连续、z 129.2–130.6 一扇窗，顶上是土冠，墙脚两垛标准沙袋（`TransferRoadFootBags0/1`）。
+- 两墙内皮净距 8.3 m（概念 8–10 m）。东墙 z 125.6 以北保持敞开：车位、上车位 (80,120)、cartRide 的第一段与空车驶离的线都在那儿。
+- 12_4：车位一排东边一段带窗洞的无顶残砖墙（`TransferBayRuin*`，x 100.4）；14：沟东沿外 2.4 m 一段带窗山墙（`TransferDitchLipRuin*`）、南边一段高些的山墙（`TransferDitchLipGable*`），沟口南侧砖房朝沟的北墙补两扇窗洞。13_2：河口石栏往西延到 x 55.6，柱顶加瓦帽。
+
+**停滞车列与残车**（`MID_TUNING.transferConvoy`；`column.convoy` 由 `TransferCart.UpdateConvoy` 按步骤开关，`Script_FirstLevelMissionView` 画）
+
+原来 13 空袭时路上一辆车都没有：装好的车 12 里就开过桥走了（3.2 m/s，二十来秒后出画），没装的停在 x 88–94 的车位上。现在多五件布景车（真牛 / 真马与真车模型，车板上码 18 只麻袋 = View 的 `cartSack` 桶；不载人、不参与 12 的装载与 13 的翻车）：
+
+| id | 位置 | 何时在 |
+| --- | --- | --- |
+| ConvoyCartB / C | 桥面上 (74.4,146) / (78,156) | TransferApproach 起；桥被炸（`MissionBridgeDestroyed`）或进 14 就撤 |
+| ConvoyCartE | 停车处 (76,135) | 只在 13 且没有 cartRide 时（阶段跳转进 13 / 出图）替顺子那辆车站着；真流程里 cartRide 到了就撤 |
+| ConvoyWreck | 西墙脚路沟 (73.3,125.8) | 13 起，侧翻残车 + 撒在沟里的 7 只麻袋，留在原地（13_4） |
+| ConvoyCartD | 沟口北侧 (40.5,108.3) | TransferApproach 起，14 起牲口跑了、车留着（14_1） |
+
+路上放不下别的停滞车：西半路是墙脚沟与散开 / 撤退的口子，东半路是 cartRide 的车身（x 75.5–80.5 @ z 118–127），北半路是分拣与后送队的路（MidTest 逐条量车列与 cartRide 整套车 / 撤退通道 / 卸车走廊不叠）。
+
+**疏散遮挡点与撤退通道重排**（`MID_TUNING.transferEvac`、`MidTransferScatterPlan`、`MidTransferRetreatJoin`）
+
+- 遮挡点：西高墙墙脚两处 `WestFootA`（z 120）/ `WestFootB`（z 129.6，人贴墙蹲在路沟里，侧翻残车夹在两处中间）替掉 `WestWallD`；东高墙外的洼地 / 草棚三处改从墙北头 z 122.5 的口子绕过去。其余墙外遮挡点不变。
+- 撤退通道：`Middle`（z 120.8 的口子）的口子落在西高墙里，改成 `westOnly`（只给墙后的人走，从 `westEntry.via` 接）；车路一侧 z < 124.5 的人一律走 `North` 口（`roadUntilZ`）。`MISSION_PURSUIT_ROUTE` 的 z 120.5 横穿段改走墙北头敞口（z 114.8）。
+- 出口只剩：北口 (73.5,111)、南口 (72.8,133.4)（卸车点旁），西墙 z 108.4–118.5 一段 10 m 敞口是分拣台入口。
+
+**约束变更**
+
+| 条 | 原值 → 新值 | 为什么 |
+| --- | --- | --- |
+| `scatterCoverOffRoadM`（散开后离路中线） | 6.5 → 2.5 | 概念 13_3 的人是「贴墙根蹲下」。原来遮挡点都在墙外侧（≥ 6.5 m），两道高墙夹路后要让人留在墙这一侧；西墙根遮挡点离路中线 3.4 m（担架停到 ≤ 0.6 m 内，实测 2.8 m），在牛车车道（车盒半宽 1.5）以外，「让出车道」的原意不变 |
+| 西墙残段 | z 122–125.8、127–130 两段 1.3–2.5 m 残墙 → 一整段 z 118.5–129.6 的 3.7 m 高墙（终点 130 → 129.6：卸车点 (72.6,135) 到沟口斜向走廊 0.8 m 余量要求） | 13_1 / 13_3 的连续高墙 |
+| 东墙 | z 104.2 止 → 另加 z 125.6–136.4 一段 3 m 高墙 | 13_3 左手夯土墙 |
+| 撤退通道 | 三条口（z 111 / 120.8 / 133.4）→ 两条口 + 一条只给墙后的人的 `Middle` | 高墙不留 z 120.8 的口子 |
+| `MISSION_PURSUIT_ROUTE` | z 120.5 横穿西墙 → 墙北头敞口 z 114.8 | 追兵线不穿墙 |
+| MidTest 扫测 | 通道从各自「口子」起扫（`westOnly` 从 `westEntry.via` 起）；`scatterCoverOffRoadM` 阈值随上表；新增夹道高墙 / 停滞车列一节（墙高 / 长度 / 净距 / 窗净高；车列不与 cartRide 整套车、撤退通道、卸车走廊叠） | 断言原意不变（担架走廊、遮挡点到得了、场上任意可站位接得上通道） |
+| 东高墙挡住停车处朝东的视线 | 停车处 (76,135) 看场院东头原来一览无余 → 只剩 z 122.5 北头口子与一扇窗 | G13_3 的「错误方向 ②：朝东不是路」更读得出来；追兵从口子出来才看得见 |
+
+**门禁与取证**：`Script_FirstLevelMidTest` / `Script_FirstLevelWhiteboxTransferTest` / `Script_FirstLevelWhiteboxTerrainTest` / `Script_FirstLevelMissionTest` / `Script_FirstLevelMissionTopologyTest --rear-only` / `Script_FirstLevelSpaceTest`（07+ 指纹红是预期：本包改了 z ≥ 100 的体块与地面，指纹由集成者重生）。整关驾驶 `Script_FirstLevelMissionBrowserTest --campaign --stage-jumps --stage-from=11 --stage-to=14`（`--stage-from=12` 不在 `CAMPAIGN_SEGMENT_STARTS`，从 11 起）在 13 停车后从机位表 13_1–13_4 各拍一张（`Kit.CapturePose`，证据在 `_shots/FirstLevelStageMiddle*/Scene_AirRaidView13_*.png`）；`CarryToDitch` 的路线改走南通道（卸车口 (72.8,133.4) → (64.6,125) → 沟口），老走法 (70,112) 会顶在西高墙上。
