@@ -35,6 +35,21 @@ export const BOOT_PAPERS = Object.freeze([
   Object.freeze({ id: "ChinaWeeklyReview19371106", file: "Texture_BootPaperChinaWeeklyReview19371106.webp" }),
 ]);
 
+/**
+ * 拖拽倾斜的口径。纸只许在一个小范围里转（不是 180° 翻面）：
+ * 偏航（横拖）±40°、俯仰（竖拖）±26°，到头有阻尼；松手后用 CSS 过渡缓缓回正。
+ * degPerPx：每像素鼠标位移转多少度。perspectivePx：透视距离，越小近大远小越明显。
+ */
+export const BOOT_PAPER_TILT = Object.freeze({
+  maxYawDeg: 40,
+  maxPitchDeg: 26,
+  yawDegPerPx: 0.2,
+  pitchDegPerPx: 0.15,
+  edgeSoftness: 0.35,     // 接近上限时的衰减：剩余余量越小，同样的位移转得越少
+  perspectivePx: 1500,
+  returnSeconds: 0.9,
+});
+
 /** 上一次亮的是哪张：存 localStorage，下次开机换一张。 */
 export const BOOT_PAPER_STORAGE_KEY = "tzBootPaperLast";
 
@@ -46,4 +61,22 @@ export function PickBootPaper(lastId = null, rand = Math.random) {
 
 export function BootPaperUrl(paper) {
   return `${BOOT_PAPER_DIR}${paper.file}?v=${BOOT_PAPER_STAMP}`;
+}
+
+/**
+ * 一次拖拽位移加到当前倾角上，返回新倾角（度）。纯函数，测试直接断言上限。
+ * 越接近上限衰减越多（橡皮筋手感），永远不会超过 max。
+ */
+export function ApplyTiltDrag(current, dx, dy, tuning = BOOT_PAPER_TILT) {
+  const step = (value, delta, max) => {
+    if (delta === 0) return value;
+    const toward = Math.sign(delta) === Math.sign(value) || value === 0;
+    const room = toward ? Math.max(0, 1 - Math.abs(value) / max) : 1;
+    const gain = toward ? tuning.edgeSoftness + (1 - tuning.edgeSoftness) * room : 1;
+    return Math.max(-max, Math.min(max, value + delta * gain));
+  };
+  return {
+    yaw: step(current.yaw, dx * tuning.yawDegPerPx, tuning.maxYawDeg),
+    pitch: step(current.pitch, -dy * tuning.pitchDegPerPx, tuning.maxPitchDeg),
+  };
 }

@@ -800,19 +800,27 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 #boot.gone { display: none; }
 /* 报纸图是「纸 + 一圈黑边」的紧裁图，横幅 / 近方 / 竖幅三种宽高比都有：按高度与宽度两头封顶、比例自动保持。
-   lighten 让图边的黑与页面黑融成一片，不留方框边。 */
+   外层 #bootPaperWrap 管位置、拖拽倾斜（变量由 Script_BootPaper 写）和 lighten 混合 —— 图边的黑与页面黑融成一片，
+   不留方框边；混合必须挂在会变换的这一层上，挂在里层 img 上会被外层的变换隔离掉。
+   松手回正是 CSS 过渡（合成线程），主线程被建关卡堵住时也回得动；拖的时候 .dragging 关掉过渡，跟手。 */
+#bootPaperWrap {
+  position: absolute; left: 63vw; top: 46%; width: max-content; height: max-content;
+  transform: translate(-50%, -50%) perspective(var(--bootPaperPerspective, 1500px))
+    rotateX(var(--bootPaperPitch, 0deg)) rotateY(var(--bootPaperYaw, 0deg));
+  transition: transform var(--bootPaperReturn, 0.9s) cubic-bezier(0.2, 0.8, 0.2, 1);
+  mix-blend-mode: lighten; cursor: grab; touch-action: none; user-select: none;
+}
+#bootPaperWrap.dragging { transition: none; cursor: grabbing; }
 #bootPaper {
-  position: absolute; left: 63vw; top: 46%; width: auto; height: auto;
-  max-width: 62vw; max-height: 82vh;
-  transform: translate(-50%, -50%); mix-blend-mode: lighten;
+  display: block; width: auto; height: auto; max-width: 62vw; max-height: 82vh;
   opacity: 0; transition: opacity 1.1s ease; pointer-events: none; user-select: none;
   animation: bootPaperDrift 70s ease-in-out infinite alternate;
 }
 #bootPaper.on { opacity: 1; }
 /* 纸极缓地漂近一点点，像镜头在慢推；只动 transform，不触发布局。 */
 @keyframes bootPaperDrift {
-  from { transform: translate(-50%, -50%) scale(1); }
-  to { transform: translate(-50%, -50%) scale(1.04); }
+  from { transform: scale(1); }
+  to { transform: scale(1.04); }
 }
 @media (prefers-reduced-motion: reduce) { #bootPaper { animation: none; } }
 #bootHead {
@@ -841,7 +849,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 /* 竖屏 / 窄屏：纸放大顶在上半屏，说明压在纸下方，不与纸叠字。 */
 @media (max-aspect-ratio: 1/1) {
-  #bootPaper { left: 50vw; top: 40%; max-width: 96vw; max-height: 58vh; }
+  #bootPaperWrap { left: 50vw; top: 40%; }
+  #bootPaper { max-width: 96vw; max-height: 58vh; }
   #bootCard { max-width: 88vw; bottom: 150px; }
 }
 #bootFoot {

@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { BOOT_PAPERS, BOOT_PAPER_DIR, PickBootPaper } from "./Data_BootPapers.mjs";
+import { ApplyTiltDrag, BOOT_PAPERS, BOOT_PAPER_DIR, BOOT_PAPER_TILT, PickBootPaper } from "./Data_BootPapers.mjs";
 import { TEXTURE_MANIFEST } from "./Data_TextureManifest.mjs";
 import { PaperCard } from "./Script_BootPaper.mjs";
 import { T } from "./Script_Text.mjs";
@@ -70,11 +70,31 @@ Check(seen.size === BOOT_PAPERS.length, "400 次抽签覆盖全部 11 期");
 Check(PickBootPaper(null, () => 0.999999).id === BOOT_PAPERS.at(-1).id, "rand 上界不越界");
 Check(PickBootPaper("不存在的id", () => 0).id === BOOT_PAPERS[0].id, "上次 id 不在清单里照常抽");
 
+console.log("拖拽倾斜");
+{
+  const T0 = { yaw: 0, pitch: 0 };
+  const right = ApplyTiltDrag(T0, 100, 0);
+  Check(right.yaw > 0 && right.pitch === 0, "横向右拖 → 偏航为正、不动俯仰");
+  Check(ApplyTiltDrag(T0, 0, 100).pitch < 0 && ApplyTiltDrag(T0, 0, -100).pitch > 0, "竖拖 → 俯仰方向与拖动相反（拖下去上边抬起）");
+  let tilt = T0;
+  for (let i = 0; i < 2000; i++) tilt = ApplyTiltDrag(tilt, 40, 40);
+  Check(Math.abs(tilt.yaw) <= BOOT_PAPER_TILT.maxYawDeg + 1e-9 && Math.abs(tilt.pitch) <= BOOT_PAPER_TILT.maxPitchDeg + 1e-9,
+    "一直往一个方向拖也不超过上限（不会转到 180°）", JSON.stringify(tilt));
+  tilt = T0;
+  for (let i = 0; i < 2000; i++) tilt = ApplyTiltDrag(tilt, -40, -40);
+  Check(tilt.yaw >= -BOOT_PAPER_TILT.maxYawDeg - 1e-9 && tilt.pitch <= BOOT_PAPER_TILT.maxPitchDeg + 1e-9, "反方向同样封顶");
+  Check(BOOT_PAPER_TILT.maxYawDeg < 90 && BOOT_PAPER_TILT.maxPitchDeg < 90, "上限都远小于 90°");
+  const near = ApplyTiltDrag({ yaw: 38, pitch: 0 }, 10, 0).yaw - 38;
+  const far = ApplyTiltDrag({ yaw: 0, pitch: 0 }, 10, 0).yaw;
+  Check(near < far, "接近上限时同样位移转得更少（橡皮筋）");
+  Check(ApplyTiltDrag({ yaw: 30, pitch: 0 }, -10, 0).yaw < 30 - 10 * BOOT_PAPER_TILT.yawDegPerPx * 0.99, "往回拖不衰减");
+}
+
 console.log("页面接线");
 const html = fs.readFileSync(path.join(here, "index.html"), "utf8");
 Check(/"\.\/Script_BootPaper\.mjs": "\.\/Script_BootPaper\.mjs\?v=\d+"/.test(html), "import map 登记 Script_BootPaper");
 Check(/"\.\/Data_BootPapers\.mjs": "\.\/Data_BootPapers\.mjs\?v=\d+"/.test(html), "import map 登记 Data_BootPapers");
-for (const id of ["bootPaper", "bootPaperName", "bootPaperNote", "bootStart", "bootStep", "bootBar"]) {
+for (const id of ["bootPaperWrap", "bootPaper", "bootPaperName", "bootPaperNote", "bootStart", "bootStep", "bootBar"]) {
   Check(new RegExp(`id="${id}"`).test(html), `#${id} 在 DOM 里`);
 }
 Check(!/id="bootProp/.test(html), "旧道具展示台的 #bootProp 已摘掉");

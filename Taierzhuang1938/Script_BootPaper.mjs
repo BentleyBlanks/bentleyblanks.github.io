@@ -9,9 +9,11 @@
 // 什么都不争，只在开机时按需拉一张（其余十九张一个字节都不下）。
 //
 // 每次开机随机换一张，不与上一次重复（localStorage，读写都包 try：隐私模式会抛，抛了就当没有上一次）。
+// **可以拖着倾斜**：按住鼠标 / 手指拖，纸在小范围里转（偏航 ±40°、俯仰 ±26°，不是翻面），松手缓缓回正。
+// 转动写在外层 #bootPaperWrap 的 CSS 变量上，回正是 CSS 过渡（合成线程跑，主线程建关卡堵住时照样回得动）。
 // 图没拉下来不影响文字：简述本身就是完整的一句话，图只是氛围。
 
-import { BOOT_PAPER_STORAGE_KEY, BootPaperUrl, PickBootPaper } from "./Data_BootPapers.mjs";
+import { ApplyTiltDrag, BOOT_PAPER_STORAGE_KEY, BOOT_PAPER_TILT, BootPaperUrl, PickBootPaper } from "./Data_BootPapers.mjs";
 import { T } from "./Script_Text.mjs";
 
 const Key = (paper, field) => `boot.paper.${paper.id}.${field}`;
@@ -48,6 +50,48 @@ export class BootPaper {
     this.current = null;
     this.shown = false;
     this.token = 0;
+    this.wrap = els.wrap ?? els.img.parentElement;
+    this.tilt = { yaw: 0, pitch: 0 };
+    this.pointerId = null;
+    this.lastX = 0;
+    this.lastY = 0;
+    if (this.wrap) this.BindDrag(this.wrap);
+  }
+
+  BindDrag(wrap) {
+    wrap.style.setProperty("--bootPaperPerspective", `${BOOT_PAPER_TILT.perspectivePx}px`);
+    wrap.style.setProperty("--bootPaperReturn", `${BOOT_PAPER_TILT.returnSeconds}s`);
+    wrap.addEventListener("pointerdown", (event) => {
+      if (this.pointerId !== null || !this.shown) return;
+      this.pointerId = event.pointerId;
+      this.lastX = event.clientX;
+      this.lastY = event.clientY;
+      wrap.classList.add("dragging");
+      // 抓不到指针（指针已被别处接走 / 合成事件）不算错：少了捕获只是拖出纸外时收不到 move。
+      try { wrap.setPointerCapture?.(event.pointerId); } catch { /* ignore */ }
+    });
+    wrap.addEventListener("pointermove", (event) => {
+      if (event.pointerId !== this.pointerId) return;
+      this.tilt = ApplyTiltDrag(this.tilt, event.clientX - this.lastX, event.clientY - this.lastY);
+      this.lastX = event.clientX;
+      this.lastY = event.clientY;
+      this.ApplyTilt();
+    });
+    const release = (event) => {
+      if (event.pointerId !== this.pointerId) return;
+      this.pointerId = null;
+      try { wrap.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
+      wrap.classList.remove("dragging");
+      this.tilt = { yaw: 0, pitch: 0 };      // 回正交给 CSS 过渡
+      this.ApplyTilt();
+    };
+    wrap.addEventListener("pointerup", release);
+    wrap.addEventListener("pointercancel", release);
+  }
+
+  ApplyTilt() {
+    this.wrap.style.setProperty("--bootPaperYaw", `${this.tilt.yaw.toFixed(2)}deg`);
+    this.wrap.style.setProperty("--bootPaperPitch", `${this.tilt.pitch.toFixed(2)}deg`);
   }
 
   /** 露面：换一张、写字、淡入。已经亮着就不再换（同一次加载里纸不许来回变）。 */
@@ -71,6 +115,9 @@ export class BootPaper {
 
   Hide() {
     this.shown = false;
+    if (this.pointerId !== null) { this.pointerId = null; this.wrap?.classList.remove("dragging"); }
+    this.tilt = { yaw: 0, pitch: 0 };
+    if (this.wrap) this.ApplyTilt();
     this.token++;
     this.img.classList.remove("on");
   }
