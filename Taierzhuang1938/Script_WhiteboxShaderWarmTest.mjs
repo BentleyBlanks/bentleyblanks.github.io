@@ -31,17 +31,11 @@ const rootDir = path.resolve(projectDir, "..");
 const PLAY_FRAMES = 300;
 const MIN_USED_SHARE = 0.5;
 /**
- * 进城后现编、但这条测试落地时 master 上就已经有的两份（2026-10-01 白盒档实测，修前修后都在）。
- * 都是开场开演后才临时造的东西，预热时场上还没有：
- *   - openingFill：顺子坐着压弹那一拍的弹夹 / 背带等道具（Script_OpeningFirstPerson 的 OpeningFirstPerson_*，
- *     双面无名 MeshStandardMaterial），第 16 帧；
- *   - faceBlood：SB03–SB04A 被俘战友脸上的血（Script_CharacterFaceBlood，`face-blood-1` 补丁变体），第 22 帧。
- * 修好一项就从这里删掉一项；**别往这里加新的** —— 新的现编就是预热漏了。
+ * 进城后允许现编的已知项（`{ id, keyPart }` 按缓存键片段认、`{ id, userPrefix }` 按挂载物体名前缀认）。
+ * 这条测试落地时有两份（开场压弹道具 OpeningFirstPerson_*、被俘战友的 `face-blood-1`），2026-10-01 改由
+ * FirstLevelBunkerShow.WarmProxy 在关卡预热里编掉，清单已清空。**别往这里加新的** —— 新的现编就是预热漏了。
  */
-const KNOWN_LATE = [
-  { id: "openingFill", userPrefix: "OpeningFirstPerson_" },
-  { id: "faceBlood", keyPart: "face-blood-1" },
-];
+const KNOWN_LATE = [];
 
 const server = await ServeRoot(rootDir, 0);
 const browser = await LaunchBrowser();

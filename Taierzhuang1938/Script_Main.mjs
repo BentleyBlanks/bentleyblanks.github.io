@@ -3439,7 +3439,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   await yieldFrame();
   // 炮坑材质在这里就编译：第一颗手榴弹落地那一帧才建 program 会冻 400 ms。
   new TerrainDeformationView(battlefield, scene, library).Warm(renderer, camera,
-    (group) => CompileAsRendered(group, "弹坑着色器预编译"));
+    (group) => CompileAsRendered(group, "craters"));
   // 炸断的树（焦黑树桩 / 倒下的树冠）同理，第一次炸树不现编。
   battlefield.breakableTrees?.Warm();
   BuildPhysics();
@@ -4398,7 +4398,7 @@ function EndOfficialCampaign(phase) {
  *      缓存时主线程卡 22.5 s（docs/Data_TechRenderPipeline.md §18.7）。
  * @returns {boolean} 提交成功（失败时调用方退回「用到时现编」）
  */
-function CompileAsRendered(root, label = "着色器提交编译") {
+function CompileAsRendered(root, label = "submit") {
   const restoreTarget = renderer.getRenderTarget();
   if (post?.targets?.hdr) renderer.setRenderTarget(post.targets.hdr);
   let restoreWhitebox = null;
@@ -4407,7 +4407,7 @@ function CompileAsRendered(root, label = "着色器提交编译") {
     renderer.compile(root, camera, scene);
     return true;
   } catch (error) {
-    console.warn(`[Main] ${label}失败（退回用到时现编）`, error);
+    console.warn(`[Main] 着色器提交编译失败（${label}，退回用到时现编）`, error);
     return false;
   } finally {
     restoreWhitebox?.();
@@ -4533,7 +4533,7 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
       // 代理组只借 children 走一趟 traverse，**不进场景树**，也不动这些网格的
       // parent —— compile 只读不写，这一层是安全的。
       proxy.children = submitList.slice(i, i + SUBMIT);
-      if (!CompileAsRendered(proxy, "着色器提交编译")) break;
+      if (!CompileAsRendered(proxy)) break;
       const submitted = Math.min(submitList.length, i + SUBMIT);
       onStep?.(T("boot.step.submitShaders", { done: submitted, total: submitList.length }),
         BootProgress(BOOT.warm.submitShaders, (submitted / submitList.length) * 0.5));
@@ -4814,7 +4814,7 @@ async function WarmLevel(phase) {
   // 链接交给 KHR_parallel_shader_compile 的线程，主线程逐帧问
   // isReady()，就绪后再真画一帧。直接 compile 完就画 = 逐个 program 阻塞等链接：实测 3A 管线
   // 上 41 份人物材质的刚体代理这么等了 27 s。
-  const SubmitCompile = (root, label) => CompileAsRendered(root, `关卡预热：${label}`);
+  const SubmitCompile = (root, label) => CompileAsRendered(root, `warmLevel:${label}`);
   const WaitProgramsReady = async (limitMs) => {
     const start = performance.now();
     for (;;) {
@@ -4879,6 +4879,14 @@ async function WarmLevel(phase) {
     // 01 起的轮番轰炸（Script_FirstLevelAirRaid）与 03 横飞进视野那一帧才现编它们的材质。
     const aircraftProxy = aircraft?.WarmProxy?.() || null;
     if (aircraftProxy) proxy.add(aircraftProxy);
+    // 01–02 开场导演进城后才造的东西（FirstLevelBunkerShow.WarmProxy）：第一人称压弹 / 背包 / 肩带道具
+    // （挂玩家身体下，白盒档保留原材质）与被俘战友脸上的血（face-blood 补丁变体）。导演的 Setup
+    // 要等玩家点「进城」才跑，没有这一件的话白盒档开场第 16 / 22 帧各现编一个（§18.7）。
+    const openingShow = missionRuntime?.frontShow?.bunker || null;
+    let openingProxy = null;
+    try { openingProxy = openingShow?.WarmProxy?.() || null; }
+    catch (error) { console.warn("[Main] 关卡预热：开场代理建失败（退回用到时现编）", error); }
+    if (openingProxy) proxy.add(openingProxy);
     // 阴影趟静态投影体合批的批次版深度程序（共用批次深度 + BuildSink 破口裁切那只的克隆）：
     // 只有真跑阴影趟才编，不预热的话开局半秒收满成员那一帧现编。
     const casterBatchProxy = shadowCasterBatch.WarmProxy([library.StaticDepth()].filter(Boolean));
@@ -5063,6 +5071,7 @@ async function WarmLevel(phase) {
     } finally {
       scene.remove(proxy);
       if (shellProxy) combat.shellVisuals.DisposeWarmProxy(shellProxy);
+      if (openingProxy) openingShow.DisposeWarmProxy(openingProxy);
       shadowCasterBatch.DisposeWarmProxy(casterBatchProxy);
     }
   } finally {

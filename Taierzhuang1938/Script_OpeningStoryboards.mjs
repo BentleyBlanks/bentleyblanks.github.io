@@ -7,11 +7,12 @@ import { LoadOpeningStoryboardAnimation, InstallOpeningStoryboardAnimation, SetO
   UpdateOpeningStoryboardCorpse, OpeningStage, OpeningClipMeta, OpeningClipRoot, OpeningPlayerPoint, OpeningPropConfig,
   OwnOpeningProp, DropOpeningWeapon, IsOpeningTerminalClip } from "./Script_OpeningStoryboardAnimation.mjs";
 import { OpeningPropSet, OpeningHoldTime } from "./Script_OpeningProps.mjs";
-import { OpeningFirstPerson, TrimOpeningPlayerBody } from "./Script_OpeningFirstPerson.mjs";
+import { OpeningFirstPerson, TrimOpeningPlayerBody, BuildOpeningFirstPersonWarmProps } from "./Script_OpeningFirstPerson.mjs";
 import { GearCamera, GearPoint, GearData, GearArrivalS } from "./Script_OpeningFirstPersonGear.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { CharacterFacial } from "./Script_CharacterFacialAnimation.mjs";
+import { PrepareFaceBloodVariants } from "./Script_CharacterFaceBlood.mjs";
 import { CharacterWounds } from "./Script_CharacterWounds.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MissionRouteProjection, MissionRoutePoint, MissionRouteLength, MissionRouteBetween } from "./Script_FirstLevelMissionColumn.mjs";
@@ -144,6 +145,28 @@ function GraspArm(bones,side,shoulder,target){
   };
   Aim(upper,lower,elbow);Aim(lower,hand,shoulder.clone().addScaledVector(dir,distance));
   hand.quaternion.copy(hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(handQ));hand.updateMatrixWorld(true);
+}
+
+/**
+ * The director's supply props: two procedural chargers (the first-person fill clip and its rounds are clones of the first)
+ * and the loading rifle; made materials and geometries go to `owned` / `ownedGeometry` (the rifle's are the factory's).
+ */
+function BuildSupplyProps(r,owned,ownedGeometry){
+  const supplyRoot=new THREE.Group();
+  const brass=new THREE.MeshStandardMaterial({color:0x887039,metalness:.65,roughness:.58}),steel=new THREE.MeshStandardMaterial({color:0x343533,metalness:.7,roughness:.5});
+  owned.push(brass,steel);
+  const Clip=()=>{
+    const clip=new THREE.Group();supplyRoot.add(clip);
+    const frame=new THREE.Mesh(new THREE.BoxGeometry(.061,.005,.009),steel);clip.add(frame);frame.position.y=-.025;ownedGeometry.push(frame.geometry);
+    for(let i=0;i<5;i++){const round=new THREE.Mesh(new THREE.CylinderGeometry(.003,.004,.053,8),brass);round.position.x=(i-2)*.011;clip.add(round);ownedGeometry.push(round.geometry);}
+    return clip;
+  };
+  const clips=[Clip(),Clip()];
+  const loadingRifle=new THREE.Group(),built=r.actorFactory.WeaponGeometry("HanYang",0,{includeBayonet:false});
+  const materials=r.actorFactory.ActorMaterials("nra",()=>.5);
+  for(const [key,geometry] of built.geometries)loadingRifle.add(new THREE.Mesh(geometry,materials[key]||materials.steel));
+  supplyRoot.add(loadingRifle);
+  return {supplyRoot,clips,loadingRifle,loadingRifleGrip:built.gripFront.clone(),loadingRifleMuzzle:built.muzzle?.clone()||new THREE.Vector3(0,0,-1)};
 }
 
 export class FirstLevelBunkerShow {
@@ -298,19 +321,40 @@ export class FirstLevelBunkerShow {
   Stage(phase){this.Set(phase);this.phaseEntered=null;}
   // ---- props ------------------------------------------------------------------------------
   MakeSupplyProps(){
-    this.supplyRoot=new THREE.Group();this.r.scene.add(this.supplyRoot);
-    const brass=new THREE.MeshStandardMaterial({color:0x887039,metalness:.65,roughness:.58}),steel=new THREE.MeshStandardMaterial({color:0x343533,metalness:.7,roughness:.5});
-    this.owned.push(brass,steel);this.clips=[];
-    for(let n=0;n<2;n++){
-      const clip=new THREE.Group();this.supplyRoot.add(clip);this.clips.push(clip);
-      const frame=new THREE.Mesh(new THREE.BoxGeometry(.061,.005,.009),steel);clip.add(frame);frame.position.y=-.025;this.ownedGeometry.push(frame.geometry);
-      for(let i=0;i<5;i++){const round=new THREE.Mesh(new THREE.CylinderGeometry(.003,.004,.053,8),brass);round.position.x=(i-2)*.011;clip.add(round);this.ownedGeometry.push(round.geometry);}
-    }
-    this.loadingRifle=new THREE.Group();const built=this.r.actorFactory.WeaponGeometry("HanYang",0,{includeBayonet:false});
-    this.loadingRifleGrip=built.gripFront.clone();this.loadingRifleMuzzle=built.muzzle?.clone()||new THREE.Vector3(0,0,-1);
-    const materials=this.r.actorFactory.ActorMaterials("nra",()=>.5);
-    for(const [key,geometry] of built.geometries)this.loadingRifle.add(new THREE.Mesh(geometry,materials[key]||materials.steel));
-    this.supplyRoot.add(this.loadingRifle);
+    const supply=BuildSupplyProps(this.r,this.owned,this.ownedGeometry);
+    this.supplyRoot=supply.supplyRoot;this.r.scene.add(this.supplyRoot);
+    this.clips=supply.clips;this.loadingRifle=supply.loadingRifle;this.loadingRifleGrip=supply.loadingRifleGrip;this.loadingRifleMuzzle=supply.loadingRifleMuzzle;
+  }
+  // ---- loading-screen warm-up ---------------------------------------------------------------
+  /**
+   * Stand-ins for what Setup makes only once the player is in, for Script_Main.WarmLevel's proxy pass (submitted through
+   * CompileAsRendered, then drawn; docs/Data_TechRenderPipeline.md §18.7): every first-person prop (FP_PROPS) made by the same
+   * code on a supply set of its own, under a character root as on the player body (the whitebox profile keeps their own
+   * materials), and the comrade's facial skin with the face-blood variant swapped in. Before this the fill charger and the
+   * face blood linked their programs in the opening's first second (frames 16 and 22 after 进城, Script_WhiteboxShaderWarmTest),
+   * the gear-up's canvas straps when they first showed. Their materials are never disposed:
+   * the programs Setup's own copies need stay cached through them. Undo with DisposeWarmProxy.
+   */
+  WarmProxy(){
+    const r=this.r,group=new THREE.Group();group.name="ShaderWarm_Opening";
+    const props=new THREE.Group();props.name="ShaderWarm_OpeningFirstPerson";props.userData.whiteboxCharacter=true;group.add(props);
+    const show={r,owned:[],ownedGeometry:[]};
+    BuildOpeningFirstPersonWarmProps(Object.assign(show,BuildSupplyProps(r,show.owned,show.ownedGeometry)),props);
+    const warm={geometries:show.ownedGeometry,comrade:null,restoreBlood:null};
+    // ComradeBleeds' SetFaceBlood, on the comrade's own skin (the spawn options of Setup's Spawn("comrade")).
+    try{
+      warm.comrade=r.actorFactory.Create("nra",{seed:90917,...SpeakingCastOptions("comrade"),weapon:null,noPool:true});
+      warm.restoreBlood=PrepareFaceBloodVariants(warm.comrade?.characterRig?.root);
+      if(warm.comrade)group.add(warm.comrade.root);
+    }catch(error){console.warn("[OpeningStoryboards] warm-up comrade unavailable (his face blood links when it first shows)",error);}
+    group.userData.openingWarm=warm;
+    return group;
+  }
+  DisposeWarmProxy(group){
+    const warm=group?.userData.openingWarm;if(!warm)return;
+    group.removeFromParent();warm.restoreBlood?.();warm.comrade?.Dispose();
+    for(const geometry of warm.geometries)geometry.dispose();
+    group.clear();delete group.userData.openingWarm;
   }
   /**
    * Furrows in the mud (drag marks behind the knees, claw marks under the fingers): thin ribbons that

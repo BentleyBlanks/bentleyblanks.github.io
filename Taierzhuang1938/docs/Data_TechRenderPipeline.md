@@ -5960,8 +5960,24 @@ program 数不涨、爆炸帧 < 1000 ms）。去掉修复同一条测试爆炸�
 
 **门禁**：`Script_WhiteboxShaderWarmTest`（`?whitebox=p012&quality=whitebox`）—— 预热期间主场景那一趟现建
 program = 0（修前 64）；提交编译建的 program 至少一半在开机结束前被用上（修前 0/135，修后 64/67）；
-进城后 300 帧不新编。后一条有两份**修前就有**的已知现编列在测试的 `KNOWN_LATE` 里（开场压弹道具
-`OpeningFirstPerson_*`、被俘战友的 `face-blood-1`），都是开演后才造出来的东西，修好一项删一项。
+进城后 300 帧不新编。测试的 `KNOWN_LATE`（允许现编的已知项）是空的，**别往里加** —— 新的现编就是预热漏了。
+
+**开场导演进城后才造的东西（同日第二轮）**：这条门落地时还剩两份修前就有的现编 —— 第 16 帧顺子坐着压弹
+那只桥夹（`OpeningFirstPerson_fillCharger`：导演补给桥夹的克隆，挂在玩家身体下，白盒按人物保留原材质，
+场景里同一材质却被换成白盒材质，所以从没编过）、第 22 帧被俘战友的脸血（NRA02 皮肤 `Material #9` 加
+`face-blood-1` 补丁）；把全部第一人称道具摆出来还会多一份（背包肩带：顶点色 + 双面）。三样都是
+`FirstLevelBunkerShow.Setup` 造的，而 Setup 要等玩家点「进城」才跑。修法是导演自带预热代理：
+
+- `FirstLevelBunkerShow.WarmProxy()`：用同一套建造代码（`BuildSupplyProps` + `BuildOpeningFirstPersonWarmProps`
+  逐个 `MakeProp`）在一个 `whiteboxCharacter` 根下摆出全部 `FP_PROPS`，再按 `SpeakingCastOptions("comrade")`
+  造一具战友（脸皮），`PrepareFaceBloodVariants` 换上零量脸血变体；`WarmLevel` 第三段把它并进代理组，
+  走 `CompileAsRendered` 提交、等链接、真画，收尾 `DisposeWarmProxy` 只拆几何与人。
+- **代理的材质不释放**：three 的 program 按引用计数，材质 dispose 到零就连源码缓存一起删，Setup 自己那份
+  就又得现编。道具材质干脆不 dispose；脸血变体照 `PrepareWoundVariants` 挂在源材质上（WeakMap，源材质
+  dispose 时才跟着走）。脸血补丁的 GLSL 不带任何逐张脸的数（脸框是 uniform），所以哪一具编的都是同一份。
+
+实测（同机白盒档）：开机 link 69 → 72，进城后 300 帧 program 69 → 69；用 `Debug.OpeningFirstPerson.Pose`
+点名全部 `FP_PROPS`（摆出可见的 9 件：两只桥夹、两支枪、木箱、背包、三条带子）再推 60 帧仍 0 现编（改前同一探针 3 个）。
 
 **规矩**：往开机链里加预热、或改 `Begin` 的替换规则时，跑这条门；量开机耗时要连白盒档一起量
 （出厂默认就是它），只量 `quality=high` 会漏。

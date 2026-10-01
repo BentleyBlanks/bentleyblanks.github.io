@@ -450,12 +450,29 @@ function DragPartner(show){return (show.Ija?.("ijaA")||show.Executioner?.(0))?.a
 function PartnerSoldier(show,who){
   return show.SpeakerActor?.(who)||show.Ija?.(who)||show.Squad?.(who)||show.cast?.[who]||null;
 }
+/**
+ * Every FP_PROPS prop made once by MakeProp and shown under `root`: the loading-screen warm-up's stand-ins
+ * (FirstLevelBunkerShow.WarmProxy). The real ones are made after the player is in (Setup, then the beat that first names
+ * them), so their programs used to link in the opening's first second. `show` needs only what MakeProp reads: r, clips,
+ * loadingRifle, owned, ownedGeometry (the made materials and geometries go to those two lists).
+ */
+export function BuildOpeningFirstPersonWarmProps(show,root){
+  const builder=new OpeningFirstPerson(show,{bench:false});
+  for(const [name,spec] of Object.entries(FP_PROPS)){
+    if(spec.kind==="track")continue;
+    const prop=builder.MakeProp(name,spec,root);
+    if(prop?.object)prop.object.visible=true;
+  }
+  return root;
+}
+
 export class OpeningFirstPerson{
-  constructor(show){this.show=show;this.rig=Anatomy(show.playerBody);this.phase=null;this.lastTargets={};this.lastFrames={};this.lastPartners={};this.partnerReleases={};this.report={};this.previousFrameFrames={};this.previousFramePartners={};
+  /** bench: false keeps Debug.OpeningFirstPerson on the director's instance (the warm-up's builder is not it). */
+  constructor(show,{bench=true}={}){this.show=show;this.rig=Anatomy(show.playerBody);this.phase=null;this.lastTargets={};this.lastFrames={};this.lastPartners={};this.partnerReleases={};this.report={};this.previousFrameFrames={};this.previousFramePartners={};
     this.lastShoulders={};this.slip={};this.slipPose={};this.gripHeld={};this.warned=new Set();this.props={};this.owned=[];this.override=null;this.legName=null;this.legShown=null;
     // Test bench (storyboard round): Debug.OpeningFirstPerson.Pose({left,right,legs,props,partner}).
     const debug=globalThis.Tengxian?.Debug;
-    if(debug)debug.OpeningFirstPerson={Pose:spec=>this.Pose(spec),Clear:()=>this.Pose(null),State:()=>this.report,
+    if(bench&&debug)debug.OpeningFirstPerson={Pose:spec=>this.Pose(spec),Clear:()=>this.Pose(null),State:()=>this.report,
       Poses:()=>Object.keys(POSES),Legs:()=>Object.keys(LEG_POSES),Props:()=>Object.keys(FP_PROPS)};
   }
   /**

@@ -133,6 +133,61 @@ function WithoutFaceBlood(material) {
   return (PatchesOf(material) || []).filter(patch => patch.key !== FACE_BLOOD_PATCH_KEY);
 }
 
+/**
+ * The face skin surfaces under a root, each with its face frame. Only the surface that holds
+ * the lips: the nearest one to Face_LipUpper (a cap brim or a collar can reach into the face
+ * oval, but never onto the lip). Empty on a skin without the Face_* bones.
+ */
+function FaceSkins(root) {
+  const candidates = [];
+  root?.traverse(mesh => {
+    if (!mesh.isSkinnedMesh || Array.isArray(mesh.material)) return;
+    const name = mesh.material?.name || '';
+    if (name === 'Material_FacialOral' || /eye/i.test(name)) return;
+    const frame = FaceBloodFrame(mesh);
+    if (!frame || FaceBloodRegionCount(mesh, frame) < C.minFaceVertices) return;
+    candidates.push({ mesh, frame, lip: FaceBloodLipDistance(mesh, frame) });
+  });
+  const nearest = Math.min(...candidates.map(c => c.lip));
+  return candidates.filter(c => c.lip <= C.skinLipReach && c.lip <= nearest + 1e-6);
+}
+
+/** A private clone of a face skin's material with the face-blood patch on top. */
+function FaceBloodMaterial(original, frame, amountUniform) {
+  const material = CloneShadedMaterial(original);
+  ApplyPatches(material, [...WithoutFaceBlood(material), FaceBloodPatch({
+    uFaceBloodAmount: amountUniform,
+    uFaceBloodOrigin: { value: frame.origin }, uFaceBloodBasis: { value: frame.basis },
+    uFaceBloodFresh: { value: new THREE.Color(C.fresh) }, uFaceBloodDry: { value: new THREE.Color(C.dry) },
+  })]);
+  return material;
+}
+
+const warmMaterials = new WeakMap();
+/**
+ * Loading-screen warm-up (FirstLevelBunkerShow.WarmProxy): swap every face skin under `root`
+ * to a zero-amount face-blood clone of its material and return the restore. The patch's GLSL
+ * takes nothing per face (the frame is uniforms), so a later SetFaceBlood on any wearer of
+ * that material links the same program. The clone lives as long as its source material (as
+ * Script_CharacterWounds.PrepareWoundVariants does): disposing it would drop the program
+ * again with the warm-up's stand-in actor.
+ */
+export function PrepareFaceBloodVariants(root) {
+  const swapped = [];
+  for (const { mesh, frame } of FaceSkins(root)) {
+    const original = mesh.material;
+    let material = warmMaterials.get(original);
+    if (!material) {
+      material = FaceBloodMaterial(original, frame, { value: 0 });
+      warmMaterials.set(original, material);
+      original.addEventListener('dispose', () => { material.dispose(); warmMaterials.delete(original); });
+    }
+    mesh.material = material;
+    swapped.push([mesh, original]);
+  }
+  return () => { for (const [mesh, original] of swapped) mesh.material = original; };
+}
+
 export class CharacterFaceBlood {
   constructor(root) {
     this.root = root; this.amount = 0; this.records = []; this.installed = false;
@@ -143,27 +198,8 @@ export class CharacterFaceBlood {
   Prepare() {
     if (this.installed) return this.records.length > 0;
     this.installed = true;
-    const candidates = [];
-    this.root?.traverse(mesh => {
-      if (!mesh.isSkinnedMesh || Array.isArray(mesh.material)) return;
-      const name = mesh.material?.name || '';
-      if (name === 'Material_FacialOral' || /eye/i.test(name)) return;
-      const frame = FaceBloodFrame(mesh);
-      if (!frame || FaceBloodRegionCount(mesh, frame) < C.minFaceVertices) return;
-      candidates.push({ mesh, frame, lip: FaceBloodLipDistance(mesh, frame) });
-    });
-    // The face skin is the surface the lips are part of: the nearest one to Face_LipUpper
-    // (a cap brim or a collar can reach into the face oval, but never onto the lip).
-    const nearest = Math.min(...candidates.map(c => c.lip));
-    const skins = candidates.filter(c => c.lip <= C.skinLipReach && c.lip <= nearest + 1e-6);
-    for (const { mesh, frame } of skins) {
-      const uniforms = {
-        uFaceBloodAmount: this.amountUniform,
-        uFaceBloodOrigin: { value: frame.origin }, uFaceBloodBasis: { value: frame.basis },
-        uFaceBloodFresh: { value: new THREE.Color(C.fresh) }, uFaceBloodDry: { value: new THREE.Color(C.dry) },
-      };
-      const original = mesh.material, material = CloneShadedMaterial(original);
-      ApplyPatches(material, [...WithoutFaceBlood(material), FaceBloodPatch(uniforms)]);
+    for (const { mesh, frame } of FaceSkins(this.root)) {
+      const original = mesh.material, material = FaceBloodMaterial(original, frame, this.amountUniform);
       mesh.material = material;
       this.records.push({ mesh, original, material, frame });
     }
