@@ -188,7 +188,16 @@ export class WhiteboxSceneRenderer {
     return material;
   }
 
-  Begin(scene, camera) {
+  /**
+   * 出画前把场景换成白盒的样子，返回还原函数。
+   *
+   * `compileRoots`：给 `renderer.compile` 用。compile 编的是 `object.material`、灯按可见收集，
+   * 不在这一层里提交的话，编出来的是「关卡灯光 + 原材质」那一份，白盒出画根本用不上
+   * （2026-10-01 第一关白盒档实测：提交的 135 个 program 一个都没用上，真用的 64 个全在出画时
+   * 同步链接，关掉 program 缓存时主线程卡 22.5 s）。compile 不看可见性，所以这几棵子树里
+   * 当前藏着的网格也按同一套规则换掉；统计不记这一趟。
+   */
+  Begin(scene, camera, { compileRoots = null } = {}) {
     const c = this.config, restore = [], stats = { meshes: 0, whiteMeshes: 0, terrainMeshes: 0, characterMeshes: 0, hiddenEffects: 0, cutoutMeshes: 0, waterMeshes: 0 };
     const Set = (object, key, value) => { restore.push([object, key, object[key]]); object[key] = value; };
     const sceneLighting = c.sceneLighting || c.shadows || c.firstPersonShadow || c.contactShadows || c.gi || c.clusteredLights;
@@ -197,13 +206,21 @@ export class WhiteboxSceneRenderer {
     if (!c.fog) Set(scene, "fog", null);
     Set(scene.userData, "whiteboxEffects", c.effects);
     if (this.sky && !c.sky) Set(this.sky, "visible", false);
-    scene.traverseVisible((object) => {
+    const visited = compileRoots ? new WeakSet() : null;
+    // 白盒出画时藏掉的特效。compile 不看 visible，只能把材质摘掉它才跳过（粒子那一族
+    // 二十来个 program，白盒档一个都画不到）。
+    const HideEffect = (object) => {
+      Set(object, "visible", false); stats.hiddenEffects++;
+      if (compileRoots) Set(object, "material", null);
+    };
+    const Visit = (object) => {
+      visited?.add(object);
       // Three selects LOD children during render. Select them before material
       // substitution too, so a newly visible distance bucket cannot escape it.
       if (object.isLOD && object.autoUpdate && camera) object.update(camera);
       if (object.isLight && object !== this.ambient && object !== this.sun && !sceneLighting) Set(object, "visible", false);
       if (!c.effects && (object.isPoints || object.isSprite || object.userData?.whiteboxEffect)) {
-        Set(object, "visible", false); stats.hiddenEffects++; return;
+        HideEffect(object); return;
       }
       if (!object.isMesh || object === this.sky || !object.material) return;
       const sources = Array.isArray(object.material) ? object.material : [object.material];
@@ -212,7 +229,7 @@ export class WhiteboxSceneRenderer {
       if (!c.effects && sources.every((m) => m.transparent && !m.depthWrite
         && (m.isShaderMaterial || !m.depthTest || m.blending === THREE.AdditiveBlending))
         && !/water/i.test(object.name)) {
-        Set(object, "visible", false); stats.hiddenEffects++; return;
+        HideEffect(object); return;
       }
       const terrain = IsWhiteboxTerrain(object);
       const character = IsWhiteboxCharacter(object);
@@ -226,10 +243,14 @@ export class WhiteboxSceneRenderer {
       Set(object, "material", Array.isArray(object.material) ? sources.map((m) => this.Material(m, { water })) : this.Material(object.material, { water }));
       if (object.instanceColor) Set(object, "instanceColor", null);
       stats.whiteMeshes++;
-    });
+    };
+    scene.traverseVisible(Visit);
+    if (compileRoots) {
+      for (const root of compileRoots) root?.traverse((object) => { if (!visited.has(object)) Visit(object); });
+    }
     Set(this.ambient, "visible", !sceneLighting);
     Set(this.sun, "visible", !sceneLighting);
-    this.stats = stats;
+    if (!compileRoots) this.stats = stats;
     return () => { for (let i = restore.length - 1; i >= 0; i--) { const [object, key, value] = restore[i]; object[key] = value; } };
   }
 

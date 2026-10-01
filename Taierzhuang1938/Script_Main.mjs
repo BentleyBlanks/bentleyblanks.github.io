@@ -3435,7 +3435,8 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   setStep(T("boot.step.physicsWalls"), base + span);
   await yieldFrame();
   // 炮坑材质在这里就编译：第一颗手榴弹落地那一帧才建 program 会冻 400 ms。
-  new TerrainDeformationView(battlefield, scene, library).Warm(renderer, camera);
+  new TerrainDeformationView(battlefield, scene, library).Warm(renderer, camera,
+    (group) => CompileAsRendered(group, "弹坑着色器预编译"));
   // 炸断的树（焦黑树桩 / 倒下的树冠）同理，第一次炸树不现编。
   battlefield.breakableTrees?.Warm();
   BuildPhysics();
@@ -4385,6 +4386,33 @@ function EndOfficialCampaign(phase) {
 }
 
 /**
+ * 提交编译（`renderer.compile`）要按**真出画时的场景状态**编，缓存键差一位就是一份用不上的
+ * 孪生 program —— 白链一遍，真正那份到出画时还得同步现编现等。两处会让两边不一样：
+ *   ① 绑着的靶：键里的 `outputColorSpace` 按当前靶算，场景网格只画进 HDR 主靶（§18.2 ②）；
+ *   ② 白盒画质（出厂默认档）：出画前 `WhiteboxSceneRenderer.Begin` 藏关卡灯、换中性光、把场景资产
+ *      换成白盒材质。不在这一层里提交，编出来的是「关卡灯光 + 原材质」那一份。2026-10-01 第一关
+ *      白盒档实测：提交的 135 个 program 一个都没用上，真用的 64 个全在出画时同步链接，关掉 program
+ *      缓存时主线程卡 22.5 s（docs/Data_TechRenderPipeline.md §18.7）。
+ * @returns {boolean} 提交成功（失败时调用方退回「用到时现编」）
+ */
+function CompileAsRendered(root, label = "着色器提交编译") {
+  const restoreTarget = renderer.getRenderTarget();
+  if (post?.targets?.hdr) renderer.setRenderTarget(post.targets.hdr);
+  let restoreWhitebox = null;
+  try {
+    restoreWhitebox = post?.whiteboxScene?.Begin(scene, camera, { compileRoots: [root] }) || null;
+    renderer.compile(root, camera, scene);
+    return true;
+  } catch (error) {
+    console.warn(`[Main] ${label}失败（退回用到时现编）`, error);
+    return false;
+  } finally {
+    restoreWhitebox?.();
+    renderer.setRenderTarget(restoreTarget);
+  }
+}
+
+/**
  * 从一批网格里挑「每个 program 一件」的代表。
  *
  * 去重键是材质加上几条会进 program cache key 的物体特征（蒙皮 / 实例化 / 顶点色）；
@@ -4494,29 +4522,19 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
     // 绑着任意离屏靶 = 工作色彩空间 `srgb-linear`。场景网格实际上只画进 HDR 靶，
     // 所以不绑靶就 compile 出来的是**另一份用不上的 program** —— 白链一遍，
     // 真正那份到第一帧还得现编现等。（改之前每个材质因此各多一份 `srgb` 变体。）
+    // 绑靶与白盒那一层都在 CompileAsRendered 里。
     const submitList = picks.concat(outsidePicks);
     const SUBMIT = 24;
-    const restoreTarget = renderer.getRenderTarget();
-    if (post?.targets?.hdr) renderer.setRenderTarget(post.targets.hdr);
-    try {
-      for (let i = 0; i < submitList.length; i += SUBMIT) {
-        const proxy = new THREE.Group();
-        // 代理组只借 children 走一趟 traverse，**不进场景树**，也不动这些网格的
-        // parent —— compile 只读不写，这一层是安全的。
-        proxy.children = submitList.slice(i, i + SUBMIT);
-        try {
-          renderer.compile(proxy, camera, scene);
-        } catch (error) {
-          console.warn("[Main] 着色器提交编译失败（退回逐帧编译）", error);
-          break;
-        }
-        const submitted = Math.min(submitList.length, i + SUBMIT);
-        onStep?.(T("boot.step.submitShaders", { done: submitted, total: submitList.length }),
-          BootProgress(BOOT.warm.submitShaders, (submitted / submitList.length) * 0.5));
-        if (!await Yield()) return picks.length;
-      }
-    } finally {
-      renderer.setRenderTarget(restoreTarget);
+    for (let i = 0; i < submitList.length; i += SUBMIT) {
+      const proxy = new THREE.Group();
+      // 代理组只借 children 走一趟 traverse，**不进场景树**，也不动这些网格的
+      // parent —— compile 只读不写，这一层是安全的。
+      proxy.children = submitList.slice(i, i + SUBMIT);
+      if (!CompileAsRendered(proxy, "着色器提交编译")) break;
+      const submitted = Math.min(submitList.length, i + SUBMIT);
+      onStep?.(T("boot.step.submitShaders", { done: submitted, total: submitList.length }),
+        BootProgress(BOOT.warm.submitShaders, (submitted / submitList.length) * 0.5));
+      if (!await Yield()) return picks.length;
     }
 
     // --- 一之二、等链接（并行） ---------------------------------------------
@@ -4789,16 +4807,11 @@ async function WarmLevel(phase) {
   const report = { pool: {}, viewmodel: 0, picks: 0, ms: 0, stepMs: {} };
   let stepStart = started;
   const Lap = (name) => { const now = performance.now(); report.stepMs[name] = Math.round(now - stepStart); stepStart = now; };
-  // 提交编译 + 轮询就绪，与 WarmupShaders 同一套：compile 时必须绑着 hdr 靶（否则编出来的是
-  // 另一份用不上的 srgb 变体），链接交给 KHR_parallel_shader_compile 的线程，主线程逐帧问
+  // 提交编译 + 轮询就绪，与 WarmupShaders 同一套：按出画时的场景状态编（CompileAsRendered），
+  // 链接交给 KHR_parallel_shader_compile 的线程，主线程逐帧问
   // isReady()，就绪后再真画一帧。直接 compile 完就画 = 逐个 program 阻塞等链接：实测 3A 管线
   // 上 41 份人物材质的刚体代理这么等了 27 s。
-  const SubmitCompile = (root, label) => {
-    const restoreTarget = renderer.getRenderTarget();
-    if (post?.targets?.hdr) renderer.setRenderTarget(post.targets.hdr);
-    try { renderer.compile(root, camera, scene); } catch (error) { console.warn(`[Main] 关卡预热：${label} 提交编译失败`, error); }
-    finally { renderer.setRenderTarget(restoreTarget); }
-  };
+  const SubmitCompile = (root, label) => CompileAsRendered(root, `关卡预热：${label}`);
   const WaitProgramsReady = async (limitMs) => {
     const start = performance.now();
     for (;;) {

@@ -388,8 +388,14 @@ export class TerrainDeformationView {
    * parked in the scene far below the level with culling off, so the level's
    * own first frame is the first use. Each proxy removes itself after that
    * frame; nothing stays behind.
+   *
+   * `compile` submits the group the way the host renders it (HDR target bound,
+   * whitebox substitution applied — Script_Main.CompileAsRendered). A bare
+   * renderer.compile links twins under another cache key that no frame uses.
+   * The crater-surface proxy is tagged as terrain because the real crater tiles
+   * are (`userData.terrainTile`), so the whitebox rules treat both alike.
    */
-  Warm(renderer, camera) {
+  Warm(renderer, camera, compile = null) {
     this.RemoveWarmProxies();
     if (!renderer || !camera || !this.sources.length) return this.warmProxies;
     this.warmState = { renderer, shadowed: false, renders: 0, lastFrame: -1 };
@@ -409,12 +415,16 @@ export class TerrainDeformationView {
       if (this.debris.materials.includes(material)) mesh.customDepthMaterial = this.debris.library.StaticDepth();
       mesh.position.set((b.minX + b.maxX) * 0.5, -500, (b.minZ + b.maxZ) * 0.5);
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.userData.terrainWarm = true;
+      if (material === this.material) mesh.userData.whiteboxTerrain = true;
       mesh.onAfterShadow = () => { if (this.warmState) this.warmState.shadowed = true; };
       mesh.onAfterRender = () => this.NoteWarmRender();
       group.add(mesh); this.warmProxies.push(mesh);
     }
-    try { renderer.compile(group, camera, this.scene); }
-    catch (error) { console.warn("[TerrainDeformationView] crater shader precompile failed", error); }
+    if (compile) compile(group);
+    else {
+      try { renderer.compile(group, camera, this.scene); }
+      catch (error) { console.warn("[TerrainDeformationView] crater shader precompile failed", error); }
+    }
     for (const mesh of this.warmProxies) this.scene.add(mesh);
     return this.warmProxies;
   }

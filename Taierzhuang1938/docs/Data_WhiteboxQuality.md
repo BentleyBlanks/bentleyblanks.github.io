@@ -63,6 +63,8 @@ Tengxian.GraphicsProfile.ExportWhitebox()
 
 新 Feature 必须登记数据与控件映射，新 Pass 必须显式加入白盒允许表，否则在白盒下默认关闭。新增物件自动服从材质替换；仅真正的地形可标 `whiteboxTerrain`。人物工厂、第一人称身体/视模的共用根节点标 `userData.whiteboxCharacter = true`，后续骨骼挂件自动继承；ActorBatch / Crowd 的场景批次带同一标记。子树可用 `false` 明确回到场景类别（例如开场人物根下的坐箱），不按单个人物或武器维护名单。LOD 在材质替换前更新，避免新显示的档位漏用场景网格。
 
+着色器预热的提交编译（`renderer.compile`）必须套同一层替换：`Script_Main.CompileAsRendered` 调 `Begin(scene, camera, { compileRoots })`，藏着的网格也按同一规则换、白盒藏掉的特效不编。替换规则改了而提交那一侧没跟上，开机就会回到「提交的全白编、出画时同步现编」（2026-10-01 实测第一关冷开机多 27 s）。口径见 [渲染管线 §18.7](Data_TechRenderPipeline.md)。
+
 旧配置缺少新字段时自动使用新默认；旧版默认表面色 `#d8dadd` 在缺少 `grid` 字段时迁移到灰色，用户自定义颜色保留。`Inspect().materials` 同时返回 `characterMeshes`、`terrainMeshes` 与 `whiteMeshes`，后者表示应用灰盒替代材质的数量。
 
 ## 验证
@@ -70,6 +72,7 @@ Tengxian.GraphicsProfile.ExportWhitebox()
 ```powershell
 node Taierzhuang1938/Script_WhiteboxQualityTest.mjs
 node Taierzhuang1938/Script_WhiteboxQualityBrowserTest.mjs
+node Taierzhuang1938/Script_WhiteboxShaderWarmTest.mjs
 node Taierzhuang1938/Script_PostFrameGraphTest.mjs
 node Taierzhuang1938/Script_SamplerBudgetTest.mjs --only=whitebox
 node Taierzhuang1938/Script_EditorTest.mjs

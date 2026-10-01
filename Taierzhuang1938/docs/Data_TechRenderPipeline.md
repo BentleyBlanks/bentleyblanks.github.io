@@ -5901,6 +5901,51 @@ program 数不涨、爆炸帧 < 1000 ms）。去掉修复同一条测试爆炸�
 **规矩**：以后凡是往开机链里加「按画质建东西 / 预热」的步骤，都要排在 `LoadSavedGraphics` 之后；
 复现卡顿先用用户存的设置（记忆条「复现用用户的设置」），默认画质下量不到的不等于没有。
 
+### 18.7 白盒档的提交编译要套白盒那一层（2026-10-01）
+
+**症状**：用户报「本地加载也很慢」。白盒画质 2026-09-29 成了出厂默认档之后，第一关
+（`?whitebox=p012`）关掉 program 缓存开机 63 s，主线程有 22.5 s 卡在「第一次用某个 program」上；
+默认页进主菜单同样变慢。
+
+**取证**（包住 `linkProgram` / `getProgramParameter` 记账：每个 program 是提交编译还是出画时建的、
+第一次取 uniform 时链好没有）：提交编译建的 135 个 program **一个都没被用上**；画面真用的 64 个全是
+出画时现建、建完立刻用、同步等链接。键的差别集中在三位：灯光数（提交时 3 盏平行光 / 3 个阴影 /
+1 个光照探针，出画时 1 / 0 / 0），以及资产材质换成了 `Whitebox_*`。
+
+**根因**：白盒出画前 `WhiteboxSceneRenderer.Begin` 会藏关卡灯、换中性光（一盏无阴影平行光 + 环境光）、
+把场景资产换成白盒材质、清掉 environment / fog（`Script_WhiteboxRendering`）。预热的
+`renderer.compile` 在这一层**之外**跑，编的是「关卡灯光 + 原材质」那一份 —— 与 §18.2 ② 绑靶是同一类病：
+提交时的场景状态与出画不一致，缓存键对不上。其余预热门全用 `quality=high/medium` 跑，白盒档没被量过。
+
+**修法**：
+
+- `Script_Main.CompileAsRendered(root)` —— 所有提交编译（`WarmupShaders` 第一段、`WarmLevel` 的
+  `SubmitCompile`、弹坑预热）都走它：绑 HDR 主靶 + 套 `post.whiteboxScene.Begin(scene, camera,
+  { compileRoots: [root] })`。非白盒档 `whiteboxScene` 为空，只剩绑靶，与原来一样。
+- `Begin` 的 `compileRoots`：compile 不看 `visible`，所以这几棵子树里当前藏着的网格也按同一套规则换材质；
+  白盒档藏掉的特效（粒子、软粒子卡片）在这一趟把材质摘掉 —— 否则二十来个画不到的粒子 program 照样编。
+- `TerrainDeformationView.Warm(renderer, camera, compile)`：弹坑预热改走同一个提交口（以前连 HDR 靶都没绑），
+  弹坑地块那只代理标 `whiteboxTerrain`，与真弹坑地块（`terrainTile`）在白盒规则里同类。
+
+**实测**（RTX 4070 SUPER / Edge，第一关，修前修后交替三轮取中位数；本机同时开着六十多个 Edge 进程，绝对值偏高）：
+
+| 口径 | 修前 | 修后 |
+|---|---:|---:|
+| 关掉 program 缓存（§18.2 口径） | 56.6 s，link 199，主线程同步等 16–19 s | 29.8 s，link 68，同步等 ≈ 10 ms |
+| 全新浏览器第一次开 | 56.1 s（预热段 36.8 s） | 30.3 s（预热段 11.8 s） |
+| 同一浏览器第二次开 | 35.6 s（预热段 7.2 s） | 21.5 s（预热段 3.9 s） |
+
+修后预热段剩下的：并行编约 45 个 program（冷 ≈ 3 s）、第一遍整场出画（贴图 / 缓冲上传）、
+预建 88 个人物对象（纯 CPU ≈ 2 s）。
+
+**门禁**：`Script_WhiteboxShaderWarmTest`（`?whitebox=p012&quality=whitebox`）—— 预热期间主场景那一趟现建
+program = 0（修前 64）；提交编译建的 program 至少一半在开机结束前被用上（修前 0/135，修后 64/67）；
+进城后 300 帧不新编。后一条有两份**修前就有**的已知现编列在测试的 `KNOWN_LATE` 里（开场压弹道具
+`OpeningFirstPerson_*`、被俘战友的 `face-blood-1`），都是开演后才造出来的东西，修好一项删一项。
+
+**规矩**：往开机链里加预热、或改 `Begin` 的替换规则时，跑这条门；量开机耗时要连白盒档一起量
+（出厂默认就是它），只量 `quality=high` 会漏。
+
 ## 19. 坑（按被踩频率排序）
 
 排序规则：**一、真的踩过并留下事故记录的**（含本仓库现役 bug）；
