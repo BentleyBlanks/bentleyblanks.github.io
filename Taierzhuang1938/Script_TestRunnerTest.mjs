@@ -167,6 +167,17 @@ for (const file of ["Texture/Texture_BrickWallBase.webp", "Data_TextureManifest.
 }
 Check(InferDomains(["Taierzhuang1938/_import/Script_BakeTerrainLayers.py"]).ignoredProjectFiles.length === 1,
   "其余 .py 烘焙脚本仍按离线工具忽略");
+// 2026-09-30 一批新模块文件名里没有既有关键词，曾整批落进「未映射」：逐个钉住它们的门禁。
+for (const [file, gate] of [
+  ["Script_NeckDeath.mjs", "NeckDeathTest"], ["Data_NeckDeath.mjs", "NeckDeathBrowserTest"],
+  ["Script_LitterGait.mjs", "LitterGaitTest"],
+  ["Animation/LitterBearer/Animation_TengxianLitterBearer.json", "ActorLocomotionTest"],
+  ["Data_BurntTimberPile.mjs", "FirstLevelSmokeOriginsTest"],
+]) {
+  const change = InferDomains([`Taierzhuang1938/${file}`]);
+  Check(!change.unmatchedProjectFiles.length && ResolveSelection(ParseArgs(["--changed=origin/master", "--profile=prepush"]), change.domains, change).includes(gate),
+    `${file} 推送前跑 ${gate}`);
+}
 
 const trackedProjectResult = spawnSync("git", ["ls-files", "Taierzhuang1938"], {
   cwd: path.resolve(dirHere, ".."),

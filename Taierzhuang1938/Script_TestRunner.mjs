@@ -507,7 +507,7 @@ export const browserTests = new Set([
   'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
   'ProneCrawlTest', 'ActorLocomotionTest', 'BackRifleRunTest', 'MeleeAnimationTest', 'DadaoSwingTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
-  "HitReactionBrowserTest",
+  "HitReactionBrowserTest", "NeckDeathBrowserTest",
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootStallTest", "BootTest", "ColliderTest",
@@ -752,6 +752,9 @@ const changedDomainRules = [
   // 第一关道具换模型 / 碎砖瓦 / 植被（docs/Data_FirstLevelVegetationProps.md）：图集烘焙脚本与白盒场地接线点也算。
   {domain:"firstLevelDressing",pattern:/FirstLevel(PropDressing|Vegetation)|BakeVegetationAtlas|Script_FirstLevelWhiteboxField/},
   {domain:"distantSmoke",pattern:/FirstLevelDistantSmoke|FirstLevelSmokeOrigins|BattleSmoke|Script_Vfx/},
+  // 烟柱下的焦木堆几何（Blender 导出的内联网格，只有 Script_FirstLevelSmokeOrigins 在用；三角预算在 SmokeOriginsTest）。
+  {domain:"distantSmoke",pattern:/BurntTimberPile/},
+  {domain:"render",pattern:/BurntTimberPile/},
   // 2026-09-28 B4：第一关天空 / 调色 / 室内天光遮蔽 / 曝光锚点（docs/Data_TechRenderPipeline.md §2.10 §5.11）
   {domain:"skyGrade",pattern:/FirstLevelSkyGrade|FirstLevelInteriors|InteriorSkyOcclusion|Script_Sky\.mjs|Data_Tuning_Camera|Data_Tuning_Volumetrics|Script_PostComposite|Data_Tuning_Lights|FirstLevelDistantSmoke|BattleSmoke/},
   {domain:"render",pattern:/InteriorSkyOcclusion/},
@@ -782,7 +785,8 @@ const changedDomainRules = [
   {domain:"firstLevel",pattern:/Type89Damage/},
   {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|CharacterFaceBlood|SpeechEnvelope|NraFacial|Nra05Facial|Lugou\w*Facial|SpeakerBinder|SpeakerHeadLayer|SpeakerGesture|SpeakingCast|FaceTrack|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
   // Script_LayeredGait（分层步态，docs/Data_ActorLocomotion.md）由 ActorLocomotionTest 验收：2026-09-28 补上映射。
-  { domain: "animation", pattern: /ActorLocomotion|LocomotionProfileBake|LayeredGait/ },
+  // 担架员抬架走的 Blender 循环（Animation/LitterBearer，只由 Script_LayeredGait 读）同归这条。
+  { domain: "animation", pattern: /ActorLocomotion|LocomotionProfileBake|LayeredGait|LitterBearer/ },
   {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing|GrenadeThrow/},
   {domain:"combat",pattern:/HitDisorientation/},
   {domain:'render',pattern:/TerrainBlend|TrenchSurfaceMaterial/},
@@ -808,8 +812,13 @@ const changedDomainRules = [
   // 受击物理反应（docs/Data_HitReaction.md）：规则 / 数值 / 弹簧层 / 方向死亡动作库，归 combat（挂在 TakeHit/Kill）也归 animation（改倒地动作）。
   { domain: "combat", pattern: /HitReaction|DeathImpact/ },
   { domain: "animation", pattern: /HitReaction|DeathImpact/ },
+  // 敌军喉咙窒息哽咽（docs/Data_NeckDeath.md）：规则 / 数值挂在 Soldier 的 TakeHit/Kill 上，门禁 NeckDeathTest(+Browser) 在 combat。
+  { domain: "combat", pattern: /NeckDeath/ },
   {domain:"hud",pattern:/IncomingFire/},
   {domain:"squadMarch",pattern:/SquadMarch/},
+  // 担架队逐副的走路性格（Script_LitterGait，数在 Data_Tuning_SquadMarch.LITTER_GAIT）：只由第一关担架队列用。
+  {domain:"squadMarch",pattern:/LitterGait/},
+  {domain:"firstLevel",pattern:/LitterGait/},
   // 整关驾驶脚本拆成了「公共 Kit + 三段」（2026.09.19 重构，第二波三个玩法包各改一段）。
   // 文件名里没有「Mission」，上面那些按 FirstLevelMission* 选域的规则盖不到。
   {domain:"firstLevel",pattern:/FirstLevelCampaign(Kit|Front|Mid|End)|FirstLevelBundleThrowDriver/},
