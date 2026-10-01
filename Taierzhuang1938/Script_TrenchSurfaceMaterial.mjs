@@ -110,7 +110,7 @@ const Evaluate = /* glsl */`
   // 翻土让位给车道/场坪（与基础地形 wSpoil = g·(1−r) 同一口径）：沟真切断路的地方，
   // SampleMissionGroundSurface 已经把车道权重收掉了（2026-09-28，06 集结洼地不再是一片沟底土）。
   float spoil=clamp(vTerrainLayers.g,0.0,1.0)*(1.0-clamp(vTerrainLayers.r,0.0,1.0));
-  float trenchLow=0.0;
+  float trenchLow=0.0,trenchHorizon=1.0;
   if(spoil>.001) {
   vec3 w=pow(abs(geomN),vec3(4));w/=max(dot(w,vec3(1)),.001);
   vec3 ca,cb,cc,na,nb,nc;vec3 ra,rb,rc;float sa,sb,sc;
@@ -132,7 +132,8 @@ const Evaluate = /* glsl */`
   gTerrainRough=mix(gTerrainRough,clamp(surface.x,.76,.96),spoil);
   gMaterialAo=mix(gMaterialAo,mix(.25,1.0,surface.y),spoil);
   gTerrainHeight=mix(gTerrainHeight,surface.z,spoil);
-  gMaterialAo*=SoilHorizon(vTerrainWorld,geomN,trenchLow);
+  trenchHorizon=SoilHorizon(vTerrainWorld,geomN,trenchLow);
+  gMaterialAo*=trenchHorizon;
   }
 #ifndef TRENCH_STONE
   {
@@ -156,6 +157,9 @@ const Evaluate = /* glsl */`
       floorSite*(uTerrainWaterD.z+mud*uTerrainMudA.w),
       max(max(gTerrainWeights.y*mix(uTerrainWaterD.w,uTerrainMudB.w,mud),floorSite*uTrenchWater.y),spoil*mud*uTerrainMudA.y));
     diffuseColor.rgb=wetColor;
+    // TerrainWater 把水面的材质 AO 归 1（土块缝隙不压水面），但沟壁挡天的地平线遮蔽要留着：
+    // 它经 computeSpecularOcclusion 压间接镜面，SSR 关掉时沟底水面不再照出整片天空。
+    gMaterialAo*=mix(1.0,trenchHorizon,gTerrainWater);
     gTrenchWet=max(gTerrainWet,gTerrainWater);
   }
 #endif
@@ -204,7 +208,7 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
   const bind=patch.uniforms;
   // Runtime diagnostic for same-frame POM A/B; normal/colour/lighting stay fixed.
   const pom={value:1};patch.trenchPomUniform=pom;
-  patch.key+=stone?':trenchStoneContact8Gbuffer':':trenchWetHeight8';
+  patch.key+=stone?':trenchStoneContact8Gbuffer':':trenchWetHeight9';
   patch.uniforms=(uniforms,shader)=>{
     bind(uniforms,shader);
 

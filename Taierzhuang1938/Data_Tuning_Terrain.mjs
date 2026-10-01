@@ -162,7 +162,11 @@ export const TERRAIN_RUTS = Object.freeze({
  *   lowRiseM      「凹度」：四个方向 1.2 / 3.2 m 处比这里高出的均值落在 [起, 满] 米之间线性算沟底
  *                 （只在壕沟补丁里有接触高度场；沟沿、抛土顶四周更低 → 不积水）
  *   damp          底湿度：车道压实泥面、沟底
- *   waterRough    水面粗糙度（地面材质开着 SSR，这个值下天空与人会被反射出来）
+ *   waterRough    水面粗糙度。2026-10-01 0.05 → 0.16：浑泥水有浮渣和细波，不是镜子；0.05 时 SSR 开着是一面
+ *                 照出人的玻璃，SSR 被动态分辨率关掉（Data_Tuning_Graphics 第 4 档起）时整片反射天空成灰白塑料片
+ *   edgeNoiseM    水线抖动噪声的尺度（米）。沟底的抬水位（凹度）与 site 都来自逐顶点权重 / 接触高度场的三角插值，
+ *                 等值线是直线 —— 不抖的话水边是一圈锯齿多边形，镜头一动像 Z-fighting
+ *   edgeJitter    水线抖动幅度（高度单位，加在「水位 − 材质高度」上；同时按 1/20 抖平地阈值）
  *   wetRough      湿痕粗糙度倍率
  *   wetDarken     湿土压暗（线性反照率减量；湿黄土约为干时的 55–65%）
  *   waterDarken   积水再压暗（浑泥水仍透出土色：压太狠时阴影里的小水洼会成一个黑洞）
@@ -181,7 +185,9 @@ export const TERRAIN_WATER = Object.freeze({
   lowWater: 0.55,
   lowRiseM: Object.freeze([0.2, 0.7]),
   damp: Object.freeze({ track: 0.28, trenchFloor: 0.6 }),
-  waterRough: 0.05,
+  waterRough: 0.16,
+  edgeNoiseM: 0.7,
+  edgeJitter: 0.45,
   wetRough: 0.62,
   wetDarken: 0.3,
   waterDarken: 0.25,

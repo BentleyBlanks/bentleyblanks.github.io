@@ -222,7 +222,7 @@ uniform vec4 uTerrainWaterA;              // x,y 两档噪声 1/米  z 水位基
 uniform vec4 uTerrainWaterB;              // x,y 平地阈值  z 水线过渡  w 湿痕带宽
 uniform vec4 uTerrainWaterC;              // x 水面粗糙度 y 湿痕粗糙度倍率 z 湿土压暗 w 积水压暗
 uniform vec4 uTerrainWaterD;              // x 车道积水 y 车辙抬水位 z 沟底抬水位 w 车道底湿度
-uniform vec4 uTerrainWaterE;              // x 材质高度参与水线的比例 y 湿土饱和度增量
+uniform vec4 uTerrainWaterE;              // x 材质高度参与水线的比例 y 湿土饱和度增量 z 水线抖动幅度 w 抖动噪声 1/米
 uniform vec4 uTerrainMudBox;              // 前沿湿泥区 minX minZ maxX maxZ（Data_Tuning_Terrain.TERRAIN_MUD_ZONE）
 uniform vec4 uTerrainMudA;                // x 羽化 y 翻土底湿度 z 沟底积水倍率 w 沟底抬水位
 uniform vec4 uTerrainMudB;                // xyz 翻土线性倍率 w 车道底湿度
@@ -284,8 +284,10 @@ void TerrainWater(inout vec3 albedo, vec2 xz, vec3 geomN, float site, float lowR
     // 材质高度只按比例参与（卵石级的起伏全额进来，水线会碎成一粒粒黑点）。
     float h = 0.5 + (gTerrainHeight - 0.5) * uTerrainWaterE.x - gTerrainRut * 0.35
       - gTerrainPrint * ${TRAIL_WATER_PER_M.toFixed(3)};
-    float above = level - h;
-    float onFlat = smoothstep(uTerrainWaterB.x, uTerrainWaterB.y, geomN.y);   // 平地（坡上存不住水）
+    // 水线抖动：抬水位（沟底凹度、site）与几何法线都是三角形内线性插值，阈值一卡就是直边锯齿多边形。
+    float jitter = (TerrainNoise(xz * uTerrainWaterE.w + 3.71) * 0.65 + TerrainNoise(xz * uTerrainWaterE.w * 2.3 - 5.2) * 0.35 - 0.5) * 2.0;
+    float above = level - h + jitter * uTerrainWaterE.z;
+    float onFlat = smoothstep(uTerrainWaterB.x, uTerrainWaterB.y, geomN.y + jitter * uTerrainWaterE.z * 0.05);   // 平地（坡上存不住水）
     water = smoothstep(-uTerrainWaterB.z, uTerrainWaterB.z, above) * onFlat * site;
     wet = max(wet, smoothstep(-uTerrainWaterB.w, 0.0, above) * site);
   }
@@ -572,7 +574,7 @@ function TerrainWaterUniforms() {
     uTerrainWaterB: { value: Vec4Of([W.flat[0], W.flat[1], W.soft, W.wetBand]) },
     uTerrainWaterC: { value: Vec4Of([W.waterRough, W.wetRough, W.wetDarken, W.waterDarken]) },
     uTerrainWaterD: { value: Vec4Of([W.site.track, W.rutWater, W.lowWater, W.damp.track]) },
-    uTerrainWaterE: { value: Vec4Of([W.heightWeight, W.wetSaturation, 0, 0]) },
+    uTerrainWaterE: { value: Vec4Of([W.heightWeight, W.wetSaturation, W.edgeJitter, 1 / W.edgeNoiseM]) },
     uTerrainMudBox: { value: Vec4Of(M.box) },
     uTerrainMudA: { value: Vec4Of([M.featherM, M.wallDamp, M.floorWater, M.floorRaise]) },
     uTerrainMudB: { value: Vec4Of([...M.soilTint, M.trackDamp]) },
