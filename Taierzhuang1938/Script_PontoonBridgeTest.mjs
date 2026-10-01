@@ -235,6 +235,77 @@ Check(set.actions.length === gltfJson.animations.length && set.animatedNodes.siz
 const Draws = (group) => { let n = 0; group.traverse((o) => { if (o.isMesh) n += 1; }); return n; };
 Check(Draws(set.groups.intact) <= 8 && Draws(set.groups.static) <= 8 && Draws(set.groups.wreck) <= 8,
   "完好桥身 / 岸栈与南截 / 残骸各合成按材质的几份（平时不按件出 draw call）");
+// 船舱里的水面遮挡片（BuildHullWaterMasks）：只写深度、藏出预通道、三态各挂各的，
+// 截面贴着舱内壁 —— 拿 GLB 真船壳在遮挡片高度切一刀，逐站核对「不出内壁、也不留出一条水缝」。
+{
+  const masks = set.hullMasks, lift = M.hullWaterMask.lift, level = data.water.top + lift;
+  const southCount = Math.min(...B.boats.sinking), northFirst = Math.max(...B.boats.sinking) + 1;
+  const Boats = (mesh) => mesh.userData.hullWaterMask.boats.join(",");
+  const Range = (a, b) => Array.from({ length: b - a }, (_, i) => a + i).join(",");
+  Check(masks && Boats(masks.static) === Range(0, southCount) && Boats(masks.intact) === Range(southCount, B.boats.count)
+    && Boats(masks.wreck) === Range(northFirst, B.boats.count) && Boats(masks.pieces) === Range(northFirst, B.boats.count),
+  "船舱遮挡片：南截一直在、完好桥身管其余各船、北截在残骸与坍塌里各一份（下沉 / 炸飞的船不遮）");
+  const all = [masks.static, masks.intact, masks.wreck, masks.pieces];
+  Check(all.every((mesh) => mesh.material.colorWrite === false && mesh.material.depthWrite && mesh.material.allowOverride === false
+    && mesh.userData.skipNormalDepth === true && mesh.renderOrder >= 900 && !mesh.castShadow),
+  "遮挡片只写深度、在不透明物最后画、藏出预通道、不投影");
+  Check(masks.static.parent === set.groups.static && masks.intact.parent === set.groups.intact
+    && masks.wreck.parent === set.groups.wreck && masks.pieces.parent === set.nodes.get("NorthSection"), "三态各挂各的组");
+  masks.wreck.geometry.computeBoundingBox();
+  const wreckBox = masks.wreck.geometry.boundingBox;
+  Check(Math.abs(wreckBox.min.y - level) < 0.01 && Math.abs(wreckBox.max.y - level) < 0.01,
+    "北截残骸那一份按末帧位姿放回到水面上方 lift", `${wreckBox.min.y.toFixed(3)}..${wreckBox.max.y.toFixed(3)} vs ${level.toFixed(3)}`);
+  // 船壳在 y = level 处与竖线 x = const 的交点（z 值）
+  const Crossings = (mesh, x) => {
+    const pos = mesh.geometry.attributes.position, index = mesh.geometry.index;
+    const count = index ? index.count : pos.count, out = [];
+    const V = (i) => new THREE.Vector3().fromBufferAttribute(pos, index ? index.getX(i) : i);
+    for (let t = 0; t < count; t += 3) {
+      const tri = [V(t), V(t + 1), V(t + 2)], cut = [];
+      for (let e = 0; e < 3; e += 1) {
+        const a = tri[e], b = tri[(e + 1) % 3];
+        if ((a.y - level) * (b.y - level) > 0 || a.y === b.y) continue;
+        const k = (level - a.y) / (b.y - a.y);
+        cut.push([a.x + (b.x - a.x) * k, a.z + (b.z - a.z) * k]);
+      }
+      if (cut.length < 2) continue;
+      const [[x0, z0], [x1, z1]] = cut;
+      if ((x0 - x) * (x1 - x) > 0 || x0 === x1) continue;
+      out.push(z0 + ((z1 - z0) * (x - x0)) / (x1 - x0));
+    }
+    return out;
+  };
+  // 炸飞的那几条（9…13）中段船壳在桥面底下本来就是参差低舷（Blender 的 hm_keel），不在这里量
+  const blastedZ = data.layout.boats.filter((b) => b.i >= B.boats.blasted[0] && b.i <= B.boats.blasted[1]).map((b) => b.z);
+  let stations = 0, worstOut = -Infinity, worstGap = -Infinity, worstAt = "";
+  for (const [mask, hullName] of [[masks.static, "PontoonBridgeSet_Static_Hull"], [masks.intact, "PontoonBridgeSet_Intact_Hull"]]) {
+    const hull = set.root.getObjectByName(hullName);
+    const pos = mask.geometry.attributes.position;
+    // 遮挡片每条船是一串 (x, z−half)/(x, z+half) 顶点对；按 x 在站间线性插值，逐 5 cm 量
+    const boats = new Map();
+    for (let i = 0; i < pos.count; i += 2) {
+      const zc = Math.round(((pos.getZ(i) + pos.getZ(i + 1)) / 2) * 100) / 100;
+      if (!boats.has(zc)) boats.set(zc, []);
+      boats.get(zc).push([pos.getX(i), (pos.getZ(i + 1) - pos.getZ(i)) / 2]);
+    }
+    for (const [zc, rows] of boats) {
+      if (blastedZ.some((z) => Math.abs(z - zc) < 0.01)) continue;
+      for (let x = -2.6; x <= 2.6 + 1e-6; x += 0.05) {   // 两头舱底翘出水面，那一段遮不遮都一样
+        const k = rows.findIndex((row, j) => j + 1 < rows.length && row[0] <= x && rows[j + 1][0] >= x);
+        const [x0, h0] = rows[k], [x1, h1] = rows[k + 1];
+        const half = h0 + ((h1 - h0) * (x - x0)) / (x1 - x0);
+        const near = Crossings(hull, x).map((z) => z - zc).filter((dz) => Math.abs(dz) > 0.25 && Math.abs(dz) < 1.3);
+        const inner = Math.min(...near.filter((dz) => dz > 0), ...near.filter((dz) => dz < 0).map((dz) => -dz));
+        stations += 1;
+        if (half - inner > worstOut) worstAt = `x ${x.toFixed(2)} z ${zc.toFixed(1)} inner ${inner.toFixed(3)} half ${half.toFixed(3)}`;
+        worstOut = Math.max(worstOut, half - inner);
+        worstGap = Math.max(worstGap, inner - half);
+      }
+    }
+  }
+  Check(stations > 1000 && worstOut < 0 && worstGap < 0.03,
+    "遮挡片截面在舱内壁里面、离内壁不到 3 cm（不露水缝）", `${stations} 站，最多出壁 ${worstOut.toFixed(4)} m（${worstAt}），最大缝 ${worstGap.toFixed(4)} m`);
+}
 const Snapshot = (name) => { const node = set.nodes.get(name); return { p: node.position.clone(), q: node.quaternion.clone() }; };
 const northRest = Snapshot("NorthSection"), boatRest = Snapshot("Boat11Bow"), sinkRest = Snapshot("SinkBoat8"), deckRest = Snapshot("Deck11_1");
 

@@ -1,28 +1,36 @@
 // 《台儿庄：血战滕县》程序化水面 —— 参考 Wave Harmonic 的 Crest（Unity/Godot 海洋系统）
-// 的分层思路，裁剪到本作管线能负担的那几层。
+// 的分层思路，裁剪到本作管线能负担的那几层；2026-10-01 第二版按河水重做细节层与合成。
 //
 // ---------------------------------------------------------------------------
-// Crest 那套里我们取什么、舍什么
+// 取什么、舍什么
 //
-// 取（对一条 10.5 m 宽的护城河与一条 30 m 宽的城河仍然成立的）：
-//   1) **Gerstner 波位移**：顶点级三波叠加，波峰变尖、波谷变宽 —— 正弦波
-//      一眼假的地方就是峰谷对称。振幅按「三月枯水、无风细浪」压到厘米级，
-//      不是海面那种半米涌浪。
-//   2) **屏幕空间水深**：Crest 用海床深度贴图驱动浅水吸收与岸线泡沫；这里
-//      没有那张贴图，但 PostPipeline 的深度法线预通道（rtNormalDepth.w =
-//      线性视深）就是现成的替代 —— 水面像元减去它身后河床/岸壁的像元，
-//      得到的视差深度直接喂吸收曲线与泡沫带。桥墩、柳根、人腿插进水里
-//      都会自动得到一圈岸线泡沫，不用给任何物体单独做处理。
-//   3) **菲涅尔天空反射 + 太阳高光**：Crest 反射的是 cubemap；这里借
-//      SkyDome 的 uniform（天顶色/地平线色/地面反照/太阳方向与颜色）
-//      解析式算一份 —— 换时段预设时水面反射跟着天一起变，零额外采样。
-//   4) **细节法线两层滚动 + 距离淡出**：高频涟漪全在片元里做，顶点网格
-//      不用为它们加密；远处淡出防闪烁（Crest 的 distant normals 同一思路）。
-//   5) **浪尖泡沫**：Gerstner 相位的压缩量当尖锐度，配噪声打碎。
+// 取：
+//   1) **Gerstner 波位移**：顶点级三波叠加，振幅按「三月枯水、无风细浪」压到厘米级。
+//      法线改在片元里按同一张波表解析算：河水网格横向一格十来米，逐顶点插值的法线
+//      会把 4 m 的短波采成十米一块的假起伏。
+//   2) **波谱涟漪法线图**（2026-10-01 取代旧的六个正弦）：启动时用 FFT 按幂律波谱
+//      （斜率谱每倍频程等能量、低频截断、高频滚降）合成两份互相独立、严格可平铺的
+//      斜率场，打进一张 256² RGBA8。片元在 1.3 / 3.3 / 8.6 / 31 m 四个尺度、四个
+//      朝向上各采一次，各自顺流漂移 + 自己的传播方向 —— 叠出来的图样随时间变化、
+//      重复周期是四个瓦片的公倍数。旧版法线图的基频是 4 m 一个周期、斜率 0.17，
+//      近处读出来是一大块一大块的云斑（用户截图 2026-10-01）；真实河面的斜率集中在
+//      分米到米级的细涟漪上，长波几乎是平的。
+//   3) **阵风斑块**：一层顺流拉长、随水漂走的低频噪声调制涟漪强度 —— 有的地方平得
+//      像镜子、照得清对岸，有的地方毛糙发亮。这是河面最像河面的那一层，也顺手把
+//      瓦片重复打散（Valve 2010《Water Flow in Portal 2》用噪声扰动打散脉动的同一思路）。
+//   4) **屏幕空间水深 → 浑水消光**：PostPipeline 的深度法线预通道（rtNormalDepth.w =
+//      线性视深）减去水面视深 = 视线在水里走过的长度，按 Beer–Lambert 求透射率
+//     （Unreal Single Layer Water 的吸收 / 散射系数那一套的单标量版本）。浑水一两分米
+//      就看不见底：桥船吃水那一截不再透出一条亮带，岸边浅处又自然软化成湿泥。
+//   5) **反射**：解析天空（借 SkyDome uniform）打底 → 屏幕里的天空（云、烟柱）→ Hi-Z
+//      SSR（对岸、船、桥）。屏幕天空那一层：反射方向在无穷远处投到屏幕上，那一像素
+//      若是天空（预通道深度 0），就取上一帧的场景色 —— 一次采样，云和烟柱就进了倒影。
+//   6) **预乘 alpha 合成**：反射项不被透明度打折（浅水边照样反光），水体只遮住
+//      (1 − F)·T 那一份身后的河床。
+//   7) 岸线 / 桥墩 / 船舷的接触泡沫（屏幕空间水深）；护城河与荆河保留浪尖泡沫。
 //
-// 舍：FFT 波谱、flow map、实时平面反射、水下后处理 —— 一条护城河用不上，
-// 预算也不许。雾不在这里做：合成 pass 按预通道深度统一上雾（水面对预通道
-// 是 skipNormalDepth，雾吃的是它身后河床的深度，差几十厘米，看不出来）。
+// 舍：FFT 实时波浪、flow map、实时平面反射、水下后处理。雾不在这里做：合成 pass 按
+// 预通道深度统一上雾（水面对预通道是 skipNormalDepth，雾吃的是它身后河床的深度）。
 //
 // ---------------------------------------------------------------------------
 // 管线契约（改这里之前先读 Script_Post.mjs 的 MarkNoPrepass 注释块）：
@@ -31,7 +39,7 @@
 //     否则它会拿自己的着色器画进预通道，把水面颜色写进法线、把 alpha 写进
 //     「线性视深」—— SSAO 与雾的判据当场作废（天空穹当年就是这么炸的）；
 //   · 渲染器 toneMapping=NoToneMapping、输出线性 HDR，tonemap 在 Composite：
-//     这里输出的颜色一律是**线性 HDR 辐亮度**，不许自己先做 gamma 或 ACES；
+//     这里输出的颜色一律是**线性 HDR 辐亮度**（预乘 alpha），不许自己先做 gamma 或 ACES；
 //   · 时间与相机相关的共享 uniform 由 UpdateWaterSurfaces() 每帧推一次，
 //     调用点是 Script_Main.RenderScene（与 vfx.SetDepthSource 同一批账）。
 // ---------------------------------------------------------------------------
@@ -54,47 +62,144 @@ const sharedUniforms = {
   uWaterViewMatrix: { value: new THREE.Matrix4() },
 };
 
-// Crest 用可平铺法线贴图承载高频细浪。这里不引入来源不明的外部资产：启动时
-// 一次性烘一张严格周期的 128² DataTexture，片元阶段只需 4 次纹理采样，替掉旧版
-// 每像素十余次 value-noise。纹理的频率都是整数，所以四边导数也连续，不会露接缝。
+// ---------------------------------------------------------------------------
+// 涟漪斜率图：FFT 合成的两份独立斜率场（RG = 场 A 的 ∂h/∂x、∂h/∂z，BA = 场 B）。
+// 不引入来源不明的外部资产：种子固定，每次启动同一张；256² 两次二维 IFFT 冷启动约 40 ms（只在第一份水面材质建出来时跑一次）。
+// 频率都是整数格点，四边连续不露接缝；按单位 RMS 斜率归一，±4σ 编进 8 位。
+// ---------------------------------------------------------------------------
+
+const RIPPLE_TEXTURE_SIZE = 256;
+const RIPPLE_ENCODE_SIGMA = 4;      // 8 位里装 ±4σ；着色器解码乘回同一个数
+
+function Mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** 原地基 2 FFT（正号指数 = 逆变换，不做 1/n 归一 —— 斜率场最后整体按 RMS 归一）。 */
+function Fft1d(re, im, n, cosTable, sinTable) {
+  for (let i = 1, j = 0; i < n; i += 1) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      let t = re[i]; re[i] = re[j]; re[j] = t;
+      t = im[i]; im[i] = im[j]; im[j] = t;
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const half = len >> 1, stride = n / len;
+    for (let i = 0; i < n; i += len) {
+      for (let k = 0; k < half; k += 1) {
+        const cr = cosTable[k * stride], ci = sinTable[k * stride];
+        const a = i + k, b = a + half;
+        const tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - tr; im[b] = im[a] - ti;
+        re[a] += tr; im[a] += ti;
+      }
+    }
+  }
+}
+
+function Ifft2d(re, im, n) {
+  const cosTable = new Float64Array(n / 2), sinTable = new Float64Array(n / 2);
+  for (let k = 0; k < n / 2; k += 1) {
+    cosTable[k] = Math.cos((2 * Math.PI * k) / n);
+    sinTable[k] = Math.sin((2 * Math.PI * k) / n);
+  }
+  const rowRe = new Float64Array(n), rowIm = new Float64Array(n);
+  for (let y = 0; y < n; y += 1) {
+    const o = y * n;
+    Fft1d(re.subarray(o, o + n), im.subarray(o, o + n), n, cosTable, sinTable);
+  }
+  for (let x = 0; x < n; x += 1) {
+    for (let y = 0; y < n; y += 1) { rowRe[y] = re[y * n + x]; rowIm[y] = im[y * n + x]; }
+    Fft1d(rowRe, rowIm, n, cosTable, sinTable);
+    for (let y = 0; y < n; y += 1) { re[y * n + x] = rowRe[y]; im[y * n + x] = rowIm[y]; }
+  }
+}
+
+/**
+ * 一份随机斜率场。高度谱 ∝ k⁻⁴（斜率谱每倍频程等能量 —— 细涟漪和长一点的波一样
+ * 「有东西」），低频在 2–4 个周期以下截掉（不许出现瓦片尺度的大斑），高频在 k≈60
+ * 滚降（离奈奎斯特 128 远一点，小 mip 不起摩尔纹）。方向带一点各向异性（风向）。
+ * 返回 { sx, sz }，已归一成单位 RMS（每个分量）。
+ */
+function RippleSlopeField(n, seed, windAngle, anisotropy) {
+  const random = Mulberry32(seed);
+  const size = n * n;
+  const gRe = new Float64Array(size), gIm = new Float64Array(size);
+  const Freq = (i) => (i < n / 2 ? i : i - n);
+  const windX = Math.cos(windAngle), windZ = Math.sin(windAngle);
+  for (let v = 0; v < n; v += 1) {
+    for (let u = 0; u < n; u += 1) {
+      const index = v * n + u;
+      // Box–Muller 一次出一对高斯数（实部、虚部），先取随机数再判零频，序列与格点一一对应
+      const radius = Math.sqrt(-2 * Math.log(Math.max(random(), 1e-12)));
+      const angle = 2 * Math.PI * random();
+      const fx = Freq(u), fz = Freq(v), k2 = fx * fx + fz * fz;
+      if (k2 === 0) continue;
+      const k = Math.sqrt(k2);
+      const lowCut = Math.min(Math.max((k - 2.0) / 2.0, 0), 1);
+      const along = (fx * windX + fz * windZ) / k;
+      const spread = 1 - anisotropy + anisotropy * along * along;
+      const amplitude = lowCut * lowCut * (3 - 2 * lowCut) * Math.exp(-k2 / 3600) * spread / k2;
+      gRe[index] = radius * Math.cos(angle) * amplitude;
+      gIm[index] = radius * Math.sin(angle) * amplitude;
+    }
+  }
+  // 厄米对称 H(k) = (G(k) + conj G(−k)) / 2 → 高度与两个斜率都是实场，
+  // 于是 Z = i·kx·H + i·(i·kz·H) 一次复 IFFT 同时得到 ∂h/∂x（实部）与 ∂h/∂z（虚部）。
+  const zRe = new Float64Array(size), zIm = new Float64Array(size);
+  for (let v = 0; v < n; v += 1) {
+    for (let u = 0; u < n; u += 1) {
+      const index = v * n + u;
+      const mirror = ((n - v) % n) * n + ((n - u) % n);
+      const hRe = 0.5 * (gRe[index] + gRe[mirror]);
+      const hIm = 0.5 * (gIm[index] - gIm[mirror]);
+      const fx = Freq(u), fz = Freq(v);
+      zRe[index] = -fx * hIm - fz * hRe;
+      zIm[index] = fx * hRe - fz * hIm;
+    }
+  }
+  Ifft2d(zRe, zIm, n);
+  let sum = 0;
+  for (let i = 0; i < size; i += 1) sum += zRe[i] * zRe[i] + zIm[i] * zIm[i];
+  const invRms = 1 / Math.sqrt(sum / (2 * size) || 1);
+  for (let i = 0; i < size; i += 1) { zRe[i] *= invRms; zIm[i] *= invRms; }
+  return { sx: zRe, sz: zIm };
+}
+
 let waterNormalTexture = null;
 function GetWaterNormalTexture() {
   if (waterNormalTexture) return waterNormalTexture;
-  const size = 128;
-  const data = new Uint8Array(size * size * 4);
-  const components = [
-    [1, 2, 0.90, 0.3], [2, -3, 0.55, 1.7], [4, 1, 0.34, 3.1],
-    [-3, 5, 0.24, 4.6], [7, 4, 0.15, 2.2], [9, -6, 0.10, 5.4],
-  ];
-  const heightAt = (ix, iy) => {
-    const x = ((ix % size) + size) % size / size;
-    const y = ((iy % size) + size) % size / size;
-    let height = 0;
-    for (const [fx, fy, amplitude, phase] of components) {
-      height += Math.sin((fx * x + fy * y) * Math.PI * 2 + phase) * amplitude;
-    }
-    return height;
-  };
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const height = heightAt(x, y);
-      const dx = (heightAt(x + 1, y) - heightAt(x - 1, y)) * 2.8;
-      const dz = (heightAt(x, y + 1) - heightAt(x, y - 1)) * 2.8;
-      const invLength = 1 / Math.hypot(dx, 1, dz);
-      const offset = (y * size + x) * 4;
-      data[offset] = Math.round((-dx * invLength * 0.5 + 0.5) * 255);
-      data[offset + 1] = Math.round((-dz * invLength * 0.5 + 0.5) * 255);
-      data[offset + 2] = Math.round((invLength * 0.5 + 0.5) * 255);
-      data[offset + 3] = Math.round((height * 0.20 + 0.5) * 255);
-    }
+  const n = RIPPLE_TEXTURE_SIZE;
+  const fieldA = RippleSlopeField(n, 0x5A11E, 0.35, 0.35);
+  const fieldB = RippleSlopeField(n, 0x2B0A7, -0.9, 0.25);
+  const data = new Uint8Array(n * n * 4);
+  const Encode = (s) => Math.round(Math.min(Math.max(0.5 + s / (2 * RIPPLE_ENCODE_SIGMA), 0), 1) * 255);
+  for (let i = 0; i < n * n; i += 1) {
+    data[i * 4] = Encode(fieldA.sx[i]);
+    data[i * 4 + 1] = Encode(fieldA.sz[i]);
+    data[i * 4 + 2] = Encode(fieldB.sx[i]);
+    data[i * 4 + 3] = Encode(fieldB.sz[i]);
   }
-  waterNormalTexture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
-  waterNormalTexture.name = "Texture_WaterNormals";
+  waterNormalTexture = new THREE.DataTexture(data, n, n, THREE.RGBAFormat, THREE.UnsignedByteType);
+  waterNormalTexture.name = "Texture_WaterRippleSlopes";
   waterNormalTexture.wrapS = THREE.RepeatWrapping;
   waterNormalTexture.wrapT = THREE.RepeatWrapping;
   waterNormalTexture.magFilter = THREE.LinearFilter;
   waterNormalTexture.minFilter = THREE.LinearMipmapLinearFilter;
   waterNormalTexture.generateMipmaps = true;
+  // 掠射角的河面全靠各向异性过滤：只做三线性，十米外顺视线方向就糊成一片平镜。
+  // three 会按驱动上限截断，这里给 8 就行。
+  waterNormalTexture.anisotropy = 8;
   waterNormalTexture.colorSpace = THREE.NoColorSpace;
   waterNormalTexture.needsUpdate = true;
   return waterNormalTexture;
@@ -110,19 +215,27 @@ export function SetWaterSkyUniforms(skyUniforms) { skyUniformsRef = skyUniforms;
  * 水面**不能**走 SSR 靶：它 `transparent + depthWrite=false`，而且整只
  * `skipNormalDepth` 藏出了预通道，所以它那一像素在 RT0 里存的是**河床**的法线
  * 与深度 —— SSR 靶在水面位置算的是河床的反射。让水面写进预通道也不行：上面
- * `BehindSurfaceDepth` 那套浅水吸收与岸线泡沫正是靠「读自己身后那个面」工作的。
+ * `BehindSurfaceDepth` 那套浑水消光与岸线泡沫正是靠「读自己身后那个面」工作的。
  * 所以水面自己按平面反射假设追同一条 Hi-Z（`SsrSurfaceBlockGlsl`），拿它自己
  * 的波浪法线当反射面，再按置信度与解析天空反射混合。
  *
- * 传 null（或压根不调）= 接 SSR 之前的行为，光照与合成一个算式没改。
+ * 传 null（或压根不调）= 只有解析天空反射，没有屏幕天空也没有 SSR。
  * **必须在任何水面材质建出来之前调**：材质按 preset+flow 缓存，建完就定型。
  */
 let ssrTraceRef = null;
 export function SetWaterSsr(traceUniforms) { ssrTraceRef = traceUniforms || null; }
 
 // ---------------------------------------------------------------------------
-// 两档预设。颜色一律从 Data_Tengxian.PALETTE.moatWater（浑浊 #6B7060）派生，
-// new THREE.Color(hex) 在 ColorManagement 下自动转线性 —— 直接当反照率用。
+// 预设。颜色一律 new THREE.Color(hex)，在 ColorManagement 下自动转线性 —— 直接当反照率用。
+//
+//   extinction   视线在水里每走 1 m 的消光系数（Beer–Lambert）：透射率 = exp(−extinction·路程）。
+//                浑水 7（一分米剩一半：船吃水那一截只透出一点影子），护城河 / 荆河 1.2–1.6。
+//   scatterColor 水体自己的散射反照率（乘天光辐照度）：浑水就是泥色。
+//   rippleSlope  涟漪的 RMS 斜率（每个分量）。三月无风的河 0.05–0.08（Cox–Munk 微风量级）。
+//   gustContrast 阵风斑块的对比：0 = 全河一样毛，0.6 = 平处只剩 40%、毛处到 124%。
+//   ssrStrength  SSR 能盖过解析 / 屏幕天空反射的最大比例（乘在置信度上，见 WATER_SSR 注释）。
+//   skyStrength  屏幕天空反射盖过解析天空的比例。
+//   crestFoam    浪尖泡沫强度（只有护城河 / 荆河那种短促的浪需要）。
 // ---------------------------------------------------------------------------
 
 function LinearColor(hex) { return new THREE.Color(hex); }
@@ -138,13 +251,16 @@ const WATER_PRESETS = {
     chop: 0.50,
     timeScale: 0.85,
     flow: [0.00, 0.00],
-    absorb: 0.46,
-    shallowColor: 0x8A9078,
-    deepColor: 0x3E443C,
+    extinction: 1.6,
+    scatterColor: 0x5C6352,
     foamColor: 0xB8B2A0,
     foamWidth: 0.42,
     foamStrength: 0.80,
-    detailStrength: 0.30,
+    crestFoam: 0.60,
+    rippleSlope: 0.070,
+    gustContrast: 0.45,
+    ssrStrength: 0.55,
+    skyStrength: 0.85,
   },
   // 荆河：三十米宽的活水，顺流有整体漂移，浪比濠里略长略高。
   river: {
@@ -156,16 +272,20 @@ const WATER_PRESETS = {
     chop: 0.55,
     timeScale: 1.0,
     flow: [0.04, 0.45],
-    absorb: 0.34,
-    shallowColor: 0x87927B,
-    deepColor: 0x39443C,
+    extinction: 1.2,
+    scatterColor: 0x56614F,
     foamColor: 0xBDB7A4,
     foamWidth: 0.60,
     foamStrength: 1.0,
-    detailStrength: 0.36,
+    crestFoam: 0.60,
+    rippleSlope: 0.080,
+    gustContrast: 0.5,
+    ssrStrength: 0.55,
+    skyStrength: 0.85,
   },
-  // 第一关北沙河（2026-09-28 B1）：三月枯水、泥沙重的缓流。吸收快（一米多深就看不见底）、
-  // 几乎没有浪尖泡沫，只在岸线与桥墩脚留一圈；颜色往灰褐泥水压，天光反射给出灰蓝。
+  // 第一关北沙河（2026-09-28 B1，2026-10-01 按河水重做）：三月枯水、泥沙重的缓流。
+  // 一两分米浑水就看不见底；没有浪尖泡沫，只在岸线、船舷、桥桩脚贴边留一细圈泥沫；
+  // 平处照得出对岸与浮桥，阵风扫过的地方发毛发亮。
   muddyRiver: {
     waves: [
       { dir: [0.99, 0.12], len: 14.0, amp: 0.018 },
@@ -175,15 +295,32 @@ const WATER_PRESETS = {
     chop: 0.35,
     timeScale: 0.8,
     flow: [0.3, 0.0],
-    absorb: 0.9,
-    shallowColor: 0x6E6A5A,
-    deepColor: 0x363730,
-    foamColor: 0x9E998A,
-    foamWidth: 0.28,
-    foamStrength: 0.35,
-    detailStrength: 0.26,
+    extinction: 7.0,
+    scatterColor: 0x6B6250,
+    foamColor: 0x968D7C,
+    foamWidth: 0.07,
+    foamStrength: 0.40,
+    crestFoam: 0.0,
+    rippleSlope: 0.070,
+    gustContrast: 0.6,
+    ssrStrength: 0.85,
+    skyStrength: 0.9,
   },
 };
+
+/**
+ * 涟漪的四个尺度。tile = 一张斜率图铺多少米；angle = 采样坐标转多少（弧度，四层
+ * 互不对齐）；drift = 相对水流的传播速度（米/秒，短波跑得快）；flowCarry = 被水流
+ * 带走的比例（大尺度的斑纹几乎跟着水走，细涟漪有自己的传播）；weight 在着色器里
+ * 归一成平方和为 1，所以 rippleSlope 就是叠加后的 RMS 斜率。
+ * 三张瓦片的边长互质般错开（31 / 8.6 / 3.3 / 1.27），重复周期远大于一条河。
+ */
+const RIPPLE_LAYERS = [
+  { tile: 31.0, field: 1, angle: 0.23, drift: [0.05, -0.03], flowCarry: 0.95, weight: 0.32 },
+  { tile: 8.6, field: 0, angle: 0.0, drift: [0.09, 0.06], flowCarry: 0.9, weight: 0.58 },
+  { tile: 3.3, field: 1, angle: 0.73, drift: [-0.06, 0.14], flowCarry: 0.85, weight: 0.55 },
+  { tile: 1.27, field: 0, angle: -1.17, drift: [0.17, -0.11], flowCarry: 0.8, weight: 0.5 },
+];
 
 // ---------------------------------------------------------------------------
 // GLSL
@@ -197,7 +334,7 @@ uniform vec2 uFlow;
 uniform float uTimeScale;
 
 varying vec3 vWorldPos;
-varying vec3 vWaveNormal;
+varying vec2 vRestXZ;
 varying float vSharpness;
 varying float vViewZ;
 
@@ -210,7 +347,6 @@ void main() {
   vec2 advected = worldPos.xz - uFlow * waterTime;
 
   vec3 disp = vec3(0.0);
-  vec3 n = vec3(0.0, 1.0, 0.0);
   float sharp = 0.0;
   float weightSum = 0.0001;
 
@@ -223,21 +359,15 @@ void main() {
     float s = sin(phase), c = cos(phase);
     // 水平位移系数取常数 chop（不做 GPU Gems 那套 Q 归一化）：
     // 这里的浪是厘米级装饰，横向摆动按振幅同量级给一点就够，归一化反而算出过冲。
-    float q = uChop;
-    disp.x += q * amp * dir.x * c;
-    disp.z += q * amp * dir.y * c;
+    disp.x += uChop * amp * dir.x * c;
+    disp.z += uChop * amp * dir.y * c;
     disp.y += amp * s;
-    // 空间导数必须乘波数 k；旧版误乘了角频率 w，长波法线被放大约五倍，
-    // 水面会像皱铝箔一样乱闪。w 只管相位随时间推进。
-    n.x -= dir.x * k * amp * c;
-    n.z -= dir.y * k * amp * c;
-    n.y -= q * k * amp * s;
     sharp += (s * 0.5 + 0.5) * (amp * k);
     weightSum += amp * k;
   }
 
   vSharpness = sharp / weightSum;
-  vWaveNormal = normalize(n);
+  vRestXZ = worldPos.xz;
   vec3 displaced = worldPos + disp;
   vWorldPos = displaced;
   vec4 viewPos = viewMatrix * vec4(displaced, 1.0);
@@ -254,6 +384,7 @@ uniform float uDepthValid;
 uniform vec2 uResolution;
 uniform vec2 uFlow;
 uniform float uTimeScale;
+uniform float uAmpScale;
 
 uniform vec3 uZenith;
 uniform vec3 uHorizon;
@@ -261,31 +392,53 @@ uniform vec3 uGround;
 uniform vec3 uSunDirection;
 uniform vec3 uSunColor;
 
-uniform vec3 uShallowColor;
-uniform vec3 uDeepColor;
+uniform vec3 uScatterColor;
 uniform vec3 uFoamColor;
-uniform float uAbsorb;
+uniform float uExtinction;
 uniform float uFoamWidth;
 uniform float uFoamStrength;
-uniform float uDetailStrength;
+uniform float uCrestFoam;
+uniform float uRippleSlope;
+uniform float uGustContrast;
 uniform float uSsrWaterStrength;
+uniform float uSkyScreenStrength;
 uniform mat4 uWaterViewMatrix;
 __SSR_BLOCK__
 
 varying vec3 vWorldPos;
-varying vec3 vWaveNormal;
+varying vec2 vRestXZ;
 varying float vSharpness;
 varying float vViewZ;
 
-// Crest 的 flow normal 双相采样：一相回卷时另一相权重最大，长时间流动不会在
-// UV 重置点跳一下。对护城河给极慢风纹，对荆河则沿 uFlow 顺流。
-vec4 SampleFlowNormal(vec2 uv, vec2 flow, float cycle) {
-  float phase0 = fract(cycle);
-  float phase1 = fract(cycle + 0.5);
-  float blend = abs(phase0 * 2.0 - 1.0);
-  vec4 sample0 = texture2D(uNormalMap, uv - flow * phase0);
-  vec4 sample1 = texture2D(uNormalMap, uv - flow * phase1);
-  return mix(sample0, sample1, blend);
+__WAVE_TABLE__
+__RIPPLE_LAYERS__
+
+// 值噪声：只给阵风斑块与泡沫打散用，频率很低，hash 精度够。
+float WaterHash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float WaterNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(WaterHash(i), WaterHash(i + vec2(1.0, 0.0)), u.x),
+             mix(WaterHash(i + vec2(0.0, 1.0)), WaterHash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+// Gerstner 的解析斜率（片元里算：河水网格横向十来米一格，逐顶点插值会把短波采坏）。
+vec2 GerstnerSlope(vec2 p, float waterTime) {
+  vec2 advected = p - uFlow * waterTime;
+  vec2 slope = vec2(0.0);
+  for (int i = 0; i < WAVE_COUNT; i++) {
+    vec2 dir = WAVE_DIR(i);
+    float k = WAVE_K(i);
+    float amp = WAVE_AMP(i) * uAmpScale;
+    float phase = k * dot(dir, advected) - WAVE_W(i) * waterTime;
+    slope += dir * (k * amp * cos(phase));
+  }
+  return slope;
 }
 
 float BehindSurfaceDepth(vec2 uv, float surfaceZ) {
@@ -308,106 +461,104 @@ void main() {
   vec3 V = normalize(cameraPosition - vWorldPos);
   float dist = length(cameraPosition - vWorldPos);
   float waterTime = uTime * uTimeScale;
-
-  // --- 法线：Gerstner 解析法线 + 两档可平铺流动法线 ---
-  float detailFade = uDetailStrength * (1.0 - smoothstep(35.0, 150.0, dist));
   vec2 flowDirection = length(uFlow) > 0.01 ? normalize(uFlow) : normalize(vec2(0.72, 0.28));
-  vec4 detail0 = SampleFlowNormal(vWorldPos.xz * 0.115, flowDirection * 0.42,
-    waterTime * 0.070);
-  vec2 rotated = vec2(vWorldPos.x - vWorldPos.z, vWorldPos.x + vWorldPos.z);
-  vec4 detail1 = SampleFlowNormal(rotated * 0.245, -flowDirection.yx * 0.36,
-    waterTime * 0.105 + 0.37);
-  vec2 grad = ((detail0.rg * 2.0 - 1.0) * 0.66 + (detail1.rg * 2.0 - 1.0) * 0.34)
-    * detailFade;
-  vec3 N = normalize(vWaveNormal + vec3(grad.x, 0.0, grad.y));
-  // 远处把波浪整体拍平：厘米级浪在两百米外只剩闪烁噪声
-  N = normalize(mix(N, vec3(0.0, 1.0, 0.0), smoothstep(180.0, 420.0, dist) * 0.5));
 
-  // --- 屏幕空间水深（Crest 的 sea-floor depth 思路，深度来源换成本作的预通道）---
+  // --- 阵风斑块：顺流拉长（沿流 46 m、横流 19 m），跟着水漂走 ---------------
+  vec2 gustPos = vRestXZ - uFlow * waterTime * 0.9 - vec2(0.06, 0.035) * waterTime;
+  vec2 gustUv = vec2(dot(gustPos, flowDirection) / 46.0,
+    dot(gustPos, vec2(-flowDirection.y, flowDirection.x)) / 19.0);
+  float gust = WaterNoise(gustUv) * 0.62 + WaterNoise(gustUv * 2.3 + vec2(7.1, 3.7)) * 0.38;
+  gust = smoothstep(0.22, 0.80, gust);
+  float roughness = mix(1.0 - uGustContrast, 1.0 + uGustContrast * 0.4, gust);
+
+  // --- 法线：Gerstner 解析斜率 + 四层涟漪 -----------------------------------
+  float lostVariance = 0.0;
+  vec2 ripple = RippleSlope(vRestXZ, waterTime, lostVariance) * (uRippleSlope * roughness);
+  // 两三百米外整体再压一半：各向异性过滤在掠射角沿短轴保留的细节到这里只剩闪烁
+  ripple *= 1.0 - smoothstep(160.0, 420.0, dist) * 0.5;
+  vec2 waveSlope = GerstnerSlope(vRestXZ, waterTime);
+  vec2 slope = waveSlope + ripple;
+  vec3 N = normalize(vec3(-slope.x, 1.0, -slope.y));
+  // SSR 追踪用的法线只带三成多细涟漪：带满的话射线逐像素乱指，近处零星打中桥面与船舷、
+  // 又被逐帧抖动成一粒一粒的暗点。倒影照样随波晃，细碎的那层留给天空反射与菲涅耳。
+  vec2 traceSlope = waveSlope + ripple * 0.35;
+  vec3 traceN = normalize(vec3(-traceSlope.x, 1.0, -traceSlope.y));
+  if (!gl_FrontFacing) { N = -N; traceN = -traceN; }     // 蹲进濠里抬头看水面
+  // 过滤掉的那部分斜率方差 → 反射锥变宽（远处不是一面完美的镜子，倒影要糊）
+  float specAlpha = 0.012 + 1.41 * uRippleSlope * roughness * sqrt(lostVariance);
+
+  // --- 屏幕空间水深：视线在水里走过的长度 ------------------------------------
   vec2 suv = gl_FragCoord.xy / max(uResolution, vec2(1.0));
   // rtNormalDepth.w 与 vViewZ 都是从相机向前递增的正数：河床在水面后方，
   // 所以必须 sceneZ - vViewZ。旧版写反后，整条河都被判成 0 深岸线。
   float rayDepth = BehindSurfaceDepth(suv, vViewZ);
   if (uDepthValid < 0.5) rayDepth = 30.0;   // 深度源没接上（探针页/首帧）：按深水渲染
-  // 视差深度换算成竖直水深：视线越平，同样的视差对应越深的水柱
+  // 竖直水深只给泡沫带用：视线越平，同样的视差对应越浅的水
   float depth = rayDepth * clamp(abs(V.y), 0.22, 1.0);
 
-  // --- 天光辐亮度近似（借天空预设的四个量，昼夜自动跟随）---
-  float sunUp = clamp(uSunDirection.y, 0.0, 1.0);
+  // --- 天光辐照度近似（借天空预设的四个量，昼夜自动跟随）---
+  vec3 sunDir = normalize(uSunDirection);
+  float sunUp = clamp(sunDir.y, 0.0, 1.0);
   vec3 irradiance = uZenith * 0.52 + uHorizon * 0.38 + uSunColor * (0.22 * sunUp);
 
-  // --- 水体：浅水吸收（浑浊的鲁南河水，不是加勒比海）---
-  float absorb = exp(-depth * uAbsorb);
-  vec3 body = mix(uDeepColor, uShallowColor, absorb) * irradiance;
-  float shallow = 1.0 - smoothstep(0.18, 1.8, depth);
-  float caustic = pow(clamp(1.0 - abs(detail0.a - detail1.a) * 3.2, 0.0, 1.0), 7.0);
-  body += uSunColor * caustic * shallow * sunUp * 0.035;
+  // --- 水体：Beer–Lambert 透射 + 泥沙散射 -----------------------------------
+  float transmit = exp(-rayDepth * uExtinction);
+  vec3 body = uScatterColor * irradiance;
 
-  // --- 泡沫：岸线带 + 浪尖 ---
-  float foamNoise = clamp(detail0.a * 0.64 + detail1.a * 0.36, 0.0, 1.0);
-  float band = sin(depth * 15.0 - waterTime * 1.8 + foamNoise * 5.0) * 0.5 + 0.5;
-  float shoreMask = 1.0 - smoothstep(0.025, uFoamWidth * (0.72 + foamNoise * 0.55), depth);
-  float shore = shoreMask * (0.34 + 0.66 * band)
-    + (1.0 - smoothstep(0.018, 0.085, depth)) * 0.62;
-  float crest = smoothstep(0.66, 0.94, vSharpness + (foamNoise - 0.5) * 0.20);
-  float foamTex = smoothstep(0.43, 0.67, foamNoise + (shore + crest) * 0.16);
-  float foam = clamp((shore * 0.92 + crest * 0.60) * foamTex * uFoamStrength, 0.0, 1.0);
+  // --- 泡沫：岸线 / 船舷接触带 + 浪尖 ---------------------------------------
+  vec2 foamPos = vRestXZ - uFlow * waterTime;
+  float foamNoise = WaterNoise(foamPos * 1.9) * 0.6 + WaterNoise(foamPos * 4.7 + vec2(3.1, 9.2)) * 0.4;
+  float shore = 1.0 - smoothstep(0.0, uFoamWidth * (0.55 + foamNoise * 0.9), depth);
+  float crest = smoothstep(0.66, 0.94, vSharpness + (foamNoise - 0.5) * 0.20) * uCrestFoam;
+  float foamTex = smoothstep(0.30, 0.70, foamNoise + (shore + crest) * 0.18);
+  // 泡沫带是厘米级的东西：几十米外只剩一条亮线（读出来像水面和岸之间裂了条缝），淡掉
+  float foam = clamp((shore * 0.95 + crest) * foamTex * uFoamStrength, 0.0, 1.0)
+    * (1.0 - smoothstep(25.0, 70.0, dist));
 
-  // --- 反射与高光 ---
+  // --- 反射：解析天空 → 屏幕天空 → SSR -------------------------------------
   vec3 R = reflect(-V, N);
   float up = clamp(R.y, -1.0, 1.0);
   vec3 refl = mix(uHorizon, uZenith, pow(clamp(up, 0.0, 1.0), 0.42));
   refl = mix(refl, uGround, smoothstep(0.02, -0.08, up));
-  float sunDot = max(dot(R, normalize(uSunDirection)), 0.0);
-  vec3 spec = uSunColor * (pow(sunDot, 420.0) * 1.9 + pow(sunDot, 42.0) * 0.18);
+  // 太阳高光按「隔着云的太阳」给宽而柔的一团：针尖高光（旧版的 pow 420）打在分米级涟漪上
+  // 会碎成满屏的小亮点，阴天里读出来是噪点。过滤掉的涟漪方差再把它摊开一点。
+  float sunDot = max(dot(R, sunDir), 0.0);
+  float sunSpread = clamp(0.06 / max(specAlpha, 0.06), 0.3, 1.0);
+  vec3 spec = uSunColor * (pow(sunDot, 90.0 * sunSpread) * 0.5 * sunSpread + pow(sunDot, 12.0) * 0.05) * sunUp;
 
-  // --- 屏幕空间反射：护城河要倒映城墙，不是一片均匀的天 -------------------
-  // 只换反射项本身（refl），菲涅尔在下面照旧决定「反射占多少」。
-  // 置信度掉到 0 的地方（屏幕边缘、射线打空、上一帧还没有颜色）自动是原来
-  // 那份解析天空反射，所以最坏情况就是今天的画面。
   __SSR_REFLECT__
 
-  float fresnel = 0.022 + 0.978 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+  float fresnel = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
 
-  // --- 合成 ---
-  vec3 scatter = uSunColor * pow(max(dot(V, -normalize(uSunDirection)), 0.0), 3.0)
-    * shallow * (1.0 - fresnel) * 0.045;
-  vec3 col = mix(body, refl, fresnel) + spec * (0.35 + 0.65 * fresnel) + scatter;
-  float foamLight = 0.74 + 0.26 * max(dot(N, normalize(uSunDirection)), 0.0);
-  col = mix(col, uFoamColor * irradiance * foamLight + spec * 0.10, foam);
+  // --- 合成（预乘 alpha）---------------------------------------------------
+  // 看到的 = 反射·F + (1 − F)·[水体散射·(1 − T) + 身后河床·T]；
+  // 河床那一项交给混合：src.a = 1 − (1 − F)·T，混合式 ONE / ONE_MINUS_SRC_ALPHA。
+  vec3 col = refl * fresnel + spec * (0.35 + 0.65 * fresnel) + body * ((1.0 - fresnel) * (1.0 - transmit));
+  float alpha = 1.0 - (1.0 - fresnel) * transmit;
+  float foamLight = 0.74 + 0.26 * max(dot(N, sunDir), 0.0);
+  col = mix(col, uFoamColor * irradiance * foamLight, foam);
+  alpha = mix(alpha, 1.0, foam);
 
-  float alpha = mix(0.52, 0.94, 1.0 - absorb);
-  alpha = clamp(max(alpha, foam * 0.96) + fresnel * 0.10, 0.0, 0.97);
-
-  gl_FragColor = vec4(col, alpha);
+  gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
 }
 `;
 
 /**
- * 水面 SSR 的口径。步数比场景 SSR 少：一条护城河宽十米，反射线从水面斜着
- * 打到对岸城墙上，三十二步的 Hi-Z 足够跨过去；水面又是半透明大面，步数直接
- * 乘在填充率上，多给没有画面收益。
- *   strength  水面反射项里 SSR 能占的最大比例（其余仍是解析天空反射）
- *   roughness 采上一帧场景色 mip 用的粗糙度：三月枯水的濠面不是镜子
+ * 水面 SSR 的口径。步数比场景 SSR 少：反射线从水面斜着打到对岸，三十二步的 Hi-Z
+ * 足够跨过去；水面又是大面，步数直接乘在填充率上，多给没有画面收益。
+ *   roughness 采上一帧场景色 mip 的粗糙度下限（片元里再按过滤掉的涟漪方差加宽）
+ *
+ * 强度在预设里（ssrStrength）。护城河那 0.55 的来历（2026-09-08，0.92 → 0.55）：
+ * 0.92 等于「有置信度的地方就整块换成 SSR」，掠射角上被换成对岸城墙那一片暗色
+ *（Gate_SouthOuter 的水面带均值 134.6 → 104.8），而且半分辨率追出来的那一份把涟漪
+ * 顶成块状低频噪声。北沙河给 0.85：平处要照得出对岸、浮桥与船，阵风斑块与新的
+ * 涟漪图让倒影本身带着涟漪，不再是一块平的。
  */
-// strength = SSR 反射盖过解析反射的比例（乘在置信度上）。
-//
-// **2026-09-08：0.92 → 0.55。** 0.92 等于「有置信度的地方就整块换成 SSR」，
-// 于是护城河那一段在掠射角上被换成了对岸城墙那一片暗色：实测 Gate_SouthOuter
-// 的水面带（x∈[60,560]、y∈[665,755]，自动曝光钉死 1.0）均值 134.6（strength 0）
-// → 104.8（0.92），而大修前基线是 133.6 —— 暗了 29/255。更要命的是**质地**：
-// 解析反射随波浪法线走，浪峰亮浪谷暗，一眼读得出涟漪；SSR 那一份是半分辨率追
-// 出来的，换过去之后涟漪被一层块状的低频噪声顶掉（斜坡旁边那块尤其明显），
-// 看着就是「水面纹理变平了」。
-// 扫值（同机位、同帧序）：0 → 134.6 / 0.25 → 123.8 / 0.40 → 122.0 /
-// **0.55 → 116.2** / 0.70 → 112.4 / 0.92 → 104.8。取 0.55：护城河仍然照得出
-// 城墙与吊桥（§17.6 买的正是这个），而涟漪的高频与明暗节奏留在解析那一份手里。
-const WATER_SSR = { steps: 32, refine: 3, strength: 0.55, roughness: 0.035 };
+const WATER_SSR = { steps: 32, refine: 3, roughness: 0.035 };
 
 /**
  * 水面片元着色器。SSR 关着（`SetWaterSsr(null)`，即 low 档或无浮点靶）时两个
- * 锚点替换成空串 —— 剩下的只有两条没人用的 uniform 声明，光照与合成那一段
- * 与接 SSR 之前**一个算式没改**。所以「水面看起来变了」只可能是 SSR 那一档的锅。
+ * 锚点替换成空串 —— 只剩解析天空反射。
  */
 function WaterFragment(withSsr) {
   if (!withSsr) {
@@ -415,17 +566,31 @@ function WaterFragment(withSsr) {
   }
   return WATER_FRAG
     .replace("__SSR_BLOCK__", SsrSurfaceBlockGlsl({
-      steps: WATER_SSR.steps, refine: WATER_SSR.refine, name: "SsrWaterReflection",
+      steps: WATER_SSR.steps, refine: WATER_SSR.refine, name: "SsrWaterReflection", rejectFront: true,
     }))
     .replace("__SSR_REFLECT__", /* glsl */`
-  if (uSsrWaterStrength > 0.0) {
-    // 水面在世界空间算光，SSR 追踪在视空间 —— 这里转一次。法线用的是含
-    // Gerstner 波与细节法线的那一份 N，所以浪峰上的倒影会跟着晃。
+  if (uSsrWaterStrength > 0.0 && uSsrHasColor > 0.5) {
+    // 水面在世界空间算光，SSR 追踪在视空间 —— 这里转一次。追踪用 traceN（细涟漪打了折，
+    // 见上），屏幕天空那一层用满涟漪的 R：它只是一次取色，不会碎成噪点。
     vec3 ssrViewPos = (uWaterViewMatrix * vec4(vWorldPos, 1.0)).xyz;
-    vec3 ssrViewNormal = normalize(mat3(uWaterViewMatrix) * N);
+    vec3 ssrViewNormal = normalize(mat3(uWaterViewMatrix) * traceN);
+    float ssrRoughness = sqrt(max(specAlpha, ${(WATER_SSR.roughness * WATER_SSR.roughness).toFixed(5)}));
+    // 屏幕里的天空：反射方向在无穷远处投到屏幕上；那一像素若是天空（预通道深度 0），
+    // 取上一帧场景色 —— 云、烟柱、天边的霾一次采样进倒影。被地物挡住的方向交给
+    // 下面的 SSR，追不中就留解析天空。
+    vec3 skyDir = mat3(uWaterViewMatrix) * R;
+    if (skyDir.z < -0.02) {
+      vec2 skyUv = SsrViewToUv(skyDir);
+      vec2 skyEdge = min(skyUv, vec2(1.0) - skyUv);
+      float skyConf = smoothstep(0.0, uSsrEdgeFade, min(skyEdge.x, skyEdge.y));
+      if (skyConf > 0.0 && texture2D(uSsrDepth, skyUv).a <= 0.0) {
+        vec3 skyRadiance = SsrFetchRadiance(skyUv, SsrColorLod(ssrRoughness, 1.0, 1.0));
+        refl = mix(refl, skyRadiance, skyConf * uSkyScreenStrength);
+      }
+    }
     float ssrNoise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453
       + uSsrFrame * 0.618034);
-    vec4 waterSsr = SsrWaterReflection(ssrViewPos, ssrViewNormal, ${WATER_SSR.roughness.toFixed(4)}, ssrNoise);
+    vec4 waterSsr = SsrWaterReflection(ssrViewPos, ssrViewNormal, ssrRoughness, ssrNoise);
     refl = mix(refl, waterSsr.rgb, clamp(waterSsr.a * uSsrWaterStrength, 0.0, 1.0));
   }`);
 }
@@ -445,6 +610,44 @@ vec2 WAVE_DIR(int i) { return WAVE_DIRS[i]; }
 float WAVE_K(int i) { return WAVE_KS[i]; }
 float WAVE_W(int i) { return WAVE_WS[i]; }
 float WAVE_AMP(int i) { return WAVE_AMPS[i]; }
+`;
+}
+
+/**
+ * 四层涟漪展开成直线代码（每层一次采样）。斜率图存的是采样坐标系里的 ∂h/∂q，
+ * 采样坐标 q = Rθ·p / tile，所以世界斜率 = Rθᵀ·s（瓦片尺度已经被单位 RMS 归一吃掉）。
+ * r：这一层按像素足迹（每像素多少个纹素）留下的比例 —— 频谱在 3–4 个纹素的波长处滚降，
+ * 足迹到 3 纹素时只留一半；lostVariance 是收掉的那部分方差。
+ */
+function RippleLayersGlsl(layers) {
+  const norm = 1 / Math.sqrt(layers.reduce((sum, layer) => sum + layer.weight * layer.weight, 0));
+  const body = layers.map((layer, index) => {
+    const c = Math.cos(layer.angle).toFixed(6), s = Math.sin(layer.angle).toFixed(6);
+    const negS = (-Math.sin(layer.angle)).toFixed(6);   // 字面量里不能写「-(-0.9)」：GLSL 把 -- 当自减
+    const texelsPerMeter = (RIPPLE_TEXTURE_SIZE / layer.tile).toFixed(6);
+    const channel = layer.field === 0 ? "rg" : "ba";
+    return `  {
+    vec2 p${index} = p - (uFlow * ${layer.flowCarry.toFixed(3)} + vec2(${layer.drift[0].toFixed(4)}, ${layer.drift[1].toFixed(4)})) * t;
+    vec2 q${index} = vec2(${c} * p${index}.x + ${negS} * p${index}.y, ${s} * p${index}.x + ${c} * p${index}.y) / ${layer.tile.toFixed(4)};
+    vec2 s${index} = (texture2D(uNormalMap, q${index}).${channel} * 2.0 - 1.0) * ${RIPPLE_ENCODE_SIGMA.toFixed(1)};
+    float f${index} = footprint * ${texelsPerMeter};
+    float r${index} = 1.0 / (1.0 + f${index} * f${index} * 0.10);
+    slope += ${(layer.weight * norm).toFixed(6)} * r${index} * vec2(${c} * s${index}.x + ${s} * s${index}.y, ${negS} * s${index}.x + ${c} * s${index}.y);
+    lostVariance += ${((layer.weight * norm) ** 2).toFixed(6)} * (1.0 - r${index} * r${index});
+  }`;
+  }).join("\n");
+  return `vec2 RippleSlope(vec2 p, float t, out float lostVariance) {
+  vec2 slope = vec2(0.0);
+  lostVariance = 0.0;
+  // 像素足迹（米）：掠射角下沿视线那一轴比横向长十几倍。各向异性过滤沿短轴还留着细节，
+  // 但反射方向随长轴那一向的涟漪乱跳 —— 那就是远岸倒影边上一粒一粒的噪点。所以往长轴偏，
+  // 每层按足迹把斜率收掉（r），收掉的那份方差记进 lostVariance，交给反射锥去糊。
+  vec2 dx = dFdx(p), dy = dFdy(p);
+  float axisX = length(dx), axisY = length(dy);
+  float footprint = mix(sqrt(axisX * axisY), max(axisX, axisY), 0.5);
+${body}
+  return slope;
+}
 `;
 }
 
@@ -468,6 +671,7 @@ function GetWaterMaterial(presetName, flowKey) {
     uSunDirection: { value: new THREE.Vector3(0.2, 0.78, -0.59).normalize() },
     uSunColor: { value: new THREE.Vector3(1.0, 0.92, 0.78) },
   };
+  const waveTable = WaveTableGlsl(preset.waves);
   const material = new THREE.ShaderMaterial({
     uniforms: {
       ...sharedUniforms,
@@ -477,26 +681,32 @@ function GetWaterMaterial(presetName, flowKey) {
         uZenith: skyU.uZenith, uHorizon: skyU.uHorizon, uGround: skyU.uGround,
         uSunDirection: skyU.uSunDirection, uSunColor: skyU.uSunColor,
       } : fallbackSkyUniforms),
-      uShallowColor: { value: LinearColor(preset.shallowColor) },
-      uDeepColor: { value: LinearColor(preset.deepColor) },
+      uScatterColor: { value: LinearColor(preset.scatterColor) },
       uFoamColor: { value: LinearColor(preset.foamColor) },
-      uAbsorb: { value: preset.absorb },
+      uExtinction: { value: preset.extinction },
       uFoamWidth: { value: preset.foamWidth },
       uFoamStrength: { value: preset.foamStrength },
-      uDetailStrength: { value: preset.detailStrength },
+      uCrestFoam: { value: preset.crestFoam },
+      uRippleSlope: { value: preset.rippleSlope },
+      uGustContrast: { value: preset.gustContrast },
       uAmpScale: { value: 1 },
       uChop: { value: preset.chop },
       uTimeScale: { value: preset.timeScale },
       uFlow: { value: new THREE.Vector2(
         flowKey ? Number(flowKey.split("_")[0]) : preset.flow[0],
         flowKey ? Number(flowKey.split("_")[1]) : preset.flow[1]) },
-      // SSR 关着时这两项也留着（值恒 0 / 单位阵），着色器里那一段整块不编。
-      uSsrWaterStrength: { value: ssrTrace ? WATER_SSR.strength : 0 },
+      // SSR 关着时这两项也留着（值恒 0），着色器里那一段整块不编。
+      uSsrWaterStrength: { value: ssrTrace ? preset.ssrStrength : 0 },
+      uSkyScreenStrength: { value: ssrTrace ? preset.skyStrength : 0 },
       ...(ssrTrace ? BindSsrTraceUniforms({}, ssrTrace) : {}),
     },
-    vertexShader: WATER_VERT.replace("__WAVE_TABLE__", WaveTableGlsl(preset.waves)),
-    fragmentShader: WaterFragment(!!ssrTrace),
+    vertexShader: WATER_VERT.replace("__WAVE_TABLE__", waveTable),
+    fragmentShader: WaterFragment(!!ssrTrace)
+      .replace("__WAVE_TABLE__", waveTable)
+      .replace("__RIPPLE_LAYERS__", RippleLayersGlsl(RIPPLE_LAYERS)),
     transparent: true,
+    // 预乘 alpha：反射项不被透明度打折，见片元「合成」一节
+    premultipliedAlpha: true,
     depthWrite: false,
     side: THREE.DoubleSide,     // 蹲进濠里抬头还要看得见水面
     fog: false,                 // 雾收在 Composite pass 里
@@ -513,7 +723,7 @@ function GetWaterMaterial(presetName, flowKey) {
  * 造一片水面网格并挂进场景。
  * @param {object} options
  *   geometry  已合批的水面几何（世界坐标，position+uv）
- *   preset    "moat" | "river"
+ *   preset    "moat" | "river" | "muddyRiver"
  *   flow      可选 [vx,vz] 覆盖预设的整体漂移（米/秒）
  *   name      场景里的对象名
  */

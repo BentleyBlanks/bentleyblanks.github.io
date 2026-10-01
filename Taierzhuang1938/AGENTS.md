@@ -26,6 +26,8 @@
 
 - **18 北沙河浮桥与奉令毁桥（2026-09-30 R3，浮桥取代铁路桥）**：约 21 条木船并排拴住（长 6.6 × 宽 2.2、船间 0.8 m、干舷 0.52 m；桥面顶 −0.23，比舷缘高 0.32 m；2026-10-01 第二轮：射位搬到水边桥头旁、被炸段北移到河心 z 122，见 `docs/Data_PontoonBridge.md` §11）的浮桥（BlenderMCP 程序建：`_blender/Script_BuildPontoonBridge.py` + `_blender/Script_ExportPontoonBridgeTerrain.mjs` → `Model/Model_PontoonBridge.glb` + `Model/Data_PontoonBridge.json`，坍塌关键帧在 Blender 里算好），起爆时中间 5 条船炸成碎块、两侧各 2 条倾斜下沉、北截缓缓向下游摆开；`Script_PontoonBridgeSet`（三态 / 起爆时间线，带 three）+ `Data_PontoonBridgeDemolition`（地址、材质、特效分量）；河与岸重做（水面在南岸地面下 1 m、南岸烂泥滩 + 芦苇、射位在烂泥垄后、铁路在河口前收尾）。口径与验收见 [docs/Data_PontoonBridge.md](docs/Data_PontoonBridge.md)，门禁 `Script_PontoonBridgeTest`，实拍 `Script_PontoonBridgeShots`。钢桁架铁路桥（`docs/Data_RailBridge.md`、`Model_RailBridge.glb` 等）**退出 18、文件保留**。
 
+- **河水着色重做（2026-10-01）**：`Script_Water` 三个预设共用 —— FFT 波谱涟漪（启动时合成，无外部资产）+ 顺流阵风斑块、浑水按视线长度 Beer–Lambert 消光、预乘 alpha、屏幕天空倒影（云 / 烟柱）+ 水面 SSR（`rejectFront`，场景 SSR 不变）；浮桥每条完好船舱一片只写深度的遮挡片挡住穿船的水面（`BuildHullWaterMasks`，船型参数与 Blender 脚本同式）。口径、三处防噪点的坑与实测开销见 [渲染管线 §4.6.1](docs/Data_TechRenderPipeline.md)，遮挡片见 [浮桥 §3](docs/Data_PontoonBridge.md)；门禁 `Script_PontoonBridgeTest`、`Script_SsrTest`。
+
 - **NPC 脚步与位移同步（2026-09-28）**：播放速率钳制 + 步幅缩放 + 骨盆下沉（UE5 Lyra 式），日军快速蹲姿移动改播共用骨架蹲走、机枪手蹲着移动不再平移，担架员与跛行伤员移动时按骨骼分层（下半身标定走路片）。口径、实机取证与门禁见 [位移与步态同步](docs/Data_ActorLocomotion.md)「速度分摊」，门禁 `Script_ActorLocomotionTest`。
 
 - **担架员抬担架动作重做（2026-09-30）**：Blender 全身动作 `LitterBearer{Front,Rear}{Walk,Stand}`（`_import/Script_LitterBearerBake.py`）：躯干直立、肩线水平，双臂直接解到杆上（杆距 ±0.29 m、高 0.88 m、握点距杆心 ≤ 5 mm），取代「视频上半身 + 走路腿 + 运行时硬拖手腕」；运行时肘极点改用 clip 当前肘位，`loadSinkM`/`loadLeanRad` 归零。口径与复现见 [担架员重做](docs/Data_LitterBearer20260930.md)，取证 `_shots/CarryProbe`（忽略目录）。

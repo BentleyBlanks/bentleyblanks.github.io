@@ -22,6 +22,7 @@ import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { MergeGeometries } from "./Script_Geo.mjs";
 import { VFX_PALETTE, ResetVfxSpawn } from "./Script_Vfx.mjs";
 import { PONTOON_BRIDGE_MODEL as M, PONTOON_BRIDGE_BLAST as FX } from "./Data_PontoonBridgeDemolition.mjs";
+import { MISSION_PONTOON_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
 
 const CHARGE_STEPS = new Set(M.chargeSteps);
 const EXPLODER_STEPS = new Set(M.exploderSteps);
@@ -147,12 +148,16 @@ export class PontoonBridgeSet {
     // 合批在把 gltf 场景挂到桥根之前做：此刻 scene 是单位变换，matrixWorld 就是桥局部坐标。
     const ofKind = (...kinds) => [...this.nodes.entries()].filter(([name]) => kinds.includes(this.kinds.get(name))).map(([, node]) => node);
     const moving = ofKind("span", "debris");
+    const north = this.nodes.get("NorthSection") || null;
     this.Pose(0);
+    const north0 = north?.matrixWorld.clone() || null;
     this.MergeInto(this.groups.static, ofKind("static"));
     this.MergeInto(this.groups.intact, moving);
     this.Pose(this.duration);
+    const northEnd = north?.matrixWorld.clone() || null;
     this.MergeInto(this.groups.wreck, moving);
     this.Pose(0);
+    this.BuildHullWaterMasks(north, north0, northEnd);
     for (const node of ofKind("static")) { scene.remove(node); node.traverse((o) => o.geometry?.dispose()); }
     for (const node of ofKind("charges")) this.groups.charges.add(node);
     for (const node of ofKind("cable", "exploder", "handle")) this.groups.exploder.add(node);
@@ -188,6 +193,93 @@ export class PontoonBridgeSet {
       mesh.receiveShadow = true;
       target.add(mesh);
     }
+  }
+
+  /**
+   * 船舱里的水面遮挡片。河水（Script_Water）是一整片平面，从船底下穿过去：敞口船的舱底在水线下
+   * 0.28 m，于是每条船舱里都露出一块水面（浑水半透明时更糟，看着像舱里灌了一层发亮的玻璃）。
+   * 这里给每条完好的船按舱内壁在水线处的截面铺一片只写深度、不写颜色的面，摆在水面上
+   * `hullWaterMask.lift`：它在不透明物之后画（renderOrder），已经画好的舱底、肋骨、芦苇不受影响，
+   * 后画的水面在舱里过不了深度测试。藏出预通道（不然 SSAO / 雾 / 水深都会读到这片假面）。
+   *
+   * 三态各一份：南截（船 0…6）一直在；完好桥身（船 7…20）跟 intact 组；北截（船 16…）在残骸组按
+   * 末帧位姿放一份、在坍塌那几秒挂在 NorthSection 节点上跟着摆。下沉 / 炸飞的船不遮 —— 它们进水了。
+   * 北截末帧的高度不一定和完好时一样（Blender 里叠了起伏）：舱里的水线跟着挪，按落得最多的那个高度取截面
+   *（坍塌途中遮挡片偏高一点无妨，它只写深度）。
+   */
+  BuildHullWaterMasks(north, north0, northEnd) {
+    const hull = M.hullWaterMask, data = this.data, waterTop = data.water.top, boatSpec = MISSION_PONTOON_BRIDGE.boats;
+    const halfL = data.layout.boatLength / 2, halfW = data.layout.boatBeam / 2;
+    const yBot = waterTop - hull.draft, yGun = waterTop + boatSpec.freeboard;
+    const Ramp = (ax, r) => { const t = Math.min(1, Math.max(0, (ax - r.from) / r.span)); return t * t; };
+    // 舱内壁在高度 level 处离船中线多远（_blender/Script_BuildPontoonBridge.py 的 InnerPoint：
+    // 内壁是从舱底面 y0 + floorT 的 BottomHalf 拉到舷缘 y1 的 HalfBeam 的直线，再往里收 wallIn）。
+    const InnerHalf = (x, level) => {
+      const ax = Math.abs(x);
+      const halfBeam = halfW - hull.beamTaper.narrow * Ramp(ax, hull.beamTaper);
+      const bottomHalf = halfBeam * hull.bottomRatio;
+      const y0 = yBot + hull.floorRise.rise * Ramp(ax, hull.floorRise) + hull.floorT;
+      const y1 = yGun + hull.gunwaleRise.rise * Ramp(ax, hull.gunwaleRise);
+      const h = Math.min(1, Math.max(0, (level - y0) / (y1 - y0)));
+      return bottomHalf + (halfBeam - bottomHalf) * h - hull.wallIn - hull.inset;
+    };
+    const xMax = halfL - hull.wallIn;
+    const half = [...hull.stationsX.filter((x) => x > 0 && x < xMax), xMax];
+    const stationXs = [...half.map((x) => -x).reverse(), ...(hull.stationsX.includes(0) ? [0] : []), ...half];
+    const material = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, side: THREE.DoubleSide });
+    material.name = "PontoonBridgeHullWaterMask";
+    // MarkNoPrepass 的同一件事（这里不引 Script_Post：Node 门禁直接跑这个模块）；
+    // 挂进场景之前设好，预通道的分类在 childadded 时现做。
+    material.allowOverride = false;
+    this.ownMaterials.push(material);
+    const MaskMesh = (name, boats, level, matrix = null) => {
+      const positions = [], indices = [];
+      for (const boat of boats) {
+        const base = positions.length / 3;
+        for (const x of stationXs) {
+          const inner = InnerHalf(x, level);
+          positions.push(x, level, boat.z - inner, x, level, boat.z + inner);
+        }
+        for (let s = 0; s < stationXs.length - 1; s += 1) {
+          const a = base + 2 * s;
+          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        }
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setIndex(indices);
+      if (matrix) geometry.applyMatrix4(matrix);
+      geometry.computeBoundingSphere();
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = `PontoonBridgeSet_HullMask${name}`;
+      mesh.renderOrder = 900;            // 不透明物里最后画：它身后的舱底必须先画完
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.skipNormalDepth = true;
+      mesh.userData.hullWaterMask = { boats: boats.map((boat) => boat.i), level };
+      return mesh;
+    };
+    const boats = data.layout.boats;
+    const sinkLo = Math.min(...boatSpec.sinking), sinkHi = Math.max(...boatSpec.sinking);
+    const southBoats = boats.filter((boat) => boat.i < sinkLo);
+    const northBoats = boats.filter((boat) => boat.i > sinkHi);
+    const level = waterTop + hull.lift;
+    this.hullMasks = {
+      static: MaskMesh("Static", southBoats, level),
+      intact: MaskMesh("Intact", boats.filter((boat) => boat.i >= sinkLo), level),
+      wreck: null, pieces: null,
+    };
+    this.groups.static.add(this.hullMasks.static);
+    this.groups.intact.add(this.hullMasks.intact);
+    if (!north || !north0 || !northEnd || !northBoats.length) return;
+    const delta = northEnd.clone().multiply(north0.clone().invert());
+    // 北截末帧往下落了多少（只有偏航与下沉，没有横滚）：取几条船里落得最多的那条
+    let drop = 0;
+    for (const boat of northBoats) drop = Math.min(drop, new THREE.Vector3(0, waterTop, boat.z).applyMatrix4(delta).y - waterTop);
+    this.hullMasks.wreck = MaskMesh("Wreck", northBoats, level - drop, delta);
+    this.hullMasks.pieces = MaskMesh("Pieces", northBoats, level - drop, north0.clone().invert());
+    this.groups.wreck.add(this.hullMasks.wreck);
+    north.add(this.hullMasks.pieces);
   }
 
   DetachWhitebox() {

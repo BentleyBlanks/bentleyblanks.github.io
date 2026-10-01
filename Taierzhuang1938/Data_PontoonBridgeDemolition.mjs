@@ -34,6 +34,21 @@ export const PONTOON_BRIDGE_MODEL = Object.freeze({
   replacesGates: Object.freeze([
     "PontoonBridgeDeck", "PontoonBridgeRailWest", "PontoonBridgeRailEast", "PontoonBridgeCutWallSouth", "PontoonBridgeCutWallNorth",
   ]),
+  // 船舱里的水面遮挡片（Script_PontoonBridgeSet.BuildHullWaterMasks）：河水是一整片平面，从船底下穿过去，
+  // 船舱里会露出一块水面（敞口船的舱底在水线下 0.28 m）。遮挡片按舱内壁在水线处的截面做、只写深度，
+  // 摆在水面上 lift 米。船型参数与 _blender/Script_BuildPontoonBridge.py 的 HalfBeam / BottomHalf / BottomY /
+  // GunwaleY / InnerPoint 同式（改船型两边一起改，Script_PontoonBridgeTest 用 GLB 船壳核对截面在舱内）。
+  hullWaterMask: Object.freeze({
+    draft: 0.28, wallIn: 0.05, floorT: 0.045, bottomRatio: 0.8,
+    beamTaper: Object.freeze({ from: 2.2, span: 1.1, narrow: 0.53 }),
+    floorRise: Object.freeze({ from: 2.2, span: 1.1, rise: 0.34 }),
+    gunwaleRise: Object.freeze({ from: 2.0, span: 1.3, rise: 0.30 }),
+    // 船壳站位（半边，_blender 的 HullShell xs；两头再加艏艉封板内侧 length/2 − wallIn）：船壳只在这些 x 上有顶点、
+    // 站与站之间是直线，遮挡片也只在这些站上取截面（按光滑曲线密取会在收窄段凸进船壁 4 cm）
+    stationsX: Object.freeze([0, 2.2, 2.75]),
+    // 再往里收 1 cm：船壁是两站之间的四边形按对角线切成两片三角，水线上的截面不是严格的直线（偏出 7 mm 以内）
+    inset: 0.01, lift: 0.05,
+  }),
   // 炸药包与桥上的导爆索只在 18 的前三步露面；地面导线与起爆器从 18 接令起一直在。
   chargeSteps: Object.freeze(["BridgeOrders", "BridgeCover", "BridgeWithdraw"]),
   exploderSteps: Object.freeze(["BridgeOrders", "BridgeCover", "BridgeWithdraw", "NightMarch"]),

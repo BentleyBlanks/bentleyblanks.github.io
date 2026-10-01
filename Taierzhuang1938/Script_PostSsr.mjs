@@ -195,8 +195,14 @@ float SsrScreenExit(vec2 uv0, vec2 duv) {
  * @param {number} steps  Hi-Z 迭代上限
  * @param {number} refine 命中后的二分细化步数
  * @param {string} name   函数名（SSR pass 与水面各要一份不同步数的）
+ * @param {boolean} rejectFront 落点在全分辨率深度上仍在面**前面**就算没打中（水面要）。
+ *   Hi-Z 第 0 级是半分辨率的 min：射线擦过细东西（栏杆、船舷）的边缘时，那一格的 min 是
+ *   栏杆，全分辨率那一像素却是它旁边的远处；二分一次都没落到「后面」时，hi 停在 Hi-Z 判定
+ *   的那一点，厚度检查只挡「钻得太深」，于是一条其实打空的射线被当成命中、取回的是那一像素
+ *   上一帧的颜色。水面上表现为近处一粒一粒的暗点（2026-10-01 浮桥边上量到）。
+ *   场景 SSR 不开：它的命中靶有时域与解算兜着，改判据要另做全场回归。
  */
-export function SsrTraceGlsl({ steps = 48, refine = 4, name = "SsrTrace" } = {}) {
+export function SsrTraceGlsl({ steps = 48, refine = 4, name = "SsrTrace", rejectFront = false } = {}) {
   return /* glsl */`
 vec4 ${name}(vec3 originView, vec3 dirView, float jitter) {
   // --- 射线段：起点 → 最远处，并且不许越过近平面 -------------------------
@@ -272,7 +278,7 @@ vec4 ${name}(vec3 originView, vec3 dirView, float jitter) {
   // 几十厘米，固定厚度会把远景整片判成「穿过去了」，所以按视深线性放宽。
   float thick = uSsrThickness + uSsrThicknessSlope * sceneZ;
   if (hitRayZ - sceneZ > thick) return vec4(0.0);
-
+${rejectFront ? "  if (sceneZ - hitRayZ > 0.02 + 0.01 * sceneZ) return vec4(0.0);" : ""}
   // --- 置信度 -----------------------------------------------------------
   float conf = 1.0;
   // 屏幕边缘：命中点越靠边，越可能是「屏幕外那部分本该挡住它」
@@ -384,9 +390,9 @@ vec3 SsrFetchRadiance(vec2 hitUv, float lod) {
  *
  * 生成一份带独立步数的函数（水面比场景反射短，32 步足够跨过一条护城河）。
  */
-export function SsrSurfaceGlsl({ steps = 32, refine = 3, name = "SsrSurfaceReflection" } = {}) {
+export function SsrSurfaceGlsl({ steps = 32, refine = 3, name = "SsrSurfaceReflection", rejectFront = false } = {}) {
   return /* glsl */`
-${SsrTraceGlsl({ steps, refine, name: `${name}Trace` })}
+${SsrTraceGlsl({ steps, refine, name: `${name}Trace`, rejectFront })}
 // viewPos / viewNormal 都是**视空间**（水面自己 viewMatrix 转一次）。
 // roughness 只用来选采色的 mip，方向仍按镜面 —— 水面粗糙度是 0.02 量级，
 // 再套一次随机 GGX 只会白白引入噪声。

@@ -224,6 +224,8 @@ export class WhiteboxSceneRenderer {
       }
       if (!object.isMesh || object === this.sky || !object.material) return;
       const sources = Array.isArray(object.material) ? object.material : [object.material];
+      // 只写深度的遮挡片（浮桥船舱里挡水面的那片）原样留着：换成白盒材质就成了一块看得见的灰板。
+      if (sources.every((m) => m.colorWrite === false && m.depthWrite)) return;
       // Soft particles/decals are meshes too. Keep solid glass/water geometry as
       // whitebox surfaces; only depthless blended effect cards are omitted.
       if (!c.effects && sources.every((m) => m.transparent && !m.depthWrite

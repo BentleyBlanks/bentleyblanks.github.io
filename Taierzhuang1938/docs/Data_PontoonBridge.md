@@ -69,6 +69,12 @@
 * 约 2.1 万三角、GLB 1.26 MB（后台懒载）；事件 34 条（全是 `water` 入水；没有 `land`、`slam`）。
 * 材质：GLB 材质名 `PontoonBridge<Key>`，运行时按 `Data_PontoonBridgeDemolition.PONTOON_BRIDGE_MODEL.materials` 换成材质库配方 + 线性色调：`Timber` / `Hull` → `HandcartWood`（船体深、桥面板浅）、
   `Rope` → `Sandbag`、`Reed` → `WattleFence`、`Iron` / `Cable` → `CarriageFloorSteel`（**不用 `Steel`**：发蓝钢在这条管线里一片黑）、`Crate` / `Charge` → `WoodCrate`。
+* **船舱水面遮挡片**（2026-10-01，`Script_PontoonBridgeSet.BuildHullWaterMasks`，数在 `PONTOON_BRIDGE_MODEL.hullWaterMask`）：河水是一整片平面、从敞口船底下穿过，
+  每条船舱里本来都露出一块水面。运行时给每条完好的船按**舱内壁在水线处的截面**铺一片只写深度的面（`colorWrite: false`、`renderOrder 900`、藏出预通道），
+  摆在水面上 5 cm：舱底、肋骨、芦苇先画完不受影响，后画的水面在舱里过不了深度测试。截面与 Blender 的 `HalfBeam / BottomHalf / BottomY / GunwaleY / InnerPoint`
+  同式、只取船壳的那几个站位（±3.25 / ±2.75 / ±2.2 / 0，站间直线），再往里收 1 cm；**改船型要两边一起改**，门禁拿 GLB 真船壳在遮挡片高度切片逐 5 cm 核对「不出内壁、缝 < 3 cm」。
+  三态：南截（船 0…6）挂 static 一直在；完好桥身（船 7…20）挂 intact；北截（船 16…20）在 wreck 组按末帧位姿一份、坍塌那几秒挂在 `NorthSection` 节点上跟着摆；下沉 / 炸飞的船不遮（进水了）。
+  白盒画质原样保留这类只写深度的面（`Script_WhiteboxRendering` 不替换 `colorWrite: false && depthWrite` 的材质），不会变成灰板。
 
 ## 4. 碰撞与三态（`Data_FirstLevelMissionLayout`）
 
@@ -136,7 +142,7 @@ Blender 进程里 `os.environ` 会留着：改渲染开关要显式设。
 ## 10. 验收
 
 ```powershell
-node Taierzhuang1938/Script_PontoonBridgeTest.mjs            # 纯 Node：烘焙产物 + 真 GLB 真时间线 + 粒子预算（321 项）
+node Taierzhuang1938/Script_PontoonBridgeTest.mjs            # 纯 Node：烘焙产物 + 真 GLB 真时间线 + 粒子预算 + 船舱遮挡片（326 项）
 node Taierzhuang1938/Script_FirstLevelEndTest.mjs            # 18 判定（等人走净、只炸一次、只调一次感知；已知基线红 ZhouDeath 15.62 s）
 node Taierzhuang1938/Script_FirstLevelSpaceTest.mjs          # 18 各节：浮桥几何、射位视线、撤出折线、河与水面（07+ 指纹预期红，集成时重生）
 node Taierzhuang1938/Script_FirstLevelMissionTopologyTest.mjs
