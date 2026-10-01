@@ -141,6 +141,9 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   `CaptureFailure` / `CheckVoiceAssets` / `InstallInputDriver` / `CampaignActions(ctx)`（`JumpStage` `Capture`
   `CaptureFocus` `WaitOutCutscene` `Route` `Interact` `RetryCampaign` `WaitStage`）。允许的起止以 `ParseCampaignArgs` 为准
   （2026-09-25：连续驾驶从 1 / 3 / 6 起，8 / 11 / 15 / 18 只配 `--stage-jumps`；`--stage-to` 收 `CAMPAIGN_SEGMENT_ENDS` = 2 / 3 / 6 / 7 / 14 / 18）。
+  `OpenCampaign` 开的页面 `page.evaluate` 带返回值体积闸（2026-10-01，`GuardEvaluateResults` / `EVALUATE_RESULT_LIMIT`）：页面函数把活的引擎对象
+  （player、actor、Object3D）带回 node 时，在页面里就报出路径与类型，不再拖到 Playwright 管道里 `ERR_STRING_TOO_LONG`。只改状态、不要返回值的
+  页面函数写花括号体（`view=>{Object.assign(player,view);}`），表达式体会把 `Object.assign` 的返回值整个回传。
 
 **人群、遗体与外观**
 

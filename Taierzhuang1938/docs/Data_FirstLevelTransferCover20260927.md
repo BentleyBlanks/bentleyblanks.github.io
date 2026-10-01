@@ -203,7 +203,7 @@ node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs
 - 拓扑门禁要求 `transferWall` 在 C 区 z ≥ 86，所以射口 z 取 86.0，胸墙在 z 84.05，射口离墙 2 m。
 - 整段实跑 `Script_FirstLevelMissionBrowserTest --campaign --stage-jumps --stage-from=11 --stage-to=14`（驾驶脚本 12 段：走通行口进场、上射口 (75.7,86.0)、
   打第一拨、挪到低墙东段打第二拨）：见下面的实测数字；跑到 14 的 Rescue 时 playwright 报 `Cannot create a string longer than 0x1fffffe8 characters`，
-  **基线 e080b510 上同一位置同样红**（与本次无关）。注意 `--stage-to` 只接受 2/3/6/7/14/18，没有 12。
+  **基线 e080b510 上同一位置同样红**（与本次无关；2026-10-01 已修，根因是 `Kit.CaptureFocus` 还原视角时把整个 player 回传，见 [系统参考](Data_AgentReference.md) 的驾驶脚本公共层一条）。注意 `--stage-to` 只接受 2/3/6/7/14/18，没有 12。
 
 ### 7.5 二轮实跑里踩到的三个坑
 
@@ -213,4 +213,4 @@ node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs
 - **回不去的岗**：何有田追东巷那拨时会翻过东段低墙到墙北的空地上，接岗的直线走位（`MidTransferWalkRoute`，没有寻路）不能穿过墙北的房，
   否则「这边我看着！去搭把手！」（`escortGranted`）永远等不到。所以路东最南一栋房（原 `TransferLaneEastHouse`）拆了，空着。
 - **循环推演**：整段实跑第三次起 12 走通：第二拨 73.6 s 出来、第一批装车 112 s、第二处 118 s 解除、何有田 197 s 接位，12 → 13 → 14 的 Carry 走通；
-  跑到 14 的 Rescue 时 playwright 报 `Cannot create a string longer than 0x1fffffe8 characters`，基线 e080b510 上同一位置同样红。
+  跑到 14 的 Rescue 时 playwright 报 `Cannot create a string longer than 0x1fffffe8 characters`，基线 e080b510 上同一位置同样红（2026-10-01 已修，同上）。

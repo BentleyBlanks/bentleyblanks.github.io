@@ -102,6 +102,61 @@ export function ParseCampaignArgs(argv = process.argv) {
   };
 }
 
+/**
+ * `page.evaluate` 的返回值整个按值过 Playwright 管道。页面函数（包括表达式体箭头函数的隐式返回）一旦带回一个活的
+ * 引擎对象（player、actor、Object3D……），Playwright 会顺着它的自有键把整张场景图连同几何的类型化数组（base64）
+ * 一起序列化：过了 512 MB，node 那头在 PipeTransport 里 `Cannot create a string longer than 0x1fffffe8 characters`
+ * （ERR_STRING_TOO_LONG）直接崩，报不出是哪一句；没过也照样每次搬几百 MB。2026-09-29 Opening 的 Restore、
+ * 2026-10-01 本文件 CaptureFocus 的还原视角各炸过一次，都是 `view=>Object.assign(window.Tengxian.player,view)`。
+ *
+ * 这里给 evaluate 包一层：结果先在页面里按 Playwright 的走法量一遍，超上限就在页面里抛错，报出最外层那个类实例的路径、
+ * 类型和页面函数开头。上限远高于正常回执（任务状态几百个对象），远低于管道极限。字符串表达式原样放行。
+ */
+export const EVALUATE_RESULT_LIMIT = Object.freeze({ objects: 200000, bytes: 32 * 1024 * 1024 });
+
+/**
+ * 按 Playwright 序列化的走法（自有可枚举键；类型化数组 / ArrayBuffer 整块按 base64 计；DOM 节点只回一个引用）量 `value`。
+ * 超过 `limit` 返回 `{ path, type, objects, bytes }`：path / type 是这条链上第一个非纯对象（类实例），再往下都是它挂着的东西；
+ * 没超返回 null。必须自包含 —— 它会被 toString 之后送进页面执行。
+ */
+export function MeasureEvaluateResult(value, limit) {
+  const Plain = (v) => { const proto = Object.getPrototypeOf(v); return proto === Object.prototype || proto === Array.prototype || proto === null; };
+  const Name = (v) => v?.constructor?.name || "Object";
+  const seen = new Set(), stack = [[value, "$", null]];
+  let objects = 0, bytes = 0;
+  while (stack.length) {
+    const [v, at, owner] = stack.pop();
+    if (typeof v === "string") { bytes += v.length; continue; }
+    if (!v || typeof v !== "object" || seen.has(v)) continue;
+    if ((typeof Node === "function" && v instanceof Node) || (typeof Window === "function" && v instanceof Window)) continue;
+    seen.add(v); objects += 1;
+    const blame = owner || (Plain(v) ? null : { path: at, type: Name(v) });
+    if (ArrayBuffer.isView(v) || v instanceof ArrayBuffer) bytes += Math.ceil(v.byteLength * 4 / 3);
+    else for (const key of Object.keys(v)) {
+      let item;
+      try { item = v[key]; } catch { continue; }
+      stack.push([item, at + "." + key, blame]);
+    }
+    if (objects > limit.objects || bytes > limit.bytes) return { ...(blame || { path: at, type: Name(v) }), objects, bytes };
+  }
+  return null;
+}
+
+/** 给 `page.evaluate` 装上返回值体积闸（见 EVALUATE_RESULT_LIMIT）。调用方式与返回值不变。 */
+export function GuardEvaluateResults(page, limit = EVALUATE_RESULT_LIMIT) {
+  const evaluate = page.evaluate.bind(page);
+  const measure = String(MeasureEvaluateResult);
+  page.evaluate = (pageFunction, arg) => typeof pageFunction !== "function" ? evaluate(pageFunction, arg)
+    : evaluate(async ({ source, arg, limit, measure }) => {
+      const result = await (0, eval)(`(${source}\n)`)(arg);
+      const over = (0, eval)(`(${measure}\n)`)(result, limit);
+      if (over) throw new Error(`page.evaluate 的返回值过大：${over.path} 是 ${over.type}（量到 ${over.objects} 个对象、`
+        + `${(over.bytes / 1048576).toFixed(1)} MB 时超限）。只回传纯数据，别把引擎对象带回 node。页面函数：${source.slice(0, 200)}`);
+      return result;
+    }, { source: String(pageFunction), arg, limit, measure });
+  return page;
+}
+
 /** 起服务、起浏览器、开页面，返回 ctx。 */
 export async function OpenCampaign(options) {
   // --evidence-tag (Gate) or CAMPAIGN_SHOTS_TAG (Front relay r2): runs of the same suite in parallel keep their evidence apart
@@ -112,7 +167,7 @@ export async function OpenCampaign(options) {
   // Serve an unchanged checkout for failure comparison; evidence stays in this task's tree.
   const server = await ServeRoot(options.baselineRoot ? path.resolve(options.baselineRoot) : root, 0);
   const browser = await LaunchBrowser();
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const page = GuardEvaluateResults(await browser.newPage({ viewport: { width: 1280, height: 720 } }));
   const errors = [];
   page.on("pageerror", (error) => { errors.push(String(error)); console.log("PAGEERROR", String(error)); });
   const ctx = {
@@ -814,7 +869,9 @@ export function CampaignActions(ctx) {
       return previous;
     },point);
     await Capture(name);
-    await page.evaluate(view=>Object.assign(window.Tengxian.player,view),view);
+    // 花括号不能省：表达式体会把 Object.assign 的返回值 —— 整个 player 连同挂在它身上的场景图 —— 回传给 node
+    // （2026-10-01 的 14 MedicalRescue / 18 BridgeRunner 就死在这一句，见 GuardEvaluateResults）。
+    await page.evaluate(view=>{Object.assign(window.Tengxian.player,view);},view);
   }
   /**
    * 站到指定位置朝指定点拍一张（拍完把玩家的位置与朝向还回去）。取证用：真实驱动到某一刻，再从概念图机位看。
