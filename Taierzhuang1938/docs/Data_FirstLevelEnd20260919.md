@@ -105,10 +105,11 @@
 
 ### 17 Death — 确认老周死亡
 
-* 军医真的走到担架边（`surgeonReachM`）→ `deathMedicArrived` → `BeginControl("death", 14 s)`；
+* 军医真的走到担架边（`surgeonReachM`）→ `deathMedicArrived` → `BeginControl("death", 16 s)`；
   幺娃沿真实接收路线走到 `receptionYard.yaowaBedside`，在担架东侧约 2 m 留守，收起步枪并以低姿复用空手伸取姿态整理覆盖物；进入 18 接令时恢复步枪与战斗状态。这个侧位也让开顺子后抬手与第一人称镜头通道。
   → `ZhouDeath`（七句，第一句之后有 `ZhouNoAnswer` 的停顿）。
-  `deathSeconds` 从 12 抬到 **14**：强制对齐量出 `ZhouDeath` 是 13.52 s，旧的 8–12 s 口径作废。
+  `deathSeconds` 从 12 抬到 14（09-20 录音强制对齐 13.52 s），2026-09-30 顺子重录后 `ZhouDeath` 末句结束在 15.62 s（整条 15.65 s），
+  再抬到 **16**；旧的 8–14 s 口径作废。运行时另有一道闸：`ZhouDeath` 没播完不还权。
 * 受控演出放完只是**确认**（`reception.OnDeathSceneEnd()`）。17 走完还要接收处真的继续工作：
   门外一副担架沿 `E.nextLitterRoute` 抬进来 → `NextLitter` → 军医转过去救下一个
   → 幺娃在老周身边待满 `coverStraightenS`（把覆盖物拉正）→ 才记 `deathSceneComplete`。
@@ -207,7 +208,7 @@
 
 | 名字 | 值 | 出处 |
 | --- | --- | --- |
-| `MISSION_TUNING.deathSeconds` | 14 | `MISSION_VOICE_ALIGNMENT.ZhouDeath` 末句结束 13.52 s + 收尾 |
+| `MISSION_TUNING.deathSeconds` | 16 | `MISSION_VOICE_ALIGNMENT.ZhouDeath` 末句结束 15.62 s（2026-09-30 重录）+ 收尾 |
 | `ditchShelterM` | 2.5 | 沟底宽下限 3.24 m 的一半 + 0.9 m 排队余量 |
 | `columnMovingM` | 3.4 | `R.litterSpacingM` |
 | `carrySwapProgressM` | 12 | 夹道 84 m 的前 1/7：先听见枪火消失再换人 |
@@ -357,7 +358,8 @@ ok debug starts 15–18 continued with real player input through their next stag
 这条夹具会在 15、16、17、18 **每个阶段重新执行一次 debug jump 并重建先验状态**；
 它证明四个调试起点都能接受真实玩家输入、走过各自下一阶段，最后一次 18 能到
 `Complete`。它不是一份从 15 开始、保留同一份运行时状态连续走到结尾的通关证据。
-17 的实际 `death` 控制段量得 14.000 s，控制归还时 `ZhouDeath` 已播放完毕。
+17 的实际 `death` 控制段量得 14.000 s，控制归还时 `ZhouDeath` 已播放完毕（当时 `deathSeconds` = 14、旧录音 13.52 s；
+2026-10-01 抬到 16 s 后这条浏览器回执未重跑）。
 
 `--campaign --stage-jumps --stage-from=18` 也已独立通过，原始回执为：
 

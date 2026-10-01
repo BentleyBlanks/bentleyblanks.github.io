@@ -100,10 +100,11 @@ export const MISSION_TUNING = Object.freeze({
   walkSpeedMps: 1.7,
   squadSpeedMps: 3.05,
   diveSeconds: 2,
-  // 17 老周牺牲那一段的接管时长。旧的 8–12 s 是采用稿之前的短版；现在 ZhouDeath
-  // 是七句 + 第一句之后那段「……」，强制对齐量出来 13.52 s
-  //（Data_FirstLevelMissionVoiceAlignment.ZhouDeath 末句结束时刻），留半秒收尾。
-  deathSeconds: 14,
+  // 17 老周牺牲那一段的接管时长。旧的 8–12 s 是采用稿之前的短版；ZhouDeath
+  // 是七句 + 第一句之后那段「……」。2026-09-30 顺子重录后强制对齐量出末句结束在 15.62 s
+  //（Data_FirstLevelMissionVoiceAlignment.ZhouDeath，整条 mp3 15.65 s），取整到 16 s 收尾
+  //（原 14 s 是 09-20 录音的 13.52 s + 半秒；运行时还会等 ZhouDeath 播完才还权，这里是计划时长与下限）。
+  deathSeconds: 16,
   deathLookSeconds: .65,
   deathLookHeightM: .44,
   // Commit the finite front force at the last approach bend, not while the
