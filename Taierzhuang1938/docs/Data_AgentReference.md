@@ -33,6 +33,8 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=x   # 第一关三�
 node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --strict    # 同 §17.1 口径：3394×1348/high、dt=0、逐 pass GPU/submit/draw 归账（可加 --ablate= / --root=）
 node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --counts    # 只数不计时：draw / traverse / updateWorldMatrix 节点访问（有负载的机器上唯一可信的对照）
 node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --shot ; --diff=a,b
+node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --find=名字 --event=#编号 --textures   # 单帧逐 DC：事件详情/纹理/状态
+node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --pixel=x,y --pass-images             # 谁画了这个像素、各 Pass 结束画面
 ```
 
 **命令行剖析 `Script_ProfileCli.mjs`**：起一次浏览器、摆好机位、开剖析器跑一段，
@@ -61,7 +63,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 与 [渲染管线](Data_TechRenderPipeline.md) §17.11；
 调试页 `Probe.html` 把材质 / 光照 / 后处理单独摆出来看。
 
-**单帧绘制调试器**：同组的 **Frame Debugger** 独立窗口捕获并冻结完整渲染帧，逐 DC/Pass 回放，查看 CPU/GPU 耗时、MRT/深度输出、网格、Shader/状态/纹理；关闭恢复模拟。入口、计时口径、WebGL 平台边界和回归命令见 [Frame Debugger](Data_FrameDebugger.md)。核心为 `Script_FrameDebugger` / `Script_FrameDebugGl`，窗口为 `Script_EditorFrameDebugger`；`Script_FrameDebuggerTest` 验证真实 GPU 像素回放与恢复。
+**单帧绘制调试器**：同组的 **Frame Debugger** 独立窗口捕获并冻结完整渲染帧，逐 DC/Pass 回放，查看 CPU/GPU 耗时、MRT/深度输出、网格、Shader/状态/纹理；关闭恢复模拟。入口、计时口径、WebGL 平台边界和回归命令见 [Frame Debugger](Data_FrameDebugger.md)。核心为 `Script_FrameDebugger` / `Script_FrameDebugGl`，窗口为 `Script_EditorFrameDebugger`；**agent 查渲染 bug 用 `Script_FrameDebugCli` 或页面内 `Tengxian.FrameDebug`**（纯 JSON：筛事件、事件详情、原始像素值、像素历史、Pass 结束画面，见该分册「Agent 接口」）；`Script_FrameDebuggerTest` 验证真实 GPU 像素回放与恢复。
 
 
 ## 路由表：改哪个系统，动哪些文件，先读哪份分册

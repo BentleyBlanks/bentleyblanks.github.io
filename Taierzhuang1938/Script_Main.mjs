@@ -129,6 +129,7 @@ import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
 import { FrameDebugger } from "./Script_FrameDebugger.mjs";
+import { FrameDebugAgent } from "./Script_FrameDebugAgent.mjs";
 import { AutoQuality } from "./Script_AutoQuality.mjs";
 import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
 import { BREATH_HOLD, FREE_AIM } from "./Data_Tuning_Player.mjs";
@@ -2190,6 +2191,8 @@ async function Boot() {
     // gi 是取值器：探针体默认不构造，运行时打开（ApplyGraphics）才补建，
     // 拷值出去的话冒烟与剖析脚本拿到的永远是 boot 时那个 null
     renderer, scene, camera, post, sky, lights, library, profiler, FrameDebugger: frameDebugger,
+    // agent / 脚本查帧：纯 JSON 的捕获、筛事件、读原始像素、像素历史（docs/Data_FrameDebugger.md「Agent 接口」）
+    FrameDebug: new FrameDebugAgent(frameDebugger, { Step: () => StepFrames(1) }),
     // 阴影烘焙子树跳过（Script_ShadowSkip）：取证脚本读登记数、同页 A/B 开关
     shadowSkip: { Count: ShadowSkipCount, SetEnabled: SetShadowSkipEnabled },
     // 骨头子树遍历剪枝（Script_BonePrune）：同页 A/B 开关、剪掉的根数与节点数

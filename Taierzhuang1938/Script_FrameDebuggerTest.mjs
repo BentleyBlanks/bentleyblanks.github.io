@@ -33,6 +33,7 @@ try {
   const result = await page.evaluate(async ({ base, samples }) => {
     const THREE = await import('three');
     const { FrameDebugger } = await import(`${base}/Taierzhuang1938/Script_FrameDebugger.mjs`);
+    const { FrameDebugAgent } = await import(`${base}/Taierzhuang1938/Script_FrameDebugAgent.mjs`);
     const { FrameProfiler } = await import(`${base}/Taierzhuang1938/Script_Profiler.mjs`);
     const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
     renderer.setSize(128, 96); document.body.append(renderer.domElement);
@@ -95,6 +96,13 @@ try {
     const outputDraw = info.events.findLast(event => event.draw);
     const sampled = debug.TexturePreview(outputDraw.index, outputDraw.textures.findIndex(texture => texture.name === 'TestColor'), { width: 32 });
     const sampledLit = sampled.pixels.some((value, i) => i % 4 !== 3 && value > 0);
+    // (20,48) is covered only by the left quad: raw values and the pixel history
+    // must name it as the last writer with its linear tint (half float).
+    const history = debug.PixelHistory(20, 48, { event: first });
+    const raw = debug.ReadPixels(first, 0, 20, 48).values[0][0];
+    const rawDepth = debug.ReadPixels(first, 2, 20, 48).values[0][0][0];
+    const rawBack = debug.ReadPixels(last, 0, 20, 48).values[0][0];
+    const tint = new THREE.Color(0xff4030);
     const a = debug.Preview(first, 0, { width: 128 });
     const b = debug.Preview(last, 0, { width: 128 });
     const c = debug.Preview(first, 0, { width: 128 });
@@ -116,6 +124,15 @@ try {
       gl.getParameter = function (key) { return key === timer.GPU_DISJOINT_EXT ? true : getParameter.call(gl, key); };
       debug.EndRender(); disjoint = debug.Inspect(); gl.getParameter = getParameter; debug.Resume();
     }
+    const agent = new FrameDebugAgent(debug, { Step: () => { debug.BeginRender(); Render(); debug.EndRender(); } });
+    const agentSummary = await agent.Capture({ timeoutMs: 5000 });
+    const leftIndex = agent.Events({ text: 'Left red' }).rows[0]?.index;
+    const agentEvent = agent.Event(leftIndex), agentImage = agent.Image(leftIndex, { width: 64 });
+    const agentJson = JSON.stringify({ agentSummary, agentEvent, events: agent.Events({ limit: 1e9 }) }).length;
+    const agentResult = { draws: agentSummary.draws, passes: agentSummary.passes.map(pass => pass.path), leftCount: agent.Events({ text: 'Left red' }).count,
+      zTest: agentEvent.state.ZTest, tint: agentEvent.uniforms.find(uniform => uniform.name === 'tint')?.value, png: agentImage.png.slice(0, 22), json: agentJson,
+      pixel: agent.Pixels(leftIndex, 20, 48).values[0][0], help: Object.keys(agent.Help().methods).length };
+    agent.Release();
     debug.RequestCapture(); debug.BeginRender(); Render(); debug.EndRender();
     debug.Present(debug.Preview(last));
     const presented = !!document.querySelector('#frameDebuggerGameView');
@@ -143,8 +160,9 @@ try {
     const glError = gl.getError(); debug.Dispose(); renderer.dispose();
     return { baseline, captured, beforeReplay, resumed, restored, glError, events: info.events.length, draws: info.events.filter(event => event.draw).length,
       multiDraw: multi?.drawInfo, hasMultiDraw: !!gl.getExtension('WEBGL_multi_draw'), instanced: instanced?.drawInfo,
-      unsupported: { status: unsupported.gpuStatus, total: unsupported.gpuMs },
+      unsupported: { status: unsupported.gpuStatus, total: unsupported.gpuMs }, agent: agentResult,
       disjoint: disjoint ? { status: disjoint.gpuStatus, total: disjoint.gpuMs } : null, rejected, fresh, profilerPaused, profilerResumed, presented, resizeReleased,
+      pixel: { raw, rawDepth, rawBack, tint: [tint.r, tint.g, tint.b], writes: history.writes, lastWriter: history.history.filter(item => item.changed).at(-1)?.label, final: history.final },
       passes: info.passes.map(pass => pass.name), organized, sampledLit, sampledSize: [sampled.width, sampled.height],
       groupTiming: timing.passes.filter(pass => pass.synthetic).map(pass => pass.gpuMs), firstHash: PixelHash(a.pixels), lastHash: PixelHash(b.pixels), repeatedHash: PixelHash(c.pixels),
       mrtHash: PixelHash(mrt.pixels), depthRange: [Math.min(...depth.pixels), Math.max(...depth.pixels)],
@@ -177,6 +195,16 @@ try {
   assert.match(result.organized.clear, /^\((Color|Depth|Stencil)( (Depth|Stencil))*\)$/);
   assert.equal(result.organized.named, 'Left red');
   assert.ok(result.sampledLit, 'a sampled texture must read back as the draw sees it');
+  const Near = (values, expected, tolerance = 4e-3) => expected.every((value, i) => Math.abs(values[i] - value) < tolerance);
+  assert.ok(Near(result.pixel.raw, result.pixel.tint), `raw HDR read must return the draw's linear tint: ${result.pixel.raw}`);
+  assert.ok(result.pixel.rawDepth > 0 && result.pixel.rawDepth < 1, `raw depth must be in (0,1): ${result.pixel.rawDepth}`);
+  assert.ok(Near(result.pixel.rawBack, [1, 0x40 / 255, 0x30 / 255], 1.5 / 255), `the output draw shows that red sRGB-encoded on the backbuffer: ${result.pixel.rawBack}`);
+  assert.equal(result.pixel.lastWriter, 'Left red', 'pixel history must name the last writer');
+  assert.ok(result.pixel.writes >= 2 && Near(result.pixel.final, result.pixel.raw), 'history: clear then the left quad');
+  assert.equal(result.agent.leftCount, 1); assert.equal(result.agent.zTest, 'LEqual'); assert.equal(result.agent.png, 'data:image/png;base64,');
+  assert.ok(Near(result.agent.tint, result.pixel.tint, 1e-6), 'agent Event() reports live uniform values');
+  assert.ok(Near(result.agent.pixel, result.pixel.raw), 'agent Pixels() is the same raw read');
+  assert.ok(result.agent.passes.includes('main/DrawTransparentObjects') && result.agent.draws === result.draws && result.agent.json > 1000 && result.agent.help >= 8);
   assert.deepEqual(result.sampledSize, [32, 24]);
   if (result.timing.status === 'ready') assert.ok(result.groupTiming.every(value => Number.isFinite(value) && value >= 0), 'synthetic groups must receive GPU time');
   if (result.timing.status === 'ready') assert.ok(result.timing.values.every(value => Number.isFinite(value) && value >= 0));

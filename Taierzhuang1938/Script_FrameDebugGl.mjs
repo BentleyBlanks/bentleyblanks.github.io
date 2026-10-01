@@ -279,3 +279,94 @@ function DrawPreview(gl, input, sourceWidth, sourceHeight, depth, { channel = 'r
     return { width: w, height: h, pixels: flipped };
   } finally { resources.reverse().forEach(Dispose => Dispose()); }
 }
+
+// Raw attachment values (HDR floats, depth in [0,1]) for agents and pixel
+// history. Region in GL coordinates (bottom-left origin). Blits the region out
+// of the attachment (resolving MSAA), then texelFetches it into RGBA32F.
+export function ReadRaw(gl, source, attachment, x, y, w = 1, h = 1) {
+  if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('EXT_color_buffer_float unavailable');
+  const a = attachment, name = String(EnumName(gl, a.format));
+  if (!a.depth && /\dU?I$/.test(name)) throw new Error(`Integer attachment ${name} has no float readback`);
+  const restore = SaveGlState(gl), resources = [];
+  try {
+    const combined = a.format === gl.DEPTH24_STENCIL8 || a.format === gl.DEPTH32F_STENCIL8;
+    // A multisampled source may only be blitted with identical rectangles:
+    // resolve all of it, then fetch the region at an offset.
+    const full = a.samples > 0, copyW = full ? a.width : w, copyH = full ? a.height : h;
+    const Texture = (format, tw, th) => {
+      const texture = gl.createTexture(); resources.push(() => gl.deleteTexture(texture));
+      gl.bindTexture(gl.TEXTURE_2D, texture); gl.texStorage2D(gl.TEXTURE_2D, 1, format, tw, th);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      return texture;
+    };
+    const Framebuffer = (point, texture) => {
+      const framebuffer = gl.createFramebuffer(); resources.push(() => gl.deleteFramebuffer(framebuffer));
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, framebuffer); gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, point, gl.TEXTURE_2D, texture, 0);
+      return framebuffer;
+    };
+    const copy = Texture(a.format, copyW, copyH);
+    Framebuffer(combined ? gl.DEPTH_STENCIL_ATTACHMENT : a.depth ? gl.DEPTH_ATTACHMENT : gl.COLOR_ATTACHMENT0, copy);
+    gl.drawBuffers([a.depth ? gl.NONE : gl.COLOR_ATTACHMENT0]);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, source);
+    if (!a.depth) gl.readBuffer(a.sourcePoint);
+    gl.disable(gl.SCISSOR_TEST);
+    if (full) gl.blitFramebuffer(0, 0, copyW, copyH, 0, 0, copyW, copyH, a.depth ? gl.DEPTH_BUFFER_BIT | (combined ? gl.STENCIL_BUFFER_BIT : 0) : gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    else gl.blitFramebuffer(x, y, x + w, y + h, 0, 0, w, h, a.depth ? gl.DEPTH_BUFFER_BIT | (combined ? gl.STENCIL_BUFFER_BIT : 0) : gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    const output = Texture(gl.RGBA32F, w, h);
+    const resultFramebuffer = Framebuffer(gl.COLOR_ATTACHMENT0, output); gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+    const vertex = gl.createShader(gl.VERTEX_SHADER), fragment = gl.createShader(gl.FRAGMENT_SHADER), program = gl.createProgram();
+    resources.push(() => { gl.deleteProgram(program); gl.deleteShader(vertex); gl.deleteShader(fragment); });
+    gl.shaderSource(vertex, '#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}');
+    gl.shaderSource(fragment, '#version 300 es\nprecision highp float;uniform highp sampler2D tex;uniform ivec2 offset;out vec4 color;void main(){color=texelFetch(tex,ivec2(gl_FragCoord.xy)+offset,0);}');
+    for (const shader of [vertex, fragment]) { gl.compileShader(shader); gl.attachShader(program, shader); }
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+    const vao = gl.createVertexArray(); resources.push(() => gl.deleteVertexArray(vao)); gl.bindVertexArray(vao);
+    gl.useProgram(program); gl.activeTexture(gl.TEXTURE0); gl.bindSampler(0, null); gl.bindTexture(gl.TEXTURE_2D, copy);
+    gl.uniform1i(gl.getUniformLocation(program, 'tex'), 0); gl.uniform2i(gl.getUniformLocation(program, 'offset'), full ? x : 0, full ? y : 0);
+    for (const flag of [gl.DEPTH_TEST, gl.STENCIL_TEST, gl.CULL_FACE, gl.BLEND, gl.SCISSOR_TEST, gl.RASTERIZER_DISCARD]) gl.disable(flag);
+    gl.colorMask(true, true, true, true); gl.viewport(0, 0, w, h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    const pixels = new Float32Array(w * h * 4);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); gl.pixelStorei(gl.PACK_ALIGNMENT, 4);
+    gl.pixelStorei(gl.PACK_ROW_LENGTH, 0); gl.pixelStorei(gl.PACK_SKIP_PIXELS, 0); gl.pixelStorei(gl.PACK_SKIP_ROWS, 0);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, resultFramebuffer); gl.readBuffer(gl.COLOR_ATTACHMENT0); gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, pixels);
+    return pixels;
+  } finally { resources.reverse().forEach(Dispose => Dispose()); restore(); }
+}
+
+// Shared by the window and the agent API so both describe an event in the same words.
+const PRETTY = { FUNC_ADD: 'Add', FUNC_SUBTRACT: 'Sub', FUNC_REVERSE_SUBTRACT: 'RevSub', LEQUAL: 'LEqual', GEQUAL: 'GEqual', NOTEQUAL: 'NotEqual',
+  INCR: 'IncrSat', DECR: 'DecrSat', INCR_WRAP: 'IncrWrap', DECR_WRAP: 'DecrWrap', CCW: 'CCW', CW: 'CW', FRONT_AND_BACK: 'FrontAndBack' };
+export const Pretty = name => typeof name !== 'string' ? String(name) : PRETTY[name] ?? name.toLowerCase().split('_').map(word => word[0].toUpperCase() + word.slice(1)).join('');
+const Hex8 = value => `0x${((value >>> 0) & 0xff).toString(16).toUpperCase().padStart(2, '0')}`;
+export const PRIMITIVES = { TRIANGLES: count => count / 3, TRIANGLE_STRIP: count => Math.max(0, count - 2), TRIANGLE_FAN: count => Math.max(0, count - 2),
+  LINES: count => count / 2, LINE_STRIP: count => Math.max(0, count - 1), LINE_LOOP: count => count, POINTS: count => count };
+export const Primitives = info => !info ? null : Math.round(info.parts.reduce((sum, part) => sum + (PRIMITIVES[info.topology] || PRIMITIVES.POINTS)(part.count) * part.instances, 0));
+// Unity Frame Debugger wording: Blend / ZTest / ZWrite / Cull / Stencil ...
+export function RenderStateRows(s, Num = String) {
+  const blend = s.BLEND ? `${Pretty(s.BLEND_SRC_RGB)} ${Pretty(s.BLEND_DST_RGB)}, ${Pretty(s.BLEND_SRC_ALPHA)} ${Pretty(s.BLEND_DST_ALPHA)}` : 'Off';
+  const mask = s.COLOR_WRITEMASK.map((on, i) => on ? 'RGBA'[i] : '').join('') || '0';
+  const Stencil = back => { const p = back ? 'STENCIL_BACK_' : 'STENCIL_';
+    return `Ref ${s[`${p}REF`]} · Read ${Hex8(s[`${p}VALUE_MASK`])} · Write ${Hex8(s[`${p}WRITEMASK`])} · Comp ${Pretty(s[`${p}FUNC`])} · Pass ${Pretty(s[`${p}PASS_DEPTH_PASS`])} · Fail ${Pretty(s[`${p}FAIL`])} · ZFail ${Pretty(s[`${p}PASS_DEPTH_FAIL`])}`; };
+  const front = Stencil(false), back = Stencil(true);
+  return [
+    ['Blend', blend], ['BlendOp', s.BLEND ? `${Pretty(s.BLEND_EQUATION_RGB)}, ${Pretty(s.BLEND_EQUATION_ALPHA)}` : undefined],
+    ['Blend color', s.BLEND && /CONSTANT/.test(`${s.BLEND_SRC_RGB}${s.BLEND_DST_RGB}${s.BLEND_SRC_ALPHA}${s.BLEND_DST_ALPHA}`) ? s.BLEND_COLOR.map(Num).join(', ') : undefined],
+    ['ColorMask', mask], ['ZTest', s.DEPTH_TEST ? Pretty(s.DEPTH_FUNC) : 'Off'], ['ZWrite', s.DEPTH_TEST && s.DEPTH_WRITEMASK ? 'On' : 'Off', !s.DEPTH_TEST && s.DEPTH_WRITEMASK ? '深度测试关闭时 GL 不写深度' : ''],
+    ['Cull', s.CULL_FACE ? Pretty(s.CULL_FACE_MODE) : 'Off'], ['FrontFace', s.FRONT_FACE], ['Offset', s.POLYGON_OFFSET_FILL ? `${Num(s.POLYGON_OFFSET_FACTOR)}, ${Num(s.POLYGON_OFFSET_UNITS)}` : 'Off'],
+    ['Stencil', s.STENCIL_TEST ? front : 'Off'], ['Stencil back', s.STENCIL_TEST && back !== front ? back : undefined],
+    ['Viewport', s.VIEWPORT.join(', ')], ['Scissor', s.SCISSOR_TEST ? s.SCISSOR_BOX.join(', ') : 'Off'], ['Depth range', s.DEPTH_RANGE.map(Num).join(' – ')],
+    ['Draw buffers', s.DRAW_BUFFERS?.join(', ')], ['Alpha to coverage', s.SAMPLE_ALPHA_TO_COVERAGE ? 'On' : 'Off'], ['Rasterizer discard', s.RASTERIZER_DISCARD ? 'On' : undefined]].filter(row => row[1] !== undefined);
+}
+
+export function ApiCall(gl, event) {
+  const info = event.drawInfo;
+  const args = event.args.map((value, i) => {
+    if (i === 0 && info) return info.topology;
+    if (info?.indexType && ['drawElements', 'drawElementsInstanced'].includes(event.api) && i === 2) return info.indexType;
+    if (event.api === 'clear' && i === 0) return ['COLOR_BUFFER_BIT', 'DEPTH_BUFFER_BIT', 'STENCIL_BUFFER_BIT'].filter(name => value & gl[name]).join(' | ') || '0';
+    const text = String(value); return text.length > 28 ? `${text.slice(0, 26)}…` : text;
+  });
+  return `${event.api}(${args.join(', ')})`;
+}

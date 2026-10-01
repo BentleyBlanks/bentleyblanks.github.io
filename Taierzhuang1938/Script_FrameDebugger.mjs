@@ -1,4 +1,4 @@
-import { CopyValue, SaveGlState, EnumName, ReadProgram, ReadDrawState, DescribeFramebuffer, CopyAttachment, ReadOutput, ReadTexture } from './Script_FrameDebugGl.mjs';
+import { CopyValue, SaveGlState, EnumName, ReadProgram, ReadDrawState, DescribeFramebuffer, CopyAttachment, ReadOutput, ReadTexture, ReadRaw } from './Script_FrameDebugGl.mjs';
 
 const DRAW = /^(drawArrays|drawElements|drawRangeElements)(Instanced)?$|^multiDraw/;
 const EVENT = /^(drawArrays|drawElements|drawRangeElements)(Instanced)?$|^multiDraw|^clear$|^clearBuffer|^blitFramebuffer$|^copyTex|^generateMipmap$/;
@@ -550,6 +550,60 @@ export class FrameDebugger {
     const attachment = target.attachments[attachmentIndex];
     if (!attachment || attachment.stencil) throw new Error('This attachment has no color/depth preview');
     return ReadOutput(this.gl, target.framebuffer, attachment, options);
+  }
+  // Raw attachment values after `index` (floats; depth in [0,1]; sRGB targets
+  // come back linear). x / y are image coordinates, top-left origin.
+  ReadPixels(index, attachmentIndex = 0, x = 0, y = 0, w = 1, h = 1) {
+    if (!this.frozen) throw new Error('Capture a frame first');
+    const event = this._events[index]; if (!event) throw new Error(`No event ${index}`);
+    const attachment = event._target.attachments[attachmentIndex];
+    if (!attachment || attachment.stencil) throw new Error(`No readable attachment ${attachmentIndex} on ${event.target}`);
+    const rect = this._Rect(attachment, x, y, w, h);
+    if (this._replayedAt !== index) this.Replay(index);
+    return { width: rect.w, height: rect.h, values: this._Rows(ReadRaw(this.gl, event._target.framebuffer, attachment, rect.x, rect.glY, rect.w, rect.h), rect.w, rect.h) };
+  }
+  _Rect(attachment, x, y, w, h) {
+    x = Math.floor(x); y = Math.floor(y); w = Math.max(1, Math.floor(w)); h = Math.max(1, Math.floor(h));
+    if (x < 0 || y < 0 || x + w > attachment.width || y + h > attachment.height) throw new Error(`Region ${x},${y} ${w}x${h} outside ${attachment.width}x${attachment.height}`);
+    return { x, y, w, h, glY: attachment.height - y - h };
+  }
+  // GL rows run bottom-up; agents read images top-down.
+  _Rows(pixels, w, h) {
+    const rows = [];
+    for (let row = h - 1; row >= 0; row--) {
+      const line = [];
+      for (let column = 0; column < w; column++) line.push(Array.from(pixels.subarray((row * w + column) * 4, (row * w + column) * 4 + 4)));
+      rows.push(line);
+    }
+    return rows;
+  }
+  // Every event (up to `event`) that wrote the same texture / renderbuffer at
+  // this pixel, through whichever framebuffer it was attached to, with the value
+  // after it. One full replay with a 1x1 readback per touching event.
+  PixelHistory(x, y, { event = this._events.length - 1, attachment: attachmentIndex = 0 } = {}) {
+    if (!this.frozen) throw new Error('Capture a frame first');
+    const last = this._events[event]; if (!last) throw new Error(`No event ${event}`);
+    const attachment = last._target.attachments[attachmentIndex];
+    if (!attachment || attachment.stencil) throw new Error(`No readable attachment ${attachmentIndex} on ${last.target}`);
+    this._Rect(attachment, x, y, 1, 1);
+    const Same = other => (other.object || null) === (attachment.object || null) && !!other.depth === !!attachment.depth
+      && (other.level || 0) === (attachment.level || 0) && (other.layer || 0) === (attachment.layer || 0) && (other.face || 0) === (attachment.face || 0);
+    const Read = (target, match) => Array.from(ReadRaw(this.gl, target.framebuffer, match, Math.floor(x), match.height - Math.floor(y) - 1, 1, 1));
+    this._ResetReplay();
+    const initial = Read(last._target, attachment), history = [];
+    let previous = initial, at = 0;
+    for (const item of this._events) {
+      if (item.index > event) break;
+      for (; at <= item.command; at++) this._Run(this._commands[at]);
+      const match = item._target.attachments.find(Same);
+      if (!match || match.width !== attachment.width || match.height !== attachment.height) continue;
+      const value = Read(item._target, match), changed = value.some((v, i) => v !== previous[i]);
+      history.push({ index: item.index, kind: item.kind, label: item.label, path: item.path, target: item.target, value, changed });
+      previous = value;
+    }
+    this.selected = event; this._replayedAt = event; this.revision++;
+    return { x: Math.floor(x), y: Math.floor(y), event, target: last.target, attachment: attachment.name, format: EnumName(this.gl, attachment.format),
+      initial, final: previous, writes: history.filter(item => item.changed).length, history };
   }
   // A sampled texture as the event's draw sees it (replay state after the draw).
   TexturePreview(index, binding, options = {}) {

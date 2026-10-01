@@ -77,9 +77,54 @@ WebGL2 禁止向多重采样缓冲 blit。游戏的 MSAA Pass 以完整 Clear �
 
 这是本游戏 WebGL2 管线的对应工具，不能宣称与 Unity 原生编辑器所有平台功能完全等价。
 
+## Agent 接口
+
+查渲染 bug、迭代画面时 agent 不开窗口，直接调这两层（与窗口读同一份捕获、同一套命名 / 分组 / 状态写法）：
+
+**命令行 `Script_FrameDebugCli.mjs`**：起无头浏览器 → 摆机位 → 捕获一帧 → 落盘到 `_shots/FrameDebug/<label>/`（忽略目录）并打印 Pass 树与最耗 GPU 的 DC。
+
+```powershell
+node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --label=front                 # summary.json / events.json / final.png
+node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --find=terrain --event=#285 --textures
+node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --pixel=800,450 --pixel=640,300@#285
+node Taierzhuang1938/Script_FrameDebugCli.mjs --stage=4 --pass-images                       # 每个顶层 Pass 结束时的画面
+node Taierzhuang1938/Script_FrameDebugCli.mjs --js="return fd.Events({ pass: 'main', minGpuMs: 0.1 })"
+node Taierzhuang1938/Script_FrameDebugCli.mjs --help
+```
+
+机位 / 阶段 / 画质参数与 `Script_ProfileCli` 相同（`--view= --stage= --url= --quality= --width= --height=`，`--base=` 用已开的预览服务）。事件编号：纯数字是 0 起的 index，`#285` 是窗口显示的编号。`--js` / `--js-file` 在页面里跑 `async (fd, g) => {...}`（`fd = Tengxian.FrameDebug`，`g = Tengxian`），返回值落 `js.json`。
+
+**页面内 `Tengxian.FrameDebug`**（`Script_FrameDebugAgent`）：全部返回纯 JSON，可直接 `page.evaluate`；`Help()` 返回下表。
+
+| 方法 | 用途 |
+| --- | --- |
+| `await Capture({ timeoutMs, waitGpu })` | 冻结下一帧，等 GPU 计时返回，返回 `Summary()`；`manual=1` 的页面自动推一帧（不推进模拟） |
+| `Release()` | 释放捕获、恢复运行 |
+| `Summary({ top })` | DC / 事件 / CPU / GPU、按树序的 Pass 与分组（`synthetic`、`gpuShare`）、最耗 GPU / CPU 的 DC |
+| `Events({ text, kind, pass, target, object, material, shader, draw, minGpuMs, from, to, sort, limit })` | 筛事件。`text` 模糊匹配名字/路径/材质/Shader/目标；`pass` 是路径前缀（`main` 含 `main/DrawOpaqueObjects`）；`sort = order\|gpu\|cpu` |
+| `Event(index, { uniforms, filter, arrayLimit, source, matrices })` | 窗口 Details / Keywords / Properties / Buffers 的同一份内容：API、绘制参数、源对象、渲染目标附件、Unity 写法的渲染状态、纹理绑定、uniform 当前值、`#define`；`source: true` 带编译后 GLSL |
+| `Image(index, { attachment, texture, channel, black, white, exposure, width })` | 该事件之后的渲染目标，或 `texture = 绑定下标` 读该 DC 采样到的纹理 → `{ png: dataURL }`（8 位显示图） |
+| `Pixels(index, x, y, { attachment, w, h })` | 该事件之后附件的**原始值** `values[row][col] = [r,g,b,a]` |
+| `PixelHistory(x, y, { event, attachment })` | 截至 `event`，所有写过同一纹理该像素的事件和写后的值，`changed` 标出真正改动的；跨帧缓冲按附件对象匹配（同一张深度图在 prepass 与 main 里都算） |
+| `Show(index, { attachment })` | 把该事件结果盖到游戏画面（截游戏画布时用） |
+
+口径：
+
+- 像素坐标是**附件自己的图像坐标**，左上 (0,0)。离屏靶受渲染比例影响（例：画布 1600×900 时 `hdr` 是 1280×720），先看 `Event(i).renderTarget.attachments` 的尺寸。
+- `Pixels` / `PixelHistory` 是附件里的真实数据：HDR 不截断，深度 [0,1]，sRGB 靶读回为线性，整数格式不支持。`Image` 是经 Levels / 通道 / 曝光的 8 位显示图，别拿它判数值。
+- MSAA 靶的帧起始内容不备份（由首个完整 Clear 重建），其 `initial` 无意义；像素历史只记录事件（Draw / Clear / Blit），不追 `texSubImage` 上传。
+- 每次 `Image` / `Pixels` / `PixelHistory` 会回放到对应事件；回放不推进模拟，可以任意顺序调用。查完 `Release()`，否则游戏一直冻结。
+
+查 bug 的常用路子：
+
+1. **这块画面为什么不对 / 谁画的**：`--pixel=x,y`（最终画面坐标）看是哪个 Pass 的哪个 DC 最后改了它；需要离屏靶时 `--pixel=x,y@#编号` 并在 `--js` 里换 `attachment`。
+2. **某个物体**：`--find=名字` → `--event=#编号 --textures`，读 `state`（ZTest/ZWrite/Cull/Blend）、`uniforms`、`textures`、`object.materialFlags`。
+3. **后处理哪一步坏的**：`--pass-images`，逐张比对；再用 `Pixels` 读那一步前后的原始值。
+4. **哪里慢**：`summary.json` 的 `passes[].gpuMs / gpuShare` 与 `topGpu`；长期趋势仍用 `Script_ProfileCli`。
+
 ## 开发与验收
 
-模块：`Script_FrameDebugger`（捕获/查询/回放）、`Script_FrameDebugGl`（GL 状态/附件）、`Script_FrameDebugMesh`（几何预览）、`Script_EditorFrameDebugger`（独立窗口）。Main 仅接入帧边界、暂停守卫及音频恢复；PostPipeline 的既有 Pass 不改变。
+模块：`Script_FrameDebugger`（捕获/查询/回放/原始像素/像素历史）、`Script_FrameDebugGl`（GL 状态/附件/原始读回/状态描述）、`Script_FrameDebugAgent`（agent 接口 `Tengxian.FrameDebug`）、`Script_FrameDebugCli`（命令行）、`Script_FrameDebugMesh`（几何预览）、`Script_EditorFrameDebugger`（独立窗口）。Main 仅接入帧边界、暂停守卫及音频恢复；PostPipeline 的既有 Pass 不改变。
 
 ```powershell
 node Taierzhuang1938/Script_FrameDebuggerTest.mjs
@@ -91,6 +136,12 @@ node Taierzhuang1938/Script_FrameDebuggerReplayProbe.mjs --runs=3 --captures=4 [
 ```
 
 核心 GPU 夹具验证逐事件差异/倒退确定性、MRT/深度、实例化/multi-draw、MSAA、GPU 扩展缺失、原始画面与回放/恢复逐像素相同、所有钩子归还；以及 Idle 分组、Opaque/Transparent 拆分、无散落事件、具名父节点与材质字段命名、采样纹理按 DC 读回、合成分组拿到 GPU 时间。夹具页用路由出的同源空白页，不再用 404 的 `/__preview/ping`（Chrome 错误页的延迟导航会撞上 setContent）。实机场景（白盒默认 SwiftShader，整个测试约 3.5 分钟；完整画质档与 `--gpu` 走硬件 GPU 并串行化比对）验证编辑器入口、冻结模拟时钟、捕获前后像素逐位相等且计时回放确实执行、网格视图及继续。截图仅存 `tmp/FrameDebugger/`，不提交。纯 JSON 报告无资源句柄，适合取证，不能当离线重放文件。
+
+### 2026-10-01 Agent 接口
+
+- 新增 `Tengxian.FrameDebug` 与 `Script_FrameDebugCli`；窗口 Output 预览单击像素出 Pixel History（与 agent 同一个 `PixelHistory`）。渲染状态 / API 调用 / 图元数的描述函数移到 `Script_FrameDebugGl`，窗口与 agent 共用。
+- 核心夹具新增：只被左侧红片覆盖的像素，原始读回等于其线性 tint（半浮点误差内），深度在 (0,1)，后续输出 DC 在 backbuffer 上给出 sRGB 编码的同一红色；像素历史最后改写者是 `Left red`；agent 的 `Capture / Events / Event / Image / Pixels / Help` 全部可 JSON 序列化并与内核一致。
+- 实机（`--view=front`）：中心像素历史是 fxaa 的 Clear → 全屏 DC，`hdr` 天空像素原始值约 (0.97, 1.01, 1.07)（HDR 未截断），同点深度 1.0。
 
 ### 2026-09-30 界面细化
 

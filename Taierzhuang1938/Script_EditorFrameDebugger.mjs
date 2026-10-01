@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { FrameDebugMesh } from './Script_FrameDebugMesh.mjs';
-import { EnumName } from './Script_FrameDebugGl.mjs';
+import { EnumName, Primitives, RenderStateRows, ApiCall } from './Script_FrameDebugGl.mjs';
 
 const CSS = `
 :root{--bg:#1a1e25;--panel:#20252e;--panel2:#262c36;--raised:#2c3440;--line:#343d4a;--line2:#404a59;--text:#d8dee7;--muted:#8a95a5;--dim:#65707f;
@@ -88,10 +88,6 @@ const Num = value => {
   const abs = Math.abs(value);
   return abs >= 1e5 || abs < 1e-4 ? value.toExponential(3) : value.toFixed(abs >= 100 ? 2 : 4).replace(/\.?0+$/, '');
 };
-const PRETTY = { FUNC_ADD: 'Add', FUNC_SUBTRACT: 'Sub', FUNC_REVERSE_SUBTRACT: 'RevSub', LEQUAL: 'LEqual', GEQUAL: 'GEqual', NOTEQUAL: 'NotEqual',
-  INCR: 'IncrSat', DECR: 'DecrSat', INCR_WRAP: 'IncrWrap', DECR_WRAP: 'DecrWrap', CCW: 'CCW', CW: 'CW', FRONT_AND_BACK: 'FrontAndBack' };
-const Pretty = name => typeof name !== 'string' ? String(name) : PRETTY[name] ?? name.toLowerCase().split('_').map(word => word[0].toUpperCase() + word.slice(1)).join('');
-const Hex8 = value => `0x${((value >>> 0) & 0xff).toString(16).toUpperCase().padStart(2, '0')}`;
 // FLOAT_VEC3 → vec3, UNSIGNED_INT_SAMPLER_2D → usampler2D: what the shader source says.
 const GlslType = type => {
   const text = String(type), sampler = text.match(/^(INT_|UNSIGNED_INT_)?SAMPLER_(.+)$/);
@@ -110,8 +106,6 @@ for (const [key, value] of Object.entries(THREE)) {
 }
 const ICONS = { 'Draw Mesh': ['draw', 'D'], 'Draw Mesh Instanced': ['inst', 'I'], 'Draw Batched': ['batch', 'B'], 'Draw Fullscreen': ['full', 'F'],
   'Draw Procedural': ['proc', 'P'], Clear: ['clear', 'C'], Blit: ['blit', '⇢'], 'Generate Mips': ['copy', 'M'], 'Copy Texture': ['copy', 'T'] };
-const PRIMITIVES = { TRIANGLES: count => count / 3, TRIANGLE_STRIP: count => Math.max(0, count - 2), TRIANGLE_FAN: count => Math.max(0, count - 2),
-  LINES: count => count / 2, LINE_STRIP: count => Math.max(0, count - 1), LINE_LOOP: count => count, POINTS: count => count };
 
 export class FrameDebuggerEditor {
   static id = 'frameDebugger';
@@ -179,6 +173,8 @@ export class FrameDebuggerEditor {
     ui.locate.onclick = () => this.Locate();
     ui.output.onmousemove = event => this.Pixel(event);
     ui.output.onmouseleave = () => { ui.pixel.hidden = true; };
+    ui.output.onclick = event => this.PixelHistoryAt(event);
+    ui.output.title = '单击像素：像素历史（哪些事件写过它、写后的原始值）';
     ui.splitter.onpointerdown = event => {
       ui.splitter.setPointerCapture(event.pointerId); ui.splitter.classList.add('drag');
       ui.splitter.onpointermove = move => doc.body.style.setProperty('--aside', `${Math.max(240, Math.min(this.win.innerWidth - 420, move.clientX))}px`);
@@ -228,7 +224,7 @@ export class FrameDebuggerEditor {
     const key = `${capture.id}:${capture.gpuStatus}`;
     if (key !== this.treeKey) {
       this.treeKey = key; this.BuildTree();
-      if (this.captureId !== capture.id) { this.captureId = capture.id; this.selectedPass = null; this.textureView = null; this.Select(capture.events.length - 1); }
+      if (this.captureId !== capture.id) { this.captureId = capture.id; this.selectedPass = null; this.textureView = null; this.pixelHistory = null; this.Select(capture.events.length - 1); }
       else { const event = this.debugger._events[this.debugger.selected]; this.Header(event); if (event) this.Properties(event); }
     }
   }
@@ -381,7 +377,7 @@ export class FrameDebuggerEditor {
     else {
       const info = event.drawInfo;
       if (info) {
-        ui.chips.append(Chip(info.topology === 'TRIANGLES' ? 'Triangles' : 'Primitives', Count(Math.round(info.parts.reduce((sum, part) => sum + (PRIMITIVES[info.topology] || PRIMITIVES.POINTS)(part.count) * part.instances, 0)))));
+        ui.chips.append(Chip(info.topology === 'TRIANGLES' ? 'Triangles' : 'Primitives', Count(Primitives(info))));
         const instances = info.parts.reduce((sum, part) => sum + part.instances, 0);
         if (instances > info.parts.length) ui.chips.append(Chip('Instances', Count(instances)));
         if (info.batch) ui.chips.append(Chip('Sub-draws', Count(info.subDraws)));
@@ -428,6 +424,41 @@ export class FrameDebuggerEditor {
       }
     } catch (error) { ui.previewError.textContent = String(error.message || error); }
     this.lastRevision = this.debugger.revision;
+  }
+  SourcePixel(event) {
+    const canvas = this.ui.output, rect = canvas.getBoundingClientRect(); if (!this.previewSource || !rect.width) return null;
+    const x = Math.floor((event.clientX - rect.left) / rect.width * this.previewSource.width), y = Math.floor((event.clientY - rect.top) / rect.height * this.previewSource.height);
+    return x < 0 || y < 0 || x >= this.previewSource.width || y >= this.previewSource.height ? null : [x, y];
+  }
+  // Same call agents use (Tengxian.FrameDebug.PixelHistory); shown at the top of the properties.
+  PixelHistoryAt(mouse) {
+    const at = this.ui.view.value === 'output' && this.SourcePixel(mouse); if (!at) return;
+    const event = this.debugger._events[this.debugger.selected];
+    try { this.pixelHistory = this.debugger.PixelHistory(at[0], at[1], { event: event.index, attachment: Number(this.ui.attachment.value) || 0 }); }
+    catch (error) { this.ui.previewError.textContent = String(error.message || error); return; }
+    this.folds.set('pixel', true); this.Properties(event); this.lastRevision = this.debugger.revision;
+    this.ui.properties.scrollIntoView({ block: 'start' });
+  }
+  PixelHistoryFold(root) {
+    const history = this.pixelHistory, Value = value => { const span = this.El('span'); span.append(this.Swatch(value), this.El('span', `(${value.map(Num).join(', ')})`)); return span; };
+    this.Fold(root, 'pixel', `Pixel History · (${history.x}, ${history.y}) · ${history.target}/${history.attachment}`, `${history.writes} 次改写`, (body, tools) => {
+      const all = this.El('label'); const box = this.El('input'); box.type = 'checkbox'; box.checked = !!this.pixelHistoryAll; all.append(box, ' 显示未改值的事件');
+      all.onclick = click => click.stopPropagation(); tools.append(all);
+      const content = this.El('div'); body.append(content);
+      const Draw = () => {
+        content.replaceChildren();
+        const cards = this.El('div', '', 'cards'); content.append(cards);
+        this.Card(cards, 'Pixel', [['坐标', `(${history.x}, ${history.y})，左上为原点`], ['格式', history.format], ['帧起始', Value(history.initial)], ['截至 #' + (history.event + 1), Value(history.final)]]);
+        const rows = history.history.filter(item => item.changed || this.pixelHistoryAll);
+        this.Table(content, ['#', '事件', 'Pass', '写后原始值', ''], rows.map(item => {
+          const link = this.El('a', `${item.kind} ${item.label}`); link.href = '#'; link.onclick = click => { click.preventDefault(); this.Select(item.index); };
+          return [String(item.index + 1), link, item.path, Value(item.value), item.changed ? '改写' : '未变'];
+        }));
+        content.append(this.El('div', '原始值是附件里的真实数据（HDR 不截断，深度 0–1，sRGB 靶为线性）；与 Tengxian.FrameDebug.PixelHistory 同一份。', 'muted'));
+      };
+      box.onchange = () => { this.pixelHistoryAll = box.checked; Draw(); };
+      Draw();
+    }, true);
   }
   Pixel(event) {
     const canvas = this.ui.output, rect = canvas.getBoundingClientRect(); if (!this.previewSource || !rect.width) return;
@@ -488,31 +519,6 @@ export class FrameDebuggerEditor {
     const span = this.El('span', '', 'swatch'), [r, g, b, a = 1] = values.map(value => Math.max(0, Math.min(1, value)));
     span.style.background = `rgba(${r * 255 | 0},${g * 255 | 0},${b * 255 | 0},${a})`; return span;
   }
-  RenderState(s) {
-    const blend = s.BLEND ? `${Pretty(s.BLEND_SRC_RGB)} ${Pretty(s.BLEND_DST_RGB)}, ${Pretty(s.BLEND_SRC_ALPHA)} ${Pretty(s.BLEND_DST_ALPHA)}` : 'Off';
-    const mask = s.COLOR_WRITEMASK.map((on, i) => on ? 'RGBA'[i] : '').join('') || '0';
-    const Stencil = back => { const p = back ? 'STENCIL_BACK_' : 'STENCIL_';
-      return `Ref ${s[`${p}REF`]} · Read ${Hex8(s[`${p}VALUE_MASK`])} · Write ${Hex8(s[`${p}WRITEMASK`])} · Comp ${Pretty(s[`${p}FUNC`])} · Pass ${Pretty(s[`${p}PASS_DEPTH_PASS`])} · Fail ${Pretty(s[`${p}FAIL`])} · ZFail ${Pretty(s[`${p}PASS_DEPTH_FAIL`])}`; };
-    const front = Stencil(false), back = Stencil(true);
-    return [
-      ['Blend', blend], ['BlendOp', s.BLEND ? `${Pretty(s.BLEND_EQUATION_RGB)}, ${Pretty(s.BLEND_EQUATION_ALPHA)}` : undefined],
-      ['Blend color', s.BLEND && /CONSTANT/.test(`${s.BLEND_SRC_RGB}${s.BLEND_DST_RGB}${s.BLEND_SRC_ALPHA}${s.BLEND_DST_ALPHA}`) ? s.BLEND_COLOR.map(Num).join(', ') : undefined],
-      ['ColorMask', mask], ['ZTest', s.DEPTH_TEST ? Pretty(s.DEPTH_FUNC) : 'Off'], ['ZWrite', s.DEPTH_TEST && s.DEPTH_WRITEMASK ? 'On' : 'Off', !s.DEPTH_TEST && s.DEPTH_WRITEMASK ? '深度测试关闭时 GL 不写深度' : ''],
-      ['Cull', s.CULL_FACE ? Pretty(s.CULL_FACE_MODE) : 'Off'], ['FrontFace', s.FRONT_FACE], ['Offset', s.POLYGON_OFFSET_FILL ? `${Num(s.POLYGON_OFFSET_FACTOR)}, ${Num(s.POLYGON_OFFSET_UNITS)}` : 'Off'],
-      ['Stencil', s.STENCIL_TEST ? front : 'Off'], ['Stencil back', s.STENCIL_TEST && back !== front ? back : undefined],
-      ['Viewport', s.VIEWPORT.join(', ')], ['Scissor', s.SCISSOR_TEST ? s.SCISSOR_BOX.join(', ') : 'Off'], ['Depth range', s.DEPTH_RANGE.map(Num).join(' – ')],
-      ['Draw buffers', s.DRAW_BUFFERS?.join(', ')], ['Alpha to coverage', s.SAMPLE_ALPHA_TO_COVERAGE ? 'On' : 'Off'], ['Rasterizer discard', s.RASTERIZER_DISCARD ? 'On' : undefined]];
-  }
-  ApiCall(event) {
-    const info = event.drawInfo;
-    const args = event.args.map((value, i) => {
-      if (i === 0 && info) return info.topology;
-      if (info?.indexType && ['drawElements', 'drawElementsInstanced'].includes(event.api) && i === 2) return info.indexType;
-      if (event.api === 'clear' && i === 0) return ['COLOR_BUFFER_BIT', 'DEPTH_BUFFER_BIT', 'STENCIL_BUFFER_BIT'].filter(name => value & this.debugger.gl[name]).join(' | ') || '0';
-      const text = String(value); return text.length > 28 ? `${text.slice(0, 26)}…` : text;
-    });
-    return `${event.api}(${args.join(', ')})`;
-  }
   UniformValue(uniform) {
     const Format = value => {
       if (!Array.isArray(value)) return Num(value);
@@ -540,6 +546,7 @@ export class FrameDebuggerEditor {
     const root = this.ui.properties; root.replaceChildren();
     const d = event.details, capture = this.debugger.capture, gl = this.debugger.gl, pass = this.selectedPass != null ? capture.passes[this.selectedPass] : null;
     const program = capture.programs[event.programId];
+    if (this.pixelHistory) this.PixelHistoryFold(root);
     if (pass) this.Fold(root, 'group', `分组 · ${pass.name}`, null, body => {
       const cards = this.El('div', '', 'cards'); body.append(cards);
       this.Card(cards, 'Group', [['路径', pass.path], ['类型', pass.synthetic ? `捕获器归并（${pass.synthetic}）` : '游戏 Pass'], ['事件', `#${pass.first + 1} – #${pass.last + 1}`],
@@ -554,11 +561,11 @@ export class FrameDebuggerEditor {
     }, true);
     this.Fold(root, 'details', 'Details', null, body => {
       const cards = this.El('div', '', 'cards'); body.append(cards);
-      this.Card(cards, 'Event', [['事件', `#${event.index + 1} / ${capture.events.length}`], ['类型', event.kind], ['API', this.ApiCall(event)],
+      this.Card(cards, 'Event', [['事件', `#${event.index + 1} / ${capture.events.length}`], ['类型', event.kind], ['API', ApiCall(this.debugger.gl, event)],
         ['Pass', event.path], ['CPU', `${Ms(event.cpuMs)} ms`, event.draw ? `GL 调用本身 ${Ms(event.cpuSubmitMs)} ms` : ''], ['GPU', `${Ms(event.gpuMs)} ms`],
         ['Batch cause', event.batchCause ?? undefined]]);
       if (event.drawInfo) {
-        const info = event.drawInfo, primitives = info.parts.reduce((sum, part) => sum + (PRIMITIVES[info.topology] || PRIMITIVES.POINTS)(part.count) * part.instances, 0);
+        const info = event.drawInfo, primitives = Primitives(info);
         this.Card(cards, 'Draw', [['Topology', info.topology], ['Indexed', info.indexed ? `Yes · ${info.indexType}` : 'No'], ['Elements', Count(info.elements)],
           ['Primitives', Count(Math.round(primitives))], ['Instances', Count(info.parts.reduce((sum, part) => sum + part.instances, 0))], ['Sub-draws', info.batch ? Count(info.subDraws) : undefined],
           ['Vertices (buffer)', d ? Count(d.vertices) : undefined], ['Indices (buffer)', d?.indices ? Count(d.indices) : undefined],
@@ -589,7 +596,7 @@ export class FrameDebuggerEditor {
         ['Initial action', target.initialAction ?? undefined]]);
       this.Table(card, ['Attachment', 'Format', 'Size', 'MSAA', 'Level/Face/Layer'], target.attachments.map(attachment => [attachment.name, String(EnumName(gl, attachment.format)),
         `${attachment.width}×${attachment.height}`, attachment.samples ? `×${attachment.samples}` : 'Off', `${attachment.level || 0} / ${attachment.face ? EnumName(gl, attachment.face) : 0} / ${attachment.layer || 0}`]));
-      this.Card(cards, 'Render State', this.RenderState(event.state));
+      this.Card(cards, 'Render State', RenderStateRows(event.state, Num));
     }, true);
     if (!event.draw) { this.RawJson(root, event); return; }
     const defines = new Map();
