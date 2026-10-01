@@ -160,26 +160,36 @@ function CsmParsGlsl(preset) {
     return out;
   };
 
+  // 逐级的光空间坐标与 receiver-plane 梯度先在**统一控制流**里全算出来，再选级。
+  // dFdx/dFdy 在非统一控制流里是未定义的（GLSL ES 3.00 §8.9）：选级分支在级边界
+  // 与覆盖边界上逐像素不同，同一个 2×2 quad 里已经 return 的像素给的是陈旧寄存器，
+  // 相邻像素还可能在对另一级的坐标求导。本仓的规矩是「先取导数、再分支」
+  // （同 Script_MaterialShading 的 POM、Script_TerrainMaterial、Script_FirstPersonSelfShadow）。
+  // 代价：每级两次导数指令。
+  let planes = "";
   let select = "";
   for (let i = 0; i < cascades; i += 1) {
+    planes += `
+  #if NUM_DIR_LIGHT_SHADOWS > ${i}
+  vec3 csmCoord${i} = vDirectionalShadowCoord[ ${i} ].xyz / vDirectionalShadowCoord[ ${i} ].w;
+  vec2 csmPlane${i} = CsmReceiverPlane( dFdx( csmCoord${i} ), dFdy( csmCoord${i} ) );
+  #endif`;
     select += `
     #if NUM_DIR_LIGHT_SHADOWS > ${i}
     if ( csmLevel < 0 ) {
-      vec4 raw = vDirectionalShadowCoord[ ${i} ];
-      vec3 c = raw.xyz / raw.w;
-      vec2 e = abs( c.xy - 0.5 );
+      vec2 e = abs( csmCoord${i}.xy - 0.5 );
       float m = max( e.x, e.y );
-      if ( m < 0.5 && c.z >= 0.0 && c.z <= 1.0 ) {
+      if ( m < 0.5 && csmCoord${i}.z >= 0.0 && csmCoord${i}.z <= 1.0 ) {
         csmLevel = ${i};
-        csmCoordNear = c;
+        csmCoordNear = csmCoord${i};
+        csmPlaneNear = csmPlane${i};
         csmMix = clamp( ( m - CSM_FADE_START ) / CSM_FADE_WIDTH, 0.0, 1.0 );
       }
     } else if ( csmLevel == ${i - 1} ) {
-      vec4 rawNext = vDirectionalShadowCoord[ ${i} ];
-      vec3 cn = rawNext.xyz / rawNext.w;
-      vec2 en = abs( cn.xy - 0.5 );
-      if ( max( en.x, en.y ) < 0.5 && cn.z >= 0.0 && cn.z <= 1.0 ) {
-        csmCoordFar = cn;
+      vec2 en = abs( csmCoord${i}.xy - 0.5 );
+      if ( max( en.x, en.y ) < 0.5 && csmCoord${i}.z >= 0.0 && csmCoord${i}.z <= 1.0 ) {
+        csmCoordFar = csmCoord${i};
+        csmPlaneFar = csmPlane${i};
         csmHasFar = true;
       }
     }
@@ -249,10 +259,9 @@ vec2 CsmVogel( int tapIndex, int tapCount, float phi ) {
  * 有了它，盘上偏移出去的那些抽样点比较的是「同一个平面在那儿应该有多深」，
  * 掠射角上就不必把常数 bias 调到能把影子整个顶飞（peter-panning）的量级。
  * 梯度在掠射角会爆掉，所以钳住。
+ * 传进来的是光空间坐标的屏幕导数（调用方在统一控制流里取好，见 CsmSunVisibility）。
  */
-vec2 CsmReceiverPlane( vec3 coord ) {
-  vec3 dx = dFdx( coord );
-  vec3 dy = dFdy( coord );
+vec2 CsmReceiverPlane( vec3 dx, vec3 dy ) {
   float det = dx.x * dy.y - dx.y * dy.x;
   if ( abs( det ) < 1e-9 ) return vec2( 0.0 );
   vec2 planeBias = vec2(
@@ -368,20 +377,21 @@ float CsmSunVisibility() {
   //     裸深度读回 0 = 整片死黑 —— 必须在采样之前就出去。
   // 用 uniform 分支而不是 #define：翻它就不必重编译整场材质（那是几百毫秒的卡顿）。
   if ( directionalLightShadows[ 0 ].shadowIntensity <= 0.0 ) return 1.0;
+${planes}
   int csmLevel = -1;
   vec3 csmCoordNear = vec3( 0.0 );
   vec3 csmCoordFar = vec3( 0.0 );
+  vec2 csmPlaneNear = vec2( 0.0 );
+  vec2 csmPlaneFar = vec2( 0.0 );
   bool csmHasFar = false;
   float csmMix = 0.0;
 ${select}
   if ( csmLevel < 0 ) return 1.0;
   if ( !csmHasFar ) csmMix = 0.0;
 
-  vec2 planeNear = CsmReceiverPlane( csmCoordNear );
-  float visibility = CsmDispatch( csmLevel, csmCoordNear, planeNear );
+  float visibility = CsmDispatch( csmLevel, csmCoordNear, csmPlaneNear );
   if ( csmMix > 0.0 ) {
-    vec2 planeFar = CsmReceiverPlane( csmCoordFar );
-    visibility = mix( visibility, CsmDispatch( csmLevel + 1, csmCoordFar, planeFar ), csmMix );
+    visibility = mix( visibility, CsmDispatch( csmLevel + 1, csmCoordFar, csmPlaneFar ), csmMix );
   }
   return clamp( visibility, 0.0, 1.0 );
 }

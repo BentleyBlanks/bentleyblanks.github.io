@@ -2299,9 +2299,12 @@ Debug Rendering「光照」组新增三项（`Script_ContactShadows.MakeShadowDe
     每帧烘、远级 ~30 Hz；预算不够（城里那种一张 1.46 M 的场）退回一帧一张，
     近级 ~30 Hz、远级 ~9 Hz。**「近级 30 Hz 看不出来」那条已经证伪**：
     一屋子会动的人贴着相机时，地板上是跳得出来的。
-11. **`CsmReceiverPlane` 的 `dFdx` 在级边界与覆盖边界处于非均匀控制流。**
-    那里同一个 quad 里的像素可能选了不同的级，导数是垃圾 —— 但梯度被钳在 ±0.02，
-    换算到 4 纹素的偏移上只有毫米级，落在过渡带里看不见。
+11. **receiver-plane 的导数先取、再选级（2026-10-01 修）。** 早先 `CsmReceiverPlane`
+    在选级与 `csmLevel < 0` 早退**之后**才 `dFdx/dFdy`，远级那次还套在 `csmMix > 0` 里 ——
+    非均匀控制流里的导数在 GLSL ES 3.00 是未定义的，级边界上同一个 quad 的邻居还在对
+    另一级的坐标求导。现在 `CsmSunVisibility` 在总闸早退（uniform）之后先把每一级的
+    `csmCoord<i>` 与 `csmPlane<i> = CsmReceiverPlane( dFdx, dFdy )` 全算完，选级只挑现成的值；
+    级内结果不变，每级多两条导数指令。同一条规矩见 POM、地形材质、第一人称自阴影。
 
 ### 6.11 怎么验
 
