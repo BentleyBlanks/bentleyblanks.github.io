@@ -68,3 +68,55 @@ export function ApplyShadowDepth(root) {
   root.traverse((object) => { if (AttachShadowDepth(object)) count += 1; });
   return count;
 }
+
+/**
+ * 预热专用（Script_Main.WarmLevel 的「全场强制出画一帧」）：`fn` 执行期间，阴影趟每画一只对象，
+ * 都让它拿到的那只深度材质重新取一次程序键。
+ *
+ * 由头（2026-10-01，Script_SavedGraphicsWarmTest 出手后第 13–19 帧现编一个深度程序）：上面说的
+ * 「把对象材质的 map / side … 抄到深度材质上」**不会**让 three 重走 getProgram —— setProgram 只在
+ * 蒙皮 / 实例 / 批次 / 变形这几位翻转、或材质 version 变了时才重新取键。所以一只共用深度材质编出
+ * 哪几个变体，取决于阴影趟的绘制顺序：紧跟在一次翻转后面的那只对象按它自己的 map / side 取键，后面
+ * 同种的对象一律沿用。实测预热帧里白盒体块（带贴图、正面）在阴影趟画了 46 次，一直沿用前一只的变体；
+ * 开局后静态合批把顺序一换，「带贴图 + 画背面」这一组合才第一次被取键，在玩法帧里现编。
+ *
+ * 做法：只在烘焙那一刻（包一层 `shadowMap.render`）把 Object3D / BatchedMesh 原型上的 onBeforeShadow
+ * 换成「先调原来的，再 `depthMaterial.needsUpdate = true`」：version 一变 setProgram 必走 getProgram，
+ * 场上每只投影体按自己的组合取键，缺的变体当场编出来（已有的按键复用，不重编）。烘完立刻原样换回
+ * （属性描述符一起还，ShadowCasterBatch 按函数身份认「没挂钩子」）；自己挂了 onBeforeShadow 的对象不受影响。
+ * 每个 draw 多一次取键，只在加载画面后面用这一帧。
+ * @param {import("three").WebGLRenderer} renderer
+ * @param {() => T} fn
+ * @returns {T}
+ * @template T
+ */
+export function WithShadowDepthRekey(renderer, fn) {
+  const shadowMap = renderer?.shadowMap;
+  if (!shadowMap || typeof shadowMap.render !== "function") return fn();
+  const prototypes = [THREE.Object3D.prototype, THREE.BatchedMesh.prototype]
+    .filter((proto) => Object.prototype.hasOwnProperty.call(proto, "onBeforeShadow"));
+  const saved = prototypes.map((proto) => Object.getOwnPropertyDescriptor(proto, "onBeforeShadow"));
+  const bake = shadowMap.render;
+  shadowMap.render = function ShadowDepthRekeyRender(...args) {
+    prototypes.forEach((proto, i) => {
+      const original = saved[i].value;
+      Object.defineProperty(proto, "onBeforeShadow", {
+        ...saved[i],
+        value(renderer, object, camera, shadowCamera, geometry, depthMaterial, group) {
+          original.call(this, renderer, object, camera, shadowCamera, geometry, depthMaterial, group);
+          if (depthMaterial) depthMaterial.needsUpdate = true;
+        },
+      });
+    });
+    try {
+      return bake.apply(this, args);
+    } finally {
+      prototypes.forEach((proto, i) => Object.defineProperty(proto, "onBeforeShadow", saved[i]));
+    }
+  };
+  try {
+    return fn();
+  } finally {
+    shadowMap.render = bake;
+  }
+}

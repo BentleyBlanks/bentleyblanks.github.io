@@ -82,6 +82,7 @@ RDR2 的雪地/泥地、God of War 的雪、Batman: Arkham Origins 的雪、Hori
   `terrainTrails` 一趟 0.02–0.04 ms（整张重建那一帧 0.13 ms）；主场景 pass 开 6.2–7.7 ms、关 6.7–7.8 ms，差别在轮间噪声里；
   CPU 采集（玩家 + 约 30 个人物 + 战车）每帧 0.16–0.22 ms。没有 pass 在画时（白盒默认、low）60 帧后停采。
 - 分档：`Data_Tuning_Graphics` 的 `terrainTrails`（档位名 / false）；白盒登记为 `terrainTrails` 开关，**照白盒契约默认关**（「编辑白盒画质 → 地面脚印与痕迹」可开）。
+- 预热（2026-10-01）：印章 / 减淡两只材质各在自己的小场景、对着靶画，程序键里灯光数是 0，不能并进 `WarmLevel` 的代理组走 `CompileAsRendered`（编出来是带关卡灯光的孪生）。`TerrainTrailsPass.Warm(renderer)` 照 `Render` 的状态各真画一次（尺寸 0 / 强度 0 的印章、0 减淡），靶内容、历史与统计都不动；`WarmLevel` 全场出画那一步调它，档位不开痕迹时什么都不做。不画的话第一枚脚印、第一次减淡那一帧现编（渲染管线 §18.8）。
 
 ## 5. 着色与观感
 

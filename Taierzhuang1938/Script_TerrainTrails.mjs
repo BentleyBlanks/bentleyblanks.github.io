@@ -774,6 +774,48 @@ export class TerrainTrailsPass {
     ctx.terrainTrails = this.target;
   }
 
+  /**
+   * 进关预热（Script_Main.WarmLevel）：印章与减淡这两只材质的程序只在第一枚脚印 / 第一次减淡那一帧才编
+   * （2026-10-01 存档画质扔弹测试：减淡在出手后第 13 帧现编）。它们各在自己的小场景里、对着痕迹靶画，
+   * 程序键里灯光数是 0、输出色彩空间与色调映射取的是这张靶 —— 并进主场景的代理组走 CompileAsRendered
+   * 编出来的是带关卡灯光的孪生，用不上。所以照 Render 的状态各真画一次：一枚尺寸 0、强度 0 的印章
+   * （MAX 混合，退化四边形不出片元）、一趟 0 减淡（反向减 0），靶上的内容一个纹素不变，历史与统计不碰。
+   * 画质档不开痕迹（白盒 / low）时什么都不做。
+   * @returns {boolean} 画了没有
+   */
+  Warm(renderer) {
+    const tier = this._Tier();
+    if (!renderer || !tier) return false;
+    this._EnsureTarget(tier);
+    const previous = renderer.getRenderTarget();
+    const autoClear = renderer.autoClear, shadowAuto = renderer.shadowMap.autoUpdate;
+    const I = this.inst;
+    try {
+      renderer.autoClear = false;
+      renderer.shadowMap.autoUpdate = false;
+      this._Scissor(renderer, null);
+      this.stampMaterial.uniforms.uTarget.value.set(tier.size, tier.size);
+      I.center.array.fill(0, 0, 2); I.axis.array[0] = 1; I.axis.array[1] = 0; I.size.array.fill(0, 0, 2);
+      I.cell.array[0] = 0; I.strength.array.fill(0, 0, 3); I.fade.array.fill(0, 0, 3);
+      for (const attr of Object.values(I)) {
+        attr.clearUpdateRanges?.();
+        attr.addUpdateRange?.(0, attr.itemSize);
+        attr.needsUpdate = true;
+      }
+      this.stampGeometry.instanceCount = 1;
+      renderer.render(this.stampScene, this.camera);
+      this.decayMaterial.uniforms.uDecay.value.set(0, 0, 0);
+      renderer.render(this.decayScene, this.camera);
+    } finally {
+      this.stampGeometry.instanceCount = 0;
+      this._Scissor(renderer, null, true);
+      renderer.autoClear = autoClear;
+      renderer.shadowMap.autoUpdate = shadowAuto;
+      renderer.setRenderTarget(previous);
+    }
+    return true;
+  }
+
   /** texel = null：整张（关剪裁）。每次都重新 setRenderTarget，three 才把剪裁框下到 GL。 */
   _Scissor(renderer, texel, release = false) {
     const target = this.target;

@@ -28,6 +28,7 @@ import { LightRig } from "./Script_Light.mjs";
 import { InstallShadowSkip, ShadowSkipCount, SetShadowSkipEnabled } from "./Script_ShadowSkip.mjs";
 import { BonePrune } from "./Script_BonePrune.mjs";
 import { ShadowCasterBatch, InstallShadowCasterBatch } from "./Script_ShadowCasterBatch.mjs";
+import { WithShadowDepthRekey } from "./Script_ShadowDepth.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
 import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
@@ -4982,7 +4983,19 @@ async function WarmLevel(phase) {
         // RenderScene 不做级联拟合（那在玩法帧里），不先拟合的话 ScheduleShadowUpdate 一张都不排
         // —— 2026-09-27 实测预热全程阴影趟一次都没跑，那些变体全留到开局现编。
         lights.UpdateShadowFrustum(camera.position, camera.getWorldDirection(new THREE.Vector3()));
-        RenderScene(0);
+        // 阴影趟里每只投影体都自己投影（绕过静态合批：成员随时可能被踢出来自己投影），并按自己的
+        // map / side 重新取深度程序键 —— 共用深度材质编出哪几个变体本来取决于绘制顺序，开局后合批
+        // 一换顺序就现编（Script_ShadowDepth.WithShadowDepthRekey 抬头，2026-10-01）。
+        const casterBypass = shadowCasterBatch.bypass;
+        shadowCasterBatch.bypass = true;
+        try {
+          WithShadowDepthRekey(renderer, () => RenderScene(0));
+        } finally {
+          shadowCasterBatch.bypass = casterBypass;
+        }
+        // 地面痕迹那一趟的印章 / 减淡各在自己的小场景、对着自己的靶画（灯光数 0），并进代理组提交
+        // 编的是孪生；由 pass 照出画的状态真画一次（TerrainTrailsPass.Warm 抬头）。
+        report.terrainTrails = post?.terrainTrailsPass?.Warm(renderer) ?? false;
       } finally {
         for (const object of culled) object.frustumCulled = true;
         for (const object of hidden) object.visible = false;

@@ -695,7 +695,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs     # 整帧 CPU/GPU 消融
 | §15 簇光 | `Script_ClusteredLightsTest.mjs`（`--node` / `--perf`） | — |
 | §16 GI 探针体 | `Script_GiTest.mjs` | — |
 | §17 性能与自动降档 | `Script_FrameProfileTest.mjs`、`Script_AutoQualityTest.mjs` | `Script_SamplePointShot.mjs --compare=` |
-| §18 预热 | `Script_RespawnShaderWarmTest.mjs`、`Script_BootTest.mjs`（`warm=` 只打印不判红） | — |
+| §18 预热 | `Script_RespawnShaderWarmTest.mjs`、`Script_SavedGraphicsWarmTest.mjs`、`Script_WhiteboxShaderWarmTest.mjs`、`Script_BootTest.mjs`（`warm=` 只打印不判红） | — |
 | 全部调试视图 | `Script_EditorTest.mjs` | — |
 
 逐比特无损的证据留法：把探针页的时间与帧序全部钉死
@@ -5981,6 +5981,47 @@ program = 0（修前 64）；提交编译建的 program 至少一半在开机结
 
 **规矩**：往开机链里加预热、或改 `Begin` 的替换规则时，跑这条门；量开机耗时要连白盒档一起量
 （出厂默认就是它），只量 `quality=high` 会漏。
+
+### 18.8 扔弹前后那两份现编：共用深度材质按绘制顺序取键、痕迹 pass 自己的材质（2026-10-01）
+
+**症状**：`Script_SavedGraphicsWarmTest`（`quality=high`、存档关 POM 等编译期开关）在 master 上红一条
+「爆炸前后不现编着色器 — program 189 → 191」。两个新 program 都没名字、到第 60 帧没有场景对象用它们，
+像是爆炸碎块之类的临时件。
+
+**取证**（包住 `renderer.renderBufferDirect`，program 一出生就记下当时那只网格 / 材质 / 调用栈；开机就挂要在
+`addInitScript` 里给 `Object.prototype` 定义 `renderBufferDirect` 的 setter，截住构造函数里的赋值）：两个都与手榴弹
+无关，出手后第 13–19 帧就出生了：
+
+1. 地面痕迹 pass 的**减淡**（`TerrainTrailsPass.decayMaterial`，全屏反向减法）：减淡攒够一个色阶才画，第一次就在
+   那时。同一类还有**印章**材质（出手前第一枚脚印那一帧现编，测试从出手才开始数所以没算它）。
+2. 阴影趟里 three 共用深度材质 `_depthMaterial` 的「带贴图 + 画背面」变体，那一帧画它的是
+   `FirstLevelWhitebox_StaticWhiteBoxes`。同一类还有出手前现编的「无贴图 + 画背面」（`FirstLevelWhitebox_Ground`）。
+
+**机制（第 2 条）**：three 每次 draw 前把对象自己材质的 map / side / alphaTest … 抄到返回的深度材质上，
+但 `setProgram` 只在蒙皮 / 实例 / 批次 / 变形这几位翻转、或材质 `version` 变了时才重走 `getProgram`
+——抄过来的 map 与 side **不触发**。所以一只共用深度材质编出哪几个变体由阴影趟的绘制顺序决定：紧跟在一次
+翻转后面的那只对象按它自己的组合取键，后面同种的对象一律沿用。实测预热帧里白盒体块在阴影趟画了 46 次、
+地面画了 90 次，一直沿用前一只（带贴图 / 双面）的变体；开局后静态合批（`Script_ShadowCasterBatch`）陆续收成员、
+把顺序一换，这两个组合才第一次被取键。（沿用别人的变体对深度图没有影响：正反面剔除是 GL 状态，不在着色器里。）
+
+**修法**：
+
+- `Script_ShadowDepth.WithShadowDepthRekey(renderer, fn)`：只在烘焙那一刻把 Object3D / BatchedMesh 原型上的
+  `onBeforeShadow` 换成「先调原来的，再 `depthMaterial.needsUpdate = true`」，场上每只投影体都按自己的组合取键，
+  缺的变体当场编出来；烘完原样换回（属性描述符一起还）。`WarmLevel` 的全场出画帧用它包住 `RenderScene(0)`，
+  同时把 `shadowCasterBatch.bypass` 打开，让每个静态投影体都自己投影一次。玩法帧不受影响（不挂钩子）。
+- `TerrainTrailsPass.Warm(renderer)`：印章 / 减淡各在自己的小场景、对着痕迹靶画，程序键里灯光数是 0、输出色彩
+  空间取靶的，**不能**并进代理组走 `CompileAsRendered`（那样编出的是带关卡 3 盏平行光 + 光照探针的孪生）。
+  由 pass 照 `Render` 的状态各真画一次：尺寸 0 / 强度 0 的印章（MAX 混合）、0 减淡（反向减 0），靶内容不变。
+  白盒 / low 不开痕迹，什么都不做。
+
+**实测**（同机 `quality=high` + 存档画质）：开机后（含出手前 20 帧、出手到爆炸后 60 帧）新出生的 program 4 → 0，
+测试 program 202 → 202、爆炸帧 106 ms；开机多编 14 个（12 个深度变体 + 2 个痕迹材质），`WarmLevel` 的全场出画那一步
+单次 1.08 → 1.40 s（同步编译 + 每个阴影 draw 多一次取键）。白盒档（`Script_WhiteboxShaderWarmTest`）不变：开机 link 72，
+进城后 300 帧 69 → 69。
+
+**规矩**：查「没名字、事后找不到主人」的现编，在出生那一刻抓网格和调用栈，别按缓存键猜；共用深度材质的变体看绘制
+顺序，不看场上有没有这种物体。新加一只**自带场景、对着自己的靶画**的 pass 材质，由 pass 自己出 `Warm`，别塞进代理组。
 
 ## 19. 坑（按被踩频率排序）
 
