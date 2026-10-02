@@ -26,10 +26,10 @@ const esbuild = require('esbuild');
 const ENTRY = 'Script_ChunkGame.js';
 // 要随页面一起带走的资产目录（运行时靠相对路径取，全都得进包）。
 const ASSET_DIRS = ['Audio', 'Models', 'Textures'];
-const ASSET_FILES = ['Data_CanalProfile.json'];
+const ASSET_FILES = ['Data_CanalProfile.json','Script_SlimeKernel.wasm'];
 const MIME = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
-  '.glb': 'model/gltf-binary', '.json': 'application/json',
+  '.glb': 'model/gltf-binary', '.json': 'application/json', '.wasm':'application/wasm',
   '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
 };
 

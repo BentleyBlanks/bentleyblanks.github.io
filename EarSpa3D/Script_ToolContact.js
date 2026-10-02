@@ -29,7 +29,9 @@ export function CreateToolContact(profile) {
     const result=out||{normal:new THREE.Vector3()};
     if((index===0&&t===0&&axial<-.03)||(index===rows.length-2&&t===1&&axial>.05)){result.clearance=Infinity;result.normal.set(0,0,0);result.depth=-1;return result;}
     let ux=a.up.x+(b.up.x-a.up.x)*t,uy=a.up.y+(b.up.y-a.up.y)*t,uz=a.up.z+(b.up.z-a.up.z)*t,rx=a.right.x+(b.right.x-a.right.x)*t,ry=a.right.y+(b.right.y-a.right.y)*t,rz=a.right.z+(b.right.z-a.right.z)*t;
-    const un=Math.hypot(ux,uy,uz),rn=Math.hypot(rx,ry,rz);ux/=un;uy/=un;uz/=un;rx/=rn;ry/=rn;rz/=rn;
+    // Unit-frame interpolation is bounded; avoid generic overflow scaling at
+    // every bristle/grain sample while retaining the complete exact sample set.
+    const un=Math.sqrt(ux*ux+uy*uy+uz*uz),rn=Math.sqrt(rx*rx+ry*ry+rz*rz);ux/=un;uy/=un;uz/=un;rx/=rn;ry/=rn;rz/=rn;
     const angle=(Math.atan2(dx*rx+dy*ry+dz*rz,dx*ux+dy*uy+dz*uz)+Math.PI*2)%(Math.PI*2),k=angle/(Math.PI*2)*64,lo=Math.floor(k),f=k-lo,next=(lo+1)%64;
     const ra=a.radii[lo]*(1-f)+a.radii[next]*f,rb=b.radii[lo]*(1-f)+b.radii[next]*f,radius=ra*(1-t)+rb*t+.012*Math.sin(angle*11+(index+t)*.18)*Math.sin((index+t)*.41+angle*3);
     result.clearance=radius-Math.sqrt(Math.max(0,distance-axial*axial));result.depth=index+t;

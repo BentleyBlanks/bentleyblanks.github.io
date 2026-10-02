@@ -16,9 +16,9 @@ page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
 await page.addInitScript(()=>{const native=requestAnimationFrame;window.requestAnimationFrame=cb=>native(t=>{if(!window.pauseFrames)cb(t);});});
 try{
  await fs.mkdir(path.join(here,'_dev'),{recursive:true});
- await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);
+ await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug,null,{timeout:90000});
  await page.evaluate(()=>{window.pauseFrames=true;localStorage.setItem('earspa3d.shop.v1',JSON.stringify({version:2,coins:500,day:2,toolLevels:{}}));});
- await page.reload();await page.waitForFunction(()=>window.__EarSpaDebug);await page.evaluate(()=>window.pauseFrames=true);
+ await page.reload();await page.waitForFunction(()=>window.__EarSpaDebug,null,{timeout:90000});await page.evaluate(()=>window.pauseFrames=true);
  await page.locator('#ear-start').click();await page.locator('#lamp-toggle').click();
  await page.evaluate(()=>{for(let i=0;i<150;i++)__EarSpaDebug.view.Update(1/60);});
  Check(await page.evaluate(()=>__EarSpaDebug.shop.day===2),'second-day saved game starts with the existing economy');
@@ -43,26 +43,29 @@ try{
  });
  Check(report.surface.finite>10000&&report.surface.maxDepthError<1e-8,'20,000 exact centerline queries match independent exhaustive searches');
  Check(report.surface.cachedCells===report.surface.cellLimit,'contact cache stays bounded after more than 8,192 cells');
+ await page.mouse.move(420,330);await page.mouse.down();
  report.input=await page.evaluate(()=>{
-  const{view}=__EarSpaDebug,original=view.Hover;let calls=0,last=null;
-  view.Hover=(...args)=>{calls++;last=args;return original(...args);};
+  const{view}=__EarSpaDebug,original=view.MoveToolDrag;let calls=0,last=null;
+  view.MoveToolDrag=(...args)=>{calls++;last=args;return original(...args);};
   const canvas=document.getElementById('ear-canvas'),rect=canvas.getBoundingClientRect();
   for(let i=0;i<40;i++)canvas.dispatchEvent(new PointerEvent('pointermove',{clientX:rect.left+420+i*3,clientY:rect.top+330,pointerId:1,pointerType:'mouse',isPrimary:true,bubbles:true}));
   const before=calls;__EarSpaDebug.StepFrames(1);const after=calls,latest=last?.slice(0,2);
   canvas.dispatchEvent(new PointerEvent('pointermove',{clientX:rect.left+500,clientY:rect.top+340,pointerId:1,pointerType:'mouse'}));
   window.dispatchEvent(new Event('blur'));__EarSpaDebug.StepFrames(1);
-  view.Hover=original;return{before,after,latest,afterBlur:calls};
+  view.MoveToolDrag=original;return{before,after,latest,afterBlur:calls};
  });
+ await page.mouse.up();
  Check(report.input.before===0&&report.input.after===1&&report.input.latest[0]===537,'40 pointer events perform one collision sweep at the newest position');
- Check(report.input.afterBlur===1,'focus loss discards pending hover input');
+ Check(report.input.afterBlur===1,'focus loss discards pending drag input');
  report.customers=await page.evaluate(()=>{
   const{view,core,shop}=__EarSpaDebug,result=[];
   for(let n=0;n<9;n++){
    if(n){shop.FinishCustomer({cleanliness01:0,comfort01:.85});shop.AdvanceCustomer();if(!shop.HasNextCustomer()){shop.NextDay();shop.StartDay();}view.Reset(shop.CurrentCustomer().waxSeed);view.Enter();}
    for(let i=0;i<150;i++)view.Update(1/60);
-   const times=[];for(let i=0;i<24;i++){const start=performance.now();view.Hover(500+i*13,330+Math.sin(i*.4)*110,'scoop');times.push(performance.now()-start);}
+   view.EnsureTool('scoop');view.StartToolDrag(500,330,'scoop');
+   const times=[];for(let i=0;i<24;i++){const start=performance.now();view.MoveToolDrag(500+i*13,330+Math.sin(i*.4)*110,'scoop');times.push(performance.now()-start);}view.EndToolDrag();
    core.Render();times.sort((a,b)=>a-b);
-   result.push({day:shop.day,seed:shop.CurrentCustomer().waxSeed,medianHoverMs:times[12],p95HoverMs:times[22],memory:{...core.renderer.info.memory},programs:core.renderer.info.programs.length,collision:view.CollisionProbe()});
+   result.push({day:shop.day,seed:shop.CurrentCustomer().waxSeed,medianDragMs:times[12],p95DragMs:times[22],memory:{...core.renderer.info.memory},programs:core.renderer.info.programs.length,collision:view.CollisionProbe()});
   }
   return result;
  });

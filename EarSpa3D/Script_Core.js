@@ -84,8 +84,10 @@ export function CreateCore({ canvas, quality = "auto", onError, viewCamera = nul
   function ApplyPixelRatio() {
     const dpr = typeof devicePixelRatio !== "undefined" ? devicePixelRatio : 1;
     const pr = renderQuality && renderQuality.resolution !== "auto" ? ({low:.75,mid:1,high:Math.min(2.5,dpr)}[renderQuality.resolution]) : Math.min(tier.pixelRatio,dpr);
-    renderer.setPixelRatio(pr * renderScale);
-    renderer.setSize(width, height, false);
+    const ratio=pr*renderScale;
+    // One resize per actual drawing-buffer change; setPixelRatio + setSize used
+    // to allocate the canvas twice, including frames with identical pixel sizes.
+    if(canvas.width!==Math.floor(width*ratio)||canvas.height!==Math.floor(height*ratio)||stats.width!==width||stats.height!==height)renderer.setDrawingBufferSize(width,height,ratio);
     stats.pixelRatio=pr*renderScale;stats.bufferWidth=canvas.width;stats.bufferHeight=canvas.height;
     stats.renderScale = renderScale;
     stats.width = width;

@@ -1,5 +1,5 @@
 // 毫米制黏弹凝胶：四面体近似不可压缩，剪切可松弛，附着受局部反力剥离。
-import {ProjectSlimeConstraints} from './Script_SlimeConstraints.mjs?v=ear038-oily-performance-20260912';
+import {ProjectSlimeConstraints} from './Script_SlimeConstraints.mjs?v=ear043-runtime-performance-20261003';
 import {WaxPhysicsMaterial} from './Data_WaxPhysicsSettings.mjs?v=ear028-physics-settings-20260912';
 import {PlanSlimeBite,UpdateSlimeBite,PartitionSlimeBite} from './Script_SlimeBite.mjs?v=ear038-oily-performance-20260912';
 const Add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],Sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],Mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
@@ -123,9 +123,16 @@ export function StepSlimeVolume(body,{target=null,efficiency=1,adhesion=1,minAnc
   return {detached:body.detached,remaining:body.anchors.filter(a=>a.alive).length,strain:Clamp(body.strain),force:body.force,contact:body.contact,biteReady:!!s.bite?.ready};
 }
 export function WriteSlimeSurface(body,positions){
-  const s=body.gel,inverse=Inverse(body.rotation),stretch=new Float32Array(s.points.length).fill(1);
-  for(const e of s.edges){const ratio=Length(Sub(s.points[e.i],s.points[e.j]))/e.rest;stretch[e.i]=Math.max(stretch[e.i],ratio);stretch[e.j]=Math.max(stretch[e.j],ratio);}
-  for(let i=0;i<s.render.bindings.length;i++){const b=s.render.bindings[i],p=[0,0,0];let thickness=0;for(let j=0;j<b.ids.length;j++){const id=b.ids[j],w=b.weights[j],rest=s.rest[id];for(let k=0;k<3;k++)p[k]+=s.points[id][k]*w;const radial=(rest[0]/(body.size*1.5))**2+(rest[1]/(body.size*1.8))**2;thickness+=w*(s.nodeThickness?s.nodeThickness[id]:Math.sqrt(Math.max(.025,1-radial)))/Math.sqrt(stretch[id]);}positions.set(Rotate(inverse,Sub(p,body.position)),i*3);s.render.thickness[i]=thickness;}
+  const s=body.gel,stretch=s.renderStretch||(s.renderStretch=new Float32Array(s.points.length));stretch.fill(1);
+  const qx=-body.rotation[0],qy=-body.rotation[1],qz=-body.rotation[2],qw=body.rotation[3];
+  for(const e of s.edges){const a=s.points[e.i],b=s.points[e.j],x=a[0]-b[0],y=a[1]-b[1],z=a[2]-b[2],ratio=Math.sqrt(x*x+y*y+z*z)/e.rest;stretch[e.i]=Math.max(stretch[e.i],ratio);stretch[e.j]=Math.max(stretch[e.j],ratio);}
+  for(let i=0;i<s.render.bindings.length;i++){
+   const b=s.render.bindings[i];let x=0,y=0,z=0,thickness=0;
+   for(let j=0;j<b.ids.length;j++){const id=b.ids[j],w=b.weights[j],rest=s.rest[id],point=s.points[id];x+=point[0]*w;y+=point[1]*w;z+=point[2]*w;const radial=(rest[0]/(body.size*1.5))**2+(rest[1]/(body.size*1.8))**2;thickness+=w*(s.nodeThickness?s.nodeThickness[id]:Math.sqrt(Math.max(.025,1-radial)))/Math.sqrt(stretch[id]);}
+   x-=body.position[0];y-=body.position[1];z-=body.position[2];
+   const tx=(qy*z-qz*y)*2,ty=(qz*x-qx*z)*2,tz=(qx*y-qy*x)*2;
+   positions[i*3]=x+(tx*qw+(qy*tz-qz*ty));positions[i*3+1]=y+(ty*qw+(qz*tx-qx*tz));positions[i*3+2]=z+(tz*qw+(qx*ty-qy*tx));s.render.thickness[i]=thickness;
+  }
 }
 export function PoseSlimeVolume(body,position,rotation){const s=body.gel,inverse=Inverse(body.rotation);for(let i=0;i<s.points.length;i++){s.points[i]=Add(position,Rotate(rotation,Rotate(inverse,Sub(s.points[i],body.position))));s.velocities[i]=Rotate(rotation,Rotate(inverse,s.velocities[i]));}if(s.grip)s.grip.offset=Rotate(rotation,Rotate(inverse,s.grip.offset));body.position=position.slice();body.rotation=rotation.slice();}
 export function CloneSlimeVolume(body,position){const copy=structuredClone({...body,gel:{...body.gel,collider:null}});UngripSlimeVolume(copy);PoseSlimeVolume(copy,position,body.rotation);copy.gel.awake=1.5;return copy;}

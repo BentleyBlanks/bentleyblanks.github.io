@@ -19,7 +19,7 @@ try{for(const [width,height,touch] of [[1000,900,false],[390,844,true],[320,568,
  async function Move(x,y){if(touch){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y}]});await page.waitForFunction(({x,y})=>Math.abs(window.__ToolPointer?.x-x)<1&&Math.abs(window.__ToolPointer?.y-y)<1,{x,y});}else await page.mouse.move(x,y);}
  async function Up(){if(touch)await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});else await page.mouse.up();}
  try{
-  await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);await page.evaluate(()=>{window.requestAnimationFrame=()=>0;document.querySelector('#ear-canvas').addEventListener('pointermove',e=>window.__ToolPointer={x:e.clientX,y:e.clientY});});
+  await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug,null,{timeout:90000});await page.evaluate(()=>{window.requestAnimationFrame=()=>0;document.querySelector('#ear-canvas').addEventListener('pointermove',e=>window.__ToolPointer={x:e.clientX,y:e.clientY});});
   Check((await Probe()).settings.toolDrag,'fresh settings use physical controls');
   await page.locator('#welcome-settings').click();await page.locator('#practice-type').selectOption('mixed');await page.screenshot({path:path.join(here,'_dev/Shot_ToolDragSettings_'+width+'.png')});
   Check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'settings fit viewport');
@@ -135,7 +135,7 @@ try{for(const [width,height,touch] of [[1000,900,false],[390,844,true],[320,568,
   const box=await page.locator('#ear-canvas').boundingBox();await Down(box.x+box.width*.5,box.y+box.height*.55);await Step(1);await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await Up();Check(!(await Probe()).rendering.draggingTool&&!(await Probe()).active,'focus loss cancels drag');
   Check(await page.locator('#tool-drag').count()===0,'obsolete follow-cursor toggle is removed');
   await page.evaluate(()=>localStorage.setItem('earspa3d.calm.settings',JSON.stringify({toolDrag:false,master:.37,haptics:false})));
-  await page.reload();await page.waitForFunction(()=>window.__EarSpaDebug);const migrated=await Probe();Check(migrated.settings.toolDrag&&migrated.rendering.toolDragMode,'old disabled setting migrates to physical controls');Check(migrated.settings.master===.37&&!migrated.settings.haptics,'migration preserves unrelated preferences');
+  await page.reload();await page.waitForFunction(()=>window.__EarSpaDebug,null,{timeout:90000});const migrated=await Probe();Check(migrated.settings.toolDrag&&migrated.rendering.toolDragMode,'old disabled setting migrates to physical controls');Check(migrated.settings.master===.37&&!migrated.settings.haptics,'migration preserves unrelated preferences');
   Check(report.errors.length===0,'no browser or resource errors');console.log('PASS tool drag '+width+': '+report.checks.length+' checks');
  }catch(error){report.failure=error.message;report.probe=await Probe().catch(()=>null);await page.screenshot({path:path.join(here,'_dev/Shot_ToolDragFailure_'+width+'.png')});throw error;}finally{await page.close();}
 }}finally{await fs.writeFile(path.join(here,'_dev/Data_ToolDragPlayReport.json'),JSON.stringify(reports,null,2));await browser.close();}

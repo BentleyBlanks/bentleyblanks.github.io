@@ -11,7 +11,7 @@
 
 import * as THREE from "three";
 import { PALETTE, CSS_VARS, SEMANTIC, SHAPE } from "./Data_Palette.mjs?v=ear006-20260911";
-import { CreateCore, GuessQuality } from "./Script_Core.js?v=ear006-20260911";
+import { CreateCore, GuessQuality } from "./Script_Core.js?v=ear043-runtime-performance-20261003";
 import { CreateInput } from "./Script_Input.js?v=ear006-20260911";
 import { CreateCameraRig } from "./Script_Camera.js?v=ear006-20260911";
 import { CreateSession } from "./Script_Session.js?v=ear006-20260911";

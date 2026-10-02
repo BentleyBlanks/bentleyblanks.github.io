@@ -1,11 +1,14 @@
 import {ResolveRenderQuality} from './Data_RenderQuality.mjs?v=ear040-render-settings-20260912';
 import {FeatherCapacity} from './Script_FeatherSweep.mjs?v=ear039-brush-gather-20260912';
 import {AddFeatherFur,ClearFeatherFur,PrepareFeatherStrands,FEATHER_FUR_LENGTH,FEATHER_FUR_PASSES} from './Script_FeatherFur.js?v=ear031-feather-groom-20260912';
-import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear041-material-response-20261003';
+import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear043-runtime-performance-20261003';
 import * as THREE from 'three';
+import {InitializeSlimeKernel,SlimeKernelProbe} from './Script_SlimeKernel.mjs?v=ear043-runtime-performance-20261003';
+import {WarmRenderPrograms} from './Script_ShaderWarmup.js?v=ear043-runtime-performance-20261003';
+import {UpdatePackedNormals} from './Script_VertexNormals.mjs?v=ear043-runtime-performance-20261003';
 import {PrepareWaxGeometry} from './Script_SurfaceDetail.js?v=ear041-material-response-20261003';
 import {BuildWaxShape,BuildWaxDebris} from './Script_WaxMorphology.mjs?v=ear042-wax-morphology-20261003';
-import {SlimeCage,PoseSlimeVolume,StepSlimeVolume,SplitSlimeBite} from './Script_SlimePhysics.mjs?v=ear038-oily-performance-20260912';
+import {SlimeCage,PoseSlimeVolume,StepSlimeVolume,SplitSlimeBite} from './Script_SlimePhysics.mjs?v=ear043-runtime-performance-20261003';
 import {BuildOilyCoating,OILY_REGIONS} from './Script_OilyCoating.mjs?v=ear036-oily-bites-20260912';
 import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-20260911';
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
@@ -13,11 +16,11 @@ import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
 
 import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear033-scoop-contact-audio-20260912';
 import {WaxEdgeContact,WaxGripNormal} from './Script_WaxEdgeContact.mjs?v=ear033-scoop-contact-audio-20260912';
-import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear041-material-response-20261003';
+import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear043-runtime-performance-20261003';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear041-material-response-20261003';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
-import { CreateToolContact } from './Script_ToolContact.js?v=ear020-contact-loading-20260912';
+import { CreateToolContact } from './Script_ToolContact.js?v=ear043-runtime-performance-20261003';
 import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear041-material-response-20261003';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
@@ -27,6 +30,7 @@ export async function CreateImmersiveScene({ core }) {
     new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear019-hair-complexion-20260912', import.meta.url).href),
     CreateTactileMaterials(core.renderer),
     fetch(new URL('./Data_CanalProfile.json?v=ear012-outer-20260911',import.meta.url)).then(response=>response.json()),
+    InitializeSlimeKernel(),
   ]);
   asset.scene.updateMatrixWorld(true);
   const contact=CreateToolContact(profile);
@@ -504,7 +508,7 @@ export async function CreateImmersiveScene({ core }) {
       const start=tool.position.clone(),steps=Math.max(1,Math.ceil(start.distanceTo(target)/.12)),moved=new Set();
       for(let i=1;i<=steps;i++){
         const previous=tool.position.clone();
-        pose=ToolAt(start.clone().lerp(target,i/steps),id);
+        pose=ToolAt(start.clone().lerp(target,i/steps),id,null,0,i<steps);
         for(const item of SweepBrush(previous))moved.add(item);
       }
       brushSweep.moved=moved.size;
@@ -766,12 +770,26 @@ export async function CreateImmersiveScene({ core }) {
     for(const [id,group] of Object.entries(toolParts))if(toolSkins[id]!==equipped[id]||toolLevels[id]!==levels[id])StyleTool(group,id,levels[id]||1,equipped[id]||'classic');
     toolSkins={...equipped};toolLevels={...levels};ApplyGroupQuality(tool);contact.Reset();
   }
-  let shadersWarmed=false;
+  let shadersWarmed=false,shaderReserve=null;
   async function WarmTools(){
-    const renderer=core.renderer,wasShadow=renderer.shadowMap.enabled;
-    const visible=[tool,...Object.values(toolParts)].map(o=>[o,o.visible]);tool.visible=true;Object.values(toolParts).forEach(g=>g.visible=true);
-    try{for(const shadow of [...new Set([wasShadow,false])]){renderer.shadowMap.enabled=shadow;await renderer.compileAsync(scene,camera);renderer.render(scene,camera);}shadersWarmed=true;}
-    finally{renderer.shadowMap.enabled=wasShadow;visible.forEach(([o,v])=>o.visible=v);}
+    if(shadersWarmed)return;
+    // Hold representative materials so program references survive customer resets.
+    // They share one tiny CPU-only geometry and never participate in rendering.
+    const reserve=shaderReserve=new THREE.Group();reserve.name='ShaderWarmupReserve';reserve.visible=false;root.add(reserve);
+    const geometry=new THREE.PlaneGeometry(.01,.01);
+    for(const type of ['dry','wet','impacted','oily'])for(const tone of type==='oily'?['brown']:['brown','paleYellow'])for(const soaked of type==='oily'||type==='wet'?[false]:[false,true]){
+      const material=materials.Wax(type,tone);if(type==='oily'||type==='wet')material.envMap=metalEnvironment.texture;
+      if(soaked)material.clearcoat=1;
+      const mesh=new THREE.Mesh(geometry,material);mesh.receiveShadow=true;reserve.add(mesh);
+    }
+    // Shadow materials are created lazily by Three, outside compileAsync's normal
+    // traversal. Match their side/alpha flags before the first tool casts a shadow.
+    const casters=[];scene.traverse(object=>{if(object.isMesh&&object.castShadow)casters.push(object);});
+    for(const object of casters)for(const source of Array.isArray(object.material)?object.material:[object.material]){
+      const material=new THREE.MeshDepthMaterial({side:source.shadowSide??({[THREE.FrontSide]:THREE.BackSide,[THREE.BackSide]:THREE.FrontSide,[THREE.DoubleSide]:THREE.DoubleSide})[source.side],map:source.map,alphaMap:source.alphaMap,alphaTest:source.alphaToCoverage?.5:source.alphaTest});
+      reserve.add(new THREE.Mesh(object.geometry,material));
+    }
+    await WarmRenderPrograms(core.renderer,scene,camera);shadersWarmed=true;
   }
   function CreateToolPreview(canvas,id,level,next,skin){
     const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(2,devicePixelRatio));renderer.setSize(canvas.clientWidth||500,canvas.clientHeight||300,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;
@@ -791,7 +809,13 @@ export async function CreateImmersiveScene({ core }) {
     if(c.body.detached){c.state='settling';c.settleAge=0;c.settleVelocity=new THREE.Vector3().fromArray(c.body.velocity);}
     else c.state='returning';
   }
-  function ToolAt(point,id,c=null,opening=0) {
+  function UpdateFiberNormals(part){
+    if(!part.userData.fiberNormalsDirty)return;
+    const geometry=part.geometry;
+    UpdatePackedNormals(geometry.attributes.position.array,geometry.index.array,geometry.attributes.normal.array);
+    geometry.attributes.normal.needsUpdate=true;part.userData.fiberNormalsDirty=false;
+  }
+  function ToolAt(point,id,c=null,opening=0,deferFiberNormals=false) {
     reachBlocked=false;
     if(inside&&!transfer){const projected=canal.Project(point);if(projected.depth>Reach(id)){const originalCenter=canal.CenterAt(projected.depth).clone();point=point.clone().sub(originalCenter).add(canal.CenterAt(Reach(id)).clone());reachBlocked=true;}}
     tool.visible=true;tool.position.copy(point);
@@ -840,7 +864,7 @@ export async function CreateImmersiveScene({ core }) {
     if(['feather','brush'].includes(id)){
       tool.updateMatrixWorld(true);
       for(const part of toolParts[id].children){if(!part.userData.softFiber)continue;
-        if(part.userData.fiberPose?.equals(part.matrixWorld))continue;part.userData.fiberPose=part.matrixWorld.clone();
+        if(part.userData.fiberPose?.equals(part.matrixWorld)){if(!deferFiberNormals)UpdateFiberNormals(part);continue;}part.userData.fiberPose=part.matrixWorld.clone();
         const p=part.geometry.attributes.position,rest=part.userData.fiberRest,inv=part.matrixWorld.clone().invert();
         const wallAt=contact.Surface(tool.position),surfacePoint=tool.position.clone().addScaledVector(wallAt.normal,-wallAt.clearance);
         const sample={normal:new THREE.Vector3()},world=new THREE.Vector3(),delta=new THREE.Vector3(),local=new THREE.Vector3();
@@ -849,10 +873,11 @@ export async function CreateImmersiveScene({ core }) {
           const gap=delta.subVectors(world,surfacePoint).dot(wallAt.normal),correction=Clamp(.035-gap,0,.7)*rootWeight;world.addScaledVector(wallAt.normal,correction);
           // 每簇是有上界半径的包络球；额外安全距离覆盖簇内每个顶点和末梢摆动。
           const clearance=.058+bin.radius*1.18+(id==='feather'?FEATHER_FUR_LENGTH:0);
-          for(let pass=0;pass<3;pass++){contact.Surface(world,sample);if(sample.clearance>=clearance)break;world.addScaledVector(sample.normal,clearance+.002-sample.clearance);}
+          for(let pass=0;pass<3;pass++){contact.Surface(world,sample,clearance);if(sample.clearance>=clearance)break;world.addScaledVector(sample.normal,clearance+.002-sample.clearance);}
           delta.copy(world).applyMatrix4(inv).sub(bin.center);
           for(const i of bin.indices)p.setXYZ(i,rest[i*3]+delta.x,rest[i*3+1]+delta.y,rest[i*3+2]+delta.z);
-        }p.needsUpdate=true;part.geometry.computeVertexNormals();
+        }p.needsUpdate=true;part.userData.fiberNormalsDirty=true;if(!deferFiberNormals)UpdateFiberNormals(part);
+        part.userData.fiberInverse=inv;
       }
     }
     lastToolPoint=tool.position.clone();return pose;
@@ -895,7 +920,7 @@ export async function CreateImmersiveScene({ core }) {
   let brushSweep={moved:0,distance:0};
   function BrushTouchesDebris(c){
     const part=toolParts.brush.children.find(p=>p.userData.softFiber);
-    const local=c.mesh.position.clone().applyMatrix4(part.matrixWorld.clone().invert());
+    const local=c.mesh.position.clone().applyMatrix4(part.userData.fiberInverse);
     const radius=Math.min(.30,Math.max(...c.footprint)*.6),fiber=new THREE.Vector3();
     // Microdust uses the same finite grain envelope as feather pickup, avoiding
     // a ray slipping through the spaces between the nine grains of one patch.
@@ -907,7 +932,7 @@ export async function CreateImmersiveScene({ core }) {
   function SweepBrush(previousPosition) {
     const motion=tool.position.clone().sub(previousPosition),moved=[];
     if(!toolDrag||transfer||motion.lengthSq()<1e-10)return moved;
-    scene.updateMatrixWorld(true);
+    tool.updateMatrixWorld(true);
     const candidates=chunks.filter(c=>IsFeatherDebris(c)&&['attached','returning'].includes(c.state)&&c.depth<=Reach('brush')&&BrushTouchesDebris(c));
     if(!candidates.length)return moved;
     // Use the contacted patch of bristles, which can bend far from the nominal tip.
@@ -934,15 +959,15 @@ export async function CreateImmersiveScene({ core }) {
       const rotationDelta=new THREE.Quaternion().setFromUnitVectors(c.normal,next.normal);
       const rotation=rotationDelta.clone().multiply(c.mesh.quaternion);
       // Check the visible grains, including their thickness, against the actual canal.
-      const positions=c.mesh.geometry.attributes.position,vertex=new THREE.Vector3();
+      const positions=c.mesh.geometry.attributes.position,vertex=new THREE.Vector3(),hit={normal:new THREE.Vector3()},correction=new THREE.Vector3();
       for(let pass=0;pass<3;pass++){
-        let penetration=0,correction=null;
+        let penetration=0;
         for(let i=0;i<positions.count;i++){
           vertex.fromBufferAttribute(positions,i).applyQuaternion(rotation).add(desired);
-          const hit=contact.Surface(vertex);
-          if(.018-hit.clearance>penetration){penetration=.018-hit.clearance;correction=hit.normal.clone();}
+          contact.Surface(vertex,hit,.018-penetration);
+          if(.018-hit.clearance>penetration){penetration=.018-hit.clearance;correction.copy(hit.normal);}
         }
-        if(!correction)break;
+        if(!penetration)break;
         desired.addScaledVector(correction,penetration);
       }
       if(desired.distanceToSquared(c.mesh.position)<1e-10)continue;
@@ -1159,7 +1184,7 @@ export async function CreateImmersiveScene({ core }) {
     Reach,CanReach(c,id){return c.coating||c.depth<=Reach(id);},SetDeep(value){inspectionTarget=value?1:0;contact.Reset();HideTool();},
     AuditTool,CollisionProbe(){return contact.Probe();},
     SetContact:materials.SetContact,SetRenderQuality,
-    RenderingProbe(){return {renderQuality:{...renderQuality},shadowSize:lamp.shadow.mapSize.x,reflectionStrength:renderQuality.reflections,furLayers:renderQuality.furLayers,shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolVisible:tool.visible,toolDragMode,draggingTool:!!toolDrag,toolPosition:tool.position.toArray(),toolScreen:Project(tool.position),toolDepth:canal.Project(tool.position).depth,toolRotation:tool.quaternion.toArray(),featherShading:'six-pass combed continuous fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
+    RenderingProbe(){return {slimeKernel:SlimeKernelProbe(),renderQuality:{...renderQuality},shadowSize:lamp.shadow.mapSize.x,reflectionStrength:renderQuality.reflections,furLayers:renderQuality.furLayers,shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolVisible:tool.visible,toolDragMode,draggingTool:!!toolDrag,toolPosition:tool.position.toArray(),toolScreen:Project(tool.position),toolDepth:canal.Project(tool.position).depth,toolRotation:tool.quaternion.toArray(),featherShading:'six-pass combed continuous fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
     ToggleLamp(){lampOn=!lampOn;return lampOn;},AimLamp(x,y){aim.set(x/width*2-1,1-y/height*2);aimed=true;},
     Enter(){inside=true;entrance=0;showcase=false;},Hover,
     ToggleView(){if(transfer)return 'canal';showcase=false;inside=!inside;HideTool();return inside?'canal':'ear';},
@@ -1170,5 +1195,5 @@ export async function CreateImmersiveScene({ core }) {
     Drop(c){c.surfaceWet=Math.max(c.surfaceWet||0,.18);if(!toolDragMode||!toolDrag)ShowTool(c,'drops');dropTarget=c.mesh.position.clone().addScaledVector(c.normal,.18);dropAge=0;droplet.visible=true;droplet.userData.start=lastToolPoint.clone();},
     get chunks(){return chunks;},
     modelInfo:{source:'BlenderMCP',file:'Models/Model_ImmersiveEar.glb',edition:'DirectionalAnatomy',nodes:asset.scene.children.map(n=>n.name)},
-    Dispose(){toolParts.feather.children.forEach(p=>ClearFeatherFur(p));collectionTray.Dispose();disposed=true;CancelPreparation();environment.dispose();metalEnvironment.dispose();metalMaterials.clear();anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
+    Dispose(){shaderReserve?.traverse(n=>n.material?.dispose());shaderReserve?.removeFromParent();toolParts.feather.children.forEach(p=>ClearFeatherFur(p));collectionTray.Dispose();disposed=true;CancelPreparation();environment.dispose();metalEnvironment.dispose();metalMaterials.clear();anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
 }

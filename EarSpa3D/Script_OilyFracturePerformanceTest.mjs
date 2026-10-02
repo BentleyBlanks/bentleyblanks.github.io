@@ -11,13 +11,14 @@ const touch=process.argv.includes('--touch'),width=touch?390:1000,height=touch?8
 const browser=await chromium.launch({executablePath:process.env.EARSPA_BROWSER||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--mute-audio']}),report={checks:[],errors:[],bites:[]};
 await fs.mkdir(path.join(here,'_dev'),{recursive:true});
 const page=await browser.newPage({viewport:{width,height},isMobile:touch,hasTouch:touch}),cdp=await page.context().newCDPSession(page);
+await page.addInitScript(()=>{const link=WebGL2RenderingContext.prototype.linkProgram;window.runtimeShaderLinks=0;WebGL2RenderingContext.prototype.linkProgram=function(...args){runtimeShaderLinks++;return link.apply(this,args);};});
 page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)report.errors.push(r.status()+' '+r.url());});
 const Check=(ok,label)=>{assert.ok(ok,label);report.checks.push(label);};
 async function Down(){if(touch)await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:inputX,y:inputY}]});else{await page.mouse.move(inputX,inputY);await page.mouse.down();}}
 async function Move(x,y){if(touch){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y}]});await page.waitForFunction(({x,y})=>Math.abs(window.oilPointer?.x-x)<1&&Math.abs(window.oilPointer?.y-y)<1,{x,y});}else await page.mouse.move(x,y);}
 async function Up(){if(touch)await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});else await page.mouse.up();}
 try{
- await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug);await page.evaluate(()=>{requestAnimationFrame=()=>0;document.querySelector('#ear-canvas').addEventListener('pointermove',e=>window.oilPointer={x:e.clientX,y:e.clientY});});
+ await page.goto(url+'?debug=1');await page.waitForFunction(()=>window.__EarSpaDebug,null,{timeout:120000});await page.evaluate(()=>{runtimeShaderLinks=0;requestAnimationFrame=()=>0;document.querySelector('#ear-canvas').addEventListener('pointermove',e=>window.oilPointer={x:e.clientX,y:e.clientY});});
  await page.locator('#welcome-settings').click();await page.locator('#practice-type').selectOption('oily');await page.locator('#practice-start').click();await page.evaluate(()=>__EarSpaDebug.StepFrames(150));
  await page.locator('[data-tool="tweezers"]').click();await page.evaluate(()=>__EarSpaDebug.StepFrames(1));
  await cdp.send('Profiler.enable');await cdp.send('Profiler.start');
@@ -53,5 +54,6 @@ try{
  const Summary=a=>{a.sort((a,b)=>a-b);return{median:a[Math.floor(a.length*.5)],p95:a[Math.floor(a.length*.95)],max:a.at(-1)};};report.summary={fractureCpuMs:report.bites.map(b=>b.fracture.cpu),loadingCpuMs:Summary(report.bites.flatMap(b=>b.loading.map(f=>f.cpu))),heldCpuMs:Summary(report.bites.flatMap(b=>b.held.map(f=>f.cpu))),heldGpuMs:Summary(report.bites.flatMap(b=>b.held.map(f=>f.gpu)))};
  const baseline=process.argv.find(a=>a.startsWith('--baseline='))?.slice(11);
  if(baseline){const prior=JSON.parse(await fs.readFile(baseline,'utf8')).summary,Mean=a=>a.reduce((s,x)=>s+x,0)/a.length;Check(Mean(report.summary.fractureCpuMs)<Mean(prior.fractureCpuMs)*.75,'mean fracture time improves at least 25 percent');Check(report.summary.heldCpuMs.median<prior.heldCpuMs.median*.75,'median held frames improve at least 25 percent');}
+ report.runtimeShaderLinks=await page.evaluate(()=>runtimeShaderLinks);Check(report.runtimeShaderLinks===0,'first oil, three fractures and tray transfers create no new shader programs');
  Check(report.errors.length===0,'no browser, shader or resource errors');console.log('PASS oily fracture',JSON.stringify(report.summary));console.log(JSON.stringify(report.hotspots));
 }finally{await fs.writeFile(path.join(here,'_dev/Data_OilyFracture_'+label+'.json'),JSON.stringify(report,null,2));await browser.close();}

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {WaxPhysicsSettings,SetWaxPhysicsSettings,WaxPhysicsMaterial,NormalizeWaxPhysicsSettings,WAX_PHYSICS_MATERIALS} from './Data_WaxPhysicsSettings.mjs?v=ear028-physics-settings-20260912';
 import {CreatePeelBody,BindPeelSurface,GripPeelBody,StepPeelBody,UngripPeelBody} from './Script_PeelPhysics.mjs';
-import {SlimeCage,BindSlimeVolume,GripSlimeVolume,StepSlimeVolume,UngripSlimeVolume} from './Script_SlimePhysics.mjs?v=ear028-physics-settings-20260912';
+import {SlimeCage,BindSlimeVolume,GripSlimeVolume,StepSlimeVolume,UngripSlimeVolume} from './Script_SlimePhysics.mjs?v=ear043-runtime-performance-20261003';
 let checks=0;const Check=(ok,label)=>{assert.ok(ok,label);checks++;};
 const defaults=WaxPhysicsSettings();
 Check(defaults.dry.stretch<1&&defaults.wet.bend<1&&defaults.dry.damping>12&&defaults.oily.damping>8&&defaults.oily.recovery<.15,'defaults reduce elastic restoration and increase dissipation');

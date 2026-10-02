@@ -5,8 +5,8 @@ import {ContactFriction} from './Script_ContactFriction.mjs?v=ear035-sticky-scra
 import {CreatePhysicsSettings} from './Script_PhysicsSettings.mjs?v=ear028-physics-settings-20260912';
 import {CUSTOMER_EARS,CustomerEarType} from './Data_CustomerTypes.mjs?v=ear029-oily-coating-20260912';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
-import { CreateCore } from './Script_Core.js?v=ear040-render-settings-20260912';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear042-wax-morphology-20261003';
+import { CreateCore } from './Script_Core.js?v=ear043-runtime-performance-20261003';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear043-runtime-performance-20261003';
 import { CreateAudio } from './Script_Audio.js?v=ear035-sticky-scrape-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear040-render-settings-20260912';
@@ -15,7 +15,7 @@ import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear039-brush-gather-20260912';
 
-const VERSION = 'ear042-wax-morphology-20261003';
+const VERSION = 'ear043-runtime-performance-20261003';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结', oily:'油性凝胶' };
@@ -449,7 +449,7 @@ export async function Start() {
       tray:view.TrayProbe(),targets: view.Targets(), transfer:view.transfer, model:view.modelInfo, viewReady:view.ready, rendering:view.RenderingProbe(), collision:view.CollisionProbe(),preparation:view.PreparationProbe(),feedback:feedback.map(f=>({...f})), events: events.map(x => ({ ...x })), audio: audio.debug(), settings: { ...settings }, physicsSettings:physicsSettings.Snapshot(),renderQuality:renderQualitySettings.Snapshot(), shop: shop.Snapshot(), stats: { ...core.stats },
       viewport: { width: innerWidth, height: innerHeight }, stage: (() => { const r = canvas.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })() };
   }
-  UpdateInventory();UpdateProgress();core.Resize();view.Resize();Frame(0);await view.WarmTools();Frame(0);
+  UpdateInventory();UpdateProgress();core.Resize();view.Resize();view.Update(0);await view.WarmTools();Frame(0);
   Object.defineProperty(window, '__EarSpaProbe', { value: Probe, configurable: true });
   if (new URLSearchParams(location.search).get('debug') === '1') {
     window.__EarSpaDebug = { StepFrames(n = 1) { for (let i = 0; i < Math.min(n, 3600); i++) Frame(1 / 60); return Probe(); }, Probe, audio, view, shop, core };

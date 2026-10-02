@@ -1,14 +1,25 @@
-// Same sequential XPBD projections in contiguous, body-owned scratch storage.
+// Same sequential XPBD projections in a bounded shared WASM arena or JS scratch.
 // Public nodes, velocities and material topology remain the authoritative state.
+import {SlimeKernelScratch} from './Script_SlimeKernel.mjs?v=ear043-runtime-performance-20261003';
 export function ProjectSlimeConstraints(body,{edgeAlpha,volumeAlpha,adhesion,efficiency,h2,gripTarget,planes,supports,floor}){
  const s=body.gel,mass=s.points.length;
  const cache=s.projection||(s.projection={points:new Float64Array(mass*3),edges:new Float64Array(s.edges.length*5),tets:new Float64Array(s.tetrahedra.length*6)});
- const p=cache.points,edges=cache.edges,tets=cache.tets;
+ const accelerated=SlimeKernelScratch(cache.points.length,cache.edges.length,cache.tets.length,body.anchors.length*7,6+(s.grip?.ids.length||0)*2);
+ const {points:p,edges,tets}=accelerated||cache;
  for(let i=0;i<mass;i++){const q=s.points[i];p[i*3]=q[0];p[i*3+1]=q[1];p[i*3+2]=q[2];}
  for(let i=0;i<s.edges.length;i++){const c=s.edges[i],j=i*5;edges[j]=c.i*3;edges[j+1]=c.j*3;edges[j+2]=c.memory;edges[j+3]=0;edges[j+4]=edgeAlpha*(s.bite&&(s.bite.mask[c.i]||s.bite.mask[c.j])?8:1);}
  for(let i=0;i<s.tetrahedra.length;i++){const c=s.tetrahedra[i],j=i*6;tets[j]=c.ids[0]*3;tets[j+1]=c.ids[1]*3;tets[j+2]=c.ids[2]*3;tets[j+3]=c.ids[3]*3;tets[j+4]=c.rest;tets[j+5]=0;}
  const anchorAlpha=2e-6/Math.max(.05,adhesion)/h2,gripAlpha=.0015/Math.max(.03,efficiency)/h2,cap=90*h2;
- for(let iteration=0;iteration<(s.coating?16:8);iteration++){
+ if(accelerated){
+  const a=accelerated.anchors,q=accelerated.planes,g=accelerated.grip;let end=0;
+  for(const anchor of body.anchors)if(anchor.alive){a[end]=anchor.node*3;for(let k=0;k<3;k++){a[end+1+k]=anchor.rest[k];a[end+4+k]=anchor.lambda[k];}end+=7;}
+  const hasPlanes=planes?1:supports&&!body.detached?2:0;
+  if(hasPlanes)for(let i=0;i<mass;i++){const point=planes?planes[i].point:supports[i],normal=planes?planes[i].normal:body.normal;for(let k=0;k<3;k++){q[i*7+k]=point[k];q[i*7+3+k]=normal[k];}q[i*7+6]=planes?planes[i].clearance:0;}
+  if(gripTarget){for(let k=0;k<3;k++){g[k]=gripTarget[k];g[k+3]=s.grip.lambda[k];}for(let j=0;j<s.grip.ids.length;j++){g[6+j*2]=s.grip.ids[j]*3;g[7+j*2]=s.grip.weights[j];}}
+  if(accelerated.Project(end,hasPlanes,gripTarget?s.grip.ids.length:0,s.coating?16:8,volumeAlpha,anchorAlpha,gripAlpha,cap,floor))body.contact=true;
+  end=0;for(const anchor of body.anchors)if(anchor.alive){for(let k=0;k<3;k++)anchor.lambda[k]=a[end+4+k];end+=7;}
+  if(gripTarget)for(let k=0;k<3;k++)s.grip.lambda[k]=g[k+3];
+ }else for(let iteration=0;iteration<(s.coating?16:8);iteration++){
   Edges(p,edges,mass);Tetrahedra(p,tets,volumeAlpha,mass);
   for(const a of body.anchors)if(a.alive){const id=a.node*3;for(let k=0;k<3;k++){const dl=(-(p[id+k]-a.rest[k])-anchorAlpha*a.lambda[k])/(mass+anchorAlpha);a.lambda[k]+=dl;p[id+k]+=dl*mass;}}
   if(gripTarget)Grip(p,s.grip,gripTarget,gripAlpha,mass,cap);
