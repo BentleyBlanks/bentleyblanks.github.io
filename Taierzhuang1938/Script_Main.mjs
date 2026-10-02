@@ -1,3 +1,4 @@
+import { ManagedTextureLoader, SetTextureImportRenderer } from "./Script_TextureImports.mjs";
 import { SampleShotDisk, IsAutomaticGun } from "./Script_FirearmHandling.mjs";
 import { AUTOMATIC_RECOIL, WALL_CARRY } from "./Data_Tuning_FirearmHandling.mjs";
 import { CollectBulletNearMisses, ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
@@ -440,6 +441,7 @@ function NextFrame() {
 bootPaper?.Show();
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
+SetTextureImportRenderer(renderer);
 renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
 renderer.setSize(window.innerWidth, window.innerHeight, false);
 // three 默认 checkShaderErrors = true：每个 program **第一次被用到**时同步去取
@@ -3528,7 +3530,7 @@ const setpiecePropTextures = new Map();
 
 function SetpiecePropTexture(path) {
   if (setpiecePropTextures.has(path)) return setpiecePropTextures.get(path);
-  const texture = new THREE.TextureLoader().load(path);
+  const texture = new ManagedTextureLoader().load(path);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   setpiecePropTextures.set(path, texture);

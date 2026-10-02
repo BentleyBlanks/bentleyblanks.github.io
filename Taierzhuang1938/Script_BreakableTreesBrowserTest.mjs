@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
-const TREE_COUNT=130;
+const TREE_COUNT=142;
 const here=path.dirname(fileURLToPath(import.meta.url)),out=path.join(here,"_shots/BreakableTrees");
 await fs.mkdir(out,{recursive:true});
 const server=await ServeRoot(path.resolve(here,".."),0),browser=await LaunchBrowser();
@@ -15,6 +15,9 @@ try {
   const origin=process.env.TREE_PREVIEW_ORIGIN||`http://127.0.0.1:${server.address().port}`;
   await page.goto(`${origin}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&missionStage=3&quality=high&scale=small`,{timeout:180000});
   await page.waitForFunction(()=>window.Tengxian?.state.ready,null,{timeout:240000});
+  // This fixture advances combat for 45 seconds while inspecting trees. Keep the
+  // observer alive so a death screen cannot stop the production physics loop.
+  await page.evaluate(()=>{window.Tengxian.player.debug.invincible=true;});
   await page.evaluate(async()=>{
     const {Vector3}=await import("three"),v=new Vector3(),field=window.Tengxian.battlefield;
     // Lowest bark vertex over the ground, and the same for the lower trunk (model y < 3.5 m).
@@ -42,7 +45,7 @@ try {
         Math.abs(c.c[0]-t.x)<.01&&Math.abs(c.c[2]-t.z)<.01).map(c=>c.id||c.tag)),
       legacyCrowns:field.layout.blocks.filter(b=>/(?:Tree|Poplar).*?(?:Crown|Branch)/.test(b.id)).length};
   });
-  assert.equal(replacements.count,46);assert.deepEqual(replacements.missing,[]);
+  assert.equal(replacements.count,58);assert.deepEqual(replacements.missing,[]);
   assert.deepEqual(replacements.ghostColliders,[]);assert.equal(replacements.legacyCrowns,0);
   for(const id of ["FieldPoplarEast3Trunk","FieldPoplarWest3Trunk","FieldPoplarSouthRoad1Trunk",
     "FieldPoplarRailApproach3Trunk","OldYardDeadTreeTrunk","CollectionEastTreeATrunk","SouthExitTreeTrunk","TankRoadDeadTreeTrunk","VillageMouthTree0Trunk"]){
@@ -86,7 +89,8 @@ try {
   assert.equal(initial.probeLod,0,"the tree 16 m away draws at full detail");
   assert.ok(initial.snapshot.lod[0]<12&&initial.snapshot.lod.slice(2).reduce((a,b)=>a+b,0)>40,"distant trees use the clustered copies: "+initial.snapshot.lod);
   assert.equal(initial.members.StumpCap_L0||0,0,"standing trees hide their fracture caps");
-  for(const part of ["Stump","Crown"])assert.equal(initial.snapshot.lod.reduce((n,_,l)=>n+(initial.members[`${part}_L${l}`]||0),0),TREE_COUNT,part+" is drawn exactly once per tree");
+  assert.ok(Object.keys(initial.members).every(name => !/^(Stump|Crown)_L/.test(name)), "intact trees have no split draw batches");
+  for(const part of ["Intact"])assert.equal(initial.snapshot.lod.reduce((n,_,l)=>n+(initial.members[`${part}_L${l}`]||0),0),TREE_COUNT,part+" is drawn exactly once per tree");
   assert.equal(initial.collider,initial.expected,"standing trunk has a real Rapier collider");
   assert.equal(initial.cameraHit,initial.expected,"capture camera has an unobstructed view of the tree");
   assert.equal(initial.warmProxies,0,"charred-tree shader proxies retire after loading has drawn them");
@@ -97,7 +101,7 @@ try {
     const hit=g.physics.Raycast(new Vector3(tree.x-3,tree.y+2,tree.z),new Vector3(1,0,0),6);
     const snapshot=g.battlefield.breakableTrees.Snapshot();
     const drawn=part=>tree.sector.batches.reduce((n,{batch})=>n+(batch.name.includes(`_${part}_`)&&batch.visible?batch.count:0),0);
-    const sectorDraws={cap:drawn("StumpCap"),crown:drawn("Crown"),stump:drawn("Stump"),charred:drawn("StumpCharred"),trees:tree.sector.trees.length};
+    const sectorDraws={cap:drawn("StumpCap"),intact:drawn("Intact"),crown:drawn("Crown"),stump:drawn("Stump"),charred:drawn("StumpCharred"),trees:tree.sector.trees.length};
     const charredMaterials=[...tree.fallen.children.map(m=>m.material),
       ...tree.sector.batches.filter(({batch})=>/_Stump(Cap|Charred)_/.test(batch.name)).map(({batch})=>batch.material)].every(m=>m.vertexColors);
     g.StepFrames(45,1/60,false);g.StepFrames(1,0,true);
@@ -105,7 +109,7 @@ try {
       moved:tree.fallen?.quaternion.toArray(),body:!!tree.body};
   });
   assert.equal(broken.snapshot.broken,1);
-  assert.deepEqual([broken.sectorDraws.cap,broken.sectorDraws.crown,broken.sectorDraws.stump,broken.sectorDraws.charred],[1,broken.sectorDraws.trees-1,broken.sectorDraws.trees-1,1],"a broken tree keeps a charred stump, shows its cap and loses its standing crown");
+  assert.deepEqual([broken.sectorDraws.cap,broken.sectorDraws.intact,broken.sectorDraws.crown,broken.sectorDraws.stump,broken.sectorDraws.charred],[1,broken.sectorDraws.trees-1,0,0,1],"a broken tree keeps a charred stump, shows its cap and loses its standing crown");
   assert.ok(broken.charredMaterials,"broken stump, cap and fallen crown draw charred (vertex-coloured) materials");
   assert.equal(broken.debrisGround,1,"a falling crown lands on its own debris-only ground patch");assert.equal(broken.snapshot.activeBodies,1);
   assert.notEqual(broken.oldCollider,initial.expected);assert.ok(broken.body);
@@ -163,7 +167,7 @@ try {
     const stress={peak:peak.activeBodies,debrisGround,trunkGapMedian:trunkGaps[trunkGaps.length>>1],
       trunkRaised:trunkGaps.filter(v=>v>0.3).length,settled:settled.settled,activeBodies:settled.activeBodies,
       standing:settled.standing,treeColliders,terrainSamples,idleUpdateMs,allStatic,
-      crownInstances:system.root.children.filter(m=>m.isInstancedMesh&&m.name.includes("_Crown_L")).reduce((n,m)=>n+m.count,0),
+      crownInstances:system.root.children.filter(m=>m.isInstancedMesh&&m.name.includes("_Intact_L")).reduce((n,m)=>n+m.count,0),
       remainingTreeBodies:treeBodies.filter(body=>g.physics.dynamics.has(body)).length,
       bodiesAfterSettling:g.physics.dynamics.size};
     // Gameplay may create unrelated projectiles during those 30 simulated seconds.

@@ -1,3 +1,4 @@
+import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 import * as THREE from "three";
 import { BLOOD_TEXTURE, BLOOD_QUALITY, BLOOD_MOTION as C, BLOOD_ARTERIAL as A, BLOOD_HEADSHOT as H, BloodPosition } from "./Data_Tuning_Blood.mjs";
 import { SurfaceDecalLayer } from "./Script_SurfaceDecals.mjs";
@@ -23,7 +24,7 @@ export class BloodEffects {
       softRange:0,renderOrder:6,blending:THREE.NormalBlending,preserveTargetAlpha:true});
     this.decals=this.CreateLayer(root,this.limits.decals,false);
     this.texture=null;
-    new THREE.TextureLoader().load(new URL(BLOOD_TEXTURE,import.meta.url).href,texture=>{
+    new ManagedTextureLoader().load(new URL(BLOOD_TEXTURE,import.meta.url).href,texture=>{
       if(this.disposed){texture.dispose();return;}
       texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
       texture.anisotropy=8;texture.needsUpdate=true;this.texture=texture;

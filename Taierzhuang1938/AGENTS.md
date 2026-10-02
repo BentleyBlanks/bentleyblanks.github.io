@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **贴图管理与枯树完整态合批（2026-10-03）**：编辑器「贴图管理」与独立 `TextureManager.html` 共用发布配置；独立图片支持尺寸／格式／质量／Mipmap，程序化配方仅 Worker 预览，GLB 内嵌图暂不管理。Pages 在 staging 导入后再打 bundle，源资产规范不变；运行时 KTX2 保留通道与 UV 方向。见 [贴图导入器](docs/Data_TextureImporter.md)，门禁 `Script_TextureImportTest` / `Script_TextureManagerBrowserTest`。枯树完整状态每区域／LOD 单一合并实例批，爆破切换原拆分物理，见 [枯树](docs/Data_BreakableTrees.md)。
+
 - **第一关性能第二轮（2026-10-02）**：白盒默认画太阳影子；白盒逐帧材质替换按顶层子树缓存（`WhiteboxSceneRenderer.Invalidate()` 兜底挂后改标记）；任务人群（`MissionPeople.Person`）画面外按 `offscreenAnimationS` 解姿势、`Threatens` 在一次 `Update` 内按参数记忆；阴影与预通道两份静态合批在 `WarmLevel` 结账帧之前一次收满（`Prime`，消掉进场后一秒的成串长帧）；新增预通道静态合批 `Script_PrepassStaticBatch`（只换预通道那一刻、烘阴影时还原成员、成员速度历史照记）。口径、实测与门禁见 [渲染管线 §17.17](docs/Data_TechRenderPipeline.md)。
 
 - **18 对岸日军步坦部队与脱离战场后再黑屏（2026-09-30）**：炸桥时河对岸有大量日军与三辆傀儡八九式（BridgeCover 起就在，BridgeWithdraw 放真 AI 8 个与冲桥组，起爆时桥上的日军被炸死落河，桥断后全停在岸边隔河射击、没有一个能过河）；撤离路线延到 109 m、翻过缓坡土岗，走到离北岸 190 m 外、对岸真 AI 连续 1.5 s 看不见玩家才黑屏（`retreatOutOfReach`），`Retry()` 的 NightMarch 分支不再把 A 段阵亡送进夜景。口径、时间线、分档伤害、性能实测与门禁见 [对岸步坦部队](docs/Data_FirstLevelBridgeFarBank.md)（规则 `Script_FirstLevelBridgeFarBank`，纯 node 门 `Script_FirstLevelFarBankTest`，出图与 A/B 帧耗时 `Script_FirstLevelFarBankShots`）。**R2c（同日）北岸抬成四级台地缓坡（`NORTH_TERRACES`，射位看对岸从一条线变成一片）：视觉人群 482 人分坡地八排、两辆岸边战车与村子上坡，地形与站位口径见文档 §11。**

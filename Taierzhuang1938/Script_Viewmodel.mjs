@@ -1,3 +1,4 @@
+import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // 《台儿庄：血战滕县》第一人称视图模型：双手 + 枪，以及它们的全部"手感"。
 //
 // 玩家 80% 的时间在看这只手和这支枪，所以这个文件里几乎每个数字都是手感数字，
@@ -354,7 +355,7 @@ function BuildMaterials(library) {
     redCloth: library.Plain("VmRedCloth", { color: 0x8e2b22, roughness: 0.92, metalness: 0 }),
     flash: new THREE.MeshBasicMaterial({
       name: "VmMuzzleFlash",
-      map: new THREE.TextureLoader().load(MUZZLE_FLASH.mask),
+      map: new ManagedTextureLoader().load(MUZZLE_FLASH.mask),
       color: new THREE.Color(MUZZLE_FLASH.color).multiplyScalar(MUZZLE_FLASH.radiance),
       blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
       transparent: true, opacity: 1, depthWrite: false, toneMapped: false,

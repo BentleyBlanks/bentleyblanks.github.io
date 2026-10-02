@@ -1,3 +1,4 @@
+import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // 《滕县 1938》过场动画系统 —— 实机演出，不是预渲染。
 //
 // 这是一次**方向变更**：docs/Data_DesignFirstPass.md 第 5.3 节与
@@ -1243,7 +1244,7 @@ export class CutsceneDirector {
     //   · **repeat 走 wrap**：Box/Plane 的 UV 是每面 0—1，贴图要铺几遍得让它 wrap，
     //     不然 repeat 大于 1 时只是把图拉伸到边缘的一列像素。
     if (spec.texture) {
-      const texture = new THREE.TextureLoader().load(spec.texture);
+      const texture = new ManagedTextureLoader().load(spec.texture);
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.minFilter = THREE.LinearMipmapLinearFilter;
       texture.magFilter = THREE.LinearFilter;

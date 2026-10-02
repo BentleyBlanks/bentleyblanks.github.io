@@ -1,3 +1,4 @@
+import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // 《台儿庄：血战滕县》粒子与特效系统。
 //
 // 这一层是"3A 观感"里最能一眼看出差距的地方：一发子弹打在青砖墙上有没有砖粉、
@@ -1765,7 +1766,7 @@ export class VfxSystem {
     this.explosionSpriteTextures = new Map();
     this.loadedExplosionSprites = new Set();
     this.lastExplosionSprite = null;
-    const textureLoader = new THREE.TextureLoader();
+    const textureLoader = new ManagedTextureLoader(undefined, { flipY: false });
 
     // 三张图同时到位才切换到 PBR；任一加载失败就继续画原程序化弹孔，避免半套
     // 法线/ORM 与错误的 Base 配在一起。每张是 3×1 图集，不随每发换 sampler。

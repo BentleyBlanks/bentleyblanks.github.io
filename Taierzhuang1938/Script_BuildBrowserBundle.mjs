@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {build} from 'esbuild';
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
-export async function BuildBrowserBundle() {
+export async function BuildBrowserBundle(projectDir = path.dirname(fileURLToPath(import.meta.url))) {
   const sourceHtml = await fs.readFile(path.join(projectDir, 'index.html'), 'utf8');
   const mapMatch = sourceHtml.match(/<script type="importmap">([\s\S]*?)<\/script>/);
   if (!mapMatch) throw new Error('Source import map is missing');
@@ -23,7 +23,7 @@ export async function BuildBrowserBundle() {
   const bundleName = 'Script_BrowserBundle.mjs';
   const bundleUrl = './' + bundleName + '?v=' + version;
   const preloadUrls = [...new Set([bundleUrl, ...Object.entries(imports)
-    .filter(([key]) => key === 'three' || key.startsWith('./vendor/')).map(([,url]) => url)])];
+    .filter(([key]) => (key === 'three' || key.startsWith('./vendor/')) && !key.endsWith('/KTX2Loader.js')).map(([,url]) => url)])];
   const preloadPattern = /<script>\s*\{\s*const map = JSON.parse\([\s\S]*?<\/script>/;
   const entryPattern = /<script type="module" src="\.\/Script_Main\.mjs\?v=\d+"><\/script>/;
   if (!preloadPattern.test(sourceHtml) || !entryPattern.test(sourceHtml)) throw new Error('Source boot markup changed; update the bundle builder');
@@ -45,7 +45,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const outputArg = process.argv.indexOf('--output-dir');
   const outputDir = outputArg >= 0 && process.argv[outputArg + 1] ? path.resolve(process.argv[outputArg + 1]) : projectDir;
   if (!preview && outputDir === projectDir) throw new Error('--deploy requires a separate --output-dir staging directory');
-  const result = await BuildBrowserBundle();
+  const result = await BuildBrowserBundle(preview ? projectDir : outputDir);
   await fs.mkdir(outputDir, {recursive:true});
   await fs.writeFile(path.join(outputDir, result.bundleName), result.code);
   await fs.writeFile(path.join(outputDir, preview ? '_check_Bundle.html' : 'index.html'), result.html);

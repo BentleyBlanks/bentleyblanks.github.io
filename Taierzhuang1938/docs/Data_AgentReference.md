@@ -6,6 +6,8 @@
 
 可炸断枯树：`Data_BreakableTreePlacements` / `Script_BreakableTrees`；
 布设、断裂资产、物理与回归入口见 [枯树说明](Data_BreakableTrees.md)。
+
+贴图管理：`TextureManager.html` / `Script_EditorTextures`；导入设置、发布编码与程序化预览见 [贴图导入器](Data_TextureImporter.md)，验证 `Script_TextureImportTest` / `Script_TextureManagerBrowserTest`。
 第一关硝烟与燃烧残骸：`Data_FirstLevelSmokeOrigins` / `Script_FirstLevelSmokeOrigins` → [烟柱实体源头](Data_FirstLevelSmokeOrigins20260927.md)；`Script_FirstLevelSmokeOriginsTest` 验证出口、道路与独立火焰池。
 
 ### 出图（优先复用的入口；输出落 `_shots/`）

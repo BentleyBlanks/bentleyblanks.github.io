@@ -51,6 +51,7 @@ jobs:
           node Taierzhuang1938/Script_ModuleGraphTest.mjs
           mkdir -p "$RUNNER_TEMP/pages"
           git archive HEAD | tar -x -C "$RUNNER_TEMP/pages"
+          node Taierzhuang1938/Script_BuildTextureImports.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"
           node Taierzhuang1938/Script_BuildBrowserBundle.mjs --deploy --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"
       - uses: actions/configure-pages@v5
       # 其余静态页面保持原样；只在 staging 内替换滕县入口，依赖与本地临时文件不发布。

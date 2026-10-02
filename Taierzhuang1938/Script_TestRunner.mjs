@@ -47,6 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  TextureImportTest: {file:"Script_TextureImportTest.mjs",desc:"Texture importer: codecs, alpha data, mipmaps and publish staging"},
+  TextureManagerBrowserTest: {file:"Script_TextureManagerBrowserTest.mjs",timeoutMs:180000,desc:"Texture manager: actual previews, save/reload, procedural worker and GPU decoding"},
   AllyGaitTest: {file:"Script_AllyGaitTest.mjs",desc:"Ally gait policy, actual skin contact, stable forward lean, loop seams and bone lengths"},
   AllyGaitMissionTest: {file:"Script_AllyGaitMissionTest.mjs",timeoutMs:900000,desc:"Ordinary 06–07 escort: real cast selects carry, dialogue palm contact and fire priority"},
   AllyGaitBrowserTest: {file:"Script_AllyGaitBrowserTest.mjs",timeoutMs:300000,desc:"Real NRA rigs and weapons: crouched ready/carry, free left hand, threat transition and rendered review"},
@@ -448,6 +450,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "TextureManagerBrowserTest",
   "FrameDebuggerTest",
   "WhiteboxQualityBrowserTest",
   "AllyGaitBrowserTest",
@@ -534,6 +537,7 @@ export const browserTests = new Set([
 ]);
 
 export const tier0Fast = [
+  "TextureImportTest",
   "BreakableTreesTest",
   "FirstLevelPropDressingTest",
   "FirstLevelVegetationTest",
@@ -738,11 +742,12 @@ export const domains = {
   // 四项都是纯 Node 毫秒级；贴图本身的改动另由 render 域与 prepush 的 BootTest / BootStallTest 兜。
   textureAssets: {
     label: "贴图资产规范与烘焙",
-    tests: ["TextureStandardsTest", "TerrainLayersTest", "BootPayloadTest", "AssetStandardsTest"],
+    tests: ["TextureStandardsTest", "TextureImportTest", "TextureManagerBrowserTest", "TerrainLayersTest", "BootPayloadTest", "AssetStandardsTest"],
   },
 };
 
 const changedDomainRules = [
+  {domain:"textureAssets",pattern:/TextureImport|TextureManager|EditorTextures/},
   { domain: "whiteboxQuality", pattern: /WhiteboxQuality|WhiteboxRendering|GraphicsProfile|Tuning_Whitebox|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },
   // 贴图资产规范：Texture/ 下任何文件、清单、通用烘焙脚本与预设、烘焙记录、关卡按需集。
   {domain:"textureAssets",pattern:/\/Texture\/|Data_TextureManifest|Script_BakePbrTexture|Data_TextureBakePresets|\/TextureBakes\/|Script_TextureStandards|Data_LevelTextureSets|Script_LevelTextureSets/},

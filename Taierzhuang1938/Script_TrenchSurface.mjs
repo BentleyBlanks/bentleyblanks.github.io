@@ -1,5 +1,6 @@
 // Physical trench dressing: shared static batches, shared heightfield, no new gameplay floor.
 import * as THREE from 'three';
+import { ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
 import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { HashString, Mulberry32 } from './Script_Noise.mjs';
 import { TRENCH_SURFACE as C } from './Data_TrenchSurface.mjs';
@@ -7,7 +8,7 @@ import { TRENCH_APPEARANCE as Earth } from './Data_TrenchAppearance.mjs';
 
 export async function LoadTrenchSurface() {
   const resources=[];
-  const Fetch=async url=>{const r=await fetch(`${url}?v=${C.version}`,{signal:AbortSignal.timeout(45000)});if(!r.ok)throw new Error(`${url}: ${r.status}`);return r;};
+  const Fetch=async url=>{const r=await fetch(ResolveTextureImportUrl(`${url}?v=${C.version}`),{signal:AbortSignal.timeout(45000)});if(!r.ok)throw new Error(`${url}: ${r.status}`);return r;};
   const Model=async url=>{
     const gltf=await new GLTFLoader().parseAsync(await (await Fetch(url)).arrayBuffer(),'');
     gltf.scene.updateMatrixWorld(true);let geometry;

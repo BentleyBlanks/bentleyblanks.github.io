@@ -1,3 +1,4 @@
+import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // Shared NRA cloth treatment for actors, cutscenes, first-person sleeves and body.
 // The source atlas also contains brass, red insignia, leather and soles: only its
 // blue cloth is recolored. Source GLBs/textures and their folds remain intact.
@@ -40,7 +41,7 @@ function ClothDetailUniforms() {
     uNraClothRoughness: { value: new THREE.Vector4(d.roughness, d.atlasRoughness, d.weaveRoughness, d.grimeRoughness) },
   };
   if (typeof document !== "undefined") {
-    new THREE.TextureLoader().load(new URL(d.texture, import.meta.url).href, (texture) => {
+    new ManagedTextureLoader(undefined, { flipY: false }).load(new URL(d.texture, import.meta.url).href, (texture) => {
       // Data, not color; glTF UV orientation like the atlas it rides on.
       texture.colorSpace = THREE.NoColorSpace;
       texture.flipY = false;

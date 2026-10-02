@@ -1,5 +1,22 @@
 # Breakable dead trees
 
+## 2026-10-03: intact draw batching
+
+Standing trees now draw one merged bark geometry per sector/LOD. The corresponding
+stump/crown LODs are concatenated without welding or re-simplification, preserving
+UVs, normals and silhouettes; fracture caps are excluded. Both parts must share the
+same material. A blast removes that intact instance and activates the existing
+charred stump, caps and physical falling crown. Split materials are still warmed
+during loading; no asset fetch or shader compilation is deferred to the blast.
+Merged geometries are field-owned and disposed with the original resources.
+
+The current browser regression checks 142 trees (84 seeded + 58 authored), zero
+standing split batches, intact-to-broken membership, occlusion and ground contact.
+All 142 crowns settle, tree bodies and debris ground patches return to zero, and
+10,000 idle updates perform zero terrain samples. The observer uses the existing
+invincibility debug flag so unrelated combat cannot stop this physics fixture.
+Historical counts below describe their dated verification runs.
+
 First-level scenery uses 130 copies of the supplied dead-tree model: 84 deterministic
 scatter placements plus 46 authored replacements (35 former green block trees along
 the east/west field edges, south road and rail approach, the collection area and exits, plus 11 primitive dead trees).

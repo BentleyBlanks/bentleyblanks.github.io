@@ -1116,6 +1116,11 @@ export const TEXTURE_MANIFEST = Object.freeze([
     ],
   },
   {
+    id: "SettingsIconDoc", kind: "doc", tier: "offline",
+    consumers: [],
+    files: [["Hud/Data_SettingsIcon.md", "Doc", 0, 0]],
+  },
+  {
     id: "PaperPropsTool", kind: "tool", tier: "offline",
     source: { provider: "procedural", date: "2026-08-28", ref: "Texture/Script_MakePaperProps.mjs" },
     consumers: [],

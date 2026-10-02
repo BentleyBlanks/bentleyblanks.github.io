@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { mergeGeometries } from "./vendor/three/examples/jsm/utils/BufferGeometryUtils.js";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ClusterDistantGeometry } from "./Script_DistantGeometry.mjs";
 import { BREAKABLE_TREES as T } from "./Data_Tuning_BreakableTrees.mjs";
@@ -143,6 +144,16 @@ export class BreakableTrees {
     source.traverse(m=>{ if(m.isMesh){m.geometry.dispose();for(const mat of Array.isArray(m.material)?m.material:[m.material])sourceMaterials.add(mat);} });
     sourceMaterials.forEach(m=>m.dispose());
     if (!this.parts.some(p=>p.cap) || this.parts.filter(p=>!p.cap).length!==2) throw new Error("Tree GLB lost its bark/cap split");
+    // Merge corresponding LODs without welding/re-simplifying: UVs, normals and the
+    // fracture seam stay identical. Split geometry is only drawn after a blast.
+    const barkParts = this.parts.filter(part => !part.cap);
+    if (barkParts[0].standing !== barkParts[1].standing) throw new Error("Intact tree bark must share one material");
+    this.intact = { standing: barkParts[0].standing, lods: T.lod.map((_, level) => {
+      const geometry = mergeGeometries(barkParts.map(part => part.lods[level]), false);
+      if (!geometry) throw new Error("Cannot merge intact tree geometry");
+      geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+      return geometry;
+    }) };
     // Until the first UpdateView every tree sits at the cheapest level.
     this.trees = MakeTreePlacements().map(p => ({ ...p, y: field.GroundHeight(p.x,p.z)-0.09,
       health: T.health, broken: false, lod: T.lod.length-1, body: null, fallen: null, fallenBark: [], age: 0, rest: 0 }));
@@ -157,22 +168,24 @@ export class BreakableTrees {
       tree.stump = TrunkBox(tree,0,T.breakHeightM);
       tree.trunk = TrunkBox(tree,T.breakHeightM,5.5);
     }
-    // One batch per sector, part, state and detail level; a batch with no members is not drawn.
-    // Standing trees use the plain bark; broken stumps and their caps use the charred copies.
+    // One intact batch per sector/LOD. Broken stumps/caps remain separate; empty
+    // batches are hidden. No additional textures or moving instance transforms.
     this.sectors = [...sectors.values()];
     for (const sector of this.sectors) {
+      const Add = (name, geometry, material, Member) => {
+        const batch = new THREE.InstancedMesh(geometry, material, sector.trees.length);
+        batch.name = `Trees_${sector.key}_${name}`;
+        batch.castShadow = true; batch.receiveShadow = true;
+        sector.batches.push({ batch, Member }); this.root.add(batch);
+      };
+      for (const [level, geometry] of this.intact.lods.entries()) {
+        Add(`Intact_L${level}`, geometry, this.intact.standing, tree => !tree.broken && tree.lod===level);
+      }
       for (const part of this.parts) {
-        if (part.cap && part.name==="Crown") continue;
-        const Add = (geometry, material, suffix, Member) => {
-          const batch = new THREE.InstancedMesh(geometry, material, sector.trees.length);
-          batch.name = `Trees_${sector.key}_${part.name}${suffix}`;
-          batch.castShadow = true; batch.receiveShadow = true;
-          sector.batches.push({ batch, Member }); this.root.add(batch);
-        };
-        if (part.cap) { Add(part.geometry, part.charred, "Cap_L0", tree => tree.broken); continue; }
+        if (part.name!=="Stump") continue;
+        if (part.cap) { Add("StumpCap_L0", part.geometry, part.charred, tree => tree.broken); continue; }
         for (const [level, geometry] of part.lods.entries()) {
-          Add(geometry, part.standing, `_L${level}`, tree => !tree.broken && tree.lod===level);
-          if (part.name==="Stump") Add(geometry, part.charred, `Charred_L${level}`, tree => tree.broken && tree.lod===level);
+          Add(`StumpCharred_L${level}`, geometry, part.charred, tree => tree.broken && tree.lod===level);
         }
       }
       this.Rebuild(sector);
@@ -325,6 +338,7 @@ export class BreakableTrees {
     this.field.BuildCollisionGrid();
     this.root.removeFromParent();this.root.traverse(m=>{if(m.isInstancedMesh)m.dispose();});
     for(const p of this.parts)for(const g of new Set(p.lods))g.dispose();
+    for(const g of this.intact.lods)g.dispose();
     for(const m of this.materials){this.field.library.externalPbrMaterials?.delete(m);m.dispose();}
     for(const t of this.textures)t.dispose();
     this.trees.length=0;

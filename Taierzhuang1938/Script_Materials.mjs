@@ -9,6 +9,7 @@
 
 import * as THREE from "three";
 import { RECIPES, BakeDetailNormal, BakeSkinLut } from "./Script_TexBake.mjs";
+import { TextureImportOf, ApplyTextureImport, LoadKtxTexture, ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
 import { SSR } from "./Data_Tuning_Graphics.mjs";
 import {
   ApplyPatches, IndirectLightingPatches, MakeDestructionPatch, FoldOrmMaps, PatchesOf,
@@ -57,10 +58,11 @@ function OrmRoughnessFloor(orm) {
  * 光滑区域误判成“全都很糙”，于是 SSR 被错误地注销掉。
  * 读不到（跨域 / 没有 canvas）时返回 0 = “不知道”，保守地保留 SSR。
  */
-function ExternalOrmRoughnessFloor(texture) {
+function ExternalOrmRoughnessFloor(texture, renderer) {
   const image = texture?.image;
   if (!image || !image.width || !image.height) return 0;
   try {
+    if (texture.isCompressedTexture) return CompressedOrmRoughnessFloor(texture, renderer);
     const canvas = typeof OffscreenCanvas === "function"
       ? new OffscreenCanvas(image.width, image.height)
       : Object.assign(document.createElement("canvas"), { width: image.width, height: image.height });
@@ -71,6 +73,46 @@ function ExternalOrmRoughnessFloor(texture) {
     return OrmRoughnessFloor(data);
   } catch (error) {
     return 0;
+  }
+}
+
+// GPU blocks have no drawable image. Inspect their actual device-decoded values
+// once during loading, including every authored mip (lossy mips may undershoot
+// the base level). This preserves SSR pruning without guessing from source data.
+function CompressedOrmRoughnessFloor(texture, renderer) {
+  if (!renderer || renderer.getContext().isContextLost()) return 0;
+  const previousTarget = renderer.getRenderTarget(), face = renderer.getActiveCubeFace(), mip = renderer.getActiveMipmapLevel();
+  const autoClear = renderer.autoClear, xrEnabled = renderer.xr.enabled;
+  const target = new THREE.WebGLRenderTarget(texture.image.width, texture.image.height, { depthBuffer: false });
+  const geometry = new THREE.PlaneGeometry(2, 2);
+  const material = new THREE.RawShaderMaterial({
+    glslVersion: THREE.GLSL3, depthTest: false, depthWrite: false, blending: THREE.NoBlending,
+    uniforms: { orm: { value: texture }, level: { value: 0 } },
+    vertexShader: "in vec3 position; void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }",
+    fragmentShader: `precision highp float; precision highp int;
+      uniform sampler2D orm; uniform int level; out vec4 result;
+      void main() { result = vec4(0.0, texelFetch(orm, ivec2(gl_FragCoord.xy), level).g, 0.0, 1.0); }`,
+  });
+  const scene = new THREE.Scene(), camera = new THREE.Camera();
+  const mesh = new THREE.Mesh(geometry, material); mesh.frustumCulled = false; scene.add(mesh);
+  const bytes = new Uint8Array(texture.image.width * texture.image.height * 4);
+  let minimum = 1;
+  try {
+    renderer.autoClear = false; renderer.xr.enabled = false;
+    for (let level = 0; level < texture.mipmaps.length; level++) {
+      const { width, height } = texture.mipmaps[level];
+      target.setSize(width, height); material.uniforms.level.value = level;
+      renderer.setRenderTarget(target); renderer.render(scene, camera);
+      const pixels = bytes.subarray(0, width * height * 4);
+      renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
+      minimum = Math.min(minimum, OrmRoughnessFloor(pixels));
+    }
+    // RGBA8 readback may round upward by half a byte; keep the bound conservative.
+    return Math.max(0, minimum - 1 / 255);
+  } finally {
+    renderer.setRenderTarget(previousTarget, face, mip);
+    renderer.autoClear = autoClear; renderer.xr.enabled = xrEnabled;
+    target.dispose(); material.dispose(); geometry.dispose();
   }
 }
 
@@ -487,6 +529,25 @@ export class MaterialLibrary {
    * 这个 img 元素 —— TextureLoader 只在成功回调里才把 image 挂到 texture 上。
    */
   _LoadExternalImage(url, srgb, timeoutMs, flipY = true) {
+    const imported = TextureImportOf(url);
+    url = ResolveTextureImportUrl(url);
+    if (imported?.format.startsWith("ktx2")) {
+      const path = flipY ? url : url.replace(/Texture\/[^?]+/, `Texture/${imported.unflipped}`);
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => { settled = true; reject(new Error(`${url} 超时 ${timeoutMs} ms`)); }, timeoutMs);
+        LoadKtxTexture(path).then(texture => {
+          clearTimeout(timer);
+          if (settled) { texture.dispose(); return; }
+          settled = true;
+          texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+          texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+          texture.anisotropy = this.anisotropy;
+          texture.flipY = false;
+          resolve(ApplyTextureImport(texture, imported));
+        }, error => { clearTimeout(timer); if (!settled) { settled = true; reject(error); } });
+      });
+    }
     return new Promise((resolve, reject) => {
       let image = null;
       let settled = false;
@@ -502,7 +563,7 @@ export class MaterialLibrary {
       }, timeoutMs);
       image = new THREE.ImageLoader().load(
         url,
-        (loaded) => Settle(resolve, this._WrapTexture(loaded, srgb, flipY)),
+        (loaded) => Settle(resolve, ApplyTextureImport(this._WrapTexture(loaded, srgb, flipY), imported)),
         undefined,
         () => Settle(reject, new Error(`${url} 读不到`)),
       );
@@ -526,7 +587,7 @@ export class MaterialLibrary {
     this.baked.set(name, {
       albedo: loaded[0], normal: loaded[1], orm: loaded[2],
       // 与程序化配方同一条：粗糙度下界超过 SSR 上限就不编那一路补丁（见 SsrEligible）。
-      roughMin: ExternalOrmRoughnessFloor(loaded[2]),
+      roughMin: ExternalOrmRoughnessFloor(loaded[2], this.renderer),
     });
     // LoadExternalSet runs before actors are built. Clear anyway so editor hot reloads
     // cannot retain a material that still points at the procedural fallback.

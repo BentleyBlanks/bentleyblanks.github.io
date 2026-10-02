@@ -30,6 +30,7 @@
 // 否则它先把坑里的粗糙度/法线改好，紧接着被这里整值覆盖掉。
 
 import * as THREE from "three";
+import { ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
 import { MakePatch, SurfacePatchEnd } from "./Script_MaterialPatches.mjs";
 import {
   TERRAIN_SETS, TERRAIN_DISTANCE, TERRAIN_MACRO, TERRAIN_STUBBLE, TERRAIN_BLEND,
@@ -56,7 +57,7 @@ async function LoadBitmap(url, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(ResolveTextureImportUrl(url), { signal: controller.signal });
     if (!response.ok) throw new Error("HTTP " + response.status + ": " + url);
     const blob = await response.blob();
     return await createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });

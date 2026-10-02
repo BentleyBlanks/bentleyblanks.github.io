@@ -1,3 +1,4 @@
+import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // ===========================================================================
 // Script_OpeningSet.mjs —— 第一关 01–03 过场分镜布景（Set 包，契约
 // docs/Data_FirstLevelStoryboard0103Contract.md §4.5）。
@@ -154,7 +155,7 @@ export class OpeningSet {
   constructor({ scene, library, groundAt, loadTexture = null, loadExternal = null, makeCanvas = null,
     vfx = null, aircraft = null, applySky = null, restoreSky = null, overcast = null }) {
     this.scene = scene; this.library = library; this.groundAt = groundAt;
-    this.loadTexture = loadTexture ?? (typeof document !== "undefined" ? (url) => new THREE.TextureLoader().loadAsync(url) : null);
+    this.loadTexture = loadTexture ?? (typeof document !== "undefined" ? (url) => new ManagedTextureLoader().loadAsync(url) : null);
     this.loadExternal = loadExternal ?? (typeof document !== "undefined"
       ? async (id) => (await import("./Script_ExternalProps.mjs")).InstantiateExternalProp(id, library) : null);
     this.makeCanvas = makeCanvas ?? (typeof document !== "undefined"

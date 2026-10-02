@@ -14,6 +14,8 @@
 
 模型（GLB / tzm）的面数与朝向规范不在这里：见 `Data_AssetStandards.mjs` + `Script_AssetStandardsTest.mjs`、`Script_ModelFacingTest.mjs`（AGENTS.md 跨系统契约 4、7）。模型自带的贴图若落在 `Texture/`，同样要登记本清单。
 
+2026-10-03 起，[贴图管理／发布导入](Data_TextureImporter.md) 在独立 staging 中按配置生成压缩产物（含 KTX2），不覆盖本清单管理的源图。生成文件和报告只随 Pages 产物交付，不提交到源 `Texture/`；程序化配方当前仅预览。
+
 ---
 
 ## 0. 一页用法（新贴图四步）

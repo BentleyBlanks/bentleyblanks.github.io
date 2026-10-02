@@ -1,3 +1,4 @@
+import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // 人物表面层（2026-09-28，3A 迭代 B3）：日军呢子 / 钢盔 / 皮革、皮肤、装具、泥污磨损落灰。
 // 口径：docs/Data_CharacterStandard.md「人物表面」；数值：Data_Tuning_Materials 的
 // CHARACTER_SURFACE_PARTS / CHARACTER_GRIME / CHARACTER_SKIN / IJA_UNIFORM_COLORS / IJA_WOOL_DETAIL。
@@ -70,7 +71,7 @@ function DetailTexture(file) {
   const uniform = { value: neutral };
   if (typeof document !== "undefined") {
     // 数据表里的路径自带 ?v= 戳。
-    new THREE.TextureLoader().load(new URL(file, import.meta.url).href, (texture) => {
+    new ManagedTextureLoader(undefined, { flipY: false }).load(new URL(file, import.meta.url).href, (texture) => {
       // 数据不是颜色；glTF 的 UV 朝向（flipY = false），与它骑着的 atlas 一致。
       texture.colorSpace = THREE.NoColorSpace;
       texture.flipY = false;

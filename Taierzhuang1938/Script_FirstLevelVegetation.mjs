@@ -1,3 +1,4 @@
+import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // 第一关植被：冬末干草簇 / 枯杂草 / 低矮灌木荆棘 / 河岸芦苇 / 零星绿芽的交叉面片。
 // 撒点规则与卡片表在 Data_FirstLevelVegetation.mjs，口径 docs/Data_FirstLevelVegetationProps.md。
 //
@@ -25,7 +26,7 @@ import {
   PlanFirstLevelVegetation, MissionDressingContext,
 } from "./Data_FirstLevelVegetation.mjs";
 
-const LOADER = new THREE.TextureLoader();
+const LOADER = new ManagedTextureLoader();
 
 /** 图集贴图（sRGB，mip + 各向异性）。失败返回 null，关卡照常建，只是没有植被。 */
 export async function LoadFirstLevelVegetationAtlas(library) {

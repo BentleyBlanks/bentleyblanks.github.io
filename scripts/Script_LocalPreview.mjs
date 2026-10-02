@@ -38,6 +38,7 @@ import { ApplyTuningChanges, TUNING_FILE_RE } from "../Taierzhuang1938/Script_Tu
 //   GET  /__notes/status → { writable, root }
 //   POST /__notes/save   { level, notes, images } → 写 Taierzhuang1938/Notes/<Level>/notes.json 与 <noteId>.png
 import { NOTES_FILE_RE, NOTE_IMAGE_RE, LEVEL_RE, NotesPathFor, ValidateNote } from "../Taierzhuang1938/Script_MissionNotes.mjs";
+import { HandleTextureImportRequest } from "../Taierzhuang1938/Script_TextureImportServer.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..");
@@ -342,6 +343,7 @@ function CreateServer(rootDir, context) {
       response.end(JSON.stringify({ app: APP_ID, root: rootDir, port: context.port }));
       return;
     }
+    if (route.startsWith("/__textures/")) { await HandleTextureImportRequest(request, response, rootDir); return; }
     if (route === "/__preview" || route === "/__preview/") {
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       response.end(RenderHub({ ...context, rootDir, mounts }));

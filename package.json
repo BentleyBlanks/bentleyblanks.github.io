@@ -69,6 +69,8 @@
   "devDependencies": {
     "esbuild": "0.28.2",
     "playwright-core": "^1.62.1",
-    "three": "^0.185.0"
+    "three": "^0.185.0",
+    "sharp": "0.34.5",
+    "@gpu-tex-enc/basis": "1.16.4"
   }
 }
