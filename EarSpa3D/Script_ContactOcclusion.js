@@ -4,9 +4,9 @@ export function CreateContactOcclusion(){
  const limit=24,tile=64,grid=5,side=tile*grid,range=.40,data=new Uint8Array(side*side*4),cache=new WeakMap();
  const texture=new THREE.DataTexture(data,side,side,THREE.RGBAFormat);texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.needsUpdate=true;
  const matrices=Array.from({length:limit},()=>new THREE.Matrix4()),sizes=Array.from({length:limit},()=>new THREE.Vector3(1,1,1)),uniforms={contactInverse:{value:matrices},contactSize:{value:sizes},contactCount:{value:0},contactEnabled:{value:1},contactSamples:{value:4},contactLamp:{value:new THREE.Vector3()},contactOutline:{value:texture}};
- const slotGeometry=Array(limit).fill(null);let covered=0;
- function Outline(g){
-  if(cache.has(g))return cache.get(g);g.computeBoundingBox();const center=g.boundingBox.getCenter(new THREE.Vector3()),size=g.boundingBox.getSize(new THREE.Vector3()).multiplyScalar(.5).add(new THREE.Vector3(range,range,.025));
+ const slotGeometry=Array(limit).fill(null);let covered=0,clock=0,refreshes=0;
+ function Outline(g,refresh=false){
+  if(cache.has(g)&&!refresh)return cache.get(g);g.computeBoundingBox();const center=g.boundingBox.getCenter(new THREE.Vector3()),size=g.boundingBox.getSize(new THREE.Vector3()).multiplyScalar(.5).add(new THREE.Vector3(range,range,.025));
   const count=tile*tile,low=new Float32Array(count).fill(Infinity),high=new Float32Array(count).fill(-Infinity),p=g.attributes.position,idx=g.index;
   const points=Array.from({length:p.count},(_,i)=>[(p.getX(i)-center.x)/size.x*.5*(tile-1)+(tile-1)/2,(p.getY(i)-center.y)/size.y*.5*(tile-1)+(tile-1)/2,p.getZ(i)-center.z]);
   for(let i=0;i<(idx?idx.count:p.count);i+=3){
@@ -22,7 +22,7 @@ export function CreateContactOcclusion(){
   for(let y=tile-1;y>=0;y--)for(let x=tile-1;x>=0;x--){const k=y*tile+x;if(x<tile-1)Visit(k,k+1,sx);if(y<tile-1)Visit(k,k+tile,sy);if(x<tile-1&&y<tile-1)Visit(k,k+tile+1,diag);if(x&&y<tile-1)Visit(k,k+tile-1,diag);}
   const pixels=new Uint8Array(count*4);
   for(let k=0;k<count;k++){const j=mask[k]?k:nearest[k];pixels[k*4]=Math.round(THREE.MathUtils.clamp(.5+(mask[k]?-dist[k]:dist[k])/(range*2),0,1)*255);pixels[k*4+1]=Math.round(THREE.MathUtils.clamp(.5+(j>=0?low[j]:0)/size.z/2,0,1)*255);pixels[k*4+2]=Math.round(THREE.MathUtils.clamp(.5+(j>=0?high[j]:0)/size.z/2,0,1)*255);pixels[k*4+3]=255;}
-  const result={center,size,pixels};cache.set(g,result);return result;
+  const result={center,size,pixels,version:p.version,time:clock};cache.set(g,result);if(refresh)refreshes++;return result;
  }
  function Bind(shader,{self=-1,wall=null}={}){
   Object.assign(shader.uniforms,uniforms);shader.uniforms.contactSelf={value:self};
@@ -54,15 +54,17 @@ export function CreateContactOcclusion(){
    reflectedLight.directDiffuse*=min(contactShadow,mix(1.0,contactAo,.70));reflectedLight.directSpecular*=contactShadow;
   `);
  }
- function Update(chunks,lamp){
+ function Update(chunks,lamp,dt=0){
+  clock+=dt;
   if(!uniforms.contactEnabled.value){uniforms.contactCount.value=0;covered=0;return;}
   uniforms.contactLamp.value.copy(lamp.position);const slots=new Map();let i=0,dirty=false;
   for(const c of chunks){if(i===limit)break;if(c.coating||c.fine||!c.mesh.visible||['fractured','collected'].includes(c.state))continue;
-   const outline=Outline(c.mesh.geometry);c.mesh.updateMatrixWorld(true);matrices[i].copy(c.mesh.matrixWorld).multiply(new THREE.Matrix4().makeTranslation(...outline.center.toArray())).invert();sizes[i].copy(outline.size);slots.set(c,i);
-   if(slotGeometry[i]!==c.mesh.geometry){for(let y=0;y<tile;y++){const start=((Math.floor(i/grid)*tile+y)*side+(i%grid)*tile)*4;data.set(outline.pixels.subarray(y*tile*4,(y+1)*tile*4),start);}slotGeometry[i]=c.mesh.geometry;dirty=true;}i++;
+   const previous=cache.get(c.mesh.geometry),refresh=previous&&previous.version!==c.mesh.geometry.attributes.position.version&&clock-previous.time>=1/15;
+   const outline=Outline(c.mesh.geometry,refresh);c.mesh.updateMatrixWorld(true);matrices[i].copy(c.mesh.matrixWorld).multiply(new THREE.Matrix4().makeTranslation(...outline.center.toArray())).invert();sizes[i].copy(outline.size);slots.set(c,i);
+   if(slotGeometry[i]!==outline){for(let y=0;y<tile;y++){const start=((Math.floor(i/grid)*tile+y)*side+(i%grid)*tile)*4;data.set(outline.pixels.subarray(y*tile*4,(y+1)*tile*4),start);}slotGeometry[i]=outline;dirty=true;}i++;
   }
   if(dirty)texture.needsUpdate=true;uniforms.contactCount.value=i;covered=i;
   for(const c of chunks){const m=c.mesh.material;m.userData.contactSelf=slots.get(c)??-1;if(m.userData.contactShader)m.userData.contactShader.uniforms.contactSelf.value=m.userData.contactSelf;}
  }
- return{Bind,Update,Prepare:Outline,SetQuality(strength,samples){uniforms.contactEnabled.value=strength;uniforms.contactSamples.value=samples;},SetEnabled(value){uniforms.contactEnabled.value=value?1:0;},Probe(){return{contactOcclusion:'actual triangle silhouette edge AO and short contact rays',contactOccluders:covered,contactEnabled:!!uniforms.contactEnabled.value,contactRimMm:.135,contactSamples:uniforms.contactSamples.value}}};
+ return{Bind,Update,Prepare:Outline,SetQuality(strength,samples){uniforms.contactEnabled.value=strength;uniforms.contactSamples.value=samples;},SetEnabled(value){uniforms.contactEnabled.value=value?1:0;},Probe(){return{contactOcclusion:'deforming triangle silhouette edge AO and short contact rays',contactRefreshes:refreshes,contactOccluders:covered,contactEnabled:!!uniforms.contactEnabled.value,contactRimMm:.135,contactSamples:uniforms.contactSamples.value}}};
 }

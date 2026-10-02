@@ -6,6 +6,12 @@ import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryU
 export function CreateCollectionTray({scene, tray, camera, Project, size, scoop, ConfigureMaterial=material=>material}) {
   const group=new THREE.Group();scene.add(group);
   const pieces=[],batches=new Map(),ray=new THREE.Raycaster(),plane=new THREE.Plane();
+  function CopyWaxMaterial(source){
+    const copy=source.clone();copy.clippingPlanes=[];
+    copy.onBeforeCompile=shader=>{const active=source.userData.contactShader;source.onBeforeCompile(shader);source.userData.contactShader=active;if(shader.uniforms.contactSelf)shader.uniforms.contactSelf={value:-1};};
+    copy.onBeforeCompile.earRenderQuality=true;copy.customProgramCacheKey=source.customProgramCacheKey;
+    return ConfigureMaterial(copy);
+  }
   const flat=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),new THREE.Vector3(0,1,0));
   const cleaner=scoop.clone(true);cleaner.name='Model_TrayCleaner';scene.add(cleaner);cleaner.visible=false;
   // 免费清盘耳勺是独立竹制器具，不参与采耳工具的等级和皮肤切换。
@@ -52,8 +58,7 @@ export function CreateCollectionTray({scene, tray, camera, Project, size, scoop,
       batch.pieces.push(piece);batch.geometries.push(piece.geometry);
     }
     for(const batch of batches.values()){
-      const mesh=new THREE.Mesh(mergeGeometries(batch.geometries),batch.material.clone());
-      if(batch.material.userData.oily){mesh.material.onBeforeCompile=batch.material.onBeforeCompile;mesh.material.customProgramCacheKey=batch.material.customProgramCacheKey;}ConfigureMaterial(mesh.material);
+      const mesh=new THREE.Mesh(mergeGeometries(batch.geometries),CopyWaxMaterial(batch.material));
       mesh.castShadow=mesh.receiveShadow=true;mesh.frustumCulled=false;group.add(mesh);batch.mesh=mesh;
     }
     Write();
@@ -73,10 +78,9 @@ export function CreateCollectionTray({scene, tray, camera, Project, size, scoop,
     c.trayStored=true;
     const geometry=c.mesh.geometry.clone().applyMatrix4(matrix.compose(new THREE.Vector3(),flat,unitScale));
     // 所有来源统一属性，碎裂面与天然微屑可以进入同一材质批次。
-    for(const name of Object.keys(geometry.attributes))if(!['position','normal','uv',...(c.body.gel?['gelRest','gelThickness']:[])].includes(name))geometry.deleteAttribute(name);
+    for(const name of Object.keys(geometry.attributes))if(!['position','normal','uv',...(c.body.gel?['gelRest','gelThickness']:['waxRest','waxResponse','waxCap'])].includes(name))geometry.deleteAttribute(name);
     if(!geometry.attributes.uv)geometry.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(geometry.attributes.position.count*2),2));
-    const material=c.mesh.material.clone();material.clippingPlanes=[];
-    if(c.body.gel){material.onBeforeCompile=c.mesh.material.onBeforeCompile;material.customProgramCacheKey=c.mesh.material.customProgramCacheKey;}
+    const material=CopyWaxMaterial(c.mesh.material);
     ConfigureMaterial(material);pieces.push({id:++serial,key:c.type+':'+c.tone,gelBody:c.body.gel?CloneSlimeVolume(c.body,position.toArray()):null,geometry,material,position:position.clone(),velocity:new THREE.Vector3(),floor:position.y,mass:c.mass,grains:c.grainCount||1,radius:Math.max(.35,Math.min(1.7,Math.max(...c.footprint)/2)),fall:0});
     Rebuild();
   }

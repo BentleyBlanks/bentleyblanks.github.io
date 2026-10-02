@@ -2,18 +2,18 @@ import * as THREE from 'three';
 // 相邻三角面的切线组成独立边界环；凹轮廓用耳切三角化，不能跨环做中心扇形封口。
 export function CutGeometry(source,normal,constant,positive=true){
  const geometry=source.index?source.toNonIndexed():source.clone(),pos=geometry.attributes.position,uv=geometry.attributes.uv,oldCap=geometry.attributes.waxCap;
- const positions=[],uvs=[],caps=[],segments=[],sign=positive?1:-1,eps=1e-7;
- const Vert=i=>({p:new THREE.Vector3().fromBufferAttribute(pos,i),u:uv?new THREE.Vector2().fromBufferAttribute(uv,i):new THREE.Vector2(),cap:oldCap?.getX(i)||0});
+ const positions=[],uvs=[],caps=[],rest=[],response=[],segments=[],sign=positive?1:-1,eps=1e-7;
+ const Vert=i=>({p:new THREE.Vector3().fromBufferAttribute(pos,i),u:uv?new THREE.Vector2().fromBufferAttribute(uv,i):new THREE.Vector2(),cap:oldCap?.getX(i)||0,r:new THREE.Vector3().fromBufferAttribute(geometry.attributes.waxRest||pos,i),s:geometry.attributes.waxResponse?new THREE.Vector3().fromBufferAttribute(geometry.attributes.waxResponse,i):new THREE.Vector3(.035,0,0)});
  const Distance=v=>(normal.dot(v.p)-constant)*sign;
  const Key=v=>v.p.toArray().map(x=>Math.round(x*1e6)).join(',');
- function Emit(a,b,c,cap=null){if(new THREE.Vector3().subVectors(b.p,a.p).cross(new THREE.Vector3().subVectors(c.p,a.p)).lengthSq()<1e-20)return;for(const v of [a,b,c]){positions.push(...v.p.toArray());uvs.push(...v.u.toArray());caps.push(cap??v.cap);}}
+ function Emit(a,b,c,cap=null){if(new THREE.Vector3().subVectors(b.p,a.p).cross(new THREE.Vector3().subVectors(c.p,a.p)).lengthSq()<1e-20)return;for(const v of [a,b,c]){positions.push(...v.p.toArray());uvs.push(...v.u.toArray());caps.push(cap??v.cap);rest.push(...v.r.toArray());response.push(...v.s.toArray());}}
  for(let i=0;i<pos.count;i+=3){
    const polygon=[Vert(i),Vert(i+1),Vert(i+2)],out=[],crossings=[];
    for(let j=0;j<3;j++){
      const a=polygon[j],b=polygon[(j+1)%3],da=Distance(a),db=Distance(b);
      if(da>=-eps)out.push(a);
      if(Math.abs(da)<eps)crossings.push(a);
-     if((da>eps&&db<-eps)||(da<-eps&&db>eps)){const t=da/(da-db),v={p:a.p.clone().lerp(b.p,t),u:a.u.clone().lerp(b.u,t),cap:a.cap};out.push(v);crossings.push(v);}
+     if((da>eps&&db<-eps)||(da<-eps&&db>eps)){const t=da/(da-db),v={p:a.p.clone().lerp(b.p,t),u:a.u.clone().lerp(b.u,t),r:a.r.clone().lerp(b.r,t),s:a.s.clone().lerp(b.s,t),cap:a.cap};out.push(v);crossings.push(v);}
    }
    for(let j=1;j<out.length-1;j++)Emit(out[0],out[j],out[j+1]);
    const cut=[...new Map(crossings.map(v=>[Key(v),v])).values()];
@@ -36,7 +36,7 @@ export function CutGeometry(source,normal,constant,positive=true){
      if((facing>0)===positive)[b,c]=[c,b];Emit(a,b,c,1);
    }
  }
- geometry.dispose();const result=new THREE.BufferGeometry();result.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));result.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));result.setAttribute('waxCap',new THREE.Float32BufferAttribute(caps,1));result.setIndex(Array.from({length:positions.length/3},(_,i)=>i));SmoothWaxNormals(result);result.computeBoundingBox();return result;
+ geometry.dispose();const result=new THREE.BufferGeometry();result.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));result.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));result.setAttribute('waxCap',new THREE.Float32BufferAttribute(caps,1));result.setAttribute('waxRest',new THREE.Float32BufferAttribute(rest,3));result.setAttribute('waxResponse',new THREE.Float32BufferAttribute(response,3));result.setIndex(Array.from({length:positions.length/3},(_,i)=>i));SmoothWaxNormals(result);result.computeBoundingBox();return result;
 }
 // 保持外壳跨 UV 接缝平滑，裂面保留真实法线，避免每个三角形变成一张纸楔。
 export function SmoothWaxNormals(g){

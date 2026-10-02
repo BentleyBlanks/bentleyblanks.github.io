@@ -25,6 +25,7 @@ node EarSpa3D/Script_PeelPhysicsTest.mjs
 | 声音触发与接触门控 | `Script_LandingSoundTest.mjs`、`Script_ContactFrictionTest.mjs`、`Script_ContactFrictionPlayTest.mjs` |
 | 画质与物理设置 | `Script_RenderQualityPlayTest.mjs`、`Script_PhysicsSettingsTest.mjs`、`Script_PhysicsSettingsPlayTest.mjs` |
 | 外耳、材质与渲染 | `Script_RenderingRegressionTest.mjs`、`Script_OuterAnatomyTest.mjs`、`Script_SkinScatteringTest.mjs`、`Script_MetalRenderingTest.mjs`、`Script_TactileDetailTest.mjs` |
+| 厚度、受力材质与动态遮蔽 | `Script_SoftWaxPhysicsTest.mjs`、`Script_MaterialResponseTest.mjs`、`Script_ToolDragPlayTest.mjs`；新增材质检查显式要求 `--url=`，包含四种材质／四种视口截图、受控物理夹具与真实像素着色错误检查 |
 | 加载、跨日与碎裂性能 | `Script_ContactLoadingTest.mjs`、`Script_DayTwoPerformanceTest.mjs`、`Script_OilyFracturePerformanceTest.mjs` |
 
 ## 证据要求

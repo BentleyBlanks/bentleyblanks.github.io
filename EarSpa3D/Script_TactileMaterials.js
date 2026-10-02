@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import {CreateContactOcclusion} from './Script_ContactOcclusion.js?v=ear040-render-settings-20260912';
+import {SURFACE_GLSL,BindWaxAppearance} from './Script_SurfaceDetail.js?v=ear041-material-response-20261003';
+import {CreateContactOcclusion} from './Script_ContactOcclusion.js?v=ear041-material-response-20261003';
 // imagegen 的图集按通道拆成 GPU 纹理；法线/粗糙度/AO 保持线性，颜色才走 sRGB。
 export async function CreateTactileMaterials(renderer) {
   const loader=new THREE.TextureLoader(),contact=CreateContactOcclusion();
@@ -81,7 +82,7 @@ export async function CreateTactileMaterials(renderer) {
   const state={outerSss:{value:.58},outside:{value:0},sss:{value:.18},light:{value:new THREE.Vector3()},power:{value:0},marks:{value:marks},wet:{value:wet}};
   function Skin({outer=false,vestibule=false}={}){
     const maps=Object.fromEntries(Object.entries(outer?outerSkin:skin).map(([k,t])=>{const c=t.clone();c.repeat.set(outer?1:4,outer?1:5);if(outer)c.wrapS=c.wrapT=THREE.MirroredRepeatWrapping;return[k,c];}));
-    const material=new THREE.MeshPhysicalMaterial({...maps,color:new THREE.Color().setRGB(.99,1.20,1.23),roughness:1,metalness:0,normalScale:new THREE.Vector2(outer?.18:.12,outer?.18:.12),aoMapIntensity:outer?.18:.65,clearcoat:1,clearcoatRoughness:.12,side:THREE.DoubleSide});
+    const material=new THREE.MeshPhysicalMaterial({...maps,color:new THREE.Color().setRGB(.99,1.20,1.23),roughness:1,metalness:0,normalScale:new THREE.Vector2(outer?.18:.085,outer?.18:.085),aoMapIntensity:outer?.18:.42,clearcoat:1,clearcoatRoughness:.24,side:THREE.DoubleSide});
     material.userData.kind='skin';
     if(outer&&!vestibule){material.normalScale.set(.10,.10);material.ior=1.4;material.specularIntensity=.65;}
     material.onBeforeCompile=shader=>{
@@ -89,9 +90,14 @@ export async function CreateTactileMaterials(renderer) {
       shader.vertexShader=(vestibule?'attribute float vestibuleDepth;varying float mouthDepth;\n':'')+'varying vec3 earWorld;\n'+shader.vertexShader;
       shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nearWorld=(modelMatrix*vec4(position,1.0)).xyz;\n'+(vestibule?'mouthDepth=vestibuleDepth;\n':'')+(outer?'':`for(int i=0;i<9;i++){float d=distance(earWorld,earMarks[i].xyz);float bump=exp(-d*d/0.65)*earMarks[i].w;transformed+=normal*bump*0.035;}`));
       if(!outer)shader.vertexShader='uniform vec4 earMarks[9];\n'+shader.vertexShader;
-      shader.fragmentShader=(vestibule?'varying float mouthDepth;\n':'')+'uniform float earOutside;varying vec3 earWorld;uniform float earSss;uniform vec3 earLamp;uniform float earPower;uniform vec4 earMarks[9];uniform vec4 earWet[9];\n'+shader.fragmentShader;
+      shader.fragmentShader=SURFACE_GLSL+(vestibule?'varying float mouthDepth;\n':'')+'uniform float earOutside;varying vec3 earWorld;uniform float earSss;uniform vec3 earLamp;uniform float earPower;uniform vec4 earMarks[9];uniform vec4 earWet[9];\n'+shader.fragmentShader;
       shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
         float localIrritation=0.0;float localWet=0.0;
+        ${outer?'':`// Remove the atlas' uniform red cast while retaining its anatomical colour variation.
+        float skinLuma=dot(diffuseColor.rgb,vec3(.299,.587,.114));
+        diffuseColor.rgb=mix(diffuseColor.rgb,skinLuma*vec3(1.34,.90,.73),.52);
+        float perfusionNoise=SurfaceNoise(earWorld*1.4);
+        diffuseColor.rgb*=mix(vec3(.96,.91,.88),vec3(1.035,1.03,1.015),perfusionNoise);`}
         ${outer?'':'diffuseColor.rgb*=mix(1.0,.18,earOutside);'}
         ${vestibule?'diffuseColor.rgb*=mix(1.0,.18,smoothstep(0.0,.85,mouthDepth)*earOutside);':''}
         ${outer?`// Keep pore/albedo variation; broad anatomical masks add subtle perfusion.
@@ -108,7 +114,13 @@ export async function CreateTactileMaterials(renderer) {
         diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.38,.095,.080),lip*.8);`:''}
         ${outer?'':`for(int i=0;i<9;i++){float d=distance(earWorld,earMarks[i].xyz);localIrritation=max(localIrritation,exp(-d*d/0.6)*earMarks[i].w);float w=distance(earWorld,earWet[i].xyz);localWet=max(localWet,exp(-w*w/1.1)*earWet[i].w*earWetQuality);}`}
         diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(1.16,.47,.40),clamp(localIrritation,0.0,.72));`);
-      shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,0.14,localWet);');
+      shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(clamp(.52+(roughnessFactor-.5)*.22,.40,.65),0.23,localWet);');
+      shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+        float skinRelief=earSurfaceDetail*(1.0-localWet*.45)*(
+          (earDetailLayers>0?(SurfaceNoise(earWorld*9.0)-.5)*.0025*SurfaceFilter(earWorld,9.0):0.0)+
+          (earDetailLayers>1?(SurfaceNoise(earWorld*43.0)-.5)*.0008*SurfaceFilter(earWorld,43.0):0.0));
+        normal=SurfaceNormal(normal,skinRelief,-vViewPosition);
+      `);
       if(outer&&!vestibule){
         shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=clamp(.43+(roughnessFactor-.5)*.20,.35,.55);');
         // Per-light diffusion approximation: broaden the red-channel light transition.
@@ -128,7 +140,7 @@ export async function CreateTactileMaterials(renderer) {
         shader.fragmentShader=shader.fragmentShader.replace('#include <lights_physical_pars_fragment>',THREE.ShaderChunk.lights_physical_pars_fragment.replace('reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseContribution );',skinDiffuse));
       }
       shader.fragmentShader=shader.fragmentShader.replace('#include <clearcoat_normal_fragment_begin>','#include <clearcoat_normal_fragment_begin>');
-      shader.fragmentShader=shader.fragmentShader.replace('#include <lights_physical_fragment>','#include <lights_physical_fragment>\nmaterial.clearcoat=localWet*.9;');
+      shader.fragmentShader=shader.fragmentShader.replace('#include <lights_physical_fragment>','#include <lights_physical_fragment>\nmaterial.clearcoat=(.055+localWet*.62)*earWetQuality;');
       // 薄皮层的单次散射近似：依赖实际灯距、受光角和遮蔽，不给深处加无条件自发光。
       shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_end>',outer?'#include <lights_fragment_end>':`#include <lights_fragment_end>
         vec3 earL=(viewMatrix*vec4(earLamp-earWorld,0.0)).xyz;
@@ -137,11 +149,11 @@ export async function CreateTactileMaterials(renderer) {
         reflectedLight.directDiffuse+=diffuseColor.rgb*vec3(1.0,.32,.18)*wrap*earSss*min(earPower/(earDistance*earDistance),2.0);`);
     };
     const skinCompile=material.onBeforeCompile;material.onBeforeCompile=shader=>{skinCompile(shader);if(!outer)contact.Bind(shader);if(outer&&!vestibule)material.userData.skinSssShader=shader;};
-    material.customProgramCacheKey=()=>outer?(vestibule?'EarSkinRecessedVestibule5':'EarSkinLightDiffusion4'):'EarSkinCanalContact2';return ConfigureMaterial(material);
+    material.customProgramCacheKey=()=>outer?(vestibule?'EarSkinRecessedVestibule6':'EarSkinLightDiffusion5'):'EarSkinCanalMicrorelief3';return ConfigureMaterial(material);
   }
   function Wax(type,tone='brown'){
     if(type==='oily'){
-      const material=new THREE.MeshPhysicalMaterial({color:0xeaba65,map:wax.map,roughness:.16,normalMap:wax.normalMap,normalScale:new THREE.Vector2(.022,.022),metalness:0,ior:1.46,transmission:.84,thickness:1,attenuationColor:0xd3993d,attenuationDistance:1.2,clearcoat:1,clearcoatRoughness:.16,specularIntensity:1,envMapIntensity:.54});
+      const material=new THREE.MeshPhysicalMaterial({color:0xd2aa75,map:wax.map,roughness:.16,normalMap:wax.normalMap,normalScale:new THREE.Vector2(.022,.022),metalness:0,ior:1.46,transmission:.84,thickness:1,attenuationColor:0xb17f43,attenuationDistance:1.2,clearcoat:.82,clearcoatRoughness:.22,specularIntensity:.8,envMapIntensity:.42});
       material.userData.waxWet={value:1};material.userData.waxSoft={value:0};material.userData.oily=true;
       // 弯曲体积的远侧折边必须被近侧挡住；关闭深度写入会出现交叉黑线。
       material.transparent=true;material.depthWrite=true;
@@ -170,19 +182,19 @@ export async function CreateTactileMaterials(renderer) {
         shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
           float gelPixel=max(length(dFdx(gelLocal)),length(dFdy(gelLocal)));
           float gelRelief=gelDetail*earSurfaceDetail*mix(.20,1.0,smoothstep(.025,.55,gelPath))*(
-            (earDetailLayers>0?.008*GelNoise(gelLocal*6.5)*(1.0-smoothstep(.05,.16,gelPixel)):0.0)+
+            (earDetailLayers>0?.005*GelNoise(gelLocal*6.5)*(1.0-smoothstep(.05,.16,gelPixel)):0.0)+
             (earDetailLayers>1?.0025*GelNoise(gelLocal*21.0+7.1)*(1.0-smoothstep(.018,.05,gelPixel)):0.0)+
             (earDetailLayers>2?.0008*GelNoise(gelLocal*57.0+19.4)*(1.0-smoothstep(.006,.018,gelPixel)):0.0));
           normal=GelPerturb(normal,gelRelief,-vViewPosition);
         `);
         shader.fragmentShader=shader.fragmentShader.replace('#include <clearcoat_normal_fragment_maps>','#include <clearcoat_normal_fragment_maps>\nclearcoatNormal=GelPerturb(clearcoatNormal,gelRelief*.50,-vViewPosition);');
         shader.fragmentShader=shader.fragmentShader.replace('#include <transmission_fragment>',THREE.ShaderChunk.transmission_fragment.replace('material.thickness = thickness;', 'material.thickness = max(.01,gelPath);').replace('material.transmission = transmission;', 'material.transmission = mix(.36,.97,exp(-gelPath*3.2))*earWetQuality;').replace('material.diffuseContribution, material.specularColorBlended','mix(vec3(1.0),material.diffuseContribution,smoothstep(.06,.65,gelPath)), material.specularColorBlended'));
-        shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(.5,mix(.10,.21,smoothstep(.02,.65,gelPath)),earWetQuality);');
+        shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(.5,mix(.15,.26,smoothstep(.02,.65,gelPath)),earWetQuality);');
         shader.fragmentShader=shader.fragmentShader.replace('#include <opaque_fragment>','diffuseColor.a*=smoothstep(.008,.075,gelPath);\n#include <opaque_fragment>');
         shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
-          float cloud=.5+.5*sin(gelLocal.x*4.1+sin(gelLocal.y*3.7))*sin(gelLocal.y*5.3+gelLocal.z*3.0);
+          float cloud=GelNoise(gelLocal*2.2);
           float lipidDetail=dot(texture2D(map,vMapUv).rgb,vec3(.299,.587,.114));
-          diffuseColor.rgb=diffuse*mix(vec3(.88,.84,.73),vec3(1.03,1.00,.94),smoothstep(.025,.42,lipidDetail));
+          diffuseColor.rgb=diffuse*mix(vec3(.76,.62,.45),vec3(1.06,1.00,.91),clamp(cloud*.45+smoothstep(.025,.42,lipidDetail)*.55,0.0,1.0));
           diffuseColor.rgb*=.96+cloud*.08;
         `);
         shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
@@ -190,51 +202,61 @@ export async function CreateTactileMaterials(renderer) {
           reflectedLight.directDiffuse+=diffuseColor.rgb*reflectedLight.directDiffuse*(.20+rim*.8)*earWetQuality;
         `);
         contact.Bind(shader,{self:material.userData.contactSelf});material.userData.contactShader=shader;
-      };material.customProgramCacheKey=()=> 'OilyContinuousDetail3';return ConfigureMaterial(material);
+      };material.customProgramCacheKey=()=> 'OilyLipidScattering4';return ConfigureMaterial(material);
     }
     const pale=tone==='paleYellow';
     const material=new THREE.MeshPhysicalMaterial({...wax,color:type==='impacted'?0xcbb588:type==='wet'?0xd1bfa1:0xfff3d5,roughness:type==='wet'?.27:1,normalScale:new THREE.Vector2(pale?.11:.22,pale?.11:.22),aoMapIntensity:pale?.35:.58,clearcoat:type==='wet'?.8:0,clearcoatRoughness:.13,metalness:0});
-    if(pale){
-      material.transparent=true;material.depthWrite=false;
-      // 保留同一 PBR 的纹理细节，重新标定薄角质层的浅黄底色，避免深棕颜色贴图把它压黑。
-      material.onBeforeCompile=shader=>{
-        shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
-          float keratinDetail=pow(clamp(dot(diffuseColor.rgb,vec3(.299,.587,.114)),0.0,1.0),.35);
-          diffuseColor.rgb=mix(vec3(.66,.38,.045),vec3(.98,.82,.30),keratinDetail);`);
-        // 用原型 UV 对应的椭球厚度估计薄层光学消光；边缘透出皮肤，厚部遮光。
-        shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
-          float thinEdge=pow(1.0-abs(dot(normal,geometryViewDir)),2.0);
-          reflectedLight.directDiffuse*=1.0+thinEdge*.22;
-          float keratinDepth=abs(sin(vMapUv.y*3.14159265)*sin(vMapUv.x*6.2831853));
-          float opticalPath=(.16+.84*pow(keratinDepth,.7))/max(.5,abs(dot(normal,geometryViewDir)));
-          diffuseColor.a*=1.0-exp(-3.5*opticalPath);`);
-      };
-      material.customProgramCacheKey=()=> 'PaleYellowKeratinThinSheet';
-    }
+    material.depthWrite=true;material.transparent=false;material.ior=1.46;
     material.userData.waxWet={value:0};material.userData.waxSoft={value:0};
-    const waxCompile=material.onBeforeCompile;material.onBeforeCompile=shader=>{waxCompile(shader);
+    material.onBeforeCompile=shader=>{
       shader.uniforms.waxWet=material.userData.waxWet;shader.uniforms.waxSoft=material.userData.waxSoft;
       shader.fragmentShader='uniform float waxWet;uniform float waxSoft;\n'+shader.fragmentShader;
+      BindWaxAppearance(shader,{type,pale});
       shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>',`
-        diffuseColor.rgb*=mix(vec3(1.0),vec3(.61,.48,.32),waxWet*.55+waxSoft*.45);
-        #include <roughnessmap_fragment>
-        roughnessFactor=mix(roughnessFactor,.075,waxWet*.85);`);
-      contact.Bind(shader,{self:material.userData.contactSelf,wall:material.userData.contactWall});material.userData.contactShader=shader;};material.customProgramCacheKey=()=>pale?'PaleKeratinWet3':'BrownWaxWet3';
+        diffuseColor.rgb*=mix(vec3(1.0),vec3(.76,.65,.48),waxRenderWet*.55+waxRenderSoft*.45);
+        #include <roughnessmap_fragment>`);
+      contact.Bind(shader,{self:material.userData.contactSelf,wall:material.userData.contactWall});material.userData.contactShader=shader;};material.customProgramCacheKey=()=> 'WaxMaterialResponse4'+type+pale;
     return ConfigureMaterial(material);
   }
   function WetWax(material,softness,wetness,type){
-    if(type==='oily'){material.roughness=.5+(.16-softness*.035-.5)*quality.wetness;material.clearcoatRoughness=.16;return;}
-    material.userData.waxWet.value=wetness*quality.wetness;material.userData.waxSoft.value=softness*quality.wetness;
+    if(type==='oily'){material.roughness=.5+(.16-softness*.035-.5)*quality.wetness;material.clearcoatRoughness=.22;return;}
+    // Keep physical state independent of quality, including frozen tray copies.
+    material.userData.waxWet.value=wetness;material.userData.waxSoft.value=softness;
     material.roughness=(type==='wet'?.65-.38*quality.wetness:1)*(1-wetness*quality.wetness*.81);
-    material.clearcoat=Math.max(type==='wet'?.8:0,wetness*.98);material.clearcoatRoughness=.055;
+    material.clearcoat=Math.max(type==='wet'?.8:0,wetness*.98);material.clearcoatRoughness=.18;
     const normal=material.userData.dryNormalScale||(material.userData.dryNormalScale=material.normalScale.clone());
     material.normalScale.copy(normal).multiplyScalar(1-softness*.72);
   }
-  function Update(chunks,lamp){
-    contact.Update(chunks,lamp);state.light.value.copy(lamp.position);state.power.value=lamp.intensity;
+  function Drum(geometry){
+    geometry.computeBoundingBox();const center=geometry.boundingBox.getCenter(new THREE.Vector3());
+    const material=new THREE.MeshPhysicalMaterial({color:0xffffff,roughness:.34,metalness:0,ior:1.38,specularIntensity:.48,clearcoat:.18,clearcoatRoughness:.26,side:THREE.DoubleSide});
+    material.onBeforeCompile=shader=>{
+      shader.uniforms.membraneCenter={value:center};
+      shader.vertexShader='uniform vec3 membraneCenter;varying vec3 membraneLocal;\n'+shader.vertexShader;
+      shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nmembraneLocal=position-membraneCenter;');
+      shader.fragmentShader='varying vec3 membraneLocal;\n'+SURFACE_GLSL+shader.fragmentShader;
+      shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+        float membraneRadius=length(membraneLocal.xy);
+        float membraneAngle=atan(membraneLocal.y,membraneLocal.x);
+        float membraneCloud=SurfaceNoise(membraneLocal*2.8);
+        float membraneFibre=sin(membraneAngle*96.0+membraneRadius*4.0);
+        float membraneRim=smoothstep(2.0,3.1,membraneRadius);
+        float membraneHandle=exp(-pow((membraneLocal.x+.19*membraneLocal.y)/.14,2.0))*smoothstep(-.7,.4,membraneLocal.y);
+        diffuseColor.rgb*=mix(vec3(.34,.285,.265),vec3(.62,.55,.46),membraneCloud)*mix(1.0,.65,membraneRim);
+        diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*1.45,membraneHandle*.42);
+      `);
+      shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+        float membraneRelief=earSurfaceDetail*(membraneFibre*.0008*SurfaceFilter(membraneLocal,40.0)+membraneCloud*.002);
+        normal=SurfaceNormal(normal,membraneRelief,-vViewPosition);
+      `);
+    };
+    material.customProgramCacheKey=()=> 'PearlMembraneRadialFibres1';return ConfigureMaterial(material);
+  }
+  function Update(chunks,lamp,dt=0){
+    contact.Update(chunks,lamp,dt);state.light.value.copy(lamp.position);state.power.value=lamp.intensity;
     const originals=chunks.filter(c=>!c.fragment).slice(0,9);
     for(let i=originals.length;i<9;i++){marks[i].set(0,0,0,0);wet[i].set(0,0,0,0);}
     originals.forEach((c,i)=>{marks[i].set(c.origin.x,c.origin.y,c.origin.z,c.irritation||0);wet[i].set(c.origin.x,c.origin.y,c.origin.z,c.surfaceWet||c.softened||0);});
   }
-  return{Skin,Wax,WetWax,GripMaterial,Update,SetQuality,ConfigureMaterial,PrepareContact:contact.Prepare,SetOutside(value){state.outside.value=value;},SetContact:contact.SetEnabled,Probe(){return{...contact.Probe(),surfaceDetail:quality.detail,detailLayers:quality.detailLayers,wetRendering:quality.wetness,pbr:['albedo','normal','roughness','ao'],sss:'thin-layer single-scattering approximation',sssStrength:state.sss.value,outerPbr:'Texture_OuterSkinPbrAtlas.png',outerSss:'per-light RGB diffusion and thin-pinna backlighting approximation',outerSssStrength:state.outerSss.value};}};
+  return{Skin,Drum,Wax,WetWax,GripMaterial,Update,SetQuality,ConfigureMaterial,PrepareContact:contact.Prepare,SetOutside(value){state.outside.value=value;},SetContact:contact.SetEnabled,Probe(){return{...contact.Probe(),materialResponse:'shell thickness, bending strain and cohesive damage',membraneDetail:'radial collagen and pearl roughness approximation',surfaceDetail:quality.detail,detailLayers:quality.detailLayers,wetRendering:quality.wetness,pbr:['albedo','normal','roughness','ao'],sss:'thin-layer single-scattering approximation',sssStrength:state.sss.value,outerPbr:'Texture_OuterSkinPbrAtlas.png',outerSss:'per-light RGB diffusion and thin-pinna backlighting approximation',outerSssStrength:state.outerSss.value};}};
 }

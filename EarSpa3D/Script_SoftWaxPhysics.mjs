@@ -75,7 +75,10 @@ export function* BindWaxSurfaceSteps(body,positions,indices){
     if(edges.has(key)){const edge=edges.get(key),bend={ids:[edge.a,edge.b,edge.opposite,opposite],lambda:0};bend.rest=Dihedral(rest,bend.ids).angle;bends.push(bend);}
     else edges.set(key,{a,b,opposite,rest:Length(Sub(rest[a],rest[b])),lambda:0});
   }
-  const surface={rest,points:rest.map(p=>World(body,p)),velocities:rest.map(()=>[0,0,0]),triangles,edges:[...edges.values()],bends,thickness,grip:null,motion:0,peakBend:0,maxStretch:0,releaseClock:0};
+  const triangleAreas=triangles.map(([a,b,c])=>Length(Cross(Sub(rest[b],rest[a]),Sub(rest[c],rest[a])))*.5);
+  // Plate bending rigidity scales with thickness cubed; cap only extreme prototype edges.
+  for(const bend of bends){const t=bend.ids.reduce((sum,i)=>sum+thickness[i]*2,0)/4;bend.rigidity=Clamp((t/.1)**3,.25,4);}
+  const surface={rest,points:rest.map(p=>World(body,p)),velocities:rest.map(()=>[0,0,0]),triangles,triangleAreas,edges:[...edges.values()],bends,thickness,grip:null,motion:0,peakBend:0,maxStretch:0,releaseClock:0};
   surface.bindings=[];
   for(let i=0;i<vertices.length;i++){surface.bindings.push(BindPoint(surface,vertices[i]));if(i%32===31)yield;}
   const used=new Set();
@@ -190,7 +193,7 @@ export function StepWaxSurface(body,{target=null,softness=0,efficiency=1,adhesio
     for(const a of body.anchors)a.lambda=[0,0,0];if(s.grip)s.grip.lambda=[0,0,0];
     for(let iteration=0;iteration<8;iteration++){
       for(const c of s.edges)DistanceConstraint(s,c,stretch,mass);
-      for(const c of s.bends)BendConstraint(s,c,bend,mass);
+      for(const c of s.bends)BendConstraint(s,c,bend/c.rigidity,mass);
       for(const a of body.anchors)if(a.alive){
         const binding=a.binding,offset=binding?Sub(BoundPoint(s,binding),Weighted(s.points,binding.ids,binding.weights)):null;
         Pin(s,binding?.ids||[a.node,a.node,a.node],binding?.weights||[1,0,0],a.rest,a.lambda,.000004*(1+(a.damage||0)*3)/Math.max(.03,adhesion)/(h*h),mass,offset);
@@ -231,11 +234,27 @@ export function StepWaxSurface(body,{target=null,softness=0,efficiency=1,adhesio
   return{detached:body.detached,remaining:body.anchors.filter(a=>a.alive).length,strain:Clamp(body.strain),force:body.force,contact:body.contact,fracture:s.fracture||null};
 }
 
-export function WriteWaxSurface(body,positions){
+export function WriteWaxSurface(body,positions,response=null){
   const s=body.surface,frames=s.triangles.map(ids=>Frame(s.points,ids)),inverse=Inverse(body.rotation);
+  // A material column keeps its volume as its supporting triangle stretches.
+  // These same measured thicknesses feed absorption; no gesture/progress animation.
+  const areaScale=s.triangles.map(([a,b,c],i)=>Clamp(Length(Cross(Sub(s.points[b],s.points[a]),Sub(s.points[c],s.points[a])))*.5/s.triangleAreas[i],.35,3));
+  const strain=new Float32Array(s.rest.length),damage=new Float32Array(s.rest.length);
+  if(response)for(const hinge of s.bends){
+    const angle=Dihedral(s.points,hinge.ids).angle;
+    const delta=Math.abs(Math.atan2(Math.sin(angle-hinge.rest),Math.cos(angle-hinge.rest)));
+    const span=Math.max(.02,Length(Sub(s.rest[hinge.ids[0]],s.rest[hinge.ids[1]])));
+    for(const i of hinge.ids){strain[i]=Math.max(strain[i],delta*s.thickness[i]/span);damage[i]=Math.max(damage[i],hinge.damage||0);}
+  }
   for(let i=0;i<s.bindings.length;i++){
     const b=s.bindings[i],p=Weighted(s.points,b.ids,b.weights),frame=frames[b.triangle];
-    for(let j=0;j<3;j++)for(let k=0;k<3;k++)p[k]+=frame[j][k]*b.offset[j];
+    const compression=1/areaScale[b.triangle];
+    for(let j=0;j<3;j++)for(let k=0;k<3;k++)p[k]+=frame[j][k]*b.offset[j]*(j===2?compression:1);
     const local=Rotate(inverse,Sub(p,body.position));for(let k=0;k<3;k++)positions[i*3+k]=local[k];
+    if(response){
+      response[i*3]=b.ids.reduce((sum,id,j)=>sum+s.thickness[id]*2*b.weights[j],0)*compression;
+      response[i*3+1]=Math.abs(Math.sqrt(areaScale[b.triangle])-1)+b.ids.reduce((sum,id,j)=>sum+strain[id]*b.weights[j],0);
+      response[i*3+2]=b.ids.reduce((sum,id,j)=>sum+damage[id]*b.weights[j],0);
+    }
   }
 }

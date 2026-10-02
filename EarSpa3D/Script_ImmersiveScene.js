@@ -1,8 +1,9 @@
 import {ResolveRenderQuality} from './Data_RenderQuality.mjs?v=ear040-render-settings-20260912';
 import {FeatherCapacity} from './Script_FeatherSweep.mjs?v=ear039-brush-gather-20260912';
 import {AddFeatherFur,ClearFeatherFur,PrepareFeatherStrands,FEATHER_FUR_LENGTH,FEATHER_FUR_PASSES} from './Script_FeatherFur.js?v=ear031-feather-groom-20260912';
-import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear040-render-settings-20260912';
+import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear041-material-response-20261003';
 import * as THREE from 'three';
+import {PrepareWaxGeometry} from './Script_SurfaceDetail.js?v=ear041-material-response-20261003';
 import {SlimeCage,PoseSlimeVolume,StepSlimeVolume,SplitSlimeBite} from './Script_SlimePhysics.mjs?v=ear038-oily-performance-20260912';
 import {BuildOilyCoating,OILY_REGIONS} from './Script_OilyCoating.mjs?v=ear036-oily-bites-20260912';
 import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-20260911';
@@ -11,12 +12,12 @@ import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
 
 import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear033-scoop-contact-audio-20260912';
 import {WaxEdgeContact,WaxGripNormal} from './Script_WaxEdgeContact.mjs?v=ear033-scoop-contact-audio-20260912';
-import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear038-oily-performance-20260912';
+import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear041-material-response-20261003';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
-import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear024-cohesive-scraping-20260912';
+import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear041-material-response-20261003';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
 import { CreateToolContact } from './Script_ToolContact.js?v=ear020-contact-loading-20260912';
-import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear040-render-settings-20260912';
+import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear041-material-response-20261003';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
@@ -105,11 +106,11 @@ export async function CreateImmersiveScene({ core }) {
     }
     outer.add(mesh);
   }
-  const wall = Baked('Model_Canal'); wall.material.side = THREE.DoubleSide; wall.receiveShadow=true; const drum=Baked('Model_Eardrum');drum.material.side=THREE.DoubleSide;const hair=Baked('Model_CanalHair');hair.material=new THREE.MeshPhysicalMaterial({color:0xd0d2ce,roughness:.8,sheen:1,sheenColor:0xe7e9e4,sheenRoughness:.7});canalGroup.add(wall,drum,hair);
+  const wall = Baked('Model_Canal'); wall.material.side = THREE.DoubleSide; wall.receiveShadow=true; const drum=Baked('Model_Eardrum');drum.material.dispose();drum.material=materials.Drum(drum.geometry);const hair=Baked('Model_CanalHair');hair.material=new THREE.MeshPhysicalMaterial({color:0xc3b59c,roughness:.67,sheen:.36,sheenColor:0xe7d8be,sheenRoughness:.8,alphaTest:.02,alphaToCoverage:true});canalGroup.add(wall,drum,hair);
   wall.material=materials.Skin();wall.receiveShadow=true;AccelerateStaticRaycast(wall);
   // 入口全景只显示管腔内表面，不暴露剖面外壳；完整原网格仍用于实际壁面射线。
   const entryWall=wall.clone(),entryIndices=[],wallPosition=wall.geometry.attributes.position,wallIndex=wall.geometry.index;
-  for(let i=0;i<wallIndex.count;i+=3){const ids=[0,1,2].map(k=>wallIndex.getX(i+k)),[a,b,c]=ids.map(id=>new THREE.Vector3().fromBufferAttribute(wallPosition,id)),center=a.clone().add(b).add(c).multiplyScalar(1/3),depth=canal.Project(center).depth,radial=center.clone().sub(canal.CenterAt(depth).clone()).normalize(),normal=b.clone().sub(a).cross(c.clone().sub(a)).normalize();if(normal.dot(radial)<-.25)entryIndices.push(...ids);}
+  for(let i=0;i<wallIndex.count;i+=3){const ids=[0,1,2].map(k=>wallIndex.getX(i+k)),[a,b,c]=ids.map(id=>new THREE.Vector3().fromBufferAttribute(wallPosition,id)),center=a.clone().add(b).add(c).multiplyScalar(1/3),depth=canal.Project(center).depth,radial=center.clone().sub(canal.CenterAt(depth).clone()).normalize(),normal=b.clone().sub(a).cross(c.clone().sub(a)).normalize();if(normal.dot(radial)<-.25||depth<2.4)entryIndices.push(...ids);}
   entryWall.name='Model_EntryCanal';entryWall.geometry=wall.geometry.clone();entryWall.geometry.setIndex(entryIndices);entryWall.material=wall.material.clone();entryWall.material.side=THREE.FrontSide;entryWall.material.onBeforeCompile=wall.material.onBeforeCompile;entryWall.material.customProgramCacheKey=wall.material.customProgramCacheKey;entryWall.visible=false;canalGroup.add(entryWall);
   // 入口孔径遮挡管腔外的深部模型；孔沿来自同一解剖轮廓，保留入口薄膜的真实视线。
   const aperturePositions=[],apertureIndices=[],apertureCenter=canal.CenterAt(0).clone();
@@ -117,11 +118,11 @@ export async function CreateImmersiveScene({ core }) {
   const apertureGeometry=new THREE.BufferGeometry();apertureGeometry.setAttribute('position',new THREE.Float32BufferAttribute(aperturePositions,3));apertureGeometry.setIndex(apertureIndices);
   const entryAperture=new THREE.Mesh(apertureGeometry,new THREE.MeshBasicMaterial({color:0x191d20,side:THREE.DoubleSide,toneMapped:false}));entryAperture.name='Model_EntryAperture';entryAperture.visible=false;canalGroup.add(entryAperture);
   const hairUniforms={time:{value:0},tool:{value:new THREE.Vector3(999,999,999)}};
-  hair.material.onBeforeCompile=shader=>{shader.uniforms.vellusTime=hairUniforms.time;shader.uniforms.vellusTool=hairUniforms.tool;shader.vertexShader='uniform float vellusTime;uniform vec3 vellusTool;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
-    float rootWeight=uv.x*uv.x;float phase=uv.y*71.0;
+  hair.material.onBeforeCompile=shader=>{shader.uniforms.vellusTime=hairUniforms.time;shader.uniforms.vellusTool=hairUniforms.tool;shader.vertexShader='varying float vellusTip;uniform float vellusTime;uniform vec3 vellusTool;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+    vellusTip=uv.x;float rootWeight=uv.x*uv.x;float phase=uv.y*71.0;
     vec3 nearTool=position-vellusTool;float influence=exp(-dot(nearTool,nearTool)*2.2);
     transformed+=rootWeight*(vec3(sin(vellusTime*1.1+phase)*.014,cos(vellusTime*.85+phase)*.009,0.0)+normalize(nearTool+vec3(.001))*.065*influence);
-  `);};hair.material.customProgramCacheKey=()=> 'PaleVellusRootWeighted';
+  `);shader.fragmentShader='varying float vellusTip;\n'+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=mix(.82,1.1,vellusTip);diffuseColor.a*=1.0-smoothstep(.65,1.0,vellusTip)*.88;');};hair.material.customProgramCacheKey=()=> 'NaturalVellusTaper2';
 
   const focus = canal.CenterAt(5.4).clone();
   const right = new THREE.Vector3(), up = new THREE.Vector3(), toward = new THREE.Vector3();
@@ -203,12 +204,17 @@ export async function CreateImmersiveScene({ core }) {
     right.setFromMatrixColumn(camera.matrixWorld,0);up.setFromMatrixColumn(camera.matrixWorld,1);toward.setFromMatrixColumn(camera.matrixWorld,2);
     toolClip.setFromNormalAndCoplanarPoint(toward.clone().negate(),camera.position.clone().addScaledVector(toward,-2.5));
     workingPlane.setFromNormalAndCoplanarPoint(toward, focus);
-    outer.visible=(entrance<.94||transferBlend>.15)&&showcaseBlend<.92;canalGroup.visible=showcaseBlend<.92;entryAperture.visible=entryWall.visible=oily&&inspectionDepth<-.03&&!outer.visible&&showcaseBlend<.92;wall.visible=!entryWall.visible;
+    outer.visible=(entrance<.94||transferBlend>.15)&&showcaseBlend<.92;canalGroup.visible=showcaseBlend<.92;
+    // Inside the canal the solid wall's external hull is never visible. Render its
+    // authored inner faces once (also in the refraction pass); retain the complete
+    // original mesh for every collision/raycast and the external transition.
+    entryWall.visible=!outer.visible&&showcaseBlend<.92;wall.visible=!entryWall.visible;
+    entryAperture.visible=oily&&inspectionDepth<-.03&&entryWall.visible;
     scene.background.set('#191d20');
     scene.backgroundIntensity=.8;scene.backgroundBlurriness=0;
     scene.environmentIntensity=transferBlend>.4?.65:lampOn?.28:.018;
     metalIntensity=THREE.MathUtils.lerp(THREE.MathUtils.lerp(.7,lampOn?.75:.045,t),.85,transferBlend);
-    for(const c of chunks)if(c.coating)c.mesh.material.envMapIntensity=metalIntensity*.72;
+    for(const c of chunks){if(c.coating)c.mesh.material.envMapIntensity=metalIntensity*.52;else if(c.type==='wet')c.mesh.material.envMapIntensity=metalIntensity*.32;}
     for(const material of metalMaterials)material.envMapIntensity=metalIntensity;
     for(const c of chunks)c.mesh.visible=(transferBlend<.66||['carrying','dropping','collected'].includes(c.state))&&!['fractured','exhausted'].includes(c.state)&&!(c.toolId==='suction'&&c.state==='collected')&&!c.trayStored&&showcaseBlend<.92;
     lamp.position.copy(camera.position).addScaledVector(right,.6).addScaledVector(up,.4);
@@ -252,7 +258,7 @@ export async function CreateImmersiveScene({ core }) {
     geo.computeVertexNormals();
     // 凝胶透光，局部遮蔽使用实际轮廓；不把它烘成不透光的黑影。
     const mesh = new THREE.Mesh(geo, materials.Wax(type,tone));mesh.castShadow=type!=='oily';mesh.receiveShadow=true;
-    if(type==='oily')mesh.material.envMap=metalEnvironment.texture;
+    if(type==='oily'||type==='wet')mesh.material.envMap=metalEnvironment.texture;
     const normal = canal.NormalAt(depth, angle).clone().normalize();
     const tangent = canal.TangentAt(depth).clone().normalize();
     const xAxis = tangent.clone().cross(normal).normalize();
@@ -303,8 +309,9 @@ export async function CreateImmersiveScene({ core }) {
       p.needsUpdate=true;SmoothWaxNormals(c.mesh.geometry);c.original=p.array.slice();yield;
       if(!c.fine){let render;if(c.type==='oily')render=BindPeelSurface(c.body,p.array,c.mesh.geometry.index.array);else yield* BindPeelSurfaceSteps(c.body,p.array,c.mesh.geometry.index.array);
         if(c.body.gel){const sample={normal:new THREE.Vector3()},point=new THREE.Vector3();c.body.gel.collider=p=>{contact.Surface(point.fromArray(p),sample);return{normal:sample.normal.toArray(),clearance:sample.clearance};};c.mesh.geometry.dispose();c.mesh.geometry=new THREE.BufferGeometry();c.mesh.geometry.setAttribute('position',new THREE.BufferAttribute(render.positions,3));c.mesh.geometry.setIndex(new THREE.BufferAttribute(render.indices,1));c.mesh.geometry.setAttribute('gelRest',new THREE.BufferAttribute(render.rest,3));const uv=new Float32Array(render.rest.length/3*2);for(let i=0;i<uv.length/2;i++){uv[i*2]=render.rest[i*3]/3+.5;uv[i*2+1]=render.rest[i*3+1]/3+.5;}c.mesh.geometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));c.mesh.geometry.setAttribute('gelThickness',new THREE.BufferAttribute(render.thickness,1));c.mesh.geometry.computeVertexNormals();c.original=render.positions.slice();}
-        yield;materials.PrepareContact(c.mesh.geometry);yield;
+        yield;if(c.body.surface)Deform(c);yield;materials.PrepareContact(c.mesh.geometry);yield;
       }
+      if(c.fine)PrepareWaxGeometry(c.mesh.geometry);
     }
   }
   let preparation=null,disposed=false;
@@ -641,8 +648,10 @@ export async function CreateImmersiveScene({ core }) {
   function Deform(c) {
     if(!c.body.surface&&!c.body.gel)return;
     const geometry=c.mesh.geometry;
-    WritePeelSurface(c.body,geometry.attributes.position.array);
+    if(c.body.surface)PrepareWaxGeometry(geometry);
+    WritePeelSurface(c.body,geometry.attributes.position.array,geometry.attributes.waxResponse?.array);
     geometry.attributes.position.needsUpdate=true;
+    if(geometry.attributes.waxResponse)geometry.attributes.waxResponse.needsUpdate=true;
     if(c.body.gel){geometry.attributes.gelThickness.needsUpdate=true;geometry.computeVertexNormals();}else SmoothWaxNormals(geometry);
     geometry.computeBoundingBox();geometry.computeBoundingSphere();
   }
@@ -665,7 +674,7 @@ export async function CreateImmersiveScene({ core }) {
       const centroid=geometry.boundingBox.getCenter(new THREE.Vector3()),extent=geometry.boundingBox.getSize(new THREE.Vector3());
       const anchors=inherited.filter(a=>(new THREE.Vector3().fromArray(a.world).sub(worldPosition).applyQuaternion(inverse).dot(cutNormal)>=constant)===(i===1));
       geometry.translate(-centroid.x,-centroid.y,-centroid.z);
-      const mesh=new THREE.Mesh(geometry,materials.Wax(c.type,c.tone));
+      const mesh=new THREE.Mesh(geometry,materials.Wax(c.type,c.tone));if(c.type==='wet')mesh.material.envMap=metalEnvironment.texture;
       mesh.position.copy(centroid.clone().applyQuaternion(worldRotation).add(worldPosition));mesh.quaternion.copy(worldRotation);
       mesh.castShadow=mesh.receiveShadow=true;root.add(mesh);
       const fragment={...c,id:String(c.id)+'.'+i,mesh,mark:c.mark.clone(),state:'returning',tear:0,stress:0,progress:0,
@@ -690,6 +699,7 @@ export async function CreateImmersiveScene({ core }) {
       }
       fragment.body.detached=fragment.body.anchors.every(a=>!a.alive);fragment.body.velocity=velocity.slice();fragment.body.spin=spin.slice();
       if(fragment.body.detached){fragment.state='settling';fragment.settleAge=0;fragment.settleVelocity=new THREE.Vector3().fromArray(velocity);}
+      PrepareWaxGeometry(geometry);if(fragment.body.surface)Deform(fragment);
       mesh.userData.chunk=fragment;chunks.push(fragment);return fragment;
     });
   }
@@ -1061,7 +1071,7 @@ export async function CreateImmersiveScene({ core }) {
         if(Math.hypot(...c.body.velocity)<.02&&Math.hypot(...c.body.spin)<.04&&(c.body.motion||0)<.035) c.state='attached';
       }
     }
-    materials.Update(chunks,lamp);
+    materials.Update(chunks,lamp,dt);
     if(transfer) {
       const c=transfer.chunk,age=transfer.age;
       if(transfer.mode==='suction'){

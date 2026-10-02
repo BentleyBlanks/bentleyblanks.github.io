@@ -53,4 +53,17 @@ WritePeelSurface(supported,output);const held=output.slice(),worldGrip=GetGripPo
 Check(output.every((v,i)=>Math.abs(v-held[i])<1e-6),'regripping preserves the deformed surface');
 const rates=[30,60,120].map(fps=>{const b=Body('wet');GripPeelBody(b,grip);return Run(b,{target:[0,-1.2,.22],minAnchors:9},fps,1/fps);});
 Check(rates.every(b=>b.surface.points.every((p,i)=>Distance(p,rates[0].surface.points[i])<1e-5)),'30, 60 and 120 Hz frames share the same 240 Hz physical result');
+
+const responseBody=Body('wet'),response=new Float32Array(positions.length);
+WritePeelSurface(responseBody,output,response);
+Check(response.every((v,i)=>i%3===0?Math.abs(v-.1)<1e-6:Math.abs(v)<1e-6),'rest thickness is measured from the closed sheet, with no invented stress or damage');
+for(const p of responseBody.surface.points)p[0]*=1.25;
+WritePeelSurface(responseBody,output,response);
+Check(response.every((v,i)=>i%3===0?Math.abs(v-.08)<1e-6:Number.isFinite(v)),'25 percent area extension reduces thickness by its reciprocal, preserving material column volume');
+Check(response.some((v,i)=>i%3===1&&v>.1)&&response.every((v,i)=>i%3!==2||v===0),'extension drives the render strain without fabricating cohesive damage');
+const thicknesses=[.05,.15].map(thickness=>{
+  const b=BindPeelSurface(CreatePeelBody({position:[0,0,0],rotation:[0,0,0,1],normal:[0,0,1],size:.8,footprint:[1,1.6],type:'wet',anchorCount:9}),positions.map((v,i)=>i%3===2?v*thickness/.1:v),indices);
+  GripPeelBody(b,[0,-1.55,thickness*.8]);return Run(b,{target:[0,-1.55,.45],minAnchors:9});
+});
+Check(thicknesses[0].bend>thicknesses[1].bend*1.1,'a thinner sheet bends more under the same applied displacement and material');
 console.log('PASS '+checks+' soft wax physics checks; 65 nodes, '+peel.surface.edges.length+' stretch/shear edges, '+peel.surface.bends.length+' bending hinges');
