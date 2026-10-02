@@ -71,12 +71,12 @@ const ALL = [...SETTINGS, ...EDITORS];
 // 性能剖析同理：它甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
 // 关卡编排工作台也在这一组：它是独立窗口里的 2D 俯视图 + 流程/时间轴，
 // 既不碰 three 场景也不接管相机，「边打边看走到哪一步」正是它的主用例。
-const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor, OrchestrationEditor, TextureEditor];
+const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor, OrchestrationEditor];
 // 面板上的**分组**与上面那条「叠加语义」是两件事。关卡编排在语义上仍是叠加层
 // （独立窗口、不接管相机、keepOnClose，走 ToggleOverlay），但用户去找它的时候
 // 想的是「我要编关卡」，不是「我要调试」—— 所以按钮画进「编辑器」组。
 // 分两张表是为了让 this.entries 每个 id 只登记一次（同一个按钮画两遍就有两处开关）。
-const DEBUG_ENTRIES = OVERLAYS.filter((editor) => editor !== OrchestrationEditor && editor !== TextureEditor);
+const DEBUG_ENTRIES = OVERLAYS.filter((editor) => editor !== OrchestrationEditor);
 const EDITOR_ENTRIES = [...EDITORS, OrchestrationEditor, TextureEditor];
 
 export class EditorSuite {
@@ -163,7 +163,6 @@ export class EditorSuite {
       ClosePlayerState: () => suite.CloseOverlay(PlayerStateEditor.id),
       CloseAi: () => suite.CloseOverlay(AiEditor.id),
       CloseOrchestration: () => suite.CloseOverlay(OrchestrationEditor.id),
-      CloseTextures: () => suite.CloseOverlay(TextureEditor.id),
       // 性能剖析在面板关着（玩法进行中）时要把自己的页面内小面板收起来
       get launcherOpen() { return suite.panelOpen; },
     };
@@ -344,6 +343,7 @@ export class EditorSuite {
   }
 
   Toggle(id) {
+    if (id === TextureEditor.id) return this.Open(id);
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
     if (this.activeId === id) this.Close();
     else this.Open(id);
@@ -381,6 +381,10 @@ export class EditorSuite {
 
   /** 打开一个编辑器。**任何时候都只有一个活着。** */
   Open(id) {
+    if (id === TextureEditor.id) {
+      try { return TextureEditor.Open(); }
+      catch (error) { this.SetHint(error.message); return null; }
+    }
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
     const Editor = ALL.find((e) => e.id === id);
     if (!Editor) return null;

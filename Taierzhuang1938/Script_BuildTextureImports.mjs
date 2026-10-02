@@ -2,7 +2,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { TextureCatalog, ValidateImportDocument } from "./Script_TextureImportRules.mjs";
+import { TextureCatalog, ValidateImportDocument, ImportSettingsForPlatform } from "./Script_TextureImportRules.mjs";
 import { EncodeTexture, TextureImportHash } from "./Script_TextureImportBuild.mjs";
 
 export async function BuildTextureImports(projectDir, outputDir, document = null) {
@@ -13,11 +13,17 @@ export async function BuildTextureImports(projectDir, outputDir, document = null
   for (const file of catalog.keys()) { const name = path.posix.basename(file); basenameCounts.set(name, (basenameCounts.get(name) || 0) + 1); }
   for (const [file, options] of Object.entries(settings.textures)) {
     const target = path.join(outputDir, "Texture", path.dirname(file));
-    const result = await EncodeTexture(projectDir, catalog.get(file), options, target);
-    const output = path.posix.join(path.posix.dirname(file), result.filename);
-    const entry = { ...result, output, unflipped: result.unflipped && path.posix.join(path.posix.dirname(file), result.unflipped) };
-    runtime[file] = entry; runtime[output] = entry;
-    replacements.push([file, output]); reports.push({ file, ...result });
+    const Encode = async platform => {
+      const result = await EncodeTexture(projectDir, catalog.get(file), ImportSettingsForPlatform(options, platform), target);
+      const Relative = name => name && path.posix.join(path.posix.dirname(file), name);
+      reports.push({ file, platform, ...result });
+      return { ...result, output: Relative(result.filename), unflipped: Relative(result.unflipped), cpuFile: Relative(result.cpuFile), mipFiles: result.mipFiles?.map(Relative) };
+    };
+    const entry = await Encode("default"); entry.variants = {};
+    for (const platform of Object.keys(options.platforms)) entry.variants[platform] = await Encode(platform);
+    runtime[file] = entry; runtime[entry.output] = entry;
+    for (const variant of Object.values(entry.variants)) runtime[variant.output] = entry;
+    replacements.push([file, entry.output]);
   }
   // Preserve relative URL prefixes and existing query strings. Includes DOM/CSS
   // consumers; the source manifest/settings are kept intact for the inspector.

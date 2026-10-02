@@ -9,7 +9,7 @@
 
 import * as THREE from "three";
 import { RECIPES, BakeDetailNormal, BakeSkinLut } from "./Script_TexBake.mjs";
-import { TextureImportOf, ApplyTextureImport, LoadKtxTexture, ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
+import { TextureImportOf, ApplyTextureImport, PrepareImportedTexture, LoadKtxTexture, ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
 import { SSR } from "./Data_Tuning_Graphics.mjs";
 import {
   ApplyPatches, IndirectLightingPatches, MakeDestructionPatch, FoldOrmMaps, PatchesOf,
@@ -68,9 +68,13 @@ function ExternalOrmRoughnessFloor(texture, renderer) {
       : Object.assign(document.createElement("canvas"), { width: image.width, height: image.height });
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) return 0;
-    context.drawImage(image, 0, 0);
-    const data = context.getImageData(0, 0, image.width, image.height).data;
-    return OrmRoughnessFloor(data);
+    let minimum = 1;
+    for (const level of texture.mipmaps.length ? texture.mipmaps : [image]) {
+      canvas.width = level.width; canvas.height = level.height;
+      context.drawImage(level, 0, 0);
+      minimum = Math.min(minimum, OrmRoughnessFloor(context.getImageData(0, 0, level.width, level.height).data));
+    }
+    return minimum;
   } catch (error) {
     return 0;
   }
@@ -536,7 +540,10 @@ export class MaterialLibrary {
       return new Promise((resolve, reject) => {
         let settled = false;
         const timer = setTimeout(() => { settled = true; reject(new Error(`${url} 超时 ${timeoutMs} ms`)); }, timeoutMs);
-        LoadKtxTexture(path).then(texture => {
+        LoadKtxTexture(path, imported.format).then(async texture => {
+          try { return await PrepareImportedTexture(texture, imported, path, flipY); }
+          catch (error) { texture.dispose(); throw error; }
+        }).then(texture => {
           clearTimeout(timer);
           if (settled) { texture.dispose(); return; }
           settled = true;
@@ -563,7 +570,13 @@ export class MaterialLibrary {
       }, timeoutMs);
       image = new THREE.ImageLoader().load(
         url,
-        (loaded) => Settle(resolve, ApplyTextureImport(this._WrapTexture(loaded, srgb, flipY), imported)),
+        (loaded) => {
+          const texture = this._WrapTexture(loaded, srgb, flipY);
+          PrepareImportedTexture(texture, imported, url, flipY).then(value => {
+            if (settled) { value.dispose(); return; }
+            Settle(resolve, value);
+          }, error => { texture.dispose(); Settle(reject, error); });
+        },
         undefined,
         () => Settle(reject, new Error(`${url} 读不到`)),
       );

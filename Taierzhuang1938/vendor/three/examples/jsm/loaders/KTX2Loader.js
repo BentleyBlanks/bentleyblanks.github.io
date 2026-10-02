@@ -372,7 +372,9 @@ class KTX2Loader extends Loader {
 	 * @param {onProgressCallback} onProgress - Executed while the loading is in progress.
 	 * @param {onErrorCallback} onError - Executed when errors occur.
 	 */
-	load( url, onLoad, onProgress, onError ) {
+	// Local extension: per-request GPU preference, shared worker pool. Unsupported
+	// preferences fall back to normal device selection; alpha is never discarded.
+	load( url, onLoad, onProgress, onError, taskConfig = {} ) {
 
 		if ( this.workerConfig === null ) {
 
@@ -390,7 +392,7 @@ class KTX2Loader extends Loader {
 
 		loader.load( url, ( buffer ) => {
 
-			this.parse( buffer, onLoad, onError );
+			this.parse( buffer, onLoad, onError, taskConfig );
 
 		}, onProgress, onError );
 
@@ -404,13 +406,16 @@ class KTX2Loader extends Loader {
 	 * @param {onErrorCallback} onError - Executed when errors occur.
 	 * @returns {Promise} A Promise that resolves when the parsing has been finished.
 	 */
-	parse( buffer, onLoad, onError ) {
+	parse( buffer, onLoad, onError, taskConfig = {} ) {
 
 		if ( this.workerConfig === null ) {
 
 			throw new Error( 'THREE.KTX2Loader: Missing initialization with `.detectSupport( renderer )`.' );
 
 		}
+
+		// Isolate configured loads: the same cached source may target BC1 and BC3.
+		if ( taskConfig.gpuFormat ) buffer = buffer.slice( 0 );
 
 		// Check for an existing task using this buffer. A transferred buffer cannot be transferred
 		// again from this thread.
@@ -422,7 +427,7 @@ class KTX2Loader extends Loader {
 
 		}
 
-		this._createTexture( buffer )
+		this._createTexture( buffer, taskConfig )
 			.then( ( texture ) => onLoad ? onLoad( texture ) : null )
 			.catch( onError );
 
@@ -430,9 +435,8 @@ class KTX2Loader extends Loader {
 
 	_createTextureFrom( transcodeResult, container ) {
 
-		const { type: messageType, error, data: { faces, width, height, format, type, dfdFlags } } = transcodeResult;
-
-		if ( messageType === 'error' ) return Promise.reject( error );
+		if ( transcodeResult.type === 'error' ) return Promise.reject( new Error( transcodeResult.error ) );
+		const { data: { faces, width, height, format, type, dfdFlags } } = transcodeResult;
 
 		let texture;
 
@@ -602,7 +606,7 @@ KTX2Loader.BasisWorker = function () {
 
 					try {
 
-						const { faces, buffers, width, height, hasAlpha, format, type, dfdFlags } = transcode( message.buffer );
+						const { faces, buffers, width, height, hasAlpha, format, type, dfdFlags } = transcode( message.buffer, message.taskConfig );
 
 						self.postMessage( { type: 'transcode', id: message.id, data: { faces, width, height, hasAlpha, format, type, dfdFlags } }, buffers );
 
@@ -642,7 +646,7 @@ KTX2Loader.BasisWorker = function () {
 
 	}
 
-	function transcode( buffer ) {
+	function transcode( buffer, taskConfig = {} ) {
 
 		const ktx2File = new BasisModule.KTX2File( new Uint8Array( buffer ) );
 
@@ -688,7 +692,7 @@ KTX2Loader.BasisWorker = function () {
 		const hasAlpha = ktx2File.getHasAlpha();
 		const dfdFlags = ktx2File.getDFDFlags();
 
-		const { transcoderFormat, engineFormat, engineType } = getTranscoderFormat( basisFormat, width, height, hasAlpha );
+		const { transcoderFormat, engineFormat, engineType } = getTranscoderFormat( basisFormat, width, height, hasAlpha, taskConfig.gpuFormat );
 
 		if ( ! width || ! height || ! levelCount ) {
 
@@ -896,7 +900,25 @@ KTX2Loader.BasisWorker = function () {
 			.sort( ( a, b ) => a.priorityHDR - b.priorityHDR ),
 	};
 
-	function getTranscoderFormat( basisFormat, width, height, hasAlpha ) {
+	function getTranscoderFormat( basisFormat, width, height, hasAlpha, preferred ) {
+
+		// Local importer extension. BC3 is explicit even for opaque input. BC1
+		// cannot erase data alpha; a foreign alpha file falls back automatically.
+		const preferences = {
+			bc1: [ 'dxtSupported', TranscoderFormat.BC1, EngineFormat.RGBA_S3TC_DXT1_Format ],
+			bc3: [ 'dxtSupported', TranscoderFormat.BC3, EngineFormat.RGBA_S3TC_DXT5_Format ],
+			bc7: [ 'bptcSupported', TranscoderFormat.BC7_M5, EngineFormat.RGBA_BPTC_Format ],
+			etc2: [ 'etc2Supported', hasAlpha ? TranscoderFormat.ETC2 : TranscoderFormat.ETC1, hasAlpha ? EngineFormat.RGBA_ETC2_EAC_Format : EngineFormat.RGB_ETC2_Format ],
+			astc: [ 'astcSupported', TranscoderFormat.ASTC_4x4, EngineFormat.RGBA_ASTC_4x4_Format ],
+		};
+		const preference = preferences[ preferred ];
+		if ( preference && config[ preference[ 0 ] ] && basisFormat !== BasisFormat.UASTC_HDR
+			&& ! ( preferred === 'bc1' && hasAlpha )
+			&& ! ( preferred === 'astc' && basisFormat !== BasisFormat.UASTC ) ) {
+
+			return { transcoderFormat: preference[ 1 ], engineFormat: preference[ 2 ], engineType: EngineType.UnsignedByteType };
+
+		}
 
 		const options = OPTIONS[ basisFormat ];
 

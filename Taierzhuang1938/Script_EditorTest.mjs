@@ -176,6 +176,19 @@ Check("面板开着时玩法暂停",
   `开火 ${paused.before.fire}→${paused.after.fire}`);
 
 if(process.argv.includes('--launcher-only')){
+  const editorBeforePopup = await page.evaluate(() => window.Taierzhuang.Debug.Editor());
+  const popupReady = page.waitForEvent("popup");
+  await page.click('[data-editor="textures"]'); const texturePopup = await popupReady;
+  await texturePopup.waitForFunction(() => document.querySelectorAll(".asset").length === 267, null, { timeout: 30000 });
+  const editorAfterPopup = await page.evaluate(() => window.Taierzhuang.Debug.Editor());
+  Check("贴图管理打开真实独立窗口", texturePopup.url().includes("TextureManager.html"));
+  Check("独立窗口不改变当前编辑器状态", JSON.stringify(editorBeforePopup) === JSON.stringify(editorAfterPopup));
+  const windows = page.context().pages().length;
+  await page.click('[data-editor="textures"]');
+  Check("再次点击聚焦原窗口", page.context().pages().length === windows && !texturePopup.isClosed());
+  await page.click(".edGear");
+  Check("关闭设置面板不关闭贴图窗口", !texturePopup.isClosed());
+  await texturePopup.close();
   await browser.close();server.close();
   const failed=results.filter(r=>!r.ok);
   console.log(`Editor launcher: ${results.length-failed.length} passed, ${failed.length} failed, ${errors.length} errors`);

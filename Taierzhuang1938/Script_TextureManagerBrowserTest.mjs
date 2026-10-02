@@ -27,6 +27,13 @@ try {
   await page.goto(`${origin}/Taierzhuang1938/TextureManager.html`);
   await page.waitForFunction(() => document.querySelectorAll(".asset").length > 250 && document.querySelector("canvas"));
   assert.equal(await page.locator("#list .asset").count(), 267);
+  const originalArea = await page.locator(".canvas-wrap").boundingBox();
+  assert.ok(originalArea.height > 460, JSON.stringify(originalArea));
+  await page.locator("#expandPreview").click();
+  assert.ok((await page.locator(".canvas-wrap").boundingBox()).height > originalArea.height + 180);
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("#expandPreview").getAttribute("aria-pressed"), "false");
+  assert.equal(await page.locator(".unsupported-group input").first().isDisabled(), true);
   await page.locator("#maxSize").selectOption("128");
   await page.locator("#format").selectOption("webp-lossless");
   await page.locator("#mipmaps").selectOption("false");
@@ -39,13 +46,39 @@ try {
   assert.equal(saved.textures["Texture_WeaponSteelV2Base.webp"].maxSize, 128);
   assert.equal(saved.textures["Texture_WeaponSteelV2Base.webp"].mipmaps, false);
   await page.reload(); await page.waitForFunction(() => document.querySelector("#maxSize").value === "128");
-  await page.locator("#format").selectOption("ktx2-uastc");
+  await page.locator("#format").selectOption("ktx2-bc3");
   await page.locator("#mipmaps").selectOption("true");
   await page.locator("#preview").click();
   await page.waitForFunction(() => document.querySelectorAll(".preview-card").length === 2, null, { timeout: 60000 });
-  assert.match(await page.locator("#result").textContent(), /ktx2-uastc/);
+  assert.match(await page.locator("#result").textContent(), /ktx2-bc3/);
   assert.match(await page.locator(".caption").last().textContent(), /8 层 mip/);
+  assert.match(await page.locator(".caption").last().textContent(), /实际 DXT5 \/ BC3/);
   await page.screenshot({ path: path.join(out, "Image_GpuImport.png") });
+  await page.locator("#mipLevel").selectOption("7");
+  await page.waitForFunction(() => [...document.querySelectorAll(".preview-card canvas")].at(-1)?.width === 1);
+  await page.locator("#mipLevel").selectOption("0");
+  await page.waitForFunction(() => [...document.querySelectorAll(".preview-card canvas")].at(-1)?.width === 128);
+  await page.locator("#platform").selectOption("android");
+  assert.equal(await page.locator("#format").isDisabled(), true);
+  await page.locator("#platformOverride").check(); await page.locator("#maxSize").selectOption("64");
+  await page.locator("#save").click(); await page.waitForFunction(() => document.querySelector("#status").textContent.includes("已保存到仓库"));
+  const platformConfig = JSON.parse(await fs.readFile(path.join(temp, "Taierzhuang1938", "Data_TextureImportSettings.json"), "utf8"));
+  assert.equal(platformConfig.textures["Texture_WeaponSteelV2Base.webp"].platforms.android.maxSize, 64);
+  assert.equal(platformConfig.textures["Texture_WeaponSteelV2Base.webp"].maxSize, 128);
+  await page.locator("#platform").selectOption("default");
+  await page.locator("#maxSize").selectOption("256"); await page.locator("#revert").click();
+  assert.equal(await page.locator("#maxSize").inputValue(), "128");
+  await page.locator("#search").fill("Texture_WeaponWoodV2Base.webp");
+  await page.locator("#selectFiltered").click();
+  await page.locator("#applySelected").click();
+  await page.locator("#search").fill("");
+  await page.locator('[data-name="Texture_WeaponWoodV2Base.webp"]').click();
+  assert.equal(await page.locator("#format").inputValue(), "ktx2-bc3");
+  assert.equal(await page.locator("#maxSize").inputValue(), "128");
+  await page.locator("#revert").click();
+  assert.equal(await page.locator("#format").inputValue(), "source");
+  await page.locator("#clearSelected").click();
+  assert.equal(await page.locator("#applySelected").isDisabled(), true);
   await page.locator("#procedural").click();
   assert.equal(await page.locator("#list .asset").count(), 52);
   await page.waitForFunction(() => document.querySelectorAll(".preview-card").length === 3, null, { timeout: 60000 });
@@ -64,7 +97,7 @@ try {
   const file = "Texture_WeaponSteelV2Base.webp";
   const Encode = async format => (await fetch(origin + "/__textures/preview", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ file, settings: { maxSize: 64, format, quality: 100, mipmaps: false } }) })).json();
-  const gpu = await Encode("ktx2-uastc"), png = await Encode("png");
+  const gpu = await Encode("ktx2-bc3"), png = await Encode("png");
   assert.ok(gpu.filename && png.filename);
   const ormFile = "Texture_WoodCrateOrm.webp";
   const ormSource = path.join(temp, "Taierzhuang1938", "Texture", ormFile);
@@ -76,17 +109,25 @@ try {
   };
   const dryOrm = await EncodeOrm(224), wetOrm = await EncodeOrm(40);
   assert.ok(dryOrm.filename && wetOrm.filename);
+  const imageFile = "Texture_WeaponWoodV2Base.webp";
+  const readable = await (await fetch(origin + "/__textures/preview", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file: imageFile, settings: { maxSize: 64, format: "png", mipmaps: true, mipFade: true, readWrite: true, wrapU: "clamp", wrapV: "mirror", filterMode: "point", colorSpace: "linear", anisotropy: 4 } }) })).json();
+  const fadedGpu = await (await fetch(origin + "/__textures/preview", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file: imageFile, settings: { maxSize: 32, format: "ktx2-bc3", mipmaps: true, mipFade: true } }) })).json();
+  assert.ok(readable.cpuFile && readable.mipFiles.length === 6 && fadedGpu.filename);
   const probe = await browser.newPage();
   const entry = { ...gpu, output: gpu.filename }, ormEntry = { ...dryOrm, output: dryOrm.filename };
-  const table = { [file]: entry, [gpu.filename]: entry, [ormFile]: ormEntry, [dryOrm.filename]: ormEntry };
+  const imageEntry = { ...readable, output: readable.filename };
+  const platformEntry = { ...entry, output: "MissingDefault.png", format: "source", variants: { desktop: entry } };
+  const table = { [file]: platformEntry, [gpu.filename]: platformEntry, [ormFile]: ormEntry, [dryOrm.filename]: ormEntry, [imageFile]: imageEntry, [readable.filename]: imageEntry };
   await probe.route("**/Data_TextureImportRuntime.mjs*", route => route.fulfill({ contentType: "text/javascript", body: `export const TEXTURE_IMPORT_RUNTIME = ${JSON.stringify(table)};` }));
   await probe.route("**/Texture/*_Import*", async route => { const name = new URL(route.request().url()).pathname.split("/").at(-1);
-    await route.fulfill({ contentType: "image/ktx2", body: await fs.readFile(path.join(temp, "tmp", "TextureImportPreview", name)) }); });
+    await route.fulfill({ contentType: name.endsWith(".png") ? "image/png" : name.endsWith(".bin") ? "application/octet-stream" : "image/ktx2", body: await fs.readFile(path.join(temp, "tmp", "TextureImportPreview", name)) }); });
   await probe.route("**/TextureProbe.html", route => route.fulfill({ contentType: "text/html", body: '<script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js"}}</script>' }));
   await probe.goto(origin + "/Taierzhuang1938/TextureProbe.html");
-  const runtime = await probe.evaluate(async ({ file, reference, ormFile, wetUrl }) => {
+  const runtime = await probe.evaluate(async ({ file, reference, ormFile, wetUrl, imageFile, gpuUrl, fadedUrl }) => {
     const THREE = await import("three"), { MaterialLibrary } = await import("./Script_Materials.mjs");
-    const { SetTextureImportRenderer, ManagedTextureLoader } = await import("./Script_TextureImports.mjs");
+    const { SetTextureImportRenderer, ManagedTextureLoader, ReadImportedTexture, WriteImportedTexture, SelectTextureImportVariant } = await import("./Script_TextureImports.mjs");
     const renderer = new THREE.WebGLRenderer(); SetTextureImportRenderer(renderer);
     const library = new MaterialLibrary(renderer), target = new THREE.WebGLRenderTarget(64, 64);
     target.texture.colorSpace = THREE.SRGBColorSpace;
@@ -99,6 +140,7 @@ try {
     const regular = await new ManagedTextureLoader().loadAsync(`./Texture/${file}`);
     const result = { compressed: texture.isCompressedTexture, size: texture.image.width, mips: texture.mipmaps.length,
       minFilter: texture.minFilter, linearFilter: THREE.LinearFilter, error: MeanError(expected, Render(texture)), managedError: MeanError(expected, Render(regular)) };
+    if (texture.format !== THREE.RGBA_S3TC_DXT5_Format) throw new Error("Explicit BC3 was ignored");
     original.flipY = false; original.needsUpdate = true;
     const noFlipExpected = Render(original), noFlip = await library._LoadExternalImage(`./Texture/${file}`, true, 30000, false);
     const noFlipLoader = await new ManagedTextureLoader(undefined, { flipY: false }).loadAsync(`./Texture/${file}`);
@@ -109,6 +151,33 @@ try {
     // A smooth region only in the last mip must still retain SSR. Use genuine
     // encoded blocks of the same format so the base level remains entirely dry.
     const { LoadKtxTexture } = await import("./Script_TextureImports.mjs");
+    const formats = await Promise.all(["bc1", "bc3", "bc7", "etc2", "astc"].map(async format => { const value = await LoadKtxTexture(gpuUrl, `ktx2-${format}`); const actual = value.format; value.dispose(); return actual; }));
+    if (formats[0] !== THREE.RGBA_S3TC_DXT1_Format || formats[1] !== THREE.RGBA_S3TC_DXT5_Format || formats[2] !== THREE.RGBA_BPTC_Format) throw new Error(`GPU choices: ${formats}`);
+    result.gpuFormats = formats;
+    const { KTX2Loader } = await import("./vendor/three/examples/jsm/loaders/KTX2Loader.js");
+    const fallbackLoader = new KTX2Loader().setTranscoderPath("./vendor/three/examples/jsm/libs/basis/").detectSupport(renderer);
+    for (const key of Object.keys(fallbackLoader.workerConfig)) fallbackLoader.workerConfig[key] = false;
+    const fallback = await new Promise((resolve, reject) => fallbackLoader.load(gpuUrl, resolve, undefined, reject, { gpuFormat: "bc3" }));
+    if (fallback.format !== THREE.RGBAFormat) throw new Error("Unsupported GPU target did not fall back");
+    Render(fallback); fallback.dispose(); fallbackLoader.dispose();
+    const faded = await LoadKtxTexture(fadedUrl, "ktx2-bc3");
+    if (faded.mipmaps.length !== 6) throw new Error("Custom GPU mip chain missing");
+    const mipTarget = new THREE.WebGLRenderTarget(1, 1); mipTarget.texture.colorSpace = THREE.SRGBColorSpace;
+    material.map = faded; material.needsUpdate = true; renderer.setRenderTarget(mipTarget); renderer.render(scene, camera);
+    const lastMip = new Uint8Array(4); renderer.readRenderTargetPixels(mipTarget, 0, 0, 1, 1, lastMip);
+    if ([0, 1, 2].some(channel => Math.abs(lastMip[channel] - 128) > 5)) throw new Error(`GPU mip fade failed: ${lastMip}`);
+    renderer.setRenderTarget(target); mipTarget.dispose(); faded.dispose();
+    const readable = await new ManagedTextureLoader().loadAsync(`./Texture/${imageFile}`);
+    if (readable.wrapS !== THREE.ClampToEdgeWrapping || readable.wrapT !== THREE.MirroredRepeatWrapping || readable.minFilter !== THREE.NearestMipmapNearestFilter || readable.colorSpace !== THREE.NoColorSpace || readable.mipmaps.length !== 7) throw new Error("Sampler settings or image mips missing");
+    const pixels = ReadImportedTexture(readable);
+    if (pixels.data.length !== 64 * 64 * 4) throw new Error("CPU pixels missing");
+    pixels.data.fill(0);
+    if (!ReadImportedTexture(readable).data.some(Boolean)) throw new Error("Read returned a mutable internal buffer");
+    for (let i = 0; i < pixels.data.length; i += 4) { pixels.data[i + 1] = 255; pixels.data[i + 3] = 255; }
+    WriteImportedTexture(readable, pixels.data);
+    const written = Render(readable); if (written[0] !== 0 || written[1] !== 255 || written[2] !== 0) throw new Error("Written pixels did not reach the GPU");
+    readable.dispose(); result.cpuWrite = true;
+    if (SelectTextureImportVariant({ output: "default", variants: { android: { output: "mobile" } } }, "android").output !== "mobile") throw new Error("Platform override missing");
     const wet = await LoadKtxTexture(wetUrl);
     drySet.orm.mipmaps.at(-1).data = wet.mipmaps.at(-1).data;
     drySet.orm.needsUpdate = true;
@@ -121,7 +190,7 @@ try {
     for (const owned of [drySet.albedo, drySet.normal, drySet.orm, wet]) owned.dispose();
     for (const owned of [original, texture, regular, noFlip, noFlipLoader]) owned.dispose();
     material.dispose(); geometry.dispose(); target.dispose(); renderer.dispose(); renderer.forceContextLoss(); return result;
-  }, { file, reference: origin + png.url, ormFile, wetUrl: origin + wetOrm.url });
+  }, { file, reference: origin + png.url, ormFile, wetUrl: origin + wetOrm.url, imageFile, gpuUrl: origin + gpu.url, fadedUrl: origin + fadedGpu.url });
   assert.equal(runtime.compressed, true); assert.equal(runtime.size, 64); assert.equal(runtime.mips, 1); assert.equal(runtime.minFilter, runtime.linearFilter);
   for (const key of ["error", "managedError", "noFlipError", "noFlipLoaderError"]) assert.ok(runtime[key] < 3, `${key}: ${JSON.stringify(runtime)}`);
   assert.ok(Math.abs(runtime.dryRoughMin - 224 / 255) < 2 / 255, JSON.stringify(runtime));

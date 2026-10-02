@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { TextureCatalog, ValidateImportDocument } from "./Script_TextureImportRules.mjs";
+import { TextureCatalog, ValidateImportDocument, NormalizeImportSettings, ImportSettingsForPlatform, IMPORT_PLATFORMS } from "./Script_TextureImportRules.mjs";
 import { EncodeTexture, TextureImportHash } from "./Script_TextureImportBuild.mjs";
 const busy = new Set();
 const Json = (res, status, data) => { res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify(data)); };
@@ -29,10 +29,10 @@ export async function HandleTextureImportRequest(req, res, rootDir) {
     if (!Local(req)) { Json(res, 403, { error: "Texture writes and encoding are available on localhost only" }); return; }
     if (route.startsWith("/__textures/result/") && req.method === "GET") {
       const name = route.slice("/__textures/result/".length);
-      if (!/^[A-Za-z0-9_]+_Import[a-f0-9]{24}(?:_NoFlip)?\.(webp|png|jpe?g|ktx2)$/.test(name)) throw new Error("Invalid preview name");
+      if (!/^[A-Za-z0-9_]+_Import[a-f0-9]{24}(?:_NoFlip|_Mip\d+|_Cpu)?\.(webp|png|jpe?g|ktx2|bin)$/.test(name)) throw new Error("Invalid preview name");
       const data = await fs.readFile(path.join(outputDir, name));
       const mime = { ".ktx2": "image/ktx2", ".webp": "image/webp", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg" };
-      res.writeHead(200, { "Content-Type": mime[path.extname(name)], "Cache-Control": "no-store", "Content-Length": data.length }); res.end(data); return;
+      res.writeHead(200, { "Content-Type": mime[path.extname(name)] || "application/octet-stream", "Cache-Control": "no-store", "Content-Length": data.length }); res.end(data); return;
     }
     if (req.method !== "POST") { Json(res, 405, { error: "POST required" }); return; }
     const body = await Body(req);
@@ -50,7 +50,10 @@ export async function HandleTextureImportRequest(req, res, rootDir) {
       if (route === "/__textures/preview") {
         const item = TextureCatalog().find(item => item.file === body.file);
         if (!item) throw new Error("Unknown texture");
-        const result = await EncodeTexture(projectDir, item, body.settings, outputDir);
+        const platform = body.platform || "default";
+        if (!["default", ...IMPORT_PLATFORMS].includes(platform)) throw new Error("Invalid preview platform");
+        const settings = ImportSettingsForPlatform(NormalizeImportSettings(body.settings, item), platform);
+        const result = await EncodeTexture(projectDir, item, settings, outputDir);
         Json(res, 200, { ...result, url: `/__textures/result/${result.filename}`,
           unflippedUrl: result.unflipped && `/__textures/result/${result.unflipped}` }); return;
       }

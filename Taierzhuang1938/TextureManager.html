@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>贴图管理 · 血战滕县</title>
-  <link rel="stylesheet" href="./Style_TextureManager.css?v=2026100301">
-  <script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js","./Script_TextureImportRules.mjs":"./Script_TextureImportRules.mjs?v=2026100301","./Script_TextureImports.mjs":"./Script_TextureImports.mjs?v=2026100301","./Data_TextureImportRuntime.mjs":"./Data_TextureImportRuntime.mjs?v=2026100301","./Data_TextureManifest.mjs":"./Data_TextureManifest.mjs?v=2026100301","./Script_TexBake.mjs":"./Script_TexBake.mjs?v=2026100301"}}</script>
+  <link rel="stylesheet" href="./Style_TextureManager.css?v=2026100302">
+  <script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js","./Script_TextureImportRules.mjs":"./Script_TextureImportRules.mjs?v=2026100302","./Script_TextureImports.mjs":"./Script_TextureImports.mjs?v=2026100302","./Data_TextureImportRuntime.mjs":"./Data_TextureImportRuntime.mjs?v=2026100302","./Data_TextureManifest.mjs":"./Data_TextureManifest.mjs?v=2026100302","./Script_TexBake.mjs":"./Script_TexBake.mjs?v=2026100302","./Script_TextureManagerFields.mjs":"./Script_TextureManagerFields.mjs?v=2026100302","./vendor/three/examples/jsm/loaders/KTX2Loader.js":"./vendor/three/examples/jsm/loaders/KTX2Loader.js?v=2026100302"}}</script>
 </head>
 <body>
   <header><div><span class="eyebrow">台儿庄 · 血战滕县</span><h1>贴图管理</h1></div><div class="actions"><span id="dirty">配置已同步</span><button id="reload">重新读取</button><button id="export">导出配置</button><label class="button">导入配置<input id="import" type="file" accept=".json" hidden></label><button id="save" class="primary">保存发布配置</button></div></header>
@@ -12,15 +12,15 @@
   <main>
     <aside><div class="tabs"><button id="ordinary" class="active">普通贴图</button><button id="procedural">程序化预览</button></div><input id="search" type="search" placeholder="搜索名称、通道、类别…" aria-label="搜索贴图"><div id="count"></div><div id="list" role="listbox" aria-label="贴图列表"></div></aside>
     <section class="workspace"><div class="selection"><span id="kind" class="tag"></span><h2 id="name">选择贴图</h2><p id="metadata"></p></div>
-      <div class="preview-tools"><label>显示通道 <select id="channel"><option value="rgba">RGBA</option><option value="rgb">RGB</option><option value="r">R</option><option value="g">G</option><option value="b">B</option><option value="a">Alpha</option></select></label><label><input id="zoom" type="checkbox"> 1:1 像素</label><label id="procSizeLabel" hidden>预览尺寸 <select id="procSize"><option>128</option><option selected>256</option><option>512</option><option>1024</option></select></label><button id="generate" hidden>生成预览</button></div>
+      <div class="preview-tools"><label>显示通道 <select id="channel"><option value="rgba">RGBA</option><option value="rgb">RGB</option><option value="r">R</option><option value="g">G</option><option value="b">B</option><option value="a">Alpha</option></select></label><label><input id="zoom" type="checkbox"> 1:1 像素</label><label id="procSizeLabel" hidden>配方基准尺寸 <select id="procSize"><option>128</option><option selected>256</option><option>512</option><option>1024</option></select></label><button id="generate" hidden>生成预览</button><button id="expandPreview" aria-pressed="false">放大预览</button></div>
       <div id="previews" class="previews"></div><div id="result"></div>
     </section>
     <section class="inspector"><h2>导入设置</h2><p id="scope">保存后，每次发布自动生成处理结果。源图保留。</p><form id="settings">
       <label>最大尺寸<select id="maxSize"><option value="0">原始尺寸</option><option>64</option><option>128</option><option>256</option><option>512</option><option>1024</option><option>2048</option><option>4096</option><option>8192</option></select></label>
-      <label>压缩格式<select id="format"><option value="source">保留源格式／原始文件</option><option value="webp">WebP · 有损文件压缩</option><option value="webp-lossless">WebP · 无损文件压缩</option><option value="png">PNG · 无损</option><option value="jpeg">JPEG · 颜色图</option><option value="ktx2-uastc">KTX2 / UASTC · GPU 高质量</option><option value="ktx2-etc1s">KTX2 / ETC1S · GPU 小体积</option></select></label>
+      <label>压缩格式<select id="format"><option value="source">保留源格式／原始文件</option><optgroup label="GPU 压缩格式"><option value="ktx2-bc1">DXT1 / BC1 · RGB · 4 bpp</option><option value="ktx2-bc3">DXT5 / BC3 · RGBA · 8 bpp</option><option value="ktx2-bc7">BC7 · 高质量 RGBA · 8 bpp</option><option value="ktx2-etc2">ETC2 · RGB / RGBA</option><option value="ktx2-astc">ASTC 4×4 · RGBA · 8 bpp</option><option value="ktx2-uastc">自动 GPU 格式 · UASTC 高质量</option><option value="ktx2-etc1s">自动 GPU 格式 · ETC1S 小体积</option></optgroup><optgroup label="图片文件格式"><option value="webp">WebP · 有损文件压缩</option><option value="webp-lossless">WebP · 无损文件压缩</option><option value="png">PNG · 无损</option><option value="jpeg">JPEG · 颜色图</option></optgroup></select></label>
       <label>压缩质量 <output id="qualityValue">85</output><input id="quality" type="range" min="1" max="100" value="85"></label>
       <label>Mipmap<select id="mipmaps"><option value="inherit">沿用当前材质</option><option value="true">开启</option><option value="false">关闭</option></select></label>
       <p id="formatHint" class="hint"></p><p id="restriction" class="hint"></p><button id="preview" type="button" class="primary">重新导入并预览</button><button id="reset" type="button">恢复此图默认设置</button>
     </form><div class="notes"><h3>发布方式</h3><p>本地保存写入仓库配置，下次 Pages 发布自动应用。在线页面可编辑并导出配置，放回项目后发布。</p><p>WebP / PNG / JPEG 控制文件体积；KTX2 同时提供 GPU 压缩。程序化配方按需预览，暂不参与发布压缩。</p></div></section>
-  </main><script type="module" src="./Script_TextureManager.mjs?v=2026100301"></script>
+  </main><script type="module" src="./Script_TextureManager.mjs?v=2026100302"></script>
 </body></html>
