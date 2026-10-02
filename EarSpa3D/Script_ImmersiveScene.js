@@ -4,6 +4,7 @@ import {AddFeatherFur,ClearFeatherFur,PrepareFeatherStrands,FEATHER_FUR_LENGTH,F
 import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear041-material-response-20261003';
 import * as THREE from 'three';
 import {PrepareWaxGeometry} from './Script_SurfaceDetail.js?v=ear041-material-response-20261003';
+import {BuildWaxShape,BuildWaxDebris} from './Script_WaxMorphology.mjs?v=ear042-wax-morphology-20261003';
 import {SlimeCage,PoseSlimeVolume,StepSlimeVolume,SplitSlimeBite} from './Script_SlimePhysics.mjs?v=ear038-oily-performance-20260912';
 import {BuildOilyCoating,OILY_REGIONS} from './Script_OilyCoating.mjs?v=ear036-oily-bites-20260912';
 import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-20260911';
@@ -232,29 +233,23 @@ export async function CreateImmersiveScene({ core }) {
     for(const c of chunks)if(c.state==='collected'&&c.toolId!=='suction')c.mesh.position.copy(TrayPosition(c));
   }
 
-  const waxPrototypes=new Map();
-  function WaxGeometry(type){
-    if(!waxPrototypes.has(type)){
-      const prototype=Baked(type==='dry'?'Model_WaxDry':type==='wet'?'Model_WaxWet':'Model_WaxFirm');
-      for(const material of(Array.isArray(prototype.material)?prototype.material:[prototype.material]))material.dispose();
-      waxPrototypes.set(type,prototype.geometry);
-    }
-    return waxPrototypes.get(type).clone();
+  function WaxGeometry(shape){
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.BufferAttribute(shape.positions,3));
+    geometry.setAttribute('uv',new THREE.BufferAttribute(shape.uv,2));
+    geometry.setAttribute('waxResponse',new THREE.BufferAttribute(shape.response,3).setUsage(THREE.DynamicDrawUsage));
+    geometry.setIndex(new THREE.BufferAttribute(shape.indices,1));
+    geometry.userData.morphology=shape.grains||shape.variant;
+    return geometry;
   }
   function BuildChunk(rng, id, depth, angle, type, form='chunk') {
     const size = .75 + rng() * .12;
     const tone=type==='dry'&&(form==='ribbon'||id===0||rng()<.48)?'paleYellow':'brown';
-    const geo=type==='oily'?new THREE.BufferGeometry():WaxGeometry(type);if(type==='oily'){const cage=SlimeCage(size,rng()*6);geo.setAttribute('position',new THREE.BufferAttribute(cage.positions,3));geo.setIndex(new THREE.BufferAttribute(cage.indices,1));}
-    const p=geo.attributes.position,seed=rng()*6;
-    const stretch=form==='film'?[1.48,1.7,.24]:form==='ribbon'?[.66,2.22,.32]:form==='flake'?[1.25,1.4,.40]:[1,1,1];
-    if(type!=='oily')geo.scale(size*stretch[0],size*stretch[1],size*stretch[2]);
-    // Blender 原型尖端平面为 XY，背面沿局部 +Z 进入内壁，正面朝向内法线。
-    for(let i=0;type!=='oily'&&i<p.count;i++){
-      const x=p.getX(i),y=p.getY(i),z=p.getZ(i);
-      const variation=1+.075*Math.sin(x*4+y*2+seed)+.035*Math.sin(y*11+seed*2);
-      const curl=tone==='paleYellow'?.055*Math.pow(Math.min(1,Math.abs(x)/(size*stretch[0])),3)*(1+.35*Math.sin(y*4+seed)):0;
-      p.setXYZ(i,x*variation,y*(1+.08*Math.sin(seed)),z+(.22*stretch[2])+curl);
-    }
+    const cage=type==='oily'?SlimeCage(size,rng()*6):null,seed=rng()*6;
+    const stretch=type==='impacted'?[1.05,1.2,1]:form==='film'?[1.48,1.7,.24]:form==='ribbon'?[.66,2.22,.32]:form==='flake'?[1.25,1.4,.40]:[1,1,1];
+    const geo=cage?new THREE.BufferGeometry():WaxGeometry(BuildWaxShape({seed:Math.floor(seed*1e7),type,radii:[size*stretch[0],size*stretch[1]],variant:form}));
+    if(cage){geo.setAttribute('position',new THREE.BufferAttribute(cage.positions,3));geo.setIndex(new THREE.BufferAttribute(cage.indices,1));}
+    const p=geo.attributes.position;
     geo.computeVertexNormals();
     // 凝胶透光，局部遮蔽使用实际轮廓；不把它烘成不透光的黑影。
     const mesh = new THREE.Mesh(geo, materials.Wax(type,tone));mesh.castShadow=type!=='oily';mesh.receiveShadow=true;
@@ -299,8 +294,7 @@ export async function CreateImmersiveScene({ core }) {
     }
     for(let i=0;earType!=='oily'&&i<12;i++){
       const c=BuildChunk(rng,'dust'+i,4.8+(i%3)*.72,.46+i*Math.PI*2/12,'dry','flake');
-      const gs=[];for(let j=0;j<9;j++){const g=new THREE.IcosahedronGeometry(.025+rng()*.06,1);g.scale(1,1,.2);g.translate((rng()-.5)*.62,(rng()-.5)*.75,.035);gs.push(g);}
-      c.mesh.geometry.dispose();c.mesh.geometry=mergeGeometries(gs);gs.forEach(g=>g.dispose());c.mesh.geometry.setIndex(Array.from({length:c.mesh.geometry.attributes.position.count},(_,i)=>i));
+      c.mesh.geometry.dispose();c.mesh.geometry=WaxGeometry(BuildWaxDebris(rng,Math.floor(c.seed*1e7)));
       c.mass=.075;c.form='microdust';c.fine=true;c.size=.38;c.footprint=[.38,.42];c.grainCount=9;c.original=c.mesh.geometry.attributes.position.array.slice();c.body=CreatePeelBody({position:c.origin.toArray(),rotation:c.rotation.toArray(),normal:c.normal.toArray(),size:c.size,type:'dry'});result.push(c);yield;
     }
     // Film and long flakes follow the wall curvature across their whole back surface.
@@ -821,7 +815,10 @@ export async function CreateImmersiveScene({ core }) {
     if(id==='tweezers'&&c?.body?.grip){
       c.mesh.updateMatrixWorld(true);const oldSide=c.mesh.material.side;c.mesh.material.side=THREE.DoubleSide;
       const sides=[-1,1].map(sign=>new THREE.Raycaster(point.clone().addScaledVector(jawAxis,sign*2.5),jawAxis.clone().multiplyScalar(-sign),0,2.5).intersectObject(c.mesh)[0]);
-      c.jawContact=sides.every(Boolean);c.jawGaps=sides.map(hit=>hit?2.5-hit.distance+.048:.66);
+      c.jawContact=sides.every(Boolean);
+      // A chipped rim can touch only one jaw. Keep the open pose until both
+      // sides engage, otherwise the unpaired hit can lever the tool off the wall.
+      c.jawGaps=c.jawContact?sides.map(hit=>2.5-hit.distance+.048):[.66,.66];
       c.mesh.material.side=oldSide;
     }
     for(const [key,group] of Object.entries(toolParts))group.visible=key===id;
@@ -1173,5 +1170,5 @@ export async function CreateImmersiveScene({ core }) {
     Drop(c){c.surfaceWet=Math.max(c.surfaceWet||0,.18);if(!toolDragMode||!toolDrag)ShowTool(c,'drops');dropTarget=c.mesh.position.clone().addScaledVector(c.normal,.18);dropAge=0;droplet.visible=true;droplet.userData.start=lastToolPoint.clone();},
     get chunks(){return chunks;},
     modelInfo:{source:'BlenderMCP',file:'Models/Model_ImmersiveEar.glb',edition:'DirectionalAnatomy',nodes:asset.scene.children.map(n=>n.name)},
-    Dispose(){toolParts.feather.children.forEach(p=>ClearFeatherFur(p));collectionTray.Dispose();disposed=true;CancelPreparation();waxPrototypes.forEach(g=>g.dispose());environment.dispose();metalEnvironment.dispose();metalMaterials.clear();anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
+    Dispose(){toolParts.feather.children.forEach(p=>ClearFeatherFur(p));collectionTray.Dispose();disposed=true;CancelPreparation();environment.dispose();metalEnvironment.dispose();metalMaterials.clear();anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
 }
