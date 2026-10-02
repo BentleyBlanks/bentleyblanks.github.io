@@ -303,6 +303,27 @@ export const HZB = { maxLevels: 8, minSize: 8 };
 export const VELOCITY = { clampUv: 0.25, skinnedPrev: true };
 
 /**
+ * 预通道静态合批（`Script_PrepassStaticBatch.mjs`，2026-10-02）。预通道所有不透明件共用一只覆盖材质，
+ * 静态布景却按分区逐块提交（12 阶段 high：白盒体块 40 + 壕沟面 37 + 工事 23 + 地形 20 …）；
+ * 一动不动的收进几只 BatchedMesh，逐成员照样视锥剔除。节奏与阴影趟那一份（Data_Tuning_Shadows.STATIC_CASTER_BATCH）同口径。
+ */
+export const PREPASS_STATIC_BATCH = {
+  enabled: true,
+  /** 连续这么多帧矩阵 / 可见性 / 几何 / 材质都没变才收（半秒）。 */
+  settleFrames: 30,
+  /** 成员一变就踢回单独画；之后至少这么多帧不再收（四秒）。 */
+  cooldownFrames: 240,
+  /** 多少帧整场景扫一次找新成员。 */
+  rescanFrames: 60,
+  /** 每帧收新成员的时间预算（毫秒）。进关那一批由 Prime 在加载画面后面一次收满。 */
+  joinBudgetMs: 1.5,
+  minInstanceCapacity: 256,
+  minVertexCapacity: 65536,
+  /** 建组时按当时登记的同组总量乘这个数一次留够，中途扩容是整批重传。 */
+  reserveScale: 1.5,
+};
+
+/**
  * 自动降档（`Script_AutoQuality.mjs`）。docs §17.5 的那一条落地：
  * 滑动窗口的帧间隔中位数 >20 ms 持续 2 s 降一级、<13 ms 持续 8 s 升一级、
  * **降级后锁 30 s**（避免在临界点来回抖）。

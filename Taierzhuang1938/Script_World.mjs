@@ -136,6 +136,8 @@ export class BuildSink {
         const enabled = material && material.userData && material.userData.damageObjectEnabled;
         if (enabled) enabled.value = 0;
       };
+      // 预通道静态合批认得这一对钩子（Script_PrepassStaticBatch）：整批一起开裁切与逐件开等价。
+      mesh.userData.prepassDamageHook = true;
       mesh.name = `Static_${key}`;
       scene.add(mesh);
       meshes.push(mesh);

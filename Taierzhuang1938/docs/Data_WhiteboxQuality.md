@@ -26,7 +26,9 @@
 
 **地形、角色、敌军、第一人称身体/手和手持装备默认保留原材质与贴图。** 人物与装备由独立 `characterTextures` 开关控制，不依赖场景的 `assetTextures`。地形以对象上的 `deformableTerrain`、`terrainTile` 或 `whiteboxTerrain` 标记识别；弹坑替换地块也保留贴图，不能用「材质名字带泥土」放行场景道具。透明粒子/贴花和天空默认不画；HUD 与任务系统继续工作。
 
-默认每帧只运行 **main → whiteboxOutput**：中性基础灯光、几何深度测试、线性色转 sRGB 和剧情黑场/眼皮。高级效果与预通道/HZB、GTAO/SSIL、SSR、室内遮蔽、CSM、自阴影、GI、簇光、大气、体积雾、TAA/FXAA、Bloom、景深、运动模糊、自动曝光、调色均关闭。调试工具主动打开时仍允许线框/调试叠加。
+默认每帧只运行 **main → whiteboxOutput**：中性基础灯光、几何深度测试、太阳级联阴影（烘焙在 main 那一次出画里）、线性色转 sRGB 和剧情黑场/眼皮。高级效果与预通道/HZB、GTAO/SSIL、SSR、室内遮蔽、自阴影、GI、簇光、大气、体积雾、TAA/FXAA、Bloom、景深、运动模糊、自动曝光、调色均关闭。调试工具主动打开时仍允许线框/调试叠加。
+
+**太阳阴影（2026-10-02 起默认开，用户要求）**：`shadows` 默认 true。中性光照旧，不切到整套关卡灯光：出画时只把关卡太阳的级联灯（`Script_Csm` 的 `SunCascade0..N`，Script_Main 以 `sunCascades` 交给 `WhiteboxSceneRenderer`）留着投影，第 0 盏换成白色，白盒环境光与它按 `WHITEBOX_LIGHTING.shadowAmbient` / `shadowSun`（1.25 / 2.3）配比，白盒自己那盏不投影的太阳收起；其余关卡灯照旧藏掉。方向跟关卡太阳走（第一关高度约 52°），受光地面亮度与旧口径（ambient 1.8 + sun 1.4）基本相同，影子处约为受光面的四成。规则在 `Script_WhiteboxRendering._LightingMode`，预热提交与逐帧出画共用。之前的存档把每个默认值都写了出去，存着的 `shadows:false` 按旧默认迁移（`WHITEBOX_DEFAULTS.schema` = 2，`LoadWhiteboxConfig`）；新存档里玩家自己关掉的保留。
 
 这是一项渲染表现配置，资产、骨骼、几何/碰撞与加载预算沿用 high。原始材质在出画后原样还回，材质切换不修改资产文件或模拟状态。现有后期管线的中间资源仍可预留，关闭表示不执行对应 Feature/Pass，不承诺免下载所有资产或零显存占用。无 alpha 贴图的植被卡片会显示其真实几何轮廓；有 alpha 贴图的卡片按上面的规则保留裁切。
 
@@ -59,9 +61,9 @@ Tengxian.GraphicsProfile.ExportWhitebox()
 
 数据源是 [Data_Tuning_Whitebox.mjs](../Data_Tuning_Whitebox.mjs)：`WHITEBOX_DEFAULTS`、控件表、`WhiteboxPassPlan`、运行时画质映射。UI 与 API 共用校验和本地存储 `tengxian1938_whitebox_v1`。导出的 JSON 可作为 agent 修改这张默认表的依据；浏览器本地编辑不会自动发布成全站默认。
 
-开关依赖会自动接入：SSR → 预通道/HZB/颜色历史；SSIL/室内天光 → GTAO；TAA/景深/运动模糊/雾 → 预通道；光晕 → Bloom；阴影/GI/簇光 → 关卡灯光。读取 `Inspect().renderedPasses` 区分「配置允许」与「场景满足条件，实际执行」。关闭白盒资产材质时保留破坏裁切与已启用的光照补丁，不保留纹理和风化；完整材质细节验收请恢复资产材质。
+开关依赖会自动接入：SSR → 预通道/HZB/颜色历史；SSIL/室内天光 → GTAO；TAA/景深/运动模糊/雾 → 预通道；光晕 → Bloom；GI/簇光 → 关卡灯光；阴影 / 接触阴影 / 第一人称自阴影 → 关卡太阳的级联灯（中性光不变，见上）。读取 `Inspect().renderedPasses` 区分「配置允许」与「场景满足条件，实际执行」。关闭白盒资产材质时保留破坏裁切与已启用的光照补丁，不保留纹理和风化；完整材质细节验收请恢复资产材质。
 
-新 Feature 必须登记数据与控件映射，新 Pass 必须显式加入白盒允许表，否则在白盒下默认关闭。新增物件自动服从材质替换；仅真正的地形可标 `whiteboxTerrain`。人物工厂、第一人称身体/视模的共用根节点标 `userData.whiteboxCharacter = true`，后续骨骼挂件自动继承；ActorBatch / Crowd 的场景批次带同一标记。子树可用 `false` 明确回到场景类别（例如开场人物根下的坐箱），不按单个人物或武器维护名单。LOD 在材质替换前更新，避免新显示的档位漏用场景网格。
+新 Feature 必须登记数据与控件映射，新 Pass 必须显式加入白盒允许表，否则在白盒下默认关闭。新增物件自动服从材质替换（逐帧替换按 scene 顶层子树缓存成清单，add / remove / attach 只重建那一棵、源材质换引用的网格当帧重判，2026-10-02 起；分类标记要在挂进场景之前设好，挂上之后才改的调 `post.whiteboxScene.Invalidate()`）；仅真正的地形可标 `whiteboxTerrain`。人物工厂、第一人称身体/视模的共用根节点标 `userData.whiteboxCharacter = true`，后续骨骼挂件自动继承；ActorBatch / Crowd 的场景批次带同一标记。子树可用 `false` 明确回到场景类别（例如开场人物根下的坐箱），不按单个人物或武器维护名单。LOD 在材质替换前更新，避免新显示的档位漏用场景网格。
 
 着色器预热的提交编译（`renderer.compile`）必须套同一层替换：`Script_Main.CompileAsRendered` 调 `Begin(scene, camera, { compileRoots })`，藏着的网格也按同一规则换、白盒藏掉的特效不编。替换规则改了而提交那一侧没跟上，开机就会回到「提交的全白编、出画时同步现编」（2026-10-01 实测第一关冷开机多 27 s）。口径见 [渲染管线 §18.7](Data_TechRenderPipeline.md)。
 

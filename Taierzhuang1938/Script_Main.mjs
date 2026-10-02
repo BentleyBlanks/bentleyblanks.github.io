@@ -28,6 +28,7 @@ import { LightRig } from "./Script_Light.mjs";
 import { InstallShadowSkip, ShadowSkipCount, SetShadowSkipEnabled } from "./Script_ShadowSkip.mjs";
 import { BonePrune } from "./Script_BonePrune.mjs";
 import { ShadowCasterBatch, InstallShadowCasterBatch } from "./Script_ShadowCasterBatch.mjs";
+import { PrepassStaticBatch, InstallPrepassStaticBatch } from "./Script_PrepassStaticBatch.mjs";
 import { WithShadowDepthRekey } from "./Script_ShadowDepth.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
@@ -692,6 +693,11 @@ const library = new MaterialLibrary(renderer, {
 // 包装装在 ShadowSkip 外面一层；RenderScene 在场景矩阵更新之后逐帧对账。
 const shadowCasterBatch = new ShadowCasterBatch(scene, { cloneDepthMaterial: CloneShadedMaterial });
 InstallShadowCasterBatch(renderer, shadowCasterBatch);
+// 预通道静态合批（Script_PrepassStaticBatch 头注）：预通道里一动不动的不透明件收进几只 BatchedMesh。
+// 阴影包装装在阴影静态合批外面：预通道藏着成员时，烘阴影之前先还回来。
+const prepassStaticBatch = new PrepassStaticBatch(scene);
+InstallPrepassStaticBatch(renderer, prepassStaticBatch);
+if (post.prepassPass) post.prepassPass.staticBatch = prepassStaticBatch;
 // 水面不能走 SSR 靶（它 skipNormalDepth，那一像素在预通道里是河床）——
 // 它自己按平面反射假设采同一条 Hi-Z，见 Script_PostSsr.SsrSurfaceGlsl。
 // 必须排在任何水面材质建出来之前（材质按预设缓存，建完就定型）。
@@ -713,6 +719,7 @@ if (WHITEBOX_CONFIG) {
 }
 const whiteboxRenderer = WHITEBOX_CONFIG ? new WhiteboxSceneRenderer(scene, WHITEBOX_CONFIG, {
   sky: sky.mesh,
+  sunCascades: lights.csm.lights,
   prepareMaterial: (material, source) => {
     if (WHITEBOX_CONFIG.firstPersonShadow && source.userData.firstPersonSelfShadow) firstPersonSelfShadow?.PatchPresentationMaterial(material);
   },
@@ -2200,6 +2207,8 @@ async function Boot() {
     bonePrune,
     // 阴影趟静态投影体合批（Script_ShadowCasterBatch）：同页 A/B 开关、成员数与组数
     shadowCasterBatch,
+    // 预通道静态合批（Script_PrepassStaticBatch）：同页 A/B 开关、成员数与组数
+    prepassStaticBatch,
     // 材质着色升级那一包（POM / 细节法线 / 微阴影 / 地平线 / 皮肤）：
     // Debug Rendering 面板按它设假彩色编号，MaterialUpgradeTest 按它做 A/B。
     materialShading: shadingUniforms, RecompileAllMaterials,
@@ -5049,6 +5058,13 @@ async function WarmLevel(phase) {
       // 把 ready 抬起来：视模摆动 / AI 姿态 / 弹道 / HUD 走的都是正式路径，管线状态组合才对得上。
       // 帧数上限 12、时长上限 12 s；账结清的信号是**连续两帧都在 80 ms 内**（含 finish），
       // 至少推 4 帧（粒子 / 第一次开火的组合要几帧才轮到）就停，别把 3A 管线的开机再拖长。
+      // 阴影趟静态合批在这里一次收满，下面几帧结账帧顺带把批次缓冲传上去；按逐帧规矩收的话
+      // 开局前一秒每帧都在收编、重传（Script_ShadowCasterBatch.Prime 抬头）。
+      report.shadowBatchPrimed = shadowCasterBatch.Prime({ exclude: proxy });
+      // 预通道那一份同理（只在预通道真跑的档位里收；白盒默认不跑预通道）。
+      if (post?.prepassPass && post.lastRenderedPasses?.includes?.("prepass")) {
+        report.prepassBatchPrimed = prepassStaticBatch.Prime({ exclude: proxy });
+      }
       const glWarm = renderer.getContext();
       const settleStart = performance.now();
       const wasReady = state.ready;

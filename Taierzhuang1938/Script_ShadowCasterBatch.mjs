@@ -38,6 +38,11 @@ import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { STATIC_CASTER_BATCH } from "./Data_Tuning_Shadows.mjs";
 
 const CANDIDATE = 0, MEMBER = 1, COOLDOWN = 2;
+
+function Within(object, root) {
+  for (let node = object; node; node = node.parent) if (node === root) return true;
+  return false;
+}
 const DEFAULT_BEFORE_SHADOW = THREE.Object3D.prototype.onBeforeShadow;
 const DEFAULT_AFTER_SHADOW = THREE.Object3D.prototype.onAfterShadow;
 
@@ -148,7 +153,37 @@ export class ShadowCasterBatch {
         }
       }
     }
-    // 这一帧阴影趟里要打开的批次
+    this._CollectLive();
+  }
+
+  /**
+   * 加载画面后面一次收满（Script_Main.WarmLevel 结账帧之前）。静止判定（settleFrames）与逐帧预算
+   * （joinBudgetMs）是给玩法中途才挂进场景的东西用的；进关那一刻按老规矩要先等半秒、再每帧收一点，
+   * 开局前一秒每帧都在收编、重传批次缓冲（2026-10-02 实测 12 阶段 high 前 60 帧里 23 帧 35 ms）。
+   * 开局才动的东西照旧在第一次变化时被踢回单独投影。前提：场景矩阵是新的、批次版深度已预热（WarmProxy）。
+   * @param {THREE.Object3D} [options.exclude] 这棵子树里的不收（预热代理：马上就拆）
+   * @returns {number} 这一趟收进去的个数
+   */
+  Prime({ exclude = null } = {}) {
+    if (!this.enabled || !this.scene) return 0;
+    if (this.root.parent !== this.scene) this.scene.add(this.root);
+    this._Scan();
+    let joined = 0;
+    for (const rec of this.records.values()) {
+      if (rec.state !== CANDIDATE) continue;
+      const object = rec.object;
+      if (!this._InScene(object) || !object.castShadow || !Batchable(object)) continue;
+      if (exclude && Within(object, exclude)) continue;
+      this._Snapshot(rec);
+      this._Join(rec);
+      if (rec.state === MEMBER) joined += 1;
+    }
+    this._CollectLive();
+    return joined;
+  }
+
+  /** 这一帧阴影趟里要打开的批次 + 统计。 */
+  _CollectLive() {
     this.live.length = 0;
     for (const group of this.groups.values()) if (group.members > 0) this.live.push(group);
     let members = 0, candidates = 0;

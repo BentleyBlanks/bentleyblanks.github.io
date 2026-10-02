@@ -18,7 +18,8 @@ assert.ok(WhiteboxPassPlan({ interiorSky: true }).includes("gtao"));
 assert.ok(WhiteboxPassPlan({ lensFlare: true }).includes("bloom"));
 assert.ok(!WhiteboxPassPlan({ bloom: true }).includes("whiteboxOutput"));
 assert.ok(WhiteboxPassPlan({ volumetrics: true }).includes("volumetricInject"));
-assert.equal(WhiteboxGraphicsOverrides({}).shadows, false);
+assert.equal(WhiteboxGraphicsOverrides({}).shadows, true, "whitebox draws the level sun's cascaded shadows by default");
+assert.equal(WhiteboxGraphicsOverrides({ shadows: false }).shadows, false);
 assert.equal(WhiteboxGraphicsOverrides({}).taa, false);
 assert.equal(WHITEBOX_DEFAULTS.characterTextures, true);
 assert.equal(WHITEBOX_DEFAULTS.assetTextures, false);
@@ -42,6 +43,15 @@ assert.equal(LoadWhiteboxConfig().surfaceColor, WHITEBOX_DEFAULTS.surfaceColor);
 assert.equal(LoadWhiteboxConfig().characterTextures, true);
 memory.set(WHITEBOX_STORAGE_KEY, JSON.stringify({ surfaceColor: "#123456" }));
 assert.equal(LoadWhiteboxConfig().surfaceColor, "#123456");
+// 2026-10-02 shadows 默认开：旧口径的存档把 shadows:false 写死了（每个默认值都存），按旧默认迁移；
+// 新口径（schema 2）里存着的 false 是玩家自己关的，保留。
+memory.set(WHITEBOX_STORAGE_KEY, JSON.stringify({ grid: true, shadows: false, taa: false }));
+assert.equal(LoadWhiteboxConfig().shadows, true, "a pre-schema save's shadows:false was the old default");
+memory.set(WHITEBOX_STORAGE_KEY, JSON.stringify({ grid: true, shadows: false, schema: 2 }));
+assert.equal(LoadWhiteboxConfig().shadows, false, "a schema-2 save keeps the player's own shadows:false");
+SaveWhiteboxConfig({ shadows: false });
+assert.equal(JSON.parse(memory.get(WHITEBOX_STORAGE_KEY)).schema, WHITEBOX_DEFAULTS.schema, "saves are stamped with the current schema");
+assert.equal(LoadWhiteboxConfig().shadows, false);
 memory.set("tengxian1938_graphics_v1", JSON.stringify({ taa: true, gi: true, profile: "high" }));
 assert.equal(LoadGraphicsProfile(), "whitebox", "legacy graphics cannot change the new default");
 const graphics = { profile: "whitebox", taa: false, gi: false };

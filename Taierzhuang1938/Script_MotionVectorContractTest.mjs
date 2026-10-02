@@ -148,8 +148,26 @@ try {
     cutoutMaterial.alphaTest=0;const opaque=CutoutDraw(true);
     const cutout={masked:masked.body.pixels,opaque:opaque.body.pixels};
     cutoutMesh.geometry.dispose();cutoutMaterial.dispose();cutoutMap.dispose();
+    // Static batch (Script_PrepassStaticBatch): a batched member still writes depth with camera-only velocity,
+    // and the frame it starts moving it is evicted with last frame's matrix already on record.
+    const {PrepassStaticBatch}=await import('./Script_PrepassStaticBatch.mjs');
+    const batchScene=new T.Scene(),batchMesh=new T.Mesh(new T.PlaneGeometry(1,1),new T.MeshBasicMaterial());
+    batchMesh.position.y=-.4;batchScene.add(batchMesh);
+    pass.staticBatch=new PrepassStaticBatch(batchScene,{tuning:{enabled:true,settleFrames:2,cooldownFrames:4,rescanFrames:1,
+      joinBudgetMs:1e9,minInstanceCapacity:4,minVertexCapacity:64,reserveScale:1}});
+    const BatchDraw=hasPrev=>{batchScene.updateMatrixWorld(true);
+      pass.Render({renderer,scene:batchScene,camera:cutoutCamera,viewProjection:cutoutVp,prevViewProjection:cutoutVp,hasPrev});
+      const result=Read();pass._SnapshotSkeletons();return result;};
+    BatchDraw(false);for(let i=0;i<4;i++)BatchDraw(true);
+    const batched=BatchDraw(true);
+    const staticBatch={members:pass.staticBatch.stats.members};
+    samples.push({label:'static batch member',expectedBody:0,expectedAttachment:null,...batched});
+    batchMesh.position.x=.1;const moved=BatchDraw(true);
+    staticBatch.evictions=pass.staticBatch.stats.evictions;
+    samples.push({label:'static batch member starts moving',expectedBody:8,expectedAttachment:null,...moved});
+    pass.staticBatch.Dispose();pass.staticBatch=null;batchMesh.geometry.dispose();batchMesh.material.dispose();
     pass.Dispose();copy.dispose();target.dispose();quad.geometry.dispose();
-    return {samples,cutout,hooks:{before,after,existingForegroundHooks},glError:renderer.getContext().getError()};
+    return {samples,cutout,staticBatch,hooks:{before,after,existingForegroundHooks},glError:renderer.getContext().getError()};
   });
   await page.screenshot({path:path.join(output,'Scene_ContractFixture.png')});
   await fs.writeFile(path.join(output,'Data_Result.json'),JSON.stringify({result,errors,skinWarnings},null,2));
@@ -167,6 +185,7 @@ try {
   assert.equal(result.glError,0);assert.deepEqual(errors,[]);
   assert.ok(result.cutout.opaque>6000);
   assert.ok(Math.abs(result.cutout.masked/result.cutout.opaque-.5)<.02,'alpha holes omit both normal/depth and velocity');
+  assert.ok(result.staticBatch.members===1&&result.staticBatch.evictions===1,`static batch joined then evicted the moving member: ${JSON.stringify(result.staticBatch)}`);
   assert.equal(skinWarnings.length,2,'each unsupported skeleton emits one diagnostic, never a silent fallback or per-frame spam');
   console.log(`PASS MotionVector contract: ${result.samples.length} GPU scenarios; attached/detached skins, new bone attachments, history lifecycle, foreground inheritance, exclusions, callbacks`);
 } finally {await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}

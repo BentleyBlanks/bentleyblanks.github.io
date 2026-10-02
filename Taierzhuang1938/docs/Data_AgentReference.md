@@ -234,6 +234,7 @@ node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --pixel=x,y --pass-im
 | 全部调试视图 | `Script_PostDebug.mjs`、`Script_EditorDebugRendering.mjs` | §1.11 三条登记路 | `Script_EditorTest.mjs` |
 | 第一人称自阴影 | `Script_FirstPersonSelfShadow.mjs` | §6.12 | `Script_EditorTest.mjs`（自阴影软化热切） |
 | 阴影静态投影体合批 | `Script_ShadowCasterBatch.mjs`、`Data_Tuning_Shadows.STATIC_CASTER_BATCH` | §6.13 | `Script_ShadowCasterBatchTest.mjs`（纯 Node）；实机看阴影段 draw 与合批开/关逐纹素 |
+| 预通道静态合批 | `Script_PrepassStaticBatch.mjs`、`Data_Tuning_Graphics.PREPASS_STATIC_BATCH`（接在 `Script_PostPrepass.Render`） | §17.17 | `Script_PrepassStaticBatchTest.mjs`（纯 Node）＋ `Script_MotionVectorContractTest.mjs`；实机看预通道 draw 与 `Tengxian.prepassStaticBatch.stats`；前沿机位开/关逐像素比不出来（烟云走墙钟，见 §17.17 坑） |
 | 骨头子树遍历剪枝 | `Script_BonePrune.mjs` | §17.15 | `Script_BonePruneTest.mjs`（纯 Node）＋ `Script_MotionVectorContractTest.mjs`（骨头挂件） |
 
 #### 改之前必须知道的几条

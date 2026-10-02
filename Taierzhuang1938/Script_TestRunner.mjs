@@ -423,7 +423,9 @@ export const testDefs = {
   PrepassSkipTest: { file: "Script_PrepassSkipTest.mjs",
     desc: "预通道藏出分类（纯 Node）：顶层子树增量重分类与整场重建逐个相同、只标变了的那棵、前景继承跟着结构走" },
   ShadowCasterBatchTest: { file: "Script_ShadowCasterBatchTest.mjs",
-    desc: "阴影静态投影体合批（纯 Node）：只收稳定的叶子、烘焙那一刻换人并原样还原、任何变化当帧踢出、不改成员属性、关掉全还原" },
+    desc: "阴影静态投影体合批（纯 Node）：只收稳定的叶子、烘焙那一刻换人并原样还原、任何变化当帧踢出、不改成员属性、关掉全还原、进关一次收满" },
+  PrepassStaticBatchTest: { file: "Script_PrepassStaticBatchTest.mjs",
+    desc: "预通道静态合批（纯 Node）：只收稳定的不透明叶子、按破口 × 地形融合分组、预通道那一刻换人且烘阴影时还原、速度历史照记、变化当帧踢出、Prime 一次收满" },
   MaterialUpgradeTest: { file: "Script_MaterialUpgradeTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "材质着色升级：视差位移随视角反号 / 距离淡出 / 微阴影压直射 / 细节法线淡入 / 布绒光与金属各向异性 / 皮肤散射红移 / 程序数稳态" },
   ExposureTest: { file: "Script_ExposureTest.mjs", timeoutMs: 30 * 60 * 1000,
@@ -716,7 +718,7 @@ export const domains = {
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
     // 开机顺序（存档画质何时套上）与关卡预热的改动连着 SavedGraphicsWarmTest 跑（约一分半）；
     // 预热按白盒档（出厂默认）编对没有，看 WhiteboxShaderWarmTest（约一分半）。
-    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest", "WhiteboxShaderWarmTest"],
+    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "PrepassStaticBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest", "WhiteboxShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -805,7 +807,7 @@ const changedDomainRules = [
   // Script_SkinnedClone 还被 /Skinn/ 那条拉进 motionVector（骨骼历史按 Skeleton 记）。
   // Script_ShadowSkip 是阴影烘焙那一趟的子树跳过包装（ShadowSkipTest 是它的纯 Node 门禁）。
   // 预通道藏出分类按顶层子树增量重建（PrepassSkipTest 是它的纯 Node 门禁）。
-  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch|Script_PostPrepass|Script_PrepassSkip/ },
+  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch|Script_PostPrepass|Script_PrepassSkip|Script_PrepassStaticBatch/ },
   // 2026.09.19 第二波：被测对象从军列车厢里的腊肉/背包换成 12/13 牛马车上老周的担架与车上近景件
   // （军列开场已下线）。改牛马车的那两个模块也要拉进这个域。
   {domain:"firstLevel",pattern:/CartCorpseBump/},

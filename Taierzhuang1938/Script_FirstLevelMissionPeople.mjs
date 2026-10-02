@@ -13,7 +13,13 @@ import { LayeredGaitId, IsLitterBearerClip } from "./Script_LayeredGait.mjs";
 // Visible people share the production character rig; two-bone IK corrects hands onto the actual rails.
 export class MissionPeople {
   constructor({root,actorFactory,battlefield}){Object.assign(this,{root,actorFactory,battlefield});this.people=new Map();this.time=0;this.patients=new Map();this.patientMerge=new Map();this.patientOwned={materials:[],geometries:[],textures:[]};this.patientMatrix=new THREE.Matrix4();this.patientRotation=new THREE.Quaternion();}
-  Begin(time,focus=null){this.focus=focus;this.dt=Math.max(0,Math.min(.05,time-this.time));this.time=time;for(const entry of this.people.values())entry.used=false;for(const parts of this.patients.values())for(const mesh of parts)mesh.count=0;}
+  /** camera：给了就按视锥节流（画面外的人按 offscreenAnimationS 解姿势，回到画面那一帧立刻补一次）。 */
+  Begin(time,focus=null,camera=null){this.focus=focus;this.dt=Math.max(0,Math.min(.05,time-this.time));this.time=time;
+    this.viewCulling=!!camera;
+    if(camera){camera.updateWorldMatrix(true,false);
+      this.viewMatrix||=new THREE.Matrix4();this.viewFrustum||=new THREE.Frustum();this.viewSphere||=new THREE.Sphere();
+      this.viewFrustum.setFromProjectionMatrix(this.viewMatrix.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));}
+    for(const entry of this.people.values())entry.used=false;for(const parts of this.patients.values())for(const mesh of parts)mesh.count=0;}
   /**
    * perform：{clip, phase, y} 播作者动作（Script_CollectionCareAnimation，06 集结处的伤员与医护），y 是根的离地高度（草垫厚）；
    * 动作库没到或装不上时照旧走下面的程序化姿态。dress(actor)：这具人第一次建出来时挂一次东西（袖标、绷带）。
@@ -39,8 +45,15 @@ export class MissionPeople {
     actor.root.position.set(x,this.battlefield.GroundHeight(x,z)+(perform?.y||0),z);actor.root.rotation.set(0,yaw,0);
     const away=this.focus?Math.hypot(x-this.focus.x,z-this.focus.z):0;
     actor.SetShadowEnabled(away<=ACTOR_DETAIL.shadowM);
-    const interval=away>C.farAnimationM?C.farAnimationS:away>C.nearAnimationM?C.midAnimationS:
+    let interval=away>C.farAnimationM?C.farAnimationS:away>C.nearAnimationM?C.midAnimationS:
       away>C.closeAnimationM?(entry.speed<C.walkThresholdMps?C.idleAnimationS:C.nearAnimationS):0;
+    if(this.viewCulling){
+      const sphere=this.viewSphere;sphere.center.set(x,actor.root.position.y+C.viewCullCentreM,z);sphere.radius=C.viewCullRadiusM;
+      const inView=this.viewFrustum.intersectsSphere(sphere);
+      if(!inView)interval=Math.max(interval,C.offscreenAnimationS);
+      else if(entry.offscreen)entry.nextPoseAt=null;
+      entry.offscreen=!inView;
+    }
     if(alive&&entry.nextPoseAt!=null&&this.time<entry.nextPoseAt)return actor;
     entry.nextPoseAt=interval?(Math.floor((this.time+entry.phase)/interval)+1)*interval-entry.phase:this.time;
     const poseDt=Math.min(.2,this.time-(entry.lastPoseAt??this.time-this.dt));entry.lastPoseAt=this.time;pose?.Restore();

@@ -123,8 +123,53 @@ function MakeWhiteboxWaterPatch() {
   });
 }
 
+// Source visibility can change during damage/death without replacing materials.
+function SyncWhiteboxMaterial(material, source) {
+  material.visible = source.visible;
+  material.opacity = source.opacity;
+  material.transparent = source.transparent && source.opacity < 1;
+  material.allowOverride = source.allowOverride;
+}
+
+function IsWhiteboxDepthOnly(sources) {
+  return sources.every((m) => m.colorWrite === false && m.depthWrite);
+}
+// Soft particles/decals are meshes too. Keep solid glass/water geometry as
+// whitebox surfaces; only depthless blended effect cards are omitted.
+function IsWhiteboxEffectMesh(object, sources) {
+  return sources.every((m) => m.transparent && !m.depthWrite
+    && (m.isShaderMaterial || !m.depthTest || m.blending === THREE.AdditiveBlending))
+    && !/water/i.test(object.name);
+}
+
+// 多材质网格的数组被原地改了某一格（引用没换）也算换了源材质。
+function SameSources(entry) {
+  const sources = entry.sources;
+  if (!sources) return true;
+  const current = entry.object.material;
+  if (current.length !== sources.length) return false;
+  for (let i = 0; i < sources.length; i += 1) if (current[i] !== sources[i]) return false;
+  return true;
+}
+
+// traverseVisible 的口径：父链上（到顶层子树为止）有一层藏着，这只网格这一帧不出画，也就不换不计。
+// 不查的话 12 阶段每帧多换 140 来只藏着的网格（收起的人物、LOD 没选中的那一级），统计也对不上旧路径。
+function ChainVisible(object, top) {
+  for (let node = object.parent; node && node !== top; node = node.parent) if (node.visible === false) return false;
+  return true;
+}
+
+// 缓存清单要重建的配置位：分类（保留贴图 / 特效）与灯光规则都只看这几位。
+const PLAN_CONFIG_KEYS = ["terrainTextures", "characterTextures", "assetTextures", "effects",
+  "sceneLighting", "shadows", "firstPersonShadow", "contactShadows", "gi", "clusteredLights"];
+const MESH_KEEP = 0, MESH_HIDE = 1, MESH_WHITE = 2;
+
 export class WhiteboxSceneRenderer {
-  constructor(scene, config, { sky = null, prepareMaterial = null } = {}) {
+  /**
+   * @param {THREE.Object3D[]} [options.sunCascades] 关卡太阳的级联灯（Script_Csm，第 0 盏带强度）。
+   *   给了才能在白盒中性光下投太阳影子；没给时开阴影仍连带切成整套关卡灯光（旧口径）。
+   */
+  constructor(scene, config, { sky = null, prepareMaterial = null, sunCascades = [] } = {}) {
     this.config = config;
     this.sky = sky;
     this.prepareMaterial = prepareMaterial;
@@ -140,7 +185,56 @@ export class WhiteboxSceneRenderer {
     this.ambient.visible = this.sun.visible = false;
     scene.add(this.ambient, this.sun);
     this.sun.updateMatrixWorld(true);
+    this.sunCascades = sunCascades.filter(Boolean);
+    this.sunCascadeSet = new Set(this.sunCascades);
+    this.shadowSunColor = new THREE.Color(0xffffff);
+    // 每帧替换的缓存清单（_BeginCached）：scene 顶层子树 → { lights, effects, lods, meshes }。
+    this._planScene = null;
+    this._planConfig = "";
+    this._tops = new Map();
+    this._dirtyTops = new Set();
+    this._watched = new WeakSet();
+    this._epoch = 0;
+    this._OnStructure = (event) => this._StructureChanged(event);
+    // 还原日志：三列平铺、逐帧复用，不在每帧给每次替换分配一个小数组。
+    this._logObjects = []; this._logKeys = []; this._logValues = []; this._logCount = 0;
+    this._active = false;
+    this._Restore = () => this._RestoreLog();
   }
+
+  /**
+   * 两条灯光规则（预热提交与逐帧出画共用）：
+   *   · sceneLighting —— 关卡灯全留、白盒中性光不放（GI / 簇光要关卡灯）。
+   *   · sunShadow —— 白盒中性光照旧，只留关卡太阳的级联灯来投影；第 0 盏换成白色、白盒环境光与它按
+   *     WHITEBOX_LIGHTING.shadowAmbient / shadowSun 配比，白盒自己那盏不投影的太阳收起
+   *     （方向跟关卡太阳走，影子才对得上）。
+   */
+  _LightingMode() {
+    const c = this.config;
+    const wantsSun = !!(c.shadows || c.firstPersonShadow || c.contactShadows);
+    const sunShadow = wantsSun && this.sunCascades.length > 0;
+    const sceneLighting = !!(c.sceneLighting || c.gi || c.clusteredLights || (wantsSun && !sunShadow));
+    return { sceneLighting, sunShadow };
+  }
+
+  _KeepLight(light, mode) {
+    return light === this.ambient || light === this.sun || mode.sceneLighting
+      || (mode.sunShadow && this.sunCascadeSet.has(light));
+  }
+
+  _ApplyLights(Set, mode) {
+    Set(this.ambient, "visible", !mode.sceneLighting);
+    Set(this.sun, "visible", !mode.sceneLighting && !mode.sunShadow);
+    if (mode.sunShadow && !mode.sceneLighting) {
+      const key = this.sunCascades[0];
+      Set(key, "color", this.shadowSunColor);
+      Set(key, "intensity", WHITEBOX_LIGHTING.shadowSun);
+      Set(this.ambient, "intensity", WHITEBOX_LIGHTING.shadowAmbient);
+    }
+  }
+
+  /** 挂进场景之后才改白盒分类标记（whiteboxCharacter / whiteboxTerrain …）时调一次：下一帧整场重判。 */
+  Invalidate() { this._planScene = null; }
 
   Material(source, { water = false } = {}) {
     // 水面与普通材质共用一张 WeakMap 的话，同一个源材质既被当水又被当地面时会串；水面单独缓存。
@@ -178,13 +272,10 @@ export class WhiteboxSceneRenderer {
       this.ownedMaterials.add(material);
       source.addEventListener("dispose", () => {
         material.dispose(); cache.delete(source); this.ownedMaterials.delete(material);
+        this._epoch += 1;
       });
     }
-    // Source visibility can change during damage/death without replacing materials.
-    material.visible = source.visible;
-    material.opacity = source.opacity;
-    material.transparent = source.transparent && source.opacity < 1;
-    material.allowOverride = source.allowOverride;
+    SyncWhiteboxMaterial(material, source);
     return material;
   }
 
@@ -196,16 +287,29 @@ export class WhiteboxSceneRenderer {
    * （2026-10-01 第一关白盒档实测：提交的 135 个 program 一个都没用上，真用的 64 个全在出画时
    * 同步链接，关掉 program 缓存时主线程卡 22.5 s）。compile 不看可见性，所以这几棵子树里
    * 当前藏着的网格也按同一套规则换掉；统计不记这一趟。
+   *
+   * 逐帧出画（不带 compileRoots）走 `_BeginCached`：替换清单按 scene 顶层子树缓存，结构变化与
+   * 源材质换引用时才重判（2026-10-02，09 阶段整场 traverseVisible 每帧 0.8 ms）。
    */
   Begin(scene, camera, { compileRoots = null } = {}) {
-    const c = this.config, restore = [], stats = { meshes: 0, whiteMeshes: 0, terrainMeshes: 0, characterMeshes: 0, hiddenEffects: 0, cutoutMeshes: 0, waterMeshes: 0 };
-    const Set = (object, key, value) => { restore.push([object, key, object[key]]); object[key] = value; };
-    const sceneLighting = c.sceneLighting || c.shadows || c.firstPersonShadow || c.contactShadows || c.gi || c.clusteredLights;
+    if (!compileRoots && !this._active) return this._BeginCached(scene, camera);
+    return this._BeginTraverse(scene, camera, compileRoots);
+  }
+
+  _BeginScene(Set, scene) {
+    const c = this.config;
     Set(scene, "background", c.sky ? scene.background : this.background);
     if (!c.environment) Set(scene, "environment", null);
     if (!c.fog) Set(scene, "fog", null);
     Set(scene.userData, "whiteboxEffects", c.effects);
     if (this.sky && !c.sky) Set(this.sky, "visible", false);
+  }
+
+  _BeginTraverse(scene, camera, compileRoots) {
+    const c = this.config, restore = [], stats = { meshes: 0, whiteMeshes: 0, terrainMeshes: 0, characterMeshes: 0, hiddenEffects: 0, cutoutMeshes: 0, waterMeshes: 0 };
+    const Set = (object, key, value) => { restore.push([object, key, object[key]]); object[key] = value; };
+    const mode = this._LightingMode();
+    this._BeginScene(Set, scene);
     const visited = compileRoots ? new WeakSet() : null;
     // 白盒出画时藏掉的特效。compile 不看 visible，只能把材质摘掉它才跳过（粒子那一族
     // 二十来个 program，白盒档一个都画不到）。
@@ -218,19 +322,15 @@ export class WhiteboxSceneRenderer {
       // Three selects LOD children during render. Select them before material
       // substitution too, so a newly visible distance bucket cannot escape it.
       if (object.isLOD && object.autoUpdate && camera) object.update(camera);
-      if (object.isLight && object !== this.ambient && object !== this.sun && !sceneLighting) Set(object, "visible", false);
+      if (object.isLight && !this._KeepLight(object, mode)) Set(object, "visible", false);
       if (!c.effects && (object.isPoints || object.isSprite || object.userData?.whiteboxEffect)) {
         HideEffect(object); return;
       }
       if (!object.isMesh || object === this.sky || !object.material) return;
       const sources = Array.isArray(object.material) ? object.material : [object.material];
       // 只写深度的遮挡片（浮桥船舱里挡水面的那片）原样留着：换成白盒材质就成了一块看得见的灰板。
-      if (sources.every((m) => m.colorWrite === false && m.depthWrite)) return;
-      // Soft particles/decals are meshes too. Keep solid glass/water geometry as
-      // whitebox surfaces; only depthless blended effect cards are omitted.
-      if (!c.effects && sources.every((m) => m.transparent && !m.depthWrite
-        && (m.isShaderMaterial || !m.depthTest || m.blending === THREE.AdditiveBlending))
-        && !/water/i.test(object.name)) {
+      if (IsWhiteboxDepthOnly(sources)) return;
+      if (!c.effects && IsWhiteboxEffectMesh(object, sources)) {
         HideEffect(object); return;
       }
       const terrain = IsWhiteboxTerrain(object);
@@ -250,10 +350,135 @@ export class WhiteboxSceneRenderer {
     if (compileRoots) {
       for (const root of compileRoots) root?.traverse((object) => { if (!visited.has(object)) Visit(object); });
     }
-    Set(this.ambient, "visible", !sceneLighting);
-    Set(this.sun, "visible", !sceneLighting);
+    this._ApplyLights(Set, mode);
     if (!compileRoots) this.stats = stats;
     return () => { for (let i = restore.length - 1; i >= 0; i--) { const [object, key, value] = restore[i]; object[key] = value; } };
+  }
+
+  _BeginCached(scene, camera) {
+    const c = this.config;
+    const configKey = PLAN_CONFIG_KEYS.map((key) => (c[key] ? 1 : 0)).join("");
+    if (this._planScene !== scene || this._planConfig !== configKey) {
+      this._tops.clear(); this._dirtyTops.clear();
+      this._planScene = scene; this._planConfig = configKey;
+      this._Watch(scene);
+    }
+    for (const top of this._dirtyTops) {
+      if (top.parent === scene) this._tops.set(top, this._BuildTop(top));
+      else this._tops.delete(top);
+    }
+    this._dirtyTops.clear();
+    this._active = true;
+    this._logCount = 0;
+    const Set = (object, key, value) => {
+      const i = this._logCount++;
+      this._logObjects[i] = object; this._logKeys[i] = key; this._logValues[i] = object[key];
+      object[key] = value;
+    };
+    const mode = this._LightingMode();
+    const stats = { meshes: 0, whiteMeshes: 0, terrainMeshes: 0, characterMeshes: 0, hiddenEffects: 0, cutoutMeshes: 0, waterMeshes: 0 };
+    this._BeginScene(Set, scene);
+    const children = scene.children;
+    for (let t = 0; t < children.length; t += 1) {
+      const top = children[t];
+      // traverseVisible 的口径：藏着的顶层子树整棵不碰。
+      if (top.visible === false) continue;
+      let bucket = this._tops.get(top);
+      if (!bucket) { bucket = this._BuildTop(top); this._tops.set(top, bucket); }
+      for (const light of bucket.lights) if (!this._KeepLight(light, mode)) Set(light, "visible", false);
+      if (!c.effects) for (const effect of bucket.effects) {
+        if (effect.visible === false) continue;
+        Set(effect, "visible", false); stats.hiddenEffects++;
+      }
+      // Three selects LOD children during render. Select them before material
+      // substitution too, so a newly visible distance bucket cannot escape it.
+      if (camera) for (const lod of bucket.lods) if (lod.autoUpdate) lod.update(camera);
+      for (const entry of bucket.meshes) {
+        const object = entry.object;
+        if (object.visible === false || !ChainVisible(object, top)) continue;
+        if (entry.epoch !== this._epoch || object.material !== entry.source || !SameSources(entry)) this._ClassifyMesh(entry);
+        if (entry.mode === MESH_KEEP) continue;
+        if (entry.mode === MESH_HIDE) { Set(object, "visible", false); stats.hiddenEffects++; continue; }
+        stats.meshes++;
+        if (entry.terrain) stats.terrainMeshes++;
+        if (entry.character) stats.characterMeshes++;
+        if (!entry.white) continue;
+        if (entry.water) stats.waterMeshes++;
+        else if (entry.cutout) stats.cutoutMeshes++;
+        if (entry.sources) for (let i = 0; i < entry.sources.length; i += 1) SyncWhiteboxMaterial(entry.white[i], entry.sources[i]);
+        else SyncWhiteboxMaterial(entry.white, entry.source);
+        Set(object, "material", entry.white);
+        if (object.instanceColor) Set(object, "instanceColor", null);
+        stats.whiteMeshes++;
+      }
+    }
+    this._ApplyLights(Set, mode);
+    this.stats = stats;
+    return this._Restore;
+  }
+
+  _RestoreLog() {
+    for (let i = this._logCount - 1; i >= 0; i -= 1) {
+      this._logObjects[i][this._logKeys[i]] = this._logValues[i];
+      this._logObjects[i] = null; this._logValues[i] = null;
+    }
+    this._logCount = 0;
+    this._active = false;
+  }
+
+  _Watch(object) {
+    if (this._watched.has(object)) return;
+    this._watched.add(object);
+    object.addEventListener("childadded", this._OnStructure);
+    object.addEventListener("childremoved", this._OnStructure);
+  }
+
+  /** 结构事件落到哪一棵顶层子树；scene 自己增删的就是那一棵。离开场景的子树挂回来那一刻重建。 */
+  _StructureChanged(event) {
+    const scene = this._planScene;
+    if (!scene) return;
+    if (event.target === scene) { if (event.child) this._dirtyTops.add(event.child); return; }
+    let node = event.target;
+    while (node && node.parent !== scene) node = node.parent;
+    if (node) this._dirtyTops.add(node);
+  }
+
+  /** 一棵顶层子树的清单。不看 visible：显隐翻转不让清单失效，出画时逐个按自己的 visible 跳过。 */
+  _BuildTop(top) {
+    const bucket = { lights: [], effects: [], lods: [], meshes: [] };
+    top.traverse((object) => {
+      this._Watch(object);
+      if (object.isLight) bucket.lights.push(object);
+      if (object.isLOD) bucket.lods.push(object);
+      if (object.isPoints || object.isSprite || object.userData?.whiteboxEffect) { bucket.effects.push(object); return; }
+      if (object.isMesh && object !== this.sky) {
+        bucket.meshes.push({ object, source: undefined, sources: null, epoch: -1, mode: MESH_KEEP,
+          white: null, terrain: false, character: false, water: false, cutout: false });
+      }
+    });
+    return bucket;
+  }
+
+  _ClassifyMesh(entry) {
+    const c = this.config, object = entry.object, material = object.material;
+    entry.epoch = this._epoch;
+    entry.source = material;
+    entry.sources = Array.isArray(material) ? material.slice() : null;
+    entry.mode = MESH_KEEP; entry.white = null;
+    entry.terrain = entry.character = entry.water = entry.cutout = false;
+    if (!material) return;
+    const sources = entry.sources || [material];
+    if (IsWhiteboxDepthOnly(sources)) return;
+    if (!c.effects && IsWhiteboxEffectMesh(object, sources)) { entry.mode = MESH_HIDE; return; }
+    entry.mode = MESH_WHITE;
+    entry.terrain = IsWhiteboxTerrain(object);
+    entry.character = IsWhiteboxCharacter(object);
+    if (entry.terrain ? c.terrainTextures : entry.character ? c.characterTextures : c.assetTextures) return;
+    // 水面：蓝灰水色 + 天空反光（WHITEBOX_WATER），不画网格。人物与地形不可能是水，先判它们。
+    entry.water = !entry.terrain && !entry.character && IsWhiteboxWater(object);
+    entry.cutout = !entry.water && sources.some(IsWhiteboxCutout);
+    const water = entry.water;
+    entry.white = entry.sources ? sources.map((m) => this.Material(m, { water })) : this.Material(material, { water });
   }
 
   Dispose() {

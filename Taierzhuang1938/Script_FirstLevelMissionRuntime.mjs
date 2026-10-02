@@ -1333,8 +1333,18 @@ export class FirstLevelMissionRuntime {
       this.Record(plan.resolved,{loaded:this.column.loadEvents.length,departed:this.column.departed});
     }
   }
+  /**
+   * 有没有敌人看得见、打得着这个点。一次 Update 之内同一组参数只算一次（03–05 前沿一帧几十次，
+   * 多数是同一个点：守军路口、缺口三点、队列安全判定），每次都是逐敌人一条带地形的射线。
+   */
   Threatens(point, ids = null, targetHeight = 1.1, rangeM = R.passageRangeM) {
-    return [...this.enemies].some(([id, actor]) => {
+    const memo = this.threatMemo?.open ? this.threatMemo : null;
+    const key = memo ? `${point.x},${point.z},${ids ? ids.join("|") : "*"},${targetHeight},${rangeM}` : null;
+    const cached = memo ? memo.results.get(key) : undefined;
+    if (cached !== undefined) return cached;
+    const scratch = this.threatScratch ||= { from: new THREE.Vector3(), delta: new THREE.Vector3() };
+    let to = null, result = false;
+    for (const [id, actor] of this.enemies) {
       if (
         (ids && !ids.includes(id)) ||
         !actor.alive ||
@@ -1343,16 +1353,17 @@ export class FirstLevelMissionRuntime {
         actor.suppression >= R.threatSuppression ||
         actor.state === "suppressed"
       )
-        return false;
-      if (Distance(actor.position, point) > rangeM) return false;
+        continue;
+      if (Distance(actor.position, point) > rangeM) continue;
       const eye = actor.stance === 2 ? .35 : actor.stance === 1 ? .9 : 1.35;
-      const from = actor.position.clone().add(new THREE.Vector3(0, eye, 0)),
-        to = this.Point(point, targetHeight),
-        delta = to.sub(from),
-        length = delta.length();
+      to ||= this.Point(point, targetHeight);
+      const from = scratch.from.copy(actor.position); from.y += eye;
+      const delta = scratch.delta.subVectors(to, from), length = delta.length();
       const hit = this.battlefield.Raycast(from, delta.normalize(), length, {terrain:true});
-      return !hit || hit.t >= length - 0.3;
-    });
+      if (!hit || hit.t >= length - 0.3) { result = true; break; }
+    }
+    if (memo) memo.results.set(key, result);
+    return result;
   }
   Register() {
     const Register = (id, point, label, Enabled, OnComplete, extra = {}) =>
@@ -2509,6 +2520,13 @@ export class FirstLevelMissionRuntime {
     return {target,label:T(`firstLevel.guide.${label}`),status};
   }
   Update(dt) {
+    // Threatens 只在一次 Update 之内按参数记忆（见那里）；Update 之外的调用（存检查点、取证）照旧现算。
+    const memo = this.threatMemo ||= { open: false, results: new Map() };
+    memo.results.clear(); memo.open = true;
+    try { this.UpdateMission(dt); }
+    finally { memo.open = false; memo.results.clear(); }
+  }
+  UpdateMission(dt) {
     // 阶段跳转/检查点可直接补齐 rifleRecovered，不经过 MissionRifle.OnComplete。
     if (this.Has("rifleRecovered")) this.RemoveBunkerRifle();
     if (this.completed || this.failed) return;

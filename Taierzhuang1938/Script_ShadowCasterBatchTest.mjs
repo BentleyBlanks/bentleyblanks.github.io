@@ -147,5 +147,30 @@ batch.SetEnabled(true);
   Check("真合批复用预热时的克隆", custom?.mesh.customDepthMaterial === batch.depthClones.get(staticDepth));
 }
 
-console.log(failed ? `FAIL ${failed} 项` : "PASS ShadowCasterBatch：只收稳定叶子、烘焙那一刻换人并原样还原、变化当帧踢出、不改成员属性、关掉全还原、预热复用克隆");
+// 8. 进关一次收满（Prime）：不等 settleFrames、不受逐帧预算，排除子树不收，之后逐帧对账照常
+{
+  const fresh = new THREE.Scene();
+  const Put = (name, x, parentNode = fresh) => {
+    const mesh = new THREE.Mesh(boxGeometry, plain); mesh.name = name; mesh.position.set(x, 0, 0); mesh.castShadow = true;
+    parentNode.add(mesh); return mesh;
+  };
+  const a = Put("primeA", 0), b = Put("primeB", 3);
+  const warm = new THREE.Group(); warm.name = "WarmProxy"; fresh.add(warm);
+  const proxyBox = Put("primeProxy", 6, warm);
+  const primed = new ShadowCasterBatch(fresh, { tuning: { ...TUNING, settleFrames: 1000, joinBudgetMs: 0 } });
+  primed.DisposeWarmProxy(primed.WarmProxy([]));
+  fresh.updateMatrixWorld();
+  const joined = primed.Prime({ exclude: warm });
+  const names = [...primed.groups.values()].flatMap((g) => g.objects.map((o) => o.name)).sort();
+  Check("Prime：一次收满静止的投影体", joined === 2 && JSON.stringify(names) === JSON.stringify(["primeA", "primeB"]), `${joined} ${JSON.stringify(names)}`);
+  Check("Prime：排除子树里的不收", !names.includes(proxyBox.name));
+  Check("Prime：统计与在场批次同步", primed.stats.members === 2 && primed.live.length === 1, `${primed.stats.members}/${primed.live.length}`);
+  fresh.updateMatrixWorld(); primed.Update();
+  Check("Prime 之后静止的成员不被踢", primed.stats.members === 2 && primed.stats.evictions === 0, `${primed.stats.members}/${primed.stats.evictions}`);
+  b.position.y = 1; fresh.updateMatrixWorld(); primed.Update();
+  Check("Prime 之后变化当帧踢出", primed.records.get(b)?.state !== undefined && primed.stats.members === 1 && primed.stats.evictions === 1, `${primed.stats.members}/${primed.stats.evictions}`);
+  Check("Prime 不动成员属性", a.castShadow && a.visible && b.castShadow && b.visible);
+}
+
+console.log(failed ? `FAIL ${failed} 项` : "PASS ShadowCasterBatch：只收稳定叶子、烘焙那一刻换人并原样还原、变化当帧踢出、不改成员属性、关掉全还原、预热复用克隆、进关一次收满");
 process.exit(failed ? 1 : 0);

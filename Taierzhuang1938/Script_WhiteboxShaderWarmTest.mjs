@@ -12,7 +12,9 @@
 // 断言（只数 program，不量毫秒，机器忙闲不影响结论）：
 //   1. 真的在白盒档（post.whiteboxScene 在）。
 //   2. 开机到「进城」可点，主场景那一趟（PostPipeline._RenderScene）里现建的 program = 0 ——
-//      预热漏交的材质都会在这里同步链接。修前 64。
+//      预热漏交的材质都会在这里同步链接。修前 64。阴影趟（WebGLShadowMap.render 里）的投影深度程序
+//      单独记：renderer.compile 编不到它们，WarmLevel 那次强制烘阴影就是为了在加载画面后面把它们逼出来
+//      （渲染管线 §18.5 / §18.8）；2026-10-02 白盒默认开太阳阴影之后才有这一类。它们是否漏到进城以后，由第 4 条管。
 //   3. 提交编译建的 program 至少一半在开机结束前真被用上（修前 0/135）。故意留到以后用的
 //      （伤口变体、断肢块）不多，阈值只拦「整批编错状态」。
 //   4. 点「进城」后连跑 300 帧，program 一个不新编。
@@ -58,7 +60,8 @@ await page.addInitScript(() => {
   proto.linkProgram = function (program) {
     const stack = new Error().stack;
     const record = {
-      origin: /WebGLRenderer\.compile/.test(stack) ? "compile" : /_RenderScene/.test(stack) ? "scenePass" : "otherPass",
+      origin: /WebGLRenderer\.compile/.test(stack) ? "compile" : /WebGLShadowMap\.render/.test(stack) ? "shadowPass"
+        : /_RenderScene/.test(stack) ? "scenePass" : "otherPass",
       used: false, afterBoot: ledger.frozen,
     };
     records.set(program, record);
@@ -95,6 +98,7 @@ try {
       whitebox: !!T.post?.whiteboxScene,
       links: ledger.links.length,
       scenePass: ledger.links.filter((r) => r.origin === "scenePass").length,
+      shadowPass: ledger.links.filter((r) => r.origin === "shadowPass").length,
       compiled: compiled.length,
       compiledUsed: compiled.filter((r) => r.used).length,
       programs: T.renderer.info.programs.length,
@@ -102,7 +106,7 @@ try {
   });
   Report(boot.whitebox, "白盒画质档", `post.whiteboxScene ${boot.whitebox ? "在" : "不在"}`);
   Report(boot.scenePass === 0, "预热不漏交：主场景那一趟不现建 program",
-    `开机共 link ${boot.links} 个，主场景一趟现建 ${boot.scenePass} 个（修前 64）`);
+    `开机共 link ${boot.links} 个，主场景一趟现建 ${boot.scenePass} 个（修前 64）；阴影趟投影深度 ${boot.shadowPass} 个（预热强制烘阴影时编，开机前收完）`);
   const share = boot.compiled ? boot.compiledUsed / boot.compiled : 0;
   Report(share >= MIN_USED_SHARE, "提交编译编的是出画要用的那一份",
     `提交编译 ${boot.compiled} 个，开机结束前用上 ${boot.compiledUsed} 个（${Math.round(share * 100)}%，下限 ${MIN_USED_SHARE * 100}%；修前 0/135）`);

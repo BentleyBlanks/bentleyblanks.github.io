@@ -20,6 +20,7 @@ export function LoadWhiteboxConfig() {
   if (saved && !("grid" in saved) && saved.surfaceColor === "#d8dadd") {
     saved.surfaceColor = WHITEBOX_DEFAULTS.surfaceColor;
   }
+  if (saved && saved.schema !== WHITEBOX_DEFAULTS.schema && saved.shadows === false) delete saved.shadows;
   return NormalizeWhiteboxConfig(saved);
 }
 export function SaveWhiteboxConfig(config) { return Write(WHITEBOX_STORAGE_KEY, NormalizeWhiteboxConfig(config)); }

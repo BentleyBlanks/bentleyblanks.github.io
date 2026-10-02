@@ -502,7 +502,7 @@ export class FirstLevelMissionView {
   Update(time, { tank,player,camera=null,soldiers=null } = {}) {
     const dt=this.lastUpdateTime===null||!(time>this.lastUpdateTime)?0:Math.min(.1,time-this.lastUpdateTime);
     this.lastUpdateTime=time;this.time=time;
-    this.people.Begin(time,player?.position);
+    this.people.Begin(time,player?.position,camera);
     this.aftermath.Update(player?.position,camera);
     for (const mesh of Object.values(this.parts)) mesh.count = 0;
     for (const mesh of this.rigidProps.values()) mesh.visible=false;

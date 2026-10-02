@@ -34,6 +34,10 @@ try {
       if (o.isMesh) fpsSources.push([o, o.material]);
     });
     const restore = T.post.whiteboxScene.Begin(T.scene);
+    // 2026-10-02 白盒默认画太阳影子：中性光照旧，关卡太阳的第 0 盏级联灯留着投影，白盒自己那盏不投影的太阳收起。
+    const wb = T.post.whiteboxScene, cascade = T.lights.csm.lights[0];
+    const sunShadowLights = { cascade: cascade.visible, cascadeWhite: cascade.color.getHexString() === "ffffff",
+      whiteboxSun: wb.sun.visible, whiteboxAmbient: wb.ambient.visible, levelAmbient: T.lights.ambient.visible };
     const firstPersonPreserved = fpsSources.length > 0 && fpsSources.every(([o, m]) => o.material === m);
     let texturedAssets = 0, terrainTextured = 0, skinnedTextured = 0, gridMaterials = 0;
     // 2026-09-30：镂空卡片（植被、壕沟草）保留贴图 alpha 与 alphaTest（不再画成不透明白竖片）；水面画蓝灰水色 + 天空反光，不画网格。
@@ -103,6 +107,7 @@ try {
     try { T.StepFrames(2); } finally { T.renderer.renderBufferDirect = originalDraw; }
     return { info, cutoutMaterials, cutoutBroken, cutoutFlat, cutoutGrid, waterMaterials, waterGrid, waterColors: [...waterColors], sceneStats,
       texturedAssets, terrainTextured, skinnedTextured, gridMaterials, spawnedWhite, restored, inherited, charactersCanBeGrey, firstPersonPreserved, draws,
+      sunShadowLights, shadowMapBaked: !!cascade.shadow.map,
       shadows: T.renderer.shadowMap.enabled, taa: T.post.taaEnabled, gl: T.renderer.getContext().getError() };
   });
   assert.equal(state.info.profile, "whitebox");
@@ -121,7 +126,11 @@ try {
   assert.ok(state.firstPersonPreserved); assert.ok(state.draws.firstPerson > 0);
   assert.ok(state.draws.grid > 0); assert.ok(state.draws.texturedCharacters > 0);
   assert.deepEqual(state.draws.texturedScenery, []);
-  assert.equal(state.shadows, false); assert.equal(state.taa, false); assert.equal(state.gl, 0);
+  // 旧 graphics_v1 的 TAA / GI 仍不覆盖白盒默认；阴影是白盒自己的默认（开）。
+  assert.equal(state.shadows, true); assert.equal(state.taa, false); assert.equal(state.gl, 0);
+  assert.deepEqual(state.sunShadowLights, { cascade: true, cascadeWhite: true, whiteboxSun: false, whiteboxAmbient: true, levelAmbient: false },
+    "whitebox shadows: the level sun's cascades cast under the neutral light; the whitebox sun and the level ambient stay off");
+  assert.ok(state.shadowMapBaked, "the near cascade has a baked shadow map in whitebox");
   await page.screenshot({ path: path.join(output, "WhiteboxScene.png") });
   // Close-up both factions and held weapons using the real actor editor/render.
   await page.evaluate(() => {

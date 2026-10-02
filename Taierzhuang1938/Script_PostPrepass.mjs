@@ -432,6 +432,9 @@ export class PrepassPass {
     this._failedUpgrade = new WeakSet();
     this._objectHistory = new WeakMap();
     this._objectsDrawn = [];
+    // 静态合批（Script_PrepassStaticBatch，Script_Main 装上）：每帧出画前对账，画的那一刻换人。
+    this.staticBatch = null;
+    this._NoteStatic = (object) => this.NoteStaticMember(object);
     this._foregroundObjects = new WeakSet();
     this._skinWorldMatrix = new THREE.Matrix4();
     this._velocityFrame = 0;
@@ -791,6 +794,23 @@ export class PrepassPass {
     U.uPrevSkinValid.value = skinValid;
   }
 
+  /**
+   * 收进静态合批、这一趟没自己画的成员：照样记一份逐物体历史，被踢出来那一帧（它开始动了）
+   * 才有上一帧矩阵可比。不碰任何 uniform。
+   */
+  NoteStaticMember(object) {
+    if (!this.velocityEnabled || this._foregroundObjects.has(object)) return;
+    let history = this._objectHistory.get(object);
+    if (!history) {
+      history = { object, matrix: object.matrixWorld.clone(), frame: -1, queued: -1, skeleton: null, bind: null };
+      this._objectHistory.set(object, history);
+    }
+    if (history.queued !== this._velocityFrame) {
+      history.queued = this._velocityFrame;
+      this._objectsDrawn.push(history);
+    }
+  }
+
   _SnapshotObjects() {
     for (const history of this._objectsDrawn) {
       const object = history.object;
@@ -850,9 +870,15 @@ export class PrepassPass {
     // 实例 / 批次交错着画，每换一种就整套重算一次程序参数（05 战车段每帧 13 次）。
     // 先按种类归堆，同种里仍按材质 id、深度排；深度趟的结果与先后无关。
     renderer.setOpaqueSort(PrepassOpaqueSort);
+    const staticBatch = this.staticBatch;
+    if (staticBatch) {
+      staticBatch.Update();
+      staticBatch.BeginPrepass(this._NoteStatic);
+    }
     try {
       renderer.render(scene, camera);
     } finally {
+      staticBatch?.EndPrepass();
       renderer.setOpaqueSort(null);
     }
     // Advance once after every material group has drawn, never between groups.

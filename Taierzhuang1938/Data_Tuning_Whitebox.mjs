@@ -17,7 +17,8 @@ export const WHITEBOX_CONTROLS = [
   ["effects", "粒子、烟火与贴花", "材质与场景", false],
   ["environment", "环境贴图 / IBL", "材质与场景", false],
   ["materialShading", "POM / 细节法线 / 皮肤散射", "材质与场景", false],
-  ["shadows", "太阳级联阴影 CSM", "光照 Feature", false],
+  // 2026-10-02 用户定：白盒也要太阳影子。中性光照旧，借关卡太阳的级联灯投影（Script_WhiteboxRendering._LightingMode）。
+  ["shadows", "太阳级联阴影 CSM（中性光下投关卡太阳的影子）", "光照 Feature", true],
   ["firstPersonShadow", "第一人称自阴影", "光照 Feature", false],
   ["clusteredLights", "簇状局部光", "光照 Feature", false],
   ["gi", "实时探针 GI", "光照 Feature", false],
@@ -46,6 +47,9 @@ export const WHITEBOX_DEFAULTS = Object.freeze({
   ...Object.fromEntries(WHITEBOX_CONTROLS.map(([key, , , value]) => [key, value])),
   surfaceColor: "#909397", gridColor: "#55585d", gridSize: 1, gridLineWidth: 0.012,
   backgroundColor: "#adb8c2", renderScale: 1,
+  // 存档口径版本：2 = shadows 默认开。之前的存档把每个默认值都写了出去，存着的 shadows:false
+  // 分不清是旧默认还是玩家关的，LoadWhiteboxConfig 按旧默认迁移。
+  schema: 2,
 });
 // 2026-09-30 白盒水面约定：白盒画质下水面不再画成灰色米制网格（读起来是一条灰公路），
 // 而是固定的蓝灰水色 + 掠射角天空色反光（菲涅耳）+ 一点太阳高光（粗糙度低）。不是可编辑项，
@@ -58,7 +62,10 @@ export const WHITEBOX_WATER = Object.freeze({ color: "#4d6f86", sheen: "#c4d6e2"
 // fallbackColor（暗橄榄枯黄）。alpha 裁切照旧；卡片上不再叠米制灰网格（网格线画在草叶上只是噪点）。
 // 开关：WHITEBOX_CONTROLS.cardTextures（默认开；关 = 回到 2026-09-30 的统一表面色卡片）。缓存键 whiteboxCard2。
 export const WHITEBOX_CARDS = Object.freeze({ desaturate: 0.4, brightness: 0.5, fallbackColor: "#7a7547" });
-export const WHITEBOX_LIGHTING = Object.freeze({ ambient: 1.8, sun: 1.4, direction: [40, 70, 25] });
+// shadowAmbient / shadowSun：开太阳阴影时的中性光（2026-10-02）。原来那组环境光比太阳还亮，影子只比受光面暗约四成、
+// 读不出来；换成这组后受光地面亮度基本不变（太阳高度约 52° 时 3.07 对 2.96），影子处约为受光面的 41%。
+export const WHITEBOX_LIGHTING = Object.freeze({ ambient: 1.8, sun: 1.4, direction: [40, 70, 25],
+  shadowAmbient: 1.25, shadowSun: 2.3 });
 
 export function NormalizeWhiteboxConfig(value = {}) {
   const config = { ...WHITEBOX_DEFAULTS };

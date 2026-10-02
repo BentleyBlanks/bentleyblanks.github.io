@@ -5670,6 +5670,49 @@ composite 的抖动都跟着帧号走，多推一帧就整屏差 ~3/255。§17.1
   motionBlur 240 ms / composite / main 上，是显卡或合成器被别的进程抢，录的时候本机 60 多个 Edge 进程、
   CPU 100%。这一类不在代码里，要在空闲机器上重录才能判。
 
+### 17.17 第一关性能第二轮：白盒阴影、白盒替换缓存、03 任务逻辑、进场卡顿、预通道合批（2026-10-02）
+
+起因：同日普查（白盒 / high 各阶段主线程分桶 + Frame Debugger 逐 draw 归账，原始数据在主检出的
+`_shots/Profile/Profile_perfplan_*`、`_shots/FrameDebug/perfplan_*`）。用户从方案里点了五项：
+白盒要画太阳阴影、白盒材质替换不要每帧重来、03 阶段任务逻辑、high 档进场那一秒的成串长帧、预通道 draw。
+
+| 项 | 改法 | 位置 |
+| --- | --- | --- |
+| 白盒太阳阴影 | `shadows` 默认开；中性光不变，只留关卡太阳的级联灯投影（第 0 盏换白、环境 / 太阳按 1.25 / 2.3 配比），旧存档的 `shadows:false` 按 schema 2 迁移 | `Script_WhiteboxRendering._LightingMode`，`Data_Tuning_Whitebox`，[白盒画质](Data_WhiteboxQuality.md)「太阳阴影」 |
+| 白盒逐帧替换 | 逐帧出画走 `_BeginCached`：按 scene 顶层子树缓存「灯 / 特效 / LOD / 网格」清单，`childadded` / `childremoved` 只重建那一棵，源材质换引用或被 dispose 时当帧重判；父链有一层藏着的网格不换不计（与 `traverseVisible` 同口径）。预热提交（带 `compileRoots`）仍走整场遍历 | `Script_WhiteboxRendering` |
+| 03 任务逻辑 | `Threatens` 在一次 `Update` 之内按参数记忆、不再每次展开敌人表和 new 向量；任务人群画面外按 `offscreenAnimationS`（1/8 s）解姿势，回画面那一帧立刻补一次 | `Script_FirstLevelMissionRuntime`，`Script_FirstLevelMissionPeople`，`Data_Tuning_FirstLevel.MISSION_PEOPLE_TUNING` |
+| 进场一秒卡顿 | 阴影静态合批与预通道静态合批在 `WarmLevel` 结账帧之前 `Prime()` 一次收满，不再开局后先等 30 帧、再每帧收 1.5 ms 并整批重传 | `Script_ShadowCasterBatch.Prime`，`Script_PrepassStaticBatch.Prime`，`Script_Main.WarmLevel` |
+| 预通道 | 新模块 `Script_PrepassStaticBatch`：预通道里一动不动的不透明叶子网格按「破口裁切 × 地形融合接收」收进 BatchedMesh；只在预通道那次出画里换人，烘阴影前把成员还回去；成员的逐物体速度历史照记（`PrepassPass.NoteStaticMember`），一动就当帧踢出、第一帧就有上一帧矩阵 | `Script_PrepassStaticBatch`，`Script_PostPrepass`，`Data_Tuning_Graphics.PREPASS_STATIC_BATCH`，`Script_World`（`prepassDamageHook`） |
+
+实测（RTX 4070 SUPER；机器上同时有别的会话在跑浏览器，毫秒数只看同一批里的前后对比）：
+
+| 项 | 改前 → 改后 | 怎么量的 |
+| --- | --- | --- |
+| 白盒逐帧替换 | 03：0.50–0.69 → 0.10–0.14 ms；09：0.46 → 0.09 ms；12：0.43–0.46 → 0.08–0.10 ms | 同页交替调 `Begin`（缓存）与 `_BeginTraverse`（旧路径）各 30 次 × 10 轮取中位；两条路 `stats` 逐项相等 |
+| 03 任务逻辑（白盒） | 任务 Update 2.23 → 1.42 ms（集结处人群 `frontShow.Draw` 1.02 → 0.40，`Threatens` 0.40 → 0.22） | ProfileCli 分桶 |
+| 12 阶段 high 进场 | 逐帧录制里 >25 ms 的帧：前 62 帧 23 帧 → 全段 552 帧只 1 帧（不在开局）；阴影合批每帧 0.15 → 0.08 ms | ProfileCli `--record` |
+| 12 阶段 high 预通道 | 预通道 draw 378 → 225，整帧 1158 → 1006；主线程 18.0 → 16.6 ms，p95 28.6 → 19.4 ms | ProfileCli |
+| 老城区（BootTest 各 phase） | draw 973 → 676、876 → 517、1142 → 977、1344 → 1046 | BootTest 报告 |
+| PerformanceTest draw | 873 → 687（门槛 650，改前就红） | PerformanceTest |
+
+代价（用户要的）：白盒开阴影后阴影趟每帧多 285–310 个 draw（03 / 09 / 12），`post` 桶多约 1–3 ms（忙机器上量的，偏大）；
+白盒档的着色器预热多编 19 个阴影深度 program（开机时在加载画面后面编完，`Script_WhiteboxShaderWarmTest` 把阴影趟单独记账，主场景晚编仍须为 0）。
+预通道合批自己的逐帧对账约 0.10–0.25 ms，已经算在上面那组预通道数字里。
+
+门禁（本轮全过）：纯 Node `PrepassStaticBatchTest`、`ShadowCasterBatchTest`（含 `Prime`）、`WhiteboxQualityTest`、`FirstLevelMissionTest`、
+`FirstLevelMidTest` 等 17 个；浏览器 `WhiteboxQualityBrowserTest`、`WhiteboxShaderWarmTest`、`SavedGraphicsWarmTest`、`CarriagePropVelocityTest`、
+`MotionVectorContractTest`（49 个 GPU 场景，新加「批次成员写深度 + 零速度」「刚踢出那一帧有 8 px 物体速度」两条）、`CsmTest`、`GtaoTest`、`SsrTest`、
+`DestructionTest`、`TerrainBlendTest` 等。`BootTest`（老城区日军远景辨识材质 6 条）与 `PerformanceTest`（draw 超 650）改前改后同样红。
+
+坑：
+* **第一关前沿机位不能逐像素比开 / 关。** 同一页 dt = 0、定帧 150 帧，「开 → 开」两张图静止的地面和砖墙也差均值 7–8（烟和云照走墙钟），
+  「开 → 关」与之同量级。预通道合批的画面正确性靠 `MotionVectorContractTest` 的批次场景与肉眼比对，别拿前沿机位的 `--diff` 当证据；
+  掩蔽部机位改前改后逐像素相同。
+* 缓存替换的分类标记（`whiteboxCharacter` / `whiteboxTerrain` …）必须在挂进场景之前设好；挂上之后才改的调 `post.whiteboxScene.Invalidate()`。
+* `Threatens` 的记忆只在 `Update` 之内开着：同一帧里先改掩体再问一次的单测曾因全局记忆拿到旧结果，所以 `Update` 之外（存检查点、取证）一律现算。
+* 没做的（用户这轮没点）：地形接触融合那一趟换轻量材质、近景人物 `Actor.Update` 细分计时与场景矩阵（方案第三批）、开机程序化内容离线烘焙、
+  动作 JSON 懒加载 / 二进制化、GLB 与 mp3 按阶段加载（方案第四批）。12 阶段人群多在画面内，画面外节流在那里只省约 0.2 ms。
+
 ## 18. 预热账：进过场与开机的着色器编译
 
 > 三段账合在一节：进过场那十几秒（2026-08 的原始做法）、八子系统合流之后的开机
