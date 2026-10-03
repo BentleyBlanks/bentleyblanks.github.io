@@ -128,6 +128,7 @@ import { EmplacementSystem } from "./Script_Emplacement.mjs";
 import { IdentifySystem, IDENTIFY } from "./Script_Identify.mjs";
 import { EditorSuite } from "./Script_Editor.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
+import { CommandRoom } from "./Script_CommandRoom.mjs";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
@@ -983,6 +984,7 @@ let cutsceneSky = null;
 let editor = null;
 // 主菜单。同样是 Boot 末尾才建（要拿相机与建好的切片），出图与 ?menu=0 下不建。
 let menu = null;
+let commandRoom = null;
 // 从菜单进入场景编辑器时，关闭工具后要回到原来的菜单层；正常游戏中打开则为 null。
 let editorReturnMenuMode = null;
 let currentWeapon = "HanYang";
@@ -3186,7 +3188,14 @@ async function Boot() {
   // 建在最末：它要拿相机、要知道现在建好的是哪一关（决定用哪一组机位），
   // 还要能把编辑器的齿轮藏起来 —— 三样东西到这一步才齐。
   if ((MENU_ON || FIRST_LEVEL_P012_WHITEBOX) && menuRoot) {
+    commandRoom = new CommandRoom(renderer);
+    if (MENU_AT_BOOT) await commandRoom.Load();
+    window.Taierzhuang.Debug.CommandRoom = () => commandRoom.State();
     menu = new MainMenu({
+      staticBackdrop: true,
+      PrepareBackdrop: () => commandRoom.Load().catch(error => {
+        console.error("Command room failed to load", error);
+      }),
       // 正式章节组不再交 PHASES（旧序章与旧第一关到终章 2026-09-06 起退出选章，
       // 只剩 ?phase=N 开发入口与 Debug.StartLevel）：第一关 = P0/P1/P2 白盒，
       // 后面几章只占位（Data_Menu.CAMPAIGN_ENTRIES）。
@@ -6816,6 +6825,11 @@ function MenuFrame(dt, render = true) {
   state.frame += 1;
   if (editor) editor.UpdateOverlays(dt);
   menu.Update(dt);
+  if (commandRoom?.ready && menu.live) {
+    commandRoom.Update(dt);
+    if (render) commandRoom.Render();
+    return;
+  }
   // 菜单运镜也要喂流送：Z8 那类俯拍机位悬在城另一头，不喂的话拍到的是空城。
   if (battlefield?.externalStreamer) {
     battlefield.externalStreamer.Update(camera.position.x, camera.position.z);

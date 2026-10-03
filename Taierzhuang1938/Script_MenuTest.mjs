@@ -15,6 +15,8 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { BOOT_PAPERS } from "./Data_BootPapers.mjs";
+import { PaperCard } from "./Script_BootPaper.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -472,7 +474,7 @@ async function CheckInterface() {
   } finally {await page.evaluate(()=>{window.Taierzhuang.menu.Activate=window.interfaceActivate;delete window.interfaceActivate;});}
   await page.evaluate(()=>window.Taierzhuang.menu.Show('levels'));
   const level=await ReadStyle('.mnLevel.on');
-  Check('主菜单与选章共用字体、旧金选中条',JSON.stringify(main)===JSON.stringify(level),JSON.stringify({main,level}));
+  Check('主菜单与选章共用字体、旧金选择色',main.font===level.font&&main.color===level.color,JSON.stringify({main,level}));
   await Shot("Levels");
   await page.evaluate(()=>window.Taierzhuang.menu.Show('title'));
   await page.evaluate(()=>window.Taierzhuang.menu.OpenPause());
@@ -482,7 +484,7 @@ async function CheckInterface() {
   await page.evaluate(()=>window.Taierzhuang.Debug.MenuAct('settings'));
   await page.locator('[data-editor="sound"]').click();
   const editor=await ReadStyle('[data-editor="sound"]');
-  Check('设置入口沿用同一条金色选择反馈',JSON.stringify(main)===JSON.stringify(editor),JSON.stringify(editor));
+  Check('设置入口沿用字体与金色选择反馈',main.font===editor.font&&main.color===editor.color,JSON.stringify(editor));
   const toggle=page.locator('.edPanel.work button[aria-pressed]').filter({hasText:'暂停时静音背景'});
   const original=await toggle.getAttribute('aria-pressed');
   await toggle.focus();await page.keyboard.press('Enter');
@@ -579,6 +581,7 @@ await CheckInterface();
       documentTitle: document.title,
       bootTitle: document.getElementById("bootTitle")?.textContent.trim(),
       bootSubtitle: document.getElementById("bootSub")?.textContent.trim(),
+      bootPaperSource: document.getElementById("bootPaper")?.getAttribute("src"),
       bootStart: document.getElementById("bootStart")?.textContent.trim(),
       bootHierarchy: document.getElementById("bootTitle")?.parentElement?.id,
       menuTitle: document.querySelector("#menu .mnTitleMain")?.textContent.trim(),
@@ -586,16 +589,17 @@ await CheckInterface();
       menuLines: [...document.querySelectorAll("#menu .mnTitleLine")].map((e) => e.textContent.trim()),
     };
   });
-  Check("启动界面标题、日期与按钮文字正确",
+  const shownPaper = BOOT_PAPERS.find(paper => m.bootPaperSource?.includes(paper.file));
+  Check("启动界面标题、当前报纸日期与按钮文字正确",
     m.documentTitle === "台儿庄：血战滕县"
       && m.bootTitle === "台儿庄：血战滕县"
-      && m.bootSubtitle === "一九三八年三月十四日 — 十八日 · 山东滕县"
+      && shownPaper && m.bootSubtitle === PaperCard(shownPaper).subtitle
       && m.bootStart === "进 城"
       && m.bootHierarchy === "bootHead",
     `${m.documentTitle} / ${m.bootTitle} / ${m.bootSubtitle} / ${m.bootStart}`);
   Check("主菜单标题与战役说明文字正确",
     m.menuTitle === "台儿庄：血战滕县"
-      && m.menuSubtitle === "一九三八年三月十四日 — 十八日 · 山东滕县"
+      && m.menuSubtitle === "一九三八年三月 · 山东滕县"
       && m.menuLines.length === 3
       && m.menuLines.every((line) => line.length > 0 && !line.includes("\uFFFD")),
     `${m.menuTitle} / ${m.menuSubtitle} / ${m.menuLines.join(" | ")}`);
@@ -636,7 +640,7 @@ await CheckInterface();
     `hud=${m.hudHidden} viewmodel=${m.viewmodel}`);
   // 菜单里摆的是几个守军，**一个日军都不许有** ——
   // 有敌人就会开打，开打就死人，而兵员池是关卡状态（玩家还没按开始）
-  Check("菜单场景里只有守军、没有日军", m.nra === 5 && m.ija === 0, `nra=${m.nra} ija=${m.ija}`);
+  Check("独立指挥室菜单不生成战场兵员", m.nra === 0 && m.ija === 0, `nra=${m.nra} ija=${m.ija}`);
   Check("菜单背后建的是东关那一章（Data_Menu.MENU_SCENE.slice）", m.menu.slice === 2,
     `slice=${m.menu.slice}`);
 }
@@ -706,13 +710,13 @@ await page.click(".edPanel.launcher .edX");
   await page.evaluate(() => window.Taierzhuang.StepFrames(180));   // 3 秒
   const after = await page.evaluate(() => window.Taierzhuang.Debug.Menu().camera);
   const moved = Math.hypot(after.x - before.x, after.y - before.y, after.z - before.z);
-  Check("推轨在动（三秒内相机位移 > 0.3 m）", moved > 0.3, `moved=${moved.toFixed(2)} m`);
+  Check("指挥室固定机位不改动玩法相机", moved === 0, `moved=${moved.toFixed(2)} m`);
   // 焦距语汇沿用分镜表：35 mm ≈ 37.8°，不该是玩法用的 55°
-  Check("机位吃的是机位表的焦距，不是玩法 FOV", Math.abs(after.fov - 55) > 2,
-    `fov=${after.fov.toFixed(1)}`);
+  const room = await page.evaluate(() => window.Taierzhuang.Debug.CommandRoom());
+  Check("实际渲染 Blender 指挥室、独立相机及烘焙光照", room.ready && room.frames > 0 && room.meshes >= 10 && room.triangles > 30000 && room.textureCount === 12 && room.lighting === "Cycles diffuse UV1" && room.camera.fov !== after.fov, JSON.stringify(room));
 
   const shots = await page.evaluate(() => window.Taierzhuang.Debug.Menu().shotCount);
-  Check("东关那一章配了两个机位", shots === 2, `shots=${shots}`);
+  Check("主菜单使用一个参考图固定机位", shots === 1, `shots=${shots}`);
 
   // 站在菜单里十秒：不许死人，兵员池不许动（菜单不消耗关卡状态）
   const poolBefore = await page.evaluate(() => window.Taierzhuang.state.nraPool);
@@ -723,7 +727,7 @@ await page.click(".edPanel.launcher .edX");
     pool: window.Taierzhuang.state.nraPool,
   }));
   Check("菜单里挂十秒：没人死、兵员池没动",
-    still.alive === 5 && still.pool === poolBefore,
+    still.alive === 0 && still.pool === poolBefore,
     `alive=${still.alive} deaths=${still.deaths} pool=${still.pool}/${poolBefore}`);
 
   // 定时切机位：先把计时归零，再推过一个完整 hold。
@@ -735,11 +739,11 @@ await page.click(".edPanel.launcher .edX");
   });
   await page.evaluate(() => window.Taierzhuang.StepFrames(17 * 60));
   const second = await page.evaluate(() => window.Taierzhuang.Debug.Menu().shot);
-  Check("十六秒后自动切下一个机位", first !== second, `${first} -> ${second}`);
+  Check("停留后仍保留参考图构图", first === "command-room" && first === second, `${first} -> ${second}`);
 }
 
 // 三个机位各出一张图（视觉审查按图说话）
-for (let i = 0; i < 3; i += 1) {
+for (let i = 0; i < 1; i += 1) {
   await page.evaluate((k) => {
     const menu = window.Taierzhuang.menu;
     menu.shotIndex = k;
@@ -1303,8 +1307,8 @@ async function CheckMissionList() {
     JSON.stringify(titleConfirm));
   await page.evaluate(() => window.Taierzhuang.StepFrames(30));
   const back = await page.evaluate(() => window.Taierzhuang.Debug.Menu());
-  Check("从暂停能回主菜单，并且换成当前切片的机位",
-    back.open && back.live && back.slice === 2 && back.shotCount >= 2,
+  Check("从暂停能回到独立指挥室主菜单",
+    back.open && back.live && back.slice === 2 && back.shotCount === 1 && back.shot === "command-room",
     `slice=${back.slice} shot=${back.shot}`);
 }
 

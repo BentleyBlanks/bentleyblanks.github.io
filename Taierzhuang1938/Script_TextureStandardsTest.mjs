@@ -179,7 +179,7 @@ console.log(`     ${TEXTURE_MANIFEST.length} 套 / ${byFile.size} 个文件，�
 // ---------------------------------------------------------------------------------------------------
 Section("命名、格式、尺寸、套件完整");
 const PBR_KINDS = new Set(["material", "terrainLayer"]);
-const POW2_KINDS = new Set(["material", "terrainLayer", "decal", "vfx", "detail"]);
+const POW2_KINDS = new Set(["material", "terrainLayer", "decal", "vfx", "detail", "lightmap"]);
 const NAME_RULES = {
   flat: /^Texture_[A-Z][A-Za-z0-9]*(_\d{2})?\.webp$/,
   ui: /^Texture_[A-Z][A-Za-z0-9]*(_[A-Z0-9][A-Za-z0-9]*)*\.(webp|png)$/,
@@ -210,6 +210,10 @@ for (const entry of TEXTURE_MANIFEST) {
     } else if (["decal", "vfx", "detail"].includes(entry.kind)) {
       Check(NAME_RULES.flat.test(name) || name === `Texture_${entry.id}${channel}.webp`, `${rel}: 命名 Texture_<PascalCase>[<通道>][_NN].webp`);
       Check(Math.max(w, h) <= (entry.sizeReason ? 2048 : 1024), `${rel}: 边长 ≤ 1024（2048 须写 sizeReason）`);
+    } else if (entry.kind === "lightmap") {
+      Check(name === `Texture_${entry.id}Image.webp`, `${rel}: 独立辐照度图集命名`);
+      Check(channel === "Image" && !!entry.packing, `${rel}: sRGB 编码与解码倍率有明确记录`);
+      Check(w === h && w <= 2048, `${rel}: 光照图集为 ≤ 2048 正方形`);
     } else if (entry.kind === "print" || entry.kind === "hud" || entry.kind === "menu") {
       Check(NAME_RULES.ui.test(name), `${rel}: 命名 Texture_<PascalCase>[_<Variant>].webp|png`);
       Check(Math.max(w, h) <= 2048, `${rel}: 边长 ≤ 2048`);

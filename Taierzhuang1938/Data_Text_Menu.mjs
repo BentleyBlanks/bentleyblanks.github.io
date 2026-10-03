@@ -6,6 +6,7 @@
 // 那些是考据过的原稿，本体留在 Data_TengxianScript 的 MENU / CREDITS 里，
 // 显示时经 `Localize("menu.<字段>" / "menu.lines.<n>" / "credits.<n>", 原稿)` 取译文（§3）。
 export const TEXT = Object.freeze({
+  "menu.commandRoom.subtitle": "一九三八年三月 · 山东滕县",
   // --- 通用 -----------------------------------------------------------------
   "menu.back": "返回",
   "menu.foot.main": "↑↓ 选择 · Enter 确定 · Esc 返回",

@@ -749,6 +749,8 @@ export const domains = {
 
 const changedDomainRules = [
   { domain: "menu", pattern: /TextureBake|Script_Main\.mjs|Script_Materials\.mjs/ },
+  { domain: "menu", pattern: /CommandRoom/ },
+  { domain: "textureAssets", pattern: /CommandRoom/ },
   {domain:"textureAssets",pattern:/TextureImport|TextureManager|EditorTextures/},
   { domain: "whiteboxQuality", pattern: /WhiteboxQuality|WhiteboxRendering|GraphicsProfile|Tuning_Whitebox|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },
   // 贴图资产规范：Texture/ 下任何文件、清单、通用烘焙脚本与预设、烘焙记录、关卡按需集。

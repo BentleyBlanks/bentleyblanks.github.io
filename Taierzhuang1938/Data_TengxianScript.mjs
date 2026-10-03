@@ -465,8 +465,8 @@ export const MENU = {
     "城是必然陷落的。",
     "你能改变的只有：这一小时守不守得住。",
   ],
-  start: "开始",
-  chapters: "选章",
+  start: "开始游戏",
+  chapters: "选择章节",
   codex: "史实注记",
   credits: "关于",
 };

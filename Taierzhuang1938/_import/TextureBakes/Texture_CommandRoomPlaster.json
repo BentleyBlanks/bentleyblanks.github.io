@@ -1,0 +1,119 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-10-04",
+  "name": "CommandRoomPlaster",
+  "preset": "limePlaster",
+  "source": {
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomPlaster.png",
+    "sha256": "3681a52119e7c877fe45387a0ad766f4f9fcac6cdb4b657829ab0417353e53c4",
+    "metrics": {
+      "meanSrgb": [
+        0.6647,
+        0.6126,
+        0.5513
+      ],
+      "luma": 0.6095,
+      "lumaStd": 0.0951,
+      "sat": 0.1706,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.007
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.66,
+      0.64,
+      0.595
+    ],
+    "contrast": 0.06,
+    "lumaRange": [
+      0.5,
+      0.75
+    ],
+    "satRange": [
+      0.0,
+      0.16
+    ],
+    "stdRange": [
+      0.03,
+      0.1
+    ],
+    "reliefM": 0.002,
+    "rough": 0.94,
+    "roughVar": 0.04,
+    "roughLumaK": 0.0,
+    "ao": 0.4,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.088,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 1.8,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_CommandRoomPlasterBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 354184,
+      "sha256": "9374a2d40088cde720ad99075d88913be22c1923cdc1865f6f4ee4dabf6d3fb9"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_CommandRoomPlasterNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 59870,
+      "sha256": "0d5c4a51c3dc6d229b7d110638c0e8309a48d967940d6a38ff6bee9729ca8496"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_CommandRoomPlasterOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 77378,
+      "sha256": "c390ddcd391f490df6dd70bd9a3df1d07de0c0b499c2188ab373dca905ea12cd"
+    }
+  ],
+  "totalBytes": 491432,
+  "metrics": {
+    "meanSrgb": [
+      0.6597,
+      0.641,
+      0.5945
+    ],
+    "luma": 0.6318,
+    "lumaStd": 0.0609,
+    "sat": 0.0989,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0021,
+    "seam": 0.0503,
+    "interior": 0.0519,
+    "seamRatio": 0.969,
+    "border": 0.968,
+    "swing": 0.0013,
+    "aoMean": 0.914,
+    "roughMean": 0.938,
+    "texelsPerMeter": 568.9
+  },
+  "gateProblems": []
+}

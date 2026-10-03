@@ -1,0 +1,119 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-10-04",
+  "name": "CommandRoomWood",
+  "preset": "weatheredWood",
+  "source": {
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomWood.png",
+    "sha256": "d611937e2178dcfa657f5d7c075c21ee42c004259d9d6869d6387c9f98537ec2",
+    "metrics": {
+      "meanSrgb": [
+        0.4371,
+        0.3629,
+        0.3042
+      ],
+      "luma": 0.3681,
+      "lumaStd": 0.0691,
+      "sat": 0.3041,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0203
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.42,
+      0.38,
+      0.33
+    ],
+    "contrast": 0.07,
+    "lumaRange": [
+      0.26,
+      0.5
+    ],
+    "satRange": [
+      0.06,
+      0.3
+    ],
+    "stdRange": [
+      0.03,
+      0.11
+    ],
+    "reliefM": 0.002,
+    "rough": 0.94,
+    "roughVar": 0.05,
+    "roughLumaK": 0.0,
+    "ao": 0.45,
+    "metal": 0.0,
+    "seamless": "weld",
+    "rowFlatten": false,
+    "flattenSigma": 0.15,
+    "isotropic": false,
+    "heightFromLuma": "direct",
+    "tileM": 1.4,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_CommandRoomWoodBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 356996,
+      "sha256": "6d4949fc15d4e24a00a9154a2545fd50c40ac60afbb092a6a1cd2dabbeeb3f88"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_CommandRoomWoodNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 59658,
+      "sha256": "c0a2249e7548d3b9ccf0426b95918e0fcafc53819aa57693cbeadfbbc8d04b98"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_CommandRoomWoodOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 67370,
+      "sha256": "4c7355d4a5733d662a1a838685d22298a992189d62b06728845047f1e5bd7f62"
+    }
+  ],
+  "totalBytes": 484024,
+  "metrics": {
+    "meanSrgb": [
+      0.42,
+      0.3805,
+      0.3305
+    ],
+    "luma": 0.377,
+    "lumaStd": 0.0718,
+    "sat": 0.2132,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0161,
+    "seam": 0.0097,
+    "interior": 0.0507,
+    "seamRatio": 0.192,
+    "border": 0.746,
+    "swing": 0.0639,
+    "aoMean": 0.903,
+    "roughMean": 0.925,
+    "texelsPerMeter": 731.4
+  },
+  "gateProblems": []
+}

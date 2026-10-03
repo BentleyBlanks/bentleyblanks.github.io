@@ -41,6 +41,7 @@ export const TEXTURE_CHANNELS = Object.freeze({
 
 /** 类别：决定命名、格式、尺寸与完整性规则（Script_TextureStandardsTest 按它分支）。 */
 export const TEXTURE_KINDS = Object.freeze({
+  lightmap: "独立 UV 的静态辐照度图集；反照率保持分离",
   material: "平铺或 UV 贴图的 PBR 材质套（Base + Normal + Orm|Orh）",
   terrainLayer: "地形 / 壕沟纹理数组的一层（Base + Normal + Orh，terrain 法线约定）",
   decal: "贴花、弹痕、镂空卡片（Base 带 A 或 Mask）",
@@ -94,13 +95,62 @@ export const TEXTURE_BUDGETS = Object.freeze({
     fx: 6.5 * 1024 * 1024,
     // ui：2026-09-30 加载画面报纸剪报 11 张 ~2 MB 入库，玩家每次开机只下其中 1 张（~0.2 MB），所以整层上限抬到 5.5 MB。
     ui: 5.5 * 1024 * 1024,
-    lazy: 5 * 1024 * 1024,
+    // Dedicated command-room set adds 2.5 MB: three PBR sets and two legible print props.
+    // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
+    lazy: 8 * 1024 * 1024,
     editor: 0.25 * 1024 * 1024,
   }),
   totalBytes: 54 * 1024 * 1024,      // Texture/ 全目录（含 offline 的搁置资产）
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
+  {
+    id: "CommandRoomLighting", kind: "lightmap", tier: "lazy",
+    packing: "RGB = sRGB(linear diffuse irradiance / 32); UV1; direct + indirect, no albedo",
+    bake: "_blender/Script_BakeCommandRoomLighting.py",
+    source: { provider: "procedural", date: "2026-10-04", ref: "_blender/Script_BakeCommandRoomLighting.py" },
+    consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomLighting" }],
+    files: [["Texture_CommandRoomLightingImage.webp", "Image", 2048, 2048]],
+    note: "Blender Cycles irradiance only; separate from Imagegen PBR material textures. Encoded by _import/Script_EncodeCommandRoomLighting.py.",
+  },
+  {
+    id: "CommandRoomWood", kind: "material", tier: "lazy",
+    toneClass: "weatheredWood", metersPerTile: 1.4, normalConvention: "gl",
+    bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_CommandRoomWood.json",
+    source: { provider: "imagegen", date: "2026-10-04", ref: "CommandRoomMenu/Source/CommandRoomWood.png", prompt: "_import/Prompts/Texture_CommandRoomWood.txt" },
+    consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomWood" }],
+    files: [["Texture_CommandRoomWoodBase.webp","Base",1024,1024],["Texture_CommandRoomWoodNormal.webp","Normal",512,512],["Texture_CommandRoomWoodOrm.webp","Orm",512,512]],
+  },
+  {
+    id: "CommandRoomPlaster", kind: "material", tier: "lazy",
+    toneClass: "limePlaster", metersPerTile: 1.8, normalConvention: "gl",
+    bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_CommandRoomPlaster.json",
+    source: { provider: "imagegen", date: "2026-10-04", ref: "CommandRoomMenu/Source/CommandRoomPlaster.png", prompt: "_import/Prompts/Texture_CommandRoomPlaster.txt" },
+    consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomPlaster" }],
+    files: [["Texture_CommandRoomPlasterBase.webp","Base",1024,1024],["Texture_CommandRoomPlasterNormal.webp","Normal",512,512],["Texture_CommandRoomPlasterOrm.webp","Orm",512,512]],
+  },
+  {
+    id: "CommandRoomCloth", kind: "material", tier: "lazy",
+    toneClass: "fabric", metersPerTile: 1, normalConvention: "gl",
+    bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_CommandRoomCloth.json",
+    source: { provider: "imagegen", date: "2026-10-04", ref: "CommandRoomMenu/Source/CommandRoomCloth.png", prompt: "_import/Prompts/Texture_CommandRoomCloth.txt" },
+    consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomCloth" }],
+    files: [["Texture_CommandRoomClothBase.webp","Base",1024,1024],["Texture_CommandRoomClothNormal.webp","Normal",512,512],["Texture_CommandRoomClothOrm.webp","Orm",512,512]],
+  },
+  {
+    id: "CommandRoomLetter", kind: "print", tier: "lazy",
+    bake: "_import/Script_BakeCommandRoomPrints.py",
+    source: { provider: "user", date: "2026-10-04", ref: "0471bcd3-badc-4edc-80e9-24d575ee34f3/image-1.png", license: "User-supplied approved Imagegen artwork for this game" },
+    consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomLetter" }],
+    files: [["Texture_CommandRoomLetterImage.webp","Image",1122,1402]],
+  },
+  {
+    id: "CommandRoomMap", kind: "print", tier: "lazy",
+    bake: "_import/Script_BakeCommandRoomPrints.py",
+    source: { provider: "user", date: "2026-10-04", ref: "0471bcd3-badc-4edc-80e9-24d575ee34f3/image-2.png", license: "User-supplied approved Imagegen artwork for this game" },
+    consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomMap" }],
+    files: [["Texture_CommandRoomMapImage.webp","Image",1536,1024]],
+  },
   {
     id: "WeaponSteelV2", kind: "material", tier: "boot",
     bake: "_import/BuildWeaponPbr.py",

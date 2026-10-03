@@ -1,4 +1,48 @@
-# 主菜单与选章 —— 活战场主菜单 + World at War 线性任务列表
+# 主菜单与选章 —— 指挥室场景与线性任务列表
+
+## 指挥室场景（2026-10-04）
+
+正式标题菜单现使用 `Script_CommandRoom.mjs` 加载 BlenderMCP 自建的
+`Model/Model_CommandRoom.glb`，构图基于用户选定的第三张指挥室参考。
+地图采用第二张，电报采用第一张较大字幅的手写版本。
+两张纸面为用户确认的游戏美术图，不是历史原件影印。
+
+`Data_Tuning_CommandRoom.mjs` 管理材质、光照图集解码和浮尘参数。
+单一窗光及间接光在 Blender 中烘焙为独立的 2048² UV1 辐照度图集，
+不包含纸面或 PBR 反照率；运行时解码后交给标准材质的 `lightMap`。
+因此不再叠加第二个运行时太阳或重复 AO。纸面文字始终来自原始确认图。
+场景包含独立相机；只在 `menu.live` 时通过已有 renderer 绘制，逐帧恢复
+玩法渲染目标、viewport、scissor、色调映射及阴影开关。静态物件无角色动画，
+浮尘为透明、不写深度的粒子；不参与玩法运动向量或主场景后期。
+暂停、阵亡及进入游戏保留原场景和相机。
+
+菜单保留六项功能。标题态使用参考图的左侧宋体大标题和金色竖条；
+暂停、设置、选章页继续使用原来的布局。`host.staticBackdrop` 关闭时，
+下文原有战场机位系统仍可运行，正式入口默认启用指挥室。
+
+原工程在 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Scene_CommandRoom.blend`。
+相邻 `Source` 保留生成原图和三张参考，`Textures` 保存 Blender 依赖，
+不依赖本地 worktree 永久存在。几何重建入口为 `_blender/Script_BuildCommandRoom.py`；
+用 `COMMAND_ROOM_ROOT` 指定仓库根，随后通过根目录 `scripts/Script_BlenderMcp.mjs exec --file` 执行。
+脚本拒绝覆盖其他 Blender 文件，输出 GLB 后还原材质节点并保存源工程。
+随后依次执行 `_blender/Script_BakeCommandRoomLighting.py`（同一 BlenderMCP 实例）
+和 `_import/Script_EncodeCommandRoomLighting.py --source <源工程目录>/Textures/Texture_CommandRoomLighting.png`。
+后者需要 Pillow。烘焙脚本以 256 samples 生成无重叠 UV1 和 HDR EXR；交付图采用
+`sRGB(linear irradiance / 32)`，运行时恢复 32 倍与 Lambert π 系数。
+固定镜头的直接、间接漫反射均计入图集，材质本身仍使用独立 PBR 套；
+移动道具或改变时刻需要重新烘焙。最终 GLB 必须以光照烘焙后的版本为准。
+生成提示词在 `_import/Prompts/Texture_CommandRoom*.txt`，PBR 烘焙记录在
+`_import/TextureBakes/`；已确认的纸图用 `_import/Script_BakeCommandRoomPrints.py --source <Source>` 转 WebP。
+
+贴图按菜单使用时加载，不加入共享 `PBR_SETS`。三套 PBR、两张纸面和一张光照图集，
+在 `Data_TextureManifest` 的 lazy 层单独登记并把整层预算扩到 8 MB。
+GLB 中静态几何按材质合并；预算见 `Data_AssetStandards.CommandRoom`。
+`Debug.CommandRoom()` 提供实际加载、绘制帧数、三角数和相机证据。
+视觉证据保留在忽略目录 `_shots/CommandRoom/`。
+
+检查：`Script_MenuTest.mjs --interface-only` 验证键盘、菜单与窄屏；完整
+`Script_MenuTest.mjs` 验证独立场景绘制、固定机位、不推进兵员池及游戏切换。
+另外运行 ModuleGraph、TextureStandards、Text 与 AssetStandards 检查。
 
 对应实现：`Data_Menu.mjs`（机位表）、`Script_Menu.mjs`（菜单本体）、`Style_Menu.css`、
 `Script_Main.mjs` 的菜单接线、`Script_MenuTest.mjs`（冒烟）。

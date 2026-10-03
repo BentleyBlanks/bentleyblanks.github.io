@@ -550,6 +550,7 @@ export class MainMenu {
   // -------------------------------------------------------------------------
   /** 开机进菜单：接管相机，跑运镜。 */
   Open() {
+    this.host.PrepareBackdrop?.();
     this.ClearSandboxComplete();
     this.DismissConfirm();
     this.open = true;
@@ -657,6 +658,7 @@ export class MainMenu {
 
   /** 从暂停回到主菜单：这时候才接管相机并起运镜。 */
   ToTitle() {
+    this.host.PrepareBackdrop?.();
     this.ClearSandboxComplete();
     this.DismissConfirm();
     this.live = true;
@@ -698,13 +700,14 @@ export class MainMenu {
   }
 
   Show(mode) {
+    this.root.classList.toggle("commandRoom", !!this.host.staticBackdrop && this.live);
     const wasMode = this.mode;
     this.mode = mode;
     if (mode === "title" || mode === "pause") {
       const title = Localize(MenuTextId("title"), MENU.title);
       this.el.titleMain.textContent = mode === "pause" ? T("menu.title.paused") : title;
       this.el.titleSub.textContent = mode === "pause"
-        ? title : Localize(MenuTextId("subtitle"), MENU.subtitle);
+        ? title : this.host.staticBackdrop ? T("menu.commandRoom.subtitle") : Localize(MenuTextId("subtitle"), MENU.subtitle);
     }
     const objective = mode === "pause" ? String(this.host.CurrentObjective?.() || "").trim() : "";
     this.el.pauseObjectiveText.textContent = objective;
@@ -1130,6 +1133,13 @@ export class MainMenu {
   // -------------------------------------------------------------------------
   /** 按当前建好的切片取机位表。切片换了就重取（回主菜单时会用到）。 */
   PickShots(reset = false) {
+    if (this.host.staticBackdrop) {
+      this.shots = [{ id: "command-room" }];
+      this.shotIndex = 0;
+      this.shotTime = 0;
+      this.host.Crowd?.(null);
+      return;
+    }
     // 问装配层「现在建好的是哪一片」：菜单手上没有 PHASES（沙盒与 ?phase=overview
     // 也都不在 PHASES 里），机位只能按建好的那片取（见 Script_Main 的 SlicePhase 注释）。
     const phase = this.host.SlicePhase?.();
@@ -1174,6 +1184,11 @@ export class MainMenu {
    * 视角抢走，回到游戏时他会发现自己看着别处。
    */
   Update(dt) {
+    if (this.host.staticBackdrop && this.live) {
+      this.time += dt;
+      this.el.fade.style.opacity = "0";
+      return;
+    }
     if (!this.open || !this.live || !this.shots.length) return;
     this.time += dt;
     this.shotTime += dt;
@@ -1194,6 +1209,7 @@ export class MainMenu {
   }
 
   ApplyShot(k) {
+    if (this.host.staticBackdrop) return;
     const shot = this.shots[this.shotIndex];
     if (!shot || !this.camera) return;
     const e = EaseInOutSine(k);

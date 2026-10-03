@@ -1,4 +1,37 @@
 /* 主菜单、暂停、任务选择与资料页共用 Style_Interface.css 的 WaW 视觉语言。 */
+
+/* Reference command room: title-only layout; pause/death retain their existing contracts. */
+#menu.commandRoom .mnVignette { backdrop-filter:none;
+  background:linear-gradient(90deg,rgba(4,5,5,.84) 0%,rgba(5,6,6,.55) 24%,rgba(5,6,6,.12) 49%,transparent 70%); }
+#menu.commandRoom .mnVignette::before,#menu.commandRoom .mnVignette::after,
+#menu.commandRoom .mnTitleLines,#menu.commandRoom .mnShotNote,#menu.commandRoom .mnItemHint { display:none; }
+#menu.commandRoom .mnTitle { left:5.1%;top:17.4%;max-width:76%; }
+#menu.commandRoom .mnTitleMain { font-size:clamp(34px,5vw,92px);line-height:1.13;letter-spacing:.025em;
+  font-weight:900;color:#eeeee7;text-shadow:0 2px 5px #0006;white-space:nowrap;
+  padding-bottom:1.35vh;border-bottom:1px solid #b5b4a65c; }
+#menu.commandRoom .mnTitleSub { margin-top:1.4vh;font-size:clamp(12px,1.25vw,22px);letter-spacing:.21em;color:#c5c5bd; }
+#menu.commandRoom .mnList { left:5.1%;top:40.7%;bottom:14%;width:min(450px,31vw);gap:.8vh;overflow:visible; }
+#menu.commandRoom .mnItem { min-height:5.75vh;padding:5px 1.6vw;font-size:clamp(19px,1.82vw,32px);
+  font-weight:400;letter-spacing:.16em;border:0;border-left:5px solid transparent;color:#b9bcb7; }
+#menu.commandRoom .mnItem.on { color:var(--ui-gold);background:linear-gradient(90deg,#d8d4c326,#bbb7a90a);
+  border-left-color:#edca83;border-image:none; }
+#menu.commandRoom .mnItem[data-act="debug"] { min-height:3.5vh;font-size:clamp(12px,1vw,17px);margin-top:.5vh;opacity:.72; }
+#menu.commandRoom .mnFoot { left:5.4%;bottom:7.5%;font-size:clamp(11px,1.1vw,19px);letter-spacing:.06em;color:#bfc2ba; }
+@media(max-aspect-ratio:1/1) {
+ #menu.commandRoom .mnTitle{top:16%;max-width:90%}
+ #menu.commandRoom .mnTitleMain{font-size:7.4vw}
+ #menu.commandRoom .mnTitleSub{font-size:2.6vw}
+ #menu.commandRoom .mnList{width:62vw}
+}
+@media(max-height:560px) {
+ #menu.commandRoom .mnTitle{top:8%}
+ #menu.commandRoom .mnTitleMain{font-size:6.9vh}
+ #menu.commandRoom .mnTitleSub{font-size:3vh}
+ #menu.commandRoom .mnList{top:35%;bottom:15%;overflow-y:auto;width:42vw;gap:0}
+ #menu.commandRoom .mnItem{min-height:32px;font-size:18px;padding-block:3px}
+ #menu.commandRoom .mnFoot{font-size:10px;bottom:5%}
+}
+
 #menu { position: fixed; inset: 0; z-index: 30; pointer-events: none; font-family: var(--ui-font); }
 #menu.off { display: none; }
 .mnVignette {

@@ -63,11 +63,15 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=<起点提交> --profile=qu
 | `Detail` | 细节层打包（例：军装布纹 RG 法线 / B 明暗 / A 污渍），语义写 `packing` | `NoColorSpace` |
 | `Atlas` | 序列帧 / 多格图集（颜色） | `SRGBColorSpace` |
 | `Image` | 整张画面：HUD、菜单、印刷品、图标 | CSS / sRGB |
+| `Image`（`lightmap`） | 独立 UV 的静态辐照度图集，编码倍率写在 `packing` | sRGB 解码后按倍率恢复线性 |
 | `Environment` | HDR 环境图（`.hdr` 白名单） | 线性 |
 
 `BaseColor` / `MetallicRoughness`（glTF 通道名）与 `Tool` 只允许出现在 legacy 条目。另外存 `…Metallic.webp` / `…Roughness.webp` 这种拆通道图是**禁止**的：运行时只读 ORM（2026-09-28 已删 30 张）。
 
 清单的 `kind` 决定规则分支：`material`、`terrainLayer`、`decal`、`vfx`、`detail`、`print`、`hud`、`menu`、`icon`、`environment`、`doc`（以及只许 legacy 的 `bakeInput`、`tool`）。完整定义在 `Data_TextureManifest.TEXTURE_KINDS`。
+
+静态室内的 `lightmap` 图集使用独立 UV，必须与反照率分离；WebP 正方形、2 的幂、上限 2048。
+条目必须记录线性辐照度的编码倍率以及烘焙脚本，不能把整张概念图作为几何光照图。
 
 ## 3. 格式与尺寸
 
