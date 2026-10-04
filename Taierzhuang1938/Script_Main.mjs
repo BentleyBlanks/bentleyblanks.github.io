@@ -3188,7 +3188,7 @@ async function Boot() {
   // 建在最末：它要拿相机、要知道现在建好的是哪一关（决定用哪一组机位），
   // 还要能把编辑器的齿轮藏起来 —— 三样东西到这一步才齐。
   if ((MENU_ON || FIRST_LEVEL_P012_WHITEBOX) && menuRoot) {
-    commandRoom = new CommandRoom(renderer);
+    commandRoom = new CommandRoom(renderer, { isActive: () => !!menu?.live && !!menu?.open && !editor?.Capturing });
     if (MENU_AT_BOOT) await commandRoom.Load();
     window.Taierzhuang.Debug.CommandRoom = () => commandRoom.State();
     menu = new MainMenu({

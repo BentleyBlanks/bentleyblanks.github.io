@@ -714,6 +714,21 @@ await page.click(".edPanel.launcher .edX");
   // 焦距语汇沿用分镜表：35 mm ≈ 37.8°，不该是玩法用的 55°
   const room = await page.evaluate(() => window.Taierzhuang.Debug.CommandRoom());
   Check("实际渲染 Blender 指挥室、独立相机及烘焙光照", room.ready && room.frames > 0 && room.meshes >= 10 && room.triangles > 30000 && room.textureCount === 12 && room.lighting === "Cycles diffuse UV1" && room.camera.fov !== after.fov, JSON.stringify(room));
+  const titleBefore = await page.locator(".mnTitleMain").boundingBox();
+  await page.mouse.move(30,30);
+  await page.evaluate(() => window.Taierzhuang.StepFrames(45));
+  const pointerLeft = await page.evaluate(() => window.Taierzhuang.Debug.CommandRoom());
+  const viewport = page.viewportSize();
+  await page.mouse.move(viewport.width-30,30);
+  await page.evaluate(() => window.Taierzhuang.StepFrames(45));
+  const pointerRight = await page.evaluate(() => window.Taierzhuang.Debug.CommandRoom());
+  const titleAfter = await page.locator(".mnTitleMain").boundingBox();
+  Check("鼠标只轻移指挥室相机，UI 保持原位置", pointerRight.camera.position[0]-pointerLeft.camera.position[0]>.05
+    && pointerRight.camera.position[0]-pointerLeft.camera.position[0]<.19
+    && titleBefore.x===titleAfter.x && titleBefore.y===titleAfter.y
+    && pointerRight.atmosphere.depthOcclusion && pointerRight.atmosphere.lightShadow,
+    JSON.stringify({left:pointerLeft.camera.position,right:pointerRight.camera.position,atmosphere:pointerRight.atmosphere}));
+  await page.mouse.move(viewport.width/2,viewport.height/2);
 
   const shots = await page.evaluate(() => window.Taierzhuang.Debug.Menu().shotCount);
   Check("主菜单使用一个参考图固定机位", shots === 1, `shots=${shots}`);

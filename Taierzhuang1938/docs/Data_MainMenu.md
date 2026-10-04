@@ -11,9 +11,20 @@
 单一窗光及间接光在 Blender 中烘焙为独立的 2048² UV1 辐照度图集，
 不包含纸面或 PBR 反照率；运行时解码后交给标准材质的 `lightMap`。
 因此不再叠加第二个运行时太阳或重复 AO。纸面文字始终来自原始确认图。
-场景包含独立相机；只在 `menu.live` 时通过已有 renderer 绘制，逐帧恢复
+场景包含独立相机；鼠标位置驱动该相机在原机位附近缓动，水平上限 8.5 cm、
+竖直上限 4.5 cm，近处信件与远处地图产生不同视差。DOM 标题和菜单不跟随。
+离开窗口或失焦后缓慢回正；触屏不触发悬停视差，减少动态效果偏好下保持原机位。
+输入只在主菜单激活时生效，不改变玩法相机。
+只在 `menu.live` 时通过已有 renderer 绘制，逐帧恢复
 玩法渲染目标、viewport、scissor、色调映射及阴影开关。静态物件无角色动画，
-浮尘为透明、不写深度的粒子；不参与玩法运动向量或主场景后期。
+浮尘为透明、不写深度的世界空间粒子；不参与玩法运动向量或主场景后期。
+`Script_CommandRoomAtmosphere` 在真实窗洞挤出的体积内积分光线，用相机深度终止
+积分，并用独立的静态光源深度图处理窗棂和家具遮挡。半分辨率体积图通过深度权重
+上采样后与线性场景颜色合成，再统一进行色调映射；没有背景图片平移。
+尘埃受同一光源深度图约束，阴影内不可见。调节入口为 `windowHaze` 和 `dust`。
+方案参考 [VLB 深度要求](https://saladgamer.com/vlb-doc/compatibility/)
+与 [世界空间浮尘](https://www.saladgamer.com/vlb-doc/comp-dustparticles/)，
+实现为本项目 WebGL shader；不依赖 Unity 插件或外部运行库。
 暂停、阵亡及进入游戏保留原场景和相机。
 
 菜单保留六项功能。标题态使用参考图的左侧宋体大标题和金色竖条；
@@ -43,6 +54,8 @@ GLB 中静态几何按材质合并；预算见 `Data_AssetStandards.CommandRoom`
 检查：`Script_MenuTest.mjs --interface-only` 验证键盘、菜单与窄屏；完整
 `Script_MenuTest.mjs` 验证独立场景绘制、固定机位、不推进兵员池及游戏切换。
 另外运行 ModuleGraph、TextureStandards、Text 与 AssetStandards 检查。
+`Script_CommandRoomBrowserTest.mjs` 实测不同深度物体的视差、缓动与回正、触屏和
+减少动态效果、相机方向与光源方向两种遮挡、renderer 状态恢复和尺寸变化。
 
 对应实现：`Data_Menu.mjs`（机位表）、`Script_Menu.mjs`（菜单本体）、`Style_Menu.css`、
 `Script_Main.mjs` 的菜单接线、`Script_MenuTest.mjs`（冒烟）。

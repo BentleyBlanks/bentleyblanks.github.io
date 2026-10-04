@@ -47,6 +47,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  CommandRoomBrowserTest: {file:"Script_CommandRoomBrowserTest.mjs",timeoutMs:120000,desc:"Command-room mesh parallax, depth-occluded window beam, particles and renderer isolation"},
   TextureImportTest: {file:"Script_TextureImportTest.mjs",desc:"Texture importer: codecs, alpha data, mipmaps and publish staging"},
   TextureManagerBrowserTest: {file:"Script_TextureManagerBrowserTest.mjs",timeoutMs:180000,desc:"Texture manager: actual previews, save/reload, procedural worker and GPU decoding"},
   AllyGaitTest: {file:"Script_AllyGaitTest.mjs",desc:"Ally gait policy, actual skin contact, stable forward lean, loop seams and bone lengths"},
@@ -524,7 +525,7 @@ export const browserTests = new Set([
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
   "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
-  "ClusteredLightsTest", "MaterialUpgradeTest",
+  "ClusteredLightsTest", "MaterialUpgradeTest", "CommandRoomBrowserTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "TerrainBlendTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
@@ -707,7 +708,7 @@ export const domains = {
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
-  menu: { label: "主菜单/加载画面", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootInteractionTest"] },
+  menu: { label: "主菜单/加载画面", tests: ["FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootInteractionTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",

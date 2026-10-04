@@ -1,13 +1,14 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { COMMAND_ROOM as DATA } from "./Data_Tuning_CommandRoom.mjs";
+import { CommandRoomAtmosphere } from "./Script_CommandRoomAtmosphere.mjs";
 
 /** A real, batched Blender scene; uses the existing renderer only during title menu frames.
  * All geometry is static. Transparent moving dust is excluded from depth/velocity passes.
  * Gameplay camera, render targets, tone mapping and shadow settings are restored after every draw.
  */
 export class CommandRoom {
-  constructor(renderer) {
+  constructor(renderer, { isActive = () => true } = {}) {
     this.renderer = renderer;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(DATA.background);
@@ -20,6 +21,31 @@ export class CommandRoom {
     this.savedViewport = new THREE.Vector4();
     this.savedScissor = new THREE.Vector4();
     this.drawSize = new THREE.Vector2();
+    this.pointerTarget = new THREE.Vector2();
+    this.pointer = new THREE.Vector2();
+    this.isActive = isActive;
+    this.basePosition = new THREE.Vector3();
+    this.baseQuaternion = new THREE.Quaternion();
+    this.cameraRight = new THREE.Vector3();
+    this.cameraUp = new THREE.Vector3();
+    this.baseAim = new THREE.Vector3();
+    this.aim = new THREE.Vector3();
+    this.offset = new THREE.Vector3();
+    this.motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    this.OnPointerMove = event => {
+      if (event.pointerType === "touch" || this.motionQuery.matches || !this.isActive() || document.pointerLockElement) return;
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      this.pointerTarget.set(THREE.MathUtils.clamp((event.clientX-rect.left)/rect.width*2-1,-1,1),
+        THREE.MathUtils.clamp(1-(event.clientY-rect.top)/rect.height*2,-1,1));
+    };
+    this.ResetPointer = () => this.pointerTarget.set(0,0);
+    this.OnMotionPreference = () => { this.ResetPointer(); if (this.motionQuery.matches) this.pointer.set(0,0); };
+    document.addEventListener("pointermove",this.OnPointerMove,{passive:true});
+    document.addEventListener("pointerleave",this.ResetPointer);
+    window.addEventListener("blur",this.ResetPointer);
+    window.addEventListener("resize",this.ResetPointer);
+    this.motionQuery.addEventListener("change",this.OnMotionPreference);
   }
   Load() {
     this.loadingPromise ??= this.LoadAssets();
@@ -51,6 +77,11 @@ export class CommandRoom {
     if (!this.camera) throw new Error("Command room GLB is missing its authored camera");
     this.camera.near = DATA.cameraNear;
     this.camera.far = DATA.cameraFar;
+    this.basePosition.copy(this.camera.position);
+    this.baseQuaternion.copy(this.camera.quaternion);
+    this.cameraRight.set(1,0,0).applyQuaternion(this.baseQuaternion);
+    this.cameraUp.set(0,1,0).applyQuaternion(this.baseQuaternion);
+    this.baseAim.set(0,0,-DATA.parallax.focusDistance).applyQuaternion(this.baseQuaternion).add(this.basePosition);
     const byName = new Map(materialSets.map(set => [set.spec.name, set]));
     let meshes = 0, triangles = 0;
     gltf.scene.traverse(object => {
@@ -87,63 +118,23 @@ export class CommandRoom {
     });
     // Static direct and indirect diffuse lighting is already in the UV1 atlas.
     // Do not add a second sun or multiply baked shadows by another AO term.
-    this.BuildDust();
+    this.atmosphere = new CommandRoomAtmosphere(this.renderer,this.scene,DATA.windowHaze);
+    this.dust = this.atmosphere.BuildDust(DATA.dust);
     this.stats = { meshes, triangles, textureCount: this.textures.length, model: DATA.model, version: DATA.version, lighting: "Cycles diffuse UV1" };
     this.ready = true;
     return this;
   }
-  BuildDust() {
-    const positions = new Float32Array(DATA.dust.count * 3);
-    let seed = 1938;
-    const Rand = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-    for (let i = 0; i < DATA.dust.count; i++) {
-      positions[i * 3] = -1.95 + Rand() * 1.55;
-      positions[i * 3 + 1] = 0.8 + Rand() * 1.9;
-      positions[i * 3 + 2] = -1.20 + Rand() * 1.85;
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    const mat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false,
-      uniforms: { clock: { value: 0 }, tint: { value: new THREE.Color(DATA.dust.color) },
-        opacity: { value: DATA.dust.opacity }, size: { value: DATA.dust.size }, drift: { value: DATA.dust.drift } },
-      vertexShader: `uniform float clock; uniform float size; uniform float drift;
-        void main() { vec3 p=position; p.x+=sin(clock*.19+p.y*3.)*drift;
-          p.y+=sin(clock*.23+p.z*4.)*drift; vec4 mv=modelViewMatrix*vec4(p,1.);
-          gl_PointSize=clamp(size*550./-mv.z,1.,3.); gl_Position=projectionMatrix*mv; }`,
-      fragmentShader: `uniform vec3 tint; uniform float opacity;
-        void main(){float d=length(gl_PointCoord-.5);float a=(1.-smoothstep(.12,.5,d))*opacity;
-          if(a<.005)discard;gl_FragColor=vec4(tint,a);}`,
-    });
-    this.dust = new THREE.Points(geometry, mat);
-    this.dust.name = "CommandRoomWindowDust";
-    this.scene.add(this.dust);
-    const haze = DATA.windowHaze;
-    const hazeMaterial = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-      uniforms: { tint: { value: new THREE.Color(haze.color) }, opacity: { value: haze.opacity } },
-      vertexShader: `varying vec2 fogUv; void main(){fogUv=uv;
-        gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}`,
-      fragmentShader: `varying vec2 fogUv; uniform vec3 tint; uniform float opacity;
-        void main(){vec2 d=min(fogUv,1.-fogUv);float edge=smoothstep(0.,.13,min(d.x,d.y));
-          gl_FragColor=vec4(tint,opacity*edge);}`,
-    });
-    const shafts = new THREE.InstancedMesh(new THREE.PlaneGeometry(...haze.size), hazeMaterial, haze.slices);
-    const start = new THREE.Vector3().fromArray(haze.center), direction = new THREE.Vector3().fromArray(haze.direction).normalize();
-    const matrix = new THREE.Matrix4();
-    for (let i = 0; i < haze.slices; i++) {
-      const p = start.clone().addScaledVector(direction, (i + .5) / haze.slices * haze.length);
-      shafts.setMatrixAt(i, matrix.makeTranslation(p.x, p.y, p.z));
-    }
-    shafts.instanceMatrix.needsUpdate = true;
-    shafts.name = "CommandRoomWindowHaze";
-    shafts.frustumCulled = false;
-    this.scene.add(shafts);
-  }
   Update(dt) {
     this.time += Math.min(dt, 0.1);
-    if (this.dust) this.dust.material.uniforms.clock.value = this.time;
+    if (!this.camera) return;
+    if (!this.isActive() || this.motionQuery.matches) this.ResetPointer();
+    this.pointer.lerp(this.pointerTarget,1-Math.exp(-Math.max(0,Math.min(dt,.1))/DATA.parallax.responseSeconds));
+    if (this.motionQuery.matches) this.pointer.set(0,0);
+    this.offset.copy(this.cameraRight).multiplyScalar(this.pointer.x*DATA.parallax.horizontal);
+    this.offset.addScaledVector(this.cameraUp,this.pointer.y*DATA.parallax.vertical);
+    this.camera.position.copy(this.basePosition).add(this.offset);
+    this.aim.copy(this.baseAim).addScaledVector(this.offset,DATA.parallax.aimFollow);
+    this.camera.lookAt(this.aim);
   }
   Render() {
     if (!this.ready) return;
@@ -164,7 +155,7 @@ export class CommandRoom {
       r.shadowMap.enabled = false;
       r.shadowMap.autoUpdate = false;
       r.shadowMap.needsUpdate = this.frames === 0;
-      r.render(this.scene, this.camera);
+      this.atmosphere.Render(this.camera,this.time);
       this.frames++;
     } finally {
       r.autoClear = autoClear; r.toneMapping = tone; r.toneMappingExposure = exposure;
@@ -174,9 +165,17 @@ export class CommandRoom {
   }
   State() {
     return { ready: this.ready, frames: this.frames, ...this.stats,
-      camera: this.camera ? { position: this.camera.getWorldPosition(new THREE.Vector3()).toArray(), fov: this.camera.fov } : null };
+      camera: this.camera ? { position: this.camera.getWorldPosition(new THREE.Vector3()).toArray(), fov: this.camera.fov } : null,
+      parallax: { pointer: this.pointer.toArray(), target: this.pointerTarget.toArray(), reducedMotion: this.motionQuery.matches },
+      atmosphere: { particles: DATA.dust.count, depthOcclusion: !!this.atmosphere, lightShadow: !!this.atmosphere && !this.atmosphere.shadowDirty } };
   }
   Dispose() {
+    document.removeEventListener("pointermove",this.OnPointerMove);
+    document.removeEventListener("pointerleave",this.ResetPointer);
+    window.removeEventListener("blur",this.ResetPointer);
+    window.removeEventListener("resize",this.ResetPointer);
+    this.motionQuery.removeEventListener("change",this.OnMotionPreference);
+    this.atmosphere?.Dispose();
     this.scene.traverse(object => {
       if (object.geometry) object.geometry.dispose();
       if (object.material) for (const mat of Array.isArray(object.material) ? object.material : [object.material]) mat.dispose();
