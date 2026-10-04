@@ -118,11 +118,42 @@ export class CommandRoom {
     });
     // Static direct and indirect diffuse lighting is already in the UV1 atlas.
     // Do not add a second sun or multiply baked shadows by another AO term.
+    this.CaptureGlassReflection();
     this.atmosphere = new CommandRoomAtmosphere(this.renderer,this.scene,DATA.windowHaze);
     this.dust = this.atmosphere.BuildDust(DATA.dust);
     this.stats = { meshes, triangles, textureCount: this.textures.length, model: DATA.model, version: DATA.version, lighting: "Cycles diffuse UV1" };
     this.ready = true;
     return this;
+  }
+  CaptureGlassReflection() {
+    const glass=[];
+    this.scene.traverse(object=>{
+      if(object.isMesh && object.material?.name===DATA.reflection.material) glass.push(object);
+    });
+    if(!glass.length) return;
+    this.scene.updateMatrixWorld(true);
+    const bounds=new THREE.Box3().setFromObject(glass[0]);
+    const cube=new THREE.WebGLCubeRenderTarget(DATA.reflection.size,{type:THREE.HalfFloatType});
+    const camera=new THREE.CubeCamera(DATA.reflection.near,DATA.reflection.far,cube);
+    bounds.getCenter(camera.position);
+    const generator=new THREE.PMREMGenerator(this.renderer),r=this.renderer;
+    const target=r.getRenderTarget(),face=r.getActiveCubeFace(),mip=r.getActiveMipmapLevel();
+    const viewport=r.getViewport(new THREE.Vector4()),scissor=r.getScissor(new THREE.Vector4());
+    const scissorTest=r.getScissorTest(),autoClear=r.autoClear;
+    const visible=glass.map(object=>object.visible);
+    try {
+      glass.forEach(object=>{object.visible=false;});
+      r.setScissorTest(false);r.autoClear=true;
+      camera.update(r,this.scene);
+      this.reflection=generator.fromCubemap(cube.texture);
+      for(const object of glass){object.material.envMap=this.reflection.texture;
+        object.material.envMapIntensity=DATA.reflection.intensity;object.material.needsUpdate=true;}
+    } finally {
+      glass.forEach((object,i)=>{object.visible=visible[i];});
+      cube.dispose();generator.dispose();
+      r.setRenderTarget(target,face,mip);r.setViewport(viewport);r.setScissor(scissor);
+      r.setScissorTest(scissorTest);r.autoClear=autoClear;
+    }
   }
   Update(dt) {
     this.time += Math.min(dt, 0.1);
@@ -176,6 +207,7 @@ export class CommandRoom {
     window.removeEventListener("resize",this.ResetPointer);
     this.motionQuery.removeEventListener("change",this.OnMotionPreference);
     this.atmosphere?.Dispose();
+    this.reflection?.dispose();
     this.scene.traverse(object => {
       if (object.geometry) object.geometry.dispose();
       if (object.material) for (const mat of Array.isArray(object.material) ? object.material : [object.material]) mat.dispose();

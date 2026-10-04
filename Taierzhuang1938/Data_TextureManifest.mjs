@@ -97,7 +97,7 @@ export const TEXTURE_BUDGETS = Object.freeze({
     ui: 5.5 * 1024 * 1024,
     // Dedicated command-room set adds 2.5 MB: three PBR sets and two legible print props.
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
-    lazy: 8 * 1024 * 1024,
+    lazy: 10 * 1024 * 1024, // Includes lossless command-room irradiance; lossy chroma causes wall/floor blotches.
     editor: 0.25 * 1024 * 1024,
   }),
   totalBytes: 54 * 1024 * 1024,      // Texture/ 全目录（含 offline 的搁置资产）
@@ -106,12 +106,12 @@ export const TEXTURE_BUDGETS = Object.freeze({
 export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "CommandRoomLighting", kind: "lightmap", tier: "lazy",
-    packing: "RGB = sRGB(linear diffuse irradiance / 32); UV1; direct + indirect, no albedo",
+    packing: "Lossless RGB = sRGB(linear diffuse irradiance / 32); UV1; direct + indirect, no albedo",
     bake: "_blender/Script_BakeCommandRoomLighting.py",
     source: { provider: "procedural", date: "2026-10-04", ref: "_blender/Script_BakeCommandRoomLighting.py" },
     consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomLighting" }],
     files: [["Texture_CommandRoomLightingImage.webp", "Image", 2048, 2048]],
-    note: "Blender Cycles irradiance only; separate from Imagegen PBR material textures. Encoded by _import/Script_EncodeCommandRoomLighting.py.",
+    note: "Blender Cycles irradiance only; separate from Imagegen PBR material textures. Lossless WebP with pixel-exact RGB round-trip; lossy YUV chroma is amplified into colored blocks. Encoded by _import/Script_EncodeCommandRoomLighting.py.",
   },
   {
     id: "CommandRoomWood", kind: "material", tier: "lazy",

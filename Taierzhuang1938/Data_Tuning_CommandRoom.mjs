@@ -1,6 +1,6 @@
 // Dedicated static menu set. Values are authored against the three approved references.
 export const COMMAND_ROOM = Object.freeze({
-  version: "202610041340",
+  version: "202610042300",
   model: "./Model/Model_CommandRoom.glb",
   background: 0x373936,
   cameraNear: 0.05,
@@ -10,6 +10,8 @@ export const COMMAND_ROOM = Object.freeze({
   // UV1 irradiance from Blender Cycles, separate from all surface albedos.
   bakedLighting: Object.freeze({ name: "CommandRoomLighting", scale: 32, intensity: 3.141592653589793 }),
   outside: Object.freeze({ color: 0xa3abb1, intensity: 0.75 }),
+  // A one-time capture of this room supplies the ink glass's window reflection.
+  reflection: Object.freeze({ material: "CommandRoomInkGlass", size: 128, near: .02, far: 16, intensity: 1.25 }),
   brickTint: 0x70716d,
   materials: Object.freeze([
     { name: "CommandRoomWood", kind: "pbr", normal: 0.45, tint: 0xffffff },

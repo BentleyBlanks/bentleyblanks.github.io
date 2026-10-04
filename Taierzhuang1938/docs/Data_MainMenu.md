@@ -11,6 +11,10 @@
 单一窗光及间接光在 Blender 中烘焙为独立的 2048² UV1 辐照度图集，
 不包含纸面或 PBR 反照率；运行时解码后交给标准材质的 `lightMap`。
 因此不再叠加第二个运行时太阳或重复 AO。纸面文字始终来自原始确认图。
+辐照度交付采用无损 WebP；编码器逐像素校验 RGB 往返一致，避免暗部有损色度
+压缩被 32 倍解码放大为墙地面的绿色、紫色色块。地面延伸覆盖宽屏可见范围。
+墨水瓶玻璃在加载时从自身位置捕获一次 128² 房间 cubemap 并预滤波，
+反射来自这间屋子的真实窗户与家具；其余材质继续使用静态漫反射图集。
 场景包含独立相机；鼠标位置驱动该相机在原机位附近缓动，水平上限 8.5 cm、
 竖直上限 4.5 cm，近处信件与远处地图产生不同视差。DOM 标题和菜单不跟随。
 离开窗口或失焦后缓慢回正；触屏不触发悬停视差，减少动态效果偏好下保持原机位。
@@ -36,6 +40,13 @@
 重建时用世界空间三角网格检查椅桌穿插。帽檐、两支 18.5 cm 铅笔、木尺、
 小墨水瓶和蘸水笔按桌板与纸面实际高度落放，保留 0.6 mm 接触余量，
 逐组检查与支撑面不相交。墨水瓶和蘸水笔是一般年代陈设，并非王铭章实物复原。
+`_blender/Script_CommandRoomDetails.py` 按 `Source/Reference_Cap.png`、
+`Reference_Coat.png`、`Reference_InkBottle.png` 三张 Imagegen 建模参考细化帽冠褶皱、
+有厚度帽檐、缝线、纽扣、衣领、门襟、贴袋、空袖口与玻璃瓶肩、瓶底及旋盖。
+三视图是美术建模参考，不作为历史原件证据。
+电报网格沿原图纸边裁切，保留原有手写内容、旧纸缺口与卷边，不再带白色矩形底框。
+边界数据为 `_blender/Data_CommandRoomPaperOutline.json`，可用
+`_import/Script_TraceCommandRoomPaper.py` 从已确认的纸图重新提取。
 相邻 `Source` 保留生成原图和三张参考，`Textures` 保存 Blender 依赖，
 不依赖本地 worktree 永久存在。几何重建入口为 `_blender/Script_BuildCommandRoom.py`；
 用 `COMMAND_ROOM_ROOT` 指定仓库根，随后通过根目录 `scripts/Script_BlenderMcp.mjs exec --file` 执行。
@@ -44,13 +55,19 @@
 和 `_import/Script_EncodeCommandRoomLighting.py --source <源工程目录>/Textures/Texture_CommandRoomLighting.png`。
 后者需要 Pillow。烘焙脚本以 256 samples 生成无重叠 UV1 和 HDR EXR；交付图采用
 `sRGB(linear irradiance / 32)`，运行时恢复 32 倍与 Lambert π 系数。
+亚毫米缝线在烘焙后复用最近布面的 UV1 辐照度，避免单独图块小于像素而出现
+断续黑线；每个微小针脚面统一采样，避免跨 UV 岛插值。帽服褶皱中不足 2.5 像素、
+不超过 10 面的孤立小图块也从相邻同向布面补采辐照度，避免孤立黑斑。
+主体网格仍独立排布，缝线几何照常参与遮挡。两步分别由
+`Script_CommandRoomMicroCharts.py` 和 `Script_CommandRoomThreadLighting.py` 在光照烘焙后执行。
 固定镜头的直接、间接漫反射均计入图集，材质本身仍使用独立 PBR 套；
 移动道具或改变时刻需要重新烘焙。最终 GLB 必须以光照烘焙后的版本为准。
 生成提示词在 `_import/Prompts/Texture_CommandRoom*.txt`，PBR 烘焙记录在
 `_import/TextureBakes/`；已确认的纸图用 `_import/Script_BakeCommandRoomPrints.py --source <Source>` 转 WebP。
 
 贴图按菜单使用时加载，不加入共享 `PBR_SETS`。三套 PBR、两张纸面和一张光照图集，
-在 `Data_TextureManifest` 的 lazy 层单独登记并把整层预算扩到 8 MB。
+在 `Data_TextureManifest` 的 lazy 层单独登记；无损光照数据使该层预算为 10 MB，
+全目录预算保持 54 MB。反射探针由场景运行时生成，不增加外部贴图请求。
 GLB 中静态几何按材质合并；预算见 `Data_AssetStandards.CommandRoom`。
 `Debug.CommandRoom()` 提供实际加载、绘制帧数、三角数和相机证据。
 视觉证据保留在忽略目录 `_shots/CommandRoom/`。

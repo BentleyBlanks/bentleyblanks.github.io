@@ -10,7 +10,11 @@ GAME=ROOT/'Taierzhuang1938'
 SOURCE=Path(r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\CommandRoom')
 assert Path(bpy.data.filepath).resolve()==(SOURCE/'Scene_CommandRoom.blend').resolve()
 scene=bpy.context.scene
-objects=[o for o in scene.objects if o.type=='MESH']
+allObjects=[o for o in scene.objects if o.type=='MESH']
+# Sub-millimetre sewn threads borrow the underlying cloth's irradiance UVs.
+# Dedicated packed charts are narrower than a texel and develop black seams.
+threads=[o for o in allObjects if o.data.materials[0].name=='CommandRoomThread']
+objects=[o for o in allObjects if o not in threads]
 bpy.ops.object.select_all(action='DESELECT')
 for ob in objects:
     ob.select_set(True)
@@ -26,7 +30,8 @@ bpy.ops.object.mode_set(mode='OBJECT')
 # Adjust relative texel density before a single shared repack; never overlap charts.
 density={'CommandRoomPlaster':.45,'CommandRoomOutside':.35,'CommandRoomPencilWood':16,'CommandRoomPencilPaint':16,'CommandRoomInkGlass':8,
          'CommandRoomGraphite':20,'CommandRoomIron':6,'CommandRoomDust':2,
-         'CommandRoomCloth':1.5,'CommandRoomLetter':1.5,'CommandRoomMap':1.25}
+         'CommandRoomCloth':2,'CommandRoomPaperEdge':6,
+         'CommandRoomLetter':1.5,'CommandRoomMap':1.25}
 for ob in objects:
     factor=density.get(ob.data.materials[0].name,1)
     for loop in ob.data.uv_layers['LightmapUV'].data: loop.uv*=factor
@@ -57,6 +62,11 @@ scene.render.image_settings.file_format='PNG';scene.render.image_settings.color_
 atlas.save_render(str(png),scene=scene)
 # Keep the HDR original as the editable Blender source image; PNG is delivery input.
 atlas.filepath_raw=str(raw);atlas.reload()
+microScript=GAME/'_blender/Script_CommandRoomMicroCharts.py'
+exec(compile(microScript.read_text(encoding='utf-8'),str(microScript),'exec'),globals())
+threadScript=GAME/'_blender/Script_CommandRoomThreadLighting.py'
+exec(compile(threadScript.read_text(encoding='utf-8'),str(threadScript),'exec'),globals())
+objects=allObjects
 for ob in objects:
     ob.data.uv_layers.active_index=0
     ob.data.uv_layers[0].active_render=True

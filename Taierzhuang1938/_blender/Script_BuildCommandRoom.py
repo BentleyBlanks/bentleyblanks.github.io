@@ -113,7 +113,7 @@ def Curve(name,pts,r,mat):
     bpy.context.view_layer.objects.active=ob;ob.select_set(True);bpy.ops.object.convert(target="MESH");ob.select_set(False)
     return ob
 # Solid enclosure with a true window opening. Camera is inside southern half.
-Cube("Floor",(0,0,-.09),(7,7,.18),plaster,.01)
+Cube("Floor",(1.5,0,-.09),(13,12,.18),plaster,.01)
 wy=1.55
 Cube("WallBelowWindow",(-1.58,wy,.75),(2.84,.24,1.50),plaster,0)
 Cube("WallAboveWindow",(-1.58,wy,3.40),(2.84,.24,.55),plaster,0)
@@ -212,7 +212,7 @@ def Paper(name,cx,cy,z,w,h,mat,angle=0,wall=False):
     return ob
 Paper("WallMap",1.26,1.385,1.82,2.18,1.45,mapmat,wall=True)
 Paper("DeskMap",tx,ty-.10,.894,2.80,2.00,mapmat,math.radians(40)-.035)
-Paper("Telegram",-.142,-.629,.920,.65,.85,letter,-.26)
+# Telegram silhouette is built with the detailed props below.
 # Ordinary 18.5 cm hexagonal pencils with exposed timber and graphite points.
 for i in range(2):
     name=f"Pencil{i}";a=Vector((.02+i*.06,.015+i*.052,.910))
@@ -230,11 +230,6 @@ for i in range(31):
     p=Vector((.46+local.x*math.cos(ang)-local.y*math.sin(ang),-.27+local.x*math.sin(ang)+local.y*math.cos(ang),.913))
     q=p+Vector((math.sin(ang),-math.cos(ang),0))*(.012 if i%5==0 else .006)
     Rod("RulerTick",p,q,.00028,graphite,4)
-# Small unbranded ink bottle and a turned wooden dip pen, no books/envelopes.
-ix=.53;iy=.27;iz=.905
-Cube("InkBottleBody",(ix,iy,iz+.029),(.064,.052,.058),inkGlass,.010)
-Rod("InkBottleNeck",(ix,iy,iz+.048),(ix,iy,iz+.069),.017,inkGlass,24)
-Rod("InkBottleLid",(ix,iy,iz+.067),(ix,iy,iz+.076),.020,iron,24)
 penStart=Vector((.29,.19,.910));penDirection=Vector((.89,-.456,0)).normalized()
 penSide=Vector((-penDirection.y,penDirection.x,0));vs=[];uvs=[]
 profiles=[(0,.0015),(.035,.0032),(.095,.0042),(.135,.0036),(.157,.0025)]
@@ -253,103 +248,9 @@ for j,(along,width) in enumerate([(.153,.0024),(.164,.004),(.174,.003),(.185,.00
 ob=Mesh("DipPenNib",vs,[(j*9+i,j*9+i+1,(j+1)*9+i+1,(j+1)*9+i) for j in range(3) for i in range(8)],iron,uvs,True)
 mod=ob.modifiers.new("Thin steel nib","SOLIDIFY");mod.thickness=.0004
 bpy.context.view_layer.objects.active=ob;bpy.ops.object.modifier_apply(modifier=mod.name)
-# Soft cap: shaped crown, raised seam, band, short stitched brim, two buttons.
-hx=.942;hy=-.092;hz=.907
-n=72;rings=18;vs=[];uvs=[]
-def CapRing(t,a):
-    rad=1+.05*math.sin(t*math.pi)-.12*t
-    ripple=1+.028*math.sin(a*7+t*7)+.012*math.sin(a*13-t*4)
-    return Vector((hx+.168*rad*math.cos(a)*ripple,hy+.146*rad*math.sin(a)*ripple,hz+.065+.088*t+.006*math.sin(a*5)*rad))
-for j in range(rings+1):
-    t=j/rings;rad=math.sin((1-t)*math.pi*.5)
-    for i in range(n+1):
-        a=i/n*math.tau
-        rad=1+.05*math.sin(t*math.pi)-.12*t
-        ripple=1+.018*math.sin(a*7+t*7)+.010*math.sin(a*13-t*4)
-        vs.append(tuple(CapRing(t,a)))
-        uvs.append((i/n*1.1,t*.45))
-fs=[]
-for j in range(rings):
-    for i in range(n):
-        a=j*(n+1)+i;fs.append((a,a+1,a+n+2,a+n+1))
-Mesh("CapCrown",vs,fs,cloth,uvs,True)
-vs=[];uvs=[]
-for j in range(13):
-    r=j/12
-    for i in range(n+1):
-        a=i/n*math.tau
-        p=Vector((hx,hy,hz+.159)).lerp(CapRing(1,a),r)
-        p.z+=.006*math.sin(r*math.pi)*math.sin(a*3+.4)
-        vs.append(tuple(p))
-        uvs.append((.5+r*math.cos(a)*.2,.5+r*math.sin(a)*.2))
-Mesh("CapTop",vs,[(j*(n+1)+i,(j+1)*(n+1)+i,(j+1)*(n+1)+i+1,j*(n+1)+i+1) for j in range(12) for i in range(n)],cloth,uvs,True)
-vs=[];uvs=[]
-for j in range(4):
-    for i in range(n+1):
-        a=i/n*math.tau
-        p=Vector((hx+.164*math.cos(a),hy+.143*math.sin(a),hz)).lerp(CapRing(0,a),j/3)
-        vs.append(tuple(p))
-        uvs.append((i/n*.8,j*.023))
-Mesh("CapBand",vs,[(j*(n+1)+i,j*(n+1)+i+1,(j+1)*(n+1)+i+1,(j+1)*(n+1)+i) for j in range(3) for i in range(n)],cloth,uvs,True)
-for j in [0,1,3]:
-    Curve("CapStitch",[(hx+.168*math.cos(i/n*math.tau),hy+.147*math.sin(i/n*math.tau),hz+.008+j*.017) for i in range(n+1)],.00045,cloth)
-vs=[];uvs=[]
-for j in range(6):
-    t=j/5
-    for i in range(31):
-        a=math.pi*1.13+i/30*math.pi*.74;r=.15+.082*t*math.sin(i/30*math.pi)**.6
-        vs.append((hx+r*math.cos(a),hy+r*.96*math.sin(a),hz+.005+.006*(1-t)+.003*math.cos(a*2)))
-        uvs.append((i/30*.35,t*.15))
-ob=Mesh("CapVisor",vs,[(j*31+i,(j+1)*31+i,(j+1)*31+i+1,j*31+i+1) for j in range(5) for i in range(30)],cloth,uvs,True)
-mod=ob.modifiers.new("Cloth visor thickness","SOLIDIFY");mod.thickness=.0012
-bpy.context.view_layer.objects.active=ob;bpy.ops.object.modifier_apply(modifier=mod.name)
-for z in [.036,.063]:
-    Rod("CapButton",(hx-.024,hy-.144,hz+z),(hx-.024,hy-.151,hz+z),.008,iron,24)
-# Hanging folded coat, sculpted as draping fabric rather than a flat card.
-coatx=-.35;coaty=1.27
-Cube("CoatRack",(coatx,1.405,2.72),(.48,.044,.075),wood,.006)
-Rod("CoatHook",(coatx,1.4,2.73),(coatx,1.23,2.75),.012,iron)
-def Drape(name,xoffset,length,width,depth,phase):
-    nx=26;ny=44;vs=[];uvs=[]
-    for j in range(ny+1):
-        t=j/ny;span=width*(.38+.62*min(1,t*4))
-        for i in range(nx+1):
-            u=i/nx;fold=math.sin(u*math.pi*4+phase+t*.8)*(.018+.035*t)
-            x=coatx+xoffset+(u-.5)*span+.023*math.sin(t*6+phase)
-            y=coaty-depth-fold-.09*math.sin(t*2.8)
-            z=2.70-t*length+.018*math.sin(u*13)*(t**5)
-            vs.append((x,y,z));uvs.append((u*width,t*length))
-    fs=[(j*(nx+1)+i,j*(nx+1)+i+1,(j+1)*(nx+1)+i+1,(j+1)*(nx+1)+i) for j in range(ny) for i in range(nx)]
-    ob=Mesh(name,vs,fs,cloth,uvs,True)
-    mod=ob.modifiers.new("Cloth thickness","SOLIDIFY");mod.thickness=.004
-    bpy.context.view_layer.objects.active=ob;ob.select_set(True);bpy.ops.object.modifier_apply(modifier=mod.name);ob.select_set(False)
-# Tubular tailoring with shoulders, collar opening, sleeves and front buttons.
-vs=[];uvs=[];nc=64;nr=40
-for j in range(nr+1):
-    t=j/nr; width=.065+.12*min(1,t/.14)
-    width*=1-.18*math.sin(t*math.pi)
-    for i in range(nc+1):
-        a=i/nc*math.tau
-        fold=(.012+.027*t)*math.sin(a*7+t*2.6)+.010*math.sin(a*13-t*9)
-        gather=.013*math.sin(t*32+a*4)*math.sin(math.pi*t)**2
-        vs.append((coatx-.11*t+.021*math.sin(t*5)+(width+fold+gather)*math.cos(a+.25*t),1.225+(.082+fold+gather)*math.sin(a)-.029*math.sin(t*7),2.66-t*1.56+.090*math.sin(a*2+.8)*t**3))
-        uvs.append((i/nc*.8,t*1.6))
-Mesh("CoatBody",vs,[(j*(nc+1)+i,j*(nc+1)+i+1,(j+1)*(nc+1)+i+1,(j+1)*(nc+1)+i) for j in range(nr) for i in range(nc)],cloth,uvs,True)
-for side in [-1,1]:
-    vs=[];uvs=[];ns=30;nl=28
-    for j in range(nl+1):
-        t=j/nl;center=Vector((coatx+side*(.15+.050*math.sin(t*math.pi))-.14*t,1.21-.13*t+(0.03 if side>0 else -.04)-.022*math.sin(t*math.pi),2.48-(.84 if side>0 else .99)*t))
-        r=.08-.025*t
-        for i in range(ns+1):
-            a=i/ns*math.tau;rr=r+.009*math.sin(t*23+a*3)+.006*math.sin(a*7+t*5)
-            vs.append(tuple(center+Vector((rr*math.cos(a),rr*math.sin(a),.01*math.sin(a)))))
-            uvs.append((i/ns*.35,t*.86))
-    Mesh("CoatSleeve",vs,[(j*(ns+1)+i,j*(ns+1)+i+1,(j+1)*(ns+1)+i+1,(j+1)*(ns+1)+i) for j in range(nl) for i in range(ns)],cloth,uvs,True)
-for z in [2.32,2.12,1.92,1.72,1.52]:
-    Rod("CoatButton",(coatx-.025,1.132,z),(coatx-.025,1.124,z),.008,iron,16)
-# Camera-facing lapels make the folded coat read as tailoring.
-Mesh("CoatLapelLeft",[(-.46,1.13,2.64),(-.31,1.07,2.63),(-.27,1.08,2.22),(-.43,1.13,2.40)],[(0,1,2,3)],cloth,[(0,0),(1,0),(1,1),(0,1)],True)
-Mesh("CoatLapelRight",[(-.27,1.08,2.63),(-.12,1.13,2.64),(-.10,1.09,2.38),(-.23,1.05,2.20)],[(0,1,2,3)],cloth,[(0,0),(1,0),(1,1),(0,1)],True)
+# Refinements follow the saved Imagegen turnaround references.
+detailsPath=GAME/"_blender/Script_CommandRoomDetails.py"
+exec(compile(detailsPath.read_text(encoding="utf-8"),str(detailsPath),"exec"),globals())
 bpy.context.view_layer.update()
 tableTransform=Matrix.Translation((tx,ty,0))@Matrix.Rotation(math.radians(40),4,"Z")@Matrix.Translation((-tx,-ty,0))
 backdropTransform=Matrix.Translation((-.85,-2.5,1.9))@Matrix.Scale(1.235,4)@Matrix.Translation((.85,2.5,-1.9))
@@ -451,7 +352,8 @@ bpy.ops.object.select_all(action="DESELECT")
 for ob in scene.objects:
     if ob.type in {"MESH","CAMERA"}:ob.select_set(True)
 (GAME/"Model").mkdir(exist_ok=True)
-bpy.ops.export_scene.gltf(filepath=str(GAME/"Model"/"Model_CommandRoom.glb"),export_format="GLB",use_selection=True,export_cameras=True,export_lights=False,export_animations=False,export_extras=True)
+# Keep the live asset intact until the lighting bake exports its matching UV1.
+bpy.ops.export_scene.gltf(filepath=str(SHOTS/"Model_CommandRoomUnbaked.glb"),export_format="GLB",use_selection=True,export_cameras=True,export_lights=False,export_animations=False,export_extras=True)
 for mat,a,b in links:mat.node_tree.links.new(a,b)
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/"Scene_CommandRoom.blend"))
 scene.render.filepath=str(SHOTS/"Scene_CommandRoomBlender.png")
