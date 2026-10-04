@@ -120,9 +120,9 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({ id: "CommandRoom", name: "启动界面指挥室", pack: "Model_CommandRoom.glb",
-    sourceTriangles: 51312, actualTriangles: 51312, targetTriangles: 51312,
+    sourceTriangles: 52232, actualTriangles: 52232, targetTriangles: 52232,
     sourceTexture: "用户确认地图和电文 / Imagegen 旧木、灰墙、布料", runtimeTexture: "三套 1K PBR、两张独立印刷品及 UV1 辐照度图集",
-    policy: "source", note: "BlenderMCP 自建静态环境；按材质合并为 11 个网格。包含独立 glTF 相机，不作为朝向 -Z 的人物或武器使用。" }),
+    policy: "source", note: "BlenderMCP 自建静态环境；按材质合并为 13 个网格。包含独立 glTF 相机，不作为朝向 -Z 的人物或武器使用。" }),
   Object.freeze({ id: "Cigarette", name: "老周卷烟", pack: "Model_Cigarette.glb",
     sourceTriangles: 50000, actualTriangles: 1798, targetTriangles: 1800,
     sourceTexture: "用户 FBX 内嵌 PBR", runtimeTexture: "源 UV / 1K PBR",

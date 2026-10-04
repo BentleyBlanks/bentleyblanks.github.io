@@ -61,10 +61,12 @@ iron=Material("CommandRoomIron",(.08,.075,.063),.83)
 brick=Material("CommandRoomBrick",(.21,.20,.18),.96)
 dust=Material("CommandRoomDust",(.42,.39,.33),.99)
 graphite=Material("CommandRoomGraphite",(.023,.022,.02),.77)
-pencilWood=Material("CommandRoomPencilWood",(.35,.24,.14),.9)
+pencilWood=Material("CommandRoomPencilWood",(.48,.34,.20),.9)
+pencilPaint=Material("CommandRoomPencilPaint",(.26,.115,.033),.86)
+inkGlass=Material("CommandRoomInkGlass",(.045,.028,.016),.30)
 paperEdge=Material("CommandRoomPaperEdge",(.47,.42,.33),.96)
 def Mesh(name, verts, faces, mat, uvs=None, smooth=False):
-    if name in {"CoatBody", "CoatSleeve"}: faces=[tuple(reversed(face)) for face in faces]
+    if name in {"CoatBody", "CoatSleeve", "DipPenNib"}: faces=[tuple(reversed(face)) for face in faces]
     data=bpy.data.meshes.new(name); data.from_pydata(verts,[],faces); data.update()
     ob=bpy.data.objects.new(name,data); scene.collection.objects.link(ob); ob.data.materials.append(mat)
     if uvs:
@@ -173,13 +175,13 @@ for i in range(110):
     o=bpy.context.object;o.name="DryMortarGrain";o.scale.z=.35;o.data.materials.append(dust)
 # Chair behind desk, deliberately empty.
 cx=.02;cy=.84
-Cube("ChairSeat",(cx,cy,.48),(.51,.47,.055),wood,.018)
+Cube("ChairSeat",(cx,cy,.48),(.75,.47,.055),wood,.018)
 for x in [cx-.34,cx+.34]:
-    Cube("ChairBackPost",(x,cy+.19,.73),(.046,.055,1.35),wood,.009)
+    Cube("ChairBackPost",(x,cy+.19,.7025),(.046,.055,1.405),wood,.009)
     Cube("ChairFrontLeg",(x,cy-.18,.23),(.05,.05,.46),wood,.007)
 Cube("ChairCrest",(cx,cy+.19,1.34),(.75,.063,.13),wood,.016)
-Cube("ChairBackSlat",(cx,cy+.19,.91),(.055,.036,.55),wood,.008)
-for x in [cx-.225,cx+.225]:Cube("ChairSideRung",(x,cy,.23),(.028,.43,.03),wood,.006)
+Cube("ChairBackSlat",(cx,cy+.19,.915),(.055,.036,.85),wood,.008)
+for x in [cx-.34,cx+.34]:Cube("ChairSideRung",(x,cy,.23),(.028,.43,.03),wood,.006)
 # Low timber cabinet left of chair.
 cabx=-1.33;caby=1.03
 Cube("CabinetBody",(cabx,caby,.67),(.94,.54,1.31),wood,.009)
@@ -211,20 +213,46 @@ def Paper(name,cx,cy,z,w,h,mat,angle=0,wall=False):
 Paper("WallMap",1.26,1.385,1.82,2.18,1.45,mapmat,wall=True)
 Paper("DeskMap",tx,ty-.10,.894,2.80,2.00,mapmat,math.radians(40)-.035)
 Paper("Telegram",-.142,-.629,.920,.65,.85,letter,-.26)
-# Visible ordinary wood pencils with graphite tips; no envelopes / books.
+# Ordinary 18.5 cm hexagonal pencils with exposed timber and graphite points.
 for i in range(2):
-    a=Vector((.09+i*.065,.025+i*.038,.925));b=a+Vector((.27,-.14,0))
-    Rod("PencilShaft",a,b,.0036,pencilWood,6)
-    d=(b-a).normalized()
-    bpy.ops.mesh.primitive_cone_add(vertices=8,radius1=.0037,radius2=.0010,depth=.026,location=b+d*.013)
-    o=bpy.context.object;o.name="PencilSharpening";o.rotation_euler=d.to_track_quat("Z","Y").to_euler();o.data.materials.append(pencilWood)
-    Rod("PencilLead",b+d*.024,b+d*.03,.001,graphite,8)
-ruler=Cube("WoodRuler",(.48,-.37,.925),(.58,.045,.009),pencilWood,.001);ruler.rotation_euler.z=-.70
-for i in range(51):
-    local=Vector((-.28+i*.0112,.010,.005));ang=-.70
-    p=Vector((.48+local.x*math.cos(ang)-local.y*math.sin(ang),-.37+local.x*math.sin(ang)+local.y*math.cos(ang),.931))
-    q=p+Vector((math.sin(ang),-math.cos(ang),0))*(.013 if i%5==0 else .006)
-    Rod("RulerTick",p,q,.00035,graphite,4)
+    name=f"Pencil{i}";a=Vector((.02+i*.06,.015+i*.052,.910))
+    d=Vector((.87,-.493+ i*.055,0)).normalized();b=a+d*.162
+    Rod(name+"Shaft",a,b,.0035,pencilPaint,6)
+    Rod(name+"ButtWood",a-d*.0005,a,.0035,pencilWood,6)
+    Rod(name+"ButtLead",a-d*.00065,a-d*.00055,.0009,graphite,8)
+    bpy.ops.mesh.primitive_cone_add(vertices=6,radius1=.0035,radius2=.00065,depth=.020,location=b+d*.010)
+    o=bpy.context.object;o.name=name+"Sharpening";o.rotation_euler=d.to_track_quat("Z","Y").to_euler();o.data.materials.append(pencilWood)
+    bpy.ops.mesh.primitive_cone_add(vertices=8,radius1=.00065,radius2=.00005,depth=.003,location=b+d*.0215)
+    o=bpy.context.object;o.name=name+"Lead";o.rotation_euler=d.to_track_quat("Z","Y").to_euler();o.data.materials.append(graphite)
+ruler=Cube("WoodRuler",(.46,-.27,.910),(.34,.032,.005),pencilWood,.001);ruler.rotation_euler.z=-.70
+for i in range(31):
+    local=Vector((-.15+i*.010,.011,.0027));ang=-.70
+    p=Vector((.46+local.x*math.cos(ang)-local.y*math.sin(ang),-.27+local.x*math.sin(ang)+local.y*math.cos(ang),.913))
+    q=p+Vector((math.sin(ang),-math.cos(ang),0))*(.012 if i%5==0 else .006)
+    Rod("RulerTick",p,q,.00028,graphite,4)
+# Small unbranded ink bottle and a turned wooden dip pen, no books/envelopes.
+ix=.53;iy=.27;iz=.905
+Cube("InkBottleBody",(ix,iy,iz+.029),(.064,.052,.058),inkGlass,.010)
+Rod("InkBottleNeck",(ix,iy,iz+.048),(ix,iy,iz+.069),.017,inkGlass,24)
+Rod("InkBottleLid",(ix,iy,iz+.067),(ix,iy,iz+.076),.020,iron,24)
+penStart=Vector((.29,.19,.910));penDirection=Vector((.89,-.456,0)).normalized()
+penSide=Vector((-penDirection.y,penDirection.x,0));vs=[];uvs=[]
+profiles=[(0,.0015),(.035,.0032),(.095,.0042),(.135,.0036),(.157,.0025)]
+for j,(along,radius) in enumerate(profiles):
+    for i in range(17):
+        a=i/16*math.tau
+        vs.append(tuple(penStart+penDirection*along+penSide*(math.cos(a)*radius)+Vector((0,0,math.sin(a)*radius))))
+        uvs.append((i/16,along*4))
+Mesh("DipPenHandle",vs,[(j*17+i,j*17+i+1,(j+1)*17+i+1,(j+1)*17+i) for j in range(len(profiles)-1) for i in range(16)],pencilPaint,uvs,True)
+vs=[];uvs=[]
+for j,(along,width) in enumerate([(.153,.0024),(.164,.004),(.174,.003),(.185,.0002)]):
+    for i in range(9):
+        across=(i/8-.5)*2
+        vs.append(tuple(penStart+penDirection*along+penSide*(across*width)+Vector((0,0,.0012*(1-across*across)))))
+        uvs.append((i/8,j/3))
+ob=Mesh("DipPenNib",vs,[(j*9+i,j*9+i+1,(j+1)*9+i+1,(j+1)*9+i) for j in range(3) for i in range(8)],iron,uvs,True)
+mod=ob.modifiers.new("Thin steel nib","SOLIDIFY");mod.thickness=.0004
+bpy.context.view_layer.objects.active=ob;bpy.ops.object.modifier_apply(modifier=mod.name)
 # Soft cap: shaped crown, raised seam, band, short stitched brim, two buttons.
 hx=.942;hy=-.092;hz=.907
 n=72;rings=18;vs=[];uvs=[]
@@ -270,9 +298,11 @@ for j in range(6):
     t=j/5
     for i in range(31):
         a=math.pi*1.13+i/30*math.pi*.74;r=.15+.082*t*math.sin(i/30*math.pi)**.6
-        vs.append((hx+r*math.cos(a),hy+r*.96*math.sin(a),hz+.007-.012*t+.011*math.cos(a*2)))
+        vs.append((hx+r*math.cos(a),hy+r*.96*math.sin(a),hz+.005+.006*(1-t)+.003*math.cos(a*2)))
         uvs.append((i/30*.35,t*.15))
-Mesh("CapVisor",vs,[(j*31+i,(j+1)*31+i,(j+1)*31+i+1,j*31+i+1) for j in range(5) for i in range(30)],cloth,uvs,True)
+ob=Mesh("CapVisor",vs,[(j*31+i,(j+1)*31+i,(j+1)*31+i+1,j*31+i+1) for j in range(5) for i in range(30)],cloth,uvs,True)
+mod=ob.modifiers.new("Cloth visor thickness","SOLIDIFY");mod.thickness=.0012
+bpy.context.view_layer.objects.active=ob;bpy.ops.object.modifier_apply(modifier=mod.name)
 for z in [.036,.063]:
     Rod("CapButton",(hx-.024,hy-.144,hz+z),(hx-.024,hy-.151,hz+z),.008,iron,24)
 # Hanging folded coat, sculpted as draping fabric rather than a flat card.
@@ -323,6 +353,13 @@ Mesh("CoatLapelRight",[(-.27,1.08,2.63),(-.12,1.13,2.64),(-.10,1.09,2.38),(-.23,
 bpy.context.view_layer.update()
 tableTransform=Matrix.Translation((tx,ty,0))@Matrix.Rotation(math.radians(40),4,"Z")@Matrix.Translation((-tx,-ty,0))
 backdropTransform=Matrix.Translation((-.85,-2.5,1.9))@Matrix.Scale(1.235,4)@Matrix.Translation((.85,2.5,-1.9))
+# Keep the chair crest at its reference height but place its feet on the floor.
+# Turn it toward the diagonal desk and retreat along the desk's rear normal.
+chairTransform=backdropTransform.copy();chairTransform[2][2]=.90;chairTransform[2][3]=0
+chairPivot=chairTransform@Vector((cx,cy,0))
+chairTransform=(Matrix.Translation((-.18*math.sin(math.radians(40)),.18*math.cos(math.radians(40)),0))
+    @Matrix.Translation(chairPivot)@Matrix.Rotation(math.radians(30),4,"Z")
+    @Matrix.Translation(-chairPivot)@chairTransform)
 for ob in list(scene.objects):
     if ob.type=="MESH" and ob.name.startswith("Cap"):
         inverse=ob.matrix_world.inverted()
@@ -331,11 +368,46 @@ for ob in list(scene.objects):
             v.co=inverse@(Vector((hx,hy,hz))+(Matrix.Rotation(math.radians(-35),3,"Z")@(p-Vector((hx,hy,hz))))*1.45)
     if ob.name.startswith(("Table","DryMortar")):
         ob.matrix_world=tableTransform@ob.matrix_world
-    elif ob.type=="MESH" and not ob.name.startswith(("DeskMap","Telegram","Pencil","Ruler","WoodRuler","Cap","Floor","SideWall")):
+    elif ob.type=="MESH" and ob.name.startswith("Chair"):
+        ob.matrix_world=chairTransform@ob.matrix_world
+    elif ob.type=="MESH" and not ob.name.startswith(("DeskMap","Telegram","Pencil","Ruler","WoodRuler","InkBottle","DipPen","Cap","Floor","SideWall")):
         ob.matrix_world=backdropTransform@ob.matrix_world
     if ob.type=="MESH" and len(ob.data.materials) and ob.data.materials[0]==cloth:
         for uv in ob.data.uv_layers:
             for corner in uv.data: corner.uv*=6
+# Validate the furniture before material batching removes individual part names.
+from mathutils.bvhtree import BVHTree
+bpy.context.view_layer.update()
+def WorldBvh(objects):
+    verts=[];faces=[]
+    for ob in objects:
+        start=len(verts);verts.extend(ob.matrix_world@v.co for v in ob.data.vertices)
+        faces.extend(tuple(start+i for i in p.vertices) for p in ob.data.polygons)
+    return BVHTree.FromPolygons(verts,faces)
+supportObjects=[o for o in scene.objects if o.type=='MESH' and o.name.startswith(('TablePlank','DeskMap','Telegram'))]
+supportTree=WorldBvh(supportObjects)
+propContacts={}
+for group,prefixes in {'Pencil0':('Pencil0',),'Pencil1':('Pencil1',),'Ruler':('WoodRuler','RulerTick'),
+    'InkBottle':('InkBottle',),'DipPen':('DipPen',),'Cap':('Cap',)}.items():
+    obs=[o for o in scene.objects if o.type=='MESH' and o.name.startswith(prefixes)]
+    points=[o.matrix_world@v.co for o in obs for v in o.data.vertices]
+    points.extend(o.matrix_world@p.center for o in obs for p in o.data.polygons)
+    delta=-100.0
+    for p in points:
+        hit,normal,index,distance=supportTree.ray_cast(Vector((p.x,p.y,3)),Vector((0,0,-1)),4)
+        if hit is not None:delta=max(delta,hit.z+.0006-p.z)
+    assert delta>-10, f'{group} is off the desk'
+    for o in obs:o.matrix_world=Matrix.Translation((0,0,delta))@o.matrix_world
+    bpy.context.view_layer.update()
+    overlaps=len(WorldBvh(obs).overlap(supportTree))
+    assert overlaps==0, f'{group} intersects its support: {overlaps} triangle pairs'
+    propContacts[group]={'heightAdjustment':delta,'surfaceGap':.0006,'supportIntersections':overlaps}
+chairObjects=[o for o in scene.objects if o.type=='MESH' and o.name.startswith('Chair')]
+tableObjects=[o for o in scene.objects if o.type=='MESH' and o.name.startswith(('TablePlank','TableLeg','TableLongApron','TableShortApron'))]
+chairOverlaps=len(WorldBvh(chairObjects).overlap(WorldBvh(tableObjects)))
+assert chairOverlaps==0, f'Chair intersects table: {chairOverlaps} triangle pairs'
+chairFloor=min((o.matrix_world@v.co).z for o in chairObjects for v in o.data.vertices)
+assert abs(chairFloor)<.001, f'Chair feet off the floor: {chairFloor}'
 # Lighting: single sun through actual left aperture, soft indirect fill.
 world=bpy.data.worlds.new("CommandRoomAmbient");scene.world=world;world.use_nodes=True
 world.node_tree.nodes["Background"].inputs["Color"].default_value=(.48,.52,.57,1)
@@ -384,6 +456,6 @@ for mat,a,b in links:mat.node_tree.links.new(a,b)
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/"Scene_CommandRoom.blend"))
 scene.render.filepath=str(SHOTS/"Scene_CommandRoomBlender.png")
 bpy.ops.render.render(write_still=True)
-summary={"blend":str(SOURCE/"Scene_CommandRoom.blend"),"glb":str(GAME/"Model"/"Model_CommandRoom.glb"),"meshes":len([o for o in scene.objects if o.type=="MESH"]),"triangles":sum(len(p.vertices)-2 for o in scene.objects if o.type=="MESH" for p in o.data.polygons),"camera":{"position":list(cam.location),"rotation":list(cam.rotation_euler),"lens":cam.data.lens},"materials":list(materials),"render":scene.render.filepath}
+summary={"blend":str(SOURCE/"Scene_CommandRoom.blend"),"glb":str(GAME/"Model"/"Model_CommandRoom.glb"),"meshes":len([o for o in scene.objects if o.type=="MESH"]),"triangles":sum(len(p.vertices)-2 for o in scene.objects if o.type=="MESH" for p in o.data.polygons),"camera":{"position":list(cam.location),"rotation":list(cam.rotation_euler),"lens":cam.data.lens},"materials":list(materials),"render":scene.render.filepath,"chairTableIntersections":chairOverlaps,"chairFloor":chairFloor,"propContacts":propContacts}
 (SHOTS/"Data_CommandRoomBuild.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
 print(json.dumps(summary))

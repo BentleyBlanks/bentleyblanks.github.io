@@ -32,6 +32,10 @@
 下文原有战场机位系统仍可运行，正式入口默认启用指挥室。
 
 原工程在 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Scene_CommandRoom.blend`。
+椅子相对原布设转向桌面并沿桌后法线后撤 18 cm，座面、竖条和横撑已连接；
+重建时用世界空间三角网格检查椅桌穿插。帽檐、两支 18.5 cm 铅笔、木尺、
+小墨水瓶和蘸水笔按桌板与纸面实际高度落放，保留 0.6 mm 接触余量，
+逐组检查与支撑面不相交。墨水瓶和蘸水笔是一般年代陈设，并非王铭章实物复原。
 相邻 `Source` 保留生成原图和三张参考，`Textures` 保存 Blender 依赖，
 不依赖本地 worktree 永久存在。几何重建入口为 `_blender/Script_BuildCommandRoom.py`；
 用 `COMMAND_ROOM_ROOT` 指定仓库根，随后通过根目录 `scripts/Script_BlenderMcp.mjs exec --file` 执行。

@@ -24,7 +24,7 @@ bpy.ops.uv.smart_project(angle_limit=math.radians(66),island_margin=.003,area_we
 bpy.ops.object.mode_set(mode='OBJECT')
 # Tiny pencils/ruler marks otherwise get sub-pixel chart widths next to entire walls.
 # Adjust relative texel density before a single shared repack; never overlap charts.
-density={'CommandRoomPlaster':.45,'CommandRoomOutside':.35,'CommandRoomPencilWood':16,
+density={'CommandRoomPlaster':.45,'CommandRoomOutside':.35,'CommandRoomPencilWood':16,'CommandRoomPencilPaint':16,'CommandRoomInkGlass':8,
          'CommandRoomGraphite':20,'CommandRoomIron':6,'CommandRoomDust':2,
          'CommandRoomCloth':1.5,'CommandRoomLetter':1.5,'CommandRoomMap':1.25}
 for ob in objects:
