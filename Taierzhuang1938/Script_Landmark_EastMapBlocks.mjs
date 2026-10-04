@@ -266,7 +266,14 @@ function AddStats(host, field, amount = 1) {
  * builders, or set a named delegate to `null` to reserve its exact frame for a
  * later pass.  Reserved frames are returned, never silently filled with houses.
  */
-export function BuildEastMapBlocks(host, specs, {
+export function BuildEastMapBlocks(host, specs, options) {
+  const steps = BuildEastMapBlockSteps(host, specs, options);
+  let step;
+  do { step = steps.next(); } while (!step.done);
+  return step.value;
+}
+
+export function* BuildEastMapBlockSteps(host, specs, {
   baseY = 0,
   sectorKey = SectorKey,
   canPlace = null,
@@ -289,6 +296,8 @@ export function BuildEastMapBlocks(host, specs, {
   const cells = specs.flatMap((spec, index) => ExpandEastMapBlockSpec(spec, index));
   try {
     for (const rawCell of cells) {
+      // One courtyard per loading slice; preserve authored order and seed indices.
+      yield rawCell;
       const named = NAMED_KIND[rawCell.kind];
       // Named grounds are expressly reserved by the authored map.  Their own
       // builders test exterior props against OnStreet; rejecting the whole

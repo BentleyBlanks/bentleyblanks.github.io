@@ -53,6 +53,7 @@ export class BootPaper {
     this.wrap = els.wrap ?? els.img.parentElement;
     this.tilt = { yaw: 0, pitch: 0 };
     this.pointerId = null;
+    this.idleWaiters = new Set();
     this.lastX = 0;
     this.lastY = 0;
     if (this.wrap) this.BindDrag(this.wrap);
@@ -62,7 +63,7 @@ export class BootPaper {
     wrap.style.setProperty("--bootPaperPerspective", `${BOOT_PAPER_TILT.perspectivePx}px`);
     wrap.style.setProperty("--bootPaperReturn", `${BOOT_PAPER_TILT.returnSeconds}s`);
     wrap.addEventListener("pointerdown", (event) => {
-      if (this.pointerId !== null || !this.shown) return;
+      if (event.button !== 0 || this.pointerId !== null || !this.shown) return;
       this.pointerId = event.pointerId;
       this.lastX = event.clientX;
       this.lastY = event.clientY;
@@ -79,14 +80,37 @@ export class BootPaper {
     });
     const release = (event) => {
       if (event.pointerId !== this.pointerId) return;
-      this.pointerId = null;
-      try { wrap.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
-      wrap.classList.remove("dragging");
-      this.tilt = { yaw: 0, pitch: 0 };      // 回正交给 CSS 过渡
-      this.ApplyTilt();
+      this.ReleaseDrag();
     };
     wrap.addEventListener("pointerup", release);
     wrap.addEventListener("pointercancel", release);
+    wrap.addEventListener("lostpointercapture", release);
+    // Capture can fail on an interrupted gesture; a release outside the paper
+    // must still unblock loading.
+    this.onRelease = release;
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    this.onBlur = () => this.ReleaseDrag();
+    this.onVisibility = () => { if (document.hidden) this.ReleaseDrag(); };
+    window.addEventListener("blur", this.onBlur);
+    document.addEventListener("visibilitychange", this.onVisibility);
+  }
+
+  /** Loading resumes on release, cancellation, loss of focus or Hide; never leave it held. */
+  WaitForIdle() {
+    if (this.pointerId === null || !this.shown) return Promise.resolve();
+    return new Promise(resolve => this.idleWaiters.add(resolve));
+  }
+
+  ReleaseDrag() {
+    const id = this.pointerId;
+    this.pointerId = null;
+    try { if (id !== null) this.wrap?.releasePointerCapture?.(id); } catch { /* ignore */ }
+    this.wrap?.classList.remove("dragging");
+    this.tilt = { yaw: 0, pitch: 0 };
+    if (this.wrap) this.ApplyTilt();
+    for (const resolve of this.idleWaiters) resolve();
+    this.idleWaiters.clear();
   }
 
   ApplyTilt() {
@@ -115,9 +139,7 @@ export class BootPaper {
 
   Hide() {
     this.shown = false;
-    if (this.pointerId !== null) { this.pointerId = null; this.wrap?.classList.remove("dragging"); }
-    this.tilt = { yaw: 0, pitch: 0 };
-    if (this.wrap) this.ApplyTilt();
+    this.ReleaseDrag();
     this.token++;
     this.img.classList.remove("on");
   }
@@ -139,5 +161,11 @@ export class BootPaper {
     if (this.noteEl) this.noteEl.textContent = card.summary;
   }
 
-  Dispose() { this.Hide(); }
+  Dispose() {
+    this.Hide();
+    window.removeEventListener("blur", this.onBlur);
+    window.removeEventListener("pointerup", this.onRelease);
+    window.removeEventListener("pointercancel", this.onRelease);
+    document.removeEventListener("visibilitychange", this.onVisibility);
+  }
 }

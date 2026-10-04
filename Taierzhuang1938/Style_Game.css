@@ -809,6 +809,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
     rotateX(var(--bootPaperPitch, 0deg)) rotateY(var(--bootPaperYaw, 0deg));
   transition: transform var(--bootPaperReturn, 0.9s) cubic-bezier(0.2, 0.8, 0.2, 1);
   mix-blend-mode: lighten; cursor: grab; touch-action: none; user-select: none;
+  will-change: transform;
 }
 #bootPaperWrap.dragging { transition: none; cursor: grabbing; }
 #bootPaper {

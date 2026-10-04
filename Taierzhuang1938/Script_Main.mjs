@@ -408,7 +408,7 @@ function SetBootStep(label, progress) {
 function NextTask() {
   return new Promise((resolve) => {
     const channel = new MessageChannel();
-    channel.port1.onmessage = () => { channel.port1.close(); resolve(); };
+    channel.port1.onmessage = () => { channel.port1.close(); channel.port2.close(); resolve(); };
     channel.port2.postMessage(0);
   });
 }
@@ -426,16 +426,22 @@ function NextTask() {
  * 所以隐藏时不等帧，改走宏任务：反正没人看进度条，加载还比前台快（不再被 60 Hz 限速）。
  * 等帧的中途被切走也要放行 —— 那一次 rAF 回调永远不会来了。
  */
-function NextFrame() {
+async function NextFrame() {
   if (document.hidden) return NextTask();
-  return new Promise((resolve) => {
+  await new Promise((resolve) => {
+    let frame;
     const finish = () => {
+      cancelAnimationFrame(frame);
       document.removeEventListener("visibilitychange", finish);
       resolve();
     };
-    requestAnimationFrame(finish);
+    frame = requestAnimationFrame(finish);
     document.addEventListener("visibilitychange", finish, { once: true });
   });
+  // rAF promises resume before paint. Hand work to the next task so this frame
+  // can present, then keep expensive loading slices away from an active drag.
+  await NextTask();
+  await bootPaper?.WaitForIdle();
 }
 
 bootPaper?.Show();
@@ -1271,7 +1277,7 @@ async function Boot() {
   // 细节法线与皮肤 LUT 是全场共用的两张图，由 PrepareSteps 排在配方前面先烘；
   // 进度条的分母要把它们算进去，否则第一格就跳到 13%。
   const total = bakeNames.length + library.PendingShadingSteps();
-  for (const name of library.PrepareSteps(bakeNames)) {
+  for await (const name of library.PrepareStepsAsync(bakeNames)) {
     baked += 1;
     setStep(T("boot.step.bakeTexturesProgress", { done: baked, total, name }),
       BootProgress(BOOT.progress.bakeTextures, baked / total));
@@ -1292,8 +1298,8 @@ async function Boot() {
         else await library.LoadExternalSet(set.name, set);
       } catch (error) {
         // 这一套退回程序化 PBR，别的套不受影响。开机时它被跳过了（见 bakeNames
-        // 那段账），现在才补烘 —— 生成器只有一项，一口气抽干就是同步烘完一张。
-        for (const _ of library.PrepareSteps([set.name])) { /* 烘一张 */ }
+        // 那段账），现在才在 Worker 补烘这一套，失败不影响其余材质。
+        for await (const _ of library.PrepareStepsAsync([set.name])) { await NextFrame(); }
         pbrFailed.push(set.name);
         console.warn(`[Main] 外部 PBR「${set.name}」没读到，退回程序化：`
           + String(error).slice(0, 160));
@@ -1357,6 +1363,7 @@ async function Boot() {
   // （它们在 Actor 构造函数里被调），拿不到文档就一律退回程序化方块几何。
   // 十四个 .tzm.json 加起来不到 300 KB，这一步的成本远小于"跑起来才发现没换模"。
   const meshes = await actorFactory.PreloadMeshes();
+  await NextFrame();
   // 白刃全身动画库（每阵营 7.7 MB）正常开机不等它：主菜单出现后才在后台拉
   // （OpenMenu），进关前基本能到。白刃实验室与它的测试要一开机就能摆姿势，等。
   if (MELEE_TEST) await LoadMeleeAnimations();
@@ -1368,6 +1375,7 @@ async function Boot() {
     BOOT.progress.actorMeshes);
   // 担架 GLB 与手榴弹一起等：CreateStretcherGeometry 是同步的，进关前得已经在手里；读不到就开机失败。
   const [grenadeAsset] = await Promise.all([LoadGrenadeAsset(), LoadStretcherAsset(), LoadCigaretteAsset()]);
+  await NextFrame();
   vfx = new VfxSystem(scene, library, {
     quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
   });
@@ -3401,6 +3409,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
     midRadius: (phase.midRadius ?? 210) * (QUALITY === "low" ? 0.72 : 1),
   });
   await battlefield.PrepareAssets?.();
+  await yieldFrame();
   for (const step of battlefield.BuildSteps()) {
     setStep(step.label, base + span * step.progress);
     await yieldFrame();
@@ -4539,7 +4548,9 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
     // 真正那份到第一帧还得现编现等。（改之前每个材质因此各多一份 `srgb` 变体。）
     // 绑靶与白盒那一层都在 CompileAsRendered 里。
     const submitList = picks.concat(outsidePicks);
-    const SUBMIT = 24;
+    // Keep the driver queue short enough that grabbing the paper can stop the
+    // next batch before dozens of pending shader compiles saturate the GPU.
+    const SUBMIT = 4;
     for (let i = 0; i < submitList.length; i += SUBMIT) {
       const proxy = new THREE.Group();
       // 代理组只借 children 走一趟 traverse，**不进场景树**，也不动这些网格的
@@ -4681,6 +4692,7 @@ async function WarmupShaders(root, onStep = null, shouldStop = null) {
  * @returns {Promise<number>} 编过的代表网格数（0 = 没有新材质，或这一场没有人物库）
  */
 async function WarmActorShaders(phase, onStep = null) {
+  await NextFrame();
   if (!renderer || !scene || !ai || !actorFactory?.characterAssets) return 0;
   const started = performance.now();
   // 会出现在这一关的 kind：撒好的兵一律算上，nra / ija 保底（补兵、换人的班组都是它们），
@@ -4722,6 +4734,7 @@ async function WarmActorShaders(phase, onStep = null) {
       actor.root.position.set((i - count * 0.5) * 1.2, 0, -4);
       group.add(actor.root);
       proxies.push(actor);
+      await NextFrame();
     }
   }
   // 只给具名角色穿的外观（翻译 NRA06，Data_CharacterSelection.CHARACTER_CAST_VARIANTS_BY_KIND）

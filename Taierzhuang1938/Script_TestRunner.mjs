@@ -371,6 +371,7 @@ export const testDefs = {
   MenuTest: { file: "Script_MenuTest.mjs", desc: "主菜单接线 29 条" },
   DeathMenuTest: { file: "Script_DeathMenuTest.mjs", desc: "阵亡独立状态与检查点恢复" },
   BootPaperTest: { file: "Script_BootPaperTest.mjs", desc: "加载画面报纸剪报：清单 / 图 / 文本 / 贴图清单对齐" },
+  BootInteractionTest: { file: "Script_BootInteractionTest.mjs", timeoutMs: 300000, desc: "Loading drag latency, worker texture parity and cancellation recovery" },
   // 现有套件已扩到 160 项，含音频试听、完整县城/车厢切换与三套 PBR 截图；
   // 实机约 12—14 分钟，继续吃 10 分钟默认值会在末段稳定误报 timeout。
   EditorTest: { file: "Script_EditorTest.mjs", timeoutMs: 16 * 60 * 1000,
@@ -517,7 +518,7 @@ export const browserTests = new Set([
   "HitReactionBrowserTest", "NeckDeathBrowserTest",
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest",
-  "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootStallTest", "BootTest", "ColliderTest",
+  "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootInteractionTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
@@ -706,7 +707,7 @@ export const domains = {
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
-  menu: { label: "主菜单/加载画面", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest"] },
+  menu: { label: "主菜单/加载画面", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootInteractionTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
@@ -747,6 +748,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "menu", pattern: /TextureBake|Script_Main\.mjs|Script_Materials\.mjs/ },
   {domain:"textureAssets",pattern:/TextureImport|TextureManager|EditorTextures/},
   { domain: "whiteboxQuality", pattern: /WhiteboxQuality|WhiteboxRendering|GraphicsProfile|Tuning_Whitebox|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },
   // 贴图资产规范：Texture/ 下任何文件、清单、通用烘焙脚本与预设、烘焙记录、关卡按需集。

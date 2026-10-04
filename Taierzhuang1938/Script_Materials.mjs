@@ -9,6 +9,7 @@
 
 import * as THREE from "three";
 import { RECIPES, BakeDetailNormal, BakeSkinLut } from "./Script_TexBake.mjs";
+import { TextureBaker } from "./Script_TextureBaker.mjs";
 import { TextureImportOf, ApplyTextureImport, PrepareImportedTexture, LoadKtxTexture, ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
 import { SSR } from "./Data_Tuning_Graphics.mjs";
 import {
@@ -440,9 +441,9 @@ export class MaterialLibrary {
    * `flipY = false`（它是数据不是图片）、`ClampToEdgeWrapping`（NdotL=±1 与
    * 曲率两端不许绕回去）、`NoColorSpace`、不生成 mipmap。
    */
-  *PrepareShadingSteps() {
+  *PrepareShadingSteps(prepared = null) {
     if (!this.shading || this.shadingMapsReady) return;
-    const detail = BakeDetailNormal(DETAIL_NORMAL.size);
+    const detail = prepared?.DetailNormal ?? BakeDetailNormal(DETAIL_NORMAL.size);
     const detailTexture = new THREE.DataTexture(detail.normal, detail.size, detail.size,
       THREE.RGBAFormat, THREE.UnsignedByteType);
     detailTexture.colorSpace = THREE.NoColorSpace;
@@ -458,7 +459,7 @@ export class MaterialLibrary {
     this.shadingTextures = [detailTexture];
     yield "DetailNormal";
 
-    const lut = BakeSkinLut();
+    const lut = prepared?.SkinLut ?? BakeSkinLut();
     const lutTexture = new THREE.DataTexture(lut.data, lut.width, lut.height,
       THREE.RGBAFormat, THREE.UnsignedByteType);
     lutTexture.colorSpace = THREE.NoColorSpace;
@@ -477,19 +478,14 @@ export class MaterialLibrary {
   }
 
   /** 逐个配方烘焙，每 yield 一次交还主线程。 */
-  *PrepareSteps(names = Object.keys(RECIPES)) {
+  *PrepareSteps(names = Object.keys(RECIPES), prepared = null) {
     // 两张全场共用图排在最前：它们是**每一份材质**都要接的 uniform，
     // 谁先建关谁就得等着，不能懒到第一次用的时候现烘（那一帧直接冻住）。
     yield* this.PrepareShadingSteps();
     for (const name of names) {
       const recipe = RECIPES[name];
       if (!recipe) continue;
-      const size = name.startsWith("Cloth") || name === "Steel" || name === "SteelHelmet"
-        || name === "Sandbag" || name === "WoodBeam" || name === "WoodStock"
-        || name === "WattleFence"
-        ? Math.min(this.smallTextureSize, this.textureSize)
-        : this.textureSize;
-      const maps = recipe(size);
+      const maps = prepared?.[name] ?? recipe(this.BakeSize(name));
       this.baked.set(name, {
         albedo: MakeTexture(maps.albedo, maps.size, { srgb: true, anisotropy: this.anisotropy }),
         normal: MakeTexture(maps.normal, maps.size, { anisotropy: this.anisotropy }),
@@ -499,6 +495,28 @@ export class MaterialLibrary {
       });
       yield name;
     }
+  }
+
+  BakeSize(name) {
+    return name.startsWith("Cloth") || ["Steel", "SteelHelmet", "Sandbag", "WoodBeam", "WoodStock", "WattleFence"].includes(name)
+      ? Math.min(this.smallTextureSize, this.textureSize) : this.textureSize;
+  }
+
+  /** Same bytes and texture settings as PrepareSteps; CPU baking stays off the UI thread. */
+  async *PrepareStepsAsync(names = Object.keys(RECIPES)) {
+    const baker = new TextureBaker();
+    try {
+      if (this.PendingShadingSteps()) {
+        const detailNormal = await baker.Bake("DetailNormal", DETAIL_NORMAL.size);
+        const skinLut = await baker.Bake("SkinLut");
+        yield* this.PrepareShadingSteps({ DetailNormal: detailNormal, SkinLut: skinLut });
+      }
+      for (const name of names) {
+        if (!Object.hasOwn(RECIPES, name)) continue;
+        const maps = await baker.Bake(name, this.BakeSize(name));
+        yield* this.PrepareSteps([name], { [name]: maps });
+      }
+    } finally { baker.Dispose(); }
   }
 
   /** 一张下好的图 → 一张按本库约定配好的贴图。外部图三条路共用。 */

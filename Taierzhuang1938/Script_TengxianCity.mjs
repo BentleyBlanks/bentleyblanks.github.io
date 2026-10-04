@@ -49,7 +49,7 @@ import {
   BuildCityBlockDetail, BuildCityBlockMid, BuildCityBlockFar,
   AddFarRoof, AddRoofChimney,
 } from "./Script_CityBlockKit.mjs";
-import { BuildEastMapBlocks } from "./Script_Landmark_EastMapBlocks.mjs";
+import { BuildEastMapBlockSteps } from "./Script_Landmark_EastMapBlocks.mjs";
 import {
   BuildSink, AddCityWall, AddBastion, AddCornerTower, AddCityRamp, AddDugout,
   AddLoopholes, AddGateComplex, AddYamen, AddPaifang, AddAlarmTower, AddSquareFort,
@@ -555,7 +555,9 @@ export class TengxianCity {
     this.BuildMapFeatures(rnd);
 
     yield { label: T("boot.build.city.eastSuburb"), progress: 0.84 };
-    this.BuildEastSuburb(rnd);
+    for (const _ of this.BuildEastSuburbSteps(rnd)) {
+      yield { label: T("boot.build.city.eastSuburb"), progress: 0.84 };
+    }
 
     yield { label: T("boot.build.city.eastFields"), progress: 0.86 };
     this.BuildEastApproach(rnd);
@@ -1600,10 +1602,14 @@ export class TengxianCity {
    * 所以密集院落实际从濠外 334 起。310—334 那一条是濠与濠外的一圈空地。
    */
   BuildEastSuburb(rnd) {
+    for (const _ of this.BuildEastSuburbSteps(rnd)) { /* synchronous tools */ }
+  }
+
+  *BuildEastSuburbSteps(rnd) {
     const b = EAST_SUBURB.bounds;
     // 布防图的每个闭合框是一整块院区，不是“允许随机撒房”的提示范围。
     // 这里直接消费 13 个手工框；挂牌框只留位，随后由专属构建器落成。
-    BuildEastMapBlocks(this, EAST_SUBURB.mapBlocks || [], {
+    yield* BuildEastMapBlockSteps(this, EAST_SUBURB.mapBlocks || [], {
       namedMode: "reserve",
       canPlace: (cell) => cell.id !== "NorthEastTemple"
         && this.InBounds(cell.x, cell.z, Math.max(cell.w, cell.d) / 2 + 8),
