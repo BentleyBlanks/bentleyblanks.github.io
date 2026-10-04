@@ -482,9 +482,10 @@ async function CheckInterface() {
   await Shot("Pause");
   await page.evaluate(()=>{window.Taierzhuang.menu.ToTitle();window.Taierzhuang.StepFrames(90);});
   await page.evaluate(()=>window.Taierzhuang.Debug.MenuAct('settings'));
-  await page.locator('[data-editor="sound"]').click();
-  const editor=await ReadStyle('[data-editor="sound"]');
+  await page.locator('[data-setting="sound"]').focus();
+  const editor=await ReadStyle('[data-setting="sound"]');
   Check('设置入口沿用字体与金色选择反馈',main.font===editor.font&&main.color===editor.color,JSON.stringify(editor));
+  await page.locator('[data-setting="sound"]').click();
   const toggle=page.locator('.edPanel.work button[aria-pressed]').filter({hasText:'暂停时静音背景'});
   const original=await toggle.getAttribute('aria-pressed');
   await toggle.focus();await page.keyboard.press('Enter');
@@ -496,17 +497,21 @@ async function CheckInterface() {
   await page.keyboard.press("Shift+Tab");
   Check("工具 Shift+Tab 焦点可返回",await toggle.evaluate(el=>el===document.activeElement));
   await Shot("Sound");
-  await page.locator('[data-editor="graphics"]').click();
+  await page.locator('.edPanel.work .edX').click();
+  await page.locator('[data-setting="graphics"]').click();
   await Shot("Graphics");
-  await page.locator('[data-editor="controls"]').click();
+  await page.locator('.edPanel.work .edX').click();
+  await page.locator('[data-setting="controls"]').click();
   await Shot("Controls");
   await page.locator('.edPanel.work .edX').focus();await page.keyboard.press('Space');
+  await page.keyboard.press('Escape');
   Check('关闭设置工作窗后主菜单文字与键盘恢复',await page.locator('.mnList').evaluate(el=>getComputedStyle(el).visibility==='visible'));
   await page.locator('.mnItem').nth(1).focus();await page.keyboard.press('Enter');
   Check('Tab 焦点对应实际激活项',await page.evaluate(()=>window.Taierzhuang.menu.mode==='levels'));
   await page.locator('.mnCampaignBack').focus();await page.keyboard.press('Space');
   Check('选章返回也支持 Space',await page.evaluate(()=>window.Taierzhuang.menu.mode==='title'));
-  await page.evaluate(()=>{window.Taierzhuang.Debug.MenuAct('settings');window.Taierzhuang.editor.Open('controls');});
+  await page.evaluate(()=>window.Taierzhuang.Debug.MenuAct('settings'));
+  await page.locator('[data-setting="tools"]').click();
   await page.locator('[data-editor="weapon"]').click();
   await page.evaluate(()=>window.Taierzhuang.StepFrames(10));
   await Shot("Weapon");
@@ -534,7 +539,8 @@ async function CheckInterface() {
     await page.evaluate(mode=>window.Taierzhuang.menu.Show(mode),mode);
     await Shot(mode);
     await page.locator('.mnBack').focus();await page.keyboard.press('Enter');
-    Check(mode+'页脚返回可用',await page.evaluate(()=>window.Taierzhuang.menu.mode==='title'));
+    Check(mode+'页脚返回可用',await page.evaluate(m=>window.Taierzhuang.menu.mode===(m==='debug'?'settings':'title'),mode));
+    if(mode==='debug')await page.keyboard.press('Escape');
   }
   for(const [name,width,height] of [['Mobile',390,844],['Landscape',844,390]]) {
     await page.setViewportSize({width,height});
@@ -633,8 +639,8 @@ await CheckInterface();
   }
   Check("开机落在主菜单上", m.menu.open && m.inMenu && !m.running && !m.rootOff,
     `open=${m.menu.open} menu=${m.inMenu} running=${m.running}`);
-  Check("菜单六项都在（含设置与调试选项）",
-    m.items.length === 6 && m.items.includes("调试选项") && m.items.includes("设置"),
+  Check("首页保留五项，调试入口仅在设置里",
+    m.items.length === 5 && !m.items.includes("调试选项") && m.items.includes("设置"),
     m.items.join(" / "));
   Check("菜单里 HUD 与手里的枪都藏起来了", m.hudHidden && !m.viewmodel,
     `hud=${m.hudHidden} viewmodel=${m.viewmodel}`);
@@ -651,7 +657,7 @@ await CheckInterface();
 await page.click('.mnItem[data-act="settings"]');
 {
   const opened = await page.evaluate(() => {
-    const panel = document.querySelector(".edPanel.launcher");
+    const panel = document.querySelector(".mnSettingsList");
     const rect = panel?.getBoundingClientRect();
     return {
       menu: window.Taierzhuang.Debug.Menu(),
@@ -661,13 +667,18 @@ await page.click('.mnItem[data-act="settings"]');
       height: rect?.height || 0,
     };
   });
-  Check("主菜单点击设置会显示设置与工具面板",
-    opened.menu.open && opened.menu.mode === "title"
-      && opened.editor.panelOpen && !opened.editor.hidden
+  Check("主菜单点击设置会显示统一的设置页",
+    opened.menu.open && opened.menu.mode === "settings"
+      && !opened.editor.panelOpen
       && opened.display === "flex" && opened.width > 0 && opened.height > 0,
     JSON.stringify(opened));
 }
-await page.click(".edPanel.launcher .edX");
+await page.click('.mnSettingsItem[data-setting="sound"]');
+Check("声音设置实际打开并沿用菜单样式", await page.evaluate(()=>
+  window.Taierzhuang.Debug.Editor().active === "sound" && document.getElementById("edRoot").classList.contains("menuSettings")));
+await page.click(".edPanel.work .edX");
+Check("关闭声音设置返回设置目录", await page.evaluate(()=>window.Taierzhuang.Debug.Menu().mode === "settings"));
+await page.keyboard.press("Escape");
 {
   const closed = await page.evaluate(() => ({
     menu: window.Taierzhuang.Debug.Menu(),
@@ -684,13 +695,14 @@ await page.click(".edPanel.launcher .edX");
 // 1b) 调试选项：开关在主菜单上可见、实际写入运行时，再返回主菜单
 // ===========================================================================
 {
-  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("debug"));
+  await page.click('.mnItem[data-act="settings"]');
+  await page.click('.mnSettingsItem[data-setting="debug"]');
   const debugPanel = await page.evaluate(() => ({
     mode: window.Taierzhuang.Debug.Menu().mode,
     options: [...document.querySelectorAll("#menu .mnDebugRow[data-option]")].map((e) => e.dataset.option),
     stages: [...document.querySelectorAll("#firstLevelStageSelect option")].map(e=>e.value),
   }));
-  Check("主菜单能打开五项调试选项", debugPanel.mode === "debug" && debugPanel.options.length === 5,
+  Check("设置能打开五项调试选项", debugPanel.mode === "debug" && debugPanel.options.length === 5,
     JSON.stringify(debugPanel));
   Check("主菜单调试面板列出第一关18个阶段",debugPanel.stages.length===18);
   await page.screenshot({ path: path.join(outDir, "Menu_Debug.png") });
@@ -699,7 +711,8 @@ await page.click(".edPanel.launcher .edX");
   Check("无碰撞开关写入玩法配置", noCollision.noCollision === true, JSON.stringify(noCollision));
   await page.evaluate(() => window.Taierzhuang.Debug.SetDebugOption("noCollision", false));
   await page.keyboard.press("Escape");
-  Check("调试面板 Esc 返回主菜单", await page.evaluate(() => window.Taierzhuang.Debug.Menu().mode === "title"));
+  Check("调试面板 Esc 返回设置", await page.evaluate(() => window.Taierzhuang.Debug.Menu().mode === "settings"));
+  await page.keyboard.press("Escape");
 }
 
 // ===========================================================================
@@ -713,7 +726,7 @@ await page.click(".edPanel.launcher .edX");
   Check("指挥室固定机位不改动玩法相机", moved === 0, `moved=${moved.toFixed(2)} m`);
   // 焦距语汇沿用分镜表：35 mm ≈ 37.8°，不该是玩法用的 55°
   const room = await page.evaluate(() => window.Taierzhuang.Debug.CommandRoom());
-  Check("实际渲染 Blender 指挥室、独立相机及烘焙光照", room.ready && room.frames > 0 && room.meshes >= 10 && room.triangles > 30000 && room.textureCount === 12 && room.lighting === "Cycles diffuse UV1" && room.camera.fov !== after.fov, JSON.stringify(room));
+  Check("实际渲染 Blender 指挥室、独立相机及烘焙光照", room.ready && room.frames > 0 && room.meshes >= 10 && room.triangles > 30000 && room.textureCount === 13 && room.lighting === "Cycles diffuse UV1" && room.camera.fov !== after.fov, JSON.stringify(room));
   const titleBefore = await page.locator(".mnTitleMain").boundingBox();
   await page.mouse.move(30,30);
   await page.evaluate(() => window.Taierzhuang.StepFrames(45));
@@ -944,7 +957,7 @@ async function CheckMissionList() {
     };
   });
   Check("第一关里的暂停菜单写「退出第一关」，不再叫 P0/P1/P2 白盒",
-    pauseItems.items.join(",") === "resume,settings,debug,exitSandbox" && pauseItems.labels.includes("退出第一关")
+    pauseItems.items.join(",") === "resume,settings,exitSandbox" && pauseItems.labels.includes("退出第一关")
       && !pauseItems.labels.some((text) => /P0\/P1\/P2/.test(text)),
     pauseItems.labels.join(" / "));
   // 「退出第一关」先弹确认框：默认落在「取消」，Esc 收起后仍停在暂停；确认了才真退。
@@ -1126,7 +1139,7 @@ async function CheckMissionList() {
     running: window.Taierzhuang.state.running,
   }));
   Check("暂停菜单能打开设置，战斗仍冻结",
-    settings.editor.panelOpen && settings.menu.mode === "pause" && !settings.running,
+    !settings.editor.panelOpen && settings.menu.mode === "settings" && !settings.running,
     JSON.stringify(settings));
   await page.keyboard.press("Escape");
   const settingsClosed = await page.evaluate(() => ({
@@ -1149,7 +1162,7 @@ async function CheckMissionList() {
   for (const id of ["controls", "graphics", "sound"]) {
     await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("settings"));
     await page.evaluate((editorId) => {
-      document.querySelector(`#edRoot .edBtn[data-editor="${editorId}"]`).click();
+      document.querySelector(`.mnSettingsItem[data-setting="${editorId}"]`).click();
     }, id);
     await page.evaluate(() => window.Taierzhuang.StepFrames(2));
     const on = await page.evaluate(() => ({
@@ -1170,9 +1183,10 @@ async function CheckMissionList() {
       visible: window.Taierzhuang.viewmodel.root.visible,
       weapon: window.Taierzhuang.Debug.Slots().viewmodel,
     }));
-    Check(`关掉设置·${id} 回暂停层，大刀还在手里`,
-      off.active === null && off.mode === "pause"
+    Check(`关掉设置·${id} 回设置目录，大刀还在手里`,
+      off.active === null && off.mode === "settings"
         && off.visible === true && off.weapon === "Dadao", JSON.stringify(off));
+    await page.keyboard.press("Escape");
   }
   await page.evaluate(() => window.Taierzhuang.Debug.CloseEditor());
 
@@ -1203,9 +1217,9 @@ async function CheckMissionList() {
     menuDisplay: getComputedStyle(document.getElementById("menu")).display,
     running: window.Taierzhuang.state.running,
   }));
-  Check("关闭构件库编辑器后恢复原暂停菜单",
+  Check("关闭构件库编辑器后恢复设置目录",
     !propEditorClosed.editor.capturing && propEditorClosed.menu.open
-      && propEditorClosed.menu.mode === "pause" && propEditorClosed.menuDisplay !== "none"
+      && propEditorClosed.menu.mode === "settings" && propEditorClosed.menuDisplay !== "none"
       && !propEditorClosed.running,
     JSON.stringify(propEditorClosed));
 
@@ -1487,8 +1501,8 @@ async function CheckMissionList() {
       labels: [...document.querySelectorAll("#menu .mnItemLabel")].map((e) => e.textContent),
     };
   });
-  Check("靶场的暂停菜单是「继续/设置/调试选项/退出靶场」（不给当场换不了的选章与主菜单）",
-    paused.items.join(",") === "resume,settings,debug,exitSandbox"
+  Check("靶场的暂停菜单是「继续/设置/退出靶场」，调试位于设置内",
+    paused.items.join(",") === "resume,settings,exitSandbox"
       && paused.labels.includes("退出靶场"),
     paused.items.join(" / "));
 

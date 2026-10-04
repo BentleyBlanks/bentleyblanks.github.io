@@ -3234,10 +3234,12 @@ async function Boot() {
       // 「设置」既然复用了这棵 DOM，就必须先把它显式还回来；否则内部的
       // panelOpen 虽然已经变成 true，玩家看到的仍是毫无反应。记住来源菜单，
       // 关掉设置后再由 FinishEditorSession 把对应的主菜单或暂停菜单恢复干净。
-      Settings: () => {
+      Settings: (section = "tools") => {
         editorReturnMenuMode = menu && menu.open ? menu.mode : null;
+        document.getElementById("edRoot")?.classList.toggle("menuSettings", section !== "tools");
         if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
-        editor.TogglePanel(true);
+        if (section === "tools") editor.TogglePanel(true);
+        else editor.Open(section);
       },
       P012Progress: () => p012Debug.State(),
       P012NextProgress: () => p012Debug.Next(),
@@ -6466,7 +6468,15 @@ function CloseMenu() {
 function FinishEditorSession() {
   const mode = editorReturnMenuMode;
   editorReturnMenuMode = null;
+  document.getElementById("edRoot")?.classList.remove("menuSettings");
   if (!mode || !menu) return;
+  if (mode === "settings") {
+    // Closing a player settings page also releases the hidden tools launcher.
+    editor.panelOpen=false;editor.launcher.style.display="none";editor.RefreshStatus();
+    const parent = menu.settingsReturnMode || "title";
+    if (parent === "pause") ShowPauseMenu(); else OpenMenu();
+    menu.Show("settings"); return;
+  }
   if (mode !== "pause") { OpenMenu(); return; }
   // 回暂停层走与 Esc 完全相同的那一条（ShowPauseMenu）。
   // 这里以前是把 OpenMenu 抄了一份：额外把枪藏了、把齿轮藏了、还把
@@ -8603,6 +8613,11 @@ function Frame(dt, render = true) {
   // 过场每帧会被推两次，走带上的速度与暂停一个都不生效。
   if (editor && editor.Capturing) {
     editor.Update(dt);
+    if (commandRoom?.ready && menu?.live && ["graphics","sound","controls"].includes(editor.activeId)) {
+      commandRoom.Update(dt);
+      if(render)commandRoom.Render();
+      return;
+    }
     // 阴影框跟着**编辑器相机**走。与过场那一条同一笔账：编辑器的自由飞行
     // 会把镜头带到离玩家几百米的地方，而阴影框留在玩家脚下 = 那一片一个
     // 影子都没有（画面上是「东西浮在地上」）。采样点出图全走这条分支。

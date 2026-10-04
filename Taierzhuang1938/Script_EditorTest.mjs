@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { TextureCatalog } from "./Script_TextureImportRules.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -179,7 +180,7 @@ if(process.argv.includes('--launcher-only')){
   const editorBeforePopup = await page.evaluate(() => window.Taierzhuang.Debug.Editor());
   const popupReady = page.waitForEvent("popup");
   await page.click('[data-editor="textures"]'); const texturePopup = await popupReady;
-  await texturePopup.waitForFunction(() => document.querySelectorAll(".asset").length === 267, null, { timeout: 30000 });
+  await texturePopup.waitForFunction(count => document.querySelectorAll(".asset").length === count, TextureCatalog().length, { timeout: 30000 });
   const editorAfterPopup = await page.evaluate(() => window.Taierzhuang.Debug.Editor());
   Check("贴图管理打开真实独立窗口", texturePopup.url().includes("TextureManager.html"));
   Check("独立窗口不改变当前编辑器状态", JSON.stringify(editorBeforePopup) === JSON.stringify(editorAfterPopup));

@@ -166,13 +166,20 @@ for x in [tx-tw/2+.12,tx+tw/2-.12]:
 for y in [ty-td/2+.12,ty+td/2-.12]:Cube("TableLongApron",(tx,y,.697),(tw-.17,.075,.2),wood,.007)
 for x in [tx-tw/2+.15,tx+tw/2-.15]:Cube("TableShortApron",(x,ty,.697),(.08,td-.24,.2),wood,.008)
 # Table scars as fine physical wood lines; light dust and small rubble at rear edges.
-for i in range(40):
+for i in range(150):
     x=random.uniform(tx-tw/2+.03,tx+tw/2-.03); y=random.choice([ty-td/2+.04,ty+td/2-.04])+random.uniform(-.026,.026)
     Curve("TableScratch",[(x,y,.887),(x+random.uniform(.02,.08),y+.001,.887)],.00055,dust)
-for i in range(110):
+for i in range(240):
     x=random.uniform(tx-tw/2+.04,tx+tw/2-.04); y=ty+random.choice([-td/2+.04,td/2-.07])+random.uniform(-.025,.04)
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=random.uniform(.002,.009),location=(x,y,.891))
     o=bpy.context.object;o.name="DryMortarGrain";o.scale.z=.35;o.data.materials.append(dust)
+# Split end grain and tiny flaked splinters along the exposed front plank edge.
+for i in range(85):
+    x=random.uniform(tx-tw/2+.025,tx+tw/2-.025);y=ty-td/2+.004
+    z=random.uniform(.816,.877);length=random.uniform(.015,.095)
+    Curve('TableEndGrainSplit',[(x,y-.001,z),(x+length*.45,y-.002,z+.001),(x+length,y-.001,z+.002)],random.uniform(.00035,.0012),graphite)
+    if i%3==0:
+        Curve('TableDrySplinter',[(x,y-.003,z),(x+length*.7,y-.004,z+.002)],.0006,dust)
 # Chair behind desk, deliberately empty.
 cx=.02;cy=.84
 Cube("ChairSeat",(cx,cy,.48),(.75,.47,.055),wood,.018)
@@ -211,7 +218,7 @@ def Paper(name,cx,cy,z,w,h,mat,angle=0,wall=False):
     bpy.context.view_layer.objects.active=ob;ob.select_set(True);bpy.ops.object.modifier_apply(modifier=m.name);ob.select_set(False)
     return ob
 Paper("WallMap",1.26,1.385,1.82,2.18,1.45,mapmat,wall=True)
-Paper("DeskMap",tx,ty-.10,.894,2.80,2.00,mapmat,math.radians(40)-.035)
+Paper("DeskMap",tx,ty-.10,.894,2.60,1.78,mapmat,math.radians(40)-.035)
 # Telegram silhouette is built with the detailed props below.
 # Ordinary 18.5 cm hexagonal pencils with exposed timber and graphite points.
 for i in range(2):
@@ -267,6 +274,8 @@ for ob in list(scene.objects):
         for v in ob.data.vertices:
             p=ob.matrix_world@v.co
             v.co=inverse@(Vector((hx,hy,hz))+(Matrix.Rotation(math.radians(-35),3,"Z")@(p-Vector((hx,hy,hz))))*1.45)
+    if ob.name.startswith('Coat'):
+        ob.matrix_world=Matrix.Translation((0,0,-.39))@ob.matrix_world
     if ob.name.startswith(("Table","DryMortar")):
         ob.matrix_world=tableTransform@ob.matrix_world
     elif ob.type=="MESH" and ob.name.startswith("Chair"):
@@ -286,6 +295,16 @@ def WorldBvh(objects):
         faces.extend(tuple(start+i for i in p.vertices) for p in ob.data.polygons)
     return BVHTree.FromPolygons(verts,faces)
 supportObjects=[o for o in scene.objects if o.type=='MESH' and o.name.startswith(('TablePlank','DeskMap','Telegram'))]
+# Seat the telegram as a thin shell, preserving the two distinct paper surfaces.
+paperSupport=WorldBvh([o for o in supportObjects if not o.name.startswith('Telegram')])
+for ob in [o for o in supportObjects if o.name.startswith('Telegram')]:
+    delta=-100
+    for vertex in ob.data.vertices:
+        p=ob.matrix_world@vertex.co
+        hit,normal,index,distance=paperSupport.ray_cast(Vector((p.x,p.y,3)),Vector((0,0,-1)),4)
+        if hit is not None:delta=max(delta,hit.z+.0006-p.z)
+    ob.matrix_world=Matrix.Translation((0,0,delta))@ob.matrix_world
+bpy.context.view_layer.update()
 supportTree=WorldBvh(supportObjects)
 propContacts={}
 for group,prefixes in {'Pencil0':('Pencil0',),'Pencil1':('Pencil1',),'Ruler':('WoodRuler','RulerTick'),
@@ -314,7 +333,7 @@ world=bpy.data.worlds.new("CommandRoomAmbient");scene.world=world;world.use_node
 world.node_tree.nodes["Background"].inputs["Color"].default_value=(.48,.52,.57,1)
 world.node_tree.nodes["Background"].inputs["Strength"].default_value=.55
 bpy.ops.object.light_add(type="AREA",location=(-1.5,1.86,2.6))
-light=bpy.context.object;light.name="WindowSky";light.location=backdropTransform@light.location;light.data.energy=150;light.data.shape="RECTANGLE";light.data.size=1.54;light.data.size_y=1.85
+light=bpy.context.object;light.name="WindowSky";light.location=backdropTransform@light.location;light.data.energy=230;light.data.shape="RECTANGLE";light.data.size=1.54;light.data.size_y=1.85
 light.rotation_euler=(Vector((.3,-.7,.8))-light.location).to_track_quat("-Z","Y").to_euler()
 bpy.ops.object.light_add(type="SUN",location=(-3,5,5))
 sun=bpy.context.object;sun.name="LeftWindowSun";sun.data.energy=2.8;sun.data.angle=.05
@@ -330,6 +349,11 @@ scene.cycles.device='CPU'
 scene.render.resolution_x=1672;scene.render.resolution_y=941;scene.render.resolution_percentage=100
 scene.view_settings.view_transform="AgX";scene.view_settings.look="AgX - Medium High Contrast";scene.view_settings.exposure=.35
 # Merge static meshes by material to keep realtime draw count proportional to materials.
+for ob in scene.objects:
+    if ob.type!='MESH':continue
+    asset=1 if ob.name.startswith('Cap') else 2 if ob.name.startswith('Coat') else 3 if ob.name.startswith('InkBottle') else 0
+    attr=ob.data.attributes.new(name='InspectionAsset',type='INT',domain='FACE')
+    for p in attr.data:p.value=asset
 bpy.ops.object.select_all(action="DESELECT")
 for mat in materials.values():
     obs=[o for o in scene.objects if o.type=="MESH" and len(o.data.materials)==1 and o.data.materials[0]==mat]
@@ -353,7 +377,7 @@ for ob in scene.objects:
     if ob.type in {"MESH","CAMERA"}:ob.select_set(True)
 (GAME/"Model").mkdir(exist_ok=True)
 # Keep the live asset intact until the lighting bake exports its matching UV1.
-bpy.ops.export_scene.gltf(filepath=str(SHOTS/"Model_CommandRoomUnbaked.glb"),export_format="GLB",use_selection=True,export_cameras=True,export_lights=False,export_animations=False,export_extras=True)
+bpy.ops.export_scene.gltf(filepath=str(SHOTS/"Model_CommandRoomUnbaked.glb"),export_format="GLB",use_selection=True,export_cameras=True,export_lights=False,export_animations=False,export_extras=True,export_vertex_color='ACTIVE')
 for mat,a,b in links:mat.node_tree.links.new(a,b)
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/"Scene_CommandRoom.blend"))
 scene.render.filepath=str(SHOTS/"Scene_CommandRoomBlender.png")

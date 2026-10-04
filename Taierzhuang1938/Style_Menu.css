@@ -1,8 +1,8 @@
-/* 主菜单、暂停、任务选择与资料页共用 Style_Interface.css 的 WaW 视觉语言。 */
+/* Command-room menus share ivory type, fine rules and a restrained gold selection. */
 
 /* Reference command room: title-only layout; pause/death retain their existing contracts. */
 #menu.commandRoom .mnVignette { backdrop-filter:none;
-  background:linear-gradient(90deg,rgba(4,5,5,.84) 0%,rgba(5,6,6,.55) 24%,rgba(5,6,6,.12) 49%,transparent 70%); }
+  background:linear-gradient(90deg,rgba(4,5,5,.76) 0%,rgba(5,6,6,.35) 18%,rgba(5,6,6,.10) 38%,transparent 62%); }
 #menu.commandRoom .mnVignette::before,#menu.commandRoom .mnVignette::after,
 #menu.commandRoom .mnTitleLines,#menu.commandRoom .mnShotNote,#menu.commandRoom .mnItemHint { display:none; }
 #menu.commandRoom .mnTitle { left:5.1%;top:17.4%;max-width:76%; }
@@ -15,7 +15,6 @@
   font-weight:400;letter-spacing:.16em;border:0;border-left:5px solid transparent;color:#b9bcb7; }
 #menu.commandRoom .mnItem.on { color:var(--ui-gold);background:linear-gradient(90deg,#d8d4c326,#bbb7a90a);
   border-left-color:#edca83;border-image:none; }
-#menu.commandRoom .mnItem[data-act="debug"] { min-height:3.5vh;font-size:clamp(12px,1vw,17px);margin-top:.5vh;opacity:.72; }
 #menu.commandRoom .mnFoot { left:5.4%;bottom:7.5%;font-size:clamp(11px,1.1vw,19px);letter-spacing:.06em;color:#bfc2ba; }
 @media(max-aspect-ratio:1/1) {
  #menu.commandRoom .mnTitle{top:16%;max-width:90%}
@@ -458,4 +457,46 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .mnLevel { transition: none; }
+}
+
+/* Secondary pages retain the real room and the title screen's typography. */
+.mnPanel { background:transparent; }
+.mnPanel::before { display:none; }
+.mnPanel::after { background:linear-gradient(90deg,#070807ed 0%,#10110edb 46%,#13140f99 78%,#10110f6b); }
+.mnPanelHead { margin:0 5.1%;padding:6vh 0 2.5vh;min-height:19vh;background:none;border-bottom:1px solid #c1bdab55; }
+.mnPanelTitle { font-family:var(--ui-title-font);font-size:clamp(30px,3.3vw,56px);font-weight:700;letter-spacing:.10em;color:#eeeee7; }
+.mnPanelHead::after { color:#c5c5bd;letter-spacing:.18em; }
+.mnCampaignMain { grid-template-columns:43% minmax(0,1fr);gap:7%;padding:3vh 5.1% 1.5vh; }
+.mnLevel { min-height:5.1vh;font-weight:400;letter-spacing:.06em;border:0;border-left:4px solid transparent;padding:8px 17px; }
+.mnLevel.on { background:linear-gradient(90deg,#d8d4c326,#bbb7a90a);border-image:none;border-left-color:#edca83; }
+.mnLvName { font-size:clamp(17px,1.55vw,26px);font-weight:400; }
+.mnPlaceholderLevel .mnLvName { font-size:clamp(15px,1.25vw,21px); }
+.mnBriefTitle { font-family:var(--ui-title-font);font-weight:600;letter-spacing:.08em; }
+.mnMissionArt { border:1px solid #c1bdab44; }
+.mnMissionArt::after { box-shadow:inset 0 0 16px #0004; }
+.mnMissionArt img { filter:saturate(.65); }
+.mnCampaignFoot,.mnPanelFoot { background:none;padding:1.5vh 5.1%;min-height:10vh;box-sizing:border-box; }
+.mnCampaignBack,.mnBack { font-weight:400;letter-spacing:.1em;padding-left:0;color:#d5d4ca; }
+.mnText,.mnDebug { padding:3vh 5.1%;color:#c9c9be;font-size:clamp(14px,1vw,18px); }
+.mnText h4 { font-family:var(--ui-title-font);font-size:22px;font-weight:500; }
+.mnSettingsList { padding:4vh 5.1%;width:min(560px,70vw);display:flex;flex-direction:column;gap:1vh; }
+.mnSettingsItem { appearance:none;cursor:pointer;text-align:left;background:none;color:#c6c7bd;border:0;border-left:4px solid transparent;
+  font:400 clamp(19px,1.85vw,30px)/1.6 var(--ui-font);padding:7px 24px;letter-spacing:.16em;min-height:48px; }
+.mnSettingsItem:hover,.mnSettingsItem:focus-visible { color:var(--ui-gold);background:linear-gradient(90deg,#d8d4c326,#bbb7a90a);border-left-color:#edca83;outline:none; }
+.mnSettingsItem[data-setting="tools"] { margin-top:2vh;font-size:16px;color:#96998e; }
+body:has(#edRoot.menuSettings:not(.off)) #menu .mnPanel { visibility:hidden; }
+#edRoot.menuSettings .launcher,#edRoot.menuSettings .edGear { display:none!important; }
+body.edToolsOpen #edRoot.menuSettings::before { display:none; }
+#edRoot.menuSettings .edPanel.work { inset:6vh 5.1% 6vh;width:auto;max-width:none;border:0;background:linear-gradient(90deg,#080907f5,#11120ede 64%,#14150cb8);box-shadow:none;backdrop-filter:none; }
+#edRoot.menuSettings .edHead { padding:2vh 3vw 2.5vh;background:none;border-bottom:1px solid #c1bdab55; }
+#edRoot.menuSettings .edTitle { font-family:var(--ui-title-font);font-size:clamp(30px,3.3vw,56px);letter-spacing:.10em;color:#eeeee7; }
+#edRoot.menuSettings .edBody { padding:2vh 3vw;max-width:1000px; }
+#edRoot.menuSettings .edSection>.h { font-size:17px;font-weight:400;padding:16px 0 12px; }
+#edRoot.menuSettings .edRow { margin:12px 0;gap:20px; }
+#edRoot.menuSettings .edRow>.l { flex-basis:160px;font-size:15px;color:#c8c8bd; }
+#edRoot.menuSettings .edBtn,#edRoot.menuSettings .edChip { font-size:14px;min-height:34px;background:#17191355;border-color:#c1bdab40; }
+@media(max-width:760px){
+ .mnPanelHead{min-height:15vh}.mnPanelHead::after{display:none}.mnCampaignMain{grid-template-columns:1fr;gap:20px;overflow-y:auto}
+ .mnSettingsList{width:80vw}.mnLevelList{max-height:40vh;flex-shrink:0}.mnLevel{min-height:44px}.mnText{font-size:14px}.mnCodexRow{grid-template-columns:1fr;gap:3px}
+ #edRoot.menuSettings .edRow>.l{flex-basis:110px;font-size:13px}
 }

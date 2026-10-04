@@ -63,7 +63,26 @@ void main(){
 const COMPOSITE = `
 varying vec2 screenUv; uniform sampler2D sceneColor; uniform sampler2D sceneDepth;
 uniform sampler2D volumeColor; uniform vec2 volumeTexel;
-uniform mat4 inverseProjection;
+uniform mat4 inverseProjection; uniform vec2 colorTexel; uniform vec4 dof;
+float ViewDepth(vec2 uv){
+  float z=texture2D(sceneDepth,uv).r;
+  vec4 p=inverseProjection*vec4(uv*2.-1.,z*2.-1.,1.);
+  return -p.z/p.w;
+}
+vec3 FocusColor(vec2 uv){
+  float d=ViewDepth(uv);
+  float radius=min(dof.w,max(0.,abs(d-dof.x)-dof.y)*dof.z/max(d,.1));
+  vec3 sum=texture2D(sceneColor,uv).rgb;float total=1.;
+  // Small depth-aware disc; foreground silhouettes never borrow background colour.
+  for(int i=0;i<12;i++){
+    float angle=float(i)*2.39996323;
+    vec2 q=uv+vec2(cos(angle),sin(angle))*sqrt((float(i)+.5)/12.)*radius*colorTexel;
+    float sampleDepth=ViewDepth(q);
+    float weight=exp(-max(0.,sampleDepth-d-.04)*35.);
+    sum+=texture2D(sceneColor,q).rgb*weight;total+=weight;
+  }
+  return sum/total;
+}
 void main(){
   float z=texture2D(sceneDepth,screenUv).r;
   vec4 v=inverseProjection*vec4(screenUv*2.-1.,z*2.-1.,1.);
@@ -75,13 +94,13 @@ void main(){
     float weight=exp(-abs(sampleFog.a-distanceToSurface)*20.)/(1.+float(x*x+y*y));
     fog+=sampleFog.rgb*weight;total+=weight;
   }
-  gl_FragColor=vec4(texture2D(sceneColor,screenUv).rgb+fog/max(total,1e-5),1.);
+  gl_FragColor=vec4(FocusColor(screenUv)+fog/max(total,1e-5),1.);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
 
 export class CommandRoomAtmosphere {
-  constructor(renderer, scene, data) {
+  constructor(renderer, scene, data, depthOfField={focus:3.15,range:1.55,aperture:2.3,maxRadius:2.2}) {
     this.renderer=renderer; this.scene=scene; this.data=data; this.shadowDirty=true;
     this.size=new THREE.Vector2();
     this.colorTarget=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,depthBuffer:true,samples:2});
@@ -108,7 +127,8 @@ export class CommandRoomAtmosphere {
     this.compositeMaterial=new THREE.ShaderMaterial({depthTest:false,depthWrite:false,
       vertexShader:VERTEX,fragmentShader:COMPOSITE,
       uniforms:{sceneColor:{value:this.colorTarget.texture},sceneDepth:{value:this.colorTarget.depthTexture},
-        volumeColor:{value:this.volumeTarget.texture},volumeTexel:{value:new THREE.Vector2()},inverseProjection:{value:new THREE.Matrix4()}}});
+        volumeColor:{value:this.volumeTarget.texture},volumeTexel:{value:new THREE.Vector2()},inverseProjection:{value:new THREE.Matrix4()},
+        colorTexel:{value:new THREE.Vector2()},dof:{value:new THREE.Vector4(depthOfField.focus,depthOfField.range,depthOfField.aperture,depthOfField.maxRadius)}}});
     this.quadScene=new THREE.Scene();this.quadCamera=new THREE.Camera();
     this.quad=new THREE.Mesh(new THREE.PlaneGeometry(2,2),this.volumeMaterial);
     this.quad.frustumCulled=false;this.quadScene.add(this.quad);
@@ -150,6 +170,7 @@ export class CommandRoomAtmosphere {
       this.colorTarget.setSize(width,height);
       this.volumeTarget.setSize(Math.max(1,Math.round(width*this.data.resolutionScale)),Math.max(1,Math.round(height*this.data.resolutionScale)));
       this.compositeMaterial.uniforms.volumeTexel.value.set(1/this.volumeTarget.width,1/this.volumeTarget.height);
+      this.compositeMaterial.uniforms.colorTexel.value.set(1/width,1/height);
     }
     camera.updateMatrixWorld(true);
     if(this.shadowDirty){

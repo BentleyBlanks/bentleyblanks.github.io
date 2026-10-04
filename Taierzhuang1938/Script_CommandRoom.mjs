@@ -93,6 +93,12 @@ export class CommandRoom {
       for (const mat of Array.isArray(object.material) ? object.material : [object.material]) {
         mat.lightMap = irradiance;
         mat.lightMapIntensity = DATA.bakedLighting.scale * DATA.bakedLighting.intensity;
+        if (mat.name === DATA.reflection.material) {
+          mat.color.setHex(0xffffff);mat.lightMap=null;
+          mat.transmission=DATA.glass.transmission;mat.roughness=DATA.glass.roughness;
+          mat.thickness=DATA.glass.thickness;mat.attenuationColor.setHex(DATA.glass.attenuationColor);
+          mat.attenuationDistance=DATA.glass.attenuationDistance;mat.side=THREE.FrontSide;
+        }
         if (mat.name === "CommandRoomOutside") {
           mat.emissive.setHex(DATA.outside.color);
           mat.emissiveIntensity = DATA.outside.intensity;
@@ -119,16 +125,17 @@ export class CommandRoom {
     // Static direct and indirect diffuse lighting is already in the UV1 atlas.
     // Do not add a second sun or multiply baked shadows by another AO term.
     this.CaptureGlassReflection();
-    this.atmosphere = new CommandRoomAtmosphere(this.renderer,this.scene,DATA.windowHaze);
+    this.atmosphere = new CommandRoomAtmosphere(this.renderer,this.scene,DATA.windowHaze,DATA.depthOfField);
     this.dust = this.atmosphere.BuildDust(DATA.dust);
     this.stats = { meshes, triangles, textureCount: this.textures.length, model: DATA.model, version: DATA.version, lighting: "Cycles diffuse UV1" };
     this.ready = true;
     return this;
   }
   CaptureGlassReflection() {
-    const glass=[];
+    const glass=[], bottle=[];
     this.scene.traverse(object=>{
       if(object.isMesh && object.material?.name===DATA.reflection.material) glass.push(object);
+      if(object.isMesh && object.material?.name?.startsWith("CommandRoomInk")) bottle.push(object);
     });
     if(!glass.length) return;
     this.scene.updateMatrixWorld(true);
@@ -140,16 +147,19 @@ export class CommandRoom {
     const target=r.getRenderTarget(),face=r.getActiveCubeFace(),mip=r.getActiveMipmapLevel();
     const viewport=r.getViewport(new THREE.Vector4()),scissor=r.getScissor(new THREE.Vector4());
     const scissorTest=r.getScissorTest(),autoClear=r.autoClear;
-    const visible=glass.map(object=>object.visible);
+    const visible=bottle.map(object=>object.visible);
     try {
-      glass.forEach(object=>{object.visible=false;});
+      bottle.forEach(object=>{object.visible=false;});
       r.setScissorTest(false);r.autoClear=true;
       camera.update(r,this.scene);
       this.reflection=generator.fromCubemap(cube.texture);
       for(const object of glass){object.material.envMap=this.reflection.texture;
         object.material.envMapIntensity=DATA.reflection.intensity;object.material.needsUpdate=true;}
+      for(const object of bottle.filter(o=>o.material.name==="CommandRoomInkLid")){
+        object.material.envMap=this.reflection.texture;object.material.envMapIntensity=.65;object.material.needsUpdate=true;
+      }
     } finally {
-      glass.forEach((object,i)=>{object.visible=visible[i];});
+      bottle.forEach((object,i)=>{object.visible=visible[i];});
       cube.dispose();generator.dispose();
       r.setRenderTarget(target,face,mip);r.setViewport(viewport);r.setScissor(scissor);
       r.setScissorTest(scissorTest);r.autoClear=autoClear;

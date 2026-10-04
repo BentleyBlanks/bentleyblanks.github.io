@@ -10,6 +10,13 @@ GAME=ROOT/'Taierzhuang1938'
 SOURCE=Path(r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\CommandRoom')
 assert Path(bpy.data.filepath).resolve()==(SOURCE/'Scene_CommandRoom.blend').resolve()
 scene=bpy.context.scene
+# A second bake in the same MCP session must not read an older .001 image.
+for image in list(bpy.data.images):
+    if image.name.startswith('CommandRoomLighting'):bpy.data.images.remove(image)
+for material in bpy.data.materials:
+    if material.use_nodes:
+        for node in list(material.node_tree.nodes):
+            if node.name.startswith('CommandRoomBakedLighting'):material.node_tree.nodes.remove(node)
 allObjects=[o for o in scene.objects if o.type=='MESH']
 # Sub-millimetre sewn threads borrow the underlying cloth's irradiance UVs.
 # Dedicated packed charts are narrower than a texel and develop black seams.
@@ -30,7 +37,7 @@ bpy.ops.object.mode_set(mode='OBJECT')
 # Adjust relative texel density before a single shared repack; never overlap charts.
 density={'CommandRoomPlaster':.45,'CommandRoomOutside':.35,'CommandRoomPencilWood':16,'CommandRoomPencilPaint':16,'CommandRoomInkGlass':8,
          'CommandRoomGraphite':20,'CommandRoomIron':6,'CommandRoomDust':2,
-         'CommandRoomCloth':2,'CommandRoomPaperEdge':6,
+         'CommandRoomCloth':3,'CommandRoomPaperEdge':6,'CommandRoomInkLabel':12,'CommandRoomInkLid':10,'CommandRoomInkLiquid':8,
          'CommandRoomLetter':1.5,'CommandRoomMap':1.25}
 for ob in objects:
     factor=density.get(ob.data.materials[0].name,1)
@@ -48,7 +55,14 @@ for mat in bpy.data.materials:
 scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=256;scene.cycles.use_denoising=True
 scene.render.bake.use_pass_direct=True;scene.render.bake.use_pass_indirect=True;scene.render.bake.use_pass_color=False
 scene.render.bake.margin=10;scene.render.bake.use_clear=True
-bpy.ops.object.bake(type='DIFFUSE')
+# Sewing thread is below the atlas texel size. Baking its hairline shadow creates
+# square black blocks; the actual sewn geometry remains visible in the game.
+threadVisibility=[o.visible_shadow for o in threads]
+try:
+    for ob in threads:ob.visible_shadow=False
+    bpy.ops.object.bake(type='DIFFUSE')
+finally:
+    for ob,visible in zip(threads,threadVisibility):ob.visible_shadow=visible
 raw=SOURCE/'Textures'/'Texture_CommandRoomLighting.exr'
 atlas.filepath_raw=str(raw);atlas.file_format='OPEN_EXR';atlas.save()
 pixels=np.empty(len(atlas.pixels),dtype=np.float32);atlas.pixels.foreach_get(pixels)
@@ -82,7 +96,7 @@ for mat in bpy.data.materials:
     for link in list(mat.node_tree.links):
         if link.to_node.type=='BSDF_PRINCIPLED':
             links.append((mat,link.from_socket,link.to_socket));mat.node_tree.links.remove(link)
-bpy.ops.export_scene.gltf(filepath=str(GAME/'Model'/'Model_CommandRoom.glb'),export_format='GLB',use_selection=True,export_cameras=True,export_lights=False,export_animations=False,export_extras=True,export_texcoords=True,export_image_format='NONE')
+bpy.ops.export_scene.gltf(filepath=str(GAME/'Model'/'Model_CommandRoom.glb'),export_format='GLB',use_selection=True,export_cameras=True,export_lights=False,export_animations=False,export_extras=True,export_texcoords=True,export_image_format='NONE',export_vertex_color='ACTIVE')
 for mat,a,b in links:mat.node_tree.links.new(a,b)
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'Scene_CommandRoom.blend'))
 record={'source':str(raw),'deliveryInput':str(png),'size':[2048,2048],'samples':256,'encoding':'sRGB(linear diffuse irradiance / 32)','scale':32,'peakLinear':peak,'uvChannel':1,'meshes':len(objects),'noAlbedo':True,'relativeTexelDensity':density}

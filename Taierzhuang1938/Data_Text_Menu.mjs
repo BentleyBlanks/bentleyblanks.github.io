@@ -138,6 +138,10 @@ export const TEXT = Object.freeze({
   "menu.item.resume": "继续 · {label}",
   "menu.item.settings": "设置",
   "menu.item.debug": "调试选项",
+  "menu.settings.graphics": "画面",
+  "menu.settings.sound": "声音",
+  "menu.settings.controls": "操作",
+  "menu.settings.tools": "高级工具",
   "menu.hint.resume": "从上次通过的下一章接着打",
   "menu.hint.start": "从第一关开始",
   "menu.hint.levels": "正式章节与测试场景两组，任选一条直接进",
@@ -309,6 +313,7 @@ export const GATED_MODULES = Object.freeze([
  */
 export const DYNAMIC_PREFIXES = Object.freeze([
   "menu.sandbox.",
+  "menu.settings.",
   "menu.debug.",
   "menu.shot.",
   "menu.slice.",

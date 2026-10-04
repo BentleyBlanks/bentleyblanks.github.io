@@ -390,7 +390,7 @@ export class MainMenu {
     event.preventDefault();
   }
 
-  /** 主列表。战役文案在 Data_TengxianScript.MENU 里，调试项只在这一层额外出现。 */
+  /** Player-facing title actions. Debug controls live inside Settings. */
   TitleItems() {
     const progress = Progress.Read();
     const resume = progress.furthest > 0 && progress.furthest < this.officialCount;
@@ -404,7 +404,6 @@ export class MainMenu {
       { id: "codex", label: Localize(MenuTextId("codex"), MENU.codex), hint: T("menu.hint.codex") },
       { id: "credits", label: Localize(MenuTextId("credits"), MENU.credits), hint: T("menu.hint.credits") },
       { id: "settings", label: T("menu.item.settings"), hint: T("menu.hint.settings") },
-      { id: "debug", label: T("menu.item.debug"), hint: T("menu.hint.debug") },
     ];
   }
 
@@ -423,7 +422,6 @@ export class MainMenu {
       return [
         { id: "resume", label: T("menu.item.resumeGame"), hint: T("menu.hint.resumeSandbox", { where: here.where }) },
         { id: "settings", label: T("menu.item.settings"), hint: T("menu.hint.settings") },
-        { id: "debug", label: T("menu.item.debug"), hint: T("menu.hint.debug") },
         { id: "exitSandbox", label: here.exit, hint: T("menu.hint.exitSandbox"),
           confirm: LeaveConfirm(T("menu.confirm.leaveTitle", { action: here.exit })) },
       ];
@@ -431,7 +429,6 @@ export class MainMenu {
     return [
       { id: "resume", label: T("menu.item.resumeGame"), hint: T("menu.hint.resumeLevel") },
       { id: "settings", label: T("menu.item.settings"), hint: T("menu.hint.settings") },
-      { id: "debug", label: T("menu.item.debug"), hint: T("menu.hint.debug") },
       { id: "levels", label: Localize(MenuTextId("chapters"), MENU.chapters), hint: T("menu.hint.levelsFromPause") },
       { id: "title", label: T("menu.item.title"), hint: T("menu.hint.title"),
         confirm: LeaveConfirm(T("menu.confirm.toTitleTitle")) },
@@ -714,8 +711,10 @@ export class MainMenu {
     this.el.pauseObjective.hidden = !objective;
     this.el.pauseObjective.scrollTop = 0;
     this.RenderObjectiveProgress(mode === "pause" ? this.host.CurrentObjectiveProgress?.() : null);
-    const panel = mode === "levels" || mode === "codex" || mode === "credits" || mode === "debug";
-    if (panel) this.panelReturnMode = wasMode === "pause" ? "pause" : "title";
+    const panel = ["levels","codex","credits","debug","settings"].includes(mode);
+    if (panel && (wasMode === "pause" || wasMode === "title")) this.settingsReturnMode = this.panelReturnMode = wasMode;
+    if (mode === "debug") this.panelReturnMode = "settings";
+    else if (mode === "settings") this.panelReturnMode = this.settingsReturnMode || "title";
     this.root.classList.toggle("panelOn", panel);
     this.el.panel.classList.toggle("on", panel);
     this.root.classList.toggle("levelsOn", mode === "levels");
@@ -737,6 +736,18 @@ export class MainMenu {
         .map((line, index) => (line
           ? `<p>${Localize(CreditsLineId(index), line)}</p>` : `<p class="mnGap"></p>`)).join("");
       this.el.panelBody.appendChild(this.el.text);
+    } else if (mode === "settings") {
+      this.el.panelTitle.textContent = T("menu.item.settings");
+      this.el.panelBody.textContent = "";
+      const list = document.createElement("div"); list.className = "mnSettingsList";
+      for (const id of ["graphics","sound","controls","debug","tools"]) {
+        const button = document.createElement("button"); button.type = "button";
+        button.className = "mnSettingsItem";button.dataset.setting = id;
+        button.textContent = T(id === "debug" ? "menu.item.debug" : `menu.settings.${id}`);
+        button.addEventListener("click",()=>id === "debug" ? this.Show("debug") : this.host.Settings?.(id));
+        list.appendChild(button);
+      }
+      this.el.panelBody.appendChild(list);
     } else if (mode === "debug") {
       this.el.panelTitle.textContent = T("menu.item.debug");
       this.BuildDebugOptions();
@@ -872,7 +883,7 @@ export class MainMenu {
       row.classList.toggle("on", input.checked);
       wrap.appendChild(row);
     }
-    if (this.panelReturnMode === "pause") {
+    if ((this.settingsReturnMode || this.panelReturnMode) === "pause") {
       const status = this.host.CheckpointStatus?.() || { available: false, note: T("menu.checkpoint.none") };
       const action = document.createElement("button");
       action.type = "button";
@@ -1012,7 +1023,7 @@ export class MainMenu {
       case "credits": this.Show("credits"); return;
       case "debug": this.Show("debug"); return;
       case "resume": this.host.Resume?.(); return;
-      case "settings": this.host.Settings?.(); return;
+      case "settings": this.Show("settings"); return;
       case "exitSandbox": this.host.ExitSandbox?.(); return;
       case "restartSandbox": this.host.RestartSandbox?.(); return;
       case "retrySandbox": this.host.RetrySandbox?.(); return;
@@ -1081,6 +1092,11 @@ export class MainMenu {
             this.SelectLevel(this.selected + delta);
             this.levelEls[this.selected]?.focus({ preventScroll: true });
             this.levelEls[this.selected]?.scrollIntoView({ block: "nearest" });
+          }
+          else if (panel && this.mode === "settings") {
+            const choices=[...this.el.panelBody.querySelectorAll(".mnSettingsItem")];
+            const index=choices.indexOf(document.activeElement);
+            choices[(index+delta+choices.length)%choices.length]?.focus();
           }
           else if (!panel) {
             this.Highlight(this.itemIndex + delta);

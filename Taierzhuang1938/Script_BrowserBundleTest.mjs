@@ -147,8 +147,10 @@ try {
       }
       assert.ok(closeup.camera.every(Number.isFinite),'the interrogation camera remains finite');
     } else {
+      await page.waitForFunction(()=>window.Tengxian?.Debug?.Menu?.().open,null,{timeout:60000});
       assert.equal(await page.evaluate(() => window.Tengxian.Debug.Menu().open), true);
-      await page.evaluate(()=>window.Tengxian.Debug.MenuAct("debug"));
+      await page.evaluate(()=>window.Tengxian.Debug.MenuAct("settings"));
+      await page.locator('[data-setting="debug"]').click();
       assert.equal(await page.locator("#firstLevelStageSelect option").count(),18);
       await page.selectOption("#firstLevelStageSelect","Transfer");
       await page.locator('[data-action="firstLevelJump"]').click();

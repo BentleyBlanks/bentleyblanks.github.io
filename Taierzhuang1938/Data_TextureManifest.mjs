@@ -133,9 +133,16 @@ export const TEXTURE_MANIFEST = Object.freeze([
     id: "CommandRoomCloth", kind: "material", tier: "lazy",
     toneClass: "fabric", metersPerTile: 1, normalConvention: "gl",
     bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_CommandRoomCloth.json",
-    source: { provider: "imagegen", date: "2026-10-04", ref: "CommandRoomMenu/Source/CommandRoomCloth.png", prompt: "_import/Prompts/Texture_CommandRoomCloth.txt" },
+    source: { provider: "imagegen", date: "2026-10-05", ref: "CommandRoom/Source/CommandRoomClothFidelity.png", prompt: "_import/Prompts/Texture_CommandRoomCloth.txt" },
     consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomCloth" }],
     files: [["Texture_CommandRoomClothBase.webp","Base",1024,1024],["Texture_CommandRoomClothNormal.webp","Normal",512,512],["Texture_CommandRoomClothOrm.webp","Orm",512,512]],
+  },
+  {
+    id: "CommandRoomInkLabel", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomInkLabel.py",
+    source: { provider: "imagegen", date: "2026-10-05", ref: "CommandRoom/Source/CommandRoomInkLabel.png", prompt: "_import/Prompts/Texture_CommandRoomInkLabel.txt" },
+    consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomInkLabel" }],
+    files: [["Texture_CommandRoomInkLabelImage.webp","Image",512,336]],
   },
   {
     id: "CommandRoomLetter", kind: "print", tier: "lazy",

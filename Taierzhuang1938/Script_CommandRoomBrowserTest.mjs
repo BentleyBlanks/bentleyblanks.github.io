@@ -80,6 +80,16 @@ try {
     room.Render();return {movingPixels,visiblePixels};
   });
   assert.ok(result.dust.movingPixels>30&&result.dust.visiblePixels>15,"World-space motes must produce visible moving pixels, not just advance a clock");
+  result.optics=await page.evaluate(()=>{
+    const Read=()=>{room.Render();const gl=renderer.getContext(),p=new Uint8Array(1280*720*4);gl.readPixels(0,0,1280,720,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;};
+    const dof=room.atmosphere.compositeMaterial.uniforms.dof.value,aperture=dof.z;
+    const soft=Read();dof.z=0;const sharp=Read();dof.z=aperture;room.Render();
+    let changed=0;for(let i=0;i<soft.length;i+=4)if(Math.abs(soft[i]-sharp[i])>2)changed++;
+    let glass=null;room.scene.traverse(o=>{if(o.material?.name==='CommandRoomInkGlass')glass={transmission:o.material.transmission,thickness:o.material.thickness,reflection:!!o.material.envMap};});
+    return {changed,glass};
+  });
+  assert.ok(result.optics.changed>200,"Depth of field must affect actual scene pixels");
+  assert.ok(result.optics.glass.transmission>.9&&result.optics.glass.thickness>0&&result.optics.glass.reflection,"Bottle uses thick transmitting glass with room reflections");
   result.restore=await page.evaluate(()=>{
     const target=new THREE.WebGLRenderTarget(20,16);renderer.setRenderTarget(target);renderer.setViewport(2,3,8,9);
     renderer.setScissor(1,2,3,4);renderer.setScissorTest(true);renderer.autoClear=false;

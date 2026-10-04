@@ -5,6 +5,7 @@ import http from "node:http";
 import os from "node:os";
 import sharp from "sharp";
 import { HandleTextureImportRequest } from "./Script_TextureImportServer.mjs";
+import { TextureCatalog } from "./Script_TextureImportRules.mjs";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 const here = import.meta.dirname, root = path.dirname(here), temp = await fs.mkdtemp(path.join(os.tmpdir(), "TengxianTextureUi-"));
 const out = path.join(here, "_shots", "TextureManager"); await fs.mkdir(out, { recursive: true });
@@ -26,7 +27,7 @@ try {
   page.on("pageerror", error => errors.push(String(error)));
   await page.goto(`${origin}/Taierzhuang1938/TextureManager.html`);
   await page.waitForFunction(() => document.querySelectorAll(".asset").length > 250 && document.querySelector("canvas"));
-  assert.equal(await page.locator("#list .asset").count(), 267);
+  assert.equal(await page.locator("#list .asset").count(), TextureCatalog().length);
   const originalArea = await page.locator(".canvas-wrap").boundingBox();
   assert.ok(originalArea.height > 460, JSON.stringify(originalArea));
   await page.locator("#expandPreview").click();
