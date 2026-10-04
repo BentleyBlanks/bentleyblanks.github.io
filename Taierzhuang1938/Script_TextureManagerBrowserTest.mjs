@@ -28,6 +28,7 @@ try {
   await page.goto(`${origin}/Taierzhuang1938/TextureManager.html`);
   await page.waitForFunction(() => document.querySelectorAll(".asset").length > 250 && document.querySelector("canvas"));
   assert.equal(await page.locator("#list .asset").count(), TextureCatalog().length);
+  await page.locator('[data-name="Texture_WeaponSteelV2Base.webp"]').click();
   const originalArea = await page.locator(".canvas-wrap").boundingBox();
   assert.ok(originalArea.height > 460, JSON.stringify(originalArea));
   await page.locator("#expandPreview").click();
@@ -46,7 +47,9 @@ try {
   const saved = JSON.parse(await fs.readFile(path.join(temp, "Taierzhuang1938", "Data_TextureImportSettings.json"), "utf8"));
   assert.equal(saved.textures["Texture_WeaponSteelV2Base.webp"].maxSize, 128);
   assert.equal(saved.textures["Texture_WeaponSteelV2Base.webp"].mipmaps, false);
-  await page.reload(); await page.waitForFunction(() => document.querySelector("#maxSize").value === "128");
+  await page.reload();
+  await page.locator('[data-name="Texture_WeaponSteelV2Base.webp"]').click();
+  await page.waitForFunction(() => document.querySelector("#maxSize").value === "128");
   await page.locator("#format").selectOption("ktx2-bc3");
   await page.locator("#mipmaps").selectOption("true");
   await page.locator("#preview").click();
