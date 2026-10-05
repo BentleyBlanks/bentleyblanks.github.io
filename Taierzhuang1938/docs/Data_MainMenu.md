@@ -57,14 +57,21 @@ Imagegen 纸图沿用原地图比例与原电报纸边，不是历史原件影�
 `Reference_Coat.png`、`Reference_InkBottle.png` 三张 Imagegen 建模参考细化帽冠褶皱、
 有厚度帽檐、缝线、纽扣、衣领、门襟、贴袋、空袖口与玻璃瓶肩、瓶底及旋盖。
 三视图是美术建模参考，不作为历史原件证据。
-2026-10-05 再细化：帽冠压低，帽顶用独立弯曲折痕替代中心放射状褶皱；
-袖褶只占局部周向，左右错开，衣身有重力长褶及连接衣钩的挂袢。布料换用
-Imagegen `Source/CommandRoomClothWorn.png`，25 cm 一铺，1K 基色与 512 法线/ORM；
+2026-10-06 再细化：帽冠侧移塌落，顶部缝合轮廓不再水平，帽檐有弯曲；
+空衣身缩薄、左右袖形不对称，局部肘褶与长褶分别控制，衣身保留连接衣钩的挂袢。布料换用
+Imagegen `Source/CommandRoomClothSerge.png`，25 cm 一铺，1K 基色与 512 法线/ORM；
+法线起伏降低至 0.18 mm，减少旧布表面过粗、像沙发面料的问题。
 专用 `menuCloth` 类允许 4096 px/m，其余贴图仍沿用原密度上限，单套文件预算不变。
 `Script_CommandRoomFurniture.py` 用七层截面构成桌板圆角，直接向木板内切局部缺口；
 柜子具有圆角台面、下压边、实框凹面抽屉和铁拉手底座。删除原来的
 `DryMortarGrain`、`TableScratch`、`TableEndGrainSplit`、`TableDrySplinter`，
 不再用白色碎粒或悬浮黑线表示磨损。检查标签 4/5 对应桌子/柜子，可单独渲染验收。
+柜子、窗沿、桌椅共用新 Imagegen 风化木 PBR，木材边角磨损进入几何与顶点色，
+不叠加脱离木面的碎屑。灰泥更换为 Imagegen 干燥剥落纹理；
+`Script_CommandRoomWallWear.py` 对墙体实际布尔切出七处破口，剥落截面约 35 mm，
+错缝排列的旧砖退入墙皮约 19 mm，砖面使用独立 512² PBR；以上为场景缩放前尺寸。
+墙图主体离墙约 3.7 mm，底部仅轻微卷起，四角钉头与钉杆连接纸面和墙体。
+相对上一版约 5.6 cm 的整面悬空间距明显缩小，匹配光照图集重新烘焙。
 电报网格沿原图纸边裁切，保留旧纸缺口与卷边，不再带白色矩形底框；新文书匹配同一轮廓。
 边界数据为 `_blender/Data_CommandRoomPaperOutline.json`，可用
 `_import/Script_TraceCommandRoomPaper.py` 从已确认的纸图重新提取。
@@ -87,7 +94,7 @@ Imagegen `Source/CommandRoomClothWorn.png`，25 cm 一铺，1K 基色与 512 法
 生成提示词在 `_import/Prompts/Texture_CommandRoom*.txt`，PBR 烘焙记录在
 `_import/TextureBakes/`；已确认的纸图用 `_import/Script_BakeCommandRoomPrints.py --source <Source>` 转 WebP。
 
-贴图按菜单使用时加载，不加入共享 `PBR_SETS`。三套 PBR、地图、电报、瓶签和光照图集，
+贴图按菜单使用时加载，不加入共享 `PBR_SETS`。四套 PBR、地图、电报、瓶签和光照图集，
 在 `Data_TextureManifest` 的 lazy 层单独登记；十张新纸图约 4 MB，预算相应增加 4 MB，
 运行时仅下载当前地图与信件（合计不足 1 MB），访问过的状态复用贴图。反射探针由场景运行时生成，不增加外部贴图请求。
 GLB 中静态几何按材质合并；预算见 `Data_AssetStandards.CommandRoom`。

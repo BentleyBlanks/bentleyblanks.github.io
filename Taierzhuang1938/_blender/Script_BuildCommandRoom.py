@@ -58,7 +58,7 @@ cloth=Material("CommandRoomCloth",(.17,.16,.14),.97,"CommandRoomCloth")
 mapmat=Material("CommandRoomMap",(.58,.51,.4),.95,"CommandRoomMap",True)
 letter=Material("CommandRoomLetter",(.64,.61,.51),.97,"CommandRoomLetter",True)
 iron=Material("CommandRoomIron",(.08,.075,.063),.83)
-brick=Material("CommandRoomBrick",(.21,.20,.18),.96)
+brick=Material("CommandRoomBrick",(.47,.365,.30),.96,"CommandRoomBrick")
 dust=Material("CommandRoomDust",(.42,.39,.33),.99)
 graphite=Material("CommandRoomGraphite",(.023,.022,.02),.77)
 pencilWood=Material("CommandRoomPencilWood",(.48,.34,.20),.9)
@@ -86,12 +86,26 @@ def Cube(name, loc, size, mat=wood, bevel=.008):
         for li in p.loop_indices:
             co=ob.data.vertices[ob.data.loops[li].vertex_index].co
             a,b=((0,1) if axis==2 else (0,2) if axis==1 else (1,2))
-            if mat==wood and name.startswith(("TablePlank","TableLongApron","ChairCrest","WindowHeadSill","CabinetTop")):
+            if mat==wood and name.startswith(("TablePlank","TableLongApron","TableApronLowerLip","ChairCrest","WindowHeadSill","CabinetTop","CabinetDrawerRail","CabinetBasePlinth")):
                 a,b=((1,0) if axis==2 else (2,0) if axis==1 else (1,2))
             uv.data[li].uv=(co[a]/tile+loc[a]*.31,co[b]/tile+loc[b]*.17)
     if bevel:
         m=ob.modifiers.new("Worn edges","BEVEL"); m.width=bevel;m.segments=5
         bpy.context.view_layer.objects.active=ob;bpy.ops.object.modifier_apply(modifier=m.name)
+        if mat==wood:
+            # Integral hand-worn corners and uneven timber, never separate chips.
+            from mathutils import noise
+            for v in ob.data.vertices:
+                p=v.co;edge=sorted(abs(p[i])/(size[i]*.5) for i in range(3))[-2]
+                n=noise.noise_vector((p+Vector(loc))*27)[0]
+                v.co+=v.normal*(-max(0,n-.12)*.0045*edge**5)
+            ob.data.update()
+            colors=ob.data.color_attributes.new(name='TimberWear',type='FLOAT_COLOR',domain='POINT')
+            for v in ob.data.vertices:
+                p=v.co;edge=sorted(abs(p[i])/(size[i]*.5) for i in range(3))[-2]
+                n=noise.noise_vector((p+Vector(loc))*8)[0]
+                wear=.88+.22*n+.23*max(0,min(1,edge))**9
+                colors.data[v.index].color=(wear,wear*.984,wear*.95,1)
         if name.startswith("TablePlank"):
             for v in ob.data.vertices:
                 edge=max(abs(v.co.x)/(size[0]*.5),abs(v.co.y)/(size[1]*.5))
@@ -140,23 +154,9 @@ def Branch(a,d,length,r,depth):
         for side in [-1,1]:
             Branch(b,(d.x+side*random.uniform(.30,.65),d.y+random.uniform(-.10,.10),d.z),length*random.uniform(.58,.75),r*.62,depth-1)
 for x in [-2.35,-.55]: Branch((x,3.8,.6),(random.uniform(-.1,.1),0,1),.72,.017,4)
-# Weathered wall repairs, exposed brick patches, subtly irregular edges.
-for cx,cz,sx,sz in [(-.52,2.72,.55,.6),(.55,1.10,.7,.44),(2.5,.70,.65,.55),(-2.6,.55,.58,.8)]:
-    n=17;vs=[(cx,wy-.135,cz)]
-    for i in range(n):
-        a=i*math.tau/n;r=random.uniform(.83,1)
-        vs.append((cx+math.cos(a)*sx*.5*r,wy-.135,cz+math.sin(a)*sz*.5*r))
-    Mesh("ExposedMortar",vs,[(0,i+1,(i+1)%n+1) for i in range(n)],plaster,[(x/1.8,z/1.8) for x,y,z in vs])
-    for row in range(int(sz/.115)):
-        for col in range(3):
-            bx=cx+(col-1)*.18+(row%2)*.05;bz=cz+(row-(sz/.115-1)/2)*.11
-            if ((bx-cx)/(sx*.47))**2+((bz-cz)/(sz*.47))**2<.78:
-                Cube("OldBrick",(bx,wy-.140,bz),(.168+random.uniform(-.012,.008),.013,.087),brick,.003)
-for i in range(16):
-    x=random.uniform(-2.9,3);z=random.uniform(.4,3.2)
-    if -2.3<x<-.7 and z>1.15:continue
-    pts=[(x+math.sin(j*1.7+i)*.015,wy-.124,z-j*.055) for j in range(random.randint(3,9))]
-    Curve("PlasterHairline",pts,.0008,brick)
+# Cut real recesses through the plaster skin and fit eroded masonry inside.
+wallPath=GAME/'_blender/Script_CommandRoomWallWear.py'
+exec(compile(wallPath.read_text(encoding='utf-8'),str(wallPath),'exec'),globals())
 furniturePath=GAME/'_blender/Script_CommandRoomFurniture.py'
 exec(compile(furniturePath.read_text(encoding='utf-8'),str(furniturePath),'exec'),globals())
 # Chair behind desk, deliberately empty.
@@ -177,6 +177,10 @@ def Paper(name,cx,cy,z,w,h,mat,angle=0,wall=False):
             u=i/nx;px=(u-.5)*w;py=(v-.5)*h
             edge=(max(0,abs(u-.5)-.43)/.07)**2*.008+(max(0,abs(v-.5)-.43)/.07)**2*.007
             cr=.0018*math.sin(u*math.pi*4)+.002*math.cos(v*math.pi*6)+edge
+            if wall:
+                # Mostly touching plaster; only the free bottom lip curls.
+                pins=min(math.hypot(u-pu,v-pv) for pu,pv in [(.025,.965),(.975,.965),(.025,.045),(.975,.045)])
+                cr=(.0008*(1+math.sin(u*19)*math.sin(v*13))+.004*(1-v)**14*(.6+.4*math.sin(u*15)**2))*min(1,pins/.055)
             x=px*math.cos(angle)-py*math.sin(angle);y=px*math.sin(angle)+py*math.cos(angle)
             vs.append((cx+x,cy-cr,z+py) if wall else (cx+x,cy+y,z+cr))
             uvs.append((u,v))
@@ -188,7 +192,11 @@ def Paper(name,cx,cy,z,w,h,mat,angle=0,wall=False):
     m=ob.modifiers.new("Paper thickness","SOLIDIFY");m.thickness=.0007
     bpy.context.view_layer.objects.active=ob;ob.select_set(True);bpy.ops.object.modifier_apply(modifier=m.name);ob.select_set(False)
     return ob
-Paper("WallMap",1.26,1.385,1.82,2.18,1.45,mapmat,wall=True)
+wallPaper=Paper("WallMapPaper",1.26,1.427,1.82,2.18,1.45,mapmat,wall=True)
+for u,v in [(.025,.965),(.975,.965),(.025,.045),(.975,.045)]:
+    x=1.26+(u-.5)*2.18;z=1.82+(v-.5)*1.45
+    Rod('WallMapPinShaft',(x,1.418,z),(x,1.466,z),.0018,iron,12)
+    Rod('WallMapPinHead',(x,1.418,z),(x,1.421,z),.0065,iron,24)
 Paper("DeskMap",tx,ty-.10,.894,2.60,1.78,mapmat,math.radians(40)-.035)
 # Telegram silhouette is built with the detailed props below.
 # Ordinary 18.5 cm hexagonal pencils with exposed timber and graphite points.

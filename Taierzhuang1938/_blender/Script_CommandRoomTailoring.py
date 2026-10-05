@@ -69,42 +69,44 @@ capCreases=[(-2.96,.30,.010,.075,.43),(-2.43,.48,.013,.12,-.55),(-1.90,.22,.009,
  (.03,.33,.008,.065,.43),(.47,.47,.012,.095,-.4),(1.16,.30,.009,.08,.7),
  (1.82,.60,.012,.10,-.5),(2.45,.43,.013,.10,.45)]
 def Crown(t,a):
-    top=.109+.009*math.sin(a*2+.4)+.0045*math.sin(a*5-.7)
+    # The upper seam buckles in broad, unequal arcs. A compressed cap has no
+    # level circular lid and the front panel folds over itself above the band.
+    top=.109+.007*math.sin(a*2+.4)+.004*math.sin(a*3-.7)-.006*math.exp(-(AngleDistance(a,.15)/.6)**2)
     # The crown starts exactly on the band's irregular upper lip. A constant
     # lower ring cuts through that lip and creates alternating black slivers.
     joinRipple=.0018*noise.noise_vector(Vector((math.cos(a)*7,math.sin(a)*7,3)))[0]
     base=.057+.0025*math.sin(a*3+.3)
-    rx=.148+joinRipple*(1-t)+.003*math.sin(math.pi*t)-.006*t
-    ry=.133+joinRipple*(1-t)+.003*math.sin(math.pi*t)-.004*t
+    rx=.148+joinRipple*(1-t)+.007*math.sin(math.pi*t)-.006*t
+    ry=.133+joinRipple*(1-t)+.010*math.sin(math.pi*t)-.005*t
     fold=0
     for ca,ct,amp,w,slope in capCreases:
         d=AngleDistance(a,ca+slope*(t-ct))
-        fold+=amp*1.10*Ridge(d,w)*math.exp(-((t-ct)/.42)**4)*math.sin(math.pi*t)**1.1
+        fold+=amp*Ridge(d,w)*math.exp(-((t-ct)/.37)**4)*math.sin(math.pi*t)**1.1
     # Long oblique sag between the stiff folded band and the crown panel.
-    fold-=.006*Ridge(t-.40-.13*math.sin(a*2+.6),.10)*math.exp(-(AngleDistance(a,-1.7)/1.4)**4)
-    fold+=.0028*noise.noise_vector(Vector((math.cos(a)*5,math.sin(a)*5,t*6)))[0]*math.sin(math.pi*t)
-    return Vector((hx-.011*t+(rx+fold)*math.cos(a),hy+.009*t+(ry+fold)*math.sin(a),hz+base+(top-base)*math.sin(t*math.pi/2)))
+    fold-=.009*Ridge(t-.44-.18*math.sin(a*2+.6),.12)*math.exp(-(AngleDistance(a,-1.7)/1.4)**4)
+    fold+=.001*noise.noise_vector(Vector((math.cos(a)*5,math.sin(a)*5,t*6)))[0]*math.sin(math.pi*t)
+    return Vector((hx-.017*t+(rx+fold)*math.cos(a),hy+.014*t+(ry+fold)*math.sin(a),hz+base+(top-base)*(t+.13*math.sin(math.pi*t))))
 Surface('CapSoftCrown',192,48,lambda u,v:Crown(v,u*math.tau),cloth,lambda u,v:(u*.91,v*.075))
 def CapTop(u,v):
     a=u*math.tau;r=1-v
-    edge=Crown(1,a);center=Vector((hx-.011,hy+.009,hz+.098))
+    edge=Crown(1,a);center=Vector((hx-.017,hy+.014,hz+.125))
     p=center.lerp(edge,r)
     # Buckled cloth panel, compressed along two diagonal crease paths.
     x=p.x-hx;y=p.y-hy
     weight=math.sin(math.pi*r)**1.25
-    p.z+=(-.017*math.exp(-((x+.025)/.065)**2-((y-.012)/.072)**2))*weight
+    p.z+=(-.009*math.exp(-((x+.025)/.085)**2-((y-.012)/.068)**2))*weight
     # Independent bent compression ridges cross the panel; none radiates
     # from the pole, avoiding the previous star-shaped pinched top.
-    for y0,amp,w,slope,xc,length in [(-.068,.011,.010,.30,-.025,.12),(-.014,.009,.013,-.42,.045,.09),(.049,.014,.012,.35,-.05,.10),(.088,-.008,.015,-.2,.005,.11)]:
+    for y0,amp,w,slope,xc,length in [(-.068,.015,.007,.30,-.025,.12),(-.014,.013,.008,-.42,.045,.09),(.049,.018,.008,.35,-.05,.10),(.088,-.009,.011,-.2,.005,.11)]:
         path=y-y0-slope*x-.24*x*x
         p.z+=amp*Ridge(path,w)*math.exp(-((x-xc)/length)**4)*weight
-    p.z+=.003*noise.noise_vector(Vector((x*40,y*40,2.3)))[0]*weight
+    p.z+=.0012*noise.noise_vector(Vector((x*40,y*40,2.3)))[0]*weight
     return p
 Surface('CapSoftTop',192,40,CapTop,cloth,lambda u,v:(.5+(1-v)*math.cos(u*math.tau)*.15,.5+(1-v)*math.sin(u*math.tau)*.14))
 def Band(u,v):
     a=u*math.tau
     ripple=.0018*noise.noise_vector(Vector((math.cos(a)*7,math.sin(a)*7,v*3)))[0]
-    ripple+=.0020*Ridge(v-.40-.17*math.sin(a*4+.5),.17)*math.sin(math.pi*v)
+    ripple+=.0045*Ridge(v-.40-.17*math.sin(a*4+.5),.17)*math.sin(math.pi*v)
     return Vector((hx+(.148+ripple)*math.cos(a),hy+(.133+ripple)*math.sin(a),hz+.003+v*.054+.0025*math.sin(a*3+.3)))
 Shell(Surface('CapFoldedBand',160,16,Band,cloth,lambda u,v:(u*.91,v*.05)),.002)
 def Visor(u,v):
@@ -112,7 +114,7 @@ def Visor(u,v):
     extent=math.sin(u*math.pi)**.65
     p=Band(a/math.tau,0)
     p.x+=.065*v*extent*1.1*math.cos(a);p.y+=.065*v*extent*math.sin(a)
-    p.z+=-.002*v+.0025*math.sin(u*12+.4)*v
+    p.z+=-.003*v-.006*math.sin(u*math.pi)**2*math.sin(v*math.pi*.8)+.0018*math.sin(u*12+.4)*v
     return p
 Shell(Surface('CapCurvedVisor',96,24,Visor,cloth,lambda u,v:(u*.30,v*.10),reverse=True),.0024)
 Curve('CapVisorBinding',[Visor(i/144,1) for i in range(145)],.0008,thread)
@@ -131,21 +133,22 @@ Curve('CoatHangingLoop',[(coatx-.022,coaty,coatTop-.005),(coatx-.025,coaty+.016,
     (coatx-.018,coaty+.016,coatTop+.100),(coatx+.010,coaty+.016,coatTop+.112),
     (coatx+.025,coaty+.016,coatTop+.074),(coatx+.022,coaty,coatTop-.005)],.0045,cloth)
 def Body(t,a):
-    width=SmoothProfile(t,[(0,.063),(.10,.227),(.27,.217),(.51,.226),(1,.258)])
-    depth=SmoothProfile(t,[(0,.046),(.15,.075),(.48,.066),(1,.073)])
+    width=SmoothProfile(t,[(0,.063),(.11,.222),(.27,.205),(.51,.213),(1,.261)])
+    depth=SmoothProfile(t,[(0,.046),(.15,.059),(.48,.047),(1,.059)])
     folds=0
-    for ca,amp,w,slope in [(-2.75,.013,.17,.09),(-2.2,.018,.20,-.16),(-1.80,.011,.15,.1),
-      (-1.26,.015,.18,.12),(-.76,.018,.16,-.13),(-.25,.012,.18,.17),(.40,.011,.2,-.10),
-      (.9,.015,.17,.13),(1.45,.016,.19,-.18),(2.05,.014,.16,.16),(2.65,.012,.19,-.1)]:
-        folds+=amp*1.75*Ridge(AngleDistance(a,ca+slope*t+.09*math.sin(t*6+ca)),w)*(.40+.60*t)
+    for ca,amp,w,slope in [(-2.78,.016,.20,.14),(-2.20,.030,.28,-.19),(-1.76,.014,.13,.20),
+      (-1.16,.025,.25,.17),(-.63,.018,.20,-.20),(.40,.014,.24,-.10),
+      (1.22,.023,.26,.13),(2.18,.016,.23,-.20)]:
+        folds+=amp*Ridge(AngleDistance(a,ca+slope*t+.14*math.sin(t*5+ca)),w)*(.38+.62*t)
     # Diagonal shoulder drag lines soften into long gravity folds below the waist.
-    folds+=.011*Ridge(t-.16-.065*math.cos(a*3+.3),.021)*math.exp(-((t-.15)/.15)**2)
-    folds+=.004*noise.noise_vector(Vector((math.cos(a)*8,math.sin(a)*8,t*9)))[0]
+    folds+=.017*Ridge(t-.16-.065*math.cos(a*3+.3),.026)*math.exp(-((t-.15)/.15)**2)
+    folds+=.0015*noise.noise_vector(Vector((math.cos(a)*8,math.sin(a)*8,t*9)))[0]
     # Fabric hangs from the narrow neck: two broad off-center front folds and
     # local diagonal tension at pocket attachments, not a filled torso.
     folds+=.012*Ridge(AngleDistance(a,-1.13-.19*t),.11)*math.sin(math.pi*t)**.5
     folds-=.011*Ridge(t-.55-.06*math.cos(a*2),.026)*math.exp(-(AngleDistance(a,-1.3)/.9)**4)
-    return Vector((coatx-.028*t+(width+folds)*math.cos(a),coaty+(depth+folds)*math.sin(a),coatTop-coatLength*t+.017*math.sin(a*3+.7)*t**5+.007*math.cos(a)*t))
+    folds+=.010*Ridge(t-.34-.09*math.cos(a+1),.033)*math.exp(-(AngleDistance(a,-2.0)/.7)**4)
+    return Vector((coatx-.037*t+.012*math.sin(t*math.pi)+(width+folds)*math.cos(a),coaty+.016*t+(depth+folds)*math.sin(a),coatTop-coatLength*t+.024*math.sin(a*3+.7)*t**5+.014*math.cos(a)*t))
 def BodyAngle(u,t):
     gap=.007+.48*max(0,1-t/.16)+.10*max(0,(t-.67)/.33)
     return -math.pi/2+gap+u*(math.tau-2*gap)
@@ -168,25 +171,26 @@ Curve('CoatBackSeam',[Body(i/120,math.pi/2)+Vector((0,.0015,0)) for i in range(1
 def Collar(side,u,v):
     inner=Vector((coatx+side*(.035+.040*u),coaty-.090+.165*u,coatTop-.09*(1-u)+.025*math.sin(u*math.pi)))
     outer=Vector((coatx+side*(.122+.015*math.sin(u*math.pi)-.048*u),coaty-.133+.208*u,coatTop-.17*(1-u)**1.4-.026*u))
-    p=inner.lerp(outer,v);p.y-=.010*math.sin(v*math.pi);p.z+=.009*math.sin(v*math.pi)*math.sin(u*math.pi)
+    p=inner.lerp(outer,v);p.y-=.016*math.sin(v*math.pi);p.z+=.013*math.sin(v*math.pi)*math.sin(u*math.pi)
+    p.z+=side*.006*(1-u)*v;p.y+=.005*math.sin(u*8+side)*math.sin(v*math.pi)
     return p
 for side in [-1,1]:
     Shell(Surface('CoatPointedCollar',36,24,lambda u,v,s=side:Collar(s,u,v),cloth,lambda u,v:(u*.20,v*.17),reverse=side>0),.004)
     Curve('CoatCollarStitch',[Collar(side,i/72,.94)+Vector((0,-.001,.001)) for i in range(73)],.0004,thread)
     Curve('CoatCollarPointStitch',[Collar(side,.025,i/36)+Vector((0,-.001,.001)) for i in range(37)],.0004,thread)
 def Sleeve(side,t,a):
-    c=Vector((coatx+side*(.189+.128*t+.018*math.sin(t*math.pi))-.018*t,
-        coaty-.015-.065*t-.021*math.sin(math.pi*t)+side*.014*t,coatTop-.125-(.742+side*.011)*t))
-    radius=SmoothProfile(t,[(0,.016),(.075,.078),(.25,.067),(.54,.064),(1,.053)])
+    c=Vector((coatx+side*(.185+.15*math.sin(t*math.pi/2)-.072*t**3)-.025*t,
+        coaty-.015-.083*t-.032*math.sin(math.pi*t)+side*.023*t,coatTop-.135-(.737+side*.018)*t))
+    radius=SmoothProfile(t,[(0,.016),(.075,.080),(.25,.071),(.54,.058),(1,.050)])
     fold=0
     # Each elbow crease occupies only part of the sleeve circumference. The
     # staggered chevrons cannot turn into the old stacked ring/accordion shape.
-    for ct,amp,slope,ca,spread in [(.33,.019,.09,-1.9,.90),(.47,-.019,-.15,-.82,.83),(.55,.024,.12,-1.6,1.0),(.65,-.015,-.13,-2.1,.8),(.75,.011,.08,-.4,.7)]:
+    for ct,amp,slope,ca,spread in [(.29,.016,.09,-1.9,.90),(.43,-.021,-.15,-.82,.83),(.54,.027,.12,-1.6,1.0),(.64,-.018,-.13,-2.1,.8),(.73,.018,.08,-.4,.7),(.85,.011,-.09,-1.5,.65)]:
         fold+=amp*Ridge(t-ct-side*.012-slope*math.cos(a+side*.5),.027)*math.exp(-(AngleDistance(a,ca+side*.24)/spread)**4)
     for ca in [-2.3,-1.0,.3,1.9]:
         fold+=.007*Ridge(AngleDistance(a,ca+.16*math.sin(t*5+ca)),.22)*math.sin(math.pi*t)**.6
-    fold+=.0025*noise.noise_vector(Vector((math.cos(a)*4,math.sin(a)*4,t*8)))[0]
-    return c+Vector(((radius+fold)*math.cos(a),(radius*.77+fold)*math.sin(a),.030*side*math.cos(a)*(1-t)**3))
+    fold+=.001*noise.noise_vector(Vector((math.cos(a)*4,math.sin(a)*4,t*8)))[0]
+    return c+Vector(((radius+fold)*math.cos(a),(radius*.60+fold)*math.sin(a),.030*side*math.cos(a)*(1-t)**3))
 for side in [-1,1]:
     Shell(Surface('CoatTailoredSleeve',88,92,lambda u,v,s=side:Sleeve(s,v,u*math.tau),cloth,lambda u,v:(u*.50,v*.75),reverse=True),.003)
     for t in [.025,.954,1]:Curve('CoatSleeveSeam',[Sleeve(side,t,i/100*math.tau) for i in range(101)],.0012 if t==1 else .00040,thread)
@@ -215,9 +219,20 @@ for u in [.12,.88]:Button('CoatBeltButton',Belt(u,.5)+Vector((0,.003,0)),.01,(0,
 for ob in list(scene.objects):
     if ob.type!='MESH' or not ob.name.startswith(('Cap','Coat')) or ob.data.materials[0]!=cloth:continue
     colors=ob.data.color_attributes.new(name='ClothWear',type='FLOAT_COLOR',domain='POINT')
+    # Exposed fold ridges lose dye through rubbing. This belongs to albedo,
+    # whereas directional shadow is kept exclusively in the lightmap.
+    neighbors=[[] for v in ob.data.vertices]
+    for e in ob.data.edges:
+        a,b=e.vertices;neighbors[a].append(b);neighbors[b].append(a)
     for v in ob.data.vertices:
         p=ob.matrix_world@v.co
         n=noise.multi_fractal(p*19,1.0,2.1,3)
         small=noise.noise_vector(p*155)[0]
-        fade=.82+.34*n+.04*small
+        adjoining=neighbors[v.index]
+        curvature=0
+        if adjoining:
+            deltas=[v.co-ob.data.vertices[i].co for i in adjoining]
+            edge2=sum(d.length_squared for d in deltas)/len(deltas)
+            curvature=sum(d.dot(v.normal) for d in deltas)/len(deltas)/max(.000001,edge2)
+        fade=.82+.34*n+.04*small+.17*max(0,math.tanh(curvature*.012))
         colors.data[v.index].color=(fade,fade,fade,1)

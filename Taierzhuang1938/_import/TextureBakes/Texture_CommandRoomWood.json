@@ -1,23 +1,23 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-10-04",
+  "date": "2026-10-06",
   "name": "CommandRoomWood",
   "preset": "weatheredWood",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomWood.png",
-    "sha256": "d611937e2178dcfa657f5d7c075c21ee42c004259d9d6869d6387c9f98537ec2",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomWoodDistressed.png",
+    "sha256": "25b8907058d70723f500166d60d5e24110aba39b5958fab45d033f972776a35f",
     "metrics": {
       "meanSrgb": [
-        0.4371,
-        0.3629,
-        0.3042
+        0.4503,
+        0.389,
+        0.333
       ],
-      "luma": 0.3681,
-      "lumaStd": 0.0691,
-      "sat": 0.3041,
-      "clipLow": 0.0,
+      "luma": 0.3908,
+      "lumaStd": 0.0881,
+      "sat": 0.2604,
+      "clipLow": 0.0022,
       "clipHigh": 0.0,
-      "lowFreq": 0.0203
+      "lowFreq": 0.0267
     }
   },
   "heightSource": null,
@@ -27,7 +27,7 @@
       0.38,
       0.33
     ],
-    "contrast": 0.07,
+    "contrast": 0.087,
     "lumaRange": [
       0.26,
       0.5
@@ -40,8 +40,8 @@
       0.03,
       0.11
     ],
-    "reliefM": 0.002,
-    "rough": 0.94,
+    "reliefM": 0.005,
+    "rough": 0.95,
     "roughVar": 0.05,
     "roughLumaK": 0.0,
     "ao": 0.45,
@@ -73,46 +73,46 @@
       "file": "Texture_CommandRoomWoodBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 356996,
-      "sha256": "6d4949fc15d4e24a00a9154a2545fd50c40ac60afbb092a6a1cd2dabbeeb3f88"
+      "bytes": 349724,
+      "sha256": "b8ac7672ac22bbd9fe7ef455310104091bdae1d77cbc3be2a2feff64d442d008"
     },
     {
       "channel": "Normal",
       "file": "Texture_CommandRoomWoodNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 59658,
-      "sha256": "c0a2249e7548d3b9ccf0426b95918e0fcafc53819aa57693cbeadfbbc8d04b98"
+      "bytes": 99364,
+      "sha256": "08ba3ebb490b0338f59e676b51feceb39c34c85f06372015862fa4df1968ff18"
     },
     {
       "channel": "Orm",
       "file": "Texture_CommandRoomWoodOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 67370,
-      "sha256": "4c7355d4a5733d662a1a838685d22298a992189d62b06728845047f1e5bd7f62"
+      "bytes": 62504,
+      "sha256": "6758d9e2995f353a2dcfe3c2752919ccd5252523b288a476a4e824829f9a6db9"
     }
   ],
-  "totalBytes": 484024,
+  "totalBytes": 511592,
   "metrics": {
     "meanSrgb": [
-      0.42,
+      0.4201,
       0.3805,
       0.3305
     ],
     "luma": 0.377,
-    "lumaStd": 0.0718,
-    "sat": 0.2132,
-    "clipLow": 0.0,
+    "lumaStd": 0.0881,
+    "sat": 0.2133,
+    "clipLow": 0.0035,
     "clipHigh": 0.0,
-    "lowFreq": 0.0161,
-    "seam": 0.0097,
-    "interior": 0.0507,
-    "seamRatio": 0.192,
-    "border": 0.746,
-    "swing": 0.0639,
-    "aoMean": 0.903,
-    "roughMean": 0.925,
+    "lowFreq": 0.0172,
+    "seam": 0.0101,
+    "interior": 0.0655,
+    "seamRatio": 0.154,
+    "border": 0.721,
+    "swing": 0.0719,
+    "aoMean": 0.906,
+    "roughMean": 0.937,
     "texelsPerMeter": 731.4
   },
   "gateProblems": []

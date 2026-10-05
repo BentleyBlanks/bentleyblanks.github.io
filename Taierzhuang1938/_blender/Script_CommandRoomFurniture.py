@@ -28,12 +28,12 @@ def Timber(name,loc,size,bevel=.014,seed=0):
             outward=Vector((q.x/(sx/2),q.y/(sy/2),0)).normalized()
             # Sparse softened impacts cut INTO a chamfer, never white chips.
             n=noise.noise_vector(Vector((q.x*17+seed,q.y*23-seed,seed*.71)))[0]
-            nick=max(0,n-.30)**2*.038
+            nick=max(0,n-.21)**2*.073
             shoulder=(.22,.25,.45,.85,1,1,.8)[ring]
             p=Vector((q.x,q.y,z))-outward*(inset+nick*shoulder)
             p.z-=nick*.4*max(0,ring-3)/3
             verts.append(tuple(p+Vector(loc)));uv.append((p.y/1.4+seed*.173,p.x/1.4+seed*.219))
-            wear=(1.0,1.03,1.03,1.06,1.16,1.17,1.03)[ring]+n*.055
+            wear=(.91,.98,1.02,1.09,1.25,1.27,1.06)[ring]+n*.10
             colors.append((wear,wear*.987,wear*.955,1))
     for j in range(len(profiles)-1):
         for i in range(count):faces.append((j*count+i,j*count+(i+1)%count,(j+1)*count+(i+1)%count,(j+1)*count+i))

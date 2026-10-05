@@ -1,33 +1,33 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-10-05",
+  "date": "2026-10-06",
   "name": "CommandRoomCloth",
   "preset": "menuCloth",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomClothWorn.png",
-    "sha256": "3a93177990318e8ad5754e12bc94dc1fd9a4e64a7cc47c9f7dcd64c97218bd6b",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomClothSerge.png",
+    "sha256": "5d18da268f4f488f1eee29b80ee81ccc8bb3b68a4fd82356d9f0711be1494f9c",
     "metrics": {
       "meanSrgb": [
-        0.3811,
-        0.3462,
-        0.2992
+        0.3714,
+        0.3374,
+        0.2962
       ],
-      "luma": 0.3422,
-      "lumaStd": 0.0879,
-      "sat": 0.2149,
+      "luma": 0.335,
+      "lumaStd": 0.0764,
+      "sat": 0.2026,
       "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.0059
+      "lowFreq": 0.008
     }
   },
   "heightSource": null,
   "params": {
     "mean": [
-      0.47,
-      0.445,
-      0.4
+      0.44,
+      0.415,
+      0.375
     ],
-    "contrast": 0.062,
+    "contrast": 0.039,
     "lumaRange": [
       0.32,
       0.52
@@ -44,8 +44,8 @@
       128,
       4096
     ],
-    "reliefM": 0.00028,
-    "rough": 0.94,
+    "reliefM": 0.00018,
+    "rough": 0.98,
     "roughVar": 0.025,
     "roughLumaK": 0.0,
     "ao": 0.22,
@@ -77,46 +77,46 @@
       "file": "Texture_CommandRoomClothBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 298680,
-      "sha256": "e930b49ec869a069d4af7b2e1acb2699d14b46467fb2d6beb53f37e7cdae2a73"
+      "bytes": 251546,
+      "sha256": "3d34a963a25770d38ce128eb68192e7bf4b521967257bdd2c89ba66612dd3cc9"
     },
     {
       "channel": "Normal",
       "file": "Texture_CommandRoomClothNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 62058,
-      "sha256": "7946738190071c7272af96db863a4e794ea99a52346e14017214d2249dae7b49"
+      "bytes": 35320,
+      "sha256": "986ab4e98abd0ac7cb8ff2aeca579aa44b310890a9438b7e16c2edd1b7332b11"
     },
     {
       "channel": "Orm",
       "file": "Texture_CommandRoomClothOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 48888,
-      "sha256": "032f384a54c3c0e50e7abda8c3dc67e5f7ab13ce4ef7d86fe8ba518c4483f15a"
+      "bytes": 50230,
+      "sha256": "a2efb7fc6492c6e4cb33100099c1ea0d08564ec628eb98e7aa6b343edd367186"
     }
   ],
-  "totalBytes": 409626,
+  "totalBytes": 337096,
   "metrics": {
     "meanSrgb": [
-      0.4697,
-      0.4459,
-      0.3997
+      0.4398,
+      0.4157,
+      0.3753
     ],
-    "luma": 0.4384,
-    "lumaStd": 0.0629,
-    "sat": 0.1489,
+    "luma": 0.4102,
+    "lumaStd": 0.0394,
+    "sat": 0.1466,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0014,
-    "seam": 0.0404,
-    "interior": 0.0422,
-    "seamRatio": 0.957,
-    "border": 0.987,
-    "swing": 0.0136,
-    "aoMean": 0.95,
-    "roughMean": 0.933,
+    "lowFreq": 0.0011,
+    "seam": 0.0313,
+    "interior": 0.0321,
+    "seamRatio": 0.977,
+    "border": 0.98,
+    "swing": 0.0084,
+    "aoMean": 0.951,
+    "roughMean": 0.973,
     "texelsPerMeter": 4096.0
   },
   "gateProblems": []

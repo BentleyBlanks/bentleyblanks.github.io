@@ -1,6 +1,6 @@
 // Dedicated static menu set. Values are authored against the three approved references.
 export const COMMAND_ROOM = Object.freeze({
-  version: "202610060110",
+  version: "202610060230",
   model: "./Model/Model_CommandRoom.glb",
   background: 0x373936,
   cameraNear: 0.05,
@@ -15,10 +15,11 @@ export const COMMAND_ROOM = Object.freeze({
   // A one-time capture of this room supplies the ink glass's window reflection.
   reflection: Object.freeze({ material: "CommandRoomInkGlass", size: 256, near: .02, far: 16, intensity: 1.8 }),
   glass: Object.freeze({ transmission: .99, roughness: .055, thickness: .0035, attenuationColor: 0xbe781f, attenuationDistance: .018 }),
-  brickTint: 0x70716d,
+  brickTint: 0xffffff,
   materials: Object.freeze([
     { name: "CommandRoomWood", kind: "pbr", normal: 0.45, tint: 0xffffff },
     { name: "CommandRoomPlaster", kind: "pbr", normal: 0.55, tint: 0xb8b7b0 },
+    { name: "CommandRoomBrick", kind: "pbr", normal: 0.65, tint: 0xffffff },
     { name: "CommandRoomCloth", kind: "pbr", normal: 0.25, tint: 0xffffff },
     { name: "CommandRoomMap", kind: "print", normal: 0, tint: 0xffffff },
     { name: "CommandRoomLetter", kind: "print", normal: 0, tint: 0xffffff },

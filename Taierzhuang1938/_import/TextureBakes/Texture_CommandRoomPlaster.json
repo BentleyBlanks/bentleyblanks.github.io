@@ -1,23 +1,23 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-10-04",
+  "date": "2026-10-06",
   "name": "CommandRoomPlaster",
   "preset": "limePlaster",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomPlaster.png",
-    "sha256": "3681a52119e7c877fe45387a0ad766f4f9fcac6cdb4b657829ab0417353e53c4",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomPlasterCrumbling.png",
+    "sha256": "d85c166fb4140f1ab00c55bdcf3fd2a10adee994dcdd94267967c6496e4fb507",
     "metrics": {
       "meanSrgb": [
-        0.6647,
-        0.6126,
-        0.5513
+        0.6891,
+        0.6363,
+        0.5669
       ],
-      "luma": 0.6095,
-      "lumaStd": 0.0951,
-      "sat": 0.1706,
+      "luma": 0.6308,
+      "lumaStd": 0.0743,
+      "sat": 0.1773,
       "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.007
+      "lowFreq": 0.0141
     }
   },
   "heightSource": null,
@@ -40,8 +40,8 @@
       0.03,
       0.1
     ],
-    "reliefM": 0.002,
-    "rough": 0.94,
+    "reliefM": 0.004,
+    "rough": 0.97,
     "roughVar": 0.04,
     "roughLumaK": 0.0,
     "ao": 0.4,
@@ -73,46 +73,46 @@
       "file": "Texture_CommandRoomPlasterBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 354184,
-      "sha256": "9374a2d40088cde720ad99075d88913be22c1923cdc1865f6f4ee4dabf6d3fb9"
+      "bytes": 349954,
+      "sha256": "0865c2cead47c7cb6044aa8d478b4ead150f1743a575bf893c5a807e4944dc65"
     },
     {
       "channel": "Normal",
       "file": "Texture_CommandRoomPlasterNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 59870,
-      "sha256": "0d5c4a51c3dc6d229b7d110638c0e8309a48d967940d6a38ff6bee9729ca8496"
+      "bytes": 102374,
+      "sha256": "ee1606149180af8d60de2ac0e7ca7bbceb67147835d9d9773f76f2b7be8d2f44"
     },
     {
       "channel": "Orm",
       "file": "Texture_CommandRoomPlasterOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 77378,
-      "sha256": "c390ddcd391f490df6dd70bd9a3df1d07de0c0b499c2188ab373dca905ea12cd"
+      "bytes": 71856,
+      "sha256": "aa809d9b467f298c5670f019177f8734b8100e70cf2ab4ab2ea3e7156654a5ac"
     }
   ],
-  "totalBytes": 491432,
+  "totalBytes": 524184,
   "metrics": {
     "meanSrgb": [
       0.6597,
       0.641,
-      0.5945
+      0.5947
     ],
     "luma": 0.6318,
-    "lumaStd": 0.0609,
-    "sat": 0.0989,
+    "lumaStd": 0.0605,
+    "sat": 0.0986,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0021,
-    "seam": 0.0503,
-    "interior": 0.0519,
-    "seamRatio": 0.969,
-    "border": 0.968,
-    "swing": 0.0013,
-    "aoMean": 0.914,
-    "roughMean": 0.938,
+    "lowFreq": 0.0045,
+    "seam": 0.0498,
+    "interior": 0.0486,
+    "seamRatio": 1.025,
+    "border": 0.938,
+    "swing": 0.0014,
+    "aoMean": 0.913,
+    "roughMean": 0.965,
     "texelsPerMeter": 568.9
   },
   "gateProblems": []

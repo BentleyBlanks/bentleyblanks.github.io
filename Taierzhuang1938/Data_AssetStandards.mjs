@@ -120,9 +120,9 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({ id: "CommandRoom", name: "启动界面指挥室", pack: "Model_CommandRoom.glb",
-    sourceTriangles: 413138, actualTriangles: 413138, targetTriangles: 413138,
-    sourceTexture: "用户确认地图和电文 / Imagegen 旧木、灰墙、布料与瓶签", runtimeTexture: "三套 1K PBR、三张独立印刷品及无损 UV1 辐照度图集",
-    policy: "source", note: "BlenderMCP 自建静态环境；按材质合并为 16 个网格。桌柜实体倒角和凹面木框；帽服局部褶皱、翻领、口袋、袖口、厚玻璃与内层墨水均为实际几何；可从源工程逐件渲染三视图。包含独立 glTF 相机。" }),
+    sourceTriangles: 454528, actualTriangles: 454528, targetTriangles: 454528,
+    sourceTexture: "用户确认地图和电文 / Imagegen 风化木、剥落灰泥、旧砖、细斜纹布与瓶签", runtimeTexture: "三套 1K 和一套 512 PBR、独立纸图及无损 UV1 辐照度图集",
+    policy: "source", note: "BlenderMCP 自建静态环境；按材质合并为 16 个网格。木家具实体磨损倒角、凹面木框；灰泥实切破口和内凹砖层；地图贴墙并由四枚钉子固定。帽服局部褶皱、翻领、口袋、袖口、厚玻璃与内层墨水均为实际几何。包含独立 glTF 相机。" }),
   Object.freeze({ id: "Cigarette", name: "老周卷烟", pack: "Model_Cigarette.glb",
     sourceTriangles: 50000, actualTriangles: 1798, targetTriangles: 1800,
     sourceTexture: "用户 FBX 内嵌 PBR", runtimeTexture: "源 UV / 1K PBR",
