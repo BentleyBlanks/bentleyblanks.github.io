@@ -90,13 +90,14 @@ def Cube(name, loc, size, mat=wood, bevel=.008):
                 a,b=((1,0) if axis==2 else (2,0) if axis==1 else (1,2))
             uv.data[li].uv=(co[a]/tile+loc[a]*.31,co[b]/tile+loc[b]*.17)
     if bevel:
-        m=ob.modifiers.new("Worn edges","BEVEL"); m.width=bevel;m.segments=3
+        m=ob.modifiers.new("Worn edges","BEVEL"); m.width=bevel;m.segments=5
         bpy.context.view_layer.objects.active=ob;bpy.ops.object.modifier_apply(modifier=m.name)
         if name.startswith("TablePlank"):
             for v in ob.data.vertices:
                 edge=max(abs(v.co.x)/(size[0]*.5),abs(v.co.y)/(size[1]*.5))
                 v.co.z+=max(0,edge-.92)*.025*math.sin(v.co.x*47+v.co.y*113)
             ob.data.update()
+        for poly in ob.data.polygons:poly.use_smooth=True
         m=ob.modifiers.new("Surface normals","WEIGHTED_NORMAL");m.keep_sharp=True
         bpy.ops.object.modifier_apply(modifier=m.name)
     return ob
@@ -156,30 +157,8 @@ for i in range(16):
     if -2.3<x<-.7 and z>1.15:continue
     pts=[(x+math.sin(j*1.7+i)*.015,wy-.124,z-j*.055) for j in range(random.randint(3,9))]
     Curve("PlasterHairline",pts,.0008,brick)
-# Four-board command table: genuine thickness, apron rails and joinery.
-tx=.250;ty=.462;tz=.84;tw=3.10;td=2.30
-for i in range(5):
-    Cube("TablePlank",(tx,ty+(i-2)*td/5,tz),(tw,td/5-.006,.09),wood,.012)
-for x in [tx-tw/2+.12,tx+tw/2-.12]:
-    for y in [ty-td/2+.13,ty+td/2-.13]:
-        Cube("TableLeg",(x,y,.405),(.13,.13,.81),wood,.012)
-for y in [ty-td/2+.12,ty+td/2-.12]:Cube("TableLongApron",(tx,y,.697),(tw-.17,.075,.2),wood,.007)
-for x in [tx-tw/2+.15,tx+tw/2-.15]:Cube("TableShortApron",(x,ty,.697),(.08,td-.24,.2),wood,.008)
-# Table scars as fine physical wood lines; light dust and small rubble at rear edges.
-for i in range(150):
-    x=random.uniform(tx-tw/2+.03,tx+tw/2-.03); y=random.choice([ty-td/2+.04,ty+td/2-.04])+random.uniform(-.026,.026)
-    Curve("TableScratch",[(x,y,.887),(x+random.uniform(.02,.08),y+.001,.887)],.00055,dust)
-for i in range(240):
-    x=random.uniform(tx-tw/2+.04,tx+tw/2-.04); y=ty+random.choice([-td/2+.04,td/2-.07])+random.uniform(-.025,.04)
-    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=random.uniform(.002,.009),location=(x,y,.891))
-    o=bpy.context.object;o.name="DryMortarGrain";o.scale.z=.35;o.data.materials.append(dust)
-# Split end grain and tiny flaked splinters along the exposed front plank edge.
-for i in range(85):
-    x=random.uniform(tx-tw/2+.025,tx+tw/2-.025);y=ty-td/2+.004
-    z=random.uniform(.816,.877);length=random.uniform(.015,.095)
-    Curve('TableEndGrainSplit',[(x,y-.001,z),(x+length*.45,y-.002,z+.001),(x+length,y-.001,z+.002)],random.uniform(.00035,.0012),graphite)
-    if i%3==0:
-        Curve('TableDrySplinter',[(x,y-.003,z),(x+length*.7,y-.004,z+.002)],.0006,dust)
+furniturePath=GAME/'_blender/Script_CommandRoomFurniture.py'
+exec(compile(furniturePath.read_text(encoding='utf-8'),str(furniturePath),'exec'),globals())
 # Chair behind desk, deliberately empty.
 cx=.02;cy=.84
 Cube("ChairSeat",(cx,cy,.48),(.75,.47,.055),wood,.018)
@@ -189,14 +168,6 @@ for x in [cx-.34,cx+.34]:
 Cube("ChairCrest",(cx,cy+.19,1.34),(.75,.063,.13),wood,.016)
 Cube("ChairBackSlat",(cx,cy+.19,.915),(.055,.036,.85),wood,.008)
 for x in [cx-.34,cx+.34]:Cube("ChairSideRung",(x,cy,.23),(.028,.43,.03),wood,.006)
-# Low timber cabinet left of chair.
-cabx=-1.33;caby=1.03
-Cube("CabinetBody",(cabx,caby,.67),(.94,.54,1.31),wood,.009)
-Cube("CabinetTop",(cabx,caby,1.365),(1.04,.62,.06),wood,.011)
-for z in [1.13,.83,.53,.23]:
-    Cube("CabinetPanel",(cabx,caby-.284,z),(.80,.023,.265),wood,.006)
-    for x in [cabx-.32,cabx+.32]:Cube("CabinetFrame",(x,caby-.304,z),(.032,.03,.265),wood,.004)
-    Rod("IronPull",(cabx-.07,caby-.334,z+.06),(cabx+.07,caby-.334,z+.06),.011,iron)
 # Paper meshes preserve the approved artwork and readable handwriting.
 def Paper(name,cx,cy,z,w,h,mat,angle=0,wall=False):
     nx=32;ny=24;vs=[];uvs=[]
@@ -284,7 +255,7 @@ for ob in list(scene.objects):
         ob.matrix_world=backdropTransform@ob.matrix_world
     if ob.type=="MESH" and len(ob.data.materials) and ob.data.materials[0]==cloth:
         for uv in ob.data.uv_layers:
-            for corner in uv.data: corner.uv*=6
+            for corner in uv.data: corner.uv*=4
 # Validate the furniture before material batching removes individual part names.
 from mathutils.bvhtree import BVHTree
 bpy.context.view_layer.update()
@@ -344,14 +315,19 @@ cam=bpy.context.object;cam.name="CommandRoomCamera"
 cam.rotation_euler=(Vector((-.40,.50,1.20))-cam.location).to_track_quat("-Z","Y").to_euler()
 cam.data.lens=29;cam.data.sensor_width=36;cam.data.clip_start=.05;cam.data.clip_end=80
 scene.camera=cam
-scene.render.engine="CYCLES";scene.cycles.samples=64;scene.cycles.use_denoising=True
+scene.render.engine="CYCLES";scene.cycles.samples=32;scene.cycles.use_denoising=True
 scene.cycles.device='CPU'
 scene.render.resolution_x=1672;scene.render.resolution_y=941;scene.render.resolution_percentage=100
 scene.view_settings.view_transform="AgX";scene.view_settings.look="AgX - Medium High Contrast";scene.view_settings.exposure=.35
 # Merge static meshes by material to keep realtime draw count proportional to materials.
 for ob in scene.objects:
     if ob.type!='MESH':continue
-    asset=1 if ob.name.startswith('Cap') else 2 if ob.name.startswith('Coat') else 3 if ob.name.startswith('InkBottle') else 0
+    # Joining timber with authored wear to ordinary timber otherwise fills the
+    # latter's missing glTF COLOR_0 with black. White is the neutral multiplier.
+    if ob.data.materials[0]==wood and not ob.data.color_attributes:
+        color=ob.data.color_attributes.new(name='TimberWear',type='FLOAT_COLOR',domain='POINT')
+        for vertex in color.data:vertex.color=(1,1,1,1)
+    asset=1 if ob.name.startswith('Cap') else 2 if ob.name.startswith('Coat') else 3 if ob.name.startswith('InkBottle') else 4 if ob.name.startswith('Table') else 5 if ob.name.startswith('Cabinet') else 0
     attr=ob.data.attributes.new(name='InspectionAsset',type='INT',domain='FACE')
     for p in attr.data:p.value=asset
 bpy.ops.object.select_all(action="DESELECT")

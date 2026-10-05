@@ -2,32 +2,32 @@
   "generator": "Script_BakePbrTexture.py@1",
   "date": "2026-10-05",
   "name": "CommandRoomCloth",
-  "preset": "fabric",
+  "preset": "menuCloth",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomClothFidelity.png",
-    "sha256": "c2d79fc053b759adaa15f216a1184014ed88e1d7c6cd84499ff520cfed46c69c",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomClothWorn.png",
+    "sha256": "3a93177990318e8ad5754e12bc94dc1fd9a4e64a7cc47c9f7dcd64c97218bd6b",
     "metrics": {
       "meanSrgb": [
-        0.4172,
-        0.3769,
-        0.3206
+        0.3811,
+        0.3462,
+        0.2992
       ],
-      "luma": 0.3716,
-      "lumaStd": 0.0905,
-      "sat": 0.2314,
+      "luma": 0.3422,
+      "lumaStd": 0.0879,
+      "sat": 0.2149,
       "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.0061
+      "lowFreq": 0.0059
     }
   },
   "heightSource": null,
   "params": {
     "mean": [
-      0.49,
-      0.463,
-      0.412
+      0.47,
+      0.445,
+      0.4
     ],
-    "contrast": 0.048,
+    "contrast": 0.062,
     "lumaRange": [
       0.32,
       0.52
@@ -40,18 +40,22 @@
       0.03,
       0.1
     ],
-    "reliefM": 0.0005,
-    "rough": 0.93,
-    "roughVar": 0.03,
+    "texelsPerMeter": [
+      128,
+      4096
+    ],
+    "reliefM": 0.00028,
+    "rough": 0.94,
+    "roughVar": 0.025,
     "roughLumaK": 0.0,
-    "ao": 0.35,
+    "ao": 0.22,
     "metal": 0.0,
     "seamless": "blend",
     "rowFlatten": false,
-    "flattenSigma": 0.06,
+    "flattenSigma": 0.088,
     "isotropic": true,
     "heightFromLuma": "direct",
-    "tileM": 1.0,
+    "tileM": 0.25,
     "size": 1024,
     "dataSize": 512,
     "pack": "orm",
@@ -73,47 +77,47 @@
       "file": "Texture_CommandRoomClothBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 257878,
-      "sha256": "fb1bbf3351487c9596175de63216a41468ee81f30a9b92dc5210e0381eaba718"
+      "bytes": 298680,
+      "sha256": "e930b49ec869a069d4af7b2e1acb2699d14b46467fb2d6beb53f37e7cdae2a73"
     },
     {
       "channel": "Normal",
       "file": "Texture_CommandRoomClothNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 11872,
-      "sha256": "ab3273e5523da6c73ed7db813cd32827f59698d7dfa22bf3b0a3b69e1a88b4da"
+      "bytes": 62058,
+      "sha256": "7946738190071c7272af96db863a4e794ea99a52346e14017214d2249dae7b49"
     },
     {
       "channel": "Orm",
       "file": "Texture_CommandRoomClothOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 70658,
-      "sha256": "cda0f15ec4122d4b705606f03b929659d6434e75350edebb54641953a9d1aac3"
+      "bytes": 48888,
+      "sha256": "032f384a54c3c0e50e7abda8c3dc67e5f7ab13ce4ef7d86fe8ba518c4483f15a"
     }
   ],
-  "totalBytes": 340408,
+  "totalBytes": 409626,
   "metrics": {
     "meanSrgb": [
-      0.4902,
-      0.4637,
-      0.4109
+      0.4697,
+      0.4459,
+      0.3997
     ],
-    "luma": 0.455,
-    "lumaStd": 0.0486,
-    "sat": 0.1618,
+    "luma": 0.4384,
+    "lumaStd": 0.0629,
+    "sat": 0.1489,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0007,
-    "seam": 0.036,
-    "interior": 0.0389,
-    "seamRatio": 0.923,
-    "border": 0.982,
-    "swing": 0.0076,
-    "aoMean": 0.918,
-    "roughMean": 0.923,
-    "texelsPerMeter": 1024.0
+    "lowFreq": 0.0014,
+    "seam": 0.0404,
+    "interior": 0.0422,
+    "seamRatio": 0.957,
+    "border": 0.987,
+    "swing": 0.0136,
+    "aoMean": 0.95,
+    "roughMean": 0.933,
+    "texelsPerMeter": 4096.0
   },
   "gateProblems": []
 }

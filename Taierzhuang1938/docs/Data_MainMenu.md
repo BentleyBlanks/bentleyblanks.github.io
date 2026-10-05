@@ -37,7 +37,7 @@
 标题态的二级页面及声音、画面、操作设置继续显示指挥室。关闭具体设置后回到
 设置目录，再返回原主菜单或暂停页。暂停继续保留真实战场和武器。
 合成器对场景颜色做基于真实深度的轻微景深，DOM 文字不参与模糊；焦距与半径
-由 `Data_Tuning_CommandRoom.depthOfField` 管理。桌面新增木纹裂口、磨损和少量浮灰，
+由 `Data_Tuning_CommandRoom.depthOfField` 管理。桌面旧损由木板本体的倒角、缺口和磨痕表现，
 单窗天空补光与曝光提亮可读区域，太阳方向保持一致。`host.staticBackdrop` 关闭时，
 下文原有战场机位系统仍可运行，正式入口默认启用指挥室。
 
@@ -50,6 +50,14 @@
 `Reference_Coat.png`、`Reference_InkBottle.png` 三张 Imagegen 建模参考细化帽冠褶皱、
 有厚度帽檐、缝线、纽扣、衣领、门襟、贴袋、空袖口与玻璃瓶肩、瓶底及旋盖。
 三视图是美术建模参考，不作为历史原件证据。
+2026-10-05 再细化：帽冠压低，帽顶用独立弯曲折痕替代中心放射状褶皱；
+袖褶只占局部周向，左右错开，衣身有重力长褶及连接衣钩的挂袢。布料换用
+Imagegen `Source/CommandRoomClothWorn.png`，25 cm 一铺，1K 基色与 512 法线/ORM；
+专用 `menuCloth` 类允许 4096 px/m，其余贴图仍沿用原密度上限，单套文件预算不变。
+`Script_CommandRoomFurniture.py` 用七层截面构成桌板圆角，直接向木板内切局部缺口；
+柜子具有圆角台面、下压边、实框凹面抽屉和铁拉手底座。删除原来的
+`DryMortarGrain`、`TableScratch`、`TableEndGrainSplit`、`TableDrySplinter`，
+不再用白色碎粒或悬浮黑线表示磨损。检查标签 4/5 对应桌子/柜子，可单独渲染验收。
 电报网格沿原图纸边裁切，保留原有手写内容、旧纸缺口与卷边，不再带白色矩形底框。
 边界数据为 `_blender/Data_CommandRoomPaperOutline.json`，可用
 `_import/Script_TraceCommandRoomPaper.py` 从已确认的纸图重新提取。

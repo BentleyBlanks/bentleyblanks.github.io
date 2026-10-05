@@ -83,6 +83,14 @@
       "reliefM": 0.002, "rough": 0.95, "roughVar": 0.03, "roughLumaK": 0.0, "ao": 0.35, "metal": 0.0,
       "seamless": "blend", "rowFlatten": false, "flattenSigma": 0.088, "isotropic": true, "heightFromLuma": "direct"
     },
+    "menuCloth": {
+      "label": "菜单近景帽服布料（25 cm 布样，最多 1K；可近距检视纤维）",
+      "mean": [0.47, 0.445, 0.40], "contrast": 0.062,
+      "lumaRange": [0.32, 0.52], "satRange": [0.1, 0.38], "stdRange": [0.03, 0.1],
+      "texelsPerMeter": [128, 4096],
+      "reliefM": 0.00028, "rough": 0.94, "roughVar": 0.025, "roughLumaK": 0.0, "ao": 0.22, "metal": 0.0,
+      "seamless": "blend", "rowFlatten": false, "flattenSigma": 0.088, "isotropic": true, "heightFromLuma": "direct"
+    },
     "wornSteel": {
       "label": "旧钢铁（枪机、铁件、车体）",
       "mean": [0.24, 0.24, 0.245], "contrast": 0.05,

@@ -29,6 +29,19 @@ try {
   await page.waitForFunction(()=>window.ready,{},{timeout:60000});
   result.initial=await page.evaluate(()=>({state:room.State(),points:Project(),fog:FogEnergy()}));
   assert.ok(result.initial.state.meshes>=10&&result.initial.state.triangles>30000);
+  result.timberColor=await page.evaluate(()=>{
+    let minimum=Infinity,vertices=0;
+    room.scene.traverse(ob=>{
+      if(ob.material?.name!=="CommandRoomWood")return;
+      const color=ob.geometry.getAttribute("color");
+      if(!color){minimum=0;return;}
+      for(let i=0;i<color.count;i++)minimum=Math.min(minimum,color.getX(i)+color.getY(i)+color.getZ(i));
+      vertices+=color.count;
+    });
+    return {minimum,vertices};
+  });
+  assert.ok(result.timberColor.vertices>0&&result.timberColor.minimum>.3,
+    "Joining worn table boards must preserve neutral vertex colors on the cabinet, chair and window timber");
   assert.ok(result.initial.fog>100,"Light volume must be visibly nonzero");
   await page.screenshot({path:path.join(out,"Scene_CommandRoomAtmosphere.png")});
   await page.mouse.move(1260,24);

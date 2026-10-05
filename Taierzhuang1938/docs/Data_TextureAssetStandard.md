@@ -106,7 +106,7 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=<起点提交> --profile=qu
 | `swing` | 亮度随「离图边距离」的起伏（平铺后就是网格） | ≤ 2%（只查 `isotropic` 类） |
 | `lowFreq` | σ = 边长/16 的大尺度明暗 ÷ 均值（烘进去的投影、侧光、暗角） | ≤ 3.5% |
 | `clipLow` / `clipHigh` | 亮度 < 0.03 / > 0.95 的像素比例（暗部 / 高光堆积） | 各 ≤ 2% |
-| 纹素密度 | Base 边长 ÷ `metersPerTile` | 128–1024 px/m |
+| 纹素密度 | Base 边长 ÷ `metersPerTile` | 通常 128–1024 px/m；独立 `menuCloth` 近景布料为 128–4096 px/m |
 | 定色 | sRGB 三通道均值的亮度、均色饱和 (max−min)/max、亮度标准差 | 按材质类范围 |
 
 材质类（`toneClass`，数值以 JSON 为准）：`greyBrick` 青砖（冷灰、饱和 ≤ 0.10）、`rammedEarth` 夯土 / 土坯、`limePlaster` 石灰抹面、`roofTile` 小青瓦、`weatheredWood` 风化灰褐木（饱和 ≤ 0.30，不是橙黄新木）、`drySoil` 干土、`wetMud` 湿泥（暗、粗糙度 0.55 附近、暗处更光滑）、`stone` 石材、`fabric` 粗布麻袋、`wornSteel` 旧钢铁。目标贴近参考图的 1938 年 3 月鲁南阴天：低饱和冷灰棕。作者 UV 图集（刀、井台）不是平铺材质：`toneClass: null` + `toneReason`、`metersPerTile: null`，不查平铺与定色。

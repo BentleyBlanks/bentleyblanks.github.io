@@ -304,7 +304,8 @@ function CheckBakeRecord(entry) {
   if (typeof entry.metersPerTile === "number") {
     if (rec.params?.tileM != null) Check(Math.abs(rec.params.tileM - entry.metersPerTile) < 1e-6, `${entry.id}: 记录 tileM = 清单 metersPerTile`, `${rec.params.tileM} vs ${entry.metersPerTile}`);
     const texels = entry.files.find((f) => f[1] === "Base")[2] / entry.metersPerTile;
-    Check(texels >= g.texelsPerMeter[0] && texels <= g.texelsPerMeter[1], `${entry.id}: 纹素密度 ${texels.toFixed(0)} px/m 在 [${g.texelsPerMeter}]`);
+    const density = presets.classes[entry.toneClass]?.texelsPerMeter || g.texelsPerMeter;
+    Check(texels >= density[0] && texels <= density[1], `${entry.id}: 纹素密度 ${texels.toFixed(0)} px/m 在 [${density}]`);
     Check(m.seamRatio <= g.seamRatioMax, `${entry.id}: seamRatio ${m.seamRatio} ≤ ${g.seamRatioMax}`);
     const cls = presets.classes[entry.toneClass];
     if (!cls || cls.isotropic !== false) {

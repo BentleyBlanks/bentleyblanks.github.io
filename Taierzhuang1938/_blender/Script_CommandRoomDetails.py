@@ -1,7 +1,7 @@
 """Tailored geometry from the three Imagegen turnarounds in the .blend Source folder.
 Executed by Script_BuildCommandRoom.py in its authoring context before batching.
 """
-thread=Material('CommandRoomThread',(.30,.275,.23),.97)
+thread=Material('CommandRoomThread',(.16,.148,.125),.97)
 inkGlass.diffuse_color=(.052,.023,.007,1)
 inkGlass.node_tree.nodes.get('Principled BSDF').inputs['Base Color'].default_value=(.052,.023,.007,1)
 inkGlass.node_tree.nodes.get('Principled BSDF').inputs['Roughness'].default_value=.14

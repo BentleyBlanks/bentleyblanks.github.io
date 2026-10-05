@@ -12,7 +12,10 @@ review.view_settings.view_transform='AgX';review.view_settings.look='AgX - Mediu
 world=bpy.data.worlds.new('InspectionWorld');world.use_nodes=True;world.node_tree.nodes['Background'].inputs['Color'].default_value=(.48,.44,.38,1);world.node_tree.nodes['Background'].inputs['Strength'].default_value=.45;review.world=world
 cameraData=bpy.data.cameras.new('InspectionCamera');cameraData.type='ORTHO'
 camera=bpy.data.objects.new('InspectionCamera',cameraData);review.collection.objects.link(camera);review.camera=camera
-for asset,name,views in [(1,'Cap',['Front','Side','Top']),(2,'Coat',['Front','Side','Back']),(3,'InkBottle',['Front','Side','Top'])]:
+selection=os.environ.get('COMMAND_ROOM_INSPECTION','').split(',')
+for asset,name,views in [(1,'Cap',['Front','Side','Top']),(2,'Coat',['Front','Side','Back']),(3,'InkBottle',['Front','Side','Top']),
+                         (4,'Table',['Front','Side']),(5,'Cabinet',['Front','Side'])]:
+    if selection!=[''] and name not in selection:continue
     pieces=[]
     for ob in source.objects:
         if ob.type!='MESH' or not ob.data.attributes.get('InspectionAsset'):continue
@@ -39,4 +42,4 @@ for asset,name,views in [(1,'Cap',['Front','Side','Top']),(2,'Coat',['Front','Si
         bpy.ops.render.render(write_still=True,scene=review.name)
     for ob in pieces+[light]:bpy.data.objects.remove(ob,do_unlink=True)
 bpy.data.scenes.remove(review)
-print('Saved neutral three-view renders of actual cap, coat and bottle geometry')
+print('Saved neutral views of actual command-room geometry')

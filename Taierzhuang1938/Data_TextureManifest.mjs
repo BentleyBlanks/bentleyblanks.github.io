@@ -131,9 +131,9 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "CommandRoomCloth", kind: "material", tier: "lazy",
-    toneClass: "fabric", metersPerTile: 1, normalConvention: "gl",
+    toneClass: "menuCloth", metersPerTile: 0.25, normalConvention: "gl",
     bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_CommandRoomCloth.json",
-    source: { provider: "imagegen", date: "2026-10-05", ref: "CommandRoom/Source/CommandRoomClothFidelity.png", prompt: "_import/Prompts/Texture_CommandRoomCloth.txt" },
+    source: { provider: "imagegen", date: "2026-10-05", ref: "CommandRoom/Source/CommandRoomClothWorn.png", prompt: "_import/Prompts/Texture_CommandRoomCloth.txt", note: "菜单近景帽服共用 25 cm 布样；1K 基色 / 512 数据图，共 400 KiB，独立 menuCloth 密度预算。" },
     consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomCloth" }],
     files: [["Texture_CommandRoomClothBase.webp","Base",1024,1024],["Texture_CommandRoomClothNormal.webp","Normal",512,512],["Texture_CommandRoomClothOrm.webp","Orm",512,512]],
   },

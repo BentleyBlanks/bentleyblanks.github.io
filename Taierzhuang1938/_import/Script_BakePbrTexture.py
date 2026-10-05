@@ -589,7 +589,7 @@ def CheckGates(metrics, total, outputs, gates, cls):
         out.append(f"暗部/高光堆积 {metrics['clipLow']}/{metrics['clipHigh']} > 2%")
     if metrics["lowFreq"] > gates["lowFreqMax"]:
         out.append(f"lowFreq {metrics['lowFreq']} > {gates['lowFreqMax']}（大块明暗 = 烘进去的光影）")
-    lo, hi = gates["texelsPerMeter"]
+    lo, hi = cls.get("texelsPerMeter", gates["texelsPerMeter"])
     if metrics["texelsPerMeter"] is not None and not lo <= metrics["texelsPerMeter"] <= hi:
         out.append(f"纹素密度 {metrics['texelsPerMeter']} px/m 不在 [{lo}, {hi}]")
     if total > gates["setBudgetBytes"]:
