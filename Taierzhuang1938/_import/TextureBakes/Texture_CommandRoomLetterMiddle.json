@@ -1,0 +1,19 @@
+{
+  "generator": "Script_EncodeCommandRoomPapers.py@1",
+  "provider": "imagegen",
+  "source": "CommandRoomLetterMiddle.png",
+  "sourceSha256": "45392bda01efad14e513a38f1db02b3fa1413cb3a2dbfb7f6ffa6e284ed7f98c",
+  "prompt": "_import/Prompts/Texture_CommandRoomPapers.txt",
+  "operation": "RGB WebP encoding only; no cropping, compositing or text changes",
+  "quality": 90,
+  "method": 6,
+  "outputs": [
+    {
+      "file": "Texture_CommandRoomLetterMiddleImage.webp",
+      "width": 1122,
+      "height": 1402,
+      "bytes": 264926,
+      "sha256": "3b93690cc21188affde2e891bdc35576be463747928aede01c85ad25ff685e60"
+    }
+  ]
+}

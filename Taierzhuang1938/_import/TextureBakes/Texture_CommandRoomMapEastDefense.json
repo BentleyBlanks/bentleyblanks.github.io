@@ -1,0 +1,19 @@
+{
+  "generator": "Script_EncodeCommandRoomPapers.py@1",
+  "provider": "imagegen",
+  "source": "CommandRoomMapEastDefense.png",
+  "sourceSha256": "d192f0090a2f17f77a33a35378240d8867fa984f0ceb87245c5f0a7102dceefb",
+  "prompt": "_import/Prompts/Texture_CommandRoomPapers.txt",
+  "operation": "RGB WebP encoding only; no cropping, compositing or text changes",
+  "quality": 90,
+  "method": 6,
+  "outputs": [
+    {
+      "file": "Texture_CommandRoomMapEastDefenseImage.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 559852,
+      "sha256": "5a472780e426ece9853128fb0ef03af40e6115649b490473e30aaff4e097aa9a"
+    }
+  ]
+}

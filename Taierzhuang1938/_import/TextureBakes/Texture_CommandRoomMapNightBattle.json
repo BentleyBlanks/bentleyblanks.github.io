@@ -1,0 +1,19 @@
+{
+  "generator": "Script_EncodeCommandRoomPapers.py@1",
+  "provider": "imagegen",
+  "source": "CommandRoomMapNightBattle.png",
+  "sourceSha256": "5993598e15bb9fae0b207784ee41ab1591c24d19c530c5252b903a8c9982e101",
+  "prompt": "_import/Prompts/Texture_CommandRoomPapers.txt",
+  "operation": "RGB WebP encoding only; no cropping, compositing or text changes",
+  "quality": 90,
+  "method": 6,
+  "outputs": [
+    {
+      "file": "Texture_CommandRoomMapNightBattleImage.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 382226,
+      "sha256": "30b0a324e89a6eeecb204ce3afc52f9033f042ad8a3c76dc88d1214943daf0e5"
+    }
+  ]
+}

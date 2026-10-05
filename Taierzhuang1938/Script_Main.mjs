@@ -3189,11 +3189,11 @@ async function Boot() {
   // 还要能把编辑器的齿轮藏起来 —— 三样东西到这一步才齐。
   if ((MENU_ON || FIRST_LEVEL_P012_WHITEBOX) && menuRoot) {
     commandRoom = new CommandRoom(renderer, { isActive: () => !!menu?.live && !!menu?.open && !editor?.Capturing });
-    if (MENU_AT_BOOT) await commandRoom.Load();
+    if (MENU_AT_BOOT) await commandRoom.Load(Progress.Read());
     window.Taierzhuang.Debug.CommandRoom = () => commandRoom.State();
     menu = new MainMenu({
       staticBackdrop: true,
-      PrepareBackdrop: () => commandRoom.Load().catch(error => {
+      PrepareBackdrop: () => commandRoom.Load(Progress.Read()).catch(error => {
         console.error("Command room failed to load", error);
       }),
       // 正式章节组不再交 PHASES（旧序章与旧第一关到终章 2026-09-06 起退出选章，

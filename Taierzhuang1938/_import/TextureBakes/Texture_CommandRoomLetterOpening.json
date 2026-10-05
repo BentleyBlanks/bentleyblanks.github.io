@@ -1,0 +1,19 @@
+{
+  "generator": "Script_EncodeCommandRoomPapers.py@1",
+  "provider": "imagegen",
+  "source": "CommandRoomLetterOpening.png",
+  "sourceSha256": "fec2bb8aa84e841a31500732e4bfc849f60df6c5de0b5cef6ec35cfbebb2a7ad",
+  "prompt": "_import/Prompts/Texture_CommandRoomPapers.txt",
+  "operation": "RGB WebP encoding only; no cropping, compositing or text changes",
+  "quality": 90,
+  "method": 6,
+  "outputs": [
+    {
+      "file": "Texture_CommandRoomLetterOpeningImage.webp",
+      "width": 1122,
+      "height": 1402,
+      "bytes": 220892,
+      "sha256": "569454dc0b277bd9026fd771aad433f6747db8e9f61d0cf0fac2340fded66eb7"
+    }
+  ]
+}

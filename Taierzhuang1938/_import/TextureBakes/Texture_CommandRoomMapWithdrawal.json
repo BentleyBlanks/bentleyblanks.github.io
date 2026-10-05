@@ -1,0 +1,19 @@
+{
+  "generator": "Script_EncodeCommandRoomPapers.py@1",
+  "provider": "imagegen",
+  "source": "CommandRoomMapWithdrawal.png",
+  "sourceSha256": "a9058ccefb143b5736c7c62f63544e2145a644679e3ad4795fda563ecf1c301c",
+  "prompt": "_import/Prompts/Texture_CommandRoomPapers.txt",
+  "operation": "RGB WebP encoding only; no cropping, compositing or text changes",
+  "quality": 90,
+  "method": 6,
+  "outputs": [
+    {
+      "file": "Texture_CommandRoomMapWithdrawalImage.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 383334,
+      "sha256": "35e89a2b9517b9e5307f9d890aede33606430632c551fa14c214018d490f9721"
+    }
+  ]
+}

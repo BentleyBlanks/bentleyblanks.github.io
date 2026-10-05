@@ -1,0 +1,19 @@
+{
+  "generator": "Script_EncodeCommandRoomPapers.py@1",
+  "provider": "imagegen",
+  "source": "CommandRoomMapEpilogue.png",
+  "sourceSha256": "d320ba26eb6f5d480921d8abbf750881a91416934225dca3f5bec75a8a9d93ec",
+  "prompt": "_import/Prompts/Texture_CommandRoomPapers.txt",
+  "operation": "RGB WebP encoding only; no cropping, compositing or text changes",
+  "quality": 90,
+  "method": 6,
+  "outputs": [
+    {
+      "file": "Texture_CommandRoomMapEpilogueImage.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 640028,
+      "sha256": "ff9c2756a3aedbd31f9cc4dc704f7ca44d7555bdc87e09c85bb760f2bd083f33"
+    }
+  ]
+}

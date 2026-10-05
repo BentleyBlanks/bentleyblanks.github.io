@@ -17,6 +17,7 @@ import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { BOOT_PAPERS } from "./Data_BootPapers.mjs";
 import { PaperCard } from "./Script_BootPaper.mjs";
+import { COMMAND_ROOM_CAMPAIGN_IDS, COMMAND_ROOM_MAPS, COMMAND_ROOM_LETTERS } from "./Data_CommandRoomPapers.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -56,7 +57,7 @@ try {
   Check("入口 HTML 是有效 UTF-8", false, String(error));
 }
 
-const Url = (query = "") => `http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small${query}`;
+const Url = (query = "") => `http://127.0.0.1:${port}/Taierzhuang1938/?quality=${process.argv.includes("--papers-only") ? "high" : "medium"}&scale=small${query}`;
 
 // Explicit lethal-hit fixture, not campaign or balance evidence.
 if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-voice-only") || process.argv.includes("--p012-enemy-bound-only") || process.argv.includes("--p012-approval-only") || process.argv.includes("--p012-grenade-only") || process.argv.includes("--p012-salvage-only")){
@@ -554,6 +555,35 @@ async function CheckInterface() {
   await page.setViewportSize({width:1600,height:900});
   await page.mouse.move(2,2);
   await page.evaluate(()=>{const menu=window.Taierzhuang.menu;menu.ToTitle();menu.el.list.scrollTop=0;});
+}
+// Explicit saved-progress fixtures verify the real boot/return-to-title wiring.
+// They do not unlock or claim playable placeholder chapters.
+if(process.argv.includes('--papers-only')) {
+  try {
+    const paperRequests=[];
+    page.on("request",request=>{if(request.url().includes("/Menu/CommandRoom/"))paperRequests.push(request.url());});
+    await page.addInitScript(ids => localStorage.setItem("tengxian1938_progress_v3", JSON.stringify({cleared:ids})), COMMAND_ROOM_CAMPAIGN_IDS);
+    await Boot();
+    const cold = await page.evaluate(() => ({
+      papers:window.Taierzhuang.Debug.CommandRoom().papers,
+    }));
+    cold.requests=paperRequests.slice();
+    Check("冷启动读取真实存档并仅请求终章的一图一信", cold.papers.stage===6
+      &&cold.papers.map===COMMAND_ROOM_MAPS[6]&&cold.papers.letter===COMMAND_ROOM_LETTERS[2]
+      &&cold.requests.length===2, JSON.stringify(cold));
+    for (const stage of [1,0]) {
+      await page.evaluate(ids => {
+        localStorage.setItem("tengxian1938_progress_v3",JSON.stringify({cleared:ids}));
+        window.Taierzhuang.menu.ToTitle();
+      },COMMAND_ROOM_CAMPAIGN_IDS.slice(0,stage));
+      await page.waitForFunction(stage=>window.Taierzhuang.Debug.CommandRoom().papers.stage===stage,stage);
+      const papers=await page.evaluate(()=>{window.Taierzhuang.StepFrames(30);return window.Taierzhuang.Debug.CommandRoom().papers;});
+      Check("重返主菜单更新纸图 "+stage,papers.map===COMMAND_ROOM_MAPS[stage]&&papers.letter===COMMAND_ROOM_LETTERS[0]);
+      await page.screenshot({path:path.join(outDir,`Scene_CommandRoomSavedProgress${stage}.png`)});
+    }
+    Check("纸图切换无浏览器错误",problems.length===0,problems.join(';'));
+  } finally {await browser.close();server.close();}
+  process.exit(failed?1:0);
 }
 if(process.argv.includes('--interface-only')) {
   try {await Boot();await CheckInterface();Check('界面切换无浏览器错误',problems.length===0,problems.join(';'));}

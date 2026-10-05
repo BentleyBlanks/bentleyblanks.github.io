@@ -4,13 +4,14 @@
 
 正式标题菜单现使用 `Script_CommandRoom.mjs` 加载 BlenderMCP 自建的
 `Model/Model_CommandRoom.glb`，构图基于用户选定的第三张指挥室参考。
-地图采用第二张，电报采用第一张较大字幅的手写版本。
-两张纸面为用户确认的游戏美术图，不是历史原件影印。
+2026-10-05 起墙面采用七张随通关进度切换的地图，桌面采用开战、中途、最后三张历史文书。
+Imagegen 纸图沿用原地图比例与原电报纸边，不是历史原件影印。
+状态表、史料与生成记录见 [七张战局地图与三张文书](Data_CommandRoomPapers.md)。
 
 `Data_Tuning_CommandRoom.mjs` 管理材质、光照图集解码和浮尘参数。
 单一窗光及间接光在 Blender 中烘焙为独立的 2048² UV1 辐照度图集，
 不包含纸面或 PBR 反照率；运行时解码后交给标准材质的 `lightMap`。
-因此不再叠加第二个运行时太阳或重复 AO。纸面文字始终来自原始确认图。
+因此不再叠加第二个运行时太阳或重复 AO。纸面反照率按存档进度替换，光照图集共用。
 辐照度交付采用无损 WebP；编码器逐像素校验 RGB 往返一致，避免暗部有损色度
 压缩被 32 倍解码放大为墙地面的绿色、紫色色块。地面延伸覆盖宽屏可见范围。
 墨水瓶玻璃在加载时从自身位置捕获一次 256² 房间 cubemap 并预滤波，
@@ -58,7 +59,7 @@ Imagegen `Source/CommandRoomClothWorn.png`，25 cm 一铺，1K 基色与 512 法
 柜子具有圆角台面、下压边、实框凹面抽屉和铁拉手底座。删除原来的
 `DryMortarGrain`、`TableScratch`、`TableEndGrainSplit`、`TableDrySplinter`，
 不再用白色碎粒或悬浮黑线表示磨损。检查标签 4/5 对应桌子/柜子，可单独渲染验收。
-电报网格沿原图纸边裁切，保留原有手写内容、旧纸缺口与卷边，不再带白色矩形底框。
+电报网格沿原图纸边裁切，保留旧纸缺口与卷边，不再带白色矩形底框；新文书匹配同一轮廓。
 边界数据为 `_blender/Data_CommandRoomPaperOutline.json`，可用
 `_import/Script_TraceCommandRoomPaper.py` 从已确认的纸图重新提取。
 相邻 `Source` 保留生成原图和三张参考，`Textures` 保存 Blender 依赖，
@@ -81,8 +82,8 @@ Imagegen `Source/CommandRoomClothWorn.png`，25 cm 一铺，1K 基色与 512 法
 `_import/TextureBakes/`；已确认的纸图用 `_import/Script_BakeCommandRoomPrints.py --source <Source>` 转 WebP。
 
 贴图按菜单使用时加载，不加入共享 `PBR_SETS`。三套 PBR、地图、电报、瓶签和光照图集，
-在 `Data_TextureManifest` 的 lazy 层单独登记；无损光照数据使该层预算为 10 MB，
-全目录预算保持 54 MB。反射探针由场景运行时生成，不增加外部贴图请求。
+在 `Data_TextureManifest` 的 lazy 层单独登记；十张新纸图约 4 MB，预算相应增加 4 MB，
+运行时仅下载当前地图与信件（合计不足 1 MB），访问过的状态复用贴图。反射探针由场景运行时生成，不增加外部贴图请求。
 GLB 中静态几何按材质合并；预算见 `Data_AssetStandards.CommandRoom`。
 `Debug.CommandRoom()` 提供实际加载、绘制帧数、三角数和相机证据。
 视觉证据保留在忽略目录 `_shots/CommandRoom/`。

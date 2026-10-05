@@ -1,0 +1,19 @@
+{
+  "generator": "Script_EncodeCommandRoomPapers.py@1",
+  "provider": "imagegen",
+  "source": "CommandRoomMapInitial.png",
+  "sourceSha256": "5af0d07184273bf4a207b3dfc1f4da504e8eb09f87207abb78f0c74caed100c9",
+  "prompt": "_import/Prompts/Texture_CommandRoomPapers.txt",
+  "operation": "RGB WebP encoding only; no cropping, compositing or text changes",
+  "quality": 90,
+  "method": 6,
+  "outputs": [
+    {
+      "file": "Texture_CommandRoomMapInitialImage.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 705816,
+      "sha256": "8b386882aee34984242b82750f8e3cec0e2cc50bdfbd9e4da1b4123565d037f8"
+    }
+  ]
+}

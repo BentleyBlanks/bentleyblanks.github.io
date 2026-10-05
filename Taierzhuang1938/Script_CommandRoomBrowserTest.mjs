@@ -4,11 +4,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { CAMPAIGN_ENTRIES } from "./Data_Menu.mjs";
+import { COMMAND_ROOM_CAMPAIGN_IDS, COMMAND_ROOM_MAPS, COMMAND_ROOM_LETTERS, CommandRoomPapers } from "./Data_CommandRoomPapers.mjs";
+
+assert.deepEqual(COMMAND_ROOM_CAMPAIGN_IDS, CAMPAIGN_ENTRIES.map(entry => entry.id));
+assert.equal(CommandRoomPapers({furthest: 99, cleared: ["CH0_Chuchuan", "CH1_NanLu", "WeaponRange", "CH6_Zuihou"]}).stage, 0);
+assert.equal(CommandRoomPapers({cleared: [COMMAND_ROOM_CAMPAIGN_IDS[0], COMMAND_ROOM_CAMPAIGN_IDS[2]]}).stage, 1);
+assert.equal(CommandRoomPapers(null).stage, 0);
 
 const project=path.dirname(fileURLToPath(import.meta.url)),out=path.join(project,"_shots/CommandRoom");
 fs.mkdirSync(out,{recursive:true});
 const server=await ServeRoot(path.dirname(project),0),browser=await LaunchBrowser();
-const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];
+const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[],paperRequests=[];
+page.on("request", request => { if (request.url().includes("/Menu/CommandRoom/")) paperRequests.push(request.url()); });
 page.on("pageerror",error=>errors.push(String(error)));
 page.on("console",message=>{if(message.type()==="error")errors.push(message.text());});
 const fixture=`<!doctype html><base href="/Taierzhuang1938/"><style>body{margin:0}canvas{display:block}</style>
@@ -43,6 +51,29 @@ try {
   assert.ok(result.timberColor.vertices>0&&result.timberColor.minimum>.3,
     "Joining worn table boards must preserve neutral vertex colors on the cabinet, chair and window timber");
   assert.ok(result.initial.fog>100,"Light volume must be visibly nonzero");
+  assert.equal(paperRequests.length,2,"Initial menu requests only its current map and letter");
+  result.papers=[];
+  for(let stage=0;stage<=COMMAND_ROOM_CAMPAIGN_IDS.length;stage++){
+    const progress={cleared:COMMAND_ROOM_CAMPAIGN_IDS.slice(0,stage)};
+    const papers=await page.evaluate(async progress=>{
+      await room.SetProgress(progress);room.Render();
+      return { ...room.State().papers, urls:[...room.paperMaterials.values()].map(material=>material.map.image.currentSrc) };
+    },progress);
+    assert.equal(papers.map,COMMAND_ROOM_MAPS[stage]);
+    assert.equal(papers.letter,COMMAND_ROOM_LETTERS[stage<2?0:stage<5?1:2]);
+    assert.ok(papers.urls.some(url=>url.includes(papers.map+"Image.webp")));
+    assert.ok(papers.urls.some(url=>url.includes(papers.letter+"Image.webp")));
+    result.papers.push(papers);
+    await page.screenshot({path:path.join(out,`Scene_CommandRoomProgress${stage}.png`)});
+  }
+  assert.equal(paperRequests.length,10,"All seven stages share exactly three letters");
+  result.paperRace=await page.evaluate(async ids=>{
+    await Promise.all([room.SetProgress({cleared:ids.slice(0,5)}),room.SetProgress({cleared:ids.slice(0,1)})]);
+    return room.State().papers;
+  },COMMAND_ROOM_CAMPAIGN_IDS);
+  assert.equal(result.paperRace.stage,1,"An older asynchronous pair cannot overwrite a newer selection");
+  await page.evaluate(async()=>{await room.SetProgress({cleared:[]});room.Render();});
+  assert.equal(paperRequests.length,10,"Returning to a visited stage reuses decoded textures");
   await page.screenshot({path:path.join(out,"Scene_CommandRoomAtmosphere.png")});
   await page.mouse.move(1260,24);
   result.first=await page.evaluate(()=>Advance(1/60));

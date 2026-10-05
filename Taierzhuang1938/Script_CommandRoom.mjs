@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { COMMAND_ROOM as DATA } from "./Data_Tuning_CommandRoom.mjs";
 import { CommandRoomAtmosphere } from "./Script_CommandRoomAtmosphere.mjs";
+import { CommandRoomPapers, CommandRoomPaperUrl } from "./Data_CommandRoomPapers.mjs";
 
 /** A real, batched Blender scene; uses the existing renderer only during title menu frames.
  * All geometry is static. Transparent moving dust is excluded from depth/velocity passes.
@@ -17,6 +18,10 @@ export class CommandRoom {
     this.time = 0;
     this.frames = 0;
     this.textures = [];
+    this.paperCache = new Map();
+    this.paperMaterials = new Map();
+    this.paperRequest = 0;
+    this.disposed = false;
     this.stats = null;
     this.savedViewport = new THREE.Vector4();
     this.savedScissor = new THREE.Vector4();
@@ -47,14 +52,16 @@ export class CommandRoom {
     window.addEventListener("resize",this.ResetPointer);
     this.motionQuery.addEventListener("change",this.OnMotionPreference);
   }
-  Load() {
-    this.loadingPromise ??= this.LoadAssets();
-    return this.loadingPromise;
+  Load(progress = {}) {
+    this.loadingPromise ??= this.LoadAssets(progress);
+    return this.loadingPromise.then(() => this.SetProgress(progress)).then(() => this);
   }
-  async LoadAssets() {
+  async LoadAssets(progress) {
+    const papers = CommandRoomPapers(progress);
     const loader = new THREE.TextureLoader();
-    const LoadTexture = async (name, channel) => {
-      const texture = await loader.loadAsync("./Texture/Texture_" + name + channel + ".webp?v=" + DATA.version);
+    const LoadTexture = this.LoadTexture = async (name, channel, url) => {
+      const texture = await loader.loadAsync(url || "./Texture/Texture_" + name + channel + ".webp?v=" + DATA.version);
+      if (this.disposed) { texture.dispose(); throw new Error("Command room disposed during texture load"); }
       texture.colorSpace = channel === "Base" || channel === "Image" ? THREE.SRGBColorSpace : THREE.NoColorSpace;
       texture.flipY = false;
       texture.wrapS = texture.wrapT = channel === "Image" ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping;
@@ -65,6 +72,8 @@ export class CommandRoom {
     const [gltf, materialSets, irradiance] = await Promise.all([
       new GLTFLoader().loadAsync(DATA.model + "?v=" + DATA.version),
       Promise.all(DATA.materials.map(async spec => {
+        const paperName = spec.name === "CommandRoomMap" ? papers.map : spec.name === "CommandRoomLetter" ? papers.letter : null;
+        if (paperName) return { spec, textures: [await this.LoadPaper(paperName)] };
         const channels = spec.kind === "print" ? ["Image"] : ["Base", "Normal", "Orm"];
         const textures = await Promise.all(channels.map(channel => LoadTexture(spec.name, channel)));
         return { spec, textures };
@@ -108,6 +117,7 @@ export class CommandRoom {
         mat.color.setHex(set.spec.tint);
         if (mat.name === "CommandRoomBrick") mat.color.setHex(DATA.brickTint);
         mat.map = set.textures[0];
+        if (mat.name === "CommandRoomMap" || mat.name === "CommandRoomLetter") this.paperMaterials.set(mat.name, mat);
         mat.roughness = 1;
         mat.metalness = 0;
         if (set.spec.kind === "pbr") {
@@ -128,8 +138,27 @@ export class CommandRoom {
     this.atmosphere = new CommandRoomAtmosphere(this.renderer,this.scene,DATA.windowHaze,DATA.depthOfField);
     this.dust = this.atmosphere.BuildDust(DATA.dust);
     this.stats = { meshes, triangles, textureCount: this.textures.length, model: DATA.model, version: DATA.version, lighting: "Cycles diffuse UV1" };
+    this.papers = papers;
     this.ready = true;
     return this;
+  }
+  LoadPaper(name) {
+    if (!this.paperCache.has(name)) {
+      this.paperCache.set(name, this.LoadTexture(name, "Image", CommandRoomPaperUrl(name)).catch(error => {
+        this.paperCache.delete(name);
+        throw error;
+      }));
+    }
+    return this.paperCache.get(name);
+  }
+  async SetProgress(progress) {
+    const request = ++this.paperRequest, papers = CommandRoomPapers(progress);
+    if (this.disposed || papers.stage === this.papers?.stage) return;
+    const [map, letter] = await Promise.all([this.LoadPaper(papers.map), this.LoadPaper(papers.letter)]);
+    if (this.disposed || request !== this.paperRequest) return;
+    this.paperMaterials.get("CommandRoomMap").map = map;
+    this.paperMaterials.get("CommandRoomLetter").map = letter;
+    this.papers = papers;
   }
   CaptureGlassReflection() {
     const glass=[], bottle=[];
@@ -205,12 +234,15 @@ export class CommandRoom {
     }
   }
   State() {
-    return { ready: this.ready, frames: this.frames, ...this.stats,
+    return { ready: this.ready, frames: this.frames, ...this.stats, textureCount: this.textures.length,
+      papers: this.papers ? { ...this.papers } : null,
       camera: this.camera ? { position: this.camera.getWorldPosition(new THREE.Vector3()).toArray(), fov: this.camera.fov } : null,
       parallax: { pointer: this.pointer.toArray(), target: this.pointerTarget.toArray(), reducedMotion: this.motionQuery.matches },
       atmosphere: { particles: DATA.dust.count, depthOcclusion: !!this.atmosphere, lightShadow: !!this.atmosphere && !this.atmosphere.shadowDirty } };
   }
   Dispose() {
+    this.disposed = true;
+    this.paperRequest++;
     document.removeEventListener("pointermove",this.OnPointerMove);
     document.removeEventListener("pointerleave",this.ResetPointer);
     window.removeEventListener("blur",this.ResetPointer);

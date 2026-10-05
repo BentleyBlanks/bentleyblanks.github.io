@@ -97,10 +97,12 @@ export const TEXTURE_BUDGETS = Object.freeze({
     ui: 5.5 * 1024 * 1024,
     // Dedicated command-room set adds 2.5 MB: three PBR sets and two legible print props.
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
-    lazy: 10 * 1024 * 1024, // Includes lossless command-room irradiance; lossy chroma causes wall/floor blotches.
+    // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
+    // Only the selected pair is requested (< 1 MB), not the whole campaign set.
+    lazy: 14 * 1024 * 1024, // Also includes lossless command-room irradiance.
     editor: 0.25 * 1024 * 1024,
   }),
-  totalBytes: 54 * 1024 * 1024,      // Texture/ 全目录（含 offline 的搁置资产）
+  totalBytes: 58 * 1024 * 1024,      // Texture/ 全目录；本轮十张按进度加载的纸图增加 4 MB 预算。
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -157,6 +159,86 @@ export const TEXTURE_MANIFEST = Object.freeze([
     source: { provider: "user", date: "2026-10-04", ref: "0471bcd3-badc-4edc-80e9-24d575ee34f3/image-2.png", license: "User-supplied approved Imagegen artwork for this game" },
     consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomMap" }],
     files: [["Texture_CommandRoomMapImage.webp","Image",1536,1024]],
+  },
+  {
+    id: "CommandRoomMapInitial", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomPapers.py",
+    bakeRecord: "_import/TextureBakes/Texture_CommandRoomMapInitial.json",
+    source: { provider: "imagegen", date: "2026-10-05", ref: "exec-f1baa0b5-2f69-45dc-8c8c-22d8effead24.png", prompt: "_import/Prompts/Texture_CommandRoomPapers.txt" },
+    consumers: [{ file: "Data_CommandRoomPapers.mjs", token: "CommandRoomMapInitial" }],
+    files: [["Menu/CommandRoom/Texture_CommandRoomMapInitialImage.webp", "Image", 1536, 1024]],
+  },
+  {
+    id: "CommandRoomMapWithdrawal", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomPapers.py",
+    bakeRecord: "_import/TextureBakes/Texture_CommandRoomMapWithdrawal.json",
+    source: { provider: "imagegen", date: "2026-10-05", ref: "exec-f6f4fad5-4dfe-4d9c-9b1c-97689dec622e.png", prompt: "_import/Prompts/Texture_CommandRoomPapers.txt" },
+    consumers: [{ file: "Data_CommandRoomPapers.mjs", token: "CommandRoomMapWithdrawal" }],
+    files: [["Menu/CommandRoom/Texture_CommandRoomMapWithdrawalImage.webp", "Image", 1536, 1024]],
+  },
+  {
+    id: "CommandRoomMapEastDefense", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomPapers.py",
+    bakeRecord: "_import/TextureBakes/Texture_CommandRoomMapEastDefense.json",
+    source: { provider: "imagegen", date: "2026-10-05", ref: "exec-7813cd83-2a34-4186-acd7-c4bf2e30276a.png", prompt: "_import/Prompts/Texture_CommandRoomPapers.txt" },
+    consumers: [{ file: "Data_CommandRoomPapers.mjs", token: "CommandRoomMapEastDefense" }],
+    files: [["Menu/CommandRoom/Texture_CommandRoomMapEastDefenseImage.webp", "Image", 1536, 1024]],
+  },
+  {
+    id: "CommandRoomMapAidReturn", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomPapers.py",
+    bakeRecord: "_import/TextureBakes/Texture_CommandRoomMapAidReturn.json",
+    source: { provider: "imagegen", date: "2026-10-05", ref: "exec-ba3d86da-ec9c-4dc9-b879-b8887f2f8fed.png", prompt: "_import/Prompts/Texture_CommandRoomPapers.txt" },
+    consumers: [{ file: "Data_CommandRoomPapers.mjs", token: "CommandRoomMapAidReturn" }],
+    files: [["Menu/CommandRoom/Texture_CommandRoomMapAidReturnImage.webp", "Image", 1536, 1024]],
+  },
+  {
+    id: "CommandRoomMapNightBattle", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomPapers.py",
+    bakeRecord: "_import/TextureBakes/Texture_CommandRoomMapNightBattle.json",
+    source: { provider: "imagegen", date: "2026-10-05", ref: "exec-f2fcbab7-9808-4d8e-a41f-32b0eedd5d9b.png", prompt: "_import/Prompts/Texture_CommandRoomPapers.txt" },
+    consumers: [{ file: "Data_CommandRoomPapers.mjs", token: "CommandRoomMapNightBattle" }],
+    files: [["Menu/CommandRoom/Texture_CommandRoomMapNightBattleImage.webp", "Image", 1536, 1024]],
+  },
+  {
+    id: "CommandRoomMapLastStand", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomPapers.py",
+    bakeRecord: "_import/TextureBakes/Texture_CommandRoomMapLastStand.json",
+    source: { provider: "imagegen", date: "2026-10-05", ref: "exec-3421737f-dd94-4224-b012-f6acbb9926e5.png", prompt: "_import/Prompts/Texture_CommandRoomPapers.txt" },
+    consumers: [{ file: "Data_CommandRoomPapers.mjs", token: "CommandRoomMapLastStand" }],
+    files: [["Menu/CommandRoom/Texture_CommandRoomMapLastStandImage.webp", "Image", 1536, 1024]],
+  },
+  {
+    id: "CommandRoomMapEpilogue", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomPapers.py",
+    bakeRecord: "_import/TextureBakes/Texture_CommandRoomMapEpilogue.json",
+    source: { provider: "imagegen", date: "2026-10-05", ref: "exec-17a4b371-c750-4bf1-91a3-8755ad612b8b.png", prompt: "_import/Prompts/Texture_CommandRoomPapers.txt" },
+    consumers: [{ file: "Data_CommandRoomPapers.mjs", token: "CommandRoomMapEpilogue" }],
+    files: [["Menu/CommandRoom/Texture_CommandRoomMapEpilogueImage.webp", "Image", 1536, 1024]],
+  },
+  {
+    id: "CommandRoomLetterOpening", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomPapers.py",
+    bakeRecord: "_import/TextureBakes/Texture_CommandRoomLetterOpening.json",
+    source: { provider: "imagegen", date: "2026-10-05", ref: "exec-0c195c60-927e-4ec8-93ec-ee9ca7fa6469.png", prompt: "_import/Prompts/Texture_CommandRoomPapers.txt" },
+    consumers: [{ file: "Data_CommandRoomPapers.mjs", token: "CommandRoomLetterOpening" }],
+    files: [["Menu/CommandRoom/Texture_CommandRoomLetterOpeningImage.webp", "Image", 1122, 1402]],
+  },
+  {
+    id: "CommandRoomLetterMiddle", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomPapers.py",
+    bakeRecord: "_import/TextureBakes/Texture_CommandRoomLetterMiddle.json",
+    source: { provider: "imagegen", date: "2026-10-05", ref: "exec-faf800a8-56be-4be1-ad61-2c9994029e19.png", prompt: "_import/Prompts/Texture_CommandRoomPapers.txt" },
+    consumers: [{ file: "Data_CommandRoomPapers.mjs", token: "CommandRoomLetterMiddle" }],
+    files: [["Menu/CommandRoom/Texture_CommandRoomLetterMiddleImage.webp", "Image", 1122, 1402]],
+  },
+  {
+    id: "CommandRoomLetterFinal", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomPapers.py",
+    bakeRecord: "_import/TextureBakes/Texture_CommandRoomLetterFinal.json",
+    source: { provider: "imagegen", date: "2026-10-05", ref: "exec-b00f3ae4-2a52-49ac-be7f-fdb121fec53f.png", prompt: "_import/Prompts/Texture_CommandRoomPapers.txt" },
+    consumers: [{ file: "Data_CommandRoomPapers.mjs", token: "CommandRoomLetterFinal" }],
+    files: [["Menu/CommandRoom/Texture_CommandRoomLetterFinalImage.webp", "Image", 1122, 1402]],
   },
   {
     id: "WeaponSteelV2", kind: "material", tier: "boot",
