@@ -600,11 +600,14 @@ node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --pixel=x,y --pass-im
 - `Script_Hud.mjs` —— 纯 DOM/CSS，不进 three 渲染；线性关卡对标 COD《战争世界》单人战役
   （目标通知只在推进时浮出再淡掉、弹药与手榴弹数几秒不交互就隐掉、无姿态图标），
   对照表与时长口径在 [docs/Data_HudLinearLevel.md](Data_HudLinearLevel.md)，数在 `Data_Tuning_Hud.IDLE_FADE`；含阵亡卡片。
-- `Script_Menu.mjs` + `Data_Menu.mjs` —— 主菜单（活战场打底 + 相机导演）；`Data_Menu` 还放着
+- `Script_Menu.mjs` + `Data_Menu.mjs` —— 主菜单与选章；指挥室由 `Script_CommandRoom.mjs` 绘制。`Data_Menu` 还放着
   **两片不进 PHASES 的切片**：全城俯瞰 `OVERVIEW_PHASE` 与界河白盒 `JIEHE_SANDBOX_PHASE`。
 - `Script_Input.mjs`（键位表 + 路由器）、`Script_Interact.mjs`（F 键分流）、
   `Script_Wheel.mjs`（指挥轮盘）、`Script_DebugOptions.mjs`（调试开关唯一真相）。
 - 先读：`docs/Data_MainMenu.md`。
+- 启动界面七状态预览：`?menuPreview=0..6&quality=high`（`menuPreviewUi=0` 纯画面），或主菜单内
+  `await Tengxian.Debug.PreviewCommandRoom(stage)`；null 恢复真实进度。入口为设置 → 调试选项，
+  API / 存档隔离 / 验收见 [地图与文书预览](Data_CommandRoomPapers.md)，门禁 `CommandRoomPreviewTest`。
 
 ### 交互 / 负重（担架·搬运·救护交互点）
 - `Script_Interact.mjs` —— 两层：**内建分支**（拾枪/分弹药）＋**可注册交互点框架**

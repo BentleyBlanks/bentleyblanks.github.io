@@ -1,5 +1,29 @@
 # 指挥室七张地图与三张文书
 
+## 启动界面预览入口（2026-10-06）
+
+主菜单 → 设置 → 调试选项 → **启动界面效果预览**，选择开战前或第一关至终章后，点「预览主菜单」。预览栏可以直接选状态、上一张／下一张、看纯画面和结束预览。纯画面按 Esc 恢复界面。暂停菜单内会提示先回主菜单，避免为看图而清掉正在玩的关卡。
+
+正式显示仍读取真实 `Progress.Read()`；`Script_CommandRoomPreview` 只在当前页面内临时替换纸图，完全不写存档或解锁章节。「结束预览」恢复当前真实进度并移除 URL 预览参数；开始游戏也会移除这些参数。
+
+agent 可直接打开：`/Taierzhuang1938/?menuPreview=4&quality=high`（第四关后），另加 `&menuPreviewUi=0` 即纯画面。编号 0 为初始，1–5 为对应关后，6 为终章后。
+
+页面准备好且处于主菜单时，调用同一条异步接口：
+
+```js
+await Tengxian.Debug.PreviewCommandRoom(4);                 // 换图完成并显示主菜单
+await Tengxian.Debug.PreviewCommandRoom(6, {hideUi: true}); // 终章后纯画面
+Tengxian.Debug.CommandRoomPreview();                       // 预览编号、真实进度、实际纸图、界面开关
+Tengxian.Debug.CommandRoom();                              // 真实渲染场景证据
+await Tengxian.Debug.PreviewCommandRoom(null);              // 恢复真实存档；也接受 "saved"
+```
+
+接口只接受 0–6 整数（或同值字符串）与 null／saved；越界拒绝，旧异步请求不能盖过新请求。接口 resolve 时材质已经切换并渲染；异步加载失败恢复上次成功状态，界面显示错误且可重试。处于游戏或暂停时调用会拒绝，不会替 agent 退出游戏。
+
+定向回归：`node Taierzhuang1938/Script_TestRunner.mjs --only=CommandRoomPreviewTest`。覆盖实际存档启动、七状态、UI 与 agent 操作、纯画面/Esc、窄屏、并发、无效输入、直达链接及存档字节不变；截图仍只写本地 `_shots/`。
+
+本轮源模块入口与 `Script_BuildBrowserBundle.mjs --preview` 产出的发布式入口均实测通过；后者用 `Script_MenuTest.mjs --papers-only --bundle`，另检查结束预览与开始游戏会清理预览参数。390×844 窄屏的选择框和全部按钮均在视口内。CommandRoomBrowserTest（含失败回退）、MotionVectorContract、Text、TextGatherCheck、ModuleGraph、TestRunner 检查通过；quick 仍停在下文已记录的未修改对白读音表断言。
+
 2026-10-05，按用户明确指定的「共七张地图、开战／中途／最后遗书」生成。全部使用内置 Imagegen；地图为游戏战局示意，文书为有史料依据的美术重排，不是历史原件扫描。
 
 ## 进度与地图

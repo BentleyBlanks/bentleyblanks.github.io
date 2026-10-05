@@ -1,5 +1,20 @@
 /* Command-room menus share ivory type, fine rules and a restrained gold selection. */
 
+.mnCommandRoomPreview { position:absolute;left:5.1%;bottom:2%;max-width:89.8%;padding:12px 16px;
+  background:#111613ed;border:1px solid var(--ui-line);pointer-events:auto;color:var(--ui-text); }
+.mnCommandRoomPreview[hidden] { display:none; }
+.mnCommandRoomPreview b { display:block;margin-bottom:8px;color:var(--ui-gold);font-size:14px; }
+.mnCommandRoomPreview small { display:block;margin-top:6px;font-size:12px;color:var(--ui-muted); }
+.mnCommandRoomPreview .mnDebugStageControls { width:auto;gap:6px; }
+.mnCommandRoomPreview .mnDebugAdvance,.mnCommandRoomPreview select { padding:7px 10px;font-size:14px; }
+#menu.commandRoomPreviewHidden > * { visibility:hidden !important;pointer-events:none !important; }
+#menu:has(.mnCommandRoomPreview:not([hidden])) .mnFoot { visibility:hidden; }
+@media(max-width:600px) {
+ .mnCommandRoomPreview {left:3%;max-width:94%;padding:9px;bottom:1%;}
+ .mnCommandRoomPreview .mnDebugStageControls select {order:-1;flex:1 0 100%;min-width:0;}
+ .mnCommandRoomPreview .mnDebugAdvance {flex:1;padding:6px;font-size:12px;white-space:nowrap;}
+}
+
 /* Reference command room: title-only layout; pause/death retain their existing contracts. */
 #menu.commandRoom .mnVignette { backdrop-filter:none;
   background:linear-gradient(90deg,rgba(4,5,5,.76) 0%,rgba(5,6,6,.35) 18%,rgba(5,6,6,.10) 38%,transparent 62%); }

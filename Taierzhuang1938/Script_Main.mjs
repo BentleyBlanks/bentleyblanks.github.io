@@ -129,6 +129,7 @@ import { IdentifySystem, IDENTIFY } from "./Script_Identify.mjs";
 import { EditorSuite } from "./Script_Editor.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { CommandRoom } from "./Script_CommandRoom.mjs";
+import { CommandRoomPreview } from "./Script_CommandRoomPreview.mjs";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
@@ -3189,11 +3190,34 @@ async function Boot() {
   // 还要能把编辑器的齿轮藏起来 —— 三样东西到这一步才齐。
   if ((MENU_ON || FIRST_LEVEL_P012_WHITEBOX) && menuRoot) {
     commandRoom = new CommandRoom(renderer, { isActive: () => !!menu?.live && !!menu?.open && !editor?.Capturing });
-    if (MENU_AT_BOOT) await commandRoom.Load(Progress.Read());
+    const previewValue = params.get("menuPreview");
+    const commandRoomPreview = new CommandRoomPreview(commandRoom, () => Progress.Read(),
+      /^[0-6]$/.test(previewValue ?? "") ? Number(previewValue) : null);
+    if (MENU_AT_BOOT) await commandRoomPreview.Load();
     window.Taierzhuang.Debug.CommandRoom = () => commandRoom.State();
+    const PreviewCommandRoom = async (stage = null, { hideUi = false } = {}) => {
+      if (!menu?.open || !menu.live) throw new Error("Open the title menu before previewing command-room artwork");
+      const preview = await commandRoomPreview.SetStage(stage);
+      if (!preview) return { ...commandRoomPreview.State(), superseded: true };
+      if (!preview.active) {
+        const url = new URL(location.href);
+        url.searchParams.delete("menuPreview"); url.searchParams.delete("menuPreviewUi");
+        history.replaceState(history.state, "", url);
+      }
+      menu.Show("title");
+      menu.RefreshCommandRoomPreview();
+      menu.SetCommandRoomPreviewUi(hideUi && preview.active);
+      commandRoom.Update(0);
+      commandRoom.Render();
+      return { ...preview, hideUi: menu.commandRoomPreviewHidden };
+    };
+    window.Taierzhuang.Debug.PreviewCommandRoom = PreviewCommandRoom;
+    window.Taierzhuang.Debug.CommandRoomPreview = () => ({ ...commandRoomPreview.State(), hideUi: !!menu?.commandRoomPreviewHidden });
     menu = new MainMenu({
       staticBackdrop: true,
-      PrepareBackdrop: () => commandRoom.Load(Progress.Read()).catch(error => {
+      CommandRoomPreview: () => commandRoomPreview.State(),
+      PreviewCommandRoom,
+      PrepareBackdrop: () => commandRoomPreview.Load().catch(error => {
         console.error("Command room failed to load", error);
       }),
       // 正式章节组不再交 PHASES（旧序章与旧第一关到终章 2026-09-06 起退出选章，
@@ -3276,7 +3300,11 @@ async function Boot() {
     window.Taierzhuang.Debug.DebugOptions = () => debugOptions.Get();
     window.Taierzhuang.Debug.SetDebugOption = (id, enabled) => SetDebugOption(id, enabled);
     // 靶场里菜单只当暂停层用（Esc 才现身），开机不接管相机 —— 见 MENU_AT_BOOT。
-    if (MENU_AT_BOOT) OpenMenu();
+    if (MENU_AT_BOOT) {
+      OpenMenu();
+      menu.RefreshCommandRoomPreview();
+      if (commandRoomPreview.State().active && params.get("menuPreviewUi") === "0") menu.SetCommandRoomPreviewUi(true);
+    }
   }
 
   if (SHOT || FIRST_LEVEL_STAGE_START) StartRun();
@@ -3345,6 +3373,8 @@ function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField;
  */
 function GoToSandbox(key, {stage = null} = {}) {
   const url = new URL(window.location.href);
+  url.searchParams.delete("menuPreview");
+  url.searchParams.delete("menuPreviewUi");
   url.searchParams.delete("movement");
   url.searchParams.delete("range");
   url.searchParams.delete("explosions");

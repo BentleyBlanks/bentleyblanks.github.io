@@ -6,11 +6,27 @@ import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { CAMPAIGN_ENTRIES } from "./Data_Menu.mjs";
 import { COMMAND_ROOM_CAMPAIGN_IDS, COMMAND_ROOM_MAPS, COMMAND_ROOM_LETTERS, CommandRoomPapers } from "./Data_CommandRoomPapers.mjs";
+import { CommandRoomPreview } from "./Script_CommandRoomPreview.mjs";
 
 assert.deepEqual(COMMAND_ROOM_CAMPAIGN_IDS, CAMPAIGN_ENTRIES.map(entry => entry.id));
 assert.equal(CommandRoomPapers({furthest: 99, cleared: ["CH0_Chuchuan", "CH1_NanLu", "WeaponRange", "CH6_Zuihou"]}).stage, 0);
 assert.equal(CommandRoomPapers({cleared: [COMMAND_ROOM_CAMPAIGN_IDS[0], COMMAND_ROOM_CAMPAIGN_IDS[2]]}).stage, 1);
 assert.equal(CommandRoomPapers(null).stage, 0);
+
+// The override has no storage writer and rolls back a failed asset transition.
+{
+  const saved={cleared:COMMAND_ROOM_CAMPAIGN_IDS.slice(0,1)}, before=JSON.stringify(saved);
+  let displayed=null, failStage=null;
+  const preview=new CommandRoomPreview({
+    async Load(progress){const papers=CommandRoomPapers(progress);if(papers.stage===failStage)throw new Error("fixture load failure");displayed=papers;},
+    State(){return {papers:displayed};},
+  },()=>saved);
+  await preview.Load(); await preview.SetStage(2); failStage=5;
+  await assert.rejects(preview.SetStage(5),/fixture load failure/);
+  assert.equal(preview.State().stage,2); assert.equal(displayed.stage,2);
+  failStage=null; await preview.SetStage(null);
+  assert.equal(displayed.stage,1); assert.equal(JSON.stringify(saved),before);
+}
 
 const project=path.dirname(fileURLToPath(import.meta.url)),out=path.join(project,"_shots/CommandRoom");
 fs.mkdirSync(out,{recursive:true});

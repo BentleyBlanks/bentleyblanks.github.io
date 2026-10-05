@@ -26,6 +26,7 @@ import { PRESUMED } from "./Data_Tengxian.mjs";
 import { T, Localize } from "./Script_Text.mjs";
 import { CastNameId, LevelFieldId } from "./Script_TextIds.mjs";
 import { DRIFT, CAMERA } from "./Data_Tuning_Menu.mjs";
+import { COMMAND_ROOM_MAPS } from "./Data_CommandRoomPapers.mjs";
 
 /** 主菜单四项与两行标题的内容 id（`menu.<字段>`，译文放 `content.menu.<字段>`）。 */
 function MenuTextId(field) { return `menu.${field}`; }
@@ -271,6 +272,9 @@ export class MainMenu {
     this.el.shotNote = mk("mnShotNote");
     this.el.foot = mk("mnFoot");
     this.el.foot.textContent = T("menu.foot.main");
+
+    this.el.commandRoomPreview = mk("mnCommandRoomPreview", this.root, "section");
+    this.el.commandRoomPreview.hidden = true;
 
     // --- 面板（选章 / 史实注记 / 关于）-------------------------------------
     this.el.panel = mk("mnPanel");
@@ -643,6 +647,7 @@ export class MainMenu {
   }
 
   Close() {
+    this.SetCommandRoomPreviewUi(false);
     this.ClearSandboxComplete();
     this.DismissConfirm();
     this.open = false;
@@ -697,9 +702,11 @@ export class MainMenu {
   }
 
   Show(mode) {
+    this.SetCommandRoomPreviewUi(false);
     this.root.classList.toggle("commandRoom", !!this.host.staticBackdrop && this.live);
     const wasMode = this.mode;
     this.mode = mode;
+    this.RefreshCommandRoomPreview();
     if (mode === "title" || mode === "pause") {
       const title = Localize(MenuTextId("title"), MENU.title);
       this.el.titleMain.textContent = mode === "pause" ? T("menu.title.paused") : title;
@@ -782,6 +789,54 @@ export class MainMenu {
   }
 
   /** 每次打开时从 host 重建，切换之后的 on/off 绝不留在过期 DOM 快照里。 */
+  CommandRoomPreviewSelect(id) {
+    const select = document.createElement("select"); select.id = id;
+    select.setAttribute("aria-label", T("menu.debug.commandRoom.label"));
+    const preview = this.host.CommandRoomPreview?.();
+    const selected = preview?.stage ?? preview?.savedStage ?? 0;
+    for (const value of ["saved", ...COMMAND_ROOM_MAPS.map((_,stage)=>String(stage))]) {
+      const option = document.createElement("option"); option.value = value;
+      option.textContent = T(`menu.debug.commandRoom.${value === "saved" ? "saved" : "stage" + value}`);
+      option.selected = value === (selected == null ? "saved" : String(selected));
+      select.appendChild(option);
+    }
+    return select;
+  }
+  async RunCommandRoomPreview(value, note, controls) {
+    const buttons = [...controls.querySelectorAll("button,select")];
+    buttons.forEach(button=>{button.disabled=true;});
+    note.textContent = T("menu.debug.commandRoom.loading");
+    try { await this.host.PreviewCommandRoom(value); }
+    catch(error) { note.textContent=T("menu.debug.commandRoom.failed",{message:error.message}); }
+    finally { buttons.forEach(button=>{button.disabled=false;}); }
+  }
+  SetCommandRoomPreviewUi(hidden) {
+    this.commandRoomPreviewHidden = !!hidden;
+    this.root.classList.toggle("commandRoomPreviewHidden", !!hidden);
+    if (hidden && this.root.contains(document.activeElement)) document.activeElement.blur();
+  }
+  RefreshCommandRoomPreview() {
+    const bar = this.el.commandRoomPreview;
+    if (!bar) return;
+    const preview = this.host.CommandRoomPreview?.();
+    bar.hidden = !preview?.active || !this.live || this.mode !== "title";
+    bar.replaceChildren();
+    if (bar.hidden) return;
+    const heading = document.createElement("b"); heading.textContent=T("menu.debug.commandRoom.label");
+    const controls=document.createElement("div"); controls.className="mnDebugStageControls";
+    const select=this.CommandRoomPreviewSelect("commandRoomPreviewQuickStage");
+    const note=document.createElement("small"); note.setAttribute("role","status"); note.textContent=T("menu.debug.commandRoom.hint");
+    const Button=(id,callback)=>{
+      const button=document.createElement("button"); button.type="button"; button.className="mnDebugAdvance";
+      button.dataset.action="commandRoomPreview"+id[0].toUpperCase()+id.slice(1);
+      button.textContent=T(`menu.debug.commandRoom.${id}`); button.addEventListener("click",callback); return button;
+    };
+    const Move=delta=>this.RunCommandRoomPreview((preview.stage+delta+COMMAND_ROOM_MAPS.length)%COMMAND_ROOM_MAPS.length,note,controls);
+    select.addEventListener("change",()=>this.RunCommandRoomPreview(select.value,note,controls));
+    controls.append(Button("previous",()=>Move(-1)),select,Button("next",()=>Move(1)),
+      Button("clean",()=>this.SetCommandRoomPreviewUi(true)),Button("exit",()=>this.RunCommandRoomPreview("saved",note,controls)));
+    bar.append(heading,controls,note);
+  }
   BuildDebugOptions() {
     const values = this.host.DebugOptions?.() || {};
     const wrap = document.createElement("div");
@@ -790,6 +845,20 @@ export class MainMenu {
     intro.className = "mnDebugIntro";
     intro.textContent = T("menu.debug.intro");
     wrap.appendChild(intro);
+    if (this.host.PreviewCommandRoom) {
+      const row = document.createElement("div"); row.className = "mnDebugRow mnDebugStages";
+      const copy = document.createElement("label"); copy.className = "mnDebugCopy"; copy.htmlFor = "commandRoomPreviewStage";
+      const name = document.createElement("b"); name.textContent = T("menu.debug.commandRoom.label");
+      const note = document.createElement("small"); note.textContent = T(`menu.debug.commandRoom.${this.live ? "note" : "pauseNote"}`);
+      copy.append(name,note);
+      const controls = document.createElement("div"); controls.className = "mnDebugStageControls";
+      const select = this.CommandRoomPreviewSelect("commandRoomPreviewStage");
+      const button = document.createElement("button"); button.type = "button"; button.className = "mnDebugAdvance";
+      button.dataset.action = "commandRoomPreview"; button.textContent = T("menu.debug.commandRoom.preview");
+      select.disabled = button.disabled = !this.live;
+      button.addEventListener("click",()=>this.RunCommandRoomPreview(select.value,note,controls));
+      controls.append(select,button); row.append(copy,controls); wrap.appendChild(row);
+    }
     const stages = this.host.FirstLevelStages?.();
     if (stages?.length) {
       const row = document.createElement("div");
@@ -1073,6 +1142,13 @@ export class MainMenu {
     this.onKey = (event) => {
       // 设置窗口接管键盘时，不让 Enter / 方向键穿透到背后的菜单。
       if (!this.open || document.querySelector("body.edToolsOpen #edRoot:not(.off)")) return;
+      if (this.commandRoomPreviewHidden) {
+        if (event.key === "Escape" && !event.repeat) {
+          this.SetCommandRoomPreviewUi(false);
+          this.el.commandRoomPreview.querySelector('[data-action="commandRoomPreviewClean"]')?.focus();
+        }
+        event.preventDefault(); return;
+      }
       // 确认框在阵亡页之上时，Esc 也是「取消」，所以排在阵亡页吞 Esc 之前。
       if (this.confirmItem) { this.ConfirmKey(event); return; }
       if (this.mode === "failure" && (event.repeat || event.key === "Escape")) {
@@ -1120,6 +1196,8 @@ export class MainMenu {
     // 第一次点击解锁音频：没有用户手势时 AudioContext 是 suspended 的
     this.onClick = () => { if (this.open) this.host.Unlock?.(); };
     this.onNativeKey = event => {
+      if (event.target.tagName === "SELECT" && event.key.startsWith("Arrow")
+        && event.target.id.startsWith("commandRoomPreview")) event.stopPropagation();
       // 确认框的按钮也交给 onKey：它要挡住 Enter 连发，原生 click 挡不住。
       if ((event.key === " " || event.key === "Enter") && event.target.closest?.("button, input, select, textarea")
         && !event.target.closest(".mnItem, .mnLevel, .mnConfirmItem")) event.stopPropagation();
@@ -1130,6 +1208,7 @@ export class MainMenu {
     this.root.addEventListener("keydown", this.onNativeKey);
     this.onTab = event => {
       if (event.key !== "Tab" || !this.open || document.querySelector("body.edToolsOpen #edRoot:not(.off)")) return;
+      if (this.commandRoomPreviewHidden) { event.preventDefault(); return; }
       event.stopPropagation();
       // 确认框开着：Tab 只在它的两颗按钮之间转，不落回背后的列表。
       if (this.confirmItem) {

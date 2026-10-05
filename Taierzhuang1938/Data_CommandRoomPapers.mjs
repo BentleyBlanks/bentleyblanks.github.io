@@ -22,3 +22,13 @@ export function CommandRoomPapers(progress = {}) {
 export function CommandRoomPaperUrl(name) {
   return `./Texture/Menu/CommandRoom/Texture_${name}Image.webp?v=${COMMAND_ROOM_PAPER_VERSION}`;
 }
+
+/** Preview uses the same chapter prefix as actual saves, without writing storage. */
+export function CommandRoomPreviewStage(value) {
+  if (value === null || value === "saved") return null;
+  if (typeof value === "string" && /^[0-6]$/.test(value)) value = Number(value);
+  if (!Number.isInteger(value) || value < 0 || value >= COMMAND_ROOM_MAPS.length) {
+    throw new RangeError("Command room preview stage must be 0..6, null or saved");
+  }
+  return value;
+}

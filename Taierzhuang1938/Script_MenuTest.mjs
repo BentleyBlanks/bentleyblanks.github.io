@@ -57,7 +57,7 @@ try {
   Check("入口 HTML 是有效 UTF-8", false, String(error));
 }
 
-const Url = (query = "") => `http://127.0.0.1:${port}/Taierzhuang1938/?quality=${process.argv.includes("--papers-only") ? "high" : "medium"}&scale=small${query}`;
+const Url = (query = "") => `http://127.0.0.1:${port}/Taierzhuang1938/${process.argv.includes("--bundle") ? "_check_Bundle.html" : ""}?quality=${process.argv.includes("--papers-only") ? "high" : "medium"}&scale=small${query}`;
 
 // Explicit lethal-hit fixture, not campaign or balance evidence.
 if(process.argv.includes("--p012-retry-only") || process.argv.includes("--p012-voice-only") || process.argv.includes("--p012-enemy-bound-only") || process.argv.includes("--p012-approval-only") || process.argv.includes("--p012-grenade-only") || process.argv.includes("--p012-salvage-only")){
@@ -581,6 +581,66 @@ if(process.argv.includes('--papers-only')) {
       Check("重返主菜单更新纸图 "+stage,papers.map===COMMAND_ROOM_MAPS[stage]&&papers.letter===COMMAND_ROOM_LETTERS[0]);
       await page.screenshot({path:path.join(outDir,`Scene_CommandRoomSavedProgress${stage}.png`)});
     }
+    const saveBefore=await page.evaluate(()=>localStorage.getItem("tengxian1938_progress_v3"));
+    await page.click('.mnItem[data-act="settings"]');
+    await page.click('.mnSettingsItem[data-setting="debug"]');
+    Check("调试面板提供实际进度和七种战局",await page.locator('#commandRoomPreviewStage option').count()===8);
+    await page.selectOption('#commandRoomPreviewStage','5');
+    await page.click('[data-action="commandRoomPreview"]');
+    await page.waitForFunction(()=>window.Taierzhuang.Debug.CommandRoom().papers.stage===5&&window.Taierzhuang.menu.mode==='title');
+    Check("预览按钮回到主菜单并显示切换工具",await page.locator('.mnCommandRoomPreview').isVisible());
+    await page.screenshot({path:path.join(outDir,'Scene_CommandRoomPreviewControls.png')});
+    await page.click('[data-action="commandRoomPreviewNext"]');
+    await page.waitForFunction(()=>window.Taierzhuang.Debug.CommandRoom().papers.stage===6);
+    await page.click('[data-action="commandRoomPreviewClean"]');
+    Check("纯画面隐藏全部菜单且仍绘制场景",await page.evaluate(()=>window.Taierzhuang.Debug.CommandRoomPreview().hideUi
+      &&getComputedStyle(document.querySelector('.mnTitle')).visibility==='hidden'&&window.Taierzhuang.Debug.CommandRoom().frames>0));
+    await page.screenshot({path:path.join(outDir,'Scene_CommandRoomPreviewClean.png')});
+    await page.keyboard.press('Escape');
+    Check("Esc 恢复预览控件",await page.locator('.mnCommandRoomPreview').isVisible());
+    for(let stage=0;stage<7;stage++){
+      const result=await page.evaluate(stage=>window.Taierzhuang.Debug.PreviewCommandRoom(stage),stage);
+      Check("agent 可等待实际换图完成 "+stage,result.stage===stage&&result.papers.map===COMMAND_ROOM_MAPS[stage]);
+    }
+    const invalid=await page.evaluate(async()=>{
+      let rejected=0;for(const value of [-1,7,1.5,'all'])try{await window.Taierzhuang.Debug.PreviewCommandRoom(value);}catch{rejected++;}
+      return {rejected,state:window.Taierzhuang.Debug.CommandRoomPreview()};
+    });
+    Check("无效预览编号被拒绝并保持当前图",invalid.rejected===4&&invalid.state.stage===6);
+    const race=await page.evaluate(async()=>{
+      await Promise.all([window.Taierzhuang.Debug.PreviewCommandRoom(3,{hideUi:true}),window.Taierzhuang.Debug.PreviewCommandRoom(4)]);
+      return window.Taierzhuang.Debug.CommandRoomPreview();
+    });
+    Check("并发预览以最后请求为准",race.stage===4&&race.papers.stage===4&&!race.hideUi);
+    await page.setViewportSize({width:390,height:844});
+    const bar=await page.locator('.mnCommandRoomPreview').boundingBox();
+    Check("窄屏预览工具完整位于视口",bar.x>=0&&bar.x+bar.width<=391&&bar.y>=0&&bar.y+bar.height<=845,JSON.stringify(bar));
+    Check("窄屏预览按钮与选择框均无横向溢出",await page.locator('.mnCommandRoomPreview').evaluate(el=>[...el.querySelectorAll('button,select')].every(control=>{
+      const r=control.getBoundingClientRect();return r.x>=0&&r.right<=innerWidth&&r.bottom<=innerHeight;
+    })));
+    await page.screenshot({path:path.join(outDir,'Scene_CommandRoomPreviewMobile.png')});
+    await page.click('[data-action="commandRoomPreviewExit"]');
+    await page.waitForFunction(()=>!window.Taierzhuang.Debug.CommandRoomPreview().active);
+    Check("结束预览恢复实际进度",(await page.evaluate(()=>window.Taierzhuang.Debug.CommandRoom().papers.stage))===0);
+    Check("预览全过程不写通关存档",await page.evaluate(()=>localStorage.getItem("tengxian1938_progress_v3"))===saveBefore);
+    await page.setViewportSize({width:1600,height:900});
+    const beforeUrl=paperRequests.length;
+    await Boot('&menuPreview=2&menuPreviewUi=0');
+    const linked=await page.evaluate(()=>window.Taierzhuang.Debug.CommandRoomPreview());
+    Check("直达链接仅加载所选一图一信并支持纯画面",linked.stage===2&&linked.papers.stage===2&&linked.hideUi&&paperRequests.length-beforeUrl===2);
+    await page.keyboard.press('Escape');
+    const restored=await page.evaluate(()=>window.Taierzhuang.Debug.PreviewCommandRoom(null));
+    Check("URL 预览退出仍恢复真实终章存档",!restored.active&&restored.papers.stage===6);
+    Check("结束预览移除直达参数",!new URL(page.url()).searchParams.has('menuPreview')&&!new URL(page.url()).searchParams.has('menuPreviewUi'));
+    await page.evaluate(async()=>{
+      const url=new URL(location.href);url.searchParams.set('menuPreview','3');url.searchParams.set('menuPreviewUi','0');history.replaceState(null,'',url);
+      await window.Taierzhuang.Debug.PreviewCommandRoom(3);
+    });
+    // Navigation-only fixture: verify generated gameplay URL without starting a new campaign.
+    await page.route('**/*whitebox=p012*',route=>route.fulfill({contentType:'text/html',body:'<title>Preview navigation fixture</title>'}));
+    await page.click('.mnItem[data-act="start"]');
+    await page.waitForURL(url=>url.searchParams.get('whitebox')==='p012');
+    Check("开始游戏不会携带纸图预览参数",!new URL(page.url()).searchParams.has('menuPreview')&&!new URL(page.url()).searchParams.has('menuPreviewUi'));
     Check("纸图切换无浏览器错误",problems.length===0,problems.join(';'));
   } finally {await browser.close();server.close();}
   process.exit(failed?1:0);
