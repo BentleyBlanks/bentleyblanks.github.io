@@ -4,9 +4,8 @@
 // 左下角是「史料摘录 | 《报名》 日期」加一句简述。玩家在等的这段时间读到的是这一仗之前
 // 的世道：卢沟桥、淞沪、南京、鲁南，一期一句。
 //
-// 为什么是一张静图而不是原来那台能转的道具展示台：展示台要起 worker、拉一件 TZM 模型、
-// 起一台小 WebGLRenderer，加载最忙的那几秒它自己就在争主线程与显存；一张 ~200 KB 的 webp
-// 什么都不争，只在开机时按需拉一张（其余十九张一个字节都不下）。
+// 原图先显示；对应 Normal / RoughnessMask 就绪后用 Worker 中的单 quad 叠上轻微纸面受光。
+// 每次只下载抽中的一期；静止不重绘，隐藏即终止 Worker 释放 GL。失败保留原图与文字。
 //
 // 每次开机随机换一张，不与上一次重复（localStorage，读写都包 try：隐私模式会抛，抛了就当没有上一次）。
 // **可以拖着倾斜**：按住鼠标 / 手指拖，纸在小范围里转（偏航 ±40°、俯仰 ±26°，不是翻面），松手缓缓回正。
@@ -15,6 +14,7 @@
 
 import { ApplyTiltDrag, BOOT_PAPER_STORAGE_KEY, BOOT_PAPER_TILT, BootPaperUrl, PickBootPaper } from "./Data_BootPapers.mjs";
 import { T } from "./Script_Text.mjs";
+import { BootPaperSurface } from "./Script_BootPaperSurface.mjs";
 
 const Key = (paper, field) => `boot.paper.${paper.id}.${field}`;
 
@@ -50,7 +50,7 @@ export class BootPaper {
     this.current = null;
     this.shown = false;
     this.token = 0;
-    this.wrap = els.wrap ?? els.img.parentElement;
+    this.wrap = els.wrap ?? els.img.closest("#bootPaperWrap") ?? els.img.parentElement;
     this.tilt = { yaw: 0, pitch: 0 };
     this.pointerId = null;
     this.idleWaiters = new Set();
@@ -60,18 +60,21 @@ export class BootPaper {
   }
 
   BindDrag(wrap) {
+    this.dragEvents = new AbortController();
+    const Listen = (target, type, handler) => target.addEventListener(type, handler, { signal: this.dragEvents.signal });
     wrap.style.setProperty("--bootPaperPerspective", `${BOOT_PAPER_TILT.perspectivePx}px`);
     wrap.style.setProperty("--bootPaperReturn", `${BOOT_PAPER_TILT.returnSeconds}s`);
-    wrap.addEventListener("pointerdown", (event) => {
+    Listen(wrap, "pointerdown", (event) => {
       if (event.button !== 0 || this.pointerId !== null || !this.shown) return;
       this.pointerId = event.pointerId;
       this.lastX = event.clientX;
       this.lastY = event.clientY;
       wrap.classList.add("dragging");
+      this.surface?.SetTilt(this.tilt);
       // 抓不到指针（指针已被别处接走 / 合成事件）不算错：少了捕获只是拖出纸外时收不到 move。
       try { wrap.setPointerCapture?.(event.pointerId); } catch { /* ignore */ }
     });
-    wrap.addEventListener("pointermove", (event) => {
+    Listen(wrap, "pointermove", (event) => {
       if (event.pointerId !== this.pointerId) return;
       this.tilt = ApplyTiltDrag(this.tilt, event.clientX - this.lastX, event.clientY - this.lastY);
       this.lastX = event.clientX;
@@ -82,18 +85,18 @@ export class BootPaper {
       if (event.pointerId !== this.pointerId) return;
       this.ReleaseDrag();
     };
-    wrap.addEventListener("pointerup", release);
-    wrap.addEventListener("pointercancel", release);
-    wrap.addEventListener("lostpointercapture", release);
+    Listen(wrap, "pointerup", release);
+    Listen(wrap, "pointercancel", release);
+    Listen(wrap, "lostpointercapture", release);
     // Capture can fail on an interrupted gesture; a release outside the paper
     // must still unblock loading.
     this.onRelease = release;
-    window.addEventListener("pointerup", release);
-    window.addEventListener("pointercancel", release);
+    Listen(window, "pointerup", release);
+    Listen(window, "pointercancel", release);
     this.onBlur = () => this.ReleaseDrag();
     this.onVisibility = () => { if (document.hidden) this.ReleaseDrag(); };
-    window.addEventListener("blur", this.onBlur);
-    document.addEventListener("visibilitychange", this.onVisibility);
+    Listen(window, "blur", this.onBlur);
+    Listen(document, "visibilitychange", this.onVisibility);
   }
 
   /** Loading resumes on release, cancellation, loss of focus or Hide; never leave it held. */
@@ -108,14 +111,15 @@ export class BootPaper {
     try { if (id !== null) this.wrap?.releasePointerCapture?.(id); } catch { /* ignore */ }
     this.wrap?.classList.remove("dragging");
     this.tilt = { yaw: 0, pitch: 0 };
-    if (this.wrap) this.ApplyTilt();
+    if (this.wrap) this.ApplyTilt(true);
     for (const resolve of this.idleWaiters) resolve();
     this.idleWaiters.clear();
   }
 
-  ApplyTilt() {
+  ApplyTilt(returning = false) {
     this.wrap.style.setProperty("--bootPaperYaw", `${this.tilt.yaw.toFixed(2)}deg`);
     this.wrap.style.setProperty("--bootPaperPitch", `${this.tilt.pitch.toFixed(2)}deg`);
+    this.surface?.SetTilt(this.tilt, returning);
   }
 
   /** 露面：换一张、写字、淡入。已经亮着就不再换（同一次加载里纸不许来回变）。 */
@@ -132,13 +136,20 @@ export class BootPaper {
     img.alt = T("boot.paper.alt", { name: T(Key(paper, "name")), date: T(Key(paper, "date")) });
     img.src = BootPaperUrl(paper);
     // decode 完再淡入：避免图一行行刷出来。decode 失败（图丢了）就保持隐藏，字照常。
-    const reveal = () => { if (token === this.token && this.shown) img.classList.add("on"); };
+    const reveal = () => {
+      if (token !== this.token || !this.shown) return;
+      img.classList.add("on");
+      this.surface?.Dispose();
+      this.surface = new BootPaperSurface(img, paper, this.tilt);
+    };
     if (typeof img.decode === "function") img.decode().then(reveal, () => {});
     else img.addEventListener("load", reveal, { once: true });
   }
 
   Hide() {
     this.shown = false;
+    this.surface?.Dispose();
+    this.surface = null;
     this.ReleaseDrag();
     this.token++;
     this.img.classList.remove("on");
@@ -163,6 +174,7 @@ export class BootPaper {
 
   Dispose() {
     this.Hide();
+    this.dragEvents?.abort();
     window.removeEventListener("blur", this.onBlur);
     window.removeEventListener("pointerup", this.onRelease);
     window.removeEventListener("pointercancel", this.onRelease);

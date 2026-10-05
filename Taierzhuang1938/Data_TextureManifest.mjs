@@ -94,7 +94,8 @@ export const TEXTURE_BUDGETS = Object.freeze({
     "level:FirstLevel": 12 * 1024 * 1024,
     fx: 6.5 * 1024 * 1024,
     // ui：2026-09-30 加载画面报纸剪报 11 张 ~2 MB 入库，玩家每次开机只下其中 1 张（~0.2 MB），所以整层上限抬到 5.5 MB。
-    ui: 5.5 * 1024 * 1024,
+    // 2026-10-06: 11 matched PBR pairs total 2.28 MiB; only one pair per boot.
+    ui: 7.5 * 1024 * 1024,
     // Dedicated command-room set adds 2.5 MB: three PBR sets and two legible print props.
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
@@ -102,7 +103,7 @@ export const TEXTURE_BUDGETS = Object.freeze({
     lazy: 14 * 1024 * 1024, // Also includes lossless command-room irradiance.
     editor: 0.25 * 1024 * 1024,
   }),
-  totalBytes: 58 * 1024 * 1024,      // Texture/ 全目录；本轮十张按进度加载的纸图增加 4 MB 预算。
+  totalBytes: 61 * 1024 * 1024,      // Includes 2.28 MiB of paper data maps; one pair (187–318 KiB) per boot.
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -1143,6 +1144,163 @@ export const TEXTURE_MANIFEST = Object.freeze([
       ["Menu/Texture_MissionCh5Chengqiang.webp", "Image", 1672, 941],
       ["Menu/Texture_MissionCh6Zuihou.webp", "Image", 1672, 941],
     ],
+  },
+  {
+    "id": "BootPaperPbr",
+    "kind": "menu",
+    "tier": "ui",
+    "normalConvention": "gl",
+    "metersPerTile": null,
+    "packing": "Normal RGB tangent OpenGL +Y; RoughnessMask RGB scalar roughness, A paper coverage; linear data.",
+    "source": {
+      "provider": "imagegen",
+      "date": "2026-10-06",
+      "ref": "One normal source per paper; original printing unchanged",
+      "prompt": "_import/Prompts/Texture_BootPaperPbr.txt"
+    },
+    "bake": "_import/Script_BakeBootPaperPbr.mjs",
+    "bakeRecord": "_import/TextureBakes/Data_BootPaperPbr.json",
+    "consumers": [
+      {
+        "file": "Data_BootPapers.mjs",
+        "token": "RoughnessMask"
+      }
+    ],
+    "note": "UV-aligned UI data maps; dedicated bake avoids tiling and color grading. Worker only fetches the selected pair (187-318 KiB).",
+    "files": [
+      [
+        "Menu/BootPaper/Texture_BootPaperLiBao19370709Normal.webp",
+        "Normal",
+        489,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperLiBao19370709RoughnessMask.webp",
+        "Mask",
+        489,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperShenBao19370731Normal.webp",
+        "Normal",
+        344,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperShenBao19370731RoughnessMask.webp",
+        "Mask",
+        344,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperWenHui19380125Normal.webp",
+        "Normal",
+        512,
+        351
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperWenHui19380125RoughnessMask.webp",
+        "Mask",
+        512,
+        351
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370820Normal.webp",
+        "Normal",
+        335,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370820RoughnessMask.webp",
+        "Mask",
+        335,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370906Normal.webp",
+        "Normal",
+        512,
+        374
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370906RoughnessMask.webp",
+        "Mask",
+        512,
+        374
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370911Normal.webp",
+        "Normal",
+        344,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370911RoughnessMask.webp",
+        "Mask",
+        344,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371001Normal.webp",
+        "Normal",
+        335,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371001RoughnessMask.webp",
+        "Mask",
+        335,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371106Normal.webp",
+        "Normal",
+        344,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371106RoughnessMask.webp",
+        "Mask",
+        344,
+        512
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371111Normal.webp",
+        "Normal",
+        512,
+        360
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371111RoughnessMask.webp",
+        "Mask",
+        512,
+        360
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperJiuGuoShiBao19371220Normal.webp",
+        "Normal",
+        512,
+        351
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperJiuGuoShiBao19371220RoughnessMask.webp",
+        "Mask",
+        512,
+        351
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperChinaWeeklyReview19371106Normal.webp",
+        "Normal",
+        512,
+        360
+      ],
+      [
+        "Menu/BootPaper/Texture_BootPaperChinaWeeklyReview19371106RoughnessMask.webp",
+        "Mask",
+        512,
+        360
+      ]
+    ]
   },
   {
     id: "BootPaper", kind: "menu", tier: "ui",

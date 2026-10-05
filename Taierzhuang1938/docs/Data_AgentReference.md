@@ -79,6 +79,7 @@ node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --pixel=x,y --pass-im
 ### 引导 / 主循环
 - `Script_Main.mjs` —— 装配层：启动顺序、关卡流程、每帧调度、输入接线。
   **任何规则不许写在这里**——规则在 Script_Ai / Script_Player / Script_Story / Data_*。
+- 2026-10-06 加载报纸新增 11 套独立 Normal / RoughnessMask，后台 PBR、按期加载、失败保留原图；入口与烘焙/验证见 [加载报纸材质](Data_BootPaperPbr.md)。
 - `Script_BootPaper` / `Data_BootPapers` —— 加载画面的战前报纸剪报（每次开机随机一张，左下角史料摘录）。拖拽期间加载链在 `NextFrame` 边界让出主线程，松手 / 取消 / 失焦 / 隐藏后继续；下载和已提交的 GPU 编译仍可进行。`MaterialLibrary.PrepareStepsAsync` 通过 `Script_TextureBaker` 单 Worker 烘焙，传回原始字节后沿用同步接口的贴图设置，完成后销毁 Worker；不可用时保留同步退路。东关按院落分段构建。验收 `Script_BootInteractionTest`：真实加载中鼠标拖动帧间隔与输入延迟、Worker 字节一致性、失焦恢复和加载完成，截图 / 指标只写忽略目录 `tmp/BootPaper/`。
 - 先读：`docs/Data_TengxianIntegration.md`（模块契约与推定值索引）。
 

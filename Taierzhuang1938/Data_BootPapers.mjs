@@ -21,6 +21,19 @@ export const BOOT_PAPER_DIR = "./Texture/Menu/BootPaper/";
 /** 图的缓存戳。换图时改这里（贴图不进 import map）。 */
 export const BOOT_PAPER_STAMP = "20261002050000";
 
+/** Matched, linear data maps; only the selected paper's pair is requested. */
+export const BOOT_PAPER_PBR_STAMP = "2026100601";
+export const BOOT_PAPER_PBR = Object.freeze({
+  normalScale: 0.85,
+  maxCanvasEdge: 1400,
+  maxPixelRatio: 1.5,
+  loadTimeoutMs: 15000,
+  ambient: 0.38,
+  direct: 0.85,
+  specular: 0.32,
+  light: Object.freeze([-0.55, 0.65, 0.82]),
+});
+
 export const BOOT_PAPERS = Object.freeze([
   Object.freeze({ id: "LiBao19370709", file: "Texture_BootPaperLiBao19370709.webp" }),
   Object.freeze({ id: "ShenBao19370731", file: "Texture_BootPaperShenBao19370731.webp" }),
@@ -61,6 +74,15 @@ export function PickBootPaper(lastId = null, rand = Math.random) {
 
 export function BootPaperUrl(paper) {
   return `${BOOT_PAPER_DIR}${paper.file}?v=${BOOT_PAPER_STAMP}`;
+}
+
+export function BootPaperPbrUrls(paper) {
+  const stem = `${BOOT_PAPER_DIR}Texture_BootPaper${paper.id}`;
+  return {
+    base: BootPaperUrl(paper),
+    normal: `${stem}Normal.webp?v=${BOOT_PAPER_PBR_STAMP}`,
+    roughness: `${stem}RoughnessMask.webp?v=${BOOT_PAPER_PBR_STAMP}`,
+  };
 }
 
 /**

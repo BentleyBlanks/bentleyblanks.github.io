@@ -1,0 +1,25 @@
+Built-in imagegen, 2026-10-06. One separate call per BOOT_PAPERS entry.
+Each existing Texture_BootPaper<id>.webp is an alignment reference only.
+The original printed image is unchanged. No generated text is used.
+
+Use case: precise-object-edit. Asset type: tangent-space OpenGL (+Y) NORMAL MAP for a newspaper PBR material, NOT a photograph. Input image is the alignment reference only. Produce one RGB normal map for the exact same image UV coordinates and aspect ratio, preserve the paper outline position and center fold location, do not crop or shift. Remove ALL printed letters, headlines, pictures and ink from the surface relief. Treat printing as perfectly flat ink. Represent only subtle, shallow natural paper wrinkles, a gentle existing central fold, small irregular diagonal handling creases near edges and fine paper fibers. Mostly neutral lavender RGB(128,128,255); very subdued cyan/magenta gradients around folds; never dramatic crumpling or deep damage. Outside the paper use neutral (128,128,255), NOT black. No lighting, shadows, albedo, labels, borders, text, legend or split panels. Output only the usable normal texture, preserving the full reference canvas.
+
+Postprocess: Script_BakeBootPaperPbr.mjs normalizes the vectors, reduces
+strength and exports linear lossless WebP Normal plus RoughnessMask.
+RGB of RoughnessMask = scalar roughness (0.76-0.94); A = paper coverage.
+The matte roughness is deterministically derived from normal slope and
+fiber variation, never from printed text brightness. The source image
+is used only to flood-fill exterior black pixels for coverage.
+
+Generated source provenance:
+LiBao19370709: exec-48d1474f-8422-4be8-9b6b-45f089ba6e10.png
+ShenBao19370731: exec-8e90b48c-fca9-4be1-b2c0-9c2fbcc5fdd8.png
+WenHui19380125: exec-e2fb7247-29c1-42c1-9a56-b21d8cf5ab10.png
+ZhanShiHuaKan19370820: exec-22d8f16c-8f9a-4b34-85a6-a872ff1e24b5.png
+ZhanShiHuaKan19370906: exec-b24d47b6-021e-4a45-984f-d7da4dad6a66.png
+ZhanShiHuaKan19370911: exec-a79f0f64-a4a0-446d-9dbb-0f6638e4a20d.png
+ZhanShiHuaKan19371001: exec-00c5ca0d-4a37-4293-892e-c20180415cd6.png
+ZhanShiHuaKan19371106: exec-a82d36d8-84f5-4b7e-9495-16c862dc5be2.png
+ZhanShiHuaKan19371111: exec-79ae023d-e3cc-4b92-863e-81dccdf09b8e.png
+JiuGuoShiBao19371220: exec-45ccfb53-1a25-45c8-bf2c-4af528c2e5e7.png
+ChinaWeeklyReview19371106: exec-12213353-2a36-4f2c-b5df-9931f04344d7.png

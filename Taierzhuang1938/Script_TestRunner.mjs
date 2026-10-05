@@ -374,6 +374,7 @@ export const testDefs = {
   DeathMenuTest: { file: "Script_DeathMenuTest.mjs", desc: "阵亡独立状态与检查点恢复" },
   BootPaperTest: { file: "Script_BootPaperTest.mjs", desc: "加载画面报纸剪报：清单 / 图 / 文本 / 贴图清单对齐" },
   BootInteractionTest: { file: "Script_BootInteractionTest.mjs", timeoutMs: 300000, desc: "Loading drag latency, worker texture parity and cancellation recovery" },
+  BootPaperPbrTest: { file: "Script_BootPaperPbrTest.mjs", timeoutMs: 180000, desc: "All paper PBR maps, real Worker shading, lazy loading, fallback and disposal" },
   // 现有套件已扩到 160 项，含音频试听、完整县城/车厢切换与三套 PBR 截图；
   // 实机约 12—14 分钟，继续吃 10 分钟默认值会在末段稳定误报 timeout。
   EditorTest: { file: "Script_EditorTest.mjs", timeoutMs: 16 * 60 * 1000,
@@ -453,6 +454,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "BootPaperPbrTest",
   "TextureManagerBrowserTest",
   "FrameDebuggerTest",
   "WhiteboxQualityBrowserTest",
@@ -709,7 +711,7 @@ export const domains = {
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
-  menu: { label: "主菜单/加载画面", tests: ["FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPreviewTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootInteractionTest"] },
+  menu: { label: "主菜单/加载画面", tests: ["FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPreviewTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootPaperPbrTest", "BootInteractionTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",

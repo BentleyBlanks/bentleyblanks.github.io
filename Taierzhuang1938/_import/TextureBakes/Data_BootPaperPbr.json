@@ -1,0 +1,578 @@
+{
+  "version": 1,
+  "date": "2026-10-06",
+  "normalConvention": "OpenGL +Y",
+  "colorSpace": "linear",
+  "packing": "Normal RGB unit vectors; RoughnessMask RGB roughness, A sheet coverage",
+  "params": {
+    "normalConvention": "gl"
+  },
+  "metrics": {},
+  "outputs": [
+    {
+      "file": "Texture_BootPaperLiBao19370709Normal.webp",
+      "width": 489,
+      "height": 512,
+      "bytes": 267128,
+      "sha256": "f8d72d1d72d51c79afb48c4ae83eae70dab80f21982534c9aefe44f41bd580be"
+    },
+    {
+      "file": "Texture_BootPaperLiBao19370709RoughnessMask.webp",
+      "width": 489,
+      "height": 512,
+      "bytes": 58308,
+      "sha256": "f5afea6c28febb6deba1d3ac93532186fefba467545e75dc34167d48b3282ea2"
+    },
+    {
+      "file": "Texture_BootPaperShenBao19370731Normal.webp",
+      "width": 344,
+      "height": 512,
+      "bytes": 164830,
+      "sha256": "dbce83eb3e3c1a6be6a6ac0341b73a1206b39b38c3b9d90177599f116e63e671"
+    },
+    {
+      "file": "Texture_BootPaperShenBao19370731RoughnessMask.webp",
+      "width": 344,
+      "height": 512,
+      "bytes": 26298,
+      "sha256": "5ab13df8e249126dc50976b35db237b79e532760c268972edb39a934f362ecaf"
+    },
+    {
+      "file": "Texture_BootPaperWenHui19380125Normal.webp",
+      "width": 512,
+      "height": 351,
+      "bytes": 175190,
+      "sha256": "93165d70d94f44728c849edd83691d494fcfadbe2a2ff1db80045a3a6e3a6034"
+    },
+    {
+      "file": "Texture_BootPaperWenHui19380125RoughnessMask.webp",
+      "width": 512,
+      "height": 351,
+      "bytes": 33246,
+      "sha256": "17720e3c58cace7528a6853b97ac0c81e05459e89a5a8c253a9c7e02925d8bae"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19370820Normal.webp",
+      "width": 335,
+      "height": 512,
+      "bytes": 180792,
+      "sha256": "bc3b913c1d10a5a0cd6ab5a7ad1bc2c5265c376802624af1faba757bee4a777f"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19370820RoughnessMask.webp",
+      "width": 335,
+      "height": 512,
+      "bytes": 36498,
+      "sha256": "243231dee24a678c148976331eea4fc5226586143649f1c3c07b9b49f1765397"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19370906Normal.webp",
+      "width": 512,
+      "height": 374,
+      "bytes": 182496,
+      "sha256": "edd7b824e4296c497a5767429e855b73c901be6d561c2b804d91d0688e6bcea9"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19370906RoughnessMask.webp",
+      "width": 512,
+      "height": 374,
+      "bytes": 37012,
+      "sha256": "a8fd96374da1692c7c0c5503b2586e0afca3c234a775a33edc23566363703fe5"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19370911Normal.webp",
+      "width": 344,
+      "height": 512,
+      "bytes": 171144,
+      "sha256": "bbd1e5baa48d74b6e5a055fe50473c86dfe659616a355c550bce2f6c9e1410c8"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19370911RoughnessMask.webp",
+      "width": 344,
+      "height": 512,
+      "bytes": 32700,
+      "sha256": "90d5d72e199ea0af7fef1d4bd1b10bad7b4822038b64bb70063d4d68be2ac5b9"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19371001Normal.webp",
+      "width": 335,
+      "height": 512,
+      "bytes": 170596,
+      "sha256": "ecfa070a2ebce633a163bef5d271f9648e68bc5ac0d350d8dce488b3a2686e0c"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19371001RoughnessMask.webp",
+      "width": 335,
+      "height": 512,
+      "bytes": 35066,
+      "sha256": "007c5c445fd9d3e2b2f992e05de7b7016db80012d0a13595811d5e3c171dbd35"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19371106Normal.webp",
+      "width": 344,
+      "height": 512,
+      "bytes": 169566,
+      "sha256": "1654e852ece3c491e1e3cea51aca7535c2dded9d1f001b99e089784e95a9684e"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19371106RoughnessMask.webp",
+      "width": 344,
+      "height": 512,
+      "bytes": 33296,
+      "sha256": "1c255a045ef55c2d65193a9cc4ece1148f4ac005af07628f06a8f794c10d6ec3"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19371111Normal.webp",
+      "width": 512,
+      "height": 360,
+      "bytes": 165602,
+      "sha256": "48be6068c992caba49f071930c33ca40d3944429841fa09ba7849a1b29a01d12"
+    },
+    {
+      "file": "Texture_BootPaperZhanShiHuaKan19371111RoughnessMask.webp",
+      "width": 512,
+      "height": 360,
+      "bytes": 31048,
+      "sha256": "2df91f04aca83e00637cae80063b3819baafbca5e4492e79567246ac6a30ce01"
+    },
+    {
+      "file": "Texture_BootPaperJiuGuoShiBao19371220Normal.webp",
+      "width": 512,
+      "height": 351,
+      "bytes": 175004,
+      "sha256": "345895aa483ec1559087d2831278c111fd9d9b4159c0a21ea3b505b61ddcbca9"
+    },
+    {
+      "file": "Texture_BootPaperJiuGuoShiBao19371220RoughnessMask.webp",
+      "width": 512,
+      "height": 351,
+      "bytes": 32938,
+      "sha256": "ab255f0e21058ed6cf8761311ea8877a8cfda617dfa1aab4c702d1272c519fe5"
+    },
+    {
+      "file": "Texture_BootPaperChinaWeeklyReview19371106Normal.webp",
+      "width": 512,
+      "height": 360,
+      "bytes": 173714,
+      "sha256": "f8f9469b275c54aea315e5cad86d8b88410557b03d80fd57dd0304aafffc8d4d"
+    },
+    {
+      "file": "Texture_BootPaperChinaWeeklyReview19371106RoughnessMask.webp",
+      "width": 512,
+      "height": 360,
+      "bytes": 33950,
+      "sha256": "d4630f6febc315b6c24dd9cdf9557266cc840b6ec925689c3972d8aedf887035"
+    }
+  ],
+  "records": [
+    {
+      "id": "LiBao19370709",
+      "sourceHash": "3c9552c5bcc665dc7e5e71c1d1c38365eaf36f8eee9a637d9a3c72cd5ea56c1e",
+      "baseHash": "1ac0a7bf2e3b5e1f6858af92f5596e6a91c3d87bffa166e21c79d276bf09aefa",
+      "roughnessRange": [
+        0.7607843137254902,
+        0.8705882352941177
+      ],
+      "outputs": [
+        {
+          "file": "Texture_BootPaperLiBao19370709Normal.webp",
+          "width": 489,
+          "height": 512,
+          "bytes": 267128,
+          "sha256": "f8d72d1d72d51c79afb48c4ae83eae70dab80f21982534c9aefe44f41bd580be"
+        },
+        {
+          "file": "Texture_BootPaperLiBao19370709RoughnessMask.webp",
+          "width": 489,
+          "height": 512,
+          "bytes": 58308,
+          "sha256": "f5afea6c28febb6deba1d3ac93532186fefba467545e75dc34167d48b3282ea2"
+        }
+      ]
+    },
+    {
+      "id": "ShenBao19370731",
+      "sourceHash": "f58b63998d957b2e8d5eb41e1a968fe85de22d4d24b7df77971df7a8448fa5a6",
+      "baseHash": "b6331fa01f0d8e359ab04acd7f1f72ebbe9307127a8e02053c59c4dfdf12579f",
+      "roughnessRange": [
+        0.7607843137254902,
+        0.8705882352941177
+      ],
+      "outputs": [
+        {
+          "file": "Texture_BootPaperShenBao19370731Normal.webp",
+          "width": 344,
+          "height": 512,
+          "bytes": 164830,
+          "sha256": "dbce83eb3e3c1a6be6a6ac0341b73a1206b39b38c3b9d90177599f116e63e671"
+        },
+        {
+          "file": "Texture_BootPaperShenBao19370731RoughnessMask.webp",
+          "width": 344,
+          "height": 512,
+          "bytes": 26298,
+          "sha256": "5ab13df8e249126dc50976b35db237b79e532760c268972edb39a934f362ecaf"
+        }
+      ]
+    },
+    {
+      "id": "WenHui19380125",
+      "sourceHash": "f4236449eee9dea5a695b46fb905bca9fb9523558ab5b6629908636ac7aa5bca",
+      "baseHash": "d4601f770584013a35e2c9372682c6970a296ed30b3ac022d5ca6bb4265ebb67",
+      "roughnessRange": [
+        0.7607843137254902,
+        0.8705882352941177
+      ],
+      "outputs": [
+        {
+          "file": "Texture_BootPaperWenHui19380125Normal.webp",
+          "width": 512,
+          "height": 351,
+          "bytes": 175190,
+          "sha256": "93165d70d94f44728c849edd83691d494fcfadbe2a2ff1db80045a3a6e3a6034"
+        },
+        {
+          "file": "Texture_BootPaperWenHui19380125RoughnessMask.webp",
+          "width": 512,
+          "height": 351,
+          "bytes": 33246,
+          "sha256": "17720e3c58cace7528a6853b97ac0c81e05459e89a5a8c253a9c7e02925d8bae"
+        }
+      ]
+    },
+    {
+      "id": "ZhanShiHuaKan19370820",
+      "sourceHash": "98c4f11e2999a270639ad5720a112101e07e1c70a7f895d70c20ab07dac2e69a",
+      "baseHash": "183946aa18f04695aa568ae85df2f337819f437ec52fe4c21a3ef6099f8cb013",
+      "roughnessRange": [
+        0.7607843137254902,
+        0.8705882352941177
+      ],
+      "outputs": [
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19370820Normal.webp",
+          "width": 335,
+          "height": 512,
+          "bytes": 180792,
+          "sha256": "bc3b913c1d10a5a0cd6ab5a7ad1bc2c5265c376802624af1faba757bee4a777f"
+        },
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19370820RoughnessMask.webp",
+          "width": 335,
+          "height": 512,
+          "bytes": 36498,
+          "sha256": "243231dee24a678c148976331eea4fc5226586143649f1c3c07b9b49f1765397"
+        }
+      ]
+    },
+    {
+      "id": "ZhanShiHuaKan19370906",
+      "sourceHash": "13ca9e2b58c974ec5c1df43f97dcfc3bf55c21e7ecf72dd51716b8fe409cdaef",
+      "baseHash": "48fb585d1008ba5e703d0e12f5f57c9ce566a77c7a102f5b964cad6705d51366",
+      "roughnessRange": [
+        0.7607843137254902,
+        0.8705882352941177
+      ],
+      "outputs": [
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19370906Normal.webp",
+          "width": 512,
+          "height": 374,
+          "bytes": 182496,
+          "sha256": "edd7b824e4296c497a5767429e855b73c901be6d561c2b804d91d0688e6bcea9"
+        },
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19370906RoughnessMask.webp",
+          "width": 512,
+          "height": 374,
+          "bytes": 37012,
+          "sha256": "a8fd96374da1692c7c0c5503b2586e0afca3c234a775a33edc23566363703fe5"
+        }
+      ]
+    },
+    {
+      "id": "ZhanShiHuaKan19370911",
+      "sourceHash": "b3b5553083052746efc641fb97d20a3d5fe8ae4127ac52f35347d38c8d93d274",
+      "baseHash": "67b74b1dd6a66dc736dff842471a0e31c4a0e112fe6f32273e3dd05a79265fa6",
+      "roughnessRange": [
+        0.7607843137254902,
+        0.8705882352941177
+      ],
+      "outputs": [
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19370911Normal.webp",
+          "width": 344,
+          "height": 512,
+          "bytes": 171144,
+          "sha256": "bbd1e5baa48d74b6e5a055fe50473c86dfe659616a355c550bce2f6c9e1410c8"
+        },
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19370911RoughnessMask.webp",
+          "width": 344,
+          "height": 512,
+          "bytes": 32700,
+          "sha256": "90d5d72e199ea0af7fef1d4bd1b10bad7b4822038b64bb70063d4d68be2ac5b9"
+        }
+      ]
+    },
+    {
+      "id": "ZhanShiHuaKan19371001",
+      "sourceHash": "cb409b0c4d78bf63485275ffa61ec245dd78e9ea0e941da3e41b63554dc24f21",
+      "baseHash": "7f340c00a1481230bbeeb6facc4a552d8175f7c616e119ff6301140b43a57cc6",
+      "roughnessRange": [
+        0.7607843137254902,
+        0.8705882352941177
+      ],
+      "outputs": [
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19371001Normal.webp",
+          "width": 335,
+          "height": 512,
+          "bytes": 170596,
+          "sha256": "ecfa070a2ebce633a163bef5d271f9648e68bc5ac0d350d8dce488b3a2686e0c"
+        },
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19371001RoughnessMask.webp",
+          "width": 335,
+          "height": 512,
+          "bytes": 35066,
+          "sha256": "007c5c445fd9d3e2b2f992e05de7b7016db80012d0a13595811d5e3c171dbd35"
+        }
+      ]
+    },
+    {
+      "id": "ZhanShiHuaKan19371106",
+      "sourceHash": "549bc4f55d7acc0ea54aedd3cbfb53209991350adc84ff5874a61367b4cf978c",
+      "baseHash": "600f951ce4a6fcfffa363c2805d2128376ac2d19cb2796f58bbb8835f4704364",
+      "roughnessRange": [
+        0.7607843137254902,
+        0.8705882352941177
+      ],
+      "outputs": [
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19371106Normal.webp",
+          "width": 344,
+          "height": 512,
+          "bytes": 169566,
+          "sha256": "1654e852ece3c491e1e3cea51aca7535c2dded9d1f001b99e089784e95a9684e"
+        },
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19371106RoughnessMask.webp",
+          "width": 344,
+          "height": 512,
+          "bytes": 33296,
+          "sha256": "1c255a045ef55c2d65193a9cc4ece1148f4ac005af07628f06a8f794c10d6ec3"
+        }
+      ]
+    },
+    {
+      "id": "ZhanShiHuaKan19371111",
+      "sourceHash": "0e86d6f507686a476b30f658a6c2e0f08b94a40fa47bf2cdcc359c13de825d8e",
+      "baseHash": "d46e5c0708c72a8778e5068bcfe52bc3b033cf5311c4a7fde24b4ec2b707a089",
+      "roughnessRange": [
+        0.7607843137254902,
+        0.8705882352941177
+      ],
+      "outputs": [
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19371111Normal.webp",
+          "width": 512,
+          "height": 360,
+          "bytes": 165602,
+          "sha256": "48be6068c992caba49f071930c33ca40d3944429841fa09ba7849a1b29a01d12"
+        },
+        {
+          "file": "Texture_BootPaperZhanShiHuaKan19371111RoughnessMask.webp",
+          "width": 512,
+          "height": 360,
+          "bytes": 31048,
+          "sha256": "2df91f04aca83e00637cae80063b3819baafbca5e4492e79567246ac6a30ce01"
+        }
+      ]
+    },
+    {
+      "id": "JiuGuoShiBao19371220",
+      "sourceHash": "cca73e43f35acffb20b6094c0c6a286bd0f83b49557f5aa42eb993dc537f8ddd",
+      "baseHash": "e8489c790cc9ee6274d45051ff871cc5f68cddbaafabfba666c6e56740395ffd",
+      "roughnessRange": [
+        0.7607843137254902,
+        0.8705882352941177
+      ],
+      "outputs": [
+        {
+          "file": "Texture_BootPaperJiuGuoShiBao19371220Normal.webp",
+          "width": 512,
+          "height": 351,
+          "bytes": 175004,
+          "sha256": "345895aa483ec1559087d2831278c111fd9d9b4159c0a21ea3b505b61ddcbca9"
+        },
+        {
+          "file": "Texture_BootPaperJiuGuoShiBao19371220RoughnessMask.webp",
+          "width": 512,
+          "height": 351,
+          "bytes": 32938,
+          "sha256": "ab255f0e21058ed6cf8761311ea8877a8cfda617dfa1aab4c702d1272c519fe5"
+        }
+      ]
+    },
+    {
+      "id": "ChinaWeeklyReview19371106",
+      "sourceHash": "5993b61c7cebb0c7b0be9ed58c3532ff1aa7c040e939de2447fc38394f4458ac",
+      "baseHash": "9b6adb6edfba9095cde82ccbf1973901a90d45f49c6a7dbea45955e774e24f6b",
+      "roughnessRange": [
+        0.7607843137254902,
+        0.8705882352941177
+      ],
+      "outputs": [
+        {
+          "file": "Texture_BootPaperChinaWeeklyReview19371106Normal.webp",
+          "width": 512,
+          "height": 360,
+          "bytes": 173714,
+          "sha256": "f8f9469b275c54aea315e5cad86d8b88410557b03d80fd57dd0304aafffc8d4d"
+        },
+        {
+          "file": "Texture_BootPaperChinaWeeklyReview19371106RoughnessMask.webp",
+          "width": 512,
+          "height": 360,
+          "bytes": 33950,
+          "sha256": "d4630f6febc315b6c24dd9cdf9557266cc840b6ec925689c3972d8aedf887035"
+        }
+      ]
+    }
+  ],
+  "files": [
+    [
+      "Menu/BootPaper/Texture_BootPaperLiBao19370709Normal.webp",
+      "Normal",
+      489,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperLiBao19370709RoughnessMask.webp",
+      "Mask",
+      489,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperShenBao19370731Normal.webp",
+      "Normal",
+      344,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperShenBao19370731RoughnessMask.webp",
+      "Mask",
+      344,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperWenHui19380125Normal.webp",
+      "Normal",
+      512,
+      351
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperWenHui19380125RoughnessMask.webp",
+      "Mask",
+      512,
+      351
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370820Normal.webp",
+      "Normal",
+      335,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370820RoughnessMask.webp",
+      "Mask",
+      335,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370906Normal.webp",
+      "Normal",
+      512,
+      374
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370906RoughnessMask.webp",
+      "Mask",
+      512,
+      374
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370911Normal.webp",
+      "Normal",
+      344,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370911RoughnessMask.webp",
+      "Mask",
+      344,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371001Normal.webp",
+      "Normal",
+      335,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371001RoughnessMask.webp",
+      "Mask",
+      335,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371106Normal.webp",
+      "Normal",
+      344,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371106RoughnessMask.webp",
+      "Mask",
+      344,
+      512
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371111Normal.webp",
+      "Normal",
+      512,
+      360
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371111RoughnessMask.webp",
+      "Mask",
+      512,
+      360
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperJiuGuoShiBao19371220Normal.webp",
+      "Normal",
+      512,
+      351
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperJiuGuoShiBao19371220RoughnessMask.webp",
+      "Mask",
+      512,
+      351
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperChinaWeeklyReview19371106Normal.webp",
+      "Normal",
+      512,
+      360
+    ],
+    [
+      "Menu/BootPaper/Texture_BootPaperChinaWeeklyReview19371106RoughnessMask.webp",
+      "Mask",
+      512,
+      360
+    ]
+  ]
+}
