@@ -3189,7 +3189,9 @@ async function Boot() {
   // 建在最末：它要拿相机、要知道现在建好的是哪一关（决定用哪一组机位），
   // 还要能把编辑器的齿轮藏起来 —— 三样东西到这一步才齐。
   if ((MENU_ON || FIRST_LEVEL_P012_WHITEBOX) && menuRoot) {
-    commandRoom = new CommandRoom(renderer, { isActive: () => !!menu?.live && !!menu?.open && !editor?.Capturing });
+    commandRoom = new CommandRoom(renderer, { isActive: () => !!menu?.live && !!menu?.open && !editor?.Capturing,
+      getMenuMode: () => editor?.Capturing && ["graphics","sound","controls"].includes(editor.activeId)
+        ? editor.activeId : menu?.mode || "title" });
     const previewValue = params.get("menuPreview");
     const commandRoomPreview = new CommandRoomPreview(commandRoom, () => Progress.Read(),
       /^[0-6]$/.test(previewValue ?? "") ? Number(previewValue) : null);

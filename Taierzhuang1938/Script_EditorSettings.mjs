@@ -21,7 +21,8 @@
 // **不是 xxxBus.gain** —— 那几个是系统自己的配平（每段音乐的 level 由 LoopLayer 施加，
 // duck 会把 duckGain 压下去再放回来），滑杆写在同一个参数上会被抹掉。
 
-import { Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note } from "./Script_EditorUi.mjs";
+import { El, Panel, Section, Slider, Chips, Toggle, ButtonRow, Facts, Note } from "./Script_EditorUi.mjs";
+import { T } from "./Script_Text.mjs";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
 import { BuildWhiteboxQualityUi } from "./Script_EditorWhiteboxQuality.mjs";
@@ -657,11 +658,12 @@ export class AudioSettings {
   Enter(root) {
     if (this.audio) this.audio.Unlock();
     this.panel = Panel({
-      title: "音效设置", sub: "",
-      variant: "work", onClose: () => this.host.Close(),
+      title: T("menu.audio.title"), sub: T("menu.audio.breadcrumb"),
+      variant: "work audioSettings", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
     this.BuildUi(this.panel.body);
+    this.controls?.[0]?.input.focus({ preventScroll: true });
     return this;
   }
 
@@ -684,56 +686,101 @@ export class AudioSettings {
 
   BuildUi(body) {
     const audio = this.audio;
+    this.controls = [];
     if (!audio || !audio.enabled) {
-      Note(body, "当前模式未启用音频。", true);
-      this.facts = Facts(body, ["状态"]);
+      Note(body, T("menu.audio.unavailable"), true);
       return;
     }
-
-    const mix = Section(body, "音量");
-    Slider(mix, {
-      label: "总音量", min: 0, max: 1, step: 0.02, value: audio.masterVolume,
-      format: (v) => `${Math.round(v * 100)}%`,
-      onInput: (v) => { audio.SetMasterVolume(v); this.Save(); },
-    });
-    const Bus = (kind, label) => {
-      Slider(mix, {
-        label, min: 0, max: 1, step: 0.02, value: audio.mix[kind],
-        format: (v) => `${Math.round(v * 100)}%`,
-        onInput: (v) => { audio.SetBusVolume(kind, v); this.Save(); },
-      });
+    const list = El("div", "audioOptions");
+    const detail = El("aside", "audioDetail");
+    detail.appendChild(El("div", "audioEyebrow", T("menu.audio.detail")));
+    this.detailTitle = El("h2");
+    this.detailText = El("p");
+    this.detailDefault = El("div", "audioDefault");
+    detail.append(this.detailTitle, this.detailText, this.detailDefault);
+    body.append(list, detail);
+    const SectionTitle = key => list.appendChild(El("h3", "audioGroup", T(key)));
+    const Add = (id, get, set, defaultValue, toggle = false) => {
+      const label = T(`menu.audio.${id}`), row = El("div", "audioRow");
+      const name = El("label", "audioLabel", label);
+      const input = El(toggle ? "button" : "input", toggle ? "audioSwitch" : "audioRange");
+      input.id = `audio-${id}`;
+      name.htmlFor = input.id;
+      input.setAttribute("aria-label", label);
+      const value = El("output", "audioValue");
+      const control = { id, row, input, value, get, toggle, defaultValue };
+      this.controls.push(control);
+      if (toggle) {
+        input.type = "button";
+        input.setAttribute("role", "switch");
+        input.addEventListener("click", () => { set(!get()); this.Refresh(); this.Save(); });
+      } else {
+        input.type = "range"; input.min = "0"; input.max = "100"; input.step = "2";
+        value.htmlFor = input.id;
+        input.addEventListener("input", () => { set(Number(input.value) / 100); this.Refresh(); this.Save(); });
+      }
+      input.addEventListener("focus", () => this.Select(control));
+      row.addEventListener("pointerenter", () => this.Select(control));
+      row.append(name, input, value);
+      list.appendChild(row);
     };
-    Bus("sfx", "音效");
-    Bus("music", "音乐");
-    Bus("ambience", "环境音");
-
-    const opts = Section(body, "开关");
-    const box = document.createElement("div");
-    box.className = "edBtns";
-    opts.appendChild(box);
-    Toggle(box, "配音", !audio.voiceMute, (on) => { audio.voiceMute = !on; this.Save(); });
-    Toggle(box, "暂停时静音背景", audio.pauseSilence !== false, (on) => {
+    SectionTitle("menu.audio.volume");
+    Add("master", () => audio.masterVolume, v => audio.SetMasterVolume(v), 1);
+    for (const id of ["sfx", "music", "ambience"]) {
+      Add(id, () => audio.mix[id], v => audio.SetBusVolume(id, v), AUDIO_MIX_DEFAULTS[id]);
+    }
+    SectionTitle("menu.audio.playback");
+    Add("voice", () => !audio.voiceMute, on => { audio.voiceMute = !on; }, true, true);
+    Add("pause", () => audio.pauseSilence !== false, on => {
       audio.pauseSilence = on;
-      // 现在就是暂停着的（这个面板本身就在暂停里），所以当场生效
-      if (on) audio.SetPaused(true); else audio.SetPaused(false);
-      this.Save();
+      // Settings pause gameplay; apply the background preference immediately.
+      audio.SetPaused(true);
+    }, true, true);
+    list.addEventListener("keydown", event => {
+      if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
+      const index = this.controls.findIndex(c => c.input === event.target);
+      if (index < 0) return;
+      event.preventDefault(); event.stopPropagation();
+      this.controls[(index + (event.key === "ArrowDown" ? 1 : -1) + this.controls.length) % this.controls.length].input.focus();
     });
-
-    ButtonRow(opts, [
-      { label: "静音", onClick: () => { audio.SetMasterVolume(0); this.Rebuild(); } },
-      { label: "恢复出厂", onClick: () => this.Reset() },
-      { label: "试一声", onClick: () => audio.Play("rifleNra", { volume: 0.9, priority: true }) },
-    ]);
-
-    const stat = Section(body, "读数");
-    this.facts = Facts(stat, ["状态"]);
+    const foot = El("footer", "audioFooter");
+    const Actions = (key, fn, primary = false) => {
+      const button = El("button", `audioAction${primary ? " primary" : ""}`, T(key));
+      button.type = "button"; button.addEventListener("click", fn); foot.appendChild(button);
+      return button;
+    };
+    Actions("menu.audio.back", () => this.host.Close());
+    Actions("menu.audio.reset", () => this.Reset());
+    Actions("menu.audio.preview", () => audio.Play("rifleNra", { volume: .9, priority: true }), true);
+    foot.appendChild(El("span", "audioSave", T("menu.audio.saved")));
+    this.panel.root.appendChild(foot);
+    this.Refresh();
+    this.Select(this.controls[0]);
   }
 
-  Rebuild() {
-    if (!this.panel) return;
-    this.panel.body.innerHTML = "";
-    this.BuildUi(this.panel.body);
-    this.Save();
+  Select(control) {
+    this.selected = control;
+    for (const c of this.controls) c.row.classList.toggle("selected", c === control);
+    this.detailTitle.textContent = T(`menu.audio.${control.id}`);
+    this.detailText.textContent = T(`menu.audio.${control.id}Help`);
+    const value = control.toggle ? T(control.defaultValue ? "menu.audio.on" : "menu.audio.off") : `${Math.round(control.defaultValue * 100)}%`;
+    this.detailDefault.textContent = T("menu.audio.default", { value });
+  }
+
+  Refresh() {
+    for (const c of this.controls || []) {
+      const value = c.get();
+      if (c.toggle) {
+        c.input.setAttribute("aria-checked", String(value));
+        c.input.textContent = T(value ? "menu.audio.on" : "menu.audio.off");
+      } else {
+        const percent = Math.round(value * 100);
+        c.input.value = String(percent);
+        c.input.style.setProperty("--fill", `${percent}%`);
+        c.input.setAttribute("aria-valuetext", `${percent}%`);
+        c.value.textContent = `${percent}%`;
+      }
+    }
   }
 
   Reset() {
@@ -743,20 +790,12 @@ export class AudioSettings {
     for (const [kind, value] of Object.entries(AUDIO_MIX_DEFAULTS)) audio.SetBusVolume(kind, value);
     audio.voiceMute = false;
     audio.pauseSilence = true;
-    this.Rebuild();
+    audio.SetPaused(true);
+    this.Refresh();
+    this.Save();
   }
 
-  Update() {
-    const audio = this.audio;
-    const f = this.facts;
-    if (!f || !audio) return;
-    f.Set("状态", audio.enabled ? (audio.Ready ? "运行中" : "未解锁") : "已关闭",
-      audio.Ready ? "good" : "warn");
-    f.Set("背景层", audio.paused ? "已暂停（静音）" : "在响", audio.paused ? "good" : "");
-    f.Set("环境 / 音乐", `${audio.ambiencePreset || "silence"} / ${audio.musicCue || "无"}`);
-    f.Set("在响的节点", audio.liveNodes);
-    f.Set("配音", audio.voiceMute ? "已关" : `${audio.voiceBank ? audio.voiceBank.size : 0} 条`);
-  }
+  Update() {}
 }
 
 // ===========================================================================

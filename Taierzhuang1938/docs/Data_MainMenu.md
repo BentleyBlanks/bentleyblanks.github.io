@@ -37,8 +37,14 @@ Imagegen 纸图沿用原地图比例与原电报纸边，不是历史原件影�
 选章、资料、关于、设置统一使用宋体标题、暖白文字、旧金竖条和半透明横条，
 标题态的二级页面及声音、画面、操作设置继续显示指挥室。关闭具体设置后回到
 设置目录，再返回原主菜单或暂停页。暂停继续保留真实战场和武器。
-合成器对场景颜色做基于真实深度的轻微景深，DOM 文字不参与模糊；焦距与半径
-由 `Data_Tuning_CommandRoom.depthOfField` 管理。桌面旧损由木板本体的倒角、缺口和磨痕表现，
+合成器对场景颜色做基于真实深度的景深，DOM 文字不参与模糊；焦距与半径
+由 `Data_Tuning_CommandRoom.depthOfField` 管理。主菜单焦距 3 m、清晰范围 .65 m，
+最大弥散半径 4.5 CSS px；二级页使用两趟半分辨率高斯模糊加强背景虚化。
+选章、注记、关于、设置及声音／画面／操作子页共用焦点状态，时间常数 .18 s，
+约 .54 s 到达目标的 95%；快速返回或反向切换从当前状态继续，减少动态效果时直接切换。
+渲染分辨率和 DPR 改变时保持 CSS 像素半径。窗外自发光底色略加红，
+体积光和浮尘同步偏暖；不增加另一个太阳，不改变既有窗光方向。
+桌面旧损由木板本体的倒角、缺口和磨痕表现，
 单窗天空补光与曝光提亮可读区域，太阳方向保持一致。`host.staticBackdrop` 关闭时，
 下文原有战场机位系统仍可运行，正式入口默认启用指挥室。
 
@@ -93,6 +99,20 @@ GLB 中静态几何按材质合并；预算见 `Data_AssetStandards.CommandRoom`
 另外运行 ModuleGraph、TextureStandards、Text 与 AssetStandards 检查。
 `Script_CommandRoomBrowserTest.mjs` 实测不同深度物体的视差、缓动与回正、触屏和
 减少动态效果、相机方向与光源方向两种遮挡、renderer 状态恢复和尺寸变化。
+该检查也比较实际像素中的虚化强度、过渡反向和返回主菜单的恢复。
+`Script_MenuPresentationTest.mjs` 从正式游戏入口验证全部二级页与设置子页的虚化状态，
+声音设置的真实增益、键盘操作、开关、试听、刷新后保存、恢复默认及手机布局。
+
+### 玩家声音设置（2026-10-06）
+
+`AudioSettings` 保留编辑器套件的打开／暂停／返回生命周期，界面独立采用正式菜单样式：
+左侧音量与播放选项、右侧焦点说明、底部返回／恢复默认／试听。音量即时写入
+master 或 sfx/music/ambience 的 User 增益，沿用 `tengxian1938_audio_v1` 保存格式；
+没有伪造输出设备或尚未存在的独立配音音量。调试节点读数不再出现在玩家页。
+方向键上下选择条目，左右调整滑杆；Tab、原生开关和 Esc 返回设置目录可用。
+手机改为纵向滚动，底部动作保持可见。分项说明参考
+[COD 官方 PC 设置指南](https://www.callofduty.com/au/en/blog/2020/11/Black-Ops-Cold-War-Controls-and-Settings-PC)，
+视觉继续沿用本游戏宋体标题、暖白文字与旧金选中条。
 
 对应实现：`Data_Menu.mjs`（机位表）、`Script_Menu.mjs`（菜单本体）、`Style_Menu.css`、
 `Script_Main.mjs` 的菜单接线、`Script_MenuTest.mjs`（冒烟）。

@@ -515,3 +515,67 @@ body.edToolsOpen #edRoot.menuSettings::before { display:none; }
  .mnSettingsList{width:80vw}.mnLevelList{max-height:40vh;flex-shrink:0}.mnLevel{min-height:44px}.mnText{font-size:14px}.mnCodexRow{grid-template-columns:1fr;gap:3px}
  #edRoot.menuSettings .edRow>.l{flex-basis:110px;font-size:13px}
 }
+
+/* Player audio settings: shared menu typography, grouped controls and contextual help. */
+#edRoot .edPanel.audioSettings { inset:6vh 5.1%;width:auto;max-width:none;border:0;
+  color:#deddd2;background:linear-gradient(90deg,#080907eb,#11120ed6 65%,#14150cab);box-shadow:none;backdrop-filter:none;
+  font-family:var(--ui-font);font-weight:400; }
+#edRoot .audioSettings .edHead { position:relative;padding:42px 3vw 22px;background:none;border-bottom:1px solid #c1bdab55; }
+#edRoot .audioSettings .edTitle { font:700 clamp(30px,3.3vw,56px)/1.3 var(--ui-title-font);letter-spacing:.1em;color:#eeeee7; }
+#edRoot .audioSettings .edSub { position:absolute;grid-area:auto;top:16px;left:3vw;font-size:12px;letter-spacing:.18em;color:#aaa99b; }
+#edRoot .audioSettings .edX { font-size:27px;color:#bbbbae;background:none;border:0; }
+#edRoot .audioSettings .edBody { display:grid;grid-template-columns:minmax(0,1.65fr) minmax(220px,1fr);align-items:start;gap:5vw;
+  max-width:none;min-height:0;padding:24px 3vw 30px;overflow:auto; }
+.audioOptions { min-width:0; }
+.audioGroup { margin:0 0 8px;padding:0 18px 12px;border-bottom:1px solid #c1bdab30;
+  color:#aaa99b;font-size:12px;font-weight:400;letter-spacing:.2em; }
+.audioGroup:not(:first-child) { margin-top:25px; }
+.audioRow { display:grid;grid-template-columns:minmax(135px,.9fr) minmax(110px,1fr) 54px;align-items:center;gap:18px;
+  min-height:62px;padding:0 18px;border-left:3px solid transparent;transition:background .15s,color .15s; }
+.audioRow.selected { border-left-color:#edca83;background:linear-gradient(90deg,#d8d4c324,#bbb7a906);color:#edca83; }
+.audioLabel { font-size:clamp(14px,1.15vw,20px);letter-spacing:.055em;cursor:pointer; }
+.audioValue { font-size:14px;font-variant-numeric:tabular-nums;text-align:right;color:#deddd2; }
+#edRoot .audioRange { appearance:none;width:100%;height:44px;margin:0;cursor:pointer;background:transparent;outline:none; }
+#edRoot .audioRange::-webkit-slider-runnable-track { height:3px;background:linear-gradient(to right,#d9bb7b var(--fill),#a4a59450 var(--fill)); }
+#edRoot .audioRange::-moz-range-track { height:3px;background:linear-gradient(to right,#d9bb7b var(--fill),#a4a59450 var(--fill)); }
+#edRoot .audioRange::-webkit-slider-thumb { appearance:none;width:7px;height:17px;margin-top:-7px;border:0;border-radius:1px;background:#e4d9bb; }
+#edRoot .audioRange::-moz-range-thumb { width:7px;height:17px;border:0;border-radius:1px;background:#e4d9bb; }
+#edRoot .audioRange:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 3px #dfbd6844;background:#ffe0a1; }
+#edRoot .audioRange:focus-visible::-moz-range-thumb { box-shadow:0 0 0 3px #dfbd6844;background:#ffe0a1; }
+.audioSwitch { justify-self:end;width:116px;min-height:38px;border:1px solid #c1bdab40;background:#13140b44;color:#a7a89e;
+  font:inherit;font-size:14px;letter-spacing:.12em;cursor:pointer; }
+.audioSwitch[aria-checked="true"] { color:#e6cb91;border-color:#cdb77b88; }
+.audioSwitch::before { content:"";display:inline-block;width:5px;height:5px;margin:0 10px 2px 0;background:currentColor; }
+.audioSwitch:focus-visible,.audioAction:focus-visible { outline:1px solid #edca83;outline-offset:4px; }
+.audioDetail { border-left:1px solid #c1bdab30;padding:0 0 20px 3vw;min-height:260px; }
+.audioEyebrow { color:#aaa99b;font-size:12px;letter-spacing:.2em; }
+.audioDetail h2 { margin:28px 0 18px;color:#eeeee7;font:500 clamp(22px,2vw,32px)/1.5 var(--ui-title-font);letter-spacing:.08em; }
+.audioDetail p { color:#c2c3b6;max-width:34em;font-size:15px;line-height:2;margin:0; }
+.audioDefault { color:#989b8b;font-size:12px;margin-top:32px;padding-top:18px;border-top:1px solid #c1bdab30; }
+.audioFooter { flex:0 0 auto;display:flex;align-items:center;gap:24px;margin:0 3vw;padding:18px 0;border-top:1px solid #c1bdab55; }
+.audioAction { background:transparent;border:0;min-height:44px;padding:0 8px;color:#d5d4ca;font:inherit;font-size:15px;letter-spacing:.1em;cursor:pointer; }
+.audioAction:first-child { padding-left:0; }
+.audioAction.primary { color:#edca83; }
+.audioAction:hover { color:#ffe0a1; }
+.audioSave { margin-left:auto;color:#979c8d;font-size:12px;letter-spacing:.08em; }
+@media(max-width:900px){
+ #edRoot .audioSettings .edBody { gap:24px;grid-template-columns:minmax(0,1.7fr) minmax(170px,1fr); }
+ .audioRow { grid-template-columns:minmax(100px,1fr) minmax(90px,1fr) 42px;gap:10px;padding:0 10px; }
+ .audioLabel { font-size:14px; }.audioValue{font-size:12px}.audioDetail p{font-size:13px}
+}
+@media(max-width:640px){
+ #edRoot .edPanel.audioSettings { inset:3vh 4%; }
+ #edRoot .audioSettings .edHead { padding-top:36px;padding-bottom:15px; }
+ #edRoot .audioSettings .edBody { display:block;padding-top:16px; }
+ .audioRow { min-height:58px; }.audioGroup:not(:first-child){margin-top:20px}
+ .audioDetail { min-height:0;margin-top:24px;padding:20px 10px 0;border-left:0;border-top:1px solid #c1bdab30; }
+ .audioDetail h2{margin:12px 0 8px;font-size:22px}.audioDefault{margin-top:16px;padding-top:12px}
+ .audioFooter { flex-wrap:wrap;gap:4px 18px;padding:9px 0; }.audioAction{font-size:13px}
+ .audioSave{width:100%;margin:0;font-size:10px;padding-bottom:3px}
+}
+@media(max-height:650px) and (min-width:641px){
+ #edRoot .audioSettings .edHead { padding-top:30px;padding-bottom:10px; }.audioRow{min-height:47px}
+ #edRoot .audioSettings .edSub {top:9px}.audioGroup:not(:first-child){margin-top:14px}
+ #edRoot .audioSettings .edBody {padding-top:16px;padding-bottom:16px}.audioFooter{padding-block:8px}
+}
+@media(prefers-reduced-motion:reduce){.audioRow{transition:none}}

@@ -150,6 +150,30 @@ try {
   });
   assert.ok(result.optics.changed>200,"Depth of field must affect actual scene pixels");
   assert.ok(result.optics.glass.transmission>.9&&result.optics.glass.thickness>0&&result.optics.glass.reflection,"Bottle uses thick transmitting glass with room reflections");
+  result.panelFocus=await page.evaluate(()=>{
+    // Freeze animated fog noise so the return comparison measures focus alone.
+    const Read=()=>{room.time=10;room.Render();const gl=renderer.getContext(),p=new Uint8Array(1280*720*4);gl.readPixels(0,0,1280,720,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;};
+    const EdgeEnergy=p=>{let e=0;for(let y=80;y<640;y++)for(let x=700;x<1150;x++){
+      const i=(y*1280+x)*4;e+=Math.abs(p[i]-p[i+4])+Math.abs(p[i]-p[i+1280*4]);}return e;};
+    room.dust.visible=false;const title=Read();room.SetMenuMode("levels");
+    const entering=Advance(1/60).presentation.panelFocus,half=Advance(.1).presentation.panelFocus;
+    room.SetMenuMode("title");const reversing=Advance(1/60).presentation.panelFocus;
+    room.SetMenuMode("levels");const reversedAgain=Advance(1/60).presentation.panelFocus;
+    Advance(2);const blurred=Read(),settled=room.State().presentation.panelFocus;
+    room.SetMenuMode("title");Advance(2);const returned=Read();room.dust.visible=true;
+    let changed=0,returnedDifference=0;
+    for(let i=0;i<title.length;i+=4){if(Math.abs(title[i]-blurred[i])>2)changed++;returnedDifference+=Math.abs(title[i]-returned[i]);}
+    return {entering,half,reversing,reversedAgain,settled,changed,titleEdges:EdgeEnergy(title),panelEdges:EdgeEnergy(blurred),returnedDifference:returnedDifference/(1280*720)};
+  });
+  const focus=result.panelFocus;
+  assert.ok(focus.entering>0&&focus.entering<.15&&focus.half>focus.entering&&focus.half<.8,"Opening a panel eases through intermediate focus values");
+  assert.ok(focus.reversing<focus.half&&focus.reversing>0&&focus.reversedAgain>focus.reversing&&focus.reversedAgain<.8,"Rapid reversals continue from the current focus, without a snap");
+  assert.ok(focus.changed>50000&&focus.panelEdges<focus.titleEdges*.45,"Secondary background must be visibly softer in the rendered pixels");
+  assert.ok(focus.settled>.999&&focus.returnedDifference<.1,"Returning to title restores its original depth of field");
+  await page.emulateMedia({reducedMotion:"reduce"});
+  assert.equal(await page.evaluate(()=>{room.SetMenuMode("levels");return Advance(1/60).presentation.panelFocus;}),1);
+  assert.equal(await page.evaluate(()=>{room.SetMenuMode("title");return Advance(1/60).presentation.panelFocus;}),0);
+  await page.emulateMedia({reducedMotion:"no-preference"});
   result.restore=await page.evaluate(()=>{
     const target=new THREE.WebGLRenderTarget(20,16);renderer.setRenderTarget(target);renderer.setViewport(2,3,8,9);
     renderer.setScissor(1,2,3,4);renderer.setScissorTest(true);renderer.autoClear=false;
@@ -160,11 +184,11 @@ try {
   });
   assert.deepEqual(result.restore,{target:true,viewport:[2,3,8,9],scissor:[1,2,3,4],scissorTest:true,autoClear:false,exposure:.73,tone:0,shadow:true});
   result.performance=await page.evaluate(()=>{const samples=[];for(let i=0;i<12;i++){const start=performance.now();room.Update(1/60);room.Render();renderer.getContext().finish();samples.push(performance.now()-start);}samples.sort((a,b)=>a-b);return {medianMs:samples[6],p95Ms:samples[11]};});
-  result.resized=await page.evaluate(()=>{renderer.setSize(800,600);room.Render();return [room.atmosphere.colorTarget.width,room.atmosphere.colorTarget.height,room.atmosphere.volumeTarget.width,room.atmosphere.volumeTarget.height];});
-  assert.deepEqual(result.resized,[800,600,400,300]);
+  result.resized=await page.evaluate(()=>{renderer.setSize(800,600);room.SetMenuMode("levels");Advance(1);return [room.atmosphere.colorTarget.width,room.atmosphere.colorTarget.height,room.atmosphere.volumeTarget.width,room.atmosphere.volumeTarget.height,...room.atmosphere.blurTargets.map(t=>[t.width,t.height]).flat()];});
+  assert.deepEqual(result.resized,[800,600,400,300,400,300,400,300]);
   await page.evaluate(()=>room.Dispose());await page.mouse.move(80,80);
   assert.deepEqual(errors,[]);
   fs.writeFileSync(path.join(out,"Data_CommandRoomInteraction.json"),JSON.stringify({...result,errors},null,2));
   console.log("PASS CommandRoom: real mesh parallax, easing/limits/reset, inactive/touch/reduced-motion, visible dust/beam, camera-depth + light-depth occlusion, renderer restore, resize and dispose");
-  console.log(JSON.stringify({fog:result.depth,shadow:result.shadow,performance:result.performance}));
+  console.log(JSON.stringify({fog:result.depth,shadow:result.shadow,panelFocus:result.panelFocus,performance:result.performance}));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

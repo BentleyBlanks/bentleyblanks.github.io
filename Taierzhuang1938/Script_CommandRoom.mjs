@@ -9,7 +9,7 @@ import { CommandRoomPapers, CommandRoomPaperUrl } from "./Data_CommandRoomPapers
  * Gameplay camera, render targets, tone mapping and shadow settings are restored after every draw.
  */
 export class CommandRoom {
-  constructor(renderer, { isActive = () => true } = {}) {
+  constructor(renderer, { isActive = () => true, getMenuMode = null } = {}) {
     this.renderer = renderer;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(DATA.background);
@@ -29,6 +29,9 @@ export class CommandRoom {
     this.pointerTarget = new THREE.Vector2();
     this.pointer = new THREE.Vector2();
     this.isActive = isActive;
+    this.getMenuMode = getMenuMode;
+    this.menuMode = "title";
+    this.panelFocus = 0;
     this.basePosition = new THREE.Vector3();
     this.baseQuaternion = new THREE.Quaternion();
     this.cameraRight = new THREE.Vector3();
@@ -109,6 +112,9 @@ export class CommandRoom {
           mat.attenuationDistance=DATA.glass.attenuationDistance;mat.side=THREE.FrontSide;
         }
         if (mat.name === "CommandRoomOutside") {
+          // An emissive courtyard card has no diffuse room irradiance. Keeping
+          // both washes out its restrained rose tint under title exposure.
+          mat.lightMap = null;mat.color.setHex(0x000000);
           mat.emissive.setHex(DATA.outside.color);
           mat.emissiveIntensity = DATA.outside.intensity;
         }
@@ -196,6 +202,11 @@ export class CommandRoom {
   }
   Update(dt) {
     this.time += Math.min(dt, 0.1);
+    if(this.getMenuMode)this.SetMenuMode(this.getMenuMode());
+    const target=this.menuMode === "title" ? 0 : 1;
+    this.panelFocus=this.motionQuery.matches ? target : THREE.MathUtils.lerp(this.panelFocus,target,
+      1-Math.exp(-Math.max(0,Math.min(dt,.1))/DATA.depthOfField.transitionSeconds));
+    this.atmosphere?.SetPanelFocus(this.panelFocus);
     if (!this.camera) return;
     if (!this.isActive() || this.motionQuery.matches) this.ResetPointer();
     this.pointer.lerp(this.pointerTarget,1-Math.exp(-Math.max(0,Math.min(dt,.1))/DATA.parallax.responseSeconds));
@@ -206,6 +217,7 @@ export class CommandRoom {
     this.aim.copy(this.baseAim).addScaledVector(this.offset,DATA.parallax.aimFollow);
     this.camera.lookAt(this.aim);
   }
+  SetMenuMode(mode) { this.menuMode=mode || "title"; }
   Render() {
     if (!this.ready) return;
     const r = this.renderer;
@@ -238,6 +250,8 @@ export class CommandRoom {
       papers: this.papers ? { ...this.papers } : null,
       camera: this.camera ? { position: this.camera.getWorldPosition(new THREE.Vector3()).toArray(), fov: this.camera.fov } : null,
       parallax: { pointer: this.pointer.toArray(), target: this.pointerTarget.toArray(), reducedMotion: this.motionQuery.matches },
+      presentation: { mode: this.menuMode, panelFocus: this.panelFocus, blur: this.panelFocus*DATA.depthOfField.panelBlur,
+        depthOfField: { ...DATA.depthOfField }, outsideColor: DATA.outside.color },
       atmosphere: { particles: DATA.dust.count, depthOcclusion: !!this.atmosphere, lightShadow: !!this.atmosphere && !this.atmosphere.shadowDirty } };
   }
   Dispose() {

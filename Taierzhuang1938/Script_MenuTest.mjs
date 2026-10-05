@@ -487,12 +487,12 @@ async function CheckInterface() {
   const editor=await ReadStyle('[data-setting="sound"]');
   Check('设置入口沿用字体与金色选择反馈',main.font===editor.font&&main.color===editor.color,JSON.stringify(editor));
   await page.locator('[data-setting="sound"]').click();
-  const toggle=page.locator('.edPanel.work button[aria-pressed]').filter({hasText:'暂停时静音背景'});
-  const original=await toggle.getAttribute('aria-pressed');
+  const toggle=page.getByRole('switch',{name:'暂停时静音背景'});
+  const original=await toggle.getAttribute('aria-checked');
   await toggle.focus();await page.keyboard.press('Enter');
-  Check('设置可用键盘切换，状态可读',await toggle.getAttribute('aria-pressed')!==original);
+  Check('设置可用键盘切换，状态可读',await toggle.getAttribute('aria-checked')!==original);
   await page.keyboard.press('Space');
-  Check('第二次切换还原原始设置',await toggle.getAttribute('aria-pressed')===original);
+  Check('第二次切换还原原始设置',await toggle.getAttribute('aria-checked')===original);
   await page.keyboard.press("Tab");
   Check("工具 Tab 焦点可前进",await toggle.evaluate(el=>el!==document.activeElement));
   await page.keyboard.press("Shift+Tab");
