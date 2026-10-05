@@ -32,11 +32,14 @@ for index,(cx,cz,sx,sz) in enumerate(patches):
     mortar=Mesh('RecessedLimeBed',[(x,front+.026,z) for x,z in outline],
         [tuple(range(n))],plaster,[(x/1.8,z/1.8) for x,z in outline])
     # A thin chipped plaster rim exposes the section at the broken outline.
-    rim=[];rimUvs=[]
+    rim=[];rimUvs=[];perimeter=[0]
+    for i in range(n):
+        a=Vector(outline[i]);b=Vector(outline[(i+1)%n]);perimeter.append(perimeter[-1]+(b-a).length)
     for depth,scale in [(0,1.00),(.007,.985),(.035,.94)]:
-        for i,(x,z) in enumerate(outline):
-            rim.append((cx+(x-cx)*scale,front+depth,cz+(z-cz)*scale));rimUvs.append((x/1.8,z/1.8))
-    Mesh('FracturedPlasterSection',rim,[(r*n+i,r*n+(i+1)%n,(r+1)*n+(i+1)%n,(r+1)*n+i) for r in range(2) for i in range(n)],plaster,rimUvs)
+        for i,(x,z) in enumerate(outline+[outline[0]]):
+            rim.append((cx+(x-cx)*scale,front+depth,cz+(z-cz)*scale));rimUvs.append((perimeter[i]/1.8,depth/1.8))
+    stride=n+1
+    Mesh('FracturedPlasterSection',rim,[(r*stride+i,r*stride+i+1,(r+1)*stride+i+1,(r+1)*stride+i) for r in range(2) for i in range(n)],plaster,rimUvs)
     rows=math.ceil(sz/.099)+2;cols=math.ceil(sx/.235)+2
     for row in range(rows):
         for col in range(cols):
@@ -61,3 +64,14 @@ for index,(cx,cz,sx,sz) in enumerate(patches):
             shade=random.uniform(.76,1.12)
             for c in colors.data:c.color=(shade,shade,shade,1)
     bpy.data.objects.remove(cut,do_unlink=True)
+
+# Boolean-created cut faces also need a physical UV projection; interpolated
+# coplanar wall UVs collapse across the thickness and stripe the normal map.
+for wall in walls:
+    layer=wall.data.uv_layers.active
+    for poly in wall.data.polygons:
+        axis=max(range(3),key=lambda i:abs(poly.normal[i]))
+        a,b=(0,2) if axis==1 else (1,2) if axis==0 else (0,1)
+        for li in poly.loop_indices:
+            p=wall.matrix_world@wall.data.vertices[wall.data.loops[li].vertex_index].co
+            layer.data[li].uv=(p[a]/1.8,p[b]/1.8)
