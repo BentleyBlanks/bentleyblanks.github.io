@@ -11,6 +11,7 @@ Imagegen 纸图沿用原地图比例与原电报纸边，不是历史原件影�
 `Data_Tuning_CommandRoom.mjs` 管理材质、光照图集解码和浮尘参数。
 单一窗光及间接光在 Blender 中烘焙为独立的 2048² UV1 辐照度图集，
 不包含纸面或 PBR 反照率；运行时解码后交给标准材质的 `lightMap`。
+UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反面之间的重叠，防止暗的桌图背面覆盖墙图的光照。
 因此不再叠加第二个运行时太阳或重复 AO。纸面反照率按存档进度替换，光照图集共用。
 辐照度交付采用无损 WebP；编码器逐像素校验 RGB 往返一致，避免暗部有损色度
 压缩被 32 倍解码放大为墙地面的绿色、紫色色块。地面延伸覆盖宽屏可见范围。
@@ -56,7 +57,8 @@ Imagegen 纸图沿用原地图比例与原电报纸边，不是历史原件影�
 `_blender/Script_CommandRoomDetails.py` 调用 `Script_CommandRoomTailoring.py`（墨水瓶），
 再由 `Script_CommandRoomDrape.py` 生成帽服。当前形体依据用户补充的
 `Source/Reference_CoatDrape.png` 与 `Reference_CapCrushed.png`：衣服从单个衣钩收拢，
-衣身转向侧面并在下半段向墙侧收拢，左右空袖前后错开，袖口具有向内折返的厚边；不再保持正面人台形状。
+衣身与袖筒用连续衣片连接，由 `Script_SimulateCommandRoomCoat.py` 在 Blender 中以领后悬挂点、重力、自碰撞和墙体碰撞计算 300 帧静态垂坠。
+求解结果保存为 `Data_CommandRoomCoatMesh.json`；`Script_CommandRoomSimulatedCoat.py` 对整件空衣调整朝向、袖口高度，添加薄壳厚度、缝边与暗扣。运行时只加载静态网格，没有布料模拟开销。
 帽冠使用高低不齐的缝合轮廓、宽而深的压褶和下陷顶片，帽围比上部布料更有支撑，
 帽檐为独立弯曲薄壳。参考是美术意图，不作为历史实物证据。
 衣服使用 Imagegen `Source/CommandRoomClothSerge.png`；帽子独立使用
@@ -69,7 +71,8 @@ Imagegen 纸图沿用原地图比例与原电报纸边，不是历史原件影�
 柜子具有圆角台面、下压边、实框凹面抽屉和铁拉手底座。检查标签 4/5 对应桌子/柜子。
 柜子、窗沿、桌椅共用 Imagegen 风化木 PBR，木材边角磨损进入几何与顶点色。
 `Script_CommandRoomWallWear.py` 用非径向凹凸轮廓切出灰泥破口，边界再加入毫米级
-崩缺与 13–27 mm 不等的剥落截面。灰浆位于墙面后 27 mm，砖面约后退 17 mm，
+崩缺与 13–27 mm 不等的剥落截面。主要破口外还有约 6 mm 的浅层脱皮，砖面保留少量狭长旧灰浆；
+墙面低处积灰、石灰层褪色使用连续的世界空间顶点色，不以等大的斑点或悬空碎片表现。灰浆位于墙面后 27 mm，砖面约后退 17 mm，
 砖缝为浅凹石灰层，错缝砖行在各破口间保持一致。砖面凹蚀使用细分几何和独立 512² PBR；
 以上为场景缩放前尺寸。灰浆与剥落截面独立合批并提高 UV1 密度，仍共用墙体 PBR，避免细砖缝低于光照像素而形成黑描边。
 顶点色缺失时补白色中性乘数，木板布尔切面的新顶点也补齐旧木反照率。
@@ -82,6 +85,8 @@ Imagegen 纸图沿用原地图比例与原电报纸边，不是历史原件影�
 不依赖本地 worktree 永久存在。几何重建入口为 `_blender/Script_BuildCommandRoom.py`；
 用 `COMMAND_ROOM_ROOT` 指定仓库根，随后通过根目录 `scripts/Script_BlenderMcp.mjs exec --file` 执行。
 脚本拒绝覆盖其他 Blender 文件，输出 GLB 后还原材质节点并保存源工程。
+光照展开使用 [xatlas Python 绑定](https://github.com/mworchel/xatlas-python)，仅供离线构建；`numpy` 和 `xatlas==0.0.11` 安装到本 worktree 的 `tmp/CommandRoomPython`。
+可用 `COMMAND_ROOM_PYTHON` 指定该解释器；输入／输出 NPZ 留在 `tmp/CommandRoomAtlas`，不随游戏发布。
 随后依次执行 `_blender/Script_BakeCommandRoomLighting.py`（同一 BlenderMCP 实例）
 和 `_import/Script_EncodeCommandRoomLighting.py --source <源工程目录>/Textures/Texture_CommandRoomLighting.png`。
 后者需要 Pillow。烘焙脚本以 256 samples 生成无重叠 UV1 和 HDR EXR；交付图采用

@@ -4,8 +4,8 @@ import bmesh
 walls=[o for o in scene.objects if o.type=='MESH' and o.name.startswith('Wall')]
 front=wy-.12
 mortarMat=Material('CommandRoomMortar',(.36,.34,.3),.97,'CommandRoomPlaster')
-patches=[(-2.50,2.45,.62,1.11),(-2.45,.65,.73,1.05),(-.54,2.77,.45,.59),
-    (.05,1.94,.44,1.13),(.80,.78,1.07,.50),(1.98,.66,.95,.58),(2.61,1.51,.78,1.25)]
+patches=[(-2.51,2.49,.66,1.38),(-2.47,.66,.80,1.20),(-.79,2.98,.57,.48),
+    (-.15,2.04,.67,1.37),(.76,.82,1.15,.62),(1.95,.64,1.13,.70),(2.61,1.60,.97,1.68)]
 # Non-radial fractures: deep bays, irregular corners and tongues of old plaster.
 profiles=[
  [(-.93,-.71),(-.67,-.91),(-.40,-.79),(-.30,-.98),(-.09,-.91),(.02,-.65),(.29,-.72),(.50,-.46),(.79,-.55),(.70,-.20),(.97,-.09),(.84,.11),(.96,.37),(.68,.33),(.58,.59),(.32,.49),(.38,.80),(.12,.72),(-.06,.98),(-.25,.78),(-.56,.89),(-.50,.57),(-.83,.51),(-.70,.29),(-.98,.12),(-.83,-.11),(-.96,-.26),(-.74,-.46)],
@@ -56,12 +56,35 @@ def ProjectUv(ob,tile):
             p=ob.matrix_world@ob.data.vertices[ob.data.loops[li].vertex_index].co
             layer.data[li].uv=(p[a]/tile,p[b]/tile)
 
+def WallAt(x,z):
+    # Respect the window aperture and wall ends when placing shallow spalls.
+    return any(min((w.matrix_world@Vector(p)).x for p in w.bound_box)+.005<x<max((w.matrix_world@Vector(p)).x for p in w.bound_box)-.005
+        and min((w.matrix_world@Vector(p)).z for p in w.bound_box)+.005<z<max((w.matrix_world@Vector(p)).z for p in w.bound_box)-.005 for w in walls)
+
+def SurfaceIsland(name,center,radius,depth,mat,rng,stretch=1):
+    # Closed, chipped plaster layer. The centre and intermediate ring prevent
+    # a large planar polygon from making the edge look like a pasted decal.
+    x,z=center;count=22;outline=[]
+    for k in range(count):
+        a=k/count*math.tau;r=radius*rng.uniform(.70,1.14)
+        outline.append((x+math.cos(a)*r,z+math.sin(a)*r*stretch))
+    points=[(x,front+depth-.0015,z)]
+    points.extend((px,front+depth+rng.uniform(-.0012,.0012),pz) for px,pz in outline)
+    points.extend((px,front+depth+.005,pz) for px,pz in outline)
+    faces=[(0,k+1,(k+1)%count+1) for k in range(count)]
+    faces.extend((k+1,count+k+1,count+(k+1)%count+1,(k+1)%count+1) for k in range(count))
+    faces.append(tuple(range(count+1,count*2+1)))
+    ob=Mesh(name,points,faces,mat);Recalculate(ob);ProjectUv(ob,1.8)
+    return ob,outline
+
+allOutlines=[]
+
 for index,(cx,cz,sx,sz) in enumerate(patches):
     rng=random.Random(738+index)
     coarse=[Vector((cx+x*sx*.5,cz+z*sz*.5)) for x,z in profiles[index%2]]
     # Worn lime loses sharp triangular tips. Smooth only the large silhouette,
     # then fracture it again at the much smaller grain scale below.
-    for iteration in range(2):
+    for iteration in range(1):
         coarse=[point for i,p in enumerate(coarse) for point in (p.lerp(coarse[(i+1)%len(coarse)],.22),p.lerp(coarse[(i+1)%len(coarse)],.78))]
     outline=[]
     for i,p in enumerate(coarse):
@@ -69,8 +92,9 @@ for index,(cx,cz,sx,sz) in enumerate(patches):
         steps=max(1,math.ceil(edge.length/.010))
         for j in range(steps):
             f=j/steps
-            point=p.lerp(q,f)+perp*rng.uniform(-.003,.003)
+            point=p.lerp(q,f)+perp*rng.uniform(-.0045,.0045)
             outline.append(tuple(point))
+    allOutlines.append(outline)
     n=len(outline)
     verts=[(x,y,z) for y in [front-.08,front+.060] for x,z in outline]
     faces=[tuple(reversed(range(n))),tuple(n+i for i in range(n))]
@@ -128,8 +152,62 @@ for index,(cx,cz,sx,sz) in enumerate(patches):
                 p=ob.matrix_world@v.co;nval=noise.noise_vector(p*25)[0];value=shade+.14*max(0,nval)
                 color.data[v.index].color=(value,value*.985,value*.955,1)
     bpy.data.objects.remove(cut,do_unlink=True)
+    # Remnants of the scratch coat stay on some brick faces. They bridge the
+    # mortar joints instead of tracing every brick like clean new tilework.
+    for sample in range(7):
+        px=cx+rng.uniform(-sx*.44,sx*.44);pz=cz+rng.uniform(-sz*.43,sz*.43)
+        radius=rng.uniform(.014,.035)
+        if not all(InsidePatch(px+dx,pz+dz,outline) for dx,dz in [(0,0),(radius,0),(-radius,0),(0,radius),(0,-radius)]):continue
+        ob,_=SurfaceIsland('OldLimeResidue',(px,pz),radius,.013,mortarMat,rng,rng.uniform(1.2,3.2))
+        colors=ob.data.color_attributes.new(name='FreshLimeSection',type='FLOAT_COLOR',domain='POINT')
+        for v,c in zip(ob.data.vertices,colors.data):
+            shade=rng.uniform(.82,1.05);c.color=(shade,shade*.975,shade*.925,1)
     for sample in [.17,.63]:
         p=Vector(outline[int(n*sample)]);direction=(p-Vector((cx,cz))).normalized()
         PlasterCrack(p-direction*.006,direction,.14+.09*rng.random(),index*41+int(sample*100))
 
-for wall in walls:ProjectUv(wall,1.8)
+# Peripheral shallow flakes progressively thin the plaster around major losses.
+# They are cut into the wall; there are no separate floating chip particles.
+for index,outline in enumerate(allOutlines):
+    rng=random.Random(8321+index);cx,cz,sx,sz=patches[index]
+    for sample in range(14):
+        p=Vector(outline[int(sample/14*len(outline))]);direction=(p-Vector((cx,cz))).normalized()
+        center=p+direction*rng.uniform(.022,.078);radius=rng.uniform(.026,.095)
+        ob,edge=SurfaceIsland('PeelingLimeUndercoat',center,radius,.006,mortarMat,rng,rng.uniform(.65,1.4))
+        if not all(WallAt(x,z) and not any(InsidePatch(x,z,other) for other in allOutlines) for x,z in edge):
+            bpy.data.objects.remove(ob,do_unlink=True);continue
+        n=len(edge);vs=[(x,y,z) for y in [front-.03,front+.012] for x,z in edge]
+        fs=[tuple(reversed(range(n))),tuple(range(n,n*2))]+[(i,(i+1)%n,n+(i+1)%n,n+i) for i in range(n)]
+        cutter=Mesh('ShallowPeelVolume',vs,fs,plaster);Recalculate(cutter)
+        for wall in walls:
+            bounds=[wall.matrix_world@Vector(p) for p in wall.bound_box]
+            if min(v.x for v in bounds)<center.x+radius and max(v.x for v in bounds)>center.x-radius and min(v.z for v in bounds)<center.y+radius*1.5 and max(v.z for v in bounds)>center.y-radius*1.5:
+                Boolean(wall,cutter,'DIFFERENCE')
+        bpy.data.objects.remove(cutter,do_unlink=True)
+        colors=ob.data.color_attributes.new(name='FreshLimeSection',type='FLOAT_COLOR',domain='POINT')
+        shade=rng.uniform(.91,1.15)
+        for c in colors.data:c.color=(shade,shade*.976,shade*.935,1)
+
+for wall in walls:
+    # Subdivide long front triangles for slow albedo variation in physical
+    # wall space. The PBR tile provides fine grain, never baked light or dirt
+    # stripes repeated at the same scale over the entire room.
+    bm=bmesh.new();bm.from_mesh(wall.data)
+    bmesh.ops.triangulate(bm,faces=list(bm.faces))
+    for iteration in range(3):
+        edges=[e for e in bm.edges if e.calc_length()>.13 and any(f.normal.y<-.5 for f in e.link_faces)]
+        if not edges:break
+        bmesh.ops.subdivide_edges(bm,edges=edges,cuts=3,use_grid_fill=True)
+    bmesh.ops.triangulate(bm,faces=list(bm.faces));bm.to_mesh(wall.data);bm.free();wall.data.update()
+    colors=wall.data.color_attributes.new(name='FreshLimeSection',type='FLOAT_COLOR',domain='POINT')
+    for v in wall.data.vertices:
+        p=wall.matrix_world@v.co
+        broad=noise.noise_vector(Vector((p.x*1.8,2.37,p.z*1.7)))[0]
+        grain=noise.noise_vector(Vector((p.x*9,5.8,p.z*7)))[0]
+        low=math.exp(-max(0,p.z)/.48)
+        # Pale abraded lime interleaves with warm absorbed dust and lower-wall
+        # damp marks; neutral channels avoid the former rainbow blotches.
+        rubbed=max(0,broad+.08)*.55
+        shade=.98+rubbed+.11*grain-.24*low
+        colors.data[v.index].color=(shade,shade*(.985-.015*low),shade*(.958-.04*low),1)
+    ProjectUv(wall,1.8)

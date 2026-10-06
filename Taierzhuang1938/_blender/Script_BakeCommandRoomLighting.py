@@ -22,29 +22,31 @@ allObjects=[o for o in scene.objects if o.type=='MESH']
 # Dedicated packed charts are narrower than a texel and develop black seams.
 threads=[o for o in allObjects if o.data.materials[0].name=='CommandRoomThread']
 objects=[o for o in allObjects if o not in threads]
-bpy.ops.object.select_all(action='DESELECT')
-for ob in objects:
-    ob.select_set(True)
-    if not ob.data.uv_layers: ob.data.uv_layers.new(name='UVMap')
-    if 'LightmapUV' in ob.data.uv_layers: ob.data.uv_layers.remove(ob.data.uv_layers['LightmapUV'])
-    ob.data.uv_layers.new(name='LightmapUV')
-    ob.data.uv_layers.active_index=1
-bpy.context.view_layer.objects.active=objects[0]
-bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT')
-bpy.ops.uv.smart_project(angle_limit=math.radians(66),island_margin=.003,area_weight=1.0,correct_aspect=True,scale_to_bounds=True)
-bpy.ops.object.mode_set(mode='OBJECT')
-# Tiny pencils/ruler marks otherwise get sub-pixel chart widths next to entire walls.
-# Adjust relative texel density before a single shared repack; never overlap charts.
 density={'CommandRoomPlaster':.45,'CommandRoomMortar':5,'CommandRoomOutside':.35,'CommandRoomPencilWood':16,'CommandRoomPencilPaint':16,'CommandRoomInkGlass':8,
          'CommandRoomGraphite':20,'CommandRoomIron':6,'CommandRoomDust':2,
          'CommandRoomCloth':3,'CommandRoomCapCloth':4,'CommandRoomPaperEdge':6,'CommandRoomInkLabel':12,'CommandRoomInkLid':10,'CommandRoomInkLiquid':8,
          'CommandRoomLetter':1.5,'CommandRoomMap':1.25}
-for ob in objects:
-    factor=density.get(ob.data.materials[0].name,1)
-    for loop in ob.data.uv_layers['LightmapUV'].data: loop.uv*=factor
-bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT')
-bpy.ops.uv.pack_islands(rotate=True,margin=.003,scale=True)
-bpy.ops.object.mode_set(mode='OBJECT')
+unwrap=GAME/'_blender/Script_UnwrapCommandRoomLightmap.py'
+exec(compile(unwrap.read_text(encoding='utf-8'),str(unwrap),'exec'),globals())
+bpy.ops.object.select_all(action='DESELECT')
+for ob in objects:ob.select_set(True)
+bpy.context.view_layer.objects.active=objects[0]
+paperObject=bpy.data.objects['Room_CommandRoomMap'];paperMesh=paperObject.data;paperMesh.calc_loop_triangles()
+paperUv=paperMesh.uv_layers['LightmapUV'].data
+paperTriangles=np.array([[list(paperUv[i].uv) for i in tri.loops] for tri in paperMesh.loop_triangles])
+paperOwners=np.array([tri.polygon_index for tri in paperMesh.loop_triangles])
+paperLo=paperTriangles.min(axis=1);paperHi=paperTriangles.max(axis=1)
+for poly in paperMesh.polygons:
+    # A sample strictly inside each polygon catches overlap between the wall
+    # paper and the dark underside of the desk map before a costly light bake.
+    uvPoints=np.array([list(paperUv[i].uv) for i in poly.loop_indices])
+    point=uvPoints.mean(axis=0)*.81+uvPoints[0]*.19
+    ids=np.flatnonzero(((paperLo<point)&(paperHi>point)).all(axis=1)&(paperOwners!=poly.index))
+    if not len(ids):continue
+    ts=paperTriangles[ids];edge=np.roll(ts,-1,axis=1)-ts;delta=point-ts
+    signs=edge[:,:,0]*delta[:,:,1]-edge[:,:,1]*delta[:,:,0]
+    overlap=(np.all(signs>1e-12,axis=1)|np.all(signs< -1e-12,axis=1))
+    assert not overlap.any(), f'Overlapping paper lightmap: {poly.index} / {paperOwners[ids[overlap]].tolist()}'
 atlas=bpy.data.images.new('CommandRoomLighting',width=2048,height=2048,float_buffer=True,alpha=False)
 atlas.colorspace_settings.name='Linear Rec.709'
 for mat in bpy.data.materials:
@@ -54,7 +56,7 @@ for mat in bpy.data.materials:
     node=tree.nodes.new('ShaderNodeTexImage');node.name='CommandRoomBakedLighting';node.image=atlas;node.select=True;tree.nodes.active=node
 scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=256;scene.cycles.use_denoising=True
 scene.render.bake.use_pass_direct=True;scene.render.bake.use_pass_indirect=True;scene.render.bake.use_pass_color=False
-scene.render.bake.margin=10;scene.render.bake.use_clear=True
+scene.render.bake.margin=3;scene.render.bake.margin_type='EXTEND';scene.render.bake.use_clear=True
 # Sewing thread is below the atlas texel size. Baking its hairline shadow creates
 # square black blocks; the actual sewn geometry remains visible in the game.
 threadVisibility=[o.visible_shadow for o in threads]
@@ -102,3 +104,4 @@ bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'Scene_CommandRoom.blend'))
 record={'source':str(raw),'deliveryInput':str(png),'size':[2048,2048],'samples':256,'encoding':'sRGB(linear diffuse irradiance / 32)','scale':32,'peakLinear':peak,'uvChannel':1,'meshes':len(objects),'noAlbedo':True,'relativeTexelDensity':density}
 (GAME/'_shots'/'CommandRoom'/'Data_CommandRoomLighting.json').write_text(json.dumps(record,indent=2),encoding='utf-8')
 print(json.dumps(record))
+result=record

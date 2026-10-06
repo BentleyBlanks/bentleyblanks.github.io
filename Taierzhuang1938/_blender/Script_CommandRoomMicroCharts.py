@@ -31,12 +31,20 @@ def RepairMaterialCharts(ob):
     atlas=globals().get('atlas') or bpy.data.images['CommandRoomLighting']
     pixels=np.empty(len(atlas.pixels),dtype=np.float32);atlas.pixels.foreach_get(pixels)
     width,height=atlas.size;pixels=pixels.reshape((height,width,4))
+    # The atlas is linear HDR / 32 at runtime. A raw .008 sample quantizes to
+    # roughly one sRGB byte: technically nonzero, but visually black. Keep
+    # resolved ambient-light samples above that quantization floor.
+    minimum=.065 if ob.name in ('Room_CommandRoomBrick','Room_CommandRoomPlaster','Room_CommandRoomMortar') else .045
     def Resolved(uv):
         x=max(0,min(width-1,int(uv.x*width)));y=max(0,min(height-1,int(uv.y*height)))
-        return float(pixels[y,x,:3].max())>.008
+        return float(pixels[y,x,:3].max())>minimum
     for p in mesh.polygons:
         center=sum((uvs[i].uv for i in p.loop_indices),Vector((0,0)))/len(p.loop_indices)
-        if areas[p.index]<80 and not Resolved(center):bad.add(p.index)
+        samples=[center]+[center.lerp(uvs[i].uv,.72) for i in p.loop_indices]
+        # A clipped brick or folded panel can have a resolved centre while a
+        # corner interpolates across an empty atlas sliver. Inspect interior
+        # corner samples too; face area alone does not detect that failure.
+        if not all(Resolved(sample) for sample in samples):bad.add(p.index)
     mesh.calc_loop_triangles();verts=[];faces=[];uvTriangles=[];normals=[]
     for tri in mesh.loop_triangles:
         if tri.polygon_index in bad:continue
@@ -50,7 +58,9 @@ def RepairMaterialCharts(ob):
     tree=BVHTree.FromPolygons(verts,faces,all_triangles=True);fixed=0
     for index in sorted(bad):
         poly=mesh.polygons[index];p=ob.matrix_world@poly.center;n=(ob.matrix_world.to_3x3()@poly.normal).normalized()
-        candidates=[x for x in tree.find_nearest_range(p,.035) if normals[x[2]].dot(n)>.15]
+        radius=.09 if ob.name=='Room_CommandRoomBrick' else .055
+        alignment=.95 if ob.name=='Room_CommandRoomPlaster' else .65
+        candidates=[x for x in tree.find_nearest_range(p,radius) if normals[x[2]].dot(n)>alignment]
         if not candidates:continue
         hit,normal,ti,distance=min(candidates,key=lambda x:x[3]+.003*(1-normals[x[2]].dot(n)))
         # Use the tested interior texel, not an edge that can land on black padding.
@@ -60,5 +70,5 @@ def RepairMaterialCharts(ob):
         fixed+=1
     print({'material':ob.name,'subpixelFaces':len(bad),'localIrradianceRepairs':fixed})
 
-for materialName in ['Room_CommandRoomCloth','Room_CommandRoomCapCloth','Room_CommandRoomMortar']:
+for materialName in ['Room_CommandRoomCloth','Room_CommandRoomCapCloth','Room_CommandRoomMortar','Room_CommandRoomPlaster']:
     RepairMaterialCharts(bpy.data.objects[materialName])

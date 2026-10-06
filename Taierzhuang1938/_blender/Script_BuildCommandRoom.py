@@ -372,3 +372,4 @@ bpy.ops.render.render(write_still=True)
 summary={"blend":str(SOURCE/"Scene_CommandRoom.blend"),"glb":str(GAME/"Model"/"Model_CommandRoom.glb"),"meshes":len([o for o in scene.objects if o.type=="MESH"]),"triangles":sum(len(p.vertices)-2 for o in scene.objects if o.type=="MESH" for p in o.data.polygons),"camera":{"position":list(cam.location),"rotation":list(cam.rotation_euler),"lens":cam.data.lens},"materials":list(materials),"render":scene.render.filepath,"chairTableIntersections":chairOverlaps,"coatChairIntersections":coatChairOverlaps,"chairFloor":chairFloor,"propContacts":propContacts}
 (SHOTS/"Data_CommandRoomBuild.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
 print(json.dumps(summary))
+result=summary
