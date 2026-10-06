@@ -154,6 +154,8 @@ def Branch(a,d,length,r,depth):
         for side in [-1,1]:
             Branch(b,(d.x+side*random.uniform(.30,.65),d.y+random.uniform(-.10,.10),d.z),length*random.uniform(.58,.75),r*.62,depth-1)
 for x in [-2.35,-.55]: Branch((x,3.8,.6),(random.uniform(-.1,.1),0,1),.72,.017,4)
+courtyardPath=GAME/'_blender/Script_CommandRoomCourtyard.py'
+exec(compile(courtyardPath.read_text(encoding='utf-8'),str(courtyardPath),'exec'),globals())
 # Cut real recesses through the plaster skin and fit eroded masonry inside.
 wallPath=GAME/'_blender/Script_CommandRoomWallWear.py'
 exec(compile(wallPath.read_text(encoding='utf-8'),str(wallPath),'exec'),globals())
@@ -237,6 +239,23 @@ bpy.context.view_layer.objects.active=ob;bpy.ops.object.modifier_apply(modifier=
 # Refinements follow the saved Imagegen turnaround references.
 detailsPath=GAME/"_blender/Script_CommandRoomDetails.py"
 exec(compile(detailsPath.read_text(encoding="utf-8"),str(detailsPath),"exec"),globals())
+# Scale the bottle to a 95 mm height; pencils retain their 185 mm length.
+for ob in list(scene.objects):
+    if ob.type=='MESH' and ob.name.startswith('InkBottle'):
+        ob.matrix_world=Matrix.Translation((ix,iy,iz))@Matrix.Scale(1.34,4)@Matrix.Translation((-ix,-iy,-iz))@ob.matrix_world
+# A small open wooden pencil tray, 23 x 8 cm, supplies an everyday scale cue.
+bx=.26;by=.11;bz=.904
+Cube('PencilBoxBase',(bx,by,bz),(.230,.080,.007),wood,.002)
+for side in [-1,1]:
+    Cube('PencilBoxLongRim',(bx,by+side*.037,bz+.010),(.230,.006,.020),wood,.002)
+    Cube('PencilBoxEndRim',(bx+side*.112,by,bz+.010),(.006,.068,.020),wood,.002)
+for ob in list(scene.objects):
+    if ob.name.startswith(('Pencil0','Pencil1')):
+        # Lay both pencils lengthwise in the tray without touching its walls.
+        index=0 if ob.name.startswith('Pencil0') else 1
+        pivot=Vector((.02+index*.06,.015+index*.052,.910))
+        angle=-math.atan2(-.493+index*.055,.87)
+        ob.matrix_world=Matrix.Translation((bx-.09,by+(index-.5)*.025,bz+.0073))@Matrix.Rotation(angle,4,'Z')@Matrix.Translation(-pivot)@ob.matrix_world
 bpy.context.view_layer.update()
 tableTransform=Matrix.Translation((tx,ty,0))@Matrix.Rotation(math.radians(40),4,"Z")@Matrix.Translation((-tx,-ty,0))
 backdropTransform=Matrix.Translation((-.85,-2.5,1.9))@Matrix.Scale(1.235,4)@Matrix.Translation((.85,2.5,-1.9))
@@ -252,7 +271,7 @@ for ob in list(scene.objects):
         inverse=ob.matrix_world.inverted()
         for v in ob.data.vertices:
             p=ob.matrix_world@v.co
-            v.co=inverse@(Vector((hx,hy,hz))+(Matrix.Rotation(math.radians(-35),3,"Z")@(p-Vector((hx,hy,hz))))*1.45)
+            v.co=inverse@(Vector((hx,hy,hz))+(Matrix.Rotation(math.radians(-35),3,"Z")@(p-Vector((hx,hy,hz))))*1.0)
     if ob.name.startswith('Coat'):
         ob.matrix_world=Matrix.Translation((0,0,-.39))@ob.matrix_world
     if ob.name.startswith(("Table","DryMortar")):
@@ -263,7 +282,7 @@ for ob in list(scene.objects):
         ob.matrix_world=backdropTransform@ob.matrix_world
     if ob.type=="MESH" and len(ob.data.materials) and ob.data.materials[0] in (cloth,capCloth):
         for uv in ob.data.uv_layers:
-            for corner in uv.data: corner.uv*=5.8 if ob.data.materials[0]==capCloth else 4
+            for corner in uv.data: corner.uv*=4
 # Validate the furniture before material batching removes individual part names.
 from mathutils.bvhtree import BVHTree
 bpy.context.view_layer.update()
@@ -286,7 +305,7 @@ for ob in [o for o in supportObjects if o.name.startswith('Telegram')]:
 bpy.context.view_layer.update()
 supportTree=WorldBvh(supportObjects)
 propContacts={}
-for group,prefixes in {'Pencil0':('Pencil0',),'Pencil1':('Pencil1',),'Ruler':('WoodRuler','RulerTick'),
+for group,prefixes in {'PencilTray':('PencilBox','Pencil0','Pencil1'),'Ruler':('WoodRuler','RulerTick'),
     'InkBottle':('InkBottle',),'DipPen':('DipPen',),'Cap':('Cap',)}.items():
     obs=[o for o in scene.objects if o.type=='MESH' and o.name.startswith(prefixes)]
     points=[o.matrix_world@v.co for o in obs for v in o.data.vertices]
@@ -369,7 +388,7 @@ for mat,a,b in links:mat.node_tree.links.new(a,b)
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/"Scene_CommandRoom.blend"))
 scene.render.filepath=str(SHOTS/"Scene_CommandRoomBlender.png")
 bpy.ops.render.render(write_still=True)
-summary={"blend":str(SOURCE/"Scene_CommandRoom.blend"),"glb":str(GAME/"Model"/"Model_CommandRoom.glb"),"meshes":len([o for o in scene.objects if o.type=="MESH"]),"triangles":sum(len(p.vertices)-2 for o in scene.objects if o.type=="MESH" for p in o.data.polygons),"camera":{"position":list(cam.location),"rotation":list(cam.rotation_euler),"lens":cam.data.lens},"materials":list(materials),"render":scene.render.filepath,"chairTableIntersections":chairOverlaps,"coatChairIntersections":coatChairOverlaps,"chairFloor":chairFloor,"propContacts":propContacts}
+summary={"blend":str(SOURCE/"Scene_CommandRoom.blend"),"glb":str(GAME/"Model"/"Model_CommandRoom.glb"),"meshes":len([o for o in scene.objects if o.type=="MESH"]),"triangles":sum(len(p.vertices)-2 for o in scene.objects if o.type=="MESH" for p in o.data.polygons),"camera":{"position":list(cam.location),"rotation":list(cam.rotation_euler),"lens":cam.data.lens},"materials":list(materials),"render":scene.render.filepath,"chairTableIntersections":chairOverlaps,"coatChairIntersections":coatChairOverlaps,"chairFloor":chairFloor,"propContacts":propContacts,"capDimensions":capDimensions,"inkBottleHeightM":.071*1.34,"pencilTraySizeM":[.230,.080,.027]}
 (SHOTS/"Data_CommandRoomBuild.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
 print(json.dumps(summary))
 result=summary

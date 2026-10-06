@@ -1,23 +1,23 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-10-06",
+  "date": "2026-10-07",
   "name": "CommandRoomCapCloth",
   "preset": "menuCloth",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomCapQuilt.png",
-    "sha256": "14155c1b9bb76d0780f3c240aabcda690335335d2ef3c6669b88d8e7dd2ed5bb",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomCapTwill20261007.png",
+    "sha256": "30154e04e2c1ec037d29ccbed40b468d987ed8eebb17108baf2601977ca8255e",
     "metrics": {
       "meanSrgb": [
-        0.3521,
-        0.2982,
-        0.2586
+        0.46,
+        0.4121,
+        0.3353
       ],
-      "luma": 0.303,
-      "lumaStd": 0.1026,
-      "sat": 0.2656,
+      "luma": 0.4024,
+      "lumaStd": 0.0721,
+      "sat": 0.271,
       "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.0043
+      "lowFreq": 0.0039
     }
   },
   "heightSource": null,
@@ -27,7 +27,7 @@
       0.435,
       0.393
     ],
-    "contrast": 0.048,
+    "contrast": 0.045,
     "lumaRange": [
       0.32,
       0.52
@@ -44,7 +44,7 @@
       128,
       4096
     ],
-    "reliefM": 0.00028,
+    "reliefM": 0.00016,
     "rough": 0.96,
     "roughVar": 0.025,
     "roughLumaK": 0.0,
@@ -77,46 +77,46 @@
       "file": "Texture_CommandRoomCapClothBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 288740,
-      "sha256": "f1dffc220a9aa875c04b6064023d6b2136692b3b1f934550e626af69e819fbad"
+      "bytes": 248988,
+      "sha256": "caf86d714df6c948251d89a2a7df2d73cb0db736412d70f7121929b96b873a18"
     },
     {
       "channel": "Normal",
       "file": "Texture_CommandRoomCapClothNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 63122,
-      "sha256": "8f2ea492b34f02b3bd2aecf1e42df57144889901f7200fa455d3e4c89839e79e"
+      "bytes": 19660,
+      "sha256": "5988aa7e55c0dcb8cb27ac6d56423dc03f54c1e20ba9ee00d3398992e562a9f5"
     },
     {
       "channel": "Orm",
       "file": "Texture_CommandRoomCapClothOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 38400,
-      "sha256": "bdc40048efa5513fffb0e2ef88f9b695a62160d72fe9786ba790bc4973d98be0"
+      "bytes": 46984,
+      "sha256": "51bb8c660ca04f0cc26591ada8dbcaa923a731c413b599bd61e9caf2bddededf"
     }
   ],
-  "totalBytes": 390262,
+  "totalBytes": 315632,
   "metrics": {
     "meanSrgb": [
-      0.4598,
-      0.4358,
-      0.3926
+      0.4596,
+      0.436,
+      0.3924
     ],
-    "luma": 0.4294,
-    "lumaStd": 0.0487,
+    "luma": 0.4293,
+    "lumaStd": 0.0455,
     "sat": 0.1462,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0009,
-    "seam": 0.039,
-    "interior": 0.0411,
-    "seamRatio": 0.948,
-    "border": 0.962,
-    "swing": 0.0067,
-    "aoMean": 0.956,
-    "roughMean": 0.95,
+    "lowFreq": 0.0007,
+    "seam": 0.0356,
+    "interior": 0.0397,
+    "seamRatio": 0.896,
+    "border": 0.981,
+    "swing": 0.0096,
+    "aoMean": 0.948,
+    "roughMean": 0.955,
     "texelsPerMeter": 4096.0
   },
   "gateProblems": []

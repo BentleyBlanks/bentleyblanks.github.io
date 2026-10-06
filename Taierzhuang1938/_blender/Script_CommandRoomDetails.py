@@ -8,6 +8,13 @@ inkGlass.node_tree.nodes.get('Principled BSDF').inputs['Roughness'].default_valu
 inkGlass.node_tree.nodes.get('Principled BSDF').inputs['Specular IOR Level'].default_value=.50
 
 def Shell(ob,thickness):
+    if ob.name.startswith('Cap'):
+        # Close periodic seams and the top's polar fan before giving it a shell.
+        import bmesh
+        bm=bmesh.new();bm.from_mesh(ob.data)
+        bmesh.ops.remove_doubles(bm,verts=list(bm.verts),dist=.000005)
+        bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
+        bm.to_mesh(ob.data);bm.free();ob.data.update()
     m=ob.modifiers.new('Physical fabric thickness','SOLIDIFY');m.thickness=thickness
     bpy.context.view_layer.objects.active=ob;bpy.ops.object.modifier_apply(modifier=m.name)
     return ob

@@ -36,11 +36,21 @@ def RepairMaterialCharts(ob):
     # resolved ambient-light samples above that quantization floor.
     minimum=.065 if ob.name in ('Room_CommandRoomBrick','Room_CommandRoomPlaster','Room_CommandRoomMortar') else .045
     def Resolved(uv):
-        x=max(0,min(width-1,int(uv.x*width)));y=max(0,min(height-1,int(uv.y*height)))
-        return float(pixels[y,x,:3].max())>minimum
+        if ob.name!='Room_CommandRoomCapCloth':
+            x=max(0,min(width-1,int(uv.x*width)));y=max(0,min(height-1,int(uv.y*height)))
+            return float(pixels[y,x,:3].max())>minimum
+        # Match the runtime's bilinear footprint, including its neighbours.
+        # A bright nearest texel alone misses seam slivers next to black padding.
+        px=uv.x*width-.5;py=uv.y*height-.5
+        x=math.floor(px);y=math.floor(py);fx=px-x;fy=py-y
+        value=np.zeros(3,dtype=np.float32)
+        for dx,dy,w in [(0,0,(1-fx)*(1-fy)),(1,0,fx*(1-fy)),(0,1,(1-fx)*fy),(1,1,fx*fy)]:
+            value+=pixels[max(0,min(height-1,y+dy)),max(0,min(width-1,x+dx)),:3]*w
+        return float(value.max())>minimum
     for p in mesh.polygons:
         center=sum((uvs[i].uv for i in p.loop_indices),Vector((0,0)))/len(p.loop_indices)
-        samples=[center]+[center.lerp(uvs[i].uv,.72) for i in p.loop_indices]
+        cornerWeight=.96 if ob.name=='Room_CommandRoomCapCloth' else .72
+        samples=[center]+[center.lerp(uvs[i].uv,cornerWeight) for i in p.loop_indices]
         # A clipped brick or folded panel can have a resolved centre while a
         # corner interpolates across an empty atlas sliver. Inspect interior
         # corner samples too; face area alone does not detect that failure.

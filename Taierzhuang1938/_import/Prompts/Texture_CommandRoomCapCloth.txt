@@ -1,10 +1,1 @@
-Provider: built-in imagegen
-Date: 2026-10-06
-Source: CommandRoom/Source/CommandRoomCapQuilt.png
-Generated file: exec-7c74ef30-3697-4fd0-9590-2294ed4674e6.png
-Reference: user supplied cap crop, saved as CommandRoom/Source/Reference_CapCrushed.png
-
-Use case: photorealistic-natural.
-Asset type: game PBR base-color texture of old cap fabric.
-Input image is ONLY a material reference: sample the cap's dusty warm gray-brown woven cloth and the fine irregular crisscross stitched quilting from it.
-Generate ONE square, seamless tileable flat fabric swatch, orthographic macro scan, covering a 25 by 25 centimeter piece. About 14 small uneven diamond/triangular stitched cells across the image, formed by very fine faded taupe threads sewn through rough cotton-wool twill. Some interrupted and frayed stitches, not perfect geometric computer lines. Dense fine fibers and understated rubbed patches. The stitching should be visible like the reference but not ornate embroidery, no large patterns. Opaque full-bleed fabric, neutral even diffuse scan lighting, no directional light, no shadows, no folds, no buttons, no cap silhouette, no borders, no labels or text. This is albedo for a 3D model with separate geometry folds and baked lighting: no photographic object render. Midtone warm gray-brown, never black, no oily shine, no exaggerated dirt or white speckles.
+Use case: photorealistic-natural. Square seamless flat albedo material scan of plain aged grey-brown khaki cotton twill fabric for a soft 1930s military field cap. Micro diagonal woven twill fibers, subtly faded slightly uneven grey-taupe dye. NO stitched diamonds, NO quilting, NO seams, NO folds, NO large wrinkles, NO embroidery, NO objects, NO text. A continuous plain textile sample covering 20 cm square. Flat shadowless orthographic diffuse lighting, even color. Dense fine cotton yarn weave visible at close distance; rough and matte. Warm neutral taupe grey, desaturated, realistic material for 3D model texturing.

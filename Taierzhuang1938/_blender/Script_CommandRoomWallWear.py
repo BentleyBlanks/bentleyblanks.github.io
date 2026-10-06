@@ -3,7 +3,12 @@ from mathutils import noise
 import bmesh
 walls=[o for o in scene.objects if o.type=='MESH' and o.name.startswith('Wall')]
 front=wy-.12
-mortarMat=Material('CommandRoomMortar',(.36,.34,.3),.97,'CommandRoomPlaster')
+mortarMat=Material('CommandRoomMortar',(.40,.295,.175),.99,'CommandRoomPlaster')
+# Ochre earth-and-lime scratch coat beneath the ivory finish.
+mt=mortarMat.node_tree;bp=mt.nodes['Principled BSDF']
+ln=next(l for l in mt.links if l.to_socket==bp.inputs['Base Color']);src=ln.from_socket;mt.links.remove(ln)
+mx=mt.nodes.new('ShaderNodeMixRGB');mx.blend_type='MULTIPLY';mx.inputs[0].default_value=1;mx.inputs[2].default_value=(.65,.47,.28,1)
+mt.links.new(src,mx.inputs[1]);mt.links.new(mx.outputs[0],bp.inputs['Base Color'])
 patches=[(-2.51,2.49,.66,1.38),(-2.47,.66,.80,1.20),(-.79,2.98,.57,.48),
     (-.15,2.04,.67,1.37),(.76,.82,1.15,.62),(1.95,.64,1.13,.70),(2.61,1.60,.97,1.68)]
 # Non-radial fractures: deep bays, irregular corners and tongues of old plaster.
@@ -121,6 +126,13 @@ for index,(cx,cz,sx,sz) in enumerate(patches):
     ob=Mesh('FracturedPlasterSection',rim,[(r*stride+i,r*stride+i+1,(r+1)*stride+i+1,(r+1)*stride+i) for r in range(3) for i in range(n)],mortarMat,rimUvs)
     color=ob.data.color_attributes.new(name='FreshLimeSection',type='FLOAT_COLOR',domain='POINT')
     for c in color.data:c.color=(1.15,1.13,1.08,1)
+    # The large loss exposes mostly earthen undercoat. Only an irregular,
+    # smaller deep core reveals blue-grey bricks, as in the user's reference.
+    innerOutline=[(cx+(x-cx)*(.50+.055*math.sin(i*.19)),cz+(z-cz)*(.65+.055*math.sin(i*.23))) for i,(x,z) in enumerate(outline)]
+    nv=len(innerOutline)
+    deepVerts=[(x,y,z) for y in [front-.02,front+.065] for x,z in innerOutline]
+    deepFaces=[tuple(reversed(range(nv))),tuple(nv+i for i in range(nv))]+[(i,(i+1)%nv,nv+(i+1)%nv,nv+i) for i in range(nv)]
+    brickCut=Mesh('InnerMasonryExposure',deepVerts,deepFaces,brick);Recalculate(brickCut)
     for row in range(math.floor((cz-sz*.6)/.105),math.ceil((cz+sz*.6)/.105)):
         for col in range(math.floor((cx-sx*.6)/.25),math.ceil((cx+sx*.6)/.25)+1):
             x=col*.25+(row%2)*.125;z=row*.105
@@ -140,7 +152,7 @@ for index,(cx,cz,sx,sz) in enumerate(patches):
             bevel=ob.modifiers.new('Chipped brick corners','BEVEL');bevel.width=.0025;bevel.segments=1
             bpy.ops.object.modifier_apply(modifier=bevel.name)
             ob.rotation_euler.y=rng.uniform(-.012,.012)
-            ob.data.update();Boolean(ob,cut,'INTERSECT')
+            ob.data.update();Boolean(ob,brickCut,'INTERSECT')
             if not ob.data.polygons:bpy.data.objects.remove(ob,do_unlink=True);continue
             # Exact CSG must not retain the cutter's front cap after erosion.
             assert min((ob.matrix_world@v.co).y for v in ob.data.vertices)>front+.010, 'Invalid recessed brick intersection'
@@ -150,7 +162,8 @@ for index,(cx,cz,sx,sz) in enumerate(patches):
             color=ob.data.color_attributes.new(name='BrickWear',type='FLOAT_COLOR',domain='POINT');shade=rng.uniform(.89,1.13)
             for v in ob.data.vertices:
                 p=ob.matrix_world@v.co;nval=noise.noise_vector(p*25)[0];value=shade+.14*max(0,nval)
-                color.data[v.index].color=(value,value*.985,value*.955,1)
+                color.data[v.index].color=(value*.96,value*.985,value,1)
+    bpy.data.objects.remove(brickCut,do_unlink=True)
     bpy.data.objects.remove(cut,do_unlink=True)
     # Remnants of the scratch coat stay on some brick faces. They bridge the
     # mortar joints instead of tracing every brick like clean new tilework.

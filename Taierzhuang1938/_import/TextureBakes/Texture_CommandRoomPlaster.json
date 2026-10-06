@@ -1,33 +1,33 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-10-06",
+  "date": "2026-10-07",
   "name": "CommandRoomPlaster",
   "preset": "limePlaster",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomPlasterCrumbling.png",
-    "sha256": "d85c166fb4140f1ab00c55bdcf3fd2a10adee994dcdd94267967c6496e4fb507",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomIvoryLime20261007.png",
+    "sha256": "53bbed0ea45020e8a3ca500f2de239bab0c27e9652aa9b41c0e23c4b54240a0d",
     "metrics": {
       "meanSrgb": [
-        0.6891,
-        0.6363,
-        0.5669
+        0.8184,
+        0.7829,
+        0.7275
       ],
-      "luma": 0.6308,
-      "lumaStd": 0.0743,
-      "sat": 0.1773,
+      "luma": 0.7762,
+      "lumaStd": 0.0442,
+      "sat": 0.1111,
       "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.0141
+      "lowFreq": 0.0042
     }
   },
   "heightSource": null,
   "params": {
     "mean": [
-      0.66,
-      0.64,
-      0.595
+      0.73,
+      0.71,
+      0.665
     ],
-    "contrast": 0.06,
+    "contrast": 0.045,
     "lumaRange": [
       0.5,
       0.75
@@ -40,7 +40,7 @@
       0.03,
       0.1
     ],
-    "reliefM": 0.004,
+    "reliefM": 0.002,
     "rough": 0.97,
     "roughVar": 0.04,
     "roughLumaK": 0.0,
@@ -73,46 +73,46 @@
       "file": "Texture_CommandRoomPlasterBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 349954,
-      "sha256": "0865c2cead47c7cb6044aa8d478b4ead150f1743a575bf893c5a807e4944dc65"
+      "bytes": 282000,
+      "sha256": "143f214a3b658bcaf24ff4efe4ea1b7030d49508cf7ccb7cbddcb7dd13a848ad"
     },
     {
       "channel": "Normal",
       "file": "Texture_CommandRoomPlasterNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 102374,
-      "sha256": "ee1606149180af8d60de2ac0e7ca7bbceb67147835d9d9773f76f2b7be8d2f44"
+      "bytes": 56646,
+      "sha256": "f2474fcbd3220ad2921f07a644ef6e50f2e9d2a6f95e59c379b7101ea4884a01"
     },
     {
       "channel": "Orm",
       "file": "Texture_CommandRoomPlasterOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 71856,
-      "sha256": "aa809d9b467f298c5670f019177f8734b8100e70cf2ab4ab2ea3e7156654a5ac"
+      "bytes": 74280,
+      "sha256": "b8485fbca04ef28ab4366dcd823ae7da9c8ab5454e752f0e93d1929e2a407ee1"
     }
   ],
-  "totalBytes": 524184,
+  "totalBytes": 412926,
   "metrics": {
     "meanSrgb": [
-      0.6597,
-      0.641,
-      0.5947
+      0.7298,
+      0.7109,
+      0.6655
     ],
-    "luma": 0.6318,
-    "lumaStd": 0.0605,
-    "sat": 0.0986,
+    "luma": 0.7021,
+    "lumaStd": 0.0449,
+    "sat": 0.0881,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0045,
-    "seam": 0.0498,
-    "interior": 0.0486,
-    "seamRatio": 1.025,
-    "border": 0.938,
-    "swing": 0.0014,
-    "aoMean": 0.913,
-    "roughMean": 0.965,
+    "lowFreq": 0.0019,
+    "seam": 0.0355,
+    "interior": 0.0362,
+    "seamRatio": 0.982,
+    "border": 0.955,
+    "swing": 0.0011,
+    "aoMean": 0.912,
+    "roughMean": 0.969,
     "texelsPerMeter": 568.9
   },
   "gateProblems": []

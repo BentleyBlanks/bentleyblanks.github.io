@@ -120,8 +120,8 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({ id: "CommandRoom", name: "启动界面指挥室", pack: "Model_CommandRoom.glb",
-    sourceTriangles: 505909, actualTriangles: 505909, targetTriangles: 505909,
-    sourceTexture: "用户确认地图和电文 / Imagegen 风化木、剥落灰泥、旧砖、细斜纹布、帽用缝线布与瓶签", runtimeTexture: "四套 1K 和一套 512 PBR、独立纸图及无损 UV1 辐照度图集",
+    sourceTriangles: 456384, actualTriangles: 456384, targetTriangles: 456384,
+    sourceTexture: "用户确认地图和电文 / Imagegen 风化木、暖白灰面、青灰砖、细斜纹布、军帽斜纹棉布与瓶签", runtimeTexture: "四套 1K 和一套 512 PBR、独立纸图及无损 UV1 辐照度图集",
     policy: "source", note: "BlenderMCP 自建静态环境；按材质合并为 18 个网格。桌板具有实体 V 形端裂、长纹开裂及磨损倒角；灰泥为不规则剥落截面和延伸裂纹、浅凹砖层。衣服收拢于单个衣钩、空袖错落；帽顶塌陷、帽围与帽檐有独立缝线。厚玻璃与内层墨水均为实际几何。包含独立 glTF 相机。" }),
   Object.freeze({ id: "Cigarette", name: "老周卷烟", pack: "Model_Cigarette.glb",
     sourceTriangles: 50000, actualTriangles: 1798, targetTriangles: 1800,

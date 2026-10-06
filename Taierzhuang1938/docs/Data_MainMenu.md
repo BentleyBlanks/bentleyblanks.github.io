@@ -49,27 +49,29 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 单窗天空补光与曝光提亮可读区域，太阳方向保持一致。`host.staticBackdrop` 关闭时，
 下文原有战场机位系统仍可运行，正式入口默认启用指挥室。
 
+窗外由 `Script_CommandRoomCourtyard.py` 建立近处树干与枝条、中层院墙和瓦檐、远层屋顶及天空，真实几何参与相机视差。
+
 原工程在 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Scene_CommandRoom.blend`。
 椅子相对原布设转向桌面并沿桌后法线后撤 18 cm，座面、竖条和横撑已连接；
 重建时用世界空间三角网格检查椅桌及悬挂衣服与椅背的穿插。帽檐、两支 18.5 cm 铅笔、木尺、
-小墨水瓶和蘸水笔按桌板与纸面实际高度落放，保留 0.6 mm 接触余量，
+95 mm 高墨水瓶、230 × 80 mm 笔盒和蘸水笔按桌板与纸面实际高度落放，保留 0.6 mm 接触余量，
 逐组检查与支撑面不相交。墨水瓶和蘸水笔是一般年代陈设，并非王铭章实物复原。
 `_blender/Script_CommandRoomDetails.py` 调用 `Script_CommandRoomTailoring.py`（墨水瓶），
-再由 `Script_CommandRoomDrape.py` 生成帽服。当前形体依据用户补充的
-`Source/Reference_CoatDrape.png` 与 `Reference_CapCrushed.png`：衣服从单个衣钩收拢，
+再由 `Script_CommandRoomDrape.py` 生成帽服。
+衣服依据 `Source/Reference_CoatDrape.png` 从单个衣钩收拢；军帽依据 `Source/Reference_CapTurnaround20261006.png` 中用户确认的 Lovart 三视图，由 `Script_CommandRoomReferenceCap.py` 重建。
 衣身与袖筒用连续衣片连接，由 `Script_SimulateCommandRoomCoat.py` 在 Blender 中以领后悬挂点、重力、自碰撞和墙体碰撞计算 300 帧静态垂坠。
 求解结果保存为 `Data_CommandRoomCoatMesh.json`；`Script_CommandRoomSimulatedCoat.py` 对整件空衣调整朝向、袖口高度，添加薄壳厚度、缝边与暗扣。运行时只加载静态网格，没有布料模拟开销。
-帽冠使用高低不齐的缝合轮廓、宽而深的压褶和下陷顶片，帽围比上部布料更有支撑，
-帽檐为独立弯曲薄壳。参考是美术意图，不作为历史实物证据。
+军帽帽体宽约 21 cm，低平软帽冠、独立折叠护布、约 5.7 cm 短帽檐、前方两枚凸面黄铜扣和十二道光芒帽徽，后面只保留竖缝。取消原先 1.45 倍放大。三视图作为美术建模参考，并非历史实物证据。
 衣服使用 Imagegen `Source/CommandRoomClothSerge.png`；帽子独立使用
-`Source/CommandRoomCapQuilt.png` 的细碎交错缝线旧布。两者均为 25 cm 一铺、
-1K 基色与 512 法线/ORM，法线起伏分别为 0.18 / 0.28 mm。专用 `menuCloth`
+`Source/CommandRoomCapTwill20261007.png` 的普通灰褐斜纹棉布。两者均为 25 cm 一铺、
+1K 基色与 512 法线/ORM，法线起伏分别为 0.18 / 0.16 mm。专用 `menuCloth`
 类允许 4096 px/m，其余贴图仍沿用原密度上限，单套文件预算不变。
 `Script_CommandRoomFurniture.py` 用七层截面构成桌板圆角并向内切局部缺口；
 桌板额外布尔切除顺纹 V 形收尖裂口，端裂长 28–74 cm，口宽 6–10 mm、深约 28 mm；
 板面还有 80–102 cm 长的干缩检查裂纹。木屑、悬浮黑线不参与这些裂口。
 柜子具有圆角台面、下压边、实框凹面抽屉和铁拉手底座。检查标签 4/5 对应桌子/柜子。
-柜子、窗沿、桌椅共用 Imagegen 风化木 PBR，木材边角磨损进入几何与顶点色。
+柜子、窗沿、桌椅共享风化木纹理；柜子独立材质保留更深的旧棕漆和较低粗糙度，桌面保持磨白的干木色。木材边角磨损进入几何与顶点色。
+2026-10-07 按用户砖木民居参考改成暖白石灰皮、黄土底灰与少量青灰砖。Imagegen 补制白灰和青砖基色，经统一 baker 输出 normal/ORM。大破口内仅约半宽的更深处露出砖，外围保留连续土黄底层。
 `Script_CommandRoomWallWear.py` 用非径向凹凸轮廓切出灰泥破口，边界再加入毫米级
 崩缺与 13–27 mm 不等的剥落截面。主要破口外还有约 6 mm 的浅层脱皮，砖面保留少量狭长旧灰浆；
 墙面低处积灰、石灰层褪色使用连续的世界空间顶点色，不以等大的斑点或悬空碎片表现。灰浆位于墙面后 27 mm，砖面约后退 17 mm，

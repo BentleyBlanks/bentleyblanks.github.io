@@ -118,13 +118,15 @@ export class CommandRoom {
           mat.emissive.setHex(DATA.outside.color);
           mat.emissiveIntensity = DATA.outside.intensity;
         }
-        const set = byName.get(mat.name) || (["CommandRoomBrick", "CommandRoomMortar"].includes(mat.name) ? byName.get("CommandRoomPlaster") : null);
+        const set = byName.get(mat.name) || (mat.name === "CommandRoomCabinetWood" ? byName.get("CommandRoomWood") : null) || (["CommandRoomBrick", "CommandRoomMortar"].includes(mat.name) ? byName.get("CommandRoomPlaster") : null);
         if (!set) continue;
         mat.color.setHex(set.spec.tint);
         if (mat.name === "CommandRoomBrick") mat.color.setHex(DATA.brickTint);
+        if (mat.name === "CommandRoomMortar") mat.color.setHex(DATA.mortarTint);
+        if (mat.name === "CommandRoomCabinetWood") mat.color.setHex(DATA.cabinet.tint);
         mat.map = set.textures[0];
         if (mat.name === "CommandRoomMap" || mat.name === "CommandRoomLetter") this.paperMaterials.set(mat.name, mat);
-        mat.roughness = 1;
+        mat.roughness = mat.name === "CommandRoomCabinetWood" ? DATA.cabinet.roughness : 1;
         mat.metalness = 0;
         if (set.spec.kind === "pbr") {
           mat.normalMap = set.textures[1];
@@ -190,9 +192,11 @@ export class CommandRoom {
       this.reflection=generator.fromCubemap(cube.texture);
       for(const object of glass){object.material.envMap=this.reflection.texture;
         object.material.envMapIntensity=DATA.reflection.intensity;object.material.needsUpdate=true;}
-      for(const object of bottle.filter(o=>o.material.name==="CommandRoomInkLid")){
-        object.material.envMap=this.reflection.texture;object.material.envMapIntensity=.65;object.material.needsUpdate=true;
-      }
+      this.scene.traverse(object=>{
+        if (!object.isMesh || !DATA.reflection.detailMaterials.includes(object.material?.name)) return;
+        object.material.envMap=this.reflection.texture;
+        object.material.envMapIntensity=DATA.reflection.detailIntensity;object.material.needsUpdate=true;
+      });
     } finally {
       bottle.forEach((object,i)=>{object.visible=visible[i];});
       cube.dispose();generator.dispose();

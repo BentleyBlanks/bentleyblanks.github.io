@@ -13,7 +13,7 @@ world=bpy.data.worlds.new('InspectionWorld');world.use_nodes=True;world.node_tre
 cameraData=bpy.data.cameras.new('InspectionCamera');cameraData.type='ORTHO'
 camera=bpy.data.objects.new('InspectionCamera',cameraData);review.collection.objects.link(camera);review.camera=camera
 selection=os.environ.get('COMMAND_ROOM_INSPECTION','').split(',')
-for asset,name,views in [(1,'Cap',['Front','Side','Top']),(2,'Coat',['Front','Side','Back']),(3,'InkBottle',['Front','Side','Top']),
+for asset,name,views in [(1,'Cap',['Front','Side','Back','Top']),(2,'Coat',['Front','Side','Back']),(3,'InkBottle',['Front','Side','Top']),
                          (4,'Table',['Front','Side']),(5,'Cabinet',['Front','Side'])]:
     if selection!=[''] and name not in selection:continue
     pieces=[]

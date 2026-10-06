@@ -1,6 +1,6 @@
 // Dedicated static menu set. Values are authored against the three approved references.
 export const COMMAND_ROOM = Object.freeze({
-  version: "202610062215",
+  version: "202610071030",
   model: "./Model/Model_CommandRoom.glb",
   background: 0x373936,
   cameraNear: 0.05,
@@ -13,12 +13,15 @@ export const COMMAND_ROOM = Object.freeze({
   bakedLighting: Object.freeze({ name: "CommandRoomLighting", scale: 32, intensity: 3.141592653589793 }),
   outside: Object.freeze({ color: 0xc4b4b0, intensity: 1.35 }),
   // A one-time capture of this room supplies the ink glass's window reflection.
-  reflection: Object.freeze({ material: "CommandRoomInkGlass", size: 256, near: .02, far: 16, intensity: 1.8 }),
+  reflection: Object.freeze({ material: "CommandRoomInkGlass", size: 256, near: .02, far: 16, intensity: 1.8,
+    detailMaterials: Object.freeze(["CommandRoomInkLid", "CommandRoomCapBrass", "CommandRoomCapEnamel"]), detailIntensity: .65 }),
   glass: Object.freeze({ transmission: .99, roughness: .055, thickness: .0035, attenuationColor: 0xbe781f, attenuationDistance: .018 }),
   brickTint: 0xffffff,
+  mortarTint: 0xd3b695,
+  cabinet: Object.freeze({ tint: 0xc2a88c, roughness: .76 }),
   materials: Object.freeze([
     { name: "CommandRoomWood", kind: "pbr", normal: 0.45, tint: 0xffffff },
-    { name: "CommandRoomPlaster", kind: "pbr", normal: 0.55, tint: 0xb8b7b0 },
+    { name: "CommandRoomPlaster", kind: "pbr", normal: 0.40, tint: 0xf2eee3 },
     { name: "CommandRoomBrick", kind: "pbr", normal: 0.65, tint: 0xffffff },
     { name: "CommandRoomCloth", kind: "pbr", normal: 0.25, tint: 0xffffff },
     { name: "CommandRoomCapCloth", kind: "pbr", normal: 0.4, tint: 0xffffff },
