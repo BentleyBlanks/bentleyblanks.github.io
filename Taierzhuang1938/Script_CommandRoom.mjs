@@ -118,7 +118,7 @@ export class CommandRoom {
           mat.emissive.setHex(DATA.outside.color);
           mat.emissiveIntensity = DATA.outside.intensity;
         }
-        const set = byName.get(mat.name) || (mat.name === "CommandRoomBrick" ? byName.get("CommandRoomPlaster") : null);
+        const set = byName.get(mat.name) || (["CommandRoomBrick", "CommandRoomMortar"].includes(mat.name) ? byName.get("CommandRoomPlaster") : null);
         if (!set) continue;
         mat.color.setHex(set.spec.tint);
         if (mat.name === "CommandRoomBrick") mat.color.setHex(DATA.brickTint);

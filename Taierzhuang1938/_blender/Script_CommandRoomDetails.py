@@ -1,4 +1,4 @@
-"""Tailored geometry from the three Imagegen turnarounds in the .blend Source folder.
+"""Authored garment, bottle and paper details; references live beside the .blend.
 Executed by Script_BuildCommandRoom.py in its authoring context before batching.
 """
 thread=Material('CommandRoomThread',(.16,.148,.125),.97)

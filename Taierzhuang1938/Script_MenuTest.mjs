@@ -816,7 +816,7 @@ await page.keyboard.press("Escape");
   Check("指挥室固定机位不改动玩法相机", moved === 0, `moved=${moved.toFixed(2)} m`);
   // 焦距语汇沿用分镜表：35 mm ≈ 37.8°，不该是玩法用的 55°
   const room = await page.evaluate(() => window.Taierzhuang.Debug.CommandRoom());
-  Check("实际渲染 Blender 指挥室、独立相机及烘焙光照", room.ready && room.frames > 0 && room.meshes >= 10 && room.triangles > 30000 && room.textureCount === 16 && room.lighting === "Cycles diffuse UV1" && room.camera.fov !== after.fov, JSON.stringify(room));
+  Check("实际渲染 Blender 指挥室、独立相机及烘焙光照", room.ready && room.frames > 0 && room.meshes >= 10 && room.triangles > 30000 && room.textureCount === 19 && room.lighting === "Cycles diffuse UV1" && room.camera.fov !== after.fov, JSON.stringify(room));
   const titleBefore = await page.locator(".mnTitleMain").boundingBox();
   await page.mouse.move(30,30);
   await page.evaluate(() => window.Taierzhuang.StepFrames(45));

@@ -53,9 +53,45 @@ def Timber(name,loc,size,bevel=.014,seed=0):
     bpy.ops.object.modifier_apply(modifier=m.name)
     return ob
 
+def TimberSplit(ob,start,direction,length,width,depth,seed,openEnd=True):
+    """Remove a tapered, forkable V-shaped volume along the timber grain."""
+    rng=random.Random(seed);verts=[];faces=[];steps=22
+    for i in range(steps+1):
+        t=i/steps
+        x=start[0]+direction*length*t
+        y=start[1]+.007*math.sin(t*9+seed)*math.sin(t*math.pi)+.002*math.sin(t*37+seed)*math.sin(t*math.pi)
+        profile=(1-t)**.7 if openEnd else math.sin(math.pi*t)**.7
+        half=max(.00006,width*.5*profile*(.8+.2*rng.random()))
+        floor=start[2]-depth*max(.015,profile)
+        verts.extend([(x,y-half,start[2]+.035),(x,y+half,start[2]+.035),
+                      (x,y+half*.08,floor),(x,y-half*.08,floor)])
+    faces.extend([tuple(reversed(range(4))),tuple(steps*4+i for i in range(4))])
+    for j in range(steps):
+        for i in range(4):faces.append((j*4+i,j*4+(i+1)%4,(j+1)*4+(i+1)%4,(j+1)*4+i))
+    cutter=Mesh('TimberSplitVolume',verts,faces,wood);Recalculate(cutter)
+    Boolean(ob,cutter,'DIFFERENCE');bpy.data.objects.remove(cutter,do_unlink=True)
+    ob.data.materials.clear();ob.data.materials.append(wood)
+    layer=ob.data.uv_layers.active
+    for poly in ob.data.polygons:
+        poly.material_index=0
+        if abs(poly.normal.z)<.82:
+            for li in poly.loop_indices:
+                p=ob.data.vertices[ob.data.loops[li].vertex_index].co
+                layer.data[li].uv=(p.z/1.4+seed*.173,(p.x if abs(poly.normal.y)>.5 else p.y)/1.4+seed*.219)
+    # CSG creates new vertices whose interpolated color defaults to black.
+    # A split is dark through its baked occlusion, never through zero albedo.
+    for c in ob.data.color_attributes.active_color.data:
+        if min(c.color[:3])<.7:c.color=(.95,.937,.907,1)
+
 tx=.250;ty=.462;tz=.84;tw=3.10;td=2.30
 for i in range(5):
-    Timber('TablePlank',(tx,ty+(i-2)*td/5,tz),(tw,td/5-.004,.09),.014,i+2)
+    cy=ty+(i-2)*td/5
+    plank=Timber('TablePlank',(tx,cy,tz),(tw,td/5-.004,.09),.009+(i%3)*.0015,i+2)
+    for side,offset,length,width in [(-1,-.115,.46+(i%3)*.12,.016),(1,.084,.57+(i%2)*.17,.022),(-1,.135,.28+i*.035,.010)]:
+        TimberSplit(plank,(tx+side*(tw/2+.018),cy+offset,tz+.045),-side,length,width,.028,32+i*7+side)
+    # A broad long-grain check is visible along the exposed front/outer board.
+    TimberSplit(plank,(tx-.68+i*.11,cy-.172,tz+.045),1,.80+(i%2)*.22,.012,.022,83+i,False)
+    TimberSplit(plank,(tx-.25+i*.11,cy-.170,tz+.045),1,.23,.003,.014,193+i,False)
 for x in [tx-tw/2+.12,tx+tw/2-.12]:
     for y in [ty-td/2+.13,ty+td/2-.13]:
         leg=Cube('TableLeg',(x,y,.405),(.145,.145,.81),wood,.017)

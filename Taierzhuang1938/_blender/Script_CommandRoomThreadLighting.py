@@ -5,22 +5,23 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 def MapThreadLighting(scene):
-    cloth=bpy.data.objects['Room_CommandRoomCloth'];cloth.data.calc_loop_triangles()
     atlas=globals().get('atlas') or bpy.data.images['CommandRoomLighting'];width,height=atlas.size
     pixels=np.empty(len(atlas.pixels),dtype=np.float32);atlas.pixels.foreach_get(pixels)
     pixels=pixels.reshape((height,width,4))
     verts=[];faces=[];uvTriangles=[];energies=[]
-    for tri in cloth.data.loop_triangles:
-        points=[cloth.matrix_world@cloth.data.vertices[i].co for i in tri.vertices]
-        if (points[1]-points[0]).cross(points[2]-points[0]).length*.5<.000004:continue
-        samples=[Vector((*cloth.data.uv_layers['LightmapUV'].data[i].uv,0)) for i in tri.loops]
-        center=sum(samples,Vector())/3
-        x=max(0,min(width-1,int(center.x*width)));y=max(0,min(height-1,int(center.y*height)))
-        if pixels[y,x,:3].max()<.008:continue
-        first=len(verts);verts.extend(points);faces.append((first,first+1,first+2))
-        # Pixel centres keep bilinear filtering out of adjacent unlit padding.
-        uvTriangles.append(Vector(((x+.5)/width,(y+.5)/height)))
-        energies.append(float(pixels[y,x,:3].max()))
+    for clothName in ['Room_CommandRoomCloth','Room_CommandRoomCapCloth']:
+        cloth=bpy.data.objects[clothName];cloth.data.calc_loop_triangles()
+        for tri in cloth.data.loop_triangles:
+            points=[cloth.matrix_world@cloth.data.vertices[i].co for i in tri.vertices]
+            if (points[1]-points[0]).cross(points[2]-points[0]).length*.5<.000004:continue
+            samples=[Vector((*cloth.data.uv_layers['LightmapUV'].data[i].uv,0)) for i in tri.loops]
+            center=sum(samples,Vector())/3
+            x=max(0,min(width-1,int(center.x*width)));y=max(0,min(height-1,int(center.y*height)))
+            if pixels[y,x,:3].max()<.008:continue
+            first=len(verts);verts.extend(points);faces.append((first,first+1,first+2))
+            # Pixel centres keep bilinear filtering out of adjacent unlit padding.
+            uvTriangles.append(Vector(((x+.5)/width,(y+.5)/height)))
+            energies.append(float(pixels[y,x,:3].max()))
     tree=BVHTree.FromPolygons(verts,faces,all_triangles=True)
     for ob in scene.objects:
         if ob.type!='MESH' or ob.data.materials[0].name!='CommandRoomThread':continue

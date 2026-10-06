@@ -43,7 +43,7 @@ def Material(name, color=(.4,.36,.3), rough=.9, texture=None, paper=False):
             np=TEXTURES/("Texture_"+texture+"Normal.webp")
             if np.exists():
                 n=mat.node_tree.nodes.new("ShaderNodeTexImage"); n.image=bpy.data.images.load(str(np),check_existing=True); n.image.colorspace_settings.name="Non-Color"
-                normal=mat.node_tree.nodes.new("ShaderNodeNormalMap"); normal.inputs["Strength"].default_value=.18 if texture=="CommandRoomCloth" else .5
+                normal=mat.node_tree.nodes.new("ShaderNodeNormalMap"); normal.inputs["Strength"].default_value=.18 if texture in ("CommandRoomCloth","CommandRoomCapCloth") else .5
                 mat.node_tree.links.new(n.outputs["Color"],normal.inputs["Color"]); mat.node_tree.links.new(normal.outputs["Normal"],p.inputs["Normal"])
             op=TEXTURES/("Texture_"+texture+"Orm.webp")
             if op.exists():
@@ -261,9 +261,9 @@ for ob in list(scene.objects):
         ob.matrix_world=chairTransform@ob.matrix_world
     elif ob.type=="MESH" and not ob.name.startswith(("DeskMap","Telegram","Pencil","Ruler","WoodRuler","InkBottle","DipPen","Cap","Floor","SideWall")):
         ob.matrix_world=backdropTransform@ob.matrix_world
-    if ob.type=="MESH" and len(ob.data.materials) and ob.data.materials[0]==cloth:
+    if ob.type=="MESH" and len(ob.data.materials) and ob.data.materials[0] in (cloth,capCloth):
         for uv in ob.data.uv_layers:
-            for corner in uv.data: corner.uv*=4
+            for corner in uv.data: corner.uv*=5.8 if ob.data.materials[0]==capCloth else 4
 # Validate the furniture before material batching removes individual part names.
 from mathutils.bvhtree import BVHTree
 bpy.context.view_layer.update()
@@ -305,6 +305,9 @@ chairObjects=[o for o in scene.objects if o.type=='MESH' and o.name.startswith('
 tableObjects=[o for o in scene.objects if o.type=='MESH' and o.name.startswith(('TablePlank','TableLeg','TableLongApron','TableShortApron'))]
 chairOverlaps=len(WorldBvh(chairObjects).overlap(WorldBvh(tableObjects)))
 assert chairOverlaps==0, f'Chair intersects table: {chairOverlaps} triangle pairs'
+coatObjects=[o for o in scene.objects if o.type=='MESH' and o.name.startswith('Coat') and o.data.materials[0]==cloth]
+coatChairOverlaps=len(WorldBvh(coatObjects).overlap(WorldBvh(chairObjects)))
+assert coatChairOverlaps==0, f'Hanging coat intersects chair: {coatChairOverlaps} triangle pairs'
 chairFloor=min((o.matrix_world@v.co).z for o in chairObjects for v in o.data.vertices)
 assert abs(chairFloor)<.001, f'Chair feet off the floor: {chairFloor}'
 # Lighting: single sun through actual left aperture, soft indirect fill.
@@ -332,8 +335,8 @@ for ob in scene.objects:
     if ob.type!='MESH':continue
     # Joining timber with authored wear to ordinary timber otherwise fills the
     # latter's missing glTF COLOR_0 with black. White is the neutral multiplier.
-    if ob.data.materials[0]==wood and not ob.data.color_attributes:
-        color=ob.data.color_attributes.new(name='TimberWear',type='FLOAT_COLOR',domain='POINT')
+    if ob.data.materials[0] in (wood,plaster,mortarMat) and not ob.data.color_attributes:
+        color=ob.data.color_attributes.new(name='TimberWear' if ob.data.materials[0]==wood else 'FreshLimeSection',type='FLOAT_COLOR',domain='POINT')
         for vertex in color.data:vertex.color=(1,1,1,1)
     asset=1 if ob.name.startswith('Cap') else 2 if ob.name.startswith('Coat') else 3 if ob.name.startswith('InkBottle') else 4 if ob.name.startswith('Table') else 5 if ob.name.startswith('Cabinet') else 0
     attr=ob.data.attributes.new(name='InspectionAsset',type='INT',domain='FACE')
@@ -366,6 +369,6 @@ for mat,a,b in links:mat.node_tree.links.new(a,b)
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/"Scene_CommandRoom.blend"))
 scene.render.filepath=str(SHOTS/"Scene_CommandRoomBlender.png")
 bpy.ops.render.render(write_still=True)
-summary={"blend":str(SOURCE/"Scene_CommandRoom.blend"),"glb":str(GAME/"Model"/"Model_CommandRoom.glb"),"meshes":len([o for o in scene.objects if o.type=="MESH"]),"triangles":sum(len(p.vertices)-2 for o in scene.objects if o.type=="MESH" for p in o.data.polygons),"camera":{"position":list(cam.location),"rotation":list(cam.rotation_euler),"lens":cam.data.lens},"materials":list(materials),"render":scene.render.filepath,"chairTableIntersections":chairOverlaps,"chairFloor":chairFloor,"propContacts":propContacts}
+summary={"blend":str(SOURCE/"Scene_CommandRoom.blend"),"glb":str(GAME/"Model"/"Model_CommandRoom.glb"),"meshes":len([o for o in scene.objects if o.type=="MESH"]),"triangles":sum(len(p.vertices)-2 for o in scene.objects if o.type=="MESH" for p in o.data.polygons),"camera":{"position":list(cam.location),"rotation":list(cam.rotation_euler),"lens":cam.data.lens},"materials":list(materials),"render":scene.render.filepath,"chairTableIntersections":chairOverlaps,"coatChairIntersections":coatChairOverlaps,"chairFloor":chairFloor,"propContacts":propContacts}
 (SHOTS/"Data_CommandRoomBuild.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
 print(json.dumps(summary))

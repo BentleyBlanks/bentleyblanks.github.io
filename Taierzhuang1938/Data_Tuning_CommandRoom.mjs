@@ -1,6 +1,6 @@
 // Dedicated static menu set. Values are authored against the three approved references.
 export const COMMAND_ROOM = Object.freeze({
-  version: "202610060230",
+  version: "202610061230",
   model: "./Model/Model_CommandRoom.glb",
   background: 0x373936,
   cameraNear: 0.05,
@@ -21,6 +21,7 @@ export const COMMAND_ROOM = Object.freeze({
     { name: "CommandRoomPlaster", kind: "pbr", normal: 0.55, tint: 0xb8b7b0 },
     { name: "CommandRoomBrick", kind: "pbr", normal: 0.65, tint: 0xffffff },
     { name: "CommandRoomCloth", kind: "pbr", normal: 0.25, tint: 0xffffff },
+    { name: "CommandRoomCapCloth", kind: "pbr", normal: 0.4, tint: 0xffffff },
     { name: "CommandRoomMap", kind: "print", normal: 0, tint: 0xffffff },
     { name: "CommandRoomLetter", kind: "print", normal: 0, tint: 0xffffff },
     { name: "CommandRoomInkLabel", kind: "print", normal: 0, tint: 0xffffff },

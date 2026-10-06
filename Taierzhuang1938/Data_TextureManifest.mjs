@@ -144,9 +144,17 @@ export const TEXTURE_MANIFEST = Object.freeze([
     id: "CommandRoomCloth", kind: "material", tier: "lazy",
     toneClass: "menuCloth", metersPerTile: 0.25, normalConvention: "gl",
     bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_CommandRoomCloth.json",
-    source: { provider: "imagegen", date: "2026-10-06", ref: "CommandRoom/Source/CommandRoomClothSerge.png", prompt: "_import/Prompts/Texture_CommandRoomWear.txt", note: "帽服共用 25 cm 细哔叽布样；1K 基色 / 512 数据图，独立 menuCloth 密度预算。" },
+    source: { provider: "imagegen", date: "2026-10-06", ref: "CommandRoom/Source/CommandRoomClothSerge.png", prompt: "_import/Prompts/Texture_CommandRoomWear.txt", note: "外衣使用 25 cm 细哔叽布样；1K 基色 / 512 数据图，独立 menuCloth 密度预算。" },
     consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomCloth" }],
     files: [["Texture_CommandRoomClothBase.webp","Base",1024,1024],["Texture_CommandRoomClothNormal.webp","Normal",512,512],["Texture_CommandRoomClothOrm.webp","Orm",512,512]],
+  },
+  {
+    id: "CommandRoomCapCloth", kind: "material", tier: "lazy",
+    toneClass: "menuCloth", metersPerTile: .25, normalConvention: "gl",
+    bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_CommandRoomCapCloth.json",
+    source: { provider: "imagegen", date: "2026-10-06", ref: "CommandRoom/Source/CommandRoomCapQuilt.png", prompt: "_import/Prompts/Texture_CommandRoomCapCloth.txt" },
+    consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomCapCloth" }],
+    files: [["Texture_CommandRoomCapClothBase.webp","Base",1024,1024],["Texture_CommandRoomCapClothNormal.webp","Normal",512,512],["Texture_CommandRoomCapClothOrm.webp","Orm",512,512]],
   },
   {
     id: "CommandRoomInkLabel", kind: "print", tier: "lazy",
