@@ -5,6 +5,8 @@ import { TRENCH_SURFACE as C } from './Data_TrenchSurface.mjs';
 import { TERRAIN_WATER } from './Data_Tuning_Terrain.mjs';
 import * as THREE from 'three';
 import { BuildTrenchSurface } from './Script_TrenchSurface.mjs';
+import { BuildTrenchEarth } from './Script_TrenchEarth.mjs';
+import { CompileTrenchNetwork } from './Script_TrenchPlan.mjs';
 
 // Updates must use the physical terrain's actual grid (including non-unit cells),
 // and must restore it after a blast reset; no camera-dependent screen depth cache.
@@ -83,4 +85,28 @@ const mats=raised.filter(b=>b.key==='TrenchDryGrass');assert.ok(mats.length>0);
 for(const {geometry} of mats){const p=geometry.attributes.position;for(let i=0;i<p.count;i++)assert.ok(p.getY(i)>2.417&&p.getY(i)<2.449,'mat sits on the rendered crown');}
 for(const {geometry} of [...crownBatches,...raised])geometry.dispose();
 for(const geometry of Object.values(crownAssets))geometry.dispose();crown.dispose();
+// Photo-style bank sculpture must not enter the original walking floor or mutate
+// excavation data. Adjacent strips share their edge even with the new spade flutes.
+const cutPlan=CompileTrenchNetwork({seed:'PhotoStyle',segments:[{id:'Straight',preset:'communication',
+  points:[{x:0,z:0},{x:0,z:20}],jitterScale:0,cornerRadiusM:0}]});
+const cutGround=(x,z)=>cutPlan.Apply(x,z,0,0);
+const stationsBefore=JSON.stringify(cutPlan.segments[0].stations),edges=new Map(),cutBatches=[];
+BuildTrenchEarth({SetSector(){},Add(key,geometry){cutBatches.push(geometry);}},cutPlan,cutGround,{roots:null});
+assert.equal(JSON.stringify(cutPlan.segments[0].stations),stationsBefore,'appearance does not edit the trench plan');
+let sharedEdges=0,skinVertices=0;
+for(const geometry of cutBatches){
+  if(geometry.userData.trenchCrust){
+    const p=geometry.attributes.position;
+    for(let i=0;i<p.count;i++){
+      const x=p.getX(i),y=p.getY(i),z=p.getZ(i),gap=y-cutGround(x,z);skinVertices++;
+      assert.ok(Math.abs(x)>=1.7+.02*1.1-1e-5,'continuous skin leaves the full original floor clear');
+      assert.ok(gap>=-.009&&gap<.21,'cut-earth finish stays within the shallow visual relief envelope');
+      const key=x.toFixed(5)+':'+z.toFixed(5);
+      if(edges.has(key)){assert.ok(Math.abs(edges.get(key)-y)<1e-4,'no vertical seam between skin strips');sharedEdges++;}
+      else edges.set(key,y);
+    }
+  }
+  geometry.dispose();
+}
+assert.ok(skinVertices>1000&&sharedEdges>100,'measure actual adjacent generated strips');
 console.log('TrenchSurfaceTest: physical contact update/reset, measured grass direction, geometry and packed asset contracts passed');

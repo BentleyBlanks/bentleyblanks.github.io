@@ -1,4 +1,22 @@
-# 通用壕沟表面：参考图 07
+# 通用壕沟表面
+
+## 2026-10-07：历史照片 01 / 14
+
+当前外观采用 [Notion《台儿庄战役历史照片汇总｜壕沟、工事与战地生活》](https://app.notion.com/p/3df60335331c81c28d74e074bfd31aaf) 的 01「村落附近的壕沟阵地」与 14「战壕里的读报小组」。01 参考厚实、不规则的翻土沟沿；14 参考大片紧实的切土壁、浅铲痕、局部崩口与零星草根。14 仅作同期形态参考，不认定为台儿庄或滕县现场；两张都是黑白照片，游戏颜色为美术取值，不从透视图反推精确宽深。
+
+- `BuildTrenchEarth` 保留连续坡皮，以宽缓的土体起伏和浅竖向铲痕取代密集颗粒，坡肩在既有坡面范围内稍突出，接缝仍共享端点并渐隐。装饰不进入沟底、不新增碰撞，不修改中心线、分岔、宽深参数、共享高度场、掩体、角色路线或地形指纹。
+- 减少坡面散块和沟脚碎屑；沟沿改为较宽而低的嵌入土块，碎石更小、更稀疏，草毯从连续覆盖改为零星短根。继续按原分区合批、随弹坑裁除，不增加逐件 Mesh。
+- `TrenchPom` 换为一张内置 imagegen 生成的紧实灰褐土壁，浅裂纹、细孔和铲痕；生成一次，无付费回退。完整提示词与旧版提示词保存在 [_import/Prompts/Texture_TrenchPom.txt](../_import/Prompts/Texture_TrenchPom.txt)。Base 为 1024²、Normal / Orh 为 256² 无损，1.8 m 平铺、18 mm 最大视差；高度和法线是亮度推导，不是实测扫描。烘焙参数与 hash 在 [记录](../_import/TextureBakes/Texture_TrenchPom.json)。整套 589,124 字节。
+- 源图保留于本地 `C:/Users/Bentl/.codex/artifacts/TrenchPhotoStyle20261007/Texture_CompactTrenchSource.png` 和内置生图输出目录。重建用 `Script_BakePbrTexture.py --rebake Taierzhuang1938/_import/TextureBakes/Texture_TrenchPom.json`（换机器时将源图放回记录中的位置或更新 source.path）。原连续高度场网格适合这次外观调整，无需新建 Blender 模型或另铺模块化壕沟。
+- 表面回归补充实际生成网格的沟底净空、浅起伏包络、相邻条带接缝与规划数据不变检查。实机截图使用默认白盒和 `quality=high`，只作外观取证，不视为整关正常通关。
+
+本轮实测：五个固定机位分别拍摄改前高画质、改后高画质、改后默认白盒；页面错误和 GL 错误均为 0。壕沟装饰由 1,137,268 三角 / 64 个分区网格降为 500,964 / 63。`TrenchPlanTest`、`TrenchSurfaceTest`、`TerrainLayersTest`、`TextureStandardsTest`、`AssetStandardsTest`、`ModuleGraphTest`、`FirstLevelMissionTest`、`FirstLevelFrontTopologyTest`、`FirstLevelSpaceTest` 通过；后方 56,048 个地面点仍匹配原指纹。`MotionVectorContractTest` 的 49 项 GPU 场景通过。
+
+第一关高画质炮击实测：沟壁下陷 0.613 m，四个附近土皮 / 石块 / 草根分区被裁除，Reset 后全部源几何和地面高度恢复；234 个程序成功链接，最大 14/16 采样器，无页面及 GL 错误。`BootStallTest` 通过。`BootTest` 旧序章通过，旧 `CH1_NanLu` 报“日军远景辨识材质未接全 count=0”，随后整组达到 240 秒上限；七场景检查未完成，不能计为通过（相同历史错误亦记录在旧参考图 07 验收中）。
+
+`FirstLevelMissionFortificationsTest` 的表面生成、有限坐标、形变标记、合批预算及掩体包围盒检查通过；42 次双向走位有 40 次通过，`FrontCommunication` 的两个方向均被集结处既有土墙阻挡。用未修改的 `7d040069` 主检出只读起服复测：全部 42 项的到达点数和终点坐标逐项相同，未改弱断言。quick / prepush 均在 `CharacterSpeechTest` 的“呃、啊”拼音表覆盖处中止，主检出同样复现；不能称全套门禁通过。原图、同机位对照和本轮日志留在本地 `C:/Users/Bentl/.codex/artifacts/TrenchPhotoStyle20261007/`。
+
+以下为此前迭代记录；与本节冲突的外观参数以当前数据表为准。
 
 2026-09-28：土壁换成冷灰棕 Lovart 贴图、湿泥积水并入地形统一的水位模型、翻土让位给车道，见文末「2026-09-28 对标 3A」。
 

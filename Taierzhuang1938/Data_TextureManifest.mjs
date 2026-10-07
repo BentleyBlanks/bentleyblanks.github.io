@@ -821,18 +821,18 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "TrenchPom", kind: "terrainLayer", tier: "level:FirstLevel",
     toneClass: "drySoil",
-    metersPerTile: 1.5,
+    metersPerTile: 1.8,
     normalConvention: "terrain",
     bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "_import/TextureBakes/Texture_TrenchPom.json",
-    // 2026-09-28 B2 地面：冷灰棕湿黄土（土块、细根、小石子），替掉偏红橙的 2026-09-26 imagegen 版
-    //（均色饱和 0.53 → 0.36，整套 2.0 MB → 0.6 MB；高度改由亮度带通推，Orh 半分辨率有损）。
-    source: { provider: "lovart", date: "2026-09-28", ref: "0d1b846e-7b95-4baa-9caf-83b03f63b6ed", prompt: "_import/Prompts/Texture_TrenchPom.txt" },
+    // Historical photographs 01/14: compact hand-cut earth. Shallow 18 mm relief;
+    // 256-square lossless data preserves POM heights within the existing byte budget.
+    source: { provider: "imagegen", date: "2026-10-07", ref: "exec-d68eb40b-92c6-478f-a500-53fc2b43cda2.png", prompt: "_import/Prompts/Texture_TrenchPom.txt" },
     consumers: [{ file: "Data_TrenchSurface.mjs", token: "Texture_TrenchPom" }],
     files: [
       ["Texture_TrenchPomBase.webp", "Base", 1024, 1024],
-      ["Texture_TrenchPomNormal.webp", "Normal", 512, 512],
-      ["Texture_TrenchPomOrh.webp", "Orh", 512, 512],
+      ["Texture_TrenchPomNormal.webp", "Normal", 256, 256],
+      ["Texture_TrenchPomOrh.webp", "Orh", 256, 256],
     ],
   },
   {

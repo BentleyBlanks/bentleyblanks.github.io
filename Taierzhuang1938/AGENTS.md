@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **壕沟外观采用历史照片 01 / 14（2026-10-07）**：紧实切土壁、浅铲痕、不规则厚沟沿，碎石与草根稀疏；仍走原样条、共享地形与分区合批，不改走向、宽深和碰撞。来源、贴图重建与验证见 [壕沟表面](docs/Data_TrenchSurface.md)；门禁 `Script_TrenchSurfaceTest` / `Script_FirstLevelMissionFortificationsTest`。
+
 - **贴图管理与枯树完整态合批（2026-10-03）**：编辑器「贴图管理」打开独立 `TextureManager.html` 窗口，共用发布配置；独立图片按 Unity Importer 分组配置类型／Alpha／尺寸／采样／Mipmap／平台覆盖，支持 DXT1/5、BC7 等 GPU 目标，当前未接入项置灰说明；程序化配方仅 Worker 预览，GLB 内嵌图暂不管理。Pages 在 staging 导入后再打 bundle，源资产规范不变；运行时 KTX2 保留通道与 UV 方向。见 [贴图导入器](docs/Data_TextureImporter.md)，门禁 `Script_TextureImportTest` / `Script_TextureManagerBrowserTest`。枯树完整状态每区域／LOD 单一合并实例批，爆破切换原拆分物理，见 [枯树](docs/Data_BreakableTrees.md)。
 
 - **第一关性能第二轮（2026-10-02）**：白盒默认画太阳影子；白盒逐帧材质替换按顶层子树缓存（`WhiteboxSceneRenderer.Invalidate()` 兜底挂后改标记）；任务人群（`MissionPeople.Person`）画面外按 `offscreenAnimationS` 解姿势、`Threatens` 在一次 `Update` 内按参数记忆；阴影与预通道两份静态合批在 `WarmLevel` 结账帧之前一次收满（`Prime`，消掉进场后一秒的成串长帧）；新增预通道静态合批 `Script_PrepassStaticBatch`（只换预通道那一刻、烘阴影时还原成员、成员速度历史照记）。口径、实测与门禁见 [渲染管线 §17.17](docs/Data_TechRenderPipeline.md)。

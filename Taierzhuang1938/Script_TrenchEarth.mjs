@@ -1,4 +1,4 @@
-// Reference 07: broken earth banks with embedded clods and sparse hanging roots.
+// Historical photographs 01/14: broad cut-earth faces, broken shoulders, sparse roots.
 // Everything samples the host heightfield; no extra colliders or walkable floors.
 import * as THREE from "three";
 import { HashString, Mulberry32, ValueNoise2 } from "./Script_Noise.mjs";
@@ -16,11 +16,16 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     sink.Add(key, geometry);
   };
   // taper 0 sinks the skin just under the heightfield: a run of skin ends without a step.
-  const CrustLift = (x,z,u,taper=1) => {
+  const CrustLift = (x,z,u,taper=1,along=0) => {
     if(u<=0||u>=1)return 0;
-    const ridge=ValueNoise2(x*3.7,z*3.7,71),grain=ValueNoise2(x*13.1,z*13.1,93);
-    const layer=ValueNoise2(x*8.3,z*8.3,417);
-    return Math.sin(u*Math.PI)*(.025+Style.crustReliefM*(ridge*.5+layer*.75)+.045*grain)*taper-.008;
+    // Low-frequency earthen masses instead of gravel-like bumps over the whole wall.
+    // The shoulder stays inside the existing bank footprint; the walking floor is untouched.
+    const mass=ValueNoise2(x*.85,z*.85,71),grain=ValueNoise2(x*8,z*8,93);
+    const shoulder=Style.cutShoulderM*Ease(u/.42)*(1-Ease((u-.68)/.32));
+    // Short, irregular spade flutes run up the face, never across the walking lane.
+    const phase=along/Style.spadeWidthM+ValueNoise2(x*1.2,z*1.2,417)*.65;
+    const scrape=Style.spadeReliefM*(.5+.5*Math.cos(phase*Math.PI*2))*(.4+.6*mass);
+    return (shoulder+Math.sin(u*Math.PI)*(.014+Style.crustReliefM*mass+scrape+.006*grain))*taper-.008;
   };
   const Ease = t => { t=Math.max(0,Math.min(1,t)); return t*t*(3-2*t); };
   const CrustTaper = (v, ends) => (ends.start ? Ease(v/.5) : 1) * (ends.end ? Ease((1-v)/.5) : 1);
@@ -49,7 +54,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       const lateral=half+bank*(.02+u*.98);
       const nx=st.nx+(next.nx-st.nx)*v,nz=st.nz+(next.nz-st.nz)*v;
       const x=st.x+(next.x-st.x)*v+nx*side*lateral,z=st.z+(next.z-st.z)*v+nz*side*lateral;
-      const lift=CrustLift(x,z,u,CrustTaper(v,ends));
+      const lift=CrustLift(x,z,u,CrustTaper(v,ends),st.s+(next.s-st.s)*v);
       positions.push(x,groundAt(x,z)+lift,z);uvs.push(u,v);
     }
     for(let row=0;row<rows;row++)for(let col=0;col<cols;col++) {
@@ -120,7 +125,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
           const lateral=((x-st.x)*st.nx+(z-st.z)*st.nz)*side;
           const u=(lateral-st.halfFloor-st.bank*.02)/(st.bank*.98);
           const v=Math.max(0,Math.min(1,((x-st.x)*st.tx+(z-st.z)*st.tz)/span));
-          return groundAt(x,z)+Math.max(0,CrustLift(x,z,u,CrustTaper(v,ends)));
+          return groundAt(x,z)+Math.max(0,CrustLift(x,z,u,CrustTaper(v,ends),st.s+span*v));
         };
         if (random() < Style.clodChance) {
           const radius = Range(random, Style.clodRadiusM), relief = Range(random, Style.clodReliefM);
