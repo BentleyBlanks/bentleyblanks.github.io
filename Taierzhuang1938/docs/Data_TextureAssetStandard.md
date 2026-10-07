@@ -41,6 +41,8 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=<起点提交> --profile=qu
 
 烘焙打印的指标里任何一条「门槛未过」就不要登记：调参数（`--seamless`、`--tone-strength`、`--flatten-sigma`）或重抽源图（每个材质最多重抽 2 次）。
 
+非平铺、跨多种材质的作者 UV 图集可使用 `--uv-atlas-reason "具体理由"`，对应已有的 `metersPerTile: null` / `toneClass: null` 契约。其材质分区本身会产生低频明暗，边界也无需接续；baker 保留色调、截断、尺寸与体积检查，记录完整指标和理由，跳过平铺接缝及低频判据。须实际核对没有方向性投影，光照仍与基色分离；普通平铺贴图不得使用此选项。
+
 ---
 
 ## 1. 目录

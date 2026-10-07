@@ -22,7 +22,7 @@ allObjects=[o for o in scene.objects if o.type=='MESH']
 # Dedicated packed charts are narrower than a texel and develop black seams.
 threads=[o for o in allObjects if o.data.materials[0].name=='CommandRoomThread']
 objects=[o for o in allObjects if o not in threads]
-density={'CommandRoomPlaster':.45,'CommandRoomMortar':5,'CommandRoomOutside':.35,'CommandRoomPencilWood':16,'CommandRoomPencilPaint':16,'CommandRoomInkGlass':8,
+density={'CommandRoomPlaster':.35,'CommandRoomWallSurface':.85,'CommandRoomMortar':5,'CommandRoomOutside':.35,'CommandRoomPencilWood':16,'CommandRoomPencilPaint':16,'CommandRoomInkGlass':8,
          'CommandRoomGraphite':20,'CommandRoomIron':6,'CommandRoomDust':2,
          'CommandRoomCloth':3,'CommandRoomCapCloth':4,'CommandRoomPaperEdge':6,'CommandRoomInkLabel':12,'CommandRoomInkLid':10,'CommandRoomInkLiquid':8,
          'CommandRoomLetter':1.5,'CommandRoomMap':1.25,

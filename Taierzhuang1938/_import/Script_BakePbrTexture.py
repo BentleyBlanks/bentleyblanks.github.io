@@ -482,7 +482,7 @@ def Bake(args):
 
     gates = presets["gates"]
     cls = presets["classes"][args.preset]
-    problems = CheckGates(metrics, total, outputs, gates, cls)
+    problems = CheckGates(metrics, total, outputs, gates, cls, uv_atlas=bool(args.uv_atlas_reason))
     record = {
         "generator": GENERATOR,
         "date": datetime.date.today().isoformat(),
@@ -495,7 +495,7 @@ def Bake(args):
                    "toneStrength": args.tone_strength, "keepTone": args.keep_tone, "noFlatten": args.no_flatten,
                    "invertHeight": args.invert_height, "keepAlpha": args.keep_alpha, "roughMin": args.rough_min,
                    "baseQuality": args.base_quality, "dataQuality": args.data_quality,
-                   "dataLossless": args.data_lossless},
+                   "dataLossless": args.data_lossless, "uvAtlasReason": args.uv_atlas_reason},
         "outputs": outputs,
         "totalBytes": total,
         "metrics": metrics,
@@ -566,7 +566,7 @@ def Audit(args):
     return 0
 
 
-def CheckGates(metrics, total, outputs, gates, cls):
+def CheckGates(metrics, total, outputs, gates, cls, uv_atlas=False):
     out = []
     lo, hi = cls["lumaRange"]
     if not lo <= metrics["luma"] <= hi:
@@ -578,16 +578,16 @@ def CheckGates(metrics, total, outputs, gates, cls):
     if not lo <= metrics["lumaStd"] <= hi:
         out.append(f"亮度标准差 {metrics['lumaStd']} 不在 {cls['stdRange']}")
     # 砖、瓦、木纹成行成列：离边距离上的明暗本来就按砖层起伏，border/swing 对它们没有意义，只看 seamRatio。
-    if cls.get("isotropic", True):
+    if not uv_atlas and cls.get("isotropic", True):
         if metrics["border"] < gates["borderMin"]:
             out.append(f"border {metrics['border']} < {gates['borderMin']}（接缝一圈发平/发糊）")
         if metrics["swing"] > gates["swingMax"]:
             out.append(f"swing {metrics['swing']} > {gates['swingMax']}（离边距离上的明暗起伏，平铺成网格）")
-    if metrics["seamRatio"] > gates["seamRatioMax"]:
+    if not uv_atlas and metrics["seamRatio"] > gates["seamRatioMax"]:
         out.append(f"seamRatio {metrics['seamRatio']} > {gates['seamRatioMax']}（接缝比图内跳得多）")
     if metrics["clipLow"] > gates["clipLowMax"] or metrics["clipHigh"] > gates["clipHighMax"]:
         out.append(f"暗部/高光堆积 {metrics['clipLow']}/{metrics['clipHigh']} > 2%")
-    if metrics["lowFreq"] > gates["lowFreqMax"]:
+    if not uv_atlas and metrics["lowFreq"] > gates["lowFreqMax"]:
         out.append(f"lowFreq {metrics['lowFreq']} > {gates['lowFreqMax']}（大块明暗 = 烘进去的光影）")
     lo, hi = cls.get("texelsPerMeter", gates["texelsPerMeter"])
     if metrics["texelsPerMeter"] is not None and not lo <= metrics["texelsPerMeter"] <= hi:
@@ -604,10 +604,12 @@ def ManifestSnippet(args, channel, outputs, record_path):
     files = "\n".join(f'      ["{o["file"]}", "{o["channel"]}", {o["width"]}, {o["height"]}],' for o in outputs)
     kind = "terrainLayer" if args.normal_convention == "terrain" else "material"
     conv = '\n    normalConvention: "terrain",' if args.normal_convention == "terrain" else ""
+    tone = 'null,\n    toneReason: ' + json.dumps(args.uv_atlas_reason, ensure_ascii=False) if args.uv_atlas_reason else json.dumps(args.preset)
+    tile = 'null' if args.uv_atlas_reason else args.tile_m
     return f"""  {{
     id: "{args.name}", kind: "{kind}", tier: "level:FirstLevel",
-    toneClass: "{args.preset}",
-    metersPerTile: {args.tile_m},{conv}
+    toneClass: {tone},
+    metersPerTile: {tile},{conv}
     bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "{Rel(record_path)}",
     source: {{ provider: "lovart", date: "{datetime.date.today().isoformat()}", ref: "<Lovart thread id>", prompt: "_import/Prompts/Texture_{args.name}.txt" }},
@@ -669,6 +671,7 @@ def ParseArgs(argv):
     ap.add_argument("--row-flatten", choices=("on", "off"), help="覆盖预设的行列拉平（砖/瓦/木纹要 off）")
     ap.add_argument("--flattenSigma", "--flatten-sigma", dest="flattenSigma", type=float, help="低频拉平 σ（相对边长的比例）")
     ap.add_argument("--no-flatten", action="store_true", help="跳过低频与行列拉平")
+    ap.add_argument("--uv-atlas-reason", help="非平铺、多材质作者 UV 图集的理由；不查平铺接缝/低频指标，仍查定色、截断与体积；须人工核对无烘入光照")
     ap.add_argument("--keep-alpha", action="store_true", help="源图带 alpha 时保留进 Base（镂空件）")
     ap.add_argument("--base-quality", type=int, default=86)
     ap.add_argument("--data-quality", type=int, default=90)
@@ -711,6 +714,8 @@ def ParseArgs(argv):
         if rec.get("heightSource"):
             hs = rec["heightSource"]["path"]
             argv2 += ["--height", hs if os.path.isabs(hs) else os.path.join(PROJECT, hs)]
+        if prm.get("uvAtlasReason"):
+            argv2 += ["--uv-atlas-reason", prm["uvAtlasReason"]]
         return ParseArgs(argv2)
     if not args.source or not args.name or args.tile_m is None:
         ap.error("--source、--name、--tile-m 必填（或用 --rebake）")

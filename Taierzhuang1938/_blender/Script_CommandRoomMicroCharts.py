@@ -34,7 +34,7 @@ def RepairMaterialCharts(ob):
     # The atlas is linear HDR / 32 at runtime. A raw .008 sample quantizes to
     # roughly one sRGB byte: technically nonzero, but visually black. Keep
     # resolved ambient-light samples above that quantization floor.
-    minimum=.065 if ob.name in ('Room_CommandRoomBrick','Room_CommandRoomPlaster','Room_CommandRoomMortar') else .045
+    minimum=.065 if ob.name in ('Room_CommandRoomWallSurface','Room_CommandRoomPlaster') else .045
     def Resolved(uv):
         if ob.name!='Room_CommandRoomCapCloth':
             x=max(0,min(width-1,int(uv.x*width)));y=max(0,min(height-1,int(uv.y*height)))
@@ -68,8 +68,8 @@ def RepairMaterialCharts(ob):
     tree=BVHTree.FromPolygons(verts,faces,all_triangles=True);fixed=0
     for index in sorted(bad):
         poly=mesh.polygons[index];p=ob.matrix_world@poly.center;n=(ob.matrix_world.to_3x3()@poly.normal).normalized()
-        radius=.09 if ob.name=='Room_CommandRoomBrick' else .055
-        alignment=.95 if ob.name=='Room_CommandRoomPlaster' else .65
+        radius=.055
+        alignment=.95 if ob.name in ('Room_CommandRoomPlaster','Room_CommandRoomWallSurface') else .65
         candidates=[x for x in tree.find_nearest_range(p,radius) if normals[x[2]].dot(n)>alignment]
         if not candidates:continue
         hit,normal,ti,distance=min(candidates,key=lambda x:x[3]+.003*(1-normals[x[2]].dot(n)))
@@ -80,5 +80,5 @@ def RepairMaterialCharts(ob):
         fixed+=1
     print({'material':ob.name,'subpixelFaces':len(bad),'localIrradianceRepairs':fixed})
 
-for materialName in ['Room_CommandRoomCloth','Room_CommandRoomCapCloth','Room_CommandRoomMortar','Room_CommandRoomPlaster']:
+for materialName in ['Room_CommandRoomCloth','Room_CommandRoomCapCloth','Room_CommandRoomWallSurface','Room_CommandRoomPlaster']:
     RepairMaterialCharts(bpy.data.objects[materialName])

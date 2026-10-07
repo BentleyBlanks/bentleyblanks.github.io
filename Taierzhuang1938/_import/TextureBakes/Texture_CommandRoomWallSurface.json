@@ -1,0 +1,120 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-10-07",
+  "name": "CommandRoomWallSurface",
+  "preset": "limePlaster",
+  "source": {
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Source/CommandRoomWallSurface20261007.png",
+    "sha256": "24211c149c6773e233772c934d850c448aa6a1e29f731483ae64cb8861ec7f17",
+    "metrics": {
+      "meanSrgb": [
+        0.7541,
+        0.6913,
+        0.6292
+      ],
+      "luma": 0.6915,
+      "lumaStd": 0.1204,
+      "sat": 0.1656,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0824
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.69,
+      0.665,
+      0.615
+    ],
+    "contrast": 0.095,
+    "lumaRange": [
+      0.5,
+      0.75
+    ],
+    "satRange": [
+      0.0,
+      0.16
+    ],
+    "stdRange": [
+      0.03,
+      0.1
+    ],
+    "reliefM": 0.004,
+    "rough": 0.96,
+    "roughVar": 0.035,
+    "roughLumaK": 0.0,
+    "ao": 0.1,
+    "metal": 0.0,
+    "seamless": "none",
+    "rowFlatten": false,
+    "flattenSigma": 0.088,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 3.5,
+    "size": 2048,
+    "dataSize": 1024,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": true,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 76,
+    "dataQuality": 90,
+    "dataLossless": false,
+    "uvAtlasReason": "Unique clamped lime, earth and brick atlas; material regions are not illumination gradients; scene lighting is separate UV1 irradiance."
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_CommandRoomWallSurfaceBase.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 414078,
+      "sha256": "6248f761be8bb233326373a0039d1679f852101e7cbf9c8c214ddbec30fa35af"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_CommandRoomWallSurfaceNormal.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 121332,
+      "sha256": "5348d632079417b396c3a7639822e67577144fd94eebbdf4b3bfcd489acade30"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_CommandRoomWallSurfaceOrm.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 50858,
+      "sha256": "9928ad2ff8f5445766c075ade0f637d907ab40efe8b2ae5648040d9a76628f3a"
+    }
+  ],
+  "totalBytes": 586268,
+  "metrics": {
+    "meanSrgb": [
+      0.6895,
+      0.666,
+      0.6149
+    ],
+    "luma": 0.6568,
+    "lumaStd": 0.0946,
+    "sat": 0.1083,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0686,
+    "seam": 0.1182,
+    "interior": 0.0235,
+    "seamRatio": 5.021,
+    "border": 0.939,
+    "swing": 0.1318,
+    "aoMean": 0.982,
+    "roughMean": 0.965,
+    "texelsPerMeter": 585.1
+  },
+  "gateProblems": []
+}

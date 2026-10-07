@@ -58,7 +58,6 @@ cloth=Material("CommandRoomCloth",(.17,.16,.14),.97,"CommandRoomCloth")
 mapmat=Material("CommandRoomMap",(.58,.51,.4),.95,"CommandRoomMap",True)
 letter=Material("CommandRoomLetter",(.64,.61,.51),.97,"CommandRoomLetter",True)
 iron=Material("CommandRoomIron",(.08,.075,.063),.83)
-brick=Material("CommandRoomBrick",(.47,.365,.30),.96,"CommandRoomBrick")
 dust=Material("CommandRoomDust",(.42,.39,.33),.99)
 graphite=Material("CommandRoomGraphite",(.023,.022,.02),.77)
 pencilWood=Material("CommandRoomPencilWood",(.48,.34,.20),.9)
@@ -156,7 +155,7 @@ def Branch(a,d,length,r,depth):
 for x in [-2.35,-.55]: Branch((x,3.8,.6),(random.uniform(-.1,.1),0,1),.72,.017,4)
 courtyardPath=GAME/'_blender/Script_CommandRoomCourtyard.py'
 exec(compile(courtyardPath.read_text(encoding='utf-8'),str(courtyardPath),'exec'),globals())
-# Cut real recesses through the plaster skin and fit eroded masonry inside.
+# Build the reference-matched wall skin with coherent lime/earth/brick relief.
 wallPath=GAME/'_blender/Script_CommandRoomWallWear.py'
 exec(compile(wallPath.read_text(encoding='utf-8'),str(wallPath),'exec'),globals())
 furniturePath=GAME/'_blender/Script_CommandRoomFurniture.py'

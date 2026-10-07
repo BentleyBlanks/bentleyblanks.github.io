@@ -79,6 +79,7 @@ export class CommandRoom {
         if (paperName) return { spec, textures: [await this.LoadPaper(paperName)] };
         const channels = spec.kind === "print" ? ["Image"] : ["Base", "Normal", "Orm"];
         const textures = await Promise.all(channels.map(channel => LoadTexture(spec.name, channel)));
+        if (spec.clamp) for (const texture of textures) texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
         return { spec, textures };
       })),
       LoadTexture(DATA.bakedLighting.name, "Image"),
@@ -118,11 +119,9 @@ export class CommandRoom {
           mat.emissive.setHex(DATA.outside.color);
           mat.emissiveIntensity = DATA.outside.intensity;
         }
-        const set = byName.get(mat.name) || (mat.name === "CommandRoomCabinetWood" ? byName.get("CommandRoomWood") : null) || (["CommandRoomBrick", "CommandRoomMortar"].includes(mat.name) ? byName.get("CommandRoomPlaster") : null);
+        const set = byName.get(mat.name) || (mat.name === "CommandRoomCabinetWood" ? byName.get("CommandRoomWood") : null);
         if (!set) continue;
         mat.color.setHex(set.spec.tint);
-        if (mat.name === "CommandRoomBrick") mat.color.setHex(DATA.brickTint);
-        if (mat.name === "CommandRoomMortar") mat.color.setHex(DATA.mortarTint);
         if (mat.name === "CommandRoomCabinetWood") mat.color.setHex(DATA.cabinet.tint);
         mat.map = set.textures[0];
         if (mat.name === "CommandRoomMap" || mat.name === "CommandRoomLetter") this.paperMaterials.set(mat.name, mat);
