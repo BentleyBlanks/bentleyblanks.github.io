@@ -1,5 +1,18 @@
 // Compact hand-cut earth: Notion historical photographs 01 and 14 (2026-10-07).
-// These are surface details, not a second excavation or collision surface.
+// Physical cross-section, read by the shared excavation sampler. Routes stay unchanged.
+export const TRENCH_EARTH_PROFILE = Object.freeze({
+  bankToe: .08,
+  bankShoulder: .90,
+  bankCutFromDepthM: 1.4,
+  bermHeightScale: 2.8,
+  bermWidthScale: 1.5,
+  bermPeak: .32,
+  bermLobeM: 2.8,
+  bermWidthJitter: .28,
+  junctionFeatherM: .4,
+});
+
+// Fine surface details, not a second excavation or collision surface.
 export const TRENCH_APPEARANCE = Object.freeze({
   sectorM: 48,
   stationStride: 1,

@@ -262,6 +262,15 @@ const GridKey = (ix, iz) => (ix + GRID_BIAS) * 32768 + (iz + GRID_BIAS);
 export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, legacy = false } = {}) {
   const seed = spec.seed || "trench";
   const globalJitter = legacy ? 0 : jitterScale;
+  // Opt-in physical finish: a firmer cut face and connected excavated spoil ridges.
+  // Legacy networks and the editor's older fixtures keep their original cross-section.
+  const profile = legacy ? null : spec.earthProfile;
+  const BankRise = (i, t) => profile && cDepth[i] >= profile.bankCutFromDepthM
+    ? Smooth((t - profile.bankToe) / (profile.bankShoulder - profile.bankToe)) : Smooth(t);
+  const BermBump = profile
+    ? u => u <= 0 || u >= 1 ? 0 : u < profile.bermPeak
+      ? Smooth(u / profile.bermPeak) : Smooth((1 - u) / (1 - profile.bermPeak))
+    : Bump;
 
   // 噪声通道：种子只挂网络级 + 通道名（见头注：接口处必须读到同一个值）
   const seedFloor = HashString(`${seed}:floor`);
@@ -269,6 +278,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
   const seedDepth = HashString(`${seed}:depth`);
   const seedRut = HashString(`${seed}:rut`);
   const seedBerm = HashString(`${seed}:berm`);
+  const seedSpoil = HashString(`${seed}:spoil`);
   // 两路细尺度通道（2026-09-17 验收补的）：9 m 一档的宽度噪声在沟里平视时读不
   // 出来，沟沿仍是一条光滑曲线、坡面仍是一张挤出来的斜面。edge 给沟沿 3 m 一档
   // 的毛边（±edgeJitterM，米），rough 给坡面 1.8 m 一档的起伏（±bankRoughM，只在
@@ -311,8 +321,9 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
     const depth = seg.depth ?? preset.depth;
     const floorW = (seg.floorW ?? preset.floorW) * widthScale;
     const bankW = seg.bankW ?? preset.bankW;
-    const bermH = legacy ? 0 : (seg.bermH ?? preset.bermH);
-    const bermW = seg.bermW ?? preset.bermW;
+    // Authored low/absent berms protect observation bays, firing gaps and dugout mouths.
+    const bermH = legacy ? 0 : (seg.bermH ?? preset.bermH * (profile?.bermHeightScale ?? 1));
+    const bermW = (seg.bermW ?? preset.bermW) * (profile?.bermWidthScale ?? 1);
     const bermSide = seg.bermSide ?? preset.bermSide;
     const cornerRadiusM = legacy ? 0 : (seg.cornerRadiusM ?? preset.cornerRadiusM);
 
@@ -333,7 +344,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
     cRoughInv[i] = 1 / (preset.bankRoughCellM || 1.8);
 
     const maxHalfTop = cFloorHalf[i] * (1 + cFloorJ[i]) + cEdgeJ[i] + bankW * (1 + cBankJ[i]);
-    cReach[i] = maxHalfTop + (cBermSide[i] !== SIDE_NONE ? bermW : 0) + 1e-6;
+    cReach[i] = maxHalfTop + (cBermSide[i] !== SIDE_NONE ? bermW * (1 + (profile?.bermWidthJitter ?? 0)) : 0) + 1e-6;
     cReachSq[i] = cReach[i] * cReach[i];
     cCellInv[i] = 1 / preset.noiseCellM;
     cRutInv[i] = 4 / preset.noiseCellM;
@@ -391,8 +402,12 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
   const BermHAt = (i, x, z) => {
     if (!cJitter[i]) return cBermH[i];
     const c = cBermCellInv[i];
+    if (profile) return cBermH[i] * (.55 + .12 * ValueNoise2(x * c, z * c, seedBerm)
+      + .6 * ValueNoise2(x / profile.bermLobeM, z / profile.bermLobeM, seedSpoil));
     return cBermH[i] * (0.6 + 0.4 * ValueNoise2(x * c, z * c, seedBerm));
   };
+  const BermWAt = (i, x, z) => !profile || !cJitter[i] ? cBermW[i]
+    : cBermW[i] * (1 + profile.bermWidthJitter * (2 * ValueNoise2(x / profile.bermLobeM, z / profile.bermLobeM, seedBerm) - 1));
 
   // --- 边表 + 分桶网格 -----------------------------------------------------
   let edgeCount = 0;
@@ -481,7 +496,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       const d = Math.sqrt(bestD2[si]);
       const half = HalfFloorAt(si, x, z);
       const bank = BankAt(si, x, z);
-      const cut = 1 - Smooth((d - half) / bank);
+      const cut = 1 - BankRise(si, (d - half) / bank);
       if (cut <= 0) continue;
       const dep = DepthAt(si, x, z) * cut;
       if (dep > deepest) deepest = dep;
@@ -501,6 +516,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
     let deepest = 0;
     let outside = true;
     let berm = 0;
+    let cutClearance = Infinity;
     for (let k = 0; k < count; k += 1) {
       const si = hits[k];
       if (bestD2[si] >= cReachSq[si]) continue;
@@ -508,10 +524,11 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       const half = HalfFloorAt(si, x, z);
       const bank = BankAt(si, x, z);
       const halfTop = half + bank;
+      if (d - halfTop < cutClearance) cutClearance = d - halfTop;
       if (d <= halfTop) {
         outside = false;
         const t = (d - half) / bank;
-        let dep = DepthAt(si, x, z) * (1 - Smooth(t));
+        let dep = DepthAt(si, x, z) * (1 - BankRise(si, t));
         // 坡面粗糙度：Bump(t) 在沟底（t≤0）与沟沿（t≥1）归零，只揉坡面那一段
         if (t > 0 && cRough[si] > 0) {
           const r = cRoughInv[si];
@@ -519,7 +536,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
         }
         if (dep > deepest) deepest = dep;
       } else if (cBermSide[si] !== SIDE_NONE) {
-        const u = (d - halfTop) / cBermW[si];
+        const u = (d - halfTop) / BermWAt(si, x, z);
         if (u < 1) {
           const e = bestEdge[si];
           const len = elen[e] || 1;
@@ -527,7 +544,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
           const nx = -edz[e] / len, nz = edx[e] / len;
           const side = (x - ex0[e]) * nx + (z - ez0[e]) * nz;
           if (SideAllowed(cBermSide[si], side)) {
-            const h = BermHAt(si, x, z) * Bump(u);
+            const h = BermHAt(si, x, z) * BermBump(u);
             if (h > berm) berm = h;
           }
         }
@@ -539,7 +556,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       if (cut < out) out = cut;
     }
     // 抛土只在「不落在任何一段的开挖坡内」时才加 —— 否则土堆进邻沟的沟底。
-    if (outside && berm > 0) out += berm;
+    if (outside && berm > 0) out += berm * (profile ? Smooth(cutClearance / profile.junctionFeatherM) : 1);
     return out;
   }
 
@@ -549,6 +566,8 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
     let bestSeg = -1, bestSq = Infinity;
     for (let k = 0; k < count; k += 1) {
       const si = hits[k];
+      // A closer zero-berm segment must not hide a neighbour's wider spoil skirt.
+      if (bestD2[si] >= cReachSq[si]) continue;
       if (bestD2[si] < bestSq) { bestSq = bestD2[si]; bestSeg = si; }
     }
     if (bestSeg < 0) return null;
@@ -566,6 +585,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       d: bestDist,
       side: side >= 0 ? 1 : -1,
       halfFloor, bank, halfTop: halfFloor + bank,
+      bermWidth: BermWAt(bestSeg, x, z),
       inFloor: bestDist <= halfFloor,
       inCut: bestDist <= halfFloor + bank,
     };
@@ -619,7 +639,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       const depth = DepthAt(seg.index, p.x, p.z);
       const halfTop = halfFloor + bank;
       const code = cBermSide[seg.index];
-      const crest = halfTop + cBermW[seg.index] / 2;
+      const crest = halfTop + BermWAt(seg.index, p.x, p.z) * (profile?.bermPeak ?? .5);
       const bermPlus = SideAllowed(code, 1)
         ? BermHAt(seg.index, p.x + nx * crest, p.z + nz * crest) : 0;
       const bermMinus = SideAllowed(code, -1)
@@ -735,6 +755,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
 
   return Object.freeze({
     revision, seed, version: spec.version ?? 1,
+    earthProfile: profile || null,
     segments: Object.freeze(outSegments),
     junctions: Object.freeze(junctions),
     bounds: Object.freeze({ minX, maxX, minZ, maxZ }),

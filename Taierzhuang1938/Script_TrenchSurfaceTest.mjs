@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { BuildTrenchSurface } from './Script_TrenchSurface.mjs';
 import { BuildTrenchEarth } from './Script_TrenchEarth.mjs';
 import { CompileTrenchNetwork } from './Script_TrenchPlan.mjs';
+import { BuildTrenchPreview } from './Script_TrenchSpline.mjs';
+import { TRENCH_EARTH_PROFILE } from './Data_TrenchAppearance.mjs';
 
 // Updates must use the physical terrain's actual grid (including non-unit cells),
 // and must restore it after a blast reset; no camera-dependent screen depth cache.
@@ -109,4 +111,18 @@ for(const geometry of cutBatches){
   geometry.dispose();
 }
 assert.ok(skinVertices>1000&&sharedEdges>100,'measure actual adjacent generated strips');
+const previewPlan=CompileTrenchNetwork({seed:'SpoilPreview',earthProfile:TRENCH_EARTH_PROFILE,
+  segments:[{id:'Cut',preset:'communication',points:[[0,0],[0,20]],jitterScale:0}]});
+let crownVertices=0;
+BuildTrenchPreview({Add(key,g){
+  if(key==='trench'){
+    const p=g.attributes.position;
+    for(let i=0;i<p.count;i++){
+      assert.ok(Math.abs(p.getY(i)-previewPlan.Apply(p.getX(i),p.getZ(i),0,0))<1e-5,'editor preview uses the shared physical profile');
+      if(p.getY(i)>.4)crownVertices++;
+    }
+  }
+  g.dispose();
+}},previewPlan,'Cut',{lift:0,natural:()=>0});
+assert.ok(crownVertices>20,'editor preview contains raised spoil crowns, not only their flat boundaries');
 console.log('TrenchSurfaceTest: physical contact update/reset, measured grass direction, geometry and packed asset contracts passed');

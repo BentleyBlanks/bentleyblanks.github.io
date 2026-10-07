@@ -30,19 +30,21 @@ export const TRENCH_PREVIEW_COLORS = Object.freeze({
 });
 
 const MIN_STATIONS = 2;
-const SECTION_POINTS = 7;
+const SECTION_POINTS = 21;
 
 function Segment(plan, segmentId) {
   if (!plan || !Array.isArray(plan.segments)) return null;
   return plan.segments.find((s) => s.id === segmentId) || null;
 }
 
-/** 站点的横断面偏移（沿法向 n，米）。berm 宽度取段的标称值。 */
+/** Sample bank faces and spoil crowns as well as their zero-height boundaries. */
 function SectionOffsets(station, bermW) {
   const halfFloor = Math.max(0.05, station.halfFloor || 0);
   const halfTop = halfFloor + Math.max(0.05, station.bank || 0);
   const outer = halfTop + Math.max(0, bermW);
-  return [-outer, -halfTop, -halfFloor, 0, halfFloor, halfTop, outer];
+  const side = [halfFloor, ...[.25,.5,.75,1].map(t => halfFloor + (halfTop-halfFloor)*t),
+    ...[.2,.4,.6,.8].map(t => halfTop + bermW*t), outer];
+  return [...side.map(x=>-x).reverse(), 0, ...side];
 }
 
 /**
@@ -72,7 +74,7 @@ export function BuildTrenchPreview(collector, plan, segmentId, {
   if (stations.length < MIN_STATIONS) return null;
 
   const Natural = typeof natural === "function" ? natural : () => 0;
-  const bermW = segment.nominal?.bermW ?? 1.6;
+  const bermW = (segment.nominal?.bermW ?? 1.6) * (1 + (plan.earthProfile?.bermWidthJitter ?? 0));
   const rows = stations.length;
   const count = rows * SECTION_POINTS;
   const position = new Float32Array(count * 3);
@@ -100,7 +102,7 @@ export function BuildTrenchPreview(collector, plan, segmentId, {
       position[at + 2] = z;
       uv[(i * SECTION_POINTS + k) * 2] = x / 2;
       uv[(i * SECTION_POINTS + k) * 2 + 1] = z / 2;
-      if (k === 3) {
+      if (k === (SECTION_POINTS - 1) / 2) {
         const depth = ground - y;
         if (depth < minDepth) minDepth = depth;
         if (depth > maxDepth) maxDepth = depth;

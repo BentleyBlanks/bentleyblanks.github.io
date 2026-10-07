@@ -469,7 +469,8 @@ export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0,
   // 到坡顶外 bermW 为止，够这一层用；麦茬的 3.5 m 退让带比它远，照旧按标称折线量。
   const corridor = TrenchPlanFor(spec).Corridor(x, z);
   if (corridor) {
-    const t = 1 - Smooth((corridor.d - corridor.halfFloor - corridor.bank * 0.5) / (corridor.bank * 0.5 + 0.8));
+    const spoilWidth = spec.trenchNetwork?.earthProfile ? corridor.bermWidth : .8;
+    const t = 1 - Smooth((corridor.d - corridor.halfFloor - corridor.bank * 0.5) / (corridor.bank * 0.5 + spoilWidth));
     if (t > spoil) spoil = t;
   }
   for (const trench of spec.trenches) {

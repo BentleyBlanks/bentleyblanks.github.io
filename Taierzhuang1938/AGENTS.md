@@ -6,7 +6,7 @@
 
 ## 当前入口与任务范围
 
-- **壕沟外观采用历史照片 01 / 14（2026-10-07）**：紧实切土壁、浅铲痕、不规则厚沟沿，碎石与草根稀疏；仍走原样条、共享地形与分区合批，不改走向、宽深和碰撞。来源、贴图重建与验证见 [壕沟表面](docs/Data_TrenchSurface.md)；门禁 `Script_TrenchSurfaceTest` / `Script_FirstLevelMissionFortificationsTest`。
+- **壕沟形状采用历史照片 01 / 14（2026-10-07）**：紧实切土壁、浅铲痕、地面上相连的弃土小垄，碎石与草根稀疏。用户补充要求实体形状后，深沟坡壁及沟外抛土进入共享地形，渲染、碰撞与贴地一致；中心线、分岔、沟底宽度和标称深度不改，浅撤退沟、观察口与射界保留原通行约束。来源、剖面参数与验证见 [壕沟表面](docs/Data_TrenchSurface.md)；门禁 `Script_TrenchPlanTest` / `Script_TrenchSurfaceTest` / `Script_FirstLevelFrontTopologyTest` / `Script_FirstLevelMissionFortificationsTest`。
 
 - **贴图管理与枯树完整态合批（2026-10-03）**：编辑器「贴图管理」打开独立 `TextureManager.html` 窗口，共用发布配置；独立图片按 Unity Importer 分组配置类型／Alpha／尺寸／采样／Mipmap／平台覆盖，支持 DXT1/5、BC7 等 GPU 目标，当前未接入项置灰说明；程序化配方仅 Worker 预览，GLB 内嵌图暂不管理。Pages 在 staging 导入后再打 bundle，源资产规范不变；运行时 KTX2 保留通道与 UV 方向。见 [贴图导入器](docs/Data_TextureImporter.md)，门禁 `Script_TextureImportTest` / `Script_TextureManagerBrowserTest`。枯树完整状态每区域／LOD 单一合并实例批，爆破切换原拆分物理，见 [枯树](docs/Data_BreakableTrees.md)。
 

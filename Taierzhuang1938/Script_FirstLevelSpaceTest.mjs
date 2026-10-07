@@ -895,6 +895,8 @@ if (!rearOnly) {
 //（Data_FirstLevelSpaceSouthFingerprint.json；只许从 baseline 字段那份提交重新生成）。基线原是重排前的 f581ac7dd；
 // 2026-09-24 并入 master 后换成 master 的 b3ba06096（其 c85614d43 重建了 06–18 白盒），合并后 07+ 与它逐项相同。
 // 2026-09-27 05–18 按概念图重做白盒（docs/Data_FirstLevelWhitebox0518Gap.md），用户授权改动 07+ 的体块与地面，基线随之换成该集成提交。
+// 2026-10-07 用户补充实体沟形和地面连续弃土垄：仅沟壁/抛土带地形与体块接地 Y/高度变化，
+// 经 f3d70dcb 逐点/逐体块审计后更新指纹；中心线、占地与壕沟外地面由 TrenchPlanTest 另作保护。
 // ---------------------------------------------------------------------------
 {
   const expected = JSON.parse(fs.readFileSync(new URL("./Data_FirstLevelSpaceSouthFingerprint.json", import.meta.url), "utf8"));

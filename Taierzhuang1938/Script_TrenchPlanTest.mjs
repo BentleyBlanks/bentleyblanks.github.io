@@ -679,4 +679,52 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
   console.log(`ok frameLengthM：改尾巴后前 ${cut.toFixed(0)} m 的站点与布设逐位不变`);
 }
 
+// 13. Photo 01/14 physical profile: preserve the full route and floor, but give
+// the field edge a continuous, irregular spoil ridge instead of a flat lip.
+{
+  const before = CompileTrenchNetwork({ ...MISSION_TRENCH_NETWORK, earthProfile: null });
+  const after = CompileTrenchNetwork(MISSION_TRENCH_NETWORK);
+  const RouteShape = p => p.segments.map(s => ({ id:s.id, control:s.control, dense:s.dense,
+    stations:s.stations.map(q => [q.s,q.x,q.z,q.tx,q.tz,q.nx,q.nz,q.halfFloor,q.bank,q.depth,q.junctionClear]) }));
+  assert.deepEqual(RouteShape(after),RouteShape(before),'all 22 centre lines, branches, widths, depths and stations stay fixed');
+  assert.deepEqual(after.junctions,before.junctions,'junction topology stays fixed');
+  const profile = MISSION_TRENCH_NETWORK.earthProfile;
+  const spec = {seed:'PhotoSpoil',earthProfile:profile,segments:[{id:'Cut',preset:'communication',
+    points:[{x:0,z:-30},{x:0,z:30}],cornerRadiusM:0}]};
+  const p = CompileTrenchNetwork(spec), old = CompileTrenchNetwork({...spec,earthProfile:null});
+  let low=Infinity,high=-Infinity,previous=null;
+  for(let z=-24;z<=24;z+=.1){
+    const c=p.Corridor(0,z),edge=c.halfTop;
+    for(const x of [-c.halfFloor*.9,0,c.halfFloor*.9])
+      assert.ok(Math.abs(p.Apply(x,z,0,0)-old.Apply(x,z,0,0))<1e-9,'full walking floor is unchanged');
+    let peak=0;
+    for(let x=edge+.1;x<edge+3.4;x+=.05)peak=Math.max(peak,p.Apply(x,z,0,0));
+    assert.ok(peak>.3&&peak<.9,`connected small spoil ridge, not isolated balls or a tall wall: ${peak}`);
+    if(previous!==null)assert.ok(Math.abs(peak-previous)<.09,'spoil heaps join without steps');
+    low=Math.min(low,peak);high=Math.max(high,peak);previous=peak;
+    assert.equal(p.Apply(edge+3.5,z,0,0),0,'outer skirt settles back into natural ground');
+  }
+  assert.ok(high-low>.12,'spoil crown has measurable variation along the trench');
+  const flat=CompileTrenchNetwork(spec,{jitterScale:0});
+  const straightOld=CompileTrenchNetwork({...spec,earthProfile:null},{jitterScale:0});
+  const faceSlope=q=>(q.Apply(2.3,0,0,0)-q.Apply(2.1,0,0,0))/.2;
+  assert.ok(faceSlope(flat)>faceSlope(straightOld)*1.15,'deep cut face is steeper through its middle');
+  const shallowSpec={...spec,segments:[{...spec.segments[0],depth:1.1,bermH:0}]};
+  const shallow=CompileTrenchNetwork(shallowSpec),shallowOld=CompileTrenchNetwork({...shallowSpec,earthProfile:null});
+  for(let x=-3;x<=3;x+=.05)assert.equal(shallow.Apply(x,0,0,0),shallowOld.Apply(x,0,0,0),'shallow escape scrapes retain climbable banks');
+  const cross=CompileTrenchNetwork({...spec,segments:[...spec.segments,{id:'Cross',preset:'communication',
+    points:[{x:-20,z:0},{x:20,z:0}],depth:2.2}]});
+  for(let x=-5;x<=5;x+=.1)for(let z=-5;z<=5;z+=.1)
+    if(cross.Depth(x,z)>.01)assert.ok(cross.Apply(x,z,0,0)<=0,'spoil never fills a neighbouring excavation');
+  const oldTerrain={...MISSION_TERRAIN,trenchNetwork:{...MISSION_TRENCH_NETWORK,earthProfile:null}};
+  let protectedSamples=0;
+  for(let x=-200;x<=250;x+=2)for(let z=-195;z<=400;z+=2){
+    if(before.Corridor(x,z)||after.Corridor(x,z))continue;
+    assert.equal(SampleMissionTerrain(x,z),SampleMissionTerrain(x,z,oldTerrain),'unrelated terrain is unchanged');
+    protectedSamples++;
+  }
+  assert.ok(protectedSamples>60000,'protect the whole field outside the trench envelope');
+  console.log(`ok photo profile: unchanged routes/floors, continuous ${low.toFixed(2)}–${high.toFixed(2)} m spoil and firmer banks`);
+}
+
 console.log("TrenchPlanTest: 全部通过");

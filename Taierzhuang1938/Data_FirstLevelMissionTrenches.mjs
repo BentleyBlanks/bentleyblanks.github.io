@@ -27,6 +27,7 @@
 // BundleApproach 3.6/1.3、WestEvacuation 5.2/2.2、两回环 3.6/1.5、Sap 3.2/1.5。
 
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
+import { TRENCH_EARTH_PROFILE } from "./Data_TrenchAppearance.mjs";
 import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_REAR_ROUTES, MISSION_BUNKER_TRENCH, MISSION_BUNKER_FRONT_SAP, MISSION_BUNKER_DEPTH_SAP,
   MISSION_FRONT_COLLECTION_ROUTE } from "./Data_FirstLevelMissionTopology.mjs";
@@ -37,6 +38,7 @@ const SUPPORT_TO_COLLECTION = OPENING.supportRoute.slice(1, OPENING.supportRoute
 export const MISSION_TRENCH_NETWORK = Object.freeze({
   version: 1,
   seed: "tengxian1938:trench",
+  earthProfile: TRENCH_EARTH_PROFILE,
   segments: Object.freeze([
     {
       id: "FrontCommunication", preset: "communication", role: null,
@@ -96,7 +98,7 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
       depth:Sortie.trenchDepthM,floorW:Sortie.trenchBottomM,bankW:Sortie.trenchBankM,bermH:.55,bermSide:"minus",
       source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.route（宽/深/坡取 trenchBottomM/trenchDepthM/trenchBankM）",routeBound:true},
     // 05 attack branch (upper link sap): rear junction -> road-side ruin; its last 4 m are shallowed.
-    {id:"RoadAttack",preset:"communication",role:null,points:Sortie.attackRoute,depth:1.6,
+    {id:"RoadAttack",preset:"communication",role:null,points:Sortie.attackRoute,depth:1.6,bermH:.25,
       source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.attackRoute",routeBound:true},
     // Road link: the blocked south road -> ammo sap (05 cut-in pair; seen from the damaged lip).
     {id:"RoadLinkSap",preset:"sap",role:"enemyEntry",points:Space.roadLink,depth:1.5,
