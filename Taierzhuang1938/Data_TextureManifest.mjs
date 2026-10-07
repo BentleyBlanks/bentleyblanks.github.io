@@ -138,7 +138,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     toneReason: "非平铺的白灰、土层、青砖组合墙面，明暗区域来自材质分区；光照另存 UV1 辐照度图。",
     sizeReason: "启动界面近景整面墙使用单张唯一图集，保留细碎剥落和砖上灰浆，2K 基色 / 1K 数据图。",
     bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_CommandRoomWallSurface.json",
-    source: { provider: "imagegen", date: "2026-10-07", ref: "CommandRoom/Source/CommandRoomWallSurface20261007.png", prompt: "_import/Prompts/Texture_CommandRoomWallSurface.txt" },
+    source: { provider: "imagegen", date: "2026-10-07", ref: "CommandRoom/Source/CommandRoomWallLime20261007.png", prompt: "_import/Prompts/Texture_CommandRoomWallLime.txt" },
     consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomWallSurface" }],
     files: [["Texture_CommandRoomWallSurfaceBase.webp","Base",2048,2048],["Texture_CommandRoomWallSurfaceNormal.webp","Normal",1024,1024],["Texture_CommandRoomWallSurfaceOrm.webp","Orm",1024,1024]],
   },

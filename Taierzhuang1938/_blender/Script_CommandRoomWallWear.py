@@ -19,7 +19,7 @@ walls=[o for o in scene.objects if o.type=='MESH' and o.name.startswith('Wall')]
 front=wy-.12
 mortarMat=plaster  # Legacy material-batching name; no separate ochre ring mesh.
 wallSurface=Material('CommandRoomWallSurface',(.69,.665,.615),.96,'CommandRoomWallSurface')
-sourceImage=bpy.data.images.load(str(SOURCE/'Source/CommandRoomWallSurface20261007.png'),check_existing=False)
+sourceImage=bpy.data.images.load(str(SOURCE/'Source/CommandRoomWallLime20261007.png'),check_existing=False)
 sourceImage.colorspace_settings.name='Non-Color'
 width,height=sourceImage.size
 pixels=np.empty(width*height*4,dtype=np.float32);sourceImage.pixels.foreach_get(pixels)
@@ -37,15 +37,16 @@ def Smooth(low,high,value):
 
 earth=Smooth(.10,.23,red-blue)*(1-Smooth(.64,.77,luma))
 brickLoss=(1-Smooth(.42,.59,luma))*(1-Smooth(.09,.20,red-blue))
-depthField=earth*.009+brickLoss*.020
+depthField=earth*.005+brickLoss*.014
 
 def WallUv(x,z):
-    # Place the connected exposure between the coat and the map. Mirroring
-    # outside the central panel keeps texel scale and boundary colour continuous;
-    # the next masonry core is beyond the main camera's right edge.
-    left=-1.52;span=3.60
-    u=1-abs(((x-left)/span)%2-1)
-    return (max(.003,min(.997,u)),max(.002,min(.998,z/3.5)))
+    # Keep the exposure between coat and map. The window's left pier samples
+    # intact plaster instead of duplicating the same brick loss beside it.
+    # The UV boundary is hidden by the window jamb and the cabinet below it.
+    left=-1.17;span=2.70
+    u=.68+(left-x)*.17 if x<left else 1-abs(((x-left)/span)%2-1)
+    v=z/3.675
+    return (max(.003,min(.997,u)),max(.002,min(.998,v)))
 
 def DepthAt(u,v):
     x=u*(width-1);y=v*(height-1);ix=int(x);iy=int(y);fx=x-ix;fy=y-iy
@@ -69,13 +70,13 @@ for wall in walls:
         z=z0+(z1-z0)*j/nz
         for i in range(nx+1):
             x=x0+(x1-x0)*i/nx;u,v=WallUv(x,z)
-            waviness=noise.noise_vector(Vector((x*4,7.3,z*4)))[0]*.0012
+            waviness=noise.noise_vector(Vector((x*4,7.3,z*4)))[0]*.0007
             verts.append((x,front-.001+DepthAt(u,v)+waviness,z));uvs.append((u,v))
     stride=nx+1
     faces=[(j*stride+i,j*stride+i+1,(j+1)*stride+i+1,(j+1)*stride+i) for j in range(nz) for i in range(nx)]
     skin=Mesh('ReferenceWallSkin_'+wall.name,verts,faces,wallSurface,uvs,True)
     surfaceTriangles+=len(faces)*2
 bpy.data.images.remove(sourceImage)
-wallSurfaceSummary={'source':'CommandRoomWallSurface20261007.png','skinTriangles':surfaceTriangles,
-    'earthRecessionM':.009,'brickRecessionM':.020,'sampleSpacingM':.025,'uniquePanelWidthM':3.60}
+wallSurfaceSummary={'source':'CommandRoomWallLime20261007.png','skinTriangles':surfaceTriangles,
+    'earthRecessionM':.005,'brickRecessionM':.014,'sampleSpacingM':.025,'uniquePanelWidthM':2.70}
 print('Reference wall surface',wallSurfaceSummary)

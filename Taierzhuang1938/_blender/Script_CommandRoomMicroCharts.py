@@ -36,7 +36,7 @@ def RepairMaterialCharts(ob):
     # resolved ambient-light samples above that quantization floor.
     minimum=.065 if ob.name in ('Room_CommandRoomWallSurface','Room_CommandRoomPlaster') else .045
     def Resolved(uv):
-        if ob.name!='Room_CommandRoomCapCloth':
+        if ob.name not in ('Room_CommandRoomCapCloth','Room_CommandRoomCloth'):
             x=max(0,min(width-1,int(uv.x*width)));y=max(0,min(height-1,int(uv.y*height)))
             return float(pixels[y,x,:3].max())>minimum
         # Match the runtime's bilinear footprint, including its neighbours.
@@ -47,24 +47,40 @@ def RepairMaterialCharts(ob):
         for dx,dy,w in [(0,0,(1-fx)*(1-fy)),(1,0,fx*(1-fy)),(0,1,(1-fx)*fy),(1,1,fx*fy)]:
             value+=pixels[max(0,min(height-1,y+dy)),max(0,min(width-1,x+dx)),:3]*w
         return float(value.max())>minimum
+    def StablePixel(uv):
+        # A bilinear-valid centre can straddle a lit texel and empty padding.
+        # Snapping that centre blindly may select the empty member and create
+        # black triangles in the repaired garment. Verify the exact final texel.
+        px=uv.x*width-.5;py=uv.y*height-.5
+        cx=round(px);cy=round(py);candidates=[]
+        for dy in (-1,0,1):
+            for dx in (-1,0,1):
+                x=max(0,min(width-1,cx+dx));y=max(0,min(height-1,cy+dy))
+                if float(pixels[y,x,:3].max())>minimum:
+                    candidates.append(((x-px)**2+(y-py)**2,x,y))
+        if not candidates:return None
+        _,x,y=min(candidates)
+        return Vector(((x+.5)/width,(y+.5)/height))
     for p in mesh.polygons:
         center=sum((uvs[i].uv for i in p.loop_indices),Vector((0,0)))/len(p.loop_indices)
-        cornerWeight=.96 if ob.name=='Room_CommandRoomCapCloth' else .72
+        cornerWeight=.96 if ob.name in ('Room_CommandRoomCapCloth','Room_CommandRoomCloth') else .72
         samples=[center]+[center.lerp(uvs[i].uv,cornerWeight) for i in p.loop_indices]
         # A clipped brick or folded panel can have a resolved centre while a
         # corner interpolates across an empty atlas sliver. Inspect interior
         # corner samples too; face area alone does not detect that failure.
         if not all(Resolved(sample) for sample in samples):bad.add(p.index)
-    mesh.calc_loop_triangles();verts=[];faces=[];uvTriangles=[];normals=[]
+    mesh.calc_loop_triangles();verts=[];faces=[];uvSamples=[];normals=[]
     for tri in mesh.loop_triangles:
         if tri.polygon_index in bad:continue
         center=sum((uvs[i].uv for i in tri.loops),Vector((0,0)))/3
         if not Resolved(center):continue
+        sample=StablePixel(center)
+        if sample is None:continue
         points=[ob.matrix_world@mesh.vertices[i].co for i in tri.vertices]
         cross=(points[1]-points[0]).cross(points[2]-points[0])
         if cross.length<.000008:continue
         first=len(verts);verts.extend(points);faces.append((first,first+1,first+2));normals.append(cross.normalized())
-        uvTriangles.append([Vector((*uvs[i].uv,0)) for i in tri.loops])
+        uvSamples.append(sample)
     tree=BVHTree.FromPolygons(verts,faces,all_triangles=True);fixed=0
     for index in sorted(bad):
         poly=mesh.polygons[index];p=ob.matrix_world@poly.center;n=(ob.matrix_world.to_3x3()@poly.normal).normalized()
@@ -74,8 +90,7 @@ def RepairMaterialCharts(ob):
         if not candidates:continue
         hit,normal,ti,distance=min(candidates,key=lambda x:x[3]+.003*(1-normals[x[2]].dot(n)))
         # Use the tested interior texel, not an edge that can land on black padding.
-        center=sum(uvTriangles[ti],Vector())/3
-        uv=Vector(((math.floor(center.x*width)+.5)/width,(math.floor(center.y*height)+.5)/height))
+        uv=uvSamples[ti]
         for li in poly.loop_indices:uvs[li].uv=uv
         fixed+=1
     print({'material':ob.name,'subpixelFaces':len(bad),'localIrradianceRepairs':fixed})
