@@ -16,7 +16,8 @@ export async function LoadTrenchSurface() {
       if(!node.isMesh)return;
       if(all||!geometries.length){
         const geometry=node.geometry.clone().applyMatrix4(node.matrixWorld);
-        geometry.userData.trenchClodHigh=node.name.endsWith('High');geometries.push(geometry);
+        geometry.userData.trenchClodHigh=node.name.endsWith('High');
+        geometry.userData.trenchClodShape=node.name;geometries.push(geometry);
       }
       node.geometry.dispose();
       for(const m of (Array.isArray(node.material)?node.material:[node.material]))m.dispose();

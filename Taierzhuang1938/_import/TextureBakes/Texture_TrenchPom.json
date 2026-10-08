@@ -4,20 +4,20 @@
   "name": "TrenchPom",
   "preset": "drySoil",
   "source": {
-    "path": "C:/Users/Bentl/.codex/artifacts/TrenchReferenceTenImplementation20261009/Source/TrenchCutFaceGpt/lovart_9a9071576057.png",
-    "sha256": "b00eff1f6997295f332e74629dcd44acf60bd6b878154e28c48c6fdbc1cafd75",
+    "path": "C:/Users/Bentl/.codex/artifacts/TrenchReferenceTenImplementation20261009/Source/TrenchCompactPlanes/lovart_ae44f0d99631.png",
+    "sha256": "c4a2220ff5829ff9686e77e97c7bb9c58e012c352c9a15bd084cfa3ef318eaa8",
     "metrics": {
       "meanSrgb": [
-        0.4065,
-        0.3312,
-        0.2667
+        0.4378,
+        0.3659,
+        0.2969
       ],
-      "luma": 0.3348,
-      "lumaStd": 0.1011,
-      "sat": 0.344,
-      "clipLow": 0.0002,
+      "luma": 0.3669,
+      "lumaStd": 0.0682,
+      "sat": 0.3219,
+      "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.0388
+      "lowFreq": 0.0159
     }
   },
   "heightSource": null,
@@ -27,7 +27,7 @@
       0.383,
       0.303
     ],
-    "contrast": 0.065,
+    "contrast": 0.055,
     "lumaRange": [
       0.28,
       0.46
@@ -40,14 +40,14 @@
       0.05,
       0.12
     ],
-    "reliefM": 0.008,
+    "reliefM": 0.003,
     "rough": 0.94,
     "roughVar": 0.025,
     "roughLumaK": 0.0,
-    "ao": 0.3,
+    "ao": 0.2,
     "metal": 0.0,
     "seamless": "blend",
-    "rowFlatten": true,
+    "rowFlatten": false,
     "flattenSigma": 0.088,
     "isotropic": true,
     "heightFromLuma": "direct",
@@ -59,15 +59,15 @@
     "normalStrength": 1.0,
     "toneStrength": 1.0,
     "keepTone": false,
-    "noFlatten": false,
+    "noFlatten": true,
     "invertHeight": false,
     "keepAlpha": false,
     "roughMin": 0.3,
     "baseQuality": 86,
     "dataQuality": 95,
     "dataLossless": false,
-    "detailBalance": 1.0,
-    "heightFineWeight": 0.03,
+    "detailBalance": 0.0,
+    "heightFineWeight": 0.15,
     "uvAtlasReason": null
   },
   "outputs": [
@@ -76,46 +76,46 @@
       "file": "Texture_TrenchPomBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 345588,
-      "sha256": "97ec5a65fe72b30683bd38b2399973b148cce1cedc67446cd54cd9ac463ac156"
+      "bytes": 359316,
+      "sha256": "d3c129aa2dc75e94ebcd066833f84ace7245b80dedd7b0947401781f5d964e15"
     },
     {
       "channel": "Normal",
       "file": "Texture_TrenchPomNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 61760,
-      "sha256": "0463ca062258ae040e730d418b534f2cb7b1199172059bea0024e6158659be0f"
+      "bytes": 89454,
+      "sha256": "55ddfb46ab74c761d61d14febc9f497467a5f3dc9099ed97589aae94966e31c9"
     },
     {
       "channel": "Orh",
       "file": "Texture_TrenchPomOrh.webp",
       "width": 512,
       "height": 512,
-      "bytes": 47342,
-      "sha256": "09b984c0bd8aec6933c0634c69a2c719be1eedcdbaac8f9e73eac6a266941d3e"
+      "bytes": 63214,
+      "sha256": "c4942b7a08ff6d0c2293908ea3f935e4168beb8208b455a0ace65723b72fc8c5"
     }
   ],
-  "totalBytes": 454690,
+  "totalBytes": 511984,
   "metrics": {
     "meanSrgb": [
-      0.4397,
-      0.3836,
+      0.4396,
+      0.3837,
       0.303
     ],
     "luma": 0.3754,
-    "lumaStd": 0.0626,
+    "lumaStd": 0.0561,
     "sat": 0.3109,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0097,
-    "seam": 0.0456,
-    "interior": 0.0478,
-    "seamRatio": 0.953,
-    "border": 0.982,
-    "swing": 0.0193,
-    "aoMean": 0.952,
-    "roughMean": 0.94,
+    "lowFreq": 0.0087,
+    "seam": 0.0523,
+    "interior": 0.0538,
+    "seamRatio": 0.972,
+    "border": 0.961,
+    "swing": 0.0145,
+    "aoMean": 0.958,
+    "roughMean": 0.939,
     "texelsPerMeter": 853.3
   },
   "gateProblems": []

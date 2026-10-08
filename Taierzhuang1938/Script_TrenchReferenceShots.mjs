@@ -48,6 +48,32 @@ try{
    return pose;
   },shot);
   await page.screenshot({path:path.join(out,shot.id+'.png')});
+  if(process.argv.includes('--diagnose-earth')){
+   await page.evaluate(()=>{window.Tengxian.graphics.grain=0;window.Tengxian.StepFrames(40,0,true);});
+   await page.screenshot({path:path.join(out,shot.id+'_Clean.png')});
+   const removed=await page.evaluate(()=>{
+    const g=window.Tengxian;window.trenchDiagnosticRestore=[];let removed=0;
+    for(const mesh of g.battlefield.meshes){
+     if(!mesh.userData.trenchEarth||!mesh.geometry.attributes.uv)continue;
+     const original=mesh.geometry,uv=original.attributes.uv,index=original.index,n=index?.count||uv.count,keep=[];
+     for(let i=0;i<n;i+=3){
+      const ids=[0,1,2].map(j=>index?index.getX(i+j):i+j);
+      if(uv.getX(ids[0])===-8&&uv.getY(ids[0])===-9){removed++;continue;}
+      keep.push(...ids);
+     }
+     if(keep.length===n)continue;
+     mesh.geometry=original.clone();mesh.geometry.setIndex(keep);window.trenchDiagnosticRestore.push([mesh,original]);
+    }
+    g.StepFrames(40,0,true);return removed;
+   });
+   await page.screenshot({path:path.join(out,shot.id+'_NoClods.png')});
+   await page.evaluate(()=>{
+    for(const [mesh,original] of window.trenchDiagnosticRestore){mesh.geometry.dispose();mesh.geometry=original;}
+    delete window.trenchDiagnosticRestore;window.Tengxian.graphics.grain=1;
+    window.Tengxian.StepFrames(32,0,true);
+   });
+   console.log('Clod diagnostic removed '+removed+' triangles');
+  }
   const picks=pickPoints.length?await page.evaluate(async points=>{
    const {Raycaster,Vector2}=await import('three'),g=window.Tengxian,ray=new Raycaster();
    return points.map(([x,y])=>{

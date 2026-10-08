@@ -6,11 +6,28 @@ import { TRENCH_APPEARANCE as DefaultStyle } from "./Data_TrenchAppearance.mjs";
 
 export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots", clods = [], style: Style = DefaultStyle } = {}) {
   const stats = { clods: 0, spoilClods: 0, roots: 0, triangles: 0 };
-  const shape = new THREE.IcosahedronGeometry(1, 0);
+  // IcosahedronGeometry(1, 0) splits every triangle for flat normals. Weld the
+  // twelve corners before reshaping so small crumbs do not shade as rock facets.
+  // Authored UV seams are irrelevant here: the soil material is world-projected.
+  const primitive = new THREE.IcosahedronGeometry(1, 0),corners=new Map(),positions=[],indices=[];
+  const primitivePositions=primitive.attributes.position;
+  for(let i=0;i<primitivePositions.count;i++){
+    const p=[primitivePositions.getX(i),primitivePositions.getY(i),primitivePositions.getZ(i)];
+    const key=p.map(v=>v.toFixed(6)).join(',');
+    if(!corners.has(key)){corners.set(key,positions.length/3);positions.push(...p);}
+    indices.push(corners.get(key));
+  }
+  primitive.dispose();
+  const shape=new THREE.BufferGeometry();
+  shape.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));shape.setIndex(indices);
+  shape.computeVertexNormals();
   const up = new THREE.Vector3(0, 1, 0);
   const dir = new THREE.Vector3(), middle = new THREE.Vector3(), rotation = new THREE.Quaternion();
   const occupied = new Set();
-  const highClods=clods.filter(g=>g.userData.trenchClodHigh),lowClods=clods.filter(g=>!g.userData.trenchClodHigh);
+  // Broad flakes represent detached crust, not granular spoil. At this scale
+  // their planar faces read as dark rock sheets; use the compact aggregate kit.
+  const aggregateClods=clods.filter(g=>!/Flake|CutShoulder/.test(g.userData.trenchClodShape||''));
+  const highClods=aggregateClods.filter(g=>g.userData.trenchClodHigh),lowClods=aggregateClods.filter(g=>!g.userData.trenchClodHigh);
   const Range = (random, limits) => limits[0] + random() * (limits[1] - limits[0]);
   const Add = (key, geometry) => {
     stats.triangles += (geometry.index?.count || geometry.attributes.position.count) / 3;
@@ -60,7 +77,9 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     }
     // World-projected material ignores authored UVs. Keep this marker through the
     // shared position/normal/UV merge, then convert it to the trench material flag.
-    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(Array(p.count*2).fill(-8),2));
+    const marker=new Float32Array(p.count*2);
+    for(let i=0;i<p.count;i++){marker[i*2]=-8;marker[i*2+1]=-9;}
+    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(marker,2));
     geometry.computeVertexNormals();
     Add(earth, geometry); stats.clods++;
   };

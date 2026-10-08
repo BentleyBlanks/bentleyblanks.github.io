@@ -15,6 +15,7 @@ const Common = /* glsl */`
 #define TERRAIN_WATER_EXTERNAL
 #define TERRAIN_TRAILS_EXTERNAL
 uniform vec4 uTrenchDetail; // normal strength, compact/loose relief (m), colour detail
+uniform vec2 uTrenchCompact; // compact UV frequency relative to loose soil, colour contrast
 uniform vec4 uTrenchWater;   // x 沟底积水 y 沟底底湿度 z,w 凹度（米）[起, 满]
 uniform float uTrenchPom;
 uniform vec4 uTrenchLooseMean;
@@ -26,11 +27,12 @@ float gTrenchShadow=1.0;
 float SoilHeightAt(vec2 uv,float lod){
   // One height fetch per ray step. At material transitions parallax fades to
   // zero (below), so changing the dominant height cannot create a seam.
-  return textureLod(uTerrainAlbedo,vec3(uv,mix(3.0,5.0,step(.5,gTrenchLoose))),lod).a;
+  float loose=step(.5,gTrenchLoose),scale=mix(uTrenchCompact.x,1.0,loose);
+  return textureLod(uTerrainAlbedo,vec3(uv*scale,mix(3.0,5.0,loose)),max(0.0,lod+log2(scale))).a;
 }
 vec4 SoilGrad(sampler2DArray map,vec2 uv,vec2 gx,vec2 gy){
   if(gTrenchLoose>.999)return textureGrad(map,vec3(uv,5.0),gx,gy);
-  vec4 v=textureGrad(map,vec3(uv,3.0),gx,gy);
+  vec4 v=textureGrad(map,vec3(uv*uTrenchCompact.x,3.0),gx*uTrenchCompact.x,gy*uTrenchCompact.x);
   if(gTrenchLoose<.001)return v;
   return mix(v,textureGrad(map,vec3(uv,5.0),gx,gy),gTrenchLoose);
 }
@@ -62,7 +64,9 @@ void SoilPlane(vec3 world,vec3 geomN,vec3 dx,vec3 dy,int axis,float weight,vec3 
   nearFade*=smoothstep(.1,.7,abs(gTrenchLoose*2.0-1.0));
   float slope=1.0-smoothstep(.45,.95,geomN.y);
   float relief=mix(uTrenchDetail.y,uTrenchDetail.z,gTrenchLoose)*mix(.48,1.0,slope);
-  float lod=max(0.0,log2(max(length(gx),length(gy))*inv*float(textureSize(uTerrainAlbedo,0).x))-.7);
+  // Clamp after the layer-specific frequency correction in SoilHeightAt, so
+  // magnified compact soil can still sample its full-resolution height mip.
+  float lod=log2(max(max(length(gx),length(gy)),1e-8)*inv*float(textureSize(uTerrainAlbedo,0).x))-.7;
   vec2 delta=vp/facing*relief*inv*nearFade;
   vec2 at=uv;float hitDepth=.5;
   if(nearFade>.02&&weight>.15){
@@ -88,7 +92,7 @@ void SoilPlane(vec3 world,vec3 geomN,vec3 dx,vec3 dy,int axis,float weight,vec3 
   vec4 s=mix(SoilGrad(uTerrainSurface,at+offA,gx*inv,gy*inv),
     SoilGrad(uTerrainSurface,at+offB,gx*inv,gy*inv),blend);
   float height=SoilHeight(at,offA,offB,blend,lod);
-  color=clamp(mix(mean.rgb,a.rgb,uTrenchDetail.w),vec3(0),vec3(1));roughAo=vec3(s.ba,height);
+  color=clamp(mix(mean.rgb,a.rgb,uTrenchDetail.w*mix(uTrenchCompact.y,1.0,gTrenchLoose)),vec3(0),vec3(1));roughAo=vec3(s.ba,height);
   float ndl=dot(lightW,geomN);
   if(nearFade>.02&&weight>.15&&ndl>.08) {
     vec3 tangentLight=lightW-geomN*ndl;
@@ -239,11 +243,12 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
   const pom={value:1};patch.trenchPomUniform=pom;
   const detail={value:new THREE.Vector4(C.mud.normalScale,C.mud.pomReliefM,C.mud.looseReliefM,C.mud.colorDetail)};
   patch.trenchDetailUniform=detail;
-  patch.key+=stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10';
+  patch.key+=(stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10')+':compactGrain';
   patch.uniforms=(uniforms,shader)=>{
     bind(uniforms,shader);
 
     uniforms.uTrenchDetail=detail;
+    uniforms.uTrenchCompact={value:new THREE.Vector2(C.mud.baseTileM/C.mud.compactTileM,C.mud.compactColorDetail)};
     uniforms.uTrenchRootColor={value:new THREE.Color(Earth.rootColor)};
     uniforms.uTrenchWater={value:new THREE.Vector4(W.site.trenchFloor,W.damp.trenchFloor,W.lowRiseM[0],W.lowRiseM[1])};
     uniforms.uTrenchPom=pom;
