@@ -93,7 +93,7 @@ try{for(const [width,height,touch] of [[1000,900,false],[390,844,true],[320,568,
     await page.locator('[data-tool="'+id+'"]').click();await Step(1);
     const placed=await page.evaluate(id=>{const v=__EarSpaDebug.view;for(const c of v.chunks.filter(c=>c.fine===(id==='feather')&&c.depth<8)){
       v.SetToolDrag(false);v.ShowTool(c,id,0,v.Project(c.mesh.position));v.SetToolDrag(true);v.ShowTool(c,id,0,v.Project(c.mesh.position));
-      const target=v.PickTool(id);if(target)return{id:target.id,position:v.RenderingProbe().toolPosition};
+      const target=v.PickTool(id);if(target&&(id!=='tweezers'||v.ForcepsProbe()?.aligned))return{id:target.id,position:v.RenderingProbe().toolPosition};
     }return null;},id);
     Check(!!placed,id+' has a real working-end contact');
     const c=(await Probe()).targets.find(c=>c.id===placed.id),box=await page.locator('#ear-canvas').boundingBox();

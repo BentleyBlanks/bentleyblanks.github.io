@@ -426,13 +426,38 @@ export async function CreateImmersiveScene({ core }) {
     return nearest;
   }
   // Contact queries use the corrected, visible working end; the cursor is never a target ray.
+  function ForcepsSurfaceHit(c){
+    const axis=new THREE.Vector3(1,0,0).applyQuaternion(tool.quaternion),probe=new THREE.Raycaster();
+    const side=c.mesh.material.side;c.mesh.material.side=THREE.DoubleSide;
+    let nearest=null,distance=Infinity;
+    try{
+      // Probe both sides of the SAME section inside the open tips. A surface
+      // hit on one side alone is an approach, not a latched grip.
+      for(const y of [0,.25,.5,.75])for(const z of [0,-.04,.04]){
+        const center=new THREE.Vector3(0,y,z).applyQuaternion(tool.quaternion).add(tool.position),gap=.66;
+        const hits=[-1,1].map(sign=>{
+          probe.set(center.clone().addScaledVector(axis,sign*gap),axis.clone().multiplyScalar(-sign));probe.far=gap*2;
+          const hit=probe.intersectObject(c.mesh)[0],skin=probe.intersectObject(wall)[0];
+          return hit&&(!skin||hit.distance<skin.distance+.035)?hit:null;
+        });
+        if(!hits.some(Boolean))continue;
+        const paired=hits.every(Boolean)&&hits[0].distance+hits[1].distance<gap*2-.008;
+        const hit=hits[0]||hits[1],point=paired?hits[0].point.clone().lerp(hits[1].point,.5):hit.point;
+        const d=point.distanceToSquared(tool.position);
+        if(nearest&&(nearest.jawContact&&!paired||nearest.jawContact===paired&&d>=distance))continue;
+        nearest={...hit,point,jawContact:paired,jawGaps:paired?hits.map(h=>gap-h.distance+.048):null};distance=d;
+      }
+    }finally{c.mesh.material.side=side;}
+    return nearest;
+  }
   function ToolSurfaceHit(c,id){
     if(!tool.visible||lastToolId!==id||!c.coating&&c.depth>Reach(id))return null;
     if(id==='scoop')return ScoopSurfaceHit(c);
     if(!c.mesh.geometry.boundingSphere)c.mesh.geometry.computeBoundingSphere();
     const bounds=c.mesh.geometry.boundingSphere.clone().applyMatrix4(c.mesh.matrixWorld);
-    const fiber=['feather','brush'].includes(id),range=fiber?4:.95;
+    const fiber=['feather','brush'].includes(id),range=fiber?4:id==='tweezers'?1.05:.95;
     if(bounds.center.distanceTo(tool.position)>bounds.radius+range)return null;
+    if(id==='tweezers')return ForcepsSurfaceHit(c);
     const probe=new THREE.Raycaster(),samples=[];
     if(fiber){
       tool.updateMatrixWorld(true);
@@ -444,14 +469,9 @@ export async function CreateImmersiveScene({ core }) {
         }
       }
     }else{
-      // The open jaw gap is the capture volume; liquid/suction only work at the outlet.
+      // Liquid/suction only work at the outlet.
       for(const x of [-.25,0,.25])for(const y of [0,.25,.5]){
-        if(id==='tweezers'){
-          const start=new THREE.Vector3(-.8,y,x*.5).applyQuaternion(tool.quaternion).add(tool.position);
-          probe.set(start,new THREE.Vector3(1,0,0).applyQuaternion(tool.quaternion));probe.far=1.6;
-          const hit=probe.intersectObject(c.mesh)[0],skin=probe.intersectObject(wall)[0];
-          if(hit&&(!skin||hit.distance<skin.distance+.035))return hit;
-        }else samples.push({point:new THREE.Vector3(x,-.08,y*.4).applyQuaternion(tool.quaternion).add(tool.position),radius:id==='drops'?.65:.35});
+        samples.push({point:new THREE.Vector3(x,-.08,y*.4).applyQuaternion(tool.quaternion).add(tool.position),radius:id==='drops'?.65:.35});
       }
     }
     let closest=null,distance=Infinity;
@@ -465,15 +485,21 @@ export async function CreateImmersiveScene({ core }) {
     }
     return closest;
   }
-  function PickTool(id){
-    scene.updateMatrixWorld(true);let nearest=null,nearestPoint=null,distance=Infinity;
+  function PickTool(id,updateDepth=true){
+    scene.updateMatrixWorld(true);let nearest=null,nearestPoint=null,distance=Infinity,grippable=false;
     for(const c of chunks){
       if(!['attached','returning'].includes(c.state)||!c.coating&&c.depth>Reach(id)||c.fine&&id!=='feather'||!c.fine&&id==='feather')continue;
       const hit=ToolSurfaceHit(c,id);if(!hit||canal.Project(hit.point).depth>Reach(id))continue;
-      const d=hit.point.distanceToSquared(tool.position);if(d<distance){nearest=c;nearestPoint=hit.point;distance=d;}
+      const ready=id==='tweezers'&&InstrumentContact(id,tool.quaternion.toArray(),c.coating?contact.Surface(hit.point).normal.toArray():c.normal.toArray(),{jawContact:hit.jawContact}).aligned;
+      const d=hit.point.distanceToSquared(tool.position);if(ready&&!grippable||ready===grippable&&d<distance){nearest=c;nearestPoint=hit.point;distance=d;grippable=ready;}
     }
-    if(nearest?.coating)nearest.depth=canal.Project(nearestPoint).depth;
+    if(updateDepth&&nearest?.coating)nearest.depth=canal.Project(nearestPoint).depth;
     return nearest;
+  }
+  function ForcepsProbe(){
+    scene.updateMatrixWorld(true);const c=PickTool('tweezers',false),hit=c&&ToolSurfaceHit(c,'tweezers');
+    if(!hit)return null;
+    return {id:c.id,point:hit.point.toArray(),jawContact:hit.jawContact,jawGaps:hit.jawGaps,...InstrumentContact('tweezers',tool.quaternion.toArray(),c.coating?contact.Surface(hit.point).normal.toArray():c.normal.toArray(),{jawContact:hit.jawContact})};
   }
   function EnsureTool(id){
     if(!inside||entrance<1||transfer||showcase)return false;
@@ -534,6 +560,12 @@ export async function CreateImmersiveScene({ core }) {
     if(id==='scoop'&&scoopStroke&&(!hit||!ScoopTouches(hit.point)||hit.point.distanceTo(tool.position)>.95))hit=ScoopSurfaceHit(c);
     let point=hit?.point.clone()||c.mesh.position.clone().addScaledVector(c.normal,.35);
     if(c.coating){const projected=canal.Project(point);if(projected.depth>Reach(id))return false;c.depth=projected.depth;c.normal.copy(contact.Surface(point).normal);}
+    if(id==='tweezers'&&manual){
+      const state=InstrumentContact(id,tool.quaternion.toArray(),c.normal.toArray(),{jawContact:hit.jawContact});
+      c.forcepsIssue=state.jawTilt>=.48?'angle':!hit.jawContact?'approach':null;
+      if(!state.aligned)return false;
+      c.jawContact=true;c.jawGaps=hit.jawGaps;c.grasped=true;
+    }
     if(id==='scoop'&&scoopStroke&&(!hit||!ScoopTouches(point)||point.distanceTo(tool.position)>.95))return false;
     if(id==='tweezers'&&!manual){
       const side=c.mesh.material.side;c.mesh.material.side=THREE.DoubleSide;
@@ -837,7 +869,7 @@ export async function CreateImmersiveScene({ core }) {
     }
 
     const jawAxis=new THREE.Vector3(1,0,0).applyQuaternion(tool.quaternion);
-    if(id==='tweezers'&&c?.body?.grip){
+    if(id==='tweezers'&&c?.body?.grip&&!c.grasped){
       c.mesh.updateMatrixWorld(true);const oldSide=c.mesh.material.side;c.mesh.material.side=THREE.DoubleSide;
       const sides=[-1,1].map(sign=>new THREE.Raycaster(point.clone().addScaledVector(jawAxis,sign*2.5),jawAxis.clone().multiplyScalar(-sign),0,2.5).intersectObject(c.mesh)[0]);
       c.jawContact=sides.every(Boolean);
@@ -1179,7 +1211,7 @@ export async function CreateImmersiveScene({ core }) {
     ClearTray(){collectionTray.Clear();traySlot=0;},
     Suspend(){CancelPreparation();const saved={tray:collectionTray.Suspend(),traySlot,showcaseBlend,chunks,transfer,showcase,inspectionDepth,inspectionTarget,inside,entrance,heading,scoopRotation,parkedTool,manualRotation,lampOn,aimed,aim:aim.clone()};for(const c of chunks)root.remove(c.mesh,c.mark);chunks=[];transfer=null;HideTool();return saved;},
     Restore(saved){CancelPreparation();collectionTray.Restore(saved.tray);traySlot=saved.traySlot;showcaseBlend=saved.showcaseBlend;for(const c of chunks){root.remove(c.mesh,c.mark);c.mesh.geometry.dispose();c.mesh.material.dispose();c.mark.geometry.dispose();c.mark.material.dispose();}({chunks,transfer,showcase,inspectionDepth,inspectionTarget,inside,entrance,heading,scoopRotation,parkedTool,manualRotation,lampOn,aimed}=saved);aim.copy(saved.aim);for(const c of chunks)root.add(c.mesh,c.mark);contact.Reset();HideTool();},
-    SetToolDrag(enabled){toolDragMode=enabled;parkedTool=toolDrag=manualRotation=null;HideTool();},EnsureTool,StartToolDrag,MoveToolDrag,PickTool,AdvanceTool,QueueToolDepth(amount){if(toolDrag)toolDrag.depth=Clamp(toolDrag.depth+amount,-.6,.6);},EndToolDrag(){toolDrag=null;},
+    SetToolDrag(enabled){toolDragMode=enabled;parkedTool=toolDrag=manualRotation=null;HideTool();},EnsureTool,StartToolDrag,MoveToolDrag,PickTool,ForcepsProbe,AdvanceTool,QueueToolDepth(amount){if(toolDrag)toolDrag.depth=Clamp(toolDrag.depth+amount,-.6,.6);},EndToolDrag(){toolDrag=null;},
     TurnStart(x,y,id){
       if(transfer||showcase)return false;
       if(toolDragMode){if(!EnsureTool(id))return false;turnChunk=PickTool(id);}

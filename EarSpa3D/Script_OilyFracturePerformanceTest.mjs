@@ -31,11 +31,19 @@ try{
    if(hit){const p=v.Targets().find(t=>t.id===hit.id);return{id:hit.id,dx:p.pullScreen.x-p.screen.x,dy:p.pullScreen.y-p.screen.y};}
   }return null;});Check(!!setup,'working jaws contact oil '+attempt);
   await Down();
+  let approach=0;
+  // A single surface hit is only an approach. Keep the same real gesture and
+  // slide toward the film edge until both jaws enclose a finite section.
+  for(;approach<45;approach++){
+   await page.evaluate(()=>__EarSpaDebug.StepFrames(1));
+   if(await page.evaluate(id=>__EarSpaProbe().active===id,setup.id))break;
+   await Move(inputX+setup.dx*(approach+1)/90,inputY+setup.dy*(approach+1)/90);
+  }
   await page.evaluate(()=>__EarSpaDebug.StepFrames(15));
   Check(await page.evaluate(id=>__EarSpaProbe().active===id,setup.id),'stationary jaws hold mother film without tearing '+attempt);
   const times=[];let bite=null;
   for(let i=1;i<=80;i++){
-   await Move(inputX+setup.dx*i/45,inputY+setup.dy*i/45);
+   await Move(inputX+setup.dx*(approach/90+i/45),inputY+setup.dy*(approach/90+i/45));
    const frame=await page.evaluate(id=>{const c=__EarSpaDebug.view.chunks.find(c=>c.id===id),steps=c.body.steps,start=performance.now();__EarSpaDebug.StepFrames(1);const cpu=performance.now()-start;__EarSpaDebug.core.renderer.getContext().finish();const gpu=performance.now()-start,p=__EarSpaProbe();return{cpu,gpu,sourceSteps:c.body.steps-steps,active:p.active,bite:p.targets.find(c=>c.id===p.active&&c.form==='oilyBite')};},setup.id);times.push(frame);
    if(frame.bite){bite=frame.bite;break;}
   }

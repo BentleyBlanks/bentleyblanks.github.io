@@ -6,7 +6,7 @@ import {CreatePhysicsSettings} from './Script_PhysicsSettings.mjs?v=ear028-physi
 import {CUSTOMER_EARS,CustomerEarType} from './Data_CustomerTypes.mjs?v=ear029-oily-coating-20260912';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear043-runtime-performance-20261003';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear044-light-wax-20261008';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear045-forceps-grip-20261009';
 import { CreateAudio } from './Script_Audio.js?v=ear035-sticky-scrape-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear040-render-settings-20260912';
@@ -15,7 +15,7 @@ import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear039-brush-gather-20260912';
 
-const VERSION = 'ear044-light-wax-20261008';
+const VERSION = 'ear045-forceps-grip-20261009';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结', oily:'油性凝胶' };
@@ -55,7 +55,7 @@ export async function Start() {
       </section>
       <section id="physics-debug" class="debug-settings" aria-labelledby="debug-title"></section>
 
-      <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键按住拖动器具，松开原地停留；勺头实际接触耳垢才能刮动，点击远处不选块；滚轮向上推进、向下退出；凹口朝向耳垢才能托刮，勺背和空划不能剥离。镊尖接触后按住拖动夹取。手机在施力模式下按住拖动，转向模式下按住旋转，进退模式向上拖推进、向下拖退出。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。细碎屑可先用柔毛刷按住拖动扫到一起，松手留在原处；再用鹅绒掸贴住后旋转，松手带出。掸子五级容量为 1／3／6／9／12 组，只带走绒羽实际扫到的微屑。较大碎片可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。尚未松脱时松手，材料会弹性回落；黏附牢固时受力断面会碎裂，残片仍需清理。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，方向键移动器具，W/S 推进或退出，按住空格接触并施力，Q/E 转向，松开空格停手，Esc 取消。</p></details>
+      <details id="operation-guide"><summary>操作指南</summary><p>鼠标右键按住连续旋转，松开停止，工具留在接触点；左键按住拖动器具，松开原地停留；勺头实际接触耳垢才能刮动，点击远处不选块；滚轮向上推进、向下退出；凹口朝向耳垢才能托刮，勺背和空划不能剥离。镊子按住拖到耳垢边缘，两侧夹稳后继续缓慢拖离耳壁；未夹住时可继续调整位置，不用松手重来。夹口侧着时用右键或转向模式调整。手机在施力模式下按住拖动，转向模式下按住旋转，进退模式向上拖推进、向下拖退出。工具遇到内壁会受阻。点放大镜切换深浅视野，短耳勺工作长度有限；深处用长镊，硬结先滴液软化。松脱后仍在工具上，松手由工具托送到耳外，再轻放入盘。硬结先滴液等待约 3 秒。干薄片用耳勺托边，黏块先松边再用镊子夹；硬拉会痛或碎裂。细碎屑可先用柔毛刷按住拖动扫到一起，松手留在原处；再用鹅绒掸贴住后旋转，松手带出。掸子五级容量为 1／3／6／9／12 组，只带走绒羽实际扫到的微屑。较大碎片可用耳勺清理，也可买毛刷轻扫或用吸引管吸走湿碎屑。尚未松脱时松手，材料会弹性回落；黏附牢固时受力断面会碎裂，残片仍需清理。</p><p>键盘：1/2/3 切换工具；画面获得焦点后，方向键移动器具，W/S 推进或退出，按住空格接触并施力，Q/E 转向，松开空格停手，Esc 取消。</p></details>
     </dialog>`;
   document.body.append(app);
   app.querySelector('.spa-brand').insertAdjacentHTML('beforeend','<div class="session-status"></div>');
@@ -186,7 +186,10 @@ export async function Start() {
       view.Drop(c);Sound('dropLiquid',.75,c);Record('soften',{id:c.id,target:c.wetting});
       Feedback('软化液已滴入');return;
     }
-    if(view.Grip(c,x,y,toolId)===false)return;
+    if(view.Grip(c,x,y,toolId)===false){
+      if(toolId==='tweezers')Hint(c.forcepsIssue==='angle'?'夹口侧着了 · 右键或转向模式调整':'还没夹住 · 继续把镊尖移到耳垢两侧');
+      return;
+    }
     active=c;app.dataset.gripping='true';c.state='peeling';c.held=0;c.stretchPlayed=false;c.painLoad=0;
     pointer={...pointer,id,x,y,currentX:x,currentY:y};
     $('pull-feedback').hidden=false;$('pull-label').textContent=TYPE_NAMES[c.type];
@@ -382,7 +385,7 @@ export async function Start() {
       Feedback('硬拉导致碎裂','pain');UpdateProgress();return;
     }
     $('pull-meter').value=state.strain;
-    $('pull-label').textContent=state.wrongDirection?(toolId==='scoop'?'勺面方向不对 · 旋转后再撬':'夹爪未对准 · 旋转后再夹'):state.wrongTool?(toolId==='suction'?'只吸软化后的碎屑':'毛刷只能刷松碎屑'):state.needsForceps?'边缘松了 · 换镊子夹出':c.type==='impacted'&&c.softened<.6?'硬结牢固 · 先滴软化液':state.detached?'松手带出':c.type==='oily'?'黏着耳壁 · 缓慢挖取一小团':state.contact?'内壁有阻力 · 轻一点':'边缘正在松开';
+    $('pull-label').textContent=state.wrongDirection?(toolId==='scoop'?'勺面方向不对 · 旋转后再撬':'夹爪未对准 · 旋转后再夹'):state.wrongTool?(toolId==='suction'?'只吸软化后的碎屑':'毛刷只能刷松碎屑'):state.needsForceps?'边缘松了 · 换镊子夹出':c.type==='impacted'&&c.softened<.6?'硬结牢固 · 先滴软化液':state.detached?'松手带出':c.type==='oily'?'黏着耳壁 · 缓慢挖取一小团':state.contact?'内壁有阻力 · 轻一点':toolId==='tweezers'?'已夹稳 · 缓慢拖离耳壁':'边缘正在松开';
     if(state.remaining<before){Record('bondBreak',{id:c.id,remaining:state.remaining});Sound(c.type==='dry'?'peelDry':'peelSticky',state.detached?1:.55,c);}
     if(state.detached&&toolId==='suction'){Release();pointer=null;Record('suction',{id:c.id});return;}
     if(state.detached&&c.state!=='held'){

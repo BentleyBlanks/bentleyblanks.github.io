@@ -17,7 +17,7 @@ node EarSpa3D/Script_PeelPhysicsTest.mjs
 
 | 改动范围 | 对应检查（按实际影响选用） |
 | --- | --- |
-| 直接操控、工作面与边缘接触 | `Script_ToolDragPlayTest.mjs`、`Script_InstrumentInteractionTest.mjs`、`Script_WaxEdgeContactTest.mjs`、`Script_WaxEdgePlayTest.mjs`、`Script_ControlPlayTest.mjs`、`Script_TweezersExtractionTest.mjs` |
+| 直接操控、工作面与边缘接触 | `Script_ToolDragPlayTest.mjs`、`Script_ForcepsControlPlayTest.mjs`、`Script_InstrumentInteractionTest.mjs`、`Script_WaxEdgeContactTest.mjs`、`Script_WaxEdgePlayTest.mjs`；`Script_ControlPlayTest.mjs`、`Script_TweezersExtractionTest.mjs` 保留旧跟随模式参考，当前直接操控使用前两项 |
 | 薄壳、剥离与黏聚断裂 | `Script_PeelPhysicsTest.mjs`、`Script_SoftWaxPhysicsTest.mjs`、`Script_SoftWaxPlayTest.mjs`、`Script_CohesivePhysicsTest.mjs`、`Script_CohesiveScrapingPlayTest.mjs`、`Script_DirectionalPhysicsTest.mjs` |
 | 油耳、体积与显示曲面 | `Script_OilyCoatingTest.mjs`、`Script_SlimePhysicsTest.mjs`、`Script_OilyWaxPlayTest.mjs`、`Script_OilyFilmPlayTest.mjs`、`Script_OilyRenderingTest.mjs`、`Script_OilyDetailTest.mjs`、`Script_OilyVisibilityTest.mjs` |
 | 羽毛与刷拢 | `Script_FeatherSweepPlayTest.mjs`、`Script_BrushGatherPlayTest.mjs` |
