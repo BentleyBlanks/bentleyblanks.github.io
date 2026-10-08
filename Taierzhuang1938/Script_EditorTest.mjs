@@ -1359,9 +1359,9 @@ const vfxEditor = await page.evaluate(() => {
   const continuous = {
     handle: active.handle,
     smokeSpawned: T.vfx.pools.sourceSmoke.cursor,
-    fireSpawned: T.vfx.pools.sourceFire.cursor,
+    fireSpawned: T.vfx.particles.Inspect().entries.reduce((n,e)=>n+e.emitted,0),
     smokeAlive: T.vfx.pools.sourceSmoke.deathTime.some((time) => time > T.vfx.time),
-    fireAlive: T.vfx.pools.sourceFire.deathTime.some((time) => time > T.vfx.time),
+    fireAlive: T.vfx.particles.Inspect().entries.some(e=>e.particleCount>0),
   };
   active.effectId = "ExplosionGrenade";
   active.Play();

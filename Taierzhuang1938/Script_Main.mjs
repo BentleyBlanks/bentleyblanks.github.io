@@ -2226,6 +2226,7 @@ async function Boot() {
     // Debug Rendering 面板按它设假彩色编号，MaterialUpgradeTest 按它做 A/B。
     materialShading: shadingUniforms, RecompileAllMaterials,
     get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
+    get Particles() { return vfx.particles; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     // 音频接线层：取证走 Debug.AudioZone，专项冒烟要直接摸缓存与限速器
     // （Script_AudioWiringTest 换探针世界之前必须先把 1 m 网格缓存清掉）。

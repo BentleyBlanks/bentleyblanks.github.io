@@ -40,7 +40,8 @@ import { MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
 import { VEHICLE_TRACER, HARD_SURFACE_SPARKS } from "./Data_Tuning_BulletVisual.mjs";
 import { BloodEffects } from "./Script_BloodEffects.mjs";
 import { BattleSmoke } from "./Script_BattleSmoke.mjs";
-import { BATTLE_FIRE_QUALITY, BATTLE_FIRE } from "./Data_Tuning_BattleSmoke.mjs";
+import { ParticleEffects } from "./Script_ParticleEffects.mjs";
+import { BURNING_LIGHT } from "./Data_Tuning_Particles.mjs";
 import { BOMB_BLAST_VFX } from "./Data_AerialBombs.mjs";
 import { BlastScale, LinearDragAt } from "./Script_BombBallistics.mjs";
 
@@ -1595,6 +1596,8 @@ export class VfxSystem {
     this.decalOrmPlaceholder.needsUpdate = true;
 
     this.shared = {
+      uParticleFireMap: { value: this.maskTransparentPlaceholder },
+      uParticleFireReady: { value: 0 },
       uTime: { value: 0 },
       uGlobalFade: { value: 1 },
       uNormalDepth: { value: this.fallbackDepth },
@@ -1647,6 +1650,7 @@ export class VfxSystem {
         authoredColor: variant.authoredColor, emission: variant.emission,
       },
     }, this.shared);
+    this.particles = new ParticleEffects(this.root, this.shared, this.quality);
     this.pools = {
       // 烟：alpha 混合 + 朗伯着色 + 软粒子，是"体积感"的全部来源。
       // aerial 只给它一个池：加性的火/曳光/枪口焰是 HDR 自发光，大气透视对它们
@@ -1827,7 +1831,11 @@ export class VfxSystem {
           }
         }
         if (key === "smoke") this.pools.sourceSmoke.material.uniforms.uMaskMap.value = texture;
-        if (key === "fire") this.pools.sourceFire.material.uniforms.uMaskMap.value = texture;
+        if (key === "fire") {
+          this.pools.sourceFire.material.uniforms.uMaskMap.value = texture;
+          this.shared.uParticleFireMap.value = texture;
+          this.shared.uParticleFireReady.value = 1;
+        }
         if (key === "groundFire") this.pools.sourceGroundFire.material.uniforms.uMaskMap.value = texture;
       }, undefined, () => {});
     }
@@ -1935,7 +1943,7 @@ export class VfxSystem {
     if (sunColor) U.uSunColorFog.value.fromArray(sunColor);
   }
 
-  SetWind(vector) { this.wind.copy(vector); }
+  SetWind(vector) { this.wind.copy(vector); this.particles?.SetWind(vector); }
 
   /**
    * 当前脚下的地面高度（米）。碎砖、木屑、弹壳落到这一层就停。
@@ -1955,10 +1963,12 @@ export class VfxSystem {
     // 记一份机位。Blood 要按距离补尺寸（见那边的抬头），而粒子是**世界尺寸**的
     // 广告牌，只有拿到相机才知道它在屏幕上究竟有几个像素。
     if (camera) this.eye.copy(camera.position);
+    this.UpdateBurningLights();
 
     this._UpdateSmokeSources(step);
     this.battleSmoke?.Update();
-    this.battleFire?.Flush(this.time);
+    if (step > 0) this.particles.Resume();
+    this.particles.Update(step);
     this.bloodEffects.Update(step,this.time,camera);
 
     if (this.dust && camera) {
@@ -2733,6 +2743,7 @@ export class VfxSystem {
         ? [VFX_PALETTE.screenSmoke, VFX_PALETTE.powderThin]   // 发烟筒：白灰，贴地翻滚
         : [VFX_PALETTE.dustDense, VFX_PALETTE.dust];
     const source = {
+      seed: opts.backdrop?.seed ?? id * 7919,
       position: new THREE.Vector3(position.x, position.y, position.z),
       rate: (opts.rate ?? 10) * this.spawnScale,
       radius: opts.radius ?? 0.35,
@@ -2753,19 +2764,19 @@ export class VfxSystem {
       backdrop: opts.backdrop || null,
       fire: opts.fire ?? 0,
       firePosition: opts.firePosition ? new THREE.Vector3(opts.firePosition.x,opts.firePosition.y,opts.firePosition.z) : null,
-      firePrewarm: !!opts.backdrop,
+      nearLight: !!opts.nearLight,
+      nearLightActive: false,
       fireShape: opts.fireShape === "column" ? "column" : "ground",
       colorA: opts.colorA || palette[0],
       colorB: opts.colorB || palette[1],
       groundHug: kind === "screen",
       accumulator: 0,
-      fireAccumulator: 0,
       lightHandle: -1,
       lightProfile: null,
     };
-    if (source.fire > 0 && opts.light !== false && this.lights) {
+    if (source.fire > 0 && (opts.light !== false || source.nearLight) && this.lights) {
       const fireScale = Math.max(0, Number(source.fire) || 0);
-      const lightPosition = source.position.clone();
+      const lightPosition = (source.firePosition || source.position).clone();
       lightPosition.y += opts.lightHeight
         ?? Math.max(0.38, Math.min(1.8, source.sizeStart * 1.4 + fireScale * 0.35));
       const lightIntensity = opts.lightIntensity
@@ -2778,29 +2789,24 @@ export class VfxSystem {
       source.lightProfile = {
         position: lightPosition, intensity: lightIntensity, radius: lightRadius, color: lightColor,
       };
+      if(source.nearLight) Object.assign(source.lightProfile,{
+        position:(source.firePosition||source.position).clone().add(new THREE.Vector3(0,BURNING_LIGHT.height,0)),
+        intensity:BURNING_LIGHT.intensity*Math.sqrt(fireScale),radius:BURNING_LIGHT.radius,color:BURNING_LIGHT.color,
+      });
       this.AttachSourceLight(source);
     }
     this.smokeSources.set(id, source);
     if (source.backdrop) {
       this.battleSmoke ||= new BattleSmoke({ root: this.root, shared: this.shared, quality: this.quality });
       this.battleSmoke.Set(id, source);
-      if(source.fire>0 && !this.battleFire) {
-        // Separate capacity: scenery cannot evict combat fire/smoke particles.
-        const template=this.pools.sourceFire;
-        this.battleFire=new ParticlePool(BATTLE_FIRE_QUALITY[this.quality]||2048,{...template.config,preserveTargetAlpha:true},this.shared);
-        this.battleFire.material.uniforms.uMaskEmission.value=BATTLE_FIRE.emission;
-        for(const name of ["uMaskMap","uMaskNoiseMap","uMaskNoiseDetailMap"])
-          this.battleFire.material.uniforms[name]=template.material.uniforms[name];
-        this.battleFire.mesh.name="BattlefieldOriginFlames";
-        this.root.add(this.battleFire.mesh);
-      }
     }
+    if (source.fire > 0) source.particleHandles = this.particles.Burning(source, this.spawnScale);
     return id;
   }
 
   /** 特效编辑器隔离正片火场时使用；逻辑烟源与粒子状态不动，只摘/挂直接光。 */
   AttachSourceLight(source) {
-    if (!source || source.lightHandle >= 0 || !source.lightProfile || !this.lights) {
+    if (!source || source.lightHandle >= 0 || !source.lightProfile || !this.lights || (source.nearLight&&!source.nearLightActive)) {
       return source?.lightHandle ?? -1;
     }
     const profile = source.lightProfile;
@@ -2812,6 +2818,21 @@ export class VfxSystem {
     if (!source || source.lightHandle < 0 || !this.lights) return;
     this.lights.RemoveFire(source.lightHandle);
     source.lightHandle = -1;
+  }
+
+  UpdateBurningLights() {
+    if(!this.lights)return;
+    const candidates=[];
+    for(const source of this.smokeSources.values())if(source.nearLight&&source.lightProfile){
+      const distance=source.lightProfile.position.distanceToSquared(this.eye);
+      if(distance<BURNING_LIGHT.viewDistance**2)candidates.push({source,distance});
+    }
+    candidates.sort((a,b)=>a.distance-b.distance);
+    const selected=new Set(candidates.slice(0,BURNING_LIGHT.count).map(v=>v.source));
+    for(const source of this.smokeSources.values())if(source.nearLight){
+      source.nearLightActive=selected.has(source);
+      if(source.nearLightActive)this.AttachSourceLight(source);else this.DetachSourceLight(source);
+    }
   }
 
   /**
@@ -2830,6 +2851,9 @@ export class VfxSystem {
     const dy = position.y - source.position.y;
     const dz = position.z - source.position.z;
     source.position.set(position.x, position.y, position.z);
+    if (source.firePosition) source.firePosition.add(new THREE.Vector3(dx, dy, dz));
+    const fireOrigin = source.firePosition || source.position;
+    for (const id of source.particleHandles || []) this.particles.Move(id, fireOrigin.toArray());
     if (source.backdrop) this.battleSmoke?.Set(handle, source);
     if (source.lightProfile) {
       source.lightProfile.position.x += dx;
@@ -2847,7 +2871,7 @@ export class VfxSystem {
     this.DetachSourceLight(source);
     this.smokeSources.delete(handle);
     if (source?.backdrop) this.battleSmoke?.Remove(handle);
-    if(source?.backdrop && ![...this.smokeSources.values()].some(s=>s.backdrop&&s.fire>0))this.battleFire?.Clear();
+    for (const id of source?.particleHandles || []) this.particles.Remove(id);
   }
 
   /** 按统一目录创建可序列化的场景持续特效。 */
@@ -2968,10 +2992,10 @@ export class VfxSystem {
   ClearParticles() {
     for (const pool of Object.values(this.pools || {})) pool.Clear?.();
     this.battleSmoke?.ClearParticles();
-    this.battleFire?.Clear();
+    this.particles?.Restart();
     // Warm-up clears combat bursts. Established backdrop fires rebuild on the
     // next live update, using its clock (including a checkpoint's reset clock).
-    for (const source of this.smokeSources.values()) {source.prewarmPending = source.prewarm;source.firePrewarm=!!source.backdrop;}
+    for (const source of this.smokeSources.values()) source.prewarmPending = source.prewarm;
     this.debris?.Clear?.();
     for (const pool of Object.values(this.chunks || {})) pool.Clear();
     // 血源与 smokeSources 不同：它挂在一根**已经不在场上**的骨头上，清粒子那一刻
@@ -2981,7 +3005,7 @@ export class VfxSystem {
 
   Dispose() {
     this.battleSmoke?.Dispose();
-    this.battleFire?.Dispose();
+    this.particles.Dispose();
     if (this.scene.onBeforeRender === this.sceneHook) {
       this.scene.onBeforeRender = this.previousSceneHook;
     }
@@ -3147,40 +3171,7 @@ export class VfxSystem {
         source.accumulator -= emit;
         for (let i = 0; i < emit; i += 1) this._SpawnSourceSmoke(source);
       }
-      if (source.fire > 0) {
-        source.fireAccumulator += source.fire * 22 * dt * this.spawnScale;
-        const warm=source.firePrewarm?Math.ceil(source.fire*22*.6*this.spawnScale):0;
-        source.firePrewarm=false;
-        const current=Math.floor(source.fireAccumulator),fires=current+warm;
-        source.fireAccumulator -= current;
-        for (let i = 0; i < fires; i += 1) {
-          const s = ResetSpawn();
-          const a = this.random() * 6.2831853;
-          const r = Math.sqrt(this.random()) * source.radius * 0.7;
-          const origin=source.firePosition||source.position;
-          s.x = origin.x + Math.cos(a) * r;
-          s.y = origin.y;
-          s.z = origin.z + Math.sin(a) * r;
-          s.vy = this._Range(1.2, 2.6) * source.fire;
-          s.vx = this._Signed(0.3); s.vz = this._Signed(0.3);
-          s.ay = 3.6;                                    // 火焰是向上**加速**的，不是匀速飘
-          s.drag = 2.2;
-          s.life = this._Range(0.3, 0.6);
-          s.sizeStart = 0.18 * source.fire;
-          s.sizeEnd = 0.42 * source.fire;
-          s.opacity = 1; s.fadeIn = 0.05;
-          s.angle = this._Range(0, 6.283); s.spin = this._Signed(2);
-          s.flicker = this._Range(6, 11);                 // 火苗要抖
-          s.colorA = source.backdrop ? BATTLE_FIRE.hot : VFX_PALETTE.fireHot;
-          s.colorB = source.backdrop ? BATTLE_FIRE.cool : VFX_PALETTE.fireCool;
-          s.seed = this.random();
-          const firePoolName = source.fireShape === "column" ? "sourceFire" : "sourceGroundFire";
-          const fireMask = source.fireShape === "column" ? "fire" : "groundFire";
-          const useAuthoredFire = this.loadedVefectsMasks.has(fireMask)
-            && (this.loadedVefectsMasks.has("noise") || this.loadedVefectsMasks.has("detailNoise"));
-          (source.backdrop?this.battleFire:useAuthoredFire ? this.pools[firePoolName] : this.pools.fire).Spawn(s, this.time-(i<warm?(i+.5)/warm*.6:0));
-        }
-      }
+
     }
   }
 }

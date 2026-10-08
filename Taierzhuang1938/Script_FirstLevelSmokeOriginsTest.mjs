@@ -18,10 +18,11 @@ const root=new THREE.Group(),battlefield={StaticGroundHeight:SampleMissionTerrai
 const solids=new Set(),physics={AddSolid(c){c._physicsHandle=c;solids.add(c)},RemoveSolid(c){solids.delete(c)}};
 const materials=new Map(),library={Get(name){if(!materials.has(name))materials.set(name,new THREE.MeshStandardMaterial());return materials.get(name)}};
 const origins=new FirstLevelSmokeOrigins({root,battlefield,physics,library,actorFactory:{ModelInstance(_id,materials){return InstantiateModel(doc,{materials})}}});
-// 63 处远烟 / 路边散点 + 2 处引导地标（2026-09-28，Data_FirstLevelDistantSmoke.LANDMARK_COLUMNS：08 横车上的木料火、07 村北口的柴垛火）。
-assert.equal(origins.entries.size,65);assert.equal(solids.size,65);
+// 61 处远烟 / 路边散点 + 2 处引导地标（08 横车上的木料火、07 村北口的柴垛火）。
+// Current master terrain leaves 61 deterministic roadside/distant slots plus 2 landmarks.
+assert.equal(origins.entries.size,63);assert.equal(solids.size,63);
 const counts={};for(const spec of FIRST_LEVEL_SMOKE_ORIGINS)counts[spec.kind]=(counts[spec.kind]||0)+1;
-assert.deepEqual(counts,{tank:7,truck:14,timber:26,barrels:18});
+assert.deepEqual(counts,{tank:7,truck:14,timber:25,barrels:17});
 // 地标自带 kind：不动原来按帧分配的 tank 奇偶（7 辆战车还是同样那 7 根柱子）。
 for(const id of ["StreetBlockFire","VillageMouthFire"])assert.equal(FIRST_LEVEL_SMOKE_ORIGINS.find(spec=>spec.id===id)?.kind,"timber",id);
 const emitters=FIRST_LEVEL_DISTANT_SMOKE.map(column=>origins.Emitter(column));
@@ -45,8 +46,8 @@ for(const c of solids)for(const [id,route] of Object.entries(MISSION_ROUTES))for
 const sources=emitters.map(e=>({position:e.position,backdrop:e.options.backdrop}));
 for(const entry of origins.entries.values()) if(entry.spec.kind==="tank"||entry.spec.kind==="truck")
   for(const tree of MakeTreePlacements())assert.ok(Math.hypot(entry.position.x-tree.x,entry.position.z-tree.z)>3.2,"vehicle body clears authored tree trunks");
-assert.equal(BuildBattleSmokeInstances(sources,"low").length,780);   // 12 per source × 65
-assert.equal(BuildBattleSmokeInstances(sources,"ultra").length,1300); // 20 per source × 65
+assert.equal(BuildBattleSmokeInstances(sources,"low").length,756);   // 12 per source × 63
+assert.equal(BuildBattleSmokeInstances(sources,"ultra").length,1260); // 20 per source × 63
 assert.ok(origins.meshes.length<=origins.materials.size,"wreck geometry is merged into one mesh per material: "+origins.meshes.length);
 const triangles=origins.meshes.reduce((n,m)=>n+m.geometry.index.count/3,0);
 assert.ok(triangles<110000,"origin triangle budget: "+triangles);
@@ -57,15 +58,43 @@ const scene=new THREE.Scene(),vfx=new VfxSystem(scene,null,{quality:"low"});
 THREE.TextureLoader.prototype.load=textureLoad;
 const handles=emitters.map(e=>vfx.SmokeSource(e.position,e.options));
 vfx.Update(.016,null,100);
-assert.ok(vfx.battleFire.geometry.instanceCount>100,"ambient flames prewarm");
+assert.ok(vfx.particles.renderer.pools.flame.geometry.instanceCount>100,"ambient flames prewarm");
 assert.equal(vfx.pools.fire.geometry.instanceCount,0,"ambient flames never consume combat fire slots");
 assert.equal(vfx.pools.sourceFire.geometry.instanceCount,0,"other persistent fire slots remain available");
-const first=vfx.battleFire.arrays.iOrigin.slice(0,3),fire=emitters[0].options.firePosition;
-assert.equal(first[1],Math.fround(fire.y),"flame spawns on actual engine outlet height");
-vfx.ClearParticles();assert.equal(vfx.battleFire.geometry.instanceCount,0);
-vfx.Update(.016,null,0);assert.ok(vfx.battleFire.geometry.instanceCount>100,"clock reset restarts flames immediately");
+const flamePool=vfx.particles.renderer.pools.flame;
+for (const [index,handle] of handles.entries()) {
+  const source=vfx.smokeSources.get(handle),fire=emitters[index].options.firePosition;
+  for(const id of source.particleHandles.slice(0,2)) {
+    const system=vfx.particles.Get(id).system;
+    const slot=flamePool.owners.findIndex(owner=>owner===system);
+    assert.ok(slot>=0,"every source retains its own flame particles");
+    assert.equal(flamePool.arrays.iOrigin[slot*3+1],Math.fround(fire.y),"flame spawns on actual engine outlet height");
+  }
+}
+for(let i=0;i<600;i++)vfx.particles.Update(1/60);
+for(const [kind,pool]of Object.entries(vfx.particles.renderer.pools))assert.equal(pool.dropped,0,kind+' pool handles all background sources for ten seconds');
+for(const quality of ['medium','high','ultra']) {
+  THREE.TextureLoader.prototype.load=function(){return new THREE.Texture()};
+  const variant=new VfxSystem(new THREE.Scene(),null,{quality});
+  THREE.TextureLoader.prototype.load=textureLoad;
+  for(const emitter of emitters)variant.SmokeSource(emitter.position,emitter.options);
+  for(let frame=0;frame<600;frame++)variant.particles.Update(1/60);
+  for(const [kind,pool]of Object.entries(variant.particles.renderer.pools))assert.equal(pool.dropped,0,quality+' '+kind+' pool handles all background sources');
+  variant.Dispose();
+}
+// Logical light allocation remains bounded while walking through all wrecks.
+const fireLights=new Map();let nextLight=1;
+vfx.lights={AddFire(position,profile){const id=nextLight++;fireLights.set(id,{position,profile});return id},RemoveFire(id){fireLights.delete(id)}};
+const lightHandles=Array.from({length:7},(_,i)=>vfx.SmokeSource(new THREE.Vector3(i,0,0),{fire:1,nearLight:true,light:false}));
+vfx.eye.set(0,0,0);vfx.UpdateBurningLights();assert.equal(fireLights.size,4);
+vfx.eye.set(100,0,0);vfx.UpdateBurningLights();assert.equal(fireLights.size,0,'distant fire lights release their slots');
+vfx.eye.set(0,0,0);vfx.UpdateBurningLights();
+for(const handle of lightHandles)vfx.RemoveSmokeSource(handle);
+assert.equal(fireLights.size,0,'removing a burning source removes its light');
+vfx.ClearParticles();assert.equal(vfx.particles.renderer.pools.flame.geometry.instanceCount,0);
+vfx.Update(.016,null,0);assert.ok(vfx.particles.renderer.pools.flame.geometry.instanceCount>100,"clock reset restarts flames immediately");
 for(const handle of handles)vfx.RemoveSmokeSource(handle);
-vfx.Update(.016,null,.016);assert.equal(vfx.battleFire.geometry.instanceCount,0,"last source removal clears flame batch");
+vfx.Update(.016,null,.016);assert.equal(vfx.particles.renderer.pools.flame.geometry.instanceCount,0,"last source removal clears flame batch");
 vfx.Dispose();origins.Dispose();
 assert.equal(solids.size,0);assert.equal(battlefield.colliders.length,0);assert.equal(root.children.length,0);
 for(const material of materials.values())material.dispose();

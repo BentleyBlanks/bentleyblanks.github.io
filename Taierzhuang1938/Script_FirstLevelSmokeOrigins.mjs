@@ -158,7 +158,7 @@ export class FirstLevelSmokeOrigins {
     const entry=this.entries.get(column.id); if(!entry)return null;
     const {x,z}=entry.spec;
     const position={x,y:Math.max(this.battlefield.StaticGroundHeight(x,z)+column.heightOffset,entry.firePoint.y),z};
-    return {position,options:{...column.options,fire:entry.spec.fire,fireShape:"column",light:false,radius:entry.spec.kind==="tank"?.65:1,
+    return {position,options:{...column.options,fire:entry.spec.fire,fireShape:"column",light:false,nearLight:true,radius:entry.spec.kind==="tank"?.65:1,
       firePosition:entry.firePoint,backdrop:{...column.options.backdrop,ignition:entry.firePoint.toArray()}}};
   }
   Dispose() {

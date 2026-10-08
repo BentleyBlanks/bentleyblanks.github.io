@@ -59,6 +59,9 @@ export const testDefs = {
   FirstLevelPropDressingTest: {file:"Script_FirstLevelPropDressingTest.mjs",desc:"第一关平色道具盒换模型：替换表块都在、外观与碰撞盒误差、资产已登记；碎砖瓦撒点禁区与确定性（纯 Node）"},
   FirstLevelVegetationTest: {file:"Script_FirstLevelVegetationTest.mjs",desc:"第一关植被撒点：不进路线/锚点/实体/沟底/路面、高卡视线门槛、实例上限、确定性、图集卡片表与烘焙记录一致（纯 Node）"},
   BreakableTreesBrowserTest: {file:"Script_BreakableTreesBrowserTest.mjs",timeoutMs:300000,desc:"Actual first-level trees: explosion, collider removal, falling, grounding and disposal"},
+  ParticleModulesTest: {file:"Script_ParticleModulesTest.mjs",desc:"Unity-style particle modules, deterministic timeline and validated agent inputs"},
+  ParticleBrowserTest: {file:"Script_ParticleBrowserTest.mjs",timeoutMs:120000,desc:"Production fire GPU: replay, pause, motion, occlusion, alpha and batched rendering"},
+  ParticleEditorTest: {file:"Script_ParticleCli.mjs",args:["--quality=low","--editor-check","--label=EditorGate"],timeoutMs:600000,desc:"Actual game VFX editor: isolated playback, restore and resume"},
   FirstLevelDistantSmokeTest: {file:"Script_FirstLevelDistantSmokeTest.mjs",desc:"Reference smoke districts: clear routes, layered 04–06 views, bounded density and combat particle isolation"},
   FirstLevelSmokeOriginsTest: {file:"Script_FirstLevelSmokeOriginsTest.mjs",desc:"Burning wrecks: actual engine outlets, clear routes, terrain, fire budget and lifecycle"},
   FirstLevelDistantSmokeBrowserTest: {file:"Script_FirstLevelDistantSmokeBrowserTest.mjs",timeoutMs:120000,desc:"Smoke atlas GPU: real animation, low-quality density, occlusion, reset and one-draw budget"},
@@ -462,6 +465,8 @@ export const browserTests = new Set([
   "AllyGaitBrowserTest",
   "AllyGaitMissionTest",
   "BreakableTreesBrowserTest",
+  "ParticleBrowserTest",
+  "ParticleEditorTest",
   "FirstLevelDistantSmokeBrowserTest",
   "FirstLevelSkyGradeBrowserTest",
   "OpeningActorPerformanceBrowserTest", "OpeningClipsBrowserTest", "FirstLevelVoicePerspectiveTest",
@@ -632,6 +637,7 @@ export const domains = {
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   firstLevelDressing: {label:"第一关道具换模型、碎砖瓦与植被",tests:["FirstLevelPropDressingTest","FirstLevelVegetationTest","FirstLevelWhiteboxBrowserTest","SamplerBudgetTest","MotionVectorContractTest","ModuleGraphTest"]},
+  particles: {label:"Modular burning particles and agent API",tests:["ParticleModulesTest","ParticleBrowserTest","ParticleEditorTest","FirstLevelSmokeOriginsTest"]},
   distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest","FirstLevelSmokeOriginsTest","FirstLevelDistantSmokeBrowserTest"]},
   skyGrade: {label:"第一关天空 / 调色 / 室内天光遮蔽 / 曝光锚点",tests:["FirstLevelSkyGradeTest","FirstLevelSkyGradeBrowserTest","ModuleGraphTest"]},
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest","OpeningStoryboardShotsTest"]},
@@ -753,6 +759,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"particles",pattern:/ParticleModules|ParticleRenderer|ParticleEffects|Data_Tuning_Particles|ParticleCli|Script_Vfx|Script_EditorVfx/},
   { domain: "menu", pattern: /TextureBake|Script_Main\.mjs|Script_Materials\.mjs/ },
   { domain: "menu", pattern: /CommandRoom/ },
   { domain: "textureAssets", pattern: /CommandRoom/ },

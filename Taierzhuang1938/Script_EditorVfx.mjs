@@ -61,6 +61,12 @@ export class VfxEditor {
     this.savedVfxVisible = vfx.root.visible;
     // 预览必须是隔离的：现关烟柱不能在摄影棚期间偷偷推进，预览的弹孔/爆炸也
     // 不能关掉工具后留在正片原点。保存池与持续源，退出时逐字节还原。
+    this.savedParticleEffects = vfx.particles;
+    this.savedParticleEffectsVisible = vfx.particles.root.visible;
+    this.savedParticleEffects.root.visible = false;
+    vfx.particles = vfx.particles.Fork();
+    this.savedBattleSmokeVisible = vfx.battleSmoke?.mesh.visible;
+    if (vfx.battleSmoke) vfx.battleSmoke.mesh.visible = false;
     this.savedSources = vfx.smokeSources;
     this.savedNextSourceId = vfx.nextSourceId;
     this.savedParticles = this.CaptureParticles(vfx);
@@ -90,6 +96,11 @@ export class VfxEditor {
   Exit() {
     this.Stop();
     const vfx = this.host.vfx;
+    vfx.particles.Dispose();
+    vfx.particles = this.savedParticleEffects;
+    vfx.particles.root.visible = this.savedParticleEffectsVisible;
+    this.savedParticleEffects = null;
+    if (vfx.battleSmoke) vfx.battleSmoke.mesh.visible = this.savedBattleSmokeVisible;
     if (this.savedSources) {
       vfx.smokeSources = this.savedSources;
       for (const source of this.savedSources.values()) vfx.AttachSourceLight(source);
