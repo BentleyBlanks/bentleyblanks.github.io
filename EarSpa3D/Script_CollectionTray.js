@@ -76,7 +76,7 @@ export function CreateCollectionTray({scene, tray, camera, Project, size, scoop,
   function Add(c,position){
     if(c.trayStored||c.toolId==='suction')return;
     c.trayStored=true;
-    const geometry=c.mesh.geometry.clone().applyMatrix4(matrix.compose(new THREE.Vector3(),flat,unitScale));
+    const geometry=c.mesh.geometry.clone().applyMatrix4(matrix.compose(new THREE.Vector3(),c.body.gel?flat:c.mesh.quaternion,unitScale));
     // 所有来源统一属性，碎裂面与天然微屑可以进入同一材质批次。
     for(const name of Object.keys(geometry.attributes))if(!['position','normal','uv',...(c.body.gel?['gelRest','gelThickness']:['waxRest','waxResponse','waxCap'])].includes(name))geometry.deleteAttribute(name);
     if(!geometry.attributes.uv)geometry.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(geometry.attributes.position.count*2),2));

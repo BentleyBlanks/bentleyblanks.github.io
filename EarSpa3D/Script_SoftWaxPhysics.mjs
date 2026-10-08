@@ -1,5 +1,6 @@
 // 有厚度的 XPBD 薄壳：物理节点驱动原网格，附着点不参与额外几何绘制。
 import {WaxPhysicsMaterial} from './Data_WaxPhysicsSettings.mjs?v=ear028-physics-settings-20260912';
+import {ShellDistance,ShellDihedral,ShellBend} from './Script_ShellConstraints.mjs?v=ear044-light-wax-20261008';
 const Add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
 const Sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
 const Mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
@@ -88,6 +89,9 @@ export function* BindWaxSurfaceSteps(body,positions,indices){
     used.add(node);anchor.node=node;anchor.local=rest[node].slice();anchor.rest=surface.points[node].slice();anchor.lambda=[0,0,0];
   }
   surface.restFit=FitRotation({points:rest});surface.support=surface.points.map(p=>p.slice());body.surface=surface;body.bend=0;body.motion=0;
+  surface.before=rest.map(()=>[0,0,0]);
+  surface.restNormals=triangles.map(ids=>Frame(rest,ids)[2]);
+  surface.renderStrain=new Float32Array(rest.length);surface.renderDamage=new Float32Array(rest.length);
   surface.sections=bends.map(edge=>{
     const [a,b]=edge.ids,mid=Mul(Add(rest[a],rest[b]),.5),axis=Unit(Sub(rest[b],rest[a])),normal=Unit(Cross(axis,Frame(rest,edge.ids.slice(0,3))[2]));
     const distances=rest.map(p=>Dot(Sub(p,mid),normal)),span=rest.map(p=>Dot(Sub(p,mid),axis));
@@ -115,23 +119,7 @@ export function WaxAnchorPoint(body,anchor){return anchor.binding?BoundPoint(bod
 
 // 壳的拉伸/剪切使用三角边，弯曲单独约束两三角形之间的有符号二面角。
 // 柔度除以子步时间平方，迭代次数不再直接决定材料软硬。
-function DistanceConstraint(s,c,alpha,inverseMass){
-  const a=s.points[c.a],b=s.points[c.b],d=Sub(a,b),length=Length(d);if(length<1e-10)return;
-  const lambda=(-(length-c.rest)-alpha*c.lambda)/(2*inverseMass+alpha);c.lambda+=lambda;
-  for(let k=0;k<3;k++){const correction=d[k]/length*lambda*inverseMass;a[k]+=correction;b[k]-=correction;}
-}
-function Dihedral(points,ids){
-  const [a,b,c,d]=ids.map(i=>points[i]),edge=Sub(b,a),length=Length(edge),n0=Cross(edge,Sub(c,a)),n1=Cross(Sub(d,a),edge),sq0=Dot(n0,n0),sq1=Dot(n1,n1);
-  if(length<1e-8||sq0<1e-14||sq1<1e-14)return{angle:0,gradients:null};
-  const q2=Mul(n0,-length/sq0),q3=Mul(n1,-length/sq1),q0=Add(Mul(q2,Dot(Sub(c,b),edge)/(length*length)),Mul(q3,Dot(Sub(d,b),edge)/(length*length))),q1=Mul(Add(Add(q0,q2),q3),-1);
-  return{angle:Math.atan2(Dot(Cross(Unit(n0),Unit(n1)),Mul(edge,1/length)),Dot(Unit(n0),Unit(n1))),gradients:[q0,q1,q2,q3]};
-}
-function BendConstraint(s,c,alpha,inverseMass){
-  const {angle,gradients}=Dihedral(s.points,c.ids);if(!gradients)return;
-  let error=angle-c.rest;if(error>Math.PI)error-=2*Math.PI;if(error<-Math.PI)error+=2*Math.PI;
-  const weight=gradients.reduce((sum,q)=>sum+Dot(q,q)*inverseMass,0),lambda=(-error-alpha*c.lambda)/(weight+alpha);c.lambda+=lambda;
-  for(let j=0;j<4;j++)for(let k=0;k<3;k++)s.points[c.ids[j]][k]+=gradients[j][k]*lambda*inverseMass;
-}
+const Dihedral=(points,ids)=>ShellDihedral(points,ids,undefined,false);
 function Pin(s,ids,weights,target,lambda,alpha,inverseMass,offset=null,maxLambda=Infinity){
   const p=Weighted(s.points,ids,weights),mass=weights.reduce((sum,w)=>sum+w*w,0)*inverseMass;
   const next=lambda.map((v,k)=>v+(-(p[k]+(offset?.[k]||0)-target[k])-alpha*v)/(mass+alpha)),length=Length(next);
@@ -187,13 +175,14 @@ export function StepWaxSurface(body,{target=null,softness=0,efficiency=1,adhesio
   const mass=s.points.length,stretch=profile.stretch*(1+soft*10)/(physics.stretch*h*h),bend=(profile.bend+soft*.20)/(physics.bend*h*h);
   body.softness=soft;body.contact=false;body.strain=0;let simulatedTime=0;
   for(let step=0;step<count;step++){
-    const before=s.points.map(p=>p.slice()),damping=Math.exp(-h*physics.damping);
+    const before=s.before,damping=Math.exp(-h*physics.damping);
+    for(let i=0;i<s.points.length;i++)for(let k=0;k<3;k++)before[i][k]=s.points[i][k];
     for(let i=0;i<s.points.length;i++)for(let k=0;k<3;k++)s.points[i][k]+=s.velocities[i][k]*h*damping;
-    for(const c of [...s.edges,...s.bends])c.lambda=0;
+    for(const c of s.edges)c.lambda=0;for(const c of s.bends)c.lambda=0;
     for(const a of body.anchors)a.lambda=[0,0,0];if(s.grip)s.grip.lambda=[0,0,0];
     for(let iteration=0;iteration<8;iteration++){
-      for(const c of s.edges)DistanceConstraint(s,c,stretch,mass);
-      for(const c of s.bends)BendConstraint(s,c,bend/c.rigidity,mass);
+      for(const c of s.edges)ShellDistance(s.points,c,stretch,mass);
+      for(const c of s.bends)ShellBend(s.points,c,bend/c.rigidity,mass);
       for(const a of body.anchors)if(a.alive){
         const binding=a.binding,offset=binding?Sub(BoundPoint(s,binding),Weighted(s.points,binding.ids,binding.weights)):null;
         Pin(s,binding?.ids||[a.node,a.node,a.node],binding?.weights||[1,0,0],a.rest,a.lambda,.000004*(1+(a.damage||0)*3)/Math.max(.03,adhesion)/(h*h),mass,offset);
@@ -220,7 +209,7 @@ export function StepWaxSurface(body,{target=null,softness=0,efficiency=1,adhesio
       for(let i=0;i<s.points.length;i++)s.points[i]=Add(pivot,Rotate(q,Sub(s.points[i],pivot)));
     }
     s.motion=0;
-    for(let i=0;i<s.points.length;i++){s.velocities[i]=Mul(Sub(s.points[i],before[i]),1/h);const speed=Length(s.velocities[i]);if(speed>24)s.velocities[i]=Mul(s.velocities[i],24/speed);s.motion=Math.max(s.motion,speed);}
+    for(let i=0;i<s.points.length;i++){const v=s.velocities[i];for(let k=0;k<3;k++)v[k]=(s.points[i][k]-before[i][k])/h;const speed=Length(v);if(speed>24)for(let k=0;k<3;k++)v[k]*=24/speed;s.motion=Math.max(s.motion,speed);}
     body.steps++;
     simulatedTime+=h;
     if(s.fracture)break;
@@ -229,7 +218,7 @@ export function StepWaxSurface(body,{target=null,softness=0,efficiency=1,adhesio
   body.rotation=rotation;body.position=Sub(center,Rotate(rotation,restCenter));body.velocity=Mul(Sub(body.position,previous),1/simulatedTime);body.spin=Mul(rotationDelta,(rotationDelta[3]<0?-2:2)/simulatedTime);body.motion=s.motion;
   if(s.grip)body.grip=Local(body,BoundPoint(s,s.grip));
   s.maxStretch=Math.max(...s.edges.map(c=>Math.abs(Length(Sub(s.points[c.a],s.points[c.b]))/c.rest-1)));
-  const restFrames=s.triangles.map(ids=>Frame(s.rest,ids)[2]),frames=s.triangles.map(ids=>Frame(s.points,ids)[2]);
+  const restFrames=s.restNormals,frames=s.triangles.map(ids=>Frame(s.points,ids)[2]);
   body.bend=Math.max(...frames.map((n,i)=>Math.acos(Clamp(Dot(n,Rotate(rotation,restFrames[i])),-1,1))));s.peakBend=Math.max(s.peakBend,body.bend);
   return{detached:body.detached,remaining:body.anchors.filter(a=>a.alive).length,strain:Clamp(body.strain),force:body.force,contact:body.contact,fracture:s.fracture||null};
 }
@@ -239,7 +228,7 @@ export function WriteWaxSurface(body,positions,response=null){
   // A material column keeps its volume as its supporting triangle stretches.
   // These same measured thicknesses feed absorption; no gesture/progress animation.
   const areaScale=s.triangles.map(([a,b,c],i)=>Clamp(Length(Cross(Sub(s.points[b],s.points[a]),Sub(s.points[c],s.points[a])))*.5/s.triangleAreas[i],.35,3));
-  const strain=new Float32Array(s.rest.length),damage=new Float32Array(s.rest.length);
+  const strain=s.renderStrain,damage=s.renderDamage;strain.fill(0);damage.fill(0);
   if(response)for(const hinge of s.bends){
     const angle=Dihedral(s.points,hinge.ids).angle;
     const delta=Math.abs(Math.atan2(Math.sin(angle-hinge.rest),Math.cos(angle-hinge.rest)));

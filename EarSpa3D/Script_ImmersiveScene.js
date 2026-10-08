@@ -1,13 +1,14 @@
 import {ResolveRenderQuality} from './Data_RenderQuality.mjs?v=ear040-render-settings-20260912';
 import {FeatherCapacity} from './Script_FeatherSweep.mjs?v=ear039-brush-gather-20260912';
 import {AddFeatherFur,ClearFeatherFur,PrepareFeatherStrands,FEATHER_FUR_LENGTH,FEATHER_FUR_PASSES} from './Script_FeatherFur.js?v=ear031-feather-groom-20260912';
-import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear043-runtime-performance-20261003';
+import {CreateCollectionTray} from './Script_CollectionTray.js?v=ear044-light-wax-20261008';
 import * as THREE from 'three';
 import {InitializeSlimeKernel,SlimeKernelProbe} from './Script_SlimeKernel.mjs?v=ear043-runtime-performance-20261003';
 import {WarmRenderPrograms} from './Script_ShaderWarmup.js?v=ear043-runtime-performance-20261003';
 import {UpdatePackedNormals} from './Script_VertexNormals.mjs?v=ear043-runtime-performance-20261003';
-import {PrepareWaxGeometry} from './Script_SurfaceDetail.js?v=ear041-material-response-20261003';
-import {BuildWaxShape,BuildWaxDebris} from './Script_WaxMorphology.mjs?v=ear042-wax-morphology-20261003';
+import {PrepareWaxGeometry} from './Script_SurfaceDetail.js?v=ear044-light-wax-20261008';
+import {BuildWaxShape,BuildWaxDebris} from './Script_WaxMorphology.mjs?v=ear044-light-wax-20261008';
+import {CreateWaxFlight,StepWaxFlight} from './Script_WaxFlight.mjs?v=ear044-light-wax-20261008';
 import {SlimeCage,PoseSlimeVolume,StepSlimeVolume,SplitSlimeBite} from './Script_SlimePhysics.mjs?v=ear043-runtime-performance-20261003';
 import {BuildOilyCoating,OILY_REGIONS} from './Script_OilyCoating.mjs?v=ear036-oily-bites-20260912';
 import { BuildEar, MakeRng } from './Script_EarAnatomy.js?v=ear012-outer-20260911';
@@ -16,12 +17,12 @@ import { PALETTE as P } from './Data_Palette.mjs?v=ear012-outer-20260911';
 
 import {InstrumentContact,IsFeatherDebris} from './Script_InstrumentInteraction.mjs?v=ear033-scoop-contact-audio-20260912';
 import {WaxEdgeContact,WaxGripNormal} from './Script_WaxEdgeContact.mjs?v=ear033-scoop-contact-audio-20260912';
-import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear043-runtime-performance-20261003';
+import { CreatePeelBody, GripPeelBody, UngripPeelBody, GetGripPoint, StepPeelBody, BindPeelSurface, BindPeelSurfaceSteps, WritePeelSurface, MovePeelBody, PosePeelBody, PeelAnchorPoint } from './Script_PeelPhysics.mjs?v=ear044-light-wax-20261008';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
-import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear041-material-response-20261003';
+import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear044-light-wax-20261008';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
 import { CreateToolContact } from './Script_ToolContact.js?v=ear043-runtime-performance-20261003';
-import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear041-material-response-20261003';
+import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear044-light-wax-20261008';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
@@ -696,7 +697,7 @@ export async function CreateImmersiveScene({ core }) {
         });
       }
       fragment.body.detached=fragment.body.anchors.every(a=>!a.alive);fragment.body.velocity=velocity.slice();fragment.body.spin=spin.slice();
-      if(fragment.body.detached){fragment.state='settling';fragment.settleAge=0;fragment.settleVelocity=new THREE.Vector3().fromArray(velocity);}
+      if(fragment.body.detached){fragment.state='settling';fragment.settleAge=0;fragment.flight=null;fragment.settleVelocity=new THREE.Vector3().fromArray(velocity);}
       PrepareWaxGeometry(geometry);if(fragment.body.surface)Deform(fragment);
       mesh.userData.chunk=fragment;chunks.push(fragment);return fragment;
     });
@@ -806,7 +807,7 @@ export async function CreateImmersiveScene({ core }) {
   const fiberTipSamples=[];for(let y=0;y<3;y+=.15)fiberTipSamples.push(new THREE.Vector3(0,y,0));
   function Slip(c){
     Ungrip(c);
-    if(c.body.detached){c.state='settling';c.settleAge=0;c.settleVelocity=new THREE.Vector3().fromArray(c.body.velocity);}
+    if(c.body.detached){c.state='settling';c.settleAge=0;c.flight=null;c.settleVelocity=new THREE.Vector3().fromArray(c.body.velocity);}
     else c.state='returning';
   }
   function UpdateFiberNormals(part){
@@ -1027,6 +1028,11 @@ export async function CreateImmersiveScene({ core }) {
     const slot=c.slot<0?0:c.slot,angle=slot*2.39996323,radius=1.1+Math.sqrt(slot%90)*.8;
     return tray.position.clone().add(new THREE.Vector3(Math.cos(angle)*radius,.10+(c.bottomOffset||0)+Math.floor(slot/90)*.18,Math.sin(angle)*radius*.7));
   }
+  function Flight(c,velocity){
+    const response=c.mesh.geometry.attributes.waxResponse;
+    let thickness=0;if(response)for(let i=0;i<response.count;i++)thickness+=response.getX(i)/response.count;
+    return CreateWaxFlight({positions:c.mesh.geometry.attributes.position.array,rotation:c.mesh.quaternion.toArray(),velocity,spin:c.body.spin,type:c.type,thickness:thickness||.15});
+  }
   function Release(c,slot) {
     if(c.toolId==='feather'){
       if(!IsFeatherDebris(c))return;
@@ -1075,8 +1081,9 @@ export async function CreateImmersiveScene({ core }) {
       materials.WetWax(c.mesh.material,c.softened,c.surfaceWet,c.type);
       c.irritation=Math.max(0,(c.irritation||0)-dt*.004);
       if(c.state==='settling'){
-        c.settleAge+=dt;c.settleVelocity.y-=9.8*dt;c.settleVelocity.multiplyScalar(Math.exp(-dt*2));
-        const desired=c.mesh.position.clone().addScaledVector(c.settleVelocity,dt),vertices=c.mesh.geometry.attributes.position;
+        c.settleAge+=dt;c.flight??=Flight(c,c.settleVelocity.toArray());
+        const position=c.mesh.position.toArray();StepWaxFlight(c.flight,position,dt,{gravity:9.8,rotate:false});c.settleVelocity.fromArray(c.flight.velocity);
+        const desired=new THREE.Vector3().fromArray(position),vertices=c.mesh.geometry.attributes.position;
         let hitWall=false;
         for(let pass=0;pass<3;pass++){
           let penetration=0,normal=null;
@@ -1085,6 +1092,7 @@ export async function CreateImmersiveScene({ core }) {
           if(into<0)c.settleVelocity.addScaledVector(normal,-into*1.12);c.settleVelocity.multiplyScalar(Math.exp(-dt*18));hitWall=true;
         }
         MovePeelBody(c.body,desired.toArray());c.mesh.position.copy(desired);c.origin.copy(desired);
+        c.settleVelocity.toArray(c.flight.velocity);
         if((hitWall&&c.settleAge>.25&&c.settleVelocity.length()<.25)||c.settleAge>3){c.state='attached';c.settleVelocity.set(0,0,0);}
       }
       if(c.oilSplitAdvanced)c.oilSplitAdvanced=false;
@@ -1109,15 +1117,23 @@ export async function CreateImmersiveScene({ core }) {
         c.mesh.position.copy(c.path.getPoint(t));
         c.mesh.quaternion.copy(c.carryRotation).slerp(FlatRotation,Smooth((t-.3)/.7));
         if(c.body.gel){PoseSlimeVolume(c.body,c.mesh.position.toArray(),c.mesh.quaternion.toArray());StepSlimeVolume(c.body,{gravity:[0,-2.5,0]},dt);SyncBody(c);Deform(c);}
-        else{c.body.position=c.mesh.position.toArray();c.body.rotation=c.mesh.quaternion.toArray();}
+        else{PosePeelBody(c.body,c.mesh.position.toArray(),c.mesh.quaternion.toArray());if(c.body.surface&&c.body.detached){StepPeelBody(c.body,{softness:c.softened},dt);SyncBody(c);Deform(c);}}
         ToolAt(new THREE.Vector3().fromArray(GetGripPoint(c.body)),c.toolId,c);
       } else {
-        if(c.state==='carrying') {c.state='dropping';Ungrip(c);}
-        const floor=TrayPosition(c).y;
+        if(c.state==='carrying') {c.state='dropping';Ungrip(c);c.flight=Flight(c,[0,0,0]);}
+        let floor=TrayPosition(c).y;
         if(c.state==='dropping') {
-          c.dropVelocity-=36*dt;c.mesh.position.y+=c.dropVelocity*dt;
+          if(c.body.gel){c.dropVelocity-=36*dt;c.mesh.position.y+=c.dropVelocity*dt;}
+          else{
+            const position=c.mesh.position.toArray();StepWaxFlight(c.flight,position,dt);c.mesh.position.fromArray(position);c.mesh.quaternion.fromArray(c.flight.rotation);c.dropVelocity=c.flight.velocity[1];
+            const vertices=c.mesh.geometry.attributes.position,q=c.mesh.quaternion;
+            // Actual rotated lower envelope prevents a banking edge entering the tray.
+            const yx=2*(q.x*q.y+q.w*q.z),yy=1-2*(q.x*q.x+q.z*q.z),yz=2*(q.y*q.z-q.w*q.x);let bottom=Infinity;
+            for(let i=0;i<vertices.count;i++)bottom=Math.min(bottom,yx*vertices.getX(i)+yy*vertices.getY(i)+yz*vertices.getZ(i));
+            floor-=bottom+(c.bottomOffset||0);
+          }
           if(c.mesh.position.y<=floor) {
-            c.mesh.position.y=floor;c.dropVelocity=Math.abs(c.dropVelocity)*(c.body.gel?.025:.22);c.bounces++;
+            c.mesh.position.y=floor;c.dropVelocity=Math.abs(c.dropVelocity)*(c.body.gel?.025:.06);c.flight.velocity[1]=c.dropVelocity;c.bounces++;
             if(c.body.gel){PoseSlimeVolume(c.body,c.mesh.position.toArray(),c.mesh.quaternion.toArray());for(const v of c.body.gel.velocities)v[1]-=1.5;c.body.gel.awake=2.5;}
             if(c.bounces===1)landed.push(c);
             if(c.bounces>2||c.dropVelocity<.18)c.state='collected';
@@ -1129,11 +1145,11 @@ export async function CreateImmersiveScene({ core }) {
         if(c.toolId==='scoop')tool.rotateY(away*.65);
         tool.visible=age<2.3;
       }
-      if(age>=3.4) { c.state='collected';if(!c.body.gel)c.mesh.position.copy(TrayPosition(c));transfer=null;HideTool(); }
+      if(age>=3.4&&c.bounces) { c.state='collected';transfer=null;HideTool(); }
     }
     if(transfer?.chunk.batch){const parent=transfer.chunk;for(const child of parent.batch){child.mesh.visible=!child.trayStored;child.mesh.position.copy(parent.mesh.position).add(child.batchOffset.clone().applyQuaternion(parent.mesh.quaternion));child.mesh.quaternion.copy(parent.mesh.quaternion);if(parent.state==='collected')child.state='collected';}}
     for(const parent of [...landed])if(parent.batch)for(const child of parent.batch){child.state='collected';landed.push(child);}
-    for(const c of landed){collectionTray.Add(c,TrayPosition(c).sub(tray.position));if(c.trayStored)c.mesh.visible=false;}
+    for(const c of landed){collectionTray.Add(c,(c.body.gel?TrayPosition(c):c.mesh.position.clone()).sub(tray.position));if(c.trayStored)c.mesh.visible=false;}
     return landed;
   }
   function AuditTool(){

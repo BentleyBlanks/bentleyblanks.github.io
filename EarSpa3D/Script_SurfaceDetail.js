@@ -36,34 +36,45 @@ export function BindWaxAppearance(shader,{type,pale}){
     float waxRenderWet=waxWet*earWetQuality;
     float waxRenderSoft=waxSoft*earWetQuality;
     float waxMottle=SurfaceNoise(waxLocal*4.7);
-    float waxGrain=SurfaceNoise(waxLocal*38.0);
+    float waxGrainFilter=SurfaceFilter(waxLocal,38.0);
+    float waxGrain=earDetailLayers>2&&waxGrainFilter>0.0?SurfaceNoise(waxLocal*38.0):.5;
+    float waxLamellaFilter=SurfaceFilter(waxLocal,63.0);
+    float waxLamella=earDetailLayers>1&&waxLamellaFilter>0.0?sin(waxLocal.y*63.0+waxMottle*9.0):0.0;
     float waxTexture=clamp(pow(max(.001,dot(diffuseColor.rgb,vec3(.299,.587,.114))),.32),0.0,1.0);
-    vec3 waxLow=${pale?'vec3(.48,.275,.105)':type==='impacted'?'vec3(.105,.036,.009)':'vec3(.30,.105,.022)'};
-    vec3 waxHigh=${pale?'vec3(.90,.72,.40)':type==='impacted'?'vec3(.39,.19,.048)':'vec3(.72,.38,.105)'};
+    vec3 waxLow=${pale?'vec3(.52,.33,.145)':type==='impacted'?'vec3(.14,.055,.017)':'vec3(.36,.16,.055)'};
+    vec3 waxHigh=${pale?'vec3(.90,.75,.47)':type==='impacted'?'vec3(.43,.24,.075)':'vec3(.78,.47,.17)'};
     diffuseColor.rgb=mix(waxLow,waxHigh,clamp(waxTexture*.65+waxMottle*.35,0.0,1.0));
     float waxLoad=smoothstep(.025,.19,waxState.y);
     float waxDamage=clamp(waxState.z,0.0,1.0);
-    float waxFissure=(1.0-smoothstep(.025,.10,abs(waxGrain-.46)))*waxDamage;
+    float waxFissure=(1.0-smoothstep(.025,.10,abs(waxGrain-.46)))*waxDamage*waxGrainFilter;
     diffuseColor.rgb*=1.0-waxFissure*.30*earSurfaceDetail;
+    float waxKeratin=(waxLamella*.5+.5)*waxLamellaFilter*earSurfaceDetail*(1.0-waxRenderSoft*.7);
+    diffuseColor.rgb*=1.0+${type==='wet'?'.035':'.075'}*(waxKeratin-.5);
     diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(1.22,1.15,1.04),waxCut*.6);
   `);
   shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
-    float waxLamella=sin(waxLocal.y*63.0+SurfaceNoise(waxLocal*7.0)*9.0);
     float waxRelief=earSurfaceDetail*(1.0-waxRenderSoft*.65)*(
       (earDetailLayers>0?(waxMottle-.5)*.009*SurfaceFilter(waxLocal,5.0):0.0)+
-      (earDetailLayers>1?waxLamella*.0016*(.4+waxLoad)*SurfaceFilter(waxLocal,63.0):0.0)+
-      (earDetailLayers>2?(waxGrain-.5)*.002*SurfaceFilter(waxLocal,38.0):0.0));
+      (earDetailLayers>1?waxLamella*.0022*(.4+waxLoad)*waxLamellaFilter:0.0)+
+      (earDetailLayers>2?(waxGrain-.5)*.002*waxGrainFilter:0.0));
     normal=SurfaceNormal(normal,waxRelief,-vViewPosition);
+    // Broaden unresolved normal highlights at oblique angles (specular AA).
+    vec3 waxDx=dFdx(normal),waxDy=dFdy(normal);
+    roughnessFactor=min(.92,sqrt(roughnessFactor*roughnessFactor+min(.16,.32*(dot(waxDx,waxDx)+dot(waxDy,waxDy)))));
   `);
   shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
-    roughnessFactor=mix(${type==='wet'?'.27':type==='impacted'?'.53':'.62'},.24,waxRenderWet);
-    roughnessFactor=clamp(roughnessFactor+(waxMottle-.5)*.13+waxCut*.11+waxLoad*.055,.19,.83);
+    roughnessFactor=mix(${type==='wet'?'.34':type==='impacted'?'.58':'.68'},.28,waxRenderWet);
+    roughnessFactor=clamp(roughnessFactor+(waxMottle-.5)*.17+waxCut*.11+waxLoad*.055,.23,.86);
   `);
-  // Broad transmission only from incident diffuse light. Thin sheets glow at the rim,
-  // thick plugs stay opaque; no emissive tint or view-dependent alpha sorting.
-  shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
-    float waxThin=exp(-max(.006,waxState.x)*12.0);
-    float waxRim=pow(1.0-abs(dot(normal,geometryViewDir)),2.0);
-    reflectedLight.directDiffuse*=vec3(1.0)+vec3(.44,.23,.075)*waxThin*(.25+waxRim)*earWetQuality;
-  `);
+  // Per-light wax diffusion uses the actual thickness and shadowed radiance.
+  // Thin keratin edges transmit amber light; dense plugs retain a dark core.
+  shader.fragmentShader=shader.fragmentShader.replace('#include <lights_physical_pars_fragment>',THREE.ShaderChunk.lights_physical_pars_fragment.replace(
+    'reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseContribution );',`
+    float waxNL=dot(geometryNormal,directLight.direction);
+    float waxThin=exp(-max(.006,waxState.x)*9.0)*earWetQuality;
+    vec3 waxWrap=vec3(.42,.24,.12);
+    vec3 waxLobe=max(vec3(waxNL)+waxWrap,vec3(0.0))/(1.0+waxWrap);
+    float waxBack=pow(max(0.0,dot(-directLight.direction,geometryViewDir)),3.0);
+    vec3 waxResponse=mix(vec3(dotNL),waxLobe,waxThin*.62)+vec3(.32,.14,.035)*waxBack*waxThin;
+    reflectedLight.directDiffuse+=directLight.color*waxResponse*BRDF_Lambert(material.diffuseContribution);`));
 }

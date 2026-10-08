@@ -10,6 +10,10 @@ export function BuildWaxShape({seed=1,type='dry',radii=[1,1],micro=false,variant
   const dry=type==='dry',curl=variant==='curl',crumb=variant==='crumb';
   const corners=micro?6:11,contour=Array.from({length:corners},()=>micro?.50+rng()*.50:.74+rng()*.26);
   const phase=rng()*tau,notch=rng()*tau,fold=rng()*tau;
+  // Separate detail stream: changing lamellae never moves another deposit.
+  const detail=MakeRng((seed^0x5f3759df)>>>0);
+  const fissures=Array.from({length:dry?5:3},()=>[detail()*tau,.05+detail()*.10,.025+detail()*.055]);
+  const foldCos=Math.cos(fold),foldSin=Math.sin(fold),lamellaPhase=detail()*tau;
   const skew=(rng()-.5)*.27,offset=(rng()-.5)*.20;
   const scale=Math.min(...radii),base=micro?scale*(crumb?.70:.15):dry?.043:type==='wet'?.15:.34;
   const positions=[],indices=[],uv=[],response=[];
@@ -18,10 +22,15 @@ export function BuildWaxShape({seed=1,type='dry',radii=[1,1],micro=false,variant
     const lifted=Math.pow(Math.max(0,x*Math.cos(fold)+y*Math.sin(fold)),2.4);
     const ripple=Math.sin(y*9+x*3+phase)*Math.sin(x*5-y*2+phase);
     const bowl=dry?(micro?(curl?1.55:.38):.20)*scale*lifted:0;
-    const bottom=.003+bowl+(dry?.009:.006)*scale*ridge*r*r;
+    const across=x*foldCos+y*foldSin,along=-x*foldSin+y*foldCos;
+    const seam=Math.sin(across*15+along*2.5+lamellaPhase);
+    const lamella=dry&&!micro?Math.pow(Math.max(0,seam),3)*.026*scale*r:0;
+    const lip=dry&&!micro?Math.pow(Math.max(0,across),3)*scale*.12:0;
+    const bottom=.003+bowl+lip+lamella+(dry?.009:.006)*scale*ridge*r*r;
     const dome=crumb?Math.sqrt(Math.max(0,1-r*r)):Math.pow(Math.max(0,1-r*r),.7);
-    const thickness=base*(.26+(crumb?1.45:1.0)*dome)*
-      (1+(dry?.24:.42)*ridge+(dry?.08:.20)*ripple);
+    const pool=type==='wet'?.36*Math.exp(-((across-.20)**2*7+(along+.22)**2*13)):0;
+    const thickness=base*(.18+(crumb?1.45:1.0)*dome+pool)*
+      (1+(dry?.24:.42)*ridge+(dry?.08:.20)*ripple+(dry&&!micro?.16*seam:0));
     return [bottom,Math.max(micro?.003:.009,thickness)];
   }
   function Vertex(r,a,side){
@@ -35,7 +44,10 @@ export function BuildWaxShape({seed=1,type='dry',radii=[1,1],micro=false,variant
       aRadius*(1-blend)+bRadius*blend;
     const distance=Math.atan2(Math.sin(a-notch),Math.cos(a-notch));
     const chip=dry?(micro?.18:.24)*Math.exp(-distance*distance/(micro?.06:.025)):.08*Math.exp(-distance*distance/.13);
-    const radius=r*(edge-chip),x=Math.cos(a)*radius,y=Math.sin(a)*radius;
+    let tears=0;
+    if(!micro)for(const [angle,depth,width] of fissures){const d=Math.atan2(Math.sin(a-angle),Math.cos(a-angle));tears+=depth*Math.exp(-d*d/width);}
+    const fray=dry&&!micro?.018*(1+Math.sin(a*23+phase)*Math.sin(a*11-fold)):0;
+    const radius=r*Math.max(.35,edge-chip-tears-fray),x=Math.cos(a)*radius,y=Math.sin(a)*radius;
     const localX=x+skew*y+offset*r*r,localY=y*(1+.13*x);
     const [bottom,thickness]=Height(x,y,r);
     positions.push(localX*radii[0],localY*radii[1],bottom+(side===0?thickness:0));

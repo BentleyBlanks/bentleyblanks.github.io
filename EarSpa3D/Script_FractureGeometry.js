@@ -39,12 +39,35 @@ export function CutGeometry(source,normal,constant,positive=true){
  geometry.dispose();const result=new THREE.BufferGeometry();result.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));result.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));result.setAttribute('waxCap',new THREE.Float32BufferAttribute(caps,1));result.setAttribute('waxRest',new THREE.Float32BufferAttribute(rest,3));result.setAttribute('waxResponse',new THREE.Float32BufferAttribute(response,3));result.setIndex(Array.from({length:positions.length/3},(_,i)=>i));SmoothWaxNormals(result);result.computeBoundingBox();return result;
 }
 // 保持外壳跨 UV 接缝平滑，裂面保留真实法线，避免每个三角形变成一张纸楔。
+const normalBindings=new WeakMap();
 export function SmoothWaxNormals(g){
- g.computeVertexNormals();const p=g.attributes.position,n=g.attributes.normal,cap=g.attributes.waxCap,idx=g.index,groups=new Map(),keys=[];
- for(let i=0;i<p.count;i++){if(cap?.getX(i)>.5){keys.push(null);continue;}const key=[p.getX(i),p.getY(i),p.getZ(i)].map(x=>Math.round(x*1e5)).join(',');keys.push(key);if(!groups.has(key))groups.set(key,new THREE.Vector3());}
- const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();
- for(let i=0;i<(idx?idx.count:p.count);i+=3){const ids=[0,1,2].map(j=>idx?idx.getX(i+j):i+j);a.fromBufferAttribute(p,ids[0]);b.fromBufferAttribute(p,ids[1]).sub(a);c.fromBufferAttribute(p,ids[2]).sub(a);b.cross(c);for(const k of ids)if(keys[k])groups.get(keys[k]).add(b);}
- for(const v of groups.values())v.normalize();for(let i=0;i<p.count;i++)if(keys[i]){const v=groups.get(keys[i]);n.setXYZ(i,v.x,v.y,v.z);}n.needsUpdate=true;
+ const p=g.attributes.position,cap=g.attributes.waxCap,idx=g.index;
+ let cache=normalBindings.get(g);
+ if(!cache||cache.position!==p||cache.index!==idx||cache.cap!==cap||cache.indexVersion!==idx?.version||cache.capVersion!==cap?.version){
+   const rest=p,groups=new Map(),binding=new Uint32Array(p.count);let count=0;
+   for(let i=0;i<p.count;i++){
+     // Capture welds when the topology is created, including newly cut edges.
+     // Keep them through bending; caps retain independent face normals.
+     const key=cap?.getX(i)>.5?'cap'+i:[rest.getX(i),rest.getY(i),rest.getZ(i)].map(x=>Math.round(x*1e5)).join(',');
+     if(!groups.has(key))groups.set(key,count++);binding[i]=groups.get(key)*3;
+   }
+   cache={position:p,index:idx,cap,indexVersion:idx?.version,capVersion:cap?.version,binding,sums:new Float64Array(count*3)};normalBindings.set(g,cache);
+ }
+ if(!g.attributes.normal||g.attributes.normal.count!==p.count)g.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(p.count*3),3));
+ const n=g.attributes.normal,{binding,sums}=cache,positions=p.array,indices=idx?.array;sums.fill(0);
+ for(let i=0;i<(indices?indices.length:p.count);i+=3){
+   const a=indices?indices[i]:i,b=indices?indices[i+1]:i+1,c=indices?indices[i+2]:i+2;
+   const ai=a*3,bi=b*3,ci=c*3;
+   const bx=positions[bi]-positions[ai],by=positions[bi+1]-positions[ai+1],bz=positions[bi+2]-positions[ai+2];
+   const cx=positions[ci]-positions[ai],cy=positions[ci+1]-positions[ai+1],cz=positions[ci+2]-positions[ai+2];
+   const x=by*cz-bz*cy,y=bz*cx-bx*cz,z=bx*cy-by*cx;
+   const ia=binding[a],ib=binding[b],ic=binding[c];
+   sums[ia]+=x;sums[ia+1]+=y;sums[ia+2]+=z;
+   sums[ib]+=x;sums[ib+1]+=y;sums[ib+2]+=z;
+   sums[ic]+=x;sums[ic+1]+=y;sums[ic+2]+=z;
+ }
+ for(let i=0;i<sums.length;i+=3){const length=Math.hypot(sums[i],sums[i+1],sums[i+2])||1;sums[i]/=length;sums[i+1]/=length;sums[i+2]/=length;}
+ for(let i=0;i<p.count;i++){const offset=binding[i];n.setXYZ(i,sums[offset],sums[offset+1],sums[offset+2]);}n.needsUpdate=true;
 }
 // Volume is measured from the actual sealed faces, so daughter mass follows the cut.
 export function GeometryVolume(g){const p=g.attributes.position,idx=g.index;let sum=0;const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();for(let i=0;i<(idx?idx.count:p.count);i+=3){a.fromBufferAttribute(p,idx?idx.getX(i):i);b.fromBufferAttribute(p,idx?idx.getX(i+1):i+1);c.fromBufferAttribute(p,idx?idx.getX(i+2):i+2);sum+=a.dot(b.cross(c))/6;}return Math.abs(sum);}

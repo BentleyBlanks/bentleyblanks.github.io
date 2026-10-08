@@ -1,10 +1,10 @@
 // 可见块体使用薄壳，细微颗粒保留低成本刚体；两者共用工具和附着接口。
-import {BindWaxSurface,BindWaxSurfaceSteps,GripWaxSurface,UngripWaxSurface,StepWaxSurface,WriteWaxSurface} from './Script_SoftWaxPhysics.mjs?v=ear041-material-response-20261003';
+import {BindWaxSurface,BindWaxSurfaceSteps,GripWaxSurface,UngripWaxSurface,StepWaxSurface,WriteWaxSurface} from './Script_SoftWaxPhysics.mjs?v=ear044-light-wax-20261008';
 import {BindSlimeVolume,GripSlimeVolume,UngripSlimeVolume,StepSlimeVolume,WriteSlimeSurface,PoseSlimeVolume} from './Script_SlimePhysics.mjs?v=ear043-runtime-performance-20261003';
 export function BindPeelSurface(body,positions,indices){return body.type==='oily'?BindSlimeVolume(body,positions,indices):BindWaxSurface(body,positions,indices);}
 export function WritePeelSurface(body,positions,response=null){return body.gel?WriteSlimeSurface(body,positions):WriteWaxSurface(body,positions,response);}
 export {BindWaxSurfaceSteps as BindPeelSurfaceSteps};
-export {WaxAnchorPoint as PeelAnchorPoint} from './Script_SoftWaxPhysics.mjs?v=ear041-material-response-20261003';
+export {WaxAnchorPoint as PeelAnchorPoint} from './Script_SoftWaxPhysics.mjs?v=ear044-light-wax-20261008';
 const Add=(a,b)=>a.map((x,i)=>x+b[i]);
 const Sub=(a,b)=>a.map((x,i)=>x-b[i]);
 const Mul=(a,s)=>a.map(x=>x*s);
@@ -42,6 +42,17 @@ export function MovePeelBody(body,position){
   const delta=Sub(position,body.position);
   if(body.surface)for(const point of body.surface.points)for(let k=0;k<3;k++)point[k]+=delta[k];
   body.position=position.slice();body.velocity=[0,0,0];
+}
+
+export function PosePeelBody(body,position,rotation){
+  if(body.gel){PoseSlimeVolume(body,position,rotation);return;}
+  const delta=Product(rotation,[-body.rotation[0],-body.rotation[1],-body.rotation[2],body.rotation[3]]);
+  if(body.surface)for(let i=0;i<body.surface.points.length;i++){
+    const point=Rotate(delta,Sub(body.surface.points[i],body.position));
+    for(let k=0;k<3;k++)body.surface.points[i][k]=position[k]+point[k];
+    body.surface.velocities[i]=Rotate(delta,body.surface.velocities[i]);
+  }
+  body.position=Array.from(position);body.rotation=Array.from(rotation);
 }
 
 export function StepPeelBody(body,{target=null,softness=0,efficiency=1,supportRotation=null,adhesion=1,minAnchors=0,fracture=false}={},dt=1/60){

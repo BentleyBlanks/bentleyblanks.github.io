@@ -22,6 +22,7 @@ node EarSpa3D/Script_PeelPhysicsTest.mjs
 | 油耳、体积与显示曲面 | `Script_OilyCoatingTest.mjs`、`Script_SlimePhysicsTest.mjs`、`Script_OilyWaxPlayTest.mjs`、`Script_OilyFilmPlayTest.mjs`、`Script_OilyRenderingTest.mjs`、`Script_OilyDetailTest.mjs`、`Script_OilyVisibilityTest.mjs` |
 | 羽毛与刷拢 | `Script_FeatherSweepPlayTest.mjs`、`Script_BrushGatherPlayTest.mjs` |
 | 耳垢与微屑形体 | `Script_WaxMorphologyTest.mjs` 验证 96 种封闭薄壳及 576 粒碎屑的拓扑、可复现性、接触范围和薄壳静态绑定；`Script_MaterialResponseTest.mjs`、`Script_BrushGatherPlayTest.mjs`、`Script_ToolDragPlayTest.mjs` 验证实景、形变碎裂、真实刷拢及收集 |
+| 轻盈脱落、搬运与薄壳性能 | `Script_LightWaxPhysicsTest.mjs` 检查厚度相关落速、30/60/120 Hz 一致性、真实触盘时限与整体节点搬运；可加 `--compare=<commit>` 对照旧求解器并记录局部耗时。`Script_LightWaxRenderTest.mjs --url=...` 检查加载／断口法线、受控飞行与实际落盘；可加 `--compare=<commit>` 对照旧法线实现。真实鼠标／触屏仍用 `Script_ToolDragPlayTest.mjs`，不得把受控夹具称为真实手动操作 |
 | 经营、完整服务与收集 | `Script_EconomyTest.mjs`、`Script_ChunkPlayTest.mjs`、`Script_TactilePlayTest.mjs` |
 | 声音触发与接触门控 | `Script_LandingSoundTest.mjs`、`Script_ContactFrictionTest.mjs`、`Script_ContactFrictionPlayTest.mjs` |
 | 画质与物理设置 | `Script_RenderQualityPlayTest.mjs`、`Script_PhysicsSettingsTest.mjs`、`Script_PhysicsSettingsPlayTest.mjs` |
