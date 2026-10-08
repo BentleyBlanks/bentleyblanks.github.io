@@ -100,13 +100,13 @@ def FlattenRowsAndColumns(lin, window=21):
     return np.clip(lin / Ratio(LinearLuminance(lin).mean(0))[None, :, None], 0, 1)
 
 
-def HeightFromLuma(lin, size):
+def HeightFromLuma(lin, size, fineWeight=0.45):
     """亮度两档带通（细颗粒 + 块面）归一化到 0..1。σ 按 1024 标定、随尺寸缩放。"""
     k = size / 1024
     lum = LinearLuminance(lin)
     fine = GaussianPeriodic(lum, 1.2 * k) - GaussianPeriodic(lum, 6 * k)
     clod = GaussianPeriodic(lum, 5 * k) - GaussianPeriodic(lum, 38 * k)
-    h = 0.45 * fine / max(fine.std(), 1e-6) + 0.55 * clod / max(clod.std(), 1e-6)
+    h = fineWeight * fine / max(fine.std(), 1e-6) + (1-fineWeight) * clod / max(clod.std(), 1e-6)
     lo, hi = np.percentile(h, 0.8), np.percentile(h, 99.2)
     return np.clip((h - lo) / max(hi - lo, 1e-6), 0, 1)
 
@@ -215,6 +215,20 @@ def MatchTone(lin, mean_srgb, contrast, strength=1.0):
     target_mean = cur_mean + (np.asarray(mean_srgb) - cur_mean) * strength
     target_scale = 1 + (scale - 1) * strength
     return np.clip(target_mean[None, None, :] + dev * target_scale, 0, 1)
+
+
+def BalanceFineDetail(srgb, strength):
+    """Optional isotropic soil calibration: even micrograin contrast, preserve clod masses.
+
+    Generated soil often has powdery soft patches beside equally sized sharp
+    grains. A periodic local contrast envelope corrects that material inconsistency
+    over the entire tile, not just its border. No new noise or features are added.
+    """
+    sigma = 3 * srgb.shape[0] / 1024
+    detail = Luma(srgb) - GaussianPeriodic(Luma(srgb), sigma)
+    rms = np.sqrt(GaussianPeriodic(detail * detail, sigma * 2))
+    gain = np.clip(np.median(rms) / np.maximum(rms, 1e-6), .55, 1.8)
+    return np.clip(srgb + (detail * (gain - 1) * strength)[..., None], 0, 1)
 
 
 # --------------------------------------------------------------------------------------------
@@ -418,10 +432,13 @@ def Bake(args):
     else:
         srgb = MatchTone(lin, p["mean"], p["contrast"], args.tone_strength)
 
+    if args.detail_balance:
+        srgb = BalanceFineDetail(srgb, args.detail_balance)
+
     if height_src is not None:
         height = NormalizeHeight(height_src)
     else:
-        height = HeightFromLuma(SrgbToLinear(srgb), size)
+        height = HeightFromLuma(SrgbToLinear(srgb), size, args.height_fine_weight)
         if p.get("heightFromLuma") == "invert":
             height = 1 - height  # 石灰砖缝比砖亮：亮 = 凹
     if args.invert_height:
@@ -495,7 +512,9 @@ def Bake(args):
                    "toneStrength": args.tone_strength, "keepTone": args.keep_tone, "noFlatten": args.no_flatten,
                    "invertHeight": args.invert_height, "keepAlpha": args.keep_alpha, "roughMin": args.rough_min,
                    "baseQuality": args.base_quality, "dataQuality": args.data_quality,
-                   "dataLossless": args.data_lossless, "uvAtlasReason": args.uv_atlas_reason},
+                   "dataLossless": args.data_lossless, "detailBalance": args.detail_balance,
+                   "heightFineWeight": args.height_fine_weight,
+                   "uvAtlasReason": args.uv_atlas_reason},
         "outputs": outputs,
         "totalBytes": total,
         "metrics": metrics,
@@ -653,6 +672,8 @@ def ParseArgs(argv):
     ap.add_argument("--invert-height", action="store_true", help="高度取反（源图里凹处反而亮时用）")
     ap.add_argument("--mean", help="覆盖预设目标 sRGB 均值，如 0.36,0.36,0.35")
     ap.add_argument("--contrast", type=float, help="覆盖预设目标亮度标准差")
+    ap.add_argument("--detail-balance", type=float, default=0, help="0..1：均衡无方向土壤的微颗粒对比度，保留大土团")
+    ap.add_argument("--height-fine-weight", type=float, default=.45, help="亮度推高度的细颗粒比例；土壤微粒的高度须低于大土团")
     ap.add_argument("--tone-strength", type=float, default=1.0, help="定色力度 0..1（1 = 完全拉到目标）")
     ap.add_argument("--keep-tone", action="store_true", help="不定色（源图已经是标定过的反照率时）")
     ap.add_argument("--reliefM", "--relief-m", dest="reliefM", type=float, help="高度 0..1 对应多少米起伏（法线斜率按米算）")
@@ -685,6 +706,9 @@ def ParseArgs(argv):
     ap.add_argument("--audit", action="store_true",
                     help="不烘：量 Texture/ 里已有的 Texture_<Name>{Base,Normal,Orm|Orh}.webp，写 generator=audit 的记录")
     args = ap.parse_args(argv)
+    for option in ("detail_balance", "height_fine_weight"):
+        if not 0 <= getattr(args, option) <= 1:
+            ap.error("--" + option.replace("_", "-") + " must be in [0, 1]")
     args.preset_given = any(a == "--preset" or a.startswith("--preset=") for a in argv)
     if args.audit:
         if not args.name:
@@ -707,6 +731,8 @@ def ParseArgs(argv):
                  "--row-flatten", "on" if prm["rowFlatten"] else "off", "--flattenSigma", str(prm["flattenSigma"]),
                  "--rough-min", str(prm["roughMin"]), "--base-quality", str(prm["baseQuality"]),
                  "--data-quality", str(prm["dataQuality"])]
+        argv2 += ["--detail-balance", str(prm.get("detailBalance", 0))]
+        argv2 += ["--height-fine-weight", str(prm.get("heightFineWeight", .45))]
         for flag, key in (("--keep-tone", "keepTone"), ("--no-flatten", "noFlatten"), ("--invert-height", "invertHeight"),
                           ("--keep-alpha", "keepAlpha"), ("--data-lossless", "dataLossless")):
             if prm.get(key):

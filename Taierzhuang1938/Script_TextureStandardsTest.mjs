@@ -70,6 +70,7 @@ const UNSTAMPED_PENDING = new Set([
 // Script_TrenchSurface.LoadTrenchSurface 的 Fetch 与 Script_FirstLevelWhiteboxField 的 VersionedLayer 都拼 `?v=${TRENCH_SURFACE.version}`。
 const STAMPED_BY_LOADER = new Set([
   ...["TrenchPomBase.webp", "TrenchPomNormal.webp", "TrenchPomOrh.webp", "TrenchStoneBase.webp", "TrenchStoneNormal.webp",
+    "TrenchLooseEarthBase.webp", "TrenchLooseEarthNormal.webp", "TrenchLooseEarthOrh.webp",
     "TrenchStoneOrm.webp", "TrenchMudHeightMask.png", "TrenchRootMat.webp"].map((f) => `Data_TrenchSurface.mjs|Texture/Texture_${f}`),
 ]);
 

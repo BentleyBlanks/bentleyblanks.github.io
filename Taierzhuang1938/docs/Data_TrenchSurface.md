@@ -1,5 +1,26 @@
 # 通用壕沟表面
 
+## 2026-10-09：按用户选中的 10 号土壤参考迭代
+
+本次外观目标是用户从十张 imagegen 图中选中的 `Reference_TrenchEarth_10.png`。历史照片 01 / 14 继续约束开挖形态；当前材质以 10 号图的灰褐、哑光、颗粒与断面为准。参考图及实机对照只存本地 `C:/Users/Bentl/.codex/artifacts/TrenchReferenceTenImplementation20261009/`，不随站点发布。
+
+- 所有 22 段共用同一表面生成器。中心线、物理高度场、宽深、分岔、路由与地形指纹不变。弃土外裙增加浅表细节，继续随弹坑裁除；不是新的行走面。
+- `TrenchPom` 为密实断面，`TrenchLooseEarth` 为沟沿、弃土与土团。两套 albedo 由 Lovart 制作，来源 thread、提示词、散列及重烘参数记在纹理清单。法线、AO、roughness 和 height 由烘焙器推导，不宣称实测扫描或真实配准高度。
+- 地形数组增加第 6 层，仍只用原有两个数组采样器。陡壁用密实土，沟沿与外裙用松土；近水平沟底混入 82% 松土颗粒，独立土团强制松土。合批前以 UV=-8 保留土团/弃土标记，合批后转换到 `terrainLayers.w=-2`；细根以 UV=-16 / w=-3 保留独立浅褐色及圆柱法线，仍和土层合批。基础地面原车辙坐标不变，壕沟纯土分支不计算车辙。两种数据图仍为 linear，Base 仍为 sRGB。
+- imagegen 先出六件土团原型，随后 `_import/Script_BakeTrenchClods.py` 经 BlenderMCP 重建 `Model_TrenchClods.glb`。源工程为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchReferenceTen/Scene_TrenchClods.blend`。六种形体各有 160 / 40 三角版本，共 12 件、1,200 三角，共享一个材质；标准化水平半径约 1，glTF 为 Y-up，埋入底部在 Y<0，运行时按米缩放。半径至少 0.27 m 的土团使用细轮廓，0.12 m 以下用简化颗粒；高度受半径约束，避免细长尖石。沟沿按世界位置改变疏密，横向和纵向散布，小颗粒比大土团更常见，避免等距珠链。坡皮改为 8×8 网格，将部分面数用于沟沿颗粒；外裙仍为 8×6。土团的上部与碎石保持实体形状、沿坡面法线埋入；土团底部单独向下贴土，避免平底悬空，取消整块逐顶点拉伸；误落在陡壁上的冠部土团限制为 4 cm 半径，避免黑色薄片。
+- 大土团与微颗粒不能使用相同高度幅度。烘焙器新增可选 `--height-fine-weight`（旧流程默认仍为 0.45），当前断面 0.03、松土 0.05；`--detail-balance` 均衡整幅图的细颗粒对比度，不改变门槛或只修接缝边缘。两个参数写进记录，`--rebake` 可复现。实机采用 1.8 m 平铺、断面/松土最大视差 12/20 mm，在 3–12 m 淡出；近水平表面减小幅度。混合边界先淡出视差，再切换主高度层，避免每步重复采两层高度。细根贴合渲染土皮，避免埋在皮下。
+- 贴图仍在第一关加载地形数组时按需取得，不增加开机 PBR_SETS。当前两套磁盘合计 1,040,304 字节（约 0.99 MiB），较原单套增加约 0.43 MiB；总贴图预算因此从 61 MiB 调到 62 MiB，单套/单图与分层预算不放宽。新增一层数组含 mip 约占 6.67 MiB GPU 内存。松土当前使用按参考图右下方区域重做的第三版，以细粉基质为主，减少均匀铺满的团块；实际源图、hash 和参数以烘焙记录为准。
+
+重建命令：用 BlenderMCP `start --task TrenchReferenceTen --blend <上述源工程>`，再通过 `exec --code` 执行 `runpy.run_path` 调用烘焙脚本，完成后 `stop` 并 `status --scan`。贴图使用 `Script_BakePbrTexture.py --rebake _import/TextureBakes/Texture_<Name>.json`，源图必须仍存在且 hash 相符。自动取证入口 `Script_TrenchReferenceShots.mjs` 默认遍历 22 段及七个固定机位；`--focus=CrestAlong,EarthFace` 可只复查两张，`--out=` 指向本地成果目录。
+
+验收入口：`TrenchSurfaceTest`（GLB 尺寸、六种形体、沟沿接缝、物理地面与材质标记）、`TrenchPlanTest`、`FirstLevelFrontTopologyTest`、`TextureStandardsTest`、`ModuleGraphTest`、`FirstLevelMissionFortificationsTest`、`SamplerBudgetTest --only=firstLevel`、`TerrainBlendTest`、`MotionVectorContractTest`。实机取证与尚未通过项记录在本地日志；图片改善不等于所有门禁已通过。
+
+当前本地取证：第二十轮高画质覆盖 22 段和七个固定机位，页面/控制台/GL 错误为 0；壕沟装饰合计 1,104,572 三角 / 60 个分区网格，低于现有 1.15M / 64 预算，基础地面仍为 871,520 三角。第二十轮高画质与第十九轮白盒炮击均削低 0.606 m，四组装饰被裁除，Reset 后源几何和地面高度完全恢复。贴图门 3,712 项、六张贴图按记录重烘的逐文件 SHA-256、49 项运动向量 GPU 场景、土石材质交界 GPU 门、壕沟规则/表面门均通过；材质 GPU 门另验合批细根仍保持独立颜色。最后一轮仅修土团底部接地，材质沿用第十九轮的 GPU 与白盒取证；陡壁土团尺寸与埋入另有生成几何断言。
+
+性能取证采用同一机位（FlankBreachSap）、每批 21 帧的冻结场景。第十九轮三批中一批 GPU 查询未返回、另两批为 16.94 / 29.72 ms；第十八轮有效批为 14.41 / 16.93 ms，未修改基线为 13.22–19.79 ms。运行环境有明显计时波动，这些数据不足以断言没有性能回退，也不能写成稳定的游戏帧率。全套截图和日志在本地成果目录；外观仍在对照参考 10 迭代，尚未宣称完全一致或发布。已改善颗粒尺度、沟底散土和沟沿轮廓；部分坡肩土团仍显得生硬，尚需继续处理。
+
+已知未通过项：全套 quick 为 116/120；CharacterSpeech 缺“呃啊”、P012Visibility 夹具缺 `manualPoses`、PontoonBridge 指纹差异在未修改主检出亦复现。音频严格门的解码器缺失，直接检查 `ffmpeg` 为 ENOENT，未改音频资产。Fortifications 的 FrontCommunication 双向卡点、到达点数和终点坐标与 2026-10-07 的既有日志相同，其余 40 条双向走位完成；不放宽断言。prepush 在同一 CharacterSpeech 基线失败处停止。
+
 ## 2026-10-07 补充：实体沟形与连续弃土垄
 
 用户补充要求按参考图调整**壕沟形状，以及地面上挖出来的土连成土包状小隆起**。上一轮只有材质和浅表细节，尚不足以表现这个轮廓；本轮把沟壁剖面和弃土垄写进共享高度场。照片来源见下节，01 用于地面翻土土包、14 用于紧实切土断面；尺寸是兼顾游戏通行的美术取值。

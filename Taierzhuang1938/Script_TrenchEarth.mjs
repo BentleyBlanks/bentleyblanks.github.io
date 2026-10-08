@@ -4,12 +4,13 @@ import * as THREE from "three";
 import { HashString, Mulberry32, ValueNoise2 } from "./Script_Noise.mjs";
 import { TRENCH_APPEARANCE as DefaultStyle } from "./Data_TrenchAppearance.mjs";
 
-export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots", style: Style = DefaultStyle } = {}) {
-  const stats = { clods: 0, roots: 0, triangles: 0 };
+export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots", clods = [], style: Style = DefaultStyle } = {}) {
+  const stats = { clods: 0, spoilClods: 0, roots: 0, triangles: 0 };
   const shape = new THREE.IcosahedronGeometry(1, 0);
   const up = new THREE.Vector3(0, 1, 0);
   const dir = new THREE.Vector3(), middle = new THREE.Vector3(), rotation = new THREE.Quaternion();
   const occupied = new Set();
+  const highClods=clods.filter(g=>g.userData.trenchClodHigh),lowClods=clods.filter(g=>!g.userData.trenchClodHigh);
   const Range = (random, limits) => limits[0] + random() * (limits[1] - limits[0]);
   const Add = (key, geometry) => {
     stats.triangles += (geometry.index?.count || geometry.attributes.position.count) / 3;
@@ -20,34 +21,51 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     if(u<=0||u>=1)return 0;
     // Low-frequency earthen masses instead of gravel-like bumps over the whole wall.
     // The shoulder stays inside the existing bank footprint; the walking floor is untouched.
-    const mass=ValueNoise2(x*.85,z*.85,71),grain=ValueNoise2(x*8,z*8,93);
-    const shoulder=Style.cutShoulderM*Ease(u/.42)*(1-Ease((u-.68)/.32));
+    const mass=.45*ValueNoise2(x*.85,z*.85,71)+.55*ValueNoise2(x*4.8,z*4.8,173),grain=ValueNoise2(x*8,z*8,93);
+    const shoulder=Style.cutShoulderM*Ease(u/.42)*(1-Ease((u-.68)/.32))*(.45+.55*ValueNoise2(x*2.3,z*2.3,218));
     // Short, irregular spade flutes run up the face, never across the walking lane.
     const phase=along/Style.spadeWidthM+ValueNoise2(x*1.2,z*1.2,417)*.65;
-    const scrape=Style.spadeReliefM*(.5+.5*Math.cos(phase*Math.PI*2))*(.4+.6*mass);
+    const scrape=Style.spadeReliefM*(.5+.5*Math.cos(phase*Math.PI*2))*(.4+.6*mass)*ValueNoise2(x*3.1,z*3.1,149);
     return (shoulder+Math.sin(u*Math.PI)*(.014+Style.crustReliefM*mass+scrape+.006*grain))*taper-.008;
   };
   const Ease = t => { t=Math.max(0,Math.min(1,t)); return t*t*(3-2*t); };
   const CrustTaper = (v, ends) => (ends.start ? Ease(v/.5) : 1) * (ends.end ? Ease((1-v)/.5) : 1);
   const Clod = (center, radius, relief, random, crown=false, heightAt=groundAt) => {
-    const geometry = shape.clone();
+    // Radius and height cannot be independent: a tiny crumb with a large height
+    // became a pointed rock. Soil aggregates remain squat broken masses.
+    relief=Math.min(relief,radius*.8);
+    const variants=radius>=.27&&highClods.length?highClods:lowClods;
+    const source=radius>=.12&&variants.length?variants[Math.floor(random()*variants.length)]:shape;
+    const geometry = source.clone();
+    const underside=Float32Array.from(geometry.attributes.position.array.filter((_,i)=>i%3===1),y=>Math.max(0,Math.min(1,(.18-y)/.4)));
     geometry.userData.trenchCrown=crown;
     geometry.rotateY(random() * Math.PI * 2);
     const e=.08,n=new THREE.Vector3(-(groundAt(center.x+e,center.z)-groundAt(center.x-e,center.z))/(2*e),
       1,-(groundAt(center.x,center.z+e)-groundAt(center.x,center.z-e))/(2*e)).normalize();
+    // Large spoil clods belong on the crown. A crown sample can land on an
+    // adjoining steep bank at junctions; keep only small embedded crumbs there.
+    const cutClod=plan.Corridor(center.x,center.z)?.inCut&&n.y<.85;
+    const slopeScale=cutClod?Math.min(1,.04/radius):Math.min(1,.065/radius+(1-.065/radius)*Ease((n.y-.45)/.35));
+    radius*=slopeScale;relief*=slopeScale;
     geometry.scale(radius,relief,radius*(.7+random()*.65));
     geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up,n));
     const p = geometry.attributes.position;
+    const embed=cutClod ? .65 : crown ? Style.clodEmbed : Math.max(.55,Style.clodEmbed);
+    const anchor=new THREE.Vector3(center.x,heightAt(center.x,center.z),center.z).addScaledVector(n,-relief*embed);
     for (let v = 0; v < p.count; v++) {
-      const x = center.x + p.getX(v),z = center.z + p.getZ(v);
-      const plane=-(n.x*(x-center.x)+n.z*(z-center.z))/Math.max(n.y,.2);
-      p.setXYZ(v,x,heightAt(x,z)+p.getY(v)-plane-relief*.65/Math.max(n.y,.2),z);
+      // Keep the exposed cap solid. Only the buried underside follows a falling
+      // crown: otherwise a flat model base hangs in the air above the cut face.
+      const x=anchor.x+p.getX(v),z=anchor.z+p.getZ(v),y=anchor.y+p.getY(v);
+      p.setXYZ(v,x,y+Math.min(0,heightAt(x,z)-.018-y)*underside[v],z);
     }
+    // World-projected material ignores authored UVs. Keep this marker through the
+    // shared position/normal/UV merge, then convert it to the trench material flag.
+    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(Array(p.count*2).fill(-8),2));
     geometry.computeVertexNormals();
     Add(earth, geometry); stats.clods++;
   };
   const Crust = (st, next, side, ends) => {
-    const positions=[],uvs=[],indices=[],cols=12,rows=8;
+    const positions=[],uvs=[],indices=[],cols=8,rows=8;
     for(let row=0;row<=rows;row++)for(let col=0;col<=cols;col++) {
       const u=col/cols,v=row/rows;
       const half=st.halfFloor+(next.halfFloor-st.halfFloor)*v,bank=st.bank+(next.bank-st.bank)*v;
@@ -66,6 +84,28 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     geometry.userData.trenchCrust=true;
     Add(earth,geometry);
   };
+  const SpoilLift=(x,z,u,taper)=>Math.sin(Math.PI*Math.max(0,Math.min(1,u)))*taper*
+    (.025+.10*ValueNoise2(x*4.2,z*4.2,712)+.035*ValueNoise2(x*9,z*9,337))-.004;
+  const SpoilSkin=(st,next,side,ends)=>{
+    if((side>0?st.bermPlus:st.bermMinus)<=0)return;
+    const positions=[],uvs=[],indices=[],cols=8,rows=6;
+    for(let row=0;row<=rows;row++)for(let col=0;col<=cols;col++){
+      const u=col/cols,v=row/rows,cx=st.x+(next.x-st.x)*v,cz=st.z+(next.z-st.z)*v;
+      const nx=st.nx+(next.nx-st.nx)*v,nz=st.nz+(next.nz-st.nz)*v;
+      const half=st.halfFloor+(next.halfFloor-st.halfFloor)*v,bank=st.bank+(next.bank-st.bank)*v;
+      const hit=plan.Corridor(cx+nx*side*(half+bank),cz+nz*side*(half+bank));
+      const offset=half+bank+(hit?.bermWidth||0)*u*.90;
+      const x=cx+nx*side*offset,z=cz+nz*side*offset;
+      positions.push(x,groundAt(x,z)+SpoilLift(x,z,u,CrustTaper(v,ends)),z);uvs.push(-8,-8);
+    }
+    for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+      const a=row*(cols+1)+col,b=a+cols+1;
+      if(side>0)indices.push(a,a+1,b,a+1,b+1,b);else indices.push(a,b,a+1,a+1,b,b+1);
+    }
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
+    geometry.userData.trenchCrown=true;geometry.userData.trenchSpoilSkin=true;Add(earth,geometry);
+  };
   const RootPiece = (a, b, radius) => {
     dir.subVectors(b, a);
     const len = dir.length();
@@ -75,6 +115,8 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     geometry.applyQuaternion(rotation);
     middle.addVectors(a, b).multiplyScalar(0.5);
     geometry.translate(middle.x, middle.y, middle.z);
+    geometry.userData.trenchRoots=true;
+    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(Array(geometry.attributes.position.count*2).fill(-16),2));
     Add(roots, geometry);
   };
   for (const segment of plan.segments) {
@@ -97,6 +139,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         const st = segment.stations[i];
         sink.SetSector(`TrenchEarth_${Math.floor(st.x / Style.sectorM)}_${Math.floor(st.z / Style.sectorM)}`);
         Crust(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
+        SpoilSkin(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
       }
     for (let i = 0; i < segment.stations.length; i += Style.stationStride) {
       const st = segment.stations[i];
@@ -125,7 +168,9 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
           const lateral=((x-st.x)*st.nx+(z-st.z)*st.nz)*side;
           const u=(lateral-st.halfFloor-st.bank*.02)/(st.bank*.98);
           const v=Math.max(0,Math.min(1,((x-st.x)*st.tx+(z-st.z)*st.tz)/span));
-          return groundAt(x,z)+Math.max(0,CrustLift(x,z,u,CrustTaper(v,ends),st.s+span*v));
+          const looseU=(lateral-st.halfFloor-st.bank)/(corridor.bermWidth*.9);
+          const loose=(side>0?st.bermPlus:st.bermMinus)>0&&looseU>=0&&looseU<=1?SpoilLift(x,z,looseU,CrustTaper(v,ends)):0;
+          return groundAt(x,z)+Math.max(0,loose,CrustLift(x,z,u,CrustTaper(v,ends),st.s+span*v));
         };
         if (random() < Style.clodChance) {
           const radius = Range(random, Style.clodRadiusM), relief = Range(random, Style.clodReliefM);
@@ -143,8 +188,22 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         }
         // A broken, root-bound crown interrupts the long straight heightfield edge.
         for (let n = 0; n < Style.lipClods; n++) {
-          const lip = Point(st.halfFloor + st.bank * (0.85 + random() * 0.28), (random() - 0.5) * 0.9);
-          if (lip.y - floor > 0.8) Clod(lip, Range(random, Style.lipRadiusM), Range(random, Style.lipReliefM), random,true,dressAt);
+          if(random()>.55+.45*ValueNoise2(cx*.7,cz*.7,602))continue;
+          const lip = Point(st.halfFloor + st.bank * (0.90 + random() * 0.34), (random() - 0.5) * 1.6);
+          // Many small crumbs connect the occasional large torn chunk. Uniform
+          // radii produced a few boulders sitting on an otherwise smooth crown.
+          const radius=Style.lipRadiusM[0]+(Style.lipRadiusM[1]-Style.lipRadiusM[0])*Math.pow(random(),2);
+          if (lip.y - floor > 0.8) Clod(lip,radius,Range(random,Style.lipReliefM),random,true,dressAt);
+        }
+        // The excavated material continues over the raised spoil ridge and skirt;
+        // its footprint is checked against the shared corridor at junctions.
+        for(let n=0;n<Style.spoilClods;n++){
+          const lateral=st.halfFloor+st.bank+corridor.bermWidth*(.06+random()*.70);
+          const at=Point(lateral,(random()-.5)*1.5),hit=plan.Corridor(at.x,at.z);
+          if(!hit||hit.inFloor||at.y-floor<Style.minRiseM||hit.id!==segment.id)continue;
+          const radius=Style.spoilRadiusM[0]+(Style.spoilRadiusM[1]-Style.spoilRadiusM[0])*Math.pow(random(),1.7);
+          Clod(at,radius,Range(random,Style.spoilReliefM),random,true,dressAt);
+          stats.spoilClods++;
         }
         if (roots && random() < Style.rootChance) {
           const crest = st.halfFloor + st.bank * 0.92;
@@ -156,6 +215,9 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
             const a = Point(crest + 0.08, spread, 0.035);
             const b = Point(crest - length * 0.4, spread + (random() - 0.5) * 0.16, 0.045);
             const c = Point(crest - length * 0.85, spread + (random() - 0.5) * 0.28, 0.02);
+            // Follow the rendered cut skin as the soil clods do. Using only the
+            // collision field buried these fine roots inside the raised skin.
+            for(const point of [a,b,c])point.y=dressAt(point.x,point.z)+.012;
             RootPiece(a, b, Style.rootRadiusM * (0.6 + random() * 0.6));
             RootPiece(b, c, Style.rootRadiusM * 0.48);
             stats.roots++;

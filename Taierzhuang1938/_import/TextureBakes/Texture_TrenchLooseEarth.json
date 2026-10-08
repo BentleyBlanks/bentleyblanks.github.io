@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-10-09",
+  "name": "TrenchLooseEarth",
+  "preset": "drySoil",
+  "source": {
+    "path": "C:/Users/Bentl/.codex/artifacts/TrenchReferenceTenImplementation20261009/Source/TrenchLooseEarthReferenceExtract/lovart_368f8632fd53.png",
+    "sha256": "ef10b56f852ad14ddd3bc2aa36085635f9023e7247882698727d3a2cb3014e1c",
+    "metrics": {
+      "meanSrgb": [
+        0.5,
+        0.4083,
+        0.328
+      ],
+      "luma": 0.4121,
+      "lumaStd": 0.0753,
+      "sat": 0.3441,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0065
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.445,
+      0.387,
+      0.306
+    ],
+    "contrast": 0.095,
+    "lumaRange": [
+      0.28,
+      0.46
+    ],
+    "satRange": [
+      0.18,
+      0.42
+    ],
+    "stdRange": [
+      0.05,
+      0.12
+    ],
+    "reliefM": 0.012,
+    "rough": 0.95,
+    "roughVar": 0.02,
+    "roughLumaK": 0.0,
+    "ao": 0.3,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.13,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 1.2,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orh",
+    "normalConvention": "terrain",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 95,
+    "dataLossless": false,
+    "detailBalance": 0.0,
+    "heightFineWeight": 0.05,
+    "uvAtlasReason": null
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_TrenchLooseEarthBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 434038,
+      "sha256": "fe04f1901ce9ac9f165d071b8aac63ae1573b420e90e08dde61e5b679ccf8a94"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_TrenchLooseEarthNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 98356,
+      "sha256": "cc671c7fef170fc2f0d2fb27c388af410736f5e8c4151ba7cb2ecaaf8832371f"
+    },
+    {
+      "channel": "Orh",
+      "file": "Texture_TrenchLooseEarthOrh.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 53220,
+      "sha256": "d0315cb71a0994a4aa9ea5ed9bdd1432983389a284cb59af4ebb0c02922fb10f"
+    }
+  ],
+  "totalBytes": 585614,
+  "metrics": {
+    "meanSrgb": [
+      0.4448,
+      0.3876,
+      0.3059
+    ],
+    "luma": 0.3795,
+    "lumaStd": 0.0973,
+    "sat": 0.3122,
+    "clipLow": 0.0001,
+    "clipHigh": 0.0,
+    "lowFreq": 0.006,
+    "seam": 0.0686,
+    "interior": 0.0717,
+    "seamRatio": 0.956,
+    "border": 0.955,
+    "swing": 0.0029,
+    "aoMean": 0.947,
+    "roughMean": 0.944,
+    "texelsPerMeter": 853.3
+  },
+  "gateProblems": []
+}

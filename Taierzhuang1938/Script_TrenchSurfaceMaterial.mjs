@@ -6,6 +6,7 @@ import { TerrainQualityOf, TERRAIN_WATER as W } from './Data_Tuning_Terrain.mjs'
 import { TerrainTrailTierOf } from './Data_Tuning_TerrainTrails.mjs';
 import { TERRAIN_CONTACT_GLSL } from './Script_TerrainContact.mjs';
 import { TRENCH_SURFACE as C } from './Data_TrenchSurface.mjs';
+import { TRENCH_APPEARANCE as Earth } from './Data_TrenchAppearance.mjs';
 
 // 基础地形那段 GLSL 被包进下面的非一致分支（纯沟土像素跳过它），导数在分支外求好；
 // 湿泥/积水等壕沟这一路（沟底凹度只有这里有接触高度场）算完再统一上。
@@ -13,17 +14,31 @@ const Common = /* glsl */`
 #define TERRAIN_HOISTED_DERIVATIVES
 #define TERRAIN_WATER_EXTERNAL
 #define TERRAIN_TRAILS_EXTERNAL
-uniform vec4 uTrenchMud;
+uniform vec4 uTrenchDetail; // normal strength, compact/loose relief (m), colour detail
 uniform vec4 uTrenchWater;   // x 沟底积水 y 沟底底湿度 z,w 凹度（米）[起, 满]
 uniform float uTrenchPom;
+uniform vec4 uTrenchLooseMean;
+uniform vec3 uTrenchRootColor;
+float gTrenchLoose=0.0;
 float gTrenchWet=0.0;
 float gTrenchContact=0.0;
 float gTrenchShadow=1.0;
+float SoilHeightAt(vec2 uv,float lod){
+  // One height fetch per ray step. At material transitions parallax fades to
+  // zero (below), so changing the dominant height cannot create a seam.
+  return textureLod(uTerrainAlbedo,vec3(uv,mix(3.0,5.0,step(.5,gTrenchLoose))),lod).a;
+}
+vec4 SoilGrad(sampler2DArray map,vec2 uv,vec2 gx,vec2 gy){
+  if(gTrenchLoose>.999)return textureGrad(map,vec3(uv,5.0),gx,gy);
+  vec4 v=textureGrad(map,vec3(uv,3.0),gx,gy);
+  if(gTrenchLoose<.001)return v;
+  return mix(v,textureGrad(map,vec3(uv,5.0),gx,gy),gTrenchLoose);
+}
 float SoilHeight(vec2 uv,vec2 offA,vec2 offB,float blend,float lod){
-  if(blend>.999)return textureLod(uTerrainAlbedo,vec3(uv+offB,3.0),lod).a;
-  float a=textureLod(uTerrainAlbedo,vec3(uv+offA,3.0),lod).a;
+  if(blend>.999)return SoilHeightAt(uv+offB,lod);
+  float a=SoilHeightAt(uv+offA,lod);
   if(blend<.001)return a;
-  return mix(a,textureLod(uTerrainAlbedo,vec3(uv+offB,3.0),lod).a,blend);
+  return mix(a,SoilHeightAt(uv+offB,lod),blend);
 }
 // Adaptive ray march followed by binary intersection refinement. All material
 // channels use the SAME hit UV; filtering height in the march avoids distant shimmer.
@@ -38,14 +53,15 @@ void SoilPlane(vec3 world,vec3 geomN,vec3 dx,vec3 dy,int axis,float weight,vec3 
   float facing=max(abs(dot(vw,geomN)),.12);
   vec3 tangentView=vw-geomN*dot(vw,geomN);
   vec2 vp=axis==0?tangentView.xz:axis==1?vec2(tangentView.z,-tangentView.y):vec2(tangentView.x,-tangentView.y);
-  float inv=1.0/${C.mud.baseTileM.toFixed(3)};
+  float inv=uTerrainTileNear.w;
   vec2 uv=p*inv;
   float variant=TerrainNoise(p*.13)*8.0,band=floor(variant);
   float blend=smoothstep(.42,.58,fract(variant));
   vec2 offA=sin(vec2(3,7)*band),offB=sin(vec2(3,7)*(band+1.0));
   float nearFade=uTrenchPom*(1.0-smoothstep(${C.mud.parallaxNearM.toFixed(1)},${C.mud.parallaxFarM.toFixed(1)},length(vViewPosition)));
+  nearFade*=smoothstep(.1,.7,abs(gTrenchLoose*2.0-1.0));
   float slope=1.0-smoothstep(.45,.95,geomN.y);
-  float relief=${C.mud.pomReliefM.toFixed(3)}*mix(.18,1.0,slope);
+  float relief=mix(uTrenchDetail.y,uTrenchDetail.z,gTrenchLoose)*mix(.48,1.0,slope);
   float lod=max(0.0,log2(max(length(gx),length(gy))*inv*float(textureSize(uTerrainAlbedo,0).x))-.7);
   vec2 delta=vp/facing*relief*inv*nearFade;
   vec2 at=uv;float hitDepth=.5;
@@ -66,12 +82,13 @@ void SoilPlane(vec3 world,vec3 geomN,vec3 dx,vec3 dy,int axis,float weight,vec3 
     }
     hitDepth=(previous+depth)*.5;at=uv+delta*(.5-hitDepth);
   }
-  vec4 a=TerrainVpMix(textureGrad(uTerrainAlbedo,vec3(at+offA,3.0),gx*inv,gy*inv),
-    textureGrad(uTerrainAlbedo,vec3(at+offB,3.0),gx*inv,gy*inv),blend,uTerrainAlbedoMean[3]);
-  vec4 s=mix(textureGrad(uTerrainSurface,vec3(at+offA,3.0),gx*inv,gy*inv),
-    textureGrad(uTerrainSurface,vec3(at+offB,3.0),gx*inv,gy*inv),blend);
+  vec4 mean=mix(uTerrainAlbedoMean[3],uTrenchLooseMean,gTrenchLoose);
+  vec4 a=TerrainVpMix(SoilGrad(uTerrainAlbedo,at+offA,gx*inv,gy*inv),
+    SoilGrad(uTerrainAlbedo,at+offB,gx*inv,gy*inv),blend,mean);
+  vec4 s=mix(SoilGrad(uTerrainSurface,at+offA,gx*inv,gy*inv),
+    SoilGrad(uTerrainSurface,at+offB,gx*inv,gy*inv),blend);
   float height=SoilHeight(at,offA,offB,blend,lod);
-  color=mix(uTerrainAlbedoMean[3].rgb,a.rgb,.88);roughAo=vec3(s.ba,height);
+  color=clamp(mix(mean.rgb,a.rgb,uTrenchDetail.w),vec3(0),vec3(1));roughAo=vec3(s.ba,height);
   float ndl=dot(lightW,geomN);
   if(nearFade>.02&&weight>.15&&ndl>.08) {
     vec3 tangentLight=lightW-geomN*ndl;
@@ -83,7 +100,7 @@ void SoilPlane(vec3 world,vec3 geomN,vec3 dx,vec3 dy,int axis,float weight,vec3 
       shadow=min(shadow,1.0-smoothstep(.012,.075,h-height-rise*float(j))*.82*nearFade);
     }
   }
-  vec2 n=(s.rg*2.0-1.0)*${C.mud.normalScale.toFixed(3)}*mix(.35,1.0,slope);
+  vec2 n=(s.rg*2.0-1.0)*uTrenchDetail.x*mix(.75,1.0,slope);
   perturb=axis==0?vec3(n.x,0,n.y):axis==1?vec3(0,-n.y,n.x):vec3(n.x,-n.y,0);
   perturb-=geomN*dot(geomN,perturb);
 }
@@ -112,6 +129,11 @@ const Evaluate = /* glsl */`
   float spoil=clamp(vTerrainLayers.g,0.0,1.0)*(1.0-clamp(vTerrainLayers.r,0.0,1.0));
   float trenchLow=0.0,trenchHorizon=1.0;
   if(spoil>.001) {
+  trenchHorizon=SoilHorizon(vTerrainWorld,geomN,trenchLow);
+  // Crown and external spoil are loose; the steep cut is compact. Fine crumbs
+  // remain in the compressed floor. Negative w marks modelled clod batches.
+  gTrenchLoose=max(1.0-step(-1.5,vTerrainLayers.w),
+    smoothstep(.70,.94,geomN.y)*mix(1.0,.82,smoothstep(.15,.65,trenchLow)));
   vec3 w=pow(abs(geomN),vec3(4));w/=max(dot(w,vec3(1)),.001);
   vec3 ca,cb,cc,na,nb,nc;vec3 ra,rb,rc;float sa,sb,sc;
   vec3 lightW=vec3(0,1,0);
@@ -132,8 +154,15 @@ const Evaluate = /* glsl */`
   gTerrainRough=mix(gTerrainRough,clamp(surface.x,.76,.96),spoil);
   gMaterialAo=mix(gMaterialAo,mix(.25,1.0,surface.y),spoil);
   gTerrainHeight=mix(gTerrainHeight,surface.z,spoil);
-  trenchHorizon=SoilHorizon(vTerrainWorld,geomN,trenchLow);
   gMaterialAo*=trenchHorizon;
+  // Thin roots share the soil batch, but retain their pale fibrous surface.
+  // The UV marker survives the static merge as terrainLayers.w = -3.
+  float rootMask=(1.0-step(-2.5,vTerrainLayers.w))*spoil;
+  vec3 rootColor=uTrenchRootColor*(.88+.12*TerrainNoise(vTerrainWorld.xz*23.0+vTerrainWorld.y*17.0));
+  diffuseColor.rgb=mix(diffuseColor.rgb,rootColor,rootMask);
+  gTerrainAlbedo=mix(gTerrainAlbedo,rootColor,rootMask);
+  gTerrainNormalW=normalize(mix(gTerrainNormalW,geomN,rootMask));
+  gMaterialAo=mix(gMaterialAo,trenchHorizon,rootMask);
   }
 #ifndef TRENCH_STONE
   {
@@ -208,13 +237,17 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
   const bind=patch.uniforms;
   // Runtime diagnostic for same-frame POM A/B; normal/colour/lighting stay fixed.
   const pom={value:1};patch.trenchPomUniform=pom;
-  patch.key+=stone?':trenchStoneContact8Gbuffer':':trenchWetHeight9';
+  const detail={value:new THREE.Vector4(C.mud.normalScale,C.mud.pomReliefM,C.mud.looseReliefM,C.mud.colorDetail)};
+  patch.trenchDetailUniform=detail;
+  patch.key+=stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10';
   patch.uniforms=(uniforms,shader)=>{
     bind(uniforms,shader);
 
-    uniforms.uTrenchMud={value:new THREE.Vector4(C.mud.tileM,C.mud.reliefM,C.mud.roughDry,W.waterRough)};
+    uniforms.uTrenchDetail=detail;
+    uniforms.uTrenchRootColor={value:new THREE.Color(Earth.rootColor)};
     uniforms.uTrenchWater={value:new THREE.Vector4(W.site.trenchFloor,W.damp.trenchFloor,W.lowRiseM[0],W.lowRiseM[1])};
     uniforms.uTrenchPom=pom;
+    uniforms.uTrenchLooseMean={value:new THREE.Vector4(...(pack.extraAlbedoMean?.slice(4,8)||pack.albedoMean.slice(12,16)))};
     if(stone){
       for(const key of ['uTerrainBlendValid','uTerrainBlendColor','uTerrainBlendNormalDepth','uTerrainBlendSize'])uniforms[key]=TerrainBlendUniforms[key];
       uniforms.uTerrainBlendWidth={value:C.contact.blendWidthM};

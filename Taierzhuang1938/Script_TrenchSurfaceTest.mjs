@@ -8,7 +8,7 @@ import { BuildTrenchSurface } from './Script_TrenchSurface.mjs';
 import { BuildTrenchEarth } from './Script_TrenchEarth.mjs';
 import { CompileTrenchNetwork } from './Script_TrenchPlan.mjs';
 import { BuildTrenchPreview } from './Script_TrenchSpline.mjs';
-import { TRENCH_EARTH_PROFILE } from './Data_TrenchAppearance.mjs';
+import { TRENCH_EARTH_PROFILE, TRENCH_APPEARANCE } from './Data_TrenchAppearance.mjs';
 
 // Updates must use the physical terrain's actual grid (including non-unit cells),
 // and must restore it after a blast reset; no camera-dependent screen depth cache.
@@ -33,6 +33,17 @@ for(const [kind,url] of Object.entries(C.models)){
   const count=primitives.reduce((n,p)=>n+json.accessors[p.indices].count/3,0);
   assert.ok(count>0&&count<1500,`${kind}: silhouette asset stays below 1500 triangles`);
   assert.equal(json.materials.length,1,'one material per static batch');
+  if(kind==='clods'){
+    assert.equal(json.meshes.length,12,'all six Blender prototype shapes have large/small variants');
+    assert.equal(json.nodes.filter(n=>n.mesh!==undefined&&n.name.endsWith('High')).length,6,'large clods retain detailed silhouettes');
+    assert.equal(json.nodes.filter(n=>n.mesh!==undefined&&n.name.endsWith('Low')).length,6,'small clods retain inexpensive silhouettes');
+    for(const primitive of primitives){
+      const bounds=json.accessors[primitive.attributes.POSITION];
+      assert.ok(bounds.min.every(Number.isFinite)&&bounds.max.every(Number.isFinite));
+      assert.ok(bounds.max[0]-bounds.min[0]>1.5&&bounds.max[0]-bounds.min[0]<2.5,'clods have measured normalized horizontal radius');
+      assert.ok(bounds.min[1]<0&&bounds.max[1]>.3,'buried sole and exposed upper volume');
+    }
+  }
   const position=json.accessors[primitives[0].attributes.POSITION];
   if(kind==='grass'){
     assert.ok(position.min[1]<-.3&&position.max[1]>.3,'tuft has hanging and standing geometry');
@@ -44,7 +55,7 @@ assert.equal(map.readUInt32BE(16),512);assert.equal(map.readUInt32BE(20),512);
 // 2026-09-28: wet mud / standing water moved to the shared terrain water model (Data_Tuning_Terrain.TERRAIN_WATER).
 assert.ok(TERRAIN_WATER.waterRough<.3&&C.mud.roughDry>.8,'separate wet/dry PBR ranges');
 assert.ok(TERRAIN_WATER.site.trenchFloor>0&&TERRAIN_WATER.lowRiseM[1]>TERRAIN_WATER.lowRiseM[0],'trench floors pool water, lips stay dry');
-for(const url of [...Object.values(C.stoneLayer),...Object.values(C.mudLayer)])
+for(const url of [...Object.values(C.stoneLayer),...Object.values(C.mudLayer),...Object.values(C.looseLayer)])
   assert.ok(fs.statSync(new URL(url,import.meta.url)).size>1000);
 // A bent bank fixture exercises footprint conformance on both sides, rather than
 // checking only the model origin. Root tips must follow the soil without floating.
@@ -93,10 +104,27 @@ const cutPlan=CompileTrenchNetwork({seed:'PhotoStyle',segments:[{id:'Straight',p
   points:[{x:0,z:0},{x:0,z:20}],jitterScale:0,cornerRadiusM:0}]});
 const cutGround=(x,z)=>cutPlan.Apply(x,z,0,0);
 const stationsBefore=JSON.stringify(cutPlan.segments[0].stations),edges=new Map(),cutBatches=[];
-BuildTrenchEarth({SetSector(){},Add(key,geometry){cutBatches.push(geometry);}},cutPlan,cutGround,{roots:null});
+BuildTrenchEarth({SetSector(){},Add(key,geometry){cutBatches.push(geometry);}},cutPlan,cutGround,{roots:'ground'});
 assert.equal(JSON.stringify(cutPlan.segments[0].stations),stationsBefore,'appearance does not edit the trench plan');
-let sharedEdges=0,skinVertices=0;
+let sharedEdges=0,skinVertices=0,spoilVertices=0,rootVertices=0;
+const spoilEdges=new Map();
 for(const geometry of cutBatches){
+  if(geometry.userData.trenchRoots){
+    const uv=geometry.attributes.uv;rootVertices+=uv.count;
+    for(let i=0;i<uv.count;i++)assert.equal(uv.getX(i),-16,'root colour flag survives the shared soil batch');
+  }
+  if(geometry.userData.trenchSpoilSkin){
+    const p=geometry.attributes.position;
+    for(let i=0;i<p.count;i++){
+      const x=p.getX(i),y=p.getY(i),z=p.getZ(i),gap=y-cutGround(x,z);spoilVertices++;
+      assert.ok(Math.abs(x)>=2.8-1e-5,'loose skin stays outside the original cut');
+      assert.ok(gap>=-.005&&gap<.17,'spoil is shallow dressing over shared terrain');
+      const key=x.toFixed(5)+':'+z.toFixed(5);
+      if(spoilEdges.has(key))assert.ok(Math.abs(spoilEdges.get(key)-y)<1e-4,'no seam along the raised spoil');
+      else spoilEdges.set(key,y);
+      assert.equal(geometry.attributes.uv.getX(i),-8,'loose material flag survives static merge UVs');
+    }
+  }
   if(geometry.userData.trenchCrust){
     const p=geometry.attributes.position;
     for(let i=0;i<p.count;i++){
@@ -111,6 +139,27 @@ for(const geometry of cutBatches){
   geometry.dispose();
 }
 assert.ok(skinVertices>1000&&sharedEdges>100,'measure actual adjacent generated strips');
+assert.ok(spoilVertices>1000,'continuous spoil detail is built on both banks');
+assert.ok(rootVertices>0,'roots retain a distinct surface in the soil batch');
+// A crown can cross onto a steep neighbouring bank. Large clods must shrink to
+// crumbs there, keep a closed volume and remain seated across curved terrain.
+const steepGround=(x,z)=>Math.abs(x)*5+Math.sin(z*2)*.09;
+const steepPlan={...plan,Corridor:()=>({bermWidth:1}),Depth:()=>0};
+let steepClods=0;
+BuildTrenchEarth({SetSector(){},Add(key,g){
+  if(!g.userData.trenchCrust&&!g.userData.trenchSpoilSkin&&!g.userData.trenchRoots){
+    const p=g.attributes.position;let diameter=0,minGap=Infinity;
+    for(let i=0;i<p.count;i++){
+      minGap=Math.min(minGap,p.getY(i)-steepGround(p.getX(i),p.getZ(i)));
+      for(let j=0;j<i;j++)diameter=Math.max(diameter,Math.hypot(p.getX(i)-p.getX(j),p.getY(i)-p.getY(j),p.getZ(i)-p.getZ(j)));
+    }
+    assert.ok(diameter<.20,'steep-bank clods stay small solid crumbs instead of stretched sheets');
+    assert.ok(minGap<0,'clod underside remains embedded in the bank');steepClods++;
+  }
+  g.dispose();
+}},steepPlan,steepGround,{roots:null,style:{...TRENCH_APPEARANCE,clodChance:0,bankClods:1,
+  clodRadiusM:[.2,.2],clodReliefM:[.08,.08],crumbs:0,lipClods:0,spoilClods:0}});
+assert.ok(steepClods>10,'steep conformance fixture exercises both banks');
 const previewPlan=CompileTrenchNetwork({seed:'SpoilPreview',earthProfile:TRENCH_EARTH_PROFILE,
   segments:[{id:'Cut',preset:'communication',points:[[0,0],[0,20]],jitterScale:0}]});
 let crownVertices=0;

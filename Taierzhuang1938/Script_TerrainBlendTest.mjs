@@ -28,8 +28,8 @@ try{
     const pass=new TerrainBlendPass(pipeline);pass.Resize(384,192);
     const contact=new TerrainContactField({cols:2,rows:2,minX:-4,minZ:-4,stepX:4,stepZ:4,heights:new Float32Array(9)});
     const ArrayTexture=channels=>{
-      const data=new Uint8Array(4*4*5*4);for(let i=0;i<data.length;i+=4)data.set(channels,i);
-      const tex=new T.DataArrayTexture(data,4,4,5);tex.needsUpdate=true;tex.wrapS=tex.wrapT=T.RepeatWrapping;return tex;
+      const data=new Uint8Array(4*4*6*4);for(let i=0;i<data.length;i+=4)data.set(channels,i);
+      const tex=new T.DataArrayTexture(data,4,4,6);tex.needsUpdate=true;tex.wrapS=tex.wrapT=T.RepeatWrapping;return tex;
     };
     const pack={setName:'MissionPlain',albedo:ArrayTexture([20,45,230,128]),surface:ArrayTexture([128,128,210,255]),
       albedoMean:new Float32Array(16).fill(.4),surfaceMean:new Float32Array(16).fill(.5)};
@@ -78,10 +78,24 @@ try{
     soil.visible=false;Render();const validAfterHide=TerrainBlendUniforms.uTerrainBlendValid.value,contextCleared=ctx.terrainBlend===null;
     pass.Resize(192,96);soil.visible=true;soil.position.y=0;Render();
     const resized=[pass.target.width,pass.target.height,...TerrainBlendUniforms.uTerrainBlendSize.value.toArray()];
+    // Root marker must select its own albedo in the actual shared soil shader.
+    // The deliberately blue soil makes accidental inheritance unambiguous.
+    const rootGeometry=plane.clone(),rootLayers=new Float32Array(rootGeometry.attributes.position.count*4);
+    for(let i=0;i<rootLayers.length;i+=4){rootLayers[i+1]=1;rootLayers[i+3]=-3;}
+    rootGeometry.setAttribute('terrainLayers',new T.BufferAttribute(rootLayers,4));
+    const rootMaterial=new T.MeshStandardMaterial({side:T.DoubleSide});
+    ApplyPatches(rootMaterial,[MakeTrenchSurfacePatch(pack,'high',null,contact),MakePatch({key:'fixtureRootChannels',fragment:[
+      ['#include <dithering_fragment>','gl_FragColor=vec4(diffuseColor.rgb,1.0);'],
+    ]})]);
+    const rootMesh=new T.Mesh(rootGeometry,rootMaterial);rootMesh.position.set(0,.7,0);scene.add(rootMesh);Render();
+    const rootColor=Pixel(target,rootMesh.position);
+    for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=0;
+    rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();const unmarkedColor=Pixel(target,rootMesh.position);
+    scene.remove(rootMesh);rootGeometry.dispose();rootMaterial.dispose();
     const gl=renderer.getContext(),glError=gl.getError(),linked=renderer.info.programs.every(p=>gl.getProgramParameter(p.program,gl.LINK_STATUS));
     pass.Dispose();const validAfterDispose=TerrainBlendUniforms.uTerrainBlendValid.value;
     prepass.Dispose();target.dispose();contact.Dispose();renderer.dispose();
-    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,glError,linked};
+    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,rootColor,unmarkedColor,glError,linked};
   });
   console.log(JSON.stringify(report,null,2));
   assert.deepEqual(errors,[]);assert.equal(report.glError,0);assert.ok(report.linked&&report.sourceIdentity&&report.restored);
@@ -95,5 +109,7 @@ try{
   assert.ok(Math.abs(report.normalDepth[0][3]-near.soil[3])<.015,'prepass preserves geometric depth');
   assert.ok(report.afterMove<.01,'terrain movement/rebuild invalidates previous contact');
   assert.equal(report.validAfterHide,0);assert.ok(report.contextCleared);assert.equal(report.validAfterDispose,0);assert.deepEqual(report.resized,[192,96,192,96]);
+  assert.ok(report.rootColor[0]>report.rootColor[2]*1.5,'shared-batch root keeps pale brown albedo');
+  assert.ok(report.unmarkedColor[2]>report.unmarkedColor[0]*2,'unmarked geometry still uses the blue soil fixture');
   console.log('TerrainBlendTest: depth mask, albedo/normal/roughness, prepass, geometry update, resize and invalidation passed');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

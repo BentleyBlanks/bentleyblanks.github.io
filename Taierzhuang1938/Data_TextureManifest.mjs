@@ -103,7 +103,7 @@ export const TEXTURE_BUDGETS = Object.freeze({
     lazy: 14 * 1024 * 1024, // Also includes lossless command-room irradiance.
     editor: 0.25 * 1024 * 1024,
   }),
-  totalBytes: 61 * 1024 * 1024,      // Includes 2.28 MiB of paper data maps; one pair (187–318 KiB) per boot.
+  totalBytes: 62 * 1024 * 1024,      // Reference 10 adds one level-only loose-soil PBR; boot assets unchanged.
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -829,18 +829,30 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "TrenchPom", kind: "terrainLayer", tier: "level:FirstLevel",
     toneClass: "drySoil",
-    metersPerTile: 1.8,
+    metersPerTile: 1.2,
     normalConvention: "terrain",
     bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "_import/TextureBakes/Texture_TrenchPom.json",
-    // Historical photographs 01/14: compact hand-cut earth. Shallow 18 mm relief;
-    // 256-square lossless data preserves POM heights within the existing byte budget.
-    source: { provider: "imagegen", date: "2026-10-07", ref: "exec-d68eb40b-92c6-478f-a500-53fc2b43cda2.png", prompt: "_import/Prompts/Texture_TrenchPom.txt" },
+    // Approved reference 10: compact cut face; generated albedo and derived height.
+    source: { provider: "lovart", date: "2026-10-09", ref: "baf34e85-1791-4996-9ca8-b83a0eb32a48", prompt: "_import/Prompts/Texture_TrenchPom.txt" },
     consumers: [{ file: "Data_TrenchSurface.mjs", token: "Texture_TrenchPom" }],
     files: [
       ["Texture_TrenchPomBase.webp", "Base", 1024, 1024],
-      ["Texture_TrenchPomNormal.webp", "Normal", 256, 256],
-      ["Texture_TrenchPomOrh.webp", "Orh", 256, 256],
+      ["Texture_TrenchPomNormal.webp", "Normal", 512, 512],
+      ["Texture_TrenchPomOrh.webp", "Orh", 512, 512],
+    ],
+  },
+  {
+    id: "TrenchLooseEarth", kind: "terrainLayer", tier: "level:FirstLevel",
+    toneClass: "drySoil", metersPerTile: 1.2, normalConvention: "terrain",
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_TrenchLooseEarth.json",
+    source: { provider: "lovart", date: "2026-10-09", ref: "20efeff7-0abc-4f93-a68d-0869d129caf7", prompt: "_import/Prompts/Texture_TrenchLooseEarth.txt" },
+    consumers: [{ file: "Data_TrenchSurface.mjs", token: "Texture_TrenchLooseEarth" }],
+    files: [
+      ["Texture_TrenchLooseEarthBase.webp", "Base", 1024, 1024],
+      ["Texture_TrenchLooseEarthNormal.webp", "Normal", 512, 512],
+      ["Texture_TrenchLooseEarthOrh.webp", "Orh", 512, 512],
     ],
   },
   {

@@ -9,21 +9,27 @@ import { TRENCH_APPEARANCE as Earth } from './Data_TrenchAppearance.mjs';
 export async function LoadTrenchSurface() {
   const resources=[];
   const Fetch=async url=>{const r=await fetch(ResolveTextureImportUrl(`${url}?v=${C.version}`),{signal:AbortSignal.timeout(45000)});if(!r.ok)throw new Error(`${url}: ${r.status}`);return r;};
-  const Model=async url=>{
+  const Model=async (url,all=false)=>{
     const gltf=await new GLTFLoader().parseAsync(await (await Fetch(url)).arrayBuffer(),'');
-    gltf.scene.updateMatrixWorld(true);let geometry;
+    gltf.scene.updateMatrixWorld(true);const geometries=[];
     gltf.scene.traverse(node=>{
       if(!node.isMesh)return;
-      if(!geometry)geometry=node.geometry.clone().applyMatrix4(node.matrixWorld);
+      if(all||!geometries.length){
+        const geometry=node.geometry.clone().applyMatrix4(node.matrixWorld);
+        geometry.userData.trenchClodHigh=node.name.endsWith('High');geometries.push(geometry);
+      }
       node.geometry.dispose();
       for(const m of (Array.isArray(node.material)?node.material:[node.material]))m.dispose();
     });
-    if(!geometry)throw new Error(`Missing trench mesh: ${url}`);
-    if(!geometry.attributes.uv)geometry.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(geometry.attributes.position.count*2),2));
-    resources.push(geometry);return geometry;
+    if(!geometries.length)throw new Error(`Missing trench mesh: ${url}`);
+    for(const geometry of geometries){
+      if(!geometry.attributes.uv)geometry.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(geometry.attributes.position.count*2),2));
+      resources.push(geometry);
+    }
+    return all?geometries:geometries[0];
   };
   try {
-    const results=await Promise.allSettled([Model(C.models.grass),Model(C.models.stone),
+    const results=await Promise.allSettled([Model(C.models.grass),Model(C.models.stone),Model(C.models.clods,true),
       (async()=>{const bitmap=await createImageBitmap(await (await Fetch(C.mudMap)).blob(),{colorSpaceConversion:'none'});
         const canvas=new OffscreenCanvas(bitmap.width,bitmap.height),ctx=canvas.getContext('2d');ctx.drawImage(bitmap,0,0);bitmap.close();
         const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
@@ -34,8 +40,8 @@ export async function LoadTrenchSurface() {
         const map=new THREE.Texture(bitmap);map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=8;
         map.needsUpdate=true;resources.push(map);resources.push({dispose:()=>bitmap.close()});return map;})()]);
     const failed=results.find(r=>r.status==='rejected');if(failed)throw failed.reason;
-    const [grass,stone,mud,rootMap]=results.map(r=>r.value);
-    return {grass,stone,mud,rootMap,Dispose(){for(const r of resources)r.dispose();}};
+    const [grass,stone,clods,mud,rootMap]=results.map(r=>r.value);
+    return {grass,stone,clods,mud,rootMap,Dispose(){for(const r of resources)r.dispose();}};
   } catch(error){for(const r of resources)r.dispose();throw error;}
 }
 
@@ -111,18 +117,14 @@ export function BuildTrenchSurface(sink,plan,groundAt,assets) {
       geometry.computeVertexNormals();
     }
     if(key==='TrenchStone') {
-      // Embed the whole footprint on steep banks, not only its centre. The contact
-      // shader supplies the gradual soil coat along this physically buried edge.
+      // Keep each small stone rigid and bury it along the local normal. Warping
+      // its vertices independently to a steep bank produced thin black fins.
       const centerHeight=groundAt(x,z),e=.08;
       const n=new THREE.Vector3(-(groundAt(x+e,z)-groundAt(x-e,z))/(2*e),1,
         -(groundAt(x,z+e)-groundAt(x,z-e))/(2*e)).normalize();
       geometry.translate(-x,-centerHeight+embed,-z);
       geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),n));
-      const p=geometry.attributes.position;
-      for(let v=0;v<p.count;v++){
-        const dx=p.getX(v),dz=p.getZ(v),plane=-(n.x*dx+n.z*dz)/Math.max(n.y,.2);
-        p.setXYZ(v,x+dx,groundAt(x+dx,z+dz)+p.getY(v)-plane-embed,z+dz);
-      }
+      geometry.translate(x-n.x*embed,centerHeight-n.y*embed,z-n.z*embed);
       geometry.computeVertexNormals();
     }
     sink.SetSector(key==='TrenchRootStrands'

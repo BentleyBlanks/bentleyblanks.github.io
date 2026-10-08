@@ -215,7 +215,7 @@ export class FirstLevelWhiteboxField {
         const VersionedLayer = layer => Object.fromEntries(Object.entries(layer)
           .map(([key,url]) => [key, `${url}?v=${TRENCH_SURFACE.version}`]));
         this.terrainLayers = await LoadTerrainLayers(this.layout.ground.terrainLayers,
-          { anisotropy: this.library.anisotropy, extraLayers: trench ? [VersionedLayer(TRENCH_SURFACE.stoneLayer)] : [],
+          { anisotropy: this.library.anisotropy, extraLayers: trench ? [VersionedLayer(TRENCH_SURFACE.stoneLayer),VersionedLayer(TRENCH_SURFACE.looseLayer)] : [],
             layerOverrides: trench ? { 3: VersionedLayer(TRENCH_SURFACE.mudLayer) } : {} });
         if (trench) {
           this.trenchSurface = await LoadTrenchSurface();
@@ -327,7 +327,7 @@ export class FirstLevelWhiteboxField {
         roughness: TRENCH_APPEARANCE.rootRoughness, metalness: 0,
       }));
       this.stats.trenchEarth = BuildTrenchEarth(dressing, TrenchPlanFor(this.layout.terrainSpec),
-        (x, z) => this.TerrainHeight(x, z), { roots: this.trenchSurface ? null : "TrenchRoots" });
+        (x, z) => this.TerrainHeight(x, z), { roots: this.trenchSurface ? "ground" : "TrenchRoots", clods: this.trenchSurface?.clods });
       if (this.trenchSurface) this.stats.trenchSurface = BuildTrenchSurface(dressing,
         TrenchPlanFor(this.layout.terrainSpec), (x, z) => this.TerrainHeight(x, z), this.trenchSurface);
       const pieces = dressing.Flush(this.scene, { Get: key => this.materials.get(key) });
@@ -338,10 +338,11 @@ export class FirstLevelWhiteboxField {
         }
         if (mesh.material === this.materials.get(ground.semantic)) {
           const count = mesh.geometry.attributes.position.count;
-          const colors = new Float32Array(count * 3).fill(1), layers = new Float32Array(count * 3);
-          for (let i = 0; i < count; i++) layers[i * 3 + 1] = 1;
+          const colors = new Float32Array(count * 3).fill(1), layers = new Float32Array(count * 4);
+          const uv=mesh.geometry.attributes.uv;
+          for (let i = 0; i < count; i++) { layers[i * 4 + 1] = 1; layers[i * 4 + 3]=uv.getX(i)<-15?-3:uv.getX(i)<-7?-2:0; }
           mesh.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-          mesh.geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(layers, 3));
+          mesh.geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(layers, 4));
         }
         // The crater adapter clips these details together with the original soil.
         // They never survive as a floating crust over a newly excavated crater.

@@ -154,6 +154,7 @@ export async function LoadTerrainLayers(setName, { anisotropy = 1, timeoutMs = 4
     albedo: MakeArrayTexture(albedoData, size, layers, true, anisotropy),
     surface: MakeArrayTexture(surfaceData, dataSize, layers, false, anisotropy),
     albedoMean: albedoMean.slice(0, set.layers.length * 4),
+    extraAlbedoMean: albedoMean.slice(set.layers.length * 4),
     surfaceMean: surfaceMean.slice(0, set.layers.length * 4),
     size,
     dataSize,
