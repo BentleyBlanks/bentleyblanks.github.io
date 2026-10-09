@@ -228,7 +228,8 @@ try {
       const { BuildBrowserBundle } = await import('./Script_BuildBrowserBundle.mjs');
       const bundle = await BuildBrowserBundle();
       await game.route('**/Taierzhuang1938/?*', route => route.fulfill({ contentType: 'text/html', body: bundle.html }));
-      await game.route('**/Script_BrowserBundle.mjs?*', route => route.fulfill({ contentType: 'text/javascript', body: bundle.code }));
+      for (const file of bundle.files)
+        await game.route('**/' + file.name + '?*', route => route.fulfill({ contentType: 'text/javascript', body: file.code }));
       console.log('Production bundle', bundle.version, bundle.inputs);
     }
     await game.goto(`${base}/Taierzhuang1938/?shot=1&manual=1&whitebox=p012&quality=${quality}&scale=small`, { waitUntil: 'load', timeout: 180000 });

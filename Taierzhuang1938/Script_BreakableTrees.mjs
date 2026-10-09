@@ -101,7 +101,7 @@ function ConvexPieces(positions, count) {
 const CAP_MATERIAL = "Material_FracturedWood";
 export class BreakableTrees {
   static async Load(field) {
-    const gltf = await new GLTFLoader().loadAsync("./Model/Model_BreakableDeadTree.glb?v=20260927b");
+    const gltf = await new GLTFLoader().loadAsync("./Model/Model_BreakableDeadTree.glb?v=20261009LosslessWebp");
     return new BreakableTrees(field, gltf.scene);
   }
   constructor(field, source) {

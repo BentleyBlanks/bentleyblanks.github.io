@@ -4,7 +4,7 @@ import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 
 let pending = null, source = null;
 export function LoadCigaretteAsset() {
-  return pending ??= new GLTFLoader().loadAsync("./Model/Model_Cigarette.glb?v=cigarette20260927")
+  return pending ??= new GLTFLoader().loadAsync("./Model/Model_Cigarette.glb?v=20261009LosslessWebp")
     .then(gltf => {
       source = gltf.scene;
       source.traverse(mesh => {

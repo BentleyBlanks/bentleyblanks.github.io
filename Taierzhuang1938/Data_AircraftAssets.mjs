@@ -11,7 +11,7 @@ export const AIRCRAFT_ASSETS = Object.freeze([
   {
     id: "MitsubishiKi30",
     label: "三菱 Ki-30 九七式轻轰炸机",
-    url: "./Model/Model_MitsubishiKi30.glb?v=1",
+    url: "./Model/Model_MitsubishiKi30.glb?v=20261009LosslessWebp",
     noseDir: { x: 0, z: 1 },
     scale: 1,
     wingspanM: 14.55,

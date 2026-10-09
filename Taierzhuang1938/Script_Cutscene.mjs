@@ -1,3 +1,4 @@
+import { FovFromFocalMm } from "./Script_CameraLens.mjs";
 import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // 《滕县 1938》过场动画系统 —— 实机演出，不是预渲染。
 //
@@ -155,10 +156,7 @@ function BuildHeightTerrainGeometry(terrain) {
  * 写成度数以后没人对得上分镜，改一个镜头就得拿计算器。
  * 全画幅感光面高 24 mm：fov = 2·atan(12 / f)。
  */
-export function FovFromFocalMm(focalMm, sensorHeightMm = 24) {
-  const f = Math.max(4, focalMm || 50);
-  return (2 * Math.atan(sensorHeightMm / (2 * f)) * 180) / Math.PI;
-}
+export { FovFromFocalMm };
 
 /** 缓动表。分镜里 ease 写的就是这里的键名。 */
 export const EASINGS = {

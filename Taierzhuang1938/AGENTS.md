@@ -177,6 +177,8 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 
 ## Pages 启动产物
 
-- Pages 在独立 staging 目录运行 `Script_BuildBrowserBundle.mjs --deploy --output-dir <staging>/Taierzhuang1938`，将第一方模块合为带内容戳的入口；Three/Rapier 仍用本仓 vendor。每次部署重建，生成文件不提交。
-- 源码与本地默认入口继续使用 import map，模块修改仍更新对应版本戳。发布 HTML 仅预载合并入口与 vendor，不再预载全部源码。
+- Pages 在独立 staging 目录运行 `Script_BuildBrowserBundle.mjs --deploy --output-dir <staging>/Taierzhuang1938`，生成带内容戳的路由、菜单、游戏三份包；Three/Rapier 仍用本仓 vendor。每次部署重建，生成文件不提交。
+- 普通入口由 `Script_Entry` / `Data_StartupRouting` 选 `Script_MenuStartup`，只建指挥部与菜单；不得预载游戏包、战场模型、物理、动作或音频包。第一关与显式 `phase` / `editor` 等开发入口仍走 `Script_Main`，进入第一关的 URL 跳转契约保持不变。菜单设置复用既有设置面板和存档；开发工具经显式点击后才装游戏宿主。回归 `Script_MenuStartupTest`，细节见[预热与启动 §18.9](docs/Data_TechRenderPipeline.md#189-独立菜单与内嵌贴图压缩2026-10-09)。
+- Ki30、枯树、卷烟的源 GLB 导出后运行 `node Taierzhuang1938/_import/Script_CompressEmbeddedTextures.mjs`，将可逐像素还原的内嵌 PNG 换为同尺寸无损 WebP；不得重采样或改几何。审计在 `Model/Data_EmbeddedTextureCompression.json`，回归 `Script_EmbeddedTextureTest`。
+- 源码与本地默认入口继续使用 import map，模块修改仍更新对应版本戳。发布 HTML 仅无条件预载小路由和 Three；游戏包只在对应路由按需导入，不再预载全部源码。
 - 本地验收：`node Taierzhuang1938/Script_BuildBrowserBundle.mjs --preview` 后用 LocalPreview 打开 `/Taierzhuang1938/_check_Bundle.html?whitebox=p012`；回归入口 `Script_BrowserBundleTest.mjs` 验证普通白盒开始按钮、正式菜单与脚本请求数。

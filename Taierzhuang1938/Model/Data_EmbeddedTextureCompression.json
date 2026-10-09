@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "method": "lossless WebP, original resolution and RGBA",
+  "models": [
+    {
+      "name": "Model_MitsubishiKi30.glb",
+      "before": {
+        "bytes": 12073436,
+        "sha256": "ac258950e2bc4174f9521d1cc25a0632570b35d4197f6c888c78153ed6c599f8",
+        "geometry": "4f7daeed7063b273d21336988a0ba072ae529d5eb32534968fc079b9b394f295",
+        "images": [
+          {
+            "index": 0,
+            "mime": "image/png",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 6069487,
+            "pixels": "48b83f5455367adde1543149469c3e17cdd941104eebd98afce0e2602887bffb"
+          },
+          {
+            "index": 1,
+            "mime": "image/png",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 3741533,
+            "pixels": "05892ddc40d3c5c2b5e0c4cd7fd1cc488d852d909cd66706605c668a461f3f8e"
+          },
+          {
+            "index": 2,
+            "mime": "image/png",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 1223543,
+            "pixels": "5b09c91b0cb31d5fbec9324779f6bbcc84d1ad135fc15215a0ee160dae897ed7"
+          }
+        ]
+      },
+      "after": {
+        "bytes": 8173484,
+        "sha256": "d052ce0b07ac2bec17da7fd106c22425afa074efd157d39d6c706483b46821c5",
+        "geometry": "4f7daeed7063b273d21336988a0ba072ae529d5eb32534968fc079b9b394f295",
+        "images": [
+          {
+            "index": 0,
+            "mime": "image/webp",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 4431084,
+            "pixels": "48b83f5455367adde1543149469c3e17cdd941104eebd98afce0e2602887bffb"
+          },
+          {
+            "index": 1,
+            "mime": "image/webp",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 2094834,
+            "pixels": "05892ddc40d3c5c2b5e0c4cd7fd1cc488d852d909cd66706605c668a461f3f8e"
+          },
+          {
+            "index": 2,
+            "mime": "image/webp",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 608516,
+            "pixels": "5b09c91b0cb31d5fbec9324779f6bbcc84d1ad135fc15215a0ee160dae897ed7"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Model_BreakableDeadTree.glb",
+      "before": {
+        "bytes": 9992452,
+        "sha256": "9b93b69c2d9896d762a859726147dbbb1be0ff13473f46a5a1e7dd7abd77413c",
+        "geometry": "c71584f07b9ebe02e1f1dd02bc1e7343fc2120a63b4840e80e2ea899d57db777",
+        "images": [
+          {
+            "index": 0,
+            "mime": "image/png",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 3606035,
+            "pixels": "6395a741fcce9d5e00ec93bcd0cd662450edb32ff3a8948240625e62f67cb84d"
+          },
+          {
+            "index": 1,
+            "mime": "image/png",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 4656009,
+            "pixels": "714c9d4b58beb68f5d1df7acfc9e5241ac5a4819793868142080e070ee87a3c5"
+          },
+          {
+            "index": 2,
+            "mime": "image/png",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 1467408,
+            "pixels": "a5c29780430daee3d1995babc7ca2e6297293aed1fe1ef46c1a61739db032247"
+          },
+          {
+            "index": 3,
+            "mime": "image/png",
+            "width": 256,
+            "height": 256,
+            "bytes": 69376,
+            "pixels": "0a4006c156f19e19f73421d923537777b63f304b0a4d6d73de5be66725425e18"
+          }
+        ]
+      },
+      "after": {
+        "bytes": 6269604,
+        "sha256": "7bb122cdffbd25c462f5875cc1a47c9a77e7fdbe079d3c7c0a0fb895867b3700",
+        "geometry": "c71584f07b9ebe02e1f1dd02bc1e7343fc2120a63b4840e80e2ea899d57db777",
+        "images": [
+          {
+            "index": 0,
+            "mime": "image/webp",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 2560606,
+            "pixels": "6395a741fcce9d5e00ec93bcd0cd662450edb32ff3a8948240625e62f67cb84d"
+          },
+          {
+            "index": 1,
+            "mime": "image/webp",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 2854872,
+            "pixels": "714c9d4b58beb68f5d1df7acfc9e5241ac5a4819793868142080e070ee87a3c5"
+          },
+          {
+            "index": 2,
+            "mime": "image/webp",
+            "width": 2048,
+            "height": 2048,
+            "bytes": 635034,
+            "pixels": "a5c29780430daee3d1995babc7ca2e6297293aed1fe1ef46c1a61739db032247"
+          },
+          {
+            "index": 3,
+            "mime": "image/webp",
+            "width": 256,
+            "height": 256,
+            "bytes": 25264,
+            "pixels": "0a4006c156f19e19f73421d923537777b63f304b0a4d6d73de5be66725425e18"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Model_Cigarette.glb",
+      "before": {
+        "bytes": 2476072,
+        "sha256": "ae46b964b1200c519cb60b330032f653d798c11cb53ad08bc2b8c37d181d9032",
+        "geometry": "881134dc39c6fe1815734eee20753dbe4b56202c02d3770096529a817673f2b4",
+        "images": [
+          {
+            "index": 0,
+            "mime": "image/png",
+            "width": 1024,
+            "height": 1024,
+            "bytes": 554016,
+            "pixels": "bd5e37eca6fcf982c662a026b3fcfb3038ab46f79e37a775debd48b7ebc48d3a"
+          },
+          {
+            "index": 1,
+            "mime": "image/png",
+            "width": 1024,
+            "height": 1024,
+            "bytes": 1064791,
+            "pixels": "46f2b33243ce9c3f642c8510b2735c1e297b622bad739ff8d8a47ea78250fa5b"
+          },
+          {
+            "index": 2,
+            "mime": "image/png",
+            "width": 1024,
+            "height": 1024,
+            "bytes": 781999,
+            "pixels": "23fa2542c824d9e56013241800087f967653c6157fe2d4dcb4e599290a37c6dd"
+          }
+        ]
+      },
+      "after": {
+        "bytes": 1437456,
+        "sha256": "3810a32e742adbbd95bd3c735cbbc849b8a41da10c595c3a2886204828afb78e",
+        "geometry": "881134dc39c6fe1815734eee20753dbe4b56202c02d3770096529a817673f2b4",
+        "images": [
+          {
+            "index": 0,
+            "mime": "image/webp",
+            "width": 1024,
+            "height": 1024,
+            "bytes": 338044,
+            "pixels": "bd5e37eca6fcf982c662a026b3fcfb3038ab46f79e37a775debd48b7ebc48d3a"
+          },
+          {
+            "index": 1,
+            "mime": "image/webp",
+            "width": 1024,
+            "height": 1024,
+            "bytes": 649210,
+            "pixels": "46f2b33243ce9c3f642c8510b2735c1e297b622bad739ff8d8a47ea78250fa5b"
+          },
+          {
+            "index": 2,
+            "mime": "image/webp",
+            "width": 1024,
+            "height": 1024,
+            "bytes": 374770,
+            "pixels": "23fa2542c824d9e56013241800087f967653c6157fe2d4dcb4e599290a37c6dd"
+          }
+        ]
+      }
+    }
+  ]
+}

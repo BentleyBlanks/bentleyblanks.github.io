@@ -26,12 +26,13 @@ function TestModuleGraphIsCacheBusted() {
   const imports = JSON.parse(mapMatch[1]).imports ?? {};
 
   // 入口自己走 <script src>，必须带版本戳；其余全靠 import map。
-  const entry = html.match(/<script type="module" src="\.\/Script_Main\.mjs\?v=(\d+)">/);
-  assert.ok(entry, "index.html 的入口 Script_Main.mjs 必须带 ?v= 版本戳");
+  const entry = html.match(/<script type="module" src="\.\/Script_Entry\.mjs\?v=(\d+)">/);
+  assert.ok(entry, "index.html 的入口 Script_Entry.mjs 必须带 ?v= 版本戳");
   // 入口只能有一条：打包脚本只替换第一条，多出来的那条在 Pages 上会从源码图再起一局游戏，
   // 两局抢 window.Tengxian，开机卡在「烘贴图」（2026-09-24 合并留下过一条重复入口）。
-  const entries = html.match(/<script type="module" src="\.\/Script_Main\.mjs\?v=\d+"><\/script>/g) || [];
-  assert.equal(entries.length, 1, "index.html 只能有一条 Script_Main.mjs 入口 <script>，现在有 " + entries.length + " 条");
+  const entries = html.match(/<script type="module" src="\.\/Script_Entry\.mjs\?v=\d+"><\/script>/g) || [];
+  assert.equal(entries.length, 1, "index.html 只能有一条 Script_Entry.mjs 入口 <script>，现在有 " + entries.length + " 条");
+  assert.ok(!/<script\b[^>]*src="\.\/Script_(?:Main|MenuStartup)\.mjs/.test(html), "不得同时加载路由和独立运行时入口");
 
   // 从入口递归走静态 from 与动态 import()。
   // 字符类比 §2.8 的正则多一个「/」：Script_JieheHeight 真的从子目录
@@ -50,8 +51,8 @@ function TestModuleGraphIsCacheBusted() {
       selfStamped.push(`${file}: ${m[0]}`);
     }
   };
-  walk("Script_Main.mjs");
-  seen.delete("Script_Main.mjs");
+  walk("Script_Entry.mjs");
+  seen.delete("Script_Entry.mjs");
   const browserModules = [...seen].sort();
 
   assert.equal(selfStamped.length, 0,

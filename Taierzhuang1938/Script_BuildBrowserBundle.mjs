@@ -1,4 +1,4 @@
-// Pages uses one content-stamped first-party module; local development keeps the import map.
+// Pages selects a separately stamped menu or game bundle; development keeps the import map.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -22,20 +22,47 @@ export async function BuildBrowserBundle(projectDir = path.dirname(fileURLToPath
   const version = BigInt('0x' + createHash('sha256').update(code).digest('hex').slice(0, 13)).toString();
   const bundleName = 'Script_BrowserBundle.mjs';
   const bundleUrl = './' + bundleName + '?v=' + version;
-  const preloadUrls = [...new Set([bundleUrl, ...Object.entries(imports)
-    .filter(([key]) => (key === 'three' || key.startsWith('./vendor/')) && !key.endsWith('/KTX2Loader.js')).map(([,url]) => url)])];
-  const preloadPattern = /<script>\s*\{\s*const map = JSON.parse\([\s\S]*?<\/script>/;
-  const entryPattern = /<script type="module" src="\.\/Script_Main\.mjs\?v=\d+"><\/script>/;
-  if (!preloadPattern.test(sourceHtml) || !entryPattern.test(sourceHtml)) throw new Error('Source boot markup changed; update the bundle builder');
+  const menuResult = await build({
+    absWorkingDir: projectDir, entryPoints: ['Script_MenuStartup.mjs'], bundle: true,
+    format: 'esm', platform: 'browser', target: 'es2022', write: false, metafile: true,
+    external: ['three', './vendor/*'], minify: true, keepNames: true,
+    legalComments: 'inline', charset: 'utf8', logLevel: 'silent',
+  });
+  const menuCode = menuResult.outputFiles[0].text;
+  const menuVersion = BigInt('0x' + createHash('sha256').update(menuCode).digest('hex').slice(0, 13)).toString();
+  const menuBundleName = 'Script_MenuBrowserBundle.mjs';
+  const menuUrl = './' + menuBundleName + '?v=' + menuVersion;
+  const entryResult = await build({
+    absWorkingDir: projectDir, entryPoints: ['Script_Entry.mjs'], bundle: true,
+    format: 'esm', platform: 'browser', target: 'es2022', write: false,
+    minify: true, keepNames: true, logLevel: 'silent',
+    plugins: [{name: 'runtime-entries', setup(builder) {
+      builder.onResolve({filter: /^\.\/Script_(Main|MenuStartup)\.mjs$/}, args => ({
+        path: args.path.includes('MenuStartup') ? menuUrl : bundleUrl, external: true,
+      }));
+    }}],
+  });
+  const entryCode = entryResult.outputFiles[0].text;
+  const entryVersion = BigInt('0x' + createHash('sha256').update(entryCode).digest('hex').slice(0, 13)).toString();
+  const entryBundleName = 'Script_EntryBrowserBundle.mjs';
+  const entryUrl = './' + entryBundleName + '?v=' + entryVersion;
+  const entryPattern = /<script type="module" src="\.\/Script_Entry\.mjs\?v=\d+"><\/script>/;
+  if (!entryPattern.test(sourceHtml)) throw new Error('Source boot markup changed; update the bundle builder');
   // A second source entry tag survives the single replace below and boots a second game
   // from the source graph next to the bundle (a merge left one behind on 2026-09-24).
   const entryCount = (sourceHtml.match(new RegExp(entryPattern.source, 'g')) || []).length;
-  if (entryCount !== 1) throw new Error('index.html must have exactly one Script_Main entry tag, found ' + entryCount);
-  let html = sourceHtml.replace(preloadPattern, preloadUrls.map(url => '<link rel="modulepreload" href="' + url + '">').join('\n  '))
-    .replace(entryPattern, '<script type="module" src="' + bundleUrl + '"></script>');
+  if (entryCount !== 1) throw new Error('index.html must have exactly one Script_Entry tag, found ' + entryCount);
+  if (/<script\b[^>]*src="\.\/Script_(?:Main|MenuStartup)\.mjs/.test(sourceHtml)) throw new Error('The router must be the only runtime entry');
+  // Only the small router and Three are unconditional. The router fetches one runtime.
+  let html = sourceHtml.replace(entryPattern, '<script type="module" src="' + entryUrl + '"></script>');
   // Source modules remain available for workers and diagnostics, but are never bulk-preloaded.
-  html = html.replace('</head>', '<meta name="tengxian-bundle" content="' + version + '">\n</head>');
+  html = html.replace('</head>', '<link rel="modulepreload" href="' + entryUrl + '">\n'
+    + '<link rel="modulepreload" href="' + imports.three + '">\n'
+    + '<meta name="tengxian-menu-bundle" content="' + menuVersion + '">\n'
+    + '<meta name="tengxian-bundle" content="' + version + '">\n</head>');
   return {html, code, bundleName, version, inputs: Object.keys(result.metafile.inputs).length,
+    menuVersion, menuInputs: Object.keys(menuResult.metafile.inputs),
+    files: [{name: bundleName, code}, {name: menuBundleName, code: menuCode}, {name: entryBundleName, code: entryCode}],
     externalImports: Object.values(result.metafile.outputs).flatMap(output => output.imports)};
 }
 
@@ -47,7 +74,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (!preview && outputDir === projectDir) throw new Error('--deploy requires a separate --output-dir staging directory');
   const result = await BuildBrowserBundle(preview ? projectDir : outputDir);
   await fs.mkdir(outputDir, {recursive:true});
-  await fs.writeFile(path.join(outputDir, result.bundleName), result.code);
+  for (const file of result.files) await fs.writeFile(path.join(outputDir, file.name), file.code);
   await fs.writeFile(path.join(outputDir, preview ? '_check_Bundle.html' : 'index.html'), result.html);
   console.log(JSON.stringify({mode:preview?'preview':'deploy',version:result.version,modules:result.inputs,bytes:Buffer.byteLength(result.code),externalImports:[...new Set(result.externalImports.map(entry=>entry.path))]}));
 }

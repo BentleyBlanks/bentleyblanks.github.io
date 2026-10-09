@@ -513,6 +513,7 @@ async function CheckInterface() {
   Check('选章返回也支持 Space',await page.evaluate(()=>window.Taierzhuang.menu.mode==='title'));
   await page.evaluate(()=>window.Taierzhuang.Debug.MenuAct('settings'));
   await page.locator('[data-setting="tools"]').click();
+  await page.waitForFunction(() => window.Taierzhuang?.editor?.panelOpen, null, {timeout: 240000});
   await page.locator('[data-editor="weapon"]').click();
   await page.evaluate(()=>window.Taierzhuang.StepFrames(10));
   await Shot("Weapon");
@@ -661,6 +662,7 @@ if (process.argv.includes("--levels-only")) {
 }
 await Boot();
 await CheckInterface();
+await Boot(); // The tools fixture loaded gameplay explicitly; return to the standalone title.
 {
   const m = await page.evaluate(() => {
     const T = window.Taierzhuang;
@@ -669,9 +671,10 @@ await CheckInterface();
       running: T.state.running,
       inMenu: T.state.menu,
       hudHidden: document.getElementById("hud").style.display === "none",
-      viewmodel: T.viewmodel.root.visible,
-      nra: T.ai.soldiers.filter((s) => s.side === "nra").length,
-      ija: T.ai.soldiers.filter((s) => s.side === "ija").length,
+      viewmodel: T.viewmodel?.root.visible ?? false,
+      nra: T.ai?.soldiers.filter((s) => s.side === "nra").length ?? 0,
+      ija: T.ai?.soldiers.filter((s) => s.side === "ija").length ?? 0,
+      gameplayCreated: !!(T.ai || T.viewmodel || T.actorFactory || T.battlefield),
       rootOff: document.getElementById("menu").classList.contains("off"),
       items: [...document.querySelectorAll("#menu .mnItem")].map((e) => e.textContent.trim()),
       documentTitle: document.title,
@@ -737,7 +740,7 @@ await CheckInterface();
   // 菜单里摆的是几个守军，**一个日军都不许有** ——
   // 有敌人就会开打，开打就死人，而兵员池是关卡状态（玩家还没按开始）
   Check("独立指挥室菜单不生成战场兵员", m.nra === 0 && m.ija === 0, `nra=${m.nra} ija=${m.ija}`);
-  Check("菜单背后建的是东关那一章（Data_Menu.MENU_SCENE.slice）", m.menu.slice === 2,
+  Check("独立菜单不创建任何战场切片、人物或视模", m.menu.slice === null && m.menu.standalone && !m.gameplayCreated,
     `slice=${m.menu.slice}`);
 }
 
@@ -840,12 +843,13 @@ await page.keyboard.press("Escape");
   const poolBefore = await page.evaluate(() => window.Taierzhuang.state.nraPool);
   await page.evaluate(() => window.Taierzhuang.StepFrames(600));
   const still = await page.evaluate(() => ({
-    alive: window.Taierzhuang.ai.soldiers.filter((s) => s.alive).length,
-    deaths: JSON.stringify(window.Taierzhuang.ai.deaths || {}),
+    aiCreated: !!window.Taierzhuang.ai,
+    alive: window.Taierzhuang.ai?.soldiers.filter((s) => s.alive).length ?? 0,
+    deaths: JSON.stringify(window.Taierzhuang.ai?.deaths || {}),
     pool: window.Taierzhuang.state.nraPool,
   }));
   Check("菜单里挂十秒：没人死、兵员池没动",
-    still.alive === 0 && still.pool === poolBefore,
+    !still.aiCreated && still.alive === 0 && still.pool === poolBefore,
     `alive=${still.alive} deaths=${still.deaths} pool=${still.pool}/${poolBefore}`);
 
   // 定时切机位：先把计时归零，再推过一个完整 hold。
@@ -1110,6 +1114,8 @@ async function CheckMissionList() {
 //    选章已不列这几章，但下面暂停 / 设置 / 调试那几节要一个在正片模式下跑着的关。
 // ===========================================================================
 {
+  // Explicit developer scene retains the full runtime; the title-only entry has none.
+  await Boot('&phase=2');
   await page.evaluate(() => window.Taierzhuang.Debug.StartLevel(2));
   await page.waitForFunction(() => window.Taierzhuang.state.running === true, null, { timeout: 180000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(60));

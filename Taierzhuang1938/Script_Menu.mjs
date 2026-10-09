@@ -16,7 +16,7 @@
 // 主菜单、暂停、选章与工具统一使用 World at War 的无衬线文字、冷灰与旧金选择条。
 
 import * as THREE from "three";
-import { FovFromFocalMm } from "./Script_Cutscene.mjs";
+import { FovFromFocalMm } from "./Script_CameraLens.mjs";
 import { ValueNoise2, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { MENU, CREDITS, PRESUMED_STAGING, CAST } from "./Data_TengxianScript.mjs";
 import { MENU_SCENE, ShotsFor } from "./Data_Menu.mjs";

@@ -47,6 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  MenuStartupTest: {file:"Script_MenuStartupTest.mjs",timeoutMs:180000,desc:"Standalone source/bundle menu: no gameplay payload, resource budget, settings and navigation"},
+  EmbeddedTextureTest: {file:"Script_EmbeddedTextureTest.mjs",desc:"Lossless GLB WebP: exact decoded RGBA, resolution and geometry buffers"},
   CommandRoomBrowserTest: {file:"Script_CommandRoomBrowserTest.mjs",timeoutMs:120000,desc:"Command-room mesh parallax, depth-occluded window beam, particles and renderer isolation"},
   CommandRoomPreviewTest: {file:"Script_MenuTest.mjs",args:["--papers-only"],timeoutMs:300000,desc:"Real menu saved-progress, seven artwork previews, clean UI, agent API and direct links"},
   MenuPresentationTest: {file:"Script_MenuPresentationTest.mjs",timeoutMs:600000,desc:"Real menu depth of field, subpage focus transitions and persistent player audio settings"},
@@ -458,6 +460,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "MenuStartupTest",
   "BootPaperPbrTest",
   "TextureManagerBrowserTest",
   "FrameDebuggerTest",
@@ -718,7 +721,7 @@ export const domains = {
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
-  menu: { label: "主菜单/加载画面", tests: ["FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPreviewTest", "MenuPresentationTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootPaperPbrTest", "BootInteractionTest"] },
+  menu: { label: "主菜单/加载画面", tests: ["MenuStartupTest", "FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPreviewTest", "MenuPresentationTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootPaperPbrTest", "BootInteractionTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
@@ -754,11 +757,13 @@ export const domains = {
   // 四项都是纯 Node 毫秒级；贴图本身的改动另由 render 域与 prepush 的 BootTest / BootStallTest 兜。
   textureAssets: {
     label: "贴图资产规范与烘焙",
-    tests: ["TextureStandardsTest", "TextureImportTest", "TextureManagerBrowserTest", "TerrainLayersTest", "BootPayloadTest", "AssetStandardsTest"],
+    tests: ["EmbeddedTextureTest", "TextureStandardsTest", "TextureImportTest", "TextureManagerBrowserTest", "TerrainLayersTest", "BootPayloadTest", "AssetStandardsTest"],
   },
 };
 
 const changedDomainRules = [
+  {domain: "menu", pattern: /(?:StartupRouting|MenuStartup|Script_Entry|GameGraphics|CameraLens)/},
+  {domain: "textureAssets", pattern: /EmbeddedTexture/},
   {domain:"particles",pattern:/ParticleModules|ParticleRenderer|ParticleEffects|Data_Tuning_Particles|ParticleCli|Script_Vfx|Script_EditorVfx/},
   { domain: "menu", pattern: /TextureBake|Script_Main\.mjs|Script_Materials\.mjs/ },
   { domain: "menu", pattern: /CommandRoom/ },

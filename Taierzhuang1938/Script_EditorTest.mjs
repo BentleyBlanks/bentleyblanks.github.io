@@ -2757,7 +2757,7 @@ Check("预览失焦走跳过收口且不启动旧战斗", blurred.done && !blurr
 // 相机循环。若菜单没有在场景编辑器接管时退出，点切片后会继续显示菜单原有场景，
 // 并且新 field 完成后编辑层不会重新包 GroundHeight。
 // ---------------------------------------------------------------------------
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small`,
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small&phase=2`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined
   && window.Taierzhuang.state.ready && window.Taierzhuang.state.menu, null, { timeout: 240000 });

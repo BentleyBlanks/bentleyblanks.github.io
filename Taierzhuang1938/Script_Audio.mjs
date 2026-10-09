@@ -4204,7 +4204,8 @@ class LoopLayer {
 // AudioEngine
 // ===========================================================================
 export class AudioEngine {
-  constructor({ enabled = true } = {}) {
+  constructor({ enabled = true, recordedPacks = true } = {}) {
+    this.recordedPacks = recordedPacks;
     this.enabled = enabled;
     this.ctx = null;
     this.liveNodes = 0;
@@ -4609,7 +4610,7 @@ export class AudioEngine {
    * 走的就是原来的老路）。
    */
   async PrefetchPacks() {
-    if (!this.enabled || this.disposed || this.prefetching) return 0;
+    if (this.recordedPacks === false || !this.enabled || this.disposed || this.prefetching) return 0;
     this.prefetching = true;
     let ok = 0;
     const Take = async (url) => {
@@ -4646,7 +4647,7 @@ export class AudioEngine {
    * 「再试一次」比「重开一局」便宜得多。
    */
   LoadPacks() {
-    if (!this.ctx || this.disposed) return;
+    if (this.recordedPacks === false || !this.ctx || this.disposed) return;
     // 失败之后允许**再自动试一次**（下一次手势时），到 PACK_ATTEMPTS 为止。
     // 不设上限的话，服真的挂了会变成"每点一下就重拉一百三十个请求"；
     // 一次都不再试的话，开局那一下网络抖动就永久把整局摁在合成音上。

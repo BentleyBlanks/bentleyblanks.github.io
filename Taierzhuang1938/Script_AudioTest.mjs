@@ -103,7 +103,8 @@ const Ok = (msg) => console.log(`ok   ${msg}`);
   else Ok(`配方表与清单对账：${Object.keys(expect).length} 个 cue 一致（无例外）；type11 ${type11.length} 条、type11Far ${type11Far.length} 条；mixed 里没有参考视频实录`);
 }
 
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?scale=small`, { waitUntil: "load", timeout: 120000 });
+// Recorded game packs belong to an explicit gameplay host, not the standalone title.
+await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?scale=small&phase=2`, { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
 
 // 真点一下：AudioContext 要用户手势才 resume。page.evaluate 不算手势，
@@ -493,9 +494,13 @@ const listener = await page.evaluate(async () => {
   // 第一章（城外原野）：切片离世界原点五百多米，听者钉住不动一眼看得出来。
   // **不能用序章**：那是过场承载章，JumpToPhase 对它不重建场、不 Respawn，
   // 相机停在上一关哪儿就还在哪儿，这条断言就测不到东西了。
-  // EnterLevel rebuilds physics asynchronously; a fixed sleep can step freed bodies.
-  await T.JumpToPhase(1);
+  // Start the gameplay host as well as rebuilding it. JumpToPhase leaves the title
+  // menu active, whose independent room never moves the gameplay camera/listener.
+  await T.Debug.StartLevel(1);
   T.StepFrames(30);
+  // Listener synchronization has run through real gameplay. Freeze gameplay now so
+  // autonomous gunfire cannot consume the later, isolated distance-probe budget.
+  T.state.running = false;
   await sleep(200);
   const cam = T.camera.position;
   const L = T.audio.listenerPos;

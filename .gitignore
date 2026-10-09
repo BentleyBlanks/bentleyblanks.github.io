@@ -60,6 +60,7 @@ Taierzhuang1938/Model/TrainReference/__pycache__/
 # First-person Blender sources and backups live in OneDrive/AI/Models/Blender.
 Taierzhuang1938/Animation/FirstPerson/*.blend*
 Taierzhuang1938/_check_*.html
+Taierzhuang1938/_check_*.mjs
 # 视频转骨骼的中间产物：只留关键点 JSON（重烘 clip 的输入），叠帧 QC 图不进仓库
 Taierzhuang1938/_import/_mocap/*
 !Taierzhuang1938/_import/_mocap/*.mocap.json
@@ -71,3 +72,5 @@ Taierzhuang1938/Script_BrowserBundle.mjs
 # EarSpa3D 的本地验收产物：各模块自测页、无头截图、CDP 探针脚本、验收录屏。
 # 按根 AGENTS.md「模型验收网页、验收截图和演示视频只留本地」，一律不进仓库。
 EarSpa3D/_dev/
+Taierzhuang1938/Script_EntryBrowserBundle.mjs
+Taierzhuang1938/Script_MenuBrowserBundle.mjs

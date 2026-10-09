@@ -11,7 +11,7 @@ const result = await BuildBrowserBundle();
 assert.ok(result.inputs > 150, 'bundle contains the complete first-party graph');
 assert.ok(result.externalImports.every(entry => entry.path === 'three' || entry.path.startsWith('./vendor/')), 'no first-party import waterfall remains');
 assert.ok(!result.html.includes('Object.values(map.imports)'), 'production never preloads the source graph');
-assert.ok(result.html.includes('Script_BrowserBundle.mjs?v=' + result.version));
+assert.ok(result.files.find(file => file.name === 'Script_EntryBrowserBundle.mjs').code.includes('Script_BrowserBundle.mjs?v=' + result.version));
 assert.ok((result.html.match(/rel="modulepreload"/g) || []).length <= 12);
 const root = path.resolve(import.meta.dirname, '..');
 const server = await ServeRoot(root, 0);
@@ -19,7 +19,11 @@ const browser = await LaunchBrowser();
 const outputDir = path.join(os.tmpdir(), 'WhiteboxBootFix');
 await fs.mkdir(outputDir, {recursive:true});
 try {
-  for (const fixture of [{name:'Whitebox',query:'whitebox=p012'}, {name:'MainMenu',query:''}, {name:'MissingCharacters',query:'whitebox=p012'}]) {
+  const fixtureName = process.argv.find(value => value.startsWith('--fixture='))?.slice('--fixture='.length);
+  const fixtures = [{name:'Whitebox',query:'whitebox=p012'}, {name:'MainMenu',query:''}, {name:'MissingCharacters',query:'whitebox=p012'}]
+    .filter(fixture => !fixtureName || fixture.name === fixtureName);
+  assert.ok(fixtures.length, 'unknown bundle fixture');
+  for (const fixture of fixtures) {
     const page = await browser.newPage({viewport:{width:1280,height:720}});
     const errors = [], modules = new Set(), failedSets = [];
     page.on('console', message => { const match = message.text().match(/外部 PBR「(\w+)」/); if (match) failedSets.push(match[1]); });
@@ -42,6 +46,8 @@ try {
     let releaseBundle;
     const bundleGate = fixture.name === 'Whitebox' ? new Promise(resolve => {releaseBundle=resolve;}) : Promise.resolve();
     await page.route('**/Script_BrowserBundle.mjs?*', async route => { await bundleGate; await route.fulfill({contentType:'text/javascript',body:result.code}); });
+    for (const file of result.files.filter(file => file.name !== result.bundleName))
+      await page.route('**/' + file.name + '?*', route => route.fulfill({contentType:'text/javascript',body:file.code}));
     const started = Date.now();
     await page.goto('http://127.0.0.1:' + server.address().port + '/Taierzhuang1938/?' + fixture.query + '&quality=low&scale=small', {waitUntil:'commit',timeout:60000});
     if (releaseBundle) {
@@ -50,7 +56,12 @@ try {
         assert.equal(await page.locator('#bootRetry').count(), 1, 'slow downloads offer an optional retry without reporting failure');
       } finally { releaseBundle(); }
     }
-    await page.waitForFunction(() => window.Tengxian?.state?.ready || document.getElementById('bootStep')?.textContent.startsWith('启动失败：'), null, {timeout:180000});
+    try {
+      await page.waitForFunction(() => window.Tengxian?.state?.ready || document.getElementById('bootStep')?.textContent.startsWith('启动失败：'), null, {timeout:180000});
+    } catch (error) {
+      console.log('BOOT FAILURE', fixture.name, await page.locator('#bootStep').textContent(), errors);
+      throw error;
+    }
     assert.equal(await page.evaluate(() => window.Tengxian?.state?.ready), true, await page.locator('#bootStep').textContent());
     if (fixture.name === 'Whitebox') {
       const expectedFallbacks = ['DadaoPbr','CarriageBenchWood','CarriageFloorSteel','CarriageCeilingSteel'];

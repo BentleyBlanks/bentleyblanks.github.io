@@ -206,7 +206,8 @@ function PlayerFacingCjk(source) {
 // ---------------------------------------------------------------------------
 // 2. 静态引用的键
 // ---------------------------------------------------------------------------
-const codeFiles = fs.readdirSync(here).filter((name) => /^Script_[A-Za-z0-9_]+\.mjs$/.test(name) && !/Test\.mjs$/.test(name)).sort();
+// Generated/minified preview bundles rename unrelated functions to T; scan their source modules.
+const codeFiles = fs.readdirSync(here).filter((name) => /^Script_[A-Za-z0-9_]+\.mjs$/.test(name) && !/(?:Test|BrowserBundle)\.mjs$/.test(name)).sort();
 const referenced = new Set();
 const T_CALL_RE = /\bT\(\s*(["'])([^"'\n]+)\1/g;
 /** 去掉注释（保留换行，行号不变），静态引用只在代码里数。 */

@@ -6066,6 +6066,41 @@ program = 0（修前 64）；提交编译建的 program 至少一半在开机结
 **规矩**：查「没名字、事后找不到主人」的现编，在出生那一刻抓网格和调用栈，别按缓存键猜；共用深度材质的变体看绘制
 顺序，不看场上有没有这种物体。新加一只**自带场景、对着自己的靶画**的 pass 材质，由 pass 自己出 `Warm`，别塞进代理组。
 
+### 18.9 独立菜单与内嵌贴图压缩（2026-10-09）
+
+普通 URL 由 `Script_Entry` 选择 `Script_MenuStartup`，菜单只构造自己的 renderer、
+`CommandRoom`、`MainMenu` 和设置宿主。旧实现先建东关切片、物理、人物/武器、预热着色器，
+最后才建指挥部；现在普通菜单不创建这些对象，也不请求它们的资产。
+显式 `phase`、`whitebox`、靶场、过场及编辑器入口仍由 `Script_Main` 处理。
+第一关仍按既有 URL 重载进入，本轮没有改同页场景切换或游戏内预热。
+
+发布产物为 `Script_EntryBrowserBundle`（小路由）、`Script_MenuBrowserBundle`、
+`Script_BrowserBundle` 三份，各有内容戳。首屏不得提前请求游戏包或 Rapier。
+菜单镜头的 FOV 公式抽到 `Script_CameraLens`（过场原导出保留），避免经菜单拖入过场运行时。
+画质初值在纯数据 `Data_Tuning_GameGraphics.CreateGameGraphics` 共用；存档键、白盒配置、
+音量与控制设置沿用原面板。菜单音频用 `recordedPacks:false`，只保留设置和合成试听，
+不下载战场音效/音乐；游戏默认仍载实录包。开发工具点击或反引号之后才加载游戏宿主。
+
+本机 1280×720、独立浏览器进程的发布版菜单样本为 5.29 s、24.68 MiB 未压缩资源；改前完整菜单样本为
+65.27 s、164.51 MiB。时间受机器负载/驱动缓存影响，不能当线上 SLA；资源隔离与 35 MiB
+上限由 `Script_MenuStartupTest` 的 source/bundle 两条入口守住。菜单外观、纸图预览、
+声音设置分别由既有 `CommandRoomBrowserTest` / `CommandRoomPreviewTest` / `MenuPresentationTest` 守。
+
+三个 GLB 仅替换内嵌 PNG 的编码，维持原分辨率；解码 RGBA 与所有非图片 buffer view
+逐字节相同。纹理通过 `EXT_texture_webp` 声明，仍由已存在的 GLTFLoader 解码。
+
+| 文件 | 原始 bytes | 压缩后 bytes |
+| --- | ---: | ---: |
+| Model_MitsubishiKi30.glb | 12073436 | 8173484 |
+| Model_BreakableDeadTree.glb | 9992452 | 6269604 |
+| Model_Cigarette.glb | 2476072 | 1437456 |
+
+源模型重导出后执行 `node Taierzhuang1938/_import/Script_CompressEmbeddedTextures.mjs`，
+审计写入 `Model/Data_EmbeddedTextureCompression.json`，重复执行不覆盖原始对比记录。
+`Script_EmbeddedTextureTest` 校验实际文件 hash、像素、尺寸、buffer 和体积。
+本地原/新 GLB 同光照对照三件都成功加载，无页面错误；最大像素差 1/255，平均差 <0.00004/255。
+验收网页、图和完整网络记录保留在忽略目录，不随站点发布。
+
 ## 19. 坑（按被踩频率排序）
 
 排序规则：**一、真的踩过并留下事故记录的**（含本仓库现役 bug）；
