@@ -23,6 +23,7 @@ export const TRENCH_APPEARANCE = Object.freeze({
   cliffCrownInsetM: .08,
   cliffToeBlendM: .20,
   cliffReliefRiseM: [.35,1.4],
+  crownCutFadeM: [.04,.30],
   spadeReliefM: .018,
   spadeWidthM: .24,
   clodChance: 0.35,

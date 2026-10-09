@@ -344,8 +344,8 @@ export class FirstLevelWhiteboxField {
           const colors = new Float32Array(count * 3).fill(1), layers = new Float32Array(count * 4);
           const uv=mesh.geometry.attributes.uv;
           // Keep material flags outside the real road's signed [-1, 1] coordinate.
-          // Positive wall UV.x is its foot-to-crown fraction; [2,3] preserves
-          // that height through batching for the loose upper-layer transition.
+          // Positive skin UV.x is its exposed-crown fraction: wall height times
+          // exposure, or exposure alone on the spoil skirt. [2,3] preserves it.
           for (let i = 0; i < count; i++) {
             layers[i * 4 + 1] = 1;
             layers[i * 4 + 3]=uv.getX(i)<-15?-3:uv.getX(i)<-7

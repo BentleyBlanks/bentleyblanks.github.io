@@ -61,6 +61,17 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
   const CrustTaper = (v, ends) => (ends.start ? Ease(v/.5) : 1) * (ends.end ? Ease((1-v)/.5) : 1);
   // A two-metre cliff kit must not retain its full lip on shallow junctions.
   const WallReliefFade=(rise)=>Ease((rise-Style.cliffReliefRiseM[0])/(Style.cliffReliefRiseM[1]-Style.cliffReliefRiseM[0]));
+  // A nominal crest can lie inside another cut or a tight return of this one.
+  // It must join the continuing soil there, rather than draw a second crown.
+  const CrownExposure=(x,z)=>1-Ease((plan.Depth(x,z)-Style.crownCutFadeM[0])/(Style.crownCutFadeM[1]-Style.crownCutFadeM[0]));
+  const MatchGroundNormals=(geometry,weights)=>{
+    const p=geometry.attributes.position,normals=geometry.attributes.normal,soilN=new THREE.Vector3(),n=new THREE.Vector3(),step=.025;
+    for(let i=0;i<p.count;i++)if(weights[i]>0){
+      const x=p.getX(i),z=p.getZ(i);
+      soilN.set(groundAt(x-step,z)-groundAt(x+step,z),2*step,groundAt(x,z-step)-groundAt(x,z+step)).normalize();
+      n.fromBufferAttribute(normals,i).lerp(soilN,weights[i]).normalize();normals.setXYZ(i,n.x,n.y,n.z);
+    }
+  };
   const Clod = (center, radius, relief, random, crown=false, heightAt=groundAt) => {
     // Radius and height cannot be independent: a tiny crumb with a large height
     // became a pointed rock. Soil aggregates remain squat broken masses.
@@ -146,7 +157,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     Add(earth, geometry); stats.clods++;
   };
   const Crust = (st, next, side, ends) => {
-    const positions=[],uvs=[],indices=[],cols=8,rows=8,rowRelief=new Float32Array(rows+1);
+    const positions=[],uvs=[],indices=[],weights=[],cols=8,rows=8,rowRelief=new Float32Array(rows+1),rowExposure=new Float32Array(rows+1);
     for(let row=0;row<=rows;row++)for(let col=0;col<=cols;col++) {
       const u=col/cols,v=row/rows;
       const half=st.halfFloor+(next.halfFloor-st.halfFloor)*v,bank=st.bank+(next.bank-st.bank)*v;
@@ -156,10 +167,12 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         const cx=st.x+(next.x-st.x)*v,cz=st.z+(next.z-st.z)*v;
         rowRelief[row]=WallReliefFade(groundAt(cx+nx*side*(half+bank),cz+nz*side*(half+bank))
           -groundAt(cx+nx*side*(half+bank*.02),cz+nz*side*(half+bank*.02)));
+        rowExposure[row]=CrownExposure(cx+nx*side*(half+bank),cz+nz*side*(half+bank));
       }
       const x=st.x+(next.x-st.x)*v+nx*side*lateral,z=st.z+(next.z-st.z)*v+nz*side*lateral;
-      const lift=CrustLift(x,z,u,CrustTaper(v,ends)*rowRelief[row],st.s+(next.s-st.s)*v,(side>0?st.bermPlus:st.bermMinus)>0);
-      positions.push(x,groundAt(x,z)+lift,z);uvs.push(u,v);
+      const join=(1-rowExposure[row])*Ease((u-.68)/.32);
+      const lift=(CrustLift(x,z,u,CrustTaper(v,ends)*rowRelief[row],st.s+(next.s-st.s)*v,(side>0?st.bermPlus:st.bermMinus)>0)+.004)*(1-join)-.004;
+      positions.push(x,groundAt(x,z)+lift,z);uvs.push(u*rowExposure[row],v);weights.push(join);
     }
     for(let row=0;row<rows;row++)for(let col=0;col<cols;col++) {
       const a=row*(cols+1)+col,b=a+cols+1;
@@ -167,6 +180,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     }
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
+    MatchGroundNormals(geometry,weights);
     geometry.userData.trenchCrust=true;
     Add(earth,geometry);
   };
@@ -178,7 +192,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     const hasCrown=(side>0?st.bermPlus:st.bermMinus)>0;
     const marker=new Float32Array(p.count*2);
     const crownPoints=new Map();
-    const toeWeights=new Float32Array(p.count);
+    const contactWeights=new Float32Array(p.count);
     for(let i=0;i<p.count;i++){
       // Kit coordinates: 1.5 m along X, 2 m up Y, +Z points into the trench.
       // Fit by height rather than stretching a heightfield grid over the face:
@@ -191,13 +205,14 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       const foot=half+bank*.02,crest=half+bank;
       const At=offset=>groundAt(cx+nx*side*offset,cz+nz*side*offset);
       const floor=At(foot),top=At(crest),reliefFade=WallReliefFade(top-floor);
-      const height=floor+(top-floor)*(Math.min(1,u)+Math.max(0,u-1)*reliefFade);
-      toeWeights[i]=1-Ease((height-floor)/Style.cliffToeBlendM);
+      const exposure=CrownExposure(cx+nx*side*crest,cz+nz*side*crest),join=(1-exposure)*Ease((u-.68)/.32);
+      const height=floor+(top-floor)*(Math.min(1,u)+Math.max(0,u-1)*reliefFade*exposure);
+      contactWeights[i]=Math.max(1-Ease((height-floor)/Style.cliffToeBlendM),join);
       let lo=foot,hi=crest;
       for(let step=0;step<10;step++){
         const mid=(lo+hi)*.5;if(At(mid)<height)lo=mid;else hi=mid;
       }
-      const base=u<=0?foot:u>=1?crest:(lo+hi)*.5,taper=CrustTaper(v,ends)*reliefFade;
+      const base=u<=0?foot:u>=1?crest:(lo+hi)*.5,taper=CrustTaper(v,ends)*reliefFade*(1-join);
       // The physical shoulder rounds away from the trench near the crest.
       // Keep the exposed crown forward of that curve; the recessed top skirt
       // still reaches the original crest so the spoil cap remains connected.
@@ -205,7 +220,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       const inset=(p.getZ(i)*Style.cliffDepthScale+crownInset)*taper*Ease(u/.10);
       const lateral=Math.max(foot,base-inset),x=cx+nx*side*lateral,z=cz+nz*side*lateral;
       const crown=hasCrown?CrownLift(cx+nx*side*crest,cz+nz*side*crest)*Ease((u-.75)/.25)*taper:0;
-      p.setXYZ(i,x,height+crown-.004,z);marker[i*2]=u;marker[i*2+1]=v;
+      p.setXYZ(i,x,height+crown-.004,z);marker[i*2]=u*exposure;marker[i*2+1]=v;
       if(topFront)crownPoints.set(Math.round(v*1e6),{v,x,y:height+crown-.004,z,nx:nx*side,nz:nz*side});
     }
     const crownKey=segmentId+':'+side;
@@ -216,16 +231,9 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       for(let i=0;i<index.count;i+=3){const b=index.getX(i+1);index.setX(i+1,index.getX(i+2));index.setX(i+2,b);}
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(marker,2));
     geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();
-    // The buried toe joins the physical soil. Match its normal at that contact,
-    // fading into the sculpted wall so a thin shell does not draw a hard rim.
-    const normals=geometry.attributes.normal;
-    for(let i=0;i<p.count;i++)if(toeWeights[i]>0){
-      const x=p.getX(i),z=p.getZ(i),step=.025,w=toeWeights[i];
-      const soilN=new THREE.Vector3(groundAt(x-step,z)-groundAt(x+step,z),2*step,
-        groundAt(x,z-step)-groundAt(x,z+step)).normalize();
-      const n=new THREE.Vector3().fromBufferAttribute(normals,i).lerp(soilN,w).normalize();
-      normals.setXYZ(i,n.x,n.y,n.z);
-    }
+    // Match the physical soil at the toe and at cut-through upper joins, fading
+    // into sculpted normals so the shell does not leave a hard contact rim.
+    MatchGroundNormals(geometry,contactWeights);
     geometry.userData.trenchCrust=true;geometry.userData.trenchCliff=true;geometry.userData.trenchCliffMirrored=mirror;
     Add(earth,geometry);stats.cliffPanels++;
   };
@@ -238,7 +246,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     if((side>0?st.bermPlus:st.bermMinus)<=0)return;
     // Match the cut face's eight rows at their shared crest. Six columns keep
     // the same triangle budget while avoiding cracks between different edge meshes.
-    const positions=[],uvs=[],indices=[],cols=6,rows=8,rowRelief=new Float32Array(rows+1);
+    const positions=[],uvs=[],indices=[],weights=[],cols=6,rows=8,rowRelief=new Float32Array(rows+1);
     for(let row=0;row<=rows;row++)for(let col=0;col<=cols;col++){
       const u=col/cols,v=row/rows,cx=st.x+(next.x-st.x)*v,cz=st.z+(next.z-st.z)*v;
       const nx=st.nx+(next.nx-st.nx)*v,nz=st.nz+(next.nz-st.nz)*v;
@@ -249,7 +257,9 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       const hit=plan.Corridor(cx+nx*side*(half+bank),cz+nz*side*(half+bank));
       const offset=half+bank+(hit?.bermWidth||0)*u*.90;
       const x=cx+nx*side*offset,z=cz+nz*side*offset;
-      positions.push(x,groundAt(x,z)+SpoilLift(x,z,u,CrustTaper(v,ends)*rowRelief[row]),z);uvs.push(-8,-8);
+      const exposure=CrownExposure(x,z);
+      const lift=(SpoilLift(x,z,u,CrustTaper(v,ends)*rowRelief[row])+.004)*exposure-.004;
+      positions.push(x,groundAt(x,z)+lift,z);uvs.push(exposure,v);weights.push(1-exposure);
     }
     for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
       const a=row*(cols+1)+col,b=a+cols+1;
@@ -257,6 +267,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     }
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
+    MatchGroundNormals(geometry,weights);
     geometry.userData.trenchCrown=true;geometry.userData.trenchSpoilSkin=true;Add(earth,geometry);
   };
   const RootPiece = (a, b, radius, endRadius=radius*.5, depth=0, attach=null, branch=false) => {

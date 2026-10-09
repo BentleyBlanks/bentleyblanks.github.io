@@ -162,7 +162,7 @@ for(const geometry of cutBatches){
       const key=x.toFixed(5)+':'+z.toFixed(5);
       if(spoilEdges.has(key))assert.ok(Math.abs(spoilEdges.get(key)-y)<1e-4,'no seam along the raised spoil');
       else spoilEdges.set(key,y);
-      assert.equal(geometry.attributes.uv.getX(i),-8,'loose material flag survives static merge UVs');
+      assert.equal(geometry.attributes.uv.getX(i),1,'outside spoil retains full exposed-crown material weight through the merge');
     }
   }
   if(geometry.userData.trenchCrust){
@@ -335,6 +335,37 @@ for(const kit of [cliffKit,[]]){
     clodChance:0,bankClods:0,crumbs:0,lipClods:0,spoilClods:0}});
   assert.ok(shallowVertices>100,'exercise shallow wall and connected spoil geometry');
   assert.ok(maxShallowGap<.06,`shallow junction has no oversized raised shell (gap ${maxShallowGap})`);
+}
+// Another excavation can cut across a segment's nominal crest. It is an inner
+// join then, not a second raised crown halfway up the actual bank.
+const crossPlan=CompileTrenchNetwork({seed:'CrossedCrest',segments:[
+  {id:'Straight',preset:'communication',points:[[0,0],[0,20]],jitterScale:0,cornerRadiusM:0},
+  {id:'Across',preset:'communication',points:[[-10,10],[10,10]],bankW:2.2,jitterScale:0,cornerRadiusM:0},
+]});
+const crossGround=(x,z)=>crossPlan.Apply(x,z,0,0);
+const crossSkinPlan={...cutPlan,Depth:crossPlan.Depth,Corridor:crossPlan.Corridor};
+for(const kit of [[cliffKit[0]],[]]){
+  let coveredCrowns=0,cutSkirtVertices=0;
+  BuildTrenchEarth({SetSector(){},Add(key,g){
+    const p=g.attributes.position,uv=g.attributes.uv;
+    if(g.userData.trenchCrust){
+      for(let i=0;i<p.count;i++){
+        const source=kit[0]?.attributes.position;
+        const top=source?source.getY(i)>=2-1e-6&&source.getZ(i)>0:i%9===8;
+        if(!top||crossPlan.Depth(Math.sign(p.getX(i))*2.8,p.getZ(i))<.45)continue;
+        assert.ok(p.getY(i)-crossGround(p.getX(i),p.getZ(i))<.03,'cut-through crest rests on the shared soil instead of forming a second lip');
+        assert.equal(uv.getX(i),0,'inner join does not receive the loose-crown material');coveredCrowns++;
+      }
+    }
+    if(g.userData.trenchSpoilSkin)for(let i=0;i<p.count;i++){
+      if(crossPlan.Depth(p.getX(i),p.getZ(i))<.45)continue;
+      assert.ok(p.getY(i)-crossGround(p.getX(i),p.getZ(i))<.03,'spoil skirt also joins the continuing cut face');
+      assert.equal(uv.getX(i),0,'buried skirt does not force loose soil onto a steep cut');cutSkirtVertices++;
+    }
+    g.dispose();
+  }},crossSkinPlan,crossGround,{cliffs:kit,roots:null,style:{...TRENCH_APPEARANCE,
+    clodChance:0,bankClods:0,crumbs:0,lipClods:0,spoilClods:0}});
+  assert.ok(coveredCrowns>10&&cutSkirtVertices>10,`exercise actual crest and skirt vertices crossed by another trench (${kit.length}: ${coveredCrowns}, ${cutSkirtVertices})`);
 }
 // Small crown crumbs must follow the visible front edge, including its inset,
 // instead of remaining behind it at the original heightfield crest.
