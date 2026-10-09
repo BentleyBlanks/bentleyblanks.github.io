@@ -146,6 +146,40 @@ try{
     directionPatch.trenchVariationUniform.value.y=Math.PI/2/(activeVariant*2.39996323);Render();
     const rotationAfter=Pixel(target,rootMesh.position).slice(0,3).map(v=>v*2-1);
     rootMesh.material=rootMaterial;rootMesh.rotation.x=0;rootMesh.position.y=.7;directionMaterial.dispose();
+    // Vertical faces with upward-smoothed normals used to sample almost only
+    // world XZ, stretching one texel row down the whole clod. A V-only ramp
+    // must retain its vertical variation, including the zero-weight fallback.
+    const originalAlbedo=pack.albedo.image.data.slice();
+    for(const layer of [3,5])for(let y=0;y<4;y++)for(let x=0;x<4;x++){
+      const value=30+y*70;pack.albedo.image.data.set([value,value,value,128],((layer*4+y)*4+x)*4);
+    }
+    pack.albedo.needsUpdate=true;
+    const projectionMaterial=new T.MeshStandardMaterial({side:T.DoubleSide});
+    const projectionPatch=MakeTrenchSurfacePatch(pack,'high',null,contact);
+    projectionPatch.trenchPomUniform.value=0;projectionPatch.trenchVariationUniform.value.set(0,0);
+    ApplyPatches(projectionMaterial,[projectionPatch,MakePatch({key:'fixtureProjectionRamp',fragment:[
+      ['#include <dithering_fragment>','gl_FragColor=vec4(gTerrainAlbedo,1.0);'],
+    ]})]);
+    // Keep the collapsed XZ coordinate inside a texel, away from a repeat seam.
+    rootMesh.material=projectionMaterial;rootMesh.rotation.x=Math.PI/2;rootMesh.position.z=.21;
+    for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=-1.25;
+    rootGeometry.attributes.terrainLayers.needsUpdate=true;
+    const projectionSamples=[];
+    for(const tangent of [false,true]){
+      const wrongNormal=new T.Vector3(0,tangent?0:.2,tangent?-1:-.98).normalize();
+      for(let i=0;i<rootGeometry.attributes.normal.count;i++)rootGeometry.attributes.normal.setXYZ(i,...wrongNormal.toArray());
+      rootGeometry.attributes.normal.needsUpdate=true;
+      const variants=[];
+      for(const guard of [0,1]){
+        projectionPatch.trenchProjectionGuardUniform.value=guard;Render();
+        const samples=[.46,.58,.70,.82,.94].map(y=>Pixel(target,new T.Vector3(0,y,.21))[0]);
+        variants.push({guard,samples,range:Math.max(...samples)-Math.min(...samples)});
+      }
+      projectionSamples.push({tangent,variants});
+    }
+    for(let i=0;i<rootGeometry.attributes.normal.count;i++)rootGeometry.attributes.normal.setXYZ(i,0,1,0);
+    rootGeometry.attributes.normal.needsUpdate=true;rootMesh.material=rootMaterial;rootMesh.rotation.x=0;rootMesh.position.z=0;projectionMaterial.dispose();
+    pack.albedo.image.data.set(originalAlbedo);pack.albedo.needsUpdate=true;
     // With calibrated means and constant albedo layers, changing the clod's
     // structure must not introduce a brighter or differently coloured pigment.
     const calibratedMeans=pack.albedoMean.slice();calibratedMeans.set([230/255,35/255,20/255,.5],12);
@@ -165,7 +199,7 @@ try{
     const gl=renderer.getContext(),glError=gl.getError(),linked=renderer.info.programs.every(p=>gl.getProgramParameter(p.program,gl.LINK_STATUS));
     pass.Dispose();const validAfterDispose=TerrainBlendUniforms.uTerrainBlendValid.value;
     prepass.Dispose();target.dispose();contact.Dispose();renderer.dispose();
-    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,rootColor,unmarkedColor,compactCapColor,looseCapColor,clodTransitionColor,clodCoreColor,calibratedFoot,calibratedCore,roadColors,crownColors,rotationBefore,rotationAfter,glError,linked};
+    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,rootColor,unmarkedColor,compactCapColor,looseCapColor,clodTransitionColor,clodCoreColor,calibratedFoot,calibratedCore,roadColors,crownColors,rotationBefore,rotationAfter,projectionSamples,glError,linked};
   });
   console.log(JSON.stringify(report,null,2));
   assert.deepEqual(errors,[]);assert.equal(report.glError,0);assert.ok(report.linked&&report.sourceIdentity&&report.restored);
@@ -185,6 +219,10 @@ try{
   assert.ok(report.rotationBefore[0]>.3&&Math.abs(report.rotationBefore[1])<.02,'unrotated +U normal points along the wall');
   assert.ok(Math.abs(report.rotationAfter[0])<.02&&Math.abs(report.rotationAfter[1]-report.rotationBefore[0])<.02
     &&Math.abs(report.rotationAfter[2]-report.rotationBefore[2])<.02,'quarter-turn UV sampling rotates the normal back to world +Y');
+  for(const {variants} of report.projectionSamples){
+    assert.ok(variants[0].range<.01,'legacy projection fixture reproduces a collapsed vertical texture');
+    assert.ok(variants[1].range>.4,'geometry-aware projection retains texture variation on a vertical face');
+  }
   const [near,middle,far]=report.samples;
   assert.ok(near.normal[3]>.97&&middle.normal[3]>.05&&middle.normal[3]<.95&&far.normal[3]<.01,'continuous contact mask');
   assert.ok(near.color[0]>.65&&near.color[2]<.06,'terrain albedo reaches the stone foot');

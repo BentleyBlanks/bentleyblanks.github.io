@@ -19,6 +19,7 @@ uniform vec2 uTrenchCompact; // compact UV frequency relative to loose soil, col
 uniform float uTrenchClodMix;
 uniform vec3 uTrenchCrown; // lower/upper wall-height fraction, boundary variation
 uniform vec2 uTrenchVariation; // spatial frequency, rotation amount
+uniform float uTrenchProjectionGuard;
 uniform vec4 uTrenchWater;   // x 沟底积水 y 沟底底湿度 z,w 凹度（米）[起, 满]
 uniform float uTrenchPom;
 uniform vec4 uTrenchLooseMean;
@@ -166,6 +167,17 @@ const Evaluate = /* glsl */`
   float clodCore=clamp((-vTerrainLayers.w-2.0)*4.0,0.0,1.0)*step(-2.5,vTerrainLayers.w);
   gTrenchLoose=mix(gTrenchLoose,uTrenchClodMix,clodCore);
   vec3 w=pow(abs(geomN),vec3(4));w/=max(dot(w,vec3(1)),.001);
+  // Smoothed/contact normals can point upward on a near-vertical clod. Reject
+  // projections that collapse against the actual triangle, preserving the
+  // smooth lighting normal while preventing stretched columns of soil texture.
+  vec3 projectionN=abs(cross(worldDx,worldDy));
+  float projectionLength=length(projectionN);
+  projectionN=projectionLength>1e-10?projectionN/projectionLength:abs(geomN);
+  vec3 validProjection=w*smoothstep(vec3(${C.mud.projectionFade[0].toFixed(3)}),
+    vec3(${C.mud.projectionFade[1].toFixed(3)}),projectionN);
+  if(dot(validProjection,vec3(1))<1e-5)validProjection=pow(projectionN,vec3(4));
+  validProjection/=max(dot(validProjection,vec3(1)),1e-8);
+  w=mix(w,validProjection,uTrenchProjectionGuard);
   vec3 ca,cb,cc,na,nb,nc;vec3 ra,rb,rc;float sa,sb,sc;
   vec3 lightW=vec3(0,1,0);
   #if NUM_DIR_LIGHTS > 0
@@ -277,7 +289,8 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
   patch.trenchCrownUniform=crown;
   const variation={value:new THREE.Vector2(C.mud.variantFrequency,C.mud.variantRotation)};
   patch.trenchVariationUniform=variation;
-  patch.key+=(stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10')+':compactGrainBank5Rotation';
+  const projectionGuard={value:1};patch.trenchProjectionGuardUniform=projectionGuard;
+  patch.key+=(stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10')+':compactGrainBank6Projection';
   patch.uniforms=(uniforms,shader)=>{
     bind(uniforms,shader);
 
@@ -285,6 +298,7 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
     uniforms.uTrenchClodMix=clodMix;
     uniforms.uTrenchCrown=crown;
     uniforms.uTrenchVariation=variation;
+    uniforms.uTrenchProjectionGuard=projectionGuard;
     uniforms.uTrenchCompact={value:new THREE.Vector2(C.mud.baseTileM/C.mud.compactTileM,C.mud.compactColorDetail)};
     uniforms.uTrenchRootColor={value:new THREE.Color(Earth.rootColor)};
     uniforms.uTrenchWater={value:new THREE.Vector4(W.site.trenchFloor,W.damp.trenchFloor,W.lowRiseM[0],W.lowRiseM[1])};
