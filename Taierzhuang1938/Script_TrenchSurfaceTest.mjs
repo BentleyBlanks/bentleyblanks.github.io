@@ -146,8 +146,39 @@ for(const geometry of cutBatches){
 }
 assert.ok(skinVertices>1000&&sharedEdges>100,'measure actual adjacent generated strips');
 assert.ok(spoilVertices>1000,'continuous spoil detail is built on both banks');
+let joinedCrest=0;
+for(const [key,height] of edges)if(spoilEdges.has(key)){
+  assert.ok(Math.abs(height-spoilEdges.get(key))<1e-4,'cut face and spoil share the same broken crown without an open seam');joinedCrest++;
+}
+assert.ok(joinedCrest>100,'verify the actual common crest vertices, not only each skin separately');
 assert.ok(rootVertices>0,'roots retain a distinct surface in the soil batch');
 assert.ok(compactClods>10,'actual cut-wall aggregates use the compact matrix');
+// Raycast the rendered triangles independently of the placement sampler. Long
+// fibres must bend with the bank instead of disappearing into the raised skin.
+const contactMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+const contactMeshes=cutBatches.filter(g=>g.userData.trenchCrust||g.userData.trenchSpoilSkin)
+  .map(g=>new THREE.Mesh(g,contactMaterial));
+const contactRay=new THREE.Raycaster(),rootGaps=[];
+for(const geometry of cutBatches)if(geometry.userData.trenchRoots){
+  const p=geometry.attributes.position;
+  // Each open triangular cylinder has two rings, each with a repeated UV seam.
+  const ends=[0,4].map(start=>{
+    const centre=new THREE.Vector3();
+    for(let i=0;i<3;i++)centre.add(new THREE.Vector3().fromBufferAttribute(p,start+i));
+    return centre.multiplyScalar(1/3);
+  });
+  for(const t of [0,.25,.5,.75,1]){
+    const point=ends[0].clone().lerp(ends[1],t);
+    contactRay.set(new THREE.Vector3(point.x,20,point.z),new THREE.Vector3(0,-1,0));
+    const hit=contactRay.intersectObjects(contactMeshes,false)[0];
+    const host=Math.max(cutGround(point.x,point.z),hit?.point.y??-Infinity);
+    rootGaps.push(point.y-host);
+  }
+}
+assert.ok(rootGaps.length>100,'sample actual rendered root fibres across both banks');
+assert.ok(Math.min(...rootGaps)>-.02,'root fibres do not cross deeply into visible soil');
+assert.ok(Math.max(...rootGaps)<.06,'root fibres do not bridge over the soil as floating sticks');
+contactMaterial.dispose();
 // A crown can cross onto a steep neighbouring bank. Large clods must shrink to
 // crumbs there, keep a closed volume and remain seated across curved terrain.
 const steepGround=(x,z)=>Math.abs(x)*5+Math.sin(z*2)*.09;
@@ -178,6 +209,10 @@ const clodKit=[];clodScene.scene.updateMatrixWorld(true);clodScene.scene.travers
   g.userData.trenchClodHigh=node.name.endsWith('High');g.userData.trenchClodShape=node.name;clodKit.push(g);
 });
 const raisedBank=(x,z)=>Math.abs(x)>1.5?2:0;
+// Leave gaps between fixture stations so no decorative skin is laid over the
+// deliberately flat host plane being used to measure contact normals here.
+const flatCapPlan={...steepPlan,segments:steepPlan.segments.map(segment=>({...segment,
+  stations:segment.stations.map((st,i)=>({...st,junctionClear:i%2===1}))}))};
 let largeClods=0,buriedNormals=0,sculptedCaps=0;
 BuildTrenchEarth({SetSector(){},Add(key,g){
   if(g.userData.trenchClodHigh){
@@ -191,9 +226,9 @@ BuildTrenchEarth({SetSector(){},Add(key,g){
     }
   }
   g.dispose();
-}},steepPlan,raisedBank,{clods:clodKit,roots:null,style:{...TRENCH_APPEARANCE,
+}},flatCapPlan,raisedBank,{clods:clodKit,roots:null,style:{...TRENCH_APPEARANCE,
   crustReliefM:0,cutShoulderM:0,spadeReliefM:0,clodChance:0,bankClods:0,crumbs:0,
-  lipClods:4,lipRadiusM:[.175,.175],lipReliefM:[.10,.10],spoilClods:0}});
+  lipClods:4,lipRadiusM:[.215,.215],lipReliefM:[.10,.10],spoilClods:0}});
 assert.ok(largeClods>10&&buriedNormals>20&&sculptedCaps>10,'large soil caps are detailed while their feet join the host');
 for(const g of clodKit)g.dispose();
 clodScene.scene.traverse(node=>{if(node.isMesh){node.geometry.dispose();for(const m of Array.isArray(node.material)?node.material:[node.material])m.dispose();}});

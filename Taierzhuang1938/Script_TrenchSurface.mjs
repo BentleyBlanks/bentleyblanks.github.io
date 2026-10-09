@@ -46,17 +46,17 @@ export async function LoadTrenchSurface() {
   } catch(error){for(const r of resources)r.dispose();throw error;}
 }
 
-// Only crown triangles enter this temporary half-metre index. Grass rests on
-// the rendered root-bound clods, not on the physical soil buried below them.
-function CrownHeightSampler(sink,groundAt) {
+// Temporary half-metre triangle index: details rest on the rendered skin,
+// rather than an analytical height that can differ between mesh vertices.
+export function CreateTrenchDressingHeightSampler(geometries,groundAt,{crownOnly=false}={}) {
   const cells=new Map(),cellM=.5;
-  for(const geometries of sink.buckets?.values()||[])for(const geometry of geometries){
+  for(const geometry of geometries){
     if(!geometry.userData.trenchCrown&&!geometry.userData.trenchCrust)continue;
     const p=geometry.attributes.position,uv=geometry.attributes.uv,index=geometry.index;
     const count=index?.count||p.count;
     for(let i=0;i<count;i+=3){
       const ids=[0,1,2].map(k=>index?index.getX(i+k):i+k);
-      if(geometry.userData.trenchCrust&&Math.max(...ids.map(j=>uv.getX(j)))<.7)continue;
+      if(crownOnly&&geometry.userData.trenchCrust&&Math.max(...ids.map(j=>uv.getX(j)))<.7)continue;
       const a=ids.map(j=>[p.getX(j),p.getY(j),p.getZ(j)]);
       const den=(a[1][2]-a[2][2])*(a[0][0]-a[2][0])+(a[2][0]-a[1][0])*(a[0][2]-a[2][2]);
       if(Math.abs(den)<1e-8)continue;
@@ -81,7 +81,7 @@ function CrownHeightSampler(sink,groundAt) {
 
 export function BuildTrenchSurface(sink,plan,groundAt,assets) {
   const stats={stones:0,grass:0,triangles:0};const occupied=new Set();
-  const crownAt=CrownHeightSampler(sink,groundAt);
+  const crownAt=CreateTrenchDressingHeightSampler([...sink.buckets?.values()||[]].flat(),groundAt,{crownOnly:true});
   const Range=(r,a)=>a[0]+r()*(a[1]-a[0]);
   const GrassMat=(x,z,scale,angle,mirror)=>{
     const positions=[],uvs=[],indices=[],cols=8,rows=6;
