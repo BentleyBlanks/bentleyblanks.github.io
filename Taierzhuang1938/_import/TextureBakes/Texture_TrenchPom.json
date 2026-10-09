@@ -40,7 +40,7 @@
       0.05,
       0.12
     ],
-    "reliefM": 0.005,
+    "reliefM": 0.008,
     "rough": 0.94,
     "roughVar": 0.025,
     "roughLumaK": 0.0,
@@ -84,8 +84,8 @@
       "file": "Texture_TrenchPomNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 93594,
-      "sha256": "f7d7d22df889247caa3beada2858c9f9b1880518d78d04fe43b26fc34ec59817"
+      "bytes": 118250,
+      "sha256": "ceb72aae4dcf5f2a9dabbb74dff9b7d82977acaecb3d8c8954fb4ddd31f41eab"
     },
     {
       "channel": "Orh",
@@ -96,7 +96,7 @@
       "sha256": "794fb0bd6f886e746522527a4a4f378d501e91358fa31d02820a8cfbc018d0c4"
     }
   ],
-  "totalBytes": 521860,
+  "totalBytes": 546516,
   "metrics": {
     "meanSrgb": [
       0.4898,
