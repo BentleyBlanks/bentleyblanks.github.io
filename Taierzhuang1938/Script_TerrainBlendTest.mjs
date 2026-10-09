@@ -99,19 +99,44 @@ try{
     rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();const compactCapColor=Pixel(target,rootMesh.position);
     for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=-2;
     rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();const looseCapColor=Pixel(target,rootMesh.position);
+    for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=-2.125;
+    rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();const clodTransitionColor=Pixel(target,rootMesh.position);
+    for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=-2.25;
+    rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();const clodCoreColor=Pixel(target,rootMesh.position);
     const roadColors=[];
     for(const lateral of [-1,-.75,-.5,0,.5,1]){
       for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=lateral;
       rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();roadColors.push(Pixel(target,rootMesh.position));
     }
+    // With calibrated means and constant albedo layers, changing the clod's
+    // structure must not introduce a brighter or differently coloured pigment.
+    const calibratedMeans=pack.albedoMean.slice();calibratedMeans.set([230/255,35/255,20/255,.5],12);
+    const calibratedPack={...pack,albedoMean:calibratedMeans,
+      extraAlbedoMean:new Float32Array([.4,.4,.4,.5,20/255,45/255,230/255,.5])};
+    const calibratedMaterial=new T.MeshStandardMaterial({side:T.DoubleSide});
+    ApplyPatches(calibratedMaterial,[MakeTrenchSurfacePatch(calibratedPack,'high',null,contact),MakePatch({key:'fixtureClodPigment',fragment:[
+      ['#include <dithering_fragment>','gl_FragColor=vec4(diffuseColor.rgb,1.0);'],
+    ]})]);
+    rootMesh.material=calibratedMaterial;
+    for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=-2;
+    rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();const calibratedFoot=Pixel(target,rootMesh.position);
+    for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=-2.25;
+    rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();const calibratedCore=Pixel(target,rootMesh.position);
+    rootMesh.material=rootMaterial;calibratedMaterial.dispose();
     scene.remove(rootMesh);rootGeometry.dispose();rootMaterial.dispose();
     const gl=renderer.getContext(),glError=gl.getError(),linked=renderer.info.programs.every(p=>gl.getProgramParameter(p.program,gl.LINK_STATUS));
     pass.Dispose();const validAfterDispose=TerrainBlendUniforms.uTerrainBlendValid.value;
     prepass.Dispose();target.dispose();contact.Dispose();renderer.dispose();
-    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,rootColor,unmarkedColor,compactCapColor,looseCapColor,roadColors,glError,linked};
+    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,rootColor,unmarkedColor,compactCapColor,looseCapColor,clodTransitionColor,clodCoreColor,calibratedFoot,calibratedCore,roadColors,glError,linked};
   });
   console.log(JSON.stringify(report,null,2));
   assert.deepEqual(errors,[]);assert.equal(report.glError,0);assert.ok(report.linked&&report.sourceIdentity&&report.restored);
+  assert.ok(report.clodCoreColor[0]>.7&&report.clodCoreColor[2]<.4,'exposed clod core uses the compact soil texture');
+  assert.ok(report.clodTransitionColor[0]>report.looseCapColor[0]&&report.clodTransitionColor[0]<report.clodCoreColor[0]
+    &&report.clodTransitionColor[2]<report.looseCapColor[2]&&report.clodTransitionColor[2]>report.clodCoreColor[2],
+    'clod contact weight continuously blends the compact core into loose soil');
+  assert.ok(report.calibratedCore.slice(0,3).every((v,i)=>Math.abs(v-report.calibratedFoot[i])<.015),
+    'cohesive clod texture keeps the loose soil pigment mean');
   const [near,middle,far]=report.samples;
   assert.ok(near.normal[3]>.97&&middle.normal[3]>.05&&middle.normal[3]<.95&&far.normal[3]<.01,'continuous contact mask');
   assert.ok(near.color[0]>.65&&near.color[2]<.06,'terrain albedo reaches the stone foot');

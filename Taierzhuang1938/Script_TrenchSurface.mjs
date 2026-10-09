@@ -48,7 +48,7 @@ export async function LoadTrenchSurface() {
 
 // Temporary half-metre triangle index: details rest on the rendered skin,
 // rather than an analytical height that can differ between mesh vertices.
-export function CreateTrenchDressingHeightSampler(geometries,groundAt,{crownOnly=false}={}) {
+export function CreateTrenchDressingHeightSampler(geometries,groundAt,{crownOnly=false,includeNormals=false}={}) {
   const cells=new Map(),cellM=.5;
   for(const geometry of geometries){
     if(!geometry.userData.trenchCrown&&!geometry.userData.trenchCrust)continue;
@@ -61,6 +61,12 @@ export function CreateTrenchDressingHeightSampler(geometries,groundAt,{crownOnly
       const den=(a[1][2]-a[2][2])*(a[0][0]-a[2][0])+(a[2][0]-a[1][0])*(a[0][2]-a[2][2]);
       if(Math.abs(den)<1e-8)continue;
       const triangle={a,den};
+      if(includeNormals){
+        const bx=a[1][0]-a[0][0],by=a[1][1]-a[0][1],bz=a[1][2]-a[0][2];
+        const cx=a[2][0]-a[0][0],cy=a[2][1]-a[0][1],cz=a[2][2]-a[0][2];
+        const normal=new THREE.Vector3(by*cz-bz*cy,bz*cx-bx*cz,bx*cy-by*cx).normalize();if(normal.y<0)normal.negate();
+        triangle.normal=normal;
+      }
       const x0=Math.floor(Math.min(...a.map(v=>v[0]))/cellM),x1=Math.floor(Math.max(...a.map(v=>v[0]))/cellM);
       const z0=Math.floor(Math.min(...a.map(v=>v[2]))/cellM),z1=Math.floor(Math.max(...a.map(v=>v[2]))/cellM);
       for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++){
@@ -68,15 +74,23 @@ export function CreateTrenchDressingHeightSampler(geometries,groundAt,{crownOnly
       }
     }
   }
-  return (x,z)=>{
+  const Sample=(x,z,normalTarget=null)=>{
     let height=groundAt(x,z);
-    for(const {a,den} of cells.get(Math.floor(x/cellM)+':'+Math.floor(z/cellM))||[]){
+    if(normalTarget)normalTarget.set(0,0,0);
+    for(const {a,den,normal} of cells.get(Math.floor(x/cellM)+':'+Math.floor(z/cellM))||[]){
       const u=((a[1][2]-a[2][2])*(x-a[2][0])+(a[2][0]-a[1][0])*(z-a[2][2]))/den;
       const v=((a[2][2]-a[0][2])*(x-a[2][0])+(a[0][0]-a[2][0])*(z-a[2][2]))/den;
-      if(u>=-1e-5&&v>=-1e-5&&u+v<=1.00001)height=Math.max(height,u*a[0][1]+v*a[1][1]+(1-u-v)*a[2][1]);
+      if(u>=-1e-5&&v>=-1e-5&&u+v<=1.00001){
+        const y=u*a[0][1]+v*a[1][1]+(1-u-v)*a[2][1];
+        if(y>=height){height=y;if(normalTarget&&normal)normalTarget.copy(normal);}
+      }
     }
     return height;
   };
+  if(includeNormals)Sample.NormalAt=(x,z)=>{
+    const normal=new THREE.Vector3();Sample(x,z,normal);return normal.lengthSq()>0?normal:null;
+  };
+  return Sample;
 }
 
 export function BuildTrenchSurface(sink,plan,groundAt,assets,{onCrownReady=null}={}) {

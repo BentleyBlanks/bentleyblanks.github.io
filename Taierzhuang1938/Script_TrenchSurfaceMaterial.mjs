@@ -16,6 +16,7 @@ const Common = /* glsl */`
 #define TERRAIN_TRAILS_EXTERNAL
 uniform vec4 uTrenchDetail; // normal strength, compact/loose relief (m), colour detail
 uniform vec2 uTrenchCompact; // compact UV frequency relative to loose soil, colour contrast
+uniform float uTrenchClodMix;
 uniform vec4 uTrenchWater;   // x 沟底积水 y 沟底底湿度 z,w 凹度（米）[起, 满]
 uniform float uTrenchPom;
 uniform vec4 uTrenchLooseMean;
@@ -141,6 +142,10 @@ const Evaluate = /* glsl */`
   // Embedded bank crumbs retain the compact matrix even on their upward caps.
   // -1.25 is outside signed road coordinates [-1,1], separate from loose/root flags.
   gTrenchLoose*=1.0-step(-1.375,vTerrainLayers.w)*(1.0-step(-1.125,vTerrainLayers.w));
+  // The body of an excavated aggregate is cohesive soil. Only its shallow
+  // contact band keeps the loose surface, using the same weight as its normals.
+  float clodCore=clamp((-vTerrainLayers.w-2.0)*4.0,0.0,1.0)*step(-2.5,vTerrainLayers.w);
+  gTrenchLoose=mix(gTrenchLoose,uTrenchClodMix,clodCore);
   vec3 w=pow(abs(geomN),vec3(4));w/=max(dot(w,vec3(1)),.001);
   vec3 ca,cb,cc,na,nb,nc;vec3 ra,rb,rc;float sa,sb,sc;
   vec3 lightW=vec3(0,1,0);
@@ -152,6 +157,8 @@ const Evaluate = /* glsl */`
   SoilPlane(vTerrainWorld,geomN,worldDx,worldDy,2,w.z,lightW,cc,nc,rc,sc);
   gTrenchShadow=mix(1.0,sa*w.y+sb*w.x+sc*w.z,spoil);
   vec3 soil=ca*w.y+cb*w.x+cc*w.z;
+  vec3 soilMean=mix(uTerrainAlbedoMean[3].rgb,uTrenchLooseMean.rgb,gTrenchLoose);
+  soil*=mix(vec3(1.0),uTrenchLooseMean.rgb/max(soilMean,vec3(.001)),clodCore);
   gTerrainAlbedo=mix(gTerrainAlbedo,soil,spoil);
   gTerrainWeights=mix(gTerrainWeights,vec4(0,0,0,1),spoil);
   vec3 surface=ra*w.y+rb*w.x+rc*w.z;
@@ -246,11 +253,13 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
   const pom={value:1};patch.trenchPomUniform=pom;
   const detail={value:new THREE.Vector4(C.mud.normalScale,C.mud.pomReliefM,C.mud.looseReliefM,C.mud.colorDetail)};
   patch.trenchDetailUniform=detail;
-  patch.key+=(stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10')+':compactGrainBank2';
+  const clodMix={value:C.mud.clodLooseFraction};patch.trenchClodMixUniform=clodMix;
+  patch.key+=(stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10')+':compactGrainBank3ClodCore';
   patch.uniforms=(uniforms,shader)=>{
     bind(uniforms,shader);
 
     uniforms.uTrenchDetail=detail;
+    uniforms.uTrenchClodMix=clodMix;
     uniforms.uTrenchCompact={value:new THREE.Vector2(C.mud.baseTileM/C.mud.compactTileM,C.mud.compactColorDetail)};
     uniforms.uTrenchRootColor={value:new THREE.Color(Earth.rootColor)};
     uniforms.uTrenchWater={value:new THREE.Vector4(W.site.trenchFloor,W.damp.trenchFloor,W.lowRiseM[0],W.lowRiseM[1])};

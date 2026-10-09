@@ -8,6 +8,7 @@ import { CreateTrenchDressingHeightSampler } from "./Script_TrenchSurface.mjs";
 export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots", clods = [], cliffs = [], style: Style = DefaultStyle } = {}) {
   const stats = { clods: 0, spoilClods: 0, roots: 0, cliffPanels: 0, triangles: 0 };
   const skinGeometries=[];
+  const crownRuns=new Map();
   // IcosahedronGeometry(1, 0) splits every triangle for flat normals. Weld the
   // twelve corners before reshaping so small crumbs do not shade as rock facets.
   // Authored UV seams are irrelevant here: the soil material is world-projected.
@@ -68,13 +69,17 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     const angle=random()*Math.PI*2;
     const e=.08,HostNormal=sample=>new THREE.Vector3(-(sample(center.x+e,center.z)-sample(center.x-e,center.z))/(2*e),
       1,-(sample(center.x,center.z+e)-sample(center.x,center.z-e))/(2*e)).normalize();
-    const physicalN=HostNormal(groundAt),n=heightAt===groundAt?physicalN:HostNormal(heightAt);
+    const physicalN=HostNormal(groundAt),n=heightAt===groundAt?physicalN:(heightAt.NormalAt?.(center.x,center.z)||HostNormal(heightAt));
     // Large spoil clods belong on the crown. A crown sample can land on an
     // adjoining steep bank at junctions; keep only small embedded crumbs there.
-    const supportN=crown?n:physicalN;
-    const cutClod=plan.Corridor(center.x,center.z)?.inCut&&supportN.y<.85;
+    const supportN=crown?n:physicalN,corridor=plan.Corridor(center.x,center.z);
+    const cutClod=corridor?.inCut&&supportN.y<.85;
     const slopeScale=cutClod?Math.min(1,.065/radius):Math.min(1,.065/radius+(1-.065/radius)*Ease((supportN.y-.45)/.35));
-    radius*=slopeScale;relief*=slopeScale;
+    const floorScale=crown&&Number.isFinite(corridor?.d)&&Number.isFinite(corridor?.halfFloor)
+      ?Math.min(1,Math.max(0,corridor.d-corridor.halfFloor)/(radius*Style.crownFloorClearanceRatio)):1;
+    const supportScale=Math.min(slopeScale,floorScale);
+    if(radius*supportScale<1e-4)return;
+    radius*=supportScale;relief*=supportScale;
     const variants=radius>=Style.clodHighRadiusM&&highClods.length?highClods:lowClods;
     const source=radius>=Style.clodModelRadiusM&&variants.length?variants[Math.floor(modelChoice*variants.length)]
       :radius<Style.clodTinyRadiusM?tinyShape:shape;
@@ -105,7 +110,10 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     const marker=new Float32Array(p.count*2);
     // Embedded cut-face aggregates share the compact matrix. Loose spoil on a
     // steep bank otherwise looks like a separate pale stone stuck onto the wall.
-    for(let i=0;i<p.count;i++){marker[i*2]=cutClod?-6:-8;marker[i*2+1]=-9;}
+    for(let i=0;i<p.count;i++){
+      marker[i*2]=cutClod?-6:-8;
+      marker[i*2+1]=-9-(cutClod?0:(1-contactWeights[i])*.25);
+    }
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(marker,2));
     geometry.computeVertexNormals();
     // At the embedded foot, aggregate and soil form one surface. Blend only the
@@ -152,17 +160,19 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     geometry.userData.trenchCrust=true;
     Add(earth,geometry);
   };
-  const CliffPanel = (st,next,side,ends,variant) => {
+  const CliffPanel = (st,next,side,ends,variant,segmentId) => {
     const geometry=cliffs[variant%cliffs.length].clone(),mirror=(variant&4)!==0;
     if(mirror)geometry.scale(-1,1,1);
     const p=geometry.attributes.position;
     const hasCrown=(side>0?st.bermPlus:st.bermMinus)>0;
     const marker=new Float32Array(p.count*2);
+    const crownPoints=new Map();
     for(let i=0;i<p.count;i++){
       // Kit coordinates: 1.5 m along X, 2 m up Y, +Z points into the trench.
       // Fit by height rather than stretching a heightfield grid over the face:
       // the module keeps its pockets, recessed skirt and overhanging crown.
       const v=Math.max(0,Math.min(1,(p.getX(i)+.75)/1.5)),u=hasCrown?p.getY(i)/2:Math.min(1,p.getY(i)/2);
+      const topFront=p.getY(i)>=2-1e-6&&p.getZ(i)>0;
       const cx=st.x+(next.x-st.x)*v,cz=st.z+(next.z-st.z)*v;
       const nx=st.nx+(next.nx-st.nx)*v,nz=st.nz+(next.nz-st.nz)*v;
       const half=st.halfFloor+(next.halfFloor-st.halfFloor)*v,bank=st.bank+(next.bank-st.bank)*v;
@@ -182,7 +192,11 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       const lateral=Math.max(foot,base-inset),x=cx+nx*side*lateral,z=cz+nz*side*lateral;
       const crown=hasCrown?CrownLift(cx+nx*side*crest,cz+nz*side*crest)*Ease((u-.75)/.25)*taper:0;
       p.setXYZ(i,x,height+crown-.004,z);marker[i*2]=u;marker[i*2+1]=v;
+      if(topFront)crownPoints.set(Math.round(v*1e6),{v,x,y:height+crown-.004,z,nx:nx*side,nz:nz*side});
     }
+    const crownKey=segmentId+':'+side;
+    if(!crownRuns.has(crownKey))crownRuns.set(crownKey,[]);
+    crownRuns.get(crownKey).push({s0:st.s,s1:next.s,points:[...crownPoints.values()].sort((a,b)=>a.v-b.v)});
     const index=geometry.index;
     if(((st.tz*st.nx-st.tx*st.nz)*side<0)!==mirror)
       for(let i=0;i<index.count;i+=3){const b=index.getX(i+1);index.setX(i+1,index.getX(i+2));index.setX(i+2,b);}
@@ -263,7 +277,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         const st = segment.stations[i];
         sink.SetSector(`TrenchEarth_${Math.floor(st.x / Style.sectorM)}_${Math.floor(st.z / Style.sectorM)}`);
         if(cliffs.length)CliffPanel(st,segment.stations[i+Style.stationStride],side,SkinEnds(i,side),
-          HashString(segment.id+':'+i+':'+side));
+          HashString(segment.id+':'+i+':'+side),segment.id);
         else Crust(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
         SpoilSkin(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
       }
@@ -285,7 +299,20 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     for(const {n,i} of members)normal.add(new THREE.Vector3().fromBufferAttribute(n,i));
     normal.normalize();for(const {n,i} of members)n.setXYZ(i,normal.x,normal.y,normal.z);
   }
-  const skinAt=CreateTrenchDressingHeightSampler(skinGeometries,groundAt);
+  const skinAt=CreateTrenchDressingHeightSampler(skinGeometries,groundAt,{includeNormals:true});
+  const CrownPoint=(segmentId,side,s)=>{
+    const runs=crownRuns.get(segmentId+':'+side)||[];let lo=0,hi=runs.length-1;
+    while(lo<=hi){
+      const mid=(lo+hi)>>1,run=runs[mid];
+      if(s<run.s0){hi=mid-1;continue;}if(s>run.s1){lo=mid+1;continue;}
+      const v=(s-run.s0)/Math.max(run.s1-run.s0,1e-6),points=run.points;
+      if(points.length<2)return null;
+      let j=1;while(j<points.length-1&&points[j].v<v)j++;
+      const a=points[j-1],b=points[j],t=Math.max(0,Math.min(1,(v-a.v)/Math.max(b.v-a.v,1e-6)));
+      return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,z:a.z+(b.z-a.z)*t,nx:a.nx+(b.nx-a.nx)*t,nz:a.nz+(b.nz-a.nz)*t};
+    }
+    return null;
+  };
   // A cliff can overhang itself: a vertical height query would attach roots to
   // the lip above their actual face. Use a small spatial index and horizontal
   // rays for these surface attachments; no per-frame meshes or physics bodies.
@@ -356,6 +383,12 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
           // Many small crumbs connect the occasional large torn chunk. Uniform
           // radii produced a few boulders sitting on an otherwise smooth crown.
           const radius=Style.lipRadiusM[0]+(Style.lipRadiusM[1]-Style.lipRadiusM[0])*Math.pow(random(),Style.lipRadiusBias);
+          const edge=CrownPoint(segment.id,side,st.s+along+tangent);
+          if(edge){
+            const length=Math.hypot(edge.nx,edge.nz)||1;
+            const margin=Style.lipEdgeOffsetM+radius*Range(random,Style.lipEdgeInsetRatio);
+            lip.set(edge.x+edge.nx/length*margin,edge.y,edge.z+edge.nz/length*margin);
+          }
           if (dressAt(lip.x,lip.z) - floor > 0.8) Clod(lip,radius,Range(random,Style.lipReliefM),random,true,dressAt);
         }
         // The excavated material continues over the raised spoil ridge and skirt;

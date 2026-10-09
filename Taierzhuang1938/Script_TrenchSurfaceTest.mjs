@@ -4,7 +4,7 @@ import { TerrainContactField } from './Script_TerrainContact.mjs';
 import { TRENCH_SURFACE as C } from './Data_TrenchSurface.mjs';
 import { TERRAIN_WATER } from './Data_Tuning_Terrain.mjs';
 import * as THREE from 'three';
-import { BuildTrenchSurface } from './Script_TrenchSurface.mjs';
+import { BuildTrenchSurface, CreateTrenchDressingHeightSampler } from './Script_TrenchSurface.mjs';
 import { BuildTrenchEarth } from './Script_TrenchEarth.mjs';
 import { CompileTrenchNetwork } from './Script_TrenchPlan.mjs';
 import { BuildTrenchPreview } from './Script_TrenchSpline.mjs';
@@ -26,6 +26,15 @@ assert.equal(contact.data[0],before[0]);assert.equal(contact.data.at(-1),before.
 assert.ok(contact.data.some((h,i)=>h!==before[i]));
 assert.deepEqual(terrain.heights,before,'render update must not mutate the physics base');
 contact.Reset();assert.deepEqual(contact.data,before);contact.Dispose();
+// Near a ledge, finite height differences straddle empty space. Placement must
+// use the actual supporting triangle, not tilt a chunk toward the lower floor.
+const supportPlane=new THREE.PlaneGeometry(1,1);supportPlane.rotateX(-Math.PI/2);supportPlane.translate(.5,1,.5);
+supportPlane.userData.trenchCrown=true;
+const supportAt=CreateTrenchDressingHeightSampler([supportPlane],()=>0,{includeNormals:true});
+assert.equal(supportAt(.99,.5),1);
+assert.ok(supportAt.NormalAt(.99,.5).dot(new THREE.Vector3(0,1,0))>.9999,'ledge support follows the real top face');
+assert.equal(supportAt.NormalAt(1.1,.5),null,'outside the mesh there is no invented support normal');
+supportPlane.dispose();
 
 for(const [kind,url] of Object.entries(C.models)){
   const b=fs.readFileSync(new URL(url,import.meta.url));assert.equal(b.toString('ascii',0,4),'glTF');
@@ -294,6 +303,32 @@ BuildTrenchEarth({SetSector(){},Add(key,g){
 }},noCrownPlan,(x,z)=>noCrownPlan.Apply(x,z,0,0),{cliffs:cliffKit,roots:null,style:{...TRENCH_APPEARANCE,
   clodChance:0,bankClods:0,crumbs:0,lipClods:0,spoilClods:0}});
 assert.ok(noCrownPanels>10,'exercise crownless modules across both sides of an exit');
+// Small crown crumbs must follow the visible front edge, including its inset,
+// instead of remaining behind it at the original heightfield crest.
+const edgeBatches=[];
+BuildTrenchEarth({SetSector(){},Add(key,g){edgeBatches.push(g);}},cutPlan,cutGround,
+  {cliffs:cliffKit,roots:null,style:{...TRENCH_APPEARANCE,clodChance:0,bankClods:0,crumbs:0,
+    lipClods:4,lipRadiusM:[.06,.06],lipReliefM:[.025,.025],spoilClods:0}});
+const edgeSides=new Map([[-1,new Map()],[1,new Map()]]);
+for(const g of edgeBatches)if(g.userData.trenchCliff){
+  const p=g.attributes.position,uv=g.attributes.uv;
+  for(let i=0;i<p.count;i++)if(uv.getX(i)>=1-1e-6){
+    const x=p.getX(i),z=p.getZ(i),side=edgeSides.get(Math.sign(x)),key=z.toFixed(6),old=side.get(key);
+    if(!old||Math.abs(x)<old.x)side.set(key,{x:Math.abs(x),z});
+  }
+}
+const edgeLines=new Map([...edgeSides].map(([side,points])=>[side,[...points.values()].sort((a,b)=>a.z-b.z)]));
+let edgeCrumbs=0;
+for(const g of edgeBatches)if(g.userData.trenchCrown&&!g.userData.trenchSpoilSkin&&!g.userData.trenchCrust){
+  g.computeBoundingBox();const centre=g.boundingBox.getCenter(new THREE.Vector3());
+  if(centre.z<=5||centre.z>=15)continue;
+  const line=edgeLines.get(Math.sign(centre.x));let j=1;while(j<line.length-1&&line[j].z<centre.z)j++;
+  const a=line[j-1],b=line[j],t=(centre.z-a.z)/(b.z-a.z),edge=a.x+(b.x-a.x)*t;
+  const offset=Math.abs(centre.x)-edge;
+  assert.ok(offset>-.02&&offset<.12,'crown crumbs sit beside the actual modelled edge');edgeCrumbs++;
+}
+assert.ok(edgeCrumbs>10,'exercise small edge crumbs on both trench sides');
+for(const g of edgeBatches)g.dispose();
 for(const g of cliffKit)g.dispose();
 cliffScene.traverse(node=>{if(node.isMesh){node.geometry.dispose();for(const m of Array.isArray(node.material)?node.material:[node.material])m.dispose();}});
 // A crown can cross onto a steep neighbouring bank. Large clods must shrink to
@@ -334,7 +369,7 @@ let largeClods=0,buriedNormals=0,sculptedCaps=0,removedBuriedFaces=0;
 BuildTrenchEarth({SetSector(){},Add(key,g){
   if(g.userData.trenchClodHigh){
     largeClods++;
-    const p=g.attributes.position,n=g.attributes.normal;
+    const p=g.attributes.position,n=g.attributes.normal,uv=g.attributes.uv;
     const original=clodKit.find(source=>source.userData.trenchClodShape===g.userData.trenchClodShape).index;
     const retained=new Set();
     for(let i=0;i<g.index.count;i+=3)retained.add([0,1,2].map(k=>g.index.getX(i+k)).join(':'));
@@ -348,7 +383,11 @@ BuildTrenchEarth({SetSector(){},Add(key,g){
     for(let i=0;i<p.count;i++){
       const length=Math.hypot(n.getX(i),n.getY(i),n.getZ(i));
       assert.ok(Math.abs(length-1)<1e-5,'blended clod normals stay finite and unit length');
-      if(p.getY(i)<2){assert.ok(n.getY(i)>.999,'embedded foot follows the flat host normal');buriedNormals++;}
+      if(p.getY(i)<2){
+        assert.ok(n.getY(i)>.999,'embedded foot follows the flat host normal');
+        assert.ok(Math.abs(uv.getY(i)+9)<1e-5,'embedded foot retains loose-soil colour');buriedNormals++;
+      }
+      if(p.getY(i)>2.06)assert.ok(uv.getY(i)<-9.24,'exposed aggregate carries the cohesive core blend marker');
       if(p.getY(i)>2.06&&n.getY(i)<.95)sculptedCaps++;
     }
   }
