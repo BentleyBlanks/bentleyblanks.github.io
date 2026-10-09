@@ -60,6 +60,7 @@ jobs:
             tengxian-gpu-${{ runner.os }}-v1-
       - name: Build and validate GPU publication assets
         run: |
+          set -o pipefail
           # Keep live encoder output and expose the actionable error in check annotations.
           if node Taierzhuang1938/Script_BuildPublishAssets.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938" --cache-dir "$RUNNER_TEMP/tengxian-gpu-cache" 2>&1 | tee "$RUNNER_TEMP/gpu-build.log"; then
             :

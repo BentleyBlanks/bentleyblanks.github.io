@@ -7,7 +7,7 @@ import {createRequire} from 'node:module';
 import sharp from 'sharp';
 import {ASSET_PUBLISH} from './Data_AssetPublish.mjs';
 import {TextureCatalog, NormalizeImportSettings} from './Script_TextureImportRules.mjs';
-import {EncodeTexture} from './Script_TextureImportBuild.mjs';
+import {EncodeTexture, BasisEncoderInfo} from './Script_TextureImportBuild.mjs';
 import {BuildTextureImports} from './Script_BuildTextureImports.mjs';
 import {CachedFiles, Hash, Within} from './Script_PublishCache.mjs';
 import {read as ReadKtx} from './vendor/three/examples/jsm/libs/ktx-parse.module.js';
@@ -15,6 +15,7 @@ import {read as ReadKtx} from './vendor/three/examples/jsm/libs/ktx-parse.module
 const require = createRequire(import.meta.url);
 const ownDir = path.dirname(fileURLToPath(import.meta.url));
 const Toolchain = async project => ({sharp: sharp.versions, basis: require('@gpu-tex-enc/basis/package.json').version,
+  encoder: await BasisEncoderInfo().then(({binary,sha256,version,threadArgs}) => ({binary,sha256,version,threadArgs})),
   platform: process.platform, arch: process.arch, pipeline: ASSET_PUBLISH.version,
   scripts: await Promise.all(['Script_TextureImportBuild.mjs','Script_TextureImportPixels.mjs','Script_TextureImportRules.mjs']
     .map(async file => [file, Hash(await fs.readFile(Within(project, file)))]))});

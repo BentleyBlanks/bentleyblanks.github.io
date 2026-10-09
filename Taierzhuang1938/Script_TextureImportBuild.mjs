@@ -10,6 +10,23 @@ import { TransformImportPixels, NormalizeImportNormals, BuildImportMipmaps } fro
 import { read as ReadKtx, write as WriteKtx } from "./vendor/three/examples/jsm/libs/ktx-parse.module.js";
 const require = createRequire(import.meta.url), run = promisify(execFile);
 const Hash = value => createHash("sha256").update(value).digest("hex");
+let basisEncoder;
+export function BasisEncoderInfo() {
+  return basisEncoder ??= (async () => {
+    const packagePath = require.resolve("@gpu-tex-enc/basis/package.json"), pkg = require(packagePath);
+    // The package's Linux baseline executable is 1.15; its SSE4.1 executable,
+    // like Windows, is 1.16.3. Probe CPU support instead of assuming x64 means SSE4.1.
+    const sse = process.platform === 'linux' && process.arch === 'x64'
+      && /^flags\s*:.*\bsse4_1\b/m.test(await fs.readFile('/proc/cpuinfo','utf8').catch(() => ''));
+    const bin = pkg.bin[`basisu-${process.platform}-${process.arch}${sse ? '-sse' : ''}`];
+    if (!bin) throw new Error(`Basis encoder unavailable on ${process.platform}/${process.arch}`);
+    const executable = path.resolve(path.dirname(packagePath), bin), bytes = await fs.readFile(executable);
+    return {executable, binary: bin, sha256: Hash(bytes),
+      version: bytes.toString('latin1').match(/Basis Universal GPU Texture Compressor v[\d.]+/)?.[0] || 'unknown',
+      // Old builds lack -max_threads. Preserve compatibility on older CPUs too.
+      threadArgs: bytes.includes(Buffer.from('max_threads')) ? ['-max_threads','2'] : ['-no_multithreading']};
+  })();
+}
 
 export async function EncodeTexture(projectDir, item, input, outputDir, {uastcRdo = null, orientations = [true, false]} = {}) {
   const sharp = require("sharp"), settings = NormalizeImportSettings(input, item);
@@ -54,17 +71,14 @@ export async function EncodeTexture(projectDir, item, input, outputDir, {uastcRd
     || !gpu && (settings.mipmaps === true || settings.mipBorder || settings.mipFilter === "box"));
   const levels = customMips ? BuildImportMipmaps(data, dimensions.width, dimensions.height, settings, colorSpace) : [base];
   if (gpu) {
-    const packagePath = require.resolve("@gpu-tex-enc/basis/package.json"), pkg = require(packagePath);
-    const bin = pkg.bin[`basisu-${process.platform}-${process.arch}`];
-    if (!bin) throw new Error(`Basis encoder unavailable on ${process.platform}/${process.arch}`);
-    const executable = path.resolve(path.dirname(packagePath), bin), temp = await fs.mkdtemp(path.join(os.tmpdir(), "TengxianTexture-"));
+    const encoder = await BasisEncoderInfo(), temp = await fs.mkdtemp(path.join(os.tmpdir(), "TengxianTexture-"));
     try {
       for (const flip of new Set(orientations)) {
         const output = flip ? destination : path.join(outputDir, `${stem}_NoFlip.ktx2`), containers = [];
         for (let level = 0; level < levels.length; level++) {
           const png = path.join(temp, "Input.png"), encoded = path.join(temp, "Level.ktx2");
           await (flip ? Pixels(levels[level]).flip() : Pixels(levels[level])).png().toFile(png);
-          const args = ["-file", png, "-output_file", encoded, "-ktx2", "-max_threads", "2"];
+          const args = ["-file", png, "-output_file", encoded, "-ktx2", ...encoder.threadArgs];
           if (settings.format === "ktx2-etc1s") args.push("-q", String(Math.max(1, Math.round(settings.quality * 255 / 100))));
           else args.push("-uastc", "-uastc_level", String(Math.min(4, Math.floor(settings.quality / 21))));
           if (uastcRdo != null && settings.format !== "ktx2-etc1s") {
@@ -77,7 +91,7 @@ export async function EncodeTexture(projectDir, item, input, outputDir, {uastcRd
             if (settings.mipBorder) args.push("-mip_clamp");
             if (settings.textureType === "normal") args.push("-mip_renorm");
           }
-          await run(executable, args, { timeout: 180000, windowsHide: true, maxBuffer: 1024 * 1024 });
+          await run(encoder.executable, args, { timeout: 180000, windowsHide: true, maxBuffer: 1024 * 1024 });
           const bytes = await fs.readFile(encoded);
           if (customMips) containers.push(ReadKtx(new Uint8Array(bytes)));
           else await fs.writeFile(output, bytes);

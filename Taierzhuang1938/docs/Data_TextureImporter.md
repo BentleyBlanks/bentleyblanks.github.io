@@ -35,6 +35,8 @@ DXT5 等指定格式实际交给 KTX2 转码器选择，BC3 即使输入不透�
 
 `Script_TextureImportRules` 是浏览器、保存端点、构建共用的配置校验。`Script_TextureImportBuild` 从原图生成产物，使用固定版本 sharp 0.34.5 和 BasisU 1.16.3（npm 包 `@gpu-tex-enc/basis` 1.16.4）；执行 npm install 即取得 Windows/Linux 编码器，不用额外安装 Unity、Blender 或系统 KTX CLI。
 
+该 npm 包的 Linux 基础二进制实际为 1.15，不支持 `-max_threads`；Linux 构建先核对 `/proc/cpuinfo` 的 SSE4.1 能力，再选包内 1.16.3 的 SSE 版本。旧 CPU 保留基础版本并使用其支持的单线程参数。实际二进制、版本、SHA-256 与线程参数进入报告及缓存键，避免把不同编译器的缓存混用。
+
 发布顺序：git archive 到独立 staging → `Script_BuildPublishAssets.mjs --output-dir <staging>/Taierzhuang1938 --cache-dir <cache>` → `Script_ValidatePublishAssets.mjs --output-dir <staging>/Taierzhuang1938` → `Script_BuildBrowserBundle.mjs --deploy --output-dir <staging>/Taierzhuang1938` → `Script_PublishAssetsBrowserTest.mjs --software --report=<staging>/Taierzhuang1938/Data_AssetPublishReport.json` → 上传 Pages。每次 master 推送自动执行。构建器禁止输出到源项目目录；源图、源清单、源 GLB 不覆盖，生成文件不提交。
 
 手动配置默认空，发布时未覆盖的 GPU 贴图采用下一节自动策略。显式选择「源格式」且无像素变换时逐字节复制，并关闭此图自动转换；手动配置优先，报告为 `Data_TextureImportReport.json`。质量配置 0–100（图片编码器下限映射到 1）；WebP 无损、PNG、RGBA32 无质量滑杆；ETC1S 质量映射到 BasisU 1–255；UASTC 映射到编码搜索级别 0–4。提高 UASTC 质量主要增加编码耗时／减少误差，不保证明显改变文件体积。RGBA32 以 PNG 传输，在 GPU 上使用未压缩 RGBA。
