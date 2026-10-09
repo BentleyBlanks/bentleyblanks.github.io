@@ -4,30 +4,30 @@
   "name": "TrenchPom",
   "preset": "drySoil",
   "source": {
-    "path": "C:/Users/Bentl/.codex/artifacts/TrenchReferenceTenImplementation20261009/Source/TrenchCompactFracture/lovart_5f3964a42752.png",
-    "sha256": "cb516c13fee1c44dcaa1be811424b21ccbe75bd156129aa4e26d5254848cfa85",
+    "path": "C:/Users/Bentl/.codex/artifacts/TrenchReferenceTenImplementation20261009/Source/TrenchCutPhoto/lovart_022eb66b221d.png",
+    "sha256": "a58de81e7cdd4a6414e2ca7451fea1d233fa57d69fc2debfa7db1773a9a72ae7",
     "metrics": {
       "meanSrgb": [
-        0.3698,
-        0.301,
-        0.2415
+        0.518,
+        0.4061,
+        0.307
       ],
-      "luma": 0.3041,
-      "lumaStd": 0.1211,
-      "sat": 0.3471,
-      "clipLow": 0.0055,
+      "luma": 0.4104,
+      "lumaStd": 0.1529,
+      "sat": 0.4074,
+      "clipLow": 0.0063,
       "clipHigh": 0.0,
-      "lowFreq": 0.0726
+      "lowFreq": 0.0442
     }
   },
   "heightSource": null,
   "params": {
     "mean": [
-      0.44,
-      0.383,
-      0.303
+      0.49,
+      0.426,
+      0.346
     ],
-    "contrast": 0.07,
+    "contrast": 0.085,
     "lumaRange": [
       0.28,
       0.46
@@ -40,7 +40,7 @@
       0.05,
       0.12
     ],
-    "reliefM": 0.007,
+    "reliefM": 0.005,
     "rough": 0.94,
     "roughVar": 0.025,
     "roughLumaK": 0.0,
@@ -67,7 +67,7 @@
     "dataQuality": 95,
     "dataLossless": false,
     "detailBalance": 0.0,
-    "heightFineWeight": 0.12,
+    "heightFineWeight": 0.16,
     "uvAtlasReason": null
   },
   "outputs": [
@@ -76,46 +76,46 @@
       "file": "Texture_TrenchPomBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 329260,
-      "sha256": "c37744b1f32f0f06071eab4bbd4e42832cd5058d6a389ebe4b05d63d7b86dcf2"
+      "bytes": 373178,
+      "sha256": "862e4c8bb08a6cb5d9a200877ad30370d686bd74a99f8abe4572c79d370fcb35"
     },
     {
       "channel": "Normal",
       "file": "Texture_TrenchPomNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 97274,
-      "sha256": "63d605dd43eaec6c711fbafbca36cb65e9b16b75634c51978a158555bed1a5b5"
+      "bytes": 95954,
+      "sha256": "1c69032afc6a7e3870a0adedac4744bffae76bacca0455cd7fd880ec5546dfc2"
     },
     {
       "channel": "Orh",
       "file": "Texture_TrenchPomOrh.webp",
       "width": 512,
       "height": 512,
-      "bytes": 49938,
-      "sha256": "1b448c532c68c1e582cec29fe13924268e9a1336a60a8fbc4143857816e215cb"
+      "bytes": 54980,
+      "sha256": "0d69b0d11a42c7ddb9aad48f817d99dcc47712d97e25655d8c0ecac7cc8577a6"
     }
   ],
-  "totalBytes": 476472,
+  "totalBytes": 524112,
   "metrics": {
     "meanSrgb": [
-      0.4396,
-      0.3838,
-      0.3028
+      0.4897,
+      0.4268,
+      0.3457
     ],
-    "luma": 0.3754,
-    "lumaStd": 0.0714,
-    "sat": 0.3112,
+    "luma": 0.4207,
+    "lumaStd": 0.0862,
+    "sat": 0.2942,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0194,
-    "seam": 0.0434,
-    "interior": 0.044,
-    "seamRatio": 0.987,
-    "border": 0.937,
-    "swing": 0.0133,
+    "lowFreq": 0.0135,
+    "seam": 0.0574,
+    "interior": 0.0606,
+    "seamRatio": 0.947,
+    "border": 0.955,
+    "swing": 0.0155,
     "aoMean": 0.969,
-    "roughMean": 0.941,
+    "roughMean": 0.942,
     "texelsPerMeter": 853.3
   },
   "gateProblems": []

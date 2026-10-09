@@ -277,7 +277,7 @@ assert.ok(noCrownPanels>10,'exercise crownless modules across both sides of an e
 for(const g of cliffKit)g.dispose();
 cliffScene.traverse(node=>{if(node.isMesh){node.geometry.dispose();for(const m of Array.isArray(node.material)?node.material:[node.material])m.dispose();}});
 // A crown can cross onto a steep neighbouring bank. Large clods must shrink to
-// crumbs there, keep a closed volume and remain seated across curved terrain.
+// crumbs there, preserve their exposed cap and remain seated across curved terrain.
 const steepGround=(x,z)=>Math.abs(x)*5+Math.sin(z*2)*.09;
 const steepPlan={...plan,Corridor:()=>({bermWidth:1}),Depth:()=>0};
 let steepClods=0;
@@ -310,11 +310,21 @@ const raisedBank=(x,z)=>Math.abs(x)>1.5?2:0;
 // deliberately flat host plane being used to measure contact normals here.
 const flatCapPlan={...steepPlan,segments:steepPlan.segments.map(segment=>({...segment,
   stations:segment.stations.map((st,i)=>({...st,junctionClear:i%2===1}))}))};
-let largeClods=0,buriedNormals=0,sculptedCaps=0;
+let largeClods=0,buriedNormals=0,sculptedCaps=0,removedBuriedFaces=0;
 BuildTrenchEarth({SetSector(){},Add(key,g){
   if(g.userData.trenchClodHigh){
     largeClods++;
     const p=g.attributes.position,n=g.attributes.normal;
+    const original=clodKit.find(source=>source.userData.trenchClodShape===g.userData.trenchClodShape).index;
+    const retained=new Set();
+    for(let i=0;i<g.index.count;i+=3)retained.add([0,1,2].map(k=>g.index.getX(i+k)).join(':'));
+    for(let i=0;i<original.count;i+=3){
+      const ids=[0,1,2].map(k=>original.getX(i+k));
+      if(ids.some(v=>p.getY(v)>=2))assert.ok(retained.has(ids.join(':')),'hidden-face culling preserves every triangle touching the visible cap');
+      if(!retained.has(ids.join(':'))){
+        assert.ok(ids.every(v=>p.getY(v)<2-.018),'removed clod triangles are below the physical ground');removedBuriedFaces++;
+      }
+    }
     for(let i=0;i<p.count;i++){
       const length=Math.hypot(n.getX(i),n.getY(i),n.getZ(i));
       assert.ok(Math.abs(length-1)<1e-5,'blended clod normals stay finite and unit length');
@@ -327,6 +337,7 @@ BuildTrenchEarth({SetSector(){},Add(key,g){
   crustReliefM:0,cutShoulderM:0,spadeReliefM:0,clodChance:0,bankClods:0,crumbs:0,
   lipClods:4,lipRadiusM:[.215,.215],lipReliefM:[.10,.10],spoilClods:0}});
 assert.ok(largeClods>10&&buriedNormals>20&&sculptedCaps>10,'large soil caps are detailed while their feet join the host');
+assert.ok(removedBuriedFaces>100,'the real kit sheds hidden faces without flattening its visible silhouette');
 for(const g of clodKit)g.dispose();
 clodScene.scene.traverse(node=>{if(node.isMesh){node.geometry.dispose();for(const m of Array.isArray(node.material)?node.material:[node.material])m.dispose();}});
 const previewPlan=CompileTrenchNetwork({seed:'SpoilPreview',earthProfile:TRENCH_EARTH_PROFILE,

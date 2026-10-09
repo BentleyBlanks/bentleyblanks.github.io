@@ -1,10 +1,21 @@
 # 通用壕沟表面
 
+## 2026-10-09 后续：土崖切面材质与沟底碎土
+
+第四十三轮沿用下节的四种土崖模块，按用户补充近照重新制作密实断面材质，并补足沟底碎土。本节为当前参数，下节第四十一轮及更早数字保留为历史取证。
+
+- Lovart 本轮只新生成一张 `TrenchPom` 第八版源图，保留相连的铲削面、细孔与局部酥碎处。提示词与源图地址见 [Texture_TrenchPom.txt](../_import/Prompts/Texture_TrenchPom.txt)，实际源图 SHA-256、参数和输出散列见 [烘焙记录](../_import/TextureBakes/Texture_TrenchPom.json)。Base 1024²、Normal / Orh 512²，合计 524,112 字节；松土沿用第三版 585,614 字节，两套共 1,109,726 字节。仍为生成底色及亮度推导的数据图，不是扫描 PBR。
+- 密实壁 1.2 m 平铺，烘焙对比 .085、细高度权重 .16、`flattenSigma=.18`、行列均衡开启；运行时颜色细节系数恢复 1.0，视差深度降到 5 mm。松土仍为 1.8 m / 20 mm。新图严格指标：luma .4207、std .0862、边缘比 .955、行列摆幅 .0155、seamRatio .947、lowFreq .0135，无高低端截断。三个通道按记录重烘到独立目录，均与现有资产和记录 SHA-256 一致。
+- 沟底抽样从每侧每站 7 颗提高到 14 颗，平缓面的埋入比例为 .35；陡壁仍至少 .55，避免增加悬空土团。石块抽样概率 .16 → .04，把原预算留给土壤。土团先计算法线，再裁除三个顶点都低于物理地面 18 mm、且面中心低于物理地面 25 mm 的隐藏三角形；不用可见土皮的最高 Y 判断，以免裁掉倒悬下方可见部分。回归检查实际高模露出地面的所有面仍在，删除面均位于地面之下。
+- 当前全网 1,035 个崖壁模块、34,825 颗土团、2,739 组根束；土层 1,101,848 三角，草/石 43,872，共 1,145,720，55 个静态分区网格。原有 1.15M 三角 / 64 网格门槛不变；地面仍为 871,520 三角。中心线、沟底、共享物理高度场与道路不变。取证目录为本地 `TrenchReferenceTenImplementation20261009/Iteration43All`；29 个高画质机位覆盖全 22 段，页面、控制台与 GL 错误为 0。实测爆破削低 0.606 m、裁除三组邻近装饰，Reset 恢复几何和地面高度。
+
+默认白盒另取 `Whitebox43` 三个机位，显示与爆破恢复检查通过，页面、控制台与 GL 错误也为 0；两档截图均已查看。本轮 `TrenchSurfaceTest`、`TrenchPlanTest`、`FirstLevelFrontTopologyTest`（48 条路线）、`ModuleGraphTest`、`TextureStandardsTest`（3,712 项）和 `MotionVectorContractTest`（49 个 GPU 场景）通过。贴图门发现模型提示词曾放入纹理专用目录，现将其移到 `_import/ModelPrompts/` 并修复引用，没有放宽孤儿记录检查。采样器及 shader 布局未改，沿用下文已有采样器与混合回归结果；下文既有 quick / prepush 失败未因此消失。土崖方案已落地，近照中的自然破碎形态仍有差距，当前保留本地审阅。本轮未新开 Blender，收尾 `status --scan` 确认本 worktree 无实例；其他任务的 Blender 实例未操作。
+
 ## 2026-10-09 补充：按用户近照改用模块化土崖内壁
 
 用户补充近乎直立、带凹洞和悬挑土沿的开挖断面照片，并要求采用成熟的山体崖壁处理方式。本节覆盖下节旧坡皮方案：大尺度断口由实际网格承担，密实土与松土继续使用世界坐标投影的现有 PBR。材质不跟随模块尺寸拉伸；壕沟走向、沟底、共享碰撞高度场与地形指纹保持原值。
 
-- 内置 imagegen 生成一张四模块原型表，再由 BlenderMCP 执行 [_import/Script_BakeTrenchCliffWalls.py](../_import/Script_BakeTrenchCliffWalls.py) 重建 [Model_TrenchCliffWalls.glb](../Model/Model_TrenchCliffWalls.glb)。生成提示词原文见 [Model_TrenchCliffWalls.txt](../_import/Prompts/Model_TrenchCliffWalls.txt)。这是手工规则重建的低模，不是扫描资产，也不是自动从图片恢复的几何。
+- 内置 imagegen 生成一张四模块原型表，再由 BlenderMCP 执行 [_import/Script_BakeTrenchCliffWalls.py](../_import/Script_BakeTrenchCliffWalls.py) 重建 [Model_TrenchCliffWalls.glb](../Model/Model_TrenchCliffWalls.glb)。生成提示词原文见 [Model_TrenchCliffWalls.txt](../_import/ModelPrompts/Model_TrenchCliffWalls.txt)。这是手工规则重建的低模，不是扫描资产，也不是自动从图片恢复的几何。
 - 源工程 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchCliffWalls/Scene_TrenchCliffWalls.blend`，该目录同时保留两张参考图、提示词及顶点边界测量。四种模块为 SpadeFace / TornFace / LowerScar / RootCrown，各 272 三角，合计 1,088 三角，GLB 25,564 字节、一个材质。实测 glTF：X 沿沟宽 1.5 m、Y 向上约 2.03–2.05 m、+Z 朝沟内，背裙 Z=-0.06 m，正向最大凹凸 0.209–0.236 m。
 - 运行时按原测站和原物理岸坡拟合高度，保持沟底净空。随机选择四种形体，前脸具备真实凹口与倒悬，顶部回折埋入弃土冠部。显式无弃土垄的出口及单侧土垄的空侧不抬高冠部，模型顶部超出的高度也被收回原岸顶。相邻端点共用切土面；只渐隐局部破损，不把整块厚度归零，避免等距柱状鼓包。变形后在共同边界平滑法线。侧边不加跨越整面高度的封口四边形，因为它会穿过弯曲后的剖面，产生三角露边。
 - 根须改为朝土壁的水平射线贴合，并按需要弯折；有倒悬的表面不能用最高 Y 来决定根须落点。独立测试对实际三角形计算三维最近距离，另查双方朝向、倒悬面、边界法线、沟底净空及原路线不变。模型变形后同步重算球形/盒形包围体，以免射线仍用源模型原点的范围而漏掉全部根须。

@@ -82,8 +82,8 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     geometry.rotateY(angle);
     geometry.scale(radius,relief,radius*(.7+random()*.65));
     geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up,n));
-    const p = geometry.attributes.position,contactWeights=new Float32Array(p.count);
-    const embed=cutClod ? .65 : crown ? Style.clodEmbed : Math.max(.55,Style.clodEmbed);
+    const p = geometry.attributes.position,contactWeights=new Float32Array(p.count),buried=new Float32Array(p.count);
+    const embed=cutClod ? .65 : crown ? Style.clodEmbed : physicalN.y>.85?Style.floorClodEmbed:Math.max(.55,Style.clodEmbed);
     const anchor=new THREE.Vector3(center.x,heightAt(center.x,center.z),center.z).addScaledVector(n,-relief*embed);
     for (let v = 0; v < p.count; v++) {
       // Keep the exposed cap solid. Only the buried underside follows a falling
@@ -91,6 +91,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       const x=anchor.x+p.getX(v),z=anchor.z+p.getZ(v),y=anchor.y+p.getY(v);
       const hostHeight=heightAt(x,z),seatedY=y+Math.min(0,hostHeight-.018-y)*underside[v];
       p.setXYZ(v,x,seatedY,z);
+      buried[v]=groundAt(x,z)-seatedY;
       contactWeights[v]=1-Ease(Math.max(0,(seatedY-hostHeight)*n.y)/Math.min(Style.clodContactM,radius*.5));
     }
     // World-projected material ignores authored UVs. Keep this marker through the
@@ -108,6 +109,21 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       const w=contactWeights[i],x=normals.getX(i)*(1-w)+n.x*w,y=normals.getY(i)*(1-w)+n.y*w,z=normals.getZ(i)*(1-w)+n.z*w;
       const length=Math.hypot(x,y,z)||1;normals.setXYZ(i,x/length,y/length,z/length);
     }
+    // Cull only faces fully inside the physical ground, keeping a safety margin
+    // and checking the centre on curved terrain. The visible skin's highest Y
+    // would incorrectly discard geometry visible beneath an overhanging lip.
+    // Compute normals first, so removing hidden faces cannot change the cap.
+    const triangles=geometry.index,keep=[];
+    for(let i=0;i<triangles.count;i+=3){
+      const a=triangles.getX(i),b=triangles.getX(i+1),c=triangles.getX(i+2);
+      let hidden=buried[a]>.018&&buried[b]>.018&&buried[c]>.018;
+      if(hidden){
+        const x=(p.getX(a)+p.getX(b)+p.getX(c))/3,z=(p.getZ(a)+p.getZ(b)+p.getZ(c))/3;
+        hidden=groundAt(x,z)-(p.getY(a)+p.getY(b)+p.getY(c))/3>.025;
+      }
+      if(!hidden)keep.push(a,b,c);
+    }
+    geometry.setIndex(keep);
     Add(earth, geometry); stats.clods++;
   };
   const Crust = (st, next, side, ends) => {
