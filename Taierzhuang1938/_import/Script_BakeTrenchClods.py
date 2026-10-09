@@ -8,8 +8,8 @@ from mathutils import Vector
 from pathlib import Path
 
 project = Path(__file__).resolve().parents[1]
-source = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchReferenceTen/ClodClusters')
-expected = source / 'Scene_TrenchClodClusters.blend'
+source = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchReferenceTen/ClodFractures')
+expected = source / 'Scene_TrenchClodFractures.blend'
 if bpy.data.filepath and Path(bpy.data.filepath).resolve() != expected.resolve():
     raise RuntimeError('Refusing another Blender project: ' + bpy.data.filepath)
 source.mkdir(parents=True, exist_ok=True)
@@ -39,12 +39,14 @@ for kind, name in enumerate(names):
         5:[((-.53,-.37,-.04),(.52,.49,.59)),((.44,-.38,.03),(.56,.47,.60)),((-.38,.41,-.02),(.52,.52,.65)),((.52,.38,-.05),(.50,.47,.51)),((.03,.02,.03),(.55,.49,.67))],
     }.get(kind,[((0,0,0),(1,1,1))])
     for part,(offset,scale) in enumerate(parts):
+        offset=tuple(v+rng.uniform(-.06,.06) for v in offset)
+        scale=tuple(v*rng.uniform(.92,1.08) for v in scale)
         result=bmesh.ops.create_icosphere(bm,subdivisions=3,radius=1)
         for vertex in result['verts']:
             p=vertex.co
-            for axis in range(3):p[axis]=math.copysign(abs(p[axis])**.78,p[axis])
-            f=1+.065*math.sin(p.x*8.1+p.y*6.7+kind)+.04*math.cos(p.y*9.7-p.z*7.1+part)
-            f+=rng.uniform(-.035,.035)
+            for axis in range(3):p[axis]=math.copysign(abs(p[axis])**.94,p[axis])
+            f=1+.08*math.sin(p.x*8.1+p.y*6.7+kind)+.05*math.cos(p.y*9.7-p.z*7.1+part)
+            f+=rng.uniform(-.045,.045)
             for axis in range(3):p[axis]=p[axis]*f*scale[axis]+offset[axis]
     bm.normal_update()
     mesh=bpy.data.meshes.new('Mesh_Trench'+name)
@@ -77,6 +79,17 @@ for kind, name in enumerate(names):
         Cut((0,-.43,0),(0,1,-.12),False)
         Cut((0,0,.76),(0,0,1),True)
     elif kind==5:Cut((.85,0,0),(1,.18,-.12),True)
+    # Fresh earth breaks are not perfectly machined planes. Add small coherent
+    # relief at fracture rims while keeping the buried sole closed and level.
+    for vertex in bm.verts:
+        if abs(vertex.co.z+.52)<1e-5:continue
+        original=vertex.co.copy()
+        for co,normal in cutPlanes[1:]:
+            normal=normal.normalized()
+            if abs((original-co).dot(normal))<1e-5:
+                ripple=.028*math.sin(original.x*6.3+original.y*8.1+kind)
+                ripple+=.022*math.cos(original.y*10.7+original.z*7.7+kind)
+                vertex.co+=normal*ripple
     bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
     bmesh.ops.triangulate(bm,faces=list(bm.faces))
     bm.to_mesh(obj.data);bm.free();obj.data.update()
@@ -92,12 +105,8 @@ for kind, name in enumerate(names):
     radius=max(math.hypot(vertex.co.x,vertex.co.y) for vertex in mesh.vertices)
     for vertex in mesh.vertices:
         vertex.co.x *= 1.12/radius; vertex.co.y *= 1.12/radius
-    transformedCuts=[(Vector((co.x*1.12/radius,co.y*1.12/radius,co.z*targetTop/top)),Vector((n.x*radius/1.12,n.y*radius/1.12,n.z*top/targetTop)).normalized()) for co,n in cutPlanes]
-    # Silhouette carries the broken edges; smooth normals keep shallow embedded
-    # faces from becoming black triangular facets when conformed to a slope.
     mesh.update()
-    for polygon in mesh.polygons:
-        polygon.use_smooth = not any(abs(polygon.normal.dot(n))>.995 and abs((polygon.center-co).dot(n))<.025 for co,n in transformedCuts)
+    for polygon in mesh.polygons:polygon.use_smooth=True
     uv = mesh.uv_layers.new(name='UVMap')
     for polygon in mesh.polygons:
         for loopIndex in polygon.loop_indices:
@@ -110,9 +119,14 @@ for kind, name in enumerate(names):
     obj.data.name = 'Mesh_Trench' + name + 'High'; low.data.name = 'Mesh_Trench' + name + 'Low'
     bpy.context.collection.objects.link(low)
     bpy.context.view_layer.objects.active = low; low.select_set(True)
-    decimate = low.modifiers.new('Small aggregate silhouette budget', 'DECIMATE'); decimate.ratio = .25
+    decimate = low.modifiers.new('Small aggregate silhouette budget', 'DECIMATE'); decimate.ratio = .35
     bpy.ops.object.modifier_apply(modifier=decimate.name); low.select_set(False)
     for level in (obj, low):
+        # Split only genuinely sharp breaks after each LOD is decimated.
+        bpy.context.view_layer.objects.active=level;level.select_set(True)
+        crease=level.modifiers.new('Broken earth creases','EDGE_SPLIT')
+        crease.split_angle=math.radians(70);crease.use_edge_angle=True;crease.use_edge_sharp=False
+        bpy.ops.object.modifier_apply(modifier=crease.name);level.select_set(False)
         mesh = level.data
         records.append({'name':level.name, 'triangles':sum(len(p.vertices)-2 for p in mesh.polygons),
             'gltfBounds':[[min(v.co.x for v in mesh.vertices),min(v.co.z for v in mesh.vertices),-max(v.co.y for v in mesh.vertices)],
