@@ -833,8 +833,8 @@ export const TEXTURE_MANIFEST = Object.freeze([
     normalConvention: "terrain",
     bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "_import/TextureBakes/Texture_TrenchPom.json",
-    // Approved reference 10: compact cut face; generated albedo and derived height.
-    source: { provider: "lovart", date: "2026-10-09", ref: "baf34e85-1791-4996-9ca8-b83a0eb32a48", prompt: "_import/Prompts/Texture_TrenchPom.txt" },
+    // Approved reference 10 and the real cut-wall photo: generated albedo and derived height.
+    source: { provider: "lovart", date: "2026-10-10", ref: "baf34e85-1791-4996-9ca8-b83a0eb32a48", prompt: "_import/Prompts/Texture_TrenchPom.txt" },
     consumers: [{ file: "Data_TrenchSurface.mjs", token: "Texture_TrenchPom" }],
     files: [
       ["Texture_TrenchPomBase.webp", "Base", 1024, 1024],
