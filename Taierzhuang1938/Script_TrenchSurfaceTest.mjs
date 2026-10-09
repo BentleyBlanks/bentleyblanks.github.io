@@ -187,6 +187,16 @@ for(const [key,height] of edges)if(spoilEdges.has(key)){
 assert.ok(joinedCrest>100,'verify the actual common crest vertices, not only each skin separately');
 assert.ok(rootVertices>0,'roots retain a distinct surface in the soil batch');
 assert.ok(compactClods>10,'actual cut-wall aggregates use the compact matrix');
+const toeCrumbs=cutBatches.filter(g=>g.userData.trenchToeCrumb);
+assert.ok(toeCrumbs.length>20,'part of the existing debris collects at both bank feet');
+for(const g of toeCrumbs){
+  const p=g.attributes.position;let meanX=0,maxRise=-Infinity;
+  for(let i=0;i<p.count;i++){
+    meanX+=p.getX(i);maxRise=Math.max(maxRise,p.getY(i)-cutGround(0,p.getZ(i)));
+  }
+  assert.ok(Math.abs(Math.abs(meanX/p.count)-1.7)<.35,'toe debris stays near the floor edge');
+  assert.ok(maxRise<.18,'toe debris remains low instead of creating a second bank');
+}
 assert.equal(new Set(cutBatches.map(g=>g.userData)).size,cutBatches.length,
   'placement metadata is private; later crown clods cannot relabel earlier floor clods');
 // Raycast the rendered triangles independently of the placement sampler. Long

@@ -6,7 +6,7 @@ import { TRENCH_APPEARANCE as DefaultStyle } from "./Data_TrenchAppearance.mjs";
 import { CreateTrenchDressingHeightSampler } from "./Script_TrenchSurface.mjs";
 
 export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots", clods = [], cliffs = [], style: Style = DefaultStyle } = {}) {
-  const stats = { clods: 0, spoilClods: 0, roots: 0, rootBranches: 0, cliffPanels: 0, triangles: 0 };
+  const stats = { clods: 0, toeCrumbs: 0, spoilClods: 0, roots: 0, rootBranches: 0, cliffPanels: 0, triangles: 0 };
   const skinGeometries=[];
   const crownRuns=new Map();
   // IcosahedronGeometry(1, 0) splits every triangle for flat normals. Weld the
@@ -72,7 +72,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       n.fromBufferAttribute(normals,i).lerp(soilN,weights[i]).normalize();normals.setXYZ(i,n.x,n.y,n.z);
     }
   };
-  const Clod = (center, radius, relief, random, crown=false, heightAt=groundAt) => {
+  const Clod = (center, radius, relief, random, crown=false, heightAt=groundAt, toe=false) => {
     // Radius and height cannot be independent: a tiny crumb with a large height
     // became a pointed rock. Soil aggregates remain squat broken masses.
     relief=Math.min(relief,radius*.8);
@@ -102,6 +102,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     geometry.userData={...source.userData};
     const underside=Float32Array.from(geometry.attributes.position.array.filter((_,i)=>i%3===1),y=>Math.max(0,Math.min(1,(.18-y)/.4)));
     geometry.userData.trenchCrown=crown;
+    geometry.userData.trenchToeCrumb=toe;
     geometry.rotateY(angle);
     geometry.scale(radius,relief,radius*(.7+random()*.65));
     geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up,n));
@@ -154,7 +155,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       if(!hidden)keep.push(a,b,c);
     }
     geometry.setIndex(keep);
-    Add(earth, geometry); stats.clods++;
+    Add(earth, geometry); stats.clods++;if(toe)stats.toeCrumbs++;
   };
   const Crust = (st, next, side, ends) => {
     const positions=[],uvs=[],indices=[],weights=[],cols=8,rows=8,rowRelief=new Float32Array(rows+1),rowExposure=new Float32Array(rows+1);
@@ -408,9 +409,15 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
           Clod(at,Range(random,Style.clodRadiusM),Range(random,Style.clodReliefM),random,false,dressAt);
         }
         for(let n=0;n<Style.crumbs;n++) {
-          const at=Point(st.halfFloor*(.1+.9*Math.pow(random(),.6))+st.bank*random()*.18,(random()-.5)*1.5);
+          // Retain the same draws and total count. Part of the existing debris
+          // settles near the bank toe instead of being spread through the lane.
+          const across=random(),bankDraw=random(),toe=n<Style.toeCrumbs;
+          const lateral=toe?st.halfFloor+Style.toeCrumbBandM[0]
+            +(Style.toeCrumbBandM[1]-Style.toeCrumbBandM[0])*(across+bankDraw)*.5
+            :st.halfFloor*(.1+.9*Math.pow(across,.6))+st.bank*bankDraw*.18;
+          const at=Point(lateral,(random()-.5)*1.5);
           const radius=Style.crumbRadiusM[0]+(Style.crumbRadiusM[1]-Style.crumbRadiusM[0])*Math.pow(random(),1.5);
-          Clod(at,radius,radius*Range(random,Style.crumbReliefRatio),random);
+          Clod(at,radius,radius*Range(random,Style.crumbReliefRatio),random,false,groundAt,toe);
         }
         // A broken, root-bound crown interrupts the long straight heightfield edge.
         for (let n = 0; n < Style.lipClods; n++) {

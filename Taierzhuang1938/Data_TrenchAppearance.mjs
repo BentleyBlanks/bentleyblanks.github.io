@@ -31,6 +31,8 @@ export const TRENCH_APPEARANCE = Object.freeze({
   clodReliefM: [0.025, 0.065],
   bankClods: 3,
   crumbs: 12,
+  toeCrumbs: 4,
+  toeCrumbBandM: [-.20,.03],
   crumbRadiusM: [.025, .145],
   crumbReliefRatio: [.45, .80],
   lipRadiusM: [0.035, 0.22],
