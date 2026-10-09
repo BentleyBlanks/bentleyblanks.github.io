@@ -114,6 +114,7 @@ menu = new MainMenu({root: document.getElementById('menu'), camera, staticBackdr
   FirstLevelJump: stage => GoToSandbox('firstLevelP012Whitebox', {stage}),
 });
 const api = {renderer, camera, scene: room.scene, audio, state, menu, graphics, GraphicsProfile: graphicsProfile, StepFrames,
+  get MenuParticles() { return room.atmosphere?.particles ?? null; },
   Debug: {
     Menu: () => ({open: menu.open, live: menu.live, mode: menu.mode, items: menu.items.map(item => item.id),
       item: menu.items[menu.itemIndex]?.id || null, selected: menu.selected, shot: menu.shots[menu.shotIndex]?.id || null,

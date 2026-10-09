@@ -2,6 +2,7 @@
 // animation, foreground occlusion, warm-up reset and teardown on a real GPU.
 import assert from "node:assert/strict";
 import path from "node:path";
+import fs from 'node:fs/promises';
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 
@@ -28,18 +29,20 @@ try {
       const gl=renderer.getContext();
       function Read(){renderer.render(scene,camera);const p=new Uint8Array(640*480*4);gl.readPixels(0,0,640,480,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;}
       function Changed(a,b){let n=0;for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>12)n++;return n;}
+      const images=[];
+      function Simulate(seconds){for(const ids of vfx.battleSmoke?.handles.values()||[])for(const id of ids){const system=vfx.particles.Get(id).system;vfx.particles.Simulate(id,system.modules.main.duration+seconds);vfx.particles.Play(id);}vfx.Update(0,camera,seconds);}
       vfx.Update(1/60,camera,10);const empty=Read();
       const handles=FIRST_LEVEL_DISTANT_SMOKE.slice(0,4).map((s,i)=>vfx.SmokeSource({x:(i-1.5)*14,y:0,z:-72},s.options));
-      vfx.Update(1/60,camera,10);const smoke=Read();
+      Simulate(10);const smoke=Read();
       const firstCalls=renderer.info.render.calls;
-      vfx.Update(1/60,camera,24);const later=Read();
+      Simulate(24);const later=Read();
       const wall=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshBasicMaterial({color:0x885533}));
       wall.position.set(0,20,-20);scene.add(wall);
       vfx.battleSmoke.mesh.visible=false;const wallOnly=Read();
       vfx.battleSmoke.mesh.visible=true;const occluded=Read();scene.remove(wall);
       vfx.ClearParticles();const cleared=Read();
       vfx.Update(1/60,camera,.1);const reset=Read();
-      const result={volume:vfx.battleSmoke.texture.isData3DTexture,instances:vfx.battleSmoke.geometry.instanceCount,
+      const result={volume:vfx.battleSmoke.texture.isData3DTexture,instances:[...vfx.battleSmoke.handles.values()].flat().reduce((n,id)=>n+vfx.particles.Inspect(id).particleCount,0),
         firstCalls,visible:Changed(empty,smoke),animated:Changed(smoke,later),occlusion:Changed(wallOnly,occluded),
         cleared:Changed(empty,cleared),reset:Changed(empty,reset),
         combatParticles:Object.values(vfx.pools).reduce((n,p)=>n+Array.from(p.deathTime).filter(t=>t>vfx.time).length,0),
@@ -61,8 +64,8 @@ try {
         // part of dust eruptions. A long 14 s difference alone can hide inertia.
         const phase=(profile.seed%4096)/4096;
         const time=frame===5?(1.18-phase)*profile.life:5;
-        vfx.Update(1/60,camera,time);const first=Read();
-        vfx.Update(1/60,camera,time+1);const second=Read();
+        Simulate(time);const first=Read();
+        Simulate(time+1);const second=Read();images.push({name:profile.type,png:renderer.domElement.toDataURL()});
         const style={type:profile.type,visible:Changed(roadEmpty,first),oneSecond:Changed(first,second)};
         if(frame===1||frame===4) {
           // Recover opacity using identical smoke over white/black backgrounds;
@@ -82,21 +85,24 @@ try {
           style.layers={core,edge,peak,selfShadow:Changed(second,unshadowed)};
         }
         if(frame===5) {
-          vfx.Update(1/60,camera,(1.8-phase)*profile.life);
+          Simulate((1.8-phase)*profile.life);
           style.quiet=Changed(roadEmpty,Read());
         }
         result.styles.push(style);vfx.RemoveSmokeSource(handle);
       }
       result.glError=gl.getError();
       vfx.Dispose();result.afterDispose=scene.getObjectByName("BattleSmokeBackdrop")===undefined;
-      wall.geometry.dispose();wall.material.dispose();renderer.dispose();window.result=result;
+      wall.geometry.dispose();wall.material.dispose();renderer.dispose();window.result=result;window.images=images;
     </script>`}));
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/_check_DistantSmokeGpu.html`,{waitUntil:"domcontentloaded"});
   await page.waitForFunction(()=>window.result,null,{timeout:60000});
   const r=await page.evaluate(()=>window.result);
+  const out=path.join(root,'Taierzhuang1938','_shots','UnifiedSmoke');await fs.mkdir(out,{recursive:true});
+  for(const capture of await page.evaluate(()=>window.images))await fs.writeFile(path.join(out,capture.name+'.png'),Buffer.from(capture.png.split(',')[1],'base64'));
+  await fs.writeFile(path.join(out,'Report.json'),JSON.stringify({r,errors},null,2));
   assert.deepEqual(errors,[]);
   assert.equal(r.volume,true,"real 3D density texture bound");
-  assert.equal(r.instances,32,"low quality keeps eight lobes per source");
+  assert.equal(r.instances,48,"low quality keeps twelve overlapping lobes per source");
   assert.equal(r.firstCalls,1,"all backdrop types are one instanced draw");
   assert.ok(r.visible>5000,"smoke visibly fills the GPU fixture");
   assert.ok(r.animated>2000,"clouds genuinely advect and roll over time");

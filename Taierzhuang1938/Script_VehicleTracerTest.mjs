@@ -53,7 +53,8 @@ scene.add(new THREE.HemisphereLight(0xc7d3df,0x51483d,1.2));
 const vfx=new VfxSystem(scene,null,{quality:"high",maxParticles:4000});vfx.SetFog(null);
 vfx.shared.uResolution.value.set(W,H);
 let clock=1;
-function Advance(dt){clock+=dt;vfx.Update(dt,camera,clock);}
+// Match real frames: Vfx clamps long input deltas to protect continuous emitters.
+function Advance(dt){if(dt===0){vfx.Update(0,camera,clock);return;}while(dt>1e-9){const step=Math.min(dt,1/60);clock+=step;vfx.Update(step,camera,clock);dt-=step;}}
 Advance(0);   // 粒子时钟先对上：生成时刻取 vfx.time，之后按同一条时钟推寿命
 function Pixels(){renderer.render(scene,camera);const gl=renderer.getContext(),p=new Uint8Array(W*H*4);gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;}
 // 同一帧、同一时刻，把指定池藏掉再画一遍：差出来的像素就是那几个池画上去的。
@@ -97,7 +98,7 @@ const r={};
  r.quiet=quiet;scene.remove(wall);}
 // 4) 白盒体块的弹着表面
 {const byId=id=>MISSION_LAYOUT.blocks.find(b=>b.id===id);
- r.surfaces=Object.fromEntries(["BundleTankScreen2","FrontTraverseBlastScreen","GuardWaitingCover6","FrontParapet15","BundleCrawlFirstRoof","FieldRuin1"]
+ r.surfaces=Object.fromEntries(["ObservationParapet","OpeningShelterRoof","FieldRuin1"]
    .map(id=>[id,byId(id)?WhiteboxSurface(byId(id),MISSION_LAYOUT):"(missing)"]));
  const sink=new BuildSink();sink.Solid(0,1,0,1,1,1,"whiteboxWall",0,"sandbag");sink.Solid(0,1,0,1,1,1,"whiteboxWall",0);
  r.sink=sink.colliders.map(c=>c.surface??null);}
@@ -142,9 +143,8 @@ try {
   }
   // 4) 白盒弹着表面
   assert.deepEqual(r.surfaces, {
-    BundleTankScreen2: null, FrontTraverseBlastScreen: null,   // null = 按 tag（whiteboxWall）落砖墙
-    GuardWaitingCover6: "sandbag", FrontParapet15: "sandbag",
-    BundleCrawlFirstRoof: "wood", FieldRuin1: null,
+    ObservationParapet: "sandbag", OpeningShelterRoof: "wood",
+    FieldRuin1: null, // null = 按 tag（whiteboxWall）落砖墙；使用当前关卡仍存在的碰撞块。
   });
   assert.deepEqual(r.sink, ["sandbag", null]);
   assert.equal(r.glError, 0);

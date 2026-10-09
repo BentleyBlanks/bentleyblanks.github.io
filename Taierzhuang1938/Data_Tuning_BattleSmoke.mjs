@@ -2,10 +2,10 @@
 // Six intentionally different silhouettes: column, billow, sheet, ribbon,
 // low white screen, and a staggered dust eruption. Shared by scene and GPU test.
 export const BATTLE_SMOKE_QUALITY = Object.freeze({
-  low: { lobes: 8, steps: 8, opacity: 1.4 },
-  medium: { lobes: 11, steps: 8, opacity: 1.15 },
-  high: { lobes: 14, steps: 10, opacity: 1 },
-  ultra: { lobes: 16, steps: 12, opacity: 1 },
+  low: { lobes: 12, steps: 8, opacity: 1.0 },
+  medium: { lobes: 15, steps: 8, opacity: .85 },
+  high: { lobes: 18, steps: 10, opacity: .8 },
+  ultra: { lobes: 22, steps: 12, opacity: .7 },
 });
 // Denser 04–06 battlefield art direction: light is absorbed through each lobe,
 // leaving deep cores and a lit, translucent outer shell. No global fog change.

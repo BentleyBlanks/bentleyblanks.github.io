@@ -10,9 +10,12 @@
 // --source=N uses the Nth existing burning wreck, --distance=10|28|70 keeps repeatable views.
 // --distances=10,28,70 additionally captures several views without rebuilding the level.
 // --editor-check opens/closes the real VFX studio and verifies game state restoration.
+// --effects=FireMedium,SmokeBlack,ExplosionShell --times=0.05,0.35,1.2,3 captures production effects over time.
+// --baseline=<git-ref> serves the changed source files from that revision for a reproducible comparison.
 // Outputs: Frame.png, Report.json, Presets.json. Sources/controls are available on Tengxian.Particles.
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
 const argv=process.argv.slice(2),Arg=(name,fallback)=>argv.find(v=>v.startsWith('--'+name+'='))?.slice(name.length+3)??fallback;
@@ -23,6 +26,15 @@ const server=Arg('base','')?null:await ServeRoot(root,0),base=Arg('base','')||`h
 const browser=await LaunchBrowser(),errors=[];let page;
 try {
  page=await browser.newPage({viewport:{width:Number(Arg('width',1440)),height:Number(Arg('height',900))}});
+ if(Arg('baseline','')) {
+   const ref=Arg('baseline','');execFileSync('git',['rev-parse','--verify',ref+'^{commit}'],{cwd:root});
+   const changed=execFileSync('git',['diff','--name-only',ref,'--','Taierzhuang1938'],{cwd:root,encoding:'utf8'}).trim().split(/\r?\n/),overrides=new Map();
+   for(const file of changed.filter(file=>/\.(mjs|html)$/.test(file))){try{overrides.set('/'+file,execFileSync('git',['show',ref+':'+file],{cwd:root,maxBuffer:20*1024*1024}));}catch{}}
+   await page.route('**/Taierzhuang1938/**',route=>{
+     const pathname=new URL(route.request().url()).pathname.replace(/\/$/,'/index.html'),body=overrides.get(pathname);
+     return body?route.fulfill({contentType:pathname.endsWith('.html')?'text/html':'text/javascript',body}):route.continue();
+   });
+ }
  page.on('pageerror',e=>{errors.push(String(e));console.error(String(e));});page.on('console',m=>{if(m.type()==='error'){errors.push(m.text().slice(0,500));console.error(m.text().slice(0,500));}});
  await page.goto(`${base}/Taierzhuang1938/?whitebox=p012&manual=1&shot=1&quality=${encodeURIComponent(Arg('quality','high'))}&missionStage=${encodeURIComponent(Arg('stage','4'))}`,{waitUntil:'domcontentloaded',timeout:240000});
  for(let attempt=0;attempt<10;attempt++){
@@ -62,6 +74,26 @@ try {
    const file=`View${distance}m.png`;await page.screenshot({path:path.join(out,file)});views.push({distance,file});
  }
  report.views=views;
+ if(Arg('effects','')) {
+   report.effectFrames=[];
+   for(const effect of Arg('effects','').split(','))for(const seconds of Arg('times','0.05,0.35,1.2,3').split(',').map(Number)){
+     if(!/^[A-Za-z0-9]+$/.test(effect)||!Number.isFinite(seconds)||seconds<0||seconds>20)throw new Error('Invalid effect capture');
+     const state=await page.evaluate(async({effect,seconds})=>{
+       const g=window.Tengxian;
+       if(g.editor.ActiveId!=='vfx')g.editor.Open('vfx');
+       const editor=g.editor.active;
+       if(!editor.Effects().some(entry=>entry.id===effect))throw new Error('Unknown editor effect '+effect);
+       editor.Stop();editor.loop=false;
+       g.vfx.ClearParticles();g.vfx.particles.Resume();
+       const {Mulberry32}=await import('./Script_Noise.mjs');g.vfx.random=Mulberry32(1938);g.vfx.bloodEffects.random=g.vfx.random;
+       editor.effectId=effect;editor.Play();editor.FrameEffect();
+       const frames=Math.round(seconds*60);g.StepFrames(frames,1/60,false);g.post.NotifyCameraCut();g.StepFrames(8,0,true);
+       return {effect,seconds,particles:g.Particles.Inspect()};
+     },{effect,seconds});
+     const file=`${effect}_${Math.round(seconds*1000)}ms.png`;await page.screenshot({path:path.join(out,file)});report.effectFrames.push({...state,file});
+   }
+   await page.evaluate(()=>{const g=window.Tengxian;g.editor.Close();g.editor.TogglePanel(false);});
+ }
  if(argv.includes('--editor-check'))report.editor=await page.evaluate(()=>{
    const g=window.Tengxian,original=g.Particles,sources=g.vfx.smokeSources,before=JSON.stringify(original.Inspect());
    g.editor.Open('vfx');g.StepFrames(30,1/60,true);

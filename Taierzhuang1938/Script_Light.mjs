@@ -593,6 +593,28 @@ export class LightRig {
     this._FeedClusters(candidates);
   }
 
+  /** Isolated VFX authoring uses the existing fixed lights, with separate sources and clocks. */
+  BeginEffectPreview() {
+    const state={fireSources:this.fireSources,spotSources:this.spotSources,explosionEnvelopes:this.explosionEnvelopes,
+      nextFireHandle:this.nextFireHandle,nextExplosionId:this.nextExplosionId,muzzleAge:this.muzzleAge,
+      muzzleDuration:this.muzzleDuration,muzzleBase:this.muzzleBase,muzzlePriority:this.muzzlePriority,
+      position:this.muzzle.position.clone(),color:this.muzzle.color.clone(),distance:this.muzzle.distance,
+      focus:this.effectFocus.clone(),hasFocus:this.hasEffectFocus};
+    this.fireSources=new Map();this.spotSources=new Map();this.explosionEnvelopes=[];
+    this.ResetEffectPreview();return state;
+  }
+  ResetEffectPreview() {
+    this.fireSources.clear();this.spotSources.clear();this.explosionEnvelopes.length=0;
+    this.nextFireHandle=1;this.nextExplosionId=1;this.muzzleAge=1;this.muzzleBase=0;this.muzzlePriority=false;
+    this.muzzle.intensity=0;this.Update(0,0);
+  }
+  EndEffectPreview(state,elapsed=0) {
+    if(!state)return;
+    const {position,color,distance,focus,hasFocus,...values}=state;Object.assign(this,values);
+    this.muzzle.position.copy(position);this.muzzle.color.copy(color);this.muzzle.distance=distance;
+    this.effectFocus.copy(focus);this.hasEffectFocus=hasFocus;this.Update(0,elapsed,hasFocus?focus:null);
+  }
+
   /**
    * 把本帧的候选源灌进簇光系统。
    *

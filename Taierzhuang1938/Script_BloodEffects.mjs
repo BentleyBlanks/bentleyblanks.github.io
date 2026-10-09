@@ -101,10 +101,12 @@ export class BloodEffects {
     s.stretch=stretch||this.Range(.03,.075);s.opacity=.93;
     if(color){s.colorA=color;s.colorB=fresh;}
     const born=this.time-lag,slot=this.drops.Spawn(s,born);
+    if(slot<0)return;
     // A pool overwrite must retire the corresponding CPU trajectory as well.
     const previous=this.activeDrops.findIndex(drop=>drop.slot===slot);
     if(previous>=0)this.activeDrops.splice(previous,1);
-    this.activeDrops.push({slot,born,origin:new THREE.Vector3().copy(p),velocity:new THREE.Vector3().copy(v),
+    const particleBorn=this.drops.arrays.iSpawnLife[slot*2];
+    this.activeDrops.push({slot,born:particleBorn,origin:new THREE.Vector3().copy(p),velocity:new THREE.Vector3().copy(v),
       previous:new THREE.Vector3().copy(p),radius,pool,deposit});this.stats.emitted++;
   }
   Spurt(node,offset,axis,options={}){
@@ -197,7 +199,8 @@ export class BloodEffects {
       }
     }
     for(let i=this.activeDrops.length-1;i>=0;i--){
-      const drop=this.activeDrops[i],age=this.time-drop.born;
+      if(this.drops.arrays.iSpawnLife[this.activeDrops[i].slot*2+1]<=0){this.activeDrops.splice(i,1);continue;}
+      const drop=this.activeDrops[i],age=(this.drops.Time?.()??this.time)-drop.born;
       if(age<=0)continue;
       BloodPosition(drop.origin,drop.velocity,Math.min(age,C.dropLife),next);
       const hit=this.Trace(drop.previous,next);
@@ -209,12 +212,25 @@ export class BloodEffects {
         this.stats.impacts++;
       }
       if(hit||age>=C.dropLife){
-        this.drops.deathTime[drop.slot]=0;this.drops.arrays.iSpawnLife[drop.slot*2+1]=0;
-        this.drops.dirtyMin=Math.min(this.drops.dirtyMin,drop.slot);this.drops.dirtyMax=Math.max(this.drops.dirtyMax,drop.slot);
+        if(this.drops.Kill)this.drops.Kill(drop.slot);
+        else {this.drops.deathTime[drop.slot]=0;this.drops.arrays.iSpawnLife[drop.slot*2+1]=0;
+          this.drops.dirtyMin=Math.min(this.drops.dirtyMin,drop.slot);this.drops.dirtyMax=Math.max(this.drops.dirtyMax,drop.slot);}
         this.activeDrops.splice(i,1);
       }else drop.previous.copy(next);
     }
   }
   Clear(){this.sources.clear();this.activeDrops.length=0;this.decals.Clear();}
+  BeginPreview(mist,drops){
+    const snapshot={sources:this.sources,activeDrops:this.activeDrops,decals:this.decals,mist:this.mist,drops:this.drops,
+      time:this.time,stats:this.stats,raycast:this.raycast,random:this.random,nextSource:this.nextSource,eye:this.eye.clone(),visibility:[...this.layers].map(layer=>[layer,layer.mesh.visible])};
+    for(const [layer]of snapshot.visibility)layer.mesh.visible=false;
+    this.sources=new Map();this.activeDrops=[];this.stats={impacts:0,emitted:0,rays:0};this.raycast=null;
+    this.mist=mist;this.drops=drops;this.decals=this.CreateLayer(this.root,this.limits.decals,false);return snapshot;
+  }
+  EndPreview(snapshot){
+    this.layers.delete(this.decals);this.decals.Dispose();
+    const {visibility,eye,...state}=snapshot;Object.assign(this,state);this.eye.copy(eye);
+    for(const [layer,visible]of visibility)layer.mesh.visible=visible;
+  }
   Dispose(){this.disposed=true;this.Clear();for(const layer of this.layers)layer.Dispose();this.layers.clear();this.texture?.dispose();}
 }

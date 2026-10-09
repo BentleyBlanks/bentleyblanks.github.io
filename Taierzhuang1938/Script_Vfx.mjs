@@ -16,14 +16,14 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 //      scene.overrideMaterial 覆盖全场烘 rtNormalDepth；半透明粒子被覆盖后会
 //      写进深度，SSAO 立刻在烟雾后面出现一圈黑边，软粒子也会自己遮自己。
 //      办法是挂 scene.onBeforeRender：overrideMaterial 非空的那一趟把 root 藏掉。
-//      （不改 Script_Post 一个字 —— 每个 agent 只碰自己那个文件。）
+//      粒子根统一标记为预通道排除，遵守共享后处理契约。
 //
 //   3) **零 Math.random**。抖动全走 Mulberry32，同一串调用永远出同一画面，
 //      视觉审查才能逐轮截图比对。
 //
 // 烟为什么"有体积"：多层半透明 billboard + 各自旋转 + 随时间膨胀 + 用
 // rtNormalDepth 做软粒子（与背景深度差小的地方淡出，否则烟像刀切进地面）+
-// 每片按假球面法线做一次朗伯着色（没有明暗面的话，叠再多层也还是一张灰纸）。
+// 近远烟材质共用 3D 密度与光路吸收，保留内部遮光和透光边缘。
 //
 // 约束 2 有一条必须自己还的债：**粒子不进预通道，就吃不到合成 pass 的雾**。
 // Script_Post 的大气透视挂在 rtNormalDepth 的 w 上，而且明写「深度 0 的天空不吃雾」；
@@ -35,13 +35,12 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 
 import * as THREE from "three";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
-import { MarkNoPrepass } from "./Script_Post.mjs";
 import { MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
 import { VEHICLE_TRACER, HARD_SURFACE_SPARKS } from "./Data_Tuning_BulletVisual.mjs";
 import { BloodEffects } from "./Script_BloodEffects.mjs";
 import { BattleSmoke } from "./Script_BattleSmoke.mjs";
 import { ParticleEffects } from "./Script_ParticleEffects.mjs";
-import { BURNING_LIGHT } from "./Data_Tuning_Particles.mjs";
+import { BURNING_LIGHT, EXPLOSION_PARTICLE_ART, PARTICLE_VOLUME, PARTICLE_MESH } from "./Data_Tuning_Particles.mjs";
 import { BOMB_BLAST_VFX } from "./Data_AerialBombs.mjs";
 import { BlastScale, LinearDragAt } from "./Script_BombBallistics.mjs";
 
@@ -177,7 +176,11 @@ export const SCENE_EFFECTS = Object.freeze({
   },
   SmokeWhite: {
     name: "白灰烟", note: "灰烬、湿料与轻烟",
-    options: { kind: "dust", rate: 8, radius: 0.42, rise: 1.7, sizeStart: 0.42, sizeEnd: 3.4, life: 5.2, opacity: 0.24, fire: 0 },
+    options: { kind: "dust", colorA: VFX_PALETTE.screenSmoke, colorB: VFX_PALETTE.powderThin, rate: 8, radius: 0.42, rise: 1.7, sizeStart: 0.42, sizeEnd: 3.4, life: 5.2, opacity: 0.24, fire: 0 },
+  },
+  SmokeDust: {
+    name: "扬尘", note: "黄土与碎砖粉尘",
+    options: { kind: "dust", rate: 8, radius: 0.65, rise: 0.8, sizeStart: 0.45, sizeEnd: 3.6, life: 4.8, opacity: 0.24, fire: 0 },
   },
   SmokeBlack: {
     name: "黑烟柱", note: "远景失火与持续燃烧",
@@ -200,733 +203,24 @@ export const SCENE_EFFECTS = Object.freeze({
 // ---------------------------------------------------------------------------
 // 共用 GLSL
 // ---------------------------------------------------------------------------
-const GLSL_NOISE = /* glsl */`
-float Hash21(vec2 p) {
-  vec3 q = fract(vec3(p.xyx) * 0.1031);
-  q += dot(q, q.yzx + 33.33);
-  return fract((q.x + q.y) * q.z);
-}
-// 一层 value noise 就够把"完美圆片"打碎；烟的填充率很高，别在这里堆八度。
-float Vnoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  float a = Hash21(i), b = Hash21(i + vec2(1.0, 0.0));
-  float c = Hash21(i + vec2(0.0, 1.0)), d = Hash21(i + vec2(1.0, 1.0));
-  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-`;
 
-const VERT_PARTICLE = /* glsl */`
-attribute vec2 iSpawnLife;   // x 生成时刻 y 寿命（0 = 空槽）
-attribute vec3 iOrigin;
-attribute vec3 iVelocity;
-attribute vec3 iAccel;       // 重力 / 浮力 / 风
-attribute vec2 iSize;        // 起始半径 -> 结束半径（米）
-attribute vec2 iSpin;        // 起始角 / 角速度
-attribute vec3 iColorA;
-attribute vec3 iColorB;
-attribute vec4 iParams;      // x 峰值不透明度 y 淡入占比 z 阻尼系数 w 种子
-attribute vec4 iExtra;       // x 拉伸长度(米) y 闪烁频率 z 地面高度（光束池：像素上限半宽）
-                             // w 序列帧起始帧（拉伸池：像素保底半宽）
-#ifdef ORIENT_NORMAL
-attribute vec3 iNormal;
-#endif
 
-uniform float uTime;
-#if defined(SHAPE_STREAK) || defined(SHAPE_BEAM)
-uniform vec2 uResolution;      // 渲染分辨率：拉伸池按它把「几个像素」换算成米
-#endif
-#ifdef SHAPE_BEAM
-// 光束不走弹道积分，iSpin / iAccel 空着，借来递光束参数：
-// x 飞行时间(秒) y 余辉时间常数(秒) z 全长(米) w 弹头亮段(米)
-varying vec4 vBeam;
-varying float vBeamTrail;      // 余辉相对弹头的亮度（iAccel.y）
-varying float vBeamMuzzleFade; // 枪口端淡入长度（米，iAccel.z）
-#endif
-uniform float uGlobalFade;
-uniform float uFadeOutStart;   // 淡出起点：普通池 0.45，序列帧火球 0.82（16 帧要播完）
-#ifdef AERIAL
-uniform vec3 uSunDirection;
-uniform float uFogDensity;
-uniform float uFogFalloff;
-uniform float uFogBase;
-uniform float uFogMax;
-uniform vec3 uFogColorSky;
-uniform vec3 uFogColorGround;
-uniform float uFogSunGain;
-uniform vec3 uSunColorFog;
-varying vec4 vAerial;        // rgb 雾色 / a 雾量。逐顶点算：片子只有四个角，逐片元纯浪费
-#endif
 
-varying vec2 vShape;
-varying vec3 vColor;
-varying vec3 vColorAlt;      // 生命末端色，弹孔那种"同一片上要两个颜色"的形状要用
-varying float vAlpha;
-varying float vSeed;
-varying float vAge01;
-varying float vAgeS;           // 已活秒数：预警准星的闪频与脉冲相位按真实秒走，不按寿命比例
-varying float vFrame;          // 序列帧池的起始帧；其余池恒为 0
-varying float vViewDepth;
-#if defined(LIT) || defined(LIT_SURFACE)
-varying vec3 vLitNormal;
-#endif
-#ifdef SHAPE_DECAL
-varying float vRays;       // 放射断口线的强度：弹孔 1、爆炸焦痕 0
-varying float vDecalSize;  // 深度裁边容差要随贴花尺寸增长；焦痕比弹孔跨过更多地表起伏
-varying vec3 vDecalTangent;
-varying vec3 vDecalBitangent;
-varying vec3 vDecalWorldPosition;
-#endif
-#ifdef LIT
-varying vec3 vViewDir;     // 世界空间视线（相机 -> 粒子），前向散射要用
-#endif
-
-void main() {
-  float life = iSpawnLife.y;
-  float age = uTime - iSpawnLife.x;
-  if (life <= 0.0 || age < 0.0 || age > life) {
-    // 死槽推出裁剪体：四个角落在同一点，光栅化直接丢掉，比每帧压缩缓冲区便宜得多
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-    return;
-  }
-  float t01 = clamp(age / life, 0.0, 1.0);
-  vAge01 = t01;
-  vAgeS = age;
-  vSeed = iParams.w;
-  vFrame = iExtra.w;
-
-  // 带线性阻尼的弹道闭式解：v' = a - k·v
-  //   v(t) = a/k + (v0 - a/k)e^(-kt)
-  //   p(t) = p0 + (a/k)t + (v0 - a/k)(1 - e^(-kt))/k
-  // k 下限卡在 0.05：再小两项就开始严重相消，float 精度撑不住（会看到粒子抽搐）。
-  float k = max(iParams.z, 0.05);
-  vec3 world = iOrigin
-    + (iVelocity - iAccel / k) * ((1.0 - exp(-k * age)) / k)
-    + iAccel * (age / k);
-#ifdef SHAPE_BEAM
-  // 光束钉在弹着点上不动：弹头的飞行在片元里按寿命揭开，iVelocity 只给方向。
-  world = iOrigin;
-  vBeam = vec4(iSpin.x, iSpin.y, iExtra.x, iAccel.x);
-  vBeamTrail = iAccel.y;
-  vBeamMuzzleFade = iAccel.z;
-#endif
-
-#ifdef SHAPE_PUFF
-  // 常驻烟源把 iExtra.z 写成很小的上升流摆幅；没有写时仍是 -9999，
-  // max 后完全等价于旧弹道。两条不同频率的横向卷动不改变烟的总体风向，
-  // 只让同一根烟柱的团絮不再像一串对齐的圆片。
-  float plumeWobble = max(iExtra.z, 0.0);
-  if (plumeWobble > 0.0) {
-    float phase = iParams.w * 31.0;
-    float swell = plumeWobble * (0.20 + t01 * 0.95);
-    world.x += (sin(age * 0.77 + phase) - sin(phase)) * swell;
-    world.z += (sin(age * 1.13 + phase * 1.7) - sin(phase * 1.7)) * swell * 0.72;
-  }
-#endif
-
-#ifdef GROUND_BOUNCE
-  // 假弹跳：陷得越深回弹越低，一定会停在地面上。真解算多次弹跳要迭代，
-  // 而火星/碎块只需要"跳一下然后趴下"这个观感。
-  float below = max(0.0, iExtra.z - world.y);
-  if (below > 0.0) world.y = iExtra.z + below * 0.34 * exp(-below * 2.2);
-#endif
-
-  // iExtra.x 对普通烟团是“扩散曲线”：0 用默认的 2.0；小于 1 会慢慢
-  // 展开。常驻火灾烟如果沿用爆炸烟的急速膨胀，会在柱顶堆成一颗遮天黑球。
-  // stretch / decal 池各自复用这条属性，受自己的预处理分支约束，不受影响。
-  float growthPower = iExtra.x > 0.0 ? iExtra.x : 2.0;
-#ifdef SHAPE_MUD
-  growthPower = 1.6;             // 泥浆池的 iExtra.x 是快门时长，不是扩散曲线
-#endif
-  float grow = 1.0 - pow(1.0 - t01, growthPower);
-  float size = mix(iSize.x, iSize.y, grow);
-  vec2 corner = position.xy;
-  vShape = corner;
-
-  vec3 offset;
-#if defined(ORIENT_NORMAL)
-  // 贴面：弹孔贴花、贴地尘环
-  vec3 n = normalize(iNormal);
-  vec3 guide = abs(n.y) > 0.92 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-  vec3 tx = normalize(cross(guide, n));
-  vec3 ty = cross(n, tx);
-  float ang = iSpin.x + iSpin.y * age;
-  float ca = cos(ang), sa = sin(ang);
-  offset = (tx * (corner.x * ca - corner.y * sa) + ty * (corner.x * sa + corner.y * ca)) * size;
-  #ifdef LIT_SURFACE
-    vLitNormal = n;
-  #endif
-  #ifdef SHAPE_DECAL
-    vDecalTangent = tx * ca + ty * sa;
-    vDecalBitangent = -tx * sa + ty * ca;
-  #endif
-#elif defined(ORIENT_STRETCH)
-  // 沿飞行方向拉长：曳光弹与火星。头在 corner.x = +1 处。
-  vec3 toCam = cameraPosition - world;
-#if defined(SHAPE_BLOODDROP) || defined(SHAPE_MUD)
-  vec3 instant=iVelocity*exp(-k*age)+iAccel*((1.0-exp(-k*age))/k);
-  vec3 dir=normalize(instant+vec3(0.0,1e-5,0.0));
-#else
-  vec3 dir = normalize(iVelocity + vec3(0.0, 1e-5, 0.0));
-#endif
-  vec3 side = normalize(cross(dir, normalize(toCam + vec3(1e-5))));
-#ifdef SHAPE_MUD
-  // 泥浆：拖尾 = 瞬时速度 × 快门（iExtra.x 秒），越飞越慢拖尾越短；下限是一颗泥团自己的长度
-  float streakLen = max(size * 1.5, length(instant) * iExtra.x);
-  vec3 along = dir * ((corner.x - 1.0) * 0.5 * streakLen);
-#else
-  vec3 along = dir * ((corner.x - 1.0) * 0.5 * iExtra.x);
-#endif
-  float halfWidth = size;
-#if defined(SHAPE_STREAK) || defined(SHAPE_BEAM)
-  // 像素保底（iExtra.w > 0 才开；旧的曳光/火星写 0，行为不变）。按**这个顶点自己**
-  // 离相机的距离换算：一条四十米的光束两端远近差得多，只按头部算的话尾巴会细成头发。
-  // side 对整条线是同一个方向（线与相机张成的平面的法线），所以逐顶点改宽度不会扭。
-  if (iExtra.w > 0.0) {
-    float camDist = length(cameraPosition - (world + along));
-    float metresPerPixel = camDist * 2.0 / (projectionMatrix[1][1] * uResolution.y);
-    halfWidth = max(halfWidth, metresPerPixel * iExtra.w);
-#ifdef SHAPE_BEAM
-    // 上限（iExtra.z，光束池没有 GROUND_BOUNCE，这一格空着）：子弹贴着脸飞过去时
-    // 3 cm 的物理宽度能占三四十个像素，读起来是一根光棍，不是一发弹。
-    if (iExtra.z > 0.0) halfWidth = min(halfWidth, metresPerPixel * iExtra.z);
-#endif
-  }
-#endif
-  offset = along + side * (corner.y * halfWidth);
-  #ifdef LIT
-    // 受光的拉伸片（泥浆池）：假圆柱法线 —— 横向两侧往外、中间朝相机，略朝上
-    vec3 camDir = normalize(toCamOrZ(world));
-    vLitNormal = normalize(side * corner.y * 0.8 + camDir * 0.7 + vec3(0.0, 0.25, 0.0));
-    vViewDir = -camDir;
-  #endif
-#else
-  // 面向相机：从 viewMatrix 取相机的右/上轴（比 modelViewMatrix 稳，
-  // 因为整个池挂在 root 上、模型矩阵是单位阵）
-  vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
-  vec3 upv   = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-  float ang = iSpin.x + iSpin.y * age;
-  float ca = cos(ang), sa = sin(ang);
-  vec2 c = vec2(corner.x * ca - corner.y * sa, corner.x * sa + corner.y * ca);
-  offset = (right * c.x + upv * c.y) * size;
-  #ifdef LIT
-    // 假球面法线：把片子当成一个球来打光，烟才有明暗面
-    vLitNormal = normalize(right * c.x * 0.85 + upv * c.y * 0.85 + normalize(toCamOrZ(world)) * 0.75);
-    vViewDir = normalize(-toCamOrZ(world));
-  #endif
-#endif
-
-  vec3 finalPos = world + offset;
-  vec4 viewPos = viewMatrix * modelMatrix * vec4(finalPos, 1.0);
-  vViewDepth = -viewPos.z;
-  gl_Position = projectionMatrix * viewPos;
-
-  vColor = mix(iColorA, iColorB, smoothstep(0.0, 0.8, t01));
-  vColorAlt = iColorB;
-#ifdef SHAPE_BEAM
-  vColor = iColorA;        // 弹头色；余辉色是 vColorAlt。两段按位置分，不按寿命渐变
-#endif
-#ifdef SHAPE_DECAL
-  vRays = iExtra.x;        // iExtra 是顶点属性，片元拿不到，得靠 varying 递过去
-  vDecalSize = size;
-  vDecalWorldPosition = finalPos;
-#endif
-
-  // fadeIn 是"占寿命的比例"。贴花寿命是 1e5 秒，任何非零比例都会变成几十秒才浮现，
-  // 所以 0 必须当"立刻出现"处理，不能靠 max() 兜一个极小值。
-  float fadeIn = iParams.y <= 0.0 ? 1.0 : smoothstep(0.0, iParams.y, t01);
-  float fadeOut = 1.0 - smoothstep(uFadeOutStart, 1.0, t01);
-  float flicker = 1.0;
-  if (iExtra.y > 0.0) {
-    flicker = 0.5 + 0.5 * sin(age * iExtra.y * 6.2831853 + iParams.w * 17.0);
-  }
-  vAlpha = iParams.x * fadeIn * fadeOut * flicker * uGlobalFade;
-
-#ifdef AERIAL
-  // 大气透视，公式与 Script_Post 的雾逐项对齐（密度/高度衰减/上限/雾色/朝阳增益）。
-  // 对不齐的话，一根烟柱跨过屋脊线时会在天空与实体的交界上裂出一条硬边。
-  vAerial = vec4(0.0);
-  if (uFogDensity > 0.0) {
-    vec3 rayDir = normalize(finalPos - cameraPosition);
-    float fd = 1.0 - exp(-max(vViewDepth, 0.0) * uFogDensity);
-    float hFall = exp(-max(finalPos.y - uFogBase, 0.0) / max(uFogFalloff, 0.5));
-    vec3 col = mix(uFogColorGround, uFogColorSky, clamp(rayDir.y * 2.0 + 0.35, 0.0, 1.0));
-    col += uSunColorFog * pow(max(dot(rayDir, normalize(uSunDirection)), 0.0), 8.0) * uFogSunGain;
-    vAerial = vec4(col, clamp(fd * hFall, 0.0, uFogMax));
-  }
-#endif
-}
-`;
 
 // toCamOrZ 只在 LIT 分支用得到，写成函数是为了让 #ifdef 里那一行读得懂。
 // 相机正好落在粒子中心时 cameraPosition - world 会退化成零向量，normalize 出 NaN，
 // 整片粒子会闪成黑块 —— 所以退化时给一个固定方向。
-const GLSL_VERT_HELPERS = /* glsl */`
-vec3 toCamOrZ(vec3 world) {
-  vec3 d = cameraPosition - world;
-  return dot(d, d) > 1e-8 ? d : vec3(0.0, 0.0, 1.0);
-}
-`;
 
-const FRAG_PARTICLE = /* glsl */`
-uniform sampler2D uNormalDepth;
-uniform float uDepthValid;   // 1 = uNormalDepth 是真的预通道靶，不是 1x1 兜底
-uniform vec2 uResolution;
-uniform float uSoftEnabled;
-uniform float uSoftRange;
-uniform float uNearFade;
-uniform sampler2D uSpriteMap;    // 序列帧贴图；非 SHAPE_SPRITE 池挂共享的 1×1 白图
-uniform vec2 uSpriteGrid;        // 帧网格（列×行）
-uniform float uSpriteFrames;     // 帧总数
-uniform float uSpriteEmission;   // 自带颜色的 CC0 flipbook：只把高亮火焰抬进 HDR，烟仍保留暗部
-uniform sampler2D uMaskMap;      // Vefects 火/烟轮廓；只给常驻场景源使用
-uniform sampler2D uMaskNoiseMap; // Vefects 流动噪声；UV 平移与侵蚀共用
-uniform sampler2D uMaskNoiseDetailMap;
-uniform float uMaskEmission;
-#ifdef SHAPE_DECAL
-uniform sampler2D uDecalBaseMap;
-uniform sampler2D uDecalNormalMap;
-uniform sampler2D uDecalOrmMap;
-uniform float uDecalReady;
-#endif
-uniform float uTime;
-uniform vec3 uSunDirection;
-uniform vec3 uSunColor;
-uniform vec3 uSkyColor;
-#ifdef AERIAL
-varying vec4 vAerial;
-#endif
 
-varying vec2 vShape;
-varying vec3 vColor;
-varying vec3 vColorAlt;
-varying float vAlpha;
-varying float vSeed;
-varying float vAge01;
-varying float vAgeS;
-varying float vFrame;          // 序列帧池的起始帧；其余池恒为 0
-varying float vViewDepth;
-#if defined(LIT) || defined(LIT_SURFACE)
-varying vec3 vLitNormal;
-#endif
-#ifdef SHAPE_DECAL
-varying float vRays;       // 放射断口线的强度：弹孔 1、爆炸焦痕 0
-varying float vDecalSize;
-varying vec3 vDecalTangent;
-varying vec3 vDecalBitangent;
-varying vec3 vDecalWorldPosition;
-#endif
-#ifdef SHAPE_BEAM
-varying vec4 vBeam;        // x 飞行时间 y 余辉时间常数 z 全长 w 弹头亮段
-varying float vBeamTrail;
-varying float vBeamMuzzleFade;
-#endif
-#ifdef SHAPE_MARKER
-uniform vec3 uMarkerSoil;  // 焦土颗粒色（受光）
-uniform vec3 uMarkerDust;  // 掀起的尘团色（受光）
-uniform vec3 uMarkerHot;   // 中心亮核的 HDR 色（自发光）
-#endif
-#ifdef LIT
-varying vec3 vViewDir;     // 世界空间视线（相机 -> 粒子），前向散射要用
-#endif
 
-void main() {
-  vec2 p = vShape;
-  float d = length(p);
-  float mask = 0.0;
-  vec3 color = vColor;
-#ifdef SHAPE_DECAL
-  vec3 decalSurfaceNormal = normalize(vLitNormal);
-  float decalAo = 1.0;
-  float decalRoughness = 0.92;
-  float decalMetalness = 0.0;
-#endif
 
-#if defined(SHAPE_BLOODMIST)
-  vec2 flow=vec2(vSeed*37.0,vSeed*19.0);
-  vec2 q=p+vec2(Vnoise(p*3.1+flow),Vnoise(p*3.9+flow.yx))*.32-.16;
-  float n=Vnoise(q*5.5+flow+vAge01*.7);
-  float fine=Vnoise(q*17.0+flow.yx);
-  float edge=1.0-smoothstep(.3,.97,length(q*vec2(1.0,1.2)));
-  float erosion=smoothstep(.19+vAge01*.15,.65,n+fine*.3);
-  mask=edge*erosion*(.38+.62*fine);
-#elif defined(SHAPE_BLOODDROP)
-  float head=1.0-smoothstep(.14,.95,length(vec2((p.x-.48)*1.3,p.y)));
-  float tail=(1.0-smoothstep(.08,.38,abs(p.y)))*smoothstep(-1.0,.55,p.x);
-  mask=max(head,tail*.6)*(1.0-smoothstep(.8,1.0,abs(p.x)));
-  color*=uSkyColor+uSunColor*.5;
-#elif defined(SHAPE_MUD)
-  // 近爆甩出来的湿泥（开场 SB02）：头是一团不规则的泥，身后一条被运动拉开的涂抹拖尾。
-  // vShape.x：-1 拖尾末端，+1 泥团前沿；y 横向。两层噪声啃边，边是软的但团是实的。
-  vec2 flow = vec2(vSeed * 41.0, vSeed * 17.0);
-  float lump = Vnoise(p * vec2(2.3, 4.1) + flow);
-  float grit = Vnoise(p * vec2(6.0, 11.0) + flow.yx);
-  float headR = length(vec2((p.x - 0.5) * 1.7, p.y * (1.0 + lump * 0.35)));
-  float head = 1.0 - smoothstep(0.30 + lump * 0.28, 0.92, headR);
-  float taper = mix(0.18, 0.78, smoothstep(-1.0, 0.55, p.x));
-  float tail = (1.0 - smoothstep(taper * (0.45 + lump * 0.35), taper, abs(p.y)))
-    * smoothstep(-1.0, -0.15, p.x) * (0.35 + 0.4 * grit);
-  mask = max(head, tail) * (0.78 + 0.22 * grit);
-  color = mix(vColor, vColorAlt, grit * 0.55);
-#elif defined(SHAPE_PUFF)
-  // 烟/尘：两层不同尺度的噪声让每一片都是一团卷起来的絮，而不是一张
-  // 单调的柔边圆盘。只啃外轮廓仍会读成“半透明云”；要让中心密度也有起伏，
-  // 多片叠起来才会出现烟羽的深浅团块。
-  float coarse = Vnoise(p * 1.9 + vec2(vSeed * 37.0, vSeed * 11.0));
-  float fine = Vnoise(p * 5.4 + vec2(vSeed * 19.0 + vAge01 * 1.7, vSeed * 29.0));
-  float edge = 0.76 + coarse * 0.26 - fine * 0.12;
-  float outer = smoothstep(edge, edge * 0.16, d);
-  float core = smoothstep(1.02, 0.08, d);
-  mask = outer * mix(0.46 + fine * 0.16, 1.0, core * core);
-  mask *= mask;                                  // 中心厚、边缘薄，叠层才有体积
-#elif defined(SHAPE_STAR)
-  // 枪口焰：不规则星芒 + 白核。两帧就灭，所以形状比动画重要。
-  float a = atan(p.y, p.x);
-  float spikes = 0.34 + 0.66 * pow(abs(sin(a * 2.5 + vSeed * 19.0)), 0.55);
-  float arm = smoothstep(spikes, spikes * 0.06, d);
-  float core = smoothstep(0.42, 0.0, d);
-  mask = arm * 0.62 + core;
-  color = mix(color, vec3(1.0), core * 0.5);
-#elif defined(SHAPE_STREAK)
-  // 曳光/火星：横向高斯 + 头亮尾暗
-  float across = exp(-p.y * p.y * 5.5);
-  float head = clamp(p.x * 0.5 + 0.5, 0.0, 1.0);
-  mask = across * mix(0.03, 1.0, pow(head, 2.2));
-#elif defined(SHAPE_BEAM)
-  // 一发子弹的光束（TracerBeam）。整条线从枪口铺到弹着点，但不是一下子全亮：
-  // 弹头按「已活秒数 / 飞行时间」从枪口飞过去，掠过的那一段按余辉常数暗下去。
-  // vShape.x：-1 是枪口，+1 是弹着点。
-  float flight = max(vBeam.x, 1e-4);
-  float along = p.x * 0.5 + 0.5;
-  float since = vAgeS - along * flight;            // 弹头掠过这一点多久了；负 = 还没飞到
-  float reached = step(0.0, since);
-  float behind = since / flight * vBeam.z;         // 这一点落后弹头几米
-  // 弹头到了弹着点就没了 —— 它打进墙里了，只剩余辉。
-  float headAlive = 1.0 - smoothstep(flight, flight + 0.012, vAgeS);
-  float head = reached * headAlive * (1.0 - smoothstep(0.0, max(vBeam.w, 0.01), behind));
-  float trail = reached * exp(-max(since, 0.0) / max(vBeam.y, 1e-3)) * vBeamTrail;
-  float muzzle = smoothstep(0.0, max(vBeamMuzzleFade, 1e-3), along * vBeam.z);
-  // 弹头胖一点、余辉细一点：线宽由顶点给的是像素保底，这里只分配亮度的横向分布。
-  float across = exp(-p.y * p.y * mix(3.2, 1.8, head));
-  mask = across * max(head, trail) * muzzle;
-  color = mix(vColorAlt, vColor, clamp(head * 1.5, 0.0, 1.0));
-#elif defined(SHAPE_RING)
-  // 贴地扩散的尘环 —— 爆炸"有当量"的关键一笔
-  float n = Vnoise(p * 3.4 + vec2(vSeed * 23.0, 7.0));
-  float radius = 0.72 + 0.12 * n;
-  float band = 0.30 - 0.16 * vAge01;             // 环随时间变薄
-  // 外圈只做很轻的收边：卡在 1.0 会把环的外半边直接切掉，看着像半个碗
-  mask = smoothstep(band, 0.0, abs(d - radius)) * smoothstep(1.38, 1.10, d);
-#elif defined(SHAPE_MARKER)
-  // 炮弹落点预警：一枚会收拢的准星，不再复用爆炸尘环那个软胖的圈。
-  // 贴图三通道：R 线稿（外圈 / 16 段虚线 / 四刻度 / 中心点），G 线稿间的焦土颗粒，
-  // B 被下压气流掀起的尘团。贴图没到位时 tex 全 0，只剩程序化收缩环与亮核。
-  // 寿命 = 落地倒计时，所以 vAge01 越接近 1 越急。
-  float t = vAge01;
-  float urgency = t * t;
-  // 准星整体从 0.86 收拢到 0.55：虚线环向落点靠，玩家看得出它在合围这一点。
-  // 起点留在 1.0 以内，这样程序化收缩环出生时不会和线稿外圈叠成一道双线。
-  float reticleScale = mix(0.86, 0.55, smoothstep(0.0, 1.0, t));
-  vec2 ruv = p / reticleScale * 0.5 + 0.5;
-  float inside = step(abs(ruv.x - 0.5), 0.5) * step(abs(ruv.y - 0.5), 0.5);
-  vec4 tex = texture2D(uSpriteMap, clamp(ruv, 0.0, 1.0)) * inside;
-  // 尘团不跟准星收缩：它是地面上的事，贴地铺开，随倒计时慢慢变浓。
-  float dustTex = texture2D(uSpriteMap, p * 0.5 + 0.5).b;
-  float aa = fwidth(d) * 1.2;
-  float lineW = 0.014;
-  // 1) 主收缩环：从外圈一路收到中心亮核，先慢后快。
-  float rc = mix(1.0, 0.13, pow(t, 1.7));
-  float ring = 1.0 - smoothstep(lineW, lineW + aa, abs(d - rc));
-  // 2) 追赶脉冲：相位错开的细环反复从外向内收，越接近落地越密。
-  float f = fract(4.0 * pow(t, 1.8) + vSeed);
-  float rp = mix(1.0, 0.13, f);
-  float pulse = (1.0 - smoothstep(lineW * 0.7, lineW * 0.7 + aa, abs(d - rp))) * pow(1.0 - f, 1.5) * 0.45;
-  // 3) 线稿：随倒计时整体变亮，按越来越快的频率闪（2 Hz → 8 Hz）。
-  float blink = 0.72 + 0.28 * sin(vAgeS * (2.0 + 6.0 * t) * 6.2831853);
-  float lines = tex.r * (0.70 + 0.30 * urgency) * blink;
-  // 4) 中心亮核：平时只是一个点，最后 15% 猛然亮成一小片。
-  float core = smoothstep(0.075, 0.0, d) * (0.35 + 0.65 * urgency)
-    + smoothstep(0.30, 0.0, d) * smoothstep(0.85, 1.0, t) * 0.9;
-  float hot = clamp(ring + pulse + lines + core, 0.0, 1.0);
-  // 5) 焦土颗粒与尘团贴面受光，和真地面一起明暗；亮线是自发光，不吃光照
-  //   （下面 LIT_SURFACE 那段对准星池不生效）。
-  vec3 lit = uSkyColor + uSunColor * max(dot(normalize(vLitNormal), uSunDirection), 0.0);
-  float aGrit = tex.g * 0.38 * (0.30 + 0.70 * urgency);
-  float aDust = dustTex * 0.30 * smoothstep(0.0, 0.60, t);
-  // 三层按"尘 → 焦土 → 亮线"叠，只有一次混合输出，所以先在这里做 over 合成。
-  float alphaAll = 1.0 - (1.0 - aDust) * (1.0 - aGrit) * (1.0 - hot);
-  vec3 hotColor = mix(vColor, uMarkerHot, clamp(core, 0.0, 1.0));
-  vec3 stack = uMarkerDust * lit * aDust * (1.0 - aGrit) * (1.0 - hot)
-    + uMarkerSoil * lit * aGrit * (1.0 - hot)
-    + hotColor * hot;
-  color = stack / max(alphaAll, 1e-4);
-  mask = alphaAll;
-#elif defined(SHAPE_DECAL)
-  if (uDecalReady > 0.5) {
-    // 三格图集由 iExtra.w / vFrame 选格；普通枪只会落 0/1，机枪固定 2。
-    vec2 atlasUv = vec2((p.x * 0.5 + 0.5 + clamp(floor(vFrame + 0.5), 0.0, 2.0)) / 3.0,
-      p.y * 0.5 + 0.5);
-    vec4 base = texture2D(uDecalBaseMap, atlasUv);
-    vec3 tangentNormal = texture2D(uDecalNormalMap, atlasUv).xyz * 2.0 - 1.0;
-    vec3 orm = texture2D(uDecalOrmMap, atlasUv).rgb;
-    float fracture = dot(base.rgb, vec3(0.2126, 0.7152, 0.0722));
-    mask = base.a;
-    color = mix(vColorAlt * 0.72, vColor * 1.55, smoothstep(0.08, 0.86, fracture));
-    decalSurfaceNormal = normalize(vDecalTangent * tangentNormal.x
-      + vDecalBitangent * tangentNormal.y + normalize(vLitNormal) * tangentNormal.z);
-    decalAo = orm.r;
-    decalRoughness = orm.g;
-    decalMetalness = orm.b;
-  } else {
-    // 贴图尚未到位时保留原程序化弹孔；异步加载不能造成第一发无痕。
-    float a = atan(p.y, p.x);
-    float n = Vnoise(p * 4.0 + vec2(vSeed * 13.0, 3.0));
-    float hole = smoothstep(0.46 + 0.06 * n, 0.16, d);
-    float rim = smoothstep(0.26, 0.5, d) * smoothstep(0.86, 0.5, d);
-    float rays = pow(abs(sin(a * 6.0 + vSeed * 31.0)), 9.0)
-      * smoothstep(0.95, 0.3, d) * vRays;
-    mask = hole * 0.95 + rim * 0.5 + rays * 0.35;
-    color = mix(vColor, vColorAlt, hole);
-  }
-#elif defined(SHAPE_SPRITE)
-  // 序列帧火球。旧的 16 帧 CC0 图只提供形状，仍由台儿庄色板着色；Unity Labs
-  // 三套 CC0 flipbook 自带火与烟的颜色，保留原色，并只把亮焰抬进 HDR 泛光。
-  float f = min(uSpriteFrames - 1.0, vFrame + floor(vAge01 * uSpriteFrames));
-  vec2 cell = vec2(mod(f, uSpriteGrid.x), floor(f / max(uSpriteGrid.x, 1.0)));
-  vec2 uv = (p * 0.5 + 0.5 + cell) / uSpriteGrid;
-  vec4 tex = texture2D(uSpriteMap, uv);
-  mask = tex.a;
-#ifdef SPRITE_AUTHORED_COLOR
-  float authoredLuma = max(tex.r, max(tex.g, tex.b));
-  float flame = smoothstep(0.18, 0.82, authoredLuma);
-  color = tex.rgb * mix(0.78, uSpriteEmission, flame);
-#else
-  color = vColor * tex.rgb;
-#endif
-#elif defined(SHAPE_MASKED)
-  // Vefects 的火/烟包不是 flipbook，而是轮廓贴图 + 两层流动噪声。把相同的
-  // 组合搬进实例粒子池：贴图负责真实的卷边，实例弹道负责上升、风与寿命。
-  vec2 uv = p * 0.5 + 0.5;
-  vec2 drift = vec2(vSeed * 7.31, vSeed * 3.17);
-  float flow = texture2D(uMaskNoiseMap,
-    uv * 1.85 + drift + vec2(uTime * 0.09, -uTime * 0.16)).r;
-  vec2 warpedUv = uv + vec2(flow - 0.5, 0.5 - flow) * 0.10;
-  float authored = texture2D(uMaskMap, warpedUv).r;
-  float erosion = texture2D(uMaskNoiseDetailMap,
-    warpedUv * 2.7 + drift.yx + vec2(-uTime * 0.12, uTime * 0.21)).r;
-  mask = authored * smoothstep(0.08, 0.58, authored + erosion * 0.46 - vAge01 * 0.22);
-#ifdef MASKED_FIRE
-  float heat = smoothstep(0.14, 0.82, authored * (0.72 + erosion * 0.58));
-  color = mix(vColorAlt, vColor, heat) * mix(0.72, uMaskEmission, heat);
-#endif
-#else
-  mask = smoothstep(1.0, 0.1, d);
-#endif
 
-  if (mask <= 0.004) discard;
-  float alpha = vAlpha * mask;
 
-#ifdef LIT
-  // 半兰伯特而不是硬兰伯特：烟是多次散射介质，背光面绝不会黑成剪影。
-  // 之前用 max(dot,0) 的版本把发烟筒的白灰烟压成了近黑色 —— 那是最典型的
-  // "把烟当固体打光"的错。
-  float wrapped = dot(normalize(vLitNormal), uSunDirection) * 0.5 + 0.5;
-  vec3 lit = uSkyColor + uSunColor * (0.34 + 0.66 * wrapped);
-  // 前向散射：视线越接近太阳方向，边缘越透亮（逆光的烟会"发光"）
-  float forward = pow(max(dot(vViewDir, uSunDirection), 0.0), 4.0);
-#ifndef SHAPE_MUD
-  // 湿泥是实的，不透光：前向散射只给烟尘
-  lit += uSunColor * forward * 0.55 * (1.0 - mask * 0.75);
-#endif
-  color *= lit;
-#endif
-#ifdef SHAPE_DECAL
-  // 与 MeshStandardMaterial 同口径的介质响应：AO 压环境光，粗糙度控制窄高光，
-  // 贴图法线只扰动断口微表面，不改变贴花几何或深度裁边。
-  float decalNdl = max(dot(decalSurfaceNormal, uSunDirection), 0.0);
-  vec3 decalView = normalize(cameraPosition - vDecalWorldPosition);
-  vec3 decalHalf = normalize(uSunDirection + decalView);
-  float decalSpecPower = mix(110.0, 7.0, decalRoughness);
-  float decalSpec = pow(max(dot(decalSurfaceNormal, decalHalf), 0.0), decalSpecPower)
-    * (1.0 - decalRoughness) * 0.24;
-  vec3 decalLit = uSkyColor * mix(0.48, 1.0, decalAo) + uSunColor * decalNdl;
-  color = color * decalLit * mix(0.58, 1.0, decalAo)
-    + uSunColor * decalSpec * mix(0.04, 1.0, decalMetalness);
-#elif defined(LIT_SURFACE) && !defined(SHAPE_MARKER)
-  // 贴面的东西（弹孔、贴地尘环）必须跟它趴着的那个面一起明暗。一张恒定色的贴片
-  // 在太阳底下永远比墙暗 —— 考据要的"新弹痕断口比墙面亮 1—2 档"就永远做不出来。
-  // 预警准星自己分层打光（尘/焦土受光、亮线自发光），不走这一乘。
-  color *= uSkyColor + uSunColor * max(dot(normalize(vLitNormal), uSunDirection), 0.0);
-#endif
 
-  // rtNormalDepth 的 w 是线性视深度；清成 0 的像素代表"这一路没打到东西"（= 天空）。
-  // 软粒子与大气透视都要这个值，所以只取一次。
-  float sceneDepth = uDepthValid > 0.5
-    ? texture2D(uNormalDepth, gl_FragCoord.xy / uResolution).w
-    : 0.0;
 
-#ifdef SHAPE_DECAL
-  // 贴花只是命中点切平面上的 quad，不是真正投影到承载几何上的网格。过去它靠 12 mm
-  // 物理抬升躲 z-fighting：贴到墙沿会探出去，墙被打穿后还会整片留在空中。现在几何
-  // 就放回命中面，polygonOffset 只改深度比较；同时拿预通道逐像素确认后面仍是原表面。
-  // 小弹孔容差约 1—2 cm，大焦痕按尺寸放宽，允许它顺着轻微起伏的地面铺开。
-  if (uDepthValid > 0.5) {
-    float surfaceTolerance = max(0.006 + vDecalSize * 0.08, vViewDepth * 0.00008);
-    if (sceneDepth <= 0.001 || abs(sceneDepth - vViewDepth) > surfaceTolerance) discard;
-  }
-#endif
-#ifdef SHAPE_MARKER
-  // 准星是落点切平面上的一张几米宽的 quad。坑沿、土沿或坡面会让它局部埋没 / 悬空：
-  // 埋没的由深度测试处理，悬空的按预通道深度差淡掉，别让一段亮线飘在坑口上方。
-  if (uDepthValid > 0.5 && sceneDepth > 0.001) {
-    float tolerance = 0.30 + vViewDepth * 0.02;
-    alpha *= 1.0 - smoothstep(tolerance, tolerance * 2.5, abs(sceneDepth - vViewDepth));
-  }
-#endif
 
-#ifdef AERIAL
-  // 补雾，且**只补背景是天空的那一半**（见文件头）。背景有实体时合成 pass 已经
-  // 按背景深度上过雾了 —— 那个深度比粒子稍远，雾略微过量，但连续、无缝，
-  // 而这里再叠一次就成了双份，烟柱会在屋脊线上被切成深浅两截。
-  // 兜底深度图（uDepthValid = 0）时按天空处理：宁可略过量，也不要天上留个黑洞。
-  if (vAerial.a > 0.0 && sceneDepth <= 0.001) {
-    color = mix(color, vAerial.rgb, vAerial.a);
-  }
-#endif
 
-  // 软粒子：与背景深度差小的地方淡出。没这一步，烟会像一把刀切进地面。
-  // 天空（sceneDepth = 0）必须按"无穷远"处理，否则天空前的粒子会整片消失。
-  //
-  // uSoftRange = 0 表示这个池**贴着面**存在（弹孔贴花、贴地尘环）：它们与背景的
-  // 深度差本来就只有那点法线偏移，一做软化就整体淡到看不见 —— 弹孔一度完全不显形
-  // 就是栽在这儿。贴面的池靠 polygonOffset 防 z-fighting，不靠软粒子。
-  if (uSoftEnabled > 0.5 && uSoftRange > 0.0 && sceneDepth > 0.001) {
-    alpha *= clamp((sceneDepth - vViewDepth) / uSoftRange, 0.0, 1.0);
-  }
-  // 贴脸淡出：拿不到深度图时这是唯一的保险，也防止一片烟糊满屏幕
-  alpha *= clamp((vViewDepth - uNearFade * 0.4) / max(uNearFade, 0.001), 0.0, 1.0);
-  if (alpha <= 0.002) discard;
 
-  gl_FragColor = vec4(color, alpha);
-}
-`;
-
-const VERT_DEBRIS = /* glsl */`
-attribute vec2 iSpawnLife;
-attribute vec3 iOrigin;
-attribute vec3 iVelocity;
-attribute vec3 iScale;
-attribute vec3 iSpin;        // 角速度向量（轴 = 归一化方向，模 = 速率）
-attribute vec3 iColor;
-attribute vec4 iParams;      // x 阻尼 y 地面高度 z 回弹系数 w 种子
-
-uniform float uTime;
-uniform vec3 uSunDirection;
-uniform vec3 uSunColor;
-uniform vec3 uSkyColor;
-
-varying vec3 vColor;
-
-void main() {
-  float life = iSpawnLife.y;
-  float age = uTime - iSpawnLife.x;
-  if (life <= 0.0 || age < 0.0 || age > life) {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-    return;
-  }
-  float t01 = age / life;
-  vec3 acc = vec3(0.0, -9.81, 0.0);
-  float k = max(iParams.x, 0.05);
-  vec3 world = iOrigin
-    + (iVelocity - acc / k) * ((1.0 - exp(-k * age)) / k)
-    + acc * (age / k);
-
-  float below = max(0.0, iParams.y - world.y);
-  if (below > 0.0) world.y = iParams.y + below * iParams.z * exp(-below * 2.2);
-
-  // 转速渐停：角度取指数收敛式，落地后碎块自己停下来，不用记落地时刻
-  float angle = length(iSpin) * (1.0 - exp(-age * 1.6)) / 1.6;
-  vec3 axis = normalize(iSpin + vec3(0.0013, 1.0, 0.0007));
-  float c = cos(angle), s = sin(angle);
-  float shrink = 1.0 - smoothstep(0.80, 1.0, t01);   // 末尾缩没，避免硬弹出
-  vec3 v = position * iScale * shrink;
-  vec3 rp = v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);
-  vec3 rn = normal * c + cross(axis, normal) * s + axis * dot(axis, normal) * (1.0 - c);
-
-  // 半兰伯特：碎块很小、翻滚很快，硬兰伯特会让一半的块变成纯黑色方片，
-  // 在青砖墙那种亮背景前特别假。
-  float wrapped = dot(normalize(rn), uSunDirection) * 0.5 + 0.5;
-  vColor = iColor * (uSkyColor + uSunColor * (0.18 + 0.82 * wrapped));
-
-  vec4 viewPos = viewMatrix * modelMatrix * vec4(world + rp, 1.0);
-  gl_Position = projectionMatrix * viewPos;
-}
-`;
-
-const FRAG_DEBRIS = /* glsl */`
-varying vec3 vColor;
-void main() { gl_FragColor = vec4(vColor, 1.0); }
-`;
-
-const VERT_DUST = /* glsl */`
-attribute vec3 iBase;    // 盒内归一化基准位置 0..1
-attribute vec4 iMote;    // x 半径 y 相位 z 上升速率 w 种子
-
-uniform float uTime;
-uniform vec3 uBox;
-uniform vec3 uCenter;
-uniform float uGlobalFade;
-
-varying vec2 vShape;
-varying float vAlpha;
-varying float vViewDepth;
-
-void main() {
-  vec3 p = iBase * uBox;
-  // 极慢的三向漂移。浮尘不能"飞"，只能"悬"。
-  p.x += sin(uTime * 0.11 + iMote.y) * 0.55;
-  p.y += sin(uTime * 0.071 + iMote.y * 1.7) * 0.32 + uTime * iMote.z;
-  p.z += cos(uTime * 0.093 + iMote.y * 2.3) * 0.55;
-  // 绕相机所在格子回卷：浮尘永远铺满视野，又完全不需要 CPU 回收/重生
-  vec3 origin = uCenter - uBox * 0.5;
-  p = mod(p - origin, uBox) + origin;
-
-  vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
-  vec3 upv   = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-  vShape = position.xy;
-  vec3 world = p + (right * position.x + upv * position.y) * iMote.x;
-
-  vec4 viewPos = viewMatrix * modelMatrix * vec4(world, 1.0);
-  vViewDepth = -viewPos.z;
-  gl_Position = projectionMatrix * viewPos;
-  vAlpha = uGlobalFade;
-}
-`;
-
-const FRAG_DUST = /* glsl */`
-uniform float uIntensity;
-uniform vec3 uTint;
-uniform float uNearFade;
-
-varying vec2 vShape;
-varying float vAlpha;
-varying float vViewDepth;
-
-void main() {
-  float d = length(vShape);
-  float mask = smoothstep(1.0, 0.0, d);
-  mask *= mask;
-  // 只留一层很淡的环境浮尘。旧版朝太阳时把 gain 从 0.10 抬到 1.80，
-  // 原本会 discard 的透明片会突然铺满屏幕，在超宽分辨率产生巨量混合 overdraw。
-  // 方向性的太阳光带现在统一交给低分辨率后处理 fallback。
-  float gain = 0.12;
-  float near = clamp((vViewDepth - uNearFade) / max(uNearFade, 0.001), 0.0, 1.0);
-  float far = 1.0 - smoothstep(28.0, 48.0, vViewDepth);
-  float alpha = mask * vAlpha * gain * near * far;
-  if (alpha <= 0.002) discard;
-  gl_FragColor = vec4(uTint * uIntensity, alpha);
-}
-`;
 
 // ---------------------------------------------------------------------------
 // 生成描述符：模块级唯一一份，调用方填字段再交给池。
@@ -972,337 +266,12 @@ function ResetSpawn() {
 }
 
 /** 四角面片（-1..1）。position.xy 直接当形状坐标用，省一套 uv。 */
-function MakeQuadGeometry() {
-  const geometry = new THREE.InstancedBufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(
-    [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
-  geometry.setIndex([0, 1, 2, 0, 2, 3]);
-  return geometry;
-}
-
-/**
- * 沿 x 切成 segments 段的长条（x 仍是 -1..1，y 是 ±1）。只有光束池用：一条光束从几十米外
- * 一直拉到相机身边，线宽的像素保底/上限按**顶点**离相机的距离算，四个角的面片只能在两端
- * 之间线性插值 —— 中间离相机最近的那一段会胀成一个楔子。切段之后每一截各按自己的距离收宽。
- */
-function MakeStripGeometry(segments) {
-  const geometry = new THREE.InstancedBufferGeometry();
-  const positions = [], index = [];
-  for (let i = 0; i <= segments; i += 1) {
-    const x = -1 + (2 * i) / segments;
-    positions.push(x, -1, 0, x, 1, 0);
-    if (i < segments) {
-      const a = i * 2;
-      index.push(a, a + 2, a + 3, a, a + 3, a + 1);
-    }
-  }
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(index);
-  return geometry;
-}
-
 // ---------------------------------------------------------------------------
 // 通用粒子池
 // ---------------------------------------------------------------------------
-class ParticlePool {
-  /**
-   * @param {number} capacity 槽位数
-   * @param {object} config shape / orient / blending / lit / bounce / softRange / renderOrder
-   * @param {object} shared 共享 uniform（uTime/uNormalDepth/... 全池同一份对象引用）
-   */
-  constructor(capacity, config, shared) {
-    this.capacity = Math.max(4, capacity | 0);
-    this.cursor = 0;
-    this.config = config;
-    this.deathTime = new Float32Array(this.capacity);   // CPU 侧只留死亡时刻，用来算 instanceCount
-    this.dirtyMin = Infinity;
-    this.dirtyMax = -Infinity;
-
-    const geometry = config.segments ? MakeStripGeometry(config.segments) : MakeQuadGeometry();
-    const n = this.capacity;
-    this.arrays = {
-      iSpawnLife: new Float32Array(n * 2),
-      iOrigin: new Float32Array(n * 3),
-      iVelocity: new Float32Array(n * 3),
-      iAccel: new Float32Array(n * 3),
-      iSize: new Float32Array(n * 2),
-      iSpin: new Float32Array(n * 2),
-      iColorA: new Float32Array(n * 3),
-      iColorB: new Float32Array(n * 3),
-      iParams: new Float32Array(n * 4),
-      iExtra: new Float32Array(n * 4),
-    };
-    if (config.orient === "normal") this.arrays.iNormal = new Float32Array(n * 3);
-
-    this.attributes = {};
-    for (const [name, array] of Object.entries(this.arrays)) {
-      const itemSize = array.length / n;
-      const attribute = new THREE.InstancedBufferAttribute(array, itemSize);
-      attribute.setUsage(THREE.DynamicDrawUsage);
-      geometry.setAttribute(name, attribute);
-      this.attributes[name] = attribute;
-    }
-    geometry.instanceCount = 0;
-    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);   // 关掉视锥剔除，粒子在 shader 里飞
-    this.geometry = geometry;
-
-    const defines = {};
-    defines[`SHAPE_${config.shape.toUpperCase()}`] = "";
-    if (config.orient === "normal") defines.ORIENT_NORMAL = "";
-    else if (config.orient === "stretch") defines.ORIENT_STRETCH = "";
-    if (config.lit) defines.LIT = "";
-    if (config.litSurface) defines.LIT_SURFACE = "";
-    if (config.bounce) defines.GROUND_BOUNCE = "";
-    if (config.aerial) defines.AERIAL = "";
-    if (config.sprite?.authoredColor) defines.SPRITE_AUTHORED_COLOR = "";
-    if (config.mask?.fire) defines.MASKED_FIRE = "";
-
-    const preserveTargetAlpha = !!config.preserveTargetAlpha;
-    this.material = new THREE.ShaderMaterial({
-      defines,
-      uniforms: Object.assign({}, shared, {
-        uSoftRange: { value: config.softRange ?? 0.6 },
-        uFadeOutStart: { value: config.fadeOutStart ?? 0.45 },
-        uSpriteMap: { value: config.sprite ? config.sprite.texture : shared.uSpriteMap.value },
-        uSpriteGrid: {
-          value: config.sprite
-            ? new THREE.Vector2(config.sprite.grid[0], config.sprite.grid[1])
-            : shared.uSpriteGrid.value,
-        },
-        uSpriteFrames: { value: config.sprite ? config.sprite.frames : shared.uSpriteFrames.value },
-        uSpriteEmission: { value: config.sprite?.emission ?? 1 },
-        uMaskMap: { value: config.mask?.texture ?? shared.uMaskMap.value },
-        uMaskNoiseMap: { value: config.mask?.noise ?? shared.uMaskNoiseMap.value },
-        uMaskNoiseDetailMap: { value: config.mask?.detailNoise ?? shared.uMaskNoiseDetailMap.value },
-        uMaskEmission: { value: config.mask?.emission ?? 1 },
-        uDecalBaseMap: { value: config.decal?.base ?? shared.uDecalBaseMap.value },
-        uDecalNormalMap: { value: config.decal?.normal ?? shared.uDecalNormalMap.value },
-        uDecalOrmMap: { value: config.decal?.orm ?? shared.uDecalOrmMap.value },
-        uDecalReady: { value: config.decal?.ready ?? 0 },
-        // 预警准星池的三个分层色；其余池的着色器里没有这几个 uniform，three 不会上传。
-        uMarkerSoil: { value: new THREE.Vector3(...(config.marker?.soil ?? [0, 0, 0])) },
-        uMarkerDust: { value: new THREE.Vector3(...(config.marker?.dust ?? [0, 0, 0])) },
-        uMarkerHot: { value: new THREE.Vector3(...(config.marker?.hot ?? [0, 0, 0])) },
-      }),
-      vertexShader: `${GLSL_VERT_HELPERS}\n${VERT_PARTICLE}`,
-      fragmentShader: `${GLSL_NOISE}\n${FRAG_PARTICLE}`,
-      transparent: true,
-      depthTest: true,
-      depthWrite: false,                 // 半透明粒子写深度 = 互相切出硬边
-      // 默认 NormalBlending 会把离屏 HDR 靶的 alpha 也按 srcAlpha 混低：贴花越深，
-      // 承载物在后续链路里越像“透明了”。贴花只改 RGB，alpha 必须原样保留。
-      blending: preserveTargetAlpha ? THREE.CustomBlending : config.blending,
-      blendSrc: preserveTargetAlpha ? THREE.SrcAlphaFactor : undefined,
-      blendDst: preserveTargetAlpha ? THREE.OneMinusSrcAlphaFactor : undefined,
-      blendEquation: preserveTargetAlpha ? THREE.AddEquation : undefined,
-      blendSrcAlpha: preserveTargetAlpha ? THREE.ZeroFactor : undefined,
-      blendDstAlpha: preserveTargetAlpha ? THREE.OneFactor : undefined,
-      blendEquationAlpha: preserveTargetAlpha ? THREE.AddEquation : undefined,
-      side: THREE.DoubleSide,
-      polygonOffset: !!config.polygonOffset,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -4,
-    });
-    this.material.userData.preserveTargetAlpha = preserveTargetAlpha;
-    // 粒子是加性/半透明的 billboard：进了深度法线预通道就会在 SSAO 里
-    // 挖出一片乱码，还会把体积光的天空判据搞坏。
-    MarkNoPrepass(this.material);
-
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = config.renderOrder ?? 0;
-    this.mesh.castShadow = false;
-    this.mesh.receiveShadow = false;
-    this.mesh.matrixAutoUpdate = false;
-    if (config.hideWhenIdle) this.mesh.visible = false;
-  }
-
-  /** 环形分配：满了就覆盖最老的那个（弹孔的先进先出也靠这条）。 */
-  Spawn(s, now) {
-    const i = this.cursor;
-    this.cursor = (this.cursor + 1) % this.capacity;
-    const a = this.arrays;
-    a.iSpawnLife[i * 2] = now;
-    a.iSpawnLife[i * 2 + 1] = s.life;
-    a.iOrigin[i * 3] = s.x; a.iOrigin[i * 3 + 1] = s.y; a.iOrigin[i * 3 + 2] = s.z;
-    a.iVelocity[i * 3] = s.vx; a.iVelocity[i * 3 + 1] = s.vy; a.iVelocity[i * 3 + 2] = s.vz;
-    a.iAccel[i * 3] = s.ax; a.iAccel[i * 3 + 1] = s.ay; a.iAccel[i * 3 + 2] = s.az;
-    a.iSize[i * 2] = s.sizeStart; a.iSize[i * 2 + 1] = s.sizeEnd;
-    a.iSpin[i * 2] = s.angle; a.iSpin[i * 2 + 1] = s.spin;
-    a.iColorA[i * 3] = s.colorA[0]; a.iColorA[i * 3 + 1] = s.colorA[1]; a.iColorA[i * 3 + 2] = s.colorA[2];
-    a.iColorB[i * 3] = s.colorB[0]; a.iColorB[i * 3 + 1] = s.colorB[1]; a.iColorB[i * 3 + 2] = s.colorB[2];
-    a.iParams[i * 4] = s.opacity; a.iParams[i * 4 + 1] = s.fadeIn;
-    a.iParams[i * 4 + 2] = s.drag; a.iParams[i * 4 + 3] = s.seed;
-    a.iExtra[i * 4] = s.stretch; a.iExtra[i * 4 + 1] = s.flicker;
-    // iExtra.w：序列帧池放起始帧，拉伸池放像素保底半宽（两者从不同池里出，不冲突）
-    a.iExtra[i * 4 + 2] = s.groundY;
-    a.iExtra[i * 4 + 3] = (this.config.orient === "stretch" ? s.minPx : s.frame) || 0;
-    if (a.iNormal) {
-      a.iNormal[i * 3] = s.nx; a.iNormal[i * 3 + 1] = s.ny; a.iNormal[i * 3 + 2] = s.nz;
-    }
-    this.deathTime[i] = now + s.life;
-    if (i < this.dirtyMin) this.dirtyMin = i;
-    if (i > this.dirtyMax) this.dirtyMax = i;
-    return i;
-  }
-
-  /**
-   * 每帧一次：把脏区间提交，并把 instanceCount 收到"最高的活槽 + 1"。
-   * 只提交区间而不是整块，是因为整块上传（约 116 B × capacity）在连发时
-   * 每帧都要走一遍 PCIe，白白吃掉几个百分点的帧时间。
-   */
-  Flush(now) {
-    if (this.dirtyMax >= this.dirtyMin) {
-      const lo = this.dirtyMin, hi = this.dirtyMax;
-      for (const attribute of Object.values(this.attributes)) {
-        const itemSize = attribute.itemSize;
-        attribute.addUpdateRange(lo * itemSize, (hi - lo + 1) * itemSize);
-        attribute.needsUpdate = true;
-      }
-      this.dirtyMin = Infinity;
-      this.dirtyMax = -Infinity;
-    }
-    let last = -1;
-    const death = this.deathTime;
-    for (let i = this.capacity - 1; i >= 0; i -= 1) {
-      if (death[i] > now) { last = i; break; }
-    }
-    this.geometry.instanceCount = last + 1;
-    // 只在一次演出里用得到的池（开场近爆的泥浆）：空着就整只藏起来，不占每帧的 program 绑定。
-    // 关卡预热的「全场强制出画」会把藏着的网格翻出来画一帧，着色器照样在加载画面后面编掉。
-    if (this.config.hideWhenIdle) this.mesh.visible = last >= 0;
-  }
-
-  Clear() {
-    this.deathTime.fill(0);
-    this.arrays.iSpawnLife.fill(0);
-    this.dirtyMin = 0;
-    this.dirtyMax = this.capacity - 1;
-    this.geometry.instanceCount = 0;
-  }
-
-  Dispose() {
-    this.geometry.dispose();
-    this.material.dispose();
-  }
-}
-
 // ---------------------------------------------------------------------------
 // 碎块池：真几何小方块，会翻滚会弹跳。砖块/木屑/弹壳共用。
 // ---------------------------------------------------------------------------
-class DebrisPool {
-  /**
-   * @param {object} [options]
-   *   shape：换掉单位方块的源几何（约 1 m 见方、有 position/normal，可带索引），着色器不变 ——
-   *     与方块池共用同一个 program，不多一次编译。开场近爆的土块/木片用（MakeClodGeometry / MakeSplinterGeometry）。
-   *   hideWhenIdle：空着时藏起整只网格（只在一场演出里用的池，不占每帧的绑定）。
-   */
-  constructor(capacity, shared, { shape = null, hideWhenIdle = false } = {}) {
-    this.capacity = Math.max(4, capacity | 0);
-    this.cursor = 0;
-    this.deathTime = new Float32Array(this.capacity);
-    this.dirtyMin = Infinity;
-    this.dirtyMax = -Infinity;
-    this.hideWhenIdle = hideWhenIdle;
-
-    const box = shape || new THREE.BoxGeometry(1, 1, 1);
-    const geometry = new THREE.InstancedBufferGeometry();
-    geometry.setAttribute("position", box.getAttribute("position"));
-    geometry.setAttribute("normal", box.getAttribute("normal"));
-    if (box.getIndex()) geometry.setIndex(box.getIndex());
-    // 只是借它的 position/normal/index，**不能 dispose**：dispose 会把这几个
-    // attribute 从渲染器的缓冲表里摘掉，而它们现在归这张实例化几何所有。
-    // 源几何本身没上过 GPU，交给 GC 就行。
-
-    const n = this.capacity;
-    this.arrays = {
-      iSpawnLife: new Float32Array(n * 2),
-      iOrigin: new Float32Array(n * 3),
-      iVelocity: new Float32Array(n * 3),
-      iScale: new Float32Array(n * 3),
-      iSpin: new Float32Array(n * 3),
-      iColor: new Float32Array(n * 3),
-      iParams: new Float32Array(n * 4),
-    };
-    this.attributes = {};
-    for (const [name, array] of Object.entries(this.arrays)) {
-      const attribute = new THREE.InstancedBufferAttribute(array, array.length / n);
-      attribute.setUsage(THREE.DynamicDrawUsage);
-      geometry.setAttribute(name, attribute);
-      this.attributes[name] = attribute;
-    }
-    geometry.instanceCount = 0;
-    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
-    this.geometry = geometry;
-
-    this.material = new THREE.ShaderMaterial({
-      uniforms: {
-        uTime: shared.uTime, uSunDirection: shared.uSunDirection,
-        uSunColor: shared.uSunColor, uSkyColor: shared.uSkyColor,
-      },
-      vertexShader: VERT_DEBRIS,
-      fragmentShader: FRAG_DEBRIS,
-      transparent: false,
-      depthWrite: true,
-      side: THREE.FrontSide,
-    });
-    // 粒子是加性/半透明的 billboard：进了深度法线预通道就会在 SSAO 里
-    // 挖出一片乱码，还会把体积光的天空判据搞坏。
-    MarkNoPrepass(this.material);
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = false;
-    this.mesh.castShadow = false;
-    this.mesh.receiveShadow = false;
-    this.mesh.matrixAutoUpdate = false;
-    if (hideWhenIdle) this.mesh.visible = false;
-  }
-
-  Spawn(d, now) {
-    const i = this.cursor;
-    this.cursor = (this.cursor + 1) % this.capacity;
-    const a = this.arrays;
-    a.iSpawnLife[i * 2] = now; a.iSpawnLife[i * 2 + 1] = d.life;
-    a.iOrigin[i * 3] = d.x; a.iOrigin[i * 3 + 1] = d.y; a.iOrigin[i * 3 + 2] = d.z;
-    a.iVelocity[i * 3] = d.vx; a.iVelocity[i * 3 + 1] = d.vy; a.iVelocity[i * 3 + 2] = d.vz;
-    a.iScale[i * 3] = d.sx; a.iScale[i * 3 + 1] = d.sy; a.iScale[i * 3 + 2] = d.sz;
-    a.iSpin[i * 3] = d.rx; a.iSpin[i * 3 + 1] = d.ry; a.iSpin[i * 3 + 2] = d.rz;
-    a.iColor[i * 3] = d.color[0]; a.iColor[i * 3 + 1] = d.color[1]; a.iColor[i * 3 + 2] = d.color[2];
-    a.iParams[i * 4] = d.drag; a.iParams[i * 4 + 1] = d.groundY;
-    a.iParams[i * 4 + 2] = d.bounce; a.iParams[i * 4 + 3] = d.seed;
-    this.deathTime[i] = now + d.life;
-    if (i < this.dirtyMin) this.dirtyMin = i;
-    if (i > this.dirtyMax) this.dirtyMax = i;
-    return i;
-  }
-
-  Flush(now) {
-    if (this.dirtyMax >= this.dirtyMin) {
-      const lo = this.dirtyMin, hi = this.dirtyMax;
-      for (const attribute of Object.values(this.attributes)) {
-        attribute.addUpdateRange(lo * attribute.itemSize, (hi - lo + 1) * attribute.itemSize);
-        attribute.needsUpdate = true;
-      }
-      this.dirtyMin = Infinity;
-      this.dirtyMax = -Infinity;
-    }
-    let last = -1;
-    for (let i = this.capacity - 1; i >= 0; i -= 1) {
-      if (this.deathTime[i] > now) { last = i; break; }
-    }
-    this.geometry.instanceCount = last + 1;
-    if (this.hideWhenIdle) this.mesh.visible = last >= 0;
-  }
-
-  Clear() {
-    this.deathTime.fill(0);
-    this.arrays.iSpawnLife.fill(0);
-    this.dirtyMin = 0; this.dirtyMax = this.capacity - 1;
-    this.geometry.instanceCount = 0;
-  }
-
-  Dispose() { this.geometry.dispose(); this.material.dispose(); }
-}
-
 /**
  * 土块：二十面体的顶点各自往里外推一点（固定种子），再拆成独立三角面算平面法线 ——
  * 翻滚时一面亮一面暗，读得出是一块不规则的湿土，不是方糖。约 1 m 见方，按 iScale 缩放。
@@ -1351,60 +320,6 @@ export function MakeSplinterGeometry(seed = "Taierzhuang.Vfx.Splinter") {
 // 浮尘场：整场战斗都在一层灰里。
 // 位置是时间的周期函数 + 绕相机回卷，永远不需要生成/回收，CPU 侧每帧零成本。
 // ---------------------------------------------------------------------------
-class DustField {
-  constructor(count, shared, seed) {
-    this.count = Math.max(1, count | 0);
-    const geometry = MakeQuadGeometry();
-    const base = new Float32Array(this.count * 3);
-    const mote = new Float32Array(this.count * 4);
-    const random = Mulberry32(seed);
-    for (let i = 0; i < this.count; i += 1) {
-      base[i * 3] = random();
-      base[i * 3 + 1] = random();
-      base[i * 3 + 2] = random();
-      mote[i * 4] = 0.008 + random() * 0.026;          // 半径：亚厘米级，别做成雪花
-      mote[i * 4 + 1] = random() * 6.2831853;
-      mote[i * 4 + 2] = 0.012 + random() * 0.045;      // 上升速率：极慢
-      mote[i * 4 + 3] = random();
-    }
-    geometry.setAttribute("iBase", new THREE.InstancedBufferAttribute(base, 3));
-    geometry.setAttribute("iMote", new THREE.InstancedBufferAttribute(mote, 4));
-    geometry.instanceCount = this.count;
-    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
-    this.geometry = geometry;
-
-    this.material = new THREE.ShaderMaterial({
-      uniforms: {
-        uTime: shared.uTime,
-        uGlobalFade: shared.uGlobalFade,
-        uNearFade: shared.uNearFade,
-        uBox: { value: new THREE.Vector3(30, 9, 30) },
-        uCenter: { value: new THREE.Vector3() },
-        uIntensity: { value: 0.55 },
-        uTint: { value: new THREE.Vector3(...VFX_PALETTE.dustPale) },
-      },
-      vertexShader: VERT_DUST,
-      fragmentShader: FRAG_DUST,
-      transparent: true,
-      depthTest: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-    });
-    // 粒子是加性/半透明的 billboard：进了深度法线预通道就会在 SSAO 里
-    // 挖出一片乱码，还会把体积光的天空判据搞坏。
-    MarkNoPrepass(this.material);
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 12;
-    this.mesh.castShadow = false;
-    this.mesh.receiveShadow = false;
-    this.mesh.matrixAutoUpdate = false;
-  }
-
-  Dispose() { this.geometry.dispose(); this.material.dispose(); }
-}
-
 // ---------------------------------------------------------------------------
 // 表面反馈表。每种材质"打上去应该是什么样"都写在这儿，Impact 只做分发。
 // ---------------------------------------------------------------------------
@@ -1638,7 +553,7 @@ export class VfxSystem {
 
     const cap = (share, floor) => Math.max(floor, Math.round(this.budget * share));
     const spriteCapacity = cap(POOL_SHARE.sprite / Object.keys(EXPLOSION_SPRITE_VARIANTS).length, 8);
-    const makeSpritePool = (variant) => new ParticlePool(spriteCapacity, {
+    const makeSpritePool = (variant) => this.particles.Channel(variant.pool,spriteCapacity, {
       shape: "sprite", orient: "billboard",
       blending: variant.blending === "normal" ? THREE.NormalBlending : THREE.AdditiveBlending,
       aerial: variant.aerial, softRange: 0.25, renderOrder: 8,
@@ -1656,27 +571,27 @@ export class VfxSystem {
       // aerial 只给它一个池：加性的火/曳光/枪口焰是 HDR 自发光，大气透视对它们
       // 是**消光**（乘 1−fog）而不是混向雾色，压下去两百米外的火就没了；
       // 它们又都是零点几秒的短命货，天上留不住洞。要补的话另开一轮，别混在这儿。
-      smoke: new ParticlePool(cap(POOL_SHARE.smoke, 96), {
+      smoke: this.particles.Channel('smoke',cap(POOL_SHARE.smoke, 96), {
         shape: "puff", orient: "billboard", blending: THREE.NormalBlending,
         lit: true, aerial: true, softRange: 0.45, renderOrder: 6,
       }, this.shared),
       // 火/闪光：加性，HDR 3—22，交给 Script_Post 的泛光
-      fire: new ParticlePool(cap(POOL_SHARE.fire, 64), {
+      fire: this.particles.Channel('fire',cap(POOL_SHARE.fire, 64), {
         shape: "puff", orient: "billboard", blending: THREE.AdditiveBlending,
         softRange: 0.25, renderOrder: 8,
       }, this.shared),
       // Vefects 原作轮廓 + 流动噪声：只接常驻场景源。
-      sourceSmoke: new ParticlePool(cap(POOL_SHARE.sourceSmoke, 48), {
+      sourceSmoke: this.particles.Channel('sourceSmoke',cap(POOL_SHARE.sourceSmoke, 48), {
         shape: "masked", orient: "billboard", blending: THREE.NormalBlending,
         lit: true, aerial: true, softRange: 0.45, renderOrder: 6,
         mask: { texture: this.maskTransparentPlaceholder, noise: this.spritePlaceholder },
       }, this.shared),
-      sourceFire: new ParticlePool(cap(POOL_SHARE.sourceFire * 0.5, 16), {
+      sourceFire: this.particles.Channel('sourceFire',cap(POOL_SHARE.sourceFire * 0.5, 16), {
         shape: "masked", orient: "billboard", blending: THREE.AdditiveBlending,
         softRange: 0.22, renderOrder: 8,
         mask: { texture: this.maskTransparentPlaceholder, noise: this.spritePlaceholder, fire: true, emission: 4.6 },
       }, this.shared),
-      sourceGroundFire: new ParticlePool(cap(POOL_SHARE.sourceFire * 0.5, 16), {
+      sourceGroundFire: this.particles.Channel('sourceGroundFire',cap(POOL_SHARE.sourceFire * 0.5, 16), {
         shape: "masked", orient: "billboard", blending: THREE.AdditiveBlending,
         softRange: 0.18, renderOrder: 8,
         mask: { texture: this.maskTransparentPlaceholder, noise: this.spritePlaceholder, fire: true, emission: 4.2 },
@@ -1688,36 +603,36 @@ export class VfxSystem {
       spriteFireball: makeSpritePool(EXPLOSION_SPRITE_VARIANTS.fireball),
       spriteHeavy: makeSpritePool(EXPLOSION_SPRITE_VARIANTS.heavy),
       // 曳光与火星共用一个"沿速度拉长"的池
-      streak: new ParticlePool(cap(POOL_SHARE.streak, 64), {
+      streak: this.particles.Channel('streak',cap(POOL_SHARE.streak, 64), {
         shape: "streak", orient: "stretch", blending: THREE.AdditiveBlending,
         bounce: true, softRange: 0.12, renderOrder: 9,
       }, this.shared),
       // 一发一条的弹道光束（TracerBeam，战车机枪）。容量固定、不吃画质档预算：
       // 它是「火力从哪儿来」的玩法信号，与落点预警准星同一个待遇。
       // 淡出全交给片元里的余辉，池级淡出推到寿命最末。
-      beam: new ParticlePool(48, {
+      beam: this.particles.Channel('beam',48, {
         shape: "beam", orient: "stretch", blending: THREE.AdditiveBlending,
         softRange: 0.12, renderOrder: 9, fadeOutStart: 0.995, segments: 32,
       }, this.shared),
       // 枪口焰：星芒
-      star: new ParticlePool(cap(POOL_SHARE.star, 24), {
+      star: this.particles.Channel('star',cap(POOL_SHARE.star, 24), {
         shape: "star", orient: "billboard", blending: THREE.AdditiveBlending,
         softRange: 0.2, renderOrder: 10,
       }, this.shared),
       // 航空炸弹的土柱与烟团（BombBlast）：与 smoke 同一种片子（同一个着色器程序，不多编），
       // 容量按画质档固定、不吃战斗烟池 —— 一轮几十颗不会把手榴弹、炮击的烟挤掉。只画活着的格子。
-      bombSmoke: new ParticlePool(BOMB_BLAST_VFX.poolCapacity[this.quality] ?? BOMB_BLAST_VFX.poolCapacity.high, {
+      bombSmoke: this.particles.Channel('bombSmoke',BOMB_BLAST_VFX.poolCapacity[this.quality] ?? BOMB_BLAST_VFX.poolCapacity.high, {
         shape: "puff", orient: "billboard", blending: THREE.NormalBlending,
         lit: true, aerial: true, softRange: 0.45, renderOrder: 6, fadeOutStart: BOMB_BLAST_VFX.fadeOutStart,
       }, this.shared),
       // 贴面的环：爆炸尘环、水花圈
-      ring: new ParticlePool(cap(POOL_SHARE.ring, 16), {
+      ring: this.particles.Channel('ring',cap(POOL_SHARE.ring, 16), {
         shape: "ring", orient: "normal", blending: THREE.NormalBlending,
         litSurface: true, softRange: 0, renderOrder: 5,
       }, this.shared),
       // 炮弹落点预警：准星贴图 + 程序化收缩环，一张 quad 演完整个倒计时。容量固定 ——
       // 同屏预警不过十几发，而且这是玩法信号，不能被画质档的预算削没。
-      marker: new ParticlePool(12, {
+      marker: this.particles.Channel('marker',12, {
         shape: "marker", orient: "normal", blending: THREE.NormalBlending,
         litSurface: true, softRange: 0, renderOrder: 5, polygonOffset: true,
         fadeOutStart: 0.985,
@@ -1725,7 +640,7 @@ export class VfxSystem {
         marker: { soil: VFX_PALETTE.markerScorch, dust: VFX_PALETTE.soilAir, hot: VFX_PALETTE.markerHot },
       }, this.shared),
       // 弹孔贴花：几何留在命中面，polygonOffset 只动深度；预通道逐像素裁掉悬空部分。
-      decal: new ParticlePool(Math.min(this.preset.decals, cap(POOL_SHARE.decal, 32)), {
+      decal: this.particles.Channel('decal',Math.min(this.preset.decals, cap(POOL_SHARE.decal, 32)), {
         shape: "decal", orient: "normal", blending: THREE.NormalBlending,
         litSurface: true, softRange: 0, renderOrder: 3, polygonOffset: true,
         preserveTargetAlpha: true,
@@ -1738,29 +653,29 @@ export class VfxSystem {
       }, this.shared),
     };
     this.bloodEffects = new BloodEffects({root:this.root,shared:this.shared,lights,quality:this.quality,
-      CreatePool:(capacity,config)=>new ParticlePool(capacity,config,this.shared),
+      CreatePool:(capacity,config)=>this.particles.Channel(config.shape,capacity,config),
       random:this.random,GroundLevel:()=>this.groundLevel});
     this.pools.bloodMist=this.bloodEffects.mist;
     this.pools.bloodDrop=this.bloodEffects.drops;
     this.bloodSpurts=this.bloodEffects.sources;
-    this.debris = new DebrisPool(cap(POOL_SHARE.debris, 48), this.shared);
+    this.debris = this.particles.Channel('debris',cap(POOL_SHARE.debris,48),{renderer:'mesh',geometryName:'rubble',shape:MakeClodGeometry('GeneralRubble')});
     // 开场近爆（Script_OpeningBlastFx，SB02）专用的三只池：甩出来的湿泥（沿速度拉伸、受光、软边）、
     // 不规则土块、劈开的木片。容量固定、空着就整只藏起来（hideWhenIdle）—— 不吃画质档预算、
     // 不占每帧的绑定，也不改手榴弹 / 炮弹的碎块与烟（那些仍走 debris / smoke）。
     // 土块与木片池和 debris 是同一份着色器（只换源几何），泥浆池的 program 由开场布景装载时
     // 生的一颗预热粒子在关卡预热里真画一次（Script_OpeningBlastFx.Warm）。
-    this.pools.mud = new ParticlePool(128, {
+    this.pools.mud = this.particles.Channel('mud',128, {
       shape: "mud", orient: "stretch", blending: THREE.NormalBlending,
       lit: true, softRange: 0.08, renderOrder: 6, hideWhenIdle: true,
     }, this.shared);
     this.chunks = {
-      clod: new DebrisPool(96, this.shared, { shape: MakeClodGeometry(), hideWhenIdle: true }),
-      splinter: new DebrisPool(48, this.shared, { shape: MakeSplinterGeometry(), hideWhenIdle: true }),
+      clod: this.particles.Channel('clod',96,{renderer:'mesh',geometryName:'clod',shape:MakeClodGeometry(),hideWhenIdle:true}),
+      splinter: this.particles.Channel('splinter',48,{renderer:'mesh',geometryName:'splinter',shape:MakeSplinterGeometry(),hideWhenIdle:true}),
+      casing: this.particles.Channel('casing',PARTICLE_MESH.casingCapacity,{renderer:'mesh',geometryName:'casing',shape:new THREE.CylinderGeometry(.5,.5,1,PARTICLE_MESH.casingSides).rotateX(Math.PI/2),hideWhenIdle:true,metalness:PARTICLE_MESH.metalness,roughness:PARTICLE_MESH.roughness}),
     };
 
-    for (const pool of Object.values(this.pools)) this.root.add(pool.mesh);
-    this.root.add(this.debris.mesh);
-    for (const pool of Object.values(this.chunks)) this.root.add(pool.mesh);
+    for (const pool of Object.values(this.pools)) if(!pool.particleId)this.root.add(pool.mesh);
+    // All emitted mesh fragments live under the same ParticleEffects root.
 
     this.dust = null;
     this.dustBox = null;
@@ -1965,17 +880,18 @@ export class VfxSystem {
     if (camera) this.eye.copy(camera.position);
     this.UpdateBurningLights();
 
-    this._UpdateSmokeSources(step);
-    this.battleSmoke?.Update();
     if (step > 0) this.particles.Resume();
     this.particles.Update(step);
+    this._UpdateSmokeSources(step);
+    this.battleSmoke?.Update();
     this.bloodEffects.Update(step,this.time,camera);
 
+    if(this.dust&&!this.particles.systems.has(this.dust.particleId))this.dust=null;
     if (this.dust && camera) {
       // 浮尘盒跟着相机走，但被 AmbientDust 给的战斗区域夹住 —— 越出战场就没有尘
-      const center = this.dust.material.uniforms.uCenter.value;
-      center.copy(camera.position);
-      if (this.dustBox) this.dustBox.clampPoint(center, center);
+      TMP_A.copy(camera.position);
+      if (this.dustBox) this.dustBox.clampPoint(TMP_A, TMP_A);
+      this.dust.Move(TMP_A.toArray());
     }
 
     for (const pool of Object.values(this.pools)) pool.Flush(this.time);
@@ -2377,6 +1293,7 @@ export class VfxSystem {
     radius = 6, kind = "grenade", groundY = null, spriteVariant = null,
   } = {}) {
     const profile = EXPLOSION_KINDS[kind] || EXPLOSION_KINDS.grenade;
+    const art = EXPLOSION_PARTICLE_ART[kind] || EXPLOSION_PARTICLE_ART.grenade;
     const scale = Math.max(0.35, radius / 6);
     // 空炸（打在墙上、屋顶上）时爆点比地面高，碎块得继续往下掉
     const ground = groundY ?? Math.min(position.y - 0.05, this.groundLevel);
@@ -2397,7 +1314,7 @@ export class VfxSystem {
       const lightProfile = {
         intensity: Math.max(38, Math.min(180, radius * (8.2 + profile.flash * 1.8))),
         radius: Math.max(14, Math.min(52, radius * (2.7 + profile.flash * 0.5))),
-        duration: Math.max(0.34, Math.min(1.0, spriteLife * 0.78)),
+        duration: Math.min(art.lightSeconds, spriteLife * 0.78),
         coreColor: 0xfff1d2,
         fireColor: profile.sooty >= 0.7 ? 0xff641d : 0xff7a26,
       };
@@ -2432,10 +1349,10 @@ export class VfxSystem {
       s.z = position.z + this._Signed(spread);
       s.vx = this._Signed(1.1) * scale; s.vy = this._Range(1.4, 3.0) * scale; s.vz = this._Signed(1.1) * scale;
       s.ay = 2.4; s.drag = 2.8;
-      s.life = this._Range(spriteProfile.life[0], spriteProfile.life[1]);
-      s.sizeStart = radius * size[0];
-      s.sizeEnd = radius * size[1];
-      s.opacity = i === 0 ? 0.95 : 0.6; s.fadeIn = 0.04;
+      s.life = this._Range(art.spriteLife*.85, art.spriteLife);
+      s.sizeStart = radius * size[0] * art.spriteScale;
+      s.sizeEnd = radius * size[1] * art.spriteScale;
+      s.opacity = (i === 0 ? 1 : .6)*art.opacity; s.fadeIn = 0.025;
       s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.5);
       s.frame = i === 0 ? 0 : Math.floor(this.random() * Math.min(8, spriteProfile.frames));
       s.colorA = VFX_PALETTE.fireHot; s.colorB = VFX_PALETTE.fireCool;
@@ -2452,9 +1369,9 @@ export class VfxSystem {
       s.z = position.z + this._Signed(radius * 0.14);
       s.vx = this._Signed(2.4 * scale); s.vy = this._Range(1.2, 4.2) * scale; s.vz = this._Signed(2.4 * scale);
       s.ay = 3.2; s.drag = 3.0;
-      s.life = this._Range(0.22, 0.45);
-      s.sizeStart = radius * 0.16; s.sizeEnd = radius * this._Range(0.3, 0.5);
-      s.opacity = 1; s.fadeIn = 0.03;
+      s.life = this._Range(art.glowLife*.65, art.glowLife);
+      s.sizeStart = radius * 0.16 * art.glowScale; s.sizeEnd = radius * this._Range(0.3, 0.5) * art.glowScale;
+      s.opacity = art.opacity; s.fadeIn = 0.02;
       s.angle = this._Range(0, 6.283); s.spin = this._Signed(2.5);
       s.colorA = VFX_PALETTE.fireHot; s.colorB = VFX_PALETTE.fireCool;
       s.seed = this.random();
@@ -2470,7 +1387,7 @@ export class VfxSystem {
       s.sizeStart = radius * 0.2;
       // 环的可见半径约是这个半宽的 0.72 倍，1.05 差不多正好铺到杀伤半径外沿
       s.sizeEnd = radius * (1.05 + i * 0.4);
-      s.opacity = 0.55 - i * 0.18; s.fadeIn = 0.05;
+      s.opacity = 0.22 - i * 0.07; s.fadeIn = 0.035;
       s.angle = this._Range(0, 3.14);
       s.colorA = VFX_PALETTE.dust; s.colorB = VFX_PALETTE.dustDense;
       s.seed = this.random();
@@ -2526,7 +1443,7 @@ export class VfxSystem {
       s.life = this._Range(2.6, 5.0);
       s.sizeStart = radius * 0.14;
       s.sizeEnd = radius * this._Range(0.42, 0.78);
-      s.opacity = 0.5; s.fadeIn = 0.14;
+      s.opacity = art.smokeOpacity; s.fadeIn = 0.025;
       s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.7);
       // 越靠近爆心越黑（燃烧产物），越往外越是砖粉黄土
       const sooty = this.random() < profile.sooty;
@@ -2719,13 +1636,13 @@ export class VfxSystem {
     const size = CASING_SIZES[key] || CASING_SIZES["7.92"];
     const dir = TMP_A.copy(direction).normalize();
     const speed = this._Range(1.8, 3.2);
-    this._SpawnDebris(
+    this.SpawnChunk('casing',
       position.x, position.y, position.z,
       dir.x * speed + this._Signed(0.4),
       dir.y * speed + this._Range(0.8, 1.8),
       dir.z * speed + this._Signed(0.4),
       size[0], size[0], size[1],
-      VFX_PALETTE.brass, this._Range(0.5, 1.1), this.groundLevel, 0.42,
+      VFX_PALETTE.brass, this._Range(...PARTICLE_MESH.casingLife), this.groundLevel, 0.42,
       this._Range(8, 18));                    // 弹壳出膛是翻着飞的，转速要高
   }
 
@@ -2797,7 +1714,7 @@ export class VfxSystem {
     }
     this.smokeSources.set(id, source);
     if (source.backdrop) {
-      this.battleSmoke ||= new BattleSmoke({ root: this.root, shared: this.shared, quality: this.quality });
+      this.battleSmoke ||= new BattleSmoke({ root: this.root, shared: this.shared, quality: this.quality,particles:this.particles });
       this.battleSmoke.Set(id, source);
     }
     if (source.fire > 0) source.particleHandles = this.particles.Burning(source, this.spawnScale);
@@ -2853,7 +1770,7 @@ export class VfxSystem {
     source.position.set(position.x, position.y, position.z);
     if (source.firePosition) source.firePosition.add(new THREE.Vector3(dx, dy, dz));
     const fireOrigin = source.firePosition || source.position;
-    for (const id of source.particleHandles || []) this.particles.Move(id, fireOrigin.toArray());
+    for (const id of source.particleHandles || []) if(this.particles.systems.has(id))this.particles.Move(id, fireOrigin.toArray());
     if (source.backdrop) this.battleSmoke?.Set(handle, source);
     if (source.lightProfile) {
       source.lightProfile.position.x += dx;
@@ -2871,7 +1788,7 @@ export class VfxSystem {
     this.DetachSourceLight(source);
     this.smokeSources.delete(handle);
     if (source?.backdrop) this.battleSmoke?.Remove(handle);
-    for (const id of source?.particleHandles || []) this.particles.Remove(id);
+    for (const id of source?.particleHandles || []) if(this.particles.systems.has(id))this.particles.Remove(id);
   }
 
   /** 按统一目录创建可序列化的场景持续特效。 */
@@ -2910,10 +1827,7 @@ export class VfxSystem {
     const count = Math.max(32, Math.min(capacity, Math.round(volume * density)));
 
     if (this.dust) { this.root.remove(this.dust.mesh); this.dust.Dispose(); }
-    this.dust = new DustField(count, this.shared, HashString("Taierzhuang.Dust"));
-    this.dust.material.uniforms.uBox.value.copy(cell);
-    this.dust.material.uniforms.uIntensity.value = 0.5;
-    this.root.add(this.dust.mesh);
+    this.dust = this.particles.Motes(cell.toArray(),count);
     return count;
   }
 
@@ -3146,7 +2060,7 @@ export class VfxSystem {
     s.sizeEnd = source.sizeEnd * this._Range(0.8, 1.2);
     s.stretch = source.growthPower;
     s.opacity = source.opacity;
-    s.fadeIn = 0.18;
+    s.fadeIn = Math.min(.18,PARTICLE_VOLUME.sourceFadeSeconds/s.life);
     s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.55);
     s.colorA = source.colorA; s.colorB = source.colorB;
     s.seed = this.random();

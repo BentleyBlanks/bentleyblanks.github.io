@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import {ParticleEffects} from "./Script_ParticleEffects.mjs";
+import {CreateParticleEnvironment} from "./Script_ParticleEnvironment.mjs";
 
 // A bounded world-space light volume. Camera depth clips the integral; a static
 // light-space depth map includes the actual window mullions, furniture and paper.
@@ -151,35 +153,18 @@ export class CommandRoomAtmosphere {
   }
   SetPanelFocus(value){this.panelFocus=THREE.MathUtils.clamp(value,0,1);this.compositeMaterial.uniforms.panelMix.value=this.panelFocus;}
   BuildDust(data) {
-    const positions=new Float32Array(data.count*3),seeds=new Float32Array(data.count);
-    let seed=1938;const Rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+    this.particleEnvironment=CreateParticleEnvironment();const shared=this.particleEnvironment.shared;
+    Object.assign(shared,{uParticleLightDepth:this.lightUniforms.lightDepth,uParticleLightMatrix:this.lightUniforms.lightMatrix,
+      uParticleLightBias:this.lightUniforms.shadowBias,uParticleLightTexel:this.lightUniforms.shadowTexel,uParticleLightValid:{value:1}});
+    this.particles=new ParticleEffects(this.scene,shared,'high');
     const origin=this.volumeMaterial.uniforms.origin.value,direction=this.volumeMaterial.uniforms.direction.value;
-    for(let i=0;i<data.count;i++){
-      const t=(.06+Rand()*.90)*this.data.length;
-      positions[i*3]=origin.x+direction.x*t+(Rand()-.5)*this.data.size[0]*.94;
-      positions[i*3+1]=origin.y+direction.y*t+(Rand()-.5)*this.data.size[1]*.94;
-      positions[i*3+2]=origin.z+direction.z*t;seeds[i]=Rand();
-    }
-    const geometry=new THREE.BufferGeometry();geometry.setAttribute("position",new THREE.BufferAttribute(positions,3));
-    geometry.setAttribute("seed",new THREE.BufferAttribute(seeds,1));
-    const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,depthTest:true,
-      uniforms:{...this.lightUniforms,clock:{value:0},tint:{value:new THREE.Color(data.color)},opacity:{value:data.opacity},
-        pointSize:{value:data.size},drift:{value:data.drift},pixelHeight:{value:1}},
-      vertexShader:`attribute float seed;uniform float clock;uniform float drift;uniform float pointSize;uniform float pixelHeight;
-        varying vec3 worldPoint;varying float brightness;
-        void main(){vec3 p=position;float phase=seed*6.283185;
-          p+=vec3(sin(clock*.27+phase),sin(clock*.17+phase*3.),cos(clock*.21+phase*2.))*drift;
-          worldPoint=(modelMatrix*vec4(p,1.)).xyz;vec4 view=modelViewMatrix*vec4(p,1.);
-          brightness=(.45+.55*seed)*smoothstep(.25,.7,-view.z)*(1.-smoothstep(5.,8.,-view.z));
-          gl_PointSize=clamp(pointSize*pixelHeight*projectionMatrix[1][1]*(.5+seed*.5)/max(.1,-view.z),.6,2.6);
-          gl_Position=projectionMatrix*view;}`,
-      fragmentShader:`uniform vec3 tint;uniform float opacity;varying vec3 worldPoint;varying float brightness;
-        ${SHADOW}
-        void main(){float radius=length(gl_PointCoord-.5);float alpha=exp(-radius*radius*18.)*smoothstep(.5,.28,radius);
-          alpha*=opacity*brightness*Lit(worldPoint);if(alpha<.003)discard;gl_FragColor=vec4(tint,alpha);}`});
-    this.dust=new THREE.Points(geometry,material);this.dust.name="CommandRoomWindowDust";
-    this.scene.add(this.dust);return this.dust;
+    this.dustId=this.particles.Create({preset:'WindowDust',name:'CommandRoom/WindowDust',position:origin.toArray(),modules:{
+      main:{maxParticles:data.count,startSize:{mode:'twoConstants',min:data.size*.5,max:data.size},startColor:[...new THREE.Color(data.color).toArray(),data.opacity]},
+      emission:{rateOverTime:data.count/120},shape:{box:[this.data.size[0]*.94,this.data.size[1]*.94,this.data.length],direction:direction.toArray()},noise:{strength:data.drift},
+    }}).id;
+    this.dust=this.particles.renderer.pools.windowMote.mesh;this.dust.name='CommandRoomWindowDust';this.lastDustTime=0;return this.dust;
   }
+
   Render(camera,time) {
     const r=this.renderer;r.getDrawingBufferSize(this.size);
     const width=Math.max(1,this.size.x),height=Math.max(1,this.size.y);
@@ -202,7 +187,12 @@ export class CommandRoomAtmosphere {
         this.shadowDirty=false;
       }finally{this.scene.overrideMaterial=override;this.scene.background=background;if(this.dust)this.dust.visible=dustVisible;}
     }
-    if(this.dust){this.dust.material.uniforms.clock.value=time;this.dust.material.uniforms.pixelHeight.value=height;}
+    if(this.particles){
+      this.particleEnvironment.shared.uResolution.value.set(width,height);
+      if(time<this.lastDustTime){this.particles.Simulate(this.dustId,120);this.particles.Play(this.dustId);this.lastDustTime=0;}
+      let dt=Math.max(0,time-this.lastDustTime);while(dt>0){const step=Math.min(120,dt);this.particles.Update(step);dt-=step;}
+      this.lastDustTime=time;
+    }
     const u=this.volumeMaterial.uniforms;
     u.clock.value=time;u.inverseProjection.value.copy(camera.projectionMatrixInverse);
     u.cameraWorld.value.copy(camera.matrixWorld);camera.getWorldPosition(u.eye.value);
@@ -221,6 +211,7 @@ export class CommandRoomAtmosphere {
     this.quad.material=this.compositeMaterial;r.setRenderTarget(null);r.render(this.quadScene,this.quadCamera);
   }
   Dispose(){
+    this.particles?.Dispose();this.particleEnvironment?.Dispose();
     this.colorTarget.dispose();this.volumeTarget.dispose();this.shadowTarget.dispose();this.depthMaterial.dispose();
     this.volumeMaterial.dispose();this.compositeMaterial.dispose();this.quad.geometry.dispose();
     for(const target of this.blurTargets)target.dispose();this.blurMaterial.dispose();

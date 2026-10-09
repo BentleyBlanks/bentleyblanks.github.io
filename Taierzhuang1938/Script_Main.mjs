@@ -2143,6 +2143,8 @@ async function Boot() {
     materialShading: shadingUniforms, RecompileAllMaterials,
     get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
     get Particles() { return vfx.particles; },
+    get ParticleEditor() { return editor?.activeId === 'vfx' ? editor.active : null; },
+    get MenuParticles() { return commandRoom?.atmosphere?.particles ?? null; },
     player, ai, vfx, viewmodel, hud, audio, state, actorFactory, actorBatch, input,
     // 音频接线层：取证走 Debug.AudioZone，专项冒烟要直接摸缓存与限速器
     // （Script_AudioWiringTest 换探针世界之前必须先把 1 m 网格缓存清掉）。
@@ -3248,6 +3250,9 @@ async function Boot() {
   if (EDITOR_PARAM === "squadMarch" && !SHOT) {
     ShowBoot(false);
     editor.Open("squadMarch");
+  }
+  if (EDITOR_PARAM === "vfx") {
+    ShowBoot(false);state.menu=false;state.running=false;editor.Open("vfx");
   }
   if (EDITOR_PARAM === "firstPerson") {
     ShowBoot(false);
@@ -8579,7 +8584,8 @@ function Frame(dt, render = true) {
     camera.getWorldDirection(_forward);
     // 特效编辑器直接驱动 VfxSystem；点光包络也必须同帧推进，否则预览里只有火球贴片，
     // 墙地仍旧不亮，退出编辑器才突然补算一大步。
-    lights.Update(dt, state.elapsed, camera.position);
+    if(editor.activeId==='vfx')lights.Update(0,editor.active.previewTime??state.elapsed,camera.position);
+    else lights.Update(dt, state.elapsed, camera.position);
     lights.UpdateShadowFrustum(camera.position, _forward);
     if (render) RenderScene(dt);
     return;

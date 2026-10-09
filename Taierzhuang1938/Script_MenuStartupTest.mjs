@@ -31,9 +31,11 @@ try {
       const g = window.Tengxian;
       return {state: g.state, room: g.Debug.CommandRoom(), actors: !!g.actorFactory, physics: !!g.physics,
         battlefield: !!g.battlefield, viewmodel: !!g.viewmodel, animation: g.state.levelWarm,
+        particles: g.MenuParticles?.Modules().renderers,
         bytes: performance.getEntriesByType('resource').reduce((n, e) => n + e.decodedBodySize, 0)};
     });
     assert.ok(snapshot.room.ready && snapshot.state.standaloneMenu);
+    assert.ok(snapshot.particles?.includes('windowMote'), 'standalone menu exposes the shared particle API');
     assert.ok(!snapshot.actors && !snapshot.physics && !snapshot.battlefield && !snapshot.viewmodel && !snapshot.animation);
     // The model, paper artwork, fonts and optional boot paper are the entire title payload.
     const forbidden = requests.filter(url => /\/(Animation|Audio)\/|\/vendor\/rapier\/|\/(Script_Main|Script_BrowserBundle|Script_Physics)\.mjs|\/Model\/(?!Model_CommandRoom\.glb)/.test(url));

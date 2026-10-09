@@ -7,7 +7,7 @@ import { FIRST_LEVEL_DISTANT_SMOKE } from "./Data_FirstLevelDistantSmoke.mjs";
 import { MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
-import { BuildBattleSmokeInstances } from "./Script_BattleSmoke.mjs";
+import { BattleSmokeParticleBudget } from "./Script_BattleSmoke.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { MakeTreePlacements } from "./Data_BreakableTreePlacements.mjs";
 
@@ -46,8 +46,8 @@ for(const c of solids)for(const [id,route] of Object.entries(MISSION_ROUTES))for
 const sources=emitters.map(e=>({position:e.position,backdrop:e.options.backdrop}));
 for(const entry of origins.entries.values()) if(entry.spec.kind==="tank"||entry.spec.kind==="truck")
   for(const tree of MakeTreePlacements())assert.ok(Math.hypot(entry.position.x-tree.x,entry.position.z-tree.z)>3.2,"vehicle body clears authored tree trunks");
-assert.equal(BuildBattleSmokeInstances(sources,"low").length,756);   // 12 per source × 63
-assert.equal(BuildBattleSmokeInstances(sources,"ultra").length,1260); // 20 per source × 63
+assert.equal(BattleSmokeParticleBudget(sources,"low"),1008);   // 16 per source × 63
+assert.equal(BattleSmokeParticleBudget(sources,"ultra"),1638); // 26 per source × 63
 assert.ok(origins.meshes.length<=origins.materials.size,"wreck geometry is merged into one mesh per material: "+origins.meshes.length);
 const triangles=origins.meshes.reduce((n,m)=>n+m.geometry.index.count/3,0);
 assert.ok(triangles<110000,"origin triangle budget: "+triangles);

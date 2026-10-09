@@ -40,14 +40,14 @@ const DEFAULTS = {
     startSize:.25, startRotation:0, startColor:[1,1,1,1], gravityModifier:0, maxParticles:128,
     simulationSpeed:1, simulationSpace:'world', randomSeed:1938},
   emission: {enabled:true, rateOverTime:10, rateOverDistance:0, bursts:[]},
-  shape: {enabled:true, type:'cone', radius:.3, angle:12, box:[1,1,1]},
+  shape: {enabled:true, type:'cone', radius:.3, angle:12, box:[1,1,1],direction:[0,0,1]},
   velocityOverLifetime: {enabled:false, x:0, y:0, z:0},
   forceOverLifetime: {enabled:false, x:0, y:0, z:0, drag:0},
   sizeOverLifetime: {enabled:true, curve:[[0,.4],[.3,1],[1,0]]},
   colorOverLifetime: {enabled:true, gradient:[[0,[1,1,1,0]],[.12,[1,1,1,1]],[.65,[1,1,1,.8]],[1,[1,1,1,0]]]},
   rotationOverLifetime: {enabled:false, angularVelocity:0},
   noise: {enabled:false, strength:0, frequency:1.5, scrollSpeed:1},
-  renderer: {mode:'flame', aspect:1.8, softRange:.35},
+  renderer: {enabled:true,mode:'flame', aspect:1.8, softRange:.35,bounds:[30,12,30],density:2.8,nearFade:.8},
 };
 function NumberIn(value, path, low, high) {
   if (!Number.isFinite(value) || value < low || value > high) throw new RangeError(`${path}: expected finite number in [${low}, ${high}]`);
@@ -84,7 +84,7 @@ export function NormalizeParticleModules(input={}) {
   const m=modules.main;
   for(const [key,low,high] of [['duration',.05,120],['startDelay',0,120],['maxParticles',1,4096],['simulationSpeed',0,8],['gravityModifier',-10,10],['randomSeed',0,4294967295]])NumberIn(m[key],'main.'+key,low,high);
   if(!Number.isInteger(m.maxParticles)||!Number.isInteger(m.randomSeed))throw new Error('main: maxParticles and randomSeed must be integers');
-  for(const [key,low,high] of [['startLifetime',.02,30],['startSpeed',0,100],['startSize',.001,50],['startRotation',-100,100]])CheckCurve(m[key],'main.'+key,low,high);
+  for(const [key,low,high] of [['startLifetime',.02,120],['startSpeed',0,100],['startSize',.001,50],['startRotation',-100,100]])CheckCurve(m[key],'main.'+key,low,high);
   if(!['world','local'].includes(m.simulationSpace))throw new Error('main.simulationSpace: expected world or local');
   if(!Array.isArray(m.startColor)||m.startColor.length!==4)throw new Error('main.startColor: expected linear RGBA');
   m.startColor.forEach((n,i)=>NumberIn(n,'main.startColor',0,i===3?1:32));
@@ -96,7 +96,8 @@ export function NormalizeParticleModules(input={}) {
     NumberIn(burst.time,'burst.time',0,m.duration);CheckCurve(burst.count,'burst.count',0,4096);
     NumberIn(burst.cycles??1,'burst.cycles',1,100);NumberIn(burst.repeatInterval??0,'burst.repeatInterval',0,120);
   }
-  if(!['cone','sphere','box','point','circle'].includes(modules.shape.type))throw new Error('shape.type: unsupported shape');
+  if(!['cone','sphere','box','point','circle','beam'].includes(modules.shape.type))throw new Error('shape.type: unsupported shape');
+  if(!Array.isArray(modules.shape.direction)||modules.shape.direction.length!==3||!modules.shape.direction.every(Number.isFinite)||Math.hypot(...modules.shape.direction)<1e-6)throw new Error('shape.direction: nonzero finite vector required');
   NumberIn(modules.shape.radius,'shape.radius',0,50);NumberIn(modules.shape.angle,'shape.angle',0,90);
   if(!Array.isArray(modules.shape.box)||modules.shape.box.length!==3)throw new Error('shape.box: expected three dimensions');
   modules.shape.box.forEach(n=>NumberIn(n,'shape.box',0,100));
@@ -117,8 +118,11 @@ export function NormalizeParticleModules(input={}) {
     if(!Array.isArray(color)||color.length!==4)throw new Error('gradient: linear RGBA required');
     color.forEach((n,i)=>NumberIn(n,'gradient.color',0,i===3?1:32));
   }
-  if(!['flame','smoke','ember'].includes(modules.renderer.mode))throw new Error('renderer.mode: unsupported renderer');
-  NumberIn(modules.renderer.aspect,'renderer.aspect',.1,10);NumberIn(modules.renderer.softRange,'renderer.softRange',.001,5);
+  if(!['flame','smoke','ember','mote','windowMote','volume','material'].includes(modules.renderer.mode))throw new Error('renderer.mode: unsupported renderer');
+  NumberIn(modules.renderer.density,'renderer.density',.01,32);NumberIn(modules.renderer.nearFade,'renderer.nearFade',0,30);
+  if(!Array.isArray(modules.renderer.bounds)||modules.renderer.bounds.length!==3)throw new Error('renderer.bounds: three box dimensions required');
+  modules.renderer.bounds.forEach(value=>NumberIn(value,'renderer.bounds',.01,1000));
+  NumberIn(modules.renderer.aspect,'renderer.aspect',.1,10);NumberIn(modules.renderer.softRange,'renderer.softRange',0,5);
   for(const [key,module]of Object.entries(modules))if('enabled'in module&&typeof module.enabled!=='boolean')throw new Error(`${key}.enabled: expected boolean`);
   for(const key of ['loop','prewarm'])if(typeof m[key]!=='boolean')throw new Error(`main.${key}: expected boolean`);
   return modules;
@@ -136,12 +140,12 @@ function RandomGenerator(seed) {
   return ()=>{state=(state+0x6D2B79F5)>>>0;let n=state;n=Math.imul(n^(n>>>15),n|1);n^=n+Math.imul(n^(n>>>7),n|61);return ((n^(n>>>14))>>>0)/4294967296;};
 }
 export class ParticleSystem {
-  constructor(modules, {position=[0,0,0], onEmit=()=>{}, onClear=()=>{}, onChange=()=>{}}={}) {
+  constructor(modules, {position=[0,0,0], onEmit=()=>{}, onClear=()=>{}, onChange=()=>{},onRetire=()=>{}}={}) {
     this.modules=NormalizeParticleModules(modules);this.Move(position);this.previousPosition=[...position];
-    this.onEmit=onEmit;this.onClear=onClear;this.onChange=onChange;this.Reset();
+    this.onEmit=onEmit;this.onClear=onClear;this.onChange=onChange;this.onRetire=onRetire;this.Reset();
   }
   Reset() {this.previousPosition=[...this.position];this.time=0;this.remainder=0;this.accumulator=0;this.distanceAccumulator=0;this.particles=[];this.emitted=0;this.dropped=0;this.random=RandomGenerator(this.modules.main.randomSeed);this.state='stopped';this.emitting=false;this.started=false;}
-  Configure(patch) {this.modules=MergeParticleModules(this.modules,patch);this.onChange(this);return this.Inspect();}
+  Configure(patch) {this.modules=MergeParticleModules(this.modules,patch);while(this.particles.length>this.modules.main.maxParticles)this.onRetire(this.particles.shift(),this);this.onChange(this);return this.Inspect();}
   Move(position) {if(!Array.isArray(position)||position.length!==3||position.some(n=>!Number.isFinite(n)))throw new Error('position: finite [x,y,z] required');this.position=[...position];}
   Play({restart=false}={}) {
     if(restart||(this.started&&this.state==='stopped')){this.onClear(this);this.Reset();}
@@ -206,6 +210,7 @@ export class ParticleSystem {
       let offset=[0,0,0],direction=[0,1,0];
       if(shape.enabled) {
         if(shape.type==='box')offset=shape.box.map(n=>(random()-.5)*n);
+        if(shape.type==='beam'){const length=Math.hypot(...shape.direction),along=(.06+random()*.9)*shape.box[2];direction=shape.direction.map(n=>n/length);offset=[(random()-.5)*shape.box[0]+direction[0]*along,(random()-.5)*shape.box[1]+direction[1]*along,direction[2]*along];}
         if(shape.type==='circle'||shape.type==='cone')offset=[Math.cos(angle)*r,0,Math.sin(angle)*r];
         if(shape.type==='cone') {const theta=shape.angle*Math.PI/180*Math.sqrt(random());direction=[Math.cos(angle)*Math.sin(theta),Math.cos(theta),Math.sin(angle)*Math.sin(theta)];}
         if(shape.type==='sphere') {const y=random()*2-1,q=Math.sqrt(1-y*y),radius=shape.radius*Math.cbrt(random());direction=[q*Math.cos(angle),y,q*Math.sin(angle)];offset=direction.map(n=>n*radius);}
@@ -213,11 +218,26 @@ export class ParticleSystem {
       const origin=offset.map((n,j)=>n+(main.simulationSpace==='world'?this.position[j]:0));
       const particle={birth,life,seed,size,rotation,color:[...main.startColor],origin,velocity:direction.map(n=>n*speed),
         force:[force.enabled?force.x:0,(force.enabled?force.y:0)-9.81*main.gravityModifier,force.enabled?force.z:0],drag:force.enabled?force.drag:0};
-      this.particles.push(particle);this.emitted++;this.onEmit(particle,this);
+      this.EmitRecord(particle);
     }
     if(count>0&&this.state==='stopped'&&this.particles.length>0)this.state='draining';
     return this.Inspect();
   }
+  EmitRecord(particle) {
+    // Explicit emission parameters share the same ownership, clock and lifetime
+    // as module-generated particles. Render slots are handles, not a second simulation.
+    NumberIn(particle.life,'particle.life',.001,100000);
+    for(const value of [particle.birth,particle.size,particle.rotation,particle.drag,...particle.origin,...particle.velocity,...particle.force,...particle.color])
+      if(!Number.isFinite(value))throw new Error('particle emission parameters must be finite');
+    const slot=this.onEmit(particle,this);
+    if(slot===-1){this.dropped++;return -1;}
+    if(Number.isInteger(slot))this.particles=this.particles.filter(p=>p.slot!==slot);
+    if(this.particles.length>=this.modules.main.maxParticles)this.onRetire(this.particles.shift(),this);
+    particle.slot=slot;this.particles.push(particle);this.emitted++;
+    if(this.state==='stopped')this.state='draining';
+    return slot;
+  }
+  Kill(slot) {this.particles=this.particles.filter(p=>p.slot!==slot);}
   Inspect() {return {time:this.time,state:this.state,isEmitting:this.emitting&&this.state==='playing',isAlive:this.emitting||this.particles.length>0,particleCount:this.particles.length,emitted:this.emitted,dropped:this.dropped,randomSeed:this.modules.main.randomSeed,position:[...this.position]};}
 }
 

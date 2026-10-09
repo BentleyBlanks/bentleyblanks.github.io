@@ -8,7 +8,7 @@ import { Sight, Bearing, Eye, RouteLength, RoutePoint } from "./Script_FirstLeve
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
 import * as THREE from "three";
-import { BattleSmoke, BuildBattleSmokeInstances } from "./Script_BattleSmoke.mjs";
+import { BattleSmoke, BattleSmokeParticleBudget } from "./Script_BattleSmoke.mjs";
 import { BATTLE_SMOKE_STYLES } from "./Data_Tuning_BattleSmoke.mjs";
 
 function DistanceToSegment(p, a, b) {
@@ -122,9 +122,11 @@ vfx._UpdateSmokeSources(10);
 vfx.battleSmoke.Update();
 assert.equal(particles.length,0,"dense backdrop uses no combat particle slots");
 assert.equal(vfx.battleSmoke.sources.size,smoke.length,"every emitter appears in the backdrop batch");
-assert.ok(vfx.battleSmoke.geometry.instanceCount>=480&&vfx.battleSmoke.geometry.instanceCount<=600,"low quality retains roadside and far smoke in a bounded batch");
-const ultra=BuildBattleSmokeInstances(vfx.battleSmoke.sources.values(),"ultra");
-assert.ok(ultra.length<=1200,"ultra remains one bounded instanced draw");
+const smokeLive=[...vfx.battleSmoke.handles.values()].flat().reduce((n,id)=>n+vfx.battleSmoke.particles.Inspect(id).particleCount,0);
+const smokeBudget=BattleSmokeParticleBudget(vfx.battleSmoke.sources.values(),'low');
+assert.ok(smokeLive>=smokeBudget*.7&&smokeLive<=smokeBudget,"low quality retains all districts with bounded, living cohorts");
+const ultra=BattleSmokeParticleBudget(vfx.battleSmoke.sources.values(),"ultra");
+assert.ok(ultra<=1638,"ultra remains one bounded instanced draw");
 for(const attribute of Object.values(vfx.battleSmoke.geometry.attributes)) {
   assert.ok(Array.from(attribute.array).every(Number.isFinite),"GPU attributes stay finite");
 }

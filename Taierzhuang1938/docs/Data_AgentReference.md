@@ -743,6 +743,7 @@ node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --pixel=x,y --pass-im
 - `Data_FirstLevelDistantSmoke.mjs` / `Script_BattleSmoke.mjs` —— 第一关64处近中远硝烟，按道路随机布设、三维密度烟团与独立实例渲染；[形态、道路布设与验收](Data_FirstLevelNaturalSmoke20260926.md)，回归口 `Script_FirstLevelDistantSmokeTest.mjs` / `Script_FirstLevelDistantSmokeBrowserTest.mjs`。旧图集方案见第二轮历史说明。
 - `Script_Vfx.mjs` —— 粒子与特效（弹孔/砖粉/烟/碎砖弹跳）；三条架构约束在头注。
 - `Script_Particle{Modules,Renderer,Effects,Cli}.mjs` / `Data_Tuning_Particles.mjs` —— 模块化燃烧与 agent JSON 控制、固定种子重放和实机取证，见 [粒子系统](Data_ParticleSystem.md)。
+- `Script_EditorVfx` / `Script_EditorParticleInspector` —— 真实粒子层、模块与可拖曲线、时间轴、预设导入导出，见 [粒子编辑器](Data_ParticleEditor.md)。全粒子迁移尚未收尾的范围见 [统一清单](Data_ParticleUnification.md)。
   先读：`docs/Data_TechRenderPipeline.md`。战车机枪的光束（`TracerBeam`，带像素下限/上限的分段条带）
   与硬面火星（`Impact` 的 `hardSparks`）口径在 `Data_Tuning_BulletVisual.mjs`，说明见
   `docs/Data_FirstLevelFront20260919.md` 05 节，回归口 `Script_VehicleTracerTest.mjs`。

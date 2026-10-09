@@ -10,13 +10,13 @@
 | --- | --- |
 | Main | duration、loop、prewarm、startDelay、lifetime/speed/size/rotation、startColor、gravityModifier、maxParticles、randomSeed、simulationSpeed、world/local |
 | Emission | rateOverTime 曲线、rateOverDistance、bursts（time/count/cycles/repeatInterval） |
-| Shape | point、circle、cone、sphere、box |
+| Shape | point、circle、cone、sphere、box、beam（窗光斜柱） |
 | Velocity / Force over Lifetime | 三轴速度曲线、恒定加速度、drag |
 | Color / Size / Rotation over Lifetime | RGBA 渐变、尺寸曲线、角速度曲线 |
 | Noise | 随年龄变化的摆动强度、频率和滚动速度 |
-| Renderer | flame/smoke/ember 广告牌、aspect、softRange、深度遮挡与 HDR 目标 alpha 保留 |
+| Renderer | flame/smoke/ember/mote/windowMote/volume 与生产材质 profile；enabled、aspect、density、bounds、nearFade、softRange、深度遮挡与 HDR 目标 alpha 保留 |
 
-`Tengxian.Particles.Modules()` 返回完整默认值、能力与不支持的模块，未知字段直接报错。当前不支持碰撞、拖尾、子发射器、序列帧、网格渲染和发射器局部旋转/缩放；local 模式支持平移。Noise 是可复现的解析摆动，不等同 Unity 的湍流噪声实现。大型战场烟柱继续使用原有的体积烟 renderer；`FireSmoke` 用于小型粒子烟。
+`Tengxian.Particles.Modules()` 返回完整默认值、能力与不支持的模块，未知字段直接报错。生产材质 profile 支持已有序列帧与碎砖、土块、木片、弹壳网格；仍不支持通用碰撞模块、拖尾、子发射器、自定义序列帧模块、任意网格资产和发射器局部旋转/缩放。现有血滴落地和碎屑弹跳保留专用逻辑；local 模式支持平移。Noise 是可复现的解析摆动，不等同 Unity 的湍流噪声实现。战场体积烟、近处烟尘、战斗粒子和菜单飘尘均由同一 ParticleSystem 管理时钟和存活记录。
 
 长度为米、时间为秒、旋转为弧度（Shape.angle 为度），颜色为线性 HDR RGBA。曲线支持数字、`[[0,value],[1,value]]`、`{mode:"twoConstants",min,max}`、`{mode:"curve",curve,multiplier}` 和 `{mode:"twoCurves",min,max,multiplier}`。键按归一化时间严格递增。GPU 每条曲线采样 48 点；诊断样本用原始曲线求值，尖锐拐点可能存在采样误差。
 
@@ -26,7 +26,8 @@
 
 ```js
 const fx = Tengxian.Particles;
-fx.Presets(); // FireRoot / FireTongue / FireEmber / FireSmoke
+fx.Presets(); // 燃烧、体积烟、环境飘尘与窗光飘尘
+fx.Profiles(); // smoke / beam / debris / casing 等生产材质
 const {id} = fx.Create({preset:"FireTongue", position:[10,1,20],
   modules:{main:{randomSeed:1938}, emission:{rateOverTime:18}}});
 fx.Configure(id,{noise:{strength:[[0,.02],[1,.3]]}});
@@ -38,10 +39,12 @@ fx.Stop(id,{clear:true});       // 立即清空
 fx.Emit(id,12);                 // 手动发射；原先停止时会继续消退
 const saved = fx.Export(id);
 fx.Remove(id);
-const restored = fx.Import(saved); // 导入配置并播放，不是运行状态快照
+ const restored = fx.Import(saved); // 导入配置并播放，不是运行状态快照
 ```
 
 另有 `Pause`、`Clear`、`Move`、`Inspect`。`Inspect()` 返回所有系统和共享池预算/丢弃计数，`Inspect(id)` 返回单个发射器。`Configure` 的发射参数影响新粒子，生命周期曲线作用于现存粒子；更换 renderer 或 simulationSpace 会清空当前粒子。`Clear` 清空存活粒子但不重置时钟；重放使用 `Simulate(...,{restart:true})` 或 `Play(...,{restart:true})`。
+
+`Create({profile:"smoke",...})` 使用生产材质，`Fork(id)` 克隆配置与材质绑定。profile 的 Main 初始尺寸/速度/寿命是出生参数倍率。网格和烟的专用生长、材质侵蚀、弹跳由 GPU 完成；`GetParticles` 是轨迹与模块参数诊断，不是最终着色的网格/像素快照。菜单管理器通过 `Tengxian.MenuParticles` 调用。整套编辑与预设见 [粒子编辑器](Data_ParticleEditor.md)。
 
 需要整套烟、火、火星和灯光时，沿用场景特效的一次调用，再取得它的粒子层调参：
 
@@ -80,9 +83,9 @@ node Taierzhuang1938/Script_ParticleCli.mjs --actions=tmp/ParticleActions.json -
 ## 结构、预算与验证
 
 - `Script_ParticleModules`：纯规则层、参数验证、固定 1/60 秒发射调度与种子随机数。
-- `Script_ParticleRenderer`：GPU 解析运动，CPU 只写出生描述与发射器时钟，不逐帧更新粒子矩阵。flame/smoke/ember 各一个实例批，正常燃烧使用两次绘制；透明特效不进法线深度预通道。
+- `Script_ParticleRenderer`：GPU 解析运动，CPU 只写出生描述与发射器时钟，不逐帧更新粒子矩阵。每个基础模式一个实例批，火焰与火星共两次绘制，体积烟一个共享批；生产材质由 ParticleBatch 合批。透明特效不进法线深度预通道。
 - `Script_ParticleEffects`：生产与 agent 共用接口。Vfx 的烟源创建、移动、移除、清场、销毁与编辑器隔离统一管理。
 - `Data_Tuning_Particles`：效果参数、画质池容量和近处灯光预算的唯一数据源。池满时丢弃新粒子并记录 dropped，不抢走其他存活发射器的槽；全场背景火焰与战斗爆炸池独立。
-- `ParticleModulesTest` 检查时间线与参数；`ParticleBrowserTest` 检查真正 GPU 像素、动画、确定性、暂停、遮挡、alpha 与释放；`FirstLevelSmokeOriginsTest` 检查真实出口、通路、预算与生命周期。原体积烟另有 `FirstLevelDistantSmokeBrowserTest`。
+- `ParticleModulesTest` 检查时间线与参数；`ParticleBrowserTest` / `ParticleChannelsTest` 检查 GPU 像素、动画、确定性、暂停、遮挡、alpha 与释放；`FirstLevelSmokeOriginsTest` 检查真实出口、通路、预算与生命周期。体积烟另有 `FirstLevelDistantSmokeBrowserTest`，菜单飘尘走 `CommandRoomBrowserTest`。
 
 本轮参考为用户选择的滕县战斗概念图，源图留在本机 `C:/Users/Bentl/.codex/artifacts/TengxianBattleConcept20261009/Reference_TengxianBattle.png`，不作为游戏贴图打包。
