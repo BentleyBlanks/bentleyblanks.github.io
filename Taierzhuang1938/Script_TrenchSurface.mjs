@@ -1,7 +1,7 @@
 // Physical trench dressing: shared static batches, shared heightfield, no new gameplay floor.
 import * as THREE from 'three';
 import { ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
-import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { HashString, Mulberry32 } from './Script_Noise.mjs';
 import { TRENCH_SURFACE as C } from './Data_TrenchSurface.mjs';
 import { TRENCH_APPEARANCE as Earth } from './Data_TrenchAppearance.mjs';

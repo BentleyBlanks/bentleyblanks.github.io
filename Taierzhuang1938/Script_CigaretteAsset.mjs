@@ -1,6 +1,6 @@
 // User Smoke.fbx, reduced by _blender/Script_CigaretteBake.py.
 // Metres; mouth at origin, ash toward -Z, 5 mm of paper inside the lips.
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 
 let pending = null, source = null;
 export function LoadCigaretteAsset() {

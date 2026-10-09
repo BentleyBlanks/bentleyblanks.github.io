@@ -13,7 +13,7 @@
 import * as THREE from "three";
 import { ApplyNraUniform } from "./Script_UniformColors.mjs";
 import { TagCharacterSurface } from "./Script_CharacterSurface.mjs";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } from "./Data_FpsArmPoses.mjs";
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Script_FpsAnatomy.mjs";

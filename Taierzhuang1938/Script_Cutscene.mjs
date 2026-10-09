@@ -42,7 +42,7 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // characterRig.SetHeadVisible(false)，避免眼位相机看见头部内壁。
 
 import * as THREE from "three";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import { LoadStretcherAsset, StretcherAssetGeometry, CreateStretcherGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
 // Lerp 在 Script_Noise 里没导出，导出的名字是 Mix —— 别自己再写一个线性插值，

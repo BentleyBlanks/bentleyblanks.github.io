@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { TEXTURE_IMPORT_RUNTIME } from "./Data_TextureImportRuntime.mjs";
+import { ASSET_PUBLISH_RUNTIME } from "./Data_AssetPublishRuntime.mjs";
 
 let renderer, ktxPromise;
 export function SetTextureImportRenderer(value) {
@@ -9,6 +10,11 @@ export function SetTextureImportRenderer(value) {
 export function ResolveTextureImportUrl(url) {
   const entry = TextureImportOf(url);
   return entry?.output ? String(url).replace(/Texture\/[^?#]+/, `Texture/${entry.output}`) : url;
+}
+export function ResolvePublishedModelUrl(url) {
+  const match = String(url).match(/(^|\/)(Model\/[^?#]+)/);
+  const output = match && ASSET_PUBLISH_RUNTIME[match[2]];
+  return output ? String(url).replace(match[2], output) : url;
 }
 export function TextureImportOf(url) {
   const pathname = String(url).split(/[?#]/)[0];
@@ -81,7 +87,10 @@ export async function LoadKtxTexture(url, format = "ktx2-uastc") {
     new KTX2Loader().setTranscoderPath(new URL("./vendor/three/examples/jsm/libs/basis/", import.meta.url).href)
       .setWorkerLimit(2).detectSupport(renderer));
   const loader = await ktxPromise;
-  return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject, { gpuFormat: format.slice(5) }));
+  // UASTC auto mode uses ASTC/BC7 or RGBA. Do not silently degrade normal/ORM data
+  // to ETC1/DXT1 on older devices. Explicit importer target choices stay available.
+  const gpuFormat = format === "ktx2-uastc" ? "high-quality" : format === "ktx2-etc1s" ? "color-compact" : format.slice(5);
+  return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject, { gpuFormat }));
 }
 
 // Native loading remains unchanged when there is no publish override. Properties

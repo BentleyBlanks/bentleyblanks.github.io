@@ -18,7 +18,7 @@
 // 结构照抄 Script_RailBridgeSet（钢桁架铁路桥，2026-09-30 退役），件表 JSON 的键名与它一致。
 // ===========================================================================
 import * as THREE from "three";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { MergeGeometries } from "./Script_Geo.mjs";
 import { VFX_PALETTE, ResetVfxSpawn } from "./Script_Vfx.mjs";
 import { PONTOON_BRIDGE_MODEL as M, PONTOON_BRIDGE_BLAST as FX } from "./Data_PontoonBridgeDemolition.mjs";

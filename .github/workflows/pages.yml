@@ -5,7 +5,7 @@
 # 2026-08-06 起连续 errored，线上因此卡在旧版本好几轮没人发现。
 # `.nojekyll` 只是关掉 Jekyll 处理，救不了超时。
 #
-# Actions 使用「导出静态站 → 合并滕县脚本 → 上传 → 发布」，没有 Jekyll。
+# Actions 使用「导出静态站 → 构建与校验 GPU 资源 → 合并滕县脚本 → 验证 → 上传 → 发布」，没有 Jekyll。
 name: Deploy Pages
 
 on:
@@ -27,7 +27,7 @@ permissions:
 # 后面每次推送都堵在它身后（GitHub 只留最新一个 pending、其余 cancelled），
 # 线上因此停在两个多小时前的版本，还得手动 gh run cancel 才化开。
 # 排队卡死 GitHub 要 24 小时才收，timeout-minutes 也救不了——那只管执行时间。
-# 站点没有构建步骤，永远是「最新一版赢」，被顶掉的那个本来就该被顶掉。
+# 站点按最新提交构建，永远是「最新一版赢」，被顶掉的那个本来就该被顶掉。
 concurrency:
   group: pages-deploy
   cancel-in-progress: true
@@ -45,14 +45,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build the Tengxian browser entry
+      - name: Prepare the publication workspace
         run: |
           npm install --ignore-scripts --no-package-lock --no-audit --no-fund
           node Taierzhuang1938/Script_ModuleGraphTest.mjs
           mkdir -p "$RUNNER_TEMP/pages"
           git archive HEAD | tar -x -C "$RUNNER_TEMP/pages"
-          node Taierzhuang1938/Script_BuildTextureImports.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"
+      - uses: actions/cache/restore@v4
+        id: gpu-assets
+        with:
+          path: ${{ runner.temp }}/tengxian-gpu-cache
+          key: tengxian-gpu-${{ runner.os }}-v1-${{ hashFiles('Taierzhuang1938/Texture/**', 'Taierzhuang1938/Model/**/*.glb', 'Taierzhuang1938/*Publish*.mjs', 'Taierzhuang1938/Script_TextureImport*.mjs', 'Taierzhuang1938/Data_TextureImportSettings.json', 'Taierzhuang1938/Data_TextureManifest.mjs', 'package.json') }}
+          restore-keys: |
+            tengxian-gpu-${{ runner.os }}-v1-
+      - name: Build and validate GPU publication assets
+        run: |
+          node Taierzhuang1938/Script_BuildPublishAssets.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938" --cache-dir "$RUNNER_TEMP/tengxian-gpu-cache"
+          node Taierzhuang1938/Script_ValidatePublishAssets.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"
+          node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/pages/Taierzhuang1938/Data_AssetPublishReport.json")); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"### GPU assets\n\n```json\n"+JSON.stringify({summary:r.summary,cache:r.cache,retained:r.skipped.length},null,2)+"\n```\n");'
+      - uses: actions/cache/save@v4
+        if: steps.gpu-assets.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/tengxian-gpu-cache
+          key: ${{ steps.gpu-assets.outputs.cache-primary-key }}
+      - name: Build the Tengxian browser entry
+        run: |
           node Taierzhuang1938/Script_BuildBrowserBundle.mjs --deploy --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"
+      - name: Verify GPU loaders against published assets
+        run: |
+          npx playwright-core install --with-deps chromium
+          node Taierzhuang1938/Script_PublishAssetsBrowserTest.mjs --software --report="$RUNNER_TEMP/pages/Taierzhuang1938/Data_AssetPublishReport.json"
       - uses: actions/configure-pages@v5
       # 其余静态页面保持原样；只在 staging 内替换滕县入口，依赖与本地临时文件不发布。
       - uses: actions/upload-pages-artifact@v3

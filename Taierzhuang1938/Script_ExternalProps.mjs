@@ -36,7 +36,7 @@
 // 等比放大会把 10 m 长的排屋拉到二十几米，会不会撞上旁边的程序化院落要另外量。
 
 import * as THREE from "three";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import {
   BuildSink, EXTERNAL_SANDBAG_ASSET_IDS, EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
 } from "./Script_World.mjs";

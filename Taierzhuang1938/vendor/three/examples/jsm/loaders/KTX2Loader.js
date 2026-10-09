@@ -901,6 +901,18 @@ KTX2Loader.BasisWorker = function () {
 	};
 
 	function getTranscoderFormat( basisFormat, width, height, hasAlpha, preferred ) {
+		// Compact opaque colors use native S3TC on desktop and ETC on mobile.
+		if ( ( preferred === 'color-compact' || preferred === 'high-quality' ) && basisFormat === BasisFormat.ETC1S && config.dxtSupported ) {
+			return { transcoderFormat: hasAlpha ? TranscoderFormat.BC3 : TranscoderFormat.BC1, engineFormat: hasAlpha ? EngineFormat.RGBA_S3TC_DXT5_Format : EngineFormat.RGBA_S3TC_DXT1_Format, engineType: EngineType.UnsignedByteType };
+		}
+
+		// Publication quality policy: UASTC data maps must not fall through to
+		// lower-precision DXT1/ETC targets when ASTC/BC7 are unavailable.
+		if ( preferred === 'high-quality' && basisFormat === BasisFormat.UASTC ) {
+			if ( config.astcSupported ) return { transcoderFormat: TranscoderFormat.ASTC_4x4, engineFormat: EngineFormat.RGBA_ASTC_4x4_Format, engineType: EngineType.UnsignedByteType };
+			if ( config.bptcSupported ) return { transcoderFormat: TranscoderFormat.BC7_M5, engineFormat: EngineFormat.RGBA_BPTC_Format, engineType: EngineType.UnsignedByteType };
+			return { transcoderFormat: TranscoderFormat.RGBA32, engineFormat: EngineFormat.RGBAFormat, engineType: EngineType.UnsignedByteType };
+		}
 
 		// Local importer extension. BC3 is explicit even for opaque input. BC1
 		// cannot erase data alpha; a foreign alpha file falls back automatically.

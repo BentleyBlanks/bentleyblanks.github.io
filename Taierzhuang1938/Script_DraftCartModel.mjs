@@ -3,7 +3,7 @@
 // (so the harness meets the shafts); their rig node's extras carry the stride and the
 // distance ahead of the cart, and the model is re-centred on that point here.
 import * as THREE from "three";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 import { MID_TUNING as MID } from "./Data_Tuning_FirstLevelMid.mjs";

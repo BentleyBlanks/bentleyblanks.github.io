@@ -17,7 +17,7 @@
 // 03 开头的横飞与 13 的扫射在用（SetManualPose）。收起的克隆与炸弹一律从场景图摘下。
 
 import * as THREE from "three";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { AIRCRAFT_ASSETS, NoseYaw } from "./Data_AircraftAssets.mjs";
 
 const LOADER = new GLTFLoader();

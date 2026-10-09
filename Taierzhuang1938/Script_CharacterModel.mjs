@@ -17,7 +17,7 @@ import { TerrainTrailSystem } from "./Script_TerrainTrails.mjs";
 import { LayeredGaitId } from "./Script_LayeredGait.mjs";
 import { ACTOR_LOCOMOTION } from "./Data_Tuning_ActorLocomotion.mjs";
 import { CharacterFacialAnimation } from "./Script_CharacterFacialAnimation.mjs";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";

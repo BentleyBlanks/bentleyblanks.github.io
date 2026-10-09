@@ -8,7 +8,7 @@
 // there is no procedural stand-in to fall back to.
 
 import * as THREE from "three";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { STRETCHER_COLOR_GRADE as GRADE } from "./Data_Tuning_Materials.mjs";
 
 const URL = "./Model/Model_BambooStretcher.glb?v=stretcher20260927";

@@ -47,6 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  PublishAssetsTest: {file:"Script_PublishAssetsTest.mjs",timeoutMs:120000,desc:"GPU publish pipeline: source/dimension/color contracts, cache validation and overrides"},
+  PublishAssetsBrowserTest: {file:"Script_PublishAssetsBrowserTest.mjs",timeoutMs:600000,desc:"Published GPU loaders: BC7/DXT formats, RGBA fallback, both UV directions and model pixel comparisons"},
   MenuStartupTest: {file:"Script_MenuStartupTest.mjs",timeoutMs:180000,desc:"Standalone source/bundle menu: no gameplay payload, resource budget, settings and navigation"},
   EmbeddedTextureTest: {file:"Script_EmbeddedTextureTest.mjs",desc:"Lossless GLB WebP: exact decoded RGBA, resolution and geometry buffers"},
   CommandRoomBrowserTest: {file:"Script_CommandRoomBrowserTest.mjs",timeoutMs:120000,desc:"Command-room mesh parallax, depth-occluded window beam, particles and renderer isolation"},
@@ -463,6 +465,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "PublishAssetsBrowserTest",
   "MenuStartupTest",
   "BootPaperPbrTest",
   "TextureManagerBrowserTest",
@@ -763,11 +766,12 @@ export const domains = {
   // 四项都是纯 Node 毫秒级；贴图本身的改动另由 render 域与 prepush 的 BootTest / BootStallTest 兜。
   textureAssets: {
     label: "贴图资产规范与烘焙",
-    tests: ["EmbeddedTextureTest", "TextureStandardsTest", "TextureImportTest", "TextureManagerBrowserTest", "TerrainLayersTest", "BootPayloadTest", "AssetStandardsTest"],
+    tests: ["PublishAssetsTest", "PublishAssetsBrowserTest", "EmbeddedTextureTest", "TextureStandardsTest", "TextureImportTest", "TextureManagerBrowserTest", "TerrainLayersTest", "BootPayloadTest", "AssetStandardsTest"],
   },
 };
 
 const changedDomainRules = [
+  {domain:"textureAssets",pattern:/(?:AssetPublish|BuildPublishAssets|ValidatePublishAssets|PublishCache|PublishAssets|ModelImports)/},
   {domain: "menu", pattern: /(?:StartupRouting|MenuStartup|Script_Entry|GameGraphics|CameraLens)/},
   {domain: "textureAssets", pattern: /EmbeddedTexture/},
   {domain:"particles",pattern:/Script_Particle|Data_ParticleSmoke|Data_Tuning_Particles|Script_Vfx|Script_EditorVfx|Script_EditorParticleInspector/},

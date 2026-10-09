@@ -1,5 +1,6 @@
 import { TextureCatalog, IMPORT_DEFAULTS, PLATFORM_FIELDS, ImportSettingsForPlatform, ValidateImportDocument, NormalizeImportSettings } from "./Script_TextureImportRules.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
+import { T } from "./Script_Text.mjs";
 import { BuildTextureManagerFields, ReadTextureManagerFields, SyncTextureManagerFields } from "./Script_TextureManagerFields.mjs";
 
 const $ = id => document.getElementById(id), catalog = TextureCatalog();
@@ -67,7 +68,7 @@ function SyncForm() {
   const settings = common && ImportSettingsForPlatform(common, platform);
   const ordinary = mode === "ordinary";
   $("settings").hidden = !ordinary;
-  $("scope").textContent = ordinary ? "保存发布设置后，每次发布从源图重新导入。" : "程序化贴图来自运行时配方；此处只预览，不保存压缩设置，也不改变游戏。";
+  $("scope").textContent = ordinary ? T("menu.textureImport.publishScope") : "程序化贴图来自运行时配方；此处只预览，不保存压缩设置，也不改变游戏。";
   $("procSizeLabel").hidden = $("generate").hidden = ordinary;
   $("mipLevel").parentElement.hidden = !ordinary;
   $("mipLevel").disabled = busy || previewResult?.id !== requestId;

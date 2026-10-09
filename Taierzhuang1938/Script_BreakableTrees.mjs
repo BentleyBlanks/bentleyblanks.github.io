@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { mergeGeometries } from "./vendor/three/examples/jsm/utils/BufferGeometryUtils.js";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ClusterDistantGeometry } from "./Script_DistantGeometry.mjs";

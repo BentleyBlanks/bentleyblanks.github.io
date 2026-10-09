@@ -17,7 +17,7 @@
 // 模型加载失败时什么都不摘：白盒桥照旧完整可玩，Fire 退回一发普通爆炸。
 // ===========================================================================
 import * as THREE from "three";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { MergeGeometries } from "./Script_Geo.mjs";
 import { VFX_PALETTE, ResetVfxSpawn } from "./Script_Vfx.mjs";
 import { RAIL_BRIDGE_MODEL as M, RAIL_BRIDGE_BLAST as FX } from "./Data_RailBridgeDemolition.mjs";

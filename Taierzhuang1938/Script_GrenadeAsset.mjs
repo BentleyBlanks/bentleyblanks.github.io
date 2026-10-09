@@ -6,7 +6,7 @@
 // person animation and Rapier rotation need no special-case offsets. If the
 // GLB cannot be read, callers keep the procedural grenade and battle still boots.
 
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 
 const URL = "./Model/Model_Type24Grenade.glb?v=grenade20260906";
 const loader = new GLTFLoader();

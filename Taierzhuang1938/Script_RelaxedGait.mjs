@@ -17,7 +17,7 @@
 // weapon and shows a copy of it on the BackRifleRun back socket; the caller decides when a clip's own
 // weapon track takes over (UpdateRelaxedGaitWeapon).
 import { AnimationClip } from "three";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { ACTOR_LOCOMOTION_PROFILES } from "./Data_ActorLocomotion.mjs";
 import { ACTOR_LOCOMOTION, RELAXED_GAIT as C } from "./Data_Tuning_ActorLocomotion.mjs";
 import { MarkDynamicPrepass } from "./Script_Post.mjs";

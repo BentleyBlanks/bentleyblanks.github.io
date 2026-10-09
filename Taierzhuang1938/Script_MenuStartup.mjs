@@ -1,5 +1,6 @@
 // Title-screen runtime: no battlefield, actors, physics, gameplay textures or shader warmup.
 import * as THREE from 'three';
+import {SetTextureImportRenderer} from './Script_TextureImports.mjs';
 import {MainMenu, Progress} from './Script_Menu.mjs';
 import {CommandRoom} from './Script_CommandRoom.mjs';
 import {CommandRoomPreview} from './Script_CommandRoomPreview.mjs';
@@ -30,6 +31,7 @@ const paper = new BootPaper({img: document.getElementById('bootPaper'), sub: doc
   name: document.getElementById('bootPaperName'), note: document.getElementById('bootPaperNote')});
 paper.Show(); bootStep.textContent = T('boot.step.dressSet');
 const renderer = new THREE.WebGLRenderer({canvas, antialias: false, powerPreference: 'high-performance'});
+SetTextureImportRenderer(renderer);
 renderer.setPixelRatio(Math.min(1.5, devicePixelRatio || 1));
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;

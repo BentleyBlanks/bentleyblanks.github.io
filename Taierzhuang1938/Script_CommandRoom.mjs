@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import {ManagedTextureLoader} from './Script_TextureImports.mjs';
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { COMMAND_ROOM as DATA } from "./Data_Tuning_CommandRoom.mjs";
 import { CommandRoomAtmosphere } from "./Script_CommandRoomAtmosphere.mjs";
 import { CommandRoomPapers, CommandRoomPaperUrl } from "./Data_CommandRoomPapers.mjs";
@@ -61,7 +62,7 @@ export class CommandRoom {
   }
   async LoadAssets(progress) {
     const papers = CommandRoomPapers(progress);
-    const loader = new THREE.TextureLoader();
+    const loader = new ManagedTextureLoader(undefined, {flipY: false});
     const LoadTexture = this.LoadTexture = async (name, channel, url) => {
       const texture = await loader.loadAsync(url || "./Texture/Texture_" + name + channel + ".webp?v=" + DATA.version);
       if (this.disposed) { texture.dispose(); throw new Error("Command room disposed during texture load"); }

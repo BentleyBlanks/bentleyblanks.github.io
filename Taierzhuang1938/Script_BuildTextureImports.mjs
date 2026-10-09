@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { TextureCatalog, ValidateImportDocument, ImportSettingsForPlatform } from "./Script_TextureImportRules.mjs";
 import { EncodeTexture, TextureImportHash } from "./Script_TextureImportBuild.mjs";
 
-export async function BuildTextureImports(projectDir, outputDir, document = null) {
+export async function BuildTextureImports(projectDir, outputDir, document = null, {encode = EncodeTexture} = {}) {
   if (path.resolve(projectDir) === path.resolve(outputDir)) throw new Error("Texture publish output must be a separate staging directory");
   const settings = ValidateImportDocument(document || JSON.parse(await fs.readFile(path.join(projectDir, "Data_TextureImportSettings.json"), "utf8")));
   const catalog = new Map(TextureCatalog().map(item => [item.file, item])), runtime = {}, replacements = [], reports = [];
@@ -14,7 +14,7 @@ export async function BuildTextureImports(projectDir, outputDir, document = null
   for (const [file, options] of Object.entries(settings.textures)) {
     const target = path.join(outputDir, "Texture", path.dirname(file));
     const Encode = async platform => {
-      const result = await EncodeTexture(projectDir, catalog.get(file), ImportSettingsForPlatform(options, platform), target);
+      const result = await encode(projectDir, catalog.get(file), ImportSettingsForPlatform(options, platform), target);
       const Relative = name => name && path.posix.join(path.posix.dirname(file), name);
       reports.push({ file, platform, ...result });
       return { ...result, output: Relative(result.filename), unflipped: Relative(result.unflipped), cpuFile: Relative(result.cpuFile), mipFiles: result.mipFiles?.map(Relative) };

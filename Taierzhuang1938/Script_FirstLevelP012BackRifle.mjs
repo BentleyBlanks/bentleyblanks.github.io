@@ -1,5 +1,5 @@
 // P012-only use of the supplied BackRifleRun. Original cast, weapons and combat clips stay owned by Actor.
-import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { MarkDynamicPrepass } from "./Script_Post.mjs";
 let libraryPromise;
 

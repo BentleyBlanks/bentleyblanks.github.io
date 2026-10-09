@@ -12,7 +12,7 @@
 
 - **壕沟形状采用历史照片 01 / 14（2026-10-07）**：紧实切土壁、浅铲痕、地面上相连的弃土小垄，碎石与草根稀疏。用户补充要求实体形状后，深沟坡壁及沟外抛土进入共享地形，渲染、碰撞与贴地一致；中心线、分岔、沟底宽度和标称深度不改，浅撤退沟、观察口与射界保留原通行约束。来源、剖面参数与验证见 [壕沟表面](docs/Data_TrenchSurface.md)；门禁 `Script_TrenchPlanTest` / `Script_TrenchSurfaceTest` / `Script_FirstLevelFrontTopologyTest` / `Script_FirstLevelMissionFortificationsTest`。
 
-- **贴图管理与枯树完整态合批（2026-10-03）**：编辑器「贴图管理」打开独立 `TextureManager.html` 窗口，共用发布配置；独立图片按 Unity Importer 分组配置类型／Alpha／尺寸／采样／Mipmap／平台覆盖，支持 DXT1/5、BC7 等 GPU 目标，当前未接入项置灰说明；程序化配方仅 Worker 预览，GLB 内嵌图暂不管理。Pages 在 staging 导入后再打 bundle，源资产规范不变；运行时 KTX2 保留通道与 UV 方向。见 [贴图导入器](docs/Data_TextureImporter.md)，门禁 `Script_TextureImportTest` / `Script_TextureManagerBrowserTest`。枯树完整状态每区域／LOD 单一合并实例批，爆破切换原拆分物理，见 [枯树](docs/Data_BreakableTrees.md)。
+- **贴图管理与枯树完整态合批（2026-10-03）**：编辑器「贴图管理」打开独立 `TextureManager.html` 窗口，共用发布配置；独立图片按 Unity Importer 分组配置类型／Alpha／尺寸／采样／Mipmap／平台覆盖，支持 DXT1/5、BC7 等 GPU 目标，当前未接入项置灰说明；程序化配方仅 Worker 预览，GLB 内嵌图由自动发布流程管理。Pages 在 staging 导入后再打 bundle，源资产规范不变；运行时 KTX2 保留通道与 UV 方向。见 [贴图导入器](docs/Data_TextureImporter.md)，门禁 `Script_TextureImportTest` / `Script_TextureManagerBrowserTest`。枯树完整状态每区域／LOD 单一合并实例批，爆破切换原拆分物理，见 [枯树](docs/Data_BreakableTrees.md)。
 
 - **第一关性能第二轮（2026-10-02）**：白盒默认画太阳影子；白盒逐帧材质替换按顶层子树缓存（`WhiteboxSceneRenderer.Invalidate()` 兜底挂后改标记）；任务人群（`MissionPeople.Person`）画面外按 `offscreenAnimationS` 解姿势、`Threatens` 在一次 `Update` 内按参数记忆；阴影与预通道两份静态合批在 `WarmLevel` 结账帧之前一次收满（`Prime`，消掉进场后一秒的成串长帧）；新增预通道静态合批 `Script_PrepassStaticBatch`（只换预通道那一刻、烘阴影时还原成员、成员速度历史照记）。口径、实测与门禁见 [渲染管线 §17.17](docs/Data_TechRenderPipeline.md)。
 
@@ -179,6 +179,7 @@ node Taierzhuang1938/Script_TestRunner.mjs --changed=origin/master --profile=pre
 
 ## Pages 启动产物
 
+- 每次 master 发布先在 staging 运行 `Script_BuildPublishAssets`，执行显式导入设置、普通 GPU 贴图与登记 GLB 的 KTX2 转换，再校验、合包和浏览器检查。自动转换保留原分辨率，BC7／ASTC／DXT1 依设备能力选择；体积增长明显的候选保留原图。原资产不覆盖，编码结果按内容缓存，报告记录采用／保留原因。运行时模型统一走 `ManagedGLTFLoader`；细则与指标见[贴图导入器「自动 GPU 发布」](docs/Data_TextureImporter.md#自动-gpu-发布2026-10-09)，门禁 `Script_PublishAssetsTest` / `Script_PublishAssetsBrowserTest`。
 - Pages 在独立 staging 目录运行 `Script_BuildBrowserBundle.mjs --deploy --output-dir <staging>/Taierzhuang1938`，生成带内容戳的路由、菜单、游戏三份包；Three/Rapier 仍用本仓 vendor。每次部署重建，生成文件不提交。
 - 普通入口由 `Script_Entry` / `Data_StartupRouting` 选 `Script_MenuStartup`，只建指挥部与菜单；不得预载游戏包、战场模型、物理、动作或音频包。第一关与显式 `phase` / `editor` 等开发入口仍走 `Script_Main`，进入第一关的 URL 跳转契约保持不变。菜单设置复用既有设置面板和存档；开发工具经显式点击后才装游戏宿主。回归 `Script_MenuStartupTest`，细节见[预热与启动 §18.9](docs/Data_TechRenderPipeline.md#189-独立菜单与内嵌贴图压缩2026-10-09)。
 - Ki30、枯树、卷烟的源 GLB 导出后运行 `node Taierzhuang1938/_import/Script_CompressEmbeddedTextures.mjs`，将可逐像素还原的内嵌 PNG 换为同尺寸无损 WebP；不得重采样或改几何。审计在 `Model/Data_EmbeddedTextureCompression.json`，回归 `Script_EmbeddedTextureTest`。

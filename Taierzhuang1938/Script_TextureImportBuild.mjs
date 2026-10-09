@@ -11,12 +11,13 @@ import { read as ReadKtx, write as WriteKtx } from "./vendor/three/examples/jsm/
 const require = createRequire(import.meta.url), run = promisify(execFile);
 const Hash = value => createHash("sha256").update(value).digest("hex");
 
-export async function EncodeTexture(projectDir, item, input, outputDir) {
+export async function EncodeTexture(projectDir, item, input, outputDir, {uastcRdo = null, orientations = [true, false]} = {}) {
   const sharp = require("sharp"), settings = NormalizeImportSettings(input, item);
   const source = await fs.readFile(path.join(projectDir, "Texture", item.file)), meta = await sharp(source).metadata();
   const dimensions = ImportDimensions(meta.width, meta.height, settings.maxSize, settings.npot);
   const colorSpace = ImportColorSpace(settings, item);
-  const key = Hash(Buffer.concat([source, Buffer.from(JSON.stringify({ settings, colorSpace, pipeline: 2 }))])).slice(0, 24);
+  if (!orientations.length || orientations.some(value => typeof value !== 'boolean')) throw new Error('Invalid texture orientations');
+  const key = Hash(Buffer.concat([source, Buffer.from(JSON.stringify({ settings, colorSpace, pipeline: 3, uastcRdo, orientations }))])).slice(0, 24);
   const gpu = settings.format.startsWith("ktx2"), originalExtension = path.extname(item.file).slice(1).toLowerCase();
   const extension = gpu ? "ktx2" : settings.format === "source" ? originalExtension
     : settings.format.startsWith("webp") ? "webp" : settings.format === "jpeg" ? "jpg" : "png";
@@ -58,7 +59,7 @@ export async function EncodeTexture(projectDir, item, input, outputDir) {
     if (!bin) throw new Error(`Basis encoder unavailable on ${process.platform}/${process.arch}`);
     const executable = path.resolve(path.dirname(packagePath), bin), temp = await fs.mkdtemp(path.join(os.tmpdir(), "TengxianTexture-"));
     try {
-      for (const flip of [true, false]) {
+      for (const flip of new Set(orientations)) {
         const output = flip ? destination : path.join(outputDir, `${stem}_NoFlip.ktx2`), containers = [];
         for (let level = 0; level < levels.length; level++) {
           const png = path.join(temp, "Input.png"), encoded = path.join(temp, "Level.ktx2");
@@ -66,6 +67,10 @@ export async function EncodeTexture(projectDir, item, input, outputDir) {
           const args = ["-file", png, "-output_file", encoded, "-ktx2", "-max_threads", "2"];
           if (settings.format === "ktx2-etc1s") args.push("-q", String(Math.max(1, Math.round(settings.quality * 255 / 100))));
           else args.push("-uastc", "-uastc_level", String(Math.min(4, Math.floor(settings.quality / 21))));
+          if (uastcRdo != null && settings.format !== "ktx2-etc1s") {
+            if (!(uastcRdo > 0 && uastcRdo <= 10)) throw new Error("Invalid UASTC RDO setting");
+            args.push("-uastc_rdo_l", String(uastcRdo), "-uastc_rdo_d", "1024", "-uastc_rdo_m");
+          }
           if (colorSpace === "linear") args.push("-linear");
           if (!customMips && settings.mipmaps !== false) {
             args.push("-mipmap", "-mip_filter", settings.mipFilter);
@@ -84,6 +89,7 @@ export async function EncodeTexture(projectDir, item, input, outputDir) {
         }
         if (!flip) result.unflipped = path.basename(output);
       }
+      if (!orientations.includes(true)) result.filename = result.unflipped;
     } finally { await fs.rm(temp, { recursive: true, force: true }); }
   } else {
     if (passthrough) await fs.writeFile(destination, source);
@@ -102,7 +108,7 @@ export async function EncodeTexture(projectDir, item, input, outputDir) {
     }
   }
   if (settings.readWrite) { result.cpuFile = `${stem}_Cpu.bin`; await fs.writeFile(path.join(outputDir, result.cpuFile), data); }
-  result.bytes = (await fs.stat(destination)).size;
+  result.bytes = (await fs.stat(path.join(outputDir, result.filename))).size;
   result.downloadBytes = result.bytes;
   for (const file of [...(result.mipFiles || []), ...(result.cpuFile ? [result.cpuFile] : [])]) result.downloadBytes += (await fs.stat(path.join(outputDir, file))).size;
   return result;
