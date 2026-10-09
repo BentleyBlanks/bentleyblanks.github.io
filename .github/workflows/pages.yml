@@ -60,7 +60,17 @@ jobs:
             tengxian-gpu-${{ runner.os }}-v1-
       - name: Build and validate GPU publication assets
         run: |
-          node Taierzhuang1938/Script_BuildPublishAssets.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938" --cache-dir "$RUNNER_TEMP/tengxian-gpu-cache"
+          # Keep live encoder output and expose the actionable error in check annotations.
+          if node Taierzhuang1938/Script_BuildPublishAssets.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938" --cache-dir "$RUNNER_TEMP/tengxian-gpu-cache" 2>&1 | tee "$RUNNER_TEMP/gpu-build.log"; then
+            :
+          else
+            message=$(tail -c 6000 "$RUNNER_TEMP/gpu-build.log")
+            message="${message//'%'/'%25'}"
+            message="${message//$'\r'/'%0D'}"
+            message="${message//$'\n'/'%0A'}"
+            printf '::error title=GPU asset build failed::%s\n' "$message"
+            exit 1
+          fi
           node Taierzhuang1938/Script_ValidatePublishAssets.mjs --output-dir "$RUNNER_TEMP/pages/Taierzhuang1938"
           node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/pages/Taierzhuang1938/Data_AssetPublishReport.json")); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"### GPU assets\n\n```json\n"+JSON.stringify({summary:r.summary,cache:r.cache,retained:r.skipped.length},null,2)+"\n```\n");'
       - uses: actions/cache/save@v4
