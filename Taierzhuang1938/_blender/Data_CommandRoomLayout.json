@@ -1,0 +1,15 @@
+{
+  "units": "metres",
+  "environmentScale": 0.5,
+  "deskTopHeightM": 0.75,
+  "chairSeatHeightM": 0.46,
+  "referenceCamera": {"position": [-0.85, -2.5, 1.9], "target": [-0.4, 0.5, 1.2], "lensMm": 29},
+  "referenceWindow": {"center": [-1.67745, 2.35355, 2.412525], "clearSizeM": [0.741, 1.88955]},
+  "room": {"leftX": -1.4875, "rightX": 1.65, "frontY": -1.6, "backY": 1.176775, "heightM": 2.6, "wallThicknessM": 0.12},
+  "cabinetTintLinear": [0.87, 0.85, 0.80],
+  "worldStrength": 0.35,
+  "windowSkyMultiplier": 0.70,
+  "entry": {"centerX": -0.5, "widthM": 1.0, "heightM": 2.1, "skyWatts": 12},
+  "propOffsets": {"DipPen": [0.018, -0.035, 0], "Ruler": [0.19, 0.185, 0]},
+  "note": "Calibrate the original environment and camera together, preserving the 29 mm lens, camera orientation and projected architectural anchors. Desktop props retain their measured real sizes."
+}

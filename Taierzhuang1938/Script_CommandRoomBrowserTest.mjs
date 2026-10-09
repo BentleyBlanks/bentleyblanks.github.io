@@ -44,7 +44,7 @@ window.THREE=THREE;window.active=true;
 window.renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);document.body.appendChild(renderer.domElement);
 window.room=new CommandRoom(renderer,{isActive:()=>window.active});await room.Load();room.Update(0);room.Render();
 window.Advance=(seconds)=>{for(let i=0;i<Math.ceil(seconds*60);i++)room.Update(1/60);room.Render();return room.State();};
-window.Project=()=>[[-.142,.92,.629],[1.75585,1.8012,-2.297975]].map(p=>new THREE.Vector3(...p).project(room.camera).toArray());
+window.Project=()=>[[-.142,.92,.629],[1.75585,1.8012,-2.297975]].map(p=>{const c=room.State().calibration;return new THREE.Vector3(...p).multiplyScalar(c.environmentScale).add(new THREE.Vector3(0,c.zLift,0)).project(room.camera).toArray();});
 window.FogEnergy=()=>{const t=room.atmosphere.volumeTarget,b=new Uint16Array(t.width*t.height*4);renderer.readRenderTargetPixels(t,0,0,t.width,t.height,b);let total=0;for(let i=0;i<b.length;i+=4)total+=THREE.DataUtils.fromHalfFloat(b[i]);return total;};
 window.ready=true;</script>`;
 const result={};
@@ -54,6 +54,26 @@ try {
   await page.waitForFunction(()=>window.ready,{},{timeout:60000});
   result.initial=await page.evaluate(()=>({state:room.State(),points:Project(),fog:FogEnergy()}));
   assert.ok(result.initial.state.meshes>=10&&result.initial.state.triangles>30000);
+  result.composition=await page.evaluate(()=>{
+    const c=room.State().calibration,up=p=>new THREE.Vector3(p[0],p[2],-p[1]);
+    const original=room.camera.clone();original.position.copy(up(c.referenceCamera.position));
+    original.lookAt(up(c.referenceCamera.target));original.updateMatrixWorld(true);
+    const errors=Object.values(c.anchors).flatMap(anchor=>anchor.reference.map((p,i)=>{
+      const a=up(p).project(original),b=up(anchor.calibrated[i]).project(room.camera);
+      return Math.hypot(a.x-b.x,a.y-b.y);
+    }));
+    return {maxProjectionError:Math.max(...errors),rotationError:original.quaternion.angleTo(room.camera.quaternion),
+      referenceCamera:c.referenceCamera,lensMm:c.camera.lensMm,desk:c.desk,chairSeatHeightM:c.chairSeatHeightM,
+      apertureError:room.atmosphere.volumeMaterial.uniforms.origin.value.distanceTo(up(c.window.center))};
+  });
+  assert.deepEqual(result.composition.referenceCamera,{position:[-.85,-2.5,1.9],target:[-.4,.5,1.2],lensMm:29},
+    "The approved reference camera is a fixed baseline, not regenerated from a new composition");
+  assert.ok(result.composition.maxProjectionError<.00001,"Reference window, maps, tabletop, cabinet and coat keep their screen positions");
+  assert.ok(result.composition.rotationError<.00001&&result.composition.lensMm===29,"Preserve the reference camera angle and lens");
+  assert.ok(Math.abs(result.composition.desk.widthM-1.55)<.001&&Math.abs(result.composition.desk.heightM-.75)<.001,
+    "Furniture must share a coherent metre scale with the adult props");
+  assert.ok(Math.abs(result.composition.chairSeatHeightM-.46)<.001);
+  assert.ok(result.composition.apertureError<.00001,"Runtime window light follows the calibrated physical aperture");
   result.exterior=await page.evaluate(()=>{
     let vista=null;
     room.scene.traverse(ob=>{
@@ -65,7 +85,7 @@ try {
     });return vista;
   });
   assert.ok(result.exterior?.url.includes("CommandRoomFarmlandImage.webp"),"Approved field vista is actually bound to the exterior material");
-  assert.ok(!result.exterior.lightMap&&result.exterior.distance>20&&result.exterior.intensity>0,
+  assert.ok(!result.exterior.lightMap&&result.exterior.distance>20*result.initial.state.calibration.environmentScale&&result.exterior.intensity>0,
     "Far vista remains behind the physical aperture with independent radiance, avoiding washed-out room lighting");
   result.appearance=await page.evaluate(()=>{
     const sums=[0,0,0];let vertices=0,capSize=null;
@@ -154,7 +174,8 @@ try {
   const base=result.initial.state.camera.position,position=result.settled.state.camera.position;
   const distance=p=>Math.hypot(...p.map((v,i)=>v-base[i]));
   assert.ok(distance(result.first.camera.position)>0&&distance(result.first.camera.position)<distance(position)*.3,"Camera must ease, not snap");
-  assert.ok(distance(position)>.06&&distance(position)<.10,"Camera movement stays subtle and bounded");
+  assert.ok(distance(position)/result.initial.state.calibration.environmentScale>.06&&distance(position)/result.initial.state.calibration.environmentScale<.10,
+    "Camera movement preserves the reference parallax after metre calibration");
   const movements=result.settled.points.map((p,i)=>p[0]-result.initial.points[i][0]);
   assert.ok(Math.abs(movements[0]-movements[1])>.008,"Near letter and distant map must show different real 3D parallax");
   await page.screenshot({path:path.join(out,"Scene_CommandRoomParallaxRight.png")});

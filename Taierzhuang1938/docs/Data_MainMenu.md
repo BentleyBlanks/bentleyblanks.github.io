@@ -68,7 +68,7 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 
 ### 桌面道具的物理尺度（2026-10-09）
 
-旧信纸以 .65×.85 m 构造，剪裁后约 64.35×84.82 cm，误成海报尺度；单独放大帽子无法修复整组比例。现在四类道具以米制重建，保持真实相机和地图桌，书写物件移到邻近的一片桌面。3.10×2.30 m 的大地图桌保留，不将小道具逐件放大来填画面。
+旧信纸以 .65×.85 m 构造，剪裁后约 64.35×84.82 cm，误成海报尺度。2026-10-09 将道具按米制重建，但遗漏了 3.10×2.30 m 地图桌的整体比例；该轮结果被用户指出比例仍不对，以下 2026-10-10 校准取代保留大桌的处理。
 
 | 物件 | 目标／实测 | 现实尺寸依据 |
 | --- | --- | --- |
@@ -82,7 +82,20 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 
 `Script_CommandRoomPhysicalScale.py` 在摆放和接触求解后测量实际世界网格，检查帽圈、纸面、笔长／杆径、瓶体三轴尺寸和任意两组道具穿插。测量记录写入 GLB extras，并由 `Tengxian.Debug.CommandRoom().physical` 提供给 agent；浏览器还独立测量导出的信纸与墨水瓶。`Script_InspectCommandRoomScale.py` 使用一台正交相机、同一张 10 cm 网格检查帽、纸、笔和瓶，禁止各物件分别适配画幅。源工程为 `CommandRoom/PhysicalScale20261009/Scene_CommandRoom.blend`，原图、测量 JSON 和对照图保留在本地 `_shots/CommandRoom/`。
 
-本轮交付为 21 网格、361507 三角形、15748680 字节的 GLB，匹配无损光照图 1316306 字节。AssetStandards、TextureStandards、CommandRoomBrowser、CommandRoomPublication、MotionVectorContract、MenuStartup 与 CommandRoomPreview 七项通过；ModuleGraph、Text、TestRunner 另行通过。发布纹理与源码实机画面的 RGB 平均误差 .64、95 分位 3，光照图字节无损；prepush 前五项通过后仍停在既有 CharacterSpeechTest 读音表断言。本任务 Blender 已停止，保留其他任务实例。本地入口为 `_shots/CommandRoom/Index_PhysicalScale.html`。
+2026-10-09 交付为 21 网格、361507 三角形、15748680 字节的 GLB，匹配无损光照图 1316306 字节。AssetStandards、TextureStandards、CommandRoomBrowser、CommandRoomPublication、MotionVectorContract、MenuStartup 与 CommandRoomPreview 七项通过；ModuleGraph、Text、TestRunner 另行通过。发布纹理与源码实机画面的 RGB 平均误差 .64、95 分位 3，光照图字节无损；prepush 前五项通过后仍停在既有 CharacterSpeechTest 读音表断言。本任务 Blender 已停止，保留其他任务实例。本地入口为 `_shots/CommandRoom/Index_PhysicalScale.html`。
+
+### 保留原构图的整室尺度校准（2026-10-10）
+
+用户要求只修尺寸，保留原画的镜头、位置与透视。`Data_CommandRoomLayout.json` 和 `Script_CommandRoomSceneScale.py` 对原环境与相机执行同一个米制校准：比例 .5、竖直平移 .3075 m，29 mm 镜头和朝向保持原样。桌面、窗框、墙图、柜顶和挂衣的参考边界在导出前检查；浏览器再用原相机独立投影对照。移动鼠标的机位偏移与焦点距离同步减半，保持原画面中的视差幅度。
+
+桌面实测约 1.550×1.148 m、桌高 .750 m，桌腿接地；柜子约 .667×.443×.951 m，椅面 .460 m。画外室内边界约 3.138×2.777×2.600 m。桌面小道具保持上表尺寸，仅随桌面重定位和重新落放；笔、尺在原邻近区域留出接触余量，继续检查任意两组道具及支撑面的穿插。相机坐标改变表示场景单位校准，不是另选机位。该轮曾试过重新布置的紧凑房间，用户否定后已撤回，不进入发布资产。
+
+柜子仍使用桌子的同一木纹，只施加轻微深色乘数；不再是深棕漆。室内增加画外遮光边界，窗户保留单一太阳方向，镜头后入口提供低强度漫射天光，使墙图和帽子在暗处仍可辨认。光照继续通过 Cycles 256 样本烘为独立 UV1，无损发布；原暖黄旧墙、窗外田野、挂衣造型和七张进度地图保留。`Tengxian.Debug.CommandRoom().calibration` 返回实际桌高、房间范围、参考与校准后的相机／构图边界，`physical` 继续返回帽圈、纸、笔、瓶的网格测量。
+
+源工程为 `CommandRoom/ReferenceScale20261010/Scene_CommandRoom.blend`，本地同机位滑动对照为 `_shots/CommandRoom/Index_ReferenceScale.html`。`COMMAND_ROOM_RENDER_PERCENT` 只控制 Blender 作者预览的出图尺寸，默认 100，不影响游戏视口、相机或发布资产。
+
+本轮最终 GLB 为 21 网格、360630 三角形、16752964 字节，无损光照图 1419644 字节。原构图边界的最大投影误差为 6.57×10⁻⁷ NDC（1280×720 下不足 .001 像素）；帽纸笔瓶尺寸、支撑与道具穿插门禁通过。AssetStandards、TextureStandards、CommandRoomBrowser、CommandRoomPublication、MotionVectorContract、MenuStartup 和 CommandRoomPreview 通过；最终曝光与光束微调后重新通过两项 CommandRoom 浏览器／发布检查。发布与源码画面 RGB 平均误差 .648、95 分位 3，光照文件保持字节一致；ModuleGraph、Text、TestRunner 自测通过。prepush 仍在未修改的 CharacterSpeechTest「呃啊」断言停止（此前五项通过），不宣称全量回归完成。BlenderMCP 已停止，`status --scan` 确认无本任务或其他 Blender 残留；本地预览服务保留供对照。
+
 衣服使用 Imagegen `Source/CommandRoomClothSerge.png`；帽子独立使用
 `Source/CommandRoomCapTwill20261007.png` 的普通灰褐斜纹棉布。两者均为 25 cm 一铺、
 1K 基色与 512 法线/ORM，法线起伏分别为 0.18 / 0.16 mm。专用 `menuCloth`
@@ -91,7 +104,7 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 桌板额外布尔切除顺纹 V 形收尖裂口，端裂长 28–74 cm，口宽 6–10 mm、深约 28 mm；
 板面还有 80–102 cm 长的干缩检查裂纹。木屑、悬浮黑线不参与这些裂口。
 柜子具有圆角台面、下压边、实框凹面抽屉和铁拉手底座。检查标签 4/5 对应桌子/柜子。
-柜子、窗沿、桌椅共享风化木纹理；柜子独立材质保留更深的旧棕漆和较低粗糙度，桌面保持磨白的干木色。木材边角磨损进入几何与顶点色。
+柜子、窗沿、桌椅共享风化木纹理；柜子独立材质只比桌面稍暗，保持干旧木料的高粗糙度，不再使用深棕漆效果。木材边角磨损进入几何与顶点色。
 2026-10-07 再按用户砖木民居参考重做墙面：保留大面积暖白灰皮，主剥落区集中在挂衣与地图之间，墙脚为不连续的返潮脱皮。露出的土层、青灰砖、砖面残灰和细碎剥落共用一张 Imagegen 作者图集，经统一 baker 输出 2K Base / 1K normal、ORM。
 墙面源图更新为 `Source/CommandRoomWallLime20261007.png`：完整灰皮保持平缓，局部露土及露砖，减少遍布墙面的厚块状颗粒和砖面凹坑。`Script_CommandRoomWallWear.py` 从材质分区生成连续起伏表面，土层最多凹 5 mm，砖面最多凹 14 mm（场景缩放前）；2.5 cm 网格负责整体厚度，法线细节幅度降到 1.2 mm。横向图集覆盖 2.7 m，恢复砖块与衣物之间的合理尺寸；图集边界落在窗框和地图遮挡处，竖向覆盖完整墙高，避免镜像破口或顶边拉成条纹。取消旧版规则砖块、重复破口轮廓及单独土黄边圈，避免拼贴感。
 主图集按作者 UV 映射，运行时 clamp；中央画面保留一处主露砖区，窗左墙柱使用完整灰皮区域，避免露砖图案在窗边重复。结构墙体后退并保留真实窗洞和遮光，基色与 UV1 辐照度继续分开。图集为跨材质分区，登记为非平铺作者图集，保留生成提示词与烘焙记录。UV1 用浅起伏墙面的 X/Z 平面代理展开后插值回细网格；其他材质保持原三维展开。已完成图集仅在图表几何核验一致时复用。

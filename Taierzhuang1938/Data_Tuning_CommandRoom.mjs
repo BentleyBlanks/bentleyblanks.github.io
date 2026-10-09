@@ -1,14 +1,14 @@
 // Dedicated static menu set. Values are authored against the three approved references.
 export const COMMAND_ROOM = Object.freeze({
-  version: "202610092350",
+  version: "202610100200",
   model: "./Model/Model_CommandRoom.glb",
   background: 0x373936,
   cameraNear: 0.05,
   cameraFar: 80,
-  exposure: 2.65,
-  depthOfField: Object.freeze({ focus: 4.1, range: 1.45, aperture: 6, maxRadius: 1.4,
+  exposure: 2.05,
+  depthOfField: Object.freeze({ focus: 2.05, range: .725, aperture: 6, maxRadius: 1.4,
     panelBlur: 7.5, transitionSeconds: .18 }),
-  parallax: Object.freeze({ horizontal: .085, vertical: .045, focusDistance: 3.3, aimFollow: .28, responseSeconds: .24 }),
+  parallax: Object.freeze({ horizontal: .0425, vertical: .0225, focusDistance: 1.65, aimFollow: .28, responseSeconds: .24 }),
   // UV1 irradiance from Blender Cycles, separate from all surface albedos.
   bakedLighting: Object.freeze({ name: "CommandRoomLighting", scale: 32, intensity: 3.141592653589793 }),
   outside: Object.freeze({ color: 0xffffff, intensity: .45 }),
@@ -16,7 +16,7 @@ export const COMMAND_ROOM = Object.freeze({
   reflection: Object.freeze({ material: "CommandRoomInkGlass", size: 256, near: .02, far: 16, intensity: 1.8,
     detailMaterials: Object.freeze(["CommandRoomInkLid", "CommandRoomCapBrass", "CommandRoomCapEnamel"]), detailIntensity: .65 }),
   glass: Object.freeze({ transmission: .99, roughness: .055, thickness: .0035, attenuationColor: 0xbe781f, attenuationDistance: .018 }),
-  cabinet: Object.freeze({ tint: 0xc2a88c, roughness: .76 }),
+  cabinet: Object.freeze({ tint: 0xf0ede7, roughness: .98 }),
   materials: Object.freeze([
     { name: "CommandRoomFarmland", kind: "print", normal: 0, tint: 0xffffff },
     { name: "CommandRoomWood", kind: "pbr", normal: 0.45, tint: 0xffffff },
@@ -28,10 +28,10 @@ export const COMMAND_ROOM = Object.freeze({
     { name: "CommandRoomLetter", kind: "print", normal: 0, tint: 0xffffff },
     { name: "CommandRoomInkLabel", kind: "print", normal: 0, tint: 0xffffff },
   ]),
-  dust: Object.freeze({ count: 460, color: 0xf2d8bd, opacity: .6, size: .0035, drift: .035 }),
+  dust: Object.freeze({ count: 320, color: 0xf2d8bd, opacity: .6, size: .0025, drift: .0175 }),
   // Actual Blender aperture; ray integration clips against camera and light depth.
-  windowHaze: Object.freeze({ center: [-1.67745, 2.412525, -2.35355], size: [.741, 1.88955],
-    direction: [.8, -1.25, 1.6], length: 3.25, density: .19, color: 0xefd1b6,
-    edgeSoftness: .035, steps: 36, resolutionScale: .5,
-    shadowSize: 1024, shadowExtent: 1.8, shadowDistance: 3, shadowFar: 8, shadowBias: .0007 }),
+  windowHaze: Object.freeze({ center: [-.838725, 1.5137625, -1.176775], size: [.3705, .944775],
+    direction: [.8, -1.25, 1.6], length: 1.625, density: .42, color: 0xefd1b6,
+    edgeSoftness: .0175, steps: 36, resolutionScale: .5,
+    shadowSize: 1024, shadowExtent: .9, shadowDistance: 1.5, shadowFar: 4, shadowBias: .00035 }),
 });

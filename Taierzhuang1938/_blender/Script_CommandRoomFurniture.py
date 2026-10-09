@@ -127,13 +127,13 @@ for z in [1.147,.856,.565,.274]:
         Rod('CabinetPullMount',(cabx+dx,caby-.350,z+.006),(cabx+dx,caby-.379,z-.004),.007,iron,12)
     Curve('CabinetIronBail',[(cabx+.059*math.cos(i/24*math.pi),caby-.382,z+.006-.041*math.sin(i/24*math.pi)) for i in range(25)],.006,iron)
 
-# Keep the cabinet's old dark brown finish distinct from the bleached desk.
-cabinetWood=Material('CommandRoomCabinetWood',(.12,.073,.037),.73,'CommandRoomWood')
+# The same dry timber, only a little darker than the desk.
+cabinetWood=Material('CommandRoomCabinetWood',(.165,.132,.096),.98,'CommandRoomWood')
 tree=cabinetWood.node_tree;principled=tree.nodes['Principled BSDF']
 baseLink=next(link for link in tree.links if link.to_socket==principled.inputs['Base Color'])
 source=baseLink.from_socket;tree.links.remove(baseLink)
 tint=tree.nodes.new('ShaderNodeMixRGB');tint.blend_type='MULTIPLY';tint.inputs[0].default_value=1
-tint.inputs[2].default_value=(.54,.40,.27,1)
+tint.inputs[2].default_value=(*layout['cabinetTintLinear'],1)
 tree.links.new(source,tint.inputs[1]);tree.links.new(tint.outputs[0],principled.inputs['Base Color'])
 for ob in scene.objects:
     if ob.type=='MESH' and ob.name.startswith('Cabinet') and ob.data.materials[0]==wood:ob.data.materials[0]=cabinetWood

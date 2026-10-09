@@ -152,7 +152,9 @@ export class CommandRoom {
     this.atmosphere = new CommandRoomAtmosphere(this.renderer,this.scene,DATA.windowHaze,DATA.depthOfField);
     this.dust = this.atmosphere.BuildDust(DATA.dust);
     const physical = gltf.scene.userData.commandRoomPhysicalProps;
+    const calibration = gltf.scene.userData.commandRoomCalibration;
     this.stats = { meshes, triangles, textureCount: this.textures.length, model: DATA.model, version: DATA.version, lighting: "Cycles diffuse UV1",
+      calibration: typeof calibration === "string" ? JSON.parse(calibration) : calibration ?? null,
       physical: typeof physical === "string" ? JSON.parse(physical) : physical ?? null };
     this.papers = papers;
     this.ready = true;

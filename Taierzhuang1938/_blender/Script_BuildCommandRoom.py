@@ -9,6 +9,7 @@ ROOT = Path(os.environ.get("COMMAND_ROOM_ROOT", r"C:\Users\Bentl\Documents\bentl
 GAME = ROOT / "Taierzhuang1938"
 appearance=json.loads((GAME/'_blender/Data_CommandRoomAppearance.json').read_text(encoding='utf-8'))
 physical=json.loads((GAME/'_blender/Data_CommandRoomPhysicalProps.json').read_text(encoding='utf-8'))
+layout=json.loads((GAME/'_blender/Data_CommandRoomLayout.json').read_text(encoding='utf-8'))
 SOURCE = Path(os.environ.get("COMMAND_ROOM_SOURCE", r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\CommandRoom"))
 SOURCE.mkdir(parents=True, exist_ok=True)
 if bpy.data.filepath and Path(bpy.data.filepath).resolve() != (SOURCE/"Scene_CommandRoom.blend").resolve():
@@ -283,6 +284,8 @@ for ob in list(scene.objects):
     if ob.type=="MESH" and len(ob.data.materials) and ob.data.materials[0] in (cloth,capCloth):
         for uv in ob.data.uv_layers:
             for corner in uv.data: corner.uv*=4
+scalePath=GAME/'_blender/Script_CommandRoomSceneScale.py'
+exec(compile(scalePath.read_text(encoding='utf-8'),str(scalePath),'exec'),globals())
 # Validate the furniture before material batching removes individual part names.
 from mathutils.bvhtree import BVHTree
 bpy.context.view_layer.update()
@@ -335,22 +338,29 @@ scene['commandRoomPhysicalProps']=json.dumps(physicalReport)
 # Lighting: single sun through actual left aperture, soft indirect fill.
 world=bpy.data.worlds.new("CommandRoomAmbient");scene.world=world;world.use_nodes=True
 world.node_tree.nodes["Background"].inputs["Color"].default_value=(.48,.52,.57,1)
-world.node_tree.nodes["Background"].inputs["Strength"].default_value=.55
+world.node_tree.nodes["Background"].inputs["Strength"].default_value=layout['worldStrength']
 bpy.ops.object.light_add(type="AREA",location=(-1.5,1.86,2.6))
-light=bpy.context.object;light.name="WindowSky";light.location=backdropTransform@light.location;light.data.energy=230;light.data.shape="RECTANGLE";light.data.size=1.54;light.data.size_y=1.85
-light.rotation_euler=(Vector((.3,-.7,.8))-light.location).to_track_quat("-Z","Y").to_euler()
+light=bpy.context.object;light.name="WindowSky";light.location=sceneCalibration@backdropTransform@light.location
+light.data.energy=230*scale*scale*layout['windowSkyMultiplier'];light.data.shape="RECTANGLE";light.data.size=1.54*scale;light.data.size_y=1.85*scale
+light.rotation_euler=(sceneCalibration@Vector((.3,-.7,.8))-light.location).to_track_quat("-Z","Y").to_euler()
+# Diffuse daylight at the camera-side entrance keeps the unlit wall
+# readable. It is outside the room opening, with no second directional sun.
+bpy.ops.object.light_add(type='AREA',location=(entry['centerX'],roomBounds['frontY']-.18,entry['heightM']/2))
+entryLight=bpy.context.object;entryLight.name='EntranceSky';entryLight.data.energy=entry['skyWatts']
+entryLight.data.shape='RECTANGLE';entryLight.data.size=entry['widthM'];entryLight.data.size_y=entry['heightM']
+entryLight.rotation_euler=Vector((0,1,0)).to_track_quat('-Z','Y').to_euler()
 bpy.ops.object.light_add(type="SUN",location=(-3,5,5))
 sun=bpy.context.object;sun.name="LeftWindowSun";sun.data.energy=2.8;sun.data.angle=.05
 sun.rotation_euler=Vector((.80,-1.6,-1.25)).to_track_quat("-Z","Y").to_euler()
 # Camera is a real glTF camera; reference matching is evaluated from render.
-bpy.ops.object.camera_add(location=(-.85,-2.50,1.90))
+bpy.ops.object.camera_add(location=calibratedCameraPosition)
 cam=bpy.context.object;cam.name="CommandRoomCamera"
-cam.rotation_euler=(Vector((-.40,.50,1.20))-cam.location).to_track_quat("-Z","Y").to_euler()
-cam.data.lens=29;cam.data.sensor_width=36;cam.data.clip_start=.05;cam.data.clip_end=80
+cam.rotation_euler=(calibratedCameraTarget-cam.location).to_track_quat("-Z","Y").to_euler()
+cam.data.lens=referenceCamera['lensMm'];cam.data.sensor_width=36;cam.data.clip_start=.05;cam.data.clip_end=80
 scene.camera=cam
 scene.render.engine="CYCLES";scene.cycles.samples=32;scene.cycles.use_denoising=True
 scene.cycles.device='CPU'
-scene.render.resolution_x=1672;scene.render.resolution_y=941;scene.render.resolution_percentage=100
+scene.render.resolution_x=1672;scene.render.resolution_y=941;scene.render.resolution_percentage=int(os.environ.get('COMMAND_ROOM_RENDER_PERCENT','100'))
 scene.view_settings.view_transform="AgX";scene.view_settings.look="AgX - Medium High Contrast";scene.view_settings.exposure=.35
 # Merge static meshes by material to keep realtime draw count proportional to materials.
 for ob in scene.objects:
