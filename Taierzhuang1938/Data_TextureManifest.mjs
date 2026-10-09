@@ -117,6 +117,14 @@ export const TEXTURE_MANIFEST = Object.freeze([
     note: "Blender Cycles irradiance only; separate from Imagegen PBR material textures. Lossless WebP with pixel-exact RGB round-trip; lossy YUV chroma is amplified into colored blocks. Encoded by _import/Script_EncodeCommandRoomLighting.py.",
   },
   {
+    id: "CommandRoomFarmland", kind: "print", tier: "lazy",
+    bake: "_import/Script_EncodeCommandRoomFarmland.py", bakeRecord: "_import/TextureBakes/Texture_CommandRoomFarmland.json",
+    source: { provider: "imagegen", date: "2026-10-09", ref: "CommandRoom/FarmlandCoat20261009/Source/CommandRoomFarmland20261009.png", prompt: "_import/Prompts/Texture_CommandRoomFarmland.txt" },
+    consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomFarmland" }],
+    files: [["Texture_CommandRoomFarmlandImage.webp", "Image", 1672, 941]],
+    note: "Approved distant field vista, on a far carrier behind the physical aperture and near branches; independent of room irradiance. Historical game illustration, not documentary photography.",
+  },
+  {
     id: "CommandRoomWood", kind: "material", tier: "lazy",
     toneClass: "weatheredWood", metersPerTile: 1.4, normalConvention: "gl",
     bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_CommandRoomWood.json",

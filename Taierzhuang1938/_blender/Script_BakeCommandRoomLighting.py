@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 ROOT=Path(os.environ.get('COMMAND_ROOM_ROOT',r'C:\Users\Bentl\Documents\bentleyblanks_Codex_CommandRoomMenu_20261004'))
 GAME=ROOT/'Taierzhuang1938'
-SOURCE=Path(r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\CommandRoom')
+SOURCE=Path(os.environ.get('COMMAND_ROOM_SOURCE',r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\CommandRoom'))
 assert Path(bpy.data.filepath).resolve()==(SOURCE/'Scene_CommandRoom.blend').resolve()
 scene=bpy.context.scene
 # A second bake in the same MCP session must not read an older .001 image.
@@ -27,7 +27,7 @@ density={'CommandRoomPlaster':.35,'CommandRoomWallSurface':.85,'CommandRoomMorta
          'CommandRoomCloth':3,'CommandRoomCapCloth':4,'CommandRoomPaperEdge':6,'CommandRoomInkLabel':12,'CommandRoomInkLid':10,'CommandRoomInkLiquid':8,
          'CommandRoomLetter':1.5,'CommandRoomMap':1.25,
          'CommandRoomCapBrass':16,'CommandRoomCapEnamel':16,'CommandRoomCapIvory':20,
-         'CommandRoomCabinetWood':1,'CommandRoomCourtyardWall':.22,'CommandRoomRoofTile':.25,'CommandRoomRoofEdge':.3}
+         'CommandRoomCabinetWood':1,'CommandRoomFarmland':.015}
 unwrap=GAME/'_blender/Script_UnwrapCommandRoomLightmap.py'
 exec(compile(unwrap.read_text(encoding='utf-8'),str(unwrap),'exec'),globals())
 bpy.ops.object.select_all(action='DESELECT')

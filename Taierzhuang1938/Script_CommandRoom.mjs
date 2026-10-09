@@ -136,6 +136,12 @@ export class CommandRoom {
         } else {
           mat.side = THREE.DoubleSide;
         }
+        if (mat.name === "CommandRoomFarmland") {
+          // Distant landscape radiance is independent of the interior UV1 bake.
+          mat.lightMap = null;mat.map = null;mat.color.setHex(0x000000);
+          mat.emissiveMap = set.textures[0];mat.emissive.setHex(DATA.outside.color);
+          mat.emissiveIntensity = DATA.outside.intensity;
+        }
         mat.needsUpdate = true;
       }
     });

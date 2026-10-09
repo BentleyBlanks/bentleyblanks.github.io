@@ -53,6 +53,19 @@ try {
   await page.waitForFunction(()=>window.ready,{},{timeout:60000});
   result.initial=await page.evaluate(()=>({state:room.State(),points:Project(),fog:FogEnergy()}));
   assert.ok(result.initial.state.meshes>=10&&result.initial.state.triangles>30000);
+  result.exterior=await page.evaluate(()=>{
+    let vista=null;
+    room.scene.traverse(ob=>{
+      if(ob.material?.name!=="CommandRoomFarmland")return;
+      const bounds=new THREE.Box3().setFromObject(ob);
+      vista={url:ob.material.emissiveMap?.image.currentSrc,lightMap:!!ob.material.lightMap,
+        distance:bounds.getCenter(new THREE.Vector3()).distanceTo(room.camera.position),
+        intensity:ob.material.emissiveIntensity};
+    });return vista;
+  });
+  assert.ok(result.exterior?.url.includes("CommandRoomFarmlandImage.webp"),"Approved field vista is actually bound to the exterior material");
+  assert.ok(!result.exterior.lightMap&&result.exterior.distance>20&&result.exterior.intensity>0,
+    "Far vista remains behind the physical aperture with independent radiance, avoiding washed-out room lighting");
   result.timberColor=await page.evaluate(()=>{
     let minimum=Infinity,vertices=0;
     room.scene.traverse(ob=>{

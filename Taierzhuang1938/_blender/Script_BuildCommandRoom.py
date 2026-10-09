@@ -7,7 +7,7 @@ from pathlib import Path
 from mathutils import Vector, Matrix
 ROOT = Path(os.environ.get("COMMAND_ROOM_ROOT", r"C:\Users\Bentl\Documents\bentleyblanks_Codex_CommandRoomMenu_20261004"))
 GAME = ROOT / "Taierzhuang1938"
-SOURCE = Path(r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\CommandRoom")
+SOURCE = Path(os.environ.get("COMMAND_ROOM_SOURCE", r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\CommandRoom"))
 SOURCE.mkdir(parents=True, exist_ok=True)
 if bpy.data.filepath and Path(bpy.data.filepath).resolve() != (SOURCE/"Scene_CommandRoom.blend").resolve():
     raise RuntimeError("Open this task's CommandRoom blend before rebuilding; refusing to replace another scene")

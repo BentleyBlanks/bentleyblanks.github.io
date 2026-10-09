@@ -1,0 +1,18 @@
+{
+  "generator": "Script_EncodeCommandRoomFarmland.py",
+  "date": "2026-10-09",
+  "source": {
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\CommandRoom\\FarmlandCoat20261009\\Source\\CommandRoomFarmland20261009.png",
+    "sha256": "a0bb0540f17ae1fe47cf341634c2b74837b4cb9d1db9641faea442d98e16d554"
+  },
+  "outputs": [
+    {
+      "file": "Texture_CommandRoomFarmlandImage.webp",
+      "width": 1672,
+      "height": 941,
+      "bytes": 241792,
+      "sha256": "b06273b953876522933b887d2d51adaf0acac026caafe61b505f87ae04001889"
+    }
+  ],
+  "encoding": "sRGB WebP quality 82; source pixels unchanged except codec quantization"
+}

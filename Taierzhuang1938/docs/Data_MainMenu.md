@@ -39,8 +39,8 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 标题态的二级页面及声音、画面、操作设置继续显示指挥室。关闭具体设置后回到
 设置目录，再返回原主菜单或暂停页。暂停继续保留真实战场和武器。
 合成器对场景颜色做基于真实深度的景深，DOM 文字不参与模糊；焦距与半径
-由 `Data_Tuning_CommandRoom.depthOfField` 管理。主菜单焦距 3 m、清晰范围 .65 m，
-最大弥散半径 4.5 CSS px；二级页使用两趟半分辨率高斯模糊加强背景虚化。
+由 `Data_Tuning_CommandRoom.depthOfField` 管理。2026-10-09 主菜单焦点移至桌面与挂衣之间，
+扩大清晰范围并降低最大弥散半径，避免袖口、布纹和窗外田埂被过度模糊；二级页继续使用两趟半分辨率高斯模糊加强背景虚化。
 选章、注记、关于、设置及声音／画面／操作子页共用焦点状态，时间常数 .18 s，
 约 .54 s 到达目标的 95%；快速返回或反向切换从当前状态继续，减少动态效果时直接切换。
 渲染分辨率和 DPR 改变时保持 CSS 像素半径。窗外自发光底色略加红，
@@ -49,7 +49,9 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 单窗天空补光与曝光提亮可读区域，太阳方向保持一致。`host.staticBackdrop` 关闭时，
 下文原有战场机位系统仍可运行，正式入口默认启用指挥室。
 
-窗外由 `Script_CommandRoomCourtyard.py` 建立近处树干与枝条、中层院墙和瓦檐、远层屋顶及天空，真实几何参与相机视差。
+窗外由 `Script_CommandRoomCourtyard.py` 按 2026-10-09 用户确认的田野参考构建：移除遮住窗洞的近院墙和大片瓦檐，保留少量实体枝条；远处 Imagegen 景片包含田块、田埂、村舍与薄雾中的树线。景片载体位于镜头约 30 m 外，表现数百米之外的乡野，受真实窗框和墙体遮挡；近枝条与远景保留不同的相机视差。`CommandRoomFarmland` 独立自发光，不重复叠加室内 UV1 辐照度；曝光沿用室内设置。景片是美术环境素材，不作为历史实景照片。
+
+本轮独立源工程在 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/FarmlandCoat20261009/Scene_CommandRoom.blend`；原工程保留。通过 `COMMAND_ROOM_SOURCE` 指定源工程目录，`COMMAND_ROOM_ROOT` 指定本任务 worktree。田野的完整 Imagegen 提示词、编码器及来源哈希分别见 `_import/Prompts/Texture_CommandRoomFarmland.txt`、`_import/Script_EncodeCommandRoomFarmland.py` 与对应 TextureBakes 记录。
 
 原工程在 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/Scene_CommandRoom.blend`。
 椅子相对原布设转向桌面并沿桌后法线后撤 18 cm，座面、竖条和横撑已连接；
@@ -59,7 +61,8 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 `_blender/Script_CommandRoomDetails.py` 调用 `Script_CommandRoomTailoring.py`（墨水瓶），
 再由 `Script_CommandRoomDrape.py` 生成帽服。
 衣服依据 `Source/Reference_CoatDrape.png` 从单个衣钩收拢；军帽依据 `Source/Reference_CapTurnaround20261006.png` 中用户确认的 Lovart 三视图，由 `Script_CommandRoomReferenceCap.py` 重建。
-衣身与袖筒由 `Script_CommandRoomHangingCoat.py` 建立连续衣片和真实袖窿，再由 `Script_RelaxCommandRoomCoat.py` 从已垂挂的姿态做短时重力松弛。长褶向下，空袖扁薄、袖口错落，领部落在短木栓上。结果存为 `Data_CommandRoomTailoredDrape.json`，以休止几何哈希校验后复用。旧版从鼓起衣身出发的长时间求解产生了衣襟缠环；旧求解脚本和缓存保留为过程来源，当前重建不消费它们。
+衣身与袖筒由 `Script_CommandRoomHangingCoat.py` 建立连续衣片和真实袖窿。2026-10-09 扩展肩部向衣身的过渡，前襟收拢、长褶与细褶错落，袖肘处有小折，空袖口高度不齐；调整挂衣朝向，减少旧版细尖锥状轮廓。表面只做保留衣钩和衣缘约束的三次局部平滑，保持重力方向的整体剪影。旧布料模拟曾产生衣襟缠环与衣摆上卷，相关脚本和 `Data_CommandRoomTailoredDrape.json` 保留为历史过程，当前重建不消费它们。
+衣服保留自身 `GarmentWear` 作为 Blender 与 glTF 的共同染色层，不再由后续通用旧化代码另建不一致的顶点色层。
 领口、袖口、襟边与下摆的退色由 `GarmentWear` 顶点色随衣片坐标生成，少量断纤维附着于真实边缘；Blender 与 glTF 使用同一染色乘数。运行时只加载静态网格，没有布料模拟开销。
 军帽帽体宽约 21 cm，低平软帽冠、独立折叠护布、约 5.7 cm 短帽檐、前方两枚凸面黄铜扣和十二道光芒帽徽，后面只保留竖缝。取消原先 1.45 倍放大。三视图作为美术建模参考，并非历史实物证据。
 衣服使用 Imagegen `Source/CommandRoomClothSerge.png`；帽子独立使用
@@ -116,6 +119,10 @@ GLB 中静态几何按材质合并；预算见 `Data_AssetStandards.CommandRoom`
 该检查也比较实际像素中的虚化强度、过渡反向和返回主菜单的恢复。
 `Script_MenuPresentationTest.mjs` 从正式游戏入口验证全部二级页与设置子页的虚化状态，
 声音设置的真实增益、键盘操作、开关、试听、刷新后保存、恢复默认及手机布局。
+
+2026-10-09 验收：实际 GLB 为 21 网格、354421 三角形、14800388 字节、零内嵌图片；窗外 `Texture/Texture_CommandRoomFarmlandImage.webp` 为 1672×941、241792 字节，仍在原贴图总预算内。重烘的 2048² 无损光照图与新网格 UV1 配套。源模型检测椅桌、挂衣椅背与五组桌面道具支撑面相交数均为零。对照截图和三视图在本地 `_shots/CommandRoom/Index_FarmlandCoat.html`，不发布到仓库。
+
+AssetStandards、TextureStandards、CommandRoomBrowser、MotionVectorContract、MenuStartup（源入口及发布式三包）、CommandRoomPreview（七状态及存档保护）、MenuPresentation 共七项通过；ModuleGraph、Text、TextGatherCheck 与 TestRunner 亦通过。quick / prepush 的前五项通过，随后仍在未改动的 CharacterSpeechTest「呃、啊」读音表断言停止，不代表全关卡回归完成。BlenderMCP 已停止，`status --scan` 确认本树和本机均无残留实例。
 
 ### 玩家声音设置（2026-10-06）
 

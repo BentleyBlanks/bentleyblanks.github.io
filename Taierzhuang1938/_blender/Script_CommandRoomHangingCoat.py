@@ -19,15 +19,20 @@ def CoatProfile(t,points):
     return points[-1][1]
 
 def CoatBodyPoint(i,j):
-    u=i/NU;t=j/NV;a=-math.pi/2+.045+u*(math.tau-.09)
-    width=CoatProfile(t,[(0,.028),(.13,.13),(.25,.183),(.55,.193),(1,.213)])
-    depth=CoatProfile(t,[(0,.021),(.18,.048),(.4,.043),(1,.046)])
+    u=i/NU;t=j/NV
+    opening=CoatProfile(t,[(0,.10),(.17,.15),(.48,.09),(1,.17)])
+    a=-math.pi/2+opening+u*(math.tau-2*opening)
+    width=CoatProfile(t,[(0,.044),(.055,.082),(.16,.194),(.28,.244),(.55,.238),(1,.258)])
+    depth=CoatProfile(t,[(0,.027),(.18,.078),(.4,.071),(1,.067)])
     # Narrow at the peg, with unequal long folds; no horizontal solver knots.
     fade=math.sin(min(1,t/.20)*math.pi/2)
-    wave=(.029*math.sin(a*5+.6+t*1.6)+.011*math.sin(a*9-.7-t*.75))*fade
-    x=width*math.cos(a)+wave*math.cos(a)*.40-.028*t+.012*math.sin(t*5)*t
-    y=depth*math.sin(a)+wave+.009*math.sin(a*3+t*2)*fade
-    z=-1.285*t-.070*(1-math.sin(a))*.5*math.sin(math.pi*t)+.059*math.sin(a+.4)*t**7+.008*math.cos(a)*(1-t)**4
+    wave=(.020*math.sin(a*4+.55+t*.85)+.027*math.sin(a*9-.3-t*.8)
+          +.007*math.sin(a*15+.8+t*.6))*fade
+    x=width*math.cos(a)+wave*math.cos(a)*.42-.036*t+.014*math.sin(t*4)*t-.028*(1-t)**2
+    y=depth*math.sin(a)+wave+.007*math.sin(a*3+t*2)*fade
+    # Two long irregular garment panels; soft diagonal tension near the peg.
+    y+=.007*math.sin(t*29+a*2)*math.exp(-((t-.22)/.16)**2)
+    z=-1.23*t-.042*(1-math.sin(a))*.5*math.sin(math.pi*t)+.092*math.sin(a+.4)*t**7+.010*math.sin(a*7)*t**10+.008*math.cos(a)*(1-t)**4
     return Vector((x,y,z))
 
 def CoatId(i,j):return j*(NU+1)+i
@@ -54,19 +59,20 @@ for a,b,c,d in holes:
     side=1 if a<NU/2 else -1
     center=sum((verts[k] for k in boundary),Vector())/len(boundary)
     count=len(boundary);previous=boundary
-    length=.55 if side>0 else .63
+    length=.59 if side>0 else .66
     for row in range(1,49):
         t=row/48;ring=[]
-        axis=Vector((side*(.083*t+.012*math.sin(t*math.pi)),
-                     -.098*t-.021*math.sin(t*math.pi),-length*t))
-        radius=.078*(1-t)+.054*t
+        axis=Vector((side*(.091*t+.020*math.sin(t*math.pi)),
+                     -.078*t-.027*math.sin(t*math.pi),-length*t))
+        radius=.084*(1-t)+.063*t
         for k,old in enumerate(boundary):
             source=verts[old]-center
             angle=math.atan2(source.z,source.y)
             # Flattened empty sleeve, with a shallow elbow crease and an open cuff.
             section=Vector((math.sin(angle)*radius,
-                            math.cos(angle)*radius*.34,-.016*math.sin(angle+.7)))
-            section.y+=.005*math.sin(angle*3+t*1.7)*math.sin(t*math.pi)
+                            math.cos(angle)*radius*.40,-.016*math.sin(angle+.7)))
+            section.y+=.009*math.sin(angle*3+t*1.7)*math.sin(t*math.pi)
+            section.y+=.007*math.sin(t*32+angle)*math.exp(-((t-.53)/.14)**2)
             blend=min(1,t/.25);blend=blend*blend*(3-2*blend)
             p=center+axis+source.lerp(section,blend)
             ring.append(len(verts));verts.append(p);uvs.append((k/count*.39,1.5+t*length))
@@ -80,9 +86,9 @@ neck=[CoatId(i,0) for i in range(NU+1)];previous=neck
 for row in range(1,11):
     t=row/10;ring=[]
     for i,k in enumerate(neck):
-        a=-math.pi/2+.045+i/NU*(math.tau-.09)
+        a=-math.pi/2+.10+i/NU*(math.tau-.20)
         p=verts[k].copy()
-        p+=Vector((math.cos(a)*.041*t,math.sin(a)*.031*t,
+        p+=Vector((math.cos(a)*.032*t,math.sin(a)*.025*t,
                    .024*math.sin(math.pi*t)-(.064+.018*math.sin(a+.7))*t*t))
         ring.append(len(verts));verts.append(p);uvs.append((i/NU*.30,-t*.075));wear.append(t**8*.65)
     faces.extend((previous[i],previous[i+1],ring[i+1],ring[i]) for i in range(NU))
@@ -92,30 +98,34 @@ seams.append(previous)
 used=sorted({k for f in faces for k in f});remap={old:new for new,old in enumerate(used)}
 verts=[verts[k] for k in used];uvs=[uvs[k] for k in used];wear=[wear[k] for k in used]
 faces=[tuple(remap[k] for k in f) for f in faces];seams=[[remap[k] for k in p] for p in seams]
-turn=Matrix.Rotation(math.radians(-45),3,'Z')
+turn=Matrix.Rotation(math.radians(-38),3,'Z')
 localPoints=[turn@p for p in verts]
 coaty=1.415-max(p.y for p in localPoints)
 points=[p+Vector((coatx,coaty,coatTop)) for p in localPoints]
 coat=Mesh('CoatLongGravityFolds',points,faces,cloth,uvs,True)
 Recalculate(coat)
-restPoints=[p.copy() for p in points]
-relaxPath=GAME/'_blender/Script_RelaxCommandRoomCoat.py'
-exec(compile(relaxPath.read_text(encoding='utf-8'),str(relaxPath),'exec'),globals())
-# Keep the gravity creases while guiding sleeves down. The transient solver
-# motion otherwise swings one empty cuff sideways like a raised arm.
-for i,(rest,p,uv) in enumerate(zip(restPoints,points,uvs)):
-    if uv[1]<0:amount=.90
-    elif uv[1]>=1.5:
-        along=min(1,(uv[1]-1.5)/.16);amount=.55-.33*along
-    else:amount=.55+.35*max(0,1-uv[1]/.12)
-    points[i]=rest.lerp(p,amount);coat.data.vertices[i].co=points[i]
+# Local surface relaxation softens armhole transitions without changing sewn
+# lengths, the peg constraint or broad gravity folds. An unbounded cloth solve
+# previously tangled the opening and lifted the hem by more than half a metre.
+neighbors=[set() for p in points]
+for face in faces:
+    for a,b in zip(face,face[1:]+face[:1]):neighbors[a].add(b);neighbors[b].add(a)
+boundary={k for path in seams for k in path}
+for iteration in range(3):
+    relaxed=[]
+    for i,p in enumerate(points):
+        if i in boundary or not neighbors[i]:relaxed.append(p);continue
+        average=sum((points[j] for j in neighbors[i]),Vector())/len(neighbors[i])
+        relaxed.append(p.lerp(average,.18))
+    points=relaxed
+for i,p in enumerate(points):coat.data.vertices[i].co=p
 coat.data.update()
 color=coat.data.color_attributes.new(name='GarmentWear',type='FLOAT_COLOR',domain='POINT')
 for i,p in enumerate(verts):
     # Faded nap and rubbed edges, with faint low-frequency dye variation.
     uneven=noise.noise_vector(p*19+Vector((3,7,2)))[0]
     rubbed=wear[i]*(.62+.38*max(0,noise.noise_vector(p*155)[0]))
-    fade=.63+.11*uneven+.38*rubbed
+    fade=.76+.10*uneven+.23*rubbed
     color.data[i].color=(fade*.95,fade*.982,fade*1.04,1)
 Shell(coat,.0022)
 

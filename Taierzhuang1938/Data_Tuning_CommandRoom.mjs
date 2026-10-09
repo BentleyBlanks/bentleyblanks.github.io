@@ -1,23 +1,24 @@
 // Dedicated static menu set. Values are authored against the three approved references.
 export const COMMAND_ROOM = Object.freeze({
-  version: "202610071730",
+  version: "202610092000",
   model: "./Model/Model_CommandRoom.glb",
   background: 0x373936,
   cameraNear: 0.05,
   cameraFar: 80,
   exposure: 2.65,
-  depthOfField: Object.freeze({ focus: 3.0, range: .65, aperture: 12, maxRadius: 4.5,
+  depthOfField: Object.freeze({ focus: 4.1, range: 1.45, aperture: 6, maxRadius: 1.4,
     panelBlur: 7.5, transitionSeconds: .18 }),
   parallax: Object.freeze({ horizontal: .085, vertical: .045, focusDistance: 3.3, aimFollow: .28, responseSeconds: .24 }),
   // UV1 irradiance from Blender Cycles, separate from all surface albedos.
   bakedLighting: Object.freeze({ name: "CommandRoomLighting", scale: 32, intensity: 3.141592653589793 }),
-  outside: Object.freeze({ color: 0xc4b4b0, intensity: 1.35 }),
+  outside: Object.freeze({ color: 0xffffff, intensity: .45 }),
   // A one-time capture of this room supplies the ink glass's window reflection.
   reflection: Object.freeze({ material: "CommandRoomInkGlass", size: 256, near: .02, far: 16, intensity: 1.8,
     detailMaterials: Object.freeze(["CommandRoomInkLid", "CommandRoomCapBrass", "CommandRoomCapEnamel"]), detailIntensity: .65 }),
   glass: Object.freeze({ transmission: .99, roughness: .055, thickness: .0035, attenuationColor: 0xbe781f, attenuationDistance: .018 }),
   cabinet: Object.freeze({ tint: 0xc2a88c, roughness: .76 }),
   materials: Object.freeze([
+    { name: "CommandRoomFarmland", kind: "print", normal: 0, tint: 0xffffff },
     { name: "CommandRoomWood", kind: "pbr", normal: 0.45, tint: 0xffffff },
     { name: "CommandRoomPlaster", kind: "pbr", normal: 0.40, tint: 0xf2eee3 },
     { name: "CommandRoomWallSurface", kind: "pbr", normal: 0.30, tint: 0xffffff, clamp: true },

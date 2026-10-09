@@ -68,6 +68,8 @@ exec(compile(drapePath.read_text(encoding='utf-8'),str(drapePath),'exec'),global
 # This gives each panel broad irregular fading without repeating painted folds.
 for ob in list(scene.objects):
     if ob.type!='MESH' or not ob.name.startswith(('Cap','Coat')) or ob.data.materials[0] not in (cloth,capCloth):continue
+    # The coat already has a seam-aware dye layer used by both Blender and glTF.
+    if ob.data.color_attributes.get('GarmentWear'):continue
     colors=ob.data.color_attributes.new(name='ClothWear',type='FLOAT_COLOR',domain='POINT')
     # Exposed fold ridges lose dye through rubbing. This belongs to albedo,
     # whereas directional shadow is kept exclusively in the lightmap.
