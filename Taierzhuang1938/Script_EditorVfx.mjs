@@ -109,12 +109,17 @@ export class VfxEditor {
     if(vfx.dust)vfx.dust.mesh.visible=false;
     vfx.dust=null;
     this.studio.Open(this.host.hideInStudio);
+    // The studio owns the visible scene here. Keep its authored particle/mesh
+    // materials without changing the game's whitebox config or saved preferences.
+    const whitebox=this.host.post?.whiteboxScene;
+    this.savedWhiteboxConfig=whitebox?.config??null;
+    if(whitebox){whitebox.config={...whitebox.config,effects:true,assetTextures:true};whitebox.Invalidate();}
     // WorldMask 会把场景直属的 VfxRoot 一起藏掉；预览器明确把它列为展品。
     vfx.root.visible = true;
     this.studio.SetGridVisible(true);
     this.studio.Frame(3.4, 8.5);
     this.panel = Panel({
-      title: "粒子特效编辑器", sub: "游戏同源预览",
+      title: "粒子特效编辑器", sub: this.savedWhiteboxConfig?"白盒环境 · 保留特效材质":"游戏同源预览",
       variant: "work", onClose: () => this.host.Close(),
     });
     root.appendChild(this.panel.root);
@@ -159,6 +164,7 @@ export class VfxEditor {
     if (this.savedWind) vfx.SetWind(this.savedWind);
     if (this.panel) this.panel.root.remove();
     this.panel = null;
+    if(this.savedWhiteboxConfig){const whitebox=this.host.post.whiteboxScene;whitebox.config=this.savedWhiteboxConfig;whitebox.Invalidate();this.savedWhiteboxConfig=null;}
     this.studio.Close();
     if(this.savedLighting)this.host.lights.EndEffectPreview(this.savedLighting,this.savedVfxTime);
     vfx.root.visible = this.savedVfxVisible;
