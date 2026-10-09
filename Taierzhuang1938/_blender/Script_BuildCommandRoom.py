@@ -7,6 +7,7 @@ from pathlib import Path
 from mathutils import Vector, Matrix
 ROOT = Path(os.environ.get("COMMAND_ROOM_ROOT", r"C:\Users\Bentl\Documents\bentleyblanks_Codex_CommandRoomMenu_20261004"))
 GAME = ROOT / "Taierzhuang1938"
+appearance=json.loads((GAME/'_blender/Data_CommandRoomAppearance.json').read_text(encoding='utf-8'))
 SOURCE = Path(os.environ.get("COMMAND_ROOM_SOURCE", r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\CommandRoom"))
 SOURCE.mkdir(parents=True, exist_ok=True)
 if bpy.data.filepath and Path(bpy.data.filepath).resolve() != (SOURCE/"Scene_CommandRoom.blend").resolve():
@@ -270,7 +271,7 @@ for ob in list(scene.objects):
         inverse=ob.matrix_world.inverted()
         for v in ob.data.vertices:
             p=ob.matrix_world@v.co
-            v.co=inverse@(Vector((hx,hy,hz))+(Matrix.Rotation(math.radians(-35),3,"Z")@(p-Vector((hx,hy,hz))))*1.0)
+            v.co=inverse@(Vector((hx,hy,hz))+(Matrix.Rotation(math.radians(-35),3,"Z")@(p-Vector((hx,hy,hz))))*appearance['capDisplayScale'])
     if ob.name.startswith('Coat'):
         ob.matrix_world=Matrix.Translation((0,0,-.39))@ob.matrix_world
     if ob.name.startswith(("Table","DryMortar")):
@@ -283,6 +284,11 @@ for ob in list(scene.objects):
         for uv in ob.data.uv_layers:
             for corner in uv.data: corner.uv*=4
 # Validate the furniture before material batching removes individual part names.
+capDimensions={**capDimensions,'displayScale':appearance['capDisplayScale'],
+    'sceneWidthM':capDimensions['widthM']*appearance['capDisplayScale'],
+    'sceneBodyLengthM':capDimensions['bodyLengthM']*appearance['capDisplayScale'],
+    'sceneVisorExtensionM':capDimensions['visorExtensionM']*appearance['capDisplayScale'],
+    'sceneHeightM':capDimensions['heightM']*appearance['capDisplayScale']}
 from mathutils.bvhtree import BVHTree
 bpy.context.view_layer.update()
 def WorldBvh(objects):

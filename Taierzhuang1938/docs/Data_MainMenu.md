@@ -64,7 +64,7 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 衣身与袖筒由 `Script_CommandRoomHangingCoat.py` 建立连续衣片和真实袖窿。2026-10-09 扩展肩部向衣身的过渡，前襟收拢、长褶与细褶错落，袖肘处有小折，空袖口高度不齐；调整挂衣朝向，减少旧版细尖锥状轮廓。表面只做保留衣钩和衣缘约束的三次局部平滑，保持重力方向的整体剪影。旧布料模拟曾产生衣襟缠环与衣摆上卷，相关脚本和 `Data_CommandRoomTailoredDrape.json` 保留为历史过程，当前重建不消费它们。
 衣服保留自身 `GarmentWear` 作为 Blender 与 glTF 的共同染色层，不再由后续通用旧化代码另建不一致的顶点色层。
 领口、袖口、襟边与下摆的退色由 `GarmentWear` 顶点色随衣片坐标生成，少量断纤维附着于真实边缘；Blender 与 glTF 使用同一染色乘数。运行时只加载静态网格，没有布料模拟开销。
-军帽帽体宽约 21 cm，低平软帽冠、独立折叠护布、约 5.7 cm 短帽檐、前方两枚凸面黄铜扣和十二道光芒帽徽，后面只保留竖缝。取消原先 1.45 倍放大。三视图作为美术建模参考，并非历史实物证据。
+军帽基础帽体宽约 21 cm，低平软帽冠、独立折叠护布、约 5.7 cm 短帽檐、前方两枚凸面黄铜扣和十二道光芒帽徽，后面只保留竖缝。2026-10-09 根据用户对画面比例的反馈，将帽冠、帽檐、帽徽、扣子和缝线整体按 1.25 倍重新布设；场景帽体宽 26.25 cm、帽体长 29.25 cm、檐伸出 7.125 cm、高约 13.875 cm。该缩放用于当前指挥桌构图校准，不宣称是王铭章实物测绘尺寸。重新按支撑面安放并重烘光照，保留 0.6 mm 接触余量。比例与墙面旧化参数统一在 `_blender/Data_CommandRoomAppearance.json`。
 衣服使用 Imagegen `Source/CommandRoomClothSerge.png`；帽子独立使用
 `Source/CommandRoomCapTwill20261007.png` 的普通灰褐斜纹棉布。两者均为 25 cm 一铺、
 1K 基色与 512 法线/ORM，法线起伏分别为 0.18 / 0.16 mm。专用 `menuCloth`
@@ -78,6 +78,7 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 墙面源图更新为 `Source/CommandRoomWallLime20261007.png`：完整灰皮保持平缓，局部露土及露砖，减少遍布墙面的厚块状颗粒和砖面凹坑。`Script_CommandRoomWallWear.py` 从材质分区生成连续起伏表面，土层最多凹 5 mm，砖面最多凹 14 mm（场景缩放前）；2.5 cm 网格负责整体厚度，法线细节幅度降到 1.2 mm。横向图集覆盖 2.7 m，恢复砖块与衣物之间的合理尺寸；图集边界落在窗框和地图遮挡处，竖向覆盖完整墙高，避免镜像破口或顶边拉成条纹。取消旧版规则砖块、重复破口轮廓及单独土黄边圈，避免拼贴感。
 主图集按作者 UV 映射，运行时 clamp；中央画面保留一处主露砖区，窗左墙柱使用完整灰皮区域，避免露砖图案在窗边重复。结构墙体后退并保留真实窗洞和遮光，基色与 UV1 辐照度继续分开。图集为跨材质分区，登记为非平铺作者图集，保留生成提示词与烘焙记录。UV1 用浅起伏墙面的 X/Z 平面代理展开后插值回细网格；其他材质保持原三维展开。已完成图集仅在图表几何核验一致时复用。
 顶点色缺失时补白色中性乘数，木板布尔切面的新顶点也补齐旧木反照率。
+2026-10-09 增加 `LimeAge` 顶点染色：灰皮略暗、偏暖黄灰，低处有不均匀返潮，窗边有弱流痕，上沿与凹处有薄积灰。染色按原图灰皮区域加权，保留青灰砖和露土的区分；不改变已有破口形状，地面和纸面不被统一染黄。Blender 与 glTF 使用相同顶点色乘数，反照率仍与 UV1 辐照度分离。本轮独立源工程目录为 `CommandRoom/CapWall20261009`。
 墙图主体离墙约 3.7 mm，底部仅轻微卷起，四角钉头与钉杆连接纸面和墙体。
 相对上一版约 5.6 cm 的整面悬空间距明显缩小，匹配光照图集重新烘焙。
 电报网格沿原图纸边裁切，保留旧纸缺口与卷边，不再带白色矩形底框；新文书匹配同一轮廓。
@@ -123,6 +124,11 @@ GLB 中静态几何按材质合并；预算见 `Data_AssetStandards.CommandRoom`
 2026-10-09 验收：实际 GLB 为 21 网格、354421 三角形、14800388 字节、零内嵌图片；窗外 `Texture/Texture_CommandRoomFarmlandImage.webp` 为 1672×941、241792 字节，仍在原贴图总预算内。重烘的 2048² 无损光照图与新网格 UV1 配套。源模型检测椅桌、挂衣椅背与五组桌面道具支撑面相交数均为零。对照截图和三视图在本地 `_shots/CommandRoom/Index_FarmlandCoat.html`，不发布到仓库。
 
 AssetStandards、TextureStandards、CommandRoomBrowser、MotionVectorContract、MenuStartup（源入口及发布式三包）、CommandRoomPreview（七状态及存档保护）、MenuPresentation 共七项通过；ModuleGraph、Text、TextGatherCheck 与 TestRunner 亦通过。quick / prepush 的前五项通过，随后仍在未改动的 CharacterSpeechTest「呃、啊」读音表断言停止，不代表全关卡回归完成。BlenderMCP 已停止，`status --scan` 确认本树和本机均无残留实例。
+
+同日帽子／墙面续修：新 GLB 为 21 网格、354276 三角形、15294304 字节；匹配光照图为 1297454 字节。实际帽组旋转后包围盒约 30.83×14.90×33.49 cm；墙皮 60662 个导出顶点保留暖灰染色，线性 RGB 均值约 .749/.664/.527。AssetStandards、TextureStandards、ModuleGraph、CommandRoomBrowser、MotionVectorContract、MenuStartup 与 CommandRoomPreview 共七项通过，prepush 仍被上述未修改对白断言阻断。本任务 Blender 已停止，未关闭其他任务的实例。本地对照入口 `_shots/CommandRoom/Index_CapWall.html`。
+合并同日 GPU 发布改动后，ModuleGraph、CommandRoomBrowser、MenuStartup、PublishAssets 再验通过。`Data_TextureImportSettings.json` 对 `Texture_CommandRoomLightingImage.webp` 显式使用 `source`，避免 GPU 量化误差被 32× HDR 解码放大成绿紫色斑；其余普通材质继续按自动 GPU 策略发布。`Script_CommandRoomPublicationTest` 对菜单实际贴图运行 `BuildPublishAssets`，校验发布光照图与源文件字节完全一致，并在相同机位比较源码／GPU 发布渲染，最终 8-bit RGB 平均误差 .64、95 分位 3，完成 640 px 缩图目检。输入尺寸不变，结果与截图留在本地 `Data_CapWallPublished.json`、`Scene_CapWallSource.png`、`Scene_CapWallPublished.png`。这项比较覆盖菜单贴图，不替代全关卡 GPU 资产验收；TextureImport、PublishAssets、TestRunner 及新增发布回归均通过。
+
+挂衣另按用户要求用 Lovart 生成一张后续建模参考，保存在本地 `_shots/CommandRoom/WangUniformReference/Scene_WangMingzhangHangingUniform.png` 及源工程 `CapWall20261009/Source/Reference_WangMingzhangUniformLovart20261009.png`；[Lovart 画布](https://www.lovart.ai/canvas?projectId=57cf57c94c3a4a23aee0489df3dacbf3)。输入含[王铭章历史肖像](https://commons.wikimedia.org/wiki/File:%E7%8E%8B%E9%93%AD%E7%AB%A0.jpg)，立领军官上衣为造型方向；布色、口袋与胸牌细节是美术重构，不视为本人原衣的精确复原。这张图尚未用于替换游戏挂衣。
 
 ### 玩家声音设置（2026-10-06）
 

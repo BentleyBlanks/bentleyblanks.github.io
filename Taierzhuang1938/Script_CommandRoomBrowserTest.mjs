@@ -66,6 +66,22 @@ try {
   assert.ok(result.exterior?.url.includes("CommandRoomFarmlandImage.webp"),"Approved field vista is actually bound to the exterior material");
   assert.ok(!result.exterior.lightMap&&result.exterior.distance>20&&result.exterior.intensity>0,
     "Far vista remains behind the physical aperture with independent radiance, avoiding washed-out room lighting");
+  result.appearance=await page.evaluate(()=>{
+    const sums=[0,0,0];let vertices=0,capSize=null;
+    room.scene.traverse(ob=>{
+      if(ob.material?.name==="CommandRoomWallSurface"){
+        const color=ob.geometry.getAttribute("color");if(!color)return;
+        for(let i=0;i<color.count;i++){sums[0]+=color.getX(i);sums[1]+=color.getY(i);sums[2]+=color.getZ(i);}
+        vertices+=color.count;
+      }
+      if(ob.material?.name==="CommandRoomCapCloth")capSize=new THREE.Box3().setFromObject(ob).getSize(new THREE.Vector3()).toArray();
+    });return {wallVertices:vertices,wallDye:sums.map(v=>v/Math.max(1,vertices)),capSize};
+  });
+  assert.ok(result.appearance.wallVertices>1000&&result.appearance.wallDye[0]>result.appearance.wallDye[1]+.02
+    &&result.appearance.wallDye[1]>result.appearance.wallDye[2]+.03,
+    "Exported wall skin must retain its warm, uneven aged-lime vertex dye");
+  assert.ok(result.appearance.capSize[1]>.13&&result.appearance.capSize[1]<.16,
+    "Actual cap geometry retains the corrected scene proportion, including crown and visor");
   result.timberColor=await page.evaluate(()=>{
     let minimum=Infinity,vertices=0;
     room.scene.traverse(ob=>{

@@ -120,9 +120,9 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({ id: "CommandRoom", name: "启动界面指挥室", pack: "Model_CommandRoom.glb",
-    sourceTriangles: 354422, actualTriangles: 354421, targetTriangles: 354421,
+    sourceTriangles: 354276, actualTriangles: 354276, targetTriangles: 354276,
     sourceTexture: "用户确认地图和电文 / Imagegen 田野远景、风化木、连续白灰土层青砖墙面、细斜纹布、军帽斜纹棉布与瓶签", runtimeTexture: "四套 1K 和一套 2K PBR、田野景片、独立纸图及无损 UV1 辐照度图集",
-    policy: "source", note: "BlenderMCP 自建静态环境；按材质合并为 21 个网格，导出排除一片退化三角形。窗外远处田野景片与近枝条分层，移除挡窗院墙与瓦檐。桌板具有实体 V 形端裂、长纹开裂及磨损倒角；墙面按唯一材质图集生成连续薄层凹陷。挂衣具有连续袖窿、收拢前襟、错落空袖与长短褶；军帽具有独立折叠护布、短帽檐与缝线。厚玻璃与内层墨水均为实际几何。包含独立 glTF 相机。" }),
+    policy: "source", note: "BlenderMCP 自建静态环境；按材质合并为 21 个网格。窗外远处田野景片与近枝条分层，移除挡窗院墙与瓦檐。桌板具有实体 V 形端裂、长纹开裂及磨损倒角；墙面有连续薄层凹陷与独立暖黄灰旧化染色。挂衣具有连续袖窿、收拢前襟、错落空袖与长短褶；军帽整组按 1.25 倍校准场景比例，保留折叠护布、短帽檐与缝线。厚玻璃与内层墨水均为实际几何。包含独立 glTF 相机。" }),
   Object.freeze({ id: "Cigarette", name: "老周卷烟", pack: "Model_Cigarette.glb",
     sourceTriangles: 50000, actualTriangles: 1798, targetTriangles: 1800,
     sourceTexture: "用户 FBX 内嵌 PBR", runtimeTexture: "源 UV / 1K PBR",

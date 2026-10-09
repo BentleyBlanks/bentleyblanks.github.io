@@ -1,0 +1,11 @@
+{
+  "capDisplayScale": 1.25,
+  "wallAge": {
+    "limeTintLinear": [0.82, 0.72, 0.56],
+    "uniformDust": 0.035,
+    "variation": 0.07,
+    "lowerDamp": 0.16,
+    "windowRunoff": 0.09,
+    "upperSoot": 0.055
+  }
+}

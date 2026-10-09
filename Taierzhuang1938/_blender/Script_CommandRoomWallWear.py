@@ -38,6 +38,25 @@ def Smooth(low,high,value):
 earth=Smooth(.10,.23,red-blue)*(1-Smooth(.64,.77,luma))
 brickLoss=(1-Smooth(.42,.59,luma))*(1-Smooth(.09,.20,red-blue))
 depthField=earth*.005+brickLoss*.014
+age=appearance['wallAge']
+# Dye/soiling remains separate from physical relief and the irradiance atlas.
+tree=wallSurface.node_tree;nodes=tree.nodes
+base=next(n for n in nodes if n.type=='TEX_IMAGE' and 'Base' in n.image.name)
+attr=nodes.new('ShaderNodeVertexColor');attr.layer_name='LimeAge'
+mix=nodes.new('ShaderNodeMixRGB');mix.blend_type='MULTIPLY';mix.inputs[0].default_value=1
+tree.links.new(base.outputs['Color'],mix.inputs[1]);tree.links.new(attr.outputs['Color'],mix.inputs[2])
+tree.links.new(mix.outputs['Color'],nodes['Principled BSDF'].inputs['Base Color'])
+
+def WallAge(x,z,u,v):
+    ix=min(width-1,int(u*(width-1)));iy=min(height-1,int(v*(height-1)))
+    lime=float(Smooth(.44,.69,luma[iy,ix]))
+    broad=.5+.5*noise.noise_vector(Vector((x*1.45,13.1,z*1.55)))[0]
+    broken=.5+.5*noise.noise_vector(Vector((x*4.1,2.3,z*3.2)))[0]
+    damp=(1-float(Smooth(.06,1.10,z)))*(.35+.65*broad)
+    runoff=math.exp(-((x+1.17)/.20)**2)*(1-float(Smooth(2.1,2.9,z)))*float(Smooth(.5,1.3,z))
+    upper=float(Smooth(2.30,3.5,z))*(.3+.7*broken)
+    shade=1-age['uniformDust']-age['variation']*broad-age['lowerDamp']*damp-age['windowRunoff']*runoff-age['upperSoot']*upper
+    return tuple((1+(c-1)*lime)*shade for c in age['limeTintLinear'])+(1,)
 
 def WallUv(x,z):
     # Keep the exposure between coat and map. The window's left pier samples
@@ -75,8 +94,10 @@ for wall in walls:
     stride=nx+1
     faces=[(j*stride+i,j*stride+i+1,(j+1)*stride+i+1,(j+1)*stride+i) for j in range(nz) for i in range(nx)]
     skin=Mesh('ReferenceWallSkin_'+wall.name,verts,faces,wallSurface,uvs,True)
+    colors=skin.data.color_attributes.new(name='LimeAge',type='FLOAT_COLOR',domain='POINT')
+    for index,(p,uv) in enumerate(zip(verts,uvs)):colors.data[index].color=WallAge(p[0],p[2],*uv)
     surfaceTriangles+=len(faces)*2
 bpy.data.images.remove(sourceImage)
 wallSurfaceSummary={'source':'CommandRoomWallLime20261007.png','skinTriangles':surfaceTriangles,
-    'earthRecessionM':.005,'brickRecessionM':.014,'sampleSpacingM':.025,'uniquePanelWidthM':2.70}
+    'earthRecessionM':.005,'brickRecessionM':.014,'sampleSpacingM':.025,'uniquePanelWidthM':2.70,'aging':age}
 print('Reference wall surface',wallSurfaceSummary)
