@@ -51,7 +51,7 @@
     "flattenSigma": 0.18,
     "isotropic": true,
     "heightFromLuma": "direct",
-    "tileM": 1.2,
+    "tileM": 1.0,
     "size": 1024,
     "dataSize": 512,
     "pack": "orh",
@@ -84,8 +84,8 @@
       "file": "Texture_TrenchPomNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 118250,
-      "sha256": "ceb72aae4dcf5f2a9dabbb74dff9b7d82977acaecb3d8c8954fb4ddd31f41eab"
+      "bytes": 131038,
+      "sha256": "8bb6949807f18c3720228b3cda20e9b99e584b03ba1d4582eb62d11761dec6ff"
     },
     {
       "channel": "Orh",
@@ -96,7 +96,7 @@
       "sha256": "794fb0bd6f886e746522527a4a4f378d501e91358fa31d02820a8cfbc018d0c4"
     }
   ],
-  "totalBytes": 546516,
+  "totalBytes": 559304,
   "metrics": {
     "meanSrgb": [
       0.4898,
@@ -116,7 +116,7 @@
     "swing": 0.0083,
     "aoMean": 0.969,
     "roughMean": 0.941,
-    "texelsPerMeter": 853.3
+    "texelsPerMeter": 1024.0
   },
   "gateProblems": []
 }

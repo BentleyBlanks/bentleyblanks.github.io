@@ -829,7 +829,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "TrenchPom", kind: "terrainLayer", tier: "level:FirstLevel",
     toneClass: "drySoil",
-    metersPerTile: 1.2,
+    metersPerTile: 1.0,
     normalConvention: "terrain",
     bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "_import/TextureBakes/Texture_TrenchPom.json",
