@@ -26,7 +26,7 @@ export const MISSION_STAGES = Object.freeze([
   ),
   Stage(
     "BunkerRescue",
-    "跟着班长出去，把枪捡起来。",
+    "接过班长递来的枪，站起后跟随班长撤离。",
     A.bunkerDoor,
     ["rescueCallHeard", "luoRescueComplete", "rifleRecovered"],
     null,
