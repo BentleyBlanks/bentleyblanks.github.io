@@ -6,7 +6,7 @@ import { TRENCH_APPEARANCE as DefaultStyle } from "./Data_TrenchAppearance.mjs";
 import { CreateTrenchDressingHeightSampler } from "./Script_TrenchSurface.mjs";
 
 export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots", clods = [], cliffs = [], style: Style = DefaultStyle } = {}) {
-  const stats = { clods: 0, spoilClods: 0, roots: 0, cliffPanels: 0, triangles: 0 };
+  const stats = { clods: 0, spoilClods: 0, roots: 0, rootBranches: 0, cliffPanels: 0, triangles: 0 };
   const skinGeometries=[];
   const crownRuns=new Map();
   // IcosahedronGeometry(1, 0) splits every triangle for flat normals. Weld the
@@ -232,7 +232,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
     geometry.userData.trenchCrown=true;geometry.userData.trenchSpoilSkin=true;Add(earth,geometry);
   };
-  const RootPiece = (a, b, radius, endRadius=radius*.5, depth=0, attach=null) => {
+  const RootPiece = (a, b, radius, endRadius=radius*.5, depth=0, attach=null, branch=false) => {
     // Bend only where a straight fibre would enter the visible skin or bridge
     // too far above it. Sampling the actual triangles also works at junctions.
     let bend=null,bendError=.012;
@@ -244,7 +244,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     }
     if(bend){
       const midRadius=radius+(endRadius-radius)*bend.t;
-      RootPiece(a,bend.point,radius,midRadius,depth+1,attach);RootPiece(bend.point,b,midRadius,endRadius,depth+1,attach);return;
+      RootPiece(a,bend.point,radius,midRadius,depth+1,attach,branch);RootPiece(bend.point,b,midRadius,endRadius,depth+1,attach,branch);return;
     }
     dir.subVectors(b, a);
     const len = dir.length();
@@ -255,6 +255,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     middle.addVectors(a, b).multiplyScalar(0.5);
     geometry.translate(middle.x, middle.y, middle.z);
     geometry.userData.trenchRoots=true;
+    geometry.userData.trenchRootBranch=branch;
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(Array(geometry.attributes.position.count*2).fill(-16),2));
     Add(roots, geometry);
   };
@@ -423,7 +424,18 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
             }else for(const point of [a,b,c])point.y=dressAt(point.x,point.z)+.012;
             const radius=Style.rootRadiusM*(.6+random()*.6);
             RootPiece(a,b,radius,radius*.5,0,attach);
-            RootPiece(b,c,Style.rootRadiusM*.48,Style.rootRadiusM*.24,0,attach);
+            RootPiece(b,c,radius*.5,radius*.18,0,attach);
+            // Independent draws keep soil placement and the existing main roots
+            // unchanged when adding or tuning the small feeder roots.
+            const branchRandom=Mulberry32(HashString(`${plan.seed}:${segment.id}:${i}:${side}:${strand}:RootBranch`));
+            if(attach&&branchRandom()<Style.rootBranch.chance){
+              const spread=length*Range(branchRandom,Style.rootBranch.spreadRatio)*(branchRandom()<.5?-1:1);
+              const end=attach(new THREE.Vector3(b.x+st.tx*spread,b.y-length*Range(branchRandom,Style.rootBranch.dropRatio),b.z+st.tz*spread));
+              if(end){
+                RootPiece(b,end,radius*Style.rootBranch.baseRadiusRatio,radius*Style.rootBranch.tipRadiusRatio,0,attach,true);
+                stats.rootBranches++;
+              }
+            }
             stats.roots++;
           }
         }

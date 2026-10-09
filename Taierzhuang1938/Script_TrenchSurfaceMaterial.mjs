@@ -17,6 +17,8 @@ const Common = /* glsl */`
 uniform vec4 uTrenchDetail; // normal strength, compact/loose relief (m), colour detail
 uniform vec2 uTrenchCompact; // compact UV frequency relative to loose soil, colour contrast
 uniform float uTrenchClodMix;
+uniform vec3 uTrenchCrown; // lower/upper wall-height fraction, boundary variation
+uniform vec2 uTrenchVariation; // spatial frequency, rotation amount
 uniform vec4 uTrenchWater;   // x 沟底积水 y 沟底底湿度 z,w 凹度（米）[起, 满]
 uniform float uTrenchPom;
 uniform vec4 uTrenchLooseMean;
@@ -37,11 +39,15 @@ vec4 SoilGrad(sampler2DArray map,vec2 uv,vec2 gx,vec2 gy){
   if(gTrenchLoose<.001)return v;
   return mix(v,textureGrad(map,vec3(uv,5.0),gx,gy),gTrenchLoose);
 }
-float SoilHeight(vec2 uv,vec2 offA,vec2 offB,float blend,float lod){
-  if(blend>.999)return SoilHeightAt(uv+offB,lod);
-  float a=SoilHeightAt(uv+offA,lod);
+mat2 SoilRotation(float band){
+  float angle=band*2.39996323*uTrenchVariation.y,c=cos(angle),s=sin(angle);
+  return mat2(c,s,-s,c);
+}
+float SoilHeight(vec2 uv,vec2 offA,vec2 offB,mat2 rotA,mat2 rotB,float blend,float lod){
+  if(blend>.999)return SoilHeightAt(rotB*(uv+offB),lod);
+  float a=SoilHeightAt(rotA*(uv+offA),lod);
   if(blend<.001)return a;
-  return mix(a,SoilHeightAt(uv+offB,lod),blend);
+  return mix(a,SoilHeightAt(rotB*(uv+offB),lod),blend);
 }
 // Adaptive ray march followed by binary intersection refinement. All material
 // channels use the SAME hit UV; filtering height in the march avoids distant shimmer.
@@ -58,9 +64,10 @@ void SoilPlane(vec3 world,vec3 geomN,vec3 dx,vec3 dy,int axis,float weight,vec3 
   vec2 vp=axis==0?tangentView.xz:axis==1?vec2(tangentView.z,-tangentView.y):vec2(tangentView.x,-tangentView.y);
   float inv=uTerrainTileNear.w;
   vec2 uv=p*inv;
-  float variant=TerrainNoise(p*.13)*8.0,band=floor(variant);
+  float variant=TerrainNoise(p*uTrenchVariation.x)*8.0,band=floor(variant);
   float blend=smoothstep(.42,.58,fract(variant));
   vec2 offA=sin(vec2(3,7)*band),offB=sin(vec2(3,7)*(band+1.0));
+  mat2 rotA=SoilRotation(band),rotB=SoilRotation(band+1.0);
   float nearFade=uTrenchPom*(1.0-smoothstep(${C.mud.parallaxNearM.toFixed(1)},${C.mud.parallaxFarM.toFixed(1)},length(vViewPosition)));
   nearFade*=smoothstep(.1,.7,abs(gTrenchLoose*2.0-1.0));
   float slope=1.0-smoothstep(.45,.95,geomN.y);
@@ -76,23 +83,28 @@ void SoilPlane(vec3 world,vec3 geomN,vec3 dx,vec3 dy,int axis,float weight,vec3 
     float stepDepth=1.0/ceil(steps),depth=0.0,previous=0.0;
     for(int i=0;i<${C.mud.pomMaxSteps};i++){
       at=uv+delta*(.5-depth);
-      if(1.0-depth<=SoilHeight(at,offA,offB,blend,lod))break;
+      if(1.0-depth<=SoilHeight(at,offA,offB,rotA,rotB,blend,lod))break;
       previous=depth;depth=min(1.0,depth+stepDepth);
     }
     // Keep a bracket on opposite sides of the height field, rather than simply
     // stopping at the first layer (which produces terraces under camera movement).
     for(int i=0;i<${C.mud.pomRefineSteps};i++){
       float mid=(previous+depth)*.5;
-      if(1.0-mid>SoilHeight(uv+delta*(.5-mid),offA,offB,blend,lod))previous=mid;else depth=mid;
+      if(1.0-mid>SoilHeight(uv+delta*(.5-mid),offA,offB,rotA,rotB,blend,lod))previous=mid;else depth=mid;
     }
     hitDepth=(previous+depth)*.5;at=uv+delta*(.5-hitDepth);
   }
   vec4 mean=mix(uTerrainAlbedoMean[3],uTrenchLooseMean,gTrenchLoose);
-  vec4 a=TerrainVpMix(SoilGrad(uTerrainAlbedo,at+offA,gx*inv,gy*inv),
-    SoilGrad(uTerrainAlbedo,at+offB,gx*inv,gy*inv),blend,mean);
-  vec4 s=mix(SoilGrad(uTerrainSurface,at+offA,gx*inv,gy*inv),
-    SoilGrad(uTerrainSurface,at+offB,gx*inv,gy*inv),blend);
-  float height=SoilHeight(at,offA,offB,blend,lod);
+  vec4 a=TerrainVpMix(SoilGrad(uTerrainAlbedo,rotA*(at+offA),rotA*gx*inv,rotA*gy*inv),
+    SoilGrad(uTerrainAlbedo,rotB*(at+offB),rotB*gx*inv,rotB*gy*inv),blend,mean);
+  vec4 surfA=SoilGrad(uTerrainSurface,rotA*(at+offA),rotA*gx*inv,rotA*gy*inv);
+  vec4 surfB=SoilGrad(uTerrainSurface,rotB*(at+offB),rotB*gx*inv,rotB*gy*inv);
+  // Return each sampled tangent normal to the unrotated projection plane before
+  // blending. Height rays, all PBR channels and their gradients share rotations.
+  surfA.rg=transpose(rotA)*(surfA.rg*2.0-1.0)*.5+.5;
+  surfB.rg=transpose(rotB)*(surfB.rg*2.0-1.0)*.5+.5;
+  vec4 s=mix(surfA,surfB,blend);
+  float height=SoilHeight(at,offA,offB,rotA,rotB,blend,lod);
   color=clamp(mix(mean.rgb,a.rgb,uTrenchDetail.w*mix(uTrenchCompact.y,1.0,gTrenchLoose)),vec3(0),vec3(1));roughAo=vec3(s.ba,height);
   float ndl=dot(lightW,geomN);
   if(nearFade>.02&&weight>.15&&ndl>.08) {
@@ -101,7 +113,7 @@ void SoilPlane(vec3 world,vec3 geomN,vec3 dx,vec3 dy,int axis,float weight,vec3 
     float rise=(1.0-height)/float(${C.mud.shadowSteps});
     vec2 lightStep=lp/max(ndl,.12)*relief*inv*rise;
     for(int j=1;j<=${C.mud.shadowSteps};j++){
-      float h=SoilHeight(at+lightStep*float(j),offA,offB,blend,lod);
+      float h=SoilHeight(at+lightStep*float(j),offA,offB,rotA,rotB,blend,lod);
       shadow=min(shadow,1.0-smoothstep(.012,.075,h-height-rise*float(j))*.82*nearFade);
     }
   }
@@ -139,6 +151,13 @@ const Evaluate = /* glsl */`
   // remain in the compressed floor. Negative w marks modelled clod batches.
   gTrenchLoose=max(1.0-step(-1.5,vTerrainLayers.w),
     smoothstep(.70,.94,geomN.y)*mix(1.0,.82,smoothstep(.15,.65,trenchLow)));
+  // The upper cut retains the loose root-bound layer under the spoil crown.
+  // Height is authored per wall, so the blend follows sloping and curved routes.
+  // World-space variation keeps adjacent modules continuous without a straight band.
+  float crownNoise=TerrainNoise(vTerrainWorld.xz*2.3+vTerrainWorld.y*.4);
+  float crownBlend=smoothstep(uTrenchCrown.x+uTrenchCrown.z*crownNoise,
+    uTrenchCrown.y,clamp(vTerrainLayers.w-2.0,0.0,1.0))*step(1.5,vTerrainLayers.w);
+  gTrenchLoose=max(gTrenchLoose,crownBlend);
   // Embedded bank crumbs retain the compact matrix even on their upward caps.
   // -1.25 is outside signed road coordinates [-1,1], separate from loose/root flags.
   gTrenchLoose*=1.0-step(-1.375,vTerrainLayers.w)*(1.0-step(-1.125,vTerrainLayers.w));
@@ -254,12 +273,18 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
   const detail={value:new THREE.Vector4(C.mud.normalScale,C.mud.pomReliefM,C.mud.looseReliefM,C.mud.colorDetail)};
   patch.trenchDetailUniform=detail;
   const clodMix={value:C.mud.clodLooseFraction};patch.trenchClodMixUniform=clodMix;
-  patch.key+=(stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10')+':compactGrainBank3ClodCore';
+  const crown={value:new THREE.Vector3(C.mud.crownBlendStart,C.mud.crownBlendEnd,C.mud.crownBlendNoise)};
+  patch.trenchCrownUniform=crown;
+  const variation={value:new THREE.Vector2(C.mud.variantFrequency,C.mud.variantRotation)};
+  patch.trenchVariationUniform=variation;
+  patch.key+=(stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10')+':compactGrainBank5Rotation';
   patch.uniforms=(uniforms,shader)=>{
     bind(uniforms,shader);
 
     uniforms.uTrenchDetail=detail;
     uniforms.uTrenchClodMix=clodMix;
+    uniforms.uTrenchCrown=crown;
+    uniforms.uTrenchVariation=variation;
     uniforms.uTrenchCompact={value:new THREE.Vector2(C.mud.baseTileM/C.mud.compactTileM,C.mud.compactColorDetail)};
     uniforms.uTrenchRootColor={value:new THREE.Color(Earth.rootColor)};
     uniforms.uTrenchWater={value:new THREE.Vector4(W.site.trenchFloor,W.damp.trenchFloor,W.lowRiseM[0],W.lowRiseM[1])};

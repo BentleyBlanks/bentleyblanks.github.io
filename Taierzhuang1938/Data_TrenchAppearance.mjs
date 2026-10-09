@@ -53,6 +53,7 @@ export const TRENCH_APPEARANCE = Object.freeze({
   rootStrands: 5,
   rootLengthM: [0.32, 0.78],
   rootRadiusM: 0.005,
+  rootBranch: { chance: .5, dropRatio: [.20,.35], spreadRatio: [.20,.40], baseRadiusRatio: .35, tipRadiusRatio: .10 },
   rootColor: 0xbcae8f,
   rootRoughness: 0.97,
   minRiseM: 0.4,

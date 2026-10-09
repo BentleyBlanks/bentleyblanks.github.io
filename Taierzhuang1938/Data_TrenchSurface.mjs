@@ -1,9 +1,11 @@
 // Historical photographs 01/14: compact earthen cuts with sparse stones and grass.
 export const TRENCH_SURFACE = Object.freeze({
-  version: '2026101001',
+  version: '2026101004',
   // 湿泥与积水 2026-09-28 起统一走 Data_Tuning_Terrain.TERRAIN_WATER（车道与沟底同一套水位模型）。
   mud: { tileM: 1.8, baseTileM: 1.8, compactTileM: 1.2, compactColorDetail: .55, reliefM: .035, roughDry: .94,
     parallaxNearM: 3, parallaxFarM: 12, pomReliefM:.005, looseReliefM:.020, normalScale:.80, colorDetail:2.2, albedoScale:1.0, clodLooseFraction:.20,
+    crownBlendStart: .72, crownBlendEnd: .99, crownBlendNoise: .10,
+    variantFrequency: .42, variantRotation: 1,
     pomMinSteps:8, pomMaxSteps:20, pomRefineSteps:4, shadowSteps:4 },
   contact: { depthM: .035, blendWidthM: .10, edgeNoiseM: .018 },
   stone: { stride: 1, chance: .04, scale: [.035,.12], embed: .36 },

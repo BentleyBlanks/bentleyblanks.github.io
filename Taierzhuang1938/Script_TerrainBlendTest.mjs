@@ -108,6 +108,44 @@ try{
       for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=lateral;
       rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();roadColors.push(Pixel(target,rootMesh.position));
     }
+    // A vertical cut stays compact below the crown and continuously acquires
+    // loose soil near the top. Distinct array colours expose reversed masks.
+    rootMesh.rotation.x=Math.PI/2;
+    const crownColors=[];
+    for(const height of [0,.70,.86,.94,1]){
+      for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=2+height;
+      rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();crownColors.push(Pixel(target,rootMesh.position));
+    }
+    rootMesh.rotation.x=0;
+    // A constant tangent +U slope must become world +Y after a quarter turn of
+    // the sampled wall texture. Read the active tile on the GPU to select a
+    // single-variant region; expected normal direction is independent of GLSL.
+    for(let i=0;i<pack.surface.image.data.length;i+=4)pack.surface.image.data.set([204,128,210,255],i);
+    pack.surface.needsUpdate=true;
+    const directionMaterial=new T.MeshStandardMaterial({side:T.DoubleSide});
+    const directionPatch=MakeTrenchSurfacePatch(pack,'high',null,contact),directionMode={value:0};
+    directionPatch.trenchPomUniform.value=0;
+    directionPatch.trenchVariationUniform.value.x=2;
+    ApplyPatches(directionMaterial,[directionPatch,MakePatch({key:'fixtureRotationDirection',
+      uniforms:uniforms=>{uniforms.uDirectionMode=directionMode;},fragment:[
+        ['#include <common>','uniform float uDirectionMode;'],
+        ['#include <dithering_fragment>',`float fixtureVariant=TerrainNoise(vec2(vTerrainWorld.x,-vTerrainWorld.y)*uTrenchVariation.x)*8.0;
+          gl_FragColor=uDirectionMode<.5?vec4(fixtureVariant,smoothstep(.42,.58,fract(fixtureVariant)),0,1):vec4(gTerrainNormalW*.5+.5,1);`],
+      ]})]);
+    rootMesh.material=directionMaterial;rootMesh.rotation.x=Math.PI/2;
+    for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=2;
+    rootGeometry.attributes.terrainLayers.needsUpdate=true;
+    let activeVariant=null;const directionCandidates=[];
+    for(const height of [.7,1,1.3,.4]){
+      rootMesh.position.y=height;Render();const v=Pixel(target,rootMesh.position);directionCandidates.push(v);
+      if(v[0]>=1&&(v[1]<.001||v[1]>.999)){activeVariant=Math.floor(v[0])+(v[1]>.999?1:0);break;}
+    }
+    if(activeVariant===null)throw new Error('No single-variant wall region for normal direction fixture: '+JSON.stringify(directionCandidates));
+    directionMode.value=1;directionPatch.trenchVariationUniform.value.y=0;Render();
+    const rotationBefore=Pixel(target,rootMesh.position).slice(0,3).map(v=>v*2-1);
+    directionPatch.trenchVariationUniform.value.y=Math.PI/2/(activeVariant*2.39996323);Render();
+    const rotationAfter=Pixel(target,rootMesh.position).slice(0,3).map(v=>v*2-1);
+    rootMesh.material=rootMaterial;rootMesh.rotation.x=0;rootMesh.position.y=.7;directionMaterial.dispose();
     // With calibrated means and constant albedo layers, changing the clod's
     // structure must not introduce a brighter or differently coloured pigment.
     const calibratedMeans=pack.albedoMean.slice();calibratedMeans.set([230/255,35/255,20/255,.5],12);
@@ -127,7 +165,7 @@ try{
     const gl=renderer.getContext(),glError=gl.getError(),linked=renderer.info.programs.every(p=>gl.getProgramParameter(p.program,gl.LINK_STATUS));
     pass.Dispose();const validAfterDispose=TerrainBlendUniforms.uTerrainBlendValid.value;
     prepass.Dispose();target.dispose();contact.Dispose();renderer.dispose();
-    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,rootColor,unmarkedColor,compactCapColor,looseCapColor,clodTransitionColor,clodCoreColor,calibratedFoot,calibratedCore,roadColors,glError,linked};
+    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,rootColor,unmarkedColor,compactCapColor,looseCapColor,clodTransitionColor,clodCoreColor,calibratedFoot,calibratedCore,roadColors,crownColors,rotationBefore,rotationAfter,glError,linked};
   });
   console.log(JSON.stringify(report,null,2));
   assert.deepEqual(errors,[]);assert.equal(report.glError,0);assert.ok(report.linked&&report.sourceIdentity&&report.restored);
@@ -137,6 +175,16 @@ try{
     'clod contact weight continuously blends the compact core into loose soil');
   assert.ok(report.calibratedCore.slice(0,3).every((v,i)=>Math.abs(v-report.calibratedFoot[i])<.015),
     'cohesive clod texture keeps the loose soil pigment mean');
+  assert.ok(report.crownColors[0][0]>.7&&report.crownColors[0][2]<.1,'lower vertical cut remains compact');
+  assert.ok(report.crownColors[4][0]<.1&&report.crownColors[4][2]>.7,'top of vertical cut joins loose spoil');
+  for(let i=1;i<report.crownColors.length;i++){
+    assert.ok(report.crownColors[i][0]<=report.crownColors[i-1][0]+.002
+      &&report.crownColors[i][2]>=report.crownColors[i-1][2]-.002,'crown transition is monotonic');
+  }
+  assert.ok(report.crownColors[2][0]>.1&&report.crownColors[2][2]>.1,'middle crown band mixes both layers');
+  assert.ok(report.rotationBefore[0]>.3&&Math.abs(report.rotationBefore[1])<.02,'unrotated +U normal points along the wall');
+  assert.ok(Math.abs(report.rotationAfter[0])<.02&&Math.abs(report.rotationAfter[1]-report.rotationBefore[0])<.02
+    &&Math.abs(report.rotationAfter[2]-report.rotationBefore[2])<.02,'quarter-turn UV sampling rotates the normal back to world +Y');
   const [near,middle,far]=report.samples;
   assert.ok(near.normal[3]>.97&&middle.normal[3]>.05&&middle.normal[3]<.95&&far.normal[3]<.01,'continuous contact mask');
   assert.ok(near.color[0]>.65&&near.color[2]<.06,'terrain albedo reaches the stone foot');

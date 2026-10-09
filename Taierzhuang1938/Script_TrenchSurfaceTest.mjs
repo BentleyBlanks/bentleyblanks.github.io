@@ -249,6 +249,7 @@ assert.ok(panels>10&&frontFaces>panels*80,'authored wall faces are visible from 
 assert.ok(mirroredPanels>0&&mirroredPanels<panels,'exercise original and mirrored wall placement');
 assert.ok(undercutFaces>10,'overhanging crown is represented by geometry, not only a normal map');
 assert.ok(cliffStats.roots>10,'wall-projected roots reach the deformed cliff mesh, including its updated raycast bounds');
+assert.ok(cliffStats.rootBranches>5,'the same surface-distance checks include actual feeder-root branches');
 assert.equal(JSON.stringify(cutPlan.segments[0].stations),stationsBefore,'cliff placement keeps the authored route');
 const cliffSeams=new Map();let joinedCliffNormals=0;
 for(const g of cliffBatches)if(g.userData.trenchCliff){
@@ -273,7 +274,7 @@ for(const g of cliffBatches)if(g.userData.trenchCliff||g.userData.trenchSpoilSki
     if(triangle.getArea()>1e-10)cliffTriangles.push({triangle,bounds:new THREE.Box3().setFromPoints(vertices)});
   }
 }
-const closest=new THREE.Vector3();let maxCliffRootGap=0,cliffRootSamples=0;
+const closest=new THREE.Vector3();let maxCliffRootGap=0,cliffRootSamples=0,cliffBranchSamples=0;
 for(const g of cliffBatches)if(g.userData.trenchRoots){
   const p=g.attributes.position,ends=[0,4].map(start=>{
     const centre=new THREE.Vector3();
@@ -287,9 +288,11 @@ for(const g of cliffBatches)if(g.userData.trenchRoots){
       triangle.closestPointToPoint(point,closest);distance=Math.min(distance,point.distanceTo(closest));
     }
     maxCliffRootGap=Math.max(maxCliffRootGap,distance);cliffRootSamples++;
+    if(g.userData.trenchRootBranch)cliffBranchSamples++;
   }
 }
 assert.ok(cliffRootSamples>100,'sample the actual fibres on the authored cliff fixture');
+assert.ok(cliffBranchSamples>25,'surface-distance checks include rendered feeder-root geometry');
 assert.ok(maxCliffRootGap<.06,`cliff roots follow the actual overhanging mesh (max gap ${maxCliffRootGap})`);
 const noCrownPlan=CompileTrenchNetwork({seed:'NoCrown',segments:[{id:'Exit',preset:'communication',
   points:[[0,0],[0,20]],jitterScale:0,cornerRadiusM:0,bermH:0}]});

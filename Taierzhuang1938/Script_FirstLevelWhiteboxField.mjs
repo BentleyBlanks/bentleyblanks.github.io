@@ -344,10 +344,13 @@ export class FirstLevelWhiteboxField {
           const colors = new Float32Array(count * 3).fill(1), layers = new Float32Array(count * 4);
           const uv=mesh.geometry.attributes.uv;
           // Keep material flags outside the real road's signed [-1, 1] coordinate.
+          // Positive wall UV.x is its foot-to-crown fraction; [2,3] preserves
+          // that height through batching for the loose upper-layer transition.
           for (let i = 0; i < count; i++) {
             layers[i * 4 + 1] = 1;
             layers[i * 4 + 3]=uv.getX(i)<-15?-3:uv.getX(i)<-7
-              ?-2-Math.min(.25,Math.max(0,-uv.getY(i)-9)):uv.getX(i)<-5?-1.25:0;
+              ?-2-Math.min(.25,Math.max(0,-uv.getY(i)-9)):uv.getX(i)<-5?-1.25
+                :2+Math.min(1,Math.max(0,uv.getX(i)));
           }
           mesh.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
           mesh.geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(layers, 4));
