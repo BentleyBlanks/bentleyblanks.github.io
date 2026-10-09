@@ -8,8 +8,8 @@ from mathutils import Vector, geometry as Geometry
 from pathlib import Path
 
 project = Path(__file__).resolve().parents[1]
-source = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchCliffWalls/Adaptive')
-expected = source / 'Scene_TrenchCliffWallsAdaptive.blend'
+source = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchCliffWalls/FineCrown')
+expected = source / 'Scene_TrenchCliffWallsFineCrown.blend'
 if bpy.data.filepath and Path(bpy.data.filepath).resolve() != expected.resolve():
     raise RuntimeError('Refusing another Blender project: ' + bpy.data.filepath)
 source.mkdir(parents=True, exist_ok=True)
@@ -91,12 +91,12 @@ for kind, name in enumerate(names):
         for cx,cz,rx,rz,amount,shear in scars:
             qx=(x-cx)/rx;qz=(z-cz)/rz
             distance=max(abs(qx+shear*qz),abs(qz),abs(qx*.65-qz*.52))
-            inside=max(0,min(1,(1-distance)/.20))
+            inside=max(0,min(1,(1-distance)/.35))
             scarDepth=max(scarDepth,amount*inside)
         depth-=scarDepth
-        lipShape=.65+.35*abs(math.sin(x*7.3+kind*2.4))
-        depth-=.11*math.exp(-((v-(.84+.025*math.sin(x*6+kind)))/.065)**2)*lipShape
-        depth+=.13*math.exp(-((v-.98)/.055)**2)*lipShape
+        lipShape=.25+.75*abs(math.sin(x*7.3+kind*2.4))
+        depth-=.05*math.exp(-((v-(.84+.025*math.sin(x*6+kind)))/.065)**2)*lipShape
+        depth+=.06*math.exp(-((v-.98)/.055)**2)*lipShape
         depth+=.035*math.exp(-((v-.06)/.1)**2)
         depth=max(.018,min(.30,.14+(depth-.13)*edge))
         if abs(z-2)<1e-6:z+=edge*(.014+.045*math.sin(x*13+kind)**2)

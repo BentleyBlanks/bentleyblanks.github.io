@@ -187,6 +187,8 @@ for(const [key,height] of edges)if(spoilEdges.has(key)){
 assert.ok(joinedCrest>100,'verify the actual common crest vertices, not only each skin separately');
 assert.ok(rootVertices>0,'roots retain a distinct surface in the soil batch');
 assert.ok(compactClods>10,'actual cut-wall aggregates use the compact matrix');
+assert.equal(new Set(cutBatches.map(g=>g.userData)).size,cutBatches.length,
+  'placement metadata is private; later crown clods cannot relabel earlier floor clods');
 // Raycast the rendered triangles independently of the placement sampler. Long
 // fibres must bend with the bank instead of disappearing into the raised skin.
 const contactMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
@@ -250,10 +252,20 @@ assert.ok(mirroredPanels>0&&mirroredPanels<panels,'exercise original and mirrore
 assert.ok(undercutFaces>10,'overhanging crown is represented by geometry, not only a normal map');
 assert.ok(cliffStats.roots>10,'wall-projected roots reach the deformed cliff mesh, including its updated raycast bounds');
 assert.ok(cliffStats.rootBranches>5,'the same surface-distance checks include actual feeder-root branches');
+assert.equal(new Set(cliffBatches.map(g=>g.userData)).size,cliffBatches.length,'cliff instances retain their own placement metadata');
+assert.ok(cliffKit.every(g=>!g.userData.trenchCliff&&!g.userData.trenchCliffMirrored),'placement leaves authored templates unchanged');
 assert.equal(JSON.stringify(cutPlan.segments[0].stations),stationsBefore,'cliff placement keeps the authored route');
-const cliffSeams=new Map();let joinedCliffNormals=0;
+const cliffSeams=new Map();let joinedCliffNormals=0,joinedToeNormals=0;
 for(const g of cliffBatches)if(g.userData.trenchCliff){
   const p=g.attributes.position,n=g.attributes.normal,uv=g.attributes.uv;
+  for(let i=0;i<p.count;i++)if(uv.getX(i)<1e-6){
+    const x=p.getX(i),z=p.getZ(i);
+    const expected=new THREE.Vector3(cutGround(x-.005,z)-cutGround(x+.005,z),.01,
+      cutGround(x,z-.005)-cutGround(x,z+.005)).normalize();
+    assert.ok(new THREE.Vector3().fromBufferAttribute(n,i).dot(expected)>.9999,
+      'cliff toe matches the physical bank tangent instead of showing a shell rim');
+    joinedToeNormals++;
+  }
   for(let i=0;i<p.count;i++)if(uv.getY(i)<1e-6||uv.getY(i)>1-1e-6){
     const key=[p.getX(i),p.getY(i),p.getZ(i)].map(v=>Math.round(v*1e5)).join(':');
     const normal=new THREE.Vector3().fromBufferAttribute(n,i),previous=cliffSeams.get(key);
@@ -263,6 +275,7 @@ for(const g of cliffBatches)if(g.userData.trenchCliff){
   }
 }
 assert.ok(joinedCliffNormals>100,'inspect actual shared cliff boundaries on both banks');
+assert.ok(joinedToeNormals>100,'inspect toe normals across the actual cliff kit on both banks');
 // A height query cannot measure attachment below an overhang. Check distance
 // to the actual wall/crown triangles in 3D, independently of the placement rays.
 const cliffTriangles=[];
@@ -306,6 +319,23 @@ BuildTrenchEarth({SetSector(){},Add(key,g){
 }},noCrownPlan,(x,z)=>noCrownPlan.Apply(x,z,0,0),{cliffs:cliffKit,roots:null,style:{...TRENCH_APPEARANCE,
   clodChance:0,bankClods:0,crumbs:0,lipClods:0,spoilClods:0}});
 assert.ok(noCrownPanels>10,'exercise crownless modules across both sides of an exit');
+// A deep-wall module must lose its full-size lip where a junction compresses
+// the bank into a half-metre rise. Inspect real vertices on both implementations.
+const shallowGround=(x,z)=>cutGround(x,z)*.25;
+for(const kit of [cliffKit,[]]){
+  let shallowVertices=0,maxShallowGap=0;
+  BuildTrenchEarth({SetSector(){},Add(key,g){
+    if(g.userData.trenchCrust||g.userData.trenchSpoilSkin){
+      const p=g.attributes.position;
+      for(let i=0;i<p.count;i++){
+        maxShallowGap=Math.max(maxShallowGap,p.getY(i)-shallowGround(p.getX(i),p.getZ(i)));shallowVertices++;
+      }
+    }g.dispose();
+  }},cutPlan,shallowGround,{cliffs:kit,roots:null,style:{...TRENCH_APPEARANCE,minRiseM:.1,
+    clodChance:0,bankClods:0,crumbs:0,lipClods:0,spoilClods:0}});
+  assert.ok(shallowVertices>100,'exercise shallow wall and connected spoil geometry');
+  assert.ok(maxShallowGap<.06,`shallow junction has no oversized raised shell (gap ${maxShallowGap})`);
+}
 // Small crown crumbs must follow the visible front edge, including its inset,
 // instead of remaining behind it at the original heightfield crest.
 const edgeBatches=[];
