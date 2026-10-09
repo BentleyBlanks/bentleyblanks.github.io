@@ -44,7 +44,12 @@ window.THREE=THREE;window.active=true;
 window.renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);document.body.appendChild(renderer.domElement);
 window.room=new CommandRoom(renderer,{isActive:()=>window.active});await room.Load();room.Update(0);room.Render();
 window.Advance=(seconds)=>{for(let i=0;i<Math.ceil(seconds*60);i++)room.Update(1/60);room.Render();return room.State();};
-window.Project=()=>[[-.142,.92,.629],[1.75585,1.8012,-2.297975]].map(p=>{const c=room.State().calibration;return new THREE.Vector3(...p).multiplyScalar(c.environmentScale).add(new THREE.Vector3(0,c.zLift,0)).project(room.camera).toArray();});
+window.LetterMesh=()=>{let found=null;room.scene.traverse(ob=>{if(ob.material?.name==='CommandRoomLetter')found=ob;});return found;};
+window.Project=()=>{const p=room.State().calibration.anchors.wallMap.calibrated,wall=new THREE.Vector3((p[0][0]+p[1][0])/2,(p[0][2]+p[1][2])/2,-(p[0][1]+p[1][1])/2);return [new THREE.Box3().setFromObject(LetterMesh()).getCenter(new THREE.Vector3()),wall].map(p=>p.project(room.camera).toArray());};
+window.LetterFocus=()=>{const mesh=LetterMesh(),positions=mesh.geometry.getAttribute('position'),v=new THREE.Vector3(),dof=room.atmosphere.compositeMaterial.uniforms.dof.value;
+ let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity,maxBlur=0,near=Infinity,far=-Infinity;
+ for(let i=0;i<positions.count;i++){v.fromBufferAttribute(positions,i).applyMatrix4(mesh.matrixWorld).applyMatrix4(room.camera.matrixWorldInverse);const d=-v.z;near=Math.min(near,d);far=Math.max(far,d);maxBlur=Math.max(maxBlur,Math.min(dof.w,Math.max(0,Math.abs(d-dof.x)-dof.y)*dof.z/Math.max(d,.1)));v.applyMatrix4(room.camera.projectionMatrix);minX=Math.min(minX,v.x);maxX=Math.max(maxX,v.x);minY=Math.min(minY,v.y);maxY=Math.max(maxY,v.y);}
+ return {focus:dof.x,range:dof.y,maxBlur,near,far,bounds:[(minX+1)*640,(1-maxY)*360,(maxX-minX)*640,(maxY-minY)*360]};};
 window.FogEnergy=()=>{const t=room.atmosphere.volumeTarget,b=new Uint16Array(t.width*t.height*4);renderer.readRenderTargetPixels(t,0,0,t.width,t.height,b);let total=0;for(let i=0;i<b.length;i+=4)total+=THREE.DataUtils.fromHalfFloat(b[i]);return total;};
 window.ready=true;</script>`;
 const result={};
@@ -121,8 +126,14 @@ try {
   },physicalSpec.letter.angleRad);
   const Near=(actual,expected,label)=>assert.ok(Math.abs(actual-expected)<.0005,`${label}: ${actual} / ${expected} m`);
   assert.equal(result.physical.authored.units,"metres");
-  Near(result.physical.letter[0],physicalSpec.letter.widthM,"Exported A5 width");
-  Near(result.physical.letter[1],physicalSpec.letter.heightM,"Exported A5 height");
+  Near(result.physical.letter[0],physicalSpec.letter.widthM*physicalSpec.letter.presentationScale,"Exported enlarged letter width");
+  Near(result.physical.letter[1],physicalSpec.letter.heightM*physicalSpec.letter.presentationScale,"Exported enlarged letter height");
+  assert.equal(result.physical.authored.letter.presentationScale,3,"The foreground letter has the explicitly requested visual enlargement");
+  result.letterFocus=await page.evaluate(()=>LetterFocus());
+  assert.ok(result.letterFocus.bounds[2]>300&&result.letterFocus.bounds[3]>160,
+    "The actual letter occupies enough screen pixels for its writing at 1280x720");
+  assert.ok(result.letterFocus.maxBlur<.000001&&result.letterFocus.focus>result.letterFocus.near&&result.letterFocus.focus<result.letterFocus.far,
+    "The DOF plane must lie on the letter and keep both ends of the page sharp");
   Near(result.physical.bottle[0],physicalSpec.inkBottle.widthM,"Exported bottle width");
   Near(result.physical.bottle[1],physicalSpec.inkBottle.heightM,"Exported bottle height");
   Near(result.physical.bottle[2],physicalSpec.inkBottle.depthM,"Exported bottle depth");
@@ -178,8 +189,11 @@ try {
     "Camera movement preserves the reference parallax after metre calibration");
   const movements=result.settled.points.map((p,i)=>p[0]-result.initial.points[i][0]);
   assert.ok(Math.abs(movements[0]-movements[1])>.008,"Near letter and distant map must show different real 3D parallax");
+  result.letterFocusRight=await page.evaluate(()=>LetterFocus());
+  assert.ok(result.letterFocusRight.maxBlur<.000001,"Letter focus follows the real camera during parallax");
   await page.screenshot({path:path.join(out,"Scene_CommandRoomParallaxRight.png")});
   await page.mouse.move(20,696);await page.evaluate(()=>Advance(1.6));
+  assert.ok((await page.evaluate(()=>LetterFocus())).maxBlur<.000001,"Far and near letter edges remain sharp at both parallax extremes");
   await page.screenshot({path:path.join(out,"Scene_CommandRoomParallaxLeft.png")});
   result.reset=await page.evaluate(()=>{document.dispatchEvent(new PointerEvent("pointerleave"));return Advance(2);});
   assert.ok(distance(result.reset.camera.position)<.0001,"Pointer leave returns to authored framing");
@@ -222,11 +236,23 @@ try {
     const Read=()=>{room.Render();const gl=renderer.getContext(),p=new Uint8Array(1280*720*4);gl.readPixels(0,0,1280,720,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;};
     const dof=room.atmosphere.compositeMaterial.uniforms.dof.value,aperture=dof.z;
     const soft=Read();dof.z=0;const sharp=Read();dof.z=aperture;room.Render();
-    let changed=0;for(let i=0;i<soft.length;i+=4)if(Math.abs(soft[i]-sharp[i])>2)changed++;
+    let changed=0,backgroundChanged=0;for(let i=0;i<soft.length;i+=4)if(Math.abs(soft[i]-sharp[i])>2){changed++;if(i/(1280*4)>400)backgroundChanged++;}
+    // Independently ray-pick interior paper pixels, then compare actual GPU
+    // outputs with DOF on/off. A globally disabled blur cannot pass both gates.
+    const mesh=LetterMesh(),ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),bounds=LetterFocus().bounds;
+    let paperSamples=0,paperDifference=0,maxPaperDifference=0;
+    for(let y=Math.ceil(bounds[1]);y<bounds[1]+bounds[3];y+=4)for(let x=Math.ceil(bounds[0]);x<bounds[0]+bounds[2];x+=4){
+      ndc.set((x+.5)/1280*2-1,1-(y+.5)/720*2);ray.setFromCamera(ndc,room.camera);
+      const hit=ray.intersectObject(mesh,false)[0];if(!hit||hit.uv.x<.1||hit.uv.x>.9||hit.uv.y<.1||hit.uv.y>.9)continue;
+      const pixel=((719-y)*1280+x)*4;for(let c=0;c<3;c++){const delta=Math.abs(soft[pixel+c]-sharp[pixel+c]);paperDifference+=delta;maxPaperDifference=Math.max(maxPaperDifference,delta);}paperSamples++;
+    }
     let glass=null;room.scene.traverse(o=>{if(o.material?.name==='CommandRoomInkGlass')glass={transmission:o.material.transmission,thickness:o.material.thickness,reflection:!!o.material.envMap};});
-    return {changed,glass};
+    return {changed,backgroundChanged,glass,paperSamples,paperMeanDifference:paperDifference/(paperSamples*3),maxPaperDifference};
   });
   assert.ok(result.optics.changed>200,"Depth of field must affect actual scene pixels");
+  assert.ok(result.optics.backgroundChanged>1000,"The background still has real depth blur");
+  assert.ok(result.optics.paperSamples>500&&result.optics.paperMeanDifference<.1&&result.optics.maxPaperDifference<=1,
+    "Actual letter text pixels must be as sharp as the no-DOF image");
   assert.ok(result.optics.glass.transmission>.9&&result.optics.glass.thickness>0&&result.optics.glass.reflection,"Bottle uses thick transmitting glass with room reflections");
   result.panelFocus=await page.evaluate(()=>{
     // Freeze animated fog noise so the return comparison measures focus alone.

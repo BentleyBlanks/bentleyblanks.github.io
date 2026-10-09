@@ -10,6 +10,6 @@
   "worldStrength": 0.35,
   "windowSkyMultiplier": 0.70,
   "entry": {"centerX": -0.5, "widthM": 1.0, "heightM": 2.1, "skyWatts": 12},
-  "propOffsets": {"DipPen": [0.018, -0.035, 0], "Ruler": [0.19, 0.185, 0]},
-  "note": "Calibrate the original environment and camera together, preserving the 29 mm lens, camera orientation and projected architectural anchors. Desktop props retain their measured real sizes."
+  "propOffsets": {"Letter": [-0.15, 0.39, 0], "PencilTray": [0.025, 0, 0], "DipPen": [0.018, -0.035, 0], "Ruler": [0.19, 0.185, 0]},
+  "note": "Preserve the 29 mm lens, camera orientation and projected architectural anchors. Desktop props retain their measured real sizes except the explicitly enlarged foreground letter, placed clear of the pen tray."
 }

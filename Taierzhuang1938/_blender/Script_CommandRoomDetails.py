@@ -57,7 +57,9 @@ vs=[];uvs=[];n=len(outline);rings=[1,.985,.94,.80,.55,.25]
 minU=min(p[0] for p in outline);maxU=max(p[0] for p in outline)
 minV=min(p[1] for p in outline);maxV=max(p[1] for p in outline)
 def LetterVertex(u,v):
-    spec=physical['letter'];px=((u-minU)/(maxU-minU)-.5)*spec['widthM'];py=((v-minV)/(maxV-minV)-.5)*spec['heightM'];angle=spec['angleRad']
+    spec=physical['letter'];displayScale=spec['presentationScale']
+    px=((u-minU)/(maxU-minU)-.5)*spec['widthM']*displayScale
+    py=((v-minV)/(maxV-minV)-.5)*spec['heightM']*displayScale;angle=spec['angleRad']
     edge=(max(0,abs(u-.5)-.43)/.07)**2*.0012+(max(0,abs(v-.5)-.43)/.07)**2*.0012
     cr=.0004*math.sin(u*math.pi*4)+.0005*math.cos(v*math.pi*6)+edge
     cx,cy,z=spec['position']

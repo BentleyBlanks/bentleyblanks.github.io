@@ -120,9 +120,9 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({ id: "CommandRoom", name: "启动界面指挥室", pack: "Model_CommandRoom.glb",
-    sourceTriangles: 360632, actualTriangles: 360630, targetTriangles: 360630,
+    sourceTriangles: 360792, actualTriangles: 360791, targetTriangles: 360791,
     sourceTexture: "用户确认地图和电文 / Imagegen 田野远景、风化木、连续白灰土层青砖墙面、细斜纹布、军帽斜纹棉布与瓶签", runtimeTexture: "四套 1K 和一套 2K PBR、田野景片、独立纸图及无损 UV1 辐照度图集",
-    policy: "source", note: "BlenderMCP 自建静态环境；按材质合并为 21 个网格。窗外田野与近枝条分层；墙面有薄层凹陷与暖黄灰旧化。桌面道具按真实米制校准：58 cm 内帽圈、A5 信纸、14.4 cm 蘸水笔、17.5 cm 铅笔、6.3×6.3×8.5 cm 墨水瓶。尺寸由最终网格测量并写入 glTF extras，取消画面放大倍率；道具及支撑面穿插受重建门禁约束。包含独立相机、帽内汗带、厚玻璃与墨水内胆。" }),
+    policy: "source", note: "BlenderMCP 自建静态环境；按材质合并为 21 个网格。窗外田野与近枝条分层；墙面有薄层凹陷与暖黄灰旧化。桌面道具按真实米制校准：58 cm 内帽圈、以 A5 为参考并按用户要求放大 3 倍边长的前景信纸、14.4 cm 蘸水笔、17.5 cm 铅笔、6.3×6.3×8.5 cm 墨水瓶。尺寸由最终网格测量并写入 glTF extras，信纸单独记录视觉放大倍率；道具及支撑面穿插受重建门禁约束。包含独立相机、帽内汗带、厚玻璃与墨水内胆。" }),
   Object.freeze({ id: "Cigarette", name: "老周卷烟", pack: "Model_Cigarette.glb",
     sourceTriangles: 50000, actualTriangles: 1798, targetTriangles: 1800,
     sourceTexture: "用户 FBX 内嵌 PBR", runtimeTexture: "源 UV / 1K PBR",

@@ -1,7 +1,7 @@
 {
   "units": "metres",
   "cap": {"headCircumferenceM": 0.58, "headLengthToWidth": 1.24, "position": [0.55, -0.58, 0.907]},
-  "letter": {"widthM": 0.148, "heightM": 0.210, "thicknessM": 0.00012, "position": [-0.142, -0.629, 0.920], "angleRad": -0.26},
+  "letter": {"widthM": 0.148, "heightM": 0.210, "presentationScale": 3.0, "thicknessM": 0.00012, "position": [-0.142, -0.629, 0.920], "angleRad": -0.26, "note": "User-authorized enlargement for readable foreground artwork; widthM/heightM retain the A5 reference, while the visible sheet is three times larger along each edge."},
   "pencil": {"lengthM": 0.175, "diameterM": 0.0071},
   "dipPen": {"lengthM": 0.144, "diameterM": 0.007, "position": [0.01, -0.69, 0.910], "direction": [0.257081, 0.966390, 0]},
   "inkBottle": {"widthM": 0.063, "depthM": 0.063, "heightM": 0.085, "position": [0.13, -0.37, 0.905]},

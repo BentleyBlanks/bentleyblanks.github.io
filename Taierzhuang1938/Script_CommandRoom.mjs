@@ -27,6 +27,8 @@ export class CommandRoom {
     this.savedViewport = new THREE.Vector4();
     this.savedScissor = new THREE.Vector4();
     this.drawSize = new THREE.Vector2();
+    this.focusCorners = [];
+    this.focusViewPoint = new THREE.Vector3();
     this.pointerTarget = new THREE.Vector2();
     this.pointer = new THREE.Vector2();
     this.isActive = isActive;
@@ -98,6 +100,7 @@ export class CommandRoom {
     this.baseAim.set(0,0,-DATA.parallax.focusDistance).applyQuaternion(this.baseQuaternion).add(this.basePosition);
     const byName = new Map(materialSets.map(set => [set.spec.name, set]));
     let meshes = 0, triangles = 0;
+    const focusBounds = new THREE.Box3();
     gltf.scene.traverse(object => {
       if (!object.isMesh) return;
       meshes++;
@@ -105,6 +108,7 @@ export class CommandRoom {
       triangles += (object.geometry.index?.count || object.geometry.attributes.position.count) / 3;
       object.castShadow = object.receiveShadow = true;
       for (const mat of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (mat.name === DATA.depthOfField.focusMaterial) focusBounds.expandByObject(object,true);
         mat.lightMap = irradiance;
         mat.lightMapIntensity = DATA.bakedLighting.scale * DATA.bakedLighting.intensity;
         if (mat.name === DATA.reflection.material) {
@@ -148,6 +152,10 @@ export class CommandRoom {
     });
     // Static direct and indirect diffuse lighting is already in the UV1 atlas.
     // Do not add a second sun or multiply baked shadows by another AO term.
+    if (focusBounds.isEmpty()) throw new Error("Command room is missing the letter focus target");
+    for (const x of [focusBounds.min.x,focusBounds.max.x])
+      for (const y of [focusBounds.min.y,focusBounds.max.y])
+        for (const z of [focusBounds.min.z,focusBounds.max.z]) this.focusCorners.push(new THREE.Vector3(x,y,z));
     this.CaptureGlassReflection();
     this.atmosphere = new CommandRoomAtmosphere(this.renderer,this.scene,DATA.windowHaze,DATA.depthOfField);
     this.dust = this.atmosphere.BuildDust(DATA.dust);
@@ -232,6 +240,19 @@ export class CommandRoom {
     this.camera.lookAt(this.aim);
   }
   SetMenuMode(mode) { this.menuMode=mode || "title"; }
+  UpdateLetterFocus() {
+    this.camera.updateMatrixWorld(true);
+    let near=Infinity,far=-Infinity;
+    for (const point of this.focusCorners) {
+      const depth=-this.focusViewPoint.copy(point).applyMatrix4(this.camera.matrixWorldInverse).z;
+      near=Math.min(near,depth);far=Math.max(far,depth);
+    }
+    // The paper is oblique to the camera: keep its near AND far writing in
+    // focus while the room falls off naturally. Re-evaluate during parallax.
+    const dof=this.atmosphere.compositeMaterial.uniforms.dof.value;
+    dof.x=(near+far)/2;
+    dof.y=Math.max(DATA.depthOfField.range,(far-near)/2+DATA.depthOfField.focusPadding);
+  }
   Render() {
     if (!this.ready) return;
     const r = this.renderer;
@@ -245,6 +266,7 @@ export class CommandRoom {
       r.setViewport(0, 0, size.x, size.y); r.setScissorTest(false);
       this.camera.aspect = size.x / size.y;
       this.camera.updateProjectionMatrix();
+      this.UpdateLetterFocus();
       r.autoClear = true;
       r.toneMapping = THREE.ACESFilmicToneMapping;
       r.toneMappingExposure = DATA.exposure;
@@ -265,7 +287,8 @@ export class CommandRoom {
       camera: this.camera ? { position: this.camera.getWorldPosition(new THREE.Vector3()).toArray(), fov: this.camera.fov } : null,
       parallax: { pointer: this.pointer.toArray(), target: this.pointerTarget.toArray(), reducedMotion: this.motionQuery.matches },
       presentation: { mode: this.menuMode, panelFocus: this.panelFocus, blur: this.panelFocus*DATA.depthOfField.panelBlur,
-        depthOfField: { ...DATA.depthOfField }, outsideColor: DATA.outside.color },
+        depthOfField: { ...DATA.depthOfField, focus: this.atmosphere?.compositeMaterial.uniforms.dof.value.x ?? DATA.depthOfField.focus,
+          range: this.atmosphere?.compositeMaterial.uniforms.dof.value.y ?? DATA.depthOfField.range }, outsideColor: DATA.outside.color },
       atmosphere: { particles: DATA.dust.count, depthOcclusion: !!this.atmosphere, lightShadow: !!this.atmosphere && !this.atmosphere.shadowDirty } };
   }
   Dispose() {

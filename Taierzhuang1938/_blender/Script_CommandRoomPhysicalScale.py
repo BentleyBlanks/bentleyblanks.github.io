@@ -1,7 +1,8 @@
 """Calibrate real prop envelopes and validate measured final world geometry.
 
-No camera/framing scale factors: the targets and their real-world sources live
-in Data_CommandRoomPhysicalProps.json. Executed before final contact placement.
+Targets and references live in Data_CommandRoomPhysicalProps.json. The letter
+has an explicit user-authorized presentation scale; all other props stay life
+size. Executed before final contact placement.
 """
 def PropObjects(prefixes):
     return [o for o in scene.objects if o.type=='MESH' and o.name.startswith(prefixes)]
@@ -45,12 +46,15 @@ def ValidatePhysicalProps():
     theta=physical['letter']['angleRad']
     letterAxes=[Vector((math.cos(theta),math.sin(theta),0)),Vector((-math.sin(theta),math.cos(theta),0)),Vector((0,0,1))]
     paper=PropObjects(('Telegram',));paperSize=PropBounds(paper,letterAxes)[2]
-    Near(paperSize.x,physical['letter']['widthM'],'Letter width')
-    Near(paperSize.y,physical['letter']['heightM'],'Letter height')
+    displayScale=physical['letter']['presentationScale']
+    Near(paperSize.x,physical['letter']['widthM']*displayScale,'Displayed letter width')
+    Near(paperSize.y,physical['letter']['heightM']*displayScale,'Displayed letter height')
     shell=paper[0];a,b=letterShellVertexPair
     thickness=(shell.matrix_world@shell.data.vertices[a].co-shell.matrix_world@shell.data.vertices[b].co).length
     Near(thickness,physical['letter']['thicknessM'],'Letter thickness',.00001)
-    report['letter']={'widthM':paperSize.x,'heightM':paperSize.y,'thicknessM':thickness,'curlEnvelopeM':paperSize.z}
+    report['letter']={'widthM':paperSize.x,'heightM':paperSize.y,'presentationScale':displayScale,
+        'referenceSizeM':[physical['letter']['widthM'],physical['letter']['heightM']],
+        'thicknessM':thickness,'curlEnvelopeM':paperSize.z}
     capAngle=math.radians(-35)
     capAxes=[Vector((math.cos(capAngle),math.sin(capAngle),0)),Vector((-math.sin(capAngle),math.cos(capAngle),0)),Vector((0,0,1))]
     headLoop=[capSweatband.matrix_world@capSweatband.data.vertices[i].co for i in headFitVertexIds]

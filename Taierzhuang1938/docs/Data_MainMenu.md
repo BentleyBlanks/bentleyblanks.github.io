@@ -39,8 +39,7 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 标题态的二级页面及声音、画面、操作设置继续显示指挥室。关闭具体设置后回到
 设置目录，再返回原主菜单或暂停页。暂停继续保留真实战场和武器。
 合成器对场景颜色做基于真实深度的景深，DOM 文字不参与模糊；焦距与半径
-由 `Data_Tuning_CommandRoom.depthOfField` 管理。2026-10-09 主菜单焦点移至桌面与挂衣之间，
-扩大清晰范围并降低最大弥散半径，避免袖口、布纹和窗外田埂被过度模糊；二级页继续使用两趟半分辨率高斯模糊加强背景虚化。
+由 `Data_Tuning_CommandRoom.depthOfField` 管理。2026-10-10 按用户要求将主菜单焦点绑定到信纸，取实际导出纸面在当前相机下的深度范围，每次视差移动后重新计算焦点与清晰带，使倾斜纸面的近端、远端文字都保持清晰；房间背景保留景深。二级页继续使用两趟半分辨率高斯模糊加强背景虚化。
 选章、注记、关于、设置及声音／画面／操作子页共用焦点状态，时间常数 .18 s，
 约 .54 s 到达目标的 95%；快速返回或反向切换从当前状态继续，减少动态效果时直接切换。
 渲染分辨率和 DPR 改变时保持 CSS 像素半径。窗外自发光底色略加红，
@@ -73,12 +72,12 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 | 物件 | 目标／实测 | 现实尺寸依据 |
 | --- | --- | --- |
 | 帽子 | 内汗带 58 cm／57.994 cm；含檐外廓约 21.16×28.78×11.92 cm | [Stetson 成人帽码](https://stetson.com/pages/fit-guide)，采用 58 cm；外廓保留已有软帽形制 |
-| 信纸 | A5 14.8×21 cm／14.805×21.004 cm；纸厚约 .12 mm | [MUJI A5 便笺](https://www.muji.com/jp/ja/store/cmdty/detail/4550584663420)，只参考尺寸，保留游戏纸图 |
+| 信纸参考 | A5 14.8×21 cm；现按下节视觉放大为约 44.4×63 cm，纸厚仍约 .12 mm | [MUJI A5 便笺](https://www.muji.com/jp/ja/store/cmdty/detail/4550584663420)，只作为原始尺寸参考，保留游戏纸图 |
 | 蘸水笔 | 全长 14.4 cm，最大杆径 7 mm | [London Museum 1901–1930 年木杆钢尖蘸水笔](https://www.londonmuseum.org.uk/collections/v/object-443434/pen-dip-pen/) |
 | 两支铅笔 | 全长各 17.5 cm，外接直径 7.1 mm | [三菱 9800EW 产品目录](https://www.mp-uni.com/files/uni-ball_Myanmar_Catalog.pdf)，174.7×7.1 mm；作为通用木铅笔尺寸参照 |
 | 墨水瓶 | 6.3×6.3×8.5 cm，包含瓶盖 | [Harvard Peabody Museum 1870–1900 年墨水瓶](https://collections.peabody.harvard.edu/objects/details/66036)，8.5×6.3×6.3 cm |
 
-这是一组有实物尺寸依据的游戏道具，不将参照品的品牌、出处或归属移植到 1938 年场景。笔托为 23×8 cm，木尺的刻度长 30 cm、尺身长 31 cm。纸厚与轻微卷边分开处理，避免缩小后的信纸仍像厚板；小纸面的 UV1 烘焙密度同步提高，尺寸本身不再被画面可读性反向拉大。
+这是一组有实物尺寸依据的游戏道具，不将参照品的品牌、出处或归属移植到 1938 年场景。笔托为 23×8 cm，木尺的刻度长 30 cm、尺身长 31 cm。纸厚与轻微卷边分开处理，避免信纸像厚板；UV1 密度与模型配套。下述信纸视觉放大是用户在 2026-10-10 明确指定的例外，替代此前坚持 A5 实物大小的处理，帽、笔、瓶的尺度保持不变。
 
 `Script_CommandRoomPhysicalScale.py` 在摆放和接触求解后测量实际世界网格，检查帽圈、纸面、笔长／杆径、瓶体三轴尺寸和任意两组道具穿插。测量记录写入 GLB extras，并由 `Tengxian.Debug.CommandRoom().physical` 提供给 agent；浏览器还独立测量导出的信纸与墨水瓶。`Script_InspectCommandRoomScale.py` 使用一台正交相机、同一张 10 cm 网格检查帽、纸、笔和瓶，禁止各物件分别适配画幅。源工程为 `CommandRoom/PhysicalScale20261009/Scene_CommandRoom.blend`，原图、测量 JSON 和对照图保留在本地 `_shots/CommandRoom/`。
 
@@ -95,6 +94,16 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 源工程为 `CommandRoom/ReferenceScale20261010/Scene_CommandRoom.blend`，本地同机位滑动对照为 `_shots/CommandRoom/Index_ReferenceScale.html`。`COMMAND_ROOM_RENDER_PERCENT` 只控制 Blender 作者预览的出图尺寸，默认 100，不影响游戏视口、相机或发布资产。
 
 本轮最终 GLB 为 21 网格、360630 三角形、16752964 字节，无损光照图 1419644 字节。原构图边界的最大投影误差为 6.57×10⁻⁷ NDC（1280×720 下不足 .001 像素）；帽纸笔瓶尺寸、支撑与道具穿插门禁通过。AssetStandards、TextureStandards、CommandRoomBrowser、CommandRoomPublication、MotionVectorContract、MenuStartup 和 CommandRoomPreview 通过；最终曝光与光束微调后重新通过两项 CommandRoom 浏览器／发布检查。发布与源码画面 RGB 平均误差 .648、95 分位 3，光照文件保持字节一致；ModuleGraph、Text、TestRunner 自测通过。prepush 仍在未修改的 CharacterSpeechTest「呃啊」断言停止（此前五项通过），不宣称全量回归完成。BlenderMCP 已停止，`status --scan` 确认无本任务或其他 Blender 残留；本地预览服务保留供对照。
+
+### 信纸阅读与景深（2026-10-10）
+
+用户指定信纸可以为视觉效果大幅放大，且景深应对准信件。`letter.presentationScale=3` 将 A5 参考的两条边各放大三倍，显示约 44.4×63.0 cm，面积为原来九倍；纸厚仍为 .12 mm。纸放在桌面前景未被帽、瓶遮住的区域，笔托仅横移 2.5 cm 让开纸缘；原镜头、桌子、窗户、挂衣和墙图的构图边界保持不变。尺寸报告同时保留 `referenceSizeM`、`presentationScale` 与实际网格大小，避免将视觉放大冒称实物尺寸。
+
+`CommandRoom.UpdateLetterFocus()` 根据 `CommandRoomLetter` 的实际世界边界计算当前视深，而非固定在房间中的某个距离；清晰带包含整张倾斜纸面及 2.5 cm 余量，鼠标视差时同步更新。`Debug.CommandRoom().presentation.depthOfField` 返回当帧的真实焦点、清晰范围及 `focusMaterial`。浏览器验收检查纸面屏幕占比、两侧视差极限的清晰范围，再射线选取纸面内的真实像素，对比开启／关闭 DOF 的 GPU 输出；纸面应保持一致，背景仍有可测的景深模糊。三张信件继续随原七种通关状态切换。
+
+源工程为 `CommandRoom/LetterFocus20261010/Scene_CommandRoom.blend`；本地对照页为 `_shots/CommandRoom/Index_LetterFocus.html`，产物和回归记录留在同目录。
+
+最终 GLB 为 21 网格、360791 三角形、16784264 字节，无损 UV1 光照图 1434676 字节。1280×720 实机中的纸面边界约 403×180 像素，视深覆盖 1.092–1.744 m；实际焦点约 1.418 m，清晰带半宽 .412 m。2231 个纸面内采样点的 DOF 开／关 RGB 差异为零，而背景有 223397 个像素发生变化；两侧视差极限的纸面模糊半径均为零。三个历史纸面均已局部目检。AssetStandards、TextureStandards、CommandRoomBrowser、CommandRoomPublication、MotionVectorContract、MenuStartup 与 CommandRoomPreview 七项通过；ModuleGraph、Text、TestRunner 自测通过。prepush 仍停在未修改的 CharacterSpeechTest 既有「呃啊」断言。本任务 Blender 已停止，扫描无残留。
 
 衣服使用 Imagegen `Source/CommandRoomClothSerge.png`；帽子独立使用
 `Source/CommandRoomCapTwill20261007.png` 的普通灰褐斜纹棉布。两者均为 25 cm 一铺、
