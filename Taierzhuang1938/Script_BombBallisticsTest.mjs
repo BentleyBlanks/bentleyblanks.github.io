@@ -108,7 +108,13 @@ const g = BOMB_PHYSICS.gravity;
   assert.equal(used("streak"), before.streak, "远处的炸弹不撒火星");
   assert.equal(used("ring"), before.ring + 2, "尘环一圈 + 冲击环一圈");
   const n = used("bombSmoke") - before.bomb;
-  assert.equal(n, info.streamers * (1 + info.trail) + info.column + info.surge + info.cap, `专用池写了 ${n} 团`);
+  assert.equal(n, info.streamers * (1 + info.trail) + info.column + info.surge, `弹道专用池写了 ${n} 团`);
+  assert.equal(info.cap,1,'aftermath uses one complete 3D explosion field');
+  const capSystem=vfx.particles.Get(vfx.particles.volumeBursts.get('GroundExplosion')).system;
+  assert.equal(capSystem.particles.length,1);const capParticle=capSystem.particles[0];
+  assert.ok(capParticle.birth>capSystem.time&&capParticle.volume.fadeIn>0,'aftermath starts after the impulse and fades in');
+  assert.ok(capParticle.life>=BOMB_BLAST_VFX.capLifeS[0]&&capParticle.life<=BOMB_BLAST_VFX.capLifeS[1]);
+  assert.equal(capParticle.velocity[0],vfx.wind.x*.7,'aftermath drifts with the wind');
   // 冲击环：外沿按 shockR（可见半径约半宽的 0.72 倍）。
   const ring = vfx.pools.ring.arrays, ri = before.ring + 1;
   assert.ok(Math.abs(ring.iSize[ri * 2 + 1] * 0.72 - info.shockR) < 1e-3, "冲击环外沿到 shockR");
@@ -117,7 +123,7 @@ const g = BOMB_PHYSICS.gravity;
   const born = A.iSpawnLife[h * 2], o = { x: A.iOrigin[h * 3], y: A.iOrigin[h * 3 + 1], z: A.iOrigin[h * 3 + 2] };
   const v = { x: A.iVelocity[h * 3], y: A.iVelocity[h * 3 + 1], z: A.iVelocity[h * 3 + 2] };
   const k = A.iParams[h * 4 + 2];
-  assert.equal(born, Math.fround(vfx.time), "头当下出生");
+  assert.equal(born, Math.fround(vfx.pools.bombSmoke.system.time), "头在所属粒子系统当前时刻出生");
   assert.ok(A.iAccel[h * 3 + 1] < -9.7, "头吃重力");
   const headLife = A.iSpawnLife[h * 2 + 1];
   const land = LinearDragAt(o, v, { x: 0, y: -g, z: 0 }, k, headLife, {});
@@ -148,9 +154,9 @@ const g = BOMB_PHYSICS.gravity;
       const budget = Math.min(1, R.impact.detailBombs / bombs), s = BlastScale(spec.chargeKg), V = BOMB_BLAST_VFX;
       const c = (base) => Math.max(1, Math.round(base * scaleQ * budget));
       const trail = Math.max(1, Math.round(V.trailPuffs * Math.min(1, scaleQ * budget + 0.3)));
-      const per = c(V.streamerBase + V.streamerPerCube * s.cube) * (1 + trail) + c(V.columnBase + s.cube)
-        + c(V.surgeBase + s.cube) + c(V.capPerCube * s.cube);
+      const per = c(V.streamerBase + V.streamerPerCube * s.cube) * (1 + trail);
       assert.ok(per * bombs <= cap * 1.05, `${quality} ${F.aircraft}×${F.slots.length}：一轮 ${per * bombs} 团 ≤ 池 ${cap}`);
+      assert.ok(bombs<=96,'the complete aftermath volley fits its shared particle system');
     }
   }
   vfx.Update(0.016, null, 11);

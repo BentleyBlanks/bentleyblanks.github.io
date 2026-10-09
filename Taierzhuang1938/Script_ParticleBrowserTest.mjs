@@ -17,12 +17,14 @@ try {
  const scene=new THREE.Scene();scene.background=new THREE.Color(.16,.18,.2);
  const camera=new THREE.PerspectiveCamera(50,1.5,.1,100);camera.position.set(0,1.8,6);camera.lookAt(0,1,0);
  const vfx=new VfxSystem(scene,null,{quality:'high'});vfx.SetFog(null);
- for(let i=0;i<200&&!vfx.shared.uParticleFireReady.value;i++)await new Promise(resolve=>setTimeout(resolve,20));
+ vfx.shared.uResolution.value.set(900,600);
  const api=vfx.particles,gl=renderer.getContext();
  function Read(){renderer.render(scene,camera);const pixels=new Uint8Array(900*600*4);gl.readPixels(0,0,900,600,gl.RGBA,gl.UNSIGNED_BYTE,pixels);return pixels;}
  function Changed(a,b){let n=0;for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>9)n++;return n;}
  const empty=Read(),initialIds=api.Inspect().entries.map(e=>e.id);
  const source=vfx.SceneEffect({x:0,y:.15,z:0},'BurningWreck');
+ await api.Ready();
+ for(const id of vfx.smokeSources.get(source).volumeSmokeHandles||[])api.Configure(id,{renderer:{enabled:false}});
  for(let i=0;i<60;i++)vfx.Update(1/60,camera,i/60);
  // Ignore legacy smoke for the isolated burning gate; its own GPU gate remains.
  for(const pool of Object.values(vfx.pools))pool.Clear();vfx.Update(0,camera,1);
@@ -33,9 +35,13 @@ try {
  for(const id of ids)api.Play(id);api.Update(.35);const animated=Read();
  for(const id of ids)api.Pause(id);api.Update(.3);const paused=Read();
  const wall=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshBasicMaterial({color:0x68594a}));wall.position.set(0,0,3);scene.add(wall);
- api.root.visible=false;const wallOnly=Read();api.root.visible=true;const occluded=Read();scene.remove(wall);
+ const depthTarget=new THREE.WebGLRenderTarget(900,600,{type:THREE.FloatType});
+ const depthMaterial=new THREE.ShaderMaterial({vertexShader:'varying float vDepth;void main(){vec4 p=modelViewMatrix*vec4(position,1.);vDepth=-p.z;gl_Position=projectionMatrix*p;}',fragmentShader:'varying float vDepth;void main(){gl_FragColor=vec4(0.,0.,1.,vDepth);}'});
+ const background=scene.background;scene.background=null;renderer.setClearColor(0,0);scene.overrideMaterial=depthMaterial;renderer.setRenderTarget(depthTarget);renderer.render(scene,camera);
+ renderer.setRenderTarget(null);scene.overrideMaterial=null;scene.background=background;vfx.SetDepthSource(depthTarget.texture);
+ api.root.visible=false;const wallOnly=Read();api.root.visible=true;const occluded=Read();scene.remove(wall);vfx.SetDepthSource(null);depthTarget.dispose();depthMaterial.dispose();
  const exported=api.Export(ids[0]);const imported=api.Import(exported);api.Remove(imported.id);
- const result={fireTextureReady:vfx.shared.uParticleFireReady.value,visible:Changed(empty,fire),replay:Changed(replayA,replayB),animated:Changed(replayB,animated),pause:Changed(animated,paused),occlusion:Changed(wallOnly,occluded),firstCalls,entries,renderer:api.Inspect().pools,glError:gl.getError(),alpha:Array.from(paused).filter((v,i)=>i%4===3&&v!==255).length};
+ const result={fireVolumeReady:api.renderer.volumes.Pool('Campfire').material.uniforms.uVolume.value.isData3DTexture,visible:Changed(empty,fire),replay:Changed(replayA,replayB),animated:Changed(replayB,animated),pause:Changed(animated,paused),occlusion:Changed(wallOnly,occluded),firstCalls,entries,renderer:api.Inspect().pools,glError:gl.getError(),alpha:Array.from(paused).filter((v,i)=>i%4===3&&v!==255).length};
  window.capture=()=>{for(const id of ids)api.Simulate(id,1.4);Read();};window.capture();
  window.finish=()=>{
    vfx.RemoveSmokeSource(source);vfx.Update(0,camera,2);Read();result.afterRemove=api.Inspect().entries.map(e=>e.id);result.initialIds=initialIds;
@@ -52,11 +58,11 @@ try {
  window.result=result;
  </script>`}));
  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/_check_Particles.html`,{waitUntil:'domcontentloaded'});
- await page.waitForFunction(()=>window.result,null,{timeout:60000});
+ await page.waitForFunction(()=>window.result,null,{timeout:60000}).catch(error=>{throw new Error(String(error)+'\n'+errors.join('\n'));});
  await page.screenshot({path:path.join(out,'BurningWreck.png')});
  const r=await page.evaluate(()=>window.finish());
  await fs.writeFile(path.join(out,'Report.json'),JSON.stringify({r,errors},null,2));
- assert.deepEqual(errors,[]);assert.equal(r.glError,0);assert.equal(r.fireTextureReady,1);assert.ok(r.visible>1500,'visible layered flames');
+ assert.deepEqual(errors,[]);assert.equal(r.glError,0);assert.equal(r.fireVolumeReady,true);assert.ok(r.visible>1500,'visible simulated flames');
  assert.equal(r.replay,0,'fixed seed replay is pixel identical');assert.ok(r.animated>500,'fire changes across time');
  assert.equal(r.pause,0,'pause freezes shader flow as well as births');assert.equal(r.occlusion,0);assert.equal(r.alpha,0,'HDR destination alpha preserved');
  assert.ok(r.firstCalls<=3,'all burning layers share bounded batches');assert.deepEqual(r.afterRemove,r.initialIds,'removal releases the effect and preserves registered channels');assert.equal(r.afterDispose,true);

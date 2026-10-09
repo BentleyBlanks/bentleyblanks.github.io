@@ -13,8 +13,10 @@ try{
  await page.goto('http://127.0.0.1:'+server.address().port+'/Taierzhuang1938/?'+entry+'&manual=1&menu=0',{waitUntil:'domcontentloaded',timeout:180000});
  if(whitebox){await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:300000});await page.getByText('特效预览',{exact:true}).click();}
  await page.waitForFunction(()=>window.Tengxian?.ParticleEditor?.panel,null,{timeout:300000});
+ await page.evaluate(()=>Tengxian.Particles.Ready());
  if(whitebox){
    await page.getByText('扬尘',{exact:true}).click();
+   await page.evaluate(()=>Tengxian.Particles.Ready());
    const visible=await page.evaluate(()=>{
      const g=Tengxian,e=g.ParticleEditor;e.Seek(3);
      const gl=g.renderer.getContext(),Pixels=()=>{g.StepFrames(1,0,true);const data=new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,data);return data;};
@@ -67,12 +69,15 @@ try{
  await page.locator('[data-particle-module="sizeOverLifetime"] > summary').click();await page.screenshot({path:path.join(out,'Scene_ParticleEditor.png')});
  const result=await page.evaluate(()=>{const g=Tengxian,e=g.ParticleEditor,original=e.savedParticleEffects,worldBefore=JSON.stringify(original.Inspect());
    const result={editor:e.Inspect(),worldBefore,lightingSources:e.savedLighting.fireSources.size,glError:g.renderer.getContext().getError()};
+   const savedLimit=e.savedStudioMaxDistance;e.SelectEffect('BombHeavy');result.bombCameraDistance=e.studio.orbit.dist;result.selectedEffect=e.effectList.Value();
    e.SelectEffect('ExplosionMortar');e.Seek(.1);const light=JSON.stringify(g.lights.GetEffectLightState());g.StepFrames(6,1/60,false);result.lightPause=light===JSON.stringify(g.lights.GetEffectLightState());
    g.editor.Close();g.editor.TogglePanel(false);result.restored=JSON.stringify(g.Particles.Inspect())===worldBefore;result.lightRestore=g.lights.fireSources.size===result.lightingSources;
+   result.cameraLimitRestored=g.editor.studio.maxDistance===savedLimit;
    if(g.post.whiteboxScene){result.whiteboxRestored=g.post.whiteboxScene.config===g.post.whiteboxConfig;g.StepFrames(1,0,true);result.gameEffectsHidden=!g.vfx.root.visible;}
    return result;});
  await fs.writeFile(path.join(out,'Report.json'),JSON.stringify({result,errors},null,2));
  assert.equal(result.worldBefore,baseline.particles);assert.equal(result.restored,true);assert.equal(result.lightPause,true);assert.equal(result.lightRestore,true);assert.equal(result.glError,0);assert.deepEqual(errors,[]);
+ assert.ok(result.bombCameraDistance>80);assert.equal(result.selectedEffect,'BombHeavy');assert.equal(result.cameraLimitRestored,true);
  if(whitebox){assert.equal(result.whiteboxRestored,true);assert.equal(result.gameEffectsHidden,true);}
  console.log('ok particle editor: direct entry, native controls, curves, seek, preset roundtrip, light pause and world restoration');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

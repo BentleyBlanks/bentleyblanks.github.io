@@ -5,6 +5,7 @@ import { PARTICLE_LIMITS,PARTICLE_VOLUME } from './Data_Tuning_Particles.mjs';
 import { ParticleBatch, ParticleMeshBatch } from './Script_ParticleBatch.mjs';
 import {AcquireParticleDensity,PARTICLE_DENSITY_GLSL} from './Script_ParticleDensity.mjs';
 import {PARTICLE_GPU_MODULES} from './Script_ParticleGpuModules.mjs';
+import {ParticleVolumeRenderer} from './Script_ParticleVolumeRenderer.mjs';
 
 const VERTEX=/*glsl*/`
 ${PARTICLE_GPU_MODULES}
@@ -206,6 +207,8 @@ export class ParticleRenderer {
    this.systemData=new Float32Array(PARTICLE_LIMITS.systems*16);
    this.curves=FloatTexture(this.curveData,PARTICLE_LIMITS.curveSamples,PARTICLE_LIMITS.systems*6);
    this.systems=FloatTexture(this.systemData,4,PARTICLE_LIMITS.systems);
+   this.volumes=new ParticleVolumeRenderer(root,shared,{uParticleCurves:{value:this.curves},uParticleSystems:{value:this.systems},
+     uCurveDimensions:{value:new THREE.Vector2(PARTICLE_LIMITS.curveSamples,PARTICLE_LIMITS.systems*6)},uSystemCount:{value:PARTICLE_LIMITS.systems}},quality);
    const budgets=PARTICLE_LIMITS[quality]||PARTICLE_LIMITS.high;
    for(const mode of ['flame','smoke','ember','mote','windowMote','volume']) {
      const capacity=budgets[mode],geometry=new THREE.InstancedBufferGeometry();
@@ -251,6 +254,8 @@ export class ParticleRenderer {
      this.curveData.set([...['x','y','z'].map(axis=>m.velocityOverLifetime.enabled?IntegrateCurve(m.velocityOverLifetime[axis],t,choice):0),0],((slot*6+4+choice)*n+i)*4);
    }
    this.curves.needsUpdate=true;this.Sync(system);
+   if(m.renderer.mode==='bakedVolume')this.volumes.Pool(m.renderer.volumeAsset);
+   this.volumes.Configure(system);
    const stream=this.streams.get(system);if(stream){if(stream.material.uniforms.uSoftRange)stream.material.uniforms.uSoftRange.value=m.renderer.softRange;stream.material.uniforms.uParticleAspect.value=m.renderer.aspect;if(stream.material.uniforms.uParticleVolume)stream.material.uniforms.uParticleVolume.value.x=m.renderer.density;}
  }
  Sync(system) {
@@ -261,6 +266,7 @@ export class ParticleRenderer {
    const stream=this.streams.get(system);if(stream){stream.material.uniforms.uTime.value=system.time;stream.enabled=m.renderer.enabled;}
  }
  Spawn(particle,system) {
+   if(system.modules.renderer.mode==='bakedVolume')return this.volumes.Spawn(particle,system,this.slots.get(system));
    const stream=this.streams.get(system);
    if(stream){
      if(stream.config.renderer==='mesh'){
@@ -290,12 +296,14 @@ export class ParticleRenderer {
    return index;
  }
  Clear(system) {
+   this.volumes.Clear(system);
    const stream=this.streams.get(system);if(stream){stream.Clear();return;}
    for(const pool of Object.values(this.pools))for(let i=0;i<pool.capacity;i++)if(!system||pool.owners[i]===system) {
      pool.owners[i]=null;pool.arrays.iBirth[i*4+1]=0;pool.dirty=true;
    }
  }
  Retire(particle,system){
+   if(system.modules.renderer.mode==='bakedVolume'){this.volumes.Retire(particle,system);return;}
    const stream=this.streams.get(system),slot=particle.slot;if(!Number.isInteger(slot))return;
    if(stream){stream.deathTime[slot]=0;stream.arrays.iSpawnLife[slot*2+1]=0;stream.dirtyMin=Math.min(stream.dirtyMin,slot);stream.dirtyMax=Math.max(stream.dirtyMax,slot);return;}
    const pool=this.pools[system.modules.renderer.mode];
@@ -305,6 +313,7 @@ export class ParticleRenderer {
  Flush() {
    for(const system of this.slots.keys())this.Sync(system);
    for(const [system,stream]of this.streams)stream.Flush(system.time);
+   this.volumes.Flush();
    for(const pool of Object.values(this.pools)) {
      if(pool.dirty){for(const attribute of Object.values(pool.attributes))attribute.needsUpdate=true;pool.dirty=false;}
      let last=-1;
@@ -312,7 +321,7 @@ export class ParticleRenderer {
      pool.geometry.instanceCount=last+1;
    }
  }
- Inspect() {return {systems:this.slots.size,pools:Object.fromEntries(Object.entries(this.pools).map(([name,p])=>[name,{capacity:p.capacity,instances:p.geometry.instanceCount,dropped:p.dropped}])),
+ Inspect() {return {systems:this.slots.size,volumes:this.volumes.Inspect(),pools:Object.fromEntries(Object.entries(this.pools).map(([name,p])=>[name,{capacity:p.capacity,instances:p.geometry.instanceCount,dropped:p.dropped}])),
    channels:[...this.streams].map(([s,p])=>({name:p.mesh.name,capacity:p.capacity,instances:p.geometry.instanceCount,time:s.time,live:s.particles.length,emitted:s.emitted,dropped:s.dropped}))};}
- Dispose() {for(const stream of this.streams.values()){stream.mesh.removeFromParent();stream.Dispose();}this.streams.clear();for(const pool of Object.values(this.pools)){pool.mesh.removeFromParent();pool.geometry.dispose();pool.material.dispose();}this.curves.dispose();this.systems.dispose();this.slots.clear();this.releaseDensity();}
+ Dispose() {this.volumes.Dispose();for(const stream of this.streams.values()){stream.mesh.removeFromParent();stream.Dispose();}this.streams.clear();for(const pool of Object.values(this.pools)){pool.mesh.removeFromParent();pool.geometry.dispose();pool.material.dispose();}this.curves.dispose();this.systems.dispose();this.slots.clear();this.releaseDensity();}
 }

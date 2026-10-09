@@ -42,5 +42,7 @@ assert.deepEqual(colors.particles.map(p=>p.color),[[1,0,0,1],[0,0,1,1]],'start c
 const warm=new ParticleSystem({main:{duration:2,prewarm:true,startLifetime:1},emission:{rateOverTime:10}});warm.Play();assert.ok(warm.particles.length>=9&&warm.particles.length<=10);
 for(const p of b.particles){assert.ok(Math.hypot(p.origin[0],p.origin[2])<=2.00001);assert.ok(p.velocity[1]>0);}
 const ground=BurningParticleModules({fire:1,fireShape:'ground'}),column=BurningParticleModules({fire:1,fireShape:'column'});
-assert.ok(ground[1].modules.renderer.aspect<column[1].modules.renderer.aspect&&ground[1].modules.main.startSpeed.max<column[1].modules.main.startSpeed.max,'ground fire keeps its low flame profile');
+assert.equal(ground[0].modules.renderer.mode,'bakedVolume');
+assert.ok(ground[0].modules.renderer.bounds[1]<column[0].modules.renderer.bounds[1],'ground fire keeps a lower physical volume');
+assert.equal(ground[0].modules.main.startSpeed,0,'burning volume stays attached while its internal flow rises');
 console.log('ok modular particles: curves, validation, deterministic replay, pause/drain, burst cycles, distance emission, budgets, prewarm');

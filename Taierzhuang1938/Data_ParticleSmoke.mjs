@@ -1,39 +1,37 @@
-import {BATTLE_SMOKE_QUALITY,BATTLE_SMOKE_STYLES,BATTLE_SMOKE_ROOT} from './Data_Tuning_BattleSmoke.mjs';
+import {BATTLE_SMOKE_STYLES} from './Data_Tuning_BattleSmoke.mjs';
+import {PARTICLE_VOLUME_ASSETS} from './Data_ParticleVolumeAssets.mjs';
 
-const Mix=(a,b,t)=>a.map((n,i)=>n+(b[i]-n)*t);
-// Authored placements remain unchanged. The former wrapped shader animation is
-// now an emission/lifetime/velocity/size/color preset, owned by ParticleSystem.
+const Position=v=>[v.x,v.y,v.z];
+// One 3D fluid sequence owns each stationary plume. The actual wreck outlet,
+// authored height, prevailing drift and opacity remain scene inputs.
 export function BattleSmokeModules(source,quality='high'){
  const p=source.backdrop;if(!p)return [];
- const q=BATTLE_SMOKE_QUALITY[quality]||BATTLE_SMOKE_QUALITY.high,style=BATTLE_SMOKE_STYLES[p.frame]||BATTLE_SMOKE_STYLES[0];
- const cycle=Math.max(1,Math.round(p.life*60)/60),burst=p.frame===5,life=burst?cycle*.62:cycle;
- const width=p.crownWidth*.5,baseRatio=Math.min(1,p.baseWidth/p.crownWidth),exponent=p.plume?.[0]||1.3;
- const velocity=axis=>[0,.08,.25,.5,.75,1].map(t=>[t,(axis==='y'?p.height:axis==='x'?p.driftX:p.driftZ)/life*(axis==='y'?1:exponent*Math.pow(t,exponent-1))]);
- const rootTint=style.tint.map(n=>n*(1-(p.plume?.[2]||0))),endTint=p.plume?Mix(style.tint,[.3,.295,.285],.65):style.tint;
- const modules={
-   main:{duration:cycle,loop:true,prewarm:true,startLifetime:life,startSpeed:0,startSize:{mode:'twoConstants',min:width*.78,max:width*1.18},
-     startColor:[1,1,1,Math.min(1,p.opacity*q.opacity)],maxParticles:q.lobes+3,randomSeed:p.seed>>>0},
-   emission:{rateOverTime:burst?0:q.lobes/life,bursts:burst?[{time:cycle*(1-(p.seed%4096)/4096),count:q.lobes}]:[]},
-   shape:{type:'circle',radius:Math.max(.05,p.baseWidth*.24)},
-   velocityOverLifetime:{enabled:true,x:velocity('x'),y:velocity('y'),z:velocity('z')},
-   sizeOverLifetime:{enabled:true,curve:burst?[[0,baseRatio],[.2,.6],[.6,1],[1,1.12]]:[[0,baseRatio],[.18,.22],[.45,.65],[.75,1],[1,.9]]},
-   colorOverLifetime:{enabled:true,gradient:[[0,[...rootTint,0]],[.07,[...rootTint,1]],[.55,[...Mix(rootTint,endTint,.45),1]],[1,[...endTint,0]]]},
-   noise:{enabled:true,strength:[[0,Math.min(.1,width*.01)],[.5,width*.08],[1,width*.15]],frequency:Math.abs(style.motion[0])*5+.3,scrollSpeed:.55},
-   renderer:{mode:'volume',aspect:p.aspect,softRange:.8,density:style.opticalDepth*5,nearFade:p.nearFade||3},
- };
- const result=[{name:'Plume/'+p.seed,preset:'BattleSmoke',position:[source.position.x,source.position.y,source.position.z],modules,
-   phase:0}];
- if(p.ignition){
-   const origin=source.firePosition?[source.firePosition.x,source.firePosition.y,source.firePosition.z]:p.ignition;
-   const h=Math.max(BATTLE_SMOKE_ROOT.height,source.position.y-origin[1]+BATTLE_SMOKE_ROOT.height),r=BATTLE_SMOKE_ROOT;
-   result.push({name:'SootRoot/'+p.seed,preset:'SootRoot',position:[...origin],modules:{
-     main:{duration:r.life,prewarm:true,startLifetime:r.life,startSpeed:0,startSize:r.crownWidth*.5,maxParticles:r.lobes+2,randomSeed:(p.seed+7919)>>>0,startColor:[1,1,1,r.opacity]},
-     emission:{rateOverTime:r.lobes/r.life},shape:{type:'circle',radius:r.baseWidth*.25},
-     velocityOverLifetime:{enabled:true,x:(p.driftX||0)*.025/r.life,y:h/r.life,z:(p.driftZ||0)*.025/r.life},
-     sizeOverLifetime:{curve:[[0,r.baseWidth/r.crownWidth],[.4,.6],[1,1]]},
-     colorOverLifetime:{gradient:[[0,[.12,.065,.03,0]],[.08,[.08,.068,.05,1]],[.4,[.065,.061,.054,.85]],[1,[.16,.15,.13,0]]]},
-     noise:{enabled:true,strength:[[0,.02],[1,.25]],frequency:1.1,scrollSpeed:.7},renderer:{mode:'volume',aspect:1.35,softRange:.35,density:8,nearFade:1.5},
-   },phase:0});
- }
- return result;
+ const style=BATTLE_SMOKE_STYLES[p.frame]||BATTLE_SMOKE_STYLES[0],burst=p.frame===5;
+ const asset=burst?'DustImpact':[1,2,4].includes(p.frame)?'DenseSmoke':'ChimneySmoke',baseTint=PARTICLE_VOLUME_ASSETS[asset].albedo;
+ const origin=source.firePosition?Position(source.firePosition):p.ignition||Position(source.position);
+ const height=Math.max(.4,p.height+source.position.y-origin[1]);
+ const drift=Math.hypot(p.driftX||0,p.driftZ||0),yaw=Math.atan2(p.driftX||0,p.driftZ||1e-6);
+ const cycle=Math.max(1,p.life),life=burst?cycle*.62:120;
+ const bounds=burst?[p.crownWidth,height,p.crownWidth]:[p.crownWidth,height,Math.max(p.baseWidth*2,drift+p.crownWidth*.5)];
+ return [{name:'Plume/'+p.seed,preset:burst?'VolumeExplosion':'VolumePlume',position:origin,modules:{
+   main:{duration:burst?cycle:120,loop:true,prewarm:burst,startLifetime:life,startSpeed:0,startSize:1,maxParticles:1,simulationSpace:'local',randomSeed:p.seed>>>0,
+     startRotation:yaw,startColor:[...style.tint.map((n,i)=>n/baseTint[i]),1]},
+   emission:{rateOverTime:0,bursts:[{time:burst?cycle*(1-(p.seed%4096)/4096):0,count:1}]},shape:{enabled:false},
+   sizeOverLifetime:{enabled:false},colorOverLifetime:{enabled:false},
+   renderer:{mode:'bakedVolume',volumeAsset:asset,bounds,
+     // Optical depth is a column property. Compensate the world-space scale so
+     // nearby six-metre plumes do not become wisps while huge distant ones seal up.
+     density:Math.max(.2,Math.min(32,style.opticalDepth*p.opacity*(asset==='DenseSmoke'?40:160)/height)),volumeSpeed:burst?PARTICLE_VOLUME_ASSETS.DustImpact.duration/life:Math.max(.3,Math.min(2,14/cycle)),
+     emissionStrength:0,flameExtinction:0,volumeLoop:!burst,nearFade:0},
+ }}];
+}
+
+export function StaticSmokeModules(source,wind){
+ const height=source.groundHug?Math.max(.8,source.sizeEnd*.65):Math.max(2,Math.min(24,source.life*source.rise*.65));
+ const spread=Math.max(.6,source.sizeEnd),drift=Math.hypot(wind.x,wind.z)*source.life;
+ return {preset:'VolumePlume',name:'SourceSmoke/'+source.seed,position:Position(source.position),modules:{
+   main:{duration:120,loop:true,prewarm:false,startLifetime:120,startSpeed:0,startSize:1,maxParticles:1,simulationSpace:'local',randomSeed:source.seed>>>0,
+     startRotation:Math.atan2(wind.x,wind.z||1e-6),startColor:[...source.colorA.map((n,i)=>(n*.3+source.colorB[i]*.7)/[.32,.31,.29][i]),1]},
+   renderer:{volumeAsset:source.kind==='black'?'ChimneySmoke':'DenseSmoke',bounds:[spread,height,Math.max(spread,drift+spread*.5)],density:Math.max(.2,Math.min(32,source.opacity*32)),volumeSpeed:Math.max(.35,Math.min(2,5/source.life))},
+ }};
 }

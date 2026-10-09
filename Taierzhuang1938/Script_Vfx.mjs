@@ -40,7 +40,9 @@ import { VEHICLE_TRACER, HARD_SURFACE_SPARKS } from "./Data_Tuning_BulletVisual.
 import { BloodEffects } from "./Script_BloodEffects.mjs";
 import { BattleSmoke } from "./Script_BattleSmoke.mjs";
 import { ParticleEffects } from "./Script_ParticleEffects.mjs";
-import { BURNING_LIGHT, EXPLOSION_PARTICLE_ART, PARTICLE_VOLUME, PARTICLE_MESH } from "./Data_Tuning_Particles.mjs";
+import {StaticSmokeModules} from './Data_ParticleSmoke.mjs';
+import {PARTICLE_VOLUME_ASSETS} from './Data_ParticleVolumeAssets.mjs';
+import { BURNING_LIGHT, EXPLOSION_PARTICLE_ART, EXPLOSION_VOLUME_ART, PARTICLE_VOLUME, PARTICLE_MESH } from "./Data_Tuning_Particles.mjs";
 import { BOMB_BLAST_VFX } from "./Data_AerialBombs.mjs";
 import { BlastScale, LinearDragAt } from "./Script_BombBallistics.mjs";
 
@@ -1336,47 +1338,12 @@ export class VfxSystem {
       this.pools.fire.Spawn(s, this.time);
     }
 
-    // 2) 火球：按冲击量从相邻的两档 CC0 序列帧里随机挑一套，再裹一层程序化辉光。
-    //    一次爆炸内的所有片共用同一套动画，避免火/烟轮廓互相穿帮；下一次爆炸才重抽。
-    const spriteCount = Math.max(1,
-      Math.min(3, Math.round(profile.fire / 5) * Math.round(this.spawnScale)));
-    for (let i = 0; i < spriteCount; i += 1) {
-      const s = ResetSpawn();
-      const size = i === 0 ? spriteProfile.mainSize : spriteProfile.secondarySize;
-      const spread = i === 0 ? 0 : radius * 0.18;
-      s.x = position.x + this._Signed(spread);
-      s.y = position.y + this._Range(0, radius * 0.10) + i * radius * 0.06;
-      s.z = position.z + this._Signed(spread);
-      s.vx = this._Signed(1.1) * scale; s.vy = this._Range(1.4, 3.0) * scale; s.vz = this._Signed(1.1) * scale;
-      s.ay = 2.4; s.drag = 2.8;
-      s.life = this._Range(art.spriteLife*.85, art.spriteLife);
-      s.sizeStart = radius * size[0] * art.spriteScale;
-      s.sizeEnd = radius * size[1] * art.spriteScale;
-      s.opacity = (i === 0 ? 1 : .6)*art.opacity; s.fadeIn = 0.025;
-      s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.5);
-      s.frame = i === 0 ? 0 : Math.floor(this.random() * Math.min(8, spriteProfile.frames));
-      s.colorA = VFX_PALETTE.fireHot; s.colorB = VFX_PALETTE.fireCool;
-      s.seed = this.random();
-      spritePool.Spawn(s, this.time);
-    }
-
-    // 程序化辉光裹在序列帧外面：向上加速，黄 -> 暗红
-    const fireCount = Math.max(1, Math.round(profile.fire * 0.5 * this.spawnScale));
-    for (let i = 0; i < fireCount; i += 1) {
-      const s = ResetSpawn();
-      s.x = position.x + this._Signed(radius * 0.14);
-      s.y = position.y + this._Range(0, radius * 0.16);
-      s.z = position.z + this._Signed(radius * 0.14);
-      s.vx = this._Signed(2.4 * scale); s.vy = this._Range(1.2, 4.2) * scale; s.vz = this._Signed(2.4 * scale);
-      s.ay = 3.2; s.drag = 3.0;
-      s.life = this._Range(art.glowLife*.65, art.glowLife);
-      s.sizeStart = radius * 0.16 * art.glowScale; s.sizeEnd = radius * this._Range(0.3, 0.5) * art.glowScale;
-      s.opacity = art.opacity; s.fadeIn = 0.02;
-      s.angle = this._Range(0, 6.283); s.spin = this._Signed(2.5);
-      s.colorA = VFX_PALETTE.fireHot; s.colorB = VFX_PALETTE.fireCool;
-      s.seed = this.random();
-      this.pools.fire.Spawn(s, this.time);
-    }
+    // A single evolving 3D field carries blast expansion and the cooling cloud.
+    // Fragmentation keeps only the brief flash above; sustained emission belongs to fuel.
+    const volumeArt=EXPLOSION_VOLUME_ART[kind]||EXPLOSION_VOLUME_ART.grenade;
+    this.lastExplosionSprite.volume=this.particles.VolumeBurst([position.x,position.y,position.z],{
+      ...volumeArt,size:scale*volumeArt.scale,seed:Math.floor(this.random()*4294967295),
+    });
 
     // 3) 贴地尘环（两圈错开，前一圈快、后一圈慢）
     for (let i = 0; i < (profile.rings ?? 2); i += 1) {
@@ -1425,32 +1392,6 @@ export class VfxSystem {
       s.colorA = VFX_PALETTE.sparkHot; s.colorB = VFX_PALETTE.sparkCool;
       s.seed = this.random();
       this.pools.streak.Spawn(s, this.time);
-    }
-
-    // 6) 慢慢升起的柱状烟：这是爆炸留在画面里的"尾巴"，比火球活得久十倍
-    const smokeCount = Math.round(profile.smoke * this.spawnScale);
-    for (let i = 0; i < smokeCount; i += 1) {
-      const t = i / Math.max(1, smokeCount - 1);
-      const s = ResetSpawn();
-      s.x = position.x + this._Signed(radius * 0.2 * (1 - t * 0.5));
-      s.y = position.y + t * radius * 0.5 * profile.column;
-      s.z = position.z + this._Signed(radius * 0.2 * (1 - t * 0.5));
-      s.vx = this._Signed(1.1) + this.wind.x * 0.6;
-      s.vy = this._Range(1.0, 2.6) * profile.column;
-      s.vz = this._Signed(1.1) + this.wind.z * 0.6;
-      s.ax = this.wind.x * 0.4; s.ay = 0.55; s.az = this.wind.z * 0.4;
-      s.drag = 1.5;
-      s.life = this._Range(2.6, 5.0);
-      s.sizeStart = radius * 0.14;
-      s.sizeEnd = radius * this._Range(0.42, 0.78);
-      s.opacity = art.smokeOpacity; s.fadeIn = 0.025;
-      s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.7);
-      // 越靠近爆心越黑（燃烧产物），越往外越是砖粉黄土
-      const sooty = this.random() < profile.sooty;
-      s.colorA = sooty ? VFX_PALETTE.blackCore : VFX_PALETTE.dustDense;
-      s.colorB = sooty ? VFX_PALETTE.blackSmoke : VFX_PALETTE.dust;
-      s.seed = this.random();
-      this.pools.smoke.Spawn(s, this.time);
     }
 
     // Persistent blast discoloration belongs to TerrainDeformationView's soil
@@ -1529,9 +1470,9 @@ export class VfxSystem {
         s.life = flight;
         const size = this._Range(V.clodM[0], V.clodM[1]) * rel;
         s.sizeStart = size; s.sizeEnd = size * 1.5;
-        s.opacity = 0.92; s.fadeIn = 0.02;
+        s.opacity = 0.55; s.fadeIn = 0.02;
         s.stretch = 0.4;
-        s.colorA = VFX_PALETTE.blackCore; s.colorB = VFX_PALETTE.woodBurnt;
+        s.colorA = VFX_PALETTE.soil; s.colorB = VFX_PALETTE.dustDense;
         s.seed = this.random();
         pool.Spawn(s, now);
       }
@@ -1557,67 +1498,18 @@ export class VfxSystem {
       }
     }
 
-    // 3) 中心土柱：竖直冲上去，阻尼减速（终速 ay/drag 往下），扩散曲线放慢，免得在半空堆成一颗球。
-    const columnN = count(V.columnBase + S.cube);
-    for (let i = 0; i < columnN; i += 1) {
-      const u = i / Math.max(1, columnN - 1);
-      const s = ResetSpawn();
-      s.x = cx + this._Signed(S.craterR * 0.5); s.y = ground + 0.5 + u * 2; s.z = cz + this._Signed(S.craterR * 0.5);
-      s.vx = this._Signed(2.5) + fx * 2; s.vy = this._Range(S.columnV[0], S.columnV[1]); s.vz = this._Signed(2.5) + fz * 2;
-      s.ax = wind.x * 0.4; s.ay = -2.2; s.az = wind.z * 0.4;
-      s.drag = 0.85;
-      s.life = this._Range(5, 8) * (0.85 + 0.15 * rel);
-      s.sizeStart = (1.8 + u * 1.2) * rel; s.sizeEnd = this._Range(V.columnSizeM[0], V.columnSizeM[1]) * rel;
-      s.opacity = V.columnOpacity; s.fadeIn = 0.03;
-      s.stretch = 1.3;
-      s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.3);
-      s.colorA = i % 2 === 0 ? VFX_PALETTE.blackCore : VFX_PALETTE.dustDense; s.colorB = VFX_PALETTE.soil;
-      s.seed = this.random();
-      pool.Spawn(s, now + i * 0.02);
-    }
+    // Bulk soil expansion and the ground surge are the DustImpact volume
+    // emitted above. Keep ballistic streamers, without stacking giant puff balls.
+    const columnN=0,surgeN=0;
 
-    // 4) 底涌尘浪：贴地向外滚，阻尼 0.9 下滚出 v/0.9 ≈ surgeR。
-    const surgeN = count(V.surgeBase + S.cube);
-    const b0 = this.random() * Math.PI * 2;
-    for (let i = 0; i < surgeN; i += 1) {
-      const az = b0 + (i + this._Signed(0.3)) * (Math.PI * 2 / surgeN);
-      const c = Math.cos(az), sn = Math.sin(az), speed = S.surgeR * 0.9 * this._Range(0.8, 1.15);
-      const s = ResetSpawn();
-      s.x = cx + c * S.craterR; s.y = ground + 0.8 * rel; s.z = cz + sn * S.craterR;
-      s.vx = c * speed + wind.x; s.vy = 0.4; s.vz = sn * speed + wind.z;
-      s.ax = wind.x * 0.3; s.ay = 0.15; s.az = wind.z * 0.3;
-      s.drag = 0.9;
-      s.life = this._Range(5, 8);
-      s.sizeStart = 1.6 * rel; s.sizeEnd = S.surgeR * this._Range(0.4, 0.55);
-      s.opacity = 0.45; s.fadeIn = 0.05;
-      s.stretch = 1.2;
-      s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.25);
-      s.colorA = VFX_PALETTE.soilAir; s.colorB = VFX_PALETTE.dust;
-      s.seed = this.random();
-      pool.Spawn(s, now + this._Range(0.05, 0.15));
-    }
-
-    // 5) 久留烟团：土柱半高处成形，缓缓上浮（终速 ay/drag ≈ 0.7 m/s），随风飘。
-    const capN = count(V.capPerCube * S.cube);
-    const top = S.columnV[1] / 0.85;
-    for (let i = 0; i < capN; i += 1) {
-      const delay = this._Range(0.9, 1.8);
-      const s = ResetSpawn();
-      const spread = S.craterR * V.capSpreadCrater;
-      s.x = cx + this._Signed(spread) + wind.x * delay; s.y = ground + top * this._Range(V.capHeightU[0], V.capHeightU[1]);
-      s.z = cz + this._Signed(spread) + wind.z * delay;
-      s.vx = wind.x * 1.2 + this._Signed(0.8); s.vy = this._Range(0.2, 0.7); s.vz = wind.z * 1.2 + this._Signed(0.8);
-      s.ax = wind.x * 0.25; s.ay = 0.3; s.az = wind.z * 0.25;
-      s.drag = 0.5;
-      s.life = this._Range(V.capLifeS[0], V.capLifeS[1]);
-      s.sizeStart = 5 * rel; s.sizeEnd = this._Range(V.capSizeM[0], V.capSizeM[1]) * rel;
-      s.opacity = V.capOpacity; s.fadeIn = 0.12;
-      s.stretch = 0.8;
-      s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.12);
-      s.colorA = VFX_PALETTE.dustDense; s.colorB = VFX_PALETTE.dust;
-      s.seed = this.random();
-      pool.Spawn(s, now + delay);
-    }
+    // 5) The cooling explosion field replaces a stack of oversized spherical caps.
+    const capN=1,top=S.columnV[1]/.85,capLife=(V.capLifeS[0]+V.capLifeS[1])*.5,cap=V.capVolume;
+    this.particles.VolumeBurst([cx,ground+top*V.capHeightU[0],cz],{
+      asset:'GroundExplosion',size:rel,life:capLife,speed:PARTICLE_VOLUME_ASSETS.GroundExplosion.duration/capLife,
+      bounds:cap.boundsScale.map(n=>n*V.capSizeM[1]),density:cap.density/Math.max(.5,rel),
+      emission:0,flameExtinction:0,delay:cap.delay,fadeIn:cap.fadeIn,velocity:[wind.x*cap.wind,cap.rise,wind.z*cap.wind],
+      seed:Math.floor(this.random()*4294967295),
+    });
 
     this.bombBlasts = (this.bombBlasts || 0) + 1;
     this.lastBombBlast = { chargeKg: S.chargeKg, budget, radius: S.visualRadius, shockR: S.shockR, surgeR: S.surgeR,
@@ -1660,6 +1552,7 @@ export class VfxSystem {
         ? [VFX_PALETTE.screenSmoke, VFX_PALETTE.powderThin]   // 发烟筒：白灰，贴地翻滚
         : [VFX_PALETTE.dustDense, VFX_PALETTE.dust];
     const source = {
+      kind,
       seed: opts.backdrop?.seed ?? id * 7919,
       position: new THREE.Vector3(position.x, position.y, position.z),
       rate: (opts.rate ?? 10) * this.spawnScale,
@@ -1717,6 +1610,10 @@ export class VfxSystem {
       this.battleSmoke ||= new BattleSmoke({ root: this.root, shared: this.shared, quality: this.quality,particles:this.particles });
       this.battleSmoke.Set(id, source);
     }
+    else if(opts.volume&&source.rate>0){
+      const spec=StaticSmokeModules(source,source.wind||this.wind),id=this.particles.Create(spec).id;source.volumeSmokeHandles=[id];
+      if(!source.wind)this.particles.Get(id).volumeWindBase=spec.modules.main.startRotation;
+    }
     if (source.fire > 0) source.particleHandles = this.particles.Burning(source, this.spawnScale);
     return id;
   }
@@ -1771,6 +1668,7 @@ export class VfxSystem {
     if (source.firePosition) source.firePosition.add(new THREE.Vector3(dx, dy, dz));
     const fireOrigin = source.firePosition || source.position;
     for (const id of source.particleHandles || []) if(this.particles.systems.has(id))this.particles.Move(id, fireOrigin.toArray());
+    for (const id of source.volumeSmokeHandles || []) if(this.particles.systems.has(id))this.particles.Move(id,source.position.toArray());
     if (source.backdrop) this.battleSmoke?.Set(handle, source);
     if (source.lightProfile) {
       source.lightProfile.position.x += dx;
@@ -1789,6 +1687,7 @@ export class VfxSystem {
     this.smokeSources.delete(handle);
     if (source?.backdrop) this.battleSmoke?.Remove(handle);
     for (const id of source?.particleHandles || []) if(this.particles.systems.has(id))this.particles.Remove(id);
+    for (const id of source?.volumeSmokeHandles || []) if(this.particles.systems.has(id))this.particles.Remove(id);
   }
 
   /** 按统一目录创建可序列化的场景持续特效。 */
@@ -1796,7 +1695,7 @@ export class VfxSystem {
     const effect = SCENE_EFFECTS[id];
     if (!effect) return 0;
     const size = Math.max(0.15, Number.isFinite(scale) ? scale : 1);
-    const options = { ...effect.options };
+    const options = { ...effect.options, volume:true };
     for (const key of ["radius", "sizeStart", "sizeEnd"]) {
       if (options[key] != null) options[key] *= size;
     }
@@ -2072,7 +1971,7 @@ export class VfxSystem {
   _UpdateSmokeSources(dt) {
     if (dt <= 0 || this.smokeSources.size === 0) return;
     for (const source of this.smokeSources.values()) {
-      if (!source.backdrop) {
+      if (!source.backdrop&&!source.volumeSmokeHandles) {
         if (source.prewarmPending) {
           source.prewarmPending = false;
           const count = Math.ceil(source.rate * source.life * 1.25);

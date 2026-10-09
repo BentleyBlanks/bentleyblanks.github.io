@@ -3,13 +3,14 @@ import {ParticleSystem, PARTICLE_MODULES, MergeParticleModules, NormalizeParticl
 import {ParticleRenderer} from './Script_ParticleRenderer.mjs';
 import {PARTICLE_PRESETS, BurningParticleModules} from './Data_Tuning_Particles.mjs';
 import {ParticleChannel} from './Script_ParticleChannel.mjs';
+import {PARTICLE_VOLUME_ASSETS} from './Data_ParticleVolumeAssets.mjs';
 
 // The production interface is also the agent interface. All inputs/outputs are JSON.
 export class ParticleEffects {
  constructor(root,shared,quality='high') {
    this.parent=root;this.shared=shared;this.quality=quality;this.root=new THREE.Group();
    this.root.name='ModularParticleSystems';root.add(this.root);
-   this.renderer=new ParticleRenderer(this.root,shared,quality);this.systems=new Map();this.profiles=new Map();this.channels=new Map();this.presetOverrides=new Map();this.nextId=1;this.disposed=false;this.wind={x:.35,z:-.15};
+   this.renderer=new ParticleRenderer(this.root,shared,quality);this.systems=new Map();this.profiles=new Map();this.channels=new Map();this.presetOverrides=new Map();this.volumeBursts=new Map();this.nextId=1;this.disposed=false;this.wind={x:.35,z:-.15};
  }
  Presets() {return Object.keys(PARTICLE_PRESETS);}
  Profiles() {return [...this.profiles].map(([name,p])=>({name,capacity:p.capacity,renderer:p.config.renderer||'billboard',shape:p.config.renderer==='mesh'?p.config.geometryName:p.config.shape,orientation:p.config.orient}));}
@@ -19,8 +20,8 @@ export class ParticleEffects {
    this.channels.set(profile,channel);this.Get(id).channel=channel;return channel;
  }
  Modules() {return {modules:[...PARTICLE_MODULES],curves:['constant','twoConstants','curve','twoCurves'],
-   shapes:['point','circle','cone','sphere','box','beam'],renderers:['flame','smoke','ember','mote','windowMote','volume','material'],profiles:this.Profiles(),simulationSpace:['world','local'],
-   defaults:NormalizeParticleModules(),controls:['Create','Play','Pause','Stop','Clear','Emit','Simulate','Move','Configure','Inspect','GetParticles','Export','Import','Remove'],
+   shapes:['point','circle','cone','sphere','box','beam'],renderers:['flame','smoke','ember','mote','windowMote','volume','bakedVolume','material'],volumeAssets:Object.keys(PARTICLE_VOLUME_ASSETS),profiles:this.Profiles(),simulationSpace:['world','local'],
+   defaults:NormalizeParticleModules(),controls:['Create','Play','Pause','Stop','Clear','Emit','Simulate','Move','Configure','Inspect','GetParticles','Export','Import','Remove','VolumeBurst','Ready'],
    unsupported:['collisionModule','trails','subEmitters','textureSheetAnimationModule','arbitraryMeshAssets','localRotationAndScale']};}
  Get(id) {const entry=this.systems.get(id);if(!entry)throw new Error(`Particle system not found: ${id}`);return entry;}
  Create({preset='FireTongue',profile=null,modules={},position=[0,0,0],name='',play=true}={}) {
@@ -43,9 +44,9 @@ export class ParticleEffects {
    const origin=source.firePosition||source.position,position=[origin.x,origin.y,origin.z];
    return BurningParticleModules(source,spawnScale).map(({preset,modules})=>{
      const wind=source.wind||this.wind;
-     modules.velocityOverLifetime={enabled:true,x:[[0,0],[1,wind.x*.45]],z:[[0,0],[1,wind.z*.45]]};
+     if(preset==='FireEmber')modules.velocityOverLifetime={enabled:true,x:[[0,0],[1,wind.x*.45]],z:[[0,0],[1,wind.z*.45]]};
      const id=this.Create({preset,modules,position,name:`Burning/${source.seed}/${preset}`}).id;
-     this.Get(id).followsWind=!source.wind;return id;
+     this.Get(id).followsWind=preset==='FireEmber'&&!source.wind;return id;
    });
  }
  Motes(bounds,count){
@@ -58,6 +59,7 @@ export class ParticleEffects {
    if(wind.x===this.wind.x&&wind.z===this.wind.z)return;
    this.wind={x:wind.x,z:wind.z};
    for(const entry of this.systems.values())if(entry.followsWind)entry.system.Configure({velocityOverLifetime:{x:[[0,0],[1,wind.x*.45]],z:[[0,0],[1,wind.z*.45]]}});
+   for(const entry of this.systems.values())if(entry.volumeWindBase!==undefined)entry.system.Configure({renderer:{volumeYaw:Math.atan2(wind.x,wind.z||1e-6)-entry.volumeWindBase}});
    this.renderer.Flush();
  }
  Configure(id,patch) {const {system}=this.Get(id);const previous=system.modules;
@@ -68,7 +70,7 @@ export class ParticleEffects {
    if(!this.renderer.streams.has(system)&&modules.renderer.mode==='material')throw new Error('Material particles require a registered profile');
    // Existing particles retain their spawn properties; shape/renderer migration
    // needs a clear to prevent old particles interpreting the new coordinate space.
-   if(modules.renderer.mode!==previous.renderer.mode||modules.main.simulationSpace!==previous.main.simulationSpace)system.Clear();
+   if(modules.renderer.mode!==previous.renderer.mode||modules.renderer.volumeAsset!==previous.renderer.volumeAsset||modules.main.simulationSpace!==previous.main.simulationSpace)system.Clear();
    system.Configure(patch);this.renderer.Flush();return this.Inspect(id);
  }
  Play(id,options) {const e=this.Get(id);e.restartPending=false;e.system.Play(options);this.renderer.Flush();return this.Inspect(id);}
@@ -78,6 +80,25 @@ export class ParticleEffects {
  Emit(id,count=1) {this.Get(id).system.Emit(count);this.renderer.Flush();return this.Inspect(id);}
  Simulate(id,seconds,options) {this.Get(id).system.Simulate(seconds,options);this.renderer.Flush();return this.Inspect(id);}
  Move(id,position) {this.Get(id).system.Move(position);this.renderer.Flush();return this.Inspect(id);}
+ Ready() {return this.renderer.volumes.Ready();}
+ VolumeBurst(position,{asset='GroundExplosion',size=1,life=5,speed=1,density=3,emission=0,flameExtinction=0,color=[1,1,1,1],seed=1938,delay=0,fadeIn=0,velocity=[0,0,0],bounds=null}={}){
+   if(!Array.isArray(position)||position.length!==3||!position.every(Number.isFinite)||!Array.isArray(color)||color.length!==4||!color.every(Number.isFinite)
+      ||!Array.isArray(velocity)||velocity.length!==3||!velocity.every(Number.isFinite)||bounds&&(!Array.isArray(bounds)||bounds.length!==3||bounds.some(n=>!Number.isFinite(n)||n<=0))
+      ||[size,life,speed,density,emission,flameExtinction,seed,delay,fadeIn].some(n=>!Number.isFinite(n)||n<0)||size===0||life<=0||life>120)throw new Error('Invalid volume burst parameters');
+   let id=this.volumeBursts.get(asset);
+   if(id&&!this.systems.has(id))return null;
+   if(!id){id=this.Create({preset:'VolumeExplosion',name:'RuntimeVolume/'+asset,modules:{main:{duration:120,loop:true,startLifetime:1,startSize:1,startSpeed:1,maxParticles:96},emission:{enabled:false},
+     renderer:{volumeAsset:asset,bounds:[1,1,1],density:1,emissionStrength:1,flameExtinction:1,volumeSpeed:1,volumeLoop:false}}}).id;this.volumeBursts.set(asset,id);}
+   const entry=this.Get(id),system=entry.system;if(entry.restartPending){entry.restartPending=false;system.Play();}
+   if(system.state==='paused'||system.state==='stopped')return null;
+   const random=((seed>>>0)*.61803398875)%1;
+   const m=system.modules,phase=(system.time%m.main.duration)/m.main.duration,force=m.forceOverLifetime;
+   const slot=system.EmitRecord({birth:system.time+delay,life:life*EvaluateCurve(m.main.startLifetime,phase,random),seed:random,size:size*EvaluateCurve(m.main.startSize,phase,random),
+     rotation:random*Math.PI*2+EvaluateCurve(m.main.startRotation,phase,random),color:color.map((n,i)=>n*m.main.startColor[i]),origin:[...position],velocity:velocity.map(n=>n*EvaluateCurve(m.main.startSpeed,phase,random)),
+     force:[force.enabled?force.x:0,(force.enabled?force.y:0)-9.81*m.main.gravityModifier,force.enabled?force.z:0],drag:force.enabled?force.drag:0,
+     volume:{bounds:bounds||PARTICLE_VOLUME_ASSETS[asset].bounds||[7,9,8.16],speed,density,emission,flameExtinction,loop:false,fadeIn}});
+   this.renderer.Flush();return {id,slot};
+ }
  Inspect(id) {
    if(id){const e=this.Get(id);return {id,name:e.name,preset:e.preset,profile:e.profile,...e.system.Inspect()};}
    return {version:1,...this.renderer.Inspect(),entries:[...this.systems.keys()].map(key=>this.Inspect(key))};

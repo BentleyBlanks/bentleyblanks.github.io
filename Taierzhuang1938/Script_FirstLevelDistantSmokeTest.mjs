@@ -1,5 +1,6 @@
 // Placement safety and camera composition against the actual mission geometry.
 import assert from "node:assert/strict";
+import fs from 'node:fs';
 import { BuildDistantSmoke, FIRST_LEVEL_DISTANT_SMOKE as smoke } from "./Data_FirstLevelDistantSmoke.mjs";
 import { MISSION_LAYOUT as layout, MISSION_ROUTES as routes } from "./Data_FirstLevelMissionLayout.mjs";
 import { SPACE_KEYFRAMES } from "./Data_FirstLevelSpaceKeyframes.mjs";
@@ -83,6 +84,7 @@ console.log("ok distant smoke: stable districts, layered views and route clearan
 // Exercise real emitter methods without a GPU: established smoke must return
 // after warm-up/reset, while existing combat sources still use global wind.
 const particles = [];
+const fetchBefore=globalThis.fetch;globalThis.fetch=async url=>new URL(url).protocol==='file:'?new Response(fs.readFileSync(new URL(url))):fetchBefore(url);
 const pool = { Spawn(p, birth) { particles.push({ ...p, birth }); }, Clear() { particles.length = 0; } };
 const vfx = Object.assign(Object.create(VfxSystem.prototype), {
   nextSourceId: 1, smokeSources: new Map(), spawnScale: 0.45, time: 100,
@@ -119,14 +121,14 @@ vfx.RemoveSmokeSource(warmHandle);
 pool.Clear();
 for(const s of smoke) vfx.SmokeSource({x:s.x,y:Ground(s.x,s.z),z:s.z},s.options);
 vfx._UpdateSmokeSources(10);
-vfx.battleSmoke.Update();
+await vfx.battleSmoke.particles.Ready();vfx.battleSmoke.Update(1/60);
 assert.equal(particles.length,0,"dense backdrop uses no combat particle slots");
 assert.equal(vfx.battleSmoke.sources.size,smoke.length,"every emitter appears in the backdrop batch");
 const smokeLive=[...vfx.battleSmoke.handles.values()].flat().reduce((n,id)=>n+vfx.battleSmoke.particles.Inspect(id).particleCount,0);
 const smokeBudget=BattleSmokeParticleBudget(vfx.battleSmoke.sources.values(),'low');
 assert.ok(smokeLive>=smokeBudget*.7&&smokeLive<=smokeBudget,"low quality retains all districts with bounded, living cohorts");
 const ultra=BattleSmokeParticleBudget(vfx.battleSmoke.sources.values(),"ultra");
-assert.ok(ultra<=1638,"ultra remains one bounded instanced draw");
+assert.equal(ultra,63,"all qualities retain one complete field per source");
 for(const attribute of Object.values(vfx.battleSmoke.geometry.attributes)) {
   assert.ok(Array.from(attribute.array).every(Number.isFinite),"GPU attributes stay finite");
 }
@@ -135,7 +137,7 @@ assert.equal(vfx.battleSmoke.material.depthWrite,false);
 assert.equal(vfx.battleSmoke.mesh.userData.skipNormalDepth,true,"smoke is excluded from motion/depth prepass");
 vfx.ClearParticles();
 assert.equal(vfx.battleSmoke.mesh.visible,false,"warm-up cleanup immediately hides the batch");
-vfx.battleSmoke.Update();
+vfx.battleSmoke.Update(1/60);
 assert.equal(vfx.battleSmoke.mesh.visible,true,"persistent districts return on the next update");
 for (const handle of [...vfx.smokeSources.keys()]) vfx.RemoveSmokeSource(handle);
 vfx.ClearParticles();
@@ -144,4 +146,5 @@ vfx.battleSmoke.Update();
 assert.equal(vfx.battleSmoke.geometry.instanceCount,0,"scene teardown removes the entire batch");
 assert.equal(particles.length, 0, "teardown leaves no ghost smoke");
 vfx.battleSmoke.Dispose();
+globalThis.fetch=fetchBefore;
 console.log("ok smoke lifecycle: combat isolation, bounded density, cold start, clear, checkpoint clock and teardown");

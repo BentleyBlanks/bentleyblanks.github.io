@@ -78,19 +78,16 @@ export const BOMB_BLAST_VFX = Object.freeze({
   /** 抛射土柱的仰角范围（度）：倒锥形的抛射幕。偏向弹着方向的程度（斜着砸进去，下游抛得多）。 */
   elevationDeg: Object.freeze([50, 80]), downrangeBias: 0.3,
   /**
-   * 以下尺寸都是半宽（米），按 ∛W / 2.8 缩放（50 kg 级为 1）。两三百米外一米只有三四个像素：
-   * 小于一两米的土团读出来是一撒碎点，不是一条土柱。
+   * 以下尺寸都是半宽（米），按 ∛W / 2.8 缩放（50 kg 级为 1）。
+   * 细小抛射头和稀薄尾迹表现弹道；爆炸主体的体量由三维土尘承担。
    *   clodM        抛射土柱的头（一团暗土，沿弹道飞到落地），clodDrag 是它的线性阻尼（1/s，重土块几乎不减速）
    *   trailSizeM   尾巴那几团出生时 / 散开后的半宽，trailOpacity 起始不透明度
    */
-  clodM: Object.freeze([0.9, 1.6]), clodDrag: 0.18,
-  trailSizeM: Object.freeze([1.4, 6]), trailOpacity: 0.75,
-  /** 中心土柱团数 = columnBase + ∛W；散开后的半宽 [最小, 最大]、不透明度。 */
-  columnBase: 5, columnSizeM: Object.freeze([8, 12]), columnOpacity: 0.78,
-  /** 久留烟团（飘在落区上空二三十秒）：团数 = round(capPerCube·∛W)；寿命、散开后的半宽、不透明度。 */
-  capPerCube: 0.62, capLifeS: Object.freeze([22, 32]), capSizeM: Object.freeze([18, 26]), capOpacity: 0.36,
-  /** 久留烟团摊开的范围：水平 ±capSpreadCrater 个弹坑半径、高度在土柱顶的 capHeightU 之间 —— 一串弹的烟连成一片，不排成一串球。 */
-  capSpreadCrater: 3.5, capHeightU: Object.freeze([0.35, 0.95]),
-  /** 底涌尘浪团数 = surgeBase + ∛W。 */
-  surgeBase: 3,
+  clodM: Object.freeze([0.15, 0.35]), clodDrag: 0.18,
+  trailSizeM: Object.freeze([0.45, 2.1]), trailOpacity: 0.34,
+  /** 久留烟体：一份冷却爆炸体积，持续二三十秒；保留原尺度和延迟形成阶段。 */
+  capLifeS: Object.freeze([22, 32]), capSizeM: Object.freeze([18, 26]),
+  capVolume: Object.freeze({boundsScale:Object.freeze([1.5,1,1.8]),density:1.8,delay:1,fadeIn:1.2,wind:0.7,rise:0.25}),
+  /** 冷却烟体的起点相对抛射顶高。 */
+  capHeightU: Object.freeze([0.35, 0.95]),
 });

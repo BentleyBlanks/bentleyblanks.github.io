@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {PARTICLE_VOLUME_ASSETS} from './Data_ParticleVolumeAssets.mjs';
 import {El,Row,Select,Toggle,ButtonRow,Note} from './Script_EditorUi.mjs';
 import {EvaluateCurve,EvaluateGradient} from './Script_ParticleModules.mjs';
 
@@ -65,19 +66,19 @@ function ColorField(parent,label,color,onChange){
 export class ParticleInspector {
  constructor(parent,{Read,Patch}){this.parent=parent;this.Read=Read;this.Patch=Patch;}
  Show(){
-   this.parent.replaceChildren();const {modules:m,profile}=this.Read()||{};if(!m){Note(this.parent,'播放或添加一个粒子层后即可编辑。');return;}
+   this.parent.replaceChildren();const record=this.Read()||{},{modules:m,profile}=record,eventLayer=!!profile||record.name?.startsWith('RuntimeVolume/');if(!m){Note(this.parent,'播放或添加一个粒子层后即可编辑。');return;}
    const Patch=(module,key,value)=>this.Patch({[module]:{[key]:value}});
    const Group=(key,title)=>{const section=El('details');section.dataset.particleModule=key;section.open=key==='main';const summary=El('summary','',title);summary.style.cssText='cursor:pointer;padding:10px 0;font-weight:600;color:#e5c78f';section.appendChild(summary);const body=El('div');section.appendChild(body);this.parent.appendChild(section);if('enabled'in m[key])Toggle(body,'启用',m[key].enabled,on=>Patch(key,'enabled',on));return body;};
    const Curve=(parent,module,key,label,options={})=>CurveField(parent,label,m[module][key],value=>Patch(module,key,value),{...options,path:module+'.'+key});
    const Number=(parent,module,key,label,options={})=>NumberField(parent,label,m[module][key],value=>Patch(module,key,value),{...options,path:module+'.'+key});
    const main=Group('main','主模块 Main');
-   if(profile)Note(main,'事件发射层：寿命、速度与尺寸为倍率；形状与发射位置由该效果决定。');
+   if(eventLayer)Note(main,'事件发射层：寿命、速度与尺寸为倍率；形状与发射位置由该效果决定。');
    Number(main,'main','duration','周期 / 秒',{min:.05,max:120,step:.1});
    Toggle(main,'循环',m.main.loop,on=>Patch('main','loop',on));Toggle(main,'预热',m.main.prewarm,on=>Patch('main','prewarm',on));
    Number(main,'main','startDelay','延迟 / 秒',{min:0,max:120,step:.05});
-   Curve(main,'main','startLifetime',profile?'寿命倍率':'寿命 / 秒',{min:.02,max:120});
-   Curve(main,'main','startSpeed',profile?'速度倍率':'初速 / 米每秒',{min:0,max:100});
-   Curve(main,'main','startSize',profile?'尺寸倍率':'初始尺寸 / 米',{min:.001,max:50});
+   Curve(main,'main','startLifetime',eventLayer?'寿命倍率':'寿命 / 秒',{min:.02,max:120});
+   Curve(main,'main','startSpeed',eventLayer?'速度倍率':'初速 / 米每秒',{min:0,max:100});
+   Curve(main,'main','startSize',eventLayer||m.renderer.mode==='bakedVolume'?'尺寸倍率':'初始尺寸 / 米',{min:.001,max:50});
    Curve(main,'main','startRotation','初始旋转 / 弧度',{min:-6.28,max:6.28});
    ColorField(main,'起始颜色',m.main.startColor,value=>Patch('main','startColor',value));
    Number(main,'main','gravityModifier','重力倍率',{min:-10,max:10,step:.1});Number(main,'main','maxParticles','最大粒子数',{min:1,max:this.Read().capacity||4096,step:1});
@@ -112,10 +113,16 @@ export class ParticleInspector {
    const noise=Group('noise','扰动 Noise');Curve(noise,'noise','strength','强度 / 米',{min:0,max:2});Number(noise,'noise','frequency','频率',{min:.01,max:20});Number(noise,'noise','scrollSpeed','变化速度',{min:0,max:20});
    const renderer=Group('renderer','渲染 Renderer');
    if(m.renderer.mode==='material')Note(renderer,'材质配置：'+profile);
-   else Select(renderer,'类型',['flame','smoke','ember','mote','windowMote','volume'],m.renderer.mode,value=>Patch('renderer','mode',value));
+   else Select(renderer,'类型',['flame','smoke','ember','mote','windowMote','volume','bakedVolume'],m.renderer.mode,value=>{Patch('renderer','mode',value);this.Show();});
    Number(renderer,'renderer','aspect','纵横比',{min:.1,max:10});Number(renderer,'renderer','softRange','软交界 / 米',{min:0,max:5});
-   if(m.renderer.mode==='volume'||['smoke','sourceSmoke','bombSmoke'].includes(profile))Number(renderer,'renderer','density','体积密度',{min:.01,max:32});
+   if(['volume','bakedVolume'].includes(m.renderer.mode)||['smoke','sourceSmoke','bombSmoke'].includes(profile))Number(renderer,'renderer','density','体积密度',{min:.01,max:32});
    if(m.renderer.mode==='volume')Number(renderer,'renderer','nearFade','近处渐隐 / 米',{min:0,max:30});
-   if(m.renderer.mode==='mote')for(let i=0;i<3;i++)NumberField(renderer,'范围 '+['X','Y','Z'][i],m.renderer.bounds[i],value=>{const bounds=[...this.Read().modules.renderer.bounds];bounds[i]=value;Patch('renderer','bounds',bounds)},{min:.01,max:1000});
+   if(['mote','bakedVolume'].includes(m.renderer.mode))for(let i=0;i<3;i++)NumberField(renderer,'范围 '+['X','Y','Z'][i],m.renderer.bounds[i],value=>{const bounds=[...this.Read().modules.renderer.bounds];bounds[i]=value;Patch('renderer','bounds',bounds)},{min:.01,max:1000});
+   if(m.renderer.mode==='bakedVolume'){
+     Select(renderer,'三维模拟',Object.keys(PARTICLE_VOLUME_ASSETS),m.renderer.volumeAsset,value=>Patch('renderer','volumeAsset',value));
+     Number(renderer,'renderer','volumeSpeed','模拟播放速度',{min:0,max:8});Toggle(renderer,'循环体积序列',m.renderer.volumeLoop,value=>Patch('renderer','volumeLoop',value));
+     Number(renderer,'renderer','volumeYaw','体积朝向 / 弧度',{min:-6.28,max:6.28});
+     Number(renderer,'renderer','emissionStrength','火焰发光',{min:0,max:100});Number(renderer,'renderer','flameExtinction','热区消光',{min:0,max:100});
+   }
  }
 }

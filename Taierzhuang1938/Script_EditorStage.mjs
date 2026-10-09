@@ -224,7 +224,7 @@ export class Studio {
   ApplyCamera() {
     const o = this.orbit;
     o.pitch = Math.max(-1.35, Math.min(1.35, o.pitch));
-    o.dist = Math.max(0.35, Math.min(40, o.dist));
+    o.dist = Math.max(0.35, Math.min(this.maxDistance??40, o.dist));
     const cp = Math.cos(o.pitch);
     this.camera.position.set(
       o.target.x + Math.sin(o.yaw) * cp * o.dist,

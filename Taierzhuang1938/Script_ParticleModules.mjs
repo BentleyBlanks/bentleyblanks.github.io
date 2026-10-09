@@ -1,4 +1,5 @@
 // Serializable Unity-style modules. Pure rules: no renderer or browser dependency.
+import {PARTICLE_VOLUME_ASSETS} from './Data_ParticleVolumeAssets.mjs';
 export const PARTICLE_STEP = 1 / 60;
 export const PARTICLE_MODULES = Object.freeze(['main', 'emission', 'shape', 'velocityOverLifetime',
   'forceOverLifetime', 'sizeOverLifetime', 'colorOverLifetime', 'rotationOverLifetime', 'noise', 'renderer']);
@@ -47,7 +48,8 @@ const DEFAULTS = {
   colorOverLifetime: {enabled:true, gradient:[[0,[1,1,1,0]],[.12,[1,1,1,1]],[.65,[1,1,1,.8]],[1,[1,1,1,0]]]},
   rotationOverLifetime: {enabled:false, angularVelocity:0},
   noise: {enabled:false, strength:0, frequency:1.5, scrollSpeed:1},
-  renderer: {enabled:true,mode:'flame', aspect:1.8, softRange:.35,bounds:[30,12,30],density:2.8,nearFade:.8},
+  renderer: {enabled:true,mode:'flame', aspect:1.8, softRange:.35,bounds:[30,12,30],density:2.8,nearFade:.8,
+    volumeAsset:'Campfire',volumeSpeed:1,volumeLoop:true,volumeYaw:0,emissionStrength:14,flameExtinction:12},
 };
 function NumberIn(value, path, low, high) {
   if (!Number.isFinite(value) || value < low || value > high) throw new RangeError(`${path}: expected finite number in [${low}, ${high}]`);
@@ -118,7 +120,11 @@ export function NormalizeParticleModules(input={}) {
     if(!Array.isArray(color)||color.length!==4)throw new Error('gradient: linear RGBA required');
     color.forEach((n,i)=>NumberIn(n,'gradient.color',0,i===3?1:32));
   }
-  if(!['flame','smoke','ember','mote','windowMote','volume','material'].includes(modules.renderer.mode))throw new Error('renderer.mode: unsupported renderer');
+  if(!['flame','smoke','ember','mote','windowMote','volume','bakedVolume','material'].includes(modules.renderer.mode))throw new Error('renderer.mode: unsupported renderer');
+  if(!Object.hasOwn(PARTICLE_VOLUME_ASSETS,modules.renderer.volumeAsset))throw new Error('renderer.volumeAsset: unsupported volume');
+  if(typeof modules.renderer.volumeLoop!=='boolean')throw new Error('renderer.volumeLoop: boolean required');
+  NumberIn(modules.renderer.volumeYaw,'renderer.volumeYaw',-100,100);
+  for(const field of ['volumeSpeed','emissionStrength','flameExtinction'])NumberIn(modules.renderer[field],'renderer.'+field,0,field==='volumeSpeed'?8:100);
   NumberIn(modules.renderer.density,'renderer.density',.01,32);NumberIn(modules.renderer.nearFade,'renderer.nearFade',0,30);
   if(!Array.isArray(modules.renderer.bounds)||modules.renderer.bounds.length!==3)throw new Error('renderer.bounds: three box dimensions required');
   modules.renderer.bounds.forEach(value=>NumberIn(value,'renderer.bounds',.01,1000));

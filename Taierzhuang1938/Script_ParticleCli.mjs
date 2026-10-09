@@ -12,6 +12,7 @@
 // --editor-check opens/closes the real VFX studio and verifies game state restoration.
 // --effects=FireMedium,SmokeBlack,ExplosionShell --times=0.05,0.35,1.2,3 captures production effects over time.
 // --baseline=<git-ref> serves the changed source files from that revision for a reproducible comparison.
+// --profile measures the same frozen view with ambient particles on/off via the game's GPU profiler.
 // Outputs: Frame.png, Report.json, Presets.json. Sources/controls are available on Tengxian.Particles.
 import path from 'node:path';
 import fs from 'node:fs/promises';
@@ -42,7 +43,7 @@ try {
    catch(error){console.log('Waiting for game:',await page.locator('body').innerText().catch(()=>'(renderer busy)'));if(attempt===9)throw error;}
  }
  const actions=Arg('actions','')?JSON.parse(await fs.readFile(path.resolve(Arg('actions','')),'utf8')):[];
- const report=await page.evaluate(({source,distance,actions,command})=>{
+ const report=await page.evaluate(async({source,distance,actions,command})=>{
    const g=window.Tengxian;g.state.menu=false;g.player.debug.invincible=true;g.StepFrames(60,1/60,false);
    const sources=[...g.vfx.smokeSources].filter(([id,s])=>s.backdrop&&s.fire>0).map(([id,s])=>({id,position:(s.firePosition||s.position).toArray(),particles:s.particleHandles}));
    if(source!==null) {
@@ -51,14 +52,14 @@ try {
      p.set(x,g.battlefield.GroundHeight(x,z)+.1,z);g.player.body?.Teleport(p.x,p.y,p.z);
      g.player.yaw=Math.atan2(x-tx,z-tz);g.player.pitch=-.08;g.StepFrames(20,1/60,true);
    }
-   const allowed=['Create','Configure','Play','Pause','Stop','Clear','Emit','Simulate','Move','Inspect','GetParticles','Export','Import','Remove'];
+   const allowed=['Create','Configure','Play','Pause','Stop','Clear','Emit','Simulate','Move','Inspect','GetParticles','Export','Import','Remove','VolumeBurst'];
    const refs={},results=[];
    for(const action of actions) {
      if(!allowed.includes(action.method))throw new Error('Unknown particle action '+action.method);
      const args=(action.args||[]).map(value=>typeof value==='string'&&value.startsWith('$')?refs[value.slice(1)]:value);
      const result=g.Particles[action.method](...args);if(action.as)refs[action.as]=result.id;results.push({method:action.method,result});
    }
-   g.StepFrames(2,0,true);
+   await g.Particles.Ready?.();g.StepFrames(2,0,true);
    return {sources,results,modules:g.Particles.Modules(),presets:g.Particles.Presets(),particles:g.Particles.Inspect(),
      renderer:g.renderer.info.render,quality:g.vfx.quality,command};
  },{source:Arg('source','')===''?null:Number(Arg('source','')),distance:Number(Arg('distance',10)),actions,command:Arg('command','inspect')});
@@ -71,7 +72,25 @@ try {
      g.player.position.set(x,g.battlefield.GroundHeight(x,z)+.1,z);g.player.body?.Teleport(x,g.player.position.y,z);
      g.player.yaw=Math.atan2(x-tx,z-tz);g.player.pitch=-.08;g.StepFrames(4,1/60,true);
    },{target:report.sources[Number(Arg('source',0))].position,distance});
-   const file=`View${distance}m.png`;await page.screenshot({path:path.join(out,file)});views.push({distance,file});
+   const file=`View${distance}m.png`;await page.screenshot({path:path.join(out,file)});const view={distance,file};
+   if(argv.includes('--profile'))view.profile=await page.evaluate(async frames=>{
+     const g=Tengxian,api=g.Particles,entries=[...api.systems.values()].filter(e=>['bakedVolume','volume','flame','ember'].includes(e.system.modules.renderer.mode));
+     const states=entries.map(e=>[e,e.system.modules.renderer.enabled]),samples=[],wasRunning=g.state.running;
+     g.state.running=false;
+     try{
+       for(const enabled of [true,false]){
+         for(const [entry,original]of states)entry.system.Configure({renderer:{enabled:enabled&&original}});api.renderer.Flush();
+         for(let i=0;i<6;i++){g.StepFrames(1,0,true);await new Promise(resolve=>setTimeout(resolve,0));}
+         g.profiler.Enable();
+         for(let i=0;i<frames+16;i++){g.StepFrames(1,0,true);await new Promise(resolve=>setTimeout(resolve,0));}
+         const valid=g.profiler.history.filter(row=>row.gpuTotal!=null&&row.newPrograms===0).slice(4,-4);
+         const Median=values=>{const sorted=values.filter(Number.isFinite).sort((a,b)=>a-b);return sorted.length?sorted[Math.floor(sorted.length/2)]:null;};
+         samples.push({enabled,summary:g.profiler.Summary(3600),median:{samples:valid.length,gpuMs:Median(valid.map(r=>r.gpuTotal)),mainGpuMs:Median(valid.map(r=>r.gpu?.main)),cpuMs:Median(valid.map(r=>r.cpuMs))},volumes:api.Inspect().volumes??[]});g.profiler.Disable();
+       }
+     }finally{g.profiler.Disable();g.state.running=wasRunning;for(const [entry,enabled]of states)entry.system.Configure({renderer:{enabled}});api.renderer.Flush();}
+     return {frames,mode:'frozen render; not live FPS',samples};
+   },Math.max(16,Number(Arg('frames',45))));
+   views.push(view);
  }
  report.views=views;
  if(Arg('effects','')) {
@@ -86,7 +105,7 @@ try {
        editor.Stop();editor.loop=false;
        g.vfx.ClearParticles();g.vfx.particles.Resume();
        const {Mulberry32}=await import('./Script_Noise.mjs');g.vfx.random=Mulberry32(1938);g.vfx.bloodEffects.random=g.vfx.random;
-       editor.effectId=effect;editor.Play();editor.FrameEffect();
+       editor.effectId=effect;editor.Play();await g.Particles.Ready?.();editor.FrameEffect();
        const frames=Math.round(seconds*60);g.StepFrames(frames,1/60,false);g.post.NotifyCameraCut();g.StepFrames(8,0,true);
        return {effect,seconds,particles:g.Particles.Inspect()};
      },{effect,seconds});

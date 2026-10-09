@@ -11,6 +11,9 @@ import {Mulberry32} from './Script_Noise.mjs';
 import {FIRST_LEVEL_DISTANT_SMOKE} from './Data_FirstLevelDistantSmoke.mjs';
 
 const INSTANT_EFFECTS = [
+  ...[['VolumeFire','三维体积 · 营火',true],['VolumePlume','三维体积 · 烟流',true],['VolumeDensePlume','三维体积 · 浓烟',true],['VolumeDustImpact','三维体积 · 土尘冲击',false],['VolumeExplosion','三维体积 · 燃油爆炸',false]].map(([id,name,continuous])=>({
+    id,name,note:'CC0 流体模拟 · 多视角体积',continuous,particleHandle:true,run:(v,s)=>v.particles.Create({preset:id,modules:{main:{startSize:s}},name:'VolumePreview/'+id}),
+  })),
   ...[['SootColumn',0,'浓黑烟柱'],['BillowColumn',1,'翻卷烟团'],['DustBank',2,'贴地尘幕'],['WindShear',3,'风切烟带'],['GroundScreen',4,'白色烟幕'],['DustPulse',5,'间歇土烟']].map(([id,frame,name])=>({
     id:'Plume'+id,name:'烟场 · '+name,note:'真实场景同源体积烟',continuous:true,sourceHandle:true,run:(v,s)=>{
       const source=FIRST_LEVEL_DISTANT_SMOKE.find(p=>p.tier!=='far'&&p.options.backdrop.frame===frame),backdrop={...source.options.backdrop,seed:1938};
@@ -25,6 +28,9 @@ const INSTANT_EFFECTS = [
   { id: "ExplosionGrenade", name: "爆炸 · 手榴弹", note: "半径 4 m", run: (v, s) => v.Explosion({ x: 0, y: 0.12, z: 0 }, { radius: 4 * s, kind: "grenade", groundY: 0 }) },
   { id: "ExplosionMortar", name: "爆炸 · 掷弹筒", note: "半径 7 m", run: (v, s) => v.Explosion({ x: 0, y: 0.16, z: 0 }, { radius: 7 * s, kind: "launcher", groundY: 0 }) },
   { id: "ExplosionShell", name: "爆炸 · 炮弹", note: "半径 11 m", run: (v, s) => v.Explosion({ x: 0, y: 0.18, z: 0 }, { radius: 11 * s, kind: "shell", groundY: 0 }) },
+  { id: "ExplosionTank", name: "爆炸 · 战车燃油", note: "燃油热相与烟团", run: (v,s)=>v.Explosion({x:0,y:.18,z:0},{radius:9*s,kind:'tank',groundY:0}) },
+  {id:'BombSmall',name:'爆炸 · 50 kg 级航空炸弹',note:'22 kg 装药 · 土柱与冷却烟体',run:(v,s)=>v.BombBlast({x:0,y:0,z:0},{chargeKg:22*s*s*s,groundY:0})},
+  {id:'BombHeavy',name:'爆炸 · 250 kg 级航空炸弹',note:'100 kg 装药 · 抛射幕与烟体',run:(v,s)=>v.BombBlast({x:0,y:0,z:0},{chargeKg:100*s*s*s,groundY:0})},
   { id: "MuzzleRifle", name: "枪口焰 · 步枪", note: "两帧焰 + 枪烟", run: (v, s) => v.MuzzleFlash(new THREE.Vector3(0, 1.05, 0), new THREE.Vector3(0, 0, -1), { scale: s, kind: "rifle" }) },
   { id: "MuzzleMg", name: "枪口焰 · 机枪", note: "连续武器单次反馈", run: (v, s) => v.MuzzleFlash(new THREE.Vector3(0, 1.05, 0), new THREE.Vector3(0, 0, -1), { scale: s, kind: "lmg" }) },
   { id: "ImpactBrick", name: "命中 · 砖墙", note: "砖粉、碎块与弹孔", run: (v) => v.Impact(new THREE.Vector3(0, 0.85, 0), new THREE.Vector3(0, 0, -1), "brick") },
@@ -69,7 +75,7 @@ export class VfxEditor {
     this.wind = new THREE.Vector3();
     this.previewTime=0;this.paused=false;this.speed=1;this.seed=1938;
     this.layerPatches=new Map();this.layerRecords=new Map();this.customLayers=[];this.customIds=[];
-    this.selectedLayer=null;this.customIndex=0;this.uiAge=0;this.seekFrame=0;this.banks=new Map();
+    this.selectedLayer=null;this.customIndex=0;this.uiAge=0;this.seekFrame=0;this.banks=new Map();this.sampleParticleIds=[];
   }
 
   Enter(root) {
@@ -109,6 +115,7 @@ export class VfxEditor {
     if(vfx.dust)vfx.dust.mesh.visible=false;
     vfx.dust=null;
     this.studio.Open(this.host.hideInStudio);
+    this.savedStudioMaxDistance=this.studio.maxDistance;
     // The studio owns the visible scene here. Keep its authored particle/mesh
     // materials without changing the game's whitebox config or saved preferences.
     const whitebox=this.host.post?.whiteboxScene;
@@ -166,6 +173,7 @@ export class VfxEditor {
     this.panel = null;
     if(this.savedWhiteboxConfig){const whitebox=this.host.post.whiteboxScene;whitebox.config=this.savedWhiteboxConfig;whitebox.Invalidate();this.savedWhiteboxConfig=null;}
     this.studio.Close();
+    this.studio.maxDistance=this.savedStudioMaxDistance;
     if(this.savedLighting)this.host.lights.EndEffectPreview(this.savedLighting,this.savedVfxTime);
     vfx.root.visible = this.savedVfxVisible;
     this.savedSources = null;
@@ -265,6 +273,7 @@ export class VfxEditor {
   SelectEffect(id){
     if(!ALL_EFFECTS.some(effect=>effect.id===id))throw new Error('Unknown particle effect '+id);
     this.banks.set(this.effectId,{patches:this.layerPatches,custom:this.customLayers});this.effectId=id;
+    this.effectList?.Select(id);
     const bank=this.banks.get(id);this.layerPatches=bank?.patches||new Map();this.customLayers=bank?.custom||[];this.selectedLayer=null;
     if(id==='Empty')this.loop=false;this.Play();this.FrameEffect();
   }
@@ -295,6 +304,7 @@ export class VfxEditor {
     this.CaptureLayers();const vfx=this.host.vfx;
     if(this.handle)vfx.RemoveSceneEffect(this.handle);this.handle=0;
     if(vfx.dust){vfx.dust.Dispose();vfx.dust=null;}
+    for(const id of this.sampleParticleIds)if(vfx.particles.systems.has(id))vfx.particles.Remove(id);this.sampleParticleIds=[];
     for(const id of this.customIds)if(vfx.particles.systems.has(id))vfx.particles.Remove(id);this.customIds=[];
     vfx.ClearParticles();vfx.bloodEffects.Clear();if(this.savedLighting)this.host.lights.ResetEffectPreview();
     this.playing=false;this.paused=false;this.loopTimer=0;this.UpdateFacts();
@@ -306,10 +316,15 @@ export class VfxEditor {
     api.presetOverrides.clear();for(const [key,patch]of this.layerPatches)if(key.startsWith('preset:'))api.presetOverrides.set(key.slice(7),patch);
     api.Restart();for(const channel of api.channels.values())if(api.systems.has(channel.particleId))channel.system.Play({restart:true});api.renderer.Flush();this.ApplyWind();this.previewTime=0;this.loopTimer=0;this.paused=false;
     if(SCENE_EFFECTS[this.effectId])this.handle=vfx.SceneEffect({x:0,y:.04,z:0},this.effectId,{scale:this.scale});
-    else {const effect=INSTANT_EFFECTS.find(effect=>effect.id===this.effectId),result=effect?.run(vfx,this.scale);if(effect?.sourceHandle)this.handle=result;}
+    else {const effect=INSTANT_EFFECTS.find(effect=>effect.id===this.effectId),result=effect?.run(vfx,this.scale);if(effect?.sourceHandle)this.handle=result;if(effect?.particleHandle)this.sampleParticleIds.push(result.id);}
     for(const layer of this.customLayers){const definition=JSON.parse(JSON.stringify(layer.definition)),patch=this.layerPatches.get(layer.key);
       if(patch)definition.modules=MergeParticleModules(definition.modules,patch);const created=api.Import(definition);api.Get(created.id).editorKey=layer.key;this.customIds.push(created.id);}
     this.playing=true;this.Advance(0);this.host.post?.NotifyCameraCut();this.RefreshLayers(true);this.UpdateFacts();
+    if(api.Inspect().volumes.some(volume=>!volume.ready)){
+      const waiting='正在载入三维流体数据…';this.Status(waiting);
+      api.Ready().then(()=>{if(this.panel&&this.host.vfx.particles===api&&this.message.textContent===waiting){this.Status('三维体积就绪');this.host.post?.NotifyCameraCut();}})
+        .catch(error=>{if(this.panel&&this.host.vfx.particles===api)this.Status('三维体积载入失败：'+error.message,true);});
+    }
   }
   Advance(dt){
     let remaining=Math.max(0,dt);do{const step=Math.min(1/60,remaining);this.previewTime+=step;
@@ -325,7 +340,8 @@ export class VfxEditor {
   QueueSeek(seconds){this.seekTarget=seconds;if(this.seekFrame)return;this.seekFrame=requestAnimationFrame(()=>{this.seekFrame=0;if(this.panel)this.Try(()=>this.Seek(this.seekTarget))});}
   FrameEffect(){
     const id=this.effectId,small=/^(Muzzle|Impact|Blood|ShellCasings)/.test(id);
-    const height=/Explosion/.test(id)?(id==='ExplosionShell'?9:6)*this.scale:/Smoke|Plume/.test(id)?7:small?1.8:3.4*this.scale;
+    const height=/^Bomb/.test(id)?(id==='BombHeavy'?42:28)*this.scale:/Explosion/.test(id)?(id==='ExplosionShell'?9:6)*this.scale:/Smoke|Plume/.test(id)?7:small?1.8:3.4*this.scale;
+    this.studio.maxDistance=Math.max(40,height*2.5);
     this.studio.Frame(height,small?2.5:Math.max(4,height*2.2));this.host.post?.NotifyCameraCut();
   }
   AddLayer(preset){return this.Try(()=>{const api=this.host.vfx.particles,created=api.Create({preset,name:'自建 '+preset});const key='custom:'+(++this.customIndex);

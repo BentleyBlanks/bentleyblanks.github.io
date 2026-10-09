@@ -14,8 +14,26 @@ export const EXPLOSION_PARTICLE_ART = Object.freeze({
   tank:{spriteScale:.65,spriteLife:.85,glowLife:.42,glowScale:.56,opacity:.8,lightSeconds:.55,smokeOpacity:.7},
   bomb:{spriteScale:.38,spriteLife:.42,glowLife:.20,glowScale:.38,opacity:.72,lightSeconds:.30,smokeOpacity:.7},
 });
+export const EXPLOSION_VOLUME_ART=Object.freeze({
+ grenade:{asset:'DustImpact',scale:.55,life:3.8,speed:1.8,density:9,emission:0,flameExtinction:0},
+ launcher:{asset:'DustImpact',scale:.6,life:4.2,speed:1.65,density:10,emission:0,flameExtinction:0},
+ shell:{asset:'DustImpact',scale:.65,life:4.7,speed:1.5,density:11,emission:0,flameExtinction:0},
+ tank:{scale:.72,life:7.5,speed:.92,density:5.5,emission:35,flameExtinction:6},
+ bomb:{asset:'DustImpact',scale:.7,life:5,speed:1.4,density:12,emission:0,flameExtinction:0},
+});
 const Range=(min,max)=>({mode:'twoConstants',min,max});
+const PhysicalFire={main:{duration:120,startLifetime:120,startSpeed:0,startSize:1,maxParticles:1,simulationSpace:'local'},emission:{rateOverTime:0,bursts:[{time:0,count:1}]},shape:{enabled:false},
+  sizeOverLifetime:{enabled:false},colorOverLifetime:{enabled:false},renderer:{mode:'bakedVolume',volumeAsset:'Campfire',bounds:[1.9,2.2,2.05],density:.12,emissionStrength:60,flameExtinction:8,volumeLoop:true}};
 export const PARTICLE_PRESETS = Object.freeze({
+  VolumeFire:PhysicalFire,
+  VolumePlume:{main:{duration:120,startLifetime:120,startSpeed:0,startSize:1,maxParticles:1},emission:{rateOverTime:0,bursts:[{time:0,count:1}]},shape:{enabled:false},
+    sizeOverLifetime:{enabled:false},colorOverLifetime:{enabled:false},renderer:{mode:'bakedVolume',volumeAsset:'ChimneySmoke',bounds:[3,6,8.55],density:12,emissionStrength:0,flameExtinction:0,volumeLoop:true}},
+  VolumeDensePlume:{main:{duration:120,startLifetime:120,startSpeed:0,startSize:1,maxParticles:1},emission:{rateOverTime:0,bursts:[{time:0,count:1}]},shape:{enabled:false},
+    sizeOverLifetime:{enabled:false},colorOverLifetime:{enabled:false},renderer:{mode:'bakedVolume',volumeAsset:'DenseSmoke',bounds:[6,7,8],density:5,emissionStrength:0,flameExtinction:0,volumeLoop:true}},
+  VolumeDustImpact:{main:{duration:7,loop:false,startLifetime:7,startSpeed:0,startSize:1,maxParticles:1},emission:{rateOverTime:0,bursts:[{time:0,count:1}]},shape:{enabled:false},
+    sizeOverLifetime:{enabled:false},colorOverLifetime:{enabled:false},renderer:{mode:'bakedVolume',volumeAsset:'DustImpact',bounds:[10,4.5,13],density:9,emissionStrength:0,flameExtinction:0,volumeLoop:false}},
+  VolumeExplosion:{main:{duration:7,loop:false,startLifetime:7,startSpeed:0,startSize:1,maxParticles:1},emission:{rateOverTime:0,bursts:[{time:0,count:1}]},shape:{enabled:false},
+    sizeOverLifetime:{enabled:false},colorOverLifetime:{enabled:false},renderer:{mode:'bakedVolume',volumeAsset:'GroundExplosion',bounds:[7,9,7],density:3,emissionStrength:10,flameExtinction:5,volumeLoop:false}},
   SootRoot:{main:{duration:4.8,prewarm:true,startLifetime:4.8,startSpeed:0,startSize:.7,startColor:[.07,.065,.06,.7],maxParticles:16},emission:{rateOverTime:2},
     velocityOverLifetime:{enabled:true,y:.6},renderer:{mode:'volume',aspect:1.35,softRange:.35,density:8}},
   WindowDust:{main:{duration:120,prewarm:true,startLifetime:120,startSpeed:0,startSize:Range(.00175,.0035),maxParticles:512},emission:{rateOverTime:4},shape:{type:'beam',box:[.75,1.9,3.25],direction:[.8,-1.25,1.6]},
@@ -30,24 +48,8 @@ export const PARTICLE_PRESETS = Object.freeze({
     sizeOverLifetime:{enabled:false},colorOverLifetime:{gradient:[[0,[1,1,1,0]],[.08,[1,1,1,1]],[.85,[1,1,1,1]],[1,[1,1,1,0]]]},
     noise:{enabled:true,strength:.2,frequency:.8,scrollSpeed:.35},renderer:{mode:'mote',aspect:1,softRange:.08,bounds:[30,9,30]},
   },
-  FireRoot: {
-    main:{duration:2,prewarm:true,startLifetime:Range(.65,1.1),startSpeed:Range(.1,.35),startSize:Range(.28,.45),maxParticles:48},
-    emission:{rateOverTime:8},shape:{type:'circle',radius:.6},
-    forceOverLifetime:{enabled:true,y:.35,drag:1.8},
-    sizeOverLifetime:{curve:[[0,.4],[.18,1],[.65,.85],[1,.1]]},
-    colorOverLifetime:{gradient:[[0,[2.4,.36,.025,0]],[.15,[3.3,.7,.06,.8]],[.55,[2.2,.28,.018,.7]],[1,[.42,.024,.002,0]]]},
-    noise:{enabled:true,strength:.05,frequency:2.7,scrollSpeed:2.1},
-    renderer:{mode:'flame',aspect:.9,softRange:.16},
-  },
-  FireTongue: {
-    main:{duration:2,prewarm:true,startLifetime:Range(.65,1.15),startSpeed:Range(.8,1.4),startSize:Range(.16,.29),maxParticles:64},
-    emission:{rateOverTime:14},shape:{type:'cone',radius:.45,angle:10},
-    forceOverLifetime:{enabled:true,y:1.8,drag:.8},
-    sizeOverLifetime:{curve:[[0,.4],[.22,1],[.5,.85],[.8,.38],[1,0]]},
-    colorOverLifetime:{gradient:[[0,[3.5,1.6,.45,0]],[.12,[4.2,2,.6,.72]],[.42,[2.7,.68,.075,.65]],[.72,[.48,.12,.015,0]],[1,[.18,.035,.004,0]]]},
-    noise:{enabled:true,strength:[[0,.015],[.4,.1],[1,.35]],frequency:2.4,scrollSpeed:1.7},
-    renderer:{mode:'flame',aspect:2.8,softRange:.25},
-  },
+  FireRoot:{...PhysicalFire,renderer:{...PhysicalFire.renderer,bounds:[1.6,.8,1.6]}},
+  FireTongue:PhysicalFire,
   FireEmber: {
     main:{duration:3,prewarm:true,startLifetime:Range(1.4,2.8),startSpeed:Range(.8,2.5),startSize:Range(.009,.023),maxParticles:24},
     emission:{rateOverTime:1.8},shape:{type:'cone',radius:.5,angle:23},
@@ -68,18 +70,18 @@ export const PARTICLE_PRESETS = Object.freeze({
 });
 export function BurningParticleModules(source, scale=1) {
   const size=Math.max(.2,Math.min(3,source.fire??1)),radius=Math.max(.1,source.radius??.6);
-  return ['FireRoot','FireTongue','FireEmber'].map((preset,index)=>{
+  return ['FireTongue','FireEmber'].map((preset,index)=>{
     const modules=JSON.parse(JSON.stringify(PARTICLE_PRESETS[preset]));
     modules.main.randomSeed=((source.backdrop?.seed??source.seed??1938)+index*7919)>>>0;
+    if(preset==='FireTongue'){
+      const width=Math.max(.35,radius*2.05),height=(source.fireShape==='ground'?1.35:2.15)*Math.sqrt(size);
+      modules.renderer.bounds=[width,height,width*.95];modules.main.startRotation=(modules.main.randomSeed%360)*Math.PI/180;
+      return {preset,modules};
+    }
     modules.main.startSize.min*=size;modules.main.startSize.max*=size;
     modules.main.startSpeed.min*=Math.sqrt(size);modules.main.startSpeed.max*=Math.sqrt(size);
     modules.emission.rateOverTime*=scale*Math.min(1.8,Math.sqrt(size));
     modules.shape.radius=radius*(index===0?.78:.55);
-    if(source.fireShape==='ground'&&index===1){
-      modules.renderer.aspect=1.5;
-      modules.main.startSpeed.min*=.5;modules.main.startSpeed.max*=.5;
-      modules.forceOverLifetime.y*=.4;
-    }
     return {preset,modules};
   });
 }

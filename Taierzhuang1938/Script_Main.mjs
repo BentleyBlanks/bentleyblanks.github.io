@@ -5025,6 +5025,7 @@ async function WarmLevel(phase) {
           report.explosionVariants = ["legacy", "compact", "fireball", "heavy"];
           for(const spriteVariant of report.explosionVariants)
             vfx.Explosion(spot.clone().setY(groundY + 0.2), { radius: 4, kind: "shell", groundY, spriteVariant });
+          vfx.Explosion(spot.clone().setY(groundY+.2),{radius:4,kind:'tank',groundY});
           smokeHandle = vfx.SmokeSource({ x: spot.x, y: groundY + 0.5, z: spot.z }, { kind: "dust", rate: 12, radius: 0.6, rise: 0.4, life: 1.5, opacity: 0.2 });
           vfx.MuzzleFlash(eye.clone().addScaledVector(forward, 0.6), forward, { kind: "rifle" });
           vfx.Tracer(eye.clone().addScaledVector(forward, 0.6), spot.clone(), { kind: "nra" });
@@ -5033,6 +5034,7 @@ async function WarmLevel(phase) {
           vfx.Impact(spot.clone().setY(groundY), new THREE.Vector3(0, 1, 0), "brick", { hardSparks: true, incoming: forward });
           vfx.Impact(spot.clone().setY(groundY), new THREE.Vector3(0, 1, 0), "dirt");
           vfx.Blood(spot.clone().setY(groundY + 1), forward, 1);
+          await vfx.particles.Ready();
         }
       } catch (error) {
         console.warn("[Main] 关卡预热：粒子预热失败", error);

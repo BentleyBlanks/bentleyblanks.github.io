@@ -1,6 +1,6 @@
 # 模块化粒子系统
 
-燃烧效果使用贴着残骸的火根、受浮力上升的火舌和少量火星；原有体积烟柱仍接在真实燃烧出口。火焰复用已入库的火焰遮罩，着色器连续扭曲、侵蚀火尖。第一关残骸只启用视点附近最多四盏暖色反射光，远处保留自发光火焰与体积烟。
+燃烧、常驻烟柱、土尘冲击和燃油爆炸使用 JangaFX CC0 流体序列，GPU 直接积分三维密度和燃烧场；火星、碎屑、弹道等继续走解析运动。第一关残骸保留真实燃烧出口与附近最多四盏暖色反射光。形态对标和验收见 [物理观感重做](Data_ParticlePhysicalReference.md)，来源与重建见 [体积资产](../Volume/README.md)。
 
 设计参考 [Unity Particle System 模块](https://docs.unity3d.com/6000.0/Documentation/Manual/ParticleSystemModules.html) 与 [Simulate](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/ParticleSystem.Simulate.html)。这是适合当前 WebGL 引擎的模块化实现，不是 Unity 组件或序列化格式的完整兼容层。
 
@@ -14,11 +14,15 @@
 | Velocity / Force over Lifetime | 三轴速度曲线、恒定加速度、drag |
 | Color / Size / Rotation over Lifetime | RGBA 渐变、尺寸曲线、角速度曲线 |
 | Noise | 随年龄变化的摆动强度、频率和滚动速度 |
-| Renderer | flame/smoke/ember/mote/windowMote/volume 与生产材质 profile；enabled、aspect、density、bounds、nearFade、softRange、深度遮挡与 HDR 目标 alpha 保留 |
+| Renderer | flame/smoke/ember/mote/windowMote/volume/bakedVolume 与生产材质 profile；enabled、aspect、density、bounds、nearFade、softRange、深度遮挡与 HDR 目标 alpha 保留；体积资产、播放速度、循环、朝向、发光和热区消光 |
 
 `Tengxian.Particles.Modules()` 返回完整默认值、能力与不支持的模块，未知字段直接报错。生产材质 profile 支持已有序列帧与碎砖、土块、木片、弹壳网格；仍不支持通用碰撞模块、拖尾、子发射器、自定义序列帧模块、任意网格资产和发射器局部旋转/缩放。现有血滴落地和碎屑弹跳保留专用逻辑；local 模式支持平移。Noise 是可复现的解析摆动，不等同 Unity 的湍流噪声实现。战场体积烟、近处烟尘、战斗粒子和菜单飘尘均由同一 ParticleSystem 管理时钟和存活记录。
 
 长度为米、时间为秒、旋转为弧度（Shape.angle 为度），颜色为线性 HDR RGBA。曲线支持数字、`[[0,value],[1,value]]`、`{mode:"twoConstants",min,max}`、`{mode:"curve",curve,multiplier}` 和 `{mode:"twoCurves",min,max,multiplier}`。键按归一化时间严格递增。GPU 每条曲线采样 48 点；诊断样本用原始曲线求值，尖锐拐点可能存在采样误差。
+
+`bakedVolume` 的 `bounds` 是米制范围，`main.startSize` 是该范围的倍率。`volumeSpeed` 驱动内部模拟播放，`volumeYaw` 是可实时调整的 Y 轴朝向；每个粒子仍接受 Main、速度、力、尺寸、颜色与旋转模块。`volumeLoop` 循环使用顺向重叠；单发持续源跨寿命周期不重抽动画相位。`emissionStrength` 和 `flameExtinction` 为相对辐亮度、消光调节，并非绝对热功率。
+
+这是一套预计算流体的实时三维播放，不是现场流体求解器；风向可以旋转静态烟体，内部流场不会因风滑杆而重新求解。窄烟流和浓烟使用不同资产，土尘与燃油爆炸也分开。
 
 ## Agent 直接调用
 
@@ -39,8 +43,21 @@ fx.Stop(id,{clear:true});       // 立即清空
 fx.Emit(id,12);                 // 手动发射；原先停止时会继续消退
 const saved = fx.Export(id);
 fx.Remove(id);
- const restored = fx.Import(saved); // 导入配置并播放，不是运行状态快照
+const restored = fx.Import(saved); // 导入配置并播放，不是运行状态快照
 ```
+
+三维体积可直接创建并等待资源就绪：
+
+```js
+const field = fx.Create({preset:"VolumeDensePlume",position:[10,0,20]});
+await fx.Ready();
+fx.Simulate(field.id,1.2);
+fx.Configure(field.id,{renderer:{density:4,volumeYaw:0.8}});
+fx.Inspect().volumes; // 实例数、活粒子数、GPU 数据量、就绪和错误
+fx.VolumeBurst([15,0,20],{asset:"DustImpact",size:0.7,life:4,speed:1.7,density:9});
+```
+
+`VolumeBurst` 使用可复用的事件发射层；可设置 delay、fadeIn、velocity 和 bounds。发射层 Main 初始参数按倍率作用于后续出生记录，暂停该层后不接受新事件。资源首次加载时编辑器显示状态；离线数据或网络错误会进入 Inspect 的错误字段。
 
 另有 `Pause`、`Clear`、`Move`、`Inspect`。`Inspect()` 返回所有系统和共享池预算/丢弃计数，`Inspect(id)` 返回单个发射器。`Configure` 的发射参数影响新粒子，生命周期曲线作用于现存粒子；更换 renderer 或 simulationSpace 会清空当前粒子。`Clear` 清空存活粒子但不重置时钟；重放使用 `Simulate(...,{restart:true})` 或 `Play(...,{restart:true})`。
 

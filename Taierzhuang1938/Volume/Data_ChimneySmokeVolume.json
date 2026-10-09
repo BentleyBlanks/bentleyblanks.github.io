@@ -1,0 +1,782 @@
+{
+  "version": 1,
+  "asset": "ChimneySmoke",
+  "dimensions": [
+    48,
+    96,
+    96
+  ],
+  "atlasTiles": [
+    4,
+    3,
+    4
+  ],
+  "frames": 48,
+  "duration": 8.476595744680852,
+  "sourceFps": 30,
+  "simulationDuration": 4.150031661987305,
+  "sourceFrameIndices": [
+    0,
+    5,
+    11,
+    16,
+    21,
+    26,
+    32,
+    37,
+    42,
+    48,
+    53,
+    58,
+    64,
+    69,
+    74,
+    79,
+    85,
+    90,
+    95,
+    101,
+    106,
+    111,
+    117,
+    122,
+    127,
+    132,
+    138,
+    143,
+    148,
+    154,
+    159,
+    164,
+    170,
+    175,
+    180,
+    185,
+    191,
+    196,
+    201,
+    207,
+    212,
+    217,
+    223,
+    228,
+    233,
+    238,
+    244,
+    249
+  ],
+  "sourceTimeRange": [
+    25.0,
+    29.149999618530273
+  ],
+  "sourceBounds": [
+    [
+      -5,
+      6,
+      -7
+    ],
+    [
+      182,
+      541,
+      368
+    ]
+  ],
+  "voxelAspect": [
+    0.5,
+    1.0,
+    1.425531914893617
+  ],
+  "anchor": [
+    0.5420903800179041,
+    0.023936170212765957,
+    0.07263721665041292
+  ],
+  "channels": 1,
+  "encoding": "sqrt-unorm8",
+  "densityScale": 0.5,
+  "flameScale": 0.4,
+  "sourceSha256": "eaeddbc288baac5796d50e41ccec347bf2b5f864be39b85b435f4ff7c976b83c",
+  "sourceUrl": "https://jangafx.com/software/embergen/download/free-vdb-animations",
+  "license": "CC0-1.0",
+  "author": "JangaFX LLC",
+  "sourceUp": "Z",
+  "runtimeUp": "Y",
+  "file": "Volume_ChimneySmoke.bin.gz",
+  "compressedBytes": 2300445,
+  "gpuBytes": 21233664,
+  "sha256": "4d46050f4b74e5d739d4945c83a857dc99fc0f799c6ff140dc5fcfb3fd5d76c4",
+  "samples": [
+    {
+      "frame": 0,
+      "channel": "density",
+      "sourceMass": 97758.0390625,
+      "occupied": 152009,
+      "max": 0.2623542845249176
+    },
+    {
+      "frame": 0,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 1,
+      "channel": "density",
+      "sourceMass": 97186.5,
+      "occupied": 152259,
+      "max": 0.26418954133987427
+    },
+    {
+      "frame": 1,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 2,
+      "channel": "density",
+      "sourceMass": 96484.78125,
+      "occupied": 151828,
+      "max": 0.26162150502204895
+    },
+    {
+      "frame": 2,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 3,
+      "channel": "density",
+      "sourceMass": 96067.8671875,
+      "occupied": 151065,
+      "max": 0.2619437873363495
+    },
+    {
+      "frame": 3,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 4,
+      "channel": "density",
+      "sourceMass": 95931.0546875,
+      "occupied": 150606,
+      "max": 0.29479753971099854
+    },
+    {
+      "frame": 4,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 5,
+      "channel": "density",
+      "sourceMass": 96093.265625,
+      "occupied": 154053,
+      "max": 0.29693934321403503
+    },
+    {
+      "frame": 5,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 6,
+      "channel": "density",
+      "sourceMass": 96654.109375,
+      "occupied": 154481,
+      "max": 0.31838613748550415
+    },
+    {
+      "frame": 6,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 7,
+      "channel": "density",
+      "sourceMass": 97347.3359375,
+      "occupied": 153516,
+      "max": 0.3181103467941284
+    },
+    {
+      "frame": 7,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 8,
+      "channel": "density",
+      "sourceMass": 98217.625,
+      "occupied": 155294,
+      "max": 0.3368433117866516
+    },
+    {
+      "frame": 8,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 9,
+      "channel": "density",
+      "sourceMass": 99453.109375,
+      "occupied": 154119,
+      "max": 0.32555249333381653
+    },
+    {
+      "frame": 9,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 10,
+      "channel": "density",
+      "sourceMass": 100535.59375,
+      "occupied": 154508,
+      "max": 0.34719401597976685
+    },
+    {
+      "frame": 10,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 11,
+      "channel": "density",
+      "sourceMass": 101890.4375,
+      "occupied": 154238,
+      "max": 0.31894415616989136
+    },
+    {
+      "frame": 11,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 12,
+      "channel": "density",
+      "sourceMass": 103669.90625,
+      "occupied": 155094,
+      "max": 0.315030038356781
+    },
+    {
+      "frame": 12,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 13,
+      "channel": "density",
+      "sourceMass": 105199.875,
+      "occupied": 154340,
+      "max": 0.29509100317955017
+    },
+    {
+      "frame": 13,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 14,
+      "channel": "density",
+      "sourceMass": 106533.125,
+      "occupied": 154344,
+      "max": 0.29698124527931213
+    },
+    {
+      "frame": 14,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 15,
+      "channel": "density",
+      "sourceMass": 107666.1328125,
+      "occupied": 154216,
+      "max": 0.31560319662094116
+    },
+    {
+      "frame": 15,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 16,
+      "channel": "density",
+      "sourceMass": 108879.6796875,
+      "occupied": 153903,
+      "max": 0.33908745646476746
+    },
+    {
+      "frame": 16,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 17,
+      "channel": "density",
+      "sourceMass": 109717.875,
+      "occupied": 153446,
+      "max": 0.32720324397087097
+    },
+    {
+      "frame": 17,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 18,
+      "channel": "density",
+      "sourceMass": 110598.03125,
+      "occupied": 154187,
+      "max": 0.3715987801551819
+    },
+    {
+      "frame": 18,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 19,
+      "channel": "density",
+      "sourceMass": 111466.734375,
+      "occupied": 154519,
+      "max": 0.3476593494415283
+    },
+    {
+      "frame": 19,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 20,
+      "channel": "density",
+      "sourceMass": 112029.2890625,
+      "occupied": 153804,
+      "max": 0.34561875462532043
+    },
+    {
+      "frame": 20,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 21,
+      "channel": "density",
+      "sourceMass": 112663.21875,
+      "occupied": 152761,
+      "max": 0.3207716643810272
+    },
+    {
+      "frame": 21,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 22,
+      "channel": "density",
+      "sourceMass": 113436.9375,
+      "occupied": 152771,
+      "max": 0.3192105293273926
+    },
+    {
+      "frame": 22,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 23,
+      "channel": "density",
+      "sourceMass": 114058.515625,
+      "occupied": 152982,
+      "max": 0.31751230359077454
+    },
+    {
+      "frame": 23,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 24,
+      "channel": "density",
+      "sourceMass": 114451.234375,
+      "occupied": 149265,
+      "max": 0.32021066546440125
+    },
+    {
+      "frame": 24,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 25,
+      "channel": "density",
+      "sourceMass": 114557.8359375,
+      "occupied": 151529,
+      "max": 0.3386247158050537
+    },
+    {
+      "frame": 25,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 26,
+      "channel": "density",
+      "sourceMass": 114511.2578125,
+      "occupied": 151503,
+      "max": 0.32086455821990967
+    },
+    {
+      "frame": 26,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 27,
+      "channel": "density",
+      "sourceMass": 114409.4140625,
+      "occupied": 151544,
+      "max": 0.3082764446735382
+    },
+    {
+      "frame": 27,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 28,
+      "channel": "density",
+      "sourceMass": 114126.7578125,
+      "occupied": 152169,
+      "max": 0.32771390676498413
+    },
+    {
+      "frame": 28,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 29,
+      "channel": "density",
+      "sourceMass": 113515.703125,
+      "occupied": 149610,
+      "max": 0.35028210282325745
+    },
+    {
+      "frame": 29,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 30,
+      "channel": "density",
+      "sourceMass": 112828.703125,
+      "occupied": 151835,
+      "max": 0.33701327443122864
+    },
+    {
+      "frame": 30,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 31,
+      "channel": "density",
+      "sourceMass": 112046.09375,
+      "occupied": 151584,
+      "max": 0.3044717609882355
+    },
+    {
+      "frame": 31,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 32,
+      "channel": "density",
+      "sourceMass": 111003.921875,
+      "occupied": 151996,
+      "max": 0.29555436968803406
+    },
+    {
+      "frame": 32,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 33,
+      "channel": "density",
+      "sourceMass": 110105.6640625,
+      "occupied": 154493,
+      "max": 0.2951141595840454
+    },
+    {
+      "frame": 33,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 34,
+      "channel": "density",
+      "sourceMass": 109184.34375,
+      "occupied": 153187,
+      "max": 0.2772642970085144
+    },
+    {
+      "frame": 34,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 35,
+      "channel": "density",
+      "sourceMass": 108312.796875,
+      "occupied": 153874,
+      "max": 0.26176315546035767
+    },
+    {
+      "frame": 35,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 36,
+      "channel": "density",
+      "sourceMass": 107616.3828125,
+      "occupied": 155785,
+      "max": 0.26754534244537354
+    },
+    {
+      "frame": 36,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 37,
+      "channel": "density",
+      "sourceMass": 107367.6015625,
+      "occupied": 155885,
+      "max": 0.25358012318611145
+    },
+    {
+      "frame": 37,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 38,
+      "channel": "density",
+      "sourceMass": 107285.09375,
+      "occupied": 154101,
+      "max": 0.24721136689186096
+    },
+    {
+      "frame": 38,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 39,
+      "channel": "density",
+      "sourceMass": 107352.1171875,
+      "occupied": 156502,
+      "max": 0.2328641265630722
+    },
+    {
+      "frame": 39,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 40,
+      "channel": "density",
+      "sourceMass": 107371.125,
+      "occupied": 157668,
+      "max": 0.22608314454555511
+    },
+    {
+      "frame": 40,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 41,
+      "channel": "density",
+      "sourceMass": 107281.65625,
+      "occupied": 157384,
+      "max": 0.2835017442703247
+    },
+    {
+      "frame": 41,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 42,
+      "channel": "density",
+      "sourceMass": 107063.453125,
+      "occupied": 154634,
+      "max": 0.2709037959575653
+    },
+    {
+      "frame": 42,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 43,
+      "channel": "density",
+      "sourceMass": 106768.328125,
+      "occupied": 158071,
+      "max": 0.25866368412971497
+    },
+    {
+      "frame": 43,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 44,
+      "channel": "density",
+      "sourceMass": 106404.40625,
+      "occupied": 156740,
+      "max": 0.24654529988765717
+    },
+    {
+      "frame": 44,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 45,
+      "channel": "density",
+      "sourceMass": 106192.7578125,
+      "occupied": 156030,
+      "max": 0.26127052307128906
+    },
+    {
+      "frame": 45,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 46,
+      "channel": "density",
+      "sourceMass": 106200.5859375,
+      "occupied": 156702,
+      "max": 0.242328941822052
+    },
+    {
+      "frame": 46,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    },
+    {
+      "frame": 47,
+      "channel": "density",
+      "sourceMass": 106399.4609375,
+      "occupied": 156812,
+      "max": 0.23906001448631287
+    },
+    {
+      "frame": 47,
+      "channel": "flames",
+      "sourceMass": 0.0,
+      "occupied": 0,
+      "max": 0.0
+    }
+  ]
+}
