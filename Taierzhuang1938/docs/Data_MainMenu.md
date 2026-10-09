@@ -64,7 +64,25 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 衣身与袖筒由 `Script_CommandRoomHangingCoat.py` 建立连续衣片和真实袖窿。2026-10-09 扩展肩部向衣身的过渡，前襟收拢、长褶与细褶错落，袖肘处有小折，空袖口高度不齐；调整挂衣朝向，减少旧版细尖锥状轮廓。表面只做保留衣钩和衣缘约束的三次局部平滑，保持重力方向的整体剪影。旧布料模拟曾产生衣襟缠环与衣摆上卷，相关脚本和 `Data_CommandRoomTailoredDrape.json` 保留为历史过程，当前重建不消费它们。
 衣服保留自身 `GarmentWear` 作为 Blender 与 glTF 的共同染色层，不再由后续通用旧化代码另建不一致的顶点色层。
 领口、袖口、襟边与下摆的退色由 `GarmentWear` 顶点色随衣片坐标生成，少量断纤维附着于真实边缘；Blender 与 glTF 使用同一染色乘数。运行时只加载静态网格，没有布料模拟开销。
-军帽基础帽体宽约 21 cm，低平软帽冠、独立折叠护布、约 5.7 cm 短帽檐、前方两枚凸面黄铜扣和十二道光芒帽徽，后面只保留竖缝。2026-10-09 根据用户对画面比例的反馈，将帽冠、帽檐、帽徽、扣子和缝线整体按 1.25 倍重新布设；场景帽体宽 26.25 cm、帽体长 29.25 cm、檐伸出 7.125 cm、高约 13.875 cm。该缩放用于当前指挥桌构图校准，不宣称是王铭章实物测绘尺寸。重新按支撑面安放并重烘光照，保留 0.6 mm 接触余量。比例与墙面旧化参数统一在 `_blender/Data_CommandRoomAppearance.json`。
+军帽保留低平软帽冠、折叠护布、短帽檐、两枚黄铜扣和十二道光芒帽徽。2026-10-09 按用户要求改为真实尺寸校准，取消此前 1.25 倍画面放大，增加内汗带与接边：实际内圈约 58 cm，含帽檐的帽组约 21.16×28.78×11.92 cm（沿自身坐标轴测量）。帽围参考实际成人帽码，不宣称是王铭章原物测绘。尺寸与位置集中在 `_blender/Data_CommandRoomPhysicalProps.json`；墙面旧化仍在 `Data_CommandRoomAppearance.json`。
+
+### 桌面道具的物理尺度（2026-10-09）
+
+旧信纸以 .65×.85 m 构造，剪裁后约 64.35×84.82 cm，误成海报尺度；单独放大帽子无法修复整组比例。现在四类道具以米制重建，保持真实相机和地图桌，书写物件移到邻近的一片桌面。3.10×2.30 m 的大地图桌保留，不将小道具逐件放大来填画面。
+
+| 物件 | 目标／实测 | 现实尺寸依据 |
+| --- | --- | --- |
+| 帽子 | 内汗带 58 cm／57.994 cm；含檐外廓约 21.16×28.78×11.92 cm | [Stetson 成人帽码](https://stetson.com/pages/fit-guide)，采用 58 cm；外廓保留已有软帽形制 |
+| 信纸 | A5 14.8×21 cm／14.805×21.004 cm；纸厚约 .12 mm | [MUJI A5 便笺](https://www.muji.com/jp/ja/store/cmdty/detail/4550584663420)，只参考尺寸，保留游戏纸图 |
+| 蘸水笔 | 全长 14.4 cm，最大杆径 7 mm | [London Museum 1901–1930 年木杆钢尖蘸水笔](https://www.londonmuseum.org.uk/collections/v/object-443434/pen-dip-pen/) |
+| 两支铅笔 | 全长各 17.5 cm，外接直径 7.1 mm | [三菱 9800EW 产品目录](https://www.mp-uni.com/files/uni-ball_Myanmar_Catalog.pdf)，174.7×7.1 mm；作为通用木铅笔尺寸参照 |
+| 墨水瓶 | 6.3×6.3×8.5 cm，包含瓶盖 | [Harvard Peabody Museum 1870–1900 年墨水瓶](https://collections.peabody.harvard.edu/objects/details/66036)，8.5×6.3×6.3 cm |
+
+这是一组有实物尺寸依据的游戏道具，不将参照品的品牌、出处或归属移植到 1938 年场景。笔托为 23×8 cm，木尺的刻度长 30 cm、尺身长 31 cm。纸厚与轻微卷边分开处理，避免缩小后的信纸仍像厚板；小纸面的 UV1 烘焙密度同步提高，尺寸本身不再被画面可读性反向拉大。
+
+`Script_CommandRoomPhysicalScale.py` 在摆放和接触求解后测量实际世界网格，检查帽圈、纸面、笔长／杆径、瓶体三轴尺寸和任意两组道具穿插。测量记录写入 GLB extras，并由 `Tengxian.Debug.CommandRoom().physical` 提供给 agent；浏览器还独立测量导出的信纸与墨水瓶。`Script_InspectCommandRoomScale.py` 使用一台正交相机、同一张 10 cm 网格检查帽、纸、笔和瓶，禁止各物件分别适配画幅。源工程为 `CommandRoom/PhysicalScale20261009/Scene_CommandRoom.blend`，原图、测量 JSON 和对照图保留在本地 `_shots/CommandRoom/`。
+
+本轮交付为 21 网格、361507 三角形、15748680 字节的 GLB，匹配无损光照图 1316306 字节。AssetStandards、TextureStandards、CommandRoomBrowser、CommandRoomPublication、MotionVectorContract、MenuStartup 与 CommandRoomPreview 七项通过；ModuleGraph、Text、TestRunner 另行通过。发布纹理与源码实机画面的 RGB 平均误差 .64、95 分位 3，光照图字节无损；prepush 前五项通过后仍停在既有 CharacterSpeechTest 读音表断言。本任务 Blender 已停止，保留其他任务实例。本地入口为 `_shots/CommandRoom/Index_PhysicalScale.html`。
 衣服使用 Imagegen `Source/CommandRoomClothSerge.png`；帽子独立使用
 `Source/CommandRoomCapTwill20261007.png` 的普通灰褐斜纹棉布。两者均为 25 cm 一铺、
 1K 基色与 512 法线/ORM，法线起伏分别为 0.18 / 0.16 mm。专用 `menuCloth`

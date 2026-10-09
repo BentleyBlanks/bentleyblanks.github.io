@@ -18,7 +18,7 @@ def Ridge(x,w):
     return math.exp(-(x/w)**2)-.48*math.exp(-((x-w*1.4)/(w*1.5))**2)
 
 # Bottle follows the square body / circular neck proportions of the turnaround.
-ix=.53;iy=.27;iz=.905
+ix,iy,iz=physical['inkBottle']['position']
 glass=inkGlass.node_tree.nodes.get('Principled BSDF')
 glass.inputs['Base Color'].default_value=(.62,.29,.065,1)
 glass.inputs['Roughness'].default_value=.16

@@ -54,11 +54,14 @@ exec(compile(tailoringPath.read_text(encoding='utf-8'),str(tailoringPath),'exec'
 # Trace the original yellowed paper's silhouette, excluding its white photo backdrop.
 outline=json.loads((GAME/'_blender/Data_CommandRoomPaperOutline.json').read_text())['uvOutline']
 vs=[];uvs=[];n=len(outline);rings=[1,.985,.94,.80,.55,.25]
+minU=min(p[0] for p in outline);maxU=max(p[0] for p in outline)
+minV=min(p[1] for p in outline);maxV=max(p[1] for p in outline)
 def LetterVertex(u,v):
-    px=(u-.5)*.65;py=(v-.5)*.85;angle=-.26
-    edge=(max(0,abs(u-.5)-.43)/.07)**2*.006+(max(0,abs(v-.5)-.43)/.07)**2*.006
-    cr=.0018*math.sin(u*math.pi*4)+.002*math.cos(v*math.pi*6)+edge
-    return (-.142+px*math.cos(angle)-py*math.sin(angle),-.629+px*math.sin(angle)+py*math.cos(angle),.920+cr)
+    spec=physical['letter'];px=((u-minU)/(maxU-minU)-.5)*spec['widthM'];py=((v-minV)/(maxV-minV)-.5)*spec['heightM'];angle=spec['angleRad']
+    edge=(max(0,abs(u-.5)-.43)/.07)**2*.0012+(max(0,abs(v-.5)-.43)/.07)**2*.0012
+    cr=.0004*math.sin(u*math.pi*4)+.0005*math.cos(v*math.pi*6)+edge
+    cx,cy,z=spec['position']
+    return (cx+px*math.cos(angle)-py*math.sin(angle),cy+px*math.sin(angle)+py*math.cos(angle),z+cr)
 for r in rings:
     for u,v in outline:
         u=.5+(u-.5)*r;v=.5+(v-.5)*r
@@ -68,4 +71,5 @@ for j in range(len(rings)-1):
     for i in range(n):faces.append((j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i))
 vs.append(LetterVertex(.5,.5));uvs.append((.5,.5));c=len(vs)-1
 faces.extend(((len(rings)-1)*n+i,(len(rings)-1)*n+(i+1)%n,c) for i in range(n))
-Shell(Mesh('Telegram',vs,faces,letter,uvs,True),.00055)
+letterShellVertexPair=(c,c+len(vs))
+Shell(Mesh('Telegram',vs,faces,letter,uvs,True),physical['letter']['thicknessM'])

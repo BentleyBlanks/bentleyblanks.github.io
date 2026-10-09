@@ -1,9 +1,9 @@
 """Soft field cap matching the approved Lovart front/side/back turnaround.
 
-Physical dimensions: 20.4 cm wide, 23 cm long plus 5.7 cm visor; 10.8 cm tall.
+Adult 58 cm inner sweatband, with the existing soft outer crown and short visor.
 The folded ear cloth is a separate shell. Only its rear has a joining seam.
 """
-hx=.942;hy=-.092;hz=.907
+hx,hy,hz=physical['cap']['position']
 capCloth=Material('CommandRoomCapCloth',(.24,.225,.19),.96,'CommandRoomCapCloth')
 capBrass=Material('CommandRoomCapBrass',(.38,.265,.095),.43)
 capBrass.node_tree.nodes['Principled BSDF'].inputs['Metallic'].default_value=.72
@@ -42,6 +42,22 @@ def CapTop(u,v):
 Shell(Surface('CapSoftCrown',128,30,CapCrown,capCloth,lambda u,v:(u*.67,v*.105)),.0018)
 Shell(Surface('CapOvalTop',128,30,CapTop,capCloth,lambda u,v:(.12+.096*(1-v)*math.cos(u*math.tau),.12+.108*(1-v)*math.sin(u*math.tau))),.0016)
 Shell(Surface('CapFoldedEarCloth',144,20,CapFold,capCloth,lambda u,v:(u*.69,v*.065)),.0018)
+
+# A real head opening fixes fit independently of loose outer cloth and the visor.
+headRatio=physical['cap']['headLengthToWidth']
+headRx=physical['cap']['headCircumferenceM']/(math.pi*(3*(headRatio+1)-math.sqrt((3*headRatio+1)*(headRatio+3))))
+headRy=headRx*headRatio
+def CapInner(u,v):
+    a=u*math.tau
+    return Vector((hx+(headRx+.001*math.sin(v*math.pi))*math.cos(a),
+                   hy+(headRy+.001*math.sin(v*math.pi))*math.sin(a),hz+.006+.022*v))
+capSweatband=Shell(Surface('CapInnerSweatband',128,8,CapInner,capCloth,lambda u,v:(u*.58,v*.022),reverse=True),.0015)
+Shell(Surface('CapInnerBinding',128,4,lambda u,v:CapInner(u,0).lerp(CapRing(u*math.tau,.008),v),capCloth),.001)
+from mathutils.kdtree import KDTree
+headTree=KDTree(len(capSweatband.data.vertices))
+for vertex in capSweatband.data.vertices:headTree.insert(vertex.co,vertex.index)
+headTree.balance()
+headFitVertexIds=[headTree.find(CapInner(i/128,0))[1] for i in range(128)]
 
 def CapVisor(u,v):
     a=math.pi*1.055+u*math.pi*.89
@@ -84,4 +100,4 @@ for i in range(12):
         points.append((badge.x+radius*math.sin(angle),badge.y-.004,badge.z+radius*math.cos(angle)))
     Mesh('CapBadgeSunRay',points,[(0,2,1)],capWhite)
 
-capDimensions={'widthM':.210,'bodyLengthM':.234,'visorExtensionM':.057,'heightM':.111,'buttons':2,'badgeRays':12}
+capDimensions={'headCircumferenceM':physical['cap']['headCircumferenceM'],'buttons':2,'badgeRays':12}

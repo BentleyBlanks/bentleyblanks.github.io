@@ -29,6 +29,7 @@ assert.equal(CommandRoomPapers(null).stage, 0);
 }
 
 const project=path.dirname(fileURLToPath(import.meta.url)),out=path.join(project,"_shots/CommandRoom");
+const physicalSpec=JSON.parse(fs.readFileSync(path.join(project,"_blender/Data_CommandRoomPhysicalProps.json"),"utf8"));
 fs.mkdirSync(out,{recursive:true});
 const server=await ServeRoot(path.dirname(project),0),browser=await LaunchBrowser();
 const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[],paperRequests=[];
@@ -80,8 +81,35 @@ try {
   assert.ok(result.appearance.wallVertices>1000&&result.appearance.wallDye[0]>result.appearance.wallDye[1]+.02
     &&result.appearance.wallDye[1]>result.appearance.wallDye[2]+.03,
     "Exported wall skin must retain its warm, uneven aged-lime vertex dye");
-  assert.ok(result.appearance.capSize[1]>.13&&result.appearance.capSize[1]<.16,
-    "Actual cap geometry retains the corrected scene proportion, including crown and visor");
+  assert.ok(result.appearance.capSize[1]>.10&&result.appearance.capSize[1]<.125,
+    "Adult cap keeps its physical crown height without a framing enlargement");
+  result.physical=await page.evaluate(angle=>{
+    const paper=[[],[]],bottle=new THREE.Box3();
+    room.scene.traverse(ob=>{
+      if(!ob.isMesh)return;
+      if(ob.material?.name?.startsWith("CommandRoomInk"))bottle.union(new THREE.Box3().setFromObject(ob));
+      if(ob.material?.name!=="CommandRoomLetter")return;
+      const position=ob.geometry.getAttribute("position"),p=new THREE.Vector3();
+      for(let i=0;i<position.count;i++){
+        p.fromBufferAttribute(position,i).applyMatrix4(ob.matrixWorld);
+        paper[0].push(p.x*Math.cos(angle)-p.z*Math.sin(angle));
+        paper[1].push(-p.x*Math.sin(angle)-p.z*Math.cos(angle));
+      }
+    });
+    return {authored:room.State().physical,letter:paper.map(values=>Math.max(...values)-Math.min(...values)),
+      bottle:bottle.getSize(new THREE.Vector3()).toArray()};
+  },physicalSpec.letter.angleRad);
+  const Near=(actual,expected,label)=>assert.ok(Math.abs(actual-expected)<.0005,`${label}: ${actual} / ${expected} m`);
+  assert.equal(result.physical.authored.units,"metres");
+  Near(result.physical.letter[0],physicalSpec.letter.widthM,"Exported A5 width");
+  Near(result.physical.letter[1],physicalSpec.letter.heightM,"Exported A5 height");
+  Near(result.physical.bottle[0],physicalSpec.inkBottle.widthM,"Exported bottle width");
+  Near(result.physical.bottle[1],physicalSpec.inkBottle.heightM,"Exported bottle height");
+  Near(result.physical.bottle[2],physicalSpec.inkBottle.depthM,"Exported bottle depth");
+  Near(result.physical.authored.cap.headCircumferenceM,physicalSpec.cap.headCircumferenceM,"Measured inner hatband");
+  Near(result.physical.authored.dipPen.lengthM,physicalSpec.dipPen.lengthM,"Measured complete dip pen");
+  for(const pencil of result.physical.authored.pencils)Near(pencil.lengthM,physicalSpec.pencil.lengthM,"Measured pencil length");
+  assert.ok(Object.values(result.physical.authored.propIntersections).every(value=>value===0));
   result.timberColor=await page.evaluate(()=>{
     let minimum=Infinity,vertices=0;
     room.scene.traverse(ob=>{

@@ -8,6 +8,7 @@ from mathutils import Vector, Matrix
 ROOT = Path(os.environ.get("COMMAND_ROOM_ROOT", r"C:\Users\Bentl\Documents\bentleyblanks_Codex_CommandRoomMenu_20261004"))
 GAME = ROOT / "Taierzhuang1938"
 appearance=json.loads((GAME/'_blender/Data_CommandRoomAppearance.json').read_text(encoding='utf-8'))
+physical=json.loads((GAME/'_blender/Data_CommandRoomPhysicalProps.json').read_text(encoding='utf-8'))
 SOURCE = Path(os.environ.get("COMMAND_ROOM_SOURCE", r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\CommandRoom"))
 SOURCE.mkdir(parents=True, exist_ok=True)
 if bpy.data.filepath and Path(bpy.data.filepath).resolve() != (SOURCE/"Scene_CommandRoom.blend").resolve():
@@ -201,24 +202,24 @@ for u,v in [(.025,.965),(.975,.965),(.025,.045),(.975,.045)]:
     Rod('WallMapPinHead',(x,1.418,z),(x,1.421,z),.0065,iron,24)
 Paper("DeskMap",tx,ty-.10,.894,2.60,1.78,mapmat,math.radians(40)-.035)
 # Telegram silhouette is built with the detailed props below.
-# Ordinary 18.5 cm hexagonal pencils with exposed timber and graphite points.
+# Adult writing pencils: measured end-to-tip length, including the exposed point.
 for i in range(2):
     name=f"Pencil{i}";a=Vector((.02+i*.06,.015+i*.052,.910))
-    d=Vector((.87,-.493+ i*.055,0)).normalized();b=a+d*.162
-    Rod(name+"Shaft",a,b,.0035,pencilPaint,6)
-    Rod(name+"ButtWood",a-d*.0005,a,.0035,pencilWood,6)
+    d=Vector((.87,-.493+ i*.055,0)).normalized();b=a+d*(physical['pencil']['lengthM']-.02365)
+    Rod(name+"Shaft",a,b,physical['pencil']['diameterM']/2,pencilPaint,6)
+    Rod(name+"ButtWood",a-d*.0005,a,physical['pencil']['diameterM']/2,pencilWood,6)
     Rod(name+"ButtLead",a-d*.00065,a-d*.00055,.0009,graphite,8)
-    bpy.ops.mesh.primitive_cone_add(vertices=6,radius1=.0035,radius2=.00065,depth=.020,location=b+d*.010)
+    bpy.ops.mesh.primitive_cone_add(vertices=6,radius1=physical['pencil']['diameterM']/2,radius2=.00065,depth=.020,location=b+d*.010)
     o=bpy.context.object;o.name=name+"Sharpening";o.rotation_euler=d.to_track_quat("Z","Y").to_euler();o.data.materials.append(pencilWood)
     bpy.ops.mesh.primitive_cone_add(vertices=8,radius1=.00065,radius2=.00005,depth=.003,location=b+d*.0215)
     o=bpy.context.object;o.name=name+"Lead";o.rotation_euler=d.to_track_quat("Z","Y").to_euler();o.data.materials.append(graphite)
-ruler=Cube("WoodRuler",(.46,-.27,.910),(.34,.032,.005),pencilWood,.001);ruler.rotation_euler.z=-.70
+ruler=Cube("WoodRuler",(.46,-.27,.910),(physical['ruler']['lengthM'],physical['ruler']['widthM'],physical['ruler']['thicknessM']),pencilWood,.001);ruler.rotation_euler.z=-.70
 for i in range(31):
     local=Vector((-.15+i*.010,.011,.0027));ang=-.70
     p=Vector((.46+local.x*math.cos(ang)-local.y*math.sin(ang),-.27+local.x*math.sin(ang)+local.y*math.cos(ang),.913))
     q=p+Vector((math.sin(ang),-math.cos(ang),0))*(.012 if i%5==0 else .006)
     Rod("RulerTick",p,q,.00028,graphite,4)
-penStart=Vector((.29,.19,.910));penDirection=Vector((.89,-.456,0)).normalized()
+penStart=Vector(physical['dipPen']['position']);penDirection=Vector(physical['dipPen']['direction']).normalized()
 penSide=Vector((-penDirection.y,penDirection.x,0));vs=[];uvs=[]
 profiles=[(0,.0015),(.035,.0032),(.095,.0042),(.135,.0036),(.157,.0025)]
 for j,(along,radius) in enumerate(profiles):
@@ -239,12 +240,11 @@ bpy.context.view_layer.objects.active=ob;bpy.ops.object.modifier_apply(modifier=
 # Refinements follow the saved Imagegen turnaround references.
 detailsPath=GAME/"_blender/Script_CommandRoomDetails.py"
 exec(compile(detailsPath.read_text(encoding="utf-8"),str(detailsPath),"exec"),globals())
-# Scale the bottle to a 95 mm height; pencils retain their 185 mm length.
-for ob in list(scene.objects):
-    if ob.type=='MESH' and ob.name.startswith('InkBottle'):
-        ob.matrix_world=Matrix.Translation((ix,iy,iz))@Matrix.Scale(1.34,4)@Matrix.Translation((-ix,-iy,-iz))@ob.matrix_world
+# Calibrate authored shapes in metres, before any scene placement or contact solve.
+calibrationPath=GAME/'_blender/Script_CommandRoomPhysicalScale.py'
+exec(compile(calibrationPath.read_text(encoding='utf-8'),str(calibrationPath),'exec'),globals())
 # A small open wooden pencil tray, 23 x 8 cm, supplies an everyday scale cue.
-bx=.26;by=.11;bz=.904
+bx,by,bz=physical['pencilTray']['position']
 Cube('PencilBoxBase',(bx,by,bz),(.230,.080,.007),wood,.002)
 for side in [-1,1]:
     Cube('PencilBoxLongRim',(bx,by+side*.037,bz+.010),(.230,.006,.020),wood,.002)
@@ -271,7 +271,7 @@ for ob in list(scene.objects):
         inverse=ob.matrix_world.inverted()
         for v in ob.data.vertices:
             p=ob.matrix_world@v.co
-            v.co=inverse@(Vector((hx,hy,hz))+(Matrix.Rotation(math.radians(-35),3,"Z")@(p-Vector((hx,hy,hz))))*appearance['capDisplayScale'])
+            v.co=inverse@(Vector((hx,hy,hz))+(Matrix.Rotation(math.radians(-35),3,"Z")@(p-Vector((hx,hy,hz)))))
     if ob.name.startswith('Coat'):
         ob.matrix_world=Matrix.Translation((0,0,-.39))@ob.matrix_world
     if ob.name.startswith(("Table","DryMortar")):
@@ -284,11 +284,6 @@ for ob in list(scene.objects):
         for uv in ob.data.uv_layers:
             for corner in uv.data: corner.uv*=4
 # Validate the furniture before material batching removes individual part names.
-capDimensions={**capDimensions,'displayScale':appearance['capDisplayScale'],
-    'sceneWidthM':capDimensions['widthM']*appearance['capDisplayScale'],
-    'sceneBodyLengthM':capDimensions['bodyLengthM']*appearance['capDisplayScale'],
-    'sceneVisorExtensionM':capDimensions['visorExtensionM']*appearance['capDisplayScale'],
-    'sceneHeightM':capDimensions['heightM']*appearance['capDisplayScale']}
 from mathutils.bvhtree import BVHTree
 bpy.context.view_layer.update()
 def WorldBvh(objects):
@@ -334,6 +329,9 @@ coatChairOverlaps=len(WorldBvh(coatObjects).overlap(WorldBvh(chairObjects)))
 assert coatChairOverlaps==0, f'Hanging coat intersects chair: {coatChairOverlaps} triangle pairs'
 chairFloor=min((o.matrix_world@v.co).z for o in chairObjects for v in o.data.vertices)
 assert abs(chairFloor)<.001, f'Chair feet off the floor: {chairFloor}'
+physicalReport=ValidatePhysicalProps()
+scene['commandRoomPhysicalProps']=json.dumps(physicalReport)
+(SHOTS/'Data_CommandRoomPhysicalMeasurements.json').write_text(json.dumps(physicalReport,indent=2),encoding='utf-8')
 # Lighting: single sun through actual left aperture, soft indirect fill.
 world=bpy.data.worlds.new("CommandRoomAmbient");scene.world=world;world.use_nodes=True
 world.node_tree.nodes["Background"].inputs["Color"].default_value=(.48,.52,.57,1)
@@ -362,7 +360,7 @@ for ob in scene.objects:
     if ob.data.materials[0] in (wood,plaster,mortarMat) and not ob.data.color_attributes:
         color=ob.data.color_attributes.new(name='TimberWear' if ob.data.materials[0]==wood else 'FreshLimeSection',type='FLOAT_COLOR',domain='POINT')
         for vertex in color.data:vertex.color=(1,1,1,1)
-    asset=1 if ob.name.startswith('Cap') else 2 if ob.name.startswith('Coat') else 3 if ob.name.startswith('InkBottle') else 4 if ob.name.startswith('Table') else 5 if ob.name.startswith('Cabinet') else 0
+    asset=1 if ob.name.startswith('Cap') else 2 if ob.name.startswith('Coat') else 3 if ob.name.startswith('InkBottle') else 4 if ob.name.startswith('Table') else 5 if ob.name.startswith('Cabinet') else 6 if ob.name.startswith('Telegram') else 7 if ob.name.startswith(('Pencil0','Pencil1')) else 8 if ob.name.startswith('DipPen') else 0
     attr=ob.data.attributes.new(name='InspectionAsset',type='INT',domain='FACE')
     for p in attr.data:p.value=asset
 bpy.ops.object.select_all(action="DESELECT")
@@ -393,7 +391,7 @@ for mat,a,b in links:mat.node_tree.links.new(a,b)
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/"Scene_CommandRoom.blend"))
 scene.render.filepath=str(SHOTS/"Scene_CommandRoomBlender.png")
 bpy.ops.render.render(write_still=True)
-summary={"blend":str(SOURCE/"Scene_CommandRoom.blend"),"glb":str(GAME/"Model"/"Model_CommandRoom.glb"),"meshes":len([o for o in scene.objects if o.type=="MESH"]),"triangles":sum(len(p.vertices)-2 for o in scene.objects if o.type=="MESH" for p in o.data.polygons),"camera":{"position":list(cam.location),"rotation":list(cam.rotation_euler),"lens":cam.data.lens},"materials":list(materials),"render":scene.render.filepath,"chairTableIntersections":chairOverlaps,"coatChairIntersections":coatChairOverlaps,"chairFloor":chairFloor,"propContacts":propContacts,"capDimensions":capDimensions,"inkBottleHeightM":.071*1.34,"pencilTraySizeM":[.230,.080,.027]}
+summary={"blend":str(SOURCE/"Scene_CommandRoom.blend"),"glb":str(GAME/"Model"/"Model_CommandRoom.glb"),"meshes":len([o for o in scene.objects if o.type=="MESH"]),"triangles":sum(len(p.vertices)-2 for o in scene.objects if o.type=="MESH" for p in o.data.polygons),"camera":{"position":list(cam.location),"rotation":list(cam.rotation_euler),"lens":cam.data.lens},"materials":list(materials),"render":scene.render.filepath,"chairTableIntersections":chairOverlaps,"coatChairIntersections":coatChairOverlaps,"chairFloor":chairFloor,"propContacts":propContacts,"physicalDimensions":physicalReport}
 (SHOTS/"Data_CommandRoomBuild.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
 print(json.dumps(summary))
 result=summary
