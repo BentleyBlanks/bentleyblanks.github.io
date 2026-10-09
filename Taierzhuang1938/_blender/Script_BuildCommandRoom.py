@@ -317,10 +317,34 @@ for group,prefixes in {'PencilTray':('PencilBox','Pencil0','Pencil1'),'Ruler':('
     for p in points:
         hit,normal,index,distance=supportTree.ray_cast(Vector((p.x,p.y,3)),Vector((0,0,-1)),4)
         if hit is not None:delta=max(delta,hit.z+.0006-p.z)
+    # Curled paper/map edges can meet a prop bottom between its own vertices.
+    # Probe support vertices too, including the tray's broad paperweight base.
+    propTree=WorldBvh(obs);lo,hi,size=PropBounds(obs)
+    for support in supportObjects:
+        for vertex in support.data.vertices:
+            p=support.matrix_world@vertex.co
+            if not (lo.x<=p.x<=hi.x and lo.y<=p.y<=hi.y):continue
+            bottom=propTree.ray_cast(Vector((p.x,p.y,0)),Vector((0,0,1)),3)[0]
+            if bottom is not None:delta=max(delta,p.z+.0006-bottom.z)
     assert delta>-10, f'{group} is off the desk'
     for o in obs:o.matrix_world=Matrix.Translation((0,0,delta))@o.matrix_world
     bpy.context.view_layer.update()
     overlaps=len(WorldBvh(obs).overlap(supportTree))
+    if overlaps:
+        # A support edge can cross a rounded bottle foot without either
+        # mesh's vertices lying inside the other footprint. Resolve the
+        # missed interior contact on a 2 mm grid, retaining the same gap.
+        propTree=WorldBvh(obs);lo,hi,size=PropBounds(obs);extra=0
+        nx=max(2,math.ceil(size.x/.002));ny=max(2,math.ceil(size.y/.002))
+        for ix in range(nx+1):
+            for iy in range(ny+1):
+                x=lo.x+size.x*ix/nx;y=lo.y+size.y*iy/ny
+                bottom=propTree.ray_cast(Vector((x,y,0)),Vector((0,0,1)),3)[0]
+                hit=supportTree.ray_cast(Vector((x,y,3)),Vector((0,0,-1)),4)[0]
+                if hit is not None and bottom is not None:extra=max(extra,hit.z+.0006-bottom.z)
+        for o in obs:o.matrix_world=Matrix.Translation((0,0,extra))@o.matrix_world
+        delta+=extra;bpy.context.view_layer.update()
+        overlaps=len(WorldBvh(obs).overlap(supportTree))
     assert overlaps==0, f'{group} intersects its support: {overlaps} triangle pairs'
     propContacts[group]={'heightAdjustment':delta,'surfaceGap':.0006,'supportIntersections':overlaps}
 chairObjects=[o for o in scene.objects if o.type=='MESH' and o.name.startswith('Chair')]
@@ -350,8 +374,8 @@ entryLight=bpy.context.object;entryLight.name='EntranceSky';entryLight.data.ener
 entryLight.data.shape='RECTANGLE';entryLight.data.size=entry['widthM'];entryLight.data.size_y=entry['heightM']
 entryLight.rotation_euler=Vector((0,1,0)).to_track_quat('-Z','Y').to_euler()
 bpy.ops.object.light_add(type="SUN",location=(-3,5,5))
-sun=bpy.context.object;sun.name="LeftWindowSun";sun.data.energy=2.8;sun.data.angle=.05
-sun.rotation_euler=Vector((.80,-1.6,-1.25)).to_track_quat("-Z","Y").to_euler()
+sun=bpy.context.object;sun.name="LeftWindowSun";sun.data.energy=layout['sunStrength'];sun.data.angle=.05
+sun.rotation_euler=Vector(layout['sunDirection']).to_track_quat("-Z","Y").to_euler()
 # Camera is a real glTF camera; reference matching is evaluated from render.
 bpy.ops.object.camera_add(location=calibratedCameraPosition)
 cam=bpy.context.object;cam.name="CommandRoomCamera"

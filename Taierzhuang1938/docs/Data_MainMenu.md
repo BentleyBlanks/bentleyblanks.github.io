@@ -43,7 +43,7 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 选章、注记、关于、设置及声音／画面／操作子页共用焦点状态，时间常数 .18 s，
 约 .54 s 到达目标的 95%；快速返回或反向切换从当前状态继续，减少动态效果时直接切换。
 渲染分辨率和 DPR 改变时保持 CSS 像素半径。窗外自发光底色略加红，
-体积光和浮尘同步偏暖；不增加另一个太阳，不改变既有窗光方向。
+体积光和浮尘同步偏暖；仍使用单一窗光，烘焙与运行时光束方向保持一致。最新方向随前景信纸调整，见后文摆位一节。
 桌面旧损由木板本体的倒角、缺口和磨痕表现，
 单窗天空补光与曝光提亮可读区域，太阳方向保持一致。`host.staticBackdrop` 关闭时，
 下文原有战场机位系统仍可运行，正式入口默认启用指挥室。
@@ -104,6 +104,18 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 源工程为 `CommandRoom/LetterFocus20261010/Scene_CommandRoom.blend`；本地对照页为 `_shots/CommandRoom/Index_LetterFocus.html`，产物和回归记录留在同目录。
 
 最终 GLB 为 21 网格、360791 三角形、16784264 字节，无损 UV1 光照图 1434676 字节。1280×720 实机中的纸面边界约 403×180 像素，视深覆盖 1.092–1.744 m；实际焦点约 1.418 m，清晰带半宽 .412 m。2231 个纸面内采样点的 DOF 开／关 RGB 差异为零，而背景有 223397 个像素发生变化；两侧视差极限的纸面模糊半径均为零。三个历史纸面均已局部目检。AssetStandards、TextureStandards、CommandRoomBrowser、CommandRoomPublication、MotionVectorContract、MenuStartup 与 CommandRoomPreview 七项通过；ModuleGraph、Text、TestRunner 自测通过。prepush 仍停在未修改的 CharacterSpeechTest 既有「呃啊」断言。本任务 Blender 已停止，扫描无残留。
+
+### 信纸前移、笔盒压纸与窗光对比（2026-10-10）
+
+按用户批注图将信纸移近、帽子后移，保留原相机、纸面尺寸与朝向、房间构图。笔盒压住信纸上沿一角，正文保持可读；笔、墨水瓶和尺在邻近位置让开。接触求解除道具顶点外还检查支撑面顶点；卷边与圆形瓶底在边线内部相交时，使用 2 mm 网格补查接触高度，不放宽穿插断言。纸面下压关系由实际网格射线测量：笔盒必须有正的覆盖面积，底面距纸面最近处为 .3–1.5 mm，所有道具与支撑面及彼此仍不穿插。
+
+环境天光由 .35 降到 .24，窗外柔光倍率由 .70 降到 .42，画外入口漫射光由 12 W 降到 6.5 W；曝光不变。窗光沿移动后的信件调整，太阳强度 3.6，Blender 方向为 `(1.15,-1.72,-1)`，运行时体积光使用对应的 Y-up 方向并延长至 1.9 m。重建直接向信纸做遮挡射线检查，确保光从窗口到纸面有畅通路径，浏览器核对光束方向与射线一致、长度覆盖落点。景深继续随信纸移动更新。
+
+`Debug.CommandRoom().physical` 增加道具中心位置、纸角受压接触数据和直射光落点；源工程为 `CommandRoom/LetterStaging20261010/Scene_CommandRoom.blend`。本地对照页为 `_shots/CommandRoom/Index_LetterStaging.html`，亮暗对照与验收记录保留在同目录。
+
+实测纸面视深约 1.253 m、帽子约 1.410 m，纸面投影约 485×234 像素且完整留在 1280×720 画幅内。笔盒 65 个底面采样点中 5 点压在纸角上，最小间隙约 1.08 mm；窗口至纸面的无遮挡射线长 1.731 m，位于 1.9 m 的可见光束内。3280 个正文像素在 DOF 开／关时 RGB 差为零。与前版同机位截图比较，墙图、左墙、柜面三个非光束采样区的平均 8-bit 亮度约降 37%；纸面 90 分位亮度相对这些区域的比值提高约 28%。挂衣区域因新的光束经过而变亮，单列记录，不混入非光束区域统计。
+
+产物为 21 网格、360639 三角形、15513128 字节的 GLB，无损光照图 1245644 字节。AssetStandards、TextureStandards、CommandRoomBrowser、CommandRoomPublication、MotionVectorContract、MenuStartup、CommandRoomPreview 七项通过；发布与源码 RGB 平均误差 .339、95 分位 2。ModuleGraph、Text 与 TestRunner 自测通过；prepush 仍停在既有未修改的 CharacterSpeechTest「呃啊」断言。BlenderMCP 已停止，扫描无残留。
 
 衣服使用 Imagegen `Source/CommandRoomClothSerge.png`；帽子独立使用
 `Source/CommandRoomCapTwill20261007.png` 的普通灰褐斜纹棉布。两者均为 25 cm 一铺、

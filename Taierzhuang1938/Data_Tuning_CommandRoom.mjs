@@ -1,6 +1,6 @@
 // Dedicated static menu set. Values are authored against the three approved references.
 export const COMMAND_ROOM = Object.freeze({
-  version: "202610100330",
+  version: "202610100430",
   model: "./Model/Model_CommandRoom.glb",
   background: 0x373936,
   cameraNear: 0.05,
@@ -32,7 +32,7 @@ export const COMMAND_ROOM = Object.freeze({
   dust: Object.freeze({ count: 320, color: 0xf2d8bd, opacity: .6, size: .0025, drift: .0175 }),
   // Actual Blender aperture; ray integration clips against camera and light depth.
   windowHaze: Object.freeze({ center: [-.838725, 1.5137625, -1.176775], size: [.3705, .944775],
-    direction: [.8, -1.25, 1.6], length: 1.625, density: .42, color: 0xefd1b6,
+    direction: [1.15, -1.0, 1.72], length: 1.9, density: .42, color: 0xefd1b6,
     edgeSoftness: .0175, steps: 36, resolutionScale: .5,
     shadowSize: 1024, shadowExtent: .9, shadowDistance: 1.5, shadowFar: 4, shadowBias: .00035 }),
 });

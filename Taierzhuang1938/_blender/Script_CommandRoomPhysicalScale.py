@@ -88,5 +88,26 @@ def ValidatePhysicalProps():
             assert count==0,f'Desk props intersect: {name}/{other}: {count} pairs'
             overlaps[name+'/'+other]=count
     report['propIntersections']=overlaps
+    # The pencil tray is an intentional paperweight, not an intersecting mesh
+    # or a prop hovering over the page. Sample the actual underside and paper.
+    trayBase=PropObjects(('PencilBoxBase',));trayTree=WorldBvh(trayBase);paperTree=WorldBvh(paper)
+    trayLo,trayHi,traySize=PropBounds(trayBase);contactGaps=[]
+    for ix in range(13):
+        for iy in range(5):
+            x=trayLo.x+(ix+.5)/13*traySize.x;y=trayLo.y+(iy+.5)/5*traySize.y
+            hit=paperTree.ray_cast(Vector((x,y,3)),Vector((0,0,-1)),4)[0]
+            underside=trayTree.ray_cast(Vector((x,y,0)),Vector((0,0,1)),3)[0]
+            if hit is not None and underside is not None:contactGaps.append(underside.z-hit.z)
+    assert len(contactGaps)>=3,'Pencil tray must overlap the upper paper margin'
+    assert .0003<=min(contactGaps)<=.0015,f'Pencil tray must rest on the paper: {contactGaps}'
+    report['letter']['paperweight']={'overlapSamples':len(contactGaps),'sampleCount':65,'minimumGapM':min(contactGaps)}
+    window=Vector(calibrationReport['window']['center']);sunDirection=Vector(layout['sunDirection']).normalized()
+    hit,normal,index,distance=paperTree.ray_cast(window,sunDirection,3)
+    assert hit is not None,'Window sunlight must still reach the repositioned letter'
+    blockers=WorldBvh([o for o in scene.objects if o.type=='MESH' and o not in paper])
+    blocked=blockers.ray_cast(window+sunDirection*.002,sunDirection,distance-.004)[0]
+    assert blocked is None,f'Letter sunlight is blocked by room geometry: {blocked}'
+    report['letter']['sunlight']={'window':list(window),'direction':list(sunDirection),'hit':list(hit),'distanceM':distance,'occluded':False}
+    report['placements']={name:{'centerM':list((PropBounds(objects)[0]+PropBounds(objects)[1])/2)} for name,objects in groups.items()}
     print('Measured physical props',json.dumps(report),flush=True)
     return report

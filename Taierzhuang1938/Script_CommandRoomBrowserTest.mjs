@@ -134,6 +134,22 @@ try {
     "The actual letter occupies enough screen pixels for its writing at 1280x720");
   assert.ok(result.letterFocus.maxBlur<.000001&&result.letterFocus.focus>result.letterFocus.near&&result.letterFocus.focus<result.letterFocus.far,
     "The DOF plane must lie on the letter and keep both ends of the page sharp");
+  assert.ok(result.letterFocus.bounds[0]>=0&&result.letterFocus.bounds[1]>=0
+    &&result.letterFocus.bounds[0]+result.letterFocus.bounds[2]<=1280&&result.letterFocus.bounds[1]+result.letterFocus.bounds[3]<=720,
+    "The closer letter must remain fully inside the approved camera frame");
+  result.letterStaging=await page.evaluate(()=>{
+    const physical=room.State().physical,up=p=>new THREE.Vector3(p[0],p[2],-p[1]);
+    const Depth=p=>-up(p).applyMatrix4(room.camera.matrixWorldInverse).z;
+    const sun=physical.letter.sunlight,direction=room.atmosphere.volumeMaterial.uniforms.direction.value;
+    return {letterDepth:Depth(physical.placements.Letter.centerM),capDepth:Depth(physical.placements.Cap.centerM),
+      paperweight:physical.letter.paperweight,sunlight:sun,
+      beamDirectionError:direction.distanceTo(up(sun.direction)),beamLength:room.atmosphere.data.length};
+  });
+  assert.ok(result.letterStaging.capDepth>result.letterStaging.letterDepth+.05,"Cap sits behind the closer foreground letter");
+  assert.ok(result.letterStaging.paperweight.overlapSamples>=3&&result.letterStaging.paperweight.minimumGapM>=.0003
+    &&result.letterStaging.paperweight.minimumGapM<=.0015,"Tray visibly overlaps and rests on the upper paper margin");
+  assert.ok(!result.letterStaging.sunlight.occluded&&result.letterStaging.beamDirectionError<.00001
+    &&result.letterStaging.beamLength>result.letterStaging.sunlight.distanceM,"Baked sunlight and the visible window beam both reach the letter");
   Near(result.physical.bottle[0],physicalSpec.inkBottle.widthM,"Exported bottle width");
   Near(result.physical.bottle[1],physicalSpec.inkBottle.heightM,"Exported bottle height");
   Near(result.physical.bottle[2],physicalSpec.inkBottle.depthM,"Exported bottle depth");
