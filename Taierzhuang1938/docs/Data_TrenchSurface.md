@@ -1,5 +1,19 @@
 # 通用壕沟表面
 
+## 2026-10-09 补充：按用户近照改用模块化土崖内壁
+
+用户补充近乎直立、带凹洞和悬挑土沿的开挖断面照片，并要求采用成熟的山体崖壁处理方式。本节覆盖下节旧坡皮方案：大尺度断口由实际网格承担，密实土与松土继续使用世界坐标投影的现有 PBR。材质不跟随模块尺寸拉伸；壕沟走向、沟底、共享碰撞高度场与地形指纹保持原值。
+
+- 内置 imagegen 生成一张四模块原型表，再由 BlenderMCP 执行 [_import/Script_BakeTrenchCliffWalls.py](../_import/Script_BakeTrenchCliffWalls.py) 重建 [Model_TrenchCliffWalls.glb](../Model/Model_TrenchCliffWalls.glb)。生成提示词原文见 [Model_TrenchCliffWalls.txt](../_import/Prompts/Model_TrenchCliffWalls.txt)。这是手工规则重建的低模，不是扫描资产，也不是自动从图片恢复的几何。
+- 源工程 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchCliffWalls/Scene_TrenchCliffWalls.blend`，该目录同时保留两张参考图、提示词及顶点边界测量。四种模块为 SpadeFace / TornFace / LowerScar / RootCrown，各 272 三角，合计 1,088 三角，GLB 25,564 字节、一个材质。实测 glTF：X 沿沟宽 1.5 m、Y 向上约 2.03–2.05 m、+Z 朝沟内，背裙 Z=-0.06 m，正向最大凹凸 0.209–0.236 m。
+- 运行时按原测站和原物理岸坡拟合高度，保持沟底净空。随机选择四种形体，前脸具备真实凹口与倒悬，顶部回折埋入弃土冠部。显式无弃土垄的出口及单侧土垄的空侧不抬高冠部，模型顶部超出的高度也被收回原岸顶。相邻端点共用切土面；只渐隐局部破损，不把整块厚度归零，避免等距柱状鼓包。变形后在共同边界平滑法线。侧边不加跨越整面高度的封口四边形，因为它会穿过弯曲后的剖面，产生三角露边。
+- 根须改为朝土壁的水平射线贴合，并按需要弯折；有倒悬的表面不能用最高 Y 来决定根须落点。独立测试对实际三角形计算三维最近距离，另查双方朝向、倒悬面、边界法线、沟底净空及原路线不变。模型变形后同步重算球形/盒形包围体，以免射线仍用源模型原点的范围而漏掉全部根须。
+- 全图当前铺设 1,035 个模块，沿用 60 个静态分区网格；无逐模块 Mesh、碰撞体或每帧更新。土壁不再散铺旧三颗颗粒；微小土团的 8 面阈值调到 7.3 cm，把面数留给实际崖壁。CPU 统计：土团 27,880、根束 2,815，土层 1,067,688 三角，加草/石 78,176，共 1,145,864，保留原有 1.15M / 64 上限。
+
+重建仍从本任务 worktree 运行 `Script_BlenderMcp.mjs start --blend <上述源工程> --task TrenchCliffWalls`，通过 `exec --code` 调用 `runpy.run_path`，完成后 `stop` 与 `status --scan`。本轮已关闭本任务实例；最终 `status --scan` 显示本任务无实例、全机亦无残留。中途发现的其他实例未操作。
+
+第四十一轮取证目录为本地 `TrenchReferenceTenImplementation20261009/Iteration41CliffAll` 与 `Whitebox41Cliff`。高画质 29 个机位覆盖全 22 段，白盒另查 3 个机位；实际统计与上述预算一致，页面/控制台/GL 错误均为 0，截图已查看。两档实测爆破削低 0.606 m、四组装饰裁除，Reset 恢复原几何与高度。本轮 `TrenchSurfaceTest`、`TrenchPlanTest`、`FirstLevelFrontTopologyTest`（48 条路线）、`ModuleGraphTest` 通过，49 场景 `MotionVectorContractTest` GPU 门通过。本轮未修改贴图、采样器布局或物理地形。此前 quick / prepush 的已知失败仍见下节，不据此宣称全套通过。局部断口已进入实际几何，模块露边与规则柱状起伏已修正；形态和材质仍未宣称与参考照片完全一致，当前保留本地审阅。
+
 ## 2026-10-09：按用户选中的 10 号土壤参考迭代
 
 本次外观目标是用户从十张 imagegen 图中选中的 `Reference_TrenchEarth_10.png`。历史照片 01 / 14 继续约束开挖形态；当前材质以 10 号图的灰褐、哑光、颗粒与断面为准。参考图及实机对照只存本地 `C:/Users/Bentl/.codex/artifacts/TrenchReferenceTenImplementation20261009/`，不随站点发布。

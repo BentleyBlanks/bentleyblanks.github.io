@@ -30,7 +30,7 @@ export async function LoadTrenchSurface() {
     return all?geometries:geometries[0];
   };
   try {
-    const results=await Promise.allSettled([Model(C.models.grass),Model(C.models.stone),Model(C.models.clods,true),
+    const results=await Promise.allSettled([Model(C.models.grass),Model(C.models.stone),Model(C.models.clods,true),Model(C.models.cliffs,true),
       (async()=>{const bitmap=await createImageBitmap(await (await Fetch(C.mudMap)).blob(),{colorSpaceConversion:'none'});
         const canvas=new OffscreenCanvas(bitmap.width,bitmap.height),ctx=canvas.getContext('2d');ctx.drawImage(bitmap,0,0);bitmap.close();
         const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
@@ -41,8 +41,8 @@ export async function LoadTrenchSurface() {
         const map=new THREE.Texture(bitmap);map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=8;
         map.needsUpdate=true;resources.push(map);resources.push({dispose:()=>bitmap.close()});return map;})()]);
     const failed=results.find(r=>r.status==='rejected');if(failed)throw failed.reason;
-    const [grass,stone,clods,mud,rootMap]=results.map(r=>r.value);
-    return {grass,stone,clods,mud,rootMap,Dispose(){for(const r of resources)r.dispose();}};
+    const [grass,stone,clods,cliffs,mud,rootMap]=results.map(r=>r.value);
+    return {grass,stone,clods,cliffs,mud,rootMap,Dispose(){for(const r of resources)r.dispose();}};
   } catch(error){for(const r of resources)r.dispose();throw error;}
 }
 

@@ -327,7 +327,8 @@ export class FirstLevelWhiteboxField {
         roughness: TRENCH_APPEARANCE.rootRoughness, metalness: 0,
       }));
       this.stats.trenchEarth = BuildTrenchEarth(dressing, TrenchPlanFor(this.layout.terrainSpec),
-        (x, z) => this.TerrainHeight(x, z), { roots: this.trenchSurface ? "ground" : "TrenchRoots", clods: this.trenchSurface?.clods });
+        (x, z) => this.TerrainHeight(x, z), { roots: this.trenchSurface ? "ground" : "TrenchRoots",
+          clods: this.trenchSurface?.clods, cliffs: this.trenchSurface?.cliffs });
       if (this.trenchSurface) this.stats.trenchSurface = BuildTrenchSurface(dressing,
         TrenchPlanFor(this.layout.terrainSpec), (x, z) => this.TerrainHeight(x, z), this.trenchSurface);
       const pieces = dressing.Flush(this.scene, { Get: key => this.materials.get(key) });

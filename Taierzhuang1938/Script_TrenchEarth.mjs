@@ -5,8 +5,8 @@ import { HashString, Mulberry32, ValueNoise2 } from "./Script_Noise.mjs";
 import { TRENCH_APPEARANCE as DefaultStyle } from "./Data_TrenchAppearance.mjs";
 import { CreateTrenchDressingHeightSampler } from "./Script_TrenchSurface.mjs";
 
-export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots", clods = [], style: Style = DefaultStyle } = {}) {
-  const stats = { clods: 0, spoilClods: 0, roots: 0, triangles: 0 };
+export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots", clods = [], cliffs = [], style: Style = DefaultStyle } = {}) {
+  const stats = { clods: 0, spoilClods: 0, roots: 0, cliffPanels: 0, triangles: 0 };
   const skinGeometries=[];
   // IcosahedronGeometry(1, 0) splits every triangle for flat normals. Weld the
   // twelve corners before reshaping so small crumbs do not shade as rock facets.
@@ -130,6 +130,39 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     geometry.userData.trenchCrust=true;
     Add(earth,geometry);
   };
+  const CliffPanel = (st,next,side,ends,variant) => {
+    const geometry=cliffs[variant%cliffs.length].clone(),p=geometry.attributes.position;
+    const hasCrown=(side>0?st.bermPlus:st.bermMinus)>0;
+    const marker=new Float32Array(p.count*2);
+    for(let i=0;i<p.count;i++){
+      // Kit coordinates: 1.5 m along X, 2 m up Y, +Z points into the trench.
+      // Fit by height rather than stretching a heightfield grid over the face:
+      // the module keeps its pockets, recessed skirt and overhanging crown.
+      const v=Math.max(0,Math.min(1,(p.getX(i)+.75)/1.5)),u=hasCrown?p.getY(i)/2:Math.min(1,p.getY(i)/2);
+      const cx=st.x+(next.x-st.x)*v,cz=st.z+(next.z-st.z)*v;
+      const nx=st.nx+(next.nx-st.nx)*v,nz=st.nz+(next.nz-st.nz)*v;
+      const half=st.halfFloor+(next.halfFloor-st.halfFloor)*v,bank=st.bank+(next.bank-st.bank)*v;
+      const foot=half+bank*.02,crest=half+bank;
+      const At=offset=>groundAt(cx+nx*side*offset,cz+nz*side*offset);
+      const floor=At(foot),top=At(crest),height=floor+(top-floor)*u;
+      let lo=foot,hi=crest;
+      for(let step=0;step<10;step++){
+        const mid=(lo+hi)*.5;if(At(mid)<height)lo=mid;else hi=mid;
+      }
+      const base=u<=0?foot:u>=1?crest:(lo+hi)*.5,taper=CrustTaper(v,ends);
+      const inset=p.getZ(i)*Style.cliffDepthScale*taper*Ease(u/.10);
+      const lateral=Math.max(foot,base-inset),x=cx+nx*side*lateral,z=cz+nz*side*lateral;
+      const crown=hasCrown?CrownLift(cx+nx*side*crest,cz+nz*side*crest)*Ease((u-.75)/.25)*taper:0;
+      p.setXYZ(i,x,height+crown-.004,z);marker[i*2]=u;marker[i*2+1]=v;
+    }
+    const index=geometry.index;
+    if((st.tz*st.nx-st.tx*st.nz)*side<0)
+      for(let i=0;i<index.count;i+=3){const b=index.getX(i+1);index.setX(i+1,index.getX(i+2));index.setX(i+2,b);}
+    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(marker,2));
+    geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();
+    geometry.userData.trenchCrust=true;geometry.userData.trenchCliff=true;
+    Add(earth,geometry);stats.cliffPanels++;
+  };
   const SpoilLift=(x,z,u,taper)=>{
     const crownBlend=1-Ease(u/.4),loose=Math.sin(Math.PI*Math.max(0,Math.min(1,u)))*
       (.025+.10*ValueNoise2(x*4.2,z*4.2,712)+.035*ValueNoise2(x*9,z*9,337));
@@ -157,18 +190,19 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
     geometry.userData.trenchCrown=true;geometry.userData.trenchSpoilSkin=true;Add(earth,geometry);
   };
-  const RootPiece = (a, b, radius, endRadius=radius*.5, depth=0) => {
+  const RootPiece = (a, b, radius, endRadius=radius*.5, depth=0, attach=null) => {
     // Bend only where a straight fibre would enter the visible skin or bridge
     // too far above it. Sampling the actual triangles also works at junctions.
     let bend=null,bendError=.012;
     if(depth<2)for(const t of [.25,.5,.75]){
-      const point=a.clone().lerp(b,t),height=skinAt(point.x,point.z)+.012;
-      const error=Math.abs(point.y-height);
-      if(error>bendError){point.y=height;bend={point,t};bendError=error;}
+      const point=a.clone().lerp(b,t),target=attach?attach(point):new THREE.Vector3(point.x,skinAt(point.x,point.z)+.012,point.z);
+      if(!target)continue;
+      const error=point.distanceTo(target);
+      if(error>bendError){bend={point:target,t};bendError=error;}
     }
     if(bend){
       const midRadius=radius+(endRadius-radius)*bend.t;
-      RootPiece(a,bend.point,radius,midRadius,depth+1);RootPiece(bend.point,b,midRadius,endRadius,depth+1);return;
+      RootPiece(a,bend.point,radius,midRadius,depth+1,attach);RootPiece(bend.point,b,midRadius,endRadius,depth+1,attach);return;
     }
     dir.subVectors(b, a);
     const len = dir.length();
@@ -200,11 +234,51 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       for (const side of [-1, 1]) if (skin[side][i]) {
         const st = segment.stations[i];
         sink.SetSector(`TrenchEarth_${Math.floor(st.x / Style.sectorM)}_${Math.floor(st.z / Style.sectorM)}`);
-        Crust(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
+        if(cliffs.length)CliffPanel(st,segment.stations[i+Style.stationStride],side,SkinEnds(i,side),
+          HashString(segment.id+':'+i+':'+side));
+        else Crust(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
         SpoilSkin(st, segment.stations[i + Style.stationStride], side, SkinEnds(i, side));
       }
   }
+  // Neighbouring modules share the border positions but were deformed and
+  // shaded separately. Join only those border normals before static batching;
+  // pockets inside each module keep their own sculpted shading.
+  const cliffBorders=new Map();
+  for(const geometry of skinGeometries)if(geometry.userData.trenchCliff){
+    const p=geometry.attributes.position,n=geometry.attributes.normal,uv=geometry.attributes.uv;
+    for(let i=0;i<p.count;i++)if(uv.getY(i)<1e-6||uv.getY(i)>1-1e-6){
+      const key=[p.getX(i),p.getY(i),p.getZ(i)].map(v=>Math.round(v*1e5)).join(':');
+      if(!cliffBorders.has(key))cliffBorders.set(key,[]);
+      cliffBorders.get(key).push({geometry,n,i});
+    }
+  }
+  for(const members of cliffBorders.values())if(new Set(members.map(m=>m.geometry)).size>1){
+    const normal=new THREE.Vector3();
+    for(const {n,i} of members)normal.add(new THREE.Vector3().fromBufferAttribute(n,i));
+    normal.normalize();for(const {n,i} of members)n.setXYZ(i,normal.x,normal.y,normal.z);
+  }
   const skinAt=CreateTrenchDressingHeightSampler(skinGeometries,groundAt);
+  // A cliff can overhang itself: a vertical height query would attach roots to
+  // the lip above their actual face. Use a small spatial index and horizontal
+  // rays for these surface attachments; no per-frame meshes or physics bodies.
+  const cliffCells=new Map(),cliffCellM=2,cliffMaterial=cliffs.length?new THREE.MeshBasicMaterial({side:THREE.DoubleSide}):null;
+  const cliffRay=new THREE.Raycaster();
+  for(const geometry of skinGeometries)if(geometry.userData.trenchCliff){
+    geometry.computeBoundingBox();const bounds=geometry.boundingBox,mesh=new THREE.Mesh(geometry,cliffMaterial);
+    for(let z=Math.floor(bounds.min.z/cliffCellM);z<=Math.floor(bounds.max.z/cliffCellM);z++)
+      for(let x=Math.floor(bounds.min.x/cliffCellM);x<=Math.floor(bounds.max.x/cliffCellM);x++){
+        const key=x+':'+z;if(!cliffCells.has(key))cliffCells.set(key,[]);cliffCells.get(key).push(mesh);
+      }
+  }
+  const AttachCliff=(point,nx,nz)=>{
+    const meshes=new Set(),cellX=Math.floor(point.x/cliffCellM),cellZ=Math.floor(point.z/cliffCellM);
+    for(let z=cellZ-1;z<=cellZ+1;z++)for(let x=cellX-1;x<=cellX+1;x++)
+      for(const mesh of cliffCells.get(x+':'+z)||[])meshes.add(mesh);
+    const normal=new THREE.Vector3(nx,0,nz).normalize();
+    cliffRay.set(point.clone().addScaledVector(normal,-.8),normal);cliffRay.far=1.6;
+    const hit=cliffRay.intersectObjects([...meshes],false)[0];
+    return hit?hit.point.addScaledVector(hit.face.normal,.004):null;
+  };
   for (const segment of plan.segments) {
     const random = Mulberry32(HashString(`${plan.seed}:${segment.id}:Earth07`));
     for (let i = 0; i < segment.stations.length; i += Style.stationStride) {
@@ -235,7 +309,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         }
         // Several sizes of embedded aggregates give the excavation real relief.
         // Jitter across the entire bank; small crumbs collect at its foot.
-        for(let n=0;n<Style.bankClods;n++) {
+        for(let n=0;n<(cliffs.length?0:Style.bankClods);n++) {
           const at=Point(st.halfFloor+st.bank*(.08+random()*.92),(random()-.5)*1.35);
           Clod(at,Range(random,Style.clodRadiusM),Range(random,Style.clodReliefM),random,false,dressAt);
         }
@@ -274,15 +348,23 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
             const c = Point(crest - length * 0.85, spread + (random() - 0.5) * 0.28, 0.02);
             // Follow the rendered cut skin as the soil clods do. Using only the
             // collision field buried these fine roots inside the raised skin.
-            for(const point of [a,b,c])point.y=dressAt(point.x,point.z)+.012;
-            RootPiece(a, b, Style.rootRadiusM * (0.6 + random() * 0.6));
-            RootPiece(b, c, Style.rootRadiusM * 0.48);
+            let attach=null;
+            if(cliffs.length){
+              a.y=dressAt(a.x,a.z)+.008;b.y=a.y-length*.5;c.y=a.y-length;
+              attach=point=>AttachCliff(point,st.nx*side,st.nz*side);
+              const surfaceB=attach(b),surfaceC=attach(c);
+              if(!surfaceB||!surfaceC)continue;
+              b.copy(surfaceB);c.copy(surfaceC);
+            }else for(const point of [a,b,c])point.y=dressAt(point.x,point.z)+.012;
+            const radius=Style.rootRadiusM*(.6+random()*.6);
+            RootPiece(a,b,radius,radius*.5,0,attach);
+            RootPiece(b,c,Style.rootRadiusM*.48,Style.rootRadiusM*.24,0,attach);
             stats.roots++;
           }
         }
       }
     }
   }
-  shape.dispose();tinyShape.dispose();
+  shape.dispose();tinyShape.dispose();cliffMaterial?.dispose();
   return stats;
 }

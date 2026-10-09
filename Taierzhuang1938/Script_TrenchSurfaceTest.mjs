@@ -45,6 +45,15 @@ for(const [kind,url] of Object.entries(C.models)){
       assert.ok(bounds.min[1]<0&&bounds.max[1]>.3,'buried sole and exposed upper volume');
     }
   }
+  if(kind==='cliffs'){
+    assert.equal(json.meshes.length,4,'four distinct earthen cliff modules');
+    for(const primitive of primitives){
+      const bounds=json.accessors[primitive.attributes.POSITION];
+      assert.ok(Math.abs(bounds.max[0]-bounds.min[0]-1.5)<1e-5,'cliff kit has a measured 1.5 m along axis');
+      assert.ok(bounds.min[1]===0&&bounds.max[1]>2&&bounds.max[1]<2.1,'cliff kit has a 2 m upright face and broken crown');
+      assert.ok(bounds.min[2]<-.05&&bounds.max[2]>.15&&bounds.max[2]<.3,'cliff kit has real front relief and a recessed skirt');
+    }
+  }
   const position=json.accessors[primitives[0].attributes.POSITION];
   if(kind==='grass'){
     assert.ok(position.min[1]<-.3&&position.max[1]>.3,'tuft has hanging and standing geometry');
@@ -179,6 +188,94 @@ assert.ok(rootGaps.length>100,'sample actual rendered root fibres across both ba
 assert.ok(Math.min(...rootGaps)>-.02,'root fibres do not cross deeply into visible soil');
 assert.ok(Math.max(...rootGaps)<.06,'root fibres do not bridge over the soil as floating sticks');
 contactMaterial.dispose();
+// The authored cliff kit must actually replace the runtime wall skin, face the
+// walking lane on both banks, and preserve the original floor and trench plan.
+const cliffBytes=fs.readFileSync(new URL(C.models.cliffs,import.meta.url));
+const cliffScene=(await new GLTFLoader().parseAsync(cliffBytes.buffer.slice(cliffBytes.byteOffset,cliffBytes.byteOffset+cliffBytes.byteLength),'')).scene;
+const cliffKit=[];cliffScene.updateMatrixWorld(true);cliffScene.traverse(node=>{
+  if(node.isMesh)cliffKit.push(node.geometry.clone().applyMatrix4(node.matrixWorld));
+});
+let panels=0,frontFaces=0,undercutFaces=0;
+const cliffBatches=[];
+const cliffStats=BuildTrenchEarth({SetSector(){},Add(key,g){
+  cliffBatches.push(g);
+  if(g.userData.trenchCliff){
+    panels++;const p=g.attributes.position,index=g.index;
+    for(let i=0;i<p.count;i++){
+      assert.ok(Math.abs(p.getX(i))>=1.7+.02*1.1-1e-5,'cliff surface never enters the original walking floor');
+      assert.ok(Math.abs(p.getX(i))<=2.87,'recessed cliff skirt stays inside the bank and crown margin');
+      assert.ok([p.getX(i),p.getY(i),p.getZ(i)].every(Number.isFinite));
+    }
+    for(let i=0;i<index.count;i+=3){
+      const [a,b,c]=[0,1,2].map(k=>new THREE.Vector3().fromBufferAttribute(p,index.getX(i+k)));
+      const normal=b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+      const centre=a.clone().add(b).add(c).multiplyScalar(1/3);
+      if(normal.x*Math.sign(centre.x)<-.3)frontFaces++;
+      if(normal.y<-.15&&centre.y>-.5)undercutFaces++;
+    }
+  }
+  g.dispose();
+}},cutPlan,cutGround,{cliffs:cliffKit,roots:'ground',style:{...TRENCH_APPEARANCE,
+  clodChance:0,bankClods:0,crumbs:0,lipClods:0,spoilClods:0}});
+assert.ok(panels>10&&frontFaces>panels*80,'authored wall faces are visible from both sides of the trench');
+assert.ok(undercutFaces>10,'overhanging crown is represented by geometry, not only a normal map');
+assert.ok(cliffStats.roots>10,'wall-projected roots reach the deformed cliff mesh, including its updated raycast bounds');
+assert.equal(JSON.stringify(cutPlan.segments[0].stations),stationsBefore,'cliff placement keeps the authored route');
+const cliffSeams=new Map();let joinedCliffNormals=0;
+for(const g of cliffBatches)if(g.userData.trenchCliff){
+  const p=g.attributes.position,n=g.attributes.normal,uv=g.attributes.uv;
+  for(let i=0;i<p.count;i++)if(uv.getY(i)<1e-6||uv.getY(i)>1-1e-6){
+    const key=[p.getX(i),p.getY(i),p.getZ(i)].map(v=>Math.round(v*1e5)).join(':');
+    const normal=new THREE.Vector3().fromBufferAttribute(n,i),previous=cliffSeams.get(key);
+    if(previous&&previous.geometry!==g){
+      assert.ok(normal.dot(previous.normal)>.9999,'adjacent cliff borders shade continuously');joinedCliffNormals++;
+    }else cliffSeams.set(key,{geometry:g,normal});
+  }
+}
+assert.ok(joinedCliffNormals>100,'inspect actual shared cliff boundaries on both banks');
+// A height query cannot measure attachment below an overhang. Check distance
+// to the actual wall/crown triangles in 3D, independently of the placement rays.
+const cliffTriangles=[];
+for(const g of cliffBatches)if(g.userData.trenchCliff||g.userData.trenchSpoilSkin){
+  const p=g.attributes.position,index=g.index;
+  for(let i=0;i<index.count;i+=3){
+    const vertices=[0,1,2].map(k=>new THREE.Vector3().fromBufferAttribute(p,index.getX(i+k)));
+    const triangle=new THREE.Triangle(...vertices);
+    if(triangle.getArea()>1e-10)cliffTriangles.push({triangle,bounds:new THREE.Box3().setFromPoints(vertices)});
+  }
+}
+const closest=new THREE.Vector3();let maxCliffRootGap=0,cliffRootSamples=0;
+for(const g of cliffBatches)if(g.userData.trenchRoots){
+  const p=g.attributes.position,ends=[0,4].map(start=>{
+    const centre=new THREE.Vector3();
+    for(let i=0;i<3;i++)centre.add(new THREE.Vector3().fromBufferAttribute(p,start+i));
+    return centre.multiplyScalar(1/3);
+  });
+  for(const t of [0,.25,.5,.75,1]){
+    const point=ends[0].clone().lerp(ends[1],t);let distance=Infinity;
+    for(const {triangle,bounds} of cliffTriangles){
+      if(bounds.distanceToPoint(point)>Math.min(distance,.08))continue;
+      triangle.closestPointToPoint(point,closest);distance=Math.min(distance,point.distanceTo(closest));
+    }
+    maxCliffRootGap=Math.max(maxCliffRootGap,distance);cliffRootSamples++;
+  }
+}
+assert.ok(cliffRootSamples>100,'sample the actual fibres on the authored cliff fixture');
+assert.ok(maxCliffRootGap<.06,`cliff roots follow the actual overhanging mesh (max gap ${maxCliffRootGap})`);
+const noCrownPlan=CompileTrenchNetwork({seed:'NoCrown',segments:[{id:'Exit',preset:'communication',
+  points:[[0,0],[0,20]],jitterScale:0,cornerRadiusM:0,bermH:0}]});
+let noCrownPanels=0;
+BuildTrenchEarth({SetSector(){},Add(key,g){
+  if(g.userData.trenchCliff){
+    noCrownPanels++;const p=g.attributes.position;
+    for(let i=0;i<p.count;i++)assert.ok(p.getY(i)<=.00001,'an explicitly crownless exit has no raised visual lip');
+  }
+  g.dispose();
+}},noCrownPlan,(x,z)=>noCrownPlan.Apply(x,z,0,0),{cliffs:cliffKit,roots:null,style:{...TRENCH_APPEARANCE,
+  clodChance:0,bankClods:0,crumbs:0,lipClods:0,spoilClods:0}});
+assert.ok(noCrownPanels>10,'exercise crownless modules across both sides of an exit');
+for(const g of cliffKit)g.dispose();
+cliffScene.traverse(node=>{if(node.isMesh){node.geometry.dispose();for(const m of Array.isArray(node.material)?node.material:[node.material])m.dispose();}});
 // A crown can cross onto a steep neighbouring bank. Large clods must shrink to
 // crumbs there, keep a closed volume and remain seated across curved terrain.
 const steepGround=(x,z)=>Math.abs(x)*5+Math.sin(z*2)*.09;

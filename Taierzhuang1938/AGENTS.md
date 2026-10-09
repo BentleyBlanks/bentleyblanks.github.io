@@ -12,7 +12,7 @@
 
 - **三维流体烟火（2026-10-09）**：使用 CC0 VDB 序列和实例体积积分，覆盖残骸、背景烟、场景烟、土尘冲击、燃油爆炸与航空炸弹冷却烟体；不把烘焙播放称为实时流体求解。对标与验收见 [物理观感](docs/Data_ParticlePhysicalReference.md)，资产／重建见 [Volume](Volume/README.md)，门禁 `ParticleVolumeTest` / `ParticleVolumeBrowserTest`。
 
-- **壕沟表面以用户选中的 imagegen 10 号图为当前目标（2026-10-09）**：全地图共用密实断面 / 松散弃土两套 Lovart PBR，以及 imagegen 原型后经 BlenderMCP 重建的土团。历史 01 / 14 的形态约束继续适用，路线与物理地形不改。实现、来源、预算和取证入口见 [壕沟表面](docs/Data_TrenchSurface.md) 最新节。
+- **壕沟表面以用户选中的 imagegen 10 号图为当前目标（2026-10-09）**：全地图共用密实断面 / 松散弃土两套 Lovart PBR。用户追加近照后，内壁改用 imagegen 原型后经 BlenderMCP 重建的四种土崖模块，世界坐标材质、共同边界法线及水平射线贴根；大尺度凹口与悬挑由网格表现。历史 01 / 14 的形态约束继续适用，路线与物理地形不改。实现、来源、预算和取证入口见 [壕沟表面](docs/Data_TrenchSurface.md) 最新节。
 
 - **壕沟形状采用历史照片 01 / 14（2026-10-07）**：紧实切土壁、浅铲痕、地面上相连的弃土小垄，碎石与草根稀疏。用户补充要求实体形状后，深沟坡壁及沟外抛土进入共享地形，渲染、碰撞与贴地一致；中心线、分岔、沟底宽度和标称深度不改，浅撤退沟、观察口与射界保留原通行约束。来源、剖面参数与验证见 [壕沟表面](docs/Data_TrenchSurface.md)；门禁 `Script_TrenchPlanTest` / `Script_TrenchSurfaceTest` / `Script_FirstLevelFrontTopologyTest` / `Script_FirstLevelMissionFortificationsTest`。
 
