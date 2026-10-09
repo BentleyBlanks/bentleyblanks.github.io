@@ -4,20 +4,20 @@
   "name": "TrenchPom",
   "preset": "drySoil",
   "source": {
-    "path": "C:/Users/Bentl/.codex/artifacts/TrenchReferenceTenImplementation20261009/Source/TrenchCutPhoto/lovart_022eb66b221d.png",
-    "sha256": "a58de81e7cdd4a6414e2ca7451fea1d233fa57d69fc2debfa7db1773a9a72ae7",
+    "path": "C:/Users/Bentl/.codex/artifacts/TrenchReferenceTenImplementation20261009/Source/TrenchCompactMatrixV9/lovart_49feddb85f79.png",
+    "sha256": "50f600ad3cff46c0f2cce29419386c0f0b8260e2d34a9e66755db05e0e6cdc66",
     "metrics": {
       "meanSrgb": [
-        0.518,
-        0.4061,
-        0.307
+        0.4207,
+        0.3591,
+        0.3072
       ],
-      "luma": 0.4104,
-      "lumaStd": 0.1529,
-      "sat": 0.4074,
-      "clipLow": 0.0063,
+      "luma": 0.3623,
+      "lumaStd": 0.099,
+      "sat": 0.2698,
+      "clipLow": 0.0002,
       "clipHigh": 0.0,
-      "lowFreq": 0.0442
+      "lowFreq": 0.0377
     }
   },
   "heightSource": null,
@@ -66,7 +66,7 @@
     "baseQuality": 86,
     "dataQuality": 95,
     "dataLossless": false,
-    "detailBalance": 0.0,
+    "detailBalance": 0.35,
     "heightFineWeight": 0.16,
     "uvAtlasReason": null
   },
@@ -76,27 +76,27 @@
       "file": "Texture_TrenchPomBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 373178,
-      "sha256": "862e4c8bb08a6cb5d9a200877ad30370d686bd74a99f8abe4572c79d370fcb35"
+      "bytes": 368924,
+      "sha256": "b2cfec6ca85f438841a9db03f03ce3fa6194afef12c98016cf5f92ea6dc294b0"
     },
     {
       "channel": "Normal",
       "file": "Texture_TrenchPomNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 95954,
-      "sha256": "1c69032afc6a7e3870a0adedac4744bffae76bacca0455cd7fd880ec5546dfc2"
+      "bytes": 99674,
+      "sha256": "06d5dd83839bf78f652552e1042baf7bd400244784e30d66c74fb0ad7c486ca6"
     },
     {
       "channel": "Orh",
       "file": "Texture_TrenchPomOrh.webp",
       "width": 512,
       "height": 512,
-      "bytes": 54980,
-      "sha256": "0d69b0d11a42c7ddb9aad48f817d99dcc47712d97e25655d8c0ecac7cc8577a6"
+      "bytes": 53110,
+      "sha256": "0aabe012dfa25212c28993ad3e321ce520f4f8293a188f991297cceb128aa8e9"
     }
   ],
-  "totalBytes": 524112,
+  "totalBytes": 521708,
   "metrics": {
     "meanSrgb": [
       0.4897,
@@ -104,17 +104,17 @@
       0.3457
     ],
     "luma": 0.4207,
-    "lumaStd": 0.0862,
-    "sat": 0.2942,
+    "lumaStd": 0.0849,
+    "sat": 0.2941,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0135,
-    "seam": 0.0574,
-    "interior": 0.0606,
-    "seamRatio": 0.947,
-    "border": 0.955,
-    "swing": 0.0155,
-    "aoMean": 0.969,
+    "lowFreq": 0.0138,
+    "seam": 0.0537,
+    "interior": 0.0582,
+    "seamRatio": 0.923,
+    "border": 0.912,
+    "swing": 0.0084,
+    "aoMean": 0.971,
     "roughMean": 0.942,
     "texelsPerMeter": 853.3
   },
