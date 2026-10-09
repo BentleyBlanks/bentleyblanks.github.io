@@ -91,11 +91,24 @@ try{
     const rootColor=Pixel(target,rootMesh.position);
     for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=0;
     rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();const unmarkedColor=Pixel(target,rootMesh.position);
+    // Upward caps on cut-wall aggregates still belong to the compact matrix.
+    // Paint the two real array layers differently to exercise that GPU choice.
+    for(let i=3*4*4*4;i<4*4*4*4;i+=4)pack.albedo.image.data.set([230,35,20,128],i);
+    pack.albedo.needsUpdate=true;
+    for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=-1.25;
+    rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();const compactCapColor=Pixel(target,rootMesh.position);
+    for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=-2;
+    rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();const looseCapColor=Pixel(target,rootMesh.position);
+    const roadColors=[];
+    for(const lateral of [-1,-.75,-.5,0,.5,1]){
+      for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=lateral;
+      rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();roadColors.push(Pixel(target,rootMesh.position));
+    }
     scene.remove(rootMesh);rootGeometry.dispose();rootMaterial.dispose();
     const gl=renderer.getContext(),glError=gl.getError(),linked=renderer.info.programs.every(p=>gl.getProgramParameter(p.program,gl.LINK_STATUS));
     pass.Dispose();const validAfterDispose=TerrainBlendUniforms.uTerrainBlendValid.value;
     prepass.Dispose();target.dispose();contact.Dispose();renderer.dispose();
-    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,rootColor,unmarkedColor,glError,linked};
+    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,rootColor,unmarkedColor,compactCapColor,looseCapColor,roadColors,glError,linked};
   });
   console.log(JSON.stringify(report,null,2));
   assert.deepEqual(errors,[]);assert.equal(report.glError,0);assert.ok(report.linked&&report.sourceIdentity&&report.restored);
@@ -111,5 +124,8 @@ try{
   assert.equal(report.validAfterHide,0);assert.ok(report.contextCleared);assert.equal(report.validAfterDispose,0);assert.deepEqual(report.resized,[192,96,192,96]);
   assert.ok(report.rootColor[0]>report.rootColor[2]*1.5,'shared-batch root keeps pale brown albedo');
   assert.ok(report.unmarkedColor[2]>report.unmarkedColor[0]*2,'unmarked geometry still uses the blue soil fixture');
+  assert.ok(report.compactCapColor[0]>report.compactCapColor[2]*2,'bank aggregate cap keeps the compact red layer');
+  assert.ok(report.looseCapColor[2]>report.looseCapColor[0]*2,'crown aggregate cap keeps the loose blue layer');
+  for(const color of report.roadColors)assert.ok(color[2]>color[0]*2,'signed road coordinates never select the compact-clod flag');
   console.log('TerrainBlendTest: depth mask, albedo/normal/roughness, prepass, geometry update, resize and invalidation passed');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

@@ -138,6 +138,9 @@ const Evaluate = /* glsl */`
   // remain in the compressed floor. Negative w marks modelled clod batches.
   gTrenchLoose=max(1.0-step(-1.5,vTerrainLayers.w),
     smoothstep(.70,.94,geomN.y)*mix(1.0,.82,smoothstep(.15,.65,trenchLow)));
+  // Embedded bank crumbs retain the compact matrix even on their upward caps.
+  // -1.25 is outside signed road coordinates [-1,1], separate from loose/root flags.
+  gTrenchLoose*=1.0-step(-1.375,vTerrainLayers.w)*(1.0-step(-1.125,vTerrainLayers.w));
   vec3 w=pow(abs(geomN),vec3(4));w/=max(dot(w,vec3(1)),.001);
   vec3 ca,cb,cc,na,nb,nc;vec3 ra,rb,rc;float sa,sb,sc;
   vec3 lightW=vec3(0,1,0);
@@ -243,7 +246,7 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
   const pom={value:1};patch.trenchPomUniform=pom;
   const detail={value:new THREE.Vector4(C.mud.normalScale,C.mud.pomReliefM,C.mud.looseReliefM,C.mud.colorDetail)};
   patch.trenchDetailUniform=detail;
-  patch.key+=(stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10')+':compactGrain';
+  patch.key+=(stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10')+':compactGrainBank2';
   patch.uniforms=(uniforms,shader)=>{
     bind(uniforms,shader);
 

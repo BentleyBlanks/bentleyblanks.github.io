@@ -58,7 +58,7 @@ try{
      const original=mesh.geometry,uv=original.attributes.uv,index=original.index,n=index?.count||uv.count,keep=[];
      for(let i=0;i<n;i+=3){
       const ids=[0,1,2].map(j=>index?index.getX(i+j):i+j);
-      if(uv.getX(ids[0])===-8&&uv.getY(ids[0])===-9){removed++;continue;}
+      if(uv.getY(ids[0])===-9&&(uv.getX(ids[0])===-8||uv.getX(ids[0])===-6)){removed++;continue;}
       keep.push(...ids);
      }
      if(keep.length===n)continue;

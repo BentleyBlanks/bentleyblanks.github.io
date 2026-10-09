@@ -9,18 +9,20 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
   // IcosahedronGeometry(1, 0) splits every triangle for flat normals. Weld the
   // twelve corners before reshaping so small crumbs do not shade as rock facets.
   // Authored UV seams are irrelevant here: the soil material is world-projected.
-  const primitive = new THREE.IcosahedronGeometry(1, 0),corners=new Map(),positions=[],indices=[];
-  const primitivePositions=primitive.attributes.position;
-  for(let i=0;i<primitivePositions.count;i++){
-    const p=[primitivePositions.getX(i),primitivePositions.getY(i),primitivePositions.getZ(i)];
-    const key=p.map(v=>v.toFixed(6)).join(',');
-    if(!corners.has(key)){corners.set(key,positions.length/3);positions.push(...p);}
-    indices.push(corners.get(key));
-  }
-  primitive.dispose();
-  const shape=new THREE.BufferGeometry();
-  shape.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));shape.setIndex(indices);
-  shape.computeVertexNormals();
+  const Weld=primitive=>{
+    const corners=new Map(),positions=[],indices=[],p=primitive.attributes.position;
+    for(let i=0;i<p.count;i++){
+      const point=[p.getX(i),p.getY(i),p.getZ(i)],key=point.map(v=>v.toFixed(6)).join(',');
+      if(!corners.has(key)){corners.set(key,positions.length/3);positions.push(...point);}
+      indices.push(corners.get(key));
+    }
+    primitive.dispose();
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setIndex(indices);
+    geometry.computeVertexNormals();return geometry;
+  };
+  const shape=Weld(new THREE.IcosahedronGeometry(1,0));
+  const tinyShape=Weld(new THREE.OctahedronGeometry(1,0));tinyShape.scale(1,.78,1);
   const up = new THREE.Vector3(0, 1, 0);
   const dir = new THREE.Vector3(), middle = new THREE.Vector3(), rotation = new THREE.Quaternion();
   const occupied = new Set();
@@ -38,7 +40,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     if(u<=0||u>=1)return 0;
     // Low-frequency earthen masses instead of gravel-like bumps over the whole wall.
     // The shoulder stays inside the existing bank footprint; the walking floor is untouched.
-    const mass=.45*ValueNoise2(x*.85,z*.85,71)+.55*ValueNoise2(x*4.8,z*4.8,173),grain=ValueNoise2(x*8,z*8,93);
+    const mass=.45*ValueNoise2(x*.85,z*.85,71)+.55*ValueNoise2(along*2.8,groundAt(x,z)*2.8,173),grain=ValueNoise2(x*8,z*8,93);
     const shoulder=Style.cutShoulderM*Ease(u/.42)*(1-Ease((u-.68)/.32))*(.45+.55*ValueNoise2(x*2.3,z*2.3,218));
     // Short, irregular spade flutes run up the face, never across the walking lane.
     const phase=along/Style.spadeWidthM+ValueNoise2(x*1.2,z*1.2,417)*.65;
@@ -51,36 +53,52 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     // Radius and height cannot be independent: a tiny crumb with a large height
     // became a pointed rock. Soil aggregates remain squat broken masses.
     relief=Math.min(relief,radius*.8);
-    const variants=radius>=.27&&highClods.length?highClods:lowClods;
-    const source=radius>=.12&&variants.length?variants[Math.floor(random()*variants.length)]:shape;
-    const geometry = source.clone();
-    const underside=Float32Array.from(geometry.attributes.position.array.filter((_,i)=>i%3===1),y=>Math.max(0,Math.min(1,(.18-y)/.4)));
-    geometry.userData.trenchCrown=crown;
-    geometry.rotateY(random() * Math.PI * 2);
+    // Preserve random placement draws while choosing detail after slope shrink.
+    // A large source clod reduced to a bank crumb needs only the small cap.
+    const modelChoice=radius>=Style.clodModelRadiusM&&lowClods.length?random():0;
+    const angle=random()*Math.PI*2;
     const e=.08,n=new THREE.Vector3(-(groundAt(center.x+e,center.z)-groundAt(center.x-e,center.z))/(2*e),
       1,-(groundAt(center.x,center.z+e)-groundAt(center.x,center.z-e))/(2*e)).normalize();
     // Large spoil clods belong on the crown. A crown sample can land on an
     // adjoining steep bank at junctions; keep only small embedded crumbs there.
     const cutClod=plan.Corridor(center.x,center.z)?.inCut&&n.y<.85;
-    const slopeScale=cutClod?Math.min(1,.04/radius):Math.min(1,.065/radius+(1-.065/radius)*Ease((n.y-.45)/.35));
+    const slopeScale=cutClod?Math.min(1,.065/radius):Math.min(1,.065/radius+(1-.065/radius)*Ease((n.y-.45)/.35));
     radius*=slopeScale;relief*=slopeScale;
+    const variants=radius>=Style.clodHighRadiusM&&highClods.length?highClods:lowClods;
+    const source=radius>=Style.clodModelRadiusM&&variants.length?variants[Math.floor(modelChoice*variants.length)]
+      :radius<Style.clodTinyRadiusM?tinyShape:shape;
+    const geometry=source.clone();
+    const underside=Float32Array.from(geometry.attributes.position.array.filter((_,i)=>i%3===1),y=>Math.max(0,Math.min(1,(.18-y)/.4)));
+    geometry.userData.trenchCrown=crown;
+    geometry.rotateY(angle);
     geometry.scale(radius,relief,radius*(.7+random()*.65));
     geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up,n));
-    const p = geometry.attributes.position;
+    const p = geometry.attributes.position,contactWeights=new Float32Array(p.count);
     const embed=cutClod ? .65 : crown ? Style.clodEmbed : Math.max(.55,Style.clodEmbed);
     const anchor=new THREE.Vector3(center.x,heightAt(center.x,center.z),center.z).addScaledVector(n,-relief*embed);
     for (let v = 0; v < p.count; v++) {
       // Keep the exposed cap solid. Only the buried underside follows a falling
       // crown: otherwise a flat model base hangs in the air above the cut face.
       const x=anchor.x+p.getX(v),z=anchor.z+p.getZ(v),y=anchor.y+p.getY(v);
-      p.setXYZ(v,x,y+Math.min(0,heightAt(x,z)-.018-y)*underside[v],z);
+      const hostHeight=heightAt(x,z),seatedY=y+Math.min(0,hostHeight-.018-y)*underside[v];
+      p.setXYZ(v,x,seatedY,z);
+      contactWeights[v]=1-Ease(Math.max(0,(seatedY-hostHeight)*n.y)/Math.min(Style.clodContactM,radius*.5));
     }
     // World-projected material ignores authored UVs. Keep this marker through the
     // shared position/normal/UV merge, then convert it to the trench material flag.
     const marker=new Float32Array(p.count*2);
-    for(let i=0;i<p.count;i++){marker[i*2]=-8;marker[i*2+1]=-9;}
+    // Embedded cut-face aggregates share the compact matrix. Loose spoil on a
+    // steep bank otherwise looks like a separate pale stone stuck onto the wall.
+    for(let i=0;i<p.count;i++){marker[i*2]=cutClod?-6:-8;marker[i*2+1]=-9;}
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(marker,2));
     geometry.computeVertexNormals();
+    // At the embedded foot, aggregate and soil form one surface. Blend only the
+    // shallow contact band; the exposed cap keeps its sculpted normal/relief.
+    const normals=geometry.attributes.normal;
+    for(let i=0;i<normals.count;i++){
+      const w=contactWeights[i],x=normals.getX(i)*(1-w)+n.x*w,y=normals.getY(i)*(1-w)+n.y*w,z=normals.getZ(i)*(1-w)+n.z*w;
+      const length=Math.hypot(x,y,z)||1;normals.setXYZ(i,x/length,y/length,z/length);
+    }
     Add(earth, geometry); stats.clods++;
   };
   const Crust = (st, next, side, ends) => {
@@ -202,7 +220,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
           Clod(at,Range(random,Style.clodRadiusM),Range(random,Style.clodReliefM),random,false,dressAt);
         }
         for(let n=0;n<Style.crumbs;n++) {
-          const at=Point(st.halfFloor*(.55+random()*.5)+st.bank*random()*.35,(random()-.5)*1.5);
+          const at=Point(st.halfFloor*(.1+.9*Math.pow(random(),.6))+st.bank*random()*.18,(random()-.5)*1.5);
           Clod(at,.025+random()*.065,.015+random()*.045,random);
         }
         // A broken, root-bound crown interrupts the long straight heightfield edge.
@@ -245,6 +263,6 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       }
     }
   }
-  shape.dispose();
+  shape.dispose();tinyShape.dispose();
   return stats;
 }

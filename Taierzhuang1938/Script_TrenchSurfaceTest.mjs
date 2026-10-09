@@ -9,6 +9,7 @@ import { BuildTrenchEarth } from './Script_TrenchEarth.mjs';
 import { CompileTrenchNetwork } from './Script_TrenchPlan.mjs';
 import { BuildTrenchPreview } from './Script_TrenchSpline.mjs';
 import { TRENCH_EARTH_PROFILE, TRENCH_APPEARANCE } from './Data_TrenchAppearance.mjs';
+import { GLTFLoader } from './vendor/three/examples/jsm/loaders/GLTFLoader.js';
 
 // Updates must use the physical terrain's actual grid (including non-unit cells),
 // and must restore it after a blast reset; no camera-dependent screen depth cache.
@@ -106,9 +107,14 @@ const cutGround=(x,z)=>cutPlan.Apply(x,z,0,0);
 const stationsBefore=JSON.stringify(cutPlan.segments[0].stations),edges=new Map(),cutBatches=[];
 BuildTrenchEarth({SetSector(){},Add(key,geometry){cutBatches.push(geometry);}},cutPlan,cutGround,{roots:'ground'});
 assert.equal(JSON.stringify(cutPlan.segments[0].stations),stationsBefore,'appearance does not edit the trench plan');
-let sharedEdges=0,skinVertices=0,spoilVertices=0,rootVertices=0;
+let sharedEdges=0,skinVertices=0,spoilVertices=0,rootVertices=0,compactClods=0;
 const spoilEdges=new Map();
 for(const geometry of cutBatches){
+  if(geometry.attributes.uv?.getX(0)===-6){
+    compactClods++;
+    const uv=geometry.attributes.uv;
+    for(let i=0;i<uv.count;i++)assert.ok(uv.getX(i)===-6&&uv.getY(i)===-9,'whole bank aggregate retains compact material through the merge');
+  }
   if(geometry.userData.trenchRoots){
     const uv=geometry.attributes.uv;rootVertices+=uv.count;
     for(let i=0;i<uv.count;i++)assert.equal(uv.getX(i),-16,'root colour flag survives the shared soil batch');
@@ -141,6 +147,7 @@ for(const geometry of cutBatches){
 assert.ok(skinVertices>1000&&sharedEdges>100,'measure actual adjacent generated strips');
 assert.ok(spoilVertices>1000,'continuous spoil detail is built on both banks');
 assert.ok(rootVertices>0,'roots retain a distinct surface in the soil batch');
+assert.ok(compactClods>10,'actual cut-wall aggregates use the compact matrix');
 // A crown can cross onto a steep neighbouring bank. Large clods must shrink to
 // crumbs there, keep a closed volume and remain seated across curved terrain.
 const steepGround=(x,z)=>Math.abs(x)*5+Math.sin(z*2)*.09;
@@ -160,6 +167,36 @@ BuildTrenchEarth({SetSector(){},Add(key,g){
 }},steepPlan,steepGround,{roots:null,style:{...TRENCH_APPEARANCE,clodChance:0,bankClods:1,
   clodRadiusM:[.2,.2],clodReliefM:[.08,.08],crumbs:0,lipClods:0,spoilClods:0}});
 assert.ok(steepClods>10,'steep conformance fixture exercises both banks');
+// Exercise the actual Blender kit on a flat raised bank. Its large variants
+// must reach the rendered geometry, and embedded feet must shade continuously
+// without flattening the exposed cap normals.
+const clodBytes=fs.readFileSync(new URL(C.models.clods,import.meta.url));
+const clodScene=await new GLTFLoader().parseAsync(clodBytes.buffer.slice(clodBytes.byteOffset,clodBytes.byteOffset+clodBytes.byteLength),'');
+const clodKit=[];clodScene.scene.updateMatrixWorld(true);clodScene.scene.traverse(node=>{
+  if(!node.isMesh)return;
+  const g=node.geometry.clone().applyMatrix4(node.matrixWorld);
+  g.userData.trenchClodHigh=node.name.endsWith('High');g.userData.trenchClodShape=node.name;clodKit.push(g);
+});
+const raisedBank=(x,z)=>Math.abs(x)>1.5?2:0;
+let largeClods=0,buriedNormals=0,sculptedCaps=0;
+BuildTrenchEarth({SetSector(){},Add(key,g){
+  if(g.userData.trenchClodHigh){
+    largeClods++;
+    const p=g.attributes.position,n=g.attributes.normal;
+    for(let i=0;i<p.count;i++){
+      const length=Math.hypot(n.getX(i),n.getY(i),n.getZ(i));
+      assert.ok(Math.abs(length-1)<1e-5,'blended clod normals stay finite and unit length');
+      if(p.getY(i)<2){assert.ok(n.getY(i)>.999,'embedded foot follows the flat host normal');buriedNormals++;}
+      if(p.getY(i)>2.06&&n.getY(i)<.95)sculptedCaps++;
+    }
+  }
+  g.dispose();
+}},steepPlan,raisedBank,{clods:clodKit,roots:null,style:{...TRENCH_APPEARANCE,
+  crustReliefM:0,cutShoulderM:0,spadeReliefM:0,clodChance:0,bankClods:0,crumbs:0,
+  lipClods:4,lipRadiusM:[.175,.175],lipReliefM:[.10,.10],spoilClods:0}});
+assert.ok(largeClods>10&&buriedNormals>20&&sculptedCaps>10,'large soil caps are detailed while their feet join the host');
+for(const g of clodKit)g.dispose();
+clodScene.scene.traverse(node=>{if(node.isMesh){node.geometry.dispose();for(const m of Array.isArray(node.material)?node.material:[node.material])m.dispose();}});
 const previewPlan=CompileTrenchNetwork({seed:'SpoilPreview',earthProfile:TRENCH_EARTH_PROFILE,
   segments:[{id:'Cut',preset:'communication',points:[[0,0],[0,20]],jitterScale:0}]});
 let crownVertices=0;
