@@ -358,6 +358,27 @@ BuildTrenchEarth({SetSector(){},Add(key,g){
   lipClods:4,lipRadiusM:[.30,.30],lipReliefM:[.10,.10],spoilClods:0}});
 assert.ok(largeClods>10&&buriedNormals>20&&sculptedCaps>10,'large soil caps are detailed while their feet join the host');
 assert.ok(removedBuriedFaces>100,'the real kit sheds hidden faces without flattening its visible silhouette');
+// A solid chunk resting beside a drop must remain a chunk. Its buried sole
+// cannot be pulled down the whole wall to meet the much lower surface below.
+const ledgePlan={...cutPlan,Corridor:()=>({bermWidth:1,inCut:false}),Depth:()=>0,
+  segments:cutPlan.segments.map(segment=>({...segment,stations:segment.stations.map((st,i)=>({...st,junctionClear:i%2===1}))}))};
+let ledgeClods=0,edgeSpanningClods=0;
+BuildTrenchEarth({SetSector(){},Add(key,g){
+  if(g.userData.trenchClodHigh){
+    const p=g.attributes.position;let low=Infinity,high=-Infinity,inner=Infinity,outer=0;
+    for(let i=0;i<p.count;i++){
+      low=Math.min(low,p.getY(i));high=Math.max(high,p.getY(i));
+      inner=Math.min(inner,Math.abs(p.getX(i)));outer=Math.max(outer,Math.abs(p.getX(i)));
+    }
+    assert.ok(high-low<.65,'a 60 cm soil chunk does not stretch into a two-metre curtain');
+    if(inner<2.7&&outer>2.78)edgeSpanningClods++;
+    ledgeClods++;
+  }
+  g.dispose();
+}},ledgePlan,(x,z)=>Math.abs(x)>2.7?2:0,{clods:clodKit,roots:null,style:{...TRENCH_APPEARANCE,
+  bankStart:1.05,bankEnd:1.05,clodChance:0,bankClods:0,crumbs:0,lipClods:12,
+  lipRadiusM:[.30,.30],lipReliefM:[.10,.10],spoilClods:0}});
+assert.ok(ledgeClods>10&&edgeSpanningClods>4,'actual high-detail chunks span both sides of the ledge fixture');
 for(const g of clodKit)g.dispose();
 clodScene.scene.traverse(node=>{if(node.isMesh){node.geometry.dispose();for(const m of Array.isArray(node.material)?node.material:[node.material])m.dispose();}});
 const previewPlan=CompileTrenchNetwork({seed:'SpoilPreview',earthProfile:TRENCH_EARTH_PROFILE,

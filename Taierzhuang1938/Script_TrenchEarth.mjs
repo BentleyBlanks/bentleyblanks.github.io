@@ -91,7 +91,11 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       // Keep the exposed cap solid. Only the buried underside follows a falling
       // crown: otherwise a flat model base hangs in the air above the cut face.
       const x=anchor.x+p.getX(v),z=anchor.z+p.getZ(v),y=anchor.y+p.getY(v);
-      const hostHeight=heightAt(x,z),seatedY=y+Math.min(0,hostHeight-.018-y)*underside[v];
+      const hostHeight=heightAt(x,z);
+      // A crown may overhang a much lower wall. Seat the sole locally instead
+      // of stretching a small aggregate into a wall-height curtain.
+      const baseDrop=Math.min(Math.max(0,y-hostHeight+.018),radius*Style.clodMaxBaseDropRatio);
+      const seatedY=y-baseDrop*underside[v];
       p.setXYZ(v,x,seatedY,z);
       buried[v]=groundAt(x,z)-seatedY;
       contactWeights[v]=1-Ease(Math.max(0,(seatedY-hostHeight)*n.y)/Math.min(Style.clodContactM,radius*.5));

@@ -42,6 +42,8 @@
 
 ## 4 植被
 
+- **沟沿可见土层接地（2026-10-10）**：物理地形与撒点种子不变。`FitVegetationToCrown` 在建场时把被土冠覆盖的根部移到可见土面，并同步缩短卡片，保持原最高点、缩小或保持平面占地；极小残片隐藏。沿用 `BuildTrenchSurface` 已创建的采样索引，建场后不保留该索引。范围、数值、回归证据与本地取证见 [壕沟表面](Data_TrenchSurface.md) 最新节；没有提高原视线遮挡上限。
+
 - **图集**：Lovart（nano_banana_pro）生成一张 2048² 品红底 8 格植物卡（提示词 `_shots/Gap3A_Source/B6/Prompt_VegetationAtlas_v2.txt`，thread
   `a97e84e9-d6af-432d-9fcd-44e7d3347a58`；第一次 thread `d5ea5e4a-dfe3-4eba-a9c6-08a0e8e5ab9c` 被后端自作主张去了背景、填成剪影，废弃）。
   **LowTuft 单独重生成**（2026-09-30）：v2 主图里它画成一整块铺满格子的草垫，左右、底三边都被格子边切平，地上交叉面片读成一张张直边方块。

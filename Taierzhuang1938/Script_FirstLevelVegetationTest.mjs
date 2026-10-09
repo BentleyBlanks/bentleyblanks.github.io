@@ -12,7 +12,7 @@ import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import {
   VEGETATION, VEGETATION_ATLAS, VEGETATION_CARDS, VEGETATION_QUALITY,
-  PlanFirstLevelVegetation, MissionDressingContext,
+  PlanFirstLevelVegetation, MissionDressingContext, FitVegetationToCrown,
 } from "./Data_FirstLevelVegetation.mjs";
 import { RouteIndex, PointIndex } from "./Data_FirstLevelPropDressing.mjs";
 
@@ -24,6 +24,17 @@ function Check(ok, message) {
 }
 
 const ctx = MissionDressingContext(MISSION_LAYOUT, SampleMissionTerrain);
+const crownFixtures=[0,1,2,3,4].map(x=>({id:x,x,z:0,y:x===3?2:0,yaw:.4,card:0,scale:.4,tint:.5,keep:.2}));
+const crownBefore=JSON.stringify(crownFixtures);
+const crownFit=FitVegetationToCrown(crownFixtures,x=>[0,.1,2,1,.001][x]);
+Check(crownFit.adjusted===1&&crownFit.hidden===1,'可见土冠只修正覆盖的植物，完全埋住的卡片移除');
+Check(JSON.stringify(crownFixtures)===crownBefore,'土冠接地不修改原始撒点计划');
+Check(crownFit.instances.filter(it=>it.id!==1).every(it=>it===crownFixtures[it.id]),'沟外、原高台与微小误差的植物保持原值');
+Check(crownFit.instances.every(it=>{
+  const original=crownFixtures[it.id],h=VEGETATION_CARDS[it.card].heightM;
+  return it.x===original.x&&it.z===original.z&&it.yaw===original.yaw&&it.scale<=original.scale
+    &&Math.abs(it.y+h*it.scale-(original.y+h*original.scale))<1e-9;
+}),'抬高根部并缩短卡片，顶部和视线高度不增加，平面占地不扩张');
 const plans = {};
 for (const quality of Object.keys(VEGETATION_QUALITY)) plans[quality] = PlanFirstLevelVegetation(ctx, quality);
 const high = plans.high;

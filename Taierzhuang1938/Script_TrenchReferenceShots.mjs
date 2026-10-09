@@ -141,7 +141,7 @@ try{
  }
  const runtime=await page.evaluate(()=>{
   const g=window.Tengxian,b=g.battlefield;
-  return {stats:b.stats,glError:g.renderer.getContext().getError(),
+  return {stats:b.stats,vegetationStats:b.vegetation?.stats||null,glError:g.renderer.getContext().getError(),
    render:{output:[g.renderer.domElement.width,g.renderer.domElement.height],scale:g.graphics.renderScale},
    programs:g.renderer.info.programs.map(p=>({name:p.name,runnable:p.diagnostics?.runnable??true})),
    terrainLayers:b.terrainLayers?{count:b.terrainLayers.layers,size:b.terrainLayers.size,dataSize:b.terrainLayers.dataSize}:null,

@@ -53,6 +53,25 @@ export const CARD_INDEX = Object.freeze(Object.fromEntries(VEGETATION_CARDS.map(
 /** 材质颜色（乘在图集上）：生成图的枯草偏粉白，压成阴天里的暖草黄。 */
 export const VEGETATION_TINT = Object.freeze([0.95, 0.87, 0.7]);
 
+/** Fit existing plants to visible trench soil without raising their tops or widening their footprint. */
+export function FitVegetationToCrown(instances, crownHeightAt, rules = VEGETATION.crownFit) {
+  if (!crownHeightAt) return { instances, adjusted: 0, hidden: 0 };
+  const fitted = [];
+  let adjusted = 0, hidden = 0;
+  for (const it of instances) {
+    const surface = crownHeightAt(it.x, it.z);
+    if (!Number.isFinite(surface)) throw new Error("Non-finite trench crown height");
+    const rise = surface - it.y;
+    if (rise <= rules.minRiseM) { fitted.push(it); continue; }
+    const cardHeight = VEGETATION_CARDS[it.card].heightM;
+    const height = cardHeight * it.scale - rise;
+    if (height < rules.minHeightM) { hidden++; continue; }
+    fitted.push({ ...it, y: surface, scale: height / cardHeight });
+    adjusted++;
+  }
+  return { instances: fitted, adjusted, hidden };
+}
+
 /** 画质分档：密度倍率、近档（全部卡片）与远档（只留 ≥ farMinHeightM 的）半径、上限、alpha-to-coverage。 */
 export const VEGETATION_QUALITY = Object.freeze({
   low: Object.freeze({ density: 0.45, nearM: 38, farM: 70, maxInstances: 30000, alphaToCoverage: false }),
@@ -76,6 +95,7 @@ export const VEGETATION = Object.freeze({
   sightMaxHeightM: 0.58,
   /** 壕沟沟沿：人站在沟里眼睛就在沟沿上方几十厘米，沿上只长矮草，不挡从沟里往外看。 */
   trenchLipMaxHeightM: 0.3,
+  crownFit: Object.freeze({ minRiseM: .002, minHeightM: .06 }),
   /** 01–06 前沿交战区（z 小于这个）：墙根以外一律压到 frontMaxHeightM，不让草里藏得住趴着的敌人。 */
   frontZ: -95, frontMaxHeightM: 0.4,
   wallFootBandM: 1.6,

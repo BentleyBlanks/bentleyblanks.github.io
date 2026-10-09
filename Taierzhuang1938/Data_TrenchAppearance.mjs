@@ -43,6 +43,7 @@ export const TRENCH_APPEARANCE = Object.freeze({
   clodHighRadiusM: .29,
   clodTinyRadiusM: .073,
   clodContactM: .025,
+  clodMaxBaseDropRatio: .5,
   bankStart: 0.28,
   bankEnd: 1.05,
   rootChance: 0.6,

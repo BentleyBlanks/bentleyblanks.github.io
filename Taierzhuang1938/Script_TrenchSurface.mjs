@@ -79,9 +79,10 @@ export function CreateTrenchDressingHeightSampler(geometries,groundAt,{crownOnly
   };
 }
 
-export function BuildTrenchSurface(sink,plan,groundAt,assets) {
+export function BuildTrenchSurface(sink,plan,groundAt,assets,{onCrownReady=null}={}) {
   const stats={stones:0,grass:0,triangles:0};const occupied=new Set();
   const crownAt=CreateTrenchDressingHeightSampler([...sink.buckets?.values()||[]].flat(),groundAt,{crownOnly:true});
+  onCrownReady?.(crownAt);
   const Range=(r,a)=>a[0]+r()*(a[1]-a[0]);
   const GrassMat=(x,z,scale,angle,mirror)=>{
     const positions=[],uvs=[],indices=[],cols=8,rows=6;

@@ -320,6 +320,7 @@ export class FirstLevelWhiteboxField {
     }
     sink.SetSector("FirstLevelWhitebox");
 
+    let trenchCrownHeightAt = null;
     if (this.layout.terrainSpec?.trenchNetwork && this.terrainLayers) {
       const dressing = new BuildSink();
       if (!this.trenchSurface) this.materials.set("TrenchRoots", new THREE.MeshStandardMaterial({
@@ -330,7 +331,8 @@ export class FirstLevelWhiteboxField {
         (x, z) => this.TerrainHeight(x, z), { roots: this.trenchSurface ? "ground" : "TrenchRoots",
           clods: this.trenchSurface?.clods, cliffs: this.trenchSurface?.cliffs });
       if (this.trenchSurface) this.stats.trenchSurface = BuildTrenchSurface(dressing,
-        TrenchPlanFor(this.layout.terrainSpec), (x, z) => this.TerrainHeight(x, z), this.trenchSurface);
+        TrenchPlanFor(this.layout.terrainSpec), (x, z) => this.TerrainHeight(x, z), this.trenchSurface,
+        {onCrownReady: sample => { trenchCrownHeightAt = sample; }});
       const pieces = dressing.Flush(this.scene, { Get: key => this.materials.get(key) });
       this.stats.trenchEarth.meshes = pieces.length;
       for (const mesh of pieces) {
@@ -362,7 +364,8 @@ export class FirstLevelWhiteboxField {
     this.fortificationPlacements=defenses.placements;
     // 平色道具盒 / 散块 / foliage 盒换成模型、碎砖瓦与植被：只换外观，碰撞与掩体仍由下面的原块登记。
     this.propDressingStats=this.propDressing?AddFirstLevelPropDressing(sink,this.layout,this.propDressing,(x,z)=>this.StaticGroundHeight(x,z),this.materials,this.library,{scene:this.scene,meshes:this.meshes}):null;
-    this.vegetation=this.vegetationAtlas?new FirstLevelVegetation(this.scene,this.layout,this.library,this.vegetationAtlas,(x,z)=>this.TerrainHeight(x,z),this.quality):null;
+    this.vegetation=this.vegetationAtlas?new FirstLevelVegetation(this.scene,this.layout,this.library,this.vegetationAtlas,(x,z)=>this.TerrainHeight(x,z),this.quality,trenchCrownHeightAt):null;
+    trenchCrownHeightAt = null;
     for(const id of [...(this.propDressingStats?.replaced||[]),...(this.vegetation?.plan.replaced||[])])defenses.replaced.add(id);
     for(const [key,material] of this.materials)if(key.startsWith("MissionDefenseMaterial_"))this.sharedFortificationMaterials.add(material);
     const trainSink = new BuildSink(),derailSink=new BuildSink(),airWallSink=this.debugAirWalls?new BuildSink():null;

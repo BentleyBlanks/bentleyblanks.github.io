@@ -23,7 +23,7 @@ import { BuildSink } from "./Script_World.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import {
   VEGETATION, VEGETATION_ATLAS, VEGETATION_CARDS, VEGETATION_QUALITY, VEGETATION_TINT,
-  PlanFirstLevelVegetation, MissionDressingContext,
+  PlanFirstLevelVegetation, MissionDressingContext, FitVegetationToCrown,
 } from "./Data_FirstLevelVegetation.mjs";
 
 const LOADER = new ManagedTextureLoader();
@@ -106,13 +106,16 @@ export class FirstLevelVegetation {
    * @param {THREE.Texture} atlas LoadFirstLevelVegetationAtlas 的结果
    * @param {(x:number,z:number)=>number} groundAt 地形高度（不含可走台面）
    * @param {string} quality 画质档（low / medium / high / ultra）
+   * @param {(x:number,z:number)=>number|null} crownHeightAt 可见沟沿土层，仅在建场时使用
    */
-  constructor(scene, layout, library, atlas, groundAt, quality = "high") {
+  constructor(scene, layout, library, atlas, groundAt, quality = "high", crownHeightAt = null) {
     this.scene = scene;
     this.quality = VEGETATION_QUALITY[quality] ? quality : "high";
     const q = VEGETATION_QUALITY[this.quality];
     const started = typeof performance !== "undefined" ? performance.now() : 0;
     this.plan = PlanFirstLevelVegetation(MissionDressingContext(layout, groundAt), this.quality);
+    const crownFit = FitVegetationToCrown(this.plan.instances, crownHeightAt);
+    this.plan.instances = crownFit.instances;
     const material = CloneShadedMaterial(library.Plain("FirstLevelVegetation", { color: 0xffffff, roughness: 0.96, metalness: 0 }));
     material.name = "FirstLevelVegetation";
     material.color.setRGB(...VEGETATION_TINT);
@@ -132,7 +135,8 @@ export class FirstLevelVegetation {
     }
     this.lods = [];
     this.stats = { instances: this.plan.instances.length, sectors: sectors.size, triangles: 0, farTriangles: 0,
-      planned: this.plan.stats.planned, capped: this.plan.stats.capped, buildMs: 0 };
+      planned: this.plan.stats.planned, capped: this.plan.stats.capped, buildMs: 0,
+      crownAdjusted: crownFit.adjusted, crownHidden: crownFit.hidden };
     // 合批走 BuildSink（仓库契约：新静态几何一律 BuildSink 分区合批），一区一只桶；
     // 预先烘好的单份几何进桶，合并时原样返回，顶点色不丢。
     const sink = new BuildSink();
