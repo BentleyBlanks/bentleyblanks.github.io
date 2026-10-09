@@ -27,8 +27,22 @@ records = []
 cols, rows = 8, 16
 for kind, name in enumerate(names):
     rng = random.Random(10936 + kind * 73)
-    scars = [(rng.uniform(-.6,.6),rng.uniform(.25,1.72),rng.uniform(.12,.30),
-              rng.uniform(.14,.42),rng.uniform(.07,.15)) for _ in range(5 + kind*2)]
+    # Different erosion zones leave broad intact spade planes between breaks.
+    # Filling every module with sinusoidal bumps made the cut look melted.
+    scars = []
+    for scar in range([3, 7, 6, 8][kind]):
+        cx = rng.uniform(-.55,.55)
+        cz = rng.uniform(.20,1.72)
+        if kind == 0:
+            cx = (-1 if scar % 2 else 1) * rng.uniform(.38,.60)
+        elif kind == 1:
+            cx = rng.uniform(-.28,.27)
+        elif kind == 2:
+            cz = rng.uniform(.12,.55)
+        else:
+            cz = rng.uniform(1.30,1.80)
+        scars.append((cx,cz,rng.uniform(.16,.30),rng.uniform(.16,.37),
+                      rng.uniform(.10,.19),rng.uniform(-.35,.35)))
     vertices, faces = [], []
     for row in range(rows+1):
         v = row/rows
@@ -40,21 +54,25 @@ for kind, name in enumerate(names):
             if 0<col<cols and 0<row<rows:
                 x += rng.uniform(-.026,.026)
                 z += rng.uniform(-.027,.027)
-            # Broad shovel planes with torn recesses, not an isotropic rock field.
-            depth = .13 + .025*math.sin(x*4+kind) + .018*math.sin(z*5-x*2)
-            depth += .018*math.sin(x*17+kind)*math.sin(math.pi*v)
-            for cx,cz,rx,rz,amount in scars:
-                inside = max(0,1-((x-cx)/rx)**2-((z-cz)/rz)**2)
-                depth -= amount*inside**.35
-            # A shallow setback immediately below the lip makes a real undercut.
-            depth -= .07*math.exp(-((v-.84)/.07)**2)
-            depth += .10*math.exp(-((v-.98)/.065)**2)*( .55+.45*math.sin(x*11+kind)**2)
+            # Shallow tilted cut planes, then local polygonal fractures. A flat
+            # recessed centre and narrow broken edge avoid rounded bowl cavities.
+            depth = .13 + [-.018,.014,.008,-.012][kind]*x + .004*(z-1)
+            for cx,cz,rx,rz,amount,shear in scars:
+                qx=(x-cx)/rx; qz=(z-cz)/rz
+                distance=max(abs(qx+shear*qz),abs(qz),abs(qx*.65-qz*.52))
+                inside=max(0,min(1,(1-distance)/.28))
+                depth -= amount*inside
+            # Root-bound ledges break only across parts of the upper face.
+            # These irregular pockets keep an overhang without an even gutter.
+            lipShape=.65+.35*abs(math.sin(x*7.3+kind*2.4))
+            depth -= .11*math.exp(-((v-(.84+.025*math.sin(x*6+kind)))/.065)**2)*lipShape
+            depth += .13*math.exp(-((v-.98)/.055)**2)*lipShape
             depth += .035*math.exp(-((v-.06)/.1)**2)
             # Keep a continuous cut plane across module boundaries; taper only
             # the sculpted damage. Tapering the whole depth made every module
             # bulge into a regular column. Zero edge derivative also avoids a
             # repeating shading crease at otherwise coincident borders.
-            depth = max(.045,min(.30,.14+(depth-.13)*edge))
+            depth = max(.018,min(.30,.14+(depth-.13)*edge))
             if row==rows:
                 z += edge*(.014+.045*math.sin(x*13+kind)**2)
             vertices.append((x,-depth,z))
@@ -81,6 +99,15 @@ for kind, name in enumerate(names):
     obj=bpy.data.objects.new('TrenchCliff'+name,mesh)
     bpy.context.collection.objects.link(obj);mesh.materials.append(material)
     for polygon in mesh.polygons: polygon.use_smooth=True
+    # Preserve only sharp fracture creases. glTF exports split vertices here,
+    # so runtime normal reconstruction keeps them after fitting to each bank.
+    bpy.context.view_layer.objects.active=obj
+    obj.select_set(True)
+    split=obj.modifiers.new('FractureCreases','EDGE_SPLIT')
+    split.split_angle=math.radians(75)
+    split.use_edge_angle=True;split.use_edge_sharp=False
+    bpy.ops.object.modifier_apply(modifier=split.name)
+    mesh=obj.data
     uv=mesh.uv_layers.new(name='UVMap')
     for polygon in mesh.polygons:
         for loopIndex in polygon.loop_indices:

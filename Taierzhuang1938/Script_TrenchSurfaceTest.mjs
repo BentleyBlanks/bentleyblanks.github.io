@@ -335,7 +335,7 @@ BuildTrenchEarth({SetSector(){},Add(key,g){
   g.dispose();
 }},flatCapPlan,raisedBank,{clods:clodKit,roots:null,style:{...TRENCH_APPEARANCE,
   crustReliefM:0,cutShoulderM:0,spadeReliefM:0,clodChance:0,bankClods:0,crumbs:0,
-  lipClods:4,lipRadiusM:[.215,.215],lipReliefM:[.10,.10],spoilClods:0}});
+  lipClods:4,lipRadiusM:[.30,.30],lipReliefM:[.10,.10],spoilClods:0}});
 assert.ok(largeClods>10&&buriedNormals>20&&sculptedCaps>10,'large soil caps are detailed while their feet join the host');
 assert.ok(removedBuriedFaces>100,'the real kit sheds hidden faces without flattening its visible silhouette');
 for(const g of clodKit)g.dispose();

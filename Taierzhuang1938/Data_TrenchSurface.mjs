@@ -1,6 +1,6 @@
 // Historical photographs 01/14: compact earthen cuts with sparse stones and grass.
 export const TRENCH_SURFACE = Object.freeze({
-  version: '2026100930',
+  version: '2026100933',
   // 湿泥与积水 2026-09-28 起统一走 Data_Tuning_Terrain.TERRAIN_WATER（车道与沟底同一套水位模型）。
   mud: { tileM: 1.8, baseTileM: 1.8, compactTileM: 1.2, compactColorDetail: 1.0, reliefM: .035, roughDry: .94,
     parallaxNearM: 3, parallaxFarM: 12, pomReliefM:.005, looseReliefM:.020, normalScale:.80, colorDetail:1.25, albedoScale:1.0,
