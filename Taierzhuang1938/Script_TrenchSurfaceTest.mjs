@@ -106,6 +106,22 @@ BuildTrenchSurface({buckets:new Map([['crown',[crown]]]),SetSector(){},Add(key,g
   plan,(x)=>Math.abs(x)>1.5?2:0,crownAssets);
 const mats=raised.filter(b=>b.key==='TrenchDryGrass');assert.ok(mats.length>0);
 for(const {geometry} of mats){const p=geometry.attributes.position;for(let i=0;i<p.count;i++)assert.ok(p.getY(i)>2.417&&p.getY(i)<2.449,'mat sits on the rendered crown');}
+// A crown-height discontinuity must cut the turf card, not turn its texture
+// into a tall opaque strip. Keep visible pieces on both levels of the fixture.
+const steppedMats=[];
+BuildTrenchSurface({SetSector(){},Add(key,g){if(key==='TrenchDryGrass')steppedMats.push(g);else g.dispose();}},
+  plan,(x,z)=>Math.abs(x)>1.5?2+(Math.floor(z/.13)%2)*.8:0,crownAssets);
+assert.ok(steppedMats.length>0,'turf remains visible beside crown-height breaks');
+let steppedMatTriangles=0;
+for(const g of steppedMats){
+  const p=g.attributes.position,index=g.index;steppedMatTriangles+=index.count/3;
+  for(let i=0;i<index.count;i+=3){
+    const y=[0,1,2].map(k=>p.getY(index.getX(i+k)));
+    assert.ok(Math.max(...y)-Math.min(...y)<.2,'turf never bridges an 80 cm crown break as a stretched sheet');
+  }
+  g.dispose();
+}
+assert.ok(steppedMatTriangles<steppedMats.length*96,'crossing card triangles are actually removed');
 for(const {geometry} of [...crownBatches,...raised])geometry.dispose();
 for(const geometry of Object.values(crownAssets))geometry.dispose();crown.dispose();
 // Photo-style bank sculpture must not enter the original walking floor or mutate

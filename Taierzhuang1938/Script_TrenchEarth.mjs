@@ -39,6 +39,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     sink.Add(key, geometry);
   };
   const CrownLift=(x,z)=>Style.crownReliefM*(.12+.88*Math.pow(ValueNoise2(x*2.15,z*2.15,751),1.5));
+  const CrownInset=(x,z)=>Style.cliffCrownInsetM*Ease((ValueNoise2(x*1.7,z*1.7,953)-.28)/.44);
   // Both sides of the crest share the same edge. Taper 0 sinks a skin run
   // just under the heightfield, including its broken crown, without a step.
   const CrustLift = (x,z,u,taper=1,along=0,crown=true) => {
@@ -70,8 +71,9 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     const physicalN=HostNormal(groundAt),n=heightAt===groundAt?physicalN:HostNormal(heightAt);
     // Large spoil clods belong on the crown. A crown sample can land on an
     // adjoining steep bank at junctions; keep only small embedded crumbs there.
-    const cutClod=plan.Corridor(center.x,center.z)?.inCut&&physicalN.y<.85;
-    const slopeScale=cutClod?Math.min(1,.065/radius):Math.min(1,.065/radius+(1-.065/radius)*Ease((physicalN.y-.45)/.35));
+    const supportN=crown?n:physicalN;
+    const cutClod=plan.Corridor(center.x,center.z)?.inCut&&supportN.y<.85;
+    const slopeScale=cutClod?Math.min(1,.065/radius):Math.min(1,.065/radius+(1-.065/radius)*Ease((supportN.y-.45)/.35));
     radius*=slopeScale;relief*=slopeScale;
     const variants=radius>=Style.clodHighRadiusM&&highClods.length?highClods:lowClods;
     const source=radius>=Style.clodModelRadiusM&&variants.length?variants[Math.floor(modelChoice*variants.length)]
@@ -166,7 +168,11 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         const mid=(lo+hi)*.5;if(At(mid)<height)lo=mid;else hi=mid;
       }
       const base=u<=0?foot:u>=1?crest:(lo+hi)*.5,taper=CrustTaper(v,ends);
-      const inset=p.getZ(i)*Style.cliffDepthScale*taper*Ease(u/.10);
+      // The physical shoulder rounds away from the trench near the crest.
+      // Keep the exposed crown forward of that curve; the recessed top skirt
+      // still reaches the original crest so the spoil cap remains connected.
+      const crownInset=hasCrown&&p.getZ(i)>0?CrownInset(cx+nx*side*crest,cz+nz*side*crest)*Ease((u-.76)/.24):0;
+      const inset=(p.getZ(i)*Style.cliffDepthScale+crownInset)*taper*Ease(u/.10);
       const lateral=Math.max(foot,base-inset),x=cx+nx*side*lateral,z=cz+nz*side*lateral;
       const crown=hasCrown?CrownLift(cx+nx*side*crest,cz+nz*side*crest)*Ease((u-.75)/.25)*taper:0;
       p.setXYZ(i,x,height+crown-.004,z);marker[i*2]=u;marker[i*2+1]=v;
@@ -331,16 +337,20 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         }
         for(let n=0;n<Style.crumbs;n++) {
           const at=Point(st.halfFloor*(.1+.9*Math.pow(random(),.6))+st.bank*random()*.18,(random()-.5)*1.5);
-          Clod(at,.025+random()*.065,.015+random()*.045,random);
+          const radius=Style.crumbRadiusM[0]+(Style.crumbRadiusM[1]-Style.crumbRadiusM[0])*Math.pow(random(),1.5);
+          Clod(at,radius,radius*Range(random,Style.crumbReliefRatio),random);
         }
         // A broken, root-bound crown interrupts the long straight heightfield edge.
         for (let n = 0; n < Style.lipClods; n++) {
           if(random()>.55+.45*ValueNoise2(cx*.7,cz*.7,602))continue;
-          const lip = Point(st.halfFloor + st.bank * (0.90 + random() * 0.34), (random() - 0.5) * 1.6);
+          const lateral=st.halfFloor+st.bank*(.90+random()*.34),tangent=(random()-.5)*1.6;
+          const crest=Point(st.halfFloor+st.bank,tangent);
+          const inset=cliffs.length&&(side>0?st.bermPlus:st.bermMinus)>0?CrownInset(crest.x,crest.z):0;
+          const lip=Point(lateral-inset*.85,tangent);
           // Many small crumbs connect the occasional large torn chunk. Uniform
           // radii produced a few boulders sitting on an otherwise smooth crown.
           const radius=Style.lipRadiusM[0]+(Style.lipRadiusM[1]-Style.lipRadiusM[0])*Math.pow(random(),Style.lipRadiusBias);
-          if (lip.y - floor > 0.8) Clod(lip,radius,Range(random,Style.lipReliefM),random,true,dressAt);
+          if (dressAt(lip.x,lip.z) - floor > 0.8) Clod(lip,radius,Range(random,Style.lipReliefM),random,true,dressAt);
         }
         // The excavated material continues over the raised spoil ridge and skirt;
         // its footprint is checked against the shared corridor at junctions.

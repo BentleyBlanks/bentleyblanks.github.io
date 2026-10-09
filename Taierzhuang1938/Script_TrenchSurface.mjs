@@ -92,13 +92,24 @@ export function BuildTrenchSurface(sink,plan,groundAt,assets) {
       positions.push(wx,crownAt(wx,wz)+.018+.030*Math.sin(v*Math.PI),wz);
       uvs.push(mirror?1-u:u,1-v);
     }
+    const AddMatFace=(a,b,c)=>{
+      // A height query jumps from an overhanging crown to the wall below it.
+      // Cut the turf card there; stretching it across that jump makes tall
+      // opaque grass strips. The separate root fibres cover the exposed face.
+      for(const [i,j] of [[a,b],[b,c],[c,a]]){
+        const dx=positions[i*3]-positions[j*3],dy=positions[i*3+1]-positions[j*3+1],dz=positions[i*3+2]-positions[j*3+2];
+        if(Math.hypot(dx,dy,dz)>C.grass.matMaxStretch*Math.hypot(dx,dz))return;
+      }
+      indices.push(a,b,c);
+    };
     for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
-      const a=row*(cols+1)+col,b=a+cols+1;indices.push(a,a+1,b,a+1,b+1,b);
+      const a=row*(cols+1)+col,b=a+cols+1;AddMatFace(a,a+1,b);AddMatFace(a+1,b+1,b);
     }
+    if(!indices.length)return false;
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
     sink.SetSector(`TrenchSurface_${Math.floor(x/C.sectorM)}_${Math.floor(z/C.sectorM)}`);
-    stats.triangles+=indices.length/3;sink.Add('TrenchDryGrass',geometry);
+    stats.triangles+=indices.length/3;sink.Add('TrenchDryGrass',geometry);return true;
   };
   const Add=(key,source,x,z,scale,angle,embed)=>{
     const earthSector=`TrenchEarth_${Math.floor(x/Earth.sectorM)}_${Math.floor(z/Earth.sectorM)}`;
@@ -159,10 +170,12 @@ export function BuildTrenchSurface(sink,plan,groundAt,assets) {
         // glTF local -Z points down the bank towards its centre; roots are slightly buried.
         for(let tuft=0;tuft<2;tuft++){
           const along=(tuft-.5)*.52+(random()-.5)*.18;
-          GrassMat(x+st.tx*along,z+st.tz*along,Range(random,C.grass.scale),Math.atan2(st.nx*side,st.nz*side)+(random()-.5)*.35,random()<.5);
-          stats.grass++;
+          if(GrassMat(x+st.tx*along,z+st.tz*along,Range(random,C.grass.scale),Math.atan2(st.nx*side,st.nz*side)+(random()-.5)*.35,random()<.5))stats.grass++;
         }
-        if(random()<.08)Add('TrenchRootStrands',assets.grass,x,z,.26,Math.atan2(st.nx*side,st.nz*side),.035);
+        // Authored cliffs already receive wall-raycast root fibres. The legacy
+        // grass model follows the physics heightfield and stretches beneath an
+        // overhanging crown, so reserve it for the heightfield-only fallback.
+        if(random()<.08&&!assets.cliffs?.length)Add('TrenchRootStrands',assets.grass,x,z,.26,Math.atan2(st.nx*side,st.nz*side),.035);
       }
     }
   }

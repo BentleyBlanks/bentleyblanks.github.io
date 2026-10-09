@@ -30,7 +30,7 @@ for kind, name in enumerate(names):
     # Different erosion zones leave broad intact spade planes between breaks.
     # Filling every module with sinusoidal bumps made the cut look melted.
     scars = []
-    for scar in range([3, 7, 6, 8][kind]):
+    for scar in range([2, 3, 4, 3][kind]):
         cx = rng.uniform(-.55,.55)
         cz = rng.uniform(.20,1.72)
         if kind == 0:
@@ -41,8 +41,8 @@ for kind, name in enumerate(names):
             cz = rng.uniform(.12,.55)
         else:
             cz = rng.uniform(1.30,1.80)
-        scars.append((cx,cz,rng.uniform(.16,.30),rng.uniform(.16,.37),
-                      rng.uniform(.10,.19),rng.uniform(-.35,.35)))
+        scars.append((cx,cz,rng.uniform(.24,.42),rng.uniform(.22,.40),
+                      rng.uniform(.045,.11),rng.uniform(-.35,.35)))
     vertices, faces = [], []
     for row in range(rows+1):
         v = row/rows
@@ -60,7 +60,7 @@ for kind, name in enumerate(names):
             for cx,cz,rx,rz,amount,shear in scars:
                 qx=(x-cx)/rx; qz=(z-cz)/rz
                 distance=max(abs(qx+shear*qz),abs(qz),abs(qx*.65-qz*.52))
-                inside=max(0,min(1,(1-distance)/.28))
+                inside=max(0,min(1,(1-distance)/.20))
                 depth -= amount*inside
             # Root-bound ledges break only across parts of the upper face.
             # These irregular pockets keep an overhang without an even gutter.
@@ -104,7 +104,7 @@ for kind, name in enumerate(names):
     bpy.context.view_layer.objects.active=obj
     obj.select_set(True)
     split=obj.modifiers.new('FractureCreases','EDGE_SPLIT')
-    split.split_angle=math.radians(75)
+    split.split_angle=math.radians(60)
     split.use_edge_angle=True;split.use_edge_sharp=False
     bpy.ops.object.modifier_apply(modifier=split.name)
     mesh=obj.data
