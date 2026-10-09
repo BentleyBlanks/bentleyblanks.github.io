@@ -4,11 +4,12 @@ Run with Script_BlenderMcp exec. glTF axes: X along the trench, Y up,
 positive Z faces the trench. The back is buried; runtime bends X along a bank.
 """
 import bpy, math, random, json
+from mathutils import Vector, geometry as Geometry
 from pathlib import Path
 
 project = Path(__file__).resolve().parents[1]
-source = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchCliffWalls')
-expected = source / 'Scene_TrenchCliffWalls.blend'
+source = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchCliffWalls/Adaptive')
+expected = source / 'Scene_TrenchCliffWallsAdaptive.blend'
 if bpy.data.filepath and Path(bpy.data.filepath).resolve() != expected.resolve():
     raise RuntimeError('Refusing another Blender project: ' + bpy.data.filepath)
 source.mkdir(parents=True, exist_ok=True)
@@ -24,13 +25,12 @@ material.use_nodes = True
 material.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value = .95
 names = ['SpadeFace', 'TornFace', 'LowerScar', 'RootCrown']
 records = []
-cols, rows = 8, 16
 for kind, name in enumerate(names):
     rng = random.Random(10936 + kind * 73)
     # Different erosion zones leave broad intact spade planes between breaks.
     # Filling every module with sinusoidal bumps made the cut look melted.
     scars = []
-    for scar in range([2, 3, 4, 3][kind]):
+    for scar in range([4, 6, 5, 7][kind]):
         cx = rng.uniform(-.55,.55)
         cz = rng.uniform(.20,1.72)
         if kind == 0:
@@ -41,50 +41,73 @@ for kind, name in enumerate(names):
             cz = rng.uniform(.12,.55)
         else:
             cz = rng.uniform(1.30,1.80)
-        scars.append((cx,cz,rng.uniform(.24,.42),rng.uniform(.22,.40),
-                      rng.uniform(.045,.11),rng.uniform(-.35,.35)))
-    vertices, faces = [], []
-    for row in range(rows+1):
-        v = row/rows
-        for col in range(cols+1):
-            u = col/cols
-            edge = math.sin(math.pi*u)**2
-            x = (u-.5)*1.5
-            z = v*2
-            if 0<col<cols and 0<row<rows:
-                x += rng.uniform(-.026,.026)
-                z += rng.uniform(-.027,.027)
-            # Shallow tilted cut planes, then local polygonal fractures. A flat
-            # recessed centre and narrow broken edge avoid rounded bowl cavities.
-            depth = .13 + [-.018,.014,.008,-.012][kind]*x + .004*(z-1)
-            for cx,cz,rx,rz,amount,shear in scars:
-                qx=(x-cx)/rx; qz=(z-cz)/rz
-                distance=max(abs(qx+shear*qz),abs(qz),abs(qx*.65-qz*.52))
-                inside=max(0,min(1,(1-distance)/.20))
-                depth -= amount*inside
-            # Root-bound ledges break only across parts of the upper face.
-            # These irregular pockets keep an overhang without an even gutter.
-            lipShape=.65+.35*abs(math.sin(x*7.3+kind*2.4))
-            depth -= .11*math.exp(-((v-(.84+.025*math.sin(x*6+kind)))/.065)**2)*lipShape
-            depth += .13*math.exp(-((v-.98)/.055)**2)*lipShape
-            depth += .035*math.exp(-((v-.06)/.1)**2)
-            # Keep a continuous cut plane across module boundaries; taper only
-            # the sculpted damage. Tapering the whole depth made every module
-            # bulge into a regular column. Zero edge derivative also avoids a
-            # repeating shading crease at otherwise coincident borders.
-            depth = max(.018,min(.30,.14+(depth-.13)*edge))
-            if row==rows:
-                z += edge*(.014+.045*math.sin(x*13+kind)**2)
-            vertices.append((x,-depth,z))
-    for row in range(rows):
-        for col in range(cols):
-            a=row*(cols+1)+col; b=a+cols+1
-            faces.extend([(a,a+1,b+1),(a,b+1,b)])
+        scars.append((cx,cz,rng.uniform(.08,.16),rng.uniform(.10,.22),
+                      rng.uniform(.025,.065),rng.uniform(-.35,.35)))
+    points, pointIds = [], {}
+    def Point(x,z,border=False):
+        if not border and (abs(x)>.73 or z<.02 or z>1.98): return None
+        key=(round(x,7),round(z,7))
+        if key not in pointIds:
+            pointIds[key]=len(points);points.append(Vector((x,z)))
+        return pointIds[key]
+    def Clip(poly,nx,nz,limit):
+        result=[]
+        for i,current in enumerate(poly):
+            previous=poly[i-1]
+            a=nx*previous[0]+nz*previous[1]-limit
+            b=nx*current[0]+nz*current[1]-limit
+            if (a<=0)!=(b<=0):
+                t=a/(a-b)
+                result.append((previous[0]+(current[0]-previous[0])*t,previous[1]+(current[1]-previous[1])*t))
+            if b<=0:result.append(current)
+        return result
+    # Shared border samples remain identical across every module. Interior
+    # vertices follow fracture rims and floors instead of a uniform grid.
+    border=[]
+    border += [Point(-.75+i*1.5/8,0,True) for i in range(8)]
+    border += [Point(.75,i*2/16,True) for i in range(16)]
+    border += [Point(.75-i*1.5/8,2,True) for i in range(8)]
+    border += [Point(-.75,2-i*2/16,True) for i in range(16)]
+    edges=[(border[i],border[(i+1)%len(border)]) for i in range(len(border))]
+    for z in [.35,.85,1.30]:
+        for x in [-.5,-.25,0,.25,.5]:Point(x,z)
+    for z in [.125,1.68,1.80,1.96]:
+        for col in range(1,8):Point((col/8-.5)*1.5,z)
+    for cx,cz,rx,rz,amount,shear in scars:
+        Point(cx,cz)
+        for radius in [.78,1.02]:
+            polygon=[(-2,-2),(2,-2),(2,2),(-2,2)]
+            for nx,nz in [(1,shear),(-1,-shear),(0,1),(0,-1),(.65,-.52),(-.65,.52)]:
+                polygon=Clip(polygon,nx,nz,radius)
+            for qx,qz in polygon:Point(cx+qx*rx,cz+qz*rz)
+    coordinates,_,triangles,*_=Geometry.delaunay_2d_cdt(points,edges,[],0,1e-7,False)
+    vertices,faces=[],[tuple(face) for face in triangles]
+    assert all(len(face)==3 for face in faces)
+    for coordinate in coordinates:
+        x,z=coordinate;u=(x+.75)/1.5;v=z/2
+        t=max(0,min(1,(.75-abs(x))/.12));edge=t*t*(3-2*t)
+        depth=.13+[-.018,.014,.008,-.012][kind]*x+.004*(z-1)
+        scarDepth=0.0
+        for cx,cz,rx,rz,amount,shear in scars:
+            qx=(x-cx)/rx;qz=(z-cz)/rz
+            distance=max(abs(qx+shear*qz),abs(qz),abs(qx*.65-qz*.52))
+            inside=max(0,min(1,(1-distance)/.20))
+            scarDepth=max(scarDepth,amount*inside)
+        depth-=scarDepth
+        lipShape=.65+.35*abs(math.sin(x*7.3+kind*2.4))
+        depth-=.11*math.exp(-((v-(.84+.025*math.sin(x*6+kind)))/.065)**2)*lipShape
+        depth+=.13*math.exp(-((v-.98)/.055)**2)*lipShape
+        depth+=.035*math.exp(-((v-.06)/.1)**2)
+        depth=max(.018,min(.30,.14+(depth-.13)*edge))
+        if abs(z-2)<1e-6:z+=edge*(.014+.045*math.sin(x*13+kind)**2)
+        vertices.append((x,-depth,z))
+    topFront=sorted([i for i,c in enumerate(coordinates) if abs(c.y-2)<1e-6],key=lambda i:coordinates[i].x)
+    assert len(topFront)==9
     # The top skirt buries the broken crown into the spoil cap. Side borders
     # share every vertex with the next module after deformation. A side quad
     # joining only its top/bottom would cut across that curved profile and show
     # as a metre-long triangular flap, so there is no redundant side cap.
-    segments = [(rows*(cols+1)+c,rows*(cols+1)+c-1) for c in range(cols,0,-1)]
+    segments = [(topFront[c],topFront[c-1]) for c in range(8,0,-1)]
     back={}
     for a,b in segments:
         for index in (a,b):

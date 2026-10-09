@@ -149,7 +149,9 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     Add(earth,geometry);
   };
   const CliffPanel = (st,next,side,ends,variant) => {
-    const geometry=cliffs[variant%cliffs.length].clone(),p=geometry.attributes.position;
+    const geometry=cliffs[variant%cliffs.length].clone(),mirror=(variant&4)!==0;
+    if(mirror)geometry.scale(-1,1,1);
+    const p=geometry.attributes.position;
     const hasCrown=(side>0?st.bermPlus:st.bermMinus)>0;
     const marker=new Float32Array(p.count*2);
     for(let i=0;i<p.count;i++){
@@ -178,11 +180,11 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
       p.setXYZ(i,x,height+crown-.004,z);marker[i*2]=u;marker[i*2+1]=v;
     }
     const index=geometry.index;
-    if((st.tz*st.nx-st.tx*st.nz)*side<0)
+    if(((st.tz*st.nx-st.tx*st.nz)*side<0)!==mirror)
       for(let i=0;i<index.count;i+=3){const b=index.getX(i+1);index.setX(i+1,index.getX(i+2));index.setX(i+2,b);}
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(marker,2));
     geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();
-    geometry.userData.trenchCrust=true;geometry.userData.trenchCliff=true;
+    geometry.userData.trenchCrust=true;geometry.userData.trenchCliff=true;geometry.userData.trenchCliffMirrored=mirror;
     Add(earth,geometry);stats.cliffPanels++;
   };
   const SpoilLift=(x,z,u,taper)=>{

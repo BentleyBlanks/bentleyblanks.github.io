@@ -211,12 +211,13 @@ const cliffScene=(await new GLTFLoader().parseAsync(cliffBytes.buffer.slice(clif
 const cliffKit=[];cliffScene.updateMatrixWorld(true);cliffScene.traverse(node=>{
   if(node.isMesh)cliffKit.push(node.geometry.clone().applyMatrix4(node.matrixWorld));
 });
-let panels=0,frontFaces=0,undercutFaces=0;
+let panels=0,mirroredPanels=0,frontFaces=0,undercutFaces=0;
 const cliffBatches=[];
 const cliffStats=BuildTrenchEarth({SetSector(){},Add(key,g){
   cliffBatches.push(g);
   if(g.userData.trenchCliff){
-    panels++;const p=g.attributes.position,index=g.index;
+    panels++;if(g.userData.trenchCliffMirrored)mirroredPanels++;
+    const p=g.attributes.position,index=g.index;let signedFrontArea=0;
     for(let i=0;i<p.count;i++){
       assert.ok(Math.abs(p.getX(i))>=1.7+.02*1.1-1e-5,'cliff surface never enters the original walking floor');
       assert.ok(Math.abs(p.getX(i))<=2.87,'recessed cliff skirt stays inside the bank and crown margin');
@@ -224,16 +225,19 @@ const cliffStats=BuildTrenchEarth({SetSector(){},Add(key,g){
     }
     for(let i=0;i<index.count;i+=3){
       const [a,b,c]=[0,1,2].map(k=>new THREE.Vector3().fromBufferAttribute(p,index.getX(i+k)));
-      const normal=b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+      const faceCross=b.clone().sub(a).cross(c.clone().sub(a)),normal=faceCross.clone().normalize();
       const centre=a.clone().add(b).add(c).multiplyScalar(1/3);
+      signedFrontArea+=faceCross.x*Math.sign(centre.x);
       if(normal.x*Math.sign(centre.x)<-.3)frontFaces++;
       if(normal.y<-.15&&centre.y>-.5)undercutFaces++;
     }
+    assert.ok(signedFrontArea<-.2,'each original or mirrored module winds toward the trench');
   }
   g.dispose();
 }},cutPlan,cutGround,{cliffs:cliffKit,roots:'ground',style:{...TRENCH_APPEARANCE,
   clodChance:0,bankClods:0,crumbs:0,lipClods:0,spoilClods:0}});
 assert.ok(panels>10&&frontFaces>panels*80,'authored wall faces are visible from both sides of the trench');
+assert.ok(mirroredPanels>0&&mirroredPanels<panels,'exercise original and mirrored wall placement');
 assert.ok(undercutFaces>10,'overhanging crown is represented by geometry, not only a normal map');
 assert.ok(cliffStats.roots>10,'wall-projected roots reach the deformed cliff mesh, including its updated raycast bounds');
 assert.equal(JSON.stringify(cutPlan.segments[0].stations),stationsBefore,'cliff placement keeps the authored route');
