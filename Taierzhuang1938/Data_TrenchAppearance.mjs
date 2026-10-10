@@ -42,6 +42,8 @@ export const TRENCH_APPEARANCE = Object.freeze({
   lipEdgeOffsetM: .02,
   lipEdgeInsetRatio: [.25, .70],
   spoilClods: 12,
+  // Fraction of the physical berm width: pile excavated clods near its crest.
+  spoilScatterBand: [.08, .46],
   spoilRadiusM: [.04, .20],
   spoilReliefM: [.035, .16],
   clodEmbed: .24,

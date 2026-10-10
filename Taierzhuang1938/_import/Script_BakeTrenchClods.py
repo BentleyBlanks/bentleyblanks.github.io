@@ -8,8 +8,8 @@ from mathutils import Vector
 from pathlib import Path
 
 project = Path(__file__).resolve().parents[1]
-source = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchReferenceTen/ClodFractures')
-expected = source / 'Scene_TrenchClodFractures.blend'
+source = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchReferenceTen/ClusterLowLod')
+expected = source / 'Scene_TrenchClodClusterLowLod.blend'
 if bpy.data.filepath and Path(bpy.data.filepath).resolve() != expected.resolve():
     raise RuntimeError('Refusing another Blender project: ' + bpy.data.filepath)
 source.mkdir(parents=True, exist_ok=True)
@@ -121,6 +121,46 @@ for kind, name in enumerate(names):
     bpy.context.view_layer.objects.active = low; low.select_set(True)
     decimate = low.modifiers.new('Small aggregate silhouette budget', 'DECIMATE'); decimate.ratio = .35
     bpy.ops.object.modifier_apply(modifier=decimate.name); low.select_set(False)
+    if kind==5:
+        # Three solid crumbs follow the prototype cluster. Decimating the five-
+        # lobe union to 56 faces left wide plates bridging its shallow valleys.
+        # Spend the same 56 faces on two icosahedra and one eight-sided bipyramid.
+        bm=bmesh.new();clusterRng=random.Random(117118)
+        lobes=[((-.44,-.19,-.05),(.64,.56,.80)),
+               ((.38,-.16,.04),(.60,.58,.68)),
+               ((.01,.42,-.04),(.55,.49,.63))]
+        for part,(offset,scale) in enumerate(lobes):
+            if part<2:
+                verts=bmesh.ops.create_icosphere(bm,subdivisions=1,radius=1)['verts']
+            else:
+                ring=[bm.verts.new((math.cos(i*math.tau/8),math.sin(i*math.tau/8),0)) for i in range(8)]
+                bottom=bm.verts.new((0,0,-1));top=bm.verts.new((.08,-.06,1))
+                for i in range(8):
+                    bm.faces.new((bottom,ring[(i+1)%8],ring[i]))
+                    bm.faces.new((ring[i],ring[(i+1)%8],top))
+                verts=ring+[bottom,top]
+            turn=clusterRng.uniform(-.5,.5)
+            for vertex in verts:
+                p=vertex.co;f=clusterRng.uniform(.91,1.09)
+                x=p.x*math.cos(turn)-p.y*math.sin(turn)
+                y=p.x*math.sin(turn)+p.y*math.cos(turn)
+                p.x=x*f*scale[0]+offset[0];p.y=y*f*scale[1]+offset[1]
+                p.z=p.z*f*scale[2]+offset[2]
+        top=max(v.co.z for v in bm.verts)
+        radius=max(math.hypot(v.co.x,v.co.y) for v in bm.verts)
+        for v in bm.verts:
+            v.co.x*=1.12/radius;v.co.y*=1.12/radius
+            v.co.z=max(-.52,v.co.z*1.05/top)
+        bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
+        bm.to_mesh(low.data);bm.free();low.data.update()
+        for polygon in low.data.polygons:polygon.use_smooth=True
+        while low.data.uv_layers:low.data.uv_layers.remove(low.data.uv_layers[0])
+        uv=low.data.uv_layers.new(name='UVMap')
+        for polygon in low.data.polygons:
+            for loopIndex in polygon.loop_indices:
+                p=low.data.vertices[low.data.loops[loopIndex].vertex_index].co
+                uv.data[loopIndex].uv=((p.x+1.3)/2.6,(p.y+1.3)/2.6)
+        assert sum(len(p.vertices)-2 for p in low.data.polygons)==56
     for level in (obj, low):
         # Split only genuinely sharp breaks after each LOD is decimated.
         bpy.context.view_layer.objects.active=level;level.select_set(True)

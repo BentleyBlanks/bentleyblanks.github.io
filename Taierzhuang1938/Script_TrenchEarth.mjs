@@ -440,7 +440,8 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         // The excavated material continues over the raised spoil ridge and skirt;
         // its footprint is checked against the shared corridor at junctions.
         for(let n=0;n<Style.spoilClods;n++){
-          const lateral=st.halfFloor+st.bank+corridor.bermWidth*(.06+random()*.70);
+          const lateral=st.halfFloor+st.bank+corridor.bermWidth*
+            (Style.spoilScatterBand[0]+random()*(Style.spoilScatterBand[1]-Style.spoilScatterBand[0]));
           const at=Point(lateral,(random()-.5)*1.5),hit=plan.Corridor(at.x,at.z);
           if(!hit||hit.inFloor||at.y-floor<Style.minRiseM||hit.id!==segment.id)continue;
           const radius=Style.spoilRadiusM[0]+(Style.spoilRadiusM[1]-Style.spoilRadiusM[0])*Math.pow(random(),1.7);

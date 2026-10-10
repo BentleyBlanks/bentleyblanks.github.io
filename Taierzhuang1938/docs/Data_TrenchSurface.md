@@ -1,5 +1,15 @@
 # 通用壕沟表面
 
+## 2026-10-10 后续：垄顶堆积与 Cluster 低精度土团
+
+弃土土团的横向散布由垄宽的 `.06–.76` 收到 `.08–.46`，集中在垄顶附近；每站数量参数仍为 12。三组宽度比较记录为 `SpoilBandAudit117.json`；中间档的全图估算超过原预算，未采用，最终档和实机近景见 `SpoilBand117Shots`。共用随机序列及交叉口筛选会让实际通过布设的装饰数量略有变化，不能称所有旧土团和根须位置逐项不动。物理地形、路线、沟宽、沟深及连贯弃土垄的剖面未改。
+
+近景射线取证 `ClodRay117.json` 将明显的大平面定位到 `TrenchClusterLow`。沿用现有 imagegen 六件土团原型，经 BlenderMCP 单独重建这一低精度网格：两个 20 面实体与一个 16 面实体组成三个相接土团，仍是 56 三角，不增加 Mesh 或材质。其他 11 个网格的顶点、法线、UV、索引哈希与前版逐项相同，证据 `ClodAssetIsolation118.json`；整套仍为 1,296 三角，GLB 为 44,476 字节。`ClusterLow118Shots` 保留同机位与局部对照。
+
+源工程为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchReferenceTen/ClusterLowLod/Scene_TrenchClodClusterLowLod.blend`，同目录保留原型及模型边界记录；重建入口 `_import/Script_BakeTrenchClods.py`。Blender 已存盘并退出，`BlenderStopped118.log` 确认本任务及本机无残留实例。材质、PBR、光照及土崖模块沿用上一轮，缓存戳 `2026101025`。
+
+`TrenchSurfaceTest`、`ModuleGraphTest`、`AssetStandardsTest`、`MotionVectorContractTest`（49 个 GPU 场景）通过。`Iteration119All` 覆盖 22 段 / 29 个高画质机位，`Whitebox119` 复查四个白盒机位，均已查看；页面、控制台、GL 错误为 0，程序链接与爆破恢复通过。土层 1,123,381 三角，加草石 21,095，合计 1,144,476，低于原 115 万预算；土层仍为 55 个分区网格。对照页默认沿沟机位与 10 号图，支持上一轮及最初实机；图片和切换检查通过。结果保留本地，尚未标为达到完整参考质感。
+
 ## 2026-10-10 后续：由真实内壁局部重做密实土
 
 第十版源图中的连续斜擦纹在实际材质中被强化，形成偏织物状的表面。`MaterialIsolation112` 以固定曝光分别检查原材质、单次平铺及关闭 POM / 法线的基础色；基础色本身仍存在这些条纹。第一张重做候选（Lovart 第十一版）减少了长条纹，但实机仍像松散颗粒，因此没有安装。
