@@ -94,26 +94,65 @@ export function CreateTrenchDressingHeightSampler(geometries,groundAt,{crownOnly
 }
 
 export function BuildTrenchSurface(sink,plan,groundAt,assets,{onCrownReady=null}={}) {
-  const stats={stones:0,grass:0,triangles:0};const occupied=new Set();
-  const crownAt=CreateTrenchDressingHeightSampler([...sink.buckets?.values()||[]].flat(),groundAt,{crownOnly:true});
+  const stats={stones:0,grass:0,wallRoots:0,triangles:0};const occupied=new Set();
+  const dressing=[...sink.buckets?.values()||[]].flat();
+  const crownAt=CreateTrenchDressingHeightSampler(dressing,groundAt,{crownOnly:true});
   onCrownReady?.(crownAt);
+  const wallGeometry=assets.cliffs?.length?dressing.filter(g=>g.userData.trenchCrust):[];
+  const wallMaterial=wallGeometry.length?new THREE.MeshBasicMaterial({side:THREE.DoubleSide}):null;
+  const wallCells=new Map(),wallCellM=2,wallRay=new THREE.Raycaster();
+  for(const geometry of wallGeometry){
+    geometry.computeBoundingBox();geometry.computeBoundingSphere();const bounds=geometry.boundingBox,mesh=new THREE.Mesh(geometry,wallMaterial);
+    for(let z=Math.floor(bounds.min.z/wallCellM);z<=Math.floor(bounds.max.z/wallCellM);z++)
+      for(let x=Math.floor(bounds.min.x/wallCellM);x<=Math.floor(bounds.max.x/wallCellM);x++){
+        const key=x+':'+z;if(!wallCells.has(key))wallCells.set(key,[]);wallCells.get(key).push(mesh);
+      }
+  }
+  const ProjectWall=(point,outward)=>{
+    const meshes=new Set();
+    for(let z=Math.floor((point.z-.8)/wallCellM);z<=Math.floor((point.z+.8)/wallCellM);z++)
+      for(let x=Math.floor((point.x-.8)/wallCellM);x<=Math.floor((point.x+.8)/wallCellM);x++)
+        for(const mesh of wallCells.get(x+':'+z)||[])meshes.add(mesh);
+    wallRay.set(point.clone().addScaledVector(outward,-.8),outward);wallRay.far=1.6;
+    const hit=wallRay.intersectObjects([...meshes],false)[0];
+    return hit?hit.point.addScaledVector(hit.face.normal,C.grass.wallMatPushM):null;
+  };
   const Range=(r,a)=>a[0]+r()*(a[1]-a[0]);
   const GrassMat=(x,z,scale,angle,mirror)=>{
-    const positions=[],uvs=[],indices=[],cols=8,rows=6;
+    const wall=wallGeometry.length>0;
+    const positions=[],uvs=[],indices=[],valid=[],cols=wall?C.grass.wallMatCols:8,rows=wall?C.grass.wallMatRows:6;
+    const width=wall?C.grass.wallMatWidthM:C.grass.matWidthM;
     const c=Math.cos(angle),s=Math.sin(angle);
+    let top=crownAt(x,z)-.04*scale;const outward=new THREE.Vector3(s,0,c);
+    if(wall){
+      let anchor=null;
+      for(let drop=0;drop<=C.grass.wallMatSearchM;drop+=C.grass.wallMatSearchStepM){
+        anchor=ProjectWall(new THREE.Vector3(x,top-drop,z),outward);if(anchor)break;
+      }
+      if(!anchor)return false;
+      top=anchor.y;
+    }
     for(let row=0;row<=rows;row++)for(let col=0;col<=cols;col++) {
-      const u=col/cols,v=row/rows,px=(u-.5)*C.grass.matWidthM*scale,pz=(.18-v*C.grass.matDepthM)*scale;
+      const u=col/cols,v=row/rows,px=(u-.5)*width*scale,pz=(.18-v*C.grass.matDepthM)*scale;
       const wx=x+px*c+pz*s,wz=z-px*s+pz*c;
-      positions.push(wx,crownAt(wx,wz)+.018+.030*Math.sin(v*Math.PI),wz);
+      if(wall){
+        const point=new THREE.Vector3(x+px*c,top+(C.grass.wallMatTopM-v*C.grass.wallMatDropM)*scale,z-px*s);
+        const hit=ProjectWall(point,outward);valid.push(!!hit);positions.push(...(hit||point).toArray());
+      }else{
+        valid.push(true);positions.push(wx,crownAt(wx,wz)+.018+.030*Math.sin(v*Math.PI),wz);
+      }
       uvs.push(mirror?1-u:u,1-v);
     }
     const AddMatFace=(a,b,c)=>{
-      // A height query jumps from an overhanging crown to the wall below it.
-      // Cut the turf card there; stretching it across that jump makes tall
-      // opaque grass strips. The separate root fibres cover the exposed face.
+      if(!valid[a]||!valid[b]||!valid[c])return;
+      // Trim cards where adjacent rays hit opposite sides of a fracture,
+      // or the fallback height query drops from the lip to the bank below.
+      // Stretching across either discontinuity leaves a floating curtain.
       for(const [i,j] of [[a,b],[b,c],[c,a]]){
         const dx=positions[i*3]-positions[j*3],dy=positions[i*3+1]-positions[j*3+1],dz=positions[i*3+2]-positions[j*3+2];
-        if(Math.hypot(dx,dy,dz)>C.grass.matMaxStretch*Math.hypot(dx,dz))return;
+        const authored=wall?scale*Math.hypot((i%(cols+1)-j%(cols+1))/cols*width,
+          (Math.floor(i/(cols+1))-Math.floor(j/(cols+1)))/rows*C.grass.wallMatDropM):Math.hypot(dx,dz);
+        if(Math.hypot(dx,dy,dz)>(wall?C.grass.wallMatMaxStretch:C.grass.matMaxStretch)*authored)return;
       }
       indices.push(a,b,c);
     };
@@ -123,6 +162,7 @@ export function BuildTrenchSurface(sink,plan,groundAt,assets,{onCrownReady=null}
     if(!indices.length)return false;
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
+    geometry.userData.trenchWallRoots=wall;if(wall)stats.wallRoots++;
     sink.SetSector(`TrenchSurface_${Math.floor(x/C.sectorM)}_${Math.floor(z/C.sectorM)}`);
     stats.triangles+=indices.length/3;sink.Add('TrenchDryGrass',geometry);return true;
   };
@@ -194,6 +234,7 @@ export function BuildTrenchSurface(sink,plan,groundAt,assets,{onCrownReady=null}
       }
     }
   }
+  wallMaterial?.dispose();
   return stats;
 }
 

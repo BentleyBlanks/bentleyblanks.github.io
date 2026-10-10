@@ -317,6 +317,37 @@ for(const g of cliffBatches)if(g.userData.trenchRoots){
 assert.ok(cliffRootSamples>100,'sample the actual fibres on the authored cliff fixture');
 assert.ok(cliffBranchSamples>25,'surface-distance checks include rendered feeder-root geometry');
 assert.ok(maxCliffRootGap<.06,`cliff roots follow the actual overhanging mesh (max gap ${maxCliffRootGap})`);
+// Fine root cutouts use horizontal surface projection on authored cliffs.
+// Check the actual card vertices/centres independently against wall triangles.
+const wallMatGeometry=[],wallMatAsset=new THREE.IcosahedronGeometry(.1,0);
+const savedGrassChance=C.grass.chance;let wallMatStats;
+try{
+  C.grass.chance=1;
+  wallMatStats=BuildTrenchSurface({buckets:new Map([['walls',cliffBatches]]),SetSector(){},Add(key,g){
+    if(g.userData.trenchWallRoots)wallMatGeometry.push(g);else g.dispose();
+  }},cutPlan,cutGround,{grass:wallMatAsset,stone:wallMatAsset,cliffs:cliffKit});
+}finally{C.grass.chance=savedGrassChance;}
+assert.ok(wallMatStats.wallRoots>2,`authored banks receive actual projected root cards (${JSON.stringify(wallMatStats)})`);
+let wallMatSamples=0,maxWallMatGap=0;
+for(const g of wallMatGeometry){
+  const p=g.attributes.position,index=g.index;
+  for(let i=0;i<index.count;i+=3){
+    const vertices=[0,1,2].map(k=>new THREE.Vector3().fromBufferAttribute(p,index.getX(i+k)));
+    const samples=[...vertices,vertices[0].clone().add(vertices[1]).add(vertices[2]).multiplyScalar(1/3)];
+    for(const point of samples){
+      let distance=Infinity;
+      for(const {triangle,bounds} of cliffTriangles){
+        if(bounds.distanceToPoint(point)>Math.min(distance,.1))continue;
+        triangle.closestPointToPoint(point,closest);distance=Math.min(distance,point.distanceTo(closest));
+      }
+      maxWallMatGap=Math.max(maxWallMatGap,distance);wallMatSamples++;
+    }
+  }
+  g.dispose();
+}
+assert.ok(wallMatSamples>100,'sample rendered card faces rather than only their anchors');
+assert.ok(maxWallMatGap<.06,`root cards follow the wall without stretched curtains (gap ${maxWallMatGap})`);
+wallMatAsset.dispose();
 const noCrownPlan=CompileTrenchNetwork({seed:'NoCrown',segments:[{id:'Exit',preset:'communication',
   points:[[0,0],[0,20]],jitterScale:0,cornerRadiusM:0,bermH:0}]});
 let noCrownPanels=0;

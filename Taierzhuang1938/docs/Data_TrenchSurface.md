@@ -1,5 +1,17 @@
 # 通用壕沟表面
 
+## 2026-10-10 后续：剥落坑与贴壁细根
+
+本轮沿用已有 imagegen 四模块土崖原型，通过 BlenderMCP 重建内壁的剥落坑。每个坑口用独立方向及边距的六边形约束，替换重复的削角矩形；凹入量为 3.5–9.5 cm，55° 以上折角保留断口法线。四模块共 1,158 三角 / 35,696 字节，沿用共同边界采样、沟沿衔接及原物理地形契约。源工程位于 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchCliffWalls/CutPockets/Scene_TrenchCliffWallsCutPockets.blend`，同目录保留参考与边界记录。重建入口仍为 `_import/Script_BakeTrenchCliffWalls.py`；Blender 已退出，证据 `BlenderStopped111.log`。
+
+根毡改为一张 imagegen 分枝细根透明贴图（生成与重建命令见 [细根贴图记录](Data_TrenchRootMatPrompt.md)）。1024² WebP 为 470,412 字节；技术烘焙保留缩放后 alpha，延展透明像素中的 RGB，防止 mipmap 渗色。独立目录重烘的 SHA-256 与运行资产一致。材质白色乘数保留原图的棕褐色，alphaTest 为 .30。沿沟仍稀疏布设，不增加草簇密度。
+
+卡片由旧高度场铺设改为水平射线投影到实际土崖，先向下寻找上缘，再投影 6×5 网格；跨断口的过长三角形裁除。所有点仍走静态合批和原爆破裁切。`TrenchSurfaceTest` 独立检查卡片顶点及面中心至真实土崖三角形的距离，6 cm 上限未放宽。新增 `wallRoots` 统计区分贴壁卡片和旧回退草毡。
+
+固定曝光对照 `CompactBalance108` 比较了降低整片密实土颜色强度及浮雕强度的方案：只是平滑了土面，没有改善剥落形态，因此未采用。`Iteration109Pockets` 的较硬坑口也未采用；最终形态见 `Iteration110Pockets`。本轮土壤 PBR、正式着色器和光照未变，缓存戳 `2026101023`。
+
+`Iteration111All` 覆盖 22 段 / 29 个高画质机位，`Whitebox111` 复查四个白盒机位，均已查看；页面、控制台、GL 错误为 0，程序链接与爆破恢复通过。土层 1,120,936 三角，加草石 21,056，合计 1,141,992，仍低于原 115 万预算；土层分区为 55。`TrenchSurfaceTest`、`TextureStandardsTest`（3,719 项）、`AssetStandardsTest`、`ModuleGraphTest`、`MotionVectorContractTest`（49 个 GPU 场景）通过。对照页显示当前与第一百零三轮 / 最初实机，切换及 29 张图片加载检查通过。本轮保留本地，照片中的自然侵蚀与细土层次仍未完全达到。
+
 ## 2026-10-10 后续：密实土纹理尺度
 
 第一百零三轮固定曝光比较 1.2 / 1.0 / .8 m 密实土平铺，诊断时同步校正法线强度，保留 1.0 m 档，让近景土纹更细而仍可辨认连续切面。8 mm 起伏、颜色强度、1.8 m 松土平铺、模型与光照保持不变。诊断接口只用于临时浏览器会话，没有进入正式着色器。

@@ -869,11 +869,11 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "TrenchRootMat", kind: "decal", tier: "level:FirstLevel",
-    source: { provider: "imagegen", date: "2026-09-26", prompt: "docs/Data_TrenchRootMatPrompt.md" },
+    source: { provider: "imagegen", date: "2026-10-10", prompt: "docs/Data_TrenchRootMatPrompt.md" },
     consumers: [{ file: "Data_TrenchSurface.mjs", token: "Texture_TrenchRootMat" }],
-    legacy: "1254² 不是 2 的幂（2026-09-28 已转 webp）",
+    bake: "_import/Script_BakeTrenchRootMat.py",
     files: [
-      ["Texture_TrenchRootMat.webp", "Base", 1254, 1254],
+      ["Texture_TrenchRootMat.webp", "Base", 1024, 1024],
     ],
   },
   {

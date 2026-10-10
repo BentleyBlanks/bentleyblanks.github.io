@@ -8,8 +8,8 @@ from mathutils import Vector, geometry as Geometry
 from pathlib import Path
 
 project = Path(__file__).resolve().parents[1]
-source = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchCliffWalls/FineCrown')
-expected = source / 'Scene_TrenchCliffWallsFineCrown.blend'
+source = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchCliffWalls/CutPockets')
+expected = source / 'Scene_TrenchCliffWallsCutPockets.blend'
 if bpy.data.filepath and Path(bpy.data.filepath).resolve() != expected.resolve():
     raise RuntimeError('Refusing another Blender project: ' + bpy.data.filepath)
 source.mkdir(parents=True, exist_ok=True)
@@ -41,8 +41,17 @@ for kind, name in enumerate(names):
             cz = rng.uniform(.12,.55)
         else:
             cz = rng.uniform(1.30,1.80)
-        scars.append((cx,cz,rng.uniform(.08,.16),rng.uniform(.10,.22),
-                      rng.uniform(.025,.065),rng.uniform(-.35,.35)))
+        rx,rz,amount=rng.uniform(.08,.16),rng.uniform(.10,.22),rng.uniform(.035,.095)
+        rng.random() # Keep subsequent scar locations stable after removing the old shear parameter.
+        # Independently vary each chip outline. The old repeated clipped box
+        # became an obvious diamond-shaped stamp once its recess was deepened.
+        chipRng=random.Random(4163+kind*131+scar*37)
+        turn=chipRng.uniform(-math.pi,math.pi)
+        planes=[]
+        for side in range(6):
+            angle=turn+side*math.tau/6+chipRng.uniform(-.18,.18)
+            planes.append((math.cos(angle),math.sin(angle),chipRng.uniform(.72,1.16)))
+        scars.append((cx,cz,rx,rz,amount,planes))
     points, pointIds = [], {}
     def Point(x,z,border=False):
         if not border and (abs(x)>.73 or z<.02 or z>1.98): return None
@@ -73,12 +82,12 @@ for kind, name in enumerate(names):
         for x in [-.5,-.25,0,.25,.5]:Point(x,z)
     for z in [.125,1.68,1.80,1.96]:
         for col in range(1,8):Point((col/8-.5)*1.5,z)
-    for cx,cz,rx,rz,amount,shear in scars:
+    for cx,cz,rx,rz,amount,planes in scars:
         Point(cx,cz)
         for radius in [.78,1.02]:
             polygon=[(-2,-2),(2,-2),(2,2),(-2,2)]
-            for nx,nz in [(1,shear),(-1,-shear),(0,1),(0,-1),(.65,-.52),(-.65,.52)]:
-                polygon=Clip(polygon,nx,nz,radius)
+            for nx,nz,limit in planes:
+                polygon=Clip(polygon,nx,nz,radius*limit)
             for qx,qz in polygon:Point(cx+qx*rx,cz+qz*rz)
     coordinates,_,triangles,*_=Geometry.delaunay_2d_cdt(points,edges,[],0,1e-7,False)
     vertices,faces=[],[tuple(face) for face in triangles]
@@ -88,9 +97,9 @@ for kind, name in enumerate(names):
         t=max(0,min(1,(.75-abs(x))/.12));edge=t*t*(3-2*t)
         depth=.13+[-.018,.014,.008,-.012][kind]*x+.004*(z-1)
         scarDepth=0.0
-        for cx,cz,rx,rz,amount,shear in scars:
+        for cx,cz,rx,rz,amount,planes in scars:
             qx=(x-cx)/rx;qz=(z-cz)/rz
-            distance=max(abs(qx+shear*qz),abs(qz),abs(qx*.65-qz*.52))
+            distance=max((qx*nx+qz*nz)/limit for nx,nz,limit in planes)
             inside=max(0,min(1,(1-distance)/.35))
             scarDepth=max(scarDepth,amount*inside)
         depth-=scarDepth
@@ -127,7 +136,7 @@ for kind, name in enumerate(names):
     bpy.context.view_layer.objects.active=obj
     obj.select_set(True)
     split=obj.modifiers.new('FractureCreases','EDGE_SPLIT')
-    split.split_angle=math.radians(60)
+    split.split_angle=math.radians(55)
     split.use_edge_angle=True;split.use_edge_sharp=False
     bpy.ops.object.modifier_apply(modifier=split.name)
     mesh=obj.data
