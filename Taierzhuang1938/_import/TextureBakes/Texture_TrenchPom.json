@@ -4,20 +4,20 @@
   "name": "TrenchPom",
   "preset": "drySoil",
   "source": {
-    "path": "C:/Users/Bentl/.codex/artifacts/TrenchReferenceTenImplementation20261009/Source/TrenchCompactMatrixV10/lovart_cf6a6720d953.png",
-    "sha256": "0dcb4a0c73496638de09831c2d83a05548f654a6b389722f00f569d6236a19de",
+    "path": "C:/Users/Bentl/.codex/artifacts/TrenchReferenceTenImplementation20261009/Source/TrenchCompactMatrixV12/lovart_1652886f9479.png",
+    "sha256": "d61294ecdaac40b43a46ce70c11dc4f54c2aedee9cf8ad5d5bce33e7957075c8",
     "metrics": {
       "meanSrgb": [
-        0.4539,
-        0.3579,
-        0.274
+        0.5692,
+        0.4137,
+        0.2728
       ],
-      "luma": 0.3619,
-      "lumaStd": 0.1252,
-      "sat": 0.3963,
-      "clipLow": 0.0031,
+      "luma": 0.4186,
+      "lumaStd": 0.123,
+      "sat": 0.5208,
+      "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.0473
+      "lowFreq": 0.0431
     }
   },
   "heightSource": null,
@@ -76,46 +76,46 @@
       "file": "Texture_TrenchPomBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 374392,
-      "sha256": "eb20d74ad891d70ee4facdb1a39debdbfaeaac5e62812505ebf351b9e7163798"
+      "bytes": 364268,
+      "sha256": "fd9c5c02bbf86812bab99d4465b0881b508fae8ee4dc293edbb88aa062ba1958"
     },
     {
       "channel": "Normal",
       "file": "Texture_TrenchPomNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 131038,
-      "sha256": "8bb6949807f18c3720228b3cda20e9b99e584b03ba1d4582eb62d11761dec6ff"
+      "bytes": 130804,
+      "sha256": "fd054b33111aafd7b7c11d88ce62678fa6ffbec198616be5222f93dd5a44a606"
     },
     {
       "channel": "Orh",
       "file": "Texture_TrenchPomOrh.webp",
       "width": 512,
       "height": 512,
-      "bytes": 53874,
-      "sha256": "794fb0bd6f886e746522527a4a4f378d501e91358fa31d02820a8cfbc018d0c4"
+      "bytes": 54154,
+      "sha256": "d08d6d3005e7ad0fc82eff6c349cdee50b053dc5f1734b6c6dfd39d75a0ede9d"
     }
   ],
-  "totalBytes": 559304,
+  "totalBytes": 549226,
   "metrics": {
     "meanSrgb": [
-      0.4898,
-      0.4268,
-      0.3457
+      0.4899,
+      0.4267,
+      0.346
     ],
-    "luma": 0.4208,
-    "lumaStd": 0.0858,
-    "sat": 0.2941,
+    "luma": 0.4209,
+    "lumaStd": 0.0861,
+    "sat": 0.2938,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0142,
-    "seam": 0.0553,
-    "interior": 0.0602,
-    "seamRatio": 0.918,
-    "border": 0.968,
-    "swing": 0.0083,
+    "lowFreq": 0.0168,
+    "seam": 0.0498,
+    "interior": 0.0545,
+    "seamRatio": 0.914,
+    "border": 0.969,
+    "swing": 0.0101,
     "aoMean": 0.969,
-    "roughMean": 0.941,
+    "roughMean": 0.939,
     "texelsPerMeter": 1024.0
   },
   "gateProblems": []

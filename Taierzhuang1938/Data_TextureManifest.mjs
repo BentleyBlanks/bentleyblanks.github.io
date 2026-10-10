@@ -834,7 +834,8 @@ export const TEXTURE_MANIFEST = Object.freeze([
     bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "_import/TextureBakes/Texture_TrenchPom.json",
     // Approved reference 10 and the real cut-wall photo: generated albedo and derived height.
-    source: { provider: "lovart", date: "2026-10-10", ref: "baf34e85-1791-4996-9ca8-b83a0eb32a48", prompt: "_import/Prompts/Texture_TrenchPom.txt" },
+    source: { provider: "lovart", date: "2026-10-10", ref: "baf34e85-1791-4996-9ca8-b83a0eb32a48", prompt: "_import/Prompts/Texture_TrenchPom.txt",
+      note: "第十二版：直接以用户内壁照片局部为参考；高度与法线由基础色推导" },
     consumers: [{ file: "Data_TrenchSurface.mjs", token: "Texture_TrenchPom" }],
     files: [
       ["Texture_TrenchPomBase.webp", "Base", 1024, 1024],

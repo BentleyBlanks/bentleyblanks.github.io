@@ -1,5 +1,15 @@
 # 通用壕沟表面
 
+## 2026-10-10 后续：由真实内壁局部重做密实土
+
+第十版源图中的连续斜擦纹在实际材质中被强化，形成偏织物状的表面。`MaterialIsolation112` 以固定曝光分别检查原材质、单次平铺及关闭 POM / 法线的基础色；基础色本身仍存在这些条纹。第一张重做候选（Lovart 第十一版）减少了长条纹，但实机仍像松散颗粒，因此没有安装。
+
+第二张直接参考用户土壁照片的右壁局部，裁剪区域为原 600×400 图的 `(418,104)-(582,350)`，没有放大或改画参考。Lovart 第十二版输出 2048² 源图；沿用原颜色标定、1 m 平铺及 8 mm 高度范围，生成 Base 1024²、Normal / Orh 512²。三图合计 549,226 字节；运行文件与独立候选目录、烘焙记录的三个 SHA-256 分别一致。源图、提示词与两个候选取证均留在本地；完整提示词追加在 `_import/Prompts/Texture_TrenchPom.txt`，清单和烘焙记录已更新。高度仍由生成基础色推导，不是摄影测量。
+
+`Candidate115Shots` 在同机位、同曝光下比较任意旋转与保持朝向。保留 `variantRotation: 0`，让切土纹的上下方向一致，随机偏移及三向投影仍启用；其余着色器、光照、松土贴图、模型、根须与物理地形不变。前一候选 `Candidate113Shots` 也保留作对照。缓存戳 `2026101024`。
+
+`TextureStandardsTest`（3,719 项）、`ModuleGraphTest`、`TrenchSurfaceTest`、`TerrainBlendTest` 通过。`Iteration116All` 覆盖 22 段 / 29 个高画质机位，`Whitebox116` 覆盖四个白盒机位，均已查看；页面、控制台及 GL 错误为 0，所有程序链接成功，爆破与恢复通过。几何统计与第一百一十一轮逐项相同，壕沟合计仍为 1,141,992 三角。对照页可切回上一轮及最初实机，29 张图片和切换检查通过。本轮保留本地，整体质感仍未标为与参考完全一致；后续重点是沟沿土团与沟底碎土的自然堆积。
+
 ## 2026-10-10 后续：剥落坑与贴壁细根
 
 本轮沿用已有 imagegen 四模块土崖原型，通过 BlenderMCP 重建内壁的剥落坑。每个坑口用独立方向及边距的六边形约束，替换重复的削角矩形；凹入量为 3.5–9.5 cm，55° 以上折角保留断口法线。四模块共 1,158 三角 / 35,696 字节，沿用共同边界采样、沟沿衔接及原物理地形契约。源工程位于 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchCliffWalls/CutPockets/Scene_TrenchCliffWallsCutPockets.blend`，同目录保留参考与边界记录。重建入口仍为 `_import/Script_BakeTrenchCliffWalls.py`；Blender 已退出，证据 `BlenderStopped111.log`。
