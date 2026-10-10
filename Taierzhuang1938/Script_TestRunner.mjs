@@ -47,6 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  TracerLifetimeTest: {file:"Script_TracerLifetimeTest.mjs",desc:"Production tracer short-hit boundary, lifetime, endpoint and strict particle validation"},
+  AircraftGeometryTest: { file: "Script_AircraftGeometryTest.mjs", desc: "Reviewed Ki21/Ki30 geometry: triangle reduction, source bounds, protected parts and byte-identical images" },
   PublishAssetsTest: {file:"Script_PublishAssetsTest.mjs",timeoutMs:120000,desc:"GPU publish pipeline: source/dimension/color contracts, cache validation and overrides"},
   PublishAssetsBrowserTest: {file:"Script_PublishAssetsBrowserTest.mjs",timeoutMs:600000,desc:"Published GPU loaders: BC7/DXT formats, RGBA fallback, both UV directions and model pixel comparisons"},
   MenuStartupTest: {file:"Script_MenuStartupTest.mjs",timeoutMs:180000,desc:"Standalone source/bundle menu: no gameplay payload, resource budget, settings and navigation"},
@@ -589,6 +591,7 @@ export const tier0Fast = [
   "TextureStandardsTest",
   "AssetStandardsTest",
   "ModelFacingTest",
+  "AircraftGeometryTest",
   "TestRunnerTest",
   "ModuleGraphTest",
   "HudPromptTest",
@@ -653,7 +656,7 @@ export const domains = {
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   firstLevelDressing: {label:"第一关道具换模型、碎砖瓦与植被",tests:["FirstLevelPropDressingTest","FirstLevelVegetationTest","FirstLevelWhiteboxBrowserTest","SamplerBudgetTest","MotionVectorContractTest","ModuleGraphTest"]},
-  particles: {label:"Modular particles and agent API",tests:["ParticleModulesTest","ParticleVolumeTest","ParticleVolumeBrowserTest","ParticleBrowserTest","ParticleChannelsTest","ParticleEditorControlsTest","ParticleEditorWhiteboxTest","ParticleEditorTest","FirstLevelSmokeOriginsTest"]},
+  particles: {label:"Modular particles and agent API",tests:["TracerLifetimeTest","ParticleModulesTest","ParticleVolumeTest","ParticleVolumeBrowserTest","ParticleBrowserTest","ParticleChannelsTest","ParticleEditorControlsTest","ParticleEditorWhiteboxTest","ParticleEditorTest","FirstLevelSmokeOriginsTest"]},
   distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest","FirstLevelSmokeOriginsTest","FirstLevelDistantSmokeBrowserTest"]},
   skyGrade: {label:"第一关天空 / 调色 / 室内天光遮蔽 / 曝光锚点",tests:["FirstLevelSkyGradeTest","FirstLevelSkyGradeBrowserTest","ModuleGraphTest"]},
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest","OpeningStoryboardShotsTest"]},
@@ -698,7 +701,7 @@ export const domains = {
       "EmplacementTest", "EmplacementViewBrowserTest", "FirstLevelMissionTest",
       // 日机扫射自己算一条伤害链（打倒 NPC、打倒玩家），不走 MarchBullet 也不走 Blast，
       // 所以碰伤害口径的改动要连着它一起跑（毫秒级，白搭一条不亏）。
-      "AircraftStrafeTest",
+      "AircraftStrafeTest", "AircraftGeometryTest",
       // 断肢挂在 TakeHit/Kill 上（还会把未致死的近炸抬成致死），碰伤害口径就要跑它。
       "DismembermentTest"],
   },
@@ -775,6 +778,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },
   {domain:"textureAssets",pattern:/(?:AssetPublish|BuildPublishAssets|ValidatePublishAssets|PublishCache|PublishAssets|ModelImports)/},
   {domain: "menu", pattern: /(?:StartupRouting|MenuStartup|Script_Entry|GameGraphics|CameraLens)/},
   {domain: "textureAssets", pattern: /EmbeddedTexture/},

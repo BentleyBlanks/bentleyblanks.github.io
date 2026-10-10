@@ -50,3 +50,12 @@ node Taierzhuang1938/Script_ParticleCli.mjs --source=0 --distances=10,28,70 --qu
 ```
 
 `--baseline=<git-ref>` 读取指定修订的改动文件作对照，不重置共享工作区。本轮比较基线为 `5c00c55e`。截图、浏览器报告和构建产物仅留本地。
+
+### 极短曳光寿命（2026-10-10）
+
+飞机 high 验收暴露了既有的近距离 AI 射击边界：`Tracer` 的寿命是距离 / 速度，
+默认 480 m/s 时，0.05–0.48 m 内的命中会生成不足 0.001 s 的光迹，低于共享粒子系统的合法下限。
+现在只跳过这类不可见的极短曳光，不延长寿命、不移动命中点，也不改变射击伤害；
+`ParticleSystem.EmitRecord` 仍严格拒绝非法寿命。
+`Script_TracerLifetimeTest.mjs` 直接贯通 Tracer → ParticleChannel → ParticleSystem，
+覆盖不同速度下的门槛两侧、正常寿命、端点和到期回收；归入 particles 选测领域。

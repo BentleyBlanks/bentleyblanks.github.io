@@ -1,0 +1,387 @@
+{
+  "version": 1,
+  "sourceCommit": "5e26010efb701b8f17ce07a64c1a1f0d9a2dab68",
+  "models": [
+    {
+      "id": "MitsubishiKi21Ia",
+      "file": "Model/Model_MitsubishiKi21Ia.glb",
+      "source": {
+        "sha256": "b26d7436a2e84d16ef3fffd06a27a158623e216a34c258f26b85c44c4afd12d1",
+        "bytes": 12082196,
+        "triangles": 102831,
+        "vertices": 272798,
+        "primitives": 8,
+        "materials": 8
+      },
+      "optimized": {
+        "sha256": "2ef5bf2a0f00c0f6c56e178f97bf722b8faca027baa4ef4f6f6a4e569f6eb23e",
+        "bytes": 6255588,
+        "triangles": 86944,
+        "vertices": 95796,
+        "primitives": 8,
+        "materials": 8
+      },
+      "metadataKeys": [
+        "nodes",
+        "scenes",
+        "scene",
+        "materials",
+        "textures",
+        "samplers",
+        "extensionsUsed",
+        "extensionsRequired",
+        "extensions"
+      ],
+      "metadataSha256": "df3a774e197a7901f0e6ddcd25068403db45a326231ba6daf04f969b7f634321",
+      "images": [
+        {
+          "mimeType": "image/jpeg",
+          "width": 256,
+          "height": 256,
+          "bytes": 4681,
+          "sha256": "d4599288d4940128e14b13f98e3f8ca1935fe412ed07bd59b5f74229152ab3f3"
+        },
+        {
+          "mimeType": "image/jpeg",
+          "width": 256,
+          "height": 256,
+          "bytes": 11811,
+          "sha256": "9ab43d3794df068cb4372adc3a324e6a916c939391e7d46eaabaa0523798fb7c"
+        },
+        {
+          "mimeType": "image/jpeg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 62923,
+          "sha256": "d63070682e96879bf74d5ac0ebf390064091d94c989aeecd6d678b0fe460f891"
+        },
+        {
+          "mimeType": "image/jpeg",
+          "width": 4096,
+          "height": 4096,
+          "bytes": 1573224,
+          "sha256": "504ad23f1e8a4f80cd778045a3408f7d4600fba5b9419b770117295240d8b04a"
+        },
+        {
+          "mimeType": "image/jpeg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 53489,
+          "sha256": "8bafed76275bc4ebea23848e6e85528879e376927ae48b32900db0f985caa2d6"
+        },
+        {
+          "mimeType": "image/jpeg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 97971,
+          "sha256": "9618dfa54d0e97816ae404dda207977aabf27b165b171ebdf3ecff2fc5f822c6"
+        },
+        {
+          "mimeType": "image/png",
+          "width": 256,
+          "height": 256,
+          "bytes": 6268,
+          "sha256": "2be9c0f07366d299c8f674563ce891e961536721a7eebc0dc9d64404769a3e64"
+        },
+        {
+          "mimeType": "image/jpeg",
+          "width": 1024,
+          "height": 512,
+          "bytes": 6458,
+          "sha256": "6326e296dd4d1213bb627acbe2b20bdbf0c4adbf36212789e05891004f9e67e4"
+        },
+        {
+          "mimeType": "image/jpeg",
+          "width": 1024,
+          "height": 512,
+          "bytes": 41739,
+          "sha256": "55d1a36bd801a15171022673d3c7e32d290d9d431bcbade92a6ab2f043105ec4"
+        },
+        {
+          "mimeType": "image/png",
+          "width": 64,
+          "height": 64,
+          "bytes": 3494,
+          "sha256": "fe11319e85a8fcdd624ae33fef40bf83d042b30c8bb4c06d8f886ddfa7e5ad64"
+        },
+        {
+          "mimeType": "image/jpeg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 234268,
+          "sha256": "d2ca85181e7ea965b907f8e414f3fe024a55a1ea06249a73a1e00fd403d686f1"
+        },
+        {
+          "mimeType": "image/jpeg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 108205,
+          "sha256": "3ab2ea5bc28531925bfabf426d933cbaf708a1888141b9257fcd45ee1734b3f9"
+        }
+      ],
+      "primitives": [
+        {
+          "material": 0,
+          "sourceBounds": [
+            [
+              -1.565000057220459,
+              1.6069999933242798,
+              -0.6669999957084656
+            ],
+            [
+              1.559999942779541,
+              3.6519999504089355,
+              -0.4169999957084656
+            ]
+          ]
+        },
+        {
+          "material": 1,
+          "sourceBounds": [
+            [
+              -11.255000114440918,
+              -7.934999942779541,
+              -4.249000072479248
+            ],
+            [
+              11.255000114440918,
+              7.949999809265137,
+              -0.0010000000474974513
+            ]
+          ]
+        },
+        {
+          "material": 2,
+          "sourceBounds": [
+            [
+              -10.991000175476074,
+              -6.677999973297119,
+              -3.7269999980926514
+            ],
+            [
+              11.034000396728516,
+              4.201000213623047,
+              -0.2160000056028366
+            ]
+          ]
+        },
+        {
+          "material": 3,
+          "sourceBounds": [
+            [
+              -11.135000228881836,
+              -7.949999809265137,
+              -2.507999897003174
+            ],
+            [
+              11.135000228881836,
+              7.949999809265137,
+              -0.13600000739097595
+            ]
+          ]
+        },
+        {
+          "material": 4,
+          "sourceBounds": [
+            [
+              -0.5109999775886536,
+              -6.206999778747559,
+              -4.084000110626221
+            ],
+            [
+              0.5109999775886536,
+              6.044000148773193,
+              -1.7369999885559082
+            ]
+          ],
+          "protectedHashes": {
+            "POSITION": "4672b1465e5bcfd0066e69b4027ae5355b2ca54c466f11768d8fc27cb5cd954d",
+            "NORMAL": "4e14b2cde2ea07d62ece633616016706d0ce3e0f19c6e1d0c82a9a5b1019982d",
+            "TEXCOORD_0": "de24d3d272444f9d8a8c4803728cf368221251d5e5b12752f834995caa62a5fe",
+            "indices": "e83f574256dfc378d4475dbda0bd0f4d21a2cd1fb79426806e7a040e698e4efd"
+          }
+        },
+        {
+          "material": 5,
+          "sourceBounds": [
+            [
+              -0.09099999815225601,
+              -3.992000102996826,
+              -1.0880000591278076
+            ],
+            [
+              0.09099999815225601,
+              7.928999900817871,
+              -0.31700000166893005
+            ]
+          ]
+        },
+        {
+          "material": 6,
+          "sourceBounds": [
+            [
+              -0.06300000101327896,
+              -3.183000087738037,
+              -2.561000108718872
+            ],
+            [
+              0.06300000101327896,
+              7.427000045776367,
+              -0.734000027179718
+            ]
+          ],
+          "protectedHashes": {
+            "POSITION": "2759ad7509a73577e2621f93452d0d0eee8ab118d503847d794bd57b032521ee",
+            "NORMAL": "91e84fa840bdda53cc257b632eb2d9cb63a35de1debe7d76ca4c32de57306d3d",
+            "TEXCOORD_0": "e0adfc33108988b0159f0e4eccbd2af2586ac011caf282e8f813086cc77093e6",
+            "indices": "75bd8c52ee11a316d7e5b9614b22d5b8a14afc17cad2f37c72f8054010579508"
+          }
+        },
+        {
+          "material": 7,
+          "sourceBounds": [
+            [
+              -0.23999999463558197,
+              -1.7929999828338623,
+              -2.6630001068115234
+            ],
+            [
+              0.23999999463558197,
+              -0.7720000147819519,
+              -1.944000005722046
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MitsubishiKi30",
+      "file": "Model/Model_MitsubishiKi30.glb",
+      "source": {
+        "sha256": "d052ce0b07ac2bec17da7fd106c22425afa074efd157d39d6c706483b46821c5",
+        "bytes": 8173484,
+        "triangles": 37797,
+        "vertices": 25208,
+        "primitives": 4,
+        "materials": 1
+      },
+      "optimized": {
+        "sha256": "e5e071899a6bc1e8bd5181c1ecc036367d938d186d303f7eeddb22a0a2133c09",
+        "bytes": 7612044,
+        "triangles": 14457,
+        "vertices": 12040,
+        "primitives": 4,
+        "materials": 1
+      },
+      "metadataKeys": [
+        "nodes",
+        "scenes",
+        "scene",
+        "materials",
+        "textures",
+        "samplers",
+        "extensionsUsed",
+        "extensionsRequired",
+        "extensions"
+      ],
+      "metadataSha256": "1c405a8c748b02cf7a2e506e598c08965efde8871700ff551db374db9617cf9a",
+      "images": [
+        {
+          "mimeType": "image/webp",
+          "width": 2048,
+          "height": 2048,
+          "bytes": 4431084,
+          "sha256": "5c2fc0d186657ba7ae8d7696e1c7b5a2abd78a056a5af165b33bc4795eca254c"
+        },
+        {
+          "mimeType": "image/webp",
+          "width": 2048,
+          "height": 2048,
+          "bytes": 2094834,
+          "sha256": "a8c15cc010ac45d55b3c9304cc4b6bbcf94ed83efb2c435b5c84db9dc31cb745"
+        },
+        {
+          "mimeType": "image/webp",
+          "width": 2048,
+          "height": 2048,
+          "bytes": 608516,
+          "sha256": "670e25a0f989edff5b3d4b401137b181f2be113f60d37be25e0b33e6611ce8e1"
+        }
+      ],
+      "primitives": [
+        {
+          "material": 0,
+          "sourceBounds": [
+            [
+              -2.466520071029663,
+              -0.20715579390525818,
+              -0.24497906863689423
+            ],
+            [
+              2.4665205478668213,
+              3.2306737899780273,
+              0.657484769821167
+            ]
+          ]
+        },
+        {
+          "material": 0,
+          "sourceBounds": [
+            [
+              -0.13695162534713745,
+              0.4690893888473511,
+              0.18910802900791168
+            ],
+            [
+              0.13697238266468048,
+              1.939028024673462,
+              0.37456420063972473
+            ]
+          ],
+          "protectedHashes": {
+            "POSITION": "dbecb2d742786af3fac55090b5d5fd617d77d63e2026820530a133f4e89ebac3",
+            "NORMAL": "4398acc1c97827b833c0fef26ac1bcc5e0570b5a1079618beec529d1055dd2a5",
+            "TEXCOORD_0": "19d25484a7c9723f70a9da8752e24ba7c0017fd751b33d9367cbe825fd23bda0",
+            "indices": "d7330a0381c37213b1df9a0bf096683307debd3283f196cf5497f5cccb4b86af"
+          }
+        },
+        {
+          "material": 0,
+          "sourceBounds": [
+            [
+              -0.14125630259513855,
+              0.45492443442344666,
+              0.17796766757965088
+            ],
+            [
+              0.14133979380130768,
+              1.947495460510254,
+              0.378982275724411
+            ]
+          ]
+        },
+        {
+          "material": 0,
+          "sourceBounds": [
+            [
+              -0.32236218452453613,
+              -0.030910659581422806,
+              -0.3665022850036621
+            ],
+            [
+              0.3223620057106018,
+              0.030910583212971687,
+              0.19184571504592896
+            ]
+          ],
+          "protectedHashes": {
+            "POSITION": "66ee5ee34bcda4dd7f48a780e5c5cb05f67e19679094275373a8b626f996125f",
+            "NORMAL": "4931f901f2eaab068791fdbfb9b55e3888ac4013f6293da2b9c58fa100b6a4cb",
+            "TEXCOORD_0": "8b53c3f100c8e827d7b03283856ad9ea0d53e0d84140db8d087a7b61ace18a5d",
+            "indices": "a42d050e283ca58f87cc6983a39a2737c00257594e3fdb84e6a2ecafa54aac14"
+          }
+        }
+      ]
+    }
+  ]
+}

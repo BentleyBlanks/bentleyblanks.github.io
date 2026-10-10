@@ -23,7 +23,7 @@ if(!reportPath){
  for(const file of ['Script_ModelImports.mjs','Script_TextureImports.mjs','Data_AssetPublishRuntime.mjs','Data_TextureImportRuntime.mjs'])
   await fs.copyFile(path.join(import.meta.dirname,file),path.join(fixtureStage,file));
  await fs.cp(path.join(import.meta.dirname,'vendor'),path.join(fixtureStage,'vendor'),{recursive:true});
- const models=['Model/Model_MitsubishiKi30.glb','Model/Model_BreakableDeadTree.glb','Model/Model_Cigarette.glb'];
+ const models=['Model/Model_MitsubishiKi30.glb','Model/Model_MitsubishiKi21Ia.glb','Model/Model_BreakableDeadTree.glb','Model/Model_Cigarette.glb'];
  for(const file of models)await fs.copyFile(path.join(import.meta.dirname,file),path.join(fixtureStage,file));
  await BuildPublishAssets(import.meta.dirname,fixtureStage,{cacheDir:path.join(root,'tmp/GpuPublish/Cache'),textureFiles:[],modelFiles:models,log:()=>{}});
  reportPath=path.join(fixtureStage,'Data_AssetPublishReport.json');
@@ -83,7 +83,7 @@ try{
  assert.equal(ordinary.fallback,'RGBA','missing high-quality formats retain a renderable fallback');
  assert.ok(ordinary.regular.mean<4&&ordinary.noFlip.mean<4,'both UV directions retain color and alpha');
  const models=[];
- for(const name of ['Model_MitsubishiKi30.glb','Model_BreakableDeadTree.glb','Model_Cigarette.glb']){
+ for(const name of ['Model_MitsubishiKi30.glb','Model_MitsubishiKi21Ia.glb','Model_BreakableDeadTree.glb','Model_Cigarette.glb']){
   const item=report.models.find(row=>row.file.endsWith('/'+name));assert.ok(item,'published model: '+name);
   // Request the original logical URL: the published loader must resolve its hashed GPU variant.
   const result=await page.evaluate(urls=>window.ReviewModel(urls),{name,before:sourceProject+item.file,after:project+item.file});

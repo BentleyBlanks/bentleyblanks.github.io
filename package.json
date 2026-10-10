@@ -71,6 +71,7 @@
     "playwright-core": "^1.62.1",
     "three": "^0.185.0",
     "sharp": "0.34.5",
-    "@gpu-tex-enc/basis": "1.16.4"
+    "@gpu-tex-enc/basis": "1.16.4",
+    "meshoptimizer": "1.3.0"
   }
 }

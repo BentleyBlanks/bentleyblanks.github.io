@@ -1075,12 +1075,16 @@ export class VfxSystem {
     TMP_A.copy(to).sub(from);
     const distance = TMP_A.length();
     if (distance < 0.05) return;
+    const life = Math.min(distance / speed, 1.2);
+    // Sub-millisecond trails are below ParticleSystem's lifetime limit. Omit
+    // their visual streak instead of extending it beyond the actual hit point.
+    if (life < 0.001) return;
     TMP_A.divideScalar(distance);
     const s = ResetSpawn();
     s.x = from.x; s.y = from.y; s.z = from.z;
     s.vx = TMP_A.x * speed; s.vy = TMP_A.y * speed; s.vz = TMP_A.z * speed;
     s.drag = 0.05;
-    s.life = Math.min(distance / speed, 1.2);
+    s.life = life;
     s.sizeStart = 0.035; s.sizeEnd = 0.02;
     s.stretch = Math.min(Math.max(speed * 0.022, 2), 14);
     s.opacity = 1; s.fadeIn = 0.01;

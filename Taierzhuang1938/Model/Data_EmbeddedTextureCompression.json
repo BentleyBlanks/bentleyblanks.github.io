@@ -5,16 +5,16 @@
     {
       "name": "Model_MitsubishiKi30.glb",
       "before": {
-        "bytes": 12073436,
-        "sha256": "ac258950e2bc4174f9521d1cc25a0632570b35d4197f6c888c78153ed6c599f8",
-        "geometry": "4f7daeed7063b273d21336988a0ba072ae529d5eb32534968fc079b9b394f295",
+        "bytes": 11259156,
+        "sha256": "0012e53e875d5fc2d66362d615ea40a2c4733a986b63e8834b5fc48fb538bfad",
+        "geometry": "c7396c358598b185028f87950809f998d987697140106f36991ee8a62ae0a631",
         "images": [
           {
             "index": 0,
             "mime": "image/png",
             "width": 2048,
             "height": 2048,
-            "bytes": 6069487,
+            "bytes": 6077753,
             "pixels": "48b83f5455367adde1543149469c3e17cdd941104eebd98afce0e2602887bffb"
           },
           {
@@ -22,7 +22,7 @@
             "mime": "image/png",
             "width": 2048,
             "height": 2048,
-            "bytes": 3741533,
+            "bytes": 3832076,
             "pixels": "05892ddc40d3c5c2b5e0c4cd7fd1cc488d852d909cd66706605c668a461f3f8e"
           },
           {
@@ -30,15 +30,15 @@
             "mime": "image/png",
             "width": 2048,
             "height": 2048,
-            "bytes": 1223543,
+            "bytes": 871900,
             "pixels": "5b09c91b0cb31d5fbec9324779f6bbcc84d1ad135fc15215a0ee160dae897ed7"
           }
         ]
       },
       "after": {
-        "bytes": 8173484,
-        "sha256": "d052ce0b07ac2bec17da7fd106c22425afa074efd157d39d6c706483b46821c5",
-        "geometry": "4f7daeed7063b273d21336988a0ba072ae529d5eb32534968fc079b9b394f295",
+        "bytes": 7612044,
+        "sha256": "e5e071899a6bc1e8bd5181c1ecc036367d938d186d303f7eeddb22a0a2133c09",
+        "geometry": "c7396c358598b185028f87950809f998d987697140106f36991ee8a62ae0a631",
         "images": [
           {
             "index": 0,
@@ -65,6 +65,102 @@
             "pixels": "5b09c91b0cb31d5fbec9324779f6bbcc84d1ad135fc15215a0ee160dae897ed7"
           }
         ]
+      },
+      "provenance": {
+        "geometryRebase": "2026-10-09 Ki30 geometry-only optimization; embedded WebP payloads unchanged",
+        "geometrySourceSha256": "d052ce0b07ac2bec17da7fd106c22425afa074efd157d39d6c706483b46821c5",
+        "geometryRecipe": "_import/Script_OptimizeKi30.py",
+        "beforeReference": "Actual same-geometry PNG GLB reconstructed losslessly from preserved WebP pixels; this is not the historical high-poly source GLB",
+        "beforeReconstruction": {
+          "sharp": "0.34.5",
+          "ensureAlpha": true,
+          "png": {
+            "compressionLevel": 9,
+            "adaptiveFiltering": false,
+            "palette": false
+          }
+        },
+        "retainedWebpPayloads": [
+          {
+            "index": 0,
+            "name": "Material_normal",
+            "sha256": "5c2fc0d186657ba7ae8d7696e1c7b5a2abd78a056a5af165b33bc4795eca254c"
+          },
+          {
+            "index": 1,
+            "name": "Material_baseColor",
+            "sha256": "a8c15cc010ac45d55b3c9304cc4b6bbcf94ed83efb2c435b5c84db9dc31cb745"
+          },
+          {
+            "index": 2,
+            "name": "Material_metallicRoughness",
+            "sha256": "670e25a0f989edff5b3d4b401137b181f2be113f60d37be25e0b33e6611ce8e1"
+          }
+        ],
+        "previousTextureCompression": {
+          "before": {
+            "bytes": 12073436,
+            "sha256": "ac258950e2bc4174f9521d1cc25a0632570b35d4197f6c888c78153ed6c599f8",
+            "geometry": "4f7daeed7063b273d21336988a0ba072ae529d5eb32534968fc079b9b394f295",
+            "images": [
+              {
+                "index": 0,
+                "mime": "image/png",
+                "width": 2048,
+                "height": 2048,
+                "bytes": 6069487,
+                "pixels": "48b83f5455367adde1543149469c3e17cdd941104eebd98afce0e2602887bffb"
+              },
+              {
+                "index": 1,
+                "mime": "image/png",
+                "width": 2048,
+                "height": 2048,
+                "bytes": 3741533,
+                "pixels": "05892ddc40d3c5c2b5e0c4cd7fd1cc488d852d909cd66706605c668a461f3f8e"
+              },
+              {
+                "index": 2,
+                "mime": "image/png",
+                "width": 2048,
+                "height": 2048,
+                "bytes": 1223543,
+                "pixels": "5b09c91b0cb31d5fbec9324779f6bbcc84d1ad135fc15215a0ee160dae897ed7"
+              }
+            ]
+          },
+          "after": {
+            "bytes": 8173484,
+            "sha256": "d052ce0b07ac2bec17da7fd106c22425afa074efd157d39d6c706483b46821c5",
+            "geometry": "4f7daeed7063b273d21336988a0ba072ae529d5eb32534968fc079b9b394f295",
+            "images": [
+              {
+                "index": 0,
+                "mime": "image/webp",
+                "width": 2048,
+                "height": 2048,
+                "bytes": 4431084,
+                "pixels": "48b83f5455367adde1543149469c3e17cdd941104eebd98afce0e2602887bffb"
+              },
+              {
+                "index": 1,
+                "mime": "image/webp",
+                "width": 2048,
+                "height": 2048,
+                "bytes": 2094834,
+                "pixels": "05892ddc40d3c5c2b5e0c4cd7fd1cc488d852d909cd66706605c668a461f3f8e"
+              },
+              {
+                "index": 2,
+                "mime": "image/webp",
+                "width": 2048,
+                "height": 2048,
+                "bytes": 608516,
+                "pixels": "5b09c91b0cb31d5fbec9324779f6bbcc84d1ad135fc15215a0ee160dae897ed7"
+              }
+            ]
+          }
+        }
       }
     },
     {
