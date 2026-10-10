@@ -276,7 +276,7 @@ float TerrainMudZone(vec2 xz) {
 }
 
 // 湿泥与积水（Data_Tuning_Terrain.TERRAIN_WATER）：低频噪声给水位，材质高度低于水位的像素是水面，
-// 水线以上一条带是湿痕。site = 这里会不会积水（0..1），lowRaise = 沟底/坑底把水位抬高多少（高度单位），damp = 底湿度。
+// 水线以上一条带是湿痕。site = 积水倾向倍率，lowRaise = 沟底/坑底把水位抬高多少（高度单位），damp = 底湿度。
 // 写 albedo（线性反照率）与 gTerrainRough / gTerrainNormalW / gMaterialAo / gTerrainWet / gTerrainWater。
 void TerrainWater(inout vec3 albedo, vec2 xz, vec3 geomN, float site, float lowRaise, float damp) {
   float wet = damp, water = 0.0;
@@ -293,6 +293,9 @@ void TerrainWater(inout vec3 albedo, vec2 xz, vec3 geomN, float site, float lowR
     water = smoothstep(-uTerrainWaterB.z, uTerrainWaterB.z, above) * onFlat * site;
     wet = max(wet, smoothstep(-uTerrainWaterB.w, 0.0, above) * site);
   }
+  // Regional puddle gains can exceed one. Clamp coverage before interpolating
+  // material channels; extrapolation made roughness negative and over-darkened soil.
+  water = clamp(water, 0.0, 1.0);
   wet = clamp(max(wet, water), 0.0, 1.0);
   gTerrainWet = wet; gTerrainWater = water;
   albedo *= (1.0 - uTerrainWaterC.z * wet) * (1.0 - uTerrainWaterC.w * water);
@@ -634,7 +637,7 @@ export function MakeTerrainPatch(pack, quality, { trails = null } = {}) {
     ...(trails ? TerrainTrailUniforms : {}),
   };
   const patch = MakePatch({
-    key: `terrain4${quality.antiTile ? "t" : ""}${quality.biplanar ? "b" : ""}${trails ? `tr${trails.parallaxSteps}` : ""}`,
+    key: `terrain4${quality.antiTile ? "t" : ""}${quality.biplanar ? "b" : ""}${trails ? `tr${trails.parallaxSteps}` : ""}:boundedWet1`,
     uniforms: (shaderUniforms) => { Object.assign(shaderUniforms, uniforms); },
     vertex: [
       ["#include <common>", GLSL_VERTEX_COMMON],

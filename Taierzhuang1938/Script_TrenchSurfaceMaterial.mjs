@@ -20,6 +20,7 @@ uniform float uTrenchClodMix;
 uniform vec3 uTrenchCrown; // lower/upper wall-height fraction, boundary variation
 uniform vec2 uTrenchVariation; // spatial frequency, rotation amount
 uniform float uTrenchProjectionGuard;
+uniform vec3 uTrenchWeather; // pooling, floor dampness, front-zone influence
 uniform vec4 uTrenchWater;   // x 沟底积水 y 沟底底湿度 z,w 凹度（米）[起, 满]
 uniform float uTrenchPom;
 uniform vec4 uTrenchLooseMean;
@@ -214,6 +215,7 @@ const Evaluate = /* glsl */`
     // 湿泥与积水（Script_TerrainMaterial.TerrainWater）：车道照常；沟底（翻土 × 凹度）更湿、积水更多。
     // 01–05 前沿湿泥区（TERRAIN_MUD_ZONE）：翻土压暗转冷灰褐、沟壁也湿、沟底水更多更深。
     float mud=TerrainMudZone(vTerrainWorld.xz);
+    float trenchMud=mud*uTrenchWeather.z;
 #ifdef TERRAIN_TRAILS
     // 脚印与痕迹（Script_TerrainTrails）：沟土算完、积水之前（坑深参与水线，沟底的脚印会汪水）
     {
@@ -225,11 +227,11 @@ const Evaluate = /* glsl */`
     }
 #endif
     float floorSite=spoil*trenchLow;
-    vec3 wetColor=diffuseColor.rgb*mix(vec3(1.0),uTerrainMudB.xyz,spoil*mud);
+    vec3 wetColor=diffuseColor.rgb*mix(vec3(1.0),uTerrainMudB.xyz,spoil*trenchMud);
     TerrainWater(wetColor,vTerrainWorld.xz,geomN,
-      max(gTerrainWeights.y*uTerrainWaterD.x,floorSite*uTrenchWater.x*mix(1.0,uTerrainMudA.z,mud)),
-      floorSite*(uTerrainWaterD.z+mud*uTerrainMudA.w),
-      max(max(gTerrainWeights.y*mix(uTerrainWaterD.w,uTerrainMudB.w,mud),floorSite*uTrenchWater.y),spoil*mud*uTerrainMudA.y));
+      max(gTerrainWeights.y*uTerrainWaterD.x,floorSite*uTrenchWater.x*uTrenchWeather.x*mix(1.0,uTerrainMudA.z,trenchMud)),
+      floorSite*(uTerrainWaterD.z+trenchMud*uTerrainMudA.w),
+      max(max(gTerrainWeights.y*mix(uTerrainWaterD.w,uTerrainMudB.w,mud),floorSite*uTrenchWater.y*uTrenchWeather.y),spoil*trenchMud*uTerrainMudA.y));
     diffuseColor.rgb=wetColor;
     // TerrainWater 把水面的材质 AO 归 1（土块缝隙不压水面），但沟壁挡天的地平线遮蔽要留着：
     // 它经 computeSpecularOcclusion 压间接镜面，SSR 关掉时沟底水面不再照出整片天空。
@@ -289,8 +291,10 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
   patch.trenchCrownUniform=crown;
   const variation={value:new THREE.Vector2(C.mud.variantFrequency,C.mud.variantRotation)};
   patch.trenchVariationUniform=variation;
+  const weather={value:new THREE.Vector3(C.wetness.pooling,C.wetness.floor,C.wetness.frontZone)};
+  patch.trenchWeatherUniform=weather;
   const projectionGuard={value:1};patch.trenchProjectionGuardUniform=projectionGuard;
-  patch.key+=(stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10')+':compactGrainBank6Projection';
+  patch.key+=(stone?':trenchStoneContact9Reference10':':trenchWetHeight10Reference10')+':compactGrainBank6Projection:wetnessReference10';
   patch.uniforms=(uniforms,shader)=>{
     bind(uniforms,shader);
 
@@ -299,6 +303,7 @@ export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=f
     uniforms.uTrenchCrown=crown;
     uniforms.uTrenchVariation=variation;
     uniforms.uTrenchProjectionGuard=projectionGuard;
+    uniforms.uTrenchWeather=weather;
     uniforms.uTrenchCompact={value:new THREE.Vector2(C.mud.baseTileM/C.mud.compactTileM,C.mud.compactColorDetail)};
     uniforms.uTrenchRootColor={value:new THREE.Color(Earth.rootColor)};
     uniforms.uTrenchWater={value:new THREE.Vector4(W.site.trenchFloor,W.damp.trenchFloor,W.lowRiseM[0],W.lowRiseM[1])};

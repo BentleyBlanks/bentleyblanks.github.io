@@ -195,14 +195,52 @@ try{
     for(let i=3;i<rootLayers.length;i+=4)rootLayers[i]=-2.25;
     rootGeometry.attributes.terrainLayers.needsUpdate=true;Render();const calibratedCore=Pixel(target,rootMesh.position);
     rootMesh.material=rootMaterial;calibratedMaterial.dispose();
+    // Trench weather may be calibrated without changing the road's wet surface.
+    // A forced high water level exercises a boosted front-zone site as well.
+    const wetContact=new TerrainContactField({cols:2,rows:2,minX:-4,minZ:-4,stepX:4,stepZ:4,heights:new Float32Array(9).fill(2)});
+    const wetMaterial=new T.MeshStandardMaterial({side:T.DoubleSide});
+    const wetPatch=MakeTrenchSurfacePatch(pack,'high',null,wetContact);
+    wetPatch.trenchPomUniform.value=0;
+    wetPatch.terrainUniforms.uTerrainWaterA.value.z=-4;
+    wetPatch.terrainUniforms.uTerrainMudBox.value.set(-4,-4,4,4);
+    wetPatch.terrainUniforms.uTerrainMudA.value.z=2.2;
+    ApplyPatches(wetMaterial,[wetPatch,MakePatch({key:'fixtureTrenchWeather',fragment:[
+      ['#include <dithering_fragment>','gl_FragColor=vec4(gTerrainWet,gTerrainWater,roughnessFactor,1.0);oTerrainNormalDepth=vec4(diffuseColor.rgb,roughnessFactor);'],
+    ]})]);
+    rootMesh.material=wetMaterial;rootMesh.rotation.x=0;
+    const weatherSamples=[];
+    for(const kind of ['soil','road']){
+      for(let i=0;i<rootLayers.length;i+=4){rootLayers[i]=kind==='road'?1:0;rootLayers[i+1]=kind==='soil'?1:0;rootLayers[i+2]=0;rootLayers[i+3]=0;}
+      rootGeometry.attributes.terrainLayers.needsUpdate=true;
+      const variants=[];
+      for(const weather of [[1,1,1],[.12,.3,.3]]){
+        wetPatch.trenchWeatherUniform.value.fromArray(weather);Render();
+        variants.push({weather,channels:Pixel(target,rootMesh.position),color:Pixel(target,rootMesh.position,1)});
+      }
+      weatherSamples.push({kind,variants});
+    }
+    rootMesh.material=rootMaterial;wetMaterial.dispose();wetContact.Dispose();
     scene.remove(rootMesh);rootGeometry.dispose();rootMaterial.dispose();
     const gl=renderer.getContext(),glError=gl.getError(),linked=renderer.info.programs.every(p=>gl.getProgramParameter(p.program,gl.LINK_STATUS));
     pass.Dispose();const validAfterDispose=TerrainBlendUniforms.uTerrainBlendValid.value;
     prepass.Dispose();target.dispose();contact.Dispose();renderer.dispose();
-    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,rootColor,unmarkedColor,compactCapColor,looseCapColor,clodTransitionColor,clodCoreColor,calibratedFoot,calibratedCore,roadColors,crownColors,rotationBefore,rotationAfter,projectionSamples,glError,linked};
+    return {samples,normalDepth,sourceIdentity,restored,afterMove,validAfterHide,contextCleared,resized,validAfterDispose,rootColor,unmarkedColor,compactCapColor,looseCapColor,clodTransitionColor,clodCoreColor,calibratedFoot,calibratedCore,roadColors,crownColors,rotationBefore,rotationAfter,projectionSamples,weatherSamples,glError,linked};
   });
   console.log(JSON.stringify(report,null,2));
   assert.deepEqual(errors,[]);assert.equal(report.glError,0);assert.ok(report.linked&&report.sourceIdentity&&report.restored);
+  for(const sample of report.weatherSamples)for(const variant of sample.variants){
+    assert.ok(variant.channels[0]>=0&&variant.channels[0]<=1.001,'wetness stays normalized');
+    assert.ok(variant.channels[1]>=0&&variant.channels[1]<=1.001,'regional puddle gain cannot extrapolate the water blend');
+    assert.ok(variant.channels[2]>=0&&variant.channels[2]<=1.001,'wet-surface roughness remains physically valid');
+  }
+  const [wetSoil,drySoil]=report.weatherSamples.find(s=>s.kind==='soil').variants;
+  assert.ok(wetSoil.channels[1]>.95,'boosted enclosed ground still supports full puddles');
+  assert.ok(drySoil.channels[1]>.02&&drySoil.channels[1]<.3&&drySoil.channels[0]<.5,
+    'reference calibration retains subdued moisture without full puddle coverage');
+  assert.ok(drySoil.channels[2]>wetSoil.channels[2]+.2,'reduced water reveals the matte soil surface');
+  const [roadBefore,roadAfter]=report.weatherSamples.find(s=>s.kind==='road').variants;
+  for(const key of ['channels','color'])assert.ok(roadBefore[key].every((v,i)=>Math.abs(v-roadAfter[key][i])<.002),
+    'trench weather calibration leaves road wetness and material channels unchanged');
   assert.ok(report.clodCoreColor[0]>.7&&report.clodCoreColor[2]<.4,'exposed clod core uses the compact soil texture');
   assert.ok(report.clodTransitionColor[0]>report.looseCapColor[0]&&report.clodTransitionColor[0]<report.clodCoreColor[0]
     &&report.clodTransitionColor[2]<report.looseCapColor[2]&&report.clodTransitionColor[2]>report.clodCoreColor[2],
