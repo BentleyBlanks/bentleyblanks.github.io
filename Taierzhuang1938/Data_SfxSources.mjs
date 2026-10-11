@@ -1854,6 +1854,34 @@ export const SFX_SOURCES = [
     credit: "Volcengine SeedAudio 1.0 · 四川口音的一片喊杀声 · 2026-09-27",
     cuts: [{ cue: "chargeCrowd", durS: 5.62, files: ["AudioSfx_SeedAudioChargeCrowd_01.mp3"] }],
   },
+  // 2026-10-11 第一关 01–02 开场重构的八条生成拟音（另四条实录见上方「第一关 01–02 开场重构」那一节）。
+  // 候选、选法与落选理由在 Script_SeedAudioOpeningFoleyBake 的 PICKS 头注；这里只登记，全量 SfxBake 不重切。
+  {
+    id: "OpeningFoleySeedAudio",
+    seedAudio: true,
+    bake: "Script_SeedAudioOpeningFoleyBake.mjs",
+    license: "volcengine",
+    credit: "Volcengine SeedAudio 1.0 · 第一关 01–02 开场拟音 · 2026-10-11",
+    cuts: [
+      { cue: "grenadeKnock", durS: 0.45, files: ["AudioSfx_GrenadeKnock_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 日兵把九一式手榴弹的引信帽往钢盔上一磕（一记短促金属「当」）（GrenadeKnock_take03.mp3） · 2026-10-11" },
+      { cue: "bayonetStabBody", durS: 0.62,
+        files: ["AudioSfx_BayonetStabBody_01.mp3", "AudioSfx_BayonetStabBody_02.mp3", "AudioSfx_BayonetStabBody_03.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 刺刀扎进躯体（闷、湿；三变体）（BayonetStabBody_take02.mp3, BayonetStabBody_take03.mp3, BayonetStabBody_take06.mp3） · 2026-10-11" },
+      { cue: "bayonetTwist", durS: 0.48, files: ["AudioSfx_BayonetTwist_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 刺刀在躯体里拧转（短而湿）（BayonetTwist_take04.mp3） · 2026-10-11" },
+      { cue: "stompMud", durS: 0.42, files: ["AudioSfx_StompMud_01.mp3", "AudioSfx_StompMud_02.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 军靴一脚踩在泥里的人背上（沉闷带湿泥）（StompMud_take02.mp3, StompMud_take04.mp3） · 2026-10-11" },
+      { cue: "boltToss", durS: 0.22, files: ["AudioSfx_BoltToss_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 步枪枪栓被甩出去，落在几米外的松土里（远、轻）（BoltToss_take01.mp3） · 2026-10-11" },
+      { cue: "rifleTossMud", durS: 0.62, files: ["AudioSfx_RifleTossMud_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 老式木托步枪被扔在泥里（木与金属一声）（RifleTossMud_take03.mp3） · 2026-10-11" },
+      { cue: "cheekCut", durS: 0.47, files: ["AudioSfx_CheekCut_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 刀尖贴脸往下压划开（很轻的一声，不是砍）（CheekCut_take08.mp3） · 2026-10-11" },
+      { cue: "bootGrind", durS: 0.58, files: ["AudioSfx_BootGrind_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 军靴鞋跟在手背与泥上碾（约 0.6 秒）（BootGrind_take02.mp3） · 2026-10-11" },
+    ],
+  },
   // 战车那一批：成品由 Script_TankAudioBake.mjs 烘，这里只负责在全量 SfxBake 时把它们重新登记进清单。
   ...TANK_SFX.map((entry) => ({
     id: "Tank" + entry.cue.charAt(0).toUpperCase() + entry.cue.slice(1),
