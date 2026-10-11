@@ -489,7 +489,9 @@ const Samples = (route) => {
   assert.equal(set.Active, false);
   // 回跳到 02：重新装载；整关拆除 Exit() 也拆干净。
   set.Enter("BunkerRescue");
-  assert.ok(set.Active && scene.children.length === 3 && set.front && !set.front.root.visible, "jumping back to 02 rebuilds the set (the front dressing is built but hidden until 03)");
+  // 2026-10-11：01–02 另有一份 redraft 根（尸体、道具；第 6 节），回跳到 02 也一起重建。
+  assert.ok(set.Active && scene.children.length === 4 && set.front && !set.front.root.visible && set.redraft?.root.parent === scene,
+    "jumping back to 02 rebuilds the set and the 01–02 redraft (the front dressing is built but hidden until 03)");
   set.Exit();
   assert.equal(scene.children.length, 1, "Exit() removes it again");
   console.log(`ok lifecycle: ${report.stats.meshes} meshes / 1 light in 01–03, lintel falls 0.25–0.6 s, lantern only in 01, zero residue after 03`);
@@ -980,6 +982,301 @@ function FakeVfx() {
   fs2.Exit();
   assert.equal(scene.children.length, 0, "Exit removes the front dressing");
   console.log(`ok front: shells ${JSON.stringify(report.shells)}, per-stage ${JSON.stringify(report.breakableShells)}, SB08 ${JSON.stringify(report.sb08)}, SB08 built meshes: ${report.sb08Mesh.spaceVisible} Space-visible gap rays, ${report.sb08Mesh.blocked.length} hidden by the set, ${report.frontMeshes} meshes`);
+}
+
+// ---------------------------------------------------------------- 6. 2026-10-11 开场重构（契约 docs/Data_OpeningRedraft20261011Contract.md §5）
+// 标记名、净空、贴地 / 叠放、跳下点、手榴弹停点、折角爆点、道具接口、离开收走、三角形预算。地面一律用游戏里的高度场（P012，宿主的 groundAt）。
+{
+  const { SET_MARKS: M, CORPSES, BODY_POSES, REDRAFT_PROPS, REDRAFT_STAGES, REDRAFT_TRIANGLE_BUDGET, CorpseFootprint, COMRADE_KNEEL } = await import("./Data_OpeningSet0103.mjs");
+  const { MISSION_PLACEMENT } = await import("./Data_FirstLevelMissionLayout.mjs");
+  const { MISSION_STAGE_ROUTES } = await import("./Data_FirstLevelMissionTopology.mjs");
+  const { BuildRedraftProp, CountTriangles } = await import("./Script_OpeningProps.mjs");
+  const P012 = CreateP012Terrain(L), GG = (x, z) => P012.SampleHeight(x, z);
+  report.redraft = {};
+  // ---- 6a. 冻结名字（契约 §5.3）都在、数值有限
+  assert.equal(M.sweep.bodies.length, 3, "sweep.bodies[0..2]");
+  // 2026-10-11 集成负责人决定删掉 finish.bodies[1]（眼位旁那具：贴脸露出悬着的腿，地要留给右手 / 手榴弹 / 翻译蹲位）。
+  assert.equal(M.finish.bodies.length, 1, "finish.bodies[0] only (the one beside the eye was dropped by the integration lead)");
+  for (const k of ["corpseLower", "corpseUpper", "gunner", "loader"]) assert.ok(Number.isFinite(M.mg[k]?.x) && Number.isFinite(M.mg[k]?.z), `mg.${k}`);
+  assert.equal(M.dropIn.lip.length, 3, "dropIn.lip[0..2]");
+  for (const p of [M.dropIn.foldBlast, M.finish.grenadeStop, M.practice.recruitBack]) assert.ok(Number.isFinite(p.x) && Number.isFinite(p.z));
+  assert.ok(Math.abs(M.practice.recruitBack.x - (COMRADE_KNEEL.x + 2.2)) < 1e-6 && M.practice.recruitBack.z === COMRADE_KNEEL.z, "practice.recruitBack = 2.2 m east of the kneel R3 (contract)");
+  assert.deepEqual(REDRAFT_STAGES, ["Trapped", "BunkerRescue", "RearTrench"], "the redraft lives in 01–02 only (03 removes it)");
+  for (const row of CORPSES) assert.ok(BODY_POSES[row.mark.pose] && Number.isFinite(row.mark.headYawDeg), `${row.id}: a prone prototype and a head direction`);
+  for (const name of ["bread", "breadPiece", "ammoBox", "clipA", "clipB", "comradeRifle", "rifleBolt", "chestBadge", "grenade", "type11", "civilianShirt"])
+    assert.ok(REDRAFT_PROPS[name], `contract §5.2 prop ${name}`);
+
+  // ---- 6b. 净空：尸体（实际大小：连横伸的胳膊）与各点标记 vs 契约 §5.3 的路线；§5.1 六人起点不被布景压
+  const Seg = (route) => route.slice(0, -1).map((a, i) => [a, route[i + 1]]);
+  const BoxDist = (box, p) => {
+    const c = Math.cos(box.ry), s = Math.sin(box.ry), dx = p.x - box.x, dz = p.z - box.z;
+    const lx = dx * c - dz * s, lz = dx * s + dz * c;
+    return Math.hypot(Math.max(0, Math.abs(lx) - box.w / 2), Math.max(0, Math.abs(lz) - box.d / 2));
+  };
+  const RouteDist = (shape, route) => {
+    let best = Infinity;
+    for (const p of Samples(route.length > 1 ? route : [route[0], route[0]])) best = Math.min(best, shape.box ? BoxDist(shape.box, p) : Math.hypot(p.x - shape.x, p.z - shape.z));
+    return best;
+  };
+  // 路线：契约 §5.3 的六条 + 任务书的 02 撤退 rearTrench（MISSION_STAGE_ROUTES.rearTrench）；`pre`：只在近爆前走（Banter / Orders），
+  // 近爆之后才出现的东西不对它们算。
+  const ROUTES = [
+    { name: "rescueRoute", route: MISSION_PLACEMENT.bunker.rescueRoute }, { name: "chargeRoute", route: C.rescue.chargeRoute },
+    { name: "exitRoute", route: C.banter.exitRoute, pre: true }, { name: "runnerRoute", route: C.banter.runnerRoute, pre: true },
+    { name: "interpreterEnter", route: C.ija.interpreterEnter }, { name: "walkIn", route: C.ija.walkIn }, { name: "rearTrench", route: MISSION_STAGE_ROUTES.rearTrench },
+  ];
+  const corpseShape = (id, mark) => ({ id, box: CorpseFootprint(mark), late: CORPSES.find((c) => c.id === id)?.show === "black" });
+  const things = [
+    ...CORPSES.map((row) => corpseShape(row.id, row.mark)),
+    ...CORPSES.filter((row) => row.mark.start).map((row) => corpseShape(`${row.id}.start`, row.mark.start && { ...row.mark, ...row.mark.start })),
+    { ...corpseShape("sweep.bodies[2] (SweepVictim, Dir actor)", M.sweep.bodies[2]) },
+    { id: "mg.gunner", x: M.mg.gunner.x, z: M.mg.gunner.z, late: true }, { id: "mg.loader", x: M.mg.loader.x, z: M.mg.loader.z, late: true },
+    ...M.dropIn.lip.map((l, i) => ({ id: `dropIn.lip[${i}].land`, x: l.land.x, z: l.land.z, late: true })),
+    { id: "finish.grenadeStop", x: M.finish.grenadeStop.x, z: M.finish.grenadeStop.z, late: true },
+    { id: "practice.recruitBack", x: M.practice.recruitBack.x, z: M.practice.recruitBack.z, late: true },
+  ];
+  // 刻意（写明原因）：这几条路线本来就要从它旁边走 / 在它上面演。
+  const DESIGNED = {
+    "sweep.bodies[2] (SweepVictim, Dir actor)|walkIn": "乙（ijaB）扎尸报数就是沿 walkIn 走到第 9 具跟前下刀、踩背补刀（契约 §1.5）",
+    "mg.gunner|rescueRoute": "02 齐射先打这两人（契约 §1.11）：罗班长一行顺 rescueRoute 冲下来时他们已经死在沟沿上",
+    "mg.loader|rescueRoute": "同上：副射手中弹翻下沟沿",
+  };
+  // 交 Dir 包（不是本包的标记、值是契约给的）：只报。
+  const HANDOVER = {
+    "sweep.bodies[2] (SweepVictim, Dir actor)|interpreterEnter": "契约值 (7.4,-124.8) 是 Dir01 的演员；翻译进来的 interpreterEnter 在 x 6–8 斜穿沟底，Dir01 改走位时绕开他的尸体",
+  };
+  const clearance = [], designed = [], handover = [];
+  for (const t of things) for (const r of ROUTES) {
+    if (r.pre && t.late) continue;
+    const d = RouteDist(t, r.route), key = `${t.id}|${r.name}`;
+    if (d >= 0.5) continue;
+    (DESIGNED[key] ? designed : HANDOVER[key] ? handover : clearance).push(`${key} ${d.toFixed(2)} m`);
+  }
+  report.redraft.designedNearRoutes = designed; report.redraft.handoverNearRoutes = handover;
+  assert.deepEqual(clearance, [], "contract §5.3: every mark and corpse stands >= 0.5 m off the current routes (or is listed as designed)");
+  // 01–02 里 Dir 的其它站点（不在契约净空名单里）：只报，交 Dir 包让开 / 核对。
+  const DIR_POINTS = { "rescue.interpreter": C.rescue.interpreter, "ija.found": C.ija.found, "ija.crouch": C.ija.crouch, "rescue.rifleMouth": C.rescue.rifleMouth,
+    "rescue.lift.heLift": C.rescue.lift.heLift, "rescue.ijaBGuard": C.rescue.ijaBGuard, "interrogation.interpreterAt": C.interrogation.interpreterAt,
+    "interrogation.ijaBAt": C.interrogation.ijaBAt, "rescue.depthPost.DepthIjaB": C.rescue.depthPost.DepthIjaB, "comradeKneel R3": COMRADE_KNEEL,
+    ...Object.fromEntries(C.rescue.extras.filter((e) => e.post).map((e) => [`rescue.extras.${e.id}.post`, e.post])) };
+  report.redraft.dirPointsNear = [];
+  for (const t of things.filter((t) => t.box)) for (const [name, p] of Object.entries(DIR_POINTS)) {
+    const d = BoxDist(t.box, p); if (d < 0.35) report.redraft.dirPointsNear.push(`${t.id} x ${name} ${d.toFixed(2)} m`);
+  }
+  report.redraft.withdrawLaneNear = things.filter((t) => t.late && RouteDist(t, C.withdraw.lane) < 0.5).map((t) => `${t.id} ${RouteDist(t, C.withdraw.lane).toFixed(2)} m`);
+  // §5.1 六人起点（契约值）：Set 的布景、新道具摆位、尸体都不压（胶囊 r 0.28，0.3–1.7 m 高），并报每个起点脚下的坡度（Dir01 定稿用）。
+  const STARTS = { shunzi: C.shunzi.seat, yaowa: P2(-1.0, -125.35), comrade: C.banter.comradeSeat, heyoutian: P2(-2.4, -127.1), luo: C.banter.luo, liuwencai: P2(1.1, -124.9) };
+  const ammo = REDRAFT_PROPS.ammoBox;
+  const ammoBox = { x: ammo.rest.x, z: ammo.rest.z, w: ammo.sizeM[0], d: ammo.sizeM[2], ry: ammo.rest.yawDeg * DEG, y0: 0, y1: ammo.sizeM[1] };
+  const startClash = [];
+  for (const [who, p] of Object.entries(STARTS)) {
+    for (const prop of PROPS) if (!prop.show) for (const box of PropFootprints(prop).filter((b) => !b.walkable)) if (Clash(box, p)) startClash.push(`${who} x ${prop.id}`);
+    if (who !== "liuwencai" && Clash(ammoBox, p)) startClash.push(`${who} x ammoBox`);
+    for (const row of CORPSES.filter((r) => r.show === "always")) if (Clash(CorpseFootprint(row.mark), p)) startClash.push(`${who} x ${row.id}`);
+  }
+  assert.deepEqual(startClash, [], "contract §5.1: the six dugout starts are clear of the set, the new props and the corpses");
+  // 弹药箱在刘文财右手边（他面朝西蹲着：右手是北）、伸手够得着，又不压他。
+  const liu = STARTS.liuwencai, toBox = Math.hypot(ammoBox.x - liu.x, ammoBox.z - liu.z);
+  assert.ok(ammoBox.z < liu.z && toBox >= 0.35 && toBox <= 0.75 && !Clash({ ...ammoBox, w: ammoBox.w - 0.02, d: ammoBox.d - 0.02 }, { x: liu.x, z: liu.z + 0.0 }), `ammoBox at Liu's right hand (${toBox.toFixed(2)} m north of him)`);
+  report.redraft.startSlope = Object.fromEntries(Object.entries(STARTS).map(([who, p]) => {
+    const gs = [[0, 0], [0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]].map(([dx, dz]) => GG(p.x + dx, p.z + dz));
+    return [who, { dropM: +(Math.max(...gs) - Math.min(...gs)).toFixed(2), overFloorM: +(GG(p.x, p.z) - GG(FLOOR.x, FLOOR.z)).toFixed(2) }];
+  }));
+  console.log(`ok redraft marks: no clash with the contract routes; designed ${JSON.stringify(designed)}; handed over ${JSON.stringify(handover)}; Dir points nearby ${JSON.stringify(report.redraft.dirPointsNear)}; `
+    + `withdraw.lane ${JSON.stringify(report.redraft.withdrawLaneNear)}; dugout starts clear, slope ${JSON.stringify(report.redraft.startSlope)}`);
+
+  // ---- 6c. 北沟沿跳下点：沟沿顶到落点 1.8–2.1 m；落点半径 0.6 m 内没有布景（沙袋 / 木撑 / 杂物；铺板是踩的不算）、尸体、Space 体块
+  report.redraft.dropIn = M.dropIn.lip.map((lip, i) => {
+    const dropM = GG(lip.x, lip.z) - GG(lip.land.x, lip.land.z), hits = [];
+    for (const prop of PROPS) for (const box of PropFootprints(prop).filter((b) => !b.walkable)) if (BoxDist(box, lip.land) < M.dropIn.landClearM) hits.push(prop.id);
+    for (const row of CORPSES) if (BoxDist(CorpseFootprint(row.mark), lip.land) < M.dropIn.landClearM) hits.push(row.id);
+    for (const b of [...L.blocks, ...L.scenario.states.flatMap((s) => s.blocks)]) if (b.solid !== false && BoxDist({ x: b.x, z: b.z, w: b.w, d: b.d, ry: b.ry || 0 }, lip.land) < M.dropIn.landClearM
+      && b.y + b.h / 2 > GG(lip.land.x, lip.land.z) + 0.1) hits.push(b.id);
+    // 落点本身是平沟底：两脚落地的 0.4 m 以内高差 ≤ 0.1 m。
+    const ring = [0, 1, 2, 3, 4, 5].map((k) => GG(lip.land.x + Math.cos(k) * 0.4, lip.land.z + Math.sin(k) * 0.4));
+    return { who: lip.who, dropM: +dropM.toFixed(2), floorSpreadM: +(Math.max(...ring) - Math.min(...ring)).toFixed(2), hits: [...new Set(hits)] };
+  });
+  for (const r of report.redraft.dropIn) {
+    assert.ok(r.dropM >= 1.8 && r.dropM <= 2.1, `dropIn ${r.who}: lip top to trench floor ${r.dropM} m (1.8–2.1)`);
+    assert.deepEqual(r.hits, [], `dropIn ${r.who}: nothing within ${M.dropIn.landClearM} m of the landing`);
+    assert.ok(r.floorSpreadM <= 0.1, `dropIn ${r.who}: lands on the flat trench floor (${r.floorSpreadM})`);
+  }
+  // ---- 6d. 手榴弹停点：离眼位 0.3–0.4 m，地面平，不压尸体与道具
+  const eye = C.shunzi.witnessEye, g = M.finish.grenadeStop, toEye = Math.hypot(g.x - eye.x, g.z - eye.z);
+  const gs = [[0, 0], [0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]].map(([dx, dz]) => GG(g.x + dx, g.z + dz)), spread = Math.max(...gs) - Math.min(...gs);
+  assert.ok(toEye >= 0.3 && toEye <= 0.4, `grenadeStop ${toEye.toFixed(2)} m from the eye (0.3–0.4)`);
+  assert.ok(spread <= 0.02, `grenadeStop on flat ground (${spread.toFixed(3)} m over 15 cm)`);
+  assert.ok(CORPSES.every((row) => BoxDist(CorpseFootprint(row.mark), g) > 0.08), "grenadeStop is not on a corpse");
+  report.redraft.grenadeStop = { toEyeM: +toEye.toFixed(3), spreadM: +spread.toFixed(3) };
+  // ---- 6e. 折角爆点：眼位（压木趴着的眼）看不见爆点本身（拐角挡住），看得见它上方 3 m 的烟（从沟沿上冒出来）
+  const eyeP = Eye(eye, C.shunzi.lieEyeM), fb = M.dropIn.foldBlast;
+  report.redraft.foldBlast = { blast: Sight(eyeP, Eye(fb, 0.3), { state: "BunkerCollapsed" }), smoke: Sight(eyeP, Eye(fb, 3.2), { state: "BunkerCollapsed" }),
+    contractPoint: Sight(eyeP, Eye({ x: 20.5, z: -126.0 }, 0.3), { state: "BunkerCollapsed" }) };
+  assert.ok(report.redraft.foldBlast.blast != null, "foldBlast: the blast itself is round the fold, off the eye's line");
+  assert.equal(report.redraft.foldBlast.smoke, null, "foldBlast: its smoke and flash 3 m up show over the fold");
+  assert.equal(report.redraft.foldBlast.contractPoint, null, "control: the contract's (20.5,-126.0) is in plain view from the eye (why it moved)");
+  console.log(`ok redraft drop-in ${JSON.stringify(report.redraft.dropIn)}, grenadeStop ${JSON.stringify(report.redraft.grenadeStop)}, fold blast ${JSON.stringify(report.redraft.foldBlast)}`);
+
+  // ---- 6f. 尸体层：Script_OpeningSet 装载 / 显隐 / 垫尸自动就位 / PlaceCorpse 叠放 / 贴地 / 震动 / 离开收走
+  // node 里没有战场尸体层：用一具同尺寸的合成趴尸（躯干、头、两腿、往左横伸的胳膊）当原型，走同一条代码。
+  const SyntheticBody = (poseKey) => {
+    const [x0, x1, z0, z1] = BODY_POSES[poseKey].box, parts = [];
+    const Box = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d, 3, 2, 4).translate(x, y, z);
+    // 按真原型的占位图（tmp/set/probe_map.mjs）：躯干偏右、头在 -Z 端、左臂沿肩横伸、两腿略分开偏左。
+    const pieces = [Box(0.45, 0.24, 0.7, 0.25, 0.12, -0.25), Box(0.2, 0.2, 0.22, 0.3, 0.1, z0 + 0.11), Box(Math.abs(x0) + 0.02, 0.1, 0.11, x0 / 2, 0.05, -0.6),
+      Box(0.16, 0.16, 0.6, -0.25, 0.08, z1 - 0.32), Box(0.16, 0.16, 0.6, 0.05, 0.08, z1 - 0.32), Box(0.1, 0.1, 0.1, x1 - 0.05, 0.05, -0.1)];;
+    const material = new THREE.MeshStandardMaterial({ name: `Synthetic_${poseKey}` });
+    for (const piece of pieces) parts.push({ material, tiers: [piece, piece], triangles: [piece.index.count / 3, piece.index.count / 3] });
+    return { parts };
+  };
+  const protos = { nra0: SyntheticBody("nra0"), nra1: SyntheticBody("nra1") };
+  const scene = new THREE.Scene(), set = new OpeningSet({ scene, library: null, groundAt: GG, corpseSource: (k) => protos[k] });
+  set.Enter("Trapped");
+  assert.ok(set.redraft && set.redraft.corpses, "01 builds the redraft (corpses from the prototypes)");
+  set.Update(1 / 60, "Trapped", "Banter", { collapsed: false, blastAge: null });
+  const Shown = () => set.redraft.corpses.Stats().shown;
+  assert.deepEqual(Shown().sort(), ["mg.corpseLower", "mg.corpseUpper", "sweep.bodies[0]", "sweep.bodies[1]"], "Banter: the far bodies are there, the one by the mouth is not");
+  assert.ok(set.props.Where("ammoBox").visible === false || set.props.Get("ammoBox").state === "rest", "ammoBox rests by Liu in Banter (external model: async)");
+  set.Update(1 / 60, "Trapped", "Blast", { collapsed: true, blastAge: 0.3 });
+  assert.ok(!Shown().includes("finish.bodies[0]"), "the body by the mouth does not pop in during the blast");
+  set.Update(1 / 60, "Trapped", "Black", { collapsed: true, blastAge: 1.2 });
+  assert.ok(Shown().includes("finish.bodies[0]"), "Black: the body by the mouth is there when the eyes open");
+  // 垫尸：CaptiveWall 之前在纵深支沟起点；导演没搬过就从 CaptiveWall 起按沟沿叠好的样子自动就位。
+  const lower0 = set.CorpseInfo("mg.corpseLower");
+  assert.ok(Math.hypot(lower0.x - M.mg.corpseLower.start.x, lower0.z - M.mg.corpseLower.start.z) < 0.05, "the lower MG body starts in the depth sap");
+  set.Update(1 / 60, "Trapped", "CaptiveWall", { collapsed: true, blastAge: 30 });
+  const lower = set.CorpseInfo("mg.corpseLower"), upper = set.CorpseInfo("mg.corpseUpper");
+  assert.equal(lower.pose, "onLip"); assert.equal(upper.pose, "stacked");
+  const contactLower = set.redraft.corpses.Contact("mg.corpseLower"), contactUpper = set.redraft.corpses.Contact("mg.corpseUpper", "mg.corpseLower");
+  report.redraft.mgStack = { lower, upper, contactLower, contactUpper, gunRest: set.MgGunRest() };
+  // 上面那具的基准（原型的脚底面）落在下面那具背上：离地约 +0.3（契约 §5.3），不是贴地。
+  const upperLift = upper.y - GG(upper.x, upper.z);
+  assert.ok(upperLift > 0.18 && upperLift < 0.45, `the upper body lies on the lower one (${upperLift.toFixed(2)} m off the ground, contract ~0.3)`);
+  assert.ok(contactUpper.intoUnderM <= 0.03 && contactUpper.restingVertices > 0, `stacked: the upper body does not sink >= 3 cm into the lower one and rests on it ${JSON.stringify(contactUpper)}`);
+  const gunLift = report.redraft.mgStack.gunRest.y - GG(report.redraft.mgStack.gunRest.x, report.redraft.mgStack.gunRest.z);
+  // 合成原型背高 0.24 m：叠两层约 0.5 m；真原型（背高 0.37）在浏览器里量（报告：Script 证据 tmp/set/evidence）。
+  assert.ok(gunLift > 0.35 && gunLift < 0.75, `the bipod rest on the upper back is about 0.55 m over the lip (${gunLift.toFixed(2)})`);
+  // 枪口越过南沟沿朝后沟：两脚架高过射手胸口那一侧的沟沿边。
+  assert.ok(report.redraft.mgStack.gunRest.y > GG(M.mg.gunner.x, M.mg.gunner.z) + 0.2, "the gun rest is over the gunner's chest on the lip");
+  // 每一具：不穿地（全部顶点）、不悬空（下包络贴地、中心下方有承托）。
+  report.redraft.contact = {};
+  for (const row of CORPSES) {
+    const c = set.redraft.corpses.Contact(row.id, row.id === "mg.corpseUpper" ? "mg.corpseLower" : null);
+    report.redraft.contact[row.id] = c;
+    assert.ok(c.penetrationM <= 0.01, `${row.id}: not sunk into the ground / trench wall (${c.penetrationM} m)`);
+    if (row.id !== "mg.corpseUpper") assert.ok(c.supportShare >= 0.3 && c.centreGapM <= 0.08, `${row.id}: resting on the ground, not floating ${JSON.stringify(c)}`);
+  }
+  // PlaceCorpse：拖动（只平移）、放回沟底、再叠；导演搬过以后不再自动就位。
+  set.PlaceCorpse("corpseLower", { pose: "floor", x: 10.5, z: -123.4, headYawDeg: 90, settle: false });
+  set.Update(1 / 60, "Trapped", "Interrogation", { collapsed: true, blastAge: 40 });
+  assert.ok(Math.abs(set.CorpseInfo("mg.corpseLower").x - 10.5) < 0.05, "a body the director moved stays where he put it");
+  set.PlaceCorpse("mg.corpseLower", { pose: "onLip" }); set.PlaceCorpse("mg.corpseUpper", { pose: "stacked" });
+  assert.equal(set.CorpseInfo("mg.corpseUpper").pose, "stacked");
+  // 点射时垫尸一颤 2 cm，之后回原位。
+  const before = set.redraft.corpses.Get("mg.corpseUpper").group.matrixWorld.elements[13];
+  set.JoltCorpse("mg.corpseUpper");
+  let peak = 0;
+  for (let i = 0; i < 20; i++) { set.Update(1 / 60, "Trapped", "Interrogation", { collapsed: true, blastAge: 40 }); peak = Math.max(peak, Math.abs(set.redraft.corpses.Get("mg.corpseUpper").group.matrixWorld.elements[13] - before)); }
+  assert.ok(peak > 0.01 && peak <= 0.021 && Math.abs(set.redraft.corpses.Get("mg.corpseUpper").group.matrixWorld.elements[13] - before) < 1e-6, `the burst jolts the upper body (${peak.toFixed(3)} m) and it settles back`);
+  // 冷启动 02：没演过 01 的选章 / 回跳，垫尸已经在沟沿上叠好，门口两具在位。
+  {
+    const s2 = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: GG, corpseSource: (k) => protos[k] });
+    s2.Update(1 / 60, "BunkerRescue", "Hold", { collapsed: true, blastAge: null });
+    assert.ok(s2.CorpseInfo("mg.corpseUpper").pose === "stacked" && s2.redraft.corpses.Stats().shown.length === CORPSES.length, "02 cold start: all five bodies, the MG pair stacked on the lip");
+    s2.Exit();
+  }
+
+  // ---- 6g. 道具接口：Place / Hold（替身：跟手骨）/ Toss 落地弹两下滚停 / AttachTo / Where
+  const props = set.props;
+  const placed = props.Place("grenade", { x: g.x, z: g.z });
+  { const box = new THREE.Box3().setFromObject(placed.object); assert.ok(Math.abs(box.min.y - GG(g.x, g.z)) < 0.003, "Place lays a prop on the shared ground"); }
+  const hand = new THREE.Bone(); hand.position.set(3.2, GG(3.2, -125.2) + 1.1, -125.2); scene.add(hand); hand.updateMatrixWorld(true);
+  const fakeIja = { missionId: "Opening_ijaA", actor: { characterRig: { bones: { handR: hand } } } };
+  props.Hold("grenade", fakeIja); props.Update(1 / 60);
+  assert.ok(props.Get("grenade").object.position.distanceTo(hand.getWorldPosition(new THREE.Vector3())) < 0.1 && props.Where("grenade").holder === "Opening_ijaA", "Hold: in his hand (no clip track yet: follows the hand bone)");
+  const bounces = []; let rested = 0;
+  props.Toss("grenade", { to: g, seconds: 0.35, arcM: 0.15, bounces: 2, bounceM: 0.06, rollM: 0.3, rollS: 0.8, onBounce: (i) => bounces.push(i), onRest: () => rested++ });
+  for (let i = 0; i < 180 && props.Get("grenade").toss; i++) props.Update(1 / 60);
+  const rest = props.Where("grenade");
+  report.redraft.toss = { rest, bounces, rested };
+  assert.ok(Math.hypot(rest.x - g.x, rest.z - g.z) < 0.02 && rest.state === "world" && rested === 1, `Toss ends at finish.grenadeStop ${JSON.stringify(rest)}`);
+  assert.ok(bounces.length >= 2, `it lands and bounces (callbacks ${bounces})`);
+  { const box = new THREE.Box3().setFromObject(props.Get("grenade").object); assert.ok(Math.abs(box.min.y - GG(g.x, g.z)) < 0.01, `it lies on the ground (${(box.min.y - GG(g.x, g.z)).toFixed(3)})`); }
+  const pack = new THREE.Object3D(); pack.position.set(-2.4, GG(-2.4, -125.62) + 0.4, -125.62); scene.add(pack);
+  props.AttachTo("civilianShirt", pack, { y: 0.2 }); props.Update(1 / 60);
+  assert.ok(props.Get("civilianShirt").object.position.distanceTo(pack.position.clone().add(new THREE.Vector3(0, 0.2, 0))) < 1e-6, "AttachTo: the shirt rides on the pack");
+  for (const name of Object.keys(REDRAFT_PROPS).filter((n) => !["comradeRifle", "type11", "ammoBox"].includes(n))) {
+    const built = BuildRedraftProp(name);
+    assert.ok(built?.object && CountTriangles(built.object) > 0, `${name} builds procedurally`);
+    built.geometries.forEach((x) => x.dispose()); built.materials.forEach((x) => x.dispose());
+  }
+  // 九一式：Ø5 cm × 9.5 cm 弹体 + 引信帽，长轴 -Z。
+  { const b = BuildRedraftProp("grenade"), box = new THREE.Box3().setFromObject(b.object), size = box.getSize(new THREE.Vector3());
+    assert.ok(Math.abs(size.x - 0.05) < 0.002 && Math.abs(size.y - 0.05) < 0.002 && size.z > 0.11 && size.z < 0.135, `Type 91: 5 cm across, 9.5 cm body + fuse along -Z (${size.toArray().map((v) => v.toFixed(3))})`);
+    b.geometries.forEach((x) => x.dispose()); b.materials.forEach((x) => x.dispose()); }
+
+  // 歪把子替身：MountLmg 把 type11 的两脚架落在上面那具垫尸背上（MgGunRest），枪口朝后沟折角 RC。工厂用一个假的（只给几何与材质）。
+  {
+    const steel = new THREE.MeshStandardMaterial(), factory = { WeaponGeometry: () => ({ geometries: new Map([["steel", new THREE.BoxGeometry(0.06, 0.08, 1.1).translate(0, 0.035, -0.3)]]), muzzle: new THREE.Vector3(0, 0.035, -0.85) }),
+      ActorMaterials: () => ({ steel }) };
+    const s3 = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: GG, corpseSource: (k) => protos[k], actorFactory: factory });
+    s3.Update(1 / 60, "BunkerRescue", "Hold", { collapsed: true, blastAge: null });
+    const h = s3.MountLmg(), rest = s3.MgGunRest(), foot = h.object.userData.bipodFoot.clone().applyMatrix4(h.object.matrixWorld);
+    const muzzle = new THREE.Vector3(0, 0.035, -0.85).applyMatrix4(h.object.matrixWorld), grip = h.object.getWorldPosition(new THREE.Vector3());
+    const aim = new THREE.Vector3(M.mg.aimAt.x - grip.x, 0, M.mg.aimAt.z - grip.z).normalize(), dir = muzzle.clone().sub(grip).setY(0).normalize();
+    report.redraft.lmg = { footToRestM: +foot.distanceTo(new THREE.Vector3(rest.x, rest.y, rest.z)).toFixed(3), aimDeg: +(Math.acos(Math.min(1, dir.dot(aim))) / DEG).toFixed(1) };
+    assert.ok(report.redraft.lmg.footToRestM < 0.01 && report.redraft.lmg.aimDeg < 1, `MountLmg: the bipod stands on the upper body, muzzle toward RC ${JSON.stringify(report.redraft.lmg)}`);
+    s3.Exit();
+  }
+  // 折角爆点：vfx.Explosion（闪光 + 火团 + 尘环）+ 一小撮定向喷土 + 冒 emitS 秒的土黄烟（到点收发射器；离开 01–02 也收）。不伤人：只碰 vfx。
+  {
+    const { FOLD_BLAST } = await import("./Data_OpeningSet0103.mjs");
+    const fake = FakeVfx(), explosions = []; fake.Explosion = (p, o) => explosions.push({ p: p.clone(), ...o });
+    const s4 = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: GG, corpseSource: (k) => protos[k], vfx: fake });
+    s4.Update(1 / 60, "Trapped", "DropIn", { collapsed: true, blastAge: 20 });
+    const at = s4.FoldBlast(), live = () => [...fake.log.sources.values()].filter((x) => Math.hypot(x.position.x - at.x, x.position.z - at.z) < 0.1).length;
+    for (let k = 0; k < 40; k++) { fake.time += 1 / 60; s4.blastFx.Update(1 / 60); }
+    assert.ok(explosions.length === 1 && Math.hypot(explosions[0].p.x - M.dropIn.foldBlast.x, explosions[0].p.z - M.dropIn.foldBlast.z) < 1e-6 && explosions[0].radius === FOLD_BLAST.explosion.radius, "FoldBlast: one explosion visual at dropIn.foldBlast");
+    assert.ok(fake.log.debris.length > 0 && live() === 1, "FoldBlast: dirt thrown up and a smoke column rising");
+    for (let t = 0; t < FOLD_BLAST.smoke.emitS + 0.1; t += 1 / 30) s4.Update(1 / 30, "Trapped", "DropIn", { collapsed: true, blastAge: 20 });
+    assert.equal(live(), 0, "FoldBlast: the smoke emitter is retired after emitS (its puffs drift on)");
+    s4.FoldBlast(); s4.Update(1 / 60, "Support", null, { collapsed: true, blastAge: 60 });
+    assert.equal(live(), 0, "leaving 01–02 retires a live fold-blast smoke emitter");
+    s4.Exit();
+  }
+  // ---- 6h. 三角形预算（≤ 60k）：尸体按原型实测三角形数（BODY_POSES.triangles，第 tier 档）+ 本页建出的程序化道具
+  //      + 两支现成武器模型（Model_*.tzm.json 的 triangles）+ 弹药箱 GLB 那一个节点（按 accessor 数）。浏览器里另量实际建出的（报告）。
+  const corpseTriangles = CORPSES.reduce((sum, row) => sum + BODY_POSES[row.mark.pose].triangles[row.mark.tier ?? 0], 0);
+  const propTriangles = set.props.Stats().triangles;
+  const weaponTriangles = Object.fromEntries(["HanYang", "Type11"].map((id) => [id, JSON.parse(fs.readFileSync(path.join(HERE, `Model/Model_${id}.tzm.json`), "utf8")).triangles]));
+  const crateTriangles = (() => {
+    const glb = fs.readFileSync(path.join(HERE, "Model/Model_MilitaryCrateSet.glb")), json = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)).toString());
+    const node = json.nodes.find((n) => n.name === "MilitaryCrateOpen");
+    return json.meshes[node.mesh].primitives.reduce((sum, p) => sum + json.accessors[p.indices].count / 3, 0);
+  })();
+  const totalTriangles = corpseTriangles + propTriangles + weaponTriangles.HanYang + weaponTriangles.Type11 + crateTriangles;
+  report.redraft.triangles = { corpses: corpseTriangles, procedural: propTriangles, weapons: weaponTriangles, crate: crateTriangles, total: totalTriangles, budget: REDRAFT_TRIANGLE_BUDGET };
+  assert.ok(totalTriangles <= REDRAFT_TRIANGLE_BUDGET, `new corpses and props <= ${REDRAFT_TRIANGLE_BUDGET} triangles: ${JSON.stringify(report.redraft.triangles)}`);
+
+  // ---- 6i. 离开 01–02（进 03）：尸体层、道具全部收走；自建几何 / 材质 dispose，借来的尸体几何不碰
+  const ownedGeo = new Set(), ownedMat = new Set();
+  for (const h of set.props.handles.values()) { (h.owned?.geometries || []).forEach((x) => ownedGeo.add(x)); (h.owned?.materials || []).forEach((x) => ownedMat.add(x)); }
+  for (const c of set.redraft.corpses.clones.values()) ownedMat.add(c);
+  const batches = set.redraft.corpses.batches.map((b) => b.mesh);
+  let geoDisposed = 0, matDisposed = 0, batchDisposed = 0, sharedDisposed = 0;
+  ownedGeo.forEach((x) => x.addEventListener("dispose", () => geoDisposed++)); ownedMat.forEach((x) => x.addEventListener("dispose", () => matDisposed++));
+  batches.forEach((b) => b.geometry.addEventListener("dispose", () => batchDisposed++));   // BatchedMesh.dispose 收它自己的合并缓冲
+  for (const p of Object.values(protos)) for (const part of p.parts) part.tiers[0].addEventListener("dispose", () => sharedDisposed++);
+  set.Update(1 / 60, "Support", null, { collapsed: true, blastAge: 60 });
+  assert.equal(set.redraft, null, "entering 03 removes the redraft");
+  assert.ok(!scene.children.some((o) => o.name === "OpeningRedraft"), "no redraft node left in the scene");
+  assert.ok(geoDisposed === ownedGeo.size && matDisposed === ownedMat.size && batchDisposed === batches.length, `everything the redraft made is disposed (${geoDisposed}/${ownedGeo.size} geometries, ${matDisposed}/${ownedMat.size} materials, ${batchDisposed}/${batches.length} batches)`);
+  assert.equal(sharedDisposed, 0, "the borrowed casualty geometry is not disposed");
+  set.Update(1 / 60, "BunkerRescue", "Hold", { collapsed: true, blastAge: null });
+  assert.ok(set.redraft?.corpses, "jumping back to 02 rebuilds it");
+  set.Exit();
+  assert.ok(!scene.children.some((o) => o.name === "OpeningRedraft"), "Exit removes it");
+  console.log(`ok redraft corpses: stack ${JSON.stringify(report.redraft.mgStack)}, contact ${JSON.stringify(report.redraft.contact)}, toss ${JSON.stringify(report.redraft.toss)}, triangles ${JSON.stringify(report.redraft.triangles)}, removed on 03`);
 }
 
 console.log(`OpeningSetTest ok ${JSON.stringify({ timberBand: report.timberBand, rubbleTopM: report.rubbleTopM, backrest: report.backrest, seatF: report.seatF, meshes: report.stats.meshes })}`);

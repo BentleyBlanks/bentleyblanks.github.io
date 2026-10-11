@@ -130,7 +130,9 @@ export const PROPS = Object.freeze([
   { id: "revetmentFront", kind: "revetment", heightM: 1.1, postEveryM: 1.15, logs: 3, leanDeg: 12,
     runs: Object.freeze([
       Object.freeze({ side: "north", path: Path([5.95, -126.16], [7.1, -126.22]) }),
-      Object.freeze({ side: "north", path: Path([10.9, -126.4], [13.4, -126.38]) }),
+      // 2026-10-11 重构：西头从 x 10.9 收到 12.25。dropIn.lip[1]（丁）在 x 11.5 从北沟沿跳下，落点 (11.5,-125.8) 半径 0.6 m 内
+      // 不许有木撑（原来护壁离落点 0.48 m，Script_OpeningSetTest 6c）。
+      Object.freeze({ side: "north", path: Path([12.25, -126.39], [13.4, -126.38]) }),
       Object.freeze({ side: "south", path: Path([5.2, -122.62], [7.1, -122.52]) }),
       Object.freeze({ side: "south", path: Path([10.9, -122.54], [12.9, -122.7]) }),
     ]) },
@@ -138,7 +140,9 @@ export const PROPS = Object.freeze([
   // x 13–16 是纵深支沟岔口，留空；x 16.8–19.6 沟沿转向东北。
   { id: "sandbagStakesSouth", kind: "sandbagStakes", layers: 2, layerM: 0.17, depthM: 0.44, bagM: 0.52,
     stakeEveryM: 1.3, stakeAboveM: 0.45, stakeBelowM: 0.55,
-    runs: Object.freeze([Path([6.0, -121.84], [12.3, -122.0]), Path([16.8, -122.72], [19.6, -123.3])]) },
+    // 2026-10-11 重构：西头从 x 6.0 收到 8.4。x 6–8 那段南沟沿让给机枪垫尸（SET_MARKS.mg.corpseLower/Upper 叠在沟沿上，
+    // 歪把子架在上面那具背上朝后沟打，契约 §1.7）：垫尸本来就是拿来当沙袋用的，两样叠在一起会穿。
+    runs: Object.freeze([Path([8.4, -121.9], [12.3, -122.0]), Path([16.8, -122.72], [19.6, -123.3])]) },
   // 日军插在南沟沿上的旗（SB03 右沿、SB03A 右上、SB04 左远）：调研写 (10.5,-122.3)，那里是南壁半坡（地面 -1.13），
   // 挪到沟沿 z -121.8、插在沙袋中间。杆 2.8 m，旗面 0.7×0.46，程序化白底红日加脏污。
   // 旗往南飘（flyYawDeg 170）：SB03/03A 从洞口朝东看，旗面正对镜头、往画面右边展开；原来朝西（70°）从洞口看是一条边（实拍只见杆）。
@@ -151,7 +155,9 @@ export const PROPS = Object.freeze([
   // 仰拍时在画面左下框景（右上的断木由 fallenLintel 承担）。全部贴地（离地 < 0.16 m），拖人、踢枪都能踩过去。
   { id: "plankDebrisButt", kind: "planks", planks: Object.freeze([
     Object.freeze({ x: 1.95, z: -124.6, lift: 0.05, len: 1.2, w: 0.2, t: 0.05, yawDeg: 62, pitchDeg: 2, rollDeg: 8 }),
-    Object.freeze({ x: 2.8, z: -123.95, lift: 0.05, len: 1.0, w: 0.18, t: 0.05, yawDeg: -24, pitchDeg: -3, rollDeg: -6 }),
+    // 2026-10-11 重构：南移 0.35 m（原 (2.8,-123.95)）。finish.bodies[0] (3.3,-124.55) 趴在铺板上，这块板的北头垫在它身下、把整具尸体
+    // 撬起 6° 悬着（实拍 tmp/set/shots/Set_EyeEast_Clear）。
+    Object.freeze({ x: 2.85, z: -123.6, lift: 0.05, len: 1.0, w: 0.18, t: 0.05, yawDeg: -24, pitchDeg: -3, rollDeg: -6 }),
     Object.freeze({ x: 2.15, z: -123.72, lift: 0.06, len: 0.9, w: 0.16, t: 0.04, yawDeg: 118, pitchDeg: 4, rollDeg: 12 }),
   ]) },
 
@@ -572,4 +578,179 @@ export function ProfileAt(profile, s) {
     if (s <= s1) { const [s0, h0] = profile[i - 1]; return h0 + (h1 - h0) * (s - s0) / Math.max(1e-6, s1 - s0); }
   }
   return profile[profile.length - 1][1];
+}
+
+// ===========================================================================
+// 2026-10-11 开场重构（契约 docs/Data_OpeningRedraft20261011Contract.md §5，Set 包）
+// ===========================================================================
+// 标记名按契约 §5.3 冻结（Dir 包读）；数值从契约起点出发，按共享地面采样（游戏高度场 P012，0.75 m 格）与沟壁实测调过，
+// 调过的每一处在旁边写了原因。测试：Script_OpeningSetTest 第 6 节。
+//
+// 尸体与新道具只活在 01–02（Trapped / BunkerRescue / RearTrench），进 03（Support）或离开 01–03 全部收走；
+// 和上面 01–03 布景（PROPS）各自一套生命周期（Script_OpeningSet.EnterRedraft / ExitRedraft）。
+export const REDRAFT_STAGES = Object.freeze(["Trapped", "BunkerRescue", "RearTrench"]);
+/** 新增道具与尸体的三角形上限（契约任务书：≤ 60k，不加新采样器）。按实际建出来的几何算（测试与 Stats().redraft.triangles）。 */
+export const REDRAFT_TRIANGLE_BUDGET = 60000;
+/**
+ * 冬瓜跪位 R3（拔出后按跪在北壁坡上的点，docs/Data_OpeningComradeKneelBank20260927.md：ComradeWallRoot 由拖出末帧与撑墙首帧
+ * 链出，不是数据标记，这里抄实测值）。practice.recruitBack 按它算。
+ */
+export const COMRADE_KNEEL = P(4.057, -125.785);
+
+/**
+ * 战场尸体的姿势原型（MissionAftermath 已经开机烘好的那几具，Script_FirstLevelMissionAftermath.BakeMissionBody；
+ * 原型键 `nra<pose>`）。实测（tmp/set/probe_map.mjs，2026-10-11）：pose 0 / 1 是趴着（背朝上、看得见背上的交叉背带），
+ * yaw 0 时头朝 -Z（北），左臂横伸出去（局部 -x）；pose 2 / 3 仰面、头朝 +Z。所以这里只用 0 / 1，`headYawDeg` 就是 yaw。
+ * box = 局部包围盒 [x0, x1, z0, z1]（米，yaw 0；含横伸的左臂），heightM = 背高；triangles = 第 0 / 1 档三角形数（5 cm 合点）。
+ */
+export const BODY_POSES = Object.freeze({
+  nra0: Object.freeze({ side: "nra", pose: 0, box: Object.freeze([-0.60, 0.61, -0.87, 0.85]), heightM: 0.37, triangles: Object.freeze([9917, 2179]) }),
+  nra1: Object.freeze({ side: "nra", pose: 1, box: Object.freeze([-0.53, 0.51, -0.83, 0.80]), heightM: 0.37, triangles: Object.freeze([9917, 2165]) }),
+});
+const Body = (x, z, headYawDeg, extra = {}) => Object.freeze({ x, z, headYawDeg, ...extra });
+
+/**
+ * 契约 §5.3 的标记（Dir 读）。尸体标记带 `pose`（BODY_POSES 的键）与 `headYawDeg`（头指向：three 的 yaw，0 北、+90 西）。
+ */
+export const SET_MARKS = Object.freeze({
+  sweep: Object.freeze({
+    // 乙（ijaB）从 J 往西沿沟底扎尸报数的第 7、8、9 具。契约起点 (11.8,-124.9) (9.9,-124.3) 在沟底正中，正压在乙进来的 walkIn
+    // （z≈-124.7）与翻译进来的 interpreterEnter（从北半斜穿到南半）上；尸体连横伸的胳膊有 1.0–1.2 m 宽，只能挪到沟底南半、
+    // 头朝西、胳膊伸向南壁脚：离两条路线 ≥ 0.5 m（乙从旁边 0.6–1.1 m 处下刀，刺刀够得着）。
+    // [0] 东移 0.5 m：南壁脚 x 10.9 起原有一段前沟护壁，收到 12.25 以东也压不下一具人，就挪到护壁西头。
+    bodies: Object.freeze([
+      Body(11.3, -123.4, 105, { pose: "nra1", tier: 1 }),
+      Body(9.4, -123.1, 90, { pose: "nra1", tier: 1 }),
+      // [2] 是演员 SweepVictim（Dir01 生成，被扎后叫一声抓泥）：Set 只保证这块地净空（测试 6a）。
+      Body(7.4, -124.8, 90, { actor: "SweepVictim", pose: "nra1" }),
+    ]),
+  }),
+  finish: Object.freeze({
+    // 甲（ijaA）擦刀卡枪后端枪沿沟底往洞口走、补一刀的那具（Black 之前不显示）。
+    // 2026-10-11 集成负责人决定：契约原有的 [1]（眼位旁那具）删掉——离眼 0.3–0.6 m，第一人称贴地眼高下会露出悬着的腿，
+    // 那块地又要留给被踩的右手、手榴弹停点与翻译蹲位。finish.bodies 只剩 [0]。
+    // [0] 契约 (3.3,-124.3)：连胳膊的实际宽度压到 02 冲锋路线 chargeRoute 的末点 (3.3,-123.5)（只差 0.27 m），北移 0.25 m，
+    //     离 chargeRoute 0.5 m 以上；再往北就压到甲 Found 站的 ija.found (2.98,-125.2)。它仍在 02 翻译蹲位 rescue.interpreter (2.92,-124.5) 与罗班长撤离折线
+    //     withdraw.lane 上（Dir 的点，不在契约净空名单里）：交 Dir02 让开（报告）。
+    bodies: Object.freeze([
+      Body(3.3, -124.55, 90, { pose: "nra1", tier: 0 }),
+    ]),
+    // 手榴弹滚停点：眼位 witnessEye (1.85,-125.25) 东 0.35 m、南 0.15 m，离眼 0.38 m；沟底平（测试 6d 量坡度）。
+    grenadeStop: P(2.2, -125.1),
+  }),
+  mg: Object.freeze({
+    // 机枪垫尸。契约值 (6.9,-123.05) 写的是「沟沿上」，实测那里是**沟底**（离南壁脚 0.3 m，地面 -2.0）：在那儿叠两具、
+    // 歪把子架 0.55 m 高，枪口离南沟沿还差 1.4 m，打不出去。南沟沿真正的边（x 6.9：z -121.85 处地面 -0.15，再往南是平地）
+    // 在北 1.2 m。所以按契约语义（「推上南沟沿」「越过南沟沿朝后沟点射」，§1.7）放到沟沿顶上：下面那具顺着沟沿横躺
+    // （头朝西、胳膊伸向南边平地，北缘离沟沿边 0.05 m 不悬空），上面那具叠在它背上（Settle 落在下面那具的上表面，
+    // 离地约 +0.3），背朝上，歪把子两脚架落在它背上（gunRest，运行时按上面那具的实际背高算）。
+    // 起点：契约任务书写 (8.2,-124.9)/(8.6,-123.9)，那里正是 SweepVictim（7.4,-124.8 起、身长 1.7 m）与翻译进来的路线；
+    // 机枪组「从甲身后（J 方向）下来」各拖一具，起点放到 J 南边纵深支沟的沟底（Dir 拖到沟沿下、推上去叠起）。
+    corpseLower: Body(6.9, -121.2, 90, { pose: "nra0", tier: 0, start: Body(14.6, -121.4, 150) }),
+    corpseUpper: Body(7.0, -121.25, 70, { pose: "nra1", tier: 0, liftM: 0.3, start: Body(15.0, -119.6, 170) }),
+    // 机枪组（Dir 摆演员）。射手趴在南壁坡顶、胸口压在沟沿边（腿垂进沟里），面朝南；副射手跪在他东侧（面朝南时的左手边——
+    // 十一年式的弹斗在枪的左侧；契约说明写「右侧」，坐标在东，按坐标）。契约值 (6.7,-123.65)/(7.5,-123.55) 是沟底，同上北移。
+    gunner: Object.freeze({ x: 6.75, z: -121.95, yawDeg: 180 }),
+    loader: Object.freeze({ x: 7.75, z: -121.7, yawDeg: 180 }),
+    // 点射朝后沟折角 RC（FRONT_SPACE.rearCorner）。
+    aimAt: P(-4, -113),
+  }),
+  dropIn: Object.freeze({
+    // 北沟沿三处跳下点：`x,z` 是沟沿顶（日兵蹲着露刺刀尖的地方，地面 ≈ 0），`land` 是沟底落点。契约值 (10.0,-126.6) 等
+    // 在北壁半坡上（地面 -1.4）；北沟沿真正的边在 z -127.2，沟底在 z -126.25 以南，落点取离坡脚 0.45–0.5 m（脚下 0.4 m 内是平沟底）。高差测试 6c 量（1.8–2.1 m）。
+    lip: Object.freeze([
+      Object.freeze({ who: "ijaC", x: 10.0, z: -127.2, yawDeg: 180, land: P(10.0, -125.75) }),
+      Object.freeze({ who: "ijaD", x: 11.5, z: -127.2, yawDeg: 180, land: P(11.5, -125.75) }),
+      Object.freeze({ who: "ijaA", x: 9.0, z: -127.25, yawDeg: 180, land: P(9.0, -125.8) }),
+    ]),
+    /** 落点半径内不许有杂物 / 沙袋 / 木撑。 */
+    landClearM: 0.6,
+    // 折角 F 以东的手榴弹爆点。契约值 (20.5,-126.0) 从眼位看是**画内**（F 以东那段沟底正对着东西向的沟，视线一路通），
+    // 挪进连接支沟拐过去的那一段（沟底，地面 -2.06）：眼位看不见爆点本身（北壁拐角挡住），烟柱与闪光从沟沿上冒出来（测试 6e）。
+    foldBlast: P(20.4, -127.9),
+  }),
+  practice: Object.freeze({
+    // 丁退三步的落脚：冬瓜跪位东 2.2 m（契约）。
+    recruitBack: P(+(COMRADE_KNEEL.x + 2.2).toFixed(3), COMRADE_KNEEL.z),
+  }),
+});
+
+/**
+ * 静态尸体（Script_OpeningSet 的 OpeningCorpses 层）：id、标记路径、显示规则。
+ * show: "always" ＝ 01 进场（Banter）就在；"black" ＝ 近爆后的黑场里才出现（和 roofTimberDown 一样）。
+ * movable: Dir 用 OpeningSet.PlaceCorpse 搬（机枪组拖尸、推上沟沿叠起）。
+ */
+export const CORPSES = Object.freeze([
+  Object.freeze({ id: "sweep.bodies[0]", mark: SET_MARKS.sweep.bodies[0], show: "always" }),
+  Object.freeze({ id: "sweep.bodies[1]", mark: SET_MARKS.sweep.bodies[1], show: "always" }),
+  Object.freeze({ id: "finish.bodies[0]", mark: SET_MARKS.finish.bodies[0], show: "black" }),
+  Object.freeze({ id: "mg.corpseLower", mark: SET_MARKS.mg.corpseLower, show: "always", movable: true }),
+  Object.freeze({ id: "mg.corpseUpper", mark: SET_MARKS.mg.corpseUpper, show: "always", movable: true }),
+]);
+/**
+ * 垫尸自动就位：Dir 在本次装载里没搬过它（PlaceCorpse），而导演已经过了 CaptiveWall（或直接进 02 / 撤离：选章、回跳、
+ * 冷启动），就按沟沿叠好的样子摆上去，免得 02 机枪手趴在空沟沿上。
+ */
+export const MG_AUTO_PLACE_FROM = "CaptiveWall";
+/** 垫尸被点射震一下（Dir 调 OpeningSet.JoltCorpse）：竖直抖幅与时长。 */
+export const CORPSE_JOLT = Object.freeze({ amplitudeM: 0.02, seconds: 0.18 });
+
+/**
+ * 契约 §5.2 的道具（Script_OpeningProps 的 OpeningWorldProps 按名建、按名取用）。尺寸单位米，颜色 sRGB。
+ * rest：世界里的初始摆位（没有就要等 Dir 来 Place / Hold）；from：从哪一拍起摆出来（"black" ＝ 近爆后的黑场）；
+ * until：在这一拍（含）之后不再自动摆（Dir 接手）。hand：握在手里时相对手骨的偏移（Hold 没有 clip 轨时用，替身用）。
+ */
+export const REDRAFT_PROPS = Object.freeze({
+  // 半块大饼：直径 22 cm 的厚烙饼对半掰开，焦黄面、掰开的断面是白的。
+  bread: Object.freeze({ kind: "bread", radiusM: 0.11, thickM: 0.024, arcDeg: 180, color: 0xc8995a, crumb: 0xe6d2a8, char: 0x6f4421, hand: Object.freeze([0.02, -0.03, 0.06]) }),
+  // 掰下来丢给幺娃的一角（约 50°）。
+  breadPiece: Object.freeze({ kind: "bread", radiusM: 0.11, thickM: 0.024, arcDeg: 50, color: 0xc8995a, crumb: 0xe6d2a8, char: 0x6f4421, hand: Object.freeze([0.02, -0.03, 0.05]) }),
+  // 刘文财脚边的弹药箱（现成 Model_MilitaryCrateSet 的开盖箱，按 sizeM 缩放）。契约 §5.1：在他右手边——他 (1.1,-124.9) 蹲着
+  // 面朝西，右手是北：箱子放在他北边 0.5 m、洞口正中（Orders 他扣上扛走，01 出洞的人从箱子北边过；塌方前就被扛走）。
+  ammoBox: Object.freeze({ kind: "external", asset: "militaryCrateOpen", sizeM: Object.freeze([0.5, 0.28, 0.32]),
+    rest: Object.freeze({ x: 1.1, z: -125.45, yawDeg: 8 }), until: "Incoming", hand: Object.freeze([0, 0.1, 0]) }),
+  // 两夹桥夹（同 fillCharger：钢片 + 五发铜弹）。顺子丢给冬瓜，一夹落地他弯腰捡。
+  clipA: Object.freeze({ kind: "charger", hand: Object.freeze([0.012, -0.026, 0.035]) }),
+  clipB: Object.freeze({ kind: "charger", hand: Object.freeze([0.012, -0.026, 0.035]) }),
+  // 冬瓜的汉阳造：近爆后躺在泥里，枪口朝东（契约 (3.9,-125.0)）。握把南移 0.25 m：原位那支枪横在 finish.bodies[0] 的北缘上。
+  comradeRifle: Object.freeze({ kind: "weapon", weapon: "HanYang", rest: Object.freeze({ x: 3.95, z: -125.25, yawDeg: -90, rollDeg: 82, liftM: 0.025 }), from: "black" }),
+  // 汉阳造（1888 式）枪栓：机头 + 栓体 + 拉机柄球，抽出来甩到沟沿外。
+  rifleBolt: Object.freeze({ kind: "bolt", lengthM: 0.16, radiusM: 0.0095, knobM: 0.016, color: 0x4b4c4a, hand: Object.freeze([0.0, -0.02, 0.04]) }),
+  // 布胸章：契约 3×8 cm 的白布条，四边缝线、上半一道蓝边（不写字：玩家看得见的字要走文本表，这里只画纹样）。
+  chestBadge: Object.freeze({ kind: "badge", widthM: 0.08, heightM: 0.03, thickM: 0.003, cloth: 0xd9d1bd, edge: 0x2f4a76, stitch: 0x6b6253,
+    chest: Object.freeze([0.09, 0.06, 0.13]), hand: Object.freeze([0.0, -0.02, 0.04]) }),
+  // 九一式手榴弹（库里没有：Model_Grenade / Model_Type24Grenade 都是中国木柄弹）：Ø5 cm × 9.5 cm 的分节圆柱弹体（铸铁、
+  // 横向三道刻槽）+ 顶部引信帽（黄铜撞针帽）+ 底部推进药筒座。深褐漆。
+  grenade: Object.freeze({ kind: "type91", diameterM: 0.05, heightM: 0.095, segments: 4, fuseM: 0.03, fuseDiameterM: 0.024,
+    color: 0x3a2b1f, fuse: 0x8a7442, hand: Object.freeze([0.0, -0.03, 0.04]) }),
+  // 十一年式轻机枪（现成武器模型 Type11；模型里没有两脚架——Model_Type11.tzm 只有装配态枪体——两条腿程序化补上）。
+  type11: Object.freeze({ kind: "weapon", weapon: "Type11", bipod: Object.freeze({ legM: 0.26, spreadDeg: 26, rakeDeg: 18, fromMuzzleM: 0.18, radiusM: 0.007 }) }),
+  // P1：背包口露出的一截蓝布便服（叠着、起皱）。Dir01 挂到收拾装备时的背包上（OpeningWorldProps.AttachTo）。
+  civilianShirt: Object.freeze({ kind: "cloth", sizeM: Object.freeze([0.2, 0.06, 0.11]), color: 0x3c5a80, fold: 0x2c4361 }),
+});
+
+/**
+ * 折角爆点的画面（Script_OpeningSet.FoldBlast：只给闪光、烟、落土，不伤人、不出声——声音归 Sfx/Dir）。
+ * explosion：vfx.Explosion 的半径与种类（中心强光 + 火团 + 贴地尘环 + 碎块）；dirt：从爆点往上、往西甩过沟沿的土
+ * （OpeningBlastFx 的定向喷土，规模小得多）；smoke：爆后冒 emitS 秒的一股土黄烟（vfx.SmokeSource，到点收掉发射器、烟团照常散）——
+ * 爆点在沟底、拐角背后，眼位贴地看不见火团本身（测试 6e），要靠这股烟在 1–2 s 内升过沟沿让人看见（实拍 tmp/set/shots/Set_FoldBlast_*：
+ * 只有 vfx.Explosion 时 1.2 s 内沟沿上几乎看不到烟）。
+ */
+export const FOLD_BLAST = Object.freeze({
+  explosion: Object.freeze({ radius: 5.5, kind: "grenade" }),
+  smoke: Object.freeze({ kind: "dust", emitS: 1.4, rate: 16, radius: 0.9, rise: 3.4, sizeStart: 0.9, sizeEnd: 4.5, life: 5.5, opacity: 0.5 }),
+  dirt: Object.freeze({ dir: Object.freeze({ x: -0.55, y: 0.75, z: 0.35 }), liftM: Object.freeze([0.2, 0.8]), clods: 10, splinters: 0, grit: 24,
+    spray: 0, mist: 6, dust: 14, seconds: 0.5, spreadRad: 0.6, speed: Object.freeze({ clods: Object.freeze([4, 8]), grit: Object.freeze([5, 9]),
+      mist: Object.freeze([2, 4]), dust: Object.freeze([1, 2.5]), splinters: Object.freeze([4, 8]), spray: Object.freeze([4, 8]) }) }),
+});
+
+export const OPENING_REDRAFT_SET = Object.freeze({ version: "20261011OpeningRedraftSetV1", stages: REDRAFT_STAGES, SET_MARKS, CORPSES,
+  BODY_POSES, REDRAFT_PROPS, FOLD_BLAST, budget: REDRAFT_TRIANGLE_BUDGET });
+
+/** 一具尸体（BODY_POSES 原型 + 标记）的世界占地盒 {x, z, w, d, ry}（ry 让盒子局部 +z 转到世界，同 PropFootprints 约定）。 */
+export function CorpseFootprint(mark) {
+  const pose = BODY_POSES[mark.pose], [x0, x1, z0, z1] = pose.box, yaw = (mark.headYawDeg || 0) * DEG;
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, c = Math.cos(yaw), s = Math.sin(yaw);
+  // 局部偏心 (cx, cz) 转到世界：x = lx cos + lz sin，z = -lx sin + lz cos（three 绕 Y 转 yaw）。
+  return { x: mark.x + cx * c + cz * s, z: mark.z - cx * s + cz * c, w: x1 - x0, d: z1 - z0, ry: yaw, y0: 0, y1: pose.heightM };
 }
