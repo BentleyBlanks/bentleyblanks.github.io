@@ -510,7 +510,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // squat 02 starts from (rescue.interpreter).
   // interpreterVia: the interpreter's way from his questioning mark to rescue.interpreter round the south of the recruit
   // (practice.recruitWait), 0.85 m+ off him (straight through rescue.interpreterReturn he was held up behind him, 2026-10-11).
-  finish:Object.freeze({ walkMps:1.0, stabMps:.3, standOffM:.5, maxPitchDeg:4, interpreterVia:Route([4.4,-123.3],[3.2,-123.6]) }),
+  finish:Object.freeze({ walkMps:1.0, stabMps:.3, standOffM:.5, maxPitchDeg:12, interpreterVia:Route([4.4,-123.3],[3.2,-123.6]) }),
   // Found (contract §1.9; N19): he stands over the eye at `stand` (the bayonet tip a hand's breadth over his back: hover),
   // the right boot comes down on the right hand (step stepS in; flags.bootStepAt), the heel grinds grindS (bootGrind at its
   // end), 「……这个是活的。留着，问。」, and he squats at the head (ija.crouch, IjaCrouchHairHold) crouchAfterLineS after it.
@@ -834,7 +834,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // N09 ijaB coming down the trench at the second body, the instant before the thrust; the first already passed, ijaC far
     // off with his back to us.
     Object.freeze({ id:"N09", storyboard:"Storyboard_N09_SweepStab.png", when:"s.flags['stabDue:8']!=null&&r.time>=s.flags['stabDue:8']-.3",
-      judge:{ camera:{ eyeM:[.15,.45] }, actors:{ ijaB:{ x:[.3,.7], distM:[7,10.5] }, ijaC:{ x:[.4,.9] } } } }),
+      // (Set moved the bodies to the south half of the floor: following ijaB there the look turns south and the fold man sits
+      // left of the drawing's x 0.67.)
+      judge:{ camera:{ eyeM:[.15,.45] }, actors:{ ijaB:{ x:[.3,.7], distM:[7,10.5] }, ijaC:{ x:[.3,.9] } } } }),
     // N10 the comrade knelt against the north wall looking straight at the eye, ijaA and ijaB over him.
     Object.freeze({ id:"N10", storyboard:"Storyboard_N10_PulledOut.png", when:"s.flags.gazeAt!=null&&r.time-s.flags.gazeAt>=.25",
       judge:{ camera:{ eyeM:[.2,.45] }, actors:{ comrade:{ x:[.08,.45], distM:[1.8,2.9], woundMin:10, faceBloodMin:.9 }, ijaA:{ x:[.12,.7] }, ijaB:{ x:[.3,.9] } } } }),
