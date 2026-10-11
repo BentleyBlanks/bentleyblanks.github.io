@@ -119,6 +119,10 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 }
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
+  Object.freeze({ id: "WardProps", name: "接收院药柜与医疗陈设", pack: "Model_WardProps.glb",
+    sourceTriangles: 44524, actualTriangles: 44524, targetTriangles: 50000,
+    sourceTexture: "项目 VillageTimber PBR / Blender 材质", runtimeTexture: "作者 UV、内嵌旧木 PBR、陶／搪瓷／药瓶独立材质",
+    policy: "source", note: "M15/M16 共 11 件可复用模型；源工程留在 OneDrive Blender/WardPropsM15M16；17 处布设替换 42 块占位（含六块重复旧柜台/药包），原碰撞与通道不变。玻璃为不透明有色瓶体，无运行时透射；纸签留白。" }),
   Object.freeze({ id: "CommandRoom", name: "启动界面指挥室", pack: "Model_CommandRoom.glb",
     sourceTriangles: 360640, actualTriangles: 360639, targetTriangles: 360639,
     sourceTexture: "用户确认地图和电文 / Imagegen 田野远景、风化木、连续白灰土层青砖墙面、细斜纹布、军帽斜纹棉布与瓶签", runtimeTexture: "四套 1K 和一套 2K PBR、田野景片、独立纸图及无损 UV1 辐照度图集",

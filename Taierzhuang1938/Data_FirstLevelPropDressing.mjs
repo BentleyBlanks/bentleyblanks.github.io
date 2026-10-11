@@ -47,6 +47,28 @@ function Stores(id, rows) {
   return out;
 }
 
+// Stocked shelves replace their old solid body, protruding boards and bottle-strip placeholders
+// together. The asset front is -Z; north-wall furniture faces +Z into the ward.
+const WardShelfParts = (id) => [0, 1, 2].flatMap((i) => [`${id}Board${i}`, `${id}Jars${i}`]);
+export const WARD_PROP_DRESSING = Object.freeze([
+  P("ReceptionWardNorthCabinet", "wardMedicineCabinet", { hide: ["ReceptionWardNorthCabinetDoors"],
+    // Legacy north-wall counters were left underneath the later cabinet/crate dressing.
+    // Remove only their duplicate exterior; they must not enlarge the fitted cabinet.
+    hideOverlaps: ["WardShelf-28", "WardMedicalRoll-28", "WardShelf-25", "WardMedicalRoll-25"], flipFacing: true }),
+  P("ReceptionWardShelf", "wardStockedShelf", { hide: WardShelfParts("ReceptionWardShelf"), flipFacing: true }),
+  P("ReceptionWardShelfN", "wardStockedShelf", { hide: WardShelfParts("ReceptionWardShelfN"),
+    hideOverlaps: ["WardShelf-22", "WardMedicalRoll-22"], flipFacing: true }),
+  P("ReceptionWardShelfB", "wardStockedShelf", { hide: WardShelfParts("ReceptionWardShelfB") }),
+  P("ReceptionWardMedicineTable", "wardTreatmentTable", { flipFacing: true }),
+  P("ReceptionWardLanternTable", "wardTreatmentTable"),
+  P("ReceptionWardStool", "wardWoodStool"),
+  P("ReceptionWardBenchW", "wardWoodBench"),
+  P("ReceptionWardBenchE", "wardWoodBench"),
+  P("ReceptionWardBasin", "wardEnamelBasin"),
+  ...["wardAmberBottle", "wardCeramicJar", "wardGreenBottle", "wardCeramicJar"].map((asset, i) => P(`ReceptionWardMedicineJar${i}`, asset, { flipFacing: true })),
+  ...["wardAmberBottle", "wardCeramicJar", "wardGreenBottle"].map((asset, i) => P(`ReceptionWardLanternTableJar${i}`, asset)),
+]);
+
 export const PROP_DRESSING = Object.freeze([
   // —— 05 前沿 / 06 集结处 / 07 交通沟 ——
   P("RightEntryCrate", "marketBox03"),
@@ -146,6 +168,7 @@ export const PROP_DRESSING = Object.freeze([
   ...Stores("TransferStores", 3),
   // —— 15–18 桥南接收 ——
   P("LaneHollowCartWheel", "ryCartWheel", WHEEL),
+  ...WARD_PROP_DRESSING,
   P("ReceptionWardWashTable", "phRoughWoodTable"),
   P("ReceptionWaitingBench", "ryYardBench", { tile: [3, 1, 1] }),
   P("ReceptionReceivingTable", "phRoughWoodTable"),
@@ -332,7 +355,8 @@ export function PlanPropDressing(blocks, groundAt, modelSizes, entries = PROP_DR
   for (const entry of entries) {
     const main = byId.get(entry.block), size = SizeOf(entry.asset);
     const parts = (entry.hide || []).map((id) => byId.get(id));
-    if (!main || !size || parts.some((part) => !part)) { missing.push(entry.block); continue; }
+    const overlaps = (entry.hideOverlaps || []).map((id) => byId.get(id));
+    if (!main || !size || parts.some((part) => !part) || overlaps.some((part) => !part)) { missing.push(entry.block); continue; }
     const union = UnionBox(main, parts);
     // 贴地：盒底就在地面附近的，按并集脚印四角 + 中心取最低地面再压进土里，顶面不动。
     const corners = CornersOf({ x: union.x, z: union.z, w: union.w, d: union.d, ry: union.ry });
@@ -352,12 +376,14 @@ export function PlanPropDressing(blocks, groundAt, modelSizes, entries = PROP_DR
       placements.push({
         id: `${entry.block}#${ix}${iy}${iz}`, block: entry.block, asset: entry.asset,
         x: union.x + lx * c + lz * s, y: bottom + iy * cell.h, z: union.z - lx * s + lz * c,
-        yaw: union.ry + fit.yaw + jitter, rollDeg: entry.rollDeg || 0, scale: fit.scale, visual: fit.visual,
+        // A 180-degree facing flip keeps the measured box/scale and all collision contracts intact.
+        yaw: union.ry + fit.yaw + jitter + (entry.flipFacing ? Math.PI : 0), rollDeg: entry.rollDeg || 0, scale: fit.scale, visual: fit.visual,
         box: { ...cell },
       });
     }
     replaced.add(main.id);
     for (const part of parts) replaced.add(part.id);
+    for (const part of overlaps) replaced.add(part.id);
   }
   return { placements, replaced, missing };
 }

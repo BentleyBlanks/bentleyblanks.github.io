@@ -64,6 +64,7 @@ export const testDefs = {
   AllyGaitBrowserTest: {file:"Script_AllyGaitBrowserTest.mjs",timeoutMs:300000,desc:"Real NRA rigs and weapons: crouched ready/carry, free left hand, threat transition and rendered review"},
   BreakableTreesTest: {file:"Script_BreakableTreesTest.mjs",desc:"Seeded tree clearance, blast falloff and shipped split GLB budget"},
   FirstLevelPropDressingTest: {file:"Script_FirstLevelPropDressingTest.mjs",desc:"第一关平色道具盒换模型：替换表块都在、外观与碰撞盒误差、资产已登记；碎砖瓦撒点禁区与确定性（纯 Node）"},
+  WardPropsTest: {file:"Script_WardPropsTest.mjs",desc:"接收院 M15/M16：正式模型、PBR、开放盆腔与桌腿、药架朝向、占位隐藏及尺寸审计"},
   FirstLevelVegetationTest: {file:"Script_FirstLevelVegetationTest.mjs",desc:"第一关植被撒点：不进路线/锚点/实体/沟底/路面、高卡视线门槛、实例上限、确定性、图集卡片表与烘焙记录一致（纯 Node）"},
   BreakableTreesBrowserTest: {file:"Script_BreakableTreesBrowserTest.mjs",timeoutMs:300000,desc:"Actual first-level trees: explosion, collider removal, falling, grounding and disposal"},
   ParticleModulesTest: {file:"Script_ParticleModulesTest.mjs",desc:"Unity-style particle modules, deterministic timeline and validated agent inputs"},
@@ -569,6 +570,7 @@ export const tier0Fast = [
   "TextureImportTest",
   "BreakableTreesTest",
   "FirstLevelPropDressingTest",
+  "WardPropsTest",
   "FirstLevelVegetationTest",
   "FacialReviewTest",
   "CharacterSpeechTest",
@@ -655,7 +657,7 @@ export const domains = {
   whiteboxQuality: { label: "白盒画质配置与实机", tests: ["WhiteboxQualityTest", "WhiteboxQualityBrowserTest", "WhiteboxShaderWarmTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
-  firstLevelDressing: {label:"第一关道具换模型、碎砖瓦与植被",tests:["FirstLevelPropDressingTest","FirstLevelVegetationTest","FirstLevelWhiteboxBrowserTest","SamplerBudgetTest","MotionVectorContractTest","ModuleGraphTest"]},
+  firstLevelDressing: {label:"第一关道具换模型、碎砖瓦与植被",tests:["FirstLevelPropDressingTest","WardPropsTest","FirstLevelVegetationTest","FirstLevelWhiteboxBrowserTest","SamplerBudgetTest","MotionVectorContractTest","ModuleGraphTest"]},
   particles: {label:"Modular particles and agent API",tests:["TracerLifetimeTest","ParticleModulesTest","ParticleVolumeTest","ParticleVolumeBrowserTest","ParticleBrowserTest","ParticleChannelsTest","ParticleEditorControlsTest","ParticleEditorWhiteboxTest","ParticleEditorTest","FirstLevelSmokeOriginsTest"]},
   distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest","FirstLevelSmokeOriginsTest","FirstLevelDistantSmokeBrowserTest"]},
   skyGrade: {label:"第一关天空 / 调色 / 室内天光遮蔽 / 曝光锚点",tests:["FirstLevelSkyGradeTest","FirstLevelSkyGradeBrowserTest","ModuleGraphTest"]},
@@ -799,7 +801,7 @@ const changedDomainRules = [
   {domain:"firstLevel",pattern:/CollectionCare/},
   {domain:"breakableTrees",pattern:/BreakableTree|Script_Combat|Script_FirstLevelWhiteboxField/},
   // 第一关道具换模型 / 碎砖瓦 / 植被（docs/Data_FirstLevelVegetationProps.md）：图集烘焙脚本与白盒场地接线点也算。
-  {domain:"firstLevelDressing",pattern:/FirstLevel(PropDressing|Vegetation)|BakeVegetationAtlas|Script_FirstLevelWhiteboxField/},
+  {domain:"firstLevelDressing",pattern:/WardProps|FirstLevel(PropDressing|Vegetation)|BakeVegetationAtlas|Script_FirstLevelWhiteboxField/},
   {domain:"distantSmoke",pattern:/FirstLevelDistantSmoke|FirstLevelSmokeOrigins|BattleSmoke|Script_Vfx/},
   // 烟柱下的焦木堆几何（Blender 导出的内联网格，只有 Script_FirstLevelSmokeOrigins 在用；三角预算在 SmokeOriginsTest）。
   {domain:"distantSmoke",pattern:/BurntTimberPile/},

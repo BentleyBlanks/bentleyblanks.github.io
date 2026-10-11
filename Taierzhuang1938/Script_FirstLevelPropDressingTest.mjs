@@ -29,7 +29,7 @@ function Check(ok, message) {
 const seen = new Set();
 const dupes = [], missing = [], interactive = [];
 for (const entry of PROP_DRESSING) {
-  for (const id of [entry.block, ...(entry.hide || [])]) {
+  for (const id of [entry.block, ...(entry.hide || []), ...(entry.hideOverlaps || [])]) {
     if (seen.has(id)) dupes.push(id);
     seen.add(id);
     const block = byId.get(id);

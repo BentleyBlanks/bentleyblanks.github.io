@@ -14,7 +14,7 @@ export const ASSET_PUBLISH = Object.freeze({
     'Model/BaconHandoff/Model_CuredPork.glb',
     ...['Ija01','Ija02','Ija03','Ija06','Nra02','Nra05','Nra06'].map(id => `Model/Character/Model_Tengxian${id}.glb`),
     ...['AsianHousePair','AsianHouseRow','BreakableDeadTree','ChineseRuralHouse','Cigarette',
-      'FirstPersonBody','FpsArmsNraSkeletal01','FpsHanYangHands','MitsubishiKi21Ia','MitsubishiKi30','Type24Grenade']
+      'FirstPersonBody','FpsArmsNraSkeletal01','FpsHanYangHands','MitsubishiKi21Ia','MitsubishiKi30','Type24Grenade','WardProps']
       .map(id => `Model/Model_${id}.glb`),
     ...['WoodenEvacCart','WorkingHorse','WorkingOx'].map(id => `Model/OxCart/Model_${id}.glb`),
   ]),

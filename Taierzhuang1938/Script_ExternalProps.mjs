@@ -58,6 +58,7 @@ import { PACK as HW_PACK, ASSETS as HW_ASSETS } from "./Data_ExternalAssets_Hous
 import { PACK as RY_PACK, ASSETS as RY_ASSETS } from "./Data_ExternalAssets_RuralYard.mjs";
 import { PACK as CL_PACK, ASSETS as CL_ASSETS } from "./Data_ExternalAssets_ChineseLife.mjs";
 import { PACK as TK_PACK, ASSETS as TK_ASSETS } from "./Data_ExternalAssets_TengxianConstruction.mjs";
+import { PACK as WARD_PACK, ASSETS as WARD_ASSETS } from "./Data_ExternalAssets_WardProps.mjs";
 
 const LOADER = new GLTFLoader();
 
@@ -297,6 +298,7 @@ const ASSETS = Object.freeze({
   ...PackAssets(RY_PACK, RY_ASSETS),
   ...PackAssets(CL_PACK, CL_ASSETS),
   ...PackAssets(TK_PACK, TK_ASSETS),
+  ...PackAssets(WARD_PACK, WARD_ASSETS),
 });
 
 // Exact sites are a compact, intentional dressing pass rather than random
