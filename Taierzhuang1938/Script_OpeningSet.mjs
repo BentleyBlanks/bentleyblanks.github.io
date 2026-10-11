@@ -24,6 +24,15 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 //                                           player：玩家位置，飞机按它触发；breakables：战车运行时的可破坏墙，
 //                                           阵位砖壳跟着它的当前级）
 //   Exit()                                  整关拆除
+//
+// 2026-10-11 开场重构（契约 docs/Data_OpeningRedraft20261011Contract.md §5，Set 包）加了一份只活在 01–02 的「redraft」：
+// 前沟静态尸体（sweep / finish）、机枪垫尸（PlaceCorpse 可搬）、§5.2 的道具（props：按名取用、握在谁手里 / 在哪），
+// 折角手榴弹的闪光与烟（FoldBlast）。进 03（Support）或离开 01–03 整份收走（ExitRedraft）。导演接口：
+//   r.openingSet.props                      OpeningWorldProps（Script_OpeningProps）：Get / Place / Hold / Release / Toss / AttachTo / Where
+//   r.openingSet.PlaceCorpse(id, spec)      id "mg.corpseLower" / "mg.corpseUpper"；spec { pose: "start"|"floor"|"onLip"|"stacked",
+//                                           x, z, headYawDeg, liftM, settle }（不给坐标就用该 pose 的标记）
+//   r.openingSet.CorpseInfo(id) / JoltCorpse(id) / MgGunRest() / FoldBlast()
+// 尸体几何借战场尸体层（宿主传 aftermath 取值器）；道具里的武器要工厂（宿主传 actorFactory）。
 // ===========================================================================
 import * as THREE from "three";
 import { PROPS, SET_STAGES, FLOOR, BLAST, SMOKE, SmokeOptions, SmokeShare, FLYOVER, FLYOVER_TRIGGER, FlyoverPose, sky as SKY,
@@ -37,6 +46,10 @@ import { SandbagRunPlacements } from "./Data_SandbagStandard.mjs";
 import { OpeningBlastFx } from "./Script_OpeningBlastFx.mjs";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
 import { TERRAIN_MUD_ZONE } from "./Data_Tuning_Terrain.mjs";
+import { REDRAFT_STAGES, SET_MARKS, CORPSES, BODY_POSES, REDRAFT_PROPS, FOLD_BLAST, MG_AUTO_PLACE_FROM, CORPSE_JOLT } from "./Data_OpeningSet0103.mjs";
+import { OpeningWorldProps } from "./Script_OpeningProps.mjs";
+import { CreateBodyContactShape, MissionBodySupport } from "./Script_FirstLevelMissionBodySupport.mjs";
+import { CloneShadedMaterial } from "./Script_Materials.mjs";
 
 const DEG = Math.PI / 180;
 const Clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -153,8 +166,14 @@ export class OpeningSet {
    *   makeCanvas(w,h)→canvas（旗面贴图；没有就用纯色）。
    */
   constructor({ scene, library, groundAt, loadTexture = null, loadExternal = null, makeCanvas = null,
-    vfx = null, aircraft = null, applySky = null, restoreSky = null, overcast = null }) {
+    vfx = null, aircraft = null, applySky = null, restoreSky = null, overcast = null,
+    actorFactory = null, aftermath = null, corpseSource = null }) {
     this.scene = scene; this.library = library; this.groundAt = groundAt;
+    // 2026-10-11 重构：工厂（道具里的汉阳造 / 歪把子）、战场尸体层取值器（借它的趴姿原型），测试可直接给 corpseSource(poseKey)。
+    this.actorFactory = actorFactory;
+    this.aftermath = typeof aftermath === "function" ? aftermath : () => aftermath;
+    this.corpseSource = corpseSource;
+    this.redraft = null;
     this.loadTexture = loadTexture ?? (typeof document !== "undefined" ? (url) => new ManagedTextureLoader().loadAsync(url) : null);
     this.loadExternal = loadExternal ?? (typeof document !== "undefined"
       ? async (id) => (await import("./Script_ExternalProps.mjs")).InstantiateExternalProp(id, library) : null);
@@ -194,6 +213,8 @@ export class OpeningSet {
     } else this.ExitFront();
     if (!SET_STAGES.includes(stageId)) { this.ExitOpening(); return false; }
     if (!this.root && !this.suspended) this.Build();
+    if (REDRAFT_STAGES.includes(stageId) && this.root) this.EnterRedraft();
+    else this.ExitRedraft();
     this.SyncSky();
     return true;
   }
@@ -203,6 +224,7 @@ export class OpeningSet {
     this.blastFx?.Update(dt);
     if (!this.root) { this.SyncBreakables(flags.breakables); return; }
     this.time = (this.time || 0) + dt;
+    this.UpdateRedraft(dt, stageId, phase, flags);
     const collapsed = !!flags.collapsed;
     this.collapsedRoot.visible = collapsed;
     this.rescueRoot.visible = collapsed && RescueShown(stageId, phase);
@@ -231,6 +253,7 @@ export class OpeningSet {
 
   /** 收走 01–03 那一份（布景、烟、飞机、阴天）。前沿布景另算（ExitFront）。 */
   ExitOpening() {
+    this.ExitRedraft();
     this.generation += 1;
     this.ClearSmoke();
     this.EndFlyover();
@@ -290,7 +313,127 @@ export class OpeningSet {
       flyover: this.flyover ? { t: +this.flyover.t.toFixed(2), triggered: this.flyover.triggered, flying: [...this.flyover.poses] } : null,
       overcast: this.overcast, skyApplied: this.skyApplied, suspended: this.suspended,
       interior: { weight: +(this.interiorWeight || 0).toFixed(3), ambientScale: +(this.ambientScale ?? 1).toFixed(3) },
-      setMaterials: { ...(this.setMaterialSource || {}) } };
+      setMaterials: { ...(this.setMaterialSource || {}) }, redraft: this.RedraftStats() };
+  }
+
+  // ---------------------------------------------------------------- 2026-10-11 重构：尸体、道具、折角爆点（只活在 01–02）
+  /** 导演按名取用的道具（OpeningWorldProps）；01–02 以外是 null。 */
+  get props() { return this.redraft?.props ?? null; }
+
+  EnterRedraft() {
+    if (this.redraft || this.suspended) return;
+    const root = new THREE.Group(); root.name = "OpeningRedraft";
+    root.userData.warmDraw = true;                       // 关卡预热照样画一帧（道具的顶点色材质不在第一次露面时现编）
+    this.scene.add(root);
+    const props = new OpeningWorldProps({ root, groundAt: this.groundAt, factory: this.actorFactory, loadExternal: this.loadExternal });
+    // 有数据摆位的、小件程序化的先建好（藏着）；歪把子要等导演 Get / Hold 才建（8k 三角，机枪手可能直接拿自己的枪）。
+    for (const name of Object.keys(REDRAFT_PROPS)) if (name !== "type11") props.Get(name);
+    this.redraft = { root, props, corpses: null, phase: null, stage: null };
+    this.TryBuildCorpses();
+  }
+
+  ExitRedraft() {
+    const r = this.redraft;
+    if (!r) return;
+    r.props.Dispose();
+    r.corpses?.Dispose();
+    r.root.removeFromParent();
+    this.redraft = null;
+  }
+
+  /** 尸体原型：测试注入的 corpseSource，或宿主战场尸体层已经烘好的 `nra<pose>` 原型。 */
+  CorpseSource(poseKey) {
+    if (this.corpseSource) return this.corpseSource(poseKey);
+    const pose = BODY_POSES[poseKey];
+    return pose ? this.aftermath()?.prototypes?.get?.(`${pose.side}${pose.pose}`) ?? null : null;
+  }
+
+  TryBuildCorpses() {
+    const r = this.redraft;
+    if (!r || r.corpses) return !!r?.corpses;
+    const corpses = new OpeningCorpses({ parent: r.root, groundAt: this.groundAt, source: (key) => this.CorpseSource(key) });
+    if (!corpses.Build(CORPSES)) { corpses.Dispose(); return false; }
+    r.corpses = corpses;
+    return true;
+  }
+
+  /** 01 的导演拍到没到 `name`（按 phase 表的先后；02 / 撤离一律算到了；01 没有 phase 时看 fallback）。 */
+  PhaseReached(stageId, phase, name, fallback = false) {
+    if (stageId !== "Trapped") return true;
+    const order = OPENING_STORYBOARDS.phases.Trapped, at = order.indexOf(name), k = order.indexOf(phase);
+    if (at < 0 || k < 0) return fallback;
+    return k >= at;
+  }
+
+  UpdateRedraft(dt, stageId, phase, flags = {}) {
+    const r = this.redraft;
+    if (!r) return;
+    r.stage = stageId; r.phase = phase;
+    if (!r.corpses) this.TryBuildCorpses();
+    const black = this.PhaseReached(stageId, phase, "Black", !!flags.collapsed);
+    if (r.corpses) {
+      for (const row of CORPSES) r.corpses.Show(row.id, row.show === "black" ? black : true);
+      // 垫尸：导演这次装载里没搬过，而且已经过了 CaptiveWall（或直接进 02 / 撤离）——按沟沿叠好的样子摆上去。
+      if (this.PhaseReached(stageId, phase, MG_AUTO_PLACE_FROM, false)) {
+        const lower = r.corpses.Get("mg.corpseLower"), upper = r.corpses.Get("mg.corpseUpper");
+        if (!lower.directed && lower.pose !== "onLip") { r.corpses.Place(lower.id, { ...SET_MARKS.mg.corpseLower, pose: "onLip" }, false); }
+        if (!upper.directed && upper.pose !== "stacked") { r.corpses.Place(upper.id, { ...SET_MARKS.mg.corpseUpper, liftM: 0, on: lower.id, pose: "stacked" }, false); }
+      }
+      r.corpses.Update(dt);
+    }
+    // 道具的数据摆位（导演碰过就不再管）。
+    for (const [name, spec] of Object.entries(REDRAFT_PROPS)) {
+      if (!spec.rest) continue;
+      const shown = (spec.from === "black" ? black : true) && !(spec.until && this.PhaseReached(stageId, phase, spec.until, !!flags.collapsed));
+      if (shown) r.props.RestAt(name, spec.rest); else r.props.RestOff(name);
+    }
+    r.props.Update(dt);
+  }
+
+  /**
+   * 机枪垫尸（Dir01 拖尸、推上沟沿叠起时调）。id："mg.corpseLower" / "mg.corpseUpper"（也认 "corpseLower" / "corpseUpper"）。
+   * spec.pose："start"（纵深支沟沟底的起点）/ "floor"（沟底任意处，给 x,z）/ "onLip"（南沟沿上，SET_MARKS.mg.corpseLower）/
+   * "stacked"（叠在下面那具背上，SET_MARKS.mg.corpseUpper）。x / z / headYawDeg / liftM 覆盖标记；settle:false 只平移（每帧拖动用）。
+   * 返回 CorpseInfo；尸体层还没建好时返回 null（下一帧再调）。
+   */
+  PlaceCorpse(id, spec = {}) {
+    const corpses = this.redraft?.corpses;
+    if (!corpses) return null;
+    const key = id.startsWith("mg.") ? id : `mg.${id}`, row = CORPSES.find((c) => c.id === key);
+    if (!row?.movable) throw new Error(`OpeningSet.PlaceCorpse: ${id} is not a movable corpse`);
+    const pose = spec.pose || "floor", lowerId = "mg.corpseLower";
+    const base = pose === "start" ? row.mark.start : pose === "onLip" ? SET_MARKS.mg.corpseLower : pose === "stacked" ? SET_MARKS.mg.corpseUpper : row.mark;
+    const on = spec.on !== undefined ? spec.on : pose === "stacked" && key !== lowerId ? lowerId : null;
+    return corpses.Place(key, { x: spec.x ?? base.x, z: spec.z ?? base.z, headYawDeg: spec.headYawDeg ?? spec.yawDeg ?? base.headYawDeg,
+      liftM: spec.liftM ?? 0, settle: spec.settle ?? true, on, pose });
+  }
+
+  CorpseInfo(id) { return this.redraft?.corpses ? this.redraft.corpses.Body(id) : null; }
+  /** 点射时垫尸一颤（CORPSE_JOLT：2 cm、0.18 s）。 */
+  JoltCorpse(id = "mg.corpseUpper") { this.redraft?.corpses?.Jolt(id); }
+  /** 歪把子两脚架的落点：上面那具垫尸背中段的最高点（世界坐标）。 */
+  MgGunRest() { return this.CorpseInfo("mg.corpseUpper")?.top ?? null; }
+
+  /**
+   * 折角以东的手榴弹爆点（SET_MARKS.dropIn.foldBlast，拐过连接支沟、眼位看不见爆点本身）：只给闪光、火团、烟与落土
+   * （vfx.Explosion + 一小撮定向喷土），不伤人、不出声（声音归 Dir / Sfx 的 cue）。返回爆点世界坐标。
+   */
+  FoldBlast(at = SET_MARKS.dropIn.foldBlast) {
+    const ground = this.groundAt(at.x, at.z), p = { x: at.x, y: ground + 0.3, z: at.z };
+    this.vfx?.Explosion?.(new THREE.Vector3(p.x, p.y, p.z), { radius: FOLD_BLAST.explosion.radius, kind: FOLD_BLAST.explosion.kind, groundY: ground });
+    const d = FOLD_BLAST.dirt, [lo, hi] = d.liftM;
+    this.blastFx?.DirectionalBlast({ x: at.x, y: ground + (lo + hi) / 2, z: at.z }, d.dir,
+      { heightM: (hi - lo) / 2, groundY: ground, clods: d.clods, splinters: d.splinters, grit: d.grit, spray: d.spray, mist: d.mist, dust: d.dust,
+        seconds: d.seconds, spreadRad: d.spreadRad, speed: d.speed });
+    if (this.redraft) this.redraft.foldBlasts = (this.redraft.foldBlasts || 0) + 1;
+    return p;
+  }
+
+  RedraftStats() {
+    const r = this.redraft;
+    if (!r) return null;
+    const corpses = r.corpses?.Stats() ?? null, props = r.props.Stats();
+    return { corpses, props, triangles: (corpses?.triangles || 0) + props.triangles, foldBlasts: r.foldBlasts || 0 };
   }
 
   // ---------------------------------------------------------------- 近爆的定向喷土
@@ -1356,3 +1499,211 @@ export class OpeningSet {
     }
   }
 }
+
+// ===========================================================================
+// 2026-10-11 开场重构：静态尸体层（契约 docs/Data_OpeningRedraft20261011Contract.md §5，数据 Data_OpeningSet0103.CORPSES）
+// ===========================================================================
+// 尸体几何不再烘：直接借战场尸体层（MissionAftermath）开机烘好的趴姿原型（`nra0` / `nra1`，同一份几何、同一份合并材质），
+// 所以零烘焙时间、零新贴图、零新 program。
+//  · 不会动的四具（sweep / finish）进 BatchedMesh（每种材质一只，与尸体层同一套 program），显隐按实例开关；
+//  · 机枪垫尸两具要被拖、被推上沟沿、被点射震：**会动的实例不进 BatchedMesh**（MotionVector 接入规范：移动实例没有历史，
+//    运动矢量是错的），各自一组普通 Mesh（材质按 CloneShadedMaterial 克隆一份：同一材质挂批次和普通网格会来回重算 program 参数）。
+// 摆放与贴地走战场尸体层同一个解算器（MissionBodySupport.Settle：整具网格最低包络贴地、不穿地、不悬空，必要时侧倾）；
+// 叠放：把下面那具的上包络加进支撑面再 Settle（pile），上面那具落在它背上。
+//
+//   const corpses = new OpeningCorpses({ parent, groundAt, source });   // source(poseKey) → { parts:[{ tiers, triangles, material }] } | null
+//   corpses.Build(CORPSES)  →  Place(id, spec) / Show(id, on) / Jolt(id) / Body(id) / Contact(id) / Stats() / Dispose()
+export class OpeningCorpses {
+  constructor({ parent, groundAt, source }) {
+    this.parent = parent; this.groundAt = groundAt; this.source = source;
+    this.group = new THREE.Group(); this.group.name = "OpeningRedraft_Corpses";
+    parent.add(this.group);
+    this.bodies = new Map();
+    this.batches = [];
+    this.clones = new Map();          // 源材质 uuid → 克隆（会动的那两具用）
+  }
+
+  /** 原型齐了就建（尸体层还没建好时返回 false，下一帧再试）。 */
+  Build(list) {
+    const protos = new Map();
+    for (const row of list) {
+      const key = row.mark.pose;
+      if (!protos.has(key)) { const p = this.source(key); if (!p?.parts?.length) return false; protos.set(key, p); }
+    }
+    const Signature = (g) => Object.keys(g.attributes).sort().map((n) => `${n}:${g.attributes[n].itemSize}${g.attributes[n].normalized ? "n" : ""}`).join(",") + (g.index ? "|i" : "");
+    const byKey = new Map();
+    for (const row of list) {
+      const proto = protos.get(row.mark.pose), tier = Math.min(row.mark.tier ?? 0, proto.parts[0].tiers.length - 1);
+      const body = { id: row.id, row, mark: row.mark, proto, tier, shape: CreateBodyContactShape(proto.parts), matrix: new THREE.Matrix4(),
+        visible: false, slots: [], group: null, jolt: null, directed: false, pose: "start", triangles: 0 };
+      for (const part of proto.parts) body.triangles += part.triangles?.[tier] ?? TriangleCount(part.tiers[tier]);
+      if (row.movable) {
+        body.group = new THREE.Group(); body.group.name = `OpeningRedraft_Corpse_${row.id}`; body.group.matrixAutoUpdate = false;
+        for (const part of proto.parts) {
+          const geometry = part.tiers[tier];
+          if (!geometry || !(part.triangles?.[tier] ?? 1)) continue;
+          let material = this.clones.get(part.material.uuid);
+          if (!material) { material = CloneShadedMaterial(part.material); this.clones.set(part.material.uuid, material); }
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.name = `${body.group.name}_${part.material.name || "part"}`; mesh.castShadow = true; mesh.receiveShadow = true;
+          mesh.userData.sharedGeometry = true;        // 几何是尸体层的，DisposeRoot 不许收
+          body.group.add(mesh);
+        }
+        body.group.visible = false;
+        this.group.add(body.group);
+      } else {
+        for (const part of proto.parts) {
+          const geometry = part.tiers[tier];
+          if (!geometry || !(part.triangles?.[tier] ?? 1)) continue;
+          const key = `${part.material.uuid}|${Signature(geometry)}`;
+          let batch = byKey.get(key);
+          if (!batch) { batch = { key, material: part.material, geometries: [], instances: 0, ids: new Map(), mesh: null }; byKey.set(key, batch); this.batches.push(batch); }
+          if (!batch.ids.has(geometry)) { batch.ids.set(geometry, -1); batch.geometries.push(geometry); }
+          batch.instances += 1;
+          body.slots.push({ batch, geometry, id: -1 });
+        }
+      }
+      this.bodies.set(row.id, body);
+    }
+    for (const batch of this.batches) {
+      let vertices = 0, indices = 0;
+      for (const g of batch.geometries) { vertices += g.attributes.position.count; indices += g.index ? g.index.count : g.attributes.position.count; }
+      const mesh = new THREE.BatchedMesh(Math.max(1, batch.instances), Math.max(1, vertices), Math.max(1, indices), batch.material);
+      mesh.name = `OpeningRedraft_Corpses_${this.batches.indexOf(batch)}`; mesh.castShadow = true; mesh.receiveShadow = true; mesh.sortObjects = false;
+      for (const g of batch.geometries) batch.ids.set(g, mesh.addGeometry(g));
+      batch.mesh = mesh; this.group.add(mesh);
+    }
+    for (const body of this.bodies.values()) for (const slot of body.slots) {
+      slot.id = slot.batch.mesh.addInstance(slot.batch.ids.get(slot.geometry));
+      slot.batch.mesh.setVisibleAt(slot.id, false);
+    }
+    for (const body of this.bodies.values()) this.Place(body.id, { ...(body.mark.start || body.mark), pose: body.mark.start ? "start" : "floor" }, false);
+    this.built = true;
+    return true;
+  }
+
+  Get(id) {
+    const body = this.bodies.get(id);
+    if (!body) throw new Error(`OpeningCorpses: unknown corpse ${id}`);
+    return body;
+  }
+
+  /**
+   * 摆一具：{ x, z, headYawDeg, liftM, settle = true, on }。settle false = 只贴着中心点的地面平移旋转（每帧拖动用，便宜）；
+   * on = 另一具的 id：叠在它背上（Settle 的 pile）。返回 Body(id)。
+   */
+  Place(id, { x, z, headYawDeg = 0, liftM = 0, settle = true, on = null, pose = null } = {}, directed = true) {
+    const body = this.Get(id), yaw = headYawDeg * DEG;
+    if (settle) {
+      const support = new MissionBodySupport(this.groundAt);
+      const under = on ? this.Get(on) : null;
+      if (under) support.Add(under.shape, under.matrix);
+      const settled = support.Settle(body.shape, { x, z, yaw, scale: 1, pile: under ? 1 : 0 });
+      body.matrix.copy(settled.matrix);
+      body.matrix.elements[13] += liftM;
+    } else {
+      body.matrix.compose(new THREE.Vector3(x, this.groundAt(x, z) + liftM, z), new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(1, 1, 1));
+    }
+    body.at = { x, z, headYawDeg, liftM, settle, on };
+    if (pose) body.pose = pose;
+    if (directed) body.directed = true;
+    this.Apply(body);
+    return this.Body(id);
+  }
+
+  Apply(body, offsetY = 0) {
+    const m = offsetY ? new THREE.Matrix4().copy(body.matrix).premultiply(new THREE.Matrix4().makeTranslation(0, offsetY, 0)) : body.matrix;
+    if (body.group) { body.group.matrix.copy(m); body.group.matrixWorldNeedsUpdate = true; body.group.updateMatrixWorld(true); }
+    for (const slot of body.slots) slot.batch.mesh.setMatrixAt(slot.id, m);
+  }
+
+  Show(id, on) {
+    const body = this.Get(id);
+    if (body.visible === !!on) return;
+    body.visible = !!on;
+    if (body.group) body.group.visible = body.visible;
+    for (const slot of body.slots) slot.batch.mesh.setVisibleAt(slot.id, body.visible);
+  }
+
+  /** 被点射震一下（只给会动的两具：批次里的实例没有运动历史）。 */
+  Jolt(id, amplitudeM = CORPSE_JOLT.amplitudeM, seconds = CORPSE_JOLT.seconds) {
+    const body = this.Get(id);
+    if (body.group) body.jolt = { t: 0, amplitudeM, seconds };
+  }
+
+  Update(dt) {
+    for (const body of this.bodies.values()) {
+      if (!body.jolt) continue;
+      body.jolt.t += dt;
+      const u = body.jolt.t / body.jolt.seconds;
+      if (u >= 1) { body.jolt = null; this.Apply(body); continue; }
+      this.Apply(body, body.jolt.amplitudeM * Math.sin(u * Math.PI * 3) * (1 - u));
+    }
+  }
+
+  /** 世界里的样子：中心、最低点、背上最高点（背中段 0.35 m 以内：歪把子两脚架落点）、三角形数。 */
+  Body(id) {
+    const body = this.Get(id), p = new THREE.Vector3(), centre = new THREE.Vector3().setFromMatrixPosition(body.matrix);
+    let minY = Infinity, top = null;
+    for (const pos of body.shape.vertices) for (let i = 0; i < pos.count; i += 3) {
+      p.fromBufferAttribute(pos, i).applyMatrix4(body.matrix);
+      minY = Math.min(minY, p.y);
+      if (Math.hypot(p.x - centre.x, p.z - centre.z) < 0.35 && (!top || p.y > top.y)) top = p.clone();
+    }
+    return { id, x: +centre.x.toFixed(3), z: +centre.z.toFixed(3), y: +centre.y.toFixed(3), minY: +minY.toFixed(3), top: top && { x: +top.x.toFixed(3), y: +top.y.toFixed(3), z: +top.z.toFixed(3) },
+      visible: body.visible, pose: body.pose, directed: body.directed, tier: body.tier, triangles: body.triangles };
+  }
+
+  /**
+   * 贴地检查（测试用，全部真顶点）：penetrationM = 最深穿进地面多少（不嵌沟壁）；supportShare = 下包络采样点里离地 4 cm 以内的比例、
+   * centreGapM = 身体中心正下方那一格下包络离地多高（不悬空）；onTop：叠在 under 上时，上面那具最低顶点穿进下面那具上包络多深。
+   */
+  Contact(id, under = null) {
+    const body = this.Get(id), p = new THREE.Vector3();
+    let penetration = -Infinity, touching = 0, n = 0;
+    for (const pos of body.shape.vertices) for (let i = 0; i < pos.count; i++) {
+      p.fromBufferAttribute(pos, i).applyMatrix4(body.matrix);
+      penetration = Math.max(penetration, this.groundAt(p.x, p.z) - p.y);
+    }
+    const centre = new THREE.Vector3().setFromMatrixPosition(body.matrix);
+    let centreGap = Infinity;
+    for (const s of body.shape.samples) {
+      p.copy(s).applyMatrix4(body.matrix); n += 1;
+      const gap = p.y - this.groundAt(p.x, p.z);
+      if (gap < 0.04) touching += 1;
+      if (Math.hypot(p.x - centre.x, p.z - centre.z) < 0.2) centreGap = Math.min(centreGap, gap);
+    }
+    const out = { penetrationM: +penetration.toFixed(3), supportShare: +(touching / Math.max(1, n)).toFixed(2), centreGapM: +centreGap.toFixed(3) };
+    if (under) {
+      const below = this.Get(under), cells = new Map(), key = (x, z) => `${Math.floor(x / 0.06)},${Math.floor(z / 0.06)}`;
+      for (const pos of below.shape.vertices) for (let i = 0; i < pos.count; i++) {
+        p.fromBufferAttribute(pos, i).applyMatrix4(below.matrix);
+        const k = key(p.x, p.z); if (p.y > (cells.get(k) ?? -Infinity)) cells.set(k, p.y);
+      }
+      let deepest = -Infinity, resting = 0;
+      for (const pos of body.shape.vertices) for (let i = 0; i < pos.count; i++) {
+        p.fromBufferAttribute(pos, i).applyMatrix4(body.matrix);
+        const topBelow = cells.get(key(p.x, p.z));
+        if (topBelow == null) continue;
+        deepest = Math.max(deepest, topBelow - p.y);
+        if (topBelow - p.y > -0.04) resting += 1;
+      }
+      out.intoUnderM = +deepest.toFixed(3); out.restingVertices = resting;
+    }
+    return out;
+  }
+
+  Stats() {
+    let triangles = 0, meshes = this.batches.length;
+    for (const body of this.bodies.values()) { triangles += body.triangles; if (body.group) meshes += body.group.children.length; }
+    return { bodies: this.bodies.size, triangles, meshes, batches: this.batches.length, shown: [...this.bodies.values()].filter((b) => b.visible).map((b) => b.id) };
+  }
+
+  Dispose() {
+    this.group.removeFromParent();
+    for (const batch of this.batches) batch.mesh.dispose();       // 批次自己的缓冲；源几何是尸体层的
+    for (const material of this.clones.values()) material.dispose();
+    this.batches.length = 0; this.bodies.clear(); this.clones.clear();
+  }
+}
+function TriangleCount(g) { return g ? (g.index ? g.index.count : g.attributes.position.count) / 3 : 0; }

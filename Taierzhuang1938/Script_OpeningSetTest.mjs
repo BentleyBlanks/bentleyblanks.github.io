@@ -489,7 +489,9 @@ const Samples = (route) => {
   assert.equal(set.Active, false);
   // 回跳到 02：重新装载；整关拆除 Exit() 也拆干净。
   set.Enter("BunkerRescue");
-  assert.ok(set.Active && scene.children.length === 3 && set.front && !set.front.root.visible, "jumping back to 02 rebuilds the set (the front dressing is built but hidden until 03)");
+  // 2026-10-11：01–02 另有一份 redraft 根（尸体、道具；第 6 节），回跳到 02 也一起重建。
+  assert.ok(set.Active && scene.children.length === 4 && set.front && !set.front.root.visible && set.redraft?.root.parent === scene,
+    "jumping back to 02 rebuilds the set and the 01–02 redraft (the front dressing is built but hidden until 03)");
   set.Exit();
   assert.equal(scene.children.length, 1, "Exit() removes it again");
   console.log(`ok lifecycle: ${report.stats.meshes} meshes / 1 light in 01–03, lintel falls 0.25–0.6 s, lantern only in 01, zero residue after 03`);

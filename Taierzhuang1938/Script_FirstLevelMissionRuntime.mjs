@@ -256,7 +256,9 @@ export class FirstLevelMissionRuntime {
     // 01–03 过场分镜布景（Set 包，Data_OpeningSet0103）：进 01–03 装载，离开收走；近爆喷土、远处烟火、
     // 03 开头的飞机、阴天开关也在里面。03 阵位的破砖墙外观装到 06 才收（它是 04–06 的战场）。
     this.openingSet = new OpeningSet({ scene: this.scene, library: this.library, groundAt: (x, z) => this.battlefield.GroundHeight(x, z),
-      vfx: this.vfx, aircraft: this.aircraft, applySky: (name) => this.ApplySky?.(name), restoreSky: () => this.RestoreSky?.() });
+      vfx: this.vfx, aircraft: this.aircraft, applySky: (name) => this.ApplySky?.(name), restoreSky: () => this.RestoreSky?.(),
+      // 2026-10-11 开场重构（Set 包薄钩子）：前沟尸体借战场尸体层的原型、道具里的汉阳造 / 歪把子要工厂。
+      actorFactory: this.actorFactory, aftermath: () => this.view?.aftermath });
     // 北沙河浮桥的模型与 18 毁桥的坍塌演出（docs/Data_PontoonBridge.md）。后台加载，
     // 装好之前（或加载失败）白盒桥照旧；FirstLevelBridge.Fire 通过 pontoonBridgeSet.Detonate 起爆。
     this.pontoonBridgeSet = new PontoonBridgeSet({ scene: this.scene, library: this.library, battlefield: this.battlefield,
