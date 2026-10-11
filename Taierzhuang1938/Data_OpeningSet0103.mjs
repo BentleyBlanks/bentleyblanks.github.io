@@ -482,6 +482,9 @@ export const FRONT_PROPS = Object.freeze([
  * Data_OpeningStoryboards 里被豁免的标记路径（`shunzi.trap` 这种写法）及原因。
  */
 export const DESIGNED_CONTACTS = Object.freeze({
+  // 2026-10-11 集成：rescue.fallenComrade 改成实测落点（ChargeB 中弹后受击方向死亡倒在洞口南侧的弃土坡上），是尸体落点不是站位。
+  spoilEarthSkin: Object.freeze({ marks: Object.freeze(["rescue.fallenComrade"]),
+    why: "ChargeB 中弹滚下台阶，实测倒在洞口外弃土上（02 集成实跑 fall:ChargeB (1.28,-123.62)）：人本来就躺在土堆上" }),
   fallenLintel: Object.freeze({ marks: Object.freeze(["shunzi.trap", "shunzi.pinnedHips", "SB02.trap", "SB03.eye", "SB03A.eye"]),
     why: "塌下的门楣就落在压着顺子的塌顶木北头上（2026-09-27：他趴在洞口正中，门楣斜在他腰胯上方 1 m 以上）" }),
   roofTimberDown: Object.freeze({ marks: Object.freeze(["shunzi.trap", "shunzi.pinnedHips", "SB02.trap", "SB03.eye", "SB03A.eye"]),
