@@ -219,9 +219,12 @@ export function MasterLine(raw, output, { targetDb, padS = 0.06, ceilingDb = -1,
   const wav = output + ".tmp.wav", temp = output + ".tmp.mp3";
   // 先滤到 wav 再编 mp3：一步直出 mp3 时实测真峰值会冒到 0 dBTP 以上（同一条链先出 wav 是 −2.5）。
   // alimiter 的 limit 是线性幅度、level=false 关掉自动电平；真峰值再留 0.5 dB 余量。
-  // 编码后仍超 ceilingDb（很少见）就按超出量整体再降一次，最多三轮。
-  let trim = 0, measure = null;
-  for (let round = 0; round < 3; round++) {
+  // 编码后仍超 ceilingDb（很少见）就按超出量整体再降一次。
+  // 2026-10-12：libmp3lame 96k CBR 编一遍有声段掉约 0.45 dB（同 MuteRanges 的实测），补录片总比清单目标低 0.4–0.5 dB；
+  // 所以编完拿 mp3 与滤好的 wav 比能量，差超 0.05 dB 就按差值补增益重编（真峰值超了优先往下降），最多五轮。
+  let trim = 0, codecTrim = 0, measure = null, codecDb = 0;
+  const Energy = (file) => { const pcm = DecodePcm(file); let e = 0; for (let i = 0; i < pcm.length; i++) e += pcm[i] * pcm[i]; return e; };
+  for (let round = 0; round < 5; round++) {
     const limit = 10 ** ((ceilingDb - 0.5) / 20);
     // alimiter 在流尾会把前瞻缓冲里没处理的几毫秒原样吐出来（实测峰值就落在最后 50 ms），
     // 所以先补 0.1 s 静音、开延迟补偿，限完再按原长剪回，淡入淡出放在最后。
@@ -229,7 +232,7 @@ export function MasterLine(raw, output, { targetDb, padS = 0.06, ceilingDb = -1,
     const filter = [
       `atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)}`, "asetpts=PTS-STARTPTS",
       ...(tempo !== 1 ? [`atempo=${tempo.toFixed(4)}`] : []),
-      `volume=${(gainDb + trim).toFixed(2)}dB`, "apad=pad_dur=0.1",
+      `volume=${(gainDb + trim + codecTrim).toFixed(2)}dB`, "apad=pad_dur=0.1",
       `alimiter=limit=${limit.toFixed(4)}:attack=1:release=40:level=false:latency=true`,
       `atrim=duration=${length.toFixed(4)}`, "asetpts=PTS-STARTPTS",
       "afade=t=in:d=0.012", "areverse,afade=t=in:d=0.03,areverse",
@@ -241,14 +244,18 @@ export function MasterLine(raw, output, { targetDb, padS = 0.06, ceilingDb = -1,
       "-b:a", bitrate, temp], { encoding: "utf8", windowsHide: true });
     if (encoded.status !== 0) throw new Error(`Unable to encode ${path.basename(output)}: ${encoded.stderr?.slice(0, 200)}`);
     const tp = TruePeakDb(temp);
-    if (tp <= ceilingDb) break;
-    trim -= tp - ceilingDb + 0.2;
+    if (tp > ceilingDb) { trim -= tp - ceilingDb + 0.2; continue; }
+    // wav 比原定电平高了 codecTrim；mp3 该落在原定电平上：残差 = 编码损失 + codecTrim。
+    codecDb = 10 * Math.log10(Energy(temp) / Math.max(1e-12, Energy(wav)));
+    const residual = codecDb + codecTrim;
+    if (Math.abs(residual) <= 0.05 || round === 4) break;
+    codecTrim -= residual;
   }
   fs.rmSync(wav, { force: true });
   fs.renameSync(temp, output);
   measure = MeasureVoice(output);
   measure.truePeakDb = +TruePeakDb(output).toFixed(2);
-  return { trimStartS: +start.toFixed(3), gainDb: +(gainDb + trim).toFixed(2), measure, ...(tailCutS != null ? { tailCutS } : {}),
+  return { trimStartS: +start.toFixed(3), gainDb: +(gainDb + trim + codecTrim).toFixed(2), codecDb: +codecDb.toFixed(2), measure, ...(tailCutS != null ? { tailCutS } : {}),
     ...(leadCutS != null ? { leadCutS } : {}) };
 }
 

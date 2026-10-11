@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-10-11T22:25:00.192Z",
+  "updatedAt": "2026-10-11T22:40:47.006Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -11797,18 +11797,40 @@
       "mastering": "WholeSceneOnceRmsTruePeakMinus1",
       "rejectedRetakes": {
         "at": "2026-10-12 R3-Voice",
-        "requests": 3,
-        "f0MedianHz": [
-          291,
-          372,
-          395
+        "requests": 6,
+        "takes": [
+          {
+            "reference": "comradeWounded",
+            "f0MedianHz": 291,
+            "seconds": 0.8
+          },
+          {
+            "reference": "comradeWounded",
+            "f0MedianHz": 340,
+            "seconds": 1.54
+          },
+          {
+            "reference": "comradeWounded",
+            "f0MedianHz": 333,
+            "seconds": 2.07
+          },
+          {
+            "reference": "comrade",
+            "f0MedianHz": 239,
+            "seconds": 1.83
+          },
+          {
+            "reference": "comrade",
+            "f0MedianHz": 308,
+            "seconds": 1.51
+          },
+          {
+            "reference": "comrade",
+            "f0MedianHz": 276,
+            "seconds": 1.05
+          }
         ],
-        "seconds": [
-          0.8,
-          1.54,
-          2.07
-        ],
-        "why": "想把 340 Hz 压到 120–220 Hz：两种提示词（胸腔里憋出来的低沉闷哼 / 再加音很低很沉、不往上挑），参考仍是 comradeWounded，三条都更尖或超长，没装；装着的仍是 R2 那条"
+        "why": "想把 R2 那条的基频（MeasureVoice 327 Hz）压到 120–220 Hz：先用 comradeWounded 两种提示词 3 次，再按集成负责人决定换平时那条 comrade 定妆音 3 次，六条都不在范围里（f0 为 MeasureVoice 中位），不变调，装着的仍是 R2 那条"
       }
     },
     "BayonetPractice": {

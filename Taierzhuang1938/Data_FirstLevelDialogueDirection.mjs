@@ -191,9 +191,11 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   // 谐波比 6.0 dB 低于嚎的 8.3 dB、基频 333 Hz、整条 3.1 s）。改成闭着嘴从喉咙里挤的闷哼：提示词压低、强度降到 0.7、一秒以内；
   // 电平按 masterDb 拉到 −27.5（比嚎低 6 dB 以上），片段超 1.2 s 算硬错误重抽。
   CaptiveWoundTwist: Scene(true, "前沟沟壁下，冬瓜被按跪着，日兵乙弯腰把拇指摁进他左肩的枪伤往里拧；他整个人弓起来、头往后仰，叫声卡在喉咙里，咬着牙不肯喊出来", {
-    // 2026-10-12 R3-Voice 又重录 3 次（提示词两种写法：「从胸腔里憋出来的低沉闷哼，嘴闭着、牙咬紧，不是哭腔不是假声」，再加「音很低很沉、
-    // 比平时说话还低、不往上挑」），参考仍是 comradeWounded：基频中位 291 / 372 / 395 Hz（目标 120–220），后两条还超 1.2 s，都不比 R2 这条好，
-    // 装回 R2 这条（340 Hz）。这条参考音本身基频中位 150、p90 326 Hz（满是痛喊），平时那条 comrade 是 118 Hz；要压低得换参考或变调，待定。
+    // 2026-10-12 R3-Voice 想把这条的基频（MeasureVoice 327 Hz）压到 120–220 Hz，重录 6 次都没进范围，装着的仍是 R2 这条（不变调）：
+    //   · 参考 comradeWounded，提示词「从胸腔里憋出来的低沉闷哼，嘴闭着、牙咬紧，不是哭腔不是假声」及再加「音很低很沉、不往上挑」：291 / 340 / 333 Hz（后两条 1.54 / 2.07 s 超长）；
+    //   · 按集成负责人决定换平时那条 comrade 定妆音（中位 118 Hz），提示词「同一个人受了重伤、闭着嘴牙关咬紧从胸腔里憋出来的一声低沉闷哼，不张嘴、
+    //     不哭腔、不假声」：239 / 308 / 276 Hz（前两条 1.83 / 1.51 s 超长）。清单 scenes.CaptiveWoundTwist.rejectedRetakes 记了这 6 次。
+    // voices.comrade 仍是 comradeWounded（Cast/AudioVoiceCast_ComradeWounded.mp3），与拖出 / 审问 / 嚎三场同一条。
     "01": P("low", 0.7, { after: "event:woundPress", offsetS: 0, masterDb: -27.5, maxSeconds: 1.2,
       delivery: "不是在说话、也不是喊：牙关咬紧、嘴闭着，剧痛的叫声闷在喉咙里出不来，只从喉咙和鼻子里挤出两下短促发抖的闷哼，第二下更短、又硬咽回去；不张嘴、不放声、不哭、不求饶；整条一秒左右，不超过一秒" }),
   }, { voices: { comrade: "comradeWounded" } }),
