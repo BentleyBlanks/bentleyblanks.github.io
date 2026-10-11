@@ -265,3 +265,18 @@ Storyboard 包交付：每张图 + `REL/附件/briefs/Storyboard_Shots_20261011.
 - **替身**：`pendingWiring` 剩 3 条（何有田钢盔、传令兵喘气喊话、刘/何跪姿），`wave` 仍为 1。
 - **实测节奏**（`--campaign --stage-to=3`，游戏秒）：渐亮→近爆 105.9；近爆→Found 结束 159.0（比集成 149.3 多 9.7 s，主要是 CaptiveWall 的拖尸推尸）；Found 起→还权 51.5（Hold→还权 42.8）；短哨→「折角，清了」11.7。
 - **仍红**：N20_Held 翻译被甲挡；N21_Level 丁的头被近处地面挡（集成时就红）；SB03_FlagKick 旗倒进度 0.131（>0.1，踢旗那段本轮没动）。
+
+### 第二轮结果（2026-10-12，R2-Dir + R2-Anim + R2-Voice）
+
+- **合并**：R2-Dir 分支上 `--no-ff` 合 R2-Anim（`c2e1e0a0`：跳沟三条按实测沟沿重烘、`Model_NraHelmet.glb`）和 R2-Voice（`a48a167e`：`BunkerBanter` 七句补录、`CaptiveWoundTwist` 重录 0.885 s、导演表 `masterDb`/`maxSeconds`）；冲突只有 `index.html` 戳。manifest `20261012OpeningStoryboardsV26R2`；本轮改过的浏览器模块戳统一 `20261011230005`。
+- **N20_Held**：Hold/Ask/Blade 的视线不再正对甲的脸，按方位角取甲脸与翻译脸之间 0.55 处（`rescue.holdShot.interpreterShare`，高度和仰角仍按甲的脸——直接取两点连线中点会把视线拉低、甲的脸出上沿）；翻译蹲位回到 `interpreterWait` (2.95,−124.0)（眼位正前方右 49°；原 (3.4,−124.75) 只右 18°，正好在甲头和身子后面），Finish/Found 不再挪一步。实测甲头 x 0.31、翻译 0.79、无遮挡；耳光甩头不变（`slapAim` 取同一个视线点）。
+- **N21_Level**：丁从割脸位（眼位左前 25°）直着退 1.8 m 会退上北壁坡、退到木板立面后面（骨盆 z −126.6）；退的时候根绕眼位往沟中线转 `blade.levelPivotDeg` −12°（`levelPivotS` 1.2 s，`LevelRoot`），始终面朝眼位、枪口对眼；甲松手后坐时再往他左手（南）让 `release.leftM` 0.25 m，丁不会退到他身后。实测丁头 x 0.47、无遮挡、骨盆离眼 3.18 m；`blade.recruitFall` 重新量为 (4.05,−126.18)。
+- **SB03_FlagKick**：在 `3d840736` 上按原顺序两张都绿；本轮踢旗挪进 Slash、比 N17 那一帧早 0.55 s 开始，列表里排在 N17 后面就在踢旗 0.65 s 后才拍（0.131）。改为排在 N17 前面；判据、踢旗时序都没改。
+- **传令兵**：到报告位先弯腰喘气 `banter.runnerCall.breathS` 0.9 s（`RunnerLeanPostCall`），再开 `BunkerOrders.01`、直起身用 `MessengerReport` 报告（那里没有门柱可扶；整段弯着报告没有说话表演，campaign 的说话表演断言会红）。这一拍在 Orders 里，不进「近爆→Found」。
+- **刘/何跪姿**：导演 `Move` 加 `crouch`（动作层读 `soldier.openingStoryboardCrouch`，原生 stance 1 蹲跪，`crouchS` 0.4 s 进出），还权时把蹲的程度交给 AI 的 `crouchBlend`，不先站起来。刘到位即跪着朝东瞄（N25 骨盆 0.48 m）；何的位置 `heCover` 挪到右边缘 (3.85,−124.1)（原位和刘在眼位同一方位、头叠在一起）。**何在 N25（Check 1.13 s）还在走过来**——木头落下到 N25 只有约 1.1 s，走 1.5 m 加换枪 1.6 s 赶不上，所以何的判据放在 N25_Released（x 0.82、骨盆 ≤0.75 m 正在跪下）。
+- **何有田的帽子**（集成负责人拍板：军便帽，不另做钢盔）：Set 的 `REDRAFT_PROPS.helmet`（kind `wornCap`）= R2-Anim 的 `Model_NraHelmet.glb` × 0.9135，按戴帽人自己的军装换色（`TagCharacterSurface`、`characterPbrSurface`、他布料的 `nraUniformPalette`、`uCharGrimeSeed.w` 10）；`HeHelmetSleepSitUp` 播放期间头上那顶用 `Script_OpeningProps.WearNraCap` 摘掉（布料网格克隆几何，头骨权重 ≥0.9 的 484 个三角挪到末尾 `setDrawRange` 截掉，帽徽藏起），起身出洞时戴回（离开洞内三拍时兜底戴回）。模板在导演就绪前预载（`PreloadRedraftModels`，与动作库一起等）：开场中途才发起的载入在逐帧同步推进的测试里要等页面空闲（实测到 Orders 还没挂上）。实测 N01 帽子在脸上（离头骨 0.15 m）、N03 在右手（0.12 m）、Incoming 起头上那顶恢复。
+- **节奏**：机枪手趴好 `setupS` 后就打第一个点射，不等副射手；副射手推尸与机枪手同时（晚 `wall.loaderHeaveLagS` 0.35 s，压在上面）；乙在冬瓜与镜头对完那一眼后就去捡枪（CaptiveDragged 里）；撕胸章提前到 `wall.tearS` 1.2；CaptiveWall 在乙甩出枪栓（`toss`）且「老古董」说完、胸章撕完时结束（`endAfterTossS` 0，原来要等第一个点射后 1.2 s），扔枪进泥与走回原位、拖尸推尸与点射在 Interrogation 里接着演（`WallRifle`、`MachineGunCrew(99)`）。CaptiveWall 14.3 → 4.5 s。
+- **R2-Voice 节奏核对**：`BunkerBanter` 长 1.4 s 被冬瓜吃饼循环的相位等待吃掉（heRoll 晚 1.4 s，倒子弹、Banter 结束时刻不变）；`CaptiveWoundTwist` 0.885 s 从 `woundPress` 起，`CaptiveInterrogation.04` 的 0.8 s 等待正好接在叫声之后（改 0.5 会盖住叫声尾巴），不改。
+- **替身与放行**：`pendingWiring` 为空，`wave` 2，`wave1Allowances` null（旧 SB04A 的 revetment 放行没人再读），storyboardShots 里没有 `behindOk`/`coverOk`/`headOptional`。
+- **实测节奏**（`--campaign --stage-to=3`，游戏秒，三次相同）：渐亮→近爆 106.8；近爆→Found 结束 149.2（打磨 159.0）；Found 起→还权 51.5（Hold→还权 42.8）；短哨→「折角，清了」11.7。
+- **门禁**：纯 node 全套绿（`--audio` 只红基线 `BridgeCover`）；抓帧 37 张全过；Handback 四情况、PostTest、ClipsBrowserTest 过；ActorPerformance 只红基线「luo: silent combat retains its original head pose」。`--campaign --stage-to=3` 01–02 段每次都过；03 段 `FirstBatchSafe` 整帧三角数在同一份代码上 7.2M–17.6M 之间跳（上限 9M），五次里两次超、最后一次 8.6M exit 0（master `44202b66` 上一次 5.8M），03 本轮没动。
