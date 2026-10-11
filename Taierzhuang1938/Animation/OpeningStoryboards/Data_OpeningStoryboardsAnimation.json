@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20261011OpeningStoryboardsV24Redraft",
+ "version": "20261011OpeningStoryboardsV25Polish",
  "fps": 24,
  "actorForward": [
   0,
@@ -5144,7 +5144,7 @@
    "next": [
     "IjaWipeBandageFixBayonet"
    ],
-   "notes": "2026-10-11 Slash: frame 0 = IjaHairLiftKneeBack at its hold-loop start. 0-0.12 s the edge is pressed in on the left of the throat, 0.12-0.40 one hard pull back toward his right hip draws it round the front of the throat (0.25 s) to its right, the fist leading (IjaThroatSlash's stroke, mirrored); the knife comes out low at his right side. 0.708 s the left knee drives forward and the fist lets go of the hair with a push: the man pitches forward onto his face; ijaA steps after him with the left foot and stands over him."
+   "notes": "2026-10-11 Slash: frame 0 = IjaHairLiftKneeBack at its hold-loop start. 0-0.12 s the edge is pressed in on the left of the throat, 0.12-0.40 one hard pull back toward his right hip draws it round the front of the throat (0.25 s) to its right, the fist leading (IjaThroatSlash's stroke, mirrored); the knife comes out low at his right side. 0.708 s the left knee drives forward and to his left and the fist lets go of the hair with a push: the man pitches over onto his face to his left; (polish 2026-10-11) ijaA draws the left foot back out of the lunge beside the right (0.76-0.96) and stands over him looking down at the bandaged arm."
   },
   "CaptiveCurledPulledUp": {
    "duration": 3.5,
@@ -5271,7 +5271,7 @@
     "CaptiveCurledPulledUp"
    ],
    "next": [],
-   "notes": "2026-10-11 Slash: frame 0 = CaptiveCurledPulledUp at its hold-loop start. The cut (0.25 s) cuts the howl dead: a jolt, the right hand comes off the fist to the throat; the knee (0.708) pitches him forward: he goes down on his face turned onto his right side (1.25), the right hand under the throat, the left arm loose with the bandage up; two twitches (2.0, 2.55); the last frame is the corpse (hold it)."
+   "notes": "2026-10-11 Slash: frame 0 = CaptiveCurledPulledUp at its hold-loop start. The cut (0.25 s) cuts the howl dead: a jolt, the right hand comes off the fist to the throat (the jet from the right of the throat onto the north wall); the knee (0.708) pitches him over to his own left (polish 2026-10-11: off the pinned eye's line, clear of ijaA's finishing walk): he goes down on his face along the foot of the north wall, turned a little onto his right side (1.25), the head east, the legs trailing west, the right hand at the throat, the bandaged left arm up on the wall side; two twitches (2.0, 2.55); the last frame is the corpse (hold it). Pelvis at rest 0.14 m west / 0.36 m south of R3, the head 0.38 m east / 0.53 m south."
   },
   "IjaWipeBandageFixBayonet": {
    "duration": 4.0,
@@ -5349,7 +5349,7 @@
    "next": [
     "IjaFinishWalkStab"
    ],
-   "notes": "2026-10-11 Slash (N17): frame 0 = IjaThroatCutKneeShove last frame. He half squats at the dead man's left shoulder and draws the flat of the bloody blade along the bandage (wipe1 0.79), turns it over and draws the other face (wipe2 1.33), stands, the knife up in his right fist; the left hand takes the rifle off his back by the barrel over the right shoulder (2.15) and brings it round in front, muzzle up; the bayonet's ring goes over the muzzle and clicks home (fix 3.0); the right hand goes back to the wrist of the stock and he lowers the rifle, the point down, and steps off with the left foot (last frame = IjaFinishWalkStab frame 0). The bayonet track rides the muzzle from 3.0 s on (the rifle was spawned bayonet:false)."
+   "notes": "2026-10-11 Slash (N17): frame 0 = IjaThroatCutKneeShove last frame. He half squats behind the dead man's left shoulder on the wall side (polish 2026-10-11: the body lies along the north wall foot, ijaA between it and the planks) and draws the flat of the bloody blade along the bandage (wipe1 0.79), turns it over and draws the other face (wipe2 1.33), stands, the knife up in his right fist; the left hand takes the rifle off his back by the barrel over the right shoulder (2.15) and brings it round in front, muzzle up; the bayonet's ring goes over the muzzle and clicks home (fix 3.0); the right hand goes back to the wrist of the stock and he lowers the rifle, the point down, and steps off with the left foot (last frame = IjaFinishWalkStab frame 0). The bayonet track rides the muzzle from 3.0 s on (the rifle was spawned bayonet:false)."
   },
   "IjaFinishWalkStab": {
    "duration": 1.75,
@@ -5605,6 +5605,268 @@
    ],
    "next": [],
    "notes": "2026-10-11 Melee (N23): frame 0 = IjaShotStaggerAway at its hold-loop start (same root: bent over, the left arm dead). He turns back to face west (180 deg to his left in four steps, 0.15-1.35 s; Dir02: Luo cuts from behind him into the picture) while the right hand leaves the wound for the Type 91 on the front of his belt (0.5 s), brings it up to his mouth, the teeth take the pin out with a jerk of the head (bite 1.125), and the grenade goes up in front of his helmet to be struck (1.75); 1.75-3.0 s a seamless hold loop (two hard breaths, the hand shaking). Prop track `grenade` (Type 91, 0.05 x 0.095 m: origin = its centre, axis = its long axis, up = the fuse side): on the belt until 0.5 s, then in the fist. When Luo's cut lands the director drops it (finish.grenadeStop)."
+  },
+  "NraShotTumbleSteps": {
+   "duration": 2.5,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "chargeB",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "terminal": true,
+   "weaponState": "oneHandRight->dropped",
+   "weaponDropFrom": "NraShotTumbleSteps",
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handR",
+     "action": "hold",
+     "target": "weapon"
+    },
+    {
+     "t": 0.16666666666666666,
+     "limb": "handR",
+     "action": "release",
+     "target": "weapon"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.08333333333333333,
+     "kind": "shot",
+     "at": "chestFront",
+     "from": "his right"
+    },
+    {
+     "t": 0.16666666666666666,
+     "kind": "weaponLost"
+    },
+    {
+     "t": 0.625,
+     "kind": "down",
+     "sound": "bodyFall"
+    },
+    {
+     "t": 1.4166666666666667,
+     "kind": "dead"
+    }
+   ],
+   "ground": {
+    "dropM": 0.8,
+    "rampM": [
+     0.15,
+     1.3
+    ],
+    "along": "forward"
+   },
+   "prev": [],
+   "next": [],
+   "notes": "2026-10-11 polish (contract \u00a71.11, N22/N23): ChargeB running down the crater step with his dadao, frame 0 a running stride (the native charge run hands over to it); 0.083 s the round into the right chest from his right: the right shoulder knocked back, the body spun to his left on a crossing stumble, the dadao out of his hand at 0.167 s (weapon track to where it lands, weaponDropFrom); down on his left side on the slope at 0.625 s, he slides and rolls down it onto his back, the head downhill to his forward left, the legs up the slope, the arms flung out; still from 1.42 s, eyes open (face layer). Root motion: the pelvis ends 0.66 m left, 1.40 m ahead of the root and 0.80 m lower (the step falls away under him: manifest ground); its last frame is the corpse."
+  },
+  "IjaLmgGunnerShotOnGun": {
+   "duration": 2.0,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "bunkerGunner",
+   "rig": "TengxianIja01",
+   "rigs": [
+    "TengxianIja01"
+   ],
+   "props": [
+    "type11"
+   ],
+   "rootMotion": false,
+   "terminal": true,
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handsLR",
+     "action": "hold",
+     "target": "type11"
+    },
+    {
+     "t": 0.3,
+     "limb": "handsLR",
+     "action": "release",
+     "target": "type11"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.041666666666666664,
+     "kind": "shot",
+     "at": "chestFront"
+    },
+    {
+     "t": 0.4166666666666667,
+     "kind": "faceOnGun"
+    },
+    {
+     "t": 1.25,
+     "kind": "dead"
+    }
+   ],
+   "prev": [
+    "IjaProneLmgOnCorpse"
+   ],
+   "next": [],
+   "notes": "2026-10-11 polish (contract \u00a71.11, N22 \u300c\u6c9f\u6cbf\u4e0a\u7684\u673a\u67aa\u624b\u8db4\u5728\u5c38\u4f53\u4e0a\u4e0d\u52a8\u4e86\u300d): frame 0 = IjaProneLmgOnCorpse frame 0 (same root: the director plays it on the gunner's mark with Kill and no hit reaction). 0.042 s the round in the chest: the shoulders and the head jerk up and back; he goes slack, the face down onto the receiver (0.417), the hands off the gun and sliding down the slope beside it (0.30-0.75); a last shudder (0.95); still from 1.25 s. No root motion; the type11 track stays where frame 0 has it (the gun on the corpse rest). The last frame is the corpse."
+  },
+  "IjaLoaderShotTumbleOffLip": {
+   "duration": 2.5,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "bunkerLoader",
+   "rig": "TengxianIja03",
+   "rigs": [
+    "TengxianIja03"
+   ],
+   "rootMotion": true,
+   "terminal": true,
+   "events": [
+    {
+     "t": 0.08333333333333333,
+     "kind": "shot",
+     "at": "chestFront"
+    },
+    {
+     "t": 0.5833333333333334,
+     "kind": "overEdge"
+    },
+    {
+     "t": 1.2916666666666667,
+     "kind": "down",
+     "sound": "bodyFall"
+    },
+    {
+     "t": 1.6666666666666667,
+     "kind": "dead"
+    }
+   ],
+   "ground": {
+    "lipDeg": 126.5,
+    "edgeM": 0.1,
+    "wall": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.2,
+      -0.31
+     ],
+     [
+      0.4,
+      -0.98
+     ],
+     [
+      0.6,
+      -1.65
+     ],
+     [
+      0.8,
+      -2.01
+     ],
+     [
+      3.0,
+      -2.01
+     ]
+    ]
+   },
+   "prev": [
+    "IjaKneelLoadLmg"
+   ],
+   "next": [],
+   "notes": "2026-10-11 polish (contract \u00a71.11, N22 \u300c\u526f\u5c04\u624b\u7ffb\u4e0b\u6c9f\u6cbf\u300d): frame 0 = IjaKneelLoadLmg frame 0 (same root: the director plays it on the loader's mark with Kill and no hit reaction). 0.083 s the round in the chest: jolted back, the hands off the hopper, turned to his left by it; over backwards toward the trench (the edge 0.10 m behind his right shoulder, 126.5 deg to his right of his facing), head first over the edge (0.583), down the wall on his back to its foot (1.292), face up on the trench floor with the legs up the wall; still from 1.67 s. Root motion: the pelvis ends 1.12 m out along that line and 1.88 m down (the wall is in the clip: manifest ground). The last frame is the corpse."
+  },
+  "IjaHeaveCorpseLip": {
+   "duration": 2.6666666666666665,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "bunkerGunner",
+   "rig": "TengxianIja01",
+   "rigs": [
+    "TengxianIja01",
+    "TengxianIja03"
+   ],
+   "props": [
+    "corpse"
+   ],
+   "rootMotion": false,
+   "contacts": [
+    {
+     "t": 0.5416666666666666,
+     "limb": "handsLR",
+     "action": "grab",
+     "target": "corpse",
+     "part": "armpit / belt"
+    },
+    {
+     "t": 1.5416666666666667,
+     "limb": "handsLR",
+     "action": "release",
+     "target": "corpse"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.5416666666666666,
+     "kind": "grab"
+    },
+    {
+     "t": 1.05,
+     "kind": "lifted"
+    },
+    {
+     "t": 1.5416666666666667,
+     "kind": "heaved",
+     "corpse": "onLip",
+     "sound": "bodyFall"
+    }
+   ],
+   "ground": {
+    "wallAheadM": 0.3,
+    "wall": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.2,
+      0.36
+     ],
+     [
+      0.4,
+      1.03
+     ],
+     [
+      0.6,
+      1.7
+     ],
+     [
+      0.8,
+      2.01
+     ],
+     [
+      3.0,
+      2.01
+     ]
+    ]
+   },
+   "prev": [
+    "IjaDragByForearm"
+   ],
+   "next": [
+    "IjaProneLmgOnCorpse",
+    "IjaKneelLoadLmg"
+   ],
+   "notes": "2026-10-11 polish (contract \u00a71.7, N12): the root stands facing the south wall, its foot 0.30 m ahead; the dragged body (the Set's movable corpse) lies face down along the foot of the wall, its middle 0.42 m ahead, head to his left. He squats and takes it under the left armpit and by the belt (grab 0.54), stands up with it against his chest (lifted 1.05), steps in and shoves it up overhead onto the wall under the lip (heaved 1.54: the Set puts the corpse on the lip, PlaceCorpse pose onLip), lets go, the hands come down and he steps back (to 2.67). Prop track `corpse`: the body's middle, the head's direction, the back's normal (up to heaved; hidden after) -- the director may carry the Set's corpse on it. No root motion. Baked on IJA01 (gunner) and IJA03 (loader)."
   }
  },
  "stages": {
@@ -6196,7 +6458,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "e8ef531d20d7fc7ffe54cfdb1c18d981b25cc3aeb455d5f87c7f3a4da37e61ef",
+   "sha256": "c3592d4f5b6c6fa962ea681f9d1c71e233c09025842ef1a303e70dd4fb1d9f54",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
@@ -6255,7 +6517,8 @@
     "LiuBoxUpGo",
     "CaptiveStabbedCurl",
     "CaptiveCurledPulledUp",
-    "CaptiveThroatCutForward"
+    "CaptiveThroatCutForward",
+    "NraShotTumbleSteps"
    ],
    "contactPoints": {
     "hairBack": {
@@ -8715,9 +8978,9 @@
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
      "wallPenetrationM": 0.0,
-     "pelvisMaxStepM": 0.0632,
-     "floorCorrectionMin": 0.06123,
-     "floorCorrectionMax": 0.24963,
+     "pelvisMaxStepM": 0.0787,
+     "floorCorrectionMin": -0.02617,
+     "floorCorrectionMax": 0.06856,
      "root": {
       "start": [
        0.35,
@@ -8726,15 +8989,50 @@
        0.3985
       ],
       "end": [
-       0.4762,
-       -0.4802,
-       -35.0,
-       0.348
+       0.1375,
+       -0.3569,
+       75.0,
+       0.1523
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
      "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "NraShotTumbleSteps",
+     "frames": 61,
+     "footSlideM": 0.0173,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1538,
+     "floorCorrectionMin": 0.00705,
+     "floorCorrectionMax": 0.22702,
+     "root": {
+      "start": [
+       0.66,
+       1.4,
+       0.0,
+       1.6103
+      ],
+      "end": [
+       -0.0,
+       0.0,
+       -154.22,
+       0.1883
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.1333,
+       0.28
+      ]
+     ],
      "kneePlants": [],
      "kneeSlideM": 0.0
     }
@@ -10317,7 +10615,7 @@
   {
    "id": "TengxianIja01",
    "file": "Animation_TengxianIja01OpeningStoryboards.json",
-   "sha256": "c0139e50662212ccd630ed3978c8b5b75d11f4d0c95c120d3e6604d73ba6198c",
+   "sha256": "40ff06a83e34d85aaf1c37f8c41a471b1e007afb78969aecfc34f19ecef6a249",
    "originalModelSha256": "0acb11411d2984cf7bd9dd578141ffcc8541e9bbe8c83b0cf3dcff76f3a2d9b1",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningRedraft_20261011_AB\\Scene_TengxianIja01OpeningStoryboards.blend",
    "contactPoints": {
@@ -12037,6 +12335,85 @@
      "plants": [],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaLmgGunnerShotOnGun",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.02994,
+     "floorCorrectionMax": 0.02994,
+     "root": {
+      "start": [
+       -0.0,
+       0.08,
+       0.0,
+       0.2676
+      ],
+      "end": [
+       -0.0,
+       0.08,
+       0.0,
+       0.2676
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaHeaveCorpseLip",
+     "frames": 65,
+     "footSlideM": 0.016,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0462,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.01734,
+     "root": {
+      "start": [
+       0.0,
+       0.0184,
+       0.0,
+       0.8161
+      ],
+      "end": [
+       0.0,
+       0.0184,
+       0.0,
+       0.8161
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       1.1
+      ],
+      [
+       "R",
+       2.0,
+       2.6667
+      ],
+      [
+       "L",
+       0,
+       1.05
+      ],
+      [
+       "L",
+       1.25,
+       2.05
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ],
    "clipIds": [
@@ -12076,13 +12453,15 @@
     "IjaDropInKneel",
     "IjaDropInStand",
     "IjaDropInPoint",
-    "IjaProneLmgOnCorpse"
+    "IjaProneLmgOnCorpse",
+    "IjaLmgGunnerShotOnGun",
+    "IjaHeaveCorpseLip"
    ]
   },
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "9ad5e7fe9e1efc88de965ea0589bac045c321c08b3457f300cf9d091eb63c8ed",
+   "sha256": "36d6db606e7ce777736fd62f15aabdf86a4095401c37995abe66d3f72728655e",
    "originalModelSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningRedraft_20261011_AB\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
@@ -15163,13 +15542,13 @@
     {
      "clip": "IjaThroatCutKneeShove",
      "frames": 41,
-     "footSlideM": 0.0072,
+     "footSlideM": 0.0,
      "contactErrorM": 0.0,
-     "gripSolveErrorM": 0.01959,
-     "wallPenetrationM": 0.0209,
-     "pelvisMaxStepM": 0.0684,
+     "gripSolveErrorM": 0.01999,
+     "wallPenetrationM": 0.0214,
+     "pelvisMaxStepM": 0.0881,
      "floorCorrectionMin": -0.00456,
-     "floorCorrectionMax": 0.00383,
+     "floorCorrectionMax": -0.00456,
      "root": {
       "start": [
        -0.0,
@@ -15178,10 +15557,10 @@
        0.6293
       ],
       "end": [
-       -0.3688,
-       0.0526,
+       -0.0493,
+       0.1261,
        0.0,
-       0.4618
+       0.7339
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -15222,24 +15601,25 @@
     {
      "clip": "IjaWipeBandageFixBayonet",
      "frames": 97,
-     "footSlideM": 0.0077,
+     "footSlideM": 0.005,
      "contactErrorM": 0.0,
-     "gripSolveErrorM": 0.11447,
-     "pelvisMaxStepM": 0.1357,
-     "floorCorrectionMin": -0.03636,
-     "floorCorrectionMax": 0.00382,
+     "gripSolveErrorM": 0.11425,
+     "wallPenetrationM": 0.0214,
+     "pelvisMaxStepM": 0.1079,
+     "floorCorrectionMin": -0.00521,
+     "floorCorrectionMax": 0.03455,
      "root": {
       "start": [
-       -0.3688,
-       0.0526,
+       -0.0493,
+       0.1261,
        0.0,
-       0.4618
+       0.7339
       ],
       "end": [
-       -0.5042,
-       -1.1503,
+       -0.5024,
+       -0.0066,
        0.0,
-       0.401
+       0.4913
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -15280,8 +15660,8 @@
      "floorCorrectionMax": 7e-05,
      "root": {
       "start": [
-       0.0653,
-       -0.0638,
+       0.0662,
+       -0.0629,
        0.0,
        0.6564
       ],
@@ -15651,7 +16031,7 @@
   {
    "id": "TengxianIja03",
    "file": "Animation_TengxianIja03OpeningStoryboards.json",
-   "sha256": "7f463a6f8780dbd106b73efd32c45082218df1e0c6327634d6da8586db5f5f7c",
+   "sha256": "2d51330ae090a1ccea8b9e75f71d08861aaa62f78cc04f498e96fd5e97fff6ee",
    "originalModelSha256": "652df6a3e31f26257754d6e7fe5bc1e5f56af6372bc0d4df2db0e753b5d8a952",
    "clipIds": [
     "SupplyReceive",
@@ -15682,7 +16062,9 @@
     "IjaRecruitSlapped",
     "IjaRecruitChargeThrust",
     "IjaRecruitCheekCut",
-    "IjaRecruitLevelRifle"
+    "IjaRecruitLevelRifle",
+    "IjaLoaderShotTumbleOffLip",
+    "IjaHeaveCorpseLip"
    ],
    "contactPoints": {
     "hairBack": {
@@ -17088,6 +17470,96 @@
        2.4167
       ]
      }
+    },
+    {
+     "clip": "IjaLoaderShotTumbleOffLip",
+     "frames": 61,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1694,
+     "floorCorrectionMin": -0.06943,
+     "floorCorrectionMax": 0.21711,
+     "root": {
+      "start": [
+       0.0,
+       0.0743,
+       0.0,
+       0.3377
+      ],
+      "end": [
+       0.9241,
+       0.634,
+       53.5,
+       -1.8146
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [
+      [
+       "L",
+       0,
+       0.0833
+      ],
+      [
+       "R",
+       0,
+       0.0833
+      ]
+     ],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaHeaveCorpseLip",
+     "frames": 65,
+     "footSlideM": 0.0009,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0462,
+     "floorCorrectionMin": -1e-05,
+     "floorCorrectionMax": 0.00102,
+     "root": {
+      "start": [
+       0.0,
+       0.0184,
+       0.0,
+       0.8161
+      ],
+      "end": [
+       0.0,
+       0.0184,
+       0.0,
+       0.8161
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       1.1
+      ],
+      [
+       "R",
+       2.0,
+       2.6667
+      ],
+      [
+       "L",
+       0,
+       1.05
+      ],
+      [
+       "L",
+       1.25,
+       2.05
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ]
   }

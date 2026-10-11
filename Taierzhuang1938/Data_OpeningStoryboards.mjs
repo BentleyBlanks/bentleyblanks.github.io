@@ -19,7 +19,7 @@ const REVETMENT = "BunkerSouthRevetment";
 // Everyone who leaves after Luo's order (banter.exitRoute; the runner's own is the same without its first point).
 const BANTER_EXIT = Route([2.1,-125.2],[3.4,-123.6],[3.1,-121.6],[1.2,-120.6],[-1,-118.5],[-4,-113],[-9,-111.3]);
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20261011OpeningStoryboardsV24Redraft", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20261011OpeningStoryboardsV25Polish", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
@@ -81,7 +81,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // his cheek and the levelled rifle, ijaA biting the grenade's pin.
       "IjaSlapRecruit","IjaRecruitSlapped","IjaRecruitChargeThrust","CaptiveStabbedCurl","IjaHairLiftKneeBack","CaptiveCurledPulledUp",
       "IjaThroatCutKneeShove","CaptiveThroatCutForward","IjaWipeBandageFixBayonet","IjaFinishWalkStab","IjaBootOnHand",
-      "IjaRecruitCheekCut","IjaRecruitLevelRifle","IjaGrenadeBitePin"],
+      "IjaRecruitCheekCut","IjaRecruitLevelRifle","IjaGrenadeBitePin",
+      // 2026-10-11 polish (PolishAnim): ChargeB's tumble down the crater step, the machine-gun pair shot on the south lip, the heave
+      // of a body onto the lip.
+      "NraShotTumbleSteps","IjaLmgGunnerShotOnGun","IjaLoaderShotTumbleOffLip","IjaHeaveCorpseLip"],
   },
   // The NRA02 comrade is clean in SB01; the shell that buries him wounds him, and he is bloodied from the
   // black after it through the drag and the interrogation (2026-09-27 review: 「应该是在爆炸后才变得伤痕累累」).
