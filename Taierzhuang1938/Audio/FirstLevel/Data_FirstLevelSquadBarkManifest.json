@@ -268,6 +268,111 @@
    "promptHash": "50a160f63c3ae10eff663d1281128a734164611a90d08b84c1bd58a82642e142",
    "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
    "rawSha256": "c7aa75c7dfcc1f8fc2d8249e21ed80e70e0b4a69493162c9b2dbf70bb801333b"
+  },
+  "luoYell": {
+   "set": "yell",
+   "lines": 1,
+   "requests": 1,
+   "picked": 1,
+   "attempts": [
+    {
+     "n": 1,
+     "hard": [],
+     "flags": [
+      "yell_sha 超长，不变调压快 9.3%",
+      "yell_sha 字错率 3 待逐字核对「Saw!」"
+     ]
+    }
+   ],
+   "cutMethod": "subtitle",
+   "raw": {
+    "noiseDb": -107.65,
+    "clipRuns": 0,
+    "seconds": 2.821
+   },
+   "loudnessRate": 0,
+   "promptHash": "51b63eac0fa2847671a5ba7b5f620545adeb82ba1ced162085a1950147712f5b",
+   "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be",
+   "rawSha256": "75d78b453b7054dfd0a7a3c776821529ff10d26fab0f7bae9286228316bae46b"
+  },
+  "heyoutianYell": {
+   "set": "yell",
+   "lines": 1,
+   "requests": 2,
+   "picked": 1,
+   "attempts": [
+    {
+     "n": 1,
+     "hard": [],
+     "flags": [
+      "yell_sha 超长，不变调压快 20.7%"
+     ]
+    },
+    {
+     "n": 2,
+     "hard": [
+      "削波 8 处",
+      "yell_sha 时长 2.394 s（要 0.3–0.9 s）"
+     ],
+     "flags": [
+      "yell_sha 字错率 1 待逐字核对「撒!」"
+     ]
+    }
+   ],
+   "cutMethod": "subtitle",
+   "raw": {
+    "noiseDb": -105.43,
+    "clipRuns": 0,
+    "seconds": 1.228
+   },
+   "loudnessRate": -20,
+   "promptHash": "8ec62188f91079d349f9f14c18a01b95a6e5d446c910480ebc42d0e2a19025a2",
+   "castSha256": "1ad7b156126131843240afb42dddc9d8f296ae43075b3cb8833606264eb1edbf",
+   "rawSha256": "488e84778fe36410845dbbcc602b07caa3c696c5bc0addf75e518f28319b6b92"
+  },
+  "liuwencaiYell": {
+   "set": "yell",
+   "lines": 1,
+   "requests": 3,
+   "picked": 3,
+   "attempts": [
+    {
+     "n": 1,
+     "hard": [
+      "yell_sha 信噪比 28.61 dB（要 ≥ 30）"
+     ],
+     "flags": [
+      "yell_sha 字错率 1 待逐字核对「啥?」"
+     ]
+    },
+    {
+     "n": 2,
+     "hard": [
+      "yell_sha 有声段 -19.88 dB（目标 -16.1，峰值先顶到上限）"
+     ],
+     "flags": [
+      "yell_sha 字错率 1 待逐字核对「塞。」"
+     ]
+    },
+    {
+     "n": 3,
+     "hard": [],
+     "flags": [
+      "yell_sha 超长，不变调压快 4.0%",
+      "yell_sha 字错率 1 待逐字核对「啥?」"
+     ]
+    }
+   ],
+   "cutMethod": "subtitle",
+   "raw": {
+    "noiseDb": -64.22,
+    "clipRuns": 0,
+    "seconds": 1.254
+   },
+   "loudnessRate": 0,
+   "promptHash": "ba70607b030c8717bf422b38075d289ee3d94065d8396327b141008519acba09",
+   "castSha256": "fa79d46b054e3a5a80c67062498097b15711adbce8cc2b48259af5da5d5da285",
+   "rawSha256": "62387bd5a7a1395264a98ccd6b4eb406d222d5873d98a524a18c3b3ab337369b"
   }
  },
  "barks": {
@@ -1401,6 +1506,87 @@
    ],
    "cer": 0.875,
    "transcript": "翠子,收留的模特儿。"
+  },
+  "yell_sha@luo": {
+   "who": "luo",
+   "take": "luoYell",
+   "key": "yell_sha",
+   "file": "Barks/AudioVoice_FirstLevelBarkLuoYellSha.mp3",
+   "sha256": "e68f60080b12eacea6de49cd2fb60eb937da080b77f6ca5d3e280c4ca01f69b4",
+   "text": "杀——！",
+   "seconds": 0.86,
+   "voicedS": 0.7,
+   "activeRmsDb": -16.66,
+   "truePeakDb": -4.81,
+   "noiseDb": -69.5,
+   "lowShare": 0.059,
+   "f0": 333,
+   "gainDb": -0.12,
+   "tempo": 1.093,
+   "takeStartS": 0.01,
+   "takeEndS": 1,
+   "tight": false,
+   "speakerCos": 0.394,
+   "nearestOther": [
+    "zhou",
+    0.383
+   ],
+   "cer": 3,
+   "transcript": "Saw!"
+  },
+  "yell_sha@heyoutian": {
+   "who": "heyoutian",
+   "take": "heyoutianYell",
+   "key": "yell_sha",
+   "file": "Barks/AudioVoice_FirstLevelBarkHeyoutianYellSha.mp3",
+   "sha256": "03e0f3c7661029a9cf649e216a1a8a56467d9652e02aa9c6527ee2032823fe72",
+   "text": "杀——！",
+   "seconds": 0.86,
+   "voicedS": 0.78,
+   "activeRmsDb": -16.71,
+   "truePeakDb": -3.52,
+   "noiseDb": -62.19,
+   "lowShare": 0.033,
+   "f0": 276,
+   "gainDb": 0,
+   "tempo": 1.207,
+   "takeStartS": 0.01,
+   "takeEndS": 1.048,
+   "tight": false,
+   "speakerCos": 0.271,
+   "nearestOther": [
+    "yaowa",
+    0.287
+   ],
+   "cer": 0,
+   "transcript": "杀!"
+  },
+  "yell_sha@liuwencai": {
+   "who": "liuwencai",
+   "take": "liuwencaiYell",
+   "key": "yell_sha",
+   "file": "Barks/AudioVoice_FirstLevelBarkLiuwencaiYellSha.mp3",
+   "sha256": "e5bab95ce246546581a0f88cf62fe366dbf23d97b88616ba6df0889eecbf0587",
+   "text": "杀——！",
+   "seconds": 0.86,
+   "voicedS": 0.72,
+   "activeRmsDb": -16.77,
+   "truePeakDb": -1.89,
+   "noiseDb": -50.51,
+   "lowShare": 0.075,
+   "f0": 174,
+   "gainDb": 0,
+   "tempo": 1.04,
+   "takeStartS": 0,
+   "takeEndS": 0.914,
+   "tight": false,
+   "speakerCos": 0.31,
+   "nearestOther": [
+    "yaowa",
+    0.23
+   ],
+   "cer": 1,
+   "transcript": "啥?"
   }
  }
 }

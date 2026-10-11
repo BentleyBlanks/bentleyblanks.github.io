@@ -60,7 +60,8 @@ const cueIds = new Set(MISSION_DIALOGUE.map((cue) => cue.id));
 // 契约 §5 冻结的 cue id。台词表归并行的 Voice 包，合并之前这些 cue 还不在
 // MISSION_DIALOGUE 里 —— 所以 voice 门先对契约表，已经到位的再对台词表。
 const CONTRACT_CUES = new Set([
-  "BunkerBanter","BunkerSearch",
+  // 2026-10-11 契约 §3：BunkerSearch 下线、由 BunkerSweep 取代。
+  "BunkerBanter","BunkerSweep",
   "SupportOrder",
   "FrontBlockade",
   "TakeOverGun","TankTerror","BundleOrder",

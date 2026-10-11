@@ -246,6 +246,20 @@ function Cut(cue, n) {
   // 满幅连续 ≥ 3 个采样算一处削波；一两处是单个峰顶碰了满幅（母带限幅后已压到 −1 dBTP 以下），三处以上才算爆音。
   if (clip >= 3) hard.push(`削波 ${clip} 处`);
   else if (clip) flags.push(`原始 take 有 ${clip} 处满幅峰顶（母带已限幅）`);
+  // 句首多念的半句（2026-10-11 BunkerBanter#2：刘文财先嘟囔了一遍「多的没得」，停了半秒才念整句「一人三夹，多的没得。」）。
+  // 第一句前面没有别的句子，多出来的字全归给它。逐字时间戳里从第 k 个字起能一字不差地对上整句稿面、前面那几个字都是稿里
+  // 本来有的字、且与整句之间隔着 ≥ 0.25 s 的停顿时，把前面那几个字剪掉（切句从整句开头起，整段录音不动），记一条提示。
+  {
+    const m0 = mapped[0], want = [...spoken[0]].filter((c) => /[\p{L}\p{N}]/u.test(c)).join("");
+    for (let k = 1; m0?.chars && k + want.length <= m0.chars.length; k++) {
+      const head = m0.chars.slice(0, k), rest = m0.chars.slice(k);
+      if (rest.slice(0, want.length).map(([c]) => c).join("") !== want || rest[0][1] - head.at(-1)[2] < 0.25
+        || !head.every(([c]) => want.includes(c))) continue;
+      Object.assign(m0, { chars: rest, start: rest[0][1], headTrimmed: true });
+      flags.push(`${cue.lines[0].id} 句首多念了「${head.map(([c]) => c).join("")}」，切句从整句开头起`);
+      break;
+    }
+  }
   const subtitleChars = mapped.reduce((t, m) => t + m.chars.length, 0), scriptChars = mapped.reduce((t, m) => t + m.total, 0);
   // 非词的人声（台词表 vocal：嚎、憋住的痛叫、冲锋时逼出来的喊，2026-10-11）：稿面那几个「啊」「呃」只是给 TTS 的提示，
   // 时间戳对不上字、多出几个「啊」都不算漏句 / 多念。只给单句场景用：整段就是这一句，按有声段切。
@@ -273,6 +287,8 @@ function Cut(cue, n) {
     const tooFast = mapped.some((m) => (m.total >= 3 && (m.end - m.start) < 0.06 * m.total) || (m.total === 2 && m.end - m.start < 0.2));
     const tooShort = slices.some((s, i) => s.endS - s.startS < Math.min(0.35, 0.1 + 0.05 * mapped[i].total));
     cutMethod = "subtitle";
+    // 句首多念剪掉的第一句：片段从整句第一个字前 padS 起（SliceScene 的第一片缺省从整段开头起）。
+    if (mapped[0].headTrimmed) slices[0].startS = +Math.max(slices[0].startS, lines[0].start - LINE_MASTER.padS).toFixed(3);
     if (tooFast || tooShort) {
       const weights = cue.lines.map((line, i) => Math.max(0.25, [...MissionVoiceSpoken(cue, i)].filter((c) => /[\p{L}\p{N}]/u.test(c)).length / (line.lang === "ja" ? 7.5 : 4.6)));
       const pauses = cue.lines.map((_, i) => LineDirection(cue, i).pauseBeforeS || 0);
@@ -728,6 +744,13 @@ function Prune(manifest) {
   for (const id of staleLines) { console.log(`${dry ? "would prune" : "pruned"} line ${id}`); if (!dry) delete manifest.lines[id]; }
   for (const name of orphans) { console.log(`${dry ? "would delete" : "deleted"} ${name}`); if (!dry) fs.rmSync(path.join(out, name)); }
   for (const name of lineOrphans) { console.log(`${dry ? "would delete" : "deleted"} Lines/${name}`); if (!dry) fs.rmSync(path.join(lineDir, name)); }
+  // 逐字时间（以片段 sha256 为键）：清单里已经没有的片段一起删（2026-10-11 下线 CaptiveTaunt / BunkerSearch 时它们被留下了，
+  // 口型轨烘焙的 --prune 又把它们当作还在用的录音）。
+  const timings = ReadJson(timingsPath, {}), liveSha = new Set(Object.values(manifest.lines || {}).map((entry) => entry.sha256));
+  for (const id of staleLines) liveSha.delete(manifest.lines?.[id]?.sha256);
+  const staleTimings = Object.keys(timings).filter((sha) => !liveSha.has(sha));
+  for (const sha of staleTimings) { console.log(`${dry ? "would prune" : "pruned"} timings ${timings[sha].lineId}`); if (!dry) delete timings[sha]; }
+  if (!dry && staleTimings.length) WriteTimings(timings);
   if (!dry && (stale.length || orphans.length || staleLines.length || lineOrphans.length || staleScenes.length)) {
     manifest.updatedAt = new Date().toISOString();
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");

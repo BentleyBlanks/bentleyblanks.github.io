@@ -224,6 +224,8 @@ export const SQUAD_BARK_KEYS = Object.freeze({
   player: Object.freeze(["rally_follow", "move_go", "rally_charge", "rally_hold", "move_flank", "move_cover", "rally_shoot"]),
   // 顺子打空弹药时骂的那几句（PLAYER_VENT_TEXT，另录一条：SQUAD_BARK_EXTRA_TAKES.shunziVent）。
   playerVent: Object.freeze(["vent_ammo_1", "vent_ammo_2", "vent_ammo_3", "vent_grenade_1", "vent_grenade_2", "vent_grenade_3"]),
+  // 02 反冲锋时罗/何/刘各喊一声本人的「杀」（2026-10-11 契约 §1.12；文本取 Data_Voice yell_sha）。各另录一条（SQUAD_BARK_EXTRA_TAKES）。
+  yell: Object.freeze(["yell_sha"]),
 });
 /** 2026-09-27 撤下、但还在录音稿里的键（按套）。squad / leader 里的 rally_shoot、move_go 只是 AI 不再喊，玩家下令照旧用。 */
 const SQUAD_RETIRED = Object.freeze(["spot_east", "spot_gap", "spot_wall", "move_flank", "move_go", "warn_down", "rally_shoot",
@@ -275,6 +277,9 @@ export const PLAYER_VENT_KEYS = Object.freeze({
  */
 export const SQUAD_BARK_EXTRA_TAKES = Object.freeze({
   shunziVent: Object.freeze({ who: "shunzi", set: "playerVent" }),
+  luoYell: Object.freeze({ who: "luo", set: "yell" }),
+  heyoutianYell: Object.freeze({ who: "heyoutian", set: "yell" }),
+  liuwencaiYell: Object.freeze({ who: "liuwencai", set: "yell" }),
 });
 /** 全部录音（一条 = 一次请求）：每个人的主录音 + 另录的。 */
 export const SQUAD_BARK_TAKES = Object.freeze([...Object.keys(SQUAD_BARK_CAST), ...Object.keys(SQUAD_BARK_EXTRA_TAKES)]);

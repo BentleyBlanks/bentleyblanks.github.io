@@ -4,7 +4,7 @@
 //   node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs --audio    再加录音资产（逐句干声指标 + 旧整段哈希/对齐）
 //
 // 两种格式并存（docs/Data_FirstLevel0105Refactor20260923Contract.md §2.2 / §5）：
-//   · 逐句干声（perLine）：01–06。01–02 逐字对 09.23 新稿（「## 分镜参考」之前），03–05 对 09.22 稿，
+//   · 逐句干声（perLine）：01–06。01–02 逐字对 2026-10-11 稿（契约 docs/Data_OpeningRedraft20261011Contract.md §3），03–05 对 09.22 稿，
 //     06 对 09.19 稿；每句一条干声、带定妆参考音、导演时间轴、多声部播放器。
 //   · 整段录音：07–18 与待 Opening 包下线的 09.21 旧 cue，旧断言原样保留。
 //   · 班组战斗短句（SQUAD_BARK_*）：罗 / 幺娃 / 何 / 刘 / 老周 / 顺子各用自己的定妆音录一份，一人一次请求；
@@ -38,7 +38,8 @@ const contract = Read("./docs/Data_FirstLevelRebuild20260919Contract.md");
 const contract0923 = Read("./docs/Data_FirstLevel0105Refactor20260923Contract.md");
 const previousSource = Read("./docs/Data_FirstLevelRebuildSource20260919.md");
 const opening0921 = Read("./docs/Data_FirstLevelOpeningSource20260921.md");
-const opening0923 = Read("./docs/Data_FirstLevelOpeningSource20260923.md");
+const opening1011 = Read("./docs/Data_FirstLevelOpeningSource20261011.md");
+const contract1011 = Read("./docs/Data_OpeningRedraft20261011Contract.md");
 const frontSource = Read("./docs/Data_FirstLevelFrontSource20260922.md");
 const story = MISSION_DIALOGUE.filter((cue) => !cue.guidance);
 const guide = MISSION_DIALOGUE.filter((cue) => cue.guidance);
@@ -66,37 +67,71 @@ for (const cue of MISSION_DIALOGUE) {
 }
 console.log(`ok ${MISSION_DIALOGUE.length} cues（剧情 ${story.length} + 带路 ${guide.length}；逐句 ${perLine.length} 场 ${perLine.reduce((n, c) => n + c.lines.length, 0)} 句）id 唯一、演员齐全`);
 
-// 2a. 09.23 契约 §5.2：01–02 的 16 个场景（09.23 稿 13 场 + 2026-09-26 用户追加的 InterpreterCall + 2026-09-29 追加的 BunkerRunnerCall + 2026-09-30 追加的 RescueHeave）、逐句说话人与句数。
-const table0923 = contract0923.slice(contract0923.indexOf("### 5.2"), contract0923.indexOf("### 5.3"));
-const scenes0923 = [...table0923.matchAll(/^\| `([A-Za-z]+)` \| (.+) \|$/gm)].map(([, id, body]) =>
-  [id, [...body.matchAll(/(?<!\d)(\d\d) ([a-zA-Z]+)\s/g)].map(([, n, who]) => [Number(n), who])]);
-assert.equal(scenes0923.length, 16, "契约 §5.2 解析出 16 个场景");
-for (const [id, rows] of scenes0923) {
+// 2a. 2026-10-11 契约 §3：01–02 的场景、逐句说话人与日语行（JA）。改了字的场景逐句列出；没改字的九场（§1.15）沿用录音；
+//     下线的（CaptiveTaunt / BunkerSearch）台词与录音都删掉。09.23 契约 §5.2 的下线名单（RETIRED_0923）照旧不许回来。
+const table1011 = contract1011.slice(contract1011.indexOf("## 3. 对白"), contract1011.indexOf("## 4. 动作"));
+const rows1011 = [...table1011.matchAll(/^\| ((?:`[A-Za-z]+` ?)+) \| ([^|]+) \| (.+) \|$/gm)].map(([, ids, status, body]) =>
+  ({ ids: [...ids.matchAll(/`([A-Za-z]+)`/g)].map(([, id]) => id), status: status.trim(), body }));
+const unchanged1011 = (/没改字的场景（(.+?)）\*\*不重录\*\*/.exec(contract1011)?.[1] || "").match(/[A-Za-z]+/g) || [];
+assert.equal(unchanged1011.length, 9, "契约 §1.15 列出没改字、不重录的 9 场");
+const retired1011 = rows1011.filter((row) => row.status.startsWith("下线")).flatMap((row) => row.ids);
+assert.deepEqual([...retired1011].sort(), ["BunkerSearch", "CaptiveTaunt"], "契约 §3 下线 CaptiveTaunt、BunkerSearch");
+const authoredRows = rows1011.filter((row) => /^(新|重写)/.test(row.status));
+const scenes1011 = authoredRows.map((row) => {
+  assert.equal(row.ids.length, 1, "契约 §3 改了字的每一行只有一个场景：" + row.ids.join(","));
+  const lines = [...row.body.matchAll(/(?<!\d)(\d\d) ([a-zA-Z]+)(?:「([^」]*)」( ?JA)?)?/g)].map(([, n, who, text, ja]) =>
+    ({ n: Number(n), who, text: text ?? null, ja: !!ja }));
+  return { id: row.ids[0], silent: row.status.includes("无字幕"), lines };
+});
+assert.equal(scenes1011.length, 13, "契约 §3 改了字的 13 场（新 8 场 + 重写 5 场）");
+for (const { id, silent, lines } of scenes1011) {
   const cue = byId.get(id);
-  assert.ok(cue?.perLine, `契约 §5.2 的场景 ${id} 必须是逐句格式`);
-  assert.deepEqual(rows.map(([n]) => n), rows.map((_, i) => i + 1), id + " 契约序号连续");
-  assert.deepEqual(cue.lines.map((line) => line.who), rows.map(([, who]) => who), id + " 逐句说话人与契约一致");
+  assert.ok(cue?.perLine, `契约 §3 的场景 ${id} 必须是逐句格式`);
+  assert.deepEqual(lines.map(({ n }) => n), lines.map((_, i) => i + 1), id + " 契约序号连续");
+  assert.deepEqual(cue.lines.map((line) => line.who), lines.map(({ who }) => who), id + " 逐句说话人与契约一致");
+  cue.lines.forEach((line, i) => {
+    if (lines[i].text != null) {
+      assert.equal(line.text, lines[i].text, line.id + " 台词与契约 §3 逐字一致");
+      assert.equal(line.lang || "zh", lines[i].ja ? "ja" : "zh", line.id + " 契约标 JA 的才是日语行");
+    }
+    // 无字幕的三场：非词人声（vocal），字幕为空串、整场不出字幕。
+    if (silent) assert.ok(line.vocal && line.subtitle === "" && cue.subtitles === false, line.id + " 无字幕：vocal + subtitle \"\" + subtitles:false");
+    else assert.ok(!line.vocal && line.subtitle == null, line.id + " 有字幕的句子不是非词人声、字幕就是 line.text");
+  });
 }
-const retired = [...table0923.matchAll(/下线：(.+?)（/g)][0]?.[1] || "";
-const retiredIds = [...retired.matchAll(/`([A-Za-z]+)`/g)].map(([, id]) => id);
-assert.deepEqual([...retiredIds].sort(), [...RETIRED_0923].sort(), "下线名单就是契约 §5.2 的下线清单");
-for (const id of RETIRED_0923) {
+for (const id of unchanged1011) assert.ok(byId.get(id)?.perLine, id + " 没改字：仍是逐句场景");
+for (const id of [...RETIRED_0923, ...retired1011]) {
   assert.ok(!byId.has(id), id + " 已下线：台词表里不许再有");
   assert.ok(!fs.existsSync(new URL(`./Audio/FirstLevel/AudioVoice_FirstLevel${id}.mp3`, import.meta.url)), id + " 的整段录音已删");
 }
 assert.deepEqual(RETIRE_PENDING, [], "待下线名单已清空");
-const ORDER0923 = scenes0923.map(([id]) => id);
+const ORDER1011 = [...scenes1011.map(({ id }) => id), ...unchanged1011];
+// 2026-10-11 稿里的播放顺序（逐字对账用）：InterpreterCall 两句在 CaptiveDragged.01 与 .02 之间（契约 §3）。
+const PLAY1011 = ["BunkerCount", "BunkerBanter", "BunkerLedger", "BunkerRunnerCall", "BunkerOrders", "BunkerExit", "BunkerIncoming", "BunkerSweep",
+  "CaptiveDragged.01", "InterpreterCall", "CaptiveDragged.02-05", "CaptiveInterrogation", "CaptiveWoundTwist", "BayonetPractice", "RecruitCharge",
+  "CaptiveHowl", "ShunziFound", "RescueInterrogation", "RescueFlee", "RescueHeave", "RescueCheck", "CollectionMeet", "SupportOrder"];
+assert.ok(table1011.includes("（`InterpreterCall` 两句在 01 与 02 之间"), "契约 §3：InterpreterCall 插在 CaptiveDragged 01 与 02 之间");
+const playLines1011 = PLAY1011.flatMap((part) => {
+  const [id, range] = part.split(".");
+  const cue = byId.get(id);
+  assert.ok(cue, "播放顺序里的场景不在台词表：" + id);
+  if (!range) return cue.lines.map((line, index) => ({ cue, line, index }));
+  const [a, b = a] = range.split("-").map(Number);
+  return cue.lines.map((line, index) => ({ cue, line, index })).slice(a - 1, b);
+});
+assert.deepEqual([...new Set(PLAY1011.map((part) => part.split(".")[0]))].sort(), [...ORDER1011].sort(), "播放顺序覆盖契约 §3 的全部场景");
+assert.equal(new Set(playLines1011.map(({ line }) => line.id)).size, ORDER1011.reduce((n, id) => n + byId.get(id).lines.length, 0), "播放顺序每句恰好一次");
 // 2b. 其余剧情 cue 对 09.19 契约 §5（01–02 的旧条目换成上面两张名单）。
 const contractSection = contract.slice(contract.indexOf("## 5. 对白 cue"), contract.indexOf("## 6. 分包与文件归属"));
 const contractCues = [...contractSection.matchAll(/`([A-Za-z]+)`\((\d+)[^)]*\)/g)].map(([, id, count]) => [id, Number(count)])
-  .filter(([id]) => !ORDER0923.includes(id) && !RETIRE_PENDING.includes(id) && !RETIRED_0923.includes(id));
+  .filter(([id]) => !ORDER1011.includes(id) && !RETIRE_PENDING.includes(id) && !RETIRED_0923.includes(id) && !retired1011.includes(id));
 assert.ok(contractCues.length >= 55, "契约 §5 至少解析出 55 条 03 以后的 cue，实际 " + contractCues.length);
 for (const [id, count] of contractCues) {
   const cue = byId.get(id);
   assert.ok(cue, "契约 §5 的 cue 不在台词表：" + id);
   assert.equal(cue.lines.length, count, id + " 句数应与契约一致");
 }
-const expectedStory = new Set([...ORDER0923, ...RETIRE_PENDING, ...contractCues.map(([id]) => id)]);
+const expectedStory = new Set([...ORDER1011, ...RETIRE_PENDING, ...contractCues.map(([id]) => id)]);
 assert.deepEqual(story.map((cue) => cue.id).filter((id) => !expectedStory.has(id)), [], "剧情 cue 不许多出契约之外的条目");
 assert.equal(story.length, expectedStory.size, "剧情 cue 总数与两份契约一致");
 // 01–06 全部逐句；07 以后全部整段。
@@ -104,52 +139,60 @@ assert.equal(story.length, expectedStory.size, "剧情 cue 总数与两份契约
 const ORDER0305 = ["FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdraw", "TakeOverGun", "TankHeard", "TankRoadContact", "TankArmor", "TankTerror",
   "BundleOrder", "BundleGo", "BundleProne", "BundleWhy", "BundleSupply", "BundleBrief", "BundleReturnCall", "BundleAttack", "BundleRetreat", "TankStopped", "FrontRelief"];
 const ORDER06 = ["Volunteer", "BorrowLight", "ZhouLift"];
-assert.deepEqual(perLine.map((cue) => cue.id).sort(), [...new Set([...ORDER0923, ...ORDER0305, ...ORDER06])].sort(),
+assert.deepEqual(perLine.map((cue) => cue.id).sort(), [...new Set([...ORDER1011, ...ORDER0305, ...ORDER06])].sort(),
   "01–06 的剧情 cue 全部是逐句格式，07 以后没有");
-console.log(`ok 契约对账：01–02 新 16 场、03 以后 ${contractCues.length} 条、待下线旧 cue ${RETIRE_PENDING.length} 条`);
+console.log(`ok 契约对账：01–02 共 ${ORDER1011.length} 场（10.11 改字 ${scenes1011.length} 场 + 沿用 ${unchanged1011.length} 场）、03 以后 ${contractCues.length} 条、待下线旧 cue ${RETIRE_PENDING.length} 条`);
 
 // 3. 台词逐字对账。
-// 3a. 09.23 新稿：> **名字：**“中文” / > **名字：**「日语」 + > **中文：**“译文”；切到「## 分镜参考」为止。
-const NAME = { 顺子: "shunzi", 幺娃: "yaowa", 川军: "comrade", 传令兵: "runner", 罗班长: "luo", 洞外士兵: "shouter", 日兵甲: "ijaA",
-  日兵乙: "ijaB", 日兵丙: "ijaC", 日兵丁: "ijaD", 翻译: "interpreter", 守军: "guard" };
-const new0923 = [];
-for (const raw of opening0923.slice(0, opening0923.indexOf("## 分镜参考")).split(/\r?\n/)) {
+// 3a. 2026-10-11 稿：> **名字（动作）：**“中文”（一行可有两句：「“七个。”……“八个。”」）。日军对白在稿里只有中文译文（契约 §3 标 JA），
+//     日语写法由 Voice 包定、写在 Data_FirstLevelJapaneseSpeech（kana 纯假名 + kanji 稿面）。无字幕的三场是非词人声，稿里没有句子。
+const NAME = { 顺子: "shunzi", 幺娃: "yaowa", 冬瓜: "comrade", 川军: "comrade", 传令兵: "runner", 罗班长: "luo", 洞外士兵: "shouter", 日兵甲: "ijaA",
+  日兵乙: "ijaB", 日兵丙: "ijaC", 日兵丁: "ijaD", 翻译: "interpreter", 守军: "guard", 何有田: "heyoutian", 刘文财: "liuwencai" };
+const new1011 = [];
+for (const raw of opening1011.split(/\r?\n/)) {
   const m = /^> \*\*(.+?)：\*\*(.*)$/.exec(raw);
-  if (!m) continue;
+  if (!m || ["阶段进展", "任务提示"].includes(m[1])) continue;
   const name = m[1].replace(/（.*?）/g, ""), body = m[2].trim();
-  if (name === "中文") { const zh = /^“([^”]*)”$/.exec(body); assert.ok(zh && new0923.at(-1)?.lang === "ja", "「中文：」只跟在日语行后面"); new0923.at(-1).translation = zh[1]; continue; }
-  const ja = /^「([^」]*)」$/.exec(body), zh = /^“([^”]*)”$/.exec(body);
-  assert.ok(ja || zh, "09.23 新稿台词行格式：" + raw);
-  assert.ok(NAME[name], "09.23 新稿出现未登记的说话人：" + name);
-  new0923.push({ who: NAME[name], text: (ja || zh)[1], lang: ja ? "ja" : "zh" });
+  const quotes = [...body.matchAll(/“([^”]*)”/g)].map(([, text]) => text);
+  assert.ok(quotes.length && /^“[^”]*”(……“[^”]*”)*$/.test(body), "10.11 稿台词行格式：" + raw);
+  assert.ok(NAME[name], "10.11 稿出现未登记的说话人：" + name);
+  for (const text of quotes) new1011.push({ who: NAME[name], text });
 }
-const authored0923 = ORDER0923.flatMap((id) => byId.get(id).lines.map((line, index) => ({ cue: byId.get(id), line, index })));
-assert.equal(authored0923.length, new0923.length, `01–02 台词句数与 09.23 新稿一致（表 ${authored0923.length}，稿 ${new0923.length}）`);
+const authored1011 = playLines1011.filter(({ line }) => !line.vocal || line.subtitle !== "");
+assert.equal(authored1011.length, new1011.length, `01–02 有字幕的台词句数与 10.11 稿一致（表 ${authored1011.length}，稿 ${new1011.length}）`);
 let japanese = 0;
-authored0923.forEach(({ cue, line, index }, i) => {
-  const entry = new0923[i], where = line.id;
-  assert.equal(line.who, entry.who, where + " 说话人与新稿一致");
-  assert.equal(line.lang || "zh", entry.lang, where + " 语言与新稿一致");
-  if (entry.lang === "ja") {
-    japanese++;
-    const speech = JAPANESE_SPEECH[line.id];
-    assert.ok(speech, where + " 日语行缺少假名/汉字写法");
-    assert.equal(speech.kanji, entry.text, where + " 日语汉字写法与新稿一致");
-    assert.equal(line.text, entry.translation, where + " 字幕是新稿「中文：」那一行");
-    assert.equal(MissionVoiceSpoken(cue, index), speech.kana, where + " 送 TTS 的是纯假名");
-    assert.ok(!/[一-鿿]/.test(speech.kana), where + " 假名里不许残留汉字");
-  } else {
-    assert.equal(line.text, entry.text, where + " 台词与新稿逐字一致");
-    assert.equal(MissionVoiceSpoken(cue, index), line.text, where + " 中文行送 TTS 的就是原文");
-  }
+authored1011.forEach(({ cue, line, index }, i) => {
+  const entry = new1011[i], where = line.id;
+  assert.equal(line.who, entry.who, where + " 说话人与 10.11 稿一致");
+  assert.equal(line.text, entry.text, where + " 台词（日语行是字幕译文）与 10.11 稿逐字一致");
   assert.equal(MissionVoiceSubtitle(cue, index), line.text, where + " 字幕默认取 line.text");
 });
-assert.equal(japanese, 20, "01–02 新稿日语 20 句（09.23 稿 18 句 + 2026-09-26 追加 InterpreterCall 2 句）");
+for (const { cue, line, index } of playLines1011) {
+  const where = line.id;
+  if (line.lang === "ja") {
+    japanese++;
+    const speech = JAPANESE_SPEECH[line.id];
+    assert.ok(speech?.kana && speech?.kanji, where + " 日语行缺少假名/汉字写法");
+    assert.equal(MissionVoiceSpoken(cue, index), speech.kana, where + " 送 TTS 的是纯假名");
+    assert.ok(/^[぀-ヿ…、。！？ー]+$/.test(speech.kana), where + " 假名里不许残留汉字：" + speech.kana);
+  } else {
+    assert.equal(MissionVoiceSpoken(cue, index), line.text, where + " 中文行送 TTS 的就是原文");
+  }
+  if (line.subtitle === "") assert.equal(MissionVoiceSubtitle(cue, index), "", where + " 无字幕的句子字幕是空串（不回落到 line.text）");
+}
+const contractJa = scenes1011.flatMap(({ lines }) => lines).filter(({ ja }) => ja).length;
+const vocalJa = playLines1011.filter(({ line }) => line.lang === "ja" && line.vocal).length;
+// 契约 §3 标 JA 的 27 句 + 没改字的 InterpreterCall 2 句、RescueFlee 1 句 + 丁冲上去的喊声（非词，日语那一路的假名）。
+assert.equal(japanese, contractJa + 3 + vocalJa, `01–02 日语 ${japanese} 句 = 契约 §3 标 JA ${contractJa} + 沿用 3 + 非词 ${vocalJa}`);
+assert.equal(contractJa, 27, "契约 §3 标 JA 的有 27 句");
+// 「丁。过来。」不把「丁」当名字念（契约 §3）；「支那猪」是全段唯一的蔑称（10.11 稿日军口径）。
+assert.ok(JAPANESE_SPEECH["BayonetPractice.02"].kana.startsWith("おい、しんぺい"), "「丁。过来。」叫的是「おい、しんぺい」");
+assert.deepEqual(Object.keys(JAPANESE_SPEECH).filter((id) => /しな/.test(JAPANESE_SPEECH[id].kana)), ["BayonetPractice.06"], "日军蔑称只有割喉时嘟囔的那一句");
 // 3b. 03–05 对 09.22 稿、06 以后对 09.19 稿（旧口径：带中文引号的 > 行）。
 const Quoted = (text) => text.split(/\r?\n/).filter((raw) => raw.startsWith("> ")).map((raw) => /“([^”]*)”(?:（([^）]*)）)?/.exec(raw))
   .filter(Boolean).map((m) => ({ text: m[1], translation: m[2] }));
 const rest = [...Quoted(frontSource), ...Quoted(previousSource.slice(previousSource.indexOf("# 06｜")))];
-const restAuthored = story.filter((cue) => !ORDER0923.includes(cue.id) && !RETIRE_PENDING.includes(cue.id))
+const restAuthored = story.filter((cue) => !ORDER1011.includes(cue.id) && !RETIRE_PENDING.includes(cue.id))
   .flatMap((cue) => cue.lines.map((line, index) => ({ cue, line, index })));
 assert.equal(restAuthored.length, rest.length, `03 以后台词句数与原文一致（表 ${restAuthored.length}，原文 ${rest.length}）`);
 restAuthored.forEach(({ cue, line, index }, i) => {
@@ -166,9 +209,9 @@ for (const id of RETIRE_PENDING) {
   cue.lines.forEach((line, index) => { if (line.lang === "ja") assert.equal(line.text, old0921[start + index].translation, `${id}[${index}] 字幕是译文`); });
 }
 const legacyJa = RETIRE_PENDING.flatMap((id) => byId.get(id).lines.map((line, index) => line.lang === "ja" ? `${id}:${index}` : null)).filter(Boolean);
-assert.deepEqual(Object.keys(JAPANESE_SPEECH).sort(), [...authored0923.filter(({ line }) => line.lang === "ja").map(({ line }) => line.id), ...legacyJa].sort(),
+assert.deepEqual(Object.keys(JAPANESE_SPEECH).sort(), [...playLines1011.filter(({ line }) => line.lang === "ja").map(({ line }) => line.id), ...legacyJa].sort(),
   "假名侧表与日语行一一对应");
-console.log(`ok 台词逐字对账：01–02 ${authored0923.length} 句（日语 ${japanese}）、03 以后 ${restAuthored.length} 句、旧 cue ${RETIRE_PENDING.length} 条`);
+console.log(`ok 台词逐字对账：01–02 ${playLines1011.length} 句（有字幕 ${authored1011.length}、日语 ${japanese}）、03 以后 ${restAuthored.length} 句、旧 cue ${RETIRE_PENDING.length} 条`);
 
 // 4. 假名不许出现在会被界面字表扫到的台词表里。
 const dialogueSource = Read("./Data_FirstLevelMissionDialogue.mjs");
@@ -269,11 +312,16 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   for (const spec of [...Object.values(MISSION_LEADER_STAGES), ...Object.values(MISSION_GUIDE_TRANSFERS)])
     referenced.set(spec.cue, "MISSION_LEADER_STAGES");
   assert.ok(referenced.size >= 40, "静态扫描至少应找到 40 个 cue 引用，实际 " + referenced.size);
-  const missing = [...referenced].filter(([id]) => !byId.has(id));
+  // 2026-10-11：CaptiveTaunt / BunkerSearch 已下线，旧导演（Script_OpeningStoryboards，归 Dir01）还引用着，等 Dir01 换成新场景。**只许变短**，集成时清空。
+  const RETIRED_AWAITING_DIRECTOR = new Set(["BunkerSearch", "CaptiveTaunt"]);
+  for (const id of RETIRED_AWAITING_DIRECTOR) assert.ok(!byId.has(id) && retired1011.includes(id), id + " 是契约 §3 下线的场景，别往这张名单里放别的");
+  const missing = [...referenced].filter(([id]) => !byId.has(id) && !RETIRED_AWAITING_DIRECTOR.has(id));
   assert.deepEqual(missing, [], "运行时引用了台词表里没有的 cue：" + JSON.stringify(missing));
   // 09.23 新场景的触发点由第二波 Opening 包（新 01–02 导演）接上。**只许变短**。
   // Opening 包（2026-09-24）已把 01–02 的 13 场全部接到导演的 PlayScene 上，名单清空。
+  // 2026-10-11 新场景由 Dir01 / Dir02 接触发点（集成时清空）。
   const SECOND_WAVE_UNWIRED = new Set([
+    "BunkerCount", "BunkerLedger", "BunkerExit", "BunkerSweep", "CaptiveWoundTwist", "BayonetPractice", "RecruitCharge", "CaptiveHowl",
   ]);
   const unwired = story.map((cue) => cue.id).filter((id) => !referenced.has(id));
   for (const id of unwired) assert.ok(SECOND_WAVE_UNWIRED.has(id), "这条剧情 cue 没有任何触发点：" + id);
@@ -282,7 +330,7 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
 
 // 9. 导演表：每个逐句场景都有、每句都有、字段合法；具名事件齐全。
 {
-  const AFTER = /^(prev|start|gate|event:[A-Za-z]+)$/;
+  const AFTER = /^(prev|start|gate|event:[A-Za-z][A-Za-z0-9]*)$/;   // 事件名可带数字（契约 §3 冻结的 stab7 / stab8 / stab9）
   const overrides = [];
   for (const cue of MISSION_DIALOGUE) {
     const scene = FIRST_LEVEL_DIALOGUE_DIRECTION[cue.id];
@@ -309,13 +357,44 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   assert.ok(LineDirection(byId.get("BunkerIncoming"), 0).cutAtS < 0, "截断点在句尾之前");
   assert.deepEqual(Emits("BorrowLight"), ["BorrowLightMatchesPocketed", "BorrowLightCigaretteOffered"], "借火两处动作空当各有事件");
   assert.ok(LineDirection(byId.get("BorrowLight"), 5).offsetS >= 1.8 && LineDirection(byId.get("BorrowLight"), 6).offsetS >= 2.8, "借火两处空当约 2 s 与 3 s");
-  assert.ok(LineDirection(byId.get("BunkerSearch"), 1).offsetS < 0, "日兵丁压住丙的尾音（重叠）");
-  assert.ok(LineDirection(byId.get("CaptiveInterrogation"), 5).offsetS < 0, "日兵乙压着翻译的话骂进来（重叠）");
-  assert.equal(LineDirection(byId.get("CaptiveTaunt"), 0).after, "event:ThroatCut", "割喉后才嘲弄");
-  assert.equal(LineDirection(byId.get("RescueInterrogation"), 5).after, "gate", "「说话！」等导演");
+  // 2026-10-11 契约 §3 冻结的导演事件名（Dir01 / Dir02 按同名发）：要等动作的句子 after:"event:<名>"，其余沿用录音间隔。
+  const FROZEN_EVENTS = {
+    "BunkerBanter.07": "nearShell", "BunkerLedger.01": "pour", "BunkerExit.01": "exitReach", "BunkerExit.02": "clipsThrown",
+    "BunkerSweep.01": "grenadeBlast", "BunkerSweep.03": "stab7", "BunkerSweep.04": "stab8", "BunkerSweep.07": "stab9",
+    "CaptiveDragged.01": "haltB", "CaptiveDragged.03": "kneeled", "CaptiveDragged.05": "boltOpen", "CaptiveWoundTwist.01": "woundPress",
+    "CaptiveInterrogation.04": "woundPress", "BayonetPractice.03": "recruitSlapped", "BayonetPractice.04": "recruitPant",
+    "BayonetPractice.05": "hairLifted", "BayonetPractice.06": "cutStart", "BayonetPractice.07": "bayonetFixed", "BayonetPractice.08": "recruitNod",
+    "ShunziFound.01": "bootGrind", "RescueInterrogation.06": "cheekCut",
+  };
+  for (const id of ORDER1011) byId.get(id).lines.forEach((line, index) => {
+    const d = LineDirection(byId.get(id), index), want = FROZEN_EVENTS[line.id];
+    if (want) assert.equal(d.after, "event:" + want, line.id + " 等导演事件 " + want + "（契约 §3 冻结）");
+    else if (!unchanged1011.includes(id)) assert.ok(!d.after.startsWith("event:") && d.after !== "gate", line.id + " 没冻结事件的句子不等导演");
+  });
+  assert.equal(LineDirection(byId.get("CaptiveInterrogation"), 3).offsetS, 0.8, "CaptiveInterrogation.04 在 woundPress 后 0.8 s");
+  assert.equal(LineDirection(byId.get("BayonetPractice"), 5).offsetS, 0, "BayonetPractice.06 下刀那一刻开口（边下刀边嘟囔）");
+  assert.equal(LineDirection(byId.get("BayonetPractice"), 5).projection, "low", "「支那猪，叫得倒响」是低声嘟囔");
+  assert.deepEqual(Emits("BayonetPractice"), ["taunted"], "BayonetPractice.06 说完发 taunted");
+  assert.equal(LineDirection(byId.get("CaptiveHowl"), 0).stopOn, "event:throatCut", "嚎声在割喉（throatCut）时掐断");
+  // 日兵甲冷静、话短、不吼：01–02 改了字的场景里强度 ≤ 0.5、不用喊的档、句前句后不写笑。
+  for (const { id } of scenes1011) byId.get(id).lines.forEach((line, index) => {
+    if (line.who !== "ijaA") return;
+    const d = LineDirection(byId.get(id), index);
+    assert.ok(d.intensity <= 0.5 && d.projection !== "shout" && !d.effort, line.id + " 日兵甲冷静：强度 ≤ 0.5、不喊、不另写笑与喘");
+  });
+  // 笑声写进 delivery 里演，不单独放句前句后（10.11 场景）。
+  for (const { id } of scenes1011) for (const d of Object.values(FIRST_LEVEL_DIALOGUE_DIRECTION[id].lines))
+    assert.ok(!/笑/.test(`${d.effort?.before || ""}${d.effort?.after || ""}`), id + " 笑不单独放在句前句后");
+  // 冬瓜：打趣三场用平时的定妆音，被拖出 / 审问 / 拧伤口 / 嚎四场用重伤状态的定妆音。
+  for (const id of ["BunkerBanter", "BunkerLedger", "BunkerExit"]) assert.ok(!FIRST_LEVEL_DIALOGUE_DIRECTION[id].voices, id + " 冬瓜用平时的定妆音");
+  for (const id of ["CaptiveDragged", "CaptiveInterrogation", "CaptiveWoundTwist", "CaptiveHowl"])
+    assert.equal(FIRST_LEVEL_DIALOGUE_DIRECTION[id].voices?.comrade, "comradeWounded", id + " 冬瓜用重伤状态的定妆音");
+  assert.equal(MISSION_VOICE_CAST.comrade[0], "冬瓜", "comrade 的界面名是「冬瓜」（键不变）");
   // 默认沿用整段录音里的原始间隔：导演只覆盖稿里要等动作（gate / 事件 / 借火两处空当）与压尾音的几句。
-  assert.deepEqual(overrides.sort(), ["BorrowLight.06", "BorrowLight.07", "BundleAttack.02", "BundleProne.02", "BunkerRunnerCall.02", "BunkerSearch.02",
-    "CaptiveInterrogation.06", "FrontApproach.02", "RescueInterrogation.06"], "覆盖录音间隔的句子只有这几处");
+  assert.deepEqual(overrides.sort(), ["BayonetPractice.03", "BayonetPractice.04", "BayonetPractice.05", "BayonetPractice.06", "BayonetPractice.07", "BayonetPractice.08",
+    "BorrowLight.06", "BorrowLight.07", "BundleAttack.02", "BundleProne.02", "BunkerBanter.07", "BunkerExit.02", "BunkerRunnerCall.02",
+    "BunkerSweep.03", "BunkerSweep.04", "BunkerSweep.07", "CaptiveDragged.03", "CaptiveDragged.05", "CaptiveInterrogation.04",
+    "FrontApproach.02", "RescueInterrogation.06"], "覆盖录音间隔的句子只有这几处（等动作的事件、gate 与借火两处空当）");
   {
     const probe = new FirstLevelMissionVoice({ audio: { voiceBank: new Map() } });
     probe.manifest = { cues: {}, lines: { "BorrowLight.02": { gapBeforeS: 0.42 }, "BorrowLight.06": { gapBeforeS: 0.3 } } };
@@ -349,31 +428,43 @@ const FakeAudio = () => {
   return audio;
 };
 {
-  // 10a. 一场有录音的对白：每句一个声源、各挂各的头、顺子居中、日兵丁压丙的尾音、侧链与让路。
+  // 10a. 一场有录音的对白：每句一个声源、各挂各的头、录音间隔为负时压尾音（重叠）、侧链与让路。
+  //      2026-10-11 起数据里没有写死的压尾音（09.23 的 BunkerSearch.02 已下线）：用 BunkerSweep.05/.06（丙→乙）+ 清单里 −0.3 s 的录音间隔。
   const audio = FakeAudio(), rows = [], events = [];
-  for (const [i, s] of [[1, 1.3], [2, 1.0]]) audio.voiceBank.set(`MissionBunkerSearch_0${i}`, { duration: s, speechEnvelope: null });
+  for (const [i, s] of [[5, 1.3], [6, 1.0]]) audio.voiceBank.set(`MissionBunkerSweep_0${i}`, { duration: s, speechEnvelope: null });
   const voice = new FirstLevelMissionVoice({ audio, hud: { SayLines: (r) => rows.push(r.map((x) => x.text)), Say() {} },
     Event: (id, cue, detail) => events.push({ id, cue, ...detail }), Clock: () => audio.t });
-  voice.manifest = { cues: {}, lines: { "BunkerSearch.01": { sha256: "a", seconds: 1.3 }, "BunkerSearch.02": { sha256: "b", seconds: 1.0 } } };
-  const heads = { ijaC: { x: 10, y: 1.6, z: 0 }, ijaD: { x: 14, y: 1.6, z: 3 } };
-  const handle = voice.PlayScene("BunkerSearch", { speakers: heads });
+  voice.manifest = { cues: {}, lines: { "BunkerSweep.05": { sha256: "a", seconds: 1.3 }, "BunkerSweep.06": { sha256: "b", seconds: 1.0, gapBeforeS: -0.3 } } };
+  const heads = { ijaC: { x: 10, y: 1.6, z: 0 }, ijaB: { x: 14, y: 1.6, z: 3 } };
+  const handle = voice.PlayLines(["BunkerSweep.05", "BunkerSweep.06"], { speakers: heads });
   const Step = (seconds) => { for (let i = 0; i < Math.round(seconds * 60); i++) { audio.t += 1 / 60; voice.Update(1 / 60); } };
   Step(0.05);
-  assert.deepEqual(audio.plays.map((p) => p.key), ["MissionBunkerSearch_01"], "第一句单独起播");
+  assert.deepEqual(audio.plays.map((p) => p.key), ["MissionBunkerSweep_05"], "第一句单独起播");
   assert.deepEqual(audio.plays[0].position, heads.ijaC, "丙的声音挂在丙头上");
   assert.ok(audio.duck.at(-1).active && audio.dialogueYield, "开口即侧链压低、自主喊话让路");
   assert.equal(audio.duck.at(-1).ambienceDb, DIALOGUE_DUCK.ambienceDb);
   Step(1.1);
-  assert.equal(audio.plays.length, 2, "丁在丙说完前 0.3 s 开口（重叠）");
-  assert.deepEqual(audio.plays[1].position, heads.ijaD, "丁的声音挂在丁头上，不跟着丙跳");
+  assert.equal(audio.plays.length, 2, "乙在丙说完前 0.3 s 开口（录音间隔为负 = 重叠）");
+  assert.deepEqual(audio.plays[1].position, heads.ijaB, "乙的声音挂在乙头上，不跟着丙跳");
   assert.ok(handle.playing.length === 2, "两句同时在响");
   assert.ok(rows.some((r) => r.length === 2), "重叠时两行字幕同时在");
-  assert.deepEqual(events.filter((e) => e.id === "Line").map((e) => e.lineId), ["BunkerSearch.01", "BunkerSearch.02"]);
+  assert.deepEqual(events.filter((e) => e.id === "Line").map((e) => e.lineId), ["BunkerSweep.05", "BunkerSweep.06"]);
   Step(0.95);
-  assert.ok(handle.done && voice.finished.has("BunkerSearch"), "场景走完记 Done");
+  assert.ok(handle.done, "两句走完");
   assert.ok(audio.duck.at(-1).active, "句间与句尾 holdS 内不放");
   Step(DIALOGUE_DUCK.holdS + 0.1);
   assert.equal(audio.duck.at(-1).active, false, "说完 holdS 后侧链放回、喊话恢复");
+  // 无字幕的非词人声：照常出声、不出字幕行。
+  {
+    const quiet = FakeAudio(), seen = [];
+    quiet.voiceBank.set("MissionCaptiveHowl_01", { duration: 1.2, speechEnvelope: null });
+    const v2 = new FirstLevelMissionVoice({ audio: quiet, hud: { SayLines: (r) => seen.push(r.length), Say() {} }, Clock: () => quiet.t });
+    v2.manifest = { cues: {}, lines: { "CaptiveHowl.01": { sha256: "c", seconds: 1.2 } } };
+    v2.PlayScene("CaptiveHowl", { speakers: { comrade: { x: 1, y: 1, z: 1 } } });
+    for (let i = 0; i < 30; i++) { quiet.t += 1 / 60; v2.Update(1 / 60); }
+    assert.equal(quiet.plays.length, 1, "嚎声照常出声");
+    assert.ok(seen.every((n) => n === 0), "无字幕的场景不出字幕行");
+  }
   console.log("ok 多声部：每句独立声源挂各自头上、可重叠、逐句字幕、侧链与喊话让路");
 }
 {
@@ -475,17 +566,17 @@ const FakeAudio = () => {
     voice.manifest = { cues: {}, lines: {} };
     assert.equal(voice.Enqueue("NoSuchCueAtAll"), false, "未知 cue 不入队");
     voice.Guidance("NoSuchCueAtAll"); voice.Cancel(["NoSuchCueAtAll"]); voice.Replay("NoSuchCueAtAll");
-    for (const id of ["BorrowLight", "CaptiveInterrogation", "SouthWhisper"]) {
+    for (const id of ["BorrowLight", "RescueFlee", "SouthWhisper"]) {
       assert.ok(voice.Enqueue(id), id + " 入队");
       for (let i = 0; i < 9000 && !done.includes(id); i++) voice.Update(1 / 60);
     }
   } finally { console.warn = original; }
-  assert.deepEqual(done, ["BorrowLight", "CaptiveInterrogation", "SouthWhisper"], "缺录音的 cue 也要走完并 Done");
+  assert.deepEqual(done, ["BorrowLight", "RescueFlee", "SouthWhisper"], "缺录音的 cue 也要走完并 Done");
   assert.deepEqual(lines.filter((l) => l.cue === "BorrowLight").map((l) => l.index), [0, 1, 2, 3, 4, 5, 6, 7, 8], "借火九句按句序发 Line");
   assert.ok(lines.filter((l) => l.cue === "BorrowLight").every((l) => l.lineId?.startsWith("BorrowLight.")), "逐句 Line 事件带 lineId");
   // 07 以后仍是整段录音（09.21 的 01–02 整段 cue 已下线，换 07 的 SouthWhisper 测整段）。
   assert.deepEqual(lines.filter((l) => l.cue === "SouthWhisper").map((l) => l.index), [0, 1, 2, 3, 4, 5], "07 以后的整段 cue 仍逐句发 Line");
-  assert.ok(said.includes("日兵甲：他们的部队往哪儿撤了！问他！"), "日语行字幕是中文译文");
+  assert.ok(said.includes("翻译：有敌人！"), "日语行字幕是中文译文");
   assert.ok(said.every((row) => !/[぀-ヿ]/.test(row)), "字幕里不许出现假名");
   assert.ok(warnings.some((text) => text.includes("NoSuchCueAtAll")), "未知 cue 警告一次");
   assert.deepEqual(voice.State().unknown, ["NoSuchCueAtAll"]);
@@ -830,7 +921,8 @@ if (process.argv.includes("--audio")) {
             `${line.id} 字错率 ${entry.metrics.cer} 超门槛，又没有绑定这条录音的人工核对记录（Data_FirstLevelVoiceTranscriptReview.json）`);
           usedReviews.add(line.id);
           const want = [...MissionVoiceSpoken(cue, index)].filter((c) => /[\p{L}\p{N}]/u.test(c)).length;
-          if (judged && entry.metrics.cer > SCENE_CHECK.reviewedMaxCer)
+          // 非词人声（vocal：嚎、憋住的痛叫、用力的闷吼）没有「念错词」这回事，核对记录照样要有。
+          if (judged && entry.metrics.cer > SCENE_CHECK.reviewedMaxCer && !line.vocal)
             assert.ok(Math.abs(entry.metrics.lengthDiff ?? 99) <= Math.max(2, 0.3 * want), `${line.id} 字错率 ${entry.metrics.cer} 且字数差 ${entry.metrics.lengthDiff}：念错 / 漏词不许核对放行`);
         }
         seconds += entry.seconds; lineCount++;

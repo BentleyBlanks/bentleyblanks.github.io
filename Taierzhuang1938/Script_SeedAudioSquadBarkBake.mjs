@@ -53,6 +53,9 @@ export const CHECK = Object.freeze({
   reviewedMaxCer: 0.6,    // 超过它、且字数也差得多 = 念错词（硬错误）
   wrongVoiceMargin: 0.08, // 与另一名班组成员定妆音的余弦比本人高出这么多 = 这一句像别人
   wrongVoiceShare: 0.25,  // 像别人的句子超过这个比例 = 整条不像本人（硬错误）
+  yellMaxSeconds: 0.9,    // 白刃冲锋的单字喊杀（yell_*，2026-10-11）：吼声本身 0.3–0.7 s + 两头各 yellPadS 静音，长了不变调压快（最多 yellMaxTempo）
+  yellPadS: 0.1,          // 喊杀两头多留的静音：一声 0.6 s 的吼只留 60 ms 时，量底噪的「安静帧」全落在吼声的衰减尾巴上，信噪比假低
+  yellMaxTempo: 1.45,     // 一声吼大半是拖长的元音，压快 40% 听不出变调（atempo 不变调）
 });
 
 const Arg = (name) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -85,6 +88,7 @@ const KEY_NOTES = Object.freeze({
   vent_ammo_1: "扣扳机才发现最后一发打出去了，又气又急地骂出口", vent_ammo_2: "摸遍子弹盒一个桥夹都没有，火冒三丈地骂",
   vent_ammo_3: "骂自己运气背，咬着牙自言自语", vent_grenade_1: "最后一颗手榴弹甩出去，手往腰上一摸是空的，骂出口",
   vent_grenade_2: "对着鬼子那边恶狠狠地骂，又带点江湖人的痞气", vent_grenade_3: "气冲冲地骂，手榴弹没得扔了",
+  yell_sha: "提着大刀冲下台阶，跟弟兄们一起吼一声杀：单字、短促、嘶吼，从胸腔里吼出来，不到一秒；吼完马上收住，不喘粗气、不拖尾音，前后都是干净的静音",
 });
 
 export function CastReference(who) {
@@ -107,6 +111,7 @@ export function BarkLines(who) {
 
 /** 另录的那几套换一句场景说明（主录音那几套仍用默认那句，提示词哈希不变）。 */
 const SCENE = Object.freeze({
+  yell: "他和弟兄们提着大刀从台阶上冲下沟去反冲锋，下面是 1 句白刃冲锋时的喊杀：只有一个字，短促、嘶吼、有狠劲，",
   playerVent: "他在前沿的战壕里，下面是 6 句互不相连的气话：子弹或手榴弹刚打光，他骂出口、半是骂鬼子半是自言自语，不是喊给谁听的命令："
     + "要冲、要短、带火气和江湖人的痞气，咬字清楚，",
 });
@@ -175,20 +180,21 @@ function Cut(who, n) {
   mapped.forEach((m, i) => { if (m.start == null || m.coverage < CHECK.minCoverage) hard.push(`漏句 ${lines[i].key}（对上 ${m.matched}/${m.total} 字）`); });
   const wav = path.join(dir, "take.wav");
   // 整条先按同一个增益拉平（只为了切点判静音有统一的尺子），逐句电平在下面各自齐平。
-  const master = MasterSceneWav(raw, wav, { targetDb: CHECK.targetRmsDb, ceilingDb: LINE_MASTER.ceilingDb });
+  const yellTake = lines.every((l) => l.key.startsWith("yell_")), slicePad = yellTake ? CHECK.yellPadS : LINE_MASTER.padS;
+  const master = MasterSceneWav(raw, wav, { targetDb: CHECK.targetRmsDb, ceilingDb: LINE_MASTER.ceilingDb, ...(yellTake ? { padS: CHECK.yellPadS + 0.02 } : {}) });
   const measure = MeasureVoice(wav), framesInfo = FrameRms(wav);
   let cutMethod = "subtitle", slices = null;
   const usable = !hard.some((h) => h.startsWith("漏句") || h === "没有逐字时间戳");
   if (usable) {
     slices = SliceScene(framesInfo, mapped.map((m) => ({ start: m.start - master.trimStartS, end: m.end - master.trimStartS })),
-      { activeRmsDb: measure.activeRmsDb, padS: LINE_MASTER.padS });
+      { activeRmsDb: measure.activeRmsDb, padS: slicePad });
   }
   const tooShort = slices?.some((s, i) => s.endS - s.startS < Math.min(0.35, 0.1 + 0.05 * mapped[i].total));
   if (!slices || tooShort) {
     const islands = IslandLines(framesInfo, lines.map((l) => Math.max(0.25, Letters(l.text) / 4.6)),
       { activeRmsDb: measure.activeRmsDb, minRunS: 0.25 });
     if (islands) {
-      slices = SliceScene(framesInfo, islands, { activeRmsDb: measure.activeRmsDb, padS: LINE_MASTER.padS });
+      slices = SliceScene(framesInfo, islands, { activeRmsDb: measure.activeRmsDb, padS: slicePad });
       cutMethod = "silence";
       flags.push(`逐字时间戳${usable ? "切出过短的片段" : "缺字"}，改按静音与预计时长切`);
       // 漏句是按时间戳判的；按静音切得开、转写又对得上，就不算漏句（转写那一关兜底）。
@@ -200,19 +206,22 @@ function Cut(who, n) {
     Run(["-y", "-v", "error", "-i", wav, "-af", `atrim=start=${s.startS.toFixed(4)}:end=${s.endS.toFixed(4)},asetpts=PTS-STARTPTS`,
       "-c:a", "pcm_f32le", seg], `cut ${who} ${lines[i].key}`);
     s.file = path.join(dir, `${lines[i].key}.mp3`);
-    let mastered = MasterLine(seg, s.file, { targetDb: CHECK.targetRmsDb, padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb });
+    const yell = lines[i].key.startsWith("yell_"), maxS = yell ? CHECK.yellMaxSeconds : CHECK.maxSeconds, padS = yell ? CHECK.yellPadS : LINE_MASTER.padS;
+    let mastered = MasterLine(seg, s.file, { targetDb: CHECK.targetRmsDb, padS, ceilingDb: LINE_MASTER.ceilingDb });
     // 只超上限一点（≤ CHECK.maxTempo）就把这一句不变调压快到上限内，不为一句整条重抽（少抽卡）。
-    const over = mastered.measure.seconds / (CHECK.maxSeconds - 0.04);
-    if (over > 1 && over <= CHECK.maxTempo) {
-      mastered = MasterLine(seg, s.file, { targetDb: CHECK.targetRmsDb, padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb, tempo: over });
+    const over = mastered.measure.seconds / (maxS - 0.04);
+    if (over > 1 && over <= (yell ? CHECK.yellMaxTempo : CHECK.maxTempo)) {
+      mastered = MasterLine(seg, s.file, { targetDb: CHECK.targetRmsDb, padS, ceilingDb: LINE_MASTER.ceilingDb, tempo: over });
       s.tempo = +over.toFixed(3);
       flags.push(`${lines[i].key} 超长，不变调压快 ${((over - 1) * 100).toFixed(1)}%`);
     }
     fs.rmSync(seg, { force: true });
     s.gainDb = mastered.gainDb;
     s.measure = mastered.measure;
-    if (s.measure.seconds > CHECK.maxSeconds || s.measure.seconds < CHECK.minSeconds)
-      hard.push(`${lines[i].key} 时长 ${s.measure.seconds} s（要 ${CHECK.minSeconds}–${CHECK.maxSeconds} s）`);
+    if (s.measure.seconds > maxS || s.measure.seconds < CHECK.minSeconds)
+      hard.push(`${lines[i].key} 时长 ${s.measure.seconds} s（要 ${CHECK.minSeconds}–${maxS} s）`);
+    // 太短太尖的一声（2026-10-11 liuwencaiYell#2，0.31 s）真峰值先顶到 −1 dBTP，有声段电平拉不到目标：与 --audio 门禁同一道（目标 −2.5 dB 以内）。
+    if (s.measure.activeRmsDb < CHECK.targetRmsDb - 2.5) hard.push(`${lines[i].key} 有声段 ${s.measure.activeRmsDb} dB（目标 ${CHECK.targetRmsDb}，峰值先顶到上限）`);
     if (s.measure.snrDb < CHECK.minSnrDb) hard.push(`${lines[i].key} 信噪比 ${s.measure.snrDb} dB（要 ≥ ${CHECK.minSnrDb}）`);
   });
   fs.rmSync(wav, { force: true });
@@ -254,7 +263,8 @@ function Judge(results) {
       }
       const want = Letters(line.text), got = Letters(s.transcript || "");
       s.lengthDiff = got - want;
-      if (long && s.cer != null && s.cer > CHECK.reviewedMaxCer && Math.abs(got - want) > Math.max(2, 0.3 * want))
+      // 单字喊杀（yell_*）是一声吼，whisper 会写成「SAAA」「Saw」「啥」：字错率照量、照样要逐字核对记录，不算念错。
+      if (long && s.cer != null && s.cer > CHECK.reviewedMaxCer && Math.abs(got - want) > Math.max(2, 0.3 * want) && !line.key.startsWith("yell_"))
         r.hard.push(`${line.key} 字错率 ${s.cer}「${s.transcript}」`);
       else if (s.cer != null && s.cer > CHECK.maxCer) r.flags.push(`${line.key} 字错率 ${s.cer} 待逐字核对「${s.transcript}」`);
     }
