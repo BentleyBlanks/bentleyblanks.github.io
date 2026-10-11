@@ -982,9 +982,41 @@
       "seconds": 2.26,
       "credit": "Volcengine SeedAudio 1.0 · 喉咙被割开/打穿时的窒息哽咽（NeckDeath_take02.mp3, NeckDeath_take07.mp3） · 2026-09-30",
       "license": "volcengine"
+    },
+    "whistleShort": {
+      "files": [
+        "AudioSfx_WhistleShort_01.mp3"
+      ],
+      "seconds": 0.42,
+      "credit": "The Chris Alan · 金属哨子单音（长短不一）· Sonniss GDC 2018",
+      "license": "sonniss"
+    },
+    "clothRip": {
+      "files": [
+        "AudioSfx_ClothRip_01.mp3"
+      ],
+      "seconds": 0.62,
+      "credit": "RDGSFX007 · 撕开棉 T 恤（带缝线崩断）· Sonniss GDC 2015",
+      "license": "sonniss"
+    },
+    "boltRattle": {
+      "files": [
+        "AudioSfx_BoltRattle_01.mp3"
+      ],
+      "seconds": 0.5,
+      "credit": "FLYSOUND · 莫辛纳甘步枪操作（枪机）· Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "bayonetFixClick": {
+      "files": [
+        "AudioSfx_BayonetFixClick_01.mp3"
+      ],
+      "seconds": 0.4,
+      "credit": "Spectral Vibrations · 栓动步枪弹匣入位 · Sonniss Game Audio Monthly #1",
+      "license": "sonniss"
     }
   },
-  "bakedAt": "2026-09-28",
+  "bakedAt": "2026-10-11",
   "normalization": {
     "normalizedAt": "2026-09-08",
     "tool": "Script_AudioNormalize.mjs",
