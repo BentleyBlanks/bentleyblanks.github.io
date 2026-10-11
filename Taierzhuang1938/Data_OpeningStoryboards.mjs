@@ -138,6 +138,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // slows into the last mark of a route (sqrt(2 a d)), never below minMps short of it. Turns speed up at
   // turnAccelRps2 to turnRps and ease into the facing instead of starting and stopping at full rate.
   pace:Object.freeze({ accelMps2:4, decelMps2:4, minMps:.3 }), turnAccelRps2:24,
+  // A director's native crouch (Move `crouch`, 2026-10-12 R2-Dir: Liu / He on one knee at their N25 posts) goes down / comes up over crouchS.
+  crouchS:.4,
   // Held-pose life (Script_OpeningActorPerformance.OpeningHeldLife): a man the director holds on a still frame
   // (Luo kneeling at the mouth through all of Banter, ijaB on the ready through 02's Hold, a collar held on a hold
   // loop) with no dialogue acting on him breathes, sways and lets his eyes wander instead of standing as a statue.
@@ -473,7 +475,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // BunkerOrders.01 waits for him at the post, and for line 2 to end, but not longer than holdMaxS after he arrives.
     // The three front-bound men (Data_FirstLevelBackdropSquads.OPENING_DEPTH_WALKERS) set off delayS after line 2 opens (or after
     // the runner arrives, if that comes first): they used to be under way 3 s before the report, which line 2 -> arrival keeps.
-    runnerCall:Object.freeze({ afterS:.5, secondWithinM:12.5, holdMaxS:1.5 }),
+    // 2026-10-12 R2-Dir (N03, 「传令兵扶膝喘气」): at the post he bends over catching his breath on leanClip (RunnerLeanPostCall, its lean
+    // onto the right hand) and BunkerOrders.01 waits breathS after he gets there (it started on his arrival: the far call was over by
+    // then); he straightens into MessengerReport for the report (its dialogue acting).
+    runnerCall:Object.freeze({ afterS:.5, secondWithinM:12.5, holdMaxS:1.5, leanClip:"RunnerLeanPostCall", breathS:.9 }),
     // Everyone who leaves after the order goes out of the mouth, down the SSW leg to RC and on west.
     exitRoute:BANTER_EXIT,
     // The runner leaves from his post outside the mouth: the same way, without the first point (behind Luo's kneel).
@@ -551,9 +556,16 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // two rounds each, at the rear trench (burstAt), the top body jolting jolthM.
   // (2026-10-11 Set: the pair starts in the depth sap south of J, crewFrom = marks.mgDragFrom[0], and climbs the south bank to
   // the gun; they aim at marks.mgAimAt, burstAt[0].)
-  wall:Object.freeze({ pickS:.9, boltS:.9, tossS:1.3, dropS:1.0, boltTo:P(5.6,-121.9), tearS:2.2, enterS:.6, crewFrom:P(14.6,-121.4),
+  // (2026-10-12 R2-Dir, pace: tearS 2.2 -> 1.2 -- ijaA is on his mark at the chest from the end of CaptiveDragged; ijaB sets off for the
+  // rifle as the comrade's look ends, in CaptiveDragged.)
+  wall:Object.freeze({ pickS:.9, boltS:.9, tossS:1.3, dropS:1.0, boltTo:P(5.6,-121.9), tearS:1.2, enterS:.6, crewFrom:P(14.6,-121.4),
     crewVia:Route([14.2,-122.7],[12,-123.4],[8.6,-123.3]), setupS:1.0, burstS:Object.freeze([3,6]), burstRounds:2, burstAt:Object.freeze([P(-4,-113),P(-14,-111.5),P(-2.5,-116)]),
-    joltM:.02, seed:1938, endAfterBurstS:1.2,
+    // 2026-10-12 R2-Dir (pace): the phase ends endAfterTossS after ijaB flings the bolt (the badge torn, CaptiveDragged.05 said; the
+    // rifle drops into the mud and he walks back in Interrogation), not endAfterBurstS (1.2) after the first burst -- the drag and heave
+    // behind it ran it to 14.3 s; the drag, the heave and the bursts go on behind the questioning. The gunner fires his first burst
+    // setupS after he is down on the gun, not waiting for the loader (who loads from when he is there); the loader heaves his body
+    // up loaderHeaveLagS after the gunner starts his (on top of it: never before it).
+    joltM:.02, seed:1938, endAfterTossS:0, loaderHeaveLagS:.35,
     // 2026-10-11 integration: ijaB's root for IjaInspectRifleBoltToss (AnimA), facing north-east (away from the kneeling comrade at R3,
     // 0.93 m off; the bolt goes out over the north rim); the clip's rifle lies 0.43 m ahead of him -- on the Set's comradeRifle mark
     // (3.95,-125.25). pickWalkS: a walk that has not arrived is put there.
@@ -756,7 +768,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // Hold/Ask camera: ijaA's left fist lifts the head by the hair: the eye rises liftM over liftS and tips up at his face
     // (pitch capped at maxPitchDeg, the face a little above centre: headAboveDeg). (2026-10-11 polish, N20_Held: 40 -> 32 -- tipped
     // up 40 the squatting interpreter at the right front sat low behind ijaA's knee; his face still in the picture.)
-    holdShot:Object.freeze({ liftM:.16, liftS:.45, maxPitchDeg:32, headAboveDeg:6, backM:.04 }),
+    // 2026-10-12 R2-Dir (N20_Held, 「甲蹲在头边……翻译蹲在右前逼问」; storyboard: ijaA's head x ~0.35, the interpreter's ~0.7): the look
+    // is interpreterShare of the way from ijaA's face to the interpreter's (Script_OpeningStoryboards.HoldLook), not on ijaA's face --
+    // on his face the interpreter sat behind his body whichever side he squatted. The slaps' flings are as before (from that look).
+    holdShot:Object.freeze({ liftM:.16, liftS:.45, maxPitchDeg:32, headAboveDeg:6, backM:.04, interpreterShare:.55 }),
     // 2026-09-30 (user: 「一看到主角主角就闭眼假装装死，眼睛开了一个小缝，随后被一巴掌扇眩晕+睁眼」): closeAtS into Found (ijaA has
     // turned onto him) the eyes shut over closeS to a slit (eyeClosure `squint`; the lids meet at the picture's sides, a
     // band in the lower middle stays open) with a faint tremor, the hands go still, and they stay so while he is grabbed
@@ -773,7 +788,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // 2026-10-11 polish (PolishDir item 8, N20_Held): at (2.95,-124.0) he was 67 deg right of the hold's look (on ijaA's face, pitched
     // up 40): out of the picture (head x 1.38). Pulled in toward the eye's line, east-south-east of it (1.6 m, 37 deg right of that
     // look), still facing the eye, 1.05 m from ijaA's squat; the finish body has gone to the south wall foot.
-    interpreter:P(3.4,-124.75,72*Math.PI/180),
+    // 2026-10-12 R2-Dir (N20_Held, 「翻译蹲在右前」): back on interpreterWait, 49 deg right of the eye's front (east) -- at (3.4,-124.75)
+    // he was 18 deg right, straight behind ijaA's head and body from the eye; with the look between the two faces (holdShot.interpreterShare)
+    // he is in the picture at the right, clear of ijaA. He no longer steps over at Hold (the wait is the squat).
+    interpreter:P(2.95,-124.0,41*Math.PI/180),
     // interpreterWait (polish): where he squats from Finish until 02's Hold -- the old squat, off the eye's line down the trench (squatting at
     // `interpreter` he hid ijaA coming up it in N18) -- and a step over to `interpreter` as the questioning starts.
     interpreterWait:P(2.95,-124.0,41*Math.PI/180),
@@ -815,6 +833,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
       clip:"IjaRecruitCheekCut", standInClip:"IjaReadyRifle", touchS:.9, cutS:1.5, pressS:.25, pressM:.035, shakeM:.004, shakeHz:9,
       releaseS:2.3, liftS:.4, thenLine:"RescueInterrogation.06", thenAfterS:.55, backAfterLineS:.2, backS:1.3,
       levelAt:P(4.6,-125.75), levelClip:"IjaRecruitLevelRifle", levelStandIn:"IjaReadyRifle", levelS:.45, chargeAfterLevelS:.5,
+      // 2026-10-12 R2-Dir (N21_Level 「丁退开三步，端平了枪」): straight back from the cut (bearingDeg left of the eye's front) the clip's
+      // 1.8 m took him up the north bank behind the timber facade (pelvis z -126.6; his head under the bank's edge from the 0.28 m eye).
+      // His root swings levelPivotDeg round the eye over levelPivotS as he backs off (Script_OpeningStoryboards.LevelRoot): he stays
+      // on the trench floor, facing the eye, the muzzle on it.
+      levelPivotDeg:-12, levelPivotS:1.2,
       recruitFall:P(4.11,-126.21) }),   // measured, 2026-10-11 integration run (flags fall:ijaD; was the preset (5.3,-125.8))
     // The cut on the cheek, first person: the head flinches flinchDeg away from it (to the right) over flinchS and comes back over
     // recoverS; the cheekCut sound (Sfx package, contract §6) -- `sound` until it is registered (pendingWiring N21); the lens look
@@ -962,7 +985,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // IjaCrouchHairHold's grab played back to its first frame (the deep squat, forearms on his knees) -- and settles back backM (east):
     // the head and the eye come down into the mud, his arm is off the left of the picture as the recruit leans in, and at the volley
     // his head is in the picture (1 m off, not 0.6 m over the eye). Script_OpeningStoryboards.HolderRoot / HairReleased.
-    release:Object.freeze({ afterS:.15, releaseS:.6, backM:.35 }),
+    // (2026-10-12 R2-Dir: and leftM to his left -- south, the right of the picture -- so the recruit backing off at the left, swung toward
+    // the trench's line by blade.levelPivotDeg, does not go behind him.)
+    release:Object.freeze({ afterS:.15, releaseS:.6, backM:.35, leftM:.25 }),
     // Melee: once the cuts have landed and the vanguard is down (vanguardIds, the interpreter) the view holds on the trench
     // (meleeHoldS) before the heave.
     meleeHoldS:1.0,
@@ -1005,7 +1030,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
       rise:Object.freeze({ durationS:.9, eye:[[0,[0,1.12,-.6]],[.12,[0,1.08,-.62]],[.55,[0,1.4,-.56]],[.9,[0,1.62,-.52]]] }) }),
     // He goes to the trench edge east of the hand-back with his rifle once he has let the timber drop (Aftercut), along the
     // north side (heCoverVia): straight there he brushed past the kneeling man at 0.8 m (2026-09-30).
-    heCover:P(4.7,-124.25,-1.3), heCoverVia:Route([2.2,-124.3],[3.4,-124.2]),
+    // 2026-10-12 R2-Dir (N25 「背景何有田、刘文财各守一侧」: He at the right edge, Liu right of the middle): heCover (4.7,-124.25) ->
+    // (3.85,-124.1). From the kneeling eye He and Liu stood on the same bearing (25-27 deg right), He's head over Liu's; here he is
+    // ~40 deg right near the south wall foot, ~0.65 m off the finish body's head, and the walk there is 0.9 m shorter.
+    heCover:P(3.85,-124.1,-1.3), heCoverVia:Route([2.2,-124.3],[3.4,-124.2]),
     // The director's framing in Check: the look on Luo's face (luoFaceDropM under his head, at most atLuoMaxDeg up, weight
     // atLuo) while he asks; on his hands as he stoops for the rifle and swings it up (atHands, no lower than handsMinDeg: the
     // grab is seen, not the mud under it); down at the rifle as it is shoved over (atRifle, no lower than rifleMinDeg, from
@@ -1094,12 +1122,16 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // N16 the comrade hauled up by the hair, the knee in his back, the blade at his throat: the beat before the cut.
     Object.freeze({ id:"N16", storyboard:"Storyboard_N16_KneeAndBlade.png", when:"s.flags['ev:cutStart']!=null&&r.time-s.flags['ev:cutStart']>=.3",
       judge:{ camera:{ eyeM:[.2,.45] }, actors:{ comrade:{ x:[.1,.62] }, ijaA:{ x:[.05,.65] }, ijaD:{ x:[.3,1] } } } }),
+    // The depth man's kick at the flag (Data_FirstLevelBackdropSquads flagKick: contact 0.4 s in, the fall over 1.1 s): still standing
+    // 0.3 s in. The probe takes the shots in list order, so this one sits where the flow reaches it -- 2026-10-12 (R2-Dir): since the
+    // redraft the kick starts in Slash ~0.55 s before N17's frame (wipeAt + 0.3); listed after N17 it was taken right after N17's frame,
+    // 0.65 s into the kick (progress 0.131: the 2026-10-11 red). On 3d840736 (kick in Taunt) both shots pass as listed.
+    Object.freeze({id:"SB03_FlagKick",when:"s.flags.flagKickAt!=null&&r.time-s.flags.flagKickAt>=.3",judge:{flagProgress:[0,.1]}}),
     // N17: the blood on the north wall, the blade wiped on the shoulder bandage, the rifle in his hand for the bayonet; ijaD pale
     // behind him; ijaB at the junction 10 m+ off. (The flag in the picture's distance is not ours.) The comrade (x ~0.25) and J
     // (x ~0.85) are 17 deg apart from the pinned eye: they stand closer in the picture than drawn.
     Object.freeze({ id:"N17", storyboard:"Storyboard_N17_WipeFix.png", when:"s.flags.wipeAt!=null&&r.time-s.flags.wipeAt>=.3",
       judge:{ camera:{ eyeM:[.2,.45] }, actors:{ ijaA:{ x:[.2,.7], distM:[1.5,3.2] }, ijaD:{ x:[.45,1] }, ijaB:{ x:[.45,1], distM:[10,14] } } } }),
-    Object.freeze({id:"SB03_FlagKick",when:"s.flags.flagKickAt!=null&&r.time-s.flags.flagKickAt>=.3",judge:{flagProgress:[0,.1]}}),
     Object.freeze({id:"SB03_FlagDown",when:"s.flags.flagKickAt!=null&&r.time-s.flags.flagKickAt>=1.6",judge:{flagProgress:[.99,1]}}),
     // N18: through the slit, ijaA walking up with the bayonet down having just stabbed the body at the lower right (finish.bodies[0],
     // south-east of the eye). (The helmet by the body in the picture is not ours: the body is a Sichuan soldier.)
@@ -1155,13 +1187,15 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // N25 「跪在沟底：罗班长俯身看着镜头问，一手已抓起右前方泥里的汉阳造横端起来塞过来，背景何有田、刘文财各守一侧」 (Check,
     // unchanged since 09-30): Luo leaning in asking, the rifle in his hands (_Hand), the hand-back standing (_Released: about
     // level, facing east down the trench where he got up; Luo turned off to the crater step on his left).
+    // (2026-10-12 R2-Dir: Liu on one knee aiming east at his post right of the middle from N25 on -- the native crouch, pelvisM; He is
+    // still walking there at N25 and swapping the dadao at _Hand, going down on one knee at the right edge from the hand-back (_Released).)
     Object.freeze({ id:"N25", storyboard:"Storyboard_N25_RifleShoved.png",
       when:"s.phase==='Check'&&s.flags.handAt!=null&&r.time-s.flags.handAt>=1.0",
-      judge:{ camera:{ eyeM:[.95,1.3], pitchDeg:[-5,40] }, actors:{ luo:{ bodyDistM:[.6,1.3], x:[.25,.75] } } } }),
+      judge:{ camera:{ eyeM:[.95,1.3], pitchDeg:[-5,40] }, actors:{ luo:{ bodyDistM:[.6,1.3], x:[.25,.75] }, liuwencai:{ x:[.5,.95], pelvisM:[.35,.75] } } } }),
     Object.freeze({ id:"N25_Hand", storyboard:"Storyboard_N25_RifleShoved.png",
       when:"s.flags.handedAt!=null&&r.time-s.flags.handedAt>=.4", judge:{ camera:{ eyeM:[1,1.75] } } }),
     Object.freeze({ id:"N25_Released", storyboard:"Storyboard_N25_RifleShoved.png", when:"s.releaseAt!=null",
-      judge:{ camera:{ pitchDeg:[-15,5], yawDeg:[-125,-55], eyeM:[1.5,1.75] } } }),
+      judge:{ camera:{ pitchDeg:[-15,5], yawDeg:[-125,-55], eyeM:[1.5,1.75] }, actors:{ heyoutian:{ x:[.7,1], pelvisM:[.35,.75] } } } }),
   ]),
   // Wave 1 stand-ins (contract §3): where a clip, hand pose, lens effect, set piece or blast effect of another
   // package belongs, the director uses the nearest existing one and lists it here. Wave 2 wires each entry to
@@ -1172,15 +1206,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // here has no delivered piece to wire to; the integration report (docs/Data_OpeningRedraft20261011Contract.md §9) says why.
     {shot:"N01", what:"He's helmet over his face and in his hand (HeHelmetSleepSitUp's `helmet` prop track)",
       now:"the track is not drawn (no `helmet` prop mesh in Script_OpeningProps); his own helmet, part of the head skin, stays on", wave2:"a `helmet` prop (Set) and the head's helmet hidden while the clip holds it (needs a separable helmet on NRA02)"},
-    {shot:"N03", what:"the runner, out of breath, calls to Luo outside the mouth (after the far call)",
-      now:"MessengerReport at runnerRoute's end (3.05,-124.5) facing Luo (PhaseOrders, BunkerRunnerCall before it)", wave2:"an Anim take of him bent over catching his breath and calling to Luo (RunnerLeanPostCall was baked leaning on a door post, facing the room)"},
+    // (2026-10-12 R2-Dir: wired -- N03 the runner catches his breath at the post on RunnerLeanPostCall before BunkerOrders.01 (banter.runnerCall
+    // leanClip / breathS); N25 Liu and He on one knee at their posts in the native crouch (Move `crouch`, the AI's stance 1 carried into
+    // the hand-back).)
     // (2026-10-11 polish: wired -- N12 the pair drag and heave the bodies onto the lip (IjaHeaveCorpseLip, MgHeave); N21 ijaA lets go of the
     // hair and settles back (rescue.release) so the recruit leans in clear of him; N22 his head in the picture at the volley (same), the
     // gunner / loader on their authored deaths (IjaLmgGunnerShotOnGun / IjaLoaderShotTumbleOffLip), ChargeB on NraShotTumbleSteps with
     // his eyes left open (face layer deadEyesOpen). What is left has no delivered piece to wire to.)
-    // SB06 / N25 (Check, Released), carried over from 2026-09-30
-    {shot:"N25", what:"Liu kneels aiming east at the trench edge; He kneels at the right edge with his rifle",
-      now:"standing while the director poses them (the director's Move hands the native layer kneel:0); kneeling (AI stance 1) from the hand-back", wave2:"the Anim-owned kneel hook for director poses (as SB01's Luo) for Liu and He from their arrival"},
   ].map(Object.freeze)),
   // ---- 02 pursuit (bunkerPursuit, contract §5.8) -----------------------------------------
   // The roster's delayS (Space) are scaled so the three followers are in the trench the player just left

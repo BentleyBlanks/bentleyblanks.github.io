@@ -232,7 +232,9 @@ export function InstallOpeningStoryboardAnimation(soldier){
     // the walk and the stand on his mark for half a second (09-29 probe).
     if(soldier.openingStoryboardTravel!=null)state={...state,moveSpeed:soldier.openingStoryboardTravel/4.2,
       ...(gait?{moveSpeedMps:soldier.openingStoryboardTravel,locomotionTracked:false}:{}),
-      crouch:0,prone:0,kneel:0,lifePose:null,idleLife:!pose,aim:soldier.openingStoryboardAim||(!pose&&actor.weaponId&&!gait ? .18 : 0)};
+      // crouch: the director's native crouch for a man it holds on a mark (2026-10-12 R2-Dir, N25: Liu and He down on one knee at
+      // their posts, the AI's stance 1, so the hand-back does not stand them up first; Script_OpeningStoryboards.Move `crouch`).
+      crouch:soldier.openingStoryboardCrouch||0,prone:0,kneel:0,lifePose:null,idleLife:!pose,aim:soldier.openingStoryboardAim||(!pose&&actor.weaponId&&!gait ? .18 : 0)};
     if(pose?.clip==="DadaoAmbush")state={...state,meleeCombat:{weapon:"Dadao",state:"attack",action:"Heavy",clip:"DadaoHeavy",
       normalized:Math.min(1,pose.seconds/C.ambushS),t:pose.seconds,weight:1}};
     if(pose?.meleeGuard)state={...state,aim:0,meleeCombat:{weapon:"Dadao",state:"idle",action:"Guard",clip:"DadaoGuard",
