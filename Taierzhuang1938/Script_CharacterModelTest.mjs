@@ -485,6 +485,13 @@ assert.match(bakePowerShell, /NRA01 and IJA01 separately/,
   assert.deepEqual([...DrawnVertices(geometry)], [...new Set([...geometry.index.array])], "a gore-filtered index gets its own list");
   assert.match(runtime, /const drawn = settling && indices \? DrawnVertices\(mesh\.geometry\) : null;/,
     "PoseDeath's settling fit walks DrawnVertices");
+  // Between the support search and t = 1 the skinned points are reused for settleRescanCalls - 1 calls of every settleRescanCalls;
+  // the support search and the final pose (deathFloorLift) are always skinned afresh.
+  assert.match(runtime, /const reuse = t >= DEATH_CONTACT\.poseEnd && t < 1 && this\.deathContactRotation && this\.deathSettlePoints/,
+    "only the settling calls between the support search and the final pose reuse skinned points");
+  const { DEATH_CONTACT } = await import("./Data_Tuning_ActorDeath.mjs");
+  assert.ok(Number.isInteger(DEATH_CONTACT.settleRescanCalls) && DEATH_CONTACT.settleRescanCalls >= 1 && DEATH_CONTACT.settleRescanCalls <= 4,
+    "a settling corpse re-skins at least every fourth call");
 }
 
 console.log(`CharacterModelTest OK — ${manifest.models.length} models × ${expectedActions.length} source-parity, `
