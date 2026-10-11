@@ -695,9 +695,14 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     // The machine-gun crew are in the hand-back's list under the roster ids the stand-ins take.
     for(const m of Object.values(R.mgCrew))assert.ok(C.vanguardIds.includes(m.id),`${m.id} must be down before the hand-back`);
     // Squad yells only (stand-ins until the Voice package's keys are wired).
-    assert.ok(R.noise.yells.every(([,key])=>/^yell_(sha|kan|chong)(@(luo|heyoutian|liuwencai))?$/.test(key)),"only short yells in the charge");
+    assert.ok(R.noise.yells.every(([,key])=>/^yell_(sha|kan|chong)(_[23])?(@(luo|heyoutian|liuwencai))?$/.test(key)),"only short yells in the charge");
     for(const who of ["luo","heyoutian","liuwencai"])assert.ok(R.noise.yells.some(([,key])=>key==="yell_sha@"+who),`${who} yells his own 「杀！」`);
-    assert.ok(R.noise.yells.every(([,key])=>!R.noise.yellStandIn||R.noise.yellStandIn[key]),"every yell has its wave-1 stand-in");
+    // 2026-10-11 integration: the Voice package's keys are wired -- no stand-in table; every shared yell is a Data_Voice "yell" line.
+    {
+      const {VOICE_LINES}=await import("./Data_Voice.mjs"),yellKeys=new Set(VOICE_LINES.filter(l=>l.kind==="yell").map(l=>l.key));
+      assert.ok(!("yellStandIn" in R.noise),"no rally_* stand-ins for the yells any more");
+      for(const [,key] of R.noise.yells)assert.ok(yellKeys.has(key.split("@")[0]),`yell ${key} is a Data_Voice yell line`);
+    }
     // The grenade rolls to rest 0.35 m east of the eye and never goes off.
     assert.ok(Math.abs(D(R.grenade.stop,eye)-.35)<.06&&R.grenade.stop.x>eye.x,`the grenade stops at his face (${D(R.grenade.stop,eye).toFixed(2)} m east)`);
     assert.ok(!/Explode|FireShell|Blast\(/.test(source.slice(source.indexOf("  Grenade(){"),source.indexOf("  GrenadeProp(){"))),"the grenade does not go off");
@@ -841,11 +846,14 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     // (Set's delivered values, 2026-10-11 Report_set.md.)
     assert.deepEqual(M.sweepBodies.map(p=>[p.x,p.z]),[[11.3,-123.4],[9.4,-123.1],[7.4,-124.8]],"sweep.bodies");
     assert.deepEqual(M.finishBodies.map(p=>[p.x,p.z]),[[3.3,-124.55]],"finish.bodies (one)");
-    assert.deepEqual(M.dropInLip.map(p=>[p.x,p.z]),[[10,-127.2],[11.5,-127.2],[9,-127.25]],"dropIn.lip (ijaC, ijaD, ijaA)");
-    assert.ok(M.dropInLand.every((p,i)=>Math.abs(p.x-M.dropInLip[i].x)<1e-9&&p.z>M.dropInLip[i].z+1),"each lands straight down off his lip");
+    // 2026-10-11 integration: 1 m nearer the eye, landing at the foot of the north bank (the jump clips' roots; Data_OpeningSet0103).
+    assert.deepEqual(M.dropInLip.map(p=>[p.x,p.z]),[[9,-127.2],[10.5,-127.2],[8,-127.2]],"dropIn.lip (ijaC, ijaD, ijaA)");
+    assert.ok(M.dropInLand.every((p,i)=>Math.abs(p.x-M.dropInLip[i].x)<1e-9&&p.z>M.dropInLip[i].z+.8),"each lands straight down off his lip");
     assert.ok(Near(M.mgGunner,6.75,-121.95)&&Near(M.mgLoader,7.75,-121.7)&&Near(M.mgCorpseLower,6.9,-121.2)&&Near(M.foldBlast,20.4,-127.9)&&Near(M.grenadeStop,2.2,-125.1)&&Near(M.comradeRifle,3.95,-125.25),"machine gun, fold blast, grenade stop, the comrade's rifle");
     for(const [i,p] of C.ija.interpreterEnter.entries())if(i)assert.ok((()=>{const a=C.ija.interpreterEnter[i-1],dx=p.x-a.x,dz=p.z-a.z,t=Math.max(0,Math.min(1,((M.sweepBodies[2].x-a.x)*dx+(M.sweepBodies[2].z-a.z)*dz)/(dx*dx+dz*dz)));return Math.hypot(a.x+dx*t-M.sweepBodies[2].x,a.z+dz*t-M.sweepBodies[2].z)>=.7;})(),"the interpreter's way in keeps 0.7 m off the man shamming dead");
-    assert.ok(Near(C.practice.recruitWait,3.9,-124.3)&&Math.abs(C.practice.recruitWait.yaw-Math.PI/2)<1e-6,"the recruit waits at practice.recruitWait facing west (the hand-over to 02)");
+    // 2026-10-11 integration: moved east off ijaA's finishing walk (IjaFinishWalkStab facing west onto finish.bodies[0]).
+    assert.ok(Near(C.practice.recruitWait,5.6,-124.05)&&Math.abs(C.practice.recruitWait.yaw-Math.PI/2)<1e-6,"the recruit waits at practice.recruitWait facing west (the hand-over to 02)");
+    assert.ok(Near(C.rescue.vanguardPosts.ijaD,C.practice.recruitWait.x,C.practice.recruitWait.z),"02 starts the recruit where 01 leaves him");
     assert.ok(Math.abs(D(C.practice.recruitBack,{x:4.0568,z:-125.7852})-2.2)<.06,"practice.recruitBack 2.2 m east of the comrade's kneel");
     assert.ok(Math.abs(C.sweep.stopX-6.9)<1e-9&&Math.abs(Math.hypot(C.sweep.stopX-eye.x,-124.95-eye.z)-5.1)<.3,"ijaB stops 5 m from the eye");
     // §2: perception, free look.

@@ -1095,14 +1095,16 @@ function FakeVfx() {
     for (const row of CORPSES) if (BoxDist(CorpseFootprint(row.mark), lip.land) < M.dropIn.landClearM) hits.push(row.id);
     for (const b of [...L.blocks, ...L.scenario.states.flatMap((s) => s.blocks)]) if (b.solid !== false && BoxDist({ x: b.x, z: b.z, w: b.w, d: b.d, ry: b.ry || 0 }, lip.land) < M.dropIn.landClearM
       && b.y + b.h / 2 > GG(lip.land.x, lip.land.z) + 0.1) hits.push(b.id);
-    // 落点本身是平沟底：两脚落地的 0.4 m 以内高差 ≤ 0.1 m。
-    const ring = [0, 1, 2, 3, 4, 5].map((k) => GG(lip.land.x + Math.cos(k) * 0.4, lip.land.z + Math.sin(k) * 0.4));
+    // 落点本身：两脚落地处（2026-10-11 集成：AnimA 的 IjaDropIn* 根点在落点，落地两脚在根左右 0.17 m、前后 0.15 m 以内，
+    // tmp/merge/probe2 实测）高差 ≤ 0.25 m。落点靠在北壁坡脚（第 0 帧站在根后 0.77 m 的沟沿上，见 SET_MARKS.dropIn 注释），
+    // 不再要求 0.4 m 一圈都是平沟底。
+    const ring = [[-0.17, -0.15], [0.17, -0.15], [-0.17, 0.15], [0.17, 0.15]].map(([dx, dz]) => GG(lip.land.x + dx, lip.land.z + dz));
     return { who: lip.who, dropM: +dropM.toFixed(2), floorSpreadM: +(Math.max(...ring) - Math.min(...ring)).toFixed(2), hits: [...new Set(hits)] };
   });
   for (const r of report.redraft.dropIn) {
     assert.ok(r.dropM >= 1.8 && r.dropM <= 2.1, `dropIn ${r.who}: lip top to trench floor ${r.dropM} m (1.8–2.1)`);
     assert.deepEqual(r.hits, [], `dropIn ${r.who}: nothing within ${M.dropIn.landClearM} m of the landing`);
-    assert.ok(r.floorSpreadM <= 0.1, `dropIn ${r.who}: lands on the flat trench floor (${r.floorSpreadM})`);
+    assert.ok(r.floorSpreadM <= 0.25, `dropIn ${r.who}: both feet land on near-level ground (${r.floorSpreadM})`);
   }
   // ---- 6d. 手榴弹停点：离眼位 0.3–0.4 m，地面平，不压尸体与道具
   const eye = C.shunzi.witnessEye, g = M.finish.grenadeStop, toEye = Math.hypot(g.x - eye.x, g.z - eye.z);

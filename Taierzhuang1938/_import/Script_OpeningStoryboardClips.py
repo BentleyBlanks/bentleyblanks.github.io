@@ -10231,7 +10231,7 @@ RA_H_T = RaF(150)                  # 6.25 s
 RA_H_ROLL = RaF(14)                # 0.583
 RA_H_HOLD = (RaF(40), RaF(100))    # 1.667-4.167: asleep on his back
 RA_H_SIT = RaF(110)                # 4.583: the helmet comes off, he sits up
-Meta('HeHelmetSleepSitUp', RA_H_T, False, 'free', role='heyoutian', rig='TengxianNra05', rigs=['TengxianNra05'],
+Meta('HeHelmetSleepSitUp', RA_H_T, False, 'free', role='heyoutian', rig='TengxianNra02', rigs=['TengxianNra02', 'TengxianNra05'],
      props=['helmet'], rootMotion=True, holdLoop=list(RA_H_HOLD), holdExit=RaExit('sitUp'),
      contacts=[{'t': RaF(104), 'limb': 'handR', 'action': 'grab', 'target': 'helmet'},
                {'t': RaF(112), 'limb': 'handL', 'action': 'push', 'target': 'ground'}],
@@ -10392,7 +10392,7 @@ STAGES['liuToss'] = {
              'placement only (first person).',
     'actors': {'liuwencai': {'rig': 'TengxianNra05', 'clip': 'LiuDivideAmmoToss', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
                'shunzi': {'rig': None, 'clip': None, 'x': 1.35, 'z': -3.05, 'yawDeg': 180}}}
-Meta('LiuDivideAmmoToss', RA_L_T, False, 'free', role='liuwencai', rig='TengxianNra05', rigs=['TengxianNra05'],
+Meta('LiuDivideAmmoToss', RA_L_T, False, 'free', role='liuwencai', rig='TengxianNra02', rigs=['TengxianNra02', 'TengxianNra05'],
      props=['clipA', 'ammoBox'], rootMotion=False, stage='liuToss', holdLoop=list(RA_L_HOLD), holdExit=RaExit('the toss'),
      contacts=[{'t': RaF(8), 'limb': 'handR', 'action': 'grab', 'target': 'ammoBox'},
                {'t': RaF(32), 'limb': 'handR', 'action': 'grab', 'target': 'ammoBox'},
@@ -11139,7 +11139,7 @@ RA_LB_T = RaF(60)                  # 2.5 s
 RA_LB_SLAM = RaF(10)               # 0.417 the lid shut
 RA_LB_LIFT = RaF(26)               # 1.083 off the floor
 RA_LB_SHOULDER = RaF(44)           # 1.833 on the shoulder
-Meta('LiuBoxUpGo', RA_LB_T, False, 'free', role='liuwencai', rig='TengxianNra05', rigs=['TengxianNra05'], props=['ammoBox'],
+Meta('LiuBoxUpGo', RA_LB_T, False, 'free', role='liuwencai', rig='TengxianNra02', rigs=['TengxianNra02', 'TengxianNra05'], props=['ammoBox'],
      rootMotion=False,
      contacts=[{'t': RA_LB_SLAM, 'limb': 'handR', 'action': 'slap', 'target': 'ammoBox'},
                {'t': RaF(20), 'limb': 'handsLR', 'action': 'grab', 'target': 'ammoBox'},

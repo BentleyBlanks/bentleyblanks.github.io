@@ -17,6 +17,10 @@ const Nra05 = Object.freeze({ actorKind: "nra", modelVariant: 4 });
 const Nra06 = Object.freeze({ actorKind: "nra", modelVariant: 5 });
 const Ija01 = Object.freeze({ actorKind: "ija", modelVariant: 0 });
 const Ija02 = Object.freeze({ actorKind: "ija", modelVariant: 1 });
+// 2026-10-11 01–02 redraft integration (docs/Data_OpeningRedraft20261011Contract.md §4.2; integrator's decision): 日兵丁 the recruit
+// wears IJA03 -- the practice / cheek-cut clips are baked and paired on that body. IJA03 has no facial skin (closed-mouth geometry):
+// his only line is RecruitCharge, a wordless scream (subtitle ""), so he speaks without a moving mouth (WORDLESS_SPEAKERS).
+const Ija03 = Object.freeze({ actorKind: "ija", modelVariant: 2 });
 const Ija06 = Object.freeze({ actorKind: "ija", modelVariant: 5 });
 
 export const FIRST_LEVEL_SPEAKING_CAST = Object.freeze({
@@ -26,9 +30,12 @@ export const FIRST_LEVEL_SPEAKING_CAST = Object.freeze({
   interpreter: Nra06,
   zhou: Nra02, relief: Nra02, keeper: Nra02,
   captiveHelper: Nra02, captiveWounded: Nra02,
-  ijaA: Ija06, ijaB: Ija01, ijaC: Ija01, ijaD: Ija02,
+  ijaA: Ija06, ijaB: Ija01, ijaC: Ija01, ijaD: Ija03,
   frontOfficer: Ija01,
 });
+
+/** Pinned speakers whose lines are all wordless (non-word cries, no subtitle) and whose body has no facial skin. */
+export const WORDLESS_SPEAKERS = Object.freeze(["ijaD"]);
 
 /** Spawn options for a speaking role: its castId and pinned model (unknown roles: {}). */
 export function SpeakingCastOptions(castId) {

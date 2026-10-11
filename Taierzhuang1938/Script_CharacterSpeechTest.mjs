@@ -7,7 +7,7 @@ import { FirstLevelMissionVoice } from './Script_FirstLevelMissionVoice.mjs';
 import { CharacterFacialAnimation, CharacterFacial } from './Script_CharacterFacialAnimation.mjs';
 import { FirstLevelSpeakerBinder, ParseLineId, WhoForLine, FIRST_LEVEL_SPEAKER_ROLES } from './Script_FirstLevelSpeakerBinder.mjs';
 import { SpeakerLookAngles, SpeakerHeadLayer } from './Script_SpeakerHeadLayer.mjs';
-import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions, FIRST_LEVEL_FACE_STEPS, FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS,
+import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions, FIRST_LEVEL_FACE_STEPS, FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS, WORDLESS_SPEAKERS,
   FACED_FRONT_GUARD_INDEX } from './Data_FirstLevelSpeakingCast.mjs';
 import { FIRST_LEVEL_STAGES } from './Data_FirstLevelMissionStages.mjs';
 import { FRONT_GUARD_POSTS } from './Data_FirstLevelMissionFront.mjs';
@@ -172,7 +172,11 @@ for (const [castId, spec] of Object.entries(FIRST_LEVEL_SPEAKING_CAST)) {
   assert.ok(IsApprovedCharacterVariant(spec.actorKind, spec.modelVariant, castId), `${castId}: approved appearance`);
   const id = `Tengxian${spec.actorKind === 'nra' ? 'Nra' : 'Ija'}${String(spec.modelVariant + 1).padStart(2, '0')}`;
   const record = MANIFEST.models.find(r => r.id === id);
-  assert.ok(record?.facialCast?.includes(castId), `${castId} is in ${id}.facialCast`);
+  // 2026-10-11: a wordless speaker (only non-word cries) may wear a body without a facial skin (日兵丁 on IJA03).
+  if (WORDLESS_SPEAKERS.includes(castId)) {
+    const lines = MISSION_DIALOGUE.flatMap(c => c.lines).filter(l => l.who === castId);
+    assert.ok(lines.length && lines.every(l => l.subtitle === "" && l.vocal === true), `${castId}: every line is a wordless cry`);
+  } else assert.ok(record?.facialCast?.includes(castId), `${castId} is in ${id}.facialCast`);
   assert.deepEqual(SpeakingCastOptions(castId), {castId, modelVariant: spec.modelVariant});
 }
 for (const record of faced) for (const castId of record.facialCast) assert.ok(FIRST_LEVEL_SPEAKING_CAST[castId], `${castId} pinned`);

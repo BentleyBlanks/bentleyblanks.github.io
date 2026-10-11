@@ -658,10 +658,14 @@ export const SET_MARKS = Object.freeze({
   dropIn: Object.freeze({
     // 北沟沿三处跳下点：`x,z` 是沟沿顶（日兵蹲着露刺刀尖的地方，地面 ≈ 0），`land` 是沟底落点。契约值 (10.0,-126.6) 等
     // 在北壁半坡上（地面 -1.4）；北沟沿真正的边在 z -127.2，沟底在 z -126.25 以南，落点取离坡脚 0.45–0.5 m（脚下 0.4 m 内是平沟底）。高差测试 6c 量（1.8–2.1 m）。
+    // 2026-10-11 集成：① 三处都往眼位（西）拉近 1.0 m（集成负责人：N07 人在画面里太远太小；甲再近就压到北侧护壁 revetmentFront 的东头）；② 落点改到 z -126.3：AnimA 的
+    // IjaDropIn* 根点在落点、第 0 帧站在根后 0.77 m、脚高 2.085 m，北壁是 1 m 宽的斜坡不是竖墙，落点离坡脚太远第 0 帧就悬在半空。
+    // 取根后 0.77 m 那点比根高 1.8 m 左右（第 0 帧脚只悬 0.2–0.3 m）、两脚落地处（根左右 0.17、前后 0.15 m）高差 ≤ 0.25 m 的 z
+    // （tmp/merge/jump2.mjs 逐点量）。
     lip: Object.freeze([
-      Object.freeze({ who: "ijaC", x: 10.0, z: -127.2, yawDeg: 180, land: P(10.0, -125.75) }),
-      Object.freeze({ who: "ijaD", x: 11.5, z: -127.2, yawDeg: 180, land: P(11.5, -125.75) }),
-      Object.freeze({ who: "ijaA", x: 9.0, z: -127.25, yawDeg: 180, land: P(9.0, -125.8) }),
+      Object.freeze({ who: "ijaC", x: 9.0, z: -127.2, yawDeg: 180, land: P(9.0, -126.25) }),
+      Object.freeze({ who: "ijaD", x: 10.5, z: -127.2, yawDeg: 180, land: P(10.5, -126.25) }),
+      Object.freeze({ who: "ijaA", x: 8.0, z: -127.2, yawDeg: 180, land: P(8.0, -126.2) }),
     ]),
     /** 落点半径内不许有杂物 / 沙袋 / 木撑。 */
     landClearM: 0.6,

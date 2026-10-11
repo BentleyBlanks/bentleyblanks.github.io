@@ -2,6 +2,7 @@
 // docs/Data_FirstLevel0105Refactor20260923Contract.md §5.3–§5.5, space docs/Data_FirstLevelSpace0106_20260923.md §2.1/§3).
 // World metres (X east, Z south); yaw in radians, three.js actor convention (0 faces -Z / north,
 // +PI/2 faces west). Every director wait has a timeout here: the show never waits forever.
+import { SET_MARKS } from "./Data_OpeningSet0103.mjs";
 const P = (x, z, yaw) => Object.freeze(yaw == null ? { x, z } : { x, z, yaw });
 const Route = (...points) => Object.freeze(points.map(([x, z]) => P(x, z)));
 /** A first-person hand pose: frame, position, finger direction, back-of-hand normal, finger curl (deg). */
@@ -407,7 +408,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // corner (breadToss after BunkerBanter.04: comrade's right hand -> Yaowa's right hand), the near shell (nearShell
     // nearShellAfterS after .06: the dugout jumps, the roof sheds dirt into his collar), He's roll (heRoll after .12),
     // the comrade's rounds poured at Shunzi's feet (pour heRollToPourS after it), his laugh (comradeLaugh after Ledger.06).
-    beats:Object.freeze({ liuTossS:1.5, liuLineAfterS:.55, flightS:.55, breadFlightS:.6, nearShellAfterS:1.5, nearShellDirtS:.15,
+    // liuReleaseS (2026-10-11 integration): LiuDivideAmmoToss lets go of its counting loop this long before liuTossS (the toss then
+    // comes at its own `toss`, 1-3 s on).
+    beats:Object.freeze({ liuTossS:1.5, liuReleaseS:1.0, liuLineAfterS:.55, flightS:.55, breadFlightS:.6, nearShellAfterS:1.5, nearShellDirtS:.15,
       heRollAfterS:.5, heRollToPourS:1.2, laughAfterS:.15, banterEndAfterS:1.2,
       jolt:Object.freeze({ dropM:.05, rollRad:.035, decayS:.55, hz:11 }) }),
     // Luo's kneel until his order (LuoKneelCheck held inside its kneel loop, pendingWiring SB01). Why he stood before:
@@ -476,6 +479,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // ijaAPost against the north wall, off the eye's line to the fold (N08: the fold man not behind him).
     foldPost:P(18.2,-125.6,-Math.PI/2), junctionPost:P(14,-124.6,-2.2), ijaAPost:P(8.8,-126.0,Math.PI/2),
     grenadeFlightS:.7,
+    // 2026-10-11 integration: AnimA's three drops (frame 0 on the rim behind the landing root; land / ready / point events), and the
+    // fold man's IjaGrenadeKnockThrow from knockAfterArriveS after he is at F (its knock / throw events; the Set's FoldBlast
+    // blastAfterThrowS after the throw).
+    clips:Object.freeze({ ijaC:"IjaDropInKneel", ijaD:"IjaDropInStand", ijaA:"IjaDropInPoint" }), knockAfterArriveS:.2,
     // The look from the pinned eye down the trench at the rim they come off (N07: pitched up so the rim is under the sky).
     shot:Object.freeze({ yawDeg:-87, pitchDeg:8 }) }),
   // Sweep (contract §1.5; N09): ijaB walks west from J along the floor bayoneting the three face-down men (sweep.bodies, §5.3;
@@ -485,6 +492,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // (east of it, coming from J).
   sweep:Object.freeze({ walkMps:1.15, stabMps:.35, stabContactS:.55, thrustS:1.15, standOffM:.55, clawS:1.2, stompAfterS:.35,
     secondStabS:.5, twistS:.35, stopX:6.9, askAfterLine1S:2.2,
+    // 2026-10-11 integration: IjaWalkStabProne (AnimA) walking west (yawDeg), its point in the back stabAtM from its root (runtime m,
+    // x right, z forward -; measured on the clip at its `stab`); IjaStompStabTwist goes on stompOffsetS into the victim's claw
+    // (the sweepStomp stage's offsetS); walkMaxS: a walk to the next cycle that has not arrived is put there.
+    // (Measured 2026-10-11, tmp/merge/probe.mjs: the point 0.34 m to his RIGHT and 2.03 m ahead of the clip root at 0.708 s, 0.16 m
+    // up -- Report_animA's "left front 1.36 m" is from the root moved on by the stride. Walking west he passes the south-half bodies
+    // on their south side, along the south wall's foot, the backs at his right.)
+    yawDeg:90, stabAtM:Object.freeze([.34,-2.03]), stompOffsetS:.667, walkMaxS:5,
     // N09: the look follows ijaB down the trench at most followDeg off its line, pitched over the floor.
     shot:Object.freeze({ yawDeg:-92, pitchDeg:6, followDeg:14, pitchMinDeg:2, pitchMaxDeg:16 }) }),
   // CaptiveDragged (contract §1.6; N10): ijaB walks from his stop to the heap and raises his rifle to stab (raiseS) -- ijaA
@@ -502,7 +516,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // the gun; they aim at marks.mgAimAt, burstAt[0].)
   wall:Object.freeze({ pickS:.9, boltS:.9, tossS:1.3, dropS:1.0, boltTo:P(5.6,-121.9), tearS:2.2, enterS:.6, crewFrom:P(14.6,-121.4),
     crewVia:Route([14.2,-122.7],[12,-123.4],[8.6,-123.3]), setupS:1.0, burstS:Object.freeze([3,6]), burstRounds:2, burstAt:Object.freeze([P(-4,-113),P(-14,-111.5),P(-2.5,-116)]),
-    joltM:.02, seed:1938, endAfterBurstS:1.2 }),
+    joltM:.02, seed:1938, endAfterBurstS:1.2,
+    // 2026-10-11 integration: ijaB's root for IjaInspectRifleBoltToss (AnimA), facing north-east (away from the kneeling comrade at R3,
+    // 0.93 m off; the bolt goes out over the north rim); the clip's rifle lies 0.43 m ahead of him -- on the Set's comradeRifle mark
+    // (3.95,-125.25). pickWalkS: a walk that has not arrived is put there.
+    rifleRoot:P(3.65,-124.95,-Math.PI/4), pickWalkS:6 }),
   // Interrogation (contract §1 / N13): the interpreter squats in front of the comrade; ijaB presses his thumb into the shoulder
   // wound (woundPress pressAfterLine3S after .03 ends; the comrade arches archS); ijaA looks back at the rear trench now and
   // then (lookBackEveryS, lookBackS).
@@ -521,43 +539,62 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // between him and the eye); ijaAAside: ijaA at the recruit's right rear, facing him.
     recruitFront:P(5.0,-125.6), ijaAAside:P(5.6,-124.85),
     hesitateS:1.2, slapS:.4, backS:1.3, chargeS:.55, stabS:Object.freeze([.15,1.25]), pantS:1.5,
-    recruitBack:P(6.26,-125.75), recruitWait:P(3.9,-124.3,Math.PI/2), howlEveryS:2.2 }),
+    // 2026-10-11 integration (AnimB clips wired): the slap and the charge are IjaRecruitSlapped / IjaRecruitChargeThrust on the
+    // recruitThrust stage root (the clip backs him off and charges by itself); the charge starts chargeAfterLine3S after 「扎。」.
+    // recruitWait moved east off (3.9,-124.3): ijaA's finishing walk (IjaFinishWalkStab, facing west onto finish.bodies[0])
+    // passes 0.07 m from it; here he is 0.8 m off that line and still faces the pinned man for 02 (= rescue.vanguardPosts.ijaD).
+    chargeAfterLine3S:.25,
+    recruitBack:P(6.26,-125.75), recruitWait:P(5.6,-124.05,Math.PI/2), howlEveryS:2.2 }),
   // Slash (contract §1.8; N16/N17): ijaA shoves ijaD aside (shoveS), draws the bayonet, lifts the comrade by the hair
   // (hairLifted), cuts (cutStart at the draw's end; the cut at IjaThroatSlash's contact), shoves him forward with the knee
   // (shove shoveAfterCutS after the cut), wipes the blade twice (wipe1/wipe2) and fixes it on his rifle (fix -> bayonetFixed);
   // ijaD nods (recruitNod nodAfterLine7S after .07 ends).
-  slash:Object.freeze({ shoveS:1.0, shoveAfterCutS:.9, wipeS:Object.freeze([.35,.85]), fixS:.55, nodAfterLine7S:.3 }),
+  // 2026-10-11 integration: the hair lift, the cut and the wipe are AnimB's chain (IjaHairLiftKneeBack -> IjaThroatCutKneeShove ->
+  // IjaWipeBandageFixBayonet with the comrade's CaptiveCurledPulledUp -> CaptiveThroatCutForward); their events time the beats. The
+  // cut goes cutAfterLine6S after 「支那猪，叫得倒响。」 (cutLateS after the blade is on the throat without the line); the blood jet
+  // goes sprayDir (world x, z: north-west, onto the north wall -- the clip's `spray`).
+  slash:Object.freeze({ shoveS:1.0, shoveAfterCutS:.9, wipeS:Object.freeze([.35,.85]), fixS:.55, nodAfterLine7S:.3,
+    cutAfterLine6S:.15, cutLateS:6, sprayDir:Object.freeze([-.6,-.8]) }),
   // Finish (contract §1.9; N18): ijaA with his rifle, bayonet down, from the comrade along the floor bayoneting the two at the
   // mouth (finish.bodies, walkMps; the downward thrust as in the sweep) to where Shunzi lies; the interpreter moves to the
   // squat 02 starts from (rescue.interpreter).
   // interpreterVia: the interpreter's way from his questioning mark to rescue.interpreter round the south of the recruit
   // (practice.recruitWait), 0.85 m+ off him (straight through rescue.interpreterReturn he was held up behind him, 2026-10-11).
-  finish:Object.freeze({ walkMps:1.0, stabMps:.3, standOffM:.5, maxPitchDeg:12, interpreterVia:Route([4.4,-123.3],[3.2,-123.6]) }),
+  // 2026-10-11 integration: IjaFinishWalkStab (AnimB) facing yawDeg (west, toward the eye) on a root put so that the point
+  // lands on the finish body's back at its `stab`: stabAtM = the point's offset from the root then (x right, z forward -,
+  // runtime m: the pelvis start (0.065, -0.064) + 0.7 m of the cycle's 1.4 m + Report_animB's 0.12 m right, 0.85 m ahead).
+  // walkMaxS: a walk that has not arrived is put there.
+  finish:Object.freeze({ walkMps:1.0, stabMps:.3, standOffM:.5, maxPitchDeg:12, interpreterVia:Route([4.4,-123.3],[3.2,-123.6]),
+    yawDeg:90, stabAtM:Object.freeze([.122,-1.614]), walkMaxS:6 }),
   // Found (contract §1.9; N19): he stands over the eye at `stand` (the bayonet tip a hand's breadth over his back: hover),
   // the right boot comes down on the right hand (step stepS in; flags.bootStepAt), the heel grinds grindS (bootGrind at its
   // end), 「……这个是活的。留着，问。」, and he squats at the head (ija.crouch, IjaCrouchHairHold) crouchAfterLineS after it.
   // stand: his right foot (to his right = north, facing west) on the right hand (flatPinned, ~(2.23,-125.12)): N19's boot.
-  found:Object.freeze({ stand:P(2.3,-124.98,Math.PI/2), hoverS:.5, stepS:1.1, grindS:.6, grindShake:.35, crouchAfterLineS:.35,
+  // 2026-10-11 integration: IjaBootOnHand (AnimB) on ija.crouch plays its hover, step and grind and is held at holdAtS (before its
+  // crouch at 3.15 s) until 「……这个是活的。留着，问。」 has been said + crouchAfterLineS.
+  found:Object.freeze({ stand:P(2.3,-124.98,Math.PI/2), hoverS:.5, stepS:1.1, grindS:.6, grindShake:.35, crouchAfterLineS:.35, holdAtS:2.6,
     // N19: the eyes on the right hand in the mud at the lower right while the boot is on it (until he squats at the head).
     look:Object.freeze({ yawDeg:-100, pitchDeg:-22 }) }),
-  // Marks of contract §5.3 as the Set package delivered them (2026-10-11, branch worktree-agent-a6280523e5c9e4005, Report_set.md;
-  // owned by Set's Data_OpeningSet0103 -- the director reads this copy until the integration points it at Set's). x, z; yaw
-  // where the body's head points (the stand-in bodies only). Set moved sweep [0] / [1] to the south half of the floor (clear of
-  // walkIn / interpreterEnter), kept one finish body ([1], at the eye, deleted), put the machine gun's rest bodies on top of the
-  // south rim with the pair dragging them from the depth sap (mgDragFrom), and shaped the north rim for the jumps (dropInLip ->
-  // dropInLand, 1.95 m down).
+  // Marks of contract §5.3: the Set's (Data_OpeningSet0103 SET_MARKS -- 2026-10-11 integration: read from there, no copy). x, z;
+  // yaw where the body's head points. Set moved sweep [0] / [1] to the south half of the floor (clear of walkIn / interpreterEnter),
+  // kept one finish body, put the machine gun's rest bodies on top of the south rim, and shaped the north rim for the jumps
+  // (dropInLip -> dropInLand; the integration pulled them 1.5 m toward the eye and onto the jump clips' roots).
   marks:Object.freeze({
-    sweepBodies:Object.freeze([P(11.3,-123.4,105*Math.PI/180),P(9.4,-123.1,Math.PI/2),P(7.4,-124.8,Math.PI/2)]),
-    finishBodies:Object.freeze([P(3.3,-124.55,Math.PI/2)]),
-    mgCorpseLower:P(6.9,-121.2,0), mgCorpseUpper:P(7.0,-121.25,.2), mgDragFrom:Object.freeze([P(14.6,-121.4),P(15.0,-119.6)]),
-    mgGunner:P(6.75,-121.95,Math.PI), mgLoader:P(7.75,-121.7,Math.PI), mgAimAt:P(-4,-113),
-    dropInLip:Object.freeze([P(10.0,-127.2),P(11.5,-127.2),P(9.0,-127.25)]),
-    dropInLand:Object.freeze([P(10.0,-125.75),P(11.5,-125.75),P(9.0,-125.8)]),
-    foldBlast:P(20.4,-127.9), grenadeStop:P(2.2,-125.1), comradeRifle:P(3.95,-125.25,-Math.PI/2),
+    sweepBodies:Object.freeze(SET_MARKS.sweep.bodies.map(b=>P(b.x,b.z,b.headYawDeg*Math.PI/180))),
+    finishBodies:Object.freeze(SET_MARKS.finish.bodies.map(b=>P(b.x,b.z,b.headYawDeg*Math.PI/180))),
+    mgCorpseLower:P(SET_MARKS.mg.corpseLower.x,SET_MARKS.mg.corpseLower.z,SET_MARKS.mg.corpseLower.headYawDeg*Math.PI/180),
+    mgCorpseUpper:P(SET_MARKS.mg.corpseUpper.x,SET_MARKS.mg.corpseUpper.z,SET_MARKS.mg.corpseUpper.headYawDeg*Math.PI/180),
+    mgDragFrom:Object.freeze([SET_MARKS.mg.corpseLower.start,SET_MARKS.mg.corpseUpper.start].map(b=>P(b.x,b.z))),
+    mgGunner:P(SET_MARKS.mg.gunner.x,SET_MARKS.mg.gunner.z,SET_MARKS.mg.gunner.yawDeg*Math.PI/180),
+    mgLoader:P(SET_MARKS.mg.loader.x,SET_MARKS.mg.loader.z,SET_MARKS.mg.loader.yawDeg*Math.PI/180), mgAimAt:P(SET_MARKS.mg.aimAt.x,SET_MARKS.mg.aimAt.z),
+    dropInLip:Object.freeze(SET_MARKS.dropIn.lip.map(l=>P(l.x,l.z))),
+    dropInLand:Object.freeze(SET_MARKS.dropIn.lip.map(l=>P(l.land.x,l.land.z))),
+    foldBlast:P(SET_MARKS.dropIn.foldBlast.x,SET_MARKS.dropIn.foldBlast.z), grenadeStop:P(SET_MARKS.finish.grenadeStop.x,SET_MARKS.finish.grenadeStop.z),
+    comradeRifle:P(3.95,-125.25,-Math.PI/2),
   }),
-  // Stand-ins until the other packages' pieces land (each listed in pendingWiring): bodies -- dead NRA actors posed on ShotCollapse's
-  // last frame stand in for Set's static corpses (sweep [0..1], finish [0..1], the two machine-gun rests).
-  standIns:Object.freeze({ bodies:true }),
+  // 2026-10-11 integration: the Set's static corpses are in (OpeningCorpses: sweep [0..1], finish [0], the machine gun's two rests);
+  // the director's dead-NRA-actor stand-ins are off.
+  standIns:Object.freeze({ bodies:false }),
   // Estimated takes of this round's new / rewritten scenes (contract §3), used while the recorded scene is not this round's
   // (the voice layer's take has another line count or other speakers: the 2026-09 recordings): who, estimated seconds, and
   // the director event the voice direction waits on (Brief Voice item 4; `afterS` past it) or the gap after the line before.
@@ -660,7 +697,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // and hauled up by the hair; the first slap snaps them open over openS (no flinch on that one) -- the daze after it
     // as before. `slitAboveDeg`: the slit sits below the middle of the picture (0.62 of the height down at a 65 deg fov), so
     // while he shams the look is on ijaA's face pitched up this much and the face falls into it.
-    playDead:Object.freeze({ closeAtS:.3, closeS:.14, squint:.84, tremor:.012, tremorHz:7, openS:.08, slitAboveDeg:9 }),
+    playDead:Object.freeze({ closeAtS:.3, closeS:.14, squint:.72, tremor:.012, tremorHz:7, openS:.08, slitAboveDeg:9 }),
     // The interpreter squats at Shunzi's right front, 1.3 m from the eye, facing him; ijaB keeps watch east down the
     // trench 3.4 m off (「快点！」 over his shoulder).
     // 2026-10-11: south of the Set's finish.bodies[0] (3.3,-124.55, head west, 1.7 m long east), facing the eye (was (2.92,-124.5), 56 deg).
@@ -673,7 +710,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // Where Dir01's Found leaves the vanguard and where 02 holds them until the charge: ijaB guarding the junction J facing east
     // (「快点！」 is shouted from there, 12 m off), ijaC at the fold F facing east, ijaD the recruit at practice.recruitWait facing
     // west with his rifle at the ready (a debug start into 02 puts them there, StageRescue).
-    vanguardPosts:Object.freeze({ ijaB:P(14,-124.6,-Math.PI/2), ijaC:P(18.2,-125.6,-Math.PI/2), ijaD:P(3.9,-124.3,Math.PI/2) }),
+    vanguardPosts:Object.freeze({ ijaB:P(14,-124.6,-Math.PI/2), ijaC:P(18.2,-125.6,-Math.PI/2), ijaD:P(5.6,-124.05,Math.PI/2) }),
     // The machine-gun crew Dir01 brings down (BunkerGunner castId gunner prone at Set mg.gunner, BunkerLoader castId loader
     // kneeling at mg.loader, facing south over the south lip). Until they are in the roster (Data_FirstLevelMission bunkerAssault)
     // the director makes stand-ins of them on 02's first frame (EnsureMgCrew, pendingWiring N22) with these ids, so the hand-back
@@ -696,7 +733,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // stand-ins are standInClip (his rifle laid from his right hand onto the cheek by the director, RecruitRifle) and
     // levelStandIn walked backwards (pendingWiring N21). recruitFall: where the volley's chest shot drops him (east of the
     // heave, 「倒向东、不压在挣出的路线上」: Script_OpeningStoryboardsTest keeps it 0.9 m+ off the heave's path).
-    blade:Object.freeze({ startLine:"RescueInterrogation.05", afterLineS:.15, recruitAt:P(2.8,-125.95),
+    // 2026-10-11 integration: with IjaRecruitCheekCut baked his root comes from its player track (cheekL on the eye's left cheek,
+    // bearingDeg to the left of the look: Report_animB); recruitAt is only the stand-in's mark.
+    blade:Object.freeze({ startLine:"RescueInterrogation.05", afterLineS:.15, recruitAt:P(2.8,-125.95), bearingDeg:25,
       clip:"IjaRecruitCheekCut", standInClip:"IjaReadyRifle", touchS:.9, cutS:1.5, pressS:.25, pressM:.035, shakeM:.004, shakeHz:9,
       releaseS:2.3, liftS:.4, thenLine:"RescueInterrogation.06", thenAfterS:.55, backAfterLineS:.2, backS:1.3,
       levelAt:P(4.6,-125.75), levelClip:"IjaRecruitLevelRifle", levelStandIn:"IjaReadyRifle", levelS:.45, chargeAfterLevelS:.5,
@@ -704,7 +743,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // The cut on the cheek, first person: the head flinches flinchDeg away from it (to the right) over flinchS and comes back over
     // recoverS; the cheekCut sound (Sfx package, contract §6) -- `sound` until it is registered (pendingWiring N21); the lens look
     // is Data_OpeningLens `cheek` on the cut's clock (events.cheekAt).
-    cheek:Object.freeze({ flinchDeg:6, flinchS:.08, recoverS:.8, cue:"cheekCut", sound:"bayonetHit", volume:.55 }),
+    cheek:Object.freeze({ flinchDeg:6, flinchS:.08, recoverS:.8, cue:"cheekCut", volume:.55 }),
     // Slaps (ijaA, crouched, the left fist in the hair): the right hand goes up high over raiseS (IjaSlapForehand /
     // IjaSlapBackhand play from their first frame: raiseS = the clip's contact), cracks down at hitS; the head is flung
     // yawDeg / rollDeg away from the blow (and shiftM sideways, dropM down), hangs there hangS and eases back over
@@ -802,8 +841,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // falls from the hand, bounces (bounceH up, bounceS later; grenadeBounce each), rolls rollS and lies at `stop` (Set
     // finish.grenadeStop, 0.35 m east of the eye) until 01–02 is left; it never goes off. Prop: Set's `grenade` (Type 91,
     // radiusM / lengthM) -- the director's own cylinder until Set wires it (pendingWiring N23).
+    // 2026-10-11 integration: the Set's grenade, dropped from the dead hand by OpeningWorldProps.Toss (tossS in the air, tossArcM,
+    // two bounces bounceH, rolling rollM over rollS) to the Set's finish.grenadeStop (= `stop`).
     grenade:Object.freeze({ drawS:1.0, biteS:1.7, readyS:2.6, bounceH:.12, bounceS:.24, rollS:.8, stop:P(2.2,-125.1),
-      radiusM:.025, lengthM:.095, pin:"grenadePin", bounce:"grenadeBounce" }),
+      radiusM:.025, lengthM:.095, pin:"grenadePin", bounce:"grenadeBounce", tossS:.32, tossArcM:.04, rollM:.3 }),
     // 「手榴弹滚到顺子脸前停住」: the look goes down onto it as it comes to rest, for grenadeLookS (from 0.3 s before it stops).
     grenadeLookS:.6,
     // 「枪炮声四起」: rifle reports from the SSW leg and the crater step at `rifles` (s into Charge), shells landing out in
@@ -816,13 +857,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
       riflesFrom:Route([-.6,-120.2],[.9,-120.7],[2.6,-121.1],[-1.8,-118.5]),
       shells:Object.freeze([[.25,12,-117.5],[.95,-3,-131],[2.1,17,-130.5]]),
       // 2026-10-11 (「冲锋时只有短促的喊杀，此起彼伏，不成句」; contract §3 squad bark library): yell_sha / yell_kan / yell_chong,
-      // and one 「杀！」 each in Luo's, He's and Liu's own voices. Until the Voice package delivers them, `yellStandIn` plays the
-      // existing rally_* barks in their place (pendingWiring N23); the integrator removes the table when they are wired.
+      // and one 「杀！」 each in Luo's, He's and Liu's own voices (2026-10-11 integration: the Voice package's keys, Data_Voice kind
+      // "yell" -- three voices each, the _2 / _3 takes -- and the three personal takes yell_sha@<who>; the rally_* stand-ins are gone).
       yells:Object.freeze([[.1,"yell_sha",.9,-120.6],[.35,"yell_sha@luo",1.0,-120.55],[.6,"yell_chong",-.5,-119.8],
         [.85,"yell_sha@heyoutian",.45,-120.35],[1.15,"yell_kan",-1.5,-118.9],[1.5,"yell_sha@liuwencai",-.2,-120.1],
-        [1.9,"yell_sha",3.2,-122.4],[2.4,"yell_kan",5.5,-124.3],[3.1,"yell_chong",7.5,-124.2]]),
-      yellStandIn:Object.freeze({ yell_sha:"rally_dadao", yell_kan:"rally_follow", yell_chong:"rally_charge",
-        "yell_sha@luo":"rally_charge@luo", "yell_sha@heyoutian":"rally_charge@heyoutian", "yell_sha@liuwencai":"rally_charge@liuwencai" }),
+        [1.9,"yell_sha_2",3.2,-122.4],[2.4,"yell_kan_2",5.5,-124.3],[3.1,"yell_chong_2",7.5,-124.2],[3.6,"yell_sha_3",6.4,-124.6]]),
     }),
     // Charge / Melee view (2026-09-30, user: 「现在一个镜头直接切过去很不自然，完全可以镜头不动，但是前面的翻译或者日军被砍死倒下吧」):
     // the eye stays on ijaA (his upper body: ijaChestDropM under the head, pitch capped at maxPitchDeg) -- shot, up off him and
