@@ -467,7 +467,9 @@ def Builder(*names):
 def MakeClips(K):
     T = Toolkit(K)
     specs = {}
+    building = K.get('Building') or (lambda name: None)    # (the bake notes which partner tracks each builder reads)
     for name in CLIPS:
+        building(name)
         if name in LEGACY:
             specs[name] = LegacySpec(K, name)
             continue
@@ -479,6 +481,7 @@ def MakeClips(K):
         if name in REACH_BY_CLIP:
             spec.setdefault('reach', REACH_BY_CLIP[name])
         specs[name] = spec
+    building(None)
     for spec in specs.values():
         spec.setdefault('scale', K['scale'])
         spec.setdefault('modelId', K['modelId'])

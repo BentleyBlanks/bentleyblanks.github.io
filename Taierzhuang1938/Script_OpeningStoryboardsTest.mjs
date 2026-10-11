@@ -154,6 +154,48 @@ for(const row of manifest.models){
     frames+=clip.frameCount;clipCount++;
   }
 }
+// ---- bake records (docs/Data_OpeningClipLibrary20260923.md §15): every rig clip says how its committed frames were
+// baked, so OPENING_PASS=verify reproduces all of them; the record must describe THESE frames (valuesSha256 = sha256 of
+// `values` as little-endian float64, -0 as 0 -- a clip re-baked without its record fails here), and only a retired clip is frozen.
+{
+  const SOLVERS=["20260927PreLimbContinuity","20260928LimbContinuity"];
+  const FrameSha=values=>crypto.createHash("sha256").update(Buffer.from(new Float64Array(values.map(v=>v+0)).buffer)).digest("hex");   // -0 counts as 0
+  let records=0,frozen=0,legacy=0,committedSeeds=0,olderPartners=0;
+  for(const row of manifest.models){
+    const asset=assets.get(row.id);
+    for(const id of row.clipIds){
+      const spec=manifest.clips[id],rec=spec?.bake?.[row.id],where=`${row.id}/${id}`;
+      assert.ok(rec,`${where}: bake record`);
+      assert.ok(SOLVERS.includes(rec.solverVersion),`${where}: solverVersion ${rec.solverVersion}`);
+      assert.equal(typeof rec.commit,"string",`${where}: commit`);
+      assert.equal(rec.valuesSha256,FrameSha(asset.clips[id].values),`${where}: the bake record describes the committed frames`);
+      records++;
+      if(rec.solverVersion===SOLVERS[0])legacy++;
+      if(rec.frozen){
+        assert.equal(rec.frozen,true);assert.ok(spec.retired,`${where}: only a clip out of the flow (retired) is frozen`);
+        frozen++;continue;
+      }
+      // 'committed:<prev>@<commit>': <prev>'s last frame as that commit had it (IjaLookBackLow: baked before IjaReadyRifle was)
+      assert.ok(rec.seed===null||/^(baked:\w+|committed:\w+(@[0-9a-f]{7,40})?)$/.test(rec.seed),`${where}: seed ${rec.seed}`);
+      if(rec.seed){
+        const prev=rec.seed.split(":")[1].split("@")[0];
+        assert.ok((spec.prev||[]).includes(prev)&&asset.clips[prev],`${where}: seeds from its prev ${prev} on the same rig`);
+        if(rec.seed.startsWith("committed:"))committedSeeds++;
+      }
+      assert.ok(rec.twistMax===null||Number.isFinite(rec.twistMax),`${where}: twistMax`);
+      if(rec.solverVersion===SOLVERS[0])assert.equal(rec.twistMax,null,`${where}: the legacy solver unwraps without a limit`);
+      assert.equal(typeof rec.seedAnyHand,"string",`${where}: seedAnyHand`);
+      if(rec.partner){
+        assert.equal(typeof rec.partner.dir,"string",`${where}: partner dir`);
+        for(const [key,sha] of Object.entries(rec.partner.tracks||{}))assert.ok(/^Tengxian\w+\/\w+$/.test(key)&&/^[0-9a-f]{64}$/.test(sha),`${where}: partner track ${key}`);
+        if(!rec.partner.dir.startsWith("OpeningRedraft_20261011_AB"))olderPartners++;
+      }
+    }
+  }
+  for(const [id,spec] of Object.entries(manifest.clips))for(const rig of Object.keys(spec.bake||{}))
+    assert.ok(assets.get(rig)?.clips[id],`${rig}/${id}: a bake record only for a rig that has the clip`);
+  console.log(`ok bake records: ${records} rig clips (${legacy} legacy solver, ${frozen} frozen, ${committedSeeds} committed seeds, ${olderPartners} on older partner tracks)`);
+}
 // Reused from other libraries.
 const captives=JSON.parse(Read("Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.json"));
 const captiveClips=new Map(captives.models.map(row=>[row.id,JSON.parse(Read("Animation/MachineGunCaptives/"+row.file)).clips]));
