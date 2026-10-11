@@ -15,6 +15,9 @@
 //      pauseBeforeS    提示词里请演员在这句之前停多久（动作空当由模型演出来，播放时沿用录音里的间隔）
 //      tempo           切句时把这一片不变调压快多少倍（atempo，1–1.35；不进提示词）。模型演不到要的语速时用，
 //                      只压这一句、整段录音不动；清单 lines[id].tempo 记下，逐字时间跟着缩
+//      masterDb        整段母带按字数加权求目标电平时，这一句不用 projection 档的电平、改用这个值（dBFS，有声段 RMS；
+//                      不进提示词）。只给「要演成压低的声音、电平还得再低一截」的非词人声用（2026-10-12 CaptiveWoundTwist）
+//      maxSeconds      切出来的片段最长几秒（含两头留白），超了算硬错误、整段重抽（不进提示词）
 //
 //   2. 播放时的**少量覆盖**。缺省一律沿用整段录音里的原始间隔（清单 lines[id].gapBeforeS，模型一次演出来的
 //      轮替节奏），只有稿里要等动作、被打断、压尾音的地方才写：
@@ -177,8 +180,12 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "09": P("normal", 0.6, { context: "赶紧转身冲日兵哈腰", delivery: "告状的谄媚奴才腔，赔着小心，急着撇清自己" }),
   }, { voices: { comrade: "comradeWounded" } }),
   // 无字幕：乙拧伤口（woundPress）那一下，冬瓜卡在喉咙里的叫声。
+  // 2026-10-12 R2-Voice 重录：10-11 那条量出来是放声喊（峰值 −1.6 dBFS、有声段 −19.5 dBFS 比 CaptiveHowl 还响 1.6 dB、
+  // 谐波比 6.0 dB 低于嚎的 8.3 dB、基频 333 Hz、整条 3.1 s）。改成闭着嘴从喉咙里挤的闷哼：提示词压低、强度降到 0.7、一秒以内；
+  // 电平按 masterDb 拉到 −27.5（比嚎低 6 dB 以上），片段超 1.2 s 算硬错误重抽。
   CaptiveWoundTwist: Scene(true, "前沟沟壁下，冬瓜被按跪着，日兵乙弯腰把拇指摁进他左肩的枪伤往里拧；他整个人弓起来、头往后仰，叫声卡在喉咙里，咬着牙不肯喊出来", {
-    "01": P("normal", 0.95, { after: "event:woundPress", offsetS: 0, delivery: "不是在说话：咬紧牙关，剧痛的叫声被硬憋在喉咙里，闷住、发抖、断成两截，憋不住漏出一点又咽回去；不喊字、不哭、不求饶，两秒左右" }),
+    "01": P("low", 0.7, { after: "event:woundPress", offsetS: 0, masterDb: -27.5, maxSeconds: 1.2,
+      delivery: "不是在说话、也不是喊：牙关咬紧、嘴闭着，剧痛的叫声闷在喉咙里出不来，只从喉咙和鼻子里挤出两下短促发抖的闷哼，第二下更短、又硬咽回去；不张嘴、不放声、不哭、不求饶；整条一秒左右，不超过一秒" }),
   }, { voices: { comrade: "comradeWounded" } }),
   // 练刺刀 → 割喉。甲冷静地教新兵干活；03 等反手耳光（recruitSlapped）、04 等丁扎完两刀站着喘（recruitPant）、05 等揪发提起（hairLifted）、
   // 06 下刀那一刻（cutStart，offsetS 0：边下刀边嘟囔，低声，说完发 taunted）、07 等刺刀卡回枪口（bayonetFixed）、08 等丁点头（recruitNod）。

@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-10-11T10:20:11.578Z",
+  "updatedAt": "2026-10-11T17:06:06.456Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -920,10 +920,10 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 3.29,
-      "bytes": 40169,
-      "sha256": "fd59aa4b6bc463585f123d46ede9cc3c799e9b5989cf6f1453f94de9c6369053",
-      "source": "scene",
+      "seconds": 2.44,
+      "bytes": 30138,
+      "sha256": "8acd657f81330d0fb425d2915565483b79aaf7e9d21341b8d329995c44269f6a",
+      "source": "patch",
       "sceneSha256": "2e057dde9ee419df5216227c1050f400e654d2eac0d8424b1f5878b468e402f8",
       "sceneStartS": 3.7,
       "sceneEndS": 6.99,
@@ -941,23 +941,23 @@
       "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -21.58,
-        "truePeakDb": -5.42,
-        "snrDb": 45.3,
-        "voicedS": 2.18,
-        "lowShare": 0.129,
+        "activeRmsDb": -22.03,
+        "truePeakDb": -6.99,
+        "snrDb": 42.31,
+        "voicedS": 1.76,
+        "lowShare": 0.166,
         "f0": {
-          "median": 168,
-          "p10": 118,
-          "p90": 320,
-          "frames": 35
+          "median": 205,
+          "p10": 144,
+          "p90": 286,
+          "frames": 41
         },
         "cer": 0.3636,
-        "transcript": "三甲,马买皮,打麻雀都不够。",
-        "speakerCos": 0.646,
+        "transcript": "三甲,买一批,大麻雀都不够。",
+        "speakerCos": 0.837,
         "nearestOther": [
-          "liuwencai",
-          0.685
+          "comrade",
+          0.528
         ],
         "referencedOther": [
           "liuwencai",
@@ -967,7 +967,15 @@
         "subtitleCoverage": 1,
         "sceneGainDb": 1.48
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "patch": {
+        "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
+        "replacedSha256": "fd59aa4b6bc463585f123d46ede9cc3c799e9b5989cf6f1453f94de9c6369053",
+        "targetDb": -21.58,
+        "takes": 1,
+        "take": 1,
+        "promptHash": "5baf1de9c2aecaf61efff6f0b1c20220bf2df022b3c1c40518d6c50fd62cfa53"
+      }
     },
     "BunkerBanter.03": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_03.mp3",
@@ -1032,10 +1040,10 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.07,
-      "bytes": 25749,
-      "sha256": "9b00184346efce3c92e3bb07700b750e9cfdedb0adf6973d0f33d4c825c8bf14",
-      "source": "scene",
+      "seconds": 2.749,
+      "bytes": 33899,
+      "sha256": "7ee56b8ce76f94edb86a1bb465d32f235d255139ceacf64e331d6dda8f69d98b",
+      "source": "patch",
       "sceneSha256": "2e057dde9ee419df5216227c1050f400e654d2eac0d8424b1f5878b468e402f8",
       "sceneStartS": 10.01,
       "sceneEndS": 12.08,
@@ -1053,23 +1061,23 @@
       "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -19.89,
-        "truePeakDb": -5.06,
-        "snrDb": 52.87,
-        "voicedS": 1.74,
-        "lowShare": 0.364,
+        "activeRmsDb": -20.34,
+        "truePeakDb": -5.37,
+        "snrDb": 41.55,
+        "voicedS": 1.98,
+        "lowShare": 0.375,
         "f0": {
-          "median": 176,
-          "p10": 107,
-          "p90": 203,
-          "frames": 55
+          "median": 163,
+          "p10": 125,
+          "p90": 213,
+          "frames": 74
         },
-        "cer": 0.5556,
-        "transcript": "烟竹子没吊到冰上了。",
-        "speakerCos": 0.649,
+        "cer": 0.4444,
+        "transcript": "言诸子,我掉到冰上了。",
+        "speakerCos": 0.768,
         "nearestOther": [
-          "yaowa",
-          0.739
+          "shunzi",
+          0.619
         ],
         "referencedOther": [
           "liuwencai",
@@ -1079,7 +1087,15 @@
         "subtitleCoverage": 1,
         "sceneGainDb": 1.48
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "patch": {
+        "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
+        "replacedSha256": "9b00184346efce3c92e3bb07700b750e9cfdedb0adf6973d0f33d4c825c8bf14",
+        "targetDb": -19.89,
+        "takes": 1,
+        "take": 1,
+        "promptHash": "4f383f0fc8c5419c2caffe96e9996e73864e4cc62b68049aa70128298b51336e"
+      }
     },
     "BunkerBanter.05": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_05.mp3",
@@ -1088,10 +1104,10 @@
       "who": "yaowa",
       "lang": "zh",
       "projection": "low",
-      "seconds": 0.65,
-      "bytes": 8508,
-      "sha256": "97d1d5a5ca34c40b205e8282e069febb9fb49f41921a593cdf7bf6ecfbd5a467",
-      "source": "scene",
+      "seconds": 1.406,
+      "bytes": 17599,
+      "sha256": "1fe10effbaa451b42f9ac8c5dd7e10474ceadbf91bc32cf48aed7b00f21aa7fd",
+      "source": "patch",
       "sceneSha256": "2e057dde9ee419df5216227c1050f400e654d2eac0d8424b1f5878b468e402f8",
       "sceneStartS": 12.58,
       "sceneEndS": 13.23,
@@ -1109,23 +1125,23 @@
       "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
       "referenced": false,
       "metrics": {
-        "activeRmsDb": -22.99,
-        "truePeakDb": -7.79,
-        "snrDb": 36.74,
-        "voicedS": 0.54,
-        "lowShare": 0.413,
+        "activeRmsDb": -23.45,
+        "truePeakDb": -8.93,
+        "snrDb": 29.48,
+        "voicedS": 0.96,
+        "lowShare": 0.24,
         "f0": {
-          "median": 188,
-          "p10": 151,
-          "p90": 232,
-          "frames": 13
+          "median": 190,
+          "p10": 120,
+          "p90": 219,
+          "frames": 23
         },
-        "cer": 0.5,
-        "transcript": "还有美的",
-        "speakerCos": 0.547,
+        "cer": 0,
+        "transcript": "还有没得?",
+        "speakerCos": 0.689,
         "nearestOther": [
           "liuwencai",
-          0.631
+          0.598
         ],
         "referencedOther": [
           "liuwencai",
@@ -1135,7 +1151,15 @@
         "subtitleCoverage": 1,
         "sceneGainDb": 1.48
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "patch": {
+        "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
+        "replacedSha256": "97d1d5a5ca34c40b205e8282e069febb9fb49f41921a593cdf7bf6ecfbd5a467",
+        "targetDb": -22.99,
+        "takes": 1,
+        "take": 1,
+        "promptHash": "65ae1c30984a0c503d23070a080b779a80a646c4f98255de126acff1a1b26ad2"
+      }
     },
     "BunkerBanter.06": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_06.mp3",
@@ -1256,9 +1280,9 @@
       "who": "yaowa",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 3.276,
-      "bytes": 40169,
-      "sha256": "80ea9e68fe5fb558c4eff77861af0991bca6ab4bec58312fc72e2b7d9f6994cf",
+      "seconds": 2.89,
+      "bytes": 35467,
+      "sha256": "28028addc64469251e4da8dcb12dd7ba8da613075221a10d3fe247b53e28da49",
       "source": "patch",
       "sceneSha256": "2e057dde9ee419df5216227c1050f400e654d2eac0d8424b1f5878b468e402f8",
       "sceneStartS": 21.635,
@@ -1277,23 +1301,23 @@
       "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
       "referenced": false,
       "metrics": {
-        "activeRmsDb": -21.89,
-        "truePeakDb": -1.96,
-        "snrDb": 87.84,
-        "voicedS": 1.9,
-        "lowShare": 0.201,
+        "activeRmsDb": -21.86,
+        "truePeakDb": -4.19,
+        "snrDb": 89.74,
+        "voicedS": 2.2,
+        "lowShare": 0.111,
         "f0": {
           "median": 182,
-          "p10": 170,
+          "p10": 168,
           "p90": 232,
-          "frames": 50
+          "frames": 67
         },
         "cer": 0.4,
         "transcript": "生死塞,灯哈都不用挖坑。",
-        "speakerCos": 0.817,
+        "speakerCos": 0.824,
         "nearestOther": [
           "liuwencai",
-          0.672
+          0.684
         ],
         "referencedOther": [
           "liuwencai",
@@ -1310,7 +1334,12 @@
         "targetDb": -21.41,
         "takes": 1,
         "take": 1,
-        "promptHash": "fb995bebadf511c4e13bba0ed909cc6ab41e7c3781bb859daaabdee4996ffa73"
+        "promptHash": "fb995bebadf511c4e13bba0ed909cc6ab41e7c3781bb859daaabdee4996ffa73",
+        "remastered": {
+          "fromSha256": "80ea9e68fe5fb558c4eff77861af0991bca6ab4bec58312fc72e2b7d9f6994cf",
+          "tailCutS": 2.83,
+          "why": "补录片末字后有与台词无关的爆音 / 杂音（原始 take 不在这个工作区），拿装上的那一片重新母带：剪掉杂音、有声段电平重新对齐"
+        }
       }
     },
     "BunkerBanter.09": {
@@ -1320,10 +1349,10 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 0.83,
-      "bytes": 10703,
-      "sha256": "0fe41796ac4063347eea217a5f99e374019495f4434fdf43362b6705ae1a1154",
-      "source": "scene",
+      "seconds": 0.707,
+      "bytes": 9449,
+      "sha256": "2231bc7624ed3d810f377d1555b0df0f4a9f4861dc723879a0c2a408758cf399",
+      "source": "patch",
       "sceneSha256": "2e057dde9ee419df5216227c1050f400e654d2eac0d8424b1f5878b468e402f8",
       "sceneStartS": 23.97,
       "sceneEndS": 24.8,
@@ -1341,23 +1370,23 @@
       "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -17.44,
-        "truePeakDb": -3.8,
-        "snrDb": 83.61,
-        "voicedS": 0.72,
-        "lowShare": 0.247,
+        "activeRmsDb": -17.89,
+        "truePeakDb": -2.92,
+        "snrDb": 22.79,
+        "voicedS": 0.54,
+        "lowShare": 0.528,
         "f0": {
-          "median": 208,
-          "p10": 130,
-          "p90": 302,
-          "frames": 31
+          "median": 136,
+          "p10": 100,
+          "p90": 308,
+          "frames": 14
         },
-        "cer": 0.75,
-        "transcript": "滾你马嘞",
-        "speakerCos": 0.377,
+        "cer": 0,
+        "transcript": "滚你妈的。",
+        "speakerCos": 0.515,
         "nearestOther": [
-          "yaowa",
-          0.477
+          "comrade",
+          0.333
         ],
         "referencedOther": [
           "liuwencai",
@@ -1367,7 +1396,15 @@
         "subtitleCoverage": 1,
         "sceneGainDb": 1.48
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "patch": {
+        "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
+        "replacedSha256": "0fe41796ac4063347eea217a5f99e374019495f4434fdf43362b6705ae1a1154",
+        "targetDb": -17.44,
+        "takes": 3,
+        "take": 2,
+        "promptHash": "8058a92997db4fe4791155e8e4757d665d3f7f2dd0c25371005188731652a424"
+      }
     },
     "BunkerBanter.10": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_10.mp3",
@@ -1376,10 +1413,10 @@
       "who": "heyoutian",
       "lang": "zh",
       "projection": "low",
-      "seconds": 1,
-      "bytes": 12897,
-      "sha256": "41d44cf7d27bb9b9a01132c19ae3726fe38c8638f259fc70214f830dc2151ff8",
-      "source": "scene",
+      "seconds": 1.74,
+      "bytes": 21674,
+      "sha256": "cd4101e096637829444b83ab9cc8580bf5909b3728d52573751bbde3d143c92c",
+      "source": "patch",
       "sceneSha256": "2e057dde9ee419df5216227c1050f400e654d2eac0d8424b1f5878b468e402f8",
       "sceneStartS": 25.7,
       "sceneEndS": 26.7,
@@ -1397,23 +1434,23 @@
       "castSha256": "1ad7b156126131843240afb42dddc9d8f296ae43075b3cb8833606264eb1edbf",
       "referenced": false,
       "metrics": {
-        "activeRmsDb": -20.11,
-        "truePeakDb": -5.65,
-        "snrDb": 42.09,
-        "voicedS": 0.82,
-        "lowShare": 0.245,
+        "activeRmsDb": -21.18,
+        "truePeakDb": -1.18,
+        "snrDb": 23.81,
+        "voicedS": 1.62,
+        "lowShare": 0.215,
         "f0": {
-          "median": 129,
-          "p10": 103,
-          "p90": 165,
-          "frames": 37
+          "median": 152,
+          "p10": 115,
+          "p90": 174,
+          "frames": 28
         },
-        "cer": 0.75,
-        "transcript": "拉个铡喽。",
-        "speakerCos": 0.402,
+        "cer": 0.25,
+        "transcript": "哪个糟了?",
+        "speakerCos": 0.503,
         "nearestOther": [
           "yaowa",
-          0.472
+          0.434
         ],
         "referencedOther": [
           "comrade",
@@ -1423,7 +1460,15 @@
         "subtitleCoverage": 1,
         "sceneGainDb": 1.48
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "patch": {
+        "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
+        "replacedSha256": "41d44cf7d27bb9b9a01132c19ae3726fe38c8638f259fc70214f830dc2151ff8",
+        "targetDb": -20.11,
+        "takes": 3,
+        "take": 2,
+        "promptHash": "4c648599e55bb44dd6ff01b61d931630ae784ae169d94221bb909f0b87d5696a"
+      }
     },
     "BunkerBanter.11": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_11.mp3",
@@ -1488,9 +1533,9 @@
       "who": "heyoutian",
       "lang": "zh",
       "projection": "low",
-      "seconds": 4.056,
-      "bytes": 49573,
-      "sha256": "ef88d48a93a8ad445d146796ada86b7db0cf7978c6468770395c8e350a88c598",
+      "seconds": 4.62,
+      "bytes": 56156,
+      "sha256": "3b803beccf7a8c5cd74c91db6a39bd82751ba86a33c2d6c713cc3ebc77fdda16",
       "source": "patch",
       "sceneSha256": "2e057dde9ee419df5216227c1050f400e654d2eac0d8424b1f5878b468e402f8",
       "sceneStartS": 28.8,
@@ -1509,23 +1554,23 @@
       "castSha256": "1ad7b156126131843240afb42dddc9d8f296ae43075b3cb8833606264eb1edbf",
       "referenced": false,
       "metrics": {
-        "activeRmsDb": -24.12,
-        "truePeakDb": -4.63,
-        "snrDb": 42.33,
-        "voicedS": 2.1,
-        "lowShare": 0.222,
+        "activeRmsDb": -24.13,
+        "truePeakDb": -3.89,
+        "snrDb": 42.19,
+        "voicedS": 3.5,
+        "lowShare": 0.223,
         "f0": {
-          "median": 216,
-          "p10": 174,
-          "p90": 276,
-          "frames": 48
+          "median": 132,
+          "p10": 107,
+          "p90": 198,
+          "frames": 99
         },
-        "cer": 0.6667,
-        "transcript": "没得忍着,就没操劳子水喝水。",
-        "speakerCos": 0.85,
+        "cer": 0.4167,
+        "transcript": "没得人找,就没吵脑子睡,喝水。",
+        "speakerCos": 0.846,
         "nearestOther": [
           "yaowa",
-          0.721
+          0.729
         ],
         "referencedOther": [
           "comrade",
@@ -1540,8 +1585,8 @@
         "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
         "replacedSha256": "43273d3ac24429a0df0c5caf174c732a68d3dbbd65e20db7ad9e2b5d907b0431",
         "targetDb": -23.68,
-        "takes": 1,
-        "take": 1,
+        "takes": 3,
+        "take": 2,
         "promptHash": "964a745d9b49ff156dc4a4ccf9a37fb861ee54b6c29ba45277cedc7245f494ba"
       }
     },
@@ -8709,47 +8754,47 @@
       "index": 0,
       "who": "comrade",
       "lang": "zh",
-      "projection": "normal",
-      "seconds": 3.097,
-      "bytes": 37974,
-      "sha256": "d7119633927d234204b99fc4b26acf77bec8837bd3cf9587b65681a0cbde196e",
+      "projection": "low",
+      "seconds": 0.885,
+      "bytes": 11329,
+      "sha256": "4bbaf8e9815043355f452995a588587f7fea48ab0fa7683c55f984d7206107e6",
       "source": "scene",
-      "sceneSha256": "580e2cec50589f12a7b527999033c71391f3e96379835988ea4bd1d5ab3b4979",
-      "sceneStartS": 0.01,
-      "sceneEndS": 3.107,
+      "sceneSha256": "122b92db16f71328fc4ba56773e569ddfb0244c93365d280a679f0bad4b5d44a",
+      "sceneStartS": 0.02,
+      "sceneEndS": 0.905,
       "gapBeforeS": 0,
       "tight": [
         false,
         false
       ],
       "edgeDb": [
-        -41.3,
-        -5.3
+        -40.8,
+        -54.1
       ],
       "cutMethod": "subtitle",
       "castOwner": "comradeWounded",
       "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -19.52,
-        "truePeakDb": -1.5,
-        "snrDb": 38.23,
-        "voicedS": 1.42,
-        "lowShare": 0.28,
+        "activeRmsDb": -27.95,
+        "truePeakDb": -15.02,
+        "snrDb": 37.71,
+        "voicedS": 0.5,
+        "lowShare": 0.461,
         "f0": {
-          "median": 333,
-          "p10": 246,
-          "p90": 400,
-          "frames": 16
+          "median": 327,
+          "p10": 182,
+          "p90": 364,
+          "frames": 14
         },
-        "cer": 2,
-        "transcript": "啊!啊!啊!啊!",
-        "speakerCos": 0.408,
+        "cer": 0.5,
+        "transcript": "呃...",
+        "speakerCos": 0.295,
         "nearestOther": null,
         "referencedOther": null,
-        "lengthDiff": 2,
+        "lengthDiff": -1,
         "subtitleCoverage": 1,
-        "sceneGainDb": 1.94
+        "sceneGainDb": -10.93
       },
       "mastering": "SliceOfWholeSceneMaster"
     },
@@ -9413,7 +9458,7 @@
       ],
       "attempt": 2,
       "pickedBy": "check",
-      "requests": 4,
+      "requests": 15,
       "attempts": [
         {
           "n": 1,
@@ -9470,7 +9515,12 @@
       "mastering": "WholeSceneOnceRmsTruePeakMinus1",
       "patched": [
         "BunkerBanter.08",
-        "BunkerBanter.12"
+        "BunkerBanter.12",
+        "BunkerBanter.02",
+        "BunkerBanter.09",
+        "BunkerBanter.10",
+        "BunkerBanter.04",
+        "BunkerBanter.05"
       ]
     },
     "CaptiveInterrogation": {
@@ -11673,10 +11723,10 @@
     },
     "CaptiveWoundTwist": {
       "file": "AudioVoice_FirstLevelCaptiveWoundTwist.mp3",
-      "sha256": "580e2cec50589f12a7b527999033c71391f3e96379835988ea4bd1d5ab3b4979",
-      "seconds": 3.107,
-      "bytes": 37974,
-      "promptHash": "605a80612320ea8326d4180187e0514e391c78a5456b58ed504074670210f630",
+      "sha256": "122b92db16f71328fc4ba56773e569ddfb0244c93365d280a679f0bad4b5d44a",
+      "seconds": 0.905,
+      "bytes": 11643,
+      "promptHash": "adc92e467340dd509dede29d5865ff482a942ac508bd3b095248599b723f9e4c",
       "castKey": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6",
       "references": [
         {
@@ -11697,20 +11747,21 @@
         {
           "n": 1,
           "hard": [],
-          "flags": 1
+          "flags": 2
         }
       ],
       "hard": [],
       "flags": [
-        "CaptiveWoundTwist.01 非词人声，字错率 2 待人工核对「啊!啊!啊!啊!」"
+        "CaptiveWoundTwist.01 有声 0.5 s，太短不判嗓子与字错率",
+        "CaptiveWoundTwist.01 非词人声，字错率 0.5 待人工核对「呃...」"
       ],
-      "targetDb": -19,
-      "gainDb": 1.94,
-      "trimStartS": 0.42,
+      "targetDb": -27.5,
+      "gainDb": -10.93,
+      "trimStartS": 0.14,
       "measure": {
-        "activeRmsDb": -19,
-        "truePeakDb": -1.32,
-        "snrDb": 38.04
+        "activeRmsDb": -27.5,
+        "truePeakDb": -15.02,
+        "snrDb": 37.29
       },
       "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },
