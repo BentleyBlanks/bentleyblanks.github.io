@@ -841,7 +841,10 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     // §5.1 / §1.19: the six in the dugout.
     // 2026-10-11 integration: 0.22 m further out to the right of the picture (crouched on YaowaCrouchCatchEat he stood in front of the
     // comrade, N01–N03); the facing is YaowaMark's (the comrade 70 deg to his right), the yaw here unused.
-    assert.ok(Near(B.yaowa,-1.2,-125.45)&&Math.abs(Deg(B.yaowa.yaw)-45)<1e-6,"Yaowa crouched at Shunzi's south side (§1.19, moved 0.22 m)");
+    // 2026-10-11 polish (PolishDir item 1): 0.23 m further west, turned with the comrade 30 deg to his right, and the seated view widened
+    // to banter.fov: his head at the right edge, nearer than the comrade and clear of him (N01–N03).
+    assert.ok(Near(B.yaowa,-1.42,-125.4)&&Math.abs(Deg(B.yaowa.yaw)-45)<1e-6&&B.yaowaComradeDeg===30,"Yaowa crouched at Shunzi's south side (§1.19, polish mark)");
+    assert.ok(B.fov>=72&&B.fov<=78&&B.fovReturnS>0&&B.fovReturnS<3,"the seated dugout view is widened to 72-78 deg and eases back after the order");
     assert.ok(Near(B.he,-.6,-127.35)&&Near(B.luo,1.75,-125.7)&&Near(B.liu,1.1,-124.9)&&Near(B.comradeSeat,.35,-124.35),"He, Luo, Liu, the comrade on §5.1's marks");
     assert.ok(B.exitOrder[0].id==="he"&&B.exitOrder.every(e=>Number.isFinite(e.delayS)&&C.speed[e.speed]>0),"He is first out of the mouth");
     for(const e of B.exitOrder)assert.ok(e.via.every(p=>D(p,S.seat)>.45&&D(p,B.yaowa)>.4||e.id==="yaowa"),`${e.id}'s way out keeps off Shunzi's seat and Yaowa`);

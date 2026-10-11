@@ -220,14 +220,25 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // The seated fill clip (hands.beats Banter / Orders `fill`): the body root stands at the seat facing shunzi.seat.yaw,
     // shifted once so the clip's eye is over shunzi.seat; the eye is the head bone plus eyeFromHeadM (body frame: x right,
     // y up, -z forward; the clip keeps the head bowed over the charger, eye to head measured in the bake, 09-27).
-    fill:Object.freeze({ eyeFromHeadM:Object.freeze([0,.024,-.127]) }),
+    // lap (2026-10-11 polish, PolishDir item 2; Script_OpeningFirstPerson.LowerFillHands): the clip fills the charger up at the
+    // chest, 0.21 m under the eye and 0.26 m over the knees, so the seated picture showed two hands hanging in the air and a rifle
+    // poking out under them. A palm higher than underEyeM (the thighs' top under the bowed eye: knees measured 0.47 m down)
+    // is lowered by (underEyeM - its depth) x (1 - keep) -- the charger 0.21 -> ~0.27 m down, over the knees and the rifle's
+    // fore-end -- by turning the whole arm down about the shoulders' line (at most maxDeg); inFrontM fades it in by how far
+    // ahead of the eye the palm is (the breast pocket stow stays put).
+    fill:Object.freeze({ eyeFromHeadM:Object.freeze([0,.024,-.127]),
+      lap:Object.freeze({ underEyeM:.40, keep:.7, maxDeg:22, inFrontM:Object.freeze([.02,.12]) }) }),
     // 2026-10-11 「冬瓜扶着墙起身，冲顺子伸手……顺子把压好的两夹丢过去」 (Orders, before the gear-up): both arms leave the fill clip
     // over `weight` (s: in, out) on the clock flags.tossAt, through `keys` [t, pose] (both hands; the left mirrors), and the two
     // chargers leave the palms at releaseS (flags.clipsThrownAt = tossAt + releaseS) toward the comrade's reaching hand; one is
     // caught, the other falls short at his feet (clipFlight). Pending wiring: a baked first-person throw (N04).
     // (weight in over 0.7 s: at 0.25 s the left palm turned 15 deg a frame leaving the clip, over the 12 deg continuity gate.)
-    toss:Object.freeze({ weight:Object.freeze([.7,.55]), releaseS:.88, endS:1.85,
-      keys:Object.freeze([Object.freeze([0,"tossHold"]),Object.freeze([.62,"tossHold"]),Object.freeze([.88,"tossThrow"]),Object.freeze([1.3,"tossThrow"])]) }),
+    // 2026-10-11 polish (PolishDir item 2, 「丢弹夹只在那 0.6 s 抬起」): the arms were up 1.2 s (0.88 s to the release, then held
+    // flung open until the gear-up took over 0.35 s later) -- two bare forearms filling the picture. Now up for ~0.6 s: in over
+    // weight[0], the fling at releaseS, back down to the clip over weight[1] (the gear-up starts exit.gearAfterThrowS after the
+    // release, 0.9 s in; out over 0.3 s the left palm turned 15 deg a frame).
+    toss:Object.freeze({ weight:Object.freeze([.42,.45]), releaseS:.4, endS:.9,
+      keys:Object.freeze([Object.freeze([0,"tossHold"]),Object.freeze([.24,"tossHold"]),Object.freeze([.4,"tossThrow"]),Object.freeze([.55,"tossThrow"])]) }),
     hands:Object.freeze({
       poses:Object.freeze({
         rest:H("cam",[.18,-.46,-.15],[0,-.4,-1],[.25,.65,.1],[14,24,14]),
@@ -392,7 +403,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
     //   liu    (1.1,-124.9) crouched at Luo's feet, beside the ammo box on his right hand, facing west into the room (to
     //          throw the clip to Shunzi): N01 x ~0.5, nearer than Luo.
     // The old north-wall Yaowa and the He / Liu marks out in the trench (4.6 / 6.1) are retired.
-    yaowa:P(-1.2,-125.45,45*Math.PI/180), comradeSeat:P(.35,-124.35,30*Math.PI/180), luo:P(1.75,-125.7,-Math.PI/2),
+    // 2026-10-11 polish (PolishDir item 1): at (-1.2,-125.45) turned 70 deg off the comrade Yaowa's raised arms and rifle sat
+    // right over the comrade's head (N01-N03 x 0.82 against 0.85) and his body filled the right half. Now 0.25 m further
+    // west, nearer the seat, turned toward the comrade (yaowaComradeDeg 30: his arms and rifle point away down the room,
+    // not across it): with the seat's wider view (fov) his head is at the right edge (N01 x ~0.9, the storyboard's 0.85-0.95),
+    // nearer than the comrade (x ~0.77) and clear of him; Liu (0.66), Luo (0.54) and He (0.35) stay where they were.
+    yaowa:P(-1.42,-125.4,45*Math.PI/180), comradeSeat:P(.35,-124.35,30*Math.PI/180), luo:P(1.75,-125.7,-Math.PI/2),
     he:P(-.6,-127.35,-Math.PI/2), liu:P(1.1,-124.9,Math.PI/2), shouter:P(8.6,-122.9),
     // Out of the dugout after the order (contract §1 / source 「刘文财啪地扣上弹药箱，扛起来就走；何有田抓起钢盔扣在头上，
     // 第一个钻出洞口；班长、传令兵、幺娃跟着撤出」): He from the far corner along the north side (clear of the seat and of
@@ -419,11 +435,19 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // native layer kneel:0 (Script_OpeningStoryboardAnimation). LuoKneelCheck is a contact clip, so it is kept.
     luoKneelS:1.6,
     // 2026-10-11 integration: Yaowa on banter.yaowa turned so the comrade is this far to his right (YaowaCrouchCatchEat's look).
-    yaowaComradeDeg:70,
+    // (Polish: 70 -> 30, see banter.yaowa.)
+    yaowaComradeDeg:30,
+    // 2026-10-11 polish (PolishDir item 1): the seated view is this wide (vertical fov, deg, at the player's default C.fov; with
+    // another setting it widens by the same factor) through Count / Banter / Orders until Luo's order, so the whole dugout --
+    // Yaowa at the right edge, the comrade on the south wall, He curled at the north wall, Luo and Liu in the mouth -- is in
+    // the one picture (at 65 Yaowa's body hid the comrade or He fell off the left). From the order it eases back over
+    // fovReturnS while he gets up and gears up (Shot: fovScale), long before the hand-back.
+    fov:76, fovReturnS:1.4,
     // SB01 camera: the seat's look (eye = the fill clip's eye, set over shunzi.seat). The player's own look is laid over
     // it (firstPerson.headLook.seated); the head no longer turns to whoever speaks (09-27 review). Pitched so the charger
-    // in his hands is in the lower third.
-    seatShot:Object.freeze({ yawDeg:-93, pitchDeg:-18 }),
+    // in his hands is in the lower third. (2026-10-11 polish: -18 -> -22 with the hands lowered to the lap, firstPerson.fill.lap;
+    // the gear-up's first key -21, Data_OpeningFirstPersonGear.)
+    seatShot:Object.freeze({ yawDeg:-93, pitchDeg:-22 }),
     // SB02 mirrored (contract §2.2): the shell lands at fallStartS (FireShell flight); the eye drops to eyeM and turns
     // to yaw/pitch with the head rolled to the left by fallEndS; the eyes close at eyesCloseS; Black at phaseS.
     // pitchDeg -6 (contract -14, ±8): at -14 the lintel was above the frame and the north post's top half hung over the
@@ -465,7 +489,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // the toss starts tossAfterLineS after BunkerExit.01 (firstPerson.toss); one clip lands in his hand (catch: from the left
   // palm), the other falls by his feet (drop) and he stoops for it pickS; he squeezes out to comradeBlast at walkMps after .03,
   // timed to be outside as Shunzi gets to the mouth. The gear-up starts gearAfterThrowS after the clips leave the hands.
-  exit:Object.freeze({ riseAfterS:.4, tossAfterLineS:.15, catchS:.45, dropAt:Object.freeze([.15,-.35]), pickS:1.1, gearAfterThrowS:.35,
+  exit:Object.freeze({ riseAfterS:.4, tossAfterLineS:.15, catchS:.45, dropAt:Object.freeze([.15,-.35]), pickS:1.1, gearAfterThrowS:.5,
     walkMps:1.5, handOffsetM:Object.freeze([0,1.05,.35]) }),
   // DropIn (contract §1.4, §5.3 dropIn.*; N07/N08): the shell going over toward the rear trench (overShell: from, to, flight s)
   // just before; whistleShort whistleS into the phase; the three on the north rim from rimS (bayonets up), then each jumps
@@ -948,11 +972,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // is left at the seat's own look (the shot tool does not move the mouse). Ranges are the storyboard's ±0.1-0.15 of the
     // picture where the frozen marks allow it; where a frozen mark cannot reach the drawing's spot the range says what the marks
     // give (noted per shot).
-    // N01 the dugout once the picture is up (Banter's start, before Liu's toss).
+    // N01 the dugout once the picture is up (Banter's start, before Liu's toss). (2026-10-11 polish: the seat's view is banter.fov
+    // wide and pitched -22; He's head, at the east end of his curled body on the north wall, comes to x ~0.35 at that width -- he is
+    // in the picture's left third, clear of every one.)
     Object.freeze({ id:"N01", storyboard:"Storyboard_N01_CaveTableau.png", when:"s.phase==='Banter'&&s.Age>=2.0",
-      judge:{ camera:{ eyeM:[.6,1.05], pitchDeg:[-22,-6], yawDeg:[-101,-85] },
+      judge:{ camera:{ eyeM:[.6,1.05], pitchDeg:[-25,-6], yawDeg:[-101,-85] },
         actors:{ yaowa:{ x:[.75,1], distM:[.5,1.8] }, comrade:{ x:[.6,.95], distM:[1.8,3.4] }, luo:{ x:[.35,.65] }, liuwencai:{ x:[.42,.78], distM:[2.6,3.8] },
-          heyoutian:{ x:[0,.3], distM:[.5,2] } }, absent:["runner"], rifleHidden:true } }),
+          heyoutian:{ x:[0,.4], distM:[.5,2] } }, absent:["runner"], rifleHidden:true } }),
     // N02 the corner of bread in the air between the comrade and Yaowa.
     Object.freeze({ id:"N02", storyboard:"Storyboard_N02_BreadToss.png", when:"s.flags['ev:breadToss']!=null&&r.time-s.flags['ev:breadToss']>=.3",
       judge:{ camera:{ eyeM:[.6,1.05] }, actors:{ yaowa:{ x:[.6,1] }, comrade:{ x:[.6,1] }, luo:{ x:[.3,.66] } } } }),

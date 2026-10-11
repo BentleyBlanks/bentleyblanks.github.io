@@ -61,7 +61,7 @@ export const OPENING_GEAR_UP = Deep({
     // Heading (deg, unwrapped: -93 is the seat's look east, -248 the pack after a 155 deg turn to the right), pitch (+ up),
     // height above the floor (null = the seated eye), roll. Monotone cubic through the keys (an equal pair is a hold).
     yawDeg: [[0, -93], [.5, -96], [1.1, -102], [2.0, -248], [3.45, -252], [4.25, -94], [4.75, -90]],
-    pitchDeg: [[0, -18], [.45, -30], [1.0, -24], [1.7, -30], [2.2, -50], [2.7, -46], [3.05, -24], [3.4, -14], [3.9, -10], [4.4, -6], [5.0, -3]],
+    pitchDeg: [[0, -21], [.45, -30], [1.0, -24], [1.7, -30], [2.2, -50], [2.7, -46], [3.05, -24], [3.4, -14], [3.9, -10], [4.4, -6], [5.0, -3]],
     heightM: [[0, null], [.85, 1.32], [1.6, 1.28], [1.95, 1.0], [2.3, .76], [2.6, .78], [2.95, 1.1], [3.2, 1.3], [3.48, 1.22], [3.8, 1.32]],
     rollDeg: [[0, 0], [1.4, -1.5], [2.4, 1], [3.3, -2.2], [3.7, 0], [4.4, 1]],
     // From lookOut [t, blend s] the look leaves the keys for the men going out of the mouth (the wounded comrade in Incoming).

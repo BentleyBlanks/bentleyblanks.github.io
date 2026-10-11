@@ -3776,8 +3776,14 @@ export class FirstLevelBunkerShow {
       // 2026-10-11 「近处落了一发。整个洞一跳」: the near shell jolts the seat (banter.beats.jolt).
       if(this.flags.joltAt!=null){const J=b.beats.jolt,t=r.time-this.flags.joltAt,k=t>=0?Math.exp(-t/J.decayS)*Smooth(t/.03):0;
         height-=J.dropM*k;roll+=J.rollRad*k*Math.sin(t*J.hz*Math.PI*2);}
+      fovScale=b.fov/C.fov;   // 2026-10-11 polish: the whole dugout in one seated picture (banter.fov)
     }
-    else if(p==="Orders"||p==="Incoming")({eye,height,target,pitch,roll}=this.FollowShot());   // 「弹装起！……跟紧！」
+    else if(p==="Orders"||p==="Incoming"){
+      ({eye,height,target,pitch,roll}=this.FollowShot());   // 「弹装起！……跟紧！」
+      // ...and the seated view's width eases back from the order (banter.fovReturnS).
+      const back=this.flags.exitAt!=null?Smooth((r.time-this.flags.exitAt)/b.fovReturnS):1;
+      fovScale=1+(b.fov/C.fov-1)*(1-back);
+    }
     else if(p==="Blast"){
       // SB02 mirrored (contract §2.2): standing where he had followed to, knocked down onto blastFall, the head rolled
       // to the left, the north post and the dugout's north wall on the left, the mouth and the blast on the right.
@@ -3947,8 +3953,9 @@ export class FirstLevelBunkerShow {
     const shotId=shot.id||"firstPerson",cut=this.presentedShotId!=null&&this.presentedShotId!==shotId;
     if(cut){this.cameraFrom=null;this.presentedCamera=null;this.previousViewPosition=null;this.previousViewQuaternion=null;this.cameraCutAt=r.time;this.cameraCutSerial=(this.cameraCutSerial||0)+1;r.NotifyCameraCut?.();}
     this.presentedShotId=shotId;
-    // The view narrows while he fixes on something (FixateScale); the player's own fov comes back exactly after it.
-    const narrowed=(shot.fovScale??1)<.999;
+    // The view narrows while he fixes on something (FixateScale) and is wider while he sits in the dugout (banter.fov); the
+    // player's own fov comes back exactly after it.
+    const narrowed=Math.abs((shot.fovScale??1)-1)>.001;
     if(shot.cinematic||narrowed||this.cinematicBaseFov!=null){
       this.cinematicBaseFov??=cam.fov;cam.fov=shot.fov??this.cinematicBaseFov*(shot.fovScale??1);cam.updateProjectionMatrix();
       if(!shot.cinematic&&!narrowed){cam.fov=this.cinematicBaseFov;cam.updateProjectionMatrix();this.cinematicBaseFov=null;}

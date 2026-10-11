@@ -840,6 +840,37 @@ export class OpeningFirstPerson{
     return {seconds:u,rounds:u>=stow?0:rounds,round,charger:!(u>=stow&&u<draw)};
   }
   /**
+   * 2026-10-11 polish (PolishDir item 2, firstPerson.fill.lap): the fill clip fills the charger 0.21 m under the eye and 0.21 m in
+   * front of it -- up at the chest, 0.26 m over the knees -- so from the seated eye the hands floated mid-picture with nothing
+   * under them (the lap and the rifle along the thigh are 50 deg under the view's axis). The hands' work is brought down toward
+   * the lap by turning each whole arm down about the shoulders' line (the body's left-right axis): a palm higher than underEyeM
+   * under the eye is lowered by (underEyeM - its depth) x (1 - keep), faded in by how far in front of the eye it is (inFrontM:
+   * the stow into the breast pocket stays put), at most maxDeg. Both shoulders lie on that one line, so two hands working
+   * together on the charger turn as one rigid piece: the grip between them, the wrists and the fingers stay the clip's (an IK
+   * solve onto lowered palms, tried first, flipped the arm's twist against the dig's blend: 20 cm jumps). `weight` fades it out
+   * while the dig or the toss has the arms. Continuous in the clip's palms.
+   */
+  LowerFillHands(weight=1){
+    const L=C.firstPerson.fill.lap,rig=this.rig,eye=this.fillEye,yaw=this.fillYaw;
+    if(!L||!rig||!eye||!yaw||weight<=0)return;
+    const toBody=yaw.clone().invert(),across=V(1,0,0).applyQuaternion(yaw);
+    for(const side of ["l","r"]){
+      const chain=rig.bones[side],palm=Palm(rig,side);if(!chain||!palm)continue;
+      const rel=palm.clone().sub(eye).applyQuaternion(toBody),below=-rel.y,ahead=-rel.z;
+      const front=Smooth((ahead-L.inFrontM[0])/(L.inFrontM[1]-L.inFrontM[0]));
+      if(below>=L.underEyeM||front<=0)continue;
+      const drop=(L.underEyeM-below)*(1-L.keep)*front*weight;
+      // The palm's arm about the shoulders' line (body y-z plane): turning it by `angle` lowers the palm by about r sin(angle).
+      const shoulder=Pos(chain.upperArm).sub(eye).applyQuaternion(toBody),r=Math.hypot(rel.y-shoulder.y,rel.z-shoulder.z);
+      const angle=Math.min(L.maxDeg/Degrees,Math.asin(Math.min(1,drop/Math.max(r,.05))));
+      if(angle<=1e-5)continue;
+      const turn=Q().setFromAxisAngle(across,-angle),world=chain.upperArm.getWorldQuaternion(Q());
+      chain.upperArm.quaternion.copy(chain.upperArm.parent.getWorldQuaternion(Q()).invert().multiply(turn.multiply(world)));
+      chain.upperArm.updateWorldMatrix(false,true);
+    }
+    rig.root.updateWorldMatrix(true,true);
+  }
+  /**
    * The fill frame: the clip already posed the whole body (PoseFill). Banter's dirt in the collar is laid over the right
    * arm (the same keys as the hand-key path); the props follow the hands; the palms / frames / shoulders are remembered
    * so the order's gear-up eases in from where the hands were.
@@ -887,6 +918,8 @@ export class OpeningFirstPerson{
       }
       if(tossWeight>.2)state.round=false;
     }
+    // Last, the work squashed down to the lap (off while the dig or the toss has the arms: their own poses are not at the lap).
+    this.LowerFillHands((1-digWeight)*(1-tossWeight));
     this.report={available:true,phase:p,pose:"Fill",age:s.Age,beat:null,hands:{},
       fill:{clip:beat.fill,seconds:state.seconds,rounds:state.rounds,round:state.round,charger:state.charger,dig:digWeight,toss:tossWeight,
         eye:this.fillEye.toArray(),root:actor.root.position.toArray()}};
