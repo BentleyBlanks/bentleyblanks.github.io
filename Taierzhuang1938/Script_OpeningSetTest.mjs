@@ -1043,6 +1043,8 @@ function FakeVfx() {
     // 2026-10-11 集成：第 8 具（南半）与 SweepVictim（北半）之间沿 x 只有 0.36 m 的缝，翻译从北半斜插到南半必须从两者中间过，
     // 走中线两边各约 0.38 m；第 8 具躺在南壁脚、SweepVictim 是刚扎死的人，翻译跨过去正好是「踉跄着跑过来」。
     "sweep.bodies[1]|interpreterEnter": "翻译从第 8 具脚边与 SweepVictim 头边之间斜插过去（两边各约 0.38 m，缝只有 0.36 m，绕不开）",
+    // 2026-10-11 打磨：补刀那具挪到南壁坡脚 (4.6,-123.0)（任务书：离眼 1.6 m 占画面右三分之一）。
+    "finish.bodies[0]|rescueRoute": "rescueRoute 是旧的塌方后救援路线（RC→杀点，斜穿弹坑台阶那片南坡），运行时不读它；现行 02 冲锋走 chargeRoute（离这具 ≥ 0.6 m）",
   };
   // 交 Dir 包（不是本包的标记、值是契约给的）：只报。
   const HANDOVER = {

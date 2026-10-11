@@ -635,8 +635,13 @@ export const SET_MARKS = Object.freeze({
     // [0] 契约 (3.3,-124.3)：连胳膊的实际宽度压到 02 冲锋路线 chargeRoute 的末点 (3.3,-123.5)（只差 0.27 m），北移 0.25 m，
     //     离 chargeRoute 0.5 m 以上；再往北就压到甲 Found 站的 ija.found (2.98,-125.2)。它仍在 02 翻译蹲位 rescue.interpreter (2.92,-124.5) 与罗班长撤离折线
     //     withdraw.lane 上（Dir 的点，不在契约净空名单里）：交 Dir02 让开（报告）。
+    // 2026-10-11 打磨（PolishDir 第 3 条）：(3.3,-124.55) 离眼 1.6 m，N09–N18 一直占画面右侧三分之一。挪到南壁坡脚 (4.6,-123.45)、头朝西、
+    //     横伸的胳膊伸到坡脚：任务书给的约 (3.9,-123.2) 正压在冲锋下台阶的 chargeRoute 末段、刘文财的射击位与罗班长撤离线上（台阶就是
+    //     x 2.4–5 那整片南坡），东移 0.7 m 后 chargeRoute 只挪 0.1–0.15 m；x 4.6 处南壁是陡坎（z -122.8 以南），再往南胳膊就搭上坎、
+    //     身子悬空。翻译进场末段与逼问位 interrogation.interpreterAt、丁的等待位 practice.recruitWait 跟着北移 / 东移 0.15–0.45 m（乙的逼问位 ijaBAt 东移 0.15 m 让出翻译的路）。离眼约 3.3 m。
+    //     旧的塌方后救援路线 MISSION_PLACEMENT.bunker.rescueRoute 斜穿这片坡（运行时不读，只有测试量它）：列为刻意（Script_OpeningSetTest 6b）。
     bodies: Object.freeze([
-      Body(3.3, -124.55, 90, { pose: "nra1", tier: 0 }),
+      Body(4.6, -123.45, 90, { pose: "nra1", tier: 0 }),
     ]),
     // 手榴弹滚停点：眼位 witnessEye (1.85,-125.25) 东 0.35 m、南 0.15 m，离眼 0.38 m；沟底平（测试 6d 量坡度）。
     grenadeStop: P(2.2, -125.1),
@@ -666,7 +671,8 @@ export const SET_MARKS = Object.freeze({
     // 取根后 0.77 m 那点比根高 1.8 m 左右（第 0 帧脚只悬 0.2–0.3 m）、两脚落地处（根左右 0.17、前后 0.15 m）高差 ≤ 0.25 m 的 z
     // （tmp/merge/jump2.mjs 逐点量）。
     lip: Object.freeze([
-      Object.freeze({ who: "ijaC", x: 9.0, z: -127.2, yawDeg: 180, land: P(9.0, -126.25) }),
+      // 2026-10-11 打磨：丙 9.0 -> 9.3，三处落点沿沟各隔 ≥ 1.2 m（甲 8.0、丙 9.3、丁 10.5）。
+      Object.freeze({ who: "ijaC", x: 9.3, z: -127.2, yawDeg: 180, land: P(9.3, -126.25) }),
       Object.freeze({ who: "ijaD", x: 10.5, z: -127.2, yawDeg: 180, land: P(10.5, -126.25) }),
       Object.freeze({ who: "ijaA", x: 8.0, z: -127.2, yawDeg: 180, land: P(8.0, -126.2) }),
     ]),

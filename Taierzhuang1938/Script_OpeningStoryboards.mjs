@@ -1549,6 +1549,15 @@ export class FirstLevelBunkerShow {
       if(t>=EventAt(clip,"land",.917)){this.flags["landed:"+role]=r.time;this.Sfx("stompMud",{position:r.Point(land,.2),volume:.75});}
       return;
     }
+    // 2026-10-11 polish (N07, 「丁落地对岔口」): the three land on one line 1 m north of the eye's, so from the low eye ijaD came down right
+    // behind ijaC. Once the landing is absorbed he steps off it south-east onto dropIn.dStep, the rifle on the junction, and goes on
+    // to J from there when his clip would have ended (+dHoldS): the right of the picture, clear of ijaC kneeling and ijaA pointing.
+    if(role==="ijaD"&&D.dStep&&t>=EventAt(clip,"absorbed",1.125)){
+      const f=this.flags,step=D.dStep;
+      if(f.dStepFrom==null){f.dStepFrom=r.time;this.RerootUnderPelvis(actor,actor.yaw);}
+      if(!(actor.openingWalk?.key==="dStep"&&actor.openingWalk.done)){if(this.Follow(actor,"dStep",[step],C.speed.brisk,null,step.yaw))actor.openingWalk.done=true;return;}
+      if(t<length+D.dHoldS){this.Hold(actor,step,"IjaReadyRifle",{seconds:ClipLength("IjaReadyRifle",1.1)});return;}
+    }
     // ijaA stays where he landed, standing on IjaDropInPoint's hold loop (off the eye's line to the fold), until the drag.
     if(t<length||role==="ijaA"){this.Put(actor,land);this.Pose(actor,clip,{seconds:t,face:land.yaw});return;}
     if(!this.flags["off:"+role]){this.flags["off:"+role]=r.time;this.RerootUnderPelvis(actor,actor.yaw);}

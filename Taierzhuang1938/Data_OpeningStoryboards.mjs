@@ -331,7 +331,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // SB05A/SB06 clean. fallRps brings the butt strike's 0.88 down to the circle's 0.45 in under 2 s.
     // 2026-09-27: the witness phases stay dazed but readable (first person all through: the throat cut must read).
     // 2026-10-11 (contract §2): Count 0, DropIn .8, Sweep .7, Practice .48, Finish .5 (01, Dir01); Blade .46 (02, Dir02).
-    base:Object.freeze({ Count:0, Banter:0, Orders:0, Incoming:0, Blast:.95, Black:.95, Wake:.9, DropIn:.8, Sweep:.7, CaptiveDragged:.6,
+    // 2026-10-11 polish (PolishDir item 6): DropIn .8 -> .55, Sweep .7 -> .5 -- the ghost and the blur at .7-.8 kept the drop-in and the
+    // sweep from reading (the men a smear); still dazed, lighter than Wake's .9 and easing on down into the questioning.
+    base:Object.freeze({ Count:0, Banter:0, Orders:0, Incoming:0, Blast:.95, Black:.95, Wake:.9, DropIn:.55, Sweep:.5, CaptiveDragged:.5,
       CaptiveWall:.55, Interrogation:.5, Practice:.48, Slash:.42, Finish:.5, Found:.5, Hold:.48, Ask:.46, Blade:.46, Charge:.42, Melee:.4,
       Lift:.42, Check:.34, Released:.32 }),
     riseRps:.8, fallRps:.25,
@@ -497,7 +499,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // (throwS after the knock) over the corner; the blast at foldBlast blastAfterThrowS later; he peeks (peekS) and
   // reports (event grenadeBlast). ijaD goes to J; ijaB comes down the link sap to J from bS (walkIn's last two legs).
   dropIn:Object.freeze({ overShell:Object.freeze({ from:P(36,-150), to:P(-6.5,-112.5), flightS:1.6, beforeEndS:1.9 }),
-    whistleS:.5, rimS:.75, jumpS:Object.freeze({ ijaC:1.35, ijaD:1.75, ijaA:2.25 }), fallS:.42,
+    whistleS:.5, rimS:.75, jumpS:Object.freeze({ ijaC:1.35, ijaD:1.6, ijaA:2.0 }), fallS:.42,
     pointS:Object.freeze([2.95,3.75]), runAfterLandS:.4, knockS:.55, throwS:.75, blastAfterThrowS:1.2, peekS:1.4,
     bS:3.6, bRoute:Route([20.1,-128.0],[18.2,-125.6],[14,-124.6]),
     // ijaC at the corner facing east round it; ijaD at J facing the depth sap's mouth; ijaA's standing mark after the
@@ -509,6 +511,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // fold man's IjaGrenadeKnockThrow from knockAfterArriveS after he is at F (its knock / throw events; the Set's FoldBlast
     // blastAfterThrowS after the throw).
     clips:Object.freeze({ ijaC:"IjaDropInKneel", ijaD:"IjaDropInStand", ijaA:"IjaDropInPoint" }), knockAfterArriveS:.2,
+    // 2026-10-11 polish (N07): the landings are 1.2 m+ apart along the rim (Set dropIn.lip: ijaA 8.0, ijaC 9.3, ijaD 10.5) but on one
+    // line 1 m north of the eye's -- seen from it one behind the other whatever the spacing (tried 8.0 / 9.6 / 11.5 and 8.0 / 9.4 /
+    // 12.5: heads within 0.03 of each other across the picture). So ijaD, once his landing is absorbed, steps south-east off it to
+    // dStep (the right of the picture, rifle on the junction) and holds there dHoldS past his clip before he goes on to J; jumpS
+    // brought in (ijaD 1.75 -> 1.6, ijaA 2.25 -> 2.0) so ijaC is still kneeling and ijaA pointing while he stands there (N07 3.75 s).
+    dStep:P(11.3,-124.95,Math.atan2(11.3-14,-124.95+124.6)), dHoldS:.6,
     // The look from the pinned eye down the trench at the rim they come off (N07: pitched up so the rim is under the sky).
     shot:Object.freeze({ yawDeg:-87, pitchDeg:8 }) }),
   // Sweep (contract §1.5; N09): ijaB walks west from J along the floor bayoneting the three face-down men (sweep.bodies, §5.3;
@@ -569,8 +577,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // recruitThrust stage root (the clip backs him off and charges by itself); the charge starts chargeAfterLine3S after 「扎。」.
     // recruitWait moved east off (3.9,-124.3): ijaA's finishing walk (IjaFinishWalkStab, facing west onto finish.bodies[0])
     // passes 0.07 m from it; here he is 0.8 m off that line and still faces the pinned man for 02 (= rescue.vanguardPosts.ijaD).
+    // (2026-10-11 polish: (5.6,-124.05) -> (5.9,-124.2), 0.5 m off finish.bodies[0] moved to the south wall foot.)
     chargeAfterLine3S:.25,
-    recruitBack:P(6.26,-125.75), recruitWait:P(5.6,-124.05,Math.PI/2), howlEveryS:2.2 }),
+    recruitBack:P(6.26,-125.75), recruitWait:P(5.9,-124.2,Math.PI/2), howlEveryS:2.2 }),
   // Slash (contract §1.8; N16/N17): ijaA shoves ijaD aside (shoveS), draws the bayonet, lifts the comrade by the hair
   // (hairLifted), cuts (cutStart at the draw's end; the cut at IjaThroatSlash's contact), shoves him forward with the knee
   // (shove shoveAfterCutS after the cut), wipes the blade twice (wipe1/wipe2) and fixes it on his rifle (fix -> bayonetFixed);
@@ -590,7 +599,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // lands on the finish body's back at its `stab`: stabAtM = the point's offset from the root then (x right, z forward -,
   // runtime m: the pelvis start (0.065, -0.064) + 0.7 m of the cycle's 1.4 m + Report_animB's 0.12 m right, 0.85 m ahead).
   // walkMaxS: a walk that has not arrived is put there.
-  finish:Object.freeze({ walkMps:1.0, stabMps:.3, standOffM:.5, maxPitchDeg:12, interpreterVia:Route([4.4,-123.3],[3.2,-123.6]),
+  finish:Object.freeze({ walkMps:1.0, stabMps:.3, standOffM:.5, maxPitchDeg:12, interpreterVia:Route([3.9,-124.45]),
+    // 2026-10-11 polish: the body lies along the south wall foot now (4.6,-123.45), head west: the stab comes 0.8 m short of its feet
+    // (the point 1.6 m ahead of him), the cycle's last steps take him past its feet, and the walk to the eye goes off north-west.
+    // interpreterVia: straight along the north side of it (was round (4.4,-123.3), (3.2,-123.6): over where it lies now).
     yawDeg:90, stabAtM:Object.freeze([.122,-1.614]), walkMaxS:6 }),
   // Found (contract §1.9; N19): he stands over the eye at `stand` (the bayonet tip a hand's breadth over his back: hover),
   // the right boot comes down on the right hand (step stepS in; flags.bootStepAt), the heel grinds grindS (bootGrind at its
@@ -680,7 +692,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // 2026-10-11: past the man shamming dead in the trench (sweep.bodies[2] (7.4,-124.8)) on his south side (Set: the old line ran
     // 0.19 m from that body). Integration: north of the 8th body (Set's (9.4,-123.1), south half) and then between its feet and
     // the victim's head (a 0.36 m gap; ~0.38 m off each, listed as designed in Script_OpeningSetTest).
-    interpreterEnter:Route([23.5,-130],[20.1,-128],[18.7,-126.8],[17.45,-126.2],[16,-125.65],[14.2,-125.75],[13.2,-125.65],[12,-124.75],[10.3,-124.25],[8.85,-124.18],[8.39,-123.94],[7.95,-123.68],[6.6,-123.55],[5.5,-123.8],[4.9,-124.05]),
+    interpreterEnter:Route([23.5,-130],[20.1,-128],[18.7,-126.8],[17.45,-126.2],[16,-125.65],[14.2,-125.75],[13.2,-125.65],[12,-124.75],[10.3,-124.25],[8.85,-124.18],[8.39,-123.94],[7.95,-123.68],[6.75,-123.6],[5.55,-124.5],[4.95,-124.5]),
+    // (2026-10-11 polish: the last three points north / east -- were (6.6,-123.55), (5.5,-123.8), (4.9,-124.05) -- 0.5 m+ off
+    // finish.bodies[0], now at the south wall foot, and 0.85 m+ off ijaB at interrogation.ijaBAt (0.15 m east with it); the last is interrogation.interpreterAt.)
     // 「翻译踉跄着退开」 (Charge): turned to face west (onto the pinned man) InterpreterFlee carries him 1.3 m back east,
     // then he runs east down the north side of the front trench (between the dead comrade and ijaB, away from the crater
     // step the charge comes down), into the depth sap past J, and is removed out of sight.
@@ -697,7 +711,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // cut's stance at his left shoulder (manifest stage slashGrab), which he takes before the grab (PhaseSlash).
   interrogation:Object.freeze({ ijaAHold:Object.freeze([-.26,-.17,-150]),
     // SB03 (contract §5): the interpreter crouches side-on to the comrade east of the group, ijaB behind him; world marks.
-    interpreterAt:P(4.9,-124.05,25*Math.PI/180), ijaBAt:P(6.05,-125.0,55*Math.PI/180),
+    interpreterAt:P(4.95,-124.5,25*Math.PI/180), ijaBAt:P(6.2,-125.1,55*Math.PI/180),
     // 2026-09-27 rework: first person all through (user: 「保持第一人称，不在切换视角」). From the pinned eye the group is
     // 2.3-4.2 m off, bearing -74..-111 deg; the heads stand 20-30 deg over the low eye.
     // 2026-10-11 (N10-N16): the comrade at the left of the picture (x ~0.2), the men round him and the machine gun on the
@@ -723,7 +737,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // and hauled up by the hair; the first slap snaps them open over openS (no flinch on that one) -- the daze after it
     // as before. `slitAboveDeg`: the slit sits below the middle of the picture (0.62 of the height down at a 65 deg fov), so
     // while he shams the look is on ijaA's face pitched up this much and the face falls into it.
-    playDead:Object.freeze({ closeAtS:.3, closeS:.14, squint:.72, tremor:.012, tremorHz:7, openS:.08, slitAboveDeg:9 }),
+    // 2026-10-11 polish (PolishDir item 7): squint .72 -> .6 (N18 / N19 were nearly black): the slit is ~0.45 of the picture high in the
+    // middle, its centre 0.58 of the height down (Data_Tuning_FirstLevel lidUpperShare .64) -- the boots and the bayonet's point read --
+    // and slitAboveDeg 9 -> 6.5 with the slit 0.04 higher. Shut from Finish (ijaA sets off) to the first slap, as before.
+    playDead:Object.freeze({ closeAtS:.3, closeS:.14, squint:.6, tremor:.012, tremorHz:7, openS:.08, slitAboveDeg:6.5 }),
     // The interpreter squats at Shunzi's right front, 1.3 m from the eye, facing him; ijaB keeps watch east down the
     // trench 3.4 m off (「快点！」 over his shoulder).
     // 2026-10-11: south of the Set's finish.bodies[0] (3.3,-124.55, head west, 1.7 m long east), facing the eye (was (2.92,-124.5), 56 deg).
@@ -736,7 +753,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // Where Dir01's Found leaves the vanguard and where 02 holds them until the charge: ijaB guarding the junction J facing east
     // (「快点！」 is shouted from there, 12 m off), ijaC at the fold F facing east, ijaD the recruit at practice.recruitWait facing
     // west with his rifle at the ready (a debug start into 02 puts them there, StageRescue).
-    vanguardPosts:Object.freeze({ ijaB:P(14,-124.6,-Math.PI/2), ijaC:P(18.2,-125.6,-Math.PI/2), ijaD:P(5.6,-124.05,Math.PI/2) }),
+    vanguardPosts:Object.freeze({ ijaB:P(14,-124.6,-Math.PI/2), ijaC:P(18.2,-125.6,-Math.PI/2), ijaD:P(5.9,-124.2,Math.PI/2) }),
     // The machine-gun crew Dir01 brings down (BunkerGunner castId gunner prone at Set mg.gunner, BunkerLoader castId loader
     // kneeling at mg.loader, facing south over the south lip). Until they are in the roster (Data_FirstLevelMission bunkerAssault)
     // the director makes stand-ins of them on 02's first frame (EnsureMgCrew, pendingWiring N22) with these ids, so the hand-back
@@ -798,7 +815,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // three over him (rescue.wound). Luo, ChargeA and ChargeD go in for the cuts (rescue.cuts), He runs on to the roof timber
     // (lift.heLift), Liu stops on the step (liuShot) and shoots the junction man, the others run on east down the trench.
     luoStart:P(1.0,-120.55), heStart:P(.45,-120.35), liuStart:P(-.2,-120.1),
-    chargeRoute:Route([1.4,-120.8],[3.1,-121.3],[3.3,-122.2],[3.3,-123.5]),
+    // (2026-10-11 polish: the step's last two points 0.1-0.15 m west, 0.55 m+ off finish.bodies[0] at the south wall foot, head west at x 3.8.)
+    chargeRoute:Route([1.4,-120.8],[3.1,-121.3],[3.2,-122.2],[3.15,-123.5]),
     runMps:4.2,
     // They burst out of cover (C.pace's 4 m/s² took 2.2 m to reach runMps: the charge came over the step at a jog);
     // the men going in for a cut reach the chop mark still running, the others pull up on theirs.
@@ -1000,7 +1018,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
       judge:{ camera:{ eyeM:[.15,.45] }, rifle:{ x:[.55,1] }, absent:["ijaA","ijaB","ijaC","ijaD"] } }),
     // N07 the drop-in: ijaA standing on the floor pointing at the fold, ijaC down, ijaD down. The frozen landing marks are 8-10 m
     // off within a 1.3 m wide band, so the three stand closer together in the picture than drawn (x 0.40 / 0.58 / 0.78).
-    Object.freeze({ id:"N07", storyboard:"Storyboard_N07_DropIn.png", when:"s.flags.dropInAt!=null&&r.time-s.flags.dropInAt>=3.05",
+    Object.freeze({ id:"N07", storyboard:"Storyboard_N07_DropIn.png", when:"s.flags.dropInAt!=null&&r.time-s.flags.dropInAt>=3.75",
       judge:{ camera:{ eyeM:[.15,.45], pitchDeg:[0,16] }, actors:{ ijaA:{ x:[.3,.85], distM:[6,10] }, ijaC:{ x:[.3,.9], distM:[6,11] }, ijaD:{ x:[.3,.95], distM:[7,12] } } } }),
     // N08 ijaC at the fold, the grenade knocked on his helmet, held a beat.
     Object.freeze({ id:"N08", storyboard:"Storyboard_N08_GrenadeCorner.png", when:"s.flags.knockAt!=null&&r.time-s.flags.knockAt>=.15",
@@ -1041,8 +1059,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     Object.freeze({id:"SB03_FlagDown",when:"s.flags.flagKickAt!=null&&r.time-s.flags.flagKickAt>=1.6",judge:{flagProgress:[.99,1]}}),
     // N18: through the slit, ijaA walking up with the bayonet down having just stabbed the body at the lower right (finish.bodies[0],
     // south-east of the eye). (The helmet by the body in the picture is not ours: the body is a Sichuan soldier.)
-    Object.freeze({ id:"N18", storyboard:"Storyboard_N18_FinishWalk.png", when:"s.flags['ev:finishStab1']!=null&&r.time-s.flags['ev:finishStab1']>=.15",
-      judge:{ camera:{ eyeM:[.15,.45], pitchDeg:[-4,16] }, eyeClosure:[.55,.97], actors:{ ijaA:{ x:[.35,.85], distM:[1.2,4] } } } }),
+    // (2026-10-11 polish: the finish body lies at the south wall foot 3.3 m off now; the shot 0.75 s after the stab -- 「刚补了一刀，军靴越来越近」
+    // -- with him a step on, 4-4.5 m off.)
+    Object.freeze({ id:"N18", storyboard:"Storyboard_N18_FinishWalk.png", when:"s.flags['ev:finishStab1']!=null&&r.time-s.flags['ev:finishStab1']>=.75",
+      judge:{ camera:{ eyeM:[.15,.45], pitchDeg:[-4,16] }, eyeClosure:[.55,.97], actors:{ ijaA:{ x:[.35,.85], distM:[1.2,4.6] } } } }),
     // N19: the right hand flat in the mud at the lower right (x 0.55-0.75), the boot on it grinding, his leg up the right; the butt
     // and the bayonet tip above (one rifle, not two pieces as drawn). Through the shammed slit (contract §1.9).
     Object.freeze({ id:"N19", storyboard:"Storyboard_N19_BootOnHand.png", when:"s.flags.bootStepAt!=null&&r.time-s.flags.bootStepAt>=.3",

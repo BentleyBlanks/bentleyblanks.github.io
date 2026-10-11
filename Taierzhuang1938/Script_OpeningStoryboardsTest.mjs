@@ -722,7 +722,8 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   const {Sight,Eye}=await import("./Script_FirstLevelSpaceProbe.mjs");
   for(const [name,p] of [["Luo",R.luoStart],["He",R.heStart],["Liu",R.liuStart],...R.extras.map(e=>[e.id,e.start])])
     assert.ok([1.7,1.2].every(h=>Sight(Eye(eye,.44),Eye(p,h),{state:"BunkerCollapsed"})!=null)||Math.abs(Bearing(eye,p)-90)>60,`${name} waits out of the pinned man's view (bearing ${Bearing(eye,p).toFixed(0)})`);
-  assert.equal(R.chargeRoute.at(-1).x,3.3,"the charge comes down the crater step into the front trench");
+  // (2026-10-11 polish: the step's foot 0.15 m west, 3.3 -> 3.15, off finish.bodies[0] now lying at the south wall foot east of it.)
+  assert.ok(Math.abs(R.chargeRoute.at(-1).x-3.15)<1e-9&&R.chargeRoute.at(-1).z<=-123.3,"the charge comes down the crater step into the front trench");
   // Slaps (2026-09-29 「看见我了就扇巴掌，等翻译问了一句主角还没说话就再来了一巴掌」): the first as soon as the head is up
   // in his fist, 「这个也问！」 after it; the second in the silence after the interpreter's first question, the next
   // question after it; the raised hand for the third before the charge. Both forehands: the backhand's wind-up is
@@ -852,19 +853,20 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     const M=C.marks;
     // (Set's delivered values, 2026-10-11 Report_set.md.)
     assert.deepEqual(M.sweepBodies.map(p=>[p.x,p.z]),[[11.3,-123.4],[9.4,-123.1],[7.4,-124.8]],"sweep.bodies");
-    assert.deepEqual(M.finishBodies.map(p=>[p.x,p.z]),[[3.3,-124.55]],"finish.bodies (one)");
+    assert.deepEqual(M.finishBodies.map(p=>[p.x,p.z]),[[4.6,-123.45]],"finish.bodies (one, at the south wall foot since the 2026-10-11 polish)");
     // 2026-10-11 integration: 1 m nearer the eye, landing at the foot of the north bank (the jump clips' roots; Data_OpeningSet0103).
-    assert.deepEqual(M.dropInLip.map(p=>[p.x,p.z]),[[9,-127.2],[10.5,-127.2],[8,-127.2]],"dropIn.lip (ijaC, ijaD, ijaA)");
+    assert.deepEqual(M.dropInLip.map(p=>[p.x,p.z]),[[9.3,-127.2],[10.5,-127.2],[8,-127.2]],"dropIn.lip (ijaC, ijaD, ijaA; 2026-10-11 polish: ijaC 9.0 -> 9.3, 1.2 m+ apart)");
     assert.ok(M.dropInLand.every((p,i)=>Math.abs(p.x-M.dropInLip[i].x)<1e-9&&p.z>M.dropInLip[i].z+.8),"each lands straight down off his lip");
     assert.ok(Near(M.mgGunner,6.75,-121.95)&&Near(M.mgLoader,7.75,-121.7)&&Near(M.mgCorpseLower,6.9,-121.2)&&Near(M.foldBlast,20.4,-127.9)&&Near(M.grenadeStop,2.2,-125.1)&&Near(M.comradeRifle,3.95,-125.25),"machine gun, fold blast, grenade stop, the comrade's rifle");
     for(const [i,p] of C.ija.interpreterEnter.entries())if(i)assert.ok((()=>{const a=C.ija.interpreterEnter[i-1],dx=p.x-a.x,dz=p.z-a.z,t=Math.max(0,Math.min(1,((M.sweepBodies[2].x-a.x)*dx+(M.sweepBodies[2].z-a.z)*dz)/(dx*dx+dz*dz)));return Math.hypot(a.x+dx*t-M.sweepBodies[2].x,a.z+dz*t-M.sweepBodies[2].z)>=.7;})(),"the interpreter's way in keeps 0.7 m off the man shamming dead");
     // 2026-10-11 integration: moved east off ijaA's finishing walk (IjaFinishWalkStab facing west onto finish.bodies[0]).
-    assert.ok(Near(C.practice.recruitWait,5.6,-124.05)&&Math.abs(C.practice.recruitWait.yaw-Math.PI/2)<1e-6,"the recruit waits at practice.recruitWait facing west (the hand-over to 02)");
+    // (2026-10-11 polish: 0.3 m east / 0.15 m north again, 0.5 m off finish.bodies[0] at the south wall foot.)
+    assert.ok(Near(C.practice.recruitWait,5.9,-124.2)&&Math.abs(C.practice.recruitWait.yaw-Math.PI/2)<1e-6,"the recruit waits at practice.recruitWait facing west (the hand-over to 02)");
     assert.ok(Near(C.rescue.vanguardPosts.ijaD,C.practice.recruitWait.x,C.practice.recruitWait.z),"02 starts the recruit where 01 leaves him");
     assert.ok(Math.abs(D(C.practice.recruitBack,{x:4.0568,z:-125.7852})-2.2)<.06,"practice.recruitBack 2.2 m east of the comrade's kneel");
     assert.ok(Math.abs(C.sweep.stopX-6.9)<1e-9&&Math.abs(Math.hypot(C.sweep.stopX-eye.x,-124.95-eye.z)-5.1)<.3,"ijaB stops 5 m from the eye");
     // §2: perception, free look.
-    for(const [phase,v] of Object.entries({Count:0,DropIn:.8,Sweep:.7,Practice:.48,Finish:.5,Blade:.46}))assert.equal(C.perception.base[phase],v,`perception.base.${phase}`);
+    for(const [phase,v] of Object.entries({Count:0,DropIn:.55,Sweep:.5,Practice:.48,Finish:.5,Blade:.46}))assert.equal(C.perception.base[phase],v,`perception.base.${phase}`);
     for(const phase of ["Wake","DropIn","Sweep","CaptiveDragged","CaptiveWall","Interrogation","Practice","Slash","Finish","Found","Hold","Ask","Blade"])
       assert.ok(C.firstPerson.headLook.free.includes(phase),`the player may turn his head a little in ${phase}`);
     assert.ok(C.phases.Trapped.every(p=>p in C.perception.base),"every 01 phase has a concussion level");

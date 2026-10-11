@@ -87,6 +87,19 @@ export const LOOKS = Freeze({
     dofNear: Freeze({ strength: 0.45, focusM: 2.8, rangeM: 2.4, maxPx: 9 }),
     mud: 0.6,
   }),
+  // 2026-10-11 polish (PolishDir item 6; the storyboards N07-N15 have no red at all): watching the drop-in, the sweep and the
+  // questioning the whole top of the picture went red (`witness`'s 0.3 x 3.4 ring saturates the upper corners) and the men were
+  // hard to make out. The same look with the blood edge at a third -- a faint dark-red rim at the upper corners -- the vignette,
+  // the slight ghost (aberration), the near blur and the mud kept. Wake and the throat cut (Slash) stay on `witness`.
+  witnessLight: Freeze({
+    blendInS: 2.2,
+    aberration: 0.0032,
+    vignette: 0.5,
+    bloodEdge: Freeze({ strength: Freeze({ clock: "phase", keys: Freeze([Freeze([0, 0.1])]), byConcussion: 0.5 }),
+      tint: BLOOD_TINT, corners: WITNESS_CORNERS }),
+    dofNear: Freeze({ strength: 0.45, focusM: 2.8, rangeM: 2.4, maxPx: 9 }),
+    mud: 0.6,
+  }),
   // 2026-09-27 rework (docs/Data_OpeningPinnedRescue20260927.md): the find and the questioning where he lies.
   // Found: ijaA's boots come up the trench at the eye, still dazed and muddy.
   found: Freeze({
@@ -146,8 +159,9 @@ export const PHASE_LOOKS = Freeze({
   // watched from the pinned eye like the questioning (witness); FrontPass and Taunt are retired.
   Count: "clean", Banter: "clean", Orders: "clean", Incoming: "clean",
   Blast: "nearMiss", Black: "nearMiss",
-  Wake: "witness", DropIn: "witness", Sweep: "witness", CaptiveDragged: "witness", CaptiveWall: "witness",
-  Interrogation: "witness", Practice: "witness", Slash: "witness",
+  // 2026-10-11 polish: DropIn through Practice on witnessLight (the red edge at a third), Wake and Slash on witness.
+  Wake: "witness", DropIn: "witnessLight", Sweep: "witnessLight", CaptiveDragged: "witnessLight", CaptiveWall: "witnessLight",
+  Interrogation: "witnessLight", Practice: "witnessLight", Slash: "witness",
   // Finish: ijaA's walk up the trench finishing the bodies is seen through the squint like the find (Dir02 choice, kept at
   // the integration of 2026-10-11).
   Finish: "found", Found: "found", Hold: "held", Ask: "held", Blade: "blade",
