@@ -1858,7 +1858,9 @@ export class FirstLevelBunkerShow {
       if(t>=length){
         // Let go of the rifle where the clip dropped it, then back to his questioning mark.
         if(f.rifleLeftAt==null){f.rifleLeftAt=r.time;if(props?.Where("comradeRifle")?.state==="held")props.Release("comradeRifle");this.RerootUnderPelvis(ijaB,ijaB.yaw);}
-        this.Hold(ijaB,m.ijaB,null,{speed:C.speed.walk});
+        // (2026-10-11 polish: round the north of the interpreter's questioning mark, moved 0.45 m north off the finish body: W.ijaBBack.)
+        if(ijaB.openingWalk?.key==="ijaBBack"&&ijaB.openingWalk.done)this.Hold(ijaB,m.ijaB,null,{speed:C.speed.walk});
+        else if(this.Follow(ijaB,"ijaBBack",[...W.ijaBBack,m.ijaB],C.speed.walk,null,m.ijaB.yaw))ijaB.openingWalk.done=true;
       }
     }
     // The machine-gun pair.
@@ -1893,7 +1895,9 @@ export class FirstLevelBunkerShow {
       if(actor.openingStoryboardHidden){this.Show(actor);this.Put(actor,{...W.crewFrom,yaw:Math.PI/2});SetRelaxedGait(actor,null);}
       if(this.MgHeave(actor,role))continue;
       const there=actor.openingWalk?.key==="mg"&&actor.openingWalk.done;
-      if(!there){if(this.Follow(actor,"mg",[...W.crewVia,mark],C.speed.brisk,null,mark.yaw))actor.openingWalk.done=true;continue;}
+      // (2026-10-11 polish: after his heave he is at the wall foot under the lip: straight up to the gun, not back round crewVia.)
+      const way=f["heave:"+role+"Done"]!=null?[mark]:[...W.crewVia,mark];
+      if(!there){if(this.Follow(actor,"mg",way,C.speed.brisk,null,mark.yaw))actor.openingWalk.done=true;continue;}
       f["mgThere:"+role]??=r.time;
       if(this.flags["hit:"+role]!=null)continue;
       this.Put(actor,mark);
@@ -1919,6 +1923,8 @@ export class FirstLevelBunkerShow {
     if(!H||!set?.PlaceCorpse||!OpeningClipMeta(clip)||f["heaved:"+role]!=null)return false;
     const key="heave:"+role;
     if(f[key+"From"]==null&&this.phase!=="CaptiveWall"){f["heaved:"+role]=r.time;return false;}
+    // Both bodies are the director's from the first frame of the drag (the Set would otherwise stack the second on the lip at once).
+    if(f.mgBodiesTaken==null){f.mgBodiesTaken=r.time;for(const who of ["gunner","loader"])set.PlaceCorpse(H.corpse[who],{pose:"start"});}
     const id=H.corpse[role],root=H.roots[role],start=SET_MARKS.mg[H.corpse[role].slice(3)].start;
     f[key+"From"]??=r.time;
     if(f[key+"At"]==null){

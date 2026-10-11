@@ -558,6 +558,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // 0.93 m off; the bolt goes out over the north rim); the clip's rifle lies 0.43 m ahead of him -- on the Set's comradeRifle mark
     // (3.95,-125.25). pickWalkS: a walk that has not arrived is put there.
     rifleRoot:P(3.65,-124.95,-Math.PI/4), pickWalkS:6,
+    // ijaBBack (2026-10-11 polish): from the rifle back to his questioning mark round the north of the interpreter's (0.9 m off; straight
+    // he passed 0.52 m from him: the campaign driver's 0.7 m clearance).
+    ijaBBack:Route([4.95,-125.4]),
     // 2026-10-11 polish (PolishAnim IjaHeaveCorpseLip, Script_OpeningStoryboards.MgHeave): each of the pair goes to his body in the depth
     // sap (Set mg.corpse*.start, reached within reachM), drags it in behind him (dragBehindM, dragMps; its head toward him) along `via`
     // -- the floor north of the sweep bodies, not over them as crewVia went -- and in from the east along the south wall foot
@@ -1098,9 +1101,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // N18: through the slit, ijaA walking up with the bayonet down having just stabbed the body at the lower right (finish.bodies[0],
     // south-east of the eye). (The helmet by the body in the picture is not ours: the body is a Sichuan soldier.)
     // (2026-10-11 polish: the finish body lies at the south wall foot 3.3 m off now; the shot 0.75 s after the stab -- 「刚补了一刀，军靴越来越近」
-    // -- with him a step on, 4-4.5 m off.)
+    // -- his pelvis ~3.4 m off (the walking stab moves him on from a root left 4.7 m off: judged on bodyDistM).)
     Object.freeze({ id:"N18", storyboard:"Storyboard_N18_FinishWalk.png", when:"s.flags['ev:finishStab1']!=null&&r.time-s.flags['ev:finishStab1']>=.75",
-      judge:{ camera:{ eyeM:[.15,.45], pitchDeg:[-4,16] }, eyeClosure:[.55,.97], actors:{ ijaA:{ x:[.35,.85], distM:[1.2,4.6] } } } }),
+      judge:{ camera:{ eyeM:[.15,.45], pitchDeg:[-4,16] }, eyeClosure:[.55,.97], actors:{ ijaA:{ x:[.35,.85], bodyDistM:[1.2,4] } } } }),
     // N19: the right hand flat in the mud at the lower right (x 0.55-0.75), the boot on it grinding, his leg up the right; the butt
     // and the bayonet tip above (one rifle, not two pieces as drawn). Through the shammed slit (contract §1.9).
     Object.freeze({ id:"N19", storyboard:"Storyboard_N19_BootOnHand.png", when:"s.flags.bootStepAt!=null&&r.time-s.flags.bootStepAt>=.3",
