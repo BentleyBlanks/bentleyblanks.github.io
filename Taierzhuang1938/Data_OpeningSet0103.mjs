@@ -626,17 +626,14 @@ export const SET_MARKS = Object.freeze({
     ]),
   }),
   finish: Object.freeze({
-    // 甲（ijaA）擦刀卡枪后端枪沿沟底往洞口走、各补一刀的两具（Black 之前不显示）。
+    // 甲（ijaA）擦刀卡枪后端枪沿沟底往洞口走、补一刀的那具（Black 之前不显示）。
+    // 2026-10-11 集成负责人决定：契约原有的 [1]（眼位旁那具）删掉——离眼 0.3–0.6 m，第一人称贴地眼高下会露出悬着的腿，
+    // 那块地又要留给被踩的右手、手榴弹停点与翻译蹲位。finish.bodies 只剩 [0]。
     // [0] 契约 (3.3,-124.3)：连胳膊的实际宽度压到 02 冲锋路线 chargeRoute 的末点 (3.3,-123.5)（只差 0.27 m），北移 0.25 m，
     //     离 chargeRoute 0.5 m 以上；再往北就压到甲 Found 站的 ija.found (2.98,-125.2)。它仍在 02 翻译蹲位 rescue.interpreter (2.92,-124.5) 与罗班长撤离折线
     //     withdraw.lane 上（Dir 的点，不在契约净空名单里）：交 Dir02 让开（报告）。
-    // [1] 契约值 (2.6,-125.95) 在眼位**东北** 1.0 m（契约说明栏写「东南 0.75 m」，与值矛盾）。东南那块地是踩手的右手、
-    //     手榴弹停点、翻译蹲位与何有田抬木的落脚，放不下一具人；按值放在北边，西移 0.55 m 让开 rescue.rifleMouth 那支枪
-    //     （枪口朝东北伸到 x 3.48）和 trenchFacadeN 板墙（x ≥ 2.6）。头朝西，横伸的左臂正好搭到顺子左肩外侧（刻意：
-    //     「就在玩家脸前」那一刀扎在他左手边 0.6 m）。
     bodies: Object.freeze([
       Body(3.3, -124.55, 90, { pose: "nra1", tier: 0 }),
-      Body(2.05, -125.8, 90, { pose: "nra1", tier: 0 }),
     ]),
     // 手榴弹滚停点：眼位 witnessEye (1.85,-125.25) 东 0.35 m、南 0.15 m，离眼 0.38 m；沟底平（测试 6d 量坡度）。
     grenadeStop: P(2.2, -125.1),
@@ -687,7 +684,6 @@ export const CORPSES = Object.freeze([
   Object.freeze({ id: "sweep.bodies[0]", mark: SET_MARKS.sweep.bodies[0], show: "always" }),
   Object.freeze({ id: "sweep.bodies[1]", mark: SET_MARKS.sweep.bodies[1], show: "always" }),
   Object.freeze({ id: "finish.bodies[0]", mark: SET_MARKS.finish.bodies[0], show: "black" }),
-  Object.freeze({ id: "finish.bodies[1]", mark: SET_MARKS.finish.bodies[1], show: "black" }),
   Object.freeze({ id: "mg.corpseLower", mark: SET_MARKS.mg.corpseLower, show: "always", movable: true }),
   Object.freeze({ id: "mg.corpseUpper", mark: SET_MARKS.mg.corpseUpper, show: "always", movable: true }),
 ]);

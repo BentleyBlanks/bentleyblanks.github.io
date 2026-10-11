@@ -1540,7 +1540,7 @@ export class OpeningSet {
 // ===========================================================================
 // 尸体几何不再烘：直接借战场尸体层（MissionAftermath）开机烘好的趴姿原型（`nra0` / `nra1`，同一份几何、同一份合并材质），
 // 所以零烘焙时间、零新贴图、零新 program。
-//  · 不会动的四具（sweep / finish）进 BatchedMesh（每种材质一只，与尸体层同一套 program），显隐按实例开关；
+//  · 不会动的三具（sweep[0..1] / finish[0]）进 BatchedMesh（每种材质一只，与尸体层同一套 program），显隐按实例开关；
 //  · 机枪垫尸两具要被拖、被推上沟沿、被点射震：**会动的实例不进 BatchedMesh**（MotionVector 接入规范：移动实例没有历史，
 //    运动矢量是错的），各自一组普通 Mesh（材质按 CloneShadedMaterial 克隆一份：同一材质挂批次和普通网格会来回重算 program 参数）。
 // 摆放与贴地走战场尸体层同一个解算器（MissionBodySupport.Settle：整具网格最低包络贴地、不穿地、不悬空，必要时侧倾）；

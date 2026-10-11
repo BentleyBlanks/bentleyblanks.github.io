@@ -995,7 +995,8 @@ function FakeVfx() {
   report.redraft = {};
   // ---- 6a. 冻结名字（契约 §5.3）都在、数值有限
   assert.equal(M.sweep.bodies.length, 3, "sweep.bodies[0..2]");
-  assert.equal(M.finish.bodies.length, 2, "finish.bodies[0..1]");
+  // 2026-10-11 集成负责人决定删掉 finish.bodies[1]（眼位旁那具：贴脸露出悬着的腿，地要留给右手 / 手榴弹 / 翻译蹲位）。
+  assert.equal(M.finish.bodies.length, 1, "finish.bodies[0] only (the one beside the eye was dropped by the integration lead)");
   for (const k of ["corpseLower", "corpseUpper", "gunner", "loader"]) assert.ok(Number.isFinite(M.mg[k]?.x) && Number.isFinite(M.mg[k]?.z), `mg.${k}`);
   assert.equal(M.dropIn.lip.length, 3, "dropIn.lip[0..2]");
   for (const p of [M.dropIn.foldBlast, M.finish.grenadeStop, M.practice.recruitBack]) assert.ok(Number.isFinite(p.x) && Number.isFinite(p.z));
@@ -1134,12 +1135,12 @@ function FakeVfx() {
   assert.ok(set.redraft && set.redraft.corpses, "01 builds the redraft (corpses from the prototypes)");
   set.Update(1 / 60, "Trapped", "Banter", { collapsed: false, blastAge: null });
   const Shown = () => set.redraft.corpses.Stats().shown;
-  assert.deepEqual(Shown().sort(), ["mg.corpseLower", "mg.corpseUpper", "sweep.bodies[0]", "sweep.bodies[1]"], "Banter: the far bodies are there, the two by the mouth are not");
+  assert.deepEqual(Shown().sort(), ["mg.corpseLower", "mg.corpseUpper", "sweep.bodies[0]", "sweep.bodies[1]"], "Banter: the far bodies are there, the one by the mouth is not");
   assert.ok(set.props.Where("ammoBox").visible === false || set.props.Get("ammoBox").state === "rest", "ammoBox rests by Liu in Banter (external model: async)");
   set.Update(1 / 60, "Trapped", "Blast", { collapsed: true, blastAge: 0.3 });
-  assert.ok(!Shown().includes("finish.bodies[0]"), "the bodies by the mouth do not pop in during the blast");
+  assert.ok(!Shown().includes("finish.bodies[0]"), "the body by the mouth does not pop in during the blast");
   set.Update(1 / 60, "Trapped", "Black", { collapsed: true, blastAge: 1.2 });
-  assert.ok(Shown().includes("finish.bodies[0]") && Shown().includes("finish.bodies[1]"), "Black: the two bodies by the mouth are there when the eyes open");
+  assert.ok(Shown().includes("finish.bodies[0]"), "Black: the body by the mouth is there when the eyes open");
   // 垫尸：CaptiveWall 之前在纵深支沟起点；导演没搬过就从 CaptiveWall 起按沟沿叠好的样子自动就位。
   const lower0 = set.CorpseInfo("mg.corpseLower");
   assert.ok(Math.hypot(lower0.x - M.mg.corpseLower.start.x, lower0.z - M.mg.corpseLower.start.z) < 0.05, "the lower MG body starts in the depth sap");
@@ -1181,7 +1182,7 @@ function FakeVfx() {
   {
     const s2 = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: GG, corpseSource: (k) => protos[k] });
     s2.Update(1 / 60, "BunkerRescue", "Hold", { collapsed: true, blastAge: null });
-    assert.ok(s2.CorpseInfo("mg.corpseUpper").pose === "stacked" && s2.redraft.corpses.Stats().shown.length === 6, "02 cold start: all six bodies, the MG pair stacked on the lip");
+    assert.ok(s2.CorpseInfo("mg.corpseUpper").pose === "stacked" && s2.redraft.corpses.Stats().shown.length === CORPSES.length, "02 cold start: all five bodies, the MG pair stacked on the lip");
     s2.Exit();
   }
 
