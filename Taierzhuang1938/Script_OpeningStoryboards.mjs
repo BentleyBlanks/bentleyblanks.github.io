@@ -2673,18 +2673,16 @@ export class FirstLevelBunkerShow {
    *  narrative protection holds him for the cut) unless the spec says so. */
   WoundShot(actor,spec){
     const r=this.r,from=r.Point(spec.from,1.5),bone=actor.actor?.characterRig?.bones?.[spec.bone];
-    // The gunner dies over the gun (his clip keeps drawing it); if he is off that clip, the Set's world type11 is let go where it is.
-    if(spec.role==="gunner"&&actor.openingStoryboardPose?.clip!=="IjaProneLmgOnCorpse"&&this.Props?.Where("type11")?.state==="held")this.Props.Release("type11");
+    // The gunner's gun stays on the corpse rest where his clip had it (the Set's world type11, let go there); he falls on the
+    // directional death (it slides him off the bank into the trench: pendingWiring N22).
+    if(spec.role==="gunner"&&this.Props?.Where("type11")?.state==="held")this.Props.Release("type11");
     const shown=!actor.renderLod||actor.renderLod==="detail";
     const aim=shown&&bone?bone.getWorldPosition(new THREE.Vector3()):this.AimPoint(actor),dir=aim.clone().sub(from).normalize();
     r.vfx?.MuzzleFlash?.(from.clone().addScaledVector(dir,.8),dir,{kind:"boltRifle"});r.vfx?.Tracer?.(from,aim,{kind:"nra"});
     r.audio?.PlayGunshot?.("rifleNra",{position:from,volume:1});
     r.vfx?.Blood?.(aim,dir,1);
     actor.openingDoomed=false;
-    // 「沟沿上的机枪手趴在尸体上不动了」 (contract §1.11): the gunner dies where he lies over the gun, on his prone clip's frame (the
-    // directional death slid him down the bank into the trench, 2026-10-11 integration run); everyone else falls natively.
-    const stays=spec.role==="gunner"&&actor.openingStoryboardPose?.clip==="IjaProneLmgOnCorpse";
-    if(spec.lethal){actor.scriptEssential=false;actor.scriptedNoncombatant=false;if(!stays)this.FallNatively(actor,true);actor.TakeHit(1000,spec.part,dir,{kind:"bullet",weaponId:"HanYang",point:aim});if(actor.alive)this.Kill(actor,"bullet");return;}
+    if(spec.lethal){actor.scriptEssential=false;actor.scriptedNoncombatant=false;this.FallNatively(actor,true);actor.TakeHit(1000,spec.part,dir,{kind:"bullet",weaponId:"HanYang",point:aim});if(actor.alive)this.Kill(actor,"bullet");return;}
     // Still the director's (scriptedNoncombatant): woken by the hit the AI turned him to face the shooters (09-30 run: his root
     // swung from 90 to 161 deg and the clip's walk away east went south into the wall, the body falling on the pinned man).
     actor.scriptEssential=true;actor.scriptedNoncombatant=true;

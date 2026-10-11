@@ -239,3 +239,13 @@ Storyboard 包交付：每张图 + `REL/附件/briefs/Storyboard_Shots_20261011.
 - 节奏：渐亮到近爆、近爆到还权各报一个实测秒数；没有一处「罚站」（任何人在镜头里不动且无台词超过 2.5 s 要有理由）。
 - 已知基线红（改前就红，别当回归）：`Script_FirstLevelMissionTest`「07+ keeps the legacy fixed-source front」、`Script_OpeningActorPerformanceBrowserTest`「luo: silent combat retains its original head pose」、`Script_TextTest` 字体子集缺字（Voice 包本轮顺手修）。
 - 推 master 前：`index.html` 所有改过的模块抬 `?v=`、prepush 按根流程。
+
+### 集成结果（2026-10-11，集成包）
+
+- **合并**：Set → Sfx → Voice → AnimA → AnimB → Dir01 → Dir02，均 `--no-ff`。冲突：`index.html` 戳取大；`_import/Script_OpeningStoryboardClips.py` 末尾 A 块在前、B 块在后（`CaptiveStabbedCurl` 的 prev 补回 `CaptiveArchCaught`）；`Data_OpeningStoryboards.mjs` 的 `clips.added` 两边都留，phase 表取 Dir01 的 01 加 Dir02 的 Blade，`vanguardIds` 取 Dir02 的六人，`cast` 取 Dir01 的（含 gunner / loader / victim），storyboardShots / pendingWiring 取 Dir01 的 N01–N19 加 Dir02 的 N20–N25；`Data_OpeningLens.PHASE_LOOKS` 的 Finish 取 Dir02 的 `found`。
+- **动作库**：没有全量重烘。实测从零重烘全部 clip 复现不了已提交的旧 clip（百余条前臂扭转分支差到 180°，`--rebake=tmp/merge/fullbake` 列表），所以旧 clip 保持已提交版本，只按骨架用 `OPENING_CLIPS` 重烘 A、B 两包的 34 条（伙伴轨用合并目录 OneDrive `OpeningRedraft_20261011_AB`）；`verify` 48 条与提交一致。`HeHelmetSleepSitUp` / `LiuDivideAmmoToss` / `LiuBoxUpGo` 加烘 NRA02（何有田、刘文财穿的是 NRA02）。manifest 220 条 rig clip。
+- **接线**：§4.2 的 A、B 行全部接上（A 的 `IjaHeaveCorpseLip`、B 的 `NraShotTumbleSteps` 没烘）；Voice 的 13 场全部走录音（`RecordedTake` 全真），喊杀用 `voice.yell_*`；Sfx 十二条按 cue 名调；Set 的尸体层、comradeRifle、grenade（`Toss` 到 `finish.grenadeStop`）、type11、FoldBlast、标记（导演改读 `SET_MARKS`）。丁穿 IJA03（`WORDLESS_SPEAKERS`：只有一句非词喊声，无面部蒙皮）。
+- **集成改动的标记**：北沟沿三处跳下点往眼位拉近 1 m 并移到跳下 clip 的根上（落点 z -126.2～-126.25）；丁的等待位 `practice.recruitWait` = `rescue.vanguardPosts.ijaD` 移到 (5.6,-124.05)（让开甲的补刀路线）；幺娃 (−1.2,−125.45)；翻译进场路线从第 8 具尸体与 SweepVictim 之间斜插（两边各约 0.38 m，SetTest 记为刻意）；`rescue.playDead.squint` 0.72；`fallenComrade` (1.28,−123.62)、`recruitFall` (4.11,−126.21) 为实测落点。
+- **实测节奏**（`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=3`，游戏秒）：渐亮→近爆 106.2 s；近爆→Found 结束（进 Hold）149.3 s；Found 开始→还权 51.4 s（Hold→还权 42.7 s）；短哨→「折角，清了」11.8 s。
+- **替身**：`pendingWiring` 剩 8 条（何有田的钢盔道具、传令兵喘气喊话、机枪组拖尸推上沟沿、N21 丁被甲挡住、N22 甲头出画、机枪组两人中弹滑下沟沿、ChargeB 滚台阶、N25 刘何跪姿），`wave` 仍为 1。
+- **基线红**（改前就红）：`Script_FirstLevelVoiceTest --audio` 的 `BridgeCover` / `BridgeWithdraw` 提示词哈希；`Script_OpeningActorPerformanceBrowserTest`「luo: silent combat retains its original head pose」；`Script_EditorTest` 三条与音频无关；`Script_AudioNormalize` 八条旧文件。契约原写的 `Script_FirstLevelMissionTest`「07+…」与 `Script_TextTest` 在本基线上是绿的。

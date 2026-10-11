@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **第一关 01–02 开场按 2026-10-11 Notion 稿重构（2026-10-11）**：口径 [Data_OpeningRedraft20261011Contract.md](docs/Data_OpeningRedraft20261011Contract.md)（文末「集成结果」：合并、只重烘新 clip、接线、实测节奏、替身与基线红）；台词原文 [Data_FirstLevelOpeningSource20261011.md](docs/Data_FirstLevelOpeningSource20261011.md)；旧 01–02 文档（09-23 / 09-27 / 09-30）顶部已注明以本契约为准。门禁：`Script_OpeningStoryboardsTest`、`Script_OpeningSetTest`、`Script_FirstLevelVoiceTest`、`Script_OpeningLensTest`、`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=3`、`Script_OpeningHandbackBrowserTest`；取证：`Script_OpeningStoryboardShots.mjs --shots=N01,…,N25 --side-by-side=<REL/附件/storyboard> --quality=high`（分镜不进仓库）。动作库不要全量重烘（旧 clip 复现不了），新 clip 用 `OPENING_CLIPS` 按骨架重烘。
+
 - **模块化燃烧粒子（2026-10-09）**：常驻燃烧共用 Main / Emission / Shape / Lifetime / Noise 等模块，GPU 解析轨迹；`Tengxian.Particles` 和 `Script_ParticleCli.mjs` 提供 agent 创建、调参、重放、诊断与 JSON 导入导出。接入、Unity 对标范围、预算与验收见 [粒子系统](docs/Data_ParticleSystem.md)。
 
 - **全粒子统一与编辑器（2026-10-09）**：战斗粒子、碎屑、近远烟和菜单飘尘共用 ParticleSystem；覆盖范围与实测证据见 [统一清单](docs/Data_ParticleUnification.md)。模块曲线、时间轴、预设和 agent 接口见 [粒子编辑器](docs/Data_ParticleEditor.md)，直达参数 `?whitebox=p012&editor=vfx&quality=high`。

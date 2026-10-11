@@ -1090,8 +1090,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
       now:"IjaRecruitCheekCut on its player-track root 25 deg left of the eye's front (BladeRoot); N21 still judges him with coverOk ijaA", wave2:"a hold over the pinned man that keeps ijaA's arm off the left of the picture, or the cut staged on the other cheek"},
     {shot:"N22", what:"ijaA's head in the picture as the volley takes the recruit (he is rising off the pinned man: his head goes out of the top of the frame)",
       now:"N22 judges him with headOptional", wave2:"a later N22 moment or a look that follows his head up (rescue.chargeView)"},
-    {shot:"N22", what:"the loader goes over the lip and down into the trench when shot",
-      now:"the hit reaction's directional death where he kneels (it may not carry him off the lip)", wave2:"a directional death taken over the lip, or an authored fall (AnimA / Dir01)"},
+    {shot:"N22", what:"the gunner dead over his gun on the corpse rest, the loader over the lip and down into the trench",
+      now:"both fall on the hit reaction's directional death: both slide down the bank into the trench (2026-10-11 run: gunner (7.53,-123.00), loader (9.77,-123.56)); the gun stays on the rest (the Set's type11 let go there)", wave2:"an authored death for each (the gunner slumping onto the gun, the loader going over the lip) -- Anim"},
     {shot:"N22", what:"ChargeB, first down the step, shot by the fold man: tumbles down and lies on his back 1 m south of the eye with his eyes open (NraShotTumbleSteps)",
       now:"the hit reaction's directional death at rescue.extras ChargeB post (falls west toward rescue.fallenComrade); the face layer's DeadSlack half-closes the lids", wave2:"NraShotTumbleSteps (AnimB P1, not baked) ending at rescue.fallenComrade, and a dead-eyes-open flag on the face layer (Script_CharacterFacialAnimation)"},
     // SB06 / N25 (Check, Released), carried over from 2026-09-30
