@@ -46,6 +46,8 @@ const ContactClips=new Set(["LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle"
   // 2026-10-11 redraft (Dir01 hook): Luo standing in the mouth looks round (GuardTurn at the near shell / the far call) and points
   // with the order; not swapped for the dugout's MessengerReport stand.
   "GuardTurn"]);
+// Contact clips whose man still turns his head to his own lines (the hands and the props stay the clip's).
+const TalkingContactClips=new Set(["YaowaSitLoad","YaowaCrouchCatchEat","ComradeEatBreadToss","ComradePourRoundsLaugh","LiuDivideAmmoToss","HeHelmetSleepSitUp"]);
 // Clips whose face is aimed at the first-person eye inside the clip (listed with ContactClips above) or whose
 // hands follow Shunzi's body track: held-pose life keeps their head nearly where the clip put it.
 const FaceAimedClips=new Set(["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
@@ -192,7 +194,9 @@ export class OpeningActorPerformance {
     const nativeCombat=this.soldier.openingStoryboardTravel==null&&(state.firing||state.fire>0||state.aim>.6||meleeActive);
     // The seated loading clip owns both hands and the rifle, but Yaowa must
     // still acknowledge his spoken lines. Keep its body/contact pose intact.
-    const loadingSpeech=pose?.clip==="YaowaSitLoad"&&talking&&!meleeActive;
+    // 2026-10-11 integration: the same for the dugout's redraft clips (AnimA; bread, rounds, clips, the helmet in the hands) --
+    // the head only, while that man talks.
+    const loadingSpeech=TalkingContactClips.has(pose?.clip)&&talking&&!meleeActive;
     const headOnly=nativeCombat&&talking||loadingSpeech;
     if(protectedBeat&&!loadingSpeech||nativeCombat&&!talking){this.rig.openingActorPerformanceState={role:context.role,protected:true};return;}
     const time=(Number.isFinite(context.clock)?context.clock:this.clock)+this.phase;

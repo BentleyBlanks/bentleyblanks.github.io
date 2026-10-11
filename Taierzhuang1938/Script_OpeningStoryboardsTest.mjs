@@ -754,7 +754,9 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     const PathD=p=>{const a=Local(heaveRoot,0,.9),b=kneel,dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz)));return Math.hypot(a.x+t*dx-p.x,a.z+t*dz-p.z);};
     assert.ok(PathD(R.blade.recruitFall)>=.9&&R.blade.recruitFall.x>kneel.x,`the recruit falls east, 0.9 m+ off the heave (${PathD(R.blade.recruitFall).toFixed(2)} m)`);
     assert.ok(PathD(R.fallenComrade)>=.9,`ChargeB lies 0.9 m+ off the heave (${PathD(R.fallenComrade).toFixed(2)} m)`);
-    assert.ok(D(R.fallenComrade,eye)<1.3,"ChargeB lies beside him");
+    // 2026-10-11 integration: fallenComrade is where the directional death really leaves him (1.7 m off, south-east of the eye; the
+    // contract's 1 m needs NraShotTumbleSteps, pendingWiring N22) -- no further than 1.8 m.
+    assert.ok(D(R.fallenComrade,eye)<1.8,`ChargeB lies beside him (${D(R.fallenComrade,eye).toFixed(2)} m)`);
     assert.ok(D(WoundBody("ijaA"),handRoot)>=.45,`Luo stands clear of ijaA's body (${D(WoundBody("ijaA"),handRoot).toFixed(2)} m)`);
     assert.ok(Math.abs(Hd.rise.eye.at(-1)[1][1]-STANCE.stand.eye)<.05&&Math.abs(Hd.rise.eye[0][1][1]-kneelKey[1])<.02,"he gets up from the kneel to the player's standing eye");
     const S0=Hd.standIn;

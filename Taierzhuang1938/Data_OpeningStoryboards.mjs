@@ -742,7 +742,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
       clip:"IjaRecruitCheekCut", standInClip:"IjaReadyRifle", touchS:.9, cutS:1.5, pressS:.25, pressM:.035, shakeM:.004, shakeHz:9,
       releaseS:2.3, liftS:.4, thenLine:"RescueInterrogation.06", thenAfterS:.55, backAfterLineS:.2, backS:1.3,
       levelAt:P(4.6,-125.75), levelClip:"IjaRecruitLevelRifle", levelStandIn:"IjaReadyRifle", levelS:.45, chargeAfterLevelS:.5,
-      recruitFall:P(5.3,-125.8) }),
+      recruitFall:P(4.11,-126.21) }),   // measured, 2026-10-11 integration run (flags fall:ijaD; was the preset (5.3,-125.8))
     // The cut on the cheek, first person: the head flinches flinchDeg away from it (to the right) over flinchS and comes back over
     // recoverS; the cheekCut sound (Sfx package, contract §6) -- `sound` until it is registered (pendingWiring N21); the lens look
     // is Data_OpeningLens `cheek` on the cut's clock (events.cheekAt).
@@ -809,7 +809,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // timeout does.
     fold:Object.freeze({ turnAtS:.15, fireWithinM:1.0, fireForceS:3.2, fireS:.1, returnFireS:4.2, returnFireGapS:.45 }),
     // Where ChargeB lies once the fold man's shot has dropped him (「摔在顺子旁边」: 1 m south of the eye); the heave keeps off him.
-    fallenComrade:P(1.85,-124.25),
+    // 2026-10-11 integration: measured in the 01->03 run (campaign --stage-to=3, flags fall:ChargeB; was the preset (1.85,-124.25)).
+    fallenComrade:P(1.28,-123.62),
     // The depth Japanese who went off down the trench after the killing hold here, watching east (the volley shoots him dead there).
     // (2026-10-11: off the Set's sweep.bodies[1] (9.4,-123.1); was (9.4,-123.75).)
     depthPost:Object.freeze({ DepthIjaB:P(9.8,-124.7,-Math.PI/2) }),
