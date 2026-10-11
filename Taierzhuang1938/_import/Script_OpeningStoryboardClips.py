@@ -10384,7 +10384,7 @@ RA_L_FLIGHT = RaF(14)              # 0.583
 # Shunzi's lap seen from Liu at §5.1 (Liu (1.1,-124.9) facing west; Shunzi's lap 0.35 m east of shunzi.seat
 # (-1.95,-126.25), 0.55 m up): runtime m, Liu's frame, Blender axes.
 RA_L_LAP = (-1.35, -2.70, .55)
-RA_L_BOX = (-.42, -.30, 0.0)       # the crate's bottom centre, runtime m, his frame (Blender axes): at his right hand
+RA_L_BOX = (-.06, -.52, 0.0)       # the crate bottom centre, runtime m, his frame (Blender axes): right front, its long side across
 STAGES['liuToss'] = {
     'anchor': 'liuwencai',
     'notes': 'contract §5.1 (Liu (1.1,-124.9) squatting facing west, Shunzi at shunzi.seat (-1.95,-126.25) facing east): the '
@@ -10402,7 +10402,7 @@ Meta('LiuDivideAmmoToss', RA_L_T, False, 'free', role='liuwencai', rig='Tengxian
              {'t': RA_L_TOSS + RA_L_FLIGHT, 'kind': 'lands', 'atM': list(RA_L_LAP)}],
      next=['LiuDivideAmmoToss'],
      notes='2026-10-11 redraft (N01 "刘文财蹲在他脚边的弹药箱旁分子弹"; "刘文财数出一夹，隔着两个人丢过来，落在顺子腿上"): '
-           'squatting, the open crate at his right hand (ammoBox track, static), the right hand takes chargers out of the crate '
+           'squatting, the open crate in front of him to his right, its long side across (ammoBox track, static), the right hand takes chargers out of the crate '
            'into the left palm (0-2.0 s hold loop, one per second). Released: one more out of the crate (2.33 s), a look at '
            'Shunzi, an underhand lob over the heads (toss 3.0 s; the clipA track flies 0.583 s to the lap point of stage '
            'liuToss, atM runtime m in his frame, and lies there to the end); back to counting = frame 0 at 4.0 s.')
@@ -10425,7 +10425,7 @@ def RaBuildLiuToss(T, name):
     D, h1 = RA_L_T, RA_L_HOLD[1]
     base = RaLiuBase(T)
     box = Vector(RA_L_BOX) / T.s
-    inBox = tuple(box + Vector((T.R(.14), -T.R(.10), T.R(.27))))
+    inBox = tuple(box + Vector((-T.R(.12), T.R(.05), T.R(.27))))
     palm = base['hand.L']
     give = Add3(palm, (-.04, 0, .05))
     lap = Vector(RA_L_LAP) / T.s
@@ -10460,7 +10460,7 @@ def RaBuildLiuToss(T, name):
     fromAt = {}
 
     def Props(t):
-        out = {'ammoBox': (tuple(box), (0, 1, 0), (0, 0, 1), True)}
+        out = {'ammoBox': (tuple(box), (1, 0, 0), (0, 0, 1), True)}
         if t < RaF(60):
             out['clipA'] = RaHidden()
         elif t <= RA_L_TOSS:
@@ -10474,7 +10474,7 @@ def RaBuildLiuToss(T, name):
         return out
     spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, D), ('R', 0, D)], 'check': lambda t: {'R': pathR(t)},
             'reach': {'fraction': .80, 'travel': .12, 'bend': .55},
-            'reviewProps': lambda t: [('box', tuple(box + Vector((0, 0, T.R(.15)))), (T.R(.54), T.R(.82), T.R(.30)), 0),
+            'reviewProps': lambda t: [('box', tuple(box + Vector((0, 0, T.R(.15)))), (T.R(.82), T.R(.54), T.R(.30)), 0),
                                       ('point', tuple(lap), None, .03)],
             'reviewFrames': lambda n: [0, 8, 18, 56, 66, 72, 79, 86, n - 1]}
     spec['reviewViews'] = RaViews(0, -.1, .60, 3.4, .9) + [('far', (-2.2, -3.8, 1.6), (-.6, -1.3, .5), 55.0)]
@@ -11129,3 +11129,632 @@ def RaBuildThumbTwist(T, name):
 
 
 REACH_BY_CLIP['IjaStompStabTwist'] = {'fraction': .86, 'travel': .14, 'bend': .35}
+
+
+# ==================================================================================================================
+# P1 (contract §4.2 row A, second tier)
+# ==================================================================================================================
+# ---- A11. LiuBoxUpGo (NRA05): from LiuDivideAmmoToss frame 0 he slaps the crate lid shut and heaves it onto his right shoulder.
+RA_LB_T = RaF(60)                  # 2.5 s
+RA_LB_SLAM = RaF(10)               # 0.417 the lid shut
+RA_LB_LIFT = RaF(26)               # 1.083 off the floor
+RA_LB_SHOULDER = RaF(44)           # 1.833 on the shoulder
+Meta('LiuBoxUpGo', RA_LB_T, False, 'free', role='liuwencai', rig='TengxianNra05', rigs=['TengxianNra05'], props=['ammoBox'],
+     rootMotion=False,
+     contacts=[{'t': RA_LB_SLAM, 'limb': 'handR', 'action': 'slap', 'target': 'ammoBox'},
+               {'t': RaF(20), 'limb': 'handsLR', 'action': 'grab', 'target': 'ammoBox'},
+               {'t': RA_LB_SHOULDER, 'limb': 'shoulderR', 'action': 'carry', 'target': 'ammoBox'}],
+     events=[{'t': RA_LB_SLAM, 'kind': 'slam', 'what': 'lidShut'}, {'t': RA_LB_LIFT, 'kind': 'lift'}, {'t': RA_LB_SHOULDER, 'kind': 'shouldered'}],
+     prev=['LiuDivideAmmoToss'], next=[],
+     notes='2026-10-11 redraft P1 (N03 "刘文财啪地扣上弹药箱，扛起来就走"): frame 0 = LiuDivideAmmoToss frame 0 (squatting, the open '
+           'crate at his right hand). The right hand slaps the lid shut (slam 0.417 s: the director swaps the crate to the closed '
+           'node, MilitaryCrateClosed), both hands take the crate by its ends (0.83 s), he stands it up off the floor (1.08 s) and '
+           'swings it onto his right shoulder (1.83 s), the right hand over it, stands up (2.5 s). ammoBox track throughout. No '
+           'root motion: the director walks him out with the crate on (keep the ammoBox track at the last frame on his rig).')
+
+
+@Builder('LiuBoxUpGo')
+def RaBuildLiuBoxUp(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D = RA_LB_T
+    base = RaLiuBase(T)
+    box0 = Vector(RA_L_BOX) / T.s
+    half = Vector((T.R(.41), T.R(.27), T.R(.15)))            # the crate: half its long side (x, across his front), depth, height
+    stand = Standing(T)
+    # on the right shoulder: the long side along his forward axis, the crate's middle a little out from the neck
+    onShoulder = Vector((-(SX + .06), -.04, SZ + .02))
+
+    def BoxAt(t):
+        if t <= RaF(20):
+            return box0.copy(), Vector((1, 0, 0)), Vector((0, 0, 1))
+        lifted = box0 + Vector((0, T.R(.08), T.R(.30)))
+        rows = [(RaF(20), box0, (1, 0, 0), (0, 0, 1)), (RA_LB_LIFT, lifted, (1, 0, 0), (0, 0, 1)),
+                (RaF(36), Vector((-(SX + .05), -.30, SZ - .20)), (.30, -.95, 0), (-.40, 0, .92)),
+                (RA_LB_SHOULDER, onShoulder, (0, -1, 0), (0, 0, 1)), (D, onShoulder, (0, -1, 0), (0, 0, 1))]
+        for (t0, a, ax0, u0), (t1, b, ax1, u1) in zip(rows, rows[1:]):
+            if t <= t1:
+                w = Smooth((t - t0) / max(1e-6, t1 - t0))
+                return Vector(a).lerp(Vector(b), w), Vector(Unit(Lerp3(ax0, ax1, w))), Vector(Unit(Lerp3(u0, u1, w)))
+        return onShoulder, Vector((0, -1, 0)), Vector((0, 0, 1))
+
+    def Ends(t):
+        c, ax, up = BoxAt(t)
+        side = ax.cross(up).normalized()
+        mid = c + up * half.z
+        return mid - ax * half.x, mid + ax * half.x, side, up, ax         # his right end, his left end
+    pel = [(0.0, base['pelvis']), (RaF(16), base['pelvis']), (RA_LB_LIFT, Add3(base['pelvis'], (0, .02, .12))),
+           (RaF(40), Add3(stand['pelvis'], (0, .04, -.18))), (D, Add3(stand['pelvis'], (0, .02, -.04)))]
+    anim = Tracks(base, {
+        'pelvis': pel,
+        'bend': [(0.0, base['bend']), (RA_LB_SLAM, .62), (RaF(20), .70), (RA_LB_LIFT, .55), (RaF(40), .30), (D, .16)],
+        'twist': [(0.0, base['twist']), (RA_LB_SLAM, -.30), (RaF(20), -.25), (RA_LB_LIFT, -.15), (RaF(40), 0.0), (D, 0.0)],
+        'pelvisTilt': [(0.0, base['pelvisTilt']), (RaF(40), (.10, 0, 0)), (D, (.04, 0, 0))],
+        'ankle.L': [(0.0, base['ankle.L']), (RaF(30), base['ankle.L']), (RaF(40), stand['ankle.L']), (D, stand['ankle.L'])],
+        'ankle.R': [(0.0, base['ankle.R']), (RaF(32), base['ankle.R']), (RaF(42), stand['ankle.R']), (D, stand['ankle.R'])],
+        'foot.L': [(0.0, base['foot.L']), (RaF(30), base['foot.L']), (RaF(40), stand['foot.L']), (D, stand['foot.L'])],
+        'foot.R': [(0.0, base['foot.R']), (RaF(32), base['foot.R']), (RaF(42), stand['foot.R']), (D, stand['foot.R'])],
+        'legPole.L': [(0.0, base['legPole.L']), (RaF(40), stand['legPole.L']), (D, stand['legPole.L'])],
+        'legPole.R': [(0.0, base['legPole.R']), (RaF(42), stand['legPole.R']), (D, stand['legPole.R'])],
+        'head': [(0.0, base['head']), (RaF(40), (.10, 0, .10)), (D, (.05, 0, .12))],
+    }, lag={'head': .05})
+    lid = tuple(box0 + Vector((T.R(.02), 0, T.R(.31))))
+    slap = RaChan([(0.0, base['hand.R']), (RaF(6), Add3(lid, (0, 0, .18))), (RA_LB_SLAM, lid), (RaF(14), Add3(lid, (0, 0, .05)))])
+
+    def Pose(t):
+        f = anim(t)
+        f['handRel.L'] = f['handRel.R'] = None
+        near, far, side, up, ax = Ends(t)
+        if t < RaF(14):
+            # the right hand comes up and slaps down on the lid
+            f['hand.R'], f['palmF.R'], f['palmN.R'], f['curl.R'] = slap(t), (0, -1, 0), (0, 0, -1), .15
+            f['hand.L'] = base['hand.L']
+        elif t < RaF(42):
+            # both hands under the ends of the crate; the left lets go as it swings up onto the shoulder (1.33 s)
+            w = Smooth((t - RaF(14)) / RaF(6))
+            grR = near - up * half.z * .5
+            grL = far - up * half.z * .5
+            f['grip.R'] = tuple(grR)
+            RaW(f, 'R', w)
+            off = Smooth((t - RaF(30)) / RaF(5))
+            if off < .999:
+                f['grip.L'] = tuple(grL)
+                RaW(f, 'L', min(w, 1 - off))
+            f['hand.R'], f['hand.L'] = slap(RaF(14)), (SX + .25, -.20, P - .25)
+            pr, pl = Grab(tuple(-ax), tuple(-up)), Grab(tuple(ax), tuple(-up))
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = pr[0], pr[1], .7
+            f['palmF.L'], f['palmN.L'], f['curl.L'] = pl[0], pl[1], .7
+        else:
+            # shouldered: the right hand over the crate's outer side, the left hangs
+            c, ax, up = BoxAt(t)
+            front = c + ax * half.x + up * T.R(.04)
+            f['grip.R'] = tuple(front)
+            p = Grab(tuple(ax), (0, 0, 1))
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = p[0], p[1], .6
+            f['handRel.L'] = (.07, -.10, -.47)
+            f['palmF.L'], f['palmN.L'], f['curl.L'] = (0, -.2, -1), (-1, 0, 0), .5
+        f['armPole.R'] = (-(SX + .50), .20, P)
+        f['armPole.L'] = (SX + .45, .20, P)
+        return T.Nest(f)
+
+    def Props(t):
+        c, ax, up = BoxAt(t)
+        return {'ammoBox': (tuple(c), tuple(ax), tuple(up), True)}
+    spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, RaF(30)), ('R', 0, RaF(32)), ('L', RaF(40), D), ('R', RaF(42), D)],
+            'reach': {'fraction': .82, 'travel': .14, 'bend': .45},
+            'reviewProps': lambda t: [('point', tuple(BoxAt(t)[0] + BoxAt(t)[2] * half.z), None, .10),
+                                      ('cyl', tuple(Ends(t)[0]), tuple(Ends(t)[1]), .06)],
+            'reviewFrames': lambda n: [0, 6, 10, 20, 26, 36, 44, n - 1]}
+    spec['reviewViews'] = RaViews(0, -.1, .70, 3.4, .9)
+    spec['reviewScale'] = 2.6
+    return spec
+
+
+# ---- A12. IjaWalkStabProne (ijaB): one stride cycle of the sweep -- walking, rifle low, he drives the bayonet down into a
+# body lying at his left front and pulls it out without breaking step.
+RA_WS_T = RaF(40)                  # 1.667 s: four steps of 0.40 m
+RA_WS_STAB = RaF(17)               # 0.708 the blade in
+RA_WS_OUT = RaF(23)                # 0.958 out
+RA_WS_STRIDE = 1.60                # runtime m a cycle
+RA_WS_TARGET = (.34, .25, -1.36)   # runtime m, three.js axes, his root at the stab: the back of the body (0.25 m up), left front
+Meta('IjaWalkStabProne', RA_WS_T, False, 'twoHand', role='ijaB', rig='TengxianIja01', rigs=['TengxianIja01', 'TengxianIja02'],
+     props=['weapon'], rootMotion=True, weaponState='twoHand', referenceSpeedMps=round(RA_WS_STRIDE / RA_WS_T, 3),
+     contacts=[{'t': RA_WS_STAB, 'limb': 'blade', 'action': 'stab', 'target': 'body'},
+               {'t': RA_WS_OUT, 'limb': 'blade', 'action': 'release'}],
+     events=[{'t': RA_WS_STAB, 'kind': 'stab', 'cue': 'bayonetStabBody', 'atM': list(RA_WS_TARGET)}, {'t': RA_WS_OUT, 'kind': 'pull'}],
+     prev=['IjaWalkStabProne', 'IjaReadyRifle'], next=['IjaWalkStabProne', 'IjaStompStabTwist'],
+     notes='2026-10-11 redraft P1 (N09, "每经过一具趴着的国军，就往背上扎一刀，拔出来，脚下不停"): one walking cycle, 1.6 m straight '
+           'ahead in 1.667 s (root motion; the last frame is the first moved 1.6 m forward), rifle with the bayonet fixed carried '
+           'low. At 0.708 s (stab) the blade goes 7 cm into the back of a body lying at his left front: the back at event atM '
+           '(runtime m, three.js axes, from his root at that instant: 0.34 m left, 0.25 m up, 1.36 m ahead) -- the director times '
+           'the cycle so a body of sweep.bodies is there; out at 0.958 s, back to the carry. Spawn him with bayonetFixed.')
+
+
+@Builder('IjaWalkStabProne')
+def RaBuildWalkStab(T, name):
+    H, P, A, SX = T.H, T.P, T.A, T.SX
+    D = RA_WS_T
+    stride = T.R(RA_WS_STRIDE)
+    base = IjaABase(T)
+    base.update({'handRel.L': None, 'handRel.R': None, 'bend': .18, 'pelvisTilt': (.06, 0, 0), 'head': (.18, 0, 0),
+                 'foot.L': (0, 6, 0), 'foot.R': (0, -6, 0)})
+    p0 = base['pelvis']
+    v = stride / D
+    pelY = lambda t: p0[1] - v * t
+    bob = lambda t: -.018 * (1 - math.cos(Tau * 2 * t / D)) / 2
+    pelXY = lambda t: (p0[0], pelY(t))
+    q = stride / 4
+    start = dict(base)
+    start['ankle.L'] = (H + .03, p0[1] - q * .5, A)
+    start['ankle.R'] = (-(H + .03), p0[1] + q * .5, A)
+    steps = [('R', RaF(1), RaF(10)), ('L', RaF(11), RaF(20)), ('R', RaF(21), RaF(30)), ('L', RaF(31), RaF(40))]
+    stance = {'L': (H + .03, -q * .5), 'R': (-(H + .03), -q * .5)}
+    feet, plants = WrPath(T, start, pelXY, lambda t: 0.0, steps, stance, lambda side, t: (H + .22, .95, .45), D, lift=.07, toeOut=(6.0, -6.0))
+    anim = Tracks(start, dict(feet, **{
+        'pelvis': WrDense(lambda t: (p0[0], pelY(t), p0[2] + bob(t)), D),
+        'twist': [(0.0, 0.0), (RaF(12), -.08), (RA_WS_STAB, .10), (RA_WS_OUT, .04), (D, 0.0)],
+        'bend': [(0.0, .18), (RaF(12), .16), (RA_WS_STAB, .42), (RA_WS_OUT, .30), (RaF(32), .18), (D, .18)],
+        'head': [(0.0, (.18, 0, 0)), (RA_WS_STAB, (.40, 0, .10)), (RaF(32), (.18, 0, 0)), (D, (.18, 0, 0))],
+    }), lag={'head': .05})
+    carry = T.Rifle((-(H + .02), p0[1] - .12, P + .20), Unit((.12, -.92, -.38)))
+    tip = T.R(RA_TIP_M)
+    # the target in the clip frame: from his root at the stab (the root is the pelvis's ground point)
+    tgt = Vector((-T.R(RA_WS_TARGET[0]), pelY(RA_WS_STAB) + T.R(RA_WS_TARGET[2]), T.R(RA_WS_TARGET[1] - .07)))
+
+    def Carry(t):
+        o = Vector(carry['origin']) + Vector((0, pelY(t) - p0[1], bob(t)))
+        return T.Rifle(tuple(o), carry['axis'])
+
+    def Stabbed(hand):
+        ax = (tgt - hand).normalized()
+        return T.Rifle(tuple(tgt - ax * tip), tuple(ax))
+
+    def RifleAt(t):
+        c = Carry(t)
+        if RA_WS_STAB <= t <= RA_WS_OUT:
+            return Stabbed(Vector(c['gripR']) + Vector((T.R(.02), -T.R(.08), T.R(.05))))
+        w = Smooth((t - RaF(11)) / (RA_WS_STAB - RaF(11))) if t < RA_WS_STAB else 1 - Smooth((t - RA_WS_OUT) / RaF(7))
+        s = Stabbed(Vector(c['gripR']) + Vector((T.R(.02), -T.R(.08), T.R(.05))))
+        o = Vector(c['origin']).lerp(Vector(s['origin']), w)
+        a = Vector(c['axis']).lerp(Vector(s['axis']), w).normalized()
+        return T.Rifle(tuple(o), tuple(a))
+
+    def Pose(t):
+        f = anim(t)
+        r = RifleAt(t)
+        palms = T.Palms(r['axis'])
+        f['grip.R'], f['grip.L'] = r['gripR'], r['gripL']
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+        f['armPole.R'] = (-(SX + .55), pelY(t) + .30, P + .15)
+        f['armPole.L'] = (SX + .45, pelY(t) - .20, P)
+        f['look'] = tuple(tgt) if t < RaF(30) else None
+        f['lookW'] = .8
+        return T.Nest(f)
+    spec = {'pose': Pose, 'props': lambda t: {'weapon': T.Track(RifleAt(t))}, 'plants': plants,
+            'check': lambda t: {'R': RifleAt(t)['gripR'], 'L': RifleAt(t)['gripL']},
+            'reach': {'fraction': .86, 'travel': .10, 'bend': .35},
+            'reviewProps': lambda t: [('cyl', RifleAt(t)['butt'], tuple(Vector(RifleAt(t)['gripR']) + Vector(RifleAt(t)['axis']) * tip), .015),
+                                      ('box', tuple(tgt + Vector((0, -T.R(.30), -T.R(.10)))), (T.R(.45), T.R(1.6), T.R(.25)), 0)],
+            'reviewFrames': lambda n: [0, 10, 14, 17, 20, 23, 30, n - 1]}
+    spec['reviewViews'] = [('side', lambda t: (-3.4, pelY(t) - .4, 1.0), lambda t: (0, pelY(t) - .4, .6)),
+                           ('q', lambda t: (-2.3, pelY(t) - 3.0, 1.8), lambda t: (0, pelY(t) - .5, .5))]
+    spec['reviewScale'] = 3.0
+    return spec
+
+
+# ---- A13. IjaGrenadeKnockThrow (ijaC): against the corner wall, a Type 91 off the belt, the pin pulled, knocked on the
+# helmet, held a beat, lobbed round the corner to his left, ducks back.
+RA_G_T = RaF(72)                   # 3.0 s
+RA_G_PIN = RaF(14)                 # 0.583
+RA_G_KNOCK = RaF(24)               # 1.0
+RA_G_THROW = RaF(50)               # 2.083 (held 1.08 s: "停了一拍")
+RA_G_FLIGHT = RaF(20)              # 0.833 to 6 m round the corner, then hidden (the blast is the director's, dropIn.foldBlast)
+Meta('IjaGrenadeKnockThrow', RA_G_T, False, 'track', role='ijaC', rig='TengxianIja02', rigs=['TengxianIja01', 'TengxianIja02'],
+     props=['weapon', 'grenade'], rootMotion=False, weaponState='slungBack', env={'wallLeftM': .30},
+     contacts=[{'t': RaF(8), 'limb': 'handR', 'action': 'grab', 'target': 'grenade'},
+               {'t': RA_G_PIN, 'limb': 'handL', 'action': 'pull', 'target': 'grenade', 'part': 'pin'},
+               {'t': RA_G_KNOCK, 'limb': 'handR', 'action': 'knock', 'target': 'helmet'},
+               {'t': RA_G_THROW, 'limb': 'handR', 'action': 'release', 'target': 'grenade'}],
+     events=[{'t': RaF(8), 'kind': 'draw'}, {'t': RA_G_PIN, 'kind': 'pin', 'cue': 'grenadePin'},
+             {'t': RA_G_KNOCK, 'kind': 'knock', 'cue': 'grenadeKnock'}, {'t': RA_G_THROW, 'kind': 'throw', 'cue': 'grenadeThrow'},
+             {'t': RA_G_THROW + RA_G_FLIGHT, 'kind': 'grenadeOut'}],
+     prev=['IjaReadyRifle'], next=['IjaJunctionPeek', 'IjaReadyRifle'],
+     notes='2026-10-11 redraft P1 (N08, "从腰上摸出一颗手榴弹，拔销，往钢盔上一磕——当——捏在手里停了一拍才甩过折角"): his '
+           'rifle slung across his back; the corner wall on his left (env wallLeftM 0.30, its edge 0.35 m ahead of his root). '
+           'Right hand to the belt pouch, the Type 91 out (0.33 s, grenade track from frame 0 at the belt); the left fingers pull '
+           'the pin (0.583 s); knocked on the crown of his helmet (knock 1.0 s); held a beat at his chest; a side-arm lob round the '
+           'corner to his left (throw 2.083 s: the track flies 0.83 s, ~6 m to his left front, then hides; the blast is '
+           'dropIn.foldBlast); he ducks back against the wall. Type 91 placeholder: segmented cylinder 0.05 x 0.095 m, axis toward '
+           'the fuse cap.')
+
+
+@Builder('IjaGrenadeKnockThrow')
+def RaBuildGrenadeKnock(T, name):
+    H, P, A, SX, SZ, HD = T.H, T.P, T.A, T.SX, T.SZ, T.HD
+    D = RA_G_T
+    base = Standing(T)
+    base.update({'pelvis': Add3(base['pelvis'], (-.03, 0, -.05)), 'bend': .16, 'lean': .05,
+                 'ankle.L': (H + .00, -.06, A), 'ankle.R': (-(H + .08), .10, A), 'foot.L': (0, 4, 0), 'foot.R': (0, -20, 0)})
+    belt = (-(H + .02), -.16, P + .04)
+    crown = (-.02, -.06, HD + T.R(.20))
+    held = (-.12, -.36, SZ - .15)
+    wind = (-(SX + .20), .10, SZ + .05)
+    out = (SX + .05, -.62, SZ + .05)
+    pathR = RaChan([(0.0, (-(SX + .02), .0, P - .05)), (RaF(6), belt), (RaF(9), belt), (RaF(13), held), (RA_G_PIN + RaF(2), held),
+                    (RaF(21), Add3(crown, (0, 0, .10))), (RA_G_KNOCK, crown), (RaF(28), Add3(crown, (-.02, -.08, .04))),
+                    (RaF(34), held), (RaF(43), held), (RaF(47), wind), (RA_G_THROW, out), (RaF(56), Add3(out, (.02, .05, -.25))),
+                    (RaF(64), (-(SX + .02), -.02, P - .05)), (D, (-(SX + .02), .0, P - .05))])
+    pathL = RaChan([(0.0, (SX + .02, .0, P - .05)), (RaF(9), (SX + .02, .0, P - .05)), (RaF(13), Add3(held, (.08, -.02, .02))),
+                    (RA_G_PIN, Add3(held, (.10, -.02, .03))), (RaF(18), Add3(held, (.22, .02, -.08))), (RaF(24), (SX + .02, -.06, P + .02)),
+                    (RaF(44), (SX + .02, -.06, P + .02)), (RA_G_THROW, (SX + .02, -.20, SZ - .25)), (RaF(62), (SX + .02, -.04, P)),
+                    (D, (SX + .02, .0, P - .05))])
+    anim = Tracks(base, {
+        'bend': [(0.0, .16), (RaF(9), .26), (RA_G_KNOCK, .10), (RaF(34), .20), (RaF(46), .16), (RA_G_THROW, .30), (RaF(62), .35), (D, .25)],
+        'twist': [(0.0, 0.0), (RaF(9), -.15), (RA_G_KNOCK, 0.0), (RaF(46), -.45), (RA_G_THROW, .45), (RaF(60), .20), (D, 0.0)],
+        'head': [(0.0, (.05, 0, .30)), (RaF(10), (.40, 0, 0)), (RA_G_PIN, (.40, 0, 0)), (RA_G_KNOCK, (.10, 0, 0)),
+                 (RaF(40), (.05, 0, .45)), (RA_G_THROW, (.0, 0, .55)), (RaF(62), (.15, 0, .20)), (D, (.10, 0, .30))],
+        'pelvis': [(0.0, base['pelvis']), (RaF(46), base['pelvis']), (RA_G_THROW, Add3(base['pelvis'], (.02, -.03, .01))),
+                   (RaF(62), Add3(base['pelvis'], (-.03, .02, -.06))), (D, Add3(base['pelvis'], (-.01, .01, -.05)))],
+    }, lag={'head': .05})
+
+    def Pose(t):
+        f = anim(t)
+        f['handRel.L'] = f['handRel.R'] = None
+        f['hand.R'], f['hand.L'] = pathR(t), pathL(t)
+        f['palmF.R'], f['palmN.R'] = (0, -.3, .95), (.95, 0, .2)
+        f['curl.R'] = .5 if t < RaF(7) else 1.05 if t < RA_G_THROW else Mix(1.05, .3, Smooth((t - RA_G_THROW) / RaF(2)))
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = (-.3, -.3, .9), (-.9, 0, .2), (.9 if RaF(12) < t < RaF(17) else .5)
+        f['armPole.R'] = (-(SX + .50), .20, P)
+        f['armPole.L'] = (SX + .45, .20, P)
+        return T.Nest(f)
+    sling = SlungProps(T)[0]
+    fly = {}
+
+    def Props(t):
+        o = sling(t)
+        if t < RaF(7):
+            o['grenade'] = (tuple(Vector(belt) + Vector((0, -T.R(.03), 0))), (0, 0, 1), (0, -1, 0), True)
+        elif t <= RA_G_THROW:
+            k, palmar, al = RaFist(T, 'R')
+            o['grenade'] = (tuple(k + palmar * T.R(.03)), tuple(al), tuple(palmar), True)
+            fly['p'] = o['grenade'][0]
+        elif t <= RA_G_THROW + RA_G_FLIGHT:
+            land = (T.R(4.5), -T.R(4.0), 0.0)
+            p = RaBallistic(fly.get('p') or out, land, RA_G_THROW, RA_G_THROW + RA_G_FLIGHT, T.R(1.2))(t)
+            spin = Quaternion((0, 1, 0), 12 * (t - RA_G_THROW))
+            o['grenade'] = (p, tuple(spin @ Vector((0, 0, 1))), tuple(spin @ Vector((0, -1, 0))), True)
+        else:
+            o['grenade'] = RaHidden()
+        return o
+    wallX = T.R(.30)
+    spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, D), ('R', 0, D)],
+            'walls': [((wallX, 0, 0), (-1, 0, 0), (0, -T.R(.35), 0), (0, 1, 0))],
+            'reviewProps': lambda t: [('box', (wallX + .03, .6, .9), (.06, 1.9, 1.8), 0)],
+            'reviewFrames': lambda n: [0, 8, 14, 24, 40, 47, 50, 56, n - 1]}
+    spec['reviewViews'] = RaViews(0, -.2, .9, 3.4, .9)
+    spec['reviewScale'] = 2.6
+    return spec
+
+
+# ---- A14. IjaDropInKneel / IjaDropInStand / IjaDropInPoint (IJA02; also baked on IJA01 and IJA03): off the 2 m north lip
+# into the trench. A shared jump (0-1.1 s), then a kneel aiming to his left, a stand aiming to his left, or a stand pointing.
+RA_DI_LIP = 2.0                    # runtime m: the lip over the landing floor
+RA_DI_EDGE = .55                   # runtime m behind the landing spot: the foot of the wall / the edge of the lip above
+RA_DI_OFF = RaF(9)                 # 0.375 off the lip
+RA_DI_LAND = RaF(22)               # 0.917 the boots on the floor
+RA_DI_DOWN = RaF(27)               # 1.125 the knees have taken it
+RA_DI = {'IjaDropInKneel': RaF(60), 'IjaDropInStand': RaF(56), 'IjaDropInPoint': RaF(80)}
+_RA_DI_NOTES = {
+    'IjaDropInKneel': 'turns to his left as he comes down onto the right knee and shoulders the rifle along the trench to his left '
+                      '(ready 1.75 s); 1.75-2.5 s hold loop aiming. (丙: the corner F to the east.)',
+    'IjaDropInStand': 'turns to his left as he straightens and holds the rifle at the low ready to his left (ready 1.67 s); '
+                      '1.67-2.33 s hold loop. (丁: the junction J.)',
+    'IjaDropInPoint': 'straightens facing into the trench, the rifle in the left hand at the trail, the right arm out with two '
+                      'fingers: first along the trench to his left (point1 1.67 s, far), then to his left front, lower (point2 2.33 s); '
+                      'the arm down by 2.75 s, 2.83-3.33 s hold loop. (甲 at the third lip.)',
+}
+for _name, _d in RA_DI.items():
+    _hold = {'IjaDropInKneel': [RaF(42), _d], 'IjaDropInStand': [RaF(40), _d], 'IjaDropInPoint': [RaF(68), _d]}[_name]
+    _events = [{'t': RA_DI_OFF, 'kind': 'jump'}, {'t': RA_DI_LAND, 'kind': 'land', 'cue': 'stompMud'}, {'t': RA_DI_DOWN, 'kind': 'absorbed'}]
+    if _name == 'IjaDropInPoint':
+        _events += [{'t': RaF(40), 'kind': 'point1', 'dirM': [-.99, 0, -.10]}, {'t': RaF(56), 'kind': 'point2', 'dirM': [-.75, -.25, -.60]}]
+    else:
+        _events += [{'t': _hold[0], 'kind': 'ready'}]
+    Meta(_name, _d, False, 'track', role='ijaDrop', rig='TengxianIja02', rigs=['TengxianIja01', 'TengxianIja02', 'TengxianIja03'],
+         props=['weapon'], rootMotion=True, holdLoop=_hold, weaponState='twoHand' if _name != 'IjaDropInPoint' else 'oneHandLeft',
+         events=_events, next=['IjaReadyRifle', 'IjaCornerFire'],
+         notes='2026-10-11 redraft P1 (N07, "沟沿上冒出四五把刺刀尖……下一秒人就跳了下来"): the root is the LANDING spot on the trench '
+               'floor; frame 0 stands on the lip 2.0 m up (the lip\'s edge 0.55 m behind the root, he faces into the trench, '
+               'forward = clip -z), rifle at the port. Crouch, jump (off 0.375 s), drops 2 m (the boots down 0.917 s, knees taken '
+               'it 1.125 s; the frames in the air are not grounded), then ' + _RA_DI_NOTES[_name] + ' Contract dropIn.lip[0..2]: '
+               'place the root at the lip\'s floor below, facing south (into the trench).')
+
+
+def RaYaw(f, psi):
+    """The whole body-frame pose turned by psi about its pelvis (every authored point turns with it; contrast Turned)."""
+    if abs(psi) < 1e-9:
+        return f
+    c = f['pelvis']
+    sx, sy = _Rot(c[0], c[1], psi)
+    f['frameYaw'], f['frameShift'] = psi, (c[0] - sx, c[1] - sy)
+    # grips are world targets (Toolkit.Nest pins them after the pose; framedGrips takes them into the frame for the first pass):
+    # the body-frame grips are carried out to the world here, their palm hints stay in the frame (Nest turns them)
+    for side in LR:
+        g = f.get('grip.' + side)
+        if g is not None:
+            x, y = _Rot(g[0], g[1], psi)
+            f['grip.' + side] = (x + c[0] - sx, y + c[1] - sy, g[2])
+    f['framedGrips'] = True
+    return f
+
+
+def RaDropRifle(T, P):
+    return T.Rifle((-(T.H + .02), -.16, P + .30), Unit((.40, -.70, .60)))
+
+
+def RaDropBuild(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D = RA_DI[name]
+    top, edge = T.R(RA_DI_LIP), T.R(RA_DI_EDGE)
+    off, land, down = RA_DI_OFF, RA_DI_LAND, RA_DI_DOWN
+    base = IjaABase(T)
+    base.update({'handRel.L': None, 'handRel.R': None, 'bend': .12})
+    y0 = edge + T.R(.22)                              # standing on the lip, 0.22 m back from its edge
+    p0 = base['pelvis']
+    hold = CLIPS[name]['holdLoop']
+    zTop = lambda: top
+    # the pelvis: crouch on the lip, the jump (a parabola), the landing absorbed, then the variant's height
+    endZ = {'IjaDropInKneel': T.K['kneelPelvisZ'] + .04, 'IjaDropInStand': P - .07, 'IjaDropInPoint': P - .05}[name]
+    endY = {'IjaDropInKneel': T.K['kneelPelvisY'] - .05, 'IjaDropInStand': .0, 'IjaDropInPoint': .02}[name]
+    pY = WrChannel([(0.0, y0 + p0[1]), (RaF(5), y0 + p0[1] + .02), (off, y0 + p0[1] - .05), (land, .03), (down, .05), (RaF(34), endY), (D, endY)])
+    pZ0 = WrChannel([(0.0, top + p0[2]), (RaF(5), top + p0[2] - .16), (RaF(8), top + p0[2] - .10), (off, top + p0[2] - .02)])
+    pZ1 = WrChannel([(land, P - .10), (down, P - .40), (RaF(30), P - .32), (RaF(36), endZ), (D, endZ)])
+
+    def PZ(t):
+        if t <= off:
+            return pZ0(t)
+        if t < land:
+            u = (t - off) / (land - off)
+            a, b = top + p0[2] - .02, P - .10
+            return a + (b - a) * u + T.R(.20) * 4 * u * (1 - u) - T.R(.40) * u * u * (1 - u)
+        return pZ1(t)
+    # the feet: on the lip, tucked in the air, on the floor; the kneel brings the right knee down after the landing
+    stanceL, stanceR = (H + .04, y0 - .04, top + A), (-(H + .04), y0 + .06, top + A)
+    landL, landR = (H + .07, -.06, A), (-(H + .07), .08, A)
+    tuck = lambda s, t: Add3((0, PYfn(t), PZ(t)), ((H + .06) * (1 if s == 'L' else -1), -.12, -.48))
+    PYfn = pY
+    kneel = KneelFlat(T, 0.0, 0.0)
+    footR = {'IjaDropInKneel': kneel['ankle.R'], 'IjaDropInStand': (-(H + .04), .10, A), 'IjaDropInPoint': (-(H + .03), .08, A)}[name]
+    footL = {'IjaDropInKneel': (H + .08, -.40, A), 'IjaDropInStand': (H + .04, -.10, A), 'IjaDropInPoint': (H + .04, -.06, A)}[name]
+
+    def Ankle(s, t):
+        a0, a1 = (stanceL, landL) if s == 'L' else (stanceR, landR)
+        if t <= off - RaF(1):
+            return a0
+        if t < land:
+            u = Smooth((t - (off - RaF(1))) / RaF(3))
+            mid = tuck(s, t)
+            v = Smooth((t - (land - RaF(4))) / RaF(4))
+            return Lerp3(Lerp3(a0, mid, u), a1, v)
+        if t < down + RaF(2):
+            return a1
+        w = Smooth((t - down - RaF(2)) / RaF(8))
+        return Lerp3(a1, footL if s == 'L' else footR, w)
+    turnTo = {'IjaDropInKneel': math.pi / 2, 'IjaDropInStand': math.pi / 2, 'IjaDropInPoint': 0.0}[name]
+    turn = WrChannel([(0.0, 0.0), (down, 0.0), (RaF(36), turnTo), (D, turnTo)])
+    aim = AimRifle(T, 2.0)
+    low = LowReady(T)
+    port = RaDropRifle(T, P)
+
+    def Rifle(t):
+        """In the body frame (RaYaw turns it), riding the pelvis -- port arms through the jump, then the variant's."""
+        shift = (0, pY(t) - p0[1], PZ(t) - p0[2])
+        if t <= down:
+            return T.Rifle(Add3(port['origin'], shift), port['axis'])
+        w = Smooth((t - down) / (RaF(36) - down))
+        if name == 'IjaDropInKneel':
+            to = aim
+        elif name == 'IjaDropInStand':
+            to = low
+        else:
+            to = T.Rifle((T.H + .10, -.02, P - .10), Unit((.05, -.35, .94)))
+        return T.Rifle(Add3(Lerp3(port['origin'], to['origin'], w), shift), Unit(Lerp3(port['axis'], to['axis'], w)))
+
+    def Pose(t):
+        f = dict(base)
+        f['pelvis'] = (p0[0], pY(t), PZ(t))
+        air = Bump(t, off - RaF(2), land + RaF(4))
+        f['bend'] = .12 + .30 * Bump(t, 0.0, off + RaF(2)) + .10 * air + .35 * Bump(t, land - RaF(2), RaF(36))
+        f['pelvisTilt'] = (.06 + .20 * Bump(t, land - RaF(2), RaF(34)), 0, 0)
+        for s in LR:
+            f['ankle.' + s] = Ankle(s, t)
+            f['legPole.' + s] = Add3(f['ankle.' + s], ((H + .25) * (1 if s == 'L' else -1), -1.0, .55))
+            f['foot.' + s] = (10 * air, 6 if s == 'L' else -8, 0)
+        if name == 'IjaDropInKneel' and t > down:
+            w = Smooth((t - down - RaF(2)) / RaF(8))
+            f['legPole.R'] = Lerp3(f['legPole.R'], kneel['legPole.R'], w)
+            f['foot.R'] = (Mix(0, kneel['foot.R'][0], w), -8, 0)
+        if name == 'IjaDropInKneel' and t > down:
+            # shouldering: the hips and chest turn the right shoulder back (AimStance's), the cheek onto the stock
+            w = Smooth((t - down) / (RaF(36) - down))
+            f['pelvisTilt'] = (f['pelvisTilt'][0], 0, -.45 * w)
+            f['twist'] = -.12 * w
+            f['neck'] = (.06 * w, -.05 * w, .20 * w)
+        r = Rifle(t)
+        palms = T.Palms(r['axis'])
+        f['grip.R'] = r['gripR'] if name != 'IjaDropInPoint' or t < RaF(30) else None
+        f['grip.L'] = r['gripL'] if name != 'IjaDropInPoint' or t < RaF(30) else T.Along(r, .62)
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+        dz = PZ(t) - p0[2]
+        f['armPole.R'] = (-(SX + .50), pY(t) + .20, P + .10 + dz)
+        f['armPole.L'] = (SX + .40, pY(t) - .10, P + dz)
+        f['head'] = (.25 * air + .10, 0, 0)
+        if name == 'IjaDropInKneel' and t > down:
+            w = Smooth((t - down) / (RaF(36) - down))
+            f['head'] = Lerp3(f['head'], (.12, -.14, .42), w)
+        if name == 'IjaDropInPoint' and t >= RaF(30):
+            # the right arm out, two fingers: point1 along the trench to his left, point2 to his left front, lower
+            p1, p2 = (SX + .20, -.58, SZ + .05 + dz), (.02, -.62, SZ - .20 + dz)
+            rest = (-(SX + .02), -.06, P - .08 + dz)
+            path = RaChan([(RaF(30), rest), (RaF(38), p1), (RaF(46), p1), (RaF(54), p2), (RaF(62), p2), (RaF(66), rest), (D, rest)])
+            f['grip.R'] = None
+            f['hand.R'] = path(t)
+            out = Smooth((t - RaF(32)) / RaF(4)) * (1 - Smooth((t - RaF(62)) / RaF(4)))
+            f['palmF.R'] = Unit(Lerp3((0, -.2, -1), (1, -.2, 0) if t < RaF(50) else (.6, -.6, -.3), out))
+            f['palmN.R'] = Unit(Lerp3((1, 0, 0), (0, 0, -1), out))
+            f['curl.R'] = Mix(.5, .9, out)
+            f['index.R'] = Mix(.5, .0, out)
+            f['armPole.R'] = (-(SX + .30), .40, SZ - .40 + dz)
+            f['head'] = (.0, 0, .55 * out if t < RaF(50) else .35 * out)
+            f['twist'] = (.50 if t < RaF(50) else .25) * out
+        if hold and t > hold[0] - .2:
+            b = WrBreath(t, hold[0], hold[1] - hold[0], per=1, ease=.2)
+            f['bend'] += .01 * b
+        return T.Nest(RaYaw(f, turn(t)))
+
+    def Props(t):
+        r = Rifle(t)
+        c = (p0[0], pY(t))
+        o = Vector(r['origin'])
+        ox, oy = _Rot(o.x - c[0], o.y - c[1], turn(t))
+        a = Vector(r['axis'])
+        ax, ay = _Rot(a.x, a.y, turn(t))
+        return {'weapon': ((ox + c[0], oy + c[1], o.z), (ax, ay, a.z), (0, 0, 1), True)}
+    lipGround = lambda x, y, t: top if y > edge else 0.0
+    spec = {'pose': Pose, 'props': Props, 'ground': lipGround, 'reach': {'fraction': .86, 'travel': .08, 'bend': .30},
+            'check': lambda t: {'R': Rifle(t)['gripR']} if t <= down else {},
+            'groundWeight': lambda t: max(1 - Smooth((t - (off - RaF(2))) / RaF(2)), Smooth((t - (land - RaF(1))) / RaF(1))),
+            'plants': [('L', 0, off - RaF(2)), ('R', 0, off - RaF(2)), ('L', down + RaF(12), D), ('R', down + RaF(12), D)],
+            'reviewProps': lambda t: [('box', (0, edge + .8, top / 2), (2.0, 1.6, top), 0)],
+            'reviewFrames': lambda n: [0, 5, 9, 14, 18, 22, 27, 36, n - 1] + ([40, 56] if name == 'IjaDropInPoint' else [])}
+    spec['reviewViews'] = [('side', (-4.2, .2, 1.6), (0, .2, 1.4)), ('q', (-3.0, -3.4, 2.8), (0, .1, 1.2))]
+    spec['reviewScale'] = 4.0
+    if name == 'IjaDropInKneel':
+        spec['kneePlants'] = [('R', RaF(42), D)]
+    return spec
+
+
+for _name in RA_DI:
+    Builder(_name)(lambda T, name: RaDropBuild(T, name))
+
+
+# ---- A15. IjaProneLmgOnCorpse (IJA01, the gunner) and IjaKneelLoadLmg (IJA03, the loader): the Type 11 on the corpses heaved
+# onto the south lip, bursts toward the rear trench. Authored on a slope: the gunner lies up the south wall, his chest at
+# the lip, the bipod on the upper corpse's back 0.55 m over his elbows.
+RA_LMG_T = RaF(48)                 # 2.0 s hold loop (whole clip)
+RA_LMG_BURSTS = (RaF(10), RaF(13)) # 0.417 / 0.542: two rounds
+RA_LMG_SLOPE = 35.0                # deg: the wall face he lies on
+Meta('IjaProneLmgOnCorpse', RA_LMG_T, False, 'track', role='bunkerGunner', rig='TengxianIja01', rigs=['TengxianIja01'],
+     props=['type11'], rootMotion=False, holdLoop=[0.0, RA_LMG_T],
+     events=[{'t': RA_LMG_BURSTS[0], 'kind': 'burst', 'cue': 'type11'}, {'t': RA_LMG_BURSTS[1], 'kind': 'shot'}],
+     next=[],
+     notes='2026-10-11 redraft P1 (N12 / contract §1.7, "机枪手把歪把子的两脚架往上面那具的背上一架，趴下"): lying face down up '
+           'the south wall face (a 35 deg slope rising ahead of him, his hips at the root, the chest 0.6 m up), both elbows on the '
+           'slope, the Type 11 shouldered, its bipod resting 0.55 m over his elbows (the upper corpse\'s back), aimed over the '
+           'lip (clip forward, 5 deg up). 2.0 s hold loop: a two-round burst (0.417, 0.542 s) with the recoil through the shoulder '
+           'and head; the director restarts the loop every 3-6 s (contract: one burst each time). type11 track: actor-weapon '
+           'convention (origin right-hand grip, axis muzzle, up top), the gun 1.1 m, bipod 0.3 m.')
+Meta('IjaKneelLoadLmg', RaF(60), False, 'free', role='bunkerLoader', rig='TengxianIja03', rigs=['TengxianIja03'], props=['clipA'],
+     rootMotion=False, holdLoop=[0.0, RaF(60)],
+     events=[{'t': RaF(14), 'kind': 'pouch'}, {'t': RaF(34), 'kind': 'load', 'what': 'hopper'}],
+     next=[],
+     notes='2026-10-11 redraft P1 (N12, "副射手跪在旁边压弹"): kneeling on both knees at the foot of the slope, at the gunner\'s right '
+           '(the hopper on the gun\'s left: he reaches across, over the gun, 0.46 m ahead and 0.26 m left of his root, 0.80 m up). 2.5 s '
+           'loop: a charger out of the pouch on his belt (0.58 s, clipA in his right hand), pressed into the hopper with both hands '
+           '(load 1.42 s), back. The director places him 0.8 m right of the gunner\'s hips.')
+
+
+@Builder('IjaProneLmgOnCorpse')
+def RaBuildProneLmg(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D = RA_LMG_T
+    slope = math.radians(RA_LMG_SLOPE)
+    local, pivot = RaProneLocal(T)
+    local.update({'head': (-.35, 0, 0), 'neck': (-.25, 0, 0), 'bend': .05})
+    R = Matrix.Rotation(math.pi / 2 - slope, 3, 'X')
+    # the chest up the slope: the body lies along a line rising at `slope` ahead of the hips
+    pelvisAt = Vector((0, T.R(.08), T.R(.24)))
+    recoil = RaChan([(0.0, 0.0), (RA_LMG_BURSTS[0], 0.0), (RA_LMG_BURSTS[0] + RaF(1), 1.0), (RA_LMG_BURSTS[1], .3),
+                     (RA_LMG_BURSTS[1] + RaF(1), 1.0), (RaF(18), .2), (RaF(24), 0.0), (D, 0.0)])
+    up = Vector((0, -math.cos(slope), math.sin(slope)))      # along the slope, ahead and up
+    norm = Vector((0, math.sin(slope), math.cos(slope)))     # out of the slope
+    shoulder = pelvisAt + up * T.R(.48) + norm * T.R(.10)
+
+    def Gun(t):
+        k = recoil(t)
+        axis = Unit((0, -math.cos(math.radians(5)), math.sin(math.radians(5))))
+        grip = shoulder + Vector((-T.R(.12), -T.R(.10), T.R(.10))) + Vector((0, T.R(.03) * k, 0))
+        return T.Rifle(tuple(grip), axis)
+
+    def Pose(t):
+        f = RaRotatePose(dict(local), R, pivot, pelvisAt)
+        k = recoil(t)
+        g = Gun(t)
+        a = Vector(g['axis'])
+        f.update({'ankle.L': tuple(pelvisAt + Vector((H + .10, .78, -.05))), 'ankle.R': tuple(pelvisAt + Vector((-(H + .14), .80, -.08))),
+                  'legPole.L': (H + .30, .40, -.6), 'legPole.R': (-(H + .30), .40, -.6),
+                  'toeDir.L': Unit((.2, .7, -.6)), 'toeDir.R': Unit((-.2, .7, -.6)), 'handRel.L': None, 'handRel.R': None})
+        f['grip.R'] = g['gripR']
+        f['grip.L'] = tuple(Vector(g['gripR']) + a * T.R(.22) + Vector((T.R(.06), 0, -T.R(.04))))
+        palms = T.Palms(tuple(a))
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .9
+        f['armPole.R'] = tuple(shoulder + Vector((-.6, .1, -.4)))
+        f['armPole.L'] = tuple(shoulder + Vector((.6, .1, -.4)))
+        f['head'] = Add3(f['head'], (.05 * k, 0, 0))
+        return T.Nest(f)
+
+    def Props(t):
+        g = Gun(t)
+        return {'type11': (g['origin'], g['axis'], (0, 0, 1), True)}
+    bip = lambda t: tuple(Vector(Gun(t)['gripR']) + Vector(Gun(t)['axis']) * T.R(.55))
+    spec = {'pose': Pose, 'props': Props, 'plants': [],
+            'ground': lambda x, y, t: max(0.0, (-y) * math.tan(slope)) if y < 0 else 0.0,
+            'reviewProps': lambda t: [('cyl', Gun(t)['butt'], tuple(Vector(Gun(t)['gripR']) + Vector(Gun(t)['axis']) * T.R(.85)), .03),
+                                      ('point', bip(t), None, .05),
+                                      ('poly', [(-1, 0, 0), (1, 0, 0), (1, -1.6, 1.6 * math.tan(slope)), (-1, -1.6, 1.6 * math.tan(slope))], None, 0)],
+            'reviewFrames': lambda n: [0, 10, 11, 14, 24]}
+    spec['reviewViews'] = [('side', (-3.2, -.4, .9), (0, -.4, .5)), ('q', (-2.2, 2.2, 1.8), (0, -.4, .4))]
+    spec['reviewScale'] = 2.6
+    return spec
+
+
+@Builder('IjaKneelLoadLmg')
+def RaBuildKneelLoad(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D = RaF(60)
+    f0 = Standing(T)
+    f0.update(KneelFeet(T, KneelFlat(T, 0.0, 0.0, sit=.25)))
+    f0.update({'bend': .30, 'pelvisTilt': (.10, 0, 0), 'twist': .25, 'head': (.25, 0, .25), 'handRel.L': None, 'handRel.R': None})
+    hopper = (T.R(.26), -T.R(.46), T.R(.80))
+    pouch = (-(H + .06), -.14, T.K['kneelPelvisZ'] + .02)
+    pathR = RaChan([(0.0, Add3(hopper, (-.10, .05, -.10))), (RaF(8), pouch), (RaF(14), pouch), (RaF(26), Add3(hopper, (-.06, .02, .08))),
+                    (RaF(34), hopper), (RaF(42), hopper), (RaF(50), Add3(hopper, (-.10, .05, -.10))), (D, Add3(hopper, (-.10, .05, -.10)))])
+    pathL = RaChan([(0.0, Add3(hopper, (.06, .04, -.12))), (RaF(28), Add3(hopper, (.06, .04, -.12))), (RaF(34), Add3(hopper, (.04, .0, .02))),
+                    (RaF(44), Add3(hopper, (.04, .0, .02))), (RaF(52), Add3(hopper, (.06, .04, -.12))), (D, Add3(hopper, (.06, .04, -.12)))])
+
+    def Pose(t):
+        f = dict(f0)
+        b = math.sin(Tau * t / D)
+        f['bend'] += .04 * Bump(t, RaF(26), RaF(44)) + .01 * b
+        f['twist'] += -.30 * Bump(t, RaF(2), RaF(22))
+        f['hand.R'], f['hand.L'] = pathR(t), pathL(t)
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = (0, -.4, -.9), (.9, 0, .1), .9
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = (.2, -.5, -.8), (-.6, 0, -.6), .5
+        f['armPole.R'] = (-(SX + .45), .10, P - .10)
+        f['armPole.L'] = (SX + .45, .10, P - .10)
+        f['look'] = hopper
+        f['lookW'] = .9
+        return T.Nest(f)
+
+    def Props(t):
+        if RaF(12) <= t <= RaF(38):
+            return {'clipA': RaInHand(T, 'R', .02, .02)}
+        return {'clipA': RaHidden()}
+    spec = {'pose': Pose, 'props': Props, 'plants': [], 'kneePlants': [('L', 0, D), ('R', 0, D)],
+            'reviewProps': lambda t: [('point', hopper, None, .04)],
+            'reviewFrames': lambda n: [0, 8, 14, 26, 34, 44]}
+    spec['reviewViews'] = RaViews(0, -.2, .5, 3.0, .9)
+    spec['reviewScale'] = 2.2
+    return spec

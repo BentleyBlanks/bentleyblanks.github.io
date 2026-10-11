@@ -71,7 +71,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // body, the rifle / badge / thumb beats at the captive wall.
       "YaowaCrouchCatchEat","ComradeEatBreadToss","ComradePourRoundsLaugh","ComradeCatchDropPick","HeHelmetSleepSitUp",
       "LiuDivideAmmoToss","IjaStompStabTwist","CorpseStabbedClaw","IjaInspectRifleBoltToss","IjaTearBadge",
-      "IjaThumbWoundTwist","CaptiveArchCaught"],
+      "IjaThumbWoundTwist","CaptiveArchCaught",
+      // ... and P1: Liu shoulders the crate, the walking stab, the corner grenade, the three drops into the trench, the machine-gun pair.
+      "LiuBoxUpGo","IjaWalkStabProne","IjaGrenadeKnockThrow","IjaDropInKneel","IjaDropInStand","IjaDropInPoint",
+      "IjaProneLmgOnCorpse","IjaKneelLoadLmg"],
   },
   // The NRA02 comrade is clean in SB01; the shell that buries him wounds him, and he is bloodied from the
   // black after it through the drag and the interrogation (2026-09-27 review: 「应该是在爆炸后才变得伤痕累累」).

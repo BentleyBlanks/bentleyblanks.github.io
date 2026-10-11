@@ -3933,7 +3933,7 @@
    "next": [
     "LiuDivideAmmoToss"
    ],
-   "notes": "2026-10-11 redraft (N01 \"\u5218\u6587\u8d22\u8e72\u5728\u4ed6\u811a\u8fb9\u7684\u5f39\u836f\u7bb1\u65c1\u5206\u5b50\u5f39\"; \"\u5218\u6587\u8d22\u6570\u51fa\u4e00\u5939\uff0c\u9694\u7740\u4e24\u4e2a\u4eba\u4e22\u8fc7\u6765\uff0c\u843d\u5728\u987a\u5b50\u817f\u4e0a\"): squatting, the open crate at his right hand (ammoBox track, static), the right hand takes chargers out of the crate into the left palm (0-2.0 s hold loop, one per second). Released: one more out of the crate (2.33 s), a look at Shunzi, an underhand lob over the heads (toss 3.0 s; the clipA track flies 0.583 s to the lap point of stage liuToss, atM runtime m in his frame, and lies there to the end); back to counting = frame 0 at 4.0 s."
+   "notes": "2026-10-11 redraft (N01 \"\u5218\u6587\u8d22\u8e72\u5728\u4ed6\u811a\u8fb9\u7684\u5f39\u836f\u7bb1\u65c1\u5206\u5b50\u5f39\"; \"\u5218\u6587\u8d22\u6570\u51fa\u4e00\u5939\uff0c\u9694\u7740\u4e24\u4e2a\u4eba\u4e22\u8fc7\u6765\uff0c\u843d\u5728\u987a\u5b50\u817f\u4e0a\"): squatting, the open crate in front of him to his right, its long side across (ammoBox track, static), the right hand takes chargers out of the crate into the left palm (0-2.0 s hold loop, one per second). Released: one more out of the crate (2.33 s), a look at Shunzi, an underhand lob over the heads (toss 3.0 s; the clipA track flies 0.583 s to the lap point of stage liuToss, atM runtime m in his frame, and lies there to the end); back to counting = frame 0 at 4.0 s."
   },
   "CorpseStabbedClaw": {
    "duration": 3.5,
@@ -4340,6 +4340,406 @@
     "IjaReadyRifle"
    ],
    "notes": "2026-10-11 redraft (N13): ijaB at the kneeling comrade's left (stage thumbWound), rifle slung across his back. Bends in, the right hand onto the front of the man's left shoulder, the thumb in the wound (press 0.583 s); screws it in -- the hand turns 30 deg each way about the press (twist 0.833 s) -- leaning his weight on it, the left hand on his own knee; lets go (1.75 s) and straightens (2.5 s)."
+  },
+  "LiuBoxUpGo": {
+   "duration": 2.5,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "liuwencai",
+   "rig": "TengxianNra05",
+   "rigs": [
+    "TengxianNra05"
+   ],
+   "props": [
+    "ammoBox"
+   ],
+   "rootMotion": false,
+   "contacts": [
+    {
+     "t": 0.4166666666666667,
+     "limb": "handR",
+     "action": "slap",
+     "target": "ammoBox"
+    },
+    {
+     "t": 0.8333333333333334,
+     "limb": "handsLR",
+     "action": "grab",
+     "target": "ammoBox"
+    },
+    {
+     "t": 1.8333333333333333,
+     "limb": "shoulderR",
+     "action": "carry",
+     "target": "ammoBox"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.4166666666666667,
+     "kind": "slam",
+     "what": "lidShut"
+    },
+    {
+     "t": 1.0833333333333333,
+     "kind": "lift"
+    },
+    {
+     "t": 1.8333333333333333,
+     "kind": "shouldered"
+    }
+   ],
+   "prev": [
+    "LiuDivideAmmoToss"
+   ],
+   "next": [],
+   "notes": "2026-10-11 redraft P1 (N03 \"\u5218\u6587\u8d22\u556a\u5730\u6263\u4e0a\u5f39\u836f\u7bb1\uff0c\u625b\u8d77\u6765\u5c31\u8d70\"): frame 0 = LiuDivideAmmoToss frame 0 (squatting, the open crate at his right hand). The right hand slaps the lid shut (slam 0.417 s: the director swaps the crate to the closed node, MilitaryCrateClosed), both hands take the crate by its ends (0.83 s), he stands it up off the floor (1.08 s) and swings it onto his right shoulder (1.83 s), the right hand over it, stands up (2.5 s). ammoBox track throughout. No root motion: the director walks him out with the crate on (keep the ammoBox track at the last frame on his rig)."
+  },
+  "IjaWalkStabProne": {
+   "duration": 1.6666666666666667,
+   "loop": false,
+   "weaponHold": "twoHand",
+   "role": "ijaB",
+   "rig": "TengxianIja01",
+   "rigs": [
+    "TengxianIja01",
+    "TengxianIja02"
+   ],
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "weaponState": "twoHand",
+   "referenceSpeedMps": 0.96,
+   "contacts": [
+    {
+     "t": 0.7083333333333334,
+     "limb": "blade",
+     "action": "stab",
+     "target": "body"
+    },
+    {
+     "t": 0.9583333333333334,
+     "limb": "blade",
+     "action": "release"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.7083333333333334,
+     "kind": "stab",
+     "cue": "bayonetStabBody",
+     "atM": [
+      0.34,
+      0.25,
+      -1.36
+     ]
+    },
+    {
+     "t": 0.9583333333333334,
+     "kind": "pull"
+    }
+   ],
+   "prev": [
+    "IjaWalkStabProne",
+    "IjaReadyRifle"
+   ],
+   "next": [
+    "IjaWalkStabProne",
+    "IjaStompStabTwist"
+   ],
+   "notes": "2026-10-11 redraft P1 (N09, \"\u6bcf\u7ecf\u8fc7\u4e00\u5177\u8db4\u7740\u7684\u56fd\u519b\uff0c\u5c31\u5f80\u80cc\u4e0a\u624e\u4e00\u5200\uff0c\u62d4\u51fa\u6765\uff0c\u811a\u4e0b\u4e0d\u505c\"): one walking cycle, 1.6 m straight ahead in 1.667 s (root motion; the last frame is the first moved 1.6 m forward), rifle with the bayonet fixed carried low. At 0.708 s (stab) the blade goes 7 cm into the back of a body lying at his left front: the back at event atM (runtime m, three.js axes, from his root at that instant: 0.34 m left, 0.25 m up, 1.36 m ahead) -- the director times the cycle so a body of sweep.bodies is there; out at 0.958 s, back to the carry. Spawn him with bayonetFixed."
+  },
+  "IjaGrenadeKnockThrow": {
+   "duration": 3.0,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaC",
+   "rig": "TengxianIja02",
+   "rigs": [
+    "TengxianIja01",
+    "TengxianIja02"
+   ],
+   "props": [
+    "weapon",
+    "grenade"
+   ],
+   "rootMotion": false,
+   "weaponState": "slungBack",
+   "env": {
+    "wallLeftM": 0.3
+   },
+   "contacts": [
+    {
+     "t": 0.3333333333333333,
+     "limb": "handR",
+     "action": "grab",
+     "target": "grenade"
+    },
+    {
+     "t": 0.5833333333333334,
+     "limb": "handL",
+     "action": "pull",
+     "target": "grenade",
+     "part": "pin"
+    },
+    {
+     "t": 1.0,
+     "limb": "handR",
+     "action": "knock",
+     "target": "helmet"
+    },
+    {
+     "t": 2.0833333333333335,
+     "limb": "handR",
+     "action": "release",
+     "target": "grenade"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.3333333333333333,
+     "kind": "draw"
+    },
+    {
+     "t": 0.5833333333333334,
+     "kind": "pin",
+     "cue": "grenadePin"
+    },
+    {
+     "t": 1.0,
+     "kind": "knock",
+     "cue": "grenadeKnock"
+    },
+    {
+     "t": 2.0833333333333335,
+     "kind": "throw",
+     "cue": "grenadeThrow"
+    },
+    {
+     "t": 2.916666666666667,
+     "kind": "grenadeOut"
+    }
+   ],
+   "prev": [
+    "IjaReadyRifle"
+   ],
+   "next": [
+    "IjaJunctionPeek",
+    "IjaReadyRifle"
+   ],
+   "notes": "2026-10-11 redraft P1 (N08, \"\u4ece\u8170\u4e0a\u6478\u51fa\u4e00\u9897\u624b\u69b4\u5f39\uff0c\u62d4\u9500\uff0c\u5f80\u94a2\u76d4\u4e0a\u4e00\u78d5\u2014\u2014\u5f53\u2014\u2014\u634f\u5728\u624b\u91cc\u505c\u4e86\u4e00\u62cd\u624d\u7529\u8fc7\u6298\u89d2\"): his rifle slung across his back; the corner wall on his left (env wallLeftM 0.30, its edge 0.35 m ahead of his root). Right hand to the belt pouch, the Type 91 out (0.33 s, grenade track from frame 0 at the belt); the left fingers pull the pin (0.583 s); knocked on the crown of his helmet (knock 1.0 s); held a beat at his chest; a side-arm lob round the corner to his left (throw 2.083 s: the track flies 0.83 s, ~6 m to his left front, then hides; the blast is dropIn.foldBlast); he ducks back against the wall. Type 91 placeholder: segmented cylinder 0.05 x 0.095 m, axis toward the fuse cap."
+  },
+  "IjaDropInKneel": {
+   "duration": 2.5,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaDrop",
+   "rig": "TengxianIja02",
+   "rigs": [
+    "TengxianIja01",
+    "TengxianIja02",
+    "TengxianIja03"
+   ],
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "holdLoop": [
+    1.75,
+    2.5
+   ],
+   "weaponState": "twoHand",
+   "events": [
+    {
+     "t": 0.375,
+     "kind": "jump"
+    },
+    {
+     "t": 0.9166666666666666,
+     "kind": "land",
+     "cue": "stompMud"
+    },
+    {
+     "t": 1.125,
+     "kind": "absorbed"
+    },
+    {
+     "t": 1.75,
+     "kind": "ready"
+    }
+   ],
+   "next": [
+    "IjaReadyRifle",
+    "IjaCornerFire"
+   ],
+   "notes": "2026-10-11 redraft P1 (N07, \"\u6c9f\u6cbf\u4e0a\u5192\u51fa\u56db\u4e94\u628a\u523a\u5200\u5c16\u2026\u2026\u4e0b\u4e00\u79d2\u4eba\u5c31\u8df3\u4e86\u4e0b\u6765\"): the root is the LANDING spot on the trench floor; frame 0 stands on the lip 2.0 m up (the lip's edge 0.55 m behind the root, he faces into the trench, forward = clip -z), rifle at the port. Crouch, jump (off 0.375 s), drops 2 m (the boots down 0.917 s, knees taken it 1.125 s; the frames in the air are not grounded), then turns to his left as he comes down onto the right knee and shoulders the rifle along the trench to his left (ready 1.75 s); 1.75-2.5 s hold loop aiming. (\u4e19: the corner F to the east.) Contract dropIn.lip[0..2]: place the root at the lip's floor below, facing south (into the trench)."
+  },
+  "IjaDropInStand": {
+   "duration": 2.3333333333333335,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaDrop",
+   "rig": "TengxianIja02",
+   "rigs": [
+    "TengxianIja01",
+    "TengxianIja02",
+    "TengxianIja03"
+   ],
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "holdLoop": [
+    1.6666666666666667,
+    2.3333333333333335
+   ],
+   "weaponState": "twoHand",
+   "events": [
+    {
+     "t": 0.375,
+     "kind": "jump"
+    },
+    {
+     "t": 0.9166666666666666,
+     "kind": "land",
+     "cue": "stompMud"
+    },
+    {
+     "t": 1.125,
+     "kind": "absorbed"
+    },
+    {
+     "t": 1.6666666666666667,
+     "kind": "ready"
+    }
+   ],
+   "next": [
+    "IjaReadyRifle",
+    "IjaCornerFire"
+   ],
+   "notes": "2026-10-11 redraft P1 (N07, \"\u6c9f\u6cbf\u4e0a\u5192\u51fa\u56db\u4e94\u628a\u523a\u5200\u5c16\u2026\u2026\u4e0b\u4e00\u79d2\u4eba\u5c31\u8df3\u4e86\u4e0b\u6765\"): the root is the LANDING spot on the trench floor; frame 0 stands on the lip 2.0 m up (the lip's edge 0.55 m behind the root, he faces into the trench, forward = clip -z), rifle at the port. Crouch, jump (off 0.375 s), drops 2 m (the boots down 0.917 s, knees taken it 1.125 s; the frames in the air are not grounded), then turns to his left as he straightens and holds the rifle at the low ready to his left (ready 1.67 s); 1.67-2.33 s hold loop. (\u4e01: the junction J.) Contract dropIn.lip[0..2]: place the root at the lip's floor below, facing south (into the trench)."
+  },
+  "IjaDropInPoint": {
+   "duration": 3.3333333333333335,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaDrop",
+   "rig": "TengxianIja02",
+   "rigs": [
+    "TengxianIja01",
+    "TengxianIja02",
+    "TengxianIja03"
+   ],
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "holdLoop": [
+    2.8333333333333335,
+    3.3333333333333335
+   ],
+   "weaponState": "oneHandLeft",
+   "events": [
+    {
+     "t": 0.375,
+     "kind": "jump"
+    },
+    {
+     "t": 0.9166666666666666,
+     "kind": "land",
+     "cue": "stompMud"
+    },
+    {
+     "t": 1.125,
+     "kind": "absorbed"
+    },
+    {
+     "t": 1.6666666666666667,
+     "kind": "point1",
+     "dirM": [
+      -0.99,
+      0,
+      -0.1
+     ]
+    },
+    {
+     "t": 2.3333333333333335,
+     "kind": "point2",
+     "dirM": [
+      -0.75,
+      -0.25,
+      -0.6
+     ]
+    }
+   ],
+   "next": [
+    "IjaReadyRifle",
+    "IjaCornerFire"
+   ],
+   "notes": "2026-10-11 redraft P1 (N07, \"\u6c9f\u6cbf\u4e0a\u5192\u51fa\u56db\u4e94\u628a\u523a\u5200\u5c16\u2026\u2026\u4e0b\u4e00\u79d2\u4eba\u5c31\u8df3\u4e86\u4e0b\u6765\"): the root is the LANDING spot on the trench floor; frame 0 stands on the lip 2.0 m up (the lip's edge 0.55 m behind the root, he faces into the trench, forward = clip -z), rifle at the port. Crouch, jump (off 0.375 s), drops 2 m (the boots down 0.917 s, knees taken it 1.125 s; the frames in the air are not grounded), then straightens facing into the trench, the rifle in the left hand at the trail, the right arm out with two fingers: first along the trench to his left (point1 1.67 s, far), then to his left front, lower (point2 2.33 s); the arm down by 2.75 s, 2.83-3.33 s hold loop. (\u7532 at the third lip.) Contract dropIn.lip[0..2]: place the root at the lip's floor below, facing south (into the trench)."
+  },
+  "IjaProneLmgOnCorpse": {
+   "duration": 2.0,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "bunkerGunner",
+   "rig": "TengxianIja01",
+   "rigs": [
+    "TengxianIja01"
+   ],
+   "props": [
+    "type11"
+   ],
+   "rootMotion": false,
+   "holdLoop": [
+    0.0,
+    2.0
+   ],
+   "events": [
+    {
+     "t": 0.4166666666666667,
+     "kind": "burst",
+     "cue": "type11"
+    },
+    {
+     "t": 0.5416666666666666,
+     "kind": "shot"
+    }
+   ],
+   "next": [],
+   "notes": "2026-10-11 redraft P1 (N12 / contract \u00a71.7, \"\u673a\u67aa\u624b\u628a\u6b6a\u628a\u5b50\u7684\u4e24\u811a\u67b6\u5f80\u4e0a\u9762\u90a3\u5177\u7684\u80cc\u4e0a\u4e00\u67b6\uff0c\u8db4\u4e0b\"): lying face down up the south wall face (a 35 deg slope rising ahead of him, his hips at the root, the chest 0.6 m up), both elbows on the slope, the Type 11 shouldered, its bipod resting 0.55 m over his elbows (the upper corpse's back), aimed over the lip (clip forward, 5 deg up). 2.0 s hold loop: a two-round burst (0.417, 0.542 s) with the recoil through the shoulder and head; the director restarts the loop every 3-6 s (contract: one burst each time). type11 track: actor-weapon convention (origin right-hand grip, axis muzzle, up top), the gun 1.1 m, bipod 0.3 m."
+  },
+  "IjaKneelLoadLmg": {
+   "duration": 2.5,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "bunkerLoader",
+   "rig": "TengxianIja03",
+   "rigs": [
+    "TengxianIja03"
+   ],
+   "props": [
+    "clipA"
+   ],
+   "rootMotion": false,
+   "holdLoop": [
+    0.0,
+    2.5
+   ],
+   "events": [
+    {
+     "t": 0.5833333333333334,
+     "kind": "pouch"
+    },
+    {
+     "t": 1.4166666666666667,
+     "kind": "load",
+     "what": "hopper"
+    }
+   ],
+   "next": [],
+   "notes": "2026-10-11 redraft P1 (N12, \"\u526f\u5c04\u624b\u8dea\u5728\u65c1\u8fb9\u538b\u5f39\"): kneeling on both knees at the foot of the slope, at the gunner's right (the hopper on the gun's left: he reaches across, over the gun, 0.46 m ahead and 0.26 m left of his root, 0.80 m up). 2.5 s loop: a charger out of the pouch on his belt (0.58 s, clipA in his right hand), pressed into the hopper with both hands (load 1.42 s), back. The director places him 0.8 m right of the gunner's hips."
   }
  },
  "stages": {
@@ -7064,7 +7464,7 @@
   {
    "id": "TengxianNra05",
    "file": "Animation_TengxianNra05OpeningStoryboards.json",
-   "sha256": "48a3626cbc071e728c6d584b69be7aeec60c094ed64cb860e245f0685cb21055",
+   "sha256": "b9a9c28c066faad8801867de5a21e112bb1bc5a417ee4b3e5e9aee44243f7b75",
    "originalModelSha256": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72",
    "clipIds": [
     "SupplyReceive",
@@ -7096,7 +7496,8 @@
     "LuoHandRifle",
     "LuoGrabRifleShove",
     "HeHelmetSleepSitUp",
-    "LiuDivideAmmoToss"
+    "LiuDivideAmmoToss",
+    "LiuBoxUpGo"
    ],
    "contactPoints": {
     "hairBack": {
@@ -8470,7 +8871,7 @@
      "footSlideM": 0.0,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.0717,
+     "pelvisMaxStepM": 0.083,
      "floorCorrectionMin": -0.0,
      "floorCorrectionMax": 0.0,
      "root": {
@@ -8503,13 +8904,63 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "LiuBoxUpGo",
+     "frames": 61,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.10752,
+     "pelvisMaxStepM": 0.1573,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0,
+       0.0918,
+       0.0,
+       0.3674
+      ],
+      "end": [
+       0.0138,
+       -0.0805,
+       0.0,
+       0.8004
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.25
+      ],
+      [
+       "R",
+       0,
+       1.3333
+      ],
+      [
+       "L",
+       1.6667,
+       2.5
+      ],
+      [
+       "R",
+       1.75,
+       2.5
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ]
   },
   {
    "id": "TengxianIja01",
    "file": "Animation_TengxianIja01OpeningStoryboards.json",
-   "sha256": "811f80c4812c46da1145748a7903dcb02056a680f0acba2d31d8d04e4e993ba8",
+   "sha256": "176aa7e5ebc16fce486bbf927894cadab5916447274e880d8870388ee0e6f8bf",
    "originalModelSha256": "0acb11411d2984cf7bd9dd578141ffcc8541e9bbe8c83b0cf3dcff76f3a2d9b1",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningRedraft_20261011_A\\Scene_TengxianIja01OpeningStoryboards.blend",
    "contactPoints": {
@@ -9870,6 +10321,287 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaWalkStabProne",
+     "frames": 41,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0211,
+     "gripSolveErrorM": 0.02111,
+     "pelvisMaxStepM": 0.0449,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0574,
+       -0.0537,
+       0.0,
+       0.7041
+      ],
+      "end": [
+       0.0574,
+       -1.6537,
+       0.0,
+       0.7041
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.4583
+      ],
+      [
+       "L",
+       0.8333,
+       1.2917
+      ],
+      [
+       "R",
+       0.0,
+       0.0417
+      ],
+      [
+       "R",
+       0.4167,
+       0.875
+      ],
+      [
+       "R",
+       1.25,
+       1.6667
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaGrenadeKnockThrow",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0068,
+     "pelvisMaxStepM": 0.0118,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0276,
+       0.0184,
+       0.0,
+       0.77
+      ],
+      "end": [
+       0.0369,
+       0.0276,
+       0.0,
+       0.7239
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaDropInKneel",
+     "frames": 61,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.01968,
+     "pelvisMaxStepM": 0.1906,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.101,
+     "root": {
+      "start": [
+       0.0089,
+       0.7701,
+       0.0,
+       2.8161
+      ],
+      "end": [
+       -0.0639,
+       -0.0635,
+       64.22,
+       0.466
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.2917
+      ],
+      [
+       "R",
+       0,
+       0.2917
+      ],
+      [
+       "L",
+       1.625,
+       2.5
+      ],
+      [
+       "R",
+       1.625,
+       2.5
+      ]
+     ],
+     "kneePlants": [
+      [
+       "R",
+       1.75,
+       2.5
+      ]
+     ],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaDropInStand",
+     "frames": 57,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1906,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.00968,
+     "root": {
+      "start": [
+       0.0089,
+       0.7701,
+       0.0,
+       2.8161
+      ],
+      "end": [
+       -0.0589,
+       -0.0444,
+       90.0,
+       0.6456
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.2917
+      ],
+      [
+       "R",
+       0,
+       0.2917
+      ],
+      [
+       "L",
+       1.625,
+       2.3333
+      ],
+      [
+       "R",
+       1.625,
+       2.3333
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaDropInPoint",
+     "frames": 81,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1906,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.00968,
+     "root": {
+      "start": [
+       0.0089,
+       0.7701,
+       0.0,
+       2.8161
+      ],
+      "end": [
+       0.0,
+       0.0184,
+       0.0,
+       0.8022
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.2917
+      ],
+      [
+       "R",
+       0,
+       0.2917
+      ],
+      [
+       "L",
+       1.625,
+       3.3333
+      ],
+      [
+       "R",
+       1.625,
+       3.3333
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaProneLmgOnCorpse",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.02994,
+     "floorCorrectionMax": 0.02994,
+     "root": {
+      "start": [
+       -0.0,
+       0.08,
+       0.0,
+       0.2676
+      ],
+      "end": [
+       -0.0,
+       0.08,
+       0.0,
+       0.2676
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ],
    "clipIds": [
@@ -9903,13 +10635,19 @@
     "IjaShotDropRifle",
     "IjaStompStabTwist",
     "IjaInspectRifleBoltToss",
-    "IjaThumbWoundTwist"
+    "IjaThumbWoundTwist",
+    "IjaWalkStabProne",
+    "IjaGrenadeKnockThrow",
+    "IjaDropInKneel",
+    "IjaDropInStand",
+    "IjaDropInPoint",
+    "IjaProneLmgOnCorpse"
    ]
   },
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "76ce8f65be71428458a28f9fbdc957b2bf672c1e89b93d7aa26f5e2e72083697",
+   "sha256": "b757424d48664453898e42a44d09d10f96ab5da131eac006dc9d1b8f11a1ca51",
    "originalModelSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningRedraft_20261011_A\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
@@ -12405,6 +13143,258 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaWalkStabProne",
+     "frames": 41,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0229,
+     "gripSolveErrorM": 0.02292,
+     "pelvisMaxStepM": 0.0449,
+     "floorCorrectionMin": 2e-05,
+     "floorCorrectionMax": 7e-05,
+     "root": {
+      "start": [
+       0.0569,
+       -0.0531,
+       0.0,
+       0.7042
+      ],
+      "end": [
+       0.0569,
+       -1.6531,
+       0.0,
+       0.7042
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.4583
+      ],
+      [
+       "L",
+       0.8333,
+       1.2917
+      ],
+      [
+       "R",
+       0.0,
+       0.0417
+      ],
+      [
+       "R",
+       0.4167,
+       0.875
+      ],
+      [
+       "R",
+       1.25,
+       1.6667
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaGrenadeKnockThrow",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.009,
+     "pelvisMaxStepM": 0.0117,
+     "floorCorrectionMin": 3e-05,
+     "floorCorrectionMax": 5e-05,
+     "root": {
+      "start": [
+       0.0274,
+       0.0183,
+       0.0,
+       0.7707
+      ],
+      "end": [
+       0.0365,
+       0.0274,
+       0.0,
+       0.7251
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaDropInKneel",
+     "frames": 61,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.01957,
+     "pelvisMaxStepM": 0.1902,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.1017,
+     "root": {
+      "start": [
+       0.0083,
+       0.7713,
+       0.0,
+       2.8164
+      ],
+      "end": [
+       -0.0633,
+       -0.062,
+       64.22,
+       0.4651
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.2917
+      ],
+      [
+       "R",
+       0,
+       0.2917
+      ],
+      [
+       "L",
+       1.625,
+       2.5
+      ],
+      [
+       "R",
+       1.625,
+       2.5
+      ]
+     ],
+     "kneePlants": [
+      [
+       "R",
+       1.75,
+       2.5
+      ]
+     ],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaDropInStand",
+     "frames": 57,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1902,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.01082,
+     "root": {
+      "start": [
+       0.0083,
+       0.7713,
+       0.0,
+       2.8164
+      ],
+      "end": [
+       -0.0582,
+       -0.0441,
+       90.0,
+       0.6475
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.2917
+      ],
+      [
+       "R",
+       0,
+       0.2917
+      ],
+      [
+       "L",
+       1.625,
+       2.3333
+      ],
+      [
+       "R",
+       1.625,
+       2.3333
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaDropInPoint",
+     "frames": 81,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1902,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.01082,
+     "root": {
+      "start": [
+       0.0083,
+       0.7713,
+       0.0,
+       2.8164
+      ],
+      "end": [
+       0.0,
+       0.0183,
+       0.0,
+       0.8027
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.2917
+      ],
+      [
+       "R",
+       0,
+       0.2917
+      ],
+      [
+       "L",
+       1.625,
+       3.3333
+      ],
+      [
+       "R",
+       1.625,
+       3.3333
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ],
    "clipIds": [
@@ -12460,13 +13450,18 @@
     "IjaSlapRaise",
     "IjaShotStaggerAway",
     "IjaStompStabTwist",
-    "IjaTearBadge"
+    "IjaTearBadge",
+    "IjaWalkStabProne",
+    "IjaGrenadeKnockThrow",
+    "IjaDropInKneel",
+    "IjaDropInStand",
+    "IjaDropInPoint"
    ]
   },
   {
    "id": "TengxianIja03",
    "file": "Animation_TengxianIja03OpeningStoryboards.json",
-   "sha256": "cd777b4fc6519c7761bdae1e7d2a0a6320ab454814bd53cef6a695cca971ff71",
+   "sha256": "7afa25226d9535ee73b650935e5b0af03937598bc284d816b7c224a3c9810790",
    "originalModelSha256": "652df6a3e31f26257754d6e7fe5bc1e5f56af6372bc0d4df2db0e753b5d8a952",
    "clipIds": [
     "SupplyReceive",
@@ -12488,7 +13483,11 @@
     "KickRifle",
     "PointBlockade",
     "ShotCollapse",
-    "GuardTurn"
+    "GuardTurn",
+    "IjaDropInKneel",
+    "IjaDropInStand",
+    "IjaDropInPoint",
+    "IjaKneelLoadLmg"
    ],
    "contactPoints": {
     "hairBack": {
@@ -12672,9 +13671,61 @@
       0.2971,
       0.8296
      ]
+    },
+    "badgeChestL": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.03049,
+      0.09395,
+      0.10294
+     ],
+     "normal": [
+      -0.1795,
+      0.9838,
+      0.0
+     ]
+    },
+    "woundShoulderL": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.07928,
+      0.05022,
+      0.16783
+     ],
+     "normal": [
+      0.0626,
+      0.9698,
+      0.2357
+     ]
+    },
+    "backStab": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.1001,
+      -0.25979,
+      0.04484
+     ],
+     "normal": [
+      0.1795,
+      -0.9838,
+      -0.0
+     ]
+    },
+    "backLow": {
+     "bone": "Bip001 Spine",
+     "offset": [
+      0.07908,
+      -0.17064,
+      1e-05
+     ],
+     "normal": [
+      0.0596,
+      -0.9982,
+      -0.0
+     ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260926HumanoidV1\\Scene_TengxianIja03OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningRedraft_20261011_A\\Scene_TengxianIja03OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
@@ -13255,6 +14306,202 @@
      "plants": [],
      "kneePlants": [],
      "kneeSlideM": 0
+    },
+    {
+     "clip": "IjaDropInKneel",
+     "frames": 61,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.01966,
+     "pelvisMaxStepM": 0.1905,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.10068,
+     "root": {
+      "start": [
+       0.0088,
+       0.7703,
+       0.0,
+       2.8161
+      ],
+      "end": [
+       -0.0638,
+       -0.0632,
+       64.22,
+       0.4659
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.2917
+      ],
+      [
+       "R",
+       0,
+       0.2917
+      ],
+      [
+       "L",
+       1.625,
+       2.5
+      ],
+      [
+       "R",
+       1.625,
+       2.5
+      ]
+     ],
+     "kneePlants": [
+      [
+       "R",
+       1.75,
+       2.5
+      ]
+     ],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaDropInStand",
+     "frames": 57,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1905,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.01076,
+     "root": {
+      "start": [
+       0.0088,
+       0.7703,
+       0.0,
+       2.8161
+      ],
+      "end": [
+       -0.0587,
+       -0.0443,
+       90.0,
+       0.646
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.2917
+      ],
+      [
+       "R",
+       0,
+       0.2917
+      ],
+      [
+       "L",
+       1.625,
+       2.3333
+      ],
+      [
+       "R",
+       1.625,
+       2.3333
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaDropInPoint",
+     "frames": 81,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1905,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.01076,
+     "root": {
+      "start": [
+       0.0088,
+       0.7703,
+       0.0,
+       2.8161
+      ],
+      "end": [
+       0.0,
+       0.0184,
+       0.0,
+       0.8023
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.2917
+      ],
+      [
+       "R",
+       0,
+       0.2917
+      ],
+      [
+       "L",
+       1.625,
+       3.3333
+      ],
+      [
+       "R",
+       1.625,
+       3.3333
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaKneelLoadLmg",
+     "frames": 61,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": -0.0181,
+     "floorCorrectionMax": -0.0181,
+     "root": {
+      "start": [
+       0.0,
+       0.0743,
+       0.0,
+       0.3718
+      ],
+      "end": [
+       0.0,
+       0.0743,
+       0.0,
+       0.3718
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [
+      [
+       "L",
+       0,
+       2.5
+      ],
+      [
+       "R",
+       0,
+       2.5
+      ]
+     ],
+     "kneeSlideM": 0.0
     }
    ]
   }
