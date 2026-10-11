@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-10-11T09:31:22.783Z",
+  "updatedAt": "2026-10-11T10:20:11.578Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -1664,9 +1664,9 @@
       "who": "interpreter",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 5.35,
-      "bytes": 64933,
-      "sha256": "94d708d796eabf6415fc1a4d81f1eb58a66f579ecf5e934a06879df65fcc7ee8",
+      "seconds": 4.664,
+      "bytes": 56783,
+      "sha256": "d9deb225823b340122cd7fa6241096b9f28c345779b337a2d2508974b2ed7a9a",
       "source": "scene",
       "sceneSha256": "e70a8dd57ea6e18e1716fc483004f45880372309c352b4683f4ab2d8d7e3a755",
       "sceneStartS": 8.15,
@@ -1681,31 +1681,32 @@
         -56.4
       ],
       "cutMethod": "subtitle",
+      "tempo": 1.15,
       "castOwner": "interpreter",
       "castSha256": "cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7",
       "referenced": true,
       "metrics": {
         "activeRmsDb": -21.74,
-        "truePeakDb": -10.01,
-        "snrDb": 81.77,
-        "voicedS": 3.58,
+        "truePeakDb": -9.99,
+        "snrDb": 80.43,
+        "voicedS": 3.14,
         "lowShare": 0.292,
         "f0": {
           "median": 291,
-          "p10": 229,
+          "p10": 232,
           "p90": 333,
-          "frames": 140
+          "frames": 122
         },
         "cer": 0,
         "transcript": "太君问你,机枪在哪儿,后沟还有几个人?说了,太君饶你一条狗命。",
-        "speakerCos": 0.883,
+        "speakerCos": 0.877,
         "nearestOther": [
           "comrade",
-          0.326
+          0.318
         ],
         "referencedOther": [
           "comrade",
-          0.326
+          0.318
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
@@ -1720,9 +1721,9 @@
       "who": "interpreter",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 4.13,
-      "bytes": 50513,
-      "sha256": "66415713a49ca4461236a91c0a29a81f935f718b32f72601da4473c3761e40cf",
+      "seconds": 3.439,
+      "bytes": 42049,
+      "sha256": "d44ba88296444d9131aa4e0c4e95f66b1053618aa56f12b340c67dd8860bec1f",
       "source": "scene",
       "sceneSha256": "e70a8dd57ea6e18e1716fc483004f45880372309c352b4683f4ab2d8d7e3a755",
       "sceneStartS": 14.01,
@@ -1737,31 +1738,32 @@
         -57.4
       ],
       "cutMethod": "subtitle",
+      "tempo": 1.2,
       "castOwner": "interpreter",
       "castSha256": "cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -21.26,
-        "truePeakDb": -10.33,
-        "snrDb": 86.92,
-        "voicedS": 3.06,
-        "lowShare": 0.25,
+        "activeRmsDb": -21.33,
+        "truePeakDb": -10.29,
+        "snrDb": 86.88,
+        "voicedS": 2.6,
+        "lowShare": 0.251,
         "f0": {
           "median": 340,
           "p10": 208,
           "p90": 410,
-          "frames": 122
+          "frames": 98
         },
         "cer": 0,
-        "transcript": "机枪!不说,今天就叫你死在这沟里!",
-        "speakerCos": 0.814,
+        "transcript": "机枪不说今天就叫你死在这沟里",
+        "speakerCos": 0.799,
         "nearestOther": [
-          "comrade",
-          0.291
+          "ijaA",
+          0.293
         ],
         "referencedOther": [
-          "comrade",
-          0.291
+          "ijaA",
+          0.293
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
@@ -2616,9 +2618,9 @@
       "who": "interpreter",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 7.55,
-      "bytes": 91578,
-      "sha256": "371cb091af5a39cc6fb714d595e5aa06aebab182d600c7eb1c528dd1a3884fa7",
+      "seconds": 5.806,
+      "bytes": 70575,
+      "sha256": "da6500774e0b84e102a950698023630ac934741fba092fbb15a86b8691e10861",
       "source": "scene",
       "sceneSha256": "a29a8bfe61701dece60a10515c4bca969e452fe4467175f31ca64037d83c1ba5",
       "sceneStartS": 3.03,
@@ -2633,31 +2635,32 @@
         -53.7
       ],
       "cutMethod": "silence",
+      "tempo": 1.3,
       "castOwner": "interpreter",
       "castSha256": "cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.91,
-        "truePeakDb": -6.13,
-        "snrDb": 83.75,
-        "voicedS": 4.96,
-        "lowShare": 0.297,
+        "activeRmsDb": -19.1,
+        "truePeakDb": -6.3,
+        "snrDb": 83.68,
+        "voicedS": 3.92,
+        "lowShare": 0.3,
         "f0": {
           "median": 286,
-          "p10": 170,
+          "p10": 167,
           "p90": 356,
-          "frames": 145
+          "frames": 103
         },
         "cer": 0.1429,
-        "transcript": "行行,机枪在哪,你们长官在哪,说了太君饶你不死,还赏你口饭吃。",
-        "speakerCos": 0.927,
+        "transcript": "行行,机枪在哪,你们长官在哪,说了,太君饶你不死,还赏你口饭吃。",
+        "speakerCos": 0.914,
         "nearestOther": [
           "ijaB",
-          0.617
+          0.601
         ],
         "referencedOther": [
           "ijaB",
-          0.617
+          0.601
         ],
         "lengthDiff": -2,
         "subtitleCoverage": 1,
@@ -2672,9 +2675,9 @@
       "who": "interpreter",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 7.03,
-      "bytes": 85308,
-      "sha256": "68fbe89ebc6dda68467cf36a7fcc472af2ec4fc3e00648088c955569cb5b4aef",
+      "seconds": 5.863,
+      "bytes": 71202,
+      "sha256": "2f28e12cb01a6a67009f4677e7c3331a3375849968d35a1134ceae6577345acc",
       "source": "scene",
       "sceneSha256": "a29a8bfe61701dece60a10515c4bca969e452fe4467175f31ca64037d83c1ba5",
       "sceneStartS": 11.34,
@@ -2689,31 +2692,32 @@
         -53.6
       ],
       "cutMethod": "silence",
+      "tempo": 1.2,
       "castOwner": "interpreter",
       "castSha256": "cf63a99af4f0857be9d081646871cd71c1f36b6596535917287dcd092a709cd7",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.59,
-        "truePeakDb": -4.13,
-        "snrDb": 85.51,
-        "voicedS": 4.66,
-        "lowShare": 0.299,
+        "activeRmsDb": -18.73,
+        "truePeakDb": -4.54,
+        "snrDb": 85.21,
+        "voicedS": 3.98,
+        "lowShare": 0.301,
         "f0": {
-          "median": 296,
+          "median": 302,
           "p10": 193,
           "p90": 372,
-          "frames": 158
+          "frames": 130
         },
         "cer": 0,
-        "transcript": "听见没有?不说?刚才那个就是你的下场。太君说了,你不说,就拿你给新兵练刀。",
-        "speakerCos": 0.918,
+        "transcript": "听见没有?不说,刚才那个就是你的下场。太君说了,你不说,就拿你给新兵练刀。",
+        "speakerCos": 0.907,
         "nearestOther": [
           "ijaB",
-          0.58
+          0.567
         ],
         "referencedOther": [
           "ijaB",
-          0.58
+          0.567
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
@@ -9788,6 +9792,9 @@
       "attempt": 1,
       "pickedBy": "check",
       "requests": 2,
+      "patched": [
+        "RescueInterrogation.01"
+      ],
       "attempts": [
         {
           "n": 1,
@@ -9814,10 +9821,7 @@
         "truePeakDb": -1.49,
         "snrDb": 84.98
       },
-      "mastering": "WholeSceneOnceRmsTruePeakMinus1",
-      "patched": [
-        "RescueInterrogation.01"
-      ]
+      "mastering": "WholeSceneOnceRmsTruePeakMinus1"
     },
     "RescueFlee": {
       "file": "AudioVoice_FirstLevelRescueFlee.mp3",

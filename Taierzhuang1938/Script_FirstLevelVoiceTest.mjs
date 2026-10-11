@@ -361,7 +361,7 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   const FROZEN_EVENTS = {
     "BunkerBanter.07": "nearShell", "BunkerLedger.01": "pour", "BunkerExit.01": "exitReach", "BunkerExit.02": "clipsThrown",
     "BunkerSweep.01": "grenadeBlast", "BunkerSweep.03": "stab7", "BunkerSweep.04": "stab8", "BunkerSweep.07": "stab9",
-    "CaptiveDragged.01": "haltB", "CaptiveDragged.03": "kneeled", "CaptiveDragged.05": "boltOpen", "CaptiveWoundTwist.01": "woundPress",
+    "CaptiveDragged.01": "haltB", "CaptiveDragged.02": "dragLanded", "CaptiveDragged.03": "kneeled", "CaptiveDragged.05": "boltOpen", "CaptiveWoundTwist.01": "woundPress",
     "CaptiveInterrogation.04": "woundPress", "BayonetPractice.03": "recruitSlapped", "BayonetPractice.04": "recruitPant",
     "BayonetPractice.05": "hairLifted", "BayonetPractice.06": "cutStart", "BayonetPractice.07": "bayonetFixed", "BayonetPractice.08": "recruitNod",
     "ShunziFound.01": "bootGrind", "RescueInterrogation.06": "cheekCut",
@@ -375,6 +375,10 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   assert.equal(LineDirection(byId.get("BayonetPractice"), 5).offsetS, 0, "BayonetPractice.06 下刀那一刻开口（边下刀边嘟囔）");
   assert.equal(LineDirection(byId.get("BayonetPractice"), 5).projection, "low", "「支那猪，叫得倒响」是低声嘟囔");
   assert.deepEqual(Emits("BayonetPractice"), ["taunted"], "BayonetPractice.06 说完发 taunted");
+  for (const id of ["BayonetPractice.08", "RescueInterrogation.05"]) {
+    const [scene, nn] = id.split("."), d = LineDirection(byId.get(scene), Number(nn) - 1);
+    assert.ok(d.spatial === "head" && d.gainDb === 3, id + " 乙在 12 m 外的岔口喊：挂在他头上、远喊补 +3 dB");
+  }
   assert.equal(LineDirection(byId.get("CaptiveHowl"), 0).stopOn, "event:throatCut", "嚎声在割喉（throatCut）时掐断");
   // 日兵甲冷静、话短、不吼：01–02 改了字的场景里强度 ≤ 0.5、不用喊的档、句前句后不写笑。
   for (const { id } of scenes1011) byId.get(id).lines.forEach((line, index) => {
@@ -393,7 +397,7 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   // 默认沿用整段录音里的原始间隔：导演只覆盖稿里要等动作（gate / 事件 / 借火两处空当）与压尾音的几句。
   assert.deepEqual(overrides.sort(), ["BayonetPractice.03", "BayonetPractice.04", "BayonetPractice.05", "BayonetPractice.06", "BayonetPractice.07", "BayonetPractice.08",
     "BorrowLight.06", "BorrowLight.07", "BundleAttack.02", "BundleProne.02", "BunkerBanter.07", "BunkerExit.02", "BunkerRunnerCall.02",
-    "BunkerSweep.03", "BunkerSweep.04", "BunkerSweep.07", "CaptiveDragged.03", "CaptiveDragged.05", "CaptiveInterrogation.04",
+    "BunkerSweep.03", "BunkerSweep.04", "BunkerSweep.07", "CaptiveDragged.02", "CaptiveDragged.03", "CaptiveDragged.05", "CaptiveInterrogation.04",
     "FrontApproach.02", "RescueInterrogation.06"], "覆盖录音间隔的句子只有这几处（等动作的事件、gate 与借火两处空当）");
   {
     const probe = new FirstLevelMissionVoice({ audio: { voiceBank: new Map() } });

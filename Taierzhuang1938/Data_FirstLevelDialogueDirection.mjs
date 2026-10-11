@@ -156,18 +156,20 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   // 01 等甲抬手拦住乙（haltB）；03 等按跪（kneeled）；05 等乙拉开枪机（boltOpen）。InterpreterCall 两句在 01 与 02 之间由导演插播。
   CaptiveDragged: Scene(true, "前沟里洞口外的塌土边，离顺子两三米。炮弹刚在洞口炸过，冬瓜被半埋在塌土里咳；日兵甲是冷静的老兵分队长，拦住正要扎下去的乙，叫人把他拖出来；甲揪领、乙架胳膊把冬瓜拔出来按跪在沟壁下。冬瓜满脸满嘴是血，左肩的伤一扯就疼，嗓子被硝烟和土呛哑，喘得厉害，但对日本兵只有愤怒和恨；甲话短、不吼，乙是粗人", {
     "01": P("normal", 0.35, { after: "event:haltB", offsetS: 0.2, context: "抬手拦住乙的刺刀，低头看塌土里咳嗽的人", delivery: "冷静、话短、不吼，像在交代一件杂事，低而平" }),
-    "02": P("shout", 0.9, { context: "被从土里拔出来，疼得眼前发黑，认出是日本兵", delivery: "嘶哑、发抖、带着嘴里的血沫，疼得每个字都在抖；刻骨的恨从牙缝里挤出来，两个词之间疼得吸一口气，第二个词更狠；绝不求饶，字要听得出来",
+    // 02 等甲乙把他拔出来按跪那一刻（Dir01 发 dragLanded，2026-10-11 集成补充）：InterpreterCall 两句插在 01 与 02 之间，按录音间隔会叠上。
+    "02": P("shout", 0.9, { after: "event:dragLanded", offsetS: 0.3, context: "被从土里拔出来，疼得眼前发黑，认出是日本兵", delivery: "嘶哑、发抖、带着嘴里的血沫，疼得每个字都在抖；刻骨的恨从牙缝里挤出来，两个词之间疼得吸一口气，第二个词更狠；绝不求饶，字要听得出来",
       effort: { before: "疼得一声压不住的闷哼" } }),
     "03": P("low", 0.3, { after: "event:kneeled", offsetS: 0.2, context: "把人按在沟壁下", delivery: "两个字，平平地，低声，不吼" }),
     "04": P("shout", 0.9, { pauseBeforeS: 0.8, context: "被按着跪下，扯到了伤处", delivery: "咬着牙一字一顿地骂，中间疼得断一下再接着骂，嘶哑带血，恨到发抖，不哭、不哀求；字要听得出来" }),
     "05": P("normal", 0.55, { after: "event:boltOpen", offsetS: 0.4, pauseBeforeS: 1, context: "从泥里捡起他那支汉阳造，拉开枪机看了一眼", delivery: "笑着说，嗤笑从鼻子里喷出来，粗野地看不起，笑在句子里演，不单独笑" }),
   }, { voices: { comrade: "comradeWounded" } }),
-  // 04 在乙拧伤口（woundPress）后 0.8 s：翻译趁他疼压上去。CaptiveWoundTwist 是那一下卡在喉咙里的叫声（另一场）。
+  // 04 在乙拧伤口（woundPress）后 0.8 s：翻译趁他疼压上去。tempo（切句时不变调压快，VoiceSync §0.12）：录出来 03 / 04 是 4.9 / 3.6 字/秒，
+  // 压 1.15 / 1.2 到 5.6 / 4.3（旧录音 4.5 / 3.3 的 1.25 倍上下）。CaptiveWoundTwist 是那一下卡在喉咙里的叫声（另一场）。
   CaptiveInterrogation: Scene(true, "前沟沟壁下，冬瓜被按跪着，满脸是血、左肩枪伤、喘得厉害；翻译空着手蹲在他面前一两米内逼问，日兵甲站着，冷静、话短、不吼，用「这个」指人；日兵乙在旁边。翻译是给日军卖命的汉奸：转向日兵时点头哈腰、谄媚讨好，转回俘虏立刻变脸；这场审问里翻译不拖腔，对俘虏说中文时语速很快，像连珠炮，一句给条活路、一句一个死字。冬瓜伤得很重，每句都喘、都疼，嗓子嘶哑带血，但对汉奸只有厌恶和恨", {
     "01": P("normal", 0.35, { context: "站着打量跪着的人，转头对翻译", delivery: "冷静，一句一顿，每个短句之间停一下，话短、平、不吼；最后一个词是下令" }),
     "02": P("normal", 0.65, { pauseBeforeS: 0.4, context: "冲日兵哈着腰", delivery: "马上应，又怕又巴结，奴才式的急切谄媚；单独一声" }),
-    "03": P("normal", 0.85, { pauseBeforeS: 0.4, context: "转回脸蹲到冬瓜面前，脸几乎贴上去", delivery: "一变脸，语速很快，不拖腔，像连珠炮：前半句恶狠狠地逼问两个问题，紧接着压低一点、假惺惺地许他活命，诱惑里透着狞笑" }),
-    "04": P("shout", 0.95, { after: "event:woundPress", offsetS: 0.8, pauseBeforeS: 1.2, context: "乙把拇指摁进冬瓜肩上的枪伤往里拧，冬瓜整个人弓起来", delivery: "趁他疼，凶狠地吼，连珠炮似的，不拖腔；后半句咬着牙阴狠地砸下去" }),
+    "03": P("normal", 0.85, { pauseBeforeS: 0.4, context: "转回脸蹲到冬瓜面前，脸几乎贴上去", delivery: "一变脸，语速很快，不拖腔，像连珠炮：前半句恶狠狠地逼问两个问题，紧接着压低一点、假惺惺地许他活命，诱惑里透着狞笑", tempo: 1.15 }),
+    "04": P("shout", 0.95, { after: "event:woundPress", offsetS: 0.8, pauseBeforeS: 1.2, context: "乙把拇指摁进冬瓜肩上的枪伤往里拧，冬瓜整个人弓起来", delivery: "趁他疼，凶狠地吼，连珠炮似的，不拖腔；后半句咬着牙阴狠地砸下去", tempo: 1.2 }),
     "05": P("low", 0.85, { pauseBeforeS: 0.8, context: "疼得直喘，慢慢抬起满是血的脸，盯着凑过来的汉奸", delivery: "嘶哑、喘着、带血沫；「滚」从牙缝里挤出来，喘一口，「狗汉奸」压着满腔厌恶冷冷地吐出去，像往他脸上啐" }),
     "06": P("normal", 0.7, { context: "换一副假惺惺的软腔凑近", delivery: "压低了、像递一根救命稻草，语速仍快、不拖腔，句尾像被打断一样收住" }),
     "07": P("shout", 0.9, { pauseBeforeS: 0.5, context: "拼力抬起头，冲着眼前卖国的翻译", delivery: "嘶哑带血，疼得发抖，一字一顿，恨和鄙夷压过了疼，后半句更狠；绝不哀求，字要听得出来" }),
@@ -189,7 +191,8 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "06": P("low", 0.3, { after: "event:cutStart", offsetS: 0, context: "边下刀边随口嘟囔", delivery: "嘴里随口嘟囔，很低，几乎是自言自语，像在说一头牲口；不嘲弄、不笑、不加重",
       emit: [{ id: "taunted", at: "end" }] }),
     "07": P("normal", 0.35, { after: "event:bayonetFixed", offsetS: 0.4, context: "刺刀「咔」地卡回枪口，转头对新兵", delivery: "平平地教人，两句都短，最后半句压给新兵，不吼" }),
-    "08": P("shout", 0.7, { after: "event:recruitNod", offsetS: 0.4, context: "十来米外的岔口那边，看着脸色发白的新兵", delivery: "先笑出声，笑着隔老远朝新兵喊，粗野地奚落；笑在句子里演，不单独笑" }),
+    // 08 / RescueInterrogation.05：乙在 12 m 外的岔口喊，挂在他头上、按远喊补 +3 dB（同 BunkerRunnerCall.02，2026-10-11 集成补充）。
+    "08": P("shout", 0.7, { after: "event:recruitNod", offsetS: 0.4, spatial: "head", gainDb: 3, context: "十来米外的岔口那边，看着脸色发白的新兵", delivery: "先笑出声，笑着隔老远朝新兵喊，粗野地奚落；笑在句子里演，不单独笑" }),
     "09": P("normal", 0.35, { pauseBeforeS: 0.6, delivery: "平平地下令，两个词，短，不吼" }),
   }),
   // 无字幕：丁退开三步、喊着冲上去。是硬着头皮逼出来的喊，不是战吼。
@@ -204,13 +207,14 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   ShunziFound: Scene(true, "塌了的防炮洞口。日兵甲是冷静的老兵分队长，端着枪、刺刀尖朝下，停在趴着装死的顺子身边，军靴踩住他伸在泥里的手、鞋跟一碾，顺子的手指抽了一下；他低头看着，对身后的人说", {
     "01": P("low", 0.35, { after: "event:bootGrind", offsetS: 0.8, delivery: "冷静，低而平，三截都短：先是看出来的陈述，再交代留着，最后一个词是下令；不兴奋、不笑、不吼" }),
   }),
-  // 02 原地审问（整场重录）。甲冷静；乙不耐烦；翻译连珠炮、一句利诱一句威胁（VoiceSync §0.12）。06 等丁划脸（cheekCut）。
+  // 02 原地审问（整场重录）。tempo：录出来 03 / 04 是 3.7 / 4.4 字/秒，压 1.3 / 1.2 到 4.8 / 5.3（旧录音 4.3 / 4.1；03 压到 1.3 的上限仍只到 1.1 倍）。
+  //甲冷静；乙不耐烦；翻译连珠炮、一句利诱一句威胁（VoiceSync §0.12）。06 等丁划脸（cheekCut）。
   RescueInterrogation: Scene(true, "坍塌的防炮洞口，顺子被塌顶木压着趴在泥里。日兵甲是冷静的老兵分队长，蹲在他头边揪着头发把头提起来扇耳光；翻译蹲在顺子面前一米内逼问，日兵乙站在旁边催。甲话短、不吼；乙是粗人、不耐烦；翻译是给日军卖命的汉奸：对日本兵点头哈腰，对顺子凶狠、带着狞笑；这场审问里翻译不拖腔，对顺子说中文时语速很快，像连珠炮，一句利诱、一句威胁", {
     "01": P("normal", 0.4, { context: "揪着顺子的头发把头提起来，对翻译", delivery: "冷静，话短，下令，不吼、不笑" }),
     "02": P("normal", 0.65, { pauseBeforeS: 0.3, context: "冲日兵哈着腰", delivery: "马上应，又怕又巴结，奴才式的急切谄媚" }),
-    "03": P("normal", 0.85, { pauseBeforeS: 0.4, context: "蹲下来拍顺子的脸", delivery: "「醒醒」两个字清清楚楚、凶狠；语速很快，不拖腔：紧接着逼问两句，再压低一点、假惺惺地许他活命还给饭吃，诱惑里透着狞笑" }),
-    "04": P("shout", 0.95, { pauseBeforeS: 0.8, context: "顺子不答，挨了第二记耳光", delivery: "不耐烦，翻脸，语速很快、连珠炮，不拖腔；拿刚才被割喉的那个川军吓他，最后一句咬着牙阴狠地砸下去，带狞笑" }),
-    "05": P("shout", 0.75, { delivery: "粗人，不耐烦地粗声催一句" }),
+    "03": P("normal", 0.85, { pauseBeforeS: 0.4, context: "蹲下来拍顺子的脸", delivery: "「醒醒」两个字清清楚楚、凶狠；语速很快，不拖腔：紧接着逼问两句，再压低一点、假惺惺地许他活命还给饭吃，诱惑里透着狞笑", tempo: 1.3 }),
+    "04": P("shout", 0.95, { pauseBeforeS: 0.8, context: "顺子不答，挨了第二记耳光", delivery: "不耐烦，翻脸，语速很快、连珠炮，不拖腔；拿刚才被割喉的那个川军吓他，最后一句咬着牙阴狠地砸下去，带狞笑", tempo: 1.2 }),
+    "05": P("shout", 0.75, { spatial: "head", gainDb: 3, delivery: "粗人，不耐烦地粗声催一句" }),
     "06": P("shout", 0.9, { after: "event:cheekCut", offsetS: 0.6, pauseBeforeS: 0.8, context: "新兵用刀尖在顺子脸上划开一道口子之后", delivery: "「说话」两个字凶狠地吼出来、咬得清清楚楚，狐假虎威" }),
   }),
   RescueFlee: Scene(true, "翻译（汉奸）看见同伴被大刀砍倒，吓破了胆，踉跄着往前沟逃，边逃边朝日兵喊", {
