@@ -1745,6 +1745,63 @@ export const SFX_SOURCES = [
       { cue: "bolt", exactAtS: 2.795, tail: 0.85, gain: 0.95, hp: 180, append: true, alignDbfs: -25 },
     ],
   },
+  // === 第一关 01–02 开场重构（2026-10-11）新增十二条 ===============================
+  // 契约 docs/Data_OpeningRedraft20261011Contract.md §6（cue 名冻结）。来源先 Sonniss 镜像、没有的走 SeedAudio：
+  //   · 实录四条（下面四组，Script_SfxBake 照组名点名切）：whistleShort / clothRip / boltRattle / bayonetFixClick；
+  //   · 生成八条（表尾 `OpeningFoleySeedAudio` 登记，Script_SeedAudioOpeningFoleyBake 烘）：grenadeKnock /
+  //     bayonetStabBody / bayonetTwist / stompMud / boltToss / rifleTossMud / cheekCut / bootGrind ——
+  //     镜像里没有泥地拟音、没有钢盔、扎刀只有西式利刃设计音（检索与淘汰理由在那个脚本的头注）。
+  // 十二条一律 alignDbfs −25（扎刀与 bayonetHit 同档，机械与 grenadePin 同档），相对响度在 Script_Audio 的 SAMPLE_MIX。
+  // 部分重烘：`node Script_SfxBake.mjs WhistleShortSamba ClothRipTShirt BoltRattleNagant BayonetFixMagInsert OpeningFoleySeedAudio`。
+  {
+    id: "WhistleShortSamba",
+    item: "sonniss-gdc-2018-game-audio-bundle-normalized",
+    path: "The Chris Alan - Musical Oddities - Bells, Whistles, Horns, Percussion and More/WHISTLE SAMABA SINGLE LONG NOTES VARIOUS STRENGTHS LENGTHS 02.mp3",
+    credit: "The Chris Alan · 金属哨子单音（长短不一）· Sonniss GDC 2018",
+    license: "sonniss",
+    // 01 日军进沟前的一声短哨（契约 §1.4：炮声越过头顶之后 0.5 s）。现有 `whistle` 切自 Commons 那条
+    // 体育馆裁判哨（同一口哨、带馆内混响），这里**换一把哨子**，免得两处听成同一声。
+    // 素材 13.7 s 里七个单音：两个 0.13—0.15 s 的点吹（太短，像鸟叫）和五个 1.2—2.0 s 的长音。
+    // 取最响的那个长音（5.48 s，基音 2.7 kHz、2—8 kHz 占 99.8 %）的头 0.42 s：前 50 ms 是吹响的起音，
+    // 中段有哨珠的颤；吹哨人断气收哨本来就是 20—40 ms 的事，fadeOutS 0.05 收住不像剪断。
+    cuts: [{ cue: "whistleShort", exactAtS: 5.480, tail: 0.42, gain: 0.85, fadeOutS: 0.05, alignDbfs: -25 }],
+  },
+  {
+    id: "ClothRipTShirt",
+    item: "sonniss-gdc-2015-game-audio-bundle-normalized",
+    path: "RDGSFX007 - Rips and Tears v.2/RIPS AND TEARS T-Shirt Rip 02.mp3",
+    credit: "RDGSFX007 · 撕开棉 T 恤（带缝线崩断）· Sonniss GDC 2015",
+    license: "sonniss",
+    // 甲一把撕下冬瓜胸前的布胸章：棉布 + 一圈缝线。这条素材里每一次撕都带着一串缝线崩断的「哒哒」
+    //（频谱上一根根竖线），正是胸章缝在军装上的样子。同库的「卡其裤撕裂」（Soundcatcher）是慢撕，
+    // 有声段只有 −30 dB 上下、一下拖两三秒，不是「一把撕下」。
+    // 取 11.385 s 那一下：先一记猛扯（0.1 s 内到峰），后面 0.4 s 是缝线一路崩开，0.62 s 收。
+    cuts: [{ cue: "clothRip", exactAtS: 11.385, tail: 0.62, gain: 0.9, fadeOutS: 0.08, alignDbfs: -25 }],
+  },
+  {
+    id: "BoltRattleNagant",
+    item: "sonniss-gdc-2020-game-audio-bundle-normalized",
+    path: "FLYSOUND - Mosin Nagant/NAGANT movement handling.mp3",
+    credit: "FLYSOUND · 莫辛纳甘步枪操作（枪机）· Sonniss GDC 2020",
+    license: "sonniss",
+    // 乙拉开冬瓜那支汉阳造的枪机看（随后把枪栓甩出去，那一下是 `boltToss`）。与 `bolt`（M1903A3 / M38 /
+    // 三八式一整套抬-拉-推-闭）不是一回事：这里只开不闭，要的是枪机被一把拽开、在机匣里哗啦乱响的那一串。
+    // 素材 49 s 里 20.64—20.99 s 是全条最密的一串（六下金属撞击挤在 0.35 s 里），别处都是规整的一开一合。
+    // hp 180 与 `bolt` 同：这条录音垫着一层 100 Hz 以下的手持底噪，机械声在那儿没有东西。
+    cuts: [{ cue: "boltRattle", exactAtS: 20.635, tail: 0.50, gain: 0.92, hp: 180, fadeOutS: 0.08, alignDbfs: -25 }],
+  },
+  {
+    id: "BayonetFixMagInsert",
+    item: "game-audio-monthly",
+    path: "Sonniss.com - Game Audio Monthy - #1/Spectral Vibrations - Gun Mechanics UK Police/GUN_Rifle_Bolt_Action_Mag_Insert_01.mp3",
+    credit: "Spectral Vibrations · 栓动步枪弹匣入位 · Sonniss Game Audio Monthly #1",
+    license: "sonniss",
+    // 甲擦完刀把刺刀卡回枪口那一声「咔」。三十年式刺刀是刀环套上枪口、卡榫扣住刺刀座 —— 一下金属滑入、一下扣死。
+    // 镜像里没有刺刀实录；这条「栓动步枪插弹匣」末尾正好是同一种动作：1.92 s 一小串滑入的碰擦，
+    // 2.135 s 一记干脆的卡扣（>2 kHz 占 93 %，不是闷响）。落刀在滑入之前，两下都要。
+    // 同库那两条门闩（Latchlocker 的钢杆卡扣、Epic Stock 的按钮锁）一条谱心 8.6 kHz 太细，一条 1.5 kHz 是塑料按键的闷「咚」。
+    cuts: [{ cue: "bayonetFixClick", exactAtS: 1.900, tail: 0.40, gain: 0.9, fadeOutS: 0.10, alignDbfs: -25 }],
+  },
   // === 十一年式近场的最终文件表（2026-09-24）===================================
   // 2026-09-11 那一轮（Script_SeedAudioGunfireBake）把 type11 直接改写成**只有一条**
   // SeedAudio 生成音；而全量 SfxBake 又会反过来把那一条丢掉（上面 `Type11MinimiSingles`
@@ -1796,6 +1853,34 @@ export const SFX_SOURCES = [
     license: "volcengine",
     credit: "Volcengine SeedAudio 1.0 · 四川口音的一片喊杀声 · 2026-09-27",
     cuts: [{ cue: "chargeCrowd", durS: 5.62, files: ["AudioSfx_SeedAudioChargeCrowd_01.mp3"] }],
+  },
+  // 2026-10-11 第一关 01–02 开场重构的八条生成拟音（另四条实录见上方「第一关 01–02 开场重构」那一节）。
+  // 候选、选法与落选理由在 Script_SeedAudioOpeningFoleyBake 的 PICKS 头注；这里只登记，全量 SfxBake 不重切。
+  {
+    id: "OpeningFoleySeedAudio",
+    seedAudio: true,
+    bake: "Script_SeedAudioOpeningFoleyBake.mjs",
+    license: "volcengine",
+    credit: "Volcengine SeedAudio 1.0 · 第一关 01–02 开场拟音 · 2026-10-11",
+    cuts: [
+      { cue: "grenadeKnock", durS: 0.45, files: ["AudioSfx_GrenadeKnock_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 日兵把九一式手榴弹的引信帽往钢盔上一磕（一记短促金属「当」）（GrenadeKnock_take03.mp3） · 2026-10-11" },
+      { cue: "bayonetStabBody", durS: 0.62,
+        files: ["AudioSfx_BayonetStabBody_01.mp3", "AudioSfx_BayonetStabBody_02.mp3", "AudioSfx_BayonetStabBody_03.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 刺刀扎进躯体（闷、湿；三变体）（BayonetStabBody_take02.mp3, BayonetStabBody_take03.mp3, BayonetStabBody_take06.mp3） · 2026-10-11" },
+      { cue: "bayonetTwist", durS: 0.48, files: ["AudioSfx_BayonetTwist_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 刺刀在躯体里拧转（短而湿）（BayonetTwist_take04.mp3） · 2026-10-11" },
+      { cue: "stompMud", durS: 0.42, files: ["AudioSfx_StompMud_01.mp3", "AudioSfx_StompMud_02.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 军靴一脚踩在泥里的人背上（沉闷带湿泥）（StompMud_take02.mp3, StompMud_take04.mp3） · 2026-10-11" },
+      { cue: "boltToss", durS: 0.22, files: ["AudioSfx_BoltToss_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 步枪枪栓被甩出去，落在几米外的松土里（远、轻）（BoltToss_take01.mp3） · 2026-10-11" },
+      { cue: "rifleTossMud", durS: 0.62, files: ["AudioSfx_RifleTossMud_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 老式木托步枪被扔在泥里（木与金属一声）（RifleTossMud_take03.mp3） · 2026-10-11" },
+      { cue: "cheekCut", durS: 0.47, files: ["AudioSfx_CheekCut_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 刀尖贴脸往下压划开（很轻的一声，不是砍）（CheekCut_take08.mp3） · 2026-10-11" },
+      { cue: "bootGrind", durS: 0.58, files: ["AudioSfx_BootGrind_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 军靴鞋跟在手背与泥上碾（约 0.6 秒）（BootGrind_take02.mp3） · 2026-10-11" },
+    ],
   },
   // 战车那一批：成品由 Script_TankAudioBake.mjs 烘，这里只负责在全量 SfxBake 时把它们重新登记进清单。
   ...TANK_SFX.map((entry) => ({
