@@ -154,3 +154,16 @@
 实际流程里（§9 的逐帧探针，60 fps 真实播放 01–02，30 m 内每个人，关键骨骼相对 root）：一帧转 > 45° 的 38 → 21 次、> 90° 12 → 5、> 140° 9 → 2；剩下两次 > 140° 不是动作库（翻译 `gait:unarmed` 的大腿、`BunkerFollowB` 的原生动画）。`CaptiveDraggedFromDirt` 接 `CaptiveWallBrace` 那一帧探针报头部 90°，是换根（前者终帧朝 −90°、后者首帧朝 0°，`ChainRoot` 转 root），世界姿态连续：头 < 0.2°，躯干、腿 < 0.3°，只有右手 17°（改前就有）和左上臂 7°。
 
 **剩下的**：以上剩下的 45–87° 都是摆动（骨头方向转），不是换分支：砍刀的挥砍和收势、爆炸把手臂甩开、`ButtThreat` 枪托砸下、翻越的收腿蹬腿；`CaptiveDraggedFromDirt` 0.83 s 左膝从胸前落到地上两帧各 60–67°（脚踝从髋关节 7 cm 处经过，那一刻膝盖只能绕着很短的髋—踝连线转，要改拖拽时左脚的路线才能再慢下来）。`IjaLookBackLow`（不在现在的流程里）接 `IjaButtStrikeCollar` 右前臂差 163°。`HeDadaoParryChop` 结尾接 `HeLiftTimber`（压木救人改稿的新 clip，没重烘）时左前臂局部差 66° → 114°：砍完那段左手的扭转回到了 ±180° 以内的那一支，`HeLiftTimber` 从自己的姿势起步，两者之间是导演的混合（整条胳膊从握刀换到抬木头）。压木救人改稿（2026-09-28）之后 `IjaSlingRifle`、`IjaCollarDragSnag`、`IjaKickBeam`、两条翻越、`IjaHaulForearmUnder`、`IjaButtStrikeCollar` 已不在导演流程里，仍在库里，按上面的清单一起重烘。
+
+## 11. 2026-10-11 开场改稿 A 包（洞内六人、扎尸、机枪组、验枪撕章拧伤口）
+
+契约 [Data_OpeningRedraft20261011Contract.md](Data_OpeningRedraft20261011Contract.md) §4.2 A 行。代码在 `_import/Script_OpeningStoryboardClips.py` 末尾 `# ==== 2026-10-11 redraft A ====` 块（全局名一律 `Ra` / `RA_` 开头，B 包的块接在后面）；manifest `20261011OpeningStoryboardsV24Redraft`；可编辑工程与伙伴轨 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningRedraft_20261011_A`（`OPENING_BLEND_DIR`，伙伴轨起点拷自 `OpeningWoundedRescue_20260930`）。全部无头 Blender 5.1 烘（`blender -b --python`，没开 BlenderMCP）。
+
+- **P0（12 条）**：`YaowaCrouchCatchEat`、`ComradeEatBreadToss`、`ComradePourRoundsLaugh`、`ComradeCatchDropPick`（NRA02）；`HeHelmetSleepSitUp`、`LiuDivideAmmoToss`（NRA05）；`IjaStompStabTwist`（IJA01，契约表写 IJA02，两套都烘）+ `CorpseStabbedClaw`（NRA02）；`IjaInspectRifleBoltToss`、`IjaThumbWoundTwist`（IJA01）+ `CaptiveArchCaught`（NRA02）；`IjaTearBadge`（IJA02，配不重烘的 `CaptiveKneelMud`）。
+- **P1（8 条）**：`LiuBoxUpGo`（NRA05）、`IjaWalkStabProne`（IJA01/02）、`IjaGrenadeKnockThrow`（IJA01/02）、`IjaDropInKneel` / `IjaDropInStand` / `IjaDropInPoint`（IJA01/02/03）、`IjaProneLmgOnCorpse`（IJA01）、`IjaKneelLoadLmg`（IJA03）。`IjaHeaveCorpseLip` 没做。
+- **成对站位**（manifest `stages`）：`breadToss`（冬瓜丢饼角 → 幺娃接，幺娃 `offsetS` 2.5）、`liuToss`（刘丢一夹到顺子腿上，`shunzi` 只给位置）、`sweepStomp`（第三具尸体 + 乙踩背补刀，乙 `offsetS` 0.667）、`tearBadge`（甲站 `collarQuestion` 同一个点撕胸章）、`thumbWound`（乙在冬瓜左侧拧伤口）。
+- **新接触点**：`badgeChestL`（左胸胸章）、`woundShoulderL`（左肩前的枪伤）、`backStab`（趴着的人两肩胛之间）、`backLow`（后腰）。五套骨架文件的 `contactPoints` 都多了这四个。
+- **新道具轨名**：`bread` `breadPiece` `clipA` `clipB` `comradeRifle` `rifleBolt` `chestBadge` `grenade` `type11` `ammoBox`（契约 §5.2 的名字）+ `helmet`（何有田手里的钢盔，契约没列，新加）。轴的约定写在 manifest `props[名].redraftA`。运行时 `OpeningPropSet` 只认识 `bayonet` / `beam` / `rifle`，其余名字的网格由 Set 包接。
+- **工具**：`RaRotatePose`（按站姿写好的平面姿态整体翻转成趴/侧躺：位置、骨盆、脊柱/颈/头的世界轴倾斜按共轭换算，脚角换成 `toeDir`）；`RaYaw`（整身绕骨盆转向，抓握点一起转到世界，`framedGrips`）；`RaR3Spec`（R3 坡上任意角色的地面/板墙/审片，`SlashGroundSpec` 只认 ijaA）。
+- **测试**：`Script_OpeningClipsBrowserTest` 里带 `blade` + `stab` 接触的 clip 用上了刺刀的步枪播（导演生成乙时同样要 `bayonetFixed`）。`Script_OpeningActorPerformance` 的 `ContactClips` 加了这 20 条（手里拿东西、成对动作，不叠说话手势）。
+- **实测**（烘焙报告，运行时米）：脚滑 ≤ 1.0 cm、接触误差 ≤ 2.3 cm、穿墙 ≤ 1.6 cm、膝盖 ≤ 0.9 cm、骨盆单帧 ≤ 0.2 m；四肢绕自身轴单帧最大仍是旧的 61°（`IjaVaultTimberOut`），新 clip 没有更大的。浏览器审片（正式 GLB）：脚滑 ≤ 1.0 cm；`sweepStomp` 刺刀到 `backStab` 2.5 cm、两人四肢最深 7.7 cm、躯干/头 0；`tearBadge` 握点 0.4 cm、4.9 cm / 0；`thumbWound` 0.6 cm、0 / 0；`breadToss` 0 / 0。

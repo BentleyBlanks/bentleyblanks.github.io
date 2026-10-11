@@ -10080,7 +10080,7 @@ def RaBuildCatchDropPick(T, name):
     start = FlatOf(T, BuildRiseWall, 'WoundedRiseWall', 2.8)
     portRifle = StoopRifle(T)
     wallX = SIDE_WALL_X
-    leaned = T.RifleFromButt((wallX - .09, -.36, .012), Unit((.065, -.02, .998)))
+    leaned = T.RifleFromButt((wallX - .22, -.48, .012), Unit((.15, -.02, .99)))     # the muzzle against the wall
     braceAt = (wallX - .035, -.10, .98)
     reach = (-.10, -.70, 1.06)
     catchAt = (-.08, -.68, 1.02)
@@ -10098,11 +10098,11 @@ def RaBuildCatchDropPick(T, name):
             return leaned
         ax = Move((0, -.15, .99), t, True)
         hand = Vector(Move((-(H + .11), -.10, P - .10), t))
-        trail = T.RifleFromButt(tuple(hand - Vector(ax) * T.R(.80)), ax)
+        trail = T.RifleFromButt(tuple(hand - Vector(ax) * T.R(.85)), ax)
         w = Smooth((t - RA_K_RIFLE) / RaF(8))
         return T.Rifle(Lerp3(leaned['origin'], trail['origin'], w), Unit(Lerp3(leaned['axis'], trail['axis'], w)))
     turnAt = WrChannel([(0.0, 0.0), (RaF(76), 0.0), (RaF(84), -.80), (RaF(92), -1.90), (D, -1.92)])
-    pelX = WrChannel([(0.0, start['pelvis'][0]), (RaF(64), start['pelvis'][0]), (RA_K_RIFLE, start['pelvis'][0] + .10), (RaF(76), start['pelvis'][0] + .04), (D, start['pelvis'][0] - .20)])
+    pelX = WrChannel([(0.0, start['pelvis'][0]), (RaF(64), start['pelvis'][0]), (RA_K_RIFLE, start['pelvis'][0] + .02), (RaF(76), start['pelvis'][0] + .01), (D, start['pelvis'][0] - .20)])
     pelY = WrChannel([(0.0, start['pelvis'][1]), (RaF(76), start['pelvis'][1]), (D, start['pelvis'][1] + .45)])
     pelZ = WrChannel([(0.0, start['pelvis'][2]), (RaF(14), start['pelvis'][2] + .02), (RaF(26), start['pelvis'][2] + .03),
                       (RaF(40), start['pelvis'][2]), (RaF(52), start['pelvis'][2] - .28), (RA_K_PICK, start['pelvis'][2] - .32),
@@ -10124,9 +10124,9 @@ def RaBuildCatchDropPick(T, name):
     anim = Tracks(start, dict(feet, **{
         'pelvis': WrDense(lambda t: (pelX(t), pelY(t), pelZ(t)), D),
         'bend': [(0.0, start['bend']), (RaF(14), .30), (RA_K_CATCH, .32), (RaF(40), .34), (RaF(50), .85), (RA_K_PICK, .95),
-                 (RaF(64), .40), (RA_K_RIFLE, .50), (RaF(80), .40), (D, .40)],
+                 (RaF(64), .40), (RA_K_RIFLE, .62), (RaF(80), .40), (D, .40)],
         'twist': [(0.0, start['twist']), (RaF(14), .10), (RA_K_CATCH, .12), (RaF(40), 0.0), (RA_K_PICK, -.10), (RaF(64), 0.0),
-                  (RA_K_RIFLE, .50), (RaF(78), .20), (D, 0.0)],
+                  (RA_K_RIFLE, .30), (RaF(78), .15), (D, 0.0)],
         'head': [(0.0, start['head']), (RaF(14), (-.10, 0, -.05)), (RA_K_CATCH, (-.05, 0, -.05)), (RaF(30), (.25, 0, -.05)),
                  (RaF(40), (.10, 0, 0)), (RA_K_PICK, (.10, 0, 0)), (RaF(64), (-.05, 0, 0)), (RA_K_RIFLE, (0, 0, .20)),
                  (D, (-.10, 0, 0))],
@@ -10172,7 +10172,7 @@ def RaBuildCatchDropPick(T, name):
             f['armPole.R'] = (-(SX + .50), .10, P - .05)
         else:
             w = Smooth((t - (RA_K_RIFLE - RaF(4))) / RaF(4))
-            f['grip.R'] = T.Along(rifle, .80)
+            f['grip.R'] = T.Along(rifle, .85)
             RaW(f, 'R', w)
             f['hand.R'] = path(RaF(68))
             f['armPole.R'] = Move((-(SX + .50), .25, P - .10), t)
@@ -10210,10 +10210,10 @@ def RaBuildCatchDropPick(T, name):
         if t <= RaF(8):
             out['L'] = T.Along(RifleAt(t), .80)
         if t >= RA_K_RIFLE:
-            out['R'] = T.Along(RifleAt(t), .80)
+            out['R'] = T.Along(RifleAt(t), .85)
         return out
     spec = {'pose': Pose, 'props': Props, 'plants': [p for p in plants], 'check': Check,
-            'reach': {'fraction': .84, 'sides': 'R', 'travel': .12, 'bend': .35},
+            'reach': {'fraction': .84, 'sides': 'R', 'travel': .16, 'bend': .40},
             'walls': [((wallX, 0, 0), (-1, 0, 0))],
             'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + [('box', (wallX + .03, -.4, .7), (.06, 1.6, 1.4), 0),
                                                                 ('point', tuple(thrower), None, .03)],
@@ -11350,7 +11350,7 @@ RA_G_KNOCK = RaF(24)               # 1.0
 RA_G_THROW = RaF(50)               # 2.083 (held 1.08 s: "停了一拍")
 RA_G_FLIGHT = RaF(20)              # 0.833 to 6 m round the corner, then hidden (the blast is the director's, dropIn.foldBlast)
 Meta('IjaGrenadeKnockThrow', RA_G_T, False, 'track', role='ijaC', rig='TengxianIja02', rigs=['TengxianIja01', 'TengxianIja02'],
-     props=['weapon', 'grenade'], rootMotion=False, weaponState='slungBack', env={'wallLeftM': .30},
+     props=['weapon', 'grenade'], rootMotion=False, weaponState='slungBack', env={'wallLeftM': .34},
      contacts=[{'t': RaF(8), 'limb': 'handR', 'action': 'grab', 'target': 'grenade'},
                {'t': RA_G_PIN, 'limb': 'handL', 'action': 'pull', 'target': 'grenade', 'part': 'pin'},
                {'t': RA_G_KNOCK, 'limb': 'handR', 'action': 'knock', 'target': 'helmet'},
@@ -11360,7 +11360,7 @@ Meta('IjaGrenadeKnockThrow', RA_G_T, False, 'track', role='ijaC', rig='TengxianI
              {'t': RA_G_THROW + RA_G_FLIGHT, 'kind': 'grenadeOut'}],
      prev=['IjaReadyRifle'], next=['IjaJunctionPeek', 'IjaReadyRifle'],
      notes='2026-10-11 redraft P1 (N08, "从腰上摸出一颗手榴弹，拔销，往钢盔上一磕——当——捏在手里停了一拍才甩过折角"): his '
-           'rifle slung across his back; the corner wall on his left (env wallLeftM 0.30, its edge 0.35 m ahead of his root). '
+           'rifle slung across his back; the corner wall on his left (env wallLeftM 0.34, its edge 0.35 m ahead of his root). '
            'Right hand to the belt pouch, the Type 91 out (0.33 s, grenade track from frame 0 at the belt); the left fingers pull '
            'the pin (0.583 s); knocked on the crown of his helmet (knock 1.0 s); held a beat at his chest; a side-arm lob round the '
            'corner to his left (throw 2.083 s: the track flies 0.83 s, ~6 m to his left front, then hides; the blast is '
@@ -11426,7 +11426,7 @@ def RaBuildGrenadeKnock(T, name):
         else:
             o['grenade'] = RaHidden()
         return o
-    wallX = T.R(.30)
+    wallX = T.R(.34)
     spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, D), ('R', 0, D)],
             'walls': [((wallX, 0, 0), (-1, 0, 0), (0, -T.R(.35), 0), (0, 1, 0))],
             'reviewProps': lambda t: [('box', (wallX + .03, .6, .9), (.06, 1.9, 1.8), 0)],

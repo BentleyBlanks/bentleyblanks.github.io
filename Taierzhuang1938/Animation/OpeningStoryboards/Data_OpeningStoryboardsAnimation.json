@@ -4467,7 +4467,7 @@
    "rootMotion": false,
    "weaponState": "slungBack",
    "env": {
-    "wallLeftM": 0.3
+    "wallLeftM": 0.34
    },
    "contacts": [
     {
@@ -4528,7 +4528,7 @@
     "IjaJunctionPeek",
     "IjaReadyRifle"
    ],
-   "notes": "2026-10-11 redraft P1 (N08, \"\u4ece\u8170\u4e0a\u6478\u51fa\u4e00\u9897\u624b\u69b4\u5f39\uff0c\u62d4\u9500\uff0c\u5f80\u94a2\u76d4\u4e0a\u4e00\u78d5\u2014\u2014\u5f53\u2014\u2014\u634f\u5728\u624b\u91cc\u505c\u4e86\u4e00\u62cd\u624d\u7529\u8fc7\u6298\u89d2\"): his rifle slung across his back; the corner wall on his left (env wallLeftM 0.30, its edge 0.35 m ahead of his root). Right hand to the belt pouch, the Type 91 out (0.33 s, grenade track from frame 0 at the belt); the left fingers pull the pin (0.583 s); knocked on the crown of his helmet (knock 1.0 s); held a beat at his chest; a side-arm lob round the corner to his left (throw 2.083 s: the track flies 0.83 s, ~6 m to his left front, then hides; the blast is dropIn.foldBlast); he ducks back against the wall. Type 91 placeholder: segmented cylinder 0.05 x 0.095 m, axis toward the fuse cap."
+   "notes": "2026-10-11 redraft P1 (N08, \"\u4ece\u8170\u4e0a\u6478\u51fa\u4e00\u9897\u624b\u69b4\u5f39\uff0c\u62d4\u9500\uff0c\u5f80\u94a2\u76d4\u4e0a\u4e00\u78d5\u2014\u2014\u5f53\u2014\u2014\u634f\u5728\u624b\u91cc\u505c\u4e86\u4e00\u62cd\u624d\u7529\u8fc7\u6298\u89d2\"): his rifle slung across his back; the corner wall on his left (env wallLeftM 0.34, its edge 0.35 m ahead of his root). Right hand to the belt pouch, the Type 91 out (0.33 s, grenade track from frame 0 at the belt); the left fingers pull the pin (0.583 s); knocked on the crown of his helmet (knock 1.0 s); held a beat at his chest; a side-arm lob round the corner to his left (throw 2.083 s: the track flies 0.83 s, ~6 m to his left front, then hides; the blast is dropIn.foldBlast); he ducks back against the wall. Type 91 placeholder: segmented cylinder 0.05 x 0.095 m, axis toward the fuse cap."
   },
   "IjaDropInKneel": {
    "duration": 2.5,
@@ -5221,7 +5221,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "fa5a8e8fb5d55bbe88b35e944f88691b8dc9bbe438191e85d6190e8ec2a699ba",
+   "sha256": "50fe5ce0d3e04bcd8d93a9bbc9751e546192868f970d794e224943c25adb09f1",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
@@ -7222,7 +7222,7 @@
      "footSlideM": 0.0024,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "wallPenetrationM": 0.0006,
+     "wallPenetrationM": 0.0032,
      "pelvisMaxStepM": 0.0003,
      "floorCorrectionMin": 0.00054,
      "floorCorrectionMax": 0.00516,
@@ -7313,10 +7313,10 @@
      "clip": "ComradeCatchDropPick",
      "frames": 97,
      "footSlideM": 0.0,
-     "contactErrorM": 0.0072,
-     "gripSolveErrorM": 0.0072,
-     "wallPenetrationM": 0.0,
-     "pelvisMaxStepM": 0.1766,
+     "contactErrorM": 0.0095,
+     "gripSolveErrorM": 0.00955,
+     "wallPenetrationM": 0.0156,
+     "pelvisMaxStepM": 0.1675,
      "floorCorrectionMin": -0.00627,
      "floorCorrectionMax": 0.0,
      "root": {
@@ -7327,8 +7327,8 @@
        0.691
       ],
       "end": [
-       0.2224,
-       0.0622,
+       0.2257,
+       0.0247,
        -107.14,
        0.5861
       ],
@@ -10383,7 +10383,7 @@
      "footSlideM": 0.0,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "wallPenetrationM": 0.0068,
+     "wallPenetrationM": 0.0,
      "pelvisMaxStepM": 0.0118,
      "floorCorrectionMin": 0.0,
      "floorCorrectionMax": 0.0,
@@ -13205,7 +13205,7 @@
      "footSlideM": 0.0,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "wallPenetrationM": 0.009,
+     "wallPenetrationM": 0.0,
      "pelvisMaxStepM": 0.0117,
      "floorCorrectionMin": 3e-05,
      "floorCorrectionMax": 5e-05,
