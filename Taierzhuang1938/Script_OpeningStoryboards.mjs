@@ -991,8 +991,10 @@ export class FirstLevelBunkerShow {
   HoldBodies(){
     for(const id of ["SweepBody0","SweepBody1",...C.marks.finishBodies.map((p,i)=>"FinishBody"+i),"MgCorpseLower","MgCorpseUpper"]){const a=this.cast[id];if(a)this.Corpse(a,"ShotCollapse");}
     const v=this.cast.SweepVictim;
-    if(v&&!v.alive)this.Corpse(v,"ShotCollapse");
-    else if(v&&this.flags.victimClawAt==null){this.Put(v,C.marks.sweepBodies[2]);this.Pose(v,"ShotCollapse",{seconds:5});}
+    if(v&&!v.alive)this.Corpse(v,OpeningClipMeta("CorpseStabbedClaw")?"CorpseStabbedClaw":"ShotCollapse");
+    // Lying still on the claw's first frame until ijaB's stab (2026-10-11 integration: CorpseStabbedClaw, AnimA).
+    else if(v&&this.flags.victimClawAt==null&&this.flags.victimClawFrom==null){const m=C.marks.sweepBodies[2];this.Put(v,m);
+      if(OpeningClipMeta("CorpseStabbedClaw"))this.Pose(v,"CorpseStabbedClaw",{seconds:0,face:m.yaw});else this.Pose(v,"ShotCollapse",{seconds:5});}
   }
   /** The dugout's six (contract §5.1, banter.*) on their marks: each until his own beat moves him. */
   Tableau(){
@@ -1014,8 +1016,23 @@ export class FirstLevelBunkerShow {
     this.Hold(luo,b.luo,t>=0&&t<ClipLength("GuardTurn",1.2)?"GuardTurn":null,t>=0?{seconds:t}:{});
   }
   // ---- 2026-10-11 integration: the dugout on AnimA's clips (contract §4.2 A, N01–N04) --------------------------------------
-  /** Yaowa's mark: the breadToss stage round the comrade's seat (he catches the corner the comrade's clip throws), else banter.yaowa. */
-  YaowaMark(){return OpeningStage("breadToss")?this.StageRoot("breadToss","yaowa",C.banter.comradeSeat):C.banter.yaowa;}
+  /** Yaowa's mark: banter.yaowa (contract §1.19, N01's right foreground), turned so the comrade is yaowaComradeDeg to his right
+   *  (YaowaCrouchCatchEat looks to his right for the bread; its head turns 70 deg at most). The breadToss stage would put him 0.44 m
+   *  further in, in front of Liu (N01 judge): the corner the comrade throws is flown to his hand instead (BreadFlight). */
+  YaowaMark(){const b=C.banter;return {x:b.yaowa.x,z:b.yaowa.z,yaw:Face(b.yaowa,b.comradeSeat)+b.yaowaComradeDeg*DEG};}
+  /** The bread corner from the comrade's hand (his clip's breadPiece at `toss`) to Yaowa's (his clip's at `catch`), over the time
+   *  between them; both clips' own pieces are hidden over it. */
+  BreadFlight(){
+    const r=this.r,f=this.flags,c=this.Comrade,y=this.Squad("yaowa"),eat="ComradeEatBreadToss",catcher="YaowaCrouchCatchEat";
+    if(f.breadFlownAt!=null||!c||!y)return;
+    f.breadFlownAt=r.time;
+    const toss=EventAt(eat,"toss",3.958),caught=EventAt(eat,"caught",4.417),seconds=Math.max(.2,caught-toss);
+    const from=this.ClipPropWorld(c,eat,"breadPiece",toss+.05,C.banter.comradeSeat),to=this.ClipPropWorld(y,catcher,"breadPiece",EventAt(catcher,"catch",1.917)+.05,this.YaowaMark());
+    if(!from||!to)return;
+    this.Fly("bread","bread",from.position,to.position,{seconds,arcM:.3,then:"hide"}).fromAt=from.position.clone();
+    this.HideClipProp(c,"breadPiece",r.time+ClipLength(eat,5)-toss);
+    this.HideClipProp(y,"breadPiece",r.time+seconds);
+  }
   /**
    * Yaowa crouched hugging his rifle, eyes on the bread (YaowaCrouchCatchEat's hold loop), catching the corner and eating it: his
    * clock runs 0.5 s ahead of the comrade's (breadToss offsetS 2.5 on a 3 s / 1.5 s pair of loops), both let go of their loops at the
@@ -1042,7 +1059,7 @@ export class FirstLevelBunkerShow {
     const now=this.Clock("comrade");
     if(now.clip===eat){
       const t=this.ClockPose("comrade",c,seat);
-      if(now.release!=null&&t>=EventAt(eat,"toss",3.958))this.Emit("breadToss");
+      if(now.release!=null&&t>=EventAt(eat,"toss",3.958)&&this.Emit("breadToss"))this.BreadFlight();
       if(now.release!=null&&t>=ClipLength(eat,5)-1e-3)this.StartClock("comrade",eat);
       return;
     }
@@ -1532,7 +1549,8 @@ export class FirstLevelBunkerShow {
       if(t>=EventAt(clip,"land",.917)){this.flags["landed:"+role]=r.time;this.Sfx("stompMud",{position:r.Point(land,.2),volume:.75});}
       return;
     }
-    if(t<length){this.Put(actor,land);this.Pose(actor,clip,{seconds:t,face:land.yaw});return;}
+    // ijaA stays where he landed, standing on IjaDropInPoint's hold loop (off the eye's line to the fold), until the drag.
+    if(t<length||role==="ijaA"){this.Put(actor,land);this.Pose(actor,clip,{seconds:t,face:land.yaw});return;}
     if(!this.flags["off:"+role]){this.flags["off:"+role]=r.time;this.RerootUnderPelvis(actor,actor.yaw);}
     const since=r.time-this.flags["off:"+role];
     if(role==="ijaC")this.FoldMan(actor,since);
@@ -1568,7 +1586,14 @@ export class FirstLevelBunkerShow {
     const D=C.dropIn,r=this.r;
     const c=this.Ija("ijaC");if(c?.alive&&!skip.includes("ijaC")){if(c.openingStoryboardHidden){this.Show(c);this.Put(c,D.foldPost);}this.Hold(c,D.foldPost,"IjaReadyRifle",{seconds:1.1});}
     const d=this.Ija("ijaD");if(d?.alive&&!skip.includes("ijaD")){if(d.openingStoryboardHidden){this.Show(d);this.Put(d,D.junctionPost);}this.Hold(d,D.junctionPost,"IjaBayonetGuard",{seconds:r.time});}
-    const a=this.Ija("ijaA");if(a?.alive&&!skip.includes("ijaA")){if(a.openingStoryboardHidden){this.Show(a);this.Put(a,D.ijaAPost);}this.Hold(a,D.ijaAPost,null);}
+    const a=this.Ija("ijaA");
+    if(a?.alive&&!skip.includes("ijaA")){
+      // 2026-10-11 integration: standing where he dropped in, on IjaDropInPoint's hold loop.
+      const land=this.DropMarks("ijaA").land,clip=D.clips.ijaA;
+      if(a.openingStoryboardHidden){this.Show(a);this.Put(a,land);}
+      if(OpeningClipMeta(clip)){this.Put(a,land);this.Pose(a,clip,{seconds:r.time-(this.flags.dropInAt??r.time)+5,face:land.yaw});}
+      else this.Hold(a,D.ijaAPost,null);
+    }
   }
   /** 02's Questioning (and Background) call this: in the redraft the corner man and the junction man hold the posts the drop-in
    *  gave them (no walk-in down the link sap any more). Kept under the 09-23 name for the 02 code. */
@@ -2493,9 +2518,10 @@ export class FirstLevelBunkerShow {
     const cam=this.presentedCamera||r.player.camera;
     if(!cheek||!cam)return {...B.recruitAt,yaw:Face(B.recruitAt,C.shunzi.witnessEye)};
     const target=cam.position.clone().add(new THREE.Vector3(-.06,-.05,-.04).applyQuaternion(cam.quaternion));
-    const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion),look=Math.atan2(-fwd.x,-fwd.z);
+
     // The root sits at T - Rot(yaw, cheek): pick the yaw whose root lies at the wanted bearing from the eye.
-    const want=look+B.bearingDeg*DEG;let best=null;
+    // The bearing is from the pinned eye's own facing (east down the trench, shunzi.witnessEye) -- the look itself swings with the hair hold.
+    const want=-Math.PI/2+B.bearingDeg*DEG;let best=null;
     for(let i=0;i<720;i++){
       const yaw=i*Math.PI/360,o=Rot(yaw,cheek.x,cheek.z),root={x:target.x-o.x,z:target.z-o.z,yaw};
       const bearing=Math.atan2(-(root.x-cam.position.x),-(root.z-cam.position.z)),err=Math.abs(Wrap(bearing-want));
@@ -2579,7 +2605,7 @@ export class FirstLevelBunkerShow {
   RecruitBlood(actor){
     const group=actor?.actor?.weaponGroup;if(!group||this.recruitBlood?.parent===group)return;
     if(!this.recruitBloodMaterial){this.recruitBloodMaterial=new THREE.MeshStandardMaterial({color:0x3a0504,roughness:.32,metalness:.05});this.owned.push(this.recruitBloodMaterial);}
-    const length=WEAPONS[actor.actor.weaponId]?.bayonetLengthM||.395,geometry=new THREE.BoxGeometry(.0175,.0255,length*.3);
+    const length=WEAPONS[actor.actor.weaponId]?.bayonetLengthM||.395,geometry=new THREE.BoxGeometry(.0065,.0215,length*.3);
     (this.ownedGeometry??=[]).push(geometry);
     this.recruitBlood?.removeFromParent();
     const mesh=this.recruitBlood=new THREE.Mesh(geometry,this.recruitBloodMaterial);mesh.name="OpeningRecruitBayonetBlood";

@@ -1,5 +1,7 @@
 # 第一关 01–02 导演（2026-09-23 新稿）
 
+> 2026-10-11 起 01–02 以 [Data_OpeningRedraft20261011Contract.md](Data_OpeningRedraft20261011Contract.md) 为准，下文与之冲突的拍子只作历史。
+
 > **2026-10-11 改稿（01 段）**：01 按 [Notion 2026-10-11 稿](Data_FirstLevelOpeningSource20261011.md) 与 [重构契约](Data_OpeningRedraft20261011Contract.md) 重排，phase 表、事件名、替身清单见本页 [§4c](#4c-2026-10-11-01-改稿)；下文 FrontPass / Taunt / 走进来的甲乙 / 嘲弄边走边说的内容只作历史。
 
 > **2026-09-27 改稿**：Slash 以后的 01 与整个 02 以 [压在塌木下原地审问、反冲锋白刃战](Data_OpeningPinnedRescue20260927.md) 为准（phase 表、眼位、审问、耳光、反冲锋、拖出、还权前的站位都在那里）；下文涉及 Wipe…Boots、KickShunzi…LongShot、救援圈、SB03 独立机位、SB03A–SB05A 的内容只作历史。

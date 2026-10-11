@@ -1,5 +1,7 @@
 # 02 先枪伤、再刀砍、自己挣出来、班长塞枪（2026-09-30 改稿）
 
+> 2026-10-11 起 01–02 以 [Data_OpeningRedraft20261011Contract.md](Data_OpeningRedraft20261011Contract.md) 为准，下文与之冲突的拍子只作历史。
+
 用户原话：「把主角救下来的这一段，应该是队友们先开枪击伤日军，日军手已经抬不起来拿枪了，再是班长和队友冲上来一刀砍死了这几个审问的日军和翻译，才接下面班长和主角的对话。而且也不要班长把玩家拖出来了，直接玩家自己往前用力一声腾挪就出来就行；图里的班长太磨叽了，眼珠子也不知道在动什么，就直接询问，得到肯定的点头以后，班长就地捡起一把枪，就塞给玩家；按照我说的改，需要BlenderMCP就自己用」。
 
 本文覆盖 [压木原地审问改稿](Data_OpeningPinnedRescue20260927.md) 第 5 节（冲锋、白刃）与 [拖出与递枪](Data_OpeningRescueHandover20260929.md) 全文（拖出、递枪）。Hold / Ask（揪发、耳光）、还权以后的撤退不变。数据在 `Data_OpeningStoryboards.rescue`（`wound` / `cuts` / `heave` / `hand` / `view` / `rifleMouth`），导演在 `Script_OpeningStoryboards` 的 Charge…Check 那几段。

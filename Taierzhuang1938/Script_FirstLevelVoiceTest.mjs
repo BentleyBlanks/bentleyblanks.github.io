@@ -300,7 +300,8 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   for (const name of RUNTIME_SOURCES) {
     if (!fs.existsSync(new URL(name, import.meta.url))) continue;
     const text = Read(name);
-    for (const [, id] of text.matchAll(/\b(?:Say|Enqueue|Replay|Guidance|PlayScene)\(\s*["']([A-Za-z][A-Za-z0-9]*)["']/g))
+    // Talk("<Scene>"): the 01–02 director's timed scene (FirstLevelBunkerShow.Talk -> voice.PlayScene), 2026-10-11.
+    for (const [, id] of text.matchAll(/\b(?:Say|Enqueue|Replay|Guidance|PlayScene|Talk)\(\s*["']([A-Za-z][A-Za-z0-9]*)["']/g))
       referenced.set(id, name);
     for (const [, id] of text.matchAll(/\bPlayLine\(\s*["']([A-Za-z][A-Za-z0-9]*)\.\d\d["']/g)) referenced.set(id, name);
     for (const [, list] of text.matchAll(/\bCancel\(\s*\[([^\]]*)\]/g))
@@ -312,17 +313,15 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   for (const spec of [...Object.values(MISSION_LEADER_STAGES), ...Object.values(MISSION_GUIDE_TRANSFERS)])
     referenced.set(spec.cue, "MISSION_LEADER_STAGES");
   assert.ok(referenced.size >= 40, "静态扫描至少应找到 40 个 cue 引用，实际 " + referenced.size);
-  // 2026-10-11：CaptiveTaunt / BunkerSearch 已下线，旧导演（Script_OpeningStoryboards，归 Dir01）还引用着，等 Dir01 换成新场景。**只许变短**，集成时清空。
-  const RETIRED_AWAITING_DIRECTOR = new Set(["BunkerSearch", "CaptiveTaunt"]);
+  // 2026-10-11：CaptiveTaunt / BunkerSearch 已下线；集成时导演不再引用它们，名单清空（**只许变短**）。
+  const RETIRED_AWAITING_DIRECTOR = new Set([]);
   for (const id of RETIRED_AWAITING_DIRECTOR) assert.ok(!byId.has(id) && retired1011.includes(id), id + " 是契约 §3 下线的场景，别往这张名单里放别的");
   const missing = [...referenced].filter(([id]) => !byId.has(id) && !RETIRED_AWAITING_DIRECTOR.has(id));
   assert.deepEqual(missing, [], "运行时引用了台词表里没有的 cue：" + JSON.stringify(missing));
   // 09.23 新场景的触发点由第二波 Opening 包（新 01–02 导演）接上。**只许变短**。
   // Opening 包（2026-09-24）已把 01–02 的 13 场全部接到导演的 PlayScene 上，名单清空。
-  // 2026-10-11 新场景由 Dir01 / Dir02 接触发点（集成时清空）。
-  const SECOND_WAVE_UNWIRED = new Set([
-    "BunkerCount", "BunkerLedger", "BunkerExit", "BunkerSweep", "CaptiveWoundTwist", "BayonetPractice", "RecruitCharge", "CaptiveHowl",
-  ]);
+  // 2026-10-11 新场景由 Dir01 / Dir02 的 Talk("<Scene>") 接上触发点（集成时清空）。
+  const SECOND_WAVE_UNWIRED = new Set([]);
   const unwired = story.map((cue) => cue.id).filter((id) => !referenced.has(id));
   for (const id of unwired) assert.ok(SECOND_WAVE_UNWIRED.has(id), "这条剧情 cue 没有任何触发点：" + id);
   console.log(`ok 运行时 ${referenced.size} 处 cue 引用全部落在台词表里（还有 ${unwired.length} 场等 Opening 包接触发点）`);

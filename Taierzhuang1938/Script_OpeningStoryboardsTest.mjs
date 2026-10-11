@@ -837,7 +837,9 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   {
     const B=C.banter,Near=(p,x,z,m=1e-6)=>Math.hypot(p.x-x,p.z-z)<=m,Deg=v=>v*180/Math.PI;
     // §5.1 / §1.19: the six in the dugout.
-    assert.ok(Near(B.yaowa,-1,-125.35)&&Math.abs(Deg(B.yaowa.yaw)-45)<1e-6,"Yaowa crouched at Shunzi's south side facing north-east (§1.19)");
+    // 2026-10-11 integration: 0.22 m further out to the right of the picture (crouched on YaowaCrouchCatchEat he stood in front of the
+    // comrade, N01–N03); the facing is YaowaMark's (the comrade 70 deg to his right), the yaw here unused.
+    assert.ok(Near(B.yaowa,-1.2,-125.45)&&Math.abs(Deg(B.yaowa.yaw)-45)<1e-6,"Yaowa crouched at Shunzi's south side (§1.19, moved 0.22 m)");
     assert.ok(Near(B.he,-.6,-127.35)&&Near(B.luo,1.75,-125.7)&&Near(B.liu,1.1,-124.9)&&Near(B.comradeSeat,.35,-124.35),"He, Luo, Liu, the comrade on §5.1's marks");
     assert.ok(B.exitOrder[0].id==="he"&&B.exitOrder.every(e=>Number.isFinite(e.delayS)&&C.speed[e.speed]>0),"He is first out of the mouth");
     for(const e of B.exitOrder)assert.ok(e.via.every(p=>D(p,S.seat)>.45&&D(p,B.yaowa)>.4||e.id==="yaowa"),`${e.id}'s way out keeps off Shunzi's seat and Yaowa`);
