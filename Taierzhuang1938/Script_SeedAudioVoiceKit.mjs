@@ -376,6 +376,62 @@ export function ClipRuns(file) {
   return runs;
 }
 
+/**
+ * 首字之前、末字之后的静音里孤立的短脉冲（咔嗒、爆音）：自身 ≤ maxS、前后各隔 ≥ quietS 比整片有声段低 quietDb 的静音
+ * （贴着片头 / 片尾的那一侧只要求到头都静），且最响那一下比有声段低不到 25 dB。返回 [[startS, endS]]（片内秒）。
+ * 2026-10-12：CollectionMeet.01 片尾 2.68 s、Volunteer.01 片头 0.06 s 各有一下 15–20 ms、约 −7 dBFS 的咔嗒（整段原始 take 带的）。
+ */
+export function IsolatedBursts(file, { speechStartS = null, speechEndS = null, maxS = 0.12, quietS = 0.15, quietDb = 40 } = {}) {
+  const { hopS, frames } = FrameRms(file, 0.005);
+  const n = frames.length, db = Array.from(frames, (v) => 20 * Math.log10(v + 1e-12));
+  const top = Math.max(...db);
+  const act = db.filter((v) => v > top - 30);
+  const actDb = 10 * Math.log10(act.reduce((t, v) => t + 10 ** (v / 10), 0) / Math.max(1, act.length));
+  const quiet = db.map((v) => v < actDb - quietDb), need = Math.round(quietS / hopS);
+  const Quiet = (a, b) => { for (let f = Math.max(0, a); f < Math.min(n, b); f++) if (!quiet[f]) return false; return true; };
+  const hits = [];
+  for (let i = 0; i < n;) {
+    if (db[i] <= actDb - 25) { i++; continue; }
+    let j = i;
+    while (j < n && db[j] > actDb - quietDb) j++;
+    const a = i * hopS, b = j * hopS;
+    const outside = (speechStartS != null && b <= speechStartS - 0.05) || (speechEndS != null && a >= speechEndS + 0.05);
+    if (b - a <= maxS && outside && (i < need ? Quiet(0, i) : Quiet(i - need, i)) && (j > n - need ? Quiet(j, n) : Quiet(j, j + need)))
+      hits.push([+a.toFixed(3), +b.toFixed(3)]);
+    i = j;
+  }
+  return hits;
+}
+
+/**
+ * 把 ranges（片内秒）静音掉、其余样本原样重编码（长度、电平、逐字时间都不变）。两头各外扩 padS；只给 IsolatedBursts 找出来、
+ * 本来就夹在静音里的脉冲用，所以硬切不会再出咔嗒。
+ */
+// 实测（2026-10-12）：ffmpeg libmp3lame 96k CBR 每编一遍有声段电平掉约 0.45 dB（VBR -q:a 2 不掉），所以编完量一下
+// 没静音的那部分与原片的能量比，按差值补增益再编一遍（|差| ≤ 0.05 dB 为止，最多三遍），电平才真不变。
+export function MuteRanges(input, output, ranges, { padS = 0.005, bitrate = "96k" } = {}) {
+  const sr = 44100, pcm = DecodePcm(input, sr);
+  const keep = new Uint8Array(pcm.length).fill(1);
+  for (const [a, b] of ranges) {
+    const i0 = Math.max(0, Math.floor((a - padS) * sr)), i1 = Math.min(pcm.length, Math.ceil((b + padS) * sr));
+    pcm.fill(0, i0, i1); keep.fill(0, i0, i1);
+  }
+  const Energy = (x) => { let e = 0; for (let i = 0; i < Math.min(x.length, keep.length); i++) if (keep[i]) e += x[i] * x[i]; return e; };
+  const target = Energy(pcm), temp = output + ".tmp.mp3";
+  let gainDb = 0;
+  for (let round = 0; round < 3; round++) {
+    const scaled = Float32Array.from(pcm, (v) => v * 10 ** (gainDb / 20));
+    const encoded = spawnSync(ffmpeg, ["-y", "-v", "error", "-f", "f32le", "-ar", String(sr), "-ac", "1", "-i", "-", "-map_metadata", "-1",
+      "-ac", "1", "-ar", String(sr), "-b:a", bitrate, temp], { input: Buffer.from(scaled.buffer), windowsHide: true });
+    if (encoded.status !== 0) throw new Error(`Unable to mute ${path.basename(output)}: ${String(encoded.stderr).slice(0, 200)}`);
+    const off = 10 * Math.log10(Energy(DecodePcm(temp, sr)) / target);
+    if (Math.abs(off) <= 0.05) break;
+    gainDb -= off;
+  }
+  fs.renameSync(temp, output);
+  return { output, gainDb: +gainDb.toFixed(2) };
+}
+
 const FoldKana = (c) => {
   const code = c.codePointAt(0);
   return code >= 0x30a1 && code <= 0x30f6 ? String.fromCodePoint(code - 0x60) : c.toLowerCase();

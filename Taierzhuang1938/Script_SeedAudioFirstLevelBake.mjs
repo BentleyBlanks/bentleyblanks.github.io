@@ -21,7 +21,10 @@
 //   --pick=S:n      人工指定场景用第几次生成（先逐句核过转写与嗓子）；--pick=S.NN:n 跟 --patch 一起用：这一句补录装第几条
 //   --patch=S.NN    例外：单独补录这一句（带本人定妆音参考），替换整段切出来的那一片；--takes=N 这一句一共几条候选（默认 1；
 //                   盘上已有的不重发），末字后隔着静音的杂音（爆音、咔嗒）母带时剪掉
-//   --remaster=S.NN 已装上的补录片重新母带（原始 take 不在这个工作区时，拿装上的那一片当原始录音）：剪末字后的杂音、电平重新对齐，不发请求
+//   --remaster=S.NN 已装上的补录片重新母带（原始 take 不在这个工作区时，拿装上的那一片当原始录音）：剪末字后的杂音、电平重新对齐，不发请求；
+//                   整段切出来的片段（source: "scene"）只把首字前 / 末字后静音里孤立的咔嗒静音掉，长度、电平、逐字时间不动（清单 remastered.muted）
+//   补录写法看导演表这一句的 patch（不进整段提示词）：delivery 换表演说明、refLines 带本人本场别的句子当参考、span 把相邻几句当小戏
+//                   一次生成只取这一句；导演表 f0Hz 是基频中位的目标范围（补录选条时不在范围里的排后面，门禁照它核）
 //   --rescore       不发请求，只对已有生成重新母带、切句、打分（whisper / 音色编码重跑）
 //   --force         无视 promptHash 重新生成     --jobs=N     并发（默认 2，上限 2：本机还有别的包在调）
 //   --prune         删掉台词表里已经不存在的 cue / 句的成品与清单条目
@@ -39,7 +42,8 @@ import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner } from "./Data_FirstLevelVoiceCast.mjs";
 import { PROJECTION_DB, LINE_MASTER, LineDirection, FIRST_LEVEL_DIALOGUE_DIRECTION } from "./Data_FirstLevelDialogueDirection.mjs";
 import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, Pool, requestStats,
-  SEED_AUDIO_MODEL, MasterSceneWav, EncodeSegment, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines, TruePeakDb, StripLaughter }
+  SEED_AUDIO_MODEL, MasterSceneWav, EncodeSegment, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines, TruePeakDb, StripLaughter,
+  IsolatedBursts, MuteRanges }
   from "./Script_SeedAudioVoiceKit.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url)),
@@ -144,13 +148,21 @@ export function SceneTargetDb(cue) {
   return +(sum / weight).toFixed(2);
 }
 
-/** 整段提示词。参考音本身不进哈希（另记 castSha256）。 */
-export function ScenePrompt(cue) {
-  const refs = SceneReferences(cue);
-  const speakers = SceneSpeakers(cue);
+/**
+ * 整段提示词。参考音本身不进哈希（另记 castSha256）。
+ * only（补录用，2026-10-12 R3-Voice）：只演这几句（原句号下标，按顺序）当一场小戏；delivery：{ 原下标: 这一句换用的表演说明 }。
+ * 两个都不给时与以前逐字相同（门禁按它核整段录音的 promptHash）。
+ */
+export function ScenePrompt(cue, { only = null, delivery = {} } = {}) {
+  const idx = only || cue.lines.map((_, i) => i);
+  const view = only ? { ...cue, lines: idx.map((i) => cue.lines[i]) } : cue;
+  const Spoken = (k) => MissionVoiceSpoken(cue, idx[k]);
+  const Dir = (k) => ({ ...LineDirection(cue, idx[k]), ...(delivery[idx[k]] ? { delivery: delivery[idx[k]] } : {}) });
+  const refs = SceneReferences(view);
+  const speakers = SceneSpeakers(view);
   const scene = FIRST_LEVEL_DIALOGUE_DIRECTION[cue.id];
   const langs = new Set(speakers.map((who) => FIRST_LEVEL_VOICE_CAST[who]?.lang || "zh"));
-  const interpreterJa = cue.lines.some((line) => line.who === "interpreter" && line.lang === "ja");
+  const interpreterJa = view.lines.some((line) => line.who === "interpreter" && line.lang === "ja");
   const dry = speakers.length > 1
     ? "录音棚近讲干声，单声道，只有下面这几个角色的人声（含稿中写明的笑、喘、闷哼）：没有任何环境声、战场声、脚步、枪炮、爆炸、音效、音乐和混响，开头和结尾不留长空白。"
     : DRY_VOICE_RULE;
@@ -170,8 +182,8 @@ export function ScenePrompt(cue) {
     langs.has("zh-north") ? `翻译讲鲁南北方官话（山东口音），绝不说四川话${interpreterJa ? "；他说日语时带很重的中国北方口音，发音生硬" : ""}` : "",
     langs.has("ja") ? "日兵是日语母语者，只说给出的日语（假名照日语念），不说中文" : "",
   ].filter(Boolean).join("；");
-  const notes = cue.lines.map((line, i) => {
-    const d = LineDirection(cue, i);
+  const notes = view.lines.map((line, i) => {
+    const d = Dir(i);
     const bits = [
       d.pauseBeforeS ? `开口前停约 ${d.pauseBeforeS} 秒` : "",
       d.effort?.before ? `开口前${d.effort.before}` : "",
@@ -182,11 +194,11 @@ export function ScenePrompt(cue) {
     ].filter(Boolean);
     return `第${i + 1}句（${Name(line.who)}）：${bits.join("，")}`;
   }).join("；");
-  const script = cue.lines.map((line, i) => {
+  const script = view.lines.map((line, i) => {
     const k = RefIndex(refs, line.who);
-    return `${k >= 0 ? `@音频${k + 1} ` : ""}${Name(line.who)}：“${MissionVoiceSpoken(cue, i)}”`;
+    return `${k >= 0 ? `@音频${k + 1} ` : ""}${Name(line.who)}：“${Spoken(i)}”`;
   }).join("\n");
-  const together = cue.lines.length > 1
+  const together = view.lines.length > 1
     ? "这是同一场戏一次录完：人物在同一个地方、彼此对着说话，听得见对方；按下面的表演说明接话、停顿、抢话，喊的就喊、低声的就低声。"
     : "";
   return `${dry}${refText}${unrefText}场景：${scene?.context || cue.delivery || ""}。人物：${cast}。${langRules}。${together}`
@@ -540,11 +552,16 @@ function Install(cue, best, all, manifestLines, scenes, timings, manifest, picke
 // 例外：单独补录一句（带本人定妆音），电平对齐到整段里原来那一片
 // ============================================================================
 
-/** 补录单句的提示词（旧逐句口径）。 */
+/**
+ * 补录单句的提示词（旧逐句口径）。导演表这一句的 patch（只进补录、不进整段提示词，2026-10-12 R3-Voice）：
+ *   delivery  补录时换用的表演说明（整段录音里那句的说明不动）
+ *   refLines  ["NN", …]：本场这几句装上的片段一起当参考音送（@音频2…；同一个人前面刚说过的句子，对准嗓子用，不念）
+ * 没写 patch 的句子提示词与以前逐字相同。
+ */
 export function LinePrompt(cue, index) {
   const line = cue.lines[index], cast = FIRST_LEVEL_VOICE_CAST[SceneVoice(cue, line.who)];
   if (!cast) throw new Error(`${cue.id}: ${line.who} has no cast entry in Data_FirstLevelVoiceCast`);
-  const direction = LineDirection(cue, index);
+  const direction = LineDirection(cue, index), patch = direction.patch || {};
   const ja = line.lang === "ja";
   const lang = ja
     ? (cast.lang === "ja" ? VOICE_LANG_RULE.ja
@@ -555,13 +572,67 @@ export function LinePrompt(cue, index) {
     direction.context ? `此刻：${direction.context}。` : "",
     previous ? `上一句是${Name(previous.who)}说的（不要念）：“${MissionVoiceSpoken(cue, index - 1)}”。` : "",
   ].join("");
+  const refText = PatchRefLines(cue, index).map(({ i }, k) =>
+    `@音频${k + 2} 是他本人在这场戏里刚说过的“${MissionVoiceSpoken(cue, i)}”：同一个人、同一个嗓子、同一次录音里的状态，只用来对准嗓子，不要念它。`).join("");
   const spoken = MissionVoiceSpoken(cue, index);
   return DRY_VOICE_RULE
     + "@音频1 是这个角色本人的声音：严格保持 @音频1 的音色、年龄感和口音，只按下面的表演改变情绪和音量。"
+    + refText
     + `角色：${cast.persona}。${lang}${context}`
-    + `表演：${direction.delivery || "自然、口语化，不是播音腔"}；${PROJECTION_WORDS[direction.projection] || PROJECTION_WORDS.normal}；`
+    + `表演：${patch.delivery || direction.delivery || "自然、口语化，不是播音腔"}；${PROJECTION_WORDS[direction.projection] || PROJECTION_WORDS.normal}；`
     + `情绪强度 ${Math.round((direction.intensity ?? 0.5) * 10)}/10。`
     + `只说这一句，一个字都不加、不删、不念角色名：“${spoken}”`;
+}
+
+/** 导演表 patch.refLines 指的本场句子（同一个人说的），{ i: 下标, id }。 */
+function PatchRefLines(cue, index) {
+  const refLines = LineDirection(cue, index).patch?.refLines || [];
+  return refLines.map((nn) => ({ i: cue.lines.findIndex((l) => l.id === `${cue.id}.${nn}`), id: `${cue.id}.${nn}` })).map((r) => {
+    if (r.i < 0 || cue.lines[r.i].who !== cue.lines[index].who) throw new Error(`${cue.lines[index].id}: patch.refLines ${r.id} 不是本人在本场说的句子`);
+    return r;
+  });
+}
+
+/**
+ * 一句补录怎么请求。缺省 = 单句（LinePrompt，本人定妆音 + patch.refLines 的片段）；导演表 patch.span = ["NN", "MM"]：
+ * 把本场 NN…MM 这几句当一场小戏一次生成（ScenePrompt only，参考音照这几句的说话人挂），只取要补的那一句（2026-10-12 R3-Voice：
+ * BunkerBanter.09 三次单句补录都是 108–127 Hz，比顺子本场其它句低三成多，试「带着上下文一起演」）。
+ */
+function PatchPlan(cue, index) {
+  const patch = LineDirection(cue, index).patch || {};
+  if (patch.span) {
+    const [a, b] = patch.span.map((nn) => cue.lines.findIndex((l) => l.id === `${cue.id}.${nn}`));
+    if (a < 0 || b < a || index < a || index > b) throw new Error(`${cue.lines[index].id}: patch.span ${patch.span.join("–")} 要包住这一句`);
+    const only = Array.from({ length: b - a + 1 }, (_, k) => a + k);
+    const prompt = ScenePrompt(cue, { only, delivery: patch.delivery ? { [index]: patch.delivery } : {} });
+    const refs = SceneReferences({ ...cue, lines: only.map((i) => cue.lines[i]) });
+    return { mode: `span ${patch.span.join("–")}`, prompt, references: refs.map((r) => ({ file: r.file, sha256: r.sha256 })), only, k: only.indexOf(index) };
+  }
+  const own = CastReference(SceneVoice(cue, cue.lines[index].who));
+  const extra = PatchRefLines(cue, index).map(({ id }) => {
+    const entry = ReadJson(manifestPath)?.lines?.[id];
+    if (!entry) throw new Error(`${cue.lines[index].id}: patch.refLines ${id} 还没有录音`);
+    return { file: path.join(out, entry.file), sha256: entry.sha256, line: id };
+  });
+  return { mode: extra.length ? `line+${extra.map((r) => r.line).join(",")}` : "line", prompt: LinePrompt(cue, index),
+    references: [{ file: own.file, sha256: own.sha256 }, ...extra] };
+}
+const PlanHash = (plan) => Hash(plan.prompt + "\n" + plan.references.map((r) => r.sha256).join(","));
+
+/** 小戏生成里切出要补的那一句，写成这一条补录的原始 take（逐字时间平移到切出来的这段）。 */
+function CutSpanTake(spanRaw, raw, plan, cue, subtitle) {
+  const mapped = MapSubtitleToLines(plan.only.map((i) => MissionVoiceSpoken(cue, i)), subtitle);
+  const m = mapped[plan.k];
+  if (m.start == null || m.coverage < SCENE_CHECK.minCoverage) throw new Error(`span take: ${cue.lines[plan.only[plan.k]].id} 没对上（${m.matched}/${m.total} 字）`);
+  const prevEnd = plan.k > 0 ? mapped[plan.k - 1].end ?? 0 : 0, next = mapped[plan.k + 1]?.start ?? null;
+  const startS = Math.max(0, Math.min(m.start - 0.05, Math.max(prevEnd + 0.05, m.start - 0.3)));
+  const endS = next != null ? Math.max(m.end + 0.05, Math.min(next - 0.05, m.end + 0.4)) : null;
+  const cut = spawnSync(process.env.FFMPEG || "ffmpeg", ["-y", "-v", "error", "-i", spanRaw, "-af",
+    `atrim=start=${startS.toFixed(3)}${endS != null ? `:end=${endS.toFixed(3)}` : ""},asetpts=PTS-STARTPTS`, "-ac", "1", "-ar", "44100", "-q:a", "2", raw],
+  { encoding: "utf8", windowsHide: true });
+  if (cut.status !== 0) throw new Error(`span take: cut failed ${cut.stderr?.slice(0, 160)}`);
+  return { sentences: [{ words: m.chars.map(([c, a, b]) => ({ text: c, start_time: Math.round((a - startS) * 1000), end_time: Math.round((b - startS) * 1000) })) }],
+    span: { startS: +startS.toFixed(3), endS: endS != null ? +endS.toFixed(3) : null, lines: mapped.map((x) => ({ start: x.start, end: x.end, coverage: x.coverage })) } };
 }
 
 async function PatchLines(manifest) {
@@ -572,31 +643,59 @@ async function PatchLines(manifest) {
     if (!cue) throw new Error(`--${remaster ? "remaster" : "patch"}: unknown line ${id}`);
     const index = cue.lines.findIndex((l) => l.id === id);
     if (!manifest.lines?.[id] || manifest.lines[id].scene !== cue.id) throw new Error(`--patch ${id}: bake the scene first`);
-    if (remaster && manifest.lines[id].source !== "patch") throw new Error(`--remaster ${id}: only installed patch clips can be remastered`);
-    return { cue, index, line: cue.lines[index], remaster };
+    return { cue, index, line: cue.lines[index], remaster, slice: remaster && manifest.lines[id].source === "scene" };
   };
   const jobsList = [...patchLines.map((id) => Job(id, false)), ...remasterLines.map((id) => Job(id, true))];
-  const takes = jobsList.flatMap((job) => job.remaster ? [{ ...job, n: "remaster" }] : Array.from({ length: patchTakes }, (_, k) => ({ ...job, n: k + 1 })));
-  const Raw = (t) => path.join(patchWork, `${t.line.id}_${t.n}.raw.mp3`), Meta = (t) => path.join(patchWork, `${t.line.id}_${t.n}.json`);
+  const timings = ReadJson(timingsPath, {});
+  // --remaster 整段切出来的片段（source: "scene"）：只把首字前 / 末字后静音里孤立的咔嗒、爆音静音掉（IsolatedBursts），
+  // 长度、电平（编码补偿到 ±0.05 dB）、逐字时间、在整段里的区间都不动；门禁比对整段时同样把这几段置零（清单 remastered.muted）。
+  const sliceJobs = jobsList.filter((j) => j.slice);
+  for (const job of sliceJobs) {
+    const entry = manifest.lines[job.line.id], file = path.join(out, entry.file);
+    const chars = (timings[entry.sha256]?.chars || []).filter(([, a, b]) => b >= a);
+    if (!chars.length) throw new Error(`--remaster ${job.line.id}: 没有逐字时间，找不到首字 / 末字`);
+    const bursts = IsolatedBursts(file, { speechStartS: chars[0][1], speechEndS: chars.at(-1)[2] });
+    if (!bursts.length) { console.log(`${job.line.id}: 首字前 / 末字后没有孤立的咔嗒，不动`); job.skip = true; continue; }
+    job.file = path.join(patchWork, `${job.line.id}_remaster.mp3`);
+    job.muted = bursts;
+    job.gainDb = MuteRanges(file, job.file, bursts).gainDb;
+    console.log(`${job.line.id}: 静音 ${bursts.map(([a, b]) => `${a}–${b} s`).join("、")}（编码补偿 ${job.gainDb} dB）`);
+  }
+  const patchJobs = jobsList.filter((j) => !j.slice);
+  for (const job of patchJobs) {
+    if (job.remaster && manifest.lines[job.line.id].source !== "patch") throw new Error(`--remaster ${job.line.id}: only installed patch or scene clips can be remastered`);
+    if (!job.remaster) { job.plan = PatchPlan(job.cue, job.index); job.tag = PlanHash(job.plan).slice(0, 8); }
+  }
+  const takes = patchJobs.flatMap((job) => job.remaster ? [{ ...job, n: "remaster" }] : Array.from({ length: patchTakes }, (_, k) => ({ ...job, n: k + 1 })));
+  // 原始 take 的文件名带提示词 + 参考音的哈希：换了补录写法（单句 / 带上一句 / 小戏）之后，旧写法的 take 还留在盘上可比、可 --pick。
+  const Raw = (t) => path.join(patchWork, t.remaster ? `${t.line.id}_remaster.raw.mp3` : `${t.line.id}_${t.tag}_${t.n}.raw.mp3`);
+  const Meta = (t) => Raw(t).replace(/\.raw\.mp3$/, ".json");
   // 这次真发出去的请求（按句记）：补录条数 = 以前记下的 + 这次新发的。旧的补录 take 可能不在这个工作区（换了 worktree），
   // 不能按盘上的 take 数重算（2026-10-12 前按盘上数，换 worktree 再补录会把以前的请求数抹掉）。
   const sent = new Map();
   if (!dry && !rescore) {
-    const todo = takes.filter((t) => !t.remaster && (force || !fs.existsSync(Raw(t)) || ReadJson(Meta(t))?.promptHash !== Hash(LinePrompt(t.cue, t.index))));
+    const todo = takes.filter((t) => !t.remaster && (force || !fs.existsSync(Raw(t)) || ReadJson(Meta(t))?.planHash !== PlanHash(t.plan)));
     console.log(`${todo.length} SeedAudio patch requests`);
     const { errors } = await Pool(todo, jobs, async (t) => {
-      const prompt = LinePrompt(t.cue, t.index), ref = CastReference(SceneVoice(t.cue, t.line.who));
-      const result = await SeedAudioSpeak({ prompt, references: [ref.file], label: `patch ${t.line.id}#${t.n}` });
+      const result = await SeedAudioSpeak({ prompt: t.plan.prompt, references: t.plan.references.map((r) => r.file), label: `patch ${t.line.id}#${t.n} (${t.plan.mode})` });
       sent.set(t.line.id, (sent.get(t.line.id) || 0) + 1);
-      fs.writeFileSync(Raw(t), result.bytes);
-      fs.writeFileSync(Meta(t), JSON.stringify({ promptHash: Hash(prompt), castSha256: ref.sha256, subtitle: result.subtitle }));
+      let subtitle = result.subtitle, span = null;
+      if (t.plan.only) {
+        const spanRaw = Raw(t).replace(/\.raw\.mp3$/, ".span.mp3");
+        fs.writeFileSync(spanRaw, result.bytes);
+        ({ span, ...subtitle } = CutSpanTake(spanRaw, Raw(t), t.plan, t.cue, result.subtitle));
+      } else fs.writeFileSync(Raw(t), result.bytes);
+      fs.writeFileSync(Meta(t), JSON.stringify({ promptHash: Hash(t.plan.prompt), planHash: PlanHash(t.plan), mode: t.plan.mode,
+        references: t.plan.references.map((r) => r.sha256), subtitle, ...(span ? { span, spanSubtitle: result.subtitle } : {}) }));
     });
     for (const e of errors) console.error(e.message);
   }
-  if (dry) { console.log(`${takes.filter((t) => !t.remaster).length} patch requests would be sent`); return; }
+  if (dry) {
+    for (const job of patchJobs.filter((j) => !j.remaster)) console.log(`${job.line.id}: ${job.plan.mode}, ${job.plan.references.length} refs, prompt ${job.plan.prompt.length} chars\n${job.plan.prompt}`);
+    console.log(`${takes.filter((t) => !t.remaster).length} patch requests would be sent`); return;
+  }
   // --remaster：装上的补录片原始 take 不在这个工作区时，拿装上的那一片当原始录音重新母带（剪末字后的杂音、电平重新对齐）。
   // 逐字时间从清单里那一片的逐字时间来（已经是片内的秒）。
-  const timings = ReadJson(timingsPath, {});
   for (const t of takes.filter((x) => x.remaster)) {
     const entry = manifest.lines[t.line.id];
     fs.copyFileSync(path.join(out, entry.file), Raw(t));
@@ -604,7 +703,7 @@ async function PatchLines(manifest) {
     fs.writeFileSync(Meta(t), JSON.stringify({ promptHash: entry.patch?.promptHash, remasteredFrom: entry.sha256,
       subtitle: { sentences: [{ words: chars.map(([c, a, b]) => ({ text: c, start_time: Math.round(a * 1000), end_time: Math.round(b * 1000) })) }] } }));
   }
-  const ready = takes.filter((t) => fs.existsSync(Raw(t)));
+  const ready = takes.filter((t) => fs.existsSync(Raw(t)) && (t.remaster || ReadJson(Meta(t))?.planHash === PlanHash(t.plan)));
   for (const t of ready) {
     const entry = manifest.lines[t.line.id];
     t.file = Raw(t).replace(/\.raw\.mp3$/, ".mp3");
@@ -618,26 +717,52 @@ async function PatchLines(manifest) {
     if (t.master.tailCutS != null) console.log(`${t.line.id}#${t.n}: 末字后有杂音，剪在原始 take ${t.master.tailCutS} s`);
     if (t.master.leadCutS != null) console.log(`${t.line.id}#${t.n}: 首字前的哼声 / 杂音太长，从原始 take ${t.master.leadCutS} s 起`);
   }
-  const castFiles = [...new Set(ready.flatMap((t) => [...new Set(t.cue.lines.map((l) => CastReference(SceneVoice(t.cue, l.who))?.file))]).filter(Boolean))];
-  const vectors = SpeakerEmbed([...ready.map((t) => t.file), ...castFiles]);
-  const texts = Transcribe(ready.map((t) => ({ file: t.file, lang: t.line.lang === "ja" ? "ja" : "zh", text: MissionVoiceSpoken(t.cue, t.index),
+  const judged = [...ready, ...sliceJobs.filter((j) => !j.skip)];
+  const castFiles = [...new Set(judged.flatMap((t) => [...new Set(t.cue.lines.map((l) => CastReference(SceneVoice(t.cue, l.who))?.file))]).filter(Boolean))];
+  const vectors = SpeakerEmbed([...judged.map((t) => t.file), ...castFiles]);
+  const texts = Transcribe(judged.map((t) => ({ file: t.file, lang: t.line.lang === "ja" ? "ja" : "zh", text: MissionVoiceSpoken(t.cue, t.index),
     reference: t.line.lang === "ja" ? JAPANESE_SPEECH[t.line.id]?.kanji : MissionVoiceSpoken(t.cue, t.index) })));
   if (!vectors || !texts) { console.error("patch judge unavailable"); process.exitCode = 1; return; }
-  for (const job of jobsList) {
+  const Voice = (t) => {
+    const own = CastReference(SceneVoice(t.cue, t.line.who));
+    t.speakerCos = +CenteredCosine(vectors[t.file], vectors[own.file]).toFixed(3);
+    const others = [...new Set(t.cue.lines.map((l) => l.who))].filter((w) => w !== t.line.who)
+      .map((w) => [w, CastReference(SceneVoice(t.cue, w))]).filter(([, r]) => r && r.owner !== own.owner && vectors[r.file])
+      .map(([w, r]) => [w, +CenteredCosine(vectors[t.file], vectors[r.file]).toFixed(3)]).sort((a, b) => b[1] - a[1]);
+    t.nearestOther = others[0] || null;
+    const refs = SceneReferences(t.cue);
+    t.referencedOther = others.find(([who]) => RefIndex(refs, who) >= 0) || null;
+    t.cer = texts[t.file]?.cer ?? null; t.transcript = texts[t.file]?.text ?? null;
+  };
+  for (const job of sliceJobs.filter((j) => !j.skip)) {
+    Voice(job);
+    const entry = manifest.lines[job.line.id], target = path.join(out, job.line.file), oldSha = entry.sha256;
+    fs.copyFileSync(job.file, target);
+    const sha256 = Sha256(target), m = MeasureVoice(target);
+    const timing = timings[oldSha];
+    delete timings[oldSha];
+    timings[sha256] = { ...timing, seconds: m.seconds };
+    Object.assign(entry, { sha256, bytes: fs.statSync(target).size, seconds: m.seconds,
+      remastered: { fromSha256: oldSha, muted: job.muted, gainDb: job.gainDb,
+        why: "整段原始 take 在这一片首字前 / 末字后的静音里带了一下孤立的咔嗒（15–20 ms），只把那几毫秒静音掉，长度、电平、逐字时间、整段区间都不动" },
+      metrics: { ...entry.metrics, activeRmsDb: m.activeRmsDb, truePeakDb: +TruePeakDb(target).toFixed(2), snrDb: m.snrDb, voicedS: m.voicedS,
+        lowShare: m.lowShare, f0: m.f0, cer: job.cer, transcript: job.transcript, speakerCos: job.speakerCos, nearestOther: job.nearestOther,
+        referencedOther: job.referencedOther } });
+    console.log(`${job.line.id}: remastered slice ${oldSha.slice(0, 8)} → ${sha256.slice(0, 8)} rms ${m.activeRmsDb} cos ${job.speakerCos} other ${job.nearestOther?.join(":")} cer ${job.cer} 「${job.transcript}」`);
+  }
+  for (const job of patchJobs) {
     const mine = ready.filter((t) => t.line.id === job.line.id && !!t.remaster === job.remaster).map((t) => {
-      const own = CastReference(SceneVoice(t.cue, t.line.who));
-      t.speakerCos = +CenteredCosine(vectors[t.file], vectors[own.file]).toFixed(3);
-      t.nearestOther = [...new Set(t.cue.lines.map((l) => l.who))].filter((w) => w !== t.line.who)
-        .map((w) => [w, CastReference(SceneVoice(t.cue, w))]).filter(([, r]) => r && r.owner !== own.owner && vectors[r.file])
-        .map(([w, r]) => [w, +CenteredCosine(vectors[t.file], vectors[r.file]).toFixed(3)]).sort((a, b) => b[1] - a[1])[0] || null;
-      t.cer = texts[t.file]?.cer ?? null; t.transcript = texts[t.file]?.text ?? null;
+      Voice(t);
       // 电平对不齐整段里原来那一片（峰值太尖、压到 −1 dBTP 以下就够不着目标）的排到后面：门禁只容 1.5 dB。
       const entry = manifest.lines[t.line.id], targetDb = entry.patch?.targetDb ?? entry.metrics.activeRmsDb;
       t.levelOff = Math.abs(t.master.measure.activeRmsDb - targetDb) > 1.5;
       // 比本场任何另一个人的定妆音更像别人的 take 排到后面（2026-10-12：BunkerBanter 五个人里三个嗓子本来就近）。
       t.wrongVoice = !!(t.nearestOther && t.nearestOther[1] >= t.speakerCos);
-      t.score = (t.cer ?? 0.5) * 10 + (1 - t.speakerCos) * 6 + (t.levelOff ? 100 : 0) + (t.wrongVoice ? 50 : 0);
-      console.log(`   ${t.line.id}#${t.n} cos ${t.speakerCos} other ${t.nearestOther?.join(":")} cer ${t.cer} level ${t.master.measure.activeRmsDb}/${targetDb} 「${t.transcript}」`);
+      // 导演表 f0Hz：基频中位不在范围里的排到后面（2026-10-12 R3-Voice：BunkerBanter.09 补录总比本人别的句子低三成）。
+      const f0Hz = LineDirection(t.cue, t.index).f0Hz, f0 = t.master.measure.f0?.median;
+      t.f0Off = !!(f0Hz && !(f0 >= f0Hz[0] && f0 <= f0Hz[1]));
+      t.score = (t.cer ?? 0.5) * 10 + (1 - t.speakerCos) * 6 + (t.levelOff ? 100 : 0) + (t.wrongVoice ? 50 : 0) + (t.f0Off ? 30 : 0);
+      console.log(`   ${t.line.id}#${t.n}${t.meta?.mode ? ` (${t.meta.mode})` : ""} cos ${t.speakerCos} other ${t.nearestOther?.join(":")} cer ${t.cer} f0 ${f0} level ${t.master.measure.activeRmsDb}/${targetDb} 「${t.transcript}」`);
       return t;
     }).sort((a, b) => a.score - b.score);
     if (!mine.length) continue;
@@ -658,11 +783,13 @@ async function PatchLines(manifest) {
       patch: { reason: previous?.reason || "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
         replacedSha256: previous?.replacedSha256 ?? entry.sha256, targetDb: entry.patch?.targetDb ?? entry.metrics.activeRmsDb, takes: totalTakes,
         take: job.remaster ? previous?.take : best.n,
-        promptHash: job.remaster ? previous?.promptHash : Hash(LinePrompt(job.cue, job.index)),
+        promptHash: job.remaster ? previous?.promptHash : Hash(job.plan.prompt),
+        ...(job.remaster ? (previous?.mode ? { mode: previous.mode } : {}) : { mode: job.plan.mode }),
         ...(job.remaster ? { remastered: { fromSha256: best.meta.remasteredFrom, tailCutS: best.master.tailCutS ?? null,
           why: "补录片末字后有与台词无关的爆音 / 杂音（原始 take 不在这个工作区），拿装上的那一片重新母带：剪掉杂音、有声段电平重新对齐" } }
           : previous?.remastered && newTakes === 0 ? { remastered: previous.remastered } : {}),
-        ...(best.master.tailCutS != null && !job.remaster ? { tailCutS: best.master.tailCutS } : {}) },
+        ...(best.master.tailCutS != null && !job.remaster ? { tailCutS: best.master.tailCutS } : {}),
+        ...(best.meta?.span ? { span: best.meta.span } : {}) },
       metrics: { ...entry.metrics, activeRmsDb: m.activeRmsDb, truePeakDb: m.truePeakDb, snrDb: m.snrDb, voicedS: m.voicedS,
         lowShare: m.lowShare, f0: m.f0, cer: best.cer, transcript: best.transcript, speakerCos: best.speakerCos, nearestOther: best.nearestOther } });
     timings[sha256] = { lineId: job.line.id, who: job.line.who, lang: job.line.lang || "zh", seconds: m.seconds, source: "seedaudio-subtitle",
@@ -671,6 +798,14 @@ async function PatchLines(manifest) {
     const scene = manifest.scenes?.[job.cue.id];
     if (scene) { scene.requests = (scene.requests || 0) + newTakes; (scene.patched ||= []).includes(job.line.id) || scene.patched.push(job.line.id); }
     console.log(`${job.line.id}: ${job.remaster ? "remastered" : `patched take ${best.n}`} cos ${best.speakerCos} other ${best.nearestOther?.join(":")} cer ${best.cer} 「${best.transcript}」`);
+  }
+  // 只发了请求、没装上的补录（例：所有候选都被 --pick 指到别的写法）也要记进请求数。
+  for (const [id, n] of sent) {
+    if (patchJobs.some((j) => j.line.id === id && ready.some((t) => t.line.id === id))) continue;
+    const entry = manifest.lines[id];
+    if (entry.source === "patch") entry.patch.takes = (entry.patch.takes || 0) + n;
+    const scene = manifest.scenes?.[entry.scene];
+    if (scene) scene.requests = (scene.requests || 0) + n;
   }
   manifest.updatedAt = new Date().toISOString();
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
