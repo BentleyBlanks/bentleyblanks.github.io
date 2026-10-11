@@ -153,7 +153,8 @@ const load = await page.evaluate(() => {
 // 2026-09-27: 开场改稿的耳光 slap 与反冲锋的一片喊杀 chargeCrowd → 103.
 // 2026-09-30: 空袭炸弹下落啸声 bombWhistle → 104.
 // 2026-09-30: 敌军刀杀 / 脖子中弹的窒息哽咽 neckDeath → 105.
-const RECIPE_COUNT = 105;
+// 2026-10-11: 第一关 01–02 开场重构十二条（契约 §6；其中四条只有采样、没有合成退路，见 SAMPLE_ONLY_CUES）→ 117.
+const RECIPE_COUNT = 117;
 
 if (!load.enabled) Fail("AudioEngine 被禁用了（正常模式不该走到出图那条路）");
 if (load.manifestCues !== RECIPE_COUNT) {
@@ -194,6 +195,40 @@ const hanYangAtRate = (probe, seconds) => probe && Math.abs(probe.duration - sec
 if (!hanYangAtRate(hanYangPlayback.shot, 1.40) || !hanYangAtRate(hanYangPlayback.bolt, 0.91)) {
   Fail(`汉阳造专用素材未原速播放：${JSON.stringify(hanYangPlayback)}`);
 } else Ok("汉阳造枪声与枪机原速播放，枪机冲头不会与动作时钟漂移");
+
+// 2026-10-11 第一关 01–02 开场重构十二条（契约 §6）：导演按拍子点名播，素材是逐条挑定的 ——
+// 必须载上（四条只有采样的没有合成退路，载不上就是不响）、原速原样播、多变体按顺序轮（扎刀三条一轮各出一次）。
+const openingFoley = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const mod = await import("./Script_Audio.mjs");
+  const cues = ["whistleShort", "grenadeKnock", "bayonetStabBody", "bayonetTwist", "stompMud", "boltRattle", "boltToss",
+    "rifleTossMud", "clothRip", "bayonetFixClick", "cheekCut", "bootGrind"];
+  const rows = [];
+  for (const cue of cues) {
+    const n = a.sfxManifest?.cues?.[cue]?.files?.length || 0;
+    const seen = [];
+    for (let i = 0; i < Math.max(1, n); i += 1) {
+      const made = [];
+      const original = a.ctx.createBufferSource;
+      a.ctx.createBufferSource = function patched() { const source = original.call(this); made.push(source); return source; };
+      a.lastPlayAt.delete(cue);
+      const voice = a.Play(cue, { priority: true, firstPerson: true, volume: 0.01 });
+      a.ctx.createBufferSource = original;
+      const source = made.find((entry) => entry.buffer && entry.buffer.duration > 0.1);
+      if (voice) a.StopVoice(voice, 0.001);
+      seen.push(source ? { duration: +source.buffer.duration.toFixed(3), rate: source.playbackRate.value } : null);
+    }
+    rows.push({ cue, sampled: a.sampleCues.has(cue), n, seen });
+  }
+  return { rows, sampleOnly: [...mod.SAMPLE_ONLY_CUES], errors: a.sfxErrors.length };
+});
+// 多变体的几条时长各不相同（扎刀 0.62 / 0.60 / 0.50、踩踏 0.40 / 0.42），连播 n 次见到 n 种时长 = 顺序轮到了每一条。
+const badFoley = openingFoley.rows.filter((r) => !r.sampled || !r.n || r.seen.some((s) => !s || s.rate !== 1)
+  || new Set(r.seen.map((s) => s.duration)).size !== r.n);
+const sampleOnlyOk = JSON.stringify(openingFoley.sampleOnly) === JSON.stringify(["bayonetTwist", "clothRip", "cheekCut", "bootGrind"]);
+if (badFoley.length || !sampleOnlyOk) {
+  Fail(`开场十二条没按原样载上 / 播出：${JSON.stringify(badFoley)}；只有采样的 ${JSON.stringify(openingFoley.sampleOnly)}`);
+} else Ok(`开场十二条全部由采样盖上、原速播放、多变体按顺序轮（${openingFoley.rows.map((r) => `${r.cue}×${r.n}`).join(" ")}）`);
 
 // Timeline 静音快进之后，目标时刻仍在说的那一句必须从**对应采样点**接回来，
 // 不能从头播、也不能没声（编辑器审片全靠这条）。

@@ -1754,6 +1754,108 @@ const RECIPES = {
   },
 
   // =========================================================================
+  // 第一关 01–02 开场重构（2026-10-11，契约 docs/Data_OpeningRedraft20261011Contract.md §6）的合成回落。
+  // 主料是采样（Data_SfxSources「第一关 01–02 开场重构」那一节 + Script_SeedAudioOpeningFoleyBake），这里只给
+  // **本来就有合成退路的那几类**（哨、金属磕碰、扎刀、枪机、踩踏 / 落地）一条同名回落；刀尖划脸、拧刀、
+  // 撕胸章、鞋跟碾手这四条不给（见 SAMPLE_ONLY_CUES）。
+  // -------------------------------------------------------------------------
+  // 短哨一声（日军进沟前）：与 whistle 同一套，短到 0.4 s、基音抬到实录那把哨子的 2.7 kHz。
+  whistleShort(A, v) {
+    const t = v.t, dur = 0.4;
+    const osc = v.Osc("sine", v.F(2700));
+    const warble = v.Osc("sine", 22);
+    const warbleGain = v.Gain(90);
+    warble.connect(warbleGain).connect(osc.detune);
+    v.Start(warble, t, dur + 0.05);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.3, 0.012, dur * 0.8, 0.05);
+    osc.connect(g).connect(v.out);
+    v.Start(osc, t, dur + 0.05);
+    v.wetGain.gain.value = 0.45;
+    v.Live(0.6);
+  },
+  // 九一式引信帽磕钢盔：硬金属对薄钢壳的一记「当」+ 一点盔壳的短振。
+  grenadeKnock(A, v) {
+    const t = v.t;
+    MetalClick(v, t, 4600, 0.26, 0.025, 12);
+    const shell = v.Osc("triangle", v.F(v.R(1500, 1800)));
+    const sg = v.Gain(FLOOR);
+    Hit(sg.gain, t, 0.2, 0.001, 0.16);
+    shell.connect(sg).connect(v.out);
+    v.Start(shell, t, 0.2);
+    v.wetGain.gain.value = 0.3;
+    v.Live(0.35);
+  },
+  // 刺刀扎进躯体：闷、湿 —— impactFlesh 的入肉闷响，前头加一下棉布被戳穿的短嘶。
+  bayonetStabBody(A, v) {
+    const t = v.t;
+    const cloth = v.Noise("white", 0.05);
+    const band = v.Filter("bandpass", v.F(2400), 1.4);
+    const cg = v.Gain(FLOOR);
+    Hit(cg.gain, t, 0.12, 0.002, 0.04);
+    cloth.connect(band).connect(cg).connect(v.out);
+    v.Start(cloth, t, 0.05);
+    Thud(v, t + 0.02, 170, 65, 0.14, 0.6, 220);
+    const wet = v.Noise("brown", 0.16);
+    const lp = v.Filter("lowpass", v.F(700), 1.2);
+    const wg = v.Gain(FLOOR);
+    Hit(wg.gain, t + 0.02, 0.3, 0.003, 0.13);
+    wet.connect(lp).connect(wg).connect(v.out);
+    v.Start(wet, t + 0.02, 0.16);
+    v.wetGain.gain.value = 0.08;
+    v.Live(0.4);
+  },
+  // 拉开枪机：抬柄一记 + 往后拽的摩擦 + 机件在机匣里乱磕的一串（只开不闭，与 bolt 分开）。
+  boltRattle(A, v) {
+    MetalClick(v, v.t, 2900, 0.18, 0.03);
+    MetalScrape(v, v.t + 0.04, 0.16, 1400, 2700, 0.13);
+    Ticks(v, v.t + 0.12, 4, 0.26, 2600, 4800, 0.14, 0.03, 10);
+    v.wetGain.gain.value = 0.1;
+    v.Live(0.55);
+  },
+  // 刺刀卡回枪口：刀环套上去的短擦 + 卡榫扣死的一记「咔」。
+  bayonetFixClick(A, v) {
+    MetalScrape(v, v.t, 0.07, 1800, 2600, 0.08);
+    MetalClick(v, v.t + 0.2, 3600, 0.28, 0.04, 15);
+    v.wetGain.gain.value = 0.08;
+    v.Live(0.4);
+  },
+  // 军靴踩背 / 踩进泥：沉闷一脚 + 湿泥被挤开。
+  stompMud(A, v) {
+    const t = v.t;
+    Thud(v, t, 140, 55, 0.13, 0.55, 220);
+    const mud = v.Noise("brown", 0.2);
+    const lp = v.Filter("lowpass", v.F(600), 1.0);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t + 0.01, 0.26, 0.01, 0.05, 0.12);
+    mud.connect(lp).connect(g).connect(v.out);
+    v.Start(mud, t + 0.01, 0.2);
+    v.wetGain.gain.value = 0.1;
+    v.Live(0.4);
+  },
+  // 枪栓甩出去落进几米外的松土：一记轻闷 + 极轻的金属一磕。远近交给 position。
+  boltToss(A, v) {
+    const t = v.t;
+    Thud(v, t, 180, 95, 0.07, 0.3, 320);
+    MetalClick(v, t + 0.01, 3100, 0.08, 0.03, 10);
+    v.wetGain.gain.value = 0.3;
+    v.Live(0.3);
+  },
+  // 步枪扔回泥里：木托拍进湿泥的闷响 + 枪管 / 背带环一下短磕。
+  rifleTossMud(A, v) {
+    const t = v.t;
+    Thud(v, t, 150, 60, 0.12, 0.5, 240);
+    const wood = v.Osc("triangle", v.F(v.R(330, 400)));
+    const woodGain = v.Gain(FLOOR);
+    Hit(woodGain.gain, t, 0.2, 0.001, 0.09);
+    wood.connect(woodGain).connect(v.out);
+    v.Start(wood, t, 0.12);
+    MetalClick(v, t + 0.04, 2600, 0.12, 0.05, 9);
+    v.wetGain.gain.value = 0.15;
+    v.Live(0.45);
+  },
+
+  // =========================================================================
   // 任务流程重制 · 音效缺口批 A2 的十五条兜底配方（2026-08-29 接线）
   //
   // **这十五条的主料是实录**（素材、切法与选材理由见 Data_SfxSources.mjs 末尾那批，
@@ -2528,8 +2630,17 @@ const RECIPES = {
   },
 };
 
-/** 对外暴露的音效名清单，给冒烟测试与关卡编辑器用。 */
-export const SOUND_NAMES = Object.keys(RECIPES);
+/**
+ * **只有采样、没有合成退路**的 cue（2026-10-11 开场重构，契约 §6）。
+ * 刀尖划脸、拧刀、撕胸章、鞋跟碾手：合成出来的一声噪声只会被听成别的东西（与环境包那只「合成的乌鸦」
+ * 同一条理由），所以不进 RECIPES。LoadSfxPack 照样把它们的采样注册成同名配方；**载不到就报错**：
+ * Play 时这几条没有配方 → console.error + sfxErrors 记一笔（每条只记一次），不许静默地不响。
+ */
+export const SAMPLE_ONLY_CUES = Object.freeze(["bayonetTwist", "clothRip", "cheekCut", "bootGrind"]);
+const SAMPLE_ONLY = new Set(SAMPLE_ONLY_CUES);
+
+/** 对外暴露的音效名清单，给冒烟测试与关卡编辑器用。只有采样的那几条也在里面（载入后才能播）。 */
+export const SOUND_NAMES = [...Object.keys(RECIPES), ...SAMPLE_ONLY_CUES];
 
 /**
  * 枪尾（接线批 INT4 的六条 gunTail* 共用）。
@@ -2917,6 +3028,10 @@ const NODE_COST = {
   flareBurn: 8, telegraphKey: 8, telegraphHum: 8, mgOverheat: 8,
   painMoan: 7, hitGrunt: 7, planeDive: 7, flareOut: 6,
   neckDeath: 7,
+  // 01–02 开场重构（2026-10-11）八条合成回落：挡掉音效清单实播一次数 voice.nodes（6/7/11/11/8/8/8/10），再留一格
+  //（采样盖上后 LoadSfxPack 改成 2）。只有采样的四条（SAMPLE_ONLY_CUES）不在这里：LoadSfxPack 直接写 2。
+  whistleShort: 7, grenadeKnock: 8, bayonetStabBody: 12, boltRattle: 12, bayonetFixClick: 9,
+  stompMud: 9, boltToss: 9, rifleTossMud: 11,
   // 会飞的引擎持续声：三个振荡器 + 拍频 LFO + 滤波 + 两个 gain，整条航线只有一条。
   planeDrone: 9,
   bombWhistle: 8,
@@ -3034,7 +3149,8 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-27 开场改稿：耳光 slap、反冲锋一片喊杀 chargeCrowd。
 // 2026-09-30：空袭炸弹下落啸声 bombWhistle，清单新增一个 cue。
 // 2026-09-30：敌军刀杀 / 脖子中弹的窒息哽咽 neckDeath（两变体），清单新增一个 cue。
-export const SFX_PACK_VERSION = "20260930neckdeath";
+// 2026-10-11：第一关 01–02 开场重构十二条（契约 §6），清单新增十二个 cue。
+export const SFX_PACK_VERSION = "20261011openingfoley";
 // 2026-09-29：清单加了 `bedVariants`（战场远景床的五条无人声候选），戳不动的话浏览器拿着旧清单永远看不到候选。
 export const AMB_PACK_VERSION = "20260929battlebeds";
 /**
@@ -3211,6 +3327,12 @@ const SAMPLE_MIX = {
   hitGrunt: 0.8, execScream: 0.55, painMoan: 0.5,
   // 敌军窒息哽咽：死在玩家十几米内才放，近处的一声细节，与 hurt 同一档偏下（不盖枪声，也不该听不见）。
   neckDeath: 0.75,
+  // 01–02 开场重构（2026-10-11）十二条：成品一律对齐 −25 dBFS，相对响度只在这里给。
+  // 扎刀与 bayonetHit 同档；拧刀、划脸是贴着顺子的小动作（划脸契约原话「很轻的一声」），压低；
+  // 枪栓落进沟外的土里「远、轻」—— 距离由 position 给，这里再压一档；哨子是给整队听的信号，站高。
+  whistleShort: 0.9, grenadeKnock: 0.8, bayonetStabBody: 0.8, bayonetTwist: 0.6, stompMud: 0.7,
+  boltRattle: 0.9, boltToss: 0.45, rifleTossMud: 0.7, clothRip: 0.75, bayonetFixClick: 0.85,
+  cheekCut: 0.5, bootGrind: 0.7,
   // 照明弹一个循环四条。燃烧那条**滞空好几十秒**，所以压到全表最低的一档
   // （比脚步略高）—— 一直在响的东西不能按「一次事件」配平；
   // 发射与点燃是事件，可以站高一点。
@@ -3270,6 +3392,11 @@ const SAMPLE_WET = {
   // 处决那声隔着一堵墙与一个院子，同理。反过来，电键与拉柄就在你手底下，
   // 给了混响就变成「隔壁屋里有人在敲」——贴身的小动作一律近乎全干。
   execScream: 0.5, painMoan: 0.3, hitGrunt: 0.12, neckDeath: 0.15,
+  // 01–02 开场重构（2026-10-11）：顺子身上 / 眼前一两米的动作近乎全干；哨子与折角那一磕在 8—16 m 外、
+  // 沟壁两侧回得来，给多一点；枪栓落在沟外的土上，尾巴是「它飞出去了」。
+  whistleShort: 0.45, grenadeKnock: 0.3, boltToss: 0.3,
+  bayonetStabBody: 0.08, bayonetTwist: 0.05, stompMud: 0.08, boltRattle: 0.1, rifleTossMud: 0.12,
+  clothRip: 0.06, bayonetFixClick: 0.08, cheekCut: 0, bootGrind: 0.04,
   flareIgnite: 0.5, flareBurn: 0.45, flareOut: 0.45, flareLaunch: 0.4,
   telegraphKey: 0.06, telegraphHum: 0.05,
   // 远近是两条真的录音，湿度也要分开：300 m 外那一梭子的价值全在尾巴上。
@@ -3379,7 +3506,11 @@ const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraph
   // （09-25 用户定换掉 SeedAudio 生成音）、远场 BAR 300 m 1 + MINIMI 50 m 2。随机挑时连着两发同一条的概率
   // 1/2—1/3、一梭 4 发可能整梭同一条；轮播让一梭里各条依次出，且不叠 ±3% 变调（点射 0.12 s 一发，
   // 变调会把各条的起音拧开）。
-  "type11", "type11Far"]);
+  "type11", "type11Far",
+  // 01–02 开场重构（2026-10-11）十二条：过场里按拍子点名播的音，素材是逐条量过挑的（Script_SeedAudioOpeningFoleyBake
+  // 头注 / Data_SfxSources 那一节），原速原样播；扎刀三变体按顺序轮（乙一路扎过去，不许连出两次同一条）。
+  "whistleShort", "grenadeKnock", "bayonetStabBody", "bayonetTwist", "stompMud", "boltRattle", "boltToss",
+  "rifleTossMud", "clothRip", "bayonetFixClick", "cheekCut", "bootGrind"]);
 
 /**
  * 把一组 AudioBuffer 包成配方。
@@ -4325,6 +4456,9 @@ export class AudioEngine {
     this.sfxErrors = [];
     this.sfxReady = false;
     this.sfxManifest = null;
+    // 音效包这一轮载完了没有（成败都算）；只有采样的 cue 缺素材时据此分「还在载」与「真缺」（见 ReportMissingSample）。
+    this.sfxPackSettled = false;
+    this.missingSampleReported = new Set();
     this.lastBarkAt = -99;
     this.lastBarkKindAt = new Map();
     this.lastBarkPickKey = null;      // 上一次 Bark 实际挑中的 key（取证用）
@@ -4910,6 +5044,7 @@ export class AudioEngine {
       manifest = await FetchAudioJson(base + "Data_SfxManifest.json?v=" + SFX_PACK_VERSION);
     } catch (err) {
       this.sfxErrors.push({ file: "Data_SfxManifest.json", message: err && err.message });
+      this.sfxPackSettled = true;
       return 0;
     }
     this.sfxManifest = manifest;
@@ -4929,7 +5064,7 @@ export class AudioEngine {
           NODE_COST.bugleCharge = BUGLE_CHARGE.length * 2 + 2;
           this.sampleCues.add("bugleCharge");
         } else {
-          if (!RECIPES[cue]) throw new Error("没有同名配方，盖不上去");
+          if (!RECIPES[cue] && !SAMPLE_ONLY.has(cue)) throw new Error("没有同名配方，盖不上去");
           // 战车三条常驻循环：多层、带 SetTank 接口（见 TankLoopSampleRecipe）。每层 2 个节点，发动机多 3 个次低频。
           RECIPES[cue] = TANK_LOOP_CUES.has(cue) ? TankLoopSampleRecipe(buffers, cue, entry.loopSpans) : SampleRecipe(buffers, cue);
           MIX_GAIN[cue] = SAMPLE_MIX[cue] ?? 1;
@@ -4943,7 +5078,27 @@ export class AudioEngine {
       }
     }));
     this.sfxReady = ok > 0;
+    this.sfxPackSettled = true;
     return ok;
+  }
+
+  /**
+   * 只有采样、没有合成退路的 cue（SAMPLE_ONLY_CUES）被叫到而配方不在：**不许静默地不响**。
+   * 音效包已经载完还缺 → console.error + sfxErrors 记一笔；包还在路上、或这个模式本来就不载实录包
+   *（标题页 Script_MenuStartup）→ console.warn。每条 cue 每种情形只报一次，不刷屏。
+   */
+  ReportMissingSample(name) {
+    const state = this.recordedPacks === false ? "noPacks" : this.sfxPackSettled ? "missing" : "loading";
+    const key = `${state}:${name}`;
+    if (this.missingSampleReported.has(key)) return;
+    this.missingSampleReported.add(key);
+    if (state === "missing") {
+      const message = "这一声只有实录、没有合成退路，音效清单里没有它或解码失败";
+      this.sfxErrors.push({ file: name, message });
+      console.error(`[Audio] ${name}：${message}`);
+    } else {
+      console.warn(`[Audio] ${name}：${state === "noPacks" ? "当前模式不载实录包" : "音效包还没载完"}，这一声没有合成退路，这次不响`);
+    }
   }
 
   /**
@@ -5735,7 +5890,10 @@ export class AudioEngine {
     this.playRequests.set(name, (this.playRequests.get(name) || 0) + 1);
     if (!this.ctx || this.disposed) return null;
     const recipe = RECIPES[name];
-    if (!recipe) return null;
+    if (!recipe) {
+      if (SAMPLE_ONLY.has(name)) this.ReportMissingSample(name);
+      return null;
+    }
 
     const ctx = this.ctx;
     const now = ctx.currentTime;
