@@ -571,7 +571,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     heave:Object.freeze({ corpse:Object.freeze({ gunner:"mg.corpseLower", loader:"mg.corpseUpper" }),
       roots:Object.freeze({ gunner:P(6.95,-123.15,Math.PI), loader:P(7.65,-123.15,Math.PI) }),
       via:Route([14.2,-122.7],[13.2,-124.1],[10.4,-124.35],[8.9,-124.0]), approach:Object.freeze([-1.0,0]),
-      reachM:.6, dragBehindM:.9, dragMps:1.1, slideS:.5, centerAheadM:.42, centreAboveRootM:.18 }) }),
+      reachM:.6, dragBehindM:.9, dragMps:1.6, slideS:.5, centerAheadM:.42, centreAboveRootM:.18 }) }),
   // Interrogation (contract §1 / N13): the interpreter squats in front of the comrade; ijaB presses his thumb into the shoulder
   // wound (woundPress pressAfterLine3S after .03 ends; the comrade arches archS); ijaA looks back at the rear trench now and
   // then (lookBackEveryS, lookBackS).
@@ -774,6 +774,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // up 40): out of the picture (head x 1.38). Pulled in toward the eye's line, east-south-east of it (1.6 m, 37 deg right of that
     // look), still facing the eye, 1.05 m from ijaA's squat; the finish body has gone to the south wall foot.
     interpreter:P(3.4,-124.75,72*Math.PI/180),
+    // interpreterWait (polish): where he squats from Finish until 02's Hold -- the old squat, off the eye's line down the trench (squatting at
+    // `interpreter` he hid ijaA coming up it in N18) -- and a step over to `interpreter` as the questioning starts.
+    interpreterWait:P(2.95,-124.0,41*Math.PI/180),
     interpreterReturn:Route([4.2,-124.25]),
     interpreterClearanceM:.44,
     // (until 2026-10-11 ijaB kept watch here, 3.4 m off; the redraft has him at the junction J -- vanguardPosts.ijaB)

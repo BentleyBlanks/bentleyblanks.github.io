@@ -2301,8 +2301,11 @@ export class FirstLevelBunkerShow {
    *  (finish.interpreterVia); the walk key is InterpreterToSquat's ("squat"), so 02 takes him on from there. */
   FinishInterpreter(){
     const a=this.cast.interpreter,R=C.rescue;if(!a)return;
-    const w=a.openingWalk;if(w?.key==="squat"&&w.done){this.Hold(a,R.interpreter,"InterpreterCrouchAsk");return;}
-    if(this.Follow(a,"squat",[...C.finish.interpreterVia,R.interpreter],C.speed.walk,null,R.interpreter.yaw,{cornerM:.1}))a.openingWalk.done=true;
+    // (2026-10-11 polish: to rescue.interpreterWait, off the eye's line down the trench, while ijaA comes up it; the squat at the head
+    // -- rescue.interpreter, on that line -- is 02's, InterpreterToSquat.)
+    const w=a.openingWalk,wait=R.interpreterWait||R.interpreter,key=R.interpreterWait?"squatWait":"squat";
+    if(w?.key===key&&w.done){this.Hold(a,wait,"InterpreterCrouchAsk");return;}
+    if(this.Follow(a,key,[...C.finish.interpreterVia,wait],C.speed.walk,null,wait.yaw,{cornerM:.1}))a.openingWalk.done=true;
   }
   /**
    * 「刺刀尖停在顺子背上一拃高的地方……军靴落下来，踩住顺子伸在泥里的那只手，鞋跟往下一碾。顺子没出声，可手指自己抽了一下」 ->
@@ -2353,7 +2356,9 @@ export class FirstLevelBunkerShow {
     const actor=this.cast.interpreter,R=C.rescue;if(!actor)return true;
     const walk=actor.openingWalk;
     if(walk?.key==="squat"&&walk.done)return this.Hold(actor,R.interpreter,"InterpreterCrouchAsk");
-    if(this.Follow(actor,"squat",[...R.interpreterReturn,R.interpreter],C.speed.trot,null,R.interpreter.yaw,{cornerM:.1}))actor.openingWalk.done=true;
+    // (2026-10-11 polish: from where he waited through the find, a step over to the squat; a cold start comes the old way round.)
+    const fromWait=walk?.key==="squatWait"||(R.interpreterWait&&Distance(actor.openingStoryboardLast||actor.position,R.interpreterWait)<.4);
+    if(this.Follow(actor,"squat",fromWait?[R.interpreter]:[...R.interpreterReturn,R.interpreter],fromWait?C.speed.walk:C.speed.trot,null,R.interpreter.yaw,{cornerM:.1}))actor.openingWalk.done=true;
     return false;
   }
   /** The questioning's cast every frame: ijaA squatting at the head with the hair in his fist (and the slaps), the
