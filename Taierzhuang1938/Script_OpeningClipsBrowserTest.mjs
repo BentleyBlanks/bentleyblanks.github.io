@@ -124,7 +124,10 @@ try {
       const meta = api.OpeningClipMeta(clip) || {};
       const armed = (meta.props || []).includes("weapon");
       const weapon = !armed ? null : kind === "ija" ? "Type38" : (role === "luo" || role === "heyoutian") ? "Dadao" : "HanYang";
-      const actor = T.actorFactory.Create(kind, { modelVariant, weapon, seed: 5100 + modelVariant, sizeScale: 1 });
+      // 2026-10-11 redraft A: a clip that stabs with the rifle (contact limb "blade", action "stab": IjaStompStabTwist) is played
+      // with the bayonet fixed, as the director spawns that soldier (the default rifle has none and stood a blade length off).
+      const bayonetFixed = (meta.contacts || []).some(c => c.limb === "blade" && c.action === "stab");
+      const actor = T.actorFactory.Create(kind, { modelVariant, weapon, seed: 5100 + modelVariant, sizeScale: 1, bayonetFixed });
       const soldier = { actor, id: role, alive: true, openingStoryboardPose: { clip, seconds: 0 } };
       api.InstallOpeningStoryboardAnimation(soldier);
       scene.add(actor.root); actor.root.visible = true;

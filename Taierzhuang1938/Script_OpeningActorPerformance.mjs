@@ -10,6 +10,10 @@ const Smooth=value=>{value=Clamp(value);return value*value*(3-2*value);};
 const ContactClips=new Set(["LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle","DuckBlast","BayonetClearWood","CollarDrag","ButtThreat","DadaoAmbush","RifleDeflect","PullComrade","KickRifle","ShotCollapse","CaptiveStandToKneel",
   // 2026-09-23 library: every paired, contact or violent beat keeps its authored timing and
   // hands (no dialogue gestures or idle substitution on top of them).
+  // 2026-10-11 redraft A: hands on the bread, the chargers, the helmet, the crate, the rifle and the bolt, the badge, the wound;
+  // the stomp and stab and the body under it.
+  "YaowaCrouchCatchEat","ComradeEatBreadToss","ComradePourRoundsLaugh","ComradeCatchDropPick","HeHelmetSleepSitUp","LiuDivideAmmoToss",
+  "IjaStompStabTwist","CorpseStabbedClaw","IjaInspectRifleBoltToss","IjaTearBadge","IjaThumbWoundTwist","CaptiveArchCaught",
   "WoundedRiseWall","BlastSlamBuried","BlastDazedStir","IjaDragCollarFromDirt","IjaPullArm","CaptiveDraggedFromDirt","CaptiveWallBrace",
   "IjaShoveToWall","IjaHairGrabPull","CaptiveHeadPulledBack","IjaDrawBayonet","IjaThroatSlash","CaptiveThroatCut",
   "CaptiveClutchThroat","CaptiveWallSlideTwitch","IjaWipeSheathBayonet","IjaReadyRifle","IjaSlingRifle","IjaCollarDragSnag",
