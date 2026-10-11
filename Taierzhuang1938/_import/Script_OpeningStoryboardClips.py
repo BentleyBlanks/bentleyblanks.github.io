@@ -9467,3 +9467,1944 @@ def _BakeBefore(names, anchor):
 
 
 _BakeBefore(('IjaVaultTimberIn', 'IjaVaultTimberOut', 'IjaHaulForearmUnder'), 'IjaButtStrikeCollar')
+
+
+# ==== 2026-10-11 redraft B ====
+# 01-02 opening, 2026-10-11 Notion redraft (docs/Data_OpeningRedraft20261011Contract.md §4.2, the B rows): the bayonet
+# practice (ijaA backhands the recruit ijaD, ijaD charges and stabs the comrade twice, the comrade curls in the mud howling),
+# the throat cut from behind (ijaA hauls the curled man up by the hair, knee in his back, cuts, shoves him on his face),
+# the wipe on the bandage and the bayonet fixed on the rifle, the finishing stabs on the way to the dugout mouth, the boot on
+# Shunzi's hand, and in 02 the recruit's cut across Shunzi's cheek, the recruit levelling his rifle, ijaA biting the pin of a
+# grenade. Reuse (user: 「能复用之前的还是都尽量复用」): the knife fist, the blade laid tangent on the neck and the pull cut are
+# the throat slash's (FistKnife / NeckBlade / SLASH_DRAW); the draw is IjaDrawBayonet's (ScabbardKnife / GripTurn / CarryPalm);
+# the two thrusts keep IjaBayonetDownThrust's timing and lunge; the boot clip ends on IjaCrouchHairHold frame 0 and the
+# grenade clip starts on IjaShotStaggerAway's hold frame; the rifle comes off the back as IjaReadyRifle takes it.
+#
+# The comrade's chain (CaptiveStabbedCurl -> CaptiveCurledPulledUp -> CaptiveThroatCutForward) and ijaA's (IjaHairLiftKneeBack ->
+# IjaThroatCutKneeShove -> IjaWipeBandageFixBayonet -> IjaFinishWalkStab -> IjaBootOnHand) are `prev` chains on one root each
+# (the forearm-twist branch and the elbow sides carry over). World (contract §1/§5): the comrade kneels at R3 (~(4.06,-125.79),
+# facing south, the planks of the north wall 0.41 m behind him); the pinned eye is 2.2 m to his right (west) and 0.54 m in front.
+# Stabbed from his left (east) he twists away to his right and goes down on his right side curled up, facing south-west, the head
+# north-west; ijaA comes up behind his right shoulder (north, by the planks: from the eye he is on the left of the picture, N16),
+# hauls him up kneeling facing south-west with the throat to the eye, cuts it from the left of the throat round to the right (the
+# last jet from the right side goes to the north wall, away from ijaA) and drives him forward onto his face with the knee.
+
+# ---- skin patches (rest pose) the B clips aim at ------------------------------------------------------------------------
+CONTACT_POINTS.update({
+    # The cheeks a hand slaps (ijaD's right cheek: IjaSlapRecruit's backhand) -- 6 cm over the head joint, to the side and front.
+    'cheekR': {'bones': ['Head'], 'normal': (-.7, -.7, 0), 'count': 12,
+               'score': lambda p, c: -.7 * p.x - .7 * p.y - 4 * abs(p.z - (_Z(c, 'Head') + .06))},
+    'cheekL': {'bones': ['Head'], 'normal': (.7, -.7, 0), 'count': 12,
+               'score': lambda p, c: .7 * p.x - .7 * p.y - 4 * abs(p.z - (_Z(c, 'Head') + .06))},
+    # The front of the left shoulder, where the recruit's first thrust goes in (over the bandaged wound).
+    'shoulderFrontL': {'bones': ['L Clavicle', 'Spine2', 'L UpperArm'], 'normal': (.3, -1, 0), 'count': 14,
+                       'score': lambda p, c: -p.y - 4 * abs(p.z - (_P(c, 'L UpperArm').z - .06)) - 3 * abs(p.x - _P(c, 'L UpperArm').x * .7)},
+    # The belly (the second thrust).
+    'bellyFront': {'bones': ['Spine', 'Spine1'], 'normal': (0, -1, 0), 'count': 16,
+                   'score': lambda p, c: -p.y - 3 * abs(p.z - (_Z(c, 'Spine1') - .03)) - 2 * abs(p.x)},
+    # The small of the back, where ijaA's knee goes in.
+    'lowerBack': {'bones': ['Spine', 'Spine1'], 'normal': (0, 1, 0), 'count': 16,
+                  'score': lambda p, c: p.y - 3 * abs(p.z - (_Z(c, 'Spine1') - .02)) - 2 * abs(p.x)},
+    # The outer face of the bandaged left upper arm (the blade is wiped on it).
+    'upperArmL': {'bones': ['L UpperArm'], 'normal': (1, 0, 0), 'count': 14,
+                  'score': lambda p, c: p.x - 4 * abs(p.z - (_P(c, 'L UpperArm').z + _P(c, 'L Forearm').z) / 2)},
+})
+
+RB_TOP = [('top', (-.30, -.25, 4.0), (-.30, -.24, 0.0)), ('sw', (-2.6, -2.6, 1.2), (-.3, -.3, .35))]
+RB_TIP = 1.40                    # runtime m from the right grip (rifle origin) to the bayonet's point (Type38 + Type30, measured 1.39)
+RB_IJAD = ['TengxianIja02', 'TengxianIja03']   # ijaD: contract §4.2 names Ija03, the speaking cast wears IJA02 (Data_FirstLevelSpeakingCast)
+# The recruit stands at the ready (IjaReadyRifle) before the slap, whose frame 0 is that clip's last: on IJA03 too.
+CLIPS['IjaReadyRifle']['rigs'] = list(CLIPS['IjaReadyRifle'].get('rigs') or IJA_BOTH) + ['TengxianIja03']
+
+
+def RbFlatOf(T, builder, name, t):
+    """FlatOf that nests: the builder is built first (its own FlatOf calls run then), the Nest spy only wraps the one pose call."""
+    spec = builder(T, name)
+    seen = {}
+    had, before = 'Nest' in T.__dict__, T.__dict__.get('Nest')
+    real = T.Nest
+
+    def Spy(f):
+        seen.clear()
+        seen.update(f)
+        return real(f)
+    T.Nest = Spy
+    try:
+        spec['pose'](t)
+    finally:
+        if had:
+            T.Nest = before
+        else:
+            del T.Nest
+    return dict(seen)
+
+
+def RbFace(fx, fz):
+    """yawDeg (+ = turn left, 0 faces -z) of an actor facing the runtime direction (fx, fz)."""
+    return round(math.degrees(math.atan2(-fx, -fz)), 2)
+
+
+def RbR3Ground(x, z):
+    """runtime ground at runtime (x right, z back) of R3 (his right = west, back = north) over R3's own."""
+    return R3GroundRT(-x, z)
+
+
+def RbStageGround(T, stage, role):
+    """ground(x, y) in `role`'s source frame for an actor standing near R3 (StageGround reads the stage row)."""
+    return StageGround(T, stage, role)
+
+
+def RbStageWalls(T, stage, role):
+    return StageWalls(T, stage, role)
+
+
+def RbStageViews(T, stage, role, spec, eye=True):
+    """Side, quarter and the pinned eye (carried into `role`'s frame through the stage)."""
+    spec = AReview(spec)
+    views = [('side', (-3.2, -.9, 1.1), (0, -.55, .70)), ('q', (-2.3, -3.2, 1.9), (0, -.5, .65)),
+             ('back', (2.4, 2.6, 1.8), (0, -.5, .6))]
+    if eye:
+        e = AnchorToRole(T, stage, role, R3_EYE)
+        look = AnchorToRole(T, stage, role, (-.30, -.10, .55))
+        views += [FirstPersonView(e, look, name='eye'), FirstPersonView(e, look, fov=30.0, name='eyeZoom')]
+    spec['reviewViews'] = views
+    spec['reviewScale'] = 3.0
+    return spec
+
+
+def RbBayonetTip(T, rifle):
+    return tuple(Vector(rifle['origin']) + Vector(rifle['axis']) * T.R(RB_TIP))
+
+
+def RbRifleAt(T, tip, axis):
+    """The rifle whose bayonet point is at `tip` (source) along `axis`."""
+    a = Vector(axis).normalized()
+    return T.Rifle(tuple(Vector(tip) - a * T.R(RB_TIP)), tuple(a))
+
+
+def RbHoldRifle(T, f, rifle, curlR=.95, curlL=.85, wL=1.0, wR=1.0, poleR=None, poleL=None):
+    """Both hands on a rifle: the right at the wrist of the stock (the model origin), the left on the handguard."""
+    palms = T.Palms(rifle['axis'])
+    if wR > 1e-4:
+        f['grip.R'], f['gripW.R'] = rifle['gripR'], min(1.0, wR)
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], curlR
+        f['handRel.R'] = f.get('handRel.R') or (-.07, -.12, -.46)
+        f['armPole.R'] = poleR or (f['pelvis'][0] - T.R(.50), f['pelvis'][1] + T.R(.20), f['pelvis'][2] + T.R(.25))
+    if wL > 1e-4:
+        f['grip.L'], f['gripW.L'] = rifle['gripL'], min(1.0, wL)
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], curlL
+        f['handRel.L'] = f.get('handRel.L') or (.07, -.12, -.46)
+        f['armPole.L'] = poleL or (f['pelvis'][0] + T.R(.40), f['pelvis'][1] - T.R(.10), f['pelvis'][2] - T.R(.05))
+    return f
+
+
+def RbRifleLerp(T, a, b, w):
+    w = Clamp(w)
+    return T.Rifle(Lerp3(a['origin'], b['origin'], w), Unit(Lerp3(a['axis'], b['axis'], w)))
+
+
+def RbRiflePath(T, rows):
+    """[(t, rifle)] -> rifle(t) (origin and axis eased between the keys)."""
+    def At(t):
+        if t <= rows[0][0]:
+            return rows[0][1]
+        for (t0, a), (t1, b) in zip(rows, rows[1:]):
+            if t <= t1:
+                return RbRifleLerp(T, a, b, Smooth((t - t0) / max(1e-6, t1 - t0)))
+        return rows[-1][1]
+    return At
+
+
+# =========================================================================================================================
+# Practice (01): ijaA backhands the recruit ijaD, who stands at low ready in front of the comrade and will not move.
+# Stage recruitSlap (anchor ijaD): ijaA at the recruit's right front, 0.6 m, facing him; the back of the right hand across the
+# recruit's RIGHT cheek from ijaA's left to his right (contract §1.8: 反手; N14 shows a forehand, the contract overrides it).
+# =========================================================================================================================
+RB_SLAP_T = 36 / 24            # 1.5 s
+RB_SLAP_HIT = 10 / 24          # 0.417 s: the back of the hand on the cheek
+RB_SLAPPED_T = 48 / 24         # 2.0 s
+STAGES['recruitSlap'] = {
+    'anchor': 'ijaD',
+    'notes': 'IjaRecruitSlapped and IjaSlapRecruit start together (the hit at 0.417 s). ijaD stands where IjaReadyRifle left him '
+             '(frame 0 = its last frame), ijaA 0.6 m off his right front facing him.',
+    'actors': {'ijaD': {'rig': 'TengxianIja03', 'clip': 'IjaRecruitSlapped', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+               'ijaA': {'rig': 'TengxianIja02', 'clip': 'IjaSlapRecruit', 'x': .30, 'z': -.55, 'yawDeg': RbFace(-.30, .55)}}}
+# (the recruit wears IJA03 from this round on: integrator 2026-10-11; his clips are baked on IJA02 as well)
+PARTNER_SOURCES.setdefault('TengxianIja03', {}).update({'IjaRecruitSlapped': ['cheekR']})
+
+Meta('IjaSlapRecruit', RB_SLAP_T, False, 'track', role='ijaA', rig='TengxianIja02', rigs=['TengxianIja02'], props=['weapon'],
+     rootMotion=False, stage='recruitSlap', weaponState='slungBack',
+     contacts=[{'t': RB_SLAP_HIT, 'limb': 'handR', 'action': 'backhand', 'partnerRole': 'ijaD', 'part': 'cheekR', 'standoffM': .03}],
+     events=[{'t': .22, 'kind': 'windUp'}, {'t': RB_SLAP_HIT, 'kind': 'hit', 'sound': 'slap'}],
+     next=['IjaShoveForward'],
+     notes='2026-10-11 Practice (N14, contract §1.8): standing, rifle slung across the back, he takes one step in at the recruit '
+           'who will not move: the right hand comes up across in front of his own left shoulder (0.22 s), and the BACK of it '
+           'cracks across the recruit\'s right cheek (0.417 s) and on out to his right; the hand drops back by 1.1 s, a cold look. '
+           'Pair: IjaRecruitSlapped (stage recruitSlap).')
+Meta('IjaRecruitSlapped', RB_SLAPPED_T, False, 'track', role='ijaD', rig='TengxianIja03', rigs=RB_IJAD, props=['weapon'],
+     rootMotion=False, stage='recruitSlap', weaponState='twoHand',
+     contacts=[{'t': RB_SLAP_HIT, 'by': 'ijaA', 'part': 'cheekR', 'action': 'slapped'},
+               {'t': .52, 'limb': 'handL', 'action': 'release', 'target': 'weapon'},
+               {'t': .78, 'limb': 'handL', 'action': 'touch', 'target': 'self.helmet'},
+               {'t': 1.70, 'limb': 'handL', 'action': 'grip', 'target': 'weapon', 'part': 'handguard'}],
+     events=[{'t': RB_SLAP_HIT, 'kind': 'hit'}],
+     prev=['IjaReadyRifle'], next=['IjaRecruitChargeThrust'],
+     notes='2026-10-11 Practice (N14): frame 0 = IjaReadyRifle last frame (low ready). The backhand at 0.417 s snaps the head round '
+           'to his left and down, half a step to the left; the left hand leaves the handguard (0.52), the rifle hangs from the right '
+           'hand muzzle-down, and the left hand goes up to put the knocked helmet straight (0.78-1.3); back on the handguard by 1.7 s, '
+           'eyes down. Last frame = IjaRecruitChargeThrust frame 0. (The helmet is skinned to the head: it cannot sit askew.)')
+
+
+def RbIjaStand(T):
+    """ijaA standing, the rifle slung across his back, hands hanging (IjaABase)."""
+    f = IjaABase(T)
+    f.update({'lookW': 0.0, 'lookLimit': 70.0})
+    return f
+
+
+@Builder('IjaSlapRecruit')
+def BuildSlapRecruit(T, name):
+    stage, D, hit = 'recruitSlap', RB_SLAP_T, RB_SLAP_HIT
+    base = RbIjaStand(T)
+
+    def Cheek(t):
+        h = PartnerPoint(T, stage, 'ijaA', 'ijaD', 'cheekR', t)
+        return (Vector(h[0]), Vector(h[1])) if h else (Vector((T.R(.02), -T.R(.55), T.R(1.45))), Vector((.6, .8, 0)))
+    c0, n0 = Cheek(hit)
+    # The path of the finger roots (source, his frame): up across his body in front of the left shoulder, the back of the hand
+    # across the cheek moving to his right (-X), out past it, down. At the hit the grip point is 4 cm past the cheek patch along
+    # the travel and 2 cm off it on the palm side (the back of the hand is on the skin).
+    travel = Vector((-1, -.15, -.10)).normalized()
+    # (the back of the hand -- SlapPalmPoint: half way from the wrist to the finger roots, on the back -- on the cheek)
+    hitPt = c0 + n0 * T.R(.03)      # the backs of the fingers across the cheek (the grip point = the finger roots)
+    sh = Vector((-T.SX, T.R(.02), T.SZ))
+    path = Channel([(0.0, tuple(Vector((-(T.SX + T.R(.04)), -T.R(.04), T.P - T.R(.08))))),
+                    (.10, tuple(sh + Vector((T.R(.10), -T.R(.22), -T.R(.18))))),
+                    (.22, tuple(hitPt + Vector((T.R(.36), T.R(.14), T.R(.10))))),
+                    (.30, tuple(hitPt + Vector((T.R(.32), T.R(.10), T.R(.08))))),
+                    (hit, tuple(hitPt)),
+                    (.52, tuple(hitPt + Vector((-T.R(.26), T.R(.02), -T.R(.08))))),
+                    (.70, tuple(hitPt + Vector((-T.R(.36), T.R(.16), -T.R(.30))))),
+                    (1.10, tuple(Vector((-(T.SX + T.R(.06)), -T.R(.04), T.P - T.R(.06))))),
+                    (D, tuple(Vector((-(T.SX + T.R(.04)), -T.R(.04), T.P - T.R(.08)))))])
+    # palm facing (palmN) and fingers (palmF): wound up the palm faces down-forward, at the crack the palm faces his left (+X)
+    # (the back leads to his right), fingers up and forward.
+    palmF = Channel([(0.0, (0, -.2, -1)), (.10, (.2, -.5, .6)), (.22, (-.1, -.3, .95)), (hit, (-.15, -.45, .88)),
+                     (.60, (-.3, -.4, .5)), (1.10, (0, -.2, -1)), (D, (0, -.2, -1))])
+    palmN = Channel([(0.0, (1, 0, 0)), (.10, (.4, .8, .1)), (.22, (.9, .3, .1)), (hit, (1, 0, 0)), (.60, (.9, 0, .4)),
+                     (1.10, (1, 0, 0)), (D, (1, 0, 0))])
+    weight = lambda t: Smooth(t / .08) * (1 - Smooth((t - .85) / .30))
+    step = Add3(base['ankle.L'], (T.R(-.02), -T.R(.10), 0))
+    anim = Tracks(base, {
+        'ankle.L': [(0.0, base['ankle.L']), (.04, base['ankle.L']), (.13, Add3(Lerp3(base['ankle.L'], step, .5), (0, 0, .05))),
+                    (.22, step)],
+        'pelvis': [(0.0, base['pelvis']), (.22, Add3(base['pelvis'], (0, -T.R(.04), -T.R(.01)))), (.50, Add3(base['pelvis'], (0, -T.R(.06), -T.R(.02)))),
+                   (D, Add3(base['pelvis'], (0, -T.R(.04), -T.R(.01))))],
+        'twist': [(0.0, 0.0), (.22, .30), (.30, .32), (hit, -.12), (.62, -.24), (1.10, -.04), (D, 0.0)],
+        'bend': [(0.0, base['bend']), (.22, .02), (hit, .12), (.70, .10), (D, .07)],
+        'shrug': [(0.0, 0.0), (.22, .08), (hit, .04), (D, 0.0)],
+        'protract.R': [(0.0, 0.0), (.22, .35), (hit, .10), (.62, -.25), (1.10, 0.0)],
+        'lookW': [(0.0, .6), (.15, 1.0), (D, 1.0)],
+    }, lag={'head': .05})
+
+    def Body(t):
+        f = anim(t)
+        c, _ = Cheek(min(t, hit))
+        f['look'] = tuple(c + Vector((0, 0, T.R(.05))))
+        w = weight(t)
+        if w > 1e-4:
+            EaseGrip(f, 'R', path(t), w, Unit(palmF(t)), Unit(palmN(t)), .20)
+            f['armPole.R'] = (-(T.SX + T.R(.55)), T.R(.30), T.SZ - T.R(.25))
+        return f
+
+    def Probe(t):
+        if abs(t - hit) > .021:
+            return None
+        return {'backOnCheek': (tuple(SlapPalmPoint(T, -1, back=True)), tuple(Cheek(hit)[0]))}
+    props, review = SlungProps(T)
+    spec = AttackerSpec(T, stage, 'ijaA', 'ijaD', {}, Body, D)
+    spec.update({'props': props, 'plants': [('R', 0, D), ('L', .22, D)], 'probes': Probe, 'look': lambda t: Body(t)['look'],
+                 'reviewProps': lambda t: review(t) + [('point', tuple(hitPt), None, .025)] + PartnerGhost(T, stage, 'ijaA', 'ijaD', t),
+                 'reviewFrames': lambda n: [0, 3, 5, 7, 10, 13, 20, n - 1]})
+    return RbStageViews(T, stage, 'ijaA', spec, eye=False)
+
+
+@Builder('IjaRecruitSlapped')
+def BuildRecruitSlapped(T, name):
+    D, hit = RB_SLAPPED_T, RB_SLAP_HIT
+    start = RbFlatOf(T, BuildReadyRifle, 'IjaReadyRifle', 1.1)
+    ready = LowReady(T)
+    # the rifle hangs from the right fist while the left hand is off it: the muzzle drops ~25 deg
+    hang = T.Rifle(tuple(Add3(ready['origin'], (T.R(.02), T.R(.03), -T.R(.04)))), Unit((.10, -.75, -.66)))
+    rifle = RbRiflePath(T, [(0.0, ready), (.46, ready), (.62, hang), (1.45, hang), (1.70, ready), (D, ready)])
+    p0 = start['pelvis']
+    stepL = Add3(start['ankle.L'], (T.R(.10), T.R(.02), 0))
+    knock = lambda t: Smooth((t - hit) / .06) * (1 - .55 * Smooth((t - .70) / .70))
+    anim = Tracks(start, {
+        'ankle.L': [(0.0, start['ankle.L']), (.50, start['ankle.L']), (.60, Add3(Lerp3(start['ankle.L'], stepL, .5), (0, 0, .04))),
+                    (.70, stepL)],
+        'pelvis': [(0.0, p0), (hit, p0), (.52, Add3(p0, (T.R(.05), T.R(.02), -T.R(.02)))), (.80, Add3(p0, (T.R(.05), T.R(.01), -T.R(.03)))),
+                   (D, Add3(p0, (T.R(.04), 0, -T.R(.02))))],
+        'shrug': [(0.0, start['shrug']), (hit, start['shrug']), (.50, .18), (1.2, .12), (D, .08)],
+        'bend': [(0.0, start['bend']), (hit, start['bend']), (.55, start['bend'] + .08), (D, start['bend'] + .10)],
+        'lean': [(0.0, 0.0), (hit, 0.0), (.50, .10), (1.0, .05), (D, .02)],
+        'twist': [(0.0, start['twist']), (hit, start['twist']), (.50, start['twist'] + .18), (1.2, start['twist'] + .10), (D, start['twist'] + .04)],
+        'lookW': [(0.0, 0.0), (D, 0.0)],
+    }, lag={'head': .03})
+    head0, neck0 = start['head'], start['neck']
+
+    def Body(t):
+        f = anim(t)
+        k = knock(t)
+        # the head snapped round to his left and down by the blow (yaw +, roll toward the left shoulder), eyes kept down after
+        f['head'] = (head0[0] + .20 * k + .10 * Smooth((t - 1.0) / .6), head0[1] + .18 * k, head0[2] + .62 * k)
+        f['neck'] = (neck0[0] + .05 * k, neck0[1] + .06 * k, neck0[2] + .25 * k)
+        r = rifle(t)
+        wL = 1 - Smooth((t - .46) / .10) + Smooth((t - 1.55) / .15)
+        RbHoldRifle(T, f, r, wL=Clamp(wL))
+        if wL < .999:
+            # the free left hand: up to the helmet's brim on the left of his face, settles it, comes back down
+            up = Smooth((t - .55) / .23) * (1 - Smooth((t - 1.30) / .25))
+            f['handRel.L'] = Lerp3((.07, -.16, -.40), (-.06, -.16, .28), up)
+            f['poleRel.L'] = Lerp3((.45, .40, -.35), (.35, -.10, -.25), up)
+            f['palmF.L'], f['palmN.L'] = Unit(Lerp3((0, -.2, -1), (-.3, -.3, .9), up)), Unit(Lerp3((-1, 0, 0), (0, .9, .3), up))
+            f['curl.L'] = Mix(.6, .9, up)
+        return f
+    spec = {'pose': lambda t: T.Nest(Body(t)), 'props': lambda t: {'weapon': T.Track(rifle(t))},
+            'plants': [('R', 0, D), ('L', 0, .50), ('L', .70, D)],
+            'reviewProps': lambda t: T.RifleProps(rifle(t)), 'reviewFrames': lambda n: [0, 10, 12, 15, 19, 30, 41, n - 1]}
+    return AReview(spec)
+
+
+# =========================================================================================================================
+# 「扎。」: the recruit backs off three steps (to practice.recruitBack, 2.2 m east of R3), screams and charges, the first thrust
+# goes wide into the comrade's left shoulder, out, the second into his belly; he stands over him panting (hold loop). The
+# comrade, kneeling at R3, shrinks from the charge, is thrown round by the first thrust, folds on the second and goes down on
+# his right side curled up in the mud, howling (hold loop; CaptiveHowl). Stage recruitThrust (anchor comrade = R3).
+# The thrust timing and the lunge are IjaBayonetDownThrust's (wind 0.40 s before the point, the point held ~0.25 s, pulled).
+# =========================================================================================================================
+RB_THRUST_T = 108 / 24          # 4.5 s
+RB_STAB1 = 53 / 24              # 2.208 s: the point in the left shoulder
+RB_STAB2 = 66 / 24              # 2.75 s: the point in the belly
+RB_THRUST_HOLD = (78 / 24, RB_THRUST_T)       # 3.25-4.5 s: panting over him
+RB_CURL_T = 132 / 24            # 5.5 s
+RB_CURL_HOLD = (84 / 24, RB_CURL_T)           # 3.5-5.5 s: curled in the mud, howling
+RB_IJAD_AT = (-.85, -.85)       # ijaD's root in R3 (runtime m): south-east of the comrade, facing the front of his left shoulder
+RB_IJAD_YAW = RbFace(-.09 - RB_IJAD_AT[0], .18 - RB_IJAD_AT[1])
+STAGES['recruitThrust'] = {
+    'anchor': 'comrade',
+    'notes': 'CaptiveStabbedCurl (comrade at R3, CaptiveKneelMud\'s root) and IjaRecruitChargeThrust start together; the points go '
+             'in at 2.208 s (left shoulder) and 2.75 s (belly). ijaD starts 1.2 m south-east of R3 facing the front of his left shoulder, backs off four steps to ~2.2 m '
+             '(practice.recruitBack) and charges back in.',
+    'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveStabbedCurl', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+               'ijaD': {'rig': 'TengxianIja03', 'clip': 'IjaRecruitChargeThrust', 'x': RB_IJAD_AT[0], 'z': RB_IJAD_AT[1],
+                        'yawDeg': RB_IJAD_YAW, 'yM': round(RbR3Ground(*RB_IJAD_AT), 4)}}}
+PARTNER_SOURCES.setdefault('TengxianNra02', {}).update({'CaptiveStabbedCurl': ['shoulderFrontL', 'bellyFront', 'hairBack']})
+
+Meta('IjaRecruitChargeThrust', RB_THRUST_T, False, 'track', role='ijaD', rig='TengxianIja03', rigs=RB_IJAD, props=['weapon'],
+     rootMotion=True, stage='recruitThrust', weaponState='twoHand', holdLoop=list(RB_THRUST_HOLD),
+     # (limb rifleBayonet: the point of the bayonet fixed on his rifle -- the bake probes tipInShoulder / tipInBelly measure it)
+     contacts=[{'t': RB_STAB1, 'limb': 'rifleBayonet', 'action': 'stab', 'partnerRole': 'comrade', 'part': 'shoulderFrontL'},
+               {'t': RB_STAB2, 'limb': 'rifleBayonet', 'action': 'stab', 'partnerRole': 'comrade', 'part': 'bellyFront'}],
+     events=[{'t': .0, 'kind': 'backOff'}, {'t': 1.30, 'kind': 'shout', 'line': 'RecruitCharge.01'},
+             {'t': RB_STAB1, 'kind': 'stab1', 'sound': 'bayonetStabBody'}, {'t': 2.42, 'kind': 'pullOut'},
+             {'t': RB_STAB2, 'kind': 'stab2', 'sound': 'bayonetStabBody'}, {'t': 3.0, 'kind': 'pullOut'},
+             {'t': RB_THRUST_HOLD[0], 'kind': 'recruitPant'}],
+     prev=['IjaRecruitSlapped'], next=['IjaReadyRifle'],
+     notes='2026-10-11 Practice (N15): frame 0 = IjaRecruitSlapped last frame. Three steps back (0-1.0 s, ~1.1 m), the rifle drops to '
+           'the thrust guard, the scream (1.3), three running steps in, the first thrust lunges wide into the comrade\'s left shoulder '
+           '(2.208), pulled out, a half step and the second into his belly (2.75), pulled out, a step back; 3.25-4.5 s a seamless hold '
+           'loop standing over him at the ready, gasping. Root motion: the stage root to ~0.5 m nearer the comrade.')
+Meta('CaptiveStabbedCurl', RB_CURL_T, False, 'free', role='comrade', rig='TengxianNra02', rigs=['TengxianNra02'], rootMotion=True,
+     stage='recruitThrust', weaponState='dropped', weaponDropFrom='BlastSlamBuried', holdLoop=list(RB_CURL_HOLD), env=KNEEL_WALL_ENV,
+     contacts=[{'t': RB_STAB1, 'by': 'ijaD', 'part': 'shoulderFrontL', 'action': 'stabbed'},
+               {'t': RB_STAB2, 'by': 'ijaD', 'part': 'bellyFront', 'action': 'stabbed'},
+               {'t': 1.45, 'limb': 'handR', 'action': 'brace', 'target': 'ground'}],
+     events=[{'t': 1.35, 'kind': 'flinch'}, {'t': RB_STAB1, 'kind': 'stabbed', 'at': 'shoulderFrontL'},
+             {'t': RB_STAB2, 'kind': 'stabbed', 'at': 'bellyFront'}, {'t': 3.40, 'kind': 'down'},
+             {'t': RB_CURL_HOLD[0], 'kind': 'howl', 'line': 'CaptiveHowl.01'}],
+     prev=['CaptiveKneelMud'], next=['CaptiveCurledPulledUp'],
+     notes='2026-10-11 Practice (N15): frame 0 = CaptiveKneelMud frame 0 (kneeling at R3). He watches the recruit back off, flinches '
+           'from the scream (1.35: shrinks back to his right, the right palm onto the bank), the first thrust into the front of the '
+           'left shoulder throws the shoulder back and turns him away (2.208), the second into the belly folds him over both hands '
+           '(2.75); he goes down on his right side off the bank, turned 35 deg to his right (facing south-west, the head north-west, '
+           'the back to the north-east), curled round the belly (down 3.4). 3.5-5.5 s a seamless hold loop: curled, the chest '
+           'heaving with each howl, the knees drawing up.')
+
+
+def RbThrustDist(T, target, pelvisZ, grip=(.12, .20, .15), depth=.10, px=0.0):
+    """Pelvis Y (source, his frame: the target ahead along -Y) that puts the bayonet point `depth` (runtime m) past `target`
+    with the right fist at the hip (`grip` runtime m: right, forward, up from the pelvis)."""
+    g = Vector((px - T.R(grip[0]), -T.R(grip[1]), pelvisZ + T.R(grip[2])))
+    L = T.R(RB_TIP - depth)
+    tgt = Vector(target)
+    dz = tgt.z - g.z
+    dx = tgt.x - g.x
+    reach = math.sqrt(max(1e-6, L * L - dz * dz - dx * dx))
+    # g.y - reach = target.y  ->  pelvis y + grip offset - reach = target.y
+    return tgt.y + reach + T.R(grip[1])
+
+
+@Builder('IjaRecruitChargeThrust')
+def BuildRecruitChargeThrust(T, name):
+    stage, D = 'recruitThrust', RB_THRUST_T
+    s1, s2, h0 = RB_STAB1, RB_STAB2, RB_THRUST_HOLD[0]
+    start = RbFlatOf(T, BuildRecruitSlapped, 'IjaRecruitSlapped', RB_SLAPPED_T)
+    p0 = start['pelvis']
+    H = T.H
+
+    def Target(point, t):
+        h = PartnerPoint(T, stage, 'ijaD', 'comrade', point, t)
+        return (Vector(h[0]), Vector(h[1])) if h else (Vector((0, -T.R(1.1), T.R(.85))), Vector((0, 1, 0)))
+    t1, n1 = Target('shoulderFrontL', s1)
+    t2, n2 = Target('bellyFront', s2)
+    low = T.R(.05)                  # the lunge drops the hips this much
+    zStab = p0[2] - low
+    # the right fist (the rifle's origin) rides the pelvis: (right, forward, up) runtime m; at the point the arms are out
+    G1, G2 = (.12, .36, .14), (.12, .36, .04)
+    x1, x2 = t1.x + T.R(.10), t2.x + T.R(.10)          # the right fist a hand to the right of the line
+    y1 = RbThrustDist(T, t1, zStab, grip=G1, px=x1)
+    y2 = RbThrustDist(T, t2, zStab - T.R(.03), grip=G2, px=x2)
+    back = p0[1] + T.R(.95)                           # backing off (four short steps)
+    yHold = y2 + T.R(.30)
+    pelX = Channel([(0.0, p0[0]), (1.0, p0[0]), (1.6, Mix(p0[0], x1, .5)), (s1, x1), (2.45, x1), (s2, x2), (3.0, x2), (h0, x2), (D, x2)])
+    pelY = Channel([(0.0, p0[1]), (.25, p0[1] + T.R(.22)), (.50, p0[1] + T.R(.47)), (.75, p0[1] + T.R(.72)), (1.00, back), (1.40, back - T.R(.04)),
+                    (1.62, back - T.R(.35)), (1.86, Mix(back, y1, .62)), (s1 - .04, y1 - T.R(.01)), (s1, y1), (2.36, y1),
+                    (2.52, y1 + T.R(.06)), (2.62, y2 + T.R(.04)), (s2, y2), (2.92, y2), (3.20, yHold), (h0, yHold), (D, yHold)])
+    pelZ = Channel([(0.0, p0[2]), (.12, p0[2] - T.R(.02)), (1.0, p0[2] - T.R(.02)), (1.30, p0[2] - T.R(.04)), (1.40, p0[2] - T.R(.05)),
+                    (1.62, p0[2] - T.R(.02)), (1.86, p0[2] - T.R(.03)), (s1, zStab), (2.36, zStab), (2.52, p0[2] - T.R(.03)),
+                    (s2, zStab - T.R(.03)), (2.92, zStab - T.R(.03)), (3.20, p0[2] - T.R(.02)), (h0, p0[2] - T.R(.02)), (D, p0[2] - T.R(.02))])
+    pelXY = lambda t: (pelX(t), pelY(t))
+    # Feet: three steps back (R, L, R), set; the charge L, R, L (the lunge lands the left foot forward), the right brought up
+    # a half step between the thrusts, the step back after the second (L, R).
+    stance = {'L': (H + T.R(.02), -T.R(.10)), 'R': (-(H + T.R(.03)), T.R(.14))}
+    lunge = {'L': (H + T.R(.03), -T.R(.30)), 'R': (-(H + T.R(.05)), T.R(.30))}
+    steps = [('R', .00, .24), ('L', .25, .49), ('R', .50, .74), ('L', .75, .99),
+             ('L', 1.40, 1.62), ('R', 1.62, 1.86), ('L', 1.88, s1 - .02),
+             ('R', 2.40, 2.60), ('L', 2.92, 3.06), ('R', 3.06, 3.20)]
+    stances = {'L': [stance['L'], stance['L'], stance['L'], lunge['L'], stance['L']],
+               'R': [stance['R'], stance['R'], (-(H + T.R(.05)), T.R(.06)), (-(H + T.R(.05)), T.R(.16)), stance['R']]}
+    feet, plants = WrPath(T, start, pelXY, lambda t: 0.0, steps, stances, lambda s, t: WrPoleRel(start)[s], D, lift=.07)
+    P = lambda t: Vector((pelX(t), pelY(t), pelZ(t)))
+    ready = LowReady(T)
+    readyOff = Vector(ready['origin']) - Vector(p0)
+    O = lambda r, f, u: Vector((-T.R(r), -T.R(f), T.R(u)))
+    a1 = (t1 - (Vector((x1, y1, zStab)) + O(*G1))).normalized()
+    a2 = (t2 - (Vector((x2, y2, zStab - T.R(.03))) + O(*G2))).normalized()
+    guardAxis = Vector(Unit((.06, -.88, .30)))
+    overAxis = Vector(Unit((.10, -.84, -.53)))
+    # the fist's offset from the pelvis and the rifle's axis: low ready, the guard, drawn back, the point, held, out, ...
+    offs = Channel([(0.0, tuple(readyOff)), (1.0, tuple(readyOff)), (1.30, tuple(O(.14, .22, .18))), (1.86, tuple(O(.14, .22, .18))),
+                    (s1 - .10, tuple(O(.12, .02, .12))), (s1, tuple(O(*G1))), (2.34, tuple(O(*G1))), (2.48, tuple(O(.12, .02, .12))),
+                    (s2 - .10, tuple(O(.12, .00, .06))), (s2, tuple(O(*G2))), (2.90, tuple(O(*G2))), (3.06, tuple(O(.12, .06, .10))),
+                    (h0, tuple(O(.13, .14, .14))), (D, tuple(O(.13, .14, .14)))])
+    axes = Channel([(0.0, tuple(ready['axis'])), (1.0, tuple(ready['axis'])), (1.30, tuple(guardAxis)), (1.86, tuple(guardAxis)),
+                    (s1 - .10, tuple(a1)), (s1, tuple(a1)), (2.34, tuple(a1)), (2.48, tuple(a1)), (s2 - .10, tuple(a2)), (s2, tuple(a2)),
+                    (2.90, tuple(a2)), (3.06, tuple(a2)), (h0, tuple(overAxis)), (D, tuple(overAxis))])
+
+    def RifleAt(t):
+        return T.Rifle(tuple(P(t) + Vector(offs(t))), Unit(axes(t)))
+    anim = Tracks(start, dict(feet, **{
+        'pelvis': WrDense(lambda t: (pelX(t), pelY(t), pelZ(t) + (.008 * WrBreath(t, h0, D - h0, per=3) if t > h0 - .4 else 0.0)), D),
+        'bend': [(0.0, start['bend']), (1.0, start['bend'] + .06), (1.30, .30), (1.86, .26), (s1, .34), (2.36, .34), (2.52, .24),
+                 (s2, .42), (2.92, .42), (3.10, .30), (D, .30)],
+        'pelvisTilt': [(0.0, start['pelvisTilt']), (1.30, (.16, 0, 0)), (s1, (.22, 0, 0)), (2.52, (.12, 0, 0)), (s2, (.24, 0, 0)),
+                       (3.1, (.14, 0, 0)), (D, (.14, 0, 0))],
+        'twist': [(0.0, start['twist']), (1.30, -.10), (1.86, -.16), (s1, .10), (2.40, .02), (2.62, -.14), (s2, .08), (3.1, 0.0), (D, 0.0)],
+        'shrug': [(0.0, start['shrug']), (1.30, .16), (1.40, .20), (s1, .10), (D, .10)],
+        'head': [(0.0, start['head']), (1.0, (.30, .02, .08)), (1.30, (-.10, 0, 0)), (1.40, (-.16, 0, 0)), (s1, (.18, 0, 0)),
+                 (s2, (.30, 0, 0)), (3.1, (.36, 0, 0)), (D, (.36, 0, 0))],
+        'neck': [(0.0, start['neck']), (1.30, (-.05, 0, 0)), (s1, (.10, 0, 0)), (D, (.12, 0, 0))],
+        'lookW': [(0.0, 0.0), (D, 0.0)],
+    }), lag={'head': .04, 'neck': .03})
+
+    def Body(t):
+        f = anim(t)
+        if t > h0 - .4:
+            b = WrBreath(t, h0, D - h0, per=3)
+            f['bend'] += .03 * b
+            f['shrug'] += .03 * b
+        RbHoldRifle(T, f, RifleAt(t))
+        return f
+
+    def Probe(t):
+        out = {}
+        if abs(t - s1) < .021:
+            out['tipInShoulder'] = (tuple(Vector(RbBayonetTip(T, RifleAt(s1))) - a1 * T.R(.10)), tuple(Target('shoulderFrontL', s1)[0]))
+        if abs(t - s2) < .021:
+            out['tipInBelly'] = (tuple(Vector(RbBayonetTip(T, RifleAt(s2))) - a2 * T.R(.10)), tuple(Target('bellyFront', s2)[0]))
+        return out or None
+    G = RbStageGround(T, stage, 'ijaD')
+    def Grounded(t):
+        # the bank under his feet eases in over the first steps (frame 0 is IjaRecruitSlapped's last, authored on the flat)
+        f = Body(t)
+        g, w = GroundFeet(T, f, G), Smooth(t / .5)
+        for k in ('ankle.L', 'ankle.R', 'foot.L', 'foot.R', 'pelvis'):
+            f[k] = Lerp3(f[k], g[k], w)
+        return f
+    spec = {'pose': lambda t: T.Nest(Grounded(t)), 'props': lambda t: {'weapon': T.Track(RifleAt(t))}, 'plants': plants,
+            'probes': Probe, 'ground': lambda x, y, t: G(x, y) * Smooth(t / .5),
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + [('cyl', RifleAt(t)['muzzle'], RbBayonetTip(T, RifleAt(t)), .012)]
+            + PartnerGhost(T, stage, 'ijaD', 'comrade', t) + [('point', tuple(t1), None, .03), ('point', tuple(t2), None, .03)],
+            'reviewFrames': lambda n: [0, 24, 31, 40, 48, 53, 58, 63, 66, 72, 80, n - 1]}
+    spec = RbStageViews(T, stage, 'ijaD', spec)
+    spec['reviewViews'][:2] = [('side', lambda t: (pelX(t) + T.R(3.4), pelY(t) - T.R(.3), T.R(1.1)), lambda t: (pelX(t), pelY(t) - T.R(.5), T.R(.7))),
+                              ('q', lambda t: (pelX(t) + T.R(2.4), pelY(t) - T.R(3.0), T.R(1.9)), lambda t: (pelX(t), pelY(t) - T.R(.5), T.R(.6)))]
+    spec['reviewScale'] = 3.4
+    return spec
+
+
+def RbKneelMud(T, t):
+    """CaptiveKneelMud's flat pose at loop time t (before R3OnBank)."""
+    f = dict(KneelWallBase(T))
+    phase = Tau * t / 3.0
+    breath = math.sin(3 * phase)
+    sway = math.sin(phase)
+    f['bend'] += .03 * breath
+    f['shrug'] += .035 * breath
+    p = f['pelvis']
+    f['pelvis'] = (p[0], p[1], p[2] + .004 * breath)
+    h = f['head']
+    f['head'] = (h[0] + .06 * sway + .02 * breath, h[1] + .04 * math.sin(2 * phase), h[2] + .05 * sway)
+    f['twist'] += .02 * sway
+    r = f['handRel.R']
+    f['handRel.R'] = (r[0], r[1], r[2] + .008 * breath)
+    return f
+
+
+# The curl in the mud (source m, R3 frame, before the turn): the pelvis comes down off the bank 0.35 m to his right (west) and
+# 0.30 m forward (south), the body turned RB_CURL_TURN to his right and rolled onto the right side.
+RB_CURL_TURN = -math.radians(35)
+RB_CURL_PELVIS_RT = (.35, -.30)        # runtime (x right = west, z back = north) of R3
+RB_CURL_ROLL = -1.38                   # pelvisTilt roll: the body's up axis to his right (lying on the right side)
+
+
+RB_LEGS = ('ankle.L', 'ankle.R', 'legPole.L', 'legPole.R', 'foot.L', 'foot.R')
+
+
+def RbCurlFlat(T, t=None, heave=0.0, draw=0.0, straight=False):
+    """The curled-up lying pose (flat dict, the turned frame; Turned is applied by the caller). heave: the chest's howl
+    (0..1), draw: the knees drawn up (0..1)."""
+    s = T.s
+    px, py = -RB_CURL_PELVIS_RT[0] / s, RB_CURL_PELVIS_RT[1] / s
+    f = dict(KneelWallBase(T))
+    z = T.R(.17)
+    # in the turned frame the body lies along X (the head toward -X), facing -Y; the leg targets are offsets in that frame,
+    # turned into the world here (Turned keeps authored positions where they are)
+    O = lambda dx, dy, dz: (px + _Rot(T.R(dx), T.R(dy), RB_CURL_TURN)[0], py + _Rot(T.R(dx), T.R(dy), RB_CURL_TURN)[1], T.R(dz))
+    f.update({'pelvis': (px, py, z), 'pelvisTilt': (.10, RB_CURL_ROLL, 0.0), 'bend': .05 + .04 * heave, 'lean': 0.0,
+              'twist': .55 + .12 * draw + .06 * heave, 'shrug': .20 + .10 * heave,
+              'neck': (0.0, 0.0, .30 + .05 * heave), 'head': (-.10, -.05, .25 - .08 * heave),
+              # legs: the thighs drawn up toward the chest, the knees forward (-Y), the right leg under, the left on top
+              'ankle.R': O(.30, -.22 - .03 * draw, .07), 'ankle.L': O(.24, -.30 - .04 * draw, .19),
+              'legPole.R': O(-.10, -1.2, .05), 'legPole.L': O(-.10, -1.2, .30),
+              'foot.L': (20, 0, 0), 'foot.R': (20, 0, 0),
+              # both hands clamped on the belly (torso frame: left, back, up from each shoulder)
+              'handRel.R': (.16, -.20, -.30), 'poleRel.R': (-.30, -.10, -.35), 'handRelW.R': 1.0,
+              'palmF.R': (.5, -.2, -.8), 'palmN.R': (0, .9, -.1), 'curl.R': .7,
+              'handRel.L': (-.12, -.22, -.34), 'poleRel.L': (.30, -.10, -.35), 'handRelW.L': 1.0,
+              'palmF.L': (-.5, -.2, -.8), 'palmN.L': (0, .9, -.1), 'curl.L': .7,
+              'lookW': 0.0})
+    if straight:
+        # the legs out along the body (toward his feet, +X of the turned frame) on the way down
+        f.update({'ankle.R': O(.78, .02, .07), 'ankle.L': O(.74, -.06, .19), 'legPole.R': O(.40, -1.0, .05), 'legPole.L': O(.40, -1.0, .30),
+                  'foot.L': (10, 0, 0), 'foot.R': (10, 0, 0)})
+    return f
+
+
+@Builder('CaptiveStabbedCurl')
+def BuildStabbedCurl(T, name):
+    D, s1, s2, h0 = RB_CURL_T, RB_STAB1, RB_STAB2, RB_CURL_HOLD[0]
+    curl = RbCurlFlat(T)
+    straight = RbCurlFlat(T, straight=True)
+    kneel0 = RbKneelMud(T, 0.0)
+    # The right palm on the bank behind his right hip (he shrinks back from the charge), world (R3 source).
+    braceR = (-T.R(.38), T.R(.06), R3Bank(T, -T.R(.38), T.R(.06)) + T.R(.09))
+    turn = Channel([(0.0, 0.0), (s1, 0.0), (2.40, -.25), (s2, -.20), (3.05, -.30), (3.40, RB_CURL_TURN), (D, RB_CURL_TURN)])
+    down = Channel([(0.0, 0.0), (2.95, 0.0), (3.40, 1.0), (D, 1.0)])      # kneel -> curled (blends every channel)
+    keys = Keys(kneel0, [
+        (0.00, {}),
+        (1.20, {'head': Add3(kneel0['head'], (-.05, 0, .25))}),                        # watching the recruit back off (east)
+        (1.35, {'shrug': kneel0['shrug'] + .18, 'lean': -.06, 'twist': -.06, 'bend': kneel0['bend'] + .06,
+                'head': Add3(kneel0['head'], (-.15, 0, .30))}),                      # the scream: he shrinks back to his right
+        (1.45, {'handRelW.R': 1.0}),
+        (1.70, {'handRelW.R': 0.0, 'hand.R': braceR, 'armPole.R': (-T.R(.70), T.R(.05), T.R(.40))}),
+        (s1, {'twist': -.10, 'lean': -.05}),
+        # the point in the left shoulder: thrown round to his right, the shoulder back, the head back
+        (s1 + .08, {'twist': -.24, 'lean': -.10, 'shrug': kneel0['shrug'] + .28, 'bend': kneel0['bend'] + .08,
+                    'head': Add3(kneel0['head'], (-.35, -.10, .10)), 'neck': (-.10, 0, 0)}),
+        (2.42, {'twist': -.20, 'lean': -.08, 'bend': kneel0['bend'] + .24, 'head': Add3(kneel0['head'], (.10, 0, .15))}),
+        # turning back toward the blade as it comes out, the left hand to the shoulder
+        (2.62, {'twist': -.18, 'bend': kneel0['bend'] + .30}),
+        (s2, {'twist': -.10}),
+        # the point in the belly: folded over it
+        (s2 + .10, {'bend': .75, 'shrug': kneel0['shrug'] + .30, 'head': (.30, 0, 0), 'neck': (.25, 0, 0), 'twist': -.12}),
+        (2.95, {'bend': .80, 'handRelW.R': 1.0}),
+    ], lag={'head': .04, 'neck': .03})
+
+    def Flat(t):
+        f = keys(t)
+        # the hands: the right on the bank from the flinch, both to the belly on the second thrust
+        belly = Smooth((t - s2) / .22)
+        if belly > 0:
+            for k in ('handRel.R', 'poleRel.R', 'palmF.R', 'palmN.R', 'curl.R', 'handRel.L', 'poleRel.L', 'palmF.L', 'palmN.L', 'curl.L'):
+                a, b = f[k], curl[k]
+                f[k] = Lerp3(a, b, belly) if isinstance(a, tuple) else Mix(a, b, belly)
+            if t < 2.95:
+                f['handRelW.R'] = Mix(f['handRelW.R'], 1.0, belly)
+        w = Smooth(down(t))
+        if w > 0:
+            kneelLegs = R3OnBank(T, f)
+            g = BankKneel(T, f)
+            for k, v in curl.items():
+                if k in ('look', 'lookLimit') or v is None or k in RB_LEGS:
+                    continue
+                a = g.get(k, v)
+                if isinstance(v, tuple) and isinstance(a, tuple):
+                    g[k] = Lerp3(a, v, w)
+                elif isinstance(v, float) and isinstance(a, (int, float)):
+                    g[k] = Mix(a, v, w)
+            # the kneeling legs are carried round with the hips as he rolls onto his side (left on the bank while the hips rolled
+            # over them, the two-bone leg IK switched branch: both thighs 178 deg in one frame), then drawn up into the curl
+            P0, P1 = Vector(kneelLegs['pelvis']), Vector(g['pelvis'])
+            axis = Quaternion((0, 0, 1), turn(t)) @ Vector((0, 1, 0))
+            spin = Quaternion(axis, g['pelvisTilt'][1] - kneelLegs['pelvisTilt'][1])
+            carried = {k: tuple(P1 + spin @ (Vector(kneelLegs[k]) - P0)) for k in RB_LEGS if not k.startswith('foot')}
+            carried.update({k: kneelLegs[k] for k in RB_LEGS if k.startswith('foot')})
+            lw = Smooth(Clamp((t - 3.02) / .43))     # (all curl by 3.45: the hold loop starts at 3.5)
+            for k in RB_LEGS:
+                g[k] = Lerp3(carried[k], curl[k], lw)
+            f = g
+            if t >= h0:
+                u = t - h0
+                # the howl: three long heaves a loop (the CaptiveHowl rhythm), the knees drawn up with them
+                heave = .5 - .5 * math.cos(Tau * 3 * u / (D - h0)) if u > 0 else 0.0
+                c = RbCurlFlat(T, heave=heave, draw=heave)
+                for k in ('twist', 'shrug', 'neck', 'head', 'bend', 'ankle.L', 'ankle.R'):
+                    f[k] = c[k]
+            return f
+        return R3OnBank(T, f)
+
+    def Pose(t):
+        f = Flat(t)
+        f = Turned(f, turn(t))
+        return T.Nest(f)
+    spec = R3Clip(T, {'pose': Pose, 'kneePlants': [('L', 0, 1.30), ('R', 0, 1.30)],
+                      'reviewFrames': lambda n: [0, 32, 41, 53, 56, 60, 66, 70, 76, 82, 100, n - 1]})
+    spec.update(R3Review())
+    spec['reviewViews'] = R3_VIEWS + RB_TOP + R3EyeView(T)
+    return spec
+
+
+# =========================================================================================================================
+# Slash (01): ijaA (the knife drawn as IjaDrawBayonet draws it) comes in behind the curled man's right shoulder, takes him by
+# the hair at the back of the head, hauls him up kneeling (lift) with his left knee in the small of his back, wrenches the
+# head back and lays the blade on the throat -- held there (「看着。」「支那猪，叫得倒响。」, N16: a beat before the cut). Then the
+# pull cut (cut) round the front of the throat from its left to its right (toward ijaA, who stands behind the right shoulder:
+# IjaThroatSlash's stroke mirrored -- the blade tangent on the neck, the fist leading, the blade sliding along its length), and
+# the knee drives him forward onto his face (shove). Stages hairLift / kneeCut (anchor comrade = R3, the curl's root).
+# =========================================================================================================================
+RB_LIFT_T = 84 / 24             # 3.5 s
+RB_LIFT_GRAB = 23 / 24          # 0.958 s: the fist closes in the hair
+RB_LIFT_HOLD = (48 / 24, RB_LIFT_T)            # 2.0-3.5 s: held up, the blade on his throat
+RB_CUT_T = 40 / 24              # 1.667 s (ijaA)
+RB_CUT = 6 / 24                 # 0.25 s: the edge across the front of the throat
+RB_SHOVE = 17 / 24              # 0.708 s: the knee drives him forward
+RB_FWD_T = 84 / 24              # 3.5 s (the comrade, CaptiveThroatCutForward)
+RB_A_AT = (.02, .16)            # ijaA behind the kneeling man, by the planks (runtime m in R3: west, north)
+RB_A_YAW = -35.0
+# where IjaHairLiftKneeBack starts him (runtime m in his own frame: right, forward): over the head of the man curled in the mud
+# (the head lies ~1.1 m west of R3); he backs off two steps as he hauls the man up, to the root behind the kneeling man
+RB_A_START = (.66, .42)
+_rbA = {'x': RB_A_AT[0], 'z': RB_A_AT[1], 'yawDeg': RB_A_YAW, 'yM': round(RbR3Ground(*RB_A_AT), 4)}
+STAGES['hairLift'] = {'anchor': 'comrade', 'notes': 'CaptiveCurledPulledUp and IjaHairLiftKneeBack start together (the fist in the '
+                      'hair at 0.958 s); the comrade at the curl\'s root (R3), ijaA behind his right shoulder by the planks.',
+                      'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveCurledPulledUp', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+                                 'ijaA': dict(_rbA, rig='TengxianIja02', clip='IjaHairLiftKneeBack')}}
+STAGES['kneeCut'] = {'anchor': 'comrade', 'notes': 'CaptiveThroatCutForward and IjaThroatCutKneeShove start together (IjaHairLiftKneeBack '
+                     'at its hold-loop start); the cut at 0.25 s, the knee at 0.708 s.',
+                     'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveThroatCutForward', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+                                'ijaA': dict(_rbA, rig='TengxianIja02', clip='IjaThroatCutKneeShove')}}
+PARTNER_SOURCES['TengxianNra02'].update({
+    'CaptiveCurledPulledUp': ['hairBack', 'throat', 'lowerBack', 'collarFront'],
+    'CaptiveThroatCutForward': ['hairBack', 'throat', 'lowerBack', 'upperArmL', 'collarFront'],
+})
+REACH_BY_CLIP.update({name: {'fraction': .86, 'sides': 'L', 'travel': .10, 'bend': .35, 'sink': .10}
+                      for name in ('IjaHairLiftKneeBack', 'IjaThroatCutKneeShove')})
+# the stoop for the hair of the man curled on the ground (0.8-1.2 s): the hips may travel and drop further toward it
+REACH_BY_CLIP['IjaHairLiftKneeBack'] = dict(REACH_BY_CLIP['IjaHairLiftKneeBack'],
+                                            travel=lambda t: .10 + .16 * Bump(t, .70, 1.45), bend=lambda t: .35 + .35 * Bump(t, .70, 1.45),
+                                            sink=lambda t: .10 + .14 * Bump(t, .70, 1.45))
+
+Meta('IjaHairLiftKneeBack', RB_LIFT_T, False, 'track', role='ijaA', rig='TengxianIja02', rigs=['TengxianIja02'],
+     props=['weapon', 'bayonet'], rootMotion=True, stage='hairLift', weaponState='slungBack', holdLoop=list(RB_LIFT_HOLD),
+     contacts=[{'t': .22, 'limb': 'handR', 'action': 'grip', 'target': 'bayonet', 'part': 'handle'},
+               {'t': RB_LIFT_GRAB, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'hairBack', 'standoffM': .03},
+               {'t': 1.58, 'limb': 'kneeL', 'action': 'press', 'partnerRole': 'comrade', 'part': 'lowerBack'},
+               {'t': 1.92, 'limb': 'bayonet', 'action': 'press', 'partnerRole': 'comrade', 'part': 'throat'}],
+     events=[{'t': .30, 'kind': 'draw', 'sound': 'bladeScrape'}, {'t': RB_LIFT_GRAB, 'kind': 'grabHair'},
+             {'t': 1.30, 'kind': 'lift'}, {'t': 1.58, 'kind': 'kneeIn'}, {'t': 1.92, 'kind': 'bladeOnThroat'},
+             {'t': 2.75, 'kind': 'hairShake'}],
+     next=['IjaThroatCutKneeShove'],
+     notes='2026-10-11 Slash (N16): standing behind the curled man\'s right shoulder (stage hairLift), rifle slung. 0-0.75 s he draws the '
+           'bayonet (IjaDrawBayonet\'s draw: cross draw reversed, turned over in the fist to a forward grip, held low at his right '
+           'side), stoops and takes the hair at the back of the head (0.958), hauls him up kneeling (lift 1.3), plants his left foot '
+           'and drives the left knee into the small of the back (1.58), wrenches the head back and lays the blade on the left of the '
+           'throat, the fist at its right (1.92). 2.0-3.5 s a seamless hold loop (a shake at 2.75). Replaces the IjaDrawBayonet play '
+           'before it (that clip\'s left fist is in the old kneeling man\'s hair). Last frame = IjaThroatCutKneeShove frame 0.')
+Meta('IjaThroatCutKneeShove', RB_CUT_T, False, 'track', role='ijaA', rig='TengxianIja02', rigs=['TengxianIja02'],
+     props=['weapon', 'bayonet'], rootMotion=True, stage='kneeCut', weaponState='slungBack',
+     contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'hairBack', 'standoffM': .03},
+               {'t': RB_CUT, 'limb': 'bayonet', 'action': 'cut', 'partnerRole': 'comrade', 'part': 'throat'},
+               {'t': RB_SHOVE, 'limb': 'kneeL', 'action': 'shove', 'partnerRole': 'comrade', 'part': 'lowerBack'},
+               {'t': .70, 'limb': 'handL', 'action': 'release', 'partnerRole': 'comrade'}],
+     events=[{'t': RB_CUT, 'kind': 'cut', 'sound': 'throatCut', 'fact': 'captivesKilled',
+              'spray': 'the comrade\'s right side of the throat, his right-front (north-west: the north wall), away from ijaA'},
+             {'t': RB_SHOVE, 'kind': 'shove'}],
+     prev=['IjaHairLiftKneeBack'], next=['IjaWipeBandageFixBayonet'],
+     notes='2026-10-11 Slash: frame 0 = IjaHairLiftKneeBack at its hold-loop start. 0-0.12 s the edge is pressed in on the left of the '
+           'throat, 0.12-0.40 one hard pull back toward his right hip draws it round the front of the throat (0.25 s) to its right, '
+           'the fist leading (IjaThroatSlash\'s stroke, mirrored); the knife comes out low at his right side. 0.708 s the left knee '
+           'drives forward and the fist lets go of the hair with a push: the man pitches forward onto his face; ijaA steps after '
+           'him with the left foot and stands over him.')
+Meta('CaptiveCurledPulledUp', RB_LIFT_T, False, 'free', role='comrade', rig='TengxianNra02', rigs=['TengxianNra02'], rootMotion=True,
+     stage='hairLift', weaponState='dropped', weaponDropFrom='BlastSlamBuried', holdLoop=list(RB_LIFT_HOLD), env=KNEEL_WALL_ENV,
+     contacts=[{'t': RB_LIFT_GRAB, 'by': 'ijaA', 'part': 'hairBack', 'action': 'grab'},
+               {'t': 1.58, 'by': 'ijaA', 'part': 'lowerBack', 'action': 'press'}],
+     events=[{'t': RB_LIFT_GRAB, 'kind': 'hairGrabbed'}, {'t': 1.30, 'kind': 'lift'}, {'t': 2.75, 'kind': 'hairShake'}],
+     prev=['CaptiveStabbedCurl'], next=['CaptiveThroatCutForward'],
+     notes='2026-10-11 Slash (N16): frame 0 = CaptiveStabbedCurl at its hold loop (curled on his right side). Howling on until the fist '
+           'closes in his hair (0.958); hauled up by it onto his knees facing south-west (1.0-1.6), sat back on his heels against '
+           'the knee in his back (1.58), the head wrenched back and turned to his right -- the throat to the pinned eye; the right '
+           'hand claws up at the fist behind his head, the left stays on the belly. 2.0-3.5 s a seamless hold loop: strained '
+           'gasping, shaken once (2.75).')
+Meta('CaptiveThroatCutForward', RB_FWD_T, False, 'free', role='comrade', rig='TengxianNra02', rigs=['TengxianNra02'], rootMotion=True,
+     stage='kneeCut', weaponState='dropped', weaponDropFrom='BlastSlamBuried', terminal=True, env=KNEEL_WALL_ENV,
+     contacts=[{'t': RB_CUT, 'by': 'ijaA', 'part': 'throat', 'action': 'cut'},
+               {'t': RB_SHOVE, 'by': 'ijaA', 'part': 'lowerBack', 'action': 'shove'}],
+     events=[{'t': RB_CUT, 'kind': 'throatCut', 'at': 'throat', 'howlEnds': True,
+              'spray': 'his right-front, ~north-west in the world (onto the north wall), away from ijaA'},
+             {'t': RB_SHOVE, 'kind': 'shoved'}, {'t': 1.25, 'kind': 'down'}, {'t': 2.0, 'kind': 'twitch'}, {'t': 2.55, 'kind': 'twitch'},
+             {'t': 3.2, 'kind': 'dead', 'fact': 'captivesKilled'}],
+     prev=['CaptiveCurledPulledUp'], next=[],
+     notes='2026-10-11 Slash: frame 0 = CaptiveCurledPulledUp at its hold-loop start. The cut (0.25 s) cuts the howl dead: a jolt, the '
+           'right hand comes off the fist to the throat; the knee (0.708) pitches him forward: he goes down on his face turned onto his '
+           'right side (1.25), the right hand under the throat, the left arm loose with the bandage up; two twitches (2.0, 2.55); the '
+           'last frame is the corpse (hold it).')
+
+
+def RbBlend(a, b, w, skip=()):
+    """Flat dict a -> b by w (tuples and numbers; other values switch at w = 0.5)."""
+    if w <= 0:
+        return dict(a)
+    out = dict(a)
+    for k, v in b.items():
+        if k in skip:
+            continue
+        x = a.get(k, v)
+        if isinstance(v, tuple) and isinstance(x, tuple) and len(x) == len(v):
+            out[k] = Lerp3(x, v, w) if len(v) == 3 else tuple(Mix(p, q, w) for p, q in zip(x, v))
+        elif isinstance(v, (int, float)) and isinstance(x, (int, float)) and not isinstance(v, bool):
+            out[k] = Mix(x, v, w)
+        elif w >= .5:
+            out[k] = v
+    return out
+
+
+def RbKneelUp(T, sit=.55):
+    """Kneeling up facing south-west (the curl's turn) at the curl's pelvis, sat back on the heels: positions in the world
+    (R3 source), the leg offsets turned by the curl's turn."""
+    s = T.s
+    px, py = -RB_CURL_PELVIS_RT[0] / s, RB_CURL_PELVIS_RT[1] / s
+    k = KneelFlat(T, 0.0, 0.0, sit=sit)
+    k0 = k['pelvis']
+    out = {}
+    for key, v in k.items():
+        if key.startswith(('ankle.', 'legPole.')):
+            rx, ry = _Rot(v[0] - k0[0], v[1] - k0[1], RB_CURL_TURN)
+            out[key] = (px + rx, py + ry, v[2])
+        else:
+            out[key] = v
+    out['pelvis'] = (px, py, k0[2])
+    return out
+
+
+def RbPulledUpFlat(T):
+    """The comrade kneeling up in the fist: the trunk back against the knee, the head wrenched back and turned to his right
+    (the throat to the eye), the right hand clawing at the fist behind his head, the left on the belly."""
+    f = RbCurlFlat(T)
+    f.update(RbKneelUp(T))
+    f.update({'pelvisTilt': (-.16, 0.0, 0.0), 'bend': -.12, 'lean': .04, 'twist': -.10, 'shrug': .28,
+              'neck': (-.30, 0.0, -.20), 'head': (-.42, -.06, -.40),
+              'handRel.R': (.12, .06, .15), 'poleRel.R': (-.40, .10, .05), 'handRelW.R': 1.0,
+              'palmF.R': (0, .3, .95), 'palmN.R': (.2, .9, -.2), 'curl.R': 1.1,
+              'handRel.L': (-.12, -.22, -.34), 'poleRel.L': (.30, -.10, -.35), 'handRelW.L': 1.0,
+              'palmF.L': (-.5, -.2, -.8), 'palmN.L': (0, .9, -.1), 'curl.L': .7, 'lookW': 0.0})
+    return f
+
+
+def RbHeave(t):
+    """The howl's chest heave on the curl's loop (zero with zero slope at the loop's ends)."""
+    return .5 - .5 * math.cos(Tau * 3 * t / (RB_CURL_T - RB_CURL_HOLD[0]))
+
+
+def RbPulledUpAt(T, t):
+    """CaptiveCurledPulledUp's flat pose (world positions, before Turned)."""
+    g, h0, D = RB_LIFT_GRAB, RB_LIFT_HOLD[0], RB_LIFT_T
+    h = RbHeave(min(t, g))
+    c = RbCurlFlat(T, heave=h, draw=h)
+    w = Smooth(Channel([(0.0, 0.0), (g, 0.0), (1.30, .55), (1.62, 1.0), (D, 1.0)])(t))
+    out = RbBlend(c, RbPulledUpFlat(T), w)
+    if t > h0 - .4:
+        b = WrBreath(t, h0, D - h0, per=3)
+        shake = Bump(t, 2.62, 2.92)
+        out['shrug'] += .03 * b + .06 * shake
+        out['bend'] += .02 * b
+        hd = out['head']
+        out['head'] = (hd[0] - .05 * shake, hd[1], hd[2] - .10 * shake * math.sin(Tau * (t - 2.62) / .15))
+    return out
+
+
+@Builder('CaptiveCurledPulledUp')
+def BuildCurledPulledUp(T, name):
+    spec = R3Clip(T, {'pose': lambda t: T.Nest(Turned(RbPulledUpAt(T, t), RB_CURL_TURN)),
+                      'reviewFrames': lambda n: [0, 18, 23, 28, 34, 39, 46, 60, n - 1]})
+    spec.update(R3Review())
+    spec['reviewViews'] = R3_VIEWS + RB_TOP + R3EyeView(T)
+    return spec
+
+
+def RbProneFlat(T):
+    """Down on his face, turned onto the right side (C3's end), facing south-west: the pelvis 0.22 m on from the kneel, the
+    right hand under the throat, the left arm loose (the bandage up)."""
+    s = T.s
+    px, py = -RB_CURL_PELVIS_RT[0] / s, RB_CURL_PELVIS_RT[1] / s
+    O = lambda dx, dy, dz: (px + _Rot(T.R(dx), T.R(dy), RB_CURL_TURN)[0], py + _Rot(T.R(dx), T.R(dy), RB_CURL_TURN)[1], T.R(dz))
+    return {'pelvis': O(0.0, -.22, .12), 'pelvisTilt': (1.42, -.30, 0.0), 'bend': .02, 'lean': -.06, 'twist': -.10, 'shrug': .08,
+            'neck': (-.05, 0.0, -.20), 'head': (-.10, -.10, -.75),
+            # (the legs trail off to his right: ijaA steps off to his left after the knee, beside the legs)
+            'ankle.R': O(-.36, .44, .07), 'ankle.L': O(-.06, .46, .10),
+            'legPole.R': O(-.60, .20, -.30), 'legPole.L': O(.30, .20, -.25),
+            'foot.L': (-30, 0, 0), 'foot.R': (-30, 0, 0),
+            'handRel.R': (.10, -.30, .02), 'poleRel.R': (-.40, -.10, -.30), 'handRelW.R': 1.0,
+            'palmF.R': (.3, -.3, .9), 'palmN.R': (0, .9, .2), 'curl.R': .6,
+            'handRel.L': (.08, .02, -.50), 'poleRel.L': (.45, .20, -.20), 'handRelW.L': 1.0,
+            'palmF.L': (0, -.2, -1), 'palmN.L': (-1, 0, 0), 'curl.L': .35, 'lookW': 0.0}
+
+
+def RbCutForwardAt(T, t):
+    up = RbPulledUpAt(T, RB_LIFT_HOLD[0])
+    f = dict(up)
+    j = Bump(t, RB_CUT - .02, RB_CUT + .30)
+    f['shrug'] += .12 * j
+    f['bend'] += .08 * j
+    tr = Smooth((t - RB_CUT - .03) / .18)
+    f = RbBlend(f, {'handRel.R': (.12, -.20, .16), 'poleRel.R': (-.40, -.10, -.30), 'palmF.R': (.3, -.3, .9), 'palmN.R': (0, .9, .2),
+                    'curl.R': .6}, tr)
+    f['palmF.R'], f['palmN.R'] = Unit(f['palmF.R']), Unit(f['palmN.R'])
+    w = Smooth(Channel([(0.0, 0.0), (RB_SHOVE, 0.0), (1.25, 1.0), (RB_FWD_T, 1.0)])(t))
+    f = RbBlend(f, RbProneFlat(T), w, skip=('handRel.R', 'poleRel.R', 'palmF.R', 'palmN.R', 'curl.R') if t < .55 else ())
+    for c, amp in ((2.0, 1.0), (2.55, .6)):
+        k = Bump(t, c - .06, c + .16) * amp
+        if k:
+            f['shrug'] += .06 * k
+            f['bend'] += .03 * k          # (the legs stay down: ijaA stands by them)
+    return f
+
+
+@Builder('CaptiveThroatCutForward')
+def BuildThroatCutForward(T, name):
+    spec = R3Clip(T, {'pose': lambda t: T.Nest(Turned(RbCutForwardAt(T, t), RB_CURL_TURN)),
+                      'reviewFrames': lambda n: [0, 6, 10, 17, 22, 30, 48, n - 1]})
+    spec.update(R3Review())
+    spec['reviewViews'] = R3_VIEWS + RB_TOP + R3EyeView(T)
+    return spec
+
+
+# ---- ijaA's side of the lift and the cut (IJA02) ---------------------------------------------------------------------------
+def RbMirrorFrame(frame):
+    """ThroatFrame with the man's left/right swapped: NeckBlade / SlashElbow then run the stroke from the left of the throat
+    round to the right (ijaA behind the right shoulder pulls toward himself)."""
+    C, n, a, up = frame
+    return C, n, -a, up
+
+
+def RbThroat(T, stage, t):
+    return RbMirrorFrame(ThroatFrame(T, stage, t))
+
+
+def RbLiftStance(T):
+    """ijaA's planted stance in the hold: the left foot a lunge forward with the knee bent into the man's back, the right back."""
+    f = IjaABase(T)
+    f.update({'ankle.L': Add3(f['ankle.L'], (-T.R(.04), -T.R(.12), 0)), 'legPole.L': Add3(f['legPole.L'], (-.05, -.60, .25)),
+              'ankle.R': Add3(f['ankle.R'], (0, T.R(.06), 0)), 'pelvis': Add3(f['pelvis'], (0, -T.R(.04), -T.R(.08))),
+              'bend': .26, 'pelvisTilt': (.10, 0, 0), 'twist': .06, 'head': (.30, 0, 0), 'lookW': 1.0, 'lookLimit': 70.0,
+              'protract.L': HAIR_PROTRACT})
+    return f
+
+
+def RbLiftBody(T):
+    """IjaHairLiftKneeBack's body keys (shared with IjaThroatCutKneeShove, which starts from its hold-loop start). He starts
+    RB_A_START off the root (over the curled man's head), stoops for the hair, hauls the man up backing off two steps to the
+    root and plants the left foot a lunge forward with the knee in the man's back."""
+    held = RbLiftStance(T)
+    g, h0 = RB_LIFT_GRAB, RB_LIFT_HOLD[0]
+    S = (-T.R(RB_A_START[0]), -T.R(RB_A_START[1]), 0.0)
+    base = dict(IjaABase(T), lookW=.6, lookLimit=70.0)
+    for k in ('ankle.L', 'ankle.R', 'legPole.L', 'legPole.R', 'pelvis'):
+        base[k] = Add3(base[k], S)
+    # (the left foot -- on the side of the man's top shoulder -- a step back: stooping, the left thigh met his upper arm)
+    base['ankle.L'] = Add3(base['ankle.L'], (T.R(.03), T.R(.20), 0))
+    base['legPole.L'] = Add3(base['legPole.L'], (T.R(.03), T.R(.20), 0))
+    midR = Add3(Lerp3(base['ankle.R'], held['ankle.R'], .55), (0, 0, 0))
+    backL = Add3(Lerp3(IjaABase(T)['ankle.L'], held['ankle.L'], .5), (-T.R(RB_A_START[0]) * .5, -T.R(RB_A_START[1]) * .5 + T.R(.12), 0))
+    return Tracks(base, {
+        # the draw (0-0.75) standing over him, the stoop for the hair, two steps back hauling (R, L), the left foot planted a
+        # lunge forward (the knee in his back), the right settled
+        'ankle.R': [(0.0, base['ankle.R']), (1.02, base['ankle.R']), (1.12, Add3(Lerp3(base['ankle.R'], midR, .5), (0, 0, .05))),
+                    (1.22, midR), (1.40, midR), (1.48, Add3(Lerp3(midR, held['ankle.R'], .5), (0, 0, .04))), (1.56, held['ankle.R'])],
+        # (the left foot, nearest the man coming up, goes back out of his way first, then forward into the lunge)
+        'ankle.L': [(0.0, base['ankle.L']), (.98, base['ankle.L']), (1.07, Add3(Lerp3(base['ankle.L'], backL, .5), (0, 0, .06))),
+                    (1.16, backL), (1.48, backL), (1.56, Add3(Lerp3(backL, held['ankle.L'], .5), (0, 0, .05))), (1.64, held['ankle.L'])],
+        'legPole.L': [(0.0, base['legPole.L']), (1.16, Add3(backL, (T.R(.25), -T.R(.9), T.R(.45)))), (1.48, Add3(backL, (T.R(.25), -T.R(.9), T.R(.45)))),
+                      (1.64, held['legPole.L'])],
+        'legPole.R': [(0.0, base['legPole.R']), (1.02, base['legPole.R']), (1.56, held['legPole.R'])],
+        'pelvis': [(0.0, base['pelvis']), (.62, base['pelvis']), (.90, Add3(base['pelvis'], (0, T.R(.13), -T.R(.17)))),
+                   (g + .05, Add3(base['pelvis'], (0, T.R(.13), -T.R(.18)))), (1.22, Lerp3(Add3(base['pelvis'], (0, T.R(.07), -T.R(.10))), held['pelvis'], .45)),
+                   (1.44, Lerp3(base['pelvis'], held['pelvis'], .85)), (1.62, held['pelvis']), (1.80, Add3(held['pelvis'], (0, T.R(.02), 0))),
+                   (h0, held['pelvis'])],
+        'bend': [(0.0, .08), (.30, .16), (.62, .14), (.90, .95), (g + .05, .98), (1.30, .55), (1.62, held['bend']), (h0, held['bend'])],
+        'pelvisTilt': [(0.0, (.03, 0, 0)), (.62, (.03, 0, 0)), (.90, (.40, 0, 0)), (1.30, (.22, 0, 0)), (1.62, held['pelvisTilt'])],
+        'twist': [(0.0, 0.0), (.20, .22), (.36, .20), (.62, .04), (.90, -.10), (g + .05, -.12), (1.30, -.06), (1.62, held['twist'])],
+        'shrug': [(0.0, 0.0), (g, .04), (1.30, .14), (1.62, .06), (h0, .04)],
+        'head': [(0.0, (.10, 0, 0)), (.40, (.30, 0, .15)), (.70, (.30, 0, 0)), (1.0, (.30, 0, 0)), (1.62, held['head'])],
+        'lookW': [(0.0, .6), (.70, 1.0), (h0, 1.0)],
+        'protract.L': [(0.0, 0.0), (.80, HAIR_PROTRACT)],
+    }, lag={'head': .05})
+
+
+def RbLiftKnife(T):
+    """(handle centre, blade axis, spine, elbow pole, reversed) of the bayonet through IjaHairLiftKneeBack: IjaDrawBayonet's draw,
+    held low at the right side, laid on the throat (the mirrored IjaThroatSlash frame 0)."""
+    base = IjaABase(T)
+    pel = base['pelvis']
+    scabbard = (pel[0] + T.R(.13), pel[1] - T.R(.12), pel[2] + T.R(SCABBARD_UP))
+    sheathAxis = Vector(Unit((.0, .34, -.94)))
+    out = Add3(scabbard, (T.R(.02), -T.R(.12), T.R(.20)))
+    chest = Add3(scabbard, (-T.R(.12), -T.R(.04), T.R(.26)))
+    shift = Vector(pel) - Vector(SlashStance(T)['pelvis'])
+    low = Vector(SLASH_HOLD_HAND) / T.s + shift + Vector((0, 0, -T.R(.06)))
+    lowAxis = Vector(Unit(SLASH_HOLD_AXIS))
+    drawn, turnPalm, fingers, turnSign = GripTurn()
+    flip = (.38, .52)
+    lowPalm = KnifePalm(tuple(lowAxis))
+    phi, dist, height = SLASH_DRAW[0][1], SLASH_DRAW[0][2], SLASH_DRAW[0][3]
+    bodyPole = (pel[0] - T.R(.55), pel[1] + T.R(.10), pel[2] + T.R(.02))
+
+    S = Vector((-T.R(RB_A_START[0]), -T.R(RB_A_START[1]), 0.0))
+    ride = Channel([(0.0, 1.0), (1.02, 1.0), (1.62, 0.0), (9.0, 0.0)])
+
+    def At(t):
+        r = Raw(t)
+        if r is None:
+            return None
+        hand, axis, palm, pole, rev = r
+        w = Smooth(ride(t))
+        return Vector(hand) + S * w if t <= 1.75 else Vector(hand), axis, palm, Vector(pole) + S * w, rev
+
+    def Raw(t):
+        if t < .22:
+            return None
+        if t <= .38:
+            w = Smooth((t - .22) / .16)
+            a = sheathAxis.lerp(drawn, w).normalized()
+            return Vector(Lerp3(scabbard, out, w)), a, KnifePalm(tuple(-a)), bodyPole, True
+        if t <= flip[1]:
+            s = Smooth((t - flip[0]) / (flip[1] - flip[0])) if t > flip[0] else 0.0
+            return Vector(Lerp3(out, chest, Smooth((t - .38) / .14))), Quaternion(fingers, turnSign * math.pi * s) @ drawn, turnPalm, bodyPole, s < .5
+        if t <= 1.75:
+            w = Smooth((t - flip[1]) / (.80 - flip[1]))
+            a, palm = CarryPalm(-drawn, turnPalm, lowAxis, lowPalm, w)
+            return Vector(chest).lerp(low, w), Vector(a), palm, bodyPole, False
+        frame = RbThroat(T, 'hairLift', t)
+        hand, axis, spine = NeckBlade(T, frame, phi, dist, height)
+        w = Smooth((t - 1.75) / .17)
+        a = lowAxis.lerp(axis, w).normalized()
+        return low.lerp(hand, w), a, KnifePalm(tuple(a)), Vector(bodyPole).lerp(SlashElbow(T, frame), w), False
+    return At, scabbard
+
+
+@Builder('IjaHairLiftKneeBack')
+def BuildHairLiftKneeBack(T, name):
+    stage, D, g, h0 = 'hairLift', RB_LIFT_T, RB_LIFT_GRAB, RB_LIFT_HOLD[0]
+    body = RbLiftBody(T)
+    knife, scabbard = RbLiftKnife(T)
+    G = RbStageGround(T, stage, 'ijaA')
+
+    def Body(t):
+        f = body(min(t, h0))
+        if t > h0 - .4:
+            b = WrBreath(t, h0, D - h0, per=2)
+            shake = Bump(t, 2.62, 2.92)
+            f['bend'] += .012 * b + .03 * shake
+            f['shrug'] += .03 * shake
+        hit = PartnerPoint(T, stage, 'ijaA', 'comrade', 'throat', t)
+        if hit is not None:
+            f['look'] = tuple(hit[0] + Vector((0, 0, T.R(.06))))
+        k = knife(t)
+        if k is not None:
+            hand, axis, (pf, pn), pole, rev = k
+            f['handRel.R'] = None
+            f['grip.R'] = tuple(Vector(hand) - Vector(pn) * T.R(KNIFE_IN))
+            f['gripW.R'] = Smooth((t - .10) / .12)
+            f['armPole.R'] = tuple(pole)
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = pf, pn, KNIFE_CURL
+        elif t > .08:
+            f['handRel.R'] = None
+            f['grip.R'] = tuple(Vector(scabbard) + Vector((-T.R(RB_A_START[0]), -T.R(RB_A_START[1]), 0.0)) - Vector(KnifePalm(tuple(-Vector(Unit((0, .34, -.94)))))[1]) * T.R(KNIFE_IN))
+            f['gripW.R'] = Smooth((t - .08) / .14)
+            f['armPole.R'] = (f['pelvis'][0] - T.R(.55), f['pelvis'][1] + T.R(.10), f['pelvis'][2] + T.R(.02))
+            pf, pn = KnifePalm(tuple(-Vector(Unit((0, .34, -.94)))))
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = pf, pn, 1.1
+        return GroundFeet(T, f, G)
+    spec = AttackerSpec(T, stage, 'ijaA', 'comrade', {'L': [(g, D, 'hairBack', .03, (0, 0, -1), 1.1)]}, Body, D)
+    pose = spec['pose']
+    spec['pose'] = lambda t: WithFist(T, pose(t), thumb=Smooth((t - .52) / .12)) if t >= .22 else pose(t)
+    props, review = SlungProps(T)
+
+    def KnifeAt(t):
+        k = knife(t)
+        if k is None:
+            return ScabbardKnife(T)
+        hand, axis, palm, pole, rev = k
+        return FistKnife(T, tuple(axis), SlashKnifeUp(axis, (0, -1, 0) if rev else (0, 0, 1)))
+
+    def Props(t):
+        o = props(t)
+        o['bayonet'] = KnifeTrack(KnifeAt(t))
+        return o
+    spec.update({'props': Props, 'plants': [('L', 0, .98), ('L', 1.16, 1.48), ('L', 1.64, D), ('R', 0, 1.02), ('R', 1.22, 1.40), ('R', 1.56, D)],
+                 'ground': lambda x, y, t: G(x, y), 'walls': RbStageWalls(T, stage, 'ijaA'),
+                 'look': lambda t: Body(t).get('look') if t > .9 else None, 'mountFrames': {'bayonet': ('Pelvis', 0)},
+                 'reviewProps': lambda t: review(t) + KnifeProps(KnifeAt(t)) + spec['markers'](t),
+                 'reviewFrames': lambda n: [0, 7, 12, 19, 23, 31, 38, 46, 60, n - 1]})
+    return RbStageViews(T, stage, 'ijaA', spec)
+
+
+def RbCutKnife(T):
+    """(handle centre, blade axis, spine, elbow pole) through IjaThroatCutKneeShove: the mirrored SLASH_DRAW stroke round the
+    throat (0-0.40 s), out low to his right side (SLASH_RECOVER), and held there."""
+    phi = Channel([(t, p) for t, p, _, _ in SLASH_DRAW])
+    dist = Channel([(t, d) for t, _, d, _ in SLASH_DRAW])
+    height = Channel([(t, v) for t, _, _, v in SLASH_DRAW])
+    shift = Vector(RbLiftStance(T)['pelvis']) - Vector(SlashStance(T)['pelvis'])
+    rec = Channel([(t, p) for t, p, _ in SLASH_RECOVER])
+    recAxis = Channel([(t, a) for t, _, a in SLASH_RECOVER])
+
+    def At(t):
+        u = min(t, SLASH_DRAW_END)
+        frame = RbThroat(T, 'kneeCut', min(t, SLASH_DRAW_END))
+        hand, axis, spine = NeckBlade(T, frame, phi(u), dist(u), height(u))
+        pole = SlashElbow(T, frame)
+        w = Smooth((t - SLASH_DRAW_END) / (SLASH_RECOVER[0][0] - SLASH_DRAW_END))
+        if w > 0:
+            q = min(max(t, SLASH_RECOVER[0][0]), 1.0)
+            hand = hand.lerp(Vector(rec(q)) / T.s + shift, w)
+            axis = axis.lerp(Vector(Unit(recAxis(q))), w).normalized()
+            spine = spine.lerp(Vector((0, 0, 1)), w)
+            pole = pole.lerp(Vector((-T.R(.60), T.R(.10), T.R(.85))), Smooth((t - SLASH_DRAW_END) / .30))
+        return hand, axis, spine, pole
+    return At
+
+
+@Builder('IjaThroatCutKneeShove')
+def BuildThroatCutKneeShove(T, name):
+    stage, D, cut, shove = 'kneeCut', RB_CUT_T, RB_CUT, RB_SHOVE
+    start = RbLiftBody(T)(RB_LIFT_HOLD[0])
+    p0 = start['pelvis']
+    knife = RbCutKnife(T)
+    # (he steps off to his left after the shove: the fallen man's legs lie where his feet were)
+    fwdL = Add3(start['ankle.L'], (T.R(.48), T.R(.05), 0))
+    fwdR = Add3(start['ankle.R'], (T.R(.46), T.R(.10), 0))
+    anim = Tracks(start, {
+        # the pull leans him back over the right foot, the knee drives forward (shove), he steps after the falling man
+        'pelvis': [(0.0, p0), (.12, Add3(p0, (0, T.R(.02), 0))), (.36, Add3(p0, (-T.R(.02), T.R(.05), T.R(.01)))),
+                   (.55, Add3(p0, (-T.R(.01), T.R(.03), 0))), (shove, Add3(p0, (0, -T.R(.06), -T.R(.02)))),
+                   (.96, Add3(p0, (T.R(.24), T.R(.02), T.R(.01)))), (1.20, Add3(p0, (T.R(.46), T.R(.07), T.R(.04)))), (D, Add3(p0, (T.R(.46), T.R(.07), T.R(.04))))],
+        'ankle.L': [(0.0, start['ankle.L']), (.76, start['ankle.L']), (.86, Add3(Lerp3(start['ankle.L'], fwdL, .5), (0, 0, .05))), (.96, fwdL)],
+        'ankle.R': [(0.0, start['ankle.R']), (.96, start['ankle.R']), (1.06, Add3(Lerp3(start['ankle.R'], fwdR, .5), (0, 0, .05))),
+                    (1.16, fwdR)],
+        'bend': [(0.0, start['bend']), (.12, start['bend'] + .02), (.36, start['bend'] - .04), (shove, start['bend'] + .04),
+                 (1.0, .34), (D, .32)],
+        'twist': [(0.0, start['twist']), (.12, start['twist'] + .06), (.36, start['twist'] - .10), (.62, start['twist'] - .04),
+                  (1.0, 0.0), (D, 0.0)],
+        'shrug': [(0.0, start['shrug']), (.30, .10), (.60, .04), (D, .02)],
+        'head': [(0.0, start['head']), (.40, (.34, 0, .05)), (1.0, (.45, 0, 0)), (D, (.45, 0, 0))],
+        'protract.L': [(0.0, HAIR_PROTRACT), (.70, HAIR_PROTRACT), (1.0, 0.0)],
+    }, lag={'head': .05})
+    G = RbStageGround(T, stage, 'ijaA')
+
+    def Body(t):
+        f = anim(t)
+        hit = PartnerPoint(T, stage, 'ijaA', 'comrade', 'throat' if t < .8 else 'upperArmL', t)
+        if hit is not None:
+            f['look'] = tuple(hit[0] + Vector((0, 0, T.R(.05))))
+        hand, axis, spine, pole = knife(t)
+        grip, pf, pn = KnifeGrip(T, hand, axis)
+        f['handRel.R'] = None
+        f['grip.R'], f['armPole.R'] = grip, tuple(pole)
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = pf, pn, KNIFE_CURL
+        if t > .70:
+            # the fist opens off the head with the push and the hand hangs at his left side
+            f['handRel.L'] = (.08, -.12, -.46)
+            f['palmF.L'], f['palmN.L'], f['curl.L'] = (0, -.2, -1), (-1, 0, 0), .5
+        return GroundFeet(T, f, G)
+    spec = AttackerSpec(T, stage, 'ijaA', 'comrade', {'L': [(0.0, .66, 'hairBack', .03, (0, 0, -1), 1.1)]}, Body, D)
+    pose = spec['pose']
+    spec['pose'] = lambda t: WithFist(T, pose(t), thumb=1.0)
+    props, review = SlungProps(T)
+
+    def KnifeAt(t):
+        hand, axis, spine, _ = knife(t)
+        return FistKnife(T, tuple(axis), SlashKnifeUp(axis, spine))
+
+    def Props(t):
+        o = props(t)
+        o['bayonet'] = KnifeTrack(KnifeAt(t))
+        return o
+
+    def CutProbe(t):
+        if abs(t - cut) > .021:
+            return None
+        k = KnifeAt(t)
+        o, tip = Vector(k['origin']), Vector(k['tip'])
+        P = PartnerPoint(T, stage, 'ijaA', 'comrade', 'throat', t)
+        if P is None:
+            return None
+        d = tip - o
+        u = Clamp((P[0] - o).dot(d) / max(d.length_squared, 1e-9))
+        return {'bladeOnThroat': (tuple(P[0]), tuple(o + d * u))}
+    spec.update({'props': Props, 'probes': CutProbe, 'plants': [('L', 0, .76), ('L', .96, D), ('R', 0, .96), ('R', 1.16, D)],
+                 'ground': lambda x, y, t: G(x, y), 'walls': RbStageWalls(T, stage, 'ijaA'),
+                 'look': lambda t: Body(t).get('look') if t < .6 else None,
+                 'reviewProps': lambda t: review(t) + KnifeProps(KnifeAt(t)) + spec['markers'](t),
+                 'reviewFrames': lambda n: [0, 3, 6, 8, 10, 14, 17, 22, 30, n - 1]})
+    return RbStageViews(T, stage, 'ijaA', spec)
+
+
+# =========================================================================================================================
+# After the cut (01 Slash -> Finish -> Found): ijaA wipes the blade on the dead man's bandage, both faces (N17), takes the rifle
+# off his back and clicks the bayonet onto the muzzle; walks down the trench floor toward the dugout mouth with the bayonet
+# pointed down, putting it into each body he passes without stopping (N18); stops over the pinned Shunzi, the point hanging
+# over his back, and treads on his right hand and grinds the heel (N19); slings the rifle and squats at his head
+# (IjaCrouchHairHold frame 0: the feet do not move for the squat).
+# =========================================================================================================================
+RB_WIPE_T = 96 / 24             # 4.0 s
+RB_WIPES = (19 / 24, 32 / 24)   # 0.79 / 1.33 s: the flat of the blade drawn along the bandage, one face then the other
+RB_FIX = 72 / 24                # 3.0 s: the bayonet clicks onto the muzzle
+RB_WALK_T = 42 / 24             # 1.75 s: two strides, 1.4 m (four steps of 0.35 m)
+RB_WALK_STEP = .35
+RB_WALK_STAB = 21 / 24          # 0.875 s: the point into the body on the trench floor
+RB_BOOT_T = 90 / 24             # 3.75 s
+RB_BOOT_STEP = 35 / 24          # 1.458 s: the sole on the hand
+RB_BOOT_GRIND = (RB_BOOT_STEP, RB_BOOT_STEP + .6)
+STAGES['bandageWipe'] = {'anchor': 'comrade', 'notes': 'IjaWipeBandageFixBayonet starts where IjaThroatCutKneeShove ends (the same '
+                         'root); CaptiveThroatCutForward started 1.667 s earlier (offsetS) and is a corpse by then.',
+                         'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveThroatCutForward', 'x': 0.0, 'z': 0.0, 'yawDeg': 0,
+                                                'offsetS': -RB_CUT_T},
+                                    'ijaA': dict(_rbA, rig='TengxianIja02', clip='IjaWipeBandageFixBayonet')}}
+
+Meta('IjaWipeBandageFixBayonet', RB_WIPE_T, False, 'track', role='ijaA', rig='TengxianIja02', rigs=['TengxianIja02'],
+     props=['weapon', 'bayonet'], rootMotion=True, stage='bandageWipe', weaponState='slungBack->twoHand', endHold='twoHand',
+     contacts=[{'t': RB_WIPES[0], 'limb': 'bayonet', 'action': 'wipe', 'partnerRole': 'comrade', 'part': 'upperArmL'},
+               {'t': RB_WIPES[1], 'limb': 'bayonet', 'action': 'wipe', 'partnerRole': 'comrade', 'part': 'upperArmL'},
+               {'t': 2.15, 'limb': 'handL', 'action': 'grip', 'target': 'weapon', 'part': 'barrel'},
+               {'t': RB_FIX, 'limb': 'bayonet', 'action': 'fix', 'target': 'weapon', 'part': 'muzzle'},
+               {'t': 3.30, 'limb': 'handR', 'action': 'grip', 'target': 'weapon', 'part': 'wrist'}],
+     events=[{'t': RB_WIPES[0], 'kind': 'wipe1'}, {'t': RB_WIPES[1], 'kind': 'wipe2'},
+             {'t': RB_FIX, 'kind': 'fix', 'sound': 'bayonetFixClick', 'flag': 'bayonetFixed'}],
+     prev=['IjaThroatCutKneeShove'], next=['IjaFinishWalkStab'],
+     notes='2026-10-11 Slash (N17): frame 0 = IjaThroatCutKneeShove last frame. He half squats at the dead man\'s left shoulder and draws '
+           'the flat of the bloody blade along the bandage (wipe1 0.79), turns it over and draws the other face (wipe2 1.33), stands, '
+           'the knife up in his right fist; the left hand takes the rifle off his back by the barrel over the right shoulder (2.15) and '
+           'brings it round in front, muzzle up; the bayonet\'s ring goes over the muzzle and clicks home (fix 3.0); the right hand '
+           'goes back to the wrist of the stock and he lowers the rifle, the point down, and steps off with the left foot (last frame '
+           '= IjaFinishWalkStab frame 0). The bayonet track rides the muzzle from 3.0 s on (the rifle was spawned bayonet:false).')
+Meta('IjaFinishWalkStab', RB_WALK_T, False, 'track', role='ijaA', rig='TengxianIja02', rigs=['TengxianIja02'],
+     props=['weapon', 'bayonet'], rootMotion=True, weaponState='twoHand',
+     contacts=[{'t': RB_WALK_STAB, 'limb': 'bayonet', 'action': 'stab', 'target': 'corpse'}],
+     events=[{'t': RB_WALK_STAB, 'kind': 'stab', 'sound': 'bayonetStabBody'}],
+     prev=['IjaWipeBandageFixBayonet', 'IjaFinishWalkStab'], next=['IjaFinishWalkStab', 'IjaBootOnHand'],
+     notes='2026-10-11 Finish (N18): rifle low, the bayonet pointed down, two strides down the trench floor (1.4 m of root motion, '
+           'four steps); on the second step the rifle comes up and the point goes down into the back of the body lying there '
+           '(0.875 s; the body\'s back 0.24 m up, 0.85 m ahead of the hips and a hand to his right: event `stab` at), out again, '
+           'the feet never stop. The last frame is frame 0 moved 1.4 m on: chain it to itself (the director re-roots each play on '
+           'the last pelvis) for the second body, then IjaBootOnHand.')
+Meta('IjaBootOnHand', RB_BOOT_T, False, 'track', role='ijaA', rig='TengxianIja02', rigs=['TengxianIja02'],
+     props=['weapon', 'bayonet'], rootMotion=True, weaponState='twoHand->slungBack', endHold='slungBack', player=True,
+     contacts=[{'t': .45, 'limb': 'bayonet', 'action': 'hover', 'partnerRole': 'shunzi', 'part': 'back', 'untilT': RB_BOOT_GRIND[1]},
+               {'t': RB_BOOT_STEP, 'limb': 'footR', 'action': 'step', 'partnerRole': 'shunzi', 'part': 'handR'},
+               {'t': RB_BOOT_GRIND[1], 'limb': 'footR', 'action': 'release', 'partnerRole': 'shunzi'}],
+     events=[{'t': .45, 'kind': 'hover', 'untilT': RB_BOOT_GRIND[1]}, {'t': RB_BOOT_STEP, 'kind': 'step'},
+             {'t': RB_BOOT_GRIND[0], 'kind': 'grind', 'sound': 'bootGrind', 'untilT': RB_BOOT_GRIND[1]},
+             {'t': 3.15, 'kind': 'crouch'}],
+     prev=['IjaFinishWalkStab'], next=['IjaCrouchHairHold'],
+     notes='2026-10-11 Found (N19): root = ija.crouch (facing west, the pinned eye 0.60 m ahead, as IjaCrouchHairHold); frame 0 = '
+           'IjaFinishWalkStab frame 0 (mid stride, 0.4 m short of the root). He stops, the bayonet point hanging a hand over the '
+           'pinned man\'s back (hover 0.45-2.06, held over him through the stomp and the grind); the right boot comes down on the hand lying in the mud (step 1.458; player track '
+           '`handR` is where the sole lands), the heel grinds it 0.6 s, the foot comes off and goes back beside the left; he slings '
+           'the rifle across his back (2.45-3.15) and squats at the head (3.15-3.75): the last frame is IjaCrouchHairHold frame 0, '
+           'the feet where it has them. Player track: head (the eye), handR, back (the hover point under the point).')
+
+
+# frame 0 is the cut's last frame (its reach assist), the last frame IjaFinishWalkStab's (the default): eased over 0.3-0.7 s
+_rbWipeEase = lambda t: Smooth((t - .3) / .4)
+REACH_BY_CLIP['IjaWipeBandageFixBayonet'] = {'fractionBySide': {'L': lambda t: .86 + .06 * _rbWipeEase(t), 'R': .92}, 'travel': .10,
+                                             'bend': lambda t: .35 - .10 * _rbWipeEase(t), 'sink': lambda t: .10 + .05 * _rbWipeEase(t)}
+
+
+def RbMountedBayonet(T, rifle):
+    """The Type 30 on the muzzle of a Type 38: the ring over the muzzle, the handle under the barrel, along the bore."""
+    a = Vector(rifle['axis']).normalized()
+    up = Vector((0, 0, 1)) - a * a.z
+    up = up.normalized() if up.length > 1e-6 else Vector((1, 0, 0))
+    origin = Vector(rifle['muzzle']) - a * T.R(.02) - up * T.R(.018)
+    return Knife(T, tuple(origin - a * T.R(WEAPONS['Bayonet']['handle'])), tuple(a), tuple(-up))
+
+
+def RbWalkRifle(T, pel, phase=0.0):
+    """The rifle carried low with the bayonet pointed down-forward (IjaFinishWalkStab's carry), riding the pelvis."""
+    p = Vector(pel)
+    return T.Rifle(tuple(p + Vector((-T.R(.15), -T.R(.14), T.R(.20 + .01 * math.sin(phase))))), Unit((.10, -.82, -.56)))
+
+
+def RbWalkBase(T):
+    """IjaFinishWalkStab frame 0 (its own root): mid stride, the left foot forward, the right behind on the toes, the
+    rifle low with the point down."""
+    H, S = T.H, T.R(RB_WALK_STEP)
+    f = IjaABase(T)
+    f.update({'pelvis': (0.0, 0.0, T.P - T.R(.07)), 'pelvisTilt': (.08, 0, 0), 'bend': .22, 'twist': -.06, 'head': (.30, 0, .05),
+              'ankle.L': (H + T.R(.02), -S / 2, T.A), 'ankle.R': (-(H + T.R(.02)), S / 2, T.A), 'foot.L': (0, 4, 0), 'foot.R': (0, -6, 0),
+              'lookW': 0.0, 'protract.L': 0.0})
+    return f
+
+
+@Builder('IjaFinishWalkStab')
+def BuildFinishWalkStab(T, name):
+    D, k = RB_WALK_T, RB_WALK_STAB
+    S = T.R(RB_WALK_STEP)
+    base = RbWalkBase(T)
+    z0 = base['pelvis'][2]
+    travel = lambda t: -4 * S * t / D
+    bob = lambda t: T.R(.015) * math.cos(Tau * 2 * t / D)
+    pelXY = lambda t: (0.0, travel(t))
+    q = D / 4
+    steps = [('R', 0.0, q), ('L', q, 2 * q), ('R', 2 * q, 3 * q), ('L', 3 * q, D)]
+    stance = {'L': (base['ankle.L'][0], -S / 2), 'R': (base['ankle.R'][0], -S / 2)}
+    feet, plants = WrPath(T, base, pelXY, lambda t: 0.0, steps, stance, lambda s, t: WrPoleRel(base)[s], D, lift=.06, toeOut=(4.0, -6.0))
+    # the body on the trench floor: 0.85 m ahead of the hips at the stab, a hand to his right, its back 0.24 m up
+    target = Vector((-T.R(.12), travel(k) - T.R(.85), T.R(.24)))
+    O = lambda r, f_, u: Vector((-T.R(r), -T.R(f_), T.R(u)))
+    P = lambda t: Vector((0.0, travel(t), z0 + bob(t)))
+    hi = P(k) + O(.10, .02, .46)
+    a = (target - hi).normalized()
+
+    def RifleAt(t):
+        carry = RbWalkRifle(T, P(t), Tau * 2 * t / D)
+        # raised (0.55-0.72), down into the back (0.875), held, out (1.05), back to the carry (1.35)
+        if t <= .55 or t >= 1.35:
+            return carry
+        up = T.Rifle(tuple(P(t) + O(.10, .02, .46) - a * T.R(.20)), tuple(a))
+        inn = T.Rifle(tuple(target - a * T.R(RB_TIP - .10)), tuple(a))
+        out = T.Rifle(tuple(target - a * T.R(RB_TIP + .18)), tuple(a))
+        rows = [(.55, carry), (.72, up), (k, inn), (.94, inn), (1.05, out), (1.35, RbWalkRifle(T, P(1.35), Tau * 2 * 1.35 / D))]
+        return RbRiflePath(T, rows)(t)
+    anim = Tracks(base, dict(feet, **{
+        'pelvis': WrDense(lambda t: tuple(P(t)), D),
+        'bend': [(0.0, base['bend']), (.55, base['bend']), (.72, .18), (k, .44), (.94, .44), (1.10, .28), (D, base['bend'])],
+        'twist': [(0.0, base['twist']), (.72, .02), (k, -.10), (1.2, -.04), (D, base['twist'])],
+        'head': [(0.0, base['head']), (.55, (.40, 0, -.10)), (k, (.50, 0, -.12)), (1.30, (.34, 0, .02)), (D, base['head'])],
+        'shrug': [(0.0, 0.0), (.72, .08), (k, .04), (D, 0.0)],
+    }), lag={'head': .05})
+
+    def Body(t):
+        f = anim(t)
+        RbHoldRifle(T, f, RifleAt(t))
+        return f
+
+    def Props(t):
+        r = RifleAt(t)
+        return {'weapon': T.Track(r), 'bayonet': KnifeTrack(RbMountedBayonet(T, r))}
+
+    def Probe(t):
+        if abs(t - k) > .021:
+            return None
+        return {'tipInBody': (tuple(Vector(RbBayonetTip(T, RifleAt(k))) - a * T.R(.10)), tuple(target))}
+    spec = {'pose': lambda t: T.Nest(Body(t)), 'props': Props, 'plants': plants, 'probes': Probe,
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + KnifeProps(RbMountedBayonet(T, RifleAt(t)))
+            + [('box', tuple(Add3(tuple(target), (0, 0, -T.R(.12)))), (T.R(.45), T.R(.9), T.R(.24)), 0)],
+            'reviewFrames': lambda n: [0, 10, 17, 21, 25, 32, n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = [('side', lambda t: (T.R(3.2), travel(t) - T.R(.4), T.R(1.0)), lambda t: (0, travel(t) - T.R(.4), T.R(.6))),
+                           ('q', lambda t: (T.R(2.2), travel(t) - T.R(2.8), T.R(1.7)), lambda t: (0, travel(t) - T.R(.4), T.R(.5)))]
+    spec['reviewScale'] = 3.0
+    return spec
+
+
+# ---- IjaWipeBandageFixBayonet ---------------------------------------------------------------------------------------------
+def RbSlungNominal(T, pel):
+    """Where the rifle hangs across the back of an upright body whose pelvis is at `pel` (IjaReadyRifle's frame 0 numbers)."""
+    d = Vector(pel) - Vector(IjaABase(T)['pelvis'])
+    return T.Rifle(tuple(Vector((.107, .20, T.P + .16)) + d), Unit((-.37, .05, .93)))
+
+
+@Builder('IjaWipeBandageFixBayonet')
+def BuildWipeBandageFixBayonet(T, name):
+    stage, D = 'bandageWipe', RB_WIPE_T
+    w1, w2 = RB_WIPES
+    start = RbFlatOf(T, BuildThroatCutKneeShove, 'IjaThroatCutKneeShove', RB_CUT_T)
+    for k_ in ('grip.R', 'gripW.R', 'grip.L', 'gripW.L', 'frameYaw', 'frameShift'):
+        start.pop(k_, None)
+    p0 = Vector(start['pelvis'])
+    knife0 = RbCutKnife(T)(RB_CUT_T)
+
+    def Patch(t):
+        h = PartnerPoint(T, stage, 'ijaA', 'comrade', 'upperArmL', t)
+        return (Vector(h[0]), Vector(h[1])) if h else (Vector((0, -T.R(.6), T.R(.3))), Vector((0, 0, 1)))
+    arm, armN = Patch(1.0)
+    up = Vector((0, 0, 1))
+    G = RbStageGround(T, stage, 'ijaA')
+    g0 = G(arm.x, arm.y + T.R(.42))      # the trench floor where he squats and stands (the start pose is grounded already)
+    # the squat: the hips 0.42 m back from the patch and a little to its left, 0.30 m down
+    # (at the dead man's left side, off his back: he lies along ijaA's forward axis)
+    squat = Vector((arm.x + T.R(.45), arm.y + T.R(.18), p0.z - T.R(.22)))
+    # the end (IjaFinishWalkStab frame 0) where he has stood up again over the squat, moved 0.2 m on
+    walk = RbWalkBase(T)
+    endPel = Vector((squat.x, squat.y - T.R(.10), walk['pelvis'][2] + g0))
+    endFlat = {}
+    for key, v in walk.items():
+        if isinstance(v, tuple) and len(v) == 3 and (key == 'pelvis' or key.startswith(POSITION_CHANNELS)):
+            endFlat[key] = tuple(Vector(v) + Vector((endPel.x, endPel.y, g0 if key != 'pelvis' else 0.0)))
+        else:
+            endFlat[key] = v
+    stand = Vector((squat.x, squat.y + T.R(.04), T.P - T.R(.04) + g0))
+    # the feet: a step toward the shoulder (L 0.08-0.30, R 0.26-0.48), then the step off (R 3.38-3.62, L 3.68-3.98)
+    L1 = (squat.x + T.R(.18), squat.y - T.R(.10), T.A + g0)
+    R1 = (squat.x - T.R(.20), squat.y + T.R(.16), T.A + g0)
+    anim = Tracks(start, {
+        'ankle.L': [(0.0, start['ankle.L']), (.08, start['ankle.L']), (.19, Add3(Lerp3(start['ankle.L'], L1, .5), (0, 0, .05))), (.30, L1),
+                    (3.62, L1), (3.80, Add3(Lerp3(L1, endFlat['ankle.L'], .5), (0, 0, .05))), (D, endFlat['ankle.L'])],
+        'ankle.R': [(0.0, start['ankle.R']), (.26, start['ankle.R']), (.37, Add3(Lerp3(start['ankle.R'], R1, .5), (0, 0, .05))), (.48, R1),
+                    (3.34, R1), (3.48, Add3(Lerp3(R1, endFlat['ankle.R'], .5), (0, 0, .04))), (3.62, endFlat['ankle.R'])],
+        'legPole.L': [(0.0, start['legPole.L']), (.30, Add3(L1, (T.R(.25), -T.R(.9), T.R(.4)))), (3.62, Add3(L1, (T.R(.25), -T.R(.9), T.R(.4)))),
+                      (D, endFlat['legPole.L'])],
+        'legPole.R': [(0.0, start['legPole.R']), (.48, Add3(R1, (-T.R(.25), -T.R(.9), T.R(.4)))), (3.34, Add3(R1, (-T.R(.25), -T.R(.9), T.R(.4)))),
+                      (D, endFlat['legPole.R'])],
+        'foot.L': [(0.0, start['foot.L']), (.30, (0, 10, 0)), (3.62, (0, 10, 0)), (D, endFlat['foot.L'])],
+        'foot.R': [(0.0, start['foot.R']), (.48, (0, -10, 0)), (3.34, (0, -10, 0)), (3.62, endFlat['foot.R'])],
+        'pelvis': [(0.0, tuple(p0)), (.30, tuple(p0.lerp(squat, .6))), (.55, tuple(squat)), (1.50, tuple(squat)),
+                   (1.95, tuple(stand)), (3.30, tuple(stand)), (3.62, tuple(stand.lerp(endPel, .5))), (D, tuple(endPel))],
+        'bend': [(0.0, start['bend']), (.55, .55), (1.50, .55), (1.95, .14), (2.55, .10), (3.0, .16), (3.40, .20), (D, endFlat['bend'])],
+        'pelvisTilt': [(0.0, start['pelvisTilt']), (.55, (.30, 0, 0)), (1.50, (.30, 0, 0)), (1.95, (.06, 0, 0)), (D, endFlat['pelvisTilt'])],
+        'twist': [(0.0, start['twist']), (.55, -.10), (1.50, -.10), (1.95, .0), (2.15, .30), (2.55, .05), (3.0, -.10), (D, endFlat['twist'])],
+        'shrug': [(0.0, start['shrug']), (.55, .04), (2.15, .10), (2.55, .04), (D, 0.0)],
+        'head': [(0.0, start['head']), (.55, (.55, 0, -.05)), (1.50, (.55, 0, -.05)), (1.95, (.25, 0, -.15)), (2.15, (.20, 0, -.50)),
+                 (2.55, (.30, 0, 0)), (3.0, (.40, 0, .10)), (D, endFlat['head'])],
+        'protract.L': [(0.0, start.get('protract.L', 0.0)), (.5, 0.0), (2.15, .25), (2.60, 0.0)],
+        'lookW': [(0.0, start.get('lookW', 0.0)), (.45, 0.0), (D, 0.0)],
+    }, lag={'head': .05})
+    # ---- the rifle (left hand): slung -> over the shoulder -> in front, muzzle up -> lowered, the point down
+    present = lambda: T.Rifle(tuple(stand + Vector((-T.R(.10), -T.R(.12), -T.R(.25)))), Unit((.12, -.40, .91)))
+    endRifle = RbWalkRifle(T, endPel)
+
+    def RifleAt(t):
+        if t < 2.15:
+            return None
+        slung = RbSlungNominal(T, stand)
+        over = T.Rifle(tuple(stand + Vector((-T.R(.16), T.R(.02), T.R(.40)))), Unit((.05, -.35, .94)))
+        rows = [(2.15, slung), (2.35, over), (2.60, present()), (3.10, present()), (3.60, endRifle), (D, endRifle)]
+        if t >= 3.60:
+            return RbWalkRifle(T, anim(t)['pelvis'])
+        return RbRiflePath(T, rows)(t)
+    alongL = Channel([(2.15, .72), (2.35, .66), (2.60, .555), (D, .555)])
+    # ---- the knife (right hand): the cut's end -> on the bandage, both faces -> up in front of his chest -> onto the muzzle
+    reach, off1, flip0, flip1, off2 = .55, .95, 1.00, 1.12, 1.50
+
+    def Stroke(t, t0, t1, face):
+        P, n = Patch(t)
+        n = n if n.z > .3 else up
+        toward = Vector((P.x, P.y, 0)) - Vector((squat.x - T.R(.20), squat.y, 0))
+        axis = (toward - n * toward.dot(n)).normalized()
+        spine = n.cross(axis).normalized() * face
+        sdt = Smooth((t - t0) / (t1 - t0))
+        hand = P + n * T.R(.012) - axis * T.R(Mix(.16, .32, sdt))
+        return hand, axis, spine
+    chest = stand + Vector((-T.R(.18), -T.R(.30), T.R(.40)))
+    upAxis = Vector(Unit((.05, -.25, .97)))
+
+    def KnifeOnMuzzle(t):
+        r = RifleAt(t) or present()
+        m = RbMountedBayonet(T, r)
+        w = 1 - Smooth((t - 2.62) / (RB_FIX - 2.62))
+        a = Vector(m['axis'])
+        return Vector(m['handle']) + a * T.R(.14) * w, a, Vector(m['up'])
+
+    def KnifePose(t):
+        """(handle centre, axis, spine) of the knife in the fist, or None once it is on the muzzle."""
+        if t >= RB_FIX:
+            return None
+        if t <= .10:
+            h, a, sp, _ = knife0
+            return Vector(h), Vector(a), Vector(sp)
+        s1h, s1a, s1s = Stroke(t, reach, off1, 1.0)
+        s2h, s2a, s2s = Stroke(t, flip1, off2, -1.0)
+        if t <= reach:
+            h, a, sp, _ = knife0
+            w = Smooth((t - .10) / (reach - .10))
+            return Vector(h).lerp(s1h, w), Vector(a).lerp(s1a, w).normalized(), Vector(sp).lerp(s1s, w)
+        if t <= off1:
+            return s1h, s1a, s1s
+        if t <= flip1:
+            # lifted off and turned over about its own axis
+            w = Smooth((t - off1) / (flip1 - off1))
+            spin = Quaternion(s1a, math.pi * w)
+            return s1h.lerp(s2h, w) + up * T.R(.03) * math.sin(math.pi * w), s1a.lerp(s2a, w).normalized(), spin @ s1s
+        if t <= off2:
+            return s2h, s2a, s2s
+        if t <= 2.62:
+            w = Smooth((t - off2) / .45)
+            return s2h.lerp(chest, w), s2a.lerp(upAxis, w).normalized(), s2s.lerp(Vector((0, 1, 0)), w)
+        h, a, sp = KnifeOnMuzzle(t)
+        w = Smooth((t - 2.62) / .18)
+        return chest.lerp(h, w), upAxis.lerp(a, w).normalized(), Vector((0, 1, 0)).lerp(sp, w)
+
+    def Body(t):
+        f = anim(t)
+        k = KnifePose(t)
+        if k is not None:
+            hand, axis, spine = k
+            grip, pf, pn = KnifeGrip(T, hand, axis)
+            f['handRel.R'] = None
+            f['grip.R'], f['gripW.R'] = grip, 1.0
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = pf, pn, KNIFE_CURL
+            own = (f['pelvis'][0] - T.R(.55), f['pelvis'][1] + T.R(.15), f['pelvis'][2] + T.R(.20))
+            f['armPole.R'] = Lerp3(tuple(knife0[3]), own, Smooth(t / .45))     # (from the cut's elbow)
+        r = RifleAt(t)
+        if t >= 1.95:
+            # the left hand reaches over to the barrel at his right shoulder (2.15) and brings the rifle round
+            rr = r or RbSlungNominal(T, stand)
+            palms = T.Palms(rr['axis'])
+            EaseGrip(f, 'L', T.Along(rr, alongL(t)), Smooth((t - 1.95) / .20), palms['L'][0], palms['L'][1], .9)
+            f['armPole.L'] = (f['pelvis'][0] + T.R(.45), f['pelvis'][1] - T.R(.05), f['pelvis'][2] + T.R(.10))
+        if t >= RB_FIX:
+            # the right hand from the bayonet's handle back to the wrist of the stock
+            w = Smooth((t - RB_FIX) / .30)
+            m = RbMountedBayonet(T, r)
+            grip0, pf0, pn0 = KnifeGrip(T, Vector(m['handle']), Vector(m['axis']))
+            palms = T.Palms(r['axis'])
+            f['handRel.R'] = None
+            f['grip.R'], f['gripW.R'] = tuple(Vector(grip0).lerp(Vector(r['gripR']), w)), 1.0
+            f['palmF.R'] = Unit(Lerp3(pf0, palms['R'][0], w))
+            f['palmN.R'] = Unit(Lerp3(pn0, palms['R'][1], w))
+            f['curl.R'] = Mix(KNIFE_CURL, .95, w)
+            f['armPole.R'] = (f['pelvis'][0] - T.R(.50), f['pelvis'][1] + T.R(.20), f['pelvis'][2] + T.R(.25))
+        return f
+    def Pose(t):
+        p = T.Nest(Body(t))
+        if KnifePose(t) is not None:
+            p = WithFist(T, p, thumb=1.0)
+        return p
+    props, review = SlungProps(T)
+
+    def KnifeAt(t):
+        k = KnifePose(t)
+        if k is None:
+            return RbMountedBayonet(T, RifleAt(t))
+        hand, axis, spine = k
+        return FistKnife(T, tuple(axis), SlashKnifeUp(axis, spine))
+
+    def Props(t):
+        r = RifleAt(t)
+        o = props(t) if r is None else {'weapon': T.Track(r)}
+        o['bayonet'] = KnifeTrack(KnifeAt(t))
+        return o
+
+    def Check(t):
+        out = {}
+        if RB_FIX + .32 <= t <= 3.10 or t >= 3.65:
+            out['R'] = RifleAt(t)['gripR']
+        if 2.60 <= t <= 3.10 or t >= 3.65:
+            r = RifleAt(t)
+            out['L'] = T.Along(r, alongL(t))
+        return out
+
+    def Probe(t):
+        out = {}
+        for i, tw in enumerate(RB_WIPES):
+            if abs(t - tw) < .021:
+                k = KnifeAt(t)
+                o, tip = Vector(k['origin']), Vector(k['tip'])
+                P, _ = Patch(t)
+                d = tip - o
+                u = Clamp((P - o).dot(d) / max(d.length_squared, 1e-9))
+                out['bladeOnBandage%d' % (i + 1)] = (tuple(P), tuple(o + d * u))
+        return out or None
+    plants = [('L', .30, 3.62), ('R', .48, 3.34)]
+    spec = {'pose': Pose, 'props': Props, 'check': Check, 'probes': Probe, 'plants': plants,
+            'ground': lambda x, y, t: G(x, y), 'mountFrames': {},
+            'reviewProps': lambda t: (T.RifleProps(RifleAt(t)) if RifleAt(t) else review(t)) + KnifeProps(KnifeAt(t))
+            + PartnerGhost(T, stage, 'ijaA', 'comrade', t) + [('point', tuple(arm), None, .03)],
+            'reviewFrames': lambda n: [0, 13, 19, 25, 32, 47, 52, 62, 70, 72, 80, n - 1]}
+    spec.pop('mountFrames')
+    spec = RbStageViews(T, stage, 'ijaA', spec)
+    spec['reviewViews'][:2] = [('side', lambda t: (squat.x + T.R(3.2), squat.y, T.R(1.0)), lambda t: (squat.x, squat.y, T.R(.6))),
+                              ('q', lambda t: (squat.x + T.R(2.2), squat.y - T.R(2.6), T.R(1.7)), lambda t: (squat.x, squat.y, T.R(.5)))]
+    return spec
+
+
+# ---- IjaBootOnHand --------------------------------------------------------------------------------------------------------
+# The crouch root (ija.crouch), Blender axes runtime m: the pinned man's eye CROUCH_EYE; his back 0.30 m on past it; his right
+# hand lies in the mud on ijaA's LEFT (Shunzi's right is south, ijaA faces west), 0.22 m ahead of the root -- under the left
+# knee of the squat to come (Data_OpeningStoryboards hands.flatFwd is 0.38 m ahead of the eye, 0.13 m to his right).
+RB_BOOT_HAND = (.10, -.22, .02)
+RB_BOOT_BACK = (-.03, -.92, .30)
+RB_BOOT_START = .40              # IjaFinishWalkStab frame 0's pelvis this far behind the root
+
+
+@Builder('IjaBootOnHand')
+def BuildBootOnHand(T, name):
+    D, st = RB_BOOT_T, RB_BOOT_STEP
+    g0, g1 = RB_BOOT_GRIND
+    walk = RbWalkBase(T)
+    off = Vector((0.0, T.R(RB_BOOT_START), 0.0))
+    start = {k: (tuple(Vector(v) + off) if isinstance(v, tuple) and len(v) == 3 and (k == 'pelvis' or k.startswith(POSITION_CHANNELS)) else v)
+             for k, v in walk.items()}
+    crouch = RbFlatOf(T, BuildCrouchHairHold, 'IjaCrouchHairHold', 0.0)
+    for k_ in ('grip.L', 'gripW.L', 'grip.R', 'gripW.R'):
+        crouch.pop(k_, None)
+    hand = Vector(RB_BOOT_HAND) / T.s
+    back = Vector(RB_BOOT_BACK) / T.s
+    hover = back + Vector((0, 0, T.R(.20)))
+    H = T.H
+    # the stop: the right foot comes up beside the left (0-0.40); the stomp: the right foot onto the hand (1.10-1.458), the heel
+    # ground into it, off (2.05-2.40) and down where the squat has it; the left foot to the squat's (2.30-2.55)
+    standR = (-(H + T.R(.04)), start['pelvis'][1] + T.R(.02), T.A)
+    stompPel = Vector((T.R(.04), -T.R(.02), start['pelvis'][2] + T.R(.03)))     # the weight onto the boot on the hand
+    sole = (hand.x - T.R(.01), hand.y + T.R(.05), T.A + T.R(.03))      # the ankle over the hand, the sole on it
+    standPel = Vector((0.0, T.R(.04), start['pelvis'][2]))
+    anim = Tracks(start, {
+        'ankle.R': [(0.0, start['ankle.R']), (.10, start['ankle.R']), (.25, Add3(Lerp3(start['ankle.R'], standR, .5), (0, 0, .06))), (.40, standR),
+                    (1.10, standR), (1.28, Add3(Lerp3(standR, sole, .5), (0, 0, .14))), (st, sole), (g1, sole),
+                    (2.22, Add3(Lerp3(sole, crouch['ankle.R'], .5), (0, 0, .10))), (2.40, crouch['ankle.R']), (D, crouch['ankle.R'])],
+        'ankle.L': [(0.0, start['ankle.L']), (2.30, start['ankle.L']), (2.42, Add3(Lerp3(start['ankle.L'], crouch['ankle.L'], .5), (0, 0, .05))),
+                    (2.55, crouch['ankle.L']), (D, crouch['ankle.L'])],
+        'foot.R': [(0.0, start['foot.R']), (.40, (0, -8, 0)), (1.10, (0, -8, 0)), (st, (0, -2, 0)), (st + .15, (0, -16, 0)), (st + .30, (0, 10, 0)),
+                   (st + .45, (0, -14, 0)), (g1, (0, -4, 0)), (2.40, crouch['foot.R']), (D, crouch['foot.R'])],
+        'foot.L': [(0.0, start['foot.L']), (2.30, start['foot.L']), (2.55, crouch['foot.L']), (D, crouch['foot.L'])],
+        'legPole.R': [(0.0, start['legPole.R']), (.40, Add3(standR, (-T.R(.25), -T.R(.9), T.R(.45)))), (1.10, Add3(standR, (-T.R(.25), -T.R(.9), T.R(.45)))),
+                      (st, Add3(sole, (-T.R(.05), -T.R(.9), T.R(.5)))), (g1, Add3(sole, (-T.R(.05), -T.R(.9), T.R(.5)))),
+                      (2.40, crouch['legPole.R']), (D, crouch['legPole.R'])],
+        'legPole.L': [(0.0, start['legPole.L']), (2.30, start['legPole.L']), (2.55, crouch['legPole.L']), (D, crouch['legPole.L'])],
+        'pelvis': [(0.0, start['pelvis']), (.40, tuple(Vector(start['pelvis']) + Vector((0, -T.R(.08), T.R(.03))))),
+                   (1.10, tuple(Vector(start['pelvis']) + Vector((0, -T.R(.10), T.R(.03))))), (st, tuple(stompPel)), (g1, tuple(stompPel)),
+                   (2.40, tuple(standPel)), (3.15, tuple(standPel)), (D, crouch['pelvis'])],
+        'bend': [(0.0, start['bend']), (.40, .30), (1.10, .32), (st, .26), (g1, .26), (2.40, .12), (2.75, .08), (3.15, .10), (D, crouch['bend'])],
+        'pelvisTilt': [(0.0, start['pelvisTilt']), (3.15, (.06, 0, 0)), (D, crouch['pelvisTilt'])],
+        'twist': [(0.0, start['twist']), (st, .06), (g1, .06), (2.75, -.25), (3.15, -.05), (D, crouch['twist'])],
+        'shrug': [(0.0, 0.0), (2.75, .10), (3.15, 0.0), (D, crouch['shrug'])],
+        'neck': [(0.0, start['neck']), (3.15, start['neck']), (D, crouch['neck'])],
+        'head': [(0.0, start['head']), (.40, (.55, 0, .02)), (1.10, (.60, 0, .10)), (st, (.65, 0, -.20)), (g1, (.62, 0, -.18)),
+                 (2.40, (.40, 0, 0)), (3.15, (.20, 0, -.10)), (D, crouch['head'])],
+        'lookW': [(0.0, 0.0), (3.15, 0.0), (D, crouch.get('lookW', 1.0))],
+    }, lag={'head': .05})
+    O = lambda r, f_, u: Vector((-T.R(r), -T.R(f_), T.R(u)))
+    P = lambda t: Vector(anim(t)['pelvis'])
+
+    def RifleAt(t):
+        if t >= 3.15:
+            return None
+        carry = RbWalkRifle(T, P(t))
+        if t <= .30:
+            return carry
+        def Hov(u):
+            # the point a hand over his back, kept there through the stomp and the grind (N19: the butt and the point hang
+            # over Shunzi while the boot is on his hand)
+            grip = P(u) + O(.14, .10, .30)
+            a = (hover - grip).normalized()
+            return T.Rifle(tuple(hover - a * T.R(RB_TIP)), tuple(a))
+        if .45 <= t <= g1:
+            return Hov(t)
+        vertical = T.Rifle(tuple(P(2.75) + O(.22, .12, .14)), Unit((-.05, -.12, .99)))
+        rows = [(.30, RbWalkRifle(T, P(.30))), (.45, Hov(.45)), (g1, Hov(g1)), (2.45, RbWalkRifle(T, P(2.45))),
+                (2.75, vertical), (3.10, RbSlungNominal(T, P(3.10))), (3.15, RbSlungNominal(T, P(3.15)))]
+        return RbRiflePath(T, rows)(t)
+    alongR = Channel([(0.0, WEAPONS['Type38']['butt']), (2.45, WEAPONS['Type38']['butt']), (2.75, .45), (D, .45)])
+
+    def Body(t):
+        f = anim(t)
+        if crouch.get('look') is not None:
+            f['look'] = crouch['look']          # (lookW is 0 until the squat: the face comes onto the eye as he goes down)
+        r = RifleAt(t)
+        if r is not None:
+            wL = 1 - Smooth((t - 2.62) / .10)
+            wR = 1 - Smooth((t - 3.00) / .15)
+            palms = T.Palms(r['axis'])
+            if wR > 1e-4:
+                EaseGrip(f, 'R', T.Along(r, alongR(t)), wR, palms['R'][0], palms['R'][1], .95)
+                f['armPole.R'] = (f['pelvis'][0] - T.R(.50), f['pelvis'][1] + T.R(.20), f['pelvis'][2] + T.R(.25))
+            if wL > 1e-4:
+                EaseGrip(f, 'L', r['gripL'], wL, palms['L'][0], palms['L'][1], .85)
+                f['armPole.L'] = (f['pelvis'][0] + T.R(.40), f['pelvis'][1] - T.R(.10), f['pelvis'][2] - T.R(.05))
+        if t > 3.0:
+            # into the squat: the hands go where IjaCrouchHairHold has them at frame 0
+            w = Smooth((t - 3.15) / (D - 3.15))
+            for k_ in ('handRel.L', 'handRel.R', 'poleRel.L', 'poleRel.R', 'palmF.L', 'palmN.L', 'palmF.R', 'palmN.R', 'curl.L', 'curl.R'):
+                if k_ in crouch and k_ in f and f[k_] is not None:
+                    f[k_] = Lerp3(f[k_], crouch[k_], w) if isinstance(crouch[k_], tuple) else Mix(f[k_], crouch[k_], w)
+        if t > 3.15:
+            # the squat's numbers exactly at the end
+            w = Smooth((t - 3.15) / (D - 3.15))
+            f = RbBlend(f, crouch, w, skip=('grip.L', 'gripW.L', 'grip.R', 'gripW.R'))
+        return f
+
+    def Props(t):
+        r = RifleAt(t)
+        if r is None:
+            rr, upv = SlungRifle(T)
+            o = {'weapon': (rr['origin'], rr['axis'], upv, True)}
+            r = rr
+        else:
+            o = {'weapon': T.Track(r)}
+        o['bayonet'] = KnifeTrack(RbMountedBayonet(T, r))
+        return o
+
+    def Player(t):
+        return {'head': tuple(Vector(CROUCH_EYE) / T.s), 'handR': tuple(hand), 'back': tuple(back)}
+
+    def Probe(t):
+        out = {}
+        if abs(t - 1.75) < .021:
+            out['pointOverBack'] = (tuple(RbBayonetTip(T, RifleAt(1.75))), tuple(hover))
+        return out or None
+    spec = {'pose': lambda t: T.Nest(Body(t)), 'props': Props, 'player': Player, 'probes': Probe,
+            'plants': [('L', 0, 2.30), ('L', 2.55, D), ('R', .40, 1.10), ('R', 2.40, D)],   # (the grind turns the boot about the heel)
+            'reviewProps': lambda t: (T.RifleProps(RifleAt(t)) if RifleAt(t) else []) + [('point', tuple(hand), None, .03),
+                                       ('point', tuple(hover), None, .02)]
+            + [('cyl', tuple(back + Vector((0, T.R(.10), -T.R(.15)))), tuple(back + Vector((0, -T.R(.45), -T.R(.15)))), .10)],
+            'reviewFrames': lambda n: [0, 10, 18, 26, 35, 42, 50, 57, 66, 76, n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = [('side', (-3.2, -.4, .9), (0, -.4, .45)), ('q', (-2.2, -2.8, 1.6), (0, -.4, .45)),
+                           ('left', (3.2, -.3, .9), (0, -.3, .45)),
+                           FirstPersonView(tuple(Vector(CROUCH_EYE) / T.s), (0, 0, T.R(.6)), fov=65.0, name='eye')]
+    return spec
+
+
+# =========================================================================================================================
+# 02 Blade: the recruit puts the point of his bayonet to Shunzi's LEFT cheek (Shunzi's head held up by the hair, IjaCrouchHairHold
+# hold) and presses and draws it down; backs off three steps and levels the rifle at him. ijaD's own root: Shunzi's held eye
+# RB_CHEEK_EYE ahead of him; the player track (head, cheekL, handR) is where the director puts the first-person eye -- it solves
+# the recruit's root from it. The point comes in from the LEFT of Shunzi's picture (N21): the recruit stands 25 deg to Shunzi's
+# left of straight ahead of him (north-east of the eye; contract §1.10 says "right front" -- that puts the blade across the face).
+# =========================================================================================================================
+RB_CHEEK_T = 63 / 24            # 2.625 s
+RB_CHEEK_TOUCH = 17 / 24        # 0.708 s: the point on the cheek
+RB_CHEEK_CUT = 24 / 24          # 1.0 s: pressed in and drawn down
+RB_CHEEK_EYE = (0.0, 1.45, .44)          # Shunzi's held eye from the recruit's root (runtime: right, forward, up)
+RB_CHEEK_TURN = 25.0                     # Shunzi faces back at him, turned this much to the recruit's left (deg); tipped up 25 deg
+RB_LEVEL_T = 72 / 24            # 3.0 s
+RB_LEVEL_HOLD = (42 / 24, RB_LEVEL_T)    # 1.75-3.0 s
+RB_LEVEL_BACK = 1.80
+
+Meta('IjaRecruitCheekCut', RB_CHEEK_T, False, 'track', role='ijaD', rig='TengxianIja03', rigs=RB_IJAD, props=['weapon'],
+     rootMotion=False, weaponState='twoHand', player=True,
+     contacts=[{'t': RB_CHEEK_TOUCH, 'limb': 'bayonet', 'action': 'touch', 'partnerRole': 'shunzi', 'part': 'cheekL'},
+               {'t': RB_CHEEK_CUT, 'limb': 'bayonet', 'action': 'cut', 'partnerRole': 'shunzi', 'part': 'cheekL'}],
+     events=[{'t': RB_CHEEK_TOUCH, 'kind': 'touch'}, {'t': RB_CHEEK_CUT, 'kind': 'cut', 'sound': 'cheekCut', 'lens': 'cheekCut'}],
+     prev=['IjaReadyRifle'], next=['IjaRecruitLevelRifle'],
+     notes='2026-10-11 Blade (N21): standing at the ready 1.45 m from Shunzi\'s held-up eye (frame 0 = IjaReadyRifle last frame), he '
+           'stoops, the left hand forward on the handguard, and brings the bloody point to the LEFT cheek (touch 0.708), presses '
+           'and draws it down 4 cm (cut 1.0), the hands shaking; holds a moment, takes it away and straightens to the ready (2.6). '
+           'Player track: head (Shunzi\'s eye), cheekL (where the point touches), handR (his right hand in the mud).')
+Meta('IjaRecruitLevelRifle', RB_LEVEL_T, False, 'track', role='ijaD', rig='TengxianIja03', rigs=RB_IJAD, props=['weapon'],
+     rootMotion=True, weaponState='twoHand', holdLoop=list(RB_LEVEL_HOLD), player=True,
+     events=[{'t': .10, 'kind': 'backOff'}, {'t': RB_LEVEL_HOLD[0], 'kind': 'levelled'}],
+     prev=['IjaRecruitCheekCut'], next=[],
+     notes='2026-10-11 Blade: frame 0 = IjaRecruitCheekCut last frame (same root). Three steps back (1.8 m of root motion), the rifle '
+           'into the shoulder and levelled at Shunzi\'s eye (down ~16 deg); 1.75-3.0 s a seamless hold loop, the muzzle shaking. '
+           'Player track: head (the eye he aims at).')
+
+
+def RbCheekGeometry(T):
+    """(eye, cheekL, handR, face direction, Shunzi's left) in the recruit's source frame."""
+    e = Vector(RB_CHEEK_EYE)
+    eye = Vector((-e.x / T.s, -e.y / T.s, e.z / T.s))
+    a = math.radians(RB_CHEEK_TURN)
+    fh = Vector((math.sin(a), math.cos(a), 0.0))                    # back toward him, turned to his left (+X)
+    face = (fh * math.cos(math.radians(25)) + Vector((0, 0, math.sin(math.radians(25))))).normalized()
+    left = Vector((-math.cos(a), math.sin(a), 0.0))                 # Shunzi's left
+    cheek = eye + left * T.R(.065) + face * T.R(.015) - Vector((0, 0, T.R(.045)))
+    hand = Vector((eye.x, eye.y, 0.0)) + fh * T.R(.38) - left * T.R(.13) + Vector((0, 0, T.R(.02)))
+    return eye, cheek, hand, face, left
+
+
+@Builder('IjaRecruitCheekCut')
+def BuildRecruitCheekCut(T, name):
+    D, touch, cut = RB_CHEEK_T, RB_CHEEK_TOUCH, RB_CHEEK_CUT
+    start = RbFlatOf(T, BuildReadyRifle, 'IjaReadyRifle', 1.1)
+    for k_ in ('grip.L', 'gripW.L', 'grip.R', 'gripW.R'):
+        start.pop(k_, None)
+    eye, cheek, hand, face, left = RbCheekGeometry(T)
+    ready = LowReady(T)
+    p0 = Vector(start['pelvis'])
+    stoop = p0 + Vector((0, -T.R(.04), -T.R(.28)))     # crouched low over him (N21)
+    stepL = Add3(start['ankle.L'], (0, -T.R(.22), 0))
+    O = lambda r, f_, u: Vector((-T.R(r), -T.R(f_), T.R(u)))
+    grip = stoop + O(.16, .08, .24)
+    a = (cheek - grip).normalized()
+    down = Vector((0, 0, -1))
+    draw = Channel([(0.0, 0.0), (touch, 0.0), (cut, 1.0), (D, 1.0)])
+
+    def PointAt(t):
+        """Where the bayonet's point is held (touching from `touch`, pressed 6 mm and drawn 4 cm down to the cut)."""
+        w = Smooth(draw(t))
+        return cheek + down * T.R(.04) * w + left * (-T.R(.006) * Smooth((t - touch) / .1))
+
+    shake = lambda t: Bump(t, touch - .05, 1.40) * Vector((T.R(.004) * math.sin(Tau * 9 * t), 0, T.R(.003) * math.sin(Tau * 7 * t + 1)))
+
+    def RifleAt(t):
+        aim = lambda gap: T.Rifle(tuple(PointAt(t) - a * T.R(RB_TIP + gap) + shake(t)), tuple(a))
+        rows = [(0.0, ready), (.20, ready), (.55, aim(.12)), (touch, aim(0.0)), (1.25, aim(0.0)), (1.60, aim(.25)),
+                (2.20, ready), (D, ready)]
+        return RbRiflePath(T, rows)(t)
+    anim = Tracks(start, {
+        'ankle.L': [(0.0, start['ankle.L']), (.15, start['ankle.L']), (.28, Add3(Lerp3(start['ankle.L'], stepL, .5), (0, 0, .05))), (.40, stepL),
+                    (1.75, stepL), (1.92, Add3(Lerp3(stepL, start['ankle.L'], .5), (0, 0, .05))), (2.10, start['ankle.L'])],
+        'pelvis': [(0.0, tuple(p0)), (.55, tuple(stoop)), (1.60, tuple(stoop)), (2.20, tuple(p0)), (D, tuple(p0))],
+        'bend': [(0.0, start['bend']), (.55, .50), (1.60, .50), (2.20, start['bend'])],
+        'pelvisTilt': [(0.0, start['pelvisTilt']), (.55, (.22, 0, 0)), (1.60, (.22, 0, 0)), (2.20, start['pelvisTilt'])],
+        'twist': [(0.0, start['twist']), (.55, -.10), (1.60, -.10), (2.2, start['twist'])],
+        'shrug': [(0.0, start['shrug']), (.55, .12), (1.6, .12), (D, start['shrug'])],
+        'lookW': [(0.0, .5), (.40, 1.0), (1.60, 1.0), (2.2, .4), (D, .4)],
+    }, lag={'head': .05})
+
+    def Body(t):
+        f = anim(t)
+        f['look'] = tuple(cheek)
+        f['lookLimit'] = 70.0
+        RbHoldRifle(T, f, RifleAt(t))
+        return f
+
+    def Player(t):
+        return {'head': tuple(eye), 'cheekL': tuple(cheek), 'handR': tuple(hand)}
+
+    def Probe(t):
+        out = {}
+        if abs(t - touch) < .021:
+            out['pointOnCheek'] = (tuple(RbBayonetTip(T, RifleAt(touch))), tuple(cheek))
+        if abs(t - cut) < .021:
+            out['pointDrawn'] = (tuple(RbBayonetTip(T, RifleAt(cut))), tuple(PointAt(cut)))
+        return out or None
+    spec = {'pose': lambda t: T.Nest(Body(t)), 'props': lambda t: {'weapon': T.Track(RifleAt(t))}, 'player': Player, 'probes': Probe,
+            'look': lambda t: tuple(cheek) if .45 <= t <= 1.55 else None,
+            'plants': [('R', 0, D), ('L', 0, .15), ('L', .40, 1.75), ('L', 2.10, D)],
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + [('cyl', RifleAt(t)['muzzle'], RbBayonetTip(T, RifleAt(t)), .010),
+                                       ('point', tuple(cheek), None, .008), ('point', tuple(hand), None, .03)]
+,
+            'reviewFrames': lambda n: [0, 13, 17, 20, 24, 30, 40, 52, n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = [('side', (-3.2, -.9, 1.0), (0, -.8, .55)), ('q', (-2.3, -3.4, 1.7), (0, -.8, .5)),
+                           FirstPersonView(tuple(eye), tuple(eye + face * T.R(1.0)), fov=65.0, name='eye'),
+                           FirstPersonView(tuple(eye), tuple(cheek + (cheek - eye) * 3 + face * T.R(.4)), fov=65.0, name='eyeLeft')]
+    return spec
+
+
+@Builder('IjaRecruitLevelRifle')
+def BuildRecruitLevelRifle(T, name):
+    D, h0 = RB_LEVEL_T, RB_LEVEL_HOLD[0]
+    start = RbFlatOf(T, BuildRecruitCheekCut, 'IjaRecruitCheekCut', RB_CHEEK_T)
+    for k_ in ('grip.L', 'gripW.L', 'grip.R', 'gripW.R'):
+        start.pop(k_, None)
+    eye, cheek, hand, face, left = RbCheekGeometry(T)
+    p0 = Vector(start['pelvis'])
+    B = T.R(RB_LEVEL_BACK)
+    pelY = Channel([(0.0, p0.y), (.05, p0.y), (.40, p0.y + T.R(.10)), (.75, p0.y + T.R(.55)), (1.10, p0.y + T.R(1.00)),
+                    (1.45, p0.y + T.R(1.45)), (1.70, p0.y + B), (D, p0.y + B)])
+    pelXY = lambda t: (p0.x, pelY(t))
+    # four steps back, the landing foot a half step (0.22 m) behind the hips, then the right brought up square
+    steps = [('R', .05, .40), ('L', .40, .75), ('R', .75, 1.10), ('L', 1.10, 1.45), ('R', 1.45, 1.70)]
+    xL, xR = start['ankle.L'][0] - p0.x, start['ankle.R'][0] - p0.x
+    stance = {'L': [(xL, T.R(.22)), (xL, T.R(.22))], 'R': [(xR, T.R(.22)), (xR, T.R(.22)), (xR, T.R(.10))]}
+    feet, plants = WrPath(T, start, pelXY, lambda t: 0.0, steps, stance, lambda s, t: WrPoleRel(start)[s], D, lift=.06)
+    aimBase = AimStance(T)
+    shift = lambda t: Vector((0.0, pelY(t), 0.0))
+
+    def Aim(t):
+        """The shouldered rifle aimed at the eye from where he stands (AimRifle on the aim stance, carried back)."""
+        sh = shift(t)
+        butt = Vector((-(T.SX - .05), -.10, T.SZ - .05)) + sh
+        d = eye - butt
+        pitch = math.degrees(math.atan2(d.z, math.hypot(d.x, d.y)))
+        yaw = math.degrees(math.atan2(d.x, -d.y))
+        trem = Vector((T.R(.004) * math.sin(Tau * 5 * (t - h0) / (D - h0)), 0, T.R(.003) * math.sin(Tau * 4 * (t - h0) / (D - h0)))) if t > h0 else Vector()
+        r = AimRifle(T, pitch, yaw)
+        return T.Rifle(tuple(Vector(r['origin']) + sh + trem), r['axis'])
+    low = lambda t: T.Rifle(tuple(Vector(LowReady(T)['origin']) + Vector((0, pelY(t) - p0.y, 0))), LowReady(T)['axis'])
+
+    def RifleAt(t):
+        if t <= 1.05:
+            return low(t)
+        if t >= h0:
+            return Aim(t)
+        return RbRifleLerp(T, low(t), Aim(t), Smooth((t - 1.05) / (h0 - 1.05)))
+    keys = {k_: [(0.0, start[k_]), (1.05, start[k_]), (h0, aimBase[k_]), (D, aimBase[k_])]
+            for k_ in ('bend', 'pelvisTilt', 'twist', 'head', 'neck') if k_ in aimBase and k_ in start}
+    anim = Tracks(start, dict(feet, pelvis=WrDense(lambda t: (p0.x, pelY(t), p0.z - T.R(.04) * Bump(t, 0.0, 1.70) + (.006 * WrBreath(t, h0, D - h0, per=2) if t > h0 - .4 else 0)), D),
+                              lookW=[(0.0, start.get('lookW', 0.0)), (1.0, 0.0), (D, 0.0)], **keys), lag={'head': .05})
+
+    def Body(t):
+        f = anim(t)
+        r = RifleAt(t)
+        palms = T.Palms(r['axis'])
+        f['grip.R'], f['grip.L'] = r['gripR'], r['gripL']
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+        f['armPole.R'] = (-(T.SX + .45), pelY(t) + .10, T.SZ - .35) if t > 1.2 else (f['pelvis'][0] - T.R(.50), f['pelvis'][1] + T.R(.20), f['pelvis'][2] + T.R(.25))
+        f['armPole.L'] = (T.SX + .30, pelY(t) - .40, T.SZ - .60) if t > 1.2 else (f['pelvis'][0] + T.R(.40), f['pelvis'][1] - T.R(.10), f['pelvis'][2] - T.R(.05))
+        if t > h0 - .4:
+            b = WrBreath(t, h0, D - h0, per=2)
+            f['shrug'] = f.get('shrug', 0.0) + .02 * b
+        return f
+    spec = {'pose': lambda t: T.Nest(Body(t)), 'props': lambda t: {'weapon': T.Track(RifleAt(t))},
+            'player': lambda t: {'head': tuple(eye)}, 'plants': plants,
+            'probes': lambda t: {'aimAtEye': (tuple(Vector(RifleAt(t)['origin']) + (eye - Vector(RifleAt(t)['origin'])).length * Vector(RifleAt(t)['axis'])),
+                                              tuple(eye))} if abs(t - 2.4) < .021 else None,
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + [('point', tuple(eye), None, .04)],
+            'reviewFrames': lambda n: [0, 10, 20, 30, 42, 56, n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = [('side', lambda t: (-T.R(3.4), pelY(t) - T.R(.8), T.R(1.0)), lambda t: (0, pelY(t) - T.R(.8), T.R(.6))),
+                           ('q', lambda t: (-T.R(2.4), pelY(t) - T.R(3.2), T.R(1.7)), lambda t: (0, pelY(t) - T.R(.8), T.R(.5))),
+                           FirstPersonView(tuple(eye), lambda t: (0, pelY(t), T.R(1.2)), fov=65.0, name='eye')]
+    spec['reviewScale'] = 3.6
+    return spec
+
+
+# =========================================================================================================================
+# 02 Melee: ijaA, shot through the left arm (IjaShotStaggerAway's hold: bent, the left arm dead, the right hand on it), goes for
+# the grenade on his belt with the right hand, bites the pin out, and holds the grenade up in front of his helmet to strike it
+# -- Luo's dadao comes first (LuoDadaoChopRear). Same root as IjaShotStaggerAway (frame 0 = its hold-loop start, 2.083 s).
+# =========================================================================================================================
+RB_PIN_T = 72 / 24              # 3.0 s
+RB_PIN_GRAB = 12 / 24           # 0.5 s
+RB_PIN_BITE = 27 / 24           # 1.125 s
+RB_PIN_HOLD = (42 / 24, RB_PIN_T)        # 1.75-3.0 s (1.25 s, as the stagger's loops)
+Meta('IjaGrenadeBitePin', RB_PIN_T, False, 'track', role='ijaA', rig='TengxianIja02', rigs=['TengxianIja02'], props=['weapon', 'grenade'],
+     rootMotion=True, weaponState='slungBack', holdLoop=list(RB_PIN_HOLD), env={'wallRightM': WR_A_WALL},
+     contacts=[{'t': RB_PIN_GRAB, 'limb': 'handR', 'action': 'grip', 'target': 'grenade'},
+               {'t': RB_PIN_BITE, 'limb': 'head', 'action': 'bite', 'target': 'grenade', 'part': 'pin'}],
+     events=[{'t': RB_PIN_GRAB, 'kind': 'grenadeOut'}, {'t': RB_PIN_BITE, 'kind': 'bite', 'sound': 'grenadePin'},
+             {'t': RB_PIN_HOLD[0], 'kind': 'raised'}],
+     prev=['IjaShotStaggerAway'], next=[],
+     notes='2026-10-11 Melee (N23): frame 0 = IjaShotStaggerAway at its hold-loop start (same root: bent over, the left arm dead). He '
+           'turns back to face west (180 deg to his left in four steps, 0.15-1.35 s; Dir02: Luo cuts from behind him into '
+           'the picture) while the right hand leaves the wound for the Type 91 on the front of his belt (0.5 s), brings it up to his mouth, the teeth take '
+           'the pin out with a jerk of the head (bite 1.125), and the grenade goes up in front of his helmet to be struck (1.75); '
+           '1.75-3.0 s a seamless hold loop (two hard breaths, the hand shaking). Prop track `grenade` (Type 91, 0.05 x 0.095 m: '
+           'origin = its centre, axis = its long axis, up = the fuse side): on the belt until 0.5 s, then in the fist. When Luo\'s '
+           'cut lands the director drops it (finish.grenadeStop).')
+PROPS.setdefault('grenade', {'model': 'Type91 (Script_OpeningProps, procedural 0.05 x 0.095 m segmented cylinder)',
+                             'track': 'centre, long axis, fuse side',
+                             'notes': 'IjaGrenadeBitePin: on the front of ijaA\'s belt, then in his right fist (2026-10-11 redraft)'})
+
+
+@Builder('IjaGrenadeBitePin')
+def BuildGrenadeBitePin(T, name):
+    D, g, b, h0 = RB_PIN_T, RB_PIN_GRAB, RB_PIN_BITE, RB_PIN_HOLD[0]
+    start = RbFlatOf(T, BuildShotStaggerAway, 'IjaShotStaggerAway', WR_A_HOLD[0])
+    # (Dir02 2026-10-11: he turns back to face west -- the camera and the steps -- while he gets the grenade out and bites the
+    # pin, so Luo's cut from his right rear lands in the picture behind him; N23.) The stagger's hold is authored turned
+    # (frameYaw -pi): its positions back into the clip's frame, then a 180 deg turn to his left over four steps (0.15-1.35 s).
+    psi0, shift = start.pop('frameYaw', 0.0), start.pop('frameShift', (0.0, 0.0))
+    world = {}
+    for k_, v in start.items():
+        if isinstance(v, tuple) and len(v) == 3 and (k_ == 'pelvis' or k_.startswith(POSITION_CHANNELS)):
+            x, y = _Rot(v[0], v[1], psi0)
+            world[k_] = (x + shift[0], y + shift[1], v[2])
+        else:
+            world[k_] = v
+    pel = world['pelvis']
+    turnAt = Channel([(0.0, psi0), (.15, psi0), (1.35, psi0 + math.pi), (D, psi0 + math.pi)])
+    body = {s_: _Rot(world['ankle.' + s_][0] - pel[0], world['ankle.' + s_][1] - pel[1], -psi0) for s_ in LR}
+    poles = {}
+    for s_ in LR:
+        dx, dy = _Rot(world['legPole.' + s_][0] - pel[0], world['legPole.' + s_][1] - pel[1], -psi0)
+        poles[s_] = ((1 if s_ == 'L' else -1) * dx, -dy, world['legPole.' + s_][2])
+    # (he comes away from the south wall as he turns: turning on the spot his shoulder went 12 cm into it)
+    offWall = lambda t: T.R(.18) * Smooth((t - .15) / 1.0)
+    pelXY = lambda t: (pel[0] + offWall(t), pel[1])
+    feet, plants = WrPath(T, world, pelXY, turnAt, [('L', .15, .45), ('R', .45, .75), ('L', .75, 1.05), ('R', 1.05, 1.35)],
+                          {s_: body[s_] for s_ in LR}, lambda s_, t: poles[s_], D, lift=.05)
+    legs = Tracks(world, feet)
+    hr0 = start['handRel.R']
+    belt, mouth, away, helmet = (-.02, -.18, -.50), (.15, -.22, .13), (.09, -.34, .10), (.12, -.30, .40)
+    hand = Channel([(0.0, hr0), (.10, hr0), (.42, belt), (g, belt), (.70, Lerp3(belt, mouth, .55)), (1.00, mouth), (b, mouth),
+                    (1.25, away), (1.70, helmet), (h0, helmet), (D, helmet)])
+    palmF = Channel([(0.0, start['palmF.R']), (.10, start['palmF.R']), (.42, (0, -.3, -.95)), (g, (0, -.3, -.95)), (1.0, (-.3, -.3, .9)),
+                     (1.25, (-.3, -.3, .9)), (1.70, (-.1, -.5, .85)), (D, (-.1, -.5, .85))])
+    palmN = Channel([(0.0, start['palmN.R']), (.10, start['palmN.R']), (.42, (.95, 0, -.3)), (g, (.95, 0, -.3)), (1.0, (.6, .7, .2)),
+                     (1.25, (.6, .7, .2)), (1.70, (.7, .6, .2)), (D, (.7, .6, .2))])
+    curl = Channel([(0.0, start['curl.R']), (.40, .4), (g, 1.2), (D, 1.2)])
+    h = start['head']
+    head = Channel([(0.0, h), (.30, Add3(h, (.20, 0, -.10))), (g, Add3(h, (.30, 0, -.12))), (1.00, Add3(h, (.05, 0, -.25))),
+                    (b, Add3(h, (.12, -.05, -.35))), (1.22, Add3(h, (-.12, .05, .05))), (1.70, Add3(h, (-.20, 0, .05))), (D, Add3(h, (-.20, 0, .05)))])
+
+    def Body(t):
+        f = dict(world)
+        f['pelvis'] = (pel[0] + offWall(t), pel[1], pel[2])
+        for k_, v in legs(t).items():
+            if k_.startswith(('ankle.', 'foot.', 'legPole.')):
+                f[k_] = v
+        f['handRel.R'] = hand(t)
+        f['poleRel.R'] = (-.40, .20, -.30)
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = Unit(palmF(t)), Unit(palmN(t)), curl(t)
+        f['head'] = head(t)
+        f['twist'] = start['twist'] + .10 * Smooth((t - .2) / .3) - .14 * Smooth((t - .9) / .4)
+        f['bend'] = start['bend'] - .10 * Smooth((t - 1.2) / .5)
+        br = WrBreath(t, h0, D - h0, per=2)
+        if t > h0 - .4:
+            f['bend'] += .03 * br
+            f['shrug'] = start['shrug'] + .02 * br
+            f['handRel.R'] = Add3(f['handRel.R'], (.006 * math.sin(Tau * 6 * (t - h0) / (D - h0)), 0, .006 * math.sin(Tau * 4 * (t - h0) / (D - h0)))) if t > h0 else f['handRel.R']
+        sway = WrBreath(t, h0, D - h0, per=2) if t > h0 - .4 else 0.0
+        f['handRel.L'] = Add3(start['handRel.L'], (0, .015 * sway, 0))
+        return f
+
+    def Grenade(t):
+        K = T.K
+        fr = BodyFrame(K)
+        onBelt = fr['pelvis'] - fr['left'] * T.R(.12) - fr['back'] * T.R(.15) + fr['up'] * T.R(.06)
+        beltAxis = fr['up']
+        knuckles, palmar = FistFrame(T, 'R')
+        across = K['Point'](K['Bone']('R Finger1')) - K['Point'](K['Bone']('R Finger4'))
+        inFist = knuckles + palmar * T.R(.028)
+        w = Smooth((t - g + .04) / .08)
+        c = onBelt.lerp(inFist, w)
+        axis = beltAxis.lerp(across.normalized(), w).normalized()
+        up = (fr['back'] * -1).lerp(palmar, w)
+        return (tuple(c), tuple(axis), tuple(up), True)
+    props, review = SlungProps(T)
+
+    def Props(t):
+        o = props(t)
+        o['grenade'] = Grenade(t)
+        return o
+    wallX = -T.R(WR_A_WALL)
+    spec = {'pose': lambda t: T.Nest(Turned(Body(t), turnAt(t))), 'props': Props,
+            'plants': plants, 'walls': [((wallX, 0.0, 0.0), (1.0, 0.0, 0.0))],
+            'reviewProps': lambda t: review(t) + [('cyl', tuple(Vector(Grenade(t)[0]) - Vector(Grenade(t)[1]) * T.R(.047)),
+                                                   tuple(Vector(Grenade(t)[0]) + Vector(Grenade(t)[1]) * T.R(.047)), T.R(.025))],
+            'reviewFrames': lambda n: [0, 6, 12, 18, 24, 27, 30, 36, 42, 60, n - 1]}
+    spec = AReview(spec)
+    endXY = (-T.R(WR_A_END[0]), T.R(WR_A_END[1]))
+    spec['reviewViews'] = WrViews(lambda t: endXY)
+    spec['reviewScale'] = 2.2
+    return spec

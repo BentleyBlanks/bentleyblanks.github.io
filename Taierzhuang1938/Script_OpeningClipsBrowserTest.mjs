@@ -80,7 +80,9 @@ const SPIKE_EXEMPT = [
 const PLAYER_PART = { collar: "collar", collarFront: "collar", collarBack: "collar", head: "head", forearmR: "forearmR", shoulderR: "shoulderR",
   chest: "chest",
   // 2026-09-27 IjaCrouchHairHold / the slaps: the fist in the hair on the crown (the track is where the fist closes)
-  crown: "crown" };
+  crown: "crown",
+  // 2026-10-11 redraft (AnimB): the boot on the hand, the point over the back, the point on the left cheek
+  handR: "handR", back: "back", cheekL: "cheekL" };
 // Skin regions of the wall contacts (the bake's WALL_REGIONS): bones whose weight the vertex carries.
 const WALL_REGIONS = {
   shoulderBack: ["spine2", "lclavicle", "rclavicle"], back: ["spine1", "spine2"], shoulderL: ["lclavicle", "lupperarm"],
