@@ -3,7 +3,8 @@ import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 // 第一关台词表（cue id 的唯一来源）。两种录音格式并存（契约 docs/Data_FirstLevel0105Refactor20260923Contract.md §2.2）：
 //   · 逐句干声（perLine: true）——01–06：每句一条干声 Audio/FirstLevel/Lines/AudioVoice_FirstLevel<Scene>_<NN>.mp3，
 //     同一角色都带定妆参考音生成；对白时间轴在 Data_FirstLevelDialogueDirection.mjs，播放器 Script_DialoguePlayer。
-//     01–02 台词逐字取自 docs/Data_FirstLevelOpeningSource20260923.md；03–06 取自 09.22 稿，id 与台词不变。
+//     01–02 台词逐字取自 docs/Data_FirstLevelOpeningSource20261011.md（2026-10-11 Notion 稿，契约 docs/Data_OpeningRedraft20261011Contract.md §3）；
+//     03–06 取自 09.22 稿，id 与台词不变。
 //   · 整段录音（旧格式）——07–18：一段连续多人对白 = 一个 cue = 一次 SeedAudio 请求 = 一条音频。
 //     台词逐字取自 docs/Data_FirstLevelRebuildSource20260919.md（Notion 采用稿），不许改字改标点。
 // 行的形状：{ who, text, tts?, subtitle?, lang? }
@@ -11,6 +12,7 @@ import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 //   · tts      送 SeedAudio 的写法（缺省 = text）。日语行的假名不写在这里，见下。
 //   · subtitle 屏幕文本覆盖（缺省 = text）。
 //   · lang     该行的语言，缺省 "zh"；"ja" 的行由 Data_FirstLevelJapaneseSpeech 提供假名。
+//   · vocal    非词的人声（嚎、憋住的痛叫、用力的闷吼）：稿面的「啊」「呃」只给 TTS 与口型轨，不算念错词（2026-10-11）。
 // 取用一律走 MissionVoiceSpoken() / MissionVoiceSubtitle()，别直接读 line.text 当「念的内容」。
 export const MISSION_VOICE_CAST = Object.freeze({
   shunzi: ["顺子", "二十出头的四川（重庆一带口音）男兵，出身跑码头、做小买卖的江湖油子；嗓音偏亮、腔调冲、语速快，抑扬顿挫、尾音上挑，带痞气，爱挖苦人；嘴硬、精明，害怕时说话急，但不是喜剧腔；压着嗓子时也不平读、不淡，咬字脆、带劲儿"],
@@ -22,11 +24,12 @@ export const MISSION_VOICE_CAST = Object.freeze({
   bearer: ["担架员", "四川成年男性，劳累喘气，抬担架时短促报路"],
   runner: ["传令兵", "年轻四川男兵，奔跑后气喘，命令说清楚"],
   interpreter: ["翻译", "给日军传话的鲁南汉奸，北方官话（山东口音）；对日兵点头哈腰、谄媚讨好，对中国俘虏恶狠狠、阴阳怪气、狐假虎威，带冷笑狞笑；绝不说四川话"],
-  ijaA: ["日兵甲", "1938年日本陆军步兵，成年男性，短促粗暴的日语命令，只说稿中日语假名，不说中文"],
+  ijaA: ["日兵甲", "1938年日本陆军步兵，分队长，老兵，成年男性；冷静、话短、不吼，日语命令低而平，只说稿中日语假名，不说中文"],
   ijaB: ["日兵乙", "1938年日本陆军步兵，成年男性，比甲更闷更沉的日语吼叫，只说稿中日语假名，不说中文"],
-  ijaC: ["日兵丙", "1938年日本陆军步兵，年轻些，嗓子尖而响，在前沟边跑边喊，只说日语"],
-  ijaD: ["日兵丁", "1938年日本陆军步兵，中等嗓音，警觉，短促催促，只说日语"],
-  comrade: ["川军", "肩膀挂彩的四川男兵，豁达嘴硬爱开玩笑，嗓子偏沙"],
+  ijaC: ["日兵丙", "1938年日本陆军步兵，老兵，低而稳，守在折角背对着人喊，只说日语"],
+  ijaD: ["日兵丁", "1938年日本陆军步兵，十八九岁新兵，嗓子发紧、怕，喊声会劈，只说日语"],
+  // 2026-10-11 Notion 稿：开场与顺子打趣的川军叫「冬瓜」（界面名；键 comrade 不变）。
+  comrade: ["冬瓜", "左肩挂彩的四川男兵，豁达嘴硬爱开玩笑，嗓子偏沙"],
   shouter: ["洞外士兵", "四川成年男兵，在洞外沟里隔着炮声拼命示警"],
   captiveWounded: ["伤兵", "腿骨断了的四川伤兵，疼得发抖还嘴硬，从牙缝里骂出来，与老周声音不同"],
   captiveHelper: ["扶人川军", "四川成年男兵，拖着同伴已经脱力，被枪托砸倒后还挣扎出声"],
@@ -87,22 +90,38 @@ export function MissionVoiceAlignmentCues() {
   }));
 }
 export const MISSION_DIALOGUE = Object.freeze([
-  // —— 2026.09.23 新稿 01–02（契约 §5.2），逐句干声。台词逐字，不改字。
+  // —— 2026-10-11 Notion 稿 01–02（docs/Data_FirstLevelOpeningSource20261011.md；契约 docs/Data_OpeningRedraft20261011Contract.md §3），
+  // 逐句干声。台词逐字，不改字。没改字的九场（BunkerRunnerCall BunkerOrders BunkerIncoming InterpreterCall RescueFlee
+  // RescueHeave RescueCheck CollectionMeet SupportOrder）原样沿用录音；BunkerSearch、CaptiveTaunt 已下线（--prune）。
+  // 黑场数数：渐亮前，幺娃压着嗓子数炮，罗班长站在洞口没回头。
+  PerLine("BunkerCount", [
+    ["yaowa", "……七、八、九——"],
+    ["yaowa", "九下。比刚才慢。"],
+    ["luo", "还在打后头。"],
+  ]),
   PerLine("BunkerBanter", [
+    ["liuwencai", "一人三夹，多的没得。"],
+    ["shunzi", "三夹？妈卖批，打麻雀都不够。"],
+    ["liuwencai", "嫌少？嫌少你龟儿自己找鬼子领去。"],
+    ["comrade", "眼珠子莫掉到饼上了。"],
+    ["yaowa", "……还有没得？"],
+    ["comrade", "有个锤子。剩下这点，老子留到夜饭。"],
     ["shunzi", "妈卖批。老子还没埋，坟头土先给我盖起了。"],
-    ["yaowa", "省事噻，等哈死了都不用挖坑。"],
-    ["shunzi", "滚。"],
-    ["comrade", "莫死这儿噻，山东的土老子睡不惯。"],
-    ["yaowa", "死人还挑地方？"],
-    ["comrade", "咋个不挑，老子要死也滚回四川死。"],
-    ["shunzi", "你想得还多，先把今天混过去。"],
-    ["comrade", "那肯定，老子命硬得很。"],
-    ["yaowa", "命硬还挨一枪？"],
-    ["comrade", "龟儿子枪法撇了噻。"],
-    ["shunzi", "那你还得谢谢他。"],
-    ["comrade", "等哈碰到，老子当面谢。"],
-    ["yaowa", "拿啥子谢？"],
-    ["comrade", "拿这个噻。"],
+    ["yaowa", "省事噻，等哈都不用挖坑。"],
+    ["shunzi", "滚你妈的。"],
+    ["heyoutian", "……哪个遭了？"],
+    ["liuwencai", "没得人遭。"],
+    ["heyoutian", "没得人遭，就莫吵老子睡瞌睡。"],
+  ]),
+  // 冬瓜往顺子脚边倒散子弹，记账；笑出声扯到肩膀那一下是 07。
+  PerLine("BunkerLedger", [
+    ["comrade", "顺子，帮我也压两夹，这只膀子抬不起来。"],
+    ["shunzi", "一夹一个铜板。"],
+    ["comrade", "日你先人，你娃钻钱眼眼头去了。"],
+    ["shunzi", "不要现钱，记账。连前头的，六个了。"],
+    ["comrade", "发饷就还。"],
+    ["shunzi", "发饷？出川到现在，饷长啥样子你见过？见过个锤子。"],
+    ["comrade", "嘶——狗日的……"],
   ]),
   // 2026-09-29 用户追加（不在 Notion 原稿里）：「传令兵应该是老远就喊话（玩家就能听到），然后在地道门外就和班长可以说话了，
   // 而不是一定要走到屋里才说话」。远喊：他还在后交通壕里、离洞口二三十米，边跑边扯着嗓子喊班长；只喊称呼，不带方位和任务
@@ -120,56 +139,76 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["luo", "贴着炮上来的……炮一停就摸进沟了。这个洞守不住。"],
     ["luo", "弹装起！往后沟撤！跟紧！"],
   ]),
+  // 冬瓜扶墙起身要他那两夹；顺子丢过去。03 冬瓜头也不回。
+  PerLine("BunkerExit", [
+    ["comrade", "我那两夹！"],
+    ["shunzi", "八个铜板了啊！"],
+    ["comrade", "记到，龟儿子！"],
+  ]),
   PerLine("BunkerIncoming", [["shouter", "炮弹！趴下——！"]]),
-  PerLine("BunkerSearch", [
-    ["ijaC", "往前！快！", JA],
-    ["ijaD", "别停！", JA],
+  // 醒来时：丙清完折角，背对着问乙扎了几个；乙沿沟底扎尸报数（取代 09.23 的 BunkerSearch）。
+  PerLine("BunkerSweep", [
+    ["ijaC", "折角，清了！", JA],
+    ["ijaC", "几个了？", JA],
+    ["ijaB", "七个。", JA],
+    ["ijaB", "八个。", JA],
+    ["ijaC", "我十一个。", JA],
+    ["ijaB", "你那是扎死人凑的。", JA],
+    ["ijaB", "……九个。", JA],
+  ]),
+  // 01 之后接 InterpreterCall 两句（乙喊翻译、翻译应声），再接 02（场景不变，导演按句排）。
+  PerLine("CaptiveDragged", [
+    ["ijaA", "这个是活的。拖出来。", JA],
+    ["comrade", "狗日的……你妈的……"],
+    ["ijaA", "跪好。", JA],
+    ["comrade", "日你……先人……"],
+    ["ijaB", "老古董。", JA],
   ]),
   // 2026-09-26 用户追加（不在 Notion 原稿里）：日兵在前沟发现被埋的川军伤兵，朝二十米外的支沟口喊翻译过来。
   PerLine("InterpreterCall", [
     ["ijaB", "翻译！翻译呢！快给我滚过来！", JA],
     ["interpreter", "是！是！这就来！", JA],
   ]),
-  PerLine("CaptiveDragged", [
-    ["comrade", "狗日的……你妈的……"],
-    ["ijaA", "起来！", JA],
-    ["comrade", "日你……先人……"],
-    ["ijaC", "右边！开火！", JA],
-  ]),
-  // 2026-09-29 用户追加（不在 Notion 原稿里）：「完全也听不出威胁感，或者可以饶他一命的这种好处诱惑」。
-  // 翻译的中文逼问各补半句：先拿「饶你一命」利诱，再拿死来威胁；原稿的问句一字不动留在句首。
   PerLine("CaptiveInterrogation", [
-    ["ijaA", "他们的部队往哪儿撤了！问他！", JA],
+    ["ijaA", "……四川兵。机枪在哪儿。后沟几个人。问。", JA],
     ["interpreter", "是！", JA],
-    ["interpreter", "你们的人往哪儿撤了？说了，太君饶你一条狗命！"],
-    ["comrade", "……啥子？"],
-    ["interpreter", "你们大队！往哪儿撤了！不说，今天就叫你死在这沟里！"],
-    ["ijaB", "你这支那混蛋！快说！", JA],
-    ["comrade", "滚……二鬼子。"],
-    ["ijaA", "他说什么！", JA],
-    ["interpreter", "他什么也不肯说！光在骂人！", JA],
-    ["comrade", "老子骂的就是你们……狗日的。"],
-    ["comrade", "小日本。"],
+    ["interpreter", "太君问你，机枪在哪儿？后沟还有几个人？说了，太君饶你一条狗命！"],
+    ["interpreter", "机枪！不说，今天就叫你死在这沟里！"],
+    ["comrade", "滚……狗汉奸。"],
+    ["interpreter", "你说了，我替你跟太君求情——"],
+    ["comrade", "给日本人舔沟子的东西……也配跟老子说话？"],
+    ["ijaA", "他说什么。", JA],
+    ["interpreter", "……光骂人，什么也不说。", JA],
   ]),
-  PerLine("CaptiveTaunt", [
-    ["ijaA", "怎么了，支那混蛋！", JA],
-    ["ijaA", "用你那张嘴，再骂啊！", JA],
-    ["ijaB", "蠢货。", JA],
-    ["ijaC", "往前！快！", JA],
+  // 无字幕（契约 §3）：乙拧伤口时冬瓜卡在喉咙里的叫声（不是台词，字幕不出；text 只给 TTS 与口型轨）。
+  PerLine("CaptiveWoundTwist", [["comrade", "呃——呃……", { subtitle: "", vocal: true }]], { subtitles: false }),
+  PerLine("BayonetPractice", [
+    ["ijaA", "没时间了。处理掉。", JA],
+    ["ijaA", "丁。过来。上刺刀。", JA],
+    ["ijaA", "扎。", JA],
+    ["ijaA", "……叫成这样，后沟都听见了。", JA],
+    ["ijaA", "看着。", JA],
+    ["ijaA", "支那猪，叫得倒响。", JA],
+    ["ijaA", "一刀，没声音。下一个你来。", JA],
+    ["ijaB", "裤子尿湿没有？", JA],
+    ["ijaA", "检查。往前。", JA],
   ]),
-  PerLine("ShunziFound", [["ijaA", "还藏着一个，支那混蛋。", JA]]),
-  // 03/04 同上（2026-09-29 用户追加利诱与威胁；「刚才那个」是顺子眼看着被割喉的川军）。
+  // 无字幕：丁硬着头皮冲上去时逼出来的喊声（非词，日语那一路的假名见 Data_FirstLevelJapaneseSpeech）。
+  PerLine("RecruitCharge", [["ijaD", "啊——！", { ...JA, subtitle: "", vocal: true }]], { subtitles: false }),
+  // 无字幕：冬瓜蜷在泥里一声接一声的嚎（≥ 4 s、可循环，导演割喉时掐断）。
+  PerLine("CaptiveHowl", [["comrade", "啊——！啊——！啊——！啊——！", { subtitle: "", vocal: true }]], { subtitles: false }),
+  PerLine("ShunziFound", [["ijaA", "……这个是活的。留着，问。", JA]]),
   PerLine("RescueInterrogation", [
     ["ijaA", "这个也问！", JA],
     ["interpreter", "是！", JA],
-    ["interpreter", "醒醒！你们的人往哪儿撤了？说了，太君饶你不死，还赏你口饭吃！"],
-    ["interpreter", "听见没有？你们长官在哪儿？不说？刚才那个就是你的下场！"],
+    ["interpreter", "醒醒！机枪在哪儿？你们长官在哪儿？说了，太君饶你不死，还赏你口饭吃！"],
+    ["interpreter", "听见没有？不说？刚才那个就是你的下场！太君说了，你不说，就拿你给新兵练刀！"],
     ["ijaB", "快点！", JA],
     ["interpreter", "说话！"],
   ]),
   PerLine("RescueFlee", [["interpreter", "有敌人！", JA]]),
   // 2026-09-30 「直接玩家自己往前用力一声腾挪就出来就行」: his own grunt as he heaves himself out from under the roof timber.
-  PerLine("RescueHeave", [["shunzi", "呃啊——！"]]),
+  PerLine("RescueHeave", [["shunzi", "呃啊——！", { vocal: true }]]),
   PerLine("RescueCheck", [["luo", "还能打不？"]]),
   PerLine("CollectionMeet", [
     ["yaowa", "顺哥！你脸咋了？"],
@@ -581,7 +620,10 @@ const SOUNDSCAPES = Object.freeze({
   night: "夜里滕县北门外：成队的脚步踩在土路上、弹药箱与器材搬动、车轮木响、许多人低声说话和零星口令；城墙把声音兜住，没有欢呼。",
 });
 const SOUNDSCAPE_ZONES = Object.freeze({
-  BunkerBanter: "bunker", BunkerSearch: "bunker",
+  // 2026-10-11 Notion 稿 01–02 的新场景（逐句干声不用这张表写提示词，登记在这里只为分区齐全）。
+  BunkerCount: "bunker", BunkerBanter: "bunker", BunkerLedger: "bunker", BunkerExit: "bunker",
+  BunkerSweep: "trench", CaptiveDragged: "trench", CaptiveInterrogation: "trench", CaptiveWoundTwist: "trench",
+  BayonetPractice: "trench", RecruitCharge: "trench", CaptiveHowl: "trench", ShunziFound: "trench", RescueInterrogation: "trench",
   SupportOrder: "trench",
   FrontApproach:"front",FrontAttack:"front",FrontWithdraw:"front",TankRoadContact:"front",BundleAttack:"bundle",BundleRetreat:"bundle",FrontRelief:"front",
   FrontBlockade: "front", TakeOverGun: "front", TankTerror: "front", BundleOrder: "front", TankHeard: "front", TankArmor: "front",

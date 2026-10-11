@@ -296,6 +296,8 @@ function EncodeOptionsFor(line) {
     };
   }
   if (line.promptMode === "continuousScene") return { maxDur: 22.0, maxTempo: 1.25 };
+  // 白刃冲锋的单字喊杀（kind "yell"，2026-10-11）：0.3–0.7 s，长了不变调压回 0.75 s 以内。
+  if (line.kind === "yell") return { maxDur: 0.75, maxTempo: 1.35 };
   return undefined;
 }
 
@@ -496,7 +498,10 @@ function SeedAudioPrompt(line) {
   }
   return [
     "生成一条单句、干净、孤立的战场男性口令配音。严格使用台词本身的语言，不要改词。",
+    // 挂了定妆音的中方句（2026-10-11 喊杀 yell_*：三份各用一个龙套的嗓子）。没挂的句子提示词逐字不变。
+    ...(line.voice ? ["@音频1 是这个川军士兵本人的声音：严格保持 @音频1 的音色、年龄感和四川口音。"] : []),
     `角色：${line.role || "士兵"}。语气短促、可信，不舞台化。`,
+    ...(line.kind === "yell" ? ["这是白刃冲锋、提着大刀冲下台阶时从胸腔里吼出来的一声：只有这一个字，嘶吼、有狠劲，元音拖住半秒左右（不短于 0.4 秒，不到一秒）；不拖长、不是尖叫、不破成噪声，用四川口音。"] : []),
     "不要音乐、不要旁白、不要环境声、不要音效、不要念角色名；开口前后只留极短静音。",
     `只说这一句原文：“${line.text}”`,
   ].join("\n");

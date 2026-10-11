@@ -224,6 +224,19 @@ const BATTLE_LINES = [
   { key: "rally_noretreat", kind: "rally",  file: "AudioVoice_RallyNoretreat.mp3", dur: 2.35,  role: "班长",    pitch: -2,                  text: "莫退！一步都莫退！" },
   { key: "rally_oath",      kind: "rally",  file: "AudioVoice_RallyOath.mp3", dur: 2.49,  role: "班长",    pitch: -2,                  text: "鬼子不打完，莫回四川！" },
   { key: "rally_shoot",     kind: "rally",  file: "AudioVoice_RallyShoot.mp3", dur: 2.37,  role: "班长",    pitch: -2,                  text: "打！打！莫歇气！" },
+  // 2026-10-11 第一关 02 反冲锋（契约 docs/Data_OpeningRedraft20261011Contract.md §1.12、§3）：喊杀只用短促单字，此起彼伏、不成句；
+  // 旧的整句 rally（「杀！大刀砍拢去！」等）不删（别处还在用），只是 02 不再用。罗/何/刘各有本人的「杀——！」（Data_FirstLevelVoiceCast
+  // SQUAD_BARK_EXTRA_TAKES，声库键 yell_sha@<who>）。kind "yell"：Script_Ai 不按这一类喊，只由开场导演按 key 点名播（voice.<key>）。
+  // 公用的每个字三份，各挂一个龙套的定妆音（voice：守军 / 传令兵 / 担架员，Script_VoiceBake 作 @音频1 送进去），三个不同的嗓子。
+  { key: "yell_sha",        kind: "yell",   file: "AudioVoice_YellSha.mp3", dur: 0.69,     role: "老兵",    pitch: 0,   voice: "guard", text: "杀——！" },
+  { key: "yell_sha_2",      kind: "yell",   file: "AudioVoice_YellSha_2.mp3", dur: 0.39,     role: "兵",    pitch: 0,   voice: "runner", text: "杀——！" },
+  { key: "yell_sha_3",      kind: "yell",   file: "AudioVoice_YellSha_3.mp3", dur: 0.75,     role: "兵",    pitch: 0,   voice: "bearer", text: "杀——！" },
+  { key: "yell_kan",        kind: "yell",   file: "AudioVoice_YellKan.mp3", dur: 0.33,     role: "老兵",    pitch: 0,   voice: "guard", text: "砍！" },
+  { key: "yell_kan_2",      kind: "yell",   file: "AudioVoice_YellKan_2.mp3", dur: 0.36,     role: "兵",    pitch: 0,   voice: "runner", text: "砍！" },
+  { key: "yell_kan_3",      kind: "yell",   file: "AudioVoice_YellKan_3.mp3", dur: 0.39,     role: "兵",    pitch: 0,   voice: "bearer", text: "砍！" },
+  { key: "yell_chong",      kind: "yell",   file: "AudioVoice_YellChong.mp3", dur: 0.83,     role: "老兵",    pitch: 0,   voice: "guard", text: "冲！" },
+  { key: "yell_chong_2",    kind: "yell",   file: "AudioVoice_YellChong_2.mp3", dur: 0.77,     role: "兵",    pitch: 0,   voice: "runner", text: "冲！" },
+  { key: "yell_chong_3",    kind: "yell",   file: "AudioVoice_YellChong_3.mp3", dur: 0.33,     role: "兵",    pitch: 0,   voice: "bearer", text: "冲！" },
   { key: "spot_enemy",      kind: "spot",   file: "AudioVoice_SpotEnemy.mp3", dur: 2.37,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "鬼子！鬼子摸拢来了！" },
   { key: "spot_plane",      kind: "spot",   file: "AudioVoice_SpotPlane.mp3", dur: 2.30,  role: "普通兵",   pitch: 0,   event: true,  text: "飞机！快躲起！" },
   { key: "spot_tank",       kind: "spot",   file: "AudioVoice_SpotTank.mp3", dur: 2.36,  role: "新兵",    pitch: 0,   event: true,  speed: 1.15, text: "战车！战车碾拢来了！" },

@@ -154,6 +154,12 @@ export function ScenePrompt(cue) {
     ? refs.map((r, i) => `@音频${i + 1} 是${r.who.map(Name).join("、")}的声音`).join("，")
       + (refs.length > 1 ? "；每个角色严格保持自己那条参考音的音色、年龄感和口音，谁的句子就用谁的嗓子，绝不串嗓。" : "；严格保持参考音的音色、年龄感和口音。")
     : "";
+  // 说话人多于 3 个（参考音上限）时，没挂参考音的人只能照人设出嗓子；2026-10-11 BunkerBanter 五个人，第一次生成里没挂参考音的
+  // 幺娃、何有田借了刘文财、冬瓜的嗓子。这句只在有这种人时才加（其余场景的提示词逐字不变）。
+  const unreferenced = refs.length ? speakers.filter((who) => RefIndex(refs, who) < 0) : [];
+  const unrefText = unreferenced.length
+    ? `${unreferenced.map(Name).join("、")}没有参考音：照下面的人设用他自己的嗓子，和 @音频1${refs.length > 1 ? `–@音频${refs.length}` : ""} 每一个都必须明显不是同一个人，绝不借用参考音的嗓子。`
+    : "";
   const cast = speakers.map((who) => `${Name(who)}：${FIRST_LEVEL_VOICE_CAST[SceneVoice(cue, who)].persona}`).join("；");
   const langRules = [
     langs.has("zh") ? "川军都讲地道四川话，用四川方言的语调、声调与发音，不是普通话加几个四川词" : "",
@@ -179,7 +185,7 @@ export function ScenePrompt(cue) {
   const together = cue.lines.length > 1
     ? "这是同一场戏一次录完：人物在同一个地方、彼此对着说话，听得见对方；按下面的表演说明接话、停顿、抢话，喊的就喊、低声的就低声。"
     : "";
-  return `${dry}${refText}场景：${scene?.context || cue.delivery || ""}。人物：${cast}。${langRules}。${together}`
+  return `${dry}${refText}${unrefText}场景：${scene?.context || cue.delivery || ""}。人物：${cast}。${langRules}。${together}`
     + `逐句表演（只照着演，不要念出来）：${notes}。`
     + `台词如下，每行开头的 @音频N 就是这一句该用的嗓子；按顺序念，不念 @音频N、角色名和编号，不加、不删、不改字：\n${script}`;
 }
@@ -240,10 +246,31 @@ function Cut(cue, n) {
   // 满幅连续 ≥ 3 个采样算一处削波；一两处是单个峰顶碰了满幅（母带限幅后已压到 −1 dBTP 以下），三处以上才算爆音。
   if (clip >= 3) hard.push(`削波 ${clip} 处`);
   else if (clip) flags.push(`原始 take 有 ${clip} 处满幅峰顶（母带已限幅）`);
+  // 句首多念的半句（2026-10-11 BunkerBanter#2：刘文财先嘟囔了一遍「多的没得」，停了半秒才念整句「一人三夹，多的没得。」）。
+  // 第一句前面没有别的句子，多出来的字全归给它。逐字时间戳里从第 k 个字起能一字不差地对上整句稿面、前面那几个字都是稿里
+  // 本来有的字、且与整句之间隔着 ≥ 0.25 s 的停顿时，把前面那几个字剪掉（切句从整句开头起，整段录音不动），记一条提示。
+  {
+    const m0 = mapped[0], want = [...spoken[0]].filter((c) => /[\p{L}\p{N}]/u.test(c)).join("");
+    for (let k = 1; m0?.chars && k + want.length <= m0.chars.length; k++) {
+      const head = m0.chars.slice(0, k), rest = m0.chars.slice(k);
+      if (rest.slice(0, want.length).map(([c]) => c).join("") !== want || rest[0][1] - head.at(-1)[2] < 0.25
+        || !head.every(([c]) => want.includes(c))) continue;
+      Object.assign(m0, { chars: rest, start: rest[0][1], headTrimmed: true });
+      flags.push(`${cue.lines[0].id} 句首多念了「${head.map(([c]) => c).join("")}」，切句从整句开头起`);
+      break;
+    }
+  }
   const subtitleChars = mapped.reduce((t, m) => t + m.chars.length, 0), scriptChars = mapped.reduce((t, m) => t + m.total, 0);
-  if (!meta.subtitle?.sentences?.length) hard.push("没有逐字时间戳");
-  if (subtitleChars > scriptChars * (1 + SCENE_CHECK.extraChars) + 2) hard.push(`多念（时间戳 ${subtitleChars} 字 / 稿 ${scriptChars} 字）`);
-  mapped.forEach((m, i) => { if (m.start == null || m.coverage < SCENE_CHECK.minCoverage) hard.push(`漏句 ${cue.lines[i].id}（对上 ${m.matched}/${m.total} 字）`); });
+  // 非词的人声（台词表 vocal：嚎、憋住的痛叫、冲锋时逼出来的喊，2026-10-11）：稿面那几个「啊」「呃」只是给 TTS 的提示，
+  // 时间戳对不上字、多出几个「啊」都不算漏句 / 多念。只给单句场景用：整段就是这一句，按有声段切。
+  const vocalScene = cue.lines.length === 1 && cue.lines[0].vocal;
+  if (vocalScene && (mapped[0].start == null || mapped[0].coverage < SCENE_CHECK.minCoverage)) {
+    Object.assign(mapped[0], { start: 0, end: meta.seconds || MeasureVoice(raw).seconds, vocalWhole: true });
+    flags.push(`${cue.lines[0].id} 是非词人声，时间戳对不上字，整段按有声段切`);
+  }
+  if (!meta.subtitle?.sentences?.length && !vocalScene) hard.push("没有逐字时间戳");
+  if (subtitleChars > scriptChars * (1 + SCENE_CHECK.extraChars) + 2 && !vocalScene) hard.push(`多念（时间戳 ${subtitleChars} 字 / 稿 ${scriptChars} 字）`);
+  mapped.forEach((m, i) => { if (!m.vocalWhole && (m.start == null || m.coverage < SCENE_CHECK.minCoverage)) hard.push(`漏句 ${cue.lines[i].id}（对上 ${m.matched}/${m.total} 字）`); });
   if (hard.some((h) => h.startsWith("漏句") || h === "没有逐字时间戳")) return { cue, n, hard, flags, mapped, slices: null };
   let extraDb = 0, master, slices, files, cutMethod = "subtitle";
   for (let round = 0; round < 3; round++) {
@@ -260,6 +287,8 @@ function Cut(cue, n) {
     const tooFast = mapped.some((m) => (m.total >= 3 && (m.end - m.start) < 0.06 * m.total) || (m.total === 2 && m.end - m.start < 0.2));
     const tooShort = slices.some((s, i) => s.endS - s.startS < Math.min(0.35, 0.1 + 0.05 * mapped[i].total));
     cutMethod = "subtitle";
+    // 句首多念剪掉的第一句：片段从整句第一个字前 padS 起（SliceScene 的第一片缺省从整段开头起）。
+    if (mapped[0].headTrimmed) slices[0].startS = +Math.max(slices[0].startS, lines[0].start - LINE_MASTER.padS).toFixed(3);
     if (tooFast || tooShort) {
       const weights = cue.lines.map((line, i) => Math.max(0.25, [...MissionVoiceSpoken(cue, i)].filter((c) => /[\p{L}\p{N}]/u.test(c)).length / (line.lang === "ja" ? 7.5 : 4.6)));
       const pauses = cue.lines.map((_, i) => LineDirection(cue, i).pauseBeforeS || 0);
@@ -328,7 +357,7 @@ function Judge(results) {
     s.measure.truePeakDb = r.master.slicePeaks[i];
     s.cer = texts[s.file]?.cer ?? null;
     s.transcript = texts[s.file]?.text ?? null;
-    if (r.master.cutMethod === "silence" && texts[s.file]?.chars?.length) { s.chars = texts[s.file].chars; s.charSource = "whisper-forced"; }
+    if ((r.master.cutMethod === "silence" || r.mapped[i]?.vocalWhole) && texts[s.file]?.chars?.length) { s.chars = texts[s.file].chars; s.charSource = "whisper-forced"; }
     const own = CastReference(SceneVoice(r.cue, line.who));
     s.speakerCos = own && vectors[voiceFile] && vectors[own.file] ? +CenteredCosine(vectors[voiceFile], vectors[own.file]).toFixed(3) : null;
     const others = [...new Set(r.cue.lines.map((l) => l.who))].filter((who) => who !== line.who)
@@ -352,6 +381,8 @@ function Judge(results) {
     s.lengthDiff = got - want;
     // 太短不判的片段也不能一个字都对不上：2026-09-29 CaptiveDragged 逐字时间把「たて」挤成 0.12 s，
     // 「立」切进了上一句、这一片只剩「て」（0.24 s，转写「ヘッ」），原来的检查全放过去了。
+    // 非词人声（line.vocal）没有「念错词」这回事：字错率照量、超门槛照样要人工核对记录，但不算硬错误。
+    if (line.vocal) { if (s.cer != null && s.cer > SCENE_CHECK.maxCer) r.flags.push(`${line.id} 非词人声，字错率 ${s.cer} 待人工核对「${s.transcript}」`); continue; }
     if (!judged && want >= 2 && s.cer != null && s.cer >= 1) r.hard.push(`${line.id} 只切到 ${s.measure.voicedS} s 且转写对不上「${s.transcript}」，切句错位`);
     if (judged && s.cer != null && s.cer > SCENE_CHECK.reviewedMaxCer && Math.abs(got - want) > Math.max(2, 0.3 * want)) r.hard.push(`${line.id} 字错率 ${s.cer}「${s.transcript}」`);
     else if (s.cer != null && s.cer > SCENE_CHECK.maxCer) r.flags.push(`${line.id} 字错率 ${s.cer} 待逐字核对「${s.transcript}」`);
@@ -713,6 +744,13 @@ function Prune(manifest) {
   for (const id of staleLines) { console.log(`${dry ? "would prune" : "pruned"} line ${id}`); if (!dry) delete manifest.lines[id]; }
   for (const name of orphans) { console.log(`${dry ? "would delete" : "deleted"} ${name}`); if (!dry) fs.rmSync(path.join(out, name)); }
   for (const name of lineOrphans) { console.log(`${dry ? "would delete" : "deleted"} Lines/${name}`); if (!dry) fs.rmSync(path.join(lineDir, name)); }
+  // 逐字时间（以片段 sha256 为键）：清单里已经没有的片段一起删（2026-10-11 下线 CaptiveTaunt / BunkerSearch 时它们被留下了，
+  // 口型轨烘焙的 --prune 又把它们当作还在用的录音）。
+  const timings = ReadJson(timingsPath, {}), liveSha = new Set(Object.values(manifest.lines || {}).map((entry) => entry.sha256));
+  for (const id of staleLines) liveSha.delete(manifest.lines?.[id]?.sha256);
+  const staleTimings = Object.keys(timings).filter((sha) => !liveSha.has(sha));
+  for (const sha of staleTimings) { console.log(`${dry ? "would prune" : "pruned"} timings ${timings[sha].lineId}`); if (!dry) delete timings[sha]; }
+  if (!dry && staleTimings.length) WriteTimings(timings);
   if (!dry && (stale.length || orphans.length || staleLines.length || lineOrphans.length || staleScenes.length)) {
     manifest.updatedAt = new Date().toISOString();
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");

@@ -206,6 +206,18 @@
       "cer": 0.875,
       "note": "逐字：锤→翠、手榴→收留、弹→的、莫得了→模特儿。前后都是近音，但「弹」转成「的」，没法只凭转写确认念对，要人工试听。",
       "needsListening": true
+    },
+    "yell_sha@luo": {
+      "sha256": "e68f60080b12eacea6de49cd2fb60eb937da080b77f6ca5d3e280c4ca01f69b4",
+      "transcript": "Saw!",
+      "note": "单字喊杀「杀——」（吼一声），whisper 写成英文「Saw!」（sa 音）；一个字的吼没有可比的字，不算念错。",
+      "needsListening": true
+    },
+    "yell_sha@liuwencai": {
+      "sha256": "e5bab95ce246546581a0f88cf62fe366dbf23d97b88616ba6df0889eecbf0587",
+      "transcript": "啥?",
+      "note": "单字喊杀，whisper 写成「啥?」（sha/sa 平翘舌不分的近音）；不算念错。",
+      "needsListening": true
     }
   }
 }

@@ -109,6 +109,12 @@ def Lines(model, jobs_path, result_path):
         segments,_=model.transcribe(samples,language=lang,beam_size=2,vad_filter=False,temperature=0.0,
             condition_on_previous_text=False,without_timestamps=True,initial_prompt=prompt,max_new_tokens=limit)
         text="".join(seg.text for seg in segments).strip()
+        # 不到一秒的短句上 medium 偶尔原样吐回提示词（2026-09-29 RescueInterrogation.03、2026-10-11 BunkerBanter.09
+        # 「滚你妈的。」转成「简体中文的句子」）：那是评分器幻觉，不是念错。吐回提示词时去掉提示词再转一次。
+        if prompt and Normalize(prompt.rstrip("。")).replace("以下是","") in Normalize(text):
+            segments,_=model.transcribe(samples,language=lang,beam_size=2,vad_filter=False,temperature=0.0,
+                condition_on_previous_text=False,without_timestamps=True,initial_prompt=None,max_new_tokens=limit)
+            text="".join(seg.text for seg in segments).strip()
         reference=job.get("reference") or job["text"]
         # 日语：稿面汉字与送 TTS 的假名各比一次取小——whisper 把「何と言った」写成「なんと言った」是写法不同，不是念错。
         cer=Cer(text,reference)

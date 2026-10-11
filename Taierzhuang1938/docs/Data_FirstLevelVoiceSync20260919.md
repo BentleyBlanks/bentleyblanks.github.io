@@ -150,6 +150,17 @@
 - **口型轨**：`Script_FirstLevelFaceTrackBake.py --lines` 新增 `BunkerRunnerCall.01/.02` 两条，原有 198 条一字未动；`Data_FaceTrackPhonemes` 补了「罗 luo」。
 - **与 §0.11 / §0.12 合并时**（同日两条分支都补了 `Data_FaceTrackPhonemes`）：按合并后的音素表把逐句口型轨整体重烘（`--lines`），相对 master 只多 `BunkerRunnerCall.01/.02` 两条，其余一字未动。
 
+### 0.14 2026-10-11 01–02 按 Notion 新稿重写（契约 [Data_OpeningRedraft20261011Contract.md](Data_OpeningRedraft20261011Contract.md) §3）
+
+- **台词**：逐字取自 [Data_FirstLevelOpeningSource20261011.md](Data_FirstLevelOpeningSource20261011.md)。新场景 `BunkerCount` `BunkerLedger` `BunkerExit` `BunkerSweep` `CaptiveWoundTwist` `BayonetPractice` `RecruitCharge` `CaptiveHowl`；重写 `BunkerBanter` `CaptiveDragged` `CaptiveInterrogation` `ShunziFound` `RescueInterrogation`；下线 `CaptiveTaunt` `BunkerSearch`（`--prune`，连同逐字时间）。没改字的九场不重录。`comrade` 界面名「冬瓜」（键不变）。
+- **日语**：稿里只有中文，日语写法由 Voice 包定（`Data_FirstLevelJapaneseSpeech.mjs` 头注）：「丁。过来。」念「おい、しんぺい」；全段唯一的蔑称是割喉时嘟囔的「しなぶたが、よくなきやがる」。
+- **非词人声**（台词行 `vocal: true`）：`CaptiveWoundTwist` `RecruitCharge` `CaptiveHowl` 三场无字幕（`subtitle: ""` + 场景 `subtitles: false`），稿面「啊」「呃」只给 TTS 与口型轨；烘焙不按它判漏句、多念、念错，门禁照样要逐字核对记录。`RescueHeave.01` 同样标了 `vocal`（录音未动，补了基线上缺的核对记录）。
+- **口径**：日兵甲冷静、话短、不吼（强度 ≤ 0.5、不喊、句前句后不写笑，门禁核）；疯劲只给乙和翻译；笑写进 delivery 里演。要等动作的句子用契约 §3 冻结的导演事件（门禁逐句核）；集成追加 `CaptiveDragged.02` 等 `dragLanded`，乙在岔口的 `BayonetPractice.08` `RescueInterrogation.05` 远喊 +3 dB。翻译四句切句压快（tempo 1.15–1.3）。
+- **定妆音**：`ijaC` 按「老兵、低而稳」重录（F0 100 Hz；与日兵乙余弦 0.72，旧的也是 0.73）。`ijaA` `ijaD` 只改人设文字：ijaA 原定妆音本来就是平稳说话录的；ijaD 的定妆音绑着日军自主喊话，不动。
+- **烘焙脚本补的几处**：①说话人多于 3 个（参考音上限）时，没挂参考音的人在提示词里单独交代「用自己的嗓子、不借参考音」（只有 `BunkerBanter` 五个人，其余场景提示词逐字不变）；②第一句句首多念的半句剪掉（`BunkerBanter.01` 先嘟囔了一遍「多的没得」）；③whisper 在短句上吐回提示词「简体中文的句子」时去掉提示词重转（`Script_FirstLevelVoiceAlign.py`）；④`--prune` 一起删掉已下线片段的逐字时间。
+- **喊杀短句**：`Data_Voice` 新 kind `yell`（Script_Ai 不按这一类喊，只由导演按 key 点名）：`yell_sha` `yell_kan` `yell_chong` 各三份，分别挂守军 / 传令兵 / 担架员的定妆音（`Script_VoiceBake` 对中方句带 `voice` 时送 @音频1）；罗 / 何 / 刘本人的 `yell_sha@<who>` 是班组短句的另录条（`SQUAD_BARK_EXTRA_TAKES` 的 `luoYell` 等），两头各留 0.1 s 静音（只留 60 ms 时信噪比按吼声尾巴量、假低），时长上限 0.9 s（吼声本身 ≤ 0.7 s），压快上限 1.45。
+- **请求**：13 场共 21 次（含 5 句单句补录），`BunkerBanter` 用了 5 次（超出每场 3 次：五个说话人只能挂三条参考音，第一次生成里幺娃、何有田借了刘文财、冬瓜的嗓子；改提示词后两次生成仍各有一句，按 §0.3 第 4 条补录了 `.08` `.12`）。定妆 2 次，喊杀公用 11 次、本人 9 次。逐场数字与要人工试听的句子见本轮 Voice 报告。
+
 ## 1. 一句话口径（旧整段格式：07–18 与待下线的 09.21 旧 cue）
 
 - 一段连续多人对白 = **一个 cue = 一次 SeedAudio 请求 = 一条 mp3**。动作打断处不拆音频，在提示词里写明停顿时长让模型留空当，再用 `VoiceTiming` 的事件把动作对上去。
