@@ -167,3 +167,14 @@
 - **工具**：`RaRotatePose`（按站姿写好的平面姿态整体翻转成趴/侧躺：位置、骨盆、脊柱/颈/头的世界轴倾斜按共轭换算，脚角换成 `toeDir`）；`RaYaw`（整身绕骨盆转向，抓握点一起转到世界，`framedGrips`）；`RaR3Spec`（R3 坡上任意角色的地面/板墙/审片，`SlashGroundSpec` 只认 ijaA）。
 - **测试**：`Script_OpeningClipsBrowserTest` 里带 `blade` + `stab` 接触的 clip 用上了刺刀的步枪播（导演生成乙时同样要 `bayonetFixed`）。`Script_OpeningActorPerformance` 的 `ContactClips` 加了这 20 条（手里拿东西、成对动作，不叠说话手势）。
 - **实测**（烘焙报告，运行时米）：脚滑 ≤ 1.0 cm、接触误差 ≤ 2.3 cm、穿墙 ≤ 1.6 cm、膝盖 ≤ 0.9 cm、骨盆单帧 ≤ 0.2 m；四肢绕自身轴单帧最大仍是旧的 61°（`IjaVaultTimberOut`），新 clip 没有更大的。浏览器审片（正式 GLB）：脚滑 ≤ 1.0 cm；`sweepStomp` 刺刀到 `backStab` 2.5 cm、两人四肢最深 7.7 cm、躯干/头 0；`tearBadge` 握点 0.4 cm、4.9 cm / 0；`thumbWound` 0.6 cm、0 / 0；`breadToss` 0 / 0。
+## 12. 2026-10-11 开场改稿 AnimB（练刺刀、背后割喉、擦刀卡枪、补刀、踩手、划脸、端枪、咬销）
+
+契约 [Data_OpeningRedraft20261011Contract.md](Data_OpeningRedraft20261011Contract.md) §4.2 的 B 行。代码在 `_import/Script_OpeningStoryboardClips.py` 文件末尾 `# ==== 2026-10-11 redraft B ====` 块；manifest `20261011OpeningStoryboardsV24Redraft`；可编辑工程与伙伴轨在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningRedraft_20261011_B`（伙伴轨起点拷自 `OpeningWoundedRescue_20260930`）。
+
+- **复用了什么**：割喉的拳握刀（`FistKnife`/`CloseFist`）、刀身与脖子相切（`NeckBlade`）和 `SLASH_DRAW` 拉割节奏原样用，只把左右镜像（甲站在身后，刀从喉咙左侧拉到右侧，朝自己拉）；拔刀用 `IjaDrawBayonet` 的十字拔刀、拳中翻刀（`ScabbardKnife`/`GripTurn`/`CarryPalm`），并进了 `IjaHairLiftKneeBack` 开头（原 `IjaDrawBayonet` 的左拳揪在旧跪位川军头发上，不能接在蜷着的人身后播）；两刀的蓄力—刺出—停—拔的节奏取自 `IjaBayonetDownThrust`；`IjaBootOnHand` 末帧就是 `IjaCrouchHairHold` 第 0 帧（蹲下不挪脚）；`IjaGrenadeBitePin` 第 0 帧就是 `IjaShotStaggerAway` 的保持帧；丁的起手是 `IjaReadyRifle` 末帧（为此 `IjaReadyRifle` 也烘到了 IJA03）。
+- **新接触部位**（`CONTACT_POINTS`）：`cheekR`/`cheekL`（脸颊）、`shoulderFrontL`（左肩前，第一刀）、`bellyFront`（第二刀）、`lowerBack`（膝顶处）、`upperArmL`（擦刀的绷带）。
+- **站位**（stage，锚点川军 = R3 = `CaptiveKneelMud` 的根，朝南）：`recruitSlap`（锚点丁）、`recruitThrust`（丁在 R3 东南 1.2 m 朝他左肩前）、`hairLift`/`kneeCut`/`bandageWipe`（甲在川军身后、板墙前 (0.02, 0.16)，朝西南）。川军被扎后转向西南、右侧着地蜷在 R3 西南 0.35/0.30 m；提起后跪着面朝西南（喉咙朝眼位），割后往前扑倒，腿往他右边拖（甲往左边让开）。
+- **链**：川军 `CaptiveKneelMud`→`CaptiveStabbedCurl`（保持循环起点）→`CaptiveCurledPulledUp`（保持循环起点）→`CaptiveThroatCutForward`；甲 `IjaHairLiftKneeBack`（保持循环起点）→`IjaThroatCutKneeShove`→`IjaWipeBandageFixBayonet`→`IjaFinishWalkStab`（可接自己）→`IjaBootOnHand`→`IjaCrouchHairHold`；丁 `IjaReadyRifle`→`IjaRecruitSlapped`→`IjaRecruitChargeThrust`，`IjaRecruitCheekCut`→`IjaRecruitLevelRifle`。逐骨交接实测：川军三处、丁四处、甲 割前→割、割→擦刀、踩手→蹲 ≤1.2°/0 cm；擦刀→补刀、补刀自接、补刀→踩手 3.6°（种子不同，导演 0.12 s 混合盖住）。
+- **烘焙要点**：蜷倒时腿要随胯一起转（留在坡上让胯翻过去，两条大腿一帧 178° 换支）；保持循环开始前所有动作要收完（丁最后一步、端枪的下蹲曾进循环窗，接缝 9°/8 cm）；甲在割后、擦刀时都要从尸体腿边让开（浏览器穿插 10–20 cm 的来源）。
+- **验收实测**（本轮）：`Script_OpeningStoryboardsTest` 全过（四肢绕自身轴最大仍是旧的 61°，B 段最大 30°）；`Script_OpeningClipsBrowserTest --clip=<B 十四条>` 全过：成对穿插最大 8.0 cm（四肢，揪发时的前臂），躯干/头 0 cm；揪发 2.5 cm、割 0.2 cm、擦刀 0.7–0.8 cm、反手耳光 0.8 cm；烘焙探针刺入肩/腹 0.0 cm、刀抵左颊 0.02 cm、刀尖悬背 0.0 cm、端枪对眼 0.4 cm。
+- **没做**：`NraShotTumbleSteps`（P1）未烘，导演用受击物理方向死亡替身（契约 §4.2 允许）。钢盔是头部蒙皮，丁挨耳光后「钢盔歪」做不出来，只做了左手扶钢盔。

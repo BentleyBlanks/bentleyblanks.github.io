@@ -37,7 +37,12 @@ const ContactClips=new Set(["LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle"
   "IjaChoppedFallBack",
   // 2026-09-30 self rescue: the three shot in the arm (hand on the wound, the arm hanging), Luo snatching up the rifle and
   // shoving it into Shunzi's hands (his face on the kneeling man's inside the clip).
-  "IjaShotStaggerAway","IjaShotDropRifle","InterpreterShotStagger","LuoGrabRifleShove"]);
+  "IjaShotStaggerAway","IjaShotDropRifle","InterpreterShotStagger","LuoGrabRifleShove",
+  // 2026-10-11 redraft (AnimB): the slap, the thrusts, the hair lift and the cut, the wipe and the fixed bayonet, the finishing
+  // stabs, the boot on the hand, the cheek cut and the levelled rifle, the grenade pin (hands on the partner, the rifle, the knife).
+  "IjaSlapRecruit","IjaRecruitSlapped","IjaRecruitChargeThrust","CaptiveStabbedCurl","IjaHairLiftKneeBack","CaptiveCurledPulledUp",
+  "IjaThroatCutKneeShove","CaptiveThroatCutForward","IjaWipeBandageFixBayonet","IjaFinishWalkStab","IjaBootOnHand",
+  "IjaRecruitCheekCut","IjaRecruitLevelRifle","IjaGrenadeBitePin"]);
 // Clips whose face is aimed at the first-person eye inside the clip (listed with ContactClips above) or whose
 // hands follow Shunzi's body track: held-pose life keeps their head nearly where the clip put it.
 const FaceAimedClips=new Set(["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
