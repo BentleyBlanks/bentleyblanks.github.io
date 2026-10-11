@@ -26,6 +26,8 @@
 //      在 [t, untilT] 里握点到那一点 ≤ 3 cm、臂长比 ≤ 1.05。
 //  10) 单帧突跳（ROUND_0925 里的 clip）：任一骨头相邻两帧的世界旋转 > 25° 且大于前后两帧各自的 2.5 倍，算一跳。
 //      基线就有的跳按「clip + 骨 + 时刻」逐条豁免（SPIKE_EXEMPT，写明出处），同一条 clip 别处的跳照样算。
+//  11) 自带地面剖面的 clip（manifest ground.profile：[[根后方米, 离根处地面的高米], …]，2026-10-12 IjaDropIn* 从北沟沿跳下）：
+//      每只脚的鞋底（脚和脚趾蒙皮顶点）到剖面的最小距离，在 bake 声明的着地窗口里 |离地| ≤ 3 cm，任何一帧都不进地面 3 cm 以上。
 //  8b) 上半身 clip（manifest upperBody:true，InterpreterHurryReach）导演不写 upperBody 时默认叠在原生腿上：
 //      腿等于同一时钟下不放 clip 的原生走路，胳膊等于 clip 采样；显式 upperBody:false 时腿是 clip 自己的站姿。
 //      导演要的 clip 这套骨架上没烘：退回原生动作，但按名字记一次（OpeningMissingClips / window.__openingMissingClips）。
@@ -60,7 +62,9 @@ const LIMIT = { footM: .02, kneeM: .02, wallM: .03, contactM: .03, boneRatio: .0
   reachGapM: .05,
   // 10) a one-frame spike: a bone's world rotation between two frames over jumpDeg and over
   // jumpRatio times both neighbouring steps
-  jumpDeg: 25, jumpRatio: 2.5 };
+  jumpDeg: 25, jumpRatio: 2.5,
+  // 11) a sole on the clip's own ground profile: within this of it in a plant window, never deeper than this into it
+  groundM: .03 };
 // The storyboard round's clips (contract Data_FirstLevelStoryboard0103Contract.md §4.1): the spike
 // check (10) runs on these; older clips were reviewed before it existed (IjaParriedChoppedFall, whose
 // first frame this round re-authored, keeps the 2026-09-23 right-forearm snap at 0.83 s: 60° world,
@@ -88,6 +92,8 @@ const WALL_REGIONS = {
   shoulderBack: ["spine2", "lclavicle", "rclavicle"], back: ["spine1", "spine2"], shoulderL: ["lclavicle", "lupperarm"],
   shoulderR: ["rclavicle", "rupperarm"], head: ["head"], handL: ["lhand", "lfinger"], handR: ["rhand", "rfinger"],
   hips: ["pelvis", "spine"], feet: ["lfoot", "rfoot", "ltoe0", "rtoe0"], calves: ["lcalf", "rcalf"],
+  // 11) the soles on a clip's own ground profile (one foot each)
+  footL: ["lfoot", "ltoe0"], footR: ["rfoot", "rtoe0"],
 };
 
 const server = await ServeRoot(rootDir, 0);
@@ -362,6 +368,26 @@ try {
       }
       return best;
     };
+    // 11) Lowest skin of one region over the clip's ground profile (runtime metres, negative = in the ground): the profile is
+    // [[behind, up], ...] in the actor frame (behind = +z), piecewise linear, flat past its ends.
+    state.ProfileAt = (profile, d) => {
+      if (d <= profile[0][0]) return profile[0][1];
+      for (let i = 1; i < profile.length; i++) if (d <= profile[i][0]) {
+        const [d0, h0] = profile[i - 1], [d1, h1] = profile[i];
+        return h0 + (h1 - h0) * (d - d0) / (d1 - d0);
+      }
+      return profile[profile.length - 1][1];
+    };
+    state.GroundGap = (e, region, profile) => {
+      state.RegionGap(e, region, null);                   // picks (and caches) the region's vertices
+      let best = Infinity; const v = V();
+      const inverse = new THREE.Matrix4().copy(e.actor.root.matrixWorld).invert();
+      for (const mesh of e.skinned) for (const i of e.regionVerts.get(mesh)?.get(region) || []) {
+        mesh.getVertexPosition(i, v); v.applyMatrix4(mesh.matrixWorld).applyMatrix4(inverse);
+        best = Math.min(best, v.y - state.ProfileAt(profile, v.z));
+      }
+      return best;
+    };
     const clips = Object.entries(library.config.clips).filter(([, m]) => !m.legacy && m.rig).map(([name, m]) => ({ name, rig: m.rig, role: m.role, duration: m.duration,
       contacts: m.contacts || [], env: m.env || null, stage: m.stage || null, player: m.player === true, retired: !!m.retired }));
     return { clips, stages: library.config.stages, fps: library.config.fps };
@@ -381,7 +407,8 @@ try {
       const plants = report.plants || [], kneePlants = report.kneePlants || [];
       const wallRows = (clip.contacts || []).filter(c => c.target === "wall" && c.action !== "release").map(c => ({ limb: c.limb, t0: c.t, t1: c.untilT ?? c.t, max: -Infinity, min: Infinity }));
       const frames = Math.round(clip.duration * fps) + 1;
-      const feet = [], ratios = [], knees = [];
+      const feet = [], ratios = [], knees = [], soles = [];
+      const profile = s.library.config.clips[clip.name]?.ground?.profile;
       let finite = true;
       s.Pose(0, true);
       for (let f = 0; f < frames; f++) {
@@ -391,6 +418,7 @@ try {
         feet.push({ t, L: [b.footL.getWorldPosition(new THREE.Vector3()), e.toes.L?.getWorldPosition(new THREE.Vector3())],
           R: [b.footR.getWorldPosition(new THREE.Vector3()), e.toes.R?.getWorldPosition(new THREE.Vector3())] });
         knees.push({ t, L: e.knees.L?.getWorldPosition(new THREE.Vector3()), R: e.knees.R?.getWorldPosition(new THREE.Vector3()) });
+        if (profile) soles.push({ t, L: s.GroundGap(e, "footL", profile), R: s.GroundGap(e, "footR", profile) });
         // Every second frame inside the window, and the frames nearest its ends (a single-instant
         // contact such as a palm slapped on the wall is the frame nearest that instant).
         for (const w of wallRows) if (t >= w.t0 - .5 / fps && t <= w.t1 + .5 / fps && (f % 2 === 0 || Math.abs(t - w.t0) <= .5 / fps || Math.abs(t - w.t1) <= .5 / fps)) {
@@ -422,6 +450,17 @@ try {
         const win = knees.filter(r => r.t >= t0 - 1e-6 && r.t <= t1 + 1e-6 && r[side]);
         for (const r of win) { const d = r[side].distanceTo(win[0][side]); if (d > kneeM) { kneeM = d; kneeAt = `${side}@${r.t.toFixed(2)}`; } }
       }
+      // 11) soles on the clip's ground profile: off it in a plant window, into it anywhere
+      let groundOff = 0, groundOffAt = null, groundIn = Infinity, groundInAt = null, groundFrame0 = null;
+      if (profile) {
+        groundFrame0 = { L: soles[0].L, R: soles[0].R };
+        for (const r of soles) for (const side of ["L", "R"]) {
+          if (r[side] < groundIn) { groundIn = r[side]; groundInAt = `${side}@${r.t.toFixed(2)}`; }
+          if (plants.some(([p, t0, t1]) => p === side && r.t >= t0 - 1e-6 && r.t <= t1 + 1e-6) && Math.abs(r[side]) > groundOff) {
+            groundOff = Math.abs(r[side]); groundOffAt = `${side}@${r.t.toFixed(2)} ${(r[side] * 100).toFixed(1)}`;
+          }
+        }
+      }
       const all = ratios.flat().sort((a, b) => a - b), median = all[all.length >> 1] || 1;
       let boneDev = 0, boneAt = null;
       ratios.forEach((row, f) => row.forEach((r, i) => { const d = Math.abs(r / median - 1); if (d > boneDev) { boneDev = d; boneAt = `${e.pairs[i].bone.name}@${(f / fps).toFixed(2)}`; } }));
@@ -441,15 +480,18 @@ try {
       });
       return { clip: clip.name, rig: clip.rig, frames, plants: plants.length, footM, footAt, kneePlants: kneePlants.length, kneeM, kneeAt,
         walls: wallRows.map(w => ({ limb: w.limb, t0: w.t0, t1: w.t1, max: w.max, min: w.min, samples: w.samples || 0 })), boneDev, boneAt, finite,
-        spikes, jumps, jumpAt, worstTurn, worstTurnAt, exempted };
+        spikes, jumps, jumpAt, worstTurn, worstTurnAt, exempted, profile: !!profile, groundOff, groundOffAt, groundIn, groundInAt, groundFrame0 };
     }, { clip, fps: plan.fps, spikes: ROUND_0925.has(clip.name), LIMIT, exempt: SPIKE_EXEMPT.filter(x => x.clip === clip.name) });
     clipRows.push(row);
     const wallBad = row.walls.some(w => !w.samples || !(w.max <= LIMIT.wallM) || !(w.min >= -LIMIT.wallM));
-    const bad = row.footM > LIMIT.footM || row.kneeM > LIMIT.kneeM || wallBad || row.boneDev > LIMIT.boneRatio || !row.finite || row.jumps > 0;
+    const groundBad = row.profile && (!(row.groundOff <= LIMIT.groundM) || !(row.groundIn >= -LIMIT.groundM));
+    const bad = row.footM > LIMIT.footM || row.kneeM > LIMIT.kneeM || wallBad || row.boneDev > LIMIT.boneRatio || !row.finite || row.jumps > 0 || groundBad;
     if (bad) failed++;
     console.log(`${bad ? "FAIL" : "ok  "} ${row.clip.padEnd(24)} ${row.rig} foot ${(row.footM * 100).toFixed(2)} cm (${row.plants} plants, ${row.footAt || "-"})`
       + (row.kneePlants ? ` knee ${(row.kneeM * 100).toFixed(2)} cm (${row.kneeAt || "-"})` : "")
       + row.walls.map(w => ` wall ${w.limb} ${w.t0}-${w.t1}s ${(w.min * 100).toFixed(1)}..${(w.max * 100).toFixed(1)} cm`).join("")
+      + (row.profile ? ` ground: frame 0 L ${(row.groundFrame0.L * 100).toFixed(1)} R ${(row.groundFrame0.R * 100).toFixed(1)} cm, planted off ≤ ${(row.groundOff * 100).toFixed(1)} cm (${row.groundOffAt || "-"}),`
+        + ` deepest ${(row.groundIn * 100).toFixed(1)} cm (${row.groundInAt || "-"})` : "")
       + ` bone ${(row.boneDev * 100).toFixed(2)}% (${row.boneAt || "-"}) finite ${row.finite}`
       + (row.spikes ? ` spikes ${row.jumps}${row.jumpAt ? ` (${row.jumpAt})` : ""}${row.exempted ? ` (+${row.exempted} exempted, SPIKE_EXEMPT)` : ""} largest step ${row.worstTurn.toFixed(0)}° (${row.worstTurnAt || "-"})` : ""));
     if (shots) {
