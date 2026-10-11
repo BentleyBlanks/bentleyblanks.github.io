@@ -1214,6 +1214,35 @@ function FakeVfx() {
     assert.ok(Math.abs(size.x - 0.05) < 0.002 && Math.abs(size.y - 0.05) < 0.002 && size.z > 0.11 && size.z < 0.135, `Type 91: 5 cm across, 9.5 cm body + fuse along -Z (${size.toArray().map((v) => v.toFixed(3))})`);
     b.geometries.forEach((x) => x.dispose()); b.materials.forEach((x) => x.dispose()); }
 
+  // 歪把子替身：MountLmg 把 type11 的两脚架落在上面那具垫尸背上（MgGunRest），枪口朝后沟折角 RC。工厂用一个假的（只给几何与材质）。
+  {
+    const steel = new THREE.MeshStandardMaterial(), factory = { WeaponGeometry: () => ({ geometries: new Map([["steel", new THREE.BoxGeometry(0.06, 0.08, 1.1).translate(0, 0.035, -0.3)]]), muzzle: new THREE.Vector3(0, 0.035, -0.85) }),
+      ActorMaterials: () => ({ steel }) };
+    const s3 = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: GG, corpseSource: (k) => protos[k], actorFactory: factory });
+    s3.Update(1 / 60, "BunkerRescue", "Hold", { collapsed: true, blastAge: null });
+    const h = s3.MountLmg(), rest = s3.MgGunRest(), foot = h.object.userData.bipodFoot.clone().applyMatrix4(h.object.matrixWorld);
+    const muzzle = new THREE.Vector3(0, 0.035, -0.85).applyMatrix4(h.object.matrixWorld), grip = h.object.getWorldPosition(new THREE.Vector3());
+    const aim = new THREE.Vector3(M.mg.aimAt.x - grip.x, 0, M.mg.aimAt.z - grip.z).normalize(), dir = muzzle.clone().sub(grip).setY(0).normalize();
+    report.redraft.lmg = { footToRestM: +foot.distanceTo(new THREE.Vector3(rest.x, rest.y, rest.z)).toFixed(3), aimDeg: +(Math.acos(Math.min(1, dir.dot(aim))) / DEG).toFixed(1) };
+    assert.ok(report.redraft.lmg.footToRestM < 0.01 && report.redraft.lmg.aimDeg < 1, `MountLmg: the bipod stands on the upper body, muzzle toward RC ${JSON.stringify(report.redraft.lmg)}`);
+    s3.Exit();
+  }
+  // 折角爆点：vfx.Explosion（闪光 + 火团 + 尘环）+ 一小撮定向喷土 + 冒 emitS 秒的土黄烟（到点收发射器；离开 01–02 也收）。不伤人：只碰 vfx。
+  {
+    const { FOLD_BLAST } = await import("./Data_OpeningSet0103.mjs");
+    const fake = FakeVfx(), explosions = []; fake.Explosion = (p, o) => explosions.push({ p: p.clone(), ...o });
+    const s4 = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: GG, corpseSource: (k) => protos[k], vfx: fake });
+    s4.Update(1 / 60, "Trapped", "DropIn", { collapsed: true, blastAge: 20 });
+    const at = s4.FoldBlast(), live = () => [...fake.log.sources.values()].filter((x) => Math.hypot(x.position.x - at.x, x.position.z - at.z) < 0.1).length;
+    for (let k = 0; k < 40; k++) { fake.time += 1 / 60; s4.blastFx.Update(1 / 60); }
+    assert.ok(explosions.length === 1 && Math.hypot(explosions[0].p.x - M.dropIn.foldBlast.x, explosions[0].p.z - M.dropIn.foldBlast.z) < 1e-6 && explosions[0].radius === FOLD_BLAST.explosion.radius, "FoldBlast: one explosion visual at dropIn.foldBlast");
+    assert.ok(fake.log.debris.length > 0 && live() === 1, "FoldBlast: dirt thrown up and a smoke column rising");
+    for (let t = 0; t < FOLD_BLAST.smoke.emitS + 0.1; t += 1 / 30) s4.Update(1 / 30, "Trapped", "DropIn", { collapsed: true, blastAge: 20 });
+    assert.equal(live(), 0, "FoldBlast: the smoke emitter is retired after emitS (its puffs drift on)");
+    s4.FoldBlast(); s4.Update(1 / 60, "Support", null, { collapsed: true, blastAge: 60 });
+    assert.equal(live(), 0, "leaving 01–02 retires a live fold-blast smoke emitter");
+    s4.Exit();
+  }
   // ---- 6h. 三角形预算（≤ 60k）：尸体按原型实测三角形数（BODY_POSES.triangles，第 tier 档）+ 本页建出的程序化道具
   //      + 两支现成武器模型（Model_*.tzm.json 的 triangles）+ 弹药箱 GLB 那一个节点（按 accessor 数）。浏览器里另量实际建出的（报告）。
   const corpseTriangles = CORPSES.reduce((sum, row) => sum + BODY_POSES[row.mark.pose].triangles[row.mark.tier ?? 0], 0);

@@ -561,14 +561,17 @@ function WeaponObject(owned, spec, ctx) {
   const muzzle = built.muzzle?.clone?.() || new THREE.Vector3(0, 0.035, -1);
   if (spec.bipod) {
     const b = spec.bipod, steel = materials.steel || PropMaterial(owned, { color: 0x333331, metalness: 0.7, roughness: 0.5 });
-    const top = new THREE.Vector3(0, muzzle.y - 0.012, muzzle.z + b.fromMuzzleM);
+    const top = new THREE.Vector3(0, muzzle.y - 0.012, muzzle.z + b.fromMuzzleM), feet = [];
     for (const side of [-1, 1]) {
       const dir = new THREE.Vector3(side * Math.sin(b.spreadDeg / 2 * DEG), -Math.cos(b.rakeDeg * DEG), -Math.sin(b.rakeDeg * DEG)).normalize();
       const leg = PropMesh(owned, new THREE.CylinderGeometry(b.radiusM, b.radiusM * 0.8, b.legM, 6), steel, "OpeningProp_Type11Bipod");
       leg.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
       leg.position.copy(top).addScaledVector(dir, b.legM / 2);
       group.add(leg);
+      feet.push(top.clone().addScaledVector(dir, b.legM));
     }
+    // 两只脚的中点（局部）：PlaceOnBipod 把它放到垫尸背上。
+    group.userData.bipodFoot = feet[0].add(feet[1]).multiplyScalar(0.5);
   }
   return { group, axis: muzzle.lengthSq() > 1e-8 ? new THREE.Vector3(0, 0, Math.sign(muzzle.z) || -1) : new THREE.Vector3(0, 0, -1) };
 }
@@ -621,6 +624,7 @@ const ActorOf = (who) => who?.actor || who || null;
  *   props.Toss(name, { from, to, seconds, arcM, bounces, bounceM, rollM, rollS, onBounce, onRest })
  *                                                     抛物线飞到 to 前 rollM 落地、弹 bounces 下、滚 rollM 停在 to
  *   props.AttachTo(name, object3D, { x, y, z, yawDeg, pitchDeg, rollDeg })   挂到别的物体上（便服挂背包）
+ *   props.PlaceOnBipod("type11", rest, { yawDeg })   歪把子两脚架落在 rest（垫尸背上；OpeningSet.MountLmg 替导演算好）
  *   props.Show(name) / props.Hide(name) / props.Where(name)
  * 导演碰过的道具（以上任一调用）不再按数据的 rest 自动摆（Script_OpeningSet.UpdateRedraft）。
  */
@@ -732,6 +736,20 @@ export class OpeningWorldProps {
     h.holder = null; h.toss = null; h.state = "attached";
     h.attach = { target: object3D, offset: new THREE.Vector3(x, y, z), rot: new THREE.Quaternion().setFromEuler(new THREE.Euler(pitchDeg * DEG, yawDeg * DEG, rollDeg * DEG, "YXZ")) };
     this.FollowAttach(h);
+    return h;
+  }
+
+  /**
+   * 歪把子架在两脚架上：两只脚的中点落在 rest（世界点，例如 OpeningSet.MgGunRest()），枪身水平、枪口朝 yawDeg。
+   */
+  PlaceOnBipod(name, rest, { yawDeg = 0 } = {}) {
+    const h = this.Direct(name), foot = h.object.userData.bipodFoot;
+    if (!foot) throw new Error(`OpeningWorldProps.PlaceOnBipod: ${name} has no bipod`);
+    h.holder = null; h.attach = null; h.toss = null; h.state = "world";
+    h.object.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawDeg * DEG); h.object.scale.setScalar(1);
+    h.object.position.set(rest.x, rest.y, rest.z).sub(foot.clone().applyQuaternion(h.object.quaternion));
+    h.object.updateMatrixWorld(true); h.object.visible = true;
+    h.at = { x: h.object.position.x, z: h.object.position.z, y: h.object.position.y, yawDeg };
     return h;
   }
 

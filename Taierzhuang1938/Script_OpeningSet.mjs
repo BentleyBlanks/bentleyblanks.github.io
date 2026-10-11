@@ -31,7 +31,7 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 //   r.openingSet.props                      OpeningWorldProps（Script_OpeningProps）：Get / Place / Hold / Release / Toss / AttachTo / Where
 //   r.openingSet.PlaceCorpse(id, spec)      id "mg.corpseLower" / "mg.corpseUpper"；spec { pose: "start"|"floor"|"onLip"|"stacked",
 //                                           x, z, headYawDeg, liftM, settle }（不给坐标就用该 pose 的标记）
-//   r.openingSet.CorpseInfo(id) / JoltCorpse(id) / MgGunRest() / FoldBlast()
+//   r.openingSet.CorpseInfo(id) / JoltCorpse(id) / MgGunRest() / MountLmg() / FoldBlast()
 // 尸体几何借战场尸体层（宿主传 aftermath 取值器）；道具里的武器要工厂（宿主传 actorFactory）。
 // ===========================================================================
 import * as THREE from "three";
@@ -46,7 +46,7 @@ import { SandbagRunPlacements } from "./Data_SandbagStandard.mjs";
 import { OpeningBlastFx } from "./Script_OpeningBlastFx.mjs";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
 import { TERRAIN_MUD_ZONE } from "./Data_Tuning_Terrain.mjs";
-import { REDRAFT_STAGES, SET_MARKS, CORPSES, BODY_POSES, REDRAFT_PROPS, FOLD_BLAST, MG_AUTO_PLACE_FROM, CORPSE_JOLT } from "./Data_OpeningSet0103.mjs";
+import { PropFootprints, REDRAFT_STAGES, SET_MARKS, CORPSES, BODY_POSES, REDRAFT_PROPS, FOLD_BLAST, MG_AUTO_PLACE_FROM, CORPSE_JOLT } from "./Data_OpeningSet0103.mjs";
 import { OpeningWorldProps } from "./Script_OpeningProps.mjs";
 import { CreateBodyContactShape, MissionBodySupport } from "./Script_FirstLevelMissionBodySupport.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
@@ -337,6 +337,7 @@ export class OpeningSet {
     if (!r) return;
     r.props.Dispose();
     r.corpses?.Dispose();
+    if (r.foldSmoke) this.vfx?.RemoveSmokeSource(r.foldSmoke.handle);
     r.root.removeFromParent();
     this.redraft = null;
   }
@@ -351,10 +352,26 @@ export class OpeningSet {
   TryBuildCorpses() {
     const r = this.redraft;
     if (!r || r.corpses) return !!r?.corpses;
-    const corpses = new OpeningCorpses({ parent: r.root, groundAt: this.groundAt, source: (key) => this.CorpseSource(key) });
+    const corpses = new OpeningCorpses({ parent: r.root, groundAt: (x, z) => this.CorpseGround(x, z), source: (key) => this.CorpseSource(key) });
     if (!corpses.Build(CORPSES)) { corpses.Dispose(); return false; }
     r.corpses = corpses;
     return true;
+  }
+
+  /**
+   * 尸体的支撑面：共享地面，再加上脚下踩的布景（铺板、贴地的断木板：PropFootprints 的 walkable 盒）——尸体躺在铺板上，
+   * 不是把铺板吞进身体里（实拍：finish.bodies[0] 压在前沟铺板与断木板上）。
+   */
+  CorpseGround(x, z) {
+    const ground = this.groundAt(x, z);
+    this.walkBoxes ??= PROPS.filter((p) => !p.show || p.show === "collapsed").flatMap((p) => PropFootprints(p).filter((b) => b.walkable).map((b) => ({ ...b, ground: p.ground })));
+    let top = ground;
+    for (const b of this.walkBoxes) {
+      const c = Math.cos(b.ry), sn = Math.sin(b.ry), dx = x - b.x, dz = z - b.z;
+      if (Math.abs(dx * c - dz * sn) > b.w / 2 || Math.abs(dx * sn + dz * c) > b.d / 2) continue;
+      top = Math.max(top, (b.ground ? this.groundAt(b.ground.x, b.ground.z) : ground) + b.y1);
+    }
+    return top;
   }
 
   /** 01 的导演拍到没到 `name`（按 phase 表的先后；02 / 撤离一律算到了；01 没有 phase 时看 fallback）。 */
@@ -388,6 +405,7 @@ export class OpeningSet {
       if (shown) r.props.RestAt(name, spec.rest); else r.props.RestOff(name);
     }
     r.props.Update(dt);
+    if (r.foldSmoke && (r.foldSmoke.t += dt) >= FOLD_BLAST.smoke.emitS) { this.vfx?.RemoveSmokeSource(r.foldSmoke.handle); r.foldSmoke = null; }
   }
 
   /**
@@ -408,6 +426,17 @@ export class OpeningSet {
       liftM: spec.liftM ?? 0, settle: spec.settle ?? true, on, pose });
   }
 
+  /**
+   * 歪把子（props 的 type11）架到垫尸背上：两脚架落在 MgGunRest()，枪口朝 SET_MARKS.mg.aimAt（后沟折角 RC）。
+   * 替身用（IjaProneLmgOnCorpse 烘出来之前）；有 clip 轨时由 clip 摆。返回道具句柄，垫尸还没建好时 null。
+   */
+  MountLmg({ yawDeg = null } = {}) {
+    const rest = this.MgGunRest(), props = this.props;
+    if (!rest || !props) return null;
+    const aim = SET_MARKS.mg.aimAt, yaw = yawDeg ?? Math.atan2(-(aim.x - rest.x), -(aim.z - rest.z)) / DEG;
+    return props.PlaceOnBipod("type11", rest, { yawDeg: yaw });
+  }
+
   CorpseInfo(id) { return this.redraft?.corpses ? this.redraft.corpses.Body(id) : null; }
   /** 点射时垫尸一颤（CORPSE_JOLT：2 cm、0.18 s）。 */
   JoltCorpse(id = "mg.corpseUpper") { this.redraft?.corpses?.Jolt(id); }
@@ -425,6 +454,12 @@ export class OpeningSet {
     this.blastFx?.DirectionalBlast({ x: at.x, y: ground + (lo + hi) / 2, z: at.z }, d.dir,
       { heightM: (hi - lo) / 2, groundY: ground, clods: d.clods, splinters: d.splinters, grit: d.grit, spray: d.spray, mist: d.mist, dust: d.dust,
         seconds: d.seconds, spreadRad: d.spreadRad, speed: d.speed });
+    const sm = FOLD_BLAST.smoke;
+    if (this.vfx?.SmokeSource && this.redraft) {
+      if (this.redraft.foldSmoke) this.vfx.RemoveSmokeSource(this.redraft.foldSmoke.handle);
+      this.redraft.foldSmoke = { t: 0, handle: this.vfx.SmokeSource({ x: p.x, y: ground + 0.4, z: p.z }, { kind: sm.kind, rate: sm.rate, radius: sm.radius, rise: sm.rise,
+        sizeStart: sm.sizeStart, sizeEnd: sm.sizeEnd, life: sm.life, opacity: sm.opacity, light: false }) };
+    }
     if (this.redraft) this.redraft.foldBlasts = (this.redraft.foldBlasts || 0) + 1;
     return p;
   }

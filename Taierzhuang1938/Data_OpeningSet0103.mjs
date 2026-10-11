@@ -155,7 +155,9 @@ export const PROPS = Object.freeze([
   // 仰拍时在画面左下框景（右上的断木由 fallenLintel 承担）。全部贴地（离地 < 0.16 m），拖人、踢枪都能踩过去。
   { id: "plankDebrisButt", kind: "planks", planks: Object.freeze([
     Object.freeze({ x: 1.95, z: -124.6, lift: 0.05, len: 1.2, w: 0.2, t: 0.05, yawDeg: 62, pitchDeg: 2, rollDeg: 8 }),
-    Object.freeze({ x: 2.8, z: -123.95, lift: 0.05, len: 1.0, w: 0.18, t: 0.05, yawDeg: -24, pitchDeg: -3, rollDeg: -6 }),
+    // 2026-10-11 重构：南移 0.35 m（原 (2.8,-123.95)）。finish.bodies[0] (3.3,-124.55) 趴在铺板上，这块板的北头垫在它身下、把整具尸体
+    // 撬起 6° 悬着（实拍 tmp/set/shots/Set_EyeEast_Clear）。
+    Object.freeze({ x: 2.85, z: -123.6, lift: 0.05, len: 1.0, w: 0.18, t: 0.05, yawDeg: -24, pitchDeg: -3, rollDeg: -6 }),
     Object.freeze({ x: 2.15, z: -123.72, lift: 0.06, len: 0.9, w: 0.16, t: 0.04, yawDeg: 118, pitchDeg: 4, rollDeg: 12 }),
   ]) },
 
@@ -734,10 +736,13 @@ export const REDRAFT_PROPS = Object.freeze({
 /**
  * 折角爆点的画面（Script_OpeningSet.FoldBlast：只给闪光、烟、落土，不伤人、不出声——声音归 Sfx/Dir）。
  * explosion：vfx.Explosion 的半径与种类（中心强光 + 火团 + 贴地尘环 + 碎块）；dirt：从爆点往上、往西甩过沟沿的土
- * （OpeningBlastFx 的定向喷土，规模小得多）。
+ * （OpeningBlastFx 的定向喷土，规模小得多）；smoke：爆后冒 emitS 秒的一股土黄烟（vfx.SmokeSource，到点收掉发射器、烟团照常散）——
+ * 爆点在沟底、拐角背后，眼位贴地看不见火团本身（测试 6e），要靠这股烟在 1–2 s 内升过沟沿让人看见（实拍 tmp/set/shots/Set_FoldBlast_*：
+ * 只有 vfx.Explosion 时 1.2 s 内沟沿上几乎看不到烟）。
  */
 export const FOLD_BLAST = Object.freeze({
-  explosion: Object.freeze({ radius: 4.5, kind: "grenade" }),
+  explosion: Object.freeze({ radius: 5.5, kind: "grenade" }),
+  smoke: Object.freeze({ kind: "dust", emitS: 1.4, rate: 16, radius: 0.9, rise: 3.4, sizeStart: 0.9, sizeEnd: 4.5, life: 5.5, opacity: 0.5 }),
   dirt: Object.freeze({ dir: Object.freeze({ x: -0.55, y: 0.75, z: 0.35 }), liftM: Object.freeze([0.2, 0.8]), clods: 10, splinters: 0, grit: 24,
     spray: 0, mist: 6, dust: 14, seconds: 0.5, spreadRad: 0.6, speed: Object.freeze({ clods: Object.freeze([4, 8]), grit: Object.freeze([5, 9]),
       mist: Object.freeze([2, 4]), dust: Object.freeze([1, 2.5]), splinters: Object.freeze([4, 8]), spray: Object.freeze([4, 8]) }) }),
