@@ -241,6 +241,7 @@ manifest `clips[名].bake[骨架]`，每条 clip 在每套骨架上一条（现�
 - 伙伴轨：记录指了别的目录，就用那个目录的轨重新建这条 clip 的 spec 再烘；先逐条核对记录的哈希，对不上直接报错（让人把那份目录拷到 `OPENING_BLEND_DIR/legacy/<目录名>`，或用 `OPENING_RERECORD` 按现行重烘）。`legacy/` 是目录不在了时的后备位置。
 - 清单之外：库的 `MakeClips` 每建一条 spec 前调 `K['Building'](名字)`（可选钩子，06 收尸库没有也没事），这样 builder 建 spec 时读的伙伴轨也算在那条 clip 名下。
 - 每次跑完在骨架文件旁边写 `Data_<骨架>OpeningStoryboardsBakeRecord.json`（`verify` 写在 verify 目录，`bake` 写在 `OPENING_BLEND_DIR`，按 clip 合并）；`WriteManifest`（`bake` / `manifest` pass）只在这份记录的 `valuesSha256` 等于骨架文件里那条 clip 的帧时才把它并进 manifest，其余 clip 保留 manifest 里原来的记录。所以**烘新 clip 不会改旧 clip 的记录**。
+- 不设 `OPENING_VERSION` 时，manifest 版本默认取 `Data_OpeningStoryboards.version`（读不到再取提交版 manifest 的 `version`，再不行用 `20261012OpeningStoryboardsV27Repro`），不会把旧版本号写回去；不带环境变量跑 `OPENING_PASS=manifest`，manifest 不变（`git diff` 为空）。
 - `OPENING_RERECORD=<clip,…>`（或 `all`）：这几条当新 clip 烘（现行烘焙器、新记录）。旧 clip 要换到现行烘焙器就这样烘，烘完逐条看审片（会换支的就是 R2 列的那些前臂）。
 
 ### 15.3 怎么复现

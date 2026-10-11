@@ -13,7 +13,8 @@ path; start/stop the instance around it). Environment:
                      OpeningStoryboards_20260926HumanoidV1 -- the 20260922/20260923/20260925
                      Lugou-rig sources stay untouched; the 0926 folder started as a copy of
                      the 0925 partner tracks, renamed to the Tengxian rig ids)
-  OPENING_VERSION    manifest version (default 20260928OpeningStoryboardsV15IkBranch)
+  OPENING_VERSION    manifest version (default: the current one -- `version` in Data_OpeningStoryboards.mjs, else
+                     the committed manifest's, else 20261012OpeningStoryboardsV27Repro; another library: its name)
   OPENING_MODEL      comma list of rigs (default all five)
   OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON. A clip's only
                      inputs from other clips are the arm-roll seeds of its `prev` clip (below): a
@@ -92,8 +93,26 @@ NAME = os.environ.get('OPENING_LIBRARY_NAME') or 'OpeningStoryboards'
 OWN = NAME == 'OpeningStoryboards'
 private = Path(os.environ.get('OPENING_BLEND_DIR')
                or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/' + NAME + '_20260926HumanoidV1')
-VERSION = os.environ.get('OPENING_VERSION') or ('20260928OpeningStoryboardsV15IkBranch' if OWN else NAME)
 committedDir = project / 'Animation' / NAME
+
+
+def CurrentVersion():
+    """The default manifest version: what the runtime reads (Data_OpeningStoryboards.version), else the committed
+    manifest's, else the last known one -- a pass run without OPENING_VERSION must not write an old version back."""
+    try:
+        import re
+        found = re.search(r'\bversion:\s*"([^"]+)"', (project / 'Data_OpeningStoryboards.mjs').read_text(encoding='utf-8'))
+        if found:
+            return found.group(1)
+    except OSError:
+        pass
+    try:
+        return json.loads((committedDir / ('Data_' + NAME + 'Animation.json')).read_text())['version']
+    except (OSError, ValueError, KeyError):
+        return '20261012OpeningStoryboardsV27Repro'
+
+
+VERSION = os.environ.get('OPENING_VERSION') or (CurrentVersion() if OWN else NAME)
 output = Path(os.environ.get('OPENING_OUTPUT') or (project.parent / 'tmp' / NAME / 'Verify'
                                                    if os.environ.get('OPENING_PASS') == 'verify' else committedDir))
 reviews = Path(os.environ.get('OPENING_REVIEW') or (project.parent / 'tmp' / NAME / 'BlenderReview'))
