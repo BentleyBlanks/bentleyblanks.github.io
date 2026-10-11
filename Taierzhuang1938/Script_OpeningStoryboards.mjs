@@ -1426,6 +1426,16 @@ export class FirstLevelBunkerShow {
     }
     // The recruit's rifle at the ready is aimed at the pinned man (RecruitRifle eases back to his hands' own pose otherwise).
     this.RecruitRifle();
+    this.HoldMgCrew();
+  }
+  /** The machine-gun crew stand-ins (EnsureMgCrew) stay on their marks on the south lip until the volley takes them: the AI would
+   *  walk them down off it into the trench (2026-10-11 probe: both at (8.2,-123.4)). Only the director's own stand-ins. */
+  HoldMgCrew(){
+    for(const [role,spec] of Object.entries(C.rescue.mgCrew)){
+      const actor=this.r.enemies.get(spec.id);
+      if(!actor?.openingMgStandIn||!actor.alive||this.flags["hit:"+role]!=null)continue;
+      this.r.PlaceActor(actor,spec.at);actor.yaw=spec.at.yaw;actor.actor.root.rotation.y=spec.at.yaw;
+    }
   }
   /** ijaA squatting at the head with the hair in his fist: the hold clip, or the slap clip playing now. */
   PoseHolder(ijaA){
@@ -1913,7 +1923,7 @@ export class FirstLevelBunkerShow {
     // eye, ijaB on the junction (until the long shot turns him), ijaC at the fold (until FoldFight turns him).
     if(ijaA?.alive&&this.flags["hit:ijaA"]==null)this.PoseHolder(ijaA);
     if(interp?.alive&&this.flags["hit:interpreter"]==null)this.InterpreterToSquat();
-    this.RecruitLevelled();
+    this.RecruitLevelled();this.HoldMgCrew();
     this.Volley();this.Cuts();this.Grenade();this.HeToTimber();this.LuoToHand();
     this.ChargeExtras();
     this.LongShotTick();this.FoldFight();

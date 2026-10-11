@@ -447,7 +447,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
     playDead:Object.freeze({ closeAtS:.3, closeS:.14, squint:.84, tremor:.012, tremorHz:7, openS:.08, slitAboveDeg:9 }),
     // The interpreter squats at Shunzi's right front, 1.3 m from the eye, facing him; ijaB keeps watch east down the
     // trench 3.4 m off (「快点！」 over his shoulder).
-    interpreter:P(2.92,-124.5,56*Math.PI/180),
+    // 2026-10-11: south of the Set's finish.bodies[0] (3.3,-124.55, head west, 1.7 m long east), facing the eye (was (2.92,-124.5), 56 deg).
+    interpreter:P(2.95,-124.0,41*Math.PI/180),
     interpreterReturn:Route([4.2,-124.25]),
     interpreterClearanceM:.44,
     // (until 2026-10-11 ijaB kept watch here, 3.4 m off; the redraft has him at the junction J -- vanguardPosts.ijaB)
@@ -462,8 +463,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // the director makes stand-ins of them on 02's first frame (EnsureMgCrew, pendingWiring N22) with these ids, so the hand-back
     // waits for them and the volley has them to shoot. stance: the AI's (2 prone, 1 kneel).
     mgCrew:Object.freeze({
-      gunner:Object.freeze({ id:"BunkerGunner", at:P(6.7,-123.65,Math.PI), weapon:"Type11", stance:2 }),
-      loader:Object.freeze({ id:"BunkerLoader", at:P(7.5,-123.55,Math.PI), weapon:"Type38", stance:1 }),
+      // The Set's final marks (Report_set: mg.gunner / mg.loader on top of the south lip by the corpse rest (6.9,-121.2)).
+      gunner:Object.freeze({ id:"BunkerGunner", at:P(6.75,-121.95,Math.PI), weapon:"Type11", stance:2 }),
+      loader:Object.freeze({ id:"BunkerLoader", at:P(7.75,-121.7,Math.PI), weapon:"Type38", stance:1 }),
     }),
     // Blade (「丁端着刺刀走过来……把刀尖抵在顺子脸颊上，往下一压，划开一道口子。手还有点抖，这回甲没催他。」): startLine's end
     // (ijaB's 「快点！」) + afterLineS, the recruit walks from his wait (vanguardPosts.ijaD) to recruitAt at the eye's LEFT front
@@ -539,7 +541,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
       Object.freeze({ id:"ChargeA", start:P(-.8,-119.6), modelVariant:4, delayS:.85 }),
       Object.freeze({ id:"ChargeB", start:P(.15,-120.05), modelVariant:1, delayS:.3, post:P(2.4,-124.6,Math.PI/2), foldTarget:true }),
       Object.freeze({ id:"ChargeC", start:P(-1.8,-118.2), modelVariant:1, delayS:1.6, weapon:"HanYang", post:P(2.75,-121.55,-1.3), shootsFold:true }),
-      Object.freeze({ id:"ChargeD", start:P(-2.3,-117.5), modelVariant:4, delayS:1.05, post:P(7.4,-124.45) }),
+      Object.freeze({ id:"ChargeD", start:P(-2.3,-117.5), modelVariant:4, delayS:1.05, post:P(10.8,-125.3) }),
       Object.freeze({ id:"ChargeE", start:P(-2.8,-116.8), modelVariant:1, delayS:2.1, weapon:"HanYang", post:P(3.75,-121.95,-1.3), shootsFold:true }),
     ]),
     // The fold man (ijaC at F) once the volley goes: he turns round where he stands from turnAtS (he was facing east, away), and
@@ -551,7 +553,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // Where ChargeB lies once the fold man's shot has dropped him (「摔在顺子旁边」: 1 m south of the eye); the heave keeps off him.
     fallenComrade:P(1.85,-124.25),
     // The depth Japanese who went off down the trench after the killing hold here, watching east (the volley shoots him dead there).
-    depthPost:Object.freeze({ DepthIjaB:P(9.4,-123.75,-Math.PI/2) }),
+    // (2026-10-11: off the Set's sweep.bodies[1] (9.4,-123.1); was (9.4,-123.75).)
+    depthPost:Object.freeze({ DepthIjaB:P(9.8,-124.7,-Math.PI/2) }),
     // 2026-09-30 (user: 「应该是队友们先开枪击伤日军，日军手已经抬不起来拿枪了，再是班长和队友冲上来一刀砍死了这几个审问的日军和翻译」):
     // the charge opens with a volley from the crater step. `at` s into Charge a shot from `from` (1.5 m over its ground)
     // hits `role` in `bone` (part `part`, `damage` -- not lethal: narrative protection holds until the cut); he plays `clip`
@@ -852,7 +855,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // 2026-09-26 integration: the old start in the mouth, (0.3,-125.1) -> (1.7,-125.3), ran through the fallen lintel,
     // the roof timber and the backrest (Script_OpeningSetTest §2). lane[3] (the crater step) and lane[6] (luoCover) keep
     // their indices: heBackRoute / liuBackRoute and the campaign's look-back read them.
-    lane:Route([3.3,-125.65],[3.05,-124.5],[3.3,-124.2],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4],[-1,-118.5],[-4,-113]),
+    // 2026-10-11: lane[1..2] go round the Set's finish.bodies[0] (3.3,-124.55, head west, lying east) to the crater step's foot
+    // (were (3.05,-124.5), (3.3,-124.2)).
+    lane:Route([3.3,-125.65],[2.7,-124.35],[3.0,-123.75],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4],[-1,-118.5],[-4,-113]),
     luoCover:P(-.6,-120.4),                // first intact wall past the low section, turned back to cover
     luoCorner:P(-7.2,-111.8),              // beyond RC, waiting for the player
     heBound:Route([-.2,-121.9],[-1.2,-118.2]),
