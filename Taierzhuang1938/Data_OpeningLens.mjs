@@ -50,6 +50,20 @@ export const SHELL_FLIGHT_S = 0.22;
 const WITNESS_CORNERS = Freeze([0.85, 1.0, 0.8, 0.3]);
 const BLOOD_TINT = Freeze([0.55, 0.06, 0.05]);
 
+// 2026-10-11 the recruit's cut on the left cheek (clock "cheek": seconds since the cut, events.cheekAt). Script_OpeningLens
+// hands lens.cheek = { flash, blood, opacity, daze } to the composite (uCheekCut: flash = the white sting on the left, blood =
+// how far the streak has seeped in from the lower-left edge, opacity = how strong it is) and the daze to SideDaze on the left
+// (with the slap's, the larger wins). All 0 = the composite untouched (Script_PostTest).
+const CHEEK_CUT = Freeze({
+  flash: K("cheek", [[0, 0], [0.02, 1], [0.15, 0]], { before: 0 }),
+  blood: K("cheek", [[0, 0], [0.12, 0.18], [0.6, 0.62], [1.5, 1]], { before: 0 }),
+  opacity: K("cheek", [[0, 0], [0.08, 0.9], [2.4, 0.9], [6, 0.75]], { before: 0 }),
+  daze: K("cheek", [[0, 0], [0.04, 0.35], [1.2, 0.2], [2.4, 0]], { before: 0 }),
+});
+// The streak's strength at the hand-back, faded over Data_OpeningStoryboards.perception.releaseDecayS after it (the last
+// value of CHEEK_CUT.opacity).
+export const LENS_CHEEK_RESIDUE = 0.75;
+
 export const LOOKS = Freeze({
   // SB01 and the shots the storyboard leaves clean (SB05A, SB06): the defaults.
   clean: Freeze({}),
@@ -99,11 +113,29 @@ export const LOOKS = Freeze({
     aberration: K("slap", [[0, 0.0022], [0.04, 0.012], [0.9, 0.0022]], { before: 0.0022 }),
     flash: K("slap", [[0, 0], [0.03, 0.2], [0.3, 0]], { before: 0 }),
   }),
-  // The charge and the cuts (Charge / Melee): the last slap's daze wears off, then clean.
+  // 2026-10-11 Blade (docs/Data_OpeningRedraft20261011Contract.md §1.10, N21): held as above, and the recruit's cut on the
+  // LEFT cheek (`cheek`, on the cut's clock): a white sting on the left of the frame for 0.15 s, a streak of blood seeping in
+  // from the lower-left edge, formed within 1.5 s, the left side dazed at 0.35 easing off over 2.4 s. No blood mist / red wash.
+  blade: Freeze({
+    blendInS: 0.6,
+    vignette: 0.5,
+    desaturate: 0.12,
+    slap: K("slap", [[0, 0], [0.04, 1], [0.5, 0.8], [1.4, 0.45], [2.4, 0]], { before: 0 }),
+    flash: K("slap", [[0, 0], [0.03, 0.2], [0.3, 0]], { before: 0 }),
+    cheek: CHEEK_CUT,
+  }),
+  // The charge and the cuts (Charge / Melee): the last slap's daze wears off, then clean; the cheek's streak stays.
   charge: Freeze({
     blendInS: 0.4,
     vignette: 0.46,
     slap: K("slap", [[0, 0], [0.04, 1], [0.5, 0.8], [1.4, 0.45], [2.4, 0]], { before: 0 }),
+    cheek: CHEEK_CUT,
+  }),
+  // The heave and the hand-over (Lift / Check): clean but for the streak on the cheek (it fades after the hand-back with the
+  // concussion residue, Script_OpeningStoryboards.ReleasedPerception, LENS_CHEEK_RESIDUE).
+  rescued: Freeze({
+    blendInS: 0.6,
+    cheek: CHEEK_CUT,
   }),
 });
 
@@ -114,9 +146,12 @@ export const PHASE_LOOKS = Freeze({
   Blast: "nearMiss", Black: "nearMiss",
   Wake: "witness", FrontPass: "witness", CaptiveDragged: "witness", CaptiveWall: "witness",
   Interrogation: "witness", Slash: "witness", Taunt: "witness",
-  Found: "found", Hold: "held", Ask: "held",
-  Charge: "charge", Melee: "charge", Lift: "clean",
-  Check: "clean", Released: "clean",
+  Found: "found", Hold: "held", Ask: "held", Blade: "blade",
+  Charge: "charge", Melee: "charge", Lift: "rescued",
+  Check: "rescued", Released: "clean",
+  // 2026-10-11 redraft (contract §2): Dir01's new 01 phases -- the black count, the drop-in, the sweep and the practice seen
+  // from the pinned eye (witness), ijaA's walk up the trench finishing the bodies (found).
+  Count: "clean", DropIn: "witness", Sweep: "witness", Practice: "witness", Finish: "found",
 });
 
 // Reduced motion (prefers-reduced-motion): the white flash is capped, the radial blur is off.

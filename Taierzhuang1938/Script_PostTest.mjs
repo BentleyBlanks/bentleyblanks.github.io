@@ -134,6 +134,13 @@ try {
     const closed=Read();
     U.uConcussion.value.set(0,0,0,0);U.uEyeClosure.value=0;
     const reset=Read();
+    // 02 cheek cut (2026-10-11, uCheekCut): on it changes the picture; back at 0 it is pixel-identical again.
+    U.uCheekCut.value.set(1,1,1);
+    const cheeked=Read();
+    U.uCheekCut.value.set(0,0,0);
+    const cheekReset=Read();
+    let cheekDifference=0,cheekResetDifference=0;
+    for(let i=0;i<clear.length;i++)if(i%4!==3){cheekDifference+=Math.abs(clear[i]-cheeked[i]);cheekResetDifference+=Math.abs(clear[i]-cheekReset[i]);}
     let difference=0,resetDifference=0,closedMaximum=0;
     for(let i=0;i<clear.length;i++)if(i%4!==3){
       difference+=Math.abs(clear[i]-blurred[i]);
@@ -143,7 +150,7 @@ try {
     stripes.dispose();
     dark.dispose();
     black.dispose();
-    return { rgba: Array.from(rgba), glError,concussion:{difference,resetDifference,closedMaximum} };
+    return { rgba: Array.from(rgba), glError,concussion:{difference,resetDifference,closedMaximum},cheek:{difference:cheekDifference,resetDifference:cheekResetDifference} };
   });
 } catch (error) {
   problems.push(`THROW ${String(error).slice(0, 240)}`);
@@ -165,4 +172,6 @@ if (!ok || !taaOk) process.exit(1);
 assert.ok(result.concussion.difference>1000,"concussion actually filters the GPU output");
 assert.equal(result.concussion.resetDifference,0,"neutral concussion is pixel-identical");
 assert.equal(result.concussion.closedMaximum,0,"closed lids leave no visible seam");
-console.log("ok concussion GPU filtering, complete blackout and exact neutral recovery");
+assert.ok(result.cheek.difference>1000,`the cheek cut (uCheekCut) changes the GPU output (${result.cheek.difference})`);
+assert.equal(result.cheek.resetDifference,0,"uCheekCut at 0 is pixel-identical");
+console.log("ok concussion GPU filtering, complete blackout and exact neutral recovery; cheek cut on/off", JSON.stringify(result.cheek));

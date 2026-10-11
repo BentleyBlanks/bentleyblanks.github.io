@@ -164,6 +164,7 @@ uniform vec3 uConcussionGrade; // secondary image mix, desaturation, peripheral 
 // 01–02 storyboard lens (Script_OpeningLens; zero / off everywhere else):
 uniform float uRadialBlur;   // SB02: edges dragged outward (uv at the corner per unit), inside the concussion taps
 uniform vec2 uSideDaze;      // 01-02 slap (2026-09-27): x = struck side (+1 left of the frame, -1 right), y = amount
+uniform vec3 uCheekCut;      // 02 cheek cut (2026-10-11): x = white sting on the left, y = streak seeped in (0..1), z = streak strength
 uniform vec4 uBloodEdge;     // rgb multiplicative tint, a strength (SB03 blood-red corners)
 uniform vec4 uBloodCorners;  // weights top-left, top-right, bottom-left, bottom-right
 uniform vec4 uLidShape;      // feather, curvature, tilt, upper lid share
@@ -533,6 +534,25 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
     color *= 1.0 - .16 * daze * daze;
   }
 
+  // 02 Blade (2026-10-11): the recruit's point cuts the left cheek -- a white sting on the left of the frame and a streak of
+  // blood seeping in from the lower-left edge toward the cheek (a curved band, wide at the edge, thinning; a soft rim of it
+  // out of focus). No blood mist, no red wash. No sample: it works on this pixel's colour only. 0 = untouched (Script_PostTest).
+  if (uCheekCut.x > 0.001 || uCheekCut.y * uCheekCut.z > 0.001) {
+    float left = 1.0 - smoothstep(0.0, 0.55, uv.x);
+    color = mix(color, vec3(1.0), clamp(uCheekCut.x * left * left * .85, 0.0, 1.0));
+    vec2 q = vec2(uv.x * uResolution.x / max(uResolution.y, 1.0), uv.y);
+    vec2 a = vec2(-.03, .02), b = vec2(.34, .30), ab = b - a;
+    float s = clamp(dot(q - a, ab) / dot(ab, ab), 0.0, 1.0);
+    vec2 c = a + ab * s + vec2(-.035, .035) * sin(s * 3.14159);
+    float d = length(q - c);
+    float width = mix(.05, .008, s) * (.85 + .15 * sin(s * 23.0 + q.x * 41.0));
+    float body = 1.0 - smoothstep(width * .55, width, d);
+    float rim = (1.0 - smoothstep(width, width * 3.5, d)) * .35;
+    float grown = 1.0 - smoothstep(uCheekCut.y - .08, uCheekCut.y + .001, s);
+    float blood = clamp((body * .9 + rim) * grown * uCheekCut.z, 0.0, .92);
+    color = mix(color, vec3(.30, .018, .015) * (.3 + .7 * Luma(color)) + vec3(.035, 0.0, 0.0), blood);
+  }
+
   // 暗角：别做成一圈发灰的环，压的是亮度不是加黑纱
   float vig = 1.0 - uVignette * smoothstep(0.02, 0.50, r2);
   color *= vig;
@@ -642,7 +662,7 @@ export class CompositePass {
       uHitGhostMix: { value: HIT_DISORIENTATION.ghostMix },
       uDamage: { value: 0 }, uFade: { value: 0 }, uEyeClosure:{value:0},
       uConcussion:{value:new THREE.Vector4()},
-      uRadialBlur:{value:0}, uSideDaze:{value:new THREE.Vector2()}, uBloodEdge:{value:new THREE.Vector4()}, uBloodCorners:{value:new THREE.Vector4(1,1,1,1)},
+      uRadialBlur:{value:0}, uSideDaze:{value:new THREE.Vector2()},uCheekCut:{value:new THREE.Vector3()}, uBloodEdge:{value:new THREE.Vector4()}, uBloodCorners:{value:new THREE.Vector4(1,1,1,1)},
       uConcussionGrade:{value:new THREE.Vector3(OPENING_PERCEPTION.ghostMix,OPENING_PERCEPTION.desaturation,OPENING_PERCEPTION.vignette)},
       uLidShape:{value:new THREE.Vector4(OPENING_PERCEPTION.lidFeather,OPENING_PERCEPTION.lidCurve,OPENING_PERCEPTION.lidTilt,OPENING_PERCEPTION.lidUpperShare)},
       uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 },
@@ -805,6 +825,10 @@ export class CompositePass {
     U.uRadialBlur.value = this.reducedMotion?.matches ? 0 : Math.max(0, options.radialBlur || 0);
     const daze = options.sideDaze;
     U.uSideDaze.value.set(daze?.side < 0 ? -1 : 1, Math.max(0, Math.min(1, daze?.amount || 0)) * (this.reducedMotion?.matches ? .5 : 1));
+    // 02 cheek cut: the lens's (Blade .. Check), after the hand-back the concussion residue's (Script_OpeningStoryboards).
+    const cheek = options.cheekCut || options.concussion?.cheek || null;
+    U.uCheekCut.value.set(this.reducedMotion?.matches ? Math.min(.35, cheek?.flash || 0) : Math.max(0, Math.min(1, cheek?.flash || 0)),
+      Math.max(0, Math.min(1, cheek?.blood || 0)), Math.max(0, Math.min(1, cheek?.opacity || 0)));
     const blood = options.bloodEdge;
     if (blood?.strength > 0) {
       U.uBloodEdge.value.set(blood.tint[0], blood.tint[1], blood.tint[2], Math.min(1, blood.strength));

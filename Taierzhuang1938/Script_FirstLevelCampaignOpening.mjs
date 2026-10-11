@@ -4,7 +4,8 @@
 //
 // What is asserted (contract docs/Data_FirstLevel0105Refactor20260923Contract.md §2.1, §5.3):
 //   · every phase of OPENING_STORYBOARDS.phases really starts, in table order (director `events`);
-//   · ijaA / ijaB die at the dadao contact, ijaD (junction) is really shot, all before Check;
+//   · 2026-10-11: ijaA dies at Luo's dadao contact, the interpreter at ChargeA's, ijaB (junction) is really shot by Liu,
+//     the recruit ijaD and the machine-gun crew by the volley, ijaC (fold) by the rifles on the step, all before Lift;
 //   · zero teleports (per-frame pelvis step), camera and first-person hands continuous;
 //   · player alive through the show, health at the hand-back recorded;
 //   · mouths: the speaking actor's jaw moves, listeners keep theirs closed (breathing only);
@@ -65,7 +66,13 @@ const KEY_FRAMES = [
   // 2026-09-27 rework (docs/Data_OpeningPinnedRescue20260927.md): the find, the slap, the charge, the cuts, the haul.
   { label: "Found", phase: "Found", age: 1.5 },
   { label: "Slap", flag: "slapAt", at: .15 },
+  // 2026-10-11 redraft (docs/Data_OpeningRedraft20261011Contract.md §1.10–1.12): the recruit's cut, levelled, the volley, the grenade.
+  { label: "CheekTouch", flag: "touch:cheek", at: .3 },
+  { label: "CheekCut", flag: "cut:cheek", at: .1 },
+  { label: "RecruitLevel", flag: "levelAt", at: .4 },
+  { label: "Volley", flag: "hit:ijaD", at: .25 },
   { label: "Charge", phase: "Charge", age: 1.5 },
+  { label: "Grenade", flag: "grenadeStopAt", at: .25 },
   // 2026-09-30 (docs/Data_OpeningSelfRescue20260930.md): the volley's shot, the cuts on the wounded, his own heave out onto his
   // knees, Luo asking, the rifle in his hands.
   { label: "ShotWounded", flag: "hit:ijaA", at: .35 },
@@ -370,7 +377,8 @@ export async function DriveOpening(ctx){
   for(const fact of ["runnerCallHeard","bunkerCollapsed","captivesKilled","playerSlapped","doorSearchStarted","rescueCallHeard","vanguardMeleeResolved","junctionShot","luoRescueComplete","playerDraggedFromWreck"])
     assert.ok(state.facts.includes(fact),`observed event: ${fact}`);
   assert.ok(show.captives.length===1&&show.captives.every(a=>!a.alive),"the comrade dies at the wall");
-  // ---- physical events: ijaA / ijaB cut down, ijaD shot, before Check -------------------------
+  // ---- physical events (2026-10-11): ijaA cut down, the interpreter cut down, ijaB shot at the junction, the recruit and the gun
+  // crew shot by the volley, ijaC shot at the fold -- all before Lift ----------------------------------------------------
   const eventTime=phase=>show.events.find(e=>e.phase===phase)?.time;
   // 2026-09-29: the runner calls from far off inside Orders (beat RunnerCall; the fact runnerCallHeard is in the facts above), before he reports.
   assert.ok(show.beats.includes("RunnerCall")&&eventTime("RunnerCall")>=eventTime("Orders")&&eventTime("RunnerCall")<eventTime("Incoming"),"the runner's far call comes inside Orders");
@@ -379,12 +387,21 @@ export async function DriveOpening(ctx){
     assert.ok(actor&&!actor.alive&&actor.health<=0&&!actor.essential,`${id} is really dead at the hand-back`);
     assert.ok(probe.deaths[id]?.time<=eventTime("Released"),`${id} died before the hand-back (${JSON.stringify(probe.deaths[id])})`);
   }
-  const {ijaA,ijaB,ijaD}=Storyboards.cast;
-  // 2026-09-30: shot in the arm by the volley first, then the cuts land at the chop's contact frame in the charge (the last may
-  // land just after Melee has begun).
-  for(const id of [ijaA,ijaB])assert.ok(["Charge","Melee"].includes(probe.kills[id]?.phase)&&probe.kills[id].kind==="blade"&&probe.kills[id].weapon==="Dadao",
-    `${id} falls to the dadao contact (${JSON.stringify(probe.kills[id])})`);
-  assert.ok(["Charge","Melee","Lift"].includes(probe.kills[ijaD]?.phase)&&probe.kills[ijaD].kind==="bullet",`${ijaD} is shot at the junction (${JSON.stringify(probe.kills[ijaD])})`);
+  const {ijaA,ijaB,ijaC,ijaD}=Storyboards.cast,RS=Storyboards.rescue;
+  // ijaA: shot in the arm by the volley first, then Luo's cut lands at the chop's contact frame (Charge, or just after Melee began).
+  assert.ok(["Charge","Melee"].includes(probe.kills[ijaA]?.phase)&&probe.kills[ijaA].kind==="blade"&&probe.kills[ijaA].weapon==="Dadao",
+    `${ijaA} falls to the dadao contact (${JSON.stringify(probe.kills[ijaA])})`);
+  for(const id of [ijaB,ijaC,ijaD,RS.mgCrew.gunner.id,RS.mgCrew.loader.id])
+    assert.ok(["Charge","Melee"].includes(probe.kills[id]?.phase)&&probe.kills[id].kind==="bullet",`${id} is shot before the heave (${JSON.stringify(probe.kills[id])})`);
+  // The volley's order (contract §1.11): the gun crew, then the recruit, then ijaA in the arm; nobody comes over the step first.
+  const hit=role=>show.flags["hit:"+role];
+  assert.ok(hit("gunner")<=hit("loader")&&hit("loader")<=hit("ijaD")&&hit("ijaD")<=hit("ijaA")&&hit("ijaA")<=hit("interpreter"),"volley order: gunner, loader, recruit, ijaA, interpreter");
+  // Who cut whom, in order; the recruit's cut before the volley; the grenade at rest at his face; all down before Lift.
+  assert.ok(show.flags["cut:cheek"]<show.flags.chargeAt&&show.flags["touch:cheek"]<=show.flags["cut:cheek"],"the recruit's cut comes before the volley");
+  assert.ok(show.flags["cut:ijaA"]<show.flags["cut:interpreter"],"Luo cuts first, then ChargeA the interpreter");
+  assert.ok(Math.hypot(show.flags.grenadeStopX-RS.grenade.stop.x,show.flags.grenadeStopZ-RS.grenade.stop.z)<.05,"the grenade comes to rest at his face");
+  for(const id of [...Storyboards.vanguardIds])assert.ok(probe.deaths[id]?.time<=eventTime("Lift"),`${id} is down before the heave (${JSON.stringify(probe.deaths[id])})`);
+  assert.equal(show.flags.meleeForced,undefined,"the heave was not forced by the Melee timeout");
   // Normal input: Liu Wencai's own shot drops the junction man (contract §2.1); He's backup and the
   // timeout are the negative variants' business (Script_OpeningHandbackBrowserTest).
   assert.equal(show.flags.junctionBy,"liu",`Liu Wencai really shoots the junction man (${show.flags.junctionBy})`);
@@ -940,7 +957,8 @@ export async function CheckOpeningActing(ctx){
 /** Where the junction man ducks for the "hide" variant: the depth sap past J, walled off from the rescue. */
 export const HANDBACK_HIDE_POINT = Object.freeze({ x: FRONT_SPACE.pursuitFallback[0].x + .6, z: FRONT_SPACE.pursuitFallback[0].z + 3 });
 /**
- * Start at BunkerRescue (debug start 2, `missionStage=2`) and bend the long shot (it starts with the charge):
+ * Start at BunkerRescue (debug start 2, `missionStage=2`) and bend the long shot (it starts with the charge). 2026-10-11: the junction
+ * man is ijaB (the redraft's 「岔口回身举枪的乙」), no longer ijaD (the recruit, shot by the volley):
  *   "miss":  Liu Wencai fires and misses (his line to the junction man is spoiled for his shot only);
  *            Luo's backup at +8 s (or the +8.5 s timeout) must drop him (He is lifting the timber then).
  *   "hide":  the junction man ducks into the depth sap as the charge begins, out of every rescuer's
@@ -962,29 +980,29 @@ export async function DriveHandbackNegative(page,variant,output){
   await page.evaluate(({variant,C})=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker;
     const F=window.handbackFixture={variant,applied:false,blocked:0};
-    if(variant==="absent"){const a=r.enemies.get(C.ijaD);if(a){r.ai.Remove(a);r.enemies.delete(C.ijaD);F.removed=true;}}
+    if(variant==="absent"){const a=r.enemies.get(C.ijaB);if(a){r.ai.Remove(a);r.enemies.delete(C.ijaB);F.removed=true;}}
     const blocks=r.BlocksSight.bind(r);
     r.BlocksSight=(from,to)=>{
-      const ijaD=r.enemies.get(C.ijaD);
+      const ijaB=r.enemies.get(C.ijaB);
       if(F.variant==="miss"&&["Charge","Melee","Lift","Check"].includes(s.phase)&&s.flags["shot:liu"]!=null&&s.flags["shot:he"]==null
-        &&ijaD&&Math.hypot(to.x-ijaD.position.x,to.z-ijaD.position.z)<1){F.blocked++;return true;}
+        &&ijaB&&Math.hypot(to.x-ijaB.position.x,to.z-ijaB.position.z)<1){F.blocked++;return true;}
       return blocks(from,to);
     };
     const stage=s.Stage.bind(s);
     s.Stage=function(phase){
-      const ijaD=r.enemies.get(C.ijaD);
-      if(phase==="Charge"&&!F.applied&&ijaD?.alive){
+      const ijaB=r.enemies.get(C.ijaB);
+      if(phase==="Charge"&&!F.applied&&ijaB?.alive){
         F.applied=true;
         if(F.variant==="hide"){
-          s.Put(ijaD,{x:C.hide.x,z:C.hide.z,yaw:0});
-          F.hidden={x:ijaD.position.x,z:ijaD.position.z};delete window.openingProbe.previous[C.ijaD];   // the fixture's own move
+          s.Put(ijaB,{x:C.hide.x,z:C.hide.z,yaw:0});
+          F.hidden={x:ijaB.position.x,z:ijaB.position.z};delete window.openingProbe.previous[C.ijaB];   // the fixture's own move
           F.sightFrom={liu:r.BlocksSight(r.Point(C.liuShot,1.4),r.Point(C.hide,1.2))};
         }
-        if(F.variant==="early"){s.Kill(ijaD,"bullet");F.earlyKilled=!ijaD.alive;}
+        if(F.variant==="early"){s.Kill(ijaB,"bullet");F.earlyKilled=!ijaB.alive;}
       }
       return stage(phase);
     };
-  },{variant,C:{ijaD:Storyboards.cast.ijaD,liuShot:Storyboards.rescue.liuShot,hide:HANDBACK_HIDE_POINT}});
+  },{variant,C:{ijaB:Storyboards.cast.ijaB,liuShot:Storyboards.rescue.liuShot,hide:HANDBACK_HIDE_POINT}});
   let state;
   for(let i=0;i<600;i++){
     state=await StepSampled(page,15);
@@ -992,23 +1010,28 @@ export async function DriveHandbackNegative(page,variant,output){
     assert.ok(state.alive,`${variant}: player survives`);
     if(state.released)break;
   }
-  const result=await page.evaluate(({ijaD})=>{
+  const result=await page.evaluate(({ijaB})=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker,P=window.openingProbe;
-    const a=r.enemies.get(ijaD);
+    const a=r.enemies.get(ijaB);
     return {phase:s.releaseAt!=null?"Released":s.phase,events:s.events,flags:Object.fromEntries(Object.entries(s.flags).filter(([,v])=>typeof v!=="object")),
       fixture:window.handbackFixture,kills:P.kills,deaths:P.deaths,violations:P.violations,facts:[...r.flow.facts],
-      ijaD:a?{alive:a.alive,x:a.position.x,z:a.position.z}:null,control:r.controls?.kind||null,health:g.player.health};
-  },{ijaD:Storyboards.cast.ijaD});
+      ijaB:a?{alive:a.alive,x:a.position.x,z:a.position.z}:null,control:r.controls?.kind||null,health:g.player.health,
+      vanguard:`${[...r.enemies.values()].filter(v=>v.missionEncounter==="bunkerAssault").map(v=>v.missionId+":"+(v.alive?"alive":"dead")).join(",")}`};
+  },{ijaB:Storyboards.cast.ijaB});
   await fs.writeFile(path.join(output,`Data_Handback_${variant}.json`),JSON.stringify(result,null,2));
   const at=phase=>result.events.find(e=>e.phase===phase)?.time;
   assert.equal(result.phase,"Released",`${variant}: the hand-back still happens`);
   assert.equal(result.control,null,`${variant}: control returns`);
   assert.deepEqual(result.violations,[],`${variant}: no teleports, no early hand-back`);
   for(const fact of ["vanguardMeleeResolved","junctionShot","luoRescueComplete","playerDraggedFromWreck"])assert.ok(result.facts.includes(fact),`${variant}: ${fact}`);
+  // Every other required man is down before the heave whatever the junction man does (2026-10-11: the recruit, the fold man,
+  // the machine-gun crew), and nobody is left standing at the hand-back.
+  for(const id of Storyboards.vanguardIds.filter(id=>id!==Storyboards.cast.ijaB))
+    assert.ok(result.deaths[id]?.time<=at("Lift"),`${variant}: ${id} is down before the heave (${JSON.stringify(result.deaths[id])})`);
   // The long shot starts with the charge (longShotAt); Check follows the junction man's fall and the haul out.
   const waited=at("Check")-result.flags.longShotAt;
   // The junction man is down within the long-shot timeouts (the hand-back itself also waits for the haul out, Lift).
-  const downBy=(result.deaths[Storyboards.cast.ijaD]?.time??result.events.find(e=>e.phase==="Check")?.time)-result.flags.longShotAt;
+  const downBy=(result.deaths[Storyboards.cast.ijaB]?.time??result.events.find(e=>e.phase==="Check")?.time)-result.flags.longShotAt;
   assert.ok(variant==="absent"||variant==="early"||downBy<=Storyboards.timeouts.longShotForceS+.6,variant+": the junction man is down within the long-shot timeouts ("+downBy.toFixed(2)+" s)");
   if(variant==="miss"){
     assert.ok(result.fixture.blocked>0&&result.flags["shot:liu"]!=null,"miss: Liu really fired and missed");
@@ -1026,7 +1049,7 @@ export async function DriveHandbackNegative(page,variant,output){
   }
   if(variant==="absent"){
     assert.ok(result.fixture.removed,"absent: the junction man was taken out of the enemy table");
-    assert.equal(result.flags.releaseMissing,Storyboards.cast.ijaD,"absent: the hand-back records who was missing");
+    assert.equal(result.flags.releaseMissing,Storyboards.cast.ijaB,"absent: the hand-back records who was missing");
     const handed=result.flags.handedAt!=null?at("Released")-result.flags.handedAt:Infinity;
     assert.ok(handed<=6+Storyboards.rescue.hand.releaseGraceS,`absent: the hand-over hands back within its grace (${handed.toFixed(2)} s after the rifle is handed)`);
   }
