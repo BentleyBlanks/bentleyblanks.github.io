@@ -466,8 +466,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
       loader:Object.freeze({ id:"BunkerLoader", at:P(7.5,-123.55,Math.PI), weapon:"Type38", stance:1 }),
     }),
     // Blade (「丁端着刺刀走过来……把刀尖抵在顺子脸颊上，往下一压，划开一道口子。手还有点抖，这回甲没催他。」): startLine's end
-    // (ijaB's 「快点！」) + afterLineS, the recruit walks from his wait (vanguardPosts.ijaD) to recruitAt at the eye's right front,
-    // leans in and lays the bloody point on the LEFT cheek (`touch`, touchS after he is there), presses it down and cuts
+    // (ijaB's 「快点！」) + afterLineS, the recruit walks from his wait (vanguardPosts.ijaD) to recruitAt at the eye's LEFT front
+    // (the brief had him at the right front, (2.75,-124.75); from the lifted eye ijaA's own arm, the fist in the hair, covers the
+    // whole upper right of the picture and the interpreter squats there, so the recruit was never seen -- and the contract has
+    // the point come in from the left of the picture onto the left cheek), leans in and lays the bloody point on the LEFT cheek
+    // (`touch`, touchS after he is there), presses it down and cuts
     // (`cut`, cutS; the tip draws pressM down the cheek over pressS with a tremor of shakeM at shakeHz), holds there until
     // releaseS and takes it off over liftS. thenLine (「说话！」) waits thenAfterS after the cut; backAfterLineS after it ends he
     // backs off three steps to levelAt (backS) and levels the rifle at the eye (the muzzle aimed, levelS to come up); the charge
@@ -475,11 +478,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // stand-ins are standInClip (his rifle laid from his right hand onto the cheek by the director, RecruitRifle) and
     // levelStandIn walked backwards (pendingWiring N21). recruitFall: where the volley's chest shot drops him (east of the
     // heave, 「倒向东、不压在挣出的路线上」: Script_OpeningStoryboardsTest keeps it 0.9 m+ off the heave's path).
-    blade:Object.freeze({ startLine:"RescueInterrogation.05", afterLineS:.15, recruitAt:P(2.75,-124.75),
+    blade:Object.freeze({ startLine:"RescueInterrogation.05", afterLineS:.15, recruitAt:P(2.8,-125.95),
       clip:"IjaRecruitCheekCut", standInClip:"IjaReadyRifle", touchS:.9, cutS:1.5, pressS:.25, pressM:.035, shakeM:.004, shakeHz:9,
       releaseS:2.3, liftS:.4, thenLine:"RescueInterrogation.06", thenAfterS:.55, backAfterLineS:.2, backS:1.3,
-      levelAt:P(4.55,-124.15), levelClip:"IjaRecruitLevelRifle", levelStandIn:"IjaReadyRifle", levelS:.45, chargeAfterLevelS:.5,
-      recruitFall:P(5.25,-124.4) }),
+      levelAt:P(4.6,-125.75), levelClip:"IjaRecruitLevelRifle", levelStandIn:"IjaReadyRifle", levelS:.45, chargeAfterLevelS:.5,
+      recruitFall:P(5.3,-125.8) }),
     // The cut on the cheek, first person: the head flinches flinchDeg away from it (to the right) over flinchS and comes back over
     // recoverS; the cheekCut sound (Sfx package, contract §6) -- `sound` until it is registered (pendingWiring N21); the lens look
     // is Data_OpeningLens `cheek` on the cut's clock (events.cheekAt).
@@ -534,7 +537,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // the step (`post`) and fire at the fold man (`shootsFold`). ChargeD runs on east down the trench.
     extras:Object.freeze([
       Object.freeze({ id:"ChargeA", start:P(-.8,-119.6), modelVariant:4, delayS:.85 }),
-      Object.freeze({ id:"ChargeB", start:P(.15,-120.05), modelVariant:1, delayS:.3, post:P(2.5,-123.95,Math.PI/2), foldTarget:true }),
+      Object.freeze({ id:"ChargeB", start:P(.15,-120.05), modelVariant:1, delayS:.3, post:P(2.4,-124.6,Math.PI/2), foldTarget:true }),
       Object.freeze({ id:"ChargeC", start:P(-1.8,-118.2), modelVariant:1, delayS:1.6, weapon:"HanYang", post:P(2.75,-121.55,-1.3), shootsFold:true }),
       Object.freeze({ id:"ChargeD", start:P(-2.3,-117.5), modelVariant:4, delayS:1.05, post:P(7.4,-124.45) }),
       Object.freeze({ id:"ChargeE", start:P(-2.8,-116.8), modelVariant:1, delayS:2.1, weapon:"HanYang", post:P(3.75,-121.95,-1.3), shootsFold:true }),
@@ -606,11 +609,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // the eye stays on ijaA (his upper body: ijaChestDropM under the head, pitch capped at maxPitchDeg) -- shot, up off him and
     // staggering away -- while the men run in from the right; on each cut the look is between the cutter and the cut man for
     // cutHoldS. The look point follows with a lookS time constant (no whip when the subject changes).
-    // grenadeMinPitchDeg: how far down the look may go onto the grenade at his face (rescue.grenadeLookS).
-    chargeView:Object.freeze({ ijaChestDropM:.3, maxPitchDeg:30, cutHoldS:1.3, lookS:.28, grenadeMinPitchDeg:-50 }),
+    // grenadeMinPitchDeg / grenadeLookS: how far down and how quickly (time constant) the look goes onto the grenade rolling to
+    // his face (rescue.grenadeLookS: how long it stays on it once at rest).
+    chargeView:Object.freeze({ ijaChestDropM:.3, maxPitchDeg:30, cutHoldS:1.3, lookS:.28, grenadeMinPitchDeg:-50, grenadeLookS:.12 }),
     // Blade's view (2026-10-11, N21): from the hair-holder's face (Hold / Ask) over toward the recruit leaning in (weight
     // atRecruit, his head dropM lower), eased with lookS.
-    bladeView:Object.freeze({ atRecruit:.55, recruitDropM:.15, lookS:.3 }),
+    bladeView:Object.freeze({ atRecruit:.75, recruitDropM:.15, lookS:.3 }),
     // Melee: once the cuts have landed and the vanguard is down (vanguardIds, the interpreter) the view holds on the trench
     // (meleeHoldS) before the heave.
     meleeHoldS:1.0,
@@ -730,24 +734,27 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // N20 「甲蹲在头边左手揪着头发把头提起来、右手高举过肩要扇；翻译蹲在右前逼问；画面一侧发晕重影」: the second slap's wind-up
     // (the hand high over his shoulder, 0.28 s before it lands), then the blow itself (_Slap: the left of the picture swimming,
     // the view flung right).
+    // (The interpreter is judged on the held frame, N20_Held: through the wind-up the look follows ijaA's head up and left.)
     Object.freeze({ id:"N20", storyboard:"Storyboard_N20_HairSlap.png", when:"s.slaps?.length>1&&r.time>=s.slaps[1].at-.28",
-      judge:{ camera:{ eyeM:[.3,.55], pitchDeg:[5,42] }, actors:{ ijaA:{ x:[.2,.75], distM:[.3,1] }, interpreter:{ x:[.45,1], distM:[.8,1.8] } } } }),
+      judge:{ camera:{ eyeM:[.3,.55], pitchDeg:[5,45] }, actors:{ ijaA:{ x:[.2,.75], distM:[.3,1] } } } }),
+    Object.freeze({ id:"N20_Held", storyboard:"Storyboard_N20_HairSlap.png", phase:"Ask", age:1,
+      judge:{ camera:{ eyeM:[.3,.55], pitchDeg:[5,42] }, actors:{ ijaA:{ x:[.25,.7], distM:[.3,1] }, interpreter:{ x:[.45,1], distM:[.8,1.8] } } } }),
     Object.freeze({ id:"N20_Slap", storyboard:"Storyboard_N20_HairSlap.png", when:"s.slaps?.length>1&&s.slaps[1].landed&&r.time-s.slaps[1].at>=.12",
       judge:{ camera:{ eyeM:[.25,.55] } } }),
     // N21 「丁俯身，刀尖带血抵在左脸颊上往下压（刀尖从画面左侧贴脸进来，占画面一角）；甲在后面看着没催」: the recruit's point
     // laid on the cheek (_Touch) and the cut (0.1 s in: the white sting on the left, the streak starting at the lower left).
     // The point itself is judged by eye in the picture (it is not an actor); the recruit leans over at the right front.
     Object.freeze({ id:"N21_Touch", storyboard:"Storyboard_N21_CheekCut.png", when:"s.flags['touch:cheek']!=null&&r.time-s.flags['touch:cheek']>=.3",
-      judge:{ camera:{ eyeM:[.3,.55] }, actors:{ ijaD:{ x:[.35,1], bodyDistM:[.5,1.4] }, ijaA:{ x:[.1,.75], distM:[.3,1] } } } }),
+      judge:{ camera:{ eyeM:[.3,.55] }, actors:{ ijaD:{ x:[.25,.7], bodyDistM:[.6,1.6], coverOk:"ijaA" }, ijaA:{ x:[.45,1], distM:[.3,1] } } } }),
     Object.freeze({ id:"N21", storyboard:"Storyboard_N21_CheekCut.png", when:"s.flags['cut:cheek']!=null&&r.time-s.flags['cut:cheek']>=.1",
-      judge:{ camera:{ eyeM:[.3,.55] }, actors:{ ijaD:{ x:[.35,1], bodyDistM:[.5,1.4] } } } }),
+      judge:{ camera:{ eyeM:[.3,.55] }, actors:{ ijaD:{ x:[.25,.7], bodyDistM:[.6,1.6], coverOk:"ijaA" } } } }),
     // 「丁退开三步，端平了枪」: levelled at the eye from rescue.blade.levelAt, the moment before the volley.
     Object.freeze({ id:"N21_Level", storyboard:"Storyboard_N21_CheekCut.png", when:"s.flags.levelAt!=null&&r.time-s.flags.levelAt>=.4&&s.phase==='Blade'",
-      judge:{ camera:{ eyeM:[.3,.55] }, actors:{ ijaD:{ x:[.3,1], bodyDistM:[1.8,3.4] } } } }),
+      judge:{ camera:{ eyeM:[.3,.55] }, actors:{ ijaD:{ x:[0,.75], bodyDistM:[1.6,3.6], coverOk:"ijaA" } } } }),
     // N22 「台阶那边一排枪口闪光：沟沿上的机枪手趴在尸体上不动了，副射手翻下沟沿；丁胸口中弹枪脱手仰面倒；甲左臂中弹踉跄转开」:
     // the recruit 0.25 s after his chest shot (the crew already hit), ijaA hit and turning away (_Arm).
     Object.freeze({ id:"N22", storyboard:"Storyboard_N22_Volley.png", when:"s.flags['hit:ijaD']!=null&&r.time-s.flags['hit:ijaD']>=.25",
-      judge:{ camera:{ eyeM:[.2,.55] }, actors:{ ijaA:{ x:[.1,.9], distM:[.3,1.2] } } } }),
+      judge:{ camera:{ eyeM:[.2,.55] }, actors:{ ijaA:{ x:[.1,.9], distM:[.3,1.2], headOptional:true } } } }),
     Object.freeze({ id:"N22_Arm", storyboard:"Storyboard_N22_Volley.png", when:"s.flags['hit:ijaA']!=null&&r.time-s.flags['hit:ijaA']>=.5",
       judge:{ camera:{ eyeM:[.2,.5] }, actors:{ ijaA:{ distM:[.3,2.2] } } } }),
     // N23 「罗班长带弟兄提大刀冲下弹坑台阶；甲右手举着手榴弹……罗从他右后方一刀劈向后颈；一名冲在最前的川军弟兄中弹滚在台阶下；
@@ -758,7 +765,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     Object.freeze({ id:"N23_Chop", storyboard:"Storyboard_N23_ChargeChop.png", when:"s.flags['cut:ijaA']!=null&&r.time-s.flags['cut:ijaA']>=.35",
       judge:{ actors:{ luo:{ distM:[.8,3] } } } }),
     Object.freeze({ id:"N23_Grenade", storyboard:"Storyboard_N23_ChargeChop.png", when:"s.flags.grenadeStopAt!=null&&r.time-s.flags.grenadeStopAt>=.25",
-      judge:{ camera:{ eyeM:[.2,.45], pitchDeg:[-55,-10] } } }),
+      judge:{ camera:{ eyeM:[.2,.45], pitchDeg:[-55,-15] } } }),
     // N24 「何有田抓住塌顶木抬起，第一人称双手撑在泥里往前挣，膝盖在泥地拖出两道痕」 (rescue.heave, unchanged since 09-30).
     Object.freeze({ id:"N24", storyboard:"Storyboard_N24_HeaveOut.png", when:"s.flags.heaveAt!=null&&r.time-s.flags.heaveAt>=.7", judge:{ camera:{ eyeM:[.25,.6] } } }),
     Object.freeze({ id:"N24_Kneel", storyboard:"Storyboard_N24_HeaveOut.png", when:"s.flags.heaveAt!=null&&r.time-s.flags.heaveAt>=2.45", judge:{ camera:{ eyeM:[.95,1.3] } } }),
@@ -805,11 +812,15 @@ export const OPENING_STORYBOARDS = Object.freeze({
       now:"he holds IjaReadyRifle's last frame at rescue.blade.recruitAt and the director lays his rifle from his right hand onto the eye's left cheek (RecruitRifle: turned about the hand, slid along the barrel), touch / cut on rescue.blade touchS / cutS", wave2:"IjaRecruitCheekCut (AnimB) with its root placed so cheekL meets the eye's left cheek; its events in place of touchS / cutS; RecruitRifle off"},
     {shot:"N21", what:"the recruit backs off three steps and levels his rifle at the eye (IjaRecruitLevelRifle, root motion -1.8 m, hold loop)",
       now:"walked backwards to rescue.blade.levelAt at the native gait holding IjaReadyRifle, the rifle aimed at the eye by RecruitRifle", wave2:"IjaRecruitLevelRifle (AnimB) from recruitAt (its root.end = levelAt), its hold loop until the volley"},
+    {shot:"N21", what:"the recruit seen past ijaA (N21 draws him in front, ijaA crouched behind on the right; here ijaA holds the hair 0.6 m from the eye, so the recruit at the left front shows over his shoulder)",
+      now:"N21 judges the recruit with coverOk ijaA", wave2:"IjaRecruitCheekCut leaning him down into the picture past ijaA; drop coverOk"},
     {shot:"N21", what:"the cheekCut sound on the cut",
       now:"rescue.cheek.sound (bayonetHit, quieter)", wave2:"the Sfx package's cheekCut cue (Data_SfxSources); drop rescue.cheek.sound"},
     {shot:"N21", what:"the recruit's bayonet bloody from the practice (01 Practice, Dir01)",
       now:"a dark red smear the director puts on his bayonet's point at Blade (RecruitBlood)", wave2:"whatever 01's practice leaves on the blade (Dir01); RecruitBlood off"},
     // N22 (Charge, the volley)
+    {shot:"N22", what:"ijaA's head in the picture as the volley takes the recruit (he is rising off the pinned man: his head goes out of the top of the frame)",
+      now:"N22 judges him with headOptional", wave2:"look again with the N22 picture at integration (the look on his upper body, rescue.chargeView)"},
     {shot:"N22", what:"the machine-gun crew BunkerGunner / BunkerLoader on the south lip (prone on the corpse rest / kneeling), bursting every 3-6 s until the volley",
       now:"EnsureMgCrew: two IJA made by the director at rescue.mgCrew marks (AI stance prone / kneel, scripted noncombatant, entered in r.enemies under the roster ids), no bursts, no corpse rest", wave2:"Dir01's roster men (Data_FirstLevelMission bunkerAssault), IjaProneLmgOnCorpse / IjaKneelLoadLmg on the Set's mg marks and corpses, Dir01's burst loop; EnsureMgCrew finds them and makes nothing"},
     {shot:"N22", what:"the loader goes over the lip and down into the trench when shot",

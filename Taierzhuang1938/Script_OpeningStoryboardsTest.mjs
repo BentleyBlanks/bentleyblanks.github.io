@@ -706,7 +706,8 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     // Blade: the recruit goes to the right front, cuts, backs off three steps (~1.8 m) and levels at the eye.
     const B=R.blade;
     assert.ok(B.touchS<B.cutS&&B.cutS<B.releaseS,"touch, cut, take it off");
-    assert.ok(D(B.recruitAt,eye)<1.4&&B.recruitAt.z>eye.z,"the recruit cuts from the eye's right front");
+    // (left front: the brief's right front is covered by ijaA's hair-holding arm from the lifted eye; the point comes in from the left)
+    assert.ok(D(B.recruitAt,eye)<1.4&&B.recruitAt.z<eye.z&&B.recruitAt.x>eye.x,"the recruit cuts from the eye's left front");
     assert.ok(Math.abs(D(B.levelAt,B.recruitAt)-1.8)<.25&&D(B.levelAt,eye)>D(B.recruitAt,eye)+1,"three steps back, away from him");
     assert.equal(B.thenLine,"RescueInterrogation.06");assert.equal(B.startLine,"RescueInterrogation.05");
     assert.ok(Math.abs(R.cheek.flinchDeg-6)<1e-9,"the head flinches 6 deg from the cut");

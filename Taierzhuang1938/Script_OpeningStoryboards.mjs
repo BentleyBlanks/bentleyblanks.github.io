@@ -499,7 +499,7 @@ export class FirstLevelBunkerShow {
     }
     const step=Math.min(distance,pace*dt);
     const to=distance>1e-5?{x:from.x+(point.x-from.x)*step/distance,z:from.z+(point.z-from.z)*step/distance}:{x:point.x,z:point.z};
-    if(actor===this.cast.interpreter&&step>0)this.AvoidInterpreterOverlap(from,to,actor);
+    if(actor===this.cast.interpreter&&step>0&&this.flags["fled:interpreter"]==null)this.AvoidInterpreterOverlap(from,to,actor);
     const travel=dt>0?Distance(from,to)/dt:0;
     actor.openingStoryboardTravel=travel;actor.openingPace=ease&&!clip&&speed>0?pace:travel;
     actor.openingStoryboardLast={...to,time:this.r.time};
@@ -1398,13 +1398,13 @@ export class FirstLevelBunkerShow {
   }
   /** The questioning's cast every frame: ijaA squatting at the head with the hair in his fist (and the slaps), the
    *  interpreter squatting at the right, ijaB watching east down the trench, the rescuers and the depth man waiting. */
-  Questioning(){
+  Questioning({skip=null}={}){
     const r=this.r,ijaA=this.Ija("ijaA"),R=C.rescue,Q=R.slap;
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     this.DepthIja();
     this.PoseHolder(ijaA);
     this.InterpreterToSquat();
-    this.RescueVanguard();
+    this.RescueVanguard({skip});
     this.WaitingRescuers();
     this.UpdateSlaps();
   }
@@ -1575,7 +1575,7 @@ export class FirstLevelBunkerShow {
   PhaseBlade(age){
     const r=this.r,R=C.rescue,B=R.blade,f=this.flags,ijaD=this.Ija("ijaD"),eye=C.shunzi.witnessEye;
     if(!this.phaseEntered){this.phaseEntered=true;f.bladeStartAt=r.time;this.bladeLook=null;}
-    this.Questioning();this.RescueVanguard({skip:"ijaD"});
+    this.Questioning({skip:"ijaD"});
     const recruit=ijaD?.alive&&!ijaD.openingCombatReleased?ijaD:null;
     if(recruit)this.RecruitBlood(recruit);
     const toEye=p=>Face(p,eye);
@@ -1583,7 +1583,7 @@ export class FirstLevelBunkerShow {
     if(f.bladeAt==null){
       const at={...B.recruitAt,yaw:toEye(B.recruitAt)};
       if(!recruit){f.bladeAt=r.time;f["touch:cheek"]=f["cut:cheek"]=null;}
-      else if(this.Hold(recruit,at,null,{speed:C.speed.walk})||age>C.timeouts.bladeWalkS){this.Put(recruit,at);f.bladeAt=r.time;}
+      else if(this.Move(recruit,at,Distance(recruit.openingStoryboardLast||recruit.position,at)<.6?at.yaw:null,null,C.speed.walk)||age>C.timeouts.bladeWalkS){this.Put(recruit,at);f.bladeAt=r.time;}
       else{this.RecruitRifle();return this.BladeTimeout(age);}
     }
     const t=r.time-f.bladeAt,clip=OpeningClipMeta(B.clip)?B.clip:null;
@@ -1604,9 +1604,9 @@ export class FirstLevelBunkerShow {
       if(levelClip){this.Put(recruit,{...B.recruitAt,yaw:toEye(B.recruitAt)});this.Pose(recruit,levelClip,{seconds:r.time-f.backAt,face:toEye(B.recruitAt)});
         if(r.time-f.backAt>=(OpeningClipMeta(levelClip).holdLoop?.[0]??B.backS))f.levelAt??=r.time;}
       else{
-        const there=Distance(recruit.openingStoryboardLast||recruit.position,level)<.05;
-        if(!there)this.Move(recruit,level,eye,B.levelStandIn,B.backS>0?Distance(B.recruitAt,B.levelAt)/B.backS:C.speed.walk,{seconds:ClipLength(B.levelStandIn,1.1),ease:false});
-        else{this.Put(recruit,level);this.Pose(recruit,B.levelStandIn,{seconds:ClipLength(B.levelStandIn,1.1),face:level.yaw});f.levelAt??=r.time;}
+        if(f.levelAt==null){
+          if(this.Move(recruit,level,eye,B.levelStandIn,B.backS>0?Distance(B.recruitAt,B.levelAt)/B.backS:C.speed.walk,{seconds:ClipLength(B.levelStandIn,1.1),ease:false}))f.levelAt=r.time;
+        }else this.Hold(recruit,level,B.levelStandIn,{speed:C.speed.walk,seconds:ClipLength(B.levelStandIn,1.1)});
         if(r.time-f.backAt>B.backS+1.5&&f.levelAt==null){this.Put(recruit,level);f.levelAt=r.time;}
       }
     }
@@ -1688,11 +1688,11 @@ export class FirstLevelBunkerShow {
   RecruitBlood(actor){
     const group=actor?.actor?.weaponGroup;if(!group||this.recruitBlood?.parent===group)return;
     if(!this.recruitBloodMaterial){this.recruitBloodMaterial=new THREE.MeshStandardMaterial({color:0x3a0504,roughness:.32,metalness:.05});this.owned.push(this.recruitBloodMaterial);}
-    const length=WEAPONS[actor.actor.weaponId]?.bayonetLengthM||.395,geometry=new THREE.BoxGeometry(.019,.027,length*.55);
+    const length=WEAPONS[actor.actor.weaponId]?.bayonetLengthM||.395,geometry=new THREE.BoxGeometry(.0175,.0255,length*.3);
     (this.ownedGeometry??=[]).push(geometry);
     this.recruitBlood?.removeFromParent();
     const mesh=this.recruitBlood=new THREE.Mesh(geometry,this.recruitBloodMaterial);mesh.name="OpeningRecruitBayonetBlood";
-    mesh.position.copy(actor.actor.weaponMuzzle).add(new THREE.Vector3(0,-.006,-length*.72));
+    mesh.position.copy(actor.actor.weaponMuzzle).add(new THREE.Vector3(0,-.006,-length*.83));
     group.add(mesh);
   }
   // ---- 02 the charge (2026-09-30, docs/Data_OpeningSelfRescue20260930.md) --------------------------------------------
@@ -1780,20 +1780,32 @@ export class FirstLevelBunkerShow {
       if(!actor)continue;
       const delay=cut.by==="luo"?R.delayS.luo:R.extras.find(e=>e.id===cut.by)?.delayS??1;
       const body=this.CutBody(cut.victim),mark=body&&this.StageRoot("chopRear","luo",body);
+      // A fleeing man (cut.fleeM): the cutter waits behind him where he stands wounded (chopRear round his unfled body) and
+      // follows him the two steps to the chop mark (flag chop:<victim>), the chop starting as he gets there.
+      const fleeing=!!cut.fleeM&&!!mark,wait=fleeing?this.StageRoot("chopRear","luo",this.WoundBody(cut.victim)):mark;
       if(this.flags[key]==null){
         if(!mark)continue;
-        const arrived=this.ChargeRun(actor,"charge:"+cut.by,mark,delay,{strike:true}),forced=this.flags.chargeForced!=null;
+        const arrived=this.ChargeRun(actor,"charge:"+cut.by,wait,delay,{strike:true}),forced=this.flags.chargeForced!=null;
         const shot=this.flags["hit:"+cut.victim];
         // After the named cut has landed (gapS): 「罗班长……一刀劈在他后颈」 first, then 「一名冲锋弟兄砍倒想跑的翻译」.
         const before=cut.after?this.flags["cut:"+cut.after]:null,afterOk=!cut.after||!this.Victim(cut.after)?.alive&&(before==null||r.time>=before+contact+cut.gapS);
         const ready=!victim?.alive||shot!=null&&r.time-shot+contact>=this.CutReadyS(cut.victim)&&afterOk;
         if(!(arrived||forced))continue;
-        if(!ready&&!forced){this.Settle(actor,mark);this.Pose(actor,null,{face:mark.yaw});continue;}
-        if(!arrived){this.Show(actor);this.Put(actor,mark);}
-        this.flags[key]=r.time;this.PlayClip(actor,"LuoDadaoChopRear",{restart:true});
+        if(!ready&&!forced){this.Settle(actor,wait);this.Pose(actor,null,{face:wait.yaw});continue;}
+        if(!arrived){this.Show(actor);this.Put(actor,wait);}
+        this.flags[key]=r.time;if(!fleeing)this.PlayClip(actor,"LuoDadaoChopRear",{restart:true});
         continue;
       }
-      const t=r.time-this.flags[key];
+      let start=this.flags[key];
+      if(fleeing){
+        if(this.flags["chop:"+cut.victim]==null){
+          const there=this.Move(actor,mark,mark.yaw,null,cut.fleeMps*1.1,{ease:false});
+          if(!there&&r.time-start<1.2)continue;
+          this.flags["chop:"+cut.victim]=r.time;this.PlayClip(actor,"LuoDadaoChopRear",{restart:true});
+        }
+        start=this.flags["chop:"+cut.victim];
+      }
+      const t=r.time-start;
       if(t<length){this.Settle(actor,mark);this.Pose(actor,"LuoDadaoChopRear",{seconds:t});}
       else this.AfterCut(cut.by,actor);
       if(t>=contact&&victim?.alive)this.CutDown(victim,actor,cut.victim);
@@ -2089,12 +2101,19 @@ export class FirstLevelBunkerShow {
     const done=R.cuts.every(c=>!this.Victim(c.victim)?.alive)&&this.VanguardDown();
     const last=Math.max(...R.cuts.map(c=>(f["cut:"+c.victim]??r.time)+ContactAt("LuoDadaoChopRear","cut",.45)));
     const grenade=f.grenadeDropAt==null&&f["hit:ijaA"]==null||f.grenadeStopAt!=null&&r.time>=f.grenadeStopAt+R.grenadeLookS;
-    if(done&&grenade&&r.time>=last+R.meleeHoldS){f.meleeDoneAt=r.time;this.Stage("Lift");}
+    if(done&&grenade&&r.time>=last+R.meleeHoldS){f.meleeDoneAt=r.time;this.NoteFalls();this.Stage("Lift");}
     else if(age>C.timeouts.meleeS){
       for(const c of R.cuts)this.Kill(this.Victim(c.victim));
       for(const id of C.vanguardIds)this.Kill(r.enemies.get(id),id==="BunkerExecutionerA"?"melee":"bullet");
       if(!r.Has("vanguardMeleeResolved"))r.Record("vanguardMeleeResolved",{forced:true});
       f.meleeForced=r.time;this.Stage("Lift");
+    }
+  }
+  /** Where the volley's and the blades' dead lie (pelvis, flags fall:<role> = "x,z"): the heave must keep off them. */
+  NoteFalls(){
+    for(const role of ["ijaA","ijaB","ijaC","ijaD","interpreter","gunner","loader","ChargeB"]){
+      const actor=role==="ChargeB"?this.cast.ChargeB:this.Victim(role),p=actor?.actor?.characterRig?.bones?.pelvis?.getWorldPosition(new THREE.Vector3());
+      if(p&&!actor.alive)this.flags["fall:"+role]=`${p.x.toFixed(2)},${p.z.toFixed(2)}`;
     }
   }
   /** Every man of vanguardIds is dead or missing from the enemy table. */
@@ -2885,16 +2904,15 @@ export class FirstLevelBunkerShow {
         const at=this.flags["cut:"+c.victim];if(at==null||r.time-at>=Q.cutHoldS||at<latest)continue;
         const x=Head(this.Cutter(c.by)),y=Head(this.Victim(c.victim));if(x&&y){point=x.clone().lerp(y,.5);latest=at;}
       }
-      // 2026-10-11 (「那颗没磕响的手榴弹滚到顺子脸前停住」): the look goes down onto the grenade as it comes to rest at his face
-      // (from 0.3 s before it stops) for rescue.grenadeLookS -- over any cut.
-      const G=this.grenadeProp,stop=this.flags.grenadeStopAt,drop=this.flags.grenadeDropAt;
-      const rollEnd=stop??(drop!=null?drop+.9+C.rescue.grenade.bounceS+C.rescue.grenade.rollS*.6:null);
-      const grenadeLook=G?.visible&&rollEnd!=null&&r.time>=rollEnd-.3&&r.time<rollEnd+C.rescue.grenadeLookS+(stop==null?1:0);
+      // 2026-10-11 (「那颗没磕响的手榴弹滚到顺子脸前停住」): the look follows the grenade down from its first bounce as it rolls
+      // to his face and stays on it rescue.grenadeLookS after it has come to rest -- over any cut.
+      const G=this.grenadeProp,stop=this.flags.grenadeStopAt,bounce=this.flags.grenadeBounce1;
+      const grenadeLook=!!G?.visible&&bounce!=null&&(stop==null||r.time<stop+C.rescue.grenadeLookS);
       if(grenadeLook)point=G.position.clone();
       if(!point&&p==="Melee")point=At(A.bunkerJunction,1.3);
       // ijaA's upper body (his head over the low eye is 40-50 deg up once he stands), else where the shot leaves him.
       if(!point)point=a1&&ijaA?.alive?a1.clone().addScaledVector(UP,-Q.ijaChestDropM):At(this.WoundBody("ijaA")||C.ija.crouch,1.1);
-      const k=this.chargeLook&&this.delta>0?1-Math.exp(-this.delta/Q.lookS):1;
+      const k=this.chargeLook&&this.delta>0?1-Math.exp(-this.delta/(grenadeLook?Q.grenadeLookS:Q.lookS)):1;
       point=this.chargeLook=this.chargeLook?this.chargeLook.lerp(point,k):point.clone();
       const e=r.Point(eye,height),elev=Math.atan2(point.y-e.y,Math.hypot(point.x-e.x,point.z-e.z));
       const low=(grenadeLook||this.grenadeLooking)?Q.grenadeMinPitchDeg:-6;
