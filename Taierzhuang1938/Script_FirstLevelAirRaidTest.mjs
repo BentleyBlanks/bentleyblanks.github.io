@@ -1,6 +1,6 @@
 // Script_FirstLevelAirRaidTest.mjs — 第一关 01–06 中远处日机轮番轰炸的纯 Node 门禁（2026-09-26；09-28 物理化）。
 //
-// 覆盖：起点（01 等到 FrontPass、02 以后进来就开始、07 以后不起新的一轮）、多轮次与间隔、
+// 覆盖：起点（01 等到 DropIn、02 以后进来就开始、07 以后不起新的一轮）、多轮次与间隔、
 // 炸点在中远处（落区中心离听者 minM–maxM、每一颗离听者不少于弹型的 minListenerM）、
 // 外弹道（带飞机速度离机、二次阻力积分：比真空多落一点时间、落在机身后十几二十米、越落越竖）、
 // 投弹解算（长机那一串的中点落在瞄准点上、僚机晚一点投）、离场协调转弯与投弹后上浮、
@@ -96,7 +96,7 @@ function WaveNow(raid, stage = "Support") {
 }
 
 // ---------------------------------------------------------------------------
-// 1) 起点：01 没走到 FrontPass 不起；走到了 firstAfterS 内起第一轮
+// 1) 起点：01 没走到 DropIn 不起；走到了 firstAfterS 内起第一轮
 // ---------------------------------------------------------------------------
 {
   const audio = FakeAudio();
@@ -109,10 +109,10 @@ function WaveNow(raid, stage = "Support") {
     audio.Tick(1 / 30); raid.Update(1 / 30, "Trapped", { started: true });
     if (raid.waves && firstAt === null) firstAt = t;
   }
-  assert.ok(firstAt !== null && firstAt <= R.firstAfterS + 0.1, `FrontPass 之后 ${firstAt?.toFixed(2)} s 起第一轮（≤ ${R.firstAfterS} s）`);
+  assert.ok(firstAt !== null && firstAt <= R.firstAfterS + 0.1, `DropIn 之后 ${firstAt?.toFixed(2)} s 起第一轮（≤ ${R.firstAfterS} s）`);
   const drone = audio.calls.find((c) => c.cue === R.audio.droneCue);
   assert.ok(drone && drone.airCut === R.stages.Trapped.airCut, "01 洞里：引擎声一起就是闷的");
-  Ok(`起点：FrontPass 前 0 轮，之后 ${firstAt.toFixed(2)} s 进场`);
+  Ok(`起点：DropIn 前 0 轮，之后 ${firstAt.toFixed(2)} s 进场`);
 }
 
 // ---------------------------------------------------------------------------
@@ -452,7 +452,7 @@ for (const seed of [7, 8]) {
 }
 
 // ---------------------------------------------------------------------------
-// 6) 挂进前线声景：01 等导演走到 FrontPass；与前线、炮击合计 ≤ sharedMaxVoices；落地走 vfx.BombBlast
+// 6) 挂进前线声景：01 等导演走到 DropIn；与前线、炮击合计 ≤ sharedMaxVoices；落地走 vfx.BombBlast
 // ---------------------------------------------------------------------------
 {
   const audio = FakeAudio({ zone: "trench" });
@@ -465,10 +465,10 @@ for (const seed of [7, 8]) {
   const sound = new FirstLevelMissionBattleSound(audio, { frontShow: { bunker: { beats } }, aircraft, vfx,
     battlefield: { GroundHeight: () => 0 }, Has: () => true }, 3);
   for (let t = 0; t < 40; t += 1 / 30) { audio.Tick(1 / 30); sound.Update(1 / 30, "Trapped", false); }
-  assert.equal(sound.airRaid.waves, 0, "01：导演还没走到 FrontPass，不起");
-  beats.add("FrontPass");
+  assert.equal(sound.airRaid.waves, 0, "01：导演还没走到 DropIn，不起");
+  beats.add("DropIn");
   for (let t = 0; t < 10; t += 1 / 30) { audio.Tick(1 / 30); sound.Update(1 / 30, "Trapped", false); }
-  assert.equal(sound.airRaid.waves, 1, "FrontPass 一到就进场");
+  assert.equal(sound.airRaid.waves, 1, "DropIn 一到就进场");
   assert.ok(formations.some((n) => n >= 2), "编队交给了 aircraft.SetFormation");
   let peak = 0;
   for (const stage of ["BunkerRescue", "RearTrench", "Support", "MachineGun", "Tank", "Orders"]) {
@@ -493,7 +493,7 @@ for (const seed of [7, 8]) {
   assert.ok(st.airRaid && st.airRaid.waves === sound.airRaid.waves, "State() 带空袭取证");
   sound.Dispose();
   assert.equal(formations.at(-1), 0, "销毁时编队收起");
-  Ok(`接进前线声景：FrontPass 起、01–06 共 ${sound.airRaid.waves} 轮、每轮 ${perWave.toFixed(1)} 声，合计声部峰值 ${peak}，`
+  Ok(`接进前线声景：DropIn 起、01–06 共 ${sound.airRaid.waves} 轮、每轮 ${perWave.toFixed(1)} 声，合计声部峰值 ${peak}，`
     + `BombBlast ${blasts.length} 次`);
 }
 

@@ -182,6 +182,13 @@ export const MISSION_ENCOUNTERS = Object.freeze({
       enter: [{x:24.2,z:-130.6},{x:23.5,z:-130},A.bunkerFold] },
     { id: "BunkerFollowB", role: "ijaD", ...A.bunkerJunction, castId: "ijaD", weapon: "Type38", bayonet: true,
       enter: [{x:26.4,z:-133.4},{x:23.5,z:-130},A.bunkerFold,A.bunkerJunction] },
+    // 2026-10-11 Notion redraft (docs/Data_OpeningRedraft20261011Contract.md §1.7): the machine-gun pair that comes down behind
+    // ijaA, heaves two bodies onto the south rim and fires the Type 11 off them at the rear trench while the comrade is
+    // questioned; 02's volley shoots them first. They wait in the depth sap south of J (where they drag the bodies from, Set's
+    // mg.dragFrom) out of the picture (the director keeps them hidden
+    // until CaptiveWall). IJA01 gunner, IJA03 loader (not speaking roles: modelVariant here).
+    { id: "BunkerGunner", role: "mgGunner", x: 14.6, z: -121.4, castId: "gunner", weapon: "Type11", modelVariant: 0 },
+    { id: "BunkerLoader", role: "mgLoader", x: 15.0, z: -119.6, castId: "loader", weapon: "Type38", modelVariant: 2 },
   ],
   // 01 background: the vanguard's forward elements pass J into the depth sap (out of sight south);
   // three distant NRA return fire from the rear corner and the support sap (never hit, fire points).

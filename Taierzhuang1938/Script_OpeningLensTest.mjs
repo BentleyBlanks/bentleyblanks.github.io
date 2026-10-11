@@ -78,8 +78,8 @@ Check("a look stuck waiting for its event warns once (renamed / retimed director
   } finally { console.warn = warn; }
 });
 
-Check("witness (Wake → Taunt, first person from the pinned eye): blood corners 0.3 with the concussion, near DOF at 2.8 m, mud", () => {
-  const full = Evaluate("FrontPass", 3, { concussion: 0.8 });
+Check("witness (Wake → Finish, first person from the pinned eye): blood corners 0.3 with the concussion, near DOF at 2.8 m, mud", () => {
+  const full = Evaluate("DropIn", 3, { concussion: 0.8 });
   Near(full.bloodEdge.strength, 0.3, 1e-9, "blood edge");
   const [tl, tr, bl, br] = full.bloodEdge.corners;
   assert.ok(tr >= 0.95 && tl >= 0.8 && bl >= 0.8 && br < 0.5, "upper right and left heavier, lower right light");
@@ -89,7 +89,7 @@ Check("witness (Wake → Taunt, first person from the pinned eye): blood corners
   assert.ok(full.dofNear.focusM - full.dofNear.rangeM <= 1.0 + 1e-9, "the mud right in front inside the soft range");
   assert.ok(full.mud >= 0.5 && full.mud <= 0.7, "mud, light enough for the throat cut to read");
   // 2026-09-27: no cut-away camera; the questioning and the cut are seen through the same lens.
-  for (const phase of ["Wake", "FrontPass", "CaptiveDragged", "CaptiveWall", "Interrogation", "Slash", "Taunt"])
+  for (const phase of ["Wake", "DropIn", "Sweep", "CaptiveDragged", "CaptiveWall", "Interrogation", "Practice", "Slash", "Finish"])
     assert.equal(Evaluate(phase, 1).look, "witness", phase);
   assert.ok(!("cinematic" in LOOKS), "the cut-away look is gone");
 });
@@ -145,7 +145,7 @@ Check("driver: crossfade between looks, idempotent per frame, null the moment 01
   // A snapshot older than a frame or two (frames stepped without rendering) is not a crossfade source.
   const s = new OpeningLensDriver();
   s.Sample(1.0, "Blast", 0.3, { blastAt: 0.7 });
-  const late = s.Sample(9.0, "FrontPass", 2, { blastAt: 0.7, concussion: 1 });
+  const late = s.Sample(9.0, "DropIn", 2, { blastAt: 0.7, concussion: 1 });
   Near(late.bloodEdge.strength, 0.3, 1e-9, "stale snapshot ignored"); Near(late.aberration, 0.0035, 1e-9, "no near-miss residue");
 });
 

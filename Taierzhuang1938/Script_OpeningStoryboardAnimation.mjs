@@ -10,8 +10,11 @@ export { SetOpeningActorPerformance, ClearOpeningActorPerformance } from "./Scri
 let library, pending;
 // Reused straight from the machine-gun captives library (contract §5.4 reuse list plus the
 // clips the 0922 director already borrowed). Only the rigs that were baked with them get them.
+// 2026-10-11 (01 redraft, contract §4.1 stand-ins): the downward bayonet thrust (ijaB's sweep, the recruit's practice, ijaA's
+// finish) and the stabbed collapse (the comrade curled in the mud) until the new takes are baked.
 const CAPTIVES_REUSED = ["IjaBayonetGuard","CaptiveStandToKneel","CaptiveHandsUpWalk","CaptiveKneelPlead",
-  "IjaKickPrisoner","IjaShoveForward","IjaTauntGesture","CaptiveKneelFlinch","CaptiveShovedStumble"];
+  "IjaKickPrisoner","IjaShoveForward","IjaTauntGesture","CaptiveKneelFlinch","CaptiveShovedStumble",
+  "IjaBayonetDownThrust","CaptiveStabbedCollapse"];
 // Stationary clips a man may be asked to play while the director walks him a few steps: his legs are the
 // native gait's while he travels (the clip's standing legs would glide along the ground).
 const TRAVEL_LEGS_CLIPS = ["CollarControl","CollarDrag","MessengerReport","CreepDadao","RifleDeflect","IjaBayonetGuard","IjaReadyRifle","IjaCollarQuestion"];

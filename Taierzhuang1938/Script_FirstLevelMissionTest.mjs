@@ -817,7 +817,15 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
     OrdersExit:storyboards.banter.exitRoute,
     // 2026-09-27 rework (docs/Data_OpeningPinnedRescue20260927.md): ijaA walks off from the kill to the pinned man; the
     // interpreter trots to his squat; the charge comes over the crater step; Liu goes down into the trench after his shot.
-    TauntWalk:[...storyboards.ija.tauntWalk,storyboards.ija.found],
+    // 2026-10-11 redraft (docs/Data_OpeningRedraft20261011Contract.md): He out of the far corner, ijaB down the link sap and his
+    // sweep along the bodies to his stop, the machine-gun pair to the south rim, the recruit to the comrade, ijaA's finish to
+    // the pinned man.
+    ExitHe:[...storyboards.banter.exitOrder[0].via,...storyboards.banter.exitRoute],
+    DropInB:storyboards.dropIn.bRoute,
+    Sweep:[storyboards.dropIn.junctionPost,...storyboards.marks.sweepBodies.map(p=>({x:p.x+storyboards.sweep.standOffM,z:p.z})),{x:7.4,z:-125.4},{x:storyboards.sweep.stopX,z:-124.95}],
+    MgCrew:[storyboards.wall.crewFrom,...storyboards.wall.crewVia],
+    PracticeIn:[storyboards.dropIn.junctionPost,{x:9,z:-125.3},storyboards.practice.recruitFront],
+    Finish:[{x:3.9,z:-125.2},{x:3.8,z:-124.75},storyboards.found.stand],
     InterpreterSquat:[storyboards.interrogation.interpreterAt,...storyboards.rescue.interpreterReturn,storyboards.rescue.interpreter],
     Charge:[...storyboards.rescue.chargeRoute],
     RescueLiuCover:[storyboards.rescue.liuShot,{x:3.3,z:-123.4},storyboards.rescue.liuCover],
@@ -827,6 +835,8 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
     Withdraw:storyboards.withdraw.lane,
   };
   for(const state of MISSION_LAYOUT.scenario.states)for(const [name,lane] of Object.entries(lanes)){
+    // He leaves the dugout before the near miss: his way out of the far corner is walked in the intact dugout only.
+    if(name==="ExitHe"&&state.id!=="BunkerIntact")continue;
     for(let i=1;i<lane.length;i++){
       const a=lane[i-1],b=lane[i],distance=Math.hypot(a.x-b.x,a.z-b.z);
       for(let d=0;d<=distance;d+=.2){
@@ -1326,7 +1336,8 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
     assert.ok(depth>=0&&depth<=point.depth+.001,"the damaged sap respects its shallow depth below natural soil: "+depth);
   }
   // 01 掩蔽部门外的行刑组：两个动手的、两个跟进的，全都在门外看得见的那一小片里。
-  assert.equal(MISSION_ENCOUNTERS.bunkerAssault.length,4,"the bunker door has its finite execution party");
+  // 2026-10-11: plus the machine-gun pair (docs/Data_OpeningRedraft20261011Contract.md §1.7).
+  assert.equal(MISSION_ENCOUNTERS.bunkerAssault.length,6,"the bunker door has its finite execution party and the machine-gun pair");
   for(const spec of MISSION_ENCOUNTERS.bunkerAssault)
     assert.ok(Math.hypot(spec.x-A.bunkerKilling.x,spec.z-A.bunkerKilling.z)<=R.bunkerSightM,
       spec.id+" stands inside the sight line through the low breach");

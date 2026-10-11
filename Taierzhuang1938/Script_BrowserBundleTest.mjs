@@ -144,7 +144,7 @@ try {
       assert.deepEqual(closeup.errors,[],'missing characters must not crash the captive, collar, strike or interrogation performances');
       assert.equal(closeup.stage,'Trapped');
       assert.equal(closeup.phase,'Interrogation');
-      for(const phase of ['Banter','Orders','Incoming','Blast','Black','Wake','FrontPass','CaptiveDragged','CaptiveWall','Interrogation'])
+      for(const phase of ['Count','Banter','Orders','Incoming','Blast','Black','Wake','DropIn','Sweep','CaptiveDragged','CaptiveWall','Interrogation'])
         assert.ok(closeup.beats.includes(phase),'the missing-model run physically completed '+phase);
       assert.deepEqual(closeup.captives,[{id:'Opening_comrade',alive:true}],
         'the actual captive survives creation and kneels at the wall for the interrogation');

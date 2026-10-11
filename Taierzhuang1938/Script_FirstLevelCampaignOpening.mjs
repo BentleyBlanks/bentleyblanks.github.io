@@ -52,6 +52,15 @@ export const REQUIRED_ACTING = ["BunkerBanter/yaowa", "BunkerBanter/comrade", "B
 /** Mouths that must be sampled mid-line (the collection guard included). */
 export const REQUIRED_JAWS = ["comrade", "yaowa", "luo", "runner", "interpreter", "ijaA", "guard"];
 const DIRECTOR_PHASES = [...Storyboards.phases.Trapped, ...Storyboards.phases.BunkerRescue];
+/** 2026-10-11: the frozen director events of 01 (contract §3; the voice direction waits on them), in story order. */
+export const OPENING_EVENTS_01 = Object.freeze(["liuToss","breadToss","nearShell","heRoll","pour","comradeLaugh","sitUp","exitReach","clipsThrown",
+  "grenadeBlast","stab7","stab8","stab9","haltB","kneeled","boltOpen","woundPress","recruitSlapped","stab1","stab2","recruitPant","hairLifted",
+  "cutStart","wipe1","wipe2","fix","bayonetFixed","recruitNod","bootGrind"]);
+/** Scenes the 01 director times by its own estimate while this round's take is not recorded (Data_OpeningStoryboards.lines):
+ *  their speakers are not judged for jaw / acting until the take is in (the voice layer then times them). */
+const EstimatedScenes=flags=>new Set(Object.entries(flags||{}).filter(([k,v])=>k.startsWith("voice:")&&v==="estimate").map(([k])=>k.slice(6)));
+const RECORDED_01_SPEAKERS=new Set(["luo","yaowa","runner","shouter","interpreter","ijaB","ijaA","guard","heyoutian","liuwencai"]);
+const Unvoiced=(role,estimated)=>!RECORDED_01_SPEAKERS.has(role)&&Object.entries(Storyboards.lines).filter(([,rows])=>rows.some(r=>r[0]===role)).every(([scene])=>estimated.has(scene));
 const RC = MISSION_STAGE_ROUTES.rearTrench[2];
 const WITHDRAW_ROUTE = [...Storyboards.withdraw.lane.slice(1), ...MISSION_STAGE_ROUTES.rearTrench.slice(3)];
 const AT_RC = WITHDRAW_ROUTE.findIndex((p) => p.x === RC.x && p.z === RC.z) + 1;
@@ -59,9 +68,16 @@ const AT_RC = WITHDRAW_ROUTE.findIndex((p) => p.x === RC.x && p.z === RC.z) + 1;
 // Key frames (contract §7.4 K1/K2 plus the draft's beats): phase + seconds into it, or a director flag.
 const KEY_FRAMES = [
   { label: "K1_Wake", phase: "Wake", age: 1.6 },
-  { label: "FrontPass", phase: "FrontPass", age: 2 },
+  // 2026-10-11 redraft (docs/Data_OpeningRedraft20261011Contract.md): the count in the black, the dugout, the drop-in, the sweep,
+  // the machine gun, the practice, the finish.
+  { label: "Count", phase: "Count", age: 2 },
+  { label: "Banter", phase: "Banter", age: 2.5 },
+  { label: "DropIn", phase: "DropIn", age: 3.1 },
+  { label: "Sweep", flag: "ev:stab8", at: .2 },
   { label: "Interrogation", phase: "Interrogation", age: 3 },
+  { label: "Practice", flag: "ev:recruitSlapped", at: .1 },
   { label: "ThroatCut", phase: "Slash", flag: "throatCut", at: .25 },
+  { label: "Finish", flag: "ev:finishStab1", at: .2 },
   // 2026-09-27 rework (docs/Data_OpeningPinnedRescue20260927.md): the find, the slap, the charge, the cuts, the haul.
   { label: "Found", phase: "Found", age: 1.5 },
   { label: "Slap", flag: "slapAt", at: .15 },
@@ -301,7 +317,7 @@ const StepSampled = (page, frames) => Watch("StepSampled", page.evaluate((frames
   for (let i = 0; i < frames; i++) { g.StepFrames(1, 1 / 60, i === frames - 1); window.openingProbe.Sample(); }
   const r = g.Debug.FirstLevelMissionRuntime(), s = r.frontShow.bunker, m = g.Debug.FirstLevelMission();
   return { stage: m.stage, time: m.time, facts: m.facts, alive: g.player.alive, health: g.player.health,
-    phase: s.phase, phaseTime: s.Age, released: s.releaseAt != null, luoM: (() => { const l = s.Squad("luo"); return l && !l.openingStoryboardHidden ? Math.hypot(l.position.x - g.player.camera.position.x, l.position.z - g.player.camera.position.z) : null; })(), flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number")),
+    phase: s.phase, phaseTime: s.Age, released: s.releaseAt != null, emitted: (s.emitted || []).length, luoM: (() => { const l = s.Squad("luo"); return l && !l.openingStoryboardHidden ? Math.hypot(l.position.x - g.player.camera.position.x, l.position.z - g.player.camera.position.z) : null; })(), flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number")),
     error: s.error };
 }, frames)).then((state) => (lastState = state));
 
@@ -324,8 +340,8 @@ export async function DriveOpening(ctx){
   await InstallProbe(page);
   const taken=new Set(),phaseShots=new Set();
   let state;
-  // 01–02 are watched: about 200 s of game time, 15 frames per round trip.
-  for(let i=0;i<1400;i++){
+  // 01–02 are watched: about 280 s of game time since the 2026-10-11 redraft, 15 frames per round trip.
+  for(let i=0;i<2200;i++){
     state=await StepSampled(page,15);
     assert.equal(state.error,undefined,"animation library loaded");
     if(!state.alive)await fs.writeFile(path.join(output,"Data_OpeningFailure.json"),JSON.stringify({state,
@@ -370,6 +386,16 @@ export async function DriveOpening(ctx){
   for(const fact of ["runnerCallHeard","bunkerCollapsed","captivesKilled","playerSlapped","doorSearchStarted","rescueCallHeard","vanguardMeleeResolved","junctionShot","luoRescueComplete","playerDraggedFromWreck"])
     assert.ok(state.facts.includes(fact),`observed event: ${fact}`);
   assert.ok(show.captives.length===1&&show.captives.every(a=>!a.alive),"the comrade dies at the wall");
+  // 2026-10-11 redraft (contract §3): every frozen director event of 01 is sent, in the flow's order where it is fixed.
+  const sent=show.emitted.map(e=>e.event);
+  console.log("EVENTS",JSON.stringify(show.emitted.map(e=>[e.event,e.time,e.phase])));
+  for(const name of OPENING_EVENTS_01)assert.ok(sent.includes(name),`director event ${name} sent (${sent.join(",")})`);
+  assert.deepEqual(OPENING_EVENTS_01.filter(n=>sent.includes(n)).map(n=>sent.indexOf(n)),OPENING_EVENTS_01.filter(n=>sent.includes(n)).map(n=>sent.indexOf(n)).slice().sort((a,b)=>a-b),"the 01 events come in story order");
+  // Captives killed at the cut, the door search at the squat (contract §1.8 / §1.9).
+  const at=n=>show.emitted.find(e=>e.event===n)?.time,phaseAt=p=>show.events.find(e=>e.phase===p)?.time;
+  console.log("PACE",JSON.stringify({fadeInToBlastS:phaseAt("Blast")-phaseAt("Banter"),blastToFoundEndS:phaseAt("Hold")-phaseAt("Blast"),
+    whistleToFoldClearS:at("grenadeBlast")-show.flags.whistleAt,phases:Object.fromEntries(DIRECTOR_PHASES.map(p=>[p,phaseAt(p)]))}));
+  assert.ok(at("grenadeBlast")-show.flags.whistleAt<=12.5,"from the whistle to 「折角，清了！」 within 12 s (contract §1.4 / Brief 6)");
   // ---- physical events: ijaA / ijaB cut down, ijaD shot, before Check -------------------------
   const eventTime=phase=>show.events.find(e=>e.phase===phase)?.time;
   // 2026-09-29: the runner calls from far off inside Orders (beat RunnerCall; the fact runnerCallHeard is in the facts above), before he reports.
@@ -527,12 +553,14 @@ export async function DriveOpening(ctx){
   await fs.writeFile(path.join(output,"Data_OpeningMotionContinuity.json"),JSON.stringify(late,null,2));
   console.log("ACTING",JSON.stringify(Object.fromEntries(Object.entries(late.acting).map(([k,v])=>[k,{f:v.speakingFrames,head:+v.headRadians.toFixed(3),hand:+v.handMetres.toFixed(3)}]))));
   console.log("JAW",JSON.stringify(late.jaw));
-  for(const role of REQUIRED_JAWS)assert.ok(late.jaw[role]?.speakingFrames>10,`${role}'s mouth was sampled mid-line (${JSON.stringify(late.jaw[role]||null)})`);
+  const estimated=EstimatedScenes(show.flags);
+  console.log("ESTIMATED_TAKES",JSON.stringify([...estimated]));
+  for(const role of REQUIRED_JAWS.filter(role=>!Unvoiced(role,estimated)))assert.ok(late.jaw[role]?.speakingFrames>10,`${role}'s mouth was sampled mid-line (${JSON.stringify(late.jaw[role]||null)})`);
   for(const [role,row] of Object.entries(late.jaw)){
     if(row.speakingFrames>10)assert.ok(row.speakingMax>=SPEAKING_JAW_RADIANS,`${role} opens the jaw while speaking (${row.speakingMax})`);
     if(row.silentFrames>10)assert.ok(row.silentMax<=SILENT_JAW_RADIANS,`${role} keeps the mouth closed while others speak (${row.silentMax} in ${row.silentMaxPhase})`);
   }
-  for(const key of REQUIRED_ACTING){
+  for(const key of REQUIRED_ACTING.filter(key=>!estimated.has(key.split("/")[0]))){
     const row=late.acting[key];
     assert.ok(row?.speakingFrames>10,`${key}: the speaking actor gets dialogue acting (${JSON.stringify(row||null)})`);
     assert.ok(row.headRadians>.06||row.handMetres>.055,`${key}: visible acting continues through the line (${JSON.stringify(row)})`);

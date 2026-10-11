@@ -363,7 +363,7 @@ function Dump({ warm, freeze, points }) {
   const e = new T.Euler().setFromQuaternion(cam.quaternion, "YXZ");
   const Screen = (v) => { const p = v.clone().project(cam); return { x: R3((p.x + 1) / 2), y: R3((1 - p.y) / 2), front: p.z < 1 && p.z > -1 }; };
   const roles = new Map();
-  for (const role of ["ijaA", "ijaB", "ijaC", "ijaD", "luo", "yaowa", "heyoutian", "liuwencai", "comrade", "runner", "shouter", "interpreter"]) { const a = Actor(role); if (a && !roles.has(a)) roles.set(a, role); }
+  for (const role of ["ijaA", "ijaB", "ijaC", "ijaD", "luo", "yaowa", "heyoutian", "liuwencai", "comrade", "runner", "shouter", "interpreter", "gunner", "loader", "victim"]) { const a = Actor(role); if (a && !roles.has(a)) roles.set(a, role); }
   for (const [id, a] of Object.entries(s.cast)) if (!roles.has(a)) roles.set(a, id);
   for (const a of r.squad) if (!roles.has(a)) roles.set(a, a.castId || a.id);
   const actors = [], heads = new Map(), people = new Set(), roots = new Map();
@@ -395,7 +395,8 @@ function Dump({ warm, freeze, points }) {
     if (!o.isMesh || o.isSkinnedMesh) return true;
     const m = Array.isArray(o.material) ? o.material[0] : o.material;
     if (!m || m.visible === false || m.colorWrite === false || (m.transparent && m.opacity < .5)) return true;
-    for (let p = o; p; p = p.parent) if (!p.visible || people.has(p) || p === cam || p === rifleView) return true;
+    // A small prop in someone's hand (the director's stand-in props: OpeningStandIn_*) is not scenery.
+    for (let p = o; p; p = p.parent) if (!p.visible || people.has(p) || p === cam || p === rifleView || p.name?.startsWith?.("OpeningStandIn_")) return true;
     return false;
   };
   for (const [row, head] of heads) {

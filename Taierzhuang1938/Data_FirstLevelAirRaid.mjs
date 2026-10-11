@@ -2,7 +2,7 @@
 //
 // 用户要求：「从日军先头兵开始，中远处安排多轮次的飞机炸弹轰炸，增加战场氛围」（09-26）；
 // 「给飞机的轰炸做得更基于物理、场面更宏大一点」（09-28）。
-// 起点 = 01 的 FrontPass 相位（先头兵沿交通壕经过洞口，Data_OpeningStoryboards.phases.Trapped）；
+// 起点 = 01 的 DropIn 相位（2026-10-11 起：先头兵跳下前沟，取代 FrontPass；Data_OpeningStoryboards.phases.Trapped）；
 // 02 以后的步骤（阶段跳转 / 检查点直接进来）一律算已经开始。终点 = 06 Orders 结束，07 以后不起新的一轮。
 //
 // **纯氛围层**：不伤人、不改地形、不进压制账与 TTK、不记任务事实。炸点离听者、离任何活人与战车
@@ -41,7 +41,7 @@ const TWO_VICS = Object.freeze([...V_SHAPE, ...Vic(-92, 104, 18)]);
 export const FIRST_LEVEL_AIR_RAID = Object.freeze({
   version: "20260928-airRaidPhysics",
   /** 从哪一刻起：Trapped 这一步要等导演走到这个相位；其余步骤进来就算开始。 */
-  start: Object.freeze({ stage: "Trapped", phase: "FrontPass" }),
+  start: Object.freeze({ stage: "Trapped", phase: "DropIn" }),
   /**
    * 哪几步起新的一轮，及各步的附加口径：
    *   airCut        这一步每一声再压一道高频（01 整段躺在洞里，隔着土只剩闷响）；

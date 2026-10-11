@@ -311,7 +311,7 @@ const Samples = (route) => {
     SB03: { eye: E, h: C.shunzi.lieEyeM, pitchDeg: 12, yawDeg: -88, targets: [["ijaA", { x: 4.10, z: -125.63 }, [1.55, 0.9, 0.35]],
       ["captive (sitting)", { x: 4.06, z: -125.90 }, [0.85, 0.5]], ["ijaB", { x: 6.05, z: -125.0 }, [1.55, 0.9, 0.35]],
       ["interpreter (crouched)", { x: 4.9, z: -124.05 }, [1.0, 0.6]]] },
-    Found: { eye: E, h: C.shunzi.lieEyeM, pitchDeg: 30, yawDeg: -90, targets: [["ijaA over him", C.ija.found, [1.55, 0.9, 0.35]]] },
+    Found: { eye: E, h: C.shunzi.lieEyeM, pitchDeg: 30, yawDeg: -90, targets: [["ijaA over him", C.found.stand, [1.55, 0.9, 0.35]]] },
     Held: { eye: E, h: C.shunzi.lieEyeM + C.rescue.holdShot.liftM, pitchDeg: 20, yawDeg: -90, targets: [["ijaA squatting", C.ija.crouch, [0.9, 0.6]],
       ["interpreter squatting", C.rescue.interpreter, [0.9, 0.6]], ["ijaB watching", C.rescue.ijaBGuard, [1.55, 0.9]]] },
   };
@@ -522,7 +522,7 @@ const Samples = (route) => {
       ["ijaA head", AtRoot(3.873, -125.316, { x: 3.857, z: -125.255 }, 1.322)]] },
     { shot: "Found", phase: "Found", settle: true, eye: pinned, targets: [
       ["dead comrade head (slid down the wall)", AtRoot(3.87, -126.121, deadRoot, 0.835)],
-      ["ijaA head over him", AtRoot(C.ija.found.x, C.ija.found.z, C.ija.found, 1.5)]] },
+      ["ijaA head over him", AtRoot(C.found.stand.x, C.found.stand.z, C.found.stand, 1.5)]] },
   ];
   const ray = new THREE.Raycaster();
   const Shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };

@@ -60,7 +60,7 @@ for(const [phase,beat] of Object.entries(C.firstPerson.hands.beats)){
   for(const name of typeof beat.legs==="string"?[beat.legs]:(beat.legs||[]).map(k=>k[1]))assert.ok(LEG_POSES[name],`${phase} names a known leg pose (${name})`);
   for(const name of beat.props||[])assert.ok(FP_PROPS[name],`${phase} names a known first-person prop (${name})`);
 }
-for(const phase of PHASES)assert.ok(C.firstPerson.hands.beats[phase]?.keys?.length||["Banter","Orders","Incoming"].includes(phase),`${phase} has hands (or holds the loading rifle)`);
+for(const phase of PHASES)assert.ok(C.firstPerson.hands.beats[phase]?.keys?.length||["Count","Banter","Orders","Incoming"].includes(phase),`${phase} has hands (or holds the loading rifle)`);
 let samples=0,maxBend=0,maxTwist=0,maxRotation=0,groundContacts=0,maxGroundError=0;
 // Hands resting on the mud must really touch it: the ground under the eye is 0.42 m down here.
 const GROUND_POSES=new Set(["flat","push","clawIn","clawOut","sit","brace","limp","scrape"]);

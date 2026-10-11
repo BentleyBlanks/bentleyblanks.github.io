@@ -110,10 +110,12 @@ export const LOOKS = Freeze({
 // The director's phases (Data_OpeningStoryboards.phases, contract §5.3 of the 01–06 round) → look.
 // A phase not listed here is outside 01–02: Evaluate returns null.
 export const PHASE_LOOKS = Freeze({
-  Banter: "clean", Orders: "clean", Incoming: "clean",
+  // 2026-10-11 redraft (Dir01 hook): Count is the black before the picture (clean); DropIn, Sweep, Practice and Finish are
+  // watched from the pinned eye like the questioning (witness); FrontPass and Taunt are retired.
+  Count: "clean", Banter: "clean", Orders: "clean", Incoming: "clean",
   Blast: "nearMiss", Black: "nearMiss",
-  Wake: "witness", FrontPass: "witness", CaptiveDragged: "witness", CaptiveWall: "witness",
-  Interrogation: "witness", Slash: "witness", Taunt: "witness",
+  Wake: "witness", DropIn: "witness", Sweep: "witness", CaptiveDragged: "witness", CaptiveWall: "witness",
+  Interrogation: "witness", Practice: "witness", Slash: "witness", Finish: "witness",
   Found: "found", Hold: "held", Ask: "held",
   Charge: "charge", Melee: "charge", Lift: "clean",
   Check: "clean", Released: "clean",
