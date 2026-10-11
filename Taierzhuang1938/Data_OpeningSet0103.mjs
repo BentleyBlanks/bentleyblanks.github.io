@@ -618,23 +618,23 @@ export const SET_MARKS = Object.freeze({
     // [0] 东移 0.5 m：南壁脚 x 10.9 起原有一段前沟护壁，收到 12.25 以东也压不下一具人，就挪到护壁西头。
     bodies: Object.freeze([
       Body(11.3, -123.4, 105, { pose: "nra1", tier: 1 }),
-      Body(9.4, -123.1, 90, { pose: "nra0", tier: 1 }),
+      Body(9.4, -123.1, 90, { pose: "nra1", tier: 1 }),
       // [2] 是演员 SweepVictim（Dir01 生成，被扎后叫一声抓泥）：Set 只保证这块地净空（测试 6a）。
       Body(7.4, -124.8, 90, { actor: "SweepVictim", pose: "nra1" }),
     ]),
   }),
   finish: Object.freeze({
     // 甲（ijaA）擦刀卡枪后端枪沿沟底往洞口走、各补一刀的两具（Black 之前不显示）。
-    // [0] 契约 (3.3,-124.3)：连胳膊的实际宽度压到 02 冲锋路线 chargeRoute 的末点 (3.3,-123.5)（只差 0.27 m），北移 0.3 m、
-    //     头偏北 10°，离 chargeRoute 0.5 m 以上。它仍在 02 翻译蹲位 rescue.interpreter (2.92,-124.5) 与罗班长撤离折线
+    // [0] 契约 (3.3,-124.3)：连胳膊的实际宽度压到 02 冲锋路线 chargeRoute 的末点 (3.3,-123.5)（只差 0.27 m），北移 0.25 m，
+    //     离 chargeRoute 0.5 m 以上；再往北就压到甲 Found 站的 ija.found (2.98,-125.2)。它仍在 02 翻译蹲位 rescue.interpreter (2.92,-124.5) 与罗班长撤离折线
     //     withdraw.lane 上（Dir 的点，不在契约净空名单里）：交 Dir02 让开（报告）。
     // [1] 契约值 (2.6,-125.95) 在眼位**东北** 1.0 m（契约说明栏写「东南 0.75 m」，与值矛盾）。东南那块地是踩手的右手、
     //     手榴弹停点、翻译蹲位与何有田抬木的落脚，放不下一具人；按值放在北边，西移 0.55 m 让开 rescue.rifleMouth 那支枪
     //     （枪口朝东北伸到 x 3.48）和 trenchFacadeN 板墙（x ≥ 2.6）。头朝西，横伸的左臂正好搭到顺子左肩外侧（刻意：
     //     「就在玩家脸前」那一刀扎在他左手边 0.6 m）。
     bodies: Object.freeze([
-      Body(3.3, -124.6, 80, { pose: "nra1", tier: 0 }),
-      Body(2.05, -125.9, 90, { pose: "nra1", tier: 0 }),
+      Body(3.3, -124.55, 90, { pose: "nra1", tier: 0 }),
+      Body(2.05, -125.8, 90, { pose: "nra1", tier: 0 }),
     ]),
     // 手榴弹滚停点：眼位 witnessEye (1.85,-125.25) 东 0.35 m、南 0.15 m，离眼 0.38 m；沟底平（测试 6d 量坡度）。
     grenadeStop: P(2.2, -125.1),
@@ -658,11 +658,11 @@ export const SET_MARKS = Object.freeze({
   }),
   dropIn: Object.freeze({
     // 北沟沿三处跳下点：`x,z` 是沟沿顶（日兵蹲着露刺刀尖的地方，地面 ≈ 0），`land` 是沟底落点。契约值 (10.0,-126.6) 等
-    // 在北壁半坡上（地面 -1.4）；北沟沿真正的边在 z -127.2，沟底在 z -126.25 以南，落点取离坡脚 0.4 m。高差测试 6c 量（1.8–2.1 m）。
+    // 在北壁半坡上（地面 -1.4）；北沟沿真正的边在 z -127.2，沟底在 z -126.25 以南，落点取离坡脚 0.45–0.5 m（脚下 0.4 m 内是平沟底）。高差测试 6c 量（1.8–2.1 m）。
     lip: Object.freeze([
-      Object.freeze({ who: "ijaC", x: 10.0, z: -127.2, yawDeg: 180, land: P(10.0, -125.85) }),
-      Object.freeze({ who: "ijaD", x: 11.5, z: -127.2, yawDeg: 180, land: P(11.5, -125.8) }),
-      Object.freeze({ who: "ijaA", x: 9.0, z: -127.25, yawDeg: 180, land: P(9.0, -125.9) }),
+      Object.freeze({ who: "ijaC", x: 10.0, z: -127.2, yawDeg: 180, land: P(10.0, -125.75) }),
+      Object.freeze({ who: "ijaD", x: 11.5, z: -127.2, yawDeg: 180, land: P(11.5, -125.75) }),
+      Object.freeze({ who: "ijaA", x: 9.0, z: -127.25, yawDeg: 180, land: P(9.0, -125.8) }),
     ]),
     /** 落点半径内不许有杂物 / 沙袋 / 木撑。 */
     landClearM: 0.6,
