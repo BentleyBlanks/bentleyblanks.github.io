@@ -771,15 +771,70 @@ export function CampaignActions(ctx) {
   }
 
   async function Capture(name) {
-    await page.evaluate(() => window.Tengxian.StepFrames(6, 1 / 60, true));
+    const drift = await page.evaluate(() => {
+      const g = window.Tengxian, out = [];
+      for (let i = 0; i < 6; i++) {
+        const before = g.player.yaw;
+        g.StepFrames(1, 1 / 60, true);
+        const d = Math.atan2(Math.sin(g.player.yaw - before), Math.cos(g.player.yaw - before));
+        if (Math.abs(d) > .01) out.push({ i, d: +d.toFixed(3), melee: !!g.meleeCombat?.Active, pose: g.player.meleePose?.state || null,
+          control: g.Debug.FirstLevelMissionRuntime?.()?.controls?.kind || null, mounted: g.emplacement?.View?.()?.id || null });
+      }
+      return out;
+    });
+    if (drift.length) console.log("CAPTURE_DRIFT", name, JSON.stringify(drift));
     const render = await page.evaluate(() => {
       const g = window.Tengxian,
         info = g.renderer.info,
         reset = info.autoReset;
       info.autoReset = false;
       info.reset();
-      g.StepFrames(1, 1 / 60, true);
+      // 逐 draw 记账（2026-10-12 R3-Perf）：整帧三角是**所有趟**加起来的（主画面、预通道、阴影各级、反射……），
+      // 只看场景根节点拆不出「这一帧多烘了一张阴影」还是「多了一批人」。包住 renderBufferDirect，
+      // 用 info 的前后差把每一笔记到「趟（相机类型 × 渲染目标尺寸）」与「物体」上，只记这一帧。
+      const passes = Object.create(null), objects = new Map(), renderer = g.renderer, direct = renderer.renderBufferDirect;
+      const PassOf = (camera) => {
+        const target = renderer.getRenderTarget();
+        return (camera?.isOrthographicCamera ? "ortho" : camera?.isPerspectiveCamera ? "persp" : camera?.type || "?")
+          + "@" + (target ? target.width + "x" + target.height + (target.isWebGLCubeRenderTarget ? "cube" : "") : "screen");
+      };
+      const PathOf = (object) => {
+        const names = [];
+        for (let node = object, guard = 0; node && node !== g.scene && guard < 12; node = node.parent, guard++)
+          if (node.name && names.length < 4) names.push(node.name);
+        let top = object;
+        while (top.parent && top.parent !== g.scene) top = top.parent;
+        return { path: names.reverse().join("/") || object.type, root: top.parent === g.scene ? (top.name || top.type) : "(detached)" };
+      };
+      renderer.renderBufferDirect = function TallyTriangles(camera, scene, geometry, material, object, group) {
+        const before = info.render.triangles, calls = info.render.calls;
+        const out = direct.call(this, camera, scene, geometry, material, object, group);
+        const tris = info.render.triangles - before;
+        if (info.render.calls === calls) return out;
+        const pass = PassOf(camera);
+        const p = passes[pass] || (passes[pass] = { calls: 0, tris: 0 });
+        p.calls++; p.tris += tris;
+        let row = objects.get(object);
+        if (!row) objects.set(object, row = { object, tris: 0, calls: 0, passes: {} });
+        row.tris += tris; row.calls++; row.passes[pass] = (row.passes[pass] || 0) + tris;
+        return out;
+      };
+      try { g.StepFrames(1, 1 / 60, true); } finally { renderer.renderBufferDirect = direct; }
       const result = { drawCalls: info.render.calls, triangles: info.render.triangles };
+      const csm = g.lights?.csm;
+      result.shadowLevels = csm?.lastScheduled ? csm.lastScheduled.map((on, level) => on ? level : -1).filter((l) => l >= 0) : null;
+      result.passes = Object.fromEntries(Object.entries(passes).sort((a, b) => b[1].tris - a[1].tris).map(([k, v]) => [k, { calls: v.calls, tris: Math.round(v.tris) }]));
+      result.top = [...objects.values()].sort((a, b) => b.tris - a.tris).slice(0, 20).map((row) => {
+        const where = PathOf(row.object), o = row.object;
+        return { ...where, type: o.isInstancedMesh ? "instanced:" + o.count : o.isBatchedMesh ? "batched" : o.isSkinnedMesh ? "skinned" : o.type,
+          tris: Math.round(row.tris), calls: row.calls, passes: row.passes };
+      });
+      const p = g.player?.position;
+      result.at = { stage: g.Debug?.FirstLevelMission?.()?.stage, time: +(g.Debug?.FirstLevelMission?.()?.time ?? NaN).toFixed?.(2),
+        player: p ? [+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)] : null, yaw: +(g.player?.yaw ?? 0).toFixed(2), pitch: +(g.player?.pitch ?? 0).toFixed(2),
+        // 实际出画的相机朝向（机枪 / 白刃 / 过场接管时与玩家 yaw 不同）与谁在接管。
+        forward: (() => { const c = g.camera, f = new c.position.constructor(0, 0, -1).applyQuaternion(c.quaternion); return [+f.x.toFixed(2), +f.y.toFixed(2), +f.z.toFixed(2)]; })(),
+        melee: !!g.meleeCombat?.Active, mounted: g.emplacement?.View?.()?.id || null, cutscene: g.state?.cutscene || null };
       // 预算读数旁边带上「谁在花」：活人 / 尸体 / LOD 分布、蒙皮数，以及按场景根节点拆的三角形。
       // 超预算时光看一个总数定不了责任，A/B 两棵树各跑一遍就能看出是布景、人物还是尸体在涨。
       const soldiers = g.ai ? g.ai.soldiers : [];
