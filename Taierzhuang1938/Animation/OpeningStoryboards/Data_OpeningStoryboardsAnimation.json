@@ -12461,7 +12461,7 @@
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "97dee17b7ebbdb19efde3dffcfb3079bfd7f445e3ed839a07915ddabd464440d",
+   "sha256": "36d6db606e7ce777736fd62f15aabdf86a4095401c37995abe66d3f72728655e",
    "originalModelSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningRedraft_20261011_AB\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
@@ -15660,8 +15660,8 @@
      "floorCorrectionMax": 7e-05,
      "root": {
       "start": [
-       0.0653,
-       -0.0638,
+       0.0662,
+       -0.0629,
        0.0,
        0.6564
       ],
