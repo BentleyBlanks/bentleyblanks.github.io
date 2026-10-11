@@ -729,6 +729,7 @@ export class FirstLevelBunkerShow {
       if(handler)handler.call(this,this.Age);
       this.TickTalks();
       this.MachineGunBursts();
+      this.AuthoredCorpses();
       this.UpdateFlyers();
       this.Background();
     }else{
@@ -1890,6 +1891,7 @@ export class FirstLevelBunkerShow {
       const actor=this.Ija(role),mark=marks[role];if(!actor?.alive)continue;
       if(f.mgPlacedAt==null&&age<W.enterS+delay){this.Hide(actor);continue;}
       if(actor.openingStoryboardHidden){this.Show(actor);this.Put(actor,{...W.crewFrom,yaw:Math.PI/2});SetRelaxedGait(actor,null);}
+      if(this.MgHeave(actor,role))continue;
       const there=actor.openingWalk?.key==="mg"&&actor.openingWalk.done;
       if(!there){if(this.Follow(actor,"mg",[...W.crewVia,mark],C.speed.brisk,null,mark.yaw))actor.openingWalk.done=true;continue;}
       f["mgThere:"+role]??=r.time;
@@ -1903,6 +1905,58 @@ export class FirstLevelBunkerShow {
     }
     if(f.mgPlacedAt==null&&f["mgThere:gunner"]!=null&&f["mgThere:loader"]!=null)f.mgPlacedAt=r.time;
     if(f.mgPlacedAt!=null&&f.firstBurstAt==null&&r.time-f.mgPlacedAt>=W.setupS){f.firstBurstAt=r.time;this.MachineGunBurst();}
+  }
+  /**
+   * 2026-10-11 polish (PolishAnim's IjaHeaveCorpseLip; contract §1.7 「拖两具尸体推上南沟沿」): each of the pair drags his body from where
+   * it lies in the depth sap (the Set's mg.corpse*.start) along his way in, the body sliding behind him (PlaceCorpse settle:false, its head
+   * toward him: no baked drag on the Ija01 / Ija03 rigs), to his heave root at the south wall foot (wall.heave.roots, facing the wall);
+   * there it is drawn round in front of him while he stoops (slideS) and he heaves it up (IjaHeaveCorpseLip: the body at its `corpse`
+   * track's place and height until `heaved`, then the Set's onLip / stacked), and goes on to the gun. The loader's heave waits for the
+   * gunner's (his body goes on top). Only from CaptiveWall: a start past it finds the Set's stacked bodies. True while busy.
+   */
+  MgHeave(actor,role){
+    const r=this.r,H=C.wall.heave,f=this.flags,set=r.openingSet,clip="IjaHeaveCorpseLip";
+    if(!H||!set?.PlaceCorpse||!OpeningClipMeta(clip)||f["heaved:"+role]!=null)return false;
+    const key="heave:"+role;
+    if(f[key+"From"]==null&&this.phase!=="CaptiveWall"){f["heaved:"+role]=r.time;return false;}
+    const id=H.corpse[role],root=H.roots[role],start=SET_MARKS.mg[H.corpse[role].slice(3)].start;
+    f[key+"From"]??=r.time;
+    if(f[key+"At"]==null){
+      const at=actor.openingStoryboardLast||actor.position;
+      // To the body first (the loader's lies 1.9 m on from where they come in), then dragging it in.
+      if(f[key+"Got"]==null){
+        if(Distance(at,start)<=H.reachM)f[key+"Got"]=r.time;
+        else{this.Follow(actor,key+"Go",[start],C.speed.brisk,null,null);return true;}
+      }
+      const there=this.Follow(actor,key+"Drag",[...H.via,Local(root,H.approach[0],H.approach[1]),root],H.dragMps,null,root.yaw);
+      const p=actor.openingStoryboardLast||actor.position,y=actor.yaw;
+      const behind={x:p.x+Math.sin(y)*H.dragBehindM,z:p.z+Math.cos(y)*H.dragBehindM,headYawDeg:y/DEG};
+      (this.dragFrom??={})[role]=behind;
+      set.PlaceCorpse(id,{pose:"floor",x:behind.x,z:behind.z,headYawDeg:behind.headYawDeg,settle:false});
+      if(!there)return true;
+      // The loader's body goes on top of the gunner's: he waits with it for that.
+      if(role==="loader"&&f["heaved:gunner"]==null&&f["heave:gunnerDone"]==null){this.Pose(actor,null,{face:root.yaw});return true;}
+      f[key+"At"]=r.time;this.Put(actor,root,{keep:true});this.PlayClip(actor,clip,{restart:true});
+    }
+    const t=r.time-f[key+"At"],heaved=EventAt(clip,"heaved",1.542),length=ClipLength(clip,2.667);
+    this.Put(actor,root);this.Pose(actor,clip,{seconds:Math.min(t,length)});
+    if(t<heaved){
+      // Drawn round in front of him while he stoops (head to his left), then on the clip's corpse track (place and height).
+      const lay=Local(root,0,-H.centerAheadM),from=this.dragFrom?.[role]||{...lay,headYawDeg:root.yaw/DEG+90};
+      const k=Smooth(t/H.slideS),track=t>=H.slideS?this.ClipPropWorld(actor,clip,"corpse",t,root):null;
+      const x=track?track.position.x:from.x+(lay.x-from.x)*k,z=track?track.position.z:from.z+(lay.z-from.z)*k;
+      const lift=track?Math.max(0,track.position.y-r.battlefield.GroundHeight(x,z)-H.centreAboveRootM):0;
+      const head=from.headYawDeg+Wrap((root.yaw/DEG+90-from.headYawDeg)*DEG)/DEG*k;
+      set.PlaceCorpse(id,{pose:"floor",x,z,headYawDeg:head,liftM:lift,settle:false});
+      return true;
+    }
+    if(f[key+"Done"]==null){
+      f[key+"Done"]=r.time;set.PlaceCorpse(id,{pose:role==="gunner"?"onLip":"stacked"});
+      this.Sfx("bodyFall",{position:r.Point(SET_MARKS.mg.corpseLower,.3),volume:.7});
+    }
+    if(t<length)return true;
+    f["heaved:"+role]=r.time;this.RerootUnderPelvis(actor,actor.yaw);
+    return false;
   }
   /** The gun keeps on: a burst every W.burstS [min, max] s (seeded) from the first until 02's volley (or the gunner's death). */
   MachineGunBursts(){
@@ -2027,9 +2081,24 @@ export class FirstLevelBunkerShow {
   }
   /** 「嗓子里一声接一声地嚎」: CaptiveHowl over and over (its stand-in cue while it is not recorded) until the cut. */
   Howl(){
-    const r=this.r,f=this.flags;
+    const r=this.r,f=this.flags,P=C.practice;
     if(f.howlFrom==null||f.throatCut!=null)return;
     const t=this.talks?.CaptiveHowl;
+    // 2026-10-11 polish (PolishDir item 11): the recorded howl ends loud (-12.7 dB) and starts on 90 ms of silence, so the loop
+    // was a hard cut. Crossfaded instead: howlHeadS + howlCrossfadeS before a take ends the next one is started on its own handle
+    // (PlayLine: the scene's own handle would be stopped by a second PlayScene) and, once it is audible, the old one fades out over
+    // howlCrossfadeS. The cut stops them all (PhaseSlash).
+    if(t?.mode==="voice"&&r.voice?.PlayLine&&P.howlCrossfadeS>0){
+      this.howlTakes=(this.howlTakes||[]).filter(h=>!h.done);
+      const cur=this.howlTakes.at(-1)||(!t.done?t.handle:null),l=cur?.lines?.[0];
+      if(l?.state==="playing"&&Number.isFinite(l.line?.duration)&&l.t>=l.line.duration-P.howlCrossfadeS-P.howlHeadS&&!cur.howlNext){
+        cur.howlNext=true;
+        const next=r.voice.PlayLine("CaptiveHowl.01",this.Speakers().comrade);
+        if(next){this.howlTakes.push(next);f.howlAt=r.time;this.howlFade={voice:l.voice,at:r.time+P.howlHeadS};}
+      }
+      if(this.howlFade&&r.time>=this.howlFade.at){if(this.howlFade.voice)r.audio?.StopVoice?.(this.howlFade.voice,P.howlCrossfadeS);this.howlFade=null;}
+      if(this.howlTakes.length)return;
+    }
     if(!t||t.done&&(t.mode==="voice"||r.time-t.doneAt>=0)&&r.time-(f.howlAt??-9)>=C.practice.howlEveryS){
       if(t)delete this.talks.CaptiveHowl;f.howlAt=r.time;this.Talk("CaptiveHowl");
     }
@@ -2143,8 +2212,8 @@ export class FirstLevelBunkerShow {
     this.Pose(comrade,"CaptiveThroatCutForward",{seconds:cut});
     if(cut>=EventAt("IjaThroatCutKneeShove","cut",.25)&&f.throatCut==null){
       f.throatCut=r.time;
-      // The howl stops dead.
-      this.talks?.CaptiveHowl?.handle?.Stop?.();
+      // The howl stops dead (the crossfaded takes too).
+      this.talks?.CaptiveHowl?.handle?.Stop?.();for(const h of this.howlTakes||[])h.Stop?.();this.howlTakes=[];this.howlFade=null;
       const neck=comrade.actor.characterRig?.bones.neck||comrade.actor.characterRig?.bones.head;
       // 「血全喷在沟壁上，自己身上一滴没沾」: the jet from his right side of the throat, his right front -- north-west, onto the
       // north wall (the clip's `spray`), away from ijaA behind him.
@@ -2153,7 +2222,9 @@ export class FirstLevelBunkerShow {
       const at=neck?.getWorldPosition(new THREE.Vector3());
       if(at)r.vfx?.BloodBurst?.(at,new THREE.Vector3(out.x,.3,out.z).normalize(),1.6);
       r.voice?.Signal?.("ThroatCut");r.voice?.Signal?.("throatCut");
-      this.Sfx("throatCut",{position:this.HeadPoint(comrade)||r.Point(k.wall,1),volume:.9});
+      // 2026-10-11 polish (PolishDir item 11): the engine has no throatCut cue -- the existing neck death (Script_Audio neckDeath: the
+      // SeedAudio choke samples of Script_SeedAudioNeckDeathBake, its synthesised fallback without them) at the cut, the howl cut off.
+      this.Sfx(C.slash.cutCue,{position:this.HeadPoint(comrade)||r.Point(k.wall,1),volume:.9});
       if(!r.Has("captivesKilled"))r.Record("captivesKilled",{count:1});
       f.depthIjaAt??=r.time;
     }
@@ -2196,7 +2267,8 @@ export class FirstLevelBunkerShow {
     this.FinishInterpreter();
     const root=this.FinishStabRoot(),boot=this.BootStart();
     if(f.finishStabFrom==null){
-      if(this.Hold(ijaA,root,null,{speed:F.walkMps})||age>F.walkMaxS){f.finishStabFrom=r.time;this.Put(ijaA,root,{keep:true});this.PlayClip(ijaA,"IjaFinishWalkStab",{restart:true});}
+      // (2026-10-11 polish: round the dead comrade's head at the north wall foot by F.via, then to the stab root.)
+      if(this.Follow(ijaA,"finishIn",[...(F.via||[]),root],F.walkMps,null,root.yaw)||age>F.walkMaxS){f.finishStabFrom=r.time;this.Put(ijaA,root,{keep:true});this.PlayClip(ijaA,"IjaFinishWalkStab",{restart:true});}
       return;
     }
     const t=r.time-f.finishStabFrom,cycle=ClipLength("IjaFinishWalkStab",1.75);
@@ -2325,10 +2397,25 @@ export class FirstLevelBunkerShow {
     if(Object.values(C.rescue.mgCrew).some(spec=>!this.r.enemies.get(spec.id)?.openingMgStandIn))this.MachineGunCrew(99);
   }
   /** ijaA squatting at the head with the hair in his fist: the hold clip, or the slap clip playing now. */
+  /** ijaA's root over the pinned man: ija.crouch, eased back rescue.release.backM (east, behind him) as he lets go of the hair. */
+  HolderRoot(){
+    const at=this.flags.hairReleaseAt,R=C.rescue.release;
+    if(at==null||!R)return C.ija.crouch;
+    return Local(C.ija.crouch,0,R.backM*Smooth((this.r.time-at)/R.releaseS));
+  }
+  /** 0..1: how far ijaA has let go of the hair (rescue.release, from Blade). */
+  HairReleased(){const at=this.flags.hairReleaseAt,R=C.rescue.release;return at==null||!R?0:Smooth((this.r.time-at)/R.releaseS);}
   PoseHolder(ijaA){
     const r=this.r;if(!ijaA)return;
-    this.Put(ijaA,C.ija.crouch);
+    this.Put(ijaA,this.HolderRoot());
     const slap=this.SlapClip(),after=this.SlapEnd();
+    // 2026-10-11 polish (N21 「这回甲没催他」): from Blade he lets go -- IjaCrouchHairHold's grab played back from its hold loop's start
+    // to its first frame (the deep squat, forearms on the knees) while he settles back rescue.release.backM: the head drops back into the
+    // mud, his arm is out of the left of the picture and the recruit leans in clear of him; held on that frame until the volley.
+    if(!slap&&this.flags.hairReleaseAt!=null&&r.time>=this.flags.hairReleaseAt){
+      const loop=OpeningClipMeta(this.HoldClip())?.holdLoop?.[0]??.75;
+      this.Pose(ijaA,this.HoldClip(),{seconds:loop*(1-this.HairReleased())});return;
+    }
     // After a slap the hold picks up at its loop start (the slap clips end on that pose).
     const t=after!=null?(OpeningClipMeta(this.HoldClip())?.holdLoop?.[0]??0)+r.time-after:r.time-(this.flags.holdAt??r.time);
     if(slap)this.Pose(ijaA,slap.clip,{seconds:slap.seconds});
@@ -2471,7 +2558,10 @@ export class FirstLevelBunkerShow {
    */
   PhaseBlade(age){
     const r=this.r,R=C.rescue,B=R.blade,f=this.flags,ijaD=this.Ija("ijaD"),eye=C.shunzi.witnessEye;
-    if(!this.phaseEntered){this.phaseEntered=true;f.bladeStartAt=r.time;this.bladeLook=null;}
+    if(!this.phaseEntered){this.phaseEntered=true;f.bladeStartAt=r.time;this.bladeLook=null;if(R.release)f.hairReleaseAt=r.time+R.release.afterS;}
+    // (2026-10-11 polish) ijaA lets go of the hair as the recruit comes (PoseHolder): the head and the eye come down with it, so the
+    // cut's root (BladeRoot, from where the cheek is) is taken again once it is down, while the recruit is still walking up.
+    if(f.hairReleaseAt!=null&&this.HairReleased()>=1&&f.bladeRootRedone==null&&f.bladeAt==null){f.bladeRootRedone=r.time;this.bladeRootMark=null;}
     this.Questioning({skip:"ijaD"});
     const recruit=ijaD?.alive&&!ijaD.openingCombatReleased?ijaD:null;
     if(recruit)this.RecruitBlood(recruit);
@@ -2639,7 +2729,7 @@ export class FirstLevelBunkerShow {
   /** Where a man stood when the volley's shot took him (his questioning mark; the recruit levelled at levelAt). */
   WoundStart(role){
     const R=C.rescue;
-    if(role==="ijaA")return C.ija.crouch;
+    if(role==="ijaA")return this.HolderRoot();
     if(role==="interpreter")return R.interpreter;
     if(role==="ijaD"){const at=this.bladeRootMark,end=at&&OpeningClipRoot(this.ClipModel(this.Ija("ijaD")),R.blade.levelClip)?.end;
       return end?Local(at,end[0],end[1],end[2]):{...R.blade.levelAt,yaw:Face(R.blade.levelAt,C.shunzi.witnessEye)};}
@@ -2682,8 +2772,21 @@ export class FirstLevelBunkerShow {
    *  narrative protection holds him for the cut) unless the spec says so. */
   WoundShot(actor,spec){
     const r=this.r,from=r.Point(spec.from,1.5),bone=actor.actor?.characterRig?.bones?.[spec.bone];
-    // The gunner's gun stays on the corpse rest where his clip had it (the Set's world type11, let go there); he falls on the
-    // directional death (it slides him off the bank into the trench: pendingWiring N22).
+    // 2026-10-11 polish (PolishAnim): the gunner dies on his gun (IjaLmgGunnerShotOnGun, first frame = IjaProneLmgOnCorpse's, same root,
+    // its type11 track where the gun was -- the Set's world gun stays held and hidden under it), the loader goes over the lip into the
+    // trench (IjaLoaderShotTumbleOffLip, first frame = IjaKneelLoadLmg's): played from the shot on their marks, no hit reaction.
+    const death=spec.lethal&&{gunner:"IjaLmgGunnerShotOnGun",loader:"IjaLoaderShotTumbleOffLip"}[spec.role];
+    if(death&&OpeningClipMeta(death)){
+      const mark=this.MgMarks()[spec.role],aimAt=bone?bone.getWorldPosition(new THREE.Vector3()):this.AimPoint(actor),d=aimAt.clone().sub(from).normalize();
+      r.vfx?.MuzzleFlash?.(from.clone().addScaledVector(d,.8),d,{kind:"boltRifle"});r.vfx?.Tracer?.(from,aimAt,{kind:"nra"});
+      r.audio?.PlayGunshot?.("rifleNra",{position:from,volume:1});r.vfx?.Blood?.(aimAt,d,1);
+      actor.scriptEssential=false;actor.scriptedNoncombatant=false;actor.openingDoomed=true;
+      this.Put(actor,mark);this.PlayClip(actor,death,{restart:true});actor.openingStoryboardPose={clip:death,seconds:0};
+      this.AuthoredDeath(actor,death,{root:mark});this.Kill(actor,"bullet");
+      return;
+    }
+    // Without them: the gunner's gun stays on the corpse rest where his clip had it (the Set's world type11, let go there); he falls on
+    // the directional death (it slides him off the bank into the trench).
     if(spec.role==="gunner"&&this.Props?.Where("type11")?.state==="held")this.Props.Release("type11");
     const shown=!actor.renderLod||actor.renderLod==="detail";
     const aim=shown&&bone?bone.getWorldPosition(new THREE.Vector3()):this.AimPoint(actor),dir=aim.clone().sub(from).normalize();
@@ -2787,14 +2890,16 @@ export class FirstLevelBunkerShow {
     if(this.phase==="Released"&&(!InCameraView(this.r.player.camera,this.r.Point(actor.position,1),10)||late))this.RetireCharge(id);
   }
   /** A man running down the crater step to `mark`, `delay` s after the charge began; true once there. */
-  ChargeRun(actor,key,mark,delay,{face=null,strike=false}={}){
+  ChargeRun(actor,key,mark,delay,{face=null,strike=false,routeN=null}={}){
     if(!actor)return true;
     const t=this.r.time-this.flags.chargeAt;
     if(t<delay){this.Hide(actor);return false;}
     this.Show(actor);
     if(actor.openingWalk?.key===key&&actor.openingWalk.done){this.Settle(actor,mark);return true;}
     const R=C.rescue;
-    if(this.Follow(actor,key,[...R.chargeRoute,mark],R.runMps,null,face??mark.yaw,{cornerM:.35,pace:strike?R.strikePace:R.runPace})){actor.openingWalk.done=true;return true;}
+    // routeN: only the first routeN points of the step (a mark up on it: ChargeB's tumble start, 2026-10-11 polish).
+    const route=routeN!=null?R.chargeRoute.slice(0,routeN):R.chargeRoute;
+    if(this.Follow(actor,key,[...route,mark],R.runMps,null,face??mark.yaw,{cornerM:.35,pace:strike?R.strikePace:R.runPace})){actor.openingWalk.done=true;return true;}
     return false;
   }
   /** 「枪炮声四起，杀喊声四起」: the rifles, the shells and the Sichuan yells on the charge's clock. */
@@ -2964,7 +3069,9 @@ export class FirstLevelBunkerShow {
       if(t<F.turnAtS)this.Pose(ijaC,"IjaReadyRifle",{seconds:ClipLength("IjaReadyRifle",1.1),face:R.vanguardPosts.ijaC.yaw});
       else if(f.foldFireAt==null){
         this.Pose(ijaC,null,{face});
-        const near=target?.alive&&spec.post&&Distance(target.openingStoryboardLast||target.position,spec.post)<=F.fireWithinM;
+        // (2026-10-11 polish: with NraShotTumbleSteps his post is where the tumble starts, up the step; he is shot there.)
+        const within=OpeningClipMeta("NraShotTumbleSteps")?R.tumble.fireWithinM:F.fireWithinM;
+        const near=target?.alive&&spec.post&&Distance(target.openingStoryboardLast||target.position,spec.post)<=within;
         const turned=Math.abs(Wrap(ijaC.yaw-face))<.25;
         if(turned&&(near||t>=F.fireForceS)){f.foldFireAt=r.time;this.PlayClip(ijaC,"IjaCornerFire",{restart:true});}
       }else{
@@ -2997,10 +3104,34 @@ export class FirstLevelBunkerShow {
     r.vfx?.Blood?.(aim,dir,1);
     target.scriptEssential=false;target.scriptedNoncombatant=false;
     const clip=OpeningClipMeta("NraShotTumbleSteps")?"NraShotTumbleSteps":null;
-    if(clip){target.openingDoomed=true;this.PlayClip(target,clip,{restart:true});target.openingStoryboardPose={clip,seconds:0};}
-    else{target.openingDoomed=false;this.FallNatively(target,true);}
+    if(clip){
+      // 2026-10-11 polish (PolishAnim's tumble): the clip's root is where he ends up lying, its first frame running rescue.tumble.startM
+      // [right, back] of it facing tumble.yawDeg down the step: the root is put so that frame is where he is now, the clip played from
+      // the shot (AuthoredCorpses drives its clock every frame after: Corpse), no hit reaction (Kill). Eyes left open (face layer).
+      const T=C.rescue.tumble,yaw=T.yawDeg*DEG,at=target.openingStoryboardLast||target.position,o=Rot(yaw,T.startM[0],T.startM[1]);
+      const root={x:at.x-o.x,z:at.z-o.z,yaw};
+      target.openingDoomed=true;this.Put(target,root,{keep:true});
+      this.PlayClip(target,clip,{restart:true});target.openingStoryboardPose={clip,seconds:0};
+      this.AuthoredDeath(target,clip,{eyesOpen:true,root});this.flags.chargeBRoot=root;
+      this.Kill(target,"bullet");return;
+    }
+    target.openingDoomed=false;this.FallNatively(target,true);
     target.TakeHit(1000,"torso",dir,{kind:"bullet",weaponId:"Type38",point:aim});
     if(target.alive)this.Kill(target,"bullet");
+  }
+  /** 2026-10-11 polish: an authored death (a terminal clip played from the shot) whose clock AuthoredCorpses drives every frame, its
+   *  root pinned where the director put it (the native corpse otherwise slid the dead pair off the lip into the trench, root and all). */
+  AuthoredDeath(actor,clip,{eyesOpen=false,root=null}={}){
+    (this.authoredDeaths??=new Map()).set(actor,{clip,root:root&&{...root}});
+    const face=actor.actor?.characterRig?.facial;if(face&&eyesOpen)face.deadEyesOpen=true;
+  }
+  /** Each authored death's clip on its own clock, every frame from the shot on (it stops at its last frame: a terminal clip). */
+  AuthoredCorpses(){
+    for(const [actor,{clip,root}] of this.authoredDeaths||[]){
+      if(!actor||actor.alive||actor.openingPlay?.clip!==clip)continue;
+      if(root){this.r.PlaceActor(actor,root);if(Number.isFinite(root.yaw)){actor.yaw=root.yaw;actor.actor.root.rotation.y=root.yaw;}}
+      this.Corpse(actor,clip);
+    }
   }
   /** Liu runs down to the step and holds it facing J; LongShotTick fires once flags.liuAt is set. */
   LiuWalk(){
@@ -3031,7 +3162,7 @@ export class FirstLevelBunkerShow {
   ExtraPost(actor,spec,post){
     if(!actor.alive)return;
     const mark={...post,yaw:post.yaw??-Math.PI/2};
-    if(this.ChargeRun(actor,"charge:"+spec.id,mark,spec.delayS)){
+    if(this.ChargeRun(actor,"charge:"+spec.id,mark,spec.delayS,{routeN:spec.routeN??null})){
       this.flags["post:"+spec.id]??=this.r.time;
       // The rifles on the step aim at the fold man (FoldFight fires them).
       const fold=spec.shootsFold&&this.Ija("ijaC")?.alive?Face(mark,C.rescue.vanguardPosts.ijaC):mark.yaw;
@@ -3826,7 +3957,10 @@ export class FirstLevelBunkerShow {
     }
     else if(p==="Slash"){
       // The throat: the look follows the comrade's head (at most followDeg off the witness line, the pitch clamped).
-      const W=C.interrogation.witnessShot,Q=C.interrogation.slashShot,h=Head(comrade);
+      // (2026-10-11 polish: from the wipe on the look goes over to ijaA -- the dead man lies along the north wall foot now, his head
+      // the subject no more -- eased over Q.wipeLookS.)
+      const W=C.interrogation.witnessShot,Q=C.interrogation.slashShot,hc=Head(comrade),ha=Head(ijaA),wf=this.flags.wipeAt;
+      const h=hc&&ha&&wf!=null?hc.clone().lerp(ha,Smooth((r.time-wf)/(Q.wipeLookS||.8))):hc||ha;
       let yaw=W.yawDeg*DEG,look=W.pitchDeg*DEG;
       if(h){const e=r.Point(eye,height);yaw+=Math.max(-Q.followDeg*DEG,Math.min(Q.followDeg*DEG,Wrap(Face(eye,h)-yaw)));
         look=Math.max(Q.pitchMinDeg*DEG,Math.min(Q.pitchMaxDeg*DEG,Math.atan2(h.y-e.y,Math.hypot(h.x-e.x,h.z-e.z))-4*DEG));}
@@ -3845,7 +3979,8 @@ export class FirstLevelBunkerShow {
     }
     else if(p==="Hold"||p==="Ask"||p==="Blade"){
       // 「日兵甲揪住他的头发把头提起来」: the eye rises liftM and tips up at his face; the slaps fling the head aside.
-      const H=C.rescue.holdShot,Q=C.rescue.slap,grip=this.flags.holdGripAt!=null?Smooth((r.time-this.flags.holdGripAt)/H.liftS):0;
+      // (2026-10-11 polish: the grip comes off as he lets go in Blade -- HairReleased.)
+      const H=C.rescue.holdShot,Q=C.rescue.slap,grip=(this.flags.holdGripAt!=null?Smooth((r.time-this.flags.holdGripAt)/H.liftS):0)*(1-this.HairReleased());
       const back={x:Math.sin(S.trap.yaw)*H.backM*grip,z:Math.cos(S.trap.yaw)*H.backM*grip};
       eye={x:eye.x+back.x,z:eye.z+back.z};height+=H.liftM*grip;
       // A slap flings the head: the aim holds on where his face was at the blow, so the whole turn is the head's (his
@@ -3856,7 +3991,8 @@ export class FirstLevelBunkerShow {
       // to the hair-holder as he backs off.
       if(p==="Blade"){
         const V=C.rescue.bladeView,f=this.flags,d=Head(this.Ija("ijaD"));
-        const w=f.backAt!=null?V.atRecruit*(1-Smooth((r.time-f.backAt)/.8)):V.atRecruit*Smooth((r.time-(f.bladeStartAt??r.time))/.8);
+        // (2026-10-11 polish: ijaA has let go and sits back, so the look stays on the recruit as he backs off and levels at the eye.)
+        const w=f.backAt!=null&&f.hairReleaseAt==null?V.atRecruit*(1-Smooth((r.time-f.backAt)/.8)):V.atRecruit*Smooth((r.time-(f.bladeStartAt??r.time))/.8);
         let want=head&&d?head.clone().lerp(d.clone().addScaledVector(UP,-V.recruitDropM),w):head;
         if(want){const e=this.bladeLook&&this.delta>0?1-Math.exp(-this.delta/V.lookS):1;want=this.bladeLook=this.bladeLook?this.bladeLook.lerp(want,e):want.clone();}
         head=want;
@@ -3879,7 +4015,7 @@ export class FirstLevelBunkerShow {
       // picture from its right edge; each cut is looked at for cutHoldS (between the cutter and the man he cuts down), then the
       // fight going on down the trench. The look point eases (chargeView.lookS), so no change of subject whips the head round.
       const H=C.rescue.holdShot,Q=C.rescue.chargeView,shotA=this.flags["hit:ijaA"];
-      height+=H.liftM*(shotA!=null?1-Smooth((r.time-shotA-.05)/.3):1);
+      height+=H.liftM*(shotA!=null?1-Smooth((r.time-shotA-.05)/.3):1)*(1-this.HairReleased());
       const a1=Head(ijaA);
       let point=null,latest=-Infinity;
       for(const c of C.rescue.cuts){

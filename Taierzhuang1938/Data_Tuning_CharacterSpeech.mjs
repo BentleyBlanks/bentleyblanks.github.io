@@ -30,6 +30,9 @@ export const CHARACTER_SPEECH = Object.freeze({
   breathPeriodS: 4.4, breathJaw: .025, breathClose: .12,
   // Death: jaw drops and lids sag to DeadSlack while the body collapses.
   deadSlackWeight: 1,
+  // A dead face the director pins eyes-open (facial.deadEyesOpen, 01-02 ChargeB): this share of the blink, negative, lifts
+  // DeadSlack's half lids back (2026-10-11 polish).
+  deadEyesOpenBlink: -.5,
   // Acting expressions (2026-09-25, 01-03 storyboard contract section 4.2):
   // rig.facial.expression = {snarl, shock, pain, shout, grit} are targets; each
   // weight moves linearly and takes expressionBlendS for a full 0 -> 1 swing

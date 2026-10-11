@@ -251,6 +251,9 @@ export class CharacterFacialAnimation {
     w.Blink = blink * alive; w.BrowUp = this.brow * alive;
     for (const name of FACIAL_EXPRESSIONS) w[EXPRESSION_POSE[name]] = this.expressionWeights[name] * alive;
     w.DeadSlack = this.dead * C.deadSlackWeight;
+    // 2026-10-11 (01-02 opening, ChargeB 「眼睛睁着」): a director may pin a dead man's eyes open (`deadEyesOpen`): the half lids
+    // of DeadSlack are taken back by a negative share of the blink (C.deadEyesOpenBlink), the slack jaw stays.
+    if (this.deadEyesOpen && this.dead > 0) w.Blink = C.deadEyesOpenBlink * this.dead;
     // While talking the expressions give most of their jaw drop to the speech.
     const expressionJaw = 1 - C.expressionTalkJawYield * this.talk;
     for (const control of this.controls) {
