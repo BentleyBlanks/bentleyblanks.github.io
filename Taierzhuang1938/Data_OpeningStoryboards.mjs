@@ -208,8 +208,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // over `weight` (s: in, out) on the clock flags.tossAt, through `keys` [t, pose] (both hands; the left mirrors), and the two
     // chargers leave the palms at releaseS (flags.clipsThrownAt = tossAt + releaseS) toward the comrade's reaching hand; one is
     // caught, the other falls short at his feet (clipFlight). Pending wiring: a baked first-person throw (N04).
-    toss:Object.freeze({ weight:Object.freeze([.25,.45]), releaseS:.62, endS:1.35,
-      keys:Object.freeze([Object.freeze([0,"tossHold"]),Object.freeze([.42,"tossHold"]),Object.freeze([.62,"tossThrow"]),Object.freeze([1.0,"tossThrow"])]) }),
+    // (weight in over 0.7 s: at 0.25 s the left palm turned 15 deg a frame leaving the clip, over the 12 deg continuity gate.)
+    toss:Object.freeze({ weight:Object.freeze([.7,.55]), releaseS:.88, endS:1.85,
+      keys:Object.freeze([Object.freeze([0,"tossHold"]),Object.freeze([.62,"tossHold"]),Object.freeze([.88,"tossThrow"]),Object.freeze([1.3,"tossThrow"])]) }),
     hands:Object.freeze({
       poses:Object.freeze({
         rest:H("cam",[.18,-.46,-.15],[0,-.4,-1],[.25,.65,.1],[14,24,14]),
@@ -441,13 +442,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
     walkMps:1.5, handOffsetM:Object.freeze([0,1.05,.35]) }),
   // DropIn (contract §1.4, §5.3 dropIn.*; N07/N08): the shell going over toward the rear trench (overShell: from, to, flight s)
   // just before; whistleShort whistleS into the phase; the three on the north rim from rimS (bayonets up), then each jumps
-  // (jumpS per role, fallS) from the rim to his landing. `rimBackM`: until Set's lip is built the rim stands this far north of
-  // the contract's lip mark (the bank there is a slope at -1.5 m; pending wiring); landings are the lip mark landM south on the
-  // floor. ijaA points at F (pointS[0]) then J (pointS[1]); ijaC runs to F, knocks the grenade (knockS after arriving), throws
+  // (jumpS per role, fallS) from the rim to his landing. The rim and landing points are Set's (marks.dropInLip / dropInLand, 1.95 m down). ijaA points at F (pointS[0]) then J (pointS[1]); ijaC runs to F, knocks the grenade (knockS after arriving), throws
   // (throwS after the knock) over the corner; the blast at foldBlast blastAfterThrowS later; he peeks (peekS) and
   // reports (event grenadeBlast). ijaD goes to J; ijaB comes down the link sap to J from bS (walkIn's last two legs).
   dropIn:Object.freeze({ overShell:Object.freeze({ from:P(36,-150), to:P(-6.5,-112.5), flightS:1.6, beforeEndS:1.9 }),
-    whistleS:.5, rimS:.75, jumpS:Object.freeze({ ijaC:1.35, ijaD:1.75, ijaA:2.25 }), fallS:.42, rimBackM:.6, landM:.95,
+    whistleS:.5, rimS:.75, jumpS:Object.freeze({ ijaC:1.35, ijaD:1.75, ijaA:2.25 }), fallS:.42,
     pointS:Object.freeze([2.95,3.75]), runAfterLandS:.4, knockS:.55, throwS:.75, blastAfterThrowS:1.2, peekS:1.4,
     bS:3.6, bRoute:Route([20.1,-128.0],[18.2,-125.6],[14,-124.6]),
     // ijaC at the corner facing east round it; ijaD at J facing the depth sap's mouth; ijaA's standing mark after the
@@ -474,19 +473,23 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // CaptiveWall (contract §1.7; N11/N12): ijaB to the comrade's rifle (comradeRifle, §5.2 (3.9,-125.0)), picks it up
   // (pickS), opens the bolt (boltOpen boltS after) and laughs, flings the bolt out over the south rim (tossS after the bolt
   // opens; boltTo), drops the rifle back in the mud (dropS); ijaA tears the badge (tearS into the phase, clothRip). The
-  // machine-gun pair comes down from J (crewFrom; enterS into the phase) dragging nothing yet (pending: the bodies are placed),
+  // machine-gun pair comes up from the depth sap south of J (crewFrom; enterS into the phase) dragging nothing yet (pending: the bodies are placed),
   // gets down (setupS) and fires the first burst; then a burst every burstS [min, max] s (seeded; dialogue does not stop it),
   // two rounds each, at the rear trench (burstAt), the top body jolting jolthM.
-  wall:Object.freeze({ pickS:.9, boltS:.9, tossS:1.3, dropS:1.0, boltTo:P(5.6,-121.9), tearS:2.2, enterS:.6, crewFrom:P(14,-124.6),
-    crewVia:Route([11.5,-124.0],[8.6,-123.75]), setupS:1.0, burstS:Object.freeze([3,6]), burstRounds:2, burstAt:Object.freeze([P(-6,-113),P(-14,-111.5),P(-2.5,-116)]),
+  // (2026-10-11 Set: the pair starts in the depth sap south of J, crewFrom = marks.mgDragFrom[0], and climbs the south bank to
+  // the gun; they aim at marks.mgAimAt, burstAt[0].)
+  wall:Object.freeze({ pickS:.9, boltS:.9, tossS:1.3, dropS:1.0, boltTo:P(5.6,-121.9), tearS:2.2, enterS:.6, crewFrom:P(14.6,-121.4),
+    crewVia:Route([14.2,-122.7],[12,-123.4],[8.6,-123.3]), setupS:1.0, burstS:Object.freeze([3,6]), burstRounds:2, burstAt:Object.freeze([P(-4,-113),P(-14,-111.5),P(-2.5,-116)]),
     joltM:.02, seed:1938, endAfterBurstS:1.2 }),
   // Interrogation (contract §1 / N13): the interpreter squats in front of the comrade; ijaB presses his thumb into the shoulder
   // wound (woundPress pressAfterLine3S after .03 ends; the comrade arches archS); ijaA looks back at the rear trench now and
   // then (lookBackEveryS, lookBackS).
   // ijaAStand: ijaA standing back at the right while the interpreter questions (N13: right of the picture, x ~0.78), facing
   // the comrade.
+  // He gets there by standVia and on to the practice's `aside` by asideVia, both clear of the interpreter's squat by 0.75 m+
+  // (the campaign's interpreter clearance, interpreterClearanceM).
   interrogate:Object.freeze({ pressAfterLine3S:.4, archS:1.4, lookBackEveryS:6, lookBackS:1.1, ijaBPress:Object.freeze([.42,-.28,170]),
-    ijaAStand:P(4.3,-123.4) }),
+    ijaAStand:P(4.0,-123.15), standVia:Route([3.75,-124.6]), asideVia:Route([5.9,-123.4]) }),
   // Practice (contract §1.8; N14/N15): ijaA looks back (lookBackS) and says it; ijaB goes to J (relieving ijaD); ijaD trots in to
   // stand facing the comrade (front, in the comrade's frame), holds the rifle without moving (hesitateS), backhand slap
   // (slapS after he stops; recruitSlapped at the contact), 「扎。」, three steps back to `back` (backS), the charge (chargeS) and
@@ -505,7 +508,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // Finish (contract §1.9; N18): ijaA with his rifle, bayonet down, from the comrade along the floor bayoneting the two at the
   // mouth (finish.bodies, walkMps; the downward thrust as in the sweep) to where Shunzi lies; the interpreter moves to the
   // squat 02 starts from (rescue.interpreter).
-  finish:Object.freeze({ walkMps:1.0, stabMps:.3, standOffM:.5, maxPitchDeg:4 }),
+  // interpreterVia: the interpreter's way from his questioning mark to rescue.interpreter round the south of the recruit
+  // (practice.recruitWait), 0.85 m+ off him (straight through rescue.interpreterReturn he was held up behind him, 2026-10-11).
+  finish:Object.freeze({ walkMps:1.0, stabMps:.3, standOffM:.5, maxPitchDeg:4, interpreterVia:Route([4.4,-123.3],[3.2,-123.6]) }),
   // Found (contract §1.9; N19): he stands over the eye at `stand` (the bayonet tip a hand's breadth over his back: hover),
   // the right boot comes down on the right hand (step stepS in; flags.bootStepAt), the heel grinds grindS (bootGrind at its
   // end), 「……这个是活的。留着，问。」, and he squats at the head (ija.crouch, IjaCrouchHairHold) crouchAfterLineS after it.
@@ -513,15 +518,20 @@ export const OPENING_STORYBOARDS = Object.freeze({
   found:Object.freeze({ stand:P(2.3,-124.98,Math.PI/2), hoverS:.5, stepS:1.1, grindS:.6, grindShake:.35, crouchAfterLineS:.35,
     // N19: the eyes on the right hand in the mud at the lower right while the boot is on it (until he squats at the head).
     look:Object.freeze({ yawDeg:-100, pitchDeg:-22 }) }),
-  // Marks of contract §5.3 (owned by the Set package, Data_OpeningSet0103; the director reads this copy of the frozen values
-  // until the integration points it at Set's). x, z; yaw where the body faces.
+  // Marks of contract §5.3 as the Set package delivered them (2026-10-11, branch worktree-agent-a6280523e5c9e4005, Report_set.md;
+  // owned by Set's Data_OpeningSet0103 -- the director reads this copy until the integration points it at Set's). x, z; yaw
+  // where the body's head points (the stand-in bodies only). Set moved sweep [0] / [1] to the south half of the floor (clear of
+  // walkIn / interpreterEnter), kept one finish body ([1], at the eye, deleted), put the machine gun's rest bodies on top of the
+  // south rim with the pair dragging them from the depth sap (mgDragFrom), and shaped the north rim for the jumps (dropInLip ->
+  // dropInLand, 1.95 m down).
   marks:Object.freeze({
-    sweepBodies:Object.freeze([P(11.8,-124.9,Math.PI/2),P(9.9,-124.3,Math.PI/2),P(7.4,-124.8,Math.PI/2)]),
-    finishBodies:Object.freeze([P(3.3,-124.3,Math.PI/2),P(2.6,-125.95,Math.PI/2)]),
-    mgCorpseLower:P(6.9,-123.05,0), mgCorpseUpper:P(6.95,-122.85,.2),
-    mgGunner:P(6.7,-123.65,Math.PI), mgLoader:P(7.5,-123.55,Math.PI),
-    dropInLip:Object.freeze([P(10.0,-126.6),P(11.5,-126.6),P(9.0,-126.7)]),
-    foldBlast:P(20.5,-126.0), grenadeStop:P(2.2,-125.1), comradeRifle:P(3.9,-125.0,.6),
+    sweepBodies:Object.freeze([P(11.3,-123.4,105*Math.PI/180),P(9.4,-123.1,Math.PI/2),P(7.4,-124.8,Math.PI/2)]),
+    finishBodies:Object.freeze([P(3.3,-124.55,Math.PI/2)]),
+    mgCorpseLower:P(6.9,-121.2,0), mgCorpseUpper:P(7.0,-121.25,.2), mgDragFrom:Object.freeze([P(14.6,-121.4),P(15.0,-119.6)]),
+    mgGunner:P(6.75,-121.95,Math.PI), mgLoader:P(7.75,-121.7,Math.PI), mgAimAt:P(-4,-113),
+    dropInLip:Object.freeze([P(10.0,-127.2),P(11.5,-127.2),P(9.0,-127.25)]),
+    dropInLand:Object.freeze([P(10.0,-125.75),P(11.5,-125.75),P(9.0,-125.8)]),
+    foldBlast:P(20.4,-127.9), grenadeStop:P(2.2,-125.1), comradeRifle:P(3.95,-125.25,-Math.PI/2),
   }),
   // Stand-ins until the other packages' pieces land (each listed in pendingWiring): bodies -- dead NRA actors posed on ShotCollapse's
   // last frame stand in for Set's static corpses (sweep [0..1], finish [0..1], the two machine-gun rests).
@@ -582,7 +592,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // 2026-10-11 redraft: the taunt walk is retired (tauntHoldS ... tauntWalk); he now bayonets his way to the mouth (Finish)
     // and stands over the eye (found.stand). `crouch` is still where he squats at the head for 02 (the hand-over to Dir02).
     crouch:P(2.45,-125.22,Math.PI/2),
-    interpreterEnter:Route([23.5,-130],[20.1,-128],[18.7,-126.8],[17.45,-126.2],[16,-125.65],[14.2,-125.75],[13.2,-125.65],[12,-124.75],[8,-124.05],[6,-123.85],[4.9,-124.05]),
+    // 2026-10-11: past the man shamming dead in the trench (sweep.bodies[2] (7.4,-124.8)) on his south side, 0.9 m off him (Set:
+    // the old line ran 0.19 m from that body).
+    interpreterEnter:Route([23.5,-130],[20.1,-128],[18.7,-126.8],[17.45,-126.2],[16,-125.65],[14.2,-125.75],[13.2,-125.65],[12,-124.75],[8.4,-123.6],[6.6,-123.55],[5.5,-123.8],[4.9,-124.05]),
     // 「翻译踉跄着退开」 (Charge): turned to face west (onto the pinned man) InterpreterFlee carries him 1.3 m back east,
     // then he runs east down the north side of the front trench (between the dead comrade and ijaB, away from the crater
     // step the charge comes down), into the depth sap past J, and is removed out of sight.
@@ -792,7 +804,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     Object.freeze({ id:"N01", storyboard:"Storyboard_N01_CaveTableau.png", when:"s.phase==='Banter'&&s.Age>=2.0",
       judge:{ camera:{ eyeM:[.6,1.05], pitchDeg:[-22,-6], yawDeg:[-101,-85] },
         actors:{ yaowa:{ x:[.75,1], distM:[.5,1.8] }, comrade:{ x:[.6,.95], distM:[1.8,3.4] }, luo:{ x:[.35,.65] }, liuwencai:{ x:[.42,.78], distM:[2.6,3.8] },
-          heyoutian:{ x:[0,.3], distM:[.5,1.6] } }, absent:["runner"], rifleHidden:true } }),
+          heyoutian:{ x:[0,.3], distM:[.5,2] } }, absent:["runner"], rifleHidden:true } }),
     // N02 the corner of bread in the air between the comrade and Yaowa.
     Object.freeze({ id:"N02", storyboard:"Storyboard_N02_BreadToss.png", when:"s.flags['ev:breadToss']!=null&&r.time-s.flags['ev:breadToss']>=.3",
       judge:{ camera:{ eyeM:[.6,1.05] }, actors:{ yaowa:{ x:[.6,1] }, comrade:{ x:[.6,1] }, luo:{ x:[.3,.66] } } } }),
@@ -928,7 +940,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     {shot:"N06", what:"the comrade's Hanyang by the spoil (comradeRifle, contract §5.2 (3.9,-125.0)) and the marks of §5.3 (sweep / finish bodies, machine gun, drop-in lips, fold blast, grenade stop)",
       now:"the comrade's own weapon dropped by BlastSlamBuried's weapon track; the marks are the director's copy (Data_OpeningStoryboards.marks)", wave2:"Set's comradeRifle prop; the director reads Data_OpeningSet0103's marks"},
     {shot:"N07", what:"three on the north rim with bayonets up, jumping down: ijaC to a knee aiming at F, ijaD standing aiming at J, ijaA pointing F then J (IjaDropInKneel / IjaDropInStand / IjaDropInPoint); the lip shaped for the jump (Set)",
-      now:"IjaReadyRifle held standing on the rim (dropIn.rimBackM 0.6 m north of the lip mark: the bank there is still a slope), the drop is the root eased down over fallS, PointBlockade (upper body) twice for ijaA; whistleShort -> whistle", wave2:"the three DropIn clips (AnimA, P1), Set's jump-down lips (rimBackM 0), Sfx whistleShort"},
+      now:"IjaReadyRifle held standing on the rim (marks.dropInLip), the drop is the root eased down over fallS onto marks.dropInLand, PointBlockade (upper body) twice for ijaA; whistleShort -> whistle", wave2:"the three DropIn clips (AnimA, P1), Set's lip terrain (Data_FirstLevelMissionLayout), Sfx whistleShort"},
     {shot:"N08", what:"ijaC knocks the Type 91 on his helmet, holds it a beat and throws it round the fold (IjaGrenadeKnockThrow, grenade); the blast beyond the fold (Script_OpeningBlastFx)",
       now:"IjaReadyRifle held at the fold, a procedural grenade (cylinder) from his right hand at the knock, flown over the corner at the throw; at foldBlast an explosionMid with a dirt impact; grenadeKnock -> impactMetal; IjaJunctionPeek for the look", wave2:"IjaGrenadeKnockThrow (AnimA, P1), Set's grenade prop and OpeningBlastFx at dropIn.foldBlast, Sfx grenadeKnock"},
     {shot:"N09", what:"ijaB bayoneting the face-down men as he walks (IjaWalkStabProne); the bodies (Set's static corpses)",

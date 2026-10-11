@@ -77,7 +77,8 @@ export const OPENING_DEPTH_IJA = Object.freeze({
   // retireFarM: a man walking on along offRoute (still in shot at his route's end) is retired this far from the player.
   afterWipeS: 3.6, speedMps: 1.4, staggerS: 1.7, retireFarM: 40,
   members: Object.freeze([
-    Object.freeze({ id: "DepthIjaA", start: W(7.8, -120.9),
+    // 2026-10-11: off the south rim's x 7-8, where the machine gun now rests on two bodies (Set's mg.corpseLower / Upper).
+    Object.freeze({ id: "DepthIjaA", start: W(10.8, -120.4),
       flagKick:Object.freeze({id:"flagTrench",root:W(9.95,-121.57),yawDeg:-62,contactS:.4,clipS:1.2,fallS:1.1}),
       route:Object.freeze([W(11,-120.9),W(11,-116),W(12,-111),W(12,-106)]),
       // 2026-09-30: (12,-106) is in the open field the pinned player looks across; still in shot there, he goes on east.

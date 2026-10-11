@@ -891,8 +891,8 @@ export class FirstLevelBunkerShow {
   StandInBodies(){
     if(!C.standIns.bodies||this.flags.bodiesPlaced)return;
     this.flags.bodiesPlaced=true;
-    const M=C.marks,marks=[["SweepBody0",M.sweepBodies[0]],["SweepBody1",M.sweepBodies[1]],["FinishBody0",M.finishBodies[0]],
-      ["FinishBody1",M.finishBodies[1]],["MgCorpseLower",M.mgCorpseLower],["MgCorpseUpper",M.mgCorpseUpper]];
+    const M=C.marks,marks=[["SweepBody0",M.sweepBodies[0]],["SweepBody1",M.sweepBodies[1]],...M.finishBodies.map((p,i)=>["FinishBody"+i,p]),
+      ["MgCorpseLower",M.mgCorpseLower],["MgCorpseUpper",M.mgCorpseUpper]];
     for(const [id,mark] of marks){
       const actor=this.Spawn(id,"nra",mark,{unarmed:true,weapon:null,actorKind:"nra",modelVariant:1});
       this.Put(actor,mark);this.PlayClip(actor,"ShotCollapse",{at:this.r.time-5,restart:true});this.Corpse(actor,"ShotCollapse");
@@ -908,7 +908,7 @@ export class FirstLevelBunkerShow {
   }
   /** Bodies stay dead on their last frame; the live victim lies still (his claw is SweepB's). */
   HoldBodies(){
-    for(const id of ["SweepBody0","SweepBody1","FinishBody0","FinishBody1","MgCorpseLower","MgCorpseUpper"]){const a=this.cast[id];if(a)this.Corpse(a,"ShotCollapse");}
+    for(const id of ["SweepBody0","SweepBody1",...C.marks.finishBodies.map((p,i)=>"FinishBody"+i),"MgCorpseLower","MgCorpseUpper"]){const a=this.cast[id];if(a)this.Corpse(a,"ShotCollapse");}
     const v=this.cast.SweepVictim;
     if(v&&!v.alive)this.Corpse(v,"ShotCollapse");
     else if(v&&this.flags.victimClawAt==null){this.Put(v,C.marks.sweepBodies[2]);this.Pose(v,"ShotCollapse",{seconds:5});}
@@ -1309,8 +1309,8 @@ export class FirstLevelBunkerShow {
   }
   /** Where each of the three drops from and lands (dropIn, marks.dropInLip in the order ijaC, ijaD, ijaA). */
   DropMarks(role){
-    const D=C.dropIn,lip=C.marks.dropInLip[{ijaC:0,ijaD:1,ijaA:2}[role]];
-    const rim={x:lip.x,z:lip.z-D.rimBackM},land={x:lip.x,z:lip.z+D.landM};
+    const i={ijaC:0,ijaD:1,ijaA:2}[role],lip=C.marks.dropInLip[i],to=C.marks.dropInLand[i];
+    const rim={x:lip.x,z:lip.z},land={x:to.x,z:to.z};
     return {rim:{...rim,yaw:Face(rim,land)},land:{...land,yaw:Face(rim,land)}};
   }
   /**
@@ -1661,8 +1661,10 @@ export class FirstLevelBunkerShow {
     if(pressed>=0&&pressed<I.archS+.6)this.Hold(ijaB,press,"CollarControl",{seconds:Math.min(pressed,.8)});
     else if(pressed>=0)this.Hold(ijaB,m.ijaB,null,{speed:C.speed.walk});
     if(pressed>=0&&pressed<I.archS)this.Pose(comrade,"CaptiveHeadPulledBack",{seconds:Math.min(.6,pressed)});else this.Pose(comrade,"CaptiveKneelMud");
-    // ijaA steps back from the chest (the badge torn) and stands watching at the right.
-    this.Hold(ijaA,{...I.ijaAStand,yaw:Face(I.ijaAStand,m.wall)},null,{speed:C.speed.walk});
+    // ijaA steps back from the chest (the badge torn) and stands watching at the right (round the interpreter's squat).
+    const stand={...I.ijaAStand,yaw:Face(I.ijaAStand,m.wall)};
+    if(ijaA?.openingWalk?.key=="stand"&&ijaA.openingWalk.done)this.Hold(ijaA,stand,null);
+    else if(this.Follow(ijaA,"stand",[...I.standVia,stand],C.speed.walk,null,stand.yaw))ijaA.openingWalk.done=true;
     if(Math.floor(age/I.lookBackEveryS)>Math.floor((age-(this.delta||0))/I.lookBackEveryS))f.ijaALookBackUntil=r.time+I.lookBackS;
     if(this.TalkDone("CaptiveInterrogation")||age>this.TalkLength("CaptiveInterrogation")+C.timeouts.interrogationExtraS)this.Stage("Practice");
   }
@@ -1689,7 +1691,9 @@ export class FirstLevelBunkerShow {
     else if(f.recruitInAt==null){SetRelaxedGait(ijaD,"alert");if(this.Follow(ijaD,"toComrade",[{x:9,z:-125.3},k.front],C.speed.trot,null,k.front.yaw))f.recruitInAt=r.time;}
     // ijaA steps aside next to where the recruit will stand.
     const stand=C.interrogate.ijaAStand;
-    if(line2!=null)this.Hold(ijaA,k.aside,null,{speed:C.speed.walk});else this.Hold(ijaA,{...stand,yaw:Face(stand,k.wall)},null,{speed:C.speed.walk});
+    if(line2!=null){if(ijaA?.openingWalk?.key==="aside"&&ijaA.openingWalk.done)this.Hold(ijaA,k.aside,null);
+      else if(this.Follow(ijaA,"aside",[...C.interrogate.asideVia,k.aside],C.speed.walk,null,k.aside.yaw))ijaA.openingWalk.done=true;}
+    else this.Hold(ijaA,{...stand,yaw:Face(stand,k.wall)},null,{speed:C.speed.walk});
     // The hesitation and the slap.
     if(f.recruitInAt!=null&&f.slapAt2==null){
       const t=r.time-f.recruitInAt;
@@ -1884,12 +1888,19 @@ export class FirstLevelBunkerShow {
     this.Hold(this.Ija("ijaD"),C.practice.recruitWait,"IjaReadyRifle",{seconds:1.1});
     this.Hold(this.Ija("ijaB"),C.dropIn.junctionPost,"IjaBayonetGuard",{seconds:r.time});
     // The interpreter to the squat 02 starts from (rescue.interpreter).
-    this.InterpreterToSquat();
+    this.FinishInterpreter();
     const stand=C.found.stand;
     const there=this.StabWalk(ijaA,this.finishWalker,C.marks.finishBodies,stand,F,(i)=>{
       this.Sfx("bayonetStabBody",{position:r.Point(C.marks.finishBodies[i],.35),volume:1});this.Emit("finishStab"+(i+1));
     });
     if(there||age>C.timeouts.finishS){if(!there&&ijaA)this.Put(ijaA,stand);this.Stage("Found");}
+  }
+  /** The interpreter from his questioning mark to the squat 02's Hold starts from (rescue.interpreter), round the recruit
+   *  (finish.interpreterVia); the walk key is InterpreterToSquat's ("squat"), so 02 takes him on from there. */
+  FinishInterpreter(){
+    const a=this.cast.interpreter,R=C.rescue;if(!a)return;
+    const w=a.openingWalk;if(w?.key==="squat"&&w.done){this.Hold(a,R.interpreter,"InterpreterCrouchAsk");return;}
+    if(this.Follow(a,"squat",[...C.finish.interpreterVia,R.interpreter],C.speed.walk,null,R.interpreter.yaw,{cornerM:.1}))a.openingWalk.done=true;
   }
   /**
    * 「刺刀尖停在顺子背上一拃高的地方……军靴落下来，踩住顺子伸在泥里的那只手，鞋跟往下一碾。顺子没出声，可手指自己抽了一下」 ->
@@ -1905,7 +1916,7 @@ export class FirstLevelBunkerShow {
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     this.Hold(this.Ija("ijaD"),C.practice.recruitWait,"IjaReadyRifle",{seconds:1.1});
     this.Hold(this.Ija("ijaB"),C.dropIn.junctionPost,"IjaBayonetGuard",{seconds:r.time});
-    this.InterpreterToSquat();
+    this.FinishInterpreter();
     const step=r.time-f.bootStepAt;
     if(step>=0&&f.bootDownAt==null){f.bootDownAt=r.time;this.Sfx("stompMud",{position:r.Point(C.shunzi.witnessEye,.1),volume:.8});this.Sfx("bootGrind",{position:r.Point(C.shunzi.witnessEye,.1),volume:.9});}
     if(step>=Fd.grindS)this.Emit("bootGrind");

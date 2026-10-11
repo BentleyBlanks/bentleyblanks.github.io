@@ -791,10 +791,13 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     for(const e of B.exitOrder)assert.ok(e.via.every(p=>D(p,S.seat)>.45&&D(p,B.yaowa)>.4||e.id==="yaowa"),`${e.id}'s way out keeps off Shunzi's seat and Yaowa`);
     // §5.3 marks (the director's copy of Set's frozen values).
     const M=C.marks;
-    assert.deepEqual(M.sweepBodies.map(p=>[p.x,p.z]),[[11.8,-124.9],[9.9,-124.3],[7.4,-124.8]],"sweep.bodies");
-    assert.deepEqual(M.finishBodies.map(p=>[p.x,p.z]),[[3.3,-124.3],[2.6,-125.95]],"finish.bodies");
-    assert.deepEqual(M.dropInLip.map(p=>[p.x,p.z]),[[10,-126.6],[11.5,-126.6],[9,-126.7]],"dropIn.lip (ijaC, ijaD, ijaA)");
-    assert.ok(Near(M.mgGunner,6.7,-123.65)&&Near(M.mgLoader,7.5,-123.55)&&Near(M.mgCorpseLower,6.9,-123.05)&&Near(M.foldBlast,20.5,-126)&&Near(M.grenadeStop,2.2,-125.1)&&Near(M.comradeRifle,3.9,-125),"machine gun, fold blast, grenade stop, the comrade's rifle");
+    // (Set's delivered values, 2026-10-11 Report_set.md.)
+    assert.deepEqual(M.sweepBodies.map(p=>[p.x,p.z]),[[11.3,-123.4],[9.4,-123.1],[7.4,-124.8]],"sweep.bodies");
+    assert.deepEqual(M.finishBodies.map(p=>[p.x,p.z]),[[3.3,-124.55]],"finish.bodies (one)");
+    assert.deepEqual(M.dropInLip.map(p=>[p.x,p.z]),[[10,-127.2],[11.5,-127.2],[9,-127.25]],"dropIn.lip (ijaC, ijaD, ijaA)");
+    assert.ok(M.dropInLand.every((p,i)=>Math.abs(p.x-M.dropInLip[i].x)<1e-9&&p.z>M.dropInLip[i].z+1),"each lands straight down off his lip");
+    assert.ok(Near(M.mgGunner,6.75,-121.95)&&Near(M.mgLoader,7.75,-121.7)&&Near(M.mgCorpseLower,6.9,-121.2)&&Near(M.foldBlast,20.4,-127.9)&&Near(M.grenadeStop,2.2,-125.1)&&Near(M.comradeRifle,3.95,-125.25),"machine gun, fold blast, grenade stop, the comrade's rifle");
+    for(const [i,p] of C.ija.interpreterEnter.entries())if(i)assert.ok((()=>{const a=C.ija.interpreterEnter[i-1],dx=p.x-a.x,dz=p.z-a.z,t=Math.max(0,Math.min(1,((M.sweepBodies[2].x-a.x)*dx+(M.sweepBodies[2].z-a.z)*dz)/(dx*dx+dz*dz)));return Math.hypot(a.x+dx*t-M.sweepBodies[2].x,a.z+dz*t-M.sweepBodies[2].z)>=.7;})(),"the interpreter's way in keeps 0.7 m off the man shamming dead");
     assert.ok(Near(C.practice.recruitWait,3.9,-124.3)&&Math.abs(C.practice.recruitWait.yaw-Math.PI/2)<1e-6,"the recruit waits at practice.recruitWait facing west (the hand-over to 02)");
     assert.ok(Math.abs(D(C.practice.recruitBack,{x:4.0568,z:-125.7852})-2.2)<.06,"practice.recruitBack 2.2 m east of the comrade's kneel");
     assert.ok(Math.abs(C.sweep.stopX-6.9)<1e-9&&Math.abs(Math.hypot(C.sweep.stopX-eye.x,-124.95-eye.z)-5.1)<.3,"ijaB stops 5 m from the eye");
@@ -817,7 +820,7 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     for(const [cue,standIn] of Object.entries(C.sfxStandIns))assert.ok(SOUND_NAMES.includes(standIn),`${cue}'s stand-in ${standIn} is an engine cue`);
     for(const cue of Object.values(C.voiceStandIns))assert.ok(SOUND_NAMES.includes(cue),`voice stand-in ${cue} is an engine cue`);
     // §1.4: from the whistle to 「折角，清了！」 in 12 s or less (the fold man's run at C.speed.run).
-    const Dd=C.dropIn,landC={x:M.dropInLip[0].x,z:M.dropInLip[0].z+Dd.landM};
+    const Dd=C.dropIn,landC=M.dropInLand[0];
     const report=Dd.jumpS.ijaC+Dd.fallS+Dd.runAfterLandS+D(landC,Dd.foldPost)/C.speed.run+Dd.knockS+Dd.throwS+Dd.blastAfterThrowS+.2+Dd.peekS;
     assert.ok(report-Dd.whistleS<=12,`whistle to 「折角，清了！」 ${(report-Dd.whistleS).toFixed(1)} s (<= 12)`);
     // §1.7: the machine-gun pair is in the roster (castId gunner / loader, a Type 11).

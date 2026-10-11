@@ -77,7 +77,7 @@ const KEY_FRAMES = [
   { label: "Interrogation", phase: "Interrogation", age: 3 },
   { label: "Practice", flag: "ev:recruitSlapped", at: .1 },
   { label: "ThroatCut", phase: "Slash", flag: "throatCut", at: .25 },
-  { label: "Finish", flag: "ev:finishStab2", at: .2 },
+  { label: "Finish", flag: "ev:finishStab1", at: .2 },
   // 2026-09-27 rework (docs/Data_OpeningPinnedRescue20260927.md): the find, the slap, the charge, the cuts, the haul.
   { label: "Found", phase: "Found", age: 1.5 },
   { label: "Slap", flag: "slapAt", at: .15 },
