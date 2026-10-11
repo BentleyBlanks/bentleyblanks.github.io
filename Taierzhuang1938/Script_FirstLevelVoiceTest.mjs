@@ -346,6 +346,8 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
       assert.ok(["self", "head", "offscreen"].includes(d.spatial), line.id + " spatial 合法");
       assert.ok(d.gainDb == null || (Number.isFinite(d.gainDb) && Math.abs(d.gainDb) <= 12), line.id + " gainDb 缺省 0，写了就在 −12…+12 dB");
       assert.ok(d.tempo == null || (d.tempo > 1 && d.tempo <= 1.35), line.id + " tempo 缺省不压快，写了就在 1–1.35（不变调压快，压过头会发虚）");
+      assert.ok(d.masterDb == null || (Number.isFinite(d.masterDb) && d.masterDb >= -30 && d.masterDb <= -14), line.id + " masterDb 缺省按 projection 档，写了就在 −30…−14 dBFS");
+      assert.ok(d.maxSeconds == null || (Number.isFinite(d.maxSeconds) && d.maxSeconds > 0.3), line.id + " maxSeconds 写了就是正的秒数");
       if (line.who === "shunzi") assert.equal(d.spatial, "self", line.id + " 顺子是第一人称");
       if (index === 0) assert.ok(d.after !== "prev", line.id + " 第一句不能等上一句");
     });
@@ -911,6 +913,8 @@ if (process.argv.includes("--audio")) {
           const same = CompareToScene(file, scenePath, entry.sceneStartS, entry.sceneEndS, entry.tempo ?? 1);
           assert.ok(same.correlation >= 0.98 && Math.abs(same.levelDb) <= 0.5, `${line.id} 片段与整段 ${entry.sceneStartS}–${entry.sceneEndS} s 对不上（相关 ${same.correlation}、电平差 ${same.levelDb} dB）`);
         }
+        const maxSeconds = LineDirection(cue, index).maxSeconds;
+        if (maxSeconds) assert.ok(entry.seconds <= maxSeconds, `${line.id} 片段 ${entry.seconds} s 超过导演表上限 ${maxSeconds} s`);
         // 嗓子：够长的片段与本场挂了参考音的其他人比，不许明显更像别人。
         const judged = entry.metrics.voicedS >= SCENE_CHECK.judgeVoicedS;
         const other = entry.metrics.referencedOther;
@@ -957,6 +961,13 @@ if (process.argv.includes("--audio")) {
     assert.equal(Hash(bytes), entry.sha256, cue.id + " 内容哈希");
     if (!cue.perLine) assert.equal(Hash(MissionVoicePrompt(cue)), entry.promptHash, cue.id + " 录音对应的是当前提示词");
     seconds += entry.seconds;
+  }
+  // 拧伤口那一下是卡在喉咙里的闷哼，不是放声喊（2026-10-12 R2-Voice）：峰值与有声段都比冬瓜的嚎低 ≥ 6 dB。
+  {
+    const Clip = (id) => Local(new URL("./Audio/FirstLevel/" + manifest.lines[id].file, import.meta.url));
+    const twist = MeasureVoice(Clip("CaptiveWoundTwist.01")), howl = MeasureVoice(Clip("CaptiveHowl.01"));
+    assert.ok(howl.activeRmsDb - twist.activeRmsDb >= 6 && howl.peakDb - twist.peakDb >= 6,
+      `CaptiveWoundTwist 有声段 ${twist.activeRmsDb} / 峰值 ${twist.peakDb} dBFS 要比 CaptiveHowl ${howl.activeRmsDb} / ${howl.peakDb} 低 6 dB 以上`);
   }
   for (const id of Object.keys(manifest.cues)) assert.ok(byId.has(id), "清单里有已下线的 cue：" + id);
   for (const id of Object.keys(manifest.lines)) assert.ok(perLine.some((cue) => cue.lines.some((line) => line.id === id)), "清单里有已下线的句：" + id);

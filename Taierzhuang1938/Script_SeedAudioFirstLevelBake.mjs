@@ -14,12 +14,14 @@
 //   · 整段录音（其余 cue，07–18 与待下线的 09.21 旧 cue）：一段对白 = 一次请求 = 一条 mp3，行为不变。
 //
 //   node Taierzhuang1938/Script_SeedAudioFirstLevelBake.mjs [--only=A,B] [--jobs=2] [--dry] [--force] [--prune]
-//        [--rescore] [--attempts=N] [--pick=Scene:n] [--patch=Scene.NN[,…]] [--takes=N]
+//        [--rescore] [--attempts=N] [--pick=Scene:n] [--patch=Scene.NN[,…]] [--takes=N] [--remaster=Scene.NN[,…]]
 //
 //   --only=a,b      只处理这几条 cue          --dry        只列清单与要发的请求数，不发请求
 //   --attempts=N    这次允许每场最多到第几次生成（默认 1；有硬错误的场景再跑一遍带 --attempts=2/3 才重抽）
-//   --pick=S:n      人工指定场景用第几次生成（先逐句核过转写与嗓子）
-//   --patch=S.NN    例外：单独补录这一句（带本人定妆音参考），替换整段切出来的那一片；--takes=N 每句几条（默认 1）
+//   --pick=S:n      人工指定场景用第几次生成（先逐句核过转写与嗓子）；--pick=S.NN:n 跟 --patch 一起用：这一句补录装第几条
+//   --patch=S.NN    例外：单独补录这一句（带本人定妆音参考），替换整段切出来的那一片；--takes=N 这一句一共几条候选（默认 1；
+//                   盘上已有的不重发），末字后隔着静音的杂音（爆音、咔嗒）母带时剪掉
+//   --remaster=S.NN 已装上的补录片重新母带（原始 take 不在这个工作区时，拿装上的那一片当原始录音）：剪末字后的杂音、电平重新对齐，不发请求
 //   --rescore       不发请求，只对已有生成重新母带、切句、打分（whisper / 音色编码重跑）
 //   --force         无视 promptHash 重新生成     --jobs=N     并发（默认 2，上限 2：本机还有别的包在调）
 //   --prune         删掉台词表里已经不存在的 cue / 句的成品与清单条目
@@ -55,6 +57,7 @@ const dry = process.argv.includes("--dry"),
 const jobs = Math.min(2, Math.max(1, Number.parseInt(Arg("jobs") ?? "2", 10) || 2));
 const patchTakes = Math.min(3, Math.max(1, Number.parseInt(Arg("takes") ?? "1", 10) || 1));
 const patchLines = Arg("patch")?.split(",").filter(Boolean) || [];
+const remasterLines = Arg("remaster")?.split(",").filter(Boolean) || [];
 const forcedScenePicks = new Map((Arg("pick")?.split(",") || []).filter(Boolean).map((p) => {
   const at = p.lastIndexOf(":");
   return [p.slice(0, at), Number(p.slice(at + 1))];
@@ -135,7 +138,8 @@ export function SceneTargetDb(cue) {
   let sum = 0, weight = 0;
   cue.lines.forEach((line, i) => {
     const w = Math.max(1, MissionVoiceSpoken(cue, i).length);
-    sum += (PROJECTION_DB[LineDirection(cue, i).projection] ?? PROJECTION_DB.normal) * w; weight += w;
+    const d = LineDirection(cue, i);
+    sum += (d.masterDb ?? PROJECTION_DB[d.projection] ?? PROJECTION_DB.normal) * w; weight += w;
   });
   return +(sum / weight).toFixed(2);
 }
@@ -369,6 +373,8 @@ function Judge(results) {
     const referencedOther = others.find(([who]) => RefIndex(refs, who) >= 0) || null;
     s.referencedOther = referencedOther;
     const judged = s.measure.voicedS >= SCENE_CHECK.judgeVoicedS;
+    const maxSeconds = LineDirection(r.cue, i).maxSeconds;
+    if (maxSeconds && s.measure.seconds > maxSeconds) r.hard.push(`${line.id} 片段 ${s.measure.seconds} s 超过导演表上限 ${maxSeconds} s`);
     if (!judged) r.flags.push(`${line.id} 有声 ${s.measure.voicedS} s，太短不判嗓子与字错率`);
     if (judged && s.speakerCos != null && referencedOther && referencedOther[1] - s.speakerCos > SCENE_CHECK.wrongVoiceMargin)
       r.hard.push(`${line.id} 像${Name(referencedOther[0])}的嗓子（本人 ${s.speakerCos} / ${referencedOther[0]} ${referencedOther[1]}）`);
@@ -559,44 +565,66 @@ export function LinePrompt(cue, index) {
 }
 
 async function PatchLines(manifest) {
-  if (!patchLines.length) return;
+  if (!patchLines.length && !remasterLines.length) return;
   fs.mkdirSync(patchWork, { recursive: true });
-  const jobsList = patchLines.map((id) => {
+  const Job = (id, remaster) => {
     const cue = MISSION_DIALOGUE.find((c) => c.perLine && c.lines.some((l) => l.id === id));
-    if (!cue) throw new Error(`--patch: unknown line ${id}`);
+    if (!cue) throw new Error(`--${remaster ? "remaster" : "patch"}: unknown line ${id}`);
     const index = cue.lines.findIndex((l) => l.id === id);
     if (!manifest.lines?.[id] || manifest.lines[id].scene !== cue.id) throw new Error(`--patch ${id}: bake the scene first`);
-    return { cue, index, line: cue.lines[index] };
-  });
-  const takes = jobsList.flatMap((job) => Array.from({ length: patchTakes }, (_, k) => ({ ...job, n: k + 1 })));
+    if (remaster && manifest.lines[id].source !== "patch") throw new Error(`--remaster ${id}: only installed patch clips can be remastered`);
+    return { cue, index, line: cue.lines[index], remaster };
+  };
+  const jobsList = [...patchLines.map((id) => Job(id, false)), ...remasterLines.map((id) => Job(id, true))];
+  const takes = jobsList.flatMap((job) => job.remaster ? [{ ...job, n: "remaster" }] : Array.from({ length: patchTakes }, (_, k) => ({ ...job, n: k + 1 })));
   const Raw = (t) => path.join(patchWork, `${t.line.id}_${t.n}.raw.mp3`), Meta = (t) => path.join(patchWork, `${t.line.id}_${t.n}.json`);
+  // 这次真发出去的请求（按句记）：补录条数 = 以前记下的 + 这次新发的。旧的补录 take 可能不在这个工作区（换了 worktree），
+  // 不能按盘上的 take 数重算（2026-10-12 前按盘上数，换 worktree 再补录会把以前的请求数抹掉）。
+  const sent = new Map();
   if (!dry && !rescore) {
-    const todo = takes.filter((t) => force || !fs.existsSync(Raw(t)) || ReadJson(Meta(t))?.promptHash !== Hash(LinePrompt(t.cue, t.index)));
+    const todo = takes.filter((t) => !t.remaster && (force || !fs.existsSync(Raw(t)) || ReadJson(Meta(t))?.promptHash !== Hash(LinePrompt(t.cue, t.index))));
     console.log(`${todo.length} SeedAudio patch requests`);
     const { errors } = await Pool(todo, jobs, async (t) => {
       const prompt = LinePrompt(t.cue, t.index), ref = CastReference(SceneVoice(t.cue, t.line.who));
       const result = await SeedAudioSpeak({ prompt, references: [ref.file], label: `patch ${t.line.id}#${t.n}` });
+      sent.set(t.line.id, (sent.get(t.line.id) || 0) + 1);
       fs.writeFileSync(Raw(t), result.bytes);
       fs.writeFileSync(Meta(t), JSON.stringify({ promptHash: Hash(prompt), castSha256: ref.sha256, subtitle: result.subtitle }));
     });
     for (const e of errors) console.error(e.message);
   }
-  if (dry) { console.log(`${takes.length} patch requests would be sent`); return; }
+  if (dry) { console.log(`${takes.filter((t) => !t.remaster).length} patch requests would be sent`); return; }
+  // --remaster：装上的补录片原始 take 不在这个工作区时，拿装上的那一片当原始录音重新母带（剪末字后的杂音、电平重新对齐）。
+  // 逐字时间从清单里那一片的逐字时间来（已经是片内的秒）。
+  const timings = ReadJson(timingsPath, {});
+  for (const t of takes.filter((x) => x.remaster)) {
+    const entry = manifest.lines[t.line.id];
+    fs.copyFileSync(path.join(out, entry.file), Raw(t));
+    const chars = timings[entry.sha256]?.chars || [];
+    fs.writeFileSync(Meta(t), JSON.stringify({ promptHash: entry.patch?.promptHash, remasteredFrom: entry.sha256,
+      subtitle: { sentences: [{ words: chars.map(([c, a, b]) => ({ text: c, start_time: Math.round(a * 1000), end_time: Math.round(b * 1000) })) }] } }));
+  }
   const ready = takes.filter((t) => fs.existsSync(Raw(t)));
   for (const t of ready) {
     const entry = manifest.lines[t.line.id];
     t.file = Raw(t).replace(/\.raw\.mp3$/, ".mp3");
-    t.master = MasterLine(Raw(t), t.file, { targetDb: entry.patch?.targetDb ?? entry.metrics.activeRmsDb, padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb });
     t.meta = ReadJson(Meta(t));
+    const words = (t.meta.subtitle?.sentences || []).flatMap((s) => s.words || []).filter((w) => /[\p{L}\p{N}]/u.test(w.text));
+    t.words = words;
+    const speechEndS = words.length ? Math.max(...words.map((w) => w.end_time)) / 1000 : null;
+    const speechStartS = words.length ? Math.min(...words.map((w) => w.start_time)) / 1000 : null;
+    t.master = MasterLine(Raw(t), t.file, { targetDb: entry.patch?.targetDb ?? entry.metrics.activeRmsDb, padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb,
+      speechEndS, speechStartS });
+    if (t.master.tailCutS != null) console.log(`${t.line.id}#${t.n}: 末字后有杂音，剪在原始 take ${t.master.tailCutS} s`);
+    if (t.master.leadCutS != null) console.log(`${t.line.id}#${t.n}: 首字前的哼声 / 杂音太长，从原始 take ${t.master.leadCutS} s 起`);
   }
   const castFiles = [...new Set(ready.flatMap((t) => [...new Set(t.cue.lines.map((l) => CastReference(SceneVoice(t.cue, l.who))?.file))]).filter(Boolean))];
   const vectors = SpeakerEmbed([...ready.map((t) => t.file), ...castFiles]);
   const texts = Transcribe(ready.map((t) => ({ file: t.file, lang: t.line.lang === "ja" ? "ja" : "zh", text: MissionVoiceSpoken(t.cue, t.index),
     reference: t.line.lang === "ja" ? JAPANESE_SPEECH[t.line.id]?.kanji : MissionVoiceSpoken(t.cue, t.index) })));
   if (!vectors || !texts) { console.error("patch judge unavailable"); process.exitCode = 1; return; }
-  const timings = ReadJson(timingsPath, {});
   for (const job of jobsList) {
-    const mine = ready.filter((t) => t.line.id === job.line.id).map((t) => {
+    const mine = ready.filter((t) => t.line.id === job.line.id && !!t.remaster === job.remaster).map((t) => {
       const own = CastReference(SceneVoice(t.cue, t.line.who));
       t.speakerCos = +CenteredCosine(vectors[t.file], vectors[own.file]).toFixed(3);
       t.nearestOther = [...new Set(t.cue.lines.map((l) => l.who))].filter((w) => w !== t.line.who)
@@ -606,31 +634,43 @@ async function PatchLines(manifest) {
       // 电平对不齐整段里原来那一片（峰值太尖、压到 −1 dBTP 以下就够不着目标）的排到后面：门禁只容 1.5 dB。
       const entry = manifest.lines[t.line.id], targetDb = entry.patch?.targetDb ?? entry.metrics.activeRmsDb;
       t.levelOff = Math.abs(t.master.measure.activeRmsDb - targetDb) > 1.5;
-      t.score = (t.cer ?? 0.5) * 10 + (1 - t.speakerCos) * 6 + (t.levelOff ? 100 : 0);
+      // 比本场任何另一个人的定妆音更像别人的 take 排到后面（2026-10-12：BunkerBanter 五个人里三个嗓子本来就近）。
+      t.wrongVoice = !!(t.nearestOther && t.nearestOther[1] >= t.speakerCos);
+      t.score = (t.cer ?? 0.5) * 10 + (1 - t.speakerCos) * 6 + (t.levelOff ? 100 : 0) + (t.wrongVoice ? 50 : 0);
+      console.log(`   ${t.line.id}#${t.n} cos ${t.speakerCos} other ${t.nearestOther?.join(":")} cer ${t.cer} level ${t.master.measure.activeRmsDb}/${targetDb} 「${t.transcript}」`);
       return t;
     }).sort((a, b) => a.score - b.score);
     if (!mine.length) continue;
-    const best = mine[0], entry = manifest.lines[job.line.id];
+    // --pick=Scene.NN:n：人工指定装第几条（例：同一个人两句补录的基频要对得上，打分器不看这个）。
+    const forced = forcedScenePicks.has(job.line.id) ? mine.find((t) => String(t.n) === String(forcedScenePicks.get(job.line.id))) : null;
+    if (forcedScenePicks.has(job.line.id) && !forced) throw new Error(`--pick ${job.line.id}: take ${forcedScenePicks.get(job.line.id)} not on disk`);
+    const best = forced || mine[0], entry = manifest.lines[job.line.id];
     const target = path.join(out, job.line.file);
     for (const [sha, t] of Object.entries(timings)) if (t.lineId === job.line.id) delete timings[sha];
     fs.copyFileSync(best.file, target);
     const sha256 = Sha256(target);
     const m = best.master.measure;
-    // 同一句再补录一次（加候选）时：被替换的仍是整段切出来的那一片，请求数只加这次新发的。
+    // 同一句再补录一次（加候选）时：被替换的仍是整段切出来的那一片；请求数 = 以前记下的 + 这次新发的。
     const previous = entry.source === "patch" ? entry.patch : null;
+    const newTakes = sent.get(job.line.id) || 0;
+    const totalTakes = (previous?.takes || 0) + newTakes;
     Object.assign(entry, { sha256, seconds: m.seconds, bytes: fs.statSync(target).size, source: "patch",
-      patch: { reason: "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
-        replacedSha256: previous?.replacedSha256 ?? entry.sha256, targetDb: entry.patch?.targetDb ?? entry.metrics.activeRmsDb, takes: mine.length, take: best.n,
-        promptHash: Hash(LinePrompt(job.cue, job.index)) },
+      patch: { reason: previous?.reason || "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
+        replacedSha256: previous?.replacedSha256 ?? entry.sha256, targetDb: entry.patch?.targetDb ?? entry.metrics.activeRmsDb, takes: totalTakes,
+        take: job.remaster ? previous?.take : best.n,
+        promptHash: job.remaster ? previous?.promptHash : Hash(LinePrompt(job.cue, job.index)),
+        ...(job.remaster ? { remastered: { fromSha256: best.meta.remasteredFrom, tailCutS: best.master.tailCutS ?? null,
+          why: "补录片末字后有与台词无关的爆音 / 杂音（原始 take 不在这个工作区），拿装上的那一片重新母带：剪掉杂音、有声段电平重新对齐" } }
+          : previous?.remastered && newTakes === 0 ? { remastered: previous.remastered } : {}),
+        ...(best.master.tailCutS != null && !job.remaster ? { tailCutS: best.master.tailCutS } : {}) },
       metrics: { ...entry.metrics, activeRmsDb: m.activeRmsDb, truePeakDb: m.truePeakDb, snrDb: m.snrDb, voicedS: m.voicedS,
         lowShare: m.lowShare, f0: m.f0, cer: best.cer, transcript: best.transcript, speakerCos: best.speakerCos, nearestOther: best.nearestOther } });
-    const words = (best.meta.subtitle?.sentences || []).flatMap((s) => s.words || []).filter((w) => /[\p{L}\p{N}]/u.test(w.text));
     timings[sha256] = { lineId: job.line.id, who: job.line.who, lang: job.line.lang || "zh", seconds: m.seconds, source: "seedaudio-subtitle",
-      chars: words.map((w) => [w.text, +Math.max(0, w.start_time / 1000 - best.master.trimStartS).toFixed(3),
-        +Math.max(0, w.end_time / 1000 - best.master.trimStartS).toFixed(3)]) };
+      chars: best.words.map((w) => [w.text, +Math.min(m.seconds, Math.max(0, w.start_time / 1000 - best.master.trimStartS)).toFixed(3),
+        +Math.min(m.seconds, Math.max(0, w.end_time / 1000 - best.master.trimStartS)).toFixed(3)]) };
     const scene = manifest.scenes?.[job.cue.id];
-    if (scene) { scene.requests = (scene.requests || 0) + mine.length - (previous?.takes || 0); (scene.patched ||= []).includes(job.line.id) || scene.patched.push(job.line.id); }
-    console.log(`${job.line.id}: patched take ${best.n} cos ${best.speakerCos} other ${best.nearestOther?.join(":")} cer ${best.cer} 「${best.transcript}」`);
+    if (scene) { scene.requests = (scene.requests || 0) + newTakes; (scene.patched ||= []).includes(job.line.id) || scene.patched.push(job.line.id); }
+    console.log(`${job.line.id}: ${job.remaster ? "remastered" : `patched take ${best.n}`} cos ${best.speakerCos} other ${best.nearestOther?.join(":")} cer ${best.cer} 「${best.transcript}」`);
   }
   manifest.updatedAt = new Date().toISOString();
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
@@ -770,7 +810,7 @@ async function Main() {
     fs.mkdirSync(raw, { recursive: true });
   }
   if (prune) { Prune(manifest); return; }
-  if (patchLines.length) { await PatchLines(manifest); console.log(`requests ${requestStats.requests}, retries ${requestStats.retries}, failures ${requestStats.failures}`); return; }
+  if (patchLines.length || remasterLines.length) { await PatchLines(manifest); console.log(`requests ${requestStats.requests}, retries ${requestStats.retries}, failures ${requestStats.failures}`); return; }
   await BakeScenes(manifest);
   const queue = MISSION_DIALOGUE.filter((cue) => !cue.perLine && (!selected || selected.includes(cue.id)));
   for (const cue of queue) {
