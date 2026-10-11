@@ -14,6 +14,7 @@
 // 密钥只从 VOLCENGINE_API_KEY 读；任何日志和异常都先把它替换成 [redacted]。
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -196,10 +197,24 @@ export function MeasureVoice(file) {
  * 返回 { trimStartS, gainDb, measure }。trimStartS 用来把 API 的逐字时间戳平移到成品上。
  */
 // tempo > 1：不变调压快（atempo），只给「超出时长上限一点点」的单句用（Script_SeedAudioSquadBarkBake）。
-export function MasterLine(raw, output, { targetDb, padS = 0.06, ceilingDb = -1, bitrate = "96k", tempo = 1 }) {
-  const before = MeasureVoice(raw);
-  const start = Math.max(0, before.leadS - padS);
-  const end = Math.min(before.seconds, before.seconds - before.tailS + padS);
+// speechEndS（原始 take 里末字结束的秒数）：给了就先按 SpeechTailCutS 剪掉末字之后、隔着一段静音的杂音，电平只量剪剩的那段。
+// speechStartS（首字开始的秒数）：给了就按 SpeechLeadCutS 剪掉首字之前一大段与台词无关的声音（只留 leadKeepS）。
+export function MasterLine(raw, output, { targetDb, padS = 0.06, ceilingDb = -1, bitrate = "96k", tempo = 1, speechEndS = null, speechStartS = null }) {
+  let before = MeasureVoice(raw);
+  let start = Math.max(0, before.leadS - padS);
+  let end = Math.min(before.seconds, before.seconds - before.tailS + padS);
+  const tailCut = speechEndS != null ? SpeechTailCutS(raw, speechEndS) : null;
+  const leadCut = speechStartS != null ? SpeechLeadCutS(raw, speechStartS) : null;
+  let tailCutS = null, leadCutS = null;
+  if (tailCut != null && tailCut + padS < end) {
+    end = tailCut + padS;
+    tailCutS = +tailCut.toFixed(3);
+  }
+  if (leadCut != null && leadCut - padS > start && leadCut < end) {
+    start = Math.max(0, leadCut - padS);
+    leadCutS = +leadCut.toFixed(3);
+  }
+  if (tailCutS != null || leadCutS != null) before = MeasureVoiceRange(raw, start, end);
   const gainDb = targetDb - before.activeRmsDb;
   const wav = output + ".tmp.wav", temp = output + ".tmp.mp3";
   // 先滤到 wav 再编 mp3：一步直出 mp3 时实测真峰值会冒到 0 dBTP 以上（同一条链先出 wav 是 −2.5）。
@@ -233,7 +248,62 @@ export function MasterLine(raw, output, { targetDb, padS = 0.06, ceilingDb = -1,
   fs.renameSync(temp, output);
   measure = MeasureVoice(output);
   measure.truePeakDb = +TruePeakDb(output).toFixed(2);
-  return { trimStartS: +start.toFixed(3), gainDb: +(gainDb + trim).toFixed(2), measure };
+  return { trimStartS: +start.toFixed(3), gainDb: +(gainDb + trim).toFixed(2), measure, ...(tailCutS != null ? { tailCutS } : {}),
+    ...(leadCutS != null ? { leadCutS } : {}) };
+}
+
+/**
+ * 首字之前剪在哪（秒，原始 take 的时间；不用剪就 null）。2026-10-12：BunkerBanter.04 的补录片首字前演了 2.2 s 的哼声和嚼东西声、
+ * .05 首字前 1 s，整段里原来那一片只有 2.07 / 0.65 s，装上去整场往后拖。首字之前最多留 leadKeepS；那之前要是有一段
+ * ≥ quietRunS 的静音、且静音结束得更晚，就从静音结束处起。首字前本来就不到 leadKeepS 的不动。
+ */
+export function SpeechLeadCutS(file, speechStartS, { leadKeepS = 0.35, quietRunS = 0.2, belowDb = 40 } = {}) {
+  const { hopS, frames } = FrameRms(file);
+  let loud = 0;
+  for (const v of frames) loud = Math.max(loud, v);
+  const gate = loud * 10 ** (-belowDb / 20), need = Math.round(quietRunS / hopS);
+  const firstF = Math.min(frames.length, Math.floor(speechStartS / hopS));
+  let firstSound = 0;
+  while (firstSound < firstF && frames[firstSound] < gate) firstSound++;
+  if (firstF * hopS - firstSound * hopS <= leadKeepS) return null;
+  let quietEnd = null, run = 0;
+  for (let f = firstSound; f < firstF; f++) {
+    run = frames[f] < gate ? run + 1 : 0;
+    if (run >= need) quietEnd = (f + 1) * hopS;
+  }
+  return Math.max(speechStartS - leadKeepS, quietEnd ?? 0);
+}
+
+/**
+ * 末字之后的杂音剪在哪（秒，原始 take 的时间；没有就 null）。2026-10-12：BunkerBanter.08 的补录片在末字后 0.37 s 静音
+ * （−115 dBFS）之后有一下 45 ms、峰值 −2 dBFS 的爆音，.12 的补录片在末字后 0.8 s 静音之后有 615 Hz 以上的尖细杂音和一下咔嗒；
+ * 按整片量有声段电平时爆音被算进去，台词本身反而被拉低了 2–3 dB。从末字结束往后找第一段 ≥ quietRunS、比全片最响帧低
+ * belowDb 的静音，从静音起点剪（末字的尾音与句末的气口在静音之前，留着）。
+ */
+export function SpeechTailCutS(file, speechEndS, { quietRunS = 0.3, belowDb = 40 } = {}) {
+  const { hopS, frames } = FrameRms(file);
+  let loud = 0;
+  for (const v of frames) loud = Math.max(loud, v);
+  const gate = loud * 10 ** (-belowDb / 20), need = Math.round(quietRunS / hopS);
+  let run = 0;
+  for (let f = Math.max(0, Math.ceil(speechEndS / hopS)); f < frames.length; f++) {
+    run = frames[f] < gate ? run + 1 : 0;
+    if (run < need) continue;
+    const startF = f - need + 1;
+    // 静音一直到片尾：没有要剪的东西（MasterLine 自己会去尾部静音）。
+    for (let g = f + 1; g < frames.length; g++) if (frames[g] >= gate) return startF * hopS;
+    return null;
+  }
+  return null;
+}
+
+/** MeasureVoice 只量 [startS, endS] 这一段。 */
+export function MeasureVoiceRange(file, startS, endS) {
+  const temp = path.join(os.tmpdir(), `voice_range_${process.pid}_${Date.now()}.wav`);
+  const cut = spawnSync(ffmpeg, ["-y", "-v", "error", "-i", file, "-af", `atrim=start=${startS.toFixed(3)}:end=${endS.toFixed(3)}`,
+    "-ac", "1", "-ar", "44100", "-c:a", "pcm_f32le", temp], { encoding: "utf8", windowsHide: true });
+  if (cut.status !== 0) throw new Error(`Unable to cut ${path.basename(file)}: ${cut.stderr?.slice(0, 200)}`);
+  try { return MeasureVoice(temp); } finally { fs.rmSync(temp, { force: true }); }
 }
 
 export const Sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
