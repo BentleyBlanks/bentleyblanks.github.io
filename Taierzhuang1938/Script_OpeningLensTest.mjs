@@ -152,7 +152,7 @@ Check("found / held nearly clean; Lift / Check clean but the cheek streak; Relea
   for (const phase of ["Lift", "Check"]) {
     const { look, cheek, ...rest } = Evaluate(phase, 1, { now: 99, cheekAt: 90 });
     assert.deepEqual({ ...rest, cheek: clean.cheek }, clean, `${phase}: clean but the cheek`);
-    assert.ok(cheek.blood === 1 && cheek.opacity > 0.5, `${phase}: the streak`);
+    assert.ok(cheek.blood === 1 && cheek.opacity >= LENS_CHEEK_RESIDUE, `${phase}: the streak`);
   }
   for (const phase of C.phases.Trapped.concat(C.phases.BunkerRescue)) assert.ok(PHASE_LOOKS[phase], `${phase} has a look`);
 });

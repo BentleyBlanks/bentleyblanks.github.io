@@ -57,12 +57,12 @@ const BLOOD_TINT = Freeze([0.55, 0.06, 0.05]);
 const CHEEK_CUT = Freeze({
   flash: K("cheek", [[0, 0], [0.02, 1], [0.15, 0]], { before: 0 }),
   blood: K("cheek", [[0, 0], [0.12, 0.18], [0.6, 0.62], [1.5, 1]], { before: 0 }),
-  opacity: K("cheek", [[0, 0], [0.08, 0.9], [2.4, 0.9], [6, 0.75]], { before: 0 }),
+  opacity: K("cheek", [[0, 0], [0.08, 0.85], [2.4, 0.75], [6, 0.5]], { before: 0 }),
   daze: K("cheek", [[0, 0], [0.04, 0.35], [1.2, 0.2], [2.4, 0]], { before: 0 }),
 });
 // The streak's strength at the hand-back, faded over Data_OpeningStoryboards.perception.releaseDecayS after it (the last
 // value of CHEEK_CUT.opacity).
-export const LENS_CHEEK_RESIDUE = 0.75;
+export const LENS_CHEEK_RESIDUE = 0.5;
 
 export const LOOKS = Freeze({
   // SB01 and the shots the storyboard leaves clean (SB05A, SB06): the defaults.

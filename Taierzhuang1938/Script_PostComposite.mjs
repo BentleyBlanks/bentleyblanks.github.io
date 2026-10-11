@@ -547,10 +547,10 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
     float d = length(q - c);
     float width = mix(.05, .008, s) * (.85 + .15 * sin(s * 23.0 + q.x * 41.0));
     float body = 1.0 - smoothstep(width * .55, width, d);
-    float rim = (1.0 - smoothstep(width, width * 3.5, d)) * .35;
+    float rim = (1.0 - smoothstep(width, width * 3.0, d)) * .25;
     float grown = 1.0 - smoothstep(uCheekCut.y - .08, uCheekCut.y + .001, s);
     float blood = clamp((body * .9 + rim) * grown * uCheekCut.z, 0.0, .92);
-    color = mix(color, vec3(.30, .018, .015) * (.3 + .7 * Luma(color)) + vec3(.035, 0.0, 0.0), blood);
+    color = mix(color, vec3(.20, .012, .01) * (.3 + .7 * Luma(color)) + vec3(.02, 0.0, 0.0), blood);
   }
 
   // 暗角：别做成一圈发灰的环，压的是亮度不是加黑纱
