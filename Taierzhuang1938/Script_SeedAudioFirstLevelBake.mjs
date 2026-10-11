@@ -240,7 +240,16 @@ async function GenerateAttempt(cue, n) {
   const prompt = ScenePrompt(cue), refs = SceneReferences(cue);
   if (prompt.length > 3000) throw new Error(`${cue.id}: scene prompt exceeds 3000 characters (${prompt.length})`);
   const result = await SeedAudioSpeak({ prompt, references: refs.map((r) => r.file), label: `${cue.id}#${n}` });
-  fs.rmSync(AttemptDir(cue, n), { recursive: true, force: true });   // 同号旧生成（旧提示词）的切片与打分作废
+  // 同号旧生成（旧提示词）挪到带旧提示词哈希的名字下留档，不覆盖（2026-10-12 R3-Voice：改了提示词再生成，第 1 次就把
+  // 上一种写法的第 1 条原始 take 盖掉了，没法再拿来比、再装）。
+  const old = ReadJson(AttemptMeta(cue, n));
+  if (old && old.promptHash !== Hash(prompt)) {
+    const tag = String(old.promptHash).slice(0, 8);
+    for (const [from, to] of [[AttemptRaw(cue, n), AttemptRaw(cue, n).replace(/\.raw\.mp3$/, `.${tag}.raw.mp3`)],
+      [AttemptMeta(cue, n), AttemptMeta(cue, n).replace(/\.json$/, `.${tag}.json`)], [AttemptDir(cue, n), `${AttemptDir(cue, n)}.${tag}`]])
+      if (fs.existsSync(from)) { fs.rmSync(to, { recursive: true, force: true }); fs.renameSync(from, to); }
+  }
+  fs.rmSync(AttemptDir(cue, n), { recursive: true, force: true });   // 同号旧生成的切片与打分作废
   fs.writeFileSync(AttemptRaw(cue, n), result.bytes);
   fs.writeFileSync(AttemptMeta(cue, n), JSON.stringify({ promptHash: Hash(prompt), castKey: refs.map((r) => r.sha256).join(","),
     references: refs.map((r) => ({ who: r.who, owner: r.owner, castSha256: r.sha256 })), subtitle: result.subtitle,
@@ -387,6 +396,9 @@ function Judge(results) {
     const judged = s.measure.voicedS >= SCENE_CHECK.judgeVoicedS;
     const maxSeconds = LineDirection(r.cue, i).maxSeconds;
     if (maxSeconds && s.measure.seconds > maxSeconds) r.hard.push(`${line.id} 片段 ${s.measure.seconds} s 超过导演表上限 ${maxSeconds} s`);
+    // 导演表 f0Hz：片段基频中位（MeasureVoice）不在范围里算硬错误重抽（2026-10-12 R3-Voice：CaptiveWoundTwist 那条 340 Hz 像呜咽）。
+    const f0Hz = LineDirection(r.cue, i).f0Hz;
+    if (f0Hz && !(s.measure.f0?.median >= f0Hz[0] && s.measure.f0?.median <= f0Hz[1])) r.hard.push(`${line.id} 基频中位 ${s.measure.f0?.median} Hz 不在导演表 ${f0Hz[0]}–${f0Hz[1]} Hz`);
     if (!judged) r.flags.push(`${line.id} 有声 ${s.measure.voicedS} s，太短不判嗓子与字错率`);
     if (judged && s.speakerCos != null && referencedOther && referencedOther[1] - s.speakerCos > SCENE_CHECK.wrongVoiceMargin)
       r.hard.push(`${line.id} 像${Name(referencedOther[0])}的嗓子（本人 ${s.speakerCos} / ${referencedOther[0]} ${referencedOther[1]}）`);
@@ -704,6 +716,8 @@ async function PatchLines(manifest) {
       subtitle: { sentences: [{ words: chars.map(([c, a, b]) => ({ text: c, start_time: Math.round(a * 1000), end_time: Math.round(b * 1000) })) }] } }));
   }
   const ready = takes.filter((t) => fs.existsSync(Raw(t)) && (t.remaster || ReadJson(Meta(t))?.planHash === PlanHash(t.plan)));
+  // 补录的目标电平：导演表 patch.masterDb（整段里原来那一片本身就比邻句响太多时用）> 以前记下的 > 原来那一片。
+  const TargetDb = (t) => LineDirection(t.cue, t.index).patch?.masterDb ?? manifest.lines[t.line.id].patch?.targetDb ?? manifest.lines[t.line.id].metrics.activeRmsDb;
   for (const t of ready) {
     const entry = manifest.lines[t.line.id];
     t.file = Raw(t).replace(/\.raw\.mp3$/, ".mp3");
@@ -712,7 +726,18 @@ async function PatchLines(manifest) {
     t.words = words;
     const speechEndS = words.length ? Math.max(...words.map((w) => w.end_time)) / 1000 : null;
     const speechStartS = words.length ? Math.min(...words.map((w) => w.start_time)) / 1000 : null;
-    t.master = MasterLine(Raw(t), t.file, { targetDb: entry.patch?.targetDb ?? entry.metrics.activeRmsDb, padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb,
+    // 原始 take 首字前 / 末字后静音里孤立的咔嗒（2026-10-12 BunkerBanter.09 补录 take 片头 25 ms 处一下 −24 dBFS）：先静音掉再母带，
+    // 不然 MeasureVoice 把它当成开口，片头那 0.3 s 静音剪不掉、整句往后拖。
+    let source = Raw(t);
+    if (!t.remaster && speechStartS != null) {
+      t.mutedRaw = IsolatedBursts(source, { speechStartS, speechEndS });
+      if (t.mutedRaw.length) {
+        source = Raw(t).replace(/.raw.mp3$/, ".clean.mp3");
+        MuteRanges(Raw(t), source, t.mutedRaw);
+        console.log(`${t.line.id}#${t.n}: 原始 take 静音里有咔嗒，母带前静音掉 ${t.mutedRaw.map(([a, b]) => `${a}–${b} s`).join("、")}`);
+      }
+    }
+    t.master = MasterLine(source, t.file, { targetDb: TargetDb(t), padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb,
       speechEndS, speechStartS });
     if (t.master.tailCutS != null) console.log(`${t.line.id}#${t.n}: 末字后有杂音，剪在原始 take ${t.master.tailCutS} s`);
     if (t.master.leadCutS != null) console.log(`${t.line.id}#${t.n}: 首字前的哼声 / 杂音太长，从原始 take ${t.master.leadCutS} s 起`);
@@ -732,7 +757,7 @@ async function PatchLines(manifest) {
     t.nearestOther = others[0] || null;
     const refs = SceneReferences(t.cue);
     t.referencedOther = others.find(([who]) => RefIndex(refs, who) >= 0) || null;
-    t.cer = texts[t.file]?.cer ?? null; t.transcript = texts[t.file]?.text ?? null;
+    t.cer = texts[t.file]?.cer ?? null; t.transcript = texts[t.file]?.text ?? null; t.whisperChars = texts[t.file]?.chars || null;
   };
   for (const job of sliceJobs.filter((j) => !j.skip)) {
     Voice(job);
@@ -754,7 +779,7 @@ async function PatchLines(manifest) {
     const mine = ready.filter((t) => t.line.id === job.line.id && !!t.remaster === job.remaster).map((t) => {
       Voice(t);
       // 电平对不齐整段里原来那一片（峰值太尖、压到 −1 dBTP 以下就够不着目标）的排到后面：门禁只容 1.5 dB。
-      const entry = manifest.lines[t.line.id], targetDb = entry.patch?.targetDb ?? entry.metrics.activeRmsDb;
+      const targetDb = TargetDb(t);
       t.levelOff = Math.abs(t.master.measure.activeRmsDb - targetDb) > 1.5;
       // 比本场任何另一个人的定妆音更像别人的 take 排到后面（2026-10-12：BunkerBanter 五个人里三个嗓子本来就近）。
       t.wrongVoice = !!(t.nearestOther && t.nearestOther[1] >= t.speakerCos);
@@ -781,7 +806,8 @@ async function PatchLines(manifest) {
     const totalTakes = (previous?.takes || 0) + newTakes;
     Object.assign(entry, { sha256, seconds: m.seconds, bytes: fs.statSync(target).size, source: "patch",
       patch: { reason: previous?.reason || "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
-        replacedSha256: previous?.replacedSha256 ?? entry.sha256, targetDb: entry.patch?.targetDb ?? entry.metrics.activeRmsDb, takes: totalTakes,
+        replacedSha256: previous?.replacedSha256 ?? entry.sha256, targetDb: TargetDb(best), sliceDb: previous?.sliceDb ?? previous?.targetDb ?? entry.metrics.activeRmsDb,
+        ...(LineDirection(job.cue, job.index).patch?.masterDb != null ? { targetFrom: "导演表 patch.masterDb" } : {}), takes: totalTakes,
         take: job.remaster ? previous?.take : best.n,
         promptHash: job.remaster ? previous?.promptHash : Hash(job.plan.prompt),
         ...(job.remaster ? (previous?.mode ? { mode: previous.mode } : {}) : { mode: job.plan.mode }),
@@ -789,12 +815,16 @@ async function PatchLines(manifest) {
           why: "补录片末字后有与台词无关的爆音 / 杂音（原始 take 不在这个工作区），拿装上的那一片重新母带：剪掉杂音、有声段电平重新对齐" } }
           : previous?.remastered && newTakes === 0 ? { remastered: previous.remastered } : {}),
         ...(best.master.tailCutS != null && !job.remaster ? { tailCutS: best.master.tailCutS } : {}),
-        ...(best.meta?.span ? { span: best.meta.span } : {}) },
+        ...(best.meta?.span ? { span: best.meta.span } : {}), ...(best.mutedRaw?.length ? { mutedRaw: best.mutedRaw } : {}) },
       metrics: { ...entry.metrics, activeRmsDb: m.activeRmsDb, truePeakDb: m.truePeakDb, snrDb: m.snrDb, voicedS: m.voicedS,
         lowShare: m.lowShare, f0: m.f0, cer: best.cer, transcript: best.transcript, speakerCos: best.speakerCos, nearestOther: best.nearestOther } });
-    timings[sha256] = { lineId: job.line.id, who: job.line.who, lang: job.line.lang || "zh", seconds: m.seconds, source: "seedaudio-subtitle",
-      chars: best.words.map((w) => [w.text, +Math.min(m.seconds, Math.max(0, w.start_time / 1000 - best.master.trimStartS)).toFixed(3),
-        +Math.min(m.seconds, Math.max(0, w.end_time / 1000 - best.master.trimStartS)).toFixed(3)]) };
+    // 逐字时间：SeedAudio 时间戳平移到成品上；平移、夹进片段后有字变成 0 长（时间戳整体偏早 / 拖到片尾之后，2026-10-12 BunkerBanter.09
+    // 补录 take 的「滚」「你」比真开口早 0.17 s、「的」给到 2.16 s），改用 whisper 对原文的强制对齐（同整段切句 cutMethod silence 的口径）。
+    const subChars = best.words.map((w) => [w.text, +Math.min(m.seconds, Math.max(0, w.start_time / 1000 - best.master.trimStartS)).toFixed(3),
+      +Math.min(m.seconds, Math.max(0, w.end_time / 1000 - best.master.trimStartS)).toFixed(3)]);
+    const whisperTimed = subChars.some(([, a, b]) => b - a <= 0) && best.whisperChars?.length;
+    timings[sha256] = { lineId: job.line.id, who: job.line.who, lang: job.line.lang || "zh", seconds: m.seconds, source: whisperTimed ? "whisper-forced" : "seedaudio-subtitle",
+      chars: whisperTimed ? best.whisperChars : subChars };
     const scene = manifest.scenes?.[job.cue.id];
     if (scene) { scene.requests = (scene.requests || 0) + newTakes; (scene.patched ||= []).includes(job.line.id) || scene.patched.push(job.line.id); }
     console.log(`${job.line.id}: ${job.remaster ? "remastered" : `patched take ${best.n}`} cos ${best.speakerCos} other ${best.nearestOther?.join(":")} cer ${best.cer} 「${best.transcript}」`);

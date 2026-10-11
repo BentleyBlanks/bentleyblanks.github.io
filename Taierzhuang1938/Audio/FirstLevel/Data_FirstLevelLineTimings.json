@@ -2983,32 +2983,32 @@
    ]
   ]
  },
- "2231bc7624ed3d810f377d1555b0df0f4a9f4861dc723879a0c2a408758cf399": {
+ "ad18f1c8b909ac0489bb71c23f2c38fbeee73ad0018fe0014d9de67d73944abf": {
   "lineId": "BunkerBanter.09",
   "who": "shunzi",
   "lang": "zh",
-  "seconds": 0.707,
-  "source": "seedaudio-subtitle",
+  "seconds": 0.66,
+  "source": "whisper-forced",
   "chars": [
    [
     "滚",
     0,
-    0
+    0.26
    ],
    [
     "你",
-    0,
-    0.34
+    0.26,
+    0.4
    ],
    [
     "妈",
-    0.34,
-    0.38
+    0.4,
+    0.5
    ],
    [
     "的",
-    0.38,
-    0.62
+    0.5,
+    0.58
    ]
   ]
  },

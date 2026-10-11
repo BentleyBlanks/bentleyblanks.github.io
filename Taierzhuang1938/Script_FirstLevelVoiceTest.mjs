@@ -909,6 +909,9 @@ if (process.argv.includes("--audio")) {
           // 例外：这一句在整段里分错了嗓子 / 念错，单独补录；电平对齐到整段里原来那一片。
           assert.ok(patched.has(line.id) && entry.patch?.reason && entry.patch.replacedSha256, line.id + " 补录要有记录");
           assert.ok(Math.abs(m.activeRmsDb - entry.patch.targetDb) <= 1.5, `${line.id} 补录电平 ${m.activeRmsDb} 对齐整段里原来那一片 ${entry.patch.targetDb}`);
+          // 导演表 patch.masterDb：补录电平不跟原来那一片、改按它（原来那一片本身就比邻句响太多时用），清单要记下原来那一片的电平。
+          const masterDb = LineDirection(cue, index).patch?.masterDb;
+          if (masterDb != null) assert.ok(entry.patch.targetDb === masterDb && Number.isFinite(entry.patch.sliceDb), `${line.id} 补录目标电平 ${entry.patch.targetDb} 应是导演表 patch.masterDb ${masterDb}，并记下原来那一片的电平`);
           patchedLines.push(line.id);
         } else {
           assert.equal(entry.source, "scene", line.id + " 来源");
@@ -929,6 +932,12 @@ if (process.argv.includes("--audio")) {
         }
         const maxSeconds = LineDirection(cue, index).maxSeconds;
         if (maxSeconds) assert.ok(entry.seconds <= maxSeconds, `${line.id} 片段 ${entry.seconds} s 超过导演表上限 ${maxSeconds} s`);
+        // 导演表 f0Hz：基频中位（清单 metrics.f0，与 MeasureVoice 同一口径）要落在范围里（2026-10-12 R3-Voice：BunkerBanter.09 补录总比本人低三成）。
+        const f0Hz = LineDirection(cue, index).f0Hz;
+        if (f0Hz) {
+          assert.equal(entry.metrics.f0?.median, m.f0.median, line.id + " 清单里的基频是这条录音量出来的");
+          assert.ok(m.f0.median >= f0Hz[0] && m.f0.median <= f0Hz[1], `${line.id} 基频中位 ${m.f0.median} Hz 不在导演表 ${f0Hz[0]}–${f0Hz[1]} Hz`);
+        }
         // 嗓子：够长的片段与本场挂了参考音的其他人比，不许明显更像别人。
         const judged = entry.metrics.voicedS >= SCENE_CHECK.judgeVoicedS;
         const other = entry.metrics.referencedOther;

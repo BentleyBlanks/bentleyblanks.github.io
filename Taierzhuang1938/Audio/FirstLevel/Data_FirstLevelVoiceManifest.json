@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-10-11T22:06:19.391Z",
+  "updatedAt": "2026-10-11T22:25:00.192Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -1349,9 +1349,9 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 0.707,
-      "bytes": 9449,
-      "sha256": "2231bc7624ed3d810f377d1555b0df0f4a9f4861dc723879a0c2a408758cf399",
+      "seconds": 0.66,
+      "bytes": 8822,
+      "sha256": "ad18f1c8b909ac0489bb71c23f2c38fbeee73ad0018fe0014d9de67d73944abf",
       "source": "patch",
       "sceneSha256": "2e057dde9ee419df5216227c1050f400e654d2eac0d8424b1f5878b468e402f8",
       "sceneStartS": 23.97,
@@ -1370,23 +1370,23 @@
       "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -17.89,
-        "truePeakDb": -2.92,
-        "snrDb": 22.79,
+        "activeRmsDb": -19.45,
+        "truePeakDb": -6.2,
+        "snrDb": 50.81,
         "voicedS": 0.54,
-        "lowShare": 0.528,
+        "lowShare": 0.338,
         "f0": {
-          "median": 136,
-          "p10": 100,
-          "p90": 308,
-          "frames": 14
+          "median": 200,
+          "p10": 113,
+          "p90": 320,
+          "frames": 16
         },
         "cer": 0,
         "transcript": "滚你妈的。",
-        "speakerCos": 0.515,
+        "speakerCos": 0.609,
         "nearestOther": [
-          "comrade",
-          0.333
+          "yaowa",
+          0.335
         ],
         "referencedOther": [
           "liuwencai",
@@ -1400,10 +1400,19 @@
       "patch": {
         "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
         "replacedSha256": "0fe41796ac4063347eea217a5f99e374019495f4434fdf43362b6705ae1a1154",
-        "targetDb": -17.44,
-        "takes": 3,
-        "take": 2,
-        "promptHash": "8058a92997db4fe4791155e8e4757d665d3f7f2dd0c25371005188731652a424"
+        "targetDb": -19,
+        "sliceDb": -17.44,
+        "targetFrom": "导演表 patch.masterDb",
+        "takes": 5,
+        "take": 1,
+        "promptHash": "1c756bf297b5573dde93a0d3fdf92b37c777b5d19559d01424ecb0c0e84b05d7",
+        "mode": "line+BunkerBanter.07",
+        "mutedRaw": [
+          [
+            0.025,
+            0.045
+          ]
+        ]
       }
     },
     "BunkerBanter.10": {
@@ -9480,7 +9489,7 @@
       ],
       "attempt": 2,
       "pickedBy": "check",
-      "requests": 15,
+      "requests": 17,
       "attempts": [
         {
           "n": 1,
@@ -11785,7 +11794,22 @@
         "truePeakDb": -15.02,
         "snrDb": 37.29
       },
-      "mastering": "WholeSceneOnceRmsTruePeakMinus1"
+      "mastering": "WholeSceneOnceRmsTruePeakMinus1",
+      "rejectedRetakes": {
+        "at": "2026-10-12 R3-Voice",
+        "requests": 3,
+        "f0MedianHz": [
+          291,
+          372,
+          395
+        ],
+        "seconds": [
+          0.8,
+          1.54,
+          2.07
+        ],
+        "why": "想把 340 Hz 压到 120–220 Hz：两种提示词（胸腔里憋出来的低沉闷哼 / 再加音很低很沉、不往上挑），参考仍是 comradeWounded，三条都更尖或超长，没装；装着的仍是 R2 那条"
+      }
     },
     "BayonetPractice": {
       "file": "AudioVoice_FirstLevelBayonetPractice.mp3",
