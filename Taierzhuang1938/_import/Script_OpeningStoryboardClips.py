@@ -14590,3 +14590,207 @@ def RpBuildHeaveCorpse(T, name):
                            ('back', (.6, 2.8, 1.6), (0, -.5, .9))]
     spec['reviewScale'] = 3.0
     return spec
+
+# ==== 2026-10-12 R2 anim ====
+# R2-Anim round (REL/附件/briefs/Brief_R2_Anim.md; contract docs/Data_OpeningRedraft20261011Contract.md §4 and its 「打磨结果」:
+# 「跳下前脚悬空 0.15–0.3 m 未修（导演层无法给根上下偏移，要动画层）」). Every global of this block starts with `R2` / `R2_`.
+# Clips: IjaDropInKneel / IjaDropInStand / IjaDropInPoint re-authored on the measured ground of the north lip.
+
+# ---- R1. The three drop-ins on the real lip (N07) ------------------------------------------------------------------------
+# A's clips stood on a flat 2.0 m lip from 0.55 m behind the root. The north wall is a slope: under the three drop-in marks
+# (Data_OpeningSet0103 dropIn.lip[i] -> its land, the shared ground sampler CreateP012Terrain(L).SampleHeight, tmp/r2/
+# lipProfile.mjs) the floor is flat to the root, the wall climbs 1.9 m between 0.05 and 0.85 m behind it, a shoulder at
+# 1.92-1.98 m from 0.85 to 1.05 m, then the parapet spoil on up to 2.5 m at 1.6 m. A's frame 0 had the feet 0.73 / 0.83 m
+# behind: on the slope, 0.08-0.15 m over it (browser check 11, the committed clips); after the landing the turned stance put
+# the left foot 0.13-0.30 m behind the root, 0.23-0.25 m into the wall (the bake grounded on its flat floor, nothing saw it).
+# Now one profile for all three (R2_DI_PROFILE: the mean of the three centre lines, every 0.05 m; the three differ by
+# <= 2.5 cm on the shoulder, <= 16 cm on the steep face, which nobody touches): he stands on the shoulder (the feet 0.90 /
+# 1.00 m behind, each ankle over the highest ground under its sole), jumps out over the face, touches down 0.10 m further from
+# the wall than before (R2_DI_LAND: A's right heel came down on the foot of the slope), and settles into the variant's
+# stance shifted away from the wall (R2_DI_SETTLE) so both feet stay on the floor. The landing instant, the events and the
+# hold loops are A's. The profile goes into the manifest (`ground.profile`, [behind m, up m] off the root) for the browser
+# check and for a director who places the root on another lip.
+R2_DI_PROFILE = [(-.40, 0.0), (0.0, 0.0), (.05, .01), (.10, .05), (.15, .14), (.20, .22), (.25, .31), (.30, .40), (.35, .56),
+                 (.40, .73), (.45, .90), (.50, 1.07), (.55, 1.24), (.60, 1.39), (.65, 1.52), (.70, 1.64), (.75, 1.77), (.80, 1.885),
+                 (.85, 1.92), (.90, 1.935), (.95, 1.95), (1.00, 1.96), (1.05, 1.975), (1.10, 2.005), (1.20, 2.10), (1.30, 2.19),
+                 (1.40, 2.32), (1.50, 2.45), (1.60, 2.53), (1.80, 2.57)]
+R2_DI_STANCE = (.90, 1.00)          # runtime m behind the root: the left (front) and right ankles on the shoulder
+R2_DI_SOLE = (.16, .07)             # runtime m of sole ahead of / behind the ankle (the ground an ankle must clear)
+R2_DI_LAND = .10                    # runtime m: the touch-down this much further from the wall than A's
+R2_DI_ARC = (.5, .35)               # at half the flight, this share of the way out is still to go
+R2_DI_SETTLE = {'IjaDropInKneel': .30, 'IjaDropInStand': .22, 'IjaDropInPoint': .12}   # runtime m: the settled stance off the wall
+
+
+def R2DiProfile(d):
+    """Runtime m up at runtime m `d` behind the root (piecewise linear, flat past the ends)."""
+    p = R2_DI_PROFILE
+    if d <= p[0][0]:
+        return p[0][1]
+    for (d0, h0), (d1, h1) in zip(p, p[1:]):
+        if d <= d1:
+            return h0 + (h1 - h0) * (d - d0) / (d1 - d0)
+    return p[-1][1]
+
+
+def R2DiUnder(d):
+    """The highest ground under a sole whose ankle is `d` behind the root (runtime m)."""
+    a, b = d - R2_DI_SOLE[0], d + R2_DI_SOLE[1]
+    return max(R2DiProfile(a + (b - a) * i / 20) for i in range(21))
+
+
+def R2DropBuild(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D = RA_DI[name]
+    off, land, down = RA_DI_OFF, RA_DI_LAND, RA_DI_DOWN
+    base = IjaABase(T)
+    base.update({'handRel.L': None, 'handRel.R': None, 'bend': .12})
+    sL, sR = T.R(R2_DI_STANCE[0]), T.R(R2_DI_STANCE[1])
+    zL, zR = T.R(R2DiUnder(R2_DI_STANCE[0])), T.R(R2DiUnder(R2_DI_STANCE[1]))
+    top = (zL + zR) / 2                                # the stance's ground under the pelvis
+    y0 = (sL + sR) / 2                                 # the pelvis over the middle of the stance
+    Ld, Sd = T.R(R2_DI_LAND), T.R(R2_DI_SETTLE[name])
+    p0 = base['pelvis']
+    hold = CLIPS[name]['holdLoop']
+    endZ = {'IjaDropInKneel': T.K['kneelPelvisZ'] + .04, 'IjaDropInStand': P - .07, 'IjaDropInPoint': P - .05}[name]
+    endY = {'IjaDropInKneel': T.K['kneelPelvisY'] - .05, 'IjaDropInStand': .0, 'IjaDropInPoint': .02}[name] - Sd
+    # the jump is 0.3 m longer than A's: two thirds of the way out are covered by the top of the arc (R2_DI_ARC), so the
+    # last frames before the boots come down stay as steep as A's (pelvis <= 0.2 m a frame; evenly spread it read 0.199)
+    yOff, yLand = y0 + p0[1] - .05, .03 - Ld
+    pY = WrChannel([(0.0, y0 + p0[1]), (RaF(5), y0 + p0[1] + .02), (off, yOff), (off + R2_DI_ARC[0] * (land - off), yLand + R2_DI_ARC[1] * (yOff - yLand)),
+                    (land, yLand), (down, .05 - Ld), (RaF(34), endY), (D, endY)])
+    pZ0 = WrChannel([(0.0, top + p0[2]), (RaF(5), top + p0[2] - .16), (RaF(8), top + p0[2] - .10), (off, top + p0[2] - .02)])
+    pZ1 = WrChannel([(land, P - .10), (down, P - .40), (RaF(30), P - .32), (RaF(36), endZ), (D, endZ)])
+
+    def PZ(t):
+        if t <= off:
+            return pZ0(t)
+        if t < land:
+            u = (t - off) / (land - off)
+            a, b = top + p0[2] - .02, P - .10
+            return a + (b - a) * u + T.R(.20) * 4 * u * (1 - u) - T.R(.40) * u * u * (1 - u)
+        return pZ1(t)
+    # the feet: each on its own ground on the shoulder, tucked in the air, on the floor clear of the slope's foot
+    stanceL, stanceR = (H + .04, sL, zL + A), (-(H + .04), sR, zR + A)
+    landL, landR = (H + .07, -.06 - Ld, A), (-(H + .07), .08 - Ld, A)
+    tuck = lambda s, t: Add3((0, pY(t), PZ(t)), ((H + .06) * (1 if s == 'L' else -1), -.12, -.48))
+    kneel = KneelFlat(T, 0.0, -Sd)
+    footR = {'IjaDropInKneel': kneel['ankle.R'], 'IjaDropInStand': (-(H + .04), .10 - Sd, A), 'IjaDropInPoint': (-(H + .03), .08 - Sd, A)}[name]
+    footL = {'IjaDropInKneel': (H + .08, -.40 - Sd, A), 'IjaDropInStand': (H + .04, -.10 - Sd, A), 'IjaDropInPoint': (H + .04, -.06 - Sd, A)}[name]
+
+    def Ankle(s, t):
+        a0, a1 = (stanceL, landL) if s == 'L' else (stanceR, landR)
+        if t <= off - RaF(1):
+            return a0
+        if t < land:
+            u = Smooth((t - (off - RaF(1))) / RaF(3))
+            mid = tuck(s, t)
+            v = Smooth((t - (land - RaF(4))) / RaF(4))
+            return Lerp3(Lerp3(a0, mid, u), a1, v)
+        if t < down + RaF(2):
+            return a1
+        w = Smooth((t - down - RaF(2)) / RaF(8))
+        return Lerp3(a1, footL if s == 'L' else footR, w)
+    turnTo = {'IjaDropInKneel': math.pi / 2, 'IjaDropInStand': math.pi / 2, 'IjaDropInPoint': 0.0}[name]
+    turn = WrChannel([(0.0, 0.0), (down, 0.0), (RaF(36), turnTo), (D, turnTo)])
+    aim = AimRifle(T, 2.0)
+    low = LowReady(T)
+    port = RaDropRifle(T, P)
+
+    def Rifle(t):
+        """In the body frame (RaYaw turns it), riding the pelvis -- port arms through the jump, then the variant's."""
+        shift = (0, pY(t) - p0[1], PZ(t) - p0[2])
+        if t <= down:
+            return T.Rifle(Add3(port['origin'], shift), port['axis'])
+        w = Smooth((t - down) / (RaF(36) - down))
+        if name == 'IjaDropInKneel':
+            to = aim
+        elif name == 'IjaDropInStand':
+            to = low
+        else:
+            to = T.Rifle((T.H + .10, -.02, P - .10), Unit((.05, -.35, .94)))
+        return T.Rifle(Add3(Lerp3(port['origin'], to['origin'], w), shift), Unit(Lerp3(port['axis'], to['axis'], w)))
+
+    def Pose(t):
+        f = dict(base)
+        f['pelvis'] = (p0[0], pY(t), PZ(t))
+        air = Bump(t, off - RaF(2), land + RaF(4))
+        f['bend'] = .12 + .30 * Bump(t, 0.0, off + RaF(2)) + .10 * air + .35 * Bump(t, land - RaF(2), RaF(36))
+        f['pelvisTilt'] = (.06 + .20 * Bump(t, land - RaF(2), RaF(34)), 0, 0)
+        for s in LR:
+            f['ankle.' + s] = Ankle(s, t)
+            f['legPole.' + s] = Add3(f['ankle.' + s], ((H + .25) * (1 if s == 'L' else -1), -1.0, .55))
+            f['foot.' + s] = (10 * air, 6 if s == 'L' else -8, 0)
+        if name == 'IjaDropInKneel' and t > down:
+            w = Smooth((t - down - RaF(2)) / RaF(8))
+            f['legPole.R'] = Lerp3(f['legPole.R'], kneel['legPole.R'], w)
+            f['foot.R'] = (Mix(0, kneel['foot.R'][0], w), -8, 0)
+        if name == 'IjaDropInKneel' and t > down:
+            w = Smooth((t - down) / (RaF(36) - down))
+            f['pelvisTilt'] = (f['pelvisTilt'][0], 0, -.45 * w)
+            f['twist'] = -.12 * w
+            f['neck'] = (.06 * w, -.05 * w, .20 * w)
+        r = Rifle(t)
+        palms = T.Palms(r['axis'])
+        f['grip.R'] = r['gripR'] if name != 'IjaDropInPoint' or t < RaF(30) else None
+        f['grip.L'] = r['gripL'] if name != 'IjaDropInPoint' or t < RaF(30) else T.Along(r, .62)
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+        dz = PZ(t) - p0[2]
+        f['armPole.R'] = (-(SX + .50), pY(t) + .20, P + .10 + dz)
+        f['armPole.L'] = (SX + .40, pY(t) - .10, P + dz)
+        f['head'] = (.25 * air + .10, 0, 0)
+        if name == 'IjaDropInKneel' and t > down:
+            w = Smooth((t - down) / (RaF(36) - down))
+            f['head'] = Lerp3(f['head'], (.12, -.14, .42), w)
+        if name == 'IjaDropInPoint' and t >= RaF(30):
+            # A's pointing arm, carried off the wall with the settled stance (its points were written for the pelvis at y .02)
+            dy = pY(t) - .02
+            p1, p2 = (SX + .20, -.58 + dy, SZ + .05 + dz), (.02, -.62 + dy, SZ - .20 + dz)
+            rest = (-(SX + .02), -.06 + dy, P - .08 + dz)
+            path = RaChan([(RaF(30), rest), (RaF(38), p1), (RaF(46), p1), (RaF(54), p2), (RaF(62), p2), (RaF(66), rest), (D, rest)])
+            f['grip.R'] = None
+            f['hand.R'] = path(t)
+            out = Smooth((t - RaF(32)) / RaF(4)) * (1 - Smooth((t - RaF(62)) / RaF(4)))
+            f['palmF.R'] = Unit(Lerp3((0, -.2, -1), (1, -.2, 0) if t < RaF(50) else (.6, -.6, -.3), out))
+            f['palmN.R'] = Unit(Lerp3((1, 0, 0), (0, 0, -1), out))
+            f['curl.R'] = Mix(.5, .9, out)
+            f['index.R'] = Mix(.5, .0, out)
+            f['armPole.R'] = (-(SX + .30), .40 + dy, SZ - .40 + dz)
+            f['head'] = (.0, 0, .55 * out if t < RaF(50) else .35 * out)
+            f['twist'] = (.50 if t < RaF(50) else .25) * out
+        if hold and t > hold[0] - .2:
+            b = WrBreath(t, hold[0], hold[1] - hold[0], per=1, ease=.2)
+            f['bend'] += .01 * b
+        return T.Nest(RaYaw(f, turn(t)))
+
+    def Props(t):
+        r = Rifle(t)
+        c = (p0[0], pY(t))
+        o = Vector(r['origin'])
+        ox, oy = _Rot(o.x - c[0], o.y - c[1], turn(t))
+        a = Vector(r['axis'])
+        ax, ay = _Rot(a.x, a.y, turn(t))
+        return {'weapon': ((ox + c[0], oy + c[1], o.z), (ax, ay, a.z), (0, 0, 1), True)}
+    ground = lambda x, y, t: T.R(R2DiProfile(y * T.s))
+    slope = [('poly', [(-1.2, T.R(d0), T.R(h0)), (1.2, T.R(d0), T.R(h0)), (1.2, T.R(d1), T.R(h1)), (-1.2, T.R(d1), T.R(h1))], None, 0)
+             for (d0, h0), (d1, h1) in zip(R2_DI_PROFILE[1:], R2_DI_PROFILE[2:])]
+    spec = {'pose': Pose, 'props': Props, 'ground': ground, 'reach': {'fraction': .86, 'travel': .08, 'bend': .30},
+            'check': lambda t: {'R': Rifle(t)['gripR']} if t <= down else {},
+            'groundWeight': lambda t: max(1 - Smooth((t - (off - RaF(2))) / RaF(2)), Smooth((t - (land - RaF(1))) / RaF(1))),
+            'plants': [('L', 0, off - RaF(2)), ('R', 0, off - RaF(2)), ('L', down + RaF(12), D), ('R', down + RaF(12), D)],
+            'reviewProps': lambda t: slope,
+            'reviewFrames': lambda n: [0, 5, 9, 14, 18, 22, 27, 36, n - 1] + ([40, 56] if name == 'IjaDropInPoint' else [])}
+    spec['reviewViews'] = [('side', (-5.2, .4, 1.9), (0, .4, 1.7)), ('q', (-3.6, -4.0, 3.6), (0, .4, 1.6))]
+    spec['reviewScale'] = 4.8
+    if name == 'IjaDropInKneel':
+        spec['kneePlants'] = [('R', RaF(42), D)]
+    return spec
+
+
+for _name in RA_DI:
+    CLIPS[_name]['ground'] = {'profile': [[d, h] for d, h in R2_DI_PROFILE], 'along': 'behind',
+                              'from': 'Data_OpeningSet0103 dropIn.lip[0..2] -> land, P012 terrain (mean of the three)'}
+    CLIPS[_name]['notes'] += (' 2026-10-12 R2: frame 0 stands on the measured lip (ground.profile: [m behind the root, m up]; '
+                              'the ankles %.2f / %.2f m behind), touches down %.2f m further from the wall, settles %.2f m off it.'
+                              % (R2_DI_STANCE[0], R2_DI_STANCE[1], R2_DI_LAND, R2_DI_SETTLE[_name]))
+    Builder(_name)(lambda T, name: R2DropBuild(T, name))
