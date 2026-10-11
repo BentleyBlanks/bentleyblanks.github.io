@@ -125,7 +125,7 @@ try {
       const kind = rig.startsWith("TengxianIja") ? "ija" : "nra", modelVariant = Number(rig.slice(-2)) - 1;
       const meta = api.OpeningClipMeta(clip) || {};
       const armed = (meta.props || []).includes("weapon");
-      const weapon = !armed ? null : kind === "ija" ? "Type38" : (role === "luo" || role === "heyoutian") ? "Dadao" : "HanYang";
+      const weapon = !armed ? null : kind === "ija" ? "Type38" : (role === "luo" || role === "heyoutian" || role === "chargeB") ? "Dadao" : "HanYang";
       // 2026-10-11 redraft A: a clip that stabs with the rifle (contact limb "blade", action "stab": IjaStompStabTwist) is played
       // with the bayonet fixed, as the director spawns that soldier (the default rifle has none and stood a blade length off).
       const bayonetFixed = (meta.contacts || []).some(c => c.limb === "blade" && c.action === "stab");

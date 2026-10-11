@@ -81,7 +81,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // his cheek and the levelled rifle, ijaA biting the grenade's pin.
       "IjaSlapRecruit","IjaRecruitSlapped","IjaRecruitChargeThrust","CaptiveStabbedCurl","IjaHairLiftKneeBack","CaptiveCurledPulledUp",
       "IjaThroatCutKneeShove","CaptiveThroatCutForward","IjaWipeBandageFixBayonet","IjaFinishWalkStab","IjaBootOnHand",
-      "IjaRecruitCheekCut","IjaRecruitLevelRifle","IjaGrenadeBitePin"],
+      "IjaRecruitCheekCut","IjaRecruitLevelRifle","IjaGrenadeBitePin",
+      // 2026-10-11 polish (PolishAnim): ChargeB's tumble down the crater step, the machine-gun pair shot on the south lip, the heave
+      // of a body onto the lip.
+      "NraShotTumbleSteps","IjaLmgGunnerShotOnGun","IjaLoaderShotTumbleOffLip","IjaHeaveCorpseLip"],
   },
   // The NRA02 comrade is clean in SB01; the shell that buries him wounds him, and he is bloodied from the
   // black after it through the drag and the interrogation (2026-09-27 review: 「应该是在爆炸后才变得伤痕累累」).

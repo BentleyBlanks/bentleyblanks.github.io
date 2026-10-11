@@ -43,6 +43,9 @@ const ContactClips=new Set(["LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle"
   "IjaSlapRecruit","IjaRecruitSlapped","IjaRecruitChargeThrust","CaptiveStabbedCurl","IjaHairLiftKneeBack","CaptiveCurledPulledUp",
   "IjaThroatCutKneeShove","CaptiveThroatCutForward","IjaWipeBandageFixBayonet","IjaFinishWalkStab","IjaBootOnHand",
   "IjaRecruitCheekCut","IjaRecruitLevelRifle","IjaGrenadeBitePin",
+  // 2026-10-11 polish (PolishAnim): the authored deaths (ChargeB down the step, the gunner on his gun, the loader off the lip) and
+  // the heave of a body onto the lip (both hands on it).
+  "NraShotTumbleSteps","IjaLmgGunnerShotOnGun","IjaLoaderShotTumbleOffLip","IjaHeaveCorpseLip",
   // 2026-10-11 redraft (Dir01 hook): Luo standing in the mouth looks round (GuardTurn at the near shell / the far call) and points
   // with the order; not swapped for the dugout's MessengerReport stand.
   "GuardTurn"]);

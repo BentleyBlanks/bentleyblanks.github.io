@@ -14041,3 +14041,552 @@ CLIPS['IjaWipeBandageFixBayonet']['notes'] = CLIPS['IjaWipeBandageFixBayonet']['
     'He half squats at the dead man\'s left shoulder',
     'He half squats behind the dead man\'s left shoulder on the wall side (polish 2026-10-11: the body lies along the north wall '
     'foot, ijaA between it and the planks)')
+
+
+# ---- P2. NraShotTumbleSteps (NRA02, ChargeB; N22 / N23) ---------------------------------------------------------------------
+# 「冲在最前面的一名川军弟兄身子一歪，滚下台阶，摔在顺子旁边，眼睛还睁着」. The first man down the crater step, running with his
+# dadao (spawned Dadao), is shot through the chest from his right (the fold man at F is east of the step): the right shoulder
+# knocked back, he spins away to his left on a crossing stumble, the dadao flies out of his hand, he goes down on his left
+# side on the slope and slides and rolls down it onto his back, the head downhill to his forward left, the legs up the slope,
+# the arms flung out. The clip carries its own ground: the step falls away ahead of him (RP_TS_DROP over the first RP_TS_RAMP of
+# forward run, flat after -- the chargeRoute step at x 3.3 drops 0.9 m from z -121.9 to -123.2). The director puts the root
+# where he is hit (running down the step, facing down it); the pelvis ends RP_TS_END (left, forward) off the root, RP_TS_DROP
+# lower. Root motion; the last frame is the corpse (face up, eyes left to the face layer).
+RP_TS_T = 60 / 24                   # 2.5 s
+RP_TS_HIT = 2 / 24                  # 0.083 s: the round into the right chest
+RP_TS_RELEASE = 4 / 24              # 0.167 s: the dadao out of his hand
+RP_TS_DOWN = 15 / 24                # 0.625 s: the left hip on the slope
+RP_TS_STILL = 34 / 24               # 1.417 s: on his back at the foot of the step
+RP_TS_DROP = .80                    # runtime m the step falls away under the slide
+RP_TS_RAMP = (.15, 1.30)            # runtime m of forward run over which it falls (smoothstep)
+RP_TS_END = (.66, 1.40)             # runtime m: the pelvis at rest, left of / ahead of the root
+RP_TS_TURN = math.pi + .45          # the body's last facing: spun round to his left, the head downhill forward left
+
+
+def RpTsFall(fwd):
+    """How far (runtime m) the step has fallen away `fwd` runtime m ahead of where he is hit."""
+    return RP_TS_DROP * Smooth((fwd - RP_TS_RAMP[0]) / (RP_TS_RAMP[1] - RP_TS_RAMP[0]))
+
+
+def RpTsGround(T, y):
+    """Ground (source m) under source y. The root is where he comes to rest (the pelvis at the last frame, on the floor at
+    the foot of the step, z 0): the step rises behind it toward where he was hit."""
+    fwd = (-y * T.s) + RP_TS_END[1]
+    return T.R(RP_TS_DROP - RpTsFall(fwd))
+
+
+def RpTsAt(T, left, fwd, up):
+    """A point `left` / `fwd` (runtime m) off where he is hit, `up` runtime m over the step's ground there (source m, in the
+    clip's frame: the root at rest, RP_TS_END on)."""
+    return (T.R(left - RP_TS_END[0]), -T.R(fwd - RP_TS_END[1]), T.R(RP_TS_DROP - RpTsFall(fwd) + up))
+
+
+Meta('NraShotTumbleSteps', RP_TS_T, False, 'track', role='chargeB', rig='TengxianNra02', rigs=['TengxianNra02'], props=['weapon'],
+     rootMotion=True, terminal=True, weaponState='oneHandRight->dropped', weaponDropFrom='NraShotTumbleSteps',
+     contacts=[{'t': 0.0, 'limb': 'handR', 'action': 'hold', 'target': 'weapon'},
+               {'t': RP_TS_RELEASE, 'limb': 'handR', 'action': 'release', 'target': 'weapon'}],
+     events=[{'t': RP_TS_HIT, 'kind': 'shot', 'at': 'chestFront', 'from': 'his right'}, {'t': RP_TS_RELEASE, 'kind': 'weaponLost'},
+             {'t': RP_TS_DOWN, 'kind': 'down', 'sound': 'bodyFall'}, {'t': RP_TS_STILL, 'kind': 'dead'}],
+     ground={'dropM': RP_TS_DROP, 'rampM': list(RP_TS_RAMP), 'along': 'forward'},
+     prev=[], next=[],
+     notes='2026-10-11 polish (contract §1.11, N22/N23): ChargeB running down the crater step with his dadao, frame 0 a running '
+           'stride (the native charge run hands over to it); 0.083 s the round into the right chest from his right: the right '
+           'shoulder knocked back, the body spun to his left on a crossing stumble, the dadao out of his hand at 0.167 s (weapon '
+           'track to where it lands, weaponDropFrom); down on his left side on the slope at 0.625 s, he slides and rolls down it '
+           'onto his back, the head downhill to his forward left, the legs up the slope, the arms flung out; still from 1.42 s, '
+           'eyes open (face layer). Root motion: the pelvis ends 0.66 m left, 1.40 m ahead of the root and 0.80 m lower (the step '
+           'falls away under him: manifest ground); its last frame is the corpse.')
+
+
+@Builder('NraShotTumbleSteps')
+def RpBuildShotTumbleSteps(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D, hit, rel, down, still = RP_TS_T, RP_TS_HIT, RP_TS_RELEASE, RP_TS_DOWN, RP_TS_STILL
+    ex, ez = RP_TS_END
+    Pr, Hr, Ar = P * T.s, H * T.s, A * T.s          # standing pelvis height, hip half width, ankle height: runtime m
+    base = T.Stand()
+    base.update({'turn': 0.0})
+
+    def Lying(pl, pf, roll, turn, legM=.80, poleM=.60):
+        """Legs of the body lying with the head along `turn` (pitch ~90 deg: the head toward the slide, the legs trailing up the
+        step), rolled `roll` about its length (0 face down, pi face up; + over onto the left side first): ankles legM behind
+        the pelvis (pl, pf), the under leg on the ground, the top one over it, the knees along the body's front."""
+        hl, hf = math.sin(turn), math.cos(turn)             # the head's direction (left, fwd)
+        ll, lf = math.cos(turn), -math.sin(turn)            # his left lying face down
+        side = .13 * math.cos(roll)
+        over = .26 * max(0.0, math.sin(roll))               # rolled onto the left side: the right leg on top
+        out = {}
+        for s, sign, up in (('L', 1, .09), ('R', -1, .09 + over)):
+            al, af = pl - legM * hl + sign * side * ll, pf - legM * hf + sign * side * lf
+            out['ankle.' + s] = RpTsAt(T, al, af, up)
+            # the knee along the body's front (face down: into the ground; face up: to the sky)
+            nl, nf, nz = -math.sin(roll) * ll, -math.sin(roll) * lf, -math.cos(roll)
+            ml, mf = (pl + al) / 2, (pf + af) / 2
+            out['legPole.' + s] = RpTsAt(T, ml + poleM * nl + sign * .10 * ll, mf + poleM * nf + sign * .10 * lf, .20 + poleM * nz)
+        return out
+    # the running stride he is hit in (left foot swinging through, right pushing off), the crossing stumble, the fall onto
+    # his face down the step and the log roll over his left side onto his back (pelvisTilt: pitch about his left-right axis,
+    # then roll about his length -- at a ~90 deg pitch the roll turns him over in place, the head staying downhill)
+    rows = [
+        (0.0, {'pelvis': RpTsAt(T, 0.0, 0.0, Pr - .07), 'pelvisTilt': (.14, 0.0, 0.0), 'bend': .22, 'twist': -.10,
+               'ankle.L': RpTsAt(T, Hr + .02, .30, .16), 'ankle.R': RpTsAt(T, -(Hr + .02), -.28, Ar),
+               'legPole.L': RpTsAt(T, .20, 1.2, .55), 'legPole.R': RpTsAt(T, -.20, .8, .45),
+               'foot.L': (10, 0, 0), 'foot.R': (-35, 0, 0), 'head': (.06, 0, 0), 'neck': (0, 0, 0), 'shrug': .04}),
+        # the round goes in: the chest jolts back, the right shoulder knocked back (twist to his left), the head snaps
+        (hit + .05, {'pelvis': RpTsAt(T, .02, .32, Pr - .08), 'pelvisTilt': (.04, .06, 0.0), 'bend': .02, 'twist': .30,
+                     'lean': .06, 'head': (-.30, .10, .25), 'neck': (-.12, .05, .10), 'shrug': .20,
+                     'ankle.L': RpTsAt(T, Hr + .02, .45, Ar), 'foot.L': (0, 0, 0)}),
+        # the right foot crosses over in front of the left: the stumble, turned to his left, pitching
+        (.30, {'pelvis': RpTsAt(T, .10, .45, Pr - .16), 'ankle.L': RpTsAt(T, Hr + .02, .45, Ar), 'pelvisTilt': (.30, .18, 0.0), 'bend': .38, 'twist': .20, 'turn': .20,
+               'ankle.R': RpTsAt(T, .16, .60, Ar), 'legPole.R': RpTsAt(T, .30, 1.5, .45), 'foot.R': (0, 0, 0),
+               'head': (.25, .10, .30), 'neck': (.10, 0, .10), 'shrug': .12}),
+        # the legs go: over the knees, falling on his face down the step
+        (.45, {'pelvis': RpTsAt(T, .18, .56, .48), 'pelvisTilt': (1.05, .30, 0.0), 'bend': .35, 'twist': .10, 'turn': .30,
+               'ankle.L': RpTsAt(T, .14, .40, Ar + .03), 'ankle.R': RpTsAt(T, .22, .50, Ar),
+               'legPole.L': RpTsAt(T, .40, 1.6, .40), 'legPole.R': RpTsAt(T, .45, 1.7, .40), 'foot.L': (-30, 0, 0), 'foot.R': (-30, 0, 0),
+               'head': (.10, .10, .20), 'neck': (.05, 0, .10), 'shrug': .15}),
+        # down on his chest and left shoulder (the hands out in front), the slide carrying him on
+        (down, dict({'pelvis': RpTsAt(T, .28, .66, .20), 'pelvisTilt': (2.15, .55, 0.0), 'bend': .12, 'twist': .05, 'turn': .38,
+                     'foot.L': (-50, 0, 0), 'foot.R': (-50, 0, 0), 'head': (-.25, .20, .30), 'neck': (-.10, .05, .10), 'shrug': .10},
+                    **Lying(.28, .66, .55, .38, legM=.72))),
+        # over onto the left side
+        (.80, dict({'pelvis': RpTsAt(T, .44, .96, .18), 'pelvisTilt': (1.70, 1.60, 0.0), 'bend': .06, 'twist': 0.0, 'turn': .42,
+                    'foot.L': (-30, 0, 0), 'foot.R': (-30, 0, 0), 'head': (-.10, .30, .20), 'neck': (-.05, .10, .05)},
+                   **Lying(.44, .96, 1.60, .42, legM=.76))),
+        # and onto his back
+        (1.05, dict({'pelvis': RpTsAt(T, .58, 1.24, .15), 'pelvisTilt': (1.40, 2.90, 0.0), 'bend': .02, 'turn': .45,
+                     'foot.L': (-55, 25, 15), 'foot.R': (-50, -20, -10), 'head': (-.15, .05, .45), 'neck': (-.06, 0, .15), 'shrug': 0.0},
+                    **Lying(.58, 1.24, 2.90, .45))),
+        (1.25, dict({'pelvis': RpTsAt(T, ex - .01, ez, .13), 'pelvisTilt': (1.48, 3.10, 0.0), 'bend': 0.0, 'turn': .45,
+                     'head': (-.12, 0, .62), 'neck': (-.05, 0, .22)}, **Lying(ex - .01, ez, 3.10, .45, legM=.82))),
+        # settled: on his back, the head fallen to his left, still
+        (still, dict({'pelvis': RpTsAt(T, ex, ez, .12), 'pelvisTilt': (1.52, math.pi, 0.0), 'bend': 0.0, 'turn': .45,
+                      'foot.L': (-60, 30, 20), 'foot.R': (-55, -25, -15), 'head': (-.12, .0, .70), 'neck': (-.05, 0, .25)},
+                     **Lying(ex, ez, math.pi, .45, legM=.84))),
+        (D, {}),
+    ]
+    anim = Keys(base, rows, lag={'head': .05, 'neck': .03})
+    # free hands (torso frame: left, back, up from each shoulder): the left pumping, both flung as he is hit, out on the ground
+    hands = Keys({'handRel.L': (.06, -.28, -.30), 'handRel.R': (-.06, -.22, -.18)}, [
+        (0.0, {}), (hit + .04, {}),
+        (.30, {'handRel.L': (.34, -.20, -.10), 'handRel.R': (-.30, -.10, .10)}),
+        (.45, {'handRel.L': (.22, -.30, .05), 'handRel.R': (-.22, -.28, .08)}),           # out in front to break the fall
+        (down, {'handRel.L': (.30, -.10, .15), 'handRel.R': (-.30, -.10, .12)}),
+        (.80, {'handRel.L': (.05, -.22, .35), 'handRel.R': (-.20, -.30, .05)}),           # the left under him, the right over
+        (1.05, {'handRel.L': (.45, .00, .20), 'handRel.R': (-.40, -.05, .10)}),
+        (still, {'handRel.L': (.55, -.02, .08), 'handRel.R': (-.52, -.02, .02)}), (D, {})])
+    # the dadao: in his right fist, edge forward, up over the right shoulder (the charge), then flung ahead to his right
+    blade0 = T.Rifle(RpTsAt(T, -(SX * T.s + .10), .18, Pr + .30), Unit((-.15, -.35, .92)), kind='Dadao')
+    land = T.Rifle(RpTsAt(T, -.45, 1.35, .03), Unit((-.85, -.50, .05)), kind='Dadao')
+
+    def BladeAt(t):
+        if t <= rel:
+            return blade0
+        u = Clamp((t - rel) / .42)
+        o = Lerp3(blade0['origin'], land['origin'], Smooth(u))
+        lift = T.R(.35) * math.sin(math.pi * min(1.0, u * 1.1))
+        o = (o[0], o[1], Mix(blade0['origin'][2], land['origin'][2], u * u) + lift * (1 - u))
+        spin = Quaternion((0, 0, 1), 2.4 * Smooth(u)) @ Vector(blade0['axis'])
+        axis = Vector(Unit(Lerp3(tuple(spin), land['axis'], Smooth((u - .5) / .5))))
+        return T.Rifle(o, tuple(axis), kind='Dadao')
+
+    def Pose(t):
+        f = anim(t)
+        # a swinging foot passes over the step's edge, not through it (the keys are straight lines over a curved slope)
+        for s in LR:
+            a = f['ankle.' + s]
+            f['ankle.' + s] = (a[0], a[1], max(a[2], RpTsGround(T, a[1]) + A))
+        h = hands(t)
+        f['handRel.L'] = h['handRel.L']
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = (0, -.2, -1), (-1, 0, 0), Mix(.75, .25, Smooth((t - hit) / .30))
+        f['poleRel.L'] = (.45, .35, -.35)
+        f['handRel.R'] = h['handRel.R']
+        if t < rel + .12:
+            b = blade0
+            palms = T.Palms(b['axis'])
+            f['grip.R'], f['gripW.R'] = b['gripR'], 1 - Smooth((t - rel) / .12)
+            f['hand.R'] = b['gripR']
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], 1.0
+            f['armPole.R'] = (-(SX + .45), .15, SZ - .25)
+        else:
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = (0, -.2, -1), (1, 0, 0), Mix(.9, .25, Smooth((t - rel) / .25))
+            f['poleRel.R'] = (-.45, .35, -.35)
+        return T.Nest(Turned(f, f['turn']))
+
+    rampY = [T.R(RP_TS_END[1] - f) for f in (-.4, 0.0, .3, .6, .9, 1.2, 1.6, 2.0)]
+    spec = {'pose': Pose, 'props': lambda t: {'weapon': T.Track(BladeAt(t))}, 'ground': lambda x, y, t: RpTsGround(T, y),
+            'plants': [('L', hit + .05, .28)],
+            'reviewProps': lambda t: T.RifleProps(BladeAt(t)) + [
+                ('poly', [(-1.8, y0, RpTsGround(T, y0)), (1.2, y0, RpTsGround(T, y0)), (1.2, y1, RpTsGround(T, y1)),
+                          (-1.8, y1, RpTsGround(T, y1))], None, 0) for y0, y1 in zip(rampY, rampY[1:])],
+            'reviewFrames': lambda n: [0, 2, 4, 7, 11, 15, 19, 22, 29, 34, n - 1]}
+    c = (-T.R(.33), T.R(.70), T.R(.30))
+    spec['reviewViews'] = [('side', Add3(c, (3.3, 1.5, .9)), c), ('q', Add3(c, (2.4, -2.8, 2.0)), c),
+                           ('back', Add3(c, (-1.6, 3.2, 1.8)), c), ('top', Add3(c, (0, 0, 5.0)), c)]
+    spec['reviewScale'] = 3.4
+    return spec
+
+
+# ---- P3. The machine-gun pair shot on the south lip (N22): IjaLmgGunnerShotOnGun, IjaLoaderShotTumbleOffLip ------------------
+# Integration: both slid into the trench when the volley killed them (the directional death does not stand on the lip's
+# slope). The director now plays these (Kill with no hit reaction) where IjaProneLmgOnCorpse / IjaKneelLoadLmg had them.
+
+# The gunner (IJA01): frame 0 = IjaProneLmgOnCorpse frame 0 (between bursts; the gun on the upper corpse's back, its own
+# type11 track). Hit in the chest from the step (in front of him, to his left): the shoulders and the head jerk up and back
+# (0.04-0.12), then he goes slack -- the face comes down onto the receiver (0.42), the hands let go of the gun and slide down
+# the slope beside it (0.30-0.75); a last shudder (0.95); still. No root motion: he stays where he lay; the gun stays on the
+# rest (type11 track held at frame 0). The last frame is the corpse.
+RP_GUN_T = 48 / 24                 # 2.0 s
+RP_GUN_HIT = 1 / 24                # 0.042 s
+RP_GUN_FACE = 10 / 24              # 0.417 s: the face on the receiver
+RP_GUN_STILL = 30 / 24             # 1.25 s
+Meta('IjaLmgGunnerShotOnGun', RP_GUN_T, False, 'track', role='bunkerGunner', rig='TengxianIja01', rigs=['TengxianIja01'],
+     props=['type11'], rootMotion=False, terminal=True,
+     contacts=[{'t': 0.0, 'limb': 'handsLR', 'action': 'hold', 'target': 'type11'},
+               {'t': .30, 'limb': 'handsLR', 'action': 'release', 'target': 'type11'}],
+     events=[{'t': RP_GUN_HIT, 'kind': 'shot', 'at': 'chestFront'}, {'t': RP_GUN_FACE, 'kind': 'faceOnGun'},
+             {'t': RP_GUN_STILL, 'kind': 'dead'}],
+     prev=['IjaProneLmgOnCorpse'], next=[],
+     notes='2026-10-11 polish (contract §1.11, N22 「沟沿上的机枪手趴在尸体上不动了」): frame 0 = IjaProneLmgOnCorpse frame 0 (same '
+           'root: the director plays it on the gunner\'s mark with Kill and no hit reaction). 0.042 s the round in the chest: the '
+           'shoulders and the head jerk up and back; he goes slack, the face down onto the receiver (0.417), the hands off the gun '
+           'and sliding down the slope beside it (0.30-0.75); a last shudder (0.95); still from 1.25 s. No root motion; the type11 '
+           'track stays where frame 0 has it (the gun on the corpse rest). The last frame is the corpse.')
+
+
+@Builder('IjaLmgGunnerShotOnGun')
+def RpBuildGunnerShot(T, name):
+    H = T.H
+    D, hit = RP_GUN_T, RP_GUN_HIT
+    slope = math.radians(RA_LMG_SLOPE)
+    local0, pivot = RaProneLocal(T)
+    local0.update({'head': (-.35, 0, 0), 'neck': (-.25, 0, 0), 'bend': .05})
+    R = Matrix.Rotation(math.pi / 2 - slope, 3, 'X')
+    pelvisAt = Vector((0, T.R(.08), T.R(.24)))
+    up = Vector((0, -math.cos(slope), math.sin(slope)))
+    norm = Vector((0, math.sin(slope), math.cos(slope)))
+    shoulder = pelvisAt + up * T.R(.48) + norm * T.R(.10)
+    axis = Unit((0, -math.cos(math.radians(5)), math.sin(math.radians(5))))
+    gun = T.Rifle(tuple(shoulder + Vector((-T.R(.12), -T.R(.10), T.R(.10)))), axis)   # IjaProneLmgOnCorpse's Gun(0)
+    a = Vector(gun['axis'])
+    gripR = Vector(gun['gripR'])
+    gripL = gripR + a * T.R(.22) + Vector((T.R(.06), 0, -T.R(.04)))
+    # where the hands come to rest: slid down the slope beside the gun, palms on the earth
+    restR = gripR - up * T.R(.32) + norm * T.R(.05) + Vector((-T.R(.10), 0, 0))
+    restL = gripL - up * T.R(.40) + norm * T.R(.05) + Vector((T.R(.08), 0, 0))
+    keys = Keys({'head': (-.35, 0, 0), 'neck': (-.25, 0, 0), 'bend': .05, 'lean': 0.0, 'twist': 0.0}, [
+        (0.0, {}), (hit, {}),
+        (hit + .08, {'head': (-.58, .10, .12), 'neck': (-.36, .04, .05), 'bend': -.06, 'twist': .06}),
+        (.24, {'head': (-.20, .06, .18), 'neck': (-.10, 0, .08), 'bend': .08}),
+        (RP_GUN_FACE, {'head': (.42, -.05, .32), 'neck': (.28, 0, .10), 'bend': .16, 'twist': -.04}),
+        (.60, {'head': (.46, -.05, .34), 'neck': (.30, 0, .10), 'bend': .18}),
+        (.92, {}), (1.00, {'head': (.40, -.03, .30), 'bend': .15}), (1.08, {'head': (.46, -.05, .34), 'bend': .18}),
+        (D, {})], lag={'head': .04, 'neck': .02})
+    release = Channel([(0.0, 1.0), (.30, 1.0), (.75, 0.0), (D, 0.0)])
+
+    def Pose(t):
+        local = dict(local0)
+        local.update(keys(t))
+        f = RaRotatePose(local, R, pivot, pelvisAt)
+        f.update({'ankle.L': tuple(pelvisAt + Vector((H + .10, .78, -.05))), 'ankle.R': tuple(pelvisAt + Vector((-(H + .14), .80, -.08))),
+                  'legPole.L': (H + .30, .40, -.6), 'legPole.R': (-(H + .30), .40, -.6),
+                  'toeDir.L': Unit((.2, .7, -.6)), 'toeDir.R': Unit((-.2, .7, -.6)), 'handRel.L': None, 'handRel.R': None})
+        w = Smooth(release(t))
+        palms = T.Palms(tuple(a))
+        # the grips ease off the gun into the hands' resting places (gripW < 1: the bake blends from `hand`)
+        f['grip.R'], f['grip.L'] = tuple(gripR), tuple(gripL)
+        f['gripW.R'], f['gripW.L'] = w, w
+        f['hand.R'], f['hand.L'] = tuple(restR), tuple(restL)
+        f['palmF.R'], f['palmN.R'] = Unit(Lerp3(palms['R'][0], tuple(-up), 1 - w)), Unit(Lerp3(palms['R'][1], tuple(-norm), 1 - w))
+        f['palmF.L'], f['palmN.L'] = Unit(Lerp3(palms['L'][0], tuple(-up), 1 - w)), Unit(Lerp3(palms['L'][1], tuple(-norm), 1 - w))
+        f['curl.R'], f['curl.L'] = Mix(.35, .95, w), Mix(.30, .9, w)
+        f['armPole.R'] = tuple(shoulder + Vector((-.6, .1, -.4)))
+        f['armPole.L'] = tuple(shoulder + Vector((.6, .1, -.4)))
+        return T.Nest(f)
+
+    spec = {'pose': Pose, 'props': lambda t: {'type11': (gun['origin'], gun['axis'], (0, 0, 1), True)}, 'plants': [],
+            'ground': lambda x, y, t: max(0.0, (-y) * math.tan(slope)) if y < 0 else 0.0,
+            'reviewProps': lambda t: [('cyl', gun['butt'], tuple(gripR + a * T.R(.85)), .03),
+                                      ('poly', [(-1, 0, 0), (1, 0, 0), (1, -1.6, 1.6 * math.tan(slope)), (-1, -1.6, 1.6 * math.tan(slope))], None, 0)],
+            'reviewFrames': lambda n: [0, 1, 3, 6, 10, 14, 18, 24, n - 1]}
+    spec['reviewViews'] = [('side', (-3.2, -.4, .9), (0, -.4, .5)), ('q', (-2.2, 2.2, 1.8), (0, -.4, .4)),
+                           ('front', (.4, -2.6, 1.6), (0, -.4, .5))]
+    spec['reviewScale'] = 2.6
+    return spec
+
+
+# The loader (IJA03): frame 0 = IjaKneelLoadLmg frame 0, kneeling on the lip at the gunner's right loading the hopper. Hit in
+# the chest from the step (in front of him, to his left): jolted back, the hands off the hopper, the shot turns him to his
+# left and he goes over backwards toward the trench (RP_LOADER_LIP: the lip's edge is behind his right shoulder), head first
+# over the edge, slides down the wall on his back and comes to rest face up on the trench floor at its foot, the legs up the
+# wall. The clip carries the lip (RpLoaderGround: the south wall of the front trench at the mg marks, sampled from the
+# mission terrain at x 7-8: flat to the edge 0.10 m behind him, 2.0 m down over the next 0.8 m). Root motion: the pelvis ends
+# 1.12 m out toward the trench and 1.88 m down; the last frame is the corpse.
+RP_LOADER_T = 60 / 24              # 2.5 s
+RP_LOADER_HIT = 2 / 24             # 0.083 s
+RP_LOADER_EDGE = 14 / 24           # 0.583 s: on his back at the edge
+RP_LOADER_FLOOR = 31 / 24          # 1.292 s: at the foot of the wall
+RP_LOADER_STILL = 40 / 24          # 1.667 s
+# the lip's fall line, deg clockwise from his facing (IjaKneelLoadLmg's root faces SET_MARKS.mg.aimAt from mg.loader: yaw
+# 126.5 deg; the trench is due north of the mark: 126.5 deg to his right), and the edge's distance behind the root along it
+RP_LOADER_LIP = 126.5
+RP_LOADER_EDGE_M = .10
+# the wall's profile beyond the edge (runtime m along the fall line, m down): mission terrain z -121.8 .. -122.6 at x 7.5
+RP_LOADER_WALL = ((0.0, 0.0), (.2, -.31), (.4, -.98), (.6, -1.65), (.8, -2.01), (3.0, -2.01))
+
+
+def RpLoaderDir():
+    a = math.radians(RP_LOADER_LIP)
+    return Vector((-math.sin(a), -math.cos(a), 0.0)), Vector((math.cos(a), -math.sin(a), 0.0))   # along the fall, to its right
+
+
+def RpLoaderDrop(d):
+    """Ground (runtime m) d runtime m past the edge along the fall line."""
+    rows = RP_LOADER_WALL
+    if d <= 0:
+        return 0.0
+    for (d0, h0), (d1, h1) in zip(rows, rows[1:]):
+        if d <= d1:
+            u = (d - d0) / (d1 - d0)
+            return h0 + (h1 - h0) * u
+    return rows[-1][1]
+
+
+def RpLoaderGround(T, x, y):
+    n, _ = RpLoaderDir()
+    d = (x * n.x + y * n.y) * T.s - RP_LOADER_EDGE_M
+    return T.R(RpLoaderDrop(d))
+
+
+def RpLoaderAt(T, along, side, up):
+    """A point `along` the fall line from the root and `side` to its right (runtime m), `up` over the wall's ground there."""
+    n, r = RpLoaderDir()
+    p = (n * along + r * side) / T.s
+    return (p.x, p.y, T.R(RpLoaderDrop(along - RP_LOADER_EDGE_M) + up))
+
+
+Meta('IjaLoaderShotTumbleOffLip', RP_LOADER_T, False, 'free', role='bunkerLoader', rig='TengxianIja03', rigs=['TengxianIja03'],
+     rootMotion=True, terminal=True,
+     events=[{'t': RP_LOADER_HIT, 'kind': 'shot', 'at': 'chestFront'}, {'t': RP_LOADER_EDGE, 'kind': 'overEdge'},
+             {'t': RP_LOADER_FLOOR, 'kind': 'down', 'sound': 'bodyFall'}, {'t': RP_LOADER_STILL, 'kind': 'dead'}],
+     ground={'lipDeg': RP_LOADER_LIP, 'edgeM': RP_LOADER_EDGE_M, 'wall': [list(r) for r in RP_LOADER_WALL]},
+     prev=['IjaKneelLoadLmg'], next=[],
+     notes='2026-10-11 polish (contract §1.11, N22 「副射手翻下沟沿」): frame 0 = IjaKneelLoadLmg frame 0 (same root: the director '
+           'plays it on the loader\'s mark with Kill and no hit reaction). 0.083 s the round in the chest: jolted back, the hands '
+           'off the hopper, turned to his left by it; over backwards toward the trench (the edge 0.10 m behind his right '
+           'shoulder, 126.5 deg to his right of his facing), head first over the edge (0.583), down the wall on his back to its '
+           'foot (1.292), face up on the trench floor with the legs up the wall; still from 1.67 s. Root motion: the pelvis ends '
+           '1.12 m out along that line and 1.88 m down (the wall is in the clip: manifest ground). The last frame is the corpse.')
+
+
+@Builder('IjaLoaderShotTumbleOffLip')
+def RpBuildLoaderShot(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D, hit = RP_LOADER_T, RP_LOADER_HIT
+    f0 = Standing(T)
+    f0.update(KneelFeet(T, KneelFlat(T, 0.0, 0.0, sit=.25)))
+    f0.update({'bend': .30, 'pelvisTilt': (.10, 0, 0), 'twist': .25, 'head': (.25, 0, .25), 'turn': 0.0})
+    hopper = (T.R(.26), -T.R(.46), T.R(.80))
+    f0['hand.R'] = Add3(hopper, (-.10, .05, -.10))
+    f0['hand.L'] = Add3(hopper, (.06, .04, -.12))
+    f0['armPole.R'], f0['armPole.L'] = (-(SX + .45), .10, P - .10), (SX + .45, .10, P - .10)
+    f0.update({'handRel.R': (-.30, -.20, -.10), 'handRel.L': (.30, -.20, -.10), 'handRelW.R': 0.0, 'handRelW.L': 0.0,
+               'poleRel.R': (-.45, .35, -.35), 'poleRel.L': (.45, .35, -.35),
+               'palmFw.R': (0, -.4, -.9), 'palmNw.R': (.9, 0, .1), 'palmFw.L': (.2, -.5, -.8), 'palmNw.L': (-.6, 0, -.6),
+               'palmF.R': (0, -.4, -.9), 'palmN.R': (.9, 0, .1), 'palmF.L': (.2, -.5, -.8), 'palmN.L': (-.6, 0, -.6),
+               'curl.R': .9, 'curl.L': .5})
+    Pr = P * T.s
+    turnTo = math.radians(180.0 - RP_LOADER_LIP)        # his back to the fall line
+
+    def Legs(along, back, up, spread=.14, kneeUp=.55):
+        """Ankles `back` runtime m behind the pelvis (away from the fall line) on the ground there, the knees up."""
+        out = {}
+        for s, sign in (('L', -1), ('R', 1)):
+            out['ankle.' + s] = RpLoaderAt(T, along - back, sign * spread, up)
+            out['legPole.' + s] = RpLoaderAt(T, along - back * .5, sign * (spread + .12), up + kneeUp)
+        return out
+    rows = [
+        (0.0, {}),
+        (hit, {}),
+        # jolted back by the round, the hands thrown off the hopper
+        (hit + .10, {'bend': -.05, 'pelvisTilt': (-.10, -.04, 0), 'twist': .05, 'head': (-.35, .05, .30), 'neck': (-.15, 0, .10),
+                     'shrug': .18, 'turn': .25, 'handRelW.R': 1.0, 'handRelW.L': 1.0,
+                     'handRel.R': (-.38, -.05, .22), 'handRel.L': (.36, -.05, .25)}),
+        # going over backwards (the knees come up off the ground, the shins swing under him)
+        (.40, dict({'pelvis': RpLoaderAt(T, .10, 0.0, .40), 'pelvisTilt': (-.85, -.10, 0), 'bend': .10, 'twist': 0.0, 'turn': turnTo * .8,
+                    'head': (.20, 0, .10), 'neck': (.15, 0, 0), 'shrug': .10, 'foot.L': (-30, 10, 0), 'foot.R': (-30, -10, 0),
+                    'handRel.R': (-.40, .05, .30), 'handRel.L': (.40, .05, .32)}, **Legs(.10, .45, A * T.s + .02, kneeUp=.45))),
+        # on his back on the edge, the head out over it
+        (RP_LOADER_EDGE, dict({'pelvis': RpLoaderAt(T, .22, 0.0, .16), 'pelvisTilt': (-1.45, -.05, 0), 'bend': .05, 'turn': turnTo,
+                               'head': (.10, .05, .15), 'neck': (.05, 0, .05), 'shrug': .0, 'foot.L': (-50, 20, 10), 'foot.R': (-50, -20, -10),
+                               'handRel.R': (-.35, .10, .40), 'handRel.L': (.35, .10, .42)}, **Legs(.22, .70, .14))),
+        # head first down the wall on his back, the legs going over the edge after him
+        (.80, dict({'pelvis': RpLoaderAt(T, .48, .02, .32), 'pelvisTilt': (-2.05, .05, 0), 'bend': -.05,
+                    'head': (-.20, .10, .20), 'neck': (-.10, 0, .05),
+                    'handRel.R': (-.30, .12, .48), 'handRel.L': (.32, .12, .46)}, **Legs(.48, .40, .28, kneeUp=.75))),
+        (1.06, dict({'pelvis': RpLoaderAt(T, .78, .03, .26), 'pelvisTilt': (-2.05, .08, 0), 'bend': 0.0,
+                     'handRel.R': (-.40, .10, .40), 'handRel.L': (.42, .10, .36)}, **Legs(.78, .30, .25, kneeUp=.70))),
+        # at the foot of the wall: face up on the floor, the legs up the wall
+        (RP_LOADER_FLOOR, dict({'pelvis': RpLoaderAt(T, 1.06, .04, .14), 'pelvisTilt': (-1.55, .10, 0), 'bend': .04,
+                                'head': (-.10, .05, .45), 'neck': (-.05, 0, .15),
+                                'handRel.R': (-.50, .04, .18), 'handRel.L': (.50, .04, .14)}, **Legs(1.06, .45, .22, kneeUp=.55))),
+        (RP_LOADER_STILL, dict({'pelvis': RpLoaderAt(T, 1.12, .04, .12), 'pelvisTilt': (-1.36, .08, 0), 'bend': .02,
+                                'head': (-.08, .0, .55), 'neck': (-.05, 0, .20),
+                                'handRel.R': (-.52, -.06, .14), 'handRel.L': (.50, -.06, .10)}, **Legs(1.12, .50, .22, kneeUp=.50))),
+        (D, {}),
+    ]
+    anim = Keys(f0, rows, lag={'head': .04, 'neck': .03})
+
+    def Pose(t):
+        f = anim(t)
+        for s in LR:
+            a = f['ankle.' + s]
+            f['ankle.' + s] = (a[0], a[1], max(a[2], RpLoaderGround(T, a[0], a[1]) + A))
+        if t > .40:
+            # over the edge the toes point out of the wall (up off the ground of whatever he lies on), not into it
+            n_, _ = RpLoaderDir()
+            for s, sign in (('L', 1), ('R', -1)):
+                f['toeDir.' + s] = Unit(Lerp3((0, 0, 1), tuple(n_ * .80 + Vector((0, 0, .60))), Smooth((t - .40) / .40)))
+        f['palmF.R'], f['palmN.R'] = Unit(f['palmF.R']), Unit(f['palmN.R'])
+        f['palmF.L'], f['palmN.L'] = Unit(f['palmF.L']), Unit(f['palmN.L'])
+        if t > hit:
+            w = Smooth((t - hit) / .25)
+            f['palmF.R'] = Unit(Lerp3(f['palmF.R'], (0, -.2, -1), w))
+            f['palmN.R'] = Unit(Lerp3(f['palmN.R'], (1, 0, 0), w))
+            f['palmF.L'] = Unit(Lerp3(f['palmF.L'], (0, -.2, -1), w))
+            f['palmN.L'] = Unit(Lerp3(f['palmN.L'], (-1, 0, 0), w))
+            f['curl.R'], f['curl.L'] = Mix(.9, .3, w), Mix(.5, .3, w)
+        return T.Nest(Turned(f, f['turn']))
+
+    n, r = RpLoaderDir()
+    wall = [(d, RpLoaderDrop(d)) for d in (-.6, 0.0, .2, .4, .6, .8, 1.6)]
+    polys = []
+    for (d0, h0), (d1, h1) in zip(wall, wall[1:]):
+        a0, a1 = n * ((d0 + RP_LOADER_EDGE_M) / T.s), n * ((d1 + RP_LOADER_EDGE_M) / T.s)
+        polys.append(('poly', [tuple(a0 - r * 1.2 + Vector((0, 0, T.R(h0)))), tuple(a0 + r * 1.2 + Vector((0, 0, T.R(h0)))),
+                               tuple(a1 + r * 1.2 + Vector((0, 0, T.R(h1)))), tuple(a1 - r * 1.2 + Vector((0, 0, T.R(h1))))], None, 0))
+    c = n * T.R(.6) + Vector((0, 0, -T.R(.9)))
+    spec = {'pose': Pose, 'ground': lambda x, y, t: RpLoaderGround(T, x, y), 'plants': [], 'kneePlants': [('L', 0, hit), ('R', 0, hit)],
+            'reviewProps': lambda t: [('point', hopper, None, .04)] + polys,
+            'reviewFrames': lambda n_: [0, 2, 5, 10, 14, 19, 24, 29, 38, n_ - 1]}
+    spec['reviewViews'] = [('side', tuple(c + r * T.R(3.6) + Vector((0, 0, T.R(.6)))), tuple(c)),
+                           ('q', tuple(c + r * T.R(2.4) - n * T.R(2.4) + Vector((0, 0, T.R(2.0)))), tuple(c)),
+                           ('back', tuple(c + n * T.R(3.2) + Vector((0, 0, T.R(1.0)))), tuple(c))]
+    spec['reviewScale'] = 3.6
+    return spec
+
+
+# ---- P4. IjaHeaveCorpseLip (IJA01 the gunner, IJA03 the loader; N12 「把两具尸体推上南沟沿」) -----------------------------------
+# He has dragged a body (the Set's movable corpse: OpeningSet.PlaceCorpse) to the foot of the south wall and lets it lie
+# there along the wall, face down, head to his left. Root: where he stands facing the wall, its foot RP_HEAVE_WALL ahead.
+# He squats, gets one hand under the armpit and one in the belt (grab), stands up with it against his chest (1.0), steps in to
+# the wall and shoves it up overhead onto the slope under the lip (heaved, 1.54 s: the Set swaps the corpse to its pose on the
+# lip, PlaceCorpse(...,{pose:"onLip"})), lets go, the hands come down, he steps back off the wall. Prop track `corpse`: the
+# body's middle (origin), the head's direction (axis), its back's normal (up) -- the director can carry the Set's corpse on
+# it frame by frame up to `heaved` (PlaceCorpse settle:false, liftM from the track's height) instead of swapping from the
+# floor. No root motion (the feet step in and back to where they were).
+RP_HEAVE_T = 64 / 24               # 2.667 s
+RP_HEAVE_GRAB = 13 / 24            # 0.542 s: the hands under the armpit and in the belt
+RP_HEAVE_UP = 37 / 24              # 1.542 s: shoved up onto the slope under the lip (heaved)
+RP_HEAVE_WALL = .30                # runtime m from the root to the wall's foot, straight ahead
+# the south wall at the mg marks above its foot (runtime m out from the foot, m up): mission terrain x 6-8
+RP_HEAVE_PROFILE = ((0.0, 0.0), (.2, .36), (.4, 1.03), (.6, 1.70), (.8, 2.01), (3.0, 2.01))
+# the body's middle (runtime m: forward of the root, up over the floor) through the heave
+RP_HEAVE_PATH = ((0.0, (.42, .13)), (RP_HEAVE_GRAB, (.42, .13)), (.80, (.36, .42)), (1.05, (.30, .92)), (1.25, (.50, 1.30)),
+                 (RP_HEAVE_UP, (.80, 1.80)))
+Meta('IjaHeaveCorpseLip', RP_HEAVE_T, False, 'free', role='bunkerGunner', rig='TengxianIja01',
+     rigs=['TengxianIja01', 'TengxianIja03'], props=['corpse'], rootMotion=False,
+     contacts=[{'t': RP_HEAVE_GRAB, 'limb': 'handsLR', 'action': 'grab', 'target': 'corpse', 'part': 'armpit / belt'},
+               {'t': RP_HEAVE_UP, 'limb': 'handsLR', 'action': 'release', 'target': 'corpse'}],
+     events=[{'t': RP_HEAVE_GRAB, 'kind': 'grab'}, {'t': 1.05, 'kind': 'lifted'},
+             {'t': RP_HEAVE_UP, 'kind': 'heaved', 'corpse': 'onLip', 'sound': 'bodyFall'}],
+     ground={'wallAheadM': RP_HEAVE_WALL, 'wall': [list(r) for r in RP_HEAVE_PROFILE]},
+     prev=['IjaDragByForearm'], next=['IjaProneLmgOnCorpse', 'IjaKneelLoadLmg'],
+     notes='2026-10-11 polish (contract §1.7, N12): the root stands facing the south wall, its foot 0.30 m ahead; the dragged '
+           'body (the Set\'s movable corpse) lies face down along the foot of the wall, its middle 0.42 m ahead, head to his left. '
+           'He squats and takes it under the left armpit and by the belt (grab 0.54), stands up with it against his chest '
+           '(lifted 1.05), steps in and shoves it up overhead onto the wall under the lip (heaved 1.54: the Set puts the corpse '
+           'on the lip, PlaceCorpse pose onLip), lets go, the hands come down and he steps back (to 2.67). Prop track `corpse`: '
+           'the body\'s middle, the head\'s direction, the back\'s normal (up to heaved; hidden after) -- the director may carry '
+           'the Set\'s corpse on it. No root motion. Baked on IJA01 (gunner) and IJA03 (loader).')
+
+
+@Builder('IjaHeaveCorpseLip')
+def RpBuildHeaveCorpse(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D, g, u = RP_HEAVE_T, RP_HEAVE_GRAB, RP_HEAVE_UP
+    path = RaChan([(t, (-T.R(f), T.R(h))) for t, (f, h) in RP_HEAVE_PATH] + [(D, (-T.R(RP_HEAVE_PATH[-1][1][0]), T.R(RP_HEAVE_PATH[-1][1][1])))])
+    Mid = lambda t: Vector((0.0, path(min(t, u))[0], path(min(t, u))[1]))
+    # the hands on the body: the left under the armpit (toward its head, his left), the right in the belt
+    def Hands(t):
+        c = Mid(t)
+        return c + Vector((T.R(.22), T.R(.12), T.R(.02))), c + Vector((-T.R(.16), T.R(.10), T.R(.06)))
+    base = Standing(T)
+    base.update({'turn': 0.0})
+    Pz = base['pelvis'][2]
+    keys = Keys(base, [
+        (0.0, {}),
+        # down into a squat over the body, the back bent
+        (g, {'pelvis': (0.0, T.R(.08), T.R(.42)), 'bend': .78, 'pelvisTilt': (.40, 0, 0), 'head': (.30, 0, 0),
+             'legPole.L': (H + T.R(.30), -T.R(.90), T.R(.50)), 'legPole.R': (-(H + T.R(.30)), -T.R(.90), T.R(.50))}),
+        # up with it, hugged to the chest, leaning back against the weight
+        (1.05, {'pelvis': (0.0, T.R(.04), Pz - T.R(.06)), 'bend': .05, 'pelvisTilt': (-.08, 0, 0), 'lean': 0.0, 'head': (-.10, 0, 0),
+                'legPole.L': (H + T.R(.22), -T.R(.95), T.R(.45)), 'legPole.R': (-(H + T.R(.22)), -T.R(.95), T.R(.45))}),
+        # a step in to the wall's foot with the left, the weight on it, up on the toes for the shove
+        (1.25, {'pelvis': (0.0, -T.R(.08), Pz - T.R(.02)), 'ankle.L': (H + T.R(.02), -T.R(.24), A), 'bend': -.02, 'head': (-.30, 0, 0)}),
+        (u, {'pelvis': (0.0, -T.R(.18), Pz - T.R(.04)), 'bend': .10, 'pelvisTilt': (.10, 0, 0), 'head': (-.45, 0, 0),
+             'foot.R': (-25, -6, 0)}),
+        # let go, the hands come down, back off the wall
+        (1.95, {'pelvis': (0.0, -T.R(.08), Pz - T.R(.02)), 'bend': .10, 'head': (-.15, 0, 0), 'foot.R': (0, -6, 0)}),
+        (2.05, {'ankle.L': (H + T.R(.02), -T.R(.24), A)}),
+        (2.25, {'ankle.L': base['ankle.L'], 'pelvis': (0.0, T.R(.02), Pz)}),
+        (D, {'pelvis': base['pelvis'], 'bend': base['bend'], 'pelvisTilt': base['pelvisTilt'], 'head': (0, 0, 0)}),
+    ], lag={'head': .05})
+    world = Channel([(0.0, 0.0), (.20, 0.0), (g - .05, 1.0), (u + .05, 1.0), (1.90, 0.0), (D, 0.0)])
+
+    def Pose(t):
+        f = keys(t)
+        w = Smooth(world(t))
+        hl, hr = Hands(t)
+        if t > u:
+            # let go: the hands stay where they shoved for a beat, then come down (the body frame takes them back)
+            hl, hr = Hands(u)
+        f['hand.L'], f['hand.R'] = tuple(hl), tuple(hr)
+        f['handRelW.L'] = f['handRelW.R'] = 1 - w
+        under = Smooth((t - .70) / .35) if t < u else 1.0
+        shove = Smooth((t - 1.10) / .40) if t < u else 1.0
+        # palms: under the body (facing up, fingers in) -> pushing up and in (facing forward-up)
+        pn = Unit(Lerp3((0, 0, 1), (0, -.75, .65), shove))
+        pf = Unit(Lerp3((0, -1, .1), (0, -.25, .95), shove))
+        f['palmFw.L'], f['palmNw.L'] = Unit(Lerp3((.1, -1, -.2), pf, under)), Unit(Lerp3((-.2, 0, 1), pn, under))
+        f['palmFw.R'], f['palmNw.R'] = Unit(Lerp3((-.1, -1, -.2), pf, under)), Unit(Lerp3((.2, 0, 1), pn, under))
+        f['curl.L'], f['curl.R'] = Mix(.45, .85, w), Mix(.45, 1.0, w)
+        f['armPole.L'] = (SX + .45, -.10, P - .10)
+        f['armPole.R'] = (-(SX + .45), -.10, P - .10)
+        f['poleRel.L'], f['poleRel.R'] = (.50, .25, -.30), (-.50, .25, -.30)
+        f['look'] = tuple(Mid(min(t, u)) + Vector((0, 0, T.R(.10))))
+        f['lookW'] = .8 * Smooth(t / .3) * (1 - Smooth((t - u - .3) / .5))
+        return T.Nest(Turned(f, f['turn']))
+
+    def Props(t):
+        c = Mid(t)
+        return {'corpse': (tuple(c), (1, 0, 0), (0, 0, 1), t <= u)}
+
+    wallPolys = []
+    prof = [(d, h) for d, h in RP_HEAVE_PROFILE[:5]]
+    for (d0, h0), (d1, h1) in zip(prof, prof[1:]):
+        y0, y1 = -T.R(RP_HEAVE_WALL + d0), -T.R(RP_HEAVE_WALL + d1)
+        wallPolys.append(('poly', [(-1.0, y0, T.R(h0)), (1.0, y0, T.R(h0)), (1.0, y1, T.R(h1)), (-1.0, y1, T.R(h1))], None, 0))
+
+    def Review(t):
+        c = Mid(t)
+        body = [('cyl', tuple(c + Vector((T.R(.80), 0, 0))), tuple(c - Vector((T.R(.80), 0, 0))), T.R(.16))] if t <= u else []
+        return body + wallPolys
+    # (grounded on the trench floor: his feet never go up the wall; the wall is in the stills and the manifest env)
+    spec = {'pose': Pose, 'props': Props,
+            'plants': [('R', 0, 1.10), ('R', 2.0, D), ('L', 0, 1.05), ('L', 1.25, 2.05)],
+            'reviewProps': Review, 'reviewFrames': lambda n: [0, 8, 13, 19, 25, 30, 37, 47, 54, n - 1]}
+    spec['reviewViews'] = [('side', (-3.4, -.6, 1.1), (0, -.5, .9)), ('q', (-2.4, 2.2, 1.9), (0, -.5, .8)),
+                           ('back', (.6, 2.8, 1.6), (0, -.5, .9))]
+    spec['reviewScale'] = 3.0
+    return spec

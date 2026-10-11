@@ -178,3 +178,18 @@
 - **烘焙要点**：蜷倒时腿要随胯一起转（留在坡上让胯翻过去，两条大腿一帧 178° 换支）；保持循环开始前所有动作要收完（丁最后一步、端枪的下蹲曾进循环窗，接缝 9°/8 cm）；甲在割后、擦刀时都要从尸体腿边让开（浏览器穿插 10–20 cm 的来源）。
 - **验收实测**（本轮）：`Script_OpeningStoryboardsTest` 全过（四肢绕自身轴最大仍是旧的 61°，B 段最大 30°）；`Script_OpeningClipsBrowserTest --clip=<B 十四条>` 全过：成对穿插最大 8.0 cm（四肢，揪发时的前臂），躯干/头 0 cm；揪发 2.5 cm、割 0.2 cm、擦刀 0.7–0.8 cm、反手耳光 0.8 cm；烘焙探针刺入肩/腹 0.0 cm、刀抵左颊 0.02 cm、刀尖悬背 0.0 cm、端枪对眼 0.4 cm。
 - **没做**：`NraShotTumbleSteps`（P1）未烘，导演用受击物理方向死亡替身（契约 §4.2 允许）。钢盔是头部蒙皮，丁挨耳光后「钢盔歪」做不出来，只做了左手扶钢盔。
+
+## 13. 2026-10-11 打磨轮 PolishAnim（割喉倒向、ChargeB 滚台阶、机枪组中弹、推尸上沟沿）
+
+任务书 `REL/附件/briefs/Brief_PolishAnim.md`。代码在 `_import/Script_OpeningStoryboardClips.py` 末尾 `# ==== 2026-10-11 polish ====` 块（全局名 `Rp` / `RP_` 开头，前面各块一字未动；改旧 clip 的方式是同名重新登记 `Builder`、改 `CLIPS[名]['notes']`）；manifest `20261011OpeningStoryboardsV25Polish`；伙伴轨与可编辑工程用 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningRedraft_20261011_AB`（`OPENING_BLEND_DIR`）。只按骨架烘了下面这些 clip（`OPENING_CLIPS`），没有全量重烘；`IjaFinishWalkStab`、`IjaBootOnHand` 用 `OPENING_PASS=verify` 核对过与提交版逐位一致。全部无头 Blender 5.1。
+
+- **割喉倒向（N17）**：`CaptiveThroatCutForward` 膝顶之后改为往他自己左侧倒（`RP_FALL` 110°，对着眼位看是往北壁脚下倒），脸朝下、身子略侧向右，贴着北壁脚躺，头朝东（终点头 (4.44,−125.26)、骨盆 (3.92,−125.43)，世界坐标按 R3 (4.06,−125.79) 朝南算），腿拖向西；胸口贴地（B 包原姿势是右前臂撑着、胸和头离地 0.1–0.2 m）。0–0.708 s（割、血喷北壁）与 B 包逐帧相同。没照任务书写的「左前方 40°」：先做了 40°，01 实跑（`Script_OpeningStoryboardShots` N17/N18）头落在沟底南半 (3.74,−124.72)，正踩在甲补刀走位 `IjaFinishWalkStab`（z −124.67 往西走到 x 3.6）的最后一步上，也压在眼位到岔口乙的视线上；北壁脚是那一带唯一没人走的地。
+  - `IjaThroatCutKneeShove`：膝顶那一帧胯往前、往左 7 cm（跟着倒向）；之后不再往左跨 0.46 m（尸体现在倒在那儿），改为把弓步的左脚收回到右脚旁、站着往下看。复用 B 包的构造函数，只换掉它建的那一张胯/脚关键帧表。
+  - `IjaWipeBandageFixBayonet`：B 包函数的副本，只改深蹲位置——从绷带接触点往他自己身后 0.36 m、左 0.05 m（尸体与北壁护板之间，`RP_WIPE_SQUAT`），蹲得更深（`RP_WIPE_DROP` 0.46 m，绷带离他脚下只有 0.1 m），两脚各踩各的地面（这里是 R3 的土坡，两脚高差 0.27 m），起身后的末帧也按坡面放脚；加了护板墙面检查。
+  - 实测：浏览器审片 `kneeCut` 四肢最深 7.9 cm / 躯干头 0，`bandageWipe` 3.7 cm / 0，擦刀刀身到绷带 1.0 / 1.2 cm；烘焙端擦刀脚滑 0.5 cm。01 实跑 N17 判据全过（改前「乙被冬瓜挡住」「乙 x 0.373」两条红）。
+- **`NraShotTumbleSteps`（NRA02，ChargeB）**：冲下弹坑台阶时右胸中弹，右肩被打得往后一拧、身子往左转、交叉绊一步，大刀 0.167 s 脱手飞到右前方地上（`weapon` 轨，`weaponDropFrom` 指自己），0.625 s 扑在坡上（左肩着地），顺坡往下滑着侧滚过左边翻成仰面，1.417 s 停住：仰面摊开、头朝坡下他的左前方、腿在坡上。**根在他停下的地方**（末帧骨盆在根上），第 0 帧在根右 0.66 m、后 1.40 m、高 0.80 m 处奔跑——台阶的坡在 clip 里（manifest `ground`：前进方向 0.15–1.30 m 内落差 0.80 m，按 chargeRoute x 3.3 那段坡的实测 0.9 m/1.2 m）。导演要把根放在他该躺的地方、朝他冲下来的方向，在他跑到根后 1.4 m、高 0.8 m 的坡上那一刻开枪；`rescue.fallenComrade` (1.28,−123.62) 往东南上坡正是 `BunkerMouthSpoil` 体块，起点放不进去，台阶脚 (2.3,−123.5) 一带可以（起点约 (2.9,−122.3)）。
+- **`IjaLmgGunnerShotOnGun`（IJA01）**：第 0 帧 = `IjaProneLmgOnCorpse` 第 0 帧（同根）。0.042 s 中弹，肩和头往上往后一抽，随即瘫下、脸落到机匣旁（0.417），两手 0.30–0.75 s 离枪顺坡滑下，0.95 s 抽一下，1.25 s 后不动。无根运动；`type11` 轨一直停在第 0 帧的位置。
+- **`IjaLoaderShotTumbleOffLip`（IJA03）**：第 0 帧 = `IjaKneelLoadLmg` 第 0 帧（同根）。0.083 s 中弹后仰、两手离开弹斗、被打得往左转，仰面倒向沟（沟沿边在他右后方 126.5°、0.10 m：按 `MgMarks` 的朝向 yaw 126.5° 算），0.583 s 仰躺在沿上头伸出去，头朝下顺沟壁滑到底，1.292 s 落到沟底仰面、腿搭在沟壁上，1.667 s 后不动。根运动：骨盆终点沿那条线外 1.12 m、低 1.81 m（沟壁剖面在 clip 里，manifest `ground`，按任务地形 x 7–8 实测）。
+- **`IjaHeaveCorpseLip`（IJA01 / IJA03）**：根站在南壁脚前、面朝沟壁（壁脚在前方 0.30 m）；拖来的尸体脸朝下顺壁脚躺、中心在前方 0.42 m、头朝他左边。蹲下一手掏腋下一手抓腰带（`grab` 0.542），抱到胸前站起（`lifted` 1.05），左脚上前一步、举过头顶推上沟沿下的坡面（`heaved` 1.542：Set 在这一帧把尸体换成 `PlaceCorpse(…,{pose:"onLip"})`），松手、手放下、退回。道具轨 `corpse`（尸体中心、头的方向、背的法线，到 `heaved` 为止可见）：导演可以每帧 `PlaceCorpse(settle:false)` 把 Set 的尸体挂在轨上，不必从地上一下换到沟沿。无根运动。
+- `Script_OpeningActorPerformance` 的 `ContactClips` 加了这四条；`Script_OpeningClipsBrowserTest` 让 ChargeB 拿大刀播。
+- **实测**（烘焙报告，运行时米）：脚滑最大 1.73 cm（滚台阶交叉步）、接触 0、骨盆单帧最大 0.17 m（副射手落沟）；四肢绕自身轴单帧最大 66°（`NraShotTumbleSteps` 右小腿 0.33 s，交叉步）。三条摔落的接地抬升最大 0.21–0.23 m（翻滚中途手臂/头先碰到坡下的平地，那几帧身体整体被抬起一点）。
