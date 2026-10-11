@@ -33,7 +33,10 @@ const ContactClips=new Set(["LuoPickUpRifleSling","LuoRescueDrag","LuoHandRifle"
   "IjaChoppedFallBack",
   // 2026-09-30 self rescue: the three shot in the arm (hand on the wound, the arm hanging), Luo snatching up the rifle and
   // shoving it into Shunzi's hands (his face on the kneeling man's inside the clip).
-  "IjaShotStaggerAway","IjaShotDropRifle","InterpreterShotStagger","LuoGrabRifleShove"]);
+  "IjaShotStaggerAway","IjaShotDropRifle","InterpreterShotStagger","LuoGrabRifleShove",
+  // 2026-10-11 redraft (Dir01 hook): Luo standing in the mouth looks round (GuardTurn at the near shell / the far call) and points
+  // with the order; not swapped for the dugout's MessengerReport stand.
+  "GuardTurn"]);
 // Clips whose face is aimed at the first-person eye inside the clip (listed with ContactClips above) or whose
 // hands follow Shunzi's body track: held-pose life keeps their head nearly where the clip put it.
 const FaceAimedClips=new Set(["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
@@ -130,7 +133,7 @@ export function ResolveOpeningActorPose(soldier,pose,clock,record){
   const speaking=context.speaker===context.role;
   const stationary=(soldier.openingStoryboardTravel||0)<.1;
   // 2026-09-23 director phases (Data_OpeningStoryboards.phases): Banter/Orders are the dugout talk.
-  const opening=["Banter","Orders"].includes(context.phase);
+  const opening=["Count","Banter","Orders"].includes(context.phase);
   let resolved=pose;
   if(opening&&stationary&&context.role==="luo")resolved={clip:speaking?"PointBlockade":"MessengerReport",seconds:clock};
   if(opening&&stationary&&context.role==="runner")resolved={clip:"MessengerReport",seconds:clock};

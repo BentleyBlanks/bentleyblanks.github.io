@@ -786,7 +786,7 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     const B=C.banter,Near=(p,x,z,m=1e-6)=>Math.hypot(p.x-x,p.z-z)<=m,Deg=v=>v*180/Math.PI;
     // §5.1 / §1.19: the six in the dugout.
     assert.ok(Near(B.yaowa,-1,-125.35)&&Math.abs(Deg(B.yaowa.yaw)-45)<1e-6,"Yaowa crouched at Shunzi's south side facing north-east (§1.19)");
-    assert.ok(Near(B.he,-2.4,-127.1)&&Near(B.luo,1.75,-125.7)&&Near(B.liu,1.1,-124.9)&&Near(B.comradeSeat,.35,-124.35),"He, Luo, Liu, the comrade on §5.1's marks");
+    assert.ok(Near(B.he,-.6,-127.35)&&Near(B.luo,1.75,-125.7)&&Near(B.liu,1.1,-124.9)&&Near(B.comradeSeat,.35,-124.35),"He, Luo, Liu, the comrade on §5.1's marks");
     assert.ok(B.exitOrder[0].id==="he"&&B.exitOrder.every(e=>Number.isFinite(e.delayS)&&C.speed[e.speed]>0),"He is first out of the mouth");
     for(const e of B.exitOrder)assert.ok(e.via.every(p=>D(p,S.seat)>.45&&D(p,B.yaowa)>.4||e.id==="yaowa"),`${e.id}'s way out keeps off Shunzi's seat and Yaowa`);
     // §5.3 marks (the director's copy of Set's frozen values).

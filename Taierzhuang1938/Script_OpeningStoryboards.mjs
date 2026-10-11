@@ -932,13 +932,14 @@ export class FirstLevelBunkerShow {
     const luo=this.Squad("luo"),b=C.banter,t=this.flags.luoTurnAt!=null?this.r.time-this.flags.luoTurnAt:-1;
     this.Hold(luo,b.luo,t>=0&&t<ClipLength("GuardTurn",1.2)?"GuardTurn":null,t>=0?{seconds:t}:{});
   }
-  /** He asleep in the far corner (stand-in: BlastDazedStir's heap on its first frame), rolling over (heRoll: its stir), sitting
-   *  up at the far call (sitUp: WoundedSitRifleIdle). */
+  /** He asleep in the far corner (stand-in: lying on ShotCollapse's last frame -- BlastDazedStir's heap is baked on the bank
+   *  outside the mouth and put his head behind the seat), rolling over (heRoll: the collapse's last 0.6 s again), sitting up at the
+   *  far call (sitUp: WoundedSitRifleIdle). */
   HeAsleep(){
     const he=this.Squad("heyoutian"),b=C.banter;if(!he)return;
     if(this.Fired("sitUp")){this.Hold(he,b.he,"WoundedSitRifleIdle");return;}
     const roll=this.Since("heRoll");
-    this.Hold(he,b.he,"BlastDazedStir",{seconds:roll>0?2+Math.min(roll,1.6):0});
+    this.Hold(he,b.he,"ShotCollapse",{seconds:roll>0&&roll<.6?1+roll:5});
   }
   ComradeSeated(){
     const r=this.r,add=this.flags.comradeAdditive;
@@ -1464,8 +1465,9 @@ export class FirstLevelBunkerShow {
       if(victim?.alive){this.Put(victim,bodies[2]);this.Pose(victim,"ShotCollapse",{seconds:Math.max(.9,1.6-Math.max(0,S.clawS-t)*.5)});}
       if(t>=S.stompAfterS&&f.stompAt==null){f.stompAt=r.time;this.Sfx("stompMud",{position:r.Point(bodies[2],.2),volume:.9});}
       const second=f.stompAt!=null?r.time-f.stompAt-.1:-1;
+      const moving=this.Fired("stab9")&&second>=C.sweep.thrustS;
       if(second<0)this.Hold(ijaB,{...spot,yaw:Face(spot,bodies[2])},"IjaBayonetDownThrust",{seconds:Math.min(1.15,C.sweep.thrustS)});
-      else this.Hold(ijaB,{...spot,yaw:Face(spot,bodies[2])},"IjaBayonetDownThrust",{seconds:second});
+      else if(!moving)this.Hold(ijaB,{...spot,yaw:Face(spot,bodies[2])},"IjaBayonetDownThrust",{seconds:second});
       if(second>=S.secondStabS&&f.secondStabAt==null){f.secondStabAt=r.time;this.Sfx("bayonetStabBody",{position:r.Point(bodies[2],.35),volume:1});}
       if(f.secondStabAt!=null&&r.time-f.secondStabAt>=S.twistS&&!this.Fired("stab9")){
         this.Sfx("bayonetTwist",{position:r.Point(bodies[2],.35),volume:.9});
@@ -1659,7 +1661,8 @@ export class FirstLevelBunkerShow {
     if(pressed>=0&&pressed<I.archS+.6)this.Hold(ijaB,press,"CollarControl",{seconds:Math.min(pressed,.8)});
     else if(pressed>=0)this.Hold(ijaB,m.ijaB,null,{speed:C.speed.walk});
     if(pressed>=0&&pressed<I.archS)this.Pose(comrade,"CaptiveHeadPulledBack",{seconds:Math.min(.6,pressed)});else this.Pose(comrade,"CaptiveKneelMud");
-    this.Hold(ijaA,m.ijaAHold,this.QuestionClip());
+    // ijaA steps back from the chest (the badge torn) and stands watching at the right.
+    this.Hold(ijaA,{...I.ijaAStand,yaw:Face(I.ijaAStand,m.wall)},null,{speed:C.speed.walk});
     if(Math.floor(age/I.lookBackEveryS)>Math.floor((age-(this.delta||0))/I.lookBackEveryS))f.ijaALookBackUntil=r.time+I.lookBackS;
     if(this.TalkDone("CaptiveInterrogation")||age>this.TalkLength("CaptiveInterrogation")+C.timeouts.interrogationExtraS)this.Stage("Practice");
   }
@@ -1685,7 +1688,8 @@ export class FirstLevelBunkerShow {
     if(line2==null&&age<P.lookBackS+6)this.Hold(ijaD,C.dropIn.junctionPost,"IjaBayonetGuard",{seconds:r.time});
     else if(f.recruitInAt==null){SetRelaxedGait(ijaD,"alert");if(this.Follow(ijaD,"toComrade",[{x:9,z:-125.3},k.front],C.speed.trot,null,k.front.yaw))f.recruitInAt=r.time;}
     // ijaA steps aside next to where the recruit will stand.
-    if(line2!=null)this.Hold(ijaA,k.aside,null,{speed:C.speed.walk});else this.Hold(ijaA,k.ijaAHold,this.QuestionClip());
+    const stand=C.interrogate.ijaAStand;
+    if(line2!=null)this.Hold(ijaA,k.aside,null,{speed:C.speed.walk});else this.Hold(ijaA,{...stand,yaw:Face(stand,k.wall)},null,{speed:C.speed.walk});
     // The hesitation and the slap.
     if(f.recruitInAt!=null&&f.slapAt2==null){
       const t=r.time-f.recruitInAt;
@@ -3008,7 +3012,9 @@ export class FirstLevelBunkerShow {
       roll=B.rollDeg*DEG*f+(a>B.fallStartS?.06*Math.sin((a-B.fallStartS)*14)*Math.exp(-(a-B.fallStartS)*3):0);
     }
     else if(["Black","Wake"].includes(p)){
-      target=At({x:4,z:-125.6},.8);roll=-.06;
+      // 2026-10-11 (N06): the rifle in the mud right of the middle (rescue.rifleMouth lies north-east of the eye): the look turned
+      // ~30 deg north of the trench line.
+      target=At({x:4,z:-126.5},.8);roll=-.06;
       // 「他试着撑起身体。背包带一下绷紧……又落回地面」, then the eyes drop to the clawing fingers.
       if(p==="Wake"){height+=L.pushUpM*Smooth((a-1.2)/.5)*(1-Smooth((a-1.85)/.12));pitch=L.clawPitch*Smooth((a-2)/.4);}
     }
@@ -3041,7 +3047,9 @@ export class FirstLevelBunkerShow {
       // 2026-10-11 (N18 / N19): he comes up the trench at the eye bayoneting the dead, shammed at through the slit; over the
       // pinned man the eyes drop to the hand his boot comes down on (found.look) until he squats at the head.
       const L=C.found.look;
+      // Finish (N18): kept low on his boots and the bodies he stabs as he comes (pitch at most finishMaxPitchDeg), not up at his face.
       if(p==="Found"&&this.flags.crouchFrom==null)target=this.Aim(eye,height,L.yawDeg*DEG,L.pitchDeg*DEG);
+      else if(p==="Finish")target=this.LookAtBody(eye,height,ijaA,-8,C.finish.maxPitchDeg)||this.Aim(eye,height,-90*DEG,4*DEG);
       else target=this.LookAtBody(eye,height,ijaA,-5,40)||this.Aim(eye,height,-90*DEG,12*DEG);
     }
     else if(p==="Hold"||p==="Ask"){
@@ -3098,7 +3106,7 @@ export class FirstLevelBunkerShow {
     }
     // Shamming dead (Found / Hold until the first slap): the look goes onto ijaA's face and tips up slitAboveDeg, so the face
     // is in the slit between the lids (it lies below the middle of the picture).
-    const sham=this.Shamming(),face=sham>0&&(p==="Finish"||p==="Found"&&this.flags.crouchFrom!=null||p==="Hold")&&Head(ijaA);
+    const sham=this.Shamming(),face=sham>0&&(p==="Found"&&this.flags.crouchFrom!=null||p==="Hold")&&Head(ijaA);
     if(face){
       const e=r.Point(eye,height),to=face.clone().sub(e).normalize(),from=target.clone().sub(e).normalize();
       target=e.clone().add(from.lerp(to,sham).normalize());pitch+=C.rescue.playDead.slitAboveDeg*DEG*sham;

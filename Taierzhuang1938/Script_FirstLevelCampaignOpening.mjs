@@ -340,8 +340,8 @@ export async function DriveOpening(ctx){
   await InstallProbe(page);
   const taken=new Set(),phaseShots=new Set();
   let state;
-  // 01–02 are watched: about 200 s of game time, 15 frames per round trip.
-  for(let i=0;i<1400;i++){
+  // 01–02 are watched: about 280 s of game time since the 2026-10-11 redraft, 15 frames per round trip.
+  for(let i=0;i<2200;i++){
     state=await StepSampled(page,15);
     assert.equal(state.error,undefined,"animation library loaded");
     if(!state.alive)await fs.writeFile(path.join(output,"Data_OpeningFailure.json"),JSON.stringify({state,
@@ -392,9 +392,9 @@ export async function DriveOpening(ctx){
   for(const name of OPENING_EVENTS_01)assert.ok(sent.includes(name),`director event ${name} sent (${sent.join(",")})`);
   assert.deepEqual(OPENING_EVENTS_01.filter(n=>sent.includes(n)).map(n=>sent.indexOf(n)),OPENING_EVENTS_01.filter(n=>sent.includes(n)).map(n=>sent.indexOf(n)).slice().sort((a,b)=>a-b),"the 01 events come in story order");
   // Captives killed at the cut, the door search at the squat (contract §1.8 / §1.9).
-  const at=n=>show.emitted.find(e=>e.event===n)?.time;
-  console.log("PACE",JSON.stringify({fadeInToBlastS:eventTime("Blast")-eventTime("Banter"),blastToFoundEndS:eventTime("Hold")-eventTime("Blast"),
-    whistleToFoldClearS:at("grenadeBlast")-show.flags.whistleAt,phases:Object.fromEntries(DIRECTOR_PHASES.map(p=>[p,eventTime(p)]))}));
+  const at=n=>show.emitted.find(e=>e.event===n)?.time,phaseAt=p=>show.events.find(e=>e.phase===p)?.time;
+  console.log("PACE",JSON.stringify({fadeInToBlastS:phaseAt("Blast")-phaseAt("Banter"),blastToFoundEndS:phaseAt("Hold")-phaseAt("Blast"),
+    whistleToFoldClearS:at("grenadeBlast")-show.flags.whistleAt,phases:Object.fromEntries(DIRECTOR_PHASES.map(p=>[p,phaseAt(p)]))}));
   assert.ok(at("grenadeBlast")-show.flags.whistleAt<=12.5,"from the whistle to 「折角，清了！」 within 12 s (contract §1.4 / Brief 6)");
   // ---- physical events: ijaA / ijaB cut down, ijaD shot, before Check -------------------------
   const eventTime=phase=>show.events.find(e=>e.phase===phase)?.time;

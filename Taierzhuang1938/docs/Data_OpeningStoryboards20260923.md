@@ -1,5 +1,7 @@
 # 第一关 01–02 导演（2026-09-23 新稿）
 
+> **2026-10-11 改稿（01 段）**：01 按 [Notion 2026-10-11 稿](Data_FirstLevelOpeningSource20261011.md) 与 [重构契约](Data_OpeningRedraft20261011Contract.md) 重排，phase 表、事件名、替身清单见本页 [§4c](#4c-2026-10-11-01-改稿)；下文 FrontPass / Taunt / 走进来的甲乙 / 嘲弄边走边说的内容只作历史。
+
 > **2026-09-27 改稿**：Slash 以后的 01 与整个 02 以 [压在塌木下原地审问、反冲锋白刃战](Data_OpeningPinnedRescue20260927.md) 为准（phase 表、眼位、审问、耳光、反冲锋、拖出、还权前的站位都在那里）；下文涉及 Wipe…Boots、KickShunzi…LongShot、救援圈、SB03 独立机位、SB03A–SB05A 的内容只作历史。
 
 2026-09-29：传令兵老远就喊话、在洞口外（不进屋）向班长报告，见 [§4b](#4b-2026-09-29-传令兵远喊--洞口外报告)；Orders 变长约 9 s，SB01 传令兵站位与判据随之改了。
@@ -144,6 +146,18 @@
 - **验收**：`Script_OpeningStoryboardsTest`、`Script_FirstLevelVoiceTest`（含 `--audio`：契约 15 场、`gainDb` 合法与乘法、覆盖录音间隔的句子多了 `BunkerRunnerCall.02`）、`Script_MissionGatesTest`（事实门 146 条，`runnerCallHeard` 是第 146 条）、`Script_FirstLevelMissionTest`（`OrdersRunner` 新路线在每个场景态下净空；此测试在 1199 行「07+ keeps the legacy fixed-source front」是改前就红的基线，干净基线同样红）、`Script_ModuleGraphTest`、`Script_OpeningStoryboardShots.mjs --shots=SB01_Call,SB01`。
 
 - **集成验收（2026-09-29，与顺子收拾装备、战场声显现、环境床候选三包合并后）**：实时跑一趟（真实钩子，不模拟）：Orders 起 0.52 s 记下 `runnerCallHeard`，Banter 渐亮到近爆 70.9 s（改前约 50 s，多出的是传令兵跑来的 9 s 与收拾装备）。战场显现以后，罗班长两句压嗓盘算（`BunkerOrders` .02 / .04，整段母带后片段 RMS 比 .01 / .05 低 16 dB）在听者处 −35.7 / −35.1 dBFS，远声组 250 Hz–4 kHz −42 / −40，逐句平均余量只剩 6.6 / 4.8 dB；导演表给这两句 `gainDb` +7 后是 11.0 / 13.1 dB，整场逐句余量 11–21 dB。第一人称连拍与录音不进仓库。
+
+## 4c. 2026-10-11 01 改稿
+
+契约 [Data_OpeningRedraft20261011Contract.md](Data_OpeningRedraft20261011Contract.md) §2：Trapped = Count → Banter → Orders → Incoming → Blast → Black → Wake → DropIn → Sweep → CaptiveDragged → CaptiveWall → Interrogation → Practice → Slash → Finish → Found。数据都在 `Data_OpeningStoryboards`（`count` `banter.beats/exitOrder` `exit` `dropIn` `sweep` `dragged` `wall` `interrogate` `practice` `slash` `finish` `found` `marks` `lines` `sfxStandIns` `voiceStandIns`）。
+
+- **台词怎么计时**：`FirstLevelBunkerShow.Talk(场景)` 起一次、留一条时间线。声库里那一场已经是本轮的录音（句数和说话人都对得上 `lines` 表）就用声音层的句柄；否则（09 月旧录音或没有录音）按 `lines` 表估计：每句等它的事件（Voice 导演表 `after:"event:…"` 用的同一个名字）或上一句结束后的间隔，按估计秒数推进，不出声（无字幕三场改播 `voiceStandIns` 的程序音）。`LineAt` / `LineEndAt` / `TalkDone` 两种情况读同一条时间线，所以接录音前后动作节拍不用改。
+- **事件**：`Emit(名)` 发给声音层（`voice.Signal`）、记 `flags["ev:名"]` 和 `emitted`（`State()` 里有）。01 发的名字：liuToss breadToss nearShell heRoll pour comradeLaugh sitUp exitReach clipsThrown grenadeBlast stab7 stab8 stab9 haltB kneeled boltOpen woundPress recruitSlapped stab1 stab2 recruitPant hairLifted cutStart wipe1 wipe2 fix bayonetFixed recruitNod bootGrind；另有契约外的 dragLanded（拖出落地，只给估计时间线用）、finishStab1/2（甲补刀，抓帧用）。
+- **收拾装备的起点改了**：罗班长下令记 `flags.orderAt`；冬瓜起身伸手（exitReach）→「我那两夹！」→ 第一人称两手把两夹丢出（`firstPerson.toss`，叠在坐姿压弹 clip 上）→ clipsThrown 后 `exit.gearAfterThrowS` 才记 `flags.exitAt`，`Data_OpeningFirstPersonGear` 的收拾装备从这里起，不改；冬瓜按顺子到洞口的时间出洞。
+- **机枪组**：`bunkerAssault` 加 `BunkerGunner`/`BunkerLoader`（castId gunner/loader），CaptiveWall 从 J 下来到南沟沿，第一个点射后每 3–6 s 一个两发点射（`wall.seed` 固定），一直到 02 的齐射；Dir02 的 `vanguardIds` 没收他俩之前，Charge 一开始导演自己把他俩打死（替身）。
+- **交接给 02（Found 结束那一帧）**：甲蹲在 `ija.crouch` 朝西、`IjaCrouchHairHold` 第 0 秒；丁在 `practice.recruitWait` 朝西端枪；乙在 J（`dropIn.junctionPost`）`IjaBayonetGuard`；丙在 F `IjaReadyRifle` 朝东；翻译在 `rescue.interpreter`；冬瓜尸体在 R3；尸体替身在 `marks`；眼缝闭着（`flags.playDeadAt` 从 Finish 起）；右手压在泥里（`flatPinned`）。`doorSearchStarted` 在甲蹲下那一刻记，`captivesKilled` 在割中那一帧记。
+- **替身**：别包的新 clip / 录音 / 道具 / 音效 / 标记一律先用现有的，逐条在 `pendingWiring`（N01–N19）。尸体（Set 的静态尸体）暂用打死的川军演员停在 `ShotCollapse` 末帧（`standIns.bodies`）；弹夹、饼、枪栓、九一式手榴弹是导演自己做的小件（`Fly`）。
+- **抓帧**：`storyboardShots` N01–N19，`node Taierzhuang1938/Script_OpeningStoryboardShots.mjs --shots=N01,…,N19 --side-by-side=<REL>/附件/storyboard --quality=high`。
 
 ## 5. 02 撤离与接上 03
 
