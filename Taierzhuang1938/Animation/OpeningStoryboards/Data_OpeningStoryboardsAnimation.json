@@ -3817,8 +3817,9 @@
    "loop": false,
    "weaponHold": "free",
    "role": "heyoutian",
-   "rig": "TengxianNra05",
+   "rig": "TengxianNra02",
    "rigs": [
+    "TengxianNra02",
     "TengxianNra05"
    ],
    "props": [
@@ -3867,8 +3868,9 @@
    "loop": false,
    "weaponHold": "free",
    "role": "liuwencai",
-   "rig": "TengxianNra05",
+   "rig": "TengxianNra02",
    "rigs": [
+    "TengxianNra02",
     "TengxianNra05"
    ],
    "props": [
@@ -4347,8 +4349,9 @@
    "loop": false,
    "weaponHold": "free",
    "role": "liuwencai",
-   "rig": "TengxianNra05",
+   "rig": "TengxianNra02",
    "rigs": [
+    "TengxianNra02",
     "TengxianNra05"
    ],
    "props": [
@@ -6193,7 +6196,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "ef6c9b091d1046faf71c8871d0f213d0c71d3f50b8dd4c85faf0ec61ea2a655c",
+   "sha256": "e8ef531d20d7fc7ffe54cfdb1c18d981b25cc3aeb455d5f87c7f3a4da37e61ef",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
@@ -6245,8 +6248,11 @@
     "ComradeEatBreadToss",
     "ComradePourRoundsLaugh",
     "ComradeCatchDropPick",
+    "HeHelmetSleepSitUp",
+    "LiuDivideAmmoToss",
     "CorpseStabbedClaw",
     "CaptiveArchCaught",
+    "LiuBoxUpGo",
     "CaptiveStabbedCurl",
     "CaptiveCurledPulledUp",
     "CaptiveThroatCutForward"
@@ -8425,6 +8431,75 @@
      "wallContactDepthM": 0.0117
     },
     {
+     "clip": "HeHelmetSleepSitUp",
+     "frames": 151,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0116,
+     "floorCorrectionMin": -0.00129,
+     "floorCorrectionMax": 0.1023,
+     "root": {
+      "start": [
+       -0.0,
+       0.0,
+       0.0,
+       0.2435
+      ],
+      "end": [
+       0.0457,
+       0.1,
+       90.0,
+       0.1293
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "LiuDivideAmmoToss",
+     "frames": 97,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0829,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0303,
+       0.0331,
+       0.0,
+       0.2672
+      ],
+      "end": [
+       0.0303,
+       0.0331,
+       0.0,
+       0.2672
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       4.0
+      ],
+      [
+       "R",
+       0,
+       4.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
      "clip": "CorpseStabbedClaw",
      "frames": 85,
      "footSlideM": 0.0,
@@ -8511,6 +8586,56 @@
      ],
      "wallContactGapM": -0.0036,
      "wallContactDepthM": 0.0117
+    },
+    {
+     "clip": "LiuBoxUpGo",
+     "frames": 61,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.1064,
+     "pelvisMaxStepM": 0.1568,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0914,
+       0.0,
+       0.3654
+      ],
+      "end": [
+       0.0137,
+       -0.0802,
+       0.0,
+       0.8007
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.25
+      ],
+      [
+       "R",
+       0,
+       1.3333
+      ],
+      [
+       "L",
+       1.6667,
+       2.5
+      ],
+      [
+       "R",
+       1.75,
+       2.5
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "CaptiveStabbedCurl",
