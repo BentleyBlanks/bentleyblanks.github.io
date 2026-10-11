@@ -147,8 +147,9 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     show.playerMeleeDormancy=false;show.savedMeleeDormancy=true;show.ReleaseMeleeDormancy();
     assert.equal(show.r.player.meleeDormant,false,"melee eligibility returns after captive camera control");
     console.log("ok rescue waits for the cut-down and shot vanguard and restores player melee eligibility");
-    // 2026-09-23 hand-back rule (contract §2.1): only ijaA, ijaB (dadao) and ijaD (the junction, Liu's shot) gate it.
-    assert.deepEqual([...C.vanguardIds].sort(),["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowB"]);
+    // 2026-10-11 hand-back rule (docs/Data_OpeningRedraft20261011Contract.md §1.12): ijaA, ijaB, ijaC, ijaD and the machine-gun
+    // pair gate it (the interpreter is checked apart, rescue.cuts).
+    assert.deepEqual([...C.vanguardIds].sort(),["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowA","BunkerFollowB","BunkerGunner","BunkerLoader"]);
     // A root chained across a clip change keeps the pelvis where it was (drag -> wall).
     const chained=show.ChainRoot.call({},{x:0,z:0,yaw:0},"TengxianNra02","CaptiveDraggedFromDirt","CaptiveWallBrace");
     assert.ok(Number.isFinite(chained.x)&&Number.isFinite(chained.z)&&Number.isFinite(chained.yaw),"root chaining without a loaded library falls back to the same root");

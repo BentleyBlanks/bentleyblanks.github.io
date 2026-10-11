@@ -1040,6 +1040,9 @@ function FakeVfx() {
     "sweep.bodies[2] (SweepVictim, Dir actor)|walkIn": "乙（ijaB）扎尸报数就是沿 walkIn 走到第 9 具跟前下刀、踩背补刀（契约 §1.5）",
     "mg.gunner|rescueRoute": "02 齐射先打这两人（契约 §1.11）：罗班长一行顺 rescueRoute 冲下来时他们已经死在沟沿上",
     "mg.loader|rescueRoute": "同上：副射手中弹翻下沟沿",
+    // 2026-10-11 集成：第 8 具（南半）与 SweepVictim（北半）之间沿 x 只有 0.36 m 的缝，翻译从北半斜插到南半必须从两者中间过，
+    // 走中线两边各约 0.38 m；第 8 具躺在南壁脚、SweepVictim 是刚扎死的人，翻译跨过去正好是「踉跄着跑过来」。
+    "sweep.bodies[1]|interpreterEnter": "翻译从第 8 具脚边与 SweepVictim 头边之间斜插过去（两边各约 0.38 m，缝只有 0.36 m，绕不开）",
   };
   // 交 Dir 包（不是本包的标记、值是契约给的）：只报。
   const HANDOVER = {
@@ -1055,7 +1058,7 @@ function FakeVfx() {
   report.redraft.designedNearRoutes = designed; report.redraft.handoverNearRoutes = handover;
   assert.deepEqual(clearance, [], "contract §5.3: every mark and corpse stands >= 0.5 m off the current routes (or is listed as designed)");
   // 01–02 里 Dir 的其它站点（不在契约净空名单里）：只报，交 Dir 包让开 / 核对。
-  const DIR_POINTS = { "rescue.interpreter": C.rescue.interpreter, "ija.found": C.ija.found, "ija.crouch": C.ija.crouch, "rescue.rifleMouth": C.rescue.rifleMouth,
+  const DIR_POINTS = { "rescue.interpreter": C.rescue.interpreter, "found.stand": C.found?.stand ?? C.ija.found, "ija.crouch": C.ija.crouch, "rescue.rifleMouth": C.rescue.rifleMouth,
     "rescue.lift.heLift": C.rescue.lift.heLift, "rescue.ijaBGuard": C.rescue.ijaBGuard, "interrogation.interpreterAt": C.interrogation.interpreterAt,
     "interrogation.ijaBAt": C.interrogation.ijaBAt, "rescue.depthPost.DepthIjaB": C.rescue.depthPost.DepthIjaB, "comradeKneel R3": COMRADE_KNEEL,
     ...Object.fromEntries(C.rescue.extras.filter((e) => e.post).map((e) => [`rescue.extras.${e.id}.post`, e.post])) };
@@ -1064,8 +1067,8 @@ function FakeVfx() {
     const d = BoxDist(t.box, p); if (d < 0.35) report.redraft.dirPointsNear.push(`${t.id} x ${name} ${d.toFixed(2)} m`);
   }
   report.redraft.withdrawLaneNear = things.filter((t) => t.late && RouteDist(t, C.withdraw.lane) < 0.5).map((t) => `${t.id} ${RouteDist(t, C.withdraw.lane).toFixed(2)} m`);
-  // §5.1 六人起点（契约值）：Set 的布景、新道具摆位、尸体都不压（胶囊 r 0.28，0.3–1.7 m 高），并报每个起点脚下的坡度（Dir01 定稿用）。
-  const STARTS = { shunzi: C.shunzi.seat, yaowa: P2(-1.0, -125.35), comrade: C.banter.comradeSeat, heyoutian: P2(-2.4, -127.1), luo: C.banter.luo, liuwencai: P2(1.1, -124.9) };
+  // §5.1 六人起点（2026-10-11 集成起读 Dir01 定稿的 banter 标记；何有田从契约 (-2.4,-127.1) 改到 (-0.6,-127.35)，集成负责人拍板）：Set 的布景、新道具摆位、尸体都不压（胶囊 r 0.28，0.3–1.7 m 高），并报每个起点脚下的坡度（Dir01 定稿用）。
+  const STARTS = { shunzi: C.shunzi.seat, yaowa: C.banter.yaowa, comrade: C.banter.comradeSeat, heyoutian: C.banter.he, luo: C.banter.luo, liuwencai: C.banter.liu };
   const ammo = REDRAFT_PROPS.ammoBox;
   const ammoBox = { x: ammo.rest.x, z: ammo.rest.z, w: ammo.sizeM[0], d: ammo.sizeM[2], ry: ammo.rest.yawDeg * DEG, y0: 0, y1: ammo.sizeM[1] };
   const startClash = [];

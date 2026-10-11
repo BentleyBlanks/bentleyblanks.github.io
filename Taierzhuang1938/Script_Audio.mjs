@@ -5093,7 +5093,7 @@ export class AudioEngine {
     if (this.missingSampleReported.has(key)) return;
     this.missingSampleReported.add(key);
     if (state === "missing") {
-      const message = "这一声只有实录、没有合成退路，音效清单里没有它或解码失败";
+      const message = "sample-only cue (no synth fallback): missing from the sfx manifest or failed to decode";
       this.sfxErrors.push({ file: name, message });
       console.error(`[Audio] ${name}：${message}`);
     } else {

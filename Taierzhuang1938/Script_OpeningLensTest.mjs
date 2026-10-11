@@ -78,7 +78,7 @@ Check("a look stuck waiting for its event warns once (renamed / retimed director
   } finally { console.warn = warn; }
 });
 
-Check("witness (Wake → Finish, first person from the pinned eye): blood corners 0.3 with the concussion, near DOF at 2.8 m, mud", () => {
+Check("witness (Wake → Slash, first person from the pinned eye): blood corners 0.3 with the concussion, near DOF at 2.8 m, mud", () => {
   const full = Evaluate("DropIn", 3, { concussion: 0.8 });
   Near(full.bloodEdge.strength, 0.3, 1e-9, "blood edge");
   const [tl, tr, bl, br] = full.bloodEdge.corners;
@@ -89,8 +89,10 @@ Check("witness (Wake → Finish, first person from the pinned eye): blood corner
   assert.ok(full.dofNear.focusM - full.dofNear.rangeM <= 1.0 + 1e-9, "the mud right in front inside the soft range");
   assert.ok(full.mud >= 0.5 && full.mud <= 0.7, "mud, light enough for the throat cut to read");
   // 2026-09-27: no cut-away camera; the questioning and the cut are seen through the same lens.
-  for (const phase of ["Wake", "DropIn", "Sweep", "CaptiveDragged", "CaptiveWall", "Interrogation", "Practice", "Slash", "Finish"])
+  for (const phase of ["Wake", "DropIn", "Sweep", "CaptiveDragged", "CaptiveWall", "Interrogation", "Practice", "Slash"])
     assert.equal(Evaluate(phase, 1).look, "witness", phase);
+  // 2026-10-11 integration: ijaA's walk up the trench (Finish) is seen through the squint like the find (Dir02's mapping).
+  assert.equal(Evaluate("Finish", 1).look, "found", "Finish");
   assert.ok(!("cinematic" in LOOKS), "the cut-away look is gone");
 });
 

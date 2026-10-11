@@ -614,9 +614,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // 2026-10-11 redraft: the taunt walk is retired (tauntHoldS ... tauntWalk); he now bayonets his way to the mouth (Finish)
     // and stands over the eye (found.stand). `crouch` is still where he squats at the head for 02 (the hand-over to Dir02).
     crouch:P(2.45,-125.22,Math.PI/2),
-    // 2026-10-11: past the man shamming dead in the trench (sweep.bodies[2] (7.4,-124.8)) on his south side, 0.9 m off him (Set:
-    // the old line ran 0.19 m from that body).
-    interpreterEnter:Route([23.5,-130],[20.1,-128],[18.7,-126.8],[17.45,-126.2],[16,-125.65],[14.2,-125.75],[13.2,-125.65],[12,-124.75],[8.4,-123.6],[6.6,-123.55],[5.5,-123.8],[4.9,-124.05]),
+    // 2026-10-11: past the man shamming dead in the trench (sweep.bodies[2] (7.4,-124.8)) on his south side (Set: the old line ran
+    // 0.19 m from that body). Integration: north of the 8th body (Set's (9.4,-123.1), south half) and then between its feet and
+    // the victim's head (a 0.36 m gap; ~0.38 m off each, listed as designed in Script_OpeningSetTest).
+    interpreterEnter:Route([23.5,-130],[20.1,-128],[18.7,-126.8],[17.45,-126.2],[16,-125.65],[14.2,-125.75],[13.2,-125.65],[12,-124.75],[10.3,-124.25],[8.85,-124.18],[8.39,-123.94],[7.95,-123.68],[6.6,-123.55],[5.5,-123.8],[4.9,-124.05]),
     // 「翻译踉跄着退开」 (Charge): turned to face west (onto the pinned man) InterpreterFlee carries him 1.3 m back east,
     // then he runs east down the north side of the front trench (between the dead comrade and ijaB, away from the crater
     // step the charge comes down), into the depth sap past J, and is removed out of sight.
