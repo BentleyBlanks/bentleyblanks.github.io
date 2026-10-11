@@ -176,7 +176,8 @@ export const MISSION_TUNING = Object.freeze({
   // 2026-09-23 01–06 space rebuild: bunkerAssault 4 + front 10 (fire base 4, bounding 6) + machineGun 4 +
   // approach 4 + tank escorts 4 = 26. The other 01–05 groups (backdrop, pursuit, flank, officer, reserve,
   // cut-in) are counted against contract §6 (<= 55 cumulative, <= 30 alive) in Script_FirstLevelFrontTopologyTest.
-  openingEnemyBudget:26,
+  // 2026-10-11 redraft: + the machine-gun pair of bunkerAssault (docs/Data_OpeningRedraft20261011Contract.md §1.7) = 28.
+  openingEnemyBudget:28,
   // approachFireSector（开火扇区）2026-09-23 删掉：从来没有人把它写进 scriptFireSector（docs/Data_EnemyAi.md §20）。
   approachAccuracyScale:.35,
   approachTacticalRadiusM:24,

@@ -449,11 +449,7 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
       `IjaCollarQuestion: fist ${r.contactErrorM} m off the collar, foot slide ${r.footSlideM}, lift ${r.floorCorrectionMin}..${r.floorCorrectionMax}`);
     assert.ok(ijaA.clips.IjaCollarQuestion.props?.weapon,"IjaCollarQuestion: a weapon track (the rifle rides his back)");
   }
-  // the tauntHoldS release lands on IjaThroatSlash's hold-loop start (the cut + tauntHoldS)
-  {
-    const cut=manifest.clips.IjaThroatSlash.contacts.find(c=>c.action==="cut").t;
-    assert.ok(Math.abs(cut+C.ija.tauntHoldS-manifest.clips.IjaThroatSlash.holdLoop[0])<1e-6,"ija.tauntHoldS ends on IjaThroatSlash's hold-loop start");
-  }
+  // (2026-10-11: the taunt hold after the cut, ija.tauntHoldS, is retired with the Taunt phase.)
   // IjaCrouchHairHold: the left fist on the crown from 0.25 s, the eye lifted 0.16 m by 0.70 s (player head track), a hold
   // loop to the end; the slaps start and end on its hold-loop start, slap contacts at 0.58 on the cheeks with the palm
   // (or the back of the hand) on the cheek at the hit (bake probes); 2026-09-29: the hand up high, cocked, before it.
@@ -594,8 +590,8 @@ for(const id of ["CaptiveDraggedFromDirt","CaptiveWallBrace","CaptiveKneelMud","
 assert.ok(["origin","axis","up"].every(k=>ijaA.propMounts?.bayonet?.[k]?.length===3&&ijaA.propMounts.bayonet[k].every(Number.isFinite)),"TengxianIja02: bayonet scabbard mount");
 
 // ---- director data (2026-09-27 rework, docs/Data_OpeningPinnedRescue20260927.md; space §2.1/§3) ---------------
-assert.deepEqual([...C.phases.Trapped],["Banter","Orders","Incoming","Blast","Black","Wake","FrontPass","CaptiveDragged","CaptiveWall",
-  "Interrogation","Slash","Taunt","Found"],"Trapped phases (2026-09-27 rework)");
+assert.deepEqual([...C.phases.Trapped],["Count","Banter","Orders","Incoming","Blast","Black","Wake","DropIn","Sweep","CaptiveDragged","CaptiveWall",
+  "Interrogation","Practice","Slash","Finish","Found"],"Trapped phases (2026-10-11 redraft, docs/Data_OpeningRedraft20261011Contract.md §2)");
 assert.deepEqual([...C.phases.BunkerRescue],["Hold","Ask","Charge","Melee","Lift","Check","Released"],"BunkerRescue phases (2026-09-29: the kick and the pickup are gone)");
 assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","SupportOrder"],"contract §5.3 RearTrench phases");
 assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持第一人称，不在切换视角」)");
@@ -623,9 +619,10 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     const ctx={seat,followTo:S.followTo,seatEyeM:.97},run=GEAR.cam.moves.find(m=>m.mps),arrive=GearArrivalS(ctx);
     assert.ok(S.followTo.x<postS.x-.3&&S.followTo.x>seat.x+1.5&&S.followTo.z>postN.z+.4&&S.followTo.z<postS.z-.4,`he stops inside the mouth, between the posts (${S.followTo.x},${S.followTo.z})`);
     assert.ok(run.mps>=1.4&&run.mps<=2,`he hurries: ${run.mps} m/s run (it was 0.24 m/s, 6+ s for the ${D(seat,S.followTo).toFixed(1)} m)`);
-    // The comrade is out of the mouth at the rise (0.4 + 2.8 s) plus his walk to comradeBlast; Blast comes after Incoming has begun.
-    const comradeOut=.4+2.8+D(C.banter.comradeSeat,C.banter.comradeBlast)/C.speed.walk;
-    assert.ok(arrive<=comradeOut+.6&&arrive<GEAR.doneS&&GEAR.doneS<=C.timeouts.ordersExitS,`he is at the mouth (${arrive.toFixed(2)} s) as the comrade is out (${comradeOut.toFixed(2)} s), inside ordersExitS`);
+    // 2026-10-11: the gear-up starts once the two clips are thrown (exit.gearAfterThrowS); the comrade, up and reaching since
+    // before the throw, walks out timed to be outside as Shunzi gets to the mouth: his walk fits inside the run there.
+    const comradeWalk=D(C.banter.comradeSeat,C.banter.comradeBlast)/C.exit.walkMps;
+    assert.ok(comradeWalk<=arrive&&arrive<GEAR.doneS&&GEAR.doneS<=C.timeouts.ordersExitS,`he is at the mouth (${arrive.toFixed(2)} s) with the comrade out (walk ${comradeWalk.toFixed(2)} s), inside ordersExitS`);
     assert.ok(GEAR.pack.rest.x<seat.x-.3&&D(GEAR.pack.rest,seat)<1.2&&GEAR.cam.pad.x<seat.x&&D(GEAR.cam.pad,GEAR.pack.rest)<.6,"the pack lies at the west wall within a step of the seat; he steps to it");
     assert.ok(S.blastFall.x<S.followTo.x&&D(S.blastFall,S.followTo)<2,"the near miss throws him back from the mouth to blastFall");
     // Every track is in time order; the eye sits where the seat's shot left it at the order (no jump into the first key).
@@ -637,9 +634,11 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   }
   // The walk from the kill to the find stays on the trench floor and ends over his head; the squat is at his head.
   const J=C.ija;
-  assert.ok(D(J.found,eye)>.9&&D(J.found,eye)<1.4&&D(J.crouch,eye)>.5&&D(J.crouch,eye)<.7,"ijaA stops 1.1 m off, then squats 0.6 m in front of his face");
-  assert.ok(J.tauntWalk.every((p,i,all)=>p.x<=(i?all[i-1].x:4.3))&&J.tauntWalk.at(-1).x>J.found.x,"he walks west toward the mouth");
-  assert.ok(Math.abs(J.found.yaw-Math.PI/2)<1e-6&&Math.abs(J.crouch.yaw-Math.PI/2)<1e-6,"facing west onto the pinned man");
+  // 2026-10-11 (Finish / Found): he stands over the pinned man within a stride of the eye (his boot on the right hand at the
+  // lower right), then squats 0.6 m in front of the face, both facing west onto him.
+  const Fd=C.found;
+  assert.ok(D(Fd.stand,eye)>.4&&D(Fd.stand,eye)<1&&Fd.stand.z>eye.z&&D(J.crouch,eye)>.5&&D(J.crouch,eye)<.7,"ijaA stands over him on his right, then squats 0.6 m in front of his face");
+  assert.ok(Math.abs(Fd.stand.yaw-Math.PI/2)<1e-6&&Math.abs(J.crouch.yaw-Math.PI/2)<1e-6,"facing west onto the pinned man");
   // 02: the questioning's marks, the charge and the haul stand clear of the mouth's collapse blocks.
   const R=C.rescue;
   const solid=["BunkerMouthRubbleS","BunkerMouthSpoil","BunkerMouthPostS","BunkerMouthPostN"].map(Block);
@@ -739,9 +738,9 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   }
   assert.ok(R.wound.shots.some(s=>s.role==="DepthIjaB"&&s.lethal)&&R.depthPost.DepthIjaB,"the depth man at his post is shot dead by the volley");
   // Storyboard shots and wave-1 stand-ins (contract §4.6).
-  assert.ok(C.storyboardShots.length>=2&&C.storyboardShots.every(s=>/^SB0[1-9]/.test(s.id)&&(s.when||s.phase&&Number.isFinite(s.age))&&s.judge),"storyboard shots are well formed");
+  assert.ok(C.storyboardShots.length>=2&&C.storyboardShots.every(s=>/^(SB0[1-9]|N\d\d)/.test(s.id)&&(s.when||s.phase&&Number.isFinite(s.age))&&s.judge),"storyboard shots are well formed");
   for(const e of C.pendingWiring){
-    assert.ok(["shot","what","now","wave2"].every(k=>typeof e[k]==="string"&&e[k].length>3),"pendingWiring entry "+JSON.stringify(e));
+    assert.ok(["shot","what","now","wave2"].every(k=>typeof e[k]==="string"&&e[k].length>(k==="shot"?2:3)),"pendingWiring entry "+JSON.stringify(e));
     assert.ok(C.storyboardShots.some(s=>s.id===e.shot||s.id.startsWith(e.shot+"_")),`pendingWiring names a storyboard shot (${e.shot})`);
   }
   {
@@ -765,7 +764,7 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     const released=C.storyboardShots.find(s=>s.id==="SB06_Released")?.judge?.camera;
     assert.ok(released&&released.pitchDeg[0]>=-15&&released.pitchDeg[1]<=5&&released.eyeM[0]>=1.4,"SB06: the hand-back view is about level and standing");
   }
-  for(const [name,route] of [["runner",C.banter.runnerRoute],["exit",C.banter.exitRoute],["walkIn",C.ija.walkIn],["taunt",C.ija.tauntWalk],
+  for(const [name,route] of [["runner",C.banter.runnerRoute],["exit",C.banter.exitRoute],["walkIn",C.ija.walkIn],["dropIn ijaB",C.dropIn.bRoute],["mg crew",C.wall.crewVia],
     ["charge",R.chargeRoute],["flee",C.ija.interpreterFlee],["withdraw",C.withdraw.lane]])
     assert.ok(route.length>=1&&route.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.z)),`${name} route is a finite polyline`);
   // 2026-09-29 (docs/Data_OpeningStoryboards20260923.md §4b): the runner starts 20-35 m from the seat (heard from afar, never seen), runs the
@@ -778,8 +777,54 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     assert.ok(call.afterS>=0&&call.afterS<=1.5&&call.holdMaxS>0&&call.holdMaxS<=3,"the far call opens within 1.5 s of Orders; the report waits for it at most 3 s");
     assert.ok(C.timeouts.runnerArriveS>=B.runnerRoute.reduce((total,p,i,a)=>i?total+D(a[i-1],p):0,0)/C.speed.run+call.afterS,"runnerArriveS covers the run");
     assert.deepEqual(B.runnerExitRoute.map(p=>[p.x,p.z]),B.exitRoute.slice(1).map(p=>[p.x,p.z]),"the runner leaves by the exit route without its first point (behind Luo's kneel)");
-    const order=C.storyboardShots.map(s=>s.id);
-    assert.ok(order.indexOf("SB01_Call")>=0&&order.indexOf("SB01_Call")<order.indexOf("SB01"),"SB01_Call (the far call) is judged before SB01 (shots run in flow order)");
+    // 2026-10-11: 01's shots are N01-N19 (contract §8), in flow order (the probe takes them as the flow reaches them).
+    const order=C.storyboardShots.map(s=>s.id),n01=Array.from({length:19},(_,i)=>`N${String(i+1).padStart(2,"0")}`);
+    assert.ok(n01.every((id,i)=>order.indexOf(id)>=0&&(!i||order.indexOf(id)>order.indexOf(n01[i-1]))),`N01-N19 all there, in flow order (${order.join(",")})`);
+  }
+  // ---- 2026-10-11 redraft, 01 (Dir01; docs/Data_OpeningRedraft20261011Contract.md) ----------------------------------------
+  {
+    const B=C.banter,Near=(p,x,z,m=1e-6)=>Math.hypot(p.x-x,p.z-z)<=m,Deg=v=>v*180/Math.PI;
+    // §5.1 / §1.19: the six in the dugout.
+    assert.ok(Near(B.yaowa,-1,-125.35)&&Math.abs(Deg(B.yaowa.yaw)-45)<1e-6,"Yaowa crouched at Shunzi's south side facing north-east (§1.19)");
+    assert.ok(Near(B.he,-2.4,-127.1)&&Near(B.luo,1.75,-125.7)&&Near(B.liu,1.1,-124.9)&&Near(B.comradeSeat,.35,-124.35),"He, Luo, Liu, the comrade on §5.1's marks");
+    assert.ok(B.exitOrder[0].id==="he"&&B.exitOrder.every(e=>Number.isFinite(e.delayS)&&C.speed[e.speed]>0),"He is first out of the mouth");
+    for(const e of B.exitOrder)assert.ok(e.via.every(p=>D(p,S.seat)>.45&&D(p,B.yaowa)>.4||e.id==="yaowa"),`${e.id}'s way out keeps off Shunzi's seat and Yaowa`);
+    // §5.3 marks (the director's copy of Set's frozen values).
+    const M=C.marks;
+    assert.deepEqual(M.sweepBodies.map(p=>[p.x,p.z]),[[11.8,-124.9],[9.9,-124.3],[7.4,-124.8]],"sweep.bodies");
+    assert.deepEqual(M.finishBodies.map(p=>[p.x,p.z]),[[3.3,-124.3],[2.6,-125.95]],"finish.bodies");
+    assert.deepEqual(M.dropInLip.map(p=>[p.x,p.z]),[[10,-126.6],[11.5,-126.6],[9,-126.7]],"dropIn.lip (ijaC, ijaD, ijaA)");
+    assert.ok(Near(M.mgGunner,6.7,-123.65)&&Near(M.mgLoader,7.5,-123.55)&&Near(M.mgCorpseLower,6.9,-123.05)&&Near(M.foldBlast,20.5,-126)&&Near(M.grenadeStop,2.2,-125.1)&&Near(M.comradeRifle,3.9,-125),"machine gun, fold blast, grenade stop, the comrade's rifle");
+    assert.ok(Near(C.practice.recruitWait,3.9,-124.3)&&Math.abs(C.practice.recruitWait.yaw-Math.PI/2)<1e-6,"the recruit waits at practice.recruitWait facing west (the hand-over to 02)");
+    assert.ok(Math.abs(D(C.practice.recruitBack,{x:4.0568,z:-125.7852})-2.2)<.06,"practice.recruitBack 2.2 m east of the comrade's kneel");
+    assert.ok(Math.abs(C.sweep.stopX-6.9)<1e-9&&Math.abs(Math.hypot(C.sweep.stopX-eye.x,-124.95-eye.z)-5.1)<.3,"ijaB stops 5 m from the eye");
+    // §2: perception, free look.
+    for(const [phase,v] of Object.entries({Count:0,DropIn:.8,Sweep:.7,Practice:.48,Finish:.5,Blade:.46}))assert.equal(C.perception.base[phase],v,`perception.base.${phase}`);
+    for(const phase of ["Wake","DropIn","Sweep","CaptiveDragged","CaptiveWall","Interrogation","Practice","Slash","Finish","Found","Hold","Ask","Blade"])
+      assert.ok(C.firstPerson.headLook.free.includes(phase),`the player may turn his head a little in ${phase}`);
+    assert.ok(C.phases.Trapped.every(p=>p in C.perception.base),"every 01 phase has a concussion level");
+    // §3: the estimated takes have the contract's line counts; the waits are the frozen event names (Brief Voice item 4).
+    const counts={BunkerCount:3,BunkerBanter:12,BunkerLedger:7,BunkerExit:3,BunkerSweep:7,CaptiveDragged:5,CaptiveInterrogation:9,CaptiveWoundTwist:1,BayonetPractice:9,RecruitCharge:1,CaptiveHowl:1,ShunziFound:1};
+    for(const [scene,n] of Object.entries(counts))assert.equal(C.lines[scene]?.length,n,`${scene}: ${n} lines (contract §3)`);
+    const frozen=["liuToss","breadToss","nearShell","heRoll","pour","comradeLaugh","sitUp","exitReach","clipsThrown","grenadeBlast","stab7","stab8","stab9","haltB","kneeled","boltOpen",
+      "woundPress","recruitSlapped","stab1","stab2","recruitPant","hairLifted","cutStart","wipe1","wipe2","fix","bayonetFixed","recruitNod","bootGrind"];
+    const waits=Object.values(C.lines).flatMap(rows=>rows.map(r=>r[2]?.wait).filter(Boolean));
+    assert.ok(waits.every(w=>frozen.includes(w)||w==="dragLanded"),`the takes wait only on the frozen events (${[...new Set(waits)].join(",")})`);
+    const director=fs.readFileSync(new URL("./Script_OpeningStoryboards.mjs",import.meta.url),"utf8");
+    for(const name of frozen)assert.ok(new RegExp(`Emit\\(\"${name}\"`).test(director)||name.startsWith("stab")&&/Emit\("stab"\+/.test(director),`the director sends ${name}`);
+    // §6: every new cue the director plays has a stand-in the engine knows until the Sfx package's lands.
+    const {SOUND_NAMES}=await import("./Script_Audio.mjs");
+    for(const [cue,standIn] of Object.entries(C.sfxStandIns))assert.ok(SOUND_NAMES.includes(standIn),`${cue}'s stand-in ${standIn} is an engine cue`);
+    for(const cue of Object.values(C.voiceStandIns))assert.ok(SOUND_NAMES.includes(cue),`voice stand-in ${cue} is an engine cue`);
+    // §1.4: from the whistle to 「折角，清了！」 in 12 s or less (the fold man's run at C.speed.run).
+    const Dd=C.dropIn,landC={x:M.dropInLip[0].x,z:M.dropInLip[0].z+Dd.landM};
+    const report=Dd.jumpS.ijaC+Dd.fallS+Dd.runAfterLandS+D(landC,Dd.foldPost)/C.speed.run+Dd.knockS+Dd.throwS+Dd.blastAfterThrowS+.2+Dd.peekS;
+    assert.ok(report-Dd.whistleS<=12,`whistle to 「折角，清了！」 ${(report-Dd.whistleS).toFixed(1)} s (<= 12)`);
+    // §1.7: the machine-gun pair is in the roster (castId gunner / loader, a Type 11).
+    const {MISSION_ENCOUNTERS:E}=await import("./Data_FirstLevelMission.mjs");
+    const gunner=E.bunkerAssault.find(s=>s.id===C.cast.gunner),loader=E.bunkerAssault.find(s=>s.id===C.cast.loader);
+    assert.ok(gunner?.castId==="gunner"&&gunner.weapon==="Type11"&&loader?.castId==="loader","BunkerGunner / BunkerLoader in bunkerAssault");
+    assert.ok(C.wall.burstS[0]>=3&&C.wall.burstS[1]<=6&&C.wall.burstRounds===2,"a two-round burst every 3-6 s");
   }
   // Every director wait has a finite timeout (the show can never stall).
   assert.ok(Object.values(C.timeouts).every(v=>Number.isFinite(v)&&v>0),"all director timeouts are finite and positive");

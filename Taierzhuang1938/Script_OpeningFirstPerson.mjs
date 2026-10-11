@@ -870,8 +870,25 @@ export class OpeningFirstPerson{
       rig.root.updateWorldMatrix(true,true);
       if(digWeight>.2)state.round=false;
     }
+    // 2026-10-11 「顺子把压好的两夹丢过去」 (Orders, before the gear-up; firstPerson.toss on the director's TossAge): both arms leave
+    // the fill clip for the chest (tossHold) and fling open toward the comrade (tossThrow), the same way as the dig above.
+    const toss=s.TossAge?.();
+    const T=C.firstPerson.toss,tossWeight=toss==null?0:Smooth(toss/T.weight[0])*(1-Smooth((toss-(T.endS-T.weight[1]))/T.weight[1]));
+    if(tossWeight>0){
+      const k=SampleKeys(T.keys.map(([t,pose])=>[t,pose,pose]),toss);
+      for(const side of ["l","r"]){
+        const over=this.BeatPose({[side]:[HANDS.poses[k.a[1]],HANDS.poses[k.b[1]]],mix:k.mix},side,frames,now);
+        const chain=rig.bones[side],bones=[chain.upperArm,chain.forearm,chain.hand,...rig.fingerBones[side]],clipQ=bones.map(bone=>bone.quaternion.clone());
+        const pole=V(side==="l"?-.43:.43,-.51,.1).applyQuaternion(cam.quaternion).add(cam.position);
+        Solve(rig,side,Pos(chain.upperArm),over.target,V(0,0,1).applyQuaternion(over.frame),V(0,1,0).applyQuaternion(over.frame),pole);
+        Fingers(rig,side,over.curl);
+        for(const [i,bone] of bones.entries()){const q=bone.quaternion.clone();bone.quaternion.copy(clipQ[i]).slerp(q,tossWeight);}
+        rig.root.updateWorldMatrix(true,true);
+      }
+      if(tossWeight>.2)state.round=false;
+    }
     this.report={available:true,phase:p,pose:"Fill",age:s.Age,beat:null,hands:{},
-      fill:{clip:beat.fill,seconds:state.seconds,rounds:state.rounds,round:state.round,charger:state.charger,dig:digWeight,
+      fill:{clip:beat.fill,seconds:state.seconds,rounds:state.rounds,round:state.round,charger:state.charger,dig:digWeight,toss:tossWeight,
         eye:this.fillEye.toArray(),root:actor.root.position.toArray()}};
     for(const side of ["l","r"]){
       const chain=rig.bones[side],palm=Palm(rig,side),shoulder=Pos(chain.upperArm);

@@ -97,7 +97,7 @@ export class FirstLevelMissionBattleSound {
   SharedBusy() { return this.frontVoices.length + this.dirtVoices.length + this.artillery.Busy() + (this.airRaid?.Busy() ?? 0); }
 
   /**
-   * 空袭的起点到了没有：01 要等开场导演走到 FrontPass（先头兵经过洞口）；其余步骤进来就算。
+   * 空袭的起点到了没有：01 要等开场导演走到 DropIn（先头兵跳下前沟；FIRST_LEVEL_AIR_RAID.start）；其余步骤进来就算。
    * 宿主没有飞机渲染层（只给 audio 的测试夹具）就不起：炸弹不能从看不见的飞机上掉下来。
    */
   AirRaidStarted(stage) {
