@@ -9467,3 +9467,1665 @@ def _BakeBefore(names, anchor):
 
 
 _BakeBefore(('IjaVaultTimberIn', 'IjaVaultTimberOut', 'IjaHaulForearmUnder'), 'IjaButtStrikeCollar')
+
+
+# ==== 2026-10-11 redraft A ====
+# 01 opening redraft (Notion 2026-10-11, docs/Data_OpeningRedraft20261011Contract.md §4.2 row A): the six in the dugout, the
+# corpse sweep, the rifle / badge / thumb beats at the captive wall. Reused clips (contract §4.1) are not baked here. Every
+# global of this block starts with `Ra` / `RA_` (the B block is appended after this one in the same module).
+# Props (contract §5.2; the Set package builds the meshes, the tracks here carry placeholders of the same size):
+#   bread       half a flat cake, 0.16 m across, 0.02 thick. origin = centre of the half disc, axis = from the broken edge
+#               to the round edge (in the disc plane), up = the flat face's normal.
+#   breadPiece  the corner broken off, ~0.06 m. Same axes.
+#   clipA/clipB Hanyang charger with five rounds, 0.06 x 0.02 (x 0.055 the rounds). origin = centre, axis = along the
+#               charger, up = toward the bullet tips.
+#   comradeRifle the comrade's Hanyang: the actor-weapon convention (origin = right-hand grip, axis = muzzle, up = sights).
+#   rifleBolt   its bolt, 0.17 m: origin = centre, axis = toward the bolt head (forward in the rifle), up = the handle side.
+#   chestBadge  cloth chest badge 0.03 x 0.08: origin = centre, axis = the long side, up = its face normal.
+#   helmet      He Youtian's steel helmet (contract §4.2 "钢盔在手"; NEW prop name, reported): origin = the dome's centre at
+#               the brim plane, axis = out of the dome (the wearer's up), up = toward the brim's front.
+#   ammoBox     Model_MilitaryCrateSet (0.82 x 0.54 x 0.30 m): origin = bottom centre, axis = the long side, up = +up.
+RA_PROP_NOTES = {
+    'bread': 'half flat cake, 0.16 m across, 0.02 m thick; origin centre, axis broken edge -> round edge, up face normal',
+    'breadPiece': 'corner of the cake, ~0.06 m; origin centre, axis/up as bread',
+    'clipA': 'Hanyang charger with five rounds, 0.06 x 0.02 (rounds 0.055); origin centre, axis along the charger, up toward the tips',
+    'clipB': 'as clipA',
+    'comradeRifle': "the comrade's Hanyang, actor-weapon convention (origin right-hand grip, axis muzzle, up sights)",
+    'rifleBolt': 'Hanyang bolt, 0.17 m; origin centre, axis toward the bolt head, up the handle side',
+    'chestBadge': 'cloth chest badge 0.03 x 0.08 m; origin centre, axis long side, up face normal',
+    'helmet': 'steel helmet (He Youtian); origin dome centre at the brim plane, axis out of the dome, up toward the brim front',
+    'ammoBox': 'Model_MilitaryCrateSet open crate 0.82 x 0.54 x 0.30 m; origin bottom centre, axis long side, up +up',
+}
+for _name, _note in RA_PROP_NOTES.items():
+    PROPS.setdefault(_name, {})
+    PROPS[_name].setdefault('redraftA', _note)
+
+# Skin patches the redraft A clips aim at (chosen on the rest pose like the others).
+CONTACT_POINTS.update({
+    # Cloth badge over the LEFT breast (his +X), a hand's breadth under the collar.
+    'badgeChestL': {'bones': ['Spine2', 'Spine1'], 'normal': (0, -1, 0), 'count': 14,
+                    'score': lambda p, c: -p.y - 3 * abs(p.z - (_Z(c, 'Spine2') + .05)) - 3 * abs(p.x - .10)},
+    # Front of the LEFT shoulder over the wound (the bandage the comrade presses in KneelWallBase).
+    'woundShoulderL': {'bones': ['L Clavicle', 'L UpperArm', 'Spine2'], 'normal': (.25, -1, .25), 'count': 14,
+                       'score': lambda p, c: -p.y - 4 * abs(p.x - _P(c, 'L UpperArm').x * .90) - 3 * abs(p.z - (_P(c, 'L UpperArm').z - .04))},
+    # Middle of the upper back between the shoulder blades (a bayonet driven into a man lying face down).
+    'backStab': {'bones': ['Spine2', 'Spine1'], 'normal': (0, 1, 0), 'count': 16,
+                 'score': lambda p, c: p.y - 3 * abs(p.z - (_Z(c, 'Spine2') + .05)) - 2 * abs(p.x)},
+    # Small of the back (a boot put on a man lying face down).
+    'backLow': {'bones': ['Spine', 'Pelvis', 'Spine1'], 'normal': (0, 1, 0), 'count': 16,
+                'score': lambda p, c: p.y - 3 * abs(p.z - (_Z(c, 'Spine') + .03)) - 2 * abs(p.x)},
+})
+
+from mathutils import Euler
+RA_TIP_M = 1.663 - .255          # Type38 with the bayonet fixed: tip ahead of the right-hand grip (runtime m, captives bake)
+
+
+def RaF(n):
+    return n / 24.0
+
+
+def RaV(v):
+    return Vector(v)
+
+
+def RaConj(R, v):
+    m = R @ Euler(tuple(v), 'XYZ').to_matrix() @ R.transposed()
+    return tuple(m.to_euler('XYZ'))
+
+
+RA_POSITIONS = ('ankle.', 'legPole.', 'hand.', 'armPole.', 'grip.')
+
+
+def RaRotatePose(f, R, pivot, to=None):
+    """A flat pose authored standing (rest axes) turned by R (3x3) about `pivot` and moved to `to` (source m): every world
+    target turns, every tilt channel is re-expressed about the world axes ApplyPose tilts about (the spine's bend/lean/twist
+    and the neck and head by conjugation), rest-relative foot angles become world toe directions. Shrug and protraction are
+    world-axis tilts that do not survive the turn: zeroed."""
+    piv, dst = Vector(pivot), Vector(to if to is not None else pivot)
+    out = dict(f)
+    for key, v in f.items():
+        if v is None:
+            continue
+        if key == 'pelvis' or key.startswith(RA_POSITIONS):
+            out[key] = tuple(dst + R @ (Vector(v) - piv))
+        elif key.startswith(('palmFw.', 'palmNw.', 'toeDir.')):
+            out[key] = tuple(R @ Vector(v))
+        elif key.startswith(('palmF.', 'palmN.')) and f.get('handRel.' + key[-1]) is None:
+            out[key] = tuple(R @ Vector(v))
+    out['pelvisTilt'] = tuple((R @ Euler(tuple(f.get('pelvisTilt') or (0, 0, 0)), 'XYZ').to_matrix()).to_euler('XYZ'))
+    out['bend'], out['lean'], out['twist'] = RaConj(R, (f.get('bend', 0.0), f.get('lean', 0.0), f.get('twist', 0.0)))
+    for k in ('neck', 'head'):
+        out[k] = RaConj(R, f.get(k) or (0, 0, 0))
+    for s in LR:
+        a = f.get('foot.' + s)
+        if a is not None and f.get('toeDir.' + s) is None:
+            pitch, yaw = math.radians(a[0]), math.radians(a[1])
+            d = Quaternion((0, 0, 1), yaw) @ Quaternion((1, 0, 0), pitch) @ Vector((0, -1, -.25))
+            out['toeDir.' + s] = tuple(R @ d.normalized())
+        out['foot.' + s] = None
+        out['protract.' + s] = 0.0
+    out['shrug'] = 0.0
+    return out
+
+
+def RaProbe(T, f, key):
+    """Pose a flat pose once (no grounding) and read the head: eye, face direction, crown-up (source m). Cached by key."""
+    cache = T.cache.setdefault('raProbe', {})
+    if key in cache:
+        return cache[key]
+    K = T.K
+    K['Reset']()
+    p = T.Nest(dict(f))
+    K['ApplyPose'](p, 0.0)
+    if p.get('post'):
+        p['post']()
+    K['Update']()
+    loc, q, _ = K['BWorld'](K['Bone']('Head')).decompose()
+    eye = loc + q @ T.eyeLocal
+    face = (q @ T.faceLocal).normalized()
+    up = (K['Point'](K['Bone']('Head')) - K['Point'](K['Bone']('Neck'))).normalized()
+    out = {'eye': eye.copy(), 'face': face, 'up': up, 'head': K['Point'](K['Bone']('Head')).copy(),
+           'mouth': eye - up * T.R(.065) + face * T.R(.035)}
+    K['Reset']()
+    cache[key] = out
+    return out
+
+
+def RaChan(rows):
+    """Channel through (t, value) rows (tuples or numbers), a function of the clip time."""
+    return Channel(sorted([(t, tuple(v) if isinstance(v, (tuple, list, Vector)) else v) for t, v in rows], key=lambda r: r[0]))
+
+
+def RaDirChan(rows):
+    """Unit directions through (t, dir) rows."""
+    c = RaChan([(t, tuple(Vector(v).normalized())) for t, v in rows])
+    return lambda t: tuple(Vector(c(t)).normalized())
+
+
+def RaFist(T, side='R'):
+    """(knuckles, palmar, back-of-hand) of the posed hand, source m."""
+    K = T.K
+    knuckles, palmar = FistFrame(T, side)
+    along = (knuckles - K['Point'](K['Bone'](side + ' Hand'))).normalized()
+    return knuckles, palmar, along
+
+
+def RaInHand(T, side, palmOut=.03, along=.02, axisFrom='along', visible=True):
+    """A small prop held in the posed fist: centre a little palmward and fingerward of the knuckles; axis along the
+    fingers (or across the palm), up = the palm normal."""
+    k, palmar, al = RaFist(T, side)
+    centre = k + palmar * T.R(palmOut) + al * T.R(along)
+    axis = al if axisFrom == 'along' else palmar.cross(al).normalized()
+    up = palmar
+    return (tuple(centre), tuple(axis), tuple(up), visible)
+
+
+def RaHidden():
+    return ((0, 0, 0), (0, 0, -1), (0, 1, 0), False)
+
+
+def RaBallistic(p0, p1, t0, t1, apex):
+    """Point flying from p0 (time t0) to p1 (time t1), the arc `apex` (source m) over the straight line at its middle."""
+    def At(t):
+        u = Clamp((t - t0) / max(1e-6, t1 - t0))
+        p = Vector(p0).lerp(Vector(p1), u)
+        p.z += 4 * apex * u * (1 - u)
+        return tuple(p)
+    return At
+
+
+def RaRoleToRole(stage, fromRole, toRole, p):
+    """A point in fromRole's frame (runtime m, Blender axes, height over its ground) -> toRole's frame (same units)."""
+    st = STAGES[stage]['actors']
+    a, b = st[fromRole], st[toRole]
+    ax, ay, ayaw = _StageXY(a)
+    bx, by, byaw = _StageXY(b)
+    x, y = _Rot(p[0], p[1], ayaw)
+    x, y = _Rot(x + ax - bx, y + ay - by, -byaw)
+    return (x, y, p[2] + a.get('yM', 0.0) - b.get('yM', 0.0))
+
+
+def RaViews(cx=0.0, cy=-.2, cz=.6, far=3.4, h=1.0):
+    return [('side', (cx - far, cy, cz + h * .4), (cx, cy, cz)), ('q', (cx - far * .68, cy - far * .82, cz + h), (cx, cy, cz)),
+            ('front', (cx - .3, cy - far, cz + .3), (cx, cy, cz))]
+
+
+def RaR3Spec(T, stage, role, spec):
+    """An actor of an R3 stage (the comrade kneeling on the bank): his feet on the bank ground, walled by the planks, the
+    review from the side and from Shunzi's pinned eye (SlashGroundSpec / SlashReview for any role)."""
+    me = STAGES[stage]['actors'][role]
+    assert abs(R3GroundRT(-me['x'], me['z']) - me['yM']) < .003, ('yM', stage, role, R3GroundRT(-me['x'], me['z']))
+    G = StageGround(T, stage, role)
+    spec.update({'ground': lambda x, y, t: G(x, y), 'walls': StageWalls(T, stage, role)})
+    props = spec.get('reviewProps')
+    bank = [('poly', [AnchorToRole(T, stage, role, (x0 * T.s, a * T.s, R3Bank(T, 0, a) * T.s)) for x0, a in quad], None, 0)
+            for quad in [((-1.0, a), (1.0, a), (1.0, b), (-1.0, b)) for a, b in
+                         [(y / 20 / T.s, (y + 1) / 20 / T.s) for y in range(-10, 12)]]]
+    spec['reviewProps'] = lambda t: (props(t) if props else []) + bank
+    spec = AReview(spec)
+    eye = AnchorToRole(T, stage, role, R3_EYE)
+    look = AnchorToRole(T, stage, role, R3_LOOK)
+    spec['reviewViews'] = [('side', (-3.2, -.9, 1.1), (0, -.55, .80)), ('q', (-2.3, -3.2, 1.9), (0, -.5, .75)),
+                           FirstPersonView(eye, look, name='eye')]
+    return spec
+
+
+def RaPartner(T, stage, selfRole, partnerRole, point, t, normalOffset=0.0):
+    """PartnerPoint, None while the partner track lacks the point (before OPENING_PASS=partner has dumped it)."""
+    try:
+        return PartnerPoint(T, stage, selfRole, partnerRole, point, t, normalOffset)
+    except KeyError:
+        return None
+
+
+def RaW(f, side, w):
+    """A grip's ease weight: below 1 the hand is between its free target and the grip; at 1 the key is left out."""
+    if w > .999:
+        f.pop('gripW.' + side, None)
+    else:
+        f['gripW.' + side] = max(w, 1e-3)
+
+
+def RaExit(t):
+    return 'pose.holdUntil: the hold loop lets go at that clip time and the clip plays on to its end (' + t + ')'
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# A1. YaowaCrouchCatchEat (NRA02, yaowa): crouched with the rifle hugged upright, eyes on the comrade's bread (hold loop);
+# catches the broken-off corner one-handed, two bites, back to the crouch (= frame 0).
+# ------------------------------------------------------------------------------------------------------------------
+RA_Y_T = RaF(102)                 # 4.25 s
+RA_Y_HOLD = (0.0, RaF(36))        # 0-1.5 s
+RA_Y_CATCH = RaF(46)              # 1.917 s
+RA_Y_BITES = (RaF(58), RaF(69))   # 2.417, 2.875
+RA_Y_GONE = RaF(71)
+# The comrade's mouth as Yaowa sees it at §5.1 (Yaowa (-1.0,-125.35) NE, comrade (0.35,-124.35) NW): 1.66 m to his right,
+# 0.25 m ahead, sitting (runtime m, Blender axes of his frame: +X left, +Y back).
+RA_Y_LOOK = (-1.66, -.25, .80)
+# The bread arrives here (runtime m, his frame): right of him, a little ahead, at the height of the half-risen shoulder.
+RA_Y_CATCH_AT = (-.50, -.32, 1.00)
+
+STAGES['breadToss'] = {
+    'anchor': 'comrade',
+    'notes': 'contract §5.1 starts (comrade (0.35,-124.35) facing NW, Yaowa (-1.0,-125.35) facing NE): the corner the comrade '
+             'tosses (ComradeEatBreadToss `toss` 3.958 s, breadPiece track) flies 0.458 s into Yaowa\'s right hand '
+             '(YaowaCrouchCatchEat `catch` 1.917 s): Yaowa\'s clip runs offsetS 2.5 s behind the comrade\'s (release his hold '
+             'loop at comrade 4.0 s). Placed elsewhere the flight still ends at this point in the comrade\'s frame.',
+    'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'ComradeEatBreadToss', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+               'yaowa': {'rig': 'TengxianNra02', 'clip': 'YaowaCrouchCatchEat', 'x': -.247, 'z': -1.66, 'yawDeg': -90, 'offsetS': 2.5}}}
+
+Meta('YaowaCrouchCatchEat', RA_Y_T, False, 'track', role='yaowa', rig='TengxianNra02', rigs=['TengxianNra02'],
+     props=['weapon', 'breadPiece'], rootMotion=False, stage='breadToss', holdLoop=list(RA_Y_HOLD), holdExit=RaExit('the catch'),
+     contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'target': 'weapon', 'part': 'handguard'},
+               {'t': 0.0, 'limb': 'butt', 'action': 'rest', 'target': 'ground'},
+               {'t': RA_Y_CATCH, 'limb': 'handR', 'action': 'catch', 'target': 'breadPiece'}],
+     events=[{'t': RaF(37), 'kind': 'reach'}, {'t': RA_Y_CATCH, 'kind': 'catch'}, {'t': RA_Y_BITES[0], 'kind': 'bite'},
+             {'t': RA_Y_BITES[1], 'kind': 'bite'}, {'t': RA_Y_GONE, 'kind': 'eaten'}],
+     next=['YaowaCrouchCatchEat'],
+     notes='2026-10-11 redraft (N01/N02): crouched on his heels in the dugout, the Hanyang upright between his knees (butt in the '
+           'dirt), both hands on it, the head turned to his right on the comrade\'s bread (look 1.66 m right, 0.8 m up); '
+           '0-1.5 s hold loop (breathing). Released: half rises and reaches up to his right (1.54 s), catches the broken corner '
+           'in the right hand (catch 1.917 s, breadPiece shown from here), stuffs it in: two bites (2.417, 2.875 s), the piece '
+           'is gone at 2.96 s; the hand back on the rifle by 3.5 s, back in the crouch looking at the bread = frame 0 at 4.25 s '
+           '(the director may restart the hold loop). Feet planted throughout; no root motion.')
+
+
+def RaYaowaRifle(T):
+    return T.RifleFromButt((.03, -.52, .012), Unit((-.10, .15, .98)))
+
+
+def RaYaowaBase(T):
+    if 'raYaowa' in T.cache:
+        return dict(T.cache['raYaowa'])
+    H, A = T.H, T.A
+    rifle = RaYaowaRifle(T)
+    palms = T.Palms(rifle['axis'])
+    f = Squat(T, .80)
+    f.update({'pelvis': (0, .08, .43), 'pelvisTilt': (.26, 0, 0), 'bend': .42, 'twist': -.08, 'shrug': .06,
+              'neck': (.05, 0, 0), 'head': (.0, 0, 0),
+              'ankle.L': (H + .07, -.06, A), 'ankle.R': (-(H + .07), -.03, A),
+              'legPole.L': (H + .55, -1.0, .80), 'legPole.R': (-(H + .55), -1.0, .80), 'foot.L': (0, 20, 0), 'foot.R': (0, -20, 0),
+              'grip.L': T.Along(rifle, .86), 'palmF.L': palms['L'][0], 'palmN.L': palms['L'][1], 'curl.L': .95,
+              'armPole.L': (.55, -.30, .55),
+              'grip.R': T.Along(rifle, .64), 'palmF.R': palms['R'][0], 'palmN.R': palms['R'][1], 'curl.R': .95,
+              'armPole.R': (-.55, -.30, .45),
+              'handRel.L': None, 'handRel.R': None,
+              'look': tuple(Vector(RA_Y_LOOK) / T.s), 'lookW': .85, 'lookLimit': 70.0})
+    T.cache['raYaowa'] = f
+    return dict(f)
+
+
+@Builder('YaowaCrouchCatchEat')
+def RaBuildYaowaCatch(T, name):
+    D, h1, c = RA_Y_T, RA_Y_HOLD[1], RA_Y_CATCH
+    base = RaYaowaBase(T)
+    rifle = RaYaowaRifle(T)
+    catchAt = Vector(RA_Y_CATCH_AT) / T.s
+    eat = dict(base)
+    eat.update({'pelvis': Add3(base['pelvis'], (0, 0, .03)), 'bend': .36, 'twist': -.12, 'lookW': 0.0})
+    mouth = RaProbe(T, eat, 'yaowaEat')['mouth']
+    face = RaProbe(T, eat, 'yaowaEat')['face']
+    upH = RaProbe(T, eat, 'yaowaEat')['up']
+    atMouth = mouth + face * T.R(.075) - upH * T.R(.02) + Vector((-T.R(.02), 0, 0))
+    nearMouth = atMouth + face * T.R(.07) - upH * T.R(.07)
+    p0 = base['pelvis']
+    anim = Tracks(base, {
+        'pelvis': [(0.0, p0), (h1, p0), (RaF(40), Add3(p0, (-.02, -.03, .10))), (c, Add3(p0, (-.04, -.05, .16))),
+                   (RaF(52), Add3(p0, (0, 0, .05))), (RaF(60), Add3(p0, (0, 0, .03))), (RaF(84), Add3(p0, (0, 0, .02))), (D, p0)],
+        'bend': [(0.0, base['bend']), (h1, base['bend']), (c, .24), (RaF(52), .34), (RaF(84), .36), (D, base['bend'])],
+        'twist': [(0.0, base['twist']), (h1, base['twist']), (c, -.30), (RaF(54), -.14), (D, base['twist'])],
+        'lean': [(0.0, 0.0), (h1, 0.0), (c, .10), (RaF(54), 0.0), (D, 0.0)],
+        'shrug': [(0.0, base['shrug']), (h1, base['shrug']), (c, .14), (RaF(56), .05), (D, base['shrug'])],
+        'head': [(0.0, (0, 0, 0)), (h1, (0, 0, 0)), (RaF(54), (.18, 0, 0)), (RA_Y_BITES[0], (.10, 0, 0)), (RaF(64), (.16, .03, 0)),
+                 (RA_Y_BITES[1], (.10, 0, 0)), (RaF(78), (.10, 0, 0)), (D, (0, 0, 0))],
+        'lookW': [(0.0, .85), (h1, .85), (RaF(44), .95), (c, .9), (RaF(52), 0.0), (RaF(84), 0.0), (D, .85)],
+        'curl.R': [(0.0, .95), (h1, .95), (RaF(40), .15), (c - RaF(1), .25), (c + RaF(2), 1.15), (RaF(70), 1.1), (RaF(76), .6),
+                   (RaF(84), .95), (D, .95)],
+    }, lag={'head': .05, 'neck': .03})
+    # The right hand: off the rifle (1.5-1.7 s) up to the bread, to the mouth, back on the rifle (3.2-3.5 s).
+    path = RaChan([(h1, base['grip.R']), (RaF(41), tuple(catchAt + Vector((T.R(.10), -T.R(.05), -T.R(.10))))),
+                   (c, tuple(catchAt)), (RaF(50), tuple(catchAt + Vector((T.R(.06), 0, -T.R(.02))))),
+                   (RaF(56), tuple(nearMouth)), (RA_Y_BITES[0], tuple(atMouth)), (RaF(62), tuple(nearMouth)),
+                   (RaF(66), tuple(nearMouth)), (RA_Y_BITES[1], tuple(atMouth)), (RaF(74), tuple(nearMouth)),
+                   (RaF(80), tuple(Vector(base['grip.R']) + Vector((0, -T.R(.08), T.R(.06))))), (RaF(84), base['grip.R'])])
+    catchF, catchN = Unit((.10, -.35, .93)), Unit((.65, -.55, -.35))           # open hand, fingers up, palm toward the bread
+    mouthF, mouthN = tuple(upH * .7 + face * -.3), tuple(-face)
+    palmF = RaDirChan([(h1, base['palmF.R']), (RaF(41), catchF), (c, catchF), (RaF(52), Unit((0, -.3, 1))), (RaF(56), mouthF),
+                       (RaF(76), mouthF), (RaF(84), base['palmF.R'])])
+    palmN = RaDirChan([(h1, base['palmN.R']), (RaF(41), catchN), (c, catchN), (RaF(52), Unit((.4, -.9, 0))), (RaF(56), mouthN),
+                       (RaF(76), mouthN), (RaF(84), base['palmN.R'])])
+
+    def Free(t):
+        return h1 + RaF(1) <= t <= RaF(83)
+
+    def Pose(t):
+        f = anim(t)
+        f['grip.R'] = base['grip.R'] if not Free(t) else path(t)
+        if Free(t):
+            w = min(Smooth((t - h1) / RaF(5)), 1 - Smooth((t - RaF(78)) / RaF(6)))
+            RaW(f, 'R', w)
+            if 'gripW.R' in f:
+                f['grip.R'] = path(t)
+                f['hand.R'] = path(t)
+                f['handRel.R'] = (-.10, -.30, -.30)
+            f['palmF.R'], f['palmN.R'] = palmF(t), palmN(t)
+        return T.Nest(f)
+
+    def Props(t):
+        piece = RaInHand(T, 'R', .025, .03) if c - 1e-6 <= t < RA_Y_GONE else RaHidden()
+        return {'weapon': T.Track(rifle, up=(0, 1, 0)), 'breadPiece': piece}
+    spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, D), ('R', 0, D)],
+            'check': lambda t: {'L': base['grip.L'], 'R': base['grip.R'] if not Free(t) else None},
+            'reviewProps': lambda t: T.RifleProps(rifle) + [('point', tuple(catchAt), None, .025), ('point', tuple(atMouth), None, .015)],
+            'reviewFrames': lambda n: [0, 38, 44, 46, 56, 58, 69, 84, n - 1]}
+    spec['reviewViews'] = RaViews(0, -.1, .55, 3.0, .9) + [('eye', (-.95, .85, .75), (-.25, -.10, .65), 60.0)]
+    spec['reviewScale'] = 2.0
+    return spec
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# A2/A3. The comrade on the dugout floor (NRA02, comrade): sitting against the south wall as WoundedSitRifleIdle, the
+# Hanyang propped between the knees against the bandaged LEFT side (no hand on it), the left arm limp on the knee.
+# ------------------------------------------------------------------------------------------------------------------
+def RaSitRifle(T):
+    """The rifle propped between his knees, the muzzle leaning to his left shoulder (clear of the right arm)."""
+    return T.RifleFromButt((.05, -.33, .012), Unit((.17, .24, .955)))
+
+
+def RaSitFree(T):
+    """SitBase with the right hand off the rifle: resting on the right thigh, palm down, in the torso frame."""
+    if 'raSitFree' in T.cache:
+        return dict(T.cache['raSitFree'])
+    f = SitBase(T)
+    f.update({'grip.R': None, 'handRel.R': (-.03, -.25, -.36), 'poleRel.R': (-.45, .30, -.30), 'handRelW.R': 1.0,
+              'palmF.R': (0, -.6, -.8), 'palmN.R': (0, -.3, -1), 'curl.R': .5})
+    T.cache['raSitFree'] = f
+    return dict(f)
+
+
+def RaBreadHold(T):
+    """The nibbling pose: the right hand with the bread in front of the chest (torso frame)."""
+    f = RaSitFree(T)
+    f.update({'handRel.R': (.12, -.30, -.28), 'poleRel.R': (-.40, .05, -.45), 'palmF.R': (.55, -.15, .80),
+              'palmN.R': (.25, -.95, .10), 'curl.R': .85})
+    return f
+
+
+RA_C_T = RaF(120)                  # 5.0 s
+RA_C_HOLD = (0.0, RaF(72))         # 0-3.0 s: two nibbles
+RA_C_TEAR = RaF(86)                # 3.583
+RA_C_TOSS = RaF(95)                # 3.958
+RA_C_FLIGHT = RaF(11)              # 0.458 s in the air
+Meta('ComradeEatBreadToss', RA_C_T, False, 'track', role='comrade', rig='TengxianNra02', rigs=['TengxianNra02'],
+     props=['weapon', 'bread', 'breadPiece'], rootMotion=False, stage='breadToss', holdLoop=list(RA_C_HOLD),
+     holdExit=RaExit('the tear and the toss'), env={'wallBehindM': .35},
+     contacts=[{'t': 0.0, 'limb': 'handR', 'action': 'hold', 'target': 'bread'},
+               {'t': RaF(84), 'limb': 'handL', 'action': 'hold', 'target': 'bread'},
+               {'t': RA_C_TOSS, 'limb': 'handR', 'action': 'release', 'target': 'breadPiece'}],
+     events=[{'t': RaF(18), 'kind': 'bite'}, {'t': RaF(52), 'kind': 'bite'}, {'t': RA_C_TEAR, 'kind': 'tear'},
+             {'t': RA_C_TOSS, 'kind': 'toss'}, {'t': RA_C_TOSS + RA_C_FLIGHT, 'kind': 'caught', 'by': 'yaowa'}],
+     prev=['WoundedSitRifleIdle'], next=['ComradeEatBreadToss', 'ComradePourRoundsLaugh', 'WoundedRiseWall'],
+     notes='2026-10-11 redraft (N01/N02): sitting against the wall (WoundedSitRifleIdle\'s seat), the Hanyang propped between the '
+           'knees leaning to the bandaged left side, the left arm limp on the left knee; the right hand holds the half cake '
+           '(bread) in front of the chest and nibbles: 0-3.0 s hold loop, two small bites (0.75, 2.17 s). Released: the left '
+           'hand comes up off the knee as far as it will (wincing), takes the cake; the right breaks a corner off (tear 3.583 s, '
+           'breadPiece from here) and lobs it underhand to Yaowa (toss 3.958 s; the breadPiece track flies 0.458 s to the '
+           'catch point of stage breadToss, then hides); the right hand takes the cake back, the left drops to the knee; frame 0 '
+           'again at 5.0 s.')
+
+
+def RaComradeMouth(T):
+    f = RaBreadHold(T)
+    return RaProbe(T, f, 'comradeSit')
+
+
+@Builder('ComradeEatBreadToss')
+def RaBuildEatBread(T, name):
+    D, h1 = RA_C_T, RA_C_HOLD[1]
+    base = RaBreadHold(T)
+    rifle = RaSitRifle(T)
+    pr = RaComradeMouth(T)
+    # torso-frame offsets from the right shoulder: the hand at the mouth (measured on the posed rest pose)
+    K = T.K
+    toMouth = (.17, -.24, .02)
+    bite = lambda t0, t1: [(t0, base['handRel.R']), ((t0 + t1) / 2, toMouth), (t1, base['handRel.R'])]
+    hold, tear = (.06, -.36, -.30), (.04, -.40, -.30)
+    keysR = ([(0.0, base['handRel.R'])] + bite(RaF(8), RaF(28)) + bite(RaF(42), RaF(62)) +
+             [(h1, base['handRel.R']), (RaF(80), hold), (RaF(84), hold), (RA_C_TEAR, Add3(tear, (-.06, .02, 0))),
+              (RaF(90), (-.10, -.30, -.32)), (RA_C_TOSS, (-.02, -.50, -.10)), (RaF(100), (-.02, -.44, -.18)),
+              (RaF(106), (.02, -.38, -.30)), (RaF(110), (.04, -.38, -.30)), (RaF(116), base['handRel.R']), (D, base['handRel.R'])])
+    anim = Tracks(base, {
+        'handRel.R': keysR,
+        'head': [(0.0, base['head']), (RaF(16), Add3(base['head'], (.10, 0, .05))), (RaF(28), base['head']),
+                 (RaF(50), Add3(base['head'], (.10, 0, .05))), (RaF(62), base['head']), (h1, base['head']),
+                 (RaF(84), Add3(base['head'], (.22, 0, .05))), (RA_C_TOSS, Add3(base['head'], (.02, 0, .25))),
+                 (RaF(104), Add3(base['head'], (.04, 0, .30))), (D, base['head'])],
+        'bend': [(0.0, base['bend']), (h1, base['bend']), (RaF(84), base['bend'] + .08), (RA_C_TOSS, base['bend'] + .02),
+                 (D, base['bend'])],
+        'shrug': [(0.0, base['shrug']), (h1, base['shrug']), (RaF(82), base['shrug'] + .10), (RaF(90), base['shrug'] + .04),
+                  (D, base['shrug'])],
+        'twist': [(0.0, base['twist']), (h1, base['twist']), (RA_C_TOSS, base['twist'] + .10), (D, base['twist'])],
+        'curl.R': [(0.0, .85), (h1, .85), (RaF(90), .9), (RA_C_TOSS - RaF(1), .9), (RA_C_TOSS + RaF(2), .25), (RaF(104), .30),
+                   (RaF(110), .85), (D, .85)],
+    }, lag={'head': .05})
+    # The left hand: off the knee to in front of the belly (0.3 m up), where the bread is torn (world, source m).
+    leftAt = Vector((T.R(.05), -T.R(.27), T.R(.55)))
+
+    def Pose(t):
+        f = anim(t)
+        f['handRel.L'] = None
+        w = min(Smooth((t - h1) / RaF(12)), 1 - Smooth((t - RaF(108)) / RaF(10)))
+        f['hand.L'] = tuple(Vector(base['hand.L']).lerp(leftAt, w))
+        f['palmF.L'] = Unit(Lerp3(base['palmF.L'], (-.4, -.6, .5), w))
+        f['palmN.L'] = Unit(Lerp3(base['palmN.L'], (-.85, .1, -.2), w))
+        f['curl.L'] = Mix(base['curl.L'], .9, w)
+        if t < h1:
+            f = SitBreath(t, f, period=h1 / 2, amount=.8)
+        return T.Nest(f)
+    yaowaCatch = RaRoleToRole('breadToss', 'yaowa', 'comrade', RA_Y_CATCH_AT)
+    landing = Vector(yaowaCatch) / T.s
+
+    def Props(t):
+        out = {'weapon': T.Track(rifle, up=(0, 1, 0))}
+        hand = RaInHand(T, 'R', .03, .03)
+        if t < RaF(87):
+            out['bread'] = hand
+        elif t < RaF(110):
+            out['bread'] = RaInHand(T, 'L', .03, .03)
+        else:
+            out['bread'] = hand
+        if t < RA_C_TEAR:
+            out['breadPiece'] = RaHidden()
+        elif t <= RA_C_TOSS:
+            out['breadPiece'] = RaInHand(T, 'R', .025, .045)
+        elif t <= RA_C_TOSS + RA_C_FLIGHT + 1e-6:
+            start = T.cache.get('raTossFrom')
+            if start is None:
+                start = T.cache['raTossFrom'] = RaInHand(T, 'R', .025, .045)[0]
+            at = RaBallistic(start, landing, RA_C_TOSS, RA_C_TOSS + RA_C_FLIGHT, T.R(.30))(t)
+            out['breadPiece'] = (at, (1, 0, 0), (0, 0, 1), True)
+        else:
+            out['breadPiece'] = RaHidden()
+        if t <= RA_C_TOSS - RaF(1):
+            T.cache['raTossFrom'] = None
+        return out
+    spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, D), ('R', 0, D)], 'walls': SIT_WALL,
+            'reviewProps': lambda t: T.RifleProps(rifle) + [('point', tuple(landing), None, .03),
+                                                           ('box', (0, .385 + .03, .7), (1.6, .06, 1.4), 0)],
+            'reviewFrames': lambda n: [0, 18, 52, 80, 86, 92, 95, 100, 110, n - 1]}
+    spec['reviewViews'] = list(SIT_VIEWS) + [('front', (-.2, -3.2, .8), (0, -.2, .5))]
+    spec['reviewScale'] = 2.4
+    return spec
+
+
+RA_P_T = RaF(182)                  # 7.583 s
+RA_P_POUR = RaF(30)                # 1.25 s
+RA_P_SETTLED = RaF(58)             # 2.417 s: the director may hold here through Ledger 01-06
+RA_P_LAUGH = RaF(64)               # 2.667
+RA_P_WINCE = RaF(80)               # 3.333
+RA_P_HOLD = (RaF(110), RA_P_T)     # 4.583-7.583: leaning back, eyes shut
+Meta('ComradePourRoundsLaugh', RA_P_T, False, 'track', role='comrade', rig='TengxianNra02', rigs=['TengxianNra02'],
+     props=['weapon'], rootMotion=False, holdLoop=list(RA_P_HOLD), env={'wallBehindM': .35},
+     contacts=[{'t': RaF(10), 'limb': 'handR', 'action': 'grab', 'target': 'pouch'},
+               {'t': RA_P_POUR, 'limb': 'handR', 'action': 'pour', 'target': 'ground'},
+               {'t': RaF(86), 'limb': 'handR', 'action': 'press', 'target': 'self', 'part': 'woundShoulderL'},
+               {'t': RA_P_HOLD[0], 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': RA_P_T}],
+     events=[{'t': RaF(10), 'kind': 'pouch'}, {'t': RA_P_POUR, 'kind': 'pour', 'handM': [.15, .36, -.39]}, {'t': RA_P_SETTLED, 'kind': 'settled'},
+             {'t': RA_P_LAUGH, 'kind': 'laugh'}, {'t': RA_P_WINCE, 'kind': 'wince', 'line': 'BunkerLedger.07'},
+             {'t': RA_P_HOLD[0], 'kind': 'eyesClosed'}],
+     prev=['ComradeEatBreadToss', 'WoundedSitRifleIdle'], next=['WoundedRiseWall'],
+     notes='2026-10-11 redraft: "冬瓜用好的那只手，往顺子脚边倒了一把散子弹" ... "冬瓜笑出声，扯到了肩膀" ... "他靠回土壁，闭上眼". '
+           'Seated as ComradeEatBreadToss (rifle propped, left arm limp). The right hand into the belt pouch (0.42 s), leans '
+           'forward and pours a handful of rounds on the floor in front of him toward Shunzi (pour 1.25 s, the hand at event handM: runtime m '
+           'in his frame, three.js axes, the rounds fall from there: no rounds prop, the director/first person shows them); back to sitting at 2.42 s (settled: hold the '
+           'clip here with pose.seconds through the ledger lines). The laugh (2.67 s, chest pulses), the shoulder catches '
+           '(wince 3.33 s: hunches, the right hand to the bandage on the left shoulder, head down), then he lets himself back '
+           'against the wall, head back, eyes shut (the face layer closes them): 4.58-7.58 s hold loop, slow breathing.')
+
+
+@Builder('ComradePourRoundsLaugh')
+def RaBuildPourLaugh(T, name):
+    D, h0 = RA_P_T, RA_P_HOLD[0]
+    base = RaSitFree(T)
+    rifle = RaSitRifle(T)
+    b, s, h = base['bend'], base['shrug'], base['head']
+    rest = base['handRel.R']
+    pouch = (.06, -.22, -.40)
+    pour = (.04, -.46, -.24)
+    wound = (.25, -.13, -.12)
+    lean = dict(base)
+    keys = {
+        'handRel.R': [(0.0, rest), (RaF(10), pouch), (RaF(14), pouch), (RaF(24), Add3(pour, (0, .06, .06))), (RA_P_POUR, pour),
+                      (RaF(36), pour), (RaF(48), rest), (RA_P_LAUGH, rest), (RaF(78), rest), (RaF(86), wound), (RaF(100), wound),
+                      (h0, rest), (D, rest)],
+        'poleRel.R': [(0.0, base['poleRel.R']), (RaF(24), (-.45, .10, -.40)), (RaF(48), base['poleRel.R']), (RaF(80), base['poleRel.R']),
+                      (RaF(86), (-.10, -.30, -.40)), (RaF(100), (-.10, -.30, -.40)), (h0, base['poleRel.R']), (D, base['poleRel.R'])],
+        'palmF.R': [(0.0, base['palmF.R']), (RaF(10), (0, -.3, -.95)), (RaF(24), (0, -.9, .1)), (RA_P_POUR, (-.4, -.6, -.5)),
+                    (RaF(48), base['palmF.R']), (RaF(80), base['palmF.R']), (RaF(86), (.35, .05, .94)), (RaF(100), (.35, .05, .94)),
+                    (h0, base['palmF.R']), (D, base['palmF.R'])],
+        'palmN.R': [(0.0, base['palmN.R']), (RaF(10), (0, -.95, 0)), (RaF(24), (0, 0, 1)), (RA_P_POUR, (.2, .3, -.9)),
+                    (RaF(48), base['palmN.R']), (RaF(80), base['palmN.R']), (RaF(86), (0, .95, .1)), (RaF(100), (0, .95, .1)),
+                    (h0, base['palmN.R']), (D, base['palmN.R'])],
+        'curl.R': [(0.0, .5), (RaF(10), .3), (RaF(14), 1.1), (RaF(24), 1.1), (RaF(28), .9), (RaF(32), .2), (RaF(48), .5),
+                   (RaF(86), .45), (D, .5)],
+        'bend': [(0.0, b), (RaF(10), b + .06), (RA_P_POUR, b + .30), (RaF(36), b + .28), (RaF(52), b), (RA_P_LAUGH, b),
+                 (RaF(67), b - .03), (RaF(70), b + .12), (RaF(73), b + .03), (RaF(76), b + .10), (RA_P_WINCE, b + .20),
+                 (RaF(92), b + .16), (h0, b - .02), (D, b - .02)],
+        'twist': [(0.0, base['twist']), (RaF(10), base['twist'] - .10), (RA_P_POUR, base['twist'] + .05), (RaF(52), base['twist']),
+                  (RaF(86), base['twist'] + .12), (h0, base['twist']), (D, base['twist'])],
+        'shrug': [(0.0, s), (RA_P_LAUGH, s), (RaF(67), s + .06), (RaF(76), s + .04), (RA_P_WINCE, s + .22), (RaF(92), s + .14),
+                  (h0, s - .02), (D, s - .02)],
+        'head': [(0.0, h), (RaF(16), (h[0] + .15, h[1], h[2] + .10)), (RA_P_POUR, (h[0] + .25, h[1], h[2] + .12)), (RaF(52), h),
+                 (RA_P_LAUGH, h), (RaF(67), (h[0] - .14, h[1], h[2])), (RaF(70), (h[0] + .06, h[1], h[2])),
+                 (RaF(76), (h[0] + .02, h[1] + .03, h[2])), (RA_P_WINCE, (h[0] + .30, h[1] + .18, h[2] + .25)),
+                 (RaF(92), (h[0] + .28, h[1] + .14, h[2] + .20)), (h0, (h[0] - .22, h[1], h[2] - .05)), (D, (h[0] - .22, h[1], h[2] - .05))],
+        'neck': [(0.0, base['neck']), (RaF(92), base['neck']), (h0, (base['neck'][0] - .12, 0, 0)), (D, (base['neck'][0] - .12, 0, 0))],
+        'pelvisTilt': [(0.0, base['pelvisTilt']), (RA_P_POUR, Add3(base['pelvisTilt'], (.16, 0, 0))), (RaF(52), base['pelvisTilt']),
+                       (RaF(92), base['pelvisTilt']), (h0, Add3(base['pelvisTilt'], (.02, 0, 0))), (D, Add3(base['pelvisTilt'], (.02, 0, 0)))],
+    }
+    anim = Tracks(base, keys, lag={'head': .05, 'neck': .03})
+
+    def Pose(t):
+        f = anim(t)
+        if t > h0:
+            br = WrBreath(t, h0, D - h0, per=2, ease=.01)
+            f['bend'] += .02 * br
+            f['shrug'] += .02 * br
+        return T.Nest(f)
+    spec = {'pose': Pose, 'props': lambda t: {'weapon': T.Track(rifle, up=(0, 1, 0))}, 'plants': [('L', 0, D), ('R', 0, D)],
+            'walls': SIT_WALL, 'reviewProps': SitReview(T, rifle),
+            'reviewFrames': lambda n: [0, 10, 30, 58, 70, 80, 90, 110, n - 1]}
+    spec['reviewViews'] = list(SIT_VIEWS) + [('front', (-.2, -3.2, .8), (0, -.2, .5))]
+    spec['reviewScale'] = 2.4
+    return spec
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# A4. ComradeCatchDropPick (NRA02, comrade): from WoundedRiseWall's end (hunched, rifle at port) he leans the rifle on the
+# wall at his left and braces on the wall, reaches out his right hand, catches one charger (clipA), the other (clipB) drops
+# at his feet; he stows the first, stoops for the second, stows it, takes the rifle off the wall and turns to squeeze out.
+# ------------------------------------------------------------------------------------------------------------------
+RA_K_T = RaF(96)                   # 4.0 s
+RA_K_CATCH = RaF(26)               # 1.083
+RA_K_LAND = RaF(31)                # 1.292 clipB on the floor
+RA_K_PICK = RaF(56)                # 2.333
+RA_K_RIFLE = RaF(72)               # 3.0
+RA_K_THROW_FROM = (0.0, -1.50, .72)          # runtime m, his frame (Blender axes): Shunzi's hands, sitting 1.5 m in front
+RA_K_THROWN = RaF(14)              # 0.583 the chargers leave Shunzi's hands (first-person throw)
+Meta('ComradeCatchDropPick', RA_K_T, False, 'track', role='comrade', rig='TengxianNra02', rigs=['TengxianNra02'],
+     props=['weapon', 'clipA', 'clipB'], rootMotion=True, env={'wallLeftM': .43},
+     contacts=[{'t': RaF(13), 'limb': 'handL', 'action': 'brace', 'target': 'wall', 'untilT': RaF(40)},
+               {'t': RA_K_CATCH, 'limb': 'handR', 'action': 'catch', 'target': 'clipA'},
+               {'t': RA_K_PICK, 'limb': 'handR', 'action': 'grab', 'target': 'clipB'},
+               {'t': RA_K_RIFLE, 'limb': 'handR', 'action': 'grip', 'target': 'weapon'}],
+     events=[{'t': RaF(8), 'kind': 'rifleOnWall'}, {'t': RA_K_THROWN, 'kind': 'thrown', 'fromM': list(RA_K_THROW_FROM)},
+             {'t': RA_K_CATCH, 'kind': 'catch'}, {'t': RA_K_LAND, 'kind': 'clipLands'}, {'t': RaF(40), 'kind': 'stow'},
+             {'t': RA_K_PICK, 'kind': 'pick'}, {'t': RaF(66), 'kind': 'stow'}, {'t': RA_K_RIFLE, 'kind': 'rifle'},
+             {'t': RaF(80), 'kind': 'turn'}],
+     prev=['WoundedRiseWall'], next=[],
+     notes='2026-10-11 redraft (N04, BunkerExit "我那两夹！"): frame 0 = WoundedRiseWall\'s last frame (StoopBase, rifle at port). '
+           'He stands the rifle against the dugout wall at his left (0-0.33 s), braces his left hand on the wall above it, '
+           'reaches his right hand out to Shunzi. The two chargers leave Shunzi\'s hands at 0.583 s (event thrown fromM: runtime '
+           'm in his frame, Blender axes) -- the director\'s first-person throw should let go of them there; clipA lands in '
+           'his palm (catch 1.083 s), clipB drops past and lands in front of his feet (1.292 s). He stows clipA in the chest '
+           'pouch (1.67 s, hidden), stoops and picks clipB up (2.333 s), stows it (2.75 s), takes the rifle off the wall in the '
+           'right hand (3.0 s) and turns about 110 deg to his right with two steps (root end ~0.5 m). Ends hunched, rifle in the '
+           'right hand at the trail; the director walks him out.')
+
+
+@Builder('ComradeCatchDropPick')
+def RaBuildCatchDropPick(T, name):
+    D, H, P, A, SX = RA_K_T, T.H, T.P, T.A, T.SX
+    stoop = StoopBase(T)
+    start = FlatOf(T, BuildRiseWall, 'WoundedRiseWall', 2.8)
+    portRifle = StoopRifle(T)
+    wallX = SIDE_WALL_X
+    leaned = T.RifleFromButt((wallX - .09, -.36, .012), Unit((.065, -.02, .998)))
+    braceAt = (wallX - .035, -.10, .98)
+    reach = (-.10, -.70, 1.06)
+    catchAt = (-.08, -.68, 1.02)
+    pouch = (-.10, -.20, .00)          # torso-frame offset (left, back, up) from the right shoulder? (unused)
+    clipBGround = (-.08, -.36, T.R(.012))
+    thrower = Vector(RA_K_THROW_FROM) / T.s
+
+    def RifleAt(t):
+        if t <= RaF(2):
+            return portRifle
+        if t <= RaF(8):
+            w = Smooth((t - RaF(2)) / RaF(6))
+            return T.Rifle(Lerp3(portRifle['origin'], leaned['origin'], w), Unit(Lerp3(portRifle['axis'], leaned['axis'], w)))
+        if t <= RA_K_RIFLE:
+            return leaned
+        ax = Move((0, -.15, .99), t, True)
+        hand = Vector(Move((-(H + .11), -.10, P - .10), t))
+        trail = T.RifleFromButt(tuple(hand - Vector(ax) * T.R(.80)), ax)
+        w = Smooth((t - RA_K_RIFLE) / RaF(8))
+        return T.Rifle(Lerp3(leaned['origin'], trail['origin'], w), Unit(Lerp3(leaned['axis'], trail['axis'], w)))
+    turnAt = WrChannel([(0.0, 0.0), (RaF(76), 0.0), (RaF(84), -.80), (RaF(92), -1.90), (D, -1.92)])
+    pelX = WrChannel([(0.0, start['pelvis'][0]), (RaF(64), start['pelvis'][0]), (RA_K_RIFLE, start['pelvis'][0] + .10), (RaF(76), start['pelvis'][0] + .04), (D, start['pelvis'][0] - .20)])
+    pelY = WrChannel([(0.0, start['pelvis'][1]), (RaF(76), start['pelvis'][1]), (D, start['pelvis'][1] + .45)])
+    pelZ = WrChannel([(0.0, start['pelvis'][2]), (RaF(14), start['pelvis'][2] + .02), (RaF(26), start['pelvis'][2] + .03),
+                      (RaF(40), start['pelvis'][2]), (RaF(52), start['pelvis'][2] - .28), (RA_K_PICK, start['pelvis'][2] - .32),
+                      (RaF(64), start['pelvis'][2]), (D, start['pelvis'][2])])
+    pelXY = lambda t: (pelX(t), pelY(t))
+
+    def Move(v, t, direction=False):
+        """A point (or direction) of the body before the turn, carried with the turning, stepping body."""
+        c = start['pelvis']
+        if direction:
+            x, y = _Rot(v[0], v[1], turnAt(t))
+            return Unit((x, y, v[2]))
+        x, y = _Rot(v[0] - c[0], v[1] - c[1], turnAt(t))
+        return (x + pelX(t), y + pelY(t), v[2])
+    steps = [('R', RaF(78), RaF(86)), ('L', RaF(84), RaF(93))]
+    stance = {'L': (H + .05, .02), 'R': (-(H + .06), .10)}
+    base = WrPoleRel(start)
+    feet, plants = WrPath(T, start, pelXY, turnAt, steps, stance, lambda s, t: base[s], D, lift=.06)
+    anim = Tracks(start, dict(feet, **{
+        'pelvis': WrDense(lambda t: (pelX(t), pelY(t), pelZ(t)), D),
+        'bend': [(0.0, start['bend']), (RaF(14), .30), (RA_K_CATCH, .32), (RaF(40), .34), (RaF(50), .85), (RA_K_PICK, .95),
+                 (RaF(64), .40), (RA_K_RIFLE, .50), (RaF(80), .40), (D, .40)],
+        'twist': [(0.0, start['twist']), (RaF(14), .10), (RA_K_CATCH, .12), (RaF(40), 0.0), (RA_K_PICK, -.10), (RaF(64), 0.0),
+                  (RA_K_RIFLE, .50), (RaF(78), .20), (D, 0.0)],
+        'head': [(0.0, start['head']), (RaF(14), (-.10, 0, -.05)), (RA_K_CATCH, (-.05, 0, -.05)), (RaF(30), (.25, 0, -.05)),
+                 (RaF(40), (.10, 0, 0)), (RA_K_PICK, (.10, 0, 0)), (RaF(64), (-.05, 0, 0)), (RA_K_RIFLE, (0, 0, .20)),
+                 (D, (-.10, 0, 0))],
+        'shrug': [(0.0, start['shrug']), (RaF(14), .14), (RaF(40), .08), (D, .10)],
+        'lean': [(0.0, 0.0), (RaF(14), .10), (RaF(40), .06), (RaF(50), 0.0), (D, 0.0)],
+    }), lag={'head': .05})
+    # the right hand (world, source m, before the turn): off the stock to the reach, the catch, the pouch, the floor, the rifle
+    pouchW = (-(SX - .06), -.30, P + .30)
+    path = RaChan([(RaF(4), start['grip.R']), (RaF(12), reach), (RaF(22), reach), (RA_K_CATCH, catchAt),
+                   (RaF(34), Add3(catchAt, (.02, .20, -.10))), (RaF(40), pouchW), (RaF(44), pouchW),
+                   (RaF(52), Add3(clipBGround, (.02, .04, .12))), (RA_K_PICK, Add3(clipBGround, (.0, .02, T.R(.035)))),
+                   (RaF(60), Add3(clipBGround, (.0, .06, .25))), (RaF(66), pouchW), (RaF(68), pouchW)])
+
+    def Pose(t):
+        f = anim(t)
+        rifle = RifleAt(t)
+        f['handRel.L'] = f['handRel.R'] = None
+        # left hand: on the stock with the rifle until it leans; then flat on the wall; then hangs free
+        if t <= RaF(8):
+            f['grip.L'] = T.Along(rifle, .80)
+            f['palmF.L'], f['palmN.L'] = stoop['palmF.L'], stoop['palmN.L']
+        else:
+            w = Smooth((t - RaF(8)) / RaF(5))
+            off = Smooth((t - RaF(40)) / RaF(8))
+            f['grip.L'] = None
+            hang = (H + .10, -.06, P - .06)
+            f['hand.L'] = Lerp3(Lerp3(T.Along(rifle, .80), braceAt, w), Move(hang, t), off)
+            f['palmF.L'] = Unit(Lerp3((0, -.15, 1), (0, -.1, -1), off))
+            f['palmN.L'] = Unit(Lerp3((1, 0, 0), (-1, 0, 0), off))
+            f['curl.L'] = Mix(.15, .5, off)
+            f['armPole.L'] = Lerp3((SX + .55, .30, P + .10), Move((SX + .45, .40, P - .30), t), off)
+        # right hand
+        if t <= RaF(4):
+            f['grip.R'] = T.Along(rifle, WEAPONS[T.gun]['butt']) if t > RaF(2) else start['grip.R']
+        elif t < RA_K_RIFLE - RaF(4):
+            f['grip.R'] = None
+            f['hand.R'] = path(t)
+            catchPose = Smooth((t - RaF(8)) / RaF(6)) * (1 - Smooth((t - RaF(28)) / RaF(6)))
+            f['palmF.R'] = Unit(Lerp3((0, -.4, -.9), (0, -.95, .25), catchPose))
+            f['palmN.R'] = Unit(Lerp3((1, 0, 0), (0, -.25, 1), catchPose))
+            f['curl.R'] = Mix(.9, .20, catchPose) if t < RA_K_CATCH else Mix(1.05, .5, Smooth((t - RaF(44)) / RaF(4))) \
+                if t < RaF(48) else (1.05 if RA_K_PICK - RaF(1) <= t <= RaF(68) else .45)
+            f['armPole.R'] = (-(SX + .50), .10, P - .05)
+        else:
+            w = Smooth((t - (RA_K_RIFLE - RaF(4))) / RaF(4))
+            f['grip.R'] = T.Along(rifle, .80)
+            RaW(f, 'R', w)
+            f['hand.R'] = path(RaF(68))
+            f['armPole.R'] = Move((-(SX + .50), .25, P - .10), t)
+            palms = T.Palms(rifle['axis'])
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+        return T.Nest(Turned(f, turnAt(t)))
+    landFrom = {}
+
+    def ClipFlight(t, catchT, endAt, apex):
+        if t < RA_K_THROWN:
+            return RaHidden()
+        return (RaBallistic(thrower, endAt, RA_K_THROWN, catchT, apex)(t), (1, 0, 0), (0, 0, 1), True)
+
+    def Props(t):
+        rifle = RifleAt(t)
+        out = {'weapon': T.Track(rifle, up=(0, 0, 1))}
+        if t < RA_K_CATCH:
+            out['clipA'] = ClipFlight(t, RA_K_CATCH, catchAt, T.R(.25))
+        elif t < RaF(41):
+            out['clipA'] = RaInHand(T, 'R', .02, .02)
+        else:
+            out['clipA'] = RaHidden()
+        if t < RA_K_LAND:
+            out['clipB'] = ClipFlight(t, RA_K_LAND, Add3(clipBGround, (0, 0, T.R(.012))), T.R(.18))
+        elif t < RA_K_PICK:
+            out['clipB'] = (Add3(clipBGround, (0, 0, T.R(.012))), (1, .3, 0), (0, -.2, 1), True)
+        elif t < RaF(67):
+            out['clipB'] = RaInHand(T, 'R', .02, .02)
+        else:
+            out['clipB'] = RaHidden()
+        return out
+
+    def Check(t):
+        out = {}
+        if t <= RaF(8):
+            out['L'] = T.Along(RifleAt(t), .80)
+        if t >= RA_K_RIFLE:
+            out['R'] = T.Along(RifleAt(t), .80)
+        return out
+    spec = {'pose': Pose, 'props': Props, 'plants': [p for p in plants], 'check': Check,
+            'reach': {'fraction': .84, 'sides': 'R', 'travel': .12, 'bend': .35},
+            'walls': [((wallX, 0, 0), (-1, 0, 0))],
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + [('box', (wallX + .03, -.4, .7), (.06, 1.6, 1.4), 0),
+                                                                ('point', tuple(thrower), None, .03)],
+            'reviewFrames': lambda n: [0, 8, 14, 22, 26, 31, 40, 56, 66, 72, 84, n - 1]}
+    spec['reviewViews'] = [('right', (-3.2, -.2, 1.0), (0, -.2, .7)), ('top', (.01, .01, 3.5), (0, 0, 0))] + [('eye', (thrower.x, thrower.y - .25, thrower.z + .30), (0, -.2, .8), 62.0)]
+    spec['reviewScale'] = 2.6
+    return spec
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# A5. HeHelmetSleepSitUp (NRA05, heyoutian): curled on his right side, the helmet over his face; rolls onto his back
+# (`roll`), sleeps on (hold loop); throws the helmet off his face and sits up with it in his right hand (`sitUp`).
+# ------------------------------------------------------------------------------------------------------------------
+RA_H_T = RaF(150)                  # 6.25 s
+RA_H_ROLL = RaF(14)                # 0.583
+RA_H_HOLD = (RaF(40), RaF(100))    # 1.667-4.167: asleep on his back
+RA_H_SIT = RaF(110)                # 4.583: the helmet comes off, he sits up
+Meta('HeHelmetSleepSitUp', RA_H_T, False, 'free', role='heyoutian', rig='TengxianNra05', rigs=['TengxianNra05'],
+     props=['helmet'], rootMotion=True, holdLoop=list(RA_H_HOLD), holdExit=RaExit('sitUp'),
+     contacts=[{'t': RaF(104), 'limb': 'handR', 'action': 'grab', 'target': 'helmet'},
+               {'t': RaF(112), 'limb': 'handL', 'action': 'push', 'target': 'ground'}],
+     events=[{'t': RA_H_ROLL, 'kind': 'roll', 'line': 'BunkerBanter.12'}, {'t': RA_H_SIT, 'kind': 'sitUp'},
+             {'t': RaF(128), 'kind': 'sat'}],
+     next=[],
+     notes='2026-10-11 redraft (N01 "何有田蜷在最里头，钢盔扣在脸上睡觉"; "他翻了个身，接着睡"; "何有田一把掀开钢盔坐了起来"). '
+           'Frame 0: lying curled on his RIGHT side, the face toward clip forward (the root\'s -z: contract "侧蜷朝东"), the head '
+           'toward his right (root +x), knees drawn up, the helmet over his face (helmet track; the model\'s own headgear should '
+           'be hidden while this clip plays). The director can hold frame 0 (held life breathes it). 0.3-1.4 s he rolls onto '
+           'his back (roll 0.583 s), knees up, the helmet still on his face; 1.667-4.167 s hold loop asleep. Released: the '
+           'right hand takes the helmet off his face (4.33 s), the left elbow and hand push (4.67 s) and he sits up (sitUp 4.583 '
+           's), seated by 5.33 s with the knees up, the helmet in his right hand on the knee, facing the clip root\'s LEFT (+x '
+           'Blender = three.js -x; the sit-up is a plain curl up from his back). Root motion: the pelvis travels ~0.25 m.')
+
+
+def RaLieLocal(T):
+    """He Youtian authored standing (rest axes) in the lying shape: knees and hips drawn up, arms in, head bowed."""
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    f = T.Stand()
+    p0 = (0.0, .02, P - .035)
+    f.update({'pelvis': p0, 'pelvisTilt': (.0, 0, 0), 'bend': .45, 'lean': 0.0, 'twist': 0.0, 'neck': (.20, 0, 0), 'head': (.25, 0, 0),
+              # knees drawn up toward the chest (local: forward -Y), the shins folded back
+              'ankle.L': (H + .02, -.22, P - .40), 'ankle.R': (-(H + .04), -.12, P - .46),
+              'legPole.L': (H + .10, -1.2, P + .20), 'legPole.R': (-(H + .10), -1.2, P + .10),
+              'foot.L': (35, 0, 0), 'foot.R': (35, 0, 0),
+              # hands tucked in front of the chest and between the knees
+              'hand.L': (.12, -.36, P + .18), 'armPole.L': (SX + .40, .10, P + .05), 'palmF.L': (-.3, -.3, -.9), 'palmN.L': (-.9, 0, .2), 'curl.L': .7,
+              'hand.R': (-.10, -.32, P + .10), 'armPole.R': (-(SX + .40), .10, P + .0), 'palmF.R': (.3, -.3, -.9), 'palmN.R': (.9, 0, .2), 'curl.R': .7})
+    return f, Vector(p0)
+
+
+def RaSitLocal(T):
+    """Sitting on the floor, knees up, leaning on the left hand behind, the right forearm on the right knee (rest axes)."""
+    H, A, SX = T.H, T.A, T.SX
+    f = T.Stand()
+    f.update({'pelvis': (0, .05, .13), 'pelvisTilt': (-.40, 0, 0), 'bend': .30, 'lean': .04, 'twist': .05, 'shrug': .0,
+              'neck': (.10, 0, 0), 'head': (.12, 0, 0),
+              'ankle.L': (H + .10, -.42, A), 'ankle.R': (-(H + .08), -.46, A),
+              'legPole.L': (H + .45, -.30, 1.2), 'legPole.R': (-(H + .40), -.35, 1.2), 'foot.L': (0, 16, 0), 'foot.R': (0, -12, 0),
+              'hand.L': (SX + .12, .22, .05), 'armPole.L': (SX + .45, .45, .35), 'palmF.L': (.2, .9, -.3), 'palmN.L': (0, 0, -1), 'curl.L': .3,
+              'hand.R': (-(H + .12), -.42, .50), 'armPole.R': (-(SX + .50), .10, .30), 'palmF.R': (.2, -.5, -.8), 'palmN.R': (.6, -.3, -.3), 'curl.R': .95})
+    return f
+
+
+@Builder('HeHelmetSleepSitUp')
+def RaBuildHeSleep(T, name):
+    D, h0, h1 = RA_H_T, RA_H_HOLD[0], RA_H_HOLD[1]
+    lie, pivot = RaLieLocal(T)
+    sit = RaSitLocal(T)
+    floor = Vector((0, 0, T.R(.15)))
+    Rside = Matrix.Rotation(-math.pi / 2, 3, 'Y')                      # right side down, head to -X, face -Y
+
+    def Rlie(s):
+        return Matrix.Rotation(-math.pi / 2 * s, 3, 'X') @ Rside       # s 0 -> 1: rolled onto his back (face up)
+    Rback = Rlie(1.0)
+    Rsit = Matrix.Rotation(math.pi / 2, 3, 'Y') @ Rback                 # curled up from his back: upright, facing +X
+    roll = lambda t: Smooth((t - RaF(7)) / (RaF(30) - RaF(7)))
+    up = lambda t: Smooth((t - RaF(106)) / (RaF(128) - RaF(106)))
+    # on his back the knees fall to the side a little and the arms lie on the chest
+    back = dict(lie)
+    back.update({'bend': .20, 'neck': (.08, 0, 0), 'head': (.05, 0, 0),
+                 'ankle.L': (T.H + .06, -.30, T.P - .62), 'ankle.R': (-(T.H + .02), -.28, T.P - .66),
+                 'hand.L': (.10, -.22, T.P + .25), 'hand.R': (-.12, -.20, T.P + .18)})
+    mid = Vector((0, T.R(.10), 0))
+
+    def Lerp(a, b, w):
+        out = {}
+        for k in set(a) | set(b):
+            x, y = a.get(k), b.get(k)
+            if isinstance(x, (tuple, list)) and isinstance(y, (tuple, list)) and len(x) == len(y):
+                out[k] = tuple(x[i] + (y[i] - x[i]) * w for i in range(len(x)))
+            elif isinstance(x, (int, float)) and isinstance(y, (int, float)):
+                out[k] = x + (y - x) * w
+            else:
+                out[k] = y if w >= .5 else x
+        return out
+    sitW = lambda t: Smooth((t - RaF(108)) / (RaF(130) - RaF(108)))
+    reach = lambda t: Smooth((t - RaF(100)) / RaF(5))
+    faceHand = (-.03, -.24, T.HD + .02)
+
+    def World(t):
+        r, u = roll(t), up(t)
+        if u <= 0:
+            local = Lerp(lie, back, r)
+            local['hand.R'] = Lerp3(local['hand.R'], faceHand, reach(t))
+            R = Rlie(r)
+            to = floor + mid * r
+            f = RaRotatePose(local, R, pivot, to)
+        else:
+            # the sit-up: the lying body turns up about the hips (a quaternion slerp of the whole frame) while the limbs
+            # go over to the sitting shape; the sitting pose is authored upright, turned to face +X
+            q = Rback.to_quaternion().slerp(Rsit.to_quaternion(), u)
+            R = q.to_matrix()
+            local = Lerp(back, sit, sitW(t))
+            local['hand.R'] = Lerp3(local['hand.R'], faceHand, reach(t) * (1 - sitW(t)))
+            sitPelvis = Vector(sit['pelvis'])
+            piv = pivot.lerp(sitPelvis, sitW(t))
+            to = (floor + mid).lerp(Matrix.Rotation(math.pi / 2, 3, 'Z') @ sitPelvis + mid, u)
+            f = RaRotatePose(local, R if u < 1 else Rsit, piv, to)
+        f['handRel.L'] = f['handRel.R'] = None
+        return f
+
+    def Breath(t, f):
+        if h0 - .2 < t < h1 + .2:
+            b = WrBreath(t, h0, h1 - h0, per=2, ease=.2)
+            p = f['pelvis']
+            f['pelvis'] = (p[0], p[1], p[2] + .004 * b)
+        return f
+
+    def Pose(t):
+        return T.Nest(Breath(t, World(t)))
+
+    def HelmetOnFace():
+        K = T.K
+        loc, q, _ = K['BWorld'](K['Bone']('Head')).decompose()
+        face = (q @ T.faceLocal).normalized()
+        upH = (K['Point'](K['Bone']('Head')) - K['Point'](K['Bone']('Neck'))).normalized()
+        centre = loc + q @ T.eyeLocal + face * T.R(.05) - upH * T.R(.01)
+        return (tuple(centre), tuple(face), tuple(upH), True)
+
+    def Props(t):
+        if t < RaF(104):
+            return {'helmet': HelmetOnFace()}
+        k, palmar, al = RaFist(T, 'R')
+        hand = (tuple(k + palmar * T.R(.06) + al * T.R(.02)), tuple(-palmar), tuple(al), True)
+        if t < RaF(108):
+            w = Smooth((t - RaF(104)) / RaF(4))
+            a = HelmetOnFace()
+            return {'helmet': (Lerp3(a[0], hand[0], w), Unit(Lerp3(a[1], hand[1], w)), Unit(Lerp3(a[2], hand[2], w)), True)}
+        return {'helmet': hand}
+    spec = {'pose': Pose, 'props': Props, 'plants': [],
+            'reviewProps': lambda t: [('cyl', Props(t)['helmet'][0], tuple(Vector(Props(t)['helmet'][0]) + Vector(Props(t)['helmet'][1]) * T.R(.10)), .13)],
+            'reviewFrames': lambda n: [0, 14, 30, 60, 100, 104, 110, 118, 128, n - 1]}
+    spec['reviewViews'] = RaViews(0, 0, .30, 3.2, 1.0) + [('top', (.01, .01, 3.5), (0, 0, 0))]
+    spec['reviewScale'] = 2.6
+    # He grabs the helmet with his right hand from his face: the grip pass (world target) takes the hand to the helmet
+    # brim at the face (computed per frame in Pose from the previous frame: a reach in the hand channel below).
+    return spec
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# A6. LiuDivideAmmoToss (NRA05, liuwencai): squatting by the open ammo crate at his right, counting chargers out into the
+# left palm (hold loop); one is lobbed over two men to Shunzi (`toss`).
+# ------------------------------------------------------------------------------------------------------------------
+RA_L_T = RaF(96)                   # 4.0 s
+RA_L_HOLD = (0.0, RaF(48))         # 0-2.0 s: two chargers counted
+RA_L_TOSS = RaF(72)                # 3.0
+RA_L_FLIGHT = RaF(14)              # 0.583
+# Shunzi's lap seen from Liu at §5.1 (Liu (1.1,-124.9) facing west; Shunzi's lap 0.35 m east of shunzi.seat
+# (-1.95,-126.25), 0.55 m up): runtime m, Liu's frame, Blender axes.
+RA_L_LAP = (-1.35, -2.70, .55)
+RA_L_BOX = (-.42, -.30, 0.0)       # the crate's bottom centre, runtime m, his frame (Blender axes): at his right hand
+STAGES['liuToss'] = {
+    'anchor': 'liuwencai',
+    'notes': 'contract §5.1 (Liu (1.1,-124.9) squatting facing west, Shunzi at shunzi.seat (-1.95,-126.25) facing east): the '
+             'charger Liu lobs (LiuDivideAmmoToss toss 3.0 s, clipA track) lands on Shunzi\'s lap 0.583 s later. shunzi is '
+             'placement only (first person).',
+    'actors': {'liuwencai': {'rig': 'TengxianNra05', 'clip': 'LiuDivideAmmoToss', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+               'shunzi': {'rig': None, 'clip': None, 'x': 1.35, 'z': -3.05, 'yawDeg': 180}}}
+Meta('LiuDivideAmmoToss', RA_L_T, False, 'free', role='liuwencai', rig='TengxianNra05', rigs=['TengxianNra05'],
+     props=['clipA', 'ammoBox'], rootMotion=False, stage='liuToss', holdLoop=list(RA_L_HOLD), holdExit=RaExit('the toss'),
+     contacts=[{'t': RaF(8), 'limb': 'handR', 'action': 'grab', 'target': 'ammoBox'},
+               {'t': RaF(32), 'limb': 'handR', 'action': 'grab', 'target': 'ammoBox'},
+               {'t': RaF(56), 'limb': 'handR', 'action': 'grab', 'target': 'ammoBox'},
+               {'t': RA_L_TOSS, 'limb': 'handR', 'action': 'release', 'target': 'clipA'}],
+     events=[{'t': RaF(14), 'kind': 'count'}, {'t': RaF(38), 'kind': 'count'}, {'t': RA_L_TOSS, 'kind': 'toss'},
+             {'t': RA_L_TOSS + RA_L_FLIGHT, 'kind': 'lands', 'atM': list(RA_L_LAP)}],
+     next=['LiuDivideAmmoToss'],
+     notes='2026-10-11 redraft (N01 "刘文财蹲在他脚边的弹药箱旁分子弹"; "刘文财数出一夹，隔着两个人丢过来，落在顺子腿上"): '
+           'squatting, the open crate at his right hand (ammoBox track, static), the right hand takes chargers out of the crate '
+           'into the left palm (0-2.0 s hold loop, one per second). Released: one more out of the crate (2.33 s), a look at '
+           'Shunzi, an underhand lob over the heads (toss 3.0 s; the clipA track flies 0.583 s to the lap point of stage '
+           'liuToss, atM runtime m in his frame, and lies there to the end); back to counting = frame 0 at 4.0 s.')
+
+
+def RaLiuBase(T):
+    H, A = T.H, T.A
+    f = Squat(T, .95)
+    f.update({'pelvis': (0, .10, .40), 'pelvisTilt': (.30, 0, 0), 'bend': .48, 'twist': -.10, 'shrug': .04, 'head': (.30, 0, -.15),
+              'ankle.L': (H + .08, -.06, A), 'ankle.R': (-(H + .10), -.02, A),
+              'legPole.L': (H + .50, -1.0, .80), 'legPole.R': (-(H + .55), -1.0, .80), 'foot.L': (0, 20, 0), 'foot.R': (0, -24, 0),
+              'handRel.L': None, 'handRel.R': None,
+              'hand.L': (.02, -.36, .50), 'armPole.L': (.60, -.10, .40), 'palmF.L': (-.3, -.9, .1), 'palmN.L': (0, 0, 1), 'curl.L': .55,
+              'hand.R': (-.30, -.30, .40), 'armPole.R': (-.70, .10, .50), 'palmF.R': (0, -.6, -.8), 'palmN.R': (1, 0, 0), 'curl.R': .6})
+    return f
+
+
+@Builder('LiuDivideAmmoToss')
+def RaBuildLiuToss(T, name):
+    D, h1 = RA_L_T, RA_L_HOLD[1]
+    base = RaLiuBase(T)
+    box = Vector(RA_L_BOX) / T.s
+    inBox = tuple(box + Vector((T.R(.14), -T.R(.10), T.R(.27))))
+    palm = base['hand.L']
+    give = Add3(palm, (-.04, 0, .05))
+    lap = Vector(RA_L_LAP) / T.s
+    one = lambda t0: [(t0, base['hand.R']), (t0 + RaF(8), inBox), (t0 + RaF(12), inBox), (t0 + RaF(18), give),
+                      (t0 + RaF(20), give), (t0 + RaF(24), base['hand.R'])]
+    windup = (-.36, .02, .42)
+    release = (-.08, -.58, .72)
+    pathR = RaChan(one(0.0) + one(RaF(24)) + [(h1, base['hand.R']), (RaF(56), inBox), (RaF(60), inBox), (RaF(66), windup),
+                                               (RA_L_TOSS, release), (RaF(78), Add3(release, (0, -.05, .05))),
+                                               (RaF(88), base['hand.R']), (D, base['hand.R'])])
+    anim = Tracks(base, {
+        'head': [(0.0, base['head']), (RaF(54), base['head']), (RaF(62), (.0, 0, .05)), (RaF(70), (-.05, 0, .10)), (RaF(80), (.0, 0, .10)),
+                 (RaF(88), base['head']), (D, base['head'])],
+        'twist': [(0.0, base['twist']), (RaF(8), base['twist'] - .10), (RaF(18), base['twist'] + .02), (RaF(24), base['twist']),
+                  (RaF(32), base['twist'] - .10), (RaF(42), base['twist'] + .02), (h1, base['twist']), (RaF(60), -.25), (RaF(66), -.30),
+                  (RA_L_TOSS, .10), (RaF(80), .05), (D, base['twist'])],
+        'bend': [(0.0, base['bend']), (h1, base['bend']), (RaF(66), .44), (RA_L_TOSS, .30), (RaF(84), .42), (D, base['bend'])],
+        'pelvis': [(0.0, base['pelvis']), (h1, base['pelvis']), (RaF(66), Add3(base['pelvis'], (0, 0, .03))),
+                   (RA_L_TOSS, Add3(base['pelvis'], (0, -.02, .06))), (RaF(84), base['pelvis']), (D, base['pelvis'])],
+        'curl.R': [(0.0, .6), (RaF(8), .3), (RaF(12), 1.05), (RaF(18), 1.0), (RaF(20), .4), (RaF(24), .6),
+                   (RaF(32), .3), (RaF(36), 1.05), (RaF(42), 1.0), (RaF(44), .4), (h1, .6), (RaF(56), .3), (RaF(60), 1.05),
+                   (RA_L_TOSS - RaF(1), 1.0), (RA_L_TOSS + RaF(2), .2), (RaF(84), .5), (D, .6)],
+    }, lag={'head': .06})
+
+    def Pose(t):
+        f = anim(t)
+        f['grip.R'] = pathR(t)
+        lob = Bump(t, RaF(62), RaF(82))
+        f['palmF.R'] = Unit(Lerp3((0, -.6, -.8), (0, -.9, .4), lob))
+        f['palmN.R'] = Unit(Lerp3((1, 0, 0), (0, -.3, 1), lob))
+        return T.Nest(f)
+    fromAt = {}
+
+    def Props(t):
+        out = {'ammoBox': (tuple(box), (0, 1, 0), (0, 0, 1), True)}
+        if t < RaF(60):
+            out['clipA'] = RaHidden()
+        elif t <= RA_L_TOSS:
+            out['clipA'] = RaInHand(T, 'R', .02, .02)
+            fromAt['p'] = out['clipA'][0]
+        elif t <= RA_L_TOSS + RA_L_FLIGHT:
+            p0 = fromAt.get('p') or tuple(Vector(release))
+            out['clipA'] = (RaBallistic(p0, lap, RA_L_TOSS, RA_L_TOSS + RA_L_FLIGHT, T.R(.45))(t), (1, 0, 0), (0, 0, 1), True)
+        else:
+            out['clipA'] = (tuple(lap), (1, 0, 0), (0, 0, 1), True)
+        return out
+    spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, D), ('R', 0, D)], 'check': lambda t: {'R': pathR(t)},
+            'reach': {'fraction': .80, 'travel': .12, 'bend': .55},
+            'reviewProps': lambda t: [('box', tuple(box + Vector((0, 0, T.R(.15)))), (T.R(.54), T.R(.82), T.R(.30)), 0),
+                                      ('point', tuple(lap), None, .03)],
+            'reviewFrames': lambda n: [0, 8, 18, 56, 66, 72, 79, 86, n - 1]}
+    spec['reviewViews'] = RaViews(0, -.1, .60, 3.4, .9) + [('far', (-2.2, -3.8, 1.6), (-.6, -1.3, .5), 55.0)]
+    spec['reviewScale'] = 2.4
+    return spec
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# A7. CorpseStabbedClaw (NRA02, the third body of the sweep, SweepVictim) + IjaStompStabTwist (ijaB, IJA01/IJA02).
+# The corpse lies face down, the head toward clip forward; t 0.10 the first bayonet (the walking stab, not in this pair)
+# goes into his back: he cries out, arches, claws the mud; ijaB stamps on the small of his back (1.5 s), drives the
+# bayonet in again (1.85 s), twists it (2.1 s), pulls it out (2.45 s); he goes slack.
+# ------------------------------------------------------------------------------------------------------------------
+RA_S_T = RaF(84)                   # corpse 3.5 s
+RA_S_OFF = RaF(16)                 # ijaB's clip starts 0.667 s into the corpse's
+RA_S_STOMP, RA_S_STAB, RA_S_TWIST, RA_S_PULL = RaF(20), RaF(28), RaF(34), RaF(42)   # ijaB clock: .833 1.167 1.417 1.75
+RA_S_BT = RaF(62)                  # ijaB 2.583 s
+STAGES['sweepStomp'] = {
+    'anchor': 'corpse',
+    'notes': 'The third body of the sweep (sweep.bodies[2], SweepVictim) lies face down with the head toward its clip forward '
+             '(-z; contract: 头朝西). CorpseStabbedClaw starts on the first stab (the walking stab, ijaB IjaWalkStabProne / '
+             'IjaBayonetDownThrust: its blade in at corpse 0.10 s); IjaStompStabTwist starts 0.667 s later with ijaB standing at '
+             'the corpse\'s right thigh facing the same way (his rifle low, bayonet down).',
+    'actors': {'corpse': {'rig': 'TengxianNra02', 'clip': 'CorpseStabbedClaw', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+               'ijaB': {'rig': 'TengxianIja01', 'clip': 'IjaStompStabTwist', 'x': .42, 'z': .30, 'yawDeg': 0, 'offsetS': RA_S_OFF}}}
+PARTNER_SOURCES.setdefault('TengxianNra02', {})['CorpseStabbedClaw'] = ['backStab', 'backLow']
+Meta('CorpseStabbedClaw', RA_S_T, False, 'free', role='corpse', rig='TengxianNra02', rigs=['TengxianNra02'], props=[],
+     rootMotion=False, stage='sweepStomp', terminal=True,
+     contacts=[{'t': RaF(2), 'by': 'ijaB', 'part': 'backStab', 'action': 'stab', 'note': 'the walking stab (not this pair)'},
+               {'t': RA_S_STOMP + RA_S_OFF, 'by': 'ijaB', 'part': 'backLow', 'action': 'stomp'},
+               {'t': RA_S_STAB + RA_S_OFF, 'by': 'ijaB', 'part': 'backStab', 'action': 'stab'}],
+     events=[{'t': RaF(2), 'kind': 'stab'}, {'t': RaF(4), 'kind': 'cry'}, {'t': RaF(8), 'kind': 'claw'},
+             {'t': RA_S_STOMP + RA_S_OFF, 'kind': 'stomp'}, {'t': RA_S_STAB + RA_S_OFF, 'kind': 'stab'},
+             {'t': RA_S_TWIST + RA_S_OFF, 'kind': 'twist'}, {'t': RA_S_PULL + RA_S_OFF, 'kind': 'pull'}, {'t': RaF(78), 'kind': 'still'}],
+     notes='2026-10-11 redraft (N09, "扎到第三具，那人叫了一声，手在泥里乱抓。乙踩住他的背又扎一刀，拧了一下才拔出来"): the '
+           'sweep\'s third body (SweepVictim, contract §1.5) face down, the head toward clip forward, the left arm bent up by '
+           'the head, the right along the side. 0.083 s a bayonet goes into his back: he cries out (0.167), the chest and head '
+           'come up off the mud and both hands claw at it (0.33-1.45 s); the boot on the small of his back flattens him (stomp '
+           '1.5 s); the second stab (1.833) and the twist (2.083) jerk him; the blade comes out (2.417) and he goes slack, a last '
+           'twitch of the fingers, still from 3.25 s. terminal: the last frame is the corpse.')
+
+
+def RaProneLocal(T):
+    """The face-down body authored standing (rest axes): legs straight, the trunk flat, the head turned to his left."""
+    f = T.Stand()
+    f.update({'pelvisTilt': (0, 0, 0), 'bend': .12, 'lean': 0.0, 'twist': 0.0, 'neck': (.05, 0, .25), 'head': (.0, 0, .75)})
+    return f, Vector(f['pelvis'])
+
+
+RA_PRONE_R = Matrix.Rotation(math.pi / 2, 3, 'X')
+
+
+def RaProneWorld(T, local, pivot, arch=0.0, press=0.0):
+    """Lay the local pose face down at the clip root (the pelvis 0.12 m up, the head toward -Y) and set the limbs on the
+    ground (source m). arch: the chest and head up (extension, rad); press: flattened by a weight on the small of the back."""
+    H, A, SX = T.H, T.A, T.SX
+    l = dict(local)
+    l['bend'] = local['bend'] - arch * .9 + press * .10
+    l['neck'] = Add3(local['neck'], (-arch * .5, 0, 0))
+    l['head'] = Add3(local['head'], (-arch * .4, 0, -arch * .4))
+    f = RaRotatePose(l, RA_PRONE_R, pivot, Vector((0, 0, T.R(.205) - press * T.R(.015))))
+    f.update({'ankle.L': (H + .06, .82, T.R(.085)), 'ankle.R': (-(H + .08), .82, T.R(.085)),
+              'legPole.L': (H + .25, .40, -.15), 'legPole.R': (-(H + .25), .40, -.15),
+              'toeDir.L': Unit((.25, .85, -.45)), 'toeDir.R': Unit((-.30, .85, -.45)),
+              'handRel.L': None, 'handRel.R': None})
+    return f
+
+
+@Builder('CorpseStabbedClaw')
+def RaBuildCorpseClaw(T, name):
+    D = RA_S_T
+    local, pivot = RaProneLocal(T)
+    SX = T.SX
+    o = RA_S_OFF
+    stomp, stab, twist, pull = RA_S_STOMP + o, RA_S_STAB + o, RA_S_TWIST + o, RA_S_PULL + o
+    # hands (world, source m): the dead layout, and the claw strokes in the mud
+    deadL, deadR = (SX + .22, -.82, T.R(.04)), (-(SX + .12), .00, T.R(.05))
+    clawL = [(0.0, deadL), (RaF(8), (SX + .26, -.86, .10)), (RaF(11), (SX + .20, -.72, .06)), (RaF(15), (SX + .32, -.90, .09)),
+             (RaF(19), (SX + .22, -.70, .05)), (RaF(23), (SX + .30, -.88, .08)), (RaF(27), (SX + .20, -.74, .05)),
+             (RaF(31), (SX + .28, -.84, .07)), (RaF(35), (SX + .22, -.78, .05)), (stomp, (SX + .24, -.80, .05)),
+             (stab, (SX + .26, -.84, .07)), (twist + RaF(2), (SX + .22, -.80, .05)), (RaF(66), deadL), (D, deadL)]
+    clawR = [(0.0, deadR), (RaF(8), (-(SX + .25), -.30, .10)), (RaF(12), (-(SX + .30), -.45, .07)), (RaF(16), (-(SX + .22), -.40, .10)),
+             (RaF(20), (-(SX + .30), -.58, .06)), (RaF(24), (-(SX + .24), -.50, .09)), (RaF(28), (-(SX + .32), -.62, .06)),
+             (RaF(33), (-(SX + .25), -.52, .07)), (stomp, (-(SX + .25), -.50, .05)), (stab, (-(SX + .28), -.55, .08)),
+             (twist + RaF(2), (-(SX + .26), -.50, .05)), (RaF(66), (-(SX + .18), -.20, .05)), (D, (-(SX + .18), -.20, .05))]
+    hL, hR = RaChan(clawL), RaChan(clawR)
+    archC = RaChan([(0.0, 0.0), (RaF(2), 0.0), (RaF(5), .42), (RaF(9), .36), (RaF(16), .30), (RaF(24), .34), (RaF(32), .28),
+                    (stomp - RaF(1), .30), (stomp + RaF(2), .02), (stab - RaF(1), 0.0), (stab + RaF(1), .20), (stab + RaF(4), .06),
+                    (twist, .04), (twist + RaF(1), .16), (twist + RaF(4), .04), (pull, .02), (pull + RaF(2), .10),
+                    (RaF(62), 0.0), (D, 0.0)])
+    pressC = RaChan([(0.0, 0.0), (stomp - RaF(1), 0.0), (stomp + RaF(1), 1.0), (pull + RaF(6), 1.0), (RaF(70), 0.0), (D, 0.0)])
+    clawCurl = RaChan([(0.0, .55), (RaF(6), .2), (RaF(9), 1.2), (RaF(12), .3), (RaF(16), 1.2), (RaF(20), .3), (RaF(24), 1.2),
+                       (RaF(28), .3), (RaF(32), 1.15), (stomp, .9), (stab, 1.25), (twist + RaF(2), 1.1), (RaF(66), .55),
+                       (RaF(70), .75), (RaF(74), .55), (D, .55)])
+
+    def Pose(t):
+        f = RaProneWorld(T, local, pivot, archC(t), pressC(t))
+        f['hand.L'], f['hand.R'] = hL(t), hR(t)
+        f['armPole.L'] = (SX + .80, -.35, -.30)
+        f['armPole.R'] = (-(SX + .80), -.10, -.30)
+        f['palmF.L'], f['palmN.L'] = Unit((.1, -1, -.15)), (0, 0, -1)
+        f['palmF.R'], f['palmN.R'] = Unit((-.1, -1, -.1)), (0, 0, -1)
+        f['curl.L'] = f['curl.R'] = clawCurl(t)
+        return T.Nest(f)
+
+    def Points(t):
+        return {}
+    spec = {'pose': Pose, 'plants': [], 'reviewFrames': lambda n: [0, 4, 9, 20, 36, 38, 45, 52, 60, 70, n - 1]}
+    spec['reviewViews'] = RaViews(0, -.3, .15, 3.0, 1.2)
+    spec['reviewScale'] = 2.6
+    return spec
+
+
+Meta('IjaStompStabTwist', RA_S_BT, False, 'twoHand', role='ijaB', rig='TengxianIja01', rigs=['TengxianIja01', 'TengxianIja02'],
+     props=['weapon'], rootMotion=False, stage='sweepStomp', weaponState='twoHand',
+     contacts=[{'t': RA_S_STOMP, 'limb': 'footL', 'action': 'stomp', 'partnerRole': 'corpse', 'part': 'backLow'},
+               {'t': RA_S_STAB, 'limb': 'blade', 'action': 'stab', 'partnerRole': 'corpse', 'part': 'backStab'},
+               {'t': RA_S_PULL, 'limb': 'blade', 'action': 'release'}],
+     events=[{'t': RA_S_STOMP, 'kind': 'stomp'}, {'t': RA_S_STAB, 'kind': 'stab'}, {'t': RA_S_TWIST, 'kind': 'twist'},
+             {'t': RA_S_PULL, 'kind': 'pull'}],
+     prev=['IjaReadyRifle'], next=['IjaReadyRifle'],
+     notes='2026-10-11 redraft (N09): ijaB (IJA01; also baked on IJA02, the contract table names it) has just pulled the first '
+           'stab out of the third body and stands at its right thigh facing along it, the rifle low with the bayonet down. He '
+           'brings the rifle up to his chest, steps his LEFT boot onto the small of the man\'s back (stomp 0.833 s), drives the '
+           'bayonet down into the upper back (stab 1.167 s: the blade 7 cm in at the backStab patch), turns it in the wound '
+           '(twist 1.417 s, the rifle rolls 35 deg about its axis), pulls it out along the same line (1.75 s), steps back off '
+           '(2.1 s) and settles into the low carry (frame 0 again at 2.583 s). Pairs with CorpseStabbedClaw on stage sweepStomp '
+           '(starts 0.667 s after it).')
+
+
+@Builder('IjaStompStabTwist')
+def RaBuildStompStab(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D, stage = RA_S_BT, 'sweepStomp'
+    stomp, stab, twist, pull = RA_S_STOMP, RA_S_STAB, RA_S_TWIST, RA_S_PULL
+    tip = T.R(RA_TIP_M)
+    base = IjaABase(T)
+    base.update({'handRel.L': None, 'handRel.R': None, 'bend': .16, 'twist': 0.0, 'lookW': 1.0, 'lookLimit': 70.0})
+    hit = RaPartner(T, stage, 'ijaB', 'corpse', 'backStab', stab)
+    low = RaPartner(T, stage, 'ijaB', 'corpse', 'backLow', stomp)
+    target = Vector(hit[0]) if hit else Vector((T.R(.32), -T.R(.79), T.R(.20)))
+    normal = Vector(hit[1]) if hit else Vector((0, 0, 1))
+    footOn = (Vector(low[0]) if low else Vector((T.R(.32), -T.R(.42), T.R(.20)))) + Vector((0, 0, A + T.R(.015)))
+    # the stab line: the rifle comes down at the target from over his right shoulder; its pitch is what the rifle's length
+    # leaves from a right hand just in front of his chest (the overhead plunge of a rifle-and-bayonet into a man at his feet)
+    deep = T.R(.07)
+    hand0 = Vector((-T.R(.04), T.R(.02), 0.0))
+    flat = Vector((target.x - hand0.x, target.y - hand0.y, 0.0))
+    d = flat.length
+    v = math.sqrt(max(.05, (tip - deep) ** 2 - d * d))
+    axis = Vector((flat.x, flat.y, -v)).normalized()
+    gripAt = lambda pen: target - axis * (tip - pen)
+    low0 = LowReady(T)
+    lowOrigin, lowAxis = Vector(low0['origin']), Vector(low0['axis'])
+    raised = gripAt(-T.R(.16))
+    penC = RaChan([(stomp, -T.R(.16)), (stab - RaF(3), -T.R(.08)), (stab, deep), (twist + RaF(2), deep), (pull, -T.R(.05)),
+                   (pull + RaF(4), -T.R(.16))])
+    rollC = RaChan([(0.0, 0.0), (twist - RaF(3), 0.0), (twist, math.radians(35)), (twist + RaF(3), math.radians(30)), (pull, math.radians(20)),
+                    (pull + RaF(6), 0.0), (D, 0.0)])
+
+    def RifleAt(t):
+        if t <= RaF(4):
+            return T.Rifle(tuple(lowOrigin), tuple(lowAxis))
+        if t < stomp:
+            w = Smooth((t - RaF(4)) / (stomp - RaF(4)))
+            return T.Rifle(tuple(lowOrigin.lerp(raised, w)), Unit(Lerp3(lowAxis, axis, w)))
+        if t <= pull + RaF(4):
+            return T.Rifle(tuple(gripAt(penC(t))), tuple(axis))
+        w = Smooth((t - pull - RaF(4)) / (D - pull - RaF(10)))
+        return T.Rifle(tuple(raised.lerp(lowOrigin, w)), Unit(Lerp3(axis, lowAxis, w)))
+
+    def Up(t, rifle):
+        a = Vector(rifle['axis'])
+        up = Vector((0, 0, 1)) - a * a.dot(Vector((0, 0, 1)))
+        up = up.normalized() if up.length > 1e-6 else Vector((0, 1, 0))
+        return Quaternion(a, rollC(t)) @ up
+    p0 = base['pelvis']
+    aL0 = base['ankle.L']
+    footBack = (footOn.x, footOn.y + T.R(.04), footOn.z + T.R(.16))
+    anim = Tracks(base, {
+        'pelvis': [(0.0, p0), (RaF(10), Add3(p0, (.02, .02, -.02))), (stomp, Add3(p0, (.05, -.05, -.04))), (stab, Add3(p0, (.06, -.08, -.08))),
+                   (pull, Add3(p0, (.05, -.07, -.06))), (RaF(50), Add3(p0, (.02, -.04, -.03))), (D, p0)],
+        'bend': [(0.0, .16), (stomp, .14), (stab, .28), (twist, .30), (pull, .22), (D, .16)],
+        'twist': [(0.0, 0.0), (stomp, -.10), (stab, .05), (twist, .12), (pull, 0.0), (D, 0.0)],
+        'pelvisTilt': [(0.0, (.03, 0, 0)), (stab, (.14, 0, 0)), (pull, (.10, 0, 0)), (D, (.03, 0, 0))],
+        'ankle.L': [(0.0, aL0), (RaF(11), aL0), (RaF(14), Add3(aL0, (0, -.04, T.R(.26)))), (RaF(17), Add3(tuple(footOn), (-.04, .04, T.R(.14)))),
+                    (stomp, tuple(footOn)),
+                    (pull + RaF(2), tuple(footOn)), (RaF(45), footBack), (RaF(48), Add3(aL0, (.0, -.03, T.R(.22)))), (RaF(51), aL0), (D, aL0)],
+        'foot.L': [(0.0, base['foot.L']), (RaF(11), base['foot.L']), (stomp, (8, 10, 0)), (pull + RaF(2), (8, 10, 0)), (RaF(50), base['foot.L']),
+                   (D, base['foot.L'])],
+        'legPole.L': [(0.0, base['legPole.L']), (RaF(12), (H + .25, -1.0, .70)), (RaF(51), (H + .25, -1.0, .70)), (D, base['legPole.L'])],
+        'head': [(0.0, (.15, 0, 0)), (stab, (.30, 0, 0)), (D, (.15, 0, 0))],
+    }, lag={'head': .05})
+
+    def Pose(t):
+        f = anim(t)
+        rifle = RifleAt(t)
+        a = Vector(rifle['axis'])
+        palms = T.Palms(tuple(a))
+        q = Quaternion(a, rollC(t))
+        f['grip.R'], f['grip.L'] = rifle['gripR'], rifle['gripL']
+        for s in LR:
+            f['palmF.' + s] = tuple(q @ Vector(palms[s][0]))
+            f['palmN.' + s] = tuple(q @ Vector(palms[s][1]))
+        f['curl.R'], f['curl.L'] = .95, .85
+        f['armPole.R'] = (-(SX + .55), .35, P + .20)
+        f['armPole.L'] = (SX + .45, -.10, P + .05)
+        f['look'] = tuple(target)
+        return T.Nest(f)
+
+    def Props(t):
+        rifle = RifleAt(t)
+        return {'weapon': (rifle['origin'], rifle['axis'], tuple(Up(t, rifle)), True)}
+
+    def Markers(t):
+        rifle = RifleAt(t)
+        tipAt = Vector(rifle['gripR']) + Vector(rifle['axis']) * tip
+        return [('cyl', rifle['butt'], tuple(tipAt), .015), ('point', tuple(target), None, .03), ('point', tuple(footOn), None, .03)] + \
+            PartnerGhost(T, stage, 'ijaB', 'corpse', t)
+    spec = {'pose': Pose, 'props': Props, 'plants': [('R', 0, D), ('L', 0, RaF(11)), ('L', stomp, pull + RaF(2)), ('L', RaF(51), D)],
+            'check': lambda t: {'R': RifleAt(t)['gripR'], 'L': RifleAt(t)['gripL']}, 'reviewProps': Markers,
+            'reviewFrames': lambda n: [0, 10, 20, 26, 28, 34, 42, 50, n - 1]}
+    spec['reviewViews'] = RaViews(T.R(.15), -T.R(.40), .55, 3.2, 1.0)
+    spec['reviewScale'] = 2.8
+    return spec
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# A8. IjaInspectRifleBoltToss (IJA01, ijaB): picks the comrade's Hanyang out of the mud, works the bolt, laughs, pulls the
+# bolt out and flings it over the lip, drops the rifle back in the mud. His own rifle stays slung on his back.
+# ------------------------------------------------------------------------------------------------------------------
+RA_B_T = RaF(108)                  # 4.5 s
+RA_B_GRAB = RaF(22)                # 0.917
+RA_B_OPEN = RaF(44)                # 1.833
+RA_B_LAUGH = RaF(52)               # 2.167
+RA_B_OUT = RaF(62)                 # 2.583
+RA_B_TOSS = RaF(72)                # 3.0
+RA_B_DROP = RaF(86)                # 3.583: the rifle hits the mud
+RA_B_LAND = RaF(98)                # the bolt lands beyond the lip (3.4 m ahead, 2.05 m over his ground)
+RA_B_GROUND = ((.04, .28, -.38), (-.93, -.12, -.30))     # lying on the slope of loose earth, the stock 0.2 m up      # comradeRifle on the mud at the start: grip, bore (runtime m, three)
+Meta('IjaInspectRifleBoltToss', RA_B_T, False, 'track', role='ijaB', rig='TengxianIja01', rigs=['TengxianIja01'],
+     props=['weapon', 'comradeRifle', 'rifleBolt'], rootMotion=False, weaponState='slungBack',
+     contacts=[{'t': RA_B_GRAB, 'limb': 'handR', 'action': 'grab', 'target': 'comradeRifle', 'part': 'wrist'},
+               {'t': RaF(32), 'limb': 'handL', 'action': 'grab', 'target': 'comradeRifle', 'part': 'handguard'},
+               {'t': RaF(40), 'limb': 'handR', 'action': 'grab', 'target': 'rifleBolt', 'part': 'handle'},
+               {'t': RA_B_TOSS, 'limb': 'handR', 'action': 'release', 'target': 'rifleBolt'},
+               {'t': RaF(82), 'limb': 'handL', 'action': 'release', 'target': 'comradeRifle'}],
+     events=[{'t': RA_B_GRAB, 'kind': 'pickUp'}, {'t': RA_B_OPEN, 'kind': 'boltOpen', 'cue': 'boltRattle'},
+             {'t': RA_B_LAUGH, 'kind': 'laugh'}, {'t': RA_B_OUT, 'kind': 'boltOut'},
+             {'t': RA_B_TOSS, 'kind': 'toss', 'cue': 'boltToss'}, {'t': RA_B_LAND, 'kind': 'boltLands'},
+             {'t': RA_B_DROP, 'kind': 'drop', 'cue': 'rifleTossMud'}],
+     prev=['IjaPullArm'], next=['IjaReadyRifle', 'IjaThumbWoundTwist'],
+     notes='2026-10-11 redraft (N11, "乙从泥里捡起冬瓜那支汉阳造，拉开枪机看了一眼，笑了。他把枪栓抽出来甩出沟沿，枪扔回泥里"): '
+           'his own rifle slung across the back. The comrade\'s Hanyang lies on the mud at his right front (comradeRifle track '
+           'from frame 0: grip (0.04, 0.28, -0.38) runtime m (on the slope of the loose earth) in his frame, muzzle to his left -- the director puts his root so '
+           'this meets the prop at (3.9,-125.0)). He stoops and takes it by the wrist of the stock (0.917 s), stands with it '
+           'across his belly, the left hand on the handguard (1.33 s); the right hand lifts and draws the bolt (boltOpen 1.833 '
+           's), he looks into the action and laughs (2.167 s), draws the bolt right out (boltOut 2.583: the rifleBolt track '
+           'leaves the rifle in his fist -- hide the mesh\'s own bolt from here), flings it forward and up (toss 3.0 s: it flies '
+           '1.08 s, 3.4 m ahead and over 2.05 m, out over the lip in front of him -- face him at a lip -- and lies there) and '
+           'tosses the rifle down with the left hand (drop 3.583 s: it lies on the mud at his left front to the end). Stands '
+           'easy from 4.0 s.')
+
+
+@Builder('IjaInspectRifleBoltToss')
+def RaBuildBoltToss(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    D = RA_B_T
+    base = Standing(T)
+    base.update({'handRel.L': (.07, -.10, -.47), 'handRel.R': (-.07, -.10, -.47),
+                 'ankle.L': (H + .04, -.06, A), 'ankle.R': (-(H + .03), .08, A), 'foot.L': (0, 8, 0), 'foot.R': (0, -14, 0)})
+    hy = 'HanYang'
+    g, b = RA_B_GROUND
+    ground = T.Rifle(tuple(RT(T, *g)), tuple(RTd(*b)), hy)
+    held = T.Rifle((-.10, -.32, P + .02), Unit((.96, -.18, .12)), hy)            # across his belly, muzzle to his left, bolt up
+    look = T.Rifle((-.04, -.36, P + .18), Unit((.92, -.25, .30)), hy)            # lifted to look into the action
+    dropped = T.Rifle(tuple(RT(T, -.25, .03, -.60)), tuple(RTd(-.80, 0, -.60)), hy)
+
+    def RifleAt(t):
+        rows = [(0.0, ground), (RA_B_GRAB, ground), (RaF(32), held), (RA_B_OPEN, held), (RaF(48), look), (RA_B_TOSS, look),
+                (RaF(78), T.Rifle(Add3(look['origin'], (0, -.08, .10)), look['axis'], hy))]
+        if t >= RaF(80):
+            u = Clamp((t - RaF(80)) / (RA_B_DROP - RaF(80)))
+            a = rows[-1][1]
+            o = Lerp3(a['origin'], dropped['origin'], u)
+            o = (o[0], o[1], o[2] + T.R(.18) * math.sin(math.pi * u) * (1 - u))
+            ax = Unit(Lerp3(a['axis'], dropped['axis'], Smooth(u)))
+            if t > RA_B_DROP:
+                v = Clamp((t - RA_B_DROP) / RaF(3))
+                o = (dropped['origin'][0], dropped['origin'][1], dropped['origin'][2] + T.R(.02) * math.sin(math.pi * v))
+                ax = dropped['axis']
+            return T.Rifle(o, ax, hy)
+        for (t0, a), (t1, c) in zip(rows, rows[1:]):
+            if t <= t1:
+                w = Smooth((t - t0) / max(1e-6, t1 - t0))
+                return T.Rifle(Lerp3(a['origin'], c['origin'], w), Unit(Lerp3(a['axis'], c['axis'], w)), hy)
+        return rows[-1][1]
+
+    def BoltPoint(rifle, back=0.0, lift=0.0):
+        """The bolt handle knob on the right of the action (Blender axes): 0.10 m ahead of the grip, 0.05 out, 0.02 up."""
+        a = Vector(rifle['axis'])
+        up = Vector((0, 0, 1)) - a * a.z
+        up.normalize()
+        right = a.cross(up).normalized()                     # the rifle's right (his front-ish when it lies across him)
+        return Vector(rifle['gripR']) + a * T.R(.10 - back) + right * T.R(.05) + up * T.R(.02 + lift), right, up
+    backC = RaChan([(0.0, 0.0), (RaF(40), 0.0), (RA_B_OPEN, .09), (RaF(56), .09), (RA_B_OUT, .30)])
+    liftC = RaChan([(0.0, 0.0), (RaF(40), 0.0), (RaF(42), .04), (RA_B_OPEN, .04), (RA_B_OUT, .04)])
+    stoop = Add3(base['pelvis'], (0, -.02, -.34))
+    anim = Tracks(base, {
+        'pelvis': [(0.0, base['pelvis']), (RaF(10), Add3(base['pelvis'], (0, -.02, -.10))), (RA_B_GRAB, stoop), (RaF(26), stoop),
+                   (RaF(34), base['pelvis']), (D, base['pelvis'])],
+        'bend': [(0.0, .08), (RA_B_GRAB, 1.20), (RaF(26), 1.10), (RaF(34), .20), (RA_B_OPEN, .22), (RaF(50), .30), (RA_B_LAUGH, .26),
+                 (RaF(55), .32), (RaF(58), .26), (RA_B_OUT, .24), (RaF(68), .10), (RA_B_TOSS, .20), (RaF(80), .22), (RA_B_DROP, .25),
+                 (RaF(96), .10), (D, .08)],
+        'twist': [(0.0, 0.0), (RA_B_GRAB, -.20), (RaF(34), 0.0), (RaF(68), -.35), (RA_B_TOSS, .30), (RaF(80), .15), (RA_B_DROP, .25),
+                  (D, 0.0)],
+        'shrug': [(0.0, 0.0), (RA_B_LAUGH, .08), (RaF(54), -.02), (RaF(56), .08), (RaF(58), 0.0), (D, 0.0)],
+        'head': [(0.0, (0, 0, 0)), (RaF(10), (.30, 0, 0)), (RA_B_GRAB, (.20, 0, -.10)), (RaF(34), (.40, 0, 0)), (RA_B_OPEN, (.55, 0, -.10)),
+                 (RA_B_LAUGH, (.15, .05, 0)), (RaF(55), (.30, 0, 0)), (RaF(58), (.10, 0, .05)), (RA_B_OUT, (.40, 0, -.10)),
+                 (RA_B_TOSS, (-.25, 0, -.10)), (RaF(78), (-.30, 0, -.10)), (RA_B_DROP, (.35, 0, .15)), (D, (.05, 0, 0))],
+        'ankle.R': [(0.0, base['ankle.R']), (RaF(6), base['ankle.R']), (RaF(14), Add3(base['ankle.R'], (.02, -.18, 0))), (D, Add3(base['ankle.R'], (.02, -.18, 0)))],
+    }, lag={'head': .05})
+    windup = (-(SX + .10), .10, SZ + .15)
+    fling = (-.10, -.55, SZ + .45)
+
+    def Pose(t):
+        f = anim(t)
+        rifle = RifleAt(t)
+        palms = T.Palms(rifle['axis'])
+        # right hand: the wrist of the stock (pick up, hold), then the bolt, then the throw, then free
+        if t < RA_B_GRAB:
+            w = Smooth((t - RaF(8)) / (RA_B_GRAB - RaF(8)))
+            f['grip.R'] = rifle['gripR']
+            RaW(f, 'R', w)
+            f['hand.R'] = T.Along(rifle, .30)
+            f['handRel.R'] = (-.07, -.10, -.47)
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+        elif t < RaF(38):
+            f['grip.R'] = rifle['gripR']
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+        elif t <= RA_B_OUT + RaF(1):
+            knob, right, up = BoltPoint(rifle, backC(t), liftC(t))
+            w = Smooth((t - RaF(38)) / RaF(3))
+            f['grip.R'] = tuple(knob + right * T.R(.012))
+            RaW(f, 'R', w)
+            f['hand.R'] = tuple(knob)
+            f['handRel.R'] = (-.10, -.30, -.30)
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = tuple(-up * .3 + Vector(rifle['axis']) * -.2 - right), tuple(Vector(rifle['axis']) * -1), 1.1
+        else:
+            # flung: up behind the right shoulder, then forward-up and let go (3.0 s), the arm comes down
+            path = RaChan([(RA_B_OUT, tuple(BoltPoint(rifle, .30, .04)[0])), (RaF(68), windup), (RA_B_TOSS, fling),
+                           (RaF(78), (-(SX + .05), -.40, SZ - .05)), (RaF(90), (-(SX + .04), -.05, P - .05)), (D, (-(SX + .04), -.02, P - .10))])
+            f['grip.R'] = None
+            f['handRel.R'] = None
+            f['hand.R'] = path(t)
+            f['armPole.R'] = (-(SX + .50), .30, SZ - .30)
+            th = Smooth((t - RaF(64)) / RaF(6))
+            f['palmF.R'] = Unit(Lerp3((0, -.2, 1), (0, -1, .3), Smooth((t - RaF(68)) / RaF(4))))
+            f['palmN.R'] = Unit((-.6, .2, 0)) if t < RA_B_TOSS else Unit((1, 0, 0))
+            f['curl.R'] = 1.05 if t < RA_B_TOSS else Mix(1.05, .3, Smooth((t - RA_B_TOSS) / RaF(2)))
+        # left hand: on the handguard from 1.33 s until it lets the rifle drop (3.42 s)
+        if RaF(26) <= t <= RaF(82):
+            w = min(Smooth((t - RaF(26)) / RaF(6)), 1 - Smooth((t - RaF(80)) / RaF(2)))
+            f['grip.L'] = T.Along(rifle, .70)
+            RaW(f, 'L', w)
+            f['hand.L'] = T.Along(rifle, .70)
+            f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .9
+        f['armPole.L'] = (SX + .45, -.05, P - .05)
+        f['look'] = tuple(BoltPoint(rifle)[0]) if RaF(30) <= t <= RA_B_OUT + RaF(2) else None
+        f['lookW'] = .8
+        return T.Nest(f)
+    sling = SlungProps(T)[0]
+    boltFrom = {}
+
+    def Props(t):
+        rifle = RifleAt(t)
+        out = sling(t)
+        out['comradeRifle'] = T.Track(rifle, up=(0, 0, 1)) if t > RA_B_GRAB else (ground['origin'], ground['axis'], (0, 0, 1), True)
+        a = Vector(rifle['axis'])
+        if t < RA_B_OUT:
+            knob, right, up = BoltPoint(rifle, backC(t), liftC(t))
+            centre = knob - right * T.R(.05) + a * T.R(.06)
+            out['rifleBolt'] = (tuple(centre), tuple(a), tuple(right), True)
+        elif t <= RA_B_TOSS:
+            k, palmar, al = RaFist(T, 'R')
+            out['rifleBolt'] = (tuple(k + palmar * T.R(.03)), tuple(-al), tuple(palmar), True)
+            boltFrom['p'] = out['rifleBolt'][0]
+        else:
+            p0 = boltFrom.get('p') or fling
+            land = (-T.R(.30), -T.R(3.4), T.R(2.05))
+            u = Clamp((t - RA_B_TOSS) / (RA_B_LAND - RA_B_TOSS))
+            at = RaBallistic(p0, land, RA_B_TOSS, RA_B_LAND, T.R(1.0))(t)
+            spin = Quaternion((1, 0, 0), 9.0 * u)
+            out['rifleBolt'] = (at, tuple(spin @ Vector((0, -1, 0))), tuple(spin @ Vector((0, 0, 1))), True)
+        return out
+
+    def Check(t):
+        out = {}
+        if RA_B_GRAB <= t < RaF(38):
+            out['R'] = RifleAt(t)['gripR']
+        if RaF(32) <= t <= RaF(80):
+            out['L'] = T.Along(RifleAt(t), .70)
+        return out
+    spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, D), ('R', 0, RaF(6)), ('R', RaF(14), D)], 'check': Check,
+            'reach': {'fraction': .84, 'travel': .14, 'bend': .40, 'sides': 'R'},
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + [('point', Props(t)['rifleBolt'][0], None, .03)],
+            'reviewFrames': lambda n: [0, 14, 22, 32, 44, 52, 62, 70, 72, 80, 86, n - 1]}
+    spec['reviewViews'] = RaViews(0, -.3, .7, 3.4, 1.0)
+    spec['reviewScale'] = 2.8
+    return spec
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# A9. IjaTearBadge (IJA02, ijaA) with CaptiveKneelMud (reused, not re-baked): at the kneeling comrade's left front, rips the
+# badge off his left breast, glances at it, pockets it.
+# ------------------------------------------------------------------------------------------------------------------
+RA_T_T = RaF(66)                   # 2.75 s
+RA_T_GRAB = RaF(11)                # 0.458
+RA_T_TEAR = RaF(15)                # 0.625
+RA_T_LOOK = RaF(25)                # 1.042
+RA_T_POCKET = RaF(42)              # 1.75
+STAGES['tearBadge'] = {
+    'anchor': 'comrade',
+    'notes': 'CaptiveKneelMud (3.0 s loop, from its frame 0) and IjaTearBadge start together; ijaA at the same mark as '
+             'collarQuestion (interrogation.ijaAHold, the comrade\'s left front, yM his ground under R3\'s).',
+    'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveKneelMud', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+               'ijaA': dict(COLLAR_AT, yM=COLLAR_YM, rig='TengxianIja02', clip='IjaTearBadge')}}
+PARTNER_SOURCES['TengxianNra02']['CaptiveKneelMud'] = sorted(set(PARTNER_SOURCES['TengxianNra02'].get('CaptiveKneelMud', [])) | {'badgeChestL'})
+Meta('IjaTearBadge', RA_T_T, False, 'track', role='ijaA', rig='TengxianIja02', rigs=['TengxianIja02'], props=['weapon', 'chestBadge'],
+     rootMotion=False, stage='tearBadge', weaponState='slungBack',
+     contacts=[{'t': RA_T_GRAB, 'limb': 'handR', 'action': 'take', 'partnerRole': 'comrade', 'part': 'badgeChestL', 'standoffM': .025,
+                'note': 'the fist closes on the badge (CaptiveKneelMud is not re-baked: no mirrored onset)'},
+               {'t': RA_T_TEAR, 'limb': 'handR', 'action': 'release', 'partnerRole': 'comrade'}],
+     events=[{'t': RA_T_GRAB, 'kind': 'grab'}, {'t': RA_T_TEAR, 'kind': 'tear', 'cue': 'clothRip'}, {'t': RA_T_LOOK, 'kind': 'look'},
+             {'t': RA_T_POCKET, 'kind': 'pocket'}],
+     prev=['IjaShoveToWall', 'IjaCollarQuestion'], next=['IjaCollarQuestion'],
+     notes='2026-10-11 redraft (N11, "甲一把撕下冬瓜胸前的胸章，扫一眼番号，塞进自己口袋"): ijaA at the comrade\'s left front '
+           '(collarQuestion mark), rifle slung across the back. Bends in and takes the badge on the comrade\'s left breast in '
+           'the right fist (grab 0.458 s), rips it off with a short yank down and out (tear 0.625 s: hide the badge on the '
+           'comrade from here; chestBadge track in ijaA\'s fist from the tear), raises it in front of his face and reads it '
+           '(look 1.04 s), stuffs it into his left breast pocket (pocket 1.75 s, the track hides at 1.79 s), stands back to the '
+           'collar-question lean (2.75 s; its first frame is the IjaCollarQuestion lead-in\'s). The comrade plays CaptiveKneelMud '
+           'from its frame 0 at the same time.')
+
+
+@Builder('IjaTearBadge')
+def RaBuildTearBadge(T, name):
+    stage, D = 'tearBadge', RA_T_T
+    base = CollarBase(T)
+    ground = StageGround(T, stage, 'ijaA')
+    SX, SZ, P = T.SX, T.SZ, T.P
+
+    def Hit(t):
+        return RaPartner(T, stage, 'ijaA', 'comrade', 'badgeChestL', t, .025)
+    hit0 = Hit(RA_T_GRAB)
+    badge0 = Vector(hit0[0]) if hit0 else Vector((0, -T.R(.6), T.R(1.0)))
+    n0 = Vector(hit0[1]) if hit0 else Vector((0, 1, 0))
+    yank = badge0 + n0 * T.R(.12) + Vector((0, 0, -T.R(.10)))
+    readAt = None
+
+    def Body(t):
+        f = dict(base)
+        e = Smooth(t / RaF(10))
+        straight = Smooth((t - RA_T_TEAR) / RaF(10))
+        f['bend'] = Mix(Mix(.10, base['bend'], e), .42, straight * (1 - Smooth((t - RaF(46)) / RaF(16)))) if t > RA_T_TEAR else Mix(.10, base['bend'], e)
+        if t > RaF(46):
+            f['bend'] = Mix(.42, base['bend'], Smooth((t - RaF(46)) / RaF(16)))
+        f['pelvis'] = Lerp3(Add3(base['pelvis'], (0, 0, T.R(.03))), base['pelvis'], e)
+        f['head'] = (base['head'][0] + (-.20 if RaF(20) < t < RaF(38) else 0) * Bump(t, RaF(18), RaF(40)) * 0 + .0, 0, 0)
+        look = Bump(t, RaF(18), RaF(40))
+        f['head'] = (base['head'][0] - .15 * look, .05 * look, .10 * look)
+        f['twist'] = base['twist'] + .12 * Bump(t, RaF(30), RaF(52))
+        f['look'] = tuple(badge0 + Vector((0, 0, T.R(.12)))) if t < RA_T_TEAR + RaF(3) else None
+        f['lookW'] = 1.0 - Smooth((t - RA_T_TEAR) / RaF(4))
+        return GroundFeet(T, f, ground)
+    pocket = (.13, -.12, -.17)          # torso frame from his right shoulder: his left breast pocket
+
+    def Pose(t):
+        f = Body(t)
+        f['handRel.L'] = (.08, -.12, -.46)
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = (0, -.2, -1), (-1, 0, 0), .7
+        hit = Hit(min(t, RA_T_TEAR))
+        if t <= RA_T_TEAR:
+            palmF, palmN, _ = Grab(hit[1] if hit else (0, 1, 0), (0, 0, -1))
+            EaseGrip(f, 'R', tuple(Vector(hit[0]) if hit else badge0), Smooth((t - RaF(2)) / (RA_T_GRAB - RaF(2))), palmF, palmN, 1.1)
+            f['armPole.R'] = (-(SX + T.R(.45)), T.R(.10), P)
+        else:
+            f['grip.R'] = None
+            read = Vector((-T.R(.06), -T.R(.42), SZ - T.R(.14)))
+            if t < RaF(22):
+                hand = yank.lerp(read, Smooth((t - RA_T_TEAR) / RaF(7)))
+                f['hand.R'] = tuple(hand)
+                f['handRel.R'] = None
+            elif t < RaF(34):
+                f['hand.R'] = tuple(read)
+                f['handRel.R'] = None
+            else:
+                w = Smooth((t - RaF(34)) / RaF(8))
+                back = 1 - Smooth((t - RaF(46)) / RaF(12))
+                f['handRel.R'] = pocket if back > .999 else Lerp3((-.07, -.10, -.47), pocket, back)
+                f['hand.R'] = tuple(read)
+                f['handRelW.R'] = w
+                f['poleRel.R'] = (-.30, .10, -.40)
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = Unit((.3, -.3, .9)), Unit((.7, .5, .2)), 1.05
+            if t > RaF(34):
+                f['palmF.R'], f['palmN.R'] = (0, -.2, -1), (1, 0, 0)
+                f['curl.R'] = 1.05 if t < RaF(44) else Mix(1.05, .7, Smooth((t - RaF(44)) / RaF(6)))
+        return WithFist(T, T.Nest(f), 'R', thumb=1.0)
+    props, review = SlungProps(T)
+
+    def Props(t):
+        out = props(t)
+        if t < RA_T_TEAR:
+            out['chestBadge'] = RaHidden()
+        elif t < RaF(43):
+            k, palmar, al = RaFist(T, 'R')
+            out['chestBadge'] = (tuple(k + palmar * T.R(.012) + al * T.R(.02)), tuple(palmar.cross(al).normalized()), tuple(-al), True)
+        else:
+            out['chestBadge'] = RaHidden()
+        return out
+    spec = {'pose': Pose, 'props': Props, 'plants': [('R', 0, D), ('L', 0, D)],
+            'check': lambda t: {'R': tuple(Hit(t)[0])} if RA_T_GRAB <= t <= RA_T_TEAR and Hit(t) else {},
+            'reviewProps': lambda t: review(t) + [('point', tuple(badge0), None, .02)] + PartnerGhost(T, stage, 'ijaA', 'comrade', t),
+            'reviewFrames': lambda n: [0, 8, 11, 15, 20, 25, 34, 42, 52, n - 1]}
+    return RaR3Spec(T, stage, 'ijaA', spec)
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# A10. IjaThumbWoundTwist (IJA01, ijaB) + CaptiveArchCaught (NRA02, comrade): ijaB bends in at the kneeling man's left and
+# screws his thumb into the wound on the front of the left shoulder; the comrade arches off the planks, the head back, the
+# cry stuck in his throat; then sags back to the kneel (CaptiveKneelMud frame 0).
+# ------------------------------------------------------------------------------------------------------------------
+RA_W_T = RaF(60)                   # 2.5 s both
+RA_W_PRESS = RaF(14)               # 0.583
+RA_W_TWIST = RaF(20)               # 0.833
+RA_W_LET = RaF(42)                 # 1.75
+RA_W_AT = {'x': -.50, 'z': -.30, 'yawDeg': -100}
+STAGES['thumbWound'] = {
+    'anchor': 'comrade',
+    'notes': 'Both clips start together. The comrade at R3 (CaptiveArchCaught starts and ends on CaptiveKneelMud frame 0); '
+             'ijaB at his left side, half a pace out (yM his ground under R3\'s), clear of the interpreter crouching in front.',
+    'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveArchCaught', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+               'ijaB': dict(RA_W_AT, yM=round(R3GroundRT(-RA_W_AT['x'], RA_W_AT['z']), 4), rig='TengxianIja01', clip='IjaThumbWoundTwist')}}
+PARTNER_SOURCES['TengxianNra02']['CaptiveArchCaught'] = ['woundShoulderL']
+Meta('CaptiveArchCaught', RA_W_T, False, 'free', role='comrade', rig='TengxianNra02', rigs=['TengxianNra02'], rootMotion=False,
+     weaponState='dropped', weaponDropFrom='BlastSlamBuried', stage='thumbWound', env=KNEEL_WALL_ENV,
+     contacts=[{'t': RA_W_PRESS, 'by': 'ijaB', 'part': 'woundShoulderL', 'action': 'grab'},
+               {'t': 0.0, 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': RaF(12)},
+               {'t': RaF(54), 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': RA_W_T}],
+     events=[{'t': RA_W_PRESS, 'kind': 'press'}, {'t': RaF(15), 'kind': 'chokedCry', 'line': 'CaptiveWoundTwist.01'},
+             {'t': RA_W_TWIST, 'kind': 'twist'}, {'t': RA_W_LET, 'kind': 'released'}],
+     prev=['CaptiveKneelMud'], next=['CaptiveKneelMud'],
+     notes='2026-10-11 redraft (N13, "乙把拇指摁进冬瓜肩上的枪伤，往里拧。冬瓜整个人弓起来，叫声卡在喉咙里"): frame 0 = last '
+           'frame = CaptiveKneelMud frame 0 (kneeling on the bank, back on the planks). His right hand is knocked off the '
+           'bandage (0.3 s) and claws at his right thigh; the thumb goes in (press 0.583 s): he arches -- the hips forward, the '
+           'chest up off the planks, the head back, the shoulders up -- and stays locked there shaking (the choked cry, '
+           'CaptiveWoundTwist.01), a second jolt at the twist (0.833 s); let go at 1.75 s he sags back onto the planks, the '
+           'hand back on the bandage by 2.5 s.')
+
+
+@Builder('CaptiveArchCaught')
+def RaBuildArchCaught(T, name):
+    D = RA_W_T
+    base = KneelWallBase(T)
+    pt = base['pelvisTilt']
+    archC = RaChan([(0.0, 0.0), (RA_W_PRESS - RaF(1), 0.0), (RA_W_PRESS + RaF(4), 1.0), (RA_W_TWIST - RaF(1), .85), (RA_W_TWIST + RaF(2), 1.1),
+                    (RaF(36), .95), (RA_W_LET, .90), (RaF(50), .25), (RaF(56), .05), (D, 0.0)])
+    handC = RaChan([(0.0, 0.0), (RaF(6), 0.0), (RaF(9), 1.0), (RaF(44), 1.0), (RaF(56), 0.0), (D, 0.0)])
+
+    def Pose(t):
+        f = dict(base)
+        a = archC(t)
+        shake = math.sin(Tau * t * 7.0) * Clamp((t - RA_W_PRESS) / .1) * (1 - Smooth((t - RA_W_LET) / .15))
+        f['pelvisTilt'] = Add3(pt, (.10 * a, 0, -.04 * a))
+        f['bend'] = base['bend'] - .12 * a + .015 * shake
+        f['lean'] = base['lean'] + .10 * a
+        f['shrug'] = base['shrug'] + .22 * a + .02 * shake
+        f['neck'] = Add3(base['neck'], (-.05 * a, 0, 0))
+        f['head'] = Add3(base['head'], (-.30 * a + .03 * shake, .12 * a, -.10 * a))
+        p = f['pelvis']
+        f['pelvis'] = (p[0], p[1] - .07 * a, p[2] + .06 * a)
+        w = handC(t)
+        f['handRel.R'] = Lerp3(base['handRel.R'], (-.02, -.26, -.48), w)
+        f['poleRel.R'] = Lerp3(base['poleRel.R'], (-.45, .25, -.30), w)
+        f['palmF.R'] = Unit(Lerp3(base['palmF.R'], (0, -.6, -.8), w))
+        f['palmN.R'] = Unit(Lerp3(base['palmN.R'], (0, -.2, -1), w))
+        f['curl.R'] = Mix(base['curl.R'], 1.2, w * Clamp((t - RA_W_PRESS) / .1))
+        f['curl.L'] = Mix(base['curl.L'], 1.15, a)
+        return T.Nest(R3OnBank(T, f))
+    return R3Clip(T, {'pose': Pose, 'reviewViews': R3_VIEWS, 'kneePlants': [('L', 0, D), ('R', 0, D)], 'reviewScale': 2.2,
+                      'reviewFrames': lambda n: [0, 8, 14, 18, 22, 36, 46, 54, n - 1]})
+
+
+Meta('IjaThumbWoundTwist', RA_W_T, False, 'track', role='ijaB', rig='TengxianIja01', rigs=['TengxianIja01'], props=['weapon'],
+     rootMotion=False, stage='thumbWound', weaponState='slungBack',
+     contacts=[{'t': RA_W_PRESS, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'woundShoulderL', 'standoffM': .035},
+               {'t': RA_W_LET, 'limb': 'handR', 'action': 'release'}],
+     events=[{'t': RA_W_PRESS, 'kind': 'press'}, {'t': RA_W_TWIST, 'kind': 'twist'}, {'t': RA_W_LET, 'kind': 'released'}],
+     prev=['IjaInspectRifleBoltToss'], next=['IjaReadyRifle'],
+     notes='2026-10-11 redraft (N13): ijaB at the kneeling comrade\'s left (stage thumbWound), rifle slung across his back. '
+           'Bends in, the right hand onto the front of the man\'s left shoulder, the thumb in the wound (press 0.583 s); '
+           'screws it in -- the hand turns 30 deg each way about the press (twist 0.833 s) -- leaning his weight on it, the '
+           'left hand on his own knee; lets go (1.75 s) and straightens (2.5 s).')
+
+
+@Builder('IjaThumbWoundTwist')
+def RaBuildThumbTwist(T, name):
+    stage, D = 'thumbWound', RA_W_T
+    H, P, A, SX = T.H, T.P, T.A, T.SX
+    me = STAGES[stage]['actors']['ijaB']
+    ground = StageGround(T, stage, 'ijaB')
+    base = IjaABase(T)
+    base.update({'handRel.L': (.08, -.12, -.46), 'curl.L': .7})
+    cf = Vector(_Rot(0, -1, -math.radians(me['yawDeg'])) + (0,))            # the comrade's forward in ijaB's frame
+    over = Unit((-cf.x, -cf.y, .9))                                          # fingers over the top of his shoulder
+    body = Tracks(base, {
+        'pelvis': [(0.0, base['pelvis']), (RaF(12), Add3(base['pelvis'], (0, -.06, -.10))), (RA_W_LET, Add3(base['pelvis'], (0, -.07, -.12))),
+                   (D, base['pelvis'])],
+        'bend': [(0.0, .10), (RaF(12), .62), (RA_W_TWIST, .70), (RA_W_LET, .66), (D, .14)],
+        'twist': [(0.0, 0.0), (RaF(12), .12), (RA_W_TWIST, .18), (RA_W_LET, .14), (D, 0.0)],
+        'head': [(0.0, (.10, 0, 0)), (RaF(12), (.10, 0, 0)), (RA_W_LET, (.05, 0, 0)), (D, (.10, 0, 0))],
+        'handRel.L': [(0.0, (.08, -.12, -.46)), (RaF(12), (.04, -.30, -.40)), (RA_W_LET, (.04, -.30, -.40)), (D, (.08, -.12, -.46))],
+        'ankle.L': [(0.0, base['ankle.L']), (RaF(4), base['ankle.L']), (RaF(10), Add3(base['ankle.L'], (-.02, -.14, 0))),
+                    (D, Add3(base['ankle.L'], (-.02, -.14, 0)))],
+        'lookW': [(0.0, 1.0), (D, 1.0)],
+    }, lag={'head': .05})
+
+    def Body(t):
+        f = body(t)
+        hit = RaPartner(T, stage, 'ijaB', 'comrade', 'woundShoulderL', min(max(t, RA_W_PRESS), RA_W_LET))
+        f['look'] = tuple(Vector(hit[0]) + Vector((0, 0, T.R(.15)))) if hit else None
+        return GroundFeet(T, f, ground)
+    turnC = RaChan([(0.0, 0.0), (RA_W_TWIST - RaF(3), 0.0), (RA_W_TWIST, .50), (RaF(26), -.45), (RaF(31), .40), (RaF(36), -.30),
+                    (RA_W_LET, 0.0), (D, 0.0)])
+
+    def Extra(t, f):
+        if f.get('grip.R') is not None and f.get('gripW.R', 1.0) > .5:
+            hit = RaPartner(T, stage, 'ijaB', 'comrade', 'woundShoulderL', Clamp(t, RA_W_PRESS, RA_W_LET))
+            if hit:
+                q = Quaternion(Vector(hit[1]), turnC(t))
+                f['palmF.R'] = tuple(q @ Vector(f['palmF.R']))
+                f['palmN.R'] = tuple(q @ Vector(f['palmN.R']))
+        f['armPole.R'] = (-(SX + .50), .20, P + .10)
+        return f
+    spec = AttackerSpec(T, stage, 'ijaB', 'comrade', {'R': [(RA_W_PRESS, RA_W_LET, 'woundShoulderL', .035, tuple(over), .85)]},
+                        Body, D, extra=Extra)
+    props, review = SlungProps(T)
+    spec.update({'props': props, 'plants': [('R', 0, D), ('L', 0, RaF(4)), ('L', RaF(10), D)],
+                 'reviewProps': lambda t: review(t) + spec['markers'](t),
+                 'reviewFrames': lambda n: [0, 8, 14, 20, 26, 36, 42, 50, n - 1]})
+    return RaR3Spec(T, stage, 'ijaB', spec)
+
+
+REACH_BY_CLIP['IjaStompStabTwist'] = {'fraction': .86, 'travel': .14, 'bend': .35}

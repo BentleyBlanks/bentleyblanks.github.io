@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260930OpeningStoryboardsV23WoundedRescue",
+ "version": "20261011OpeningStoryboardsV24Redraft",
  "fps": 24,
  "actorForward": [
   0,
@@ -3482,6 +3482,864 @@
    "rigs": [
     "TengxianNra05"
    ]
+  },
+  "YaowaCrouchCatchEat": {
+   "duration": 4.25,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "yaowa",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "props": [
+    "weapon",
+    "breadPiece"
+   ],
+   "rootMotion": false,
+   "stage": "breadToss",
+   "holdLoop": [
+    0.0,
+    1.5
+   ],
+   "holdExit": "pose.holdUntil: the hold loop lets go at that clip time and the clip plays on to its end (the catch)",
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handL",
+     "action": "hold",
+     "target": "weapon",
+     "part": "handguard"
+    },
+    {
+     "t": 0.0,
+     "limb": "butt",
+     "action": "rest",
+     "target": "ground"
+    },
+    {
+     "t": 1.9166666666666667,
+     "limb": "handR",
+     "action": "catch",
+     "target": "breadPiece"
+    }
+   ],
+   "events": [
+    {
+     "t": 1.5416666666666667,
+     "kind": "reach"
+    },
+    {
+     "t": 1.9166666666666667,
+     "kind": "catch"
+    },
+    {
+     "t": 2.4166666666666665,
+     "kind": "bite"
+    },
+    {
+     "t": 2.875,
+     "kind": "bite"
+    },
+    {
+     "t": 2.9583333333333335,
+     "kind": "eaten"
+    }
+   ],
+   "next": [
+    "YaowaCrouchCatchEat"
+   ],
+   "notes": "2026-10-11 redraft (N01/N02): crouched on his heels in the dugout, the Hanyang upright between his knees (butt in the dirt), both hands on it, the head turned to his right on the comrade's bread (look 1.66 m right, 0.8 m up); 0-1.5 s hold loop (breathing). Released: half rises and reaches up to his right (1.54 s), catches the broken corner in the right hand (catch 1.917 s, breadPiece shown from here), stuffs it in: two bites (2.417, 2.875 s), the piece is gone at 2.96 s; the hand back on the rifle by 3.5 s, back in the crouch looking at the bread = frame 0 at 4.25 s (the director may restart the hold loop). Feet planted throughout; no root motion."
+  },
+  "ComradeEatBreadToss": {
+   "duration": 5.0,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "comrade",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "props": [
+    "weapon",
+    "bread",
+    "breadPiece"
+   ],
+   "rootMotion": false,
+   "stage": "breadToss",
+   "holdLoop": [
+    0.0,
+    3.0
+   ],
+   "holdExit": "pose.holdUntil: the hold loop lets go at that clip time and the clip plays on to its end (the tear and the toss)",
+   "env": {
+    "wallBehindM": 0.35
+   },
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handR",
+     "action": "hold",
+     "target": "bread"
+    },
+    {
+     "t": 3.5,
+     "limb": "handL",
+     "action": "hold",
+     "target": "bread"
+    },
+    {
+     "t": 3.9583333333333335,
+     "limb": "handR",
+     "action": "release",
+     "target": "breadPiece"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.75,
+     "kind": "bite"
+    },
+    {
+     "t": 2.1666666666666665,
+     "kind": "bite"
+    },
+    {
+     "t": 3.5833333333333335,
+     "kind": "tear"
+    },
+    {
+     "t": 3.9583333333333335,
+     "kind": "toss"
+    },
+    {
+     "t": 4.416666666666667,
+     "kind": "caught",
+     "by": "yaowa"
+    }
+   ],
+   "prev": [
+    "WoundedSitRifleIdle"
+   ],
+   "next": [
+    "ComradeEatBreadToss",
+    "ComradePourRoundsLaugh",
+    "WoundedRiseWall"
+   ],
+   "notes": "2026-10-11 redraft (N01/N02): sitting against the wall (WoundedSitRifleIdle's seat), the Hanyang propped between the knees leaning to the bandaged left side, the left arm limp on the left knee; the right hand holds the half cake (bread) in front of the chest and nibbles: 0-3.0 s hold loop, two small bites (0.75, 2.17 s). Released: the left hand comes up off the knee as far as it will (wincing), takes the cake; the right breaks a corner off (tear 3.583 s, breadPiece from here) and lobs it underhand to Yaowa (toss 3.958 s; the breadPiece track flies 0.458 s to the catch point of stage breadToss, then hides); the right hand takes the cake back, the left drops to the knee; frame 0 again at 5.0 s."
+  },
+  "ComradePourRoundsLaugh": {
+   "duration": 7.583333333333333,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "comrade",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "holdLoop": [
+    4.583333333333333,
+    7.583333333333333
+   ],
+   "env": {
+    "wallBehindM": 0.35
+   },
+   "contacts": [
+    {
+     "t": 0.4166666666666667,
+     "limb": "handR",
+     "action": "grab",
+     "target": "pouch"
+    },
+    {
+     "t": 1.25,
+     "limb": "handR",
+     "action": "pour",
+     "target": "ground"
+    },
+    {
+     "t": 3.5833333333333335,
+     "limb": "handR",
+     "action": "press",
+     "target": "self",
+     "part": "woundShoulderL"
+    },
+    {
+     "t": 4.583333333333333,
+     "limb": "shoulderBack",
+     "action": "lean",
+     "target": "wall",
+     "untilT": 7.583333333333333
+    }
+   ],
+   "events": [
+    {
+     "t": 0.4166666666666667,
+     "kind": "pouch"
+    },
+    {
+     "t": 1.25,
+     "kind": "pour",
+     "handM": [
+      0.15,
+      0.36,
+      -0.39
+     ]
+    },
+    {
+     "t": 2.4166666666666665,
+     "kind": "settled"
+    },
+    {
+     "t": 2.6666666666666665,
+     "kind": "laugh"
+    },
+    {
+     "t": 3.3333333333333335,
+     "kind": "wince",
+     "line": "BunkerLedger.07"
+    },
+    {
+     "t": 4.583333333333333,
+     "kind": "eyesClosed"
+    }
+   ],
+   "prev": [
+    "ComradeEatBreadToss",
+    "WoundedSitRifleIdle"
+   ],
+   "next": [
+    "WoundedRiseWall"
+   ],
+   "notes": "2026-10-11 redraft: \"\u51ac\u74dc\u7528\u597d\u7684\u90a3\u53ea\u624b\uff0c\u5f80\u987a\u5b50\u811a\u8fb9\u5012\u4e86\u4e00\u628a\u6563\u5b50\u5f39\" ... \"\u51ac\u74dc\u7b11\u51fa\u58f0\uff0c\u626f\u5230\u4e86\u80a9\u8180\" ... \"\u4ed6\u9760\u56de\u571f\u58c1\uff0c\u95ed\u4e0a\u773c\". Seated as ComradeEatBreadToss (rifle propped, left arm limp). The right hand into the belt pouch (0.42 s), leans forward and pours a handful of rounds on the floor in front of him toward Shunzi (pour 1.25 s, the hand at event handM: runtime m in his frame, three.js axes, the rounds fall from there: no rounds prop, the director/first person shows them); back to sitting at 2.42 s (settled: hold the clip here with pose.seconds through the ledger lines). The laugh (2.67 s, chest pulses), the shoulder catches (wince 3.33 s: hunches, the right hand to the bandage on the left shoulder, head down), then he lets himself back against the wall, head back, eyes shut (the face layer closes them): 4.58-7.58 s hold loop, slow breathing."
+  },
+  "ComradeCatchDropPick": {
+   "duration": 4.0,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "comrade",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "props": [
+    "weapon",
+    "clipA",
+    "clipB"
+   ],
+   "rootMotion": true,
+   "env": {
+    "wallLeftM": 0.43
+   },
+   "contacts": [
+    {
+     "t": 0.5416666666666666,
+     "limb": "handL",
+     "action": "brace",
+     "target": "wall",
+     "untilT": 1.6666666666666667
+    },
+    {
+     "t": 1.0833333333333333,
+     "limb": "handR",
+     "action": "catch",
+     "target": "clipA"
+    },
+    {
+     "t": 2.3333333333333335,
+     "limb": "handR",
+     "action": "grab",
+     "target": "clipB"
+    },
+    {
+     "t": 3.0,
+     "limb": "handR",
+     "action": "grip",
+     "target": "weapon"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.3333333333333333,
+     "kind": "rifleOnWall"
+    },
+    {
+     "t": 0.5833333333333334,
+     "kind": "thrown",
+     "fromM": [
+      0.0,
+      -1.5,
+      0.72
+     ]
+    },
+    {
+     "t": 1.0833333333333333,
+     "kind": "catch"
+    },
+    {
+     "t": 1.2916666666666667,
+     "kind": "clipLands"
+    },
+    {
+     "t": 1.6666666666666667,
+     "kind": "stow"
+    },
+    {
+     "t": 2.3333333333333335,
+     "kind": "pick"
+    },
+    {
+     "t": 2.75,
+     "kind": "stow"
+    },
+    {
+     "t": 3.0,
+     "kind": "rifle"
+    },
+    {
+     "t": 3.3333333333333335,
+     "kind": "turn"
+    }
+   ],
+   "prev": [
+    "WoundedRiseWall"
+   ],
+   "next": [],
+   "notes": "2026-10-11 redraft (N04, BunkerExit \"\u6211\u90a3\u4e24\u5939\uff01\"): frame 0 = WoundedRiseWall's last frame (StoopBase, rifle at port). He stands the rifle against the dugout wall at his left (0-0.33 s), braces his left hand on the wall above it, reaches his right hand out to Shunzi. The two chargers leave Shunzi's hands at 0.583 s (event thrown fromM: runtime m in his frame, Blender axes) -- the director's first-person throw should let go of them there; clipA lands in his palm (catch 1.083 s), clipB drops past and lands in front of his feet (1.292 s). He stows clipA in the chest pouch (1.67 s, hidden), stoops and picks clipB up (2.333 s), stows it (2.75 s), takes the rifle off the wall in the right hand (3.0 s) and turns about 110 deg to his right with two steps (root end ~0.5 m). Ends hunched, rifle in the right hand at the trail; the director walks him out."
+  },
+  "HeHelmetSleepSitUp": {
+   "duration": 6.25,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "heyoutian",
+   "rig": "TengxianNra05",
+   "rigs": [
+    "TengxianNra05"
+   ],
+   "props": [
+    "helmet"
+   ],
+   "rootMotion": true,
+   "holdLoop": [
+    1.6666666666666667,
+    4.166666666666667
+   ],
+   "holdExit": "pose.holdUntil: the hold loop lets go at that clip time and the clip plays on to its end (sitUp)",
+   "contacts": [
+    {
+     "t": 4.333333333333333,
+     "limb": "handR",
+     "action": "grab",
+     "target": "helmet"
+    },
+    {
+     "t": 4.666666666666667,
+     "limb": "handL",
+     "action": "push",
+     "target": "ground"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.5833333333333334,
+     "kind": "roll",
+     "line": "BunkerBanter.12"
+    },
+    {
+     "t": 4.583333333333333,
+     "kind": "sitUp"
+    },
+    {
+     "t": 5.333333333333333,
+     "kind": "sat"
+    }
+   ],
+   "next": [],
+   "notes": "2026-10-11 redraft (N01 \"\u4f55\u6709\u7530\u8737\u5728\u6700\u91cc\u5934\uff0c\u94a2\u76d4\u6263\u5728\u8138\u4e0a\u7761\u89c9\"; \"\u4ed6\u7ffb\u4e86\u4e2a\u8eab\uff0c\u63a5\u7740\u7761\"; \"\u4f55\u6709\u7530\u4e00\u628a\u6380\u5f00\u94a2\u76d4\u5750\u4e86\u8d77\u6765\"). Frame 0: lying curled on his RIGHT side, the face toward clip forward (the root's -z: contract \"\u4fa7\u8737\u671d\u4e1c\"), the head toward his right (root +x), knees drawn up, the helmet over his face (helmet track; the model's own headgear should be hidden while this clip plays). The director can hold frame 0 (held life breathes it). 0.3-1.4 s he rolls onto his back (roll 0.583 s), knees up, the helmet still on his face; 1.667-4.167 s hold loop asleep. Released: the right hand takes the helmet off his face (4.33 s), the left elbow and hand push (4.67 s) and he sits up (sitUp 4.583 s), seated by 5.33 s with the knees up, the helmet in his right hand on the knee, facing the clip root's LEFT (+x Blender = three.js -x; the sit-up is a plain curl up from his back). Root motion: the pelvis travels ~0.25 m."
+  },
+  "LiuDivideAmmoToss": {
+   "duration": 4.0,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "liuwencai",
+   "rig": "TengxianNra05",
+   "rigs": [
+    "TengxianNra05"
+   ],
+   "props": [
+    "clipA",
+    "ammoBox"
+   ],
+   "rootMotion": false,
+   "stage": "liuToss",
+   "holdLoop": [
+    0.0,
+    2.0
+   ],
+   "holdExit": "pose.holdUntil: the hold loop lets go at that clip time and the clip plays on to its end (the toss)",
+   "contacts": [
+    {
+     "t": 0.3333333333333333,
+     "limb": "handR",
+     "action": "grab",
+     "target": "ammoBox"
+    },
+    {
+     "t": 1.3333333333333333,
+     "limb": "handR",
+     "action": "grab",
+     "target": "ammoBox"
+    },
+    {
+     "t": 2.3333333333333335,
+     "limb": "handR",
+     "action": "grab",
+     "target": "ammoBox"
+    },
+    {
+     "t": 3.0,
+     "limb": "handR",
+     "action": "release",
+     "target": "clipA"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.5833333333333334,
+     "kind": "count"
+    },
+    {
+     "t": 1.5833333333333333,
+     "kind": "count"
+    },
+    {
+     "t": 3.0,
+     "kind": "toss"
+    },
+    {
+     "t": 3.5833333333333335,
+     "kind": "lands",
+     "atM": [
+      -1.35,
+      -2.7,
+      0.55
+     ]
+    }
+   ],
+   "next": [
+    "LiuDivideAmmoToss"
+   ],
+   "notes": "2026-10-11 redraft (N01 \"\u5218\u6587\u8d22\u8e72\u5728\u4ed6\u811a\u8fb9\u7684\u5f39\u836f\u7bb1\u65c1\u5206\u5b50\u5f39\"; \"\u5218\u6587\u8d22\u6570\u51fa\u4e00\u5939\uff0c\u9694\u7740\u4e24\u4e2a\u4eba\u4e22\u8fc7\u6765\uff0c\u843d\u5728\u987a\u5b50\u817f\u4e0a\"): squatting, the open crate at his right hand (ammoBox track, static), the right hand takes chargers out of the crate into the left palm (0-2.0 s hold loop, one per second). Released: one more out of the crate (2.33 s), a look at Shunzi, an underhand lob over the heads (toss 3.0 s; the clipA track flies 0.583 s to the lap point of stage liuToss, atM runtime m in his frame, and lies there to the end); back to counting = frame 0 at 4.0 s."
+  },
+  "CorpseStabbedClaw": {
+   "duration": 3.5,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "corpse",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "props": [],
+   "rootMotion": false,
+   "stage": "sweepStomp",
+   "terminal": true,
+   "contacts": [
+    {
+     "t": 0.08333333333333333,
+     "by": "ijaB",
+     "part": "backStab",
+     "action": "stab",
+     "note": "the walking stab (not this pair)"
+    },
+    {
+     "t": 1.5,
+     "by": "ijaB",
+     "part": "backLow",
+     "action": "stomp"
+    },
+    {
+     "t": 1.8333333333333335,
+     "by": "ijaB",
+     "part": "backStab",
+     "action": "stab"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.08333333333333333,
+     "kind": "stab"
+    },
+    {
+     "t": 0.16666666666666666,
+     "kind": "cry"
+    },
+    {
+     "t": 0.3333333333333333,
+     "kind": "claw"
+    },
+    {
+     "t": 1.5,
+     "kind": "stomp"
+    },
+    {
+     "t": 1.8333333333333335,
+     "kind": "stab"
+    },
+    {
+     "t": 2.0833333333333335,
+     "kind": "twist"
+    },
+    {
+     "t": 2.4166666666666665,
+     "kind": "pull"
+    },
+    {
+     "t": 3.25,
+     "kind": "still"
+    }
+   ],
+   "notes": "2026-10-11 redraft (N09, \"\u624e\u5230\u7b2c\u4e09\u5177\uff0c\u90a3\u4eba\u53eb\u4e86\u4e00\u58f0\uff0c\u624b\u5728\u6ce5\u91cc\u4e71\u6293\u3002\u4e59\u8e29\u4f4f\u4ed6\u7684\u80cc\u53c8\u624e\u4e00\u5200\uff0c\u62e7\u4e86\u4e00\u4e0b\u624d\u62d4\u51fa\u6765\"): the sweep's third body (SweepVictim, contract \u00a71.5) face down, the head toward clip forward, the left arm bent up by the head, the right along the side. 0.083 s a bayonet goes into his back: he cries out (0.167), the chest and head come up off the mud and both hands claw at it (0.33-1.45 s); the boot on the small of his back flattens him (stomp 1.5 s); the second stab (1.833) and the twist (2.083) jerk him; the blade comes out (2.417) and he goes slack, a last twitch of the fingers, still from 3.25 s. terminal: the last frame is the corpse."
+  },
+  "IjaStompStabTwist": {
+   "duration": 2.5833333333333335,
+   "loop": false,
+   "weaponHold": "twoHand",
+   "role": "ijaB",
+   "rig": "TengxianIja01",
+   "rigs": [
+    "TengxianIja01",
+    "TengxianIja02"
+   ],
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "stage": "sweepStomp",
+   "weaponState": "twoHand",
+   "contacts": [
+    {
+     "t": 0.8333333333333334,
+     "limb": "footL",
+     "action": "stomp",
+     "partnerRole": "corpse",
+     "part": "backLow"
+    },
+    {
+     "t": 1.1666666666666667,
+     "limb": "blade",
+     "action": "stab",
+     "partnerRole": "corpse",
+     "part": "backStab"
+    },
+    {
+     "t": 1.75,
+     "limb": "blade",
+     "action": "release"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.8333333333333334,
+     "kind": "stomp"
+    },
+    {
+     "t": 1.1666666666666667,
+     "kind": "stab"
+    },
+    {
+     "t": 1.4166666666666667,
+     "kind": "twist"
+    },
+    {
+     "t": 1.75,
+     "kind": "pull"
+    }
+   ],
+   "prev": [
+    "IjaReadyRifle"
+   ],
+   "next": [
+    "IjaReadyRifle"
+   ],
+   "notes": "2026-10-11 redraft (N09): ijaB (IJA01; also baked on IJA02, the contract table names it) has just pulled the first stab out of the third body and stands at its right thigh facing along it, the rifle low with the bayonet down. He brings the rifle up to his chest, steps his LEFT boot onto the small of the man's back (stomp 0.833 s), drives the bayonet down into the upper back (stab 1.167 s: the blade 7 cm in at the backStab patch), turns it in the wound (twist 1.417 s, the rifle rolls 35 deg about its axis), pulls it out along the same line (1.75 s), steps back off (2.1 s) and settles into the low carry (frame 0 again at 2.583 s). Pairs with CorpseStabbedClaw on stage sweepStomp (starts 0.667 s after it)."
+  },
+  "IjaInspectRifleBoltToss": {
+   "duration": 4.5,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaB",
+   "rig": "TengxianIja01",
+   "rigs": [
+    "TengxianIja01"
+   ],
+   "props": [
+    "weapon",
+    "comradeRifle",
+    "rifleBolt"
+   ],
+   "rootMotion": false,
+   "weaponState": "slungBack",
+   "contacts": [
+    {
+     "t": 0.9166666666666666,
+     "limb": "handR",
+     "action": "grab",
+     "target": "comradeRifle",
+     "part": "wrist"
+    },
+    {
+     "t": 1.3333333333333333,
+     "limb": "handL",
+     "action": "grab",
+     "target": "comradeRifle",
+     "part": "handguard"
+    },
+    {
+     "t": 1.6666666666666667,
+     "limb": "handR",
+     "action": "grab",
+     "target": "rifleBolt",
+     "part": "handle"
+    },
+    {
+     "t": 3.0,
+     "limb": "handR",
+     "action": "release",
+     "target": "rifleBolt"
+    },
+    {
+     "t": 3.4166666666666665,
+     "limb": "handL",
+     "action": "release",
+     "target": "comradeRifle"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.9166666666666666,
+     "kind": "pickUp"
+    },
+    {
+     "t": 1.8333333333333333,
+     "kind": "boltOpen",
+     "cue": "boltRattle"
+    },
+    {
+     "t": 2.1666666666666665,
+     "kind": "laugh"
+    },
+    {
+     "t": 2.5833333333333335,
+     "kind": "boltOut"
+    },
+    {
+     "t": 3.0,
+     "kind": "toss",
+     "cue": "boltToss"
+    },
+    {
+     "t": 4.083333333333333,
+     "kind": "boltLands"
+    },
+    {
+     "t": 3.5833333333333335,
+     "kind": "drop",
+     "cue": "rifleTossMud"
+    }
+   ],
+   "prev": [
+    "IjaPullArm"
+   ],
+   "next": [
+    "IjaReadyRifle",
+    "IjaThumbWoundTwist"
+   ],
+   "notes": "2026-10-11 redraft (N11, \"\u4e59\u4ece\u6ce5\u91cc\u6361\u8d77\u51ac\u74dc\u90a3\u652f\u6c49\u9633\u9020\uff0c\u62c9\u5f00\u67aa\u673a\u770b\u4e86\u4e00\u773c\uff0c\u7b11\u4e86\u3002\u4ed6\u628a\u67aa\u6813\u62bd\u51fa\u6765\u7529\u51fa\u6c9f\u6cbf\uff0c\u67aa\u6254\u56de\u6ce5\u91cc\"): his own rifle slung across the back. The comrade's Hanyang lies on the mud at his right front (comradeRifle track from frame 0: grip (0.04, 0.28, -0.38) runtime m (on the slope of the loose earth) in his frame, muzzle to his left -- the director puts his root so this meets the prop at (3.9,-125.0)). He stoops and takes it by the wrist of the stock (0.917 s), stands with it across his belly, the left hand on the handguard (1.33 s); the right hand lifts and draws the bolt (boltOpen 1.833 s), he looks into the action and laughs (2.167 s), draws the bolt right out (boltOut 2.583: the rifleBolt track leaves the rifle in his fist -- hide the mesh's own bolt from here), flings it forward and up (toss 3.0 s: it flies 1.08 s, 3.4 m ahead and over 2.05 m, out over the lip in front of him -- face him at a lip -- and lies there) and tosses the rifle down with the left hand (drop 3.583 s: it lies on the mud at his left front to the end). Stands easy from 4.0 s."
+  },
+  "IjaTearBadge": {
+   "duration": 2.75,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "TengxianIja02",
+   "rigs": [
+    "TengxianIja02"
+   ],
+   "props": [
+    "weapon",
+    "chestBadge"
+   ],
+   "rootMotion": false,
+   "stage": "tearBadge",
+   "weaponState": "slungBack",
+   "contacts": [
+    {
+     "t": 0.4583333333333333,
+     "limb": "handR",
+     "action": "take",
+     "partnerRole": "comrade",
+     "part": "badgeChestL",
+     "standoffM": 0.025,
+     "note": "the fist closes on the badge (CaptiveKneelMud is not re-baked: no mirrored onset)"
+    },
+    {
+     "t": 0.625,
+     "limb": "handR",
+     "action": "release",
+     "partnerRole": "comrade"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.4583333333333333,
+     "kind": "grab"
+    },
+    {
+     "t": 0.625,
+     "kind": "tear",
+     "cue": "clothRip"
+    },
+    {
+     "t": 1.0416666666666667,
+     "kind": "look"
+    },
+    {
+     "t": 1.75,
+     "kind": "pocket"
+    }
+   ],
+   "prev": [
+    "IjaShoveToWall",
+    "IjaCollarQuestion"
+   ],
+   "next": [
+    "IjaCollarQuestion"
+   ],
+   "notes": "2026-10-11 redraft (N11, \"\u7532\u4e00\u628a\u6495\u4e0b\u51ac\u74dc\u80f8\u524d\u7684\u80f8\u7ae0\uff0c\u626b\u4e00\u773c\u756a\u53f7\uff0c\u585e\u8fdb\u81ea\u5df1\u53e3\u888b\"): ijaA at the comrade's left front (collarQuestion mark), rifle slung across the back. Bends in and takes the badge on the comrade's left breast in the right fist (grab 0.458 s), rips it off with a short yank down and out (tear 0.625 s: hide the badge on the comrade from here; chestBadge track in ijaA's fist from the tear), raises it in front of his face and reads it (look 1.04 s), stuffs it into his left breast pocket (pocket 1.75 s, the track hides at 1.79 s), stands back to the collar-question lean (2.75 s; its first frame is the IjaCollarQuestion lead-in's). The comrade plays CaptiveKneelMud from its frame 0 at the same time."
+  },
+  "CaptiveArchCaught": {
+   "duration": 2.5,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "comrade",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "rootMotion": false,
+   "weaponState": "dropped",
+   "weaponDropFrom": "BlastSlamBuried",
+   "stage": "thumbWound",
+   "env": {
+    "wallBehindM": 0.41,
+    "wallLeanFromM": 0.496,
+    "wallLeanDeg": 20
+   },
+   "contacts": [
+    {
+     "t": 0.5833333333333334,
+     "by": "ijaB",
+     "part": "woundShoulderL",
+     "action": "grab"
+    },
+    {
+     "t": 0.0,
+     "limb": "shoulderBack",
+     "action": "lean",
+     "target": "wall",
+     "untilT": 0.5
+    },
+    {
+     "t": 2.25,
+     "limb": "shoulderBack",
+     "action": "lean",
+     "target": "wall",
+     "untilT": 2.5
+    }
+   ],
+   "events": [
+    {
+     "t": 0.5833333333333334,
+     "kind": "press"
+    },
+    {
+     "t": 0.625,
+     "kind": "chokedCry",
+     "line": "CaptiveWoundTwist.01"
+    },
+    {
+     "t": 0.8333333333333334,
+     "kind": "twist"
+    },
+    {
+     "t": 1.75,
+     "kind": "released"
+    }
+   ],
+   "prev": [
+    "CaptiveKneelMud"
+   ],
+   "next": [
+    "CaptiveKneelMud"
+   ],
+   "notes": "2026-10-11 redraft (N13, \"\u4e59\u628a\u62c7\u6307\u6441\u8fdb\u51ac\u74dc\u80a9\u4e0a\u7684\u67aa\u4f24\uff0c\u5f80\u91cc\u62e7\u3002\u51ac\u74dc\u6574\u4e2a\u4eba\u5f13\u8d77\u6765\uff0c\u53eb\u58f0\u5361\u5728\u5589\u5499\u91cc\"): frame 0 = last frame = CaptiveKneelMud frame 0 (kneeling on the bank, back on the planks). His right hand is knocked off the bandage (0.3 s) and claws at his right thigh; the thumb goes in (press 0.583 s): he arches -- the hips forward, the chest up off the planks, the head back, the shoulders up -- and stays locked there shaking (the choked cry, CaptiveWoundTwist.01), a second jolt at the twist (0.833 s); let go at 1.75 s he sags back onto the planks, the hand back on the bandage by 2.5 s."
+  },
+  "IjaThumbWoundTwist": {
+   "duration": 2.5,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaB",
+   "rig": "TengxianIja01",
+   "rigs": [
+    "TengxianIja01"
+   ],
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "stage": "thumbWound",
+   "weaponState": "slungBack",
+   "contacts": [
+    {
+     "t": 0.5833333333333334,
+     "limb": "handR",
+     "action": "grab",
+     "partnerRole": "comrade",
+     "part": "woundShoulderL",
+     "standoffM": 0.035
+    },
+    {
+     "t": 1.75,
+     "limb": "handR",
+     "action": "release"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.5833333333333334,
+     "kind": "press"
+    },
+    {
+     "t": 0.8333333333333334,
+     "kind": "twist"
+    },
+    {
+     "t": 1.75,
+     "kind": "released"
+    }
+   ],
+   "prev": [
+    "IjaInspectRifleBoltToss"
+   ],
+   "next": [
+    "IjaReadyRifle"
+   ],
+   "notes": "2026-10-11 redraft (N13): ijaB at the kneeling comrade's left (stage thumbWound), rifle slung across his back. Bends in, the right hand onto the front of the man's left shoulder, the thumb in the wound (press 0.583 s); screws it in -- the hand turns 30 deg each way about the press (twist 0.833 s) -- leaning his weight on it, the left hand on his own knee; lets go (1.75 s) and straightens (2.5 s)."
   }
  },
  "stages": {
@@ -3755,6 +4613,110 @@
      "yawDeg": 12
     }
    }
+  },
+  "breadToss": {
+   "anchor": "comrade",
+   "notes": "contract \u00a75.1 starts (comrade (0.35,-124.35) facing NW, Yaowa (-1.0,-125.35) facing NE): the corner the comrade tosses (ComradeEatBreadToss `toss` 3.958 s, breadPiece track) flies 0.458 s into Yaowa's right hand (YaowaCrouchCatchEat `catch` 1.917 s): Yaowa's clip runs offsetS 2.5 s behind the comrade's (release his hold loop at comrade 4.0 s). Placed elsewhere the flight still ends at this point in the comrade's frame.",
+   "actors": {
+    "comrade": {
+     "rig": "TengxianNra02",
+     "clip": "ComradeEatBreadToss",
+     "x": 0.0,
+     "z": 0.0,
+     "yawDeg": 0
+    },
+    "yaowa": {
+     "rig": "TengxianNra02",
+     "clip": "YaowaCrouchCatchEat",
+     "x": -0.247,
+     "z": -1.66,
+     "yawDeg": -90,
+     "offsetS": 2.5
+    }
+   }
+  },
+  "liuToss": {
+   "anchor": "liuwencai",
+   "notes": "contract \u00a75.1 (Liu (1.1,-124.9) squatting facing west, Shunzi at shunzi.seat (-1.95,-126.25) facing east): the charger Liu lobs (LiuDivideAmmoToss toss 3.0 s, clipA track) lands on Shunzi's lap 0.583 s later. shunzi is placement only (first person).",
+   "actors": {
+    "liuwencai": {
+     "rig": "TengxianNra05",
+     "clip": "LiuDivideAmmoToss",
+     "x": 0.0,
+     "z": 0.0,
+     "yawDeg": 0
+    },
+    "shunzi": {
+     "rig": null,
+     "clip": null,
+     "x": 1.35,
+     "z": -3.05,
+     "yawDeg": 180
+    }
+   }
+  },
+  "sweepStomp": {
+   "anchor": "corpse",
+   "notes": "The third body of the sweep (sweep.bodies[2], SweepVictim) lies face down with the head toward its clip forward (-z; contract: \u5934\u671d\u897f). CorpseStabbedClaw starts on the first stab (the walking stab, ijaB IjaWalkStabProne / IjaBayonetDownThrust: its blade in at corpse 0.10 s); IjaStompStabTwist starts 0.667 s later with ijaB standing at the corpse's right thigh facing the same way (his rifle low, bayonet down).",
+   "actors": {
+    "corpse": {
+     "rig": "TengxianNra02",
+     "clip": "CorpseStabbedClaw",
+     "x": 0.0,
+     "z": 0.0,
+     "yawDeg": 0
+    },
+    "ijaB": {
+     "rig": "TengxianIja01",
+     "clip": "IjaStompStabTwist",
+     "x": 0.42,
+     "z": 0.3,
+     "yawDeg": 0,
+     "offsetS": 0.6666666666666666
+    }
+   }
+  },
+  "tearBadge": {
+   "anchor": "comrade",
+   "notes": "CaptiveKneelMud (3.0 s loop, from its frame 0) and IjaTearBadge start together; ijaA at the same mark as collarQuestion (interrogation.ijaAHold, the comrade's left front, yM his ground under R3's).",
+   "actors": {
+    "comrade": {
+     "rig": "TengxianNra02",
+     "clip": "CaptiveKneelMud",
+     "x": 0.0,
+     "z": 0.0,
+     "yawDeg": 0
+    },
+    "ijaA": {
+     "x": -0.26,
+     "z": -0.17,
+     "yawDeg": -150,
+     "yM": -0.1153,
+     "rig": "TengxianIja02",
+     "clip": "IjaTearBadge"
+    }
+   }
+  },
+  "thumbWound": {
+   "anchor": "comrade",
+   "notes": "Both clips start together. The comrade at R3 (CaptiveArchCaught starts and ends on CaptiveKneelMud frame 0); ijaB at his left side, half a pace out (yM his ground under R3's), clear of the interpreter crouching in front.",
+   "actors": {
+    "comrade": {
+     "rig": "TengxianNra02",
+     "clip": "CaptiveArchCaught",
+     "x": 0.0,
+     "z": 0.0,
+     "yawDeg": 0
+    },
+    "ijaB": {
+     "x": -0.5,
+     "z": -0.3,
+     "yawDeg": -100,
+     "yM": -0.1677,
+     "rig": "TengxianIja01",
+     "clip": "IjaThumbWoundTwist"
+    }
+   }
   }
  },
  "props": {
@@ -3823,18 +4785,43 @@
   "comradeRifle": {
    "model": "HanYang (actor weapon)",
    "track": "weapon",
-   "notes": "WoundedSitRifleIdle/Banter*/WoundedRiseWall hold it through the `weapon` track; BlastSlamBuried throws it forward-right; last track frame = where it lies."
+   "notes": "WoundedSitRifleIdle/Banter*/WoundedRiseWall hold it through the `weapon` track; BlastSlamBuried throws it forward-right; last track frame = where it lies.",
+   "redraftA": "the comrade's Hanyang, actor-weapon convention (origin right-hand grip, axis muzzle, up sights)"
   },
   "roofTimberDown": {
    "set": "Data_OpeningSet0103.roofTimberDown",
    "notes": "posed by the Set (OpeningSet.LiftRoofTimber); HeLiftTimber's hands ride its lift"
+  },
+  "bread": {
+   "redraftA": "half flat cake, 0.16 m across, 0.02 m thick; origin centre, axis broken edge -> round edge, up face normal"
+  },
+  "breadPiece": {
+   "redraftA": "corner of the cake, ~0.06 m; origin centre, axis/up as bread"
+  },
+  "clipA": {
+   "redraftA": "Hanyang charger with five rounds, 0.06 x 0.02 (rounds 0.055); origin centre, axis along the charger, up toward the tips"
+  },
+  "clipB": {
+   "redraftA": "as clipA"
+  },
+  "rifleBolt": {
+   "redraftA": "Hanyang bolt, 0.17 m; origin centre, axis toward the bolt head, up the handle side"
+  },
+  "chestBadge": {
+   "redraftA": "cloth chest badge 0.03 x 0.08 m; origin centre, axis long side, up face normal"
+  },
+  "helmet": {
+   "redraftA": "steel helmet (He Youtian); origin dome centre at the brim plane, axis out of the dome, up toward the brim front"
+  },
+  "ammoBox": {
+   "redraftA": "Model_MilitaryCrateSet open crate 0.82 x 0.54 x 0.30 m; origin bottom centre, axis long side, up +up"
   }
  },
  "models": [
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "d0588e671b32d3c532aa49cb868b685eef8b58efd3d6795055ec0c6975ea4538",
+   "sha256": "fa5a8e8fb5d55bbe88b35e944f88691b8dc9bbe438191e85d6190e8ec2a699ba",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
@@ -3881,7 +4868,13 @@
     "YaowaSitLoad",
     "ShunziSitFillCharger",
     "HeLiftTimber",
-    "InterpreterShotStagger"
+    "InterpreterShotStagger",
+    "YaowaCrouchCatchEat",
+    "ComradeEatBreadToss",
+    "ComradePourRoundsLaugh",
+    "ComradeCatchDropPick",
+    "CorpseStabbedClaw",
+    "CaptiveArchCaught"
    ],
    "contactPoints": {
     "hairBack": {
@@ -4065,9 +5058,61 @@
       0.2971,
       0.8296
      ]
+    },
+    "badgeChestL": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.02441,
+      0.1335,
+      0.1108
+     ],
+     "normal": [
+      -0.1795,
+      0.9838,
+      0.0
+     ]
+    },
+    "woundShoulderL": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.10544,
+      0.09121,
+      0.17783
+     ],
+     "normal": [
+      0.0626,
+      0.9698,
+      0.2357
+     ]
+    },
+    "backStab": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.05665,
+      -0.13094,
+      -0.00062
+     ],
+     "normal": [
+      0.1795,
+      -0.9838,
+      -0.0
+     ]
+    },
+    "backLow": {
+     "bone": "Bip001 Spine",
+     "offset": [
+      0.04519,
+      -0.11938,
+      0.00211
+     ],
+     "normal": [
+      0.0596,
+      -0.9982,
+      -0.0
+     ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningWoundedRescue_20260930\\Scene_TengxianNra02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningRedraft_20261011_A\\Scene_TengxianNra02OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
@@ -5730,13 +6775,296 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "YaowaCrouchCatchEat",
+     "frames": 103,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0411,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0731,
+       0.0,
+       0.3928
+      ],
+      "end": [
+       -0.0,
+       0.0731,
+       0.0,
+       0.3928
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       4.25
+      ],
+      [
+       "R",
+       0,
+       4.25
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "ComradeEatBreadToss",
+     "frames": 121,
+     "footSlideM": 0.0024,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0006,
+     "pelvisMaxStepM": 0.0003,
+     "floorCorrectionMin": 0.00054,
+     "floorCorrectionMax": 0.00516,
+     "root": {
+      "start": [
+       0.0,
+       0.0457,
+       2.29,
+       0.1171
+      ],
+      "end": [
+       0.0,
+       0.0457,
+       2.29,
+       0.1171
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       5.0
+      ],
+      [
+       "R",
+       0,
+       5.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "ComradePourRoundsLaugh",
+     "frames": 183,
+     "footSlideM": 0.0029,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0006,
+     "pelvisMaxStepM": 0.0022,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.00407,
+     "root": {
+      "start": [
+       0.0,
+       0.0457,
+       2.29,
+       0.1171
+      ],
+      "end": [
+       0.0,
+       0.0457,
+       2.29,
+       0.1153
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       7.5833
+      ],
+      [
+       "R",
+       0,
+       7.5833
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "wallContacts": [
+      [
+       "shoulderBack",
+       4.5833,
+       7.5833,
+       0.0077,
+       -0.0006
+      ]
+     ],
+     "wallContactGapM": 0.0077,
+     "wallContactDepthM": 0.0006
+    },
+    {
+     "clip": "ComradeCatchDropPick",
+     "frames": 97,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0072,
+     "gripSolveErrorM": 0.0072,
+     "wallPenetrationM": 0.0,
+     "pelvisMaxStepM": 0.1766,
+     "floorCorrectionMin": -0.00627,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0048,
+       -0.2459,
+       2.86,
+       0.691
+      ],
+      "end": [
+       0.2224,
+       0.0622,
+       -107.14,
+       0.5861
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       3.5
+      ],
+      [
+       "L",
+       3.875,
+       4.0
+      ],
+      [
+       "R",
+       0.0,
+       3.25
+      ],
+      [
+       "R",
+       3.5833,
+       4.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "wallContacts": [
+      [
+       "handL",
+       0.5417,
+       1.6667,
+       -0.0087,
+       -0.0117
+      ]
+     ],
+     "wallContactGapM": -0.0087,
+     "wallContactDepthM": 0.0117
+    },
+    {
+     "clip": "CorpseStabbedClaw",
+     "frames": 85,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0084,
+     "floorCorrectionMin": 0.06016,
+     "floorCorrectionMax": 0.07275,
+     "root": {
+      "start": [
+       0.0,
+       0.0,
+       0.0,
+       0.2642
+      ],
+      "end": [
+       0.0,
+       0.0,
+       0.0,
+       0.2642
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "CaptiveArchCaught",
+     "frames": 61,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0117,
+     "pelvisMaxStepM": 0.0012,
+     "floorCorrectionMin": 0.02364,
+     "floorCorrectionMax": 0.02836,
+     "root": {
+      "start": [
+       -0.0,
+       0.0676,
+       2.29,
+       0.3914
+      ],
+      "end": [
+       -0.0,
+       0.0676,
+       2.29,
+       0.3914
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [
+      [
+       "L",
+       0,
+       2.5
+      ],
+      [
+       "R",
+       0,
+       2.5
+      ]
+     ],
+     "kneeSlideM": 0.0086,
+     "wallContacts": [
+      [
+       "shoulderBack",
+       0.0,
+       0.5,
+       -0.0117,
+       -0.0117
+      ],
+      [
+       "shoulderBack",
+       2.25,
+       2.5,
+       -0.0036,
+       -0.0117
+      ]
+     ],
+     "wallContactGapM": -0.0036,
+     "wallContactDepthM": 0.0117
     }
    ]
   },
   {
    "id": "TengxianNra05",
    "file": "Animation_TengxianNra05OpeningStoryboards.json",
-   "sha256": "25bc110bb68b07f82ae5ee493360d76fa1821168a59e1c72bfa86a7d1a7c8111",
+   "sha256": "48a3626cbc071e728c6d584b69be7aeec60c094ed64cb860e245f0685cb21055",
    "originalModelSha256": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72",
    "clipIds": [
     "SupplyReceive",
@@ -5766,7 +7094,9 @@
     "LuoPickUpRifleSling",
     "LuoRescueDrag",
     "LuoHandRifle",
-    "LuoGrabRifleShove"
+    "LuoGrabRifleShove",
+    "HeHelmetSleepSitUp",
+    "LiuDivideAmmoToss"
    ],
    "contactPoints": {
     "hairBack": {
@@ -5950,9 +7280,61 @@
       0.2971,
       0.8296
      ]
+    },
+    "badgeChestL": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.0389,
+      0.12901,
+      0.09674
+     ],
+     "normal": [
+      -0.1795,
+      0.9838,
+      0.0
+     ]
+    },
+    "woundShoulderL": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.07859,
+      0.09361,
+      0.18091
+     ],
+     "normal": [
+      0.0626,
+      0.9698,
+      0.2357
+     ]
+    },
+    "backStab": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.0757,
+      -0.12426,
+      -0.0027
+     ],
+     "normal": [
+      0.1795,
+      -0.9838,
+      -0.0
+     ]
+    },
+    "backLow": {
+     "bone": "Bip001 Spine",
+     "offset": [
+      0.04551,
+      -0.12515,
+      -0.00161
+     ],
+     "normal": [
+      0.0596,
+      -0.9982,
+      -0.0
+     ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningWoundedRescue_20260930\\Scene_TengxianNra05OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningRedraft_20261011_A\\Scene_TengxianNra05OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
@@ -7052,15 +8434,84 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "HeHelmetSleepSitUp",
+     "frames": 151,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0185,
+     "floorCorrectionMin": -0.03073,
+     "floorCorrectionMax": 0.08922,
+     "root": {
+      "start": [
+       0.0,
+       0.0,
+       0.0,
+       0.2319
+      ],
+      "end": [
+       0.0459,
+       0.1,
+       90.0,
+       0.1299
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "LiuDivideAmmoToss",
+     "frames": 97,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0717,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0309,
+       0.0327,
+       0.0,
+       0.2687
+      ],
+      "end": [
+       0.0309,
+       0.0327,
+       0.0,
+       0.2687
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       4.0
+      ],
+      [
+       "R",
+       0,
+       4.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ]
   },
   {
    "id": "TengxianIja01",
    "file": "Animation_TengxianIja01OpeningStoryboards.json",
-   "sha256": "2bf948ca39551f261b2e6a4e6477f5c4156bce7ea18e38b8ba90a30911b5d933",
+   "sha256": "811f80c4812c46da1145748a7903dcb02056a680f0acba2d31d8d04e4e993ba8",
    "originalModelSha256": "0acb11411d2984cf7bd9dd578141ffcc8541e9bbe8c83b0cf3dcff76f3a2d9b1",
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningWoundedRescue_20260930\\Scene_TengxianIja01OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningRedraft_20261011_A\\Scene_TengxianIja01OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
      "bone": "Bip001 Head",
@@ -7242,6 +8693,58 @@
       0.4728,
       0.2971,
       0.8296
+     ]
+    },
+    "badgeChestL": {
+     "bone": "Bip001 Spine1",
+     "offset": [
+      0.18266,
+      0.09183,
+      0.10326
+     ],
+     "normal": [
+      -0.1198,
+      0.9928,
+      0.0
+     ]
+    },
+    "woundShoulderL": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.06974,
+      0.05648,
+      0.16229
+     ],
+     "normal": [
+      0.0626,
+      0.9698,
+      0.2357
+     ]
+    },
+    "backStab": {
+     "bone": "Bip001 Spine1",
+     "offset": [
+      0.22909,
+      -0.14662,
+      -0.02677
+     ],
+     "normal": [
+      0.1198,
+      -0.9928,
+      -0.0
+     ]
+    },
+    "backLow": {
+     "bone": "Bip001 Spine1",
+     "offset": [
+      -0.05702,
+      -0.17429,
+      0.00033
+     ],
+     "normal": [
+      0.1198,
+      -0.9928,
+      -0.0
      ]
     }
    },
@@ -8226,6 +9729,147 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaStompStabTwist",
+     "frames": 63,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.069,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0701,
+       -0.0899,
+       0.0,
+       0.7079
+      ],
+      "end": [
+       0.0701,
+       -0.0899,
+       0.0,
+       0.7079
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       2.5833
+      ],
+      [
+       "L",
+       0,
+       0.4583
+      ],
+      [
+       "L",
+       0.8333,
+       1.8333
+      ],
+      [
+       "L",
+       2.125,
+       2.5833
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaInspectRifleBoltToss",
+     "frames": 109,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0085,
+     "gripSolveErrorM": 0.00854,
+     "pelvisMaxStepM": 0.0958,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0,
+       0.0184,
+       0.0,
+       0.8161
+      ],
+      "end": [
+       0.0,
+       0.0184,
+       0.0,
+       0.8161
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       4.5
+      ],
+      [
+       "R",
+       0,
+       0.25
+      ],
+      [
+       "R",
+       0.5833,
+       4.5
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaThumbWoundTwist",
+     "frames": 61,
+     "footSlideM": 0.0103,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0,
+     "pelvisMaxStepM": 0.049,
+     "floorCorrectionMin": 0.01633,
+     "floorCorrectionMax": 0.01633,
+     "root": {
+      "start": [
+       0.0,
+       0.0184,
+       0.0,
+       0.8345
+      ],
+      "end": [
+       0.0,
+       0.0184,
+       0.0,
+       0.8388
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       2.5
+      ],
+      [
+       "L",
+       0,
+       0.1667
+      ],
+      [
+       "L",
+       0.4167,
+       2.5
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ],
    "clipIds": [
@@ -8256,15 +9900,18 @@
     "IjaChoppedFallWall",
     "IjaGuardPort",
     "IjaChoppedFallBack",
-    "IjaShotDropRifle"
+    "IjaShotDropRifle",
+    "IjaStompStabTwist",
+    "IjaInspectRifleBoltToss",
+    "IjaThumbWoundTwist"
    ]
   },
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "f97dbc525b8b16fb849b689fb37b47f503a3dc95dfadb083a5416fa803050385",
+   "sha256": "76ce8f65be71428458a28f9fbdc957b2bf672c1e89b93d7aa26f5e2e72083697",
    "originalModelSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61",
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningWoundedRescue_20260930\\Scene_TengxianIja02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningRedraft_20261011_A\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
      "bone": "Bip001 Head",
@@ -8446,6 +10093,58 @@
       0.4728,
       0.2971,
       0.8296
+     ]
+    },
+    "badgeChestL": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.02817,
+      0.09324,
+      0.10511
+     ],
+     "normal": [
+      -0.1795,
+      0.9838,
+      0.0
+     ]
+    },
+    "woundShoulderL": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.07678,
+      0.04624,
+      0.15715
+     ],
+     "normal": [
+      0.0626,
+      0.9698,
+      0.2357
+     ]
+    },
+    "backStab": {
+     "bone": "Bip001 Spine2",
+     "offset": [
+      0.1004,
+      -0.24217,
+      0.04337
+     ],
+     "normal": [
+      0.1795,
+      -0.9838,
+      -0.0
+     ]
+    },
+    "backLow": {
+     "bone": "Bip001 Spine",
+     "offset": [
+      0.07907,
+      -0.17064,
+      0.00033
+     ],
+     "normal": [
+      0.0596,
+      -0.9982,
+      -0.0
      ]
     }
    },
@@ -10615,6 +12314,97 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaStompStabTwist",
+     "frames": 63,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0692,
+     "floorCorrectionMin": 1e-05,
+     "floorCorrectionMax": 6e-05,
+     "root": {
+      "start": [
+       0.0696,
+       -0.0889,
+       0.0,
+       0.7074
+      ],
+      "end": [
+       0.0696,
+       -0.0889,
+       0.0,
+       0.7074
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       2.5833
+      ],
+      [
+       "L",
+       0,
+       0.4583
+      ],
+      [
+       "L",
+       0.8333,
+       1.8333
+      ],
+      [
+       "L",
+       2.125,
+       2.5833
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaTearBadge",
+     "frames": 67,
+     "footSlideM": 0.0023,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0,
+     "pelvisMaxStepM": 0.1085,
+     "floorCorrectionMin": 0.0211,
+     "floorCorrectionMax": 0.02362,
+     "root": {
+      "start": [
+       0.0365,
+       0.0913,
+       0.0,
+       0.825
+      ],
+      "end": [
+       0.0365,
+       0.0913,
+       0.0,
+       0.7973
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       2.75
+      ],
+      [
+       "L",
+       0,
+       2.75
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ],
    "clipIds": [
@@ -10668,7 +12458,9 @@
     "IjaSlapForehand",
     "IjaSlapBackhand",
     "IjaSlapRaise",
-    "IjaShotStaggerAway"
+    "IjaShotStaggerAway",
+    "IjaStompStabTwist",
+    "IjaTearBadge"
    ]
   },
   {
