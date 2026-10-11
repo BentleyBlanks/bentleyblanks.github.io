@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20261011OpeningStoryboardsV24Redraft",
+ "version": "20261011OpeningStoryboardsV25Polish",
  "fps": 24,
  "actorForward": [
   0,
@@ -5144,7 +5144,7 @@
    "next": [
     "IjaWipeBandageFixBayonet"
    ],
-   "notes": "2026-10-11 Slash: frame 0 = IjaHairLiftKneeBack at its hold-loop start. 0-0.12 s the edge is pressed in on the left of the throat, 0.12-0.40 one hard pull back toward his right hip draws it round the front of the throat (0.25 s) to its right, the fist leading (IjaThroatSlash's stroke, mirrored); the knife comes out low at his right side. 0.708 s the left knee drives forward and the fist lets go of the hair with a push: the man pitches forward onto his face; ijaA steps after him with the left foot and stands over him."
+   "notes": "2026-10-11 Slash: frame 0 = IjaHairLiftKneeBack at its hold-loop start. 0-0.12 s the edge is pressed in on the left of the throat, 0.12-0.40 one hard pull back toward his right hip draws it round the front of the throat (0.25 s) to its right, the fist leading (IjaThroatSlash's stroke, mirrored); the knife comes out low at his right side. 0.708 s the left knee drives forward and to his left and the fist lets go of the hair with a push: the man pitches over onto his face to his left; (polish 2026-10-11) ijaA draws the left foot back out of the lunge beside the right (0.76-0.96) and stands over him looking down at the bandaged arm."
   },
   "CaptiveCurledPulledUp": {
    "duration": 3.5,
@@ -5271,7 +5271,7 @@
     "CaptiveCurledPulledUp"
    ],
    "next": [],
-   "notes": "2026-10-11 Slash: frame 0 = CaptiveCurledPulledUp at its hold-loop start. The cut (0.25 s) cuts the howl dead: a jolt, the right hand comes off the fist to the throat; the knee (0.708) pitches him forward: he goes down on his face turned onto his right side (1.25), the right hand under the throat, the left arm loose with the bandage up; two twitches (2.0, 2.55); the last frame is the corpse (hold it)."
+   "notes": "2026-10-11 Slash: frame 0 = CaptiveCurledPulledUp at its hold-loop start. The cut (0.25 s) cuts the howl dead: a jolt, the right hand comes off the fist to the throat (the jet from the right of the throat onto the north wall); the knee (0.708) pitches him over to his own left (polish 2026-10-11: off the pinned eye's line, clear of ijaA's finishing walk): he goes down on his face along the foot of the north wall, turned a little onto his right side (1.25), the head east, the legs trailing west, the right hand at the throat, the bandaged left arm up on the wall side; two twitches (2.0, 2.55); the last frame is the corpse (hold it). Pelvis at rest 0.14 m west / 0.36 m south of R3, the head 0.38 m east / 0.53 m south."
   },
   "IjaWipeBandageFixBayonet": {
    "duration": 4.0,
@@ -5349,7 +5349,7 @@
    "next": [
     "IjaFinishWalkStab"
    ],
-   "notes": "2026-10-11 Slash (N17): frame 0 = IjaThroatCutKneeShove last frame. He half squats at the dead man's left shoulder and draws the flat of the bloody blade along the bandage (wipe1 0.79), turns it over and draws the other face (wipe2 1.33), stands, the knife up in his right fist; the left hand takes the rifle off his back by the barrel over the right shoulder (2.15) and brings it round in front, muzzle up; the bayonet's ring goes over the muzzle and clicks home (fix 3.0); the right hand goes back to the wrist of the stock and he lowers the rifle, the point down, and steps off with the left foot (last frame = IjaFinishWalkStab frame 0). The bayonet track rides the muzzle from 3.0 s on (the rifle was spawned bayonet:false)."
+   "notes": "2026-10-11 Slash (N17): frame 0 = IjaThroatCutKneeShove last frame. He half squats behind the dead man's left shoulder on the wall side (polish 2026-10-11: the body lies along the north wall foot, ijaA between it and the planks) and draws the flat of the bloody blade along the bandage (wipe1 0.79), turns it over and draws the other face (wipe2 1.33), stands, the knife up in his right fist; the left hand takes the rifle off his back by the barrel over the right shoulder (2.15) and brings it round in front, muzzle up; the bayonet's ring goes over the muzzle and clicks home (fix 3.0); the right hand goes back to the wrist of the stock and he lowers the rifle, the point down, and steps off with the left foot (last frame = IjaFinishWalkStab frame 0). The bayonet track rides the muzzle from 3.0 s on (the rifle was spawned bayonet:false)."
   },
   "IjaFinishWalkStab": {
    "duration": 1.75,
@@ -6196,7 +6196,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "e8ef531d20d7fc7ffe54cfdb1c18d981b25cc3aeb455d5f87c7f3a4da37e61ef",
+   "sha256": "3393f87f198cec2c1d89617f242b7de08365023a15842cc8a97e6a4fe2317b32",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
@@ -8715,9 +8715,9 @@
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
      "wallPenetrationM": 0.0,
-     "pelvisMaxStepM": 0.0632,
-     "floorCorrectionMin": 0.06123,
-     "floorCorrectionMax": 0.24963,
+     "pelvisMaxStepM": 0.0787,
+     "floorCorrectionMin": -0.02617,
+     "floorCorrectionMax": 0.06856,
      "root": {
       "start": [
        0.35,
@@ -8726,10 +8726,10 @@
        0.3985
       ],
       "end": [
-       0.4762,
-       -0.4802,
-       -35.0,
-       0.348
+       0.1375,
+       -0.3569,
+       75.0,
+       0.1523
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -12082,7 +12082,7 @@
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "9ad5e7fe9e1efc88de965ea0589bac045c321c08b3457f300cf9d091eb63c8ed",
+   "sha256": "97dee17b7ebbdb19efde3dffcfb3079bfd7f445e3ed839a07915ddabd464440d",
    "originalModelSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningRedraft_20261011_AB\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
@@ -15163,13 +15163,13 @@
     {
      "clip": "IjaThroatCutKneeShove",
      "frames": 41,
-     "footSlideM": 0.0072,
+     "footSlideM": 0.0,
      "contactErrorM": 0.0,
-     "gripSolveErrorM": 0.01959,
-     "wallPenetrationM": 0.0209,
-     "pelvisMaxStepM": 0.0684,
+     "gripSolveErrorM": 0.01999,
+     "wallPenetrationM": 0.0214,
+     "pelvisMaxStepM": 0.0881,
      "floorCorrectionMin": -0.00456,
-     "floorCorrectionMax": 0.00383,
+     "floorCorrectionMax": -0.00456,
      "root": {
       "start": [
        -0.0,
@@ -15178,10 +15178,10 @@
        0.6293
       ],
       "end": [
-       -0.3688,
-       0.0526,
+       -0.0493,
+       0.1261,
        0.0,
-       0.4618
+       0.7339
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -15222,24 +15222,25 @@
     {
      "clip": "IjaWipeBandageFixBayonet",
      "frames": 97,
-     "footSlideM": 0.0077,
+     "footSlideM": 0.005,
      "contactErrorM": 0.0,
-     "gripSolveErrorM": 0.11447,
-     "pelvisMaxStepM": 0.1357,
-     "floorCorrectionMin": -0.03636,
-     "floorCorrectionMax": 0.00382,
+     "gripSolveErrorM": 0.11425,
+     "wallPenetrationM": 0.0214,
+     "pelvisMaxStepM": 0.1079,
+     "floorCorrectionMin": -0.00521,
+     "floorCorrectionMax": 0.03455,
      "root": {
       "start": [
-       -0.3688,
-       0.0526,
+       -0.0493,
+       0.1261,
        0.0,
-       0.4618
+       0.7339
       ],
       "end": [
-       -0.5042,
-       -1.1503,
+       -0.5024,
+       -0.0066,
        0.0,
-       0.401
+       0.4913
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
