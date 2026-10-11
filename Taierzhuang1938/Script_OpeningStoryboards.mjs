@@ -6,7 +6,7 @@ import { FRONT_SPACE } from "./Data_FirstLevelFrontRoute.mjs";
 import { LoadOpeningStoryboardAnimation, InstallOpeningStoryboardAnimation, SetOpeningActorPerformance, ClearOpeningActorPerformance,
   UpdateOpeningStoryboardCorpse, OpeningStage, OpeningClipMeta, OpeningClipRoot, OpeningPlayerPoint, OpeningPropConfig,
   OwnOpeningProp, DropOpeningWeapon, IsOpeningTerminalClip, OpeningClipLibrary } from "./Script_OpeningStoryboardAnimation.mjs";
-import { OpeningPropSet, OpeningHoldTime, SampleOpeningPropTrack, PlaceOnOpeningTrack } from "./Script_OpeningProps.mjs";
+import { OpeningPropSet, OpeningHoldTime, SampleOpeningPropTrack, PlaceOnOpeningTrack, WearNraCap, PreloadRedraftModels } from "./Script_OpeningProps.mjs";
 import { SET_MARKS } from "./Data_OpeningSet0103.mjs";
 import { OpeningFirstPerson, TrimOpeningPlayerBody, BuildOpeningFirstPersonWarmProps } from "./Script_OpeningFirstPerson.mjs";
 import { GearCamera, GearPoint, GearData, GearArrivalS } from "./Script_OpeningFirstPersonGear.mjs";
@@ -178,7 +178,8 @@ export class FirstLevelBunkerShow {
   constructor(runtime){
     this.r=runtime;this.captives=[];this.rifleProps=[];this.beats=new Set();this.phase=null;this.at=0;this.cast={};this.ready=false;this.owned=[];
     this.scenes={};this.events=[];this.flags={};
-    LoadOpeningStoryboardAnimation().then(()=>this.ready=true).catch(error=>this.error=String(error));
+    // (2026-10-12 R2: with the external prop models -- He's cap -- loaded too: a load started mid-flow waits for the page to idle.)
+    Promise.all([LoadOpeningStoryboardAnimation(),PreloadRedraftModels()]).then(()=>this.ready=true).catch(error=>this.error=String(error));
     // The walk with the rifle slung / with no weapon (ijaA, ijaB, the depth Japanese, the interpreter).
     LoadRelaxedGait().catch(error=>{this.gaitError=String(error);});
   }
@@ -722,6 +723,8 @@ export class FirstLevelBunkerShow {
     if(["Trapped","BunkerRescue","RearTrench"].includes(stage)||this.setup)this.Setup();
     if(!this.setup)return;
     this.AdoptAssault();
+    // (2026-10-12 R2: He's own cap goes back on if anything takes him out of the dugout beats with it off -- a skip, a checkpoint.)
+    if(this.heCapOff&&!["Count","Banter","Orders"].includes(this.phase))this.HeCap(true);
     if(stage==="Trapped"||stage==="BunkerRescue"){
       if(this.phase==null)this.Stage("Count");
       // Phase dispatch: the handler of the current phase (contract §2 table; Data_OpeningStoryboards.phases). 01 (Dir01): Count,
@@ -1117,7 +1120,10 @@ export class FirstLevelBunkerShow {
   /**
    * He asleep in the far corner, curled on his side (HeHelmetSleepSitUp's first frame), rolling over at heRoll (its `roll`) onto its
    * hold loop, sitting up at the far call (sitUp: the loop let go -> its `sitUp`, `sat`), sitting there until the order (ExitSquad
-   * re-roots him under his pelvis: the clip turns and moves him). The helmet track has no mesh (no `helmet` prop): his own stays on.
+   * re-roots him under his pelvis: the clip turns and moves him).
+   * 2026-10-12 R2 (the integrator: the cap, not a helmet -- 「钢盔扣在脸上」 played with the NRA02 field cap): the clip's `helmet` track draws
+   * the Set's `helmet` prop (Model_NraHelmet, over his face, then in his hand) and the cap on his head is taken off while it plays
+   * (HeCap, Script_OpeningProps.WearNraCap); it goes back on as he sets off for the mouth (ExitSquad).
    */
   HeAsleep(){
     const r=this.r,he=this.Squad("heyoutian"),b=C.banter,f=this.flags,clip="HeHelmetSleepSitUp";if(!he)return;
@@ -1128,6 +1134,12 @@ export class FirstLevelBunkerShow {
     const sit=this.flags["ev:sitUp"],roll=this.flags["ev:heRoll"]??(sit!=null?sit-.7:null);
     const seconds=roll==null?0:r.time-roll,holdUntil=sit==null?Infinity:Math.max(0,sit-roll);
     this.Hold(he,b.he,clip,{seconds,holdUntil});
+    if(!this.flags.heRerooted)this.HeCap(false);
+  }
+  /** He Youtian's own cap on (true) / off (false) -- off while HeHelmetSleepSitUp's `helmet` prop is the one shown. */
+  HeCap(on){
+    const he=this.Squad("heyoutian");if(!he?.actor)return;
+    if(WearNraCap(he.actor,on))this.heCapOff=!on;
   }
   ComradeGesture(clip,length){this.flags.comradeAdditive={clip,at:this.r.time,length};}
   /** 「黑场里先是声音：远处一声炮响，隔几秒又一声。近处有人在小声数数」: two far guns, BunkerCount, a near one shedding dirt
@@ -1220,7 +1232,8 @@ export class FirstLevelBunkerShow {
       if(since<spec.delayS)continue;
       if(spec.id==="liu"&&this.LiuStaying())continue;
       // He sat up on a root-motion clip (HeHelmetSleepSitUp): re-rooted under his pelvis before he runs.
-      if(spec.id==="he"&&!this.flags.heRerooted&&OpeningClipMeta("HeHelmetSleepSitUp")){this.flags.heRerooted=true;this.RerootUnderPelvis(actor,Face(actor.openingStoryboardLast||actor.position,this.ExitRoute("he")[0]));}
+      // (2026-10-12 R2: the cap in his hand goes back on his head as he gets up to go -- 「何有田抓起钢盔扣在头上，第一个钻出洞口」.)
+      if(spec.id==="he"&&!this.flags.heRerooted&&OpeningClipMeta("HeHelmetSleepSitUp")){this.flags.heRerooted=true;this.HeCap(true);this.RerootUnderPelvis(actor,Face(actor.openingStoryboardLast||actor.position,this.ExitRoute("he")[0]));}
       if(this.Follow(actor,"exit",this.ExitRoute(spec.id),C.speed[spec.speed],null))this.Hide(actor);
     }
   }

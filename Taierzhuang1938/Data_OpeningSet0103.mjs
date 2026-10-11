@@ -740,6 +740,13 @@ export const REDRAFT_PROPS = Object.freeze({
   type11: Object.freeze({ kind: "weapon", weapon: "Type11", bipod: Object.freeze({ legM: 0.26, spreadDeg: 26, rakeDeg: 18, fromMuzzleM: 0.18, radiusM: 0.007 }) }),
   // P1：背包口露出的一截蓝布便服（叠着、起皱）。Dir01 挂到收拾装备时的背包上（OpeningWorldProps.AttachTo）。
   civilianShirt: Object.freeze({ kind: "cloth", sizeM: Object.freeze([0.2, 0.06, 0.11]), color: 0x3c5a80, fold: 0x2c4361 }),
+  // 2026-10-12 R2（集成负责人拍板：用军便帽，不另做钢盔；原文「钢盔扣在脸上」按帽子演）：何有田 HeHelmetSleepSitUp 的 helmet 轨。
+  // 模型是 R2-Anim 从 NRA02 军装里按蒙皮切出来的那顶帽子（_import/Script_NraHelmetProp.py → Model_NraHelmet.glb：原点帽顶中心、
+  // 帽檐高度，局部 -Z 朝帽顶外、+Y 朝帽檐；运行时米 = GLB × scale）。颜色走戴帽人自己的军装换色（wearer 的打标 + 他布料材质的
+  // nraUniformPalette；刚体小件的泥按高度画，grimeLift 抬开）。他播这条 clip 时头上那顶摘掉（Script_OpeningProps.WearNraCap：
+  // clothMaterial 里三个顶点头骨权重 ≥ headWeightMin 的三角截掉、badgeMaterial 的帽徽藏起来），出洞口前戴回。
+  helmet: Object.freeze({ kind: "wornCap", model: "./Model/Model_NraHelmet.glb?v=20261012R2Cap", scale: 0.9135, wearer: "TengxianNra02",
+    grimeLift: 10, clothMaterial: "Material #1721585337", badgeMaterial: "Material #1721585500", headWeightMin: 0.9 }),
 });
 
 /**

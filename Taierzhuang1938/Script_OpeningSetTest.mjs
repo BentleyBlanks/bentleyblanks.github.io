@@ -1212,7 +1212,11 @@ function FakeVfx() {
   const pack = new THREE.Object3D(); pack.position.set(-2.4, GG(-2.4, -125.62) + 0.4, -125.62); scene.add(pack);
   props.AttachTo("civilianShirt", pack, { y: 0.2 }); props.Update(1 / 60);
   assert.ok(props.Get("civilianShirt").object.position.distanceTo(pack.position.clone().add(new THREE.Vector3(0, 0.2, 0))) < 1e-6, "AttachTo: the shirt rides on the pack");
-  for (const name of Object.keys(REDRAFT_PROPS).filter((n) => !["comradeRifle", "type11", "ammoBox"].includes(n))) {
+  // helmet (2026-10-12 R2): R2-Anim's GLB, loaded in the browser only (an empty group here) -- its file and fields are checked instead.
+  { const h = REDRAFT_PROPS.helmet, file = path.join(path.dirname(fileURLToPath(import.meta.url)), h.model.split("?")[0]);
+    assert.ok(h.kind === "wornCap" && fs.existsSync(file) && h.scale > 0.8 && h.scale < 1 && h.wearer === "TengxianNra02" && h.headWeightMin >= 0.9,
+      `helmet: Model_NraHelmet.glb on the NRA02 cap's scale (${h.model})`); }
+  for (const name of Object.keys(REDRAFT_PROPS).filter((n) => !["comradeRifle", "type11", "ammoBox", "helmet"].includes(n))) {
     const built = BuildRedraftProp(name);
     assert.ok(built?.object && CountTriangles(built.object) > 0, `${name} builds procedurally`);
     built.geometries.forEach((x) => x.dispose()); built.materials.forEach((x) => x.dispose());

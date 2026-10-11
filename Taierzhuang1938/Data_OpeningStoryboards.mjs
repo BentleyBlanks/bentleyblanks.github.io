@@ -10,12 +10,9 @@ const H = (frame, p, f, n, c, extra = {}) => Object.freeze({ in: frame, p: Objec
 /** Hand keys of one phase: [t, leftPose, rightPose], eased with smoothstep; `clock` names a director flag. */
 const K = (...keys) => Object.freeze({ keys: Object.freeze(keys.map((k) => Object.freeze(k))) });
 const KC = (clock, ...keys) => Object.freeze({ clock, keys: Object.freeze(keys.map((k) => Object.freeze(k))) });
-// Wave 1 (contract §3): BunkerSouthRevetment (Data_FirstLevelMissionLayout shell, x -2.8..0.8, z -123.95..-123.55,
-// 2.2 m) stands where 02's circle closes (shunzi.dragged) and across SB04A's drag. Until it is opened in the collapsed
-// state (pendingWiring SB04A/SB05, owner to be named by the integrator) the three places that must look past it name it
-// through this one constant: storyboardShots SB04A behindOk, Data_FirstLevelSpaceKeyframes K2 ignore and
-// Script_OpeningStoryboardsTest's sight/drag checks. Wave 2 sets wave1Allowances.revetment to null.
-const REVETMENT = "BunkerSouthRevetment";
+// (Wave 1, 2026-09-23: wave1Allowances.revetment named BunkerSouthRevetment for the old SB04A drag's sight lines. SB04A, the
+// circle and that drag are gone with the 2026-10-11 redraft and nothing reads the allowance any more: wave 2 (2026-10-12 R2-Dir)
+// sets it to null.)
 // Everyone who leaves after Luo's order (banter.exitRoute; the runner's own is the same without its first point).
 const BANTER_EXIT = Route([2.1,-125.2],[3.4,-123.6],[3.1,-121.6],[1.2,-120.6],[-1,-118.5],[-4,-113],[-9,-111.3]);
 export const OPENING_STORYBOARDS = Object.freeze({
@@ -23,8 +20,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
-  wave:1,
-  wave1Allowances:Object.freeze({ revetment:REVETMENT }),
+  // (2026-10-12 R2-Dir: wave 2 -- the last stand-in, He's cap, is wired: Set's `helmet` prop and WearNraCap.)
+  wave:2,
+  wave1Allowances:null,
   // 2026-09-23 action library (contract §5.4). Names are frozen; per-clip metadata (role,
   // contacts, stages, props, root motion, holdLoop, next) is in the manifest `clips`.
   clips:{
@@ -838,7 +836,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // His root swings levelPivotDeg round the eye over levelPivotS as he backs off (Script_OpeningStoryboards.LevelRoot): he stays
       // on the trench floor, facing the eye, the muzzle on it.
       levelPivotDeg:-12, levelPivotS:1.2,
-      recruitFall:P(4.11,-126.21) }),   // measured, 2026-10-11 integration run (flags fall:ijaD; was the preset (5.3,-125.8))
+      // measured: his pelvis at rest at Check (2026-10-12 R2-Dir run with levelPivotDeg; 2026-10-11 integration (4.11,-126.21); preset (5.3,-125.8))
+      recruitFall:P(4.05,-126.18) }),
     // The cut on the cheek, first person: the head flinches flinchDeg away from it (to the right) over flinchS and comes back over
     // recoverS; the cheekCut sound (Sfx package, contract §6) -- `sound` until it is registered (pendingWiring N21); the lens look
     // is Data_OpeningLens `cheek` on the cut's clock (events.cheekAt).
@@ -1204,8 +1203,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // ---- 2026-10-11 integration: what is still a stand-in after the seven packages were wired (the rest of the wave-1 list is
     // wired: AnimA / AnimB clips, the Voice takes and yells, the Set's corpses / props / marks / FoldBlast, the Sfx cues). Each left
     // here has no delivered piece to wire to; the integration report (docs/Data_OpeningRedraft20261011Contract.md §9) says why.
-    {shot:"N01", what:"He's helmet over his face and in his hand (HeHelmetSleepSitUp's `helmet` prop track)",
-      now:"the track is not drawn (no `helmet` prop mesh in Script_OpeningProps); his own helmet, part of the head skin, stays on", wave2:"a `helmet` prop (Set) and the head's helmet hidden while the clip holds it (needs a separable helmet on NRA02)"},
+    // (2026-10-12 R2-Dir: wired -- N01 He's cap over his face and in his hand: the Set's `helmet` prop (R2-Anim's Model_NraHelmet, the
+    // NRA02 field cap -- the integrator's call: the cap, not a helmet) on HeHelmetSleepSitUp's track, his own taken off meanwhile
+    // (Script_OpeningProps.WearNraCap) and put back on as he sets off for the mouth.)
     // (2026-10-12 R2-Dir: wired -- N03 the runner catches his breath at the post on RunnerLeanPostCall before BunkerOrders.01 (banter.runnerCall
     // leanClip / breathS); N25 Liu and He on one knee at their posts in the native crouch (Move `crouch`, the AI's stance 1 carried into
     // the hand-back).)

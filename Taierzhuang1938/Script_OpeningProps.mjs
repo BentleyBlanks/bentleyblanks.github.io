@@ -245,7 +245,7 @@ export class OpeningPropSet {
     } else if (REDRAFT_PROPS[name]) {
       // 2026-10-11 开场重构的道具（契约 §5.2）：clip 带同名 prop 轨就画在这个人手里（同一套挂载约定：长轴局部 -Z、上 +Y）。
       // 自己建的几何与材质在 Dispose 里一起收。
-      const built = BuildRedraftProp(name, { factory: actor.factory, materials: actor.materials });
+      const built = BuildRedraftProp(name, { factory: actor.factory, materials: actor.materials, wearer: actor });
       if (!built) return null;
       item = { object: built.object, axis: built.axis, owned: built };
     } else return null;
@@ -592,15 +592,116 @@ export function BuildRedraftProp(name, ctx = {}) {
   else if (spec.kind === "type91") object = Type91Object(owned, spec);
   else if (spec.kind === "cloth") object = ClothObject(owned, spec);
   else if (spec.kind === "weapon") { const w = WeaponObject(owned, spec, ctx); if (!w) return null; object = w.group; axis = w.axis; }
+  else if (spec.kind === "wornCap") object = WornCapObject(owned, spec, ctx);
   else return null;
   if (!object.isGroup) { const group = new THREE.Group(); group.add(object); object = group; }
   object.name = `OpeningProp_${name}`;
-  return { object, axis, ...owned };
+  // (2026-10-12: the same object, not a copy -- an asynchronously loaded prop, the helmet, checks `disposed` on it and adds what it loads.)
+  return Object.assign(owned, { object, axis });
 }
 function DisposeBuilt(built) {
   if (!built) return;
+  built.disposed = true;
   for (const g of built.geometries || []) g.dispose();
   for (const m of built.materials || []) m.dispose();
+  for (const t of built.textures || []) t.dispose();
+}
+
+/**
+ * 2026-10-12 R2：外部模型道具（wornCap）的模板与换色用的模块，开场导演就绪前载好（PreloadRedraftModels；导演在
+ * LoadOpeningStoryboardAnimation 旁边一起等）。逐帧同步推进的测试和抓帧里，开场中途才发起的异步载入要等页面空闲才走完
+ * （实测何有田的帽子到 Orders 还没挂上），所以先载、用时同步克隆。
+ */
+const PRELOADED = { modules: null, models: new Map() };
+export function PreloadRedraftModels() {
+  if (typeof document === "undefined") return Promise.resolve();
+  return PRELOADED.promise ??= (async () => {
+    const [{ ManagedGLTFLoader }, { TagCharacterSurface }, { ApplyNraUniform }, { PatchesOf }] = await Promise.all([
+      import("./Script_ModelImports.mjs"), import("./Script_CharacterSurface.mjs"), import("./Script_UniformColors.mjs"), import("./Script_MaterialPatches.mjs")]);
+    PRELOADED.modules = { TagCharacterSurface, ApplyNraUniform, PatchesOf };
+    const urls = [...new Set(Object.values(REDRAFT_PROPS).filter((s) => s.kind === "wornCap").map((s) => s.model))];
+    await Promise.all(urls.map(async (url) => PRELOADED.models.set(url, (await new ManagedGLTFLoader().loadAsync(url)).scene)));
+  })().catch((error) => console.warn(`[OpeningProps] preload: ${error}`));
+}
+
+/**
+ * 2026-10-12 R2：何有田的军便帽（REDRAFT_PROPS.helmet，kind wornCap）。预载的模板克隆一份（几何与材质各自克隆，贴图共用模板的），
+ * 颜色按戴帽人（ctx.wearer：他的 Actor）自己的军装换色：打标 → characterPbrSurface → ApplyNraUniform(他布料的
+ * nraUniformPalette) → 布料变体的 uCharGrimeSeed.w 抬到 grimeLift（R2-Anim 报告 §2：不抬会按道具自己坐标里的高度画一身泥）。
+ * 克隆的几何与材质（原件和换色后的）记进 owned，Dispose 一起收。没预载好（或 node 测试）就是空组，模板载好后再挂上。
+ */
+function WornCapObject(owned, spec, ctx) {
+  const group = new THREE.Group();
+  if (typeof document === "undefined") return group;
+  const Attach = () => {
+    const template = PRELOADED.models.get(spec.model), M = PRELOADED.modules;
+    if (!template || !M || owned.disposed) return;
+    const cap = template.clone(true);
+    cap.traverse((o) => {
+      if (!o.isMesh) return;
+      o.geometry = o.geometry.clone(); owned.geometries.push(o.geometry);
+      o.material = Array.isArray(o.material) ? o.material.map((m) => m.clone()) : o.material.clone();
+      owned.materials.push(...(Array.isArray(o.material) ? o.material : [o.material]));
+      o.userData.characterPbrSurface = true; o.castShadow = true; o.receiveShadow = true;
+    });
+    let palette = null;
+    ctx.wearer?.root?.traverse((o) => { if (o.isSkinnedMesh && o.material?.userData?.nraUniformPalette) palette ??= o.material.userData.nraUniformPalette; });
+    M.TagCharacterSurface(cap, spec.wearer);
+    M.ApplyNraUniform(cap, palette || undefined);
+    cap.traverse((o) => {
+      if (!o.isMesh) return;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (!owned.materials.includes(m)) owned.materials.push(m);
+      for (const p of M.PatchesOf(o.material) || []) { const u = {}; p?.uniforms?.(u, {}); if (u.uCharGrimeSeed) u.uCharGrimeSeed.value.w = spec.grimeLift; }
+    });
+    cap.scale.setScalar(spec.scale);
+    group.add(cap);
+  };
+  if (PRELOADED.models.has(spec.model) && PRELOADED.modules) Attach();
+  else PreloadRedraftModels().then(Attach);
+  return group;
+}
+
+/**
+ * 2026-10-12 R2：摘下 / 戴回 NRA02 头上那顶帽子（帽子长在军装布料网格里，不是单独的网格）。摘：这个人的布料网格换一份克隆的
+ * 几何，「三个顶点头骨权重都 ≥ headWeightMin」的三角挪到索引末尾，setDrawRange 截掉；帽徽网格（badgeMaterial）藏起来。不加着色器、
+ * 不加程序。戴回：换回原几何、收掉克隆、帽徽显出来。actor：Actor（.root / .characterRig）。幂等。
+ */
+export function WearNraCap(actor, worn, spec = REDRAFT_PROPS.helmet) {
+  const rig = actor?.characterRig, root = actor?.root || rig?.root;
+  if (!rig || !root || !spec) return false;
+  let state = rig.openingCapHidden;
+  if (worn) {
+    if (!state) return true;
+    state.mesh.geometry = state.original; state.clone.dispose();
+    for (const badge of state.badges) badge.visible = true;
+    rig.openingCapHidden = null;
+    return true;
+  }
+  if (state) return true;
+  let cloth = null; const badges = [];
+  root.traverse((o) => {
+    if (!o.isSkinnedMesh) return;
+    if (o.material?.name === spec.clothMaterial) cloth ??= o;
+    else if (o.material?.name === spec.badgeMaterial) badges.push(o);
+  });
+  if (!cloth?.geometry?.index) return false;
+  const N = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const head = cloth.skeleton.bones.findIndex((b) => N(b.name).endsWith("head") && !/nub/.test(N(b.name)));
+  if (head < 0) return false;
+  const g = cloth.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, idx = g.index;
+  const HeadW = (v) => { let w = 0; for (let k = 0; k < 4; k++) if (si.getComponent(v, k) === head) w += sw.getComponent(v, k); return w; };
+  const keep = [], cap = [];
+  for (let t = 0; t < idx.count; t += 3) {
+    const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+    (HeadW(a) >= spec.headWeightMin && HeadW(b) >= spec.headWeightMin && HeadW(c) >= spec.headWeightMin ? cap : keep).push(a, b, c);
+  }
+  const clone = g.clone();
+  clone.setIndex(new THREE.BufferAttribute(new idx.array.constructor([...keep, ...cap]), 1));
+  clone.setDrawRange(0, keep.length);
+  rig.openingCapHidden = state = { mesh: cloth, original: g, clone, badges, capTriangles: cap.length / 3 };
+  cloth.geometry = clone;
+  for (const badge of badges) badge.visible = false;
+  return true;
 }
 /** 一件道具建出来的三角形数（共用的武器几何也算：它画在这里）。 */
 export function CountTriangles(object) {
