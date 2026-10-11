@@ -136,7 +136,7 @@ export function WhiteboxGraphicsOverrides(value) {
 export function WhiteboxPostOptions(config, options) {
   if (!config) return options;
   return {
-    ...options, aberration: 0, radialBlur: 0, sideDaze: null, concussion: null, bloodEdge: null,
+    ...options, aberration: 0, radialBlur: 0, sideDaze: null, cheekCut: null, concussion: null, bloodEdge: null,
     hitDisorientation: 0, motionBlur: config.motionBlur ? options.motionBlur : 0,
     dofStrength: config.dof ? options.dofStrength : 0, nearDofStrength: config.dof ? options.nearDofStrength : 0,
     exposure: config.autoExposure || config.grading ? options.exposure : 1,

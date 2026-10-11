@@ -592,7 +592,7 @@ assert.ok(["origin","axis","up"].every(k=>ijaA.propMounts?.bayonet?.[k]?.length=
 // ---- director data (2026-09-27 rework, docs/Data_OpeningPinnedRescue20260927.md; space §2.1/§3) ---------------
 assert.deepEqual([...C.phases.Trapped],["Count","Banter","Orders","Incoming","Blast","Black","Wake","DropIn","Sweep","CaptiveDragged","CaptiveWall",
   "Interrogation","Practice","Slash","Finish","Found"],"Trapped phases (2026-10-11 redraft, docs/Data_OpeningRedraft20261011Contract.md §2)");
-assert.deepEqual([...C.phases.BunkerRescue],["Hold","Ask","Charge","Melee","Lift","Check","Released"],"BunkerRescue phases (2026-09-29: the kick and the pickup are gone)");
+assert.deepEqual([...C.phases.BunkerRescue],["Hold","Ask","Blade","Charge","Melee","Lift","Check","Released"],"BunkerRescue phases (2026-10-11: Blade, the recruit's cut, between the questioning and the volley)");
 assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","SupportOrder"],"contract §5.3 RearTrench phases");
 assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持第一人称，不在切换视角」)");
 {
@@ -648,7 +648,7 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   // 2026-09-30 self rescue (docs/Data_OpeningSelfRescue20260930.md): the volley's wounded end up east of the lane he heaves
   // himself out along; each is cut down from his right rear (chopRear) by Luo or an NRA05 extra.
   const Local=(a,x,z,dyaw=0)=>{const d=Rot(a.yaw,x,z);return {x:a.x+d.x,z:a.z+d.z,yaw:a.yaw+dyaw*Math.PI/180};};
-  const WoundStart={ijaA:J.crouch,ijaB:R.ijaBGuard,interpreter:R.interpreter};
+  const WoundStart={ijaA:J.crouch,interpreter:R.interpreter};
   const models=Object.fromEntries(manifest.models.map(m=>[m.id,m]));
   const Model={ijaA:"TengxianIja02",ijaB:"TengxianIja01",interpreter:"TengxianNra02"};
   const WoundBody=role=>{
@@ -658,7 +658,8 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   const heaveRoot={x:eye.x,z:eye.z,yaw:-Math.PI/2},kneelKey=R.heave.body.eye.at(-1)[1],kneel=Local(heaveRoot,kneelKey[0],kneelKey[2]);
   const handRoot=Local({...kneel,yaw:heaveRoot.yaw},0,-R.hand.frontM,180);
   const cutMarks=R.cuts.map(c=>[c,Stage("chopRear","luo",WoundBody(c.victim))]);
-  for(const [name,p,m] of [["ijaA's crouch",J.crouch,.1],["the interpreter's squat",R.interpreter,.1],["ijaB's guard",R.ijaBGuard,.3],
+  for(const [name,p,m] of [["ijaA's crouch",J.crouch,.1],["the interpreter's squat",R.interpreter,.1],["the recruit's cut spot",R.blade.recruitAt,.2],
+    ["where the recruit levels his rifle",R.blade.levelAt,.2],["where the grenade comes to rest",R.grenade.stop,.05],["where ChargeB lies",R.fallenComrade,.1],
     ...cutMarks.map(([c,p])=>[`${c.by}'s cut mark behind ${c.victim}`,p,.2]),["Liu's firing spot",R.liuShot,.2],["Liu's trench post",R.liuCover,.3],
     ["He's timber spot",R.lift.heLift,.1],["where he kneels up",kneel,.3],["Luo's hand-over root",handRoot,.3],["the rifle Luo snatches up",R.rifleMouth,.1],
     ["He's trench-edge post",R.heCover,.3]])
@@ -671,8 +672,45 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     assert.ok(shot&&!shot.lethal&&shot.part==="arm"&&shot.at<delay,`${c.victim} is shot in the arm (${shot?.at} s) before ${c.by} comes over the step (${delay} s)`);
     assert.ok(c.by==="luo"||R.extras.find(e=>e.id===c.by)?.modelVariant===4,`${c.by} has the NRA05 body LuoDadaoChopRear is baked on`);
   }
-  assert.deepEqual(R.cuts.map(c=>c.victim).sort(),["ijaA","ijaB","interpreter"],"the two who questioned him and the interpreter are cut down");
-  assert.equal(R.cuts.find(c=>c.victim==="ijaA").by,"luo","Luo cuts down the man who slapped him");
+  assert.deepEqual(R.cuts.map(c=>[c.by,c.victim]),[["luo","ijaA"],["ChargeA","interpreter"]],"Luo cuts down the man who slapped him, then ChargeA the interpreter (2026-10-11)");
+  {
+    // 2026-10-11 (contract §1.11–1.12): no bugle; the volley's five aimed shots in order -- the gunner and the loader dead, the
+    // recruit dead in the chest, ijaA and the interpreter in the left arm -- then the depth man; all before anyone is over the step.
+    const W=R.wound.shots,order=W.map(w=>w.role);
+    assert.deepEqual(order,["gunner","loader","ijaD","ijaA","interpreter","DepthIjaB"],"volley order: the gun crew first");
+    assert.deepEqual(W.slice(0,5).map(w=>w.at),[0,.12,.30,.48,.66],"volley times (contract §1.11)");
+    for(const role of ["gunner","loader","ijaD"])assert.ok(W.find(w=>w.role===role).lethal,`${role} is shot dead`);
+    for(const role of ["ijaA","interpreter"]){const w=W.find(w=>w.role===role);assert.ok(!w.lethal&&w.bone==="upperArmL",`${role} in the left arm`);}
+    const firstOver=Math.min(R.delayS.luo,...R.extras.map(e=>e.delayS));
+    assert.ok(W.slice(0,5).every(w=>w.at<firstOver+.4),"the volley is over (but the depth man) before the first man is down the step");
+    const source=fs.readFileSync(new URL("./Script_OpeningStoryboards.mjs",import.meta.url),"utf8");
+    const charge=source.slice(source.indexOf("  PhaseCharge(age){"),source.indexOf("  RecruitLevelled(){"));
+    assert.ok(charge&&!charge.includes('Play?.("bugle'),"no bugle in the charge (「没有号声」)");
+    assert.match(source,/  PhaseBlade\(age\)\{/,"the Blade phase exists");
+    // The long shot is at the junction man ijaB now; the fold man ijaC is FoldFight's.
+    const long=source.slice(source.indexOf("  LongShotTick(){"),source.indexOf("  ShotOrigin(shooter){"));
+    assert.ok(/this\.Ija\("ijaB"\)/.test(long)&&!/this\.Ija\("ijaD"\)/.test(long)&&!/ReleaseCombat/.test(long),"Liu Wencai shoots ijaB at the junction; nobody releases the fold man to the AI");
+    assert.ok(R.extras.some(e=>e.foldTarget)&&R.extras.filter(e=>e.shootsFold).length>=2&&R.extras.filter(e=>e.shootsFold).every(e=>e.weapon==="HanYang"&&e.post),
+      "the fold man drops the first man down; two riflemen on the step answer him");
+    // The machine-gun crew are in the hand-back's list under the roster ids the stand-ins take.
+    for(const m of Object.values(R.mgCrew))assert.ok(C.vanguardIds.includes(m.id),`${m.id} must be down before the hand-back`);
+    // Squad yells only (stand-ins until the Voice package's keys are wired).
+    assert.ok(R.noise.yells.every(([,key])=>/^yell_(sha|kan|chong)(@(luo|heyoutian|liuwencai))?$/.test(key)),"only short yells in the charge");
+    for(const who of ["luo","heyoutian","liuwencai"])assert.ok(R.noise.yells.some(([,key])=>key==="yell_sha@"+who),`${who} yells his own 「杀！」`);
+    assert.ok(R.noise.yells.every(([,key])=>!R.noise.yellStandIn||R.noise.yellStandIn[key]),"every yell has its wave-1 stand-in");
+    // The grenade rolls to rest 0.35 m east of the eye and never goes off.
+    assert.ok(Math.abs(D(R.grenade.stop,eye)-.35)<.06&&R.grenade.stop.x>eye.x,`the grenade stops at his face (${D(R.grenade.stop,eye).toFixed(2)} m east)`);
+    assert.ok(!/Explode|FireShell|Blast\(/.test(source.slice(source.indexOf("  Grenade(){"),source.indexOf("  GrenadeProp(){"))),"the grenade does not go off");
+    assert.ok(R.grenade.readyS>=R.grenade.biteS&&R.grenade.biteS>R.grenade.drawS,"draw, bite, then the cut");
+    // Blade: the recruit goes to the right front, cuts, backs off three steps (~1.8 m) and levels at the eye.
+    const B=R.blade;
+    assert.ok(B.touchS<B.cutS&&B.cutS<B.releaseS,"touch, cut, take it off");
+    // (left front: the brief's right front is covered by ijaA's hair-holding arm from the lifted eye; the point comes in from the left)
+    assert.ok(D(B.recruitAt,eye)<1.4&&B.recruitAt.z<eye.z&&B.recruitAt.x>eye.x,"the recruit cuts from the eye's left front");
+    assert.ok(Math.abs(D(B.levelAt,B.recruitAt)-1.8)<.25&&D(B.levelAt,eye)>D(B.recruitAt,eye)+1,"three steps back, away from him");
+    assert.equal(B.thenLine,"RescueInterrogation.06");assert.equal(B.startLine,"RescueInterrogation.05");
+    assert.ok(Math.abs(R.cheek.flinchDeg-6)<1e-9,"the head flinches 6 deg from the cut");
+  }
   // The Charge phase view needs the men to come into the picture from its right: the crater step is north of the eye.
   const Bearing=(a,b)=>Math.atan2(b.x-a.x,-(b.z-a.z))*180/Math.PI;
   // The charge comes over the crater step at the right of the pinned eye, from out of its sight.
@@ -706,6 +744,12 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     assert.ok(Math.abs(kneelKey[1]-1.12)<.1,`up on his knees (eye ${kneelKey[1]} m)`);
     assert.ok(H.gruntS<0&&H.gruntS>-1,"the grunt's catch of breath leads the lunge");
     for(const c of R.cuts)assert.ok(D(WoundBody(c.victim),kneel)>=.8,`${c.victim}'s body is clear of where he kneels up (${D(WoundBody(c.victim),kneel).toFixed(2)} m)`);
+    // 2026-10-11: the dead recruit (rescue.blade.recruitFall, 「倒向东、不压在挣出的路线上」) and ChargeB (rescue.fallenComrade) lie
+    // off the heave's path: from the hips under the timber to where he kneels up, along the eye's line.
+    const PathD=p=>{const a=Local(heaveRoot,0,.9),b=kneel,dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz)));return Math.hypot(a.x+t*dx-p.x,a.z+t*dz-p.z);};
+    assert.ok(PathD(R.blade.recruitFall)>=.9&&R.blade.recruitFall.x>kneel.x,`the recruit falls east, 0.9 m+ off the heave (${PathD(R.blade.recruitFall).toFixed(2)} m)`);
+    assert.ok(PathD(R.fallenComrade)>=.9,`ChargeB lies 0.9 m+ off the heave (${PathD(R.fallenComrade).toFixed(2)} m)`);
+    assert.ok(D(R.fallenComrade,eye)<1.3,"ChargeB lies beside him");
     assert.ok(D(WoundBody("ijaA"),handRoot)>=.45,`Luo stands clear of ijaA's body (${D(WoundBody("ijaA"),handRoot).toFixed(2)} m)`);
     assert.ok(Math.abs(Hd.rise.eye.at(-1)[1][1]-STANCE.stand.eye)<.05&&Math.abs(Hd.rise.eye[0][1][1]-kneelKey[1])<.02,"he gets up from the kneel to the player's standing eye");
     const S0=Hd.standIn;
@@ -738,8 +782,11 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   }
   assert.ok(R.wound.shots.some(s=>s.role==="DepthIjaB"&&s.lethal)&&R.depthPost.DepthIjaB,"the depth man at his post is shot dead by the volley");
   // Storyboard shots and wave-1 stand-ins (contract §4.6).
-  assert.ok(C.storyboardShots.length>=2&&C.storyboardShots.every(s=>/^(SB0[1-9]|N\d\d)/.test(s.id)&&(s.when||s.phase&&Number.isFinite(s.age))&&s.judge),"storyboard shots are well formed");
+  assert.ok(C.storyboardShots.length>=2&&C.storyboardShots.every(s=>/^(SB0[1-9]|N(0[1-9]|1\d|2[0-5]))/.test(s.id)&&(s.when||s.phase&&Number.isFinite(s.age))&&s.judge),"storyboard shots are well formed");
+  // 2026-10-11 redraft (contract §8): 02 is judged by N20–N25.
+  for(const id of ["N20","N21","N22","N23","N24","N25"])assert.ok(C.storyboardShots.some(s=>s.id===id||s.id.startsWith(id+"_")),`storyboard shot ${id}`);
   for(const e of C.pendingWiring){
+    // (2026-10-11: the redraft's shot ids are three characters, N01..N25.)
     assert.ok(["shot","what","now","wave2"].every(k=>typeof e[k]==="string"&&e[k].length>(k==="shot"?2:3)),"pendingWiring entry "+JSON.stringify(e));
     assert.ok(C.storyboardShots.some(s=>s.id===e.shot||s.id.startsWith(e.shot+"_")),`pendingWiring names a storyboard shot (${e.shot})`);
   }
@@ -761,7 +808,7 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     assert.ok(W.liuBackRoute.slice(1).every((p,i)=>Same(p,W.lane[3+i])),"Liu's way back follows the lane from the crater step to RC");
   }
   {
-    const released=C.storyboardShots.find(s=>s.id==="SB06_Released")?.judge?.camera;
+    const released=C.storyboardShots.find(s=>s.id==="N25_Released")?.judge?.camera;
     assert.ok(released&&released.pitchDeg[0]>=-15&&released.pitchDeg[1]<=5&&released.eyeM[0]>=1.4,"SB06: the hand-back view is about level and standing");
   }
   for(const [name,route] of [["runner",C.banter.runnerRoute],["exit",C.banter.exitRoute],["walkIn",C.ija.walkIn],["dropIn ijaB",C.dropIn.bRoute],["mg crew",C.wall.crewVia],
@@ -831,7 +878,7 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
   }
   // Every director wait has a finite timeout (the show can never stall).
   assert.ok(Object.values(C.timeouts).every(v=>Number.isFinite(v)&&v>0),"all director timeouts are finite and positive");
-  assert.deepEqual([...C.vanguardIds].sort(),["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowB"],"hand-back waits for ijaA, ijaB and ijaD only");
+  assert.deepEqual([...C.vanguardIds].sort(),["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowA","BunkerFollowB","BunkerGunner","BunkerLoader"],"hand-back waits for ijaA..ijaD and the machine-gun crew (2026-10-11)");
 }
 // Two methods of one name in a class: the later silently replaces the earlier (09-24 review: the corner
 // man's rifle shot had become the camera's Shot and his loop fired without sound, flash or tracer).

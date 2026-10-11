@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Evaluate, EvaluateLook, OpeningLensDriver, ApplyLensToPost, BlendLens, SampleKeys, LookForPhase, EVENT_WAITS } from "./Script_OpeningLens.mjs";
-import { LENS_DEFAULT, LOOKS, PHASE_LOOKS, LENS_MUD_TEXTURE, SHELL_FLIGHT_S } from "./Data_OpeningLens.mjs";
+import { LENS_DEFAULT, LOOKS, PHASE_LOOKS, LENS_MUD_TEXTURE, SHELL_FLIGHT_S, LENS_CHEEK_RESIDUE } from "./Data_OpeningLens.mjs";
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -111,17 +111,48 @@ Check("the slap: the struck side swims for 2.4 s, the aberration kicks, the side
   assert.equal(ApplyLensToPost({ vignette: 0.42 }, at(3)).sideDaze, null, "no daze: no parameter");
 });
 
-Check("found / held nearly clean; Lift, Check, Released clean", () => {
+Check("the cheek cut (Blade, 2026-10-11): a 0.15 s white sting on the left, the streak formed within 1.5 s, the left daze 0.35 gone by 2.4 s, no blood mist; the streak stays to the hand-back", () => {
+  const at = (t, phase = "Blade") => Evaluate(phase, 3, { now: 50 + t, cheekAt: 50, slapAt: 40, slapSide: 1 });
+  const none = Evaluate("Blade", 1, { now: 49, slapAt: 40 });
+  assert.deepEqual(none.cheek, { flash: 0, blood: 0, opacity: 0, daze: 0 }, "nothing before the cut");
+  assert.ok(at(0.02).cheek.flash >= 0.95 && at(0.1).cheek.flash > 0 && at(0.16).cheek.flash === 0, "the sting lasts 0.15 s");
+  assert.ok(at(0.3).cheek.blood > 0.1 && at(0.3).cheek.blood < 0.6, "the streak seeping in");
+  Near(at(1.5).cheek.blood, 1, 1e-9, "formed by 1.5 s");
+  Near(at(0.04).cheek.daze, 0.35, 1e-9, "the left side dazed at 0.35");
+  assert.ok(at(1).cheek.daze > 0.1 && at(2.5).cheek.daze === 0, "the daze eases off by 2.4 s");
+  assert.equal(at(0.5).bloodEdge.strength, 0, "no blood mist / red corners");
+  for (const phase of ["Charge", "Melee", "Lift", "Check"]) {
+    const later = at(8, phase).cheek;
+    assert.ok(later.blood === 1 && Math.abs(later.opacity - LENS_CHEEK_RESIDUE) < 1e-9, `${phase}: the streak stays (${JSON.stringify(later)})`);
+  }
+  const post = ApplyLensToPost({ vignette: 0.42 }, at(0.04));
+  assert.deepEqual(post.sideDaze, { side: 1, amount: at(0.04).cheek.daze }, "the cut's daze swims the left of the frame");
+  assert.ok(post.cheekCut && post.cheekCut.flash > 0.8, "handed to the composite");
+  const slapBigger = ApplyLensToPost({ vignette: 0.42 }, Evaluate("Blade", 3, { now: 50.05, cheekAt: 49, slapAt: 50, slapSide: -1 }));
+  assert.equal(slapBigger.sideDaze.side, -1, "the larger daze wins");
+  assert.equal(ApplyLensToPost({ vignette: 0.42 }, Evaluate("Ask", 1, { now: 99 })).cheekCut, null, "no cut: no parameter");
+  const source = Read("Script_OpeningStoryboards.mjs");
+  assert.match(source, /cheekAt:this\.flags\["cut:cheek"\]/, "the director hands the cut's time to the lens");
+  assert.match(source, /opacity:LENS_CHEEK_RESIDUE\*\(1-Smooth\(t\)\)/, "the residue fades with releaseDecayS after the hand-back");
+});
+
+Check("found / held nearly clean; Lift / Check clean but the cheek streak; Released clean", () => {
   const found = Evaluate("Found", 1);
   assert.ok(found.mud > 0 && found.bloodEdge.strength <= 0.3, "found: still muddy");
   for (const phase of ["Hold", "Ask"]) {
     const held = Evaluate(phase, 1, { now: 99 });
     assert.ok(held.bloodEdge.strength === 0 && held.radialBlur === 0 && held.flash === 0 && held.mud === 0, phase);
   }
+  const clean = { ...JSON.parse(JSON.stringify(LENS_DEFAULT)), slap: { side: 1, amount: 0 }, cheek: { flash: 0, blood: 0, opacity: 0, daze: 0 } };
   for (const phase of ["Lift", "Check", "Released", "Banter", "Orders", "Incoming"]) {
     const lens = Evaluate(phase, 1, { now: 99, blastAt: 98.8 });
     const { look, ...rest } = lens;
-    assert.deepEqual(rest, { ...JSON.parse(JSON.stringify(LENS_DEFAULT)), slap: { side: 1, amount: 0 } }, `${phase} is clean`);
+    assert.deepEqual(rest, clean, `${phase} is clean`);
+  }
+  for (const phase of ["Lift", "Check"]) {
+    const { look, cheek, ...rest } = Evaluate(phase, 1, { now: 99, cheekAt: 90 });
+    assert.deepEqual({ ...rest, cheek: clean.cheek }, clean, `${phase}: clean but the cheek`);
+    assert.ok(cheek.blood === 1 && cheek.opacity >= LENS_CHEEK_RESIDUE, `${phase}: the streak`);
   }
   for (const phase of C.phases.Trapped.concat(C.phases.BunkerRescue)) assert.ok(PHASE_LOOKS[phase], `${phase} has a look`);
 });
@@ -194,11 +225,11 @@ Check("wiring: Main, Runtime, Composite and HUD use the lens; no new pass or sam
   const composite = Read("Script_PostComposite.mjs"), hud = Read("Script_Hud.mjs"), css = Read("Style_Game.css");
   assert.match(main, /const openingLens = missionRuntime\?\.Perception\(\)\.lens \|\| null;/);
   assert.match(main, /hud\.SetLens\(openingLens\)/, "a direct call: a renamed HUD method fails loudly");
-  assert.match(main, /post\.Render\(scene, camera, ApplyLensToPost\(\{[\s\S]*?\}, openingLens\)\);/);
+  assert.match(main, /post\.Render\(scene, camera, WhiteboxPostOptions\(WHITEBOX_CONFIG, ApplyLensToPost\(\{[\s\S]*?\}, openingLens\)\)\);/);
   assert.match(runtime, /lens: this\.OpeningLens\(\)/);
   assert.match(runtime, /live \? show\.phase : null/);
-  for (const u of ["uRadialBlur", "uBloodEdge", "uBloodCorners", "uSideDaze"]) {
-    assert.match(composite, new RegExp(`uniform vec4 ${u};|uniform float ${u};|uniform vec2 ${u};`), `${u} declared`);
+  for (const u of ["uRadialBlur", "uBloodEdge", "uBloodCorners", "uSideDaze", "uCheekCut"]) {
+    assert.match(composite, new RegExp(`uniform vec4 ${u};|uniform float ${u};|uniform vec2 ${u};|uniform vec3 ${u};`), `${u} declared`);
     assert.ok(!new RegExp(`sampler2D\\s+${u}`).test(composite));
   }
   const segmentAt = composite.indexOf("vec3 MotionBlur(");

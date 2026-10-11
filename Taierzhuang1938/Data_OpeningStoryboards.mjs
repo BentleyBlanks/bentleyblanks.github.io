@@ -117,7 +117,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
   phases:Object.freeze({
     Trapped:Object.freeze(["Count","Banter","Orders","Incoming","Blast","Black","Wake","DropIn","Sweep","CaptiveDragged","CaptiveWall",
       "Interrogation","Practice","Slash","Finish","Found"]),
-    BunkerRescue:Object.freeze(["Hold","Ask","Charge","Melee","Lift","Check","Released"]),
+    BunkerRescue:Object.freeze(["Hold","Ask","Blade","Charge","Melee","Lift","Check","Released"]),
     RearTrench:Object.freeze(["Withdraw","Corner","Collection","SupportOrder"]),
   }),
   fps:24, fov:65, fadeInS:1.8,
@@ -180,7 +180,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // holdLineS: the questioning's lines (each gate); askS: the whole questioning; chargeS: the rescuers reach their marks
     // (a late man is put there); meleeS: the cuts landed; liftS: Luo's walk, the rifle pickup and the haul done (a stalled
     // clip is played out); checkS: the question and the nod before the hand-over goes on without them.
-    holdLineS:8, askS:24, chargeS:4.5, meleeS:7, liftS:16, luoArriveS:7, heArriveS:7,
+    // 2026-10-11: bladeWalkS the recruit's walk to the pinned man (a late walker is put there); bladeS the whole Blade phase
+    // (the cut, 「说话！」 and his three steps back) before the charge breaks in anyway.
+    holdLineS:8, askS:24, bladeWalkS:3.5, bladeS:14, chargeS:4.5, meleeS:7, liftS:16, luoArriveS:7, heArriveS:7,
     longShotRetryS:4, longShotForceS:8, checkS:9, contactKillS:.35,
     // 02 -> 03: Yaowa catches up (else the scene starts where he is), the guard's run up the sap.
     collectionMeetS:8, guardArriveS:10,
@@ -290,8 +292,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
         // ijaA's forearm sat 0.2 m off the lens and filled a third of the picture).
         Hold:KC("wokenAt",[-1,"flat","flatFwd"],[0,"push","clawIn"],[.35,"push","push"]),
         Ask:K([0,"push","push"],[1.6,"push","clawIn"],[2.6,"clawIn","push"],[4,"push","push"]),
-        // The charge: he is dropped (hair let go) and the hands go flat in the mud, then claw as he tries to see.
-        Charge:K([0,"push","push"],[.25,"flat","flat"],[1.4,"flat","clawIn"]),
+        // 2026-10-11 Blade (clock: the cut, flags['cut:cheek']): straining against the mud as the blade comes to his cheek, the
+        // fingers clawing into it on the cut, then pushing again.
+        Blade:KC("cut:cheek",[-1,"push","push"],[0,"push","clawIn"],[.35,"clawIn","clawIn"],[1.6,"push","push"]),
+        // The charge: he is dropped (hair let go; ijaA is shot at rescue.wound .48 s) and the hands go flat in the mud, then claw
+        // as he tries to see.
+        Charge:K([0,"push","push"],[.55,"flat","flat"],[1.7,"flat","clawIn"]),
         Melee:K([0,"flat","clawIn"],[.8,"flat","flat"]),
         // 2026-09-30 (docs/Data_OpeningSelfRescue20260930.md), clock on the heave (rescue.heave): straining against the mud
         // while He gets the timber up, braced on both hands, the lunge forward onto them, clawing a pull, pushing up onto his
@@ -338,9 +344,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
     dragFurrows:Route([-29,-110],[-33,-106],[-36.5,-101.5]),   // 「有人拖着伤员往后走，靴子在泥里划出两道长痕」
     restPost:P(-31,-95.4),            // after the report the guard falls back to the collection (collection.runner)
   }),
-  // The vanguard that must really be down before the hand-back (contract §2.1): ijaA and
-  // ijaB by the dadao, ijaD (the junction) by Liu Wencai. ijaC (the fold) may live.
-  vanguardIds:["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowB"],
+  // The vanguard that must really be down before the hand-back. 2026-10-11 (docs/Data_OpeningRedraft20261011Contract.md §1.12,
+  // 「还权前确认甲、丁、翻译、岔口的乙、折角的丙和机枪组两人均已死亡」): ijaA by Luo's dadao, ijaB at the junction by Liu Wencai,
+  // ijaC at the fold by the rifles on the crater step, ijaD (the recruit) and the machine-gun crew by the volley. The
+  // interpreter is checked apart (rescue.cuts). A man missing from the enemy table is let pass (Release `absent`).
+  vanguardIds:["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowA","BunkerFollowB","BunkerGunner","BunkerLoader"],
   // 2026-10-11: the machine-gun pair (bunkerAssault BunkerGunner / BunkerLoader, contract §1.7) and the man who shams dead in
   // the front trench (victim: the director's own NRA spawn, cast id SweepVictim, not in a roster).
   cast:Object.freeze({ ijaA:"BunkerExecutionerA", ijaB:"BunkerExecutionerB", ijaC:"BunkerFollowA", ijaD:"BunkerFollowB",
@@ -654,10 +662,48 @@ export const OPENING_STORYBOARDS = Object.freeze({
     playDead:Object.freeze({ closeAtS:.3, closeS:.14, squint:.84, tremor:.012, tremorHz:7, openS:.08, slitAboveDeg:9 }),
     // The interpreter squats at Shunzi's right front, 1.3 m from the eye, facing him; ijaB keeps watch east down the
     // trench 3.4 m off (「快点！」 over his shoulder).
-    interpreter:P(2.92,-124.5,56*Math.PI/180),
+    // 2026-10-11: south of the Set's finish.bodies[0] (3.3,-124.55, head west, 1.7 m long east), facing the eye (was (2.92,-124.5), 56 deg).
+    interpreter:P(2.95,-124.0,41*Math.PI/180),
     interpreterReturn:Route([4.2,-124.25]),
     interpreterClearanceM:.44,
+    // (until 2026-10-11 ijaB kept watch here, 3.4 m off; the redraft has him at the junction J -- vanguardPosts.ijaB)
     ijaBGuard:P(5.2,-124.7,-Math.PI/2),
+    // ---- 2026-10-11 redraft (docs/Data_OpeningRedraft20261011Contract.md §1.10–1.12; Dir02 brief 「起点状态」) ----------
+    // Where Dir01's Found leaves the vanguard and where 02 holds them until the charge: ijaB guarding the junction J facing east
+    // (「快点！」 is shouted from there, 12 m off), ijaC at the fold F facing east, ijaD the recruit at practice.recruitWait facing
+    // west with his rifle at the ready (a debug start into 02 puts them there, StageRescue).
+    vanguardPosts:Object.freeze({ ijaB:P(14,-124.6,-Math.PI/2), ijaC:P(18.2,-125.6,-Math.PI/2), ijaD:P(3.9,-124.3,Math.PI/2) }),
+    // The machine-gun crew Dir01 brings down (BunkerGunner castId gunner prone at Set mg.gunner, BunkerLoader castId loader
+    // kneeling at mg.loader, facing south over the south lip). Until they are in the roster (Data_FirstLevelMission bunkerAssault)
+    // the director makes stand-ins of them on 02's first frame (EnsureMgCrew, pendingWiring N22) with these ids, so the hand-back
+    // waits for them and the volley has them to shoot. stance: the AI's (2 prone, 1 kneel).
+    mgCrew:Object.freeze({
+      // The Set's final marks (Report_set: mg.gunner / mg.loader on top of the south lip by the corpse rest (6.9,-121.2)).
+      gunner:Object.freeze({ id:"BunkerGunner", at:P(6.75,-121.95,Math.PI), weapon:"Type11", stance:2 }),
+      loader:Object.freeze({ id:"BunkerLoader", at:P(7.75,-121.7,Math.PI), weapon:"Type38", stance:1 }),
+    }),
+    // Blade (「丁端着刺刀走过来……把刀尖抵在顺子脸颊上，往下一压，划开一道口子。手还有点抖，这回甲没催他。」): startLine's end
+    // (ijaB's 「快点！」) + afterLineS, the recruit walks from his wait (vanguardPosts.ijaD) to recruitAt at the eye's LEFT front
+    // (the brief had him at the right front, (2.75,-124.75); from the lifted eye ijaA's own arm, the fist in the hair, covers the
+    // whole upper right of the picture and the interpreter squats there, so the recruit was never seen -- and the contract has
+    // the point come in from the left of the picture onto the left cheek), leans in and lays the bloody point on the LEFT cheek
+    // (`touch`, touchS after he is there), presses it down and cuts
+    // (`cut`, cutS; the tip draws pressM down the cheek over pressS with a tremor of shakeM at shakeHz), holds there until
+    // releaseS and takes it off over liftS. thenLine (「说话！」) waits thenAfterS after the cut; backAfterLineS after it ends he
+    // backs off three steps to levelAt (backS) and levels the rifle at the eye (the muzzle aimed, levelS to come up); the charge
+    // breaks in chargeAfterLevelS after that. clip / levelClip: the frozen AnimB clips (contract §4.2); until they are baked the
+    // stand-ins are standInClip (his rifle laid from his right hand onto the cheek by the director, RecruitRifle) and
+    // levelStandIn walked backwards (pendingWiring N21). recruitFall: where the volley's chest shot drops him (east of the
+    // heave, 「倒向东、不压在挣出的路线上」: Script_OpeningStoryboardsTest keeps it 0.9 m+ off the heave's path).
+    blade:Object.freeze({ startLine:"RescueInterrogation.05", afterLineS:.15, recruitAt:P(2.8,-125.95),
+      clip:"IjaRecruitCheekCut", standInClip:"IjaReadyRifle", touchS:.9, cutS:1.5, pressS:.25, pressM:.035, shakeM:.004, shakeHz:9,
+      releaseS:2.3, liftS:.4, thenLine:"RescueInterrogation.06", thenAfterS:.55, backAfterLineS:.2, backS:1.3,
+      levelAt:P(4.6,-125.75), levelClip:"IjaRecruitLevelRifle", levelStandIn:"IjaReadyRifle", levelS:.45, chargeAfterLevelS:.5,
+      recruitFall:P(5.3,-125.8) }),
+    // The cut on the cheek, first person: the head flinches flinchDeg away from it (to the right) over flinchS and comes back over
+    // recoverS; the cheekCut sound (Sfx package, contract §6) -- `sound` until it is registered (pendingWiring N21); the lens look
+    // is Data_OpeningLens `cheek` on the cut's clock (events.cheekAt).
+    cheek:Object.freeze({ flinchDeg:6, flinchS:.08, recoverS:.8, cue:"cheekCut", sound:"bayonetHit", volume:.55 }),
     // Slaps (ijaA, crouched, the left fist in the hair): the right hand goes up high over raiseS (IjaSlapForehand /
     // IjaSlapBackhand play from their first frame: raiseS = the clip's contact), cracks down at hitS; the head is flung
     // yawDeg / rollDeg away from the blow (and shiftM sideways, dropM down), hangs there hangS and eases back over
@@ -677,8 +723,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
         Object.freeze({ at:"grab", delayS:.75, afterLine:"ShunziFound", afterLineS:-.55, side:1, then:"RescueInterrogation.01", thenAfterS:.4 }),
         Object.freeze({ line:"RescueInterrogation.03", afterEndS:1.1, side:1, then:"RescueInterrogation.04", thenAfterS:.6 }),
       ]),
-      // 「说话！」 (.06): the hand goes up for a third -- and the charge breaks in before it lands.
-      raiseLine:"RescueInterrogation.06", raiseAfterS:.2, chargeAfterRaiseS:.55 }),
+      // 2026-10-11 (「这回甲没催他」): no third raised hand any more -- 「说话！」 (.06) comes after the recruit's cut (rescue.blade)
+      // and ijaA keeps his fist in the hair; the charge breaks in once the recruit has backed off and levelled his rifle.
+      raiseLine:null }),
     // The rescuers wait out of sight in the SSW leg just behind the spoil and the crater step; on the charge they come
     // over the step (chargeRoute) into the front trench at runMps, staggered by `delayS`, once the volley has wounded the
     // three over him (rescue.wound). Luo, ChargeA and ChargeD go in for the cuts (rescue.cuts), He runs on to the roof timber
@@ -691,60 +738,103 @@ export const OPENING_STORYBOARDS = Object.freeze({
     runPace:Object.freeze({ accelMps2:10, decelMps2:6, minMps:.3 }),
     strikePace:Object.freeze({ accelMps2:10, decelMps2:6, minMps:2.4 }),
     // Luo leads (he starts 0.58 m further down the route; going second he ran inside He, 8 cm apart), He behind him.
-    // 2026-09-30: all of them after the volley's three hits (rescue.wound.shots, the last at 0.7 s).
+    // 2026-09-30: all of them after the volley's three hits (rescue.wound.shots, the last at 0.7 s). 2026-10-11: ChargeB is the
+    // first down the step (rescue.extras), Luo right behind him.
     delayS:Object.freeze({ luo:.7, he:1.0, liu:1.2 }),
-    liuShot:P(3.3,-122.4,-1.45),
+    // Liu's shot at the junction man: no earlier than liuEarliestS into the charge (after the cuts: 「刘文财在台阶处举枪，击倒岔口
+    // 回身举枪的乙」 comes after the interpreter is cut down).
+    liuShot:P(3.3,-122.4,-1.45), liuEarliestS:3.6,
     // After the junction shot Liu goes down into the front trench and aims east from the south wall (SB06: right of centre, far enough east that He's head, swaying on his held pose, does not cover his).
     liuCover:P(5.92,-123.52,-Math.PI/2),
     // 「一大帮人」: more men of the company with dadao (NRA02 / NRA05 bodies, the rigs the opening clips are baked on). ChargeA
-    // and ChargeD cut down the wounded interpreter and ijaB (rescue.cuts: LuoDadaoChopRear needs the NRA05 body, modelVariant 4).
+    // cuts down the wounded interpreter (rescue.cuts: LuoDadaoChopRear needs the NRA05 body, modelVariant 4).
+    // 2026-10-11 (「丙在折角原地转身，跪着朝台阶开枪，冲在最前面的一名川军弟兄身子一歪，滚下台阶，摔在顺子旁边，眼睛还睁着」;
+    // 「丙随后被台阶上的枪打倒」): ChargeB runs first, down the step and on toward the pinned man (`post`), and the fold man's shot
+    // drops him there (`foldTarget`, rescue.fold) -- he lies at rescue.fallenComrade; ChargeC and ChargeE carry rifles, stop on
+    // the step (`post`) and fire at the fold man (`shootsFold`). ChargeD runs on east down the trench.
     extras:Object.freeze([
       Object.freeze({ id:"ChargeA", start:P(-.8,-119.6), modelVariant:4, delayS:.85 }),
-      Object.freeze({ id:"ChargeB", start:P(-1.3,-118.9), modelVariant:1, delayS:1.3, post:P(12.6,-124.2) }),
-      Object.freeze({ id:"ChargeC", start:P(-1.8,-118.2), modelVariant:1, delayS:1.6, post:P(14.8,-124.9) }),
-      Object.freeze({ id:"ChargeD", start:P(-2.3,-117.5), modelVariant:4, delayS:1.05 }),
-      Object.freeze({ id:"ChargeE", start:P(-2.8,-116.8), modelVariant:1, delayS:2.1, post:P(8.2,-124.6) }),
+      Object.freeze({ id:"ChargeB", start:P(.15,-120.05), modelVariant:1, delayS:.3, post:P(2.4,-124.6,Math.PI/2), foldTarget:true }),
+      Object.freeze({ id:"ChargeC", start:P(-1.8,-118.2), modelVariant:1, delayS:1.6, weapon:"HanYang", post:P(2.75,-121.55,-1.3), shootsFold:true }),
+      Object.freeze({ id:"ChargeD", start:P(-2.3,-117.5), modelVariant:4, delayS:1.05, post:P(10.8,-125.3) }),
+      Object.freeze({ id:"ChargeE", start:P(-2.8,-116.8), modelVariant:1, delayS:2.1, weapon:"HanYang", post:P(3.75,-121.95,-1.3), shootsFold:true }),
     ]),
+    // The fold man (ijaC at F) once the volley goes: he turns round where he stands from turnAtS (he was facing east, away), and
+    // as soon as the first man down the step (foldTarget) is within fireWithinM of his post -- at the latest fireForceS into the
+    // charge -- kneels into IjaCornerFire facing him; its shot (the clip's `fire` event) drops him. The rifles on the step
+    // (shootsFold) fire at him from returnFireS into the charge; one with a clear line takes him, longShotForceS (timeouts) +.5 the
+    // timeout does.
+    fold:Object.freeze({ turnAtS:.15, fireWithinM:1.0, fireForceS:3.2, fireS:.1, returnFireS:4.2, returnFireGapS:.45 }),
+    // Where ChargeB lies once the fold man's shot has dropped him (「摔在顺子旁边」: 1 m south of the eye); the heave keeps off him.
+    fallenComrade:P(1.85,-124.25),
     // The depth Japanese who went off down the trench after the killing hold here, watching east (the volley shoots him dead there).
-    depthPost:Object.freeze({ DepthIjaB:P(9.4,-123.75,-Math.PI/2) }),
+    // (2026-10-11: off the Set's sweep.bodies[1] (9.4,-123.1); was (9.4,-123.75).)
+    depthPost:Object.freeze({ DepthIjaB:P(9.8,-124.7,-Math.PI/2) }),
     // 2026-09-30 (user: 「应该是队友们先开枪击伤日军，日军手已经抬不起来拿枪了，再是班长和队友冲上来一刀砍死了这几个审问的日军和翻译」):
     // the charge opens with a volley from the crater step. `at` s into Charge a shot from `from` (1.5 m over its ground)
     // hits `role` in `bone` (part `part`, `damage` -- not lethal: narrative protection holds until the cut); he plays `clip`
     // from there (the arm hangs dead, the other hand on the wound) and stands on its hold loop, his root moved by the
     // clip's root motion (standIn [right, back, turn deg] until it is baked). `lethal`: shot dead where he stands.
+    // 2026-10-11 (contract §1.11, 「没有号声。台阶上先响了一排枪。第一排枪先打沟沿上的机枪组」): five aimed shots, no bugle --
+    // the gunner dead over his corpse rest, the loader dead off the lip, the recruit in the chest (on his back, east of the
+    // heave: rescue.blade.recruitFall), ijaA and the interpreter in the left arm; the depth man as before.
     wound:Object.freeze({ damage:30, shots:Object.freeze([
-      Object.freeze({ role:"ijaA", at:.18, from:P(1.0,-120.7), bone:"upperArmL", part:"arm", clip:"IjaShotStaggerAway", standIn:Object.freeze([.1,1.5,180]) }),
-      Object.freeze({ role:"interpreter", at:.42, from:P(2.6,-121.1), bone:"upperArmL", part:"arm", clip:"InterpreterShotStagger", standIn:Object.freeze([.75,1.12,-146]) }),
-      Object.freeze({ role:"ijaB", at:.61, from:P(-.6,-120.2), bone:"upperArmR", part:"arm", clip:"IjaShotDropRifle", standIn:Object.freeze([-.1,-.35,0]) }),
+      Object.freeze({ role:"gunner", at:0, from:P(2.6,-121.1), bone:"chest", part:"torso", lethal:true }),
+      Object.freeze({ role:"loader", at:.12, from:P(-.6,-120.2), bone:"chest", part:"torso", lethal:true }),
+      Object.freeze({ role:"ijaD", at:.30, from:P(.9,-120.7), bone:"chest", part:"torso", lethal:true }),
+      Object.freeze({ role:"ijaA", at:.48, from:P(1.0,-120.7), bone:"upperArmL", part:"arm", clip:"IjaShotStaggerAway", standIn:Object.freeze([.1,1.5,180]) }),
+      Object.freeze({ role:"interpreter", at:.66, from:P(2.6,-121.1), bone:"upperArmL", part:"arm", clip:"InterpreterShotStagger", standIn:Object.freeze([.75,1.12,-146]) }),
       Object.freeze({ role:"DepthIjaB", at:.9, from:P(2.6,-121.1), bone:"chest", part:"torso", lethal:true }),
     ]) }),
-    // ...then 「班长和队友冲上来一刀砍死」: each wounded man is cut down from his right rear (stage chopRear round his wounded
-    // root) by `by` (a squad id or an extra) leaving `delayS` after the charge began; the blade kills at the clip's cut contact
-    // and he falls the way the blow drives him (the hit reaction's directional deaths, docs/Data_HitReaction.md).
+    // ...then 「罗班长从右后方抢上来，一刀劈在他后颈」 / 「一名冲锋弟兄砍倒想跑的翻译」: each wounded man is cut down from his
+    // right rear (stage chopRear round his wounded root) by `by` leaving `delayS` after the charge began; the blade kills at the
+    // clip's cut contact and he falls the way the blow drives him (docs/Data_HitReaction.md). `after` / `gapS`: this cut starts
+    // no earlier than gapS after the named victim's cut has landed. `fleeM`: the interpreter gets up and runs fleeM east (two
+    // steps, at fleeMps) from where his wounded clip left him as the cut starts -- the blade takes him on the second step.
     cuts:Object.freeze([
       Object.freeze({ by:"luo", victim:"ijaA" }),
-      Object.freeze({ by:"ChargeA", victim:"interpreter" }),
-      Object.freeze({ by:"ChargeD", victim:"ijaB" }),
+      Object.freeze({ by:"ChargeA", victim:"interpreter", after:"ijaA", gapS:.35, fleeM:1.0, fleeMps:3.0 }),
     ]),
+    // 「甲用右手摸出手榴弹，牙咬掉保险销，正要往钢盔上磕」 (IjaGrenadeBitePin from the wounded hold; until it is baked the hold of
+    // IjaShotStaggerAway with the grenade in his right hand): the grenade shows drawS after his hit, the pin goes at biteS,
+    // and Luo's cut lands no earlier than readyS after the hit. The cut drops it (「那颗没磕响的手榴弹滚到顺子脸前停住」): it
+    // falls from the hand, bounces (bounceH up, bounceS later; grenadeBounce each), rolls rollS and lies at `stop` (Set
+    // finish.grenadeStop, 0.35 m east of the eye) until 01–02 is left; it never goes off. Prop: Set's `grenade` (Type 91,
+    // radiusM / lengthM) -- the director's own cylinder until Set wires it (pendingWiring N23).
+    grenade:Object.freeze({ drawS:1.0, biteS:1.7, readyS:2.6, bounceH:.12, bounceS:.24, rollS:.8, stop:P(2.2,-125.1),
+      radiusM:.025, lengthM:.095, pin:"grenadePin", bounce:"grenadeBounce" }),
+    // 「手榴弹滚到顺子脸前停住」: the look goes down onto it as it comes to rest, for grenadeLookS (from 0.3 s before it stops).
+    grenadeLookS:.6,
     // 「枪炮声四起」: rifle reports from the SSW leg and the crater step at `rifles` (s into Charge), shells landing out in
     // the fields (feedback only, no damage) at `shells`; 「杀喊声四起（全都是四川话）」: `yells` [s, voice key, x, z].
     noise:Object.freeze({
       // The crowd's war cry (Script_SeedAudioChargeBake: a whole trenchful of Sichuan voices yelling 「杀——」) from behind
       // the spoil where the men wait, at crowd[0] s.
       crowd:Object.freeze([.05,.4,-120.6]),
-      rifles:Object.freeze([0,.18,.42,.61,.9,1.3,1.75,2.3,2.9]),
+      rifles:Object.freeze([0,.12,.30,.48,.66,.9,1.3,1.75,2.3,2.9]),
       riflesFrom:Route([-.6,-120.2],[.9,-120.7],[2.6,-121.1],[-1.8,-118.5]),
       shells:Object.freeze([[.25,12,-117.5],[.95,-3,-131],[2.1,17,-130.5]]),
-      yells:Object.freeze([[.1,"rally_dadao",.9,-120.6],[.35,"rally_charge@luo",1.0,-120.55],[.6,"rally_follow",-.5,-119.8],
-        [.85,"rally_charge@heyoutian",.45,-120.35],[1.15,"rally_dadao",-1.5,-118.9],[1.5,"rally_charge@liuwencai",-.2,-120.1],
-        [1.9,"rally_noretreat",3.2,-122.4],[2.4,"rally_dadao",5.5,-124.3],[3.1,"rally_charge",7.5,-124.2]]),
+      // 2026-10-11 (「冲锋时只有短促的喊杀，此起彼伏，不成句」; contract §3 squad bark library): yell_sha / yell_kan / yell_chong,
+      // and one 「杀！」 each in Luo's, He's and Liu's own voices. Until the Voice package delivers them, `yellStandIn` plays the
+      // existing rally_* barks in their place (pendingWiring N23); the integrator removes the table when they are wired.
+      yells:Object.freeze([[.1,"yell_sha",.9,-120.6],[.35,"yell_sha@luo",1.0,-120.55],[.6,"yell_chong",-.5,-119.8],
+        [.85,"yell_sha@heyoutian",.45,-120.35],[1.15,"yell_kan",-1.5,-118.9],[1.5,"yell_sha@liuwencai",-.2,-120.1],
+        [1.9,"yell_sha",3.2,-122.4],[2.4,"yell_kan",5.5,-124.3],[3.1,"yell_chong",7.5,-124.2]]),
+      yellStandIn:Object.freeze({ yell_sha:"rally_dadao", yell_kan:"rally_follow", yell_chong:"rally_charge",
+        "yell_sha@luo":"rally_charge@luo", "yell_sha@heyoutian":"rally_charge@heyoutian", "yell_sha@liuwencai":"rally_charge@liuwencai" }),
     }),
     // Charge / Melee view (2026-09-30, user: 「现在一个镜头直接切过去很不自然，完全可以镜头不动，但是前面的翻译或者日军被砍死倒下吧」):
     // the eye stays on ijaA (his upper body: ijaChestDropM under the head, pitch capped at maxPitchDeg) -- shot, up off him and
     // staggering away -- while the men run in from the right; on each cut the look is between the cutter and the cut man for
     // cutHoldS. The look point follows with a lookS time constant (no whip when the subject changes).
-    chargeView:Object.freeze({ ijaChestDropM:.3, maxPitchDeg:30, cutHoldS:1.3, lookS:.28 }),
-    // Melee: once the three cuts have landed the view holds on the trench (meleeHoldS) before the heave.
+    // grenadeMinPitchDeg / grenadeLookS: how far down and how quickly (time constant) the look goes onto the grenade rolling to
+    // his face (rescue.grenadeLookS: how long it stays on it once at rest).
+    chargeView:Object.freeze({ ijaChestDropM:.3, maxPitchDeg:30, cutHoldS:1.3, lookS:.28, grenadeMinPitchDeg:-50, grenadeLookS:.12 }),
+    // Blade's view (2026-10-11, N21): from the hair-holder's face (Hold / Ask) over toward the recruit leaning in (weight
+    // atRecruit, his head dropM lower), eased with lookS.
+    bladeView:Object.freeze({ atRecruit:.75, recruitDropM:.15, lookS:.3 }),
+    // Melee: once the cuts have landed and the vanguard is down (vanguardIds, the interpreter) the view holds on the trench
+    // (meleeHoldS) before the heave.
     meleeHoldS:1.0,
     // Lift: He lifts the timber off his hips (Set PoseRoofTimber toward its hang, raise .. of it) standing at heLift.
     // HeLiftTimber: his hands under the timber at gripS, the heave over raiseS; he holds it (the clip's hold loop) until the
@@ -887,32 +977,56 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // and the bayonet tip above (one rifle, not two pieces as drawn). Through the shammed slit (contract §1.9).
     Object.freeze({ id:"N19", storyboard:"Storyboard_N19_BootOnHand.png", when:"s.flags.bootStepAt!=null&&r.time-s.flags.bootStepAt>=.3",
       judge:{ camera:{ eyeM:[.15,.45], pitchDeg:[-40,0] }, eyeClosure:[.55,.97], hands:{ r:{ pose:"flatPinned", x:[.5,1], y:[.5,1] } } } }),
-    // The first slap (2026-09-29: the moment the head is up in his fist, before 「这个也问！」): the view flung to the
-    // right, the left of the picture swimming.
-    Object.freeze({id:"SB05_Slap",when:"s.flags.slapAt!=null&&r.time-s.flags.slapAt>=.12",judge:{camera:{eyeM:[.25,.55]}}}),
-    // Held up by the hair: ijaA's face close above the middle, the interpreter squatting at the right.
-    Object.freeze({id:"SB05_Held",phase:"Ask",age:1,
-      judge:{camera:{eyeM:[.3,.55],pitchDeg:[5,42]},actors:{ijaA:{x:[.25,.7],distM:[.3,1]},interpreter:{x:[.45,1],distM:[.8,1.8]}}}}),
-    // 2026-09-30 (docs/Data_OpeningSelfRescue20260930.md): the volley's shot takes ijaA off him -- the look stays on him as he
-    // staggers away with the arm hanging -- and the men come over the crater step into the right of the picture.
-    Object.freeze({id:"SB05A_Shot",when:"s.flags['hit:ijaA']!=null&&r.time-s.flags['hit:ijaA']>=.35",judge:{camera:{eyeM:[.2,.5]},actors:{ijaA:{distM:[.3,2.2]}}}}),
-    Object.freeze({id:"SB05A_Charge",phase:"Charge",age:1.9,judge:{camera:{eyeM:[.2,.45]},inFrameAtLeast:[{ roles:["luo","heyoutian","Charge"], count:1 }]}}),
-    // Luo's cut on the wounded ijaA in front of him.
-    Object.freeze({id:"SB05A_LuoCut",when:"s.flags['cut:ijaA']!=null&&r.time-s.flags['cut:ijaA']>=.5",judge:{actors:{luo:{distM:[.8,3]}}}}),
-    // His own heave out from under the timber: the lunge forward onto his hands, then up on his knees (no judge on the lunge:
-    // the picture is looked at).
-    Object.freeze({id:"SB05B_Heave",when:"s.flags.heaveAt!=null&&r.time-s.flags.heaveAt>=.7",judge:{camera:{eyeM:[.25,.6]}}}),
-    Object.freeze({id:"SB05B_Kneel",when:"s.flags.heaveAt!=null&&r.time-s.flags.heaveAt>=2.45",judge:{camera:{eyeM:[.95,1.3]}}}),
-    // SB06 (Check, 「还能打不？」): up on his knees, Luo standing over him leaning in, asking.
-    Object.freeze({ id:"SB06", storyboard:"Storyboard_06_RifleReturned.png",
+    // ---- 02, 2026-10-11 redraft (contract docs/Data_OpeningRedraft20261011Contract.md §8 N20–N25; Dir02). The storyboard
+    // pictures were not drawn yet when these were set (Lovart credits ran out): the judges are the contract's text and the old
+    // SB05/SB06 frames, to be checked again against REL/附件/storyboard/Storyboard_N2x_*.png at integration.
+    // N20 「甲蹲在头边左手揪着头发把头提起来、右手高举过肩要扇；翻译蹲在右前逼问；画面一侧发晕重影」: the second slap's wind-up
+    // (the hand high over his shoulder, 0.28 s before it lands), then the blow itself (_Slap: the left of the picture swimming,
+    // the view flung right).
+    // (The interpreter is judged on the held frame, N20_Held: through the wind-up the look follows ijaA's head up and left.)
+    Object.freeze({ id:"N20", storyboard:"Storyboard_N20_HairSlap.png", when:"s.slaps?.length>1&&r.time>=s.slaps[1].at-.28",
+      judge:{ camera:{ eyeM:[.3,.55], pitchDeg:[5,45] }, actors:{ ijaA:{ x:[.2,.75], distM:[.3,1] } } } }),
+    Object.freeze({ id:"N20_Held", storyboard:"Storyboard_N20_HairSlap.png", phase:"Ask", age:1,
+      judge:{ camera:{ eyeM:[.3,.55], pitchDeg:[5,42] }, actors:{ ijaA:{ x:[.25,.7], distM:[.3,1] }, interpreter:{ x:[.45,1], distM:[.8,1.8] } } } }),
+    Object.freeze({ id:"N20_Slap", storyboard:"Storyboard_N20_HairSlap.png", when:"s.slaps?.length>1&&s.slaps[1].landed&&r.time-s.slaps[1].at>=.12",
+      judge:{ camera:{ eyeM:[.25,.55] } } }),
+    // N21 「丁俯身，刀尖带血抵在左脸颊上往下压（刀尖从画面左侧贴脸进来，占画面一角）；甲在后面看着没催」: the recruit's point
+    // laid on the cheek (_Touch) and the cut (0.1 s in: the white sting on the left, the streak starting at the lower left).
+    // The point itself is judged by eye in the picture (it is not an actor); the recruit leans over at the right front.
+    Object.freeze({ id:"N21_Touch", storyboard:"Storyboard_N21_CheekCut.png", when:"s.flags['touch:cheek']!=null&&r.time-s.flags['touch:cheek']>=.3",
+      judge:{ camera:{ eyeM:[.3,.55] }, actors:{ ijaD:{ x:[.25,.7], bodyDistM:[.6,1.6], coverOk:"ijaA" }, ijaA:{ x:[.45,1], distM:[.3,1] } } } }),
+    Object.freeze({ id:"N21", storyboard:"Storyboard_N21_CheekCut.png", when:"s.flags['cut:cheek']!=null&&r.time-s.flags['cut:cheek']>=.1",
+      judge:{ camera:{ eyeM:[.3,.55] }, actors:{ ijaD:{ x:[.25,.7], bodyDistM:[.6,1.6], coverOk:"ijaA" } } } }),
+    // 「丁退开三步，端平了枪」: levelled at the eye from rescue.blade.levelAt, the moment before the volley.
+    Object.freeze({ id:"N21_Level", storyboard:"Storyboard_N21_CheekCut.png", when:"s.flags.levelAt!=null&&r.time-s.flags.levelAt>=.4&&s.phase==='Blade'",
+      judge:{ camera:{ eyeM:[.3,.55] }, actors:{ ijaD:{ x:[0,.75], bodyDistM:[1.6,3.6], coverOk:"ijaA" } } } }),
+    // N22 「台阶那边一排枪口闪光：沟沿上的机枪手趴在尸体上不动了，副射手翻下沟沿；丁胸口中弹枪脱手仰面倒；甲左臂中弹踉跄转开」:
+    // the recruit 0.25 s after his chest shot (the crew already hit), ijaA hit and turning away (_Arm).
+    Object.freeze({ id:"N22", storyboard:"Storyboard_N22_Volley.png", when:"s.flags['hit:ijaD']!=null&&r.time-s.flags['hit:ijaD']>=.25",
+      judge:{ camera:{ eyeM:[.2,.55] }, actors:{ ijaA:{ x:[.1,.9], distM:[.3,1.2], headOptional:true } } } }),
+    Object.freeze({ id:"N22_Arm", storyboard:"Storyboard_N22_Volley.png", when:"s.flags['hit:ijaA']!=null&&r.time-s.flags['hit:ijaA']>=.5",
+      judge:{ camera:{ eyeM:[.2,.5] }, actors:{ ijaA:{ distM:[.3,2.2] } } } }),
+    // N23 「罗班长带弟兄提大刀冲下弹坑台阶；甲右手举着手榴弹……罗从他右后方一刀劈向后颈；一名冲在最前的川军弟兄中弹滚在台阶下；
+    // 远处弟兄砍向逃跑的翻译」: the men down the step (N23), Luo's cut a moment before its contact (_Chop), and the grenade come to
+    // rest at the face (_Grenade: the look down on it).
+    Object.freeze({ id:"N23", storyboard:"Storyboard_N23_ChargeChop.png", phase:"Charge", age:2.2,
+      judge:{ camera:{ eyeM:[.2,.45] }, inFrameAtLeast:[{ roles:["luo","heyoutian","Charge"], count:1 }] } }),
+    Object.freeze({ id:"N23_Chop", storyboard:"Storyboard_N23_ChargeChop.png", when:"s.flags['cut:ijaA']!=null&&r.time-s.flags['cut:ijaA']>=.35",
+      judge:{ actors:{ luo:{ distM:[.8,3] } } } }),
+    Object.freeze({ id:"N23_Grenade", storyboard:"Storyboard_N23_ChargeChop.png", when:"s.flags.grenadeStopAt!=null&&r.time-s.flags.grenadeStopAt>=.25",
+      judge:{ camera:{ eyeM:[.2,.45], pitchDeg:[-55,-15] } } }),
+    // N24 「何有田抓住塌顶木抬起，第一人称双手撑在泥里往前挣，膝盖在泥地拖出两道痕」 (rescue.heave, unchanged since 09-30).
+    Object.freeze({ id:"N24", storyboard:"Storyboard_N24_HeaveOut.png", when:"s.flags.heaveAt!=null&&r.time-s.flags.heaveAt>=.7", judge:{ camera:{ eyeM:[.25,.6] } } }),
+    Object.freeze({ id:"N24_Kneel", storyboard:"Storyboard_N24_HeaveOut.png", when:"s.flags.heaveAt!=null&&r.time-s.flags.heaveAt>=2.45", judge:{ camera:{ eyeM:[.95,1.3] } } }),
+    // N25 「跪在沟底：罗班长俯身看着镜头问，一手已抓起右前方泥里的汉阳造横端起来塞过来，背景何有田、刘文财各守一侧」 (Check,
+    // unchanged since 09-30): Luo leaning in asking, the rifle in his hands (_Hand), the hand-back standing (_Released: about
+    // level, facing east down the trench where he got up; Luo turned off to the crater step on his left).
+    Object.freeze({ id:"N25", storyboard:"Storyboard_N25_RifleShoved.png",
       when:"s.phase==='Check'&&s.flags.handAt!=null&&r.time-s.flags.handAt>=1.0",
       judge:{ camera:{ eyeM:[.95,1.3], pitchDeg:[-5,40] }, actors:{ luo:{ bodyDistM:[.6,1.3], x:[.25,.75] } } } }),
-    // The rifle in his hands, getting up.
-    Object.freeze({ id:"SB06_Hand", storyboard:"Storyboard_06_RifleReturned.png",
+    Object.freeze({ id:"N25_Hand", storyboard:"Storyboard_N25_RifleShoved.png",
       when:"s.flags.handedAt!=null&&r.time-s.flags.handedAt>=.4", judge:{ camera:{ eyeM:[1,1.75] } } }),
-    // The hand-back: standing (2026-09-29, not crouched), about level, facing east down the trench where he got up
-    // (2026-09-30; Luo turned off to the crater step on his left).
-    Object.freeze({ id:"SB06_Released", storyboard:"Storyboard_06_RifleReturned.png", when:"s.releaseAt!=null",
+    Object.freeze({ id:"N25_Released", storyboard:"Storyboard_N25_RifleShoved.png", when:"s.releaseAt!=null",
       judge:{ camera:{ pitchDeg:[-15,5], yawDeg:[-125,-55], eyeM:[1.5,1.75] } } }),
   ]),
   // Wave 1 stand-ins (contract §3): where a clip, hand pose, lens effect, set piece or blast effect of another
@@ -986,8 +1100,36 @@ export const OPENING_STORYBOARDS = Object.freeze({
       now:"IjaBayonetDownThrust over the native walk (upper body) at finish.bodies, the bodies dead NRA actors (standIns.bodies)", wave2:"IjaFinishWalkStab (AnimB), Set's static corpses"},
     {shot:"N19", what:"he stands over Shunzi, the bayonet a hand's breadth over his back, the right boot on Shunzi's right hand, the heel grinding (IjaBootOnHand, player track handR; bootGrind)",
       now:"the native stand with IjaReadyRifle held at found.stand (his right foot beside the hand, not on it), the hand flat and flinching (beats.Found); bootGrind -> footstepMud", wave2:"IjaBootOnHand (AnimB) with the foot on the hand, Sfx bootGrind"},
-    // SB06 (Check, Released)
-    {shot:"SB06", what:"Liu kneels aiming east at the trench edge; He kneels at the right edge with his rifle",
+    // ---- 02, 2026-10-11 redraft (Dir02; contract §7: stand-ins until the other packages' pieces are wired) ----
+    // N21 (Blade)
+    {shot:"N21", what:"the recruit leans over and lays his bloody bayonet point on the left cheek, presses and cuts (IjaRecruitCheekCut, player track cheekL, events touch / cut)",
+      now:"he holds IjaReadyRifle's last frame at rescue.blade.recruitAt and the director lays his rifle from his right hand onto the eye's left cheek (RecruitRifle: turned about the hand, slid along the barrel), touch / cut on rescue.blade touchS / cutS", wave2:"IjaRecruitCheekCut (AnimB) with its root placed so cheekL meets the eye's left cheek; its events in place of touchS / cutS; RecruitRifle off"},
+    {shot:"N21", what:"the recruit backs off three steps and levels his rifle at the eye (IjaRecruitLevelRifle, root motion -1.8 m, hold loop)",
+      now:"walked backwards to rescue.blade.levelAt at the native gait holding IjaReadyRifle, the rifle aimed at the eye by RecruitRifle", wave2:"IjaRecruitLevelRifle (AnimB) from recruitAt (its root.end = levelAt), its hold loop until the volley"},
+    {shot:"N21", what:"the recruit seen past ijaA (N21 draws him in front, ijaA crouched behind on the right; here ijaA holds the hair 0.6 m from the eye, so the recruit at the left front shows over his shoulder)",
+      now:"N21 judges the recruit with coverOk ijaA", wave2:"IjaRecruitCheekCut leaning him down into the picture past ijaA; drop coverOk"},
+    {shot:"N21", what:"the cheekCut sound on the cut",
+      now:"rescue.cheek.sound (bayonetHit, quieter)", wave2:"the Sfx package's cheekCut cue (Data_SfxSources); drop rescue.cheek.sound"},
+    {shot:"N21", what:"the recruit's bayonet bloody from the practice (01 Practice, Dir01)",
+      now:"a dark red smear the director puts on his bayonet's point at Blade (RecruitBlood)", wave2:"whatever 01's practice leaves on the blade (Dir01); RecruitBlood off"},
+    // N22 (Charge, the volley)
+    {shot:"N22", what:"ijaA's head in the picture as the volley takes the recruit (he is rising off the pinned man: his head goes out of the top of the frame)",
+      now:"N22 judges him with headOptional", wave2:"look again with the N22 picture at integration (the look on his upper body, rescue.chargeView)"},
+    {shot:"N22", what:"the machine-gun crew BunkerGunner / BunkerLoader on the south lip (prone on the corpse rest / kneeling), bursting every 3-6 s until the volley",
+      now:"EnsureMgCrew: two IJA made by the director at rescue.mgCrew marks (AI stance prone / kneel, scripted noncombatant, entered in r.enemies under the roster ids), no bursts, no corpse rest", wave2:"Dir01's roster men (Data_FirstLevelMission bunkerAssault), IjaProneLmgOnCorpse / IjaKneelLoadLmg on the Set's mg marks and corpses, Dir01's burst loop; EnsureMgCrew finds them and makes nothing"},
+    {shot:"N22", what:"the loader goes over the lip and down into the trench when shot",
+      now:"the hit reaction's directional death where he kneels (it may not carry him off the lip)", wave2:"a directional death taken over the lip, or an authored fall (AnimA / Dir01)"},
+    {shot:"N22", what:"ChargeB, first down the step, shot by the fold man: tumbles down and lies on his back 1 m south of the eye with his eyes open (NraShotTumbleSteps)",
+      now:"the hit reaction's directional death at rescue.extras ChargeB post (falls west toward rescue.fallenComrade); the face layer's DeadSlack half-closes the lids", wave2:"NraShotTumbleSteps (AnimB P1) ending at rescue.fallenComrade, and a dead-eyes-open flag on the face layer (Script_CharacterFacialAnimation)"},
+    // N23 (Melee)
+    {shot:"N23", what:"ijaA, shot in the left arm, draws a grenade with his right hand, bites the pin out and raises it to his helmet (IjaGrenadeBitePin, event bite)",
+      now:"IjaShotStaggerAway's hold loop with the grenade in his right hand from rescue.grenade.drawS, the pin sound at biteS", wave2:"IjaGrenadeBitePin (AnimB) chained from IjaShotStaggerAway's end, its `grenade` prop and bite event"},
+    {shot:"N23", what:"the Type 91 grenade prop (in his hand, falling, rolling to finish.grenadeStop and lying there)",
+      now:"the director's own olive cylinder (RescueGrenade, radiusM / lengthM), rolled to rescue.grenade.stop", wave2:"Set's `grenade` prop (Script_OpeningProps) and Data_OpeningSet0103 finish.grenadeStop in place of rescue.grenade.stop"},
+    {shot:"N23", what:"short Sichuan yells only: yell_sha / yell_kan / yell_chong and one 「杀！」 each by Luo, He, Liu",
+      now:"rescue.noise.yellStandIn plays the rally_* barks under those names", wave2:"the Voice package's squad bark keys; remove yellStandIn"},
+    // N25 (Check, Released)
+    {shot:"N25", what:"Liu kneels aiming east at the trench edge; He kneels at the right edge with his rifle",
       now:"standing while the director poses them (the director's Move hands the native layer kneel:0); kneeling (AI stance 1) from the hand-back", wave2:"the Anim-owned kneel hook for director poses (as SB01's Luo) for Liu and He from their arrival"},
   ].map(Object.freeze)),
   // ---- 02 pursuit (bunkerPursuit, contract §5.8) -----------------------------------------
@@ -1004,7 +1146,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // 2026-09-26 integration: the old start in the mouth, (0.3,-125.1) -> (1.7,-125.3), ran through the fallen lintel,
     // the roof timber and the backrest (Script_OpeningSetTest §2). lane[3] (the crater step) and lane[6] (luoCover) keep
     // their indices: heBackRoute / liuBackRoute and the campaign's look-back read them.
-    lane:Route([3.3,-125.65],[3.05,-124.5],[3.3,-124.2],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4],[-1,-118.5],[-4,-113]),
+    // 2026-10-11: lane[1..2] go round the Set's finish.bodies[0] (3.3,-124.55, head west, lying east) to the crater step's foot
+    // (were (3.05,-124.5), (3.3,-124.2)).
+    lane:Route([3.3,-125.65],[2.7,-124.35],[3.0,-123.75],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4],[-1,-118.5],[-4,-113]),
     luoCover:P(-.6,-120.4),                // first intact wall past the low section, turned back to cover
     luoCorner:P(-7.2,-111.8),              // beyond RC, waiting for the player
     heBound:Route([-.2,-121.9],[-1.2,-118.2]),
