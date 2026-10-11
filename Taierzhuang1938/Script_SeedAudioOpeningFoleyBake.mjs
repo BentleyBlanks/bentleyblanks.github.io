@@ -9,7 +9,9 @@
 //   node Taierzhuang1938/Script_SeedAudioOpeningFoleyBake.mjs --force         # 重新生成全部候选（会换掉已选定的音！）
 //
 // 密钥只从 VOLCENGINE_API_KEY 读，不打印、不落盘。候选 take 与提示词旁注落 Audio/Sfx/_raw/SeedAudioOpeningFoley/
-//（.gitignore 挡着，不进仓库）；只有成品 mp3 与清单条目进仓库。
+//（.gitignore 挡着，不进仓库）；只有成品 mp3 与清单条目进仓库。全部候选另有一份归档在
+// OneDrive\Sync\饮河\FPS\关卡白盒\会话接力\滕县第一关01-02开场重构_20261011\附件\evidence\sfx\raw\SeedAudioOpeningFoley\
+//（同目录还有实录四条的原始长片，放回 Audio/Sfx/_raw/ 就能用 Script_SfxBake 照组名重切）。
 //
 // ## 为什么这八条走生成，不走 Sonniss
 // 2015—2026 九届 GDC 包 + Game Audio Monthly（约 7900 条 mp3）按名字检索、下载候选量过：
