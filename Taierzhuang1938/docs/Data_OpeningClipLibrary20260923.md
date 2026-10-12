@@ -60,6 +60,7 @@
 无头 Blender 每条命令加外层超时、看退出码；也可以用 `node scripts/Script_BlenderMcp.mjs exec --file` 送同一个脚本（前后 start / stop）。
 可编辑 .blend 默认存在 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningStoryboards_20260923`（`OPENING_BLEND_DIR`，不进仓库；09-22 的源工程不动）。
 重烘后抬 `OPENING_VERSION` 与 `Data_OpeningStoryboards.version`、抬 `index.html` 戳，跑下面的测试。
+每条 clip 按 manifest 里的烘焙记录烘（`clips[名].bake[骨架]`，2026-10-12 起），全量 `verify` 能逐条复现提交版；新 clip 怎么记、旧 clip 怎么换到新烘焙器见 §15。
 
 ## 6. 回归口
 
@@ -208,4 +209,60 @@
   1. **烘焙器改了、clip 没重烘（104 条）**：最后一次烘在 2026-09-28 那次烘焙器改动（56ebe386：`LegRoll`、`LimitSwivel`、`TWIST_MAX`，以及给俘虏库摆姿势的旧 clip 补的手臂连续性）之前。09-22 的 18 条旧 clip × 五套骨架 90 条（`BayonetClearWood`、`CaptiveHeld`、`DadaoAmbush`、`KickRifle`、`PointBlockade`、`GuardTurn`、`MessengerReport`…：前臂绕自身轴 43–180°，骨头方向不差，位置 0 mm）；解算 clip 14 条（`YaowaSitLoad` 左大腿 88° 纯扭转、`InterpreterFlee` 右小腿 180°、`RunnerLeanPostCall`、`LuoDragToCover`、`IjaReadyRifle`（IJA01/02）、`IjaSlapRaise`、`IjaStartleTurn`、`HeLiftTimber`、`IjaButtStrike`、`IjaHoldCollarUp`、`InterpreterGrabCollar`、`IjaChoppedFallWall` / `IjaChoppedFallBack`（IJA01））。用 b366d39e（56ebe386 前一版）的烘焙脚本和动作库重烘其中 11 条，逐位等于提交版。
   2. **前一条重烘了、这一条从它末帧取扭转分支（15 条）**：全量烘时 IJA02 的 `IjaWipeSheathBayonet`（09-27 退出流程，按旧链留着提交版，属于上一类）用现行代码重烘，`IjaReadyRifle` 从它的新末帧起步，后面整串（10-11 的 `IjaStompStabTwist`、`IjaWalkStabProne`、`IjaRecruit*` 四条，09-28 的 `IjaSlingRifle`→`IjaHaulForearmUnder` 五条）前臂都换到另一支（180°）；只烘这一串、`IjaWipeSheathBayonet` 取提交版末帧当种子时，这 11 条逐位一致。`LuoKneelCheck` / `LuoKneelReach` 跟着 `LuoDragToCover`，`IjaShoveToWall` 跟着 `IjaDragCollarFromDirt`，`IjaLookBackLow` 跟着 `IjaReadyRifle`。
   3. **伙伴轨变了（1 条）**：`IjaDragCollarFromDirt`（09-27 烘）差 1.5°、1 cm，用 AB、09-30 目录的伙伴轨都一样差，用它当时的 `ComradeKneelBank_20260927` 目录逐位一致（09-28 `CaptiveDraggedFromDirt` 重烘后 `wristR` 挪了 0.7 cm）。AB 目录与之前目录不同的另两条（`CaptiveKneelMud` 多了 `badgeChestL`、`IjaChoppedFallWall` 只差法线）不影响任何 clip（`IjaPullArm` 等复现一致）。
-  - 要做全量重烘的话：先决定第 1 类那 104 条要不要按新烘焙器重烘（重烘后逐条看审片，旧 clip 前臂会换支）；第 2 类给烘焙加「种子取提交版末帧」的开关（或把退出流程的 clip 标成不烘）；第 3 类让每条 clip 在骨架文件里记下烘它时用的伙伴轨目录与哈希。三类都可以在骨架文件里按 clip 记下烘焙器版本（提交号）和 `twistMax` / `seedAnyHand` / 种子来源，`verify` 时按记录复现。
+  - 要做全量重烘的话：先决定第 1 类那 104 条要不要按新烘焙器重烘（重烘后逐条看审片，旧 clip 前臂会换支）；第 2 类给烘焙加「种子取提交版末帧」的开关（或把退出流程的 clip 标成不烘）；第 3 类让每条 clip 在骨架文件里记下烘它时用的伙伴轨目录与哈希。三类都可以在骨架文件里按 clip 记下烘焙器版本（提交号）和 `twistMax` / `seedAnyHand` / 种子来源，`verify` 时按记录复现。（§15 已按这个做了，记录放在 manifest 里，骨架文件一个字节没动。）
+
+## 15. 2026-10-12 R3-Anim：按烘焙记录复现（全量 verify 228 条一致）
+
+任务书 `REL/附件/briefs/Brief_R3_Anim.md`。只改烘焙器、manifest 和测试，**五个骨架文件（帧数据）一个字节没变**；manifest `20261012OpeningStoryboardsV27Repro`。
+
+### 15.1 记录放在哪、有哪些字段
+
+manifest `clips[名].bake[骨架]`，每条 clip 在每套骨架上一条（现在 228 条）：
+
+| 字段 | 意思 |
+| --- | --- |
+| `solverVersion` | `20260927PreLimbContinuity` = 56ebe386 之前的烘焙器（没有 `LegRoll`、`LimitSwivel`、`TWIST_MAX`，摆姿势的旧 clip 也不补手臂连续性处理）；`20260928LimbContinuity` = 56ebe386 起的现行烘焙器 |
+| `twistMax` | 前臂扭转展开的上限（度）；`null` = 不设上限（旧烘焙器就是这样） |
+| `seedAnyHand` | 同 spec 键（`''` / `'L'` / `'R'`） |
+| `twistSplit` | 同 spec 键，只有用到的 clip 才有 |
+| `seed` | 扭转分支、手臂滚转、肘膝弯向和贴地抬高从哪一帧接：`baked:<prev>` = 这次烘出来的 `<prev>` 末帧（这次没烘它就用提交版）；`committed:<prev>` = 总是用提交版 `<prev>` 的末帧；`committed:<prev>@<提交号>` = 那个提交里的 `<prev>` 末帧（`git show` 读）；`null` = 不接 |
+| `partner` | `{dir, tracks}`：伙伴轨目录（OneDrive `AI/Models/Blender/Taierzhuang1938/` 下的文件夹名）和这条 clip 读到的每条伙伴轨的 sha256（`<骨架>/<clip>`，含 builder 建 spec 时读的） |
+| `frozen` | `true` = 退出流程的 clip，不重新解算，直接用提交版的帧（先核对哈希） |
+| `commit` | 最先带着这组帧的提交（从 git 历史逐条比出来的）；还没提交的新烘是 `after:<当时的 HEAD>` |
+| `valuesSha256` | 这条 clip `values` 按 little-endian float64 算的 sha256（-0 当 0 算：重烘出来同一组数有时零的符号会翻） |
+
+现在的分布：旧烘焙器 125 条（§14 第 1 类 104 条，第 2 类里 09-28 前烘的 4 条，第 3 类 1 条，退出的 1 条，再加 R2 全量重烘时就一致的 15 条旧 clip：它们本来就是旧烘焙器烘的，按旧烘焙器烘也一致——判据是这组帧最先出现的提交在不在 56ebe386 之前）；`frozen` 1 条（IJA02 `IjaWipeSheathBayonet`）；`committed:` 种子 15 条（R2 第 2 类）；伙伴轨在旧目录的 2 条：IJA02 `IjaDragCollarFromDirt` → `ComradeKneelBank_20260927`、IJA01 `IjaPullArm` → `OpeningIkBranch_20260928`（后者在 AB 目录下也在 0.5°/1 mm 内，但只有 09-28 的轨能逐位一致）。
+
+### 15.2 烘焙器怎么按记录走（`_import/Script_OpeningStoryboardBake.py`）
+
+- 每个 pass（`bake` / `verify` / `partner`）开始读提交版 manifest 的记录；有记录的 clip 按记录烘，没记录的（新 clip）按现行烘焙器、spec 的键和 `baked:` 种子烘。
+- 旧烘焙器：`Solve` 里摆姿势的 clip 摆完直接返回，解算的 clip 不做腿的 `LimitSwivel` + `LegRoll`、不做手臂的 `LimitSwivel`，`ArmRoll` 扭转不设上限。现行烘焙器的代码一行没改。
+- 记录里的值优先于 spec：spec 后来加了 `twistMax` 之类、和记录不一致时打一行 `RECORD`，按记录烘。
+- 伙伴轨：记录指了别的目录，就用那个目录的轨重新建这条 clip 的 spec 再烘；先逐条核对记录的哈希，对不上直接报错（让人把那份目录拷到 `OPENING_BLEND_DIR/legacy/<目录名>`，或用 `OPENING_RERECORD` 按现行重烘）。`legacy/` 是目录不在了时的后备位置。
+- 清单之外：库的 `MakeClips` 每建一条 spec 前调 `K['Building'](名字)`（可选钩子，06 收尸库没有也没事），这样 builder 建 spec 时读的伙伴轨也算在那条 clip 名下。
+- 每次跑完在骨架文件旁边写 `Data_<骨架>OpeningStoryboardsBakeRecord.json`（`verify` 写在 verify 目录，`bake` 写在 `OPENING_BLEND_DIR`，按 clip 合并）；`WriteManifest`（`bake` / `manifest` pass）只在这份记录的 `valuesSha256` 等于骨架文件里那条 clip 的帧时才把它并进 manifest，其余 clip 保留 manifest 里原来的记录。所以**烘新 clip 不会改旧 clip 的记录**。
+- 不设 `OPENING_VERSION` 时，manifest 版本默认取 `Data_OpeningStoryboards.version`（读不到再取提交版 manifest 的 `version`，再不行用 `20261012OpeningStoryboardsV27Repro`），不会把旧版本号写回去；不带环境变量跑 `OPENING_PASS=manifest`，manifest 不变（`git diff` 为空）。
+- `OPENING_RERECORD=<clip,…>`（或 `all`）：这几条当新 clip 烘（现行烘焙器、新记录）。旧 clip 要换到现行烘焙器就这样烘，烘完逐条看审片（会换支的就是 R2 列的那些前臂）。
+
+### 15.3 怎么复现
+
+```powershell
+# 每套骨架一个进程，可以并行；OPENING_BLEND_DIR 指 OneDrive OpeningRedraft_20261011_AB
+$env:OPENING_PROJECT="<worktree>\Taierzhuang1938"; $env:OPENING_PASS="verify"; $env:OPENING_MODEL="TengxianIja02"
+blender --background --python-exit-code 1 --python Taierzhuang1938/_import/Script_OpeningStoryboardBake.py
+node Taierzhuang1938/Script_OpeningStoryboardsTest.mjs --rebake=tmp/OpeningStoryboards/Verify
+```
+
+实测（无头 Blender 5.1，五个进程并行，每套 2–6 分钟）：
+
+- 改前（master `0c98e6c7` 的烘焙器）：228 条里 121 条超出 0.5°/1 mm（同 R2）。
+- 改后全量：228 条全部在 0.5°/1 mm 内（`ok rebake: 228 rig clips`）。其中 104 条逐位相同，114 条数值相同、只有若干个零的符号不同，10 条最大差 2–6e-6（0.001° 以内、0.00 mm，第六位小数的舍入）：IJA02 `IjaKickBeam`、`IjaLookBackLow`、`IjaReadyRifle`、`IjaRecruitChargeThrust`、`IjaRecruitLevelRifle`、`IjaShotStaggerAway`、`IjaSlapBackhand`、`IjaSlapForehand`、`IjaVaultTimberOut`，NRA02 `YaowaSitLoad`。
+- 只烘几条（`OPENING_CLIPS=LuoKneelCheck,CaptiveHeld,IjaDragCollarFromDirt`，NRA05 / IJA03 / IJA02）：5 条也一致。
+- 查出来的一条 R2 没分出来的：IJA02 `IjaLookBackLow`（09-26 b6fe4f57 烘）接的是当时的 `IjaReadyRifle`，后者 09-27 又重烘过，所以种子要用 `committed:IjaReadyRifle@b6fe4f57`；用现在的提交版仍差 180°。
+
+### 15.4 以后新 clip / 改旧 clip
+
+- 新 clip：照常 `OPENING_CLIPS` 烘，记录自动生成（现行烘焙器、`baked:` 种子、AB 目录与轨哈希、`commit: after:<HEAD>`），`bake` 或 `manifest` pass 写进 manifest；提交后 `commit` 留着 `after:` 也行（它只是说明，测试只认 `valuesSha256`）。
+- 改了旧 clip 的 builder 再烘：它仍按自己的记录烘（比如旧烘焙器）；要换现行烘焙器加 `OPENING_RERECORD`。
+- 伙伴轨重新导出后，读它的 clip 下次 `verify` 会报哈希对不上：要么一起重烘（`OPENING_RERECORD`），要么把旧目录拷进 `legacy/`。
+- 回归口：`Script_OpeningStoryboardsTest.mjs` 新加一段——每条 clip × 骨架都要有记录、`solverVersion` 认得、`valuesSha256` 必须等于提交的帧（忘了更新记录就红）、`frozen` 只给 `retired` 的 clip、`seed` 只能指自己的 `prev`。

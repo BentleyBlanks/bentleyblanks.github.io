@@ -13,7 +13,8 @@ path; start/stop the instance around it). Environment:
                      OpeningStoryboards_20260926HumanoidV1 -- the 20260922/20260923/20260925
                      Lugou-rig sources stay untouched; the 0926 folder started as a copy of
                      the 0925 partner tracks, renamed to the Tengxian rig ids)
-  OPENING_VERSION    manifest version (default 20260928OpeningStoryboardsV15IkBranch)
+  OPENING_VERSION    manifest version (default: the current one -- `version` in Data_OpeningStoryboards.mjs, else
+                     the committed manifest's, else 20261012OpeningStoryboardsV27Repro; another library: its name)
   OPENING_MODEL      comma list of rigs (default all five)
   OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON. A clip's only
                      inputs from other clips are the arm-roll seeds of its `prev` clip (below): a
@@ -50,6 +51,22 @@ same) and `twistMax` (deg: the forearm twist unwraps only that far, then the pri
 `twistSplit` ((shoulder, forearm, wrist) shares of the arm's twist against the bind pose, 2026-09-29, ArmRoll): spreads a
 turned-over palm over three joints instead of two so the wrist skin does not pinch shut.
 
+Bake records (2026-10-12, docs/Data_OpeningClipLibrary20260923.md §15): the manifest keeps, per clip and rig,
+`clips[name].bake[rig]` -- how the committed frames were baked -- and every pass bakes a clip the way its record says,
+so a from-scratch 'verify' reproduces all of them: `solverVersion` (SOLVER_LEGACY = the baker before 56ebe386, without
+LegRoll / LimitSwivel / TWIST_MAX / the authored clips' arm passes; SOLVER_CURRENT = since), `twistMax` (deg; null =
+unwrapped without limit), `seedAnyHand`, `twistSplit`, `seed` ('baked:<prev>' = that clip's last frame as baked in this
+run, else as committed; 'committed:<prev>' = always the committed last frame; 'committed:<prev>@<commit>' = the last
+frame of <prev> as that commit had it, read with git show; null = none), `partner` ({dir: folder
+under the OneDrive Blender root, tracks: {'<rig>/<clip>': sha256 of the track}}; the tracks are read from that folder
+and must match), `frozen` (a clip out of the flow: never re-solved, the committed frames are copied after their hash is
+checked), `commit` (the first commit that shipped these frames; 'after:<sha>' for a bake on top of <sha> not yet
+committed) and `valuesSha256` (sha256 of the clip's `values` as little-endian float64, -0 as 0). A clip with no record (a new
+one) bakes with SOLVER_CURRENT, its spec's keys and 'baked:' seeds and gets a record; a bake never changes another
+clip's record. OPENING_RERECORD (comma list, or 'all') re-bakes those clips as new ones (current solver, fresh record).
+Each pass writes the records it used next to its rig files (Data_<rig><name>BakeRecord.json: the verify folder, or
+OPENING_BLEND_DIR for 'bake'); WriteManifest takes a written record when its valuesSha256 matches the rig file.
+
 It reuses the production-rig importer, two-bone IK, palm solver and original-local-frame
 exporter of `_import/Script_MachineGunCaptivesBake.py`; meshes, skins and inverse binds are
 never replaced. The clips are authored in `_import/Script_OpeningStoryboardClips.py`; this
@@ -67,7 +84,7 @@ so the lowest skinned vertex rests at CLEARANCE. Anything a director or partner 
 in RUNTIME metres (source x scale) in the three.js actor frame (+x right, +y up, -z
 forward): runtime = (-X, Z, Y) * scale.
 """
-import bpy, os, runpy, json, math, hashlib, time
+import bpy, os, runpy, json, math, hashlib, time, struct, subprocess
 from pathlib import Path
 from mathutils import Vector, Matrix, Quaternion
 
@@ -76,8 +93,26 @@ NAME = os.environ.get('OPENING_LIBRARY_NAME') or 'OpeningStoryboards'
 OWN = NAME == 'OpeningStoryboards'
 private = Path(os.environ.get('OPENING_BLEND_DIR')
                or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/' + NAME + '_20260926HumanoidV1')
-VERSION = os.environ.get('OPENING_VERSION') or ('20260928OpeningStoryboardsV15IkBranch' if OWN else NAME)
 committedDir = project / 'Animation' / NAME
+
+
+def CurrentVersion():
+    """The default manifest version: what the runtime reads (Data_OpeningStoryboards.version), else the committed
+    manifest's, else the last known one -- a pass run without OPENING_VERSION must not write an old version back."""
+    try:
+        import re
+        found = re.search(r'\bversion:\s*"([^"]+)"', (project / 'Data_OpeningStoryboards.mjs').read_text(encoding='utf-8'))
+        if found:
+            return found.group(1)
+    except OSError:
+        pass
+    try:
+        return json.loads((committedDir / ('Data_' + NAME + 'Animation.json')).read_text())['version']
+    except (OSError, ValueError, KeyError):
+        return '20261012OpeningStoryboardsV27Repro'
+
+
+VERSION = os.environ.get('OPENING_VERSION') or (CurrentVersion() if OWN else NAME)
 output = Path(os.environ.get('OPENING_OUTPUT') or (project.parent / 'tmp' / NAME / 'Verify'
                                                    if os.environ.get('OPENING_PASS') == 'verify' else committedDir))
 reviews = Path(os.environ.get('OPENING_REVIEW') or (project.parent / 'tmp' / NAME / 'BlenderReview'))
@@ -132,6 +167,87 @@ def Sha(path):
 
 def Round(values, digits=6):
     return [round(v, digits) for v in values]
+
+
+# ---- bake records (module doc; docs/Data_OpeningClipLibrary20260923.md §15) ----------------------
+SOLVER_LEGACY = '20260927PreLimbContinuity'     # the baker up to b366d39e (before 56ebe386)
+SOLVER_CURRENT = '20260928LimbContinuity'       # 56ebe386 on: LegRoll, LimitSwivel, TWIST_MAX, the authored clips' arm passes
+SOLVERS = (SOLVER_LEGACY, SOLVER_CURRENT)
+manifestFile = committedDir / ('Data_' + NAME + 'Animation.json')
+committedManifest = json.loads(manifestFile.read_text()) if manifestFile.exists() else {}
+RECORDS = {name: dict(row.get('bake') or {}) for name, row in (committedManifest.get('clips') or {}).items()}
+RERECORD = [c for c in os.environ.get('OPENING_RERECORD', '').split(',') if c]
+BLEND_ROOT = private.parent
+RECORD_FILE = 'Data_%s' + NAME + 'BakeRecord.json'
+try:
+    HEAD = subprocess.run(['git', '-C', str(project), 'rev-parse', '--short=8', 'HEAD'], capture_output=True, text=True).stdout.strip() or '?'
+except Exception:
+    HEAD = '?'
+
+
+def ValuesSha(values):
+    """sha256 of a clip's bone values as little-endian float64 (what a record's valuesSha256 is; the JSON numbers parse
+    back to the same doubles in node: Script_OpeningStoryboardsTest checks every record against the committed frames).
+    -0.0 counts as 0.0 (`+ 0.0`): a re-bake writes the same frames with a zero's sign flipped here and there."""
+    return hashlib.sha256(struct.pack('<%dd' % len(values), *[v + 0.0 for v in values])).hexdigest()
+
+
+def TrackSha(track):
+    return hashlib.sha256(json.dumps(track, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def PartnerFolder(name):
+    """A record's partner `dir`: a folder under the OneDrive Blender root (or absolute); a folder that is gone is looked
+    for in OPENING_BLEND_DIR/legacy/<its name>."""
+    path = Path(name)
+    path = path if path.is_absolute() else BLEND_ROOT / name
+    if not path.exists() and (private / 'legacy' / path.name).exists():
+        path = private / 'legacy' / path.name
+    if not path.exists():
+        raise RuntimeError('partner tracks folder %s (record dir %r) is missing' % (path, name))
+    return path
+
+
+def PartnerName(path):
+    path = Path(path)
+    try:
+        return path.relative_to(BLEND_ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
+_partnerFolders = {}
+
+
+def PartnerTracksIn(path):
+    key = str(Path(path).resolve())
+    if key not in _partnerFolders:
+        _partnerFolders[key] = {f.stem.split('_')[-1]: json.loads(f.read_text()) for f in Path(path).glob(PARTNER_GLOB)}
+    return _partnerFolders[key]
+
+
+class PartnerView:
+    """K['partnerTracks'] for the clip library: rig -> clip -> track, from one folder, noting every track a clip reads
+    (the library looks them up per frame, K['partnerTracks'].get(rig, {}).get(clip), and some builders while MakeClips
+    builds the specs: K['Building'](name) tells which clip is being built, `built` keeps what each builder read)."""
+
+    def __init__(self, tracks):
+        self.tracks, self.used, self.built, self.building = tracks, set(), {}, None
+
+    def Building(self, name):
+        self.building = name
+
+    def get(self, rig, default=None):
+        view = self
+
+        class Rig:
+            def get(self, clip, default=None):
+                track = (view.tracks.get(rig) or {}).get(clip)
+                if track is None:
+                    return default
+                (view.built.setdefault(view.building, set()) if view.building else view.used).add(rig + '/' + clip)
+                return track
+        return Rig()
 
 
 def BakeRig(ctx):
@@ -247,12 +363,20 @@ def BakeRig(ctx):
         return err, min(turn, 360 - turn)
 
     K = dict(ctx)
-    K.update({'scale': scale, 'ContactWorld': ContactWorld, 'Reset': Reset,
-              'partnerTracks': {f.stem.split('_')[-1]: json.loads(f.read_text()) for f in private.glob(PARTNER_GLOB)}})
+    # (the partner tracks of OPENING_BLEND_DIR; a clip whose bake record names another folder is built and baked on that
+    # folder's tracks, below)
+    partnerView = PartnerView(PartnerTracksIn(private))
+    K.update({'scale': scale, 'ContactWorld': ContactWorld, 'Reset': Reset, 'partnerTracks': partnerView,
+              'Building': partnerView.Building})
     # The grounding lift of the previous frame (Solve's solveState, defined below): AimHead aims from
     # where the eye ends up after grounding, as the reach assist does for the grips.
     K['GroundLift'] = lambda: solveState['lift']
     specs = library['MakeClips'](K)
+    partnerView.Building(None)
+    builtReads = {name: set(keys) for name, keys in partnerView.built.items()}     # clip -> tracks its builder read
+    if partnerView.used:
+        # a read outside any clip's builder (a library that does not call K['Building']) is nobody's: say so
+        print('   PARTNER_READ_AT_BUILD', sorted(partnerView.used), flush=True)
 
     fingerBones = {s: [pb for pb in arm.pose.bones if pb.name.startswith(prefix + ' ' + s + ' Finger')] for s in 'LR'}
     handPrev = {}
@@ -638,6 +762,9 @@ def BakeRig(ctx):
             spec['author'](t, 0.0)
             low, _ = ctx['LowestVertex']()
             spec['author'](t, CLEARANCE - low)
+            if solveState.get('legacy'):
+                # SOLVER_LEGACY (bake record): the authored pose as it is, as before 56ebe386
+                return CLEARANCE - low, {}
             # (2026-09-28) the arm continuity the solved clips have: the rifle grip's branch, the elbow's side, the arm
             # rolls and the forearm twist (the captives authoring aims every bone from rest: ButtThreat's forearms turned
             # 130-170 deg about themselves in a frame, ShotCollapse's 70-90)
@@ -720,7 +847,8 @@ def BakeRig(ctx):
                 p['post']()
                 Update()
         planted = spec['groundWeight'](t) if spec.get('groundWeight') else 1.0
-        for side in 'LR':
+        legacy = solveState.get('legacy')      # SOLVER_LEGACY (bake record): no LegRoll / LimitSwivel, as before 56ebe386
+        for side in ('' if legacy else 'LR'):
             LimitSwivel('leg' + side)
             LegRoll(side, planted)
         # `ground` (x, y, t) -> z: a clip authored on uneven ground (the comrade's bank) grounds on it.
@@ -769,7 +897,8 @@ def BakeRig(ctx):
             if side not in errors:
                 LimitHand(side)
         for side in 'LR':
-            LimitSwivel(side)
+            if not legacy:
+                LimitSwivel(side)
             ArmRoll(side)
         LimitFingers()
         Update()
@@ -839,13 +968,87 @@ def BakeRig(ctx):
     if PASS == 'partner':
         wanted = [name for name in wanted if name in library['PARTNER_SOURCES'].get(modelId, {})]
     arm.animation_data_create()
+    records = {}            # clip -> the bake record this run baked it by (written next to the rig file)
+    committedEnd = {}       # clip -> seeds of its COMMITTED last frame (bake record seed 'committed:<clip>')
+
+    shipped = {}            # commit -> this rig's file as that commit had it (seed 'committed:<prev>@<commit>')
+
+    def CommittedEnd(name, at=None):
+        """Seeds of `name`'s last frame as committed -- now, or in commit `at` (a clip baked while its prev was an older
+        bake of that clip: IjaLookBackLow, 2026-09-27, before IjaReadyRifle was baked again the same day)."""
+        key = (name, at)
+        if key not in committedEnd:
+            source = committed
+            if at:
+                if at not in shipped:
+                    rel = committedFile.relative_to(project).as_posix()
+                    text = subprocess.run(['git', '-C', str(project), 'show', '%s:./%s' % (at, rel)], capture_output=True,
+                                          text=True, encoding='utf-8')
+                    if text.returncode:
+                        raise RuntimeError('%s/%s: seed commit %s: %s' % (modelId, name, at, text.stderr.strip()))
+                    shipped[at] = json.loads(text.stdout)
+                source = shipped[at]
+            row = source['clips'][name]
+            last = len(source['bones']) * 7 * (row['frameCount'] - 1)
+            committedEnd[key] = SeedsFromValues(source['bones'], row['values'][last:]) + (row.get('endLift', 0.0) * unitF,)
+        return committedEnd[key]
+
     for clip in wanted:
         spec = specs[clip]
         meta = CLIPS[clip]
+        # ---- the clip's bake record (module doc): how its committed frames were baked ----
+        held = None if (clip in RERECORD or 'all' in RERECORD) else (RECORDS.get(clip) or {}).get(modelId)
+        if held and held.get('frozen'):
+            # out of the flow: the committed frames as they are (checked against the record), and the seeds of their
+            # last frame for a clip that continues it
+            row = committed['clips'].get(clip)
+            if row is None or ValuesSha(row['values']) != held.get('valuesSha256'):
+                raise RuntimeError('%s/%s is frozen but its committed frames are %s the record' % (
+                    modelId, clip, 'missing from' if row is None else 'not the ones in'))
+            clipsOut[clip] = row
+            twistEnd[clip] = CommittedEnd(clip)
+            records[clip] = dict(held)
+            print('CLIP %-26s %s FROZEN (committed frames, %s)' % (clip, modelId, held['valuesSha256'][:12]), flush=True)
+            continue
+        fresh = held is None
+        rec = dict(held or {})
+        solver = rec.get('solverVersion', SOLVER_CURRENT)
+        if solver not in SOLVERS:
+            raise RuntimeError('%s/%s: unknown bake record solverVersion %r' % (modelId, clip, solver))
+        legacy = solver == SOLVER_LEGACY
+
+        def Pick(key, now, before):
+            """The record's value; without one, what this solver version reads from the spec (a key it did not have: off)."""
+            value = rec[key] if key in rec else (before if legacy else now)
+            if not fresh and spec.get(key) and now != value:
+                print('   RECORD %s %s: spec %r, record %r (the record bakes)' % (clip, key, now, value), flush=True)
+            return value
+        twistMax = Pick('twistMax', float(spec['twistMax']) if spec.get('twistMax') else math.degrees(TWIST_MAX), None)
+        seedAnyHand = Pick('seedAnyHand', spec.get('seedAnyHand') or '', '')
+        twistSplit = Pick('twistSplit', list(spec['twistSplit']) if spec.get('twistSplit') else None, None)
+        # partner tracks: the record's folder (a clip baked against older tracks), else OPENING_BLEND_DIR
+        folder = PartnerFolder(rec['partner']['dir']) if rec.get('partner') else private
+        partnerView.tracks = PartnerTracksIn(folder)
+        for key, sha in ((rec.get('partner') or {}).get('tracks') or {}).items():
+            rig_, clip_ = key.split('/', 1)
+            track = (partnerView.tracks.get(rig_) or {}).get(clip_)
+            if track is None or TrackSha(track) != sha:
+                raise RuntimeError('%s/%s: partner track %s in %s is %s the recorded one (copy the recorded folder to '
+                                   'OPENING_BLEND_DIR/legacy/ or rebake the clip with OPENING_RERECORD)' % (
+                                       modelId, clip, key, folder, 'missing, not' if track is None else 'not'))
+        if Path(folder).resolve() != Path(private).resolve():
+            # built on that folder's tracks too (builders read them outside the frame loop)
+            partnerView.built = {}
+            spec = library['MakeClips'](dict(K, partnerTracks=partnerView))[clip]
+            partnerView.Building(None)
+            partnerView.used = set(partnerView.built.get(clip, ()))
+        else:
+            partnerView.used = set(builtReads.get(clip, ()))
         spec['twoHand'] = meta.get('weaponHold') == 'twoHand'
-        solveState['seedAnyHand'] = spec.get('seedAnyHand') or ''      # the sides ('L', 'R', 'LR')
-        solveState['twistMax'] = math.radians(spec['twistMax']) if spec.get('twistMax') else TWIST_MAX
-        solveState['twistSplit'] = tuple(spec['twistSplit']) if spec.get('twistSplit') else None
+        solveState['legacy'] = legacy
+        solveState['seedAnyHand'] = seedAnyHand       # the sides ('L', 'R', 'LR')
+        solveState['twistMax'] = math.radians(twistMax) if twistMax is not None else math.inf
+        solveState['twistSplit'] = tuple(twistSplit) if twistSplit else None
         duration, loop = meta['duration'], meta['loop']
         count = math.ceil(duration * FPS) + 1
         action = bpy.data.actions.new(clip)
@@ -888,24 +1091,35 @@ def BakeRig(ctx):
         swivelPrev.clear()
         swivelNow.clear()
         swivelSeed.clear()
-        # The first `prev` that bakes before this clip on this rig (what a full bake has in twistEnd); when
-        # this run did not bake it, its last frame comes from the committed file.
-        earlier = onRig[:onRig.index(clip)]
-        for before in meta.get('prev') or []:
-            if before not in earlier:
-                continue
-            if before not in twistEnd and before in committed['clips']:
-                row = committed['clips'][before]
-                last = len(committed['bones']) * 7 * (row['frameCount'] - 1)
-                twistEnd[before] = SeedsFromValues(committed['bones'], row['values'][last:]) + (row.get('endLift', 0.0) * unitF,)
+        # The seed (bake record `seed`): 'baked:<prev>' = <prev>'s last frame as this run baked it, or as committed when
+        # this run did not bake it before this clip; 'committed:<prev>' = always the committed last frame (the clip was
+        # baked when <prev> was the committed one -- it stays that way when <prev> is re-baked); null = none. A clip with
+        # no record takes the first `prev` that bakes before it on this rig (what a full bake has in twistEnd), 'baked:'.
+        seed = rec['seed'] if 'seed' in rec else None
+        if 'seed' not in rec:
+            earlier = onRig[:onRig.index(clip)]
+            seed = next(('baked:' + before for before in meta.get('prev') or []
+                         if before in earlier and (before in twistEnd or before in committed['clips'])), None)
+        source = None
+        if seed:
+            kind, before = seed.split(':', 1)
+            before, _, at = before.partition('@')        # 'committed:<prev>@<commit>': <prev> as that commit had it
+            if kind == 'baked' and before in twistEnd and not at:
+                source = twistEnd[before]
+            elif kind == 'committed' and at:
+                source = CommittedEnd(before, at)
+                print('   SEED', clip, 'from', before, 'as committed in', at, flush=True)
+            elif kind in ('baked', 'committed') and before in committed['clips'] and not at:
+                source = CommittedEnd(before)
                 print('   SEED', clip, 'from committed', before, flush=True)
-            if before in twistEnd:
-                twistSeed.update(twistEnd[before][0])
-                uaSeed.update(twistEnd[before][1])
-                faSeed.update(twistEnd[before][2])
-                swivelSeed.update(twistEnd[before][3])
-                solveState['lift'] = twistEnd[before][4]
-                break
+            else:
+                raise RuntimeError('%s/%s: seed %r -- %s is neither baked before it nor committed' % (modelId, clip, seed, before))
+        if source is not None:
+            twistSeed.update(source[0])
+            uaSeed.update(source[1])
+            faSeed.update(source[2])
+            swivelSeed.update(source[3])
+            solveState['lift'] = source[4]
         for frame in range(count):
             arm.animation_data.action = None
             t = frame * duration / (count - 1)
@@ -1021,6 +1235,19 @@ def BakeRig(ctx):
         # (+ the grounding lift of that frame: a loop's last frame is its first)
         endLift = round(lifts[0] if loop else lifts[-1], 6)
         twistEnd[clip] = SeedsFromValues(names, values[-stride:]) + (endLift,)
+        # the record of this bake: what it was baked by and the frames it gave (a record keeps its `commit` while the
+        # frames are the recorded ones; new frames are 'after:<HEAD>' until they are committed)
+        sha = ValuesSha(values)
+        if not fresh and rec.get('partner') and set(rec['partner'].get('tracks') or {}) != partnerView.used:
+            print('   RECORD %s partner tracks read %s, recorded %s' % (clip, sorted(partnerView.used),
+                                                                     sorted(rec['partner'].get('tracks') or {})), flush=True)
+        records[clip] = dict({'solverVersion': solver, 'seed': seed, 'twistMax': twistMax, 'seedAnyHand': seedAnyHand},
+                             **({'twistSplit': twistSplit} if twistSplit else {}),
+                             **({'partner': {'dir': PartnerName(folder),
+                                             'tracks': {key: TrackSha(partnerView.tracks[key.split('/')[0]][key.split('/', 1)[1]])
+                                                        for key in sorted(partnerView.used)}}} if partnerView.used else {}),
+                             commit=rec['commit'] if rec.get('commit') and rec.get('valuesSha256') == sha else 'after:' + HEAD,
+                             valuesSha256=sha)
         nla = arm.animation_data.nla_tracks.new()
         nla.name = clip
         nla.mute = True
@@ -1094,6 +1321,12 @@ def BakeRig(ctx):
     temporary = file.with_suffix('.json.tmp')
     temporary.write_text(json.dumps(asset, separators=(',', ':')), encoding='utf-8')
     temporary.replace(file)
+    # the records this run baked by, next to the rig file (verify: the verify folder; bake: OPENING_BLEND_DIR, merged per
+    # clip -- WriteManifest takes one into the manifest when its valuesSha256 is the rig file's frames)
+    recordFile = (output if PASS == 'verify' else private) / (RECORD_FILE % modelId)
+    kept = json.loads(recordFile.read_text()) if PASS != 'verify' and recordFile.exists() else {}
+    kept.update(records)
+    recordFile.write_text(json.dumps(kept, indent=1), encoding='utf-8')
     if PASS == 'verify':
         print('OPENING_VERIFY_BAKED', modelId, len(clipsOut), str(file), flush=True)
         return {'id': modelId, 'verify': list(clipsOut)}
@@ -1105,8 +1338,9 @@ def BakeRig(ctx):
     reportFile.write_text(json.dumps({'modelId': modelId, 'scale': scale, 'clips': reports}, indent=1), encoding='utf-8')
     blend = private / ('Scene_' + modelId + NAME + '.blend')
     if not SKIP_BLEND:
-        if wanted:
-            arm.animation_data.action = bpy.data.actions[wanted[0]]
+        first = next((name for name in wanted if name in bpy.data.actions), None)     # (a frozen clip has no action)
+        if first:
+            arm.animation_data.action = bpy.data.actions[first]
         scene.frame_start, scene.frame_end = 0, 120
         scene['BlenderMcpTask'] = 'OpeningStoryboards20260923'
         scene['StoryboardSource'] = 'docs/Data_FirstLevelOpeningSource20260923.md'
@@ -1325,6 +1559,24 @@ def WriteManifest(results):
                 validation.update({c['clip']: dict({'clip': c['clip']}, **{k: c[k] for k in keep if k in c})
                                    for c in json.loads(report.read_text())['clips'] if c['clip'] in asset['clips']})
                 row['clips'] = [validation[name] for name in asset['clips'] if name in validation]
+    # Bake records (module doc): the committed manifest's, and a record a bake wrote next to OPENING_BLEND_DIR's rig
+    # files when it describes the frames in the rig file now (its valuesSha256); only for the rigs that have the clip.
+    records = {name: dict(row) for name, row in RECORDS.items()}
+    onRigs = {}
+    for modelId in MODELS:
+        file = output / ('Animation_' + modelId + NAME + '.json')
+        if not file.exists():
+            continue
+        clips = json.loads(file.read_text())['clips']
+        onRigs[modelId] = set(clips)
+        side = private / (RECORD_FILE % modelId)
+        for name, rec in (json.loads(side.read_text()).items() if side.exists() else ()):
+            if name in clips and rec.get('valuesSha256') == ValuesSha(clips[name]['values']):
+                records.setdefault(name, {})[modelId] = rec
+    clipRows = {}
+    for name, row in CLIPS.items():
+        bake = {m: records[name][m] for m in MODELS if m in records.get(name, {}) and name in onRigs.get(m, ())}
+        clipRows[name] = dict(row, bake=bake) if bake else row
     manifest = {'schema': 2, 'version': VERSION, 'fps': FPS, 'actorForward': [0, 0, -1], 'blendSeconds': .12,
                 'floorClearanceM': CLEARANCE,
                 'coordinates': {
@@ -1332,7 +1584,7 @@ def WriteManifest(results):
                     'props': 'glTF scene space = rig.root local, source metres: origin xyz, axis xyz, up xyz, visible',
                     'stages': 'runtime metres in the anchor actor frame (+x right, +y up, -z forward); yawDeg + = turn left',
                     'contacts': 'clip seconds; partner parts are contactPoints names; standoffM = runtime metres along the patch normal where the knuckle centroid (finger roots) sits'},
-                'clips': CLIPS, 'stages': library['STAGES'], 'props': library['PROPS'],
+                'clips': clipRows, 'stages': library['STAGES'], 'props': library['PROPS'],
                 'models': [rows[m] for m in MODELS if m in rows]}
     existing.write_text(json.dumps(manifest, indent=1), encoding='utf-8')
     print('OPENING_MANIFEST', len(manifest['models']), 'models', len(CLIPS), 'clips', flush=True)

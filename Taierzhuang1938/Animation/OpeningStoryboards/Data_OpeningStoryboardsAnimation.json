@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20261012OpeningStoryboardsV26R2",
+ "version": "20261012OpeningStoryboardsV27Repro",
  "fps": 24,
  "actorForward": [
   0,
@@ -20,121 +20,961 @@
    "duration": 3,
    "loop": true,
    "weaponHold": "free",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "0125910a4d0b469437bdd6cc8178f43485598594d73203d2866f7f7b6a6a64af"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "9174322660d0e9f29061d2f1b1665d6b527e73b48a85a3a389fd21fa209eb8b7"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "cdf780a5adfe3bbc0bfd1b5baeab26d0565f38720b6efee6d1e67236d0f1aab8"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "d79d791fbf9a99aae1e9d2cc3454d29363c9b14a9218f5ee69546dd382885f19"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "312f6ae5ca0a9bfaad426b73ee60c055e75f0a97cf15649a560bb044eec3a046"
+    }
+   }
   },
   "ClipLoad": {
    "duration": 3,
    "loop": true,
    "weaponHold": "free",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "b061f0730e65b87a68e3066624f5b08b9e16fb406315addf96e9b4610afad50d"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "b3acc088dfab4c3e23ac569ed02b88269e30703d754bbf0c63fbb39add1e16e2"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "246f213e0b46699e1f16d8cb1eb23ca33698f16b67f3014f5eedeeee73062928"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "3f2fdf03bcf3aafb4f592119438a9dad1d835bd4ef42d72dd1ca89983467f216"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "8cbd264dee59f4bc736c0dedc32d2faf06b40c362feb97631f922ecf4666c95e"
+    }
+   }
   },
   "MessengerReport": {
    "duration": 3,
    "loop": true,
    "weaponHold": "oneHandRight",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "61f859da103eaa8f5f782313761ad307695b24cbd0d537d225f85b08a1993790"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "8d3153a927a60e1cf544d84d3ffbb49cde90b67b2d9228d6f456b4d2ca8b7e21"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "ca58d69b5c72bcca4b4fc530fc8f3287229653a489cfe34f7f83896aaa85248e"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "c36c84eab797843e4fc1d0eee1e6bdced3eaf5590c3c35449627fd24004175e0"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "cfd48b3529106a956ca3259f3fe48d87d228ee916b1b6aba9b07841da5a9491a"
+    }
+   }
   },
   "DuckBlast": {
    "duration": 1.2,
    "loop": false,
    "weaponHold": "free",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "d19838de96c032161e9966cf4fe75e9db96345f9d649a71cff25e01d9ec86268"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "6ba40c5c19d7f9557d11d284bf39f1e7bdbbaf9b9031a4c2246b5277a6cf9ca2"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "24f3faf57b84faeb26739827773759628b559e7329e54ab6ff64854afd04ea17"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "42e6f2dfb5ae9e87cc6797e1e582244a55e905a128a543127ec02d2f0d814e65"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "5a55ce7879a8ce55ec83b02e02d5addfc01986413f2e709b3e8081cdf6f4eeb0"
+    }
+   }
   },
   "WoundedReach": {
    "duration": 3,
    "loop": true,
    "weaponHold": "free",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "c9bd7126622b418bcc45a29f4dace9eb03c3d6607325e72ebfd5d2d33bddd989"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "0c1e7311a305f5c17ddb34792e07a99c65936017ac7a8d2cad6f910f0de08431"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "767ebe60c05ddc241a42c9262ba5e6a36ecdaba27db79dfd4bfe6f9a82a50828"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "8a37aaeb3a730cfc527e963a1aff6ba71e4f32256fbca268343516b766f252be"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "3822627b0c3bea0778624bdac88bfb77f39d3a9315753b581bfbca9fae1c9a50"
+    }
+   }
   },
   "CaptiveHeld": {
    "duration": 3,
    "loop": true,
    "weaponHold": "free",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "de027c463573e3494c2c144fcca24814a737e32c29c0f0c68a7c7440f5026bc4"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "31e1a2ca65a9236ffd398635e62b93c392c4468bff0ff28356dcb4678f0b45a3"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "ef1dd210898bc0a93013fdffdd9e54a6e9f55e5f881cec298250e1b668c71014"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "baad902af6193ae41b7b15ab2f997b5e533443a1c817948f8becee180c896ba2"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "aef53efdc06011d7226164625f25e507cb1b6cdf6fc58ed661d84eeedeb6cb2a"
+    }
+   }
   },
   "CollarControl": {
    "duration": 2,
    "loop": true,
    "weaponHold": "oneHandRight",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "a679086ec226cf037e379618e66dc5b60bfc87253f396dab35a3875341eb85ba"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "64c4e64115bccecb5607586889e491b7c5ea572d4ee643802f175b75869da252"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "adc7f1d00d9abe69d0526c32887a873e97c3b9e8afe5624047f4b3bf41d59b6c"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "80eec829f10bd63c84120c0dace8fd8384bbb7dced284dca35e6e5f12e9ebb2a"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "c190e2cff8573beb3fd938fd3eeec7fe28e9e833d298771261bd61334e76ce1e"
+    }
+   }
   },
   "BayonetClearWood": {
    "duration": 1.6,
    "loop": false,
    "weaponHold": "twoHand",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "4540293cd7f462a72c99680c2ee5a245822986341aec84c2c9568ed24702017b"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "162b749f107c0ba66a1e0da92b8930958a25258de9dbdfdb33b94d25de34777f"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "f519b68be387896ec755b3b643077bd497e21ece2150f96a47cee2fd3946a333"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "44313b3b28b457b3b0b9dc16995b0bd3fe77d62b0f72654581dd3ee7d7d276a9"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "7aa30114fa3b46922add5d3b817ec1fdba8623275f501fe25695cb40bab7cbf4"
+    }
+   }
   },
   "CollarDrag": {
    "duration": 2.2,
    "loop": false,
    "weaponHold": "oneHandRight",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "f51122a7614990d823b783c257117757b1f3f5e3896f1258f96c0ec4802b25c9"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "81d06cde4b08839fd01f2c4eef6ac2658bece2826db0eb2031a231018bccae32"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "af6604d3f49d784c12a732c75e57701c4aa82ec1cb46a555ab63c1e5df586108"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "883aacb5d8af9e6ae2edca6ae398c27816519267fcbc7ab6401c017f3a5be502"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "41faaa4d370fe8603978d609073288e7d66f34193e22f61b9d98e3b94c9b549b"
+    }
+   }
   },
   "ButtThreat": {
    "duration": 1.4,
    "loop": false,
    "weaponHold": "twoHand",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "7c6c53756f22212e37647b20fa807b9c65ba51364a361b7b242abad1ff9b74d8"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "bfee86025d83afa5e500c260b4bcac28ee78bc8c3d4f9ca1587f53614763c45c"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "87e9762f1e3dc5b0022e202c4698dba1350f64f766f7f67ef3e2da8bf9e31f47"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "fa1fbccb631299f61658d324a58df6a4db11e8d00f8db5fa7a2b04da672a27dd"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "019bdf4adab602807378cc550ab7d6fa95e419e533f6a9346a0203f1173c1787"
+    }
+   }
   },
   "InterrogateCrouch": {
    "duration": 3,
    "loop": true,
    "weaponHold": "free",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "fecb5810d54179a3f70f10c3c8a886cea33bcc6614c9bb20ec011f200b44af29"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "efc91eaba7e25ff66b41c452f80e3efe75718725b2fbb859d107f2f3b42e4ed0"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "a986becd59dfd4d894917f9edc158d4edb2d838e60746cbbe1c555f9191edf50"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "3d2550581c8657a4e9e71fc49bc27ca537f6fcb4aeea45dd92c99728265301c8"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "a8525991620771cc10b6a392451b72828b2dfb8d3559bed040610b35d06f6eab"
+    }
+   }
   },
   "InterpreterPoint": {
    "duration": 3,
    "loop": true,
    "weaponHold": "free",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "4e8182758a44229923dd4a771d379878abd1b9109f57065af2fa834309b1eedb"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "c34142178de358eaede2821f9ef3ecfe960b2652e85d0b6083c436c94058f72f"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "5b1bbbc01ada392109ac958496637f5bb42160cb75c3f2e275a578a735988eb0"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "ba5256dc87e9b4f4fd3acdcadc6fbd0f54a6c980a9814dd0e6cd75c5f01501da"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "d92d59fcad146bd5ccf4ad46c2d3ad9bd5e59a4d94ea5e8a6d06cb01d8eedfd1"
+    }
+   }
   },
   "CreepDadao": {
    "duration": 1.8,
    "loop": true,
    "weaponHold": "oneHandRight",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "544ce68e04d438bc179864b8682a39d917da3476edab7fdf4a83f995460fc367"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "ea9a5f6966d72211a6088c1fb70db6a615f4583703dc0b65a5b52c3d95cd6d45"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "43eeeaa2b1eaf1666c069ce6fefd1beb3ee02a5f77ff60a20602c484916691e9"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "0415befc378f9e498f83df695bcd549d30b8c7df5ac11783cbcfab6ef17616d5"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "c85ec193f1c8e0baf690253b4b72bc2fb47d1bc32aa8b252a33736005e0aea78"
+    }
+   }
   },
   "DadaoAmbush": {
    "duration": 0.85,
    "loop": false,
    "weaponHold": "oneHandRight",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "96906707c54b82eb3edd183eed6d81f2f17890ff5dee7a6bf2649f3da0ca5048"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "c8f1fac085b98a3ef7b4bad8146108589e6a553e77d41efece870fdb468b3f0e"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "81a16aa66f06f487a1b26230f90b680258e72acdff674ac31a4e803eaa090eca"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "4da818e78dc53113f4020947ca5049d5257633672f1644a5dad9eb07aef7a4ce"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "3833019f52ae66f2e1bf31ab714154ebfe61d93530a84b50bc6a5d7464735b17"
+    }
+   }
   },
   "RifleDeflect": {
    "duration": 0.8,
    "loop": false,
    "weaponHold": "oneHandRight",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "4d8b3640671c008cf2c9169d58e6038a7a61cf739425a011b697939d1449a51c"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "85d508667cc87293e8e100cbe6cd05ec5e829efad14eadf69c90a6b49c5ce6fd"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "6a7629216d871e9fa46241932813d900b8efc200240dfb8bf3140af666406c41"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "cf02cb8acbd3b70e4cf27b3c36977a213052e1570ac7ba363a5bc594feb4d070"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "05d995df864a5af5ab49f578f0292b310a070072bc6ff21ebfe51807f9d9740d"
+    }
+   }
   },
   "PullComrade": {
    "duration": 2,
    "loop": false,
    "weaponHold": "free",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "1ac666bd67d81cc809512b0619c90fe5fdd8c4dbede3ef514a94ee388385c031"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "ed8f90f33499566727f77b1f569c4bf2b4b6cd9700259c673dcae195e713bf2e"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "901fe7e560abffcba8bb512a1278dcb7f7b4b455412166cec9d6b5e13ce9aae6"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "27a035943ec67f16329b0f383b58a148e6eb0bbafbaeeca543d6b3b2123b7ad5"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "aa28f6f871dba3a977f79084151f471e7f6c0162a219b85bbf0fe1ef8490a78a"
+    }
+   }
   },
   "KickRifle": {
    "duration": 1.2,
    "loop": false,
    "weaponHold": "free",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "0e3d42b15760cd72791beb63bab9018dc708f3e5c2b27ecb2431b66e3d872fd5"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "78762f368b705bc79638bd8ae611cefeb40052ece08382b9c52e42aa459271ac"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "6e5154ce350ff95d6a090d5060e97c17a9fa224d8c428ebb84af1d69f060630b"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "d0fab113ed260428d829e5abc99e60608d57e53650cfdeab73c8b0154fc05383"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "0b9456fd9937c6adac3f62461439df8a53fff391e34e474782d4ea3604567239"
+    }
+   }
   },
   "PointBlockade": {
    "duration": 3,
    "loop": true,
    "weaponHold": "oneHandRight",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "1a9f25d844a688d478f00dfed1fcb4c7a217f7dc24e347b14d994a821aa975c7"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "237fa1251a059578ced17865429ef4bd94acd58dc9dd12eafac673036cb02497"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "5e840068bb15009d711b66235d3bdf8494d387748392aec9557462648b0106c4"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "72b743fa8d42a39db5974e911001a86561e9ba6aa88b0e8ff1dffb307c4c47c7"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "1a0f05fbf6a0ec40d7396047372eba2b5ab3dfb7343ca25ae7753a39ac0c7334"
+    }
+   }
   },
   "ShotCollapse": {
    "duration": 1.6,
    "loop": false,
    "weaponHold": "free",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "c4e49260feb562d005a230cb1388ab3faedd56df17ba3835db78452ed632770b"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "0e9b5fc8a1aff061ee9729a91a613309c068bf82bc9033ea31474331b1f0807c"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "4b725f1042995c1c19ad690f2cb4229fc9195a35b73bba5f3d0d13605058ed4c"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "57a3812c41c3747013aa759a6526022536e8c598804da61f1f8a38b86e7fe0df"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "226a2d798da3c3d3a6167494497de599e60ef4f88699f6f09dd9ec8fc4abdc4d"
+    }
+   }
   },
   "GuardTurn": {
    "duration": 1.2,
    "loop": false,
    "weaponHold": "twoHand",
-   "legacy": "20260922"
+   "legacy": "20260922",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "8ce7c17915801f3a10f43bc903b76b6dbdb2daa4b2d4e76dd151f7dd5873144b"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "e5f90b1faa32db00724f48208d53427756a27a4c86bdc64ee3f91a733c483727"
+    },
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "a6407f8339f09db3fdfa5c6cd7b200c243ba31cd04b5d18a1a2c32d202d3743d"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "fa959ef93388057eed34bebc8f58728ba07ec0667b760519de59a51a7607d71f"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "f7d79bddc55507dff514789b9db883ab30034521454353a5bbc4cb4c6ac13c3c"
+    }
+   }
   },
   "WoundedSitRifleIdle": {
    "duration": 4.0,
@@ -173,7 +1013,17 @@
    "notes": "Seated on the dugout floor, back on the wall, knees up; rifle upright between the knees, butt in the dirt, right hand round the handguard; bandaged left arm limp on the left knee.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "5d91408a2f662d6d977b934f09a482728d7d599c7de583385fd14bea7f35b4a6"
+    }
+   }
   },
   "BanterLaugh": {
    "duration": 1.6,
@@ -200,7 +1050,17 @@
    "notes": "Short shared laugh: breath in, three decaying chest pulses, head back then down. Additive on spine/neck/head/clavicles; full-body it is the seated comrade.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "22e26413f5cc38cc4c8886a9f29c7659feece4c7a6267779269c105be924faa6"
+    }
+   }
   },
   "BanterLookShoulder": {
    "duration": 2.2,
@@ -227,7 +1087,17 @@
    "notes": "Glances down at the bandaged left shoulder and back up (\"\u4f4e\u5934\u770b\u4e86\u4e00\u773c\u80a9\u8180\").",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "74be38deea9095f8c68c459412258af9bb95b9399baaa006e4d998fc1366547f"
+    }
+   }
   },
   "BanterPatRifle": {
    "duration": 2.0,
@@ -285,7 +1155,17 @@
    "notes": "\"\u62ff\u8fd9\u4e2a\u567b\": lets go of the handguard, pats the rifle twice, closes the hand again. Starts and ends on WoundedSitRifleIdle frame 0.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:WoundedSitRifleIdle",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "c56571aa4c1b3f151a11a691b92a0f260ebfd132cef8c1a9831a69f7ccc64e15"
+    }
+   }
   },
   "WoundedRiseWall": {
    "duration": 2.8,
@@ -338,7 +1218,17 @@
    "notes": "Pulls the feet in, braces the bandaged side on the wall, stalls with a sharp inhale when the shoulder pulls, rises into a hunched low-ceiling stance, clamps the rifle at port.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:WoundedSitRifleIdle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "07d8732c86bd6ac12ec9d7a257c8ecad3d03bbd1a185d2896e36418a5363e1d9"
+    }
+   }
   },
   "BlastSlamBuried": {
    "duration": 1.5,
@@ -382,7 +1272,17 @@
    "notes": "Near miss from front-right: thrown back-left into the trench wall, the rifle torn out forward-right, slides down the wall into a slumped heap on his left side (dust hides him). The heap lies on the real bank at the foot of the planks (BANK_RAMP). The last frame is exactly BlastDazedStir / CaptiveDraggedFromDirt frame 0 in the same root.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:WoundedRiseWall",
+     "twistMax": 200.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "24aa3f4ea0dc2de00fb9789f8e6f76ee97dcf493eb82c156b34d72b5c1a66ada"
+    }
+   }
   },
   "BlastDazedStir": {
    "duration": 6.4,
@@ -417,7 +1317,17 @@
    "notes": "Stunned by the near miss, in the heap on the bank (Wake .. the drag): heavy breathing, the head comes up and lolls, the right hand goes to the ringing head and he shakes it slowly, the left palm pushes on the bank to sit up and the arm gives, he sags back. Frame 0 = last frame = BlastSlamBuried last frame = CaptiveDraggedFromDirt frame 0 (the director lands the drag on a loop end).",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:BlastSlamBuried",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "b18555d4b604126635d365bb801361d2f678a8fea9b84aa602a2295eabc84177"
+    }
+   }
   },
   "CaptiveDraggedFromDirt": {
    "duration": 4.4,
@@ -494,7 +1404,17 @@
    "notes": "Hauled out of the loose earth by the back collar (ijaA) and the right arm (ijaB); knees and insteps drag, one foot gets under him and slips; jerked up on \"\u7acb\u3066\uff01\", drops onto his knees; the arm is wrenched up across the wound (gasp). Frame 0 = BlastSlamBuried last frame.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:BlastSlamBuried",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "26c4fa2e075e8e92f988991ca7b79b0e0799de4f385ea17d28a61c754ad2fe3f"
+    }
+   }
   },
   "IjaDragCollarFromDirt": {
    "duration": 4.4,
@@ -531,7 +1451,23 @@
    "notes": "Stoops, hooks the back collar with the right hand, backs up three steps hauling; the jerk on \"\u7acb\u3066\uff01\" straightens him. Rifle slung across the back.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "ComradeKneelBank_20260927",
+      "tracks": {
+       "TengxianNra02/CaptiveDraggedFromDirt": "831df8e60634130939beaba8bf9d0ab29e400c0c242e755df545e037dc79c876"
+      }
+     },
+     "commit": "fec1fc7c",
+     "valuesSha256": "181c4678d1f16d6c827182169d3ad5cfa19a059fe077eb7556d10345b899d46a"
+    }
+   }
   },
   "IjaPullArm": {
    "duration": 4.4,
@@ -582,7 +1518,23 @@
    "notes": "Two-handed hold on the right upper arm and wrist, sidesteps back with the drag, wrenches the arm up at 3.2 s and lets go at 4.05 s.",
    "rigs": [
     "TengxianIja01"
-   ]
+   ],
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningIkBranch_20260928",
+      "tracks": {
+       "TengxianNra02/CaptiveDraggedFromDirt": "1073f92ebf77f9b181683fbdcb3f319082c14f1cbf8c5aade61da0b2eff734aa"
+      }
+     },
+     "commit": "56ebe386",
+     "valuesSha256": "71efaa4b22e7a7e608c72f9efc3a34ec0eabfadaf4d4a14a0716014db2e96438"
+    }
+   }
   },
   "CaptiveWallBrace": {
    "duration": 2.0,
@@ -631,7 +1583,17 @@
    "notes": "Shoved in the chest: topples back-left, the left palm finds the planks and slides down them, he ends kneeling on the bank leaning back with shoulders and back on the planks, right hand on the torn bandage.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:CaptiveDraggedFromDirt",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "81a80d3ae74b3ecd3a333ffd3522475abf269d715e0c1e1d720a57f6c52e1802"
+    }
+   }
   },
   "IjaShoveToWall": {
    "duration": 1.0,
@@ -671,7 +1633,23 @@
    "notes": "Not in contract \u00a75.4 (added): the shove the draft describes (\"\u63a8\u5230\u6c9f\u58c1\u4e0a\") needs its own pair with CaptiveWallBrace. Short wind-up, lunge on the left foot, flat right palm to the chest.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "committed:IjaDragCollarFromDirt",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveWallBrace": "f2b76f93cca2655ef84159c11c9cd8a250fb0603685a3175164e3676d3da4f59"
+      }
+     },
+     "commit": "fec1fc7c",
+     "valuesSha256": "361f33859d7cce4a85d05aee7b07b988742916b4fc145e11ed6a04f027724638"
+    }
+   }
   },
   "CaptiveKneelMud": {
    "duration": 3.0,
@@ -705,7 +1683,17 @@
    "notes": "Interrogation idle: kneeling on the bank (shins up the slope, sitting on high heels) and leaning back on the planks, three hard breaths per loop, head lolling, right hand pressed on the bandage. Same root as CaptiveWallBrace.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:CaptiveWallBrace",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "fec1fc7c",
+     "valuesSha256": "8708b1712a6120f79dd5fc8d93f19f04bba2c5814a0b75273178e5bc99e430e9"
+    }
+   }
   },
   "CaptiveHeadPulledBack": {
    "duration": 1.8,
@@ -753,7 +1741,17 @@
    "notes": "2026-09-27: a fist in the hair at the back of his head (ijaA at his left shoulder): he is wrenched up off his heels and off the planks, the head torn back and turned to his right -- toward the pinned eye -- so the stretched throat faces it; both hands fly up to the wrist in his hair and claw at it while the bayonet is drawn (covers IjaHairGrabPull + IjaDrawBayonet).",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:CaptiveKneelMud",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "da47b1bf",
+     "valuesSha256": "0acde6a4671f2852b7686635dd830cfdf985601a61bf47c8e122cde914f500e7"
+    }
+   }
   },
   "IjaHairGrabPull": {
    "duration": 1.0,
@@ -789,7 +1787,23 @@
    "notes": "2026-09-27: a step in at the comrade's left shoulder, the left fist into the hair at the back of his head and a hard wrench: the head back and turned away from him (toward the pinned eye). No pause before the draw.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveHeadPulledBack": "9191a7239f8138dc60a486950cc5baabc12c47e6253239acaa10d19f3d93ecb7"
+      }
+     },
+     "commit": "b366d39e",
+     "valuesSha256": "e2f86fe93f0885656671b9b1ee541eaee120108e6f4bc7ce54fe14b0f99d1933"
+    }
+   }
   },
   "IjaDrawBayonet": {
    "duration": 0.8,
@@ -849,7 +1863,24 @@
    "notes": "The left fist keeps the head wrenched back; the right hand crosses to the scabbard on the left hip and draws the bayonet out blade down (reversed), brings it up in front of his chest and turns it over in the fist to a forward grip (0.44-0.58), then reaches round in front of the comrade's neck and lays the edge on the right of his throat, the fist in front of the neck (last frame = IjaThroatSlash frame 0). 2026-09-29: a closed fist round the handle.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaHairGrabPull",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveHeadPulledBack": "9191a7239f8138dc60a486950cc5baabc12c47e6253239acaa10d19f3d93ecb7",
+       "TengxianNra02/CaptiveThroatCut": "dfa9cfbe1d1731ad7d4cbd03f8342ea63fae5add3794b4f2b76911c57f1b0d3d"
+      }
+     },
+     "commit": "da47b1bf",
+     "valuesSha256": "2eecddac43eedd1f04223566e8834adaae983a5727f32574b791fee7f30e27f7"
+    }
+   }
   },
   "IjaThroatSlash": {
    "duration": 5.0,
@@ -940,7 +1971,24 @@
    "notes": "2026-09-29 pull cut: the edge laid on the right of the throat and pressed in (0-0.12 s, a short push seats it), then one hard pull back toward his right hip draws it round the front of the neck -- the fist leads, the edge stays on the skin (it crosses the front of the throat at 0.24 s) and the blade slides through along its length; the trunk turns into the pull, the weight goes back. The pull runs out past his right hip and the bloody blade comes to rest low at his right side (0.4-1.0). The left fist keeps the head up and shakes it (0.72) while he leans in to jeer; 1.0-1.6 he lays the flat of the blade on the dying man's left shoulder and wipes it once along its length. 2.0-5.0 is a seamless hold loop with two more shakes (the director lets go at 2.0: ija.tauntHoldS after the cut).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaDrawBayonet",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveClutchThroat": "75a0b68653be5359b8de7b8a4ea0f385f8ebd98e825ea6a36b00eb67e63eced5",
+       "TengxianNra02/CaptiveThroatCut": "dfa9cfbe1d1731ad7d4cbd03f8342ea63fae5add3794b4f2b76911c57f1b0d3d"
+      }
+     },
+     "commit": "da47b1bf",
+     "valuesSha256": "18499172affef1e5f8f155f40ac9dc881718837d1dea91a4cda046df2ec24138"
+    }
+   }
   },
   "IjaReleaseSheathe": {
    "duration": 1.3333333333333333,
@@ -1009,7 +2057,23 @@
    "notes": "2026-09-29 (user: \u300c\u671d\u7740\u73a9\u5bb6\u8d70\u8fc7\u6765\u7684\u65f6\u5019\u6ca1\u6709\u6536\u8d77\u6765\u7684\u5c0f\u5200\u300d): frame 0 = IjaThroatSlash at 2.0 s (the start of its hold loop, where the director lets go). The fist opens with a shove off the head of the dying man; the wiped knife comes in front of his chest and is turned back over in the fist to the reversed grip (0.30-0.44, the turn of IjaDrawBayonet run backwards), goes down into the scabbard on his left hip and is pushed home (0.80), his eyes down on it; the hand comes off the handle and hangs free. Then he walks off empty-handed (IjaTauntWalk).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaThroatSlash",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveWallSlideTwitch": "2b7dd4a7a72b5e4592a33ec000f1f43173366c1071566eea1b4403bab14a2039"
+      }
+     },
+     "commit": "da47b1bf",
+     "valuesSha256": "52b11f22a2dd823e115a8fdb63aa5aa1ffe7aaa10bf7dbaca31d07e51dce6564"
+    }
+   }
   },
   "CaptiveThroatCut": {
    "duration": 1.0,
@@ -1061,7 +2125,17 @@
    "notes": "The cut lands: a full-body jolt, the right hand drops off the fist and clamps on the throat (2026-09-29: the left keeps clawing at the fist in his hair until ijaA lets go; in the old bake both hands came down and the left elbow went through ijaA), the legs go -- the seat sinks toward the heels (0.56 s) and he hangs from the fist in his hair, which keeps the face turned up toward the pinned eye (2026-09-27: his back no longer slams onto the planks; he falls back onto them when let go).",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:CaptiveHeadPulledBack",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "da47b1bf",
+     "valuesSha256": "e813a03b23cce1afc8559a0a19a35d61775a116b81a4dd3e443d982d3b8aa6f1"
+    }
+   }
   },
   "CaptiveClutchThroat": {
    "duration": 3.0,
@@ -1109,7 +2183,17 @@
    "notes": "The right hand clamped on the throat, the left still on the fist in his hair, choking spasms, the head held up by the fist and shaken twice per loop (in step with the IjaThroatSlash hold window).",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:CaptiveThroatCut",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "da47b1bf",
+     "valuesSha256": "897339b3bff8be99b0521b3401cef0e26e4ad3dfb168aefffca2cd29bd71a7c0"
+    }
+   }
   },
   "CaptiveWallSlideTwitch": {
    "duration": 3.2,
@@ -1173,7 +2257,17 @@
    "notes": "Let go: the head drops, his left hand comes off his hair to his throat (0.05-0.45 s), he falls back onto the planks (0.55 s), the seat sags to his right on his heels and he slides down the planks over to his right -- he dies kneeling on the bank; one hand slips off the throat, the legs jerk three times and stop. Last frame is the corpse (hold it; replaces ShotCollapse).",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:CaptiveClutchThroat",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "da47b1bf",
+     "valuesSha256": "f0d7a3f2089193a5b7dcb7aeb27bff6ae45162fed800973bf3b0dfd18c62b9d1"
+    }
+   }
   },
   "IjaWipeSheathBayonet": {
    "duration": 5.6,
@@ -1250,7 +2344,15 @@
    "notes": "Retired 2026-09-27 (not played: the director walks ijaA off taunting, IjaTauntWalk, and he sheathes the bayonet in IjaFoundLook); kept as baked 2026-09-27 V12 against the old collar-hold chain at the old spot (stage slashWipe). Frame 0 was the old IjaThroatSlash hold pose: the fist opens (0.05 s) and drops, the knife stays low at the hip while he watches the man slide down the wall (to 3.2 s). Then he stoops, drags the flat of the blade once across the dead man's left shoulder, straightens, sheathes on the left hip and reaches over the right shoulder for the slung rifle (last frame = IjaReadyRifle frame 0).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "frozen": true,
+     "solverVersion": "20260927PreLimbContinuity",
+     "commit": "fec1fc7c",
+     "valuesSha256": "95e3bc760735f7058b234645670a4fb4982ac19a447be448151ef791b66ee069"
+    }
+   }
   },
   "IjaReadyRifle": {
    "duration": 1.1,
@@ -1300,7 +2402,33 @@
     "TengxianIja01",
     "TengxianIja02",
     "TengxianIja03"
-   ]
+   ],
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "a8a2fdf428a2b5c9cc92c7c9fe1e0c0328aa87f2f936b3e29d972343a10f51b5"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:IjaWipeSheathBayonet",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "fec1fc7c",
+     "valuesSha256": "8d887468517d34f990ca1bc412ccc60b318d61407b1f66c6364303ce597a58fd"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "2c2d2b70",
+     "valuesSha256": "7cf9a6de98b3bcfcbf52c65b94760ef812e61876f5acc10c99a729a6affb4236"
+    }
+   }
   },
   "IjaCollarQuestion": {
    "duration": 3.5,
@@ -1338,7 +2466,23 @@
    "notes": "2026-09-30 (the questioning, replaces the legacy CollarControl there): at arm's length at the comrade's left front on the bank, rifle slung across the back, bent over him with the left fist closed in his front collar, the face on his face; the right fist in front of his chest jabs at him twice a loop (hold-loop seconds 0.55-0.95, 1.75-2.15), shaking the collar. 0-0.5 s lead-in from IjaShoveToWall's stoop, 0.5-3.5 s seamless hold loop.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaShoveToWall",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveKneelMud": "036dc244fff951f53378eb79a5011a6ef2f6e2955056efac595a3e9e8a2f1dd2"
+      }
+     },
+     "commit": "5b0b4779",
+     "valuesSha256": "d8cf5ed295a35157617ca14a16308521fec03bb42f399b446f71c14b1dbf0988"
+    }
+   }
   },
   "IjaCornerFire": {
    "duration": 2.6,
@@ -1373,7 +2517,25 @@
    "rigs": [
     "TengxianIja01",
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "e28673f761d5dfcb4d4fa0d09bd55c4d3923295bf3dfbdd2699cdbe6ac4c93b7"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "7b266d63990a7a72eb8beb9f8bd67b15e315b44cf03b705daea1baa21904b408"
+    }
+   }
   },
   "IjaJunctionPeek": {
    "duration": 3.2,
@@ -1392,7 +2554,25 @@
    "rigs": [
     "TengxianIja01",
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "574e3ed7271f53e61d8572f8df4f43d92c86c31e1a06900dc5ad2170e40e9670"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "d7a5febf98d6a11a995fdf5beed418c3eb624068fc5cc6ee24acd7b51c494e79"
+    }
+   }
   },
   "IjaSlingRifle": {
    "duration": 0.8,
@@ -1417,7 +2597,17 @@
    "notes": "\"\u628a\u6b65\u67aa\u7529\u5230\u8eab\u4fa7\": swings the rifle up and back onto the right shoulder by the sling, lets go, hands free and stooping for the collar.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "committed:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "7d87285724f39381f8775a48b02d86baf3f9baa7fb8602c78a67a08bdef9e346"
+    }
+   }
   },
   "IjaCollarDragSnag": {
    "duration": 1.75,
@@ -1464,7 +2654,17 @@
    "notes": "Squats at his head, hooks the back of the collar and backs off two short steps hauling, face on him; the pack snags on the beam (packSnagged): a dead stop that jerks him forward, two yanks, a look back at what holds. 2026-09-26: hips further back and lower, trunk less folded (the face was straight above the prone eye, upside down in the picture, the jacket collar through the chin) and 1.7 s instead of 2.2 s.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "committed:IjaSlingRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "9d0bcf48954eb48568a1290f4a139d379360480d273a2e5c669abb74504618f1"
+    }
+   }
   },
   "IjaKickBeam": {
    "duration": 1.0,
@@ -1509,7 +2709,17 @@
    "notes": "Keeps the collar in his left fist, stamps the loose beam off the pack with the right sole; the beam track carries it clear (rests at 0.75 s); face back on him for the haul (1.0 s, was 1.2 s).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "committed:IjaCollarDragSnag",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "11faa4c73e3eb66c18458617d4058b040188137970ad8dcf751af43ca4fde70a"
+    }
+   }
   },
   "IjaButtStrike": {
    "duration": 1.0,
@@ -1550,7 +2760,17 @@
    "notes": "No warning: the rifle comes off the shoulder into both hands and the butt is driven straight down onto the head of the man propping himself up (0.42 s), then back to low ready.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:CollarDrag",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "1c703e48cdb1df2a34048f17a7b80ccd148572355f34ffe28d5668a5ee5fba6b"
+    }
+   }
   },
   "IjaHoldCollarUp": {
    "duration": 3.8,
@@ -1609,7 +2829,17 @@
    "notes": "SB05 (2026-09-25): squats in front of Shunzi, fists the front of his jacket and hauls him up until his eye is 0.73 m off the ground (player head); the head is up and pushed forward and the face stays on Shunzi's eye (head aimed at the player head track; the helmet brim does not cover it) except one glance to his right at the interpreter (2.2-2.9 s). 0.8-3.8 s is a seamless hold loop with two shakes.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:IjaButtStrike",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "072b925e1d049486c26b98063b309d5f9475cb2b53ae4ff3a629002f2cc8d7a3"
+    }
+   }
   },
   "InterpreterCrouchAsk": {
    "duration": 3.2,
@@ -1622,7 +2852,17 @@
    "notes": "Squatting on his heels in front of Shunzi, leaning in, right hand turned up asking and jabbing, left forearm on the left knee; the head searches his face.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "948e6fb900ac0150ed8ec318518efb23bc666c46bd1a2cff9494fbf12fa1ae73"
+    }
+   }
   },
   "InterpreterGrabCollar": {
    "duration": 3.0,
@@ -1661,7 +2901,17 @@
    "notes": "\"\u8bf4\u8bdd\uff01\": lunges from the squat, grabs the collar with the right hand and shakes once; 0.6-3.0 s holds.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:InterpreterCrouchAsk",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "c5888a57e92e69cc4e1616985e37db8f8645327c6f3d1fd7aab42a8b501ff462"
+    }
+   }
   },
   "InterpreterFlee": {
    "duration": 1.6,
@@ -1694,7 +2944,17 @@
    "notes": "Lets go, recoils onto his hands, scrambles up turning away and breaks into a run toward the front trench (about 1.3 m inside the clip); the director hands him to the native run at the end.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:InterpreterGrabCollar",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "15cd1b41d793a7de02c466d1f0168885e034b83a77fcf68bf523d79a6bbffbea"
+    }
+   }
   },
   "LuoDadaoChopRear": {
    "duration": 1.3,
@@ -1732,7 +2992,23 @@
    "notes": "From the right-rear: dadao cocked over the right shoulder, a step in on the left foot and one diagonal two-handed cut down through the right side of the neck, follow-through low left, back to guard.",
    "rigs": [
     "TengxianNra05"
-   ]
+   ],
+   "bake": {
+    "TengxianNra05": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:CreepDadao",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianIja01/IjaChoppedFallWall": "b07d38666ec36203e29e8b585adcdc4975c716238534e0a7e2432954c8ceb437"
+      }
+     },
+     "commit": "56ebe386",
+     "valuesSha256": "c10c5bc667d6f4525c727a870e86097d26a00fbfb1146c51e456da5d2c7b64d1"
+    }
+   }
   },
   "IjaChoppedFallWall": {
    "duration": 2.2,
@@ -1787,7 +3063,17 @@
    "notes": "Aiming down at Shunzi when the blade lands: neck snaps away, the rifle drops out of his hands, he staggers left into the trench wall, left shoulder first, and slides down it into a sit on the ground, the left shoulder and head against the wall, legs out, arms slack. Frame 0 is his aim; last frame is the corpse.",
    "rigs": [
     "TengxianIja01"
-   ]
+   ],
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:IjaReadyRifle",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "49ceea5428bacc07f8637ef32d48cedc9576aba3ad0af805b9e84c9d52b2673b"
+    }
+   }
   },
   "HeDadaoParryChop": {
    "duration": 1.5,
@@ -1836,7 +3122,23 @@
    "notes": "Runs the last step in, beats the turning muzzle aside with the flat of the dadao (0.40 s), and cuts down into the left side of the neck (0.78 s). No pause between the two.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:CreepDadao",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianIja02/IjaParriedChoppedFall": "f0b1e170eae2543fd566ed008b0cfdad643ad0ac04156a144d73575d09f4a088"
+      }
+     },
+     "commit": "56ebe386",
+     "valuesSha256": "675a9b7f7548aeec20a4645c5fb5b21bd646f079173e7e0a8c4ddca279a57f96"
+    }
+   }
   },
   "LuoDragToCover": {
    "duration": 2.6,
@@ -1871,7 +3173,17 @@
    "notes": "Crouches, fists the back of the collar and the pack strap, and hauls Shunzi backwards 1.4 m behind the collapsed earth (first-person: Shunzi is the dragged one; `player` gives his collar).",
    "rigs": [
     "TengxianNra05"
-   ]
+   ],
+   "bake": {
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:LuoDadaoChopRear",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "85695b31d7afb951d7d28e15d9433f21bd935da94c7a5cef6f9408f5981dcbcb"
+    }
+   }
   },
   "HeSwapDadaoRifle": {
    "duration": 1.6,
@@ -1904,7 +3216,17 @@
    "notes": "Backs into the cover, drives the dadao point-down into the earth, pulls the rifle off his back over the right shoulder and comes up at low ready. `weapon` = the dadao (planted), `rifle` = the rifle. At the last frame the director calls DropOpeningWeapon(soldier, \"HeSwapDadaoRifle\") (the dadao stays planted in the world) and then SetWeapon(\"HanYang\") (his rifle; the `rifle` prop hides with the next clip).",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:HeDadaoParryChop",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "fe572ac026af156e92eb7594857e3d5cac6fdff1ce463b939de1cce8a5eab19e"
+    }
+   }
   },
   "LuoKneelCheck": {
    "duration": 3.4,
@@ -1949,7 +3271,17 @@
    "notes": "Drops onto his right knee in front of Shunzi, left hand on his shoulder, looks him in the face (0.9-2.6 s hold loop while \"\u8fd8\u80fd\u6253\u4e0d\uff1f\" and the nod play), then stands for the kick.",
    "rigs": [
     "TengxianNra05"
-   ]
+   ],
+   "bake": {
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "committed:LuoDragToCover",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "e608dcc5c772171f9211711b9e8a5fc41499593ca4cd1a4364cf9b2157aa8d05"
+    }
+   }
   },
   "IjaVaultTimberIn": {
    "duration": 1.8333333333333333,
@@ -2001,7 +3333,17 @@
    "notes": "Found (2026-09-27): comes up to the fallen roof timber (hip high, 0.47 m ahead), turns side-on to it (facing south), lets the wrist of the stock go and puts the right palm on its top, the rifle up in the left fist; loads, hops and swings both legs over drawn up under him, the hips 0.25 m over the top and the head leaned out over the landing side, lands in the pit south-west of Shunzi's eye (0.35 m off it), takes the rifle in both hands again and steps round to the snag root facing west (the clip ends standing on it: root motion). Frames 0.55-0.92 s are off the ground (bake spec groundWeight 0).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "7dcbbd3eddcc4184dbc2e3551b5605e1a1ebdf38625b322b8cd293c3eed1cb44"
+    }
+   }
   },
   "IjaVaultTimberOut": {
    "duration": 1.9166666666666667,
@@ -2067,7 +3409,17 @@
    "notes": "DragOut (2026-09-27): frame 0 = IjaKickBeam's last frame (same root, the left fist in the collar). Lets go, rises and turns left to face south, walks to the lane at the south end of the timber, the left palm on its top (the rifle slung on the right), vaults it the other way (0.98-1.36 s off the ground), lands outside and turns right to face Shunzi (west-north-west): the last frame is IjaHaulForearmUnder frame 0 at that clip's root (VAULT_OUT_END in this root).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "committed:IjaKickBeam",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "27ab73c18ab4acbb3810ede1b5b6dc79f11eb5dbd9501ef6f9ba348f26cf8470"
+    }
+   }
   },
   "IjaHaulForearmUnder": {
    "duration": 2.75,
@@ -2118,7 +3470,17 @@
    "notes": "DragOut (2026-09-27): at the timber's east face goes down on the right knee, the chest low, reaches down with the right hand to Shunzi's left wrist stretched out from under the timber, grabs it (0.375 s), yanks it up and toward him, comes off the knee and backs off bent low, seven short hauling steps, face on Shunzi, hauling him out from under the timber 1.8 m straight back (root motion along actor +z) to the trench edge; lets go at 2.56 s. Rifle slung on the right (hanging as he bends); the left hand swings free. Player track: forearmL (the grip) and head (his eye, 0.45 m behind the wrist).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "committed:IjaVaultTimberOut",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "6925833bc75881fadf08eda7a04cdcc6f25d3d0b828e67374162a03b23f7450e"
+    }
+   }
   },
   "IjaButtStrikeCollar": {
    "duration": 2.125,
@@ -2183,7 +3545,17 @@
    "notes": "SB04: squats astride Shunzi's legs, left fist in his collar (player collar), and swings the rifle up one-handed, butt first over the top, sliding his fist from the handguard up to the wrist of the stock (0.42 m from the butt plate): fist high over his right shoulder, butt aimed down at Shunzi's face, barrel up behind him (apex 0.55 s; from Shunzi's eye the butt is upper left). 0.55-1.05 s is a seamless hold loop (the fist trembles); the director lets go with pose.holdUntil (hold at least 0.4 s). Cocks to 1.125 s and drives the butt down onto the forehead (buttHit 1.375 s, player head + playerOffsetM), swings it back over the top and ends in the low carry (fist on the handguard at the knee, muzzle forward-down to his right). Face up and on Shunzi's eye throughout (look = player head). Last frame = IjaDragByForearm frame 0.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaHaulForearmUnder",
+     "twistMax": 400.0,
+     "seedAnyHand": "R",
+     "commit": "56ebe386",
+     "valuesSha256": "8a5ab5575ad995eed7820946295948f36a025e43604bd4b01bdedbd92420da91"
+    }
+   }
   },
   "IjaDragByForearm": {
    "duration": 2.625,
@@ -2237,7 +3609,17 @@
    "notes": "SB04A: frame 0 = IjaButtStrikeCollar's last frame (astride, rifle in the low carry). Lets go of the collar, grabs Shunzi's right forearm (player forearmR, 0.41 s) and backs off bent low, hauling him 2.0 m (root motion along +z of the actor frame, i.e. backwards) with ten short steps; the right fist keeps the rifle low, muzzle forward-down. The head is up and the face on Shunzi's eye (look = player head) the whole way.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:IjaButtStrikeCollar",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "1bc4cf17796076f0fa7a98e1a5711f9d4de3f2b7fa95fdb268142944092eb0da"
+    }
+   }
   },
   "IjaLookBackLow": {
    "duration": 1.625,
@@ -2274,7 +3656,17 @@
    "notes": "SB03A: standing at low ready he hears the beam shift, stops, and turns head and shoulders back and down over his LEFT shoulder (0.15-0.75 s; hips 13 deg, spine 29 deg, the rest in neck and head) onto a point 4.7 m away, 115 deg to his left of his forward and 0.18 m off the ground (the director turns his root so Shunzi's eye is there). The left hand leaves the handguard; the rifle hangs low in the right fist, muzzle forward-down. 0.8 s to the end is a seamless hold (breathing).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "committed:IjaReadyRifle@b6fe4f57",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "ad91ff554e70450333bea1cfcab52b4f8dee39b61141a5412adf38c71aec8665"
+    }
+   }
   },
   "IjaStartleTurn": {
    "duration": 0.625,
@@ -2321,7 +3713,17 @@
    "notes": "SB05A: frame 0 = IjaHoldCollarUp at its hold-loop start (0.8 s). A flinch (0.04 s), the fist opens off the collar (0.12 s) and head and shoulders snap round to his LEFT rear (= screen right from Shunzi, where Luo and He come from) by 0.3 s, eyes on a point 95 deg to his left at head height. Shunzi sinks (player collar and head drop 0.12 m: the contract's 0.62 m eye); he flinches down with it (hips 0.07 m lower, so his head stays in the top of the SB05A frame). Look check: the face on the swinging look point while the aim is on (0-0.34 s); the keyed head then holds the turn to his left rear. Last frame = IjaParriedChoppedFall frame 0 (same root, no blend).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:IjaHoldCollarUp",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "e5f9b9e4c5096416ba4b4d567cf4706d7ca29bccecdb2998baf5109d21a8b1fb"
+    }
+   }
   },
   "IjaParriedChoppedFall": {
    "duration": 2.4,
@@ -2368,7 +3770,17 @@
    "notes": "Comes up spinning left and swinging the rifle off his shoulder at the man behind him; the muzzle is beaten aside, the cut drops him beside Shunzi. Last frame is the corpse. Frame 0 is IjaStartleTurn's last frame (collar already let go -- IjaStartleTurn carries the releaseCollar event -- head and shoulders turned to his left rear, hips dropped); play it after IjaStartleTurn (from IjaHoldCollarUp directly it is a blend that turns the head ~60 deg in 0.12 s).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaStartleTurn",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "56ebe386",
+     "valuesSha256": "c0cb9586dde472ae24124bc98807d0d30c96af79e580dc59556cd4c1fc5c04cf"
+    }
+   }
   },
   "IjaGuardPort": {
    "duration": 3.0,
@@ -2392,7 +3804,17 @@
    "notes": "SB05 ijaB: stands square in the trench, rifle level at the waist (butt at the right hip, left hand on the handguard), muzzle a little down onto the captive 4 m ahead; breathing, the muzzle drifts 1-2 deg. The face is on a point 4 m ahead, 0.75 m up (look). Seamless 3 s loop.",
    "rigs": [
     "TengxianIja01"
-   ]
+   ],
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:IjaReadyRifle",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "d3a795be2793d7a06c447546a955a552579507919b3d463b62987e1808bc2be3"
+    }
+   }
   },
   "LuoKneelReach": {
    "duration": 3.5,
@@ -2447,7 +3869,17 @@
    "notes": "SB06 (2026-09-25): from the standing pose (= LuoKneelCheck frame 0) he drops onto his right knee in front of the sitting Shunzi (1.1 m, player head/chest), leans in and holds out his open left hand, palm down, fingers toward him, 0.3 m short of his breastbone (1.0 s; the elbow stays bent). 1.0-2.5 s is a seamless hold loop (the hand offers twice, the face on Shunzi's eye, look = player head). holdUntil lets go: the hand comes back to the knee (2.5-2.8 s) and he stands (3.5 s). Last frame = frame 0 = LuoKneelCheck frame 0: a drop-in for the Check beat, hands on to KickRifle like LuoKneelCheck does.",
    "rigs": [
     "TengxianNra05"
-   ]
+   ],
+   "bake": {
+    "TengxianNra05": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "committed:LuoDragToCover",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "49042e2e995adef016de20b8d036da206941e58c37e4a8c9171bab49dad4b723"
+    }
+   }
   },
   "RunnerLeanPostCall": {
    "duration": 3.0,
@@ -2507,7 +3939,17 @@
    "notes": "SB01 (2026-09-25): in the dugout mouth, the RIGHT hand closes round the north door post at shoulder height (0.45 s; contact pointM = the fist on the post, postAxisM = where the post stands, runtime metres in the actor frame: the director puts the root so postAxisM is on the north door post (1.05,-127.5) -- facing into the dugout that is root ~(1.24,-126.89), yawDeg ~80) and he leans in past it, shouting into the dugout (head on a point 2.4 m in, 0.73 m up, a little to his left). Mirrored from the storyboard's left hand (contract \u00a71.3: the storyboard side of the post is the north wall). 0.75-3.0 s is a seamless hold loop with two shouts (1.25 / 2.30 s: the trunk pushes in, the free left hand swings up). Rifle slung across the back.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:MessengerReport",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "850f897945b8cd1debc5f99ddabf363e6306e29272dca18c2916e30490bf1e9d"
+    }
+   }
   },
   "InterpreterHurryReach": {
    "duration": 1.25,
@@ -2537,7 +3979,17 @@
    "notes": "SB04A (2026-09-25): play with upperBody:true over the native walk/run (the director's Move(actor, point, face, \"InterpreterHurryReach\", speed, {upperBody:true})): the right arm comes up and reaches forward, open hand palm down, fingers spread (0.40 s), the left arm pulled back, the face on the ground 3 m ahead. 0.5-1.25 s is a seamless hold loop (the hand grabs at the air once). Full-body it is a standing stride (stills and a stationary fallback only).",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:InterpreterCrouchAsk",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "fdcf1f8ea4fac7a536e3cb06aa7397da1d7ead877fdd672eca9554c2738d4b18"
+    }
+   }
   },
   "YaowaSitLoad": {
    "duration": 3.0,
@@ -2614,7 +4066,17 @@
    "notes": "SB01 (2026-09-25): sits on the floor against the north wall (wall 0.35 m behind the root), knees up and apart, the rifle between the knees, butt in the dirt, muzzle leaning away to his left; the left hand holds the handguard, the head is bowed over the open bolt (look = the receiver). Loop: two thumb pushes on the charger (0.2-1.1 s), the empty charger flicked out to his right (1.3 s), a new one from the belt pouch (1.75 s), seated in the guide (2.45 s). Replaces the kneeling ClipLoad for Yaowa in Banter/Orders.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": null,
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "25123ec1",
+     "valuesSha256": "914a0f6d9a2aab89c5444e7b8a12efd0868ad061d3ed10245650a05fdcbf531c"
+    }
+   }
   },
   "ShunziSitFillCharger": {
    "duration": 9.5,
@@ -2698,7 +4160,22 @@
    "notes": "SB01 first person (2026-09-27): seated on an ammo crate (seat.crateM, drawn at runtime) against the back wall, feet on the floor, rifle along the right thigh (runtime prop; the right hand rests on it between rounds), the charger held in the left hand over the lap. Five rounds from the right front belt pouch pressed into it one after the other (events roundPicked / roundIn n), then the full charger looked over, into the left breast pocket (chargerStowed) and an empty one out (chargerDrawn). Hands in the torso frame. Played on the player body in Banter / Orders until the order to leave.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 180.0,
+     "seedAnyHand": "",
+     "twistSplit": [
+      0.35,
+      0.35,
+      0.3
+     ],
+     "commit": "0939ab4e",
+     "valuesSha256": "35e99acc265576c29c5247d4de0262405aef7bdd5c2fe43681bf0e6d90d59c09"
+    }
+   }
   },
   "IjaChoppedFallBack": {
    "duration": 2.25,
@@ -2751,7 +4228,17 @@
    "notes": "SB05A (2026-09-25), alternative to IjaChoppedFallWall on the same stage and frames 0-0.50 s: aiming down at Shunzi when the blade lands; neck snaps away, the rifle drops forward into the mud in front of Shunzi, the front (left) foot shoots out and he sits down hard 0.2 m behind his root (0.92 s, event seatHit), the trunk thrown back, arms flung out, right knee up (the SB05A frame is 0.92-1.15 s); then he goes over onto his back toward his left rear (turned 22 deg right about the pelvis: Luo stands at his right rear), the right knee falling open. Last frame is the corpse on his back.",
    "rigs": [
     "TengxianIja01"
-   ]
+   ],
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:IjaGuardPort",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b6fe4f57",
+     "valuesSha256": "2cdc6134091fb64a8e4ef8362ecec7012c798c4e682cd333ccb10f0edeebbcfe"
+    }
+   }
   },
   "IjaTauntWalk": {
    "duration": 2.375,
@@ -2784,7 +4271,17 @@
    "notes": "2026-09-27: upper body over the native walk (the director walks him west to ija.found at 0.75 m/s, seconds = time since he set off; loops): head and shoulders turned back over his RIGHT shoulder at the dying man behind him (from the walk the comrade is behind his right shoulder, north-east of the trench floor he walks along), one contemptuous flick of the open right hand back at him per loop with a swaggering shrug, the left thumb in the belt; a glance ahead (1.1-1.7 s) where the pinned man lies. 2026-09-29: empty-handed, the bayonet already sheathed (IjaReleaseSheathe; the runtime shows it on its scabbard mount).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaReleaseSheathe",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "da47b1bf",
+     "valuesSha256": "8ed8dc20e630b7fd82643ef9d9e16a6ad4baece14d88e45937d3e1609c7174da"
+    }
+   }
   },
   "IjaFoundLook": {
    "duration": 2.25,
@@ -2816,7 +4313,17 @@
    "notes": "2026-09-27 ShunziFound: on ija.found facing west, the pinned man's eye 1.13 m ahead on the ground. He stops dead out of the walk (the weight onto the front foot, the back foot drawn up), bends a little and looks down into the man's face (the face on the eye: look); 1.6-2.2 s is a seamless hold loop (breathing, looking down at him). 2026-09-29: the hands are free (the bayonet went into its scabbard before the walk, IjaReleaseSheathe).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaTauntWalk",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "da47b1bf",
+     "valuesSha256": "a8cb4d1ab618e19aaa34594f06e6d69cfc886a15a9afafd03daf9c523bdcc3d6"
+    }
+   }
   },
   "IjaCrouchHairHold": {
    "duration": 3.75,
@@ -2885,7 +4392,17 @@
    "notes": "2026-09-27 Hold: on ija.crouch facing west over the pinned man's head (his eye 0.60 m ahead, 0.28 m up). Frame 0 is a deep squat, forearms on the knees. 0-0.25 s the LEFT hand reaches out and grabs the hair on his crown; 0.25-0.70 s hauls the head up by it -- the eye rises 0.16 m and tips back (rescue.holdShot liftM / liftS) -- the fist on the crown all the way. 0.75-3.75 s is a seamless hold loop: leaning in, the face on the eye, three small angry shakes. The right hand rests on the right knee. Player track: head (the lifted eye), crown (where the fist closes in the hair).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:IjaFoundLook",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b366d39e",
+     "valuesSha256": "6ed0775903bf5d4e44955571a00be810f33d563363f47a699102ab2c6e2bb988"
+    }
+   }
   },
   "IjaSlapForehand": {
    "duration": 1.5,
@@ -2935,7 +4452,17 @@
    "notes": "2026-09-29: from the hair hold (frame 0 and the last frame = IjaCrouchHairHold at its hold-loop start, the left fist in the hair). 0-0.30 s the open right hand goes up high over his right shoulder (1.1 m up: from the pinned eye it stands against the sky), the trunk wound back to his right, and hangs there cocked to 0.42 s; 0.50-0.58 s it cracks down, the PALM across the man's LEFT cheek (0.58 s: on ijaA's right), the shoulder and trunk turning through; follow-through wide to his left; the head knocked away in his fist and held there a moment; back to the hold by 1.3 s.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaCrouchHairHold",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "f1d9b630",
+     "valuesSha256": "9344a18a5fa15d69b457e6cf114c53689b5fd69c4b3e4a9aaccbd2d56fbbc5e4"
+    }
+   }
   },
   "IjaSlapBackhand": {
    "duration": 1.5,
@@ -2985,7 +4512,17 @@
    "notes": "2026-09-29: the mirror of IjaSlapForehand: the right hand goes up in front of his left shoulder (0.30 s, cocked to 0.42 s), the BACK of the hand lashes down across the man's RIGHT cheek left to right (0.58 s), follow-through wide to his right; back to the hold by 1.3 s.",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaCrouchHairHold",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "f1d9b630",
+     "valuesSha256": "a9ef9a93fed7eee7ca774cf40c684c326eeea0308cfac994dc4eba86c1b13be5"
+    }
+   }
   },
   "IjaSlapRaise": {
    "duration": 2.4166666666666665,
@@ -3027,7 +4564,17 @@
    "notes": "2026-09-27 \u300c\u8bf4\u8bdd\uff01\u300d: from the hair hold the right hand goes up high, open, for a third, bigger slap (0-0.4 s) and hangs there shaking with rage, the trunk wound to his right, the fist still in the hair (0.4-2.4 s hold loop). The charge interrupts it: the director plays IjaStartleTurn -> IjaParriedChoppedFall (a pose blend covers the start).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:IjaCrouchHairHold",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b366d39e",
+     "valuesSha256": "2cbab308f342c70e3ab8e8d520d2e7a41c8a695bc1c9a964cc3203f64cdb8f23"
+    }
+   }
   },
   "HeLiftTimber": {
    "duration": 2.4166666666666665,
@@ -3080,7 +4627,17 @@
    "notes": "2026-09-27 Lift: on rescue.lift.heLift facing the fallen roof timber (west-north-west), the dadao pushed through his belt at the left hip. 0-0.3 s he squats and gets both hands under the timber's east edge south of Shunzi's hips (z -124.87 / -125.03); 0.3-0.8 s heaves it up on the director's lift (rescue.lift raise .55 over raiseS from gripS: the hands ride the Set's PoseRoofTimber path); 1.0-1.5 s a seamless straining hold loop (kept short: after holdUntil the loop plays out before the release); 1.5-2.4 s he lets go -- the timber drops -- and straightens.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260927PreLimbContinuity",
+     "seed": "baked:HeDadaoParryChop",
+     "twistMax": null,
+     "seedAnyHand": "",
+     "commit": "b366d39e",
+     "valuesSha256": "da7767e6b0abe9036685403ab181c188347461b972a805f037589d4527177733"
+    }
+   }
   },
   "LuoPickUpRifleSling": {
    "duration": 1.7916666666666667,
@@ -3127,7 +4684,17 @@
    "notes": "2026-09-29: from standing (dadao in the belt) steps his right foot out, stoops and takes the Hanyang lying 0.7 m to his right (prop `rifle`: on the ground at frame 0, centre (+.70, .04, +.05), muzzle toward (-.5, 0, +.87) in the root frame), stands with it, swings it over the right shoulder onto his back and lets go; the last frame is the standing pose with the rifle slung (SlungRifle back) = LuoRescueDrag frame 0.",
    "rigs": [
     "TengxianNra05"
-   ]
+   ],
+   "bake": {
+    "TengxianNra05": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:LuoDadaoChopRear",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "8df75eb1",
+     "valuesSha256": "09ade1d024f111dd06daa6f020bd2f5cdca08e99ec2b56d0cd9f2a478be31707"
+    }
+   }
   },
   "LuoRescueDrag": {
    "duration": 5.0,
@@ -3190,7 +4757,17 @@
    "notes": "2026-09-29: Luo (rifle slung on his back, dadao in the belt) squats at the head of the prone Shunzi, rolls him onto his back by the left shoulder, hooks both forearms under his armpits from behind the head, lifts his trunk and hauls him 1.45 m (five pulls, feet planted) out from under the roof timber, lets him down and stands 0.78 m behind his eye. `player`: his rigid body in Luo's root frame at frame 0 -- eye, gaze (1.0 m along the head), crown (0.2 m toward the top of the head: the camera's up is crown - eye), chest (breastbone centre), chestUp (0.25 m along the chest normal), pelvis, kneeL/R, heelL/R (his left/right). The root is pinned at frame 0 and the pelvis carries the root motion.",
    "rigs": [
     "TengxianNra05"
-   ]
+   ],
+   "bake": {
+    "TengxianNra05": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:LuoPickUpRifleSling",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "8df75eb1",
+     "valuesSha256": "ca6d64c5dd517c1820b90ae37939303e13a558a548153e108ef2d6234d0679a7"
+    }
+   }
   },
   "LuoHandRifle": {
    "duration": 5.416666666666667,
@@ -3266,7 +4843,17 @@
    "notes": "2026-09-30 (was 2026-09-29): from the standing pose LuoRescueDrag ends in (rifle slung; root R_C = its root.end) Luo pulls the rifle off his back over the right shoulder into both hands (0-0.5 s) and walks round Shunzi's left at port arms (0.5-1.87 s: 1.65 m, turning 90 deg right to face +x) while Shunzi sits up and turns to his left onto his knees facing him (-x, the crater step: no roll back onto his belly); Luo kneels on his right knee 0.75 m in front of him, holds the Hanyang across his chest height (2.57-3.57 s seamless hold loop: \"\u8fd8\u80fd\u6253\u4e0d\uff1f\" and the nod), lets go as Shunzi's hands close on it (3.57-3.77 s; the `rifle` prop is hidden after 3.77 s), takes Shunzi's right shoulder strap in his left fist and hauls him to his feet (3.97-4.87 s), lets go and steps round to his right side (0.8 m) turning to face the way Shunzi faces. `player`: eye, gaze, crown, chest, chestUp, pelvis, kneeL/R, heelL/R (his left/right) plus gripR (neck of the rifle), gripL (handguard), rifle (centre), rifleMuzzle (0.4 m along the bore), rifleUp (0.1 m along the sights) for the whole clip -- after 3.77 s they follow Shunzi's hands -- and shoulderStrapR (where the left fist closes).",
    "rigs": [
     "TengxianNra05"
-   ]
+   ],
+   "bake": {
+    "TengxianNra05": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:LuoRescueDrag",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "7b3345d9",
+     "valuesSha256": "7a6ee3200f281d6043745d7bc029ee9ba37f9585f1ebd726943929cabd359e30"
+    }
+   }
   },
   "IjaShotStaggerAway": {
    "duration": 3.3333333333333335,
@@ -3322,7 +4909,17 @@
    "notes": "2026-09-30: frame 0 = IjaCrouchHairHold at its hold-loop start (0.75 s: squatting over the pinned man, the left fist in his hair). 0.04 s the left shoulder is hit from his left front: the fist opens, the trunk is knocked round to his right, the head snaps, the left arm is flung out and drops dead (the left shoulder lower: lean); the right hand keeps to the knee to push him up (0.4-0.9 s) and then clamps on the left upper arm; he turns to his RIGHT over his planted feet and then by two stumbling steps, six in all, 180 deg to face east (the south wall is on his right at ~0.4 m: he ends on his left side of it) and runs bent over 1.5 m east (root end x +0.10 right, z +1.50 back in his frame). 2.08-3.33 s is a hold loop: stood bent (the neck 25 cm under standing height), the left arm dead, the right hand on it, two breaths a loop, one glance back over the left shoulder toward the gunmen (WNW).",
    "rigs": [
     "TengxianIja02"
-   ]
+   ],
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaCrouchHairHold",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "b64e4f43",
+     "valuesSha256": "f397e4102430dd3e47d26c8e4f7aa5c862fc0093d89df335029404a1c7c2f4b0"
+    }
+   }
   },
   "IjaShotDropRifle": {
    "duration": 2.5,
@@ -3380,7 +4977,17 @@
    "notes": "2026-09-30: frame 0 = IjaReadyRifle's last frame (low ready, root rescue.ijaBGuard facing east). 0.04 s the right upper arm is hit from his right rear: the right arm jerks, the right hand opens (0.04-0.10 s) and the left lets go (0.06-0.14 s), the rifle falls from 0.10 s (free fall, lands at 0.46 s on the ground at his right front and lies there: weapon track, the director leaves it: weaponDropFrom) while he folds over to his left front and staggers one step to the left (pelvis root end x -0.10 (left), z -0.35 (forward), turned <= 20 deg left); the left hand clamps the right upper arm. 1.25-2.5 s hold loop: bent, right arm dead, left hand on the wound, two breaths a loop.",
    "rigs": [
     "TengxianIja01"
-   ]
+   ],
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "b64e4f43",
+     "valuesSha256": "e0e2f3ce253ac72d5e9d9eb0faadb177340f1e35334b468d97c88eae5e8aa6dc"
+    }
+   }
   },
   "InterpreterShotStagger": {
    "duration": 3.0,
@@ -3419,7 +5026,17 @@
    "notes": "2026-09-30: frame 0 = InterpreterCrouchAsk frame 0 (squatting at Shunzi's right front, facing WSW, unarmed). 0.04 s the LEFT upper arm is hit from his left: knocked onto his seat and back on his right hand (0.04-0.4 s), the left arm flung out and dead; 0.4-1.0 s scrambles and pushes himself up turning to his right over his braced hand, then four short stumbling steps: 146 deg to the right in all (WSW to east) and 1.35 m east along the north side of the trench (root end x +0.75 right, z +1.12 back in his frame). 1.75-3.0 s hold loop: stood bent, the right hand clamped on the left upper arm, the left arm hanging, trembling, looking back over his left shoulder the way the charge comes from.",
    "rigs": [
     "TengxianNra02"
-   ]
+   ],
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:InterpreterCrouchAsk",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "b64e4f43",
+     "valuesSha256": "89ab302a94d5609cf8b3cdf0dd9bf629c051eff3535254ba66d357e9381d803d"
+    }
+   }
   },
   "LuoGrabRifleShove": {
    "duration": 3.1666666666666665,
@@ -3482,7 +5099,23 @@
    "notes": "2026-09-30: from LuoDadaoChopRear's last frame (two-handed dadao guard; he has run up and stopped, root HandRoot 0.95 m from Shunzi, who kneels upright in front of him: eye (0, 1.12, -0.95), chest (0, 0.88, -0.85) in this frame, runtime m). 0-0.14 s the left hand comes off the dadao, 0.04-0.20 s the right hand pushes it through the belt at his left hip (`weapon` track: hand to belt, weaponState dadaoInBelt), 0.5-1.5 s hold loop (empty hands, leaning 12 deg in, the face on his eye, blowing from the charge; \"\u8fd8\u80fd\u6253\u4e0d\uff1f\" and the nod, pose.holdUntil lets go). 1.5-1.78 s steps the right foot out to his right front and stoops, both fists on the Hanyang (`rifle` prop: on the ground at frame 0, centre (+0.40, 0.04, -0.28), muzzle toward (+0.8, 0, +0.6) in the root frame; grip contact 1.80 s), 1.82-2.12 s stands with it across his chest, muzzle to his right (as LuoHandRifle's offer), 2.12-2.25 s shoves it out to (0, 0.90, -0.58) (`offered` 2.25 s), 2.42 s lets go (`handed`; the rifle prop is hidden from then on: the director's HeldRifle takes Luo's hand rifle pose at that moment), then turns 90 deg to his LEFT and draws the dadao from the belt into his right hand (2.5-3.05 s; `weapon` ends in the hand, guard; `turned` 3.04 s). Feet stay out of z < -0.45 (Shunzi's knees).",
    "rigs": [
     "TengxianNra05"
-   ]
+   ],
+   "bake": {
+    "TengxianNra05": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:LuoDadaoChopRear",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianIja01/IjaChoppedFallWall": "b07d38666ec36203e29e8b585adcdc4975c716238534e0a7e2432954c8ceb437"
+      }
+     },
+     "commit": "b64e4f43",
+     "valuesSha256": "cf6311e00ae6105e70ba7977d2f74b4b9e1998313d4cc56a4c2dc259612621bc"
+    }
+   }
   },
   "YaowaCrouchCatchEat": {
    "duration": 4.25,
@@ -3550,7 +5183,17 @@
    "next": [
     "YaowaCrouchCatchEat"
    ],
-   "notes": "2026-10-11 redraft (N01/N02): crouched on his heels in the dugout, the Hanyang upright between his knees (butt in the dirt), both hands on it, the head turned to his right on the comrade's bread (look 1.66 m right, 0.8 m up); 0-1.5 s hold loop (breathing). Released: half rises and reaches up to his right (1.54 s), catches the broken corner in the right hand (catch 1.917 s, breadPiece shown from here), stuffs it in: two bites (2.417, 2.875 s), the piece is gone at 2.96 s; the hand back on the rifle by 3.5 s, back in the crouch looking at the bread = frame 0 at 4.25 s (the director may restart the hold loop). Feet planted throughout; no root motion."
+   "notes": "2026-10-11 redraft (N01/N02): crouched on his heels in the dugout, the Hanyang upright between his knees (butt in the dirt), both hands on it, the head turned to his right on the comrade's bread (look 1.66 m right, 0.8 m up); 0-1.5 s hold loop (breathing). Released: half rises and reaches up to his right (1.54 s), catches the broken corner in the right hand (catch 1.917 s, breadPiece shown from here), stuffs it in: two bites (2.417, 2.875 s), the piece is gone at 2.96 s; the hand back on the rifle by 3.5 s, back in the crouch looking at the bread = frame 0 at 4.25 s (the director may restart the hold loop). Feet planted throughout; no root motion.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "3b5286cc",
+     "valuesSha256": "7c5f6f8f07781c953ade1c0659037784577140410a96d2af1713391469b45cb2"
+    }
+   }
   },
   "ComradeEatBreadToss": {
    "duration": 5.0,
@@ -3627,7 +5270,17 @@
     "ComradePourRoundsLaugh",
     "WoundedRiseWall"
    ],
-   "notes": "2026-10-11 redraft (N01/N02): sitting against the wall (WoundedSitRifleIdle's seat), the Hanyang propped between the knees leaning to the bandaged left side, the left arm limp on the left knee; the right hand holds the half cake (bread) in front of the chest and nibbles: 0-3.0 s hold loop, two small bites (0.75, 2.17 s). Released: the left hand comes up off the knee as far as it will (wincing), takes the cake; the right breaks a corner off (tear 3.583 s, breadPiece from here) and lobs it underhand to Yaowa (toss 3.958 s; the breadPiece track flies 0.458 s to the catch point of stage breadToss, then hides); the right hand takes the cake back, the left drops to the knee; frame 0 again at 5.0 s."
+   "notes": "2026-10-11 redraft (N01/N02): sitting against the wall (WoundedSitRifleIdle's seat), the Hanyang propped between the knees leaning to the bandaged left side, the left arm limp on the left knee; the right hand holds the half cake (bread) in front of the chest and nibbles: 0-3.0 s hold loop, two small bites (0.75, 2.17 s). Released: the left hand comes up off the knee as far as it will (wincing), takes the cake; the right breaks a corner off (tear 3.583 s, breadPiece from here) and lobs it underhand to Yaowa (toss 3.958 s; the breadPiece track flies 0.458 s to the catch point of stage breadToss, then hides); the right hand takes the cake back, the left drops to the knee; frame 0 again at 5.0 s.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:WoundedSitRifleIdle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "3b5286cc",
+     "valuesSha256": "f6701da2907c584cf56482e9368d88dd5621dc43d3987d079e819713bf3a9333"
+    }
+   }
   },
   "ComradePourRoundsLaugh": {
    "duration": 7.583333333333333,
@@ -3716,7 +5369,17 @@
    "next": [
     "WoundedRiseWall"
    ],
-   "notes": "2026-10-11 redraft: \"\u51ac\u74dc\u7528\u597d\u7684\u90a3\u53ea\u624b\uff0c\u5f80\u987a\u5b50\u811a\u8fb9\u5012\u4e86\u4e00\u628a\u6563\u5b50\u5f39\" ... \"\u51ac\u74dc\u7b11\u51fa\u58f0\uff0c\u626f\u5230\u4e86\u80a9\u8180\" ... \"\u4ed6\u9760\u56de\u571f\u58c1\uff0c\u95ed\u4e0a\u773c\". Seated as ComradeEatBreadToss (rifle propped, left arm limp). The right hand into the belt pouch (0.42 s), leans forward and pours a handful of rounds on the floor in front of him toward Shunzi (pour 1.25 s, the hand at event handM: runtime m in his frame, three.js axes, the rounds fall from there: no rounds prop, the director/first person shows them); back to sitting at 2.42 s (settled: hold the clip here with pose.seconds through the ledger lines). The laugh (2.67 s, chest pulses), the shoulder catches (wince 3.33 s: hunches, the right hand to the bandage on the left shoulder, head down), then he lets himself back against the wall, head back, eyes shut (the face layer closes them): 4.58-7.58 s hold loop, slow breathing."
+   "notes": "2026-10-11 redraft: \"\u51ac\u74dc\u7528\u597d\u7684\u90a3\u53ea\u624b\uff0c\u5f80\u987a\u5b50\u811a\u8fb9\u5012\u4e86\u4e00\u628a\u6563\u5b50\u5f39\" ... \"\u51ac\u74dc\u7b11\u51fa\u58f0\uff0c\u626f\u5230\u4e86\u80a9\u8180\" ... \"\u4ed6\u9760\u56de\u571f\u58c1\uff0c\u95ed\u4e0a\u773c\". Seated as ComradeEatBreadToss (rifle propped, left arm limp). The right hand into the belt pouch (0.42 s), leans forward and pours a handful of rounds on the floor in front of him toward Shunzi (pour 1.25 s, the hand at event handM: runtime m in his frame, three.js axes, the rounds fall from there: no rounds prop, the director/first person shows them); back to sitting at 2.42 s (settled: hold the clip here with pose.seconds through the ledger lines). The laugh (2.67 s, chest pulses), the shoulder catches (wince 3.33 s: hunches, the right hand to the bandage on the left shoulder, head down), then he lets himself back against the wall, head back, eyes shut (the face layer closes them): 4.58-7.58 s hold loop, slow breathing.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:ComradeEatBreadToss",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "3b5286cc",
+     "valuesSha256": "5e67a6b7340c520b28ccf72dd3b79ece16dec00f7c178c6838e9592a67cc827b"
+    }
+   }
   },
   "ComradeCatchDropPick": {
    "duration": 4.0,
@@ -3810,7 +5473,17 @@
     "WoundedRiseWall"
    ],
    "next": [],
-   "notes": "2026-10-11 redraft (N04, BunkerExit \"\u6211\u90a3\u4e24\u5939\uff01\"): frame 0 = WoundedRiseWall's last frame (StoopBase, rifle at port). He stands the rifle against the dugout wall at his left (0-0.33 s), braces his left hand on the wall above it, reaches his right hand out to Shunzi. The two chargers leave Shunzi's hands at 0.583 s (event thrown fromM: runtime m in his frame, Blender axes) -- the director's first-person throw should let go of them there; clipA lands in his palm (catch 1.083 s), clipB drops past and lands in front of his feet (1.292 s). He stows clipA in the chest pouch (1.67 s, hidden), stoops and picks clipB up (2.333 s), stows it (2.75 s), takes the rifle off the wall in the right hand (3.0 s) and turns about 110 deg to his right with two steps (root end ~0.5 m). Ends hunched, rifle in the right hand at the trail; the director walks him out."
+   "notes": "2026-10-11 redraft (N04, BunkerExit \"\u6211\u90a3\u4e24\u5939\uff01\"): frame 0 = WoundedRiseWall's last frame (StoopBase, rifle at port). He stands the rifle against the dugout wall at his left (0-0.33 s), braces his left hand on the wall above it, reaches his right hand out to Shunzi. The two chargers leave Shunzi's hands at 0.583 s (event thrown fromM: runtime m in his frame, Blender axes) -- the director's first-person throw should let go of them there; clipA lands in his palm (catch 1.083 s), clipB drops past and lands in front of his feet (1.292 s). He stows clipA in the chest pouch (1.67 s, hidden), stoops and picks clipB up (2.333 s), stows it (2.75 s), takes the rifle off the wall in the right hand (3.0 s) and turns about 110 deg to his right with two steps (root end ~0.5 m). Ends hunched, rifle in the right hand at the trail; the director walks him out.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:WoundedRiseWall",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "6ad36b0e",
+     "valuesSha256": "791490616644298265af4cf77b4cc5a0c6b8f7d397468a064ce3fd599e6863fe"
+    }
+   }
   },
   "HeHelmetSleepSitUp": {
    "duration": 6.25,
@@ -3861,7 +5534,25 @@
     }
    ],
    "next": [],
-   "notes": "2026-10-11 redraft (N01 \"\u4f55\u6709\u7530\u8737\u5728\u6700\u91cc\u5934\uff0c\u94a2\u76d4\u6263\u5728\u8138\u4e0a\u7761\u89c9\"; \"\u4ed6\u7ffb\u4e86\u4e2a\u8eab\uff0c\u63a5\u7740\u7761\"; \"\u4f55\u6709\u7530\u4e00\u628a\u6380\u5f00\u94a2\u76d4\u5750\u4e86\u8d77\u6765\"). Frame 0: lying curled on his RIGHT side, the face toward clip forward (the root's -z: contract \"\u4fa7\u8737\u671d\u4e1c\"), the head toward his right (root +x), knees drawn up, the helmet over his face (helmet track; the model's own headgear should be hidden while this clip plays). The director can hold frame 0 (held life breathes it). 0.3-1.4 s he rolls onto his back (roll 0.583 s), knees up, the helmet still on his face; 1.667-4.167 s hold loop asleep. Released: the right hand takes the helmet off his face (4.33 s), the left elbow and hand push (4.67 s) and he sits up (sitUp 4.583 s), seated by 5.33 s with the knees up, the helmet in his right hand on the knee, facing the clip root's LEFT (+x Blender = three.js -x; the sit-up is a plain curl up from his back). Root motion: the pelvis travels ~0.25 m."
+   "notes": "2026-10-11 redraft (N01 \"\u4f55\u6709\u7530\u8737\u5728\u6700\u91cc\u5934\uff0c\u94a2\u76d4\u6263\u5728\u8138\u4e0a\u7761\u89c9\"; \"\u4ed6\u7ffb\u4e86\u4e2a\u8eab\uff0c\u63a5\u7740\u7761\"; \"\u4f55\u6709\u7530\u4e00\u628a\u6380\u5f00\u94a2\u76d4\u5750\u4e86\u8d77\u6765\"). Frame 0: lying curled on his RIGHT side, the face toward clip forward (the root's -z: contract \"\u4fa7\u8737\u671d\u4e1c\"), the head toward his right (root +x), knees drawn up, the helmet over his face (helmet track; the model's own headgear should be hidden while this clip plays). The director can hold frame 0 (held life breathes it). 0.3-1.4 s he rolls onto his back (roll 0.583 s), knees up, the helmet still on his face; 1.667-4.167 s hold loop asleep. Released: the right hand takes the helmet off his face (4.33 s), the left elbow and hand push (4.67 s) and he sits up (sitUp 4.583 s), seated by 5.33 s with the knees up, the helmet in his right hand on the knee, facing the clip root's LEFT (+x Blender = three.js -x; the sit-up is a plain curl up from his back). Root motion: the pelvis travels ~0.25 m.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "545a0a6a",
+     "valuesSha256": "9220181e8878917155611ee77000d334f593135b35d2be55ce26efbff9f59b53"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "3b5286cc",
+     "valuesSha256": "8880677b82c85a593913252e126b335b36b8d71adc77f3573caeab1395adeb7b"
+    }
+   }
   },
   "LiuDivideAmmoToss": {
    "duration": 4.0,
@@ -3936,7 +5627,25 @@
    "next": [
     "LiuDivideAmmoToss"
    ],
-   "notes": "2026-10-11 redraft (N01 \"\u5218\u6587\u8d22\u8e72\u5728\u4ed6\u811a\u8fb9\u7684\u5f39\u836f\u7bb1\u65c1\u5206\u5b50\u5f39\"; \"\u5218\u6587\u8d22\u6570\u51fa\u4e00\u5939\uff0c\u9694\u7740\u4e24\u4e2a\u4eba\u4e22\u8fc7\u6765\uff0c\u843d\u5728\u987a\u5b50\u817f\u4e0a\"): squatting, the open crate in front of him to his right, its long side across (ammoBox track, static), the right hand takes chargers out of the crate into the left palm (0-2.0 s hold loop, one per second). Released: one more out of the crate (2.33 s), a look at Shunzi, an underhand lob over the heads (toss 3.0 s; the clipA track flies 0.583 s to the lap point of stage liuToss, atM runtime m in his frame, and lies there to the end); back to counting = frame 0 at 4.0 s."
+   "notes": "2026-10-11 redraft (N01 \"\u5218\u6587\u8d22\u8e72\u5728\u4ed6\u811a\u8fb9\u7684\u5f39\u836f\u7bb1\u65c1\u5206\u5b50\u5f39\"; \"\u5218\u6587\u8d22\u6570\u51fa\u4e00\u5939\uff0c\u9694\u7740\u4e24\u4e2a\u4eba\u4e22\u8fc7\u6765\uff0c\u843d\u5728\u987a\u5b50\u817f\u4e0a\"): squatting, the open crate in front of him to his right, its long side across (ammoBox track, static), the right hand takes chargers out of the crate into the left palm (0-2.0 s hold loop, one per second). Released: one more out of the crate (2.33 s), a look at Shunzi, an underhand lob over the heads (toss 3.0 s; the clipA track flies 0.583 s to the lap point of stage liuToss, atM runtime m in his frame, and lies there to the end); back to counting = frame 0 at 4.0 s.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "545a0a6a",
+     "valuesSha256": "7dc5b2f61e004b6218eda3804de2e166afa0636cb6d2354f03e596503d301134"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "47b7a189",
+     "valuesSha256": "ec9555cf5d811eb234c35def02e3b8159a504cd35b9aaeb776f65af37d63558b"
+    }
+   }
   },
   "CorpseStabbedClaw": {
    "duration": 3.5,
@@ -4006,7 +5715,17 @@
      "kind": "still"
     }
    ],
-   "notes": "2026-10-11 redraft (N09, \"\u624e\u5230\u7b2c\u4e09\u5177\uff0c\u90a3\u4eba\u53eb\u4e86\u4e00\u58f0\uff0c\u624b\u5728\u6ce5\u91cc\u4e71\u6293\u3002\u4e59\u8e29\u4f4f\u4ed6\u7684\u80cc\u53c8\u624e\u4e00\u5200\uff0c\u62e7\u4e86\u4e00\u4e0b\u624d\u62d4\u51fa\u6765\"): the sweep's third body (SweepVictim, contract \u00a71.5) face down, the head toward clip forward, the left arm bent up by the head, the right along the side. 0.083 s a bayonet goes into his back: he cries out (0.167), the chest and head come up off the mud and both hands claw at it (0.33-1.45 s); the boot on the small of his back flattens him (stomp 1.5 s); the second stab (1.833) and the twist (2.083) jerk him; the blade comes out (2.417) and he goes slack, a last twitch of the fingers, still from 3.25 s. terminal: the last frame is the corpse."
+   "notes": "2026-10-11 redraft (N09, \"\u624e\u5230\u7b2c\u4e09\u5177\uff0c\u90a3\u4eba\u53eb\u4e86\u4e00\u58f0\uff0c\u624b\u5728\u6ce5\u91cc\u4e71\u6293\u3002\u4e59\u8e29\u4f4f\u4ed6\u7684\u80cc\u53c8\u624e\u4e00\u5200\uff0c\u62e7\u4e86\u4e00\u4e0b\u624d\u62d4\u51fa\u6765\"): the sweep's third body (SweepVictim, contract \u00a71.5) face down, the head toward clip forward, the left arm bent up by the head, the right along the side. 0.083 s a bayonet goes into his back: he cries out (0.167), the chest and head come up off the mud and both hands claw at it (0.33-1.45 s); the boot on the small of his back flattens him (stomp 1.5 s); the second stab (1.833) and the twist (2.083) jerk him; the blade comes out (2.417) and he goes slack, a last twitch of the fingers, still from 3.25 s. terminal: the last frame is the corpse.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "3b5286cc",
+     "valuesSha256": "3fc4efbc0edb5c12f3d39da13b78184b9fea0f0c6f5678ba98a2067be82b3459"
+    }
+   }
   },
   "IjaStompStabTwist": {
    "duration": 2.5833333333333335,
@@ -4069,7 +5788,37 @@
    "next": [
     "IjaReadyRifle"
    ],
-   "notes": "2026-10-11 redraft (N09): ijaB (IJA01; also baked on IJA02, the contract table names it) has just pulled the first stab out of the third body and stands at its right thigh facing along it, the rifle low with the bayonet down. He brings the rifle up to his chest, steps his LEFT boot onto the small of the man's back (stomp 0.833 s), drives the bayonet down into the upper back (stab 1.167 s: the blade 7 cm in at the backStab patch), turns it in the wound (twist 1.417 s, the rifle rolls 35 deg about its axis), pulls it out along the same line (1.75 s), steps back off (2.1 s) and settles into the low carry (frame 0 again at 2.583 s). Pairs with CorpseStabbedClaw on stage sweepStomp (starts 0.667 s after it)."
+   "notes": "2026-10-11 redraft (N09): ijaB (IJA01; also baked on IJA02, the contract table names it) has just pulled the first stab out of the third body and stands at its right thigh facing along it, the rifle low with the bayonet down. He brings the rifle up to his chest, steps his LEFT boot onto the small of the man's back (stomp 0.833 s), drives the bayonet down into the upper back (stab 1.167 s: the blade 7 cm in at the backStab patch), turns it in the wound (twist 1.417 s, the rifle rolls 35 deg about its axis), pulls it out along the same line (1.75 s), steps back off (2.1 s) and settles into the low carry (frame 0 again at 2.583 s). Pairs with CorpseStabbedClaw on stage sweepStomp (starts 0.667 s after it).",
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CorpseStabbedClaw": "a41b419602b051e5cb544a1dc93419295b0942a29777e205c644ea3e4107b5e9"
+      }
+     },
+     "commit": "3b5286cc",
+     "valuesSha256": "33a8c4d5a2d0f0b402c544c9ae061208cb019e2599a3c2e9ea6e9d808fab0d19"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "committed:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CorpseStabbedClaw": "a41b419602b051e5cb544a1dc93419295b0942a29777e205c644ea3e4107b5e9"
+      }
+     },
+     "commit": "3b5286cc",
+     "valuesSha256": "9581f18d201220dcfcda091b8a9ef5b27777edb19f136cef15257b1f103f9648"
+    }
+   }
   },
   "IjaInspectRifleBoltToss": {
    "duration": 4.5,
@@ -4162,7 +5911,17 @@
     "IjaReadyRifle",
     "IjaThumbWoundTwist"
    ],
-   "notes": "2026-10-11 redraft (N11, \"\u4e59\u4ece\u6ce5\u91cc\u6361\u8d77\u51ac\u74dc\u90a3\u652f\u6c49\u9633\u9020\uff0c\u62c9\u5f00\u67aa\u673a\u770b\u4e86\u4e00\u773c\uff0c\u7b11\u4e86\u3002\u4ed6\u628a\u67aa\u6813\u62bd\u51fa\u6765\u7529\u51fa\u6c9f\u6cbf\uff0c\u67aa\u6254\u56de\u6ce5\u91cc\"): his own rifle slung across the back. The comrade's Hanyang lies on the mud at his right front (comradeRifle track from frame 0: grip (0.04, 0.28, -0.38) runtime m (on the slope of the loose earth) in his frame, muzzle to his left -- the director puts his root so this meets the prop at (3.9,-125.0)). He stoops and takes it by the wrist of the stock (0.917 s), stands with it across his belly, the left hand on the handguard (1.33 s); the right hand lifts and draws the bolt (boltOpen 1.833 s), he looks into the action and laughs (2.167 s), draws the bolt right out (boltOut 2.583: the rifleBolt track leaves the rifle in his fist -- hide the mesh's own bolt from here), flings it forward and up (toss 3.0 s: it flies 1.08 s, 3.4 m ahead and over 2.05 m, out over the lip in front of him -- face him at a lip -- and lies there) and tosses the rifle down with the left hand (drop 3.583 s: it lies on the mud at his left front to the end). Stands easy from 4.0 s."
+   "notes": "2026-10-11 redraft (N11, \"\u4e59\u4ece\u6ce5\u91cc\u6361\u8d77\u51ac\u74dc\u90a3\u652f\u6c49\u9633\u9020\uff0c\u62c9\u5f00\u67aa\u673a\u770b\u4e86\u4e00\u773c\uff0c\u7b11\u4e86\u3002\u4ed6\u628a\u67aa\u6813\u62bd\u51fa\u6765\u7529\u51fa\u6c9f\u6cbf\uff0c\u67aa\u6254\u56de\u6ce5\u91cc\"): his own rifle slung across the back. The comrade's Hanyang lies on the mud at his right front (comradeRifle track from frame 0: grip (0.04, 0.28, -0.38) runtime m (on the slope of the loose earth) in his frame, muzzle to his left -- the director puts his root so this meets the prop at (3.9,-125.0)). He stoops and takes it by the wrist of the stock (0.917 s), stands with it across his belly, the left hand on the handguard (1.33 s); the right hand lifts and draws the bolt (boltOpen 1.833 s), he looks into the action and laughs (2.167 s), draws the bolt right out (boltOut 2.583: the rifleBolt track leaves the rifle in his fist -- hide the mesh's own bolt from here), flings it forward and up (toss 3.0 s: it flies 1.08 s, 3.4 m ahead and over 2.05 m, out over the lip in front of him -- face him at a lip -- and lies there) and tosses the rifle down with the left hand (drop 3.583 s: it lies on the mud at his left front to the end). Stands easy from 4.0 s.",
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaPullArm",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "3b5286cc",
+     "valuesSha256": "c9b60e1cb6e8dd33e0a2f41bacedc6f5454b66b3210f1cc5d344f510119c4ce9"
+    }
+   }
   },
   "IjaTearBadge": {
    "duration": 2.75,
@@ -4223,7 +5982,23 @@
    "next": [
     "IjaCollarQuestion"
    ],
-   "notes": "2026-10-11 redraft (N11, \"\u7532\u4e00\u628a\u6495\u4e0b\u51ac\u74dc\u80f8\u524d\u7684\u80f8\u7ae0\uff0c\u626b\u4e00\u773c\u756a\u53f7\uff0c\u585e\u8fdb\u81ea\u5df1\u53e3\u888b\"): ijaA at the comrade's left front (collarQuestion mark), rifle slung across the back. Bends in and takes the badge on the comrade's left breast in the right fist (grab 0.458 s), rips it off with a short yank down and out (tear 0.625 s: hide the badge on the comrade from here; chestBadge track in ijaA's fist from the tear), raises it in front of his face and reads it (look 1.04 s), stuffs it into his left breast pocket (pocket 1.75 s, the track hides at 1.79 s), stands back to the collar-question lean (2.75 s; its first frame is the IjaCollarQuestion lead-in's). The comrade plays CaptiveKneelMud from its frame 0 at the same time."
+   "notes": "2026-10-11 redraft (N11, \"\u7532\u4e00\u628a\u6495\u4e0b\u51ac\u74dc\u80f8\u524d\u7684\u80f8\u7ae0\uff0c\u626b\u4e00\u773c\u756a\u53f7\uff0c\u585e\u8fdb\u81ea\u5df1\u53e3\u888b\"): ijaA at the comrade's left front (collarQuestion mark), rifle slung across the back. Bends in and takes the badge on the comrade's left breast in the right fist (grab 0.458 s), rips it off with a short yank down and out (tear 0.625 s: hide the badge on the comrade from here; chestBadge track in ijaA's fist from the tear), raises it in front of his face and reads it (look 1.04 s), stuffs it into his left breast pocket (pocket 1.75 s, the track hides at 1.79 s), stands back to the collar-question lean (2.75 s; its first frame is the IjaCollarQuestion lead-in's). The comrade plays CaptiveKneelMud from its frame 0 at the same time.",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaShoveToWall",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveKneelMud": "036dc244fff951f53378eb79a5011a6ef2f6e2955056efac595a3e9e8a2f1dd2"
+      }
+     },
+     "commit": "3b5286cc",
+     "valuesSha256": "ff31591269e0c7884e5e1062d19bca71efd4ba93a3fee35047c9e90ccbd6d51c"
+    }
+   }
   },
   "CaptiveArchCaught": {
    "duration": 2.5,
@@ -4290,7 +6065,17 @@
    "next": [
     "CaptiveKneelMud"
    ],
-   "notes": "2026-10-11 redraft (N13, \"\u4e59\u628a\u62c7\u6307\u6441\u8fdb\u51ac\u74dc\u80a9\u4e0a\u7684\u67aa\u4f24\uff0c\u5f80\u91cc\u62e7\u3002\u51ac\u74dc\u6574\u4e2a\u4eba\u5f13\u8d77\u6765\uff0c\u53eb\u58f0\u5361\u5728\u5589\u5499\u91cc\"): frame 0 = last frame = CaptiveKneelMud frame 0 (kneeling on the bank, back on the planks). His right hand is knocked off the bandage (0.3 s) and claws at his right thigh; the thumb goes in (press 0.583 s): he arches -- the hips forward, the chest up off the planks, the head back, the shoulders up -- and stays locked there shaking (the choked cry, CaptiveWoundTwist.01), a second jolt at the twist (0.833 s); let go at 1.75 s he sags back onto the planks, the hand back on the bandage by 2.5 s."
+   "notes": "2026-10-11 redraft (N13, \"\u4e59\u628a\u62c7\u6307\u6441\u8fdb\u51ac\u74dc\u80a9\u4e0a\u7684\u67aa\u4f24\uff0c\u5f80\u91cc\u62e7\u3002\u51ac\u74dc\u6574\u4e2a\u4eba\u5f13\u8d77\u6765\uff0c\u53eb\u58f0\u5361\u5728\u5589\u5499\u91cc\"): frame 0 = last frame = CaptiveKneelMud frame 0 (kneeling on the bank, back on the planks). His right hand is knocked off the bandage (0.3 s) and claws at his right thigh; the thumb goes in (press 0.583 s): he arches -- the hips forward, the chest up off the planks, the head back, the shoulders up -- and stays locked there shaking (the choked cry, CaptiveWoundTwist.01), a second jolt at the twist (0.833 s); let go at 1.75 s he sags back onto the planks, the hand back on the bandage by 2.5 s.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:CaptiveKneelMud",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "3b5286cc",
+     "valuesSha256": "d2e5db5cd5bdec0da769f6e895bc1ce66dace565f3e79cea4025f18ffa71463c"
+    }
+   }
   },
   "IjaThumbWoundTwist": {
    "duration": 2.5,
@@ -4342,7 +6127,23 @@
    "next": [
     "IjaReadyRifle"
    ],
-   "notes": "2026-10-11 redraft (N13): ijaB at the kneeling comrade's left (stage thumbWound), rifle slung across his back. Bends in, the right hand onto the front of the man's left shoulder, the thumb in the wound (press 0.583 s); screws it in -- the hand turns 30 deg each way about the press (twist 0.833 s) -- leaning his weight on it, the left hand on his own knee; lets go (1.75 s) and straightens (2.5 s)."
+   "notes": "2026-10-11 redraft (N13): ijaB at the kneeling comrade's left (stage thumbWound), rifle slung across his back. Bends in, the right hand onto the front of the man's left shoulder, the thumb in the wound (press 0.583 s); screws it in -- the hand turns 30 deg each way about the press (twist 0.833 s) -- leaning his weight on it, the left hand on his own knee; lets go (1.75 s) and straightens (2.5 s).",
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaInspectRifleBoltToss",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveArchCaught": "c22a8655fd6eedc4a1381580a24b19e3bc1282c8602cfe4f956e296bb8fb2f1c"
+      }
+     },
+     "commit": "3b5286cc",
+     "valuesSha256": "2e4501e1410731012f45bbb898cb436293bd0b95d968743285501d6e31ae3a56"
+    }
+   }
   },
   "LiuBoxUpGo": {
    "duration": 2.5,
@@ -4397,7 +6198,25 @@
     "LiuDivideAmmoToss"
    ],
    "next": [],
-   "notes": "2026-10-11 redraft P1 (N03 \"\u5218\u6587\u8d22\u556a\u5730\u6263\u4e0a\u5f39\u836f\u7bb1\uff0c\u625b\u8d77\u6765\u5c31\u8d70\"): frame 0 = LiuDivideAmmoToss frame 0 (squatting, the open crate at his right hand). The right hand slaps the lid shut (slam 0.417 s: the director swaps the crate to the closed node, MilitaryCrateClosed), both hands take the crate by its ends (0.83 s), he stands it up off the floor (1.08 s) and swings it onto his right shoulder (1.83 s), the right hand over it, stands up (2.5 s). ammoBox track throughout. No root motion: the director walks him out with the crate on (keep the ammoBox track at the last frame on his rig)."
+   "notes": "2026-10-11 redraft P1 (N03 \"\u5218\u6587\u8d22\u556a\u5730\u6263\u4e0a\u5f39\u836f\u7bb1\uff0c\u625b\u8d77\u6765\u5c31\u8d70\"): frame 0 = LiuDivideAmmoToss frame 0 (squatting, the open crate at his right hand). The right hand slaps the lid shut (slam 0.417 s: the director swaps the crate to the closed node, MilitaryCrateClosed), both hands take the crate by its ends (0.83 s), he stands it up off the floor (1.08 s) and swings it onto his right shoulder (1.83 s), the right hand over it, stands up (2.5 s). ammoBox track throughout. No root motion: the director walks him out with the crate on (keep the ammoBox track at the last frame on his rig).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:LiuDivideAmmoToss",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "545a0a6a",
+     "valuesSha256": "8a159be82b78889fa5773bc117553a656146a200c7fd427e15ff1333a73ad04b"
+    },
+    "TengxianNra05": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:LiuDivideAmmoToss",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "47b7a189",
+     "valuesSha256": "f9928528528a505f8fe9adbad6280bf416ccb8ebaf7ca80cec90f35b53d59b29"
+    }
+   }
   },
   "IjaWalkStabProne": {
    "duration": 1.6666666666666667,
@@ -4452,7 +6271,25 @@
     "IjaWalkStabProne",
     "IjaStompStabTwist"
    ],
-   "notes": "2026-10-11 redraft P1 (N09, \"\u6bcf\u7ecf\u8fc7\u4e00\u5177\u8db4\u7740\u7684\u56fd\u519b\uff0c\u5c31\u5f80\u80cc\u4e0a\u624e\u4e00\u5200\uff0c\u62d4\u51fa\u6765\uff0c\u811a\u4e0b\u4e0d\u505c\"): one walking cycle, 1.6 m straight ahead in 1.667 s (root motion; the last frame is the first moved 1.6 m forward), rifle with the bayonet fixed carried low. At 0.708 s (stab) the blade goes 7 cm into the back of a body lying at his left front: the back at event atM (runtime m, three.js axes, from his root at that instant: 0.34 m left, 0.25 m up, 1.36 m ahead) -- the director times the cycle so a body of sweep.bodies is there; out at 0.958 s, back to the carry. Spawn him with bayonetFixed."
+   "notes": "2026-10-11 redraft P1 (N09, \"\u6bcf\u7ecf\u8fc7\u4e00\u5177\u8db4\u7740\u7684\u56fd\u519b\uff0c\u5c31\u5f80\u80cc\u4e0a\u624e\u4e00\u5200\uff0c\u62d4\u51fa\u6765\uff0c\u811a\u4e0b\u4e0d\u505c\"): one walking cycle, 1.6 m straight ahead in 1.667 s (root motion; the last frame is the first moved 1.6 m forward), rifle with the bayonet fixed carried low. At 0.708 s (stab) the blade goes 7 cm into the back of a body lying at his left front: the back at event atM (runtime m, three.js axes, from his root at that instant: 0.34 m left, 0.25 m up, 1.36 m ahead) -- the director times the cycle so a body of sweep.bodies is there; out at 0.958 s, back to the carry. Spawn him with bayonetFixed.",
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "47b7a189",
+     "valuesSha256": "8c48160c3dd9ea120530615221439438a08a902008e8403048cc1ba7d5731eae"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "committed:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "47b7a189",
+     "valuesSha256": "899b45784171697ff37919ab96b54f7caa0e587b3d9a607ff0af00986d289787"
+    }
+   }
   },
   "IjaGrenadeKnockThrow": {
    "duration": 3.0,
@@ -4532,7 +6369,25 @@
     "IjaJunctionPeek",
     "IjaReadyRifle"
    ],
-   "notes": "2026-10-11 redraft P1 (N08, \"\u4ece\u8170\u4e0a\u6478\u51fa\u4e00\u9897\u624b\u69b4\u5f39\uff0c\u62d4\u9500\uff0c\u5f80\u94a2\u76d4\u4e0a\u4e00\u78d5\u2014\u2014\u5f53\u2014\u2014\u634f\u5728\u624b\u91cc\u505c\u4e86\u4e00\u62cd\u624d\u7529\u8fc7\u6298\u89d2\"): his rifle slung across his back; the corner wall on his left (env wallLeftM 0.34, its edge 0.35 m ahead of his root). Right hand to the belt pouch, the Type 91 out (0.33 s, grenade track from frame 0 at the belt); the left fingers pull the pin (0.583 s); knocked on the crown of his helmet (knock 1.0 s); held a beat at his chest; a side-arm lob round the corner to his left (throw 2.083 s: the track flies 0.83 s, ~6 m to his left front, then hides; the blast is dropIn.foldBlast); he ducks back against the wall. Type 91 placeholder: segmented cylinder 0.05 x 0.095 m, axis toward the fuse cap."
+   "notes": "2026-10-11 redraft P1 (N08, \"\u4ece\u8170\u4e0a\u6478\u51fa\u4e00\u9897\u624b\u69b4\u5f39\uff0c\u62d4\u9500\uff0c\u5f80\u94a2\u76d4\u4e0a\u4e00\u78d5\u2014\u2014\u5f53\u2014\u2014\u634f\u5728\u624b\u91cc\u505c\u4e86\u4e00\u62cd\u624d\u7529\u8fc7\u6298\u89d2\"): his rifle slung across his back; the corner wall on his left (env wallLeftM 0.34, its edge 0.35 m ahead of his root). Right hand to the belt pouch, the Type 91 out (0.33 s, grenade track from frame 0 at the belt); the left fingers pull the pin (0.583 s); knocked on the crown of his helmet (knock 1.0 s); held a beat at his chest; a side-arm lob round the corner to his left (throw 2.083 s: the track flies 0.83 s, ~6 m to his left front, then hides; the blast is dropIn.foldBlast); he ducks back against the wall. Type 91 placeholder: segmented cylinder 0.05 x 0.095 m, axis toward the fuse cap.",
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "47b7a189",
+     "valuesSha256": "51aee50f2e5572eefe2de3a9bc87e0cf229a11f69f6fcf8d338d9a6d968f9d54"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "47b7a189",
+     "valuesSha256": "30954bc6a9caea7afd08e26f75e73483b24f5dabdb8f2d3e6203b6cc6b72a21a"
+    }
+   }
   },
   "IjaDropInKneel": {
    "duration": 2.5,
@@ -4703,6 +6558,32 @@
     ],
     "along": "behind",
     "from": "Data_OpeningSet0103 dropIn.lip[0..2] -> land, P012 terrain (mean of the three)"
+   },
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "f04a3a15",
+     "valuesSha256": "d5071c1485fbeb5a5c5e0cdf4c318e94859871c005169b6c2335590ce33d9e47"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "f04a3a15",
+     "valuesSha256": "3732bc614f36ecf657271adce6a7e09134617bb2d05f29e205440ac07dc7774b"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "f04a3a15",
+     "valuesSha256": "00178ba93fbbcfbff7467362bd7320bee62e5e782d4befab8dc28a6bd691cf41"
+    }
    }
   },
   "IjaDropInStand": {
@@ -4874,6 +6755,32 @@
     ],
     "along": "behind",
     "from": "Data_OpeningSet0103 dropIn.lip[0..2] -> land, P012 terrain (mean of the three)"
+   },
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "f04a3a15",
+     "valuesSha256": "3d3a4390e628790ace89346974e36a852ab1ac99c277245c59ffee7353325983"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "f04a3a15",
+     "valuesSha256": "8831ca8a77990f78042458b4a71a955b664350864eeba32e19f5eb0a1f6fef82"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "f04a3a15",
+     "valuesSha256": "79aebec0fd296fbd6521a4d74c0d55e2f0a9c895df93e7323b3b97887694263b"
+    }
    }
   },
   "IjaDropInPoint": {
@@ -5059,6 +6966,32 @@
     ],
     "along": "behind",
     "from": "Data_OpeningSet0103 dropIn.lip[0..2] -> land, P012 terrain (mean of the three)"
+   },
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "f04a3a15",
+     "valuesSha256": "3ee787ac8c5b121a694fdf3facfbcb5aff384bb269dbc3447db1adfba7cfbcd3"
+    },
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "f04a3a15",
+     "valuesSha256": "2635a7f652a0d4cce5abf809dfffb751b7492182bc73e6dc4f534a604564cf94"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "f04a3a15",
+     "valuesSha256": "b423cbeed0ea89ece4954d82aa055bbed407a655cf58bc7cd642610984c92a68"
+    }
    }
   },
   "IjaProneLmgOnCorpse": {
@@ -5090,7 +7023,17 @@
     }
    ],
    "next": [],
-   "notes": "2026-10-11 redraft P1 (N12 / contract \u00a71.7, \"\u673a\u67aa\u624b\u628a\u6b6a\u628a\u5b50\u7684\u4e24\u811a\u67b6\u5f80\u4e0a\u9762\u90a3\u5177\u7684\u80cc\u4e0a\u4e00\u67b6\uff0c\u8db4\u4e0b\"): lying face down up the south wall face (a 35 deg slope rising ahead of him, his hips at the root, the chest 0.6 m up), both elbows on the slope, the Type 11 shouldered, its bipod resting 0.55 m over his elbows (the upper corpse's back), aimed over the lip (clip forward, 5 deg up). 2.0 s hold loop: a two-round burst (0.417, 0.542 s) with the recoil through the shoulder and head; the director restarts the loop every 3-6 s (contract: one burst each time). type11 track: actor-weapon convention (origin right-hand grip, axis muzzle, up top), the gun 1.1 m, bipod 0.3 m."
+   "notes": "2026-10-11 redraft P1 (N12 / contract \u00a71.7, \"\u673a\u67aa\u624b\u628a\u6b6a\u628a\u5b50\u7684\u4e24\u811a\u67b6\u5f80\u4e0a\u9762\u90a3\u5177\u7684\u80cc\u4e0a\u4e00\u67b6\uff0c\u8db4\u4e0b\"): lying face down up the south wall face (a 35 deg slope rising ahead of him, his hips at the root, the chest 0.6 m up), both elbows on the slope, the Type 11 shouldered, its bipod resting 0.55 m over his elbows (the upper corpse's back), aimed over the lip (clip forward, 5 deg up). 2.0 s hold loop: a two-round burst (0.417, 0.542 s) with the recoil through the shoulder and head; the director restarts the loop every 3-6 s (contract: one burst each time). type11 track: actor-weapon convention (origin right-hand grip, axis muzzle, up top), the gun 1.1 m, bipod 0.3 m.",
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "47b7a189",
+     "valuesSha256": "6d6e4c0602cfd5b294881f8c1e27d0bc91d0a65e15aba744134e3d27452c4ff1"
+    }
+   }
   },
   "IjaKneelLoadLmg": {
    "duration": 2.5,
@@ -5121,7 +7064,17 @@
     }
    ],
    "next": [],
-   "notes": "2026-10-11 redraft P1 (N12, \"\u526f\u5c04\u624b\u8dea\u5728\u65c1\u8fb9\u538b\u5f39\"): kneeling on both knees at the foot of the slope, at the gunner's right (the hopper on the gun's left: he reaches across, over the gun, 0.46 m ahead and 0.26 m left of his root, 0.80 m up). 2.5 s loop: a charger out of the pouch on his belt (0.58 s, clipA in his right hand), pressed into the hopper with both hands (load 1.42 s), back. The director places him 0.8 m right of the gunner's hips."
+   "notes": "2026-10-11 redraft P1 (N12, \"\u526f\u5c04\u624b\u8dea\u5728\u65c1\u8fb9\u538b\u5f39\"): kneeling on both knees at the foot of the slope, at the gunner's right (the hopper on the gun's left: he reaches across, over the gun, 0.46 m ahead and 0.26 m left of his root, 0.80 m up). 2.5 s loop: a charger out of the pouch on his belt (0.58 s, clipA in his right hand), pressed into the hopper with both hands (load 1.42 s), back. The director places him 0.8 m right of the gunner's hips.",
+   "bake": {
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "47b7a189",
+     "valuesSha256": "f0d199fd337fd2ac849b6a445a55ac56854af75348e6a47290e0cff000dc96b0"
+    }
+   }
   },
   "IjaSlapRecruit": {
    "duration": 1.5,
@@ -5162,7 +7115,23 @@
    "next": [
     "IjaShoveForward"
    ],
-   "notes": "2026-10-11 Practice (N14, contract \u00a71.8): standing, rifle slung across the back, he takes one step in at the recruit who will not move: the right hand comes up across in front of his own left shoulder (0.22 s), and the BACK of it cracks across the recruit's right cheek (0.417 s) and on out to his right; the hand drops back by 1.1 s, a cold look. Pair: IjaRecruitSlapped (stage recruitSlap)."
+   "notes": "2026-10-11 Practice (N14, contract \u00a71.8): standing, rifle slung across the back, he takes one step in at the recruit who will not move: the right hand comes up across in front of his own left shoulder (0.22 s), and the BACK of it cracks across the recruit's right cheek (0.417 s) and on out to his right; the hand drops back by 1.1 s, a cold look. Pair: IjaRecruitSlapped (stage recruitSlap).",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianIja03/IjaRecruitSlapped": "312d2443da79b1d5543cb658cc41a5195af668350609426d8cb2371f20b9d65a"
+      }
+     },
+     "commit": "2c2d2b70",
+     "valuesSha256": "8523062cf42780fe3a9746cf864ae612d1188dfe0aae1de0f2122152c1f9ce48"
+    }
+   }
   },
   "IjaRecruitSlapped": {
    "duration": 2.0,
@@ -5219,7 +7188,25 @@
    "next": [
     "IjaRecruitChargeThrust"
    ],
-   "notes": "2026-10-11 Practice (N14): frame 0 = IjaReadyRifle last frame (low ready). The backhand at 0.417 s snaps the head round to his left and down, half a step to the left; the left hand leaves the handguard (0.52), the rifle hangs from the right hand muzzle-down, and the left hand goes up to put the knocked helmet straight (0.78-1.3); back on the handguard by 1.7 s, eyes down. Last frame = IjaRecruitChargeThrust frame 0. (The helmet is skinned to the head: it cannot sit askew.)"
+   "notes": "2026-10-11 Practice (N14): frame 0 = IjaReadyRifle last frame (low ready). The backhand at 0.417 s snaps the head round to his left and down, half a step to the left; the left hand leaves the handguard (0.52), the rifle hangs from the right hand muzzle-down, and the left hand goes up to put the knocked helmet straight (0.78-1.3); back on the handguard by 1.7 s, eyes down. Last frame = IjaRecruitChargeThrust frame 0. (The helmet is skinned to the head: it cannot sit askew.)",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "committed:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "2c2d2b70",
+     "valuesSha256": "9e65403d1aaa9e81f941353d7c020d56694d46dd096f25177062ac5233a55787"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "2c2d2b70",
+     "valuesSha256": "62c7e422d75fb06f8c205c4a8dc5242d6a0844b1df0dcd9f0572143393a2a3d3"
+    }
+   }
   },
   "IjaRecruitChargeThrust": {
    "duration": 4.5,
@@ -5296,7 +7283,37 @@
    "next": [
     "IjaReadyRifle"
    ],
-   "notes": "2026-10-11 Practice (N15): frame 0 = IjaRecruitSlapped last frame. Three steps back (0-1.0 s, ~1.1 m), the rifle drops to the thrust guard, the scream (1.3), three running steps in, the first thrust lunges wide into the comrade's left shoulder (2.208), pulled out, a half step and the second into his belly (2.75), pulled out, a step back; 3.25-4.5 s a seamless hold loop standing over him at the ready, gasping. Root motion: the stage root to ~0.5 m nearer the comrade."
+   "notes": "2026-10-11 Practice (N15): frame 0 = IjaRecruitSlapped last frame. Three steps back (0-1.0 s, ~1.1 m), the rifle drops to the thrust guard, the scream (1.3), three running steps in, the first thrust lunges wide into the comrade's left shoulder (2.208), pulled out, a half step and the second into his belly (2.75), pulled out, a step back; 3.25-4.5 s a seamless hold loop standing over him at the ready, gasping. Root motion: the stage root to ~0.5 m nearer the comrade.",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "committed:IjaRecruitSlapped",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveStabbedCurl": "d66ae4b70d3635891a27eeffcec050860f40d4577e6a0965312fee79d6967df4"
+      }
+     },
+     "commit": "2c2d2b70",
+     "valuesSha256": "03e877077c896892d5e6e53faac056dea5c56353ec81b69571e613853dcc31cf"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaRecruitSlapped",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveStabbedCurl": "d66ae4b70d3635891a27eeffcec050860f40d4577e6a0965312fee79d6967df4"
+      }
+     },
+     "commit": "2c2d2b70",
+     "valuesSha256": "e344b9536ab54a2bca76ad4b7100800248b09c2f3626319de4bb5aa358e4bb01"
+    }
+   }
   },
   "CaptiveStabbedCurl": {
    "duration": 5.5,
@@ -5372,7 +7389,17 @@
    "next": [
     "CaptiveCurledPulledUp"
    ],
-   "notes": "2026-10-11 Practice (N15): frame 0 = CaptiveKneelMud frame 0 (kneeling at R3). He watches the recruit back off, flinches from the scream (1.35: shrinks back to his right, the right palm onto the bank), the first thrust into the front of the left shoulder throws the shoulder back and turns him away (2.208), the second into the belly folds him over both hands (2.75); he goes down on his right side off the bank, turned 35 deg to his right (facing south-west, the head north-west, the back to the north-east), curled round the belly (down 3.4). 3.5-5.5 s a seamless hold loop: curled, the chest heaving with each howl, the knees drawing up."
+   "notes": "2026-10-11 Practice (N15): frame 0 = CaptiveKneelMud frame 0 (kneeling at R3). He watches the recruit back off, flinches from the scream (1.35: shrinks back to his right, the right palm onto the bank), the first thrust into the front of the left shoulder throws the shoulder back and turns him away (2.208), the second into the belly folds him over both hands (2.75); he goes down on his right side off the bank, turned 35 deg to his right (facing south-west, the head north-west, the back to the north-east), curled round the belly (down 3.4). 3.5-5.5 s a seamless hold loop: curled, the chest heaving with each howl, the knees drawing up.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:CaptiveKneelMud",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "2c2d2b70",
+     "valuesSha256": "478916c29acb974a1a02c76a2871a9cb2e8704ac86ed35de9cca771a777c0429"
+    }
+   }
   },
   "IjaHairLiftKneeBack": {
    "duration": 3.5,
@@ -5455,7 +7482,23 @@
    "next": [
     "IjaThroatCutKneeShove"
    ],
-   "notes": "2026-10-11 Slash (N16): standing behind the curled man's right shoulder (stage hairLift), rifle slung. 0-0.75 s he draws the bayonet (IjaDrawBayonet's draw: cross draw reversed, turned over in the fist to a forward grip, held low at his right side), stoops and takes the hair at the back of the head (0.958), hauls him up kneeling (lift 1.3), plants his left foot and drives the left knee into the small of the back (1.58), wrenches the head back and lays the blade on the left of the throat, the fist at its right (1.92). 2.0-3.5 s a seamless hold loop (a shake at 2.75). Replaces the IjaDrawBayonet play before it (that clip's left fist is in the old kneeling man's hair). Last frame = IjaThroatCutKneeShove frame 0."
+   "notes": "2026-10-11 Slash (N16): standing behind the curled man's right shoulder (stage hairLift), rifle slung. 0-0.75 s he draws the bayonet (IjaDrawBayonet's draw: cross draw reversed, turned over in the fist to a forward grip, held low at his right side), stoops and takes the hair at the back of the head (0.958), hauls him up kneeling (lift 1.3), plants his left foot and drives the left knee into the small of the back (1.58), wrenches the head back and lays the blade on the left of the throat, the fist at its right (1.92). 2.0-3.5 s a seamless hold loop (a shake at 2.75). Replaces the IjaDrawBayonet play before it (that clip's left fist is in the old kneeling man's hair). Last frame = IjaThroatCutKneeShove frame 0.",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveCurledPulledUp": "2313f59a8530303e30d129a33d7f88931eb647480bfd432957c072d68e7f4783"
+      }
+     },
+     "commit": "2c2d2b70",
+     "valuesSha256": "2f2aa57e9d74bc35db4ecae7b008a95556952b59313751153a8ac786ecde92f6"
+    }
+   }
   },
   "IjaThroatCutKneeShove": {
    "duration": 1.6666666666666667,
@@ -5522,7 +7565,23 @@
    "next": [
     "IjaWipeBandageFixBayonet"
    ],
-   "notes": "2026-10-11 Slash: frame 0 = IjaHairLiftKneeBack at its hold-loop start. 0-0.12 s the edge is pressed in on the left of the throat, 0.12-0.40 one hard pull back toward his right hip draws it round the front of the throat (0.25 s) to its right, the fist leading (IjaThroatSlash's stroke, mirrored); the knife comes out low at his right side. 0.708 s the left knee drives forward and to his left and the fist lets go of the hair with a push: the man pitches over onto his face to his left; (polish 2026-10-11) ijaA draws the left foot back out of the lunge beside the right (0.76-0.96) and stands over him looking down at the bandaged arm."
+   "notes": "2026-10-11 Slash: frame 0 = IjaHairLiftKneeBack at its hold-loop start. 0-0.12 s the edge is pressed in on the left of the throat, 0.12-0.40 one hard pull back toward his right hip draws it round the front of the throat (0.25 s) to its right, the fist leading (IjaThroatSlash's stroke, mirrored); the knife comes out low at his right side. 0.708 s the left knee drives forward and to his left and the fist lets go of the hair with a push: the man pitches over onto his face to his left; (polish 2026-10-11) ijaA draws the left foot back out of the lunge beside the right (0.76-0.96) and stands over him looking down at the bandaged arm.",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaHairLiftKneeBack",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveThroatCutForward": "4058e0772c648c0887fc4ec395f2a6184616874f74e56ff5f3ae219bb45e3512"
+      }
+     },
+     "commit": "68aa5e14",
+     "valuesSha256": "15ecf2fd83f6960439d442d832d942cc22c6d1077a20620eb13404716373945e"
+    }
+   }
   },
   "CaptiveCurledPulledUp": {
    "duration": 3.5,
@@ -5580,7 +7639,17 @@
    "next": [
     "CaptiveThroatCutForward"
    ],
-   "notes": "2026-10-11 Slash (N16): frame 0 = CaptiveStabbedCurl at its hold loop (curled on his right side). Howling on until the fist closes in his hair (0.958); hauled up by it onto his knees facing south-west (1.0-1.6), sat back on his heels against the knee in his back (1.58), the head wrenched back and turned to his right -- the throat to the pinned eye; the right hand claws up at the fist behind his head, the left stays on the belly. 2.0-3.5 s a seamless hold loop: strained gasping, shaken once (2.75)."
+   "notes": "2026-10-11 Slash (N16): frame 0 = CaptiveStabbedCurl at its hold loop (curled on his right side). Howling on until the fist closes in his hair (0.958); hauled up by it onto his knees facing south-west (1.0-1.6), sat back on his heels against the knee in his back (1.58), the head wrenched back and turned to his right -- the throat to the pinned eye; the right hand claws up at the fist behind his head, the left stays on the belly. 2.0-3.5 s a seamless hold loop: strained gasping, shaken once (2.75).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:CaptiveStabbedCurl",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "2c2d2b70",
+     "valuesSha256": "7ea917998da32bd0b1d7c6135f0c646b5ff280cdd7fab380f0496b8f55c5294e"
+    }
+   }
   },
   "CaptiveThroatCutForward": {
    "duration": 3.5,
@@ -5649,7 +7718,17 @@
     "CaptiveCurledPulledUp"
    ],
    "next": [],
-   "notes": "2026-10-11 Slash: frame 0 = CaptiveCurledPulledUp at its hold-loop start. The cut (0.25 s) cuts the howl dead: a jolt, the right hand comes off the fist to the throat (the jet from the right of the throat onto the north wall); the knee (0.708) pitches him over to his own left (polish 2026-10-11: off the pinned eye's line, clear of ijaA's finishing walk): he goes down on his face along the foot of the north wall, turned a little onto his right side (1.25), the head east, the legs trailing west, the right hand at the throat, the bandaged left arm up on the wall side; two twitches (2.0, 2.55); the last frame is the corpse (hold it). Pelvis at rest 0.14 m west / 0.36 m south of R3, the head 0.38 m east / 0.53 m south."
+   "notes": "2026-10-11 Slash: frame 0 = CaptiveCurledPulledUp at its hold-loop start. The cut (0.25 s) cuts the howl dead: a jolt, the right hand comes off the fist to the throat (the jet from the right of the throat onto the north wall); the knee (0.708) pitches him over to his own left (polish 2026-10-11: off the pinned eye's line, clear of ijaA's finishing walk): he goes down on his face along the foot of the north wall, turned a little onto his right side (1.25), the head east, the legs trailing west, the right hand at the throat, the bandaged left arm up on the wall side; two twitches (2.0, 2.55); the last frame is the corpse (hold it). Pelvis at rest 0.14 m west / 0.36 m south of R3, the head 0.38 m east / 0.53 m south.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:CaptiveCurledPulledUp",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "68aa5e14",
+     "valuesSha256": "6772b8e2765d0e46ef8bcb10559b42b6eaa931fa4f8b0bf4dfcfefd15d2d8845"
+    }
+   }
   },
   "IjaWipeBandageFixBayonet": {
    "duration": 4.0,
@@ -5727,7 +7806,23 @@
    "next": [
     "IjaFinishWalkStab"
    ],
-   "notes": "2026-10-11 Slash (N17): frame 0 = IjaThroatCutKneeShove last frame. He half squats behind the dead man's left shoulder on the wall side (polish 2026-10-11: the body lies along the north wall foot, ijaA between it and the planks) and draws the flat of the bloody blade along the bandage (wipe1 0.79), turns it over and draws the other face (wipe2 1.33), stands, the knife up in his right fist; the left hand takes the rifle off his back by the barrel over the right shoulder (2.15) and brings it round in front, muzzle up; the bayonet's ring goes over the muzzle and clicks home (fix 3.0); the right hand goes back to the wrist of the stock and he lowers the rifle, the point down, and steps off with the left foot (last frame = IjaFinishWalkStab frame 0). The bayonet track rides the muzzle from 3.0 s on (the rifle was spawned bayonet:false)."
+   "notes": "2026-10-11 Slash (N17): frame 0 = IjaThroatCutKneeShove last frame. He half squats behind the dead man's left shoulder on the wall side (polish 2026-10-11: the body lies along the north wall foot, ijaA between it and the planks) and draws the flat of the bloody blade along the bandage (wipe1 0.79), turns it over and draws the other face (wipe2 1.33), stands, the knife up in his right fist; the left hand takes the rifle off his back by the barrel over the right shoulder (2.15) and brings it round in front, muzzle up; the bayonet's ring goes over the muzzle and clicks home (fix 3.0); the right hand goes back to the wrist of the stock and he lowers the rifle, the point down, and steps off with the left foot (last frame = IjaFinishWalkStab frame 0). The bayonet track rides the muzzle from 3.0 s on (the rifle was spawned bayonet:false).",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaThroatCutKneeShove",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "partner": {
+      "dir": "OpeningRedraft_20261011_AB",
+      "tracks": {
+       "TengxianNra02/CaptiveThroatCutForward": "4058e0772c648c0887fc4ec395f2a6184616874f74e56ff5f3ae219bb45e3512"
+      }
+     },
+     "commit": "68aa5e14",
+     "valuesSha256": "f24159e846aed89eccde58b5984e2472e7b71adc5a5954ab1ec3bc787f937525"
+    }
+   }
   },
   "IjaFinishWalkStab": {
    "duration": 1.75,
@@ -5767,7 +7862,17 @@
     "IjaFinishWalkStab",
     "IjaBootOnHand"
    ],
-   "notes": "2026-10-11 Finish (N18): rifle low, the bayonet pointed down, two strides down the trench floor (1.4 m of root motion, four steps); on the second step the rifle comes up and the point goes down into the back of the body lying there (0.875 s; the body's back 0.24 m up, 0.85 m ahead of the hips and a hand to his right: event `stab` at), out again, the feet never stop. The last frame is frame 0 moved 1.4 m on: chain it to itself (the director re-roots each play on the last pelvis) for the second body, then IjaBootOnHand."
+   "notes": "2026-10-11 Finish (N18): rifle low, the bayonet pointed down, two strides down the trench floor (1.4 m of root motion, four steps); on the second step the rifle comes up and the point goes down into the back of the body lying there (0.875 s; the body's back 0.24 m up, 0.85 m ahead of the hips and a hand to his right: event `stab` at), out again, the feet never stop. The last frame is frame 0 moved 1.4 m on: chain it to itself (the director re-roots each play on the last pelvis) for the second body, then IjaBootOnHand.",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaWipeBandageFixBayonet",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "98721779",
+     "valuesSha256": "4c32e331e6c30d5beadbe1ef29c1c83c9afac13a538ddef05aba87e5d2a1be92"
+    }
+   }
   },
   "IjaBootOnHand": {
    "duration": 3.75,
@@ -5836,7 +7941,17 @@
    "next": [
     "IjaCrouchHairHold"
    ],
-   "notes": "2026-10-11 Found (N19): root = ija.crouch (facing west, the pinned eye 0.60 m ahead, as IjaCrouchHairHold); frame 0 = IjaFinishWalkStab frame 0 (mid stride, 0.4 m short of the root). He stops, the bayonet point hanging a hand over the pinned man's back (hover 0.45-2.06, held over him through the stomp and the grind); the right boot comes down on the hand lying in the mud (step 1.458; player track `handR` is where the sole lands), the heel grinds it 0.6 s, the foot comes off and goes back beside the left; he slings the rifle across his back (2.45-3.15) and squats at the head (3.15-3.75): the last frame is IjaCrouchHairHold frame 0, the feet where it has them. Player track: head (the eye), handR, back (the hover point under the point)."
+   "notes": "2026-10-11 Found (N19): root = ija.crouch (facing west, the pinned eye 0.60 m ahead, as IjaCrouchHairHold); frame 0 = IjaFinishWalkStab frame 0 (mid stride, 0.4 m short of the root). He stops, the bayonet point hanging a hand over the pinned man's back (hover 0.45-2.06, held over him through the stomp and the grind); the right boot comes down on the hand lying in the mud (step 1.458; player track `handR` is where the sole lands), the heel grinds it 0.6 s, the foot comes off and goes back beside the left; he slings the rifle across his back (2.45-3.15) and squats at the head (3.15-3.75): the last frame is IjaCrouchHairHold frame 0, the feet where it has them. Player track: head (the eye), handR, back (the hover point under the point).",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaFinishWalkStab",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "2c2d2b70",
+     "valuesSha256": "2831bd7ecff6a083d73314cdd5f03f1e2411ae1d35cdfde971464881d8dfe891"
+    }
+   }
   },
   "IjaRecruitCheekCut": {
    "duration": 2.625,
@@ -5888,7 +8003,25 @@
    "next": [
     "IjaRecruitLevelRifle"
    ],
-   "notes": "2026-10-11 Blade (N21): standing at the ready 1.45 m from Shunzi's held-up eye (frame 0 = IjaReadyRifle last frame), he stoops, the left hand forward on the handguard, and brings the bloody point to the LEFT cheek (touch 0.708), presses and draws it down 4 cm (cut 1.0), the hands shaking; holds a moment, takes it away and straightens to the ready (2.6). Player track: head (Shunzi's eye), cheekL (where the point touches), handR (his right hand in the mud)."
+   "notes": "2026-10-11 Blade (N21): standing at the ready 1.45 m from Shunzi's held-up eye (frame 0 = IjaReadyRifle last frame), he stoops, the left hand forward on the handguard, and brings the bloody point to the LEFT cheek (touch 0.708), presses and draws it down 4 cm (cut 1.0), the hands shaking; holds a moment, takes it away and straightens to the ready (2.6). Player track: head (Shunzi's eye), cheekL (where the point touches), handR (his right hand in the mud).",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "committed:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "2c2d2b70",
+     "valuesSha256": "67ad28eff7897f1943bafb4051a8f64b1f20708bfa465039e759667ea1a639a0"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaReadyRifle",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "2c2d2b70",
+     "valuesSha256": "ba967bef6d422915cb9e2b6e92b2ba0e479e8872dfdb234f23ec29a74052f637"
+    }
+   }
   },
   "IjaRecruitLevelRifle": {
    "duration": 3.0,
@@ -5924,7 +8057,25 @@
     "IjaRecruitCheekCut"
    ],
    "next": [],
-   "notes": "2026-10-11 Blade: frame 0 = IjaRecruitCheekCut last frame (same root). Three steps back (1.8 m of root motion), the rifle into the shoulder and levelled at Shunzi's eye (down ~16 deg); 1.75-3.0 s a seamless hold loop, the muzzle shaking. Player track: head (the eye he aims at)."
+   "notes": "2026-10-11 Blade: frame 0 = IjaRecruitCheekCut last frame (same root). Three steps back (1.8 m of root motion), the rifle into the shoulder and levelled at Shunzi's eye (down ~16 deg); 1.75-3.0 s a seamless hold loop, the muzzle shaking. Player track: head (the eye he aims at).",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "committed:IjaRecruitCheekCut",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "2c2d2b70",
+     "valuesSha256": "492371edb0f089dbe823ebcb6ad9fbe1539fa93e82a0c97ae33be1a21aeba258"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaRecruitCheekCut",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "2c2d2b70",
+     "valuesSha256": "5b8ac31f6f62436ea26fae5b5952cef56ad58133a620be8c2db2c67de50bae6e"
+    }
+   }
   },
   "IjaGrenadeBitePin": {
    "duration": 3.0,
@@ -5982,7 +8133,17 @@
     "IjaShotStaggerAway"
    ],
    "next": [],
-   "notes": "2026-10-11 Melee (N23): frame 0 = IjaShotStaggerAway at its hold-loop start (same root: bent over, the left arm dead). He turns back to face west (180 deg to his left in four steps, 0.15-1.35 s; Dir02: Luo cuts from behind him into the picture) while the right hand leaves the wound for the Type 91 on the front of his belt (0.5 s), brings it up to his mouth, the teeth take the pin out with a jerk of the head (bite 1.125), and the grenade goes up in front of his helmet to be struck (1.75); 1.75-3.0 s a seamless hold loop (two hard breaths, the hand shaking). Prop track `grenade` (Type 91, 0.05 x 0.095 m: origin = its centre, axis = its long axis, up = the fuse side): on the belt until 0.5 s, then in the fist. When Luo's cut lands the director drops it (finish.grenadeStop)."
+   "notes": "2026-10-11 Melee (N23): frame 0 = IjaShotStaggerAway at its hold-loop start (same root: bent over, the left arm dead). He turns back to face west (180 deg to his left in four steps, 0.15-1.35 s; Dir02: Luo cuts from behind him into the picture) while the right hand leaves the wound for the Type 91 on the front of his belt (0.5 s), brings it up to his mouth, the teeth take the pin out with a jerk of the head (bite 1.125), and the grenade goes up in front of his helmet to be struck (1.75); 1.75-3.0 s a seamless hold loop (two hard breaths, the hand shaking). Prop track `grenade` (Type 91, 0.05 x 0.095 m: origin = its centre, axis = its long axis, up = the fuse side): on the belt until 0.5 s, then in the fist. When Luo's cut lands the director drops it (finish.grenadeStop).",
+   "bake": {
+    "TengxianIja02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaShotStaggerAway",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "2c2d2b70",
+     "valuesSha256": "a1c97da190e508afb6edcdf9787a45da5f79056e93ebb83bc6d5da3a09228377"
+    }
+   }
   },
   "NraShotTumbleSteps": {
    "duration": 2.5,
@@ -6045,7 +8206,17 @@
    },
    "prev": [],
    "next": [],
-   "notes": "2026-10-11 polish (contract \u00a71.11, N22/N23): ChargeB running down the crater step with his dadao, frame 0 a running stride (the native charge run hands over to it); 0.083 s the round into the right chest from his right: the right shoulder knocked back, the body spun to his left on a crossing stumble, the dadao out of his hand at 0.167 s (weapon track to where it lands, weaponDropFrom); down on his left side on the slope at 0.625 s, he slides and rolls down it onto his back, the head downhill to his forward left, the legs up the slope, the arms flung out; still from 1.42 s, eyes open (face layer). Root motion: the pelvis ends 0.66 m left, 1.40 m ahead of the root and 0.80 m lower (the step falls away under him: manifest ground); its last frame is the corpse."
+   "notes": "2026-10-11 polish (contract \u00a71.11, N22/N23): ChargeB running down the crater step with his dadao, frame 0 a running stride (the native charge run hands over to it); 0.083 s the round into the right chest from his right: the right shoulder knocked back, the body spun to his left on a crossing stumble, the dadao out of his hand at 0.167 s (weapon track to where it lands, weaponDropFrom); down on his left side on the slope at 0.625 s, he slides and rolls down it onto his back, the head downhill to his forward left, the legs up the slope, the arms flung out; still from 1.42 s, eyes open (face layer). Root motion: the pelvis ends 0.66 m left, 1.40 m ahead of the root and 0.80 m lower (the step falls away under him: manifest ground); its last frame is the corpse.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "6274c469",
+     "valuesSha256": "3781e702922cc8223a8a909425396b34a06b9d951e6e9a7ba6bab0c944f2db5d"
+    }
+   }
   },
   "IjaLmgGunnerShotOnGun": {
    "duration": 2.0,
@@ -6094,7 +8265,17 @@
     "IjaProneLmgOnCorpse"
    ],
    "next": [],
-   "notes": "2026-10-11 polish (contract \u00a71.11, N22 \u300c\u6c9f\u6cbf\u4e0a\u7684\u673a\u67aa\u624b\u8db4\u5728\u5c38\u4f53\u4e0a\u4e0d\u52a8\u4e86\u300d): frame 0 = IjaProneLmgOnCorpse frame 0 (same root: the director plays it on the gunner's mark with Kill and no hit reaction). 0.042 s the round in the chest: the shoulders and the head jerk up and back; he goes slack, the face down onto the receiver (0.417), the hands off the gun and sliding down the slope beside it (0.30-0.75); a last shudder (0.95); still from 1.25 s. No root motion; the type11 track stays where frame 0 has it (the gun on the corpse rest). The last frame is the corpse."
+   "notes": "2026-10-11 polish (contract \u00a71.11, N22 \u300c\u6c9f\u6cbf\u4e0a\u7684\u673a\u67aa\u624b\u8db4\u5728\u5c38\u4f53\u4e0a\u4e0d\u52a8\u4e86\u300d): frame 0 = IjaProneLmgOnCorpse frame 0 (same root: the director plays it on the gunner's mark with Kill and no hit reaction). 0.042 s the round in the chest: the shoulders and the head jerk up and back; he goes slack, the face down onto the receiver (0.417), the hands off the gun and sliding down the slope beside it (0.30-0.75); a last shudder (0.95); still from 1.25 s. No root motion; the type11 track stays where frame 0 has it (the gun on the corpse rest). The last frame is the corpse.",
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaProneLmgOnCorpse",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "6274c469",
+     "valuesSha256": "d180d8f430ecdb15353fca095eeef9c09c7d4f1103bed71e5824bc1ebca727a2"
+    }
+   }
   },
   "IjaLoaderShotTumbleOffLip": {
    "duration": 2.5,
@@ -6161,7 +8342,17 @@
     "IjaKneelLoadLmg"
    ],
    "next": [],
-   "notes": "2026-10-11 polish (contract \u00a71.11, N22 \u300c\u526f\u5c04\u624b\u7ffb\u4e0b\u6c9f\u6cbf\u300d): frame 0 = IjaKneelLoadLmg frame 0 (same root: the director plays it on the loader's mark with Kill and no hit reaction). 0.083 s the round in the chest: jolted back, the hands off the hopper, turned to his left by it; over backwards toward the trench (the edge 0.10 m behind his right shoulder, 126.5 deg to his right of his facing), head first over the edge (0.583), down the wall on his back to its foot (1.292), face up on the trench floor with the legs up the wall; still from 1.67 s. Root motion: the pelvis ends 1.12 m out along that line and 1.88 m down (the wall is in the clip: manifest ground). The last frame is the corpse."
+   "notes": "2026-10-11 polish (contract \u00a71.11, N22 \u300c\u526f\u5c04\u624b\u7ffb\u4e0b\u6c9f\u6cbf\u300d): frame 0 = IjaKneelLoadLmg frame 0 (same root: the director plays it on the loader's mark with Kill and no hit reaction). 0.083 s the round in the chest: jolted back, the hands off the hopper, turned to his left by it; over backwards toward the trench (the edge 0.10 m behind his right shoulder, 126.5 deg to his right of his facing), head first over the edge (0.583), down the wall on his back to its foot (1.292), face up on the trench floor with the legs up the wall; still from 1.67 s. Root motion: the pelvis ends 1.12 m out along that line and 1.88 m down (the wall is in the clip: manifest ground). The last frame is the corpse.",
+   "bake": {
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:IjaKneelLoadLmg",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "6274c469",
+     "valuesSha256": "9e0bb0a0469a091eaa6d8663a613360e278f09c5ee6b9c1e567cc825f0e3e78c"
+    }
+   }
   },
   "IjaHeaveCorpseLip": {
    "duration": 2.6666666666666665,
@@ -6244,7 +8435,25 @@
     "IjaProneLmgOnCorpse",
     "IjaKneelLoadLmg"
    ],
-   "notes": "2026-10-11 polish (contract \u00a71.7, N12): the root stands facing the south wall, its foot 0.30 m ahead; the dragged body (the Set's movable corpse) lies face down along the foot of the wall, its middle 0.42 m ahead, head to his left. He squats and takes it under the left armpit and by the belt (grab 0.54), stands up with it against his chest (lifted 1.05), steps in and shoves it up overhead onto the wall under the lip (heaved 1.54: the Set puts the corpse on the lip, PlaceCorpse pose onLip), lets go, the hands come down and he steps back (to 2.67). Prop track `corpse`: the body's middle, the head's direction, the back's normal (up to heaved; hidden after) -- the director may carry the Set's corpse on it. No root motion. Baked on IJA01 (gunner) and IJA03 (loader)."
+   "notes": "2026-10-11 polish (contract \u00a71.7, N12): the root stands facing the south wall, its foot 0.30 m ahead; the dragged body (the Set's movable corpse) lies face down along the foot of the wall, its middle 0.42 m ahead, head to his left. He squats and takes it under the left armpit and by the belt (grab 0.54), stands up with it against his chest (lifted 1.05), steps in and shoves it up overhead onto the wall under the lip (heaved 1.54: the Set puts the corpse on the lip, PlaceCorpse pose onLip), lets go, the hands come down and he steps back (to 2.67). Prop track `corpse`: the body's middle, the head's direction, the back's normal (up to heaved; hidden after) -- the director may carry the Set's corpse on it. No root motion. Baked on IJA01 (gunner) and IJA03 (loader).",
+   "bake": {
+    "TengxianIja01": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "6274c469",
+     "valuesSha256": "547b2320400533f8917f69f4ccced1c5183f13934a49d407f4d303407e4a0faa"
+    },
+    "TengxianIja03": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "6274c469",
+     "valuesSha256": "35da8c660f4d8b849fcb2bf74d417b616fa21589d23f19c705c810eaf0a3e3bd"
+    }
+   }
   }
  },
  "stages": {
