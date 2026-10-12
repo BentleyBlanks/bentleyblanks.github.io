@@ -17,9 +17,11 @@
 // 响应头刻意跟线上保持一致（**不**发 COOP/COEP）：本地能跑而线上跑不了的东西，
 // 本地预览就白做了。
 //
-// 两个只在回环上可写的本地口（线上 Pages 没有，编辑器自动退化）：
-//   /__tuning/*  敌军 AI 编辑器把滑杆的数存回 Data_Tuning_*.mjs（docs/Data_EnemyAi.md §14.3）；
-//   /__notes/*   关卡编排工作台把批注草稿存进 Taierzhuang1938/Notes/<Level>/notes.json 与同目录的 PNG。
+// 三个只在回环上可写的本地口（线上 Pages 没有，编辑器自动退化）：
+//   /__tuning/*   敌军 AI 编辑器把滑杆的数存回 Data_Tuning_*.mjs（docs/Data_EnemyAi.md §14.3）；
+//   /__notes/*    关卡编排工作台把批注草稿存进 Taierzhuang1938/Notes/<Level>/notes.json 与同目录的 PNG；
+//   /__blockout/* 白盒关卡编辑器把配置存回 Taierzhuang1938/Blockout/<Level>.json
+//                 （Taierzhuang1938/docs/Data_EditorBlockout.md §7；另查 Host / Origin / Content-Type 与版本号）。
 //
 // 首页 http://127.0.0.1:<port>/__preview/ 是一个索引页：列出这棵树里所有
 // 带 index.html 的页面（按改动时间排序），并且能一键把任意 worktree 挂到
@@ -29,6 +31,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { createHash } from "node:crypto";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 // 敌军 AI 编辑器的「保存到源码」（docs/Data_EnemyAi.md §14.3）。改写器是纯 Node、
@@ -39,6 +42,10 @@ import { ApplyTuningChanges, TUNING_FILE_RE } from "../Taierzhuang1938/Script_Tu
 //   POST /__notes/save   { level, notes, images } → 写 Taierzhuang1938/Notes/<Level>/notes.json 与 <noteId>.png
 import { NOTES_FILE_RE, NOTE_IMAGE_RE, LEVEL_RE, NotesPathFor, ValidateNote } from "../Taierzhuang1938/Script_MissionNotes.mjs";
 import { HandleTextureImportRequest } from "../Taierzhuang1938/Script_TextureImportServer.mjs";
+// 白盒关卡编辑器的「记下当前机位」。配置模块是纯的（node 与浏览器共用），导入时不抛错：
+//   GET  /__blockout/status → { writable, root, revisions: { <Level>: sha1 | null } }
+//   POST /__blockout/save   { level, doc, revision } → 写 Taierzhuang1938/Blockout/<Level>.json
+import { BLOCKOUT_LEVEL_KEYS, BLOCKOUT_CONFIG_FILE_RE, BlockoutConfigPath, ValidateBlockout } from "../Taierzhuang1938/Script_EditorBlockoutConfig.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..");
@@ -387,6 +394,11 @@ function CreateServer(rootDir, context) {
     }
     if (route === "/__notes/save") { await HandleNotesSave(request, response, rootDir); return; }
 
+    // 白盒关卡编辑器的配置存档口，同样排在 405 闸之前。读配置不走端点
+    // （编辑器直接 fetch ./Blockout/<Level>.json），status 只报能不能写与各关的版本号。
+    if (route === "/__blockout/status") { SendBlockoutStatus(request, response, rootDir); return; }
+    if (route === "/__blockout/save") { await HandleBlockoutSave(request, response, rootDir); return; }
+
     if (request.method !== "GET" && request.method !== "HEAD") { response.writeHead(405).end(); return; }
     const filePath = path.join(rootDir, route);
     if (!filePath.startsWith(rootDir)) { response.writeHead(403).end(); return; }
@@ -608,6 +620,119 @@ async function HandleNotesSave(request, response, rootDir) {
   }
 }
 
+// -------------------------------------------- 白盒关卡配置保存（只在本地）
+//
+// 白盒关卡编辑器（Taierzhuang1938/docs/Data_EditorBlockout.md §7）只有一个写操作「记下当前机位」，
+// 其余改动由人或 AI 直接改 JSON：
+//   GET  /__blockout/status → { writable, root, revisions: { FirstLevel: "<sha1>", SecondLevel: null }, reason? }
+//   POST /__blockout/save   { level: "FirstLevel", doc: {...}, revision: "<sha1>" | null }
+//                        → { ok: true, level, file, revision, warnings }
+//
+// 比上面两个口多几道闸（照 Taierzhuang1938/Script_TextureImportServer.mjs）：
+//   ① 回环 socket **并且** Host 头只认 localhost / 127.0.0.1 —— 挡 DNS rebinding；
+//   ② Content-Type 必须是 application/json、Origin 有就必须同源 —— 别的网页发不了跨站 POST
+//      （text/plain 的简单请求不走预检，只查 socket 挡不住）；
+//   ③ body ≤ 4 MB；
+//   ④ level 只认 BLOCKOUT_LEVEL_KEYS，拼出的路径再过 BLOCKOUT_CONFIG_FILE_RE，解析后必须在根之下；
+//   ⑤ ValidateBlockout 不过 → 400 + details；配置里的 level 与请求的不一致 → 400；
+//   ⑥ revision = 盘上原始字节的 sha1，对不上 → 409（编辑器开着时文件被人或 AI 改过）。
+//      null 只在文件还不存在时成立；不带 revision 一律 400，不给「盲写覆盖」留口子。
+// 任何拒绝都不落一个字节。读完 body 之后的校验、比版本、写盘全是同步的，同一进程里两次保存不会交错。
+// 场景文件（<Level>.scene.json）v1 不开放写。
+const BLOCKOUT_BODY_LIMIT = 4 * 1024 * 1024;
+
+function IsLocalPage(request) {
+  const host = String(request.headers.host || "").split(":")[0].toLowerCase();
+  return IsLoopback(request) && (host === "localhost" || host === "127.0.0.1");
+}
+
+function IsSameOrigin(request) {
+  const origin = request.headers.origin;
+  if (origin === undefined) return true;
+  try { return new URL(origin).host === request.headers.host; } catch { return false; }
+}
+
+/** 盘上原始字节的 sha1；文件不存在是 null。 */
+function BlockoutRevision(filePath) {
+  try { return createHash("sha1").update(fs.readFileSync(filePath)).digest("hex"); } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function SendBlockoutStatus(request, response, rootDir) {
+  if (request.method !== "GET" && request.method !== "HEAD") { SendJson(response, 405, { ok: false, error: "只收 GET" }); return; }
+  const revisions = {};
+  for (const level of BLOCKOUT_LEVEL_KEYS) {
+    try { revisions[level] = BlockoutRevision(path.join(rootDir, BlockoutConfigPath(level))); } catch { revisions[level] = null; }
+  }
+  const writable = IsLocalPage(request);
+  SendJson(response, 200, {
+    writable, root: rootDir, revisions,
+    ...(writable ? {} : { reason: "只有在本机用 localhost / 127.0.0.1 打开时才能存盘" }),
+  });
+}
+
+async function HandleBlockoutSave(request, response, rootDir) {
+  const Reject = (status, error, extra = {}) => SendJson(response, status, { ok: false, error, ...extra });
+  if (request.method !== "POST") { Reject(405, "只收 POST"); return; }
+  if (!IsLocalPage(request)) { Reject(403, "只接受本机 localhost / 127.0.0.1 的请求"); return; }
+  if (!String(request.headers["content-type"] || "").toLowerCase().startsWith("application/json")) {
+    Reject(415, "Content-Type 必须是 application/json");
+    return;
+  }
+  if (!IsSameOrigin(request)) { Reject(403, "只接受同源页面的请求"); return; }
+  let body;
+  try { body = await ReadBody(request, BLOCKOUT_BODY_LIMIT); } catch (error) { Reject(413, error.message); return; }
+  let payload;
+  try { payload = JSON.parse(body); } catch { Reject(400, "body 不是 JSON"); return; }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) { Reject(400, "body 要是 { level, doc, revision }"); return; }
+
+  const level = typeof payload.level === "string" ? payload.level : "";
+  const relative = BlockoutConfigPath(level);
+  if (!BLOCKOUT_LEVEL_KEYS.includes(level) || !BLOCKOUT_CONFIG_FILE_RE.test(relative)) {
+    Reject(403, `level 只能是 ${BLOCKOUT_LEVEL_KEYS.join(" / ")}`);
+    return;
+  }
+  const filePath = path.resolve(rootDir, relative);
+  if (filePath !== path.join(rootDir, relative) || !filePath.startsWith(rootDir + path.sep)) {
+    Reject(403, "路径不在服务根之下");
+    return;
+  }
+  const { revision, doc } = payload;
+  if (revision !== null && typeof revision !== "string") {
+    Reject(400, "revision 要是上次读到的版本号（文件还不存在时写 null）");
+    return;
+  }
+  const check = ValidateBlockout(doc);
+  if (!check.ok) { Reject(400, "配置不合规", { details: check.errors, warnings: check.warnings }); return; }
+  if (doc.level !== level) { Reject(400, `配置里的 level 是 ${doc.level}，和请求的 ${level} 不是一回事`); return; }
+
+  let current;
+  try { current = BlockoutRevision(filePath); } catch (error) { Reject(500, String(error?.message || error)); return; }
+  if (revision !== current) {
+    Reject(409, current === null ? "盘上已经没有这个文件，按新文件保存要带 revision: null"
+      : "配置已在别处改过（版本号对不上），先重新读取再保存", { revision: current });
+    return;
+  }
+
+  const text = `${JSON.stringify(doc, null, 2)}\n`;
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    WriteAtomic(filePath, text);
+  } catch (error) {
+    try { fs.rmSync(`${filePath}.tmp`, { force: true }); } catch { /* 清不掉就算了，报错里有原因 */ }
+    Reject(500, String(error?.message || error));
+    return;
+  }
+  console.log(`  /__blockout/save ${relative}：${doc.keyframes.length} 个关键帧`);
+  SendJson(response, 200, {
+    ok: true, level, file: relative,
+    revision: createHash("sha1").update(text, "utf8").digest("hex"),
+    warnings: check.warnings,
+  });
+}
+
 function LanAddresses(port) {
   const urls = [];
   for (const list of Object.values(os.networkInterfaces())) {
@@ -682,7 +807,10 @@ const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127
   只替换那一个数字字面量，注释与格式一个字不动（Taierzhuang1938/Script_TuningWriter.mjs）。
 批注草稿保存口（关卡编排工作台，只在回环上可写）：GET /__notes/status；POST /__notes/save
   { level: "FirstLevel", notes: [...], images: { "n_20260918_101500_ab12.png": "data:image/png;base64,…" } }
-  逐条过 ValidateNote 后写 Taierzhuang1938/Notes/<Level>/notes.json 与同目录 PNG（单张 ≤ 1.5 MB，原子写）。`;
+  逐条过 ValidateNote 后写 Taierzhuang1938/Notes/<Level>/notes.json 与同目录 PNG（单张 ≤ 1.5 MB，原子写）。
+白盒关卡配置保存口（白盒关卡编辑器，只在本机 localhost / 127.0.0.1 上可写）：GET /__blockout/status；POST /__blockout/save
+  { level: "FirstLevel", doc: {...}, revision: "<status 里那一关的 sha1，文件还不存在时写 null>" }
+  过 ValidateBlockout 后原子写 Taierzhuang1938/Blockout/<Level>.json（body ≤ 4 MB）；版本号对不上回 409，任何拒绝都不落盘。`;
 
 async function Main() {
   const args = process.argv.slice(2);

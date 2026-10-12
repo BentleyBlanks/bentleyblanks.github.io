@@ -588,6 +588,53 @@ DOM 常驻、只写属性；面板 4 Hz，地图只在 live 指纹变了或选�
 冒烟：`node Taierzhuang1938/Script_OrchestrationEditorTest.mjs`（浏览器，69 条）
 与 `node Taierzhuang1938/Script_OrchestrationMapTest.mjs`（浏览器，45 条）。
 
+### 白盒关卡编辑器 `Script_EditorBlockout.mjs`（整页模式）
+
+入口：设置 → 高级工具 → 编辑器 → 白盒关卡编辑器。它跳到 `index.html?editor=blockout&level=FirstLevel`
+（保留当前的画质 / 尺寸 / 声音参数）；也可以直接开
+`?editor=blockout&level=<关卡>[&kf=<关键帧 id>][&quality=whitebox]`。已经在这个模式里时按钮显示为当前项，
+点了不重新加载。数据格式、接口与分工见 [Data_EditorBlockout.md](Data_EditorBlockout.md)，这里只记怎么用。
+
+这是整页模式，不是叠加面板：只建白盒场景（地形只有高度色带和网格）、玩家（汉阳造 + 大刀 + 手榴弹，
+WASD / 开火 / 换弹照旧）和按关键帧摆的敌我单位；没有任务流程、过场和补兵，单位不进 AI、不吃子弹。
+玩家这一次无敌、弹药不减，不改存下来的调试选项。
+
+| 位置 | 有什么 |
+| --- | --- |
+| 左上 | 关键帧卡片：阶段号 + 阶段标题 + 站位名；「此时」发生了什么；「下一步」去哪（随视角转的箭头 + 距离）；可选的提示标签、对照备注、推测位置的个数；右上角「记下当前机位」 |
+| 右上 | 关卡下拉；射界 / 去向 / 标签 / 穿墙显示四个开关；配置状态点（绿 = 已载入，蓝闪 = 外部修改已同步，红 = 配置有错，悬停看原因） |
+| 左下 | 小地图：纸面俯视图，北朝上，跟着玩家 |
+| 底部 | 关键帧导航栏：按阶段分段，点刻度或拖滑块跳转；过渡太长时显示「快进 ×n」 |
+| 3D 里 | 敌红、友蓝、百姓绿的地环，朝向箭头、射界扇、去向虚线；POI 与下一步目标的光柱；被墙挡住的人用暗色透出来 |
+
+按键（拿着鼠标或按过 Esc 都有效）：`.` 下一个关键帧（连贯的单位走过去）、`,` 上一个（直接到位）、
+`M` 全关总图（替代平时的小地图；滚轮缩放、拖动平移、双击回全图、点关键帧点跳转，M / Esc 关）、
+`Y` 重播进入当前关键帧的过渡、`Esc` 交还鼠标（交还后界面才能点，点画面重新拿鼠标）。
+
+文件都在 `Taierzhuang1938/Blockout/`：`<Level>.json` 是配置（关键帧、玩家机位、此时 / 下一步文字、
+敌我单位、POI），人和 AI 都直接改它；`<Level>.scene.json` 是第一关以外的关卡用的高度图 + 体块
+（第一关直接用游戏里的地形与体块）。页面开着时每 2 s 读一次配置，外部改了就按当前关键帧重新摆
+（不重建场景），状态点蓝闪并提示。
+
+存盘只有一个操作「记下当前机位」：把玩家当前的位置、朝向、姿态写进当前关键帧，再整份存回。
+本机预览（localhost / 127.0.0.1）下先问 `GET /__blockout/status`，可写才 `POST /__blockout/save`；
+服务端过校验、比版本号，文件在编辑器外被改过会被拒（先重新读取再存）。写不了时（Pages、测试服、
+局域网、旧的预览进程）存进 `localStorage["tengxian1938_blockout_<Level>"]` 并提供下载 JSON，
+界面上写明原因。场景文件不开放写。
+
+`window.Tengxian.Debug.Blockout`（测试与 agent 用）：`State()`、`GoTo(idOrIndex, { animate })`、
+`Next()`、`Prev()`、`Replay()`、`SwitchLevel(key)`、`Reload()`、`Units()`、`ToggleMap(open?)`、
+`SetLayers(partial)`、`Config()`。`GoTo` 等过渡结束、`SwitchLevel` 等新关卡和配置都就绪才 resolve。
+
+命令行 `node Taierzhuang1938/Script_EditorBlockoutCli.mjs <子命令>`（纯 node）：`export`
+从游戏数据生成第一关配置（`export FirstLevel`）、`scene` 生成第二关草稿场景、`validate` 校验配置与
+场景文件、`summary` 列出关键帧、`kf` 打印一个关键帧。参数见脚本文件头注。
+
+冒烟：`node Taierzhuang1938/Script_EditorBlockoutConfigTest.mjs`（数据与生成器）、
+`node Taierzhuang1938/Script_EditorBlockoutSaveTest.mjs`（存档口，真起一次本地预览）、
+`node Taierzhuang1938/Script_EditorBlockoutMapTest.mjs`（俯视图，浏览器）、
+`node Taierzhuang1938/Script_EditorBlockoutBrowserTest.mjs`（整页，浏览器）。
+
 ### Profiler `Script_EditorProfiler.mjs`（叠加层，独立窗口）
 
 与 Debug Rendering 同在「调试」组，不接管相机、不暂停玩法 ——
