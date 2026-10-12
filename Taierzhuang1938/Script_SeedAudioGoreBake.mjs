@@ -38,6 +38,10 @@
 // 与白刃那一轮同一条：生成音的波峰因数只有 13—17 dB，按峰值归一会比 Sonniss 那批
 // 响十几个 dB。这里同样把每条压到全库中位响度 −28.5 dBFS，再留一道峰值保险，
 // 并且量**成品自己**再补一刀（72 kbps 单声道编宽带噪声，解出来的 RMS 会偏高 2—3 dB）。
+//
+// 2026-10-12：这四条不在 Script_AudioNormalize 的人工档豁免里（不是人耳挑的，是按数挑的），所以部署件按库线
+// 对齐到有声段 −25 dBFS（`Script_AudioNormalize.mjs --write`，+1.82…+2.53 dB），−28.5 那一档的响度挪进
+// Script_Audio.SAMPLE_MIX（goreSever 0.78 → 0.602、goreLimbLand 0.45 → 0.355）。重烘之后要再跑一遍 --write。
 
 import fs from "node:fs";
 import path from "node:path";
