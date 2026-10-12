@@ -55,9 +55,10 @@
 | `role` / `group` | 职责 / 所属遭遇组，用来分类筛选 |
 | `weapon` | 不写时日军三八式、国军汉阳造；机枪写 `Type11` / `Type92Hmg` / `Zb26` 会自动画射界 |
 | `x` / `z` / `yawDeg` | 位置与朝向（也可以写 `faceTo`） |
-| `stance` / `aim` / `state` | 站蹲卧；`aim: true` 举枪；`state: "down"` 倒地（伤或亡） |
+| `stance` / `aim` / `state` | 站蹲卧；`aim: true` 举枪；`state: "down"` 倒地（伤或亡）。担架的 `down` 只表示抬担架的人倒了 |
+| `bearers` | 只给担架：抬的人数，不写 = 2；`1` = 只有前头一个（后头是玩家自己，如 14-1），`0` = 担架放在地上 / 床边没人抬（如 17-1 床位上的老周） |
 | `arc` | 射界 `{ "halfDeg": 半角, "rangeM": 射程 }`；不写时只有机枪和战车按默认画 |
-| `path` | 从**上一个关键帧**的位置走到这里的折线（不含起点）；不写就走直线，穿墙的地方要写 |
+| `path` | 从**上一个关键帧**的位置走到这里的折线（不含起点）；不写就走直线，穿墙的地方要写（过门洞写门外、门内各一点） |
 | `intent` | 「即将去」的折线，画成虚线箭头；不写时如果下一个关键帧里他换了位置，自动取那边的 `path` |
 | `speedMps` | 走过去的速度（米 / 秒）；不写时日军 2.8、国军 2.4、百姓 1.6、担架 1.2、战车 2.0 |
 | `guess` | `true` = 这个位置是推测的（游戏数据里没写），界面上画虚线圈和问号 |
@@ -74,6 +75,17 @@
 
 切到下一个关键帧时，两边都有的人沿 `path` 走过去（各按自己的速度，整段超过 8 秒就整体快进）；只在新关键帧里有的人原地出现，写了 `path` 的从 `path` 起点走进来；只在旧关键帧里有的人消失，写了 `intent` 的先走完再消失。
 
+## 第一关的摆位规矩（测试按这些判失败）
+
+`Script_EditorBlockoutConfigTest.mjs` 对 `FirstLevel.json` 查这几条，`validate FirstLevel` 也会把问题一条条列出来：
+
+- **走过去不穿墙**：相邻两个关键帧之间每个人的路线（`path`，没写就是直线；走进来、走出去的也算，原地不动的查站的那一点）按一个半径 0.3 m 的人、离地 0.5–1.4 m 那一段，每 0.1 m 取一点，不能扎进高过 1.6 m 的块超过 0.12 m。块按两个关键帧 `signals` 合起来的场景算（门开没开、桥断没断）。齐腰高的矮墙、坎子翻得过去，不算。
+- **玩家站得下**：每个关键帧的 `player` 处放一个站着的人（半径 0.3 m、离地 0.35–1.6 m），碰到任何实心块都不行。
+- **不挤**：人离玩家至少 1 m（倒地的 0.5 m）；人离担架中心至少 1.3 m，离抬担架的人站的那一段（担架中心沿朝向前后 1.6 m）至少 0.6 m；任意两个单位至少 0.8 m。
+- **下一步不在脚下**：`next` 的目标点离玩家不到 2 m 时只写 `text`，不写坐标。
+
+手改之后跑 `validate FirstLevel` 看有没有新问题。重新生成时，生成器给每个人挑路线的顺序是：配方里写的 `path` → 他跟的战术折线 / 指定要贴着走的路（例如跟车步兵贴着战车的路走）→ 附近已知路线（上路、走到和目的地平齐再下路）→ 两条路线接力 → 直线，挑第一条不穿墙的；都穿就在命令行里报出来。
+
 场景文件（`*.scene.json`）里的 `terrain.data` 是 base64 编码的高度网格：`(cols+1)×(rows+1)` 个 16 位小端整数，单位厘米，第 `iz` 行第 `ix` 列在 `iz*(cols+1)+ix`。体块不写高度位置，载入时落在脚下最低的地面上。
 
 ## 怎么改
@@ -88,7 +100,7 @@
 从 worktree 根运行：
 
 ```powershell
-node Taierzhuang1938/Script_EditorBlockoutCli.mjs validate all                  # 校验全部配置与场景
+node Taierzhuang1938/Script_EditorBlockoutCli.mjs validate all                  # 校验全部配置与场景；第一关另列摆位 / 走位问题
 node Taierzhuang1938/Script_EditorBlockoutCli.mjs summary FirstLevel            # 每个关键帧一行：机位、各阵营人数、推测几个、要点几个、警告
 node Taierzhuang1938/Script_EditorBlockoutCli.mjs kf FirstLevel 03-2            # 看一个关键帧的全部单位与要点
 node Taierzhuang1938/Script_EditorBlockoutCli.mjs export FirstLevel --force     # 从游戏数据重新生成第一关（会丢掉手改）
