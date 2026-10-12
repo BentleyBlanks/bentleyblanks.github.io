@@ -1,6 +1,6 @@
 // Dedicated static menu set. Values are authored against the three approved references.
 export const COMMAND_ROOM = Object.freeze({
-  version: "202610100430",
+  version: "202610130055",
   model: "./Model/Model_CommandRoom.glb",
   background: 0x373936,
   cameraNear: 0.05,
@@ -23,16 +23,18 @@ export const COMMAND_ROOM = Object.freeze({
     { name: "CommandRoomWood", kind: "pbr", normal: 0.45, tint: 0xffffff },
     { name: "CommandRoomPlaster", kind: "pbr", normal: 0.40, tint: 0xf2eee3 },
     { name: "CommandRoomWallSurface", kind: "pbr", normal: 0.30, tint: 0xffffff, clamp: true },
-    { name: "CommandRoomCloth", kind: "pbr", normal: 0.25, tint: 0xffffff },
-    { name: "CommandRoomCapCloth", kind: "pbr", normal: 0.4, tint: 0xffffff },
+    { name: "CommandRoomCloth", kind: "pbr", normal: 0.18, tint: 0xffffff },
+    { name: "CommandRoomCapCloth", kind: "pbr", normal: 0.28, tint: 0xffffff },
     { name: "CommandRoomMap", kind: "print", normal: 0, tint: 0xffffff },
     { name: "CommandRoomLetter", kind: "print", normal: 0, tint: 0xffffff },
     { name: "CommandRoomInkLabel", kind: "print", normal: 0, tint: 0xffffff },
   ]),
-  dust: Object.freeze({ count: 320, color: 0xf2d8bd, opacity: .6, size: .0025, drift: .0175 }),
+  dust: Object.freeze({ count: 480, color: 0xffe7ca, opacity: .65, size: .0028, drift: .016,
+    brightness: 1.45, glint: Object.freeze([3.8, 1.45, 14]) }),
   // Actual Blender aperture; ray integration clips against camera and light depth.
   windowHaze: Object.freeze({ center: [-.838725, 1.5137625, -1.176775], size: [.3705, .944775],
-    direction: [1.15, -1.0, 1.72], length: 1.9, density: .42, color: 0xefd1b6,
-    edgeSoftness: .0175, steps: 36, resolutionScale: .5,
+    direction: [1.15, -1.0, 1.72], length: 1.9, density: .58, color: 0xefd1b6,
+    scatterGain: 1, anisotropy: .24, variation: .28, noiseScale: 9,
+    edgeSoftness: .022, steps: 48, resolutionScale: .5,
     shadowSize: 1024, shadowExtent: .9, shadowDistance: 1.5, shadowFar: 4, shadowBias: .00035 }),
 });

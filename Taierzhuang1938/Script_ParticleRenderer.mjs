@@ -85,6 +85,8 @@ uniform mat4 uParticleLightMatrix;
 uniform float uParticleLightBias;
 uniform float uParticleLightTexel;
 uniform float uParticleLightValid;
+// Zero gain preserves all other window-mote consumers; the menu opts in.
+uniform vec3 uParticleWindowGlint;
 varying vec3 vWorldPoint;
 float DustLight(vec3 p){
  if(uParticleLightValid<.5)return 1.;
@@ -180,6 +182,9 @@ void main(){
  vec2 p=uv*2.-1.;float r=length(p);
  mask=exp(-dot(p,p)*4.5)*(1.-smoothstep(.56,1.,r));
  mask*=(.45+.55*vShape.x)*smoothstep(.25,.7,vDepth)*(1.-smoothstep(5.,8.,vDepth))*DustLight(vWorldPoint);
+ // Independent slow rotations give only a few grains a brief bright glint.
+ float glint=pow(.5+.5*sin(age*uParticleWindowGlint.y*(.75+vShape.x*.5)+seed*4.3),max(1.,uParticleWindowGlint.z));
+ color*=1.+uParticleWindowGlint.x*glint;
 #else
  vec2 p=uv*2.-1.;mask=exp(-dot(p,p)*4.)*(1.-smoothstep(.65,1.,length(p)));
 #endif
@@ -218,7 +223,7 @@ export class ParticleRenderer {
        arrays[name]=new Float32Array(capacity*size);attributes[name]=new THREE.InstancedBufferAttribute(arrays[name],size).setUsage(THREE.DynamicDrawUsage);geometry.setAttribute(name,attributes[name]);
      }
      const material=new THREE.ShaderMaterial({vertexShader:VERTEX,fragmentShader:FRAGMENT,defines:{['PARTICLE_'+mode.toUpperCase()]:'',PARTICLE_VOLUME_STEPS:PARTICLE_VOLUME.steps[quality]||8},
-       uniforms:{uParticleLightDepth:{value:null},uParticleLightMatrix:{value:new THREE.Matrix4()},uParticleLightValid:{value:0},uParticleLightBias:{value:0},uParticleLightTexel:{value:0},...shared,uSmokeLighting:{value:new THREE.Vector3(.85,1,PARTICLE_VOLUME.shadow)},uParticleCurves:{value:this.curves},uParticleSystems:{value:this.systems},uCurveDimensions:{value:new THREE.Vector2(PARTICLE_LIMITS.curveSamples,PARTICLE_LIMITS.systems*6)},uSystemCount:{value:PARTICLE_LIMITS.systems}},
+       uniforms:{uParticleLightDepth:{value:null},uParticleLightMatrix:{value:new THREE.Matrix4()},uParticleLightValid:{value:0},uParticleLightBias:{value:0},uParticleLightTexel:{value:0},uParticleWindowGlint:{value:new THREE.Vector3()},...shared,uSmokeLighting:{value:new THREE.Vector3(.85,1,PARTICLE_VOLUME.shadow)},uParticleCurves:{value:this.curves},uParticleSystems:{value:this.systems},uCurveDimensions:{value:new THREE.Vector2(PARTICLE_LIMITS.curveSamples,PARTICLE_LIMITS.systems*6)},uSystemCount:{value:PARTICLE_LIMITS.systems}},
        transparent:true,depthWrite:false,depthTest:true,blending:THREE.CustomBlending,blendSrc:THREE.SrcAlphaFactor,blendDst:mode==='mote'||mode==='flame'||mode==='ember'?THREE.OneFactor:THREE.OneMinusSrcAlphaFactor,
        blendSrcAlpha:THREE.ZeroFactor,blendDstAlpha:THREE.OneFactor,blendEquation:THREE.AddEquation,blendEquationAlpha:THREE.AddEquation,side:THREE.DoubleSide});
      material.userData.preserveTargetAlpha=true;MarkNoPrepass(material);

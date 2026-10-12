@@ -74,6 +74,12 @@ await Tengxian.Debug.PreviewCommandRoom(null);              // 恢复真实存�
 
 ## 验收入口
 
+2026-10-13：三张文书使用内置 Imagegen 进行文字样式编辑，字号目标为原图 85%，改用不等笔压、字形和字距的日常钢笔手写；纸面尺寸在模型中另缩小 15%。史料原句、三状态切换和绿色竖格保留。第一张「人人要抱有敵無我」的三列分别对齐右侧三个格子中心，避免压在竖线上；其余两张也完成格子位置和正文目检。
+
+更新的游戏素材为 `Texture/Menu/CommandRoom/Texture_CommandRoomLetterOpeningImage.webp`、`Texture_CommandRoomLetterMiddleImage.webp`、`Texture_CommandRoomLetterFinalImage.webp`，均为 1122×1402。原始 PNG 存在 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/AtmosphereDrape20261013/Source/CommandRoomLetter<Opening|Middle|Final>.png`。完整修改与对齐提示词附在 `_import/Prompts/Texture_CommandRoomPapers.txt` 的 2026-10-13 节，来源 ID 与哈希同步到清单和三份 TextureBakes 记录；使用内置工具，未使用付费回退。
+
+只编码三张信件的复现命令：`python Taierzhuang1938/_import/Script_EncodeCommandRoomPapers.py --source <源工程目录>/Source --assets LetterOpening,LetterMiddle,LetterFinal`。编码仍只执行 RGB/WebP 格式转换，不程序绘字。地图无需重编；源码与发布式启动、七种预览状态、存档不变、纸面景深和 GPU 发布颜色比较均通过，数值记录见 [主菜单续修](Data_MainMenu.md)。
+
 `Script_CommandRoomBrowserTest.mjs` 实际装载七种状态，检查材质图片 URL、只加载当前两张、七状态共十张、缓存复用与并发更新；截图留 `_shots/CommandRoom/Scene_CommandRoomProgress0..6.png`。这些是明确的进度夹具，不代表第二关至终章可游玩。真实菜单链路由 `Script_MenuTest.mjs` 检查，标准门禁包含 ModuleGraph、TextureStandards 与项目 quick/prepush。
 
 2026-10-06 实测：七状态浏览器检查通过；`Script_MenuTest.mjs --papers-only` 在 high 画质真实入口验证终章存档冷启动只请求两张、返回主菜单切到第一关后／初始图、无页面错误。ModuleGraph、TextureStandards、AssetStandards、Text、TextGatherCheck、BootPayload、TestRunner、TextureImport、MotionVectorContract 与 BrowserBundle 检查通过。合入同期帽服桌柜更新后重跑七状态与存档检查，并重新核对材质和缓存戳。

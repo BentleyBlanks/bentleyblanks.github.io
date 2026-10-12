@@ -798,6 +798,8 @@ const changedDomainRules = [
   {domain:"particles",pattern:/Script_Particle|Data_ParticleSmoke|Data_ParticleVolume|Data_Tuning_Particles|Script_Vfx|Script_EditorVfx|Script_EditorParticleInspector|\/Volume\//},
   { domain: "menu", pattern: /TextureBake|Script_Main\.mjs|Script_Materials\.mjs/ },
   { domain: "menu", pattern: /CommandRoom/ },
+  { domain: "editor", pattern: /(?:Script|Data)_DevTools(?:Stub)?\.mjs|Script_SettingsHost\.mjs/ },
+  { domain: "menu", pattern: /Data_DevTools(?:Stub)?\.mjs|Script_SettingsHost\.mjs/ },
   { domain: "textureAssets", pattern: /CommandRoom/ },
   {domain:"textureAssets",pattern:/TextureImport|TextureManager|EditorTextures/},
   { domain: "whiteboxQuality", pattern: /WhiteboxQuality|WhiteboxRendering|GraphicsProfile|Tuning_Whitebox|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },

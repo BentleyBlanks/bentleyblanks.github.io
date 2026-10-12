@@ -128,7 +128,7 @@ try {
   assert.equal(result.physical.authored.units,"metres");
   Near(result.physical.letter[0],physicalSpec.letter.widthM*physicalSpec.letter.presentationScale,"Exported enlarged letter width");
   Near(result.physical.letter[1],physicalSpec.letter.heightM*physicalSpec.letter.presentationScale,"Exported enlarged letter height");
-  assert.equal(result.physical.authored.letter.presentationScale,3,"The foreground letter has the explicitly requested visual enlargement");
+  assert.equal(result.physical.authored.letter.presentationScale,3*.85,"The foreground letter keeps the requested enlargement reduced by 15% per edge");
   result.letterFocus=await page.evaluate(()=>LetterFocus());
   assert.ok(result.letterFocus.bounds[2]>300&&result.letterFocus.bounds[3]>160,
     "The actual letter occupies enough screen pixels for its writing at 1280x720");
@@ -245,9 +245,17 @@ try {
     let movingPixels=0,visiblePixels=0;
     for(let i=0;i<first.length;i+=4){if(Math.abs(THREE.DataUtils.fromHalfFloat(first[i])-THREE.DataUtils.fromHalfFloat(later[i]))>.002)movingPixels++;
       if(Math.abs(THREE.DataUtils.fromHalfFloat(later[i])-THREE.DataUtils.fromHalfFloat(hidden[i]))>.002)visiblePixels++;}
-    room.Render();return {movingPixels,visiblePixels};
+    const glint=room.dust.material.uniforms.uParticleWindowGlint.value,gain=glint.x;
+    glint.x=0;room.Render();const matte=Read();glint.x=gain;room.Render();
+    let glintPixels=0,peakGlint=0;
+    for(let i=0;i<later.length;i+=4){
+      const delta=THREE.DataUtils.fromHalfFloat(later[i])-THREE.DataUtils.fromHalfFloat(matte[i]);
+      if(delta>.01)glintPixels++;peakGlint=Math.max(peakGlint,delta);
+    }
+    return {movingPixels,visiblePixels,glintPixels,peakGlint};
   });
   assert.ok(result.dust.movingPixels>30&&result.dust.visiblePixels>15,"World-space motes must produce visible moving pixels, not just advance a clock");
+  assert.ok(result.dust.glintPixels>4&&result.dust.peakGlint>.05,"Occasional dust glints must add real HDR highlights beyond the matte dust");
   result.optics=await page.evaluate(()=>{
     const Read=()=>{room.Render();const gl=renderer.getContext(),p=new Uint8Array(1280*720*4);gl.readPixels(0,0,1280,720,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;};
     const dof=room.atmosphere.compositeMaterial.uniforms.dof.value,aperture=dof.z;
