@@ -1,0 +1,583 @@
+{
+  "schema": "tengxian-blockout/1",
+  "level": "FirstLevel",
+  "title": "第一关 · 往南的路",
+  "source": {
+    "generator": "hand-made sample (contract 2026-10-13); replaced by Script_EditorBlockoutCli.mjs export FirstLevel",
+    "generatedAt": "2026-10-13T00:00:00Z"
+  },
+  "zones": [
+    {
+      "id": "A",
+      "name": "前沿与后交通壕",
+      "stages": [
+        1,
+        6
+      ],
+      "box": {
+        "minX": -62,
+        "maxX": 118,
+        "minZ": -233,
+        "maxZ": -84
+      }
+    }
+  ],
+  "keyframes": [
+    {
+      "id": "03-1",
+      "stage": 3,
+      "stageTitle": "夺取右侧阵位",
+      "name": "集结处东北角",
+      "player": {
+        "x": -35.6,
+        "z": -103.2,
+        "yawDeg": -25.1,
+        "pitchDeg": 0,
+        "stance": "stand"
+      },
+      "what": "守军报信：老周和守军被一挺机枪困在土坎后，班长掉头往北",
+      "next": {
+        "text": "跟班长进支沟",
+        "x": -29.6,
+        "z": -116,
+        "radiusM": 3
+      },
+      "how": [
+        "班长往北走",
+        "逆着撤下来的伤兵",
+        "北边一直有老周的机枪声"
+      ],
+      "notes": "样例",
+      "signals": [
+        "BunkerCollapsed"
+      ],
+      "units": [
+        {
+          "id": "luo",
+          "side": "nra",
+          "kind": "soldier",
+          "name": "罗班长",
+          "role": "squad",
+          "x": -32.5,
+          "z": -108,
+          "yawDeg": -20,
+          "stance": "stand"
+        },
+        {
+          "id": "NestGunner",
+          "side": "ija",
+          "kind": "soldier",
+          "name": "破墙机枪",
+          "role": "machineGun",
+          "weapon": "Type11",
+          "x": 26.5,
+          "z": -155.5,
+          "yawDeg": 97,
+          "stance": "prone",
+          "aim": true,
+          "group": "machineGun"
+        },
+        {
+          "id": "Guard0",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -14,
+          "z": -156.6,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        },
+        {
+          "id": "Guard1",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -10,
+          "z": -157,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        },
+        {
+          "id": "Guard2",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -6,
+          "z": -156.8,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        },
+        {
+          "id": "Guard3",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -2,
+          "z": -157.2,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        },
+        {
+          "id": "Guard4",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": 2,
+          "z": -156.9,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        }
+      ],
+      "pois": [
+        {
+          "id": "gap",
+          "name": "缺口",
+          "kind": "poi",
+          "x": -8,
+          "z": -150,
+          "radiusM": 3
+        }
+      ]
+    },
+    {
+      "id": "03-2",
+      "stage": 3,
+      "stageTitle": "夺取右侧阵位",
+      "name": "观察射台",
+      "player": {
+        "x": -23,
+        "z": -131,
+        "yawDeg": -33.6,
+        "pitchDeg": -2.7,
+        "stance": "stand"
+      },
+      "what": "班长停下来依次指：被困的守军、缺口、右边破墙冒火的机枪",
+      "next": {
+        "text": "打掉右边破墙那挺机枪",
+        "x": 24.9,
+        "z": -153.9,
+        "radiusM": 4
+      },
+      "how": [
+        "班长停下三指",
+        "机枪火光一直在前面",
+        "任务字"
+      ],
+      "notes": "样例",
+      "signals": [
+        "BunkerCollapsed"
+      ],
+      "units": [
+        {
+          "id": "luo",
+          "side": "nra",
+          "kind": "soldier",
+          "name": "罗班长",
+          "role": "squad",
+          "x": -21,
+          "z": -133,
+          "yawDeg": -40,
+          "stance": "crouch",
+          "path": [
+            {
+              "x": -30,
+              "z": -114
+            },
+            {
+              "x": -26,
+              "z": -124
+            },
+            {
+              "x": -21,
+              "z": -133
+            }
+          ]
+        },
+        {
+          "id": "NestGunner",
+          "side": "ija",
+          "kind": "soldier",
+          "name": "破墙机枪",
+          "role": "machineGun",
+          "weapon": "Type11",
+          "x": 26.5,
+          "z": -155.5,
+          "yawDeg": 97,
+          "stance": "prone",
+          "aim": true,
+          "group": "machineGun"
+        },
+        {
+          "id": "Guard0",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -14,
+          "z": -156.6,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        },
+        {
+          "id": "Guard1",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -10,
+          "z": -157,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        },
+        {
+          "id": "Guard2",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -6,
+          "z": -156.8,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        },
+        {
+          "id": "Guard3",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -2,
+          "z": -157.2,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        },
+        {
+          "id": "Guard4",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": 2,
+          "z": -156.9,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        }
+      ],
+      "pois": [
+        {
+          "id": "gap",
+          "name": "缺口",
+          "kind": "poi",
+          "x": -8,
+          "z": -150,
+          "radiusM": 3
+        },
+        {
+          "id": "nest",
+          "name": "右侧阵位",
+          "kind": "objective",
+          "x": 24.9,
+          "z": -153.9,
+          "radiusM": 4
+        }
+      ]
+    },
+    {
+      "id": "03-3",
+      "stage": 3,
+      "stageTitle": "夺取右侧阵位",
+      "name": "夺下的机枪座",
+      "player": {
+        "x": 25.9,
+        "z": -153.9,
+        "yawDeg": 96.5,
+        "pitchDeg": -1.2,
+        "stance": "stand"
+      },
+      "what": "夺下阵位；侧翼组和拔刀军官反扑，第一批 5 人从缺口撤",
+      "next": {
+        "text": "守住，直到第一批人过缺口",
+        "x": -8,
+        "z": -150,
+        "radiusM": 3
+      },
+      "how": [
+        "守军从左边跑过缺口",
+        "刘文财数人数",
+        "路弯后传来发动机声"
+      ],
+      "notes": "样例",
+      "signals": [
+        "BunkerCollapsed"
+      ],
+      "units": [
+        {
+          "id": "luo",
+          "side": "nra",
+          "kind": "soldier",
+          "name": "罗班长",
+          "role": "squad",
+          "x": 28.4,
+          "z": -151.6,
+          "yawDeg": 60,
+          "stance": "crouch",
+          "path": [
+            {
+              "x": -12,
+              "z": -140
+            },
+            {
+              "x": 10,
+              "z": -146
+            },
+            {
+              "x": 28.4,
+              "z": -151.6
+            }
+          ],
+          "speedMps": 4
+        },
+        {
+          "id": "Flank0",
+          "side": "ija",
+          "kind": "soldier",
+          "role": "flank",
+          "x": 38,
+          "z": -163,
+          "yawDeg": 45,
+          "stance": "crouch",
+          "aim": true,
+          "path": [
+            {
+              "x": 44,
+              "z": -179
+            },
+            {
+              "x": 38,
+              "z": -163
+            }
+          ],
+          "intent": [
+            {
+              "x": 32,
+              "z": -157
+            }
+          ],
+          "group": "frontFlank"
+        },
+        {
+          "id": "Flank1",
+          "side": "ija",
+          "kind": "soldier",
+          "role": "flank",
+          "x": 40.5,
+          "z": -164.5,
+          "yawDeg": 45,
+          "stance": "crouch",
+          "aim": true,
+          "path": [
+            {
+              "x": 46.5,
+              "z": -180.5
+            },
+            {
+              "x": 40.5,
+              "z": -164.5
+            }
+          ],
+          "intent": [
+            {
+              "x": 34.5,
+              "z": -158.5
+            }
+          ],
+          "group": "frontFlank"
+        },
+        {
+          "id": "Flank2",
+          "side": "ija",
+          "kind": "soldier",
+          "role": "flank",
+          "x": 42,
+          "z": -162,
+          "yawDeg": 45,
+          "stance": "crouch",
+          "aim": true,
+          "path": [
+            {
+              "x": 48,
+              "z": -178
+            },
+            {
+              "x": 42,
+              "z": -162
+            }
+          ],
+          "intent": [
+            {
+              "x": 36,
+              "z": -156
+            }
+          ],
+          "group": "frontFlank"
+        },
+        {
+          "id": "Flank3",
+          "side": "ija",
+          "kind": "soldier",
+          "role": "flank",
+          "x": 44,
+          "z": -165,
+          "yawDeg": 45,
+          "stance": "crouch",
+          "aim": true,
+          "path": [
+            {
+              "x": 50,
+              "z": -181
+            },
+            {
+              "x": 44,
+              "z": -165
+            }
+          ],
+          "intent": [
+            {
+              "x": 38,
+              "z": -159
+            }
+          ],
+          "group": "frontFlank"
+        },
+        {
+          "id": "Officer",
+          "side": "ija",
+          "kind": "officer",
+          "name": "拔刀军官",
+          "role": "officer",
+          "x": 46,
+          "z": -160,
+          "yawDeg": 60,
+          "stance": "stand",
+          "path": [
+            {
+              "x": 52,
+              "z": -176
+            },
+            {
+              "x": 46,
+              "z": -160
+            }
+          ],
+          "intent": [
+            {
+              "x": 34,
+              "z": -156
+            }
+          ],
+          "group": "frontOfficer"
+        },
+        {
+          "id": "Guard0",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -16,
+          "z": -140,
+          "yawDeg": 0,
+          "stance": "stand",
+          "aim": false,
+          "path": [
+            {
+              "x": -8,
+              "z": -150
+            },
+            {
+              "x": -16,
+              "z": -140
+            }
+          ]
+        },
+        {
+          "id": "Guard1",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -12,
+          "z": -138.5,
+          "yawDeg": 0,
+          "stance": "stand",
+          "aim": false,
+          "path": [
+            {
+              "x": -8,
+              "z": -150
+            },
+            {
+              "x": -12,
+              "z": -138.5
+            }
+          ]
+        },
+        {
+          "id": "Guard2",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -8,
+          "z": -137,
+          "yawDeg": 0,
+          "stance": "stand",
+          "aim": false,
+          "path": [
+            {
+              "x": -8,
+              "z": -150
+            },
+            {
+              "x": -8,
+              "z": -137
+            }
+          ]
+        },
+        {
+          "id": "Guard3",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": -2,
+          "z": -151.2,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        },
+        {
+          "id": "Guard4",
+          "side": "nra",
+          "kind": "soldier",
+          "role": "guard",
+          "x": 2,
+          "z": -150.9,
+          "yawDeg": 0,
+          "stance": "crouch",
+          "aim": true
+        }
+      ],
+      "pois": [
+        {
+          "id": "gap",
+          "name": "缺口",
+          "kind": "objective",
+          "x": -8,
+          "z": -150,
+          "radiusM": 3
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "schema": "tengxian-blockout/1",
+  "level": "SecondLevel",
+  "title": "第二关 · 手榴弹雨（空间草稿）",
+  "source": {
+    "generator": "hand-made sample (contract 2026-10-13)",
+    "generatedAt": "2026-10-13T00:00:00Z"
+  },
+  "zones": [],
+  "keyframes": [
+    {
+      "id": "S-1",
+      "stage": 1,
+      "stageTitle": "寨墙投掷线（草稿）",
+      "name": "寨门内",
+      "player": {
+        "x": 520,
+        "z": -65,
+        "yawDeg": -90,
+        "pitchDeg": 0,
+        "stance": "stand"
+      },
+      "what": "第二关流程未定稿，这里只是空间占位",
+      "next": {
+        "text": "寨门"
+      },
+      "how": [],
+      "notes": "样例配置",
+      "signals": [],
+      "units": [],
+      "pois": [
+        {
+          "id": "gate",
+          "name": "寨门",
+          "kind": "poi",
+          "x": 540,
+          "z": -65,
+          "radiusM": 2
+        },
+        {
+          "id": "gully",
+          "name": "地隙",
+          "kind": "landmark",
+          "x": 555,
+          "z": -65,
+          "radiusM": 4
+        }
+      ]
+    },
+    {
+      "id": "S-2",
+      "stage": 2,
+      "stageTitle": "外壕与地隙（草稿）",
+      "name": "寨墙投掷线",
+      "player": {
+        "x": 536,
+        "z": -58,
+        "yawDeg": -90,
+        "pitchDeg": -4,
+        "stance": "crouch"
+      },
+      "what": "第二关流程未定稿，这里只是空间占位",
+      "next": {
+        "text": "看地隙"
+      },
+      "how": [],
+      "notes": "样例配置",
+      "signals": [],
+      "units": [],
+      "pois": [
+        {
+          "id": "gully",
+          "name": "地隙",
+          "kind": "landmark",
+          "x": 555,
+          "z": -65,
+          "radiusM": 4
+        }
+      ]
+    }
+  ]
+}
