@@ -237,3 +237,4 @@ Regroup 夹具 17 幺娃够不到老周卡死；MenuTest 副标题；SmokeOrigin
 ## 9. 变更记录
 
 - 2026-10-12 契约 v1：集成负责人按改稿冻结；第一波 A（Front）∥ B（Rear + 耿家）并行，第二波 C（Village），第三波 D（Voice）。
+- 2026-10-12 A 包（Front 03–05）实现落在分支 `worktree-agent-a7b388014b4cf078c`：§3.1–3.3 全部接线。偏差三条——缺口牺牲的是第二批 7 号（5 号是面对玩家说 `TankSpotted` 的人）；去程「掷弹筒落弹声」是剧本 `FireShell` 真弹（支沟无视线，环境火点打不进来）；侧翼「再冲阵位」用 `nestFrontContested` 隔院对打实现而非第二次成组冲锋。实拍后两处收口：掷弹筒落弹（支沟 + 阵位）都是 `feedbackOnly` 不扣血（110 / 40 两档都把守阵位的玩家打死或流血至死）；`gapRushRepelled` 只看缺口 8 m 内与 16 m 内的冲锋（远处跃进不算）。留给集成的两条基线问题：`RightNestShortRetreat` 整帧三角 10.1 M > 9 M 上限（分支起点同样超）；左机枪坑的 54–55° 坡超胶囊 52° 爬坡上限，何有田交枪被钉在坡脚（本包用 `FrontBattle.RampLift` 兜底，地形改 ≤ 45° 后可撤）。实现口径见 `Data_FirstLevelFront20260919.md` §6。

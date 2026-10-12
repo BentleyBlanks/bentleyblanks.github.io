@@ -108,10 +108,12 @@ r.Has=()=>false;gun.rounds=0;gun.belts=0;
 assert.equal(guide.View().mode,"cover","unused optional gun does not force a rifle player to resupply it");
 assert.deepEqual(MISSION_LEADER_STAGES.MachineGun.target,MISSION_ANCHORS.front);
 r.flow.stage={id:"Tank",objective:"bundle"};r.Inventory=()=>({bundles:0});
-let tankView=guide.View();assert.equal(tankView.target.x,FRONT_SORTIE.route[0].x);
-assert.equal(tankView.target.z,FRONT_SORTIE.route[0].z,"outward marker follows unvisited route gates");
-r.Has=id=>id.startsWith("bundleRoutePoint");r.player.position={...MISSION_ANCHORS.bundle,y:0};
-assert.equal(guide.View().label,"collect");assert.equal(guide.View().target.z,MISSION_ANCHORS.bundle.z);
+// 2026-10-12 (03–11 refactor §3.3): the outward leg is the attack branch, the pick-up the fallen comrade's bundles (bundleDrop).
+let tankView=guide.View();assert.equal(tankView.target.x,FRONT_SORTIE.attackRoute[0].x);
+assert.equal(tankView.target.z,FRONT_SORTIE.attackRoute[0].z,"outward marker follows unvisited route gates");
+assert.equal(tankView.cue,"GuideFollow","the old ammo-house order (GuideBundle) is not said on the way up the branch");
+r.Has=id=>id.startsWith("bundleRoutePoint");r.player.position={...MISSION_ANCHORS.bundleDrop,y:0};
+assert.equal(guide.View().label,"collect");assert.equal(guide.View().target.z,MISSION_ANCHORS.bundleDrop.z);
 r.Has=id=>id==="bundleTaken";r.Inventory=()=>({bundles:1});
 assert.equal(guide.View().cue,"GuideThrow");
 assert.notEqual(guide.View().target.z,MISSION_ANCHORS.throw.z,"return marker follows bends instead of pointing through banks to the final throw position");

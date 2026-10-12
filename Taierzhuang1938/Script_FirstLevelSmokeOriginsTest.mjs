@@ -18,13 +18,14 @@ const root=new THREE.Group(),battlefield={StaticGroundHeight:SampleMissionTerrai
 const solids=new Set(),physics={AddSolid(c){c._physicsHandle=c;solids.add(c)},RemoveSolid(c){solids.delete(c)}};
 const materials=new Map(),library={Get(name){if(!materials.has(name))materials.set(name,new THREE.MeshStandardMaterial());return materials.get(name)}};
 const origins=new FirstLevelSmokeOrigins({root,battlefield,physics,library,actorFactory:{ModelInstance(_id,materials){return InstantiateModel(doc,{materials})}}});
-// 61 处远烟 / 路边散点 + 2 处引导地标（08 横车上的木料火、07 村北口的柴垛火）。
-// Current master terrain leaves 61 deterministic roadside/distant slots plus 2 landmarks.
-assert.equal(origins.entries.size,63);assert.equal(solids.size,63);
+// 61 处远烟 / 路边散点 + 3 处引导地标（08 横车上的木料火、07 村北口的柴垛火、2026-10-12 04 远坡上烧着的车）。
+// Current master terrain leaves 61 deterministic roadside/distant slots plus 3 landmarks.
+assert.equal(origins.entries.size,64);assert.equal(solids.size,64);
 const counts={};for(const spec of FIRST_LEVEL_SMOKE_ORIGINS)counts[spec.kind]=(counts[spec.kind]||0)+1;
-assert.deepEqual(counts,{tank:7,truck:14,timber:25,barrels:17});
+assert.deepEqual(counts,{tank:7,truck:14,timber:25,barrels:17,metal:1});
 // 地标自带 kind：不动原来按帧分配的 tank 奇偶（7 辆战车还是同样那 7 根柱子）。
 for(const id of ["StreetBlockFire","VillageMouthFire"])assert.equal(FIRST_LEVEL_SMOKE_ORIGINS.find(spec=>spec.id===id)?.kind,"timber",id);
+assert.equal(FIRST_LEVEL_SMOKE_ORIGINS.find(spec=>spec.id==="BurningTankSlope")?.kind,"metal","the far burning tank is its own wreck (Data_FirstLevelWhiteboxFront), not a prop");
 const emitters=FIRST_LEVEL_DISTANT_SMOKE.map(column=>origins.Emitter(column));
 for(let i=0;i<emitters.length;i++) {
   const emitter=emitters[i],column=FIRST_LEVEL_DISTANT_SMOKE[i],fire=emitter.options.firePosition;
@@ -46,8 +47,8 @@ for(const c of solids)for(const [id,route] of Object.entries(MISSION_ROUTES))for
 const sources=emitters.map(e=>({position:e.position,backdrop:e.options.backdrop}));
 for(const entry of origins.entries.values()) if(entry.spec.kind==="tank"||entry.spec.kind==="truck")
   for(const tree of MakeTreePlacements())assert.ok(Math.hypot(entry.position.x-tree.x,entry.position.z-tree.z)>3.2,"vehicle body clears authored tree trunks");
-assert.equal(BattleSmokeParticleBudget(sources,"low"),63);   // one full 3D field per source
-assert.equal(BattleSmokeParticleBudget(sources,"ultra"),63); // quality changes integration, not the physical shape
+assert.equal(BattleSmokeParticleBudget(sources,"low"),64);   // one full 3D field per source
+assert.equal(BattleSmokeParticleBudget(sources,"ultra"),64); // quality changes integration, not the physical shape
 assert.ok(origins.meshes.length<=origins.materials.size,"wreck geometry is merged into one mesh per material: "+origins.meshes.length);
 const triangles=origins.meshes.reduce((n,m)=>n+m.geometry.index.count/3,0);
 assert.ok(triangles<110000,"origin triangle budget: "+triangles);
@@ -59,7 +60,7 @@ const scene=new THREE.Scene(),vfx=new VfxSystem(scene,null,{quality:"low"});
 THREE.TextureLoader.prototype.load=textureLoad;
 const handles=emitters.map(e=>vfx.SmokeSource(e.position,e.options));
 await vfx.particles.Ready();vfx.Update(1/60,null,100);
-assert.equal(vfx.particles.renderer.volumes.Pool('Campfire').geometry.instanceCount,63,"every wreck owns a full simulated flame volume");
+assert.equal(vfx.particles.renderer.volumes.Pool('Campfire').geometry.instanceCount,64,"every wreck owns a full simulated flame volume");
 assert.equal(vfx.pools.fire.geometry.instanceCount,0,"ambient flames never consume combat fire slots");
 assert.equal(vfx.pools.sourceFire.geometry.instanceCount,0,"other persistent fire slots remain available");
 const flamePool=vfx.particles.renderer.volumes.Pool('Campfire');
@@ -98,7 +99,7 @@ vfx.eye.set(0,0,0);vfx.UpdateBurningLights();
 for(const handle of lightHandles)vfx.RemoveSmokeSource(handle);
 assert.equal(fireLights.size,0,'removing a burning source removes its light');
 vfx.ClearParticles();assert.equal(flamePool.geometry.instanceCount,0);
-vfx.Update(1/60,null,0);assert.equal(flamePool.geometry.instanceCount,63,"clock reset restarts all wreck flames");
+vfx.Update(1/60,null,0);assert.equal(flamePool.geometry.instanceCount,64,"clock reset restarts all wreck flames");
 for(const handle of handles)vfx.RemoveSmokeSource(handle);
 vfx.Update(1/60,null,1/60);assert.equal(flamePool.geometry.instanceCount,0,"last source removal clears flame batch");
 vfx.Dispose();origins.Dispose();
