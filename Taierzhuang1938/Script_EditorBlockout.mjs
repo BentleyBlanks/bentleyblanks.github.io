@@ -5,9 +5,12 @@
 //   读配置 → 校验（错误进状态点与提示条，配置坏了仍能走场景）→ 建界面 / 地图 / 标记 / 演员
 //   → 跳到 kf 指定的关键帧；切关走现成的 JumpToLevel（整片拆除重建）；
 //   页面可见时每 2 s 读一次配置原文，变了就按当前关键帧 id 重新摆（AI 改完 JSON、这里自动看到）；
-//   「记下当前机位」把玩家现在的位置 / 朝向 / 姿态写回当前关键帧并保存。
+//   外面改到一半（文件暂时没了、JSON 写了一半、校验不过）不换掉已经载入的配置，只亮红点报原因；
+//   玩家留在原地，只有当前关键帧的 player 改了才挪过去；
+//   「记下当前机位」把玩家现在的位置 / 朝向 / 姿态写回当前关键帧并保存（带上读配置时的版本号，§7）。
 //
-// 界面（Script_EditorBlockoutUi）与纸面俯视图（Script_EditorBlockoutMap）只走 §4 / §4.1 的接口。
+// 界面（Script_EditorBlockoutUi）与纸面俯视图（Script_EditorBlockoutMap）只走 §4 / §4.1 的接口；
+// 全关总图上的鼠标（滚轮缩放、拖动平移、双击看全图、点关键帧）归地图模块，点选经 onMapPick 回到这里。
 // 地形与水的样子（§6.3）在每次建关后补：顶点按真实高度上色、地面加米格线、水块铺成水面。
 
 import * as THREE from "three";
@@ -35,6 +38,10 @@ export const BLOCKOUT_EDITOR = Object.freeze({
   freeSpotRadius: 0.2,
   freeSpotHeight: 1.2,
   groundName: "FirstLevelWhitebox_Ground",
+  // 第一次烘纸面地图要等加载画面收掉、再跑够这么久的游戏帧：开机那阵子一起烘会卡出一帧约 290 ms
+  //（C 包实测；延后 1.5 s 就没有了）。之后切关建完就烘。
+  firstBakeDelayMs: 1500,
+  firstBakeMinFrames: 30,
 });
 
 function WrapDeg(deg) { let d = ((deg + 180) % 360 + 360) % 360 - 180; if (d === -180) d = 180; return d; }
@@ -98,12 +105,17 @@ export class EditorBlockout {
     this.doc = null;
     this.rawDoc = null;
     this.configText = null;
+    // 读配置时按原始字节算的 sha1（§7）：保存时原样带上；null = 文件当时不存在；undefined = 不知道
+    this.revision = undefined;
+    // 盘上的配置现在是坏的 / 没了，手里拿的是上一次好的：不许拿它去盖盘上的文件
+    this.staleConfig = false;
     this.configState = "loading";
     this.configMessage = "";
     this.validation = null;
     this.index = -1;
     this.signals = null;
     this.unitData = new Map();
+    this.toUnitData = null;
     this.liveUnits = [];
     this.pending = null;
     this.switching = null;
@@ -113,8 +125,19 @@ export class EditorBlockout {
     this.locked = null;
     this.mapTimer = 0;
     this.cardKey = "";
+    this.transitionKey = "";
     this.writable = null;
     this.saveReason = "";
+    // 轮询与保存的先后：每次开始 / 结束保存都 +1，轮询读回来时代数变了就丢掉这次读到的
+    this.saving = false;
+    this.saveGen = 0;
+    this.syncCount = 0;
+    this.syncRejected = 0;
+    this.lastSyncMs = null;
+    // 第一次烘纸面地图：等加载画面收掉、再跑一阵游戏帧（见 BLOCKOUT_EDITOR.firstBakeDelayMs）
+    this.firstBakeDone = false;
+    this.bakeWait = null;
+    this.bake = { startedAt: null, doneAt: null, levelKey: null };
     this._cam = new THREE.Vector3();
     this.groundAt = (x, z) => {
       const field = this.game.battlefield;
@@ -146,7 +169,6 @@ export class EditorBlockout {
       onMapPick: (index) => { this.GoTo(index, { animate: false }); },
     });
     this.BindKeys();
-    this.BindFullMap();
 
     this.api = {
       State: () => this.State(),
@@ -164,6 +186,11 @@ export class EditorBlockout {
       Stats: () => this.Stats(),
       // 取证 / 出图用：把玩家摆到任意机位（{x,z,yawDeg,pitchDeg?,stance?}），不改关键帧。
       PlacePlayer: (pose) => { this.PlacePlayer(pose); return { x: this.game.player.position.x, z: this.game.player.position.z }; },
+      // 测试用：全关总图的视图，与某个关键帧点在屏幕上的位置（客户区像素；图没开时 null）。
+      MapView: () => this.MapView(),
+      MapPoint: (idOrIndex) => this.MapPoint(idOrIndex),
+      // 测试用：标记层与俯视图正在用的单位（演员现场位置 + 关键帧数据）。
+      Marked: () => this.liveUnits.map(u => ({ id: u.id, name: u.name, side: u.side, kind: u.kind, x: u.x, z: u.z, arc: !!u.arc })),
     };
   }
 
@@ -196,28 +223,50 @@ export class EditorBlockout {
     return true;
   }
 
-  /** 读当前关卡的配置（原文 + 校验 + 归一化）。坏了也给一个能走的空配置。 */
+  /** 读当前关卡的配置（原文 + 校验 + 归一化）。这一关第一次读：坏了也给一个能走的空配置。 */
   async LoadConfig() {
     const result = await this.store.Load(this.levelKey);
-    this.ApplyLoaded(result);
+    this.ApplyLoaded(result, { keepOnError: false });
   }
 
-  ApplyLoaded(result) {
-    this.configText = result.text;
-    this.validation = null;
+  /**
+   * 换上读到的配置。→ true = 换上了；false = 没换（keepOnError 且读到的是坏的）。
+   * keepOnError：已经有一份载入的配置时（外部同步、重读），文件暂时没了 / JSON 写了一半 /
+   * 校验不过 / 一个关键帧都没有，**不换**：留着手里的配置、序号、演员与信号，只亮红点写原因，
+   * 记下这份坏原文（下一次轮询读到同一份就不再提示）。空配置只在这一关第一次读时给。
+   */
+  ApplyLoaded(result, { keepOnError = false } = {}) {
+    let check = null, normalized = null;
+    if (result.state === "ok") {
+      check = ValidateBlockout(result.doc);
+      normalized = NormalizeBlockout(result.doc);
+    }
+    const usable = !!normalized && normalized.keyframes.length > 0;
+    if (keepOnError && this.doc && (!usable || !check.ok)) {
+      this.configText = result.text ?? null;
+      this.staleConfig = true;
+      this.configState = "error";
+      const reason = result.state !== "ok" ? result.message
+        : !check.ok ? `配置有 ${check.errors.length} 处错误：${check.errors.slice(0, 2).join("；")}`
+          : "配置里一个关键帧都没有";
+      this.configMessage = `${reason}（先保留上一次读到的配置）`;
+      this.PushStatus();
+      return false;
+    }
+    this.configText = result.text ?? null;
+    this.revision = result.revision;
+    this.staleConfig = false;
+    this.validation = check;
     if (result.state !== "ok") {
       this.rawDoc = null;
       this.doc = EmptyDoc(this.level, this.phase);
       this.configState = "error";
       this.configMessage = result.message;
       this.PushStatus();
-      return;
+      return true;
     }
-    const check = ValidateBlockout(result.doc);
-    this.validation = check;
     this.rawDoc = result.doc;
-    const normalized = NormalizeBlockout(result.doc);
-    this.doc = normalized.keyframes.length ? normalized : EmptyDoc(this.level, this.phase);
+    this.doc = usable ? normalized : EmptyDoc(this.level, this.phase);
     if (!check.ok) {
       this.configState = "error";
       this.configMessage = `配置有 ${check.errors.length} 处错误：${check.errors.slice(0, 2).join("；")}`;
@@ -228,6 +277,7 @@ export class EditorBlockout {
     const sceneError = this.phase.blockout?.sceneError;
     if (sceneError) { this.configState = "error"; this.configMessage = `${sceneError}（场景退回空地）`; }
     this.PushStatus();
+    return true;
   }
 
   PushStatus(state = this.configState, message = this.configMessage) {
@@ -238,11 +288,38 @@ export class EditorBlockout {
   SetupLevel() {
     const layout = this.phase.whitebox.layout;
     this.DressWorld(layout);
+    // 文件场景每次进关都重读（可能被生成器改过），块数不变时地图的缓存认不出来：先丢掉
+    if (this.level.scene?.kind === "file") this.map.ClearCache(this.levelKey);
     this.map.SetScene({ levelKey: this.levelKey, ...BlockoutMapScene(layout, this.groundAt) });
-    this.map.Bake()?.then?.(() => { this.mapTimer = 0; });
+    if (this.firstBakeDone) this.StartBake();
+    else this.bakeWait = { frames: 0, since: null };
     this.map.FitBounds();
     this.ui.SetKeyframes(this.KeyframeList(), Math.max(0, this.index));
     this.map.SetKeyframes(this.doc.keyframes.map(kf => ({ id: kf.id, stage: kf.stage, player: { x: kf.player.x, z: kf.player.z } })), Math.max(0, this.index));
+  }
+
+  /** 烘这一关的纸面静态层（空闲分块；同一关已经烘过直接回来）。 */
+  StartBake() {
+    this.firstBakeDone = true;
+    this.bakeWait = null;
+    const levelKey = this.levelKey;
+    this.bake = { startedAt: performance.now(), doneAt: null, levelKey };
+    Promise.resolve(this.map.Bake()).then(() => {
+      if (this.bake.levelKey === levelKey) this.bake.doneAt = performance.now();
+      this.mapTimer = 0;
+    }).catch((error) => console.warn("[Blockout] map bake failed", error));
+  }
+
+  /** 第一次烘：等加载画面收掉，再跑够 firstBakeDelayMs 的游戏帧（开机那阵子一起烘会卡一大帧）。 */
+  UpdateFirstBake() {
+    const wait = this.bakeWait;
+    if (!wait) return;
+    const boot = typeof document !== "undefined" ? document.getElementById("boot") : null;
+    if ((boot && !boot.classList.contains("gone")) || !this.game.state?.running) { wait.frames = 0; wait.since = null; return; }
+    const now = performance.now();
+    if (wait.since === null) wait.since = now;
+    wait.frames += 1;
+    if (now - wait.since >= BLOCKOUT_EDITOR.firstBakeDelayMs && wait.frames >= BLOCKOUT_EDITOR.firstBakeMinFrames) this.StartBake();
   }
 
   /** §6.3：地面按真实高度的色带上色 + 米格线；水块铺成水面（白盒画质认网格名里的 water）。 */
@@ -327,6 +404,8 @@ export class EditorBlockout {
       this.markers.SetPois([]);
       this.markers.SetNext(null);
       this.unitData = new Map();
+      this.toUnitData = null;
+      this.liveUnits = [];
       // 重建期间旧配置与旧场地对不上：按键、导航栏、地图点选一律不理
       this.rebuilding = true;
       try {
@@ -362,27 +441,45 @@ export class EditorBlockout {
   }
 
   /** 重读配置（不重建场景），按当前关键帧 id 重新摆。 */
-  async Reload() {
+  async Reload({ holdPlayer = false, quiet = false } = {}) {
     const result = await this.store.Load(this.levelKey);
-    await this.Resync(result, { external: false });
-    return true;
+    if (result.state === "error") {
+      if (!quiet) this.ui.Toast(result.message, "error");
+      return false;
+    }
+    return this.Resync(result, { external: false, holdPlayer, quiet });
   }
 
-  /** 换上新读到的配置：按当前关键帧 id 重新摆（id 没了就停在原序号上）。 */
-  async Resync(result, { external }) {
-    const id = this.keyframe?.id;
-    this.ApplyLoaded(result);
+  /**
+   * 换上新读到的配置：按当前关键帧 id 重新摆（id 没了就停在原序号上）。→ true = 换上了。
+   * 读到的是坏的（文件没了、JSON 半截、校验不过）就不换，见 ApplyLoaded 的 keepOnError。
+   * 玩家留在原地；只有当前关键帧的 player 改了（或换到了别的关键帧）才挪过去。holdPlayer = 无论如何不挪。
+   */
+  async Resync(result, { external, holdPlayer = false, quiet = false }) {
+    const before = this.keyframe;
+    const id = before?.id;
+    const playerBefore = before ? JSON.stringify(before.player) : null;
+    const applied = this.ApplyLoaded(result, { keepOnError: true });
+    if (!applied) {
+      this.syncRejected += 1;
+      if (!quiet) this.ui.Toast(this.configMessage, "error");
+      return false;
+    }
     let index = id != null ? KeyframeIndex(this.doc, id) : -1;
-    if (index < 0) index = Math.min(Math.max(0, this.index), this.doc.keyframes.length - 1);
+    const sameKeyframe = index >= 0;
+    if (!sameKeyframe) index = Math.min(Math.max(0, this.index), this.doc.keyframes.length - 1);
+    const keepPlayer = holdPlayer || (sameKeyframe && JSON.stringify(this.doc.keyframes[index].player) === playerBefore);
     this.index = -1;
     this.SetupLevelLists();
-    await this.GoTo(index, { animate: false });
-    if (this.configState === "error") { this.ui.Toast(this.configMessage, "error"); return; }
-    if (!external) { this.ui.Toast("已重新读取配置", "info"); return; }
+    await this.GoTo(index, { animate: false, keepPlayer });
+    if (quiet) return true;
+    if (this.configState === "error") { this.ui.Toast(this.configMessage, "error"); return true; }
+    if (!external) { this.ui.Toast("已重新读取配置", "info"); return true; }
     this.PushStatus("synced", "配置已在外部修改，已同步");
     this.ui.Toast("配置已在外部修改，已同步", "info");
     clearTimeout(this.syncedTimer);
     this.syncedTimer = setTimeout(() => this.PushStatus(), 2500);
+    return true;
   }
 
   SetupLevelLists() {
@@ -390,18 +487,26 @@ export class EditorBlockout {
     this.map.SetKeyframes(this.doc.keyframes.map(kf => ({ id: kf.id, stage: kf.stage, player: { x: kf.player.x, z: kf.player.z } })), Math.max(0, this.index));
   }
 
-  /** 外部修改同步：页面可见时每 2 s 读一次原文，原文变了才动。 */
+  /**
+   * 外部修改同步：页面可见时每 2 s 读一次原文，原文变了才动（先比原文，不变就不解析、不算 sha1）。
+   * 保存进行中不读；读的途中开始或做完了一次保存（saveGen 变了），读回来的可能是存之前的旧文，丢掉。
+   */
   async Poll() {
-    if (this.polling || this.switching || !this.ready) return;
+    if (this.polling || this.switching || this.saving || !this.ready) return;
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
     this.polling = true;
+    const gen = this.saveGen, levelKey = this.levelKey;
     try {
-      const result = await this.store.Load(this.levelKey);
-      // 网络抖一下不算「外部修改」；切关途中读到的是上一关的
-      if (this.switching || result.state === "error") return;
+      const result = await this.store.Load(levelKey, { knownText: this.configText ?? undefined });
+      // 网络抖一下不算「外部修改」；切关途中读到的是上一关的；读的时候存过档，读到的可能是旧文
+      if (this.switching || this.saving || gen !== this.saveGen || levelKey !== this.levelKey) return;
+      if (result.state === "error" || result.state === "same") return;
       if ((result.text ?? null) === this.configText) return;
-      await this.Resync(result, { external: true });
-      this.syncCount = (this.syncCount || 0) + 1;
+      const t0 = performance.now();
+      if (await this.Resync(result, { external: true })) {
+        this.syncCount += 1;
+        this.lastSyncMs = performance.now() - t0;
+      }
     } catch (error) {
       console.warn("[Blockout] poll failed", error);
     } finally {
@@ -425,8 +530,9 @@ export class EditorBlockout {
   /**
    * 跳到某个关键帧。玩家立即传送（保留武器弹药）；animate 只在「第 i 个到第 i+1 个」时生效，
    * 其余一律直接到位。返回的 Promise 在过渡结束时 resolve。
+   * keepPlayer：玩家不动（外部同步时当前关键帧的 player 没改）。
    */
-  GoTo(idOrIndex, { animate = false } = {}) {
+  GoTo(idOrIndex, { animate = false, keepPlayer = false } = {}) {
     if (!this.doc || this.rebuilding) return Promise.resolve(false);
     const index = KeyframeIndex(this.doc, idOrIndex);
     if (index < 0) return Promise.resolve(false);
@@ -434,9 +540,11 @@ export class EditorBlockout {
     const prevKf = this.doc.keyframes[prevIndex] || null;
     const kf = this.doc.keyframes[index];
     this.ResolvePending(false);
+    // 被打断的过渡留下的「到站后的单位数据」作废：否则下一帧会把它盖到这一帧的单位上
+    this.toUnitData = null;
     this.index = index;
     this.ApplySignals(kf);
-    this.PlacePlayer(kf.player);
+    if (!keepPlayer) this.PlacePlayer(kf.player);
     this.host.camera.getWorldPosition(this._cam);
     let promise = Promise.resolve(true);
     if (animate && prevKf && index === prevIndex + 1) {
@@ -472,6 +580,7 @@ export class EditorBlockout {
     if (!this.doc || this.rebuilding || this.index <= 0) return Promise.resolve(false);
     const prevKf = this.doc.keyframes[this.index - 1], kf = this.doc.keyframes[this.index];
     this.ResolvePending(false);
+    this.toUnitData = null;
     this.host.camera.getWorldPosition(this._cam);
     this.puppets.Apply(prevKf.units, this._cam);
     return this.StartTransition(prevKf, kf);
@@ -489,8 +598,8 @@ export class EditorBlockout {
         this.markers.Flash(entry.from.x, entry.from.z, (entry.unitTo || entry.unitFrom)?.side);
       }
     }
+    // 「快进 ×n」由导航栏显示（Update 里按 puppets 的计划喂 ui.SetTransition）
     this.lastPlan = { durationS: plan.durationS, playbackRate: plan.playbackRate, wallS: plan.wallS, units: plan.units.length };
-    if (plan.playbackRate > 1.01) this.ui.Toast(`快进 ×${plan.playbackRate.toFixed(1)}`, "info");
     if (!this.puppets.transitioning) { this.unitData = this.toUnitData; this.toUnitData = null; return Promise.resolve(true); }
     return new Promise(resolve => { this.pending = resolve; });
   }
@@ -521,11 +630,15 @@ export class EditorBlockout {
     if (physics?.GroundProbe) y = physics.GroundProbe(x, z, y + 0.3, 1.2, 4).y;
     // 机位是设计者写死的（常常站在射击台阶上、贴着沙袋）：只在膝盖以上真埋进墙里时才挪，
     // 探针取细一点、矮一点的身子，脚下的矮台阶不算。
+    // 先按 0.1 m 一圈往外挪（贴墙站的机位只差几厘米，FindFreeSpot 一步就是 0.8 m），找不到再交给它。
     const { freeSpotRadius: radius, freeSpotHeight: height, freeSpotM } = BLOCKOUT_EDITOR;
-    if (physics?.Overlaps && physics.FindFreeSpot && physics.Overlaps(x, y + 0.35, z, radius, height)) {
-      const free = physics.FindFreeSpot(x, z, radius, height, freeSpotM);
-      if (free.moved >= 0) { x = free.x; z = free.z; }
-      y = free.y;
+    if (physics?.Overlaps && physics.Overlaps(x, y + 0.35, z, radius, height)) {
+      const near = this.NudgeFree(physics, x, z);
+      const free = near || (physics.FindFreeSpot ? physics.FindFreeSpot(x, z, radius, height, freeSpotM) : null);
+      if (free) {
+        if (free.moved >= 0) { x = free.x; z = free.z; }
+        y = free.y;
+      }
     }
     player.position.set(x, y, z);
     player.body?.Teleport?.(x, y, z);
@@ -535,6 +648,24 @@ export class EditorBlockout {
     player.aimPitch = 0;
     player.velocity?.set?.(0, 0, 0);
     player.SetStance?.(pose.stance || "stand");
+  }
+
+  /** 机位埋进墙里时就近挪：0.1 m 一圈、每圈 16 个方向，最多 0.7 m。→ {x,y,z,moved} | null */
+  NudgeFree(physics, x, z) {
+    const { freeSpotRadius: radius, freeSpotHeight: height } = BLOCKOUT_EDITOR;
+    const At = (px, pz) => {
+      const ground = this.groundAt(px, pz);
+      return physics.GroundProbe ? physics.GroundProbe(px, pz, ground + 0.3, 1.2, 4).y : ground;
+    };
+    for (let step = 1; step <= 7; step++) {
+      const ring = step * 0.1;
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2;
+        const px = x + Math.cos(a) * ring, pz = z + Math.sin(a) * ring, py = At(px, pz);
+        if (!physics.Overlaps(px, py + 0.35, pz, radius, height)) return { x: px, y: py, z: pz, moved: ring };
+      }
+    }
+    return null;
   }
 
   // -------------------------------------------------------------------------
@@ -551,12 +682,24 @@ export class EditorBlockout {
     this.puppets.Update(dt, this._cam);
     if (!this.puppets.transitioning && this.toUnitData) { this.unitData = this.toUnitData; this.toUnitData = null; }
     if (this.pending && !this.puppets.transitioning) this.ResolvePending(true);
+    this.UpdateTransitionBadge();
+    this.UpdateFirstBake();
     this.liveUnits = this.LiveUnits();
     this.markers.SetUnits(this.liveUnits);
     this.markers.Update(dt);
     this.UpdateCard(false);
     this.mapTimer -= dt;
     if (this.mapTimer <= 0) { this.mapTimer = 1 / BLOCKOUT_EDITOR.mapHz; this.PaintMaps(); }
+  }
+
+  /** 导航栏的「快进 ×n」（§5.2）：只在过渡状态或倍率变了时碰 DOM。 */
+  UpdateTransitionBadge() {
+    const active = this.puppets.transitioning;
+    const rate = active ? (this.puppets.plan?.playbackRate || 1) : 1;
+    const key = active ? `on|${rate.toFixed(2)}` : "off";
+    if (key === this.transitionKey) return;
+    this.transitionKey = key;
+    this.ui.SetTransition?.({ active, rate });
   }
 
   /** 演员现场位置 + 关键帧数据（标记层与俯视图都读这一份）。 */
@@ -566,7 +709,8 @@ export class EditorBlockout {
       const unit = this.unitData.get(live.id);
       if (!unit) continue;
       let arc = null;
-      if (this.layers.arcs !== "off" && this.layers.arcs !== false) {
+      // 倒地的人不画射界（俯视图同样不画）
+      if (unit.state !== "down" && this.layers.arcs !== "off" && this.layers.arcs !== false) {
         const source = unit.arc || (this.layers.arcs === "all" ? DefaultArc(unit, "all") : null);
         if (source) arc = { halfDeg: source.halfDeg, rangeM: source.rangeM,
           yawDeg: source.source === "data" ? source.yawDeg : live.yawDeg };
@@ -625,7 +769,7 @@ export class EditorBlockout {
       else this.layers[name] = !!value;
     }
     this.markers.SetLayers(this.layers);
-    this.map.SetLayers({ arcs: this.layers.arcs !== "off", intents: this.layers.intents, labels: this.layers.labels });
+    this.map.SetLayers({ arcs: this.layers.arcs, intents: this.layers.intents, labels: this.layers.labels });
     this.ui.SetLayers(this.layers);
     this.mapTimer = 0;
     return { ...this.layers };
@@ -659,46 +803,49 @@ export class EditorBlockout {
     document.addEventListener("keydown", this.onKeyDown);
   }
 
-  /** 全关总图：滚轮以光标为中心缩放、拖动平移、双击回到全图、点关键帧点跳转（图保持打开）。只挂在这块 canvas 上。 */
-  BindFullMap() {
+  // 全关总图的鼠标（滚轮缩放、拖动平移、双击看全图、点关键帧）归地图模块（§4.1）：
+  // 它在第一次 PaintFull 时挂到 ui.fullCanvas 上，点中关键帧经 blockoutmappick → BlockoutUi → onMapPick 回来。
+  // 这里不再挂第二套监听（两套并存时滚轮一格缩放两次）。
+
+  /** 测试用：全关总图的视图（没画过时 null）。 */
+  MapView() {
+    const view = this.map.view;
+    return view ? { cx: view.cx, cz: view.cz, pxPerM: view.pxPerM, open: this.mapOpen, kfIndex: this.map.kfIndex } : null;
+  }
+
+  /** 测试用：某个关键帧点在全关总图上的客户区坐标（图没开时 null）。 */
+  MapPoint(idOrIndex) {
     const canvas = this.ui.fullCanvas;
-    if (!canvas) return;
-    const Local = (event) => { const r = canvas.getBoundingClientRect(); return [event.clientX - r.left, event.clientY - r.top]; };
-    let drag = null;
-    this.mapListeners = {
-      wheel: (event) => { event.preventDefault(); event.stopPropagation(); const [x, y] = Local(event); this.map.ZoomAt(x, y, event.deltaY < 0 ? 1.2 : 1 / 1.2); this.mapTimer = 0; },
-      mousedown: (event) => { event.stopPropagation(); if (event.button !== 0) return; drag = { x: event.clientX, y: event.clientY, moved: 0 }; },
-      mousemove: (event) => {
-        if (!drag) return;
-        const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
-        drag.x = event.clientX; drag.y = event.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
-        this.map.PanBy(dx, dy); this.mapTimer = 0;
-      },
-      mouseup: (event) => {
-        if (!drag) return;
-        const click = drag.moved < 4;
-        drag = null;
-        if (!click) return;
-        const [x, y] = Local(event);
-        const index = this.map.PickKeyframe(x, y);
-        if (index >= 0) this.GoTo(index, { animate: false });
-      },
-      mouseleave: () => { drag = null; },
-      dblclick: (event) => { event.preventDefault(); this.map.FitBounds(); this.mapTimer = 0; },
-    };
-    for (const [name, fn] of Object.entries(this.mapListeners)) canvas.addEventListener(name, fn, name === "wheel" ? { passive: false } : undefined);
+    if (!this.mapOpen || !canvas || !this.doc) return null;
+    const index = KeyframeIndex(this.doc, idOrIndex);
+    if (index < 0) return null;
+    const kf = this.doc.keyframes[index], rect = canvas.getBoundingClientRect();
+    const p = this.map.WorldToScreen(kf.player.x, kf.player.z);
+    return { index, x: rect.left + p.x, y: rect.top + p.y, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } };
   }
 
   // -------------------------------------------------------------------------
   // 存档
 
-  /** 「记下当前机位」：把玩家现在的位置 / 朝向 / 姿态写进当前关键帧的 player 并保存。 */
+  /**
+   * 「记下当前机位」：把玩家现在的位置 / 朝向 / 姿态写进当前关键帧的 player 并保存。
+   * 带上读配置时的版本号（§7）：盘上的文件在这之间被人或 AI 改过，端点回 409，
+   * 这里重读一次（玩家不挪）并请用户再记一次。没存成（校验不过、存档口拒绝）就把 player 还原。
+   */
   async SavePose() {
     const kf = this.keyframe, player = this.game.player;
     if (!this.rawDoc || !kf || !player) { this.ui.Toast("没有可写的配置（先修好配置文件）", "error"); return { ok: false }; }
+    if (this.staleConfig) {
+      const reason = `配置文件现在有错，先修好再记机位：${this.configMessage}`;
+      this.ui.Toast(reason, "error");
+      return { ok: false, reason };
+    }
+    if (this.saving) return { ok: false, reason: "正在保存上一次的机位" };
     const raw = this.rawDoc.keyframes?.find(item => item?.id === kf.id);
     if (!raw) { this.ui.Toast("配置里找不到这个关键帧", "error"); return { ok: false }; }
-    const before = JSON.stringify(raw.player);
+    const hadPlayer = Object.prototype.hasOwnProperty.call(raw, "player");
+    const before = hadPlayer ? JSON.stringify(raw.player) : null;
+    const Restore = () => { if (hadPlayer) raw.player = JSON.parse(before); else delete raw.player; };
     raw.player = {
       ...(raw.player && typeof raw.player === "object" ? raw.player : {}),
       x: Round(player.position.x, 2), z: Round(player.position.z, 2),
@@ -708,21 +855,47 @@ export class EditorBlockout {
     delete raw.player.faceTo;
     const check = ValidateBlockout(this.rawDoc);
     if (!check.ok) {
-      raw.player = JSON.parse(before);
+      Restore();
       this.ui.Toast(`配置有错误，没有保存：${check.errors[0]}`, "error");
       return { ok: false, errors: check.errors };
     }
-    const result = await this.store.Save(this.levelKey, this.rawDoc);
+    this.saving = true;
+    this.saveGen += 1;
+    const levelKey = this.levelKey, rawDoc = this.rawDoc;
+    let result;
+    try {
+      result = await this.store.Save(levelKey, rawDoc, this.revision);
+    } catch (error) {
+      result = { ok: false, mode: "server", reason: `保存失败：${error?.message || error}` };
+    } finally {
+      this.saving = false;
+      this.saveGen += 1;
+    }
+    // 存的途中切了关 / 换了配置：结果只报，不再碰手里的这一份
+    if (levelKey !== this.levelKey || rawDoc !== this.rawDoc) return result;
     if (result.ok && result.mode === "server") {
       this.configText = `${JSON.stringify(this.rawDoc, null, 2)}\n`;
+      this.revision = result.revision;   // 端点按写下去的字节算的；没给就是不知道，下次保存先重读
       this.writable = true; this.saveReason = "";
       this.ui.Toast("机位已保存", "ok");
     } else if (result.ok && result.mode === "local") {
+      // 本地草稿：盘上的文件没变，手里这份带着新机位（草稿里也是它），并给一份下载
       this.writable = false; this.saveReason = result.reason || "";
       this.store.Download(this.levelKey, this.rawDoc);
       this.ui.Toast(`机位存成了本地草稿并下载了配置：${result.reason || ""}`, "warn");
+    } else if (result.conflict) {
+      Restore();
+      const reloaded = await this.Reload({ holdPlayer: true, quiet: true });
+      this.ui.Toast(reloaded
+        ? "配置文件刚在外面被改过，已经重新读取；人还在原地，请再点一次「记下当前机位」"
+        : "配置文件刚在外面被改过，重新读取没成功；等编辑器读到好的配置后再记一次机位", "warn");
+      this.PushStatus();
+      return result;
     } else {
+      Restore();
       this.ui.Toast(result.reason || "保存失败", "error");
+      this.PushStatus();
+      return result;
     }
     // 卡片、地图与之后的跳转按新机位走
     const id = kf.id;
@@ -743,7 +916,9 @@ export class EditorBlockout {
       count: this.doc?.keyframes.length ?? 0, transitioning: this.puppets.transitioning,
       units: this.puppets.puppets.size, configState: this.configState, configMessage: this.configMessage,
       mapOpen: this.mapOpen, pointerLocked: !!this.PointerLocked(), switching: !!this.switching,
-      layers: { ...this.layers }, signals: [...(this.signals || [])], syncCount: this.syncCount || 0,
+      layers: { ...this.layers }, signals: [...(this.signals || [])], syncCount: this.syncCount,
+      syncRejected: this.syncRejected, lastSyncMs: this.lastSyncMs, staleConfig: this.staleConfig,
+      revision: this.revision ?? null, saving: this.saving,
       lastPlan: this.lastPlan || null, writable: this.writable,
     };
   }
@@ -752,6 +927,12 @@ export class EditorBlockout {
     return {
       puppets: this.puppets.puppets.size, actors: this.puppets.actorCount, warning: this.puppets.warning,
       markers: { ...this.markers.stats },
+      fans: this.markers.FanInfo(),
+      map: {
+        baking: !!this.map.baking, baked: !!this.map.baked, waiting: !!this.bakeWait,
+        startedAt: this.bake.startedAt, doneAt: this.bake.doneAt, levelKey: this.bake.levelKey,
+        stats: this.map.bakeStats ? { ...this.map.bakeStats } : null,
+      },
     };
   }
 
@@ -759,8 +940,6 @@ export class EditorBlockout {
     clearInterval(this.pollTimer);
     clearTimeout(this.syncedTimer);
     document.removeEventListener("keydown", this.onKeyDown);
-    const canvas = this.ui.fullCanvas;
-    if (canvas && this.mapListeners) for (const [name, fn] of Object.entries(this.mapListeners)) canvas.removeEventListener(name, fn);
     this.ResolvePending(false);
     this.puppets.Dispose();
     this.markers.Dispose();
