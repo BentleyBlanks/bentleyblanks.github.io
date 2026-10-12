@@ -21,7 +21,7 @@ export const HAN_PINYIN = Object.freeze({
   di: "低底弟地", dian: "点", diao: "叼掉", ding: "顶盯定", diu: "丢", dong: "东动懂洞",
   dou: "抖都", du: "堵", duan: "段端断", dui: "队", duo: "多",
   en: "嗯", er: "儿二",
-  fa: "法发", fan: "饭", fang: "放方", fei: "废飞", fen: "分坟", feng: "封", fu: "扶副",
+  fa: "法发", fan: "饭", fang: "放方", fei: "废飞费", fen: "分坟", feng: "封", fu: "扶副",
   gai: "该盖", gan: "干", gang: "刚", gao: "搞高", ge: "哥个", gei: "给", gen: "跟根", gong: "拱",
   gou: "沟狗够", gu: "股", guai: "拐", guan: "官管惯", guang: "光", gui: "鬼龟", gun: "滚", guo: "过",
   ha: "哈", hai: "还", hao: "好耗", he: "何", hen: "很", hou: "后厚", hu: "护", hua: "话",
@@ -30,11 +30,11 @@ export const HAN_PINYIN = Object.freeze({
   jiu: "就旧九", jun: "君",
   ka: "卡", kai: "开", kan: "坎看槛", kao: "靠", ke: "磕壳颗瞌", ken: "肯", keng: "坑", kong: "空",
   kou: "口", ku: "裤", kuai: "快块", kun: "捆",
-  lai: "来", lao: "老", le: "了", li: "里利", lian: "连脸链练", liang: "两", ling: "令领", liu: "留榴六",
-  lu: "路", luan: "乱", luo: "罗", lv: "履",
+  lai: "来赖", lao: "老", le: "了", li: "里利", lian: "连脸链练", liang: "两", ling: "令领", liu: "留榴六",
+  lu: "路", luan: "乱", luo: "罗", lv: "履女",
   ma: "妈麻骂", mai: "卖埋", man: "慢", mang: "忙", mao: "冒", me: "么", mei: "没", men: "们门",
   mian: "面", ming: "命", mo: "莫磨摸",
-  na: "拿哪那", nan: "喃南", ne: "呢", neng: "能", ni: "你", nong: "弄",
+  na: "拿哪那", nan: "喃南", ne: "呢", neng: "能", ni: "你妮", nong: "弄",
   o: "哦",
   pa: "趴爬", pang: "旁", pao: "炮跑", peng: "棚碰", pi: "批屁", pie: "撇", po: "破",
   qi: "起气七", qian: "前牵钱", qiang: "枪墙抢", qiao: "桥", qing: "清情", qu: "去", quan: "全",
@@ -42,7 +42,7 @@ export const HAN_PINYIN = Object.freeze({
   sai: "噻", san: "散三", sao: "扫", sha: "啥", shan: "山", shang: "上伤赏", shao: "少", she: "舍",
   shen: "什", sheng: "剩声牲生省", shi: "是使事", shou: "守手收", shu: "束", shuai: "甩",
   shui: "睡", shun: "顺", shuo: "说", si: "死四撕嘶", song: "送松", suo: "嗦缩",
-  ta: "他它", tai: "抬太", tang: "躺", teng: "滕", ti: "体替", tian: "田天舔", tiao: "挑条", tie: "贴铁",
+  ta: "他它她", tai: "抬太", tang: "躺", teng: "滕", ti: "体替", tian: "田天舔", tiao: "挑条", tie: "贴铁",
   ting: "听停挺", tong: "通铜", tou: "头投", tu: "土", tuan: "团", tui: "退腿", tuo: "拖坨",
   wa: "娃挖", wai: "外", wan: "完", wang: "往", wei: "为位卫尾", wen: "问文", wo: "我握", wu: "屋伍五",
   xi: "西", xia: "下匣", xian: "先县现嫌", xiang: "箱巷想响饷", xiao: "晓小", xie: "些谢", xing: "醒行",
@@ -53,7 +53,7 @@ export const HAN_PINYIN = Object.freeze({
   zhao: "照找", zhe: "着这", zhen: "真阵", zheng: "整", zhi: "指只支", zhong: "重", zhou: "周", zhu: "住珠",
   zhuan: "转专", zhuang: "装", zhui: "追", zhun: "准", zi: "子自", zou: "走", zuan: "钻", zui: "嘴最", zuo: "左",
   // 2026-10-11 01–02 Notion 稿新出现的音节（数数、记账、嚎叫的「啊」「呃」「嘶」等）。
-  e: "呃", a: "啊", bang: "帮膀", xin: "新", yang: "样", qiu: "求", han: "汉", pei: "配", chui: "锤", que: "雀",
+  e: "呃", a: "啊", bang: "帮膀", xin: "新", yang: "样", qiu: "求", han: "汉喊", hei: "嘿", geng: "耿", pei: "配", chui: "锤", que: "雀",
 });
 
 // Mandarin initials that shape the lips before the vowel. Longest match first.
