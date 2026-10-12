@@ -138,7 +138,8 @@ assert.equal(story.length, expectedStory.size, "剧情 cue 总数与两份契约
 // TankHeard / TankArmor / BundleWhy / BundleBrief：2026-09-27 用户追加（战车怎么回事、为什么要集束弹、往哪扔），稿里标「用户追加」。
 const ORDER0305 = ["FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdraw", "TakeOverGun", "TankHeard", "TankRoadContact", "TankArmor", "TankTerror",
   "BundleOrder", "BundleGo", "BundleProne", "BundleWhy", "BundleSupply", "BundleBrief", "BundleReturnCall", "BundleAttack", "BundleRetreat", "TankStopped", "FrontRelief"];
-const ORDER06 = ["Volunteer", "BorrowLight", "ZhouLift"];
+// NierShells：2026-10-12 0311 重构 B 包（06 沟沿上捡弹壳的妮儿，担架员 / 庄稼人两句）。
+const ORDER06 = ["Volunteer", "BorrowLight", "ZhouLift", "NierShells"];
 assert.deepEqual(perLine.map((cue) => cue.id).sort(), [...new Set([...ORDER1011, ...ORDER0305, ...ORDER06])].sort(),
   "01–06 的剧情 cue 全部是逐句格式，07 以后没有");
 console.log(`ok 契约对账：01–02 共 ${ORDER1011.length} 场（10.11 改字 ${scenes1011.length} 场 + 沿用 ${unchanged1011.length} 场）、03 以后 ${contractCues.length} 条、待下线旧 cue ${RETIRE_PENDING.length} 条`);
@@ -295,6 +296,8 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
     "./Script_FirstLevelBridge.mjs", "./Script_FirstLevelNightGate.mjs",
     "./Script_OpeningStoryboards.mjs", "./Script_FirstLevelCollection.mjs",
     "./Script_FirstLevelFrontShow.mjs", "./Script_FirstLevelFrontBattle.mjs",
+    // 2026-10-12 0311 B 包：耿家四个角色（NierShells / NierFollow）与 07 沟口遭遇（MouthContact / MouthGo / MouthFlank）。
+    "./Script_FirstLevelGengFamily.mjs", "./Script_FirstLevelSouthMouth.mjs",
   ];
   const referenced = new Map();
   for (const name of RUNTIME_SOURCES) {
@@ -357,7 +360,11 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   assert.deepEqual(Emits("BunkerIncoming"), ["BunkerBlast"], "「炮弹！趴下——！」被爆炸截断的那一刻发 BunkerBlast");
   assert.ok(LineDirection(byId.get("BunkerIncoming"), 0).cutAtS < 0, "截断点在句尾之前");
   assert.deepEqual(Emits("BorrowLight"), ["BorrowLightMatchesPocketed", "BorrowLightCigaretteOffered"], "借火两处动作空当各有事件");
-  assert.ok(LineDirection(byId.get("BorrowLight"), 5).offsetS >= 1.8 && LineDirection(byId.get("BorrowLight"), 6).offsetS >= 2.8, "借火两处空当约 2 s 与 3 s");
+  assert.ok(LineDirection(byId.get("BorrowLight"), 5).offsetS >= 1.8, "借火第一处空当约 2 s");
+  // 2026-10-12 借火改两次 F（0311 契约 §3.4）：第 7 句等玩家第二次按 F（Script_FirstLevelCollection 发 BorrowLightMatchAsked），
+  // 提示词里的「约 3 s」空当留在 pauseBeforeS。
+  assert.equal(LineDirection(byId.get("BorrowLight"), 6).after, "event:BorrowLightMatchAsked", "借火第 7 句等第二次 F");
+  assert.ok(LineDirection(byId.get("BorrowLight"), 6).pauseBeforeS >= 2.8, "借火第二处空当的提示词仍约 3 s");
   // 2026-10-11 契约 §3 冻结的导演事件名（Dir01 / Dir02 按同名发）：要等动作的句子 after:"event:<名>"，其余沿用录音间隔。
   const FROZEN_EVENTS = {
     "BunkerBanter.07": "nearShell", "BunkerLedger.01": "pour", "BunkerExit.01": "exitReach", "BunkerExit.02": "clipsThrown",
@@ -573,14 +580,19 @@ const FakeAudio = () => {
     voice.Guidance("NoSuchCueAtAll"); voice.Cancel(["NoSuchCueAtAll"]); voice.Replay("NoSuchCueAtAll");
     for (const id of ["BorrowLight", "RescueFlee", "SouthWhisper"]) {
       assert.ok(voice.Enqueue(id), id + " 入队");
-      for (let i = 0; i < 9000 && !done.includes(id); i++) voice.Update(1 / 60);
+      for (let i = 0; i < 9000 && !done.includes(id); i++) {
+        voice.Update(1 / 60);
+        // 借火第 7 句等玩家第二次 F（2026-10-12 两次 F）：第 6 句发出 Line 之后一秒，模拟导演发那个事件。
+        if (id === "BorrowLight" && i === 60 * 20) voice.Signal("BorrowLightMatchAsked");
+      }
     }
   } finally { console.warn = original; }
   assert.deepEqual(done, ["BorrowLight", "RescueFlee", "SouthWhisper"], "缺录音的 cue 也要走完并 Done");
   assert.deepEqual(lines.filter((l) => l.cue === "BorrowLight").map((l) => l.index), [0, 1, 2, 3, 4, 5, 6, 7, 8], "借火九句按句序发 Line");
   assert.ok(lines.filter((l) => l.cue === "BorrowLight").every((l) => l.lineId?.startsWith("BorrowLight.")), "逐句 Line 事件带 lineId");
   // 07 以后仍是整段录音（09.21 的 01–02 整段 cue 已下线，换 07 的 SouthWhisper 测整段）。
-  assert.deepEqual(lines.filter((l) => l.cue === "SouthWhisper").map((l) => l.index), [0, 1, 2, 3, 4, 5], "07 以后的整段 cue 仍逐句发 Line");
+  // 2026-10-12：SouthWhisper 末尾加了幺娃一句（7 句）。
+  assert.deepEqual(lines.filter((l) => l.cue === "SouthWhisper").map((l) => l.index), [0, 1, 2, 3, 4, 5, 6], "07 以后的整段 cue 仍逐句发 Line");
   assert.ok(said.includes("翻译：有敌人！"), "日语行字幕是中文译文");
   assert.ok(said.every((row) => !/[぀-ヿ]/.test(row)), "字幕里不许出现假名");
   assert.ok(warnings.some((text) => text.includes("NoSuchCueAtAll")), "未知 cue 警告一次");
@@ -621,7 +633,8 @@ const FakeAudio = () => {
   assert.ok(routes.some((row) => row.who === "yaowa" && !row.firstPerson), "幺娃是世界声源");
   const plan = MissionVoiceTimeline(byId.get("SouthWhisper"), 10.8), last = plan.lines.at(-1);
   const gap = { cue: byId.get("SouthWhisper"), plan, sourceTime: (last[0] + last[1]) / 2 };
-  assert.equal(voice.Speaker(gap).who, "shunzi");
+  // 2026-10-12 起 SouthWhisper 末句是幺娃的「一个女娃儿，她懂个啥子。」。
+  assert.equal(voice.Speaker(gap).who, "yaowa");
   console.log("ok 旧整段录音的说话人路由不变");
 }
 {

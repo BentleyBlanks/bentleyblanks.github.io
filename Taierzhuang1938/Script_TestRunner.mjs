@@ -95,6 +95,9 @@ export const testDefs = {
   FirstLevelFrontTopologyTest:{file:"Script_FirstLevelFrontTopologyTest.mjs",desc:"01–06 space: K1–K11 sightlines, tank lane, route clearance, exposure rhythm, covered enemy starts, hidden entries and withdrawal gates"},
   FirstLevelFrontTest: {file:"Script_FirstLevelFrontTest.mjs",desc:"第一关阶段 1–7：分镜契约、集结处、借火、南行与演出接线（纯 Node）"},
   FirstLevelCollectionCareTest: {file:"Script_FirstLevelCollectionCareTest.mjs",desc:"06 集结处救护动作：动作库清单/循环、医护配对与老周靠墙距离对烘焙、运行时接线（纯 Node）"},
+  // 2026-10-12 0311 重构 B 包（docs/Data_FirstLevel0311Refactor20261012Contract.md §3.4–3.5 / §5.6）。
+  FirstLevelGengFamilyTest: {file:"Script_FirstLevelGengFamilyTest.mjs",desc:"06–11 耿家四个角色：§5.6 接口与签名、占位分身、沟沿捡弹壳与看枪、07 走沟沿跟队与撒腿进村、老耿 / 驴车动作、薄钩子（纯 Node）"},
+  FirstLevelSouthMouthTest: {file:"Script_FirstLevelSouthMouthTest.mjs",desc:"07 沟口遭遇：锚点 / 田埂坟包 / southMouth 组与折线、编排表、压住-抬头-冲过的纯规则、运行时薄适配与钩子（纯 Node）"},
   OpeningStoryboardsTest: {file:"Script_OpeningStoryboardsTest.mjs",desc:"01–03 source rigs, baked animation hashes, normalized poses and V3 placement"},
   OpeningActorPerformanceBrowserTest: {file:"Script_OpeningActorPerformanceBrowserTest.mjs",timeoutMs:300000,desc:"Production-rig dialogue, idle, guard movement, planted feet and high-quality acting views"},
   OpeningClipsBrowserTest: {file:"Script_OpeningClipsBrowserTest.mjs",timeoutMs:600000,desc:"2026-09-23 opening clips on production rigs: plant slide, paired contacts, body overlap, bone length, NaN"},
@@ -623,6 +626,8 @@ export const tier0Fast = [
   "FirstLevelFrontTopologyTest",
   "FirstLevelFrontTest",
   "FirstLevelCollectionCareTest",
+  "FirstLevelGengFamilyTest",
+  "FirstLevelSouthMouthTest",
   "FirstLevelTankBrainTest",
   "FirstLevelFrontPressureTest",
   "FirstLevelFrontPacingTest",
@@ -825,6 +830,8 @@ const changedDomainRules = [
   {domain:"firstLevel",pattern:/FrontStoryboardShots/},
   {domain:"openingStoryboards",pattern:/FrontStoryboardShots/},
   {domain:"firstLevel",pattern:/FirstLevelRearDoorWalk|FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontScenes|FirstLevelFrontPacing|FirstLevelFrontTopology|FirstLevelTransition/},
+  // 2026-10-12 0311 B 包：耿家四个角色与 07 沟口遭遇（两个纯 Node 门在 tier0Fast）。
+  {domain:"firstLevel",pattern:/FirstLevelGengFamily|FirstLevelSouthMouth/},
   // 2026-09-23 01–06 space rebuild: keyframe table and the static probe the space gate reads.
   {domain:"firstLevel",pattern:/FirstLevelSpaceKeyframes|FirstLevelSpaceProbe|FirstLevelSpaceMap|FirstLevelSpaceShots|FirstLevelSpaceSouthFingerprint|Data_FirstLevelFrontBreakables/},
   {domain:"firstLevel",pattern:/FirstLevelZhouExit/},

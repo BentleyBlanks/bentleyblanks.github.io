@@ -33,6 +33,7 @@ import { COLLECTION_CARE_CLIPS as CARE, CareMedicSpot, CarePatientClip } from ".
 import { LoadCollectionCareAnimation, CollectionCareLibrary, CareClipDuration, InstallCareClips, RemoveCareClips,
   DressMedic, DressWound, StrawMaterial } from "./Script_CollectionCareAnimation.mjs";
 import { T } from "./Script_Text.mjs";
+import { INTERACT } from "./Data_Tuning_Interact.mjs";
 
 /** 借火那一段的姿态顺序（State().borrow 按这个序列记，测试照它对账）。 */
 export const BORROW_POSE_ORDER = Object.freeze(["ask", "pat", "pocket", "offer", "light", "share", "wince"]);
@@ -109,6 +110,12 @@ export class FirstLevelCollection {
     }));
     this.bearerCloseAt = null;
     this.borrowSaid = false;
+    // 2026-10-12 借火改两次 F（0311 契约 §3.4）：第一次 F 开 BorrowLight 1–6 句；老周掏烟递出（offered）后第二次 F
+    //（matchAsked）发 BorrowLightMatchAsked，7–9 句与划火才接着来。borrowCued = 玩家站在他跟前脸朝着他（提示才亮）。
+    this.borrowCued = false;
+    this.offered = false;
+    this.matchAsked = false;
+    this.borrowInteraction = null;
     // 06 老周：靠在土壁边半躺的活人身体（带脸），抬上担架时换回烘焙躺姿（见 SeatZhou）。
     this.seated = null;
     this.zhouWinceAt = null;
@@ -282,6 +289,9 @@ export class FirstLevelCollection {
     soldier.speakerRole = "zhou";
     soldier.scriptEssential = true;
     soldier.missionUntargetable = true;
+    // 他的枪在 04 就交给了何有田，弹药为 0 会让 F 变成「给老周分一个桥夹」（Script_Interact 的活人分弹候选，
+    // 内建优先级压过借火的交互点）：按满，借火的 F 才是借火。
+    soldier.ammo = Math.max(soldier.ammo || 0, soldier.weapon?.magazine || 5);
     soldier.yaw = FirstLevelCollection.SeatYaw();
     // 准星认人读 identity.name / age：他是「老周」（字幕同一张表），年龄与 03–05 枪上那一副同一个数（B.zhouAge）。
     soldier.identity = { ...soldier.identity, name: MISSION_VOICE_CAST.zhou?.[0] ?? soldier.identity?.name, age: B.zhouAge };
@@ -332,6 +342,7 @@ export class FirstLevelCollection {
   }
   OnEvent(id) {
     if (id === "BorrowLightMatchesPocketed" || id === "BorrowLightCigaretteOffered") this.borrowEvents.add(id);
+    if (id === "BorrowLightCigaretteOffered") this.offered = true;
   }
   Pose(action) {
     const r = this.r, zhou = r.column.zhou;
@@ -374,15 +385,49 @@ export class FirstLevelCollection {
   }
 
   /**
-   * 借火那一段该不该开播。Notion 06：老周靠在土壁边摸兜找火，
-   * 「**看见顺子经过**」才开口 —— 所以要玩家真的走到他跟前、脸朝着他。
+   * 借火那一段能不能开。Notion 06：老周靠在土壁边摸兜找火，「**看见顺子经过**」才开口 —— 所以要玩家真的走到他跟前、
+   * 脸朝着他；2026-10-12 起再加一道 F（契约 §3.4「借火改两次 F」）：站到跟前只亮提示，按 F 才开口。
    */
   UpdateBorrowCue() {
     const r = this.r;
-    if (this.borrowSaid || !r.Has("volunteerHeard")) return;
+    this.borrowCued = false;
+    if (this.matchAsked || !r.Has("volunteerHeard")) return;
     if (!BorrowLightCued(r.player.position, r.column.zhou, r.player.yaw)) return;
+    this.borrowCued = true;
+  }
+  /** 第一次 F：BorrowLight 1–6 句（FrontScenes 的逐句场景）。 */
+  BorrowFirstF() {
+    const r = this.r;
+    if (this.borrowSaid || !this.borrowCued) return false;
     this.borrowSaid = true;
     r.Say("BorrowLight");
+    return true;
+  }
+  /** 第二次 F：老周递出烟之后，划火递过去 —— 放 7–9 句（导演表 BorrowLight.07 等 BorrowLightMatchAsked）。 */
+  BorrowSecondF() {
+    const r = this.r;
+    if (!this.borrowSaid || !this.offered || this.matchAsked) return false;
+    this.matchAsked = true;
+    r.voice?.Signal?.("BorrowLightMatchAsked");
+    r.Record?.("matchAsked");
+    return true;
+  }
+  /** 老周跟前的交互点（单击 F，两次）：第一次借火，第二次划火递过去。 */
+  EnsureBorrowInteraction() {
+    const r = this.r;
+    if (this.borrowInteraction || !r.interact?.Register) return;
+    const zhou = r.column.zhou;
+    this.borrowInteraction = r.interact.Register({
+      id: "MissionBorrowLight", tag: "FirstLevelMission", kind: "interact",
+      position: r.Point(Place.collection.zhouWall, 0.9),
+      Anchor: () => r.Point(zhou, 0.9),
+      label: () => T(this.borrowSaid ? "firstLevel.interaction.borrowLightShare" : "firstLevel.interaction.borrowLight"),
+      Enabled: () => r.flow?.stage?.id === "Orders" && this.borrowCued && (!this.borrowSaid || (this.offered && !this.matchAsked)),
+      OnComplete: () => (this.borrowSaid ? this.BorrowSecondF() : this.BorrowFirstF()),
+      // 集结处的补给箱（MissionSupplyOrders）离借火位只有 1.1 m：脸朝着老周时借火压过它（实拍 2026-10-12 第一次 F 吃进了补给）。
+      priority: INTERACT.pointPriority + 1,
+      gesture: "tap", reachM: F.borrowTriggerM, heightM: 2.5, facingDot: null, once: false,
+    }) || true;
   }
   /**
    * 抬老周那两个担架员：对白期间在 borrowClearRadiusM 外等着，不挤进两人中间；
@@ -419,6 +464,7 @@ export class FirstLevelCollection {
     // 贴着土壁、脸朝经过的玩家 —— 不许横在路当中（集成方 2026-09-20 的口径）。
     if (!r.Has("zhouOnLitter"))
       zhou.yaw = Math.atan2(r.player.position.x - zhou.x, r.player.position.z - zhou.z);
+    this.EnsureBorrowInteraction();
     this.UpdateBorrowCue();
     this.UpdateLiftBearers(dt);
     // 借火演完，担架员才开口催（ZhouLift 播完 → zhouOnLitter）。
@@ -541,6 +587,7 @@ export class FirstLevelCollection {
       runner: this.runner?.actor?.alive ? { x: this.runner.actor.position.x, z: this.runner.actor.position.z } : null,
       borrow: BORROW_POSE_ORDER.filter((action) => this.poses.has(action)),
       borrowSaid: this.borrowSaid,
+      borrowCued: this.borrowCued, offered: this.offered, matchAsked: this.matchAsked,
       liftBearers: this.liftBearers.map((bearer) => ({ id: bearer.id, x: +bearer.x.toFixed(2), z: +bearer.z.toFixed(2) })),
       zhouParked: this.zhouParked,
       zhouLifted: this.zhouLiftAt != null,

@@ -47,6 +47,10 @@ export const MISSION_VOICE_CAST = Object.freeze({
   officer: ["桥头军官", "四川军官，隔着桥面喊话，命令清楚有权威"],
   usher: ["带路军人", "夜里带路的四川男兵，扯着嗓子招呼人跟上"],
   crowd: ["有人", "现场不具名的四川男声，隔着人群远远喊出来"],
+  // 2026-10-12 03–11 重构（契约 §5.2）：老耿与庄稼人是鲁南本地人，北方官话占位（用户之后按耿家庄口音改）。
+  // 妮儿听不见、不说话，不进对白表：叫声 / 笑声走音效 cue（Script_FirstLevelGengFamily）。
+  geng: ["老耿", "六十出头的鲁南庄稼汉，赶驴车的；嗓子干硬、嘴硬抠门，帮人从不说是帮；北方官话（鲁南口音），不说四川话"],
+  peasant: ["庄稼人", "鲁南本地的中年庄稼人，北方官话（鲁南口音），在集结处旁边搭话，不急不吼，像说邻家的事"],
 });
 const Cue = (id, lines, extra = {}) =>
   Object.freeze({
@@ -276,7 +280,23 @@ export const MISSION_DIALOGUE = Object.freeze([
   ], {
     delivery: "担架员过来催，例行公事的大嗓门；老周含着烟说话，含混、赖着不肯动，最后一句是嘟囔给自己听的。",
   }),
+  // 2026-10-12 03–11 重构 B 包（契约 §3.4 / §5.2）：洼地东北沟沿上蹲着捡弹壳的妮儿，担架员冲她喊，旁边的庄稼人搭话。
+  // 第二句是鲁南北方官话占位（用户之后按耿家庄口音改）。
+  PerLine("NierShells", [
+    ["bearer", "哪家的娃儿！下来！那上头吃枪子的！"],
+    ["peasant", "老耿家的妮儿。喊不应的，你别费那个劲。"],
+  ], {
+    delivery: "担架员隔着十几米冲坡上的女娃喊，例行公事的大嗓门，带点急；庄稼人在旁边不紧不慢地接一句，像说邻家的事，北方官话，不是四川话。",
+  }),
   // 07 沿沟南行
+  // 2026-10-12 03–11 重构 B 包（契约 §3.5 / §5.2）：沟里幺娃丢弹壳逗沟沿上跟着的妮儿；SouthWhisper 在它之后。
+  Cue("NierFollow", [
+    ["yaowa", "顺哥，那个女娃儿还跟到起。"],
+    ["shunzi", "路又不是你屋头的。"],
+    ["yaowa", "嘿，还赖上了。"],
+  ], {
+    delivery: "两人走在沟里压低声音说，幺娃回头瞟沟沿上那个女娃，带笑；顺子懒洋洋地顶他一句；幺娃第二句是笑着说的，说完顺手把一颗弹壳丢上沟沿逗她。",
+  }),
   Cue("SouthWhisper", [
     ["yaowa", "你抢着来干啥子？"],
     ["shunzi", "不来，留上头挨炸？"],
@@ -284,8 +304,27 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["shunzi", "人交给他们，老子就不回来了。"],
     ["yaowa", "你来真的？"],
     ["shunzi", "你龟儿小声点。"],
+    // 2026-10-12（契约 §5.2）：原六句不改字，末尾加一句 —— 第 5→6 句之间顺子抬头看沟沿上的妮儿。
+    ["yaowa", "一个女娃儿，她懂个啥子。"],
   ], {
-    delivery: "两人并肩走在队伍里压低声音说话，全程气声偏多但每个字都要听清，脚步节奏一直在。幺娃越问越不安；顺子第四句是真话说漏了嘴，说完自己也一顿；最后一句立刻把话按住，眼睛还在瞟前头。",
+    delivery: "两人并肩走在队伍里压低声音说话，全程气声偏多但每个字都要听清，脚步节奏一直在。幺娃越问越不安；顺子第四句是真话说漏了嘴，说完自己也一顿；第六句立刻把话按住，眼睛瞟向沟沿上跟着的女娃；幺娃最后一句顺着他的眼睛看过去，小声、带点不屑，又像是替自己宽心。",
+  }),
+  // 07 沟口遭遇（Script_FirstLevelSouthMouth）：东边田埂上的机枪一响，担架停在沟口；压住了担架才冲；绕村的两个露头时刘文财喊。
+  Cue("MouthContact", [
+    ["heyoutian", "东边！机枪！"],
+    ["luo", "担架莫动！顺子，压住它！"],
+  ], {
+    delivery: "何有田在沟口土坎上第一个看见东边田埂冒火，急喊；罗班长紧接着下令，两句都短、砸下来，隔着机枪声要听清。",
+  }),
+  Cue("MouthGo", [
+    ["luo", "压住了！担架，跑！"],
+  ], {
+    delivery: "罗班长看见田埂上的机枪缩下去了，回头冲沟里的担架吼，一口气喊完，急。",
+  }),
+  Cue("MouthFlank", [
+    ["liuwencai", "有人往村里绕！"],
+  ], {
+    delivery: "刘文财在队尾看见两个日军往南绕村子，急促报警，一句话，不拖。",
   }),
   Cue("VillagePointer", [
     ["crowd", "过了村子就是桥头接运点！能走的自己跟上，担架别掉队！"],
@@ -628,8 +667,9 @@ const SOUNDSCAPE_ZONES = Object.freeze({
   FrontApproach:"front",FrontAttack:"front",FrontWithdraw:"front",TankRoadContact:"front",BundleAttack:"bundle",BundleRetreat:"bundle",FrontRelief:"front",
   FrontBlockade: "front", TakeOverGun: "front", TankTerror: "front", BundleOrder: "front", TankHeard: "front", TankArmor: "front",
   BundleGo: "bundle", BundleProne: "bundle", BundleWhy: "bundle", BundleBrief: "bundle", BundleSupply: "bundle", BundleReturnCall: "bundle", TankStopped: "bundle",
-  Volunteer: "collection", BorrowLight: "collection", ZhouLift: "collection",
+  Volunteer: "collection", BorrowLight: "collection", ZhouLift: "collection", NierShells: "collection",
   SouthWhisper: "southWalk", VillagePointer: "southWalk",
+  NierFollow: "southWalk", MouthContact: "southWalk", MouthGo: "southWalk", MouthFlank: "southWalk",
   StreetBlocked: "village", KitchenDetour: "village",
   MeleeRight: "village", MeleeCurse: "village", WindowOrder: "village",
   CourtyardOpen: "courtyard", TwoLitters: "courtyard", LastLitter: "courtyard",

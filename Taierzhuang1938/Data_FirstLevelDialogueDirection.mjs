@@ -329,11 +329,18 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "05": P("low", 0.35, { emit: [{ id: "BorrowLightMatchesPocketed", at: "end" }] }),
     // 两处动作空当：第五句后顺子把火柴往兜里一收（约 2 s）、第六句后老周摸出烟包递一根过去（约 3 s）。
     "06": P("low", 0.5, { delivery: "江湖油子的腔调，半是占便宜半是让步，压着嗓子但有笑意", offsetS: 2.0, emit: [{ id: "BorrowLightCigaretteOffered", at: "end" }] }),
-    "07": P("normal", 0.4, { offsetS: 3.0 }), "08": P("normal", 0.6, { delivery: "江湖油子的腔调，故意挑理，带笑，尾音上挑" }), "09": P("low", 0.35),
+    // 2026-10-12 借火改两次 F（0311 契约 §3.4）：老周递出烟（BorrowLightCigaretteOffered）之后等玩家第二次按 F
+    //（Script_FirstLevelCollection 发 BorrowLightMatchAsked），7–9 句与划火才接着来。提示词里仍是「约 3 s」的动作空当。
+    "07": P("normal", 0.4, { after: "event:BorrowLightMatchAsked", offsetS: 0.4, pauseBeforeS: 3 }), "08": P("normal", 0.6, { delivery: "江湖油子的腔调，故意挑理，带笑，尾音上挑" }), "09": P("low", 0.35),
   }),
   ZhouLift: Scene(true, "担架员走到老周跟前催他上担架，例行公事的大嗓门；老周含着刚点着的烟，含混、赖着不肯动，最后一句是嘟囔给自己听的", {
     "01": P("shout", 0.6), "02": P("low", 0.35, { delivery: "含着烟，含混" }), "03": P("shout", 0.6),
     "04": P("breath", 0.3, { delivery: "嘟囔" }),
+  }),
+  // 2026-10-12 03–11 重构 B 包（契约 §3.4）：洼地东北沟沿上蹲着捡弹壳的女娃，担架员隔着十几米冲她喊，庄稼人在旁边接一句。
+  NierShells: Scene(true, "背坡伤员集结处。洼地东北角的沟沿上蹲着一个女娃在捡弹壳，一个担架员站在洼地里隔着十几米冲坡上喊她下来；她不理。旁边一个鲁南本地的庄稼人不紧不慢地接一句，北方官话", {
+    "01": P("shout", 0.7, { spatial: "head", delivery: "例行公事的大嗓门，带点急，冲坡上喊；喊完等了一下她没反应" }),
+    "02": P("normal", 0.4, { pauseBeforeS: 1.2, context: "看了一眼坡上的女娃，又看了一眼喊话的担架员", delivery: "不紧不慢，像说邻家的事；北方官话（鲁南口音），不是四川话；「喊不应的」说得笃定" }),
   }),
 });
 

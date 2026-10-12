@@ -452,5 +452,7 @@ export const SOLDIER_MESH_BY_KIND = {
  * 分身**不是新 kind**：AI、伤害、误伤判定全都只认 "civilian" 这一个 kind。
  */
 export const ACTOR_MESH_BY_VARIANT = {
-  civilian: { male: "CivilianMale", female: "CivilianFemale" },
+  // girl：2026-10-12 0311 重构的占位分身（契约 §1.9）—— 妮儿 = CivilianFemale 整体缩放 0.62
+  //（缩放在 Script_Actor 的 KIND_SPEC.civilian.variants.girl），不是 childGirl 那套程序化方块小孩。
+  civilian: { male: "CivilianMale", female: "CivilianFemale", girl: "CivilianFemale" },
 };

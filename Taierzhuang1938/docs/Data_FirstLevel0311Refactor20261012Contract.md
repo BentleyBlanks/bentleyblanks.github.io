@@ -207,6 +207,23 @@ export class FirstLevelGengFamily {
 
 C 只能**加方法**（如 `CartBlockGate()`），不改已有签名；B 把这些状态都放进 `runtime.Debug.FirstLevelMission().gengFamily` 供驾驶脚本与测试读。
 
+B 包实现时的增补（2026-10-12，只加不改上面的签名）：
+
+```js
+  get peasant()                   // 06 洼地沟沿上搭话的庄稼人（NierShells 第二句），07 起收走
+  get cartState()                 // 驴车裸数据 { x, z, yaw, travel, moving, blocking, target, animal }
+  SetCartBlocking(bool)           // cart.blocking 的写口（CartTo 不改它）
+  OnLine(cueId, index)            // 逐句事件：NierFollow.03 幺娃丢弹壳、SouthWhisper.06 顺子抬头看她（运行时 VoiceEvent 转来）
+  OnMouthContact()                // 07 机枪一响：撒腿沿 southWalk 跑进村北巷 R.geng.villageRefuge（Script_FirstLevelSouthMouth 调）
+  VoicePosition(cue, line)        // NierShells 两句的发声位置（担架员 / 庄稼人）
+  Leave() / State() / Dispose()
+  // 模块级：GENG_IDS（missionId）、NIER_SHOUT_CUE（妮儿叫声 / 笑声的占位 cue，素材侧登记 nier_shout 后只改这一处）、
+  // RimSide / ShellLandingPoint / MuzzlePoint / FaceYaw / PlayerYawTo（纯函数，测试用）
+```
+
+`Enter(stepId)` 在运行时 `Enter(stage)` 里对每一步各调一次（Orders 起妮儿与庄稼人；South 跟队；Village/Melee/Courtyard/TransferApproach 起老耿与驴车的占位），
+C 包不必再在自己的 case 里补钩子。老耿与驴车的起点占位在 `Data_Tuning_FirstLevel.geng.gengHouse / cartYard`，C 包按村子的锚点改。
+
 ## 6. 概念图对应（验收截图要对得上）
 
 | 站 | 概念图 | 截图里必须成立 |
@@ -237,3 +254,4 @@ Regroup 夹具 17 幺娃够不到老周卡死；MenuTest 副标题；SmokeOrigin
 ## 9. 变更记录
 
 - 2026-10-12 契约 v1：集成负责人按改稿冻结；第一波 A（Front）∥ B（Rear + 耿家）并行，第二波 C（Village），第三波 D（Voice）。
+- 2026-10-12 B 包（Rear 06–07 + 耿家）结果：新 `Script_FirstLevelGengFamily` / `Script_FirstLevelSouthMouth`（+ 两个纯 Node 门），06 借火两次 F、妮儿沟沿捡弹壳 / 看枪 / 跟队 / 撒腿进村，07 沟口遭遇（`southMouth` 组由 `southMouthReached` 放出、压住 ≥ 2 s 担架才跑、会再抬头），沟口东侧 5 块白盒掩体（07+ 指纹已重生）。与契约的偏差：① `A.southMouth` 取在真正的出坡起点 (−8,−36)（契约写的 ≈(−16,−52) 是沟身拐点，不是沟口），停点 (−13.4,−46.7) 在南口前 12 m；`A.mouthEmbankment` 取 (15.2,−44.9)（契约 ≈(12,−42)，离南口 24 m）；② 06/07 的驾驶与 07 时长断言在 `Script_FirstLevelCampaignFront`（A 包独占文件）的 06/07 两块里改，A 包的 03–05 块没碰；`Script_FirstLevelFrontTest` 的 South requirements 一行同步；③ 妮儿按契约 0.62 缩放约 0.99 m 高（十一岁偏矮，`R.geng.nierScale` 一处可调）；④ 新增 `Script_Actor.KIND_SPEC.civilian` 的 `girl` 分身与 `pickable` 随机池（缩放只能在那张表里给）；⑤ `nier_shout` 暂用 `hitGrunt` 抬音高占位。留给集成：`index.html` import map 登记两个新模块并抬戳（ModuleGraphTest 现红）、重跑 `Font/Script_FontSubset.py`（新文案 8 个字：嘿 她 妮 懂 稼 耿 赖 阔，TextTest 的字体两项现红）、Voice 包录 NierShells / NierFollow / MouthContact / MouthGo / MouthFlank / SouthWhisper 第 7 句与 geng / peasant 定妆。

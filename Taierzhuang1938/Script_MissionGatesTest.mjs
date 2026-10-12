@@ -102,7 +102,8 @@ for (const stage of MISSION_STAGES)
 checks += 1;
 // 98 = 96 + leftGunHandover、zhouLeftGun（契约 §2.6：03 改为「何有田接枪 + 老周离枪 ≥10 m」，zhouGunWounded 挪到 05）。
 // 97：2026-09-28 tankBlocksExit 不再是 04 的过关条件（门还在，只是不挡阶段）。
-Check(requirementFacts.length === 97, `requirements 事实共 97 条，实际 ${requirementFacts.length}`);
+// 98：2026-10-12 0311 B 包，07 加 mouthCrossed（担架真的过了沟口开阔地）。
+Check(requirementFacts.length === 98, `requirements 事实共 98 条，实际 ${requirementFacts.length}`);
 
 const KINDS = new Set(["proximity", "proximityFamily", "interior", "voice", "interaction",
   "combat", "column", "cutscene", "scripted", "timer"]);
@@ -159,7 +160,7 @@ for (const [cue, factId] of Object.entries(MISSION_VOICE_FACTS)) {
 }
 checks += 1;
 // 09.19 契约 §5 的 23 条减去 09.23 契约 §5.2 下线的 RescueCall（rescueCallHeard 改由导演记）。
-Check(Object.keys(MISSION_VOICE_FACTS).length === 22, "对白事实共 22 条（契约 §5，RescueCall 已下线）");
+Check(Object.keys(MISSION_VOICE_FACTS).length === 23, "对白事实共 23 条（契约 §5，RescueCall 已下线；2026-10-12 0311 B 包加 NierFollow→nierFollowHeard）");
 Check(MISSION_FACT_GATES.rescueCallHeard?.kind === "scripted" && !("RescueCall" in MISSION_VOICE_FACTS), "rescueCallHeard 由开场导演记");
 
 // ---------------------------------------------------------------------------

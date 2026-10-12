@@ -63,18 +63,21 @@ export const MISSION_STAGES = Object.freeze([
     ["bundleRouteTraversed", "bundleTaken", "bundleReturned", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned", "zhouGunWounded"],
     "BundleGo",
   ),
+  // 2026-10-12 03–11 重构（契约 §5.5）：任务字只写看得见的东西。06 requirements 不变（matchAsked / nierSeen 是内部事实）。
   Stage(
     "Orders",
-    "回伤员集结处接令，带老周离开阵地。",
+    "回集结处接令。",
     A.collection,
     ["ordersReached", "volunteerHeard", "lightShared", "zhouOnLitter", "columnDeparted"],
     "Volunteer",
   ),
+  // 07：沟口遭遇（Script_FirstLevelSouthMouth）—— mouthCrossed = 活着的担架全部过了开阔地进村北巷；
+  // 沟口那一段的任务字由 SOUTH_MOUTH_OBJECTIVES 切换。
   Stage(
     "South",
-    "护送伤员向南，抵达村口。",
+    "护送伤员向南，跟住班长。",
     A.village,
-    ["southWhisperHeard", "villageMouthReached", "mainStreetPointed"],
+    ["southWhisperHeard", "mouthCrossed", "villageMouthReached", "mainStreetPointed"],
     "SouthWhisper",
   ),
   Stage(
@@ -294,6 +297,19 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "BridgeNorthB", x: A.bridgeEnemy.x + 7, z: A.bridgeEnemy.z - 3 },
     { id: "BridgeNorthC", x: A.bridgeEnemy.x + 2, z: A.bridgeEnemy.z - 5 },
   ],
+  // ---- 0311 B Rear ----
+  // 07 沟口遭遇（docs/Data_FirstLevel0311Refactor20261012Contract.md §3.5 / §5.3）：东头突破进来的一个班 6 人，
+  // 从东北 60 m 外（南田房 SouthFieldHouse 北面，从沟口看被房挡住）赶来：MouthGunner 架在东侧白盒田埂 A.mouthEmbankment
+  // 上打沟口外的空地，MouthRifleA–C 各占一道田埂 / 坟包，MouthFlankA/B 往南绕到村北口的乱石墙后想抢先进村。
+  // 由 southMouthReached 这条事实放出（Script_FirstLevelSouthMouth），折线在 MISSION_TACTICS（fact 门控）。
+  southMouth: [
+    { id: "MouthGunner", x: 71.0, z: -67.5, weapon: "Type11", hold: true },
+    { id: "MouthRifleA", x: 75.5, z: -69.5 },
+    { id: "MouthRifleB", x: 70.0, z: -72.5 },
+    { id: "MouthRifleC", x: 76.0, z: -75.0 },
+    { id: "MouthFlankA", x: 80.5, z: -70.5, bayonet: true },
+    { id: "MouthFlankB", x: 84.0, z: -74.5, bayonet: true },
+  ],
 });
 // 12 只有两处威胁（契约 §2/§4）：先是压向装载区的 transfer，解除之后才是侧巷的 transferAlley。
 // 每解除一处，接运真实推进一批。旧的四拍守波次（MISSION_TRANSFER_BEATS）已下线。
@@ -312,7 +328,8 @@ export const MISSION_GUIDANCE = Object.freeze({
   Support:{label:'support',route:'support'},
   MachineGun:{label:'front'},Tank:{label:'bundle',route:'bundle'},
   Orders:{label:'orders',route:'collectionReturn'},
-  South:{label:'south',route:'southWalk'},Village:{label:'village',route:'village'},
+  // 0311 B：沟口接火到担架过完开阔地之间，标签指东边田埂上的机枪（mouthLabel；运行时 CurrentGuide 按两条事实切）。
+  South:{label:'south',route:'southWalk',mouthLabel:'mouth'},Village:{label:'village',route:'village'},
   Courtyard:{label:'gate',route:'courtyardBypass'},
   TransferApproach:{label:'transfer',route:'village'},Transfer:{label:'transferWall'},
   CartRide:{label:'cart',route:'cartRide'},AirFirst:{label:'transfer'},
@@ -382,6 +399,27 @@ export const MISSION_TACTICS = Object.freeze({
   BridgeNorthA: { delay: 2, points: [{x:-74,z:80},{x:-76,z:84}] },
   BridgeNorthB: { delay: 6, points: [{x:-72,z:76.5},{x:-74,z:80}] },
   BridgeNorthC: { delay: 10, points: [{x:-68,z:72},{x:-72,z:78}] },
+  // ---- 0311 B Rear ----
+  // 07 沟口遭遇：全组先绕过南田房北面的 (51,−68) 再散开（直线腿不能穿房）；每人最后一点是他趴的掩体后面
+  //（白盒田埂 / 坟包的东北面，Data_FirstLevelWhiteboxRear 的 Mouth*；绕村那两个到村北口乱石墙 / 草垛北面）。
+  // fact 门控：记下 southMouthReached 才动；跑步穿田（mps 3.2）、折点不停（holdS 0），到最后一点转守区（contact）。
+  MouthGunner: { fact: "southMouthReached", delay: 0.5, mps: 3.0, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:22,z:-56}, {x:15.2,z:-44.9}] },
+  MouthRifleA: { fact: "southMouthReached", delay: 1.2, mps: 3.2, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:30,z:-52}, {x:27.2,z:-49.2}] },
+  MouthRifleB: { fact: "southMouthReached", delay: 2.0, mps: 3.2, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:20,z:-60}, {x:9.6,z:-59.6}] },
+  MouthRifleC: { fact: "southMouthReached", delay: 2.8, mps: 3.2, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:40,z:-50}, {x:27.4,z:-39.4}] },
+  MouthFlankA: { fact: "southMouthReached", delay: 3.5, mps: 3.2, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:50,z:-50}, {x:44,z:-36}, {x:39.2,z:-27.3}] },
+  MouthFlankB: { fact: "southMouthReached", delay: 4.5, mps: 3.2, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:48,z:-52}, {x:44,z:-38}, {x:34.6,z:-29.6}] },
+});
+// 07 沟口那一段的任务字（契约 §5.5：只写看得见的东西）；Script_FirstLevelSouthMouth 在 mouthContact / mouthCrossed 两刻切换。
+export const SOUTH_MOUTH_OBJECTIVES = Object.freeze({
+  mouth: "压住东边机枪，掩护担架冲过空地。",
+  crossed: "护送伤员向南，跟住班长。",
 });
 export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   id: "FirstLevelP012Whitebox",
