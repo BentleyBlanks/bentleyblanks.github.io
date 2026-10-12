@@ -30,7 +30,7 @@ export const MAP_COLORS = Object.freeze({
   roof: RGB(203, 194, 175),      // 屋面：浅墨铺底（墙压在上面）
   water: RGB(152, 187, 207),     // 水
   foliage: RGB(122, 136, 88),    // 树 / 苇
-  road: RGB(244, 240, 229),      // 路面
+  road: RGB(244, 240, 229),      // 路面 / 桥面
   contour: RGB(126, 96, 62),     // 等高线
   cut: RGB(158, 116, 70),        // 开挖水洗
   ink: RGB(38, 35, 31),          // 描边 / 路线 / 文字
@@ -64,6 +64,7 @@ const SKIP_SEMANTICS = new Set(["airWall", "void", "coping"]);
 const LOW_MAX_H = 1.4;
 const MIN_H = 0.35;
 const OVERHEAD_M = 1.5;
+const DECK_LIFT_M = 4;
 
 const FONT_STACK = '"TzUiLatin", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "TzUiSans", sans-serif';
 const MONO_STACK = '"Cascadia Mono", Consolas, ui-monospace, monospace';
@@ -98,6 +99,8 @@ function CanvasAngle(yawDeg) {
  * 规则见 §4.1：airWall / void / coping 与 0.35 m 以下的碎块不画；矮掩体（高 ≤ 1.4 m）中灰，其余深墨；
  * 屋面铺浅墨底（让房子读得出是房子），水淡蓝，树 / 苇橄榄色。不挡人的装饰件（solid: false）不画；
  * 给了 y 且底面高出地面 1.5 m 以上的（门楣、梁）不画，免得把门口画死。
+ * 薄板（< 0.35 m）一般不画，例外是架空的实心板：标了 walkable / deck 的、或离地 ≥ 4 m 的是桥面（"deck"，
+ * 浅色带墨边），离地 1–4 m 的是棚顶 / 屋顶板（按屋面铺底）。
  */
 export function ClassifyBlock(block, groundAt = null) {
   if (!block) return "skip";
@@ -107,7 +110,15 @@ export function ClassifyBlock(block, groundAt = null) {
   if (sem === "water") return "water";
   if (sem === "roof") return block.w * block.d >= 1.5 ? "roof" : "skip";
   if (sem === "foliage") return "foliage";
-  if (!(block.h >= MIN_H)) return "skip";
+  if (block.walkable === true || block.deck === true) return "deck";
+  if (!(block.h >= MIN_H)) {
+    if (block.solid !== false && block.w * block.d >= 8 && Math.min(block.w, block.d) >= 1.5 && groundAt && Finite(block.y)) {
+      const lift = block.y - block.h / 2 - groundAt(block.x, block.z);
+      if (Finite(lift) && lift >= DECK_LIFT_M) return "deck";
+      if (Finite(lift) && lift >= 1) return "roof";
+    }
+    return "skip";
+  }
   if (Math.min(block.w, block.d) < 0.06) return "skip";
   if (block.solid === false) return "skip";
   if (groundAt && Finite(block.y)) {
@@ -126,7 +137,7 @@ function Corners(b) {
   return [P(-hw, -hd), P(hw, -hd), P(hw, hd), P(-hw, hd)];
 }
 
-const STYLE_ORDER = ["water", "roof", "foliage", "low", "wall"];
+const STYLE_ORDER = ["water", "deck", "roof", "foliage", "low", "wall"];
 
 function Schedule(fn) {
   if (typeof requestIdleCallback === "function") {
@@ -210,7 +221,7 @@ export class BlockoutMap {
   BuildItems(blocks) {
     const groundAt = this.scene.sampleHeight;
     const items = [];
-    const counts = { skip: 0, water: 0, roof: 0, foliage: 0, low: 0, wall: 0 };
+    const counts = { skip: 0, water: 0, deck: 0, roof: 0, foliage: 0, low: 0, wall: 0 };
     for (const block of blocks) {
       if (!block || !Finite(block.x) || !Finite(block.z)) { counts.skip++; continue; }
       const style = ClassifyBlock(block, groundAt);
@@ -1136,6 +1147,7 @@ function BlitBaked(ctx, img, bs, b, view) {
 function DrawItems(ctx, items, pxPerM) {
   const fills = {
     water: Css(MAP_COLORS.water),
+    deck: Css(MAP_COLORS.road),
     roof: Css(MAP_COLORS.roof),
     foliage: Css(MAP_COLORS.foliage, 0.72),
     low: Css(MAP_COLORS.low),
@@ -1154,16 +1166,20 @@ function DrawItems(ctx, items, pxPerM) {
     }
   }
   Flush();
-  // 屋面压一道细边，房子的轮廓才读得出
-  if (pxPerM >= 1) {
+  // 屋面压一道细边，房子的轮廓才读得出；桥面的边重一点
+  for (const [style, alpha] of [["roof", 0.28], ["deck", 0.6]]) {
+    if (pxPerM < 1 && style === "roof") continue;
     ctx.beginPath();
+    let any = false;
     for (const item of items) {
-      if (item.style !== "roof") continue;
+      if (item.style !== style) continue;
       const c = item.corners;
       ctx.moveTo(c[0][0], c[0][1]); ctx.lineTo(c[1][0], c[1][1]); ctx.lineTo(c[2][0], c[2][1]); ctx.lineTo(c[3][0], c[3][1]); ctx.closePath();
+      any = true;
     }
-    ctx.lineWidth = 1 / pxPerM;
-    ctx.strokeStyle = Css(MAP_COLORS.ink, 0.28);
+    if (!any) continue;
+    ctx.lineWidth = (style === "deck" ? 1.4 : 1) / pxPerM;
+    ctx.strokeStyle = Css(MAP_COLORS.ink, alpha);
     ctx.stroke();
   }
 }

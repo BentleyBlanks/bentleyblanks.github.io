@@ -245,6 +245,8 @@ const HARNESS = `<!doctype html>
         { id: "ghost", x: 85, z: 20, w: 6, d: 6, h: 3, semantic: "timber", solid: false },
         { id: "lintel", x: 40, z: 65, w: 6, d: 1.2, h: 0.5, y: 4 + 2.6, semantic: "structure" },
         { id: "river", x: 50, z: 93, w: 60, d: 4, h: 0.1, semantic: "water", solid: false },
+        { id: "bridge", x: 30, z: 93, w: 4, d: 10, h: 0.25, y: 3 + 5, semantic: "structure" },     // 离地 5 m 的薄板 = 桥面
+        { id: "shed", x: 80, z: 72, w: 5, d: 5, h: 0.2, y: 8 + 2.5, semantic: "timber" },          // 离地 2.4 m 的薄板 = 棚顶
       ];
       m.SetScene({
         levelKey: "Synthetic", bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 100 }, blocks: blocksS,
@@ -424,6 +426,8 @@ try {
     out.ghost = P(85, 20);
     out.lintel = P(40, 65);
     out.river = P(50, 93);
+    out.bridge = P(30, 93);
+    out.shed = P(80, 72);
     // 等高线：z = 35 这一行，h = 0.1x → 每 10 m 一条，x = 50 是 5 m 粗线
     const row = W(0, 35);
     const lum = h.RowLum(c, row.y, row.x, row.x + 300);
@@ -504,6 +508,8 @@ try {
   Check("不画：airWall、0.2 m 碎块、不挡人的装饰件、门楣", notInk(syn.air) && notInk(syn.tiny) && notInk(syn.ghost) && notInk(syn.lintel),
     `air ${syn.air} tiny ${syn.tiny} ghost ${syn.ghost} lintel ${syn.lintel}`);
   Check("水是淡蓝", nearWater(syn.river), JSON.stringify(syn.river));
+  Check("架空薄板：离地 5 m 的是桥面（路面色压在水上）、离地 2.4 m 的按屋面铺底", near(syn.bridge, [244, 240, 229], 6) && near(syn.shed, [203, 194, 175], 8),
+    `bridge ${syn.bridge} shed ${syn.shed}`);
   const cx = syn.contours.map((d) => d.x);
   const expect = [10, 20, 30, 40, 50, 60, 70, 80, 90];
   const matched = expect.filter((x) => cx.some((v) => Math.abs(v - x) <= 1.2)).length;
