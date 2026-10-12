@@ -510,7 +510,7 @@ ordersReached 且玩家进到她 seenRangeM 16 m 内 → nierSeen；担架员喊
 
 `Enter("Village")` 起老耿（`R.geng.gengHouse`）与驴车（`R.geng.cartYard`；黑子 = WorkingHorse 缩 0.75、毛色 ×0.38，车板上三件白盒行李）
 就在；`GengGoTo / GengPose('slap'|'vat'|'table'|'unbar'|'lead-donkey'|'load') / CartTo / SetCartBlocking / PointAt` 都是占位实现
-（走位 + 蹲站 + 一声音效），C 包按概念图换动作、只加方法不改签名。妮儿的叫声 / 笑声暂用 `hitGrunt` 抬音高占位（`NIER_SHOUT_CUE`，
+（走位 + 蹲站 + 一声音效），C 包按概念图换动作、只加方法不改签名。妮儿的叫声 / 笑声 2026-10-12 D 包起是她本人的两条非词人声（`Data_Voice` kind `nier`，`Script_SeedAudioNierShoutBake`，`NIER_SHOUT_CUES` 轮着播、不走 Bark；[配音同步 §0.17](Data_FirstLevelVoiceSync20260919.md)），之前暂用 `hitGrunt` 抬音高占位（`NIER_SHOUT_CUE`，
 素材侧登记 `nier_shout` 后只改这一处）。
 
 ### 验收

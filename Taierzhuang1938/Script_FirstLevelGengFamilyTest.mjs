@@ -18,7 +18,9 @@ import { ACTOR_MESH_BY_VARIANT } from "./Data_Meshes.mjs";
 import { MISSION_DIALOGUE, MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FIRST_LEVEL_DIALOGUE_DIRECTION } from "./Data_FirstLevelDialogueDirection.mjs";
 import { FIRST_LEVEL_VOICE_CAST } from "./Data_FirstLevelVoiceCast.mjs";
-import { FirstLevelGengFamily, RimSide, ShellLandingPoint, MuzzlePoint, FaceYaw, PlayerYawTo, GENG_IDS, NIER_SHOUT_CUE } from "./Script_FirstLevelGengFamily.mjs";
+import { FirstLevelGengFamily, RimSide, ShellLandingPoint, MuzzlePoint, FaceYaw, PlayerYawTo, GENG_IDS, NIER_SHOUT_CUE, NIER_SHOUT_CUES } from "./Script_FirstLevelGengFamily.mjs";
+import { SHOUT_AUDIBILITY } from "./Data_Tuning_Audio.mjs";
+import { VOICE_LINES } from "./Data_Voice.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const Read = (file) => fs.readFileSync(path.join(HERE, file), "utf8");
@@ -43,7 +45,12 @@ const Check = (ok, message) => { assert.ok(ok, message); checks++; };
   Check(T.nierScale === 0.62 && T.heiziScale === 0.75, "妮儿 0.62、黑子 0.75（契约 §1.9）");
   Check(MISSION_VOICE_CAST.geng && MISSION_VOICE_CAST.peasant && FIRST_LEVEL_VOICE_CAST.geng && FIRST_LEVEL_VOICE_CAST.peasant, "geng / peasant 进了对白表与定妆表");
   Check(!MISSION_VOICE_CAST.nier, "妮儿不进对白表（叫声 / 笑声走音效）");
-  Check(typeof NIER_SHOUT_CUE === "string" && NIER_SHOUT_CUE.length, "妮儿的叫声有占位 cue");
+  Check(typeof NIER_SHOUT_CUE === "string" && NIER_SHOUT_CUES.includes(NIER_SHOUT_CUE), "妮儿的叫声有 cue");
+  // 2026-10-12 D 包：叫声是 Data_Voice 里她本人的两条非词人声（kind nier / side civil，不进中日口令池），录音在 Audio/ 下。
+  Check(NIER_SHOUT_CUES.every((cue) => {
+    const line = VOICE_LINES.find((l) => "voice." + l.key === cue);
+    return line && line.kind === "nier" && line.side === "civil" && line.generated && line.dur > 0 && fs.existsSync(path.join(HERE, "Audio", line.file));
+  }), "妮儿的两条叫声都在 Data_Voice（kind nier）里且录音在盘上");
   const shells = MISSION_DIALOGUE.find((cue) => cue.id === "NierShells");
   Check(shells?.perLine && shells.lines.map((l) => l.who).join() === "bearer,peasant", "NierShells：担架员 / 庄稼人两句、逐句格式");
   Check(FIRST_LEVEL_DIALOGUE_DIRECTION.NierShells?.lines?.["01"] && FIRST_LEVEL_DIALOGUE_DIRECTION.NierShells.lines["02"], "NierShells 有导演表");
@@ -196,7 +203,13 @@ function Step(r, geng, seconds) {
   // NierFollow：玩家走过 followCueProgressM、幺娃活着、她在 followRangeM 内才说。
   Check(r.said.includes("NierFollow"), "沟里幺娃丢弹壳逗她（NierFollow）");
   geng.OnLine("NierFollow", 2);
-  Check(geng.State().nier.picking && r.played.filter((p) => p.name === NIER_SHOUT_CUE).length >= 1, "幺娃丢的弹壳她去捡，叫一声");
+  Check(geng.State().nier.picking && r.played.filter((p) => NIER_SHOUT_CUES.includes(p.name)).length >= 1, "幺娃丢的弹壳她去捡，叫一声");
+  {
+    const shout = r.played.find((p) => NIER_SHOUT_CUES.includes(p.name));
+    Check(shout && shout.priority === true && shout.rolloff === SHOUT_AUDIBILITY.rolloff && shout.volume === T.shoutVolume
+      && Math.abs(shout.position.y - (Ground(shout.position.x, shout.position.z) + T.shoutMouthM)) < 1e-6,
+      "叫声是她本人的声库条目：不让路、喊话档衰减、嘴的高度按身高");
+  }
   Step(r, geng, 6);
   // SouthWhisper 第 5→6 句：顺子轻微转头看她（不是接管）。
   const yaw0 = r.player.yaw;

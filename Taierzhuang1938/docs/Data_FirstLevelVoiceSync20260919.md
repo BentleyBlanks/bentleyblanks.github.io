@@ -197,6 +197,54 @@
 
 请求：`.09` 2 次，`CaptiveWoundTwist` 6 次（都没装，清单 `requests` 只算装上的那次），咔嗒 0 次。
 
+### 0.17 2026-10-12 D 包：03–11 重构的配音（契约 [Data_FirstLevel0311Refactor20261012Contract.md](Data_FirstLevel0311Refactor20261012Contract.md) §5.2）
+
+**定妆音**（`Script_SeedAudioCastBake`，理由全文在 `Audio/FirstLevel/Data_FirstLevelVoiceCastManifest.json`）：
+
+| 角色 | 文件 | 选定 | 指标 | 怎么来的 |
+| --- | --- | --- | --- | --- |
+| `peasant` 庄稼人 | `Cast/AudioVoiceCast_Peasant.mp3` | 2 条候选选 #1 | 基频中位 124 Hz（p10–p90 105–165，人设 95–165）、低频占比 0.31、信噪比 42.5 dB、字错率 0.18、11.1 s；与翻译余弦 0.57、与老耿 0.51 | 先考虑共用已有的北方嗓子：唯一的北方口音定妆音是翻译（汉奸腔：尖、油滑、带鼻音，225 Hz），与中年庄稼人「不急不吼」相反，不共用；自己录 |
+| `geng` 老耿 | `Cast/AudioVoiceCast_Geng.mp3` | 四轮 9 条候选选第 4 轮 #2 | 基频中位 133 Hz（p10–p90 105–158，人设 85–150）、低频占比 0.23、信噪比 81.1 dB、字错率 0.07、23.6 s；与庄稼人 0.51、翻译 0.28 | 第 1 轮（B 包的定妆台词 + 缺省表演说明）195 / 219 Hz、第 2 轮（表演说明写「低、干、沙、喊哑」）286–327 Hz —— **参考音决定音高，提示词决定不了**（与顺子 09-30 同一个教训）。第 3 轮带 `baseFile`（第 1 轮 #2 用 rubberband 保共振峰降 6 个半音做成的 133 Hz 音色参照 `Cast/AudioVoiceCastBase_Geng20261012.mp3`）137 / 147 Hz 进了区间，但 B 包起草的定妆台词是 `GengCart` / `GengGate` 的剧情原句，`GengCart` 整段 cue 挂它作参考时两条 take 都接着把独白念了出来（「缸别碰…俺这车可不是白给人用的」）；第 4 轮换成非剧情独白（驴、车板、赶路）再录 2 条，装 #2 |
+
+**PerLine（01–06 格式，一场一次请求，切句、各句定位播放）**：11 场共 15 次请求（`FirstBatchCount` 2 次、`GapGuardDown` 3 + 1 次，其余各 1 次）。退役的 `TankHeard` `BundleWhy` `BundleSupply`（`retired: true`）录音与清单条目保留、提示词哈希仍对得上，没有重录；班组喊话 `tank_turret` 已撤下、不重录；本轮没有新日语行。
+
+| 场 | 文件 | 时长（各句） | 请求数 | 参考音 | 嗓子 / 字错率 |
+| --- | --- | --- | --- | --- | --- |
+| `FrontObservation` | `AudioVoice_FirstLevelFrontObservation.mp3` | 6.664 s（2.94 / 2.974）| 1 | luo | 本人余弦 0.85 / 0.827；字错率 0.2 / 0.27 |
+| `FirstBatchCount` | `AudioVoice_FirstLevelFirstBatchCount.mp3` | 3.66 s（3.64）| 2（装第 2 次）| liuwencai | 本人余弦 0.812；字错率 0.5（个→国）。第 1 次「一」之前多了 1.6 s 的哼声（转写「警惕号袍」），按多念重抽 |
+| `TankSpotted` | `AudioVoice_FirstLevelTankSpotted.mp3` | 4.4 s（2.47 / 1.32）| 1 | guard / luo | 本人余弦 0.887 / 0.518（罗班长那句离守军 0.592，差 0.074 在门槛 0.08 内；两人定妆音本来就 0.65 近）；字错率 0.25 / 0 |
+| `TankRoadContact` | `AudioVoice_FirstLevelTankRoadContact.mp3` | 4.48 s（2.36 / 2）| 1 | heyoutian / luo | 本人余弦 0.857 / 0.82；字错率 0.25 / 0.08 |
+| `TankArmor` | `AudioVoice_FirstLevelTankArmor.mp3` | 2.372 s（2.352）| 1 | luo | 本人余弦 0.859；字错率 0.56（莫→别、壳→锅、跟车的→根铁来，字数一致） |
+| `GapGuardDown` | `AudioVoice_FirstLevelGapGuardDown.mp3` | 1.295 s（1.285）| 3 + 1 | liuwencai | 本人余弦 0.821；字错率 0；整段信噪比 54 dB。旧提示词 3 次都是硬错误：#1 干净但整段信噪比 25.9 dB（门禁 30）、#2 把省略号演成 3 s 的嘟囔（转写「上楼的全部楼,它小到」）、#3 把表演说明「看着人倒下」念了出来；导演表这一句改成明确的无声空当（`pauseBeforeS: 0.8`、不再描述停顿里在看什么），新提示词 1 次就过 |
+| `BundleOrder` | `AudioVoice_FirstLevelBundleOrder.mp3` | 17.716 s（6.32 / 3.83 / 1.45 / 1.2 / 2.036）| 1 | guard / luo / shunzi | 本人余弦 0.922 / 0.738 / 0.773 / 0.512 / 0.79；字错率 0.15 / 0.36 / 0.43 / 0.33 / 0.25。`.02` 罗班长离守军 0.752、差 0.014（09-23 这一句曾三次串嗓补录，这次没串）|
+| `BundleGo` | `AudioVoice_FirstLevelBundleGo.mp3` | 6.017 s（3.19 / 2.587）| 1 | heyoutian / luo | 本人余弦 0.8 / 0.831；字错率 0.2 / 0.43 |
+| `BundleFound` | `AudioVoice_FirstLevelBundleFound.mp3` | 2.969 s（0.71 / 1.699）| 1 | luo | 本人余弦 0.66 / 0.684；字错率 1 / 0.6（「就是他」0.71 s、基频 77 Hz 的压嗓三个字转成「九四塔」，字数一致）。`.01` 96k 单独编码与整段的波形相关只有 0.969（门禁 0.98），烘焙脚本现在对这种片段逐级抬码率重编（128k → 0.984，清单 `bitrate`） |
+| `BundleBrief` | `AudioVoice_FirstLevelBundleBrief.mp3` | 6.807 s（2.53 / 3.757）| 1 | luo | 本人余弦 0.781 / 0.863；字错率 0.55 / 0.22 |
+| `NierShells` | `AudioVoice_FirstLevelNierShells.mp3` | 9.507 s（3.7 / 4.857）| 1 | bearer / peasant | 本人余弦 0.864 / 0.884；字错率 0 / 1。`.02` 整片转写全是「啊」是 whisper 在片头 1.9 s 的空当（`pauseBeforeS` 1.2 + 看了一眼）上的幻觉：SeedAudio 逐字时间 16 个字全在，剪掉片头再转一遍是「老耿家家的女儿喊不硬的,你别吠那个劲」（0.25） |
+
+字错率超 0.34 的 9 句逐字核对记录在 `Data_FirstLevelVoiceTranscriptReview.json`（都是字数对得上的同音字；没有标 `needsListening`）。导演表只改了 `GapGuardDown.01`（见上）与 `BorrowLight.07`：B 包把第二处空当写成了 `pauseBeforeS: 3`，它进整段提示词、与 09-30 录音的 promptHash 对不上而台词没改，撤掉（空当仍由播放时的 `after: event:BorrowLightMatchAsked` + `offsetS` 给，门禁改核「不进提示词」）。其余新场的播放间隔沿用录音里的原始间隔（`gapBeforeS`）。口型轨：`Script_FirstLevelFaceTrackBake.py --lines` 重烘，153 → 170 条片段轨。
+
+**整段 cue（07–11 格式，一条一次请求、整条播放）**：10 条共 13 次请求。这一轮起整段 cue 可以挂定妆参考音（`Script_SeedAudioFirstLevelBake.WHOLE_CUE_REFERENCED` 名单 + `WholeCuePrompt`：`@音频N 是谁的声音`、台词行以 `@音频N` 开头，与 01–06 同一套 `SceneReferences`，仍烘环境声），老耿五场是同一个嗓子、川军与 01–06 里是同一个人；名单外的整段 cue 提示词逐字不变。整段 take 多一道客观检查（`WHOLE_CHECK`）：削波、转写对上的字不到四成（漏句）、多念、**念了参考音定妆独白的内容**（转写里有独白连续 5 个字而稿里没有）——硬错误才再抽、最多 3 次；烘焙时量不到的（逐句认嗓）由外面取证后 `--reject=Cue:n:理由` 记进去再抽。`MissionVoicePrompt` 有老耿 / 庄稼人在场时点名他们说北方官话（只有翻译时句子逐字不变）。
+
+| cue | 文件 | 时长 | 请求数 | 参考音 | 检查 |
+| --- | --- | --- | --- | --- | --- |
+| `NierFollow` | `AudioVoice_FirstLevelNierFollow.mp3` | 10.423 s | 1 | yaowa / shunzi | 字错率 0.13；逐句认嗓（按对齐区间切片对定妆音）幺娃 0.59 / 0.44、顺子 0.56，都是本人 |
+| `SouthWhisper` | `AudioVoice_FirstLevelSouthWhisper.mp3` | 18.73 s | 1 | yaowa / shunzi | 字错率 0.13，7 句都在（第 7 句「一个女娃儿，她懂个啥子」转写「一个女儿?她懂个啥子」）；顺子四句本人 0.52–0.75；幺娃三句是气声（基频 193–213 Hz，顺子 127–142），对两条定妆音都只有 0.17–0.29、分不出，按基频与顺子分开 |
+| `MouthContact` | `AudioVoice_FirstLevelMouthContact.mp3` | 4.545 s | 1 | heyoutian / luo | 字错率 0.46（击枪 / 单枪不动 / 孙子，同音）；何有田 0.53、罗班长 0.70 |
+| `MouthGo` | `AudioVoice_FirstLevelMouthGo.mp3` | 2.952 s | 1 | luo | 字错率 0.5（胆家 / 炮）；本人 0.65 |
+| `MouthFlank` | `AudioVoice_FirstLevelMouthFlank.mp3` | 2.821 s | 1 | liuwencai | 字错率 0.17；本人 0.59 |
+| `GengHouse` | `AudioVoice_FirstLevelGengHouse.mp3` | 16.039 s | 2（装第 2 次）| geng | #1 转写只对上 12/48 字（「这些是我的家,我的家」，漏句）；#2 字错率 0.06，三句本人 0.80 / 0.92 / 0.91，基频 225 / 157 / 113 Hz |
+| `GengGate` | `AudioVoice_FirstLevelGengGate.mp3` | 16.536 s | 1 | luo / geng | 字错率 0.23；罗 0.55 / 0.72，耿 0.57 / 0.69 / 0.73，五句都是本人 |
+| `CartPush` | `AudioVoice_FirstLevelCartPush.mp3` | 10.71 s | 1 | geng / luo / shunzi | 字错率 0.24；耿 0.39、罗 0.57、顺子 0.45，各是本人 |
+| `GengCart` | `AudioVoice_FirstLevelGengCart.mp3` | 12.931 s | 1（旧参考音下另有 2 条作废）| geng | 字错率 0.09；三句本人 0.88 / 0.67 / 0.75。旧参考音（第 3 轮定妆、台词 = 剧情原句）下的两条 take 都念了定妆独白（#1 还削波 5 处），换定妆音后 1 次就过 |
+| `AskGeng` | `AudioVoice_FirstLevelAskGeng.mp3` | 12.826 s | 2（装第 2 次）| shunzi / geng | #1 烘焙检查过了，逐句认嗓发现老耿两句 258 / 232 Hz、离顺子 0.44 / 0.52 高过本人 0.17 / 0.21（错嗓），`--reject` 后再抽；#2 老耿 205 / 160 Hz、本人 0.51 / 0.72，顺子 0.51 / 0.42 |
+
+整段对齐 `Script_FirstLevelVoiceAlign.py --only … --emit`（`_shots/L1Voice/Data_FirstLevelVoiceAlignment.json` 先从现有 `Data_FirstLevelMissionVoiceAlignment.mjs` 灌一遍，`--emit` 才不会把别的 cue 丢掉）；口型轨 `--cues` 逐条重烘（`AskGeng` 第一次烘出 voicedMoving 0.68，`--realign` 后 1.0）。`SouthWhisper` 重录后 `Script_CharacterSpeechTest` 不再报 stale。另外 `BridgeCover` / `BridgeWithdraw` 的 promptHash 自 2026-10-01 浮桥改词（`bridge` 环境声）起就对不上、`--audio` 一直红，这次顺手重录了这两条（各 1 次，无参考音）。
+
+**妮儿的叫声 `nier_shout`**：免费素材库查过（Sonniss GDC 2016–2023 全部 VBR MP3 清单，关键词 child / kid / girl × shout / scream / yell…）只有 3 条孩童喊叫：`Child_Shout_005`（0.4 s，转写「好了」是说词的）、`EMOTE Lily, Child, Anger Fight Ninja 01`（1.8 s，「Hi-ya」，信噪比 11 dB）、`Female_Scream_005`（成年女声 4 s 尖叫），没有一条是聋孩子那种直愣愣的叫，所以用 SeedAudio 按音效写法生成（新 `Script_SeedAudioNierShoutBake.mjs`，提示词：十一岁听不见也不说话的农村女孩，又粗又响、直愣愣、不收敛，一声就完）。两条各 2 条候选按客观指标选（有声 0.3–1.4 s、基频 230–520 Hz、信噪比 ≥ 30、不削波、转写不是词）：`Audio/AudioVoice_NierShout_01.mp3` 0.66 s / 314 Hz / 信噪比 39 dB，`_02` 1.18 s / 327 Hz / 44 dB，有声段 −16.1 dBFS、真峰值 −4.3 / −4.7 dBTP（口令档），记录 `Audio/Data_NierShoutManifest.json`。登记在 `Data_Voice`（kind `nier`、side `civil`、`generated`，`Script_VoiceBake` 跳过），`Script_FirstLevelGengFamily.Shout` 两条轮着按 `voice.<key>` 直接播（不走 Bark：不让路、不变调、不被同类闸吃掉），喊话档衰减（`SHOUT_AUDIBILITY.rolloff`）、嘴高 `R.geng.shoutMouthM` 0.9 m、增益 `shoutVolume` 1.0；原 `hitGrunt` 抬音高的占位撤掉。
+
+请求合计：定妆 9（geng 7 + peasant 2）、PerLine 15、整段 13 + 桥头 2、叫声 4。
+
 ## 1. 一句话口径（旧整段格式：07–18 与待下线的 09.21 旧 cue）
 
 - 一段连续多人对白 = **一个 cue = 一次 SeedAudio 请求 = 一条 mp3**。动作打断处不拆音频，在提示词里写明停顿时长让模型留空当，再用 `VoiceTiming` 的事件把动作对上去。

@@ -645,6 +645,9 @@ else if (args.includes("--missing")) lines = VOICE_LINES.filter((l) => !Has(l));
 else if (args.includes("--all")) lines = VOICE_LINES.slice();
 else { console.log("要指定 key，或 --missing / --all / --story / --chapter=N / --normalize"); process.exit(0); }
 if (!force && !args.includes("--missing")) lines = lines.filter((l) => !Has(l) || picks.includes(l.key));
+// 带 generated 的行（妮儿的叫声）是别的脚本按音效写法生成的非词人声，不走这里的口令 TTS 分支。
+for (const l of lines.filter((l) => l.generated)) console.log(`  · ${l.key.padEnd(16)} 由 ${l.generated} 生成，这里跳过`);
+lines = lines.filter((l) => !l.generated);
 
 if (!lines.length) { console.log("没有要烘的行（加 --force 可以重烘）"); process.exit(0); }
 console.log(`要烘 ${lines.length} 条 → ${path.relative(HERE, AUDIO_DIR)}`);

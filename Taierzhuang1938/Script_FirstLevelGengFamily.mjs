@@ -22,6 +22,7 @@
 import * as THREE from "three";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as MID } from "./Data_Tuning_FirstLevelMid.mjs";
+import { SHOUT_AUDIBILITY } from "./Data_Tuning_Audio.mjs";
 import { MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as Place } from "./Data_FirstLevelMissionLayout.mjs";
 import { MissionCarryRoutePoint, MissionRouteProjection } from "./Script_FirstLevelMissionColumn.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
@@ -35,10 +36,13 @@ export const FaceYaw = (self, target) => Math.atan2(self.x - target.x, self.z - 
 export const PlayerYawTo = (player, target) => Math.atan2(player.x - target.x, player.z - target.z);
 const WrapRad = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 /**
- * 妮儿的叫声 / 笑声：没有录音前用现有素材占位（短促的人声 hitGrunt，音高抬 R.geng.shoutPitch），集成 / Voice 包换成她自己的
- * `nier_shout` 素材时只改这一处。cue 名 nier_shout 留给素材侧登记。
+ * 妮儿的叫声 / 笑声（2026-10-12 D 包）：Data_Voice 里 kind "nier" 的两条非词人声（Script_SeedAudioNierShoutBake 生成，电平已齐到口令档），
+ * 声库键 voice.<key>。直接按 cue 点名播、不走 Bark：她的叫声不该被同类闸 / 变调 / 对白让路吃掉（SouthWhisper 里那一声笑就是
+ * 对白中间叫的）；距离衰减走喊话档（SHOUT_AUDIBILITY.rolloff），嘴的高度按她的身高（R.geng.shoutMouthM）。
+ * 2026-10-12 之前是 hitGrunt 抬音高占位。
  */
-export const NIER_SHOUT_CUE = "hitGrunt";
+export const NIER_SHOUT_CUES = Object.freeze(["voice.nier_shout_01", "voice.nier_shout_02"]);
+export const NIER_SHOUT_CUE = NIER_SHOUT_CUES[0];
 export const NIER_SHOUT_ID = "nier_shout";
 /** 妮儿 / 老耿 / 庄稼人在 AI 里的 missionId。 */
 export const GENG_IDS = Object.freeze({ nier: "GengNier", geng: "GengLaoGeng", peasant: "GengPeasant", cart: "GengCart" });
@@ -342,8 +346,11 @@ export class FirstLevelGengFamily {
   Shout(why) {
     const r = this.r, actor = this.actors.nier;
     if (!actor?.alive) return;
-    r.audio?.Play?.(NIER_SHOUT_CUE, { position: r.Point(actor.position, 0.9), volume: 0.55, pitch: this.T.shoutPitch });
-    this.Log(NIER_SHOUT_ID, { why });
+    // 两条叫声轮着用（连着两声不重样），不变调 —— 这是她本人的嗓子。
+    const cue = NIER_SHOUT_CUES[(this.shoutCount = (this.shoutCount || 0) + 1) % NIER_SHOUT_CUES.length];
+    r.audio?.Play?.(cue, { position: r.Point(actor.position, this.T.shoutMouthM), volume: this.T.shoutVolume, priority: true,
+      rolloff: SHOUT_AUDIBILITY.rolloff });
+    this.Log(NIER_SHOUT_ID, { why, cue });
   }
   Stop(actor) { this.r.MoveActor(actor, actor.position, 0); }
 

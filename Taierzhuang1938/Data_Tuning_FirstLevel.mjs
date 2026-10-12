@@ -486,8 +486,10 @@ export const MISSION_TUNING = Object.freeze({
       Object.freeze([0.1, 0.1, -0.75, 0.46, 0.2, 0.46, 0x2b2b2b]),
     ]),
     cartDeckM: 0.95,
-    // 妮儿的叫声 / 笑声：没有录音前用现有素材占位（Script_FirstLevelGengFamily.NIER_SHOUT_CUE），音高抬一截。
-    shoutPitch: 1.55,
+    // 妮儿的叫声 / 笑声（Data_Voice kind "nier"，Script_SeedAudioNierShoutBake 生成，电平已齐到口令档 −16.1 dBFS）：
+    // 混音增益与喊话一样 1.0，距离衰减走喊话档（SHOUT_AUDIBILITY.rolloff）；嘴的高度按她 0.99 m 的身高。
+    shoutVolume: 1.0,
+    shoutMouthM: 0.9,
   }),
 });
 
