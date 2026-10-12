@@ -852,13 +852,16 @@ export function CampaignActions(ctx) {
       const timing=await page.evaluate(async()=>{
         const {Box3,Vector3}=await import("three");
         const g=window.Tengxian,gl=g.renderer.getContext(),samples=[];
-        for(let i=0;i<24;i++){const start=performance.now();g.StepFrames(1,1/60,true);gl.finish();if(i>=4)samples.push(performance.now()-start);}
+        // 2026-10-12 R4-Perf: 8 warm-up frames, not 4 -- the 5th frame stepped after a page.evaluate yield can stall 20-55 ms
+        // inside one WebGL call (GPU process catching up after the yield; seen at every 300-frame chunk boundary of the 01 frame
+        // driver, never when it yields every frame). That frame is the driver's, not the game's; p95 of 20 is their maximum.
+        for(let i=0;i<28;i++){const start=performance.now();g.StepFrames(1,1/60,true);gl.finish();if(i>=8)samples.push(performance.now()-start);}
         samples.sort((a,b)=>a-b);
         const reducedBounds=Object.fromEntries([...g.ai.crowd.kinds].map(([key,entry])=>{
           const bounds=new Box3();for(const mesh of entry.meshes){mesh.geometry.computeBoundingBox();bounds.union(mesh.geometry.boundingBox);}
           return [key,bounds.getSize(new Vector3()).toArray()];
         }));
-        return {method:"synchronous simulation and GPU completion, 4 warmup and 20 measured frames",p50Ms:samples[10],p95Ms:samples[19],reducedBounds,
+        return {method:"synchronous simulation and GPU completion, 8 warmup and 20 measured frames",p50Ms:samples[10],p95Ms:samples[19],reducedBounds,
           actualLivingEnemies:g.ai.soldiers.filter(actor=>actor.alive && actor.side==="ija").length,
           front:g.Debug.FirstLevelMission().assault,crowd:g.ai.crowd?.BakeReport(),cellM:g.ai.crowd?.cellM};
       });
