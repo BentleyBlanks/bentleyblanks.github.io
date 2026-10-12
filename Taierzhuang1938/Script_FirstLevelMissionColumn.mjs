@@ -172,6 +172,21 @@ export class FirstLevelMissionColumn {
       .slice(0, R.zhouQueueIndex)
       .filter((litter) => !litter.loaded && !litter.evacuated && litter.health > 0).length;
   }
+  /**
+   * 2026-10-12 0311 B 包的只读口：队尾 / 队首在主线上的里程（活着、在场、还没后送的担架与步行者）。
+   * 妮儿远远跟在队尾（Script_FirstLevelGengFamily.Follow）与沟口停点（Script_FirstLevelSouthMouth）读它，不改队列。
+   */
+  Marchers() {
+    return [...this.litters, ...this.walkers].filter((entry) => entry.visible && entry.health > 0 && !entry.evacuated && !entry.loaded);
+  }
+  TailProgress() {
+    const marchers = this.Marchers();
+    return marchers.length ? Math.min(...marchers.map((entry) => entry.progress)) : 0;
+  }
+  LeadProgress() {
+    const marchers = this.Marchers();
+    return marchers.length ? Math.max(...marchers.map((entry) => entry.progress)) : 0;
+  }
   BeginZhouBoarding() {
     if (this.zhouBoarding || this.QueueAhead() > 0) return false;
     this.zhouBoarding = true;
