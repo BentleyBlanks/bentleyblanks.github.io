@@ -676,10 +676,10 @@
     },
     "BridgeCover": {
       "file": "AudioVoice_FirstLevelBridgeCover.mp3",
-      "seconds": 6.426,
-      "bytes": 77785,
-      "promptHash": "7edd980dfdfb4334d11353737958870559cc01efb83917c64df0b604e7d87e17",
-      "sha256": "e79904ea5cd92c7eefecd1f59d7aeeba3556c10b115d5afe06fb7424c492ef54",
+      "seconds": 5.329,
+      "bytes": 64619,
+      "promptHash": "886a6c4cf7724d3720f0ae6a0f9550fdcb507f768ff92a6094c7b61a717a0543",
+      "sha256": "2c8d896f2830a97d0667655148e4d1ba84175d5886bb8eebe7caaf26dc466860",
       "lineCount": 2,
       "requests": 1,
       "speechRate": 0,
@@ -702,8 +702,8 @@
       "file": "AudioVoice_FirstLevelBridgeWithdraw.mp3",
       "seconds": 5.721,
       "bytes": 69321,
-      "promptHash": "b8834c3ae7a9e0f17da07f05f21f3fafaa4ff695771a3631bc319cd6702b4d20",
-      "sha256": "11839ac9da1c9726838dae296178247c689bd78988232fcae9bb293cb64e3b37",
+      "promptHash": "24cd95238545db687ca3ce54bf9e601f691e3d4a79c184b143f10c7ec0865532",
+      "sha256": "15442799d90737e3cba9ec1bd5beda1602c7d24a4e0c86b2d27a81ae3c96a44f",
       "lineCount": 3,
       "requests": 1,
       "speechRate": 0,
@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-10-12T02:46:58.034Z",
+  "updatedAt": "2026-10-12T03:00:56.054Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",

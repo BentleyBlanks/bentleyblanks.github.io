@@ -568,7 +568,9 @@ def Main():
             if not row or not (AUDIO / cue["file"]).exists():
                 print("SKIP", cue["id"], "no recording or alignment", flush=True); continue
             old_key, cached = by_id.get(cue["id"], (None, None))
-            if args.realign: cached = None
+            # A re-recorded take (old track keyed by another sha) must not reuse the old take's character timings:
+            # 2026-10-12 BridgeCover kept the 6.4 s take's chars on the new 5.3 s take (mouth still on 58% of speech).
+            if args.realign or old_key != Sha(AUDIO / cue["file"]): cached = None
             digest, track = BakeCue(cue, row, data, ph, aligner, cached)
             if not track: continue
             if old_key and old_key != digest: tracks.pop(old_key, None)
