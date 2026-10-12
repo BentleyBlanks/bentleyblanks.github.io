@@ -710,6 +710,14 @@ export const CORPSES = Object.freeze([
 export const MG_AUTO_PLACE_FROM = "CaptiveWall";
 /** 垫尸被点射震一下（Dir 调 OpeningSet.JoltCorpse）：竖直抖幅与时长。 */
 export const CORPSE_JOLT = Object.freeze({ amplitudeM: 0.02, seconds: 0.18 });
+/**
+ * 尸体层怎么画（2026-10-12 R4-Perf）。五具共用一套按材质分的 BatchedMesh（每趟每种材质一个 draw，与具数无关）；
+ * 两具垫尸只在被拖 / 被震的那几帧换成自己的普通网格（MotionVector 规范：动的实例不进批次），
+ * 矩阵连续 stillCalls 次 Update 没变就回批次。smallPartTriangles：第 0 档三角数不到这个数的分件（眼睛，120 三角，
+ * 藏在头里）不投影 —— 阴影图里一个纹素都占不满，省两趟阴影 draw。
+ * 实测（R4-Perf，1080p high 定帧，docs/Data_TechRenderPipeline.md §17.18）：压木看前沟 CaptiveWall +15 s 尸体 45 → 18 个 draw，02 Charge +2 s 30 → 18。
+ */
+export const CORPSE_RENDER = Object.freeze({ stillCalls: 2, smallPartTriangles: 200 });
 
 /**
  * 契约 §5.2 的道具（Script_OpeningProps 的 OpeningWorldProps 按名建、按名取用）。尺寸单位米，颜色 sRGB。

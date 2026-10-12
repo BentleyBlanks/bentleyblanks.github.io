@@ -46,7 +46,7 @@ import { SandbagRunPlacements } from "./Data_SandbagStandard.mjs";
 import { OpeningBlastFx } from "./Script_OpeningBlastFx.mjs";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
 import { TERRAIN_MUD_ZONE } from "./Data_Tuning_Terrain.mjs";
-import { PropFootprints, REDRAFT_STAGES, SET_MARKS, CORPSES, BODY_POSES, REDRAFT_PROPS, FOLD_BLAST, MG_AUTO_PLACE_FROM, CORPSE_JOLT } from "./Data_OpeningSet0103.mjs";
+import { PropFootprints, REDRAFT_STAGES, SET_MARKS, CORPSES, BODY_POSES, REDRAFT_PROPS, FOLD_BLAST, MG_AUTO_PLACE_FROM, CORPSE_JOLT, CORPSE_RENDER } from "./Data_OpeningSet0103.mjs";
 import { OpeningWorldProps } from "./Script_OpeningProps.mjs";
 import { CreateBodyContactShape, MissionBodySupport } from "./Script_FirstLevelMissionBodySupport.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
@@ -1540,9 +1540,14 @@ export class OpeningSet {
 // ===========================================================================
 // 尸体几何不再烘：直接借战场尸体层（MissionAftermath）开机烘好的趴姿原型（`nra0` / `nra1`，同一份几何、同一份合并材质），
 // 所以零烘焙时间、零新贴图、零新 program。
-//  · 不会动的三具（sweep[0..1] / finish[0]）进 BatchedMesh（每种材质一只，与尸体层同一套 program），显隐按实例开关；
+//  · 五具都进同一套 BatchedMesh（每种材质一只，与尸体层同一套 program），显隐按实例开关：一趟一种材质一个 draw，与具数无关；
 //  · 机枪垫尸两具要被拖、被推上沟沿、被点射震：**会动的实例不进 BatchedMesh**（MotionVector 接入规范：移动实例没有历史，
-//    运动矢量是错的），各自一组普通 Mesh（材质按 CloneShadedMaterial 克隆一份：同一材质挂批次和普通网格会来回重算 program 参数）。
+//    运动矢量是错的），所以它们另有一组普通 Mesh（材质按 CloneShadedMaterial 克隆一份：同一材质挂批次和普通网格会来回重算
+//    program 参数）—— 矩阵在变（拖、推、震）的时候画网格、藏批次实例，矩阵连续 CORPSE_RENDER.stillCalls 次 Update 不变就换回
+//    批次（2026-10-12 R4-Perf：原来两具垫尸一直画网格，震一下就被踢出阴影 / 预通道静态合批 240 帧，压木看前沟那一帧
+//    尸体 45 个 draw，其中垫尸 25）。换回批次那一帧它已经静止了两帧，速度只剩相机运动，与批次的口径一致；
+//    从批次换出那一帧网格按「隔帧重新出现」丢旧历史（规范里写明的行为），之后每帧照常有物体运动。
+//  · 第 0 档三角不到 CORPSE_RENDER.smallPartTriangles 的分件（眼睛）不投影。
 // 摆放与贴地走战场尸体层同一个解算器（MissionBodySupport.Settle：整具网格最低包络贴地、不穿地、不悬空，必要时侧倾）；
 // 叠放：把下面那具的上包络加进支撑面再 Settle（pile），上面那具落在它背上。
 //
@@ -1570,8 +1575,9 @@ export class OpeningCorpses {
     for (const row of list) {
       const proto = protos.get(row.mark.pose), tier = Math.min(row.mark.tier ?? 0, proto.parts[0].tiers.length - 1);
       const body = { id: row.id, row, mark: row.mark, proto, tier, shape: CreateBodyContactShape(proto.parts), matrix: new THREE.Matrix4(),
-        visible: false, slots: [], group: null, jolt: null, directed: false, pose: "start", triangles: 0 };
+        visible: false, slots: [], group: null, jolt: null, directed: false, pose: "start", triangles: 0, stillCalls: 0, meshMode: null };
       for (const part of proto.parts) body.triangles += part.triangles?.[tier] ?? TriangleCount(part.tiers[tier]);
+      const small = (part) => (part.triangles?.[0] ?? TriangleCount(part.tiers[0])) < CORPSE_RENDER.smallPartTriangles;
       if (row.movable) {
         body.group = new THREE.Group(); body.group.name = `OpeningRedraft_Corpse_${row.id}`; body.group.matrixAutoUpdate = false;
         for (const part of proto.parts) {
@@ -1580,23 +1586,23 @@ export class OpeningCorpses {
           let material = this.clones.get(part.material.uuid);
           if (!material) { material = CloneShadedMaterial(part.material); this.clones.set(part.material.uuid, material); }
           const mesh = new THREE.Mesh(geometry, material);
-          mesh.name = `${body.group.name}_${part.material.name || "part"}`; mesh.castShadow = true; mesh.receiveShadow = true;
+          mesh.name = `${body.group.name}_${part.material.name || "part"}`; mesh.castShadow = !small(part); mesh.receiveShadow = true; mesh.userData.corpseSmallPart = small(part);
           mesh.userData.sharedGeometry = true;        // 几何是尸体层的，DisposeRoot 不许收
           body.group.add(mesh);
         }
         body.group.visible = false;
         this.group.add(body.group);
-      } else {
-        for (const part of proto.parts) {
-          const geometry = part.tiers[tier];
-          if (!geometry || !(part.triangles?.[tier] ?? 1)) continue;
-          const key = `${part.material.uuid}|${Signature(geometry)}`;
-          let batch = byKey.get(key);
-          if (!batch) { batch = { key, material: part.material, geometries: [], instances: 0, ids: new Map(), mesh: null }; byKey.set(key, batch); this.batches.push(batch); }
-          if (!batch.ids.has(geometry)) { batch.ids.set(geometry, -1); batch.geometries.push(geometry); }
-          batch.instances += 1;
-          body.slots.push({ batch, geometry, id: -1 });
-        }
+      }
+      // 每一具（含垫尸：静止时画批次实例）在它用到的每只批次里占一个实例。
+      for (const part of proto.parts) {
+        const geometry = part.tiers[tier];
+        if (!geometry || !(part.triangles?.[tier] ?? 1)) continue;
+        const key = `${part.material.uuid}|${Signature(geometry)}`;
+        let batch = byKey.get(key);
+        if (!batch) { batch = { key, material: part.material, geometries: [], instances: 0, ids: new Map(), mesh: null, castShadow: !small(part) }; byKey.set(key, batch); this.batches.push(batch); }
+        if (!batch.ids.has(geometry)) { batch.ids.set(geometry, -1); batch.geometries.push(geometry); }
+        batch.instances += 1;
+        body.slots.push({ batch, geometry, id: -1 });
       }
       this.bodies.set(row.id, body);
     }
@@ -1604,7 +1610,7 @@ export class OpeningCorpses {
       let vertices = 0, indices = 0;
       for (const g of batch.geometries) { vertices += g.attributes.position.count; indices += g.index ? g.index.count : g.attributes.position.count; }
       const mesh = new THREE.BatchedMesh(Math.max(1, batch.instances), Math.max(1, vertices), Math.max(1, indices), batch.material);
-      mesh.name = `OpeningRedraft_Corpses_${this.batches.indexOf(batch)}`; mesh.castShadow = true; mesh.receiveShadow = true; mesh.sortObjects = false;
+      mesh.name = `OpeningRedraft_Corpses_${this.batches.indexOf(batch)}`; mesh.castShadow = batch.castShadow; mesh.receiveShadow = true; mesh.sortObjects = false;
       for (const g of batch.geometries) batch.ids.set(g, mesh.addGeometry(g));
       batch.mesh = mesh; this.group.add(mesh);
     }
@@ -1648,16 +1654,46 @@ export class OpeningCorpses {
 
   Apply(body, offsetY = 0) {
     const m = offsetY ? new THREE.Matrix4().copy(body.matrix).premultiply(new THREE.Matrix4().makeTranslation(0, offsetY, 0)) : body.matrix;
-    if (body.group) { body.group.matrix.copy(m); body.group.matrixWorldNeedsUpdate = true; body.group.updateMatrixWorld(true); }
+    if (body.group) {
+      // 垫尸：矩阵一变就回到网格（会动的实例不进批次），批次里那份矩阵等它静下来再写。
+      if (!body.group.matrix.equals(m)) body.stillCalls = 0;
+      body.group.matrix.copy(m); body.group.matrixWorldNeedsUpdate = true; body.group.updateMatrixWorld(true);
+      this.Sync(body);
+      return;
+    }
     for (const slot of body.slots) slot.batch.mesh.setMatrixAt(slot.id, m);
+  }
+
+  /** 垫尸这一帧画网格还是批次实例（见类头）；不会动的三具恒为批次。 */
+  Sync(body) {
+    const mesh = !!body.group && (this.legacyDraw || !!body.jolt || body.stillCalls < CORPSE_RENDER.stillCalls);
+    if (body.group) {
+      body.group.visible = body.visible && mesh;
+      if (!mesh && body.meshMode !== false) for (const slot of body.slots) slot.batch.mesh.setMatrixAt(slot.id, body.group.matrix);
+    }
+    if (body.meshMode === mesh && body.slotsShown === (body.visible && !mesh)) return;
+    body.meshMode = mesh; body.slotsShown = body.visible && !mesh;
+    for (const slot of body.slots) slot.batch.mesh.setVisibleAt(slot.id, body.slotsShown);
+  }
+
+  /**
+   * 同页 A/B（取证用，Probe 里调）：true = 2026-10-12 R4-Perf 之前的画法 —— 垫尸一直画自己的网格、眼睛也投影；
+   * false = 现行画法。不进存档、不进画质表。
+   */
+  SetLegacyDraw(on) {
+    this.legacyDraw = !!on;
+    for (const batch of this.batches) batch.mesh.castShadow = this.legacyDraw || batch.castShadow;
+    for (const body of this.bodies.values()) {
+      if (body.group) for (const mesh of body.group.children) mesh.castShadow = this.legacyDraw || !mesh.userData.corpseSmallPart;
+      this.Sync(body);
+    }
   }
 
   Show(id, on) {
     const body = this.Get(id);
     if (body.visible === !!on) return;
     body.visible = !!on;
-    if (body.group) body.group.visible = body.visible;
-    for (const slot of body.slots) slot.batch.mesh.setVisibleAt(slot.id, body.visible);
+    this.Sync(body);
   }
 
   /** 被点射震一下（只给会动的两具：批次里的实例没有运动历史）。 */
@@ -1668,7 +1704,9 @@ export class OpeningCorpses {
 
   Update(dt) {
     for (const body of this.bodies.values()) {
-      if (!body.jolt) continue;
+      if (!body.group) continue;
+      body.stillCalls += 1;
+      if (!body.jolt) { this.Sync(body); continue; }
       body.jolt.t += dt;
       const u = body.jolt.t / body.jolt.seconds;
       if (u >= 1) { body.jolt = null; this.Apply(body); continue; }
