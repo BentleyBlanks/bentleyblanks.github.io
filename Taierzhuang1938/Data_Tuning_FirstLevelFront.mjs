@@ -561,5 +561,9 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
     // Cleared also counts a pulled-back man at the pull-back point (nestFrontPullbackClearM) or out of the yard and
     // nestFrontAwayM from the nest; the pull-back itself is ordered when the tank reaches Block, half are down or the hold runs out.
     nestFrontPullbackClearM:4,nestFrontAwayM:10,
+    // The fight across the yard has to stand (coordinator, 2026-10-12 round 4): the tank-at-Block pull-back can only fire
+    // once nestFrontContested is nestFrontMinFightS old - the third-round drive had the tank at Block before the men
+    // were in, so they turned round the frame they arrived (4 s of fight). Half down and nestFrontHoldS stay as they are.
+    nestFrontMinFightS:20,
     launcherFlightS:2.2,nestFrontRadiusM:3,tugS:1.2,tugM:1.4,branchCorridorM:4}),
 });

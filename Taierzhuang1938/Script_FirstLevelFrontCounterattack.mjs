@@ -89,6 +89,16 @@ export function LightShellHurt(distance, T = C()) {
   return T.shellHurtMaxHp + (T.shellHurtMinHp - T.shellHurtMaxHp) * t;
 }
 /**
+ * Why the men in the nest's front half pull back now, or null: the tank at Block - only once the fight has stood
+ * minFightS since the first man climbed in - half of them down, or the hold (holdS) run out.
+ */
+export function NestFrontPullBackWhy({ tankAtBlock, dead, total, sinceArrivalS }, T = C()) {
+  if (dead * 2 >= total) return "halfDown";
+  if (sinceArrivalS >= T.nestFrontHoldS) return "held";
+  if (tankAtBlock && sinceArrivalS >= T.nestFrontMinFightS) return "tankAtBlock";
+  return null;
+}
+/**
  * nestFrontCleared (04 gate): every man who climbed in is dead, or back north of clearZ (the berm), or - once the
  * pull-back was ordered - at the pull-back point (within pullbackM) or out of the compound and awayM from the nest.
  */
@@ -288,7 +298,7 @@ export class FirstLevelFrontCounterattack {
     // mover), vault and detour allowed (tacticalRadiusM > 0), until they are out and clear.
     if (!st.pulledBack && st.clearedAt == null) {
       const alive = st.men.filter((a) => a.alive).length, dead = st.men.length - alive;
-      const why = (r.Has("tankBlocksExit") || r.tank?.atBlock) ? "tankAtBlock" : dead * 2 >= st.men.length ? "halfDown" : r.time - (st.arrivedAt ?? st.startedAt) >= T.nestFrontHoldS ? "held" : null;
+      const why = NestFrontPullBackWhy({ tankAtBlock: !!(r.Has("tankBlocksExit") || r.tank?.atBlock), dead, total: st.men.length, sinceArrivalS: r.time - (st.arrivedAt ?? st.startedAt) }, T);
       if (why) {
         st.pulledBack = true; st.pulledBackAt = r.time;
         for (const a of st.men) if (a.alive) { a.missionAssault = null; a.holdZone = null; a.tacticalRadiusM = 3; a.contactRadiusBaseM = 3; a.scriptDefensive = false; }

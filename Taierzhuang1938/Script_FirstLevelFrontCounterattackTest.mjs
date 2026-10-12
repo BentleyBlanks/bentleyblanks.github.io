@@ -6,7 +6,7 @@
 // 在事实表里）。口径：docs/Data_FirstLevel0311Refactor20261012Contract.md §3.1–3.3。
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { GapWindow, PickSapShellPoint, PickNestShellPoint, EscortsClear, NestFrontPicks, OnAttackBranch, LightShellHurt, NestFrontCleared } from "./Script_FirstLevelFrontCounterattack.mjs";
+import { GapWindow, PickSapShellPoint, PickNestShellPoint, EscortsClear, NestFrontPicks, OnAttackBranch, LightShellHurt, NestFrontCleared, NestFrontPullBackWhy } from "./Script_FirstLevelFrontCounterattack.mjs";
 import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { FRONT_SAP_SHELL_POINTS, FRONT_NEST_SHELL_AREA, FRONT_NEST_FRONT_POSTS, FRONT_NEST_FRONT_PULLBACK, FRONT_TANK_CREW, FRONT_ESCORT_WITHDRAWN } from "./Data_FirstLevelMissionFront.mjs";
@@ -166,6 +166,13 @@ const eq = (a, b, message) => { assert.equal(a, b, message); checks++; };
   ok(NestFrontCleared([outMan, atBack], T.nestFrontClearZ, { pulledBack: true, pullbackM: T.nestFrontPullbackClearM, awayM: T.nestFrontAwayM }), "pulled back: out of the yard and away, or at the pull-back point, counts");
   ok(!NestFrontCleared([yardMan], T.nestFrontClearZ, { pulledBack: true, pullbackM: T.nestFrontPullbackClearM, awayM: T.nestFrontAwayM }), "pulled back but still in the yard: not cleared");
   ok(T.nestFrontOrderPauseS >= 1, "BundleOrder waits a beat after the clearing");
+  // Round 4: the fight across the yard stands at least nestFrontMinFightS before the tank at Block sends them back.
+  eq(NestFrontPullBackWhy({ tankAtBlock: true, dead: 0, total: 2, sinceArrivalS: T.nestFrontMinFightS - 1 }, T), null, "tank at Block, fight younger than nestFrontMinFightS: nobody pulls back yet");
+  eq(NestFrontPullBackWhy({ tankAtBlock: true, dead: 0, total: 2, sinceArrivalS: T.nestFrontMinFightS }, T), "tankAtBlock", "tank at Block once the fight has stood: pull back");
+  eq(NestFrontPullBackWhy({ tankAtBlock: false, dead: 0, total: 2, sinceArrivalS: T.nestFrontHoldS }, T), "held", "the hold runs out: pull back");
+  eq(NestFrontPullBackWhy({ tankAtBlock: false, dead: 1, total: 2, sinceArrivalS: 1 }, T), "halfDown", "half of them down: pull back at once");
+  eq(NestFrontPullBackWhy({ tankAtBlock: false, dead: 0, total: 2, sinceArrivalS: T.nestFrontMinFightS + 1 }, T), null, "no tank at Block, fight young: they stay");
+  ok(T.nestFrontMinFightS >= 15 && T.nestFrontMinFightS < T.nestFrontHoldS, "the minimum fight is a real beat and shorter than the hold");
   ok(FRONT_NEST_FRONT_PULLBACK.z <= T.nestFrontClearZ && T.nestFrontHoldS >= 30 && T.nestFrontHoldS <= 90, "the pull-back point is north of the clear line and the hold keeps 04 inside 90-150 s");
   ok(T.suppressLevel <= 0.3, "the gun counts as suppressed at the AI's own threshold (Script_Ai wake check 0.3)");
   ok(T.gapRushCloseM > T.gapRadiusM, "the rush ring is wider than the gap ring");
