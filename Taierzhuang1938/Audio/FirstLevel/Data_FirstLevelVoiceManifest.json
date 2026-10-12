@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-10-11T17:06:06.456Z",
+  "updatedAt": "2026-10-11T22:40:47.006Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -1349,9 +1349,9 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 0.707,
-      "bytes": 9449,
-      "sha256": "2231bc7624ed3d810f377d1555b0df0f4a9f4861dc723879a0c2a408758cf399",
+      "seconds": 0.66,
+      "bytes": 8822,
+      "sha256": "ad18f1c8b909ac0489bb71c23f2c38fbeee73ad0018fe0014d9de67d73944abf",
       "source": "patch",
       "sceneSha256": "2e057dde9ee419df5216227c1050f400e654d2eac0d8424b1f5878b468e402f8",
       "sceneStartS": 23.97,
@@ -1370,23 +1370,23 @@
       "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -17.89,
-        "truePeakDb": -2.92,
-        "snrDb": 22.79,
+        "activeRmsDb": -19.45,
+        "truePeakDb": -6.2,
+        "snrDb": 50.81,
         "voicedS": 0.54,
-        "lowShare": 0.528,
+        "lowShare": 0.338,
         "f0": {
-          "median": 136,
-          "p10": 100,
-          "p90": 308,
-          "frames": 14
+          "median": 200,
+          "p10": 113,
+          "p90": 320,
+          "frames": 16
         },
         "cer": 0,
         "transcript": "滚你妈的。",
-        "speakerCos": 0.515,
+        "speakerCos": 0.609,
         "nearestOther": [
-          "comrade",
-          0.333
+          "yaowa",
+          0.335
         ],
         "referencedOther": [
           "liuwencai",
@@ -1400,10 +1400,19 @@
       "patch": {
         "reason": "整段里这一句分错了嗓子 / 念错，单独补录（带本人定妆音），有声段电平对齐到整段里原来那一片",
         "replacedSha256": "0fe41796ac4063347eea217a5f99e374019495f4434fdf43362b6705ae1a1154",
-        "targetDb": -17.44,
-        "takes": 3,
-        "take": 2,
-        "promptHash": "8058a92997db4fe4791155e8e4757d665d3f7f2dd0c25371005188731652a424"
+        "targetDb": -19,
+        "sliceDb": -17.44,
+        "targetFrom": "导演表 patch.masterDb",
+        "takes": 5,
+        "take": 1,
+        "promptHash": "1c756bf297b5573dde93a0d3fdf92b37c777b5d19559d01424ecb0c0e84b05d7",
+        "mode": "line+BunkerBanter.07",
+        "mutedRaw": [
+          [
+            0.025,
+            0.045
+          ]
+        ]
       }
     },
     "BunkerBanter.10": {
@@ -2991,7 +3000,7 @@
       "projection": "shout",
       "seconds": 2.75,
       "bytes": 33899,
-      "sha256": "3a2afa1c24087c8ac501d8e566bd9818e88d838e9430bbf556ed07301a7db50a",
+      "sha256": "4e9929611d8e16df100d4bee80842cea3c4053863b96e0832c9a48d38bead46e",
       "source": "scene",
       "sceneSha256": "079767a5b1fc950cfada2425bb42e3d9ce6a4f488ff55c161f3cf12cc221cf35",
       "sceneStartS": 0,
@@ -3010,11 +3019,11 @@
       "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -18.14,
-        "truePeakDb": -3.28,
-        "snrDb": 90.36,
-        "voicedS": 1.34,
-        "lowShare": 0.099,
+        "activeRmsDb": -18.08,
+        "truePeakDb": -3.25,
+        "snrDb": 90.57,
+        "voicedS": 1.32,
+        "lowShare": 0.098,
         "f0": {
           "median": 239,
           "p10": 174,
@@ -3023,20 +3032,31 @@
         },
         "cer": 0.1667,
         "transcript": "孙哥,你脸咋了?",
-        "speakerCos": 0.776,
+        "speakerCos": 0.781,
         "nearestOther": [
           "luo",
-          0.524
+          0.531
         ],
         "referencedOther": [
           "luo",
-          0.524
+          0.531
         ],
         "lengthDiff": 0,
         "subtitleCoverage": 1,
         "sceneGainDb": 0.2
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "remastered": {
+        "fromSha256": "3a2afa1c24087c8ac501d8e566bd9818e88d838e9430bbf556ed07301a7db50a",
+        "muted": [
+          [
+            2.68,
+            2.695
+          ]
+        ],
+        "gainDb": 0.45,
+        "why": "整段原始 take 在这一片首字前 / 末字后的静音里带了一下孤立的咔嗒（15–20 ms），只把那几毫秒静音掉，长度、电平、逐字时间、整段区间都不动"
+      }
     },
     "CollectionMeet.02": {
       "file": "Lines/AudioVoice_FirstLevelCollectionMeet_02.mp3",
@@ -5411,7 +5431,7 @@
       "projection": "shout",
       "seconds": 6.83,
       "bytes": 82800,
-      "sha256": "5be0e2a00467413509894e552199eb7f9b22ae9e80a50c3acd92479611f149d3",
+      "sha256": "f2d025e6374548f0413ed0b50615e4e04145749f764b0a67379d3de35b66c757",
       "source": "scene",
       "sceneSha256": "08912d5a6bc6e7bb5633a37ffc45d08edff288895b03410a49554e72e13e12c3",
       "sceneStartS": 0.03,
@@ -5430,10 +5450,10 @@
       "castSha256": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -17.87,
-        "truePeakDb": -4.34,
-        "snrDb": 45.08,
-        "voicedS": 4.42,
+        "activeRmsDb": -17.86,
+        "truePeakDb": -4.43,
+        "snrDb": 45.05,
+        "voicedS": 4.4,
         "lowShare": 0.09,
         "f0": {
           "median": 410,
@@ -5443,20 +5463,31 @@
         },
         "cer": 0.2381,
         "transcript": "这里有人接!你们帮人护着伤员王们,送到桥头接运店!",
-        "speakerCos": 0.633,
+        "speakerCos": 0.645,
         "nearestOther": [
           "shunzi",
-          0.351
+          0.36
         ],
         "referencedOther": [
           "shunzi",
-          0.351
+          0.36
         ],
         "lengthDiff": 1,
         "subtitleCoverage": 1,
         "sceneGainDb": 1.56
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "remastered": {
+        "fromSha256": "5be0e2a00467413509894e552199eb7f9b22ae9e80a50c3acd92479611f149d3",
+        "muted": [
+          [
+            0.06,
+            0.08
+          ]
+        ],
+        "gainDb": 0.44,
+        "why": "整段原始 take 在这一片首字前 / 末字后的静音里带了一下孤立的咔嗒（15–20 ms），只把那几毫秒静音掉，长度、电平、逐字时间、整段区间都不动"
+      }
     },
     "Volunteer.02": {
       "file": "Lines/AudioVoice_FirstLevelVolunteer_02.mp3",
@@ -9458,7 +9489,7 @@
       ],
       "attempt": 2,
       "pickedBy": "check",
-      "requests": 15,
+      "requests": 17,
       "attempts": [
         {
           "n": 1,
@@ -11763,7 +11794,44 @@
         "truePeakDb": -15.02,
         "snrDb": 37.29
       },
-      "mastering": "WholeSceneOnceRmsTruePeakMinus1"
+      "mastering": "WholeSceneOnceRmsTruePeakMinus1",
+      "rejectedRetakes": {
+        "at": "2026-10-12 R3-Voice",
+        "requests": 6,
+        "takes": [
+          {
+            "reference": "comradeWounded",
+            "f0MedianHz": 291,
+            "seconds": 0.8
+          },
+          {
+            "reference": "comradeWounded",
+            "f0MedianHz": 340,
+            "seconds": 1.54
+          },
+          {
+            "reference": "comradeWounded",
+            "f0MedianHz": 333,
+            "seconds": 2.07
+          },
+          {
+            "reference": "comrade",
+            "f0MedianHz": 239,
+            "seconds": 1.83
+          },
+          {
+            "reference": "comrade",
+            "f0MedianHz": 308,
+            "seconds": 1.51
+          },
+          {
+            "reference": "comrade",
+            "f0MedianHz": 276,
+            "seconds": 1.05
+          }
+        ],
+        "why": "想把 R2 那条的基频（MeasureVoice 327 Hz）压到 120–220 Hz：先用 comradeWounded 两种提示词 3 次，再按集成负责人决定换平时那条 comrade 定妆音 3 次，六条都不在范围里（f0 为 MeasureVoice 中位），不变调，装着的仍是 R2 那条"
+      }
     },
     "BayonetPractice": {
       "file": "AudioVoice_FirstLevelBayonetPractice.mp3",
