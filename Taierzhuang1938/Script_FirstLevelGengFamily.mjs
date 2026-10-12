@@ -113,6 +113,8 @@ export class FirstLevelGengFamily {
       actor.missionGeng = key;
       actor.scriptEssential = this.protected;
       actor.missionUntargetable = this.protected;
+      // 没有枪的百姓弹药为 0 会被 Script_Interact 当成「弹打光了的自己人」给出分桥夹的 F 提示：按满。
+      actor.ammo = 99;
       actor.yaw = spot.yaw ?? 0;
       InstallMissionSentry(actor);
       r.MoveActor(actor, actor.position, 0);
@@ -485,7 +487,9 @@ export class FirstLevelGengFamily {
     return {
       protected: this.protected,
       nier: { state: this.nierState, ...Pos(this.actors.nier), shells: this.shells, picking: !!this.nierPick && !this.nierPick.done,
-        following: !!this.follow, running: !!this.nierRoute, pointing: !!this.pointing, model: this.actors.nier?.actor?.characterRig?.modelId ?? null,
+        following: !!this.follow, running: !!this.nierRoute, pointing: !!this.pointing,
+        // 百姓是 tzm 合批网格（没有 GLB 骨架 characterRig）：报模型来源与分身，"box" = 模型没读到退回方块。
+        modelSource: this.actors.nier?.actor?.meshSource ?? null,
         scale: this.actors.nier?.actor?.sizeScale ?? null, variant: this.actors.nier?.actor?.variant ?? null },
       geng: { ...Pos(this.actors.geng), pose: this.gengPose?.kind ?? null, walking: !!this.gengGoal },
       peasant: Pos(this.actors.peasant),

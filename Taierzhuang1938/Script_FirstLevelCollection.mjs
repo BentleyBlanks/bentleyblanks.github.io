@@ -33,6 +33,7 @@ import { COLLECTION_CARE_CLIPS as CARE, CareMedicSpot, CarePatientClip } from ".
 import { LoadCollectionCareAnimation, CollectionCareLibrary, CareClipDuration, InstallCareClips, RemoveCareClips,
   DressMedic, DressWound, StrawMaterial } from "./Script_CollectionCareAnimation.mjs";
 import { T } from "./Script_Text.mjs";
+import { INTERACT } from "./Data_Tuning_Interact.mjs";
 
 /** 借火那一段的姿态顺序（State().borrow 按这个序列记，测试照它对账）。 */
 export const BORROW_POSE_ORDER = Object.freeze(["ask", "pat", "pocket", "offer", "light", "share", "wince"]);
@@ -288,6 +289,9 @@ export class FirstLevelCollection {
     soldier.speakerRole = "zhou";
     soldier.scriptEssential = true;
     soldier.missionUntargetable = true;
+    // 他的枪在 04 就交给了何有田，弹药为 0 会让 F 变成「给老周分一个桥夹」（Script_Interact 的活人分弹候选，
+    // 内建优先级压过借火的交互点）：按满，借火的 F 才是借火。
+    soldier.ammo = Math.max(soldier.ammo || 0, soldier.weapon?.magazine || 5);
     soldier.yaw = FirstLevelCollection.SeatYaw();
     // 准星认人读 identity.name / age：他是「老周」（字幕同一张表），年龄与 03–05 枪上那一副同一个数（B.zhouAge）。
     soldier.identity = { ...soldier.identity, name: MISSION_VOICE_CAST.zhou?.[0] ?? soldier.identity?.name, age: B.zhouAge };
@@ -420,6 +424,8 @@ export class FirstLevelCollection {
       label: () => T(this.borrowSaid ? "firstLevel.interaction.borrowLightShare" : "firstLevel.interaction.borrowLight"),
       Enabled: () => r.flow?.stage?.id === "Orders" && this.borrowCued && (!this.borrowSaid || (this.offered && !this.matchAsked)),
       OnComplete: () => (this.borrowSaid ? this.BorrowSecondF() : this.BorrowFirstF()),
+      // 集结处的补给箱（MissionSupplyOrders）离借火位只有 1.1 m：脸朝着老周时借火压过它（实拍 2026-10-12 第一次 F 吃进了补给）。
+      priority: INTERACT.pointPriority + 1,
       gesture: "tap", reachM: F.borrowTriggerM, heightM: 2.5, facingDot: null, once: false,
     }) || true;
   }

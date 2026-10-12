@@ -22,7 +22,7 @@ const Idle = (page, seconds) =>
 /** 阶段 1–7。前置：ctx 已经开好页、装好输入驱动器。 */
 export async function Drive(ctx) {
   const { page, output } = ctx;
-  const { JumpStage, Capture, CaptureFocus, WaitOutCutscene, Route, Interact, WaitStage } = CampaignActions(ctx);
+  const { JumpStage, Capture, CaptureFocus, WaitOutCutscene, Route, Interact, InteractProbe, WaitStage } = CampaignActions(ctx);
   const shots = path.join(output, "..", "L1Front");
   await fs.mkdir(shots, { recursive: true });
 
@@ -94,11 +94,14 @@ export async function Drive(ctx) {
     }
   }, frames);
   let orders = await Snapshot();
-  for (let chunk = 0; chunk < 20 && !orders.front.collection.borrowCued; chunk++) { await Step(30); orders = await Snapshot(); }
+  // 提示要等 Volunteer（五句，约 20 s）说完（volunteerHeard）才亮：站着等，最多 60 s。
+  for (let chunk = 0; chunk < 120 && !orders.front.collection.borrowCued; chunk++) { await Step(30); orders = await Snapshot(); }
   assert.ok(orders.front.collection.borrowCued, "站到老周跟前、脸朝着他，借火的提示亮了：" + JSON.stringify(orders.front.collection));
   assert.ok(!orders.front.collection.borrowSaid, "没按 F 之前老周不开口（契约 §3.4 两次 F）");
-  await Interact();
+  await InteractProbe("BorrowFirstF");
+  const pressed = await Interact();
   orders = await Snapshot();
+  console.log("BORROW_FIRST_F", JSON.stringify({ pressed, collection: orders.front.collection, frontScenes: orders.front.scenes ?? null }));
   assert.ok(orders.front.collection.borrowSaid, "第一次 F：借火开口了");
   // 分段推：借火那一拍要在演的时候拍，等整段走完老周已经上担架抬走了。
   let secondPressed = false;
@@ -137,7 +140,8 @@ export async function Drive(ctx) {
   assert.equal(orders.stage, "South", "后送队起行把 06 推到 07");
   // 妮儿：06 在沟沿上捡弹壳、担架员喊过她；起行后跟队。
   assert.ok(orders.facts.includes("nierSeen") && orders.played.includes("NierShells"), "06 看见沟沿上捡弹壳的妮儿，担架员喊了她");
-  assert.ok(orders.geng?.nier?.x != null && orders.geng.nier.model === "CivilianFemale", "妮儿在场、占位模型是 CivilianFemale：" + JSON.stringify(orders.geng?.nier));
+  assert.ok(orders.geng?.nier?.x != null && orders.geng.nier.variant === "girl" && orders.geng.nier.modelSource === "model" && orders.geng.nier.scale < 0.7,
+    "妮儿在场、占位是 CivilianFemale 的 girl 分身（模型读到了、缩 0.62）：" + JSON.stringify(orders.geng?.nier));
   assert.ok((orders.geng?.nier?.shells ?? 0) >= 1, "妮儿真的捡过弹壳：" + JSON.stringify(orders.geng?.nier));
   {
     const stages = (await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().log.filter((e) => e.kind === "stage")));

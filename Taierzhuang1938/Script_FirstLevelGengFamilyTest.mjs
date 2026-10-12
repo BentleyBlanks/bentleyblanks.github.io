@@ -118,7 +118,7 @@ function FakeRuntime() {
       Spawn: (side, x, z, options) => {
         if (r.spawnFail) return null;
         const actor = { id: nextId++, side, alive: true, position: { x, y: Ground(x, z), z }, yaw: 0, stance: 0, options,
-          actor: { characterRig: { modelId: options.actorVariant === "girl" ? "CivilianFemale" : "CivilianMale" }, sizeScale: options.actorVariant === "girl" ? 0.62 : 1.03, variant: options.actorVariant } };
+          actor: { meshSource: "model", sizeScale: options.actorVariant === "girl" ? 0.62 : 1.03, variant: options.actorVariant } };
         r.ai.soldiers.push(actor);
         return actor;
       },
@@ -238,7 +238,7 @@ function Step(r, geng, seconds) {
   Check(nier.actor.missionUntargetable && geng.State().protected, "Protect(true) 回来");
   const state = geng.State();
   for (const key of ["protected", "nier", "geng", "peasant", "heizi", "cart", "events"]) Check(key in state, `State() 有 ${key}`);
-  Check(state.nier.model === "CivilianFemale" && state.nier.scale === 0.62, "State().nier 报占位模型与缩放");
+  Check(state.nier.modelSource === "model" && state.nier.variant === "girl" && state.nier.scale === 0.62, "State().nier 报模型来源、分身与缩放");
   // 生成失败（人口满）会排进 spawnQueue 重试。
   const r2 = FakeRuntime(), g2 = new FirstLevelGengFamily(r2);
   r2.spawnFail = true; g2.Enter("Orders");
