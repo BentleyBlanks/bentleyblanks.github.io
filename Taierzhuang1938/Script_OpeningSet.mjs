@@ -1586,7 +1586,7 @@ export class OpeningCorpses {
           let material = this.clones.get(part.material.uuid);
           if (!material) { material = CloneShadedMaterial(part.material); this.clones.set(part.material.uuid, material); }
           const mesh = new THREE.Mesh(geometry, material);
-          mesh.name = `${body.group.name}_${part.material.name || "part"}`; mesh.castShadow = !small(part); mesh.receiveShadow = true;
+          mesh.name = `${body.group.name}_${part.material.name || "part"}`; mesh.castShadow = !small(part); mesh.receiveShadow = true; mesh.userData.corpseSmallPart = small(part);
           mesh.userData.sharedGeometry = true;        // 几何是尸体层的，DisposeRoot 不许收
           body.group.add(mesh);
         }
@@ -1666,7 +1666,7 @@ export class OpeningCorpses {
 
   /** 垫尸这一帧画网格还是批次实例（见类头）；不会动的三具恒为批次。 */
   Sync(body) {
-    const mesh = !!body.group && (!!body.jolt || body.stillCalls < CORPSE_RENDER.stillCalls);
+    const mesh = !!body.group && (this.legacyDraw || !!body.jolt || body.stillCalls < CORPSE_RENDER.stillCalls);
     if (body.group) {
       body.group.visible = body.visible && mesh;
       if (!mesh && body.meshMode !== false) for (const slot of body.slots) slot.batch.mesh.setMatrixAt(slot.id, body.group.matrix);
@@ -1674,6 +1674,19 @@ export class OpeningCorpses {
     if (body.meshMode === mesh && body.slotsShown === (body.visible && !mesh)) return;
     body.meshMode = mesh; body.slotsShown = body.visible && !mesh;
     for (const slot of body.slots) slot.batch.mesh.setVisibleAt(slot.id, body.slotsShown);
+  }
+
+  /**
+   * 同页 A/B（取证用，Probe 里调）：true = 2026-10-12 R4-Perf 之前的画法 —— 垫尸一直画自己的网格、眼睛也投影；
+   * false = 现行画法。不进存档、不进画质表。
+   */
+  SetLegacyDraw(on) {
+    this.legacyDraw = !!on;
+    for (const batch of this.batches) batch.mesh.castShadow = this.legacyDraw || batch.castShadow;
+    for (const body of this.bodies.values()) {
+      if (body.group) for (const mesh of body.group.children) mesh.castShadow = this.legacyDraw || !mesh.userData.corpseSmallPart;
+      this.Sync(body);
+    }
   }
 
   Show(id, on) {
