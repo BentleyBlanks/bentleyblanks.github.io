@@ -123,8 +123,10 @@ export const PROPS = Object.freeze([
     lean: Object.freeze({ fromM: 0.3, deg: 20 }),
     openings: Object.freeze([Object.freeze({ x0: 2.7, x1: 3.5, h: 1.7 }), Object.freeze({ x0: 4.9, x1: 5.5, h: 1.45 })]) },
   // 沟底铺板：x 2→14、z≈-124.6、宽 0.6。跳过现有铺板 BunkerTrenchDuckboard45（中心 x 9.02，长 2.4）。
+  // （2026-10-12 R4：西头从 x 2.2 收到 4.05：顺子右前方的汉阳造 rescue.rifleMouth 顺沟躺在 z -124.63、x 2.62–3.88 的泥里，
+  // 原来的铺板正盖在它上面，N06 看不见枪。洞口外这 2 m 是塌土边的烂泥。）
   { id: "duckboardsFront", kind: "duckboards", width: 0.6, slatM: 0.11, gapM: 0.05, columns: 1,
-    path: Path([2.2, -124.72], [7.7, -124.62]), path2: Path([10.3, -124.6], [13.6, -124.6]) },
+    path: Path([4.05, -124.686], [7.7, -124.62]), path2: Path([10.3, -124.6], [13.6, -124.6]) },
   // 前沟两壁护壁：竖桩 + 横木，贴坡脚、向墙里斜。跳过现有围栏式护壁 BunkerTrenchRevetment45_±1（x 7.2–10.8）。
   // 北壁 x 2.6–5.9 是木框立面，护壁接在它东头。
   { id: "revetmentFront", kind: "revetment", heightM: 1.1, postEveryM: 1.15, logs: 3, leanDeg: 12,
@@ -492,8 +494,9 @@ export const DESIGNED_CONTACTS = Object.freeze({
   rubbleMoundBack: Object.freeze({ marks: Object.freeze(["shunzi.cover", "shunzi.trap", "shunzi.witnessEye", "SB06.seat", "SB06.dragCoverSet", "withdraw.playerSet"]),
     why: "SB06：顺子坐着背靠塌土；它只在他被拖出来、坐上坐位（导演 Check）以后出现，压着的时候他的胸口在这块地上（RescueShown）" }),
   bunkerCrateStackN: Object.freeze({ marks: Object.freeze(["SB01.yaowa"]), why: "SB01：幺娃靠着北壁坐，身后就是弹药箱" }),
-  trenchFacadeN: Object.freeze({ marks: Object.freeze(["SB03.captive", "SB03A.captive", "banter.comradeBlast", "rescue.rifleMouth"]),
-    why: "SB03/03A：死川军背靠门框边的板墙；近爆时他就是被摔在这面北壁上（BlastSlamBuried）；汉阳造躺在板墙脚下的泥里（不是人，只是标记）" }),
+  // （2026-10-12 R4：汉阳造 rescue.rifleMouth 从眼位左前（北壁板墙脚下）挪到右前方沟底，不再挨着这面板墙，豁免撤掉；净空见 SetTest 6d2。）
+  trenchFacadeN: Object.freeze({ marks: Object.freeze(["SB03.captive", "SB03A.captive", "banter.comradeBlast"]),
+    why: "SB03/03A：死川军背靠门框边的板墙；近爆时他就是被摔在这面北壁上（BlastSlamBuried）" }),
 });
 
 export const OPENING_SET = Object.freeze({ version: "20260928OpeningSetV3", stages: SET_STAGES, PROPS, BLAST, SMOKE, FLYOVER, FLYOVER_TRIGGER, sky,
