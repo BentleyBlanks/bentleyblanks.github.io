@@ -164,6 +164,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 | `intent` | 可选：此刻「即将去」的折线，画成虚线箭头；没有且下一关键帧里这个人换了位置，则自动取下一关键帧的 `path`/直线 |
 | `speedMps` | 可选过渡速度；缺省 ija 2.8、nra 2.4、civ 1.6、litter 1.2、tank 2.0 |
 | `guess` | 可选 `true`：位置是推测的（游戏数据里没写），界面上用虚线圈 + 「?」 |
+| `bearers` | 只对 `kind: "litter"`：抬担架的人数 0–2（缺省 2）；`0` = 担架放在地上 / 床边、没人抬。担架的 `state: "down"` 只表示抬担架的人倒了 |
 
 `Script_EditorBlockoutConfig.mjs`（纯，node 与浏览器共用，LocalPreview 也要 import，**导入时不得抛错、不得碰 DOM / three**）：
 
@@ -268,12 +269,13 @@ export class BlockoutMap {
 
 - 当前关键帧 `signals` 里的名字视为「已发生」。`Script_Main` 每帧的 `SyncScenario` 回调加一句 `|| !!blockout?.Signalled(name)`（一次性 `OpenGate` 会被下一帧冲掉）。
 - 往回跳到信号更少的关键帧：调一次 `battlefield.RestoreScenario({ signalled })`，再 `nav.Refresh(battlefield, { spread: true })`。
-- 第一关常用：`BunkerCollapsed`（02 起）、`MissionCourtyardGateOpen`（11 起，按现有 StageJump 口径手动开门）、`MissionBridgeDestroyed`（14 起）、`RailBridgeDestroyed` / `NightGateShown`（18 末）。名字以 `MISSION_SCENARIO_SIGNALS` 与门的 `signal` / `appearSignal` 为准，生成器负责写对。
+- 第一关（按剧情时刻，不按阶段起点）：`BunkerCollapsed`（01-2 起）、`MissionCourtyardGateOpen`（10-1 起，老耿开后门那一刻）、`MissionBridgeDestroyed`（13-2 起，第一轮扫射时记）、`RailBridgeDestroyed`（18-3 起）、`NightGateShown`（只在 18-4）。名字以 `MISSION_SCENARIO_SIGNALS` 与门的 `signal` / `appearSignal` 为准，生成器负责写对；运行时与测试一律读配置里的 `signals`，不按阶段号推。
 
 ### 5.5 3D 标记（`Script_EditorBlockoutMarkers.mjs`）
 
 - 全部画在 `post.AddDebugOverlay(root)` 里（默认白盒画质会把场景里的 Sprite / Points 藏掉、把普通 Mesh 涂灰，debug overlay 不受影响）；颜色做曝光补偿（`root.userData.PrepareDebugOverlay`，照 `Script_EditorAi` 的 `AiOverlayGeometry`）。
 - 每个单位：脚下地环（敌 `#d6604a`、友 `#9dc0e4`、百姓 `#9fc47f`、推测 = 虚线）；朝向短箭头；射界扇（贴地、半透明填充 + 描边）；去向虚线箭头（贴地）。
+- 射界扇只画深度测试那一遍（不穿墙）、填充很淡（不透明度约 0.1）、描边细；扇子起点离相机 6 m 以内的整片淡出（第一人称低机位时近处的扇子会糊满屏幕）。地环、箭头、光柱照常两遍。
 - POI：细光柱 0→8 m + 地环；下一步目标：金色光柱 0→14 m + 呼吸地环。
 - **看得见 / 被挡住两种画法**：同一组几何画两遍，一遍做深度测试（亮），一遍不做（暗、半透明）。被墙挡住的人也能找到，但一眼分得出「现在看不看得见他」。图层开关「穿墙显示」关掉第二遍。
 - 头顶 DOM 标签池：有名字的显示「色点 + 名字」，无名普通兵只显示色点三角；120 m 外只保留有名字的与机枪；按近到远避让；下一步目标在屏幕外时贴边显示箭头 + 「下一步 · 文字 · 距离」。标签挂在单位的世界位置上（不挂 `actor.root` 子节点）。
@@ -348,7 +350,8 @@ Config()                     // → 归一化后的配置（深拷贝）
 ## 7. 存档（`Script_EditorBlockoutStore.mjs` + 本机端点）
 
 - 读：`fetch("./Blockout/<Level>.json?t=" + Date.now(), { cache: "no-store" })`；404 / 非 JSON 视为没有配置（界面提示）。
-- 写（只在本机 LocalPreview 下可写）：`GET /__blockout/status` → `{ writable, root, revisions: { <Level>: "<sha1 原始字节>" } }`；`POST /__blockout/save`，body `{ level, doc, revision }`。
+- 写（只在本机 LocalPreview 下可写）：`GET /__blockout/status`（只收 GET / HEAD）→ `{ writable, root, revisions: { <Level>: "<sha1 原始字节>" | null }, reason? }`（不可写时 `reason` 写原因）；`POST /__blockout/save`，body `{ level, doc, revision }`：`revision` 必填（字符串，文件不存在时才可为 `null`），`doc.level` 必须等于 `level`。成功 200 `{ ok, level, file, revision, warnings }`（客户端留下返回的 `revision` 供下次保存）；状态码：方法不对 405、非本机 / Host / Origin 不对 403、Content-Type 不对 415、超 4 MB 413、坏 JSON / 校验不过 / 嵌套过深 400（带 `details`）、level 或路径不对 403、版本号不符 409（带当前 `revision`）、写盘失败 500。
+- 版本号 = 文件**原始字节**的 sha1（工作区是 CRLF 时也一样）：客户端读配置时按响应的原始字节（`arrayBuffer`）算 sha1，作为「我改的是哪一版」随保存发出；不得用状态口当下返回的版本号（那会把外部刚改的内容静默盖掉）。
 - 端点（照 `Script_TextureImportServer` 的加固写法）：本机 socket + Host 只认 localhost / 127.0.0.1、`Content-Type: application/json`、同源 Origin、body ≤ 4 MB、`level ∈ BLOCKOUT_LEVEL_KEYS` 且路径过 `BLOCKOUT_CONFIG_FILE_RE`、解析后路径必须在根目录下、`ValidateBlockout` 不过返回 400 + `details`、`revision` 不符返回 409、`.tmp` + rename 原子写（`JSON.stringify(doc, null, 2) + "\n"`）。任何拒绝都不落一个字节。路由放在 405 闸之前。场景文件 v1 不开放写。
 - 不可写时（Pages、测试服、局域网、旧的预览进程）：存进 `localStorage`（键 `tengxian1938_blockout_<Level>`）+ 提供下载 JSON，界面写明原因。
 - 编辑器 v1 只有一个写操作：「记下当前机位」= 把玩家当前位置 / 朝向 / 姿态写进当前关键帧的 `player` 并保存。其余改动直接改 JSON（人或 AI），编辑器 2 s 内同步。
@@ -450,5 +453,6 @@ Config()                     // → 归一化后的配置（深拷贝）
 
 ## 12. 变更记录
 
-- 2026-10-13：初版（入口、数据格式、接口、界面、第一关 45 个关键帧、第二关草稿、测试与分工）。
+- 2026-10-13：初版（入口、数据格式、接口、界面、第一关 44 个关键帧、第二关草稿、测试与分工）。
 - 2026-10-13：追加「设置 → 高级工具」面板入口；`Script_EditorBlockoutConfig.mjs` 由集成负责人先写好；过渡改为按自然速度 + 整段快进；`Script_EditorBlockoutStore.mjs` 归 B 包。
+- 2026-10-13（集成）：四包合并；§5.4 信号按剧情时刻；§3 担架加 `bearers`；§5.5 射界扇只画不穿墙的一遍并在近处淡出；§7 写明端点的必填字段、返回与状态码、版本号按原始字节；校验器报错不再回显嵌套值（防预览服务栈溢出）。

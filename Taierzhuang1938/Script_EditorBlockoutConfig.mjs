@@ -39,6 +39,13 @@ function Finite(value) { return typeof value === "number" && Number.isFinite(val
 function IsObject(value) { return !!value && typeof value === "object" && !Array.isArray(value); }
 function IsPoint(value) { return IsObject(value) && Finite(value.x) && Finite(value.z); }
 function Clone(value) { return value === undefined ? undefined : JSON.parse(JSON.stringify(value)); }
+// 报错时回显用户给的值：只回显标量，对象 / 数组一律写类型（嵌套极深的值 JSON.stringify 会栈溢出，
+// 存档口在 LocalPreview 进程里调校验器，那里抛出来会带倒整个预览服务）。
+function Echo(value) {
+  if (value === null || ["string", "number", "boolean"].includes(typeof value)) return JSON.stringify(value).slice(0, 80);
+  if (Array.isArray(value)) return "数组";
+  return typeof value === "object" ? "对象" : typeof value;
+}
 function WrapDeg(deg) {
   let d = ((deg + 180) % 360 + 360) % 360 - 180;
   if (d === -180) d = 180;
@@ -134,8 +141,8 @@ function CheckYaw(errors, at, value) {
 function CheckUnit(errors, warnings, at, unit) {
   if (!IsObject(unit)) { errors.push(`${at} 要是对象`); return; }
   if (typeof unit.id !== "string" || !unit.id) errors.push(`${at}.id 要是非空字符串`);
-  if (!BLOCKOUT_SIDES.includes(unit.side)) errors.push(`${at}.side 要是 ${BLOCKOUT_SIDES.join(" / ")}，现在是 ${JSON.stringify(unit.side)}`);
-  if (unit.kind !== undefined && !BLOCKOUT_KINDS.includes(unit.kind)) errors.push(`${at}.kind 不认识：${JSON.stringify(unit.kind)}`);
+  if (!BLOCKOUT_SIDES.includes(unit.side)) errors.push(`${at}.side 要是 ${BLOCKOUT_SIDES.join(" / ")}，现在是 ${Echo(unit.side)}`);
+  if (unit.kind !== undefined && !BLOCKOUT_KINDS.includes(unit.kind)) errors.push(`${at}.kind 不认识：${Echo(unit.kind)}`);
   if (!Finite(unit.x) || !Finite(unit.z)) errors.push(`${at} 要带有限的 x / z`);
   CheckYaw(errors, at, unit);
   if (unit.stance !== undefined && !BLOCKOUT_STANCES.includes(unit.stance)) errors.push(`${at}.stance 要是 ${BLOCKOUT_STANCES.join(" / ")}`);
@@ -149,6 +156,7 @@ function CheckUnit(errors, warnings, at, unit) {
   CheckPoints(errors, `${at}.intent`, unit.intent);
   if (unit.name !== undefined && typeof unit.name !== "string") errors.push(`${at}.name 要是字符串`);
   if (unit.guess !== undefined && typeof unit.guess !== "boolean") warnings.push(`${at}.guess 应当是 true / false`);
+  if (unit.bearers !== undefined && !(Number.isInteger(unit.bearers) && unit.bearers >= 0 && unit.bearers <= 2)) errors.push(`${at}.bearers 要是 0–2 的整数`);
 }
 
 function CheckKeyframe(errors, warnings, at, kf) {
@@ -210,7 +218,7 @@ export function ValidateBlockout(doc) {
   const errors = [];
   const warnings = [];
   if (!IsObject(doc)) return { ok: false, errors: ["配置要是一个 JSON 对象"], warnings };
-  if (doc.schema !== BLOCKOUT_SCHEMA) errors.push(`schema 要是 ${JSON.stringify(BLOCKOUT_SCHEMA)}，现在是 ${JSON.stringify(doc.schema)}`);
+  if (doc.schema !== BLOCKOUT_SCHEMA) errors.push(`schema 要是 ${JSON.stringify(BLOCKOUT_SCHEMA)}，现在是 ${Echo(doc.schema)}`);
   if (typeof doc.level !== "string" || !BLOCKOUT_LEVEL_RE.test(doc.level)) errors.push("level 要匹配 /^[A-Za-z0-9]+$/");
   if (doc.title !== undefined && typeof doc.title !== "string") errors.push("title 要是字符串");
   if (doc.zones !== undefined) {
@@ -302,6 +310,9 @@ function NormalizeUnit(raw, arcMode) {
   unit.aim = !!unit.aim;
   unit.guess = !!unit.guess;
   unit.name = typeof unit.name === "string" ? unit.name : "";
+  // 担架：bearers 是抬担架的人数（缺省 2）；0 = 担架放在地上 / 床边，没人抬。state:"down" 只表示抬担架的人倒了。
+  if (unit.kind === "litter") unit.bearers = Number.isInteger(unit.bearers) && unit.bearers >= 0 && unit.bearers <= 2 ? unit.bearers : 2;
+  else delete unit.bearers;
   if (unit.weapon === undefined) unit.weapon = DefaultWeapon(unit.side, unit.kind);
   unit.yawDeg = NormalizeYawFrom(unit, unit);
   delete unit.faceTo;
