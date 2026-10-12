@@ -20,7 +20,7 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
   shadowM: 25,
   childScale: 0.62,
   tank: { w: 2.18, d: 5.75, h: 1.2, turretW: 1.5, turretD: 1.7, turretH: 0.75, barrel: 1.6 },
-  litter: { w: 0.7, d: 2.1, y: 0.78, bearerGapM: 0.55 },
+  litter: { w: 0.7, d: 2.1, y: 0.78, groundY: 0.12, bearerGapM: 0.55 },
   cart: { w: 1.5, d: 2.4, h: 0.55, y: 0.75, wheel: 0.62 },
   animal: { w: 0.6, d: 1.7, h: 0.75, y: 0.95, head: 0.55 },
 });
@@ -31,6 +31,28 @@ function ActorKind(unit) {
   if (unit.kind === "officer") return unit.side === "ija" ? "ijaOfficer" : "nraOfficer";
   if (unit.kind === "civilian" || unit.kind === "child" || unit.side === "civ") return "civilian";
   return unit.side === "ija" ? "ija" : "nra";
+}
+
+/** 担架上有几个人抬、各站哪头（§3 bearers，缺省 2；只剩一人时留前头）。 */
+export function LitterSlots(unit) {
+  const n = Number.isInteger(unit?.bearers) ? Math.max(0, Math.min(2, unit.bearers)) : 2;
+  return n >= 2 ? ["front", "rear"] : n === 1 ? ["front"] : [];
+}
+
+/**
+ * 担架怎么摆：抬着 → 杆在手的高度、放平；只剩前头一人 → 前头在手上、后头着地（斜着）；
+ * 没人抬或抬的人倒了（state:"down"）→ 平放在地上。→ { y, tilt }（y 是担架面中心离地高度，tilt 绕 X 的弧度，前高为正）
+ */
+export function LitterPose(unit, down = unit?.state === "down") {
+  const l = BLOCKOUT_PUPPETS.litter;
+  const slots = LitterSlots(unit);
+  if (down || slots.length === 0) return { y: l.groundY, tilt: 0 };
+  if (slots.length === 1) {
+    const half = (l.d + 0.9) / 2;
+    const tilt = Math.asin(Math.min(0.9, (l.y - l.groundY) / (2 * half)));
+    return { y: (l.y + l.groundY) / 2, tilt };
+  }
+  return { y: l.y, tilt: 0 };
 }
 
 function HashSeed(text) {
@@ -111,10 +133,15 @@ export class BlockoutPuppets {
       Box(group, side, t.turretW, t.turretH, t.turretD, 0, 0.35 + t.h + t.turretH / 2, 0.35);
       Box(group, m.dark, 0.14, 0.14, t.barrel, 0, 0.35 + t.h + t.turretH / 2, 0.35 - t.turretD / 2 - t.barrel / 2);
     } else if (unit.kind === "litter") {
+      // 担架单独一个组：抬着 / 一头着地 / 放在地上 由 _Pose 摆高度与倾角（LitterPose）
       const l = P.litter;
-      Box(group, m.cloth, l.w, 0.1, l.d, 0, l.y, 0);
-      Box(group, m.wood, 0.05, 0.05, l.d + 0.9, -l.w / 2, l.y + 0.03, 0);
-      Box(group, m.wood, 0.05, 0.05, l.d + 0.9, l.w / 2, l.y + 0.03, 0);
+      const bed = new THREE.Group();
+      bed.name = "BlockoutStretcher";
+      Box(bed, m.cloth, l.w, 0.1, l.d, 0, 0, 0);
+      Box(bed, m.wood, 0.05, 0.05, l.d + 0.9, -l.w / 2, 0.03, 0);
+      Box(bed, m.wood, 0.05, 0.05, l.d + 0.9, l.w / 2, 0.03, 0);
+      group.add(bed);
+      group.userData.stretcher = bed;
     } else if (unit.kind === "cart" || unit.kind === "animal") {
       if (unit.kind === "cart") {
         const c = P.cart;
@@ -144,12 +171,14 @@ export class BlockoutPuppets {
     const bodyKinds = ["tank", "litter", "cart", "animal"];
     if (bodyKinds.includes(unit.kind)) puppet.body = this._MakeBody(unit);
     if (unit.kind === "litter") {
-      if (allowActors >= 2) {
-        for (const slot of ["front", "rear"]) {
+      // §3 bearers：2 = 前后两人抬；1 = 只剩前头一人（后端着地）；0 = 担架放在地上，没人抬
+      const slots = LitterSlots(unit);
+      if (slots.length && allowActors >= slots.length) {
+        for (const slot of slots) {
           const human = this._MakeHuman({ ...unit, kind: "soldier", side: unit.side === "civ" ? "civ" : "nra", aim: false }, slot, unit.side === "civ" ? "civilian" : "nra", null);
           if (human) puppet.humans.push(human);
         }
-      } else puppet.noActor = true;
+      } else if (slots.length) puppet.noActor = true;
     } else if (!bodyKinds.includes(unit.kind)) {
       if (allowActors >= 1) {
         const human = this._MakeHuman(unit, "main");
@@ -175,7 +204,7 @@ export class BlockoutPuppets {
 
   /** 演员名额：按到相机的距离分，近的先给（超出上限的只留地环与标签）。 */
   _Budget(units, cameraPosition) {
-    const need = u => (u.kind === "litter" ? 2 : ["tank", "cart", "animal"].includes(u.kind) ? 0 : 1);
+    const need = u => (u.kind === "litter" ? LitterSlots(u).length : ["tank", "cart", "animal"].includes(u.kind) ? 0 : 1);
     const total = units.reduce((n, u) => n + need(u), 0);
     const allow = new Map();
     if (total <= BLOCKOUT_PUPPETS.maxActors) { for (const u of units) allow.set(u.id, need(u)); this.warning = null; return allow; }
@@ -201,6 +230,7 @@ export class BlockoutPuppets {
       const wantActors = allow.get(unit.id) ?? 0;
       const stale = puppet && (puppet.unit.kind !== unit.kind || puppet.unit.side !== unit.side
         || (puppet.unit.weapon ?? null) !== (unit.weapon ?? null)
+        || (unit.kind === "litter" && LitterSlots(puppet.unit).length !== LitterSlots(unit).length)
         || (puppet.down && unit.state !== "down")
         || (puppet.noActor && wantActors > 0) || (!puppet.noActor && wantActors === 0 && puppet.humans.length > 0));
       if (stale) { this._Destroy(puppet); this.puppets.delete(unit.id); puppet = null; }
@@ -284,6 +314,12 @@ export class BlockoutPuppets {
       puppet.body.visible = puppet.visible;
       puppet.body.position.set(puppet.x, y, puppet.z);
       puppet.body.rotation.y = ry;
+      const bed = puppet.body.userData.stretcher;
+      if (bed) {
+        const pose = LitterPose(puppet.unit, !!puppet.down);
+        bed.position.y = pose.y;
+        bed.rotation.x = pose.tilt;
+      }
     }
     const unit = puppet.unit;
     const fx = -Math.sin(ry), fz = -Math.cos(ry);

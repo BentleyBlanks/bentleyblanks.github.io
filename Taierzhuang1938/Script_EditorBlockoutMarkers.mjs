@@ -6,6 +6,10 @@
 //
 // 看得见 / 被挡住两种画法：同一份几何画两遍 —— 一遍做深度测试（亮），一遍不做（暗、半透明）。
 // 被墙挡住的人也找得到，但一眼分得出现在看不看得见他。「穿墙显示」关掉第二遍。
+// 射界扇例外（§5.5）：只画深度测试那一遍（不穿墙），填充很淡（约 0.1）、描边细；
+// 扇子起点离相机 6 m 以内整片淡出 —— 第一人称低机位时，近处的扇子会像一大张半透明的布糊满屏幕；
+// 起点在远处、扇面却铺到眼前的，离相机 3 m 内的那部分逐像素淡掉。
+// 地环与朝向箭头压在脚下的高度附近（不顺着沟壁竖起来，低机位看不会是一大片斜色块）。
 //
 // 头顶标签是 DOM（挂在单位的世界位置上，不挂 actor 子节点）：有名字的「色点 + 名字」，
 // 无名普通兵只有色点；120 m 外只留有名字的与机枪；近的先排、互相避让；
@@ -23,6 +27,34 @@ const LABEL_FAR_M = 120;
 const FLASH_S = 0.6;
 const DEG = Math.PI / 180;
 
+/** 射界扇（§5.5）：填充、描边的不透明度，与近处淡出的距离（扇子起点到相机，米）。 */
+export const BLOCKOUT_FAN = Object.freeze({
+  fillAlpha: 0.1,
+  fillEdgeFalloff: 0.4,     // 射程边缘比起点再淡这么多
+  edgeAlpha: 0.5,
+  fadeNearM: 6,             // 这以内整片不画
+  fadeFarM: 10,             // 这以外不淡
+  fadeStep: 0.1,            // 淡出量化到这一档：相机走动时扇子只在跨档时重建
+  // 起点在远处、扇面却铺到眼前（人站在机枪射界里、扇面贴着沟壁）：离相机这么近的那部分逐像素淡掉
+  surfaceNearM: 3,
+  surfaceFarM: 8,
+});
+
+/**
+ * 脚下地环与朝向箭头贴地时最多往上爬多少 / 往下落多少（米，相对脚下）。人贴着沟壁站时，
+ * 照地形逐点贴地的地环会顺着沟壁竖起来，低机位看就是一大片斜着的色块；压平在脚下就不会。
+ */
+const UNIT_GROUND_CLAMP = Object.freeze({ above: 0.2, below: 0.6 });
+const SPOT_GROUND_CLAMP = Object.freeze({ above: 0.35, below: 1.0 });
+
+/** 起点离相机 distanceM 时扇子的不透明度系数（0…1，按 fadeStep 量化）。 */
+export function FanFade(distanceM) {
+  const { fadeNearM, fadeFarM, fadeStep } = BLOCKOUT_FAN;
+  if (!(distanceM > fadeNearM)) return 0;
+  const t = Math.min(1, (distanceM - fadeNearM) / (fadeFarM - fadeNearM));
+  return Math.round(Math.round(t / fadeStep) * fadeStep * 1000) / 1000;
+}
+
 const RING_RADIUS = { soldier: 0.55, officer: 0.6, civilian: 0.5, child: 0.4, tank: 3.4, litter: 1.9, cart: 2.4, animal: 1.2 };
 const HEAD_Y = { soldier: 2.05, officer: 2.05, civilian: 2.0, child: 1.45, tank: 3.1, litter: 2.1, cart: 2.2, animal: 1.9 };
 
@@ -31,12 +63,23 @@ function Rgba(hex, alpha = 1) {
   return [c.r, c.g, c.b, alpha];
 }
 
-/** 一段几何（三角 + 线段），各自按顶点存 xyz + rgba。 */
+/**
+ * 一段几何（三角 + 线段），各自按顶点存 xyz + rgba。
+ * tri / line 画两遍（看得见 + 穿墙）；fanTri / fanLine 是射界扇，只画深度测试那一遍。
+ */
 class Chunk {
-  constructor(groundAt) { this.groundAt = groundAt; this.tri = []; this.line = []; }
-  Y(x, z, lift) { return this.groundAt(x, z) + lift; }
-  Tri(a, b, c, rgba) { this.tri.push(...a, ...rgba, ...b, ...rgba, ...c, ...rgba); }
-  Seg(a, b, rgba) { this.line.push(...a, ...rgba, ...b, ...rgba); }
+  constructor(groundAt) { this.groundAt = groundAt; this.tri = []; this.line = []; this.fanTri = []; this.fanLine = []; this.clamp = null; }
+  /** 贴地高度；clamp = {y, above, below} 时夹在 y 上下这个范围里（地环、箭头不顺着墙爬）。 */
+  Y(x, z, lift) {
+    let ground = this.groundAt(x, z);
+    const c = this.clamp;
+    if (c) ground = Math.min(c.y + c.above, Math.max(c.y - c.below, ground));
+    return ground + lift;
+  }
+  /** 之后画的贴地几何以 (x, z) 处的地面为准夹住高度；limits 为 null 时取消。 */
+  ClampAround(x, z, limits) { this.clamp = limits ? { y: this.groundAt(x, z), above: limits.above, below: limits.below } : null; }
+  Tri(a, b, c, rgba, out = this.tri) { out.push(...a, ...rgba, ...b, ...rgba, ...c, ...rgba); }
+  Seg(a, b, rgba, out = this.line) { out.push(...a, ...rgba, ...b, ...rgba); }
   /** 贴地的带子（每段一个四边形）。dash：[实长, 空长]。 */
   Ribbon(points, width, rgba, { lift = 0.08, dash = null } = {}) {
     if (points.length < 2) return;
@@ -92,7 +135,7 @@ class Chunk {
     this.Tri([tip.x, this.Y(tip.x, tip.z, lift), tip.z], [bx + nx, this.Y(bx + nx, bz + nz, lift), bz + nz],
       [bx - nx, this.Y(bx - nx, bz - nz, lift), bz - nz], rgba);
   }
-  /** 射界扇：贴地半透明填充 + 两条边线与外弧（线段）。 */
+  /** 射界扇：贴地的淡填充 + 两条边线与外弧（细线）。只进 fanTri / fanLine（不穿墙）。 */
   Fan(cx, cz, yawDeg, halfDeg, range, fill, edge) {
     const angSteps = Math.max(4, Math.ceil(halfDeg * 2 / 5));
     const radSteps = Math.max(2, Math.ceil(range / 3));
@@ -106,12 +149,15 @@ class Chunk {
     for (let j = 0; j < radSteps; j++) for (let k = 0; k < angSteps; k++) {
       const a = grid[j][k], b = grid[j][k + 1], c = grid[j + 1][k + 1], d = grid[j + 1][k];
       // 填充向外渐淡：近处实一点，射程边缘轻一点
-      const f = [fill[0], fill[1], fill[2], fill[3] * (1 - 0.55 * j / radSteps)];
-      if (j === 0) this.Tri(a, c, d, f);
-      else { this.Tri(a, b, c, f); this.Tri(a, c, d, f); }
+      const f = [fill[0], fill[1], fill[2], fill[3] * (1 - BLOCKOUT_FAN.fillEdgeFalloff * j / radSteps)];
+      if (j === 0) this.Tri(a, c, d, f, this.fanTri);
+      else { this.Tri(a, b, c, f, this.fanTri); this.Tri(a, c, d, f, this.fanTri); }
     }
-    for (let j = 0; j < radSteps; j++) { this.Seg(grid[j][0], grid[j + 1][0], edge); this.Seg(grid[j][angSteps], grid[j + 1][angSteps], edge); }
-    for (let k = 0; k < angSteps; k++) this.Seg(grid[radSteps][k], grid[radSteps][k + 1], edge);
+    for (let j = 0; j < radSteps; j++) {
+      this.Seg(grid[j][0], grid[j + 1][0], edge, this.fanLine);
+      this.Seg(grid[j][angSteps], grid[j + 1][angSteps], edge, this.fanLine);
+    }
+    for (let k = 0; k < angSteps; k++) this.Seg(grid[radSteps][k], grid[radSteps][k + 1], edge, this.fanLine);
   }
   /** 竖光柱：围一圈的竖线。 */
   Pillar(x, z, height, radius, rgba, count = 4) {
@@ -125,24 +171,30 @@ class Chunk {
   }
 }
 
-/** 一层可增长的动态缓冲（三角或线段），两遍画法共用同一份 geometry。 */
+/**
+ * 一层可增长的动态缓冲（三角或线段），两遍画法共用同一份 geometry。
+ * xray:false 只建深度测试那一遍（射界扇），occluded / occludedMaterial 为 null。
+ */
 class DynamicLayer {
-  constructor(name, Ctor, makeMaterial) {
+  constructor(name, Ctor, makeMaterial, { xray = true, order = 999 } = {}) {
     this.geometry = new THREE.BufferGeometry();
     this.capacity = 0;
     this.count = 0;
     this._Allocate(2048);
     this.visibleMaterial = makeMaterial(true);
-    this.occludedMaterial = makeMaterial(false);
+    this.occludedMaterial = xray ? makeMaterial(false) : null;
     this.visible = new Ctor(this.geometry, this.visibleMaterial);
-    this.occluded = new Ctor(this.geometry, this.occludedMaterial);
-    for (const [object, order, suffix] of [[this.occluded, 997, "Occluded"], [this.visible, 999, "Visible"]]) {
+    this.occluded = xray ? new Ctor(this.geometry, this.occludedMaterial) : null;
+    const passes = [[this.visible, order, "Visible"]];
+    if (this.occluded) passes.unshift([this.occluded, order - 2, "Occluded"]);
+    for (const [object, renderOrder, suffix] of passes) {
       object.name = `${name}${suffix}`;
       object.frustumCulled = false;
       object.matrixAutoUpdate = false;
-      object.renderOrder = order;
+      object.renderOrder = renderOrder;
     }
   }
+  get materials() { return this.occludedMaterial ? [this.visibleMaterial, this.occludedMaterial] : [this.visibleMaterial]; }
   _Allocate(capacity) {
     this.capacity = capacity;
     this.positions = new Float32Array(capacity * 3);
@@ -172,12 +224,36 @@ class DynamicLayer {
     if (v) { position.addUpdateRange(0, v * 3); color.addUpdateRange(0, v * 4); }
     this.geometry.setDrawRange(0, v);
   }
-  Dispose() { this.geometry.dispose(); this.visibleMaterial.dispose(); this.occludedMaterial.dispose(); }
+  Dispose() { this.geometry.dispose(); for (const material of this.materials) material.dispose(); }
 }
 
 function MeshMaterial(depthTest) {
   return new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: depthTest ? 1 : 0.3,
     depthTest, depthWrite: false, toneMapped: false, fog: false, side: THREE.DoubleSide });
+}
+/** 射界扇：离相机 surfaceNearM 以内的那部分扇面逐像素淡掉（顶点里算到相机的距离）。 */
+function WithNearFade(material) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.blockoutFanNear = { value: BLOCKOUT_FAN.surfaceNearM };
+    shader.uniforms.blockoutFanFar = { value: BLOCKOUT_FAN.surfaceFarM };
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying float vBlockoutFanCam;")
+      .replace("#include <project_vertex>", "#include <project_vertex>\nvBlockoutFanCam = distance((modelMatrix * vec4(transformed, 1.0)).xyz, cameraPosition);");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying float vBlockoutFanCam;\nuniform float blockoutFanNear;\nuniform float blockoutFanFar;")
+      .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.a *= smoothstep(blockoutFanNear, blockoutFanFar, vBlockoutFanCam);");
+  };
+  material.customProgramCacheKey = () => "blockoutFanNearFade1";
+  return material;
+}
+/** 射界扇的填充：只做深度测试那一遍；贴地薄片往相机挪一点，免得和地面打架。 */
+function FanMeshMaterial() {
+  return WithNearFade(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 1,
+    depthTest: true, depthWrite: false, toneMapped: false, fog: false, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
+}
+function FanLineMaterial() {
+  return WithNearFade(LineMaterial(true));
 }
 function LineMaterial(depthTest) {
   return new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: depthTest ? 1 : 0.3,
@@ -196,8 +272,12 @@ export class BlockoutMarkers {
     this.root.name = "BlockoutMarkers";
     this.tris = new DynamicLayer("BlockoutMarkerTris", THREE.Mesh, MeshMaterial);
     this.lines = new DynamicLayer("BlockoutMarkerLines", THREE.LineSegments, LineMaterial);
-    this.root.add(this.tris.occluded, this.lines.occluded, this.tris.visible, this.lines.visible);
-    const materials = [this.tris.visibleMaterial, this.tris.occludedMaterial, this.lines.visibleMaterial, this.lines.occludedMaterial];
+    // 射界扇单独两层：不穿墙、排在地环之前画（地环压在扇子上）
+    this.fanTris = new DynamicLayer("BlockoutMarkerFanTris", THREE.Mesh, FanMeshMaterial, { xray: false, order: 995 });
+    this.fanLines = new DynamicLayer("BlockoutMarkerFanLines", THREE.LineSegments, FanLineMaterial, { xray: false, order: 996 });
+    this.layersAll = [this.fanTris, this.fanLines, this.tris, this.lines];
+    this.root.add(this.tris.occluded, this.lines.occluded, this.fanTris.visible, this.fanLines.visible, this.tris.visible, this.lines.visible);
+    const materials = this.layersAll.flatMap(layer => layer.materials);
     this.root.userData.PrepareDebugOverlay = ({ exposure }) => {
       const gain = OVERLAY_PEAK / THREE.MathUtils.clamp(exposure || 1, 0.05, 20);
       for (const material of materials) material.color.setScalar(gain);
@@ -216,7 +296,7 @@ export class BlockoutMarkers {
     this._v = new THREE.Vector3();
     this._w = new THREE.Vector3();
     this._camera = new THREE.Vector3();
-    this.stats = { units: 0, tris: 0, lines: 0, labels: 0 };
+    this.stats = { units: 0, tris: 0, lines: 0, fanTris: 0, fanLines: 0, fans: 0, labels: 0 };
   }
 
   // -------------------------------------------------------------------------
@@ -225,16 +305,20 @@ export class BlockoutMarkers {
   SetUnits(units) {
     this.units = units || [];
     const alive = new Set();
+    this.camera.getWorldPosition(this._camera);
+    const cam = this._camera;
     for (const unit of this.units) {
       const key = `u:${unit.id}`;
       alive.add(key);
       const arc = this.layers.arcs === "off" || this.layers.arcs === false ? null : unit.arc;
+      // 射界扇起点离相机近了整片淡出（量化成档，相机走动时只在跨档时重建这一人）
+      const fade = arc ? FanFade(Math.hypot(unit.x - cam.x, this.groundAt(unit.x, unit.z) + 0.14 - cam.y, unit.z - cam.z)) : 0;
       const sig = `${unit.x.toFixed(2)},${unit.z.toFixed(2)},${unit.yawDeg.toFixed(1)},${unit.visible !== false},${unit.side},${unit.kind},${unit.guess}`
-        + `,${arc ? `${arc.halfDeg},${arc.rangeM},${(arc.yawDeg ?? unit.yawDeg).toFixed(1)}` : "-"}`
+        + `,${arc && fade > 0 ? `${arc.halfDeg},${arc.rangeM},${(arc.yawDeg ?? unit.yawDeg).toFixed(1)},${fade.toFixed(1)}` : "-"}`
         + `,${this.layers.intents && !unit.moving && unit.intent?.length ? unit.intent.map(p => `${p.x},${p.z}`).join(";") : "-"}`;
       const entry = this.chunks.get(key);
       if (entry && entry.sig === sig) continue;
-      this.chunks.set(key, { sig, chunk: this._UnitChunk(unit, arc) });
+      this.chunks.set(key, { sig, chunk: this._UnitChunk(unit, arc, fade) });
       this.dirty = true;
     }
     for (const key of [...this.chunks.keys()]) if (key.startsWith("u:") && !alive.has(key)) { this.chunks.delete(key); this.dirty = true; }
@@ -246,7 +330,9 @@ export class BlockoutMarkers {
     for (const poi of this.pois) {
       const color = BLOCKOUT_MARKER_COLORS[poi.kind] || BLOCKOUT_MARKER_COLORS.poi;
       chunk.Pillar(poi.x, poi.z, 8, 0.06, Rgba(color, 0.95), 3);
+      chunk.ClampAround(poi.x, poi.z, SPOT_GROUND_CLAMP);
       chunk.Ring(poi.x, poi.z, Math.max(0.6, poi.radiusM || 2), 0.12, Rgba(color, 0.85), { segments: 36 });
+      chunk.ClampAround(0, 0, null);
     }
     this.chunks.set("pois", { sig: "", chunk });
     this.dirty = true;
@@ -263,16 +349,19 @@ export class BlockoutMarkers {
     if (this.layers.arcs === true) this.layers.arcs = "default";
     if (JSON.stringify(this.layers) === before) return;
     for (const key of [...this.chunks.keys()]) if (key.startsWith("u:")) this.chunks.delete(key);
+    // 射界扇没有穿墙那一遍，「穿墙显示」只管地环、箭头、光柱
     this.tris.occluded.visible = this.lines.occluded.visible = this.layers.xray !== false;
     this.SetUnits(this.units);
     this.dirty = true;
   }
 
-  _UnitChunk(unit, arc) {
+  _UnitChunk(unit, arc, fade = 1) {
     const chunk = new Chunk(this.groundAt);
     if (unit.visible === false) return chunk;
     const color = BLOCKOUT_MARKER_COLORS[unit.side] || BLOCKOUT_MARKER_COLORS.nra;
     const ring = RING_RADIUS[unit.kind] || RING_RADIUS.soldier;
+    // 地环与朝向箭头压在脚下（贴沟壁站的人，地环不顺着沟壁竖起来）
+    chunk.ClampAround(unit.x, unit.z, UNIT_GROUND_CLAMP);
     chunk.Ring(unit.x, unit.z, ring, unit.kind === "tank" ? 0.2 : 0.11, Rgba(color, 0.95), { dash: !!unit.guess, segments: unit.kind === "tank" ? 40 : 24 });
     // 朝向短箭头：从地环边上伸出去
     const fx = -Math.sin(unit.yawDeg * DEG), fz = -Math.cos(unit.yawDeg * DEG);
@@ -280,8 +369,10 @@ export class BlockoutMarkers {
     const start = { x: unit.x + fx * ring, z: unit.z + fz * ring }, tip = { x: unit.x + fx * reach, z: unit.z + fz * reach };
     chunk.Ribbon([start, { x: tip.x - fx * 0.25, z: tip.z - fz * 0.25 }], 0.1, Rgba(color, 0.95));
     chunk.Head(tip, { x: fx, z: fz }, unit.kind === "tank" ? 0.9 : 0.42, Rgba(color, 0.95));
-    if (arc) {
-      chunk.Fan(unit.x, unit.z, arc.yawDeg ?? unit.yawDeg, arc.halfDeg, arc.rangeM, Rgba(color, 0.13), Rgba(color, 0.85));
+    chunk.ClampAround(0, 0, null);
+    if (arc && fade > 0) {
+      chunk.Fan(unit.x, unit.z, arc.yawDeg ?? unit.yawDeg, arc.halfDeg, arc.rangeM,
+        Rgba(color, BLOCKOUT_FAN.fillAlpha * fade), Rgba(color, BLOCKOUT_FAN.edgeAlpha * fade));
     }
     if (this.layers.intents && !unit.moving && unit.intent?.length) {
       const route = [{ x: unit.x, z: unit.z }, ...unit.intent];
@@ -304,6 +395,7 @@ export class BlockoutMarkers {
     for (const f of this.flashes) {
       const k = (this.time - f.t0) / FLASH_S;
       if (k < 0 || k >= 1) continue;
+      chunk.ClampAround(f.x, f.z, UNIT_GROUND_CLAMP);
       chunk.Ring(f.x, f.z, 0.5 + 1.6 * k, 0.16, Rgba(f.color, 0.95 * (1 - k)), { segments: 24 });
     }
     return chunk;
@@ -316,6 +408,7 @@ export class BlockoutMarkers {
     chunk.Pillar(n.x, n.z, 14, 0.16, Rgba(gold, 1), 6);
     const base = Math.max(0.8, n.radiusM || 3);
     const breath = 1 + 0.1 * Math.sin(this.time * 3.2);
+    chunk.ClampAround(n.x, n.z, SPOT_GROUND_CLAMP);
     chunk.Ring(n.x, n.z, base * breath, 0.18, Rgba(gold, 0.95), { segments: 40 });
     chunk.Ring(n.x, n.z, base * 0.35, 0.1, Rgba(gold, 0.7), { segments: 20 });
     return chunk;
@@ -325,10 +418,25 @@ export class BlockoutMarkers {
     const chunks = [...this.chunks.values()].map(entry => entry.chunk);
     this.tris.Fill(chunks, "tri");
     this.lines.Fill(chunks, "line");
+    this.fanTris.Fill(chunks, "fanTri");
+    this.fanLines.Fill(chunks, "fanLine");
     this.dirty = false;
     this.stats.tris = this.tris.count / 3;
     this.stats.lines = this.lines.count / 2;
+    this.stats.fanTris = this.fanTris.count / 3;
+    this.stats.fanLines = this.fanLines.count / 2;
+    this.stats.fans = chunks.filter(chunk => chunk.fanTri.length).length;
     this.stats.units = this.units.length;
+  }
+
+  /** 取证：现在场上画了哪些扇子、各自的淡出系数（测试用）。 */
+  FanInfo() {
+    const out = [];
+    for (const [key, entry] of this.chunks) {
+      if (!key.startsWith("u:") || !entry.chunk.fanTri.length) continue;
+      out.push({ id: key.slice(2), alpha: entry.chunk.fanTri[6] });
+    }
+    return out;
   }
 
   // -------------------------------------------------------------------------
@@ -481,8 +589,7 @@ export class BlockoutMarkers {
   Dispose() {
     if (this.host === "post") this.post?.RemoveDebugOverlay?.(this.root);
     else this.root.removeFromParent();
-    this.tris.Dispose();
-    this.lines.Dispose();
+    for (const layer of this.layersAll) layer.Dispose();
     this.root.clear();
     for (const el of this.labels) el.remove();
     this.labels.length = 0;
