@@ -13,7 +13,10 @@ export const MISSION_LEADER_STAGES = Object.freeze({
   // 讲的是北边侧沟与补给屋，本轮不播：去程喊 GuideFollow，捡弹后沿用 GuideThrow（Script_FirstLevelLeaderGuide.View）。
   Tank: Entry("collect", "Follow", A.bundleDrop, {story: true}),
   Orders: Entry("rally", "Collection", A.collection, {story: true}),
-  South: Entry("follow", "South", null, {story: true, rejoinRoute: true}),
+  // 07（2026-10-12 0311 B 包）：沟口机枪一响（holdFrom mouthContact）到担架过完开阔地（holdUntil mouthCrossed）之间，
+  // 标记指东边田埂上的机枪（cover），守着时不喊；过完接着带路。
+  South: Entry("follow", "South", null, {story: true, rejoinRoute: true,
+    holdFrom: "mouthContact", holdUntil: "mouthCrossed", holdTarget: A.mouthEmbankment, holdMode: "cover", holdCue: null, afterHoldCue: "GuideSouth"}),
   // 08 先看见街堵了，再进灶屋（2026-09-28 引导轮，docs/Data_FirstLevelGuidance20260928.md §5 B）：
   // `streetBlockSeen` 只在主街北口那个 box 里落（Gates 表），标记与班长若一开始就指灶屋，玩家跟着进屋
   // 就永远过不了 08。所以落下之前标记指主街口（动作词仍是「前往」、不喊灶屋那句），落下之后才指灶屋、喊 GuideKitchen。

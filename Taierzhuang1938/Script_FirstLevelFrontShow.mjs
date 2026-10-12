@@ -163,7 +163,9 @@ export class FirstLevelFrontShow {
         z: r.player.position.z - Math.sin(yaw) * F.southWhisperSideM,
       }, R.squadCatchupMps);
     }
-    if (near || r.time - this.southAt >= F.southWhisperFallbackS) {
+    // 2026-10-12 0311 B 包：沟里先是幺娃丢弹壳逗妮儿（NierFollow），私语在它之后；妮儿不在（没接上）就按原兜底时间说。
+    const afterNier = r.Has("nierFollowHeard") || r.time - this.southAt >= F.southWhisperFallbackS;
+    if ((near || r.time - this.southAt >= F.southWhisperFallbackS) && afterNier) {
       this.whisperDone = true;
       r.Say("SouthWhisper");
     }

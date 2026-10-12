@@ -469,5 +469,30 @@ assert.match(runtime, /this\.root\.rotation\.y = MODEL_FORWARD_YAW;/,
 assert.match(bakePowerShell, /NRA01 and IJA01 separately/,
   "Max batch exports faction-canonical NRA and IJA action sources");
 
+// 2026-10-12 R3-Perf: PoseDeath's settling ground fit reads each drawn vertex once (DrawnVertices) instead of once per
+// triangle that uses it. Same vertex set in first-use order, cached per index attribute, rebuilt when gore swaps the index.
+{
+  const THREE = await import("three");
+  const { DrawnVertices } = await import("./Script_CharacterModel.mjs");
+  const geometry = new THREE.TorusKnotGeometry(1, .3, 64, 9);
+  const walk = [], seen = new Set();
+  for (let i = 0; i < geometry.index.count; i++) { const v = geometry.index.getX(i); if (!seen.has(v)) { seen.add(v); walk.push(v); } }
+  const list = DrawnVertices(geometry);
+  assert.deepEqual([...list], walk, "DrawnVertices lists every drawn vertex once, in the index's first-use order");
+  assert.ok(list.length * 3 < geometry.index.count, "the settling fit no longer re-skins each vertex once per triangle");
+  assert.equal(DrawnVertices(geometry), list, "the list is cached per index attribute");
+  geometry.setIndex(new THREE.BufferAttribute(new Uint32Array([...geometry.index.array].slice(0, 30)), 1));
+  assert.deepEqual([...DrawnVertices(geometry)], [...new Set([...geometry.index.array])], "a gore-filtered index gets its own list");
+  assert.match(runtime, /const drawn = settling && indices \? DrawnVertices\(mesh\.geometry\) : null;/,
+    "PoseDeath's settling fit walks DrawnVertices");
+  // Between the support search and t = 1 the skinned points are reused for settleRescanCalls - 1 calls of every settleRescanCalls;
+  // the support search and the final pose (deathFloorLift) are always skinned afresh.
+  assert.match(runtime, /const reuse = t >= DEATH_CONTACT\.poseEnd && t < 1 && this\.deathContactRotation && this\.deathSettlePoints/,
+    "only the settling calls between the support search and the final pose reuse skinned points");
+  const { DEATH_CONTACT } = await import("./Data_Tuning_ActorDeath.mjs");
+  assert.ok(Number.isInteger(DEATH_CONTACT.settleRescanCalls) && DEATH_CONTACT.settleRescanCalls >= 1 && DEATH_CONTACT.settleRescanCalls <= 4,
+    "a settling corpse re-skins at least every fourth call");
+}
+
 console.log(`CharacterModelTest OK — ${manifest.models.length} models × ${expectedActions.length} source-parity, `
   + "GLB-measured pelvis-pose and ground audits, sockets and bone hitboxes verified");

@@ -27,7 +27,7 @@ export class FirstLevelLeaderGuide {
   Enter(stage) {
     this.stage = stage.id; this.variant = null; this.firstOrder = true;
     // A story step that opens with a fight to hold gets its order at once.
-    const spec = MISSION_LEADER_STAGES[stage.id], holding = spec?.holdUntil && !this.r.Has(spec.holdUntil);
+    const spec = MISSION_LEADER_STAGES[stage.id], holding = spec?.holdUntil && (!spec.holdFrom || this.r.Has(spec.holdFrom)) && !this.r.Has(spec.holdUntil);
     this.nextVoiceAt = this.r.time + (spec?.story && !holding ? G.storyOrderDelayS : G.initialOrderS);
     this.r.voice.CancelGuidance(); this.waitSince = null; this.aheadSince = null;
     if(this.Leader) { this.Leader.missionGuideWaiting = false; this.Leader.missionGuideGesture = 0; }
@@ -115,7 +115,8 @@ export class FirstLevelLeaderGuide {
     // holdUntil：事实落下之前标记指 holdTarget。缺省口径是 BridgeCover 那种「守住射位」：动作词 cover、
     // 守着时喊本步的 cue、守完不再喊。08 Village 反过来（先去主街口看见街堵了，再进灶屋）：
     // holdMode "move"、守着时不喊（holdCue null）、落下之后才喊 afterHoldCue（GuideKitchen）。
-    if(spec.holdUntil){
+    // holdFrom（2026-10-12 0311 B 包）：这条事实落下之前不进「守着」那一档（07 沟口的机枪只在接火之后才指）。
+    if(spec.holdUntil&&(!spec.holdFrom||r.Has(spec.holdFrom))){
       if(!r.Has(spec.holdUntil)){
         target=spec.holdTarget;mode=label=spec.holdMode||"cover";variant+="Hold";
         if(spec.holdCue!==undefined)cue=spec.holdCue;

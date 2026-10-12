@@ -783,6 +783,11 @@ export const MISSION_ANCHORS = Object.freeze({
   forwardNest: Sortie.leftGun,
   gate: { x: 53, z: 34 }, courtCover: { x: 67, z: 24 },
   transfer: { x: 95, z: 103 }, queue: { x: 74, z: 111 },
+  // 2026-10-12 03–11 重构 B 包（docs/Data_FirstLevel0311Refactor20261012Contract.md §5.4）：07 沟口遭遇。
+  //   southMouth      南行沟的南口：出坡起点（southWalk 里程 75 m，沟底 −0.5 m，地面在 z −34.2 回到 0）
+  //   southMouthHold  担架停住等压制的点：沟内，southWalk 里程 63 m（离南口 12 m，契约要 ≥ 6 m）
+  //   mouthEmbankment 歪把子射手趴的点：东侧白盒田埂 MouthEmbankment 的东北面（离南口 24 m，打沟口外那片空地）
+  southMouth: { x: -8, z: -36 }, southMouthHold: { x: -13.4, z: -46.7 }, mouthEmbankment: { x: 15.2, z: -44.9 },
   ...MISSION_REAR_ANCHORS,
   ...MISSION_STAGE_ANCHORS,
 });

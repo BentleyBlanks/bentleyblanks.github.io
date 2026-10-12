@@ -18,6 +18,10 @@
 //      masterDb        整段母带按字数加权求目标电平时，这一句不用 projection 档的电平、改用这个值（dBFS，有声段 RMS；
 //                      不进提示词）。只给「要演成压低的声音、电平还得再低一截」的非词人声用（2026-10-12 CaptiveWoundTwist）
 //      maxSeconds      切出来的片段最长几秒（含两头留白），超了算硬错误、整段重抽（不进提示词）
+//      f0Hz            [低, 高]：片段基频中位（MeasureVoice）的目标范围；整段切出来的超了算硬错误重抽，补录选条时排到后面，门禁核（不进提示词）
+//      patch           单句补录（--patch）专用，不进整段提示词（2026-10-12 R3-Voice）：
+//                        delivery  补录时换用的表演说明      refLines ["NN"]  本人本场这几句装上的片段一起当参考音（@音频2…，对准嗓子）
+//                        span ["NN","MM"]  把这几句当一场小戏一次生成、只取这一句      masterDb  补录的目标电平（缺省对齐整段里原来那一片）
 //
 //   2. 播放时的**少量覆盖**。缺省一律沿用整段录音里的原始间隔（清单 lines[id].gapBeforeS，模型一次演出来的
 //      轮替节奏），只有稿里要等动作、被打断、压尾音的地方才写：
@@ -85,7 +89,10 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "07": P("normal", 0.65, { after: "event:nearShell", offsetS: 1.6, pauseBeforeS: 1.2, context: "近处落了一发，土从洞顶泼进衣领，几个人缩着脖子等第二下，没有第二下；他伸手往领子里掏土",
       delivery: "江湖油子的腔调，先一声带鼻音的狠骂，再带笑自嘲，尾音上挑拖长，有劲儿不淡" }),
     "08": P("normal", 0.5, { delivery: "接话快，嘴贫，带笑" }),
-    "09": P("normal", 0.6, { delivery: "笑骂一样甩回去，又冲又痞，不是真生气" }),
+    // 2026-10-12 R3-Voice：R2 三条单句补录基频都 108–127 Hz（顺子本场 .02/.07 是 205/198），改成带上 .07 的片段当第二条参考音补录；
+    // 整段里原来那一片 −17.44 dBFS 比邻句 .07/.08/.10（−21.0/−21.9/−21.2）响 3.6–4.4 dB，补录电平改按 normal 档 −19。
+    "09": P("normal", 0.6, { delivery: "笑骂一样甩回去，又冲又痞，不是真生气", f0Hz: [170, 215],
+      patch: { refLines: ["07"], masterDb: -19, delivery: "同一个人，接着 @音频2 那一句的嗓子往下说：短促地骂一句，笑骂一样甩回去，又冲又痞，不是真生气；音高和音色跟 @音频2 一样，不压低、不变粗、不拖长" } }),
     "10": P("low", 0.35, { pauseBeforeS: 0.8, context: "最里头的钢盔底下传出声音，人没动", delivery: "闷在钢盔底下，含糊、带着睡意，粗嗓子嘟囔着问" }),
     "11": P("normal", 0.4, { delivery: "平平地答，清楚" }),
     "12": P("low", 0.4, { delivery: "还闷在钢盔底下，含糊、不耐烦地嘟囔，说完翻个身接着睡" }),
@@ -184,6 +191,11 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   // 谐波比 6.0 dB 低于嚎的 8.3 dB、基频 333 Hz、整条 3.1 s）。改成闭着嘴从喉咙里挤的闷哼：提示词压低、强度降到 0.7、一秒以内；
   // 电平按 masterDb 拉到 −27.5（比嚎低 6 dB 以上），片段超 1.2 s 算硬错误重抽。
   CaptiveWoundTwist: Scene(true, "前沟沟壁下，冬瓜被按跪着，日兵乙弯腰把拇指摁进他左肩的枪伤往里拧；他整个人弓起来、头往后仰，叫声卡在喉咙里，咬着牙不肯喊出来", {
+    // 2026-10-12 R3-Voice 想把这条的基频（MeasureVoice 327 Hz）压到 120–220 Hz，重录 6 次都没进范围，装着的仍是 R2 这条（不变调）：
+    //   · 参考 comradeWounded，提示词「从胸腔里憋出来的低沉闷哼，嘴闭着、牙咬紧，不是哭腔不是假声」及再加「音很低很沉、不往上挑」：291 / 340 / 333 Hz（后两条 1.54 / 2.07 s 超长）；
+    //   · 按集成负责人决定换平时那条 comrade 定妆音（中位 118 Hz），提示词「同一个人受了重伤、闭着嘴牙关咬紧从胸腔里憋出来的一声低沉闷哼，不张嘴、
+    //     不哭腔、不假声」：239 / 308 / 276 Hz（前两条 1.83 / 1.51 s 超长）。清单 scenes.CaptiveWoundTwist.rejectedRetakes 记了这 6 次。
+    // voices.comrade 仍是 comradeWounded（Cast/AudioVoiceCast_ComradeWounded.mp3），与拖出 / 审问 / 嚎三场同一条。
     "01": P("low", 0.7, { after: "event:woundPress", offsetS: 0, masterDb: -27.5, maxSeconds: 1.2,
       delivery: "不是在说话、也不是喊：牙关咬紧、嘴闭着，剧痛的叫声闷在喉咙里出不来，只从喉咙和鼻子里挤出两下短促发抖的闷哼，第二下更短、又硬咽回去；不张嘴、不放声、不哭、不求饶；整条一秒左右，不超过一秒" }),
   }, { voices: { comrade: "comradeWounded" } }),
@@ -345,11 +357,18 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "05": P("low", 0.35, { emit: [{ id: "BorrowLightMatchesPocketed", at: "end" }] }),
     // 两处动作空当：第五句后顺子把火柴往兜里一收（约 2 s）、第六句后老周摸出烟包递一根过去（约 3 s）。
     "06": P("low", 0.5, { delivery: "江湖油子的腔调，半是占便宜半是让步，压着嗓子但有笑意", offsetS: 2.0, emit: [{ id: "BorrowLightCigaretteOffered", at: "end" }] }),
-    "07": P("normal", 0.4, { offsetS: 3.0 }), "08": P("normal", 0.6, { delivery: "江湖油子的腔调，故意挑理，带笑，尾音上挑" }), "09": P("low", 0.35),
+    // 2026-10-12 借火改两次 F（0311 契约 §3.4）：老周递出烟（BorrowLightCigaretteOffered）之后等玩家第二次按 F
+    //（Script_FirstLevelCollection 发 BorrowLightMatchAsked），7–9 句与划火才接着来。提示词里仍是「约 3 s」的动作空当。
+    "07": P("normal", 0.4, { after: "event:BorrowLightMatchAsked", offsetS: 0.4, pauseBeforeS: 3 }), "08": P("normal", 0.6, { delivery: "江湖油子的腔调，故意挑理，带笑，尾音上挑" }), "09": P("low", 0.35),
   }),
   ZhouLift: Scene(true, "担架员走到老周跟前催他上担架，例行公事的大嗓门；老周含着刚点着的烟，含混、赖着不肯动，最后一句是嘟囔给自己听的", {
     "01": P("shout", 0.6), "02": P("low", 0.35, { delivery: "含着烟，含混" }), "03": P("shout", 0.6),
     "04": P("breath", 0.3, { delivery: "嘟囔" }),
+  }),
+  // 2026-10-12 03–11 重构 B 包（契约 §3.4）：洼地东北沟沿上蹲着捡弹壳的女娃，担架员隔着十几米冲她喊，庄稼人在旁边接一句。
+  NierShells: Scene(true, "背坡伤员集结处。洼地东北角的沟沿上蹲着一个女娃在捡弹壳，一个担架员站在洼地里隔着十几米冲坡上喊她下来；她不理。旁边一个鲁南本地的庄稼人不紧不慢地接一句，北方官话", {
+    "01": P("shout", 0.7, { spatial: "head", delivery: "例行公事的大嗓门，带点急，冲坡上喊；喊完等了一下她没反应" }),
+    "02": P("normal", 0.4, { pauseBeforeS: 1.2, context: "看了一眼坡上的女娃，又看了一眼喊话的担架员", delivery: "不紧不慢，像说邻家的事；北方官话（鲁南口音），不是四川话；「喊不应的」说得笃定" }),
   }),
 });
 

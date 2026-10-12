@@ -144,7 +144,8 @@ const ORDER0305 = ["FrontObservation", "FrontBlockade", "FrontApproach", "FrontA
 const RETIRED_0311 = ["TankHeard", "BundleWhy", "BundleSupply"];
 for (const id of RETIRED_0311) assert.ok(byId.get(id)?.retired === true, id + " 2026-10-12 退出流程：retired:true，条目与录音保留");
 for (const cue of MISSION_DIALOGUE) if (cue.retired) assert.ok(RETIRED_0311.includes(cue.id), cue.id + " 标了 retired 却不在本轮退出名单里");
-const ORDER06 = ["Volunteer", "BorrowLight", "ZhouLift"];
+// NierShells：2026-10-12 0311 重构 B 包（06 沟沿上捡弹壳的妮儿，担架员 / 庄稼人两句）。
+const ORDER06 = ["Volunteer", "BorrowLight", "ZhouLift", "NierShells"];
 assert.deepEqual(perLine.map((cue) => cue.id).sort(), [...new Set([...ORDER1011, ...ORDER0305, ...ORDER06])].sort(),
   "01–06 的剧情 cue 全部是逐句格式，07 以后没有");
 console.log(`ok 契约对账：01–02 共 ${ORDER1011.length} 场（10.11 改字 ${scenes1011.length} 场 + 沿用 ${unchanged1011.length} 场）、03 以后 ${contractCues.length} 条、待下线旧 cue ${RETIRE_PENDING.length} 条`);
@@ -303,6 +304,8 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
     "./Script_FirstLevelFrontShow.mjs", "./Script_FirstLevelFrontBattle.mjs",
     // 2026-10-12 03–11 重构 A 包：反扑 / 掷弹筒 / 车组的新模块也会点名 cue（GapGuardDown）。
     "./Script_FirstLevelFrontCounterattack.mjs",
+    // 2026-10-12 0311 B 包：耿家四个角色（NierShells / NierFollow）与 07 沟口遭遇（MouthContact / MouthGo / MouthFlank）。
+    "./Script_FirstLevelGengFamily.mjs", "./Script_FirstLevelSouthMouth.mjs",
   ];
   const referenced = new Map();
   for (const name of RUNTIME_SOURCES) {
@@ -366,7 +369,11 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   assert.deepEqual(Emits("BunkerIncoming"), ["BunkerBlast"], "「炮弹！趴下——！」被爆炸截断的那一刻发 BunkerBlast");
   assert.ok(LineDirection(byId.get("BunkerIncoming"), 0).cutAtS < 0, "截断点在句尾之前");
   assert.deepEqual(Emits("BorrowLight"), ["BorrowLightMatchesPocketed", "BorrowLightCigaretteOffered"], "借火两处动作空当各有事件");
-  assert.ok(LineDirection(byId.get("BorrowLight"), 5).offsetS >= 1.8 && LineDirection(byId.get("BorrowLight"), 6).offsetS >= 2.8, "借火两处空当约 2 s 与 3 s");
+  assert.ok(LineDirection(byId.get("BorrowLight"), 5).offsetS >= 1.8, "借火第一处空当约 2 s");
+  // 2026-10-12 借火改两次 F（0311 契约 §3.4）：第 7 句等玩家第二次按 F（Script_FirstLevelCollection 发 BorrowLightMatchAsked），
+  // 提示词里的「约 3 s」空当留在 pauseBeforeS。
+  assert.equal(LineDirection(byId.get("BorrowLight"), 6).after, "event:BorrowLightMatchAsked", "借火第 7 句等第二次 F");
+  assert.ok(LineDirection(byId.get("BorrowLight"), 6).pauseBeforeS >= 2.8, "借火第二处空当的提示词仍约 3 s");
   // 2026-10-11 契约 §3 冻结的导演事件名（Dir01 / Dir02 按同名发）：要等动作的句子 after:"event:<名>"，其余沿用录音间隔。
   const FROZEN_EVENTS = {
     "BunkerBanter.07": "nearShell", "BunkerLedger.01": "pour", "BunkerExit.01": "exitReach", "BunkerExit.02": "clipsThrown",
@@ -582,14 +589,19 @@ const FakeAudio = () => {
     voice.Guidance("NoSuchCueAtAll"); voice.Cancel(["NoSuchCueAtAll"]); voice.Replay("NoSuchCueAtAll");
     for (const id of ["BorrowLight", "RescueFlee", "SouthWhisper"]) {
       assert.ok(voice.Enqueue(id), id + " 入队");
-      for (let i = 0; i < 9000 && !done.includes(id); i++) voice.Update(1 / 60);
+      for (let i = 0; i < 9000 && !done.includes(id); i++) {
+        voice.Update(1 / 60);
+        // 借火第 7 句等玩家第二次 F（2026-10-12 两次 F）：第 6 句发出 Line 之后一秒，模拟导演发那个事件。
+        if (id === "BorrowLight" && i === 60 * 20) voice.Signal("BorrowLightMatchAsked");
+      }
     }
   } finally { console.warn = original; }
   assert.deepEqual(done, ["BorrowLight", "RescueFlee", "SouthWhisper"], "缺录音的 cue 也要走完并 Done");
   assert.deepEqual(lines.filter((l) => l.cue === "BorrowLight").map((l) => l.index), [0, 1, 2, 3, 4, 5, 6, 7, 8], "借火九句按句序发 Line");
   assert.ok(lines.filter((l) => l.cue === "BorrowLight").every((l) => l.lineId?.startsWith("BorrowLight.")), "逐句 Line 事件带 lineId");
   // 07 以后仍是整段录音（09.21 的 01–02 整段 cue 已下线，换 07 的 SouthWhisper 测整段）。
-  assert.deepEqual(lines.filter((l) => l.cue === "SouthWhisper").map((l) => l.index), [0, 1, 2, 3, 4, 5], "07 以后的整段 cue 仍逐句发 Line");
+  // 2026-10-12：SouthWhisper 末尾加了幺娃一句（7 句）。
+  assert.deepEqual(lines.filter((l) => l.cue === "SouthWhisper").map((l) => l.index), [0, 1, 2, 3, 4, 5, 6], "07 以后的整段 cue 仍逐句发 Line");
   assert.ok(said.includes("翻译：有敌人！"), "日语行字幕是中文译文");
   assert.ok(said.every((row) => !/[぀-ヿ]/.test(row)), "字幕里不许出现假名");
   assert.ok(warnings.some((text) => text.includes("NoSuchCueAtAll")), "未知 cue 警告一次");
@@ -630,7 +642,8 @@ const FakeAudio = () => {
   assert.ok(routes.some((row) => row.who === "yaowa" && !row.firstPerson), "幺娃是世界声源");
   const plan = MissionVoiceTimeline(byId.get("SouthWhisper"), 10.8), last = plan.lines.at(-1);
   const gap = { cue: byId.get("SouthWhisper"), plan, sourceTime: (last[0] + last[1]) / 2 };
-  assert.equal(voice.Speaker(gap).who, "shunzi");
+  // 2026-10-12 起 SouthWhisper 末句是幺娃的「一个女娃儿，她懂个啥子。」。
+  assert.equal(voice.Speaker(gap).who, "yaowa");
   console.log("ok 旧整段录音的说话人路由不变");
 }
 {
@@ -804,7 +817,8 @@ if (process.argv.includes("--audio")) {
   // 片段与整段同一段的波形相关（±20 ms 找对齐）与电平差。
   // 压快过的句子（清单 tempo）：拿整段那一段照样压快再比 10 ms 能量包络——atempo 的拼接点随输入的细微差别
   // （切句时压的是母带 wav，这里只有装上的 mp3）挪位，波形相关只剩 0.92 左右；包络相关同一段 ≥ 0.99、别的录音 < 0.75。
-  const CompareToScene = (slice, scene, startS, endS, tempo = 1) => {
+  // muted（清单 remastered.muted，片内秒）：重新母带时静音掉的咔嗒，两边同一段都置零再比（2026-10-12 R3-Voice）。
+  const CompareToScene = (slice, scene, startS, endS, tempo = 1, muted = []) => {
     if (tempo !== 1) {
       const ref = EncodeSegment(scene, path.join(os.tmpdir(), `tempo-ref-${process.pid}-${path.basename(slice)}`), { startS, endS, fadeS: 0, tempo });
       try {
@@ -826,6 +840,10 @@ if (process.argv.includes("--audio")) {
     }
     const sr = 16000, a = DecodePcm(slice, sr), whole = DecodePcm(scene, sr);
     const s0 = Math.round(startS * sr), n = Math.min(a.length, Math.round((endS - startS) * sr));
+    for (const [m0, m1] of muted) {
+      const i0 = Math.max(0, Math.floor((m0 - 0.03) * sr)), i1 = Math.ceil((m1 + 0.03) * sr);
+      a.fill(0, i0, Math.min(a.length, i1)); whole.fill(0, s0 + i0, Math.min(whole.length, s0 + i1));
+    }
     let best = -1, bestLevel = 0;
     for (let lag = -320; lag <= 320; lag += 4) {
       let xy = 0, xx = 0, yy = 0;
@@ -913,17 +931,35 @@ if (process.argv.includes("--audio")) {
           // 例外：这一句在整段里分错了嗓子 / 念错，单独补录；电平对齐到整段里原来那一片。
           assert.ok(patched.has(line.id) && entry.patch?.reason && entry.patch.replacedSha256, line.id + " 补录要有记录");
           assert.ok(Math.abs(m.activeRmsDb - entry.patch.targetDb) <= 1.5, `${line.id} 补录电平 ${m.activeRmsDb} 对齐整段里原来那一片 ${entry.patch.targetDb}`);
+          // 导演表 patch.masterDb：补录电平不跟原来那一片、改按它（原来那一片本身就比邻句响太多时用），清单要记下原来那一片的电平。
+          const masterDb = LineDirection(cue, index).patch?.masterDb;
+          if (masterDb != null) assert.ok(entry.patch.targetDb === masterDb && Number.isFinite(entry.patch.sliceDb), `${line.id} 补录目标电平 ${entry.patch.targetDb} 应是导演表 patch.masterDb ${masterDb}，并记下原来那一片的电平`);
           patchedLines.push(line.id);
         } else {
           assert.equal(entry.source, "scene", line.id + " 来源");
           assert.equal(entry.metrics.sceneGainDb, scene.gainDb, line.id + " 电平是整段一次母带的结果（片段不单独归一）");
           // 片段就是整段里那一段：同一段解码出来波形相关 ≥ 0.98、电平差 ≤ 0.5 dB。
           assert.equal(entry.tempo ?? 1, LineDirection(cue, index).tempo ?? 1, line.id + " 片段压快的倍率与导演表一致");
-          const same = CompareToScene(file, scenePath, entry.sceneStartS, entry.sceneEndS, entry.tempo ?? 1);
+          // 重新母带过的片段（--remaster）：只许静音掉首字前 / 末字后静音里 ≤ 0.12 s 的孤立脉冲，比整段时同一段置零。
+          const muted = entry.remastered?.muted || [];
+          if (entry.remastered) {
+            const chars = timings[entry.sha256].chars.filter(([, a, b]) => b >= a);
+            assert.ok(entry.remastered.fromSha256 && entry.remastered.why && muted.length, line.id + " 重新母带要记来源、原因和静音掉的区间");
+            for (const [m0, m1] of muted)
+              assert.ok(m1 > m0 && m1 - m0 <= 0.12 && (m1 <= chars[0][1] - 0.05 || m0 >= chars.at(-1)[2] + 0.05),
+                `${line.id} 静音掉的 ${m0}–${m1} s 只能是首字前 / 末字后静音里的短脉冲`);
+          }
+          const same = CompareToScene(file, scenePath, entry.sceneStartS, entry.sceneEndS, entry.tempo ?? 1, muted);
           assert.ok(same.correlation >= 0.98 && Math.abs(same.levelDb) <= 0.5, `${line.id} 片段与整段 ${entry.sceneStartS}–${entry.sceneEndS} s 对不上（相关 ${same.correlation}、电平差 ${same.levelDb} dB）`);
         }
         const maxSeconds = LineDirection(cue, index).maxSeconds;
         if (maxSeconds) assert.ok(entry.seconds <= maxSeconds, `${line.id} 片段 ${entry.seconds} s 超过导演表上限 ${maxSeconds} s`);
+        // 导演表 f0Hz：基频中位（清单 metrics.f0，与 MeasureVoice 同一口径）要落在范围里（2026-10-12 R3-Voice：BunkerBanter.09 补录总比本人低三成）。
+        const f0Hz = LineDirection(cue, index).f0Hz;
+        if (f0Hz) {
+          assert.equal(entry.metrics.f0?.median, m.f0.median, line.id + " 清单里的基频是这条录音量出来的");
+          assert.ok(m.f0.median >= f0Hz[0] && m.f0.median <= f0Hz[1], `${line.id} 基频中位 ${m.f0.median} Hz 不在导演表 ${f0Hz[0]}–${f0Hz[1]} Hz`);
+        }
         // 嗓子：够长的片段与本场挂了参考音的其他人比，不许明显更像别人。
         const judged = entry.metrics.voicedS >= SCENE_CHECK.judgeVoicedS;
         const other = entry.metrics.referencedOther;

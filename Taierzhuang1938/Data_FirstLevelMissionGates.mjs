@@ -165,6 +165,13 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "BridgeCover" }),
     note: "北岸土坎的火力，来自北侧外围战场；不在桥边凭空生成",
   }),
+  // ---- 0311 B Rear ----
+  southMouth: Object.freeze({
+    spawn: Object.freeze({ kind: "fact", fact: "southMouthReached" }),
+    note: "07 沟口遭遇：担架队到沟口停住（southMouthReached）那一刻，东头突破进来的一个班 6 人从南田房北面 60 m 外赶来；"
+      + "歪把子架到东侧田埂打空地、三个步枪各占一道田埂 / 坟包、两个往南绕村北口。由 Script_FirstLevelSouthMouth 按 fact 放出，"
+      + "折线在 MISSION_TACTICS（fact 门控）。契约 §1.3：不被打退，只会被压住 —— 压住 ≥ 2 s 担架才跑，抬头就停在田埂 / 电线杆后",
+  }),
 });
 
 // ---------------------------------------------------------------------------
@@ -177,6 +184,8 @@ export const MISSION_VOICE_FACTS = Object.freeze({
   BorrowLight: "lightShared",
   ZhouLift: "zhouOnLitter",
   SouthWhisper: "southWhisperHeard",
+  // 0311 B：沟里幺娃丢弹壳逗妮儿那一段说完（SouthWhisper 在它之后才说）。
+  NierFollow: "nierFollowHeard",
   VillagePointer: "mainStreetPointed",
   TransferSorting: "transferSortingHeard",
   VillageRoadThreat: "villageRoadThreatSeen",
@@ -403,8 +412,45 @@ export const MISSION_FACT_GATES = Object.freeze({
     kind: "column", step: "Orders", source: "Update",
     text: "后送队真实起行（担架队沿路线走出集结处）",
   }),
+  // ---- 0311 B Rear（06 内部事实，不是过关条件）----
+  nierSeen: Gate({
+    kind: "scripted", step: "Orders", source: "FirstLevelGengFamily.UpdateOrders",
+    text: "玩家进了洼地、走到沟沿上捡弹壳的妮儿 16 m 以内 —— 担架员冲她喊 NierShells 就在这一刻",
+  }),
+  matchAsked: Gate({
+    kind: "scripted", step: "Orders", source: "FirstLevelCollection.UpdateOrders",
+    text: "借火的第二次 F：老周掏烟递出（BorrowLightCigaretteOffered）之后玩家再按一次 F，7–9 句与划火才接着来；lightShared 仍在第 9 句播完记",
+  }),
   // --- South -------------------------------------------------------------
   southWhisperHeard: Gate({ kind: "voice", step: "South", cue: "SouthWhisper", source: "VoiceDone" }),
+  // ---- 0311 B Rear：07 沟口遭遇（Script_FirstLevelSouthMouth）----
+  nierFollowHeard: Gate({ kind: "voice", step: "South", cue: "NierFollow", source: "VoiceDone" }),
+  southMouthReached: Gate({
+    kind: "scripted", step: "South", source: "FirstLevelSouthMouth.Update",
+    text: "领头那副担架走到沟口停点 A.southMouthHold（或玩家先到了它 " + R.southMouth.playerReachM + " m 内）：southMouth 组从东北 60 m 外赶来",
+  }),
+  mouthContact: Gate({
+    kind: "scripted", step: "South", source: "FirstLevelSouthMouth.Update",
+    text: "东边田埂上的歪把子真的开了火（兜底：射手到位 " + R.southMouth.contactFallbackS + " s 没开火、或组里先有人被打死也算）。"
+      + "MouthContact 这时喊；妮儿撒腿先跑进村",
+    requires: ["southMouthReached"],
+  }),
+  mouthMgSuppressed: Gate({
+    kind: "combat", step: "South", member: "MouthGunner", encounter: "southMouth", source: "FirstLevelSouthMouth.Update",
+    text: "机枪被压住：射手处于 suppressed 状态连续 ≥ " + R.southMouth.mgSuppressS + " s（或已被打死）。第一次成立记事实、喊 MouthGo；"
+      + "之后他会再抬头（抬头后 " + R.southMouth.mgRegraceS + " s 担架停在田埂 / 电线杆后），压住期间担架才跑",
+    requires: ["mouthContact"],
+  }),
+  mouthFlankResolved: Gate({
+    kind: "combat", step: "South", member: "MouthFlankA", encounter: "southMouth", source: "FirstLevelSouthMouth.Update",
+    text: "绕村的两个都被打死，或都被连续压住 ≥ " + R.southMouth.flankPinS + " s（契约 §1.3 不打退）；不是过关条件，MouthFlank 在他们露头往村里绕时喊",
+    requires: ["mouthContact"],
+  }),
+  mouthCrossed: Gate({
+    kind: "column", step: "South", source: "FirstLevelSouthMouth.Update",
+    text: "活着的担架全部过了开阔地进村北巷（southWalk 末点 (48,−20) 前 " + R.southMouth.crossedSlackM + " m 以内）；担架只在 mouthMgSuppressed 期间跑",
+    requires: ["mouthContact"],
+  }),
   villageMouthReached: Gate({
     kind: "proximity", step: "South", anchor: "village", radiusM: 9, source: "Update",
     note: "真走一段（取消了旧的黑屏转场），目标时长 45–75 秒；"

@@ -75,6 +75,9 @@ import {
 // 自己步骤的 Enter 分支与 Update 段，逻辑在这两个模块里。
 import { FirstLevelVillageBlock, VillageCourtyardCleared, VillagePendingLitters } from "./Script_FirstLevelVillageBlock.mjs";
 import { FirstLevelTransferCart } from "./Script_FirstLevelTransferCart.mjs";
+// 2026-10-12 0311 B 包：耿家四个角色（06 起）与 07 沟口遭遇。
+import { FirstLevelGengFamily } from "./Script_FirstLevelGengFamily.mjs";
+import { FirstLevelSouthMouth } from "./Script_FirstLevelSouthMouth.mjs";
 import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { SquadMarchAi } from "./Script_SquadMarchAi.mjs";
@@ -206,6 +209,9 @@ export class FirstLevelMissionRuntime {
     // 08–10 村落改道、11–14 接运与空袭（第二波 Mid 包）。
     this.village = new FirstLevelVillageBlock(this);
     this.transferCart = new FirstLevelTransferCart(this);
+    // 06–11 耿家（老耿 / 妮儿 / 黑子 / 驴车）与 07 沟口遭遇（0311 B 包；C 包只加方法）。
+    this.gengFamily = new FirstLevelGengFamily(this);
+    this.southMouth = new FirstLevelSouthMouth(this);
     this.flow = new FirstLevelMissionFlow({ Enter: (stage) => this.Enter(stage) });
     this.voice = new FirstLevelMissionVoice({
       audio: this.audio,
@@ -436,6 +442,9 @@ export class FirstLevelMissionRuntime {
     // assigns its whole exchange to the reporting guard.
     const front=cue.id==="BundleOrder"?null:this.frontShow?.VoicePosition(cue,line);
     if(front)return front;
+    // 06 沟沿那一拍（NierShells：担架员 / 庄稼人，0311 B 包）。
+    const geng=this.gengFamily?.VoicePosition(cue,line);
+    if(geng)return geng;
     // 08 主街那一头喊话的前队（Mid 包）。
     const village=this.village?.VoicePosition(cue,line);
     if(village)return village;
@@ -475,7 +484,7 @@ export class FirstLevelMissionRuntime {
   VoiceEvent(id,cueId,detail) {
     // 逐句事件（Voice 包统一发）：阶段 1–7 的演出靠它把动作对到台词上；15A 的点名靠它让
     // 说话的人与何有田互相转过去（「逐个应答要对着真人」）。
-    if(id==="Line"){this.frontShow?.OnLine(cueId,detail);this.quietMarch?.OnLine(cueId,detail);return;}
+    if(id==="Line"){this.frontShow?.OnLine(cueId,detail);this.gengFamily?.OnLine(cueId,detail?.index);this.quietMarch?.OnLine(cueId,detail);return;}
     this.frontShow?.OnEvent(id,cueId,detail);
     if(id==="BunkerBlast"){this.opening.BunkerBlast();return;}
     if(id==="RescueHeave"){this.Record("bunkerRescueHeave");return;}
@@ -1524,6 +1533,8 @@ export class FirstLevelMissionRuntime {
     this.opening.Enter(stage.id);
     this.openingSet?.Enter(stage.id);
     this.frontShow?.Enter(stage.id);
+    this.gengFamily.Enter(stage.id);
+    this.southMouth.Enter(stage.id);
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
     // 进场不自动播的那几步：它们的 cue 由编排在真正发生的那一刻起播
@@ -1575,7 +1586,7 @@ export class FirstLevelMissionRuntime {
       case "South":
         // 前沿那一场留在身后：真走一段，不再黑屏瞬移。
         for (const actor of this.enemies.values())
-          if (actor.alive && actor.missionEncounter !== "village" && actor.missionEncounter !== "melee")
+          if (actor.alive && !["village", "melee", "southMouth"].includes(actor.missionEncounter))
             actor.scriptedNoncombatant = true;
         for (const cart of this.column.traffic) cart.visible = true;
         this.audio.Ambience("firstLevelSouth");
@@ -2504,6 +2515,8 @@ export class FirstLevelMissionRuntime {
     if(!spec || this.failed || this.controls || this.completed)return null;
     let target=stage.target, label=spec.label;
     if(spec.route)target=MissionRouteLookahead(MISSION_ROUTES[spec.route],this.player.position);
+    // 07 沟口接火到担架过完开阔地之间：标签指东边田埂上的机枪（0311 B 包，MISSION_GUIDANCE.South.mouthLabel）。
+    if(spec.mouthLabel&&this.Has("mouthContact")&&!this.Has("mouthCrossed")){label=spec.mouthLabel;target=A.mouthEmbankment;}
     const battleGuide=this.frontBattle.Guide();
     if(battleGuide){target=battleGuide.target;label=battleGuide.label;}
     if(stage.id==="Courtyard" && this.Has("courtyardGateOpen") && this.Threatens(A.gate)) {target={x:A.gate.x,z:A.gate.z+4};label="gateThreat";}
@@ -2586,6 +2599,7 @@ export class FirstLevelMissionRuntime {
     this.frontShow?.Update(dt);
     // 03–05 反扑层先算（撤退窗口双条件、落弹、守军中弹、车组），FrontBattle 同一帧读它的窗口。
     this.frontCounter.Update(dt);
+    this.gengFamily.Update(dt);
     this.frontBattle.Update(dt);
     // 03–06: a speaker stepping into the player's picture for his line (after every other mover, so it holds).
     this.frontScenes.Steer();
@@ -2654,6 +2668,7 @@ export class FirstLevelMissionRuntime {
     }
     if(stage==="South"){
       this.Say("SouthWhisper");
+      this.southMouth.Update(dt);
       if(this.GateNear("villageMouthReached")){this.Record("villageMouthReached");this.Say("VillagePointer");}
     }
     if(stage==="Tank")this.UpdateSortie();
@@ -2699,6 +2714,8 @@ export class FirstLevelMissionRuntime {
     // 08/09：担架停在可靠遮挡里，不跟进未清空间。
     if (stage === "Village" || stage === "Melee")
       maxProgress = MissionRouteProjection(this.column.route, A.litterHold).progress;
+    // 07：担架在沟口停住，只在机枪被压住期间冲过开阔地（Script_FirstLevelSouthMouth）。
+    if (stage === "South") { maxProgress = this.southMouth.MaxProgress(maxProgress); safeAt = this.southMouth.SafeAt; }
     if (stage === "Courtyard") {
       const gun = this.enemies.get("VillageGunner");
       if (gun && !gun.alive) this.Record("villageGunSilent");
@@ -2950,6 +2967,8 @@ export class FirstLevelMissionRuntime {
       cart:this.transferCart.State().ride,
       village:this.village.State(),
       transferCart:this.transferCart.State(),
+      gengFamily:this.gengFamily.State(),
+      southMouth:this.southMouth.State(),
       // 15–18（End 包）的现场：布景、剧情实体、四个步骤模块各自的进度。
       end:{
         dressing:this.dressing.State(), extras:this.extras.State(),
@@ -3024,6 +3043,7 @@ export class FirstLevelMissionRuntime {
     this.pontoonBridgeSet?.Dispose();
     this.opening.Dispose();
     this.frontShow?.Dispose();
+    this.gengFamily?.Dispose();
     this.frontPressure?.Dispose();
     if(this.physics)this.physics.terrainTileEdgeRest=false;
     if(this.ai.tactics?.grenadeVeto===this.frontBattle?.grenadeVeto)this.ai.tactics.grenadeVeto=null;

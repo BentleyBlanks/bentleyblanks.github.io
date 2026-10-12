@@ -324,7 +324,11 @@ const KIND_SPEC = {
     // 关节偏移必须与 _blender 里烘死的那一套逐字一致，改比值就开缝。
     // 1.03 / 0.958 落在 1.65 m / 1.53 m，是 1930 年代华北成年男女的平均身高；
     // 两个模型都建在 1.60 m 上，差值全在这两个数里。
-    variants: { male: 1.03, female: 0.958 },
+    // girl：2026-10-12 第一关 0311 重构的占位分身（妮儿 = CivilianFemale 缩 0.62，契约 §1.9；
+    // 只在 Script_FirstLevelGengFamily 按名点用，seed 不会抽到它：见下面 pickable）。
+    variants: { male: 1.03, female: 0.958, girl: 0.62 },
+    // seed 随机只在这几个里抽（点名的分身不进随机池）。
+    pickable: ["male", "female"],
   },
 };
 
@@ -1271,9 +1275,10 @@ export class Actor {
     // AI、伤害、误伤判定都只认 kind，分身纯粹是显示层的事。用 seed 抽，
     // 所以同一个人重开一局还是同一个人。
     const variantNames = spec.variants ? Object.keys(spec.variants) : null;
+    const pickable = spec.pickable || variantNames;
     this.isChild = kind==="civilian" && ["childBoy","childGirl"].includes(options.variant);
     this.variant = this.isChild ? options.variant : variantNames
-      ? (variantNames.includes(options.variant) ? options.variant : variantNames[HashString(`${seedText}|variant`) % variantNames.length])
+      ? (variantNames.includes(options.variant) ? options.variant : pickable[HashString(`${seedText}|variant`) % pickable.length])
       : null;
 
     // 身高 ±4% 的个体差走整体缩放，手持武器再乘 1/scale 抵消 —— 枪长是史实数据

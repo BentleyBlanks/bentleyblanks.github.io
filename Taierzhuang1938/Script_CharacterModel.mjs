@@ -33,7 +33,25 @@ const MELEE_FACE_FORWARD = new THREE.Vector3();
 const MELEE_FACE_TARGET = new THREE.Vector3();
 const MELEE_FACE_UP = new THREE.Vector3(0, 1, 0);
 const MELEE_FACE_Q = new THREE.Quaternion();
-const IsBayonetThrust = pose => /^Bayonet(Light|LightAlt|Heavy|Compact|CompactAlt)$/.test(pose?.clip || "");
+// Each vertex the index draws, once, in the order the index first uses it (PoseDeath's settling ground fit). Cached per
+// index attribute; gore rewriting the index (new array, a version bump or a new count) rebuilds the list.
+const DRAWN_VERTICES = new WeakMap();
+export function DrawnVertices(geometry) {
+  const index = geometry.index;
+  if (!index) return null;
+  const cached = DRAWN_VERTICES.get(index);
+  if (cached && cached.array === index.array && cached.version === index.version && cached.count === index.count) return cached.list;
+  const seen = new Uint8Array(geometry.attributes.position.count), list = new Uint32Array(index.count);
+  let n = 0;
+  for (let i = 0; i < index.count; i += 1) {
+    const v = index.getX(i);
+    if (!seen[v]) { seen[v] = 1; list[n++] = v; }
+  }
+  const entry = { array: index.array, version: index.version, count: index.count, list: list.slice(0, n) };
+  DRAWN_VERTICES.set(index, entry);
+  return entry.list;
+}
+const IsBayonetThrust = pose =>/^Bayonet(Light|LightAlt|Heavy|Compact|CompactAlt)$/.test(pose?.clip || "");
 import { RaycastShapes } from "./Script_CharacterHitboxMath.mjs";
 import { CHARACTER_HITBOX_PROFILE } from "./Data_CharacterHitbox.mjs";
 
@@ -989,7 +1007,7 @@ export class LugouCharacterRig {
     this.infantry.Cancel(); this.meleeAnimation?.Restore();
     this.root.position.y -= this.infantryFloorOffset || 0;
     this.infantryFloorOffset = 0;
-    this.deathFloorLift = undefined; this.deathContactRotation = null;
+    this.deathFloorLift = undefined; this.deathContactRotation = null; this.deathSettlePoints = null; this.deathSettleCalls = 0;
     this.deathGroundProbes = [];
     this.root.traverse(mesh => {
       if (mesh.isMesh && mesh.userData.characterPbrSurface) this.deathGroundProbes.push(mesh);
@@ -1112,23 +1130,43 @@ export class LugouCharacterRig {
     // Ground against visible skin, in Actor.root's fitted terrain plane, not ankle pivots.
     this.root.updateWorldMatrix(true, false); this.root.updateMatrixWorld(true);
     const inverse = this.actor.root.matrixWorld.clone().invert();
-    const transform = new THREE.Matrix4(), points = [];
-    let floor = Infinity;
-    for (const mesh of this.deathGroundProbes) {
+    const transform = new THREE.Matrix4();
+    let points = [], floor = Infinity;
+    // Between the support search and the final pose a settling corpse re-skins only every settleRescanCalls-th call
+    // (DEATH_CONTACT.settleRescanCalls); the calls between reuse its last skinned points under this call's tilt.
+    const reuse = t >= DEATH_CONTACT.poseEnd && t < 1 && this.deathContactRotation && this.deathSettlePoints
+      && (this.deathSettleCalls = (this.deathSettleCalls || 0) + 1) % DEATH_CONTACT.settleRescanCalls !== 0;
+    if (reuse) points = this.deathSettlePoints;
+    else for (const mesh of this.deathGroundProbes) {
       if (!mesh.visible) continue;
       mesh.skeleton?.update(); transform.multiplyMatrices(inverse, mesh.matrixWorld);
       // Gore removes triangles from the index while retaining the shared vertex buffer.
       // Only drawn vertices can support the body; a removed boot must not lift the torso.
       const indices = mesh.geometry.index;
       const count = indices?.count ?? mesh.geometry.attributes.position.count;
-      const stride = t >= DEATH_CONTACT.poseEnd ? 1 : Math.max(1, Math.floor(count / 256));
+      const settling = t >= DEATH_CONTACT.poseEnd;
+      // Settling reads every drawn vertex. Walking the index visits each one about six times (once per triangle that
+      // uses it) and CPU-skins it every time; DrawnVertices lists each drawn vertex once, in first-use order, so the
+      // minimum, the support cells and the floor come out exactly as before (2026-10-12: five men dying in the same
+      // second of the 02 charge spent 40-80 ms a frame here).
+      const drawn = settling && indices ? DrawnVertices(mesh.geometry) : null;
+      if (drawn) {
+        for (let k = 0; k < drawn.length; k += 1) {
+          mesh.getVertexPosition(drawn[k], point).applyMatrix4(transform);
+          floor = Math.min(floor, point.y);
+          points.push(point.clone().sub(this.actor.body.position));
+        }
+        continue;
+      }
+      const stride = settling ? 1 : Math.max(1, Math.floor(count / 256));
       for (let offset = 0; offset < count; offset += stride) {
         const index = indices ? indices.getX(offset) : offset;
         mesh.getVertexPosition(index, point).applyMatrix4(transform);
         floor = Math.min(floor, point.y);
-        if (t >= DEATH_CONTACT.poseEnd) points.push(point.clone().sub(this.actor.body.position));
+        if (settling) points.push(point.clone().sub(this.actor.body.position));
       }
     }
+    if (!reuse && t >= DEATH_CONTACT.poseEnd) this.deathSettlePoints = t < 1 ? points : null;
     if (points.length) {
       if (!this.deathContactRotation) {
         // One bounded support search per corpse. Minimise the mass centre height,

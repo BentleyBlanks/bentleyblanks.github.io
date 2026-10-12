@@ -53,6 +53,11 @@ export const TEXT = Object.freeze({
   "firstLevel.guide.bundle": "集束手榴弹",
   "firstLevel.guide.throw": "侧沟投掷位置",
   "firstLevel.guide.south": "南行道路",
+  // 0311 B：07 沟口接火到担架过完开阔地之间的标签（MISSION_GUIDANCE.South.mouthLabel）。
+  "firstLevel.guide.mouth": "东边田埂上的机枪",
+  // 0311 B：06 借火改两次 F（第一次借火、老周递烟之后第二次划火递过去）。
+  "firstLevel.interaction.borrowLight": "跟老周借个火",
+  "firstLevel.interaction.borrowLightShare": "划火，递过去",
   "firstLevel.guide.village": "灶屋入口",
   "firstLevel.guide.gate": "院门通道",
   "firstLevel.guide.gateThreat": "院门外追兵：探出缺口压住侧翼",
@@ -88,4 +93,6 @@ export const TEXT = Object.freeze({
 export const DYNAMIC_PREFIXES = ["firstLevel.return.", "firstLevel.interaction.", "firstLevel.guide.", "firstLevel.hint.", "firstLevel.leader.", "firstLevel.transition."];
 export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_FirstLevelMissionVoice.mjs", "Script_FirstLevelOpening.mjs", "Script_FirstLevelLeaderGuide.mjs",
   // 第二波 Mid 包（阶段 8–14）的两个玩法模块：零玩家可见中文，台词一律走台词表。
-  "Script_FirstLevelVillageBlock.mjs", "Script_FirstLevelTransferCart.mjs"];
+  "Script_FirstLevelVillageBlock.mjs", "Script_FirstLevelTransferCart.mjs",
+  // 2026-10-12 0311 B 包：耿家四个角色与 07 沟口遭遇。
+  "Script_FirstLevelGengFamily.mjs", "Script_FirstLevelSouthMouth.mjs"];

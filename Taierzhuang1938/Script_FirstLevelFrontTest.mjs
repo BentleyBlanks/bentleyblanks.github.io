@@ -355,7 +355,8 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
     MachineGun: ["tankPositionPressured", "gapGuardKilled", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
     Tank: ["bundleRouteTraversed", "bundleTaken", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "escortsWithdrawn", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned", "zhouGunWounded"],
     Orders: ["ordersReached", "volunteerHeard", "lightShared", "zhouOnLitter", "columnDeparted"],
-    South: ["southWhisperHeard", "villageMouthReached", "mainStreetPointed"],
+    // 2026-10-12 0311 B 包（契约 §3.5）：07 加沟口遭遇，mouthCrossed = 活着的担架全部过了开阔地。
+    South: ["southWhisperHeard", "mouthCrossed", "villageMouthReached", "mainStreetPointed"],
   };
   for (const [id, requirements] of Object.entries(expected)) {
     const stage = MISSION_STAGES.find((entry) => entry.id === id);
