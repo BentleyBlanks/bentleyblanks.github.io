@@ -2325,8 +2325,11 @@ export class FirstLevelBunkerShow {
       if(t>=EventAt("IjaFinishWalkStab","stab",.875)&&this.Emit("finishStab1"))this.Sfx("bayonetStabBody",{position:r.Point(C.marks.finishBodies[0],.35),volume:1});
       return;
     }
-    if(f.finishWalkAt==null){f.finishWalkAt=r.time;this.RerootUnderPelvis(ijaA,Face(ijaA.openingStoryboardLast||ijaA.position,boot));}
-    if(this.Hold(ijaA,{...boot,yaw:C.ija.crouch.yaw},null,{speed:F.walkMps})||r.time-f.finishWalkAt>F.walkMaxS){this.Put(ijaA,C.ija.crouch,{keep:true});this.Stage("Found");}
+    // (2026-10-12 R4: round the east end of the rifle lying at the eye's right front by bootVia, then onto the boot's start.)
+    const bootVia=F.bootVia||[];
+    if(f.finishWalkAt==null){f.finishWalkAt=r.time;this.RerootUnderPelvis(ijaA,Face(ijaA.openingStoryboardLast||ijaA.position,bootVia[0]||boot));}
+    if(bootVia.length&&f.finishViaAt==null){if(this.Follow(ijaA,"finishBoot",bootVia,F.walkMps,null,null,{cornerM:.15}))f.finishViaAt=r.time;}
+    if(r.time-f.finishWalkAt>F.walkMaxS||(f.finishViaAt!=null||!bootVia.length)&&this.Hold(ijaA,{...boot,yaw:C.ija.crouch.yaw},null,{speed:F.walkMps})){this.Put(ijaA,C.ija.crouch,{keep:true});this.Stage("Found");}
   }
   /** Where IjaFinishWalkStab's root goes so the bayonet's point lands on the finish body's back at `stab` (facing finish.yawDeg). */
   FinishStabRoot(){
@@ -4019,11 +4022,15 @@ export class FirstLevelBunkerShow {
       roll=B.rollDeg*DEG*f+(a>B.fallStartS?.06*Math.sin((a-B.fallStartS)*14)*Math.exp(-(a-B.fallStartS)*3):0);
     }
     else if(["Black","Wake"].includes(p)){
-      // 2026-10-11 (N06): the rifle in the mud right of the middle (rescue.rifleMouth lies north-east of the eye): the look turned
-      // ~30 deg north of the trench line.
-      target=At({x:4,z:-126.5},.8);roll=-.06;
+      // N06 「汉阳造落在右前方一臂开外」: the look down the trench (4 deg left of its line), the rifle in the mud in the lower right of
+      // the picture (rescue.rifleMouth south-east of the eye). (2026-10-12 R4: Dir01 had turned it ~30 deg north to bring the rifle,
+      // then at the eye's left front, into the right half; with the rifle back at the right front that turn is gone.)
+      target=At({x:4,z:-125.4},.8);roll=-.06;
       // 「他试着撑起身体。背包带一下绷紧……又落回地面」, then the eyes drop to the clawing fingers.
-      if(p==="Wake"){height+=L.pushUpM*Smooth((a-1.2)/.5)*(1-Smooth((a-1.85)/.12));pitch=L.clawPitch*Smooth((a-2)/.4);}
+      // ...and then up off them to the rifle out of his reach at the right front (look.rifleLook; N06).
+      if(p==="Wake"){const G=L.rifleLook,up=G?Smooth((a-G.fromS)/G.riseS):0;
+        height+=L.pushUpM*Smooth((a-1.2)/.5)*(1-Smooth((a-1.85)/.12));pitch=L.clawPitch*Smooth((a-2)/.4)*(1-up);
+        if(up>0)target=target.clone().lerp(At(C.rescue.rifleMouth,.05),G.share*up);}
     }
     else if(p==="DropIn"){
       // N07 / N08: down the front trench at the north rim they come off (pitched up to the rim), then at the fold.

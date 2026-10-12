@@ -284,7 +284,16 @@ export function InstallOpeningStoryboardAnimation(soldier){
     wasRescueReady=rescueReady;
     const rerooted=soldier.openingRerooted,noBlend=soldier.openingNoBlend;
     soldier.openingRerooted=false;soldier.openingNoBlend=false;
-    if(key!==lastKey||rerooted){
+    // Native combat with no authored clip (an aimed Luo / Zhou calling a line, Script_OpeningActorPerformance headOnly): the
+    // AI's own pose is what is shown, the only thing on top is the head while he talks. The pose blend is for an authored
+    // pose handed to the AI (KneelHold -> native aim, combatBlendS); starting one here from the pose shown a frame ago only
+    // dragged the aimed chest, hands and rifle behind the native aim (2026-10-12 R4-Gates: chest 0.087 rad, hands and gun
+    // 1.8 cm over the first 7 frames of a line) and held the turned head over the first 7 silent frames after it
+    // (OpeningActorPerformanceBrowserTest «silent combat retains its original head pose», red since 238bd5fa 09-28).
+    // A blend already running from a clip (the hand-back) still runs to its end.
+    const nativeOnly=!pose&&nativeCombat&&!rerooted;
+    if(nativeOnly&&key!==lastKey&&lastKey==null){lastKey=key;travelClock=0;blendFrom=null;}
+    else if(key!==lastKey||rerooted){
       blendFrom=blendBuffer;
       if(displayed){for(let i=0;i<bones.length;i++){blendFrom[i].p.copy(displayed[i].p);blendFrom[i].q.copy(displayed[i].q);}KeepDisplayedPelvis();}
       else Snapshot(blendFrom);
@@ -343,7 +352,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     // runner, the comrade rising). A layer switching without a clip change (grip correction, a protected or
     // head-only beat) restarts the blend from what was shown too.
     const layers=`${rig.openingActorGripState?1:0}|${rig.openingActorPerformanceState?.protected?1:0}|${rig.openingActorPerformanceState?.headOnly?1:0}|${pose?.additive?.clip||""}`;
-    if(layers!==lastLayers&&lastLayers!=null&&displayed&&!freshShow&&!noBlend&&blendAt!==clock){
+    if(layers!==lastLayers&&lastLayers!=null&&displayed&&!freshShow&&!noBlend&&!nativeOnly&&blendAt!==clock){
       blendFrom=blendBuffer;
       for(let i=0;i<bones.length;i++){blendFrom[i].p.copy(displayed[i].p);blendFrom[i].q.copy(displayed[i].q);}
       KeepDisplayedPelvis();blendAt=clock;limbsOnly=false;

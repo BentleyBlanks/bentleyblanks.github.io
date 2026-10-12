@@ -492,6 +492,38 @@ assert.match(bakePowerShell, /NRA01 and IJA01 separately/,
   const { DEATH_CONTACT } = await import("./Data_Tuning_ActorDeath.mjs");
   assert.ok(Number.isInteger(DEATH_CONTACT.settleRescanCalls) && DEATH_CONTACT.settleRescanCalls >= 1 && DEATH_CONTACT.settleRescanCalls <= 4,
     "a settling corpse re-skins at least every fourth call");
+  // 2026-10-12 R4-Perf: a call at the same t as the last skinning (zero-delta frame) reuses those points without counting
+  // toward the cadence; the points are stored with the t they were skinned at.
+  assert.match(runtime, /&& \(t === this\.deathSettleT \|\| \(this\.deathSettleCalls = \(this\.deathSettleCalls \|\| 0\) \+ 1\) % DEATH_CONTACT\.settleRescanCalls !== 0\);/,
+    "a zero-delta settling call reuses the points skinned at that very t");
+  assert.match(runtime, /if \(!reuse && t >= DEATH_CONTACT\.poseEnd\) \{ this\.deathSettlePoints = t < 1 \? points : null; this\.deathSettleT = t; \}/,
+    "the skinned points remember their t");
+  // 2026-10-12 R4-Perf: SkinnedVertexReader hoists the per-bone product out of the vertex loop and must read the very same
+  // bits as SkinnedMesh.getVertexPosition (a skinned, morphed, weighted mesh under an arbitrary pose and bind matrix).
+  const { SkinnedVertexReader } = await import("./Script_CharacterModel.mjs");
+  const g2 = new THREE.CylinderGeometry(.2, .3, 1.6, 12, 16), n = g2.attributes.position.count;
+  const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4), morph = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const y = g2.attributes.position.getY(i) + .8, b = Math.max(0, Math.min(2, Math.floor(y / .6)));
+    si.set([b, Math.min(3, b + 1), 0, 3], i * 4);
+    const w = (y % .6) / .6; sw.set([1 - w, w * .7, w * .2, w * .1], i * 4);
+    morph.set([Math.sin(i) * .01, Math.cos(i) * .02, 0], i * 3);
+  }
+  g2.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(si, 4));
+  g2.setAttribute("skinWeight", new THREE.Float32BufferAttribute(sw, 4));
+  g2.morphAttributes.position = [new THREE.Float32BufferAttribute(morph, 3)]; g2.morphTargetsRelative = true;
+  const bones = [0, 1, 2, 3].map(() => new THREE.Bone());
+  bones[0].position.set(0, -.8, 0); for (let i = 1; i < 4; i++) { bones[i].position.set(0, .6, 0); bones[i - 1].add(bones[i]); }
+  const mesh = new THREE.SkinnedMesh(g2, new THREE.MeshStandardMaterial());
+  mesh.add(bones[0]); mesh.position.set(1.5, .2, -3); mesh.rotation.set(.3, 1.1, -.2); mesh.updateMatrixWorld(true);
+  mesh.bind(new THREE.Skeleton(bones)); mesh.morphTargetInfluences = [.6];
+  bones[1].rotation.set(.4, .1, .7); bones[2].rotation.set(-.5, .3, .2); bones[3].position.set(.05, .55, .1);
+  mesh.updateMatrixWorld(true);
+  const read = SkinnedVertexReader(mesh), a = new THREE.Vector3(), b = new THREE.Vector3();
+  let same = 0;
+  for (let i = 0; i < n; i++) { read(i, a); mesh.getVertexPosition(i, b); if (a.x === b.x && a.y === b.y && a.z === b.z) same++; }
+  assert.equal(same, n, `SkinnedVertexReader is bit-identical to SkinnedMesh.getVertexPosition (${same}/${n})`);
+  assert.match(runtime, /const read = SkinnedVertexReader\(mesh\);/, "PoseDeath's ground fit reads skinned vertices through the hoisted reader");
 }
 
 console.log(`CharacterModelTest OK — ${manifest.models.length} models × ${expectedActions.length} source-parity, `

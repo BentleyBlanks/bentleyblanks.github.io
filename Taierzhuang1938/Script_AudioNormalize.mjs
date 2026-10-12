@@ -71,6 +71,7 @@ for (const file of ["AudioSfx_ExplosionMidVillage.mp3", "AudioSfx_ExplosionFarFi
 
 const PEAK_CEILING_DBFS = -1;
 const PROCESS_LIMIT_DBFS = -1.5; // Leave MP3 reconstruction headroom for the -1 dBFS decoded ceiling.
+const WRITE_AIM_DB = 0.1; // --write lands within ±0.1 dB of the target (verification tolerance stays ±0.5).
 const MAX_BUFFER = 384 * 1024 * 1024;
 
 function Run(command, args, options = {}) {
@@ -165,6 +166,9 @@ function Encode(file, probe, initialGainDb, target) {
   const bitRateK = Math.max(32, Math.round(probe.bitRate / 1000));
   let gainDb = initialGainDb;
   let lastAfter = null;
+  // 写的时候瞄准目标 ±WRITE_AIM_DB，不是一进容差就收：2026-10-12 R4-Voice 补那八条旧红时第一遍就停在 −25.50（容差边上），
+  // 再量一次或换台机器解码就可能翻红。几轮都进不了 ±0.1（限幅吃得多）时退回容差内最接近目标的那一遍。
+  let best = null;
   try {
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const limit = Math.pow(10, PROCESS_LIMIT_DBFS / 20).toFixed(8);
@@ -178,13 +182,23 @@ function Encode(file, probe, initialGainDb, target) {
       const after = Measure(temp, afterProbe);
       lastAfter = after;
       const error = target.targetDbfs - after[target.metric];
-      if (Math.abs(error) <= target.toleranceDb && after.peakDbfs <= PEAK_CEILING_DBFS + 0.1) {
+      const fits = Math.abs(error) <= target.toleranceDb && after.peakDbfs <= PEAK_CEILING_DBFS + 0.1;
+      if (fits && Math.abs(error) <= WRITE_AIM_DB) {
         fs.renameSync(temp, file);
         return;
       }
+      if (fits && (!best || Math.abs(error) < best.error)) best = { error: Math.abs(error), gainDb };
       // Always render the next attempt from the untouched source, so retries never stack lossy
       // MP3 generations. The correction compensates for energy removed by the peak limiter.
       gainDb += Math.max(-4, Math.min(4, error));
+    }
+    if (best) {
+      const limit = Math.pow(10, PROCESS_LIMIT_DBFS / 20).toFixed(8);
+      Run(ffmpeg, ["-y", "-v", "error", "-i", file, "-map_metadata", "0", "-af",
+        `volume=${best.gainDb.toFixed(4)}dB,alimiter=limit=${limit}:attack=2:release=50:level=false`,
+        "-ac", String(probe.channels), "-ar", String(probe.sampleRate), "-b:a", `${bitRateK}k`, temp]);
+      fs.renameSync(temp, file);
+      return;
     }
     throw new Error(`${path.basename(file)} could not reach ${target.targetDbfs} dBFS without exceeding the peak ceiling`
       + ` (last ${lastAfter?.[target.metric].toFixed(2)} dBFS, peak ${lastAfter?.peakDbfs.toFixed(2)} dBFS)`);

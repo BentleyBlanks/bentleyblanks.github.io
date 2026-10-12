@@ -634,7 +634,14 @@ export class FirstLevelFrontScenes {
         else if (g.phase === "back") { g.phase = "aside"; g.clearSince = null; }
       }
       if (g.phase === "aside") {
-        if (Distance(r.player.position, g.home) >= B.giveWayReleaseM) g.clearSince ??= now;
+        // A player who has stopped (no movement keys, standing: PlayerHeading null) for giveWayStillClearS is not coming past
+        // any more, though he may stand nearer than giveWayReleaseM -- he is never released otherwise: 2026-10-12 R4-Gates, R3
+        // drive fin2 ("Luo physically reaches his cover within four seconds", 0.70 m short): Luo sidestepped from 0.64 m
+        // short of his cover as the player came into the right nest, the player then crouched by the captured gun 1.6 m from
+        // that spot and Luo stood aside for the 22 s to the check. Not while the player stands on that spot (giveWayNearM).
+        if (heading) g.stillSince = null; else g.stillSince ??= now;
+        const stopped = g.stillSince != null && now - g.stillSince >= B.giveWayStillClearS && Distance(r.player.position, g.home) >= B.giveWayNearM;
+        if (Distance(r.player.position, g.home) >= B.giveWayReleaseM || stopped) g.clearSince ??= now;
         else g.clearSince = null;
         if (g.clearSince != null && now - g.clearSince >= B.giveWayClearS) {
           // A man with a route still to walk (a leader who stood waiting for the player) takes it up from where he is:

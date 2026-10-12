@@ -9,7 +9,9 @@ export const CARRIAGE_SOUND = Object.freeze({
   speechBedGain: 0.28,
   escapeSpeechBedGain: 0.68,
   uneasyScale: 0.38,
-  cheerVolume: 0.48,
+  // 2026-10-12：AudioAmb_CarriageRearCheer 成品从有声段 −18.07 对齐到库线 −25 dBFS（−6.88 dB），0.48 × 10^(6.88/20) 复原原响度。
+  // （2026-10-12 时没有运行时代码读这个数，接上起哄声时用它。烘焙仍按下面的 targetLufs −20 出片，之后要过 Script_AudioNormalize --write。）
+  cheerVolume: 1.06,
   cheerSlots: [14, 15],
   reactions: [
     {id:"CarriageLaughAtTasting",line:2},

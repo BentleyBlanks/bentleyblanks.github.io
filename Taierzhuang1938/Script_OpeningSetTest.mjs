@@ -987,7 +987,7 @@ function FakeVfx() {
 // ---------------------------------------------------------------- 6. 2026-10-11 开场重构（契约 docs/Data_OpeningRedraft20261011Contract.md §5）
 // 标记名、净空、贴地 / 叠放、跳下点、手榴弹停点、折角爆点、道具接口、离开收走、三角形预算。地面一律用游戏里的高度场（P012，宿主的 groundAt）。
 {
-  const { SET_MARKS: M, CORPSES, BODY_POSES, REDRAFT_PROPS, REDRAFT_STAGES, REDRAFT_TRIANGLE_BUDGET, CorpseFootprint, COMRADE_KNEEL } = await import("./Data_OpeningSet0103.mjs");
+  const { SET_MARKS: M, CORPSES, BODY_POSES, REDRAFT_PROPS, REDRAFT_STAGES, REDRAFT_TRIANGLE_BUDGET, CorpseFootprint, COMRADE_KNEEL, CORPSE_RENDER } = await import("./Data_OpeningSet0103.mjs");
   const { MISSION_PLACEMENT } = await import("./Data_FirstLevelMissionLayout.mjs");
   const { MISSION_STAGE_ROUTES } = await import("./Data_FirstLevelMissionTopology.mjs");
   const { BuildRedraftProp, CountTriangles } = await import("./Script_OpeningProps.mjs");
@@ -1115,6 +1115,46 @@ function FakeVfx() {
   assert.ok(spread <= 0.02, `grenadeStop on flat ground (${spread.toFixed(3)} m over 15 cm)`);
   assert.ok(CORPSES.every((row) => BoxDist(CorpseFootprint(row.mark), g) > 0.08), "grenadeStop is not on a corpse");
   report.redraft.grenadeStop = { toEyeM: +toEye.toFixed(3), spreadM: +spread.toFixed(3) };
+  // ---- 6d2. 汉阳造（rescue.rifleMouth，2026-10-12 R4：原文「汉阳造落在右前方一臂开外」「罗班长弯腰捡起顺子右前方泥地里的汉阳造」）：
+  // 整支枪（1.258 m，中心在 rifleMouth、枪口沿 (-sin yaw, -cos yaw)）躺在眼位右前方（眼位朝东，右 = 南）够不着的地方，平躺在沟底；
+  // 离翻译蹲位 ≥ 0.6 m，不压手榴弹停点、丁的站位 / 倒地位、日兵甲的蹲位与踩手起点、补刀尸体与其它尸体、地上的布景；
+  // 近爆后在沟底走的几条路（翻译去蹲位、甲补刀后去踩手、何有田去沟沿）离它 ≥ 0.3 m（脚不踩枪）。
+  {
+    const R = C.rescue, rm = R.rifleMouth, half = 1.258 / 2, dir = { x: -Math.sin(rm.yaw), z: -Math.cos(rm.yaw) };
+    const muzzle = { x: rm.x + dir.x * half, z: rm.z + dir.z * half }, butt = { x: rm.x - dir.x * half, z: rm.z - dir.z * half };
+    const along = Samples([butt, muzzle]);
+    const SegDist = (p) => Math.min(...along.map((q) => Math.hypot(p.x - q.x, p.z - q.z)));
+    const PathDist = (route) => Math.min(...Samples(route).map(SegDist));
+    const bearing = Math.atan2(rm.z - eye.z, rm.x - eye.x) / DEG, nearEnd = Math.min(...[butt, muzzle].map((p) => Math.hypot(p.x - eye.x, p.z - eye.z)));
+    assert.ok(bearing >= 10 && bearing <= 45, `rifleMouth at the eye's right front (${bearing.toFixed(0)} deg right of the trench line, 10–45)`);
+    assert.ok(nearEnd >= 0.8, `the rifle lies out of reach of the pinned man (its near end ${nearEnd.toFixed(2)} m from the eye)`);
+    const gr = along.map((p) => GG(p.x, p.z)), rifleSpread = Math.max(...gr) - Math.min(...gr);
+    assert.ok(rifleSpread <= 0.12, `the rifle lies flat on the trench floor (${rifleSpread.toFixed(3)} m along it)`);
+    const ijaBoot = { x: C.ija.crouch.x + 0.336, z: C.ija.crouch.z - 0.065 };       // IjaBootOnHand's start, behind ija.crouch (facing west)
+    // where IjaFinishWalkStab leaves him (its root facing west, finish.stabAtM off finish.bodies[0], then 1.4 m of root motion west)
+    // Luo's hand-over root (HandRoot: hand.frontM in front of the kneeling eye, facing him) and where he waits aside until the heave
+    // has brought the knees under him (hand.waitSide: [left, back] of it)
+    const kneelKey = R.heave.body.eye.at(-1)[1], kneelAt = { x: eye.x - kneelKey[2], z: eye.z }, handRoot = { x: kneelAt.x + R.hand.frontM, z: kneelAt.z };
+    const luoWait = { x: handRoot.x + R.hand.waitSide[1], z: handRoot.z + R.hand.waitSide[0] };
+    const fb0 = M.finish.bodies[0], stabEnd = { x: fb0.x - C.finish.stabAtM[1] - 1.4, z: fb0.z + C.finish.stabAtM[0] };
+    const points = { "rescue.interpreter (squat)": [R.interpreter, 0.6], "finish.grenadeStop": [M.finish.grenadeStop, 0.5], "ija.crouch": [C.ija.crouch, 0.5],
+      "IjaBootOnHand start": [ijaBoot, 0.5], "blade.recruitAt": [R.blade.recruitAt, 0.6], "blade.levelAt": [R.blade.levelAt, 0.6],
+      "blade.recruitFall": [R.blade.recruitFall, 0.6], "practice.recruitWait": [C.practice.recruitWait, 0.6], "rescue.fallenComrade": [R.fallenComrade, 0.5] };
+    const rifleNear = Object.entries(points).filter(([, [p, m]]) => SegDist(p) < m).map(([n, [p]]) => `${n} ${SegDist(p).toFixed(2)} m`);
+    rifleNear.push(...CORPSES.filter((row) => Math.min(...along.map((q) => BoxDist(CorpseFootprint(row.mark), q))) < 0.3).map((row) => `corpse ${row.id}`));
+    for (const prop of PROPS) for (const box of PropFootprints(prop).filter((b) => !b.walkable && b.y0 < 0.15)) if (along.some((q) => BoxDist(box, q) < 0.03)) rifleNear.push(`prop ${prop.id}`);
+    // and not under the duckboards (walkable, but a rifle at ground + 3 cm under the slats is not seen: N06, R4 first run)
+    for (const prop of PROPS) for (const box of PropFootprints(prop).filter((b) => b.walkable)) if (along.some((q) => BoxDist(box, q) < 0.1)) rifleNear.push(`under ${prop.id}`);
+    assert.deepEqual(rifleNear, [], "the rifle at the right front is clear of the marks, corpses and dressing on the floor");
+    const walks = { "interpreter to his squat": [C.interrogation.interpreterAt, ...C.finish.interpreterVia, R.interpreter],
+      "ijaA from the stab to the boot": [stabEnd, ...C.finish.bootVia, ijaBoot], "He to the trench edge": [...R.heCoverVia, R.heCover],
+      "Luo waiting aside, then stepping in to HandRoot": [luoWait, handRoot] };
+    const walksNear = Object.entries(walks).map(([n, route]) => [n, PathDist(route)]).filter(([, d]) => d < 0.3).map(([n, d]) => `${n} ${d.toFixed(2)} m`);
+    assert.deepEqual(walksNear, [], "nobody walks over the rifle lying in the mud");
+    report.redraft.rifle = { bearingDeg: +bearing.toFixed(1), nearEndM: +nearEnd.toFixed(2), spreadM: +rifleSpread.toFixed(3),
+      walksM: Object.fromEntries(Object.entries(walks).map(([n, route]) => [n, +PathDist(route).toFixed(2)])) };
+    console.log(`ok rifle at the right front ${JSON.stringify(report.redraft.rifle)}`);
+  }
   // ---- 6e. 折角爆点：眼位（压木趴着的眼）看不见爆点本身（拐角挡住），看得见它上方 3 m 的烟（从沟沿上冒出来）
   const eyeP = Eye(eye, C.shunzi.lieEyeM), fb = M.dropIn.foldBlast;
   report.redraft.foldBlast = { blast: Sight(eyeP, Eye(fb, 0.3), { state: "BunkerCollapsed" }), smoke: Sight(eyeP, Eye(fb, 3.2), { state: "BunkerCollapsed" }),
@@ -1185,6 +1225,32 @@ function FakeVfx() {
   let peak = 0;
   for (let i = 0; i < 20; i++) { set.Update(1 / 60, "Trapped", "Interrogation", { collapsed: true, blastAge: 40 }); peak = Math.max(peak, Math.abs(set.redraft.corpses.Get("mg.corpseUpper").group.matrixWorld.elements[13] - before)); }
   assert.ok(peak > 0.01 && peak <= 0.021 && Math.abs(set.redraft.corpses.Get("mg.corpseUpper").group.matrixWorld.elements[13] - before) < 1e-6, `the burst jolts the upper body (${peak.toFixed(3)} m) and it settles back`);
+  // 2026-10-12 R4-Perf：垫尸静止时画批次实例（五具共用一套批次），被震 / 被拖的那几帧画自己的网格；两边不会同时画、也不会都不画。
+  {
+    const corpses = set.redraft.corpses, upperBody = corpses.Get("mg.corpseUpper");
+    const SlotsOn = (b) => b.slots.map((s) => s.batch.mesh.getVisibleAt(s.id));
+    const Mode = (b) => ({ mesh: b.group.visible, batch: SlotsOn(b).every(Boolean), none: SlotsOn(b).every((v) => !v) });
+    let m = Mode(upperBody);
+    assert.ok(!m.mesh && m.batch, `a still MG body draws through the shared batches, not its own meshes ${JSON.stringify(m)}`);
+    const at = new THREE.Matrix4(); upperBody.slots[0].batch.mesh.getMatrixAt(upperBody.slots[0].id, at);
+    assert.ok(at.elements.every((v, i) => Math.abs(v - upperBody.matrix.elements[i]) < 1e-5), "its batch instance sits where the body lies (float32 instance texture)");
+    set.JoltCorpse("mg.corpseUpper");
+    set.Update(1 / 60, "Trapped", "Interrogation", { collapsed: true, blastAge: 40 });
+    m = Mode(upperBody);
+    assert.ok(m.mesh && m.none, `while it jolts it draws its own meshes (moving instances stay out of batches) ${JSON.stringify(m)}`);
+    for (let i = 0; i < 20; i++) set.Update(1 / 60, "Trapped", "Interrogation", { collapsed: true, blastAge: 40 });
+    m = Mode(upperBody);
+    assert.ok(!m.mesh && m.batch, `back in the batch once it is still again ${JSON.stringify(m)}`);
+    set.PlaceCorpse("mg.corpseLower", { pose: "floor", x: 10.4, z: -123.4, headYawDeg: 90, settle: false });
+    assert.ok(Mode(corpses.Get("mg.corpseLower")).mesh, "dragging a body shows its meshes at once");
+    set.PlaceCorpse("mg.corpseLower", { pose: "onLip" }); set.PlaceCorpse("mg.corpseUpper", { pose: "stacked" });
+    for (let i = 0; i < 3; i++) set.Update(1 / 60, "Trapped", "Interrogation", { collapsed: true, blastAge: 40 });
+    assert.ok(!Mode(corpses.Get("mg.corpseLower")).mesh, "and the batch again once it lies still");
+    for (const b of corpses.batches) {
+      const small = b.geometries.every((g) => (g.index ? g.index.count : g.attributes.position.count) / 3 < CORPSE_RENDER.smallPartTriangles);
+      assert.equal(b.mesh.castShadow, !small, `${b.mesh.name}: only parts of ${CORPSE_RENDER.smallPartTriangles}+ triangles cast shadows`);
+    }
+  }
   // 冷启动 02：没演过 01 的选章 / 回跳，垫尸已经在沟沿上叠好，门口两具在位。
   {
     const s2 = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: GG, corpseSource: (k) => protos[k] });

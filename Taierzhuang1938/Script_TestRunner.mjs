@@ -834,8 +834,9 @@ const changedDomainRules = [
   {domain:"firstLevel",pattern:/FrontStoryboardShots/},
   {domain:"openingStoryboards",pattern:/FrontStoryboardShots/},
   {domain:"firstLevel",pattern:/FirstLevelRearDoorWalk|FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontScenes|FirstLevelFrontPacing|FirstLevelFrontTopology|FirstLevelFrontCounterattack|FirstLevelTransition/},
-  // 2026-10-12 0311 B 包：耿家四个角色与 07 沟口遭遇（两个纯 Node 门在 tier0Fast）。
-  {domain:"firstLevel",pattern:/FirstLevelGengFamily|FirstLevelSouthMouth/},
+  // 2026-10-12 0311 B 包：耿家四个角色与 07 沟口遭遇（两个纯 Node 门在 tier0Fast）；C 包 08–11 巷战模块 Script_FirstLevelStreetFight
+  // （master 761926bc 登记了模块与 FirstLevelStreetFightTest，漏了领域映射，TestRunnerTest「未映射」红）。
+  {domain:"firstLevel",pattern:/FirstLevelGengFamily|FirstLevelSouthMouth|FirstLevelStreetFight/},
   // 2026-09-23 01–06 space rebuild: keyframe table and the static probe the space gate reads.
   {domain:"firstLevel",pattern:/FirstLevelSpaceKeyframes|FirstLevelSpaceProbe|FirstLevelSpaceMap|FirstLevelSpaceShots|FirstLevelSpaceSouthFingerprint|Data_FirstLevelFrontBreakables/},
   {domain:"firstLevel",pattern:/FirstLevelZhouExit/},

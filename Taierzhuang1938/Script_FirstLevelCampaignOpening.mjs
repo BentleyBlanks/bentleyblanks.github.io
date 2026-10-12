@@ -723,8 +723,11 @@ export async function InstallSpeakerActing(page){
           if(row.acted===1||row.acted===30||row.acted===90)(row.diag??=[]).push({n:row.acted,t:+(r.time??0).toFixed(2),st:soldier.state,
             stance:soldier.stance,rootVis:!!soldier.actor?.root?.visible,d:+Math.sqrt(soldier.actor?.renderDistanceSq??0).toFixed(1),
             tick:r.ai?.tickIndex,id:soldier.id,mixer:+(rig.mixer?.time??-1).toFixed(3),clip:rig.currentId??null,
+            // layer = the shared SpeakerHeadLayer: its clock stands still while the director acts this rig (it returns before
+            // ticking when rig.openingActorPerformanceState is set) -- director.* is the acting that runs then.
             layer:layer?{on:layer.enabled,speak:layer.speaking,clock:+(layer.clock??0).toFixed(2)}:null,
-            director:director?{speak:!!director.speaking,prot:!!director.protected}:null,rest:!!soldier.missionSurfaceRest,
+            director:director?{speak:!!director.speaking,prot:!!director.protected,headOnly:!!director.headOnly,speech:+(director.speech??0).toFixed(3),
+              jaw:+(rig.facial?.jaw??-1).toFixed(3),talkJaw:+(rig.openingActorPerformance?.talkJaw??-1).toFixed(3)}:null,rest:!!soldier.missionSurfaceRest,
             evade:!!soldier.missionGrenadeEvade,carriage:!!soldier.missionCarriageAction,head:head.toArray().map(v=>+v.toFixed(4))});
           // Evidence: one first-person picture per line, taken the 15th frame he is acted and seen (the drive's
           // StepFrames wrapper renders and reads it back in the same task, see InstallSpeakerGlance).
@@ -898,6 +901,7 @@ export const FRONT_LINES_IN_FIREFIGHT = Object.freeze({
   "BundleRetreat.01": "炸车后罗班长在身旁 1 m 内喊「回来！低头！」，玩家这时对着战车与跟车步兵",
   "TankRoadContact.02": "04 开头罗班长回何有田「先看住跟车的！」，玩家在夺下的机枪上或正和摸近的侧翼组对射（09-25 Front step 3 驾驶：一趟 136 帧全在打、中了 FrontFlankC 一枪）",
   "TankTerror.01": "战车炮口转过来时罗班长喊「下来！莫站枪口上！」，玩家正在枪上对射（同一趟 245 帧里 214 帧在打）",
+  "TankHeard.02": "车影刚在路那头露面，罗班长在夺下的右枪位旁 1–3 m 喊「战车！……先把人接下来！」，玩家这时在枪上压着缺口（2026-10-12 R4-Gates 基线第 5 趟：206 帧全在打、罗在玩家身后 123°，一帧没看见）；没在打仗的趟次照旧要看得见、要有表演",
   "TankStopped.02": "战车刚停，罗班长朝缺口喊守军下来；玩家边撤边打剩下的跟车步兵",
   "BundleAttack.01": "攻击位：罗班长在投弹点西侧 1.5 m 到位时喊「就这边！莫上大路！」，玩家正对着战车和跟车护兵（09-25 Front step 2 驾驶：115 帧全在打）",
   "BundleAttack.02": "攻击位上罗班长在投弹点西侧 1.5 m 喊「顺子，拿弹！旁边的人我看到！」，玩家正瞄着战车和跟车步兵",

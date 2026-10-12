@@ -676,7 +676,9 @@ export const SFX_SOURCES = [
     path: "The Chris Alan - Hand-to-Hand Combat - Body Hits & Vocal Excursions/Hand-to-Hand Combat - Body Hits - Face Slap Hard 04.mp3",
     credit: "The Chris Alan · 重扇耳光 · Sonniss GDC 2018",
     license: "sonniss",
-    cuts: [{ cue: "slap", tail: 0.2, gain: 0.95, whole: true, alignDbfs: -16 }],
+    // 2026-10-12：alignDbfs −16 → −25（库线）。原来按 −16 出片，Script_AudioNormalize 一直红；成品已对齐、
+    // 响度差 9.10 dB 挪进 Script_Audio.SAMPLE_MIX.slap（0.85 → 2.423），重烘出来的成品与现在这条同一电平。
+    cuts: [{ cue: "slap", tail: 0.2, gain: 0.95, whole: true, alignDbfs: -25 }],
   },
 
   // === 身体 ===============================================================

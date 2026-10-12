@@ -99,7 +99,7 @@
   "via": "Data_MusicSources.mjs"
  },
  "normalization": {
-  "normalizedAt": "2026-08-25",
+  "normalizedAt": "2026-10-12",
   "tool": "Script_AudioNormalize.mjs",
   "peakCeilingDbfs": -1,
   "metric": "rmsDbfs",

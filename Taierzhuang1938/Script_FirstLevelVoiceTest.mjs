@@ -21,7 +21,7 @@ import {
 import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
-import { FIRST_LEVEL_DIALOGUE_DIRECTION, PROJECTION_DB, DIALOGUE_DUCK, LineDirection, FALLBACK_GAP_S, MAX_LIVE_DIALOGUE_LINES } from "./Data_FirstLevelDialogueDirection.mjs";
+import { FIRST_LEVEL_DIALOGUE_DIRECTION, PROJECTION_DB, DIALOGUE_DUCK, LineDirection, FALLBACK_GAP_S, MAX_LIVE_DIALOGUE_LINES, LINE_MASTER } from "./Data_FirstLevelDialogueDirection.mjs";
 import { FIRST_LEVEL_VOICE_CAST, CastVoiceOwner, SQUAD_BARK_KEYS, SQUAD_BARK_CAST, SQUAD_BARK_STAGES, SquadBarkEntries, SquadBarkKey,
   SquadBarkLive, SQUAD_BARK_RETIRED, SQUAD_BARK_RETIRED_TEXT, SQUAD_BARK_TAKES, SQUAD_BARK_EXTRA_TAKES, BarkTakeVoice, PLAYER_VENT_TEXT, PLAYER_VENT_KEYS }
   from "./Data_FirstLevelVoiceCast.mjs";
@@ -373,6 +373,11 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
       assert.ok(d.tempo == null || (d.tempo > 1 && d.tempo <= 1.35), line.id + " tempo 缺省不压快，写了就在 1–1.35（不变调压快，压过头会发虚）");
       assert.ok(d.masterDb == null || (Number.isFinite(d.masterDb) && d.masterDb >= -30 && d.masterDb <= -14), line.id + " masterDb 缺省按 projection 档，写了就在 −30…−14 dBFS");
       assert.ok(d.maxSeconds == null || (Number.isFinite(d.maxSeconds) && d.maxSeconds > 0.3), line.id + " maxSeconds 写了就是正的秒数");
+      // 保共振峰变调（2026-10-12 R4-Voice）：半音数非零、±12 以内；写了变调就必须写 f0Hz，门禁按它核变调后的基频。
+      assert.ok(d.pitchShift == null || (Number.isFinite(d.pitchShift.semitones) && d.pitchShift.semitones !== 0 && Math.abs(d.pitchShift.semitones) <= 12),
+        line.id + " pitchShift.semitones 写了就是 ±12 以内的非零半音数");
+      if (d.pitchShift) assert.ok(Array.isArray(d.f0Hz) && d.f0Hz[0] < d.f0Hz[1], line.id + " 变调的句子要写导演表 f0Hz（变调后的基频目标范围）");
+      assert.ok(d.loop == null || d.loop === true, line.id + " loop 写了就是 true（导演循环播放的句子）");
       if (line.who === "shunzi") assert.equal(d.spatial, "self", line.id + " 顺子是第一人称");
       if (index === 0) assert.ok(d.after !== "prev", line.id + " 第一句不能等上一句");
     });
@@ -825,16 +830,20 @@ const FakeAudio = () => {
 }
 
 if (process.argv.includes("--audio")) {
-  const { MeasureVoice, TruePeakDb, FrameRms, DecodePcm, EncodeSegment } = await import("./Script_SeedAudioVoiceKit.mjs");
+  const { MeasureVoice, TruePeakDb, FrameRms, DecodePcm, EncodeSegment, PitchShiftWav, PITCH_SHIFT_METHOD } = await import("./Script_SeedAudioVoiceKit.mjs");
   const { ScenePrompt, SceneReferences, SCENE_CHECK, WholeCuePrompt, WholeCueReferences, WHOLE_CHECK } = await import("./Script_SeedAudioFirstLevelBake.mjs");
   const Local = (url) => decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, "$1");
   // 片段与整段同一段的波形相关（±20 ms 找对齐）与电平差。
   // 压快过的句子（清单 tempo）：拿整段那一段照样压快再比 10 ms 能量包络——atempo 的拼接点随输入的细微差别
   // （切句时压的是母带 wav，这里只有装上的 mp3）挪位，波形相关只剩 0.92 左右；包络相关同一段 ≥ 0.99、别的录音 < 0.75。
   // muted（清单 remastered.muted，片内秒）：重新母带时静音掉的咔嗒，两边同一段都置零再比（2026-10-12 R3-Voice）。
-  const CompareToScene = (slice, scene, startS, endS, tempo = 1, muted = []) => {
-    if (tempo !== 1) {
-      const ref = EncodeSegment(scene, path.join(os.tmpdir(), `tempo-ref-${process.pid}-${path.basename(slice)}`), { startS, endS, fadeS: 0, tempo });
+  // 变调过的句子（清单 pitchShift，2026-10-12 R4-Voice）：拿整段那一段照样保共振峰变调、补同样的增益，再比 10 ms 能量包络（同压快）。
+  const CompareToScene = (slice, scene, startS, endS, tempo = 1, muted = [], pitch = null) => {
+    if (tempo !== 1 || pitch) {
+      const tag = `${process.pid}-${path.basename(slice)}`, shifted = pitch ? path.join(os.tmpdir(), `pitch-ref-${tag}.wav`) : null;
+      if (pitch) PitchShiftWav(scene, shifted, pitch.semitones);
+      const ref = EncodeSegment(shifted || scene, path.join(os.tmpdir(), `tempo-ref-${tag}`), { startS, endS, fadeS: 0, tempo, gainDb: pitch?.gainDb || 0 });
+      if (shifted) fs.rmSync(shifted, { force: true });
       try {
         const Env = (pcm, hop = 160) => Float32Array.from({ length: Math.floor(pcm.length / hop) }, (_, f) => {
           let e = 0;
@@ -963,13 +972,29 @@ if (process.argv.includes("--audio")) {
               assert.ok(m1 > m0 && m1 - m0 <= 0.12 && (m1 <= chars[0][1] - 0.05 || m0 >= chars.at(-1)[2] + 0.05),
                 `${line.id} 静音掉的 ${m0}–${m1} s 只能是首字前 / 末字后静音里的短脉冲`);
           }
-          const same = CompareToScene(file, scenePath, entry.sceneStartS, entry.sceneEndS, entry.tempo ?? 1, muted);
+          // 保共振峰变调（导演表 pitchShift）：清单记的半音数与导演表一致、方法写明；没写变调的句子清单里也不许有。
+          const pitchShift = LineDirection(cue, index).pitchShift;
+          assert.equal(entry.pitchShift?.semitones ?? 0, pitchShift?.semitones ?? 0, line.id + " 片段变调的半音数与导演表一致");
+          if (entry.pitchShift) assert.ok(entry.pitchShift.method === PITCH_SHIFT_METHOD && Number.isFinite(entry.pitchShift.gainDb), line.id + " 变调要记方法与补回的增益");
+          if (entry.resliced) assert.ok(entry.resliced.fromSha256 && entry.resliced.why, line.id + " 从装上的整段重切过（--remaster），要记原来那一片与原因");
+          // 循环播放的句子（导演表 loop）：首尾各淡 loopFadeS，两头 50 ms 都在静音里（比整段有声段低 24 dB 以上），导演一遍接一遍播时接缝落在静音上。
+          if (LineDirection(cue, index).loop) {
+            assert.equal(entry.loop?.fadeS, LINE_MASTER.loopFadeS, line.id + " 循环句首尾各淡 " + LINE_MASTER.loopFadeS + " s");
+            const clip = FrameRms(file), last = clip.frames.length, hop = clip.hopS;
+            const EdgeDb = (f0, f1) => { let p = 0; for (let f = f0; f < f1; f++) p = Math.max(p, clip.frames[f]); return 20 * Math.log10(Math.max(p, 1e-9)) - scene.measure.activeRmsDb; };
+            const head = EdgeDb(0, Math.round(0.05 / hop)), tail = EdgeDb(last - Math.round(0.05 / hop), last);
+            assert.ok(head <= -24 && tail <= -24, `${line.id} 循环句首尾 50 ms 要在静音里（片头 ${head.toFixed(1)} / 片尾 ${tail.toFixed(1)} dB）`);
+          } else assert.ok(!entry.loop, line.id + " 不是循环句，清单里不许有 loop");
+          const same = CompareToScene(file, scenePath, entry.sceneStartS, entry.sceneEndS, entry.tempo ?? 1, muted, entry.pitchShift || null);
           assert.ok(same.correlation >= 0.98 && Math.abs(same.levelDb) <= 0.5, `${line.id} 片段与整段 ${entry.sceneStartS}–${entry.sceneEndS} s 对不上（相关 ${same.correlation}、电平差 ${same.levelDb} dB）`);
         }
         const maxSeconds = LineDirection(cue, index).maxSeconds;
         if (maxSeconds) assert.ok(entry.seconds <= maxSeconds, `${line.id} 片段 ${entry.seconds} s 超过导演表上限 ${maxSeconds} s`);
         // 导演表 f0Hz：基频中位（清单 metrics.f0，与 MeasureVoice 同一口径）要落在范围里（2026-10-12 R3-Voice：BunkerBanter.09 补录总比本人低三成）。
         const f0Hz = LineDirection(cue, index).f0Hz;
+        // 带 pitchShift 的句子（变调后）基频中位必须落在导演表 f0Hz 里（2026-10-12 R4-Voice：变调是为了把基频压进范围，不核等于没做）。
+        if (entry.pitchShift) assert.ok(f0Hz && m.f0.median >= f0Hz[0] && m.f0.median <= f0Hz[1],
+          `${line.id} 变调 ${entry.pitchShift.semitones} 半音后基频中位 ${m.f0.median} Hz 要落在导演表 f0Hz ${f0Hz?.join("–") ?? "（没写）"} Hz`);
         if (f0Hz) {
           assert.equal(entry.metrics.f0?.median, m.f0.median, line.id + " 清单里的基频是这条录音量出来的");
           assert.ok(m.f0.median >= f0Hz[0] && m.f0.median <= f0Hz[1], `${line.id} 基频中位 ${m.f0.median} Hz 不在导演表 ${f0Hz[0]}–${f0Hz[1]} Hz`);

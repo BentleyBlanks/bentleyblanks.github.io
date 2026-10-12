@@ -16,7 +16,7 @@ const KC = (clock, ...keys) => Object.freeze({ clock, keys: Object.freeze(keys.m
 // Everyone who leaves after Luo's order (banter.exitRoute; the runner's own is the same without its first point).
 const BANTER_EXIT = Route([2.1,-125.2],[3.4,-123.6],[3.1,-121.6],[1.2,-120.6],[-1,-118.5],[-4,-113],[-9,-111.3]);
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20261012OpeningStoryboardsV27Repro", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20261012OpeningStoryboardsV28R4Rifle", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
@@ -144,6 +144,17 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // Starts once the pose's watched bones turn slower than stillRadS, fades in over inS and out over outS as soon as
   // the clip moves again. Radians and hertz; the head's share is cut to faceAimedShare on clips whose face is aimed
   // at the first-person eye inside the clip.
+  // Head-only talk (Script_OpeningActorPerformance, a man in native combat calling a line with both hands on the gun): the head
+  // dips with his own mouth -- the face track's jaw, low-passed at jawFollowHz -- by up to jawNodRad (on top of the stress nod).
+  // 2026-10-12 R4-Gates: TankHeard.02 (3.44 s, one stressed syllable at 0.15 s, before the line has faded in) said by Luo
+  // kneeling on the aim with his face already on the player turned his head 0.017-0.022 rad (breathing only) over 53-182 seen
+  // frames: the front line gate (CheckFrontActing, > 0.03) went red 2 of 9 R3 drives. Face tracks: the low-passed jaw spans
+  // 0.41 on the median line (TankHeard.02 0.44, tenth percentile 0.15). The dip follows the line's fade-in, not the acting's
+  // speech weight: that one already rides the voice level (the track's jaw), so jaw x speech went as the square of the mouth and
+  // quiet syllables hardly moved the head (round-4 integration drive: TankHeard.02 turn 0.029 over 68 seen frames; the
+  // isolated replay in OpeningActorPerformanceBrowserTest, kneeling, 0.026 in its worst 68 frames). 0.14 rad: 0.14 x 0.41 =
+  // 3.3 deg on the median line, at most ~7 deg on a wide-open shout; TankHeard.02 at least 0.05 rad in any 68 frames.
+  aimedTalk:Object.freeze({ jawNodRad:.14, jawFollowHz:6 }),
   heldLife:Object.freeze({ stillRadS:.35, inS:.6, outS:.12,
     breathRad:.018, breathHz:.28, swayRad:.012, swayHz:.11,
     headYawRad:.12, headYawHz:[.07,.19], headPitchRad:.03, headPitchHz:.13, neckShare:.5, faceAimedShare:.25 }),
@@ -211,7 +222,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // limits (FirstLevelBunkerShow.LookLimits). After the order the look eases back to the follow shot over returnS.
       seated:Object.freeze({ yawRad:1.75, pitchRad:Object.freeze([-.95,1.15]), returnS:1.1 }) }),
     // Shot pitch (rad, + up) while a hand beat is the subject; the push-up lift of the lying eye (m).
-    look:Object.freeze({ clawPitch:-.8, reachPitch:-.28, pushUpM:.13, dragRollRad:.025,
+    // rifleLook (2026-10-12 R4, 「手指在泥里抓出痕迹。汉阳造落在右前方一臂开外，受困时够不到」): after the claw (fromS into Wake,
+    // over riseS) the eyes come up off the fingers and over to the rifle at the right front (rescue.rifleMouth), weight share of
+    // the way from the trench line, and stay there until DropIn's whistle (N06).
+    look:Object.freeze({ clawPitch:-.8, reachPitch:-.28, pushUpM:.13, dragRollRad:.025, rifleLook:Object.freeze({ fromS:3.3, riseS:.7, share:.7 }),
       // Parry: the eye steps this far aside from ijaA's back so He (behind ijaA) is seen, and holds the
       // duel this long after the cut before following the interpreter.
       duelAsideM:.25, duelHoldS:.45 }),
@@ -631,13 +645,16 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // lands on the finish body's back at its `stab`: stabAtM = the point's offset from the root then (x right, z forward -,
   // runtime m: the pelvis start (0.065, -0.064) + 0.7 m of the cycle's 1.4 m + Report_animB's 0.12 m right, 0.85 m ahead).
   // walkMaxS: a walk that has not arrived is put there.
-  finish:Object.freeze({ walkMps:1.0, stabMps:.3, standOffM:.5, maxPitchDeg:12, interpreterVia:Route([3.9,-124.45]),
+  finish:Object.freeze({ walkMps:1.0, stabMps:.3, standOffM:.5, maxPitchDeg:12, interpreterVia:Route([3.95,-124.2]),
     // 2026-10-11 polish: the body lies along the south wall foot now (4.6,-123.45), head west: the stab comes 0.8 m short of its feet
     // (the point 1.6 m ahead of him), the cycle's last steps take him past its feet, and the walk to the eye goes off north-west.
     // interpreterVia: straight along the north side of it (was round (4.4,-123.3), (3.2,-123.6): over where it lies now).
+    // (2026-10-12 R4: (3.9,-124.45) -> (3.95,-124.2): the rifle lies along the floor at z -124.63 from x 2.62 to 3.88 now; the old
+    // way went over its east end, 0.18 m. bootVia: from the stab to IjaBootOnHand's start he went straight across it (south-east
+    // to north-west); round its east end instead, 0.3 m+ off it and 0.45 m off the cut comrade's head (4.44,-125.26).)
     // via (2026-10-11 polish, PolishAnim): the cut comrade now lies along the north wall foot, head east at (4.44,-125.26): the walk to
     // the stab goes round east of his head (0.6 m off) -- straight it passed 0.2 m from it; walkMaxS 6 -> 8 for the longer way.
-    via:Route([4.95,-125.6]), yawDeg:90, stabAtM:Object.freeze([.122,-1.614]), walkMaxS:8 }),
+    via:Route([4.95,-125.6]), bootVia:Route([4.12,-124.92]), yawDeg:90, stabAtM:Object.freeze([.122,-1.614]), walkMaxS:8 }),
   // Found (contract §1.9; N19): he stands over the eye at `stand` (the bayonet tip a hand's breadth over his back: hover),
   // the right boot comes down on the right hand (step stepS in; flags.bootStepAt), the heel grinds grindS (bootGrind at its
   // end), 「……这个是活的。留着，问。」, and he squats at the head (ija.crouch, IjaCrouchHairHold) crouchAfterLineS after it.
@@ -1017,14 +1034,18 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // Luo walks from his cut to stand frontM in front of the kneeling man, facing him (HandRoot), and plays LuoGrabRifleShove:
     // the dadao into his belt, a short hold loop leaning in over him -- 「还能打不？」 lineDelayS into it, eyes on his face (the
     // speaker binder's gaze is pinned to the player's eye) -- the nod (nodS after the line) lets it go: he snatches up the rifle
-    // lying at his right front (rescue.rifleMouth: the clip's rifle prop at its first frame) and shoves it into Shunzi's hands.
+    // lying at Shunzi's right front -- his own left front (rescue.rifleMouth: the clip's rifle prop at its first frame; 2026-10-12 R4)
+    // -- and shoves it into Shunzi's hands.
     // The palms reach for it from reachS before "handed"; carryS: the taken rifle comes from where Luo held it to the gear-up's
     // end (Data_OpeningFirstPersonGear: the rifle at the ready in both hands). From "handed" he gets up (rise: eye keys on the
     // clock since handed, HeaveRoot frame) and the hand-back follows once he stands and Luo's clip has played out
     // (releaseGraceS more for a vanguard man missing from the enemy table). standIn: the clip's timing before it is baked.
     // waitSide: until the knees come under him (heave stepInS) Luo stands aside, off the line he heaves himself out along
     // (09-30 run: waiting in front of him his legs filled the whole lunge) -- [left, back] of HandRoot, facing him.
-    hand:Object.freeze({ frontM:.95, waitSide:Object.freeze([.6,0]), stepInS:1.7, lineDelayS:.1, nodS:.15, reachS:.3, carryS:.8, releaseGraceS:1,
+    // (2026-10-12 R4: [.6, 0] -> [.5, .9]: 0.6 m to his left is south of the lane, where the rifle lies along the floor now (he stood
+    // on it, N24); 0.9 m further back he waits east of its end (0.44 m; the step in passes it at 0.35 m), 1.9 m off the kneeling
+    // eye, 15 deg right of the lane.)
+    hand:Object.freeze({ frontM:.95, waitSide:Object.freeze([.5,.9]), stepInS:1.7, lineDelayS:.1, nodS:.15, reachS:.3, carryS:.8, releaseGraceS:1,
       standIn:Object.freeze({ durationS:3.167, offerS:2.25, handedS:2.417, holdLoop:Object.freeze([.5,1.5]) }),
       rise:Object.freeze({ durationS:.9, eye:[[0,[0,1.12,-.6]],[.12,[0,1.08,-.62]],[.55,[0,1.4,-.56]],[.9,[0,1.62,-.52]]] }) }),
     // He goes to the trench edge east of the hand-back with his rifle once he has let the timber drop (Aftercut), along the
@@ -1038,10 +1059,16 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // grab is seen, not the mud under it); down at the rifle as it is shoved over (atRifle, no lower than rifleMinDeg, from
     // just before "offered" to handed + .5); level ahead as he stands. The look trails what it follows by lookS.
     view:Object.freeze({ atLuo:.85, luoFaceDropM:.1, atLuoMaxDeg:35, atHands:.75, handsMinDeg:-25, atRifle:.6, rifleMinDeg:-30, lookS:.25 }),
-    // The mission rifle lies in the mud at his right front, out of reach while he is pinned; Luo snatches it up for him
-    // (LuoGrabRifleShove's prop starts where it lies: its first frame in HandRoot's frame, +x Luo's right, -z ahead, is
-    // (+.40, .04, -.28), the muzzle toward (+.8, 0, +.6)). Prop yaw: the muzzle points along (-sin yaw, -cos yaw).
-    rifleMouth:P(3.12,-125.65,-36.87*Math.PI/180),
+    // The mission rifle lies in the mud at his right front (「汉阳造落在右前方一臂开外」), out of reach while he is pinned; Luo
+    // snatches it up for him (LuoGrabRifleShove's prop starts where it lies: its first frame in HandRoot's frame, +x Luo's right,
+    // -z ahead, is (-.62, .04, -.15), the muzzle toward (0, 0, -1)). Prop yaw: the muzzle points along (-sin yaw, -cos yaw).
+    // 2026-10-12 R4 (Brief_R4_Rifle): was (3.12,-125.65) at the eye's LEFT front (north-east; the Wake look turned 30 deg north
+    // for it). Now south-east of the eye, along the trench floor, muzzle west: 1.53 m off the eye, 24 deg right of the trench line,
+    // its near end 1.0 m off; 0.63 m off the interpreter's squat, 0.63 m off the grenade's stop, 0.61 m off ijaA's crouch and 0.66 m
+    // off his boot-on-hand start, clear of the recruit's marks, ChargeB and the finish bodies. The brief's mirror of the 09-30 rest
+    // (centre (2.9-3.1,-124.8), muzzle south-east) lay diagonally under ijaA's boot-on-hand start and Luo's own left foot and across
+    // the interpreter's and He's walks; the walks that do cross this one go round it: finish.interpreterVia, finish.bootVia.
+    rifleMouth:P(3.25,-124.63,Math.PI/2),
     // 「还权后 3 s 内玩家不掉血」 (contract §2.9): at the hand-back every live Japanese within handbackHoldFireM holds his fire
     // this long (the AI's hesitation: no fire, no move); Script_FirstLevelCampaignOpening asserts it.
     handbackHoldFireS:3.5, handbackHoldFireM:40,
@@ -1191,6 +1218,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
     Object.freeze({ id:"N25", storyboard:"Storyboard_N25_RifleShoved.png",
       when:"s.phase==='Check'&&s.flags.handAt!=null&&r.time-s.flags.handAt>=1.0",
       judge:{ camera:{ eyeM:[.95,1.3], pitchDeg:[-5,40] }, actors:{ luo:{ bodyDistM:[.6,1.3], x:[.25,.75] }, liuwencai:{ x:[.5,.95], pelvisM:[.35,.75] } } } }),
+    // N25_Grab (2026-10-12 R4): the grab -- Luo stooped to the rifle at Shunzi's right front (his own left front), both hands on it:
+    // he is right of the middle (the 09-30 rest at the left front had him left of it). From the kneeling eye his stooped head and
+    // shoulders are over his fists (the look follows his hands, view.atHands); the rifle shows as he lifts it across.
+    Object.freeze({ id:"N25_Grab", storyboard:"Storyboard_N25_RifleShoved.png",
+      when:"s.flags.handAt!=null&&s.flags.handHoldUntil!=null&&s.HandSeconds(r.time-s.flags.handAt)>=1.84",
+      judge:{ camera:{ eyeM:[.95,1.3] }, actors:{ luo:{ x:[.52,1], bodyDistM:[.4,1.4] } } } }),
     Object.freeze({ id:"N25_Hand", storyboard:"Storyboard_N25_RifleShoved.png",
       when:"s.flags.handedAt!=null&&r.time-s.flags.handedAt>=.4", judge:{ camera:{ eyeM:[1,1.75] } } }),
     Object.freeze({ id:"N25_Released", storyboard:"Storyboard_N25_RifleShoved.png", when:"s.releaseAt!=null",

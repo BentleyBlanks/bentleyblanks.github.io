@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20261012OpeningStoryboardsV27Repro",
+ "version": "20261012OpeningStoryboardsV28R4Rifle",
  "fps": 24,
  "actorForward": [
   0,
@@ -5096,7 +5096,7 @@
     "LuoDadaoChopRear"
    ],
    "next": [],
-   "notes": "2026-09-30: from LuoDadaoChopRear's last frame (two-handed dadao guard; he has run up and stopped, root HandRoot 0.95 m from Shunzi, who kneels upright in front of him: eye (0, 1.12, -0.95), chest (0, 0.88, -0.85) in this frame, runtime m). 0-0.14 s the left hand comes off the dadao, 0.04-0.20 s the right hand pushes it through the belt at his left hip (`weapon` track: hand to belt, weaponState dadaoInBelt), 0.5-1.5 s hold loop (empty hands, leaning 12 deg in, the face on his eye, blowing from the charge; \"\u8fd8\u80fd\u6253\u4e0d\uff1f\" and the nod, pose.holdUntil lets go). 1.5-1.78 s steps the right foot out to his right front and stoops, both fists on the Hanyang (`rifle` prop: on the ground at frame 0, centre (+0.40, 0.04, -0.28), muzzle toward (+0.8, 0, +0.6) in the root frame; grip contact 1.80 s), 1.82-2.12 s stands with it across his chest, muzzle to his right (as LuoHandRifle's offer), 2.12-2.25 s shoves it out to (0, 0.90, -0.58) (`offered` 2.25 s), 2.42 s lets go (`handed`; the rifle prop is hidden from then on: the director's HeldRifle takes Luo's hand rifle pose at that moment), then turns 90 deg to his LEFT and draws the dadao from the belt into his right hand (2.5-3.05 s; `weapon` ends in the hand, guard; `turned` 3.04 s). Feet stay out of z < -0.45 (Shunzi's knees).",
+   "notes": "2026-10-12 R4 (the rifle at Shunzi's right front, as the source text has it): from LuoDadaoChopRear's last frame (two-handed dadao guard; root HandRoot 0.95 m from Shunzi, who kneels upright in front of him: eye (0, 1.12, -0.95), chest (0, 0.88, -0.85) in this frame, runtime m). 0-0.14 s the left hand comes off the dadao, 0.04-0.20 s the right hand pushes it through the belt at his left hip (`weapon` track: hand to belt, weaponState dadaoInBelt), 0.5-1.5 s hold loop (empty hands, leaning 12 deg in, the face on his eye; \"\u8fd8\u80fd\u6253\u4e0d\uff1f\" and the nod, pose.holdUntil lets go). 1.5-1.78 s turns to his LEFT (29 deg, the chest 16 more) stepping the left foot out and stoops, both fists on the Hanyang (`rifle` prop: on the ground at frame 0 along the trench at his left front, centre (-0.62, 0.04, -0.15), muzzle toward (0, 0, -1) in the root frame = rescue.rifleMouth; the right hand on the fore-end, the left at the wrist; grip contact 1.80 s), 1.82-2.12 s stands up with it, turning back to face Shunzi, the rifle across his chest muzzle to his right, 2.12-2.25 s shoves it out to (0, 0.90, -0.58) (`offered` 2.25 s), 2.42 s lets go (`handed`; the rifle prop is hidden from then on: the director's HeldRifle takes Luo's hand rifle pose at that moment), then turns 90 deg to his LEFT and draws the dadao from the belt into his right hand (2.5-3.05 s; `weapon` ends in the hand, guard; `turned` 3.04 s). Feet stay out of z < -0.45 (Shunzi's knees). The 09-30 clip (the rifle at his right front, centre (+0.40, 0.04, -0.28), muzzle (+0.8, 0, +0.6)) is in git history.",
    "rigs": [
     "TengxianNra05"
    ],
@@ -5112,8 +5112,8 @@
        "TengxianIja01/IjaChoppedFallWall": "b07d38666ec36203e29e8b585adcdc4975c716238534e0a7e2432954c8ceb437"
       }
      },
-     "commit": "b64e4f43",
-     "valuesSha256": "cf6311e00ae6105e70ba7977d2f74b4b9e1998313d4cc56a4c2dc259612621bc"
+     "commit": "after:91c73aab",
+     "valuesSha256": "0308b00dd09f5e9ab9e27a28878e5baa7de8316f29bef6951a104b1f5a8442fb"
     }
    }
   },
@@ -11628,7 +11628,7 @@
   {
    "id": "TengxianNra05",
    "file": "Animation_TengxianNra05OpeningStoryboards.json",
-   "sha256": "90d07b9c6ce93559721f31291630c54d571df7e90c7caa069da247ff740af969",
+   "sha256": "6a1847ed223267dcb47757314294f077fd40942367763222e86d58c41ba78801",
    "originalModelSha256": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72",
    "clipIds": [
     "SupplyReceive",
@@ -13021,12 +13021,12 @@
     {
      "clip": "LuoGrabRifleShove",
      "frames": 77,
-     "footSlideM": 0.0027,
-     "contactErrorM": 0.0029,
-     "gripSolveErrorM": 0.0029,
-     "pelvisMaxStepM": 0.169,
-     "floorCorrectionMin": -0.00617,
-     "floorCorrectionMax": 0.00147,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1522,
+     "floorCorrectionMin": -0.00079,
+     "floorCorrectionMax": 0.0,
      "root": {
       "start": [
        0.0,
@@ -13052,6 +13052,11 @@
       [
        "L",
        0.36,
+       1.5
+      ],
+      [
+       "L",
+       1.76,
        2.44
       ],
       [
@@ -13062,11 +13067,6 @@
       [
        "R",
        0.0,
-       1.5
-      ],
-      [
-       "R",
-       1.76,
        2.7
       ],
       [

@@ -14797,3 +14797,229 @@ for _name in RA_DI:
                               'the ankles %.2f / %.2f m behind), touches down %.2f m further from the wall, settles %.2f m off it.'
                               % (R2_DI_STANCE[0], R2_DI_STANCE[1], R2_DI_LAND, R2_DI_SETTLE[_name]))
     Builder(_name)(lambda T, name: R2DropBuild(T, name))
+
+
+# ==== 2026-10-12 R4 rifle ====
+# R4-Rifle round (REL/附件/briefs/Brief_R4_Rifle.md): the source text has the Hanyang 「落在右前方一臂开外」 and Luo 「弯腰捡起顺子
+# 右前方泥地里的汉阳造，横端起来直接塞到他手里」. The 09-30 clip had it at Shunzi's LEFT front (Luo's right front, rescue.rifleMouth
+# north-east of the pinned eye). Every global of this block starts with `R4` / `R4_`. One clip, LuoGrabRifleShove, re-authored under
+# its own name: everything up to the stoop (prev LuoDadaoChopRear, the sheathe, the hold loop) and from the hand-over on (the turn
+# away, the draw) is the 09-30 clip's, and so are its times (grabbed 1.80, offered 2.25, handed 2.42, 3.17 s).
+# Where it lies: at Luo's LEFT front (= Shunzi's right front), along the trench, muzzle west -- toward the dugout -- the centre
+# (-0.62, 0.04, -0.15) in the HandRoot frame (rescue.rifleMouth (3.25, -124.63), 1.5 m off the pinned eye, 24 deg right of the
+# trench line, its near end 1.0 m off). The brief's mirror of the 09-30 rest (centre (-0.40, 0.04, -0.28), muzzle (-0.8, 0, +0.6))
+# lies diagonally across the floor: its butt is under ijaA's boot-on-hand start (0.01 m) and Luo's own left foot (0.12 m), the
+# interpreter's walk to his squat crosses it (0.08 m) and He's walk to the trench edge (0.16 m); and lying that way, the hands that
+# pick it up as it lies (left on the fore-end, right at the wrist) hold it muzzle to Luo's LEFT -- Shunzi's right, which crosses the
+# first person's arms (the gear-up's ready hands ride with this rifle: Script_OpeningFirstPerson HeldRifleGear) -- so they would have
+# to change ends in the air (tmp/r4 iterations 1-8, not kept). Along the trench with the muzzle west the 09-30 grip carries over:
+# he turns 29 deg to his left (and 16 more in the chest) with a step of the left foot, stoops, the right hand on the fore-end (west, his right as he faces the
+# rifle), the left at the wrist, and lifts it up across his chest as he turns back -- the muzzle comes round to his right (WR_D_CLOSE,
+# Shunzi's left) -- and shoves it over (WR_D_OFFER), exactly the 09-30 hold.
+R4_RS_GROUND = ((-.62, .04, -.15), (0.0, 0.0, -1.0))    # runtime m, root frame (x right, y up, z back): centre, bore (muzzle)
+R4_RS_MID0 = ((-.67, .18, -.22), (.12, .06, -.99))      # straight up off the ground first, clear of his left thigh
+R4_RS_MID1 = ((-.56, .36, -.34), (.45, .12, -.88))      # coming up as he turns back
+R4_RS_MID2 = ((-.26, .66, -.42), (.86, .16, -.48))      # swinging across in front of him
+R4_RS_CLOSE = ((0.0, 1.0, -.42), WR_D_CLOSE[1])          # the 09-30 carry across his chest, 5 cm up and 12 cm out (it lay on his belly)
+R4_RS_TURN = .50                                        # rad: the turn to the rifle (29 deg to his left; the chest twists 0.28 more), back by the close
+R4_RS_STOOP = (-.26, .44, -.14)                         # the pelvis at the stoop (runtime m, root frame): over to his left
+R4_RS_FOOT_L = (-.30, 0.0, -.05)                        # the left foot's stoop step lands here (0.32 m off the rifle)
+
+CLIPS['LuoGrabRifleShove']['notes'] = (
+    '2026-10-12 R4 (the rifle at Shunzi\'s right front, as the source text has it): from LuoDadaoChopRear\'s last frame (two-handed '
+    'dadao guard; root HandRoot 0.95 m from Shunzi, who kneels upright in front of him: eye (0, 1.12, -0.95), chest (0, 0.88, -0.85) in '
+    'this frame, runtime m). 0-0.14 s the left hand comes off the dadao, 0.04-0.20 s the right hand pushes it through the belt at his '
+    'left hip (`weapon` track: hand to belt, weaponState dadaoInBelt), 0.5-1.5 s hold loop (empty hands, leaning 12 deg in, the face on '
+    'his eye; "还能打不？" and the nod, pose.holdUntil lets go). 1.5-1.78 s turns to his LEFT (29 deg, the chest 16 more) stepping the left foot out and '
+    'stoops, both fists on the Hanyang (`rifle` prop: on the ground at frame 0 along the trench at his left front, centre (-0.62, 0.04, '
+    '-0.15), muzzle toward (0, 0, -1) in the root frame = rescue.rifleMouth; the right hand on the fore-end, the left at the wrist; grip '
+    'contact 1.80 s), 1.82-2.12 s stands up with it, turning back to face Shunzi, the rifle across his chest muzzle to his right, '
+    '2.12-2.25 s shoves it out to (0, 0.90, -0.58) (`offered` 2.25 s), 2.42 s lets go (`handed`; the rifle prop is hidden from then on: '
+    'the director\'s HeldRifle takes Luo\'s hand rifle pose at that moment), then turns 90 deg to his LEFT and draws the dadao from the '
+    'belt into his right hand (2.5-3.05 s; `weapon` ends in the hand, guard; `turned` 3.04 s). Feet stay out of z < -0.45 (Shunzi\'s '
+    'knees). The 09-30 clip (the rifle at his right front, centre (+0.40, 0.04, -0.28), muzzle (+0.8, 0, +0.6)) is in git history.')
+
+
+@Builder('LuoGrabRifleShove')
+def R4BuildLuoGrabRifleShove(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    s, K, D = T.s, T.K, WR_D_T
+    h0, h1 = WR_D_HOLD
+    w = WEAPONS[T.gun]
+    start = FlatOf(T, BuildChopRear, 'LuoDadaoChopRear', 1.3)
+    p0 = start['pelvis']
+    g0 = tuple(start['grip.R'])
+    a0, u0 = Unit((.05, -.80, .60)), (-1.0, 0.0, 0.0)
+    hold = Add3(p0, (0.0, .08, .11))                       # stood up from the cut's lunge, the hips settled back under him
+    # ---- the rifle (the 09-30 path from a new rest: ground -> two keys turning it round -> the 09-30 close and offer) ---------
+    At = lambda c, b: RifleAtCentre(T, RT(T, *c), RTd(*b))
+    ground, close, offer = At(*R4_RS_GROUND), At(*R4_RS_CLOSE), At(*WR_D_OFFER)
+    mid0, mid1, mid2 = At(*R4_RS_MID0), At(*R4_RS_MID1), At(*R4_RS_MID2)
+    rifleAt = RiflePath(T, [(0.0, ground), (1.80, ground), (1.86, mid0), (1.92, mid1), (2.04, mid2), (2.12, close), (2.25, offer), (D, offer)])
+    alongR = Channel([(0.0, .75), (1.80, .75), (2.04, .90), (2.12, .95), (D, .95)])
+    alongL = Channel([(0.0, .56), (1.80, .56), (2.04, .22), (2.12, .12), (D, .12)])
+    wRifleR = lambda t: Smooth((t - 1.56) / .24) * (1 - Smooth((t - WR_D_HANDED) / .10))
+    wRifleL = lambda t: Smooth((t - 1.58) / .22) * (1 - Smooth((t - WR_D_HANDED) / .10))
+    # ---- the body -------------------------------------------------------------------------------------------------------
+    stoop = tuple(RT(T, *R4_RS_STOOP))
+    pelX = WrChannel([(0.0, p0[0]), (.30, hold[0]), (h0, hold[0]), (1.50, hold[0]), (1.64, hold[0] + (stoop[0] - hold[0]) * .5), (1.78, stoop[0]),
+                      (1.88, stoop[0]), (2.06, stoop[0] * .4 + hold[0] * .6), (2.18, hold[0] + .02), (2.80, hold[0] + .03), (D, hold[0] + .03)])
+    pelY = WrChannel([(0.0, p0[1]), (.30, hold[1]), (h0, hold[1]), (1.50, hold[1]), (1.64, hold[1] + (stoop[1] - hold[1]) * .5), (1.78, stoop[1]),
+                      (1.88, stoop[1]), (2.06, stoop[1] * .5 + hold[1] * .5), (2.18, hold[1] - .04), (2.42, hold[1] - .06), (2.80, hold[1] + .02), (D, hold[1] + .04)])
+    pelZ = WrChannel([(0.0, p0[2]), (.30, hold[2] - .03), (h0, hold[2]), (1.50, hold[2]), (1.58, hold[2] - .05), (1.66, stoop[2] + .26), (1.74, stoop[2] + .08), (1.80, stoop[2]),
+                      (1.88, stoop[2] + .02), (2.02, stoop[2] + .20), (2.14, hold[2] - .03), (2.42, hold[2] - .02), (D, hold[2] + .01)])
+    # the turn: to the rifle on his left for the stoop, back to Shunzi for the shove, then the 09-30 turn away to his left
+    turnAt = WrChannel([(0.0, 0.0), (1.50, 0.0), (1.64, R4_RS_TURN * .55), (1.78, R4_RS_TURN), (1.90, R4_RS_TURN), (2.04, R4_RS_TURN * .45), (2.16, .04),
+                        (2.42, 0.0), (2.58, .14), (2.84, .95), (3.06, math.pi / 2), (D, math.pi / 2)])
+    pelXY = lambda t: (pelX(t), pelY(t))
+    steps = [('L', .06, .36), ('L', 1.50, 1.76), ('L', 2.44, 2.72), ('R', 2.70, 2.98)]
+    footL = tuple(RT(T, *R4_RS_FOOT_L))
+    # (a step's stance is where the foot lands from the pelvis at its end, in the body frame turned turnAt(t1): the stoop step
+    # lands at R4_RS_FOOT_L in the clip's frame, so its offset is turned back by the turn at 1.76 s)
+    psL = turnAt(1.76)
+    stoopL = _Rot(footL[0] - pelX(1.76), footL[1] - pelY(1.76), -psL)
+    stance = {'L': [(H + .05, -.02), stoopL, (H + .05, -.02)], 'R': [(-(H + .05), -.02)]}
+    feet, plants = WrPath(T, start, pelXY, turnAt, steps, stance, lambda s, t: WrPoleRel(start)[s], D, lift=.05)
+    # belt: the dadao's origin in the hip frame (left, back, up) and its blade direction there
+    BELT_AT, BELT_AXIS = (.08, -.14, .04), Unit((.10, .15, -.98))
+
+    def BeltWorld(t):
+        """Where the belt's dadao origin is on the authored body at clip time t (source m, the clip's frame; good to ~2 cm)."""
+        x, y = pelXY(t)
+        ox, oy = _Rot(BELT_AT[0], BELT_AT[1], turnAt(t))
+        return (x + ox, y + oy, pelZ(t) + BELT_AT[2]), tuple(Vector(_Rot(BELT_AXIS[0], BELT_AXIS[1], turnAt(t)) + (BELT_AXIS[2],)))
+    # ---- the dadao in the right hand: guard -> belt (0.10-0.40 s), belt -> guard (2.52-3.05 s) ------------------------------------
+    def DrawGuard(t):
+        """The guard of the last frame (hand, axis, up) in the turned body's frame."""
+        x, y = pelXY(t)
+        ox, oy = _Rot(-(SX - .05), -.10, turnAt(t))
+        ax, ay = _Rot(.05, -.80, turnAt(t))
+        ux, uy = _Rot(-1.0, 0.0, turnAt(t))
+        return (x + ox, y + oy, pelZ(t) + .36), Unit((ax, ay, .60)), (ux, uy, 0.0)
+
+    def Blade(t):
+        """(grip, axis, up, weight of the right fist on it) while the dadao is in the hand, else None."""
+        if t < .42:
+            c, au = BeltWorld(.40)
+            beltHand = Add3(c, (0, 0, .09))
+            rows = [(0.0, g0, a0, u0), (.04, g0, a0, u0), (.11, Add3(Lerp3(g0, beltHand, .55), (0, -.06, .10)), Unit(Lerp3(a0, au, .55)), u0),
+                    (.19, beltHand, au, u0), (.42, beltHand, au, u0)]
+            gr = Channel([(r[0], r[1]) for r in rows])(t)
+            ax = Channel([(r[0], r[2]) for r in rows])(t)
+            return gr, Unit(ax), u0, 1 - Smooth((t - .20) / .08) if t > .20 else 1.0
+        if t < 2.50:
+            return None
+        c, au = BeltWorld(2.52)
+        beltHand = Add3(c, (0, 0, .09))
+        gg, ga, gu = DrawGuard(3.06)
+        u = Smooth((t - 2.52) / .52)
+        mid = Add3(Lerp3(beltHand, gg, .5), (0, -.05, .12))
+        grip = tuple(Channel([(2.52, beltHand), (2.78, mid), (3.04, gg), (D, DrawGuard(D)[0])])(t))
+        axis = Unit(Lerp3(au, ga, u)) if u < 1 else ga
+        return grip, axis, gu, Smooth((t - 2.50) / .10)
+
+    def BladeProp(t):
+        """The `weapon` track: in the hand, then in the belt (the hip frame on the posed bones), then in the hand again."""
+        # 0 = in the hand, 1 = in the belt
+        u = 0.0 if t < .18 else Smooth((t - .18) / .06) if t < .24 else 1.0 if t < 2.50 else 1 - Smooth((t - 2.50) / .06) if t < 2.56 else 0.0
+        b = Blade(t)
+        hand = None
+        if b is not None:
+            d = Dadao(T, b[0], b[1], b[2])
+            hand = (Vector(d['origin']), Vector(d['axis']), Vector(d['up']))
+        if u <= 0.0 and hand is not None:
+            return tuple(hand[0]), tuple(hand[1]), tuple(hand[2])
+        pel, left, back, upv = WrHipFrame(K)
+        org = pel + left * BELT_AT[0] + back * BELT_AT[1] + upv * BELT_AT[2]
+        ax = (left * BELT_AXIS[0] + back * BELT_AXIS[1] + upv * BELT_AXIS[2]).normalized()
+        if u >= 1.0 or hand is None:
+            return tuple(org), tuple(ax), tuple(left)
+        return (tuple(hand[0].lerp(org, u)), tuple(hand[1].slerp(ax, u)), tuple(hand[2].lerp(left, u)))
+    # ---- the pose ---------------------------------------------------------------------------------------------------------
+    sig = lambda t, a, b: Smooth((t - a) / (b - a))
+    anim = Tracks(start, dict(feet, **{
+        'pelvis': WrDense(lambda t: (pelX(t), pelY(t), pelZ(t)), D),
+        'bend': [(0.0, start['bend']), (.30, .16), (.50, .14), (1.50, .14), (1.62, .50), (1.78, .98), (1.88, .94), (2.04, .52), (2.14, .28), (2.25, .30),
+                 (2.42, .26), (2.90, .12), (D, .12)],
+        'pelvisTilt': [(0.0, start['pelvisTilt']), (.30, (.08, 0, 0)), (.50, (.07, 0, 0)), (1.50, (.07, 0, 0)), (1.78, (.38, 0, 0)), (1.88, (.34, 0, 0)), (2.14, (.12, 0, 0)),
+                       (2.42, (.12, 0, 0)), (2.90, (.05, 0, 0)), (D, (.05, 0, 0))],
+        # (the turn does most of the facing; a little more of it in the chest, and a lean to the left over the rifle)
+        'twist': [(0.0, 0.0), (1.50, 0.0), (1.78, .28), (1.88, .26), (2.14, .04), (2.42, 0.0), (D, 0.0)],
+        'lean': [(0.0, 0.0), (1.50, 0.0), (1.78, .10), (1.88, .10), (2.14, .02), (2.42, 0.0), (D, 0.0)],
+        'shrug': [(0.0, 0.0), (.50, .02), (1.50, .02), (2.42, .04), (D, .0)],
+        'head': [(0.0, start['head']), (.40, (.10, 0, 0)), (1.50, (.10, 0, 0)), (1.78, (-.10, 0, 0)), (2.42, (.0, 0, 0)), (D, (.10, 0, 0))],
+        'lookW': [(0.0, 0.0), (.26, 0.0), (.50, .85), (1.50, .85), (1.62, .25), (1.92, .25), (2.10, .85), (2.50, .85), (2.85, 0.0), (D, 0.0)],
+        'handRel.L': [(0.0, (.07, -.10, -.47)), (D, (.07, -.10, -.47))], 'poleRel.L': [(0.0, (.45, .40, -.35)), (D, (.45, .40, -.35))],
+        'handRel.R': [(0.0, (-.07, -.10, -.47)), (D, (-.07, -.10, -.47))], 'poleRel.R': [(0.0, (-.45, .40, -.35)), (D, (-.45, .40, -.35))],
+        'palmF.L': [(0.0, (0, -.2, -1)), (D, (0, -.2, -1))], 'palmN.L': [(0.0, (-1, 0, 0)), (D, (-1, 0, 0))],
+        'palmF.R': [(0.0, (0, -.2, -1)), (D, (0, -.2, -1))], 'palmN.R': [(0.0, (1, 0, 0)), (D, (1, 0, 0))],
+        'curl.L': [(0.0, .45), (D, .45)], 'curl.R': [(0.0, .45), (D, .45)],
+    }), lag={'head': .05})
+    eyeSrc = tuple(RT(T, *WR_D_EYE))
+
+    def Pose(t):
+        f = anim(t)
+        f['look'] = eyeSrc
+        br = WrBreath(t, h0, h1 - h0, per=2, ease=.3) if h0 - .3 < t < 1.75 else 0.0
+        f['bend'] += .022 * br * (1 - sig(t, 1.50, 1.64))
+        f['shrug'] += .02 * br
+        f['framedGrips'] = True
+        # left fist: still on the dadao's grip at the start (frame 0 = the guard), off it by 0.14 s
+        for side in LR:
+            f['grip.' + side], f['gripW.' + side] = None, None
+        wl0 = 1 - Smooth((t - .02) / .10)
+        if wl0 > 1e-4 and start.get('grip.L') is not None:
+            f['grip.L'], f['gripW.L'] = start['grip.L'], wl0
+            f['palmF.L'], f['palmN.L'], f['curl.L'] = start['palmF.L'], start['palmN.L'], start['curl.L']
+        b = Blade(t)
+        if b is not None and b[3] > 1e-4:
+            grip, axis, up, wgt = b
+            palms = DadaoPalms(axis, up)
+            EaseGrip(f, 'R', grip, wgt, palms['R'][0], palms['R'][1], palms['R'][2])
+            f['armPole.R'] = start['armPole.R']
+        rifle = rifleAt(t)
+        palms = T.Palms(rifle['axis'])
+        wR, wL = wRifleR(t), wRifleL(t)
+        if wR > 1e-4:
+            EaseGrip(f, 'R', T.Along(rifle, alongR(t)), wR, palms['R'][0], palms['R'][1], .95)
+            f['armPole.R'] = (-(SX + .50), .10, P - .05)
+        if wL > 1e-4:
+            EaseGrip(f, 'L', T.Along(rifle, alongL(t)), wL, palms['L'][0], palms['L'][1], .85)
+            f['armPole.L'] = (SX + .45, .10, P - .05)
+        f = Turned(f, turnAt(t))
+        return T.Nest(f)
+
+    def Props(t):
+        r = rifleAt(t)
+        o, a, u = BladeProp(t)
+        return {'rifle': (r['origin'], r['axis'], (0, 0, 1), t < WR_D_HANDED + .01), 'weapon': (o, a, u, True)}
+
+    def Check(t):
+        out = {}
+        rifle = rifleAt(t)
+        if WR_D_GRAB + .01 <= t <= WR_D_HANDED - .02:
+            out['R'] = T.Along(rifle, alongR(t))
+            out['L'] = T.Along(rifle, alongL(t))
+        return out
+
+    def Ghost(t):
+        """Shunzi kneeling upright in front of him, as review shapes (his reference points)."""
+        r = lambda p: tuple(RT(T, *p))
+        pts = [(0, .55, -.95), WR_D_CHEST, (0, 1.05, -.93), WR_D_EYE]
+        return [('cyl', r(pts[0]), r(pts[1]), .11 / s), ('cyl', r(pts[1]), r(pts[2]), .05 / s), ('point', r((0, 1.15, -.95)), None, .08 / s),
+                ('cyl', r(pts[0]), r((0, .06, -.95)), .07 / s)]
+    # (the reach assist's sink is the 09-30 clip's .20 there; turned to his left the trailing right knee went down into the mud
+    # and the grounding lifted the whole body 3 cm off its planted feet)
+    spec = {'pose': Pose, 'props': Props, 'check': Check, 'plants': plants,
+            'reach': {'fraction': lambda t: .92 - .12 * Smooth((t - 1.50) / .10), 'travel': .14, 'sink': lambda t: .16 * Smooth((t - 1.62) / .18),
+                      'bend': lambda t: .25 + .30 * Smooth((t - 1.62) / .18)},
+            'reviewProps': lambda t: T.RifleProps(rifleAt(t)) + Ghost(t) + [('cyl', tuple(Props(t)['weapon'][0]), tuple(Vector(Props(t)['weapon'][0]) + Vector(Props(t)['weapon'][1]) * T.R(.63)), .02)],
+            'reviewFrames': lambda n: [0, 3, 6, 9, 12, 24, 36, 38, 40, 43, 45, 47, 48, 50, 52, 54, 56, 58, 62, 66, 70, n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = [('right', lambda t: (-3.0, pelXY(t)[1] - .5, 1.0), lambda t: (0, pelXY(t)[1] - .5, .7)),
+                           ('front', lambda t: (2.0, -3.0, 1.7), lambda t: (.1, -.6, .7)),
+                           ('left', lambda t: (3.0, -.6, 1.0), lambda t: (0, -.6, .7)),
+                           ('eye', lambda t: tuple(RT(T, *WR_D_EYE)), lambda t: tuple(RT(T, 0.0, .75, -.25))),
+                           ('top', lambda t: (.02, -.5, 4.0), lambda t: (0, -.5, 0.0))]
+    spec['reviewScale'] = 2.6
+    return spec

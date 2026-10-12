@@ -3150,9 +3150,11 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-30：空袭炸弹下落啸声 bombWhistle，清单新增一个 cue。
 // 2026-09-30：敌军刀杀 / 脖子中弹的窒息哽咽 neckDeath（两变体），清单新增一个 cue。
 // 2026-10-11：第一关 01–02 开场重构十二条（契约 §6），清单新增十二个 cue。
-export const SFX_PACK_VERSION = "20261011openingfoley";
+// 2026-10-12 R4-Voice：断肢四条、breathInjured、耳光、喊杀七条成品对齐到库线（同文件名、电平变了，SAMPLE_MIX 反算复原响度）。
+export const SFX_PACK_VERSION = "20261012openingfoley-levelline";
 // 2026-09-29：清单加了 `bedVariants`（战场远景床的五条无人声候选），戳不动的话浏览器拿着旧清单永远看不到候选。
-export const AMB_PACK_VERSION = "20260929battlebeds";
+// 2026-10-12 R4-Voice：AudioAmb_CarriageRearCheer 对齐到库线（同文件名、电平变了）。
+export const AMB_PACK_VERSION = "20261012battlebeds-levelline";
 /**
  * 这一局战场远景床走哪一档：?ambBed= 优先于 BATTLE_BED_VARIANT；认不出就退回默认 layered（不静音；
  * 清单里没有候选的旧清单再退回旧床）。取值见 Data_Tuning_Audio.BATTLE_BED_VARIANT。
@@ -3313,8 +3315,12 @@ const SAMPLE_MIX = {
   // 断肢两条：sever 与 dadaoHit 同一档（同样是「一段身体被切下来」这件事，
   // 而且十有八九与那一发枪声同时响，站低了就被枪盖掉）；落地那一记按 bodyFall
   // 再压一点 —— 掉的是一条胳膊不是一个人。
-  goreSever: 0.78, goreLimbLand: 0.45,
-  impactBrick: 0.55, impactDirt: 0.45, impactWood: 0.5, impactMetal: 0.55, impactFlesh: 0.72, slap: 0.85, chargeCrowd: 0.9,
+  // 2026-10-12 R4-Voice：断肢四条、耳光、喊杀这几条成品原来没走库线（断肢按白刃口径压到整段 −28.5、耳光 alignDbfs −16、喊杀峰值 −3），
+  // Script_AudioNormalize 一直红；现在成品对齐到有声段 −25 dBFS，这里按各自补的增益反算，玩家听到的响度一丝不变：
+  // goreSever 0.78 × 10^(−2.25/20)（两变体 +1.96 / +2.53 dB 的平均）、goreLimbLand 0.45 × 10^(−2.07/20)（+1.82 / +2.32）、
+  // slap 0.85 × 10^(9.10/20)、chargeCrowd 0.9 × 10^(9.52/20)。
+  goreSever: 0.602, goreLimbLand: 0.355,
+  impactBrick: 0.55, impactDirt: 0.45, impactWood: 0.5, impactMetal: 0.55, impactFlesh: 0.72, slap: 2.423, chargeCrowd: 2.693,
   footstepDirt: 0.26, footstepRubble: 0.28, bodyFall: 0.55, hurt: 0.8, heartbeat: 0.75,
   // 弹壳与脚步同一档：每开一枪响一次的东西，与枪声同量级的话整场只剩叮叮当当。
   shellDrop: 0.3,
@@ -3358,7 +3364,8 @@ const SAMPLE_MIX = {
   // 四种材质脚步与 dirt/rubble 同一档：木板与石板本来就比土路响一点，草与泥更闷。
   footstepWood: 0.3, footstepStone: 0.3, footstepGrass: 0.22, footstepMud: 0.26,
   // 身体 foley 全是「贴着自己」的小动作，比脚步略低；喘息一直在响，按床配平。
-  clothMove: 0.22, gearRattle: 0.2, breathHeavy: 0.3, breathInjured: 0.3, bodyLand: 0.5,
+  // breathInjured：2026-10-12 成品从有声段 −23.12 对齐到 −25（−1.94 dB），0.3 × 10^(1.94/20) 复原原响度。
+  clothMove: 0.22, gearRattle: 0.2, breathHeavy: 0.3, breathInjured: 0.375, bodyLand: 0.5,
   grenadeBounce: 0.45, grenadeRoll: 0.35,
   // 中距爆炸夹在近（1.0）与远（0.5）之间；落屑是爆炸之后的余音，不能抢爆炸本身。
   explosionMid: 0.72, debrisFall: 0.4,
