@@ -391,10 +391,15 @@ export async function DriveFrontBattle(ctx){
   const coverRadius=B.leaderCoverArrivalM+B.coverReopenM;
   const coverArrival=await page.evaluate(({target,maxM})=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),luo=r.companion.Handle("luo");
-    let frames=0;
-    for(;frames<240&&g.player.alive&&Math.hypot(luo.position.x-target.x,luo.position.z-target.z)>maxM;frames++)g.StepFrames(1,1/60,false);
-    return {frames,alive:g.player.alive,distance:Math.hypot(luo.position.x-target.x,luo.position.z-target.z)};
+    let frames=0;const D=()=>Math.hypot(luo.position.x-target.x,luo.position.z-target.z),trace=[];
+    const Mark=()=>trace.push({f:frames,x:+luo.position.x.toFixed(2),z:+luo.position.z.toFixed(2),d:+D().toFixed(2),st:luo.state,stance:luo.stance,
+      evade:!!luo.missionGrenadeEvade,steer:!!r.frontScenes?.Steers?.(luo),speech:!!r.voice?.Speech?.("luo")?.active});
+    Mark();
+    for(;frames<240&&g.player.alive&&D()>maxM;frames++){g.StepFrames(1,1/60,false);if(frames%20===19)Mark();}
+    Mark();
+    return {frames,alive:g.player.alive,distance:D(),trace};
   },{target:S.leaderCover,maxM:coverRadius});
+  console.log("LUO_COVER",JSON.stringify({frames:coverArrival.frames,distance:+coverArrival.distance.toFixed(3),start:coverArrival.trace[0]}));
   assert.ok(coverArrival.alive&&coverArrival.distance<=coverRadius,"Luo physically reaches his cover within four seconds "+JSON.stringify(coverArrival));
   const staging=await page.evaluate(async()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),T=await import('three');

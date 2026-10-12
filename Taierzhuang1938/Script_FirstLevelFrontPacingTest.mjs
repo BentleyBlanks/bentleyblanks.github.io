@@ -1241,6 +1241,25 @@ function WalkRuntime(extra = {}) {
   assert.ok(s4.giveWay, "a waiting leader gives way too");
   player.position = { x: 25.6, y: 0, z: -153.2 }; player.moveWishX = player.moveWishZ = 0; s4.r.time = 50; s4.Steer(); s4.r.time += B.giveWayClearS + 0.05; s4.Steer();
   assert.ok(s4.giveWay == null && s4.gaveWay.at(-1).end === "walkOn", "... and walks on from where he stepped to, not back");
+  // 2026-10-12 R4-Gates (R3 drive fin2): a player who stops inside giveWayReleaseM of the spot Luo left (crouched by the captured
+  // gun 1.6 m off) is not coming past any more: after giveWayStillClearS standing still, then giveWayClearS, the waiting leader
+  // walks on to his cover. A player standing on that spot (inside giveWayNearM) still keeps him aside.
+  const StopNear = (offset) => {
+    const s = new FirstLevelFrontScenes({ ...r, flow: { stage: { id: "Support" } }, frontBattle: { walks: new Map([[luo.id, walk]]) } });
+    Object.assign(luo.position, home); luo.moveSpeed = 0; player.position = { x: 23.7, y: 0, z: -150.4 }; player.velocity = { x: 0, y: 0, z: 0 };
+    Heading(target); s.r.time = 80; s.Steer();
+    assert.ok(s.giveWay, "giving way to a player coming past");
+    player.position = { x: home.x + offset.x, y: 0, z: home.z + offset.z }; player.moveWishX = player.moveWishZ = 0;
+    s.r.time += 0.1; s.Steer(); s.r.time += B.giveWayStillClearS - 0.1; s.Steer(); s.r.time += B.giveWayClearS + 0.05; s.Steer();
+    const early = s.giveWay?.phase ?? null;
+    s.r.time += 0.2; s.Steer(); s.r.time += B.giveWayClearS + 0.05; s.Steer();
+    return { early, late: s.giveWay?.phase ?? null, end: s.gaveWay.at(-1)?.end ?? null };
+  };
+  const stopped = StopNear({ x: 1.0, z: -1.25 });
+  assert.ok(Math.hypot(1.0, 1.25) < B.giveWayReleaseM && stopped.early === "aside" && stopped.late === null && stopped.end === "walkOn",
+    `a player stopped 1.6 m off: aside while he has only just stopped, then walks on to his cover (${JSON.stringify(stopped)})`);
+  const onSpot = StopNear({ x: 0.5, z: -0.5 });
+  assert.ok(onSpot.late === "aside", `a player stopped on the spot he left: he stays aside (${JSON.stringify(onSpot)})`);
   // Wiring: Steer runs it, the player reports where his keys point.
   assert.ok(/this\.StepAside\(\);\s*\n\s*this\.GiveWay\(\);/.test(Read("Script_FirstLevelFrontScenes.mjs")), "FrontScenes.Steer runs GiveWay every frame");
   assert.ok(/this\.moveWishX = wish\.x; this\.moveWishZ = wish\.z;/.test(Read("Script_Player.mjs")), "Script_Player reports the movement keys' direction (moveWishX/Z)");

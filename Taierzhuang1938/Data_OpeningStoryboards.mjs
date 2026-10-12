@@ -144,6 +144,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // Starts once the pose's watched bones turn slower than stillRadS, fades in over inS and out over outS as soon as
   // the clip moves again. Radians and hertz; the head's share is cut to faceAimedShare on clips whose face is aimed
   // at the first-person eye inside the clip.
+  // Head-only talk (Script_OpeningActorPerformance, a man in native combat calling a line with both hands on the gun): the head
+  // dips with his own mouth -- the face track's jaw, low-passed at jawFollowHz -- by up to jawNodRad (on top of the stress nod).
+  // 2026-10-12 R4-Gates: TankHeard.02 (3.44 s, one stressed syllable at 0.15 s, before the line has faded in) said by Luo
+  // kneeling on the aim with his face already on the player turned his head 0.017-0.022 rad (breathing only) over 53-182 seen
+  // frames: the front line gate (CheckFrontActing, > 0.03) went red 2 of 9 R3 drives. Face tracks: the low-passed jaw spans
+  // 0.41 on the median line (TankHeard.02 0.44, tenth percentile 0.15): 0.1 rad x 0.4 = 2.3 deg.
+  aimedTalk:Object.freeze({ jawNodRad:.1, jawFollowHz:6 }),
   heldLife:Object.freeze({ stillRadS:.35, inS:.6, outS:.12,
     breathRad:.018, breathHz:.28, swayRad:.012, swayHz:.11,
     headYawRad:.12, headYawHz:[.07,.19], headPitchRad:.03, headPitchHz:.13, neckShare:.5, faceAimedShare:.25 }),

@@ -822,7 +822,11 @@ export class FirstLevelFrontBattle {
     const yaowa=r.companion.Handle("yaowa");
     if(!this.zhouEscortDispatched){this.zhouEscortDispatched=true;this.SetWalk(yaowa,S.leftRoute.slice(-3));}
     if(!this.walks.has(a.id)){
-      if(yaowa?.alive&&Distance(yaowa.position,a.position)>B.rearArrivalM)return;
+      // Yaowa within rearArrivalM, or as near as the access trench lets him: no nearer by walkStallProgressM for walkStallS
+      // within rearArrivalM x walkStallArrivalScale (the stall rule of Walk). 2026-10-12 R4-Gates (drive fix3, 03 never ended,
+      // «MachineGun: reached while holding the nest»): He reached his handover spot 1.07 m short of the seat before Yaowa came,
+      // Yaowa stopped 2.8 m behind He in the one-man trench, 3.86 m from Zhou, and the three waited on each other for 200 s.
+      if(yaowa?.alive&&Distance(yaowa.position,a.position)>B.rearArrivalM&&!this.EscortAsNearAsHeGets(yaowa,a))return;
       const he=r.companion.Handle("heyoutian");
       if(he?.alive&&Distance(he.position,S.leftSeat)>B.handoverReadyM)return;
       r.emplacement.NpcVacate(r.leftGunId,"woundedWithdrawal");
@@ -836,6 +840,13 @@ export class FirstLevelFrontBattle {
       Object.assign(r.column.zhou,{x:a.position.x,z:a.position.z,health:a.health,visible:true,state:"waiting"});
       r.Record("zhouGunWounded",{priorWound:true,x:a.position.x,z:a.position.z});r.ai.Remove(a);this.SetWalk(yaowa,[{x:-33,z:-100}]);
     }
+  }
+  /** Zhou's escort has come as near as he can (UpdateZhou): no nearer by B.walkStallProgressM for B.walkStallS, within
+   *  B.rearArrivalM x B.walkStallArrivalScale of him. */
+  EscortAsNearAsHeGets(escort,zhou){
+    const d=Distance(escort.position,zhou.position),now=this.r.time,e=this.zhouEscortWait??={best:Infinity,at:now};
+    if(d<e.best-B.walkStallProgressM){e.best=d;e.at=now;}
+    return d<=B.rearArrivalM*B.walkStallArrivalScale&&now-e.at>=B.walkStallS;
   }
   RoadDistance(index){return MissionRouteLength(S.road.slice(0,index+1));}
   MoveTank(dt){

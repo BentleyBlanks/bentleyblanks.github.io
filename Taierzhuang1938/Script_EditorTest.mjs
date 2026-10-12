@@ -363,6 +363,56 @@ const debugRendering = await page.evaluate(() => {
     }
     foregroundPixels[view] = changed;
   }
+  // 【2026-10-12】金属度视图另算：手、袖子、木枪托都是非金属（0），和它们背后的地面一样是黑的，
+  // 藏不藏第一人称那几块本来就一样；真能变的只有枪上的钢件（汉阳造钢件 metalness 0.62，
+  // 48×30 上只占 1% 上下，旧的「每个视图都 >2%」对这一格是拿木头和手去要求金属度）。
+  // 所以这一格改成逐像素对账：在法线 / 深度视图里量整把枪加双手的剪影，再把钢件藏掉量一次，
+  // 只在前者里、不在后者里的像素就是「露在外面、背后是地面的钢件」；要求金属度视图里变了的像素
+  // 盖住其中大部分、且几乎都落在整个剪影里（不是噪声）。只藏木头和手去量会把被手挡住的机匣也算进来。
+  // 钢件细（枪管、机柄），48×30 上一根枪管只剩几个半格；这一格用 160×90 的取样图量。
+  const fine = document.createElement("canvas");
+  fine.width = 160; fine.height = 90;
+  const fineCtx = fine.getContext("2d");
+  const GrabFine = () => {
+    fineCtx.drawImage(canvas, 0, 0, fine.width, fine.height);
+    return fineCtx.getImageData(0, 0, fine.width, fine.height).data;
+  };
+  const Mask = (view) => {
+    panel.SetView(view);
+    T.StepFrames(3);
+    const shown = GrabFine();
+    T.viewmodel.root.visible = false;
+    T.StepFrames(3);
+    const hidden = GrabFine();
+    T.viewmodel.root.visible = true;
+    T.StepFrames(3);
+    const mask = new Uint8Array(shown.length / 4);
+    for (let i = 0; i < shown.length; i += 4) {
+      mask[i / 4] = Math.abs(shown[i] - hidden[i]) + Math.abs(shown[i + 1] - hidden[i + 1])
+        + Math.abs(shown[i + 2] - hidden[i + 2]) > 24 ? 1 : 0;
+    }
+    return mask;
+  };
+  const Union = (a, b) => a.map((v, i) => v | b[i]);
+  const Count = (m) => m.reduce((n, v) => n + v, 0);
+  const Both = (a, b) => Count(a.map((v, i) => v & b[i]));
+  const metalMeshes = [];
+  T.viewmodel.root.traverse((object) => {
+    if (!object.isMesh || !object.visible || !object.material) return;
+    const list = Array.isArray(object.material) ? object.material : [object.material];
+    if (list.some((material) => material?.metalness > 0)) metalMeshes.push(object);
+  });
+  const metalMask = Mask("metalness");
+  const silhouette = Union(Mask("normal"), Mask("depth"));
+  for (const object of metalMeshes) object.visible = false;
+  const withoutSteel = Union(Mask("normal"), Mask("depth"));
+  for (const object of metalMeshes) object.visible = true;
+  const steel = silhouette.map((v, i) => v & (1 - withoutSteel[i]));
+  const metalnessCheck = {
+    pixels: fine.width * fine.height, changed: Count(metalMask), steel: Count(steel), silhouette: Count(silhouette),
+    coversSteel: Count(steel) ? +(Both(metalMask, steel) / Count(steel)).toFixed(3) : 0,
+    insideSilhouette: Count(metalMask) ? +(Both(metalMask, silhouette) / Count(metalMask)).toFixed(3) : 0,
+  };
   T.post.SetTaaEnabled(taaWas);
   panel.SetView("normal");
   T.StepFrames(3);
@@ -374,7 +424,7 @@ const debugRendering = await page.evaluate(() => {
     // 留着的话所有材质还在往 hdr 靶里写调试色，正片就毁了。
     matReset: !T.library.gi || T.library.gi.debugView.value === 0,
     target: !!T.post.targets.normalDepth,
-    visible, lit, chipsOn, matMode, characterPbr, firstPerson, foregroundPixels,
+    visible, lit, chipsOn, matMode, characterPbr, firstPerson, foregroundPixels, metalnessCheck,
     probePixels: probe.width * probe.height,
   };
 });
@@ -394,9 +444,14 @@ Check("Debug Rendering：第一人称手/枪进前景预通道且材质已注入
   && debugRendering.firstPerson.translucentOut,
   JSON.stringify(debugRendering.firstPerson));
 // 48x30 的取样图上，屏幕下方那支枪加两只手怎么也该占到百分之几。
+// 金属度那一格：手和木头本来就是黑的，只对钢件（见上面 metalnessCheck 的注释）。2026-10-12 phase 5 开局实测 160×90 上
+// 露在地面前的钢件 47 格（0.33%）、金属度变了 120 格（0.83%），盖住钢件 100%、全在剪影里；门槛取 0.1% / 0.3% / 80% / 90%。
 Check("Debug Rendering：藏掉第一人称，四个视图的画面真的变了",
-  Object.values(debugRendering.foregroundPixels).every((n) => n > debugRendering.probePixels * 0.02),
-  JSON.stringify(debugRendering.foregroundPixels));
+  ["normal", "depth", "baseColor"].every((view) => debugRendering.foregroundPixels[view] > debugRendering.probePixels * 0.02)
+    && debugRendering.metalnessCheck.steel >= debugRendering.metalnessCheck.pixels * 0.001
+    && debugRendering.metalnessCheck.changed >= debugRendering.metalnessCheck.pixels * 0.003
+    && debugRendering.metalnessCheck.coversSteel >= 0.8 && debugRendering.metalnessCheck.insideSilhouette >= 0.9,
+  JSON.stringify({ ...debugRendering.foregroundPixels, metalness: debugRendering.metalnessCheck }));
 Check("Debug Rendering：GLB 角色接入 PBR、材质视图与阴影链",
   debugRendering.characterPbr.meshes > 0 && debugRendering.characterPbr.materials > 0
   && debugRendering.characterPbr.configured && debugRendering.characterPbr.injected
@@ -1057,12 +1112,15 @@ const actor = await page.evaluate(() => {
   active.lineup = true;
   active.Rebuild();
   window.Taierzhuang.StepFrames(10);
-  const ijaLineupSourceDefaults = active.actors.length === 4
-    && active.actors.map(a=>a.characterRig?.modelId).join(',') === 'TengxianIja01,TengxianIja02,TengxianIja03,TengxianIja01'
-    && active.actors.slice(0, 3).every((previewActor) => previewActor.kind === "ija"
+  // 【2026-10-12 改数据】2026-09-24 用户批准 IJA06（Data_CharacterSelection 的 ija 表加了序号 5，
+  // 主力匿名日军外观、日兵甲的脸），本阵营对比从「三兵一官」变成「四兵一官」；这里原来还按四个人数。
+  const ijaLineupSourceDefaults = active.actors.length === 5
+    && active.actors.map(a=>a.characterRig?.modelId).join(',') === 'TengxianIja01,TengxianIja02,TengxianIja03,TengxianIja06,TengxianIja01'
+    && active.actors.slice(0, 4).every((previewActor) => previewActor.kind === "ija"
       && previewActor.weaponId === "Type38")
-    && active.actors[3]?.kind === "ijaOfficer"
-    && active.actors[3]?.weaponId === "Type38";
+    && active.actors[4]?.kind === "ijaOfficer"
+    && active.actors[4]?.weaponId === "Type38";
+  const ijaLineup = active.actors.map((a) => `${a.kind}:${a.characterRig?.modelId}:${a.weaponId}`).join(" / ");
   // 当前阵营采用的军人全部走新的蒙皮 GLB，且必须进入法线/深度预通道；主材质须至少有一份
   // 不透明、写深度的主体材质。头发/帽带的 alpha 卡允许透明且不写深度。
   // 静默退回旧 model/box 也会让这一条红。
@@ -1104,7 +1162,7 @@ const actor = await page.evaluate(() => {
     fingerGripSources, legacySocketSeparation, weaponRollDot,
     correctedCrouchPlayback, correctedCrouchLeanDeg, correctedCrouchStance, correctionDisclosed,
     sourceDefault, singleWeaponReplaced, nraLineupSourceDefaults,
-    ijaLineupSourceDefaults, lineupWeaponsReplaced,
+    ijaLineupSourceDefaults, ijaLineup, lineupWeaponsReplaced,
     studio: editor.studio.Active,
     worldHidden: !window.Taierzhuang.battlefield.meshes.some((m) => m.visible),
     viewmodelHidden: window.Taierzhuang.viewmodel.root.visible === false,
@@ -1120,7 +1178,7 @@ Check("人物编辑器列出当前士兵适用的 22 条导入动作", actor.imp
 Check("人物编辑器单人默认读取正式人物配枪", actor.sourceDefault);
 Check("人物编辑器下拉可替换单人枪械", actor.singleWeaponReplaced);
 Check("国军两款士兵与复用外观的军官装备默认枪械", actor.nraLineupSourceDefaults);
-Check("日军三款士兵与复用外观的军官装备默认枪械", actor.ijaLineupSourceDefaults);
+Check("日军四款士兵与复用外观的军官装备默认枪械", actor.ijaLineupSourceDefaults, actor.ijaLineup);
 Check("本阵营对比下拉可统一替换全部枪械", actor.lineupWeaponsReplaced);
 Check("本阵营获准人物都用蒙皮 GLB，且主体材质不透明/写深度", actor.rigidShadingSolid);
 Check("枪身前握把沿左右手骨骼挂点定向", actor.socketDirectionDot > 0.98,
@@ -1356,12 +1414,22 @@ const vfxEditor = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const active = T.editor.active;
   const gl = T.renderer.getContext();
+  // 【2026-10-12 改口径】2026-10-09 起（62f75b7a「render smoke and fire from simulated volumes」）
+  // SceneEffect 的常驻烟一律走三维体积粒子（source.volumeSmokeHandles，预设 VolumePlume），
+  // 不再往 sourceSmoke 精灵池里吐 —— 原来量 sourceSmoke.cursor 的写法在新管线上恒为 0。
+  // 现在按这一个烟源自己挂的句柄分开量：烟 = 它的体积烟系统，火 = 它的 Burning 系统，
+  // 不再用「全场任何一个系统有粒子」顶替（那样烟没了火也能把这一条撑绿）。
+  const source = T.vfx.smokeSources.get(active.handle);
+  const entries = T.vfx.particles.Inspect().entries;
+  const Of = (ids) => entries.filter((entry) => (ids || []).includes(entry.id));
+  const smoke = Of(source?.volumeSmokeHandles), fire = Of(source?.particleHandles);
   const continuous = {
     handle: active.handle,
-    smokeSpawned: T.vfx.pools.sourceSmoke.cursor,
-    fireSpawned: T.vfx.particles.Inspect().entries.reduce((n,e)=>n+e.emitted,0),
-    smokeAlive: T.vfx.pools.sourceSmoke.deathTime.some((time) => time > T.vfx.time),
-    fireAlive: T.vfx.particles.Inspect().entries.some(e=>e.particleCount>0),
+    smokeSystems: smoke.length,
+    smokeSpawned: smoke.reduce((n, e) => n + e.emitted, 0),
+    fireSpawned: fire.reduce((n, e) => n + e.emitted, 0),
+    smokeAlive: smoke.length > 0 && smoke.every((e) => e.particleCount > 0),
+    fireAlive: fire.length > 0 && fire.some((e) => e.particleCount > 0),
   };
   active.effectId = "ExplosionGrenade";
   active.Play();
@@ -1383,6 +1451,7 @@ Check("特效预览编辑器打开正片同源摄影棚",
   JSON.stringify(vfxEditor));
 Check("Vefects 常驻烟火在预览器真实发射",
   vfxEditor.masks === 5 && vfxEditor.continuous.handle > 0
+    && vfxEditor.continuous.smokeSpawned > 0 && vfxEditor.continuous.fireSpawned > 0
     && vfxEditor.continuous.smokeAlive && vfxEditor.continuous.fireAlive,
   JSON.stringify(vfxEditor.continuous));
 Check("特效预览器可重播瞬时爆炸且 shader 无 GL 错误",
@@ -1736,12 +1805,18 @@ const scene = await page.evaluate(() => {
   active.SetPalette("Effect_FireSmall");
   active.Place(12, -18);
   T.StepFrames(45);
+  // 【2026-10-12】只量这一个放下去的烟源自己挂的体积烟 / 燃烧系统（同上节 Vefects 常驻烟火）：
+  // 原来读 sourceSmoke / sourceFire 两个精灵池的累计游标，那是全场的数，2026-10-09 起烟也不再进那个池。
+  const placed = T.vfx.smokeSources.get(active.effectHandles[0]);
+  const placedEntries = T.vfx.particles.Inspect().entries;
+  const Emitted = (ids) => placedEntries.filter((entry) => (ids || []).includes(entry.id))
+    .reduce((n, entry) => n + entry.emitted, 0);
   out.effect = {
     category: active.panel.root.textContent.includes("特效"),
     handles: active.effectHandles.length,
     source: T.vfx.smokeSources.has(active.effectHandles[0]),
     json: active.Serialize().items.some((item) => item.type === "Effect_FireSmall"),
-    emitted: T.vfx.pools.sourceSmoke.cursor + T.vfx.pools.sourceFire.cursor > 0,
+    emitted: Emitted(placed?.volumeSmokeHandles) > 0 && Emitted(placed?.particleHandles) > 0,
   };
   active.DeleteSelected();
 
