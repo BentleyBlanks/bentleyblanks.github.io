@@ -48,9 +48,14 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   if (leadStart) r.player.yaw = Math.atan2(spawn.x - leadStart.x, spawn.z - leadStart.z);
   for (const [i,actor] of (r.squad||[]).entries()) {
     actor.missionTrainReady = true;
+    // 17：幺娃守在担架边。必须在 flow.Enter() 之前摆好 —— Death 的 Enter 按他**此刻**的位置算床边路线
+    //（ReceptionBedGuideRoute：在厢房里才只剩床边那一点，在外面就接整条接收路线）。先 Enter 再摆的话，
+    // 路线是从厢房外的通用落点算的，摆到床边的幺娃反被旧路线拉去 (-13,249)，撞在厢房东墙上
+    //（x≈-21.6，离老周 3.38 m），coverS 永远不累计、deathSceneComplete 不落（2026-10-01 / 10-12 实拍）。
     const point = n === 2 ? bunkerPosts[i] || bunkerPosts.at(-1)
       : n === 3 ? (i === 0 ? {x:leadStart.x,z:leadStart.z} : {x:spawn.x+(i%2?1:-1),z:spawn.z+2+Math.floor(i/2)*2})
       : n === 4 ? OPENING.frontPosts[i] : n === 5 ? (i===0?Sortie.rear:OPENING.frontPosts[i]) : n <= 6 ? P.squadFrontPositions[i]
+      : n === 17 && actor.castId === "yaowa" ? P.receptionYard.yaowaBedside
         : {x:spawn.x+(i%2?2.4:-2.4),z:spawn.z+3+Math.floor(i/2)*2.4};
     r.PlaceActor(actor,point); r.Defend(actor,point);
   }
@@ -117,10 +122,8 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   if (n === 5) r.frontBattle?.StartHandover?.(false);
   if (n === 14) {r.BeginCarry();r.UpdateCarry();}
   if (n === 17) {
-    // 幺娃守在担架边；军医是 15C 起就在院子里的那个真人（EnsureYardCast 已经建好），
-    // 直接摆到担架另一侧，省掉他从厢房另一头走过来的那十几秒。
-    const yaowa=r.companion.Handle("yaowa");
-    r.PlaceActor(yaowa,P.receptionYard.yaowaBedside);
+    // 幺娃已在上面的班组摆位里放到了床边（Enter 之前）。军医是 15C 起就在院子里的那个真人
+    //（EnsureYardCast 在 Enter 里建好），直接摆到担架另一侧，省掉他从厢房另一头走过来的那十几秒。
     const surgeon=r.extras.Actor("WardSurgeon");
     if (surgeon) r.PlaceActor(surgeon,{x:A.zhouDrop.x-1,z:A.zhouDrop.z});
   }

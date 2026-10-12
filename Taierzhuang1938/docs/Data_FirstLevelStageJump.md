@@ -36,11 +36,11 @@ await debug.FirstLevelJump("Handover"); // 等同第 16 阶段
 | 10 打开内院，放行担架 | `Courtyard` | `Courtyard` |
 | 11 抵达桥头接运点 | `TransferApproach` | `TransferApproach` |
 | 12 掩护装载与离开 | `Transfer` | `Transfer` → `CartRide` |
-| 13 日机空袭桥头道路与车列 | `AirFirst` | `AirFirst` |
+| 13 日机空袭桥头道路与车列 | `AirFirst` | `AirFirst`（起点在停车处 `cartHalt` 的车路西侧 (73.6,135.4)：09-30 起没有 cartRide 时停车处站着实心替身车 `ConvoyCartE`，落在 `A.cartHalt` 正中等于生在车厢里，2026-10-12 修） |
 | 14 第二轮扫射，转入西沟 | `Dive` | `Carry` → `Dive` → `Rescue` |
 | 15 收拢、换手抬运、找到接收处 | `Regroup` | `Regroup` → `WallPath` → `ReceptionGate` |
 | 16 完成交接 | `Handover` | `Handover` |
-| 17 确认老周死亡 | `Death` | `Death` |
+| 17 确认老周死亡 | `Death` | `Death`（幺娃在 `flow.Enter()` **之前**摆到 `receptionYard.yaowaBedside`：Death 的 Enter 按他此刻的位置算床边路线，先 Enter 再摆会把他拉出厢房、`deathSceneComplete` 永远不落，见 End 册 §6，2026-10-12 修） |
 | 18 接应回援尾队，奉令毁桥，夜入滕城 | `Bridge` | `BridgeOrders` → `BridgeCover` → `BridgeWithdraw` → `NightMarch` |
 
 跳转会重建本轮关卡、此前完成事实和目标阶段起点；不会沿用原现场的弹药、伤亡、破坏或未来事实。

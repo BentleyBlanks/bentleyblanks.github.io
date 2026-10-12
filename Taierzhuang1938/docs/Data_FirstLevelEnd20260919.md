@@ -311,6 +311,30 @@ Notion 的「有人可能中弹」留在他们身上，不是留给整支队伍�
 撤退要用 `fight:false`；编排会接管的路线要带 `stopFact`，在接管点松手。
 爆破那一段不要只等事实 —— 等不到就得报得出「是谁还在爆破区里」（`BLAST_WAIT`）。
 
+**17 跳转起点的幺娃走出厢房、`deathSceneComplete` 永远不落（2026-10-12 修）。**
+现象：`Script_FirstLevelMissionStageJumpTest` 选 `Death`、以及 `--campaign --stage-jumps --stage-from=15`
+跳进 17 之后，`ZhouDeath` 放完、门外担架抬进来、军医也转过去了，唯独 `coverS` 一直是 0 ——
+幺娃钉在 (−21.62, 242.04)，离老周 3.38 m（要 < 2.4 m 才累计），10-01 与 10-12 两次实拍坐标逐位相同。
+根因：`c85614d4`（2026-09-24）把 `ReceptionBedGuideRoute("Death", position, remaining)` 改成按幺娃
+**此刻的位置**算路（在厢房 `MISSION_RECEPTION_SPACE.ward` 里且直达床边才只剩床边一点，否则接整条
+`MISSION_ROUTES.reception`），而 `Script_FirstLevelMissionStageJump` 是先 `r.flow.Enter()`（Death 的 Enter
+在这里算路，幺娃还站在班组通用落点 (−23.6, 246.6)，厢房外）、**之后**才 `PlaceActor` 到
+`receptionYard.yaowaBedside`。于是站在床边的幺娃被旧路线拉去 (−13,249)，直线撞在厢房东墙上
+（x ≈ −21.6）停住，`UpdateSquad` 每帧继续 `MoveActor` 往墙里推。连续游玩不受影响（16 他真走到床边，
+17 进场时已在厢房里）。
+修法：跳转脚本把幺娃的床边落点挪进 `flow.Enter()` 之前的班组摆位（`n === 17 && castId === "yaowa"`），
+Enter 按床边算出的路线就是 `[yaowaBedside]`；不动判定半径、不动 `ReceptionBedGuideRoute`。
+`Script_FirstLevelMissionTest` 静态守住「17 起点先摆人再 Enter、Enter 之后不再挪幺娃」。
+验收：取证探针跳 17 后床边路线 `[(−23.1,241.5)]`、`coverS` 从确认那一刻起累计、36.6 s 记
+`deathSceneComplete` 进 `BridgeOrders`；`Script_FirstLevelMissionStageJumpTest`、
+`--campaign --stage-jumps --stage-from=15 --budget=report`（15–18 走到 `Complete`，唯一的 `BUDGET_OVER` 是 18
+`RetreatLook160` 9.08 M > 9 M，与本修无关）、`FirstLevelMissionTest` / `FirstLevelEndTest` / `MissionGatesTest` 通过。
+17 修好之后 StageJumpTest 才第一次跑到后半段，顺手露出同期的第二条红：13 的跳转起点 `A.cartHalt` 正中站着
+09-30 加的实心替身车 `ConvoyCartE`（玩家生在车厢里，`player capsule clears stage 13` 翻红），起点改到车路西侧
+(73.6,135.4)，见 [阶段跳转](Data_FirstLevelStageJump.md) 的 13 行。第三条是夹具自己的：测 18 死亡重试那一段
+摆关尾状态时只放了夜景没记 `marchOutReached`，而 09-30 起 `Retry()` 按它分 A/B 段（没有它 = A 段阵亡、夜景不动），
+夹具补记 `marchOutReached` / `retreatOutOfReach`（真流程里夜景本来就只在这两件之后才摆），断言一字没改。
+
 ## 5. 验收命令
 
 纯 Node（毫秒级）：
