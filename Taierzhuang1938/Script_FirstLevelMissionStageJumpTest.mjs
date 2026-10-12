@@ -106,6 +106,10 @@ try {
       const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
       r.flow.index=nightIndex;r.flow.Enter();
       r.flow.facts.add("blastZoneCleared");
+      // 真流程里夜景只在随队走完 marchOut、脱离战场之后才摆（nightTransitionComplete 的 requires）；
+      // 09-30 起 Retry 的 NightMarch 分支也按 marchOutReached 分 A/B 段：没有它就是 A 段阵亡（原地重生、夜景不动）。
+      // 夹具摆关尾状态要把这两件事实一起摆上，不然测的是一种玩不出来的状态（2026-10-12）。
+      r.flow.facts.add("marchOutReached");r.flow.facts.add("retreatOutOfReach");
       r.bridge.blast={set:0,ready:true,fired:false,waitedS:0,stuckS:0,overdue:false,lastInside:null};
       r.bridge.Fire();
       r.BeginNightTransition();r.PlaceNightArrival();

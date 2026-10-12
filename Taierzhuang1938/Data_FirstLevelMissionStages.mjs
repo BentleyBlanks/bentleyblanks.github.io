@@ -21,7 +21,10 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(10, "Courtyard", "打开内院，放行担架", ["Courtyard"], A.melee),
   Phase(11, "TransferApproach", "抵达桥头接运点", ["TransferApproach"], {x:53,z:40}),
   Phase(12, "Transfer", "掩护装载与离开", ["Transfer", "CartRide"], {x:94,z:101}),
-  Phase(13, "AirFirst", "日机空袭桥头道路与车列", ["AirFirst"], A.cartHalt),
+  // 13 的跳转起点在停车处 cartHalt (76,135) 的车路西侧：09-30 起没有 cartRide 时停车处站着实心替身车
+  // ConvoyCartE（3 × 5.8 m，MID_TUNING.transferConvoy），落在 A.cartHalt 正中等于生在车厢里（StageJumpTest
+  // 「player capsule clears stage 13」，2026-10-12 实拍 (75.56,135.49) 与 ConvoyCartE 相交）。
+  Phase(13, "AirFirst", "日机空袭桥头道路与车列", ["AirFirst"], { x: 73.6, z: 135.4 }),
   Phase(14, "Dive", "第二轮扫射，转入西沟", ["Carry", "Dive", "Rescue"], A.ditchMouth),
   Phase(15, "Regroup", "降压：收拢、换手抬运、找到接收处", ["Regroup", "WallPath", "ReceptionGate"], A.retreatA),
   Phase(16, "Handover", "完成交接", ["Handover"], MISSION_RECEPTION_SPACE.entry),

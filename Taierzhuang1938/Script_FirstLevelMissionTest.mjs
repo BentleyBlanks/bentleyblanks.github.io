@@ -254,8 +254,17 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
       const topUp=enter.indexOf("this.TopUpStepBandages(stage.id)"),save=enter.lastIndexOf("this.SaveCheckpoint()");
       assert.ok(topUp>0&&topUp<save,"Enter tops dressings up before it saves the step's checkpoint");
       // A debug / checkpoint start at 03 (Script_FirstLevelMissionStageJump) enters through flow.Enter too.
-      assert.match(fs.readFileSync(new URL("./Script_FirstLevelMissionStageJump.mjs",import.meta.url),"utf8"),/r\.flow\.index = saved\.index;\s*r\.flow\.Enter\(\);/,
+      const jumpSource=fs.readFileSync(new URL("./Script_FirstLevelMissionStageJump.mjs",import.meta.url),"utf8");
+      assert.match(jumpSource,/r\.flow\.index = saved\.index;\s*r\.flow\.Enter\(\);/,
         "a 03 checkpoint start runs the same Enter");
+      // 17: Death's Enter computes Yaowa's bed-guide route from where he stands (ReceptionBedGuideRoute). Placing him at
+      // the bedside only after Enter left him on the outdoor reception route, stuck on the ward's east wall 3.38 m from
+      // Zhou, and deathSceneComplete never landed (2026-10-01 / 10-12 StageJumpTest 17→18).
+      const bedsidePlace=jumpSource.indexOf('n === 17 && actor.castId === "yaowa" ? P.receptionYard.yaowaBedside');
+      assert.ok(bedsidePlace>0&&bedsidePlace<jumpSource.indexOf("r.flow.Enter();"),
+        "a 17 start places Yaowa at the bedside before Enter computes his bed-guide route");
+      assert.ok(!/r\.flow\.Enter\(\);[\s\S]*PlaceActor\(yaowa,P\.receptionYard\.yaowaBedside\)/.test(jumpSource),
+        "a 17 start does not move Yaowa after Enter without recomputing the bed-guide route");
       const {r}=TopUp(0);r.player.health=100;
       const entrySave={health:100,bandages:r.player.bandages};
       assert.equal(FirstLevelCheckpointVitals(entrySave,{health:100,bandages:0}).bandages,2,
