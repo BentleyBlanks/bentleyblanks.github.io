@@ -132,7 +132,9 @@ export class FirstLevelFrontCounterattack {
     if (stage === "Support" && !r.Has("rightNestCaptured")) this.SapShells();
     if (r.Has("rightNestCaptured")) this.UpdateWindow();
     // The discharger works the nest from the capture until the tank and its infantry are on (tankAtBendExit): 04 has its own pressure.
-    if (r.Has("rightNestCaptured") && !r.Has("tankAtBendExit") && stage !== "Tank") this.NestShells();
+    // The discharger works the nest through 03 only (the second-round 03->07 drive: 9 rounds over 100 s, four hits for
+    // 57 hp on a man sitting on the gun, then 04's tank fire finished him); 04 has its own pressure.
+    if (stage === "Support" && r.Has("rightNestCaptured")) this.NestShells();
     if (stage === "MachineGun" || stage === "Tank") this.GapGuard();
     if (stage === "MachineGun" && r.Has("rightRearReached")) this.NestFront();
     if (stage === "Tank") { this.SapInfiltration(); this.TankCrew(); this.EscortsWithdrawn(); }
@@ -154,7 +156,7 @@ export class FirstLevelFrontCounterattack {
   NestShells() {
     const r = this.r, T = C();
     this.nestShell.nextAt ??= r.time + T.nestShellFirstS;
-    if (r.time < this.nestShell.nextAt) return;
+    if (this.nestShell.fired >= T.nestShellMax || r.time < this.nestShell.nextAt) return;
     this.nestShell.nextAt = r.time + T.nestShellEveryS[0] + Math.random() * (T.nestShellEveryS[1] - T.nestShellEveryS[0]);
     const at = PickNestShellPoint(FRONT_NEST_SHELL_AREA, r.player.position, this.Squad(), T.nestShellPlayerClearM, T.nestShellSquadClearM);
     if (!at) return;

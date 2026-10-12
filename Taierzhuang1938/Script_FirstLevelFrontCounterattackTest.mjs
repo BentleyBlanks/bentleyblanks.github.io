@@ -155,6 +155,7 @@ const eq = (a, b, message) => { assert.equal(a, b, message); checks++; };
   eq(LightShellHurt(T.shellHurtM + 0.01, T), 0, "beyond the hurt radius: nothing");
   ok(LightShellHurt((T.shellHurtFullM + T.shellHurtM) / 2, T) === (T.shellHurtMaxHp + T.shellHurtMinHp) / 2, "linear in between");
   ok(T.shellHurtMaxHp <= 18 && T.shellHurtMinHp >= 12 && T.shellHurtFullM >= T.nestShellPlayerClearM && T.shellHurtFloorHp >= 1, "12-18 hp, from the clearance out, with a floor");
+  ok(T.nestShellMax >= 6 && T.nestShellMax * T.shellHurtMaxHp * 0.5 < 100, "the yard rounds are capped: half of them hitting at full does not take a full-health man");
   // nestFrontCleared: dead or back north of the berm.
   const north = T.nestFrontClearZ - 1, inYard = T.nestFrontClearZ + 5;
   ok(NestFrontCleared([{ alive: false, position: { z: inYard } }, { alive: true, position: { z: north } }], T.nestFrontClearZ), "dead or north of the line: cleared");

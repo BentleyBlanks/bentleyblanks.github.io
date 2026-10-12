@@ -36,7 +36,7 @@ export async function DriveFrontBattle(ctx){
           if(!close&&D.StepHome()){g.StepFrames(1,1/60,false);continue;}
           const foe=fight?D.Target(90):close;
           if(foe)window.MissionInputDriver.Shoot(foe);else {g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);D.Rearm();}
-          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          if(g.player.bleeding&&g.player.health<80||g.player.health<45&&(g.player.bandages||0)>0)g.Debug.Key("KeyB");
           g.StepFrames(1,1/60,false);
         }
         g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
@@ -222,7 +222,7 @@ export async function DriveFrontBattle(ctx){
           if(foe)window.MissionInputDriver.Shoot(foe);
           else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
             if(g.state.activeSlot==="melee")g.Debug.Key("Digit1");if(g.state.ammo===0)g.Debug.Key("KeyR");}
-          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          if(g.player.bleeding&&g.player.health<80||g.player.health<45&&(g.player.bandages||0)>0)g.Debug.Key("KeyB");
           g.StepFrames(1,1/60,false);
         }
         g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
@@ -336,7 +336,7 @@ export async function DriveFrontBattle(ctx){
           const evading=window.MissionInputDriver.EvadeGrenade(),foe=evading?null:window.MissionInputDriver.Target(90);
           if(foe)window.MissionInputDriver.Shoot(foe);
           else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);if(g.state.activeSlot==="melee")g.Debug.Key("Digit1");if(g.state.ammo===0)g.Debug.Key("KeyR");}
-          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          if(g.player.bleeding&&g.player.health<80||g.player.health<45&&(g.player.bandages||0)>0)g.Debug.Key("KeyB");
           g.StepFrames(1,1/60,false);
         }
         g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
@@ -483,7 +483,7 @@ export async function DriveFrontBattle(ctx){
         const close=evading?null:window.MissionInputDriver.Target?.(r.Has("nestFrontContested")&&!r.Has("nestFrontCleared")?20:8);
         if(close)window.MissionInputDriver.Shoot(close);
         else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);}
-        if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+        if(g.player.bleeding&&g.player.health<80||g.player.health<45&&(g.player.bandages||0)>0)g.Debug.Key("KeyB");
         g.StepFrames(1,1/60,false);
         if(!evading&&Math.hypot(g.player.position.x-x,g.player.position.z-z)>2.5)break;
       }
@@ -549,7 +549,7 @@ export async function DriveFrontBattle(ctx){
         const shots0=tr?.log.shots.length??0,bursts0=tr?.brain?.telemetry.bursts.length??0;
         if(g.player.stance==="stand")g.Debug.Key("KeyC");
         for(let f=0;f<9*60&&g.player.alive&&r.tank.damageState==="MobilityKill";f++){
-          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          if(g.player.bleeding&&g.player.health<80||g.player.health<45&&(g.player.bandages||0)>0)g.Debug.Key("KeyB");
           // A tank escort walking up during the hold is answered like a player would (09-24 TankProbe run R: escort C
           // shot and bayoneted the crouched thrower from 1.8 m while the hold only watched the tank).
           const close=window.MissionInputDriver?.Target?.(8);

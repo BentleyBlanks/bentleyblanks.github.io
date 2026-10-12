@@ -368,7 +368,8 @@ node Taierzhuang1938/Script_FirstLevelLeaderGuideBrowserTest.mjs
   1.1 m/s 被拖着走完撤退线（腿仍在 `UpdateGuards`，写 `g.woundedAt`）。到安全区后刘文财数人 `FirstBatchCount`
   （「一个……三个……五个！」），接 `TankSpotted`：守军喊「战车……路那头是战车！」罗接「先把人接下来！」—— 取代旧 `TankHeard`。
 - **夺点后掷弹筒找准阵位**（`NestShells`）：夺点 `nestShellFirstS` 40 s 后每 10–16 s 一发落在 `FRONT_NEST_SHELL_AREA`（院内）
-  随机点，离玩家 ≥ 3.5 m、离小队 ≥ 2.5 m（`PickNestShellPoint`，12 次抽不到就这轮不落）；到 `tankAtBendExit` 或进 05 停。
+  随机点，离玩家 ≥ 3.5 m、离小队 ≥ 2.5 m（`PickNestShellPoint`，12 次抽不到就这轮不落）；只在 03 内、最多 `nestShellMax` 8 发
+  （第二轮连续实拍 9 发 100 s 命中 4 发 57 hp，坐机枪不动的驾驶器随后被 04 的车火打死）。
   炸、啸声、震屏走 `FireShell feedbackOnly`（不走 `Blast`），伤害是模块自己的**轻伤**（`LightShellHurt` / `HurtPlayer`，第二轮
   协调人口径）：离爆点 ≤ `shellHurtFullM` 3.5 m 扣 `shellHurtMaxHp` 18，到 `shellHurtM` 5.5 m 线性降到 `shellHurtMinHp` 12，
   再远不扣；**不开流血伤口**（`Player.TakeHit` 任何伤害都开伤口，第一轮 40 伤害九发把人流血至死），最低留 `shellHurtFloorHp`

@@ -550,7 +550,7 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
     suppressLevel:.3,suppressS:2,windowStaleS:45,woundedGuard:2,woundedDragMps:1.1,woundedDownS:1.5,
     gapSacrificeGuard:7,gapKillM:1.6,gapRunMaxS:9,gapKillShots:5,
     sapShellFirstS:8,sapShellEveryS:Object.freeze([8,14]),sapShellMax:4,sapShellPlayerClearM:6,sapShellHurtScale:0,
-    nestShellFirstS:40,nestShellEveryS:Object.freeze([10,16]),nestShellPlayerClearM:3.5,nestShellSquadClearM:2.5,nestShellHurtScale:1,
+    nestShellFirstS:40,nestShellEveryS:Object.freeze([10,16]),nestShellMax:8,nestShellPlayerClearM:3.5,nestShellSquadClearM:2.5,nestShellHurtScale:1,
     shellHurtM:5.5,shellHurtFullM:3.5,shellHurtMaxHp:18,shellHurtMinHp:12,shellHurtFloorHp:1,shellHurtSuppression:.5,
     // 04 gate nestFrontCleared: the men who climbed into the nest's front half are dead or back north of this z (the
     // berm crest line is -160.3); BundleOrder waits nestFrontOrderPauseS after it (Luo looks at the tank, the sap, a beat).
