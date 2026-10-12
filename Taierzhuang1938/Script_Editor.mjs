@@ -49,6 +49,7 @@ import { AiEditor } from "./Script_EditorAi.mjs";
 import { OrchestrationEditor } from "./Script_EditorOrchestration.mjs";
 import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
 import { TextureEditor } from "./Script_EditorTextures.mjs";
+import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
 import {
   GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings,
 } from "./Script_EditorSettings.mjs";
@@ -77,7 +78,8 @@ const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, Wor
 // 想的是「我要编关卡」，不是「我要调试」—— 所以按钮画进「编辑器」组。
 // 分两张表是为了让 this.entries 每个 id 只登记一次（同一个按钮画两遍就有两处开关）。
 const DEBUG_ENTRIES = OVERLAYS.filter((editor) => editor !== OrchestrationEditor);
-const EDITOR_ENTRIES = [...EDITORS, OrchestrationEditor, TextureEditor];
+// 白盒关卡编辑器同贴图管理一样只是一个跳转入口（整页换成 ?editor=blockout），不进互斥表。
+const EDITOR_ENTRIES = [...EDITORS, OrchestrationEditor, TextureEditor, BlockoutEntry];
 
 export class EditorSuite {
   /**
@@ -305,7 +307,8 @@ export class EditorSuite {
   RefreshStatus() {
     document.body.classList.toggle("edToolsOpen", this.panelOpen);
     for (const [id, button] of this.entries) {
-      button.classList.toggle("on", id === this.activeId || this.overlays.has(id));
+      button.classList.toggle("on", id === this.activeId || this.overlays.has(id)
+        || (id === BlockoutEntry.id && BlockoutEntry.Active()));
     }
     if (this.gear) this.gear.classList.toggle("on", this.Capturing);
     this.RefreshFpsToggle();
@@ -343,7 +346,7 @@ export class EditorSuite {
   }
 
   Toggle(id) {
-    if (id === TextureEditor.id) return this.Open(id);
+    if (id === TextureEditor.id || id === BlockoutEntry.id) return this.Open(id);
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
     if (this.activeId === id) this.Close();
     else this.Open(id);
@@ -383,6 +386,11 @@ export class EditorSuite {
   Open(id) {
     if (id === TextureEditor.id) {
       try { return TextureEditor.Open(); }
+      catch (error) { this.SetHint(error.message); return null; }
+    }
+    // 白盒关卡编辑器：整页跳到 ?editor=blockout；已经在里面就什么也不做（按钮亮着表示当前项）。
+    if (id === BlockoutEntry.id) {
+      try { return BlockoutEntry.Open(); }
       catch (error) { this.SetHint(error.message); return null; }
     }
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
