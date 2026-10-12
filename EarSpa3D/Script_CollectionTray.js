@@ -151,6 +151,7 @@ export function CreateCollectionTray({scene, tray, camera, Project, size, scoop,
   function Probe(){return{active,tilting,tilt,dragging:!!drag,exitHeight,count:pieces.filter(p=>!p.fall).length,mass:pieces.reduce((sum,p)=>sum+(p.fall?0:p.mass),0),removed,batches:batches.size,toolVisible:cleaner.visible,pieces:pieces.filter(p=>!p.fall).map(p=>({id:p.id,mass:p.mass,position:p.position.toArray(),screen:Project(group.localToWorld(p.position.clone()))}))};}
   function Clear(){for(const p of pieces){p.geometry.dispose();p.material.dispose();}pieces.length=0;serial=removed=exitHeight=0;SetActive(false);Rebuild();}
   return{Add,Begin,Move,End,SetTilt,SetActive,Update,Probe,Sync,
+    SurfaceAt(point,radius=0){Sync();const local=group.worldToLocal(point.clone()),wall=WallContact(local.x,local.z,radius);return{inside:wall.r<1,height:tray.position.y+.045+wall.lift,radius:wall.r};},
     Clear,Suspend(){const saved={pieces:pieces.splice(0),serial,removed,active,tilt};serial=removed=0;SetActive(false);Rebuild();return saved;},
     Restore(saved){Clear();pieces.push(...saved.pieces);serial=saved.serial;removed=saved.removed;active=saved.active;tilt=saved.tilt;tray.rotation.x=-tilt;Rebuild();Sync();},
     Dispose(){for(const p of pieces){p.geometry.dispose();p.material.dispose();}for(const b of batches.values()){b.mesh.geometry.dispose();b.mesh.material.dispose();}cleaner.traverse(n=>{n.geometry?.dispose();for(const m of Array.isArray(n.material)?n.material:n.material?[n.material]:[])m.dispose();});scene.remove(group,cleaner);}};
