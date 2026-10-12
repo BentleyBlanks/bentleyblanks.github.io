@@ -800,6 +800,11 @@ async function InstallSpeakerGlance(page){
     // every frame, 0.04 rad) is undone, so the player stops and looks, as a player does when someone talks to him.
     // The route bot lets go of W when it faces 0.65 rad off its corner. Shooting, dodging, melee and a manned gun win.
     function Glance(){
+      // A capture (CampaignKit.Capture) owns the view it asked for: no glance, and no glance state touched, until it is done.
+      // 2026-10-12 R3-Perf: the measured frame is a single-frame step, so a near line playing at FirstBatchSafe turned the
+      // view back from the breach to the speaker (glance.last) on exactly that frame -- 0.35-1.5 rad, the trench and its
+      // terrain tiles in the picture, 8.7-10.2 M triangles against 7.0-7.6 M on the asked-for view.
+      if(glance.paused)return;
       const r=g.Debug.FirstLevelMissionRuntime(),p=g.player;
       if(!r?.voice?.dialogue||!p.alive||g.state.cutscene||r.controls){glance.active=false;glance.saved=null;return;}
       // Only the 03–06 front scenes (FRONT_SCENE_IDS in FRONT_LINE_STAGES): the 02 opening's speakers are checked on

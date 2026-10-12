@@ -771,18 +771,16 @@ export function CampaignActions(ctx) {
   }
 
   async function Capture(name) {
-    const drift = await page.evaluate(() => {
-      const g = window.Tengxian, out = [];
-      for (let i = 0; i < 6; i++) {
-        const before = g.player.yaw;
-        g.StepFrames(1, 1 / 60, true);
-        const d = Math.atan2(Math.sin(g.player.yaw - before), Math.cos(g.player.yaw - before));
-        if (Math.abs(d) > .01) out.push({ i, d: +d.toFixed(3), melee: !!g.meleeCombat?.Active, pose: g.player.meleePose?.state || null,
-          control: g.Debug.FirstLevelMissionRuntime?.()?.controls?.kind || null, mounted: g.emplacement?.View?.()?.id || null });
-      }
-      return out;
+    // The speaker glance (CampaignOpening.InstallSpeakerGlance) turns the view on single-frame steps; the measured frame below is one,
+    // so a near line playing at a capture pointed the budget frame back at the speaker instead of the asked-for view (2026-10-12
+    // R3-Perf: FirstBatchSafe 8.7-10.2 M on the turned view, 7.0-7.6 M on the breach). Paused for the whole capture.
+    const view = await page.evaluate(() => {
+      const g = window.Tengxian;
+      if (g.speakerGlance) g.speakerGlance.paused = true;
+      const asked = { yaw: g.player.yaw, pitch: g.player.pitch };
+      g.StepFrames(6, 1 / 60, true);
+      return asked;
     });
-    if (drift.length) console.log("CAPTURE_DRIFT", name, JSON.stringify(drift));
     const render = await page.evaluate(() => {
       const g = window.Tengxian,
         info = g.renderer.info,
@@ -848,6 +846,7 @@ export function CampaignActions(ctx) {
       info.autoReset = reset;
       return result;
     });
+    render.asked = { yaw: +view.yaw.toFixed(2), pitch: +view.pitch.toFixed(2) };
     console.log("BUDGET", name, JSON.stringify(render));
     if(name==="MachineGun") {
       const timing=await page.evaluate(async()=>{
@@ -901,6 +900,7 @@ export function CampaignActions(ctx) {
         2,
       ),
     );
+    await page.evaluate(() => { const s = window.Tengxian.speakerGlance; if (s) s.paused = false; });
   }
 
   /**
