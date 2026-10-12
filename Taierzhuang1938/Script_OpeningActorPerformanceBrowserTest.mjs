@@ -125,6 +125,51 @@ try{
     assert.equal(receipt.idleProtected,false,"an idle melee state is not an attack");
   }
   console.log("ok freely controlled Luo/Zhou aim=1: audible-line head acting preserves hands, torso and weapon; idle melee is not protected");
+  // 2026-10-12 R4-Gates (03 TankHeard.02 «he visibly turns/nods», red 2 of 9 R3 drives): Luo on the aim, his face already on
+  // the listener, a line whose only stressed syllable comes before it has faded in. The stress nod then never shows and the
+  // gaze does not move, so the head moved by breathing only (0.017-0.022 rad). His head dips with his own mouth
+  // (Data_OpeningStoryboards.aimedTalk): a syllable envelope with no stress at all must still turn the head past the front
+  // gate's 0.03 rad, with the hands, torso and gun left on the native aim.
+  const mouthSpeech=await page.evaluate(()=>{
+    const p=window.openingActorPerformanceProbe,{T,api}=p,receipts=[];
+    for(const mouth of [false,true]){
+      const actor=p.g.actorFactory.Create("nra",{modelVariant:4,castId:"luo",weapon:"HanYang",seed:407});
+      const soldier={actor,id:"luo",alive:true};
+      const Read=()=>{actor.root.updateMatrixWorld(true);const b=actor.characterRig.bones;
+        return {head:b.head.getWorldQuaternion(new T.Quaternion()).normalize(),chest:b.chest.getWorldQuaternion(new T.Quaternion()).normalize(),
+          weapon:actor.weaponGroup.getWorldPosition(new T.Vector3())};};
+      const nativeUpdate=actor.Update;let before;
+      actor.Update=function(dt,state){const result=nativeUpdate.call(this,dt,state);before=Read();return result;};
+      api.InstallOpeningStoryboardAnimation(soldier);
+      // About five syllables a second, open 0.2-1.0 (the face tracks' range), no stress mark.
+      let clock=0;const facial=actor.characterRig.facial;
+      if(facial)facial.source=()=>({active:true,cue:"TankHeard",line:1,jaw:mouth?.2+.8*Math.max(0,Math.sin(clock*Math.PI*5)):0,wide:0,round:0,close:0,stress:0});
+      let head0=null,turn=0,body=0;
+      for(let frame=0;frame<180;frame++){
+        clock=frame/60;
+        // The listener straight ahead of his face: the gaze has nowhere to turn.
+        const head=actor.characterRig.bones.head.getWorldPosition(new T.Vector3());
+        const ahead=new T.Vector3(0,0,-3).applyQuaternion(actor.root.getWorldQuaternion(new T.Quaternion())).add(head);
+        api.SetOpeningActorPerformance(soldier,{role:"luo",phase:"Support",cue:"TankHeard",line:1,speaker:"luo",clock,lineSeconds:clock,lookAt:{x:ahead.x,y:ahead.y,z:ahead.z}});
+        actor.Update(1/60,{elapsed:2+clock,moveSpeed:0,aim:1});
+        const after=Read();
+        // The acting alone (what the layer adds on top of the native head this frame), so the native aim settling in does
+        // not count: its change from the first frames of the line.
+        const acting=before.head.clone().invert().multiply(after.head);
+        if(frame>=6){head0??=acting.clone();turn=Math.max(turn,acting.angleTo(head0));}
+        body=Math.max(body,before.chest.angleTo(after.chest),before.weapon.distanceTo(after.weapon));
+      }
+      receipts.push({mouth,facial:!!facial,turn,body,headOnly:!!actor.characterRig.openingActorPerformanceState?.headOnly});
+      api.ClearOpeningActorPerformance(soldier);actor.Dispose();
+    }
+    return receipts;
+  });
+  console.log("AIMED_MOUTH",JSON.stringify(mouthSpeech));
+  const [still,talking]=mouthSpeech;
+  assert.ok(talking.facial&&talking.headOnly,`Luo has a face and talks head-only on the aim (${JSON.stringify(talking)})`);
+  assert.ok(talking.turn>.03,`an aimed speaker whose gaze has nowhere to turn still visibly moves his head with his mouth (${talking.turn} rad; mouth shut ${still.turn})`);
+  assert.ok(talking.body<1e-5&&still.body<1e-5,`... with the torso and the gun left on the native aim (${talking.body})`);
+  console.log(`ok aimed Luo with no stress and no gaze to turn: the head moves ${talking.turn.toFixed(3)} rad with the mouth (${still.turn.toFixed(3)} with it shut)`);
   const seatedSpeech=await page.evaluate(()=>{
     const p=window.openingActorPerformanceProbe,{T,api}=p;
     const actor=p.g.actorFactory.Create("nra",{modelVariant:1,weapon:"HanYang",seed:407});
