@@ -9,8 +9,8 @@
 //   ① status：本机可写、版本号 = 盘上原始字节的 sha1、外来 Host 报不可写；
 //   ② 别的口没受影响：/__preview/ping、/__notes/status、/__tuning/status、静态读配置；
 //   ③ 保存：写对文件（2 空格缩进 + 末尾换行）、回新版本号、新建文件只认 revision: null；
-//   ④ 拒绝：坏 level / `..` / 超大 body / 坏配置 / GET / 错 Content-Type / 外来 Origin / 外来 Host /
-//      版本号不符……每一条之后盘上逐字节不变、没有 .tmp；
+//   ④ 拒绝：坏 level / `..` / 超大 body / 坏配置 / 嵌套 20 万层（服务不能挂）/ GET / 错 Content-Type /
+//      外来 Origin / 外来 Host / 版本号不符……每一条之后盘上逐字节不变、没有 .tmp；
 //   ⑤ 非回环 socket（--lan，Host 伪造成 127.0.0.1）也被拒；拿不到局域网地址时跳过；
 //   ⑥ 仓库里的 Blockout/ 在测试前后逐字节相同（端点只打临时目录）。
 //
@@ -318,6 +318,24 @@ try {
     await Expect("body 不是 JSON", 400, Save(port, null, { raw: "level=FirstLevel" }));
     await Expect("body 是数组", 400, Save(port, null, { raw: "[]" }));
 
+    // 嵌套极深（20 万层，约 0.4 MB）：JSON.parse 收得下；校验器不看的字段要到 JSON.stringify 才栈溢出，
+    // 校验器回显的字段（schema / side / kind）也不能整个 stringify。都得是 400 JSON，而且预览服务还活着
+    // （它同时在服务所有 worktree，带倒一次所有页面一起断）。payload 只能手拼：这边 stringify 一样会栈溢出。
+    const DEEP = `${"[".repeat(200000)}${"]".repeat(200000)}`;
+    const DeepBody = (doc) => `{"level":"FirstLevel","revision":${JSON.stringify(current)},"doc":${JSON.stringify(doc).replace('"__DEEP__"', DEEP)}}`;
+    const deepExtra = await Expect("doc 里多一个嵌套 20 万层的字段（校验器不看它）", 400,
+      Save(port, null, { raw: DeepBody({ ...goodDoc, extra: "__DEEP__" }) }));
+    Check(Array.isArray(deepExtra.json.details) && deepExtra.json.details.length > 0,
+      `嵌套太深也带 details：${JSON.stringify(deepExtra.json.details)}`);
+    await Expect("schema 是嵌套 20 万层的数组", 400, Save(port, null, { raw: DeepBody({ ...goodDoc, schema: "__DEEP__" }) }));
+    const deepUnit = Clone(goodDoc);
+    deepUnit.keyframes[0].units = [{ id: "deep", side: "__DEEP__", x: 0, z: 0 }];
+    await Expect("单位的 side 是嵌套 20 万层的数组", 400, Save(port, null, { raw: DeepBody(deepUnit) }));
+    const alive = await Request(port, { route: "/__preview/ping" });
+    Check(alive.status === 200 && alive.json?.app === "BlanksLocalPreview", `嵌套极深的请求之后预览服务还活着：/__preview/ping → ${alive.status}`);
+    const aliveStatus = await Request(port, { route: "/__blockout/status" });
+    Check(aliveStatus.json?.revisions?.FirstLevel === current, "之后 status 照常回、版本号没变");
+
     // 方法
     await Expect("GET 保存口", 405, Request(port, { route: "/__blockout/save" }));
     await Expect("PUT 保存口", 405, Request(port, {
@@ -360,7 +378,7 @@ try {
 
     Check(!fs.existsSync(path.join(serveProject, "Blockout", "ThirdLevel.json")) && !fs.existsSync(path.join(serveRoot, "x.json")),
       "被拒的 level 没有在任何地方建出文件");
-    console.log(`ok  ④ 拒绝：${cases.length} 种请求全被拒（坏 level / 超大 / 坏配置 / 方法 / Content-Type / Origin / Host / 版本号），`
+    console.log(`ok  ④ 拒绝：${cases.length} 种请求全被拒（坏 level / 超大 / 坏配置 / 嵌套太深 / 方法 / Content-Type / Origin / Host / 版本号），`
       + "每一条之后盘上逐字节不变、没有 .tmp");
   }
   await preview.Stop();

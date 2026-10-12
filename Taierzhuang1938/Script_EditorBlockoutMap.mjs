@@ -176,6 +176,7 @@ export class BlockoutMap {
     this.cursor = null;         // 全关总图上光标的世界坐标
     this.drag = null;
     this.repaintQueued = false;
+    this.fullDirty = false;     // 约过重画、之后还没真画过
     this.disposed = false;
     this.miniView = null;       // 最近一次小地图的视图（测试与调试用）
     this.lastMiniMs = 0;
@@ -264,7 +265,12 @@ export class BlockoutMap {
     this.RequestFullRepaint();
   }
 
-  /** @param {{player?:{x,z,yawDeg}, units?:Array, pois?:Array, next?:{x,z,text,radiusM}|null}} d */
+  /**
+   * 换动态层（玩家、单位、要点、下一步）。全关总图开着时自己约一次重画（同一帧合并成一次；
+   * 调用方紧接着自己 PaintFull 的话那次约好的就不再画；图关着时什么也不画）——
+   * 地图上点关键帧跳过去、过渡中单位在走，图保持打开也得跟着动。
+   * @param {{player?:{x,z,yawDeg}, units?:Array, pois?:Array, next?:{x,z,text,radiusM}|null}} d
+   */
   SetDynamic(d = {}) {
     this.dynamic = {
       player: d.player && Finite(d.player.x) && Finite(d.player.z) ? { x: d.player.x, z: d.player.z, yawDeg: d.player.yawDeg || 0 } : null,
@@ -272,6 +278,7 @@ export class BlockoutMap {
       pois: Array.isArray(d.pois) ? d.pois : [],
       next: d.next && Finite(d.next.x) && Finite(d.next.z) ? d.next : null,
     };
+    this.RequestFullRepaint();
   }
 
   /** arcs: true / "default"（数据给的 + 机枪战车）、"all"（再加举枪的步枪）、false / "off" */
@@ -581,6 +588,7 @@ export class BlockoutMap {
     this.PaintDynamic(ctx, view, { mini: false });
     this.PaintHoverTip(ctx, view);
     this.PaintChrome(ctx, view);
+    this.fullDirty = false;     // 画的就是最新的：之前约好的那次重画到点不用再画
     this.lastFullMs = Now() - t0;
   }
 
@@ -670,11 +678,17 @@ export class BlockoutMap {
     return best;
   }
 
+  /**
+   * 约下一帧重画全关总图：同一帧里约多少次都只画一次；约好之后调用方自己 PaintFull 了，到点就不再画；
+   * 全关总图从没打开过、或者现在藏着（clientWidth 为 0）时什么也不画。
+   */
   RequestFullRepaint() {
+    this.fullDirty = true;
     if (this.repaintQueued || !this.full.canvas || this.disposed) return;
     this.repaintQueued = true;
     const Go = () => {
       this.repaintQueued = false;
+      if (!this.fullDirty) return;
       if (!this.disposed && this.full.canvas && this.full.canvas.isConnected && this.full.canvas.clientWidth > 0) this.PaintFull(this.full.canvas);
     };
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(Go); else setTimeout(Go, 16);
@@ -977,7 +991,8 @@ export class BlockoutMap {
 
   ArcFor(u, mode) {
     let arc = u.arc && Finite(u.arc.halfDeg) && Finite(u.arc.rangeM) ? u.arc : null;
-    if (!arc && mode === "all") arc = DefaultArc(u, "all");
+    // 数据没给射界（或没经过 NormalizeBlockout）时按 §5.3 补：机枪、战车两档都画，举枪的步枪只在「全部」里画。
+    if (!arc) arc = DefaultArc(u, mode);
     if (!arc) return null;
     // 缺省射界跟着人现在的朝向走（过渡中会转身）；数据给了中心朝向的按数据。
     const yawDeg = arc.source === "default" || !Finite(arc.yawDeg) ? u.yawDeg : arc.yawDeg;

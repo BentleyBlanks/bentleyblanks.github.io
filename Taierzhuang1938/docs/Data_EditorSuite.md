@@ -617,18 +617,39 @@ WASD / 开火 / 换弹照旧）和按关键帧摆的敌我单位；没有任务�
 （不重建场景），状态点蓝闪并提示。
 
 存盘只有一个操作「记下当前机位」：把玩家当前的位置、朝向、姿态写进当前关键帧，再整份存回。
-本机预览（localhost / 127.0.0.1）下先问 `GET /__blockout/status`，可写才 `POST /__blockout/save`；
-服务端过校验、比版本号，文件在编辑器外被改过会被拒（先重新读取再存）。写不了时（Pages、测试服、
-局域网、旧的预览进程）存进 `localStorage["tengxian1938_blockout_<Level>"]` 并提供下载 JSON，
-界面上写明原因。场景文件不开放写。
+本机预览（localhost / 127.0.0.1 打开的页面）下先问 `GET /__blockout/status`（只收 GET / HEAD），回
+`{ writable, root, revisions, reason? }`：`revisions` 是各关配置文件**原始字节**的 sha1（文件不在是 `null`），
+不可写时 `reason` 写原因。可写才 `POST /__blockout/save`，body `{ level, doc, revision }`：
+
+- `revision` 必填，填编辑器**读配置时**按响应原始字节算的 sha1（工作区是 CRLF 也照原样算），意思是「我改的是这一版」；
+  文件还不存在时才写 `null`。不要拿 status 当下报的版本号来填 —— 那会把外部刚改的内容悄悄盖掉。
+- `doc.level` 必须等于 `level`。服务端过 `ValidateBlockout` 后写成 `JSON.stringify(doc, null, 2)` + 换行（LF），
+  先写 `.tmp` 再改名。成功回 200 `{ ok, level, file, revision, warnings }`，下一次保存用回来的 `revision`。
+- 版本号对不上回 409 并带上盘上当前的 `revision`：文件在编辑器外被人或 AI 改过。等 2 s 同步（或 `Reload()`）
+  读到新内容后再记一次，不要直接拿 409 里的版本号重发。
+- 其他拒绝：方法不对 405；不是本机、Host / Origin 不对、level 不在名单里 403；Content-Type 不是
+  `application/json` 415；超过 4 MB 413；坏 JSON、校验不过、嵌套太深 400（带 `details`）；写盘失败 500。
+  任何拒绝都不落一个字节。
+
+写不了时（Pages、测试服、局域网、旧的预览进程）存进 `localStorage["tengxian1938_blockout_<Level>"]` 并提供
+下载 JSON，界面上写明原因。场景文件不开放写。
 
 `window.Tengxian.Debug.Blockout`（测试与 agent 用）：`State()`、`GoTo(idOrIndex, { animate })`、
 `Next()`、`Prev()`、`Replay()`、`SwitchLevel(key)`、`Reload()`、`Units()`、`ToggleMap(open?)`、
 `SetLayers(partial)`、`Config()`。`GoTo` 等过渡结束、`SwitchLevel` 等新关卡和配置都就绪才 resolve。
 
-命令行 `node Taierzhuang1938/Script_EditorBlockoutCli.mjs <子命令>`（纯 node）：`export`
-从游戏数据生成第一关配置（`export FirstLevel`）、`scene` 生成第二关草稿场景、`validate` 校验配置与
-场景文件、`summary` 列出关键帧、`kf` 打印一个关键帧。参数见脚本文件头注。
+命令行（纯 node，从 worktree 根跑）：
+
+```
+node Taierzhuang1938/Script_EditorBlockoutCli.mjs export FirstLevel [--out=<path>] [--force]   从游戏数据生成第一关配置
+node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene SecondLevel [--force]                  生成第二关草稿场景与占位配置
+node Taierzhuang1938/Script_EditorBlockoutCli.mjs validate [FirstLevel|SecondLevel|all]        校验配置与场景文件（缺省 all）
+node Taierzhuang1938/Script_EditorBlockoutCli.mjs summary [Level]                              每个关键帧一行：机位、各阵营人数、推测、POI、警告
+node Taierzhuang1938/Script_EditorBlockoutCli.mjs kf <Level> <id>                              看一个关键帧的全部单位与 POI
+```
+
+`export` / `scene` 默认不覆盖已有文件（可能刚被人或 AI 改过），确认要覆盖再加 `--force`；
+`--commit=<sha>` / `--generated-at=<ISO>` 写进 `source`（缺省 git HEAD / 现在）。不带子命令运行打印用法。
 
 冒烟：`node Taierzhuang1938/Script_EditorBlockoutConfigTest.mjs`（数据与生成器）、
 `node Taierzhuang1938/Script_EditorBlockoutSaveTest.mjs`（存档口，真起一次本地预览）、
