@@ -396,8 +396,18 @@ function CreateServer(rootDir, context) {
 
     // 白盒关卡编辑器的配置存档口，同样排在 405 闸之前。读配置不走端点
     // （编辑器直接 fetch ./Blockout/<Level>.json），status 只报能不能写与各关的版本号。
-    if (route === "/__blockout/status") { SendBlockoutStatus(request, response, rootDir); return; }
-    if (route === "/__blockout/save") { await HandleBlockoutSave(request, response, rootDir); return; }
+    // 外面再兜一层：这个口收的是任意 JSON，处理里漏掉的异常一律回 500 JSON，不让它冒出回调带倒整个进程。
+    if (route === "/__blockout/status" || route === "/__blockout/save") {
+      try {
+        if (route === "/__blockout/status") SendBlockoutStatus(request, response, rootDir);
+        else await HandleBlockoutSave(request, response, rootDir);
+      } catch (error) {
+        console.error(`  ${route} 出错：${error?.stack || error}`);
+        if (!response.headersSent) SendJson(response, 500, { ok: false, error: `存档口内部出错：${String(error?.message || error).slice(0, 200)}` });
+        else if (!response.writableEnded) response.end();
+      }
+      return;
+    }
 
     if (request.method !== "GET" && request.method !== "HEAD") { response.writeHead(405).end(); return; }
     const filePath = path.join(rootDir, route);
@@ -635,7 +645,9 @@ async function HandleNotesSave(request, response, rootDir) {
 //   ③ body ≤ 4 MB；
 //   ④ level 只认 BLOCKOUT_LEVEL_KEYS，拼出的路径再过 BLOCKOUT_CONFIG_FILE_RE，解析后必须在根之下；
 //   ⑤ ValidateBlockout 不过 → 400 + details；配置里的 level 与请求的不一致 → 400；
-//   ⑥ revision = 盘上原始字节的 sha1，对不上 → 409（编辑器开着时文件被人或 AI 改过）。
+//      嵌套太深、校验或 JSON.stringify 抛错 → 400 + details（不让异常冒出回调带倒进程）；
+//   ⑥ revision = 客户端读配置时那份原始字节的 sha1（不是 status 当下报的那个），与盘上原始字节的
+//      sha1 对不上 → 409 + 当前 revision（编辑器开着时文件被人或 AI 改过：先重新读取再存）。
 //      null 只在文件还不存在时成立；不带 revision 一律 400，不给「盲写覆盖」留口子。
 // 任何拒绝都不落一个字节。读完 body 之后的校验、比版本、写盘全是同步的，同一进程里两次保存不会交错。
 // 场景文件（<Level>.scene.json）v1 不开放写。
@@ -704,9 +716,22 @@ async function HandleBlockoutSave(request, response, rootDir) {
     Reject(400, "revision 要是上次读到的版本号（文件还不存在时写 null）");
     return;
   }
-  const check = ValidateBlockout(doc);
-  if (!check.ok) { Reject(400, "配置不合规", { details: check.errors, warnings: check.warnings }); return; }
-  if (doc.level !== level) { Reject(400, `配置里的 level 是 ${doc.level}，和请求的 ${level} 不是一回事`); return; }
+  // 校验 → 比 level → 序列化放在一个 try 里：JSON.parse 收得下几十万层的嵌套，
+  // 校验器不认识的字段又不看，到 JSON.stringify 才栈溢出（RangeError）。这里不接住的话，
+  // 异常会冒出 http 回调、带倒整个预览服务（它同时在服务所有 worktree）。
+  let check;
+  let text;
+  try {
+    check = ValidateBlockout(doc);
+    if (!check.ok) { Reject(400, "配置不合规", { details: check.errors, warnings: check.warnings }); return; }
+    if (doc.level !== level) { Reject(400, `配置里的 level 是 ${doc.level}，和请求的 ${level} 不是一回事`); return; }
+    text = `${JSON.stringify(doc, null, 2)}\n`;
+  } catch (error) {
+    Reject(400, "配置没法校验或写回（多半是嵌套太深）", {
+      details: [`${error?.name || "Error"}：${String(error?.message || error).slice(0, 200)}`],
+    });
+    return;
+  }
 
   let current;
   try { current = BlockoutRevision(filePath); } catch (error) { Reject(500, String(error?.message || error)); return; }
@@ -716,7 +741,6 @@ async function HandleBlockoutSave(request, response, rootDir) {
     return;
   }
 
-  const text = `${JSON.stringify(doc, null, 2)}\n`;
   try {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     WriteAtomic(filePath, text);
@@ -809,8 +833,9 @@ const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127
   { level: "FirstLevel", notes: [...], images: { "n_20260918_101500_ab12.png": "data:image/png;base64,…" } }
   逐条过 ValidateNote 后写 Taierzhuang1938/Notes/<Level>/notes.json 与同目录 PNG（单张 ≤ 1.5 MB，原子写）。
 白盒关卡配置保存口（白盒关卡编辑器，只在本机 localhost / 127.0.0.1 上可写）：GET /__blockout/status；POST /__blockout/save
-  { level: "FirstLevel", doc: {...}, revision: "<status 里那一关的 sha1，文件还不存在时写 null>" }
-  过 ValidateBlockout 后原子写 Taierzhuang1938/Blockout/<Level>.json（body ≤ 4 MB）；版本号对不上回 409，任何拒绝都不落盘。`;
+  { level: "FirstLevel", doc: {...}, revision: "<读配置时那份原始字节的 sha1；必填，文件还不存在时写 null>" }
+  过 ValidateBlockout 后原子写 Taierzhuang1938/Blockout/<Level>.json（body ≤ 4 MB）；版本号对不上回 409（带当前版本号，
+  先重新读取再存），坏 JSON / 校验不过 / 嵌套太深回 400，任何拒绝都不落盘。`;
 
 async function Main() {
   const args = process.argv.slice(2);
