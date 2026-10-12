@@ -245,6 +245,8 @@
 
 请求合计：定妆 9（geng 7 + peasant 2）、PerLine 15、整段 13 + 桥头 2、叫声 4。
 
+**门禁与实机（2026-10-12）**：`Script_FirstLevelVoiceTest --audio`（51 场 159 句 + 整段 80 条全部逐条解码、哈希 / 提示词 / 参考音 sha 对上、切点 / 电平 / 嗓子 / 字错率核对记录）、`Script_CharacterSpeechTest`（239 条口型轨，`SouthWhisper` 不再 stale）、`Script_FirstLevelMissionTest`、`Script_MissionGatesTest`、`Script_FirstLevelGengFamilyTest` 全绿。实机三趟（`Script_FirstLevelMissionBrowserTest.mjs`，`--mute-audio` 无头）：① `--campaign --audio --stage-from=3 --stage-to=7 --budget=report` 03→07 真输入走完（Support 244 s / MachineGun 85 s / Tank 213 s / Orders 48 s / South 151 s，0 页面错误），`FRONT_LINES` 记到新切句逐句真播（`FrontObservation` 354 帧、`FirstBatchCount`、`TankSpotted`、`TankRoadContact` 141 / 120、`GapGuardDown` 77、`BundleOrder` 379 / 229 / 87 / 122、`BundleGo` 191 / 155、`BundleFound` 42 / 101、`BundleBrief` 151 / 225 帧各挂在说话人头上），06 `NierShells` 说了、妮儿捡了 9 颗弹壳后跟队，07 沟口 contact / suppressed / flank 三个事实都到（`MouthContact` / `MouthGo` / `MouthFlank` 的触发点）；② `--campaign --stage-jumps --stage-from=8 --stage-to=11 --audio --budget=report` 8→11 真走完（Village 88 s / Melee 15.5 s / Courtyard 97 s / TransferApproach 55 s / Transfer 29 s，0 页面错误），`GENG_HOUSE` 一巴掌那一下妮儿叫的是 `voice.nier_shout_02`（`{"name":"nier_shout","why":"slapped"}`），`ASK_GENG` 按 F 问了老耿；③ `--audio`（从 01 开机）`CheckVoiceAssets`：131 条 cue、239 个播放键（51 场逐句 + 80 条整段）在真 AudioContext 里全部解码并创建了播放源（`_shots/FirstLevelMission/Data_VoicePlayback.json`，新 cue 的时长与清单一致），0 条不可播。**听不出来的事**仍要人耳定：老耿的鲁南口音像不像（北方官话只是占位）、`SouthWhisper` 幺娃三句气声是不是幺娃、`BundleFound.01` 压嗓的三个字、两条叫声像不像十一岁的聋女孩。整帧预算 03 机位 > 9 M 是既有基线红（`--budget=report` 只报不断言）。
+
 ## 1. 一句话口径（旧整段格式：07–18 与待下线的 09.21 旧 cue）
 
 - 一段连续多人对白 = **一个 cue = 一次 SeedAudio 请求 = 一条 mp3**。动作打断处不拆音频，在提示词里写明停顿时长让模型留空当，再用 `VoiceTiming` 的事件把动作对上去。
