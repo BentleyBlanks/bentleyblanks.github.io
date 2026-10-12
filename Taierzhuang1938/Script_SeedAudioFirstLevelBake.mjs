@@ -43,7 +43,7 @@ import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner
 import { PROJECTION_DB, LINE_MASTER, LineDirection, FIRST_LEVEL_DIALOGUE_DIRECTION } from "./Data_FirstLevelDialogueDirection.mjs";
 import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, Pool, requestStats,
   SEED_AUDIO_MODEL, MasterSceneWav, EncodeSegment, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines, TruePeakDb, StripLaughter,
-  IsolatedBursts, MuteRanges }
+  IsolatedBursts, MuteRanges, PitchShiftWav, EncodeLevelMatched, LoopSpan, PITCH_SHIFT_METHOD }
   from "./Script_SeedAudioVoiceKit.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url)),
@@ -232,7 +232,13 @@ function SceneUpToDate(cue, manifest) {
     && entry.castKey === SceneReferences(cue).map((r) => r.sha256).join(",")
     && fs.existsSync(path.join(out, cue.file)) && cue.lines.every((line) => fs.existsSync(path.join(out, line.file)))
     && cue.lines.every((line, i) => manifest.lines?.[line.id]?.source === "patch"
-      || (manifest.lines?.[line.id]?.tempo ?? 1) === (LineDirection(cue, i).tempo ?? 1));
+      || ((manifest.lines?.[line.id]?.tempo ?? 1) === (LineDirection(cue, i).tempo ?? 1) && SameCut(manifest.lines?.[line.id], cue, i)));
+}
+
+/** 切句时的变调（pitchShift）与循环句首尾（loop）和导演表一致：改了导演表这两项，切好的片段作废、重切（不用重新生成）。 */
+function SameCut(s, cue, i) {
+  const d = LineDirection(cue, i);
+  return (s?.pitchShift?.semitones ?? 0) === (d.pitchShift?.semitones ?? 0) && !!s?.loop === !!d.loop;
 }
 
 /** 生成一次整段。 */
@@ -324,9 +330,17 @@ function Cut(cue, n) {
         flags.push(`逐字时间戳不可信（${tooFast ? "字速过快" : "切出过短的片段"}），改按静音与预计时长切`);
       } else hard.push("逐字时间戳不可信，静音段也不够切");
     }
+    // 导演循环播放的句子（loop）：首尾都退到静音里、各淡 loopFadeS（2026-10-12 R4-Voice CaptiveHowl 接缝）；邻句间隔跟着重算。
+    slices.forEach((s, i) => {
+      if (!LineDirection(cue, i).loop) return;
+      const span = LoopSpan(framesInfo, s, { activeRmsDb: measure.activeRmsDb, fadeS: LINE_MASTER.loopFadeS,
+        minS: i ? slices[i - 1].endS : 0, maxS: i + 1 < slices.length ? slices[i + 1].startS : framesInfo.seconds });
+      Object.assign(s, { startS: span.startS, endS: span.endS, edgeDb: span.edgeDb,
+        loop: { fadeS: LINE_MASTER.loopFadeS, ...(span.cutTailS ? { cutTailS: span.cutTailS } : {}), ...(span.cutHeadS ? { cutHeadS: span.cutHeadS } : {}) } });
+    });
+    slices.forEach((s, i) => { s.gapBeforeS = i ? +(s.startS - slices[i - 1].endS).toFixed(3) : 0; });
     const sceneMp3 = EncodeSegment(wav, path.join(dir, "scene.mp3"), { fadeS: 0 });
-    files = slices.map((s, i) => EncodeSegment(wav, path.join(dir, `line_${String(i + 1).padStart(2, "0")}.mp3`),
-      { startS: s.startS, endS: s.endS, fadeS: LINE_MASTER.crossfadeS, tempo: LineDirection(cue, i).tempo ?? 1 }));
+    files = slices.map((s, i) => EncodeLine(cue, i, s, wav, path.join(dir, `line_${String(i + 1).padStart(2, "0")}.mp3`)));
     const peaks = [sceneMp3, ...files].map(TruePeakDb);
     const worst = Math.max(...peaks);
     master.measure = { ...measure, truePeakDb: +peaks[0].toFixed(2) };
@@ -348,6 +362,24 @@ function Cut(cue, n) {
     s.coverage = mapped[i].coverage;
   });
   return { cue, n, hard, flags, mapped, slices, master, sceneFile: path.join(dir, "scene.mp3") };
+}
+
+/**
+ * 编一句切片：缺省就是整段母带 wav 的 [startS, endS]（两头 crossfadeS，循环句 loopFadeS）。导演表写了 pitchShift 的句子
+ * （2026-10-12 R4-Voice CaptiveWoundTwist）从整段保共振峰变调后的 wav 上切同一段，电平补回不变调那一片（片段不单独归一的
+ * 口径不破：补的只是 rubberband 吃掉的那几 dB），s.pitchShift 记半音数、方法、补的增益与渲染延迟。
+ */
+function EncodeLine(cue, i, s, wav, output) {
+  const d = LineDirection(cue, i);
+  const options = { startS: s.startS, endS: s.endS, fadeS: d.loop ? LINE_MASTER.loopFadeS : LINE_MASTER.crossfadeS, tempo: d.tempo ?? 1 };
+  EncodeSegment(wav, output, options);
+  if (!d.pitchShift) return output;
+  const plain = MeasureVoice(output).activeRmsDb, shifted = output.replace(/\.mp3$/, `.pitch${d.pitchShift.semitones}.wav`);
+  const { lagS } = PitchShiftWav(wav, shifted, d.pitchShift.semitones);
+  const { gainDb } = EncodeLevelMatched(shifted, output, options, plain);
+  fs.rmSync(shifted, { force: true });
+  s.pitchShift = { semitones: d.pitchShift.semitones, method: PITCH_SHIFT_METHOD, gainDb, lagS, plainActiveRmsDb: plain };
+  return output;
 }
 
 /** 一批生成一起打分：一次 whisper、一次音色编码（各自起一次 python）。 */
@@ -473,7 +505,7 @@ async function BakeScenes(manifest) {
   for (const cue of pending) for (const n of ValidAttempts(cue)) {
     const judged = ReadJson(path.join(AttemptDir(cue, n), "judge.json"));
     // 导演表的 tempo 改过：切好的片段作废，重切重打分（不用重新生成）。
-    const sameTempo = judged?.lines?.every((s, i) => (s.tempo ?? 1) === (LineDirection(cue, i).tempo ?? 1)) ?? true;
+    const sameTempo = judged?.lines?.every((s, i) => (s.tempo ?? 1) === (LineDirection(cue, i).tempo ?? 1) && SameCut(s, cue, i)) ?? true;
     if (judged && sameTempo && !rescore && fs.existsSync(path.join(AttemptDir(cue, n), "scene.wav"))) {
       results.push({ cue, n, hard: judged.hard, flags: judged.flags, master: judged.master, cached: true,
         slices: judged.lines?.map((s, i) => ({ ...s, file: path.join(AttemptDir(cue, n), `line_${String(i + 1).padStart(2, "0")}.mp3`) })) || null,
@@ -532,7 +564,7 @@ function Install(cue, best, all, manifestLines, scenes, timings, manifest, picke
       seconds: s.measure.seconds, bytes: fs.statSync(target).size, sha256, source: "scene",
       sceneSha256: sceneSha, sceneStartS: s.startS, sceneEndS: s.endS, gapBeforeS: s.gapBeforeS,
       tight: [!!s.tightStart, !!s.tightEnd], edgeDb: s.edgeDb, cutMethod: best.master.cutMethod || "subtitle",
-      ...(s.tempo ? { tempo: s.tempo } : {}),
+      ...(s.tempo ? { tempo: s.tempo } : {}), ...(s.pitchShift ? { pitchShift: s.pitchShift } : {}), ...(s.loop ? { loop: s.loop } : {}),
       castOwner: own?.owner || CastVoiceOwner(SceneVoice(cue, line.who)), castSha256: own?.sha256 || null, referenced: RefIndex(refs, line.who) >= 0,
       metrics: { activeRmsDb: s.measure.activeRmsDb, truePeakDb: s.measure.truePeakDb, snrDb: s.measure.snrDb,
         voicedS: s.measure.voicedS, lowShare: s.measure.lowShare, f0: s.measure.f0, cer: s.cer, transcript: s.transcript,
@@ -647,6 +679,48 @@ function CutSpanTake(spanRaw, raw, plan, cue, subtitle) {
     span: { startS: +startS.toFixed(3), endS: endS != null ? +endS.toFixed(3) : null, lines: mapped.map((x) => ({ start: x.start, end: x.end, coverage: x.coverage })) } };
 }
 
+/**
+ * --remaster 循环句 / 变调句（导演表 loop / pitchShift，2026-10-12 R4-Voice）：整段母带 wav 不在这个工作区时，拿装上的整段 mp3
+ * 解码重切这一句（不发请求）。loop：首尾退到静音里、各淡 loopFadeS；pitchShift：从整段保共振峰变调后的 wav 上切同一段。
+ * 电平：变调句对回原清单值（不变调那一片的有声段电平），循环句对回整段 mp3 解码出来的同一段（只补多编那一遍的 0.45 dB）。
+ * 结果挂在 job.reslice，由 PatchLines 后面统一转写、量嗓子、装上。
+ */
+function ResliceFromScene(job, entry, d, manifest) {
+  const sceneFile = path.join(out, job.cue.file), wav = path.join(patchWork, `${job.line.id}_scene.wav`);
+  const decoded = spawnSync(process.env.FFMPEG || "ffmpeg", ["-y", "-v", "error", "-i", sceneFile, "-ac", "1", "-ar", "44100", "-c:a", "pcm_f32le", wav],
+    { encoding: "utf8", windowsHide: true });
+  if (decoded.status !== 0) throw new Error(`--remaster ${job.line.id}: 解不开整段 ${decoded.stderr?.slice(0, 160)}`);
+  const framesInfo = FrameRms(wav), activeRmsDb = MeasureVoice(wav).activeRmsDb, lines = job.cue.lines;
+  const prev = job.index ? manifest.lines[lines[job.index - 1].id] : null, next = job.index + 1 < lines.length ? manifest.lines[lines[job.index + 1].id] : null;
+  let span = { startS: entry.sceneStartS, endS: entry.sceneEndS, edgeDb: entry.edgeDb }, loop = null;
+  if (d.loop) {
+    span = LoopSpan(framesInfo, span, { activeRmsDb, fadeS: LINE_MASTER.loopFadeS, minS: prev?.sceneEndS ?? 0, maxS: next?.sceneStartS ?? framesInfo.seconds });
+    loop = { fadeS: LINE_MASTER.loopFadeS, ...(span.cutTailS ? { cutTailS: span.cutTailS } : {}), ...(span.cutHeadS ? { cutHeadS: span.cutHeadS } : {}) };
+  }
+  const options = { startS: span.startS, endS: span.endS, fadeS: d.loop ? LINE_MASTER.loopFadeS : LINE_MASTER.crossfadeS, tempo: d.tempo ?? 1 };
+  job.file = path.join(patchWork, `${job.line.id}_reslice.mp3`);
+  let targetDb = entry.metrics.activeRmsDb, source = wav, pitchShift = null;
+  if (!d.pitchShift) {
+    // 不编码的同一段（两头同样淡）当电平基准：多出来的这一遍 96k 编码的损失补回来，片段仍是整段里那一段。
+    const ref = path.join(patchWork, `${job.line.id}_reslice.ref.wav`);
+    const fade = options.fadeS > 0 ? `,afade=t=in:d=${options.fadeS},areverse,afade=t=in:d=${options.fadeS},areverse` : "";
+    const rendered = spawnSync(process.env.FFMPEG || "ffmpeg", ["-y", "-v", "error", "-i", wav, "-af",
+      `atrim=start=${options.startS.toFixed(4)}:end=${options.endS.toFixed(4)},asetpts=PTS-STARTPTS${fade}`, "-c:a", "pcm_f32le", ref], { encoding: "utf8", windowsHide: true });
+    if (rendered.status !== 0) throw new Error(`--remaster ${job.line.id}: ${rendered.stderr?.slice(0, 160)}`);
+    targetDb = MeasureVoice(ref).activeRmsDb;
+    fs.rmSync(ref, { force: true });
+  } else {
+    source = path.join(patchWork, `${job.line.id}_scene.pitch${d.pitchShift.semitones}.wav`);
+    pitchShift = { semitones: d.pitchShift.semitones, method: PITCH_SHIFT_METHOD, lagS: PitchShiftWav(wav, source, d.pitchShift.semitones).lagS };
+  }
+  const level = EncodeLevelMatched(source, job.file, options, targetDb);
+  if (pitchShift) Object.assign(pitchShift, { gainDb: level.gainDb, targetDb, fromF0Hz: entry.metrics.f0?.median ?? null });
+  const why = [d.pitchShift ? `基频中位 ${entry.metrics.f0?.median} Hz 不在导演表 f0Hz ${d.f0Hz?.join("–")} Hz，保共振峰变 ${d.pitchShift.semitones} 半音、电平对回原清单值 ${targetDb} dBFS` : "",
+    d.loop ? `导演循环播放：首尾退到静音里、各淡 ${LINE_MASTER.loopFadeS} s${loop?.cutTailS ? `（片尾 ${loop.cutTailS.join("–")} s 是被截断的半声，切掉）` : ""}` : ""].filter(Boolean).join("；");
+  job.reslice = { startS: span.startS, endS: span.endS, edgeDb: span.edgeDb, pitchShift, loop, why };
+  console.log(`${job.line.id}: 重切 ${span.startS}–${span.endS} s（原 ${entry.sceneStartS}–${entry.sceneEndS}）${pitchShift ? `，变调 ${pitchShift.semitones} 半音 补 ${level.gainDb} dB` : ""} → ${level.activeRmsDb} dBFS`);
+}
+
 async function PatchLines(manifest) {
   if (!patchLines.length && !remasterLines.length) return;
   fs.mkdirSync(patchWork, { recursive: true });
@@ -664,6 +738,8 @@ async function PatchLines(manifest) {
   const sliceJobs = jobsList.filter((j) => j.slice);
   for (const job of sliceJobs) {
     const entry = manifest.lines[job.line.id], file = path.join(out, entry.file);
+    const d = LineDirection(job.cue, job.index);
+    if (d.pitchShift || d.loop) { ResliceFromScene(job, entry, d, manifest); continue; }
     const chars = (timings[entry.sha256]?.chars || []).filter(([, a, b]) => b >= a);
     if (!chars.length) throw new Error(`--remaster ${job.line.id}: 没有逐字时间，找不到首字 / 末字`);
     const bursts = IsolatedBursts(file, { speechStartS: chars[0][1], speechEndS: chars.at(-1)[2] });
@@ -766,6 +842,24 @@ async function PatchLines(manifest) {
     const sha256 = Sha256(target), m = MeasureVoice(target);
     const timing = timings[oldSha];
     delete timings[oldSha];
+    if (job.reslice) {
+      const r = job.reslice, moved = entry.sceneStartS - r.startS, len = r.endS - r.startS;
+      timings[sha256] = { ...timing, seconds: m.seconds,
+        chars: timing.chars.map(([c, a, b]) => [c, +Math.min(len, Math.max(0, a + moved)).toFixed(3), +Math.min(len, Math.max(0, b + moved)).toFixed(3)]) };
+      const lines = job.cue.lines, next = job.index + 1 < lines.length ? manifest.lines[lines[job.index + 1].id] : null;
+      if (next) next.gapBeforeS = +(next.sceneStartS - r.endS).toFixed(3);
+      const prev = job.index ? manifest.lines[lines[job.index - 1].id] : null;
+      delete entry.pitchShift; delete entry.loop;
+      Object.assign(entry, { sha256, bytes: fs.statSync(target).size, seconds: m.seconds, sceneStartS: r.startS, sceneEndS: r.endS,
+        gapBeforeS: prev ? +(r.startS - prev.sceneEndS).toFixed(3) : 0, edgeDb: r.edgeDb,
+        ...(r.pitchShift ? { pitchShift: r.pitchShift } : {}), ...(r.loop ? { loop: r.loop } : {}),
+        resliced: { fromSha256: oldSha, from: "installed scene mp3", why: r.why },
+        metrics: { ...entry.metrics, activeRmsDb: m.activeRmsDb, truePeakDb: +TruePeakDb(target).toFixed(2), snrDb: m.snrDb, voicedS: m.voicedS,
+          lowShare: m.lowShare, f0: m.f0, cer: job.cer, transcript: job.transcript, speakerCos: job.speakerCos, nearestOther: job.nearestOther,
+          referencedOther: job.referencedOther } });
+      console.log(`${job.line.id}: resliced ${oldSha.slice(0, 8)} → ${sha256.slice(0, 8)} ${r.startS}–${r.endS} s rms ${m.activeRmsDb} f0 ${m.f0.median} cos ${job.speakerCos} cer ${job.cer} 「${job.transcript}」`);
+      continue;
+    }
     timings[sha256] = { ...timing, seconds: m.seconds };
     Object.assign(entry, { sha256, bytes: fs.statSync(target).size, seconds: m.seconds,
       remastered: { fromSha256: oldSha, muted: job.muted, gainDb: job.gainDb,

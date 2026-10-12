@@ -22,6 +22,11 @@
 //      patch           单句补录（--patch）专用，不进整段提示词（2026-10-12 R3-Voice）：
 //                        delivery  补录时换用的表演说明      refLines ["NN"]  本人本场这几句装上的片段一起当参考音（@音频2…，对准嗓子）
 //                        span ["NN","MM"]  把这几句当一场小戏一次生成、只取这一句      masterDb  补录的目标电平（缺省对齐整段里原来那一片）
+//      pitchShift      { semitones }：切句时把这一片保共振峰变调（rubberband formant=preserved，时长不变，不用 asetrate；不进提示词）。
+//                      重录多次基频都压不进 f0Hz 时才用；电平补回不变调那一片，清单 lines[id].pitchShift 记半音数、方法与补的增益，
+//                      写了它就必须写 f0Hz（门禁核变调后的基频中位在范围里）。2026-10-12 R4-Voice CaptiveWoundTwist
+//      loop            true：导演循环播放的句子。切句时首尾都退到静音里（片尾截在一声中间就退到那一声起头之前），两头各淡
+//                      LINE_MASTER.loopFadeS；清单 lines[id].loop 记下（不进提示词）。2026-10-12 R4-Voice CaptiveHowl
 //
 //   2. 播放时的**少量覆盖**。缺省一律沿用整段录音里的原始间隔（清单 lines[id].gapBeforeS，模型一次演出来的
 //      轮替节奏），只有稿里要等动作、被打断、压尾音的地方才写：
@@ -45,8 +50,9 @@ import { FIRST_LEVEL_VOICE_CAST } from "./Data_FirstLevelVoiceCast.mjs";
 
 /** 音量档的有声段 RMS（dBFS）。整段母带的目标 = 本场各句按字数加权的平均档位（整段只拉一次电平）。 */
 export const PROJECTION_DB = Object.freeze({ shout: -16, normal: -19, low: -23, breath: -27 });
-/** 真峰值上限（dBTP）与切句时句首句尾保留的静音（秒）；两句贴得比 2×padS 还紧时在能量最低点切、各 10 ms 淡入淡出。 */
-export const LINE_MASTER = Object.freeze({ ceilingDb: -1, padS: 0.06, padMinS: 0.04, padMaxS: 0.08, crossfadeS: 0.01 });
+/** 真峰值上限（dBTP）与切句时句首句尾保留的静音（秒）；两句贴得比 2×padS 还紧时在能量最低点切、各 10 ms 淡入淡出。
+ *  loopFadeS：导演循环播放的句子（loop）首尾各淡多久（2026-10-12 R4-Voice：CaptiveHowl 接缝，任务书定 0.1 s）。 */
+export const LINE_MASTER = Object.freeze({ ceilingDb: -1, padS: 0.06, padMinS: 0.04, padMaxS: 0.08, crossfadeS: 0.01, loopFadeS: 0.1 });
 export const PROJECTION_OFFSCREEN_DB = -4;
 /**
  * 剧情语音同时最多几路（契约 §6 音频节点预算：剧情语音同时 ≤ 3 路）。计的是真在出声的句子：
@@ -196,7 +202,10 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     //   · 按集成负责人决定换平时那条 comrade 定妆音（中位 118 Hz），提示词「同一个人受了重伤、闭着嘴牙关咬紧从胸腔里憋出来的一声低沉闷哼，不张嘴、
     //     不哭腔、不假声」：239 / 308 / 276 Hz（前两条 1.83 / 1.51 s 超长）。清单 scenes.CaptiveWoundTwist.rejectedRetakes 记了这 6 次。
     // voices.comrade 仍是 comradeWounded（Cast/AudioVoiceCast_ComradeWounded.mp3），与拖出 / 审问 / 嚎三场同一条。
-    "01": P("low", 0.7, { after: "event:woundPress", offsetS: 0, masterDb: -27.5, maxSeconds: 1.2,
+    // 2026-10-12 R4-Voice（集成负责人授权）：装着的 R2 这条切句时保共振峰降 7 个半音（pitchShift，rubberband formant=preserved、
+    // 时长不变、不用 asetrate），基频中位 327 → 219 Hz（MeasureVoice）；rubberband 吃掉的 6.6 dB 补回，有声段 −27.96 dBFS（原清单值 −27.95），
+    // 真峰值 −13.6 dBTP，仍比嚎低 6.9 / 12.4 dB。整段录音与提示词不动，f0Hz 由门禁核（VoiceSync §0.17）。
+    "01": P("low", 0.7, { after: "event:woundPress", offsetS: 0, masterDb: -27.5, maxSeconds: 1.2, pitchShift: { semitones: -7 }, f0Hz: [180, 230],
       delivery: "不是在说话、也不是喊：牙关咬紧、嘴闭着，剧痛的叫声闷在喉咙里出不来，只从喉咙和鼻子里挤出两下短促发抖的闷哼，第二下更短、又硬咽回去；不张嘴、不放声、不哭、不求饶；整条一秒左右，不超过一秒" }),
   }, { voices: { comrade: "comradeWounded" } }),
   // 练刺刀 → 割喉。甲冷静地教新兵干活；03 等反手耳光（recruitSlapped）、04 等丁扎完两刀站着喘（recruitPant）、05 等揪发提起（hairLifted）、
@@ -219,8 +228,10 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "01": P("shout", 0.9, { delivery: "不是战吼：硬着头皮逼出来的一声喊，嗓子发紧、怕，喊到一半劈了、带颤，一秒左右，不喊字" }),
   }),
   // 无字幕：冬瓜被扎两刀后蜷在泥里一声接一声地嚎，≥ 4 s，导演循环播放；割喉（throatCut）时掐断。
+  // loop（2026-10-12 R4-Voice）：原片尾截在下一声「啊」的起头上（整段 4.97–5.158 s），导演交叉淡化时接缝处先冒出这半声（485 Hz、跟嚎一样响），
+  // 45 ms 后新的一遍 271 Hz 才起头；切句改成首尾退到静音里、各淡 0.1 s（片长 5.138 → 4.95 s），接缝落在比有声段低 28 dB 的静音里（VoiceSync §0.17）。
   CaptiveHowl: Scene(true, "前沟泥里，冬瓜肩膀和肚子各挨了一刺刀，没死，蜷成一团侧躺在泥里", {
-    "01": P("shout", 0.95, { stopOn: "event:throatCut", delivery: "不是在说话：嗓子里一声接一声地嚎，每声一秒左右、中间抽一口气，连着嚎四五声，一直不停、不减弱；嘶哑、带血、疼到失控，不喊字、不是哭腔、不求饶；整段四到六秒" }),
+    "01": P("shout", 0.95, { stopOn: "event:throatCut", loop: true, delivery: "不是在说话：嗓子里一声接一声地嚎，每声一秒左右、中间抽一口气，连着嚎四五声，一直不停、不减弱；嘶哑、带血、疼到失控，不喊字、不是哭腔、不求饶；整段四到六秒" }),
   }, { voices: { comrade: "comradeWounded" } }),
   // 甲补刀到洞口，军靴碾顺子的手（bootGrind）之后才开口。
   ShunziFound: Scene(true, "塌了的防炮洞口。日兵甲是冷静的老兵分队长，端着枪、刺刀尖朝下，停在趴着装死的顺子身边，军靴踩住他伸在泥里的手、鞋跟一碾，顺子的手指抽了一下；他低头看着，对身后的人说", {

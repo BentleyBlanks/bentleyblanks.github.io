@@ -347,10 +347,12 @@ export function MasterSceneWav(raw, wav, { targetDb, padS = 0.08, ceilingDb = -1
  * 从 wav 的 [startS, endS] 编一段 mp3（两端各 fadeS 淡入淡出；整段就传 0 与全长）。
  * tempo > 1：切出来再不变调压快（atempo），给导演表写了 tempo 的句子用（片段时长 = 区间 / tempo）。
  */
-export function EncodeSegment(wav, output, { startS = 0, endS = null, fadeS = 0.01, bitrate = "96k", tempo = 1 } = {}) {
+// gainDb：只给变调过的片段补回 rubberband 吃掉的电平（EncodeLevelMatched 求出来的数），其余片段一律 0（片段不单独归一）。
+export function EncodeSegment(wav, output, { startS = 0, endS = null, fadeS = 0.01, bitrate = "96k", tempo = 1, gainDb = 0 } = {}) {
   const parts = [];
   if (startS > 0 || endS != null) parts.push(`atrim=start=${startS.toFixed(4)}${endS != null ? `:end=${endS.toFixed(4)}` : ""}`, "asetpts=PTS-STARTPTS");
   if (tempo !== 1) parts.push(`atempo=${tempo.toFixed(4)}`);
+  if (gainDb) parts.push(`volume=${gainDb.toFixed(2)}dB`);
   if (fadeS > 0) parts.push(`afade=t=in:d=${fadeS}`, "areverse", `afade=t=in:d=${fadeS}`, "areverse");
   const temp = output + ".tmp.mp3";
   const args = ["-y", "-v", "error", "-i", wav, "-map_metadata", "-1", ...(parts.length ? ["-af", parts.join(",")] : []),
@@ -359,6 +361,114 @@ export function EncodeSegment(wav, output, { startS = 0, endS = null, fadeS = 0.
   if (encoded.status !== 0) throw new Error(`Unable to encode ${path.basename(output)}: ${encoded.stderr?.slice(0, 200)}`);
   fs.renameSync(temp, output);
   return output;
+}
+
+// ============================================================================
+// 保共振峰变调、循环句的首尾（2026-10-12 R4-Voice，VoiceSync §0.17）
+// ============================================================================
+
+export const PITCH_SHIFT_METHOD = "ffmpeg rubberband（librubberband）pitch=2^(半音/12)、formant=preserved、pitchq=quality；时长不变，渲染延迟按 1 ms 包络互相关量出来剪掉";
+
+/**
+ * 整条保共振峰变调（导演表 pitchShift.semitones），输出 44.1 kHz 单声道 f32 wav，时长不变。不用 asetrate（那是连共振峰一起变、
+ * 嗓子变成另一个人）。rubberband 出来比原条晚约 20 ms：按 1 ms RMS 包络与原条互相关（0–80 ms）量出延迟，从头剪掉、尾巴补静音，
+ * 音节仍落在原来的时刻（逐字时间不用动）。rubberband 保共振峰时电平掉 4–6 dB，补电平交给 EncodeLevelMatched。返回 { lagS }。
+ */
+export function PitchShiftWav(input, output, semitones) {
+  const sr = 44100, ratio = 2 ** (semitones / 12), temp = output + ".rb.wav";
+  const rendered = spawnSync(ffmpeg, ["-y", "-v", "error", "-i", input, "-map_metadata", "-1",
+    "-af", `rubberband=pitch=${ratio.toFixed(7)}:formant=preserved:pitchq=quality`, "-ac", "1", "-ar", String(sr), "-c:a", "pcm_f32le", temp],
+  { encoding: "utf8", windowsHide: true });
+  if (rendered.status !== 0) throw new Error(`Unable to pitch-shift ${path.basename(input)} (ffmpeg needs librubberband): ${rendered.stderr?.slice(0, 200)}`);
+  const a = DecodePcm(input, sr), b = DecodePcm(temp, sr), hop = Math.round(sr / 1000);
+  const Env = (x) => Float32Array.from({ length: Math.floor(x.length / hop) }, (_, f) => {
+    let e = 0;
+    for (let i = f * hop; i < (f + 1) * hop; i++) e += x[i] * x[i];
+    return Math.sqrt(e / hop);
+  });
+  const ea = Env(a), eb = Env(b);
+  let best = -2, lag = 0;
+  for (let L = 0; L <= 80; L++) {
+    let xy = 0, xx = 0, yy = 0;
+    for (let i = 0; i + L < eb.length && i < ea.length; i++) { xy += ea[i] * eb[i + L]; xx += ea[i] * ea[i]; yy += eb[i + L] * eb[i + L]; }
+    const c = xy / Math.sqrt(xx * yy + 1e-20);
+    if (c > best) { best = c; lag = L; }
+  }
+  const shift = lag * hop, aligned = new Float32Array(a.length);
+  aligned.set(b.subarray(shift, Math.min(b.length, shift + a.length)));
+  const written = spawnSync(ffmpeg, ["-y", "-v", "error", "-f", "f32le", "-ar", String(sr), "-ac", "1", "-i", "-", "-c:a", "pcm_f32le", output],
+    { input: Buffer.from(aligned.buffer), windowsHide: true });
+  fs.rmSync(temp, { force: true });
+  if (written.status !== 0) throw new Error(`Unable to write ${path.basename(output)}: ${String(written.stderr).slice(0, 200)}`);
+  return { lagS: +(lag / 1000).toFixed(3) };
+}
+
+/**
+ * EncodeSegment，再按 MeasureVoice 的有声段电平补增益重编，直到落在 targetDb ±0.05 dB（最多五轮）。变调片段用它把电平对回
+ * 不变调那一片（rubberband 吃掉的电平 + mp3 编码损失一起补）；返回 { gainDb, activeRmsDb }。
+ */
+export function EncodeLevelMatched(wav, output, options, targetDb) {
+  let gainDb = options.gainDb || 0, m = null;
+  for (let round = 0; round < 5; round++) {
+    EncodeSegment(wav, output, { ...options, gainDb });
+    m = MeasureVoice(output);
+    const error = targetDb - m.activeRmsDb;
+    if (Math.abs(error) <= 0.05) break;
+    gainDb += error;
+  }
+  return { gainDb: +gainDb.toFixed(2), activeRmsDb: m.activeRmsDb };
+}
+
+/**
+ * 循环播放的句子（导演表 loop：导演一遍接一遍地播，2026-10-12 CaptiveHowl）：片段首尾都要停在静音里，两头各淡 fadeS。
+ *   · 片尾最后 edgeS 还在出声（截在一声的中间：CaptiveHowl 末 0.12 s 是第五声「啊」刚起头就被母带截断，导演交叉淡化时
+ *     旧的那条在接缝处冒出半声 485 Hz、45 ms 后新的那条 271 Hz 才起头）：往前退到它起头之前那段 ≥ fadeS + marginS 的静音里，
+ *     切在起头前 marginS；片头同理（往后进到那段静音里）。
+ *   · 首尾本来就停在静音里、但第一声 / 最后一声离切点不到 fadeS：在 [minS, maxS]（邻句 / 整段的边界）里往外让到 fadeS，
+ *     淡入淡出只落在静音上。
+ * 静音 = 比整段有声段低 silenceDb（与 SliceScene 同一口径）。framesInfo 是 FrameRms 的结果，秒都是整段的时间轴。
+ * 返回 { startS, endS, edgeDb, cutHeadS?, cutTailS? }（cut* = 截掉的那半声在整段里的起止）。
+ */
+export function LoopSpan(framesInfo, { startS, endS }, { activeRmsDb, minS = 0, maxS = null, fadeS = 0.1, edgeS = 0.05, marginS = 0.02, silenceDb = 30 } = {}) {
+  const { hopS, frames, seconds } = framesInfo;
+  const top = maxS ?? seconds;
+  const quiet = 10 ** ((activeRmsDb - silenceDb) / 20);
+  const F = (t) => Math.max(0, Math.min(frames.length - 1, Math.round(t / hopS)));
+  const loud = (f) => frames[f] >= quiet;
+  const need = Math.ceil((fadeS + marginS) / hopS - 1e-9);
+  const Any = (a, b) => { for (let f = F(a); f < F(b); f++) if (loud(f)) return true; return false; };
+  let s = startS, e = endS;
+  const out = {};
+  if (Any(e - edgeS, e)) {
+    // 往前找最晚的一段 ≥ need 帧的静音，它后面那一帧就是被截断那一声的起头。
+    let f = F(e) - 1, run = 0;
+    for (; f > F(s); f--) { if (loud(f)) { run = 0; continue; } if (++run >= need) break; }
+    if (run >= need) {
+      let onset = f + run; while (onset < F(e) && !loud(onset)) onset++;
+      out.cutTailS = [+(onset * hopS).toFixed(3), +e.toFixed(3)];
+      e = onset * hopS - marginS;
+    }
+  }
+  if (Any(s, s + edgeS)) {
+    let f = F(s), run = 0;
+    for (; f < F(e); f++) { if (loud(f)) { run = 0; continue; } if (++run >= need) break; }
+    if (run >= need) {
+      let tail = f - run; while (tail > F(s) && !loud(tail)) tail--;
+      out.cutHeadS = [+s.toFixed(3), +((tail + 1) * hopS).toFixed(3)];
+      s = (tail + 1) * hopS + marginS;
+    }
+  }
+  // 第一声 / 最后一声离切点不到 fadeS：往外让（只用静音，不越过邻句与整段的边界）。
+  let first = F(s); while (first < F(e) && !loud(first)) first++;
+  if (first * hopS - s < fadeS) s = Math.max(minS, Math.min(s, first * hopS - fadeS));
+  let last = F(e) - 1; while (last > F(s) && !loud(last)) last--;
+  if (e - (last + 1) * hopS < fadeS) e = Math.min(top, Math.max(e, (last + 1) * hopS + fadeS));
+  const Edge = (t0, t1) => {
+    let peak = 0;
+    for (let f = F(t0); f <= F(t1); f++) peak = Math.max(peak, frames[f]);
+    return +(Db(peak) - activeRmsDb).toFixed(1);
+  };
+  return { startS: +s.toFixed(3), endS: +e.toFixed(3), edgeDb: [Edge(s, s + 0.02), Edge(e - 0.02, e)], ...out };
 }
 
 /** 10 ms 一帧的 RMS（16 kHz 解码）。 */

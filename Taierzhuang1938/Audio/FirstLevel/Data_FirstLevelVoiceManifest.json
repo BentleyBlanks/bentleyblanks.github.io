@@ -855,7 +855,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-10-11T22:40:47.006Z",
+  "updatedAt": "2026-10-12T02:46:58.034Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -8788,7 +8788,7 @@
       "projection": "low",
       "seconds": 0.885,
       "bytes": 11329,
-      "sha256": "4bbaf8e9815043355f452995a588587f7fea48ab0fa7683c55f984d7206107e6",
+      "sha256": "ba02d3765653139a1a02a79e9a901be0e12cc8cd4056e9447dd745215bff3122",
       "source": "scene",
       "sceneSha256": "122b92db16f71328fc4ba56773e569ddfb0244c93365d280a679f0bad4b5d44a",
       "sceneStartS": 0.02,
@@ -8807,27 +8807,40 @@
       "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -27.95,
-        "truePeakDb": -15.02,
-        "snrDb": 37.71,
-        "voicedS": 0.5,
-        "lowShare": 0.461,
+        "activeRmsDb": -27.96,
+        "truePeakDb": -13.63,
+        "snrDb": 33.98,
+        "voicedS": 0.52,
+        "lowShare": 0.661,
         "f0": {
-          "median": 327,
-          "p10": 182,
-          "p90": 364,
+          "median": 219,
+          "p10": 208,
+          "p90": 242,
           "frames": 14
         },
-        "cer": 0.5,
-        "transcript": "呃...",
-        "speakerCos": 0.295,
+        "cer": 2,
+        "transcript": "不不不不",
+        "speakerCos": 0.141,
         "nearestOther": null,
         "referencedOther": null,
         "lengthDiff": -1,
         "subtitleCoverage": 1,
         "sceneGainDb": -10.93
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "pitchShift": {
+        "semitones": -7,
+        "method": "ffmpeg rubberband（librubberband）pitch=2^(半音/12)、formant=preserved、pitchq=quality；时长不变，渲染延迟按 1 ms 包络互相关量出来剪掉",
+        "lagS": 0.021,
+        "gainDb": 6.56,
+        "targetDb": -27.95,
+        "fromF0Hz": 327
+      },
+      "resliced": {
+        "fromSha256": "4bbaf8e9815043355f452995a588587f7fea48ab0fa7683c55f984d7206107e6",
+        "from": "installed scene mp3",
+        "why": "基频中位 327 Hz 不在导演表 f0Hz 180–230 Hz，保共振峰变 -7 半音、电平对回原清单值 -27.95 dBFS"
+      }
     },
     "BayonetPractice.01": {
       "file": "Lines/AudioVoice_FirstLevelBayonetPractice_01.mp3",
@@ -9398,13 +9411,13 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "shout",
-      "seconds": 5.138,
-      "bytes": 62425,
-      "sha256": "181fcd115e441dd334369d985114a0e9adc801fae3edf82ca95b3af762d5215a",
+      "seconds": 4.95,
+      "bytes": 60231,
+      "sha256": "80b1516819274e6d731b34bad1cb06315da9a83860874fa837f3b4c86b826665",
       "source": "scene",
       "sceneSha256": "ba1d7092ea4e9e6e4ef34673be0d301aa3d3e6ed604f0429b56b97b4cfeeb89f",
-      "sceneStartS": 0.02,
-      "sceneEndS": 5.158,
+      "sceneStartS": 0,
+      "sceneEndS": 4.95,
       "gapBeforeS": 0,
       "tight": [
         false,
@@ -9412,34 +9425,46 @@
       ],
       "edgeDb": [
         -35.8,
-        -12.7
+        -32.1
       ],
       "cutMethod": "subtitle",
       "castOwner": "comradeWounded",
       "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6",
       "referenced": true,
       "metrics": {
-        "activeRmsDb": -21.08,
-        "truePeakDb": -1.14,
-        "snrDb": 30.99,
-        "voicedS": 3.08,
-        "lowShare": 0.153,
+        "activeRmsDb": -21.1,
+        "truePeakDb": -1.16,
+        "snrDb": 30.78,
+        "voicedS": 2.92,
+        "lowShare": 0.155,
         "f0": {
-          "median": 225,
-          "p10": 140,
-          "p90": 421,
-          "frames": 56
+          "median": 211,
+          "p10": 137,
+          "p90": 400,
+          "frames": 55
         },
-        "cer": 0.25,
-        "transcript": "啊!啊!啊!",
-        "speakerCos": 0.354,
+        "cer": 0.5,
+        "transcript": "啊!啊!",
+        "speakerCos": 0.38,
         "nearestOther": null,
         "referencedOther": null,
         "lengthDiff": -1,
         "subtitleCoverage": 1,
         "sceneGainDb": 1.09
       },
-      "mastering": "SliceOfWholeSceneMaster"
+      "mastering": "SliceOfWholeSceneMaster",
+      "loop": {
+        "fadeS": 0.1,
+        "cutTailS": [
+          4.97,
+          5.158
+        ]
+      },
+      "resliced": {
+        "fromSha256": "181fcd115e441dd334369d985114a0e9adc801fae3edf82ca95b3af762d5215a",
+        "from": "installed scene mp3",
+        "why": "导演循环播放：首尾退到静音里、各淡 0.1 s（片尾 4.97–5.158 s 是被截断的半声，切掉）"
+      }
     }
   },
   "scenes": {
