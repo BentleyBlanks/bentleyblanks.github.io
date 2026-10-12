@@ -558,5 +558,8 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
     // Survivors of the front half pull back north (FRONT_NEST_FRONT_PULLBACK) this long after the first of them is in
     // the yard; the first 04 drive of the second round took 240 s to kill two men crouched behind the yard's front wall.
     nestFrontHoldS:45,
+    // Cleared also counts a pulled-back man at the pull-back point (nestFrontPullbackClearM) or out of the yard and
+    // nestFrontAwayM from the nest; the pull-back itself is ordered when the tank reaches Block, half are down or the hold runs out.
+    nestFrontPullbackClearM:4,nestFrontAwayM:10,
     launcherFlightS:2.2,nestFrontRadiusM:3,tugS:1.2,tugM:1.4,branchCorridorM:4}),
 });

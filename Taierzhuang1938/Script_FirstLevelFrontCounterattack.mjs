@@ -88,9 +88,18 @@ export function LightShellHurt(distance, T = C()) {
   const t = (distance - T.shellHurtFullM) / Math.max(1e-6, T.shellHurtM - T.shellHurtFullM);
   return T.shellHurtMaxHp + (T.shellHurtMinHp - T.shellHurtMaxHp) * t;
 }
-/** nestFrontCleared (04 gate): every man who climbed in is dead or back north of clearZ (the berm). */
-export function NestFrontCleared(men, clearZ) {
-  return men.every((a) => !a.alive || a.position.z <= clearZ);
+/**
+ * nestFrontCleared (04 gate): every man who climbed in is dead, or back north of clearZ (the berm), or - once the
+ * pull-back was ordered - at the pull-back point (within pullbackM) or out of the compound and awayM from the nest.
+ */
+export function NestFrontCleared(men, clearZ, { pulledBack = false, pullback = FRONT_NEST_FRONT_PULLBACK, pullbackM = 4, awayM = 10, nest = S.nest } = {}) {
+  return men.every((a) => {
+    if (!a.alive || a.position.z <= clearZ) return true;
+    if (!pulledBack) return false;
+    if (Distance(a.position, pullback) <= pullbackM) return true;
+    const inYard = a.position.x > 24.4 && a.position.x < 33 && a.position.z < -145.6 && a.position.z > -157.2;
+    return !inYard && Distance(a.position, nest) >= awayM;
+  });
 }
 /** Player progress along the attack branch past attackRoute[index] (sapInfiltrationStarted when >= 1 m past [1]). */
 export function OnAttackBranch(player, index = 1, route = S.attackRoute) {
@@ -272,18 +281,30 @@ export class FirstLevelFrontCounterattack {
       }
       return;
     }
-    // nestFrontHoldS after the first man is in: whoever is still alive pulls back north over the berm (the fight ends
-    // either way; the first second-round drive took 240 s to kill two men crouched behind the yard's front wall).
-    if (!st.pulledBack && st.clearedAt == null && r.time - (st.arrivedAt ?? st.startedAt) >= T.nestFrontHoldS) {
-      st.pulledBack = true;
-      for (const a of st.men) if (a.alive) { a.tacticalRadiusM = 0; a.contactRadiusBaseM = 0; r.Defend(a, FRONT_NEST_FRONT_PULLBACK, 2, R.defendCoverSlackM); r.ai.SetStance(a, 0, .5, true); }
-      this.Note("nestFrontPullBack", { alive: st.men.filter((a) => a.alive).length });
+    // The pull-back (third round, things that really happen): the tank reaches Block (tankBlocksExit / tank.atBlock -
+    // the yard is now the tank's to seal, the infantry pulls out), or half of them are down, or nestFrontHoldS has run
+    // since the first man climbed in. The integration drive (INT1) had two men sit in the yard for 265 s: a Defend
+    // order alone never moved them out of a fight, so the way out is walked with MoveActor every frame (the guards'
+    // mover), vault and detour allowed (tacticalRadiusM > 0), until they are out and clear.
+    if (!st.pulledBack && st.clearedAt == null) {
+      const alive = st.men.filter((a) => a.alive).length, dead = st.men.length - alive;
+      const why = (r.Has("tankBlocksExit") || r.tank?.atBlock) ? "tankAtBlock" : dead * 2 >= st.men.length ? "halfDown" : r.time - (st.arrivedAt ?? st.startedAt) >= T.nestFrontHoldS ? "held" : null;
+      if (why) {
+        st.pulledBack = true; st.pulledBackAt = r.time;
+        for (const a of st.men) if (a.alive) { a.missionAssault = null; a.holdZone = null; a.tacticalRadiusM = 3; a.contactRadiusBaseM = 3; a.scriptDefensive = false; }
+        this.Note("nestFrontPullBack", { why, alive });
+      }
     }
-    // 04 gate (second round): the fight for the front half is over when every man who climbed in is dead or back
-    // north of the berm (nestFrontClearZ); BundleOrder waits for it plus a beat (FrontBattle.UpdatePressure).
-    if (st.clearedAt == null && NestFrontCleared(st.men, T.nestFrontClearZ)) {
+    if (st.pulledBack) for (const a of st.men) {
+      if (!a.alive || a.nestFrontBack) continue;
+      if (Distance(a.position, FRONT_NEST_FRONT_PULLBACK) <= 2) { a.nestFrontBack = true; r.Defend(a, FRONT_NEST_FRONT_PULLBACK, 2, R.defendCoverSlackM); continue; }
+      r.ai.SetStance(a, 0, .5, true); r.MoveActor(a, FRONT_NEST_FRONT_PULLBACK, R.assaultRushMps);
+    }
+    // 04 gate (second round): the fight for the front half is over when every man who climbed in is dead, back north of
+    // the berm (nestFrontClearZ) or, pulled back, out of the yard and away; BundleOrder waits for it plus a beat.
+    if (st.clearedAt == null && NestFrontCleared(st.men, T.nestFrontClearZ, { pulledBack: !!st.pulledBack, pullbackM: T.nestFrontPullbackClearM, awayM: T.nestFrontAwayM })) {
       st.clearedAt = r.time;
-      r.Record("nestFrontCleared", { dead: st.men.filter((a) => !a.alive).length, back: st.men.filter((a) => a.alive).length });
+      r.Record("nestFrontCleared", { dead: st.men.filter((a) => !a.alive).length, back: st.men.filter((a) => a.alive).length, pulledBack: !!st.pulledBack });
     }
   }
   /** When the nest's front half was cleared (nestFrontCleared), or null. */
@@ -323,7 +344,7 @@ export class FirstLevelFrontCounterattack {
   State() {
     return { window: { open: this.window.open, rushRepelled: this.window.rushRepelled, fireSuppressed: this.window.fireSuppressed, openedAt: this.window.openedAt, closedAt: this.window.closedAt },
       sapShells: this.sapShell.fired, nestShells: this.nestShell.fired, gapGuard: this.gapGuard ? { shots: this.gapGuard.shots, dead: !!this.gapGuard.dead } : null,
-      nestFront: this.nestFront ? { men: this.nestFront.men.map((a) => ({ id: a.missionId, alive: !!a.alive })), arrived: this.nestFront.arrived, arrivedAt: this.nestFront.arrivedAt ?? null, pulledBack: !!this.nestFront.pulledBack, clearedAt: this.nestFront.clearedAt ?? null } : null,
+      nestFront: this.nestFront ? { men: this.nestFront.men.map((a) => ({ id: a.missionId, alive: !!a.alive, x: +a.position.x.toFixed(1), z: +a.position.z.toFixed(1), back: !!a.nestFrontBack })), arrived: this.nestFront.arrived, arrivedAt: this.nestFront.arrivedAt ?? null, pulledBack: !!this.nestFront.pulledBack, pulledBackAt: this.nestFront.pulledBackAt ?? null, clearedAt: this.nestFront.clearedAt ?? null } : null,
       crewSpawned: this.crewSpawned, gapBody: this.gapBody || null, log: this.log.slice(-16) };
   }
   Dispose() {}
