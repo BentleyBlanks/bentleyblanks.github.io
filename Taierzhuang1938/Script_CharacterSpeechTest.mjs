@@ -502,7 +502,9 @@ let faceTrackCount = 0;
     const alignment = MISSION_VOICE_ALIGNMENT[id];
     if (!cues.has(id)) continue;
     // A take whose alignment was not redone is skipped only outside 01-06; inside it is a failure.
-    if (alignment?.sha256 !== entry.sha256) { stale.push(id); continue; }
+    // A take whose script has since changed (2026-10-12: SouthWhisper gained a seventh line before its re-record)
+    // is just as stale: its face track still describes the old line table.
+    if (alignment?.sha256 !== entry.sha256 || (entry.lineCount != null && entry.lineCount !== cues.get(id).lines.length)) { stale.push(id); continue; }
     const json = FACE_TRACKS.tracks[entry.sha256];
     assert.ok(json, `${id}: face track baked for the current take (run Script_FirstLevelFaceTrackBake.py --cues ${id})`);
     assert.equal(json.id, id);

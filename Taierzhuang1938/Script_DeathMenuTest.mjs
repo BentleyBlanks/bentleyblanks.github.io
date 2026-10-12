@@ -212,7 +212,7 @@ try {
     g.Debug.Pause();
   });
   assert.deepEqual(await page.locator(".mnPauseCondition").evaluateAll(rows => rows.map(row => row.dataset.condition)),
-    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "leftGunHandover", "zhouLeftGun", "tankPreviewed"]);
+    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "leftGunHandover", "zhouLeftGun", "tankHeard"]);
   assert.equal(await page.locator(".mnPauseCondition").count(), 8);
   assert.equal(await page.locator(".mnPauseCondition.complete").count(), 2);
   assert.equal(await page.locator(".mnPauseProgressSummary").textContent(), "已达成 2 / 8 项");
@@ -246,9 +246,9 @@ try {
     r.flow.index++; g.menu.Show("pause");
   });
   assert.deepEqual(await page.locator(".mnPauseCondition").evaluateAll(rows => rows.map(row => row.dataset.condition)),
-    ["tankPositionPressured", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
+    ["tankPositionPressured", "gapGuardKilled", "nestFrontContested", "nestFrontCleared", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
     "MachineGun exposes the adopted tank-pressure and retreat conditions");
-  assert.equal(await page.locator(".mnPauseCondition").count(), 4, "new stage replaces all previous conditions");
+  assert.equal(await page.locator(".mnPauseCondition").count(), 7, "new stage replaces all previous conditions");
   assert.equal(await page.locator('[data-condition="frontReached"]').count(), 0);
   assert.ok(await page.locator('[data-condition="tankPositionPressured"]').isVisible());
   await page.evaluate(() => {

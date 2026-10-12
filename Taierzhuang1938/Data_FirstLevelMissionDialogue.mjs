@@ -228,22 +228,38 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["luo", "先把那几个接下来！"],
   ]),
   // Notion 2026-09-22: stages 03–05, verbatim source and complete exchanges.
+  // 2026-10-12 03–11 重构（docs/Data_FirstLevel0311Refactor20261012Contract.md §5.2，A 包）：新 / 改的句子先写字幕、
+  // Voice 包第三波再录（缺录音按字数估时走字幕）。退出流程的 cue 标 retired:true，条目与录音都不删（清单哈希才对得上）。
+  // 03 观察口：班长在支沟观察口停下，等玩家到 4 m 内，三指 —— 守军、缺口（这两句）、右侧破墙的机枪（接 FrontBlockade）。
+  PerLine("FrontObservation", [["luo", "看到没得？那几个，下不来。"], ["luo", "就那个口子，过一个打一个。"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；不作播音腔。"}),
   PerLine("FrontBlockade", [["zhou", "右边破墙！冒火那个口子！把路封死了！"], ["luo", "周哥，顶一下！我们去拿右边！"], ["luo", "顺子，跟紧！莫走外头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("FrontApproach", [["luo", "贴这道墙！前头有人！"], ["luo", "口子压住了，进！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("FrontAttack", [["luo", "土坎前头那一伙！莫让他们压到口子上！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("FrontWithdraw", [["luo", "压下去了！前头的，下来！往沟里走！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  // 03 第一批过缺口：刘文财在沟口数人。
+  PerLine("FirstBatchCount", [["liuwencai", "一个……三个……五个！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；不作播音腔。"}),
   PerLine("TakeOverGun", [["luo", "何有田，接周哥那边！幺娃，扶他下去！"], ["zhou", "外头还有人！"], ["luo", "看到了！这边有人接，你先下去！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   // 2026-09-27 用户追加：战车露面、为什么要集束弹、往哪扔（docs/Data_FirstLevelFrontSource20260922.md 各段「用户追加」）。
-  PerLine("TankHeard", [["shunzi", "啥子在响？"], ["luo", "战车！还在路那头，先把人接下来！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("TankRoadContact", [["heyoutian", "右边路上！战车出来了！"], ["luo", "先看住跟车的！前头还有人没下来！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("TankArmor", [["luo", "莫打铁壳子！枪子儿钻不进去！"], ["luo", "打跟车的！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  // 2026-10-12 退出（契约 §1.5 取消一问一答）：录音保留，运行时不再排。
+  PerLine("TankHeard", [["shunzi", "啥子在响？"], ["luo", "战车！还在路那头，先把人接下来！"]], {retired:true,delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  // 03 战车起步（tankHeard）之后、第一批人撤完时：守军慌着喊，班长压住他先顾眼前。
+  PerLine("TankSpotted", [["guard", "战车……路那头是战车！"], ["luo", "先把人接下来！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；不作播音腔。"}),
+  PerLine("TankRoadContact", [["heyoutian", "右边路上！战车！战车！"], ["luo", "打跟车的！前头还有人没下来！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("TankArmor", [["luo", "莫打铁壳子！打跟车的！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("TankTerror", [["luo", "下来！莫站枪口上！退后墙！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("BundleOrder", [["guard", "外边旧弹药屋还有集束弹！后沟能过去！"], ["luo", "文财，看住沟口！何有田，前头交给你！"], ["luo", "顺子，跟我走后沟，去拿弹！"], ["shunzi", "前头还咋个过？"], ["luo", "莫走路上！跟到老子！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("BundleGo", [["heyoutian", "班长，快点！这边老子顶到！"], ["luo", "顺子，下沟！屋在墙后头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  // 04 缺口里倒下的守军（gapGuardKilled）：刘文财数剩下的人。
+  PerLine("GapGuardDown", [["liuwencai", "……还剩两个。"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；不作播音腔。"}),
+  // 2026-10-12 改写：守军报的不是弹药屋，是先前抱着集束弹摸过去没回来的弟兄；班长看车、看沟、停一拍再分工。
+  PerLine("BundleOrder", [["guard", "外头……先前有个弟兄抱着集束弹从支沟摸过去了，到现在没回来！"], ["luo", "文财，看住沟口！何有田，前头交给你！"], ["luo", "顺子，跟我走支沟！"], ["shunzi", "前头还咋个过？"], ["luo", "莫走路上！跟到老子！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("BundleGo", [["heyoutian", "班长，快点！这边老子顶到！"], ["luo", "顺子，下沟！贴到走！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("BundleProne", [["luo", "低点！上头看得到！"], ["luo", "前头岔口！有人下沟了！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("BundleWhy", [["shunzi", "班长，手榴弹炸得动那铁家伙？"], ["luo", "一颗不得行！五颗捆一坨，一起响，才撕得开它！"], ["shunzi", "屋头有现成的？"], ["luo", "前几天就捆好了，专门等它的！"]], {delivery:"四川兵在交通沟里边跑边说，喘着气、压着嗓子交代要紧事；不作播音腔。"}),
-  PerLine("BundleSupply", [["keeper", "里头那个箱子！就剩这些！"], ["luo", "拿起！沿刚才的沟回！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("BundleBrief", [["luo", "听好！莫往它脸上甩，前头铁最厚！"], ["luo", "甩到履带边上，链子一断，它就走不动了！"], ["luo", "还在打，就再补一捆，丢上屁股后头那块铁板，底下是发动机！"], ["shunzi", "你咋晓得这些？"], ["luo", "山西那边，见弟兄们这么炸过！"]], {delivery:"四川兵在交通沟里边跑边说，喘着气、压着嗓子交代要紧事；不作播音腔。"}),
+  // 2026-10-12 退出（弹在沟里，不再有「屋头有现成的」）：录音保留，运行时不再排。
+  PerLine("BundleWhy", [["shunzi", "班长，手榴弹炸得动那铁家伙？"], ["luo", "一颗不得行！五颗捆一坨，一起响，才撕得开它！"], ["shunzi", "屋头有现成的？"], ["luo", "前几天就捆好了，专门等它的！"]], {retired:true,delivery:"四川兵在交通沟里边跑边说，喘着气、压着嗓子交代要紧事；不作播音腔。"}),
+  PerLine("BundleSupply", [["keeper", "里头那个箱子！就剩这些！"], ["luo", "拿起！沿刚才的沟回！"]], {retired:true,delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  // 05 捡弹点：倒下的弟兄身边。
+  PerLine("BundleFound", [["luo", "……就是他。"], ["luo", "弹还在！捡起！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；不作播音腔。"}),
+  // 2026-10-12 改写：跑动中两句（履带边 / 屁股后头那块铁板），不再一问一答。
+  PerLine("BundleBrief", [["luo", "莫往它脸上甩！甩履带边上！"], ["luo", "还在打，就再丢一捆，丢它屁股后头那块铁板！"]], {delivery:"四川兵在交通沟里边跑边说，喘着气、压着嗓子交代要紧事；不作播音腔。"}),
   PerLine("BundleReturnCall", [["heyoutian", "它又往前挤了！前头的人还卡到起！"], ["luo", "听到了！顺子，跟紧！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("BundleAttack", [["luo", "就这边！莫上大路！"], ["luo", "顺子，拿弹！旁边的人我看到！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("BundleRetreat", [["luo", "回来！低头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
@@ -713,7 +729,9 @@ const SOUNDSCAPE_ZONES = Object.freeze({
   SupportOrder: "trench",
   FrontApproach:"front",FrontAttack:"front",FrontWithdraw:"front",TankRoadContact:"front",BundleAttack:"bundle",BundleRetreat:"bundle",FrontRelief:"front",
   FrontBlockade: "front", TakeOverGun: "front", TankTerror: "front", BundleOrder: "front", TankHeard: "front", TankArmor: "front",
+  FrontObservation: "front", FirstBatchCount: "front", TankSpotted: "front", GapGuardDown: "front",
   BundleGo: "bundle", BundleProne: "bundle", BundleWhy: "bundle", BundleBrief: "bundle", BundleSupply: "bundle", BundleReturnCall: "bundle", TankStopped: "bundle",
+  BundleFound: "bundle",
   Volunteer: "collection", BorrowLight: "collection", ZhouLift: "collection", NierShells: "collection",
   SouthWhisper: "southWalk", VillagePointer: "southWalk",
   NierFollow: "southWalk", MouthContact: "southWalk", MouthGo: "southWalk", MouthFlank: "southWalk",

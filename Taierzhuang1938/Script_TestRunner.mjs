@@ -167,6 +167,7 @@ export const testDefs = {
   FirstLevelFrontCheckpoint05Test: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--stage-from=5','--stage-to=6'],timeoutMs:1800000,desc:'05 检查点冷启动：玩家在后侧岔口、战车完好；取弹、到攻击位、战车毁伤按序到 Disabled、并行撤离、06 起行（零页面错误、零检查点重试）'},
   FirstLevelFrontCheckpoint05BombFirstTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--stage-from=5','--stage-to=6','--bomb-first'],timeoutMs:1800000,desc:'05 检查点冷启动 + 先炸车再到攻击位：Intact→MobilityKill→Disabled 都记上、attackPositionReached 记 skipped、流程走到 06（验收指引 §3「05 取弹炸车」）'},
   FirstLevelFrontPacingTest: {file:"Script_FirstLevelFrontPacingTest.mjs",desc:"03–06 节奏：何有田接枪/老周离枪 10 m、05 先炸车与并行撤离、安全区汇合、06 起行判据、PlayScene 说话人、指引指向战车、落弹区（纯 Node）"},
+  FirstLevelFrontCounterattackTest: {file:'Script_FirstLevelFrontCounterattackTest.mjs',desc:'第一关 03–05 反击模块纯规则：撤退窗口双条件会关会开、落弹选点安全距、跟车解封、阵位前半边人选、攻击支路进度、车组/事实表合约、运行时三行钩子（纯 Node）'},
   FirstLevelFrontPressureTest: {file:'Script_FirstLevelFrontPressureTest.mjs',desc:'第一关敌军不当木桩：压力表数据与运行时、环境射击的账、迟疑/成组冲锋/军官、01 背景兵（纯 Node）'},
   FirstLevelMidTest: {file:'Script_FirstLevelMidTest.mjs',desc:'第一关 08–14（Mid 包）：担架停进遮挡、连屋近战先手、内院放行计数、两处威胁与装载联动、上车/停车/卸人时序、空袭目标与扑沟'},
   FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：01–02 对 09.23 新稿逐字、契约 cue/句数、日语假名与中文字幕、对白导演表、多声部播放器（重叠/截断/等事件/侧链）、缺录音兜底（纯 Node）'},
@@ -632,6 +633,7 @@ export const tier0Fast = [
   "FirstLevelStreetFightTest",
   "FirstLevelTankBrainTest",
   "FirstLevelFrontPressureTest",
+  "FirstLevelFrontCounterattackTest",
   "FirstLevelFrontPacingTest",
   "OpeningStoryboardsTest",
   "OpeningSetTest",
@@ -677,7 +679,7 @@ export const domains = {
   railBridgeModel: {label:'退役钢桁架铁路桥模型自检（不在第一关里）',tests:['RailBridgeTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","LitterGaitTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','FirstLevelFarBankTest','PontoonBridgeTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','LitterGaitTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','FirstLevelFarBankTest','PontoonBridgeTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','LitterGaitTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontCounterattackTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest','HitReactionTest','HitReactionBrowserTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -831,7 +833,7 @@ const changedDomainRules = [
   // 03 分镜抓帧（2026-09-25 Front 包）：文件名里没有 FirstLevel，归第一关与 01–03 分镜两个域。
   {domain:"firstLevel",pattern:/FrontStoryboardShots/},
   {domain:"openingStoryboards",pattern:/FrontStoryboardShots/},
-  {domain:"firstLevel",pattern:/FirstLevelRearDoorWalk|FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontScenes|FirstLevelFrontPacing|FirstLevelFrontTopology|FirstLevelTransition/},
+  {domain:"firstLevel",pattern:/FirstLevelRearDoorWalk|FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontScenes|FirstLevelFrontPacing|FirstLevelFrontTopology|FirstLevelFrontCounterattack|FirstLevelTransition/},
   // 2026-10-12 0311 B 包：耿家四个角色与 07 沟口遭遇（两个纯 Node 门在 tier0Fast）。
   {domain:"firstLevel",pattern:/FirstLevelGengFamily|FirstLevelSouthMouth/},
   // 2026-09-23 01–06 space rebuild: keyframe table and the static probe the space gate reads.

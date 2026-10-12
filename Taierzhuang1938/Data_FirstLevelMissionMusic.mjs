@@ -67,7 +67,9 @@ export const FIRST_LEVEL_MUSIC_COMBAT = Object.freeze({
   stages: Object.freeze(["RearTrench", "Support", "MachineGun", "Tank"]),
   fromIntensity: 0.35, fullIntensity: 0.9, depth: 0.55, stepScale: 0.05,
   // breachReopened（Front 包 09-24）：战车哑火、缺口前没人再封 —— 撤口重新打开那一刻。
-  stingers: Object.freeze(["tankPreviewed", "tankImmobilized", "tankFireDisabled", "breachReopened", "lastGuardsWithdrawn"]),
+  // 2026-10-12 契约 §1.5「战车不做 boss」：tankPreviewed / tankImmobilized / tankFireDisabled 三个战车标点撤掉；
+  // 撤回集结处那 100 m 也不起胜利音乐（剩下两个标点都在撤回之前）。
+  stingers: Object.freeze(["breachReopened", "lastGuardsWithdrawn"]),
   holdS: 6, fadeS: 4, lift: 1.15,
 });
 

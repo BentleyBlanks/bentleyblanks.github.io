@@ -271,6 +271,15 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   gapClearM:6,
   // Zhou lets go of the gun only once He stands this close to the seat (the gun is never left empty).
   handoverReadyM:3,
+  // 2026-10-12 handover order (FrontBattle.StartHandover / UpdateZhou): He within this of the access trench's last corner
+  // walks straight to the seat (no detour back to the corner); Yaowa is sent only once He has the seat and waits this far
+  // short of it (within rearArrivalM of Zhou). Sent together, Yaowa reached the seat first and the one-man-wide trench
+  // left He 3.9 m behind him for good (03->07 drives 1 and 3).
+  handoverViaSkipM:4,yaowaHandoverShortM:1.4,
+  // FrontBattle.RampLift: a handover walker stalled (walkStallS, walkStallProgressM) between these distances of the seat is
+  // standing at the foot of the pit ramp (54-55 deg, over the capsule's 52 deg climb limit); he is set on the pit floor
+  // handoverRampLiftM short of the seat. Integration item: a <= 45 deg transition in Data_FirstLevelMissionTerrain.
+  handoverRampFootM:Object.freeze([2.5,5.5]),handoverRampLiftM:1.6,
   // FrontBlockade (Zhou/Luo shouting across) fires when the player is this close to the observation spur mouth or the fold (K3).
   observationCallM:6,
   // A cold start at 03 (death retry / chapter select, missionStage=3) skips the collection's SupportOrder: this long
@@ -512,4 +521,49 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   giveWaySpotArrivalM:.12,
   giveWayPassM:.7,giveWaySpeedMps:2.4,giveWayReleaseM:1.8,giveWayClearS:.6,giveWayReturnS:4,giveWayReturnM:.15,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
+  // ---- 2026-10-12 03–11 refactor (contract §3.1–3.3), Script_FirstLevelFrontCounterattack ----
+  // observation: Luo stops in the spur off the support sap (FRONT_SPACE.observation) and talks once the player is within
+  // observeWaitM of him (contract: <= 4 m); a player who walks on past the spur mouth releases him (he says it on the move).
+  // gapRadiusM: "冲到缺口边" = a live attacker within this of FRONT_SORTIE.gap (the gap sap is 6 m long, the last
+  // bound line 11 m north of the scrape). gapGunners: the two fire-base LMGs that cover the gap (FRONT_PRESSURE_GROUPS.fireBase).
+  // suppressLevel: Data_Tuning_FirstLevel.tacticalSuppression's band (a man at 0.5 drops into the pinned branch,
+  // FIRE_BASE fireStanceMaxSuppression 0.5); suppressS 2: the contract's "压住 >= 2 s". windowStaleS 45: a shut window
+  // that never reopens cannot hold the waiting batch for good (the old assaultWindowFallbackS 90 is the open-at-all guard).
+  // woundedDragMps: a wounded man dragged by the next one, under R.walkSpeedMps 1.7. woundedGuard 2: contract §3.1.
+  // gapSacrificeGuard 7 (contract names guard 5): guard 5 is the second batch's talking face (FACED_FRONT_GUARD_INDEX,
+  // BundleOrder / TankSpotted), so the assistant of the LMG pair, guard 7, is the one the hull MG kills in the gap.
+  // Sap shells: Type 89 discharger (Data_Battle.SUPPORT.ija launcher radius 5). The sap rounds are ambient (contract §3.1:
+  // baseAccuracy 0, no TTK account): sapShellDamage 0 = FireShell feedbackOnly - burst, whistle, concussion, no injury.
+  // The nest rounds are pressure, not the killer: >= 3.5 m from the player (contract), light and bloodless hurt
+  // (FrontCounterattack.LightShellHurt, second round 10-12): shellHurtMaxHp at <= shellHurtFullM from the burst down to
+  // shellHurtMinHp at shellHurtM, no wound, never below shellHurtFloorHp. The first drives tried Blast at 110 then 40:
+  // at 110 six rounds in 40 s on a player sitting on the captured gun cost 23 hp each and killed him in 03; at 40 each round
+  // still opened a torso wound (Player.TakeHit bleeds on any damage) and nine rounds bled him out. Now a man who sits
+  // through nine rounds (10-16 s apart, 0.13 hp/s regen) is hit by the few that land inside shellHurtM and must move;
+  // the sap rounds keep sapShellHurtScale 0 (ambient, contract: no TTK account, the player is >= 6 m off anyway).
+  // launcherFlightS 2.2: over SHELL.incomingMinFlightS so the whistle plays (contract: 落前 1.6 s 啸声).
+  // gapRushCloseM: a bounder in rush/charge inside this (2 x gapRadiusM) shuts the window; one bounding between covers 20 m
+  // out does not (the first drive showed the window fluttering every 1.5 s on far bounds, holding the first batch for 48 s).
+  // suppressLevel .3 = the AI's own "suppressed" threshold (Script_Ai wake check s.suppression > 0.3): at .5 the second
+  // drive never saw the fact in 90 s of nest fire and the batch only went on FrontBattle's assaultWindowFallbackS.
+  counter:Object.freeze({observeWaitM:4,observeMaxS:12,gapRadiusM:8,gapRushCloseM:16,gapGunners:Object.freeze(["FrontGunner","FrontSupportGunner"]),
+    suppressLevel:.3,suppressS:2,windowStaleS:45,woundedGuard:2,woundedDragMps:1.1,woundedDownS:1.5,
+    gapSacrificeGuard:7,gapKillM:1.6,gapRunMaxS:9,gapKillShots:5,
+    sapShellFirstS:8,sapShellEveryS:Object.freeze([8,14]),sapShellMax:4,sapShellPlayerClearM:6,sapShellHurtScale:0,
+    nestShellFirstS:40,nestShellEveryS:Object.freeze([10,16]),nestShellMax:8,nestShellPlayerClearM:3.5,nestShellSquadClearM:2.5,nestShellHurtScale:1,
+    shellHurtM:5.5,shellHurtFullM:3.5,shellHurtMaxHp:18,shellHurtMinHp:12,shellHurtFloorHp:1,shellHurtSuppression:.5,
+    // 04 gate nestFrontCleared: the men who climbed into the nest's front half are dead or back north of this z (the
+    // berm crest line is -160.3); BundleOrder waits nestFrontOrderPauseS after it (Luo looks at the tank, the sap, a beat).
+    nestFrontClearZ:-159,nestFrontOrderPauseS:1.5,
+    // Survivors of the front half pull back north (FRONT_NEST_FRONT_PULLBACK) this long after the first of them is in
+    // the yard; the first 04 drive of the second round took 240 s to kill two men crouched behind the yard's front wall.
+    nestFrontHoldS:45,
+    // Cleared also counts a pulled-back man at the pull-back point (nestFrontPullbackClearM) or out of the yard and
+    // nestFrontAwayM from the nest; the pull-back itself is ordered when the tank reaches Block, half are down or the hold runs out.
+    nestFrontPullbackClearM:4,nestFrontAwayM:10,
+    // The fight across the yard has to stand (coordinator, 2026-10-12 round 4): the tank-at-Block pull-back can only fire
+    // once nestFrontContested is nestFrontMinFightS old - the third-round drive had the tank at Block before the men
+    // were in, so they turned round the frame they arrived (4 s of fight). Half down and nestFrontHoldS stay as they are.
+    nestFrontMinFightS:20,
+    launcherFlightS:2.2,nestFrontRadiusM:3,tugS:1.2,tugM:1.4,branchCorridorM:4}),
 });

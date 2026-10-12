@@ -773,6 +773,9 @@ export const MISSION_ANCHORS = Object.freeze({
   orders: Sortie.orders,
   gun: Sortie.nest,
   bundle: Sortie.bundle,
+  // 2026-10-12 03–11 refactor (A package, contract §5.4): the 05 bundle pick-up beside the fallen comrade in the attack
+  // branch (the 03 observation stop is MISSION_STAGE_ANCHORS.frontObservation = FRONT_SPACE.observation).
+  bundleDrop: Sortie.bundleDrop,
   throw: Sortie.throw,
   village: { x: 55, z: -20 },
   melee: { x: 58, z: 6 },

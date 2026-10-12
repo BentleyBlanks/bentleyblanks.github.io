@@ -217,8 +217,10 @@ console.log(`ok tank escort slots hidden from the gap: ${FRONT_TANK_ESCORT_SLOTS
   // Budget from the real spawn tables (MISSION_STEP_SPAWNS + activation facts + retire), contract §6.
   const n=ProbeCounts();
   assert.deepEqual(n.unresolved,[],"every 01-05 enemy has a spawn stage and a leave stage");
-  assert.ok(n.cumulative<=55,`01-05 cumulative enemies <= 55: ${n.cumulative}`);
-  assert.ok(n.alive03<=30&&n.alive04<=30&&n.alive05<=30,`03-05 worst-case alive <= 30: ${n.alive03}/${n.alive04}/${n.alive05}`);
+  // 2026-10-12 03–11 refactor contract §4: the front may hold up to 44 Japanese at once (actorPool.ija 48 unchanged); the
+  // sap infiltrators grew to four and the tank crew (2, 05 only) joined the ledger - 03/04/05 worst case 31/31/34.
+  assert.ok(n.cumulative<=60,`01-05 cumulative enemies <= 60: ${n.cumulative}`);
+  assert.ok(n.alive03<=44&&n.alive04<=44&&n.alive05<=44,`03-05 worst-case alive <= 44 (contract 2026-10-12 §4): ${n.alive03}/${n.alive04}/${n.alive05}`);
   for(const g of ["bunkerAssault","bunkerBackdrop","bunkerPursuit"]){
     assert.ok(ACTIVATION[g].retire,`${g} declares how its survivors leave (retire)`);
     assert.ok(!n.alive03ByGroup[g]&&!n.alive05ByGroup[g],`${g} is off the field before 03`);
@@ -229,7 +231,7 @@ console.log(`ok tank escort slots hidden from the gap: ${FRONT_TANK_ESCORT_SLOTS
   assert.ok(!ex.rearRoute04.by?.pursuitFallback0&&!ex.rearRoute04.by?.pursuitFallback1,"RJ and the 04 rear route are hidden from the pursuit fallback");
   // No two 01-05 starts share a spot (NPC capsules do not collide: two men spawned on one point merge into one).
   {
-    const starts=["bunkerAssault","bunkerBackdrop","bunkerPursuit","approach","front","frontFlank","frontOfficer","machineGun","tank","frontReserve","bundleApproach"]
+    const starts=["bunkerAssault","bunkerBackdrop","bunkerPursuit","approach","front","frontFlank","frontOfficer","machineGun","tank","frontReserve","sapInfiltrators"]
       .flatMap(g=>E[g].map(s=>({id:g+"/"+s.id,x:s.x,z:s.z})));
     const close=[];
     for(let i=0;i<starts.length;i++)for(let j=i+1;j<starts.length;j++)if(D(starts[i],starts[j])<0.8)close.push(`${starts[i].id}~${starts[j].id}`);

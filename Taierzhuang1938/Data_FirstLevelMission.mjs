@@ -1,6 +1,6 @@
-import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as Sortie, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_TOPOLOGY_VERSION } from "./Data_FirstLevelMissionTopology.mjs";
-import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS, FRONT_FLANK_GROUP, FRONT_OFFICER, FRONT_RESERVE_ENTRIES } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS, FRONT_FLANK_GROUP, FRONT_OFFICER, FRONT_RESERVE_ENTRIES, FRONT_TANK_CREW } from "./Data_FirstLevelMissionFront.mjs";
 import { FRONT_PRESSURE_TACTICS } from "./Data_FirstLevelFrontPressure.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
@@ -38,29 +38,33 @@ export const MISSION_STAGES = Object.freeze([
     ["rearTrenchEntered", "cornerReached", "collectionPointSeen", "supportOrdersHeard"],
     null,
   ),
+  // 2026-10-12 03–11 重构（docs/Data_FirstLevel0311Refactor20261012Contract.md §3.1–3.3、§5.5）：任务字只写看得见的东西；
+  // 03 的 tankPreviewed 改 tankHeard（引擎起播即记，不再露面停车）；04 加 gapGuardKilled（车体机枪打死冲缺口的 guard 5）；
+  // 05 退出旧弹药屋那一段（bundleReturned），加 escortsWithdrawn（跟车步兵退了口子才开）。
   Stage(
     "Support",
-    "跟随班长，夺取右侧机枪阵位。",
+    "跟随班长，回前沿接人。",
     A.front,
     // 契约 §2.6：03 到「何有田接枪 + 老周离枪 ≥10 m」即过，不再等老周走回集结处（约 100 s 空等）；
     // zhouGunWounded（老周走到集结处）挪到 05 的背景条件：06 之前必须成立。
-    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "leftGunHandover", "zhouLeftGun", "tankPreviewed"],
+    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "leftGunHandover", "zhouLeftGun", "tankHeard"],
     null,
   ),
   Stage(
     "MachineGun",
-    "掩护后续守军，留意右前方道路。",
+    "掩护守军，盯住右前方道路。",
     A.gun,
-    // 2026-09-28：不再等 tankBlocksExit。罗班长在后墙岔口说完「顺子，跟我走后沟，去拿弹！」就该带人走；战车那时
+    // 2026-09-28：不再等 tankBlocksExit。罗班长在后墙岔口说完「顺子，跟我走支沟！」就该带人走；战车那时
     // 多半还在路上（三趟 03→06 连续跑：说完到压到沟口 37–42 s），他原地干站到车到位。车照样开到 Block 封口，05 里记。
-    ["tankPositionPressured", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
+    // 2026-10-12 第二轮：阵位前半边的隔院近战是 04 的门（nestFrontContested → nestFrontCleared），BundleOrder 在它之后。
+    ["tankPositionPressured", "gapGuardKilled", "nestFrontContested", "nestFrontCleared", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
     null,
   ),
   Stage(
     "Tank",
-    "沿后侧支沟取得集束弹，解除撤口封锁。",
-    A.bundle,
-    ["bundleRouteTraversed", "bundleTaken", "bundleReturned", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned", "zhouGunWounded"],
+    "沿支沟摸到战车侧面。",
+    A.bundleDrop,
+    ["bundleRouteTraversed", "bundleTaken", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "escortsWithdrawn", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned", "zhouGunWounded"],
     "BundleGo",
   ),
   // 2026-10-12 03–11 重构（契约 §5.5）：任务字只写看得见的东西。06 requirements 不变（matchAsked / nierSeen 是内部事实）。
@@ -234,10 +238,16 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   frontReserve: FRONT_RESERVE_ENTRIES.flatMap((entry)=>entry.slots.map((slot,i)=>
     ({ id: `FrontReserve${entry.id}${i}`, role: "reserve", ...slot, entry: entry.id, stage: entry.slotStages[i] }))),
   machineGun: FRONT_MACHINE_GUN_ATTACK,
-  bundleApproach: Sortie.enemies,
+  // ---- 0311 A Front ----
+  // 05 sap infiltrators (2026-10-12 contract §5.3, formerly `bundleApproach`): four men in the road link sap who come
+  // west through the old ammo sap to the rear junction once the player is up the attack branch (sapInfiltrationStarted).
+  sapInfiltrators: Sortie.enemies,
   // Escorts start with the tank in the plateau road cutting (hidden); FRONT_TANK_ESCORT_SLOTS are their block-point slots.
   tank: [{id:"TankEscortA",role:"escort",x:101,z:-208.5},{id:"TankEscortB",role:"escort",x:106.5,z:-210.5},
     {id:"TankEscortC",role:"escort",x:99,z:-212.5},{id:"TankEscortD",role:"escort",x:104,z:-215}],
+  // 05 tank crew (contract §3.3): two men who bail out of the Disabled tank and run back up the road to Bend. Spawned by
+  // Script_FirstLevelFrontCounterattack at the live tank's sides on tankFireDisabled, never by the generic step spawner.
+  tankCrew: FRONT_TANK_CREW,
   village: [
     { id: "VillageGunner", ...P.sideRoomGunner, weapon: "Type11", hold: true },
     { id: "VillageCorner", x: 54, z: -12 },
@@ -361,7 +371,8 @@ export const MISSION_GUIDANCE = Object.freeze({
   BunkerRescue:{label:'rescue'},
   RearTrench:{label:'rearTrench',route:'rearTrench'},
   Support:{label:'support',route:'support'},
-  MachineGun:{label:'front'},Tank:{label:'bundle',route:'bundle'},
+  // 2026-10-12 契约 §5.4：05 的路线是攻击支路（支沟里捡弹），不再指旧弹药屋。
+  MachineGun:{label:'front'},Tank:{label:'bundle',route:'attack'},
   Orders:{label:'orders',route:'collectionReturn'},
   // 0311 B：沟口接火到担架过完开阔地之间，标签指东边田埂上的机枪（mouthLabel；运行时 CurrentGuide 按两条事实切）。
   South:{label:'south',route:'southWalk',mouthLabel:'mouth'},Village:{label:'village',route:'village'},
@@ -377,15 +388,22 @@ export const MISSION_GUIDANCE = Object.freeze({
 });
 // Front riflemen no longer use point tactics: they bound between FRONT_ASSAULT lines (runtime UpdateAssault).
 // 2026-09-23（docs/Data_EnemyAi.md §20）：过滤按「真在某个遭遇组里的人」取，不再只认 approach 组 ——
-// 只认 approach 的那一版把 bundleApproach 的 BundleBendA/B 的切沟战术整条滤掉了，
+// 只认 approach 的那一版把 sapInfiltrators（旧 bundleApproach）的 BundleBendA/B 的切沟战术整条滤掉了，
 // 那两个人从 02 起就站在路上一动不动（05「切进沟里」那一拍从没发生过）。
 const TACTIC_MEMBER_IDS = new Set([...FRONT_APPROACH_ENEMIES, ...Sortie.enemies].map((spec) => spec.id));
+// 2026-10-12（契约 §3.3）：炸哑后弃车的两名车组沿战车路倒着跑回 Bend，边跑边打；mps 是跑步，不在路点停。
+const TANK_CREW_FLIGHT = Object.freeze(["Approach","Pressure","BendExit","Bend"].map((id) => {
+  const w = FRONT_TANK_PATH.find((p) => p.id === id); return Object.freeze({ x: w.x, z: w.z, holdS: 0 });
+}));
 export const MISSION_TACTICS = Object.freeze({
   // APPROACH_TACTICS 里还带着旧开场那支 surface 突进队的条目（那一组随军列开场下线了），
   // 只取名册里真有的人 —— 不然战术表里会留下一批不属于任何组的孤儿。
   ...Object.fromEntries(Object.entries(APPROACH_TACTICS).filter(([id]) => TACTIC_MEMBER_IDS.has(id))),
   // 压力表给的切沟路线覆盖同名条目（原 BundleBendB 那条穿路侧挡墙，见 FRONT_PRESSURE_TACTICS 头注）。
   ...FRONT_PRESSURE_TACTICS,
+  // ---- 0311 A Front ----
+  TankCrewA: { fact: "tankCrewBailed", delay: 0.4, mps: 3.6, points: TANK_CREW_FLIGHT },
+  TankCrewB: { fact: "tankCrewBailed", delay: 1.1, mps: 3.6, points: TANK_CREW_FLIGHT },
   // 2026-10-12 C 包：巷东头主街口放了草垛 LaneHaystack（x 78.4–80.4、z 41.8–43.8），折线都从它北面过。
   // 2026-10-12 C 包：第一拨停在巷子东半段（离院门 11–16 m）——「追兵从绕行巷东头来」，不再冲到院门口贴脸；
   // 从院门外东侧墙角（A.laneEast）往东看就是他们，门楼在他们身后。
@@ -550,7 +568,8 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   },
 });
 
-export const FRONT_BATTLE_OBJECTIVES=Object.freeze({capture:"跟随班长，夺取右侧机枪阵位。",coverFirst:"掩护第一批守军撤入交通壕。",
-    coverRest:"掩护后续守军，留意右前方道路。",rear:"跟随班长，退到阵位后墙。",
-    supply:"沿后侧支沟取得集束弹。",return:"沿原支沟返回阵位后侧岔口。",attack:"跟随班长接近战车，解除撤口封锁。",
-    retreat:"退回支沟遮挡，掩护剩余守军撤回。",disengage:"沿后交通壕撤离，随班长返回伤员集结处。"});
+// 2026-10-12 契约 §5.5：任务字只写看得见的东西（观察口后指破墙那挺机枪；05 指战车侧面、捡弹后「炸停战车」）。
+export const FRONT_BATTLE_OBJECTIVES=Object.freeze({capture:"跟随班长，回前沿接人。",observed:"打掉右边破墙那挺机枪。",coverFirst:"守住阵位，掩护守军撤下来。",
+    coverRest:"掩护守军，盯住右前方道路。",rear:"跟随班长，退到阵位后墙。",
+    supply:"沿支沟摸到战车侧面。",attack:"炸停战车。",
+    retreat:"退回支沟，掩护剩下的人撤回。",disengage:"随班长撤回集结处。"});

@@ -146,6 +146,11 @@ export const LANDMARK_COLUMNS = Object.freeze([
   // scale 1.5：从出沟点看它在 45 m 外、房子后面，只露烟柱；1.0 的 9 m 柱子在灰天上只是一小抹，13.5 m 才够抬头。
   Object.freeze({ id: "VillageMouthFire", x: 40, z: -30.5, frame: 0, kind: "timber", scale: 1.5,
     reference: "07 village mouth landmark: burning woodpile north of the lane" }),
+  // 2026-10-12 (03–11 refactor §3.2, Concept_04): the second Type 89 burning on the slope east of CrestEast
+  // (Data_FirstLevelWhiteboxFront BurningTank*): the soot column over its engine deck is what reads from the nest's
+  // firing positions 95 m away. 35 m off the tank road (>= 13 m route clearance), nothing solid within 3 m but the hull.
+  Object.freeze({ id: "BurningTankSlope", x: 96, z: -216, frame: 0, kind: "metal", scale: 1.8,
+    reference: "04 burning tank on the far slope: soot column over the wreck" }),
 ]);
 function BuildLandmarkSmoke(random) {
   return LANDMARK_COLUMNS.map((mark) => Object.freeze({
