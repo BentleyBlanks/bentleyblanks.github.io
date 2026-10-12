@@ -235,8 +235,10 @@ try {
 
   // 5) 小地图与卡片像素
   console.log("--- pixels");
+  // 选择器只认「#blockoutRoot 里看得见的 canvas / 卡片」，不认占位界面的类名（C 包替换后照样能跑）。
   const mini = await page.evaluate(() => {
-    const canvas = document.querySelector("#blockoutRoot canvas");
+    const visible = [...document.querySelectorAll("#blockoutRoot canvas")].filter(c => c.clientWidth > 0 && c.clientHeight > 0);
+    const canvas = visible.find(c => c.clientWidth >= 120 && c.clientWidth <= 360) || visible[0];
     const ctx = canvas.getContext("2d");
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     const colors = new Set();
@@ -248,11 +250,17 @@ try {
     return { colors: colors.size, ink, w: canvas.width, h: canvas.height };
   });
   Check("小地图有内容（纸色之外有块、单位、玩家）", mini.colors > 12 && mini.ink > 50, JSON.stringify(mini));
-  const cardBox = await page.evaluate(() => {
-    const card = document.querySelector("#blockoutRoot .bkCard") || document.querySelector("#blockoutRoot [class*=Card]");
+  const cardBox = await page.evaluate((what) => {
+    // 卡片 = 含「此时」那句话、宽不过 600 px 的最大一块
+    let card = null, area = 0;
+    for (const el of document.querySelectorAll("#blockoutRoot *")) {
+      if (!el.textContent.includes(what)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.width < 600 && r.width * r.height > area) { card = el; area = r.width * r.height; }
+    }
     const r = card?.getBoundingClientRect();
     return r ? { x: r.x, y: r.y, w: r.width, h: r.height, text: card.textContent.length } : null;
-  });
+  }, configDoc.keyframes[2].what);
   let cardPixels = null;
   if (cardBox && cardBox.w > 10 && cardBox.h > 10) {
     const png = await page.screenshot({ clip: { x: cardBox.x, y: cardBox.y, width: cardBox.w, height: cardBox.h } });
@@ -276,8 +284,8 @@ try {
   await page.evaluate(() => window.Tengxian.Debug.Blockout.ToggleMap(true));
   await page.waitForTimeout(700);
   const full = await page.evaluate(() => {
-    const canvases = [...document.querySelectorAll("#blockoutRoot canvas")];
-    const canvas = canvases[canvases.length - 1];
+    const canvases = [...document.querySelectorAll("#blockoutRoot canvas")].filter(c => c.clientWidth > 0 && c.clientHeight > 0);
+    const canvas = canvases.sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
     const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
     let ink = 0;
     for (let i = 0; i < data.length; i += 4 * 13) if (data[i] + data[i + 1] + data[i + 2] < 560) ink++;
