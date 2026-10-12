@@ -155,6 +155,31 @@ try {
     poses.push(`${kf.id}:${error.toFixed(2)}m`);
     Check(`GoTo ${kf.id}：玩家位置误差 < 0.5 m、关键帧号对`, error < 0.5 && p.state.id === kf.id, `${error.toFixed(3)} m`);
   }
+  // 按键：, 上一个（直接到位）、. 下一个（带过渡）、M 全关总图、Esc 关图
+  console.log("--- keys");
+  await page.evaluate(() => window.Tengxian.Debug.Blockout.GoTo(1, { animate: false }));
+  await page.keyboard.press("Comma");
+  const afterComma = await page.evaluate(() => window.Tengxian.Debug.Blockout.State());
+  await page.keyboard.press("Period");
+  const afterPeriod = await page.evaluate(() => window.Tengxian.Debug.Blockout.State());
+  await page.waitForFunction(() => !window.Tengxian.Debug.Blockout.State().transitioning, null, { timeout: 30000 });
+  await page.keyboard.press("KeyY");
+  const afterY = await page.evaluate(() => window.Tengxian.Debug.Blockout.State());
+  await page.waitForFunction(() => !window.Tengxian.Debug.Blockout.State().transitioning, null, { timeout: 30000 });
+  const replayEnd = await page.evaluate(() => window.Tengxian.Debug.Blockout.Units());
+  const kf1 = configDoc.keyframes[1];
+  const replayOff = kf1.units.filter(u => { const f = replayEnd.find(v => v.id === u.id); return !f || Math.hypot(f.x - u.x, f.z - u.z) > 0.05; });
+  Check("Y：从上一关键帧重播进入当前关键帧的过渡，播完到位", afterY.index === 1 && afterY.transitioning && replayOff.length === 0
+    && replayEnd.length === kf1.units.length, `${replayEnd.length} 人，错位 ${replayOff.map(u => u.id).join(",")}`);
+  await page.keyboard.press("KeyM");
+  const afterM = await page.evaluate(() => window.Tengxian.Debug.Blockout.State());
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(100);
+  const afterEsc = await page.evaluate(() => window.Tengxian.Debug.Blockout.State());
+  Check("按键：「,」上一个直接到位，「.」下一个带过渡，M 开全关总图，Esc 关图",
+    afterComma.index === 0 && !afterComma.transitioning && afterPeriod.index === 1 && afterPeriod.transitioning
+      && afterM.mapOpen && !afterEsc.mapOpen,
+    JSON.stringify({ comma: afterComma.index, period: [afterPeriod.index, afterPeriod.transitioning], m: afterM.mapOpen, esc: afterEsc.mapOpen }));
   await page.evaluate(() => window.Tengxian.Debug.Blockout.GoTo(1, { animate: false }));
   await page.waitForTimeout(800);
   await page.screenshot({ path: path.join(shotDir, "FirstLevel_03-2.png") });

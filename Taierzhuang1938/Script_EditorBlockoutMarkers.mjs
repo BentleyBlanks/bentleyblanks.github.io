@@ -20,6 +20,7 @@ export const BLOCKOUT_MARKER_COLORS = Object.freeze({
 });
 const OVERLAY_PEAK = 0.75;
 const LABEL_FAR_M = 120;
+const FLASH_S = 0.6;
 const DEG = Math.PI / 180;
 
 const RING_RADIUS = { soldier: 0.55, officer: 0.6, civilian: 0.5, child: 0.4, tank: 3.4, litter: 1.9, cart: 2.4, animal: 1.2 };
@@ -292,6 +293,22 @@ export class BlockoutMarkers {
     return chunk;
   }
 
+  /** 地环闪一下（§5.2：原地出现 / 过渡开始时消失的人）。 */
+  Flash(x, z, side) {
+    this.flashes = (this.flashes || []).filter(f => this.time - f.t0 < FLASH_S);
+    this.flashes.push({ x, z, color: BLOCKOUT_MARKER_COLORS[side] || BLOCKOUT_MARKER_COLORS.nra, t0: this.time });
+  }
+
+  _FlashChunk() {
+    const chunk = new Chunk(this.groundAt);
+    for (const f of this.flashes) {
+      const k = (this.time - f.t0) / FLASH_S;
+      if (k < 0 || k >= 1) continue;
+      chunk.Ring(f.x, f.z, 0.5 + 1.6 * k, 0.16, Rgba(f.color, 0.95 * (1 - k)), { segments: 24 });
+    }
+    return chunk;
+  }
+
   _NextChunk() {
     const n = this.next;
     const chunk = new Chunk(this.groundAt);
@@ -320,6 +337,11 @@ export class BlockoutMarkers {
   Update(dt) {
     this.time += dt;
     if (this.next) { this.chunks.set("next", { sig: "", chunk: this._NextChunk() }); this.dirty = true; }
+    if (this.flashes?.length) {
+      this.flashes = this.flashes.filter(f => this.time - f.t0 < FLASH_S);
+      this.chunks.set("flash", { sig: "", chunk: this._FlashChunk() });
+      this.dirty = true;
+    } else if (this.chunks.has("flash")) { this.chunks.delete("flash"); this.dirty = true; }
     if (this.dirty) this._Rebuild();
     this._UpdateLabels();
   }

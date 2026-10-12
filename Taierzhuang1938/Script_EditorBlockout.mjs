@@ -327,13 +327,19 @@ export class EditorBlockout {
       this.markers.SetPois([]);
       this.markers.SetNext(null);
       this.unitData = new Map();
-      await this.game.JumpToLevel(index);
-      this.levelIndex = index;
-      this.levelKey = key;
-      this.index = -1;
-      this.signals = null;
+      // 重建期间旧配置与旧场地对不上：按键、导航栏、地图点选一律不理
+      this.rebuilding = true;
+      try {
+        await this.game.JumpToLevel(index);
+        this.levelIndex = index;
+        this.levelKey = key;
+        this.index = -1;
+        this.signals = null;
+        await this.LoadConfig();
+      } finally {
+        this.rebuilding = false;
+      }
       this.ReplaceUrl();
-      await this.LoadConfig();
       this.SetupLevel();
       this.ui.SetLevels(BLOCKOUT_LEVELS.map(({ key: k, label }) => ({ key: k, label })), this.levelKey);
       await this.GoTo(0, { animate: false });
@@ -421,7 +427,7 @@ export class EditorBlockout {
    * 其余一律直接到位。返回的 Promise 在过渡结束时 resolve。
    */
   GoTo(idOrIndex, { animate = false } = {}) {
-    if (!this.doc) return Promise.resolve(false);
+    if (!this.doc || this.rebuilding) return Promise.resolve(false);
     const index = KeyframeIndex(this.doc, idOrIndex);
     if (index < 0) return Promise.resolve(false);
     const prevIndex = this.index;
@@ -434,14 +440,7 @@ export class EditorBlockout {
     this.host.camera.getWorldPosition(this._cam);
     let promise = Promise.resolve(true);
     if (animate && prevKf && index === prevIndex + 1) {
-      const plan = PlanTransition(prevKf, kf);
-      this.unitData = new Map([...prevKf.units.map(u => [u.id, u]), ...kf.units.map(u => [u.id, u])]);
-      this.toUnitData = new Map(kf.units.map(u => [u.id, u]));
-      this.puppets.Transition(plan, prevKf.units, kf.units, this._cam);
-      this.lastPlan = { durationS: plan.durationS, playbackRate: plan.playbackRate, wallS: plan.wallS, units: plan.units.length };
-      if (plan.playbackRate > 1.01) this.ui.Toast(`快进 ×${plan.playbackRate.toFixed(1)}`, "info");
-      if (this.puppets.transitioning) promise = new Promise(resolve => { this.pending = resolve; });
-      else this.unitData = this.toUnitData;
+      promise = this.StartTransition(prevKf, kf);
     } else {
       this.unitData = new Map(kf.units.map(u => [u.id, u]));
       this.puppets.Apply(kf.units, this._cam);
@@ -470,18 +469,29 @@ export class EditorBlockout {
 
   /** Y：先把单位摆回上一关键帧，再播进入当前关键帧的过渡（玩家不动）。 */
   Replay() {
-    if (!this.doc || this.index <= 0) return Promise.resolve(false);
+    if (!this.doc || this.rebuilding || this.index <= 0) return Promise.resolve(false);
     const prevKf = this.doc.keyframes[this.index - 1], kf = this.doc.keyframes[this.index];
     this.ResolvePending(false);
     this.host.camera.getWorldPosition(this._cam);
     this.puppets.Apply(prevKf.units, this._cam);
+    return this.StartTransition(prevKf, kf);
+  }
+
+  /** 播 prevKf → kf 的过渡（§5.2）；返回过渡结束时 resolve 的 Promise。 */
+  StartTransition(prevKf, kf) {
     const plan = PlanTransition(prevKf, kf);
     this.unitData = new Map([...prevKf.units.map(u => [u.id, u]), ...kf.units.map(u => [u.id, u])]);
     this.toUnitData = new Map(kf.units.map(u => [u.id, u]));
     this.puppets.Transition(plan, prevKf.units, kf.units, this._cam);
+    // 原地出现 / 一开始就消失的人：地环闪一下
+    for (const entry of plan.units) {
+      if ((entry.mode === "appear" && !entry.walkIn) || (entry.mode === "vanish" && !entry.walkOut)) {
+        this.markers.Flash(entry.from.x, entry.from.z, (entry.unitTo || entry.unitFrom)?.side);
+      }
+    }
     this.lastPlan = { durationS: plan.durationS, playbackRate: plan.playbackRate, wallS: plan.wallS, units: plan.units.length };
     if (plan.playbackRate > 1.01) this.ui.Toast(`快进 ×${plan.playbackRate.toFixed(1)}`, "info");
-    if (!this.puppets.transitioning) { this.unitData = this.toUnitData; return Promise.resolve(true); }
+    if (!this.puppets.transitioning) { this.unitData = this.toUnitData; this.toUnitData = null; return Promise.resolve(true); }
     return new Promise(resolve => { this.pending = resolve; });
   }
 

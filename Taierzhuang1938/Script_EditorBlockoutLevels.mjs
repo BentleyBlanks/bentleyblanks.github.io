@@ -31,8 +31,11 @@ export const BLOCKOUT_TINT_STOPS = Object.freeze({
   mid: Object.freeze([0.60, 0.60, 0.56]),
   high: Object.freeze([0.78, 0.71, 0.56]),
 });
-/** 第一关高度范围（米）：格网实测 −6.2…7.5，色带夹在 −4…6，沟底与河槽仍落在冷端。 */
-export const FIRST_LEVEL_TINT = Object.freeze({ lo: -4, hi: 6 });
+/**
+ * 第一关高度范围（米）：格网实测 −6.2…7.5。色带夹在 −3…4：地面大多在 0…1 m，
+ * 2 m 深的交通沟沟底落在冷端，河槽更冷，两侧高坡偏暖。
+ */
+export const FIRST_LEVEL_TINT = Object.freeze({ lo: -3, hi: 4 });
 
 /** 高度 → sRGB 三元组（写进 out）。 */
 export function BlockoutTintColor(y, tint, out = [0, 0, 0]) {
