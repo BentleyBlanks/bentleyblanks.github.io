@@ -901,6 +901,8 @@ export const FRONT_LINES_IN_FIREFIGHT = Object.freeze({
   "TankStopped.02": "战车刚停，罗班长朝缺口喊守军下来；玩家边撤边打剩下的跟车步兵",
   "BundleAttack.01": "攻击位：罗班长在投弹点西侧 1.5 m 到位时喊「就这边！莫上大路！」，玩家正对着战车和跟车护兵（09-25 Front step 2 驾驶：115 帧全在打）",
   "BundleAttack.02": "攻击位上罗班长在投弹点西侧 1.5 m 喊「顺子，拿弹！旁边的人我看到！」，玩家正瞄着战车和跟车步兵",
+  // 2026-10-12 03–05 重构（A 包）第二轮：第一批撤完那一拍罗班长在阵位里喊「先把人接下来！」，玩家在缴获机枪上压着缺口。
+  "TankSpotted.02": "第一批守军撤完、战车发动机响起时，罗班长在阵位里身旁 3 m 喊「先把人接下来！」；玩家在缴获机枪上压着缺口和土坎（第二轮 03→07 第 2 趟：说话时玩家背对他在打）",
 });
 export const FRONT_LINE_FIGHT_SHARE = .5;
 /** A speaker counts as firing for this long after his last shot (s): a rifleman's bolt cycle and an MG burst pause. */
