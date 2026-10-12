@@ -3,78 +3,269 @@
   "level": "SecondLevel",
   "title": "第二关 · 手榴弹雨（空间草稿）",
   "source": {
-    "generator": "hand-made sample (contract 2026-10-13)",
-    "generatedAt": "2026-10-13T00:00:00Z"
+    "generator": "Script_EditorBlockoutCli.mjs scene SecondLevel",
+    "gameVersion": "draft-2026-10-12-topology",
+    "commit": "d8af08b3aee582b30f65a954dfc5e01514a375bf",
+    "generatedAt": "2026-10-12T17:35:51.160Z"
   },
-  "zones": [],
+  "zones": [
+    {
+      "id": "A",
+      "name": "东关寨墙一线",
+      "stages": [
+        1,
+        4
+      ],
+      "box": {
+        "minX": 400,
+        "maxX": 640,
+        "minZ": -250,
+        "maxZ": 60
+      }
+    }
+  ],
   "keyframes": [
     {
-      "id": "S-1",
+      "id": "01-1",
       "stage": 1,
-      "stageTitle": "寨墙投掷线（草稿）",
-      "name": "寨门内",
+      "stageTitle": "后街第二街垒",
+      "name": "主路街垒后",
       "player": {
-        "x": 520,
+        "x": 468,
         "z": -65,
         "yawDeg": -90,
         "pitchDeg": 0,
         "stance": "stand"
       },
       "what": "第二关流程未定稿，这里只是空间占位",
-      "next": {
-        "text": "寨门"
-      },
+      "next": null,
       "how": [],
-      "notes": "样例配置",
+      "notes": "四片空间取自 10-12 拓扑草稿（未定稿）；坐标以 Data_Tengxian 现状为准：寨墙 x=540、东寨门 (540,−65)、地隙 x≈548–562。",
       "signals": [],
       "units": [],
       "pois": [
         {
-          "id": "gate",
-          "name": "寨门",
-          "kind": "poi",
+          "id": "zhaiGate",
+          "name": "东寨门",
+          "kind": "landmark",
           "x": 540,
           "z": -65,
-          "radiusM": 2
+          "radiusM": 2.5
+        },
+        {
+          "id": "breachNorth",
+          "name": "寨墙北缺口",
+          "kind": "poi",
+          "x": 540,
+          "z": -24,
+          "radiusM": 8
+        },
+        {
+          "id": "breachSouth",
+          "name": "寨墙南缺口",
+          "kind": "poi",
+          "x": 540,
+          "z": 52,
+          "radiusM": 6
         },
         {
           "id": "gully",
           "name": "地隙",
-          "kind": "landmark",
+          "kind": "danger",
           "x": 555,
-          "z": -65,
+          "z": -40,
           "radiusM": 4
+        },
+        {
+          "id": "eastGuangStreet",
+          "name": "东关大街",
+          "kind": "landmark",
+          "x": 449,
+          "z": -65,
+          "radiusM": 5
         }
       ]
     },
     {
-      "id": "S-2",
+      "id": "02-1",
       "stage": 2,
-      "stageTitle": "外壕与地隙（草稿）",
-      "name": "寨墙投掷线",
+      "stageTitle": "主巷与北侧院子",
+      "name": "主巷看北侧院子",
       "player": {
-        "x": 536,
-        "z": -58,
-        "yawDeg": -90,
-        "pitchDeg": -4,
-        "stance": "crouch"
+        "x": 500,
+        "z": -66.5,
+        "yawDeg": -50.8,
+        "pitchDeg": 0,
+        "stance": "stand"
       },
       "what": "第二关流程未定稿，这里只是空间占位",
-      "next": {
-        "text": "看地隙"
-      },
+      "next": null,
       "how": [],
-      "notes": "样例配置",
+      "notes": "",
       "signals": [],
       "units": [],
       "pois": [
         {
+          "id": "zhaiGate",
+          "name": "东寨门",
+          "kind": "landmark",
+          "x": 540,
+          "z": -65,
+          "radiusM": 2.5
+        },
+        {
+          "id": "breachNorth",
+          "name": "寨墙北缺口",
+          "kind": "poi",
+          "x": 540,
+          "z": -24,
+          "radiusM": 8
+        },
+        {
+          "id": "breachSouth",
+          "name": "寨墙南缺口",
+          "kind": "poi",
+          "x": 540,
+          "z": 52,
+          "radiusM": 6
+        },
+        {
           "id": "gully",
           "name": "地隙",
-          "kind": "landmark",
+          "kind": "danger",
           "x": 555,
-          "z": -65,
+          "z": -40,
           "radiusM": 4
+        },
+        {
+          "id": "eastGuangStreet",
+          "name": "东关大街",
+          "kind": "landmark",
+          "x": 449,
+          "z": -65,
+          "radiusM": 5
+        }
+      ]
+    },
+    {
+      "id": "03-1",
+      "stage": 3,
+      "stageTitle": "寨墙投掷线",
+      "name": "南翼投弹位",
+      "player": {
+        "x": 526.8,
+        "z": -45,
+        "yawDeg": -90,
+        "pitchDeg": 0,
+        "stance": "crouch"
+      },
+      "what": "第二关流程未定稿，这里只是空间占位",
+      "next": null,
+      "how": [],
+      "notes": "",
+      "signals": [],
+      "units": [],
+      "pois": [
+        {
+          "id": "zhaiGate",
+          "name": "东寨门",
+          "kind": "landmark",
+          "x": 540,
+          "z": -65,
+          "radiusM": 2.5
+        },
+        {
+          "id": "breachNorth",
+          "name": "寨墙北缺口",
+          "kind": "poi",
+          "x": 540,
+          "z": -24,
+          "radiusM": 8
+        },
+        {
+          "id": "breachSouth",
+          "name": "寨墙南缺口",
+          "kind": "poi",
+          "x": 540,
+          "z": 52,
+          "radiusM": 6
+        },
+        {
+          "id": "gully",
+          "name": "地隙",
+          "kind": "danger",
+          "x": 555,
+          "z": -40,
+          "radiusM": 4
+        },
+        {
+          "id": "eastGuangStreet",
+          "name": "东关大街",
+          "kind": "landmark",
+          "x": 449,
+          "z": -65,
+          "radiusM": 5
+        }
+      ]
+    },
+    {
+      "id": "04-1",
+      "stage": 4,
+      "stageTitle": "外壕与地隙",
+      "name": "寨墙外看地隙",
+      "player": {
+        "x": 545.5,
+        "z": -24,
+        "yawDeg": -90,
+        "pitchDeg": -8,
+        "stance": "stand"
+      },
+      "what": "第二关流程未定稿，这里只是空间占位",
+      "next": null,
+      "how": [],
+      "notes": "",
+      "signals": [],
+      "units": [],
+      "pois": [
+        {
+          "id": "zhaiGate",
+          "name": "东寨门",
+          "kind": "landmark",
+          "x": 540,
+          "z": -65,
+          "radiusM": 2.5
+        },
+        {
+          "id": "breachNorth",
+          "name": "寨墙北缺口",
+          "kind": "poi",
+          "x": 540,
+          "z": -24,
+          "radiusM": 8
+        },
+        {
+          "id": "breachSouth",
+          "name": "寨墙南缺口",
+          "kind": "poi",
+          "x": 540,
+          "z": 52,
+          "radiusM": 6
+        },
+        {
+          "id": "gully",
+          "name": "地隙",
+          "kind": "danger",
+          "x": 555,
+          "z": -40,
+          "radiusM": 4
+        },
+        {
+          "id": "eastGuangStreet",
+          "name": "东关大街",
+          "kind": "landmark",
+          "x": 449,
+          "z": -65,
+          "radiusM": 5
         }
       ]
     }
