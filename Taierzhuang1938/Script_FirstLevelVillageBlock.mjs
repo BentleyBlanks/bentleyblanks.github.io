@@ -2,7 +2,8 @@
 // Script_FirstLevelVillageBlock.mjs —— 第一关公开阶段 8/9/10 的演出与通过条件
 //
 // 需求原文：docs/Data_FirstLevelRebuildSource20260919.md 的 08—10；
-// 接口契约：docs/Data_FirstLevelRebuild20260919Contract.md §2/§4/§5。
+// 接口契约：docs/Data_FirstLevelRebuild20260919Contract.md §2/§4/§5；
+// 2026-10-12 03–11 重构 C 包：docs/Data_FirstLevel0311Refactor20261012Contract.md §3.6–3.8（耿家庄巷战）。
 // 运行时（Script_FirstLevelMissionRuntime）只留薄钩子：Enter 的三个分支与 Update 的一段。
 //
 // 这一层负责四件在骨架里只有最小实现的事：
@@ -17,6 +18,14 @@
 //      那一拍收尾后其余三个才从东巷那扇门进来，贴上身走共用白刃（Script_MeleeCombat）。
 //      10 开院门之后担架**真的从等待点走过来**，穿院子接回主街。
 //
+// 2026-10-12 C 包（耿家庄，COD 巷战套路）—— 纯规则在 Script_FirstLevelStreetFight，这里是它的副作用：
+//   08 主街是杀伤区：何有田 + 刘文财蹲街口压东窗；东巷来的 4 人逐个放出贴东墙根往北压（streetPush）；
+//      老耿在灶屋门口揪妮儿一巴掌、指灶屋、说连屋进了人（GengHouse）；玩家跨进侧路（灶屋 / 西侧夹道）街口不再补人。
+//   09 两条路汇到后院：夹道走到一半机枪屋侧门里那个窜出来（alleyPop）；MeleeAlley 先从连屋东窗往屋里扔一颗再进门；
+//      后院屋顶上那个（RoofThrower）在玩家进院 6 s 后投弹，妮儿先拍车板指他。
+//   10 守巷口只看东边：班长喊老耿开后门（GengGate：缸 → 桌 → 闩 → 车堵门 → 拽驴让路）；第二拨（laneWave2）逐个放出、
+//      90 s 不再补；担架只在草垛机枪被压住期间过门；驴车夹在担架队中间出门，卡门槛时可选 F 推（CartPush）。
+//
 // 玩家可见中文一律走文本表/台词表（Script_TextTest 的闸门模块清单里有这一份）。
 // ===========================================================================
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
@@ -25,13 +34,27 @@ import { MID_TUNING as M, MidLitterHoldSlots, MidWalkerHoldSlots } from "./Data_
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { T as Text } from "./Script_Text.mjs";
 import { FirstLevelKitchenAmbush, KitchenAmbushTriggered, KitchenAmbushLungeTarget } from "./Script_FirstLevelKitchenAmbush.mjs";
+import { StreetFightRules, ThrowPowerFor } from "./Script_FirstLevelStreetFight.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+/** 村落这一段算「同时存活」的遭遇组（契约 §4：≤ 14）。 */
+export const VILLAGE_ENCOUNTER_IDS = Object.freeze(["village", "melee", "streetPush", "alleyPop", "roofThrower", "courtyard", "laneWave2"]);
+/** 老耿开口的几段：说话位置按他本人（Script_FirstLevelMissionRuntime.VoicePosition 转到这里）。 */
+export const GENG_CUES = Object.freeze(["GengHouse", "GengGate", "CartPush", "GengCart", "AskGeng"]);
+/** 10 驴车出院门的折线（院门 → 绕行巷 → 主街南段西侧等着，让开担架线 x≈77.3、草垛与门楼口）；11 从那儿接着走。 */
+export const GENG_CART_LANE_ROUTE = Object.freeze([
+  { x: 53, z: 36.4 }, { x: 53, z: 39 }, { x: 66, z: 39 }, { x: 73.2, z: 39.4 }, { x: 74.0, z: 42.6 },
+]);
 
-/** 主街那一头站着的人：前队两个、刚从东巷退回来的守军两个。都不开枪，只站位与喊话。 */
+/** 主街那一头站着的人：前队两个（担架墙后北沿）、刚从东巷退回来的守军两个。都不开枪，只站位与喊话。 */
 export const VILLAGE_BYSTANDERS = Object.freeze([
-  ...P.streetBlock.frontParty.map((point, i) => Object.freeze({ id: `StreetFrontParty${i}`, ...point })),
+  ...P.streetBlock.frontPartyWait.map((point, i) => Object.freeze({ id: `StreetFrontParty${i}`, ...point })),
   ...P.streetBlock.withdrawnGuards.map((point, i) => Object.freeze({ id: `StreetWithdrawn${i}`, ...point })),
+]);
+/** 08 何有田、刘文财蹲街口压东窗的两个点（契约 §3.6：P.streetBlock.frontParty）。 */
+export const VILLAGE_STREET_POSTS = Object.freeze([
+  Object.freeze({ cast: "heyoutian", ...P.streetBlock.frontParty[0] }),
+  Object.freeze({ cast: "liuwencai", ...P.streetBlock.frontParty[1] }),
 ]);
 
 /**
@@ -55,6 +78,23 @@ export class FirstLevelVillageBlock {
     this.ambushQteSerial = null;
     this.releaseAt = null;
     this.retryHintPending = false;
+    // 2026-10-12 C 包：巷战纯规则与它的副作用状态。
+    this.rules = new StreetFightRules(M.streetFight, { alley: P.westAlley, yard: M.streetFight.yardBox });
+    this.pushSpawned = 0;
+    this.laneSpawned = 0;
+    this.roofPlaced = false;
+    this.roofAwake = false;
+    this.windowThrown = false;
+    this.gengHouse = null;       // { since, pointed, crouched }
+    this.gengGate = null;        // { phase, since }
+    this.cartBeat = null;        // { phase, since, helper }
+    this.streetPosted = false;
+    this.ridePending = false;
+    this.log = [];
+  }
+  Note(name, detail) {
+    this.log.push({ name, t: +(this.r.time ?? 0).toFixed(2), ...(detail || {}) });
+    if (this.log.length > 48) this.log.shift();
   }
 
   // -------------------------------------------------------------------------
@@ -65,9 +105,12 @@ export class FirstLevelVillageBlock {
       this.SpawnBystanders();
       this.HoldColumn();
       this.WatchOutside();
+      this.PlaceGengFamily();
     }
     // 08 里就可能已经走出灶屋南门、那一拍已经演过：不重置。
     if (stageId === "Village" || (stageId === "Melee" && this.ambush.Phase === "hidden")) this.HideAmbushLead();
+    if (stageId === "Melee") this.SendFamilyToYard();
+    if (stageId === "Courtyard") this.SendFamilyToYard();
   }
 
   /** 前队与退回守军：真人、不参战、不会被当成普通阵亡拖累编排。 */
@@ -101,15 +144,46 @@ export class FirstLevelVillageBlock {
     this.holding = true;
   }
 
-  /** 何有田留在外头看着（KitchenDetour 的第二句）。 */
+  /**
+   * 何有田 + 刘文财蹲在街口压东窗（契约 §3.6：P.streetBlock.frontParty）。何有田到位记 outsideWatched
+   * （KitchenDetour 的第二句「外头我看着！」）。
+   */
   WatchOutside() {
-    const actor = this.r.companion.Handle("heyoutian");
-    if (!actor) return;
-    this.watchPost = {
-      x: (P.streetBlock.litterWait[0].x + A.litterHold.x) / 2,
-      z: A.litterHold.z + 2.4,
-    };
-    this.r.squadRoutes.set(actor.id, [{ ...this.watchPost }]);
+    for (const post of VILLAGE_STREET_POSTS) {
+      const actor = this.r.companion.Handle(post.cast);
+      if (!actor) continue;
+      this.r.squadRoutes.set(actor.id, [{ x: post.x, z: post.z }]);
+    }
+    this.watchPost = { x: VILLAGE_STREET_POSTS[0].x, z: VILLAGE_STREET_POSTS[0].z };
+  }
+
+  /** 08：老耿已在灶屋北门外（GengFamily.Enter 按 R.geng.gengHouse 摆的）；妮儿从村北巷跑到他身边（他要揪着她）。 */
+  PlaceGengFamily() {
+    const family = this.r.gengFamily;
+    const geng = family?.geng?.position;
+    if (!family || !geng) return;
+    family.NierRideCart(false);
+    family.RunTo({ x: geng.x + 1.1, z: geng.z + 0.5 });
+  }
+
+  /**
+   * 09 起老耿与妮儿回后院：妮儿走西侧夹道到驴车尾「上车」（PointAt 要在车边拍车板）；老耿也走夹道回院里，
+   * 站在驴旁边等班长喊开后门。走直线会撞墙，所以逐点接（GengGoTo 回调链 / RunTo 一串点）。
+   */
+  SendFamilyToYard() {
+    if (this.ridePending) return;
+    const family = this.r.gengFamily;
+    if (!family?.geng?.position || !family.nier?.position) return;
+    this.ridePending = true;
+    const T = M.streetFight;
+    family.RunTo([A.westAlleyNorth, A.westAlleySouth], () => family.NierRideCart(true));
+    const yardSpot = family.CartSeatPoints()?.geng || { x: A.gengCartYard.x + 2, z: A.gengCartYard.z - 2 };
+    const legs = [A.westAlleyNorth, A.westAlleySouth, { x: 47.5, z: 20.5 }, yardSpot];
+    const Next = (i) => { if (i < legs.length) family.GengGoTo(legs[i], () => Next(i + 1)); else family.GengFace(T.gengVat, 2); };
+    // 已经在院子里（跳转起点）就别再绕夹道。
+    const inYard = family.geng.position.z > 16;
+    if (inYard) family.GengGoTo(yardSpot); else Next(0);
+    this.Note("familyToYard", { inYard });
   }
 
   // -------------------------------------------------------------------------
@@ -117,12 +191,14 @@ export class FirstLevelVillageBlock {
   // -------------------------------------------------------------------------
   Update(dt) {
     const stage = this.r.flow.stage.id;
+    if (["Village", "Melee", "Courtyard", "TransferApproach"].includes(stage)) this.UpdateStreetFight(dt);
     if (stage === "Village") this.UpdateVillage(dt);
     // 进门遭伏击在 08 进了灶屋之后就上膛：08 的三条事实常常是「进灶屋」最后落，但也可能
     // 玩家先冲过去、担架还没停好 —— 那一拍照样得演，不能等 09 开了才补。
     if (stage === "Melee" || (stage === "Village" && this.r.Has?.("kitchenEntered"))) this.UpdateKitchenAmbush(dt);
     if (stage === "Melee") this.UpdateMeleeBeat();
-    if (stage === "Courtyard") this.UpdateCourtyard();
+    if (["Melee", "Courtyard"].includes(stage)) this.UpdateWindowThrow();
+    if (stage === "Courtyard") this.UpdateCourtyard(dt);
   }
 
   UpdateVillage() {
@@ -144,14 +220,38 @@ export class FirstLevelVillageBlock {
       || inside(luo.position)
       || Distance(luo.position, P.ambushSquadPosts[2]) < M.houseCheckArrivalM))
       r.Record("houseChecked", { x: luo?.position.x ?? null, z: luo?.position.z ?? null });
-    const watcher = r.companion.Handle("heyoutian");
-    if (watcher?.alive && this.watchPost && !r.Has("outsideWatched")
-      && Distance(watcher.position, this.watchPost) < M.outsideWatchArrivalM) {
-      r.Record("outsideWatched", { x: watcher.position.x, z: watcher.position.z });
-      r.Defend(watcher, this.watchPost, 0, 0);
+    // 街口两个：到位就蹲下守着压东窗；何有田到位记 outsideWatched。
+    for (const post of VILLAGE_STREET_POSTS) {
+      const actor = r.companion.Handle(post.cast);
+      if (!actor?.alive || actor.missionStreetPosted || Distance(actor.position, post) >= M.outsideWatchArrivalM) continue;
+      actor.missionStreetPosted = true;
+      r.Defend(actor, post, 0, 0);
+      r.ai.SetStance(actor, 1, 3, true);
+      if (post.cast === "heyoutian") r.Record("outsideWatched", { x: actor.position.x, z: actor.position.z });
     }
     if (r.Has("houseChecked")) r.Say("KitchenDetour");
     if (this.LittersHeld()) r.Record("littersInCover", { held: this.HeldLitters().length });
+    this.UpdateGengHouse();
+  }
+
+  /** 08 老耿：玩家从主街口回来、走到他跟前 —— 揪妮儿一巴掌（GengHouse 第一句）、指灶屋、说连屋进了人；说完蹲门边不进屋。 */
+  UpdateGengHouse() {
+    const r = this.r, T = M.streetFight, family = r.gengFamily;
+    const geng = family?.geng;
+    if (!geng?.position) return;
+    if (!this.gengHouse) {
+      if (Distance(r.player.position, geng.position) > T.gengHouseRangeM) return;
+      this.gengHouse = { since: r.time, pointed: false, crouched: false };
+      r.Record("gengHouseOffered", { x: +r.player.position.x.toFixed(1), z: +r.player.position.z.toFixed(1) });
+      r.Say("GengHouse");
+      family.GengPose("slap");
+      family.RunTo({ ...T.nierWallBack });
+      this.Note("gengHouse");
+      return;
+    }
+    const beat = this.gengHouse;
+    if (!beat.pointed && r.time - beat.since >= T.gengSlapToPointS) { beat.pointed = true; family.GengFace(T.gengHouseFace, 4); }
+    if (!beat.crouched && r.voice?.finished?.has("GengHouse")) { beat.crouched = true; family.GengCrouchAt(T.gengDoorSide); }
   }
 
   HeldLitters() {
@@ -166,6 +266,151 @@ export class FirstLevelVillageBlock {
       litter.held
       && Distance(litter, litter.holdSlot || litter) <= M.litterHoldArrivalM
       && VillageHoldCovered(litter, (from, to) => r.BlocksSight(from, to), (point, rise) => r.Point(point, rise)));
+  }
+
+  // -------------------------------------------------------------------------
+  // 2026-10-12 C 包：巷战纯规则的现场与事件（08 推进点 / 09 侧路与屋顶 / 10 巷口两波与放行门）
+  // -------------------------------------------------------------------------
+  Actor(id) { return this.r.enemies?.get?.(id) || null; }
+  /** 村落里此刻活着的日军（含装睡的）。 */
+  AliveVillage() {
+    let n = 0;
+    for (const actor of this.r.enemies.values()) if (actor.alive && VILLAGE_ENCOUNTER_IDS.includes(actor.missionEncounter)) n++;
+    return n;
+  }
+  /** 这一帧的现场（纯数据，测试也能照着喂）。 */
+  Scene() {
+    const r = this.r, pop = this.Actor("AlleyPop"), roof = this.Actor("RoofThrower"), gunner = this.Actor("LaneGunner");
+    return {
+      stage: r.flow.stage.id, streetSeen: r.Has("streetBlockSeen"), kitchenEntered: r.Has("kitchenEntered"),
+      player: r.player.position, aliveVillage: this.AliveVillage(), pushSpawned: this.pushSpawned,
+      alleyPop: { present: !!pop, alive: !!pop?.alive }, roof: { present: !!roof, alive: !!roof?.alive },
+      gateOpen: r.Has("courtyardGateOpen"), laneSpawned: this.laneSpawned,
+      gunner: { present: !!gunner, alive: !!gunner?.alive, suppressed: !!gunner?.alive && gunner.state === "suppressed" },
+      cartAtThreshold: this.cartBeat?.phase === "threshold", cartPushed: r.Has("cartPushed"),
+    };
+  }
+  /** 逐个放人（契约：不再补人 = 没放出来的不放；人口预算在规则里数）。生成走运行时的队列，与按表生成同一条路。 */
+  SpawnMember(group, index) {
+    const r = this.r, spec = MISSION_ENCOUNTERS[group]?.[index];
+    if (!spec) return false;
+    r.spawned?.add?.(group);
+    r.spawnQueue.push(() => r.SpawnEncounterActor(group, spec));
+    this.Note("spawn", { group, id: spec.id });
+    return true;
+  }
+  UpdateStreetFight(dt) {
+    const r = this.r, T = M.streetFight, family = r.gengFamily;
+    const events = this.rules.Update(dt, this.Scene());
+    for (const event of events) {
+      if (event === "spawnPusher") { if (this.SpawnMember("streetPush", this.pushSpawned)) this.pushSpawned++; }
+      else if (event === "pushStopped") r.Record("streetPushStopped", { spawned: this.pushSpawned });
+      else if (event === "westAlleyEntered") { r.Record("westAlleyEntered", { from: this.rules.alleyEnteredFrom }); r.SpawnEncounter("alleyPop"); }
+      else if (event === "sideRouteEntered") r.Record("sideRouteEntered", { kitchen: r.Has("kitchenEntered"), alley: this.rules.westAlleyEntered });
+      else if (event === "alleyPop") this.PopAlley();
+      else if (event === "yardEntered") this.Note("yardEntered");
+      else if (event === "roofSpot") {
+        const roof = this.Actor("RoofThrower");
+        if (roof?.alive) { family?.PointAt(roof.position, 3); r.Record("roofThrowerSpotted"); }
+      }
+      else if (event === "roofThrow") { const roof = this.Actor("RoofThrower"); if (roof?.alive) this.ThrowAt(roof, r.player.position, "roof"); }
+      else if (event === "roofDown") r.Record("roofThrowerDown");
+      else if (event === "spawnLane") { if (this.SpawnMember("laneWave2", this.laneSpawned)) this.laneSpawned++; }
+      else if (event === "laneSpent") r.Record("laneWave2Spent", { spawned: this.laneSpawned });
+      else if (event === "laneSuppressed") r.Record("laneMgSuppressed");
+      else if (event === "laneRaised") this.Note("laneRaised");
+      else if (event === "cartHelp") this.CartHelp();
+    }
+    this.UpdateSideRoutes();
+    this.UpdateRoofThrower();
+    void T;
+  }
+  /** 09 夹道那个：生出来先装睡（机枪屋里），窜出来之前不开枪、不被当成威胁。 */
+  UpdateSideRoutes() {
+    const pop = this.Actor("AlleyPop");
+    if (!pop?.alive || this.rules.alleyPopped) return;
+    pop.missionDormant = true; pop.scriptedNoncombatant = true; pop.wakeOnThreat = false;
+  }
+  PopAlley() {
+    const r = this.r, pop = this.Actor("AlleyPop");
+    r.Record("alleyPopped");
+    if (!pop?.alive) return false;
+    pop.missionDormant = false; pop.scriptedNoncombatant = false; pop.bayonetFixed = true; pop.wakeOnThreat = true;
+    r.ai?.SetStance?.(pop, 0, 3, true);
+    r.ai?.ReleaseCover?.(pop);
+    r.audio?.Bark?.("rally", { key: "ija_rally_charge", side: "ija", priority: true, position: r.Point ? r.Point(pop.position, 1.5) : null });
+    this.Note("alleyPop");
+    return true;
+  }
+  /**
+   * 09 屋顶上那个：按表生在院里（导航把他放在地上），这里摆到侧间屋顶东坡面上钉住（物理胶囊站在实心坡面块上）；
+   * 玩家进后院之前装睡，进了就醒（站起来、只守不走）。
+   */
+  UpdateRoofThrower() {
+    const r = this.r, T = M.streetFight, roof = this.Actor("RoofThrower");
+    if (!roof?.alive) return;
+    const y = r.battlefield.GroundHeight(A.roofPost.x, A.roofPost.z) + T.roofTopM;
+    if (!this.roofPlaced || Distance(roof.position, A.roofPost) > 1.2 || Math.abs(roof.position.y - y) > 0.6) {
+      roof.position.set(A.roofPost.x, y, A.roofPost.z);
+      roof.body?.Teleport(A.roofPost.x, y, A.roofPost.z);
+      roof.goal.set(A.roofPost.x, 0, A.roofPost.z);
+      roof.actor?.root.position.copy(roof.position);
+      roof.tacticalRadiusM = 0;
+      r.Defend(roof, A.roofPost, 0, 0);
+      roof.scriptDefensive = true;
+      roof.scriptSuppressible = true;
+      if (!this.roofPlaced) this.Note("roofPlaced", { y: +y.toFixed(2) });
+      this.roofPlaced = true;
+    }
+    const awake = this.rules.yardEnteredAt != null;
+    if (!awake) { roof.missionDormant = true; roof.scriptedNoncombatant = true; roof.wakeOnThreat = false; r.ai.SetStance(roof, 1, 1, true); return; }
+    if (!this.roofAwake) {
+      this.roofAwake = true;
+      roof.missionDormant = false; roof.scriptedNoncombatant = false;
+      r.ai.SetStance(roof, 0, 2, true);
+      this.Note("roofAwake");
+    }
+  }
+  /**
+   * 剧本投弹（屋顶上那个朝玩家、MeleeAlley 从东窗往屋里）：走 AI 自己那条投掷链（actor.BeginGrenadeThrow 压到动画脱手帧，
+   * combat.Throw 造真弹，owner "ija"），只是瞄点与力道由这里按距离算（Script_FirstLevelStreetFight.ThrowPowerFor）。
+   */
+  ThrowAt(actor, target, why) {
+    const r = this.r, T = M.streetFight, combat = r.combat;
+    if (!actor?.alive || !combat?.Throw) return false;
+    const dx = target.x - actor.position.x, dz = target.z - actor.position.z, dist = Math.hypot(dx, dz) || 1;
+    // 落点在玩家身前 roofThrowMinOffsetM（朝投弹者那一侧）：逼人挪窝，不是必杀。
+    const range = why === "roof" ? Math.max(3, dist - T.roofThrowMinOffsetM) : dist;
+    const from = r.Point(actor.position, 0); from.y = actor.position.y + T.throwReleaseY;
+    const drop = from.y - r.battlefield.GroundHeight(target.x, target.z);
+    const { power } = ThrowPowerFor(range, drop);
+    const dir = r.Point(target, 0).sub(from).setY(0).normalize();
+    actor.yaw = Math.atan2(-dx, -dz);
+    actor.watchYaw = actor.yaw; actor.watchUntil = (r.ai?.time ?? r.time) + 2;
+    const Release = (hand) => {
+      if (!actor.alive) return;
+      combat.Throw("Grenade", power, hand || from, dir, 0, { owner: "ija", ownerId: actor.id });
+    };
+    if (!actor.actor?.BeginGrenadeThrow?.(Release)) Release(from);
+    r.audio?.Bark?.("grenade", { key: "ija_warn_grenade", side: "ija", position: r.Point ? r.Point(actor.position, 1.5) : null });
+    this.Note("throw", { why, id: actor.missionId, range: +range.toFixed(1), power: +power.toFixed(2) });
+    return true;
+  }
+  /** 09 连屋：MeleeAlley 到了东窗外那一点，先往屋里扔一颗（折线在那一点停 1.5 s），再从东门进。 */
+  UpdateWindowThrow() {
+    if (this.windowThrown) return;
+    const T = M.streetFight, actor = this.Actor("MeleeAlley");
+    if (!actor?.alive || actor.missionDormant || actor.scriptedNoncombatant) return;
+    if (Distance(actor.position, T.windowThrowPost) > T.windowThrowReachM) return;
+    this.windowThrown = true;
+    this.ThrowAt(actor, T.windowThrowAt, "window");
+  }
+  /** 10 担架能不能过院门：巷口机枪没来 / 死了 / 被压住期间才放（运行时 safeAt 的薄钩子）。 */
+  LaneOpen() { return this.rules.LaneOpen() && !this.r.gengFamily?.cart?.blocking; }
+  /** 驴车出了院门（courtyardPassed 的驴车条件）。 */
+  CartLeft() {
+    const cart = this.r.gengFamily?.cart;
+    return !!cart?.position && cart.position.z > A.gate.z + M.streetFight.cartLeftGateM;
   }
 
   // -------------------------------------------------------------------------
@@ -494,13 +739,15 @@ export class FirstLevelVillageBlock {
   // -------------------------------------------------------------------------
   // 10：开院门，放行担架
   // -------------------------------------------------------------------------
-  UpdateCourtyard() {
+  UpdateCourtyard(dt) {
     const r = this.r;
     if (r.Has("courtyardGateOpen")) this.Release();
     // 队尾掩护脱离：队尾那个人（刘文财）走过院门以南这么远。
     const tail = r.companion.Handle("liuwencai");
     if (!r.Has("rearCoverDisengaged") && (!tail?.alive || tail.position.z > A.gate.z + M.rearCoverClearM))
       r.Record("rearCoverDisengaged", { z: tail?.position.z ?? null });
+    this.UpdateGengGate(dt);
+    this.UpdateCartBeat(dt);
   }
 
   /** 08 等待点 → 主街后送线：给每个人一条从自己脚下接回 courtyardBypass 的路。 */
@@ -514,12 +761,104 @@ export class FirstLevelVillageBlock {
     this.released = true;
   }
 
-  /** 「街堵了！」从前队那个回头喊话的人嘴里出来，不是贴在玩家脸上。 */
-  VoicePosition(cue) {
-    if (cue.id !== "StreetBlocked") return null;
-    const actor = this.bystanders.find((a) => a.missionId === "StreetFrontParty0" && a.alive)
-      || this.bystanders.find((a) => a.alive);
-    return actor ? this.r.Point(actor.position, 1.3) : null;
+  /**
+   * 10 老耿开后门（GengGate 五句）：窗口机枪打哑之后班长喊 → 老耿抱缸挪墙根 → 和何有田拖桌 → 拔闩（门真开了：
+   * 走运行时同一个 OpenCourtyardGate，玩家先按 F 也一样）→ 驴车堵门 → 拽驴让出半边门（车退到院南墙根）。
+   * 每一拍都是人真走到、姿势真摆完才进下一拍（GengFamily 的回调），不是计时器顶替。
+   */
+  UpdateGengGate() {
+    const r = this.r, T = M.streetFight, family = r.gengFamily;
+    if (!family?.geng?.position) return;
+    if (!this.gengGate) {
+      if (!r.Has("villageGunSilent")) return;
+      this.gengGate = { phase: "vat", since: r.time };
+      r.Say("GengGate");
+      family.GengFollowCart(false);
+      family.GengGoTo(T.gengVat, () => { family.GengPose("vat"); this.GateBeat("vatHold"); });
+      return;
+    }
+    const beat = this.gengGate, since = r.time - beat.since;
+    if (beat.phase === "vatHold" && since >= T.gengPoseS.vat) {
+      this.GateBeat("table");
+      const he = r.companion.Handle("heyoutian");
+      if (he?.alive) r.squadRoutes.set(he.id, [{ ...T.heTable }]);
+      family.GengGoTo(T.gengTable, () => { family.GengPose("table"); this.GateBeat("tableHold"); });
+    } else if (beat.phase === "tableHold" && since >= T.gengPoseS.table) {
+      this.GateBeat("unbar");
+      family.GengGoTo(T.gengUnbar, () => { family.GengPose("unbar"); this.GateBeat("unbarHold"); });
+    } else if (beat.phase === "unbarHold" && since >= T.gengPoseS.unbar) {
+      r.OpenCourtyardGate?.();
+      this.GateBeat("cartBlock");
+      family.SetCartBlocking(true);
+      family.CartTo(T.cartGateway, () => this.GateBeat("cartHold"));
+    } else if (beat.phase === "cartHold" && since >= T.cartBlockHoldS) {
+      this.GateBeat("lead");
+      family.GengPose("lead-donkey");
+      family.GengFollowCart(true);
+      family.CartTo(T.cartWallFoot, () => { family.SetCartBlocking(false); this.GateBeat("waitLitters"); });
+    } else if (beat.phase === "waitLitters") {
+      // 驴车夹在担架队中间：过了院门的担架到一半才跟着出门；门槛那一下归 UpdateCartBeat。
+      const living = r.column.litters.filter((litter) => litter.health > 0 && !litter.evacuated);
+      const passed = living.filter((litter) => litter.passedGate).length;
+      const need = Math.max(1, Math.ceil(living.length * T.cartFollowAfterFraction));
+      if (passed >= need && this.LaneOpen() && !this.cartBeat) {
+        this.GateBeat("out");
+        this.cartBeat = { phase: "toThreshold", since: r.time, helper: false };
+        family.CartFollowRoute([T.cartGateway, { x: T.cartGateway.x, z: A.gate.z }], () => {
+          family.CartHalt();
+          this.cartBeat = { phase: "threshold", since: r.time, helper: false };
+          this.Note("cartThreshold");
+        });
+      }
+    }
+  }
+  GateBeat(phase) { this.gengGate = { phase, since: this.r.time }; this.Note("gengGate", { phase }); }
+
+  /** 10 推车过门槛：车卡在门槛上，玩家 10 s 内按 F（CartPush）；没按就何有田去推（班长那句不说）。 */
+  UpdateCartBeat() {
+    const r = this.r, T = M.streetFight, beat = this.cartBeat;
+    if (!beat || beat.phase !== "helping") return;
+    const he = r.companion.Handle("heyoutian");
+    const arrived = !he?.alive || Distance(he.position, T.heCartPush) <= 1.3 || r.time - beat.since >= T.heCartPushS;
+    if (arrived) this.CartProceed("heyoutian");
+  }
+  CartHelp() {
+    const r = this.r, T = M.streetFight, he = r.companion.Handle("heyoutian");
+    if (!this.cartBeat || this.cartBeat.phase !== "threshold") return;
+    this.cartBeat = { phase: "helping", since: r.time, helper: true };
+    if (he?.alive) r.squadRoutes.set(he.id, [{ ...T.heCartPush }]);
+    this.Note("cartHelp");
+  }
+  /** 玩家在车尾按 F 推（运行时 MissionCartPush 交互的回调）。 */
+  CartPushAvailable() { return this.cartBeat?.phase === "threshold" && !this.r.Has("cartPushed"); }
+  CartPushed() {
+    if (!this.CartPushAvailable()) return false;
+    this.r.Record("cartPushed");
+    this.r.Say("CartPush");
+    this.CartProceed("player");
+    return true;
+  }
+  CartProceed(by) {
+    const r = this.r, family = r.gengFamily;
+    if (!this.cartBeat || this.cartBeat.phase === "out") return;
+    this.cartBeat = { phase: "out", since: r.time, helper: by === "heyoutian", by };
+    family.GengFollowCart(true);
+    family.CartFollowRoute([...GENG_CART_LANE_ROUTE], () => this.Note("cartInStreet"));
+    this.Note("cartProceed", { by });
+  }
+
+  /** 「街堵了！」从前队那个回头喊话的人嘴里出来，不是贴在玩家脸上；老耿的几段从他头上出来。 */
+  VoicePosition(cue, line) {
+    if (cue.id === "StreetBlocked") {
+      const actor = this.bystanders.find((a) => a.missionId === "StreetFrontParty0" && a.alive)
+        || this.bystanders.find((a) => a.alive);
+      return actor ? this.r.Point(actor.position, 1.3) : null;
+    }
+    if (GENG_CUES.includes(cue.id) && line?.who === "geng") {
+      const geng = this.r.gengFamily?.geng?.position;
+      return geng ? this.r.Point(geng, 1.45) : null;
+    }
+    return null;
   }
 
   /** 担架队还停着没有？工作台与测试用。 */
@@ -528,6 +867,10 @@ export class FirstLevelVillageBlock {
       holding: this.holding, released: this.released,
       bystanders: this.bystanders.map((actor) => ({ id: actor.missionId, alive: actor.alive })),
       held: this.HeldLitters().map((litter) => ({ id: litter.id, held: !!litter.held, x: litter.x, z: litter.z })),
+      streetFight: this.rules.State(),
+      pushSpawned: this.pushSpawned, laneSpawned: this.laneSpawned, roofPlaced: this.roofPlaced, roofAwake: this.roofAwake,
+      windowThrown: this.windowThrown, gengHouse: this.gengHouse, gengGate: this.gengGate, cartBeat: this.cartBeat,
+      log: this.log.slice(-24),
     };
   }
 }
@@ -541,4 +884,12 @@ export function VillagePendingLitters(column) {
 export function VillageCourtyardCleared(column, rearDisengaged) {
   const living = column.litters.filter((litter) => litter.health > 0 && !litter.evacuated);
   return rearDisengaged && living.length > 0 && living.every((litter) => litter.passedGate);
+}
+
+/** 11 驴车从主街南段等着的地方到接运点东侧停车位的折线（门楼洞口 x 74.9–78.3、村口低墙通行口 x 78.1–81.0）。 */
+export function GengCartTransferRoute(from = GENG_CART_LANE_ROUTE.at(-1), bay = M.streetFight.gengCartBay) {
+  return [
+    { x: from.x, z: from.z }, { x: 76.2, z: 45.2 }, { x: 76.6, z: 47.6 }, { x: 77.4, z: 56 }, { x: 78.4, z: 74 },
+    { x: 79.3, z: 83.2 }, { x: 79.5, z: 86.8 }, { x: 82.5, z: 92.5 }, { x: 88, z: 100.5 }, { x: bay.x, z: bay.z },
+  ];
 }

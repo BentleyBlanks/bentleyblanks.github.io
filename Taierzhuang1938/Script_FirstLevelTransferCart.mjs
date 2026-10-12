@@ -24,6 +24,7 @@ import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as M, MidWalkingWounded, MidTransferScatterPlan, MidTransferWalkRoute } from "./Data_Tuning_FirstLevelMid.mjs";
 import { MissionRouteLength, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
 import { CartDeckLift } from "./Script_CartCorpseBump.mjs";
+import { GengCartTransferRoute } from "./Script_FirstLevelVillageBlock.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const Wrap = (radians) => Math.atan2(Math.sin(radians), Math.cos(radians));
@@ -58,15 +59,59 @@ export class FirstLevelTransferCart {
     this.ride = null;
     this.unload = null;
     this.scattered = false;
+    // 2026-10-12 C 包（契约 §3.9）：老耿的驴车到接运点（gengCart 一槽）、GengCart 三句、AskGeng 四句。
+    this.gengCart = null;   // { sent, arrivedAt, asked }
   }
 
   // -------------------------------------------------------------------------
   // 进步骤
   // -------------------------------------------------------------------------
   Enter(stageId) {
-    if (stageId === "TransferApproach") this.SpawnWalkingWounded();
+    if (stageId === "TransferApproach") { this.SpawnWalkingWounded(); this.SendGengCart(); }
     if (stageId === "Transfer") this.TakePosts();
     if (stageId === "AirFirst") this.Scatter();
+  }
+
+  /**
+   * 11：驴车夹在担架队中间走到接运点东侧的停车位（M.streetFight.gengCartBay），老耿牵驴、妮儿跟在车尾。
+   * 10 里车已经走到主街南段东侧等着；跳转进 11 的话从那一点起走（GengFamily.Enter 按 A.gengCartYard 摆的车先挪过去）。
+   */
+  SendGengCart() {
+    const r = this.r, family = r.gengFamily, T = M.streetFight;
+    if (this.gengCart?.sent || !family?.cart?.position) return;
+    const cart = family.cart.position;
+    const from = cart.z > A.gate.z + 2 ? { x: cart.x, z: cart.z } : null;
+    const route = GengCartTransferRoute(from || undefined);
+    if (!from) {
+      // 车还在院里（跳转起点）：先瞬到主街南段等着的地方，再走。
+      family.CartTo(route[0]);
+      family.cartState.x = route[0].x; family.cartState.z = route[0].z; family.cartState.target = null;
+      const geng = family.geng.actor, nier = family.nier.actor;
+      if (geng) r.PlaceActor(geng, { x: route[0].x - 2.2, z: route[0].z - 2 });
+      if (nier) r.PlaceActor(nier, { x: route[0].x + 1, z: route[0].z + 2.4 });
+    }
+    family.NierRideCart(true);
+    family.GengFollowCart(true);
+    family.SetCartBlocking(false);
+    this.gengCart = { sent: true, arrivedAt: null, asked: false, jumped: !from };
+    family.CartFollowRoute(route, () => {
+      this.gengCart.arrivedAt = r.time;
+      r.Record("gengCartArrived", { x: +T.gengCartBay.x.toFixed(1), z: +T.gengCartBay.z.toFixed(1) });
+      r.Say("GengCart");
+    });
+  }
+  /** 老耿在车旁：玩家走到他 askRangeM 内按 F 问路（运行时 MissionAskGeng 交互）。 */
+  AskGengAvailable() {
+    const r = this.r, geng = r.gengFamily?.geng?.position;
+    return !!this.gengCart?.arrivedAt && !r.Has("gengAsked") && !this.gengCart.asked && !!geng
+      && Distance(r.player.position, geng) <= M.streetFight.askRangeM;
+  }
+  AskGeng(by = "player") {
+    if (!this.gengCart?.arrivedAt || this.gengCart.asked) return false;
+    this.gengCart.asked = true;
+    this.gengCart.askedBy = by;
+    this.r.Say("AskGeng");
+    return true;
   }
 
   /**
@@ -150,6 +195,7 @@ export class FirstLevelTransferCart {
 
   UpdateApproach() {
     const r = this.r;
+    this.UpdateGengCart();
     if (!r.Has("transferApproachReached")) return;
     r.Say("TransferSorting");
     if (!r.Has("transferSorted") && this.LittersSorted() && this.walkers.some((walker) => walker.sorted))
@@ -169,6 +215,13 @@ export class FirstLevelTransferCart {
     // 三样都辨认过了，何有田才喊「后头追出来了」，班长才把村路压给顺子。
     if (r.Has("transferSorted") && r.Has("bridgeHeadSeen") && r.Has("villageRoadWatched"))
       r.Say("VillageRoadThreat");
+  }
+
+  /** 11 驴车到了之后：GengCart 说完、到场 askAutoS 没按 F 就自动问（AskGeng → gengAsked 由 VoiceDone 记）。 */
+  UpdateGengCart() {
+    const r = this.r, beat = this.gengCart;
+    if (!beat?.arrivedAt || beat.asked) return;
+    if (r.time - beat.arrivedAt >= M.streetFight.askAutoS && r.voice?.finished?.has("GengCart")) this.AskGeng("auto");
   }
 
   // --- 12 -------------------------------------------------------------------
@@ -417,6 +470,7 @@ export class FirstLevelTransferCart {
       allowance: this.r.column.loadAllowance ?? 0,
       ride: this.ride ? { cart: this.ride.cart.id, progress: this.ride.progress, halted: this.ride.halted } : null,
       unload: this.unload ? { started: !!this.unload.started, seconds: this.unload.seconds, lowered: this.unload.lowered } : null,
+      gengCart: this.gengCart,
     };
   }
 }

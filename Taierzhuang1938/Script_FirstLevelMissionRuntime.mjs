@@ -1348,6 +1348,14 @@ export class FirstLevelMissionRuntime {
    * 有没有敌人看得见、打得着这个点。一次 Update 之内同一组参数只算一次（03–05 前沿一帧几十次，
    * 多数是同一个点：守军路口、缺口三点、队列安全判定），每次都是逐敌人一条带地形的射线。
    */
+  /** 院门真开了（玩家按 F，或 10 老耿拔闩 —— 2026-10-12 C 包，两条路同一个口）。 */
+  OpenCourtyardGate() {
+    if (this.Has("courtyardGateOpen")) return true;
+    this.battlefield.OpenGate("MissionCourtyardGate");
+    this.column.gateOpen = true;
+    this.Record("courtyardGateOpen");
+    return true;
+  }
   Threatens(point, ids = null, targetHeight = 1.1, rangeM = R.passageRangeM) {
     const memo = this.threatMemo?.open ? this.threatMemo : null;
     const key = memo ? `${point.x},${point.z},${ids ? ids.join("|") : "*"},${targetHeight},${rangeM}` : null;
@@ -1430,12 +1438,23 @@ export class FirstLevelMissionRuntime {
       A.gate,
       () => this.Text("gate"),
       () => ["Village", "Melee", "Courtyard"].includes(this.flow.stage.id) && !this.Has("courtyardGateOpen"),
-      () => {
-        this.battlefield.OpenGate("MissionCourtyardGate");
-        this.column.gateOpen = true;
-        this.Record("courtyardGateOpen");
-        return true;
-      },
+      () => this.OpenCourtyardGate(),
+    );
+    // 2026-10-12 0311 C 包（契约 §3.8 / §3.9）：10 驴车卡门槛时搭把手（可选）、11 在车旁问老耿往哪走。
+    Register(
+      "MissionCartPush",
+      MID_TUNING.streetFight.cartPushPoint,
+      () => this.Text("cartPush"),
+      () => this.flow.stage.id === "Courtyard" && this.village.CartPushAvailable(),
+      () => this.village.CartPushed(),
+    );
+    Register(
+      "MissionAskGeng",
+      MID_TUNING.streetFight.askPoint,
+      () => this.Text("askGeng"),
+      () => ["TransferApproach", "Transfer"].includes(this.flow.stage.id) && this.transferCart.AskGengAvailable(),
+      () => this.transferCart.AskGeng("player"),
+      { gesture: "tap", seconds: 0 },
     );
     Register(
       "MissionZhouCarry",
@@ -2717,12 +2736,14 @@ export class FirstLevelMissionRuntime {
     if (stage === "Courtyard") {
       const gun = this.enemies.get("VillageGunner");
       if (gun && !gun.alive) this.Record("villageGunSilent");
-      safeAt = point => Distance(point,A.gate) > R.passageRangeM || (this.Has("villageGunSilent") && !this.Threatens(point));
+      // 2026-10-12 C 包：院门那一圈（laneGateRangeM）还要巷口机枪被压住 / 驴车没堵门（FirstLevelVillageBlock.LaneOpen）。
+      safeAt = point => Distance(point,A.gate) > R.passageRangeM || (this.Has("villageGunSilent") && !this.Threatens(point)
+        && (Distance(point,A.gate) > MID_TUNING.streetFight.laneGateRangeM || this.village.LaneOpen()));
       if (this.Has("courtyardGateOpen") && this.Has("villageGunSilent")) this.Say("CourtyardOpen");
-      // 「后头还有两副」「过了」按真实队列计数喊；通过条件另加「队尾掩护脱离」。
+      // 「后头还有两副」「过了」按真实队列计数喊；通过条件另加「队尾掩护脱离」与「驴车出了门」（C 包）。
       const pending=VillagePendingLitters(this.column);
       if(pending.length===2)this.Say("TwoLitters");
-      if(VillageCourtyardCleared(this.column,this.Has("rearCoverDisengaged"))){
+      if(VillageCourtyardCleared(this.column,this.Has("rearCoverDisengaged")) && this.village.CartLeft()){
         this.Say("LastLitter");
         this.Record("courtyardPassed",{passed:this.column.litters.filter(litter=>litter.passedGate).length,
           casualties:this.column.litters.filter(litter=>litter.health<=0&&!litter.passedGate).length});
