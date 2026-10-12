@@ -54,6 +54,8 @@ export const MISSION_STEP_SPAWNS = Object.freeze({
   BunkerRescue: Object.freeze(["approach", "front", "frontFlank", "frontOfficer", "machineGun", "tank", "sapInfiltrators"]),
   Support: Object.freeze(["village", "melee"]),
   Village: Object.freeze(["village", "melee"]),
+  // 0311 C：屋顶投弹的那个进 09 就在（装睡），玩家进后院才醒；08 东巷 / 09 夹道 / 10 第二拨都是 fact 放出的，不在这里。
+  Melee: Object.freeze(["roofThrower"]),
   Courtyard: Object.freeze(["courtyard"]),
   Transfer: Object.freeze(["transfer"]),
   AirFirst: Object.freeze(["air"]),
@@ -172,6 +174,34 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
       + "歪把子架到东侧田埂打空地、三个步枪各占一道田埂 / 坟包、两个往南绕村北口。由 Script_FirstLevelSouthMouth 按 fact 放出，"
       + "折线在 MISSION_TACTICS（fact 门控）。契约 §1.3：不被打退，只会被压住 —— 压住 ≥ 2 s 担架才跑，抬头就停在田埂 / 电线杆后",
   }),
+  // ---- 0311 C Village ----
+  streetPush: Object.freeze({
+    spawn: Object.freeze({ kind: "fact", fact: "streetBlockSeen" }),
+    note: "08 东巷来的 4 人：玩家站在主街北口看见街堵了（streetBlockSeen）起，Script_FirstLevelVillageBlock 按 "
+      + "MID_TUNING.streetFight.pushGapsS 每隔几秒从东巷放一个（村落同时存活 ≤ 14 才放），贴东墙根往北压向担架墙；"
+      + "玩家跨进侧路（sideRouteEntered）之后不再补人（streetPushStopped），已出来的照打",
+  }),
+  alleyPop: Object.freeze({
+    spawn: Object.freeze({ kind: "fact", fact: "westAlleyEntered" }),
+    dormant: true,
+    wake: Object.freeze({ kind: "scripted", step: "Melee", source: "FirstLevelVillageBlock.UpdateSideRoutes",
+      text: "玩家从进来的那一头往夹道里走了 ≥ 8 m（alleyPopped）：他嚎一声从机枪屋侧门窜出来，刺刀冲向玩家" }),
+    note: "09 西侧夹道：玩家跨进夹道（westAlleyEntered）时在机枪屋里生出一个装睡的；走到夹道一半（≥ 8 m）他从东墙后段的门洞窜出",
+  }),
+  roofThrower: Object.freeze({
+    spawn: Object.freeze({ kind: "step", step: "Melee" }),
+    dormant: true,
+    wake: Object.freeze({ kind: "scripted", step: "Melee", source: "FirstLevelVillageBlock.UpdateRoofThrower",
+      text: "玩家进后院：他在侧间屋顶上站起来，6 s 后朝玩家投弹；在那之前被打死就什么都不发生（roofThrowerDown）" }),
+    note: "09 后院屋顶投弹的那个：进 09 就生出来、由 VillageBlock 摆到侧间屋顶东坡面（A.roofPost）装睡；"
+      + "玩家进后院 6 s 后投弹，妮儿在车边拍车板指他（roofThrowerSpotted）；玩家先打死他这一下就不发生",
+  }),
+  laneWave2: Object.freeze({
+    spawn: Object.freeze({ kind: "fact", fact: "courtyardGateOpen" }),
+    note: "10 第二拨（含草垛机枪 LaneGunner）：院门真开了之后 VillageBlock 按 MID_TUNING.streetFight.laneWaveGapsS 逐个放出"
+      + "（村落同时存活 ≤ 14 才放），从东边沿绕行巷压进；开门 90 s 后不再补人（laneWave2Spent）。"
+      + "担架只在机枪被压住（laneMgSuppressed，压住 ≥ 2 s）或射手死了的时候过门",
+  }),
 });
 
 // ---------------------------------------------------------------------------
@@ -187,6 +217,9 @@ export const MISSION_VOICE_FACTS = Object.freeze({
   // 0311 B：沟里幺娃丢弹壳逗妮儿那一段说完（SouthWhisper 在它之后才说）。
   NierFollow: "nierFollowHeard",
   VillagePointer: "mainStreetPointed",
+  // 0311 C：10 老耿开后门五句说完、11 顺子问老耿四句说完。
+  GengGate: "gengGateHeard",
+  AskGeng: "gengAsked",
   TransferSorting: "transferSortingHeard",
   VillageRoadThreat: "villageRoadThreatSeen",
   EscortZhou: "escortGranted",
@@ -481,12 +514,42 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   kitchenEntered: Gate({
     kind: "interior", step: "Village", box: "kitchenInterior", source: "Update",
-    text: "玩家从右侧灶屋绕进去",
+    text: "玩家从右侧灶屋绕进去（2026-10-12 起不是过关条件：给 09 进门遭伏击上膛，也是 sideRouteEntered 的两条路之一）",
+  }),
+  // 0311 C（契约 §3.6 / §5.1）：推进点 —— 跨进灶屋北门或西侧夹道北口，街口就不再补人。
+  sideRouteEntered: Gate({
+    kind: "scripted", step: "Village", source: "FirstLevelVillageBlock.UpdateSideRoutes",
+    text: "玩家跨进了侧路：进了灶屋（kitchenEntered）或进了西侧夹道（westAlleyEntered）—— 两条路任选一条，都汇到后院",
+  }),
+  westAlleyEntered: Gate({
+    kind: "interior", step: "Village", box: "westAlley", source: "FirstLevelVillageBlock.UpdateSideRoutes",
+    text: "玩家跨进了灶屋—机枪屋之间那条 2.4 m 的西侧夹道（从北口或后院那一头都算）",
+  }),
+  gengHouseOffered: Gate({
+    kind: "scripted", step: "Village", source: "FirstLevelVillageBlock.UpdateVillage",
+    text: "看见街堵了之后玩家走到灶屋门口的老耿跟前：他揪着妮儿一巴掌、指灶屋、说连屋那边刚才进了人（GengHouse 三句开口那一刻）",
+  }),
+  streetPushStopped: Gate({
+    kind: "scripted", step: "Village", source: "FirstLevelVillageBlock.UpdateStreetPush",
+    text: "玩家跨进侧路之后，东巷那一组不再补人（还没放出来的不放了；已经在街上的照打）",
   }),
   // --- Melee -------------------------------------------------------------
   meleeResolved: Gate({
     kind: "combat", step: "Melee", encounter: "melee", source: "UpdateMelee",
-    text: "从连屋出来的那一组处理完（提前击败就不会有固定僵持）",
+    text: "从连屋出来的那一组处理完（提前击败就不会有固定僵持；含从东窗往屋里扔过手榴弹再进门的那个）",
+  }),
+  // 0311 C（契约 §3.7 / §5.1）：西侧夹道的那个、后院屋顶投弹的那个。
+  alleyPopped: Gate({
+    kind: "scripted", step: "Melee", source: "FirstLevelVillageBlock.UpdateSideRoutes",
+    text: "玩家在夹道里走了 ≥ 8 m：机枪屋侧门里那个嚎一声窜出来，刺刀冲过来",
+  }),
+  roofThrowerSpotted: Gate({
+    kind: "scripted", step: "Melee", source: "FirstLevelVillageBlock.UpdateRoofThrower",
+    text: "玩家进后院之后妮儿在车边拍车板指屋顶上那个（他还活着才指）",
+  }),
+  roofThrowerDown: Gate({
+    kind: "combat", step: "Melee", member: "RoofThrower", encounter: "roofThrower",
+    source: "FirstLevelVillageBlock.UpdateRoofThrower", text: "屋顶上投弹的那个被打死（先打死他，投弹与妮儿指他都不发生）",
   }),
   // --- Courtyard ---------------------------------------------------------
   villageGunSilent: Gate({
@@ -500,7 +563,23 @@ export const MISSION_FACT_GATES = Object.freeze({
   courtyardPassed: Gate({
     kind: "column", step: "Courtyard", source: "Update/VillageCourtyardCleared",
     requires: Object.freeze(["rearCoverDisengaged"]),
-    text: "还活着的担架全部通过院门、在障碍南侧 streetRejoin 接回主街，且队尾掩护已经脱离",
+    text: "还活着的担架全部通过院门、在障碍南侧 streetRejoin 接回主街，队尾掩护已经脱离，而且老耿的驴车也出了院门（2026-10-12）",
+  }),
+  // 0311 C（契约 §3.8 / §5.1）：老耿开后门、巷口机枪、第二拨上限、推车。
+  gengGateHeard: Gate({ kind: "voice", step: "Courtyard", cue: "GengGate", source: "VoiceDone",
+    text: "窗口机枪打哑之后班长喊老耿开后门：抱缸挪墙根 → 和何有田拖桌 → 拔闩 → 车堵门 → 拽驴让出半边门，五句说完" }),
+  laneMgSuppressed: Gate({
+    kind: "combat", step: "Courtyard", member: "LaneGunner", encounter: "laneWave2",
+    source: "FirstLevelVillageBlock.UpdateLane",
+    text: "巷东头草垛边那挺机枪被压住（射手 suppressed 连续 ≥ 2 s，或已死）—— 第一次成立记事实；之后他会再抬头，担架只在压住期间过门",
+  }),
+  laneWave2Spent: Gate({
+    kind: "timer", step: "Courtyard", source: "FirstLevelVillageBlock.UpdateLane",
+    text: "院门开了 90 s（契约 §3.8 整段上限）：第二拨不再补人",
+  }),
+  cartPushed: Gate({
+    kind: "interaction", step: "Courtyard", interaction: "MissionCartPush", anchor: "gengCartYard", source: "Register",
+    text: "驴车卡在门槛上，玩家 10 s 内走到车尾按 F 搭把手推过去（可选；过时何有田去推、班长那句不说）",
   }),
   // --- TransferApproach --------------------------------------------------
   transferApproachReached: Gate({
@@ -508,6 +587,13 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   transferSortingHeard: Gate({ kind: "voice", step: "TransferApproach", cue: "TransferSorting", source: "VoiceDone" }),
   villageRoadThreatSeen: Gate({ kind: "voice", step: "TransferApproach", cue: "VillageRoadThreat", source: "VoiceDone" }),
+  // 0311 C（契约 §3.9 / §5.1）：驴车到接运点、顺子问老耿。
+  gengCartArrived: Gate({
+    kind: "column", step: "TransferApproach", source: "FirstLevelTransferCart.UpdateApproach",
+    text: "老耿的驴车夹在担架队中间真走到了接运点东侧的停车位（GengCart 三句在车旁自说）",
+  }),
+  gengAsked: Gate({ kind: "voice", step: "TransferApproach", cue: "AskGeng", source: "VoiceDone",
+    text: "顺子问老耿往哪走：玩家走到老耿 2 m 内按 F，或到场 20 s 没按就自动播；四句说完" }),
   // --- Transfer ----------------------------------------------------------
   // 12 守来时路（docs/Data_FirstLevelTransferCover20260927.md）：顺子真的上了村口低墙（射口 ± 8 m，
   // 盖住低墙西段与路口）。装载从这时开始，第一拨追兵也是这时才开始往前压（MISSION_TACTICS 的 fact）。

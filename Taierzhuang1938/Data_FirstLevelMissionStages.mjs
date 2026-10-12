@@ -34,10 +34,15 @@ export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
   courtyard:10, transfer:12, transferAlley:12, air:13, bridgeNorth:18,
   // 0311 B：07 沟口遭遇组，由 southMouthReached 放出（Script_FirstLevelSouthMouth），不是进 07 就有。
   southMouth:7,
+  // 0311 C：08 东巷 4 人（streetBlockSeen 起逐个放）、09 夹道里那个（westAlleyEntered）、09 屋顶投弹（进 09 按表生）、
+  // 10 第二拨（courtyardGateOpen 起逐个放）。
+  streetPush:8, alleyPop:8, roofThrower:9, laneWave2:10,
 });
 // These belong to the current public phase but arrive after its entry encounter.
 export const FIRST_LEVEL_DEFERRED_ENCOUNTERS=Object.freeze({
   7:Object.freeze(["southMouth"]),
+  8:Object.freeze(["streetPush","alleyPop"]),
+  10:Object.freeze(["laneWave2"]),
   12:Object.freeze(["transferAlley"]),
   18:Object.freeze(["bridgeNorth"]),
 });
@@ -85,8 +90,9 @@ export const FIRST_LEVEL_STAGE_ENCOUNTERS = Object.freeze([
   ["front","frontFlank","frontOfficer","approach","machineGun","tank","sapInfiltrators","village","melee"],
   // tankCrew is fact-activated (tankFireDisabled, spawned by FrontCounterattack at the live tank): never recreated here.
   ["front","frontFlank","frontOfficer","machineGun","approach","tank","village","melee","sapInfiltrators"],
-  ["village","melee"], ["village","melee"], ["village","melee"], ["village","melee"],
-  ["village","courtyard"], [], ["transfer"], ["air"], ["air"],
+  // 0311 C：09 / 10 的跳转起点屋顶上那个还在（玩家进后院才动）；08 东巷 / 09 夹道 / 10 第二拨是 fact 放出的，跳转不建。
+  ["village","melee"], ["village","melee"], ["village","melee"], ["village","melee","roofThrower"],
+  ["village","courtyard","roofThrower"], [], ["transfer"], ["air"], ["air"],
   [], [], [], [],
 ].map(Object.freeze));
 export function FirstLevelStageForStep(step) {

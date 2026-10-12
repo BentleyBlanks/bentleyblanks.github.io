@@ -52,8 +52,9 @@ function MakeHost(stageId, { sight = () => false } = {}) {
     // 开局摆在主街这一头（还没进灶屋、也还没到外头的观察位）。
     id: 100 + i, castId: id, alive: true, position: { x: 56 + i, z: -27 }, yaw: 0, goal: { set() {} },
   }]));
+  const spawnQueue = [], spawned = new Set();
   const host = {
-    flow, time: 0, delta: 1 / 60, said, moved,
+    flow, time: 0, delta: 1 / 60, said, moved, spawnQueue, spawned,
     column: new FirstLevelMissionColumn(),
     enemies: new Map(),
     squadRoutes: new Map(),
@@ -80,6 +81,40 @@ function MakeHost(stageId, { sight = () => false } = {}) {
     Defend() {},
     MoveActor: (actor, point, speed) => { moved.set(actor.castId || actor.id, { ...point, speed }); },
     Control() {},
+    // 2026-10-12 C 包：逐个放人走运行时的生成队列（这里按 id 建假敌人）；组生成与老耿一家都是桩。
+    SpawnEncounterActor: (group, spec) => {
+      const actor = { missionId: spec.id, missionEncounter: group, alive: true, state: "idle", position: { x: spec.x, z: spec.z },
+        yaw: 0, goal: { set() {} }, body: null };
+      host.enemies.set(spec.id, actor);
+      return actor;
+    },
+    SpawnEncounter: (group) => { if (spawned.has(group)) return; spawned.add(group); for (const spec of MISSION_ENCOUNTERS[group] || []) spawnQueue.push(() => host.SpawnEncounterActor(group, spec)); },
+    Drain: () => { while (spawnQueue.length) spawnQueue.shift()(); },
+    gengFamily: {
+      calls: [],
+      geng: { position: { x: 55.6, z: -18.4 }, actor: { alive: true } }, nier: { position: { x: 44.5, z: -22.6 }, actor: { alive: true } },
+      cart: { position: { x: A.gengCartYard.x, y: 0, z: A.gengCartYard.z }, blocking: false, state: "parked" },
+      cartState: { x: A.gengCartYard.x, z: A.gengCartYard.z, target: null },
+      Call(name, ...args) { this.calls.push({ name, args, t: host.time }); },
+      NierRideCart(on) { this.Call("NierRideCart", on); },
+      RunTo(points, cb) { this.Call("RunTo", points); cb?.(); },
+      GengGoTo(point, cb) { this.Call("GengGoTo", point); this.geng.position = { x: point.x, z: point.z }; cb?.(); return true; },
+      GengPose(kind) { this.Call("GengPose", kind); return true; },
+      GengFace(point) { this.Call("GengFace", point); return true; },
+      GengCrouchAt(point, cb) { this.Call("GengCrouchAt", point); cb?.(); return true; },
+      GengFollowCart(on) { this.Call("GengFollowCart", on); },
+      PointAt(target, seconds) { this.Call("PointAt", target, seconds); },
+      SetCartBlocking(on) { this.cart.blocking = !!on; this.Call("SetCartBlocking", on); },
+      CartTo(point, cb) { this.Call("CartTo", point); this.cart.position = { x: point.x, y: 0, z: point.z }; cb?.(); },
+      CartHalt() { this.Call("CartHalt"); },
+      CartFollowRoute(points, cb) { this.Call("CartFollowRoute", points); const end = points.at(-1); this.cart.position = { x: end.x, y: 0, z: end.z }; cb?.(); },
+      CartSeatPoints() { return { geng: { x: 44.5, z: 26.5 }, nier: { x: 41, z: 26 }, head: { x: 45, z: 23 } }; },
+    },
+    combat: { thrown: [], Throw(kind, power, from, dir, cooked, options) { this.thrown.push({ kind, power, options }); return {}; } },
+    audio: { Bark() {} },
+    voice: { finished: new Set() },
+    OpenCourtyardGate() { host.column.gateOpen = true; host.Record("courtyardGateOpen"); return true; },
+    PlaceActor(actor, point) { if (actor) actor.position = { x: point.x, z: point.z }; },
   };
   host.column.Activate();
   return host;
@@ -197,8 +232,10 @@ const Step = (host, module, seconds, options = {}) => {
   Check(host.Has("houseChecked") && host.said.includes("KitchenDetour"),
     "走到了才记 houseChecked 并喊 KitchenDetour");
   const he = host.companion.Handle("heyoutian");
-  Check(host.squadRoutes.get(he.id)?.length === 1, "何有田被指到外头的观察位，不跟着进屋");
-  he.position = { ...host.squadRoutes.get(he.id)[0] };
+  // 2026-10-12 C 包：观察位是街口压东窗的 P.streetBlock.frontParty[0]，走位先沿巷子到主街北口再拐进街（最后一点是观察位）。
+  const heRoute = host.squadRoutes.get(he.id);
+  Check(heRoute?.length >= 2 && Math.abs(heRoute.at(-1).x - P.streetBlock.frontParty[0].x) < 0.01, "何有田被指到街口压东窗的位置，不跟着进屋");
+  he.position = { ...heRoute.at(-1) };
   village.Update(1 / 60);
   Check(host.Has("outsideWatched"), "他真的到位了才记 outsideWatched");
 }

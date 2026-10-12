@@ -788,6 +788,13 @@ export const MISSION_ANCHORS = Object.freeze({
   //   southMouthHold  担架停住等压制的点：沟内，southWalk 里程 63 m（离南口 12 m，契约要 ≥ 6 m）
   //   mouthEmbankment 歪把子射手趴的点：东侧白盒田埂 MouthEmbankment 的东北面（离南口 24 m，打沟口外那片空地）
   southMouth: { x: -8, z: -36 }, southMouthHold: { x: -13.4, z: -46.7 }, mouthEmbankment: { x: 15.2, z: -44.9 },
+  // 2026-10-12 03–11 重构 C 包（契约 §5.4）：08–11 耿家庄。
+  //   westAlleyNorth / South  灶屋—机枪屋之间那条 2.4 m 夹道（x 49.3–51.7）的北口（灶屋北墙外）与南口（后院里、酒缸西侧）
+  //   roofPost                后院东排房顶：侧间屋顶朝院子的东坡面上（MID_TUNING.streetFight.roofTopM 给高度）
+  //   laneEast                院门外东侧墙角（南棚西端下），守着看绕行巷东头
+  //   gengCartYard            老耿的驴车在后院里停的地方（西厢前、水井以西，驴头朝院门）
+  westAlleyNorth: { x: 50.5, z: -18.2 }, westAlleySouth: { x: 50.2, z: 16.6 }, roofPost: { x: 69.6, z: 9.8 },
+  laneEast: { x: 57.2, z: 37.9 }, gengCartYard: { x: 42.4, z: 24.6, yaw: -0.55 },
   ...MISSION_REAR_ANCHORS,
   ...MISSION_STAGE_ANCHORS,
 });
@@ -876,6 +883,9 @@ export const MISSION_PLACEMENT = Object.freeze({
   // ConnectedHouse（58,8，12×15）的可站区域：墙心 x 52/64、z 0.5/15.5，墙厚 0.6。
   // 伏击那一拍用它判断「班里人进屋了没有」。
   roomInterior: {minX:52.6,maxX:63.4,minZ:1,maxZ:15},
+  // 2026-10-12 C 包：灶屋 / 连屋西墙（x 52）与机枪屋东墙（x 49）之间的夹道，从灶屋北墙外（z −16.8）通到后院（z 16.2）。
+  // westAlleyEntered 的 interior 门用它；机枪屋侧门（MachineGunHouseEastBack 的门洞，z 12.6–14.2）开在它西侧。
+  westAlley: {minX:49.3,maxX:51.7,minZ:-16.8,maxZ:16.2},
   // 罗班长、何有田、刘文财在灶屋北门内侧的掩护位（北墙 z=-16.5），让开 x=58 的担架通道。
   // 贴着门口而不是门外十米：挣脱之后他们要在顺子被四个人围死之前跑进屋（实拍量过）。
   ambushSquadPosts: [{x:55,z:-14.2},{x:61,z:-14.2},{x:58,z:-15.4}],
@@ -983,7 +993,10 @@ export const MISSION_PLACEMENT = Object.freeze({
     gap: { x: 76.65, z: 20 },
     // 喊话的前队站在**玩家来向（北口）与障碍之间**，一个回头朝北喊「后头莫挤！街堵了！」、
     // 一个还盯着堵死的街口。两个都让开街心 x=76.65 那条线（望障碍的视线门走那条线）。
+    // 2026-10-12 0311 C 包（契约 §3.6）：frontParty 两点改给何有田 + 刘文财蹲着压东窗；喊话的前队两个退到担架墙后
+    // 北沿（frontPartyWait，背靠 LitterHoldBackWall、让开班组往返主街口的 z≈−24 那条线与柴垛）。
     frontParty: [{ x: 74.6, z: 9.4, yaw: Math.PI }, { x: 79.2, z: 13.2, yaw: 0 }],
+    frontPartyWait: [{ x: 71.2, z: -26.2, yaw: Math.PI }, { x: 69.0, z: -26.4, yaw: 0.4 }],
     withdrawnGuards: [{ x: 74.2, z: 8.4, yaw: 0 }, { x: 79.8, z: 7.2, yaw: 0 }],
     litterWait: [{ x: 64.6, z: -19.4, yaw: 0 }, { x: 67.4, z: -20.6, yaw: 0 },
       { x: 62.4, z: -21.2, yaw: 0 }],

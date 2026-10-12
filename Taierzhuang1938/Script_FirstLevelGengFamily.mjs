@@ -94,6 +94,23 @@ export class FirstLevelGengFamily {
     this.events = [];
     this.nierFollowSaid = false;
     this.spawnedSteps = new Set();
+    // 2026-10-12 C 包加的状态（只加不改 B 的字段）：老耿牵驴跟车、妮儿跟在车尾、驴车走折线。
+    // 两个人都没有寻路：跟车走的是车留下的脚印（cart.trail，每米一个点），不抄直线（直线会贴着房角卡死）。
+    this.gengLead = false;
+    this.nierCart = false;
+    this.gengTrailIndex = 0;
+    this.nierTrailIndex = 0;
+  }
+  /**
+   * 沿车的脚印走：从 index 起把已经走到（≤ 1.2 m）的点跳过，返回下一个脚印点；脚印走完了（跟到车边）返回 null。
+   * 纯函数风格（trail 注入），Script_FirstLevelStreetFightTest 可以直接喂。
+   */
+  static TrailTarget(trail, index, from) {
+    if (!trail?.length) return { index, target: null };
+    let i = Math.min(index, trail.length - 1);
+    while (i < trail.length - 1 && Distance(from, trail[i]) <= 1.2) i++;
+    if (i >= trail.length - 1 && Distance(from, trail[i]) <= 1.2) return { index: i, target: null };
+    return { index: i, target: trail[i] };
   }
 
   // --- 装配 -----------------------------------------------------------------
@@ -145,10 +162,10 @@ export class FirstLevelGengFamily {
       this.Follow(MISSION_ROUTES.southWalk, this.T.followGapM);
     }
     if (["Village", "Melee", "Courtyard", "TransferApproach"].includes(stepId)) {
-      // 08 起老耿与驴车在耿家（占位点，C 包按村子的锚点改）；妮儿跳进来时在村北巷。
+      // 08 起老耿在灶屋北门外、驴车在后院（A.gengCartYard，C 包 2026-10-12 按村子的锚点改）；妮儿跳进来时在村北巷。
       if (!this.actors.nier?.alive) this.SpawnCivilian("nier", { ...this.T.villageRefuge, yaw: Math.PI }, "girl");
       if (!this.actors.geng?.alive) this.SpawnCivilian("geng", this.T.gengHouse, "male");
-      if (!this.cartState) this.SpawnCart(this.T.cartYard);
+      if (!this.cartState) this.SpawnCart(A.gengCartYard);
       if (this.nierState === "following") { this.follow = null; this.nierState = "idle"; }
     }
     this.spawnedSteps.add(stepId);
@@ -240,11 +257,75 @@ export class FirstLevelGengFamily {
   /** 驴车移动（10 出门、11 到接运点）：直线挪到 point，到了调 cb；cart.blocking 由 SetCartBlocking 管。 */
   CartTo(point, cb = null) {
     if (!this.cartState) this.SpawnCart({ x: point.x, z: point.z, yaw: 0 });
+    this.cartState.route = null; this.cartState.routeCb = null;
     this.cartState.target = { x: point.x, z: point.z };
     this.cartState.cb = cb;
     this.Log("cartTo", { x: +point.x.toFixed(1), z: +point.z.toFixed(1) });
   }
   SetCartBlocking(blocking) { if (this.cartState) this.cartState.blocking = !!blocking; }
+
+  // --- 2026-10-12 C 包加的方法（只加不改上面的签名；docs/Data_FirstLevel0311Refactor20261012Contract.md §5.6）------
+  /** 驴车沿折线走（10 出院门走绕行巷、11 到接运点）：一个点接一个点直线挪，走完调 cb；mps 不给用 cartMps。 */
+  CartFollowRoute(points, cb = null, mps = null) {
+    if (!points?.length) { cb?.(); return; }
+    if (!this.cartState) this.SpawnCart({ x: points[0].x, z: points[0].z, yaw: 0 });
+    const cart = this.cartState;
+    cart.route = points.slice(1).map((p) => ({ x: p.x, z: p.z }));
+    cart.routeCb = cb;
+    cart.routeMps = Number.isFinite(mps) && mps > 0 ? mps : null;
+    cart.target = { x: points[0].x, z: points[0].z };
+    cart.cb = null;
+    this.Log("cartRoute", { points: points.length, x: +points.at(-1).x.toFixed(1), z: +points.at(-1).z.toFixed(1) });
+  }
+  /** 驴车停下（卡在门槛上等人推）：折线与目标都收掉，位置不动。 */
+  CartHalt() {
+    const cart = this.cartState;
+    if (!cart) return;
+    cart.target = null; cart.route = null; cart.routeCb = null; cart.cb = null; cart.moving = false;
+    this.Log("cartHalt");
+  }
+  /** 老耿面朝某点一会儿（08 指灶屋 / 指连屋那边）。 */
+  GengFace(point, seconds = 2) {
+    const actor = this.actors.geng;
+    if (!actor?.alive) return false;
+    this.FaceNpc(actor, point, seconds);
+    this.Log("gengFace", { x: +point.x.toFixed(1), z: +point.z.toFixed(1) });
+    return true;
+  }
+  /** 老耿走到 point 蹲下（08 蹲门边不进屋）；到了调 cb。 */
+  GengCrouchAt(point, cb = null) {
+    return this.GengGoTo(point, () => {
+      const actor = this.actors.geng;
+      if (actor?.alive) { this.r.ai.SetStance(actor, 1, Infinity, true); this.gengPose = { kind: "crouch", since: this.r.time }; }
+      cb?.();
+    });
+  }
+  /** 老耿牵着驴走（10 出门、11 到接运点）：每帧跟在驴头左前方；关掉就站住。 */
+  GengFollowCart(on = true) {
+    this.gengLead = !!on;
+    if (!on && this.actors.geng?.alive) this.Stop(this.actors.geng);
+    if (on) this.gengPose = { kind: "lead-donkey", since: this.r.time };
+    this.Log("gengFollowCart", { on: this.gengLead });
+  }
+  /** 妮儿「在车上」：占位是跟在车尾后面一步（百姓是物理胶囊，车没有碰撞盒，真坐上去会掉下来）；关掉就站住。 */
+  NierRideCart(on = true) {
+    this.nierCart = !!on;
+    this.follow = null; this.nierRoute = null; this.nierPick = null;
+    if (on) this.nierState = "riding";
+    else if (this.nierState === "riding") this.nierState = "idle";
+    this.Log("nierRideCart", { on: this.nierCart });
+  }
+  /** 妮儿在车尾该站的点 / 老耿牵驴该站的点（世界坐标；纯几何，测试用）。 */
+  CartSeatPoints() {
+    const cart = this.cartState;
+    if (!cart) return null;
+    const c = Math.cos(cart.yaw), s = Math.sin(cart.yaw);
+    // 车头方向 f = (−s, −c)，右手 r = (c, −s)（与 UpdateCart 里牲口挂在车心前方 teamOffsetM 同一套）。
+    const N = MID.streetFight.nierCartOffset, G = MID.streetFight.gengLeadOffset;
+    const nier = { x: cart.x + s * N.behind + c * N.side, z: cart.z + c * N.behind - s * N.side };
+    const geng = { x: cart.animal.x - s * G.ahead - c * G.side, z: cart.animal.z - c * G.ahead + s * G.side };
+    return { nier, geng, head: { x: cart.animal.x - s * 3, z: cart.animal.z - c * 3 } };
+  }
   /** scriptEssential / missionUntargetable 开关（整段默认 true）。 */
   Protect(on = true) {
     this.protected = !!on;
@@ -304,14 +385,24 @@ export class FirstLevelGengFamily {
     const player = r.player.position, dist = Distance(player, nier.position);
     // 指向：面朝目标到期为止。
     if (this.pointing) {
-      if (r.time >= this.pointing.until) { this.pointing = null; if (this.nierState === "pointing") this.nierState = "idle"; }
+      if (r.time >= this.pointing.until) { this.pointing = null; if (this.nierState === "pointing") this.nierState = this.nierCart ? "riding" : "idle"; }
       else this.FaceNpc(nier, this.pointing.target, 0.5);
     }
     // 撒腿跑（优先级最高）。
     if (this.nierState === "running" && this.nierRoute) {
       while (this.nierRoute.length && Distance(nier.position, this.nierRoute[0]) < 0.9) this.nierRoute.shift();
       if (this.nierRoute.length) { r.ai.SetStance(nier, 0, 0.5, true); r.MoveActor(nier, this.nierRoute[0], T.runMps); }
-      else { this.Stop(nier); this.nierRoute = null; this.nierState = "idle"; const cb = this.nierRouteDone; this.nierRouteDone = null; this.Log("arrived"); cb?.(); }
+      else { this.Stop(nier); this.nierRoute = null; this.nierState = this.nierCart ? "riding" : "idle"; const cb = this.nierRouteDone; this.nierRouteDone = null; this.Log("arrived"); cb?.(); }
+      return;
+    }
+    // 2026-10-12 C 包：跟在车尾（「在车上」的占位）。指人的那几秒头朝目标，脚还是跟着车。车在走就沿车的脚印走。
+    if (this.nierCart && (this.nierState === "riding" || this.nierState === "pointing") && this.cartState) {
+      const seat = this.CartSeatPoints().nier, gap = Distance(nier.position, seat);
+      const trail = FirstLevelGengFamily.TrailTarget(this.cartState.trail, this.nierTrailIndex, nier.position);
+      this.nierTrailIndex = trail.index;
+      const goal = gap > 2.5 && trail.target ? trail.target : seat;
+      if (gap > 0.8) { r.ai.SetStance(nier, 0, 0.5, true); r.MoveActor(nier, goal, gap > 4 ? T.runMps : Math.max(T.walkMps, T.cartMps * 1.15)); }
+      else { this.Stop(nier); if (!this.pointing) this.FaceNpc(nier, this.CartSeatPoints().head, 0.4); }
       return;
     }
     // 捡弹壳：走过去、蹲下 pickS 秒、口袋响一声。
@@ -359,7 +450,19 @@ export class FirstLevelGengFamily {
   }
   UpdateGeng() {
     const r = this.r, geng = this.actors.geng;
-    if (!geng?.alive || !this.gengGoal) return;
+    if (!geng?.alive) return;
+    // 2026-10-12 C 包：牵驴跟车 —— 站在驴头左前方，车动他就走，车停他就站着看驴。
+    if (this.gengLead && !this.gengGoal && this.cartState) {
+      const spot = this.CartSeatPoints().geng, gap = Distance(geng.position, spot);
+      const trail = FirstLevelGengFamily.TrailTarget(this.cartState.trail, this.gengTrailIndex, geng.position);
+      this.gengTrailIndex = trail.index;
+      // 落后车两步以上就沿车的脚印追（不抄直线），到车边再站到驴头左前方。
+      const goal = gap > 2.5 && trail.target ? trail.target : spot;
+      if (gap > 0.9) { r.ai.SetStance(geng, 0, 0.5, true); r.MoveActor(geng, goal, gap > 4 ? this.T.runMps : Math.max(this.T.walkMps, this.T.cartMps * 1.15)); }
+      else { this.Stop(geng); this.FaceNpc(geng, this.cartState.animal, 0.4); }
+      return;
+    }
+    if (!this.gengGoal) return;
     if (Distance(geng.position, this.gengGoal.point) <= 0.8) {
       this.Stop(geng);
       const cb = this.gengGoal.cb; this.gengGoal = null; this.Log("gengArrived"); cb?.();
@@ -438,12 +541,20 @@ export class FirstLevelGengFamily {
     if (!cart) return;
     if (cart.target) {
       const d = Distance(cart, cart.target);
-      if (d <= 0.3) { cart.target = null; cart.moving = false; const cb = cart.cb; cart.cb = null; this.Log("cartArrived"); cb?.(); }
+      if (d <= 0.3) {
+        cart.target = null;
+        // 2026-10-12 C 包：折线（CartFollowRoute）—— 还有点就接着走，走完才调 routeCb。
+        if (cart.route?.length) cart.target = cart.route.shift();
+        else { cart.moving = false; const cb = cart.cb || cart.routeCb; cart.cb = null; cart.routeCb = null; cart.route = null; this.Log("cartArrived"); cb?.(); }
+      }
       else {
-        const step = Math.min(d, T.cartMps * Math.max(0, dt));
+        const step = Math.min(d, (cart.routeMps || T.cartMps) * Math.max(0, dt));
         cart.yaw = Math.atan2(cart.x - cart.target.x, cart.z - cart.target.z);
         cart.x += (cart.target.x - cart.x) / d * step; cart.z += (cart.target.z - cart.z) / d * step;
         cart.travel += step; cart.moving = true;
+        // 脚印（C 包）：每走一米记一个点，老耿 / 妮儿沿它跟车。
+        cart.trail ??= [];
+        if (!cart.trail.length || Distance(cart.trail.at(-1), cart) >= 1.0) { cart.trail.push({ x: cart.x, z: cart.z }); if (cart.trail.length > 400) { cart.trail.shift(); this.gengTrailIndex = Math.max(0, this.gengTrailIndex - 1); this.nierTrailIndex = Math.max(0, this.nierTrailIndex - 1); } }
       }
     } else cart.moving = false;
     cart.y = r.battlefield.GroundHeight(cart.x, cart.z);
@@ -491,11 +602,12 @@ export class FirstLevelGengFamily {
         // 百姓是 tzm 合批网格（没有 GLB 骨架 characterRig）：报模型来源与分身，"box" = 模型没读到退回方块。
         modelSource: this.actors.nier?.actor?.meshSource ?? null,
         scale: this.actors.nier?.actor?.sizeScale ?? null, variant: this.actors.nier?.actor?.variant ?? null },
-      geng: { ...Pos(this.actors.geng), pose: this.gengPose?.kind ?? null, walking: !!this.gengGoal },
+      geng: { ...Pos(this.actors.geng), pose: this.gengPose?.kind ?? null, walking: !!this.gengGoal, leading: this.gengLead },
       peasant: Pos(this.actors.peasant),
       heizi: this.cartState ? { x: +this.cartState.animal.x.toFixed(2), z: +this.cartState.animal.z.toFixed(2), scale: this.T.heiziScale, styled: this.cartStyled } : null,
       cart: this.cartState ? { x: +this.cartState.x.toFixed(2), z: +this.cartState.z.toFixed(2), yaw: +this.cartState.yaw.toFixed(2), moving: this.cartState.moving,
-        blocking: this.cartState.blocking, travel: +this.cartState.travel.toFixed(1), drawn: !!this.cartModels?.instances?.get(this.cartState.id) } : null,
+        blocking: this.cartState.blocking, travel: +this.cartState.travel.toFixed(1), drawn: !!this.cartModels?.instances?.get(this.cartState.id),
+        routeLeft: this.cartState.route?.length ?? 0, nierRiding: this.nierCart } : null,
       nierFollowSaid: this.nierFollowSaid, gaze: !!this.gaze, events: this.events.slice(-24),
     };
   }

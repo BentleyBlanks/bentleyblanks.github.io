@@ -35,6 +35,9 @@ export const TEXT = Object.freeze({
   "firstLevel.interaction.rifle": "捡起地上的步枪",
   "firstLevel.interaction.bundle": "捡起弟兄身边的集束弹和绷带 · H 蓄力投掷，B 包扎",
   "firstLevel.interaction.gate": "打开院门，让担架通过",
+  // 0311 C（2026-10-12）：10 驴车卡在门槛上搭把手（可选）、11 在接运点问老耿往哪走。
+  "firstLevel.interaction.cartPush": "搭把手，把驴车推过门槛",
+  "firstLevel.interaction.askGeng": "问老耿往哪走",
   "firstLevel.interaction.carry": "接过老周担架后端",
   "firstLevel.interaction.cart": "上车，跟着老周",
   "firstLevel.interaction.place": "将老周放在军医旁",
@@ -60,6 +63,8 @@ export const TEXT = Object.freeze({
   "firstLevel.interaction.borrowLightShare": "划火，递过去",
   "firstLevel.guide.village": "灶屋入口",
   "firstLevel.guide.gate": "院门通道",
+  // 0311 C：10 院门开了之后顺子守的地方（院门外东侧墙角，看绕行巷东头）。
+  "firstLevel.guide.laneEast": "院门外东边墙角",
   "firstLevel.guide.gateThreat": "院门外追兵：探出缺口压住侧翼",
   "firstLevel.guide.transfer": "桥头接运点",
   "firstLevel.guide.transferWall": "村口矮墙射位",
@@ -95,4 +100,6 @@ export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_Fir
   // 第二波 Mid 包（阶段 8–14）的两个玩法模块：零玩家可见中文，台词一律走台词表。
   "Script_FirstLevelVillageBlock.mjs", "Script_FirstLevelTransferCart.mjs",
   // 2026-10-12 0311 B 包：耿家四个角色与 07 沟口遭遇。
-  "Script_FirstLevelGengFamily.mjs", "Script_FirstLevelSouthMouth.mjs"];
+  "Script_FirstLevelGengFamily.mjs", "Script_FirstLevelSouthMouth.mjs",
+  // 2026-10-12 0311 C 包：08–11 巷战的纯规则。
+  "Script_FirstLevelStreetFight.mjs"];

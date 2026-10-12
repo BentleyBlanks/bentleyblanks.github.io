@@ -98,6 +98,7 @@ export const testDefs = {
   // 2026-10-12 0311 重构 B 包（docs/Data_FirstLevel0311Refactor20261012Contract.md §3.4–3.5 / §5.6）。
   FirstLevelGengFamilyTest: {file:"Script_FirstLevelGengFamilyTest.mjs",desc:"06–11 耿家四个角色：§5.6 接口与签名、占位分身、沟沿捡弹壳与看枪、07 走沟沿跟队与撒腿进村、老耿 / 驴车动作、薄钩子（纯 Node）"},
   FirstLevelSouthMouthTest: {file:"Script_FirstLevelSouthMouthTest.mjs",desc:"07 沟口遭遇：锚点 / 田埂坟包 / southMouth 组与折线、编排表、压住-抬头-冲过的纯规则、运行时薄适配与钩子（纯 Node）"},
+  FirstLevelStreetFightTest: {file:"Script_FirstLevelStreetFightTest.mjs",desc:"08–11 耿家庄巷战：四个新遭遇组 / 折线 / 事实门 / 台词、夹道与屋顶与草垛的空间、投弹力道、推进点-侧路-后院-巷口-推车的纯规则、薄钩子（纯 Node）"},
   OpeningStoryboardsTest: {file:"Script_OpeningStoryboardsTest.mjs",desc:"01–03 source rigs, baked animation hashes, normalized poses and V3 placement"},
   OpeningActorPerformanceBrowserTest: {file:"Script_OpeningActorPerformanceBrowserTest.mjs",timeoutMs:300000,desc:"Production-rig dialogue, idle, guard movement, planted feet and high-quality acting views"},
   OpeningClipsBrowserTest: {file:"Script_OpeningClipsBrowserTest.mjs",timeoutMs:600000,desc:"2026-09-23 opening clips on production rigs: plant slide, paired contacts, body overlap, bone length, NaN"},
@@ -629,6 +630,7 @@ export const tier0Fast = [
   "FirstLevelCollectionCareTest",
   "FirstLevelGengFamilyTest",
   "FirstLevelSouthMouthTest",
+  "FirstLevelStreetFightTest",
   "FirstLevelTankBrainTest",
   "FirstLevelFrontPressureTest",
   "FirstLevelFrontCounterattackTest",

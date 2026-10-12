@@ -149,7 +149,8 @@ export class FirstLevelLeaderGuide {
     }
     if(variant==="Courtyard") {
       if(r.Has("villageGunSilent")){target=A.gate;mode=label="open";}
-      if(r.Has("courtyardGateOpen")&&r.Has("villageGunSilent")){target=A.courtCover;mode=label="cover";cue="GuideCourtCover";variant+="Cover";}
+      // 2026-10-12 0311 C 包（契约 §3.8）：院门开了守院门外东侧墙角 A.laneEast，看绕行巷东头。
+      if(r.Has("courtyardGateOpen")&&r.Has("villageGunSilent")){target=A.laneEast;mode=label="cover";cue="GuideCourtCover";variant+="Cover";}
     }
     if(variant==="Transfer") {
       const id=r.transferBeats?.started.findLast(id=>!r.transferBeats.cleared.includes(id));

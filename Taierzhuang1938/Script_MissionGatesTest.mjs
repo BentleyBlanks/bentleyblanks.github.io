@@ -161,8 +161,9 @@ for (const [cue, factId] of Object.entries(MISSION_VOICE_FACTS)) {
   assert.equal(MISSION_FACT_GATES[factId].cue, cue, `${factId} 的 cue 与表不一致`);
 }
 checks += 1;
-// 09.19 契约 §5 的 23 条减去 09.23 契约 §5.2 下线的 RescueCall（rescueCallHeard 改由导演记）。
-Check(Object.keys(MISSION_VOICE_FACTS).length === 23, "对白事实共 23 条（契约 §5，RescueCall 已下线；2026-10-12 0311 B 包加 NierFollow→nierFollowHeard）");
+// 09.19 契约 §5 的 23 条减去 09.23 契约 §5.2 下线的 RescueCall（rescueCallHeard 改由导演记）；
+// 2026-10-12 0311 B 包加 NierFollow→nierFollowHeard，C 包加 GengGate→gengGateHeard、AskGeng→gengAsked。
+Check(Object.keys(MISSION_VOICE_FACTS).length === 25, "对白事实共 25 条（契约 §5，RescueCall 已下线；0311 B 加 NierFollow、C 加 GengGate / AskGeng）");
 Check(MISSION_FACT_GATES.rescueCallHeard?.kind === "scripted" && !("RescueCall" in MISSION_VOICE_FACTS), "rescueCallHeard 由开场导演记");
 
 // ---------------------------------------------------------------------------
