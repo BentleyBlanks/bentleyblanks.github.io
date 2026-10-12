@@ -190,7 +190,11 @@ export function LayoutFromSceneDoc(doc) {
   const w = t.cols * t.cellM, d = t.rows * t.cellM;
   const ground = { x: t.minX + w / 2, z: t.minZ + d / 2, w, d, h: 1, y: -0.5, semantic: "ground" };
   const tint = { lo: sampler.minY, hi: Math.max(sampler.minY + 0.5, sampler.maxY) };
-  const blocks = doc.blocks.map(block => GroundedBlock(block, sampler));
+  // 水块同第一关（BlockoutBlock）：盒子不画（灰盒子读不出是水，还会和水面打架），总控在顶面另铺水面
+  const blocks = doc.blocks.map(block => {
+    const grounded = GroundedBlock(block, sampler);
+    return grounded.semantic === "water" ? { ...grounded, visual: false, blockoutWater: true } : grounded;
+  });
   return {
     id: `Blockout${doc.level}`,
     level: doc.level,
