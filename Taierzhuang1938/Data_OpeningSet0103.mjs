@@ -492,8 +492,9 @@ export const DESIGNED_CONTACTS = Object.freeze({
   rubbleMoundBack: Object.freeze({ marks: Object.freeze(["shunzi.cover", "shunzi.trap", "shunzi.witnessEye", "SB06.seat", "SB06.dragCoverSet", "withdraw.playerSet"]),
     why: "SB06：顺子坐着背靠塌土；它只在他被拖出来、坐上坐位（导演 Check）以后出现，压着的时候他的胸口在这块地上（RescueShown）" }),
   bunkerCrateStackN: Object.freeze({ marks: Object.freeze(["SB01.yaowa"]), why: "SB01：幺娃靠着北壁坐，身后就是弹药箱" }),
-  trenchFacadeN: Object.freeze({ marks: Object.freeze(["SB03.captive", "SB03A.captive", "banter.comradeBlast", "rescue.rifleMouth"]),
-    why: "SB03/03A：死川军背靠门框边的板墙；近爆时他就是被摔在这面北壁上（BlastSlamBuried）；汉阳造躺在板墙脚下的泥里（不是人，只是标记）" }),
+  // （2026-10-12 R4：汉阳造 rescue.rifleMouth 从眼位左前（北壁板墙脚下）挪到右前方沟底，不再挨着这面板墙，豁免撤掉；净空见 SetTest 6d2。）
+  trenchFacadeN: Object.freeze({ marks: Object.freeze(["SB03.captive", "SB03A.captive", "banter.comradeBlast"]),
+    why: "SB03/03A：死川军背靠门框边的板墙；近爆时他就是被摔在这面北壁上（BlastSlamBuried）" }),
 });
 
 export const OPENING_SET = Object.freeze({ version: "20260928OpeningSetV3", stages: SET_STAGES, PROPS, BLAST, SMOKE, FLYOVER, FLYOVER_TRIGGER, sky,

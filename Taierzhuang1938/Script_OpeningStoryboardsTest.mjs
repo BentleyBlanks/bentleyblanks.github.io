@@ -808,6 +808,17 @@ assert.ok(!("cinematic" in C.interrogation),"no cut-away camera (user: 「保持
     if(meta){
       assert.ok(meta.holdLoop&&["offered","handed"].every(kind=>meta.events?.some(e=>e.kind===kind))&&meta.props?.includes("rifle"),"LuoGrabRifleShove: hold loop for the question, offered / handed events, the rifle prop");
       assert.ok(meta.holdLoop[1]-meta.holdLoop[0]<=1.2,"Luo's hold loop is short: he does not dawdle once the nod comes");
+      // 2026-10-12 R4: the rifle Luo snatches up lies where the mission rifle lies (rescue.rifleMouth), at Shunzi's right front.
+      // The clip's `rifle` prop at frame 0 (glTF scene space of the rig root = the runtime root frame turned half round, source
+      // metres: so only its bearing and bore are compared, not its scale) against rescue.rifleMouth seen from HandRoot.
+      const rig=JSON.parse(Read("./Animation/OpeningStoryboards/"+manifest.models.find(m=>m.id==="TengxianNra05").file)).clips.LuoGrabRifleShove;
+      // (rifleMouth is the rifle's centre; the prop's origin is its right-hand grip, 0.374 m behind the centre along the bore.)
+      const v=rig.props.rifle.values,o={x:-v[0],z:-v[2]},a={x:-v[3],z:-v[5]};
+      const rel=Rot(-handRoot.yaw,R.rifleMouth.x-handRoot.x,R.rifleMouth.z-handRoot.z),bore=Rot(-handRoot.yaw,-Math.sin(R.rifleMouth.yaw),-Math.cos(R.rifleMouth.yaw));
+      const grip={x:rel.x-bore.x*.374,z:rel.z-bore.z*.374};
+      const Ang=(p,q)=>Math.abs(Math.atan2(p.x*q.z-p.z*q.x,p.x*q.x+p.z*q.z))*180/Math.PI;
+      assert.ok(Ang(o,grip)<3&&Ang(a,bore)<3,`LuoGrabRifleShove's rifle at frame 0 lies at rescue.rifleMouth: grip bearing off ${Ang(o,grip).toFixed(1)} deg, bore off ${Ang(a,bore).toFixed(1)} deg`);
+      assert.ok(rel.x<0&&R.rifleMouth.z>eye.z,"the rifle lies at Luo's left front = Shunzi's right front (south of the eye)");
     }
     for(const shot of R.wound.shots.filter(s=>s.clip)){
       const m=manifest.clips[shot.clip];
