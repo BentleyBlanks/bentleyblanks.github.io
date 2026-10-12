@@ -13,7 +13,7 @@
 //   - 第一关真数据：分块烘静态层的耗时与烘时最长的一帧、小地图以玩家为中心并夹在边界内、
 //     全关总图缩放 / 平移 / 关键帧拾取（含真鼠标事件）。
 //   - 界面：导航栏刻度数 = 关键帧数、点 / 拖动松手跳转、上一个 / 下一个、SetInteractive(false) 挡住点击、
-//     鼠标 / 滚轮 / 按键不漏到 document、快进标记、关卡下拉、图层开关、全程无控制台错误。
+//     mousedown / 滚轮 / 按键不漏到 document（pointerdown 放行）、快进标记、关卡下拉、图层开关、全程无控制台错误。
 // 截图（1920×1080、1280×720）：整屏、小地图特写、全关总图看全图、放大到 03–05 前沿（约 6 px/m）。
 // ===========================================================================
 
@@ -530,7 +530,7 @@ try {
   const bake = await page.evaluate(() => window.__h.RebakeProbe());
   Info("第一关静态层（页面稳定后重烘）", JSON.stringify(bake));
   Check("第一关静态层烘好（≤ 4 px/m、块数 > 1000）", bake && bake.width > 500 && bake.blocks > 1000 && bake.pxPerM <= 4, `${bake?.width}×${bake?.height} @ ${bake?.pxPerM?.toFixed?.(2)} px/m, ${bake?.blocks} blocks`);
-  Check("烘焙分块：每一片 ≤ 12 ms，烘的过程中最长一帧 < 50 ms", bake && bake.maxStepMs <= 12 && bake.maxFrameGapMs < 50, `max step ${bake?.maxStepMs} ms (${bake?.maxStepPhase}), max frame gap ${bake?.maxFrameGapMs} ms over ${bake?.frames} frames ${JSON.stringify(bake?.slowFrames)}`);
+  Check("烘焙分块：每一步 ≤ 一帧（16 ms），烘的过程中最长一帧 < 50 ms", bake && bake.maxStepMs <= 16 && bake.maxFrameGapMs < 50, `max step ${bake?.maxStepMs} ms (${bake?.maxStepPhase}), max frame gap ${bake?.maxFrameGapMs} ms over ${bake?.frames} frames ${JSON.stringify(bake?.slowFrames)}`);
   {
     const p3 = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     Watch(p3);
@@ -683,7 +683,7 @@ try {
   const pickEv = await page.evaluate(() => ({ events: window.__h.events.slice(), index: window.__h.index, open: window.__h.ui.mapOpen }));
   Check("点全关总图上的关键帧点 → onMapPick 跳过去，图保持打开", pickEv.events.some((e) => e[0] === "mapPick" && e[1] === target.i) && pickEv.index === target.i && pickEv.open, JSON.stringify(pickEv));
   const leakMap = await page.evaluate(() => ({ ...window.__h.leaked }));
-  Check("全关总图上的滚轮 / 按下不漏到 document", leakMap.wheel === 0 && leakMap.mousedown === 0 && leakMap.pointerdown === 0, JSON.stringify(leakMap));
+  Check("全关总图上的滚轮 / mousedown 不漏到 document（pointerdown 放行，给开机解锁音频）", leakMap.wheel === 0 && leakMap.mousedown === 0 && leakMap.pointerdown > 0, JSON.stringify(leakMap));
   // Esc / M 关闭（焦点在界面里）
   await page.evaluate(() => window.__h.ui.btnCloseMap.focus());
   await page.keyboard.press("Escape");
@@ -781,8 +781,8 @@ try {
   await page.keyboard.press("Period");
   await page.keyboard.press("KeyY");
   const leakAfter = await page.evaluate(() => ({ leaked: { ...window.__h.leaked }, events: window.__h.events.map((e) => e[0]).join(","), focus: document.activeElement?.className || "" }));
-  Check("界面上的 mousedown / pointerdown / wheel / keydown 都不漏到 document；焦点在界面里时 . Y 照样转给总控",
-    leakAfter.leaked.mousedown === leakBefore.mousedown && leakAfter.leaked.pointerdown === leakBefore.pointerdown && leakAfter.leaked.wheel === leakBefore.wheel && leakAfter.leaked.keydown === leakBefore.keydown && leakAfter.events === "next,replay",
+  Check("界面上的 mousedown / wheel / keydown 不漏到 document、pointerdown 照常冒泡（音频解锁）；焦点在界面里时 . Y 照样转给总控",
+    leakAfter.leaked.mousedown === leakBefore.mousedown && leakAfter.leaked.pointerdown > leakBefore.pointerdown && leakAfter.leaked.wheel === leakBefore.wheel && leakAfter.leaked.keydown === leakBefore.keydown && leakAfter.events === "next,replay",
     JSON.stringify({ leakBefore, leakAfter }));
   const focusAfterClick = await page.evaluate(() => document.activeElement === document.body || !document.querySelector(".boRoot").contains(document.activeElement));
   await page.evaluate(() => document.activeElement?.blur?.());

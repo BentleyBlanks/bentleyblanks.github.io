@@ -12,8 +12,8 @@
 //   中上  提示条（2.5 s 淡出）
 //
 // 输入约定：
-// - 本界面 DOM 上的 mousedown / pointerdown / wheel / keydown 一律 stopPropagation —— 游戏的按键路由挂在
-//   document 上，不拦会触发抢指针锁、滚轮换枪、空格跳。按钮在 mousedown 时就 preventDefault，不留焦点
+// - 本界面 DOM 上的 mousedown / wheel / keydown 一律 stopPropagation —— 游戏的按键路由挂在
+//   document 上，不拦会触发抢指针锁、滚轮换枪、空格跳（pointerdown 放行：开机那下解锁音频要它）。按钮在 mousedown 时就 preventDefault，不留焦点
 //   （焦点留在按钮上，回到游戏按空格会「点」它）。
 // - 焦点在本界面里时，. , M Y Esc 由这里直接转给 handlers（随后被拦住，不会再到总控的 window 监听上
 //   重复触发）。总控请在冒泡阶段监听这些键。
@@ -137,8 +137,11 @@ export class BlockoutUi {
   // 构建
 
   WireRoot() {
+    // 只拦游戏按键路由（Script_Input）认的那几种：mousedown 会抢指针锁、wheel 会换枪、keydown 会走路开火。
+    // pointerdown / click 照常冒泡 —— Script_Main 在 document 上挂了一次性的 pointerdown 解锁音频，
+    // 第一下点在编辑器界面上也得算数。
     const stop = (e) => e.stopPropagation();
-    for (const type of ["mousedown", "pointerdown", "wheel", "keydown", "keypress", "click", "dblclick", "contextmenu"]) {
+    for (const type of ["mousedown", "wheel", "keydown", "keypress", "contextmenu"]) {
       this.Listen(this.root, type, (e) => {
         if (type === "contextmenu") e.preventDefault();
         if (type === "keydown") this.OnKey(e);

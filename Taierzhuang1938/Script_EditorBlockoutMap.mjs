@@ -370,16 +370,19 @@ export class BlockoutMap {
     const { scene, cols, rows, cellM } = job;
     const { minX, minZ } = scene.bounds;
     if (job.phase === "heights") {
-      // 一次一行格点
+      // 一次至多 128 个格点（采样函数可能很贵：第一关挖沟后的地面约 4 µs / 点），片的预算才压得住
       const iz = job.row;
       const z = minZ + iz * cellM;
       const base = iz * (cols + 1);
-      for (let ix = 0; ix <= cols; ix++) {
+      const c0 = job.col || 0, c1 = Math.min(cols, c0 + 127);
+      for (let ix = c0; ix <= c1; ix++) {
         const x = minX + ix * cellM;
         const h = scene.sampleHeight(x, z);
         job.H[base + ix] = Finite(h) ? h : 0;
         if (job.N) { const n = scene.naturalHeight(x, z); job.N[base + ix] = Finite(n) ? n : job.H[base + ix]; }
       }
+      if (c1 < cols) { job.col = c1 + 1; return; }
+      job.col = 0;
       job.row += 1;
       if (job.row > rows) { job.phase = "gradients"; job.row = 0; }
       return;
