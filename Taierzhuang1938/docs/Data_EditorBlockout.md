@@ -254,10 +254,11 @@ export class BlockoutMap {
 
 ### 5.2 过渡规划（`PlanTransition(prevKf, nextKf)`，纯函数）
 
-- 两边都有的 `id`：`mode: "move"`，沿 `nextKf` 里该单位的 `path`（没有则直线）从旧位置走到新位置；速度 = `speedMps` 或缺省，时长夹在 0.6–8 s（超出就按比例调速）；走动时朝向顺着行进方向，最后 0.4 s 转到目标朝向；姿态在到达时切换（目标是 crouch 则蹲着走）。
+- 两边都有的 `id`：`mode: "move"`，沿 `nextKf` 里该单位的 `path`（没有则直线）从旧位置走到新位置；每人按自己的自然速度（`speedMps` 或缺省）走，很短的挪动拉长到 0.6 s；走动时朝向顺着行进方向，最后 0.4 s 转到目标朝向；姿态在到达时切换（目标是蹲 / 卧则蹲着走）。
+- 整段（最慢的那个人）超过 8 s 时**不提速，整段快进**：`playbackRate = durationS / 8`，消费方每帧按 `dt × playbackRate` 推进计划时间，演员动画也用同一倍率；导航栏在过渡中显示「快进 ×2.4」。
 - 只在新关键帧有的：有 `path` 则 `mode: "appear"` 从 `path[0]` 走进来，否则原地出现（地环闪一下）。
 - 只在旧关键帧有的：`mode: "vanish"`，过渡开始时消失（地环闪一下）；旧关键帧给了 `intent` 的，先沿 `intent` 走完再消失。
-- 输出：`{ durationS, units: [{ id, mode, from, to, path, speedMps, startS, endS, stanceTo }] }`。
+- 输出：`{ durationS, playbackRate, wallS, units: [{ id, mode, walkIn?, walkOut?, route, length, speedMps, startS, endS, from, to, unitFrom, unitTo }] }`；`SampleTransitionUnit(entry, t)` / `SampleTransition(plan, t)` 给出 t 秒（计划时间）时每人的 `{x, z, yawDeg, stance, moving, visible, speedMps, done}`。实现在 `Script_EditorBlockoutConfig.mjs`（已提交，各包直接用；要改先和集成负责人对齐）。
 
 ### 5.3 默认射界
 
@@ -439,10 +440,10 @@ Config()                     // → 归一化后的配置（深拷贝）
 
 | 包 | 独占文件 | 说明 |
 | --- | --- | --- |
-| A 数据与生成 | `Script_EditorBlockoutConfig.mjs`、`Script_EditorBlockoutFirstLevel.mjs`、`Data_EditorBlockoutFirstLevelStations.mjs`（§8 表）、`Script_EditorBlockoutSecondLevel.mjs`、`Script_EditorBlockoutCli.mjs`、`Blockout/*.json`、`Blockout/README.md`、`Script_EditorBlockoutConfigTest.mjs` | 纯 node；不碰浏览器模块 |
-| B 运行时 | `Script_Main.mjs`（只加 §6 的钩子）、`Script_EditorBlockoutEntry.mjs`、`Script_Editor.mjs`（只加 §1 的启动面板按钮）、`Script_EditorTest.mjs`（按钮数）、`Script_EditorBlockoutLevels.mjs`、`Data_FirstLevelP012Terrain.mjs`（只加 `terrainSampler` 钩子）、`Script_EditorBlockout.mjs`、`Script_EditorBlockoutPuppets.mjs`、`Script_EditorBlockoutMarkers.mjs`、`Script_EditorBlockoutBrowserTest.mjs`、`Data_Text_Boot.mjs`（若需要） | 先用 `Blockout/` 里的样例配置开发；UI 未合入前用一个最小占位面板 |
+| A 数据与生成 | `Script_EditorBlockoutFirstLevel.mjs`、`Data_EditorBlockoutFirstLevelStations.mjs`（§8 表）、`Script_EditorBlockoutSecondLevel.mjs`、`Script_EditorBlockoutCli.mjs`、`Blockout/*.json`、`Blockout/README.md`、`Script_EditorBlockoutConfigTest.mjs` | 纯 node；不碰浏览器模块。`Script_EditorBlockoutConfig.mjs` 已由集成负责人写好并提交：可以加函数、加校验，不改已有导出的签名与语义 |
+| B 运行时 | `Script_Main.mjs`（只加 §6 的钩子）、`Script_EditorBlockoutEntry.mjs`、`Script_Editor.mjs`（只加 §1 的启动面板按钮）、`Script_EditorTest.mjs`（按钮数）、`Script_EditorBlockoutLevels.mjs`、`Data_FirstLevelP012Terrain.mjs`（只加 `terrainSampler` 钩子）、`Script_EditorBlockout.mjs`、`Script_EditorBlockoutPuppets.mjs`、`Script_EditorBlockoutMarkers.mjs`、`Script_EditorBlockoutStore.mjs`、`Script_EditorBlockoutBrowserTest.mjs`、`Data_Text_Boot.mjs`（若需要） | 先用 `Blockout/` 里的样例配置开发；C 的 `Script_EditorBlockoutUi.mjs` / `Script_EditorBlockoutMap.mjs` 未合入前，自己写同名同接口的最小占位实现（文件头注 `// STUB：集成时由 C 包替换`），合并时取 C 的 |
 | C 界面与地图 | `Script_EditorBlockoutUi.mjs`、`Script_EditorBlockoutMap.mjs`、`Style_EditorBlockout.css`、`Script_EditorBlockoutMapTest.mjs` | 用 harness 页独立开发与测试；按 §4 接口交付 |
-| D 存档与文档 | `scripts/Script_LocalPreview.mjs`（只加 `/__blockout/*`）、`Script_EditorBlockoutStore.mjs`、`Script_EditorBlockoutSaveTest.mjs`、根 `CLAUDE.md` 端点一条、`docs/Data_EditorSuite.md` 一节 | |
+| D 存档与文档 | `scripts/Script_LocalPreview.mjs`（只加 `/__blockout/*`）、`Script_EditorBlockoutSaveTest.mjs`、根 `CLAUDE.md` 端点一条、`docs/Data_EditorSuite.md` 一节 | |
 | 集成 | `index.html`、`Script_TestRunner.mjs`、`AGENTS.md`、`docs/Data_AgentReference.md`、本文 §12 | 由集成负责人做 |
 
 各包 import map：只给**自己新建 / 修改**的模块加或抬 `?v=`（合并时冲突按「每个键取较新的戳」解决）。各包只在自己的分支提交，不 push、不合别人的分支、不改别人的独占文件。
@@ -450,3 +451,4 @@ Config()                     // → 归一化后的配置（深拷贝）
 ## 12. 变更记录
 
 - 2026-10-13：初版（入口、数据格式、接口、界面、第一关 45 个关键帧、第二关草稿、测试与分工）。
+- 2026-10-13：追加「设置 → 高级工具」面板入口；`Script_EditorBlockoutConfig.mjs` 由集成负责人先写好；过渡改为按自然速度 + 整段快进；`Script_EditorBlockoutStore.mjs` 归 B 包。
