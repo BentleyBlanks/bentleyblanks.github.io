@@ -51,6 +51,32 @@ export function DrawnVertices(geometry) {
   DRAWN_VERTICES.set(index, entry);
   return entry.list;
 }
+// SkinnedMesh.getVertexPosition with the per-bone product (bone.matrixWorld × boneInverse) hoisted out of the vertex loop:
+// three's applyBoneTransform recomputes it for every weight of every vertex (up to four 4×4 products a vertex). Same Matrix4
+// product, same per-vertex operations in the same order, so the points are bit-identical (Script_CharacterModelTest). Valid
+// while the pose does not change -- make a reader per scan. 2026-10-12 R4-Perf: the settling ground fit of the 02 charge.
+const SKIN_INDEX = new THREE.Vector4(), SKIN_WEIGHT = new THREE.Vector4(), SKIN_BASE = new THREE.Vector4(), SKIN_TERM = new THREE.Vector4();
+export function SkinnedVertexReader(mesh) {
+  if (!mesh.isSkinnedMesh || !mesh.skeleton || mesh.getVertexPosition !== THREE.SkinnedMesh.prototype.getVertexPosition
+    || mesh.applyBoneTransform !== THREE.SkinnedMesh.prototype.applyBoneTransform) return (index, target) => mesh.getVertexPosition(index, target);
+  const { bones, boneInverses } = mesh.skeleton, products = new Array(bones.length);
+  const geometry = mesh.geometry, skinIndex = geometry.attributes.skinIndex, skinWeight = geometry.attributes.skinWeight;
+  const unskinned = THREE.Mesh.prototype.getVertexPosition;
+  return (index, target) => {
+    unskinned.call(mesh, index, target);
+    SKIN_INDEX.fromBufferAttribute(skinIndex, index); SKIN_WEIGHT.fromBufferAttribute(skinWeight, index);
+    SKIN_BASE.set(target.x, target.y, target.z, 1); target.set(0, 0, 0);
+    SKIN_BASE.applyMatrix4(mesh.bindMatrix);
+    for (let i = 0; i < 4; i += 1) {
+      const weight = SKIN_WEIGHT.getComponent(i);
+      if (weight === 0) continue;
+      const bone = SKIN_INDEX.getComponent(i);
+      const product = products[bone] ??= new THREE.Matrix4().multiplyMatrices(bones[bone].matrixWorld, boneInverses[bone]);
+      target.addScaledVector(SKIN_TERM.copy(SKIN_BASE).applyMatrix4(product), weight);
+    }
+    return target.applyMatrix4(mesh.bindMatrixInverse);
+  };
+}
 const IsBayonetThrust = pose =>/^Bayonet(Light|LightAlt|Heavy|Compact|CompactAlt)$/.test(pose?.clip || "");
 import { RaycastShapes } from "./Script_CharacterHitboxMath.mjs";
 import { CHARACTER_HITBOX_PROFILE } from "./Data_CharacterHitbox.mjs";
@@ -1007,7 +1033,7 @@ export class LugouCharacterRig {
     this.infantry.Cancel(); this.meleeAnimation?.Restore();
     this.root.position.y -= this.infantryFloorOffset || 0;
     this.infantryFloorOffset = 0;
-    this.deathFloorLift = undefined; this.deathContactRotation = null; this.deathSettlePoints = null; this.deathSettleCalls = 0;
+    this.deathFloorLift = undefined; this.deathContactRotation = null; this.deathSettlePoints = null; this.deathSettleCalls = 0; this.deathSettleT = NaN;
     this.deathGroundProbes = [];
     this.root.traverse(mesh => {
       if (mesh.isMesh && mesh.userData.characterPbrSurface) this.deathGroundProbes.push(mesh);
@@ -1134,12 +1160,16 @@ export class LugouCharacterRig {
     let points = [], floor = Infinity;
     // Between the support search and the final pose a settling corpse re-skins only every settleRescanCalls-th call
     // (DEATH_CONTACT.settleRescanCalls); the calls between reuse its last skinned points under this call's tilt.
+    // A call at the very t of the last skinning (a zero-delta frame: StepFrames(n, 0), a frozen terminal screen) reuses them
+    // too -- same clip sample, same points, the same floor bit for bit -- and does not count toward the rescan cadence
+    // (2026-10-12 R4-Perf: three corpses mid-settle in a frozen 02 Charge frame re-skinned ~6k vertices every third frame).
     const reuse = t >= DEATH_CONTACT.poseEnd && t < 1 && this.deathContactRotation && this.deathSettlePoints
-      && (this.deathSettleCalls = (this.deathSettleCalls || 0) + 1) % DEATH_CONTACT.settleRescanCalls !== 0;
+      && (t === this.deathSettleT || (this.deathSettleCalls = (this.deathSettleCalls || 0) + 1) % DEATH_CONTACT.settleRescanCalls !== 0);
     if (reuse) points = this.deathSettlePoints;
     else for (const mesh of this.deathGroundProbes) {
       if (!mesh.visible) continue;
       mesh.skeleton?.update(); transform.multiplyMatrices(inverse, mesh.matrixWorld);
+      const read = SkinnedVertexReader(mesh);
       // Gore removes triangles from the index while retaining the shared vertex buffer.
       // Only drawn vertices can support the body; a removed boot must not lift the torso.
       const indices = mesh.geometry.index;
@@ -1152,7 +1182,7 @@ export class LugouCharacterRig {
       const drawn = settling && indices ? DrawnVertices(mesh.geometry) : null;
       if (drawn) {
         for (let k = 0; k < drawn.length; k += 1) {
-          mesh.getVertexPosition(drawn[k], point).applyMatrix4(transform);
+          read(drawn[k], point).applyMatrix4(transform);
           floor = Math.min(floor, point.y);
           points.push(point.clone().sub(this.actor.body.position));
         }
@@ -1161,12 +1191,12 @@ export class LugouCharacterRig {
       const stride = settling ? 1 : Math.max(1, Math.floor(count / 256));
       for (let offset = 0; offset < count; offset += stride) {
         const index = indices ? indices.getX(offset) : offset;
-        mesh.getVertexPosition(index, point).applyMatrix4(transform);
+        read(index, point).applyMatrix4(transform);
         floor = Math.min(floor, point.y);
         if (settling) points.push(point.clone().sub(this.actor.body.position));
       }
     }
-    if (!reuse && t >= DEATH_CONTACT.poseEnd) this.deathSettlePoints = t < 1 ? points : null;
+    if (!reuse && t >= DEATH_CONTACT.poseEnd) { this.deathSettlePoints = t < 1 ? points : null; this.deathSettleT = t; }
     if (points.length) {
       if (!this.deathContactRotation) {
         // One bounded support search per corpse. Minimise the mass centre height,
