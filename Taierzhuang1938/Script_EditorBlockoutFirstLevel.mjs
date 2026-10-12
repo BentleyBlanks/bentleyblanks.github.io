@@ -1790,6 +1790,19 @@ function PickClearPath(from, to, candidates, blocks) {
   return first || { path: null, crossings: [] };
 }
 
+/** 自动找的走法：比直线最多长这么多（直线本身不穿墙时）。 */
+const AUTO_PATH_DETOUR = Object.freeze({ ratio: 1.3, extraM: 2 });
+/** 折线里有没有走回头路：相邻两段都长于 1 m、夹角余弦 < −0.85。 */
+function PathDoublesBack(points) {
+  for (let i = 1; i + 1 < points.length; i++) {
+    const ax = points[i].x - points[i - 1].x, az = points[i].z - points[i - 1].z;
+    const bx = points[i + 1].x - points[i].x, bz = points[i + 1].z - points[i].z;
+    const la = Math.hypot(ax, az), lb = Math.hypot(bx, bz);
+    if (la > 1 && lb > 1 && (ax * bx + az * bz) / (la * lb) < -0.85) return true;
+  }
+  return false;
+}
+
 /** 同一条 track（遭遇组成员的战术折线）上从下标 i 走到 j。 */
 function TrackPathBetween(track, i, j) {
   if (i === null || j === null || j <= i) return null;
@@ -1896,31 +1909,42 @@ export function BuildFirstLevelBlockoutConfig({ commit = "", generatedAt = "", i
       seen.add(u.id);
     }
     const next = NextFor(station, player, rawUnits);
+    // 朝向先定（车身脚印要按车头方向算），再把落在车身上的人 / 担架推开，最后挑走位折线。
+    FinishFacing(rawUnits, player, Number.isFinite(next.x) ? next : null);
+    PushUnitsOffVehicles(rawUnits);
     // 相邻关键帧之间的走位折线，按偏好逐条试，第一条身体不穿高墙的就用（两帧信号并集下的实心块）：
     // 配方写的 path → 指定贴着走的路（lane）→ 同一条战术折线 → 贴着已知路线（含两条接力）→ 直线。
     const blocks = SolidsFor([...prevSignals, ...signals]);
     for (const u of rawUnits) {
       const prev = prevUnits.get(u.id);
       if (!prev) continue;
+      // 配方写的 path 与战术折线是游戏 / 设计给的走法，照用；贴路（lane）与贴路线（含接力）是自动找的：
+      // 不许走回头路，直线本身不穿墙时也不许比直线长太多（否则短挪动会先走出去再折回来）。
+      const straightClear = !RouteSolidCrossings(blocks, [prev, u]).length;
+      const autoOk = (path) => {
+        const points = [prev, ...path, u];
+        // 直线穿墙时什么绕法都可以（战车路本身有折返）；直线走得通时才挑剔回头路与绕远。
+        return !straightClear || (!PathDoublesBack(points) && PathLength(points) <= Dist(prev, u) * AUTO_PATH_DETOUR.ratio + AUTO_PATH_DETOUR.extraM);
+      };
       const candidates = [];
       if (u.path?.length) candidates.push(u.path.map((p) => Pt(p.x, p.z)));
       const meta = META.get(u), prevMeta = META.get(prev);
       if (meta?.lane) {
         const lane = meta.lane, a = MissionRouteProjection(lane, prev).progress, b = MissionRouteProjection(lane, u).progress;
-        if (Math.abs(b - a) >= 1) candidates.push(TidyPath(prev, [MissionRoutePoint(lane, a), ...RouteVerticesBetween(lane, RouteProgresses(lane), a, b), MissionRoutePoint(lane, b)], u));
+        const lanePath = Math.abs(b - a) >= 1 ? TidyPath(prev, [MissionRoutePoint(lane, a), ...RouteVerticesBetween(lane, RouteProgresses(lane), a, b), MissionRoutePoint(lane, b)], u) : null;
+        if (lanePath && autoOk(lanePath)) candidates.push(lanePath);
       }
       if (meta?.track && prevMeta?.track && meta.track.length === prevMeta.track.length && Dist(meta.track[0], prevMeta.track[0]) < 1e-6) {
         const track = TrackPathBetween(meta.track, prevMeta.trackAt, meta.trackAt);
         if (track?.length) candidates.push(track);
       }
-      if (Dist(prev, u) >= 2) candidates.push(...RouteCandidates(prev, u));
+      if (Dist(prev, u) >= 2) candidates.push(...RouteCandidates(prev, u).filter(autoOk));
       candidates.push(null);
       // 都穿的话先用第一条，组装完由 FirstLevelBlockoutIssues 报出来（测试判失败）。
       const { path } = PickClearPath(prev, u, candidates, blocks);
       delete u.path;
       if (path?.length > 1 || (path?.length === 1 && Dist(path[0], u) > 1e-6)) u.path = path.map((p) => ({ x: R2(p.x), z: R2(p.z) }));
     }
-    FinishFacing(rawUnits, player, Number.isFinite(next.x) ? next : null);
     const units = rawUnits.map((u) => OrderUnit(SanitizeUnit(u)));
     const poiIds = new Set();
     const pois = [...recipePois, ...AutoPois(player, station.stage)].filter((p) => !poiIds.has(p.id) && poiIds.add(p.id));
@@ -2168,6 +2192,48 @@ export const BLOCKOUT_SPACING = Object.freeze({
 });
 
 const PEOPLE_KINDS = new Set(["soldier", "officer", "civilian", "child"]);
+/** 车身脚印（与 Script_EditorBlockoutPuppets 的车体同尺寸；w 横向、d 沿朝向）与人离车身的最小余量。 */
+export const BLOCKOUT_VEHICLE_FOOTPRINT = Object.freeze({ tank: { w: 2.18, d: 5.75 }, cart: { w: 1.5, d: 2.4 }, marginM: 0.35 });
+/** 点在车身脚印（外扩 margin）里时，返回推到脚印外 0.05 m 的位置；不在里面返回 null。 */
+function PushOutOfFootprint(pt, v, margin) {
+  const fp = BLOCKOUT_VEHICLE_FOOTPRINT[v.kind];
+  if (!fp) return null;
+  const yaw = (v.yawDeg || 0) * Math.PI / 180, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = -fz, rz = fx;
+  const dx = pt.x - v.x, dz = pt.z - v.z;
+  const along = dx * fx + dz * fz, across = dx * rx + dz * rz;
+  const hd = fp.d / 2 + margin, hw = fp.w / 2 + margin;
+  if (Math.abs(along) >= hd || Math.abs(across) >= hw) return null;
+  const outAlong = hd - Math.abs(along), outAcross = hw - Math.abs(across);
+  if (outAcross <= outAlong) {
+    const s = (across >= 0 ? 1 : -1) * (outAcross + 0.05);
+    return { x: pt.x + rx * s, z: pt.z + rz * s };
+  }
+  const s = (along >= 0 ? 1 : -1) * (outAlong + 0.05);
+  return { x: pt.x + fx * s, z: pt.z + fz * s };
+}
+/** 摆位时把人和担架（连同抬的人）推出车身脚印：配方按锚点摆的人有时正好落在车身上。 */
+function PushUnitsOffVehicles(units) {
+  const margin = BLOCKOUT_VEHICLE_FOOTPRINT.marginM;
+  for (const v of units.filter((u) => BLOCKOUT_VEHICLE_FOOTPRINT[u.kind])) {
+    for (const u of units) {
+      if (u === v) continue;
+      if (PEOPLE_KINDS.has(u.kind || "soldier")) {
+        const out = PushOutOfFootprint(u, v, margin);
+        if (out) { u.x = out.x; u.z = out.z; }
+      } else if (u.kind === "litter") {
+        // 推开一个端点后另一个端点可能还在里面：最多推三轮。
+        for (let round = 0; round < 3; round++) {
+          let moved = false;
+          for (const pt of [{ x: u.x, z: u.z }, ...(CarrySegment(u) || [])]) {
+            const out = PushOutOfFootprint(pt, v, margin);
+            if (out) { u.x += out.x - pt.x; u.z += out.z - pt.z; moved = true; break; }
+          }
+          if (!moved) break;
+        }
+      }
+    }
+  }
+}
 function SegmentDistance(p, a, b) {
   const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz;
   const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2)) : 0;
@@ -2215,6 +2281,13 @@ export function FirstLevelSpacingIssues(kf) {
     for (let j = i + 1; j < units.length; j++) {
       const d = Dist(units[i], units[j]);
       if (d < S.unitM) out.push(`${units[i].id} 和 ${units[j].id} 相距 ${R2(d)} m（< ${S.unitM}）`);
+    }
+  }
+  for (const v of units.filter((u) => BLOCKOUT_VEHICLE_FOOTPRINT[u.kind])) {
+    for (const u of units) {
+      if (u === v) continue;
+      const points = isPerson(u) ? [u] : u.kind === "litter" ? [u, ...(CarrySegment(u) || [])] : [];
+      if (points.some((pt) => PushOutOfFootprint(pt, v, BLOCKOUT_VEHICLE_FOOTPRINT.marginM - 0.01))) out.push(`${u.id} 站在车身 ${v.id} 上（离车身不到 ${BLOCKOUT_VEHICLE_FOOTPRINT.marginM} m）`);
     }
   }
   if (Number.isFinite(kf.next?.x) && Dist(kf.next, kf.player) < S.nextM) out.push(`下一步目标离玩家 ${R2(Dist(kf.next, kf.player))} m（< ${S.nextM}，只写文字）`);
