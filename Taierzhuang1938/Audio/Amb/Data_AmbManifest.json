@@ -278,7 +278,7 @@
   },
   "normalization": {
     "beds": {
-      "normalizedAt": "2026-08-25",
+      "normalizedAt": "2026-10-12",
       "tool": "Script_AudioNormalize.mjs",
       "peakCeilingDbfs": -1,
       "metric": "rmsDbfs",
@@ -286,7 +286,7 @@
       "toleranceDb": 0.5
     },
     "cues": {
-      "normalizedAt": "2026-08-25",
+      "normalizedAt": "2026-10-12",
       "tool": "Script_AudioNormalize.mjs",
       "peakCeilingDbfs": -1,
       "metric": "activeRmsDbfs",
@@ -316,8 +316,15 @@
       "continuous": true,
       "promptHash": "f51635ff6f81fa6997ebbf13d0ed645a005103e00dc881969a00850a8165d568",
       "mastering": "ChannelsBeforeLoudnessV2",
-      "sha256": "783f2fadc55ccdc1b5582cb0ac93a70159c1d2cd71cca92f3254acafc124f5f4",
-      "bytes": 113311
+      "sha256": "0167aa01e7cff7fa2f91a81bc27cffbd5a24f48102ac2351b4ebf8f6620ac10d",
+      "bytes": 113311,
+      "levelAligned": {
+        "fromSha256": "783f2fadc55ccdc1b5582cb0ac93a70159c1d2cd71cca92f3254acafc124f5f4",
+        "tool": "Script_AudioNormalize.mjs --write",
+        "gainDb": -6.88,
+        "on": "2026-10-12",
+        "why": "成品对齐到库线有声段 −25 dBFS（原来没走这一步，Normalize 一直红）；响度差挪进运行时混音（R4-Voice）"
+      }
     },
     "trainCarriageOnly": {
       "file": "AudioAmb_TrainCarriageOnly.mp3",

@@ -50,6 +50,8 @@ if (Has("generate")) for (let take = 0; take < CHARGE_CROWD_PROMPTS.length; take
 if (!fs.existsSync(raw(PICK))) throw new Error(`missing ${raw(PICK)} (run with --generate)`);
 // 去掉 120 Hz 以下的轰声和 9 kHz 以上的毛刺，头 20 ms 淡入、尾 0.6 s 淡出，单声道，峰值归一到 −3 dBFS（先量峰值再精确归一，
 // 不做「限幅后再推增益」）。
+// 2026-10-12：部署件随后按库线对齐到有声段 −25 dBFS（`Script_AudioNormalize.mjs --write`，−9.52 dB），
+// 响度挪进 Script_Audio.SAMPLE_MIX.chargeCrowd（0.9 → 2.693）。重烘之后要再跑一遍 --write。
 const seconds = Number(execFileSync(process.env.FFPROBE || "ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", raw(PICK)], { encoding: "utf8" }).trim());
 const detect = spawnSync(ffmpeg, ["-hide_banner", "-nostats", "-i", raw(PICK), "-af", "highpass=f=120,lowpass=f=9000,volumedetect", "-f", "null", "-"], { encoding: "utf8" }).stderr || "";
 const peak = Number(/max_volume:\s*(-?[\d.]+) dB/.exec(detect)?.[1]);

@@ -1085,7 +1085,7 @@
   },
   "bakedAt": "2026-10-11",
   "normalization": {
-    "normalizedAt": "2026-09-08",
+    "normalizedAt": "2026-10-12",
     "tool": "Script_AudioNormalize.mjs",
     "peakCeilingDbfs": -1,
     "metric": "activeRmsDbfs",
@@ -1221,6 +1221,13 @@
     "generatedAt": "2026-09-12T16:18:26.033Z",
     "approvedOn": "2026-09-13",
     "file": "AudioSfx_BreathInjured_01.mp3",
-    "sha256": "0c9ba273229103b96c078af53052d8a461c11f3d2ae89efbd3d56175edc65e70"
+    "sha256": "17d0a81b01ca5e433942e66874d0ebc417b95663013eabbe1fd725a1f61c351e",
+    "levelAligned": {
+      "fromSha256": "0c9ba273229103b96c078af53052d8a461c11f3d2ae89efbd3d56175edc65e70",
+      "tool": "Script_AudioNormalize.mjs --write",
+      "gainDb": -1.94,
+      "on": "2026-10-12",
+      "why": "成品对齐到库线有声段 −25 dBFS（原来没走这一步，Normalize 一直红）；响度差挪进运行时混音（R4-Voice）"
+    }
   }
 }
