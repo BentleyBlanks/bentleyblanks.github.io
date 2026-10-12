@@ -468,7 +468,9 @@ export const MISSION_TUNING = Object.freeze({
     // SouthWhisper 第 5→6 句之间顺子抬头看沟沿上的妮儿：这么久的轻微转头（不是接管）。
     gazeS: 0.7,
     gazeRad: 0.35,
-    // mouthContact 时撒腿先跑进村：从沟沿跑到村北巷这一点（southWalk 末点以西，不堵担架路）。
+    // mouthContact 时撒腿先跑进村：先沿东侧抛土带跑到南口外（地面 0、离沟中线 4 m，不蹭沟壁），再进村北巷这一点
+    //（southWalk 末点以西，不堵担架路）。
+    mouthRimExit: Object.freeze({ x: -4.5, z: -36.5 }),
     villageRefuge: Object.freeze({ x: 44.5, z: -22.6 }),
     // 08–11（C 包消费）：老耿、驴车的起点占位；C 包按村子的锚点改这两处。
     gengHouse: Object.freeze({ x: 55.6, z: -18.4, yaw: 0 }),

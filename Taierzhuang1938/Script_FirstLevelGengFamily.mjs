@@ -404,10 +404,12 @@ export class FirstLevelGengFamily {
     const nier = this.actors.nier;
     if (!nier?.alive) return;
     const route = MISSION_ROUTES.southWalk, from = MissionRouteProjection(route, nier.position).progress;
+    // 沟沿上先沿抛土带跑到南口外侧（不下沟、不蹭沟壁），再沿 southWalk 的空地段进村北巷。
     const points = route.filter((_, i) => i >= 4 && MissionRouteProjection(route, route[i]).progress > from + 2)
       .map((p) => ({ x: p.x, z: p.z }));
     points.pop();
-    this.RunTo([...points, { ...this.T.villageRefuge }], () => this.Shout("refuge"));
+    const rimExit = from < this.T.trenchProgressM[1] + 2 ? [{ ...this.T.mouthRimExit }] : [];
+    this.RunTo([...rimExit, ...points, { ...this.T.villageRefuge }], () => this.Shout("refuge"));
   }
   VoicePosition(cue, line) {
     const r = this.r;

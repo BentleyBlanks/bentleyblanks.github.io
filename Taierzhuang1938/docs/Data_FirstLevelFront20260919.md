@@ -337,3 +337,70 @@ node Taierzhuang1938/Script_FirstLevelLeaderGuideBrowserTest.mjs
 - **借火的手部动作**：烟与火柴是白盒，没有手部 IK，也没有点火的光。
 - **老周靠土壁**：用 `state "fallen"` 表示「还没上担架」，视觉上是躺在土壁边而不是靠坐。
 - **行刑的创口遮挡**：靠门框与身体位置，没有专门的遮挡体积；换摆位时要重新看一眼。
+
+---
+
+## 6. 2026-10-12 06–07 与耿家（0311 重构 B 包）
+
+口径：[0311 重构契约](Data_FirstLevel0311Refactor20261012Contract.md) §1.6 / §1.9 / §3.4–3.5 / §5.6；改稿「06 集结处」「07 南行沟、出沟口遭遇」。
+新模块两个，运行时只加薄钩子：
+
+| 文件 | 管什么 |
+| --- | --- |
+| `Script_FirstLevelGengFamily.mjs` | 老耿 / 妮儿 / 黑子 / 驴车（§5.6 接口；06 捡弹壳、07 走沟沿跟队与撒腿进村；08–11 的走位 / 姿态 / 推车给 C 包） |
+| `Script_FirstLevelSouthMouth.mjs` | 07 沟口遭遇：纯规则 `SouthMouthRules`（到沟口 → 接火 → 压住 / 再抬头 → 绕村 → 过完）+ 运行时薄适配（放组、记事实、喊 cue、切任务字、担架限位） |
+| `Data_Tuning_FirstLevel.mjs` | 新段 `southMouth` / `geng`（每一行带出处） |
+| `Data_FirstLevelWhiteboxRear.mjs` | 沟口东侧的 `MouthEmbankment` / `MouthFieldBankA` / `MouthGraveMoundA(+Cap)` / `MouthFieldBankB` / `MouthGraveMoundB`（高 0.9–1.3 m，横在「射手 → 南口」的线上）；07+ 指纹已按本轮重生（`baseline` 0311-b-rear-mouth-banks-20261012） |
+
+### 06 Orders
+
+```
+进 06：妮儿（CivilianFemale 分身 girl，整体缩 R.geng.nierScale 0.62）蹲在洼地东北沟沿 R.geng.nierRim (−29.2,−105.3)
+      —— SJ→集结处那段交通沟的东南沿，比洼地场坪高 1.8 m；庄稼人（CivilianMale）站她身后 (−27.4,−106.6)。
+      两人 scriptEssential + missionUntargetable（Protect(true)），不参战。
+闲着：每 4–7 s 走到沟沿 1.5 m 内的随机点弯腰蹲下 pickS 1.2 s，口袋响一声（shellDrop）。
+ordersReached 且玩家进到她 seenRangeM 16 m 内 → nierSeen；担架员喊 NierShells（两句逐句：bearer / peasant，
+      说话位置：集结处东侧那个搬运人员 / 庄稼人头上）。
+玩家 ≤ lookGunM 6 m：她的头朝枪口（MuzzlePoint = 眼位沿前向 0.8 m），不看脸。
+玩家 shellRangeM 8 m 内开枪：落点 = 枪口右侧 shellEjectM 0.6–1.4 m 的随机点，她走过去捡（PickShellNear）。
+借火改两次 F（交互点 MissionBorrowLight，单击）：
+  站到老周跟前、脸朝着他（BorrowLightCued）只亮提示「跟老周借个火」；第一次 F → BorrowLight 1–6 句（FrontScenes 的逐句场景）
+  第 6 句末 BorrowLightCigaretteOffered → offered，提示换成「划火，递过去」；第二次 F → Collection 发 BorrowLightMatchAsked
+  （导演表 BorrowLight.07 after:"event:BorrowLightMatchAsked"）、记 matchAsked → 7–9 句 + 划火；lightShared 仍在第 9 句播完记。
+起行（South）：庄稼人收走；妮儿 Follow(southWalk, followGapM 9)。
+```
+
+### 07 South
+
+```
+跟队：目标 = 队尾里程 − 9 m 的路线点，沟身里程 trenchProgressM [40,72] 里往沟沿偏 rimOffsetM 3.6（RimSide 取地面高的那一侧），
+      沟外偏 1.8；走 walkMps 1.15。玩家走过 followCueProgressM 22 m、幺娃活着、她在 26 m 内 → NierFollow（整段）；
+      第 3 句「嘿，还赖上了」她去捡幺娃丢上沟沿的弹壳、叫一声。SouthWhisper 在 nierFollowHeard 之后才说（FrontShow，仍有兜底时间）；
+      第 5→6 句之间顺子抬头看她：gazeS 0.7 s 内视线往她那边轻带 ≤ gazeRad 0.35（不是接管，玩家随时转回），她也转过来笑一声。
+沟口：领头担架到 A.southMouthHold（southWalk 里程 63 m，离南口 12 m）或玩家先到它 8 m 内 → southMouthReached，
+      southMouth 组 6 人从南田房北面 60 m 外放出（出生点离机枪点 ≥ 60 m、4 个从南口看被房挡着）、沿 MISSION_TACTICS 跑步穿田：
+      MouthGunner（歪把子）趴到 A.mouthEmbankment (15.2,−44.9) 的土埂后打空地；MouthRifleA/B/C 各占田埂 A / 坟包 A / 田埂 B；
+      MouthFlankA/B 绕到村北口乱石墙 / 草垛后（SOUTH_MOUTH_FLANK_WATCH 22 m 内露头 → 刘文财喊 MouthFlank）。
+      接火以前担架停在停点（MaxProgress）；机枪开火（lastFire；兜底：到位 8 s 没开火 / 组里先有人死）→ mouthContact →
+      MouthContact、任务字切「压住东边机枪，掩护担架冲过空地。」、标签 firstLevel.guide.mouth、班长标记指机枪（holdFrom/holdUntil）、
+      妮儿撒腿沿 southWalk 跑进村北巷 R.geng.villageRefuge（不受伤）。
+      射手 suppressed 状态连续 ≥ mgSuppressS 2 s（或已死）→ mouthMgSuppressed（第一次记事实、喊 MouthGo）；担架只在它成立时过开阔地
+      （SafeAt：里程在 [停点, 末点−4) 的担架 / 步行者只在压住期间动），抬头后 mgRegraceS 1.5 s 再停在田埂 / 电线杆后，之后再压再跑。
+      绕村的两个都死或都被压住 ≥ 2 s → mouthFlankResolved（不是过关条件）。
+      活着的担架全部到 southWalk 末点前 4 m → mouthCrossed，任务字回「护送伤员向南，跟住班长。」。
+07 requirements：southWhisperHeard, mouthCrossed, villageMouthReached, mainStreetPointed。
+```
+
+### 08–11 给 C 包的占位
+
+`Enter("Village")` 起老耿（`R.geng.gengHouse`）与驴车（`R.geng.cartYard`；黑子 = WorkingHorse 缩 0.75、毛色 ×0.38，车板上三件白盒行李）
+就在；`GengGoTo / GengPose('slap'|'vat'|'table'|'unbar'|'lead-donkey'|'load') / CartTo / SetCartBlocking / PointAt` 都是占位实现
+（走位 + 蹲站 + 一声音效），C 包按概念图换动作、只加方法不改签名。妮儿的叫声 / 笑声暂用 `hitGrunt` 抬音高占位（`NIER_SHOUT_CUE`，
+素材侧登记 `nier_shout` 后只改这一处）。
+
+### 验收
+
+纯 Node：`Script_FirstLevelGengFamilyTest`、`Script_FirstLevelSouthMouthTest`，加既有 `MissionTest` / `MissionGatesTest` / `VoiceTest` /
+`TextTest` / `SpaceTest --rear-only` / `FrontTest` / `CollectionCareTest`。实机：`--campaign --stage-to=7`（06 两次 F、07 沟口真打、
+07 时长按 `R.southMouth.targetSeconds` 90–210 s、06 按 `ordersTargetSeconds` 36–100 s 断言；截图 `_shots/L1Front/Scene_BorrowLight.png`、
+`Scene_SouthMouthContact.png`）。
