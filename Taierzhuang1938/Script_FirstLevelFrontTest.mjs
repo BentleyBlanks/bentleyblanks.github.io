@@ -31,17 +31,16 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const Read = (name) => fs.readFileSync(path.join(here, name), "utf8");
 const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
 
-// 01–02 follow the 2026-09-23 draft (contract §5.2/§5.3). Phase tables and marks live in
-// Script_OpeningStoryboardsTest; normal controls run in CampaignOpening.
+// 01–02 follow the 2026-09-23 draft (contract §5.2/§5.3). Phase tables, marks and the 01 line counts
+// (CaptiveInterrogation etc.) live in Script_OpeningStoryboardsTest; normal controls run in CampaignOpening.
 {
   for(const id of ["BunkerKilling","ShunziCurse","RescueCall","RescueLift","RescueOut","TrenchCurse","CornerCheck"])
     assert.equal(Cue(id),undefined,id+" is retired (contract §5.2)");
-  assert.equal(Cue("CaptiveInterrogation").lines.length,11);
   assert.equal(Cue("RescueInterrogation").lines.length,6);
   const opening=Read("Script_OpeningStoryboards.mjs");
   assert.ok(opening.includes('this.captives=[this.cast.comrade]'));
   for(const scene of ["BunkerOrders","CaptiveInterrogation","RescueInterrogation","RescueCheck","CollectionMeet","SupportOrder"])
-    assert.ok(opening.includes('PlayScene("'+scene+'"'),scene);
+    assert.ok(opening.includes('PlayScene("'+scene+'"')||opening.includes('Talk("'+scene+'"'),scene);
   assert.ok(opening.includes('this.r.meleeCombat?.Damage(victim,attacker,200,"heavy")'));
   assert.ok(opening.includes('r.Record("luoRescueComplete")'));
   const support=MISSION_STAGES.find(stage=>stage.id==="Support");

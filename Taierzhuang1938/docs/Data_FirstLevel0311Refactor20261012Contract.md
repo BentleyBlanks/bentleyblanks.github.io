@@ -252,7 +252,7 @@ C 包不必再在自己的 case 里补钩子。老耿与驴车的起点占位在
 Regroup 夹具 17 幺娃够不到老周卡死；MenuTest 副标题；SmokeOrigins 63≠65；TextTest 君/饶；PhysicsTest 帧耗时；BootTest 远景辨识材质；EndTest ZhouDeath 15.62 s；campaign 驱动在 14 Rescue / `--quality=whitebox` 下 18 起点的 `ERR_STRING_TOO_LONG`。动工前先在 `origin/master` 跑一遍自己要用的闸门记下基线。
 
 集成期间（2026-10-12）又确认三条，都在本轮之前就红：
-- `Script_FirstLevelFrontTest` 第 39 行 `CaptiveInterrogation` 9≠11 —— 另一会话的 01–02 改稿（master 593fc7a9）改了对白没改断言。
+- `Script_FirstLevelFrontTest` 第 39 行 `CaptiveInterrogation` 9≠11 —— 另一会话的 01–02 改稿（master 593fc7a9）改了对白没改断言。已修：01 的句数归 `Script_OpeningStoryboardsTest` 管（9 句），FrontTest 不再重复断言；01 现在用 `Talk("CaptiveInterrogation")` 起播，场景存在性检查两种写法都认。
 - `Script_FirstLevelMissionStageJumpTest` 17→18：选 `Death` 后 150 s 内等不到 `BridgeCover`，`deathSceneComplete` 不落；在只含 B 包的树上同样失败、无页面错误、耿家模块闲置，与 10-01 记下的「`--stage-from=15` 卡 17」同源。
 - 整帧三角预算：03 `RightNestShortRetreat` 机位在分支起点就 10.1 M > 9 M（A 包 `--baseline-root` A/B：基线 10.10 M、本轮 10.14 M；连续跑里 `Tank` 入口 9.4 M、`ReturnToNestAfterEvade` 9.1 M 也超），10-07/10-09 壕沟表面重做之后的事。**预算没放宽**；驾驶脚本加了 `--budget=report`（超了只打 `BUDGET_OVER`，缺省仍断言），只给流程验收用。
 
