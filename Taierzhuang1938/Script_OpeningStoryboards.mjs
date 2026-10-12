@@ -4027,7 +4027,10 @@ export class FirstLevelBunkerShow {
       // then at the eye's left front, into the right half; with the rifle back at the right front that turn is gone.)
       target=At({x:4,z:-125.4},.8);roll=-.06;
       // 「他试着撑起身体。背包带一下绷紧……又落回地面」, then the eyes drop to the clawing fingers.
-      if(p==="Wake"){height+=L.pushUpM*Smooth((a-1.2)/.5)*(1-Smooth((a-1.85)/.12));pitch=L.clawPitch*Smooth((a-2)/.4);}
+      // ...and then up off them to the rifle out of his reach at the right front (look.rifleLook; N06).
+      if(p==="Wake"){const G=L.rifleLook,up=G?Smooth((a-G.fromS)/G.riseS):0;
+        height+=L.pushUpM*Smooth((a-1.2)/.5)*(1-Smooth((a-1.85)/.12));pitch=L.clawPitch*Smooth((a-2)/.4)*(1-up);
+        if(up>0)target=target.clone().lerp(At(C.rescue.rifleMouth,.05),G.share*up);}
     }
     else if(p==="DropIn"){
       // N07 / N08: down the front trench at the north rim they come off (pitched up to the rim), then at the fold.

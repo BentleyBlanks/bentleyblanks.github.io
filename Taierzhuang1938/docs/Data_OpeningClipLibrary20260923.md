@@ -266,3 +266,12 @@ node Taierzhuang1938/Script_OpeningStoryboardsTest.mjs --rebake=tmp/OpeningStory
 - 改了旧 clip 的 builder 再烘：它仍按自己的记录烘（比如旧烘焙器）；要换现行烘焙器加 `OPENING_RERECORD`。
 - 伙伴轨重新导出后，读它的 clip 下次 `verify` 会报哈希对不上：要么一起重烘（`OPENING_RERECORD`），要么把旧目录拷进 `legacy/`。
 - 回归口：`Script_OpeningStoryboardsTest.mjs` 新加一段——每条 clip × 骨架都要有记录、`solverVersion` 认得、`valuesSha256` 必须等于提交的帧（忘了更新记录就红）、`frozen` 只给 `retired` 的 clip、`seed` 只能指自己的 `prev`。
+
+## 16. 2026-10-12 R4-Rifle：`LuoGrabRifleShove` 换到右前方的枪
+
+任务书 `REL/附件/briefs/Brief_R4_Rifle.md`（原文「汉阳造落在右前方一臂开外」「罗班长弯腰捡起顺子右前方泥地里的汉阳造」）。代码在 `_import/Script_OpeningStoryboardClips.py` 末尾 `# ==== 2026-10-12 R4 rifle ====` 块（全局名 `R4` / `R4_` 开头，同名重新登记 `Builder`，`CLIPS[名]['notes']` 改写，前面各块一字未动）；manifest `20261012OpeningStoryboardsV28R4Rifle`；只烘 NRA05 这一条，`OPENING_RERECORD=LuoGrabRifleShove`（新记录：现行烘焙器、`baked:LuoDadaoChopRear` 种子、AB 目录伙伴轨、`commit: after:91c73aab`），其余 227 条的帧和记录不变。
+
+- **枪躺在哪**：罗的根坐标系（HandRoot）里中心 (−0.62, 0.04, −0.15)、枪口 (0, 0, −1)：罗的左前方 = 顺子右前方，顺着沟底、枪口朝西。世界 `rescue.rifleMouth` (3.25, −124.63)，离压木眼位 1.53 m、在沟线右 24°，近端离眼 1.0 m。任务书给的「09-30 镜像」（中心 (−0.40, 0.04, −0.28)、枪口 (−0.8, 0, +0.6)）斜躺在沟底：枪托压在日兵甲踩手起点（0.01 m）和罗自己左脚（0.12 m）下，翻译去蹲位、何有田去沟沿两条路踩过它（0.08 / 0.16 m）；而且照它躺的样子顺手抓起来（左手前护木、右手枪颈），端平后枪口在罗左边 = 顺子右边，第一人称接枪时两手会交叉（`HeldRifleGear` 是整装端枪的两手跟着这支枪转），只能在空中倒手。前八版按镜像做了倒手（tmp 里的迭代，没留），看审片图都别扭，改成顺沟放。
+- **动作**：0–1.5 s 与 09-30 版逐帧同（收刀、问话 holdLoop 0.5–1.5）；1.5–1.78 s 向左转 29°（`R4_RS_TURN` 0.5 rad，胸再多转 16°）、左脚往左前迈、下蹲，右手前护木（`along` 0.75 m）、左手枪颈（0.56 m）——就是 09-30 的握法；1.80 s 抓住，1.86 s 先竖直提离地面（不刮左大腿），1.92/2.04 s 一边转回正面一边把枪横到胸前（枪口转到罗右边），2.12 s 横端在胸前（`R4_RS_CLOSE`：09-30 的位置往外 12 cm、往上 5 cm，原位置枪贴在肚子上），2.25 s 塞出（`offered`，同 09-30 的 `WR_D_OFFER`），2.42 s 松手（`handed`），之后左转 90° 拔刀。事件、接触时刻、holdLoop、总长 3.17 s 全与 09-30 一样。下蹲的 `reach.sink` 0.20 → 0.16：身子往左转以后后面的右膝会跪进泥里，落地修正把整个人抬 3 cm、两脚滑 3.3 cm。
+- **实测**（烘焙报告）：脚滑 0、接触误差 0.0 cm、抓握解算 0.0 cm、骨盆单帧 ≤ 0.15 m、落地修正 −0.001..0.000 m。枪身（枪轴）到身体皮肤（不算两手）逐帧最近：躯干、腿 ≥ 3.3 cm，前臂 ≥ 1.0 cm（抱着枪的那两条胳膊）；09-30 版同一量法 0.2–1.5 cm（枪压着右脚尖、贴右大腿和肚子）。量法 `tmp/r4/rifle_clear.py`（Blender 打开 AB 目录里刚烘完的场景，逐帧拿蒙皮后的身体顶点量到枪轴的距离）。审片图 `tmp/OpeningStoryboards/BlenderReview/LuoGrabRifleShove_TengxianNra05_*`（多了一个从顺子眼睛看过去的 `eye` 视角）。
+- 浏览器 `Script_OpeningClipsBrowserTest.mjs --clip=LuoGrabRifleShove`：脚滑 0.00 cm、骨长 0.00%、全有限。

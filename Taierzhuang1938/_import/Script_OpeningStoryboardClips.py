@@ -14813,7 +14813,7 @@ for _name in RA_DI:
 # pick it up as it lies (left on the fore-end, right at the wrist) hold it muzzle to Luo's LEFT -- Shunzi's right, which crosses the
 # first person's arms (the gear-up's ready hands ride with this rifle: Script_OpeningFirstPerson HeldRifleGear) -- so they would have
 # to change ends in the air (tmp/r4 iterations 1-8, not kept). Along the trench with the muzzle west the 09-30 grip carries over:
-# he turns 46 deg to his left with a step of the left foot, stoops, the right hand on the fore-end (west, his right as he faces the
+# he turns 29 deg to his left (and 16 more in the chest) with a step of the left foot, stoops, the right hand on the fore-end (west, his right as he faces the
 # rifle), the left at the wrist, and lifts it up across his chest as he turns back -- the muzzle comes round to his right (WR_D_CLOSE,
 # Shunzi's left) -- and shoves it over (WR_D_OFFER), exactly the 09-30 hold.
 R4_RS_GROUND = ((-.62, .04, -.15), (0.0, 0.0, -1.0))    # runtime m, root frame (x right, y up, z back): centre, bore (muzzle)
@@ -14821,7 +14821,7 @@ R4_RS_MID0 = ((-.67, .18, -.22), (.12, .06, -.99))      # straight up off the gr
 R4_RS_MID1 = ((-.56, .36, -.34), (.45, .12, -.88))      # coming up as he turns back
 R4_RS_MID2 = ((-.26, .66, -.42), (.86, .16, -.48))      # swinging across in front of him
 R4_RS_CLOSE = ((0.0, 1.0, -.42), WR_D_CLOSE[1])          # the 09-30 carry across his chest, 5 cm up and 12 cm out (it lay on his belly)
-R4_RS_TURN = .50                                        # rad: the turn to the rifle (46 deg to his left), back by the close
+R4_RS_TURN = .50                                        # rad: the turn to the rifle (29 deg to his left; the chest twists 0.28 more), back by the close
 R4_RS_STOOP = (-.26, .44, -.14)                         # the pelvis at the stoop (runtime m, root frame): over to his left
 R4_RS_FOOT_L = (-.30, 0.0, -.05)                        # the left foot's stoop step lands here (0.32 m off the rifle)
 
@@ -14830,7 +14830,7 @@ CLIPS['LuoGrabRifleShove']['notes'] = (
     'dadao guard; root HandRoot 0.95 m from Shunzi, who kneels upright in front of him: eye (0, 1.12, -0.95), chest (0, 0.88, -0.85) in '
     'this frame, runtime m). 0-0.14 s the left hand comes off the dadao, 0.04-0.20 s the right hand pushes it through the belt at his '
     'left hip (`weapon` track: hand to belt, weaponState dadaoInBelt), 0.5-1.5 s hold loop (empty hands, leaning 12 deg in, the face on '
-    'his eye; "还能打不？" and the nod, pose.holdUntil lets go). 1.5-1.78 s turns 46 deg to his LEFT stepping the left foot out and '
+    'his eye; "还能打不？" and the nod, pose.holdUntil lets go). 1.5-1.78 s turns to his LEFT (29 deg, the chest 16 more) stepping the left foot out and '
     'stoops, both fists on the Hanyang (`rifle` prop: on the ground at frame 0 along the trench at his left front, centre (-0.62, 0.04, '
     '-0.15), muzzle toward (0, 0, -1) in the root frame = rescue.rifleMouth; the right hand on the fore-end, the left at the wrist; grip '
     'contact 1.80 s), 1.82-2.12 s stands up with it, turning back to face Shunzi, the rifle across his chest muzzle to his right, '

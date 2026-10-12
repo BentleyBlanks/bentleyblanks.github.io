@@ -1132,6 +1132,10 @@ function FakeVfx() {
     assert.ok(rifleSpread <= 0.12, `the rifle lies flat on the trench floor (${rifleSpread.toFixed(3)} m along it)`);
     const ijaBoot = { x: C.ija.crouch.x + 0.336, z: C.ija.crouch.z - 0.065 };       // IjaBootOnHand's start, behind ija.crouch (facing west)
     // where IjaFinishWalkStab leaves him (its root facing west, finish.stabAtM off finish.bodies[0], then 1.4 m of root motion west)
+    // Luo's hand-over root (HandRoot: hand.frontM in front of the kneeling eye, facing him) and where he waits aside until the heave
+    // has brought the knees under him (hand.waitSide: [left, back] of it)
+    const kneelKey = R.heave.body.eye.at(-1)[1], kneelAt = { x: eye.x - kneelKey[2], z: eye.z }, handRoot = { x: kneelAt.x + R.hand.frontM, z: kneelAt.z };
+    const luoWait = { x: handRoot.x + R.hand.waitSide[1], z: handRoot.z + R.hand.waitSide[0] };
     const fb0 = M.finish.bodies[0], stabEnd = { x: fb0.x - C.finish.stabAtM[1] - 1.4, z: fb0.z + C.finish.stabAtM[0] };
     const points = { "rescue.interpreter (squat)": [R.interpreter, 0.6], "finish.grenadeStop": [M.finish.grenadeStop, 0.5], "ija.crouch": [C.ija.crouch, 0.5],
       "IjaBootOnHand start": [ijaBoot, 0.5], "blade.recruitAt": [R.blade.recruitAt, 0.6], "blade.levelAt": [R.blade.levelAt, 0.6],
@@ -1139,9 +1143,12 @@ function FakeVfx() {
     const rifleNear = Object.entries(points).filter(([, [p, m]]) => SegDist(p) < m).map(([n, [p]]) => `${n} ${SegDist(p).toFixed(2)} m`);
     rifleNear.push(...CORPSES.filter((row) => Math.min(...along.map((q) => BoxDist(CorpseFootprint(row.mark), q))) < 0.3).map((row) => `corpse ${row.id}`));
     for (const prop of PROPS) for (const box of PropFootprints(prop).filter((b) => !b.walkable && b.y0 < 0.15)) if (along.some((q) => BoxDist(box, q) < 0.03)) rifleNear.push(`prop ${prop.id}`);
+    // and not under the duckboards (walkable, but a rifle at ground + 3 cm under the slats is not seen: N06, R4 first run)
+    for (const prop of PROPS) for (const box of PropFootprints(prop).filter((b) => b.walkable)) if (along.some((q) => BoxDist(box, q) < 0.1)) rifleNear.push(`under ${prop.id}`);
     assert.deepEqual(rifleNear, [], "the rifle at the right front is clear of the marks, corpses and dressing on the floor");
     const walks = { "interpreter to his squat": [C.interrogation.interpreterAt, ...C.finish.interpreterVia, R.interpreter],
-      "ijaA from the stab to the boot": [stabEnd, ...C.finish.bootVia, ijaBoot], "He to the trench edge": [...R.heCoverVia, R.heCover] };
+      "ijaA from the stab to the boot": [stabEnd, ...C.finish.bootVia, ijaBoot], "He to the trench edge": [...R.heCoverVia, R.heCover],
+      "Luo waiting aside, then stepping in to HandRoot": [luoWait, handRoot] };
     const walksNear = Object.entries(walks).map(([n, route]) => [n, PathDist(route)]).filter(([, d]) => d < 0.3).map(([n, d]) => `${n} ${d.toFixed(2)} m`);
     assert.deepEqual(walksNear, [], "nobody walks over the rifle lying in the mud");
     report.redraft.rifle = { bearingDeg: +bearing.toFixed(1), nearEndM: +nearEnd.toFixed(2), spreadM: +rifleSpread.toFixed(3),

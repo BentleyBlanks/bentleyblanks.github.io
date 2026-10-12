@@ -211,7 +211,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // limits (FirstLevelBunkerShow.LookLimits). After the order the look eases back to the follow shot over returnS.
       seated:Object.freeze({ yawRad:1.75, pitchRad:Object.freeze([-.95,1.15]), returnS:1.1 }) }),
     // Shot pitch (rad, + up) while a hand beat is the subject; the push-up lift of the lying eye (m).
-    look:Object.freeze({ clawPitch:-.8, reachPitch:-.28, pushUpM:.13, dragRollRad:.025,
+    // rifleLook (2026-10-12 R4, 「手指在泥里抓出痕迹。汉阳造落在右前方一臂开外，受困时够不到」): after the claw (fromS into Wake,
+    // over riseS) the eyes come up off the fingers and over to the rifle at the right front (rescue.rifleMouth), weight share of
+    // the way from the trench line, and stay there until DropIn's whistle (N06).
+    look:Object.freeze({ clawPitch:-.8, reachPitch:-.28, pushUpM:.13, dragRollRad:.025, rifleLook:Object.freeze({ fromS:3.3, riseS:.7, share:.7 }),
       // Parry: the eye steps this far aside from ijaA's back so He (behind ijaA) is seen, and holds the
       // duel this long after the cut before following the interpreter.
       duelAsideM:.25, duelHoldS:.45 }),
@@ -1028,7 +1031,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // (releaseGraceS more for a vanguard man missing from the enemy table). standIn: the clip's timing before it is baked.
     // waitSide: until the knees come under him (heave stepInS) Luo stands aside, off the line he heaves himself out along
     // (09-30 run: waiting in front of him his legs filled the whole lunge) -- [left, back] of HandRoot, facing him.
-    hand:Object.freeze({ frontM:.95, waitSide:Object.freeze([.6,0]), stepInS:1.7, lineDelayS:.1, nodS:.15, reachS:.3, carryS:.8, releaseGraceS:1,
+    // (2026-10-12 R4: [.6, 0] -> [.5, .9]: 0.6 m to his left is south of the lane, where the rifle lies along the floor now (he stood
+    // on it, N24); 0.9 m further back he waits east of its end (0.44 m; the step in passes it at 0.35 m), 1.9 m off the kneeling
+    // eye, 15 deg right of the lane.)
+    hand:Object.freeze({ frontM:.95, waitSide:Object.freeze([.5,.9]), stepInS:1.7, lineDelayS:.1, nodS:.15, reachS:.3, carryS:.8, releaseGraceS:1,
       standIn:Object.freeze({ durationS:3.167, offerS:2.25, handedS:2.417, holdLoop:Object.freeze([.5,1.5]) }),
       rise:Object.freeze({ durationS:.9, eye:[[0,[0,1.12,-.6]],[.12,[0,1.08,-.62]],[.55,[0,1.4,-.56]],[.9,[0,1.62,-.52]]] }) }),
     // He goes to the trench edge east of the hand-back with his rifle once he has let the timber drop (Aftercut), along the
@@ -1202,7 +1208,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
       when:"s.phase==='Check'&&s.flags.handAt!=null&&r.time-s.flags.handAt>=1.0",
       judge:{ camera:{ eyeM:[.95,1.3], pitchDeg:[-5,40] }, actors:{ luo:{ bodyDistM:[.6,1.3], x:[.25,.75] }, liuwencai:{ x:[.5,.95], pelvisM:[.35,.75] } } } }),
     // N25_Grab (2026-10-12 R4): the grab -- Luo stooped to the rifle at Shunzi's right front (his own left front), both hands on it:
-    // he is right of the middle (the 09-30 rest at the left front had him left of it).
+    // he is right of the middle (the 09-30 rest at the left front had him left of it). From the kneeling eye his stooped head and
+    // shoulders are over his fists (the look follows his hands, view.atHands); the rifle shows as he lifts it across.
     Object.freeze({ id:"N25_Grab", storyboard:"Storyboard_N25_RifleShoved.png",
       when:"s.flags.handAt!=null&&s.flags.handHoldUntil!=null&&s.HandSeconds(r.time-s.flags.handAt)>=1.84",
       judge:{ camera:{ eyeM:[.95,1.3] }, actors:{ luo:{ x:[.52,1], bodyDistM:[.4,1.4] } } } }),
