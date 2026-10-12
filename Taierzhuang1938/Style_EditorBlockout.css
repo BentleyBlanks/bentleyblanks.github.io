@@ -374,6 +374,9 @@ body.blockoutMode #hud .hudFps { top: 56px; left: auto; right: 18px; }
   .boKeys { display: none; }
   .boSeg, .boStageNum { min-width: 10px; }
   .boStageNum { font-size: 9px; }
+  /* 导航栏占满了底边：右下角的弹药与状态读数抬到它上面，不被盖住 */
+  body.blockoutMode #hud .hudCombat { bottom: 80px; }
+  body.blockoutMode #hud .hudState { bottom: 156px; }
 }
 /* 高度不够时卡片只留「此时 / 下一步」，提示标签与备注让给小地图 */
 @media (max-height: 600px) {
