@@ -239,55 +239,70 @@ try{
     console.log(`ok ${spec.role} ${receipt.model}: hand ${receipt.handRange.toFixed(3)} m, head ${receipt.headRange.toFixed(3)} rad, sole ${receipt.soleRange.toFixed(4)} m`);
   }
   }
-  // 09.23 draft: the comrade dies at the throat cut and the authored CaptiveWallSlideTwitch (3.2 s) plays
-  // on past the AI's corpse freeze. Since 09-27 (docs/Data_OpeningComradeKneelBank20260927.md) he dies
-  // kneeling on the bank: both feet stay, the pelvis only slumps ~0.1 m to his right, the trunk slides
-  // down the planks. The kneel heights come from the clip root data (manifest models[].clips[].root).
+  // 2026-10-11 redraft (docs/Data_OpeningRedraft20261011Contract.md §4, AnimB): ijaA cuts the kneeling comrade's throat and
+  // shoves him on with the knee (IjaThroatCutKneeShove + CaptiveThroatCutForward, 3.5 s, terminal): he pitches forward onto
+  // his side, twitches twice and is still. The director kills him at the clip's `dead` event (Script_OpeningStoryboards
+  // Slash) and holds the clip's last frame (ComradeCorpse) - the AI's own death pose never replaces it. 2026-10-12 R4-Gates:
+  // this block still checked the 09-27 kneel-on-the-bank death (CaptiveWallSlideTwitch, pelvis 0.37 m), and its 14000-frame
+  // budget ran out in Slash: the redraft opening reaches Found about 250 s in (blast 106.8 s, blast -> Found end 149.2 s).
   const corpse=await page.evaluate(()=>{
     const p=window.openingActorPerformanceProbe,{g,r,T,api}=p;
     if(p.soldier){p.soldier.actor.Dispose();p.soldier=null;}
     g.post.Render=p.render;
-    const scene=r.frontShow.bunker,samples=[];let clipRoot=null;
-    for(let frame=0;frame<14000;frame++){
+    const scene=r.frontShow.bunker,samples=[];let clipRoot=null,clipSeconds=null,cutAt=null;
+    for(let frame=0;frame<30000;frame++){
       g.StepFrames(1,1/60,false);
-      const soldier=scene.Comrade;if(!soldier||soldier.alive)continue;
+      const soldier=scene.Comrade;if(!soldier)continue;
+      const onClip=soldier.openingStoryboardPose?.clip==="CaptiveThroatCutForward";
+      if(!onClip&&soldier.alive)continue;
+      cutAt??=r.time;
       const actor=soldier.actor,rig=actor.characterRig;
-      clipRoot ||= api.OpeningClipRoot(rig.clipModelId||rig.modelId,"CaptiveWallSlideTwitch");
-      if(soldier.deadTime<3.6||frame%60===0){
+      clipRoot ||= api.OpeningClipRoot(rig.clipModelId||rig.modelId,"CaptiveThroatCutForward");
+      clipSeconds ??= p.library.models.get(rig.clipModelId||rig.modelId)?.clips.CaptiveThroatCutForward?.duration??null;
+      const deadTime=soldier.alive?null:soldier.deadTime;
+      if(soldier.alive||deadTime<3.6||frame%60===0){
         rig.root.updateMatrixWorld(true);
         const Pos=bone=>bone.getWorldPosition(new T.Vector3()).sub(actor.root.position).toArray();
-        samples.push({time:soldier.deadTime,shown:rig.openingStoryboardState?.seconds,clip:soldier.openingStoryboardPose?.clip||null,
+        samples.push({t:r.time-cutAt,alive:soldier.alive,time:deadTime,shown:rig.openingStoryboardState?.seconds,clip:soldier.openingStoryboardPose?.clip||null,
           head:Pos(rig.bones.head),chest:Pos(rig.bones.chest),pelvis:Pos(rig.bones.pelvis),root:actor.root.position.toArray()});
       }
-      if(["Found","Hold","Ask"].includes(scene.phase)&&soldier.deadTime>6){g.StepFrames(3,1/60,true);break;}
+      if(["Found","Hold","Ask"].includes(scene.phase)&&!soldier.alive&&deadTime>6){g.StepFrames(3,1/60,true);break;}
     }
-    return {samples,clipRoot,phase:scene.phase,alive:scene.Comrade?.alive};
+    return {samples,clipRoot,clipSeconds,phase:scene.phase,alive:scene.Comrade?.alive};
   });
   await fs.writeFile(path.join(output,"Data_CaptiveCollapse.json"),JSON.stringify(corpse,null,2));
   await page.screenshot({path:path.join(output,"Scene_CaptiveCollapseTerminal.png")});
   assert.equal(corpse.alive,false,"the normal opening actually kills the comrade at the wall");
-  assert.ok(["Found","Hold","Ask"].includes(corpse.phase),"the normal opening continues past the cut to ijaA finding and questioning Shunzi");
-  const sliding=corpse.samples.filter(sample=>sample.time>.91&&sample.time<3.25);
-  assert.ok(sliding.length>20&&sliding.every(sample=>sample.clip==="CaptiveWallSlideTwitch")&&sliding.at(-1).shown>=3.1,
-    "the corpse finishes the authored 3.2-second slide down the wall beyond native AI's 0.9-second freeze");
-  const terminal=corpse.samples.filter(sample=>sample.time>3.5);
-  assert.ok(terminal.length>3,"observe the corpse over several seconds after the slide");
-  // Clip root pelvisHeight: 0.386 m kneeling upright before the slide, 0.368 m slumped at the terminal frame;
-  // sitting in the mud (the pre-09-27 death) put the pelvis near 0.16 m, well outside the tolerance.
-  const kneelStart=corpse.clipRoot?.start?.[3],kneelEnd=corpse.clipRoot?.end?.[3];
-  assert.ok(Number.isFinite(kneelStart)&&Number.isFinite(kneelEnd)&&kneelEnd<kneelStart,
-    `CaptiveWallSlideTwitch clip root data gives the kneel heights (${JSON.stringify(corpse.clipRoot)})`);
+  assert.ok(["Found","Hold","Ask"].includes(corpse.phase),`the normal opening continues past the cut to ijaA finding and questioning Shunzi (${corpse.phase})`);
+  const dead=corpse.samples.filter(sample=>!sample.alive);
+  assert.ok(corpse.clipSeconds>3&&dead.length>20&&dead.every(sample=>sample.clip==="CaptiveThroatCutForward"),
+    `the dead comrade stays on his authored CaptiveThroatCutForward, never the AI's own death (${JSON.stringify(dead.find(s=>s.clip!=="CaptiveThroatCutForward")||null)})`);
+  const terminal=dead.filter(sample=>sample.time>3.5);
+  assert.ok(terminal.length>3,"observe the corpse over several seconds after the fall");
+  assert.ok(terminal.every(sample=>sample.shown>=corpse.clipSeconds-1/30),
+    `the corpse rests on the clip's last frame (${terminal.map(s=>s.shown).join("/")} of ${corpse.clipSeconds} s)`);
+  // Clip root pelvisHeight: 0.40 m kneeling at the first frame, 0.15 m lying on his side at the terminal frame.
+  const kneelStart=corpse.clipRoot?.start?.[3],lyingEnd=corpse.clipRoot?.end?.[3];
+  assert.ok(Number.isFinite(kneelStart)&&Number.isFinite(lyingEnd)&&lyingEnd<kneelStart-.15,
+    `CaptiveThroatCutForward clip root data gives the kneel and the lying heights (${JSON.stringify(corpse.clipRoot)})`);
   for(const sample of terminal){
-    assert.ok(Math.abs(sample.pelvis[1]-kneelEnd)<.04,
-      `dead comrade stays kneeling on the bank at the clip's terminal pelvis height ${kneelEnd} m (${sample.pelvis[1]})`);
-    assert.ok(sample.pelvis[1]<kneelStart+.01&&sample.pelvis[1]<terminal[0].pelvis[1]+.005,
-      `dead comrade does not rise back up after slumping (${sample.pelvis[1]}, first terminal ${terminal[0].pelvis[1]}, kneel ${kneelStart})`);
+    assert.ok(Math.abs(sample.pelvis[1]-lyingEnd)<.04,
+      `dead comrade lies at the clip's terminal pelvis height ${lyingEnd} m (${sample.pelvis[1]})`);
+    assert.ok(sample.pelvis[1]<terminal[0].pelvis[1]+.005,
+      `dead comrade does not rise back up after falling (${sample.pelvis[1]}, first terminal ${terminal[0].pelvis[1]})`);
     assert.ok(Math.hypot(...sample.head.map((n,i)=>n-terminal[0].head[i]))<.001,"terminal corpse remains still without replaying the death");
   }
-  let maxStep=0;
-  for(let i=1;i<sliding.length;i++)maxStep=Math.max(maxStep,Math.hypot(...sliding[i].head.map((n,j)=>n-sliding[i-1].head[j])));
-  assert.ok(maxStep<.04,`the slide advances continuously (${maxStep} m/frame)`);
-  console.log(`ok normal comrade death: the authored wall slide completes after the AI corpse freeze, rests kneeling on the bank (pelvis ${terminal.at(-1).pelvis[1].toFixed(3)} m, clip ${kneelEnd} m) and never replays`);
+  // The cut, the shove and the fall forward play continuously from the first cut frame to the rest: no frame's head step
+  // stands out from both of its neighbours (a pop or a re-pose), and nothing moves at the director's kill (the clip's
+  // `dead` event) or where the clip ends. The fall itself is fast: the head peaks at 0.115 m per 60 Hz frame (6.9 m/s) on
+  // a bell from 0.03 m when he hits the mud (2026-10-12 probe), each step at most 0.94 x its larger neighbour + 1 cm.
+  const fall=corpse.samples.filter(sample=>sample.t<=(corpse.clipSeconds??3.5)+.5);
+  const steps=fall.map((sample,i)=>i?Math.hypot(...sample.head.map((n,j)=>n-fall[i-1].head[j])):0);
+  const killAt=fall.findIndex(sample=>!sample.alive),endAt=fall.findIndex(sample=>sample.shown>=corpse.clipSeconds-1/30);
+  const pop=steps.findIndex((v,i)=>i>1&&i<steps.length-1&&v>2*Math.max(steps[i-1],steps[i+1])+.01),maxStep=Math.max(...steps);
+  assert.ok(fall.length>150&&killAt>0&&endAt>0&&pop<0&&maxStep<.15&&steps[killAt]<.005&&steps[endAt]<.005,
+    `the fall advances continuously (max ${maxStep} m/frame, pop at ${pop}, kill step ${steps[killAt]}, clip end step ${steps[endAt]}, ${fall.length} frames)`);
+  console.log(`ok normal comrade death: the authored throat cut and fall forward play through the kill, rest lying on the clip's last frame (pelvis ${terminal.at(-1).pelvis[1].toFixed(3)} m, clip ${lyingEnd} m, fall step ${maxStep.toFixed(3)} m/frame) and never replay`);
   assert.deepEqual(ctx.errors,[]);
   if(!process.argv.includes("--corpse-only"))console.log("ok five production rigs, dialogue gestures, idle attention, planted soles, clear lifecycle and high-quality rendered frames");
 }finally{await CloseCampaign(ctx);}
