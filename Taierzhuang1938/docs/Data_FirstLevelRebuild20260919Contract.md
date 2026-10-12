@@ -113,15 +113,15 @@
 | Trapped | `BunkerBanter`(7，黑屏；末句被近爆打断) · `BunkerKilling`(6，日兵甲/伤兵/扶人川军/日兵乙) · `BunkerSearch`(2，日语) · `ShunziCurse`(1，压声) |
 | BunkerRescue | `RescueCall`(6) · `RescueLift`(3) · `RescueOut`(3) |
 | RearTrench | `TrenchCurse`(4) · `CornerCheck`(5) · `SupportOrder`(4) |
-| Support | `FrontBlockade`(3) · `FrontApproach`(2) · `FrontAttack`(1) · `FrontWithdraw`(1) · `TakeOverGun`(3) · `TankHeard`(2，2026-09-27 用户追加) |
-| MachineGun | `TankRoadContact`(2) · `TankArmor`(2，2026-09-27 用户追加，玩家枪打车体才喊) · `TankTerror`(1) · `BundleOrder`(5) |
-| Tank | `BundleGo`(2) · `BundleProne`(2) · `BundleWhy`(4，2026-09-27 用户追加) · `BundleSupply`(2) · `BundleBrief`(5，2026-09-27 用户追加) · `BundleReturnCall`(2) · `BundleAttack`(2) · `BundleRetreat`(1) · `TankStopped`(3) · `FrontRelief`(3) |
-| Orders | `Volunteer`(5：传令兵/罗/传令兵/顺子/罗) · `BorrowLight`(9，含两处动作停顿) · `ZhouLift`(4) |
-| South | `SouthWhisper`(6) · `VillagePointer`(1) |
-| Village | `StreetBlocked`(2) · `KitchenDetour`(2) |
+| Support | `FrontObservation`(2，2026-10-12 契约 §5.2 新) · `FrontBlockade`(3) · `FrontApproach`(2) · `FrontAttack`(1) · `FrontWithdraw`(1) · `FirstBatchCount`(1，2026-10-12 新) · `TakeOverGun`(3) · `TankHeard`(2，2026-09-27 用户追加；2026-10-12 退出 retired，录音保留) · `TankSpotted`(2，2026-10-12 新) |
+| MachineGun | `TankRoadContact`(2，2026-10-12 改字) · `TankArmor`(1，2026-09-27 用户追加，玩家枪打车体才喊；2026-10-12 并成一句) · `TankTerror`(1) · `GapGuardDown`(1，2026-10-12 新) · `BundleOrder`(5，2026-10-12 改写) |
+| Tank | `BundleGo`(2，2026-10-12 改字) · `BundleProne`(2) · `BundleWhy`(4，2026-09-27 用户追加；2026-10-12 退出 retired) · `BundleSupply`(2，2026-10-12 退出 retired) · `BundleFound`(2，2026-10-12 新) · `BundleBrief`(2，2026-09-27 用户追加；2026-10-12 改成跑动中两句) · `BundleReturnCall`(2) · `BundleAttack`(2) · `BundleRetreat`(1) · `TankStopped`(3) · `FrontRelief`(3) |
+| Orders | `Volunteer`(5：传令兵/罗/传令兵/顺子/罗) · `BorrowLight`(9，含两处动作停顿；2026-10-12 起拆成 1–6 / 7–9 两次 F) · `ZhouLift`(4) · `NierShells`(2，2026-10-12 0311 重构 B 包：担架员/庄稼人) |
+| South | `SouthWhisper`(7，2026-10-12 原六句不改字、末尾加幺娃一句) · `NierFollow`(3，2026-10-12 新) · `MouthContact`(2，2026-10-12 新) · `MouthGo`(1，2026-10-12 新) · `MouthFlank`(1，2026-10-12 新) · `VillagePointer`(1) |
+| Village | `StreetBlocked`(2) · `KitchenDetour`(2) · `GengHouse`(3，2026-10-12 0311 重构 C 包：老耿揪妮儿一巴掌 / 指灶屋 / 连屋进了人) |
 | Melee | `MeleeRight`(1) · `MeleeCurse`(1) · `WindowOrder`(1) |
-| Courtyard | `CourtyardOpen`(2) · `TwoLitters`(1) · `LastLitter`(2) |
-| TransferApproach | `TransferSorting`(1) · `VillageRoadThreat`(2) |
+| Courtyard | `CourtyardOpen`(2) · `TwoLitters`(1) · `LastLitter`(2) · `GengGate`(5，2026-10-12 C 包：班长喊老耿开后门 / 缸 / 车 / 往边上靠 / 俺这车) · `CartPush`(3，2026-10-12 C 包：可选 F 推车过门槛) |
+| TransferApproach | `TransferSorting`(1) · `VillageRoadThreat`(2) · `GengCart`(3，2026-10-12 C 包：老耿在车旁自说) · `AskGeng`(4，2026-10-12 C 包：顺子问老耿往哪走) |
 | Transfer | `TransferDefense`(1) · `TransferRight`(1) · `TransferBatch`(1) · `EscortZhou`(3) |
 | CartRide | `CartTalk`(5) |
 | AirFirst | `AircraftFirst`(3) · `WestDitchOrder`(1) |
@@ -134,11 +134,11 @@
 | Bridge* | `BridgeOrders`(3) · `BridgeCover`(2) · `BridgeWithdraw`(3) · `MarchToTengxian`(1) |
 | NightMarch | `NorthGate`(2) |
 
-播完记事实的对应（`MISSION_VOICE_FACTS`）：`RescueCall→rescueCallHeard` `SupportOrder→supportOrdersHeard` `BundleOrder→bundleOrderHeard` `Volunteer→volunteerHeard` `BorrowLight→lightShared` `SouthWhisper→southWhisperHeard` `VillagePointer→mainStreetPointed` `TransferSorting→transferSortingHeard` `VillageRoadThreat→villageRoadThreatSeen` `EscortZhou→escortGranted` `CartTalk→cartTalkHeard` `WestDitchOrder→westDitchPointed` `CarryZhou→carryOrdersHeard` `PicketHold→picketHolding` `ZhouCheck→zhouChecked` `Headcount→headcountDone` `GateChallenge→gateChallenged` `ReceptionAccept→receptionAccepted` `MedicAsk→medicExamining` `SquadAssign→squadAssigned` `BridgeOrders→bridgeOrdersHeard` `MarchToTengxian→marchOrderHeard`。
+播完记事实的对应（`MISSION_VOICE_FACTS`）：`RescueCall→rescueCallHeard` `SupportOrder→supportOrdersHeard` `BundleOrder→bundleOrderHeard` `Volunteer→volunteerHeard` `BorrowLight→lightShared` `SouthWhisper→southWhisperHeard` `NierFollow→nierFollowHeard` `VillagePointer→mainStreetPointed` `GengGate→gengGateHeard` `AskGeng→gengAsked` `TransferSorting→transferSortingHeard` `VillageRoadThreat→villageRoadThreatSeen` `EscortZhou→escortGranted` `CartTalk→cartTalkHeard` `WestDitchOrder→westDitchPointed` `CarryZhou→carryOrdersHeard` `PicketHold→picketHolding` `ZhouCheck→zhouChecked` `Headcount→headcountDone` `GateChallenge→gateChallenged` `ReceptionAccept→receptionAccepted` `MedicAsk→medicExamining` `SquadAssign→squadAssigned` `BridgeOrders→bridgeOrdersHeard` `MarchToTengxian→marchOrderHeard`。
 
 罗班长带路短命令（Guide）按新步骤重排：下线 `GuideTrench` `GuideShelter` `GuideRetreatFirst` `GuideRetreatWall` `GuideRetreatYard` `GuideReception` `GuideRearDefense` `GuideExit` `GuideSouthFlank` `GuideNorthRear`；新增 `GuideRearTrench` `GuideCollection` `GuideAlley` `GuideCart` `GuideWestDitch` `GuideWallPath` `GuideYardGate` `GuideBridge` `GuideWithdraw` `GuideNorthGate`；其余沿用（台词不变则不重烘）。新 Guide 台词不在 Notion 里，由配音包按罗班长口吻写短句（≤12 字，四川话），写进交付报告供验收。
 
-新增说话人（`MISSION_VOICE_CAST`）：`ijaA` `ijaB`（日兵甲/乙，日语）、`captiveWounded`（腿伤川军）、`captiveHelper`（扶人川军）、`guard`（守军）、`keeper`（弹药屋留守兵）、`loader`（接运兵）、`drover`（赶车人）、`picket`（警戒兵）、`rearBearer`/`frontBearer`（后/前抬手）、`gateGuard`（院门守军）、`receiver`（接收人员）、`surgeon`（军医）、`officer`（桥头军官）、`usher`（带路军人）、`crowd`（「飞机——！」「过了村子就是…」这类无名喊话）。沿用：`luo` `shunzi` `yaowa` `heyoutian` `liuwencai` `zhou` `bearer` `runner`。
+新增说话人（`MISSION_VOICE_CAST`）：`ijaA` `ijaB`（日兵甲/乙，日语）、`captiveWounded`（腿伤川军）、`captiveHelper`（扶人川军）、`guard`（守军）、`keeper`（弹药屋留守兵）、`loader`（接运兵）、`drover`（赶车人）、`picket`（警戒兵）、`rearBearer`/`frontBearer`（后/前抬手）、`gateGuard`（院门守军）、`receiver`（接收人员）、`surgeon`（军医）、`officer`（桥头军官）、`usher`（带路军人）、`crowd`（「飞机——！」「过了村子就是…」这类无名喊话）。沿用：`luo` `shunzi` `yaowa` `heyoutian` `liuwencai` `zhou` `bearer` `runner`。2026-10-12 0311 重构（[契约](Data_FirstLevel0311Refactor20261012Contract.md) §5.2）再加 `geng`（老耿）、`peasant`（庄稼人），都是鲁南北方官话占位；妮儿不进对白表。
 
 ## 6. 分包与文件归属
 

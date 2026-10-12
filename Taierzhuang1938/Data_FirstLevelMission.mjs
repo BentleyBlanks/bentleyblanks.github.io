@@ -1,6 +1,6 @@
-import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as Sortie, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_TOPOLOGY_VERSION } from "./Data_FirstLevelMissionTopology.mjs";
-import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS, FRONT_FLANK_GROUP, FRONT_OFFICER, FRONT_RESERVE_ENTRIES } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS, FRONT_FLANK_GROUP, FRONT_OFFICER, FRONT_RESERVE_ENTRIES, FRONT_TANK_CREW } from "./Data_FirstLevelMissionFront.mjs";
 import { FRONT_PRESSURE_TACTICS } from "./Data_FirstLevelFrontPressure.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
@@ -38,57 +38,67 @@ export const MISSION_STAGES = Object.freeze([
     ["rearTrenchEntered", "cornerReached", "collectionPointSeen", "supportOrdersHeard"],
     null,
   ),
+  // 2026-10-12 03–11 重构（docs/Data_FirstLevel0311Refactor20261012Contract.md §3.1–3.3、§5.5）：任务字只写看得见的东西；
+  // 03 的 tankPreviewed 改 tankHeard（引擎起播即记，不再露面停车）；04 加 gapGuardKilled（车体机枪打死冲缺口的 guard 5）；
+  // 05 退出旧弹药屋那一段（bundleReturned），加 escortsWithdrawn（跟车步兵退了口子才开）。
   Stage(
     "Support",
-    "跟随班长，夺取右侧机枪阵位。",
+    "跟随班长，回前沿接人。",
     A.front,
     // 契约 §2.6：03 到「何有田接枪 + 老周离枪 ≥10 m」即过，不再等老周走回集结处（约 100 s 空等）；
     // zhouGunWounded（老周走到集结处）挪到 05 的背景条件：06 之前必须成立。
-    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "leftGunHandover", "zhouLeftGun", "tankPreviewed"],
+    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "leftGunHandover", "zhouLeftGun", "tankHeard"],
     null,
   ),
   Stage(
     "MachineGun",
-    "掩护后续守军，留意右前方道路。",
+    "掩护守军，盯住右前方道路。",
     A.gun,
-    // 2026-09-28：不再等 tankBlocksExit。罗班长在后墙岔口说完「顺子，跟我走后沟，去拿弹！」就该带人走；战车那时
+    // 2026-09-28：不再等 tankBlocksExit。罗班长在后墙岔口说完「顺子，跟我走支沟！」就该带人走；战车那时
     // 多半还在路上（三趟 03→06 连续跑：说完到压到沟口 37–42 s），他原地干站到车到位。车照样开到 Block 封口，05 里记。
-    ["tankPositionPressured", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
+    // 2026-10-12 第二轮：阵位前半边的隔院近战是 04 的门（nestFrontContested → nestFrontCleared），BundleOrder 在它之后。
+    ["tankPositionPressured", "gapGuardKilled", "nestFrontContested", "nestFrontCleared", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
     null,
   ),
   Stage(
     "Tank",
-    "沿后侧支沟取得集束弹，解除撤口封锁。",
-    A.bundle,
-    ["bundleRouteTraversed", "bundleTaken", "bundleReturned", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned", "zhouGunWounded"],
+    "沿支沟摸到战车侧面。",
+    A.bundleDrop,
+    ["bundleRouteTraversed", "bundleTaken", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "escortsWithdrawn", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned", "zhouGunWounded"],
     "BundleGo",
   ),
+  // 2026-10-12 03–11 重构（契约 §5.5）：任务字只写看得见的东西。06 requirements 不变（matchAsked / nierSeen 是内部事实）。
   Stage(
     "Orders",
-    "回伤员集结处接令，带老周离开阵地。",
+    "回集结处接令。",
     A.collection,
     ["ordersReached", "volunteerHeard", "lightShared", "zhouOnLitter", "columnDeparted"],
     "Volunteer",
   ),
+  // 07：沟口遭遇（Script_FirstLevelSouthMouth）—— mouthCrossed = 活着的担架全部过了开阔地进村北巷；
+  // 沟口那一段的任务字由 SOUTH_MOUTH_OBJECTIVES 切换。
   Stage(
     "South",
-    "护送伤员向南，抵达村口。",
+    "护送伤员向南，跟住班长。",
     A.village,
-    ["southWhisperHeard", "villageMouthReached", "mainStreetPointed"],
+    ["southWhisperHeard", "mouthCrossed", "villageMouthReached", "mainStreetPointed"],
     "SouthWhisper",
   ),
+  // 2026-10-12 03–11 重构 C 包（契约 §3.6 / §5.5）：08 的过关条件是「跨进了侧路」（灶屋北门或西侧夹道北口，
+  // sideRouteEntered），kitchenEntered 留作内部事实给伏击上膛；任务字只写看得见的东西。
   Stage(
     "Village",
-    "主街堵死了。把担架停进遮挡，从右侧灶屋绕。",
+    "主街堵死了。担架进墙后，从灶屋或西边夹道绕。",
     A.streetBlock,
-    ["streetBlockSeen", "littersInCover", "kitchenEntered"],
+    ["streetBlockSeen", "littersInCover", "sideRouteEntered"],
     "StreetBlocked",
   ),
   // 目标文字不剧透：进过道那一下是偷袭（2026-09-28 进门遭伏击），原文「连屋里冲出来了！上刺刀。」提前把它说破了。
   Stage("Melee", "穿过灶屋，打通连屋。", A.melee, ["meleeResolved"], "MeleeRight"),
+  // 2026-10-12 C 包（契约 §3.8 / §5.5）：守的是院门外东侧巷口（A.laneEast），requirements 不变（courtyardPassed 含驴车出门）。
   Stage(
     "Courtyard",
-    "清理窗口机枪，打开院门，掩护担架分批通过。",
+    "守住东边巷口，掩护担架出院门。",
     A.gate,
     ["villageGunSilent", "courtyardGateOpen", "courtyardPassed"],
     "CourtyardOpen",
@@ -228,15 +238,22 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   frontReserve: FRONT_RESERVE_ENTRIES.flatMap((entry)=>entry.slots.map((slot,i)=>
     ({ id: `FrontReserve${entry.id}${i}`, role: "reserve", ...slot, entry: entry.id, stage: entry.slotStages[i] }))),
   machineGun: FRONT_MACHINE_GUN_ATTACK,
-  bundleApproach: Sortie.enemies,
+  // ---- 0311 A Front ----
+  // 05 sap infiltrators (2026-10-12 contract §5.3, formerly `bundleApproach`): four men in the road link sap who come
+  // west through the old ammo sap to the rear junction once the player is up the attack branch (sapInfiltrationStarted).
+  sapInfiltrators: Sortie.enemies,
   // Escorts start with the tank in the plateau road cutting (hidden); FRONT_TANK_ESCORT_SLOTS are their block-point slots.
   tank: [{id:"TankEscortA",role:"escort",x:101,z:-208.5},{id:"TankEscortB",role:"escort",x:106.5,z:-210.5},
     {id:"TankEscortC",role:"escort",x:99,z:-212.5},{id:"TankEscortD",role:"escort",x:104,z:-215}],
+  // 05 tank crew (contract §3.3): two men who bail out of the Disabled tank and run back up the road to Bend. Spawned by
+  // Script_FirstLevelFrontCounterattack at the live tank's sides on tankFireDisabled, never by the generic step spawner.
+  tankCrew: FRONT_TANK_CREW,
   village: [
     { id: "VillageGunner", ...P.sideRoomGunner, weapon: "Type11", hold: true },
     { id: "VillageCorner", x: 54, z: -12 },
     { id: "KitchenGuard", x: 58, z: -7 },
-    { id: "RearWindow", ...P.streetBlock.windowShooter, hold: true },
+    // 2026-10-12 C 包（契约 §3.6）：东窗改成歪把子 hold，顺着主街扫 —— 主街是杀伤区。
+    { id: "RearWindow", ...P.streetBlock.windowShooter, weapon: "Type11", hold: true },
     { id: "SideYard", x: 40, z: 27 },
   ],
   // 09：日军从与东巷相通的连屋出来。领头那个（MeleeLead）2026-09-28 起改回预埋：
@@ -247,12 +264,16 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "MeleeLead", x: 54, z: -0.5, weapon: "Type38", bayonet: true },
     { id: "MeleeSecond", x: 58, z: 14.4, weapon: "Type38", bayonet: true },
     { id: "MeleeThird", x: 54.5, z: 11, weapon: "Type38", bayonet: true },
-    { id: "MeleeAlley", x: 66, z: 17, weapon: "Type38", bayonet: true },
+    // 2026-10-12 C 包：东巷那个改在侧间里、连屋东窗外（装睡），放出来当场往屋里扔一颗（VillageBlock.UpdateWindowThrow），
+    // 再从东门进（折线见 MISSION_TACTICS）。实跑过两趟：摆远一点他还没走到窗口就被从窗里打死了。
+    { id: "MeleeAlley", x: 66.8, z: 6.8, weapon: "Type38", bayonet: true },
   ],
+  // 10 第一拨追兵（契约 §3.8：既有三人 + 1），从东边（主街东侧房后）沿绕行巷压向院门。
   courtyard: [
     { id: "CourtyardPursuerA", x: 91, z: 24 },
     { id: "CourtyardPursuerB", x: 97, z: 21 },
     { id: "CourtyardPursuerC", x: 98, z: 29 },
+    { id: "CourtyardPursuerD", x: 95, z: 26.5, bayonet: true },
   ],
   // 12 掩护装载（2026-09-27 重做，docs/Data_FirstLevelTransferCover20260927.md）：守的是来时路。
   // 第一处威胁走的就是担架队的来时路：出生在 10 担架队绕过主街障碍走的那条短巷里
@@ -294,6 +315,46 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "BridgeNorthB", x: A.bridgeEnemy.x + 7, z: A.bridgeEnemy.z - 3 },
     { id: "BridgeNorthC", x: A.bridgeEnemy.x + 2, z: A.bridgeEnemy.z - 5 },
   ],
+  // ---- 0311 B Rear ----
+  // 07 沟口遭遇（docs/Data_FirstLevel0311Refactor20261012Contract.md §3.5 / §5.3）：东头突破进来的一个班 6 人，
+  // 从东北 60 m 外（南田房 SouthFieldHouse 北面，从沟口看被房挡住）赶来：MouthGunner 架在东侧白盒田埂 A.mouthEmbankment
+  // 上打沟口外的空地，MouthRifleA–C 各占一道田埂 / 坟包，MouthFlankA/B 往南绕到村北口的乱石墙后想抢先进村。
+  // 由 southMouthReached 这条事实放出（Script_FirstLevelSouthMouth），折线在 MISSION_TACTICS（fact 门控）。
+  southMouth: [
+    { id: "MouthGunner", x: 71.0, z: -67.5, weapon: "Type11", hold: true },
+    { id: "MouthRifleA", x: 75.5, z: -69.5 },
+    { id: "MouthRifleB", x: 70.0, z: -72.5 },
+    { id: "MouthRifleC", x: 76.0, z: -75.0 },
+    { id: "MouthFlankA", x: 80.5, z: -70.5, bayonet: true },
+    { id: "MouthFlankB", x: 84.0, z: -74.5, bayonet: true },
+  ],
+  // ---- 0311 C Village ----
+  // 08 东巷来的 4 人（契约 §3.6 / §5.3）：出生在东巷里（A.eastAlley 一带，街东两堵墙 z 2…20 之间，从主街看不见），
+  // 由 Script_FirstLevelVillageBlock 在 streetBlockSeen 之后按 MID_TUNING.streetFight.pushGapsS 逐个放出，
+  // 贴东墙根（x≈80.8）往北压向担架墙；玩家跨进侧路（sideRouteEntered）之后不再补人。
+  streetPush: [
+    { id: "StreetPushA", x: 88, z: 11, bayonet: true },
+    { id: "StreetPushB", x: 90.5, z: 9.6 },
+    { id: "StreetPushC", x: 92.2, z: 12.4 },
+    { id: "StreetPushD", x: 89.6, z: 14.2, bayonet: true },
+  ],
+  // 09 西侧夹道：机枪屋（MachineGunHouse）里的一个，玩家进夹道 ≥ 8 m 时从东墙后段的门洞（z 12.6–14.2）窜出来（alleyPopped）。
+  alleyPop: [
+    { id: "AlleyPop", x: 46.6, z: 13.4, weapon: "Type38", bayonet: true },
+  ],
+  // 09 后院：屋顶投弹的那个。出生点按表写在院里（通用生成器 / 导航把他放在地上），VillageBlock 再把他摆到
+  // A.roofPost 的侧间屋顶东坡面上（MID_TUNING.streetFight.roofTopM）；玩家进后院 6 s 后投弹，可被先打死。
+  roofThrower: [
+    { id: "RoofThrower", x: A.roofPost.x, z: A.roofPost.z, weapon: "Type38" },
+  ],
+  // 10 第二拨（契约 §3.8）：院门真开了之后从东边来，歪把子架在绕行巷东头主街口的草垛（LaneHaystack，贴街东墙）西边，
+  // 顺着巷子往院门方向扫；担架只在它被压住（laneMgSuppressed）期间过门。
+  laneWave2: [
+    { id: "LaneGunner", x: 92.5, z: 35, weapon: "Type11", hold: true },
+    { id: "LaneRifleA", x: 93, z: 30 },
+    { id: "LaneRifleB", x: 96, z: 33, bayonet: true },
+    { id: "LaneRifleC", x: 98.2, z: 27.5 },
+  ],
 });
 // 12 只有两处威胁（契约 §2/§4）：先是压向装载区的 transfer，解除之后才是侧巷的 transferAlley。
 // 每解除一处，接运真实推进一批。旧的四拍守波次（MISSION_TRANSFER_BEATS）已下线。
@@ -310,9 +371,11 @@ export const MISSION_GUIDANCE = Object.freeze({
   BunkerRescue:{label:'rescue'},
   RearTrench:{label:'rearTrench',route:'rearTrench'},
   Support:{label:'support',route:'support'},
-  MachineGun:{label:'front'},Tank:{label:'bundle',route:'bundle'},
+  // 2026-10-12 契约 §5.4：05 的路线是攻击支路（支沟里捡弹），不再指旧弹药屋。
+  MachineGun:{label:'front'},Tank:{label:'bundle',route:'attack'},
   Orders:{label:'orders',route:'collectionReturn'},
-  South:{label:'south',route:'southWalk'},Village:{label:'village',route:'village'},
+  // 0311 B：沟口接火到担架过完开阔地之间，标签指东边田埂上的机枪（mouthLabel；运行时 CurrentGuide 按两条事实切）。
+  South:{label:'south',route:'southWalk',mouthLabel:'mouth'},Village:{label:'village',route:'village'},
   Courtyard:{label:'gate',route:'courtyardBypass'},
   TransferApproach:{label:'transfer',route:'village'},Transfer:{label:'transferWall'},
   CartRide:{label:'cart',route:'cartRide'},AirFirst:{label:'transfer'},
@@ -325,22 +388,52 @@ export const MISSION_GUIDANCE = Object.freeze({
 });
 // Front riflemen no longer use point tactics: they bound between FRONT_ASSAULT lines (runtime UpdateAssault).
 // 2026-09-23（docs/Data_EnemyAi.md §20）：过滤按「真在某个遭遇组里的人」取，不再只认 approach 组 ——
-// 只认 approach 的那一版把 bundleApproach 的 BundleBendA/B 的切沟战术整条滤掉了，
+// 只认 approach 的那一版把 sapInfiltrators（旧 bundleApproach）的 BundleBendA/B 的切沟战术整条滤掉了，
 // 那两个人从 02 起就站在路上一动不动（05「切进沟里」那一拍从没发生过）。
 const TACTIC_MEMBER_IDS = new Set([...FRONT_APPROACH_ENEMIES, ...Sortie.enemies].map((spec) => spec.id));
+// 2026-10-12（契约 §3.3）：炸哑后弃车的两名车组沿战车路倒着跑回 Bend，边跑边打；mps 是跑步，不在路点停。
+const TANK_CREW_FLIGHT = Object.freeze(["Approach","Pressure","BendExit","Bend"].map((id) => {
+  const w = FRONT_TANK_PATH.find((p) => p.id === id); return Object.freeze({ x: w.x, z: w.z, holdS: 0 });
+}));
 export const MISSION_TACTICS = Object.freeze({
   // APPROACH_TACTICS 里还带着旧开场那支 surface 突进队的条目（那一组随军列开场下线了），
   // 只取名册里真有的人 —— 不然战术表里会留下一批不属于任何组的孤儿。
   ...Object.fromEntries(Object.entries(APPROACH_TACTICS).filter(([id]) => TACTIC_MEMBER_IDS.has(id))),
   // 压力表给的切沟路线覆盖同名条目（原 BundleBendB 那条穿路侧挡墙，见 FRONT_PRESSURE_TACTICS 头注）。
   ...FRONT_PRESSURE_TACTICS,
-  CourtyardPursuerA: { delay: 1, points: [{x:86,z:37},{x:62,z:40},{x:53,z:38}] },
-  CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:66,z:43},{x:59,z:40}] },
-  CourtyardPursuerC: { delay: 25, points: [{x:91,z:41},{x:70,z:44},{x:64,z:40}] },
+  // ---- 0311 A Front ----
+  TankCrewA: { fact: "tankCrewBailed", delay: 0.4, mps: 3.6, points: TANK_CREW_FLIGHT },
+  TankCrewB: { fact: "tankCrewBailed", delay: 1.1, mps: 3.6, points: TANK_CREW_FLIGHT },
+  // 2026-10-12 C 包：巷东头主街口放了草垛 LaneHaystack（x 78.4–80.4、z 41.8–43.8），折线都从它北面过。
+  // 2026-10-12 C 包：第一拨停在巷子东半段（离院门 11–16 m）——「追兵从绕行巷东头来」，不再冲到院门口贴脸；
+  // 从院门外东侧墙角（A.laneEast）往东看就是他们，门楼在他们身后。
+  // fact 门控：院门真开了才从东边压进来（之前他们在街东房后待命，看不见）—— 实跑两趟：开门前就到巷子里等着的三四个人
+  // 在门一开那一刻贴脸齐射，守巷口的人没得打；按顺序一个一个来才是「一拨」。
+  CourtyardPursuerA: { fact: "courtyardGateOpen", delay: 1, mps: 3.0, holdS: 0, points: [{x:86,z:37},{x:70,z:39.6},{x:66,z:40.4}] },
+  CourtyardPursuerB: { fact: "courtyardGateOpen", delay: 12, mps: 3.0, holdS: 0, points: [{x:89,z:39},{x:72.5,z:40.2},{x:68.6,z:42.6}] },
+  CourtyardPursuerC: { fact: "courtyardGateOpen", delay: 24, mps: 3.0, holdS: 0, points: [{x:91,z:41},{x:76.8,z:40.6},{x:71.6,z:40.9},{x:69.4,z:38.6}] },
+  CourtyardPursuerD: { fact: "courtyardGateOpen", delay: 36, mps: 3.0, holdS: 0, points: [{x:88,z:36.6},{x:74.2,z:39.6},{x:64.8,z:38.6}] },
   // MeleeLead 没有折线：他藏在灶屋—连屋过道里，冲锋由进门遭伏击那一拍驱动（VillageBlock.DriveLunge）。
   MeleeSecond: { delay: 1.5, points: [{x:58.6,z:9},{x:59,z:4}] },
   MeleeThird: { delay: 3, points: [{x:55.5,z:7},{x:56,z:4}] },
-  MeleeAlley: { delay: 5, points: [{x:62,z:17.5},{x:58,z:17},{x:58,z:13.5}] },
+  // 2026-10-12 C 包（契约 §3.7）：MeleeAlley 先穿侧间到连屋东窗外（MID_TUNING.streetFight.windowThrowPost，停 1.5 s
+  // 把一颗手榴弹从窗口扔进屋 —— VillageBlock.UpdateWindowThrow），再从东门（64, z 8–9.2）进屋。
+  MeleeAlley: { delay: 0.3, mps: 2.6, points: [{x:66.6,z:6.6,holdS:1.8},{x:65.6,z:8.6},{x:62.5,z:8.6},{x:58.4,z:6.2}] },
+  // ---- 0311 C Village ----
+  // 08 东巷 4 人：出巷口（x 82，z 8–14）→ 贴东墙根（x 80.8）往北 → 街北口，各自停在街北半段不同的点转守区（contact）。
+  // fact 门控用的就是放人的那条事实（人是 VillageBlock 逐个放的，放出来就走）。
+  // 街东房前墙推到 x 80.2（StreetEastNorthHouse，z −24…−1.3），东墙根那条线取 x 78.4–78.6（门前柴垛 x 79.2–80.1 也让开）。
+  StreetPushA: { fact: "streetBlockSeen", delay: 0.5, mps: 3.0, holdS: 0, points: [{x:84,z:11},{x:79.4,z:9},{x:78.6,z:6},{x:78.6,z:-13.5}] },
+  StreetPushB: { fact: "streetBlockSeen", delay: 0.5, mps: 3.0, holdS: 0, points: [{x:84,z:10.4},{x:79.2,z:7.4},{x:78.6,z:4},{x:78.6,z:-19}] },
+  StreetPushC: { fact: "streetBlockSeen", delay: 0.5, mps: 3.0, holdS: 0, points: [{x:84,z:12.4},{x:79.3,z:8.6},{x:78.6,z:5},{x:78.6,z:-17.6},{x:77.2,z:-22.8}] },
+  StreetPushD: { fact: "streetBlockSeen", delay: 0.5, mps: 3.2, holdS: 0, points: [{x:84,z:13.4},{x:79.0,z:10},{x:78.4,z:6},{x:78.4,z:-10},{x:76.2,z:-23.6}] },
+  // 09 夹道：从机枪屋东墙后段的门洞（z 12.6–14.2）窜出来，拐进夹道冲向玩家来的那一头（之后交给 AI 白刃）。
+  AlleyPop: { fact: "alleyPopped", delay: 0, mps: 4.5, holdS: 0, points: [{x:47.6,z:13.4},{x:50.5,z:13.4},{x:50.5,z:9.5}] },
+  // 10 第二拨：从东边主街东侧房后出来，沿绕行巷东头压进（第一拨同一条路）；机枪到草垛边（LaneHaystack 东北角）架住。
+  LaneGunner: { fact: "courtyardGateOpen", delay: 0, mps: 3.0, holdS: 0, points: [{x:84,z:38.2},{x:77.8,z:40.5},{x:77.5,z:42.5}] },
+  LaneRifleA: { fact: "courtyardGateOpen", delay: 0, mps: 3.2, holdS: 0, points: [{x:86,z:37.5},{x:70,z:40.2},{x:64.5,z:40.5}] },
+  LaneRifleB: { fact: "courtyardGateOpen", delay: 0, mps: 3.2, holdS: 0, points: [{x:88,z:39},{x:72.5,z:40.2},{x:67.5,z:42.3}] },
+  LaneRifleC: { fact: "courtyardGateOpen", delay: 0, mps: 3.2, holdS: 0, points: [{x:90,z:41},{x:76.8,z:40.6},{x:71.6,z:40.9},{x:68.5,z:38.6}] },
   // 12 两拨追兵的跃进（docs/Data_FirstLevelTransferCover20260927.md §3；2026-09-30 一夫当关改路，见文末一节）。
   // fact：顺子上了村口低墙才开始压（之前是站在街里的普通守敌）。mps / holdS：跑步穿街、
   // 在掩体后停一两秒再跃进（默认 1.85 m/s 走、每点停 4.5 s，是给守区巡逻的节奏）。
@@ -382,6 +475,27 @@ export const MISSION_TACTICS = Object.freeze({
   BridgeNorthA: { delay: 2, points: [{x:-74,z:80},{x:-76,z:84}] },
   BridgeNorthB: { delay: 6, points: [{x:-72,z:76.5},{x:-74,z:80}] },
   BridgeNorthC: { delay: 10, points: [{x:-68,z:72},{x:-72,z:78}] },
+  // ---- 0311 B Rear ----
+  // 07 沟口遭遇：全组先绕过南田房北面的 (51,−68) 再散开（直线腿不能穿房）；每人最后一点是他趴的掩体后面
+  //（白盒田埂 / 坟包的东北面，Data_FirstLevelWhiteboxRear 的 Mouth*；绕村那两个到村北口乱石墙 / 草垛北面）。
+  // fact 门控：记下 southMouthReached 才动；跑步穿田（mps 3.2）、折点不停（holdS 0），到最后一点转守区（contact）。
+  MouthGunner: { fact: "southMouthReached", delay: 0.5, mps: 3.0, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:22,z:-56}, {x:15.2,z:-44.9}] },
+  MouthRifleA: { fact: "southMouthReached", delay: 1.2, mps: 3.2, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:30,z:-52}, {x:27.2,z:-49.2}] },
+  MouthRifleB: { fact: "southMouthReached", delay: 2.0, mps: 3.2, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:20,z:-60}, {x:9.6,z:-59.6}] },
+  MouthRifleC: { fact: "southMouthReached", delay: 2.8, mps: 3.2, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:40,z:-50}, {x:27.4,z:-39.4}] },
+  MouthFlankA: { fact: "southMouthReached", delay: 3.5, mps: 3.2, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:50,z:-50}, {x:44,z:-36}, {x:39.2,z:-27.3}] },
+  MouthFlankB: { fact: "southMouthReached", delay: 4.5, mps: 3.2, holdS: 0, points: [
+    {x:51,z:-68.5}, {x:48,z:-52}, {x:44,z:-38}, {x:34.6,z:-29.6}] },
+});
+// 07 沟口那一段的任务字（契约 §5.5：只写看得见的东西）；Script_FirstLevelSouthMouth 在 mouthContact / mouthCrossed 两刻切换。
+export const SOUTH_MOUTH_OBJECTIVES = Object.freeze({
+  mouth: "压住东边机枪，掩护担架冲过空地。",
+  crossed: "护送伤员向南，跟住班长。",
 });
 export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   id: "FirstLevelP012Whitebox",
@@ -454,7 +568,8 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   },
 });
 
-export const FRONT_BATTLE_OBJECTIVES=Object.freeze({capture:"跟随班长，夺取右侧机枪阵位。",coverFirst:"掩护第一批守军撤入交通壕。",
-    coverRest:"掩护后续守军，留意右前方道路。",rear:"跟随班长，退到阵位后墙。",
-    supply:"沿后侧支沟取得集束弹。",return:"沿原支沟返回阵位后侧岔口。",attack:"跟随班长接近战车，解除撤口封锁。",
-    retreat:"退回支沟遮挡，掩护剩余守军撤回。",disengage:"沿后交通壕撤离，随班长返回伤员集结处。"});
+// 2026-10-12 契约 §5.5：任务字只写看得见的东西（观察口后指破墙那挺机枪；05 指战车侧面、捡弹后「炸停战车」）。
+export const FRONT_BATTLE_OBJECTIVES=Object.freeze({capture:"跟随班长，回前沿接人。",observed:"打掉右边破墙那挺机枪。",coverFirst:"守住阵位，掩护守军撤下来。",
+    coverRest:"掩护守军，盯住右前方道路。",rear:"跟随班长，退到阵位后墙。",
+    supply:"沿支沟摸到战车侧面。",attack:"炸停战车。",
+    retreat:"退回支沟，掩护剩下的人撤回。",disengage:"随班长撤回集结处。"});

@@ -79,6 +79,8 @@ export const SPEAKER_GESTURE_CLIPS = Object.freeze({
 export const SPEAKER_GESTURE_TARGETS = Object.freeze({
   rightNest: "sortie:nest",       // FrontBlockade: the right position with the burning broken wall that seals the way
   gap: "sortie:gap",              // the one gap in the backslope
+  guardPosts: "sortie:lastCover", // FrontObservation.01 (2026-10-12): the pinned guards in the backslope scrape
+  bundleDrop: "sortie:bundleDrop",// BundleFound.02 (2026-10-12): the two bundles beside the fallen comrade
   leftGun: "sortie:leftSeat",
   ammoHouse: "sortie:house",
   ammoBox: "sortie:bundle",
@@ -109,6 +111,9 @@ const Row = (who, pose, gesture = null, target = null) => Object.freeze({ who, p
 export const FIRST_LEVEL_SPEAKER_GESTURES = Object.freeze({
   // 03 Support. Cold start: head layer and gestures. Run from 01: the storyboard director still acts the squad in
   // this step (its own PointBlockade on FrontBlockade.02) and both shared layers yield to it.
+  // 2026-10-12 03 观察口三指（契约 §3.1 / Concept_03A）：守军（lastCover，背坡刮沟）、缺口，再接 FrontBlockade.02 指右侧阵位。
+  "FrontObservation.01": Row("luo", "crouch", "GesturePointL", "guardPosts"),
+  "FrontObservation.02": Row("luo", "crouch", "GesturePointL", "gap"),
   "FrontBlockade.01": Row("zhou", "wounded"),
   "FrontBlockade.02": Row("luo", "crouch", "GesturePointL", "rightNest"),
   "FrontBlockade.03": Row("luo", "crouch"),
@@ -120,29 +125,35 @@ export const FIRST_LEVEL_SPEAKER_GESTURES = Object.freeze({
   "TakeOverGun.01": Row("luo", "crouch", "GestureBeatL"),
   "TakeOverGun.02": Row("zhou", "gun"),
   "TakeOverGun.03": Row("luo", "crouch"),
+  // TankHeard retired 2026-10-12 (row kept for its recording); TankSpotted: the guard points up the road, Luo waves it off.
   "TankHeard.02": Row("luo", "crouch", "GesturePointL", "tank"),
+  "TankSpotted.01": Row("guard", "kneel", "GesturePointL", "tank"),
+  "TankSpotted.02": Row("luo", "crouch", "GestureDownL"),
+  "FirstBatchCount.01": Row("liuwencai", "crouch"),
   "TankRoadContact.01": Row("heyoutian", "gun", "GesturePointL", "tank"),
   "TankRoadContact.02": Row("luo", "crouch"),
   "TankArmor.01": Row("luo", "crouch", "GestureDownL"),
-  "TankArmor.02": Row("luo", "crouch"),
   "TankTerror.01": Row("luo", "crouch", "GestureDownL"),
+  "GapGuardDown.01": Row("liuwencai", "crouch"),
+  // 2026-10-12 BundleOrder: the guard reports the comrade who went up the sap; Luo looks at the tank, then the sap (the
+  // pause is in the direction table), then assigns; .03 beckons Shunzi into the sap.
   "BundleOrder.01": Row("guard", "kneel", "GestureBeatL"),
-  "BundleOrder.02": Row("luo", "crouch"),
+  "BundleOrder.02": Row("luo", "crouch", "GesturePointL", "attackBranch"),
   "BundleOrder.03": Row("luo", "crouch", "GestureBeckonL", "listener"),
   "BundleOrder.05": Row("luo", "crouch"),
   // 05 Tank
   "BundleGo.01": Row("heyoutian", "gun"),
-  "BundleGo.02": Row("luo", "move", "GesturePointL", "ammoHouse"),
+  "BundleGo.02": Row("luo", "move", "GestureDownL"),
   "BundleProne.01": Row("luo", "crouch", "GestureDownL"),
   "BundleProne.02": Row("luo", "crouch"),
   "BundleWhy.02": Row("luo", "move"),
   "BundleWhy.04": Row("luo", "move"),
   "BundleSupply.01": Row("keeper", "crouch", "GesturePointL", "ammoBox"),
   "BundleSupply.02": Row("luo", "crouch"),
-  "BundleBrief.01": Row("luo", "move"),
-  "BundleBrief.02": Row("luo", "move", "GestureBeatL"),
-  "BundleBrief.03": Row("luo", "move"),
-  "BundleBrief.05": Row("luo", "move"),
+  "BundleFound.01": Row("luo", "crouch"),
+  "BundleFound.02": Row("luo", "crouch", "GesturePointL", "bundleDrop"),
+  "BundleBrief.01": Row("luo", "move", "GestureBeatL"),
+  "BundleBrief.02": Row("luo", "move"),
   "BundleReturnCall.01": Row("heyoutian", "gun"),
   "BundleReturnCall.02": Row("luo", "move"),
   "BundleAttack.01": Row("luo", "crouch", "GesturePointL", "attackBranch"),

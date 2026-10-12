@@ -207,6 +207,23 @@ export class FirstLevelGengFamily {
 
 C 只能**加方法**（如 `CartBlockGate()`），不改已有签名；B 把这些状态都放进 `runtime.Debug.FirstLevelMission().gengFamily` 供驾驶脚本与测试读。
 
+B 包实现时的增补（2026-10-12，只加不改上面的签名）：
+
+```js
+  get peasant()                   // 06 洼地沟沿上搭话的庄稼人（NierShells 第二句），07 起收走
+  get cartState()                 // 驴车裸数据 { x, z, yaw, travel, moving, blocking, target, animal }
+  SetCartBlocking(bool)           // cart.blocking 的写口（CartTo 不改它）
+  OnLine(cueId, index)            // 逐句事件：NierFollow.03 幺娃丢弹壳、SouthWhisper.06 顺子抬头看她（运行时 VoiceEvent 转来）
+  OnMouthContact()                // 07 机枪一响：撒腿沿 southWalk 跑进村北巷 R.geng.villageRefuge（Script_FirstLevelSouthMouth 调）
+  VoicePosition(cue, line)        // NierShells 两句的发声位置（担架员 / 庄稼人）
+  Leave() / State() / Dispose()
+  // 模块级：GENG_IDS（missionId）、NIER_SHOUT_CUE（妮儿叫声 / 笑声的占位 cue，素材侧登记 nier_shout 后只改这一处）、
+  // RimSide / ShellLandingPoint / MuzzlePoint / FaceYaw / PlayerYawTo（纯函数，测试用）
+```
+
+`Enter(stepId)` 在运行时 `Enter(stage)` 里对每一步各调一次（Orders 起妮儿与庄稼人；South 跟队；Village/Melee/Courtyard/TransferApproach 起老耿与驴车的占位），
+C 包不必再在自己的 case 里补钩子。老耿与驴车的起点占位在 `Data_Tuning_FirstLevel.geng.gengHouse / cartYard`，C 包按村子的锚点改。
+
 ## 6. 概念图对应（验收截图要对得上）
 
 | 站 | 概念图 | 截图里必须成立 |
@@ -234,6 +251,15 @@ C 只能**加方法**（如 `CartBlockGate()`），不改已有签名；B 把这
 
 Regroup 夹具 17 幺娃够不到老周卡死；MenuTest 副标题；SmokeOrigins 63≠65；TextTest 君/饶；PhysicsTest 帧耗时；BootTest 远景辨识材质；EndTest ZhouDeath 15.62 s；campaign 驱动在 14 Rescue / `--quality=whitebox` 下 18 起点的 `ERR_STRING_TOO_LONG`。动工前先在 `origin/master` 跑一遍自己要用的闸门记下基线。
 
+集成期间（2026-10-12）又确认三条，都在本轮之前就红：
+- `Script_FirstLevelFrontTest` 第 39 行 `CaptiveInterrogation` 9≠11 —— 另一会话的 01–02 改稿（master 593fc7a9）改了对白没改断言。
+- `Script_FirstLevelMissionStageJumpTest` 17→18：选 `Death` 后 150 s 内等不到 `BridgeCover`，`deathSceneComplete` 不落；在只含 B 包的树上同样失败、无页面错误、耿家模块闲置，与 10-01 记下的「`--stage-from=15` 卡 17」同源。
+- 整帧三角预算：03 `RightNestShortRetreat` 机位在分支起点就 10.1 M > 9 M（A 包 `--baseline-root` A/B：基线 10.10 M、本轮 10.14 M；连续跑里 `Tank` 入口 9.4 M、`ReturnToNestAfterEvade` 9.1 M 也超），10-07/10-09 壕沟表面重做之后的事。**预算没放宽**；驾驶脚本加了 `--budget=report`（超了只打 `BUDGET_OVER`，缺省仍断言），只给流程验收用。
+
 ## 9. 变更记录
 
 - 2026-10-12 契约 v1：集成负责人按改稿冻结；第一波 A（Front）∥ B（Rear + 耿家）并行，第二波 C（Village），第三波 D（Voice）。
+- 2026-10-12 A 包（Front 03–05）实现落在分支 `worktree-agent-a7b388014b4cf078c`：§3.1–3.3 全部接线。偏差三条——缺口牺牲的是第二批 7 号（5 号是面对玩家说 `TankSpotted` 的人）；去程「掷弹筒落弹声」是剧本 `FireShell` 真弹（支沟无视线，环境火点打不进来）；侧翼「再冲阵位」用 `nestFrontContested` 隔院对打实现而非第二次成组冲锋。实拍后两处收口：掷弹筒落弹（支沟 + 阵位）都是 `feedbackOnly` 不扣血（110 / 40 两档都把守阵位的玩家打死或流血至死）；`gapRushRepelled` 只看缺口 8 m 内与 16 m 内的冲锋（远处跃进不算）。留给集成的两条基线问题：`RightNestShortRetreat` 整帧三角 10.1 M > 9 M 上限（分支起点同样超）；左机枪坑的 54–55° 坡超胶囊 52° 爬坡上限，何有田交枪被钉在坡脚（本包用 `FrontBattle.RampLift` 兜底，地形改 ≤ 45° 后可撤）。实现口径见 `Data_FirstLevelFront20260919.md` §6。第二轮（合入 master 404fdcd6 后）：04 加门 `nestFrontContested` / `nestFrontCleared`（隔院近战打完、停一拍才 `BundleOrder`），04 requirements 七条；掷弹筒落弹改轻伤（12–18 hp、不开伤口、最低留 1 hp）。
+- 2026-10-12 B 包（Rear 06–07 + 耿家）结果：新 `Script_FirstLevelGengFamily` / `Script_FirstLevelSouthMouth`（+ 两个纯 Node 门），06 借火两次 F、妮儿沟沿捡弹壳 / 看枪 / 跟队 / 撒腿进村，07 沟口遭遇（`southMouth` 组由 `southMouthReached` 放出、压住 ≥ 2 s 担架才跑、会再抬头），沟口东侧 5 块白盒掩体（07+ 指纹已重生）。与契约的偏差：① `A.southMouth` 取在真正的出坡起点 (−8,−36)（契约写的 ≈(−16,−52) 是沟身拐点，不是沟口），停点 (−13.4,−46.7) 在南口前 12 m；`A.mouthEmbankment` 取 (15.2,−44.9)（契约 ≈(12,−42)，离南口 24 m）；② 06/07 的驾驶与 07 时长断言在 `Script_FirstLevelCampaignFront`（A 包独占文件）的 06/07 两块里改，A 包的 03–05 块没碰；`Script_FirstLevelFrontTest` 的 South requirements 一行同步；③ 妮儿按契约 0.62 缩放约 0.99 m 高（十一岁偏矮，`R.geng.nierScale` 一处可调）；④ 新增 `Script_Actor.KIND_SPEC.civilian` 的 `girl` 分身与 `pickable` 随机池（缩放只能在那张表里给）；⑤ `nier_shout` 暂用 `hitGrunt` 抬音高占位。留给集成：`index.html` import map 登记两个新模块并抬戳（ModuleGraphTest 现红）、重跑 `Font/Script_FontSubset.py`（新文案 8 个字：嘿 她 妮 懂 稼 耿 赖 阔，TextTest 的字体两项现红）、Voice 包录 NierShells / NierFollow / MouthContact / MouthGo / MouthFlank / SouthWhisper 第 7 句与 geng / peasant 定妆。
+- 2026-10-12 D 包（Voice）结果（口径与逐条指标见 [配音同步 §0.17](Data_FirstLevelVoiceSync20260919.md)）：定妆 `peasant`（124 Hz，自己录，不与翻译共用）、`geng`（四轮 9 条候选，133 Hz：不带参考音时模型把老汉拔到 195–327 Hz，用降 6 个半音的第 1 轮候选作 `baseFile` 才进区间；B 包起草的定妆台词是剧情原句，`GengCart` 挂它作参考时模型接着念独白，定妆台词换成非剧情独白后重录）；PerLine 11 场 15 次请求（`FirstBatchCount` 2 次、`GapGuardDown` 旧提示词 3 次全硬错误后改导演表再 1 次），整段 10 条 13 次（`GengHouse` 2、`AskGeng` 2、`GengCart` 旧参考音下 2 条作废），`nier_shout` 两条 SeedAudio 女童叫声（免费素材库 3 条孩童喊叫都是说词的或成年女声）；退役 `TankHeard` / `BundleWhy` / `BundleSupply` 录音与条目保留，`tank_turret@luo` 从喊话清单与 `Barks/` 撤下。与契约的偏差 / 顺手的事：① 整段 cue 这一轮起可以挂定妆参考音（`WHOLE_CUE_REFERENCED` 名单，名单外提示词逐字不变），`MissionVoicePrompt` 有老耿 / 庄稼人在场时点名北方官话；② `BorrowLight.07` 的 `pauseBeforeS: 3`（B 包）会改 promptHash、录音没重录，撤掉（门禁改核「不进提示词」）；③ `BridgeCover` / `BridgeWithdraw` 自 10-01 浮桥改词起 `--audio` 就红，重录了这两条；④ `Data_Voice` 新 kind `nier` / side `civil`、`Script_VoiceBake` 跳过 `generated` 行；⑤ `SouthWhisper` 幺娃三句是气声、音色编码分不出（按基频与顺子分开），要人耳定。门禁：`Script_FirstLevelVoiceTest --audio`、`Script_CharacterSpeechTest`（`SouthWhisper` 不再 stale）、`Script_FirstLevelMissionTest`、`Script_MissionGatesTest`、`Script_FirstLevelGengFamilyTest` 全绿；实机两趟见 §0.17 末尾。留给集成：`index.html` 抬 `Data_Voice` / `Script_FirstLevelGengFamily` / `Data_Tuning_FirstLevel` / 台词表 / 导演表 / 定妆表 / 烘焙脚本不入图的不用抬，配音清单（Manifest / LineTimings / FaceTracks / CastManifest / TranscriptReview / SquadBarkManifest / NierShoutManifest）按键合并、同戳要比 master 再 +1。
+- 2026-10-12 C 包（Village 08–11）结果：新 `Script_FirstLevelStreetFight`（纯规则 + 纯 Node 门 `Script_FirstLevelStreetFightTest`），08 东巷 `streetPush` 逐个放 / 推进点 `sideRouteEntered`（灶屋或西侧夹道）/ 老耿 `GengHouse` 一巴掌指灶屋，09 西侧夹道走通（机枪屋东墙后段开侧门、`alleyPop` ≥ 8 m 窜出）/ 连屋东窗先扔进一颗 / 后院屋顶 `RoofThrower`（进院 6 s 投弹、妮儿先指、可先打死），10 `GengGate` 缸-桌-闩-车堵门-拽驴（老耿拔闩与玩家 F 同一个 `OpenCourtyardGate`）/ `courtyard` 4 + `laneWave2` 4（草垛机枪、开门 90 s 不再补）/ 担架只在 `laneMgSuppressed` 期间过门 / `CartPush` 可选 F / `courtyardPassed` 含驴车出门，11 驴车到接运点东侧停车位 `gengCartArrived` + `GengCart` / `AskGeng`。实装口径 `docs/Data_FirstLevelMid20260919.md` §7。与契约的偏差：① 妮儿「在车上」占位是跟在车尾后一步（百姓是物理胶囊、驴车没碰撞盒）；② `LaneGunner` 的草垛放在巷东头主街口贴街东墙（x 78.4–80.4），不是巷尾正中（12 第一拨的折线与担架线都在街西半边）；③ 何有田 + 刘文财用的是既有 `frontParty` 两点（在街北半段、离东窗 10 m），喊话的前队退到 `frontPartyWait`；④ `Script_FirstLevelLeaderGuide` 的 Courtyard 分支改了一行（cover 目标 `A.courtCover → A.laneEast`）；⑤ Kit 的 `CAMPAIGN_SEGMENT_ENDS` 加 11；⑥ 10 第一拨 `courtyard` 改成 fact 门控（院门真开了才从东边来，1/12/24/36 s），不再进 10 就在巷子里等；⑦ 从连屋南门进（走夹道）的伏击按拍表「追不上作罢」转白刃，一次性按键只在灶屋那条路上；⑧ `MeleeAlley` 装睡期间挂 `scriptEssential`（08 流弹）。实跑两趟（灶屋 / 夹道）8→11 全部真走完，站时长都在节奏表 ±40% 内（Melee 一步本身 30 s，按站折算 57 s）；两趟都在 11 回看村路那一帧的整帧预算（9.04–9.19 M > 9.0 M，两级阴影同帧）翻红，详见 `docs/Data_FirstLevelMid20260919.md` §7.6。留给集成：`index.html` import map 登记 `Script_FirstLevelStreetFight.mjs` 并抬戳（ModuleGraphTest 现红）、重跑 `Font/Script_FontSubset.py`（新文案 5 个字：俺 尥 故 蹶 驴）、Voice 包录 GengHouse / GengGate / CartPush / GengCart / AskGeng。

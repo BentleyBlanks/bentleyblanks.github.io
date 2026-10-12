@@ -30,19 +30,21 @@ import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { BRAIN } from "./Data_Tuning_Ai.mjs";
 
 /** The 03–06 scenes (steps Support, MachineGun, Tank, Orders). */
+// 2026-10-12 03–11 refactor: FrontObservation / FirstBatchCount / TankSpotted / GapGuardDown / BundleFound added; TankHeard /
+// BundleWhy / BundleSupply retired (kept in the list so a stray Say still goes through the scene queue, never the old one).
 export const FRONT_SCENE_IDS = Object.freeze([
-  "FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdraw", "TakeOverGun", "TankHeard",
-  "TankRoadContact", "TankArmor", "TankTerror", "BundleOrder",
-  "BundleGo", "BundleProne", "BundleWhy", "BundleSupply", "BundleBrief", "BundleReturnCall", "BundleAttack", "BundleRetreat", "TankStopped", "FrontRelief",
+  "FrontObservation", "FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdraw", "FirstBatchCount", "TakeOverGun", "TankHeard", "TankSpotted",
+  "TankRoadContact", "TankArmor", "TankTerror", "GapGuardDown", "BundleOrder",
+  "BundleGo", "BundleProne", "BundleWhy", "BundleSupply", "BundleFound", "BundleBrief", "BundleReturnCall", "BundleAttack", "BundleRetreat", "TankStopped", "FrontRelief",
   "Volunteer", "BorrowLight", "ZhouLift",
 ]);
 const OWNED = new Set(FRONT_SCENE_IDS);
 /**
  * Asides that never hold up the story (2026-09-27 user addition): still waiting their turn when any other front scene
- * is asked for, they are dropped - 03's「战车！还在路那头」is stale once He Youtian shouts the tank is out, 04's
- * 「莫打铁壳子！」must not delay「下来！莫站枪口上！」.
+ * is asked for, they are dropped - 03's「战车……路那头是战车！」is stale once He Youtian shouts the tank is out, 04's
+ * 「莫打铁壳子！」must not delay「下来！莫站枪口上！」; the two counts (FirstBatchCount / GapGuardDown) are asides too.
  */
-export const FRONT_OPTIONAL_SCENES = Object.freeze(["TankHeard", "TankArmor"]);
+export const FRONT_OPTIONAL_SCENES = Object.freeze(["TankHeard", "TankSpotted", "TankArmor", "FirstBatchCount", "GapGuardDown"]);
 const CUES = new Map(MISSION_DIALOGUE.map((cue) => [cue.id, cue]));
 /** Steps in which the ids above are played as scenes (outside them runtime.Say keeps the old queue). */
 export const FRONT_SCENE_STEPS = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);

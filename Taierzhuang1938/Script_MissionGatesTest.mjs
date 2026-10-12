@@ -102,7 +102,10 @@ for (const stage of MISSION_STAGES)
 checks += 1;
 // 98 = 96 + leftGunHandover、zhouLeftGun（契约 §2.6：03 改为「何有田接枪 + 老周离枪 ≥10 m」，zhouGunWounded 挪到 05）。
 // 97：2026-09-28 tankBlocksExit 不再是 04 的过关条件（门还在，只是不挡阶段）。
-Check(requirementFacts.length === 97, `requirements 事实共 97 条，实际 ${requirementFacts.length}`);
+// 98：2026-10-12 0311 B 包，07 加 mouthCrossed（担架真的过了沟口开阔地）。
+// 99：2026-10-12 03–11 重构 A 包 —— tankPreviewed→tankHeard（同数）、04 加 gapGuardKilled、05 加 escortsWithdrawn、去 bundleReturned。
+// 101：2026-10-12 第二轮，04 加 nestFrontContested / nestFrontCleared（隔院近战是门）。
+Check(requirementFacts.length === 101, `requirements 事实共 101 条，实际 ${requirementFacts.length}`);
 
 const KINDS = new Set(["proximity", "proximityFamily", "interior", "voice", "interaction",
   "combat", "column", "cutscene", "scripted", "timer"]);
@@ -158,8 +161,9 @@ for (const [cue, factId] of Object.entries(MISSION_VOICE_FACTS)) {
   assert.equal(MISSION_FACT_GATES[factId].cue, cue, `${factId} 的 cue 与表不一致`);
 }
 checks += 1;
-// 09.19 契约 §5 的 23 条减去 09.23 契约 §5.2 下线的 RescueCall（rescueCallHeard 改由导演记）。
-Check(Object.keys(MISSION_VOICE_FACTS).length === 22, "对白事实共 22 条（契约 §5，RescueCall 已下线）");
+// 09.19 契约 §5 的 23 条减去 09.23 契约 §5.2 下线的 RescueCall（rescueCallHeard 改由导演记）；
+// 2026-10-12 0311 B 包加 NierFollow→nierFollowHeard，C 包加 GengGate→gengGateHeard、AskGeng→gengAsked。
+Check(Object.keys(MISSION_VOICE_FACTS).length === 25, "对白事实共 25 条（契约 §5，RescueCall 已下线；0311 B 加 NierFollow、C 加 GengGate / AskGeng）");
 Check(MISSION_FACT_GATES.rescueCallHeard?.kind === "scripted" && !("RescueCall" in MISSION_VOICE_FACTS), "rescueCallHeard 由开场导演记");
 
 // ---------------------------------------------------------------------------
@@ -251,8 +255,7 @@ const NEAR_WHITELIST = [
   // 2026-09-27 敌军威胁评估：被惊动（threatWokenAt）的人不等放行点也走；仍然只放走位、不记事实。
   { pattern: /if\(!this\.Near\(plan\.near,plan\.nearM\) && !\(actor\.threatWokenAt>=0\)\)continue;/,
     why: "UpdateTactics 的战术放行点，点与半径来自 MISSION_TACTICS 的 near/nearM，放的是走位不是事实" },
-  { pattern: /if\(this\.Near\(Sortie\.house,Sortie\.supplierRangeM\)\)this\.Say\('BundleSupply'\);/,
-    why: "补给兵台词的触发圈；事实 bundleDirectionsHeard 由 VoiceDone 记，走的是 voice 门" },
+  // 2026-10-12：旧弹药屋与补给兵（BundleSupply）退出流程，那一处 this.Near( 随之删掉。
 ];
 const nearCalls = [...runtimeSource.matchAll(/this\.Near\(/g)].length;
 assert.equal(nearCalls, NEAR_WHITELIST.length,
@@ -357,7 +360,7 @@ Check(PhaseLayout(model, 1).encounters.filter((e) => e.id !== "bunkerAssault").e
 const bunkerAssault = PhaseLayout(model, 1).encounters.find((e) => e.id === "bunkerAssault");
 Check(bunkerAssault.dormant && bunkerAssault.wake.step === "BunkerRescue" && bunkerAssault.wake.source === "FirstLevelBunkerShow.ReleaseCombat",
   "02 反扑时日兵交还战斗 AI，由小队清场后才拖救还权");
-for(const id of ["approach","front","machineGun","tank","bundleApproach"])
+for(const id of ["approach","front","machineGun","tank","sapInfiltrators"])
   Check(MISSION_STEP_SPAWNS.BunkerRescue.includes(id)&&FIRST_LEVEL_ENCOUNTER_STARTS[id]===2,
     `${id} 在 02 预置，出门和接近阵位不再生成`);
 const STATES = new Set(["pending", "spawned", "dormant", "standby", "active", "cleared"]);

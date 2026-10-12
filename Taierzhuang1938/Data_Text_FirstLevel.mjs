@@ -33,8 +33,11 @@ export const TEXT = Object.freeze({
   "firstLevel.casualty.speaker": "战友",
   "firstLevel.casualty.reaction": "有弟兄倒下了！守住掩体，继续掩护！",
   "firstLevel.interaction.rifle": "捡起地上的步枪",
-  "firstLevel.interaction.bundle": "领取集束弹和绷带 · H 蓄力投掷，B 包扎",
+  "firstLevel.interaction.bundle": "捡起弟兄身边的集束弹和绷带 · H 蓄力投掷，B 包扎",
   "firstLevel.interaction.gate": "打开院门，让担架通过",
+  // 0311 C（2026-10-12）：10 驴车卡在门槛上搭把手（可选）、11 在接运点问老耿往哪走。
+  "firstLevel.interaction.cartPush": "搭把手，把驴车推过门槛",
+  "firstLevel.interaction.askGeng": "问老耿往哪走",
   "firstLevel.interaction.carry": "接过老周担架后端",
   "firstLevel.interaction.cart": "上车，跟着老周",
   "firstLevel.interaction.place": "将老周放在军医旁",
@@ -53,8 +56,15 @@ export const TEXT = Object.freeze({
   "firstLevel.guide.bundle": "集束手榴弹",
   "firstLevel.guide.throw": "侧沟投掷位置",
   "firstLevel.guide.south": "南行道路",
+  // 0311 B：07 沟口接火到担架过完开阔地之间的标签（MISSION_GUIDANCE.South.mouthLabel）。
+  "firstLevel.guide.mouth": "东边田埂上的机枪",
+  // 0311 B：06 借火改两次 F（第一次借火、老周递烟之后第二次划火递过去）。
+  "firstLevel.interaction.borrowLight": "跟老周借个火",
+  "firstLevel.interaction.borrowLightShare": "划火，递过去",
   "firstLevel.guide.village": "灶屋入口",
   "firstLevel.guide.gate": "院门通道",
+  // 0311 C：10 院门开了之后顺子守的地方（院门外东侧墙角，看绕行巷东头）。
+  "firstLevel.guide.laneEast": "院门外东边墙角",
   "firstLevel.guide.gateThreat": "院门外追兵：探出缺口压住侧翼",
   "firstLevel.guide.transfer": "桥头接运点",
   "firstLevel.guide.transferWall": "村口矮墙射位",
@@ -73,8 +83,9 @@ export const TEXT = Object.freeze({
   "firstLevel.hint.guardsLoss": "活着的守军已经撤回，其余已伤亡。下机枪，去侧沟领取集束弹炸停战车",
   "firstLevel.hint.guardsLost": "这一批守军全部阵亡，接应失败",
   "firstLevel.hint.gunSupply": "机枪弹药不足：F 离位，身后弹药箱可补充弹匣",
-  "firstLevel.hint.bundle": "按住 H 蓄力：先扔到履带边炸断履带；还在打就再补一捆上车尾后甲板。炸哑后退回支沟",
-  "firstLevel.hint.bundleEmpty": "集束弹已用完：回侧沟弹药箱补充后继续投掷",
+  "firstLevel.hint.bundle": "按住 H 蓄力：先扔履带边；还在打就补一捆上车尾。",
+  "firstLevel.hint.bundleEmpty": "集束弹已用完：回支沟弟兄身边再捡",
+  "firstLevel.hint.bundleShort": "扔到车旁履带边",
   "firstLevel.hint.queue": "担架正在分批通过，留意两侧火力和来路",
   "firstLevel.hint.transferEast": "鬼子顺着村路压过来了！守住矮墙，让第一批伤员装车",
   "firstLevel.hint.transferAlley": "右边巷口有机枪！沿矮墙往右挪，打掉它第二批才装得上",
@@ -87,4 +98,8 @@ export const TEXT = Object.freeze({
 export const DYNAMIC_PREFIXES = ["firstLevel.return.", "firstLevel.interaction.", "firstLevel.guide.", "firstLevel.hint.", "firstLevel.leader.", "firstLevel.transition."];
 export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_FirstLevelMissionVoice.mjs", "Script_FirstLevelOpening.mjs", "Script_FirstLevelLeaderGuide.mjs",
   // 第二波 Mid 包（阶段 8–14）的两个玩法模块：零玩家可见中文，台词一律走台词表。
-  "Script_FirstLevelVillageBlock.mjs", "Script_FirstLevelTransferCart.mjs"];
+  "Script_FirstLevelVillageBlock.mjs", "Script_FirstLevelTransferCart.mjs",
+  // 2026-10-12 0311 B 包：耿家四个角色与 07 沟口遭遇。
+  "Script_FirstLevelGengFamily.mjs", "Script_FirstLevelSouthMouth.mjs",
+  // 2026-10-12 0311 C 包：08–11 巷战的纯规则。
+  "Script_FirstLevelStreetFight.mjs"];

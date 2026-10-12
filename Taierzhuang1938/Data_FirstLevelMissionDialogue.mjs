@@ -47,6 +47,10 @@ export const MISSION_VOICE_CAST = Object.freeze({
   officer: ["桥头军官", "四川军官，隔着桥面喊话，命令清楚有权威"],
   usher: ["带路军人", "夜里带路的四川男兵，扯着嗓子招呼人跟上"],
   crowd: ["有人", "现场不具名的四川男声，隔着人群远远喊出来"],
+  // 2026-10-12 03–11 重构（契约 §5.2）：老耿与庄稼人是鲁南本地人，北方官话占位（用户之后按耿家庄口音改）。
+  // 妮儿听不见、不说话，不进对白表：叫声 / 笑声走音效 cue（Script_FirstLevelGengFamily）。
+  geng: ["老耿", "六十出头的鲁南庄稼汉，赶驴车的；嗓子干硬、嘴硬抠门，帮人从不说是帮；北方官话（鲁南口音），不说四川话"],
+  peasant: ["庄稼人", "鲁南本地的中年庄稼人，北方官话（鲁南口音），在集结处旁边搭话，不急不吼，像说邻家的事"],
 });
 const Cue = (id, lines, extra = {}) =>
   Object.freeze({
@@ -224,22 +228,38 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["luo", "先把那几个接下来！"],
   ]),
   // Notion 2026-09-22: stages 03–05, verbatim source and complete exchanges.
+  // 2026-10-12 03–11 重构（docs/Data_FirstLevel0311Refactor20261012Contract.md §5.2，A 包）：新 / 改的句子先写字幕、
+  // Voice 包第三波再录（缺录音按字数估时走字幕）。退出流程的 cue 标 retired:true，条目与录音都不删（清单哈希才对得上）。
+  // 03 观察口：班长在支沟观察口停下，等玩家到 4 m 内，三指 —— 守军、缺口（这两句）、右侧破墙的机枪（接 FrontBlockade）。
+  PerLine("FrontObservation", [["luo", "看到没得？那几个，下不来。"], ["luo", "就那个口子，过一个打一个。"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；不作播音腔。"}),
   PerLine("FrontBlockade", [["zhou", "右边破墙！冒火那个口子！把路封死了！"], ["luo", "周哥，顶一下！我们去拿右边！"], ["luo", "顺子，跟紧！莫走外头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("FrontApproach", [["luo", "贴这道墙！前头有人！"], ["luo", "口子压住了，进！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("FrontAttack", [["luo", "土坎前头那一伙！莫让他们压到口子上！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("FrontWithdraw", [["luo", "压下去了！前头的，下来！往沟里走！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  // 03 第一批过缺口：刘文财在沟口数人。
+  PerLine("FirstBatchCount", [["liuwencai", "一个……三个……五个！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；不作播音腔。"}),
   PerLine("TakeOverGun", [["luo", "何有田，接周哥那边！幺娃，扶他下去！"], ["zhou", "外头还有人！"], ["luo", "看到了！这边有人接，你先下去！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   // 2026-09-27 用户追加：战车露面、为什么要集束弹、往哪扔（docs/Data_FirstLevelFrontSource20260922.md 各段「用户追加」）。
-  PerLine("TankHeard", [["shunzi", "啥子在响？"], ["luo", "战车！还在路那头，先把人接下来！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("TankRoadContact", [["heyoutian", "右边路上！战车出来了！"], ["luo", "先看住跟车的！前头还有人没下来！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("TankArmor", [["luo", "莫打铁壳子！枪子儿钻不进去！"], ["luo", "打跟车的！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  // 2026-10-12 退出（契约 §1.5 取消一问一答）：录音保留，运行时不再排。
+  PerLine("TankHeard", [["shunzi", "啥子在响？"], ["luo", "战车！还在路那头，先把人接下来！"]], {retired:true,delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  // 03 战车起步（tankHeard）之后、第一批人撤完时：守军慌着喊，班长压住他先顾眼前。
+  PerLine("TankSpotted", [["guard", "战车……路那头是战车！"], ["luo", "先把人接下来！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；不作播音腔。"}),
+  PerLine("TankRoadContact", [["heyoutian", "右边路上！战车！战车！"], ["luo", "打跟车的！前头还有人没下来！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("TankArmor", [["luo", "莫打铁壳子！打跟车的！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("TankTerror", [["luo", "下来！莫站枪口上！退后墙！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("BundleOrder", [["guard", "外边旧弹药屋还有集束弹！后沟能过去！"], ["luo", "文财，看住沟口！何有田，前头交给你！"], ["luo", "顺子，跟我走后沟，去拿弹！"], ["shunzi", "前头还咋个过？"], ["luo", "莫走路上！跟到老子！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("BundleGo", [["heyoutian", "班长，快点！这边老子顶到！"], ["luo", "顺子，下沟！屋在墙后头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  // 04 缺口里倒下的守军（gapGuardKilled）：刘文财数剩下的人。
+  PerLine("GapGuardDown", [["liuwencai", "……还剩两个。"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；不作播音腔。"}),
+  // 2026-10-12 改写：守军报的不是弹药屋，是先前抱着集束弹摸过去没回来的弟兄；班长看车、看沟、停一拍再分工。
+  PerLine("BundleOrder", [["guard", "外头……先前有个弟兄抱着集束弹从支沟摸过去了，到现在没回来！"], ["luo", "文财，看住沟口！何有田，前头交给你！"], ["luo", "顺子，跟我走支沟！"], ["shunzi", "前头还咋个过？"], ["luo", "莫走路上！跟到老子！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("BundleGo", [["heyoutian", "班长，快点！这边老子顶到！"], ["luo", "顺子，下沟！贴到走！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("BundleProne", [["luo", "低点！上头看得到！"], ["luo", "前头岔口！有人下沟了！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("BundleWhy", [["shunzi", "班长，手榴弹炸得动那铁家伙？"], ["luo", "一颗不得行！五颗捆一坨，一起响，才撕得开它！"], ["shunzi", "屋头有现成的？"], ["luo", "前几天就捆好了，专门等它的！"]], {delivery:"四川兵在交通沟里边跑边说，喘着气、压着嗓子交代要紧事；不作播音腔。"}),
-  PerLine("BundleSupply", [["keeper", "里头那个箱子！就剩这些！"], ["luo", "拿起！沿刚才的沟回！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  PerLine("BundleBrief", [["luo", "听好！莫往它脸上甩，前头铁最厚！"], ["luo", "甩到履带边上，链子一断，它就走不动了！"], ["luo", "还在打，就再补一捆，丢上屁股后头那块铁板，底下是发动机！"], ["shunzi", "你咋晓得这些？"], ["luo", "山西那边，见弟兄们这么炸过！"]], {delivery:"四川兵在交通沟里边跑边说，喘着气、压着嗓子交代要紧事；不作播音腔。"}),
+  // 2026-10-12 退出（弹在沟里，不再有「屋头有现成的」）：录音保留，运行时不再排。
+  PerLine("BundleWhy", [["shunzi", "班长，手榴弹炸得动那铁家伙？"], ["luo", "一颗不得行！五颗捆一坨，一起响，才撕得开它！"], ["shunzi", "屋头有现成的？"], ["luo", "前几天就捆好了，专门等它的！"]], {retired:true,delivery:"四川兵在交通沟里边跑边说，喘着气、压着嗓子交代要紧事；不作播音腔。"}),
+  PerLine("BundleSupply", [["keeper", "里头那个箱子！就剩这些！"], ["luo", "拿起！沿刚才的沟回！"]], {retired:true,delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  // 05 捡弹点：倒下的弟兄身边。
+  PerLine("BundleFound", [["luo", "……就是他。"], ["luo", "弹还在！捡起！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；不作播音腔。"}),
+  // 2026-10-12 改写：跑动中两句（履带边 / 屁股后头那块铁板），不再一问一答。
+  PerLine("BundleBrief", [["luo", "莫往它脸上甩！甩履带边上！"], ["luo", "还在打，就再丢一捆，丢它屁股后头那块铁板！"]], {delivery:"四川兵在交通沟里边跑边说，喘着气、压着嗓子交代要紧事；不作播音腔。"}),
   PerLine("BundleReturnCall", [["heyoutian", "它又往前挤了！前头的人还卡到起！"], ["luo", "听到了！顺子，跟紧！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("BundleAttack", [["luo", "就这边！莫上大路！"], ["luo", "顺子，拿弹！旁边的人我看到！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("BundleRetreat", [["luo", "回来！低头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
@@ -276,7 +296,23 @@ export const MISSION_DIALOGUE = Object.freeze([
   ], {
     delivery: "担架员过来催，例行公事的大嗓门；老周含着烟说话，含混、赖着不肯动，最后一句是嘟囔给自己听的。",
   }),
+  // 2026-10-12 03–11 重构 B 包（契约 §3.4 / §5.2）：洼地东北沟沿上蹲着捡弹壳的妮儿，担架员冲她喊，旁边的庄稼人搭话。
+  // 第二句是鲁南北方官话占位（用户之后按耿家庄口音改）。
+  PerLine("NierShells", [
+    ["bearer", "哪家的娃儿！下来！那上头吃枪子的！"],
+    ["peasant", "老耿家的妮儿。喊不应的，你别费那个劲。"],
+  ], {
+    delivery: "担架员隔着十几米冲坡上的女娃喊，例行公事的大嗓门，带点急；庄稼人在旁边不紧不慢地接一句，像说邻家的事，北方官话，不是四川话。",
+  }),
   // 07 沿沟南行
+  // 2026-10-12 03–11 重构 B 包（契约 §3.5 / §5.2）：沟里幺娃丢弹壳逗沟沿上跟着的妮儿；SouthWhisper 在它之后。
+  Cue("NierFollow", [
+    ["yaowa", "顺哥，那个女娃儿还跟到起。"],
+    ["shunzi", "路又不是你屋头的。"],
+    ["yaowa", "嘿，还赖上了。"],
+  ], {
+    delivery: "两人走在沟里压低声音说，幺娃回头瞟沟沿上那个女娃，带笑；顺子懒洋洋地顶他一句；幺娃第二句是笑着说的，说完顺手把一颗弹壳丢上沟沿逗她。",
+  }),
   Cue("SouthWhisper", [
     ["yaowa", "你抢着来干啥子？"],
     ["shunzi", "不来，留上头挨炸？"],
@@ -284,8 +320,27 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["shunzi", "人交给他们，老子就不回来了。"],
     ["yaowa", "你来真的？"],
     ["shunzi", "你龟儿小声点。"],
+    // 2026-10-12（契约 §5.2）：原六句不改字，末尾加一句 —— 第 5→6 句之间顺子抬头看沟沿上的妮儿。
+    ["yaowa", "一个女娃儿，她懂个啥子。"],
   ], {
-    delivery: "两人并肩走在队伍里压低声音说话，全程气声偏多但每个字都要听清，脚步节奏一直在。幺娃越问越不安；顺子第四句是真话说漏了嘴，说完自己也一顿；最后一句立刻把话按住，眼睛还在瞟前头。",
+    delivery: "两人并肩走在队伍里压低声音说话，全程气声偏多但每个字都要听清，脚步节奏一直在。幺娃越问越不安；顺子第四句是真话说漏了嘴，说完自己也一顿；第六句立刻把话按住，眼睛瞟向沟沿上跟着的女娃；幺娃最后一句顺着他的眼睛看过去，小声、带点不屑，又像是替自己宽心。",
+  }),
+  // 07 沟口遭遇（Script_FirstLevelSouthMouth）：东边田埂上的机枪一响，担架停在沟口；压住了担架才冲；绕村的两个露头时刘文财喊。
+  Cue("MouthContact", [
+    ["heyoutian", "东边！机枪！"],
+    ["luo", "担架莫动！顺子，压住它！"],
+  ], {
+    delivery: "何有田在沟口土坎上第一个看见东边田埂冒火，急喊；罗班长紧接着下令，两句都短、砸下来，隔着机枪声要听清。",
+  }),
+  Cue("MouthGo", [
+    ["luo", "压住了！担架，跑！"],
+  ], {
+    delivery: "罗班长看见田埂上的机枪缩下去了，回头冲沟里的担架吼，一口气喊完，急。",
+  }),
+  Cue("MouthFlank", [
+    ["liuwencai", "有人往村里绕！"],
+  ], {
+    delivery: "刘文财在队尾看见两个日军往南绕村子，急促报警，一句话，不拖。",
   }),
   Cue("VillagePointer", [
     ["crowd", "过了村子就是桥头接运点！能走的自己跟上，担架别掉队！"],
@@ -304,6 +359,16 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["heyoutian", "外头我看着！"],
   ], {
     delivery: "罗班长刚查看完相邻房屋，一口气把判断和命令说完，语速快但清楚；何有田应一声就转身端枪，声音已经背着走开了。",
+  }),
+  // 2026-10-12 03–11 重构 C 包（契约 §3.6 / §5.2）：灶屋门口的老耿揪着妮儿出来 —— 一巴掌、指灶屋、说连屋那边进了人。
+  // 老耿是鲁南北方官话占位（用户之后按耿家庄口音改）；本轮只写文本与导演表，录音是第三波（Voice 包）。
+  Cue("GengHouse", [
+    ["geng", "死哪去了！满庄子找你！"],
+    ["geng", "当兵的！别走大街！那是俺家——灶屋连着后院，后门能绕到街后头。"],
+    ["geng", "连屋那边……刚才进了人，俺没敢过去。"],
+  ], {
+    soundscape: "村街巷口：东窗机枪顺街扫过来的点射打在墙上，碎砖落地，担架停在墙后的喘息；一个老汉揪着孩子的衣领。",
+    delivery: "北方官话（鲁南），六十出头的庄稼汉。第一句是揪住孩子骂的，气急、嗓子干硬，紧接着一巴掌；第二句转向当兵的，嘴硬但是在帮人，指着自家灶屋门说得快；第三句压低了声，带怯，说到「进了人」停一下。不哭不喊，不是戏腔。",
   }),
   // 09 灶屋—连屋近战
   Cue("MeleeRight", [
@@ -342,6 +407,25 @@ export const MISSION_DIALOGUE = Object.freeze([
   ], {
     delivery: "刘文财一声短报；罗班长立刻催全队离开，不看后面。",
   }),
+  // 2026-10-12 C 包（契约 §3.8 / §5.2）：窗口机枪打哑之后班长喊老耿开后门 —— 抱缸、拖桌、拔闩、车堵门、拽驴让路。
+  Cue("GengGate", [
+    ["luo", "通了！老人家，后门！"],
+    ["geng", "缸！缸别碰！"],
+    ["geng", "车得带走！驴也得带走！"],
+    ["luo", "往边上靠！担架先过！"],
+    ["geng", "……俺这车。"],
+  ], {
+    soundscape: "土院坝：缸底在地上拖出的闷响、桌腿刮地、门闩抽出、驴打响鼻、车轴吱呀；院外巷子里的枪声隔着墙压低。",
+    delivery: "罗班长第一句是隔着院子吼的，急；老耿第二句护着自家的缸，急得嗓子发尖，北方官话；第三句一边拖桌一边犟着说；罗班长第四句压过他，命令；老耿最后一句小声，不甘心，像是说给自己听。",
+  }),
+  Cue("CartPush", [
+    ["geng", "当兵的！搭把手！"],
+    ["luo", "你娃今天倒勤快。"],
+    ["shunzi", "……搭把手嘛。"],
+  ], {
+    soundscape: "院门门槛：车轮卡在石槛上的顿挫、人推车的闷哼、驴蹄刨地；担架队从旁边过去的脚步。",
+    delivery: "老耿冲着身边的当兵的喊，不客气，北方官话；罗班长看着顺子推车，半开玩笑地损一句，不笑出声；顺子嘴上不服气，小声顶回去，带着用力推车的气。",
+  }),
   // 11 抵达桥头接运点
   Cue("TransferSorting", [
     ["loader", "走得动的跟前头！躺着的先上车！担架别堵路！"],
@@ -353,6 +437,24 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["luo", "顺子，看住村路！别让他们进接运点！"],
   ], {
     delivery: "何有田回头看见村落方向的人影，一声短喊；罗班长立刻指派，第二句咬字重，是把责任压在顺子身上。",
+  }),
+  // 2026-10-12 C 包（契约 §3.9 / §5.2）：驴车到了接运点，老耿在车旁自说三句（把被褥卷起来给伤兵腾车板）；顺子问他往哪走。
+  Cue("GengCart", [
+    ["geng", "黑子！站好！再尥蹶子，进了城就把你卖了！"],
+    ["geng", "就这么大地方。"],
+    ["geng", "轻点！人是肉长的，不是麻袋！"],
+  ], {
+    soundscape: "桥头接运点：牛马打响鼻、车板上被褥卷起来的布响、担架搁上车板；村路方向的枪声一阵阵逼近。",
+    delivery: "老耿一个人在车旁忙，北方官话：第一句是骂驴，嘴狠心不狠；第二句是挪开被褥腾地方时自言自语，低；第三句冲抬伤兵上车的人喊，急，带着心疼。三句之间各有一两秒干活的空当。",
+  }),
+  Cue("AskGeng", [
+    ["shunzi", "老人家，往哪走？"],
+    ["geng", "进滕县城。城里有城墙，比庄上牢靠。"],
+    ["shunzi", "再往南喃？"],
+    ["geng", "再往南是临城。俺在那儿没亲没故，去干啥？"],
+  ], {
+    soundscape: "桥头接运点：人群走动、车轴吱呀、担架搁地；远处河风，村路方向零星枪声。",
+    delivery: "顺子站在车旁随口问，四川话，不客气也不刻意；老耿一边干活一边答，北方官话，第二句说得笃定；顺子第三句追问，带点试探；老耿最后一句反问，理所当然，手上活没停。",
   }),
   // 12 掩护装载与离开
   Cue("TransferDefense", [
@@ -582,6 +684,8 @@ export const MISSION_DIALOGUE = Object.freeze([
   }),
   ...MISSION_GUIDE_DIALOGUE,
 ]);
+/** 说鲁南北方官话的角色（定妆表 lang "zh-north"）；其余中国角色都是川军。 */
+export const NORTHERN_SPEAKERS = new Set(["interpreter", "geng", "peasant"]);
 export function MissionVoicePrompt(cue) {
   const cast = [...new Set(cue.lines.map((line) => line.who))]
     .map((who) => MISSION_VOICE_CAST[who].join("："))
@@ -589,11 +693,19 @@ export function MissionVoicePrompt(cue) {
   const environment = cue.soundscape || MissionVoiceSoundscape(cue.id);
   // 日语段单独交代口径；纯中文 cue 的提示词逐字保持旧模板，沿用的录音才不会白白重烘。
   const bilingual = cue.lines.some((line) => line.lang === "ja");
-  const northern = cue.lines.some(line => line.who === "interpreter");
+  // 鲁南本地人（翻译 / 老耿 / 庄稼人）说北方官话。只有翻译时句子逐字保持旧写法（沿用的录音才不会白白重烘）；
+  // 2026-10-12 03–11 重构加了老耿与庄稼人，有他们在场时点名谁说北方官话，否则「所有中国人物必须讲四川话」会把老耿念成川军。
+  const northerners = [...new Set(cue.lines.filter((line) => NORTHERN_SPEAKERS.has(line.who)).map((line) => MISSION_VOICE_CAST[line.who][0]))];
+  const northern = northerners.length > 0;
+  const onlyInterpreter = northerners.length === 1 && northerners[0] === "翻译";
+  const northText = onlyInterpreter ? "翻译只说北方官话，川军角色只说四川话。" : `${northerners.join("、")}只说北方官话，川军角色只说四川话。`;
   const rule = bilingual
-    ? `日军角色只念稿中给出的日语，用日语发音，不说中文；${northern ? "翻译只说北方官话，川军角色只说四川话。" : "中国角色只说稿中四川话。"}`
+    ? `日军角色只念稿中给出的日语，用日语发音，不说中文；${northern ? northText : "中国角色只说稿中四川话。"}`
     : "日军角色只说稿中日语。";
-  return `生成游戏战场剧情的整段连续多人对白和同场环境声，一个完整音频，一次演完。${northern ? "1938年战场：翻译必须说鲁南北方官话，川军角色必须说地道四川话，两者口音明显不同。" : "1938年四川军人，所有中国人物必须讲地道四川话，使用四川方言语调与发音，不能仅四川词汇配普通话播音。"}${cast}。${cue.delivery || "自然接话、短停顿、呼吸，角色声音明确不同且稳定。"}环境声必须录进本次完整录音：${environment}环境声保持在对白下方，整段连续不突兀截断；不加音乐，不念角色名和动作说明，不删词改词，不添加其他可辨识台词。${rule}完整对白如下：\n${cue.lines.map((line, index) => `${MISSION_VOICE_CAST[line.who][0]}：“${MissionVoiceSpoken(cue, index)}”`).join("\n")}`;
+  const accent = !northern ? "1938年四川军人，所有中国人物必须讲地道四川话，使用四川方言语调与发音，不能仅四川词汇配普通话播音。"
+    : onlyInterpreter ? "1938年战场：翻译必须说鲁南北方官话，川军角色必须说地道四川话，两者口音明显不同。"
+    : `1938年战场：${northerners.join("、")}是鲁南本地人，必须说鲁南一带的北方官话（山东口音），绝不说四川话；川军角色必须说地道四川话，使用四川方言语调与发音，两者口音明显不同。`;
+  return `生成游戏战场剧情的整段连续多人对白和同场环境声，一个完整音频，一次演完。${accent}${cast}。${cue.delivery || "自然接话、短停顿、呼吸，角色声音明确不同且稳定。"}环境声必须录进本次完整录音：${environment}环境声保持在对白下方，整段连续不突兀截断；不加音乐，不念角色名和动作说明，不删词改词，不添加其他可辨识台词。${rule}完整对白如下：\n${cue.lines.map((line, index) => `${MISSION_VOICE_CAST[line.who][0]}：“${MissionVoiceSpoken(cue, index)}”`).join("\n")}`;
 }
 // 分区兜底环境声：给没有单独写 soundscape 的 cue 用。罗班长带路短命令（Guide*）
 // 一律落到默认那条，改这里不要动到它们的提示词哈希。
@@ -627,13 +739,16 @@ const SOUNDSCAPE_ZONES = Object.freeze({
   SupportOrder: "trench",
   FrontApproach:"front",FrontAttack:"front",FrontWithdraw:"front",TankRoadContact:"front",BundleAttack:"bundle",BundleRetreat:"bundle",FrontRelief:"front",
   FrontBlockade: "front", TakeOverGun: "front", TankTerror: "front", BundleOrder: "front", TankHeard: "front", TankArmor: "front",
+  FrontObservation: "front", FirstBatchCount: "front", TankSpotted: "front", GapGuardDown: "front",
   BundleGo: "bundle", BundleProne: "bundle", BundleWhy: "bundle", BundleBrief: "bundle", BundleSupply: "bundle", BundleReturnCall: "bundle", TankStopped: "bundle",
-  Volunteer: "collection", BorrowLight: "collection", ZhouLift: "collection",
+  BundleFound: "bundle",
+  Volunteer: "collection", BorrowLight: "collection", ZhouLift: "collection", NierShells: "collection",
   SouthWhisper: "southWalk", VillagePointer: "southWalk",
-  StreetBlocked: "village", KitchenDetour: "village",
+  NierFollow: "southWalk", MouthContact: "southWalk", MouthGo: "southWalk", MouthFlank: "southWalk",
+  StreetBlocked: "village", KitchenDetour: "village", GengHouse: "village",
   MeleeRight: "village", MeleeCurse: "village", WindowOrder: "village",
-  CourtyardOpen: "courtyard", TwoLitters: "courtyard", LastLitter: "courtyard",
-  TransferSorting: "transfer", VillageRoadThreat: "transfer", TransferDefense: "transfer",
+  CourtyardOpen: "courtyard", TwoLitters: "courtyard", LastLitter: "courtyard", GengGate: "courtyard", CartPush: "courtyard",
+  TransferSorting: "transfer", VillageRoadThreat: "transfer", TransferDefense: "transfer", GengCart: "transfer", AskGeng: "transfer",
   TransferRight: "transfer", TransferBatch: "transfer", EscortZhou: "transfer",
   CartTalk: "cart",
   AircraftFirst: "air", WestDitchOrder: "air", CarryZhou: "air", AircraftReturn: "air", RescueZhou: "air",

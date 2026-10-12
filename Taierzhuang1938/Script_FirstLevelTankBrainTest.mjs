@@ -373,8 +373,10 @@ function Run(brain, world, seconds, each = null) {
   const P = FRONT_TANK_BRAIN_PATH, W = P.waypoints, I = (id) => FrontTankIndex(id);
   ok(W.length === FRONT_TANK_PATH.length && W.every((w, i) => w.id === FRONT_TANK_PATH[i].id && w.x === FRONT_TANK_PATH[i].x
     && w.z === FRONT_TANK_PATH[i].z && w.kind === FRONT_TANK_PATH[i].kind), "the brain drives Space's waypoints, same ids, coordinates and kinds");
-  ok(W[I("HullDown")].preview && W[I("HullDown")].holdS === 15 && W[I("Pressure")].holdUntil === "tankPositionPressured"
-    && W[I("Block")].holdUntil === "tankImmobilized" && W[I("Squeeze")].stage === "Tank", "pace: preview at HullDown, pressure before block, holds Block through 05");
+  // 2026-10-12 (03–11 refactor §3.1): no preview hold at HullDown any more (holdS 0, no preview flag): it is still a hullDown
+  // stop so the brain turns round on the spot, but it does not wait to be looked at.
+  ok(!W[I("HullDown")].preview && W[I("HullDown")].holdS == null && W[I("HullDown")].kind === "hullDown" && W[I("Pressure")].holdUntil === "tankPositionPressured"
+    && W[I("Block")].holdUntil === "tankImmobilized" && W[I("Squeeze")].stage === "Tank", "pace: HullDown turns round without a preview hold, pressure before block, holds Block through 05");
   ok(Dist(W[I("HullDown")].faceTo, FRONT_SPACE.tankTargets.nest) < 1e-9 && Dist(W[I("Block")].faceTo, FRONT_SPACE.tankTargets.gap) < 1e-9,
     "faceTo names resolve to FRONT_SPACE.tankTargets");
   ok(W[I("Block")].escortSlots === FRONT_TANK_ESCORT_SLOTS && FRONT_TANK_ESCORT_SLOTS.length === 4, "block escorts take Space's four crater slots");
@@ -413,7 +415,7 @@ function Run(brain, world, seconds, each = null) {
   const step = (seconds, fn) => Run(brain, world, seconds, (o, b) => {
     t += DT;
     for (const e of o.events) if (e.id === "stop") stops.push({ index: e.index, t });
-    if (o.drive.waypoint?.preview && previewAt == null) previewAt = t;
+    if (o.drive.waypoint?.id === "HullDown" && previewAt == null) previewAt = t;
     for (const f of o.fire) if (f.weapon === "main" && firstShellAt == null) firstShellAt = t;
     // Moving: the hull points along the road (no sideways slide), including off the switchback.
     // Measured against the real motion (frame-to-frame displacement), not the path ahead.
@@ -423,9 +425,9 @@ function Run(brain, world, seconds, each = null) {
     fn?.(o, b);
   });
   step(45);
-  ok(previewAt != null && previewAt < 45, `03: reaches the hull-down preview on the switchback (${previewAt?.toFixed(1)} s)`);
+  ok(previewAt != null && previewAt < 45, `03: reaches the switchback top (${previewAt?.toFixed(1)} s)`);
   step(40);
-  ok(brain.holdIndex === I("Bend") && stops.some((s) => s.index === I("HullDown")), "03: after the preview it waits behind NorthRuin at the bend for 04");
+  ok(brain.holdIndex === I("Bend") && stops.some((s) => s.index === I("HullDown")), "03: it turns round at the switchback (a stop, no hold) and waits behind NorthRuin at the bend for 04");
   ok(departedHullDown && Math.abs(Wrap(departedHullDown.yaw - YawTo(W[I("HullDown")], W[I("Descent")]))) < TANK.drive.pivotThresholdRad,
     "03: it turns round on the spot before leaving the switchback (≈160°)");
   // Sharp bends are taken at speed with a turn-rate-limited hull (35° at Descent, hidden behind NorthRuin; the old temp

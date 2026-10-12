@@ -128,7 +128,7 @@ const smokeLive=[...vfx.battleSmoke.handles.values()].flat().reduce((n,id)=>n+vf
 const smokeBudget=BattleSmokeParticleBudget(vfx.battleSmoke.sources.values(),'low');
 assert.ok(smokeLive>=smokeBudget*.7&&smokeLive<=smokeBudget,"low quality retains all districts with bounded, living cohorts");
 const ultra=BattleSmokeParticleBudget(vfx.battleSmoke.sources.values(),"ultra");
-assert.equal(ultra,63,"all qualities retain one complete field per source");
+assert.equal(ultra,64,"all qualities retain one complete field per source");
 for(const attribute of Object.values(vfx.battleSmoke.geometry.attributes)) {
   assert.ok(Array.from(attribute.array).every(Number.isFinite),"GPU attributes stay finite");
 }

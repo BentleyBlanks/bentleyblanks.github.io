@@ -5,8 +5,10 @@ import { SampleMissionTerrain, MissionPathDistance } from "./Data_FirstLevelMiss
 
 // Authored environmental storytelling, not a historical casualty census. Reuse the
 // two existing adult civilian models and settled poses; no new generated assets.
+// 2026-10-12 03–11 重构 C 包（契约 §1.6 / §3.6）：08–10 的村子是耿家庄，灶屋 / 连屋是老耿家 ——
+// 两间屋外的百姓尸体撤掉（Kitchen / ConnectedHouse 从这张表退出；机枪屋那一组照旧）。
 export const MISSION_CIVILIAN_AFTERMATH_HOUSES = Object.freeze([
-  "Kitchen", "ConnectedHouse", "MachineGunHouse", "VillageEdgeHouse",
+  "MachineGunHouse", "VillageEdgeHouse",
   "VillageRearHouse", "RearFarm", "SouthFieldHouse", "NorthFarm",
   "NorthRuin", "RearCourtyardHouse", "ReceptionStreetRoom", "WestFieldHouse",
 ]);

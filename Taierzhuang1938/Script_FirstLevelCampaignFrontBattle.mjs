@@ -13,6 +13,7 @@ import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { TANK } from "./Data_Tuning_Tank.mjs";
 import { FIRST_LEVEL_CHECKPOINT_FRONT_LOST } from "./Data_FirstLevelMissionStages.mjs";
+import { FRONT_NEST_FRONT_POSTS } from "./Data_FirstLevelMissionFront.mjs";
 import { InstallSpeakerActing, CheckFrontActing } from "./Script_FirstLevelCampaignOpening.mjs";
 
 // --front-clear-from-door: see ClearNestFromDoor below (opt-in, not the gate default since the 09-25 review).
@@ -35,7 +36,7 @@ export async function DriveFrontBattle(ctx){
           if(!close&&D.StepHome()){g.StepFrames(1,1/60,false);continue;}
           const foe=fight?D.Target(90):close;
           if(foe)window.MissionInputDriver.Shoot(foe);else {g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);D.Rearm();}
-          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          if(g.player.bleeding&&g.player.health<80||g.player.health<45&&(g.player.bandages||0)>0)g.Debug.Key("KeyB");
           g.StepFrames(1,1/60,false);
         }
         g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
@@ -221,7 +222,7 @@ export async function DriveFrontBattle(ctx){
           if(foe)window.MissionInputDriver.Shoot(foe);
           else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
             if(g.state.activeSlot==="melee")g.Debug.Key("Digit1");if(g.state.ammo===0)g.Debug.Key("KeyR");}
-          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          if(g.player.bleeding&&g.player.health<80||g.player.health<45&&(g.player.bandages||0)>0)g.Debug.Key("KeyB");
           g.StepFrames(1,1/60,false);
         }
         g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
@@ -335,7 +336,7 @@ export async function DriveFrontBattle(ctx){
           const evading=window.MissionInputDriver.EvadeGrenade(),foe=evading?null:window.MissionInputDriver.Target(90);
           if(foe)window.MissionInputDriver.Shoot(foe);
           else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);if(g.state.activeSlot==="melee")g.Debug.Key("Digit1");if(g.state.ammo===0)g.Debug.Key("KeyR");}
-          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          if(g.player.bleeding&&g.player.health<80||g.player.health<45&&(g.player.bandages||0)>0)g.Debug.Key("KeyB");
           g.StepFrames(1,1/60,false);
         }
         g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
@@ -482,10 +483,12 @@ export async function DriveFrontBattle(ctx){
         const evading=window.MissionInputDriver.EvadeGrenade();
         // Anyone who walks up to the junction is answered like a player would (09-25 TankProbe: flank man A came
         // through the abandoned nest to the rear door, 1.1 m off, and bled the waiting bot out while it only watched).
-        const close=evading?null:window.MissionInputDriver.Target?.(8);
+        // 2026-10-12 second round: once the Japanese are in the nest's front half (nestFrontContested, 10-14 m off), the
+        // fight across the yard is 04's gate (nestFrontCleared) - the bot shoots them like a player would.
+        const close=evading?null:window.MissionInputDriver.Target?.(r.Has("nestFrontContested")&&!r.Has("nestFrontCleared")?20:8);
         if(close)window.MissionInputDriver.Shoot(close);
         else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);}
-        if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+        if(g.player.bleeding&&g.player.health<80||g.player.health<45&&(g.player.bandages||0)>0)g.Debug.Key("KeyB");
         g.StepFrames(1,1/60,false);
         if(!evading&&Math.hypot(g.player.position.x-x,g.player.position.z-z)>2.5)break;
       }
@@ -494,6 +497,10 @@ export async function DriveFrontBattle(ctx){
       return {stage:r.flow.stage.id,alive:g.player.alive,d:Math.hypot(p.x-x,p.z-z),at:[+p.x.toFixed(2),+p.z.toFixed(2)]};
     },S.rear);
     if(wait.stage==="Tank"||!wait.alive)break;
+    // The beat of the second round: the men in the front half, seen across the yard from the junction (one picture).
+    if(!ctx.nestFrontShot&&await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().Has("nestFrontContested"))){
+      ctx.nestFrontShot=true;await CaptureFocus("NestFrontContested",FRONT_NEST_FRONT_POSTS[1]);
+    }
     if(wait.d>2.5){
       console.log("RIGHT_REAR_REJOIN",JSON.stringify(wait));
       // Back the way the dodge went: along the ammo-house trench (S.route starts at the junction), from its nearest corner.
@@ -506,12 +513,13 @@ export async function DriveFrontBattle(ctx){
   await EntryState("Tank","continuous");
   }
   await CaptureFocus("RightRearJunction",S.attackRoute[1]);
-  await Route([...Routes.bundle,{x:A.bundle.x,z:A.bundle.z+1}],"AmmoHouseCoveredBranch",{stance:"crouch",fight:true,crawl:true});
+  // 2026-10-12 (03–11 refactor §3.3): up the attack branch to the fallen comrade in its middle leg, pick the bundles up
+  // beside him (F), on to the attack position. The sap infiltrators come in behind (sapInfiltrationStarted): fight on the way.
+  await Route([...S.attackRoute.slice(0,3),{x:A.bundleDrop.x+.5,z:A.bundleDrop.z+.4}],"SapBundleDrop",{stance:"crouch",fight:true,crawl:true});
+  await WaitFact("bundleRouteTraversed",20,true);
   await Interact();
   let state=await State();assert.ok(state.facts.includes("bundleTaken"));assert.ok(state.facts.includes("bundleRouteTraversed"));
-  await CaptureFocus("AmmoHouse",A.bundle);
-  await Route(Routes.bundleReturn,"SameBranchReturn",{stance:"crouch",fight:true,crawl:true});
-  await WaitFact("bundleReturned",90,true);
+  await CaptureFocus("BundleDrop",A.bundleDrop);
   // --bomb-first (contract v1.1 deadlock ②, a non-ideal order the ideal drive never hits): stop on the attack branch
   // one bend (about 5 m) short of the attack position and finish the tank from there. attackPositionReached must then
   // be recorded as skipped and 05 must go on to the withdrawal like the ideal order.
@@ -519,7 +527,8 @@ export async function DriveFrontBattle(ctx){
   const bombFirst=!!ctx.options.bombFirst||process.argv.includes("--bomb-first");
   const throwFrom=bombFirst?S.attackRoute.findIndex(p=>Math.hypot(p.x-S.throw.x,p.z-S.throw.z)<6)+1:S.attackRoute.length;
   assert.ok(throwFrom>1&&throwFrom<S.attackRoute.length+(bombFirst?0:1),"the attack branch has a throwing point short of the attack position");
-  await Route(S.attackRoute.slice(0,throwFrom),"RoadsideAttackBranch",{stance:"crouch",fight:true,crawl:true});
+  // From the drop (between attackRoute[2] and [3]) on: the leg behind the body is already walked.
+  await Route(S.attackRoute.slice(3,throwFrom),"RoadsideAttackBranch",{stance:"crouch",fight:true,crawl:true});
   // Bomb-first: that corner is 5.9 m short, beyond a bundle's reach of the tank at Block (both throws of run L4 fell
   // 4.4 m short, tank intact, no Luo finish without a cut track). Creep on toward the attack position and stop just
   // outside its radius (B.attackArrivalM), where the fact still cannot be recorded.
@@ -545,7 +554,7 @@ export async function DriveFrontBattle(ctx){
         const shots0=tr?.log.shots.length??0,bursts0=tr?.brain?.telemetry.bursts.length??0;
         if(g.player.stance==="stand")g.Debug.Key("KeyC");
         for(let f=0;f<9*60&&g.player.alive&&r.tank.damageState==="MobilityKill";f++){
-          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          if(g.player.bleeding&&g.player.health<80||g.player.health<45&&(g.player.bandages||0)>0)g.Debug.Key("KeyB");
           // A tank escort walking up during the hold is answered like a player would (09-24 TankProbe run R: escort C
           // shot and bayoneted the crouched thrower from 1.8 m while the hold only watched the tank).
           const close=window.MissionInputDriver?.Target?.(8);

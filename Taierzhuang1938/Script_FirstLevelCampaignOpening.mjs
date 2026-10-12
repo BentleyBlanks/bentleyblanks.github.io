@@ -874,6 +874,11 @@ export const FRONT_LINES_OUT_OF_PICTURE = Object.freeze({
   "TankStopped.03": "刘文才在沟口（约 67 m）招呼后面的人跟上",
   "ZhouLift.01": "担架员是集结处的立即模式人群（FirstLevelCollection.Draw），没有能绑脸的身体",
   "ZhouLift.03": "同上，担架员没有能绑脸的身体",
+  // 2026-10-12 03–05 重构（A 包）：观察口与阵位里隔着几十米的喊话。
+  "FrontBlockade.01": "老周在左枪位（约 29 m）隔着缺口冲罗班长喊；玩家在观察口顺着罗班长的手臂看土坎背坡的守军，老周的枪在画面左远处",
+  "FirstBatchCount.01": "刘文财在支沟口（约 50 m）看着第一批守军进沟数人；玩家这时在夺下的阵位机枪后看缺口",
+  "TankSpotted.01": "土坎背坡里一个守军（约 24 m，隔着土坎）听见履带声喊战车；玩家在阵位机枪后，他本来就在视线外",
+  "GapGuardDown.01": "刘文财在支沟口（约 53 m）看着缺口里倒下的守军数剩下的人；玩家在阵位机枪后盯着右前方的战车",
 });
 /**
  * Near lines shouted in the thick of a fight, one reason each: excused only when either side really was fighting through
@@ -897,6 +902,8 @@ export const FRONT_LINES_IN_FIREFIGHT = Object.freeze({
   "TankStopped.02": "战车刚停，罗班长朝缺口喊守军下来；玩家边撤边打剩下的跟车步兵",
   "BundleAttack.01": "攻击位：罗班长在投弹点西侧 1.5 m 到位时喊「就这边！莫上大路！」，玩家正对着战车和跟车护兵（09-25 Front step 2 驾驶：115 帧全在打）",
   "BundleAttack.02": "攻击位上罗班长在投弹点西侧 1.5 m 喊「顺子，拿弹！旁边的人我看到！」，玩家正瞄着战车和跟车步兵",
+  // 2026-10-12 03–05 重构（A 包）第二轮：第一批撤完那一拍罗班长在阵位里喊「先把人接下来！」，玩家在缴获机枪上压着缺口。
+  "TankSpotted.02": "第一批守军撤完、战车发动机响起时，罗班长在阵位里身旁 3 m 喊「先把人接下来！」；玩家在缴获机枪上压着缺口和土坎（第二轮 03→07 第 2 趟：说话时玩家背对他在打）",
 });
 export const FRONT_LINE_FIGHT_SHARE = .5;
 /** A speaker counts as firing for this long after his last shot (s): a rifleman's bolt cycle and an MG burst pause. */

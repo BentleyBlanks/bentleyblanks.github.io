@@ -43,7 +43,7 @@ import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner
 import { PROJECTION_DB, LINE_MASTER, LineDirection, FIRST_LEVEL_DIALOGUE_DIRECTION } from "./Data_FirstLevelDialogueDirection.mjs";
 import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, Pool, requestStats,
   SEED_AUDIO_MODEL, MasterSceneWav, EncodeSegment, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines, TruePeakDb, StripLaughter,
-  IsolatedBursts, MuteRanges, PitchShiftWav, EncodeLevelMatched, LoopSpan, PITCH_SHIFT_METHOD }
+  IsolatedBursts, MuteRanges, PitchShiftWav, EncodeLevelMatched, LoopSpan, PITCH_SHIFT_METHOD, DecodePcm }
   from "./Script_SeedAudioVoiceKit.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url)),
@@ -62,6 +62,8 @@ const jobs = Math.min(2, Math.max(1, Number.parseInt(Arg("jobs") ?? "2", 10) || 
 const patchTakes = Math.min(3, Math.max(1, Number.parseInt(Arg("takes") ?? "1", 10) || 1));
 const patchLines = Arg("patch")?.split(",").filter(Boolean) || [];
 const remasterLines = Arg("remaster")?.split(",").filter(Boolean) || [];
+// --reject=Cue:n:理由  整段 cue（挂参考音的）第 n 条 take 由外面的取证判成硬错误（逐句认嗓等烘焙时量不到的），下一次跑再抽一条
+const wholeRejects = (Arg("reject")?.split(",").filter(Boolean) || []).map((p) => { const [id, n, ...why] = p.split(":"); return { id, n: Number(n), why: why.join(":") || "外部取证判为硬错误" }; });
 const forcedScenePicks = new Map((Arg("pick")?.split(",") || []).filter(Boolean).map((p) => {
   const at = p.lastIndexOf(":");
   return [p.slice(0, at), Number(p.slice(at + 1))];
@@ -263,6 +265,18 @@ async function GenerateAttempt(cue, n) {
   console.log(`${cue.id}#${n}: ${result.bytes.length} bytes`);
 }
 
+/** 片段与整段 mp3 同一段解码后的波形相关（与 Script_FirstLevelVoiceTest 的 CompareToScene 同一口径：16 kHz、±20 ms 找最佳对齐）。 */
+function SliceSceneCorrelation(sliceFile, sceneFile, startS, endS) {
+  const sr = 16000, a = DecodePcm(sliceFile, sr), whole = DecodePcm(sceneFile, sr);
+  const s0 = Math.round(startS * sr), n = Math.min(a.length, Math.round((endS - startS) * sr));
+  let best = -1;
+  for (let lag = -320; lag <= 320; lag += 4) {
+    let xy = 0, xx = 0, yy = 0;
+    for (let i = 160; i < n - 160; i++) { const y = whole[s0 + i + lag] || 0, x = a[i]; xy += x * y; xx += x * x; yy += y * y; }
+    best = Math.max(best, xy / Math.sqrt(xx * yy + 1e-12));
+  }
+  return best;
+}
 /** 母带 + 对字 + 切句（不打分）。真峰值超了整段统一再降，最多三轮。 */
 function Cut(cue, n) {
   const dir = AttemptDir(cue, n);
@@ -340,7 +354,7 @@ function Cut(cue, n) {
     });
     slices.forEach((s, i) => { s.gapBeforeS = i ? +(s.startS - slices[i - 1].endS).toFixed(3) : 0; });
     const sceneMp3 = EncodeSegment(wav, path.join(dir, "scene.mp3"), { fadeS: 0 });
-    files = slices.map((s, i) => EncodeLine(cue, i, s, wav, path.join(dir, `line_${String(i + 1).padStart(2, "0")}.mp3`)));
+    files = slices.map((s, i) => EncodeLine(cue, i, s, wav, path.join(dir, `line_${String(i + 1).padStart(2, "0")}.mp3`), sceneMp3));
     const peaks = [sceneMp3, ...files].map(TruePeakDb);
     const worst = Math.max(...peaks);
     master.measure = { ...measure, truePeakDb: +peaks[0].toFixed(2) };
@@ -369,11 +383,19 @@ function Cut(cue, n) {
  * （2026-10-12 R4-Voice CaptiveWoundTwist）从整段保共振峰变调后的 wav 上切同一段，电平补回不变调那一片（片段不单独归一的
  * 口径不破：补的只是 rubberband 吃掉的那几 dB），s.pitchShift 记半音数、方法、补的增益与渲染延迟。
  */
-function EncodeLine(cue, i, s, wav, output) {
+function EncodeLine(cue, i, s, wav, output, sceneMp3) {
   const d = LineDirection(cue, i);
   const options = { startS: s.startS, endS: s.endS, fadeS: d.loop ? LINE_MASTER.loopFadeS : LINE_MASTER.crossfadeS, tempo: d.tempo ?? 1 };
+  if (!d.pitchShift) {
+    // 片段必须就是整段里那一段（门禁：解码后波形相关 ≥ 0.98）。很短、基频很低的片段（2026-10-12 BundleFound.01「……就是他」0.71 s、77 Hz）
+    // 96k 单独编码与整段 mp3 的帧边界对不齐，相关只有 0.969；这种片段逐级抬码率重编（128k 0.984），电平与长度不变。
+    for (const bitrate of ["96k", "128k", "192k"]) {
+      EncodeSegment(wav, output, { ...options, bitrate });
+      if (options.tempo !== 1 || SliceSceneCorrelation(output, sceneMp3, s.startS, s.endS) >= 0.98) { if (bitrate !== "96k") s.bitrate = bitrate; break; }
+    }
+    return output;
+  }
   EncodeSegment(wav, output, options);
-  if (!d.pitchShift) return output;
   const plain = MeasureVoice(output).activeRmsDb, shifted = output.replace(/\.mp3$/, `.pitch${d.pitchShift.semitones}.wav`);
   const { lagS } = PitchShiftWav(wav, shifted, d.pitchShift.semitones);
   const { gainDb } = EncodeLevelMatched(shifted, output, options, plain);
@@ -450,6 +472,8 @@ function Judge(results) {
     else if (s.cer != null && s.cer > SCENE_CHECK.maxCer) r.flags.push(`${line.id} 字错率 ${s.cer} 待逐字核对「${s.transcript}」`);
   }
   for (const r of results) {
+    // 整段母带的信噪比低于门禁的 30 dB（干声带了底噪 / 环境声）也是硬错误：--audio 门禁按它红，装上去只能重抽（2026-10-12 GapGuardDown 25.9 dB）。
+    if (r.master?.measure && r.master.measure.snrDb < LINE_PICK.minSnrDb) r.hard.push(`整段信噪比 ${r.master.measure.snrDb} dB 低于 ${LINE_PICK.minSnrDb}`);
     fs.writeFileSync(path.join(AttemptDir(r.cue, r.n), "judge.json"), JSON.stringify({ hard: r.hard, flags: r.flags,
       lines: r.slices?.map(({ file, ...s }) => s) || null, master: r.master || null }, null, 1));
   }
@@ -565,6 +589,7 @@ function Install(cue, best, all, manifestLines, scenes, timings, manifest, picke
       sceneSha256: sceneSha, sceneStartS: s.startS, sceneEndS: s.endS, gapBeforeS: s.gapBeforeS,
       tight: [!!s.tightStart, !!s.tightEnd], edgeDb: s.edgeDb, cutMethod: best.master.cutMethod || "subtitle",
       ...(s.tempo ? { tempo: s.tempo } : {}), ...(s.pitchShift ? { pitchShift: s.pitchShift } : {}), ...(s.loop ? { loop: s.loop } : {}),
+      ...(s.bitrate ? { bitrate: s.bitrate } : {}),
       castOwner: own?.owner || CastVoiceOwner(SceneVoice(cue, line.who)), castSha256: own?.sha256 || null, referenced: RefIndex(refs, line.who) >= 0,
       metrics: { activeRmsDb: s.measure.activeRmsDb, truePeakDb: s.measure.truePeakDb, snrDb: s.measure.snrDb,
         voicedS: s.measure.voicedS, lowShare: s.measure.lowShare, f0: s.measure.f0, cer: s.cer, transcript: s.transcript,
@@ -939,6 +964,76 @@ async function PatchLines(manifest) {
 // ============================================================================
 // 整段录音（旧格式，07–18 与待下线的 09.21 旧 cue）—— 行为不变
 // ============================================================================
+//
+// 2026-10-12 D 包（03–11 重构契约 §5.2）：下面名单里的整段 cue 生成时挂定妆参考音（最多 3 条，@音频N 指派说话人，
+// 与 01–06 场景同一套 SceneReferences），老耿五场是同一个嗓子、川军与 01–06 里是同一个人。不在名单里的整段 cue
+// 提示词、请求与清单条目逐字不变（沿用的录音不重烘）。名单里的 cue 另做一道客观检查（WHOLE_CHECK）：削波、
+// 转写对上的字太少（漏句）、多念 —— 硬错误才整条重抽，同一条最多 3 次，装上的那次仍记 requests: 1。
+
+export const WHOLE_CUE_REFERENCED = new Set(["NierFollow", "SouthWhisper", "MouthContact", "MouthGo", "MouthFlank",
+  "GengHouse", "GengGate", "CartPush", "GengCart", "AskGeng"]);
+// echoChars：转写里出现参考音定妆独白的连续 ≥ 这么多字、而稿里没有 = 模型把参考音的内容念出来了（2026-10-12 GengCart 两条
+// take 都接着念了老耿定妆独白里「缸别碰 / 车得带走 / 俺这车可不是白给人用的」—— 当时的定妆台词与剧情台词重合，已换成非剧情独白）。
+export const WHOLE_CHECK = Object.freeze({ maxAttempts: 3, minCoverage: 0.4, extraChars: 0.3, clipRuns: 3, echoChars: 5 });
+const wholeWork = path.join(worktree, "tmp", "voice", "whole");
+
+/** 这条整段 cue 挂的参考音（名单外为空）。 */
+export function WholeCueReferences(cue) {
+  return WHOLE_CUE_REFERENCED.has(cue.id) ? SceneReferences(cue) : [];
+}
+/**
+ * 整段 cue 的提示词。名单外 = MissionVoicePrompt 逐字不变；名单内在台词前加「@音频N 是谁的声音」、没参考音的人照人设，
+ * 台词每行以 @音频N 开头（01–06 实测这种写法绑说话人最准，VoiceSync §0.1）。
+ */
+export function WholeCuePrompt(cue) {
+  const base = MissionVoicePrompt(cue);
+  const refs = WholeCueReferences(cue);
+  if (!refs.length) return base;
+  const marker = "完整对白如下：\n";
+  const at = base.indexOf(marker);
+  if (at < 0) throw new Error(`${cue.id}: whole-cue prompt has no script marker`);
+  const refText = refs.map((r, i) => `@音频${i + 1} 是${r.who.map(Name).join("、")}的声音`).join("，")
+    + (refs.length > 1 ? "；每个角色严格保持自己那条参考音的音色、年龄感和口音，谁的句子就用谁的嗓子，绝不串嗓。" : "；严格保持参考音的音色、年龄感和口音。");
+  const unreferenced = [...new Set(cue.lines.map((line) => line.who))].filter((who) => RefIndex(refs, who) < 0);
+  const unrefText = unreferenced.length
+    ? `${unreferenced.map(Name).join("、")}没有参考音：照人设用他自己的嗓子，和每一条参考音都必须明显不是同一个人。` : "";
+  const script = cue.lines.map((line, i) => {
+    const k = RefIndex(refs, line.who);
+    return `${k >= 0 ? `@音频${k + 1} ` : ""}${Name(line.who)}：“${MissionVoiceSpoken(cue, i)}”`;
+  }).join("\n");
+  return `${base.slice(0, at)}${refText}${unrefText}台词如下，每行开头的 @音频N 就是这一句该用的嗓子；按顺序念，不念 @音频N、角色名和编号，不加、不删、不改字：\n${script}`;
+}
+/** 整段 take 的客观检查（我们听不见）：削波、转写字数对不上稿面（漏句 / 多念）。 */
+function JudgeWholeTake(cue, rawFile, refs = []) {
+  const spoken = cue.lines.map((_, i) => MissionVoiceSpoken(cue, i)).join("");
+  const lang = cue.lines.every((line) => line.lang === "ja") ? "ja" : "zh";
+  const texts = Transcribe([{ file: rawFile, lang, text: spoken }]);
+  const t = texts?.[rawFile] || null;
+  const Letters = (text) => [...String(text ?? "")].filter((c) => /[\p{L}\p{N}]/u.test(c)).join("");
+  const want = Letters(spoken).length;
+  const got = t ? Letters(StripLaughter(t.text || "", spoken)).length : null;
+  const clipRuns = ClipRuns(rawFile);
+  const hard = [], flags = [];
+  if (clipRuns >= WHOLE_CHECK.clipRuns) hard.push(`削波 ${clipRuns} 处`);
+  if (got != null && got < want * WHOLE_CHECK.minCoverage) hard.push(`转写只对上 ${got}/${want} 字（漏句）「${t.text}」`);
+  else if (got != null && got - want > Math.max(6, want * WHOLE_CHECK.extraChars)) hard.push(`多念 ${got - want} 字「${t.text}」`);
+  // 念了参考音的内容：转写里有定妆独白的连续 echoChars 个字、而稿里没有这一串。
+  if (t) {
+    const hyp = Letters(t.text), script = Letters(spoken);
+    for (const r of refs) {
+      const sample = Letters(FIRST_LEVEL_VOICE_CAST[r.owner]?.sample);
+      let echoed = null;
+      for (let i = 0; i + WHOLE_CHECK.echoChars <= sample.length && !echoed; i++) {
+        const run = sample.slice(i, i + WHOLE_CHECK.echoChars);
+        if (hyp.includes(run) && !script.includes(run)) echoed = run;
+      }
+      if (echoed) hard.push(`念了 ${r.who.map(Name).join("、")} 定妆独白的内容「…${echoed}…」「${t.text}」`);
+    }
+  }
+  if (!t) flags.push("whisper 不可用，没核转写");
+  else if (t.cer > SCENE_CHECK.maxCer) flags.push(`字错率 ${t.cer}（整段带环境声，四川话同音字为主）「${t.text}」`);
+  return { cer: t?.cer ?? null, transcript: t?.text ?? null, lengthDiff: got == null ? null : got - want, clipRuns, hard, flags };
+}
 
 function WriteGuideAlignment(manifest) {
   const entries = MISSION_DIALOGUE.filter(cue => cue.guidance && manifest.cues[cue.id]);
@@ -1073,19 +1168,16 @@ async function Main() {
   await BakeScenes(manifest);
   const queue = MISSION_DIALOGUE.filter((cue) => !cue.perLine && (!selected || selected.includes(cue.id)));
   for (const cue of queue) {
-    const prompt = MissionVoicePrompt(cue);
+    const prompt = WholeCuePrompt(cue);
     if (prompt.length > 3000) throw new Error(`Seed Audio prompt exceeds 3000 characters: ${cue.id}`);
   }
   if (dry) {
     let pending = 0;
     for (const cue of queue) {
-      const prompt = MissionVoicePrompt(cue),
-        hash = crypto.createHash("sha256").update(prompt).digest("hex");
-      const current = !force && manifest.cues[cue.id]?.promptHash === hash
-        && (manifest.cues[cue.id]?.speechRate ?? 0) === (cue.speechRate ?? 0)
-        && fs.existsSync(path.join(out, cue.file));
+      const prompt = WholeCuePrompt(cue), refs = WholeCueReferences(cue);
+      const current = WholeCueUpToDate(cue, manifest);
       if (!current) pending++;
-      console.log(`${cue.id}: ${cue.lines.length} lines, ONE request, ${prompt.length} characters, ${current ? "up-to-date" : "NEEDS BAKE"}`);
+      console.log(`${cue.id}: ${cue.lines.length} lines, ONE request, ${prompt.length} characters${refs.length ? `, refs ${refs.map((r) => r.owner).join("/")}` : ""}, ${current ? "up-to-date" : "NEEDS BAKE"}`);
     }
     console.log(`${queue.length} whole cues, ${pending} need baking`);
     return;
@@ -1105,11 +1197,52 @@ async function Main() {
   console.log(`requests ${requestStats.requests}, retries ${requestStats.retries}, failures ${requestStats.failures}`);
   if (failure) throw failure;
 }
+function WholeCueUpToDate(cue, manifest) {
+  const entry = manifest.cues[cue.id];
+  return !force && entry?.promptHash === crypto.createHash("sha256").update(WholeCuePrompt(cue)).digest("hex")
+    && (entry.speechRate ?? 0) === (cue.speechRate ?? 0)
+    && (entry.castKey ?? "") === WholeCueReferences(cue).map((r) => r.sha256).join(",")
+    && fs.existsSync(path.join(out, cue.file));
+}
+/**
+ * 挂参考音的整段 cue：一次一条，客观检查有硬错误才再抽，最多 WHOLE_CHECK.maxAttempts 次；原始 take 与检查结果留在
+ * tmp/voice/whole/（同提示词、同参考音的旧 take 直接复用，不再发请求）。返回装上的那条：{ bytes, n, judged, attempts }。
+ */
+async function GenerateWholeReferenced(cue, prompt, refs) {
+  fs.mkdirSync(wholeWork, { recursive: true });
+  const promptHash = Hash(prompt), castKey = refs.map((r) => r.sha256).join(",");
+  const RawOf = (n) => path.join(wholeWork, `${cue.id}_${n}.raw.mp3`), MetaOf = (n) => path.join(wholeWork, `${cue.id}_${n}.json`);
+  for (const reject of wholeRejects.filter((r) => r.id === cue.id)) {
+    const meta = ReadJson(MetaOf(reject.n));
+    if (!meta) throw new Error(`${cue.id}: no take #${reject.n} to reject`);
+    if (!meta.judged.hard.includes(reject.why)) { meta.judged.hard.push(reject.why); fs.writeFileSync(MetaOf(reject.n), JSON.stringify(meta, null, 1)); }
+    console.log(`${cue.id}#${reject.n}: rejected (${reject.why})`);
+  }
+  const takes = [];
+  for (let n = 1; n <= WHOLE_CHECK.maxAttempts; n++) {
+    let meta = ReadJson(MetaOf(n));
+    if (!meta || meta.promptHash !== promptHash || meta.castKey !== castKey || !fs.existsSync(RawOf(n))) {
+      if (takes.length && !takes.at(-1).judged.hard.length) break;   // 上一条没有硬错误：不再抽
+      const result = await SeedAudioSpeak({ prompt, references: refs.map((r) => r.file), speechRate: cue.speechRate ?? 0, subtitle: false, label: `${cue.id}#${n}` });
+      fs.writeFileSync(RawOf(n), result.bytes);
+      Probe(RawOf(n));
+      const judged = JudgeWholeTake(cue, RawOf(n), refs);
+      meta = { promptHash, castKey, references: refs.map((r) => ({ who: r.who, owner: r.owner, castSha256: r.sha256 })), judged, generatedAt: new Date().toISOString() };
+      fs.writeFileSync(MetaOf(n), JSON.stringify(meta, null, 1));
+      console.log(`${cue.id}#${n}: ${result.bytes.length} bytes, ${judged.hard.length ? "HARD " + judged.hard.join("；") : "ok"}${judged.flags.length ? " | " + judged.flags.join("；") : ""}`);
+    }
+    takes.push({ n, judged: meta.judged, file: RawOf(n) });
+    if (!meta.judged.hard.length) break;
+  }
+  const best = [...takes].sort((a, b) => (a.judged.hard.length - b.judged.hard.length) || ((a.judged.cer ?? 1) - (b.judged.cer ?? 1)) || (a.n - b.n))[0];
+  return { bytes: fs.readFileSync(best.file), n: best.n, judged: best.judged,
+    attempts: takes.map((t) => ({ n: t.n, hard: t.judged.hard, flags: t.judged.flags.length, cer: t.judged.cer, lengthDiff: t.judged.lengthDiff, clipRuns: t.judged.clipRuns })) };
+}
 async function Bake(cue, manifest, raw) {
-  const prompt = MissionVoicePrompt(cue),
+  const prompt = WholeCuePrompt(cue), refs = WholeCueReferences(cue),
     hash = crypto.createHash("sha256").update(prompt).digest("hex");
   const output = path.join(out, cue.file);
-  if (!force && manifest.cues[cue.id]?.promptHash === hash && (manifest.cues[cue.id]?.speechRate??0)===(cue.speechRate??0) && fs.existsSync(output)) {
+  if (WholeCueUpToDate(cue, manifest) && !wholeRejects.some((r) => r.id === cue.id)) {
     Probe(output);
     if (cue.guidance) WriteGuideAlignment(manifest);
     return;
@@ -1117,7 +1250,8 @@ async function Bake(cue, manifest, raw) {
   const apiKey = process.env.VOLCENGINE_API_KEY;
   if (!apiKey)
     throw new Error("VOLCENGINE_API_KEY is required in the environment; do not store credentials in files");
-  const bytes = await Generate(cue, prompt, apiKey);
+  const take = refs.length ? await GenerateWholeReferenced(cue, prompt, refs) : { bytes: await Generate(cue, prompt, apiKey), n: 1, judged: null, attempts: null };
+  const bytes = take.bytes;
   const rawFile = path.join(raw, cue.file);
   fs.writeFileSync(rawFile, bytes);
   Probe(rawFile);
@@ -1145,6 +1279,12 @@ async function Bake(cue, manifest, raw) {
     speechRate: cue.speechRate ?? 0,
     continuous: true,
     mastering: "MonoBeforeLoudnessTruePeakMinus3",
+    ...(refs.length ? {
+      castKey: refs.map((r) => r.sha256).join(","),
+      references: refs.map((r) => ({ who: r.who, owner: r.owner, castSha256: r.sha256 })),
+      attempt: take.n, attempts: take.attempts, hard: take.judged.hard, flags: take.judged.flags,
+      metrics: { cer: take.judged.cer, transcript: take.judged.transcript, lengthDiff: take.judged.lengthDiff, clipRuns: take.judged.clipRuns },
+    } : {}),
   };
   manifest.updatedAt = new Date().toISOString();
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");

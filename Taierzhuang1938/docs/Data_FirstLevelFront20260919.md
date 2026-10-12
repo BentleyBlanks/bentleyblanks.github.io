@@ -337,3 +337,185 @@ node Taierzhuang1938/Script_FirstLevelLeaderGuideBrowserTest.mjs
 - **借火的手部动作**：烟与火柴是白盒，没有手部 IK，也没有点火的光。
 - **老周靠土壁**：用 `state "fallen"` 表示「还没上担架」，视觉上是躺在土壁边而不是靠坐。
 - **行刑的创口遮挡**：靠门框与身体位置，没有专门的遮挡体积；换摆位时要重新看一眼。
+
+---
+
+## 6. 2026-10-12 03–05 重构（03–11 重构 A 包）
+
+口径 `docs/Data_FirstLevel0311Refactor20261012Contract.md` §3.1–3.3、§5、§6。上面 §2 的 03/04/05 三段里凡与本节冲突的
+（弹药屋、`BundleSupply`、`bundleReturned`、`tankPreviewed`、`TankHeard`、`tank_turret`、三条战车音乐 stinger）以本节为准；
+旧文字留着当历史。本节只记「现在是怎么跑的、数在哪、怎么验」。
+
+### 6.1 03 Support —— 日军不会被打退
+
+- **前沿观察停顿**（`FrontObservation`）：罗到 `MISSION_STAGE_ANCHORS.frontObservation`（=`FRONT_SPACE.observation`，支沟最后一个弯前）
+  停下不走，等玩家到 `counter.observeWaitM` 4 m 内（或 `observeMaxS` 12 s 兜底）才说两句、三指比划，接着原来的 `FrontBlockade`
+  指右边破墙；说完记 `frontObserved`，罗继续带路。腿在 `FirstLevelFrontBattle.Walk`（`OBSERVATION_STOP`，`observationReleased`
+  放行），嘴在 `UpdateObservation`。`CaptureRouteWithObservation()` 把观察点插进 03 的领路线。
+- **去程落弹**（`FirstLevelFrontCounterattack.SapShells`）：玩家在支沟里（投影到 `MISSION_ROUTES.support` ≤ 4 m、z < −112、x < 0）
+  时，进 03 `sapShellFirstS` 8 s 后每 8–14 s 一发掷弹筒落在 `FRONT_SAP_SHELL_POINTS` 四个沟底弯点之一，离玩家与小队 ≥ 6 m，
+  最多 4 发（`sapShellMax`）。走 `combat.FireShell` 的 `feedbackOnly`（`sapShellDamage` 0：炸、啸声、震屏、不进 TTK 账），
+  不是环境火点：支沟里没有视线，环境射击打不进来，只能剧本落弹。
+- **撤退窗口双条件**（`GapWindow`，`frontRifleDefense` 的 `requires`）：`gapRushRepelled`（六名跃进兵 + 侧翼组 + 军官里活着的都
+  不在 `gap` 8 m 内、`gapRushCloseM` 16 m 内也没人在 rush/charge——20 m 外两个掩体之间的跃进不算冲缺口，第一趟实拍窗口
+  为此每 1.5 s 开关一次）且 `gapFireSuppressed`（`FrontGunner` / `FrontSupportGunner` 至少一挺死了或压制值 ≥ `suppressLevel`
+  0.3——AI 自己判「被压住」的阈值——连续 ≥ 2 s）。两个事实各自第一次为真就记下（门只开一次），但**活窗口会关**：机枪再抬头、
+  或有人再冲，`frontCounter.window.open` 变 false，第一批下一个人就在最后遮挡后面等（`UpdateGuards` 每放一个人问一次
+  `WindowOpenFor`）；关了 `windowStaleS` 45 s 还不开就当开，窗口从没开过而是 `assaultWindowFallbackS` 90 s 放的行也直接走
+  （不许把人钉死）。所以第一批是**分两趟**过口的，不是一列五人一口气。驾驶器不上缴获机枪、只打眼前的人，四趟实拍
+  `gapFireSuppressed` 都是靠 90 s 兜底过的；真人坐机枪上扫土坎才会按设计开窗。
+- **第一批第 2 人中弹被拖**（`counter.woundedGuard` 2）：他过口时按 `woundedDownS` 倒 1.5 s，之后以 `woundedDragMps`
+  1.1 m/s 被拖着走完撤退线（腿仍在 `UpdateGuards`，写 `g.woundedAt`）。到安全区后刘文财数人 `FirstBatchCount`
+  （「一个……三个……五个！」），接 `TankSpotted`：守军喊「战车……路那头是战车！」罗接「先把人接下来！」—— 取代旧 `TankHeard`。
+- **夺点后掷弹筒找准阵位**（`NestShells`）：夺点 `nestShellFirstS` 40 s 后每 10–16 s 一发落在 `FRONT_NEST_SHELL_AREA`（院内）
+  随机点，离玩家 ≥ 3.5 m、离小队 ≥ 2.5 m（`PickNestShellPoint`，12 次抽不到就这轮不落）；只在 03 内、最多 `nestShellMax` 8 发
+  （第二轮连续实拍 9 发 100 s 命中 4 发 57 hp，坐机枪不动的驾驶器随后被 04 的车火打死）。
+  炸、啸声、震屏走 `FireShell feedbackOnly`（不走 `Blast`），伤害是模块自己的**轻伤**（`LightShellHurt` / `HurtPlayer`，第二轮
+  协调人口径）：离爆点 ≤ `shellHurtFullM` 3.5 m 扣 `shellHurtMaxHp` 18，到 `shellHurtM` 5.5 m 线性降到 `shellHurtMinHp` 12，
+  再远不扣；**不开流血伤口**（`Player.TakeHit` 任何伤害都开伤口，第一轮 40 伤害九发把人流血至死），最低留 `shellHurtFloorHp`
+  1 hp 不当致命一击；配 0.5 压制、红闪、受击事件、来向标记。坐着不动的人只吃落在 5.5 m 内的那几发，得挪窝。
+  支沟落弹 `sapShellHurtScale` 0 仍是纯环境（契约：不进 TTK 账，玩家本来 ≥ 6 m）。
+- `tankPreviewed` → `tankHeard`：战车一动（`TankRuntime` progress > 1 或在动）就记；HullDown 不再停车预览。
+- **交枪顺序**（`StartHandover` / `UpdateZhou`）：何有田离通道壕最后一个拐角 `handoverViaSkipM` 4 m 内就直奔座位（不绕回拐角）；
+  幺娃等何有田到座位 `handoverReadyM` 3 m 内（或何死了）才下去，停在座位前 `yaowaHandoverShortM` 1.4 m（`YaowaHandoverPost`）。
+  一起派的话幺娃先到座位，一人宽的壕里何就钉在他身后 3.9 m、老周等何：03 永远不结束（实拍 1、3 趟）。
+- **坑沿兜底**（`RampLift`）：左机枪坑（`Data_FirstLevelMissionTerrain` steps 的 leftSeat 坑 0.65 m）与 2 m 深的通道壕之间是
+  z −152.5..−153.3 的一道 54–55° 坡，超过胶囊 52° 爬坡上限（`Script_Physics`），只能靠 autostep 偶尔上去：老周往下走没事，
+  幺娃三趟里两趟上去了一趟没有，何有田四趟实拍 + 12 次探针里 10 次钉在坡脚 100 s 以上（蹲着站着都一样）。交枪的两个人
+  （何有田、幺娃）在离座位 `handoverRampFootM` 2.5–5.5 m 之间 `walkStallS` 6 s 没进展，就被放到坑底座位前
+  `handoverRampLiftM` 1.6 m 处（`stalls` 记 `rampLift`）。**集成项**：地形把这道过渡改成 ≤ 45° 的坡（不是本包的文件，
+  指纹要重生），兜底就不会触发。
+
+### 6.2 04 MachineGun —— 战车压口，缺口丢人
+
+- **一起到**：`FRONT_PRESSURE_PHASES.tankShown` 的 `when` 改成 `tankAtBendExit`（战车过路弯口，`TankRuntime` 记），
+  战车 + 4 名跟车 + 两组预备队（`reserveWest` / `reserveRoad`，`reserve:true`）+ 侧翼幸存者一口气上。`mgAttack` 的 offstage
+  也等到 `tankAtBendExit` 才放。`frontAttackRepelled` 之后侧翼组的「再冲阵位」用 `NestFront`（下）实现，不再第二次成组冲锋
+  （`FrontPressureTest` 只许一次成组冲锋）。
+- **缺口丢人**（`GapGuard`，`gapGuardKilled`）：战车到 Pressure（`brain.reached ≥ Pressure` 或 `tankPositionPressured`）时，
+  第二批的 `counter.gapSacrificeGuard` **7 号**（轻机枪副射手）脱离保护（`missionUntargetable/scriptEssential` 都关）直奔
+  `gap`，到 `gapKillM` 1.6 m 内（或跑了 `gapRunMaxS` 9 s）车体机枪走一串点射（`gapKillShots` 5 发，前 4 发 damageScale 0
+  打在他身边、第 5 发 `TakeHit(400)`），尸体留在口子正中（`GapBody`），刘文财 `GapGuardDown`。**偏差**：契约写第 5 人，但
+  5 号是 `FACED_FRONT_GUARD_INDEX`（第二批里面对玩家说 `TankSpotted` 的那个），牺牲他台词就没人说，所以改 7 号。
+- **阵位前半边隔院对打**（`NestFront`，`nestFrontContested` → `nestFrontCleared`，第二轮起都是 04 的门）：玩家退到后墙
+  （`rightRearReached`）后，`NestFrontPicks` 从侧翼组幸存者优先、再按离阵位远近挑 `FRONT_NEST_FRONT_POSTS.length` 4 人，
+  `Defend` 到院内前半边四个岗（z ≤ −151，互距 ≥ 1.6 m，离缴获机枪块 ≥ 1.2 m），`tacticalRadiusM` 收到 3 m；第一个人进院
+  前半边记 `nestFrontContested`；翻进来的人全部死亡、或缩回 `nestFrontClearZ` −159（土坎以北）、或（下令回撤后）到了回撤点
+  `FRONT_NEST_FRONT_PULLBACK` 4 m 内 / 出了院子且离阵位 ≥ 10 m，记 `nestFrontCleared`（没人可进时两条都记 `void`，04 不等）。
+  回撤令（第三轮，按真实发生的事）：战车到 Block（`tankBlocksExit` / `tank.atBlock`，且 `nestFrontContested` 已过
+  `nestFrontMinFightS` 20 s——第四轮口径「隔院对打要站住」，第三轮实拍车早到 Block、人进院当帧就撤只打了 4 s）、或伤亡过半、
+  或 `nestFrontHoldS` 45 s（纯规则 `NestFrontPullBackWhy`）；
+  回撤的腿用 `MoveActor` 逐帧带（守军那套，允许翻跨/绕行），到点再 `Defend`——集成实拍 INT1 里两个人只靠 `Defend` 在院里对射
+  265 s 没挪窝，04 跑到 350 s。`BundleOrder`（守军报信 + 班长分工）要等 `nestFrontCleared` 再停 `nestFrontOrderPauseS` 1.5 s
+  才说（`UpdatePressure`）。04 requirements：`tankPositionPressured, gapGuardKilled, nestFrontContested, nestFrontCleared,
+  remainingGuardsGathered, rightRearReached, bundleOrderHeard`。驾驶器在后墙岔口把射程放到 20 m 打前半边的人并截一张
+  `Scene_NestFrontContested.png`。
+- `TankArmor` 只剩一句「莫打铁壳子！打跟车的！」，`tank_turret` 退役（`TANK.barkCues.turretTraverse` null、`SQUAD_BARK_RETIRED.leader`）。
+  `BundleOrder` 按 §5.2 重写（第二句前停 1.4 s）。`TankRoadContact` 两句改成「右边路上！战车！战车！」「打跟车的！前头还有人没下来！」。
+- **远处烧着的车**：`Data_FirstLevelWhiteboxFront` 的 `BurningTank*` 一组块在 (96,−216)（路弯以北坡上），`Data_FirstLevelDistantSmoke`
+  的地标柱 `BurningTankSlope`（kind `metal`，scale 1.8）；`SmokeOriginsTest` / `DistantSmokeTest` 的 63 → 64。
+
+### 6.3 05 Tank —— 支沟里的集束弹
+
+- **路线**：后侧岔口 → `FRONT_SORTIE.attackRoute[0..3]` → `A.bundleDrop`（=`FRONT_SORTIE.bundleDrop` (40.1,−147.4)，倒着的弟兄
+  `bundleBody` + 两捆 `bundles`，白盒 `BundleDropBundle0/1` / `BundleDropHead0/1`，尸体层 `AftermathBundleBearer`）→ 攻击位
+  `attackRoute[3..]` 投弹。弹药屋、`bundleReturned`、`bundleHouseReached`、`bundleDirectionsHeard` 全退；`BundleWhy` / `BundleSupply`
+  `retired:true`（录音留着）。`MISSION_GUIDANCE.Tank.route` 指 `attack`；`LeaderGuide` Tank 变体去程按 `attackRoute[0..3]+bundleDrop`
+  未到的点带路（`GuideFollow`），返程沿 `MISSION_ROUTES.attack`（`GuideThrow`）。`BundleFound`（罗两句）在 drop 点触发，
+  `BundleBrief` 两句边走边说。F 捡起（`interaction.bundle` 文案 §5.5）。
+- **渗透组**（`sapInfiltrators`，4 人：`BundleBendA/B` + `SapInfilC/D`，各 1 颗手雷的只有 C/D）：进 05 就生成在支沟外待命，
+  玩家过 `attackRoute[1]` 1 m（`OnAttackBranch`，走廊 `branchCorridorM` 4 m）记 `sapInfiltrationStarted`，`FRONT_PRESSURE_TACTICS`
+  按这个事实沿 `SAP_IN` 路线 3.2 m/s 摸进后侧岔口，分两拨。
+- **战车盯支沟**（`Data_Tuning_Tank.sapWatch`，`lanes[0].sapWatch`）：05 里车体机枪每 6–10 s 挑一段沟沿扫，`playerClearM` 3.5 m
+  （`LanePointAt` 取点）。`requireFact` 去掉、散布 1–2 m。
+- **炸哑后**：`tankFireDisabled` → `TankCrew` 在车两侧 2.3 m 生成 `TankCrewA/B`（`FRONT_TANK_CREW`，三八式、无手雷），记
+  `tankCrewBailed`，`MISSION_TACTICS` 沿 `TANK_CREW_FLIGHT`（Approach→Pressure→BendExit→Bend）3.6 m/s 跑，到 Bend 收走；
+  跟车步兵都死了或都退到 `gap` 30 m 外（`FRONT_ESCORT_WITHDRAWN`，45 s 兜底）才记 `escortsWithdrawn`，第二批守军这才过口；
+  最后两人经过 `GapBody` 1.4 m 内时停 1.2 s 拽一把（`tugS/tugM`）。返程不放 cue、不换音乐；`stingers` 只剩
+  `breachReopened` / `lastGuardsWithdrawn`。
+- **预算**：05 最坏同时存活 = 4 跟车 + 4 渗透 + 2 车组 + 预备队/侧翼残余 ≤ 34，加 02 残兵不超 44（`FrontTopologyTest` 的 alive
+  上限由 30 抬到契约的 44，累计 ≤ 60；`actorPool` 不动）。
+
+### 6.4 文件与验收
+
+- 新：`Script_FirstLevelFrontCounterattack.mjs`（纯规则 `GapWindow` / `PickSapShellPoint` / `PickNestShellPoint` / `EscortsClear` /
+  `NestFrontPicks` / `OnAttackBranch` + 运行时类，`MissionRuntime` 只留 `new` / `Enter` / `Update`（在 `frontBattle.Update` 之前）/
+  `State` 四行）、`Script_FirstLevelFrontCounterattackTest.mjs`（TestRunner `FirstLevelFrontCounterattackTest`）。
+- 数值：`Data_Tuning_FirstLevelFront.FRONT_BATTLE_TUNING.counter`、`Data_Tuning_Tank.sapWatch`；几张表在 `Data_FirstLevelMissionFront`
+  （`FRONT_SAP_SHELL_POINTS` / `FRONT_NEST_SHELL_AREA` / `FRONT_NEST_FRONT_POSTS` / `FRONT_TANK_CREW` / `FRONT_ESCORT_WITHDRAWN`）。
+- 纯 Node：`FrontCounterattackTest`、`FrontTest`（第 39 行 `CaptiveInterrogation` 9≠11 是 01–02 对白改稿的基线红）、`FrontPacingTest`、
+  `FrontPressureTest`、`TankBrainTest`、`FrontTopologyTest`、`LeaderGuideTest`、`MissionTest`、`MissionGatesTest`（98 个事实）、
+  `VoiceTest`、`TextTest`、`SpaceTest`、`SmokeOriginsTest`、`DistantSmokeTest`、`CharacterSpeechTest`（拼音表补 抱/支/捡）。
+  `ModuleGraphTest` 在 A 分支上红：新模块还没进 `index.html` 的 import map（戳归集成负责人，契约 §2.1）。
+- 实机：`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=3 --stage-to=7` / `--stage-from=4 --stage-to=6` /
+  `--stage-from=5 --stage-to=6`；`Script_FirstLevelCampaignFrontBattle` 05 段改走 `attackRoute[0..3]` → `bundleDrop`（`CaptureFocus("BundleDrop")`）。
+  **基线红**：`RightNestShortRetreat` 机位整帧三角 10.10 M（分支起点 52f353ce 的树，`--baseline-root` A/B）/ 10.14 M（本分支）
+  对 `SCENE_RENDER_LIMITS.triangles` 9 M（09-28 定的上限），04 检查点与连续驾驶都在这一步断言失败；本包取证时临时把
+  `Script_FirstLevelCampaignKit` 这条断言改成打印（未提交）。
+
+---
+
+## 7. 2026-10-12 06–07 与耿家（0311 重构 B 包）
+
+口径：[0311 重构契约](Data_FirstLevel0311Refactor20261012Contract.md) §1.6 / §1.9 / §3.4–3.5 / §5.6；改稿「06 集结处」「07 南行沟、出沟口遭遇」。
+新模块两个，运行时只加薄钩子：
+
+| 文件 | 管什么 |
+| --- | --- |
+| `Script_FirstLevelGengFamily.mjs` | 老耿 / 妮儿 / 黑子 / 驴车（§5.6 接口；06 捡弹壳、07 走沟沿跟队与撒腿进村；08–11 的走位 / 姿态 / 推车给 C 包） |
+| `Script_FirstLevelSouthMouth.mjs` | 07 沟口遭遇：纯规则 `SouthMouthRules`（到沟口 → 接火 → 压住 / 再抬头 → 绕村 → 过完）+ 运行时薄适配（放组、记事实、喊 cue、切任务字、担架限位） |
+| `Data_Tuning_FirstLevel.mjs` | 新段 `southMouth` / `geng`（每一行带出处） |
+| `Data_FirstLevelWhiteboxRear.mjs` | 沟口东侧的 `MouthEmbankment` / `MouthFieldBankA` / `MouthGraveMoundA(+Cap)` / `MouthFieldBankB` / `MouthGraveMoundB`（高 0.9–1.3 m，横在「射手 → 南口」的线上）；07+ 指纹已按本轮重生（`baseline` 0311-b-rear-mouth-banks-20261012） |
+
+### 06 Orders
+
+```
+进 06：妮儿（CivilianFemale 分身 girl，整体缩 R.geng.nierScale 0.62）蹲在洼地东北沟沿 R.geng.nierRim (−29.2,−105.3)
+      —— SJ→集结处那段交通沟的东南沿，比洼地场坪高 1.8 m；庄稼人（CivilianMale）站她身后 (−27.4,−106.6)。
+      两人 scriptEssential + missionUntargetable（Protect(true)），不参战。
+闲着：每 4–7 s 走到沟沿 1.5 m 内的随机点弯腰蹲下 pickS 1.2 s，口袋响一声（shellDrop）。
+ordersReached 且玩家进到她 seenRangeM 16 m 内 → nierSeen；担架员喊 NierShells（两句逐句：bearer / peasant，
+      说话位置：集结处东侧那个搬运人员 / 庄稼人头上）。
+玩家 ≤ lookGunM 6 m：她的头朝枪口（MuzzlePoint = 眼位沿前向 0.8 m），不看脸。
+玩家 shellRangeM 8 m 内开枪：落点 = 枪口右侧 shellEjectM 0.6–1.4 m 的随机点，她走过去捡（PickShellNear）。
+借火改两次 F（交互点 MissionBorrowLight，单击）：
+  站到老周跟前、脸朝着他（BorrowLightCued）只亮提示「跟老周借个火」；第一次 F → BorrowLight 1–6 句（FrontScenes 的逐句场景）
+  第 6 句末 BorrowLightCigaretteOffered → offered，提示换成「划火，递过去」；第二次 F → Collection 发 BorrowLightMatchAsked
+  （导演表 BorrowLight.07 after:"event:BorrowLightMatchAsked"）、记 matchAsked → 7–9 句 + 划火；lightShared 仍在第 9 句播完记。
+起行（South）：庄稼人收走；妮儿 Follow(southWalk, followGapM 9)。
+```
+
+### 07 South
+
+```
+跟队：目标 = 队尾里程 − 9 m 的路线点，沟身里程 trenchProgressM [40,72] 里往沟沿偏 rimOffsetM 3.6（RimSide 取地面高的那一侧），
+      沟外偏 1.8；走 walkMps 1.15。玩家走过 followCueProgressM 22 m、幺娃活着、她在 26 m 内 → NierFollow（整段）；
+      第 3 句「嘿，还赖上了」她去捡幺娃丢上沟沿的弹壳、叫一声。SouthWhisper 在 nierFollowHeard 之后才说（FrontShow，仍有兜底时间）；
+      第 5→6 句之间顺子抬头看她：gazeS 0.7 s 内视线往她那边轻带 ≤ gazeRad 0.35（不是接管，玩家随时转回），她也转过来笑一声。
+沟口：领头担架到 A.southMouthHold（southWalk 里程 63 m，离南口 12 m）或玩家先到它 8 m 内 → southMouthReached，
+      southMouth 组 6 人从南田房北面 60 m 外放出（出生点离机枪点 ≥ 60 m、4 个从南口看被房挡着）、沿 MISSION_TACTICS 跑步穿田：
+      MouthGunner（歪把子）趴到 A.mouthEmbankment (15.2,−44.9) 的土埂后打空地；MouthRifleA/B/C 各占田埂 A / 坟包 A / 田埂 B；
+      MouthFlankA/B 绕到村北口乱石墙 / 草垛后（SOUTH_MOUTH_FLANK_WATCH 22 m 内露头 → 刘文财喊 MouthFlank）。
+      接火以前担架停在停点（MaxProgress）；机枪开火（lastFire；兜底：到位 8 s 没开火 / 组里先有人死）→ mouthContact →
+      MouthContact、任务字切「压住东边机枪，掩护担架冲过空地。」、标签 firstLevel.guide.mouth、班长标记指机枪（holdFrom/holdUntil）、
+      妮儿撒腿沿 southWalk 跑进村北巷 R.geng.villageRefuge（不受伤）。
+      射手 suppressed 状态连续 ≥ mgSuppressS 2 s（或已死）→ mouthMgSuppressed（第一次记事实、喊 MouthGo）；担架只在它成立时过开阔地
+      （SafeAt：里程在 [停点, 末点−4) 的担架 / 步行者只在压住期间动），抬头后 mgRegraceS 1.5 s 再停在田埂 / 电线杆后，之后再压再跑。
+      绕村的两个都死或都被压住 ≥ 2 s → mouthFlankResolved（不是过关条件）。
+      活着的担架全部到 southWalk 末点前 4 m → mouthCrossed，任务字回「护送伤员向南，跟住班长。」。
+07 requirements：southWhisperHeard, mouthCrossed, villageMouthReached, mainStreetPointed。
+```
+
+### 08–11 给 C 包的占位
+
+`Enter("Village")` 起老耿（`R.geng.gengHouse`）与驴车（`R.geng.cartYard`；黑子 = WorkingHorse 缩 0.75、毛色 ×0.38，车板上三件白盒行李）
+就在；`GengGoTo / GengPose('slap'|'vat'|'table'|'unbar'|'lead-donkey'|'load') / CartTo / SetCartBlocking / PointAt` 都是占位实现
+（走位 + 蹲站 + 一声音效），C 包按概念图换动作、只加方法不改签名。妮儿的叫声 / 笑声 2026-10-12 D 包起是她本人的两条非词人声（`Data_Voice` kind `nier`，`Script_SeedAudioNierShoutBake`，`NIER_SHOUT_CUES` 轮着播、不走 Bark；[配音同步 §0.17](Data_FirstLevelVoiceSync20260919.md)），之前暂用 `hitGrunt` 抬音高占位（`NIER_SHOUT_CUE`，
+素材侧登记 `nier_shout` 后只改这一处）。
+
+### 验收
+
+纯 Node：`Script_FirstLevelGengFamilyTest`、`Script_FirstLevelSouthMouthTest`，加既有 `MissionTest` / `MissionGatesTest` / `VoiceTest` /
+`TextTest` / `SpaceTest --rear-only` / `FrontTest` / `CollectionCareTest`。实机：`--campaign --stage-to=7`（06 两次 F、07 沟口真打、
+07 时长按 `R.southMouth.targetSeconds` 90–210 s、06 按 `ordersTargetSeconds` 36–100 s 断言；截图 `_shots/L1Front/Scene_BorrowLight.png`、
+`Scene_SouthMouthContact.png`）。
