@@ -197,12 +197,15 @@ const HARNESS = `<!doctype html>
       if (baking) requestAnimationFrame(Tick);
     };
     requestAnimationFrame(Tick);
-    const bakeT0 = performance.now();
-    map.Bake().then((stats) => {
-      baking = false;
-      window.__bake = { ...stats, resolvedMs: Math.round(performance.now() - bakeT0), maxFrameGapMs: Math.round(frames.max), frames: frames.n, slowFrames: frames.slow, setSceneMs: Math.round(setSceneMs) };
-      Refresh();
-    }).catch((e) => { window.__bootError = String(e && e.stack || e); });
+    // ?bakeDelay=ms：晚一点再开烘，用来分清「开机那一帧慢」是页面自己（排版 / 字体 / 首次合成）还是烘焙
+    setTimeout(() => {
+      const bakeT0 = performance.now();
+      map.Bake().then((stats) => {
+        baking = false;
+        window.__bake = { ...stats, resolvedMs: Math.round(performance.now() - bakeT0), maxFrameGapMs: Math.round(frames.max), frames: frames.n, slowFrames: frames.slow, setSceneMs: Math.round(setSceneMs) };
+        Refresh();
+      }).catch((e) => { window.__bootError = String(e && e.stack || e); });
+    }, Number(params.get("bakeDelay") || 0));
 
     // ---- 合成场景：每个断言都能算出该在哪儿 ----
     function Synthetic() {
@@ -502,6 +505,16 @@ try {
   Info("第一关静态层（页面稳定后重烘）", JSON.stringify(bake));
   Check("第一关静态层烘好（≤ 4 px/m、块数 > 1000）", bake && bake.width > 500 && bake.blocks > 1000 && bake.pxPerM <= 4, `${bake?.width}×${bake?.height} @ ${bake?.pxPerM?.toFixed?.(2)} px/m, ${bake?.blocks} blocks`);
   Check("烘焙分块：每一片 ≤ 12 ms，烘的过程中最长一帧 < 50 ms", bake && bake.maxStepMs <= 12 && bake.maxFrameGapMs < 50, `max step ${bake?.maxStepMs} ms (${bake?.maxStepPhase}), max frame gap ${bake?.maxFrameGapMs} ms over ${bake?.frames} frames ${JSON.stringify(bake?.slowFrames)}`);
+  {
+    const p3 = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    Watch(p3);
+    await Open(p3, "kf=table&at=03-2&bakeDelay=1500");
+    const delayed = await p3.evaluate(() => window.__bake);
+    await p3.close();
+    Info("开机慢帧归属（烘焙推迟 1.5 s 再开）", JSON.stringify({ slowFrames: delayed.slowFrames, maxFrameGapMs: delayed.maxFrameGapMs, frames: delayed.frames }));
+    Check("开机时的慢帧出在烘焙开始之前（页面自己的排版 / 字体 / 首次合成），烘的过程中没有慢帧",
+      delayed.slowFrames.every((s) => s.endsWith("@idle")), JSON.stringify(delayed.slowFrames));
+  }
   const cached = await page.evaluate(async () => { const h = window.__h; const t0 = performance.now(); h.map.SetScene(h.levelScene); const s = await h.map.Bake(); return { ms: performance.now() - t0, same: !!s && !h.map.baking }; });
   Check("同一关再 SetScene + Bake 直接用缓存（不重烘）", cached.same && cached.ms < 40, `${cached.ms.toFixed(1)} ms`);
 

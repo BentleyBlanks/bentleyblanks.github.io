@@ -125,7 +125,7 @@
   margin: 9px 0 0 54px; padding-left: 8px;
   border-left: 2px solid rgba(214, 217, 209, 0.16);
   font-size: 11.5px; line-height: 1.5; color: var(--bo-faint);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;   /* 一行；全文在悬停提示里 */
 }
 .boGuess { display: flex; align-items: center; gap: 6px; margin: 8px 0 0 54px; font-size: 11.5px; color: var(--bo-muted); }
 .boGuessIcon { display: inline-flex; color: var(--bo-muted); }
@@ -278,7 +278,7 @@
 .boCount { font: 600 13px/16px var(--bo-num); color: var(--bo-bright); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .boFast {
   padding: 0 6px; font-size: 11px; line-height: 16px; color: var(--bo-bright); white-space: nowrap;
-  border: 1px solid rgba(223, 189, 104, 0.55); background: rgba(223, 189, 104, 0.1);
+  border: 1px solid var(--bo-line-strong); background: rgba(214, 217, 209, 0.08);
 }
 .boFast:empty { display: none; }
 .boKeys { display: flex; align-items: center; gap: 3px; font-size: 10px; line-height: 13px; color: var(--bo-faint); white-space: nowrap; }

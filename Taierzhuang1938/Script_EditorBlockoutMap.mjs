@@ -1219,12 +1219,12 @@ function Dot(ctx, x, y, r, yawDeg, rgb, tick) {
     const a = CanvasAngle(yawDeg);
     ctx.beginPath();
     ctx.moveTo(x + Math.cos(a) * (r - 1), y + Math.sin(a) * (r - 1));
-    ctx.lineTo(x + Math.cos(a) * (r + 5.5), y + Math.sin(a) * (r + 5.5));
+    ctx.lineTo(x + Math.cos(a) * (r + 4), y + Math.sin(a) * (r + 4));
     ctx.lineCap = "round";
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3.6;
     ctx.strokeStyle = Css(MAP_COLORS.paper);
     ctx.stroke();
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.8;
     ctx.strokeStyle = Css(rgb);
     ctx.stroke();
   }
