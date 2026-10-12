@@ -414,6 +414,79 @@ export const MISSION_TUNING = Object.freeze({
   nightTransition: Object.freeze({ fadeOutS: 1, holdS: 4, fadeInS: 1 }),
   // 夜景段：淡入点到北门的行军速度（队列小跑不上，按 walkSpeedMps）。
   nightMarchSpeedMps: 1.7,
+
+  // =========================================================================
+  // 2026-10-12 03–11 重构 B 包（docs/Data_FirstLevel0311Refactor20261012Contract.md §3.4–3.5、§5.6）。
+  // 07 沟口遭遇（Script_FirstLevelSouthMouth）与耿家四个角色（Script_FirstLevelGengFamily）的数值。
+  // 出处写在每一行；没有实拍的先取同族既有值。
+  // =========================================================================
+  southMouth: Object.freeze({
+    // 队伍到沟口：领头那副担架走到 A.southMouthHold 的投影这么近、或玩家离它这么近，就记 southMouthReached
+    //（southMouth 组这时才从东北 60 m 外赶来）。
+    holdReachM: 2.5,
+    playerReachM: 8,
+    // 机枪「压住」：射手处于 AI 的 suppressed 状态连续这么久才算（契约 §1.3），抬头后这么久以内担架还能收尾一步。
+    mgSuppressS: 2.0,
+    mgRegraceS: 1.5,
+    // 机枪一直没开火的兜底：射手到位这么久、或组里有人先死了，也算接火（mouthContact）。
+    contactFallbackS: 8,
+    // 绕村那两个：死了，或连续被压住这么久，算解决（契约 §1.3 不打退）。
+    flankPinS: 2.0,
+    // 担架「过了开阔地」：离 southWalk 末点（村北巷 (48,−20)）这么近就算过了。
+    crossedSlackM: 4,
+    // 改稿节奏表：07 约 2.5 分钟（±40%）。驾驶脚本按这个区间断言。
+    targetSeconds: Object.freeze([90, 210]),
+    // 06 约 1 分钟（±40%）。
+    ordersTargetSeconds: Object.freeze([36, 100]),
+  }),
+  geng: Object.freeze({
+    // 妮儿 = CivilianFemale 整体缩放（契约 §1.9 定 0.62；1.60 × 0.62 ≈ 0.99 m，比十一岁矮，集成时可按概念图抬到 0.85 左右）。
+    nierScale: 0.62,
+    // 06：她蹲在洼地东北沟沿（SJ→集结处那段交通沟的东南沿，地面比洼地高 1.8 m）捡弹壳；庄稼人站她身后的坡上。
+    nierRim: Object.freeze({ x: -29.2, z: -105.3, yaw: 2.3 }),
+    peasantSpot: Object.freeze({ x: -27.4, z: -106.6, yaw: 2.5 }),
+    // 玩家 ≤ 6 m 她只看枪不看脸（头朝枪口）；8 m 内开枪她去捡落点的弹壳；弹壳落在枪口右侧这么远的随机点。
+    lookGunM: 6,
+    shellRangeM: 8,
+    shellEjectM: Object.freeze([0.6, 1.4]),
+    // 担架员喊 NierShells：玩家进洼地、离她这么近（nierSeen 记在这一刻）。
+    seenRangeM: 16,
+    // 捡弹壳：弯腰（蹲姿）这么久，口袋响一声。
+    pickS: 1.2,
+    // 走 / 跑速度（成年百姓 walkSpeedMps 1.7 × 0.62 身高 ≈ 1.1；撒腿跑按 2.9）。
+    walkMps: 1.15,
+    runMps: 2.9,
+    // 07 跟队：远远跟在队尾后这么远，走沟沿（离沟中线这么远、挑地面高的那一侧）不下沟。
+    followGapM: 9,
+    rimOffsetM: 3.6,
+    openOffsetM: 1.8,
+    // southWalk 上沟身那一段的里程（北口 (−16,−69.5) 全深到南口出坡起点之间）：这段里她走沟沿。
+    trenchProgressM: Object.freeze([40, 72]),
+    // NierFollow：玩家沿 southWalk 走过这么远、幺娃活着、她跟在 followRangeM 以内才说。
+    followCueProgressM: 22,
+    followRangeM: 26,
+    // SouthWhisper 第 5→6 句之间顺子抬头看沟沿上的妮儿：这么久的轻微转头（不是接管）。
+    gazeS: 0.7,
+    gazeRad: 0.35,
+    // mouthContact 时撒腿先跑进村：从沟沿跑到村北巷这一点（southWalk 末点以西，不堵担架路）。
+    villageRefuge: Object.freeze({ x: 44.5, z: -22.6 }),
+    // 08–11（C 包消费）：老耿、驴车的起点占位；C 包按村子的锚点改这两处。
+    gengHouse: Object.freeze({ x: 55.6, z: -18.4, yaw: 0 }),
+    cartYard: Object.freeze({ x: 48.5, z: 24, yaw: Math.PI }),
+    // 黑子 = WorkingHorse 整体缩放 0.75、毛色压暗（契约 §1.9）。
+    heiziScale: 0.75,
+    heiziCoat: 0.38,
+    cartMps: 1.3,
+    // 车板上的白盒行李（被褥 / 铁锅 / 粮袋）：[dx, dy, dz, w, h, d, 颜色]（dz 正 = 车尾）。
+    cartLoad: Object.freeze([
+      Object.freeze([-0.45, 0.16, 0.5, 0.7, 0.32, 1.1, 0x6e6a5a]),
+      Object.freeze([0.45, 0.12, 0.3, 0.55, 0.24, 0.8, 0xb8a37a]),
+      Object.freeze([0.1, 0.1, -0.75, 0.46, 0.2, 0.46, 0x2b2b2b]),
+    ]),
+    cartDeckM: 0.95,
+    // 妮儿的叫声 / 笑声：没有录音前用现有素材占位（Script_FirstLevelGengFamily.NIER_SHOUT_CUE），音高抬一截。
+    shoutPitch: 1.55,
+  }),
 });
 
 // Aftermath tiers (2026-09-08 frame probe: 87 full bodies inside 30 m cost 0.9 M triangles per pass): full mesh only to

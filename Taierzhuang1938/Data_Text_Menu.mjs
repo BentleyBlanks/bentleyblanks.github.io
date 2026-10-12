@@ -73,6 +73,7 @@ export const TEXT = Object.freeze({
   "menu.condition.zhouOnLitter": "等待老周安置到担架上",
   "menu.condition.columnDeparted": "等后送队真正起行",
   "menu.condition.southWhisperHeard": "听完南行途中同伴的私语",
+  "menu.condition.mouthCrossed": "压住沟口东边的机枪，掩护担架冲过开阔地",
   "menu.condition.villageMouthReached": "沿南行道路到达村口",
   "menu.condition.mainStreetPointed": "听完指认主街的那一句",
   "menu.condition.streetBlockSeen": "看清主街上的倒墙与横车",

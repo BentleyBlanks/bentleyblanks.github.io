@@ -31,9 +31,12 @@ export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
   bunkerAssault:1, bunkerBackdrop:1, bunkerPursuit:2, frontFlank:2, frontOfficer:2, frontReserve:4,
   front:2, approach:2, tank:2, village:3, melee:3, machineGun:2, bundleApproach:2,
   courtyard:10, transfer:12, transferAlley:12, air:13, bridgeNorth:18,
+  // 0311 B：07 沟口遭遇组，由 southMouthReached 放出（Script_FirstLevelSouthMouth），不是进 07 就有。
+  southMouth:7,
 });
 // These belong to the current public phase but arrive after its entry encounter.
 export const FIRST_LEVEL_DEFERRED_ENCOUNTERS=Object.freeze({
+  7:Object.freeze(["southMouth"]),
   12:Object.freeze(["transferAlley"]),
   18:Object.freeze(["bridgeNorth"]),
 });
