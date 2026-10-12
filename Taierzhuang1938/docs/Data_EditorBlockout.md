@@ -23,7 +23,7 @@ index.html?editor=blockout&level=FirstLevel[&kf=03-2][&quality=whitebox]
 
 - `editor=blockout` 已经能把启动路由到 `Script_Main`（`Data_StartupRouting.IsMenuStartup` 认 `editor`），**不改路由表**。
 - `level` 缺省 `FirstLevel`；`kf` 缺省第一个关键帧。
-- **菜单入口（用户 2026-10-13 追加）**：「设置 → 高级工具」打开的编辑器面板（`EditorSuite` 启动面板）的「编辑器」组里加一个按钮「白盒关卡编辑器」（照 `TextureEditor` 的写法：一个只带静态 `id = "blockout"` / `label` / `hint` / `Open()` 的小类，放在新模块 `Script_EditorBlockoutEntry.mjs`，`Script_Editor.mjs` 把它加进 `EDITOR_ENTRIES` 并在 `Toggle` / `Open` 里按 id 特判）。`Open()` 跳到 `?editor=blockout&level=FirstLevel`（保留当前 `quality` / `scale` / `audio` 参数，去掉 `whitebox` / `missionStage` / `phase` 等关卡参数）。已经在编辑器模式里时，这个按钮显示为当前项，点了不重载。启动面板按钮数因此 +1：`Script_EditorTest` 的 29 → 30（另外三个仍断言 26 的测试先在基线上确认是否本来就红，本来就红的只在报告里点名，不顺手改）。轻量菜单（`Script_MenuStartup`）里的「高级工具」本来就跳到带编辑器面板的完整页面，不另加入口。
+- **菜单入口（用户 2026-10-13 追加）**：高级工具（同日另一轮已改成顶部菜单栏 + Inspector）的「关卡」菜单第一项「白盒关卡编辑器」（照 `TextureEditor` 的写法：一个只带静态 `id = "blockout"` / `label` / `hint` / `Open()` 的小类，放在 `Script_EditorBlockoutEntry.mjs`，`Script_Editor.mjs` 把它放进 `TOOL_MENUS` 的「关卡」并在 `Toggle` / `Open` 里按 id 特判）。`Open()` 跳到 `?editor=blockout&level=FirstLevel`（保留当前 `quality` / `scale` / `audio` 参数，去掉 `whitebox` / `missionStage` / `phase` 等关卡参数）。已经在编辑器模式里时，这个按钮显示为当前项，点了不重载。菜单栏条目数因此 +1：`Script_EditorTest` 的 19 → 20。轻量菜单（`Script_MenuStartup`）里的「高级工具」本来就跳到带编辑器面板的完整页面，不另加入口。
 - 该模式下：
   - `PHASE_TABLE` 换成 `BLOCKOUT_PHASES`（每个关卡一个 phase），关卡间切换走现成的 `JumpToLevel(i)`（整片拆除重建）。
   - **不建** `FirstLevelMissionRuntime`、过场、故事拍、`companion` / `setpieces`、`SeedSoldiers`（含每 3 s 的补兵）、主菜单。
@@ -458,4 +458,5 @@ Config()                     // → 归一化后的配置（深拷贝）
 
 - 2026-10-13：初版（入口、数据格式、接口、界面、第一关 44 个关键帧、第二关草稿、测试与分工）。
 - 2026-10-13：追加「设置 → 高级工具」面板入口；`Script_EditorBlockoutConfig.mjs` 由集成负责人先写好；过渡改为按自然速度 + 整段快进；`Script_EditorBlockoutStore.mjs` 归 B 包。
+- 2026-10-13（合 master）：高级工具改成菜单栏后入口挪进「关卡」菜单；按开发工具隔离规则，`Script_Main` 不再直接 import 编辑器模块，关卡表与总控经 `Script_DevTools.BlockoutPhases / BlockoutStartIndex / CreateBlockoutEditor` 取（剔除版返回空表 / null）。
 - 2026-10-13（集成）：四包合并；§5.4 信号按剧情时刻；§3 担架加 `bearers`；§5.5 射界扇只画不穿墙的一遍并在近处淡出；§7 写明端点的必填字段、返回与状态码、版本号按原始字节；校验器报错不再回显嵌套值（防预览服务栈溢出）。

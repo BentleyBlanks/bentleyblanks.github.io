@@ -734,7 +734,7 @@ node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --pixel=x,y --pass-im
   关卡编排（Orchestration）独立窗口显示第一关的真实编排：流程（18 阶段/27 步骤 + 要求事实实时勾）、
   真实比例俯视图（按阶段看敌我布局与触发圈）、设计/实际两行时间轴、现场批注 → 交给 agent；
   口径 `docs/Data_MissionOrchestration.md`，回归口 `Script_OrchestrationEditorTest.mjs` / `Script_OrchestrationMapTest.mjs`。
-  白盒关卡编辑器（Blockout）是独立模式而不是面板：`?editor=blockout&level=FirstLevel`（「设置 → 高级工具」编辑器组也有按钮），
+  白盒关卡编辑器（Blockout）是独立模式而不是面板：`?editor=blockout&level=FirstLevel`（高级工具菜单栏「关卡」菜单第一项也能进；关卡表与总控经 `Script_DevTools` 边界取），
   不起任务运行时与过场，按关键帧摆敌我（独立演员，不进 AI）、画射界 / 去向 / POI，纸面小地图 + 可缩放全关总图，导航栏切关键帧；
   每关一份 `Blockout/<Level>.json`（第二关另有 `.scene.json` 场景），外部改动 2 s 内同步，生成器 `Script_EditorBlockoutCli.mjs`；
   `window.Tengxian.Debug.Blockout` 给测试与 agent 用。口径 `docs/Data_EditorBlockout.md`，回归口

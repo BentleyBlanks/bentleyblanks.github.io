@@ -1,4 +1,4 @@
-// 「设置 → 高级工具」面板（EditorSuite 启动面板）「编辑器」组里的「白盒关卡编辑器」按钮
+// 高级工具菜单栏「关卡」菜单里的「白盒关卡编辑器」一项
 //（docs/Data_EditorBlockout.md §1）。照 TextureEditor 的写法：只有静态 id / label / hint / Open()，
 // 不进互斥编辑器表 —— 白盒编辑器是一整套独立入口（?editor=blockout），打开就是换页面。
 //

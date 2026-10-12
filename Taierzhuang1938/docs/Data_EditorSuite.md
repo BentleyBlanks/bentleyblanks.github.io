@@ -627,7 +627,7 @@ DOM 常驻、只写属性；面板 4 Hz，地图只在 live 指纹变了或选�
 
 ### 白盒关卡编辑器 `Script_EditorBlockout.mjs`（整页模式）
 
-入口：设置 → 高级工具 → 编辑器 → 白盒关卡编辑器。它跳到 `index.html?editor=blockout&level=FirstLevel`
+入口：高级工具菜单栏「关卡」→ 白盒关卡编辑器（第一项）。它跳到 `index.html?editor=blockout&level=FirstLevel`
 （保留当前的画质 / 尺寸 / 声音参数）；也可以直接开
 `?editor=blockout&level=<关卡>[&kf=<关键帧 id>][&quality=whitebox]`。已经在这个模式里时按钮显示为当前项，
 点了不重新加载。数据格式、接口与分工见 [Data_EditorBlockout.md](Data_EditorBlockout.md)，这里只记怎么用。

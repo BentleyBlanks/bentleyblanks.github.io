@@ -452,21 +452,22 @@ try {
   }
   await B(() => window.Tengxian.Debug.Blockout.ToggleMap(false));
 
-  // 启动面板：白盒关卡编辑器按钮显示为当前项，点了不重载
+  // 高级工具菜单栏「关卡」菜单：白盒关卡编辑器那一项打勾（当前项），点了不重载
   const launcher = await page.evaluate(async () => {
     const T = window.Tengxian;
     T.editor.TogglePanel(true);
-    const button = document.querySelector('.edPanel.launcher [data-editor="blockout"]');
+    const button = document.querySelector('#edRoot .edMenuBar [data-editor="blockout"]');
     const before = location.href;
     const on = !!button?.classList.contains("on");
     button?.click();
     await new Promise(r => setTimeout(r, 300));
-    const count = document.querySelectorAll(".edPanel.launcher [data-editor]").length;
+    const count = document.querySelectorAll("#edRoot .edMenuBar [data-editor]").length;
+    const menu = button?.closest(".edMenu")?.querySelector(".edMenuTitle")?.textContent || null;
     T.editor.TogglePanel(false);
-    return { exists: !!button, on, label: button?.textContent, stayed: location.href === before, count };
+    return { exists: !!button, on, label: button?.querySelector(".edMenuLabel")?.textContent ?? button?.textContent, menu, stayed: location.href === before, count };
   });
-  Check("「设置 → 高级工具」面板的编辑器组里有「白盒关卡编辑器」，当前项高亮、点了不重载",
-    launcher.exists && launcher.on && launcher.stayed && launcher.label === "白盒关卡编辑器", JSON.stringify(launcher));
+  Check("高级工具菜单栏「关卡」菜单里有「白盒关卡编辑器」，当前项打勾、点了不重载",
+    launcher.exists && launcher.on && launcher.stayed && launcher.label === "白盒关卡编辑器" && launcher.menu === "关卡", JSON.stringify(launcher));
 
   // 6) 外部改配置：用 page.route 改响应（盘上的文件一个字节都不动）
   console.log("--- external edit");
