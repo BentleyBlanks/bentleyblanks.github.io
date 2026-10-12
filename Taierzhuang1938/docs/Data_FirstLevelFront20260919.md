@@ -400,8 +400,13 @@ node Taierzhuang1938/Script_FirstLevelLeaderGuideBrowserTest.mjs
 - **阵位前半边隔院对打**（`NestFront`，`nestFrontContested` → `nestFrontCleared`，第二轮起都是 04 的门）：玩家退到后墙
   （`rightRearReached`）后，`NestFrontPicks` 从侧翼组幸存者优先、再按离阵位远近挑 `FRONT_NEST_FRONT_POSTS.length` 4 人，
   `Defend` 到院内前半边四个岗（z ≤ −151，互距 ≥ 1.6 m，离缴获机枪块 ≥ 1.2 m），`tacticalRadiusM` 收到 3 m；第一个人进院
-  前半边记 `nestFrontContested`；翻进来的人全部死亡或缩回 `nestFrontClearZ` −159（土坎以北）记 `nestFrontCleared`（没人可进时
-  两条都记 `void`，04 不等）。`BundleOrder`（守军报信 + 班长分工）要等 `nestFrontCleared` 再停 `nestFrontOrderPauseS` 1.5 s
+  前半边记 `nestFrontContested`；翻进来的人全部死亡、或缩回 `nestFrontClearZ` −159（土坎以北）、或（下令回撤后）到了回撤点
+  `FRONT_NEST_FRONT_PULLBACK` 4 m 内 / 出了院子且离阵位 ≥ 10 m，记 `nestFrontCleared`（没人可进时两条都记 `void`，04 不等）。
+  回撤令（第三轮，按真实发生的事）：战车到 Block（`tankBlocksExit` / `tank.atBlock`，且 `nestFrontContested` 已过
+  `nestFrontMinFightS` 20 s——第四轮口径「隔院对打要站住」，第三轮实拍车早到 Block、人进院当帧就撤只打了 4 s）、或伤亡过半、
+  或 `nestFrontHoldS` 45 s（纯规则 `NestFrontPullBackWhy`）；
+  回撤的腿用 `MoveActor` 逐帧带（守军那套，允许翻跨/绕行），到点再 `Defend`——集成实拍 INT1 里两个人只靠 `Defend` 在院里对射
+  265 s 没挪窝，04 跑到 350 s。`BundleOrder`（守军报信 + 班长分工）要等 `nestFrontCleared` 再停 `nestFrontOrderPauseS` 1.5 s
   才说（`UpdatePressure`）。04 requirements：`tankPositionPressured, gapGuardKilled, nestFrontContested, nestFrontCleared,
   remainingGuardsGathered, rightRearReached, bundleOrderHeard`。驾驶器在后墙岔口把射程放到 20 m 打前半边的人并截一张
   `Scene_NestFrontContested.png`。
