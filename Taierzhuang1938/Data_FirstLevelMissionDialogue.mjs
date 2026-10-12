@@ -344,6 +344,16 @@ export const MISSION_DIALOGUE = Object.freeze([
   ], {
     delivery: "罗班长刚查看完相邻房屋，一口气把判断和命令说完，语速快但清楚；何有田应一声就转身端枪，声音已经背着走开了。",
   }),
+  // 2026-10-12 03–11 重构 C 包（契约 §3.6 / §5.2）：灶屋门口的老耿揪着妮儿出来 —— 一巴掌、指灶屋、说连屋那边进了人。
+  // 老耿是鲁南北方官话占位（用户之后按耿家庄口音改）；本轮只写文本与导演表，录音是第三波（Voice 包）。
+  Cue("GengHouse", [
+    ["geng", "死哪去了！满庄子找你！"],
+    ["geng", "当兵的！别走大街！那是俺家——灶屋连着后院，后门能绕到街后头。"],
+    ["geng", "连屋那边……刚才进了人，俺没敢过去。"],
+  ], {
+    soundscape: "村街巷口：东窗机枪顺街扫过来的点射打在墙上，碎砖落地，担架停在墙后的喘息；一个老汉揪着孩子的衣领。",
+    delivery: "北方官话（鲁南），六十出头的庄稼汉。第一句是揪住孩子骂的，气急、嗓子干硬，紧接着一巴掌；第二句转向当兵的，嘴硬但是在帮人，指着自家灶屋门说得快；第三句压低了声，带怯，说到「进了人」停一下。不哭不喊，不是戏腔。",
+  }),
   // 09 灶屋—连屋近战
   Cue("MeleeRight", [
     ["luo", "右手！"],
@@ -381,6 +391,25 @@ export const MISSION_DIALOGUE = Object.freeze([
   ], {
     delivery: "刘文财一声短报；罗班长立刻催全队离开，不看后面。",
   }),
+  // 2026-10-12 C 包（契约 §3.8 / §5.2）：窗口机枪打哑之后班长喊老耿开后门 —— 抱缸、拖桌、拔闩、车堵门、拽驴让路。
+  Cue("GengGate", [
+    ["luo", "通了！老人家，后门！"],
+    ["geng", "缸！缸别碰！"],
+    ["geng", "车得带走！驴也得带走！"],
+    ["luo", "往边上靠！担架先过！"],
+    ["geng", "……俺这车。"],
+  ], {
+    soundscape: "土院坝：缸底在地上拖出的闷响、桌腿刮地、门闩抽出、驴打响鼻、车轴吱呀；院外巷子里的枪声隔着墙压低。",
+    delivery: "罗班长第一句是隔着院子吼的，急；老耿第二句护着自家的缸，急得嗓子发尖，北方官话；第三句一边拖桌一边犟着说；罗班长第四句压过他，命令；老耿最后一句小声，不甘心，像是说给自己听。",
+  }),
+  Cue("CartPush", [
+    ["geng", "当兵的！搭把手！"],
+    ["luo", "你娃今天倒勤快。"],
+    ["shunzi", "……搭把手嘛。"],
+  ], {
+    soundscape: "院门门槛：车轮卡在石槛上的顿挫、人推车的闷哼、驴蹄刨地；担架队从旁边过去的脚步。",
+    delivery: "老耿冲着身边的当兵的喊，不客气，北方官话；罗班长看着顺子推车，半开玩笑地损一句，不笑出声；顺子嘴上不服气，小声顶回去，带着用力推车的气。",
+  }),
   // 11 抵达桥头接运点
   Cue("TransferSorting", [
     ["loader", "走得动的跟前头！躺着的先上车！担架别堵路！"],
@@ -392,6 +421,24 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["luo", "顺子，看住村路！别让他们进接运点！"],
   ], {
     delivery: "何有田回头看见村落方向的人影，一声短喊；罗班长立刻指派，第二句咬字重，是把责任压在顺子身上。",
+  }),
+  // 2026-10-12 C 包（契约 §3.9 / §5.2）：驴车到了接运点，老耿在车旁自说三句（把被褥卷起来给伤兵腾车板）；顺子问他往哪走。
+  Cue("GengCart", [
+    ["geng", "黑子！站好！再尥蹶子，进了城就把你卖了！"],
+    ["geng", "就这么大地方。"],
+    ["geng", "轻点！人是肉长的，不是麻袋！"],
+  ], {
+    soundscape: "桥头接运点：牛马打响鼻、车板上被褥卷起来的布响、担架搁上车板；村路方向的枪声一阵阵逼近。",
+    delivery: "老耿一个人在车旁忙，北方官话：第一句是骂驴，嘴狠心不狠；第二句是挪开被褥腾地方时自言自语，低；第三句冲抬伤兵上车的人喊，急，带着心疼。三句之间各有一两秒干活的空当。",
+  }),
+  Cue("AskGeng", [
+    ["shunzi", "老人家，往哪走？"],
+    ["geng", "进滕县城。城里有城墙，比庄上牢靠。"],
+    ["shunzi", "再往南喃？"],
+    ["geng", "再往南是临城。俺在那儿没亲没故，去干啥？"],
+  ], {
+    soundscape: "桥头接运点：人群走动、车轴吱呀、担架搁地；远处河风，村路方向零星枪声。",
+    delivery: "顺子站在车旁随口问，四川话，不客气也不刻意；老耿一边干活一边答，北方官话，第二句说得笃定；顺子第三句追问，带点试探；老耿最后一句反问，理所当然，手上活没停。",
   }),
   // 12 掩护装载与离开
   Cue("TransferDefense", [
@@ -670,10 +717,10 @@ const SOUNDSCAPE_ZONES = Object.freeze({
   Volunteer: "collection", BorrowLight: "collection", ZhouLift: "collection", NierShells: "collection",
   SouthWhisper: "southWalk", VillagePointer: "southWalk",
   NierFollow: "southWalk", MouthContact: "southWalk", MouthGo: "southWalk", MouthFlank: "southWalk",
-  StreetBlocked: "village", KitchenDetour: "village",
+  StreetBlocked: "village", KitchenDetour: "village", GengHouse: "village",
   MeleeRight: "village", MeleeCurse: "village", WindowOrder: "village",
-  CourtyardOpen: "courtyard", TwoLitters: "courtyard", LastLitter: "courtyard",
-  TransferSorting: "transfer", VillageRoadThreat: "transfer", TransferDefense: "transfer",
+  CourtyardOpen: "courtyard", TwoLitters: "courtyard", LastLitter: "courtyard", GengGate: "courtyard", CartPush: "courtyard",
+  TransferSorting: "transfer", VillageRoadThreat: "transfer", TransferDefense: "transfer", GengCart: "transfer", AskGeng: "transfer",
   TransferRight: "transfer", TransferBatch: "transfer", EscortZhou: "transfer",
   CartTalk: "cart",
   AircraftFirst: "air", WestDitchOrder: "air", CarryZhou: "air", AircraftReturn: "air", RescueZhou: "air",

@@ -398,6 +398,93 @@ export const MID_TUNING = Object.freeze({
   ditchShelterM: 8,
   // 「队伍离开主车道」：活着的担架离桥头路中线这么远。
   offRoadM: 8,
+
+  // -------------------------------------------------------------------------
+  // 2026-10-12 03–11 重构 C 包：08–11 耿家庄巷战（docs/Data_FirstLevel0311Refactor20261012Contract.md §3.6–3.9）。
+  // 纯规则在 Script_FirstLevelStreetFight（推进点 / 侧路 / 屋顶投弹 / 巷口两波 / 担架放行门），
+  // 副作用在 Script_FirstLevelVillageBlock；每一条数的出处写在后面。
+  // -------------------------------------------------------------------------
+  streetFight: Object.freeze({
+    // 村落同时存活日军上限（契约 §4）：streetPush / laneWave2 逐个放人前先数活人，到顶就不放。
+    villageAliveMax: 14,
+    // 08 东巷来的 streetPush：streetBlockSeen 之后第 i 个人隔这么久放出（4 人）；玩家跨进侧路（sideRouteEntered）
+    // 之后不再补人（已出来的照打）。间隔按一个人从东巷口贴东墙根跑到街北口（约 35 m / 3 m/s ≈ 12 s）的一半取。
+    pushGapsS: Object.freeze([0, 6, 12, 18]),
+    // 老耿：streetBlockSeen 之后玩家离他这么近就开口（GengHouse 三句 + 揪妮儿一巴掌）；灶屋北门外的门边蹲位、
+    // 妮儿被拽去的担架墙后、指灶屋 / 指连屋方向时脸朝的点。
+    gengHouseRangeM: 11,
+    gengDoorSide: Object.freeze({ x: 55.1, z: -18.6 }),
+    gengHouseFace: Object.freeze({ x: 58, z: -16.5 }),
+    gengConnectedFace: Object.freeze({ x: 60, z: 2 }),
+    nierWallBack: Object.freeze({ x: 62.2, z: -22.9 }),
+    // 一巴掌之后多久转身指灶屋（PerLine 不烘录音，整段 cue 的 Line 事件按字幕估时，不等它）。
+    gengSlapToPointS: 1.6,
+    // 09 西侧夹道：跨进夹道记 westAlleyEntered；从进来的那一头往里走了这么远，机枪屋侧门里那个（AlleyPop）窜出来。
+    alleyPopDepthM: 8,
+    // 09 后院：玩家进后院这么久之后屋顶上那个（RoofThrower）投弹；进后院这么久之后妮儿拍车板指他（他已死就不指）。
+    roofThrowDelayS: 6,
+    roofSpotDelayS: 1.8,
+    // 后院的可站区域（院墙内皮：西厢 x 37.3、东墙 x 71.65、连屋南墙 z 15.8、南墙 z 33.7）。
+    yardBox: Object.freeze({ minX: 38, maxX: 71.3, minZ: 16.3, maxZ: 33.4 }),
+    // 屋顶上那个站的地方：侧间屋顶（Roof("SideRoom")）朝院子的东坡面 SideRoomSlope1（x 68.72–70.48），
+    // 顶 = 地面 + 2.95 + 0.44×1.4 + 0.3×1.4/2 = 3.776。他不走导航（屋顶在导航网格里是墙），由 VillageBlock 摆上去、
+    // 物理胶囊站在实心坡面块上；A.roofPost 在 Data_FirstLevelMissionLayout。
+    roofTopM: 3.78,
+    // 投弹：从出手点看目标的水平距离 → 初速（Combat.Throw：竖直分量 = 初速 × arcLift，重力 19.6），再折成 power。
+    // 落点离玩家至少这么远（不是必杀，是逼人挪窝）。
+    roofThrowMinOffsetM: 2.2,
+    throwArcLift: 0.26,
+    throwGravity: 19.6,
+    throwReleaseY: 1.2,
+    throwSpeedRange: Object.freeze([14, 26]),
+    // 09 连屋：MeleeAlley 放出来后先到侧间里连屋东窗外这一点（离窗 2.4 m），把一颗手榴弹从窗口扔进屋（落点 windowThrowAt），
+    // 再从东门进（MISSION_TACTICS.MeleeAlley）。
+    windowThrowPost: Object.freeze({ x: 66.6, z: 6.6 }),
+    windowThrowAt: Object.freeze({ x: 58.4, z: 6.2 }),
+    windowThrowReachM: 1.6,
+    // 10 巷口：院门真开了（courtyardGateOpen）之后第二拨（laneWave2，含草垛机枪）第 i 个人隔这么久放出；
+    // 整段上限（契约 §3.8：≤ 90 s），到点第二拨不再补人（laneWave2Spent）。
+    laneWaveGapsS: Object.freeze([3, 8, 13, 18]),
+    laneWaveCapS: 90,
+    // 机枪「压住」：射手 suppressed 连续这么久（与 07 沟口同口径 R.southMouth.mgSuppressS）；抬头之后担架还能收尾一步。
+    laneMgSuppressS: 2.0,
+    laneMgRegraceS: 1.5,
+    // 担架过门的放行圈：离院门这么近的担架才归巷口机枪管（远处的照 Threatens）。
+    laneGateRangeM: 14,
+    // 10 老耿开后门（GengGate 五句）：抱缸挪墙根的缸、拖桌的桌（都在院门内侧，让开 x=53 的担架道）、
+    // 拔闩站的点、每个姿势保持多久；车堵门停的点、拽驴让出半边门后停的墙根点（院南墙内侧西段）。
+    gengVat: Object.freeze({ x: 51.8, z: 30.4 }),
+    gengTable: Object.freeze({ x: 55.2, z: 30.8 }),
+    gengUnbar: Object.freeze({ x: 51.6, z: 32.4 }),
+    heTable: Object.freeze({ x: 57.3, z: 29.2 }),
+    gengPoseS: Object.freeze({ vat: 2.4, table: 2.6, unbar: 1.4 }),
+    cartGateway: Object.freeze({ x: 53, z: 32.9 }),
+    cartWallFoot: Object.freeze({ x: 46.6, z: 31.7 }),
+    cartBlockHoldS: 2.2,
+    // 驴车夹在担架队中间出门：过了院门的担架到这个数（活担架的一半，向上取整；最少 1）车才跟着走。
+    cartFollowAfterFraction: 0.5,
+    // 10 推车过门槛（CartPush，可选 F）：车停在门槛上这么久没人推，何有田去推；车尾交互点在车后这么远。
+    cartPushWindowS: 10,
+    cartTailM: 2.6,
+    cartPushPoint: Object.freeze({ x: 53, z: 30.4 }),
+    heCartPush: Object.freeze({ x: 54.4, z: 30.6 }),
+    heCartPushS: 4,
+    // 车出了门（courtyardPassed 的驴车条件）：车心过院门以南这么远。
+    cartLeftGateM: 2.5,
+    // 老耿牵驴时站在驴头左前方这么远；妮儿跟车站在车尾后这么远。
+    gengLeadOffset: Object.freeze({ side: 1.5, ahead: 0.9 }),
+    nierCartOffset: Object.freeze({ side: 0.9, behind: 1.3 }),
+    // 11：驴车从院门外走绕回巷 → 主街南段 → 村口通行口到接运点东侧的停车位（空场东侧，让开四个车位与排队道）。
+    gengCartBay: Object.freeze({ x: 91.6, z: 108.2, yaw: Math.PI }),
+    gengCartArriveM: 1.2,
+    // AskGeng：老耿在车旁（牵驴站在驴头左前方，车停在停车位上时约 (93.9,109.6)），玩家走到他 askRangeM 内按 F
+    //（交互点 askPoint 是静态的，到老耿本人的距离另判）；到场这么久没按就自动播。
+    askPoint: Object.freeze({ x: 93.9, z: 109.6 }),
+    askRangeM: 2.6,
+    askAutoS: 20,
+    // 改稿节奏表（±40%）：08 约 2 分、09 约 2 分、10 约 2–2.5 分、11 约 1 分。驾驶脚本按区间断言。
+    targetSeconds: Object.freeze({ Village: [72, 168], Melee: [72, 168], Courtyard: [72, 210], TransferApproach: [36, 84] }),
+  }),
 });
 
 /** 08 担架停车位：空间包的三个点打底，多出来的按行往北排。 */

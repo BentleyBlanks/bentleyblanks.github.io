@@ -79,6 +79,7 @@ export const TEXT = Object.freeze({
   "menu.condition.streetBlockSeen": "看清主街上的倒墙与横车",
   "menu.condition.littersInCover": "把担架队停进可靠遮挡",
   "menu.condition.kitchenEntered": "从右侧灶屋绕进去",
+  "menu.condition.sideRouteEntered": "从灶屋或西边夹道绕进去",
   "menu.condition.meleeResolved": "打掉从连屋冲出来的日军",
   "menu.condition.villageGunSilent": "清除窗口机枪手",
   "menu.condition.courtyardGateOpen": "打开院门",

@@ -118,10 +118,10 @@
 | Tank | `BundleGo`(2) · `BundleProne`(2) · `BundleWhy`(4，2026-09-27 用户追加) · `BundleSupply`(2) · `BundleBrief`(5，2026-09-27 用户追加) · `BundleReturnCall`(2) · `BundleAttack`(2) · `BundleRetreat`(1) · `TankStopped`(3) · `FrontRelief`(3) |
 | Orders | `Volunteer`(5：传令兵/罗/传令兵/顺子/罗) · `BorrowLight`(9，含两处动作停顿；2026-10-12 起拆成 1–6 / 7–9 两次 F) · `ZhouLift`(4) · `NierShells`(2，2026-10-12 0311 重构 B 包：担架员/庄稼人) |
 | South | `SouthWhisper`(7，2026-10-12 原六句不改字、末尾加幺娃一句) · `NierFollow`(3，2026-10-12 新) · `MouthContact`(2，2026-10-12 新) · `MouthGo`(1，2026-10-12 新) · `MouthFlank`(1，2026-10-12 新) · `VillagePointer`(1) |
-| Village | `StreetBlocked`(2) · `KitchenDetour`(2) |
+| Village | `StreetBlocked`(2) · `KitchenDetour`(2) · `GengHouse`(3，2026-10-12 0311 重构 C 包：老耿揪妮儿一巴掌 / 指灶屋 / 连屋进了人) |
 | Melee | `MeleeRight`(1) · `MeleeCurse`(1) · `WindowOrder`(1) |
-| Courtyard | `CourtyardOpen`(2) · `TwoLitters`(1) · `LastLitter`(2) |
-| TransferApproach | `TransferSorting`(1) · `VillageRoadThreat`(2) |
+| Courtyard | `CourtyardOpen`(2) · `TwoLitters`(1) · `LastLitter`(2) · `GengGate`(5，2026-10-12 C 包：班长喊老耿开后门 / 缸 / 车 / 往边上靠 / 俺这车) · `CartPush`(3，2026-10-12 C 包：可选 F 推车过门槛) |
+| TransferApproach | `TransferSorting`(1) · `VillageRoadThreat`(2) · `GengCart`(3，2026-10-12 C 包：老耿在车旁自说) · `AskGeng`(4，2026-10-12 C 包：顺子问老耿往哪走) |
 | Transfer | `TransferDefense`(1) · `TransferRight`(1) · `TransferBatch`(1) · `EscortZhou`(3) |
 | CartRide | `CartTalk`(5) |
 | AirFirst | `AircraftFirst`(3) · `WestDitchOrder`(1) |
@@ -134,7 +134,7 @@
 | Bridge* | `BridgeOrders`(3) · `BridgeCover`(2) · `BridgeWithdraw`(3) · `MarchToTengxian`(1) |
 | NightMarch | `NorthGate`(2) |
 
-播完记事实的对应（`MISSION_VOICE_FACTS`）：`RescueCall→rescueCallHeard` `SupportOrder→supportOrdersHeard` `BundleOrder→bundleOrderHeard` `Volunteer→volunteerHeard` `BorrowLight→lightShared` `SouthWhisper→southWhisperHeard` `NierFollow→nierFollowHeard` `VillagePointer→mainStreetPointed` `TransferSorting→transferSortingHeard` `VillageRoadThreat→villageRoadThreatSeen` `EscortZhou→escortGranted` `CartTalk→cartTalkHeard` `WestDitchOrder→westDitchPointed` `CarryZhou→carryOrdersHeard` `PicketHold→picketHolding` `ZhouCheck→zhouChecked` `Headcount→headcountDone` `GateChallenge→gateChallenged` `ReceptionAccept→receptionAccepted` `MedicAsk→medicExamining` `SquadAssign→squadAssigned` `BridgeOrders→bridgeOrdersHeard` `MarchToTengxian→marchOrderHeard`。
+播完记事实的对应（`MISSION_VOICE_FACTS`）：`RescueCall→rescueCallHeard` `SupportOrder→supportOrdersHeard` `BundleOrder→bundleOrderHeard` `Volunteer→volunteerHeard` `BorrowLight→lightShared` `SouthWhisper→southWhisperHeard` `NierFollow→nierFollowHeard` `VillagePointer→mainStreetPointed` `GengGate→gengGateHeard` `AskGeng→gengAsked` `TransferSorting→transferSortingHeard` `VillageRoadThreat→villageRoadThreatSeen` `EscortZhou→escortGranted` `CartTalk→cartTalkHeard` `WestDitchOrder→westDitchPointed` `CarryZhou→carryOrdersHeard` `PicketHold→picketHolding` `ZhouCheck→zhouChecked` `Headcount→headcountDone` `GateChallenge→gateChallenged` `ReceptionAccept→receptionAccepted` `MedicAsk→medicExamining` `SquadAssign→squadAssigned` `BridgeOrders→bridgeOrdersHeard` `MarchToTengxian→marchOrderHeard`。
 
 罗班长带路短命令（Guide）按新步骤重排：下线 `GuideTrench` `GuideShelter` `GuideRetreatFirst` `GuideRetreatWall` `GuideRetreatYard` `GuideReception` `GuideRearDefense` `GuideExit` `GuideSouthFlank` `GuideNorthRear`；新增 `GuideRearTrench` `GuideCollection` `GuideAlley` `GuideCart` `GuideWestDitch` `GuideWallPath` `GuideYardGate` `GuideBridge` `GuideWithdraw` `GuideNorthGate`；其余沿用（台词不变则不重烘）。新 Guide 台词不在 Notion 里，由配音包按罗班长口吻写短句（≤12 字，四川话），写进交付报告供验收。
 

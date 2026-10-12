@@ -46,7 +46,10 @@ export function BuildVillageWhitebox(groundAt) {
     }),
     ["KitchenEast", 64, -9, .6, 2.9, 15], ["ConnectedHouseEastFront", 64, 2.6, .6, 2.9, 4.2],
     ["ConnectedHouseWindowSill", 64, 6.35, .6, .82, 3.3], ["ConnectedHouseEastDoorSill", 64, 10.25, .6, .82, 2.1],
-    ["MachineGunHouseEastFront", 49, 2.6, .6, 2.9, 4.2], ["MachineGunHouseEastBack", 49, 13.4, .6, 2.9, 4.2],
+    ["MachineGunHouseEastFront", 49, 2.6, .6, 2.9, 4.2],
+    // 2026-10-12 0311 C 包（契约 §3.6）：MachineGunHouseEastBack（z 11.3–15.5）开成通西侧夹道的侧门 —— 09 窜出人的门。
+    // 门洞 z 12.6–14.2（1.6 m），两边填墙到原墙的两头；Layout 的整段墙照旧由 replaceBlockIds 拆掉。
+    ["WestAlleyDoorInfillN", 49, 11.95, .6, 2.9, 1.3], ["WestAlleyDoorInfillS", 49, 14.85, .6, 2.9, 1.3],
     ["MachineGunHouseWindowSill", 49, 8, .6, .82, 6.6],
     ["MeleeAlcoveScreen", 61, 2.2, 4, 1.9, .35], ["AmbushWestScreen", 54.6, 3.5, .35, 1.9, 4.2],
     ["CourtyardWest", 33, 25, .7, 2.5, 19], ["CourtyardExitLeft", 42, 34, 17, 2.5, .6],
@@ -69,6 +72,8 @@ export function BuildVillageWhitebox(groundAt) {
     }),
   ];
   replaceBlockIds.push(...RESKIN.map(([id]) => id));
+  // 侧门开在 MachineGunHouseEastBack 的位置上：Layout 那整段墙拆掉，这里发的是两段填墙 + 门楣（下面）。
+  replaceBlockIds.push("MachineGunHouseEastBack");
   function Block(id, x, z, w, h, d, semantic = "plaster", extra = {}) {
     const block = { id, x, z, w, h, d, y: groundAt(x, z) + h / 2,
       semantic, tag: "whiteboxWall", ...extra };
@@ -404,6 +409,17 @@ export function BuildVillageWhitebox(groundAt) {
   Roof("Kitchen", 58, -9, 12, 15, 2.95, false, 1.4);
   Roof("ConnectedHouse", 58, 8, 12, 15, 2.95, false, 1.4);
   Roof("MachineGunHouse", 43, 8, 12, 15, 2.95, false, 1.4);
+  // 2026-10-12 0311 C 包：机枪屋通西侧夹道的侧门（门洞 z 12.6–14.2，两段填墙在 RESKIN 里）：门楣、两根门柱、门槛。
+  // 09 玩家进夹道 ≥ 8 m 时 AlleyPop 从这里窜出来（MISSION_TACTICS.AlleyPop 走 z 13.4 过 x 49）。
+  {
+    const g = groundAt(49, 13.4);
+    Block("WestAlleyDoorHead", 49, 13.4, .6, .5, 2.0, "timber", { y: g + 2.65 });
+    // 门柱与填墙齐平（Script_FirstLevelMidTest「门框不许凸出墙面」：凸出的框角会挂住贴墙滑的脚本走位）。
+    for (const z of [12.52, 14.28]) Block(`WestAlleyDoorJamb${z}`, 49, z, .6, 2.4, .16, "timber", { y: g + 1.2 });
+    Detail("WestAlleyDoorSill", 49, 13.4, .7, .1, 1.6, "structure", { y: g + .05 });
+    // 门扇朝夹道那一侧敞着（非实心，贴在东墙外皮上）。
+    Detail("WestAlleyDoorLeaf", 49.72, 12.55, .8, 2.0, .06, "timber", { y: g + 1.0, ry: .35 });
+  }
   // 09: close the two-metre gap between kitchen and connected house with a
   // narrow roofed link.
   Bank("KitchenLinkWest", 52, -.5, .6, 2.9, 2, "plaster");
@@ -436,18 +452,27 @@ export function BuildVillageWhitebox(groundAt) {
   // Exposed beams under the soffit.
   for (const z of [-14.2, -10.6, -7, -3.4])
     Detail(`KitchenBeam${z}`, 58, z, 11.4, .2, .24, "timber", { y: kg + 2.78 });
-  // Centre room: hearth (0.8 m, two pots and a flue) on the west side, woodpile east.
+  // Centre room: hearth (0.8 m, a flue) on the west side, woodpile east.
+  // 2026-10-12 0311 C 包（契约 §3.7）：这是老耿家，人正要走 —— 灶上没锅（两口锅已经上了驴车），只剩两个空灶眼。
   Block("KitchenHearth", 56.17, -7.7, .9, .8, 2.2, "earthDark");
-  Detail("KitchenHearthPot0", 56.17, -8.3, .64, .26, .64, "metal", { y: kg + .93 });
-  Detail("KitchenHearthPot1", 56.17, -7.1, .52, .2, .52, "metal", { y: kg + .9 });
+  Detail("KitchenHearthEye0", 56.17, -8.3, .56, .04, .56, "boundary", { y: kg + .81 });
+  Detail("KitchenHearthEye1", 56.17, -7.1, .46, .04, .46, "boundary", { y: kg + .81 });
   Block("KitchenHearthFlue", 55.95, -8.9, .4, 2.15, .4, "earthDark", { y: kg + .8 + 1.075 });
   Woodpile("KitchenWoodpile", 59.42, -10, .85, 3.2, 1.15);
   Jar("KitchenWaterJar", 56.25, -15.55, .9);
   Detail("KitchenHangingBasket", 59.4, -15.4, .5, .3, .5, "timber", { y: kg + 1.9 });
   Detail("KitchenHangingCord", 59.4, -15.4, .03, .75, .03, "timber", { y: kg + 2.42 });
+  // 西间：捆了口的粮缸（缸口蒙布、一圈绳）—— 让开 VillageCorner (54,−12) 的出生点与 x=58 的担架道。
+  Jar("KitchenGrainJar", 54.2, -9.6, .95);
+  Detail("KitchenGrainJarCloth", 54.2, -9.6, .82, .06, .82, "canvas", { y: kg + .79 });
+  Detail("KitchenGrainJarRope", 54.2, -9.6, .74, .05, .74, "earthDark", { y: kg + .72 });
   // East room: a kang-bed; the old table and stores already stand here.
   Block("KitchenKang", 62.8, -3.9, 1.6, .6, 3.6, "earthDark");
   Detail("KitchenKangMat", 62.8, -3.9, 1.5, .06, 3.4, "canvas", { y: kg + .63 });
+  // 炕上半打的包袱：一个捆好的、一个摊开着没捆完（布角搭下来）。
+  Detail("KitchenKangBundle0", 62.9, -4.9, .7, .34, .55, "canvas", { y: kg + .83, ry: .25 });
+  Detail("KitchenKangBundle1", 62.6, -3.0, .95, .18, .8, "canvas", { y: kg + .75, ry: -.15 });
+  Detail("KitchenKangBundleFlap", 62.15, -2.55, .5, .03, .6, "canvas", { y: kg + .67, ry: .4 });
   // 09_3: the connected house's east back wall opens a window onto the side
   // room, so its gunner reads "in the window"; the doorway z 8…9.2 is unchanged.
   {
@@ -531,6 +556,11 @@ export function BuildVillageWhitebox(groundAt) {
   // The carriers swing round each pocket corner (radius 1.28 about (x, 18)).
   Jar("CourtJar0", 51.3, 16.3, .85);
   Woodpile("CourtWoodpile", 61.0, 16.25, 2.6, .8, .9);
+  // 2026-10-12 0311 C 包（契约 §3.8 / §4）：后院里老耿家正在收拾的杂物 —— 院门内侧西边一口缸（GengGate 抱缸挪墙根的那口）、
+  // 东边一张方桌（和何有田拖的那张），都让开 x=53 的担架道（±1 m）与口袋出口那条 z 32.2 的横线（搬运员 0.32 m）。
+  Jar("CourtGateVat", 50.9, 30.2, .9);
+  Block("CourtGateTable", 56.3, 29.9, 1.1, .78, .72, "timber");
+  Detail("CourtGateTableTop", 56.3, 29.9, 1.22, .05, .84, "timber", { y: groundAt(56.3, 29.9) + .8 });
 
   // 10_2 lane back to the street: shed face (z 37.3) north, a coped wall
   // (z 41.1) south → 3.8 m for x 55.9…59.9; east of that it widens to the
@@ -543,6 +573,12 @@ export function BuildVillageWhitebox(groundAt) {
   RubbleStrip("BypassLaneFoot", 56.2, 40.8, 59.5, 40.75, 5);
   RubbleStrip("BypassLaneFootN", 56.4, 37.62, 71.2, 37.65, 10);
   Door("BypassSouthWallGate", { axis: "z", plane: 41.1, dir: -1, c: 0 }, 57.6, 1.0, 1.95, 0);
+  // 2026-10-12 0311 C 包（契约 §3.8）：绕行巷东头主街口的草垛 —— 10 第二拨的歪把子（LaneGunner）架在它西边
+  // (77.5,42.5)，顺着巷子往院门方向扫。贴主街东墙（x 81.65）南段北头，让开担架线 (74,39)→(77,34)→(78,60)（≥ 1.7 m）、
+  // 12 第一拨从绕回短巷出来往南跑的折线（TransferGunner / TransferRifle*，x 74.8–76.4 一带）与追兵折线
+  //（MISSION_TACTICS 的 Courtyard* / Lane*，都从它北面过）；追兵从东边进来的口子（x 82，z 35–45）留 35–41.8 那一段。
+  Haystack("LaneHaystack", 79.4, 42.8, 1.0, 1.7);
+  Detail("LaneHaystackFork", 80.9, 42.3, .08, 1.6, .08, "timber", { ry: .3, y: groundAt(80.9, 42.3) + .8 });
 
   // ---------------------------------------------------------------------------
   // The rest of the Village box: rows of houses, yard walls, lanes, stores.
