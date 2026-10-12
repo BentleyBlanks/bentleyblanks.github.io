@@ -27,8 +27,14 @@ const Smooth = value => { const t = Clamp01(value); return t * t * (3 - 2 * t); 
  */
 const CHUNK_METRES = 72;
 
+/**
+ * 白盒关卡编辑器的文件场景（docs/Data_EditorBlockout.md §2.2）：`layout.terrainSampler`
+ * 存在时，格点高度与 RefineCells 的细分高度都取它（格距取 `terrainSampler.cellM`）；
+ * 不存在时下面每一行与原来逐位相同。
+ */
 export function CreateP012Terrain(layout) {
-  const {x, z, w, d} = layout.ground, cellM = layout.terrainSpec?.cellM || 2;
+  const sampler = typeof layout.terrainSampler === "function" ? layout.terrainSampler : null;
+  const {x, z, w, d} = layout.ground, cellM = layout.terrainSpec?.cellM || sampler?.cellM || 2;
   const chunkCells = Math.max(32, Math.round(CHUNK_METRES / cellM));
   const minX = x - w / 2, minZ = z - d / 2;
   const cols = Math.ceil(w / cellM), rows = Math.ceil(d / cellM);
@@ -49,6 +55,8 @@ export function CreateP012Terrain(layout) {
   }
   for (let iz=0; iz<=rows; iz++) for (let ix=0; ix<=cols; ix++) {
     const px=minX+ix*stepX, pz=minZ+iz*stepZ;
+    // Blockout scene files bring their own height grid (§2.2 of the blockout contract).
+    if (sampler) { heights[iz*width+ix]=sampler(px,pz); continue; }
     // The authored mission terrain carries its own pads; the fixture formula below is not used.
     if (layout.terrainSpec) { heights[iz*width+ix]=SampleMissionTerrain(px,pz,layout.terrainSpec); continue; }
     // Low rolling fields beside the station and roads; broader rises outside
@@ -67,7 +75,7 @@ export function CreateP012Terrain(layout) {
     heights[iz*width+ix]=h*flat;
   }
   const NodeHeight = (ix, iz) => heights[Math.max(0,Math.min(rows,iz))*width+Math.max(0,Math.min(cols,ix))];
-  const {cellOf, fine, sub} = RefineCells(layout.terrainSpec, {cols, rows, minX, minZ, stepX, stepZ, NodeHeight});
+  const {cellOf, fine, sub} = RefineCells(layout.terrainSpec, {cols, rows, minX, minZ, stepX, stepZ, NodeHeight, sampler});
   const fineWidth = sub + 1, fineCount = fineWidth * fineWidth;
   const SampleHeight = (px,pz) => {
     const gx=Clamp01((px-minX)/w)*cols,gz=Clamp01((pz-minZ)/d)*rows;
@@ -136,7 +144,7 @@ export function CreateP012Terrain(layout) {
  * 小格点取两端粗格点的直线插值（邻格的三角边就是这条直线，不开裂）；
  * 这条边上解析中点也偏得多时，把邻格也拉进来，反复到稳定。
  */
-function RefineCells(spec, {cols, rows, minX, minZ, stepX, stepZ, NodeHeight}) {
+function RefineCells(spec, {cols, rows, minX, minZ, stepX, stepZ, NodeHeight, sampler = null}) {
   const sub = spec?.refine?.subdivisions | 0;
   if (sub < 2) return {cellOf: null, fine: null, sub: 1};
   const errorM = spec.refine.errorM ?? .04, screenM = spec.refine.screenM ?? .1;
@@ -146,7 +154,11 @@ function RefineCells(spec, {cols, rows, minX, minZ, stepX, stepZ, NodeHeight}) {
   const FineHeight = (gx, gz) => {
     const key = gz * rowWidth + gx;
     let h = cache.get(key);
-    if (h === undefined) { h = SampleMissionTerrain(minX + gx * (stepX / sub), minZ + gz * (stepZ / sub), spec); cache.set(key, h); }
+    if (h === undefined) {
+      const px = minX + gx * (stepX / sub), pz = minZ + gz * (stepZ / sub);
+      h = sampler ? sampler(px, pz) : SampleMissionTerrain(px, pz, spec);
+      cache.set(key, h);
+    }
     return h;
   };
   // Error of the coarse anti-diagonal split at fine node (p, q) of cell (ix, iz).
