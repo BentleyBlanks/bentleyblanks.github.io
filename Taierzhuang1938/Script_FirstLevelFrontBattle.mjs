@@ -96,6 +96,11 @@ const LeaderCover=()=>({...S.leaderCover,arrivalM:B.leaderCoverArrivalM});
  * is within observeWaitM or has walked on past the mouth, says FrontObservation + FrontBlockade, and comes back out.
  */
 export const OBSERVATION_STOP=Object.freeze({x:-23.05,z:-130.2,arrivalM:.6,observe:true});
+/** Where Yaowa waits for Zhou: B.yaowaHandoverShortM up the access trench from the seat (He stands on the seat). */
+export function YaowaHandoverPost(){
+  const via=S.leftRoute.at(-2),seat=S.leftSeat,d=Distance(via,seat)||1;
+  return {x:seat.x+(via.x-seat.x)/d*B.yaowaHandoverShortM,z:seat.z+(via.z-seat.z)/d*B.yaowaHandoverShortM};
+}
 export function CaptureRouteWithObservation(support=Routes.support){
   const route=support.slice(0,-1),at=route.findIndex(p=>p===S.approach[3]);
   if(at<0)return [...route,LeaderCover()];
@@ -488,13 +493,38 @@ export class FirstLevelFrontBattle {
   StartHandover(say=true){
     if(this.handoverStarted)return;
     const r=this.r,he=r.companion.Handle("heyoutian");if(!he)return;
-    // A 04 checkpoint places He on the seat already: do not send him 9 m up the access trench and back.
-    const onSeat=Distance(he.position,S.leftSeat)<B.handoverReadyM;
-    this.handoverStarted=true;this.SetWalk(he,onSeat?[S.leftSeat]:[...S.leftRoute.slice(-2)]);if(say)r.Say("TakeOverGun");
+    // A 04 checkpoint places He on the seat already: do not send him 9 m up the access trench and back. He stands at
+    // (or has drifted a few metres past) the access trench's last corner from his 03 walk: from there the seat is one
+    // straight leg - walking him back to the corner first let Yaowa (sent at the same moment, 21 m out) reach the seat
+    // ahead of him, and in the 1.85 m trench He then stood 3.9 m behind Yaowa, outside handoverReadyM, while Zhou waited
+    // for He: 03 never ended (2026-10-12 03->07 drives 1 and 3, 100+ s each).
+    const via=S.leftRoute.at(-2),direct=Distance(he.position,S.leftSeat)<B.handoverReadyM||Distance(he.position,via)<B.handoverViaSkipM;
+    this.handoverStarted=true;this.SetWalk(he,direct?[S.leftSeat]:[...S.leftRoute.slice(-2)]);if(say)r.Say("TakeOverGun");
+  }
+  /**
+   * The left gun pit's ramp (Data_FirstLevelMissionTerrain steps: the leftSeat pit, 0.65 m deep, meets the 2 m access
+   * trench in a 54-55 deg rise at z -152.5..-153.3, over the capsule's 52 deg climb limit, Script_Physics) is climbed by
+   * autostep or not at all: Zhou walks down it, Yaowa got up it in two drives, He stood at its foot for 100+ s in four
+   * 2026-10-12 03->07 drives and 10/12 probe trials (crouched and standing alike), so 03 never ended. Until the terrain
+   * gives that transition a <= 45 deg ramp (not this package's file; integration item), a man of the handover who has
+   * made no progress on the ramp's foot for walkStallS is set on the pit floor B.handoverRampLiftM short of the seat -
+   * a 1.6 m lift inside a trench, logged in `stalls` as rampLift.
+   */
+  RampLift(a){
+    const r=this.r,d=Distance(a.position,S.leftSeat),st=this.rampLift??=new Map();
+    if(!(d>B.handoverRampFootM[0]&&d<B.handoverRampFootM[1])){st.delete(a.id);return;}
+    const w=st.get(a.id)??{best:Infinity,at:r.time};st.set(a.id,w);
+    if(d<w.best-B.walkStallProgressM){w.best=d;w.at=r.time;return;}
+    if(r.time-w.at<B.walkStallS)return;
+    r.PlaceActor(a,{x:S.leftSeat.x,z:S.leftSeat.z+B.handoverRampLiftM});
+    this.stalls.push({id:a.missionId||a.castId||a.id,kind:"rampLift",x:+a.position.x.toFixed(1),z:+a.position.z.toFixed(1),at:+r.time.toFixed(1)});
+    if(this.stalls.length>24)this.stalls.shift();
+    st.delete(a.id);
   }
   UpdateHandover(){
     const r=this.r,he=r.companion.Handle("heyoutian");
     if(!this.handoverStarted||this.postsRelieved||!he?.alive)return;
+    this.RampLift(he);
     // Not gated on the fact: a debug start at 04 already carries leftGunHandover, He still has to sit down.
     const gun=r.emplacement.guns.get(r.leftGunId);if(gun?.npc)return;
     if(Distance(he.position,S.leftSeat)<B.arrivalM){r.emplacement.NpcOccupy(r.leftGunId,he);r.Record("leftGunHandover");return;}
@@ -896,11 +926,17 @@ export class FirstLevelFrontBattle {
       this.zhouEscortDispatched=true;
     }
     if(!r.Has("rifleWithdrawalResolved")){r.Defend(a,S.leftSeat,0,.4);return;}
-    const yaowa=r.companion.Handle("yaowa");
-    if(!this.zhouEscortDispatched){this.zhouEscortDispatched=true;this.SetWalk(yaowa,S.leftRoute.slice(-3));}
+    const yaowa=r.companion.Handle("yaowa"),he=r.companion.Handle("heyoutian");
+    // Yaowa goes down the access trench only once He has the seat (or He is gone): the order is "He takes the gun,
+    // Yaowa helps Zhou down", and the trench holds one man abreast - sent together, Yaowa reached the seat first and He
+    // stood behind him for good (see StartHandover). He stops 1.4 m short of the seat, within rearArrivalM of Zhou.
+    if(!this.zhouEscortDispatched&&(!he?.alive||Distance(he.position,S.leftSeat)<=B.handoverReadyM)){
+      this.zhouEscortDispatched=true;this.SetWalk(yaowa,[...S.leftRoute.slice(-3,-1),YaowaHandoverPost()]);
+    }
+    // The same pit ramp stops Yaowa on his way down to Zhou (03->07 drive 5: 4.0 m off the seat, rearArrivalM is 3.5).
+    if(this.zhouEscortDispatched&&yaowa?.alive&&this.walks.has(yaowa.id))this.RampLift(yaowa);
     if(!this.walks.has(a.id)){
       if(yaowa?.alive&&Distance(yaowa.position,a.position)>B.rearArrivalM)return;
-      const he=r.companion.Handle("heyoutian");
       if(he?.alive&&Distance(he.position,S.leftSeat)>B.handoverReadyM)return;
       r.emplacement.NpcVacate(r.leftGunId,"woundedWithdrawal");
       // FRONT_SORTIE.zhouExit from the corner nearest to where he stands, over a clear first leg (Opening's helper).

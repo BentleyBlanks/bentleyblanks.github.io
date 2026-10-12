@@ -866,6 +866,11 @@ export const FRONT_LINES_OUT_OF_PICTURE = Object.freeze({
   "TankStopped.03": "刘文才在沟口（约 67 m）招呼后面的人跟上",
   "ZhouLift.01": "担架员是集结处的立即模式人群（FirstLevelCollection.Draw），没有能绑脸的身体",
   "ZhouLift.03": "同上，担架员没有能绑脸的身体",
+  // 2026-10-12 03–05 重构（A 包）：观察口与阵位里隔着几十米的喊话。
+  "FrontBlockade.01": "老周在左枪位（约 29 m）隔着缺口冲罗班长喊；玩家在观察口顺着罗班长的手臂看土坎背坡的守军，老周的枪在画面左远处",
+  "FirstBatchCount.01": "刘文财在支沟口（约 50 m）看着第一批守军进沟数人；玩家这时在夺下的阵位机枪后看缺口",
+  "TankSpotted.01": "土坎背坡里一个守军（约 24 m，隔着土坎）听见履带声喊战车；玩家在阵位机枪后，他本来就在视线外",
+  "GapGuardDown.01": "刘文财在支沟口（约 53 m）看着缺口里倒下的守军数剩下的人；玩家在阵位机枪后盯着右前方的战车",
 });
 /**
  * Near lines shouted in the thick of a fight, one reason each: excused only when either side really was fighting through

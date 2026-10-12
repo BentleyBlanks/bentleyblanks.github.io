@@ -171,6 +171,9 @@ export class FirstLevelFrontCounterattack {
    */
   WindowOpenFor(batchStartedAt) {
     if (this.window.open) return true;
+    // The batch was released without the window ever opening (FrontBattle's assaultWindowFallbackS: the attack broke off
+    // on its own): there is no live window to wait for - go. The second drive had the men wait 45 s more here.
+    if (this.window.openedAt == null) return true;
     const since = this.window.closedAt ?? batchStartedAt ?? this.r.time;
     return this.r.time - since >= C().windowStaleS;
   }
