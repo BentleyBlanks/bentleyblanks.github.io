@@ -300,8 +300,10 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   }),
   TankTerror: Scene(true, `${FRONT}。战车的机枪扫过来，罗班长冲站起来的人吼`, { "01": P("shout", 1) }),
   // 04 缺口里倒下一个：刘文财在沟口数剩下的人。
+  // 2026-10-12 D 包录音：原表演说明「前面一个停顿是看着人倒下」被模型念了出来（第 3 次生成转写「人倒下,还剩两果」），第 2 次把省略号
+  // 演成 3 s 的嘟囔，第 1 次干净但整段信噪比 25.9 dB；停顿改写成明确的无声空当（pauseBeforeS），不再描述停顿里在看什么。
   GapGuardDown: Scene(true, "支沟口，刘文财刚看着一个守军冲缺口被车上机枪打倒在口子正中，隔了一拍低声数剩下的人", {
-    "01": P("low", 0.6, { delivery: "前面一个停顿是看着人倒下，后面「还剩两个」平平地、压着说出来，不煽情" }),
+    "01": P("low", 0.6, { pauseBeforeS: 0.8, delivery: "开口前只是无声地停一拍（省略号不出声、不哼、不念任何字），然后「还剩两个」平平地、压着说出来，这四个字之外一个字不多，不煽情" }),
   }),
   // 2026-10-12 改写（契约 §3.2）：守军报的是先前抱着集束弹从支沟摸过去没回来的弟兄；罗班长看车、看沟、停一拍再分工。
   BundleOrder: Scene(true, `${FRONT}。阵位后墙下的岔口，一名退下来的守军喊着报告先前有个弟兄抱着集束弹从支沟摸过去了没回来；罗班长看了一眼路上的战车、再看支沟，停了一拍才分派人手，顺子在他身边问了一句`, {
@@ -358,8 +360,10 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     // 两处动作空当：第五句后顺子把火柴往兜里一收（约 2 s）、第六句后老周摸出烟包递一根过去（约 3 s）。
     "06": P("low", 0.5, { delivery: "江湖油子的腔调，半是占便宜半是让步，压着嗓子但有笑意", offsetS: 2.0, emit: [{ id: "BorrowLightCigaretteOffered", at: "end" }] }),
     // 2026-10-12 借火改两次 F（0311 契约 §3.4）：老周递出烟（BorrowLightCigaretteOffered）之后等玩家第二次按 F
-    //（Script_FirstLevelCollection 发 BorrowLightMatchAsked），7–9 句与划火才接着来。提示词里仍是「约 3 s」的动作空当。
-    "07": P("normal", 0.4, { after: "event:BorrowLightMatchAsked", offsetS: 0.4, pauseBeforeS: 3 }), "08": P("normal", 0.6, { delivery: "江湖油子的腔调，故意挑理，带笑，尾音上挑" }), "09": P("low", 0.35),
+    //（Script_FirstLevelCollection 发 BorrowLightMatchAsked），7–9 句与划火才接着来。
+    // 2026-10-12 D 包：这里不能写 pauseBeforeS —— 它进整段提示词，录音（2026-09-30 顺子重录版）的提示词里从来没有它，写了就与清单的
+    // promptHash 对不上（--audio 门禁红）而台词一字没改；动作空当本来就由播放时的 after/offsetS 给，不靠录音里的停顿。
+    "07": P("normal", 0.4, { after: "event:BorrowLightMatchAsked", offsetS: 0.4 }), "08": P("normal", 0.6, { delivery: "江湖油子的腔调，故意挑理，带笑，尾音上挑" }), "09": P("low", 0.35),
   }),
   ZhouLift: Scene(true, "担架员走到老周跟前催他上担架，例行公事的大嗓门；老周含着刚点着的烟，含混、赖着不肯动，最后一句是嘟囔给自己听的", {
     "01": P("shout", 0.6), "02": P("low", 0.35, { delivery: "含着烟，含混" }), "03": P("shout", 0.6),

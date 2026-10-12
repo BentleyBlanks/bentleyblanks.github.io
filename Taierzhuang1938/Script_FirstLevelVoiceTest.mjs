@@ -231,7 +231,7 @@ console.log("ok 假名留在侧表，界面字表不受影响");
 
 // 5. 提示词。旧整段：逐句覆盖、单次请求、要环境声（旧口径）。
 //    01–06 场景整段：一场一次请求、干声不烘环境、最多 3 条参考音按 @音频N 绑定说话人、每句原文都在、谁说哪句写明。
-const { ScenePrompt, SceneReferences } = await import("./Script_SeedAudioFirstLevelBake.mjs");
+const { ScenePrompt, SceneReferences, WholeCuePrompt, WholeCueReferences, WHOLE_CUE_REFERENCED } = await import("./Script_SeedAudioFirstLevelBake.mjs");
 for (const cue of MISSION_DIALOGUE) {
   if (cue.perLine) {
     const prompt = ScenePrompt(cue), refs = SceneReferences(cue);
@@ -249,11 +249,24 @@ for (const cue of MISSION_DIALOGUE) {
     });
     continue;
   }
-  const prompt = MissionVoicePrompt(cue);
+  const prompt = WholeCuePrompt(cue);
   assert.ok(prompt.length <= 3000, cue.id + " 提示词超过 3000 字符");
   cue.lines.forEach((line, index) => assert.ok(prompt.includes(MissionVoiceSpoken(cue, index)), cue.id + " 提示词缺少第 " + index + " 句"));
   assert.ok(prompt.includes("四川"), cue.id + " 提示词要写明四川话表演");
   if (cue.lines.some((line) => line.lang === "ja")) assert.ok(prompt.includes("日军角色只念稿中给出的日语"), cue.id + " 混合语言段要交代日语口径");
+  // 2026-10-12 03–11 重构：老耿 / 庄稼人是鲁南人，有他们在场的整段 cue 要点名谁说北方官话（不能被「所有中国人物讲四川话」盖掉）。
+  const northerners = cue.lines.filter((line) => ["geng", "peasant"].includes(line.who)).map((line) => MISSION_VOICE_CAST[line.who][0]);
+  for (const name of new Set(northerners)) assert.ok(prompt.includes(`${name}`) && prompt.includes("北方官话"), cue.id + " 要交代 " + name + " 说北方官话");
+  // D 包名单里的整段 cue 挂定妆参考音（1–3 条、@音频N 行首绑说话人）；名单外的提示词与 MissionVoicePrompt 逐字相同（沿用录音不重烘）。
+  if (WHOLE_CUE_REFERENCED.has(cue.id)) {
+    const refs = WholeCueReferences(cue);
+    assert.ok(refs.length >= 1 && refs.length <= 3, cue.id + " 挂 1–3 条定妆参考音");
+    refs.forEach((ref, k) => assert.ok(prompt.includes(`@音频${k + 1} 是`), cue.id + " 交代 @音频" + (k + 1) + " 是谁"));
+    cue.lines.forEach((line, index) => {
+      const k = refs.findIndex((ref) => ref.who.includes(line.who));
+      if (k >= 0) assert.ok(prompt.includes(`@音频${k + 1} ${MISSION_VOICE_CAST[line.who][0]}：“${MissionVoiceSpoken(cue, index)}”`), cue.id + " 第 " + (index + 1) + " 句标明用哪条参考音的嗓子");
+    });
+  } else assert.equal(prompt, MissionVoicePrompt(cue), cue.id + " 名单外的整段提示词不变");
 }
 console.log("ok 提示词：旧整段逐句覆盖；01–06 场景整段一次请求、带参考音绑定说话人、禁环境声");
 
@@ -370,10 +383,11 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   assert.ok(LineDirection(byId.get("BunkerIncoming"), 0).cutAtS < 0, "截断点在句尾之前");
   assert.deepEqual(Emits("BorrowLight"), ["BorrowLightMatchesPocketed", "BorrowLightCigaretteOffered"], "借火两处动作空当各有事件");
   assert.ok(LineDirection(byId.get("BorrowLight"), 5).offsetS >= 1.8, "借火第一处空当约 2 s");
-  // 2026-10-12 借火改两次 F（0311 契约 §3.4）：第 7 句等玩家第二次按 F（Script_FirstLevelCollection 发 BorrowLightMatchAsked），
-  // 提示词里的「约 3 s」空当留在 pauseBeforeS。
+  // 2026-10-12 借火改两次 F（0311 契约 §3.4）：第 7 句等玩家第二次按 F（Script_FirstLevelCollection 发 BorrowLightMatchAsked）。
+  // D 包：第二处空当不进提示词（pauseBeforeS 会改整段 promptHash，而 BorrowLight 台词没改、录音沿用 2026-09-30 版，--audio 按哈希核）；
+  // 空当由播放时的 after / offsetS 给。
   assert.equal(LineDirection(byId.get("BorrowLight"), 6).after, "event:BorrowLightMatchAsked", "借火第 7 句等第二次 F");
-  assert.ok(LineDirection(byId.get("BorrowLight"), 6).pauseBeforeS >= 2.8, "借火第二处空当的提示词仍约 3 s");
+  assert.equal(LineDirection(byId.get("BorrowLight"), 6).pauseBeforeS, undefined, "借火第二处空当不写进提示词（录音沿用，哈希要对得上）");
   // 2026-10-11 契约 §3 冻结的导演事件名（Dir01 / Dir02 按同名发）：要等动作的句子 after:"event:<名>"，其余沿用录音间隔。
   const FROZEN_EVENTS = {
     "BunkerBanter.07": "nearShell", "BunkerLedger.01": "pour", "BunkerExit.01": "exitReach", "BunkerExit.02": "clipsThrown",
@@ -812,7 +826,7 @@ const FakeAudio = () => {
 
 if (process.argv.includes("--audio")) {
   const { MeasureVoice, TruePeakDb, FrameRms, DecodePcm, EncodeSegment } = await import("./Script_SeedAudioVoiceKit.mjs");
-  const { ScenePrompt, SceneReferences, SCENE_CHECK } = await import("./Script_SeedAudioFirstLevelBake.mjs");
+  const { ScenePrompt, SceneReferences, SCENE_CHECK, WholeCuePrompt, WholeCueReferences, WHOLE_CHECK } = await import("./Script_SeedAudioFirstLevelBake.mjs");
   const Local = (url) => decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, "$1");
   // 片段与整段同一段的波形相关（±20 ms 找对齐）与电平差。
   // 压快过的句子（清单 tempo）：拿整段那一段照样压快再比 10 ms 能量包络——atempo 的拼接点随输入的细微差别
@@ -1004,7 +1018,15 @@ if (process.argv.includes("--audio")) {
     const bytes = fs.readFileSync(new URL("./Audio/FirstLevel/" + cue.file, import.meta.url));
     assert.equal(bytes.length, entry.bytes, cue.id + " 字节数");
     assert.equal(Hash(bytes), entry.sha256, cue.id + " 内容哈希");
-    if (!cue.perLine) assert.equal(Hash(MissionVoicePrompt(cue)), entry.promptHash, cue.id + " 录音对应的是当前提示词");
+    if (!cue.perLine) assert.equal(Hash(WholeCuePrompt(cue)), entry.promptHash, cue.id + " 录音对应的是当前提示词");
+    // 挂参考音的整段 cue：清单里的参考音 sha 就是现在的定妆音；装上的那条 1–3 次抽中的、没有未处理的硬错误。
+    const wholeRefs = WholeCueReferences(cue);
+    assert.equal(entry.castKey ?? "", wholeRefs.map((r) => r.sha256).join(","), cue.id + " 参考音 sha 对得上定妆音");
+    if (wholeRefs.length) {
+      assert.ok(Array.isArray(entry.attempts) && entry.attempts.length >= 1 && entry.attempts.length <= WHOLE_CHECK.maxAttempts, cue.id + " 生成 1–3 次");
+      assert.deepEqual(entry.hard, [], cue.id + " 装上的整段没有未处理的硬错误");
+      assert.ok(Number.isFinite(entry.metrics?.cer) && entry.metrics.clipRuns === 0, cue.id + " 整段量过转写与削波");
+    }
     seconds += entry.seconds;
   }
   // 拧伤口那一下是卡在喉咙里的闷哼，不是放声喊（2026-10-12 R2-Voice）：峰值与有声段都比冬瓜的嚎低 ≥ 6 dB。
