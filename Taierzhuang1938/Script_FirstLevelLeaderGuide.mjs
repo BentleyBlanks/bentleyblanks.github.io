@@ -123,12 +123,14 @@ export class FirstLevelLeaderGuide {
       else cue=spec.afterHoldCue??null;
     }
     if(variant==="Tank"){
+      // 2026-10-12（契约 §3.3）：去程沿攻击支路到弟兄倒下处捡弹（bundleRoutePoint 家族门的点），捡到后标记指沟口攻击位。
       const returning=r.Has("bundleTaken")&&r.Inventory().bundles>0;
-      target=returning?MissionRouteLookahead(MISSION_ROUTES.bundleReturn,r.player.position):
-        Sortie.route.find((point,index)=>!r.Has(`bundleRoutePoint${index}`))||A.bundle;
-      if(!returning&&Distance(r.player.position,A.bundle)<Sortie.supplierRangeM)target=A.bundle;
-      mode=label=returning?"throw":target===A.bundle?"collect":"move";
-      cue=returning?"GuideThrow":"GuideBundle";variant+=returning?"Return":"Outward";
+      const outward=[...Sortie.attackRoute.slice(0,4),Sortie.bundleDrop];
+      target=returning?MissionRouteLookahead(MISSION_ROUTES.attack,r.player.position):
+        outward.find((point,index)=>!r.Has(`bundleRoutePoint${index}`))||A.bundleDrop;
+      if(!returning&&Distance(r.player.position,A.bundleDrop)<Sortie.supplierRangeM)target=A.bundleDrop;
+      mode=label=returning?"throw":target===A.bundleDrop?"collect":"move";
+      cue=returning?"GuideThrow":"GuideFollow";variant+=returning?"Return":"Outward";
     }
     if(variant==="MachineGun"){
       const gun=r.emplacement.Emplacement(r.gunId);

@@ -31,6 +31,18 @@ import { TankAudio } from "./Script_TankAudio.mjs";
 
 const TANK_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+/** The point at arc length s along a lane's polyline (clamped). */
+export function LanePointAt(lane, s) {
+  const P = lane.points || [];
+  if (P.length < 2) return null;
+  let run = 0;
+  for (let i = 1; i < P.length; i++) {
+    const a = P[i - 1], b = P[i], len = Distance(a, b) || 1e-6;
+    if (s <= run + len || i === P.length - 1) { const t = Math.max(0, Math.min(1, (s - run) / len)); return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }; }
+    run += len;
+  }
+  return { x: P.at(-1).x, z: P.at(-1).z };
+}
 const Plain = (v) => ({ x: v.x, y: v.y, z: v.z });
 const Wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -47,7 +59,9 @@ export class FirstLevelTankRuntime {
     this.escortAnchors = new Map();
     this.escortsReleased = false;
     this.blockIndex = path.waypoints.findIndex((w) => w.kind === "block");
-    this.previewIndex = path.waypoints.findIndex((w) => w.preview);
+    // 2026-10-12 (03–11 refactor §3.1 / §3.2): no preview stop; tankHeard is the engine moving off Start, tankAtBendExit
+    // the moment it has driven out of the bend (escorts, push group and reserves all come at once).
+    this.bendExitIndex = path.waypoints.findIndex((w) => w.id === "BendExit");
     this.from = new THREE.Vector3();
     this.to = new THREE.Vector3();
     this.entryWaitSince = null;
@@ -163,6 +177,17 @@ export class FirstLevelTankRuntime {
       let at = LanePoint(lane, player.position), weight = lane.weight;
       if (!at && lane.watch && !r.Has(TankClearFact(r.tank))) { at = LanePoint(lane, player.position, lane.watch.rangeM); weight = lane.watch.weight; }
       if (!at) continue;
+      // 2026-10-12 sapWatch (TANK.sapWatch, contract §3.3): the round goes on the sap lip ahead of the player, never on
+      // him - the zone point is pushed along the lane toward the tank's end by playerClearM plus the scatter's upper
+      // bound, so the burst stays >= playerClearM from where he crouches.
+      const W = this.T.sapWatch;
+      if (lane.sapWatch && W) {
+        const shifted = LanePoint(lane, { x: at.x, z: at.z }, Infinity);
+        const push = W.playerClearM + (lane.scatterM?.[1] ?? 0);
+        const total = (lane.points || []).slice(1).reduce((s, p, i) => s + Distance(lane.points[i], p), 0);
+        const s = Math.min(total, (shifted?.s ?? at.s) + push), seg = LanePointAt(lane, s);
+        if (seg) at = { ...seg, s };
+      }
       const g = this.Ground(at.x, at.z);
       out.push({ id: lane.id, kind: "zone", weight, x: at.x, z: at.z, y: g + 1.1, ground: g, scatterM: lane.scatterM });
     }
@@ -276,7 +301,10 @@ export class FirstLevelTankRuntime {
     // 露面：玩家第一次真的看得见它的那一刻（探针用）。
     if (this.log.appearedAt == null && r.player?.Alive && !r.BlocksSight(r.player.EyePosition, r.Point(t, 2.2), r.view.tankCollider))
       this.log.appearedAt = { t: r.time, stage: r.flow.stage.id, x: t.x, z: t.z, distance: Distance(t, r.player.position) };
-    if (r.flow.stage.id === "Support" && this.previewIndex >= 0 && this.brain.holdIndex === this.previewIndex) r.Record("tankPreviewed");
+    // tankHeard: the engine has moved off the route's start (the offstage idle was already playing; this is the moment
+    // the player can tell it is coming). tankAtBendExit: out of the bend, in full view of the nest.
+    if (!r.Has("tankHeard") && (d.progress > 1 || (d.moving && d.speed > 0.3))) r.Record("tankHeard", { x: +d.x.toFixed(1), z: +d.z.toFixed(1) });
+    if (this.bendExitIndex >= 0 && this.brain.reached >= this.bendExitIndex && !r.Has("tankAtBendExit")) r.Record("tankAtBendExit");
     if (out.state !== this.lastState) { this.lastState = out.state; this.ApplyState(out.state, true); }
     r.view.SyncTank(t);
     const sound = this.Sound, groundY = r.view.tank.position.y;
