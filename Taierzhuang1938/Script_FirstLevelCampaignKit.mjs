@@ -76,6 +76,9 @@ export function ParseCampaignArgs(argv = process.argv) {
   // 03–06 的两条玩家反射（近身还手、躲雷后回位）默认开；--no-reflexes 回到改之前的驾驶器，做前后对照用。
   const reflexes = !Has("--no-reflexes");
   assert.ok(/^[A-Za-z0-9_-]*$/.test(evidenceTag), "--evidence-tag is letters, digits, _ or -");
+  // 帧预算：缺省 assert（超 SCENE_RENDER_LIMITS 就断言死）；`--budget=report` 只打 BUDGET_OVER 继续跑（见 Capture）。
+  const budget = argv.find((arg) => arg.startsWith("--budget="))?.split("=")[1] || "assert";
+  assert.ok(["assert", "report"].includes(budget), "--budget is assert (default) or report");
   return {
     campaign: Has("--campaign"),
     baselineRoot: argv.find((arg) => arg.startsWith("--baseline-root="))?.slice("--baseline-root=".length) || null,
@@ -86,7 +89,7 @@ export function ParseCampaignArgs(argv = process.argv) {
     // 默认整关/分段驾驶只观察运行时自主产生的 cue，不能改写真实语音排队。
     quietGuidanceInterruptProbe: Has("--probe-quiet-guidance-interrupt"),
     allowCheckpointRetry: Has("--allow-checkpoint-retry"),
-    bombFirst, evidenceTag, reflexes,
+    bombFirst, evidenceTag, reflexes, budget,
     // 出图 / 对照用：`--quality=whitebox|high|…` 或环境变量 CAMPAIGN_QUALITY；缺省仍是 low（OpenCampaign 的老口径，不改）。
     quality: argv.find((arg) => arg.startsWith("--quality="))?.split("=")[1] || process.env.CAMPAIGN_QUALITY || undefined,
     stageFrom, stageTo,
@@ -867,10 +870,12 @@ export function CampaignActions(ctx) {
       assert.ok(timing.cellM>0 && standing.length>=2 && standing.every(([,entry])=>entry.bodySpan>1.2),"the optimized standing crowd retains human-sized bodies");
       for(const [key,entry] of Object.entries(timing.crowd))assert.ok(entry.size.every((size,axis)=>Math.abs(size-timing.reducedBounds[key][axis])<=2*Math.sqrt(3)*timing.cellM),"clustering preserves the original pose bounds: "+key);
     }
-    assert.ok(
-      render.drawCalls <= SCENE_RENDER_LIMITS.drawCalls && render.triangles <= SCENE_RENDER_LIMITS.triangles,
-      `${name} must fit the shared whole-frame rendering budget: ${JSON.stringify(render)}`,
-    );
+    const withinBudget = render.drawCalls <= SCENE_RENDER_LIMITS.drawCalls && render.triangles <= SCENE_RENDER_LIMITS.triangles;
+    // `--budget=report`（2026-10-12）：预算仍按 SCENE_RENDER_LIMITS 量、超了只打 BUDGET_OVER 不断言。只给「分支起点本来就超」
+    // 的场景做流程验收用（03 RightNestShortRetreat 在 10-07 壕沟表面重做后 10.1 M > 9 M），不是放宽预算：缺省 assert 不变。
+    if (!withinBudget && ctx.options.budget === "report")
+      console.log("BUDGET_OVER", name, JSON.stringify({ drawCalls: render.drawCalls, triangles: render.triangles, limits: SCENE_RENDER_LIMITS }));
+    else assert.ok(withinBudget, `${name} must fit the shared whole-frame rendering budget: ${JSON.stringify(render)}`);
     await page.screenshot({ path: path.join(output, `Scene_${name}.png`) });
     await fs.writeFile(
       path.join(output, `Data_${name}.json`),
