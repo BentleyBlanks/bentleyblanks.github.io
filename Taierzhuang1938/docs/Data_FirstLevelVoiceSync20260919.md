@@ -197,6 +197,26 @@
 
 请求：`.09` 2 次，`CaptiveWoundTwist` 6 次（都没装，清单 `requests` 只算装上的那次），咔嗒 0 次。
 
+### 0.17 2026-10-12 R4-Voice：拧伤口变调、桥头两段重录、八条旧电平红、传令兵片尾轻响、嚎的循环接缝
+
+| 项 | 量法 / 依据 | 结果 |
+| --- | --- | --- |
+| `CaptiveWoundTwist.01` 变调（集成负责人授权） | 装着的 R2 那条（重录 6 次都压不进范围，§0.16）切句时保共振峰降 7 个半音：ffmpeg `rubberband=pitch=2^(−7/12):formant=preserved:pitchq=quality`，不用 `asetrate`（那会连共振峰一起降、换成另一个人）。rubberband 出来晚 21 ms，按 1 ms 包络互相关剪回原位；保共振峰时电平掉约 6.6 dB，按 `MeasureVoice` 有声段补回原清单值（`EncodeLevelMatched`，±0.05 dB） | 基频中位 327 → 219 Hz（p10 / p90 208 / 242，导演表 `f0Hz` 180–230）；0.885 s 不变；有声段 −27.96 dBFS（原 −27.95）、真峰值 −13.6 dBTP，仍比嚎低 6.9 / 12.4 dB。整段录音与提示词不动。whisper 写成「不不不不」（变调前「呃...」），核对记录已改。清单 `lines[id].pitchShift = { semitones: −7, method, lagS: 0.021, gainDb: 6.56, targetDb, fromF0Hz: 327 }`、`resliced`（从装上的整段 mp3 重切） |
+| `BridgeCover` / `BridgeWithdraw` 提示词哈希不符（03 以后的长期基线红） | 从 09-20 烘焙提交 `12f38922` 起，对每个改过三张台词模块的提交现算 `MissionVoicePrompt` 哈希：一直对得上到 `b64e4f43`（09-30），从 `e85a4ca3`（10-01「铁路桥换浮桥」）起对不上。那次只改了 `SOUNDSCAPES.bridge`：「北沙河铁路桥南岸：…桥面上急促通过的脚步…」→「北沙河浮桥南岸：…木船浮桥上…船板吱呀与水拍船帮…」。07–18 的整段录音把环境声一起录进去，环境换了桥就是录音内容变了，所以整场重录、不改哈希 | 请求 3 次：`BridgeWithdraw` 1 次；`BridgeCover` 2 次——第 1 条装上后口型轨门禁红（嘴动帧 56%），当成录音问题又抽了一次，查下来是口型轨烘焙器在台词没变时沿用了旧录音（6.4 s）的逐字时间，`--realign` 后两条都是 100%。烘焙器已改成录音换了就不沿用旧逐字时间。装第 2 条：6.426 → 5.329 s；`BridgeWithdraw` 5.721 s。无提示转写两场每句都在（四川话同音字照旧）。整段对齐只改这两行（`Script_FirstLevelVoiceAlign.py --only` 出 JSON 再按 `--emit` 的格式替换；`--emit` 会把工作区里没有累积 JSON 的其余 cue 全删掉，不能直接用）。`--audio` 现在全绿、一场不跳 |
+| `Script_AudioNormalize` 八条旧红 | 八条都是各自烘焙脚本定了自己的电平、从没跑过 `--write`：断肢四条按白刃口径整段 −28.5（`Script_SeedAudioGoreBake`）、`slap` 配方 `alignDbfs −16`、`chargeCrowd` 峰值 −3（`Script_SeedAudioChargeBake`）、`CarriageRearCheer` loudnorm −20（`Script_SeedAudioCarriageBake`）、`breathInjured` SeedAudio 原样。断肢不在人工档豁免里（是按数挑的，不是人耳挑的），按库线处理。切点、素材不动，只用本脚本的 `--write` 加减增益（同码率重编一遍）；`--write` 改成瞄准目标 ±0.1 dB 再收（以前一进 ±0.5 就停，第一遍 Cheer 停在 −25.50） | 有声段 −26.98 / −27.45 / −26.90 / −27.38（断肢）、−23.12（breathInjured）、−15.91（slap）、−15.47（chargeCrowd）、−18.07（Cheer）→ −24.92…−25.08；补的增益（整段 RMS 差）+1.96 / +2.53 / +1.82 / +2.32、−1.94、−9.10、−9.52、−6.88 dB。运行时响度按同一个数反算回去，玩家听到的不变：`SAMPLE_MIX` goreSever 0.78 → 0.602、goreLimbLand 0.45 → 0.355、breathInjured 0.3 → 0.375、slap 0.85 → 2.423、chargeCrowd 0.9 → 2.693，`CARRIAGE_SOUND.cheerVolume` 0.48 → 1.06（现在没人读）；`slap` 配方改 `alignDbfs −25`；清单里钉着文件 sha 的两处（`injuredBreathSource`、`carriageSources.carriageRearCheer`）改成新 sha 并记 `levelAligned`；`SFX_PACK_VERSION` / `AMB_PACK_VERSION` 抬了 |
+| `BunkerRunnerCall.02` 片尾 3.12 s 轻响 | 量这一下（3.115–3.16 s）与两种对照：同一条录音两声「罗班长」之间 1.06 s 处的嘴里的声音、R3 静音掉的两下咔嗒（`CollectionMeet.01` 2.68 s、`Volunteer.01` 0.06 s，取 R3 之前的旧片）。比起振时间（峰前到 10%）、波峰因数、频谱重心、各频带占比、样点跳变 / RMS | 这一下：峰值 −24.6 dBFS、起振 5 ms、重心 721 Hz、300–1000 Hz 占 73%、6 kHz 以上 0.7%、样点跳变 / RMS 1.15，后面跟 35 ms 更轻的气声；1.06 s 那一下：起振 8 ms、重心 813 Hz、300–1000 Hz 占 67%、跳变 1.31——同一类。咔嗒：起振 2–3 ms、重心 2951 / 5059 Hz、6 kHz 以上 20% / 38%、跳变 7.7 / 12.4，频谱图上是贯穿全频带的一条竖线。**判为嘴里的声音 / 换气（气口），不是咔嗒，不动**。频谱图 `REL/附件/evidence/r4voice/runnercall02_tail_vs_refs.png` |
+| `CaptiveHowl.01` 循环接缝 | 按导演参数拼三遍（`Data_OpeningStoryboards` practice：下一遍在上一遍结束前 `howlHeadS + howlCrossfadeS` = 0.21 s 起播，上一遍在结束前 0.12 s 起按 `StopVoice` 的 `setTargetAtTime(τ = 0.03 s)` 淡出），量两处接缝：20 ms 窗、5 ms 步；接缝点取「新的一遍比旧的一遍响」的第一个窗；另量重叠段里旧的一遍有多响、混合比新的一遍单独多出多少、两边最近的有基频窗（NCCF ≥ 0.75）之间的基频跳变 | **改前不达标**：原片尾 4.97–5.158 s 是下一声「啊」刚起头就被母带截断，接缝处先冒出这半声（比有声段还响 0.9 dB、485 Hz），45 ms 后新的一遍 271 Hz 才起头：基频跳 44%（> 15%），接缝窗在有声段下 12.5 dB 处跳 3.9 dB（> 3 dB），混合比新的一遍单独响 25 dB。**按任务书改成录音层重切**（导演表 `loop`）：首尾退到静音里、各淡 0.1 s，切掉那半声，片长 5.138 → 4.95 s。改后：接缝落在比有声段低 28.4 dB 的静音里，重叠段里旧的一遍最响 −32.4 dB（相对有声段）、混合比新的一遍单独最多多 0.1 dB，接缝两边没有有声的东西挨着（上一遍最后一个有基频的窗到下一遍第一个有基频的窗 0.52 s；录音里几声之间的静音是 0.15–0.32 s，原片尾那段静音 0.55 s）。导演的 `howlHeadS .09`（「录音开头 90 ms 静音」）现在是 80 ms，接缝在静音里不受影响 |
+
+工具（`Script_SeedAudioVoiceKit` / `Script_SeedAudioFirstLevelBake` / 门禁）：
+
+1. 导演表新字段（都不进提示词）：`pitchShift: { semitones }`（切句时保共振峰变调；写了就必须写 `f0Hz`）、`loop: true`（循环播放的句子：`LoopSpan` 把首尾退到静音里——片尾最后 50 ms 还在出声就退到那一声起头前 ≥ 0.12 s 的静音里，片头同理；两头各淡 `LINE_MASTER.loopFadeS` = 0.1 s）。切句（`EncodeLine`）与重烘判断（`SameCut`）都认这两项，改了就重切、不重新生成。
+2. `--remaster=S.NN` 对写了 `pitchShift` / `loop` 的整段切片：整段母带 wav 不在工作区时拿装上的整段 mp3 解码重切（`ResliceFromScene`，多编一遍 96k，电平补回）；清单记 `resliced: { fromSha256, why }`，邻句 `gapBeforeS` 跟着重算，逐字时间按新起点平移。
+3. `Script_FirstLevelVoiceTest`：导演表 `pitchShift` / `loop` 字段合法；`--audio` 里清单的变调半音数与导演表一致、方法写明、**带 `pitchShift` 的句子基频中位在导演表 `f0Hz` 里**；变调片段与整段比对时把整段那一段照样变调、补同样增益后比 10 ms 包络（同 `tempo`）；循环句首尾 50 ms 都比有声段低 24 dB 以上。
+4. 口型轨（`Script_FirstLevelFaceTrackBake.py --cues`）：录音换了（旧轨道的 sha 不是这条录音）就不沿用旧轨道的逐字时间。
+5. `Script_AudioNormalize --write` 瞄准 ±0.1 dB。
+
+请求：桥头两场 3 次（`BridgeCover` 2、`BridgeWithdraw` 1），其余 0 次。
+
 ## 1. 一句话口径（旧整段格式：07–18 与待下线的 09.21 旧 cue）
 
 - 一段连续多人对白 = **一个 cue = 一次 SeedAudio 请求 = 一条 mp3**。动作打断处不拆音频，在提示词里写明停顿时长让模型留空当，再用 `VoiceTiming` 的事件把动作对上去。
