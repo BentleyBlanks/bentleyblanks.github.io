@@ -237,7 +237,7 @@ Storyboard 包交付：每张图 + `REL/附件/briefs/Storyboard_Shots_20261011.
 - 纯 node：`Script_OpeningStoryboardsTest`、`Script_OpeningSetTest`、`Script_OpeningFirstPersonTest`、`Script_OpeningLensTest`、`Script_FirstLevelVoiceTest`（含 `--audio`）、`Script_MissionGatesTest`、`Script_FirstLevelMissionTest`、`Script_AudioTest`、`Script_TextTest`、`Script_ModuleGraphTest`、`Script_TestRunnerTest`。
 - 浏览器：`Script_OpeningStoryboardShots.mjs --shots=N01…N25 --side-by-side=REL/附件/storyboard`（25 张并排图）、`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=3`、`Script_OpeningHandbackBrowserTest.mjs`、`Script_OpeningClipsBrowserTest.mjs`、`Script_OpeningActorPerformanceBrowserTest.mjs`、`Script_PostTest.mjs`（`cheekCut` 为 0 时逐像素不变）。
 - 节奏：渐亮到近爆、近爆到还权各报一个实测秒数；没有一处「罚站」（任何人在镜头里不动且无台词超过 2.5 s 要有理由）。
-- 已知基线红（改前就红，别当回归）：`Script_FirstLevelMissionTest`「07+ keeps the legacy fixed-source front」、`Script_OpeningActorPerformanceBrowserTest`「luo: silent combat retains its original head pose」、`Script_TextTest` 字体子集缺字（Voice 包本轮顺手修）。
+- 已知基线红（2026-10-12 第四轮后的现状）：以上三条都已不红（`FirstLevelMissionTest` 那条在本基线上本来就是绿的；罗班长头部姿势与字体子集已修）。仍红的只有 04 旧机枪夹具两条：`Script_FirstLevelMachineGunTest`「步枪阶段不能提前把机枪那拨打掉」、`Script_FirstLevelMachineGunCutsceneTest`「过场后机枪照旧能接能打」（基线 91c73aab 即红，与开场无关，另开任务）。03 的 `TankHeard.02` 在玩家半数以上帧交火时免检「说话的人要有表演」，没在打的趟次照常检查。
 - 推 master 前：`index.html` 所有改过的模块抬 `?v=`、prepush 按根流程。
 
 ### 集成结果（2026-10-11，集成包）
