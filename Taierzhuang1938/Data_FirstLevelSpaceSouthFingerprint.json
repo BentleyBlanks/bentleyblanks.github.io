@@ -4,7 +4,7 @@
  "zMin": -95,
  "blocks": {
   "count": 3270,
-  "sha": "ef28e0446a3995f8"
+  "sha": "39e7561d8bf4ce34"
  },
  "placements": {
   "count": 2,
@@ -26,7 +26,7 @@
  "previousBaseline": "0311-b-rear-mouth-banks-20261012",
  "structuralBlocks": {
   "count": 3270,
-  "sha": "ef28e0446a3995f8"
+  "sha": "39e7561d8bf4ce34"
  },
  "trenchArtRevision": "2026-09-26 concept 07 removes only generated non-solid Revetment<n>_<side>Post/Slat and Duckboard<n>; structuralBlocks excludes those ids."
 }

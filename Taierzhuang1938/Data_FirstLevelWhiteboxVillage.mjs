@@ -462,10 +462,11 @@ export function BuildVillageWhitebox(groundAt) {
   Jar("KitchenWaterJar", 56.25, -15.55, .9);
   Detail("KitchenHangingBasket", 59.4, -15.4, .5, .3, .5, "timber", { y: kg + 1.9 });
   Detail("KitchenHangingCord", 59.4, -15.4, .03, .75, .03, "timber", { y: kg + 2.42 });
-  // 西间：捆了口的粮缸（缸口蒙布、一圈绳）—— 让开 VillageCorner (54,−12) 的出生点与 x=58 的担架道。
-  Jar("KitchenGrainJar", 54.2, -9.6, .95);
-  Detail("KitchenGrainJarCloth", 54.2, -9.6, .82, .06, .82, "canvas", { y: kg + .79 });
-  Detail("KitchenGrainJarRope", 54.2, -9.6, .74, .05, .74, "earthDark", { y: kg + .72 });
+  // 西间：捆了口的粮缸（缸口蒙布、一圈绳）—— 贴西墙根，让开 VillageCorner (54,−12) 的出生点与 x=58 的担架道。
+  // 不摆在隔墙（x 55.6）边上：实跑里罗班长被挤进西间后卡在缸与隔墙之间 0.9 m 的缝里，整队停在灶屋、10 过不了。
+  Jar("KitchenGrainJar", 52.95, -5.4, .95);
+  Detail("KitchenGrainJarCloth", 52.95, -5.4, .82, .06, .82, "canvas", { y: kg + .79 });
+  Detail("KitchenGrainJarRope", 52.95, -5.4, .74, .05, .74, "earthDark", { y: kg + .72 });
   // East room: a kang-bed; the old table and stores already stand here.
   Block("KitchenKang", 62.8, -3.9, 1.6, .6, 3.6, "earthDark");
   Detail("KitchenKangMat", 62.8, -3.9, 1.5, .06, 3.4, "canvas", { y: kg + .63 });

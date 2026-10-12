@@ -95,8 +95,22 @@ export class FirstLevelGengFamily {
     this.nierFollowSaid = false;
     this.spawnedSteps = new Set();
     // 2026-10-12 C 包加的状态（只加不改 B 的字段）：老耿牵驴跟车、妮儿跟在车尾、驴车走折线。
+    // 两个人都没有寻路：跟车走的是车留下的脚印（cart.trail，每米一个点），不抄直线（直线会贴着房角卡死）。
     this.gengLead = false;
     this.nierCart = false;
+    this.gengTrailIndex = 0;
+    this.nierTrailIndex = 0;
+  }
+  /**
+   * 沿车的脚印走：从 index 起把已经走到（≤ 1.2 m）的点跳过，返回下一个脚印点；脚印走完了（跟到车边）返回 null。
+   * 纯函数风格（trail 注入），Script_FirstLevelStreetFightTest 可以直接喂。
+   */
+  static TrailTarget(trail, index, from) {
+    if (!trail?.length) return { index, target: null };
+    let i = Math.min(index, trail.length - 1);
+    while (i < trail.length - 1 && Distance(from, trail[i]) <= 1.2) i++;
+    if (i >= trail.length - 1 && Distance(from, trail[i]) <= 1.2) return { index: i, target: null };
+    return { index: i, target: trail[i] };
   }
 
   // --- 装配 -----------------------------------------------------------------
@@ -381,10 +395,13 @@ export class FirstLevelGengFamily {
       else { this.Stop(nier); this.nierRoute = null; this.nierState = this.nierCart ? "riding" : "idle"; const cb = this.nierRouteDone; this.nierRouteDone = null; this.Log("arrived"); cb?.(); }
       return;
     }
-    // 2026-10-12 C 包：跟在车尾（「在车上」的占位）。指人的那几秒头朝目标，脚还是跟着车。
+    // 2026-10-12 C 包：跟在车尾（「在车上」的占位）。指人的那几秒头朝目标，脚还是跟着车。车在走就沿车的脚印走。
     if (this.nierCart && (this.nierState === "riding" || this.nierState === "pointing") && this.cartState) {
       const seat = this.CartSeatPoints().nier, gap = Distance(nier.position, seat);
-      if (gap > 0.8) { r.ai.SetStance(nier, 0, 0.5, true); r.MoveActor(nier, seat, gap > 4 ? T.runMps : Math.max(T.walkMps, T.cartMps * 1.15)); }
+      const trail = FirstLevelGengFamily.TrailTarget(this.cartState.trail, this.nierTrailIndex, nier.position);
+      this.nierTrailIndex = trail.index;
+      const goal = gap > 2.5 && trail.target ? trail.target : seat;
+      if (gap > 0.8) { r.ai.SetStance(nier, 0, 0.5, true); r.MoveActor(nier, goal, gap > 4 ? T.runMps : Math.max(T.walkMps, T.cartMps * 1.15)); }
       else { this.Stop(nier); if (!this.pointing) this.FaceNpc(nier, this.CartSeatPoints().head, 0.4); }
       return;
     }
@@ -437,7 +454,11 @@ export class FirstLevelGengFamily {
     // 2026-10-12 C 包：牵驴跟车 —— 站在驴头左前方，车动他就走，车停他就站着看驴。
     if (this.gengLead && !this.gengGoal && this.cartState) {
       const spot = this.CartSeatPoints().geng, gap = Distance(geng.position, spot);
-      if (gap > 0.9) { r.ai.SetStance(geng, 0, 0.5, true); r.MoveActor(geng, spot, gap > 4 ? this.T.runMps : Math.max(this.T.walkMps, this.T.cartMps * 1.15)); }
+      const trail = FirstLevelGengFamily.TrailTarget(this.cartState.trail, this.gengTrailIndex, geng.position);
+      this.gengTrailIndex = trail.index;
+      // 落后车两步以上就沿车的脚印追（不抄直线），到车边再站到驴头左前方。
+      const goal = gap > 2.5 && trail.target ? trail.target : spot;
+      if (gap > 0.9) { r.ai.SetStance(geng, 0, 0.5, true); r.MoveActor(geng, goal, gap > 4 ? this.T.runMps : Math.max(this.T.walkMps, this.T.cartMps * 1.15)); }
       else { this.Stop(geng); this.FaceNpc(geng, this.cartState.animal, 0.4); }
       return;
     }
@@ -531,6 +552,9 @@ export class FirstLevelGengFamily {
         cart.yaw = Math.atan2(cart.x - cart.target.x, cart.z - cart.target.z);
         cart.x += (cart.target.x - cart.x) / d * step; cart.z += (cart.target.z - cart.z) / d * step;
         cart.travel += step; cart.moving = true;
+        // 脚印（C 包）：每走一米记一个点，老耿 / 妮儿沿它跟车。
+        cart.trail ??= [];
+        if (!cart.trail.length || Distance(cart.trail.at(-1), cart) >= 1.0) { cart.trail.push({ x: cart.x, z: cart.z }); if (cart.trail.length > 400) { cart.trail.shift(); this.gengTrailIndex = Math.max(0, this.gengTrailIndex - 1); this.nierTrailIndex = Math.max(0, this.nierTrailIndex - 1); } }
       }
     } else cart.moving = false;
     cart.y = r.battlefield.GroundHeight(cart.x, cart.z);

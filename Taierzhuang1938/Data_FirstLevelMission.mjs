@@ -254,7 +254,9 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "MeleeLead", x: 54, z: -0.5, weapon: "Type38", bayonet: true },
     { id: "MeleeSecond", x: 58, z: 14.4, weapon: "Type38", bayonet: true },
     { id: "MeleeThird", x: 54.5, z: 11, weapon: "Type38", bayonet: true },
-    { id: "MeleeAlley", x: 66, z: 17, weapon: "Type38", bayonet: true },
+    // 2026-10-12 C 包：东巷那个改在侧间里、连屋东窗外（装睡），放出来当场往屋里扔一颗（VillageBlock.UpdateWindowThrow），
+    // 再从东门进（折线见 MISSION_TACTICS）。实跑过两趟：摆远一点他还没走到窗口就被从窗里打死了。
+    { id: "MeleeAlley", x: 66.8, z: 6.8, weapon: "Type38", bayonet: true },
   ],
   // 10 第一拨追兵（契约 §3.8：既有三人 + 1），从东边（主街东侧房后）沿绕行巷压向院门。
   courtyard: [
@@ -385,16 +387,20 @@ export const MISSION_TACTICS = Object.freeze({
   // 压力表给的切沟路线覆盖同名条目（原 BundleBendB 那条穿路侧挡墙，见 FRONT_PRESSURE_TACTICS 头注）。
   ...FRONT_PRESSURE_TACTICS,
   // 2026-10-12 C 包：巷东头主街口放了草垛 LaneHaystack（x 78.4–80.4、z 41.8–43.8），折线都从它北面过。
-  CourtyardPursuerA: { delay: 1, points: [{x:86,z:37},{x:62,z:40},{x:53,z:38}] },
-  CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:72.5,z:40.2},{x:66,z:43},{x:59,z:40}] },
-  CourtyardPursuerC: { delay: 25, points: [{x:91,z:41},{x:76.8,z:40.6},{x:71.6,z:40.9},{x:66,z:43.2},{x:64,z:40}] },
-  CourtyardPursuerD: { delay: 7, mps: 3.0, points: [{x:88,z:36.6},{x:74.2,z:39.6},{x:61,z:39.8}] },
+  // 2026-10-12 C 包：第一拨停在巷子东半段（离院门 11–16 m）——「追兵从绕行巷东头来」，不再冲到院门口贴脸；
+  // 从院门外东侧墙角（A.laneEast）往东看就是他们，门楼在他们身后。
+  // fact 门控：院门真开了才从东边压进来（之前他们在街东房后待命，看不见）—— 实跑两趟：开门前就到巷子里等着的三四个人
+  // 在门一开那一刻贴脸齐射，守巷口的人没得打；按顺序一个一个来才是「一拨」。
+  CourtyardPursuerA: { fact: "courtyardGateOpen", delay: 1, mps: 3.0, holdS: 0, points: [{x:86,z:37},{x:70,z:39.6},{x:66,z:40.4}] },
+  CourtyardPursuerB: { fact: "courtyardGateOpen", delay: 12, mps: 3.0, holdS: 0, points: [{x:89,z:39},{x:72.5,z:40.2},{x:68.6,z:42.6}] },
+  CourtyardPursuerC: { fact: "courtyardGateOpen", delay: 24, mps: 3.0, holdS: 0, points: [{x:91,z:41},{x:76.8,z:40.6},{x:71.6,z:40.9},{x:69.4,z:38.6}] },
+  CourtyardPursuerD: { fact: "courtyardGateOpen", delay: 36, mps: 3.0, holdS: 0, points: [{x:88,z:36.6},{x:74.2,z:39.6},{x:64.8,z:38.6}] },
   // MeleeLead 没有折线：他藏在灶屋—连屋过道里，冲锋由进门遭伏击那一拍驱动（VillageBlock.DriveLunge）。
   MeleeSecond: { delay: 1.5, points: [{x:58.6,z:9},{x:59,z:4}] },
   MeleeThird: { delay: 3, points: [{x:55.5,z:7},{x:56,z:4}] },
   // 2026-10-12 C 包（契约 §3.7）：MeleeAlley 先穿侧间到连屋东窗外（MID_TUNING.streetFight.windowThrowPost，停 1.5 s
   // 把一颗手榴弹从窗口扔进屋 —— VillageBlock.UpdateWindowThrow），再从东门（64, z 8–9.2）进屋。
-  MeleeAlley: { delay: 5, points: [{x:66.6,z:6.6,holdS:1.5},{x:65.6,z:8.6},{x:62.5,z:8.6},{x:58.4,z:6.2}] },
+  MeleeAlley: { delay: 0.3, mps: 2.6, points: [{x:66.6,z:6.6,holdS:1.8},{x:65.6,z:8.6},{x:62.5,z:8.6},{x:58.4,z:6.2}] },
   // ---- 0311 C Village ----
   // 08 东巷 4 人：出巷口（x 82，z 8–14）→ 贴东墙根（x 80.8）往北 → 街北口，各自停在街北半段不同的点转守区（contact）。
   // fact 门控用的就是放人的那条事实（人是 VillageBlock 逐个放的，放出来就走）。

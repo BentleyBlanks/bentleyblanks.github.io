@@ -441,10 +441,12 @@ export const MID_TUNING = Object.freeze({
     // 再从东门进（MISSION_TACTICS.MeleeAlley）。
     windowThrowPost: Object.freeze({ x: 66.6, z: 6.6 }),
     windowThrowAt: Object.freeze({ x: 58.4, z: 6.2 }),
-    windowThrowReachM: 1.6,
+    windowThrowReachM: 2.0,
     // 10 巷口：院门真开了（courtyardGateOpen）之后第二拨（laneWave2，含草垛机枪）第 i 个人隔这么久放出；
     // 整段上限（契约 §3.8：≤ 90 s），到点第二拨不再补人（laneWave2Spent）。
-    laneWaveGapsS: Object.freeze([3, 8, 13, 18]),
+    // 第一拨（courtyard，fact 门控，1/12/24/36 s）先来；第二拨从开门 30 s 起，机枪头一个（到草垛约 38 s），
+    // 之后每 12 s 一个，最后一个 66 s 放出，都在 90 s 上限以内。
+    laneWaveGapsS: Object.freeze([30, 42, 54, 66]),
     laneWaveCapS: 90,
     // 机枪「压住」：射手 suppressed 连续这么久（与 07 沟口同口径 R.southMouth.mgSuppressS）；抬头之后担架还能收尾一步。
     laneMgSuppressS: 2.0,

@@ -1454,7 +1454,8 @@ export class FirstLevelMissionRuntime {
       () => this.Text("askGeng"),
       () => ["TransferApproach", "Transfer"].includes(this.flow.stage.id) && this.transferCart.AskGengAvailable(),
       () => this.transferCart.AskGeng("player"),
-      { gesture: "tap", seconds: 0 },
+      // 挂在老耿本人身上（他牵驴站在车旁，位置每次现算）。
+      { gesture: "tap", seconds: 0, Anchor: () => { const geng = this.gengFamily?.geng?.position; return geng ? this.Point(geng, 0.6) : this.Point(MID_TUNING.streetFight.askPoint, 0.6); } },
     );
     Register(
       "MissionZhouCarry",

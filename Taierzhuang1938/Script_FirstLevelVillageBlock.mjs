@@ -51,6 +51,8 @@ export const VILLAGE_BYSTANDERS = Object.freeze([
   ...P.streetBlock.frontPartyWait.map((point, i) => Object.freeze({ id: `StreetFrontParty${i}`, ...point })),
   ...P.streetBlock.withdrawnGuards.map((point, i) => Object.freeze({ id: `StreetWithdrawn${i}`, ...point })),
 ]);
+/** 从村北巷到主街北口再进街的折线（班长带路的同一条 z≈−24 线；街东房前墙 x 80.2 以西）。 */
+export const VILLAGE_STREET_APPROACH = Object.freeze([{ x: 66, z: -23.8 }, { x: 72.2, z: -24.2 }, { x: 76.6, z: -20 }]);
 /** 08 何有田、刘文财蹲街口压东窗的两个点（契约 §3.6：P.streetBlock.frontParty）。 */
 export const VILLAGE_STREET_POSTS = Object.freeze([
   Object.freeze({ cast: "heyoutian", ...P.streetBlock.frontParty[0] }),
@@ -109,8 +111,28 @@ export class FirstLevelVillageBlock {
     }
     // 08 里就可能已经走出灶屋南门、那一拍已经演过：不重置。
     if (stageId === "Village" || (stageId === "Melee" && this.ambush.Phase === "hidden")) this.HideAmbushLead();
-    if (stageId === "Melee") this.SendFamilyToYard();
+    // 2026-10-12 C 包：连屋东窗外装睡的那个（MeleeAlley）在放出来之前挂叙事保护 —— 08 街上的流弹从侧间临街门洞飞进来，
+    // 实跑三趟他都没等到放出就死在窗外（窗外那颗手榴弹从来没扔成）；放出（UpdateRelease）那一刻摘掉。
+    if (["Village", "Melee"].includes(stageId)) {
+      const alley = this.r.enemies.get("MeleeAlley");
+      if (alley?.alive && alley.missionDormant) alley.scriptEssential = true;
+    }
+    if (stageId === "Melee") { this.SendFamilyToYard(); this.RecallStreetPosts(); }
     if (stageId === "Courtyard") this.SendFamilyToYard();
+  }
+
+  /**
+   * 09 起街口那两个撤回灶屋北门（原路回主街北口再沿巷子回来）：10 的带路线从灶屋穿院子出门，
+   * 留在街里的人会从主街那一侧接线、卡在障碍前，队尾掩护永远脱离不了（实跑第四趟）。
+   */
+  RecallStreetPosts() {
+    for (const [i, post] of VILLAGE_STREET_POSTS.entries()) {
+      const actor = this.r.companion.Handle(post.cast);
+      if (!actor?.alive) continue;
+      const back = [...VILLAGE_STREET_APPROACH].reverse().map((p) => ({ ...p }));
+      this.r.squadRoutes.set(actor.id, [...back, { ...M.houseCheckDoorApproach }, { ...P.ambushSquadPosts[i] }]);
+      actor.missionStreetPosted = false;
+    }
   }
 
   /** 前队与退回守军：真人、不参战、不会被当成普通阵亡拖累编排。 */
@@ -152,7 +174,8 @@ export class FirstLevelVillageBlock {
     for (const post of VILLAGE_STREET_POSTS) {
       const actor = this.r.companion.Handle(post.cast);
       if (!actor) continue;
-      this.r.squadRoutes.set(actor.id, [{ x: post.x, z: post.z }]);
+      // 班里人的走位没有寻路：从村北巷到街里要先沿巷子北侧走到主街北口再拐南（只给一个终点会贴着灶屋西墙滑进夹道）。
+      this.r.squadRoutes.set(actor.id, [...VILLAGE_STREET_APPROACH.map((p) => ({ ...p })), { x: post.x, z: post.z }]);
     }
     this.watchPost = { x: VILLAGE_STREET_POSTS[0].x, z: VILLAGE_STREET_POSTS[0].z };
   }
@@ -383,7 +406,8 @@ export class FirstLevelVillageBlock {
     const from = r.Point(actor.position, 0); from.y = actor.position.y + T.throwReleaseY;
     const drop = from.y - r.battlefield.GroundHeight(target.x, target.z);
     const { power } = ThrowPowerFor(range, drop);
-    const dir = r.Point(target, 0).sub(from).setY(0).normalize();
+    // 水平单位方向（Combat.Throw 自己加竖直分量）；运行时的 Point 给的是 Vector3，测试桩给的是裸对象，两种都认。
+    const dir = typeof from.clone === "function" ? from.clone().set(dx / dist, 0, dz / dist) : { x: dx / dist, y: 0, z: dz / dist };
     actor.yaw = Math.atan2(-dx, -dz);
     actor.watchYaw = actor.yaw; actor.watchUntil = (r.ai?.time ?? r.time) + 2;
     const Release = (hand) => {
@@ -688,6 +712,8 @@ export class FirstLevelVillageBlock {
       actor.scriptedNoncombatant = false;
       actor.meleeDormant = false;
       actor.bayonetFixed = true;
+      // 装睡期间的叙事保护（MeleeAlley）到此为止；流弹打掉的血补回来，放出来是个整人。
+      if (actor.scriptEssential) { actor.scriptEssential = false; actor.health = Math.max(actor.health, 100); }
     }
     if (!r.Has("meleeBreachStarted")) r.Record("meleeBreachStarted", { woke: due.length });
   }
@@ -769,7 +795,8 @@ export class FirstLevelVillageBlock {
     const r = this.r, T = M.streetFight, family = r.gengFamily;
     if (!family?.geng?.position) return;
     if (!this.gengGate) {
-      if (!r.Has("villageGunSilent")) return;
+      // 老耿还在夹道里往院子走（SendFamilyToYard 的回调链）时不开始：直线去缸边会贴着西墙滑。
+      if (!r.Has("villageGunSilent") || family.geng.position.z < M.streetFight.yardBox.minZ) return;
       this.gengGate = { phase: "vat", since: r.time };
       r.Say("GengGate");
       family.GengFollowCart(false);

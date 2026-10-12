@@ -232,8 +232,10 @@ const Step = (host, module, seconds, options = {}) => {
   Check(host.Has("houseChecked") && host.said.includes("KitchenDetour"),
     "走到了才记 houseChecked 并喊 KitchenDetour");
   const he = host.companion.Handle("heyoutian");
-  Check(host.squadRoutes.get(he.id)?.length === 1, "何有田被指到外头的观察位，不跟着进屋");
-  he.position = { ...host.squadRoutes.get(he.id)[0] };
+  // 2026-10-12 C 包：观察位是街口压东窗的 P.streetBlock.frontParty[0]，走位先沿巷子到主街北口再拐进街（最后一点是观察位）。
+  const heRoute = host.squadRoutes.get(he.id);
+  Check(heRoute?.length >= 2 && Math.abs(heRoute.at(-1).x - P.streetBlock.frontParty[0].x) < 0.01, "何有田被指到街口压东窗的位置，不跟着进屋");
+  he.position = { ...heRoute.at(-1) };
   village.Update(1 / 60);
   Check(host.Has("outsideWatched"), "他真的到位了才记 outsideWatched");
 }

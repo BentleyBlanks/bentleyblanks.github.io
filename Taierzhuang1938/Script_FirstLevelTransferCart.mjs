@@ -143,7 +143,8 @@ export class FirstLevelTransferCart {
     const stage = this.r.flow.stage.id;
     if (["TransferApproach", "Transfer", "CartRide", "AirFirst"].includes(stage)) this.UpdateWalkingWounded(dt);
     if (stage === "TransferApproach") this.UpdateApproach();
-    if (stage === "Transfer") this.UpdateTransfer();
+    // 11 的三样辨认常常在驴车到场之前就过了：驴车到场 / 问路在 12 里接着算。
+    if (stage === "Transfer") { this.UpdateGengCart(); this.UpdateTransfer(); }
     if (stage === "AirFirst") this.UpdateAirGround(dt);
     if (["Carry", "Dive", "Rescue"].includes(stage)) this.UpdateDitch();
     this.UpdateUnload(dt);
