@@ -174,11 +174,11 @@ export class OpeningActorPerformance {
     this.saved=new Map();this.pool=[];this.clock=0;this.speech=0;this.lookYaw=0;this.lookPitch=0;this.still=null;
     this.rootQ=new Quaternion();this.parentQ=new Quaternion();this.turnQ=new Quaternion();
     this.axis=new Vector3();this.right=new Vector3();this.forward=new Vector3();this.up=new Vector3(0,1,0);
-    this.origin=new Vector3();this.target=new Vector3();this.local=new Vector3();this.lookAngles={yaw:0,pitch:0};
+    this.origin=new Vector3();this.target=new Vector3();this.local=new Vector3();this.lookAngles={yaw:0,pitch:0};this.talkJaw=0;
     this.phase=(Hash(soldier.missionId||soldier.id||this.rig.modelId)%997)/157;
   }
   Restore(){for(const [bone,q] of this.saved){bone.quaternion.copy(q);this.pool.push(q);}this.saved.clear();}
-  Reset(){this.Restore();this.speech=0;this.lookYaw=0;this.lookPitch=0;this.still=null;this.rig.openingActorPerformanceState=null;}
+  Reset(){this.Restore();this.speech=0;this.lookYaw=0;this.lookPitch=0;this.still=null;this.talkJaw=0;this.rig.openingActorPerformanceState=null;}
   Turn(bone,axis,angle){
     if(!bone?.parent||Math.abs(angle)<1e-6)return;
     if(!this.saved.has(bone))this.saved.set(bone,(this.pool.pop()||new Quaternion()).copy(bone.quaternion));
@@ -201,7 +201,7 @@ export class OpeningActorPerformance {
     // the head only, while that man talks.
     const loadingSpeech=TalkingContactClips.has(pose?.clip)&&talking&&!meleeActive;
     const headOnly=nativeCombat&&talking||loadingSpeech;
-    if(protectedBeat&&!loadingSpeech||nativeCombat&&!talking){this.rig.openingActorPerformanceState={role:context.role,protected:true};return;}
+    if(protectedBeat&&!loadingSpeech||nativeCombat&&!talking){this.talkJaw=0;this.rig.openingActorPerformanceState={role:context.role,protected:true};return;}
     const time=(Number.isFinite(context.clock)?context.clock:this.clock)+this.phase;
     const lineAge=Math.max(0,context.lineSeconds||0);
     const voice=Number.isFinite(context.speechLevel) ? .35+.65*Clamp(context.speechLevel) : 1;
@@ -245,7 +245,11 @@ export class OpeningActorPerformance {
       // A gunner can call out while keeping both hands and the gun on target.
       // Some Biped clavicles descend from Neck, so rotate Head only here.
       this.Turn(bones.head,this.up,Clamp(this.lookYaw,-.14,.14));
-      this.Turn(bones.head,this.right,Clamp(this.lookPitch,-.10,.10)-.065*emphasis+.012*breath);
+      // ... and dips with his own mouth (Data_OpeningStoryboards.aimedTalk): with the gaze already on the listener and one early
+      // stress the stress nod alone left a long line with the breathing only (TankHeard.02, 0.02 rad).
+      const A=OPENING_STORYBOARDS.aimedTalk,jaw=talking?Clamp(this.rig.facial?.jaw||0):0;
+      this.talkJaw+=(jaw-this.talkJaw)*(1-Math.exp(-dt*A.jawFollowHz));
+      this.Turn(bones.head,this.right,Clamp(this.lookPitch,-.10,.10)-.065*emphasis+.012*breath-A.jawNodRad*this.talkJaw*this.speech);
     }else{
       this.Turn(neck,this.up,this.lookYaw*.65);
       this.Turn(bones.head,this.up,this.lookYaw*.35);
