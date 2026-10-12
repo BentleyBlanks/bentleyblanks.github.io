@@ -76,13 +76,23 @@ function AssertLevel(level) {
 async function CmdExport(level, options) {
   if (level !== "FirstLevel") throw new Error("export 只支持 FirstLevel（第二关的配置随 scene SecondLevel 一起写）");
   const { BuildFirstLevelBlockoutConfig } = await import("./Script_EditorBlockoutFirstLevel.mjs");
-  const doc = BuildFirstLevelBlockoutConfig(SourceOptions(options));
+  const issues = [];
+  const doc = BuildFirstLevelBlockoutConfig({ ...SourceOptions(options), issues });
   const result = ValidateBlockout(doc);
   if (!result.ok) throw new Error(`生成的配置没过校验：\n  ${result.errors.join("\n  ")}`);
   const out = typeof options.out === "string" ? path.resolve(process.cwd(), options.out) : ConfigFile(level);
   WriteGuarded(out, StringifyBlockout(doc), !!options.force);
-  console.log(`写出 ${path.relative(process.cwd(), out)}：${doc.keyframes.length} 个关键帧，${doc.keyframes.reduce((s, k) => s + k.units.length, 0)} 个单位位次，警告 ${result.warnings.length}`);
+  console.log(`写出 ${path.relative(process.cwd(), out)}：${doc.keyframes.length} 个关键帧，${doc.keyframes.reduce((s, k) => s + k.units.length, 0)} 个单位位次，警告 ${result.warnings.length}，摆位 / 走位问题 ${issues.length}`);
   for (const w of result.warnings) console.log(`  警告 ${w}`);
+  for (const line of issues) console.log(`  问题 ${line}`);
+}
+
+/** 第一关的摆位与走位检查（玩家站位、间距、过渡穿墙；与 ConfigTest 判失败的口径相同），只报不改退出码。 */
+async function PrintFirstLevelIssues(doc) {
+  const { FirstLevelBlockoutIssues } = await import("./Script_EditorBlockoutFirstLevel.mjs");
+  const issues = FirstLevelBlockoutIssues(doc);
+  console.log(`FirstLevel 摆位 / 走位: ${issues.length ? `${issues.length} 处问题（测试会判失败）` : "没有问题"}`);
+  for (const line of issues) console.log(`  问题 ${line}`);
 }
 
 async function CmdScene(level, options) {
@@ -100,18 +110,20 @@ async function CmdScene(level, options) {
   for (const row of await SampleSecondLevelGroundChecks()) console.log(`  地面抽样 ${row}`);
 }
 
-function CmdValidate(which) {
+async function CmdValidate(which) {
   const levels = !which || which === "all" ? BLOCKOUT_LEVEL_KEYS : [which];
   let bad = 0;
   for (const level of levels) {
     AssertLevel(level);
     const file = ConfigFile(level);
     if (!fs.existsSync(file)) { console.log(`${level}: 没有配置文件 ${path.relative(process.cwd(), file)}`); bad++; continue; }
-    const result = ValidateBlockout(ReadJson(file));
+    const doc = ReadJson(file);
+    const result = ValidateBlockout(doc);
     console.log(`${level}: ${result.ok ? "通过" : "不通过"}（错误 ${result.errors.length}，警告 ${result.warnings.length}）`);
     for (const e of result.errors) console.log(`  错误 ${e}`);
     for (const w of result.warnings) console.log(`  警告 ${w}`);
     if (!result.ok) bad++;
+    else if (level === "FirstLevel") await PrintFirstLevelIssues(doc);
     const sceneFile = SceneFile(level);
     if (fs.existsSync(sceneFile)) {
       const scene = ValidateBlockoutScene(ReadJson(sceneFile));
@@ -189,7 +201,7 @@ export async function Main(argv = process.argv.slice(2)) {
   switch (command) {
     case "export": await CmdExport(a || "FirstLevel", options); break;
     case "scene": await CmdScene(a || "SecondLevel", options); break;
-    case "validate": CmdValidate(a); break;
+    case "validate": await CmdValidate(a); break;
     case "summary": CmdSummary(a); break;
     case "kf": if (!a || !b) throw new Error("用法：kf <Level> <keyframeId>"); CmdKeyframe(a, b); break;
     default:
@@ -197,7 +209,7 @@ export async function Main(argv = process.argv.slice(2)) {
         "白盒关卡编辑器配置命令行",
         "  export FirstLevel [--out=<path>] [--force]   从游戏数据生成第一关配置（默认写 Taierzhuang1938/Blockout/FirstLevel.json）",
         "  scene SecondLevel [--force]                  生成第二关草稿场景与占位配置",
-        "  validate [FirstLevel|SecondLevel|all]        校验配置（与场景文件）",
+        "  validate [FirstLevel|SecondLevel|all]        校验配置（与场景文件）；第一关另列摆位 / 走位问题",
         "  summary [Level]                              每个关键帧一行：玩家机位、各阵营人数、推测、POI、警告",
         "  kf <Level> <id>                              看一个关键帧的全部单位与 POI",
         "  选项 --commit=<sha> --generated-at=<ISO>      写进 source（缺省 git HEAD / 现在）",

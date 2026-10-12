@@ -12,6 +12,14 @@
 //   5. 生成器两次输出除 generatedAt 外逐字相同；CLI 不带 --force 不覆盖已有文件
 //   6. 每个关键帧的玩家点在关卡边界内、不在实心块里（第一关 = MISSION_LAYOUT 块 + 该关键帧场景态的块 + 关着的门）
 //   7. 单位落在实心块里只报警告并列出（不算失败）
+//   8. 第一关（判失败）：
+//      - 相邻关键帧过渡（PlanTransition 的每条路线，取自归一化后的提交配置）身体不穿高墙：半径 0.3 m、离地 0.5–1.4 m、
+//        只算高过 1.6 m 的块、扎进去超过 0.12 m 才算，块取两帧信号并集下的 FirstLevelSolidBlocks；放行名单 TRANSITION_CROSSING_ALLOW
+//        每条必须写原因（现在是空的）
+//      - 玩家站位放得下一个站着的人（半径 0.3 m、离地 0.35–1.6 m，碰任何实心块都不行）
+//      - 摆位间距：人离玩家 ≥ 1 m（倒地的 ≥ 0.5 m）、人离担架中心 ≥ 1.3 m、人离抬担架的人站的那一段 ≥ 0.6 m、
+//        任意两个单位 ≥ 0.8 m；下一步目标离玩家不到 2 m 的只写文字
+//      - 军官是 kind officer（拔刀军官、桥头军官）；床位上的老周担架 bearers 0、不是 down；Litter6 的抬担架的人倒了还是 down
 // ===========================================================================
 
 import assert from "node:assert/strict";
@@ -28,7 +36,9 @@ import { FIRST_LEVEL_BLOCKOUT_STATIONS } from "./Data_EditorBlockoutFirstLevelSt
 import {
   BuildFirstLevelBlockoutConfig, FirstLevelSolidBlocks, SolidBlockAt, FirstLevelSignalsFor,
   YawDegFromActorRad, YawDegFromPlacementRad, YawDegFromCameraDeg,
+  BodyBlockAt, RouteSolidCrossings, FirstLevelSpacingIssues, FirstLevelBlockoutIssues, BLOCKOUT_ROUTE_BODY, BLOCKOUT_PLAYER_BODY, BLOCKOUT_SPACING,
 } from "./Script_EditorBlockoutFirstLevel.mjs";
+import { MID_TUNING } from "./Data_Tuning_FirstLevelMid.mjs";
 import { BuildSecondLevelConfig, SecondLevelZhaiWallBlocks, SecondLevelCourtyardBlocks, DecodeHeightAt, SECOND_LEVEL_BOUNDS } from "./Script_EditorBlockoutSecondLevel.mjs";
 import { Main as CliMain, StringifyBlockout } from "./Script_EditorBlockoutCli.mjs";
 import { MISSION_PLACEMENT as P, MISSION_ANCHORS as A, MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
@@ -409,6 +419,117 @@ Check("第一关：每个关键帧的玩家点在边界内、不在实心块里"
   assert.ok(before.some((b) => b.id === "MissionCourtyardGate") && !after.some((b) => b.id === "MissionCourtyardGate"), "内院门随 MissionCourtyardGateOpen 打开");
   assert.ok(!before.some((b) => b.id === "NightWallWest") && after.some((b) => b.id === "NightWallWest"), "北门夜景块随 NightGateShown 出现");
   assert.ok(!before.some((b) => b.id === "PontoonBridgeCutWallNorth") && after.some((b) => b.id === "PontoonBridgeCutWallNorth"), "浮桥断口随 RailBridgeDestroyed 出现");
+});
+
+// ---------------------------------------------------------------------------
+// 8. 第一关：过渡不穿墙、玩家站得下、摆位间距、军官与担架（判失败）
+
+/**
+ * 过渡穿墙的放行名单：键 "<前一帧>→<后一帧> <单位 id>"，值写清楚为什么可以穿（例如「游戏里这一段是黑屏传送」）。
+ * 没写原因、或者已经不穿了的条目本身算失败。现在是空的：2026-10-13 修完是 0 条。
+ */
+const TRANSITION_CROSSING_ALLOW = Object.freeze({});
+
+Check("身体穿墙的取样口径（真墙：穿过判出、贴着走不判、扎进 0.12 m 以内不判、矮墙不判；玩家站位矮墙也算）", () => {
+  const blocks = FirstLevelSolidBlocks(["BunkerCollapsed"]);
+  const ids = (points) => RouteSolidCrossings(blocks, points).map((h) => h.id);
+  // 灶屋西墙 KitchenWest：x 51.7–52.3、z −16.5…−1.5、高 2.9 m。
+  assert.ok(ids([{ x: 50.5, z: -9 }, { x: 54, z: -9 }]).includes("KitchenWest"), "横穿灶屋西墙要判出来");
+  assert.deepEqual(ids([{ x: 50.5, z: -12 }, { x: 50.5, z: -6 }]), [], "西侧夹道里贴着墙走（离墙面 1.2 m）不算");
+  const face = 51.7, r = BLOCKOUT_ROUTE_BODY.radiusM, tol = BLOCKOUT_ROUTE_BODY.toleranceM;
+  assert.deepEqual(ids([{ x: face - r + tol - 0.03, z: -12 }, { x: face - r + tol - 0.03, z: -6 }]), [], "身体扎进墙不到 0.12 m 不算");
+  assert.ok(ids([{ x: face - r + tol + 0.03, z: -12 }, { x: face - r + tol + 0.03, z: -6 }]).includes("KitchenWest"), "扎进超过 0.12 m 算");
+  // 右侧阵位北墙西段 RightNestNorthLow 只有齐腰高（高 1.29 m）：翻过去不算穿墙，但玩家站在墙根算碰到。
+  assert.deepEqual(ids([{ x: 28, z: -155 }, { x: 28, z: -158.5 }]), [], "翻矮墙不算穿墙");
+  assert.equal(BodyBlockAt(blocks, 28, -156.2, BLOCKOUT_PLAYER_BODY)?.id, "RightNestNorthLow", "玩家站位贴着矮墙算碰到");
+  assert.equal(BodyBlockAt(blocks, 28, -155.5, BLOCKOUT_PLAYER_BODY), null, "离矮墙 0.95 m 站得下");
+});
+
+Check("第一关：相邻关键帧的过渡路线不穿高墙（PlanTransition 每条路线取样，块按两帧信号的并集）", () => {
+  const doc = NormalizeBlockout(COMMITTED.FirstLevel);
+  for (const [key, why] of Object.entries(TRANSITION_CROSSING_ALLOW)) assert.ok(typeof why === "string" && why.trim().length >= 4, `放行名单 ${key} 没写原因`);
+  const cache = new Map(), bad = [], allowedHit = new Set();
+  let routes = 0, metres = 0;
+  for (let i = 1; i < doc.keyframes.length; i++) {
+    const a = doc.keyframes[i - 1], b = doc.keyframes[i];
+    const signals = [...new Set([...a.signals, ...b.signals])].sort();
+    const key = signals.join(",");
+    if (!cache.has(key)) cache.set(key, FirstLevelSolidBlocks(signals));
+    // 原地不动 / 原地出现的人路线只有一个点：照样取样（站的地方本身不能扎进高墙里）。
+    for (const entry of PlanTransition(a, b).units) {
+      routes++; metres += entry.length;
+      const hits = RouteSolidCrossings(cache.get(key), entry.route);
+      if (!hits.length) continue;
+      const id = `${a.id}→${b.id} ${entry.id}`;
+      if (TRANSITION_CROSSING_ALLOW[id]) { allowedHit.add(id); continue; }
+      bad.push(`${id}（${entry.mode}）穿过 ${hits.map((h) => `${h.id}@(${h.x},${h.z})`).join("、")}`);
+    }
+  }
+  assert.ok(routes > 300, `取样的路线太少（${routes}），过渡计划可能没算出来`);
+  const stale = Object.keys(TRANSITION_CROSSING_ALLOW).filter((id) => !allowedHit.has(id));
+  assert.deepEqual(stale, [], `放行名单里这些已经不穿墙了，删掉：${stale.join("、")}`);
+  assert.equal(bad.length, 0, `${bad.length} 条过渡路线穿墙：\n  ${bad.join("\n  ")}`);
+  console.log(`    ${routes} 条路线、共 ${Math.round(metres)} m 每 ${BLOCKOUT_ROUTE_BODY.stepM} m 取样：穿高墙 0 条（放行 ${Object.keys(TRANSITION_CROSSING_ALLOW).length}）`);
+});
+
+Check("第一关：每个玩家站位放得下一个站着的人（半径 0.3 m、离地 0.35–1.6 m，任何实心块）", () => {
+  for (const kf of COMMITTED.FirstLevel.keyframes) {
+    const hit = BodyBlockAt(FirstLevelSolidBlocks(kf.signals), kf.player.x, kf.player.z, BLOCKOUT_PLAYER_BODY);
+    assert.equal(hit, null, `${kf.id} 玩家站位 (${kf.player.x},${kf.player.z}) 碰到 ${hit?.id}`);
+  }
+});
+
+Check("第一关：摆位间距（人离玩家 / 担架 / 抬担架的人，单位不叠）；下一步目标不落在玩家脚下", () => {
+  // 口径先用合成关键帧钉住。
+  const S = BLOCKOUT_SPACING;
+  const kf = (units, next = null) => NormalizeBlockout({ schema: BLOCKOUT_SCHEMA, level: "FirstLevel", keyframes: [{ id: "a", stage: 1, name: "a",
+    player: { x: 0, z: 0 }, what: "", next: next || { text: "t" }, units }] }).keyframes[0];
+  const litter = { id: "L", side: "nra", kind: "litter", x: 0, z: -10, yawDeg: 0 };   // 朝北：前头抬的人在 (0, −11.6)，后头 (0, −8.4)
+  assert.deepEqual(FirstLevelSpacingIssues(kf([litter, { id: "p", side: "nra", x: 2, z: -10 }])), [], "担架边上 2 m 没问题");
+  assert.equal(FirstLevelSpacingIssues(kf([{ id: "p", side: "nra", x: 0.5, z: 0.5 }])).length, 1, "离玩家 0.7 m 要报");
+  assert.deepEqual(FirstLevelSpacingIssues(kf([{ id: "d", side: "nra", x: 0.6, z: 0, state: "down" }])), [], "倒地的人可以躺在玩家脚边");
+  assert.equal(FirstLevelSpacingIssues(kf([litter, { id: "p", side: "nra", x: 0.2, z: -11.6 }])).length, 1, "站在前头抬的人身上要报");
+  assert.equal(FirstLevelSpacingIssues(kf([{ ...litter, bearers: 1 }, { id: "p", side: "nra", x: 0.2, z: -8.2 }])).length, 0, "bearers 1：后头没人，站后抬杆处（老耿）不报");
+  assert.equal(FirstLevelSpacingIssues(kf([{ ...litter, bearers: 0 }, { id: "p", side: "nra", x: 0, z: -11.6 }])).length, 0, "bearers 0：没人抬");
+  assert.equal(FirstLevelSpacingIssues(kf([{ id: "a", side: "ija", x: 5, z: 5 }, { id: "b", side: "ija", x: 5.5, z: 5.3 }])).length, 1, "两个单位 0.58 m 要报");
+  assert.equal(FirstLevelSpacingIssues(kf([], { text: "t", x: 1, z: 1 })).length, 1, "下一步目标离玩家 1.4 m 要报");
+  // 提交的配置。
+  const doc = NormalizeBlockout(COMMITTED.FirstLevel);
+  const bad = doc.keyframes.flatMap((k) => FirstLevelSpacingIssues(k).map((line) => `${k.id} ${line}`));
+  assert.equal(bad.length, 0, `${bad.length} 处摆位间距不够：\n  ${bad.join("\n  ")}`);
+  for (const k of COMMITTED.FirstLevel.keyframes) {
+    if (!Number.isFinite(k.next?.x)) continue;
+    assert.ok(Math.hypot(k.next.x - k.player.x, k.next.z - k.player.z) >= S.nextM, `${k.id} 下一步目标离玩家不到 ${S.nextM} m，应只写文字`);
+  }
+  // 12-1：要守的是排队道（追兵机枪扫的那一点），不是玩家自己站的低墙射位。
+  const k121 = COMMITTED.FirstLevel.keyframes.find((k) => k.id === "12-1");
+  assert.deepEqual([k121.next.x, k121.next.z], [MID_TUNING.loadingThreatPoint.x, MID_TUNING.loadingThreatPoint.z]);
+  // CLI validate / export 报的问题清单与上面同口径，也是空的。
+  assert.deepEqual(FirstLevelBlockoutIssues(COMMITTED.FirstLevel), []);
+});
+
+Check("第一关：军官是 kind officer；床位上的老周担架 bearers 0 不是 down；倒下的抬担架的人仍是 down", () => {
+  const doc = COMMITTED.FirstLevel;
+  const all = (id) => doc.keyframes.flatMap((k) => k.units.filter((u) => u.id === id).map((u) => [k.id, u]));
+  for (const id of ["FrontOfficer", "bridgeOfficer"]) {
+    const list = all(id);
+    assert.ok(list.length > 0, `${id} 没出现`);
+    for (const [k, u] of list) assert.equal(u.kind, "officer", `${k} ${id} 应是 kind officer`);
+  }
+  for (const k of ["17-1", "18-1"]) {
+    const u = doc.keyframes.find((x) => x.id === k).units.find((x) => x.id === "Litter5");
+    assert.equal(u.bearers, 0, `${k} 老周在床位上，担架没人抬`);
+    assert.notEqual(u.state, "down", `${k} 老周的担架不是「抬的人倒了」`);
+  }
+  for (const k of ["13-2", "14-1", "14-2"]) {
+    const u = doc.keyframes.find((x) => x.id === k).units.find((x) => x.id === "Litter6");
+    assert.equal(u.state, "down", `${k} Litter6 抬的人被扫倒（检查点 fallen）`);
+    assert.notEqual(u.bearers, 0, `${k} Litter6 down 的意思是抬的人倒了，得有人`);
+  }
+  for (const k of doc.keyframes) for (const u of k.units) {
+    if (u.bearers !== undefined) assert.equal(u.kind, "litter", `${k.id} ${u.id} 只有担架有 bearers`);
+    if (u.kind === "litter" && u.state === "down") assert.notEqual(u.bearers, 0, `${k.id} ${u.id}：没人抬的担架不能是 down`);
+  }
 });
 
 Check("第二关：玩家点在边界内、不在实心块里；寨门 / 两处缺口 / 主路留空；高度对得上城区地面", () => {

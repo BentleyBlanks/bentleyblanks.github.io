@@ -18,13 +18,16 @@
 //            担架队：BuildFirstLevelCheckpoint(n).column.litters 打底，阶段内的推进按担架队路线里程摆。
 //   pois     该阶段步骤的位置事实、补给箱、地标烟柱。
 // 同一个人在相邻关键帧里 id 不变（花名册 id / luo / Litter5 …），过渡时走过去；有折线的（战术点、路线）写进 path。
+// 走位折线按偏好逐条试（配方 path → 指定贴着走的路 lane → 战术折线 → 已知路线 → 两条接力 → 直线），取第一条身体不穿高墙的
+// （BLOCKOUT_ROUTE_BODY）；组装完 FirstLevelBlockoutIssues 再按 PlanTransition 复查一遍，连同玩家站位（BLOCKOUT_PLAYER_BODY）
+// 与摆位间距（BLOCKOUT_SPACING）一起报给 CLI；Script_EditorBlockoutConfigTest 按同一口径判失败。
 //
 // 朝向一律换成 yawDeg（0 = 北 −Z，+90 = 西，−90 = 东；前方 = (−sin, −cos)）。三种来源的换算见下面三个函数，
 // 由 Script_EditorBlockoutConfigTest 钉住。MISSION_PLACEMENT 的 yaw 各块口径不一（块头注释写「0 朝 +z 南」，但接收院 /
 // 浮桥爆破手等几处是按演员口径调的），所以这里凡是能说清「看向谁」的人一律写 faceTo，不直接搬表里的 yaw。
 // ===========================================================================
 
-import { BLOCKOUT_SCHEMA, YawDegFromTo, PathLength } from "./Script_EditorBlockoutConfig.mjs";
+import { BLOCKOUT_SCHEMA, YawDegFromTo, PathLength, PlanTransition, NormalizeBlockout } from "./Script_EditorBlockoutConfig.mjs";
 import { FIRST_LEVEL_BLOCKOUT_STATIONS, FIRST_LEVEL_BLOCKOUT_ZONES, FIRST_LEVEL_BLOCKOUT_TITLE } from "./Data_EditorBlockoutFirstLevelStations.mjs";
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES as Routes, MISSION_LAYOUT, MISSION_SUPPLIES, MISSION_WHITEBOX_VERSION }
   from "./Data_FirstLevelMissionLayout.mjs";
@@ -45,6 +48,7 @@ import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as MID, MidLitterHoldSlots, MidWalkingWounded } from "./Data_Tuning_FirstLevelMid.mjs";
 import { END_TUNING as END } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { FAR_BANK_REAL, FAR_BANK_TANKS, FAR_BANK_REAL_SPAWN_BACK_M, FarBankTankPostZ, FarBankTankPushZ } from "./Data_FirstLevelBridgeFarBank.mjs";
+import { FarBankSpawnAt, FarBankWalkInVia } from "./Script_FirstLevelBridgeFarBank.mjs";
 import { MISSION_CROWD_AREAS } from "./Data_FirstLevelMissionCrowd.mjs";
 import { LANDMARK_COLUMNS } from "./Data_FirstLevelDistantSmoke.mjs";
 import { BuildOrchestrationModel, PhaseLayout } from "./Script_MissionOrchestration.mjs";
@@ -209,7 +213,8 @@ const NEXT_TARGETS = {
   "10-1": { at: A.gate, r: 3 },
   "10-2": { at: GATE_TOWER, r: 3 },
   "11-1": { at: MID.streetFight.askPoint, r: MID.streetFight.askRangeM },
-  "12-1": { at: A.transferWall, r: 1.5 },
+  // 要守的是排队道（追兵机枪扫的那一段），不是玩家自己站的低墙射位（12_3 就在 A.transferWall 上）。
+  "12-1": { at: MID.loadingThreatPoint, r: 3 },
   "12-2": { at: A.cartBoard, r: 2 },
   "12-3": { at: A.cartHalt, r: 3 },
   // 西高墙墙脚的路沟 RoadSideDitchWest（x 72.6、z 120.2–129.2，Data_FirstLevelWhiteboxTerrainTransfer）。
@@ -260,8 +265,9 @@ const DEFAULT_WEAPON = { ija: "Type38", nra: "HanYang" };
 const NO_WEAPON_KINDS = new Set(["civilian", "child", "tank", "litter", "cart", "animal"]);
 
 /**
- * 造一个单位。o: kind name role group weapon yawDeg faceTo stance aim state arc speedMps path intent guess
+ * 造一个单位。o: kind name role group weapon yawDeg faceTo stance aim state bearers arc speedMps path intent guess
  *               track（这个人跟的折线，含起点）trackAt（他此刻在折线上的下标）
+ *               lane（从上一关键帧走过来时要贴着走的折线：从上一位置在它上面的投影上道，走到与这里平齐再下道）
  */
 function Unit(id, side, at, o = {}) {
   const kind = o.kind || "soldier";
@@ -276,6 +282,8 @@ function Unit(id, side, at, o = {}) {
   if (o.stance && o.stance !== "stand") u.stance = o.stance;
   if (o.aim) u.aim = true;
   if (o.state === "down") u.state = "down";
+  // §3：担架的 bearers = 抬的人数（缺省 2 不写）；0 = 放在地上 / 床边没人抬，1 = 只有前头一个（后头是玩家）。
+  if (kind === "litter" && Number.isInteger(o.bearers) && o.bearers !== 2) u.bearers = o.bearers;
   if (o.arc) u.arc = o.arc;
   if (o.speedMps) u.speedMps = o.speedMps;
   if (o.path?.length) u.path = o.path.map((p) => ({ x: R2(p.x), z: R2(p.z) }));
@@ -286,6 +294,7 @@ function Unit(id, side, at, o = {}) {
     faceTo: o.faceTo || null,
     track: o.track || null,
     trackAt: Number.isFinite(o.trackAt) ? o.trackAt : null,
+    lane: o.lane ? o.lane.map((p) => Pt(p.x, p.z)) : null,
   });
   return u;
 }
@@ -301,6 +310,12 @@ function MoveTo(u, at, path = null) {
   const meta = META.get(u);
   if (meta) { meta.track = null; meta.trackAt = null; }
   if (path?.length) u.path = path.map((p) => ({ x: R2(p.x), z: R2(p.z) }));
+  return u;
+}
+/** 事后给一个人指定从上一关键帧走过来要贴着的折线（见 Unit 的 lane）。 */
+function WithLane(u, lane) {
+  const meta = META.get(u);
+  if (meta) meta.lane = lane.map((p) => Pt(p.x, p.z));
   return u;
 }
 const Ija = (id, at, o) => Unit(id, "ija", at, o);
@@ -354,6 +369,7 @@ const ENEMY_NAMES = Object.freeze({
  * o.down:    这些 id 画成倒地（含 FIRST_LEVEL_STAGE_CLEARED_ENEMIES 里的，否则清掉的人不出现）
  * o.face:    缺省朝向点（行里有 faceTo 的用行里的）
  * o.intent:  true = 还没走完的折线写成「即将去」
+ * o.pathOf:  { [id]: 折线 }，从上一关键帧走过来的路（绕墙用）
  * o.allowStates: 允许的组状态（缺省 active / standby / pending）
  */
 function Group(n, groupId, o = {}) {
@@ -381,6 +397,8 @@ function Group(n, groupId, o = {}) {
     const tactic = MISSION_TACTICS[row.id];
     const mg = ["Type11", "Type92Hmg"].includes(row.weapon);
     out.push(Unit(row.id, row.side || "ija", at, {
+      // 花名册 role officer（拔刀军官）→ §3 的 kind officer（编辑器换军官模型）。
+      kind: row.role === "officer" ? "officer" : undefined,
       group: groupId, role: row.role, weapon: row.weapon, name: ENEMY_NAMES[row.id],
       faceTo: o.faceOf?.[row.id] || (isDown ? null : (row.faceTo || row.fireAt || (o.intent && remaining[0]) || o.face || null)),
       stance: isDown ? "prone" : (o.stanceOf?.[row.id] || o.stance
@@ -389,6 +407,7 @@ function Group(n, groupId, o = {}) {
       state: isDown ? "down" : "alive",
       speedMps: tactic?.mps,
       intent: o.intent && !isDown ? remaining : null,
+      path: o.pathOf?.[row.id] || null,
       track, trackAt,
     }));
   }
@@ -408,18 +427,28 @@ function Tank(wayId, o = {}) {
     state: o.down ? "down" : "alive", intent: o.intent, track, trackAt: idx });
 }
 
-/** 跟车步兵：挡口子的槽位（FRONT_TANK_ESCORT_SLOTS，相对 Block）平移到战车所在路点。 */
+/** 战车走的路（FRONT_TANK_PATH 的路点连线）。 */
+const TANK_LANE = Object.freeze(FRONT_TANK_PATH.map((p) => Pt(p.x, p.z)));
+/** 跟车步兵前后拉开的间距（一路纵队跟在车前后）。 */
+const ESCORT_FILE_GAP_M = 2.5;
+
+/**
+ * 跟车步兵：挡口子的槽位（FRONT_TANK_ESCORT_SLOTS，相对 Block）平移到战车所在路点。
+ * o.fileM：不按槽位，沿战车的路排成一路纵队（A 在 fileM 米处，往后每人隔 ESCORT_FILE_GAP_M）。
+ * o.followTank：从上一关键帧走过来时贴着战车的路走（不把路点平移到槽位上：平移过的路点会穿过北边的破屋），
+ *              走到与槽位平齐才下路。
+ */
 function TankEscorts(at, o = {}) {
   const block = TankWay("Block");
-  return FRONT_TANK_ESCORT_SLOTS.map((slot) => {
+  return FRONT_TANK_ESCORT_SLOTS.map((slot, i) => {
     const dx = slot.x - block.x, dz = slot.z - block.z;
-    return Ija(slot.id, Offset(at, dx, dz), {
+    const pos = Number.isFinite(o.fileM) ? MissionRoutePoint(TANK_LANE, o.fileM - i * ESCORT_FILE_GAP_M) : Offset(at, dx, dz);
+    return Ija(slot.id, pos, {
       group: "tank", role: "escort", faceTo: o.face || SP.tankTargets.gap, stance: o.stance || "crouch", aim: o.aim ?? true,
-      state: o.down?.includes(slot.id) ? "down" : "alive", intent: o.intent?.(slot),
-      // 跟着战车沿路走过来：路点平移到自己的槽位上。
-      path: o.pathWays ? o.pathWays.map((id) => Offset(TankWay(id), dx, dz)) : null });
+      state: o.down?.includes(slot.id) ? "down" : "alive", intent: o.intent?.(slot), lane: o.followTank ? TANK_LANE : null });
   });
 }
+const TankLaneM = (wayId) => MissionRouteProjection(TANK_LANE, TankWay(wayId)).progress;
 
 /**
  * 推进组（MachineGunAttack*）跃进到最后一道线的落点。FrontAssaultLane 把不同起点推到同一个掩体列边上，
@@ -447,8 +476,11 @@ function Guards({ posts = "scrape", only = null, down = [], atOf = {}, intentOf 
   });
   return out;
 }
-/** 守军撤到的安全区落点（MISSION_PLACEMENT.guardWithdrawalRoutes 的末点）。 */
-const GuardSafe = (i) => P.guardWithdrawalRoutes[i].at(-1);
+/**
+ * 守军撤到的安全区落点（MISSION_PLACEMENT.guardWithdrawalRoutes 的末点）。表里 8 个末点在沟底排成一行、相邻只隔 0.5 m
+ * （游戏里 AI 到了会自己散开），这里单号往北错 0.9 m，两排之间相邻的人相距 1 m 以上。
+ */
+const GuardSafe = (i) => { const p = P.guardWithdrawalRoutes[i].at(-1); return Pt(p.x, p.z - (i % 2 ? 0.9 : 0)); };
 
 /** 火力组 + 跃进组（FRONT_RIFLEMEN）。bound = 跃进组在 FrontAssaultLane 上的下标（-1 = 出发点，"last" = 最后一道线）。 */
 function FrontRiflemen(n, { bound = -1, down = [], skip = [] } = {}) {
@@ -477,14 +509,14 @@ function LitterUnit(id, at, o = {}) {
   return Nra(id, at, { kind: "litter", name: zhou ? "老周的担架" : "", role: zhou ? "zhouLitter" : "litter", group: "column", ...o });
 }
 /** 检查点快照里的担架（装上车走了的不画；fallen = 抬担架的人倒了）。 */
-function CheckpointLitters(n, { skip = [], atOf = {}, faceOf = {} } = {}) {
+function CheckpointLitters(n, { skip = [], atOf = {}, faceOf = {}, bearersOf = {} } = {}) {
   const out = [];
   for (const l of Checkpoint(n).column.litters) {
     if (skip.includes(l.id)) continue;
     if (!atOf[l.id] && (l.loaded || l.evacuated || l.visible === false)) continue;
     const at = atOf[l.id] || l;
     out.push(LitterUnit(l.id, at, { yawDeg: atOf[l.id] ? null : YawDegFromActorRad(l.yaw || 0), faceTo: faceOf[l.id],
-      state: !atOf[l.id] && l.state === "fallen" ? "down" : "alive" }));
+      state: !atOf[l.id] && l.state === "fallen" ? "down" : "alive", bearers: bearersOf[l.id] }));
   }
   return out;
 }
@@ -558,8 +590,18 @@ const BUNKER = P.bunker;
 const BLOCK = TankWay("Block");
 /** 破墙机枪手：花名册写的是枪的位置（RightNestFrontRest 枪架上），人在枪后的座位上。 */
 const NEST_GUNNER = S.seat;
+/** 右侧阵位北墙外、矮墙段（RightNestNorthLow，x 24–32.5）北面一点：从阵位前半边出去翻这一段。 */
+const NEST_LOW_WALL_OUT = Object.freeze(Pt(30.4, -158.2));
+/** 妮儿躲在墙后（MID_TUNING.streetFight.nierWallBack 往西 1 m：原位贴着停放的 Litter2 前头抬的人）。 */
+const NIER_WALL_BACK = Object.freeze(Offset(MID.streetFight.nierWallBack, -1, 0));
 /** 08 墙后停靠处 → 灶屋北门 → 穿灶屋、连屋 → 后院 / 内院（担架队与老耿一家走的那一段 village 路线）。 */
 const THROUGH_KITCHEN = Object.freeze([Pt(58, -20), Pt(58, -9), Pt(58, 8), Pt(58, 18)]);
+/**
+ * 灶屋（x 52–64、z −16.5…−1.5）：北门洞 x 57–59 在 z −16.5，进门是中间过道（x 55.7–59.9）；西间的隔墙在 z −13.9…−11.9 有个口。
+ * 09 伏击时班长在西间（P.ambushSquadPosts[0]），进出都走：巷子 → 北门 → 过道 → 隔墙口。
+ */
+const KITCHEN_WEST_ROOM_IN = Object.freeze([Pt(58, -20), Pt(58, -12.9), Pt(54.8, -12.9)]);
+const KITCHEN_WEST_ROOM_OUT = Object.freeze([...KITCHEN_WEST_ROOM_IN].reverse());
 /** 厢房门口 → 后门 → toBridge 到南岸射位（18 接令后班组走的路）。 */
 const WARD_TO_BRIDGE = Object.freeze([Pt(-26, 247), Pt(-35, 247), Pt(-38, 244), ...Routes.toBridge.map((p) => Pt(p.x, p.z))]);
 /** 内院 → 院门合流点（MISSION_CROWD_AREAS.courtyard.merge）→ 门外绕行巷。 */
@@ -568,12 +610,52 @@ const OUT_OF_YARD = Object.freeze([Pt(53, 32.2), Pt(53, 39)]);
 const THROUGH_WALL_GAP = Object.freeze([Pt(MID.villageWall.gapX, 82.5), Pt(MID.villageWall.gapX, 86.5)]);
 /** 院门 → 院里 → 厢房南门（END_TUNING.receptionApproach 的后半段）。 */
 const YARD_TO_WARD = Object.freeze([Pt(2, 240), Pt(-5, 240), Pt(-13, 240), Pt(-13, 249), Pt(-26, 249), Pt(-26, 241)]);
+/** 夹道（wallPath）→ 院门 → 院里 → 厢房南门：15 走在夹道里的担架进院放到厢房里，贴着这条走（夹道出口外的石院墙挡着斜插）。 */
+const WALL_PATH_TO_WARD = Object.freeze([...Routes.wallPath.map((p) => Pt(p.x, p.z)), ...YARD_TO_WARD.slice(1)]);
+/** 接运点往南的车路口：两道路墙（x 70.75–71.25 / 79.75–80.25）从 z 90.6 起夹着车路，从低墙一线下来先进这个口。 */
+const ROAD_MOUTH = Object.freeze({ east: Pt(78.2, 88.6), west: Pt(74.6, 88.6) });
+/**
+ * 车路西墙（x 70.65–71.35）的南头在 z 129.6，再往南到桥头墩（z 136.95）之间是空的：13 车停下后人从路上绕过墙头去西沟。
+ * 车路一侧 → 墙头外一侧。
+ */
+const ROAD_WALL_SOUTH_END = Object.freeze([Pt(72.4, 131.8), Pt(69.6, 131.8)]);
 /** 车路 → 物资箱北面 → 下沟口 → 西沟（MISSION_PURSUIT_ROUTE 那条线，撤离线 evacuation 的头）。 */
 const ROAD_TO_DITCH = Object.freeze([Pt(74, 112), Pt(61, 112), Pt(60, 114), Pt(54, 114), Pt(39, 116)]);
 /** 先走 via，再沿 route 走到 to 的投影。 */
 function ViaThenRoute(via, route, to) { return [...via, ...RouteSlice(route, via.at(-1), to)]; }
 /** 炸桥后随队往南（marchOut），黑屏后在夜里北门外的出生点归队（nightMarch 起点）。 */
 const NIGHT_MARCH = Object.freeze([...Routes.marchOut.slice(1).map((p) => Pt(p.x, p.z)), Pt(Routes.nightMarch[0].x, Routes.nightMarch[0].z)]);
+
+/** p 离 anchor 不到 minM 时沿两者连线推到 minM（两个人挤在一起时把后摆的那个挪开一点）。 */
+function Apart(anchor, p, minM) {
+  const d = Dist(anchor, p);
+  if (d >= minM) return Pt(p.x, p.z);
+  const dx = d > 1e-6 ? (p.x - anchor.x) / d : 1, dz = d > 1e-6 ? (p.z - anchor.z) / d : 0;
+  return Pt(anchor.x + dx * minM, anchor.z + dz * minM);
+}
+/** 担架（中心 at、朝 faceTo）前头（sign 1）/ 后头（sign −1）抬杆处，离中心 1.6 m。 */
+function LitterEnd(at, faceTo, sign) {
+  const d = Dist(at, faceTo) || 1;
+  return Pt(at.x + (faceTo.x - at.x) / d * 1.6 * sign, at.z + (faceTo.z - at.z) / d * 1.6 * sign);
+}
+/** 14-2 老周的担架：沟口东边一点，前头抬的人离玩家（14_1 机位）1.5 m。 */
+const ZHOU_LITTER_1402 = Object.freeze(Offset(A.ditchMouth, 1.2, 0.6));
+/** 一组人里挨得太近的（< 0.9 m，倒地的尸首常常落在同一个点上）后摆的那个沿连线挪开到 0.9 m。 */
+function Spread(units, minM = 0.9) {
+  for (let i = 1; i < units.length; i++) {
+    for (let j = 0; j < i; j++) {
+      if (Dist(units[i], units[j]) >= minM) continue;
+      const p = Apart(units[j], units[i], minM);
+      units[i].x = R2(p.x); units[i].z = R2(p.z);
+    }
+  }
+  return units;
+}
+/** 冬瓜在刺杀处的位置；日兵甲站在他跟前（分镜 0.65 m，这里拉到 0.9 m，两个人的身体不叠）。 */
+const COMRADE_AT = Object.freeze(Pt(4.06, -125.9));
+const EXECUTIONER_AT = Object.freeze(Apart(COMRADE_AT, Pt(4.4, -125.35), 0.9));
+/** 沟沿机枪组的射手：分镜里离副射手 0.7 m，往西拉到 0.9 m（副射手东边 1 m 是倒地的喊话兵）。 */
+const BUNKER_GUNNER_AT = Object.freeze(Apart(SB.wall.heave.roots.loader, SB.wall.heave.roots.gunner, 0.9));
 
 const RECIPES = {
   // ---------------- 01 ----------------
@@ -590,10 +672,10 @@ const RECIPES = {
   }),
   "01-2": (ctx) => ({
     units: [
-      Nra("comrade", { x: 4.06, z: -125.9 }, { name: "冬瓜", role: "comrade", faceTo: ctx.player, stance: "crouch" }),
+      Nra("comrade", COMRADE_AT, { name: "冬瓜", role: "comrade", faceTo: ctx.player, stance: "crouch" }),
       ...Group(1, "bunkerAssault", {
         allowStates: ["dormant", "active"],
-        at: { BunkerExecutionerA: Pt(4.4, -125.35), BunkerExecutionerB: SB.wall.rifleRoot, BunkerGunner: SB.wall.heave.roots.gunner,
+        at: { BunkerExecutionerA: EXECUTIONER_AT, BunkerExecutionerB: SB.wall.rifleRoot, BunkerGunner: BUNKER_GUNNER_AT,
           BunkerLoader: SB.wall.heave.roots.loader },
         faceOf: { BunkerExecutionerA: Pt(4.06, -125.9), BunkerExecutionerB: Pt(9, -128), BunkerFollowA: A.bunkerKilling,
           BunkerFollowB: A.bunkerKilling, BunkerGunner: SB.wall.burstAt[0], BunkerLoader: SB.wall.burstAt[0] },
@@ -627,10 +709,10 @@ const RECIPES = {
         liuwencai: { ...BUNKER.liuwencaiShot, faceTo: A.bunkerJunction, aim: true },
         yaowa: { ...BUNKER.yaowaLift, faceTo: A.bunkerDoor },
       }),
-      Nra("comrade", { x: 4.06, z: -125.9 }, { name: "冬瓜", role: "comrade", stance: "prone", state: "down" }),
+      Nra("comrade", COMRADE_AT, { name: "冬瓜", role: "comrade", stance: "prone", state: "down" }),
       Nra("shouter", BANTER.shouter, { name: "喊话的兵", role: "comrade", stance: "prone", state: "down" }),
       ...Group(2, "bunkerAssault", {
-        at: { BunkerExecutionerA: Pt(4.4, -125.35), BunkerExecutionerB: SB.wall.rifleRoot, BunkerGunner: SB.wall.heave.roots.gunner,
+        at: { BunkerExecutionerA: EXECUTIONER_AT, BunkerExecutionerB: SB.wall.rifleRoot, BunkerGunner: BUNKER_GUNNER_AT,
           BunkerLoader: SB.wall.heave.roots.loader },
         down: ["BunkerExecutionerA", "BunkerExecutionerB", "BunkerFollowB", "BunkerGunner", "BunkerLoader"],
         faceOf: { BunkerFollowA: A.bunkerRear },
@@ -652,7 +734,7 @@ const RECIPES = {
           heyoutian: { ...SB.withdraw.heBound[1], faceTo: A.bunkerJunction, stance: "crouch", aim: true },
           liuwencai: { ...SB.withdraw.liuBound[1], faceTo: A.bunkerJunction, stance: "crouch", aim: true },
         }),
-        Nra("comrade", { x: 4.06, z: -125.9 }, { name: "冬瓜", role: "comrade", stance: "prone", state: "down" }),
+        Nra("comrade", COMRADE_AT, { name: "冬瓜", role: "comrade", stance: "prone", state: "down" }),
         ...Group(2, "bunkerAssault", { only: ["BunkerFollowA"], faceOf: { BunkerFollowA: A.bunkerRear } }),
         ...Group(2, "bunkerPursuit", { atAll: "end", faceOf: Object.fromEntries(["BunkerPursuitFold", "BunkerPursuitA", "BunkerPursuitB", "BunkerPursuitC"].map((id) => [id, A.rearCorner])) }),
         ...CollectionScene(),
@@ -672,7 +754,8 @@ const RECIPES = {
           luo: { ...lead, faceTo: S.approach[1] },
           heyoutian: { ...SP.rcHold[0], faceTo: A.bunkerJunction, stance: "crouch", aim: true },
           liuwencai: { x: ctx.player.x + 1.2, z: ctx.player.z - 1.6, faceTo: S.approach[1], guess: true },
-          yaowa: { ...MissionRoutePoint(Routes.support, 3), faceTo: S.approach[1], guess: true },
+          // 支沟里玩家前面几步（原先 3 m 处离玩家站位不到 0.5 m）。
+          yaowa: { ...MissionRoutePoint(Routes.support, 7.5), faceTo: S.approach[1], guess: true },
         }),
         ...FRONT_DEFENDERS.map((d) => Nra(d.id, d, { role: "defender", faceTo: Pt(d.x, d.z - 30), stance: "crouch", aim: true })),
         Nra("WalkingWounded0", Pt(-30, -119.5), { role: "wounded", faceTo: A.collection, guess: true }),
@@ -737,7 +820,8 @@ const RECIPES = {
         ...Group(3, "frontFlank", { atAll: "end", face: A.front }),
         ...Group(3, "frontOfficer", { atAll: "end", face: A.front, stance: "stand" }),
         Tank("Start"),
-        ...TankEscorts(TankWay("Cutting"), { aim: false, stance: "stand", face: TankWay("CrestEast") }),
+        // 跟车步兵在战车前面沿路排成一路纵队（队首在 Cutting 路点）。
+        ...TankEscorts(null, { fileM: TankLaneM("Cutting"), aim: false, stance: "stand", face: TankWay("CrestEast") }),
       ],
       pois: [
         Poi("safeZone", "撤下来的守军去这里", "poi", SP.safeZone, 3),
@@ -764,7 +848,7 @@ const RECIPES = {
         pathOf: { 6: FRONT_GUARD_MG_GROUP.exit.slice(0, -1), 7: FRONT_GUARD_MG_GROUP.exit },
       }).map((u) => (u.id === "Guard6" || u.id === "Guard7" || u.id === "Guard5") ? u : Object.assign(u, { aim: undefined })),
       Tank("BendExit", { intent: [TankWay("Pressure"), TankWay("Approach"), BLOCK] }),
-      ...TankEscorts(TankWay("BendExit"), { face: A.front, pathWays: ["CrestEast", "Shadow", "HullDown", "Descent", "Bend"] }),
+      ...TankEscorts(TankWay("BendExit"), { face: A.front, followTank: true }),
       ...Group(4, "machineGun", { intent: true, at: {} }).map((u) => {
         const lane = FrontAssaultLane(u.x, u.z);
         u.intent = lane.map((p) => ({ x: R2(p.x), z: R2(p.z) }));
@@ -792,7 +876,7 @@ const RECIPES = {
         down: [5],
       }).map((u) => (u.id === "Guard6" || u.id === "Guard7" || u.id === "Guard5") ? u : Object.assign(u, { aim: undefined })),
       Tank("Approach", { intent: [BLOCK] }),
-      ...TankEscorts(TankWay("Approach"), { pathWays: ["Pressure"] }),
+      ...TankEscorts(TankWay("Approach"), { followTank: true }),
       // 04 nestFrontContested：侧翼组剩下的人 + 拔刀军官 + 西北台地的两个增援翻进阵位前半边（FrontCounterattack.NestFront）。
       ...Group(4, "frontFlank", { only: ["FrontFlankA"], at: { FrontFlankA: FRONT_NEST_FRONT_POSTS[0] }, face: ctx.player }),
       ...Group(4, "frontOfficer", { at: { FrontOfficer: FRONT_NEST_FRONT_POSTS[1] }, face: ctx.player, stance: "stand" }),
@@ -828,7 +912,9 @@ const RECIPES = {
       Tank("Block"),
       ...TankEscorts(BLOCK).map((u) => Object.assign(u, FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS[5][u.id] || {})),
       ...Group(5, "frontFlank", { only: ["FrontFlankA"], at: { FrontFlankA: FRONT_NEST_FRONT_PULLBACK }, face: A.front }),
-      ...Group(5, "frontOfficer", { at: { FrontOfficer: Offset(FRONT_NEST_FRONT_PULLBACK, 1.6, -1.2) }, face: A.front, stance: "stand" }),
+      // 从阵位前半边退出来：翻北墙西段的矮墙（RightNestNorthLow），不穿东段的高墙。
+      ...Group(5, "frontOfficer", { at: { FrontOfficer: Offset(FRONT_NEST_FRONT_PULLBACK, 1.6, -1.2) }, face: A.front, stance: "stand",
+        pathOf: { FrontOfficer: [NEST_LOW_WALL_OUT] } }),
       ...Group(5, "machineGun", { at: {}, face: A.front }).map((u) => MoveTo(u, MgPushPost(u.id, FrontAssaultLane(u.x, u.z).at(-1) || u))),
       ...FrontRiflemen(5, { bound: "last" }),
       ...Group(5, "sapInfiltrators", { at: { BundleBendA: 2, BundleBendB: 1, SapInfilC: 0, SapInfilD: 0 }, intent: true }),
@@ -954,7 +1040,8 @@ const RECIPES = {
         ...Squad({
           luo: { ...ColumnPoint(playerM + 30), faceTo: ColumnPoint(playerM + 34) },
           yaowa: { ...ColumnPoint(playerM + 1.5), faceTo: ColumnPoint(playerM + 6), guess: true },
-          heyoutian: { ...ColumnPoint(playerM + 11), faceTo: ColumnPoint(playerM + 13), guess: true },
+          // 担架队尾巴后面（队里每两副担架之间都站着抬的人，插不进去）。
+          heyoutian: { ...ColumnPoint(playerM + 3), faceTo: ColumnPoint(playerM + 6), guess: true },
           liuwencai: { ...ColumnPoint(playerM - 4), faceTo: ColumnPoint(playerM), guess: true },
         }),
         Nier(Offset(ctx.player, R.geng.rimOffsetM, -2), { faceTo: ColumnPoint(playerM + 6), guess: true }),
@@ -966,11 +1053,12 @@ const RECIPES = {
     const holdM = ColumnProgress(A.southMouthHold);
     return {
       units: [
-        ...ColumnLitters(holdM + 2),
+        // 担架停在沟里、玩家身后（队首前头抬的人离玩家约 1 m）。
+        ...ColumnLitters(holdM - 2.6),
         ...Squad({
           luo: { x: -9.6, z: -40.6, faceTo: A.mouthEmbankment, stance: "crouch", aim: true, guess: true },
           heyoutian: { x: -11.4, z: -43.2, faceTo: A.mouthEmbankment, stance: "crouch", aim: true, guess: true },
-          yaowa: { ...ColumnPoint(holdM - 16), faceTo: A.southMouth, stance: "crouch", guess: true },
+          yaowa: { ...ColumnPoint(holdM + 1.6), faceTo: A.southMouth, stance: "crouch", guess: true },
           liuwencai: { x: -12.8, z: -49.6, faceTo: A.mouthEmbankment, stance: "crouch", guess: true },
         }),
         Nier({ x: -10.6, z: -48.4 }, { faceTo: A.southMouth, stance: "crouch", guess: true }),
@@ -1006,7 +1094,8 @@ const RECIPES = {
           luo: { x: 70.5, z: -23.2, faceTo: Pt(76, -24) },
           heyoutian: { x: 56, z: -20.4, faceTo: Pt(76, -24), guess: true },
           liuwencai: { x: 52.6, z: -21.2, faceTo: Pt(76, -24), guess: true },
-          yaowa: { ...ColumnPoint(playerM - 8), faceTo: ctx.player, guess: true },
+          // 担架队北边一侧（队里两副担架之间站着抬的人）。
+          yaowa: { ...RouteSide(COLUMN_ROUTE, playerM - 8, -1.5), faceTo: ctx.player, guess: true },
         }),
         Nier(R.geng.villageRefuge, { faceTo: ctx.player }),
         ...Group(8, "village", { face: Pt(76.65, -10) , faceOf: { VillageGunner: A.gate, RearWindow: Pt(70, 5), SideYard: A.gate, VillageCorner: Pt(58, -16.6), KitchenGuard: Pt(58, -16.6) } }),
@@ -1023,7 +1112,8 @@ const RECIPES = {
           luo: { x: 74.4, z: -24.4, faceTo: Pt(76.65, 20) },
           heyoutian: { ...P.streetBlock.frontParty[0], faceTo: P.streetBlock.windowShooter, stance: "crouch", aim: true },
           liuwencai: { ...P.streetBlock.frontParty[1], faceTo: P.streetBlock.windowShooter, stance: "crouch", aim: true },
-          yaowa: { ...Offset(ColumnPoint(litterM - 5), 0, -1.4), faceTo: ctx.player, guess: true },
+          // 担架队南侧（巷子北边贴着 KitchenLaneHouseBody 的墙，z −21.5）。
+          yaowa: { ...Offset(ColumnPoint(litterM - 5), 0, 1.4), faceTo: ctx.player, guess: true },
         }),
         ...P.streetBlock.frontPartyWait.map((p, i) => Nra(`FrontParty${i}`, p, { role: "frontParty", faceTo: Pt(76.65, 20) })),
         Nier(R.geng.villageRefuge, { faceTo: ctx.player }),
@@ -1047,7 +1137,7 @@ const RECIPES = {
       }),
       ...P.streetBlock.frontPartyWait.map((p, i) => Nra(`FrontParty${i}`, p, { role: "frontParty", faceTo: Pt(76.65, 20) })),
       Geng(MID.streetFight.gengDoorSide, { faceTo: MID.streetFight.gengHouseFace }),
-      Nier(MID.streetFight.nierWallBack, { faceTo: MID.streetFight.gengDoorSide, stance: "crouch" }),
+      Nier(NIER_WALL_BACK, { faceTo: MID.streetFight.gengDoorSide, stance: "crouch" }),
       GengCart(A.gengCartYard, { faceTo: A.gate }),
       ...Group(8, "village", { faceOf: { VillageGunner: A.gate, RearWindow: Pt(70, 5), SideYard: A.gate, VillageCorner: Pt(58, -16.6), KitchenGuard: Pt(58, -16.6) } }),
       ...Group(8, "streetPush", { atAll: "end", face: Pt(71, -24) }),
@@ -1062,13 +1152,13 @@ const RECIPES = {
     units: [
       ...MidLitterHoldSlots(P.streetBlock.litterWait, R.litterCount).map((slot, i) => LitterUnit(`Litter${i}`, slot, { faceTo: Pt(slot.x, slot.z - 4) })),
       ...Squad({
-        luo: { ...P.ambushSquadPosts[0], faceTo: ctx.player },
+        luo: { ...P.ambushSquadPosts[0], faceTo: ctx.player, path: [Pt(70, -23), ...KITCHEN_WEST_ROOM_IN] },
         heyoutian: { ...P.ambushSquadPosts[1], faceTo: ctx.player },
         liuwencai: { ...P.ambushSquadPosts[2], faceTo: ctx.player },
         yaowa: { ...P.ambushYaowaPost, faceTo: A.melee, stance: "crouch" },
       }),
       Geng({ x: 61.2, z: -24.2 }, { faceTo: Pt(58, -16.6), guess: true }),
-      Nier(MID.streetFight.nierWallBack, { faceTo: Pt(58, -16.6), stance: "crouch" }),
+      Nier(NIER_WALL_BACK, { faceTo: Pt(58, -16.6), stance: "crouch" }),
       GengCart(A.gengCartYard, { faceTo: A.gate }),
       ...Group(9, "village", { down: ["VillageCorner", "KitchenGuard"],
         faceOf: { VillageGunner: A.gate, RearWindow: Pt(70, 5), SideYard: A.gate } }),
@@ -1092,13 +1182,13 @@ const RECIPES = {
       ...MidLitterHoldSlots(P.streetBlock.litterWait, R.litterCount).map((slot, i) => LitterUnit(`Litter${i}`, slot, { faceTo: Pt(slot.x, slot.z - 4) })),
       ...Squad({
         // 灶屋北墙外那条巷子（z −21.5…−16.8）里，跟在玩家身后。
-        luo: { x: 49.4, z: -19.8, faceTo: A.westAlleySouth, guess: true },
+        luo: { x: 49.4, z: -19.8, faceTo: A.westAlleySouth, guess: true, path: KITCHEN_WEST_ROOM_OUT },
         heyoutian: { x: 51.8, z: -20.2, faceTo: A.westAlleySouth, guess: true },
         liuwencai: { x: 53.8, z: -19.6, faceTo: A.westAlleySouth, guess: true },
         yaowa: { x: 66.6, z: -25.4, faceTo: ctx.player, guess: true },
       }),
       Geng({ x: 61.2, z: -24.2 }, { faceTo: Pt(58, -16.6), guess: true }),
-      Nier(MID.streetFight.nierWallBack, { faceTo: Pt(58, -16.6), stance: "crouch" }),
+      Nier(NIER_WALL_BACK, { faceTo: Pt(58, -16.6), stance: "crouch" }),
       GengCart(A.gengCartYard, { faceTo: A.gate }),
       ...Group(9, "village", { faceOf: { VillageGunner: A.gate, RearWindow: Pt(70, 5), SideYard: A.gate } }),
       ...Group(9, "melee", { at: { MeleeLead: MID.kitchenAmbush.hide, MeleeAlley: MID.streetFight.windowThrowPost },
@@ -1115,8 +1205,9 @@ const RECIPES = {
       units: [
         ...MidLitterHoldSlots(P.streetBlock.litterWait, R.litterCount).map((slot, i) => LitterUnit(`Litter${i}`, slot, { faceTo: Pt(slot.x, slot.z - 4) })),
         ...Squad({
+          // 三个人都在西侧夹道（x 49.3–51.7）南口里，等着侧面绕过去。
           luo: { x: 51.2, z: 14.2, faceTo: P.sideRoomGunner, stance: "crouch", guess: true },
-          heyoutian: { x: 52.8, z: 12.6, faceTo: P.sideRoomGunner, guess: true },
+          heyoutian: { x: 50.6, z: 13, faceTo: P.sideRoomGunner, guess: true },
           liuwencai: { x: 50.4, z: 11.8, faceTo: A.roofPost, guess: true },
           yaowa: { x: 66.6, z: -25.4, faceTo: Pt(58, -16.6), guess: true },
         }),
@@ -1145,13 +1236,15 @@ const RECIPES = {
         ...pockets.slice(0, R.litterCount).map((p, i) => LitterUnit(`Litter${i}`, p, { faceTo: A.gate, path: THROUGH_KITCHEN })),
         ...Squad({
           luo: { x: 54.6, z: 36.2, faceTo: Pt(77, 40), stance: "crouch", aim: true, guess: true },
-          heyoutian: { ...MID.streetFight.heTable, faceTo: A.gate },
+          // 先出夹道南口（连屋南墙 z 15.2–15.8 以南）再斜插到桌边。
+          heyoutian: { ...MID.streetFight.heTable, faceTo: A.gate, path: [Pt(50.5, 17.2)] },
           liuwencai: { x: 56.2, z: 39.6, faceTo: Pt(77, 40), stance: "crouch", aim: true, guess: true },
           yaowa: { x: 52.4, z: 29.6, faceTo: A.gate, guess: true, path: THROUGH_KITCHEN },
         }),
         GengCart(MID.streetFight.cartWallFoot, { faceTo: A.gate }),
         Geng(MID.streetFight.gengUnbar, { faceTo: A.gate }),
-        Nier(Offset(MID.streetFight.cartWallFoot, -0.9, -1.3), { faceTo: A.gate }),
+        // 车的东边（西南边是 Litter4 的停放位）。
+        Nier(Offset(MID.streetFight.cartWallFoot, 1.2, -0.5), { faceTo: A.gate }),
         ...Group(10, "village", { only: ["RearWindow", "SideYard"], faceOf: { RearWindow: Pt(70, 5), SideYard: A.gate } }),
         ...Group(10, "village", { only: ["VillageGunner"], down: ["VillageGunner"] }),
         ...Group(10, "roofThrower", { face: A.gate }),
@@ -1164,16 +1257,20 @@ const RECIPES = {
   },
   "10-2": (ctx) => ({
     units: [
-      ...CheckpointLitters(11).map((u) => Object.assign(u, { path: ViaThenRoute(OUT_OF_YARD, COLUMN_ROUTE, u) })),
+      // Litter3（检查点 11 在 x 70.1、朝东）往后挪 0.5 m：原位前头抬的人离 G10_2 机位只有 0.8 m。
+      ...CheckpointLitters(11).map((u) => Object.assign(u, u.id === "Litter3" ? { x: R2(u.x - 0.5) } : {}))
+        .map((u) => Object.assign(u, { path: ViaThenRoute(OUT_OF_YARD, COLUMN_ROUTE, u) })),
       ...Squad({
         luo: { ...A.streetRejoin, faceTo: GATE_TOWER },
-        heyoutian: { x: 70.4, z: 39.4, faceTo: Pt(90, 38), stance: "crouch", aim: true, guess: true, path: OUT_OF_YARD },
-        liuwencai: { x: 68.4, z: 38.6, faceTo: GATE_TOWER, guess: true },
+        // 绕行巷（z 37.3–41.1）里担架队排成一行（检查点 11），人站在两副担架之间的空当或巷子两边。
+        heyoutian: { x: 67.5, z: 40.4, faceTo: Pt(90, 38), stance: "crouch", aim: true, guess: true, path: OUT_OF_YARD },
+        liuwencai: { x: 67.4, z: 38, faceTo: GATE_TOWER, guess: true },
         yaowa: { x: 60.8, z: 39.2, faceTo: Pt(74, 39), guess: true },
       }),
-      GengCart({ x: 64.2, z: 39.2 }, { faceTo: Pt(74, 39), guess: true, path: OUT_OF_YARD }),
+      // 车停在巷子南边加宽处（BypassSouthWall 东头 x 59.9 以东）：出院门后沿巷子中线走过墙头再靠边。
+      GengCart({ x: 61.6, z: 41.4 }, { faceTo: Pt(74, 39), guess: true, path: [...OUT_OF_YARD, Pt(60.6, 39.4)] }),
       Geng({ x: 66.2, z: 38.2 }, { faceTo: Pt(74, 39), guess: true, path: OUT_OF_YARD }),
-      Nier({ x: 62.2, z: 40.4 }, { faceTo: Pt(74, 39), guess: true, path: OUT_OF_YARD }),
+      Nier({ x: 62.6, z: 39.6 }, { faceTo: Pt(74, 39), guess: true, path: OUT_OF_YARD }),
       ...Group(10, "village", { only: ["RearWindow", "SideYard"], faceOf: { RearWindow: Pt(70, 5), SideYard: A.gate } }),
       ...Group(10, "roofThrower", { face: A.gate }),
     ],
@@ -1184,14 +1281,15 @@ const RECIPES = {
     units: [
       ...CheckpointLitters(12),
       ...Squad({
-        luo: { x: 78.6, z: 80.4, faceTo: A.transfer },
+        // 担架队靠路东（检查点 12，x 78–79），班里人和妮儿走路西半边。
+        luo: { x: 77.2, z: 80.6, faceTo: A.transfer, guess: true },
         heyoutian: { x: 77.2, z: 69.4, faceTo: A.transfer, guess: true },
         liuwencai: { x: 74.8, z: 70.6, faceTo: A.transfer, guess: true },
-        yaowa: { x: 77.6, z: 64.2, faceTo: A.transfer, guess: true },
+        yaowa: { x: 76.4, z: 64.6, faceTo: A.transfer, guess: true },
       }),
       GengCart({ x: 79.3, z: 77.8 }, { faceTo: Pt(79.3, 86.5), guess: true }),
       Geng({ x: 80.9, z: 78.6 }, { faceTo: Pt(79.3, 86.5), guess: true }),
-      Nier({ x: 79.2, z: 74.8 }, { faceTo: Pt(79.3, 86.5), guess: true }),
+      Nier({ x: 76.6, z: 76.2 }, { faceTo: Pt(79.3, 86.5), guess: true }),
       ...MidWalkingWounded().map((w) => Nra(w.id, w, { role: "walkingWounded", faceTo: MID.walkingWoundedExit })),
       ...P.cartBays.map((b, i) => Civ(`BayCart${i}`, b, { kind: "cart", name: "", faceTo: Offset(b, 0, 4) })),
       ...MID.transferConvoy.carts.filter((c) => !c.from).map((c) => Civ(c.id, c, { kind: "cart", faceTo: Offset(c, 0, 4), yawDeg: YawDegFromActorRad(c.yaw) })),
@@ -1225,7 +1323,10 @@ const RECIPES = {
   }),
   "12-2": (ctx) => ({
     units: [
-      ...CheckpointLitters(12, { atOf: { Litter5: Offset(A.cartBoard, -1.6, 0.6) }, faceOf: { Litter5: A.cartBoard } }),
+      // 车头朝南，从车尾（北头）往上抬：担架在车尾北面、朝车，前头抬的人站在车尾外 0.5 m。
+      // 从村路下来过低墙路口，在车路东墙外侧（x 80.25 以东）往南走到车尾。
+      ...CheckpointLitters(12, { atOf: { Litter5: Offset(A.cartBoard, 0, -3.3) }, faceOf: { Litter5: A.cartBoard } })
+        .map((u) => (u.id === "Litter5" ? Object.assign(u, { path: [Pt(78.4, 74), ...THROUGH_WALL_GAP, Pt(82, 89)] }) : u)),
       ...MID.defencePosts.map((post) => Nra(post.cast, post, { name: SQUAD_NAMES[post.cast], role: "squad",
         faceTo: post.cast === "yaowa" ? A.cartBoard : post.face, stance: post.face ? "crouch" : "stand" })),
       Nier({ x: 86.6, z: 114.6 }, { faceTo: A.cartBoard, guess: true }),
@@ -1233,7 +1334,7 @@ const RECIPES = {
       Geng(Offset(A.cartBoard, 1.5, -3.6), { faceTo: A.cartBoard, guess: true }),
       ...P.cartBays.map((b, i) => Civ(`BayCart${i}`, b, { kind: "cart", name: "", faceTo: Offset(b, 0, 4) })),
       ...MID.transferConvoy.carts.filter((c) => !c.from).map((c) => Civ(c.id, c, { kind: "cart", yawDeg: YawDegFromActorRad(c.yaw) })),
-      ...Group(12, "transfer", { atAll: "end", down: MISSION_ENCOUNTERS.transfer.map((m) => m.id) }),
+      ...Spread(Group(12, "transfer", { atAll: "end", down: MISSION_ENCOUNTERS.transfer.map((m) => m.id) })),
       ...Group(12, "transferAlley", { atAll: "end", down: MISSION_ENCOUNTERS.transferAlley.map((m) => m.id) }),
     ],
     pois: [Poi("cartBoard", "老耿的驴车（上车处）", "poi", A.cartBoard, 2)],
@@ -1263,9 +1364,10 @@ const RECIPES = {
         Nier(Offset(cartAt, -0.3, 2.6), { faceTo: cartAt, stance: "crouch", guess: true }),
         Nra("yaowa", Offset(cartAt, 0.6, 1.8), { name: "幺娃", role: "squad", faceTo: Offset(cartAt, -0.3, 2.6), guess: true }),
         ...Squad({
-          luo: { x: 76.4, z: 111.2, faceTo: A.cartHalt, guess: true },
-          heyoutian: { x: 78.6, z: 104.4, faceTo: Pt(76, 146), guess: true },
-          liuwencai: { x: 76.2, z: 102.8, faceTo: Pt(76, 146), guess: true },
+          luo: { x: 74.6, z: 111, faceTo: A.cartHalt, guess: true },
+          // 从低墙射位下来，先进车路口（两道路墙 x 71 / 80 从 z 90.6 起），再沿车路往南。
+          heyoutian: { x: 78.6, z: 104.4, faceTo: Pt(76, 146), guess: true, path: [ROAD_MOUTH.east] },
+          liuwencai: { x: 76.2, z: 102.8, faceTo: Pt(76, 146), guess: true, path: [ROAD_MOUTH.west] },
         }),
         ...MID.transferConvoy.carts.filter((c) => !c.from).map((c) => Civ(c.id, c, { kind: "cart", yawDeg: YawDegFromActorRad(c.yaw) })),
         ...Group(13, "air", { intent: true }),
@@ -1280,7 +1382,7 @@ const RECIPES = {
         // 第一轮扫过之后（检查点 14 的快照）：Litter6 的人被打倒在车路上，Litter4 卸在路边等人抬。
         ...CheckpointLitters(14, { atOf: { Litter5: unload }, faceOf: { Litter5: A.ditchMouth } }),
         GengCart(A.cartHalt, { faceTo: Pt(76, 146) }),
-        Geng(Offset(unload, 0.4, -1.2), { faceTo: unload }),
+        Geng(Offset(unload, 0.5, -1.4), { faceTo: unload }),
         Nier(Offset(unload, -1.6, 1.4), { faceTo: A.ditchMouth, guess: true }),
         Nra("transferSorter", { x: 70.2, z: 132.6 }, { name: "接运兵", role: "transfer", faceTo: A.ditchMouth, guess: true }),
         ...Squad({
@@ -1301,17 +1403,21 @@ const RECIPES = {
     const ahead = Lerp(ctx.player, A.ditchMouth, 2.4 / Dist(ctx.player, A.ditchMouth));
     return {
       units: [
-        ...CheckpointLitters(14, { atOf: { Litter5: ahead }, faceOf: { Litter5: A.ditchMouth } }),
-        Geng(Offset(ahead, -1.2, -1.4), { faceTo: A.ditchMouth, guess: true }),
-        Nier(Offset(ahead, -6.2, -2.4), { faceTo: A.ditchMouth, guess: true }),
+        // 顺子抬后头：老周的担架只画前头一个抬的人（bearers 1），后头就是玩家。
+        ...CheckpointLitters(14, { atOf: { Litter5: ahead }, faceOf: { Litter5: A.ditchMouth }, bearersOf: { Litter5: 1 } }),
+        // 老耿跟在担架右手边（不站在前头抬的人身上）。
+        Geng(Offset(ahead, 0.4, -1.6), { faceTo: A.ditchMouth, guess: true }),
+        // 从车尾绕过棚子的两根柱子（x 62.2，z 126.6 / 130）中间。
+        Nier(Offset(ahead, -6.2, -2.4), { faceTo: A.ditchMouth, guess: true, path: [Pt(61, 128)] }),
         GengCart(A.cartHalt, { faceTo: Pt(76, 146) }),
         Civ("drover", END.droverPost, { name: "赶车人", yawDeg: YawDegFromActorRad(END.droverPost.yaw) }),
         Civ("droverCart", END.droverCart, { kind: "cart", name: "丢下的车", yawDeg: YawDegFromActorRad(END.droverCart.yaw) }),
         ...Squad({
-          luo: { x: 55.8, z: 116.4, faceTo: A.ditch, guess: true },
+          // 三个人从车路绕过西墙南头（ROAD_WALL_SOUTH_END）再去沟口。
+          luo: { x: 55.8, z: 116.4, faceTo: A.ditch, guess: true, path: ROAD_WALL_SOUTH_END },
           yaowa: { ...Lerp(ctx.player, A.ditchMouth, 0.45), faceTo: A.ditchMouth, guess: true },
-          heyoutian: { ...END.picketPosts[0], faceTo: Pt(80, 116), stance: "crouch", aim: true, guess: true },
-          liuwencai: { ...END.picketPosts[2], faceTo: Pt(80, 116), stance: "crouch", guess: true },
+          heyoutian: { ...END.picketPosts[0], faceTo: Pt(80, 116), stance: "crouch", aim: true, guess: true, path: ROAD_WALL_SOUTH_END },
+          liuwencai: { ...END.picketPosts[2], faceTo: Pt(80, 116), stance: "crouch", guess: true, path: ROAD_WALL_SOUTH_END },
         }),
         Civ("ConvoyWreck", MID.transferConvoy.carts.find((c) => c.id === "ConvoyWreck"), { kind: "cart", name: "侧翻的车", state: "down",
           yawDeg: YawDegFromActorRad(MID.transferConvoy.carts.find((c) => c.id === "ConvoyWreck").yaw) }),
@@ -1325,19 +1431,22 @@ const RECIPES = {
     const pursuers = ["AirPursuerA", "AirPursuerB", "AirPursuerC", "AirPursuerD"];
     return {
       units: [
-        ...CheckpointLitters(14, { atOf: { Litter5: Offset(A.ditchMouth, -0.6, 0.6) }, faceOf: { Litter5: A.ditch } }),
-        Geng(Offset(A.ditchMouth, 0.8, -0.8), { faceTo: A.ditchMouth }),
+        // 顺子松手扑进沟，老耿抓住后头的抬杆：担架只画前头一个抬的人，老耿站在后头抬杆处。
+        ...CheckpointLitters(14, { atOf: { Litter5: ZHOU_LITTER_1402 }, faceOf: { Litter5: A.ditch }, bearersOf: { Litter5: 1 } }),
+        Geng(LitterEnd(ZHOU_LITTER_1402, A.ditch, -1), { faceTo: A.ditch }),
         Nier({ x: 47.4, z: 116.8 }, { faceTo: A.ditch, guess: true }),
         Civ("drover", END.droverPost, { name: "赶车人", yawDeg: YawDegFromActorRad(END.droverPost.yaw) }),
         Civ("droverCart", END.droverCart, { kind: "cart", name: "丢下的车", yawDeg: YawDegFromActorRad(END.droverCart.yaw) }),
         GengCart(A.cartHalt, { faceTo: Pt(76, 146) }),
         ...Squad({
           luo: { x: 45.2, z: 115.6, faceTo: A.ditchMouth, guess: true },
-          yaowa: { ...Offset(A.ditchMouth, -1.6, 1.2), faceTo: A.ditchMouth, stance: "crouch", guess: true },
+          yaowa: { ...Offset(A.ditchMouth, -1, 1.6), faceTo: A.ditchMouth, stance: "crouch", guess: true },
           heyoutian: { ...END.picketPosts[0], faceTo: Pt(80, 116), stance: "crouch", aim: true, guess: true },
           liuwencai: { ...END.picketPosts[1], faceTo: Pt(80, 116), stance: "crouch", aim: true, guess: true },
         }),
-        ...Group(14, "air", { at: Object.fromEntries(pursuers.map((id, i) => [id, pursuit[i]])), face: A.ditchMouth })
+        // 追兵沿追击线一个接一个压上来（走在线上：车路西墙的门洞就在这条线的 z 112 上）。
+        ...Group(14, "air", { at: Object.fromEntries(pursuers.map((id, i) => [id, pursuit[i]])), face: A.ditchMouth,
+          pathOf: Object.fromEntries(pursuers.map((id, i) => [id, pursuit.slice(1, i)])) })
           .map((u, i) => Object.assign(u, { intent: pursuit.slice(i + 1, 4).map((p) => ({ x: p.x, z: p.z })) })),
       ],
       pois: [Poi("ditch", "西沟", "landmark", A.ditch, 3)],
@@ -1348,12 +1457,13 @@ const RECIPES = {
     const ev = Routes.evacuation;
     return {
       units: [
-        LitterUnit("Litter5", { x: 38.2, z: 118.2 }, { faceTo: ev[2] }),
+        // 沟里点名：老周的担架放在沟底（没人抬），幺娃、老耿守在边上。
+        LitterUnit("Litter5", { x: 38.2, z: 118.2 }, { faceTo: ev[2], bearers: 0 }),
         LitterUnit("Litter4", MissionRoutePoint(ev, 26), { faceTo: ev[2], path: ROAD_TO_DITCH }),
         LitterUnit("Litter6", MissionRoutePoint(ev, 30), { faceTo: ev[2], path: ROAD_TO_DITCH }),
         ...Squad({
           heyoutian: { x: 36.4, z: 121.6, faceTo: ctx.player },
-          luo: { x: 35, z: 124.8, faceTo: ev[2] },
+          luo: { x: 34.4, z: 124, faceTo: ev[2] },
           liuwencai: { ...MissionRoutePoint(ev, 34), faceTo: ev[2] },
           yaowa: { x: 39.4, z: 117.4, faceTo: { x: 38.2, z: 118.2 }, stance: "crouch" },
         }),
@@ -1406,7 +1516,8 @@ const RECIPES = {
           heyoutian: { ...At(-3, 0.7), faceTo: At(-1), guess: true },
           liuwencai: { ...At(-8, -0.7), faceTo: At(-6), guess: true },
         }),
-        Geng(At(8.5, -0.8), { faceTo: At(10.5), guess: true }),
+        // 夹道另一侧（掉队的 Straggler0 在南侧），离北墙 WallPathYardWall 0.5 m 以上。
+        Geng(At(8.5, 0.6), { faceTo: At(10.5), guess: true }),
         Nier(At(2, -0.8), { faceTo: At(4), guess: true }),
       ],
       pois: [Poi("lanternPole", "灯笼杆（在这里左拐）", "landmark", { x: 18.45, z: 213.85 }, 1)],
@@ -1439,7 +1550,7 @@ const RECIPES = {
   "16-1": (ctx) => ({
     units: [
       LitterUnit("Litter5", { x: -12.6, z: 243.6 }, { faceTo: Reception.yardJunction }),
-      ...CheckpointLitters(16, { skip: ["Litter5"] }).map((u) => Object.assign(u, { path: YARD_TO_WARD })),
+      ...CheckpointLitters(16, { skip: ["Litter5"] }).map((u) => WithLane(u, WALL_PATH_TO_WARD)),
       Nra("surgeon", END.surgeonPoint, { name: "军医", role: "surgeon", yawDeg: YawDegFromActorRad(END.surgeonPoint.yaw) }),
       Nra("GateGuardNorth", P.receptionYard.gateGuard[0], { name: "院门守军", role: "gateGuard", faceTo: Pt(16, 230) }),
       Nra("GateGuardSouth", P.receptionYard.gateGuard[1], { role: "gateGuard", faceTo: Pt(16, 230) }),
@@ -1450,14 +1561,16 @@ const RECIPES = {
         heyoutian: { x: -4.6, z: 242.6, faceTo: Reception.wardEntry, guess: true },
         liuwencai: { x: -6.8, z: 237.6, faceTo: Reception.wardEntry, guess: true },
       }),
-      Geng({ x: -1.6, z: 236.4 }, { faceTo: ctx.player, guess: true }),
+      // 院里、街屋南墙（z 235.7–236.3）往南 1 m。
+      Geng({ x: -1.6, z: 237.4 }, { faceTo: ctx.player, guess: true }),
       Nier({ x: 4.6, z: 236.8 }, { faceTo: Pt(4.6, 238.8), stance: "crouch", guess: true }),
     ],
     pois: [Poi("wardDoor", "厢房南门（门槛）", "poi", Reception.wardThreshold, 1)],
   }),
   "17-1": (ctx) => ({
     units: [
-      LitterUnit("Litter5", A.zhouDrop, { name: "老周", faceTo: Pt(A.zhouDrop.x, A.zhouDrop.z - 4), state: "down" }),
+      // 老周躺在床位上（担架放下、没人抬：bearers 0；state 不写 down，担架的 down 只表示抬的人倒了，§3）。
+      LitterUnit("Litter5", A.zhouDrop, { name: "老周", faceTo: Pt(A.zhouDrop.x, A.zhouDrop.z - 4), bearers: 0 }),
       ...CheckpointLitters(17, { skip: ["Litter5"] }),
       Nra("surgeon", END.surgeonExamine, { name: "军医", role: "surgeon", yawDeg: YawDegFromActorRad(END.surgeonExamine.yaw), stance: "crouch" }),
       Nra("yaowa", P.receptionYard.yaowaBedside, { name: "幺娃", role: "squad", faceTo: A.zhouDrop, stance: "crouch" }),
@@ -1474,7 +1587,8 @@ const RECIPES = {
   // ---------------- 18 ----------------
   "18-1": (ctx) => ({
     units: [
-      LitterUnit("Litter5", A.zhouDrop, { name: "老周", faceTo: Pt(A.zhouDrop.x, A.zhouDrop.z - 4), state: "down" }),
+      // 老周躺在床位上（担架放下、没人抬：bearers 0；state 不写 down，担架的 down 只表示抬的人倒了，§3）。
+      LitterUnit("Litter5", A.zhouDrop, { name: "老周", faceTo: Pt(A.zhouDrop.x, A.zhouDrop.z - 4), bearers: 0 }),
       ...CheckpointLitters(18, { skip: ["Litter5"] }),
       LitterUnit("NextLitter", END.nextLitterRoute.at(-1), { name: "又一副担架", faceTo: Pt(-30, 232) }),
       Nra("surgeon", Offset(END.nextLitterRoute.at(-1), 1.2, 0.8), { name: "军医", role: "surgeon", faceTo: END.nextLitterRoute.at(-1), stance: "crouch" }),
@@ -1504,7 +1618,7 @@ const RECIPES = {
           liuwencai: { x: -82.2, z: 164.4, faceTo: A.bridgeEnemy, stance: "crouch", aim: true, guess: true, path: WARD_TO_BRIDGE },
           yaowa: { x: -86.4, z: 165.6, faceTo: A.bridgeEnemy, stance: "crouch", guess: true, path: WARD_TO_BRIDGE },
         }),
-        Nra("bridgeOfficer", P.bridge.officer, { name: "桥头军官", role: "officer", faceTo: A.railBridge }),
+        Nra("bridgeOfficer", P.bridge.officer, { kind: "officer", name: "桥头军官", role: "officer", faceTo: A.railBridge }),
         ...P.bridge.demolition.map((d, i) => Nra(`Demolition${i}`, d, { role: "demolition", faceTo: Pt(-77, 159.4), stance: "crouch" })),
         ...columnZ.map((z, i) => Nra(`RearColumn${i}`, { x: -77 + (i % 2 ? 0.5 : -0.5), z }, { name: i === 0 ? "尾队" : "", role: "rearColumn",
           faceTo: crossing[2], intent: [crossing[2], crossing[3]], speedMps: R.bridgeColumnSpeedMps })),
@@ -1527,16 +1641,19 @@ const RECIPES = {
           liuwencai: { x: -68.6, z: 202.6, faceTo: { x: -77, z: 122 }, guess: true, path: Routes.bridgeWithdraw.slice(1, -1) },
           yaowa: { x: -65.2, z: 199.6, faceTo: A.marchOut, guess: true, path: Routes.bridgeWithdraw.slice(1, -1) },
         }),
-        Nra("bridgeOfficer", END.officerPullback.at(-1), { name: "桥头军官", role: "officer", faceTo: ctx.player, path: END.officerPullback.slice(0, -1) }),
+        Nra("bridgeOfficer", END.officerPullback.at(-1), { kind: "officer", name: "桥头军官", role: "officer", faceTo: ctx.player, path: END.officerPullback.slice(0, -1) }),
         ...P.bridge.demolition.map((d, i) => Nra(`Demolition${i}`, END.demolitionPullback[i].at(-1), { role: "demolition",
           faceTo: { x: -77, z: 122 }, stance: "crouch", path: END.demolitionPullback[i].slice(0, -1) })),
         // 尾队过完桥（bridgeCrossing 共 163.8 m），在南岸往南走（队首在 150 m 处，往后隔 bridgeColumnSpacingM）。
         ...[0, 1, 2, 3, 4, 5].map((i) => Nra(`RearColumn${i}`, MissionRoutePoint(march, 150 - i * R.bridgeColumnSpacingM), { name: i === 0 ? "尾队" : "", role: "rearColumn",
           faceTo: march.at(-1), intent: [march.at(-1)], speedMps: R.bridgeColumnSpeedMps })),
         ...Group(18, "bridgeNorth", { atAll: "end", face: Pt(-77, 150) }),
-        ...FAR_BANK_REAL.map((u) => Ija(u.id, u, { group: "farBank", role: u.role || "farBank", weapon: u.weapon, name: u.weapon === "Type11" ? "对岸机枪" : "",
+        // 真 AI 走进来的路照游戏（Script_FirstLevelBridgeFarBank.BeginWithdraw）：第 n 个从桥轴往北 60 + (n % 4)·5 m 出生，
+        // 沿桥轴往南走到自己那一排的 z（土坎北面的走廊），再横着走到射位（FarBankWalkInVia）；直着从北面 60 m 走下来会穿过北岸的房子。
+        ...FAR_BANK_REAL.map((u, n) => Ija(u.id, u, { kind: u.role === "officer" ? "officer" : undefined, group: "farBank", role: u.role || "farBank",
+          weapon: u.weapon, name: u.weapon === "Type11" ? "对岸机枪" : "",
           faceTo: Pt(u.x, 160), stance: u.weapon === "Type11" ? "prone" : "crouch", aim: true,
-          path: [{ x: u.x, z: u.z - FAR_BANK_REAL_SPAWN_BACK_M }] })),
+          path: [FarBankSpawnAt(n, FAR_BANK_REAL_SPAWN_BACK_M + (n % 4) * 5), ...FarBankWalkInVia(u)] })),
         ...FAR_BANK_TANKS.map((t) => Ija(t.id, { x: t.x, z: FarBankTankPushZ(t) }, { kind: "tank", group: "farBank", role: "tank", faceTo: Pt(t.x, 160) })),
       ],
       pois: [Poi("pontoon", "浮桥被炸段", "danger", { x: -77, z: 122 }, 8)],
@@ -1600,31 +1717,44 @@ function RouteVerticesBetween(route, prog, a, b) {
 
 const START_SNAP_M = 4, END_SNAP_M = 5, JUNCTION_M = 1.2;
 
+/** 折线去掉和前一点（含起点 from）挨得太近的点，终点 to 一定保留。 */
+function TidyPath(from, points, to) {
+  const out = [];
+  let last = from;
+  for (const p of points) {
+    if (Dist(p, last) < 0.3 || Dist(p, to) < 0.3) continue;
+    out.push(Pt(p.x, p.z));
+    last = p;
+  }
+  out.push(Pt(to.x, to.z));
+  return out;
+}
+
 /**
- * 从 from 走到 to：两头都贴着某条路线就沿那条路线走；贴不上一条的，试两条在某个折点相接的路线（例：后交通壕 → 支沟交汇 → 左翼机枪交通沟）。
- * 返回 path（不含起点、含终点）或 null（直线）。
+ * 从 from 走到 to 可选的路线折线（不含起点、含终点），按偏好排好：
+ *   1. 一条路线：两头都贴着它（起点 ≤ 4 m、终点 ≤ 5 m），先走到起点在路线上的投影，沿路线走到与终点平齐的投影点，再离开路线；
+ *   2. 两条路线在某个折点相接（例：后交通壕 → 支沟交汇 → 左翼机枪交通沟），同样从投影点上、投影点下。
+ * 太绕（长于直线 2.5 倍 + 5 m）的不要。直线不在这里（调用方最后才试）。
  */
-function RoutePathBetween(from, to) {
+function RouteCandidates(from, to) {
   const straight = Dist(from, to);
-  const accept = (path) => {
+  const acceptable = (path) => {
     const length = PathLength([from, ...path]);
     return length <= straight * 2.5 + 5 ? length : null;
   };
   const near = PATH_ROUTES.map((route, i) => ({ route, prog: PATH_ROUTE_PROGRESS[i], a: MissionRouteProjection(route, from), b: MissionRouteProjection(route, to) }));
-  let best = null;
+  const singles = [];
   for (const r of near) {
     if (r.a.distance > START_SNAP_M || r.b.distance > END_SNAP_M || Math.abs(r.b.progress - r.a.progress) < 1) continue;
     const mid = RouteVerticesBetween(r.route, r.prog, r.a.progress, r.b.progress);
-    if (!mid.length) continue;
-    const path = [...mid, to];
-    const length = accept(path);
+    const path = TidyPath(from, [MissionRoutePoint(r.route, r.a.progress), ...mid, MissionRoutePoint(r.route, r.b.progress)], to);
+    const length = acceptable(path);
     if (length === null) continue;
-    const score = r.a.distance + r.b.distance;
-    if (!best || score < best.score) best = { score, path };
+    // 路线上没有中间折点的（两头都在同一段上）排在后面：和直线差不多，只在直线走不通时才有用。
+    singles.push({ score: r.a.distance + r.b.distance + (mid.length ? 0 : 1000), length, path });
   }
-  if (best) return best.path;
-  // 两条路线接力。
-  let chain = null;
+  singles.sort((p, q) => p.score - q.score || p.length - q.length);
+  const chains = [];
   for (const r1 of near) {
     if (r1.a.distance > START_SNAP_M) continue;
     for (const r2 of near) {
@@ -1633,15 +1763,31 @@ function RoutePathBetween(from, to) {
         const v = r2.route[j];
         const onR1 = MissionRouteProjection(r1.route, v);
         if (onR1.distance > JUNCTION_M) continue;
-        const path = [...RouteVerticesBetween(r1.route, r1.prog, r1.a.progress, onR1.progress), v,
-          ...RouteVerticesBetween(r2.route, r2.prog, r2.prog[j], r2.b.progress), to];
-        const length = accept(path);
-        if (length === null || length < straight - 1e-6) continue;
-        if (!chain || length < chain.length) chain = { length, path };
+        const path = TidyPath(from, [MissionRoutePoint(r1.route, r1.a.progress), ...RouteVerticesBetween(r1.route, r1.prog, r1.a.progress, onR1.progress), v,
+          ...RouteVerticesBetween(r2.route, r2.prog, r2.prog[j], r2.b.progress), MissionRoutePoint(r2.route, r2.b.progress)], to);
+        const length = acceptable(path);
+        if (length === null || length < straight - 1e-6 || path.length < 2) continue;
+        chains.push({ length, path });
       }
     }
   }
-  return chain && chain.path.length > 1 ? chain.path : null;
+  chains.sort((p, q) => p.length - q.length);
+  return [...singles.filter((c) => c.score < 1000), ...chains, ...singles.filter((c) => c.score >= 1000)].map((c) => c.path);
+}
+
+/**
+ * 给一个人挑从 from 走到 to 的折线：按顺序试 candidates（配方写的 path、战术折线、路线、两条路线接力、直线），
+ * 第一条身体不穿高墙的就用（BLOCKOUT_ROUTE_BODY）。都穿时返回 { path: 第一条, crossings } 让调用方报出来。
+ */
+function PickClearPath(from, to, candidates, blocks) {
+  let first = null;
+  for (const path of candidates) {
+    const points = [from, ...(path || []), to];
+    const crossings = RouteSolidCrossings(blocks, points);
+    if (!crossings.length) return { path, crossings };
+    if (!first) first = { path, crossings };
+  }
+  return first || { path: null, crossings: [] };
 }
 
 /** 同一条 track（遭遇组成员的战术折线）上从下标 i 走到 j。 */
@@ -1662,6 +1808,8 @@ function NextFor(station, player, units) {
     const escorts = units.filter((u) => u.role === "escort" && u.state !== "down");
     at = { x: escorts.reduce((s, u) => s + u.x, 0) / escorts.length, z: escorts.reduce((s, u) => s + u.z, 0) / escorts.length };
   }
+  // 目标就在脚下（< 2 m）：只写文字，不让光柱 / 地环落在玩家自己身上（§3「没有移动目标时只写 text」）。
+  if (Dist(at, player) < BLOCKOUT_SPACING.nextM) return next;
   return { ...next, x: R2(at.x), z: R2(at.z), radiusM: spec.r };
 }
 
@@ -1697,7 +1845,7 @@ function SanitizeUnit(u) {
 }
 
 /** 单位的键顺序（读起来顺手：身份 → 位置 → 姿态 → 走位）。 */
-const UNIT_KEY_ORDER = ["id", "side", "kind", "name", "role", "group", "weapon", "x", "z", "yawDeg", "stance", "aim", "state", "arc", "speedMps", "path", "intent", "guess"];
+const UNIT_KEY_ORDER = ["id", "side", "kind", "name", "role", "group", "weapon", "x", "z", "yawDeg", "stance", "aim", "state", "bearers", "arc", "speedMps", "path", "intent", "guess"];
 function OrderUnit(u) {
   const out = {};
   for (const key of UNIT_KEY_ORDER) if (u[key] !== undefined) out[key] = u[key];
@@ -1730,15 +1878,17 @@ function ZoneBoxes(keyframes) {
  * @param {{commit?: string, generatedAt?: string}} [options] 时钟与 git 由调用方给（CLI），这里不读。
  * @returns {object} tengxian-blockout/1 文档
  */
-export function BuildFirstLevelBlockoutConfig({ commit = "", generatedAt = "" } = {}) {
+export function BuildFirstLevelBlockoutConfig({ commit = "", generatedAt = "", issues = null } = {}) {
   const keyframes = [];
-  let prevUnits = new Map();
+  let prevUnits = new Map(), prevSignals = [];
   for (const station of FIRST_LEVEL_BLOCKOUT_STATIONS) {
     const poseFn = POSES[station.id];
     const recipe = RECIPES[station.id];
     if (!poseFn || !recipe) throw new Error(`blockout: 关键帧 ${station.id} 缺机位或配方`);
     const pose = poseFn();
-    const player = { x: R2(pose.x), z: R2(pose.z), yawDeg: R1(pose.yawDeg), pitchDeg: R1(pose.pitchDeg), stance: pose.stance };
+    const signals = FirstLevelSignalsFor(station.id, station.stage);
+    const standing = ClearStandingPoint({ x: R2(pose.x), z: R2(pose.z) }, signals);
+    const player = { x: standing.at.x, z: standing.at.z, yawDeg: R1(pose.yawDeg), pitchDeg: R1(pose.pitchDeg), stance: pose.stance };
     const { units: rawUnits, pois: recipePois } = recipe({ player, station });
     const seen = new Set();
     for (const u of rawUnits) {
@@ -1746,23 +1896,35 @@ export function BuildFirstLevelBlockoutConfig({ commit = "", generatedAt = "" } 
       seen.add(u.id);
     }
     const next = NextFor(station, player, rawUnits);
-    // 相邻关键帧之间的走位折线：同一条战术折线优先，其次贴着已知路线。
+    // 相邻关键帧之间的走位折线，按偏好逐条试，第一条身体不穿高墙的就用（两帧信号并集下的实心块）：
+    // 配方写的 path → 指定贴着走的路（lane）→ 同一条战术折线 → 贴着已知路线（含两条接力）→ 直线。
+    const blocks = SolidsFor([...prevSignals, ...signals]);
     for (const u of rawUnits) {
-      if (u.path?.length) continue;
       const prev = prevUnits.get(u.id);
-      if (!prev || Dist(prev, u) < 2) continue;
+      if (!prev) continue;
+      const candidates = [];
+      if (u.path?.length) candidates.push(u.path.map((p) => Pt(p.x, p.z)));
       const meta = META.get(u), prevMeta = META.get(prev);
-      let path = null;
-      if (meta?.track && prevMeta?.track && meta.track.length === prevMeta.track.length && Dist(meta.track[0], prevMeta.track[0]) < 1e-6)
-        path = TrackPathBetween(meta.track, prevMeta.trackAt, meta.trackAt);
-      if (!path) path = RoutePathBetween(prev, u);
+      if (meta?.lane) {
+        const lane = meta.lane, a = MissionRouteProjection(lane, prev).progress, b = MissionRouteProjection(lane, u).progress;
+        if (Math.abs(b - a) >= 1) candidates.push(TidyPath(prev, [MissionRoutePoint(lane, a), ...RouteVerticesBetween(lane, RouteProgresses(lane), a, b), MissionRoutePoint(lane, b)], u));
+      }
+      if (meta?.track && prevMeta?.track && meta.track.length === prevMeta.track.length && Dist(meta.track[0], prevMeta.track[0]) < 1e-6) {
+        const track = TrackPathBetween(meta.track, prevMeta.trackAt, meta.trackAt);
+        if (track?.length) candidates.push(track);
+      }
+      if (Dist(prev, u) >= 2) candidates.push(...RouteCandidates(prev, u));
+      candidates.push(null);
+      // 都穿的话先用第一条，组装完由 FirstLevelBlockoutIssues 报出来（测试判失败）。
+      const { path } = PickClearPath(prev, u, candidates, blocks);
+      delete u.path;
       if (path?.length > 1 || (path?.length === 1 && Dist(path[0], u) > 1e-6)) u.path = path.map((p) => ({ x: R2(p.x), z: R2(p.z) }));
     }
     FinishFacing(rawUnits, player, Number.isFinite(next.x) ? next : null);
     const units = rawUnits.map((u) => OrderUnit(SanitizeUnit(u)));
     const poiIds = new Set();
     const pois = [...recipePois, ...AutoPois(player, station.stage)].filter((p) => !poiIds.has(p.id) && poiIds.add(p.id));
-    const notes = [station.notes, POSE_NOTES[station.id] || ""].filter(Boolean).join(" ");
+    const notes = [station.notes, POSE_NOTES[station.id] || "", standing.note].filter(Boolean).join(" ");
     const kf = {
       id: station.id,
       stage: station.stage,
@@ -1773,14 +1935,15 @@ export function BuildFirstLevelBlockoutConfig({ commit = "", generatedAt = "" } 
       next,
       how: [...station.how],
       notes,
-      signals: FirstLevelSignalsFor(station.id, station.stage),
+      signals,
       units,
       pois,
     };
     keyframes.push(kf);
     prevUnits = new Map(rawUnits.map((u) => [u.id, u]));
+    prevSignals = signals;
   }
-  return {
+  const doc = {
     schema: BLOCKOUT_SCHEMA,
     level: "FirstLevel",
     title: FIRST_LEVEL_BLOCKOUT_TITLE,
@@ -1793,6 +1956,28 @@ export function BuildFirstLevelBlockoutConfig({ commit = "", generatedAt = "" } 
     zones: ZoneBoxes(keyframes),
     keyframes,
   };
+  if (issues) issues.push(...FirstLevelBlockoutIssues(doc));
+  return doc;
+}
+
+/**
+ * 一份第一关配置（原样或已归一化都行）的摆位与走位问题，一行一条；空数组 = 没问题。
+ * 和 Script_EditorBlockoutConfigTest 判失败的口径相同：玩家站位碰实心块、摆位间距（BLOCKOUT_SPACING）、
+ * 相邻关键帧过渡的路线穿高墙（BLOCKOUT_ROUTE_BODY）。
+ */
+export function FirstLevelBlockoutIssues(doc) {
+  const norm = NormalizeBlockout(doc);
+  const out = [];
+  norm.keyframes.forEach((kf, i) => {
+    const hit = FirstLevelPlayerBlock(kf);
+    if (hit) out.push(`${kf.id} 玩家站位碰到 ${hit.id}`);
+    for (const line of FirstLevelSpacingIssues(kf)) out.push(`${kf.id} ${line}`);
+    if (i > 0) {
+      const prev = norm.keyframes[i - 1];
+      for (const c of FirstLevelTransitionCrossings(prev, kf)) out.push(`${prev.id}→${kf.id} ${c.id} 的走位穿过 ${c.blocks.map((b) => b.id).join("、")}`);
+    }
+  });
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -1838,4 +2023,200 @@ export function SolidBlockAt(blocks, x, z, { fromM = 0.35, toM = 1.6, marginM = 
     return b;
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// 人的身体 vs 实心块（走位穿墙、玩家站位）
+
+/**
+ * 关键帧之间走位的身体：半径 0.3 m、离地 0.5–1.4 m 那一段；只算高过 1.6 m 的块（矮掩体、坎子人能翻能绕，不算穿墙），
+ * 身体扎进块里超过 0.12 m 才算穿（贴着墙走、擦过门框不算）。沿折线每 0.1 m 取一点。
+ */
+export const BLOCKOUT_ROUTE_BODY = Object.freeze({ radiusM: 0.3, toleranceM: 0.12, fromM: 0.5, toM: 1.4, tallM: 1.6, stepM: 0.1 });
+/** 玩家站立的胶囊：半径 0.3 m、离地 0.35–1.6 m，碰到任何实心块都不行（运行时会把人挤开）。 */
+export const BLOCKOUT_PLAYER_BODY = Object.freeze({ radiusM: 0.3, toleranceM: 0.005, fromM: 0.35, toM: 1.6, tallM: 0 });
+
+/** 半径 r 的圆扎进块脚印（按 ry 转的矩形）多深：> 0 = 碰到了，圆心在块里时 = r + 到最近一条边的距离。 */
+function FootprintPenetration(b, x, z, r) {
+  const c = Math.cos(b.ry || 0), s = Math.sin(b.ry || 0);
+  const dx = x - b.x, dz = z - b.z;
+  const lx = dx * c - dz * s, lz = dx * s + dz * c;
+  const ex = Math.abs(lx) - b.w / 2, ez = Math.abs(lz) - b.d / 2;
+  if (ex <= 0 && ez <= 0) return r + Math.min(-ex, -ez);
+  return r - Math.hypot(Math.max(ex, 0), Math.max(ez, 0));
+}
+
+const BODY_GRID_M = 8;
+const BODY_INDEX = new WeakMap();
+/** 块按 8 m 网格分桶（每组块只建一次），取样点只查自己那一格。 */
+function BodyIndex(blocks) {
+  let index = BODY_INDEX.get(blocks);
+  if (index) return index;
+  index = new Map();
+  for (const b of blocks) {
+    const reach = Math.hypot(b.w, b.d) / 2 + 0.5;
+    for (let ix = Math.floor((b.x - reach) / BODY_GRID_M); ix <= Math.floor((b.x + reach) / BODY_GRID_M); ix++) {
+      for (let iz = Math.floor((b.z - reach) / BODY_GRID_M); iz <= Math.floor((b.z + reach) / BODY_GRID_M); iz++) {
+        const key = `${ix},${iz}`;
+        if (!index.has(key)) index.set(key, []);
+        index.get(key).push(b);
+      }
+    }
+  }
+  BODY_INDEX.set(blocks, index);
+  return index;
+}
+
+/** 站在 (x,z) 的身体碰到的第一个实心块（body 见上面两组常量），没有返回 null。 */
+export function BodyBlockAt(blocks, x, z, body = BLOCKOUT_ROUTE_BODY) {
+  const cell = BodyIndex(blocks).get(`${Math.floor(x / BODY_GRID_M)},${Math.floor(z / BODY_GRID_M)}`);
+  if (!cell) return null;
+  let ground = null;
+  for (const b of cell) {
+    if (b.h <= body.tallM) continue;
+    if (FootprintPenetration(b, x, z, body.radiusM) <= body.toleranceM) continue;
+    if (ground === null) ground = Ground(x, z);
+    if (b.y + b.h / 2 < ground + body.fromM || b.y - b.h / 2 > ground + body.toM) continue;
+    return b;
+  }
+  return null;
+}
+
+/**
+ * 沿折线 points（含两端）每 stepM 取一点，列出身体穿过的高块：每个块一条 { id, x, z, atM }（第一次碰到的地方）。
+ * 空数组 = 走得通。
+ */
+export function RouteSolidCrossings(blocks, points, body = BLOCKOUT_ROUTE_BODY) {
+  const hits = new Map();
+  const Probe = (x, z, atM) => {
+    const b = BodyBlockAt(blocks, x, z, body);
+    if (b && !hits.has(b.id)) hits.set(b.id, { id: b.id, x: R2(x), z: R2(z), atM: R1(atM) });
+  };
+  if (!points?.length) return [];
+  Probe(points[0].x, points[0].z, 0);
+  let walked = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i], length = Dist(a, b);
+    const steps = Math.max(1, Math.ceil(length / body.stepM));
+    for (let k = 1; k <= steps; k++) {
+      const t = k / steps;
+      Probe(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, walked + length * t);
+    }
+    walked += length;
+  }
+  return [...hits.values()];
+}
+
+const SOLIDS_BY_SIGNALS = new Map();
+/** FirstLevelSolidBlocks 按信号组合缓存（顺序无关）。 */
+function SolidsFor(signals) {
+  const key = [...new Set(signals)].sort().join(",");
+  if (!SOLIDS_BY_SIGNALS.has(key)) SOLIDS_BY_SIGNALS.set(key, Object.freeze(FirstLevelSolidBlocks([...new Set(signals)])));
+  return SOLIDS_BY_SIGNALS.get(key);
+}
+
+/**
+ * 相邻两个关键帧（NormalizeBlockout 之后）的过渡里，谁的路线穿了高墙：按 PlanTransition 的每条路线
+ * （走过去 / 走进来 / 走出去；原地不动的只有一个点，也取样）对 FirstLevelSolidBlocks(两帧信号的并集) 取样。
+ * @returns {Array<{id, mode, blocks: Array<{id,x,z,atM}>}>}
+ */
+export function FirstLevelTransitionCrossings(prevKf, nextKf) {
+  const blocks = SolidsFor([...(prevKf.signals || []), ...(nextKf.signals || [])]);
+  const out = [];
+  for (const entry of PlanTransition(prevKf, nextKf).units) {
+    const hits = RouteSolidCrossings(blocks, entry.route);
+    if (hits.length) out.push({ id: entry.id, mode: entry.mode, blocks: hits });
+  }
+  return out;
+}
+
+/** 玩家站位碰到的实心块（站立胶囊，见 BLOCKOUT_PLAYER_BODY），没有返回 null。 */
+export function FirstLevelPlayerBlock(kf) {
+  return BodyBlockAt(SolidsFor(kf.signals || []), kf.player.x, kf.player.z, BLOCKOUT_PLAYER_BODY);
+}
+
+/**
+ * 机位的站立胶囊碰到实心块时（运行时会把人挤开，机位就不是表里那个了），往外挪到刚好不碰：
+ * 由近到远（每 5 cm、16 个方向）找第一个空位，最多挪 1 m。返回 { at, note }（挪了才有 note，写进关键帧 notes）。
+ */
+function ClearStandingPoint(at, signals) {
+  const blocks = SolidsFor(signals);
+  const hit = BodyBlockAt(blocks, at.x, at.z, BLOCKOUT_PLAYER_BODY);
+  if (!hit) return { at, note: "" };
+  for (let step = 1; step <= 20; step++) {
+    const r = step * 0.05;
+    for (let k = 0; k < 16; k++) {
+      const a = k * Math.PI / 8, p = { x: R2(at.x + Math.cos(a) * r), z: R2(at.z + Math.sin(a) * r) };
+      if (!BodyBlockAt(blocks, p.x, p.z, BLOCKOUT_PLAYER_BODY)) return { at: p, note: `机位贴着 ${hit.id}（站着会碰到），往外挪了 ${R2(r)} m。` };
+    }
+  }
+  return { at, note: "" };
+}
+
+/** 摆位间距（§3「单位」的约定；测试按这个判失败）。 */
+export const BLOCKOUT_SPACING = Object.freeze({
+  /** 人到玩家站位；倒地的人可以躺在脚边。 */
+  playerM: 1.0, playerDownM: 0.5,
+  /** 人到担架中心（担架 2.1 m 长、前后各一个抬的人）。 */
+  litterM: 1.3,
+  /** 人到抬担架的人站的那一段（担架中心沿朝向前后各 1.6 m，按 bearers：1 = 只有前头一个人，0 = 没人抬）。 */
+  carryM: 0.6, carryReachM: 1.6,
+  /** 任意两个单位。 */
+  unitM: 0.8,
+  /** 下一步目标离玩家这么近就只写文字（不画落在自己脚下的光柱）。 */
+  nextM: 2,
+});
+
+const PEOPLE_KINDS = new Set(["soldier", "officer", "civilian", "child"]);
+function SegmentDistance(p, a, b) {
+  const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz;
+  const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2)) : 0;
+  return Math.hypot(p.x - a.x - dx * t, p.z - a.z - dz * t);
+}
+/** 担架上抬的人站的那一段（中心 → 前头，bearers 2 时再到后头）；bearers 0 返回 null。 */
+function CarrySegment(litter) {
+  const bearers = Number.isInteger(litter.bearers) ? litter.bearers : 2;
+  if (bearers <= 0) return null;
+  const yaw = (litter.yawDeg || 0) * Math.PI / 180, fx = -Math.sin(yaw), fz = -Math.cos(yaw), r = BLOCKOUT_SPACING.carryReachM;
+  const front = { x: litter.x + fx * r, z: litter.z + fz * r };
+  const rear = bearers >= 2 ? { x: litter.x - fx * r, z: litter.z - fz * r } : { x: litter.x, z: litter.z };
+  return [rear, front];
+}
+
+/**
+ * 一个关键帧（NormalizeBlockout 之后）的摆位问题：人贴着玩家、人站在担架上 / 抬担架的人身上、两个单位叠在一起、
+ * 下一步目标落在玩家脚下。空数组 = 没问题。
+ */
+export function FirstLevelSpacingIssues(kf) {
+  const S = BLOCKOUT_SPACING, out = [];
+  const units = kf.units || [];
+  const isPerson = (u) => PEOPLE_KINDS.has(u.kind || "soldier");
+  const litters = units.filter((u) => u.kind === "litter");
+  for (const u of units) {
+    if (!isPerson(u)) continue;
+    const limit = u.state === "down" ? S.playerDownM : S.playerM;
+    const d = Dist(u, kf.player);
+    if (d < limit) out.push(`${u.id} 离玩家 ${R2(d)} m（< ${limit}）`);
+  }
+  for (const l of litters) {
+    const d = Dist(l, kf.player);
+    if (d < S.playerM) out.push(`担架 ${l.id} 离玩家 ${R2(d)} m（< ${S.playerM}）`);
+    const seg = CarrySegment(l);
+    // 抬担架的人也是人：离玩家同样要 playerM。
+    if (seg && SegmentDistance(kf.player, seg[0], seg[1]) < S.playerM) out.push(`担架 ${l.id} 抬的人离玩家不到 ${S.playerM} m`);
+    for (const u of units) {
+      if (!isPerson(u)) continue;
+      const dl = Dist(u, l);
+      if (dl < S.litterM) out.push(`${u.id} 离担架 ${l.id} ${R2(dl)} m（< ${S.litterM}）`);
+      else if (seg && SegmentDistance(u, seg[0], seg[1]) < S.carryM) out.push(`${u.id} 站在担架 ${l.id} 抬的人身上`);
+    }
+  }
+  for (let i = 0; i < units.length; i++) {
+    for (let j = i + 1; j < units.length; j++) {
+      const d = Dist(units[i], units[j]);
+      if (d < S.unitM) out.push(`${units[i].id} 和 ${units[j].id} 相距 ${R2(d)} m（< ${S.unitM}）`);
+    }
+  }
+  if (Number.isFinite(kf.next?.x) && Dist(kf.next, kf.player) < S.nextM) out.push(`下一步目标离玩家 ${R2(Dist(kf.next, kf.player))} m（< ${S.nextM}，只写文字）`);
+  return out;
 }
