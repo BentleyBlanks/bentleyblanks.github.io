@@ -787,7 +787,10 @@ async function InstallSpeakerGlance(page){
     g.StepFrames=function(frames){
       if(frames===1)try{Glance();}catch(error){glance.error=String(error);}
       const result=step.apply(this,arguments);
-      const id=window.frontLineShotPending;
+      // Not inside a capture (glance.paused): the extra rendered frame would land in the capture's measured frame and count
+      // the whole scene twice (2026-10-12 R3-Perf: RightNestCaptured 17.9 M triangles / 1854 draws = two frames). The shot
+      // waits for the next single-frame step after it.
+      const id=glance.paused?null:window.frontLineShotPending;
       if(id&&frames===1){
         window.frontLineShotPending=null;
         // No preserveDrawingBuffer: render one frame and read the canvas back before this task ends.
