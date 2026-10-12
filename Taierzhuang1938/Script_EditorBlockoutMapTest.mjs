@@ -491,6 +491,20 @@ try {
     const off = Snap("off"), def = Snap("default"), all = Snap("all");
     out.arcDefault = Diff(off, def);
     out.arcAll = Diff(def, all);
+    // e) 数据里没写 arc、也没经过 NormalizeBlockout 的单位：机枪手和战车在缺省档也要有扇（§5.3），步枪手没有
+    const SnapUnits = (units, mode) => { m.SetDynamic({ player: null, pois: [], next: null, units }); return Snap(mode); };
+    const rawMg = [{ id: "mg", side: "ija", kind: "soldier", weapon: "Type11", x: 50, z: 60, yawDeg: 0 }];
+    out.rawMg = Diff(SnapUnits(rawMg, "off"), SnapUnits(rawMg, "default"));
+    const rawTank = [{ id: "tk", side: "ija", kind: "tank", x: 50, z: 40, yawDeg: 180 }];
+    out.rawTank = Diff(SnapUnits(rawTank, "off"), SnapUnits(rawTank, "default"));
+    const rawRifle = [{ id: "rf", side: "nra", kind: "soldier", weapon: "HanYang", aim: true, x: 50, z: 40, yawDeg: 180 }];
+    out.rawRifle = Diff(SnapUnits(rawRifle, "off"), SnapUnits(rawRifle, "default"));
+    out.rawRifleAll = Diff(SnapUnits(rawRifle, "off"), SnapUnits(rawRifle, "all"));
+    // f) 担架 bearers: 0（放在地上 / 床边、没人抬）照样画成蓝色小矩形
+    m.SetLayers({ arcs: "default" });
+    m.SetDynamic({ player: null, pois: [], next: null, units: [{ id: "lt", side: "nra", kind: "litter", bearers: 0, x: 50, z: 50, yawDeg: 30 }] });
+    m.PaintMini(mini, { pxPerM: 2 });
+    out.litter0 = h.Count(mini, ["friend"]);
     m.SetLayers({ arcs: "default" });
     c.remove(); mini.remove(); m.Dispose();
     return out;
@@ -527,6 +541,12 @@ try {
     syn.arcDefault.n > 1500 && syn.arcDefault.red > 10 && syn.arcDefault.north > syn.arcDefault.south * 3
       && syn.arcAll.n > 800 && syn.arcAll.blue > 5 && syn.arcAll.south > syn.arcAll.north * 3,
     `off→default ${JSON.stringify(syn.arcDefault)} default→all ${JSON.stringify(syn.arcAll)}`);
+  Check("射界缺省档：数据没写 arc 的机枪手（朝北）与战车（朝南）照样有红扇，举枪的步枪手只在「全部」里有",
+    syn.rawMg.n > 1500 && syn.rawMg.red > 10 && syn.rawMg.north > syn.rawMg.south * 3
+      && syn.rawTank.n > 1500 && syn.rawTank.red > 10 && syn.rawTank.south > syn.rawTank.north * 3
+      && syn.rawRifle.n === 0 && syn.rawRifleAll.n > 800,
+    `mg ${JSON.stringify(syn.rawMg)} tank ${JSON.stringify(syn.rawTank)} rifle default ${syn.rawRifle.n} / all ${syn.rawRifleAll.n}`);
+  Check("担架 bearers: 0 照样画成蓝色小矩形", syn.litter0.friendExact > 15, JSON.stringify(syn.litter0));
 
   // =========================================================================
   // 2. 第一关：烘焙耗时、小地图、全关总图
@@ -656,6 +676,56 @@ try {
   Check("全关总图有纸、墨、桌面底与金色（当前关键帧 / 玩家）", full.fullInk.paper > 20000 && full.fullInk.wallExact > 50 && full.fullInk.deskExact > 1000 && full.fullInk.goldExact > 20, JSON.stringify(full.fullInk));
   Check("放大到前沿（6 px/m，矢量块）有墨色块与红 / 蓝单位", full.vectorInk.wallExact > 500 && full.vectorInk.enemyExact > 10 && full.vectorInk.friendExact > 10, JSON.stringify(full.vectorInk));
   Info("全关总图重画", `看全图 ${full.fitMs.toFixed(1)} ms，6 px/m 矢量 ${full.vectorMs.toFixed(1)} ms`);
+
+  // SetDynamic 自己约全关总图重画：地图上点关键帧跳过去、过渡中单位在走，图开着也得跟上（不靠调用方再 PaintFull）
+  const repaint = await page.evaluate(async () => {
+    const h = window.__h;
+    const { map, ui } = h;
+    const c = ui.fullCanvas;
+    const Frames = (n) => new Promise((resolve) => { const step = () => (--n <= 0 ? resolve() : requestAnimationFrame(step)); requestAnimationFrame(step); });
+    const b = h.levelScene.bounds;
+    const spot = { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
+    const tank = { id: "probeTank", side: "ija", kind: "tank", x: spot.x, z: spot.z, yawDeg: 0 };
+    const Red = () => { const p = map.WorldToScreen(spot.x, spot.z); return h.Count(c, ["enemy"], { x: p.x - 24, y: p.y - 24, w: 48, h: 48 }).enemyExact; };
+    map.FitBounds();
+    map.SetDynamic({ player: null, units: [], pois: [], next: null });
+    map.PaintFull(c);
+    await Frames(3);
+    let paints = 0;
+    const PaintFull = Object.getPrototypeOf(map).PaintFull;
+    map.PaintFull = function (canvas) { paints += 1; return PaintFull.call(this, canvas); };
+    const out = { before: Red() };
+    try {
+      // a) 只调 SetDynamic（同一帧 5 次）：下一帧画一次，图上出现那辆车
+      for (let i = 0; i < 5; i++) map.SetDynamic({ player: null, units: [tank], pois: [], next: null });
+      out.sameTick = paints;
+      await Frames(3);
+      out.open = { paints, red: Red() };
+      // b) 总控的写法：SetDynamic 后紧接着自己 PaintFull —— 约好的那次不再重复画
+      paints = 0;
+      map.SetDynamic({ player: null, units: [], pois: [], next: null });
+      map.PaintFull(c);
+      await Frames(3);
+      out.caller = { paints, red: Red() };
+      // c) 图关着：SetDynamic 不画
+      ui.SetMapOpen(false);
+      paints = 0;
+      for (let i = 0; i < 3; i++) map.SetDynamic({ player: null, units: [tank], pois: [], next: null });
+      await Frames(3);
+      out.closed = { paints };
+    } finally {
+      delete map.PaintFull;
+      h.OpenMap();
+      map.FitBounds();
+      h.Go(h.index);
+      await Frames(2);
+    }
+    return out;
+  });
+  Check("SetDynamic 自己约全关总图重画：图开着时下一帧跟上（同一帧 5 次只画 1 次）、调用方紧接着自己画了不重复画、图关着不画",
+    repaint.before === 0 && repaint.sameTick === 0 && repaint.open.paints === 1 && repaint.open.red > 30
+      && repaint.caller.paints === 1 && repaint.caller.red === 0 && repaint.closed.paints === 0,
+    JSON.stringify(repaint));
 
   // 全关总图：真鼠标
   const canvasBox = await page.locator(".boMapCanvas").boundingBox();
@@ -795,6 +865,30 @@ try {
   await page.mouse.click(nb.x + nb.width / 2, nb.y + nb.height / 2);
   const focusAfter = await page.evaluate(() => !document.querySelector(".boRoot").contains(document.activeElement));
   Check("点按钮不留焦点（回到游戏按空格不会再「点」它）", focusAfter, `before-blur ${focusAfterClick}`);
+  // 状态点：鼠标点它看说明不留焦点（不然 WASD / R / 空格全被界面吞掉）；键盘 Tab 过去的，鼠标移开时交还焦点
+  const statusBox = await page.locator(".boStatus").boundingBox();
+  await page.mouse.click(statusBox.x + statusBox.width / 2, statusBox.y + statusBox.height / 2);
+  const statusClick = await page.evaluate(() => ({ inUi: document.querySelector(".boRoot").contains(document.activeElement), keydown: window.__h.leaked.keydown }));
+  await page.keyboard.press("KeyW");
+  const keydownAfterW = await page.evaluate(() => window.__h.leaked.keydown);
+  await page.evaluate(() => document.querySelector(".boStatus").focus());
+  const statusFocused = await page.evaluate(() => document.activeElement === document.querySelector(".boStatus"));
+  await page.mouse.move(statusBox.x + statusBox.width / 2 + 1, statusBox.y + statusBox.height / 2);
+  await page.mouse.move(statusBox.x - 240, statusBox.y + 320, { steps: 3 });
+  const statusLeft = await page.evaluate(() => !document.querySelector(".boRoot").contains(document.activeElement));
+  Check("点状态点不留焦点、之后按 W 照样到游戏；Tab 到状态点的，鼠标移开交还焦点",
+    !statusClick.inUi && keydownAfterW === statusClick.keydown + 1 && statusFocused && statusLeft,
+    JSON.stringify({ statusClick, keydownAfterW, statusFocused, statusLeft }));
+  // 按住不连发：焦点在界面里时，自动重复的 . / , 不算
+  const repeatKeys = await page.evaluate(() => {
+    const h = window.__h;
+    h.events.length = 0;
+    const card = document.querySelector(".boCard");
+    const Fire = (code, repeat) => card.dispatchEvent(new KeyboardEvent("keydown", { code, key: code === "Period" ? "." : ",", repeat, bubbles: true, cancelable: true }));
+    Fire("Period", true); Fire("Comma", true); Fire("Period", true); Fire("Period", false);
+    return h.events.map((e) => e[0]).join(",");
+  });
+  Check("焦点在界面里按住 . / , 不连发（自动重复的按键不算）", repeatKeys === "next", repeatKeys);
   // 小地图点击 → 打开全关总图
   await page.evaluate(() => { window.__h.events.length = 0; });
   await page.click(".boMini");
@@ -816,12 +910,16 @@ try {
     return r;
   });
   Check("状态点：红 = 有错（悬停列出原因）、蓝闪 = 已同步", status.state === "error" && status.lines === 3 && status.synced, JSON.stringify(status));
-  // 只有 3 个关键帧的真配置
+  // 真配置（生成器写的 Blockout/FirstLevel.json），停在它的第一个关键帧上
+  const realKfs = JSON.parse(fs.readFileSync(path.join(projectDir, "Blockout", "FirstLevel.json"), "utf8")).keyframes;
+  const realFirst = realKfs[0];
+  const realCount = `${String(realFirst.stage).padStart(2, "0")} · 1/${realKfs.filter((k) => k.stage === realFirst.stage).length}`;
   const page2 = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   Watch(page2);
-  await Open(page2, "at=03-1");
+  await Open(page2, `at=${encodeURIComponent(realFirst.id)}`);
   const small = await page2.evaluate(() => ({ ticks: document.querySelectorAll(".boTick").length, kfs: window.__h.kfs.length, valid: window.__h.valid.ok, count: document.querySelector(".boCount").textContent, prevDisabled: window.__h.ui.btnPrev.disabled }));
-  Check("真配置（Blockout/FirstLevel.json）：刻度数 = 关键帧数、第一个时「上一个」不可点", small.valid && small.ticks === small.kfs && small.kfs >= 3 && small.prevDisabled && small.count === "03 · 1/3", JSON.stringify(small));
+  Check(`真配置（Blockout/FirstLevel.json）：刻度数 = 关键帧数、停在第一个（${realFirst.id}）时「上一个」不可点、计数「${realCount}」`,
+    small.valid && small.ticks === small.kfs && small.kfs === realKfs.length && small.prevDisabled && small.count === realCount, JSON.stringify(small));
   await page2.close();
   // 第二关：场景文件（int16 厘米高度网格 + 块 + 路），走总控给文件场景的同一条路
   const page4 = await browser.newPage({ viewport: { width: 1280, height: 720 } });

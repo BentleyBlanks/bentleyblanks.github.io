@@ -13,10 +13,11 @@
 //
 // 输入约定：
 // - 本界面 DOM 上的 mousedown / wheel / keydown 一律 stopPropagation —— 游戏的按键路由挂在
-//   document 上，不拦会触发抢指针锁、滚轮换枪、空格跳（pointerdown 放行：开机那下解锁音频要它）。按钮在 mousedown 时就 preventDefault，不留焦点
-//   （焦点留在按钮上，回到游戏按空格会「点」它）。
+//   document 上，不拦会触发抢指针锁、滚轮换枪、空格跳（pointerdown 放行：开机那下解锁音频要它）。按钮与状态点在 mousedown 时就
+//   preventDefault，不留焦点（焦点留在按钮上，回到游戏按空格会「点」它；留在界面里任何地方，WASD 都被上面的拦截吞掉）。
+//   状态点能 Tab 到（键盘看说明），鼠标移开时交还焦点。
 // - 焦点在本界面里时，. , M Y Esc 由这里直接转给 handlers（随后被拦住，不会再到总控的 window 监听上
-//   重复触发）。总控请在冒泡阶段监听这些键。
+//   重复触发；按住不连发）。总控请在冒泡阶段监听这些键。
 // - SetInteractive(false)（指针锁定中）：整层 pointer-events:none，仍然可见。
 // - 全关总图上点关键帧：地图模块在 fullCanvas 上派发 "blockoutmappick"（detail.index），这里接住转 onMapPick。
 //
@@ -148,8 +149,9 @@ export class BlockoutUi {
         stop(e);
       });
     }
-    // 按钮不抢焦点（见文件头）
-    this.Listen(this.root, "mousedown", (e) => { if (e.target.closest?.("button")) e.preventDefault(); }, true);
+    // 按钮和状态点不抢焦点（见文件头）：焦点一旦留在界面里，根上的 keydown 拦截会把 WASD / R / 空格全吞掉。
+    // 状态点的说明靠悬停就能看；键盘 Tab 过去照样能看（:focus），鼠标移开就交还焦点。
+    this.Listen(this.root, "mousedown", (e) => { if (e.target.closest?.("button, .boStatus")) e.preventDefault(); }, true);
     this.Listen(this.fullCanvas, MAP_PICK_EVENT, (e) => {
       const index = e.detail?.index;
       if (Number.isInteger(index) && index >= 0) this.Call("onMapPick", index);
@@ -157,7 +159,8 @@ export class BlockoutUi {
   }
 
   OnKey(e) {
-    if (e.repeat && e.code !== "Period" && e.code !== "Comma") return;
+    // 按住不连发（与总控在 document 上的按键一致）：按住 . 不会一口气翻过好几个关键帧。
+    if (e.repeat) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const action = KEY_ACTIONS[e.code];
     if (!action) return;
@@ -252,6 +255,7 @@ export class BlockoutUi {
     this.elStatusDot = El("i", "boDot");
     this.elStatusTip = El("div", "boStatusTip boPanel");
     status.append(this.elStatusDot, this.elStatusTip);
+    this.Listen(status, "mouseleave", () => { if (status.contains(document.activeElement)) document.activeElement.blur(); });
     this.statusEl = status;
 
     bar.append(level, layers, status);
