@@ -1,0 +1,356 @@
+/* 白盒关卡编辑器（docs/Data_EditorBlockout.md §4）。
+   沿用 Style_Interface.css 的 --ui-* 令牌：冷灰 / 旧金、直角、1 px 细线；金色只给「当前 / 选中」；
+   数字等宽。面板是半透明深色 + 轻微背景模糊，压在 3D 画面上不挡视线。
+   中文先用系统黑体：编辑器文字不在打包字体子集里，逐字回落会一句话混两种字形。 */
+
+.boRoot {
+  --bo-font: "TzUiLatin", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "TzUiSans", sans-serif;
+  --bo-num: var(--ui-mono, "Cascadia Mono", Consolas, monospace);
+  --bo-panel: rgba(12, 15, 16, 0.76);
+  --bo-panel-solid: rgba(12, 15, 16, 0.94);
+  --bo-line: rgba(196, 198, 187, 0.2);
+  --bo-line-strong: rgba(196, 198, 187, 0.34);
+  --bo-text: var(--ui-text, #d6d9d1);
+  --bo-bright: var(--ui-bright, #eeefec);
+  --bo-muted: var(--ui-muted, #a3aaa4);
+  --bo-faint: rgba(214, 217, 209, 0.46);
+  --bo-gold: var(--ui-gold, #dfbd68);
+  --bo-ok: #8fca7a;
+  --bo-sync: #86c9dc;
+  --bo-bad: #d6604a;
+  --bo-enemy: rgb(196, 60, 42);
+  --bo-friend: rgb(38, 106, 180);
+  --bo-civ: rgb(70, 136, 56);
+  --bo-mapgold: rgb(226, 166, 26);
+  position: fixed; inset: 0; z-index: 30;
+  pointer-events: none;
+  font: 13px/1.45 var(--bo-font);
+  color: var(--bo-text);
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+  user-select: none;
+}
+.boRoot *, .boRoot *::before, .boRoot *::after { box-sizing: border-box; }
+.boRoot [hidden] { display: none !important; }
+.boRoot :is(.boCard, .boTopBar, .boMini, .boNav, .boMapOverlay.open) { pointer-events: auto; }
+.boRoot.inert, .boRoot.inert * { pointer-events: none !important; }
+.boRoot.inert [data-tip]::after { display: none; }
+
+.boPanel {
+  background: var(--bo-panel);
+  border: 1px solid var(--bo-line);
+  border-radius: 0;
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+  backdrop-filter: blur(10px) saturate(1.1);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
+}
+
+/* --- 按钮与提示 ---------------------------------------------------------- */
+.boBtn {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  margin: 0; padding: 0; border-radius: 0;
+  border: 1px solid transparent; background: transparent;
+  color: var(--bo-muted); font: inherit; cursor: pointer;
+  transition: color 0.12s linear, border-color 0.12s linear, background-color 0.12s linear;
+}
+.boBtn svg { width: 16px; height: 16px; display: block; }
+.boBtn:hover { color: var(--bo-bright); background: rgba(214, 217, 209, 0.07); }
+.boBtn:disabled { opacity: 0.3; cursor: default; background: transparent; color: var(--bo-muted); }
+.boBtn:focus-visible { outline: 1px solid var(--bo-gold); outline-offset: 1px; }
+.boIconBtn { width: 30px; height: 30px; }
+
+.boRoot [data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
+  padding: 4px 8px; white-space: nowrap;
+  font: 12px/1.4 var(--bo-font); color: var(--bo-bright);
+  background: var(--bo-panel-solid); border: 1px solid var(--bo-line-strong);
+  pointer-events: none; opacity: 0; z-index: 6;
+  transition: opacity 0.1s linear 0s;
+}
+.boRoot [data-tip]:hover::after { opacity: 1; transition-delay: 0.35s; }
+.boRoot [data-tip][data-tip-side="below"]::after { bottom: auto; top: calc(100% + 8px); }
+.boRoot [data-tip][data-tip-side="left"]::after { left: auto; right: calc(100% + 8px); bottom: auto; top: 50%; transform: translateY(-50%); }
+
+.boKbd {
+  display: inline-block; min-width: 15px; padding: 0 3px;
+  font: 600 9.5px/13px var(--bo-num); text-align: center; color: var(--bo-text);
+  border: 1px solid rgba(214, 217, 209, 0.26); border-bottom-color: rgba(214, 217, 209, 0.4);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* --- 左上：关键帧卡片 ------------------------------------------------------ */
+.boCard {
+  position: absolute; left: 16px; top: 16px;
+  width: 380px; padding: 11px 12px 12px 14px;
+}
+.boCardHead {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding-bottom: 9px; margin-bottom: 8px;
+  border-bottom: 1px solid var(--bo-line);
+}
+.boCardTitle { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; row-gap: 0; padding-top: 2px; }
+.boStageNo {
+  font: 600 22px/1 "TzUiLatin", var(--bo-num); color: var(--bo-gold);
+  font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+}
+.boStageTitle { font-size: 15px; font-weight: 700; color: var(--bo-bright); letter-spacing: 0.02em; }
+.boPlace { font-size: 13px; color: var(--bo-muted); }
+.boSave { flex: 0 0 auto; margin: -3px -4px 0 0; color: var(--bo-text); border-color: var(--bo-line); }
+.boSave:hover { border-color: var(--bo-line-strong); }
+
+.boLine { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 10px; margin: 6px 0 0; }
+.boLine:first-of-type { margin-top: 0; }
+.boKey { color: var(--bo-faint); font-size: 12px; letter-spacing: 0.06em; line-height: 19px; }
+.boVal { color: var(--bo-text); line-height: 19px; }
+.boVal.muted { color: var(--bo-faint); }
+.boNextVal { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.boArrow {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border: 1px solid var(--bo-line-strong); border-radius: 50%;
+  color: var(--bo-bright); transform-origin: 50% 50%;
+}
+.boArrow svg { width: 13px; height: 13px; stroke-width: 1.8; }
+.boNextText { flex: 1 1 auto; min-width: 0; color: var(--bo-bright); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boDist { flex: 0 0 auto; font: 12px/19px var(--bo-num); color: var(--bo-muted); font-variant-numeric: tabular-nums; }
+
+.boHow { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 0 54px; }
+.boChip {
+  padding: 1px 7px; font-size: 11.5px; line-height: 18px;
+  color: rgba(214, 217, 209, 0.78); border: 1px solid rgba(214, 217, 209, 0.16);
+  background: rgba(255, 255, 255, 0.025);
+}
+.boNotes {
+  margin: 9px 0 0 54px; padding-left: 8px;
+  border-left: 2px solid rgba(214, 217, 209, 0.16);
+  font-size: 11.5px; line-height: 1.5; color: var(--bo-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;   /* 一行；全文在悬停提示里 */
+}
+.boGuess { display: flex; align-items: center; gap: 6px; margin: 8px 0 0 54px; font-size: 11.5px; color: var(--bo-muted); }
+.boGuessIcon { display: inline-flex; color: var(--bo-muted); }
+.boGuessIcon svg { width: 13px; height: 13px; }
+.boEmpty { display: none; color: var(--bo-faint); font-size: 12.5px; }
+.boCard.empty > :not(.boEmpty) { display: none; }
+.boCard.empty .boEmpty { display: block; }
+
+/* --- 右上：关卡与图层（齿轮左侧） ------------------------------------------ */
+.boTopBar {
+  position: absolute; top: 14px; right: 62px;
+  display: flex; align-items: stretch; gap: 6px; height: 34px;
+}
+.boLevel { position: relative; }
+.boLevelBtn {
+  height: 34px; min-width: 176px; max-width: 280px; padding: 0 9px 0 12px; justify-content: space-between; gap: 10px;
+  background: var(--bo-panel); border: 1px solid var(--bo-line);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  color: var(--bo-bright); font-size: 13px;
+}
+.boLevelBtn:hover { border-color: var(--bo-line-strong); background: var(--bo-panel); }
+.boLevelBtn:disabled { opacity: 1; cursor: default; color: var(--bo-bright); background: var(--bo-panel); }
+.boLevelBtn:disabled .boChevron { opacity: 0.25; }
+.boLevelName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boChevron { display: inline-flex; color: var(--bo-muted); transition: transform 0.15s ease; }
+.boChevron svg { width: 14px; height: 14px; }
+.boLevel.open .boChevron { transform: rotate(180deg); }
+.boLevel.open .boLevelBtn { border-color: var(--bo-line-strong); }
+.boLevelBtn[data-tip]::after { display: none; }
+.boLevelMenu {
+  position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%;
+  padding: 4px 0; display: none; z-index: 7; background: var(--bo-panel-solid);
+}
+.boLevel.open .boLevelMenu { display: block; }
+.boLevelItem {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 7px 14px 7px 10px; border: 0; background: transparent; border-radius: 0;
+  color: var(--bo-text); font: 13px/1.4 var(--bo-font); text-align: left; white-space: nowrap; cursor: pointer;
+}
+.boLevelItem:hover { background: var(--ui-selection, rgba(214, 217, 209, 0.08)); color: var(--bo-bright); }
+.boLevelMark { width: 2px; height: 14px; background: transparent; }
+.boLevelItem.on { color: var(--bo-gold); }
+.boLevelItem.on .boLevelMark { background: var(--bo-gold); }
+
+.boLayers {
+  display: flex; background: var(--bo-panel); border: 1px solid var(--bo-line);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.boLayer { width: 34px; height: 32px; color: rgba(214, 217, 209, 0.42); }
+.boLayer + .boLayer { border-left: 1px solid rgba(196, 198, 187, 0.1); }
+.boLayer.on { color: var(--bo-gold); background: rgba(223, 189, 104, 0.08); }
+.boLayer.on:hover { color: var(--bo-gold); background: rgba(223, 189, 104, 0.14); }
+.boLayer.all::before {
+  content: ""; position: absolute; right: 4px; top: 4px; width: 4px; height: 4px; background: var(--bo-gold);
+}
+
+.boStatus {
+  position: relative; width: 34px; display: flex; align-items: center; justify-content: center;
+  background: var(--bo-panel); border: 1px solid var(--bo-line); cursor: default; outline: none;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.boStatus:focus-visible { outline: 1px solid var(--bo-gold); outline-offset: 1px; }
+.boDot { width: 8px; height: 8px; border-radius: 50%; background: var(--bo-muted); }
+.boDot[data-state="ok"] { background: var(--bo-ok); }
+.boDot[data-state="synced"] { background: var(--bo-sync); }
+.boDot[data-state="error"] { background: var(--bo-bad); box-shadow: 0 0 0 3px rgba(214, 96, 74, 0.22); }
+.boDot[data-state="loading"] { animation: boPulse 1.1s ease-in-out infinite; }
+.boDot.flash { animation: boFlash 0.6s ease-out 3; }
+@keyframes boPulse { 50% { opacity: 0.35; } }
+@keyframes boFlash {
+  0% { box-shadow: 0 0 0 0 rgba(134, 201, 220, 0.75); }
+  100% { box-shadow: 0 0 0 9px rgba(134, 201, 220, 0); }
+}
+.boStatusTip {
+  position: absolute; top: calc(100% + 6px); right: -1px; width: 300px;
+  padding: 9px 12px 10px; display: none; z-index: 7; background: var(--bo-panel-solid);
+  font-size: 12px; line-height: 1.5; color: var(--bo-text); white-space: normal; user-select: text;
+}
+.boStatus:hover .boStatusTip, .boStatus:focus .boStatusTip { display: block; }
+.boTipHead { color: var(--bo-bright); font-weight: 700; margin-bottom: 4px; }
+.boStatus[data-state="error"] .boTipHead { color: var(--bo-bad); }
+.boTipLine { overflow-wrap: anywhere; }
+.boTipLine + .boTipLine { margin-top: 2px; }
+.boTipLine.muted { color: var(--bo-muted); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--bo-line); }
+
+/* --- 左下：小地图 --------------------------------------------------------- */
+.boMini {
+  position: absolute; left: 16px; bottom: 16px; width: 220px; height: 220px; box-sizing: content-box;
+  border: 1px solid var(--bo-line-strong); background: #1a1d1e; cursor: pointer;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+}
+.boMini:hover { border-color: rgba(214, 217, 209, 0.6); }
+.boMiniCanvas { display: block; width: 100%; height: 100%; }
+.boMiniHint {
+  position: absolute; right: 5px; bottom: 5px;
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px 2px 3px;
+  font-size: 11px; line-height: 15px; color: var(--bo-text); background: rgba(12, 15, 16, 0.78);
+}
+
+/* --- 底部：导航栏 --------------------------------------------------------- */
+.boNav {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+  /* §4：min(1100 px, 62vw)；窄屏再让出左下小地图（16 + 222）两侧各 16 px，不贴上去 */
+  width: min(1100px, 62vw, calc(100vw - 508px)); height: 58px; padding: 0 12px 0 10px;
+  display: grid; grid-template-columns: 30px minmax(0, 1fr) 30px auto; align-items: center; column-gap: 10px;
+}
+.boNavBtn { width: 30px; height: 30px; color: var(--bo-text); border-color: var(--bo-line); }
+.boNavBtn:hover { border-color: var(--bo-line-strong); }
+.boTrackWrap { position: relative; height: 44px; display: flex; flex-direction: column; justify-content: center; cursor: pointer; touch-action: none; }
+.boTrack { display: flex; gap: 3px; height: 20px; align-items: center; }
+/* 段宽按关键帧数，但每段至少 16 px（阶段号读得出）；下面那排阶段号用同一套 flex 参数，逐段对齐 */
+.boSeg { position: relative; flex: 1 1 0; min-width: 16px; height: 20px; }
+.boSegLine, .boSegFill { position: absolute; left: 0; top: 50%; height: 2px; margin-top: -1px; }
+.boSegLine { right: 0; background: rgba(214, 217, 209, 0.16); }
+.boSegFill { width: 0; background: rgba(214, 217, 209, 0.5); }
+.boSeg.passed .boSegFill { width: 100%; }
+/* 关键帧刻度：时间轴上的小菱形 */
+.boTick {
+  position: absolute; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
+  transform: rotate(45deg); background: rgba(214, 217, 209, 0.34);
+  transition: transform 0.1s ease, background-color 0.1s linear;
+}
+.boTick.passed { background: rgba(214, 217, 209, 0.78); }
+.boTick.hover { background: var(--bo-bright); transform: rotate(45deg) scale(1.6); }
+.boTick.current { opacity: 0; }
+.boKnob {
+  position: absolute; top: 50%; width: 6px; height: 18px; margin: -9px 0 0 -3px; z-index: 2;
+  background: var(--bo-gold);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 12px rgba(223, 189, 104, 0.35);
+}
+.boGhost { background: transparent; border: 1px solid var(--bo-gold); box-shadow: none; opacity: 0.85; z-index: 3; }
+.boNav.playing .boKnob:not(.boGhost) { animation: boKnobPlay 0.9s ease-in-out infinite; }
+@keyframes boKnobPlay { 50% { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 18px rgba(223, 189, 104, 0.75); } }
+.boStageNums { display: flex; gap: 3px; margin-top: 3px; }
+.boStageNum {
+  flex: 1 1 0; min-width: 16px; overflow: hidden; text-align: center;
+  font: 10px/12px var(--bo-num); color: rgba(214, 217, 209, 0.42); font-variant-numeric: tabular-nums;
+}
+.boStageNum.current { color: var(--bo-gold); }
+.boNavTip {
+  position: absolute; bottom: calc(100% + 2px); left: 0; transform: translateX(-50%);
+  padding: 4px 9px; white-space: nowrap; pointer-events: none;
+  font: 12px/1.4 var(--bo-font); color: var(--bo-bright);
+  background: var(--bo-panel-solid); border: 1px solid var(--bo-line-strong);
+  opacity: 0; transition: opacity 0.08s linear;
+}
+.boNavTip.on { opacity: 1; }
+.boNavSide { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 4px; min-width: 128px; }
+.boCounter { display: flex; align-items: center; gap: 8px; }
+.boCount { font: 600 13px/16px var(--bo-num); color: var(--bo-bright); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.boFast {
+  padding: 0 6px; font-size: 11px; line-height: 16px; color: var(--bo-bright); white-space: nowrap;
+  border: 1px solid var(--bo-line-strong); background: rgba(214, 217, 209, 0.08);
+}
+.boFast:empty { display: none; }
+.boKeys { display: flex; align-items: center; gap: 3px; font-size: 10px; line-height: 13px; color: var(--bo-faint); white-space: nowrap; }
+.boKeys .boKbd { font-size: 9px; line-height: 12px; min-width: 13px; color: var(--bo-muted); }
+.boKeys > span { margin-right: 6px; }
+.boKeys > span:last-child { margin-right: 0; }
+.boNav.empty .boTrackWrap { cursor: default; }
+
+/* --- 全关总图外框 --------------------------------------------------------- */
+.boMapOverlay {
+  position: absolute; inset: 0; z-index: 5; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(3, 4, 4, 0.38);
+}
+.boMapOverlay.open { display: flex; }
+.boMapFrame { width: 92vw; height: 88vh; display: flex; flex-direction: column; background: var(--bo-panel-solid); }
+.boMapHead {
+  flex: 0 0 44px; display: flex; align-items: center; gap: 22px;
+  padding: 0 7px 0 16px; border-bottom: 1px solid var(--bo-line);
+}
+.boMapTitle { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+.boMapName { font-size: 14px; font-weight: 700; color: var(--bo-bright); letter-spacing: 0.04em; }
+.boMapLevel { font-size: 12px; color: var(--bo-muted); }
+.boLegend { display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: var(--bo-muted); white-space: nowrap; overflow: hidden; }
+.boLegendItem { display: inline-flex; align-items: center; gap: 6px; }
+.boGlyph { position: relative; display: inline-block; width: 11px; height: 11px; flex: 0 0 auto; }
+.boGlyph.enemy { width: 0; height: 0; border-left: 5.5px solid transparent; border-right: 5.5px solid transparent; border-bottom: 10px solid var(--bo-enemy); }
+.boGlyph.friend { width: 8px; height: 8px; border-radius: 50%; background: var(--bo-friend); box-shadow: 0 0 0 1.5px #e6dfcd; }
+.boGlyph.civ { width: 8px; height: 8px; border-radius: 50%; background: var(--bo-civ); box-shadow: 0 0 0 1.5px #e6dfcd; }
+.boGlyph.poi { width: 8px; height: 8px; background: var(--bo-mapgold); transform: rotate(45deg); box-shadow: 0 0 0 1px #26231f; }
+.boGlyph.next { width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--bo-mapgold); }
+.boGlyph.player { width: 11px; height: 12px; background: var(--bo-mapgold); clip-path: polygon(50% 0, 100% 100%, 50% 74%, 0 100%); }
+.boGlyph.kf { width: 11px; height: 11px; border-radius: 50%; background: #26231f; box-shadow: 0 0 0 1.5px #e6dfcd; }
+.boMapHint { margin-left: auto; font-size: 11.5px; color: var(--bo-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.boClose { color: var(--bo-text); }
+.boMapBody { position: relative; flex: 1 1 auto; min-height: 0; }
+.boMapCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.boMapCanvas.dragging { cursor: grabbing; }
+
+/* --- 中上：提示条 --------------------------------------------------------- */
+.boToasts {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 6;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none;
+}
+.boToast {
+  display: flex; align-items: center; gap: 10px; max-width: min(560px, 60vw);
+  padding: 7px 14px 7px 10px; font-size: 13px; color: var(--bo-bright);
+  background: var(--bo-panel-solid); border: 1px solid var(--bo-line);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  opacity: 0; transform: translateY(-6px); transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.boToast.on { opacity: 1; transform: none; }
+.boToast.out { opacity: 0; transform: translateY(-4px); transition-duration: 0.35s; }
+.boToastMark { flex: 0 0 auto; width: 3px; height: 15px; background: var(--bo-muted); }
+.boToast.ok .boToastMark { background: var(--bo-ok); }
+.boToast.warn .boToastMark { background: var(--bo-gold); }
+.boToast.error .boToastMark { background: var(--bo-bad); }
+
+/* --- 窄屏（≤ 1366 px）：卡片与小地图收一点，导航栏不碰小地图 ------------------ */
+@media (max-width: 1366px) {
+  .boCard { width: 352px; }
+}
+@media (max-height: 760px) {
+  .boCard { padding-bottom: 10px; }
+  .boHow { margin-top: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boRoot * { transition-duration: 0s !important; animation: none !important; }
+}
+
+/* --- 编辑器模式下的游戏 HUD：只留准星、弹药、受伤反馈（§4） -------------------- */
+body.blockoutMode #hud :is(.hudTop, .hudBrief, .hudTitle, .hudSubtitle, .hudMinimap, .hudMarkers,
+  .hudMissionGuide, .hudMissionArea, .hudMissionReturn, .hudForceStatus, .hudHint, .hudActions,
+  .hudNote, .hudEpilogue, .hudCinematicPrompt) { display: none !important; }
+body.blockoutMode #hud .hudFps { top: 56px; left: auto; right: 18px; }
