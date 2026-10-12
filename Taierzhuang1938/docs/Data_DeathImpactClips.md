@@ -148,6 +148,11 @@ NRA/IJA 共用，不需要 `RetargetAnimationLibrary`）。不动的骨头（手
 - **`crumple` 的 `fallLocal` 仅作参考**：`Crumple1` 实测头往前落 1.0 m（人在原地折下去后往前趴），`Crumple2` 往左。契约里 crumple 只在期望是 crumple 时参与，剩余偏角转向由运行时处理。
 - 蒙皮最低点：NRA 四条镜像是 Kimodo 原 clip 的镜像，本来就有 −0.9…−2.0 cm 的离地偏差（运行时 `DEATH_CONTACT.poseEnd` 之后按可见蒙皮做接地拟合，抬到 8 mm），未改动；八条物理 clip 在 NRA 上是 3.7 mm，IJA 上 6–19 mm（IJA 靴子/下摆比 NRA 厚，同一条动作的最低点不同），运行时同样有接地拟合。
 - 帧间抖动：浏览器里整条曲线的骨盆高度逐帧（1/60 s）最大跳变 ≤ 0.041 m（下落段），头速度峰值 2.3–4.2 m/s；无爆开、无抽搐。
+- 接地拟合的开销（2026-10-12 R3-Perf）：`poseEnd` 到终帧之间要在 CPU 上蒙皮全部可见顶点。原来按索引走，每个顶点按用到它的三角数重复蒙皮约 5 次；
+  02 冲锋那一秒五个人同时倒下（机枪手、副射手、ChargeB、DepthIjaB、FollowB），`ai/corpse` 每帧 40–80 ms。现在 `Script_CharacterModel.DrawnVertices`
+  每个可见顶点只蒙皮一次（结果逐位不变），找支撑面那一次与终帧（`deathFloorLift`）照样全量重蒙，中间的调用每 `DEATH_CONTACT.settleRescanCalls`（3）次
+  才重蒙一次、其余沿用上一次蒙好的点（倒地最后 15% 一帧只动毫米级）。实测（1080p high、冲锋 2 s 定帧 dt=0）：改前 57.3 ms（1 次），改后 26.0 ms（5 次中位；
+  改前的 `3d840736` 同时段交替 5 次中位 21.4 ms，那时冲锋里倒下的人少）；冲锋那一秒 >50 ms 的长帧每次约 52 帧 → 平均 0.2 帧。
 
 ## 8. 看渲染图的判断（`sheets/<clip>.png`：侧视 + 正视，t = 0 / 0.15 / 0.3 / 0.5 / 0.75 / 1.0 / 终点）
 
