@@ -509,14 +509,17 @@ export class BlockoutMap {
   // -------------------------------------------------------------------------
   // 小地图
 
-  /** 北朝上、以玩家为中心并夹在边界内。canvas 的 CSS 尺寸决定画多大，按 DPR 出图。 */
+  /**
+   * 北朝上、以玩家为中心并夹在边界内。canvas 的 CSS 尺寸决定画多大，按 DPR 出图。
+   * 关卡比视野还小时自动放大到整关正好铺满（不在小地图上留一圈空白）。
+   */
   PaintMini(canvas, { pxPerM = MINI_PX_PER_M } = {}) {
     if (!canvas || !this.scene) return;
     const t0 = Now();
     const { ctx, w, h, dpr } = PrepareCanvas(canvas);
     if (!ctx) return;
-    const s = pxPerM;
     const b = this.scene.bounds;
+    const s = Math.max(Finite(pxPerM) && pxPerM > 0 ? pxPerM : MINI_PX_PER_M, Math.min(w / (b.maxX - b.minX), h / (b.maxZ - b.minZ)));
     const viewW = w / s, viewH = h / s;
     const player = this.dynamic.player;
     let cx = player ? player.x : (b.minX + b.maxX) / 2;
@@ -742,6 +745,9 @@ export class BlockoutMap {
       const items = this.ItemsIn(minX, maxX, minZ, maxZ);
       ctx.save();
       ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, dpr * (view.w / 2 - view.cx * view.s), dpr * (view.h / 2 - view.cz * view.s));
+      ctx.beginPath();
+      ctx.rect(b.minX, b.minZ, b.maxX - b.minX, b.maxZ - b.minZ);
+      ctx.clip();   // 与烘好的图一致：路头、块都不画出图纸
       DrawWays(ctx, this.ways, view.s);
       DrawItems(ctx, items, view.s);
       ctx.restore();

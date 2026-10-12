@@ -108,12 +108,38 @@ const HARNESS = `<!doctype html>
       ways: { rails: [MISSION_LAYOUT.railway.points] },
     };
 
+    // ---- 第二关（?level=SecondLevel）：场景文件 = int16 厘米高度网格 + 块 + 路 ----
+    const LEVEL = params.get("level") === "SecondLevel" ? "SecondLevel" : "FirstLevel";
+    function GridSampler(t) {
+      const bin = atob(t.data);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const dv = new DataView(bytes.buffer);
+      const W = t.cols + 1;
+      const H = new Float32Array(W * (t.rows + 1));
+      for (let i = 0; i < H.length; i++) H[i] = dv.getInt16(i * 2, true) / 100;
+      return (x, z) => {
+        const fx = Math.min(Math.max((x - t.minX) / t.cellM, 0), t.cols - 1e-6), fz = Math.min(Math.max((z - t.minZ) / t.cellM, 0), t.rows - 1e-6);
+        const ix = Math.floor(fx), iz = Math.floor(fz), u = fx - ix, v = fz - iz, i = iz * W + ix;
+        return H[i] * (1 - u) * (1 - v) + H[i + 1] * u * (1 - v) + H[i + W] * (1 - u) * v + H[i + W + 1] * u * v;
+      };
+    }
+    let scene = levelScene;
+    if (LEVEL === "SecondLevel") {
+      const sd = await (await fetch("../../Blockout/SecondLevel.scene.json", { cache: "no-store" })).json();
+      const sampleHeight = GridSampler(sd.terrain);
+      scene = {
+        levelKey: "SecondLevel", bounds: sd.bounds, sampleHeight, ways: sd.ways || {},
+        blocks: sd.blocks.map((b) => ({ ...b, y: Math.min(sampleHeight(b.x, b.z), sampleHeight(b.x - b.w / 2, b.z - b.d / 2), sampleHeight(b.x + b.w / 2, b.z + b.d / 2)) + b.h / 2 })),
+      };
+    }
+
     // ---- 关键帧 ----
-    const raw = await (await fetch("../../Blockout/FirstLevel.json", { cache: "no-store" })).json();
+    const raw = await (await fetch("../../Blockout/" + LEVEL + ".json", { cache: "no-store" })).json();
     const valid = ValidateBlockout(raw);
     const doc = NormalizeBlockout(raw);
     let kfs = doc.keyframes;
-    if (params.get("kf") === "table") {
+    if (LEVEL === "FirstLevel" && params.get("kf") === "table") {
       const real = new Map(kfs.map((k) => [k.id, k]));
       const seen = {};
       kfs = STATIONS.map(([id, stage, name]) => {
@@ -175,13 +201,13 @@ const HARNESS = `<!doctype html>
       map.PaintMini(ui.miniCanvas, { pxPerM: MINI_PX_PER_M });
       if (ui.mapOpen) map.PaintFull(ui.fullCanvas);
     }
-    ui.SetLevels([{ key: "FirstLevel", label: "第一关 · 往南的路" }, { key: "SecondLevel", label: "第二关 · 手榴弹雨（空间草稿）" }], "FirstLevel");
+    ui.SetLevels([{ key: "FirstLevel", label: "第一关 · 往南的路" }, { key: "SecondLevel", label: "第二关 · 手榴弹雨（空间草稿）" }], LEVEL);
     ui.SetLayers({ arcs: "default", intents: true, labels: true, xray: true });
     ui.SetStatus({ state: valid.ok ? "ok" : "error",
-      message: valid.ok ? "Blockout/FirstLevel.json · " + kfs.length + " 个关键帧" : valid.errors.join("\\n"),
+      message: valid.ok ? "Blockout/" + LEVEL + ".json · " + kfs.length + " 个关键帧" : valid.errors.join("\\n"),
       writable: false, saveReason: "测试页没有本机存档口" });
     const t0 = performance.now();
-    map.SetScene(levelScene);
+    map.SetScene(scene);
     const setSceneMs = performance.now() - t0;
     Go(index);
 
@@ -324,7 +350,7 @@ const HARNESS = `<!doctype html>
     }
 
     window.__h = {
-      ui, map, events, leaked, kfs, valid, levelScene, MAP_COLORS, MAP_PICK_EVENT, MINI_PX_PER_M, VECTOR_PX_PER_M, RebakeProbe,
+      ui, map, events, leaked, kfs, valid, levelScene, scene, LEVEL, MAP_COLORS, MAP_PICK_EVENT, MINI_PX_PER_M, VECTOR_PX_PER_M, RebakeProbe,
       Go, Refresh, Synthetic, Data, Count, Pixel, Is, RowLum, GoldCentroid, GoldTip, TestCanvas,
       get index() { return index; },
       OpenMap() { ui.SetMapOpen(true); map.PaintFull(ui.fullCanvas); },
@@ -791,6 +817,32 @@ try {
   const small = await page2.evaluate(() => ({ ticks: document.querySelectorAll(".boTick").length, kfs: window.__h.kfs.length, valid: window.__h.valid.ok, count: document.querySelector(".boCount").textContent, prevDisabled: window.__h.ui.btnPrev.disabled }));
   Check("真配置（Blockout/FirstLevel.json）：刻度数 = 关键帧数、第一个时「上一个」不可点", small.valid && small.ticks === small.kfs && small.kfs >= 3 && small.prevDisabled && small.count === "03 · 1/3", JSON.stringify(small));
   await page2.close();
+  // 第二关：场景文件（int16 厘米高度网格 + 块 + 路），走总控给文件场景的同一条路
+  const page4 = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  Watch(page4);
+  await Open(page4, "level=SecondLevel");
+  const lv2 = await page4.evaluate(() => {
+    const h = window.__h;
+    h.OpenMap();
+    const c = h.ui.fullCanvas;
+    h.map.FitBounds();
+    h.map.PaintFull(c);
+    return {
+      bake: { w: window.__bake.width, h: window.__bake.height, blocks: window.__bake.blocks, pxPerM: window.__bake.pxPerM },
+      full: h.Count(c, ["road", "wall", "gold"]), mini: h.Count(h.ui.miniCanvas, ["road", "wall"]),
+      ticks: document.querySelectorAll(".boTick").length, kfs: h.kfs.length, level: document.querySelector(".boLevelName").textContent,
+      scale: +h.map.view.pxPerM.toFixed(2),
+    };
+  });
+  Check("第二关（场景文件）：烘好、路面与墙墨都画出、要点是金色、导航栏刻度 = 关键帧数、关卡名对",
+    lv2.bake.blocks >= 4 && lv2.full.roadExact > 500 && lv2.full.wallExact > 200 && lv2.full.goldExact > 20 && lv2.mini.roadExact > 20 && lv2.mini.wallExact > 5
+      && lv2.ticks === lv2.kfs && lv2.level.startsWith("第二关"), JSON.stringify(lv2));
+  if (SHOTS) {
+    await page4.screenshot({ path: path.join(shotDir, "1280x720_level2_fullmap.png") });
+    await page4.evaluate(() => window.__h.ui.SetMapOpen(false));
+    await page4.screenshot({ path: path.join(shotDir, "1280x720_level2_ui.png") });
+  }
+  await page4.close();
 
   // =========================================================================
   // 4. 截图
