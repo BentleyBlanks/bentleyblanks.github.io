@@ -113,9 +113,9 @@
 | Trapped | `BunkerBanter`(7，黑屏；末句被近爆打断) · `BunkerKilling`(6，日兵甲/伤兵/扶人川军/日兵乙) · `BunkerSearch`(2，日语) · `ShunziCurse`(1，压声) |
 | BunkerRescue | `RescueCall`(6) · `RescueLift`(3) · `RescueOut`(3) |
 | RearTrench | `TrenchCurse`(4) · `CornerCheck`(5) · `SupportOrder`(4) |
-| Support | `FrontBlockade`(3) · `FrontApproach`(2) · `FrontAttack`(1) · `FrontWithdraw`(1) · `TakeOverGun`(3) · `TankHeard`(2，2026-09-27 用户追加) |
-| MachineGun | `TankRoadContact`(2) · `TankArmor`(2，2026-09-27 用户追加，玩家枪打车体才喊) · `TankTerror`(1) · `BundleOrder`(5) |
-| Tank | `BundleGo`(2) · `BundleProne`(2) · `BundleWhy`(4，2026-09-27 用户追加) · `BundleSupply`(2) · `BundleBrief`(5，2026-09-27 用户追加) · `BundleReturnCall`(2) · `BundleAttack`(2) · `BundleRetreat`(1) · `TankStopped`(3) · `FrontRelief`(3) |
+| Support | `FrontObservation`(2，2026-10-12 契约 §5.2 新) · `FrontBlockade`(3) · `FrontApproach`(2) · `FrontAttack`(1) · `FrontWithdraw`(1) · `FirstBatchCount`(1，2026-10-12 新) · `TakeOverGun`(3) · `TankHeard`(2，2026-09-27 用户追加；2026-10-12 退出 retired，录音保留) · `TankSpotted`(2，2026-10-12 新) |
+| MachineGun | `TankRoadContact`(2，2026-10-12 改字) · `TankArmor`(1，2026-09-27 用户追加，玩家枪打车体才喊；2026-10-12 并成一句) · `TankTerror`(1) · `GapGuardDown`(1，2026-10-12 新) · `BundleOrder`(5，2026-10-12 改写) |
+| Tank | `BundleGo`(2，2026-10-12 改字) · `BundleProne`(2) · `BundleWhy`(4，2026-09-27 用户追加；2026-10-12 退出 retired) · `BundleSupply`(2，2026-10-12 退出 retired) · `BundleFound`(2，2026-10-12 新) · `BundleBrief`(2，2026-09-27 用户追加；2026-10-12 改成跑动中两句) · `BundleReturnCall`(2) · `BundleAttack`(2) · `BundleRetreat`(1) · `TankStopped`(3) · `FrontRelief`(3) |
 | Orders | `Volunteer`(5：传令兵/罗/传令兵/顺子/罗) · `BorrowLight`(9，含两处动作停顿；2026-10-12 起拆成 1–6 / 7–9 两次 F) · `ZhouLift`(4) · `NierShells`(2，2026-10-12 0311 重构 B 包：担架员/庄稼人) |
 | South | `SouthWhisper`(7，2026-10-12 原六句不改字、末尾加幺娃一句) · `NierFollow`(3，2026-10-12 新) · `MouthContact`(2，2026-10-12 新) · `MouthGo`(1，2026-10-12 新) · `MouthFlank`(1，2026-10-12 新) · `VillagePointer`(1) |
 | Village | `StreetBlocked`(2) · `KitchenDetour`(2) |

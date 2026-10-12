@@ -230,7 +230,7 @@ export function ProbeRoutes() {
     ...Object.fromEntries(E.bunkerPursuit.filter((s) => s.route).map((s) => [`pursuit ${s.id}`, [s, ...s.route]])),
     ...Object.fromEntries(E.bunkerBackdrop.filter((s) => s.route).map((s) => [`backdrop ${s.id}`, [s, ...s.route]])),
     ...Object.fromEntries(E.bunkerAssault.filter((s) => s.enter).map((s) => [`vanguard ${s.id}`, s.enter])),
-    ...Object.fromEntries(E.bundleApproach.map((s) => [`cut-in ${s.id}`, [s, ...APPROACH_TACTICS[s.id].points]])),
+    ...Object.fromEntries(E.sapInfiltrators.map((s) => [`cut-in ${s.id}`, [s, ...APPROACH_TACTICS[s.id].points]])),
   };
   const out = {};
   for (const [name, [route, state]] of Object.entries(rows)) out[name] = RouteClearance(route, { state });
@@ -317,7 +317,7 @@ export function ProbeEnemyCover() {
     const face = s.faceTo ? { x: s.faceTo.x - at.x, z: s.faceTo.z - at.z } : { x: 0, z: 1 };
     rows.push({ group, id: s.id, role: s.role || null, x: Round(at.x), z: Round(at.z), cover: CoverAt(at, face) });
   };
-  for (const g of ["bunkerAssault", "bunkerPursuit", "approach", "front", "frontFlank", "frontOfficer", "bundleApproach", "machineGun", "frontReserve", "tank"])
+  for (const g of ["bunkerAssault", "bunkerPursuit", "approach", "front", "frontFlank", "frontOfficer", "sapInfiltrators", "machineGun", "frontReserve", "tank"])
     for (const s of E[g]) Add(g, s);
   for (const s of E.bunkerBackdrop.filter((m) => m.side === "ija")) Add("bunkerBackdrop", s);
   for (const s of FRONT_FLANK_GROUP) Add("frontFlank@last", s, s.lane.at(-1));
@@ -342,7 +342,7 @@ function SegDist(p, a, b) { const dx = b.x - a.x, dz = b.z - a.z; const t = Math
 const STAGE_OF_STEP = Object.freeze({ Trapped: 1, BunkerRescue: 2, RearTrench: 2, Support: 3, MachineGun: 4, Tank: 5 });
 const REQUIRED_DEATH_STAGE = Object.freeze({ ijaA: 2, ijaB: 2, ijaD: 2, nestGun: 3, nestGuard: 3, linkGuard: 3 });
 const FRONT_GROUPS = ["bunkerAssault", "bunkerBackdrop", "bunkerPursuit", "approach", "front", "frontFlank", "frontOfficer",
-  "machineGun", "tank", "frontReserve", "bundleApproach"];
+  "machineGun", "tank", "frontReserve", "sapInfiltrators", "tankCrew"];
 export function ProbeCounts() {
   const factStage = (f) => STAGE_OF_STEP[MISSION_FACT_GATES[f]?.step] ?? null;
   const members = [];

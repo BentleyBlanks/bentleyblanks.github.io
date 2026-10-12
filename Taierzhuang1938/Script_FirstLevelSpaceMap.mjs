@@ -40,7 +40,7 @@ const data = { EXT, step, W, H, hg: Array.from(hg, (v) => +v.toFixed(2)), cut: A
   guardRoutes: P.guardWithdrawalRoutes, guardPosts: F.FRONT_GUARD_POSTS, defenders: F.FRONT_DEFENDERS,
   bgLanes, fgLanes, officer: F.FRONT_OFFICER,
   enemies: { bunkerAssault: E.bunkerAssault, bunkerBackdrop: E.bunkerBackdrop, bunkerPursuit: E.bunkerPursuit, approach: E.approach, front: E.front, frontFlank: E.frontFlank, frontOfficer: E.frontOfficer,
-    tank: E.tank, escortSlots: F.FRONT_TANK_ESCORT_SLOTS, bundleApproach: E.bundleApproach, reserveEntries: F.FRONT_RESERVE_ENTRIES, machineGun: E.machineGun },
+    tank: E.tank, escortSlots: F.FRONT_TANK_ESCORT_SLOTS, sapInfiltrators: E.sapInfiltrators, reserveEntries: F.FRONT_RESERVE_ENTRIES, machineGun: E.machineGun },
   fire: F.FRONT_FIRE_POINTS, fireSteps: F.FRONT_FIRE_STEPS, roadblock: SP.roadblock, rcFrame: SP.rearCornerFrame,
   bunkerPlace: P.bunker, collectionPlace: P.collection,
   len: { rearTrench: len(RT.rearTrench), support: len(RT.support), rearRoute: len(S.rearRoute), bundle: len(RT.bundle), attack: len(S.attackRoute), collectionReturn: len(Top.MISSION_STAGE_ROUTES.collectionReturn), left: len(S.leftRoute), tank: len(TP) },

@@ -136,8 +136,14 @@ assert.deepEqual(story.map((cue) => cue.id).filter((id) => !expectedStory.has(id
 assert.equal(story.length, expectedStory.size, "剧情 cue 总数与两份契约一致");
 // 01–06 全部逐句；07 以后全部整段。
 // TankHeard / TankArmor / BundleWhy / BundleBrief：2026-09-27 用户追加（战车怎么回事、为什么要集束弹、往哪扔），稿里标「用户追加」。
-const ORDER0305 = ["FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdraw", "TakeOverGun", "TankHeard", "TankRoadContact", "TankArmor", "TankTerror",
-  "BundleOrder", "BundleGo", "BundleProne", "BundleWhy", "BundleSupply", "BundleBrief", "BundleReturnCall", "BundleAttack", "BundleRetreat", "TankStopped", "FrontRelief"];
+// 2026-10-12 03–11 重构（契约 docs/Data_FirstLevel0311Refactor20261012Contract.md §5.2）：新 FrontObservation / FirstBatchCount / TankSpotted /
+// GapGuardDown / BundleFound；TankHeard / BundleWhy / BundleSupply 退出（retired:true，条目与录音保留）。
+const ORDER0305 = ["FrontObservation", "FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdraw", "FirstBatchCount", "TakeOverGun", "TankHeard", "TankSpotted",
+  "TankRoadContact", "TankArmor", "TankTerror", "GapGuardDown",
+  "BundleOrder", "BundleGo", "BundleProne", "BundleWhy", "BundleSupply", "BundleFound", "BundleBrief", "BundleReturnCall", "BundleAttack", "BundleRetreat", "TankStopped", "FrontRelief"];
+const RETIRED_0311 = ["TankHeard", "BundleWhy", "BundleSupply"];
+for (const id of RETIRED_0311) assert.ok(byId.get(id)?.retired === true, id + " 2026-10-12 退出流程：retired:true，条目与录音保留");
+for (const cue of MISSION_DIALOGUE) if (cue.retired) assert.ok(RETIRED_0311.includes(cue.id), cue.id + " 标了 retired 却不在本轮退出名单里");
 // NierShells：2026-10-12 0311 重构 B 包（06 沟沿上捡弹壳的妮儿，担架员 / 庄稼人两句）。
 const ORDER06 = ["Volunteer", "BorrowLight", "ZhouLift", "NierShells"];
 assert.deepEqual(perLine.map((cue) => cue.id).sort(), [...new Set([...ORDER1011, ...ORDER0305, ...ORDER06])].sort(),
@@ -296,6 +302,8 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
     "./Script_FirstLevelBridge.mjs", "./Script_FirstLevelNightGate.mjs",
     "./Script_OpeningStoryboards.mjs", "./Script_FirstLevelCollection.mjs",
     "./Script_FirstLevelFrontShow.mjs", "./Script_FirstLevelFrontBattle.mjs",
+    // 2026-10-12 03–11 重构 A 包：反扑 / 掷弹筒 / 车组的新模块也会点名 cue（GapGuardDown）。
+    "./Script_FirstLevelFrontCounterattack.mjs",
     // 2026-10-12 0311 B 包：耿家四个角色（NierShells / NierFollow）与 07 沟口遭遇（MouthContact / MouthGo / MouthFlank）。
     "./Script_FirstLevelGengFamily.mjs", "./Script_FirstLevelSouthMouth.mjs",
   ];
@@ -325,7 +333,8 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   // Opening 包（2026-09-24）已把 01–02 的 13 场全部接到导演的 PlayScene 上，名单清空。
   // 2026-10-11 新场景由 Dir01 / Dir02 的 Talk("<Scene>") 接上触发点（集成时清空）。
   const SECOND_WAVE_UNWIRED = new Set([]);
-  const unwired = story.map((cue) => cue.id).filter((id) => !referenced.has(id));
+  // 2026-10-12 退出流程的 cue（retired:true）本来就没有触发点：条目与录音留着只为清单哈希。
+  const unwired = story.map((cue) => cue.id).filter((id) => !referenced.has(id) && !byId.get(id).retired);
   for (const id of unwired) assert.ok(SECOND_WAVE_UNWIRED.has(id), "这条剧情 cue 没有任何触发点：" + id);
   console.log(`ok 运行时 ${referenced.size} 处 cue 引用全部落在台词表里（还有 ${unwired.length} 场等 Opening 包接触发点）`);
 }

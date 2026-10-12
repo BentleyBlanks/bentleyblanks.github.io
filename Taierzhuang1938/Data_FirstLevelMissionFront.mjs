@@ -225,6 +225,7 @@ export const APPROACH_TACTICS=Object.fromEntries([
     near:{x:-52,z:50},nearM:18,delay:(i%3)*2,
     points:[{x:s.x+(s.team==="Rail"?8:-6),z:s.z},{x:s.x+(s.team==="Rail"?14:-12),z:s.z}],
   }]),
+  // 05 sap infiltrators: the pressure table's FRONT_PRESSURE_TACTICS overrides these by id (fact-released, not near).
   ...Sortie.enemies.map((s,i)=>[s.id,{near:Sortie.damagedLip,nearM:22,delay:i*2.5,
     points:[Space.roadLink[0],Space.roadLink[1],{x:47.5-i*1.6,z:-124.5}]}]),
 ]);
@@ -341,6 +342,59 @@ export const FRONT_TANK_ESCORT_SLOTS=Object.freeze([
   {id:"TankEscortA",x:28.8,z:-171.4,role:"escort"},{id:"TankEscortB",x:31.2,z:-170.8,role:"escort"},
   {id:"TankEscortC",x:39.4,z:-172.2,role:"escort"},{id:"TankEscortD",x:36.8,z:-172,role:"escort"},
 ].map(Object.freeze));
+/**
+ * 2026-10-12 (contract §3.3): the escorts have left the gap once every live one is this far from FRONT_SORTIE.gap and
+ * past the berm line (z < -160) or back on the road north of BendExit - with the tank Disabled they retreat up the
+ * road (Script_FirstLevelTankRuntime.Escorts). A man stuck on the way counts after escortWithdrawMaxS (FrontCounterattack).
+ */
+export const FRONT_ESCORT_WITHDRAWN=Object.freeze({gapClearM:30,maxS:45});
+// ---------------------------------------------------------------------------
+// 2026-10-12 03–11 refactor, A package (docs/Data_FirstLevel0311Refactor20261012Contract.md §3.1–3.3).
+// Pure data for Script_FirstLevelFrontCounterattack (the tank is Data_Tuning_Tank's).
+// ---------------------------------------------------------------------------
+/**
+ * 03 on the way up: knee-mortar (Type 89 discharger) rounds dropping into the support sap while the player walks it
+ * (contract §3.1 「去程支沟里掷弹筒环境落弹」). Indirect fire needs no sight line, so these are scripted shells
+ * (Script_Combat.FireShell, the launcher's own numbers from Data_Battle.SUPPORT) on the sap floor, not ambient-fire
+ * points: an ambient point inside a 1.85 m sap is seen by nobody north of the berm and only burns the pickers' rays.
+ * Each point lies on the sap floor at a bend the player has either passed or not reached yet when it is picked
+ * (FrontCounterattack.SapShells keeps >= sapShellPlayerClearM from him and the squad).
+ */
+export const FRONT_SAP_SHELL_POINTS=Object.freeze([
+  Object.freeze({id:"sapShellA",x:-28.4,z:-121.6}),
+  Object.freeze({id:"sapShellB",x:-23.6,z:-126.4}),
+  Object.freeze({id:"sapShellC",x:-15.2,z:-133.6}),
+  Object.freeze({id:"sapShellD",x:-9.2,z:-139.4}),
+].map(Object.freeze));
+/**
+ * After the capture the discharger finds the nest (contract §3.1): one round every 10–16 s somewhere inside the
+ * compound, never within nestShellPlayerClearM of the player (FrontCounterattack.NestShells). The box is the yard's
+ * inside between the west parapet (x 24.4) and the east gable (x 33), the north wall (z -157) and the rear wall (z -146).
+ */
+export const FRONT_NEST_SHELL_AREA=Object.freeze({minX:24.6,maxX:32.6,minZ:-156.6,maxZ:-146.6});
+/**
+ * 04 `nestFrontContested`: posts in the nest's front (north) half for the 3–4 Japanese who climb in after the player
+ * has fallen back to the rear wall (contract §3.2). Inside the compound, north of the gun seat line (z <= -151),
+ * >= 1.6 m apart, >= 1.2 m from the captured gun's block (RightNestFrontRest 24.45–25.35 x, -154.25–-153.55 z).
+ */
+export const FRONT_NEST_FRONT_POSTS=Object.freeze([
+  Object.freeze({x:27.4,z:-155.4}),Object.freeze({x:29.6,z:-154.2}),Object.freeze({x:31.4,z:-155.6}),Object.freeze({x:28.2,z:-152.4}),
+]);
+/**
+ * 04 `nestFrontCleared` (second round): the men still alive in the front half after FRONT_BATTLE_TUNING.counter.nestFrontHoldS
+ * pull back here - the flank lane's last crater, north of the berm crest (z -160.3) and of nestFrontClearZ - so the fight
+ * for the yard ends either way (all dead, or back over the berm) and 04 stays inside its 90-150 s.
+ */
+export const FRONT_NEST_FRONT_PULLBACK=Object.freeze({x:39.2,z:-162.2});
+/**
+ * 05 `tankCrewBailed`: the two crewmen who bail out when the tank is Disabled (contract §3.3; group `tankCrew`,
+ * spawned by FrontCounterattack at the live tank's sides, never at these roster coordinates - they are the Block
+ * waypoint's two flanks so the orchestration map draws them where it happens). They run back up the road to Bend.
+ */
+export const FRONT_TANK_CREW=Object.freeze([
+  Object.freeze({id:"TankCrewA",x:36.6,z:-169.2,role:"crew",hatchSide:-1}),
+  Object.freeze({id:"TankCrewB",x:39.4,z:-165.8,role:"crew",hatchSide:1}),
+]);
 /** Ambient-fire authorised points per stage (contract §2.9: never the player's live position,
  *  baseAccuracy 0, no TTK). y is metres above the shared ground at (x,z). gap:true points are
  *  switched off inside a withdrawal window. */
@@ -417,4 +471,8 @@ export const MISSION_AFTERMATH=clusters.flatMap(([x,z,count,ijaShare,spread],gro
   // SB07: the bloodied casualty lying beside the backslope LMG pair (a body, not a live man: contract §6 budget).
   {id:"AftermathMgWounded",x:FRONT_GUARD_MG_GROUP.wounded.x,z:FRONT_GUARD_MG_GROUP.wounded.z,yaw:FRONT_GUARD_MG_GROUP.wounded.yaw,
     side:"nra",pose:1,pile:0,scale:1,blood:1.35,opening:false},
+  // 2026-10-12 (03–11 refactor §3.3, Concept_05A): the comrade who went up the attack branch with two bundles before 04
+  // and was shot leaning out at the sap mouth. He lies in the sap's middle leg beside the bundles (FRONT_SORTIE.bundleDrop).
+  {id:"AftermathBundleBearer",x:Sortie.bundleBody.x,z:Sortie.bundleBody.z,yaw:Sortie.bundleBody.yaw,
+    side:"nra",pose:2,pile:0,scale:1,blood:1.2,opening:false},
 ]);

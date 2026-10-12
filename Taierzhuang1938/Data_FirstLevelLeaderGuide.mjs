@@ -9,7 +9,9 @@ export const MISSION_LEADER_STAGES = Object.freeze({
   RearTrench: Entry("follow", "RearTrench", null, {story: true, rejoinRoute: true}),
   Support: Entry("follow", "Support", A.front),
   MachineGun: Entry("cover", "Gun", A.front, {story: true}),
-  Tank: Entry("collect", "Bundle", A.bundle, {story: true}),
+  // 2026-10-12 契约 §3.3：05 的弹在攻击支路中段倒下的弟兄身边（A.bundleDrop），不再指旧弹药屋。旧 GuideBundle 的录音
+  // 讲的是北边侧沟与补给屋，本轮不播：去程喊 GuideFollow，捡弹后沿用 GuideThrow（Script_FirstLevelLeaderGuide.View）。
+  Tank: Entry("collect", "Follow", A.bundleDrop, {story: true}),
   Orders: Entry("rally", "Collection", A.collection, {story: true}),
   // 07（2026-10-12 0311 B 包）：沟口机枪一响（holdFrom mouthContact）到担架过完开阔地（holdUntil mouthCrossed）之间，
   // 标记指东边田埂上的机枪（cover），守着时不喊；过完接着带路。

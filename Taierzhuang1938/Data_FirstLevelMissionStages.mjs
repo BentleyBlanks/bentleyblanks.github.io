@@ -11,7 +11,8 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(2, "Rescue", "班长救人，撤入后交通壕", ["BunkerRescue", "RearTrench"], A.bunker),
   Phase(3, "Support", "夺取右侧阵位，接回第一批守军", ["Support"], Routes.support[0]),
   Phase(4, "MachineGun", "战车压进，退至阵位后侧", ["MachineGun"], A.front),
-  Phase(5, "Tank", "班长带路取弹，炸停战车", ["Tank"], Routes.bundle[0]),
+  // 2026-10-12：05 从后墙岔口起，沿攻击支路捡弹（Routes.attack[0] = FRONT_SORTIE.rear）。
+  Phase(5, "Tank", "班长带路取弹，炸停战车", ["Tank"], Routes.attack[0]),
   Phase(6, "Orders", "回到伤员集结处，接下后送", ["Orders"], A.collection),
   Phase(7, "South", "沿沟南行", ["South"], A.collection),
   Phase(8, "Village", "主街受阻", ["Village"], Routes.village[0]),
@@ -29,7 +30,7 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
 ]);
 export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
   bunkerAssault:1, bunkerBackdrop:1, bunkerPursuit:2, frontFlank:2, frontOfficer:2, frontReserve:4,
-  front:2, approach:2, tank:2, village:3, melee:3, machineGun:2, bundleApproach:2,
+  front:2, approach:2, tank:2, village:3, melee:3, machineGun:2, sapInfiltrators:2, tankCrew:5,
   courtyard:10, transfer:12, transferAlley:12, air:13, bridgeNorth:18,
   // 0311 B：07 沟口遭遇组，由 southMouthReached 放出（Script_FirstLevelSouthMouth），不是进 07 就有。
   southMouth:7,
@@ -79,10 +80,11 @@ export const FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS = Object.freeze({
 export const FIRST_LEVEL_STAGE_ENCOUNTERS = Object.freeze([
   // bunkerBackdrop / bunkerPursuit / frontReserve are fact-activated (their owning mechanism spawns
   // them, see MISSION_ENCOUNTER_ACTIVATION), so a jump never recreates them through the generic spawner.
-  ["bunkerAssault"], ["bunkerAssault","front","frontFlank","frontOfficer","approach","machineGun","tank","bundleApproach"],
-  ["front","frontFlank","frontOfficer","approach","machineGun","tank","bundleApproach","village","melee"],
-  ["front","frontFlank","frontOfficer","approach","machineGun","tank","bundleApproach","village","melee"],
-  ["front","frontFlank","frontOfficer","machineGun","approach","tank","village","melee","bundleApproach"],
+  ["bunkerAssault"], ["bunkerAssault","front","frontFlank","frontOfficer","approach","machineGun","tank","sapInfiltrators"],
+  ["front","frontFlank","frontOfficer","approach","machineGun","tank","sapInfiltrators","village","melee"],
+  ["front","frontFlank","frontOfficer","approach","machineGun","tank","sapInfiltrators","village","melee"],
+  // tankCrew is fact-activated (tankFireDisabled, spawned by FrontCounterattack at the live tank): never recreated here.
+  ["front","frontFlank","frontOfficer","machineGun","approach","tank","village","melee","sapInfiltrators"],
   ["village","melee"], ["village","melee"], ["village","melee"], ["village","melee"],
   ["village","courtyard"], [], ["transfer"], ["air"], ["air"],
   [], [], [], [],

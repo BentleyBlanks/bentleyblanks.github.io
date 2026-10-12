@@ -114,9 +114,10 @@ export const FRONT_PRESSURE_GROUPS = Object.freeze({
   // 军官取第一个步枪手（机枪手上不了刺刀，也带不了冲锋）。
   // offstage：北侧出发壕里等战车的推进组，战车露面（tankPreviewed）以前装睡、不算前沿在场的人（04 起一律醒）。
   // 09-24 探针：03 里他们在出发壕 88 m 外，对任何授权点都不通视，四个人一百多秒端着枪不打。
+  // 2026-10-12 契约 §3.2：车驶出路弯（tankAtBendExit）才醒，与跟车、增援同一刻。
   mgAttack: Object.freeze({ ids: Object.freeze(FRONT_MACHINE_GUN_ATTACK.map((spec) => spec.id)),
     officer: FRONT_MACHINE_GUN_ATTACK.find((spec) => spec.weapon !== "Type11")?.id ?? null,
-    offstage: Object.freeze({ until: "tankPreviewed", steps: Object.freeze(["BunkerRescue", "RearTrench", "Support"]) }) }),
+    offstage: Object.freeze({ until: "tankAtBendExit", steps: Object.freeze(["BunkerRescue", "RearTrench", "Support", "MachineGun"]) }) }),
   reserveWest: Object.freeze({ ids: ReserveIds("NorthWestPlateau") }),
   reserveRoad: Object.freeze({ ids: ReserveIds("RoadCutting") }),
 });
@@ -233,9 +234,12 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
     bark: "advance", fire: FIRE_03,
     groups: Object.freeze({ fireBase: FB_03, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK(), nest: NEST }) }),
   // 右侧阵位丢了：玩家上了那挺机枪。土坎、撤退口之外开始打阵位的墙。
+  // 2026-10-12 契约 §3.1 夺点后反扑：侧翼组沿 lane 跳到最后一线（阵位东北弹坑群，≤ 15–18 m，投弹距离内），军官拔刀带人
+  // 冲阵位（GroupCharge，领头的喊 ija_rally_charge）：夺点 20 s 后、活着 ≥ 3、组心离玩家 ≤ 30 m、半数上了末线就冲。
   Object.freeze({ id: "nestLost", when: "rightNestCaptured", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     bark: "mg", fire: FIRE_03_NEST,
-    groups: Object.freeze({ fireBase: FB_NEST, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK() }) }),
+    groups: Object.freeze({ fireBase: FB_NEST, boundWest: BOUND(), boundEast: BOUND_EAST(),
+      flank: FLANK({ charge: Object.freeze({ afterS: 20, minAlive: 3, playerWithinM: 30, lastLineShare: 0.5 }) }) }) }),
   // 第一批守军过口：跃进组退到第三条线（土坎北侧断视线），侧翼退到倒数第二跳；看得见口子的人一条条往回拉。
   Object.freeze({ id: "firstWithdrawal", when: "frontRifleDefense", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     yield: true, bark: "fallback", fire: NoGap(FIRE_03_NEST),
@@ -245,12 +249,15 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
   Object.freeze({ id: "firstDone", when: "rifleWithdrawalResolved", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     bark: "advance", fire: FIRE_03_NEST,
     groups: Object.freeze({ fireBase: FB_NEST, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK() }) }),
-  // 04 战车露面：出发壕里的推进组上来（MISSION_ENCOUNTER_ACTIVATION.machineGun.standbyUntil = tankPreviewed）。
-  // 这一相位唯一一次脚本化成组冲锋；伤亡过半就退两条线，退完记 frontAttackRepelled。
-  Object.freeze({ id: "tankShown", when: "tankPreviewed", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
-    bark: "advance", fire: FIRE_03_NEST,
+  // 04 战车驶出路弯（2026-10-12 契约 §3.2：tankAtBendExit，不再是 03 的露面）：出发壕里的推进组上来
+  // （MISSION_ENCOUNTER_ACTIVATION.machineGun.standbyUntil）、04 的增援槽同时放（reserve）；侧翼残部「再冲阵位」由
+  // Script_FirstLevelFrontCounterattack.NestFront 在玩家退到后墙后直接带进阵位前半边（不另配成组冲锋：一相位只冲一次）。
+  // 推进组这一相位唯一一次脚本化成组冲锋；伤亡过半就退两条线，退完记 frontAttackRepelled。
+  Object.freeze({ id: "tankShown", when: "tankAtBendExit", stages: Object.freeze(["MachineGun", "Tank"]),
+    bark: "advance", fire: FIRE_03_NEST, reserve: true,
     groups: Object.freeze({ fireBase: FB_NEST, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK(),
-      mgAttack: MG_ATTACK({ charge: Object.freeze({ afterS: 12, minAlive: 3, playerWithinM: 80, lastLineShare: 0.34 }) }) }) }),
+      mgAttack: MG_ATTACK({ charge: Object.freeze({ afterS: 12, minAlive: 3, playerWithinM: 80, lastLineShare: 0.34 }) }),
+      reserveWest: RESERVE_WEST(), reserveRoad: RESERVE_ROAD() }) }),
   // 战车压阵位：玩家往阵位后墙撤；视线外入口放出第一批增援（04：2+2）。
   Object.freeze({ id: "tankPressure", when: "tankPositionPressured", stages: Object.freeze(["MachineGun", "Tank"]),
     fire: FIRE_03_NEST, reserve: true,
@@ -275,22 +282,29 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
 ]);
 
 /**
- * 05 切入组（bundleApproach，道路连接支沟东段守位的两人）的切沟战术，覆盖 APPROACH_TACTICS 里的同名条目
- *（`Data_FirstLevelMission.MISSION_TACTICS` 按这个顺序展开，后写的赢）。
- * 事实门 `bundleTaken`：取到集束弹之前他们是守位的活人（hold，看不到缺口与背坡 —— FrontTopologyTest），
- * 取到之后顺道路连接支沟西行、在取弹沟交汇口切进沟，正好迎上回程的玩家（05「前头岔口！有人下沟了！」）。
- * 路线：RoadLinkSap (55,−126.8) → (48.5,−125.8) → 交汇口 (44.6,−125.6)，A 再往受损沟沿那段走一截。
+ * 05 渗透组（sapInfiltrators，2026-10-12 契约 §3.3；旧 bundleApproach 的切入对改成四人）的切沟战术，覆盖 APPROACH_TACTICS
+ * 里的同名条目（`Data_FirstLevelMission.MISSION_TACTICS` 按这个顺序展开，后写的赢）。
+ * 事实门 `sapInfiltrationStarted`（玩家上了攻击支路）：之前他们是道路连接支沟里守位的活人（hold，看不到缺口与背坡 ——
+ * FrontTopologyTest）；之后分两拨顺连接支沟西行、从取弹沟交汇口钻进旧取弹沟、一路下到阵位后墙岔口 —— 玩家和班长的背后。
+ * 第一拨 A/B 立刻走，第二拨 C/D 隔十几秒；C 带一颗手榴弹（名册 grenades:1）。
+ * 路线：RoadLinkSap (55,−126.8) → (48.5,−125.8) → 交汇口 (44.6,−125.6) → 旧取弹沟 (40.6,−130.6) → (34,−136.4) → 岔口以东。
+ * mps 3.2：窄沟里小跑；末点 holdS 缺省（4.5 s 守一停）后交给普通 AI 守区（Defend）。
  */
+const SAP_IN = Object.freeze([{ x: 55, z: -126.8 }, { x: 48.5, z: -125.8 }, { x: 44.6, z: -125.6 }, { x: 40.6, z: -130.6 }, { x: 34, z: -136.4 }]);
 export const FRONT_PRESSURE_TACTICS = Object.freeze({
-  BundleBendA: Object.freeze({ fact: "bundleTaken", delay: 0,
-    points: Object.freeze([{ x: 55, z: -126.8 }, { x: 48.5, z: -125.8 }, { x: 44.6, z: -125.6 }, { x: 42.8, z: -128.4 }]) }),
-  BundleBendB: Object.freeze({ fact: "bundleTaken", delay: 2.5,
-    points: Object.freeze([{ x: 55, z: -126.8 }, { x: 48.5, z: -125.8 }, { x: 44.6, z: -125.6 }]) }),
+  BundleBendA: Object.freeze({ fact: "sapInfiltrationStarted", delay: 0, mps: 3.2,
+    points: Object.freeze([...SAP_IN, { x: 31.6, z: -139.4 }]) }),
+  BundleBendB: Object.freeze({ fact: "sapInfiltrationStarted", delay: 2.5, mps: 3.2,
+    points: Object.freeze([...SAP_IN, { x: 33, z: -137.6 }]) }),
+  SapInfilC: Object.freeze({ fact: "sapInfiltrationStarted", delay: 14, mps: 3.2,
+    points: Object.freeze([...SAP_IN.slice(0, 4), { x: 36.4, z: -134.2 }]) }),
+  SapInfilD: Object.freeze({ fact: "sapInfiltrationStarted", delay: 17, mps: 3.2,
+    points: Object.freeze([...SAP_IN.slice(0, 4), { x: 38.6, z: -132.2 }]) }),
 });
 
 /** 哪些遭遇组的日军拿相位的环境射击点（不在任何组里的也拿：前沿不许有人端枪不打）。 */
 export const FRONT_PRESSURE_FIRE_ENCOUNTERS = Object.freeze(["front", "frontFlank", "frontOfficer", "frontReserve", "machineGun",
-  "approach", "tank", "bundleApproach"]);
+  "approach", "tank", "sapInfiltrators"]);
 
 /** 运行时节拍（秒）：组规则（伤亡、冲锋、让口子、僵持）按这个间隔评一次，不逐帧。 */
 export const FRONT_PRESSURE_TICK = Object.freeze({

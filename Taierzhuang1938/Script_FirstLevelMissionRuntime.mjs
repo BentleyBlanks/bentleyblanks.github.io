@@ -1,4 +1,5 @@
 import { FirstLevelFrontBattle, ColumnDeparture, GuardWithdrawalRoute } from "./Script_FirstLevelFrontBattle.mjs";
+import { FirstLevelFrontCounterattack } from "./Script_FirstLevelFrontCounterattack.mjs";
 import { FirstLevelFrontScenes } from "./Script_FirstLevelFrontScenes.mjs";
 // 03–05 战车：纯规则大脑 + 接线层（战车包 2026-09-23）。开关 Data_Tuning_Tank.brainEnabled，关掉走下面旧的定时插值。
 import { FirstLevelTankRuntime } from "./Script_FirstLevelTankRuntime.mjs";
@@ -196,6 +197,8 @@ export class FirstLevelMissionRuntime {
     // Enter 马上就会问它要门外那一拍。
     this.frontShow = new FirstLevelFrontShow(this);
     this.frontBattle = new FirstLevelFrontBattle(this);
+    // 03–05 反扑 / 掷弹筒 / 守军中弹拖人 / 车组弃车（2026-10-12 03–11 重构 A 包，纯规则在新模块）。
+    this.frontCounter = new FirstLevelFrontCounterattack(this);
     // 03–06 对白走 voice.PlayScene、说话人由 binder 绑到真人头上（Front 包，契约 §5.5）。
     this.frontScenes = new FirstLevelFrontScenes(this);
     this.tankRuntime = TANK.brainEnabled ? new FirstLevelTankRuntime(this) : null;
@@ -1411,7 +1414,8 @@ export class FirstLevelMissionRuntime {
     );
     Register(
       "MissionBundle",
-      A.bundle,
+      // 2026-10-12（03–11 重构契约 §3.3）：弹在攻击支路中段倒下的弟兄身边（A.bundleDrop），不再是旧弹药屋的箱子。
+      A.bundleDrop,
       () => this.Text("bundle"),
       // 大脑接管时断履带（MobilityKill）还没解决：照样能回来补（否则两捆都没炸到位就卡死）。
       () => this.flow.stage.id === "Tank" && this.Has("bundleRouteTraversed") && BundleResupplyOpen(this.tank, this.Has("bundleTaken")),
@@ -1421,7 +1425,6 @@ export class FirstLevelMissionRuntime {
         if (missing || bandages) this.GiveSupply({ bundles: missing, bandages });
         this.Record("bundleTaken");
         this.SaveCheckpoint();
-        this.GuideSortie(MISSION_ROUTES.bundleReturn);
         return true;
       },
     );
@@ -1570,11 +1573,9 @@ export class FirstLevelMissionRuntime {
         for (const [i, actor] of this.squad.entries()) this.Defend(actor, OPENING.frontPosts[i],R.contactRadiusM,R.companionCoverSlackM);
         break;
       case "Tank":
-        // The blast screen separates the front posts from the far end of the
-        // bundle approach. Everyone exits through its central trench junction.
+        // 2026-10-12（契约 §3.3）：05 从后墙岔口沿攻击支路走，弹在沟中段捡；旧弹药屋与留守兵退出流程（EnsureBundleKeeper 不再调）。
         this.emplacement.Vacate("sortie");
-        this.GuideSortie(MISSION_ROUTES.bundle);
-        this.EnsureBundleKeeper();
+        this.GuideSortie(MISSION_ROUTES.attack);
         break;
       case "Orders":
         this.Guide([{x:A.collection.x+1.5,z:A.collection.z},A.collection]);
@@ -1719,6 +1720,7 @@ export class FirstLevelMissionRuntime {
         break;
     }
     this.frontBattle.Enter(stage.id);
+    this.frontCounter.Enter(stage.id);
     // 18 的对岸：BridgeCover 起放兵与战车、BridgeWithdraw 放真 AI 与冲桥组；18 以外的步骤（含回跳）整个撤掉。
     this.farBank.Enter(stage.id);
     if (stage.id === "BridgeOrders") this.farBankCrowdView.Prepare();   // 人群那一层的模型烘焙（约 0.2 s）放在接令这个平静的时刻
@@ -1920,24 +1922,22 @@ export class FirstLevelMissionRuntime {
     }
   }
   UpdateSortie(){
-    this.EnsureBundleKeeper();
     for(const crawl of Sortie.crawl)if(this.player.stance==='prone' && this.GateNear(`bundleCrawl${crawl.id}`) && this.player.position.y<this.battlefield.GroundHeight(this.player.position.x,this.player.position.z)+.2)
       this.Record(`bundleCrawl${crawl.id}`,{x:this.player.position.x,z:this.player.position.z,stance:this.player.stance});
-    // 检查点不再死守顺序：走到后面的点（或已经进了弹药屋）时，前面没踩到的一并补记。
+    // 检查点不再死守顺序：走到后面的点时，前面没踩到的一并补记。
     // 只认「下一个」时，05 起头前人已顺支沟走过后侧岔口（04 末尾 BundleOrder 还在说、躲炮往前挪），
-    // 第 0 点就永远等不到，箱子前交互不出现、引导指回门外（2026-09-27 实机卡死）。
-    if(this.GateNear('bundleHouseReached'))this.Record('bundleHouseReached');
-    const next=Sortie.route.findIndex((point,index)=>!this.Has(`bundleRoutePoint${index}`));
+    // 第 0 点就永远等不到，交互不出现（2026-09-27 实机卡死）。
+    // 2026-10-12（契约 §3.3）：检查点是攻击支路到弟兄倒下处的那几个点（MISSION_FACT_GATES.bundleRoutePoint.points），旧弹药屋退出。
+    const points=MISSION_FACT_GATES.bundleRoutePoint.points;
+    const next=points.findIndex((point,index)=>!this.Has(`bundleRoutePoint${index}`));
     if(next>=0){
       let reached=-1;
-      for(let index=Sortie.route.length-1;index>=next&&reached<0;index--)if(this.GateNear(`bundleRoutePoint${index}`))reached=index;
-      if(reached<0&&this.Has('bundleHouseReached'))reached=Sortie.route.length-1;
+      for(let index=points.length-1;index>=next&&reached<0;index--)if(this.GateNear(`bundleRoutePoint${index}`))reached=index;
       for(let index=next;index<=reached;index++)
         this.Record(`bundleRoutePoint${index}`,index<reached?{via:reached}:undefined);
     }
-    if(Sortie.route.every((point,index)=>this.Has(`bundleRoutePoint${index}`)) &&
+    if(points.every((point,index)=>this.Has(`bundleRoutePoint${index}`)) &&
       Sortie.crawl.every(crawl=>this.Has(`bundleCrawl${crawl.id}`)))this.Record('bundleRouteTraversed');
-    if(this.Near(Sortie.house,Sortie.supplierRangeM))this.Say('BundleSupply');
   }
   // UpdateFrontAttack（机枪组伤亡过半 / 被压住就沿跃进线退回、全组退完记 frontAttackRepelled）从来没有调用点：
   // 2026-09-23 起由压力表的 mgAttack 组规则接管（fallback.repelledFact，Script_FirstLevelFrontPressure）。
@@ -2597,6 +2597,8 @@ export class FirstLevelMissionRuntime {
     if(["Support","MachineGun","Tank","Orders"].includes(stage))this.UpdateGuards(dt);
     // 阶段 1–7 的演出（Front 包）。放在 UpdateSquad 之后：剧情走位要压过接触反应。
     this.frontShow?.Update(dt);
+    // 03–05 反扑层先算（撤退窗口双条件、落弹、守军中弹、车组），FrontBattle 同一帧读它的窗口。
+    this.frontCounter.Update(dt);
     this.gengFamily.Update(dt);
     this.frontBattle.Update(dt);
     // 03–06: a speaker stepping into the player's picture for his line (after every other mover, so it holds).
@@ -2949,6 +2951,7 @@ export class FirstLevelMissionRuntime {
       opening:this.opening.State(),
       front:this.frontShow?.State() || null,
       frontBattle:this.frontBattle.State(),
+      frontCounter:this.frontCounter.State(),
       frontScenes:this.frontScenes.State(),
       pressure:this.frontPressure?.State() || null,
       backdrop:this.backdrop?.State() || null,
