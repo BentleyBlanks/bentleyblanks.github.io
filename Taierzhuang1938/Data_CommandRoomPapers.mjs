@@ -1,6 +1,6 @@
 // Menu paper artwork, authored from the current Notion campaign and cited historical excerpts.
 // Only a contiguous prefix of real cleared chapter IDs advances the artwork; furthest/debug IDs do not.
-export const COMMAND_ROOM_PAPER_VERSION = "202610051500";
+export const COMMAND_ROOM_PAPER_VERSION = "202610130055";
 export const COMMAND_ROOM_CAMPAIGN_IDS = Object.freeze([
   "FirstLevelP012Whitebox", "CH2_Shouliudan", "CH3_Jiuhusuo",
   "CH4_DongguanYe", "CH5_Chengqiang", "CH6_Zuihou",

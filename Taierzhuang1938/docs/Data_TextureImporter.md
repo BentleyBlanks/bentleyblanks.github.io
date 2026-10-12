@@ -1,6 +1,6 @@
 # 贴图管理与发布导入
 
-2026-10-03：游戏「设置与工具 → 编辑器 → 贴图管理」打开独立窗口，再次点击复用窗口；关闭游戏编辑器不关闭贴图窗口，也不改变当前编辑器状态。可直接打开 `TextureManager.html`，入口不启动游戏；本地运行 `node scripts/Script_LocalPreview.mjs --no-open` 后访问 `/Taierzhuang1938/TextureManager.html`。
+2026-10-03：游戏「高级工具 → 资产 → 贴图管理」打开独立窗口，再次点击复用窗口；关闭游戏编辑器不关闭贴图窗口，也不改变当前编辑器状态。可直接打开 `TextureManager.html`，入口不启动游戏；本地运行 `node scripts/Script_LocalPreview.mjs --no-open` 后访问 `/Taierzhuang1938/TextureManager.html`。
 
 ## 使用
 

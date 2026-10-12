@@ -76,7 +76,7 @@
   --ui-selection: linear-gradient(90deg, #b6b8a92b, #9ea0920d 72%, transparent);
   --ui-selection-edge: linear-gradient(90deg, #d7d7c75c, transparent 95%) 1;
 }
-:is(#menu, #boot, #edRoot, .uiProfiler) {
+:is(#menu, #boot, #edRoot, #settingsRoot, .uiProfiler) {
   --paper: var(--ui-text);
   --dim: var(--ui-muted);
   --warn: var(--ui-gold);
@@ -85,15 +85,15 @@
   -webkit-font-smoothing: antialiased;
   color-scheme: dark;
 }
-:is(#menu, #boot, #edRoot, .uiProfiler) :is(button, input, select, textarea, summary):focus-visible {
+:is(#menu, #boot, #edRoot, #settingsRoot, .uiProfiler) :is(button, input, select, textarea, summary):focus-visible {
   outline: 1px solid var(--ui-gold);
   outline-offset: 2px;
 }
-:is(#menu, #edRoot, .uiProfiler) * {
+:is(#menu, #edRoot, #settingsRoot, .uiProfiler) * {
   scrollbar-width: thin;
   scrollbar-color: #8a8e8070 transparent;
 }
-:is(#menu, #boot, #edRoot, .uiProfiler) button { font-family: inherit; }
+:is(#menu, #boot, #edRoot, #settingsRoot, .uiProfiler) button { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
-  :is(#menu, #boot, #edRoot, .uiProfiler) * { transition-duration: 0s !important; }
+  :is(#menu, #boot, #edRoot, #settingsRoot, .uiProfiler) * { transition-duration: 0s !important; }
 }

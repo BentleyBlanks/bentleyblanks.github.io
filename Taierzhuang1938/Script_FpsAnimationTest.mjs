@@ -57,7 +57,7 @@ if(process.argv.includes('--browser')){
     assert.equal(report.first.source,'BlenderMCP');
     assert.ok(Math.max(...Object.values(report.gripError))<.0001,'authored hands stay on the gun without runtime IK');
     await page.screenshot({path:path.join(output,'Timeline.png')});
-    await page.addStyleTag({content:'.edPanel,.edGear,.edFpsLegend,.edFpsMountHud{display:none!important}'});
+    await page.addStyleTag({content:'.edPanel,.edGear,.edMenuBar,.edFpsLegend,.edFpsMountHud{display:none!important}'});
     for(const clip of FPS_SKELETAL_ANIMATION.clips)for(const normalized of [0,.25,.5,.75,1]){
       const snapshot=await page.evaluate(({clip,normalized})=>{
         const game=window.Taierzhuang;

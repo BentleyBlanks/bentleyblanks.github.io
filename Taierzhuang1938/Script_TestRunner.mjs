@@ -130,7 +130,8 @@ export const testDefs = {
   // 旧的 --march-only 只跑到军列开场结束就 break，那段已经下线。现在跑 Front 那一段
   // （`--stage-to=7`）：共用行进层真正被消费的地方是后交通壕上前沿与 07 南行那两趟。
   FirstLevelSquadMarchTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-to=7"],timeoutMs:900000,desc:"Shared march consumed by real first-level AI on the rear trench approach and the south walk"},
-  EditorLauncherTest: {file:"Script_EditorTest.mjs",args:["--launcher-only"],timeoutMs:240000,desc:"Editor launcher inventory including the squad march entry"},
+  EditorLauncherTest: {file:"Script_EditorTest.mjs",args:["--launcher-only"],timeoutMs:240000,desc:"Advanced-tools menubar inventory, FPS debug toggle and texture window"},
+  DevToolsIsolationTest: {file:"Script_DevToolsIsolationTest.mjs",args:["--browser"],timeoutMs:600000,desc:"Developer tools strip down to two boundary modules; the stripped bundle boots with player settings intact"},
   FirstLevelMissionAftermathTest: {file:"Script_FirstLevelMissionAftermathTest.mjs",timeoutMs:600000,desc:"Civilian body placement, actual model clearance, grounding, LOD and screenshots"},
   MachineGunCaptivesAnimationTest:{file:"Script_MachineGunCaptivesAnimationTest.mjs",timeoutMs:300000,desc:"Captives cutscene clips on five original rigs, authored grounding and the state.perform contract"},
   FirstLevelMissionStageJumpTest: {file:"Script_FirstLevelMissionStageJumpTest.mjs",timeoutMs:900000,desc:"18 stage starts, backward jumps and resumed mission gates"},
@@ -481,6 +482,7 @@ export const testDefs = {
 
 export const browserTests = new Set([
   "PublishAssetsBrowserTest",
+  "DevToolsIsolationTest",
   "MenuStartupTest",
   "BootPaperPbrTest",
   "TextureManagerBrowserTest",
@@ -755,7 +757,7 @@ export const domains = {
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
   menu: { label: "主菜单/加载画面", tests: ["MenuStartupTest", "FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootPaperPbrTest", "BootInteractionTest"] },
-  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutConfigTest", "EditorBlockoutSaveTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutConfigTest", "EditorBlockoutSaveTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
@@ -802,6 +804,8 @@ const changedDomainRules = [
   {domain:"particles",pattern:/Script_Particle|Data_ParticleSmoke|Data_ParticleVolume|Data_Tuning_Particles|Script_Vfx|Script_EditorVfx|Script_EditorParticleInspector|\/Volume\//},
   { domain: "menu", pattern: /TextureBake|Script_Main\.mjs|Script_Materials\.mjs/ },
   { domain: "menu", pattern: /CommandRoom/ },
+  { domain: "editor", pattern: /(?:Script|Data)_DevTools(?:Stub)?\.mjs|Script_SettingsHost\.mjs/ },
+  { domain: "menu", pattern: /Data_DevTools(?:Stub)?\.mjs|Script_SettingsHost\.mjs/ },
   { domain: "textureAssets", pattern: /CommandRoom/ },
   {domain:"textureAssets",pattern:/TextureImport|TextureManager|EditorTextures/},
   { domain: "whiteboxQuality", pattern: /WhiteboxQuality|WhiteboxRendering|GraphicsProfile|Tuning_Whitebox|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },

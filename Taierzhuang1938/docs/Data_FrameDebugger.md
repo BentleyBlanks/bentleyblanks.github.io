@@ -1,6 +1,6 @@
 # Frame Debugger
 
-入口：游戏右上角齿轮 → **渲染调试（可叠加） → Frame Debugger**。独立窗口可放在另一块屏幕。
+入口：暂停菜单（Esc）→ **设置 → Debug工具 → Frame Debugger**。独立窗口可放在另一块屏幕。
 点击「启用 / 捕获当前帧」捕获一次完整的 RenderScene（含 GI、第一人称阴影和 PostPipeline），随后冻结模拟、镜头和任务时钟；「禁用 / 继续」、关闭窗口、视口改变或 context lost 会释放捕获。当前暂停/音频状态会恢复，原有 Profiler 录制在捕获期间暂停，结束后续录。
 
 ## 使用

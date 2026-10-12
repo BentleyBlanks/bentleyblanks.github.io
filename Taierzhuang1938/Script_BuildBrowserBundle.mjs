@@ -6,7 +6,19 @@ import {createHash} from 'node:crypto';
 import {build} from 'esbuild';
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
-export async function BuildBrowserBundle(projectDir = path.dirname(fileURLToPath(import.meta.url))) {
+// Developer tools (advanced tools + debug overlays) are reachable only through these two
+// boundary modules; stripping swaps each for its stub and leaves every other import intact.
+export const DEV_TOOL_STUBS = Object.freeze({
+  './Script_DevTools.mjs': './Script_DevToolsStub.mjs',
+  './Data_DevTools.mjs': './Data_DevToolsStub.mjs',
+});
+function StripDevToolsPlugin(projectDir) {
+  return {name: 'strip-dev-tools', setup(builder) {
+    builder.onResolve({filter: /^\.\/(?:Script|Data)_DevTools\.mjs$/}, args => ({path: path.join(projectDir, DEV_TOOL_STUBS[args.path])}));
+  }};
+}
+export async function BuildBrowserBundle(projectDir = path.dirname(fileURLToPath(import.meta.url)), {stripDevTools = false} = {}) {
+  const plugins = stripDevTools ? [StripDevToolsPlugin(projectDir)] : [];
   const sourceHtml = await fs.readFile(path.join(projectDir, 'index.html'), 'utf8');
   const mapMatch = sourceHtml.match(/<script type="importmap">([\s\S]*?)<\/script>/);
   if (!mapMatch) throw new Error('Source import map is missing');
@@ -16,7 +28,7 @@ export async function BuildBrowserBundle(projectDir = path.dirname(fileURLToPath
     format: 'esm', platform: 'browser', target: 'es2022', write: false, metafile: true,
     // Keep vendor identity, worker-relative URLs and observable class/function names.
     external: ['three', './vendor/*'], minify: true, keepNames: true,
-    legalComments: 'inline', charset: 'utf8', logLevel: 'silent',
+    legalComments: 'inline', charset: 'utf8', logLevel: 'silent', plugins,
   });
   const code = result.outputFiles[0].text;
   const version = BigInt('0x' + createHash('sha256').update(code).digest('hex').slice(0, 13)).toString();
@@ -26,7 +38,7 @@ export async function BuildBrowserBundle(projectDir = path.dirname(fileURLToPath
     absWorkingDir: projectDir, entryPoints: ['Script_MenuStartup.mjs'], bundle: true,
     format: 'esm', platform: 'browser', target: 'es2022', write: false, metafile: true,
     external: ['three', './vendor/*'], minify: true, keepNames: true,
-    legalComments: 'inline', charset: 'utf8', logLevel: 'silent',
+    legalComments: 'inline', charset: 'utf8', logLevel: 'silent', plugins,
   });
   const menuCode = menuResult.outputFiles[0].text;
   const menuVersion = BigInt('0x' + createHash('sha256').update(menuCode).digest('hex').slice(0, 13)).toString();
@@ -61,6 +73,7 @@ export async function BuildBrowserBundle(projectDir = path.dirname(fileURLToPath
     + '<meta name="tengxian-menu-bundle" content="' + menuVersion + '">\n'
     + '<meta name="tengxian-bundle" content="' + version + '">\n</head>');
   return {html, code, bundleName, version, inputs: Object.keys(result.metafile.inputs).length,
+    gameInputs: Object.keys(result.metafile.inputs),
     menuVersion, menuInputs: Object.keys(menuResult.metafile.inputs),
     files: [{name: bundleName, code}, {name: menuBundleName, code: menuCode}, {name: entryBundleName, code: entryCode}],
     externalImports: Object.values(result.metafile.outputs).flatMap(output => output.imports)};
@@ -72,7 +85,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const outputArg = process.argv.indexOf('--output-dir');
   const outputDir = outputArg >= 0 && process.argv[outputArg + 1] ? path.resolve(process.argv[outputArg + 1]) : projectDir;
   if (!preview && outputDir === projectDir) throw new Error('--deploy requires a separate --output-dir staging directory');
-  const result = await BuildBrowserBundle(preview ? projectDir : outputDir);
+  // --strip-dev-tools: ship without the developer tools (see Data_DevTools.mjs). Not the Pages default yet.
+  const result = await BuildBrowserBundle(preview ? projectDir : outputDir, {stripDevTools: process.argv.includes('--strip-dev-tools')});
   await fs.mkdir(outputDir, {recursive:true});
   for (const file of result.files) await fs.writeFile(path.join(outputDir, file.name), file.code);
   await fs.writeFile(path.join(outputDir, preview ? '_check_Bundle.html' : 'index.html'), result.html);

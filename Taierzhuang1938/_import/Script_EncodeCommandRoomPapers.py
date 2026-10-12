@@ -10,7 +10,7 @@ from pathlib import Path
 from PIL import Image
 
 
-def Encode(sourceDir):
+def Encode(sourceDir, suffixes=None):
     game = Path(__file__).resolve().parents[1]
     outputDir = game / "Texture/Menu/CommandRoom"
     recordDir = game / "_import/TextureBakes"
@@ -18,6 +18,11 @@ def Encode(sourceDir):
     names = ["MapInitial", "MapWithdrawal", "MapEastDefense", "MapAidReturn",
              "MapNightBattle", "MapLastStand", "MapEpilogue",
              "LetterOpening", "LetterMiddle", "LetterFinal"]
+    if suffixes is not None:
+        unknown = set(suffixes) - set(names)
+        if unknown:
+            raise ValueError("Unknown stationery assets: " + ", ".join(sorted(unknown)))
+        names = list(dict.fromkeys(suffixes))
     for suffix in names:
         assetName = "CommandRoom" + suffix
         sourcePath = sourceDir / (assetName + ".png")
@@ -45,4 +50,6 @@ def Encode(sourceDir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", required=True, type=Path)
-    Encode(parser.parse_args().source)
+    parser.add_argument("--assets", help="Comma-separated asset suffixes; defaults to all ten papers")
+    args = parser.parse_args()
+    Encode(args.source, args.assets.split(",") if args.assets else None)

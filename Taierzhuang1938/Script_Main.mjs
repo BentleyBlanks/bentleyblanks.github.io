@@ -25,7 +25,8 @@ import {
   MakeMaterialShadingUniforms, ApplyShadingQuality, SyncShadingKnobs,
 } from "./Script_MaterialShading.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
-import { NormalizeGraphicsDetails, LoadSavedGraphics } from "./Script_EditorSettings.mjs";
+import { NormalizeGraphicsDetails, LoadSavedGraphics, ApplySavedSettings } from "./Script_EditorSettings.mjs";
+import { SettingsHost, SETTINGS_PAGE_IDS } from "./Script_SettingsHost.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { InstallShadowSkip, ShadowSkipCount, SetShadowSkipEnabled } from "./Script_ShadowSkip.mjs";
 import { BonePrune } from "./Script_BonePrune.mjs";
@@ -51,7 +52,6 @@ import { WeaponRangeField } from "./Script_WeaponRangeField.mjs";
 import { WEAPON_RANGE_PHASE, WEAPON_RANGE_LEVEL_ID } from "./Data_WeaponRange.mjs";
 import { WeaponRangeRuntime } from "./Script_WeaponRangeRuntime.mjs";
 import { MOVEMENT_RANGE_PHASE, MOVEMENT_RANGE_ID } from "./Data_MovementRange.mjs";
-import { BLOCKOUT_PHASES, BlockoutLevelIndex } from "./Script_EditorBlockoutLevels.mjs";
 import { MovementRangeField } from "./Script_MovementRangeField.mjs";
 import { MovementRange } from "./Script_MovementRange.mjs";
 import { GORE_RANGE_PHASE, GORE_RANGE_ID } from "./Data_GoreRange.mjs";
@@ -128,7 +128,8 @@ import { PlayerVent } from "./Script_PlayerVent.mjs";
 import { PlayerHitboxes, RaycastPlayerHitboxes } from "./Script_PlayerHitbox.mjs";
 import { EmplacementSystem } from "./Script_Emplacement.mjs";
 import { IdentifySystem, IDENTIFY } from "./Script_Identify.mjs";
-import { EditorSuite } from "./Script_Editor.mjs";
+// 开发工具（高级工具 + Debug工具）只经这一个边界模块进来；打包剔除时换成 Script_DevToolsStub（见 Data_DevTools）。
+import { CreateDevTools, BlockoutPhases, BlockoutStartIndex, CreateBlockoutEditor } from "./Script_DevTools.mjs";
 import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { CommandRoom } from "./Script_CommandRoom.mjs";
 import { CommandRoomPreview } from "./Script_CommandRoomPreview.mjs";
@@ -261,7 +262,9 @@ const SHOT = params.get("shot");                 // 出图模式：不进指针�
 const AIR_WALLS_DEBUG = params.get("airWalls") === "1";
 const EDITOR_PARAM = params.get("editor");
 // 白盒关卡编辑器：整表换成 BLOCKOUT_PHASES（每个关卡一片），不建任务运行时、过场与主菜单。
-const BLOCKOUT = EDITOR_PARAM === "blockout";
+// 关卡表也是开发工具的一部分，经 Script_DevTools 边界取；剔除开发工具的包里它是空表，?editor=blockout 不生效。
+const BLOCKOUT_PHASES = EDITOR_PARAM === "blockout" ? BlockoutPhases() : [];
+const BLOCKOUT = BLOCKOUT_PHASES.length > 0;
 // 上一版曾把完整场景编辑器的车厢按钮指到正式序章预览。旧书签若还带着这组 query，
 // 也必须按静态场景解释，不能因为缓存 URL 又把过场播起来。
 const LEGACY_FULL_SCENE_CARRIAGE = EDITOR_PARAM === "fullScene"
@@ -376,7 +379,7 @@ const MENU_SLICE = Math.max(0, PHASE_TABLE.findIndex((p) => p.id === MENU_SCENE.
 // `?phase=overview` 已经在上面换掉了整张表，这里就没有序号可解析了 ——
 // parseInt("overview") 是 NaN，而 NaN 会一路穿过 Math.min/Math.max 变成 START_PHASE。
 const PHASE_INDEX = PHASE_PARAM !== null ? parseInt(PHASE_PARAM, 10) : NaN;
-const START_PHASE = BLOCKOUT ? BlockoutLevelIndex(params.get("level")) : Number.isFinite(PHASE_INDEX)
+const START_PHASE = BLOCKOUT ? BlockoutStartIndex(params.get("level")) : Number.isFinite(PHASE_INDEX)
   ? Math.max(0, Math.min(PHASE_TABLE.length - 1, PHASE_INDEX))
   : (MENU_AT_BOOT ? MENU_SLICE : 0);
 
@@ -899,9 +902,12 @@ let setpieces = null;
 let scriptInvulnUntil = 0;
 // 正在播的过场自带的天空预设名（cut.sky）；null = 按本关的天空走。
 let cutsceneSky = null;
-// 编辑器套件（齿轮按钮 + 六个编辑器）。Boot 末尾才建 —— 它拿的是活引用。
+// 编辑器套件（高级工具 + Debug工具）。Boot 末尾才建 —— 它拿的是活引用。
 // 出图与两个冒烟里它照样建，只是整棵 DOM 被 .off 藏起来（截图里不许有它）。
+// 剔除开发工具的包里它恒为 null，下面每一处都按「没有」处理。
 let editor = null;
+// 玩家设置页（画面 / 声音 / 操作）。与编辑器无关，剔除开发工具后照常在。
+let settings = null;
 // 白盒关卡编辑器（?editor=blockout，docs/Data_EditorBlockout.md）。Boot 末尾动态载入；其余入口恒为 null。
 let blockout = null;
 // 主菜单。同样是 Boot 末尾才建（要拿相机与建好的切片），出图与 ?menu=0 下不建。
@@ -909,6 +915,16 @@ let menu = null;
 let commandRoom = null;
 // 从菜单进入场景编辑器时，关闭工具后要回到原来的菜单层；正常游戏中打开则为 null。
 let editorReturnMenuMode = null;
+
+/** 设置页或高级工具占着画面：玩法停、键位闸掉、不抢指针锁。 */
+function UiCapturing() {
+  return !!settings?.IsOpen || !!editor?.Capturing;
+}
+
+/** 开发工具层（齿轮、Debug Rendering 浮窗等）跟着菜单藏 / 现。没有开发工具时什么也不做。 */
+function SetDevToolsHidden(hidden) {
+  editor?.SetHidden(hidden || !!SHOT);
+}
 let currentWeapon = "HanYang";
 let weaponRange = null;
 let movementRange = null;
@@ -2982,16 +2998,37 @@ async function Boot() {
     meleeLab = new MeleeLab({ Start: api.Select, Pause: api.Pause, Preview: api.Preview, SetAssist: api.SetAssist, Focus: RequestPointerLock });
   }
 
+  // --- 玩家设置页 -----------------------------------------------------------
+  // 菜单「设置」的画面 / 声音 / 操作三页。存下来的画质与音量在这一刻装回去
+  // （只在打开面板时才生效的设置不叫设置）。与开发工具无关，剔除后照常在。
+  settings = new SettingsHost({
+    host: {
+      renderer, canvas, camera, post, lights, audio,
+      game: {
+        graphics, ApplyGraphics, autoQuality, GraphicsProfile: graphicsProfileApi,
+        get firstPersonSelfShadow() { return firstPersonSelfShadow; },
+      },
+    },
+    OnOpen: () => audio.SetPaused(true),
+    OnClose: () => FinishSettings(),
+  });
+  try {
+    ApplySavedSettings(settings.pageHost);
+  } catch (error) {
+    console.warn("[Settings] 设置装不回去：", error);
+  }
+
   // --- 编辑器套件 ---------------------------------------------------------
   // 建在最后：六个编辑器要的东西（材质库、人物工厂、视图模型、过场导演、城、破坏系统）
   // 到这一步才齐。battlefield 每换一关都是新的一份，所以走取值器交出去，
   // 不许在这里把当时那一份拷进去（拷了就是「编辑器指着上一关那座城」）。
-  editor = new EditorSuite({
+  editor = CreateDevTools({
     renderer, scene, camera, canvas, library, lights, post, vfx,
     actorFactory, viewmodel, audio, cutscene, destruction, profiler,
     shot: !!SHOT,
     ReleasePointerLock,
     ReturnToMainMenu: MENU_AT_BOOT ? () => OpenMenu() : null,
+    SettingsOpen: () => !!settings?.IsOpen,
     game: {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
       state, FrameDebugger: frameDebugger, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, autoQuality, GraphicsProfile: graphicsProfileApi,
@@ -3066,10 +3103,15 @@ async function Boot() {
     },
   });
   window.Taierzhuang.editor = editor;
-  // 编辑器的取证口：冒烟测试不点按钮，直接从这里开关与读状态
-  window.Taierzhuang.Debug.OpenEditor = (id) => !!editor.Open(id);
+  window.Taierzhuang.settings = settings;
+  // 编辑器的取证口：冒烟测试不点按钮，直接从这里开关与读状态。剔除开发工具后它们都按「没有」回答。
+  window.Taierzhuang.Debug.OpenEditor = (id) => !!editor?.Open(id);
+  // 设置 → Debug工具 那一页的同一份开关（菜单点的也是它）
+  window.Taierzhuang.Debug.DebugTools = () => editor?.DebugToolStates() ?? [];
+  window.Taierzhuang.Debug.ToggleDebugTool = (id) => editor?.ToggleDebugTool(id) ?? [];
   // Deterministic first-person animation inspection, shared with the UI.
   window.Taierzhuang.Debug.FirstPersonAnimation = (options = {}) => {
+    if (!editor) throw new Error("Developer tools are stripped from this build");
     if(editor.ActiveId!=="firstPerson")editor.Open("firstPerson");
     const tool=editor.active;
     if(options.weapon&&!tool.SetWeapon(options.weapon,options.variant))throw new Error(`Unknown FPS weapon: ${options.weapon}`);
@@ -3087,23 +3129,24 @@ async function Boot() {
     }
     return tool.Snapshot();
   };
-  window.Taierzhuang.Debug.CloseEditor = () => { editor.TogglePanel(false); };
+  window.Taierzhuang.Debug.CloseEditor = () => { editor?.TogglePanel(false); };
+  // active：占着画面的那一层 —— 高级工具里的编辑器，没有就看玩家设置页（settings 单独再给一次）。
   window.Taierzhuang.Debug.Editor = () => ({
-    panelOpen: editor.panelOpen,
-    active: editor.ActiveId,
-    debugRendering: editor.overlays.has("debugRendering"),
+    panelOpen: !!editor?.panelOpen,
+    active: editor?.ActiveId ?? settings?.ActiveId ?? null,
+    settings: settings?.ActiveId ?? null,
+    debugRendering: !!editor?.overlays.has("debugRendering"),
     debugView: post.GetDebugView(),
-    capturing: editor.Capturing,
-    studio: editor.studio.Active,
-    fly: editor.flycam.Active,
-    hidden: !!document.getElementById("edRoot")
-      && document.getElementById("edRoot").classList.contains("off"),
+    capturing: UiCapturing(),
+    studio: !!editor?.studio.Active,
+    fly: !!editor?.flycam.Active,
+    hidden: editor ? editor.root.classList.contains("off") : true,
   });
 
   // --- 采样点：县城固定机位的出图口 ----------------------------------------
   // Script_SamplePointShot 不自己算机位，而是开采样点编辑器、逐点调它。
   // 面板里预览到的与出图出来的必须是同一份位姿；两边各算一遍迟早会分叉。
-  const SampleTool = () => (editor.ActiveId === "samplePoints"
+  const SampleTool = () => (!editor ? null : editor.ActiveId === "samplePoints"
     ? editor.active : editor.Open("samplePoints"));
   window.Taierzhuang.Debug.SamplePoints = () => SampleTool()?.Points() || null;
   window.Taierzhuang.Debug.SamplePoint = (id) => SampleTool()?.ApplyPointById(id) || null;
@@ -3116,9 +3159,8 @@ async function Boot() {
   // 建在最末：它要拿相机、要知道现在建好的是哪一关（决定用哪一组机位），
   // 还要能把编辑器的齿轮藏起来 —— 三样东西到这一步才齐。
   if ((MENU_ON || FIRST_LEVEL_P012_WHITEBOX) && menuRoot) {
-    commandRoom = new CommandRoom(renderer, { isActive: () => !!menu?.live && !!menu?.open && !editor?.Capturing,
-      getMenuMode: () => editor?.Capturing && ["graphics","sound","controls"].includes(editor.activeId)
-        ? editor.activeId : menu?.mode || "title" });
+    commandRoom = new CommandRoom(renderer, { isActive: () => !!menu?.live && !!menu?.open && !UiCapturing(),
+      getMenuMode: () => settings?.IsOpen ? settings.ActiveId : menu?.mode || "title" });
     const previewValue = params.get("menuPreview");
     const commandRoomPreview = new CommandRoomPreview(commandRoom, () => Progress.Read(),
       /^[0-6]$/.test(previewValue ?? "") ? Number(previewValue) : null);
@@ -3183,17 +3225,16 @@ async function Boot() {
       RestartSandbox: () => location.reload(),
       RetrySandbox: () => { if(missionRuntime?.Retry() || p012Runtime?.RetryPlayer()){state.playerAliveLast=true;state.pendingRespawn=false;state.deathTimer=0;viewmodel.root.visible=true;ResumeFromPause();hud.Hint(T("hud.hint.p012Retry"),4);} },
       Resume: () => ResumeFromPause(),
-      // OpenMenu / PauseGame 会把整棵编辑器 DOM 藏掉（主菜单不该常驻开发齿轮）。
-      // 「设置」既然复用了这棵 DOM，就必须先把它显式还回来；否则内部的
-      // panelOpen 虽然已经变成 true，玩家看到的仍是毫无反应。记住来源菜单，
-      // 关掉设置后再由 FinishEditorSession 把对应的主菜单或暂停菜单恢复干净。
+      // 画面 / 声音 / 操作走玩家设置页（SettingsHost，关掉回到设置目录，见 FinishSettings）；
+      // 「高级工具」是开发工具，走 OpenDevTools。
       Settings: (section = "tools") => {
-        editorReturnMenuMode = menu && menu.open ? menu.mode : null;
-        document.getElementById("edRoot")?.classList.toggle("menuSettings", section !== "tools");
-        if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
-        if (section === "tools") editor.TogglePanel(true);
-        else editor.Open(section);
+        if (section === "tools") OpenDevTools();
+        else if (SETTINGS_PAGE_IDS.includes(section)) settings.Open(section);
       },
+      // 开发工具：剔除后菜单里不列「Debug工具」「高级工具」
+      DevToolsAvailable: !!editor,
+      DebugTools: () => editor?.DebugToolStates() ?? [],
+      ToggleDebugTool: (id) => editor?.ToggleDebugTool(id) ?? [],
       P012Progress: () => p012Debug.State(),
       P012NextProgress: () => p012Debug.Next(),
       DebugOptions: () => debugOptions.Get(),
@@ -3238,10 +3279,10 @@ async function Boot() {
 
   if (SHOT || FIRST_LEVEL_STAGE_START || (!PREVIEW && PHASE_PARAM !== null && params.get("autoplay") === "1")) StartRun();
   else if (PREVIEW_AUTOPLAY) StartPreview({ unlockAudio: false });
-  if (EDITOR_PARAM === "tools" && !SHOT) {
+  if (EDITOR_PARAM === "tools" && !SHOT && editor) {
     menu?.Close(); state.menu = false; ShowBoot(false);
     editorReturnMenuMode = "title";
-    document.getElementById("edRoot")?.classList.remove("off");
+    SetDevToolsHidden(false);
     editor.TogglePanel(true);
   }
   if (EDITOR_PARAM === "fullScene" && !SHOT) {
@@ -3253,16 +3294,16 @@ async function Boot() {
       state.menu = false;
       state.running = false;
     }
-    editor.Open("fullScene");
+    editor?.Open("fullScene");
   }
   if (EDITOR_PARAM === "squadMarch" && !SHOT) {
     ShowBoot(false);
-    editor.Open("squadMarch");
+    editor?.Open("squadMarch");
   }
   if (EDITOR_PARAM === "vfx") {
-    ShowBoot(false);state.menu=false;state.running=false;editor.Open("vfx");
+    ShowBoot(false);state.menu=false;state.running=false;editor?.Open("vfx");
   }
-  if (EDITOR_PARAM === "firstPerson") {
+  if (EDITOR_PARAM === "firstPerson" && editor) {
     ShowBoot(false);
     state.menu = false;
     state.running = false;
@@ -3276,8 +3317,7 @@ async function Boot() {
   // 没有用户手势，下一次在画面里点按时补解锁音频。编辑器自己的界面与逻辑全在它的模块里。
   if (BLOCKOUT) {
     document.body.classList.add("blockoutMode");
-    const { EditorBlockout } = await import("./Script_EditorBlockout.mjs");
-    blockout = new EditorBlockout({
+    blockout = await CreateBlockoutEditor({
       host: editor.editorHost, params,
       PointerLocked, RequestPointerLock, ReleasePointerLock,
     });
@@ -4290,7 +4330,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   if (MOVEMENT_RANGE) {
     state.pinned = true;
     movementRange = new MovementRange({ player, scene, battlefield,
-      CanUse: () => state.ready && state.running && !state.menu && !state.cutscene && !editor?.Capturing });
+      CanUse: () => state.ready && state.running && !state.menu && !state.cutscene && !UiCapturing() });
     if (window.Taierzhuang?.Debug) window.Taierzhuang.Debug.MovementRange = movementRange.api;
   } else if (EXPLOSION_TEST) {
     state.pinned = true;
@@ -4328,7 +4368,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
       // 核心断肢系统的调试口（docs/Data_Dismemberment.md §8.3）。惰性取：它挂在
       // Debug 上，建关时可能还没挂好，取值器让面板从「未就绪」自己转成有数。
       Gore: () => window.Taierzhuang?.Debug?.Gore || null,
-      CanUse: () => state.ready && state.running && !state.menu && !state.cutscene && !editor?.Capturing,
+      CanUse: () => state.ready && state.running && !state.menu && !state.cutscene && !UiCapturing(),
       Focus: RequestPointerLock,
     });
     if (window.Taierzhuang?.Debug) window.Taierzhuang.Debug.GoreRange = goreRange.api;
@@ -6180,7 +6220,7 @@ let rawInputActive = false;
  * 抓不到就提示玩家点一下，别让人对着不转的镜头猜。
  */
 function RequestPointerLock() {
-  if (SHOT || altMouseFree || (editor && editor.Capturing)) return;
+  if (SHOT || altMouseFree || UiCapturing()) return;
   if (escapeHeld) { lockAfterEscape = true; return; }
   if (FAKE_POINTER_LOCK) {
     if (!fakeLocked) { fakeLocked = true; OnPointerLockChange(); }
@@ -6288,7 +6328,7 @@ function OnPointerLockChange() {
   // 锁掉了：把连续输入清零，否则松开锁的那一瞬间按着的键会一直"按着"
   if (PointerLocked()) {
     // Alt 或编辑器已接管时，晚到的异步 requestPointerLock 也必须立即退回去。
-    if (altMouseFree || (editor && editor.Capturing)) { ReleasePointerLock(); return; }
+    if (altMouseFree || UiCapturing()) { ReleasePointerLock(); return; }
     // 暂停 / 菜单已经盖上来了，晚到的锁也退回去：不然菜单里光标是藏着的，
     // 下一次 Esc 被浏览器拿去解锁、页面收不到按键，玩家要按两次才能继续。
     if (menu && menu.open) { ReleasePointerLock(); return; }
@@ -6309,7 +6349,7 @@ function OnPointerLockChange() {
   // Chrome/Edge 在指针锁内会把 Esc 留给浏览器：页面收不到 keydown，只收到解锁事件。
   // 这条兜底让真人按 Esc 与冒烟合成 Esc 走到同一个 PauseGame。
   if (!intentional && state.ready && state.running && menu
-      && !state.cutscene && !state.advancing && !(editor && editor.Capturing)) {
+      && !state.cutscene && !state.advancing && !UiCapturing()) {
     if (performance.now() - lockGrantedAt < LOCK_ECHO_MS) {
       clearTimeout(lockEchoRetry);
       lockEchoRetry = setTimeout(() => {
@@ -6440,7 +6480,7 @@ function OpenMenu() {
   ShowBoot(false);
   if (ai) ai.Dispose();
   // 齿轮按钮藏起来：菜单是给玩家看的，编辑器是给我们自己用的
-  document.getElementById("edRoot")?.classList.add("off");
+  SetDevToolsHidden(true);
   menu.Open();
 }
 
@@ -6453,18 +6493,30 @@ function CloseMenu() {
   hudRoot.style.display = "";
   // 回到战场时手上还占着东西的话，枪继续收着（负重的边沿不会重放一次）。
   if (viewmodel) viewmodel.root.visible = !carry?.Blocking;
-  if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
+  SetDevToolsHidden(false);
+}
+
+/** 菜单 设置 → 高级工具：工作台接管整张画面，退出后回到菜单的设置目录（FinishEditorSession）。 */
+function OpenDevTools() {
+  if (!editor) return;
+  editorReturnMenuMode = menu && menu.open ? menu.mode : null;
+  SetDevToolsHidden(false);
+  editor.TogglePanel(true);
+}
+
+/** 玩家设置页关掉：回到设置目录。主菜单里进来的把背景声放回来，暂停里进来的保持静音。 */
+function FinishSettings() {
+  if (!menu) return;
+  if ((menu.settingsReturnMode || "title") !== "pause") audio.SetPaused(false);
+  menu.Show("settings");
 }
 
 /** 编辑器从菜单进来时，完整关闭后回到原来的菜单层。 */
 function FinishEditorSession() {
   const mode = editorReturnMenuMode;
   editorReturnMenuMode = null;
-  document.getElementById("edRoot")?.classList.remove("menuSettings");
   if (!mode || !menu) return;
   if (mode === "settings") {
-    // Closing a player settings page also releases the hidden tools launcher.
-    editor.panelOpen=false;editor.launcher.style.display="none";editor.RefreshStatus();
     const parent = menu.settingsReturnMode || "title";
     if (parent === "pause") ShowPauseMenu(); else OpenMenu();
     menu.Show("settings"); return;
@@ -6735,6 +6787,8 @@ function SuspendGameplay() {
 
 function ShowPauseMenu() {
   SuspendGameplay();
+  // 暂停菜单盖住整张画面时开发工具层（齿轮、Debug Rendering 浮窗）一并藏起，继续后还原。
+  SetDevToolsHidden(true);
   menu.OpenPause();
 }
 
@@ -6745,7 +6799,7 @@ function ShowDeathMenu(atLoad = false) {
   p012CarryView?.Update(0, { alive: false });
   if (viewmodel.body) viewmodel.body.root.visible = false;
   SuspendGameplay();
-  document.getElementById("edRoot")?.classList.add("off");
+  SetDevToolsHidden(true);
   menu.OpenSandboxFailure(atLoad);
   menu.SetDeathReveal(0);
 }
@@ -6808,11 +6862,12 @@ function ResumeFromPause() {
   // 里的 Close() 会调 FinishEditorSession 把暂停菜单又盖回来。
   editorReturnMenuMode = null;
   if (editor && editor.panelOpen) editor.TogglePanel(false);
+  settings?.Dismiss();
   menu.Close();
   state.menu = false;
   state.running = true;
   hudRoot.style.display = "";
-  if (!SHOT) document.getElementById("edRoot")?.classList.remove("off");
+  SetDevToolsHidden(false);
   audio.SetPaused(false);
   missionRuntime?.voice.Resume();
   RequestPointerLock();
@@ -6860,7 +6915,7 @@ const router = new InputRouter({
     if (frameDebugger.frozen) return false;
     if (!state.running) return false;
     // 编辑器开着：这一下鼠标是在点面板/摆东西，不是在抢指针锁开枪
-    if (editor && editor.Capturing) return false;
+    if (UiCapturing()) return false;
     if (!PointerLocked() && !SHOT) { RequestPointerLock(); return false; }
     return true;
   },
@@ -6868,7 +6923,7 @@ const router = new InputRouter({
   Capture: (_event, detail) => {
     if (frameDebugger.frozen) return false;
     if(detail.code==='Blur')return !!meleeCombat?.HandleInput('Blur',false);
-    if(!state.ready || !state.running || state.menu || state.cutscene || editor?.Capturing)return false;
+    if(!state.ready || !state.running || state.menu || state.cutscene || UiCapturing())return false;
     // 剧本提示环（第一关屋内伏击的抓枪与反捅）先于共用白刃层与 KEYMAP：
     // 那两下发生在共用 QTE 还没开／已经结算完的时候，不接管的话 F 会去拾弹药、左键会开枪。
     if(missionRuntime?.AmbushInput?.(detail.code,detail.down,detail.repeat))return true;
@@ -6884,7 +6939,7 @@ const router = new InputRouter({
     if (!state.ready) return;
     // 编辑器开着就把整张键位表闸掉。不闸的话在编辑器里按 R 会真的去装填、
     // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
-    if (editor && editor.Capturing) return;
+    if (UiCapturing()) return;
     if (["crouch", "prone", "traverse"].includes(action) || action.startsWith("stance:")) {
       if (!state.running || state.menu || !player.Alive || meleeCombat?.Active || emplacement?.Mounted) return;
     }
@@ -6984,7 +7039,7 @@ document.addEventListener("keyup", (event) => {
   if (event.code !== "AltLeft" && event.code !== "AltRight") return;
   altMouseFree = false;
   // Timeline 里松 Alt 后仍要能点面板；普通玩法则恢复原来的锁定手感。
-  if (state.running && !state.menu && !state.cutscene && !(editor && editor.Capturing)) RequestPointerLock();
+  if (state.running && !state.menu && !state.cutscene && !UiCapturing()) RequestPointerLock();
   event.preventDefault();
 });
 
@@ -8562,7 +8617,7 @@ function Frame(dt, render = true) {
     return;
   }
   // StepFrames also enters here directly: terminal P012 screens freeze the entire world clock.
-  if (missionRuntime?.completed || missionRuntime?.failed || (missionRuntime && !state.running && !editor?.Capturing) || p012Runtime?.completed || p012Runtime?.failed) {
+  if (missionRuntime?.completed || missionRuntime?.failed || (missionRuntime && !state.running && !UiCapturing()) || p012Runtime?.completed || p012Runtime?.failed) {
     if (render) RenderScene(0);
     return;
   }
@@ -8605,9 +8660,10 @@ function Frame(dt, render = true) {
   // **必须排在过场那一条之前**：Timeline 编辑器要自己按走带的步长推
   // cutscene.Update（暂停、0.25 倍速、拖进度条全靠它），排在后面的话
   // 过场每帧会被推两次，走带上的速度与暂停一个都不生效。
-  if (editor && editor.Capturing) {
-    editor.Update(dt);
-    if (commandRoom?.ready && menu?.live && ["graphics","sound","controls"].includes(editor.activeId)) {
+  if (UiCapturing()) {
+    settings?.Update(dt);
+    editor?.Update(dt);
+    if (commandRoom?.ready && menu?.live && settings?.IsOpen) {
       commandRoom.Update(dt);
       if(render)commandRoom.Render();
       return;
@@ -8618,7 +8674,7 @@ function Frame(dt, render = true) {
     camera.getWorldDirection(_forward);
     // 特效编辑器直接驱动 VfxSystem；点光包络也必须同帧推进，否则预览里只有火球贴片，
     // 墙地仍旧不亮，退出编辑器才突然补算一大步。
-    if(editor.activeId==='vfx')lights.Update(0,editor.active.previewTime??state.elapsed,camera.position);
+    if(editor?.activeId==='vfx')lights.Update(0,editor.active.previewTime??state.elapsed,camera.position);
     else lights.Update(dt, state.elapsed, camera.position);
     lights.UpdateShadowFrustum(camera.position, _forward);
     if (render) RenderScene(dt);
@@ -9342,7 +9398,7 @@ function RenderSceneContent(dt) {
   missionRuntime?.frontShow?.bunker.BeforeRender();
   const openingBody=player?.Alive && missionRuntime?.frontShow?.bunker.CameraActive;
   if(openingBody&&viewmodel)viewmodel.root.visible=false;
-  if (viewmodel?.body) viewmodel.body.root.visible = !openingBody && !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !state.cutscene && !state.menu && !editor?.Capturing;
+  if (viewmodel?.body) viewmodel.body.root.visible = !openingBody && !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !state.cutscene && !state.menu && !UiCapturing();
   const phase = PHASE_TABLE[state.phaseIndex];
   // 剖析：GPU 帧从这里开到 post.Render 之后 —— GI 的几趟探针 pass、阴影烘焙、
   // 整条合成链都在这个窗口里按段计时（剖析器关着时这些调用是空转）。
@@ -9468,7 +9524,7 @@ function RenderSceneContent(dt) {
   profiler.E("actorBatch");
   // 可炸断的枯树按这一帧的出画相机挑细节档（远处换聚类减面的同一棵树），排在第一次 renderer.render 之前。
   battlefield?.breakableTrees?.UpdateView(camera);
-  const hitDisorientation = state.running && !state.menu && !state.cutscene && !editor?.Capturing
+  const hitDisorientation = state.running && !state.menu && !state.cutscene && !UiCapturing()
     ? player?.HitDisorientation || 0 : 0;
   audio.SetHitDisorientation(hitDisorientation);
   const suppression = player ? player.suppression : 0;
@@ -9578,7 +9634,7 @@ function StepFrames(count = 1, dt = 1 / 60, render = true) {
     profiler.BeginFrame(performance.now());
     // 编辑器接管时必须压过主菜单。否则从菜单打开场景编辑器后，
     // StepFrames 只会推进菜单运镜，换切片后编辑器无法把地形/碰撞层接到新场景。
-    if (!(editor && editor.Capturing) && state.menu && menu && menu.live) MenuFrame(dt, render);
+    if (!UiCapturing() && state.menu && menu && menu.live) MenuFrame(dt, render);
     else Frame(dt, render);
     profiler.EndFrame();
   }
@@ -9653,7 +9709,7 @@ function LoopStep(dt) {
   // 菜单态：只推运镜与画面（玩法停摆）。暂停态两个都是 false —— 世界冻住，
   // 最后那一帧留在屏幕上，菜单盖在它上面，这正是暂停该有的样子。
   // 编辑器与菜单都要独占相机；编辑器优先，以便能从菜单里的设置入口直接编辑切片。
-  if (!(editor && editor.Capturing) && state.menu && menu && menu.live && state.ready) {
+  if (!UiCapturing() && state.menu && menu && menu.live && state.ready) {
     MenuFrame(dt);
     return;
   }
@@ -9664,7 +9720,7 @@ function LoopStep(dt) {
   // 是因为换关时玩家还在游戏里，state.running 一直是 true。
   // 从主菜单或暂停菜单打开编辑器时 running 都是 false；仍要让编辑器更新，
   // 否则切片重建完成后的 GroundHeight、碰撞和地形网格无法重新挂载。
-  if (!state.running && !(cutscene && cutscene.Playing) && !(editor && editor.Capturing)) return;
+  if (!state.running && !(cutscene && cutscene.Playing) && !UiCapturing()) return;
   Frame(dt);
 }
 requestAnimationFrame(Loop);

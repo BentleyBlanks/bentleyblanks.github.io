@@ -11,7 +11,7 @@ try{
  page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text().slice(0,500))});
  const entry=whitebox?'phase=2&editor=tools':'whitebox=p012&editor=vfx&quality=high';
  await page.goto('http://127.0.0.1:'+server.address().port+'/Taierzhuang1938/?'+entry+'&manual=1&menu=0',{waitUntil:'domcontentloaded',timeout:180000});
- if(whitebox){await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:300000});await page.getByText('特效预览',{exact:true}).click();}
+ if(whitebox){await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:300000});await page.click('#edRoot .edMenu[data-menu="media"] > .edMenuTitle');await page.getByText('特效预览',{exact:true}).click();}
  await page.waitForFunction(()=>window.Tengxian?.ParticleEditor?.panel,null,{timeout:300000});
  await page.evaluate(()=>Tengxian.Particles.Ready());
  if(whitebox){

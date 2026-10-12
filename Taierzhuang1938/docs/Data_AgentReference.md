@@ -728,7 +728,9 @@ node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --pixel=x,y --pass-im
   FullScene = 完整县城与四门外 / 出川军列车厢静态布景的只读巡场、种子、Spline 与环境取证；
   FirstPerson = 正片 Viewmodel 的装备切换、玩家/外部检查视角、武器挂点/IK 目标/真实掌心与骨骼残差可视化，只读不写姿态表；
   车厢不播放 CS_Chuchuan 时间轴、不加载演员/对白/字幕，不读写 Scene 的关卡文档。
-  DebugRendering、Profiler、WorldInfo、玩家状态与关卡编排位于「调试」组，可叠加且不接管相机、不暂停玩法。
+  DebugRendering、Profiler、Frame Debugger、WorldInfo、玩家状态、敌军 AI 是菜单 设置 → Debug工具 里的叠加层，关卡编排在高级工具「关卡」菜单；
+  都可叠加且不接管相机、不暂停玩法。高级工具 = 顶部菜单栏 + 右侧 Inspector；整组开发工具只经 Script_DevTools / Data_DevTools
+  两个边界模块进来，打包可剔除（docs/Data_EditorSuite.md「开发工具隔离与打包剔除」）。
   关卡编排（Orchestration）独立窗口显示第一关的真实编排：流程（18 阶段/27 步骤 + 要求事实实时勾）、
   真实比例俯视图（按阶段看敌我布局与触发圈）、设计/实际两行时间轴、现场批注 → 交给 agent；
   口径 `docs/Data_MissionOrchestration.md`，回归口 `Script_OrchestrationEditorTest.mjs` / `Script_OrchestrationMapTest.mjs`。

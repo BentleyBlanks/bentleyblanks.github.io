@@ -5,14 +5,47 @@
 设置与编辑器使用 `Style_Interface.css` 的 World at War 主题，`Style_Editor.css` 定义工具布局。
 黑色标题栏、冷灰底色、旧金选中条与菜单一致；读数保留等宽字体，阵营和错误状态保留语义色。
 通用按钮、开关、选项及关闭按钮使用原生 button，支持 Tab / Enter / Space；开关和选项同步
-`aria-pressed`。窄屏将目录放在上方、当前工作窗放在下方，各自滚动。
+`aria-pressed`。高级工具是 Unity 式布局：顶部菜单栏 + 右侧 Inspector（菜单栏高 34 px，
+Inspector 宽 340 / 宽版 420 px，CSS 变量 `--ed-bar-h` / `--ed-inspector-w`）；窄屏时菜单栏横向滚动，
+Inspector 改成底部抽屉。玩家设置页画在 `#settingsRoot`，开发工具画在 `#edRoot`，两棵根分开。
 Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接。
 
 外观与操作验收见 [主菜单文档](Data_MainMenu.md) 的 `--interface-only`；相机、设置持久化与
 编辑工具功能继续由 `Script_EditorTest.mjs` 验证。
 
-开发用的十七个互斥编辑器、六个可叠加工具（Debug Rendering / Profiler / WorldInfo / 玩家状态 / 敌军 AI / 关卡编排）+ 一个入口面板。**不对玩家开放**：出图模式（`?shot=1`）下整棵
-DOM 是 `display:none`，任何截图里都不会有它。
+开发工具分两块，**都不对玩家开放**，出图模式（`?shot=1`）下整棵 DOM 是 `display:none`：
+
+- **高级工具**（菜单 设置 → 高级工具、齿轮或 `` ` ``）：十七个互斥编辑器 + 关卡编排、贴图管理两个独立窗口，
+  共 19 项，分在顶部菜单栏的「场景 / 关卡 / 角色 / 武器 / 特效与声音 / 资产」六个菜单里（表在
+  `Script_Editor.TOOL_MENUS`），「游戏」菜单放关闭当前工具、返回主菜单、退出。选中的工具显示在右侧 Inspector。
+- **Debug工具**（菜单 设置 → Debug工具）：六个可叠加的观察层 Debug Rendering / Profiler / Frame Debugger /
+  WorldInfo / 玩家状态 / 敌军 AI，外加 FPS 显示。代码仍在编辑器套件里（`EditorSuite.DebugToolStates` /
+  `ToggleDebugTool`，页内顺序 `Data_DevTools.DEBUG_TOOL_IDS`），高级工具的菜单栏不再列它们。
+  标题菜单（独立启动，没有战局）里这一页只读，提示进关后从暂停菜单开。
+
+玩家设置（画面 / 声音 / 操作）不属于开发工具，见下文「设置不在高级工具里」。
+各编辑器的过时 / 有问题 / 信息冗余清单（2026-10-13 审计，待挑选处理）见 [编辑器审计](Data_EditorAudit20261013.md)。
+
+## 开发工具隔离与打包剔除
+
+打包时会整组剔除高级工具与 Debug工具，所以运行时只经两个边界模块碰它们：
+
+| 边界 | 谁用 | 剔除版 |
+| --- | --- | --- |
+| `Script_DevTools.mjs`（`CreateDevTools(host)` → `EditorSuite`） | `Script_Main` | `Script_DevToolsStub.mjs`：返回 `null` |
+| `Data_DevTools.mjs`（`DEV_TOOLS_ENABLED`、`DEBUG_TOOL_IDS`，零依赖） | `Script_MenuStartup`、`Script_Editor` | `Data_DevToolsStub.mjs`：`false` / 空表 |
+
+- 剔除 = `node Taierzhuang1938/Script_BuildBrowserBundle.mjs --deploy --strip-dev-tools --output-dir <staging>`：
+  esbuild 插件把两个边界模块换成剔除版，其余代码不动。现在 Pages 发布**默认不剔除**。
+- 宿主拿到 `editor === null` 就按「没有开发工具」跑：不建齿轮、`` ` `` 不响应、菜单不列「Debug工具」「高级工具」
+  （`Script_Menu` 看宿主给的 `DevToolsAvailable`），`Debug.OpenEditor` 等取证口回答「没有」。
+- 名字带 Editor 却随包发布的只有三个：`Script_EditorSettings`（设置页的类）、`Script_EditorUi`（控件工具箱）、
+  `Script_EditorWhiteboxQuality`（白盒画质那一栏）。它们不许 import 任何开发模块。
+- 样式：菜单栏 / Inspector 停靠只写在 `#edRoot` 下（`Style_Editor.css`「高级工具」两节），控件样式两边共用；
+  剔除时 CSS 可原样留着（选择器落空），要瘦身再把 `#edRoot` 专属段落拆出去。
+- 闸门 `Script_DevToolsIsolationTest.mjs`：两对边界模块导出同名；剔除后游戏包与菜单包里没有任何开发模块
+  （有人绕过边界直接 import 编辑器时报出是谁拉进来的）；标题菜单包从不带编辑器；`--browser` 真浏览器跑剔除包，
+  标题菜单与第一关都能开机、设置三页可用、菜单里没有两项开发入口。2026-10-13 实测剔除省 817 KB、43 个模块。
 
 ## 精简测试界面
 
@@ -27,29 +60,33 @@ DOM 是 `display:none`，任何截图里都不会有它。
 
 | 路子 | 什么时候能用 |
 | --- | --- |
-| 点右上角齿轮 | **没拿指针锁**的时候（开局那张「进城」页、或玩家按过 Esc） |
-| 按 `` ` ``（Backquote） | 任何时候。打游戏当中这是唯一的入口 |
-| `window.Tengxian.Debug.OpenEditor("actor")` | 测试与自动化 |
+| 菜单 设置 → 高级工具 | 主菜单或暂停菜单。退出后回到设置目录；标题菜单（独立启动）会换到 `?phase=2&editor=tools` |
+| 菜单 设置 → Debug工具 | 暂停菜单（Esc）。勾上后「继续」即可边打边看；暂停菜单开着时开发工具层整层收起 |
+| 点右上角齿轮 | **没拿指针锁**的时候（开局那张「进城」页、或玩家按过 Esc）；打开的是高级工具 |
+| 按 `` ` ``（Backquote） | 任何时候（玩家设置页开着时除外）。打游戏当中这是唯一的入口 |
+| `window.Tengxian.Debug.OpenEditor("actor")` / `Debug.ToggleDebugTool("debugRendering")` | 测试与自动化 |
 
 指针锁一挂上，浏览器就把所有鼠标事件路由给 canvas，DOM 上的按钮谁也点不着 ——
 这不是 bug 是指针锁的定义。所以 `` ` `` 那条路在开面板时会顺手交还指针锁。
 
-Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把编辑器也关了。
+Esc：下拉菜单开着时只收菜单，否则退出高级工具；过场正在播时 Esc 归过场（跳过），不会顺手把编辑器也关了。
+工作窗（Inspector）右上的 × 只关当前工具、回到空 Inspector，不退出高级工具。
 
 ## 一次只开一个
 
 十七个互斥编辑器里有十四个要接管相机（七个摄影棚 `cameraMode="studio"`、七个自由飞行
 `"fly"`，地形编辑器继承场景编辑器的 `"fly"`），过场时间轴还要把相机交给过场导演。
 同时开两个的结果是两边每帧各写一次 `camera.position`，画面会抖。
-所以入口面板虽然是一排开关，语义是**换到这一个**：开新的自动关旧的。
+所以菜单栏里的工具虽然是勾选项，语义是**换到这一个**：开新的自动关旧的；再点一次打勾的那项就关掉它。
 不接管相机的三个（音频 / 资产规范 / 过场时间轴）也走同一条互斥路 —— 它们改的都是
 这一局的运行时状态，退出时得各自收干净。可叠加的六个工具不在这条规矩里。
 
-## 面板分两组：设置 / 编辑器
+## 设置不在高级工具里
 
 **它们不是一回事。** 设置改的是玩家自己的偏好、要落盘、与这一局无关；
-编辑器改的是这一局的运行时状态、退出时必须还干净。摆在同一排会让人以为
-「画质」也是个要小心退出的东西。
+编辑器改的是这一局的运行时状态、退出时必须还干净。2026-10-13 起画面 / 声音 / 操作三页
+只从菜单「设置」进，宿主是 `Script_SettingsHost`（标题菜单与游戏共用，画在 `#settingsRoot`），
+高级工具里不再有它们；剔除开发工具后它们照常工作。页面类仍在 `Script_EditorSettings`。
 
 ### 画质 `Script_EditorSettings.GraphicsSettings`
 
@@ -57,7 +94,7 @@ TAA 开放当前帧权重、抖动幅度和锐化；GI 开放采样偏移、反�
 
 
 存 `localStorage` 键 `tengxian1938_graphics_v1`，**开机时装回去**
-（`ApplySavedSettings`，`EditorSuite` 的构造函数调）——只在打开面板时才生效的
+（`ApplySavedSettings`，`Script_Main` 建 `SettingsHost` 时调，标题菜单同样）——只在打开面板时才生效的
 设置不叫设置，那叫开关。
 
 - **渲染分辨率**是唯一真正省时间的一根：整条合成链（法线深度、AO、泛光六级、
@@ -125,7 +162,7 @@ TAA 开放当前帧权重、抖动幅度和锐化；GI 开放采样偏移、反�
 
 ### 人物面部 `Script_EditorFacial.mjs`
 
-独立摄影棚工具，工具目录入口「人物面部」。按角色筛选配套对白，支持真实录音同步口型、字幕、波形、逐帧、慢放、循环选句、近景角度和中性表情对照。表情关键帧与检查备注可本地保存、导入导出；无面部骨骼的角色明确标注。资产范围及验证见 [人物面部编辑器](Data_FacialEditor.md)。
+独立摄影棚工具，高级工具「角色」菜单里的「人物面部」。按角色筛选配套对白，支持真实录音同步口型、字幕、波形、逐帧、慢放、循环选句、近景角度和中性表情对照。表情关键帧与检查备注可本地保存、导入导出；无面部骨骼的角色明确标注。资产范围及验证见 [人物面部编辑器](Data_FacialEditor.md)。
 
 ### 人物动作 `Script_EditorActor.mjs`
 
@@ -417,11 +454,11 @@ GPU 实例桶」：PCG 输出就是普通 ExternalProps placement，但默认 `s
 ### Debug Rendering `Script_EditorDebugRendering.mjs`（叠加层）
 
 不接管相机、不暂停玩法，负责把当前帧的渲染靶直接送到主画布。与 Profiler 一样
-`static keepOnClose = true`：**关设置面板回去打仗不收它** —— 运行时才复现的渲染 bug
+`static keepOnClose = true`：**退出高级工具、回去打仗都不收它** —— 运行时才复现的渲染 bug
 （第一人称手上的暗块、移动中的雾/AO 闪烁）只能开着调试视图边打边看；材质假彩色
-uniform 与送屏视图都原样保留，浮窗留在画面一侧照常刷「当前靶」。要停：面板里再点一次
-「Debug Rendering」、叉掉浮窗，或按「全部关掉」（它按字面办，keepOnClose 的叠加层
-也一起收，送屏回到最终画面）。`Script_EditorTest` 两条断言各守一头。除 GBuffer、材质、
+uniform 与送屏视图都原样保留，浮窗留在画面左侧照常刷新。要停：设置 → Debug工具 里再点一次
+「Debug Rendering」或叉掉浮窗（送屏回到最终画面）。暂停菜单开着时浮窗随开发工具层收起，继续后还原。
+`Script_EditorTest` 两条断言各守一头。除 GBuffer、材质、
 光照与 GI 外，「后处理」分组还把三段容易串线的结果拆开：`Bloom 提取` 是阈值/软膝后的
 半分辨率亮部，`Bloom 合成` 是正式 Composite 真正采样的多级叠加靶；`雾量` 从
 NormalDepth 和本帧 Composite uniforms 重算距离雾×高度衰减，`景深 CoC` 以同样方式
@@ -481,21 +518,21 @@ TAA 之前用同一张 hdr 靶与深度再画一遍）：画的是 Rapier 世界
 
 ### WorldInfo `Script_EditorWorldInfo.mjs`（叠加层，独立窗口）
 
-入口：设置 · 工具 → 调试 → WorldInfo。独立窗口实时显示当前玩家脚底世界 XYZ、偏航和俯仰角、地形高度、脚底距地形、眼高和视点世界高度，以及水平/垂直速度、姿态和接地状态。位置/高度以米计，旋转以度计。地形高度沿用玩家当前 world 的共享采样器；距地形不等于距楼板或道具。
+入口：设置 → Debug工具 → WorldInfo。独立窗口实时显示当前玩家脚底世界 XYZ、偏航和俯仰角、地形高度、脚底距地形、眼高和视点世界高度，以及水平/垂直速度、姿态和接地状态。位置/高度以米计，旋转以度计。地形高度沿用玩家当前 world 的共享采样器；距地形不等于距楼板或道具。
 
-只读玩家控制器，不跟随编辑器/过场相机，也不修改角色。读数每 0.1 秒刷新；场景加载时清空旧数据。关闭工具目录或切换其他编辑器时保留，关闭独立窗口、再次点击入口或「全部关掉」时退出；宿主页面离开和套件销毁时关闭窗口。浏览器拦截弹窗时开关恢复关闭。
+只读玩家控制器，不跟随编辑器/过场相机，也不修改角色。读数每 0.1 秒刷新；场景加载时清空旧数据。退出高级工具或切换其他编辑器时保留，关闭独立窗口或在 Debug工具里再点一次时退出；宿主页面离开和套件销毁时关闭窗口。浏览器拦截弹窗时开关恢复关闭。
 
 ### 玩家状态 `Script_EditorPlayerState.mjs`（叠加层，独立窗口）
 
-入口：设置 · 工具 → 调试 → 玩家状态。独立窗口（`window.open`，游戏拿着指针锁时照样能看）实时显示 HUD 不给出的玩家状态，分七组：生存（血量、失血、伤口、绷带、包扎回血、腿伤/臂伤系数、出生保护与剧情无敌剩余）、受击与压制（压制、闪红、受击晕眩）、体力与呼吸（体力及上限、冲刺、屏息、水深、搬运移速）、姿态与移动（姿态过渡、换姿被拦原因、接地、跳跃/翻越、侧身、架枪）、瞄准与散布（开镜量、自由瞄准偏角与上限、后坐余量、摇摆、散布真值、连射扩散、枪口贴墙）、武器与弹药（槽位、弹仓、手榴弹、攥弹、射击冷却、刺刀、白刃蓄力、第一人称动作）、控制与调试（控制权、搬运、机枪位、白刃镜头、无限弹药、穿墙/快速/无敌）。
+入口：设置 → Debug工具 → 玩家状态。独立窗口（`window.open`，游戏拿着指针锁时照样能看）实时显示 HUD 不给出的玩家状态，分七组：生存（血量、失血、伤口、绷带、包扎回血、腿伤/臂伤系数、出生保护与剧情无敌剩余）、受击与压制（压制、闪红、受击晕眩）、体力与呼吸（体力及上限、冲刺、屏息、水深、搬运移速）、姿态与移动（姿态过渡、换姿被拦原因、接地、跳跃/翻越、侧身、架枪）、瞄准与散布（开镜量、自由瞄准偏角与上限、后坐余量、摇摆、散布真值、连射扩散、枪口贴墙）、武器与弹药（槽位、弹仓、手榴弹、攥弹、射击冷却、刺刀、白刃蓄力、第一人称动作）、控制与调试（控制权、搬运、机枪位、白刃镜头、无限弹药、穿墙/快速/无敌）。
 
-字段是文件里的 `GROUPS` 一张表，加一项加一行；读取容错，缺的字段显示「—」。`PlayerController` 身上没有的（射击冷却、剧情无敌、搬运、机枪位、第一人称动作、无限弹药）由 `Script_Main` 的 `game.PlayerRuntime()` 交出只读快照。只读、不改角色；每 0.1 秒刷新，值变了的那一行闪 0.6 秒；「冻结读数」停在当前帧，「复制快照 JSON」把全部读数放进剪贴板。生命周期与 WorldInfo 相同：关工具目录保留，叉掉浮窗、再点入口或「全部关掉」退出，弹窗被拦时开关复位。回归口 `Script_PlayerStateEditorTest.mjs`。
+字段是文件里的 `GROUPS` 一张表，加一项加一行；读取容错，缺的字段显示「—」。`PlayerController` 身上没有的（射击冷却、剧情无敌、搬运、机枪位、第一人称动作、无限弹药）由 `Script_Main` 的 `game.PlayerRuntime()` 交出只读快照。只读、不改角色；每 0.1 秒刷新，值变了的那一行闪 0.6 秒；「冻结读数」停在当前帧，「复制快照 JSON」把全部读数放进剪贴板。生命周期与 WorldInfo 相同：退出高级工具保留，叉掉浮窗或在 Debug工具里再点一次退出，弹窗被拦时开关复位。回归口 `Script_PlayerStateEditorTest.mjs`。
 
 ### 敌军 AI `Script_EditorAi.mjs`（叠加层）
 
-入口：设置 · 工具 → 调试 → 敌军 AI。与 Debug Rendering / Profiler 同组：不接管相机、不暂停玩法、
+入口：设置 → Debug工具 → 敌军 AI。与 Debug Rendering / Profiler 同在 Debug工具：不接管相机、不暂停玩法、
 不碰指针锁，`static keepOnClose = true` —— 它要看的东西（谁选了哪个掩体、谁探头、谁拿到攻击令牌）
-**只在打仗时存在**，关面板回去打正是主用例。停它：面板里再点一次、叉掉浮窗，或「全部关掉」。
+**只在打仗时存在**，关掉菜单回去打正是主用例。停它：Debug工具里再点一次，或叉掉浮窗。
 设计口径与验收在 [Data_EnemyAi.md §14](Data_EnemyAi.md)。
 
 六个分节用 Chips 切页，DOM 常驻（冒烟按 `.edPanel.ai [data-page]` 数得到六个）：
@@ -658,7 +695,7 @@ node Taierzhuang1938/Script_EditorBlockoutCli.mjs kf <Level> <id>               
 
 ### Profiler `Script_EditorProfiler.mjs`（叠加层，独立窗口）
 
-与 Debug Rendering 同在「调试」组，不接管相机、不暂停玩法 ——
+与 Debug Rendering 同在 设置 → Debug工具，不接管相机、不暂停玩法 ——
 它量的就是战斗中的帧。面板里就是一颗开关（**没有页面内面板**，用户点名去掉的）：
 点开即 `FrameProfiler.Enable()`（内核在 `Script_Profiler.mjs`，表格排版在
 `Script_ProfilerReport.mjs`）并弹一个 `window.open` 独立窗口：帧时间条图、

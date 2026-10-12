@@ -20,19 +20,21 @@ def CoatProfile(t,points):
 
 def CoatBodyPoint(i,j):
     u=i/NU;t=j/NV
-    opening=CoatProfile(t,[(0,.10),(.17,.15),(.48,.09),(1,.17)])
+    opening=CoatProfile(t,[(0,.10),(.17,.14),(.48,.12),(1,.16)])
     a=-math.pi/2+opening+u*(math.tau-2*opening)
-    width=CoatProfile(t,[(0,.044),(.055,.082),(.16,.194),(.28,.244),(.55,.238),(1,.258)])
-    depth=CoatProfile(t,[(0,.027),(.18,.078),(.4,.071),(1,.067)])
+    width=CoatProfile(t,[(0,.044),(.055,.076),(.16,.167),(.28,.184),(.55,.173),(1,.157)])
+    depth=CoatProfile(t,[(0,.027),(.18,.052),(.4,.043),(1,.034)])
     # Narrow at the peg, with unequal long folds; no horizontal solver knots.
     fade=math.sin(min(1,t/.20)*math.pi/2)
-    wave=(.020*math.sin(a*4+.55+t*.85)+.027*math.sin(a*9-.3-t*.8)
-          +.007*math.sin(a*15+.8+t*.6))*fade
-    x=width*math.cos(a)+wave*math.cos(a)*.42-.036*t+.014*math.sin(t*4)*t-.028*(1-t)**2
-    y=depth*math.sin(a)+wave+.007*math.sin(a*3+t*2)*fade
+    wave=(.011*math.sin(a*4+.55+t*.35)+.008*math.sin(a*7-.3-t*.45)
+          +.003*math.sin(a*11+.8+t*.6))*fade
+    x=width*math.cos(a)+wave*math.cos(a)*.25-.024*t+.008*math.sin(t*4)*t-.028*(1-t)**2
+    y=(depth+wave)*math.sin(a)+.004*math.sin(a*3+t*2)*fade
     # Two long irregular garment panels; soft diagonal tension near the peg.
-    y+=.007*math.sin(t*29+a*2)*math.exp(-((t-.22)/.16)**2)
-    z=-1.23*t-.042*(1-math.sin(a))*.5*math.sin(math.pi*t)+.092*math.sin(a+.4)*t**7+.010*math.sin(a*7)*t**10+.008*math.cos(a)*(1-t)**4
+    y+=.004*math.sin(t*16+a*2)*math.exp(-((t-.18)/.12)**2)
+    # The rear nape takes the load. Free collar sides fall away from the peg;
+    # lower panels settle into a narrow hem instead of flaring like a skirt.
+    z=-1.23*t-.064*(1-math.sin(a))*.5*(1-t)**3-.025*(1-math.sin(a))*.5*math.sin(math.pi*t)+.036*math.sin(a+.4)*t**7+.004*math.sin(a*5)*t**10
     return Vector((x,y,z))
 
 def CoatId(i,j):return j*(NU+1)+i
@@ -62,17 +64,17 @@ for a,b,c,d in holes:
     length=.59 if side>0 else .66
     for row in range(1,49):
         t=row/48;ring=[]
-        axis=Vector((side*(.091*t+.020*math.sin(t*math.pi)),
-                     -.078*t-.027*math.sin(t*math.pi),-length*t))
-        radius=.084*(1-t)+.063*t
+        axis=Vector((side*(.018*t+.018*math.sin(t*math.pi)),
+                     -.024*t-.012*math.sin(t*math.pi),-length*t))
+        radius=.071*(1-t)+.052*t
         for k,old in enumerate(boundary):
             source=verts[old]-center
             angle=math.atan2(source.z,source.y)
             # Flattened empty sleeve, with a shallow elbow crease and an open cuff.
             section=Vector((math.sin(angle)*radius,
-                            math.cos(angle)*radius*.40,-.016*math.sin(angle+.7)))
-            section.y+=.009*math.sin(angle*3+t*1.7)*math.sin(t*math.pi)
-            section.y+=.007*math.sin(t*32+angle)*math.exp(-((t-.53)/.14)**2)
+                            math.cos(angle)*radius*.30,-.006*math.sin(angle+.7)))
+            section.y+=.004*math.sin(angle*3+t*.7)*math.sin(t*math.pi)
+            section.y+=.003*math.sin(t*18+angle)*math.exp(-((t-.53)/.14)**2)
             blend=min(1,t/.25);blend=blend*blend*(3-2*blend)
             p=center+axis+source.lerp(section,blend)
             ring.append(len(verts));verts.append(p);uvs.append((k/count*.39,1.5+t*length))
@@ -98,7 +100,7 @@ seams.append(previous)
 used=sorted({k for f in faces for k in f});remap={old:new for new,old in enumerate(used)}
 verts=[verts[k] for k in used];uvs=[uvs[k] for k in used];wear=[wear[k] for k in used]
 faces=[tuple(remap[k] for k in f) for f in faces];seams=[[remap[k] for k in p] for p in seams]
-turn=Matrix.Rotation(math.radians(-38),3,'Z')
+turn=Matrix.Rotation(math.radians(-24),3,'Z')
 localPoints=[turn@p for p in verts]
 coaty=1.415-max(p.y for p in localPoints)
 points=[p+Vector((coatx,coaty,coatTop)) for p in localPoints]

@@ -105,6 +105,20 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 
 最终 GLB 为 21 网格、360791 三角形、16784264 字节，无损 UV1 光照图 1434676 字节。1280×720 实机中的纸面边界约 403×180 像素，视深覆盖 1.092–1.744 m；实际焦点约 1.418 m，清晰带半宽 .412 m。2231 个纸面内采样点的 DOF 开／关 RGB 差异为零，而背景有 223397 个像素发生变化；两侧视差极限的纸面模糊半径均为零。三个历史纸面均已局部目检。AssetStandards、TextureStandards、CommandRoomBrowser、CommandRoomPublication、MotionVectorContract、MenuStartup 与 CommandRoomPreview 七项通过；ModuleGraph、Text、TestRunner 自测通过。prepush 仍停在未修改的 CharacterSpeechTest 既有「呃啊」断言。本任务 Blender 已停止，扫描无残留。
 
+### 浮尘、窗光、帽服与信件续修（2026-10-13）
+
+保留原相机与房间构图。`dust` 使用 480 个世界空间尘粒，粒径保留大小差异；每粒按独立相位缓慢闪亮，菜单尘埃采用加色混合，窗外与家具阴影继续由同一光源深度图限制。通用粒子 renderer 的新增闪光 uniform 默认增益为零，只有指挥室启用。窗光改为沿相机射线前后积分，加入空气中的透射衰减、沿窗光方向的衰减、前向散射和缓慢变化的三维密度噪声；仍由真实窗洞、窗棂、家具和相机深度裁切，半分辨率与双边上采样保留。左侧 DOM 暗角提高标题和选项区域的遮罩，向画面中央渐隐。
+
+军帽保留 58 cm 内帽圈、原帽徽与两枚扣，帽冠与帽顶增加不对称压瘪、下陷，帽檐略不齐。`GarmentWear` 增加局部退色、汗渍与磨旧，黄铜和珐琅减少新件光泽；Blender 与 glTF 使用同一染色。挂衣保留连接衣片和袖窿，从后领受力，衣身和下摆收窄，空袖近乎沿重力下垂，减少规则波纹和过度外张。仍是静态作者网格，无运行时布料模拟。独立源工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/CommandRoom/AtmosphereDrape20261013/Scene_CommandRoom.blend`。
+
+信件两边各缩小 15%，`letter.presentationScale` 从 3 改为 2.55，实际约 37.74×53.55 cm，纸厚仍 .12 mm；笔盒略向纸角靠近，保留压纸接触。三张信件文字另按用户要求缩小约 15%，以内置 Imagegen 修改为更松散的钢笔手写，保持史料正文；第一张三列正文已重新居中到右侧三个竖格内。生成原图留在源工程 `Source/`，资产和完整提示词见 [文书](Data_CommandRoomPapers.md)。
+
+1280×720 的实际纸面约 393×195 像素，导出两边相对前版分别为 .850012/.850006；纸面景深最大模糊为零。笔盒有 5 个真实压纸采样点，最小间隙约 1.19 mm，道具与支撑面、道具彼此、挂衣与椅背穿插均为零。浮尘可见像素由 118 增至 226，独立闪光使 63 个像素增加 HDR 亮度；无阻挡窗光能量约为前版 2.03 倍，前景遮挡与封窗后仍为零。该能量是固定机位诊断指标，不是物理照度。
+
+最终模型 21 网格、360984 三角形、15690368 字节；配套 2048² / 256 samples 光照图无损 WebP 为 1285882 字节。CommandRoomBrowser、AssetStandards、MotionVectorContract、MenuStartup、CommandRoomPreview、CommandRoomPublication，以及 ParticleBrowser/Channels、ModuleGraph、Text、TextGatherCheck、TextureStandards、ParticleModules、TestRunner 均通过。发布与源码 RGB 平均误差 .327、95 分位 2。quick/prepush 在未修改的 SpeakerGestureTest `FrontObservation.02: luo gestured on his previous line too` 停止，相关手势表、对白表和测试与基准完全一致，不宣称全游戏回归通过。本地目检和对照保存在 `_shots/CommandRoom/AtmosphereDrape/`；BlenderMCP 已停止，`status --scan` 确认本任务和本机无残留实例。
+
+合入同日菜单设置／开发工具隔离更新后，保留它的新模块与设置宿主，重新通过 ModuleGraph、MenuStartup、CommandRoomPreview、TestRunner 与开发工具剔除的静态打包检查。补齐五个开发工具边界／设置宿主文件的选测领域映射。CommandRoomPublication 另纳入三张实际前景文书并分别渲染初始、中途、最后三种纸面；三张文字图按发布策略保留原图，最终三状态平均 RGB 误差仍约 .327、95 分位 2。
+
 ### 信纸前移、笔盒压纸与窗光对比（2026-10-10）
 
 按用户批注图将信纸移近、帽子后移，保留原相机、纸面尺寸与朝向、房间构图。笔盒压住信纸上沿一角，正文保持可读；笔、墨水瓶和尺在邻近位置让开。接触求解除道具顶点外还检查支撑面顶点；卷边与圆形瓶底在边线内部相交时，使用 2 mm 网格补查接触高度，不放宽穿插断言。纸面下压关系由实际网格射线测量：笔盒必须有正的覆盖面积，底面距纸面最近处为 .3–1.5 mm，所有道具与支撑面及彼此仍不穿插。

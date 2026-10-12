@@ -696,7 +696,7 @@ node Taierzhuang1938/Script_MissionNotesCli.mjs dismiss <id> [--summary "…"]
 1. 起本地预览：`node scripts/Script_LocalPreview.mjs --no-open`（8080 被占时看输出端口）。
 2. 打开 `http://127.0.0.1:<port>/Taierzhuang1938/?whitebox=p012`；
    想从某一阶段开打就加 `&missionStage=<1..18>`。
-3. `` ` `` 打开工具目录 → **编辑器** → **关卡编排**。允许弹窗。
+3. `` ` `` 打开高级工具 → 菜单栏 **关卡** → **关卡编排**。允许弹窗。
 4. 拖阶段滑条看布局怎么变；打起来之后开「跟随实时」，左栏会实时告诉你
    **正在等哪些事实**（底栏实际行末尾也有一枚枚空心标记），
    实际行还会记下真正发生的时刻、关卡时钟走到哪儿、这一步用了多久。
@@ -770,7 +770,7 @@ node Taierzhuang1938/Script_TextTest.mjs
 # 浏览器
 node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图（110 条）：数像素、PickAt、组/威胁把手、视口快照与完整底图合成、工具回调
 node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（153 条）：三栏/分栏线/时间轴折叠、事实与 flow 一致、顶栏只剩一枚状态、时间轴接住时钟与「正在等」空心标记、live 指纹含玩家朝向与班里人、跟随实时不抢视野、标注输入框、分类抽屉与敌军布设表、右栏两页签、完整底图下载、批注对话框（阶段/状态下拉框、@ 提及、候选位 ✕、Delete 删草图）、批注退化与图片补传、关窗还干净
-node Taierzhuang1938/Script_EditorTest.mjs --launcher-only  # 入口面板 26 个按钮
+node Taierzhuang1938/Script_EditorTest.mjs --launcher-only  # 高级工具菜单栏 19 项
 node Taierzhuang1938/Script_WorldInfoEditorTest.mjs
 node Taierzhuang1938/Script_PlayerStateEditorTest.mjs
 

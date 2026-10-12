@@ -19,15 +19,11 @@ try {
   await page.waitForFunction(() => window.Taierzhuang?.state.ready && window.Taierzhuang?.editor,
     null, { timeout: 300000 });
   await page.click("#bootStart");
-  await page.click(".edGear");
-  assert.equal(await page.locator(".edPanel.launcher .edSection")
-    .filter({ has: page.locator('[data-editor="worldInfo"]') }).locator(":scope > .h").textContent(), "调试");
-  // 三个设置 + 六个可叠加（渲染调试/性能剖析/WorldInfo/玩家状态/敌军 AI/关卡编排）+ 十六个编辑器
-  // + 一个「全部关掉」（data-editor 是空串，也被这个选择器数进来）。
-  // 与 Script_EditorTest 那条同源，加编辑器时两处一起改。
-  assert.equal(await page.locator(".edPanel.launcher [data-editor]").count(), 26);
+  // 入口在菜单 设置 → Debug工具（与高级工具分开）；这一趟没有菜单（menu=0），走那一页背后的同一个开关。
+  assert.ok((await page.evaluate(() => window.Taierzhuang.Debug.DebugTools())).some((tool) => tool.id === "worldInfo" && tool.available));
+  assert.equal(await page.locator('#edRoot [data-editor="worldInfo"]').count(), 0, "Debug工具不再列在高级工具菜单栏里");
   const popupEvent = page.waitForEvent("popup");
-  await page.click('[data-editor="worldInfo"]');
+  await page.evaluate(() => window.Taierzhuang.Debug.ToggleDebugTool("worldInfo"));
   const popup = await popupEvent;
   await popup.waitForSelector('[data-field="x"]');
   const checks = await page.evaluate(() => {
@@ -46,8 +42,10 @@ try {
       && Near(first.pitch, player.pitch * 180 / Math.PI));
     Check("观察读数不会修改角色", player.position.equals(before.position)
       && player.yaw === before.yaw && player.pitch === before.pitch);
-    T.editor.Open("controls");
-    Check("设置与浮窗可同时打开", T.editor.ActiveId === "controls" && T.editor.overlays.has("worldInfo"));
+    // 玩家设置页走 SettingsHost（菜单「设置」），与 Debug工具浮窗互不干扰
+    T.settings.Open("controls");
+    Check("设置与浮窗可同时打开", T.settings.ActiveId === "controls" && T.editor.overlays.has("worldInfo"));
+    T.settings.Close();
     T.editor.TogglePanel(false);
     Check("关目录后玩法恢复且浮窗保留", !T.editor.Capturing && T.editor.overlays.has("worldInfo"));
 
@@ -101,15 +99,15 @@ try {
   await page.screenshot({ path: path.join(root, "Taierzhuang1938/_shots/WorldInfoMenu.png") });
   await popup.close();
   await page.waitForFunction(() => !window.Taierzhuang.editor.overlays.has("worldInfo"));
-  assert.equal(await page.locator('[data-editor="worldInfo"]').evaluate(node => node.classList.contains("on")), false);
+  assert.equal((await page.evaluate(() => window.Taierzhuang.Debug.DebugTools())).find((tool) => tool.id === "worldInfo").on, false);
   console.log("ok   关闭浮窗后开关自动复位");
   const nextPopupEvent = page.waitForEvent("popup");
-  await page.click('[data-editor="worldInfo"]');
+  await page.evaluate(() => window.Taierzhuang.Debug.ToggleDebugTool("worldInfo"));
   const nextPopup = await nextPopupEvent;
-  await page.click('[data-editor=""]');
+  await page.evaluate(() => window.Taierzhuang.Debug.ToggleDebugTool("worldInfo"));
   if (!nextPopup.isClosed()) await nextPopup.waitForEvent("close");
   assert.ok(nextPopup.isClosed());
-  console.log("ok   全部关掉关闭独立窗口");
+  console.log("ok   Debug工具里再点一次关闭独立窗口");
 
   const blocked = await page.evaluate(() => {
     const T = window.Taierzhuang;
@@ -120,7 +118,7 @@ try {
     try {
       T.editor.Toggle("worldInfo");
       return !T.editor.overlays.has("worldInfo")
-        && !T.editor.entries.get("worldInfo").classList.contains("on");
+        && !T.Debug.DebugTools().find((tool) => tool.id === "worldInfo").on;
     } finally { window.open = open; console.error = error; }
   });
   assert.ok(blocked);

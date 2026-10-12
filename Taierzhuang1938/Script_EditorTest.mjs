@@ -43,6 +43,28 @@ async function Step(frames = 20) {
   await page.evaluate((n) => window.Taierzhuang.StepFrames(n), frames);
 }
 
+/**
+ * 高级工具是 Unity 式菜单栏：工具条目藏在下拉里，先点它所在的菜单再点条目
+ * （菜单 id 记在条目的 data-group 上）。没开高级工具时先按 ` 打开。
+ */
+async function ClickTool(id) {
+  if (!(await page.evaluate(() => window.Taierzhuang.editor.panelOpen))) await page.evaluate(() => window.Taierzhuang.editor.TogglePanel(true));
+  const group = await page.getAttribute(`#edRoot [data-editor="${id}"]`, "data-group");
+  await page.click(`#edRoot .edMenu[data-menu="${group}"] > .edMenuTitle`);
+  await page.click(`#edRoot [data-editor="${id}"]`);
+}
+
+/** 玩家设置页（画面 / 声音 / 操作）不在高级工具里：走 Script_SettingsHost（菜单「设置」点的也是它）。 */
+async function OpenSettings(id) {
+  // 只开不取回：Open 返回的是活的设置页实例，带回 node 会把整个游戏序列化撑爆管道
+  await page.evaluate((id) => { window.Taierzhuang.settings.Open(id); }, id);
+}
+
+/** Debug工具（Debug Rendering 等叠加层、FPS）的开关在菜单 设置 → Debug工具；这里走它背后的同一个接口。 */
+async function ToggleDebugTool(id) {
+  return page.evaluate((id) => window.Taierzhuang.Debug.ToggleDebugTool(id), id);
+}
+
 /** 真的按一下画布。笔刷是在 Update 里落的，所以按下与抬起之间要推几帧。 */
 async function CanvasClick(x, y) {
   await page.mouse.move(x, y);
@@ -105,7 +127,7 @@ const gearPresentation = await page.evaluate(() => {
   };
 });
 Check("右上入口改为同风格图标并保留无障碍名称",
-  gearPresentation.text === "" && gearPresentation.label === "设置与工具"
+  gearPresentation.text === "" && gearPresentation.label === "高级工具"
     && gearPresentation.width <= 42
     && gearPresentation.backgroundImage.includes("Icon_SettingsTools.png"),
   JSON.stringify(gearPresentation));
@@ -113,7 +135,7 @@ Check("右上入口改为同风格图标并保留无障碍名称",
 await page.click(".edGear");
 const byGear = await page.evaluate(() => window.Taierzhuang.Debug.Editor().panelOpen);
 Check("没拿指针锁时鼠标点齿轮能开", byGear);
-await page.click(".edGear");   // 收起来，下面走键盘那条
+await page.click(".edMenuExit");   // 收起来（开着时齿轮让位给菜单栏右端的 ×），下面走键盘那条
 
 await page.click("#bootStart");
 await Step(20);
@@ -124,46 +146,46 @@ const afterGear = await page.evaluate(() => {
   return {
     capturing: T.Debug.Editor().capturing,
     panelOpen: T.Debug.Editor().panelOpen,
-    entries: document.querySelectorAll(".edPanel.launcher [data-editor]").length,
-    squadMarch: !!document.querySelector('.edPanel.launcher [data-editor="squadMarch"]'),
-    facial: !!document.querySelector('.edPanel.launcher [data-editor="facial"]'),
-    frameDebugger: !!document.querySelector('.edPanel.launcher [data-editor="frameDebugger"]'),
-    textures: !!document.querySelector('.edPanel.launcher [data-editor="textures"]'),
-    blockout: !!document.querySelector('.edPanel.launcher [data-editor="blockout"]'),
+    entries: document.querySelectorAll("#edRoot .edMenuBar [data-editor]").length,
+    menus: [...document.querySelectorAll("#edRoot .edMenuTitle")].map((el) => el.textContent),
+    barVisible: !!document.querySelector("#edRoot .edMenuBar")?.getClientRects().length,
+    squadMarch: !!document.querySelector('#edRoot .edMenuBar [data-editor="squadMarch"]'),
+    facial: !!document.querySelector('#edRoot .edMenuBar [data-editor="facial"]'),
+    textures: !!document.querySelector('#edRoot .edMenuBar [data-editor="textures"]'),
+    orchestration: !!document.querySelector('#edRoot .edMenuBar [data-editor="orchestration"]'),
+    blockout: !!document.querySelector('#edRoot .edMenuBar [data-editor="blockout"]'),
+    // 设置三页与 Debug工具不再在高级工具里
+    settingsInBar: ["graphics", "sound", "controls"].some((id) => document.querySelector(`#edRoot [data-editor="${id}"]`)),
+    debugInBar: ["debugRendering", "profiler", "frameDebugger", "worldInfo", "playerState", "ai"]
+      .some((id) => document.querySelector(`#edRoot [data-editor="${id}"]`)) || !!document.querySelector('[data-action="fps"]'),
+    emptyInspector: !document.querySelector("#edRoot .edInspectorEmpty")?.hidden,
   };
 });
-Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
+Check("打游戏当中按 ` 弹出高级工具", afterGear.panelOpen && afterGear.capturing && afterGear.barVisible && afterGear.emptyInspector,
   `进游戏时指针锁=${locked}`);
-// 三个设置 + 六个「调试」叠加层（渲染调试/性能剖析/Frame Debugger/WorldInfo/玩家状态/敌军 AI）
-// + 十七个「编辑器」（十六个含小队行进，加上关卡编排 —— 它语义上仍是叠加层，
-//   但按钮画在编辑器组里）+ 贴图管理 + 白盒关卡编辑器（2026-10-13，整页跳转入口）
-// + 一个「全部关掉」（data-editor 是空串，也被选择器数进来）
-Check("面板列出设置、调试与全部编辑器入口", afterGear.entries === 30 && afterGear.squadMarch && afterGear.facial && afterGear.frameDebugger && afterGear.textures && afterGear.blockout, `按钮数=${afterGear.entries}，小队行进=${afterGear.squadMarch}，人物面部=${afterGear.facial}，Frame Debugger=${afterGear.frameDebugger}，贴图管理=${afterGear.textures}，白盒关卡编辑器=${afterGear.blockout}`);
+// 菜单栏：游戏 + 六个工具菜单；十七个互斥编辑器 + 关卡编排 + 贴图管理 + 白盒关卡编辑器（整页跳转入口）= 20 个条目
+Check("菜单栏列出全部编辑器入口", afterGear.entries === 20
+  && afterGear.menus.join(",") === "游戏,场景,关卡,角色,武器,特效与声音,资产"
+  && afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.orchestration && afterGear.blockout,
+  `条目=${afterGear.entries}，菜单=${afterGear.menus.join("/")}，白盒关卡编辑器=${afterGear.blockout}`);
+Check("设置三页与 Debug工具不在高级工具里", !afterGear.settingsInBar && !afterGear.debugInBar);
 const fpsDefault = await page.evaluate(() => {
   const fps = document.querySelector(".hudFps");
-  const toggle = document.querySelector('[data-action="fps"]');
   const rect = fps.getBoundingClientRect();
-  return {
-    hidden: fps.hidden,
-    left: rect.left,
-    top: rect.top,
-    pressed: toggle?.getAttribute("aria-pressed"),
-    label: toggle?.textContent,
-  };
+  const state = window.Taierzhuang.Debug.DebugTools().find((tool) => tool.id === "fps");
+  return { hidden: fps.hidden, left: rect.left, top: rect.top, on: state?.on, available: state?.available };
 });
-Check("FPS 默认显示在左上角且调试开关同步为开启",
-  !fpsDefault.hidden && fpsDefault.left <= 12 && fpsDefault.top <= 12
-    && fpsDefault.pressed === "true" && fpsDefault.label === "FPS 显示：开",
+Check("FPS 默认开启，Debug工具里的开关同步为开",
+  !fpsDefault.hidden && fpsDefault.on === true && fpsDefault.available === true,
   JSON.stringify(fpsDefault));
-await page.click('[data-action="fps"]');
-const fpsHidden = await page.evaluate(() => ({
-  hidden: document.querySelector(".hudFps").hidden,
-  pressed: document.querySelector('[data-action="fps"]').getAttribute("aria-pressed"),
-}));
-Check("调试开关可隐藏 FPS 并同步状态", fpsHidden.hidden && fpsHidden.pressed === "false",
+const fpsHidden = await ToggleDebugTool("fps");
+Check("Debug工具可隐藏 FPS 并同步状态",
+  await page.evaluate(() => document.querySelector(".hudFps").hidden) && fpsHidden.find((tool) => tool.id === "fps").on === false,
   JSON.stringify(fpsHidden));
-await page.click('[data-action="fps"]');
-Check("调试开关可恢复 FPS", await page.isVisible(".hudFps"));
+await ToggleDebugTool("fps");
+await page.evaluate(() => window.Taierzhuang.editor.TogglePanel(false));
+Check("Debug工具可恢复 FPS", await page.isVisible(".hudFps"));
+await page.evaluate(() => window.Taierzhuang.editor.TogglePanel(true));
 
 // 玩法真的停了：推 60 帧，state.elapsed 只应该被编辑器那条分支加，AI 不许再动
 const paused = await page.evaluate(() => {
@@ -181,16 +203,16 @@ Check("面板开着时玩法暂停",
 if(process.argv.includes('--launcher-only')){
   const editorBeforePopup = await page.evaluate(() => window.Taierzhuang.Debug.Editor());
   const popupReady = page.waitForEvent("popup");
-  await page.click('[data-editor="textures"]'); const texturePopup = await popupReady;
+  await ClickTool("textures"); const texturePopup = await popupReady;
   await texturePopup.waitForFunction(count => document.querySelectorAll(".asset").length === count, TextureCatalog().length, { timeout: 30000 });
   const editorAfterPopup = await page.evaluate(() => window.Taierzhuang.Debug.Editor());
   Check("贴图管理打开真实独立窗口", texturePopup.url().includes("TextureManager.html"));
   Check("独立窗口不改变当前编辑器状态", JSON.stringify(editorBeforePopup) === JSON.stringify(editorAfterPopup));
   const windows = page.context().pages().length;
-  await page.click('[data-editor="textures"]');
+  await ClickTool("textures");
   Check("再次点击聚焦原窗口", page.context().pages().length === windows && !texturePopup.isClosed());
-  await page.click(".edGear");
-  Check("关闭设置面板不关闭贴图窗口", !texturePopup.isClosed());
+  await page.click(".edMenuExit");
+  Check("退出高级工具不关闭贴图窗口", !texturePopup.isClosed());
   await texturePopup.close();
   await browser.close();server.close();
   const failed=results.filter(r=>!r.ok);
@@ -200,7 +222,7 @@ if(process.argv.includes('--launcher-only')){
 
 // 资产规范是构件库之外的独立只读分类。它不摆模型，但必须把原始/实际/限制/贴图
 // 与七类入口真实摆出来；只注册一个空按钮不算完成。
-await page.click('[data-editor="assetStandards"]');
+await ClickTool("assetStandards");
 await Step(2);
 const assetStandards = await page.evaluate(() => {
   const panel = document.querySelector(".edPanel.assetStandards");
@@ -225,11 +247,11 @@ Check("资产表展示原始/实际/限制/降幅/贴图", assetStandards.rows >
 Check("枪械表显示捷克式原始 7,811 与实际 7,781", assetStandards.text.includes("7,811")
   && assetStandards.text.includes("7,781"));
 Check("资产规范当前没有不合规红项", assetStandards.bad === 0, `红项=${assetStandards.bad}`);
-await page.click('[data-editor="assetStandards"]');
+await ClickTool("assetStandards");
 
 // Debug Rendering 是观察工具，不可被互斥编辑器的切换顺手销毁。它要真的把
 // NormalDepth 靶送到屏幕，不能只是 DOM 面板里一串假的状态文字。
-await page.click('[data-editor="debugRendering"]');
+await ToggleDebugTool("debugRendering");
 await Step(6);
 const debugRendering = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -604,7 +626,7 @@ Check("Debug Rendering：透视（关深度测试）比贴面模式画出更多�
 
 // 点击 range 后浏览器会把键盘焦点留在滑杆上。编辑器不能因为这个焦点
 // 就不再收到 WASD：场景编辑器的飞行镜头仍应继续移动。
-await page.click('[data-editor="scene"]');
+await ClickTool("scene");
 await Step(4);
 const debugOverlayPersists = await page.evaluate(() => window.Taierzhuang.Debug.Editor());
 Check("打开其它编辑器时 Debug Rendering 保持叠加", debugOverlayPersists.active === "scene"
@@ -729,10 +751,10 @@ Check("继续之后按原样接回来",
 // ---------------------------------------------------------------------------
 // 1c) 操作、画质与音效设置面板
 // ---------------------------------------------------------------------------
-await page.click('[data-editor="controls"]');
+await OpenSettings("controls");
 await Step(3);
 const controls = await page.evaluate(() => ({
-  id: window.Taierzhuang.editor.ActiveId,
+  id: window.Taierzhuang.settings.ActiveId,
   title: document.querySelector(".edPanel.work .edTitle")?.textContent || "",
   rows: document.querySelectorAll(".edControlRow").length,
   text: document.querySelector(".edPanel.work")?.textContent || "",
@@ -742,12 +764,12 @@ Check("操作面板：列出真实快捷键与情境动作",
   && controls.text.includes("拾枪、换枪") && controls.text.includes("包扎止血"),
   `${controls.title} · ${controls.rows} 行`);
 
-await page.click('[data-editor="graphics"]');
+await OpenSettings("graphics");
 await Step(6);
 const gfx = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const before = { w: T.post.width, h: T.post.height, shadow: T.renderer.shadowMap.enabled };
-  const g = T.editor.active;
+  const g = T.settings.active;
   g.gfx.renderScale = 0.6;
   g.gfx.bloom = 0.25;
   g.gfx.fov = 62;
@@ -757,7 +779,7 @@ const gfx = await page.evaluate(() => {
     outW: T.post.outputWidth, outH: T.post.outputHeight, taau: !!T.post.taauActive };
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem("tengxian1938_graphics_v1")); } catch (e) { saved = null; }
-  return { id: T.editor.ActiveId, before, after, saved, fov: T.camera.fov,
+  return { id: T.settings.ActiveId, before, after, saved, fov: T.camera.fov,
     inner: [window.innerWidth, window.innerHeight] };
 });
 // 出厂 renderScale 跟画质档走（TAAU：high 是 0.8），所以不能拿「比出厂小 30%」当判据 ——
@@ -902,7 +924,7 @@ Check("画质面板：自阴影软化可热切（2048 靶 / 软化分支）并�
 // 留张图下一轮直接看。
 await page.screenshot({ path: path.join(projectDir, "_shots", "editor_graphics_panel.png") });
 
-await page.click('[data-editor="sound"]');
+await OpenSettings("sound");
 await Step(6);
 const snd = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -910,11 +932,11 @@ const snd = await page.evaluate(() => {
   audio.SetBusVolume("ambience", 0.3);
   audio.SetMasterVolume(0.7);
   audio.voiceMute = true;
-  T.editor.active.Save();
+  T.settings.active.Save();
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem("tengxian1938_audio_v1")); } catch (e) { saved = null; }
   return {
-    id: T.editor.ActiveId,
+    id: T.settings.ActiveId,
     mix: audio.mix.ambience,
     node: audio.ambienceUser ? +audio.ambienceUser.gain.value.toFixed(2) : null,
     barked: audio.Bark("rally", { priority: true }),
@@ -933,10 +955,10 @@ Check("音效面板：配音开关生效 + 设置落盘",
 // （这个套件后面还要再开一次页面验出图模式）。
 await page.evaluate(() => {
   const T = window.Taierzhuang;
-  T.editor.active.Reset();          // 音效
-  T.editor.Open("graphics");
-  T.editor.active.Reset();          // 画质（fov / renderScale 都在这儿回 55 / 1.0）
-  T.editor.Close();
+  T.settings.active.Reset();          // 音效
+  T.settings.Open("graphics");
+  T.settings.active.Reset();          // 画质（fov / renderScale 都在这儿回 55 / 1.0）
+  T.settings.Close();
   T.audio.voiceMute = false;
   try {
     localStorage.removeItem("tengxian1938_graphics_v1");
@@ -959,7 +981,7 @@ const baseline = await page.evaluate(() => {
 // ---------------------------------------------------------------------------
 // 2) 人物动作编辑器
 // ---------------------------------------------------------------------------
-await page.click('[data-editor="actor"]');
+await ClickTool("actor");
 await Step(20);
 const actor = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
@@ -1298,7 +1320,7 @@ Check("移动胶囊跟着姿态换档（站 0 / 卧 2）",
 // ---------------------------------------------------------------------------
 // 3) 枪械编辑器
 // ---------------------------------------------------------------------------
-await page.click('[data-editor="weapon"]');
+await ClickTool("weapon");
 await Step(15);
 const weapon = await page.evaluate(async () => {
   const editor = window.Taierzhuang.editor;
@@ -1410,7 +1432,7 @@ Check("军刀台架取消人物动作轴，改为横向检视", weapon.swordInsp
 // ---------------------------------------------------------------------------
 // 4) 特效预览编辑器
 // ---------------------------------------------------------------------------
-await page.click('[data-editor="vfx"]');
+await ClickTool("vfx");
 await Step(90);
 const vfxEditor = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -1462,7 +1484,7 @@ Check("特效预览器可重播瞬时爆炸且 shader 无 GL 错误",
 // ---------------------------------------------------------------------------
 // 5) 音效音乐编辑器
 // ---------------------------------------------------------------------------
-await page.click('[data-editor="audio"]');
+await ClickTool("audio");
 await Step(10);
 const audio = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
@@ -1554,7 +1576,7 @@ Check("每个配方都有分类与说明", undescribed.length === 0,
 // ---------------------------------------------------------------------------
 // 6) Timeline 编辑器
 // ---------------------------------------------------------------------------
-await page.click('[data-editor="timeline"]');
+await ClickTool("timeline");
 await Step(10);
 const timeline = await page.evaluate(() => {
   const editor = window.Taierzhuang.editor;
@@ -1654,7 +1676,7 @@ await page.evaluate(() => window.Taierzhuang.editor.active.Stop());
 // ---------------------------------------------------------------------------
 // 7) 拆分后的场景关卡编辑器
 // ---------------------------------------------------------------------------
-await page.click('[data-editor="scene"]');
+await ClickTool("scene");
 await Step(15);
 const scene = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -1956,7 +1978,7 @@ await page.evaluate(() => {
 // ---------------------------------------------------------------------------
 // 6c) 构件库预览器
 // ---------------------------------------------------------------------------
-await page.click('[data-editor="props"]');
+await ClickTool("props");
 await Step(8);
 const props = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -2291,7 +2313,7 @@ Check("构件库覆盖正式战场新增的带署名外部 GLB",
 // ---------------------------------------------------------------------------
 // 6d) 地形编辑器：共享场景文档 + 物体/碰撞随地高同步
 // ---------------------------------------------------------------------------
-await page.click('[data-editor="terrain"]');
+await ClickTool("terrain");
 await Step(8);
 const terrainLift = await page.evaluate(() => {
   const T = window.Taierzhuang;
@@ -2459,14 +2481,14 @@ await page.evaluate(() => {
 
 // 换关：先在场景关卡编辑器布设，再切到地形编辑器落笔。两边共享的文档、碰撞盒、
 // GroundHeight 与顶点位移都必须搬到新 city，且必须等 state.ready 之后再搬。
-await page.click('[data-editor="scene"]');
+await ClickTool("scene");
 await Step(4);
 await page.evaluate(() => {
   const active = window.Taierzhuang.editor.active;
   active.SetPalette("Well");
   active.Place(12, 12);
 });
-await page.click('[data-editor="terrain"]');
+await ClickTool("terrain");
 await Step(4);
 await page.evaluate(() => {
   const active = window.Taierzhuang.editor.active;
@@ -2505,15 +2527,19 @@ await page.evaluate(() => {
 // ---------------------------------------------------------------------------
 // 7) 关掉之后有没有还干净
 // ---------------------------------------------------------------------------
-await page.click('.edPanel.launcher .edBtn.danger');   // 全部关掉
-await page.keyboard.press("Backquote");                       // 收面板
+// 「全部关掉」随入口面板一起去掉了：Debug工具在 设置 → Debug工具 里各自关，高级工具按 ` 退出。
+await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  for (const tool of T.Debug.DebugTools()) if (tool.on && tool.id !== "fps") T.Debug.ToggleDebugTool(tool.id);
+});
+await page.keyboard.press("Backquote");                       // 退出高级工具
 await Step(20);
 const restored = await page.evaluate(() => {
   const T = window.Taierzhuang;
   return {
     capturing: T.Debug.Editor().capturing,
     active: T.Debug.Editor().active,
-    // 「全部关掉」按字面办：keepOnClose 的 Debug Rendering 也要收，送屏回到最终画面
+    // Debug工具里关掉 keepOnClose 的 Debug Rendering 之后，送屏回到最终画面
     debugRendering: T.Debug.Editor().debugRendering,
     debugView: T.Debug.Editor().debugView,
     matMode: T.library.gi ? T.library.gi.debugView.value : 0,
@@ -2532,7 +2558,7 @@ const restored = await page.evaluate(() => {
   };
 });
 Check("关掉后不再接管", !restored.capturing && restored.active === null);
-Check("「全部关掉」连 keepOnClose 的 Debug Rendering 也收、送屏回到最终画面",
+Check("Debug工具里关掉 Debug Rendering 后送屏回到最终画面",
   !restored.debugRendering && restored.debugView === "final" && restored.matMode === 0,
   JSON.stringify({ debugRendering: restored.debugRendering, debugView: restored.debugView, matMode: restored.matMode }));
 Check("Debug Rendering 关掉后着色模式还回着色、调试叠加层清空",

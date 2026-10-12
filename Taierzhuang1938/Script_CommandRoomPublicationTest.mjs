@@ -10,6 +10,10 @@ const stage=path.join(root,'tmp/CapWallPublish'),out=path.join(project,'_shots/C
 await fs.mkdir(stage,{recursive:true});
 for(const file of ['Script_ModelImports.mjs','Script_TextureImports.mjs','Data_AssetPublishRuntime.mjs','Data_TextureImportRuntime.mjs'])await fs.copyFile(path.join(project,file),path.join(stage,file));
 const textureFiles=(await fs.readdir(path.join(project,'Texture'))).filter(x=>x.startsWith('Texture_CommandRoom'));
+// Progress letters live below Menu/CommandRoom; include the actual foreground
+// textures so font edits are compared after GPU publication as well.
+for(const file of (await fs.readdir(path.join(project,'Texture/Menu/CommandRoom'))).filter(x=>x.startsWith('Texture_CommandRoomLetter')))
+ textureFiles.push('Menu/CommandRoom/'+file);
 const report=await BuildPublishAssets(project,stage,{textureFiles,modelFiles:[],cacheDir:path.join(root,'tmp/CapWallGpuCache')});
 const runtime=await fs.readFile(path.join(stage,'Data_TextureImportRuntime.mjs'),'utf8');
 const entries=JSON.parse(runtime.match(/=\s*([\s\S]*);\s*$/)[1]);
@@ -40,8 +44,16 @@ try{
   await page.goto(`http://127.0.0.1:${server.address().port}/CapWallPublishedFixture`);
   await page.waitForFunction(()=>window.ready,{},{timeout:120000});
   if(errors.length)throw Error(errors.join('\n'));
-  const name=published?'Published':'Source',file=path.join(out,`Scene_CapWall${name}.png`);
-  await page.screenshot({path:file});shots.push(await sharp(file).removeAlpha().raw().toBuffer());
+  const name=published?'Published':'Source',frames=[];
+  for(const stage of [0,2,5]){
+   await page.evaluate(async stage=>{
+    const {COMMAND_ROOM_CAMPAIGN_IDS}=await import('./Data_CommandRoomPapers.mjs');
+    await room.SetProgress({cleared:COMMAND_ROOM_CAMPAIGN_IDS.slice(0,stage)});room.Render();
+   },stage);
+   const file=path.join(out,stage===0?`Scene_CapWall${name}.png`:`Scene_CapWall${name}Letter${stage}.png`);
+   await page.screenshot({path:file});frames.push(await sharp(file).removeAlpha().raw().toBuffer());
+  }
+  shots.push(Buffer.concat(frames));
   await page.close();
  }
  const a=shots[0],b=shots[1],differences=[];let total=0;

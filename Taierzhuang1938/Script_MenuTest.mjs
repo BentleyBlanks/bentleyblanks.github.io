@@ -514,12 +514,15 @@ async function CheckInterface() {
   await page.evaluate(()=>window.Taierzhuang.Debug.MenuAct('settings'));
   await page.locator('[data-setting="tools"]').click();
   await page.waitForFunction(() => window.Taierzhuang?.editor?.panelOpen, null, {timeout: 240000});
+  // 高级工具是菜单栏 + Inspector：先点「武器」菜单，再点下拉里的「枪械」
+  await page.locator('#edRoot .edMenu[data-menu="weapon"] > .edMenuTitle').click();
   await page.locator('[data-editor="weapon"]').click();
   await page.evaluate(()=>window.Taierzhuang.StepFrames(10));
   await Shot("Weapon");
-  Check('编辑器工作窗关闭按钮可聚焦',await page.locator('.edPanel.work .edX').evaluate(el=>el.tagName==='BUTTON'&&!!el.getAttribute('aria-label')));
+  Check('编辑器工作窗关闭按钮可聚焦',await page.locator('#edRoot .edPanel.work .edX').evaluate(el=>el.tagName==='BUTTON'&&!!el.getAttribute('aria-label')));
   const popupPromise=page.waitForEvent('popup');
-  await page.locator('[data-editor="profiler"]').click();
+  // Profiler 属于 设置 → Debug工具；这里走那一页背后的同一个开关
+  await page.evaluate(()=>window.Taierzhuang.Debug.ToggleDebugTool('profiler'));
   const popup=await popupPromise;
   await popup.waitForFunction(()=>getComputedStyle(document.body).fontFamily.includes('Arial'));
   Check('独立性能窗口加载相同主题',await popup.locator('body').evaluate(el=>getComputedStyle(el).getPropertyValue('--ui-gold').trim()==='#dfbd68'));
@@ -527,7 +530,7 @@ async function CheckInterface() {
   await page.evaluate(()=>window.Taierzhuang.editor.CloseOverlay('profiler'));
   for(const [name,width,height] of [['Laptop',1280,720],['Mobile',390,844],['Landscape',844,390]]) {
     await page.setViewportSize({width,height});
-    const fits=await page.locator('.edPanel.work').evaluate(el=>{
+    const fits=await page.locator('#edRoot .edPanel.work').evaluate(el=>{
       const r=el.getBoundingClientRect();const body=el.querySelector('.edBody');
       return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:innerWidth,height:innerHeight,bodyOverflow:body.scrollWidth>body.clientWidth+1};
     });
@@ -768,7 +771,7 @@ await page.click('.mnItem[data-act="settings"]');
 }
 await page.click('.mnSettingsItem[data-setting="sound"]');
 Check("声音设置实际打开并沿用菜单样式", await page.evaluate(()=>
-  window.Taierzhuang.Debug.Editor().active === "sound" && document.getElementById("edRoot").classList.contains("menuSettings")));
+  window.Taierzhuang.Debug.Editor().active === "sound" && !document.getElementById("settingsRoot").classList.contains("off")));
 await page.click(".edPanel.work .edX");
 Check("关闭声音设置返回设置目录", await page.evaluate(()=>window.Taierzhuang.Debug.Menu().mode === "settings"));
 await page.keyboard.press("Escape");
@@ -1244,11 +1247,12 @@ async function CheckMissionList() {
   }));
   Check("设置里按 Esc 回到暂停菜单",
     !settingsClosed.editor.panelOpen && settingsClosed.menu.open && settingsClosed.menu.mode === "pause");
-  // 从设置回暂停层不能顺手把枪和齿轮藏了：那是**主菜单**的收口（OpenMenu），
+  // 从设置回暂停层不能顺手把枪藏了：那是**主菜单**的收口（OpenMenu），
   // 抄到暂停这条路上就成了「从设置回来手里空了」——拿大刀时整只手都没了，
   // 而且不换关不重生再也回不来（SwitchSlot 不碰 root.visible）。
-  Check("从设置回暂停层，手里的枪与齿轮都还在",
-    settingsClosed.viewmodel === true && !settingsClosed.editor.hidden,
+  // 开发工具层（齿轮、Debug工具浮窗）在暂停菜单上本来就收着，「继续」时还原（下面验）。
+  Check("从设置回暂停层，手里的枪还在、开发工具层随暂停菜单收着",
+    settingsClosed.viewmodel === true && settingsClosed.editor.hidden,
     `viewmodel=${settingsClosed.viewmodel} gearHidden=${settingsClosed.editor.hidden}`);
 
   // 玩家说的「点击了设置界面」指的是真的点**进**操作 / 画质 / 音效那三页，
@@ -1270,7 +1274,7 @@ async function CheckMissionList() {
       on.active === id && on.visible === true && on.weapon === "Dadao", JSON.stringify(on));
     // 点这一页自己的 ×（不是面板的 ×，也不是 Esc）：玩家最常用的那个关法
     await page.evaluate(() => {
-      document.querySelector("#edRoot .edPanel.work .edX").click();
+      document.querySelector("#settingsRoot .edPanel.work .edX").click();
     });
     await page.evaluate(() => window.Taierzhuang.StepFrames(2));
     const off = await page.evaluate(() => ({
@@ -1335,6 +1339,7 @@ async function CheckMissionList() {
   Check("「继续」把还开着的设置面板一并收掉（否则世界还冻着、点击全被吃）",
     !resumed.editor.panelOpen && !resumed.editor.capturing && resumed.locked === true,
     JSON.stringify(resumed.editor) + ` locked=${resumed.locked}`);
+  Check("「继续」后开发工具层（齿轮）回来", !resumed.editor.hidden, JSON.stringify(resumed.editor));
   const audioBack = await page.evaluate(() => window.Taierzhuang.audio.paused);
   Check("继续之后背景音接回来", audioBack === false, `audio.paused=${audioBack}`);
   const hudBack = await page.evaluate(() => getComputedStyle(document.getElementById("hud")).display);
@@ -1448,9 +1453,10 @@ async function CheckMissionList() {
     panelOpen: window.Taierzhuang.Debug.Editor().panelOpen,
     text: document.querySelector('[data-action="main-menu"]')?.textContent || "",
   }));
-  Check("设置菜单里有返回主菜单选项",
+  Check("高级工具的「游戏」菜单里有返回主菜单选项",
     option.panelOpen && option.text.trim() === "返回主菜单", JSON.stringify(option));
 
+  await page.click('#edRoot .edMenu[data-menu="game"] > .edMenuTitle');
   await page.click('[data-action="main-menu"]');
   await page.evaluate(() => window.Taierzhuang.StepFrames(30));
   const returned = await page.evaluate(() => ({

@@ -12,6 +12,6 @@
   "sunDirection": [1.15, -1.72, -1.0],
   "sunStrength": 3.6,
   "entry": {"centerX": -0.5, "widthM": 1.0, "heightM": 2.1, "skyWatts": 6.5},
-  "propOffsets": {"Letter": [0.08, 0.1845, 0], "PencilTray": [0.06, 0.235, 0], "Cap": [0.18, 0.28, 0], "InkBottle": [0.275, -0.075, 0], "DipPen": [0.238, -0.01, 0], "Ruler": [0.19, 0.405, 0]},
+  "propOffsets": {"Letter": [0.08, 0.1845, 0], "PencilTray": [0.035, 0.193, 0], "Cap": [0.18, 0.28, 0], "InkBottle": [0.275, -0.075, 0], "DipPen": [0.238, -0.01, 0], "Ruler": [0.19, 0.405, 0]},
   "note": "Keep the approved camera and architecture. Pull the enlarged letter forward, set the cap farther back, and rest a corner of the pencil tray on the letter's upper margin without covering the writing. Dim diffuse fill while keeping the window sunlight on the letter."
 }
