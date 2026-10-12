@@ -5,13 +5,16 @@
 //   - Ask: each slap swims the struck side of the frame (the composite's uSideDaze really gets it);
 //   - loading phases: the world rifle stays hidden (one loading rifle on screen);
 //   - no actor is taken out of the scene and put back within one frame (AI and director culling two frusta);
-// and once the director lets go of the view (Released, then the rifle pickup into RearTrench) nothing of the
-// lens remains: Perception().lens null, the HUD mud / flash layers off, uRadialBlur 0, uBloodEdge.w 0, the
-// director's blood cap lifted. Also: no OpeningLens "has run … without" warning on the way.
+// and once the director lets go of the view (Released, the same frame RearTrench begins: Luo shoves the rifle into his
+// hands, no pickup) the lens is off: Perception().lens null, the HUD mud / flash layers off, uRadialBlur 0, uBloodEdge.w 0,
+// uSideDaze 0, the director's blood cap lifted; only the concussion residue and the cheek cut's streak stay and fade out
+// over perception.releaseDecayS (2026-10-12). Also: no OpeningLens "has run … without" warning on the way.
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { OpenCampaign, CloseCampaign, CaptureFailure } from "./Script_FirstLevelCampaignKit.mjs";
+import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
+import { LENS_CHEEK_RESIDUE } from "./Data_OpeningLens.mjs";
 
 const ctx = await OpenCampaign({ suite: "OpeningLensBrowser", quality: "low", stageFrom: 1, stageTo: 3 });
 const { page, output } = ctx;
@@ -75,7 +78,6 @@ try {
   await fs.writeFile(path.join(output, "Data_OpeningLensProbe.json"), JSON.stringify({ state, probe, warnings }, null, 2));
   console.log("PHASES", probe.order.join(" "));
   console.log("DRAWN", JSON.stringify(probe.drawn));
-  assert.equal(state.phase, "Released", "the director reaches the hand-back");
   const P = probe.phases;
   // Inside 01–02 the lens is on every frame the director owns the view.
   for (const phase of ["Banter", "Blast", "Wake", "Interrogation", "Found", "Hold", "Ask", "Charge", "Lift"])
@@ -96,32 +98,58 @@ try {
   console.log("SLAPS", JSON.stringify(probe.slapDrawn));
   assert.ok(probe.slapDrawn.length >= 2, `both slaps land (${probe.slapDrawn.length})`);
   for (const d of probe.slapDrawn) assert.ok(d.sideDaze > .8 && Math.sign(d.sideDazeSide) === Math.sign(d.side), `the composite swims the struck side (${JSON.stringify(d)})`);
-  assert.ok(probe.slapDrawn.some((d) => d.side > 0) && probe.slapDrawn.some((d) => d.side < 0), "one forehand (left side), one backhand (right side)");
-  // ---- leaving 01–02: nothing remains --------------------------------------------------------------
-  const Residue = () => page.evaluate(() => {
-    const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
-    g.StepFrames(3, 1 / 60, true);
-    return { stage: r.flow.stage.id, phase: r.frontShow.bunker?.phase ?? null, lens: r.Perception().lens, ...window.lensProbe.Drawn() };
+  // 2026-10-12 R4-Gates: both blows are forehands on his left cheek since 2026-09-29 (a backhand is not seen from the pinned
+  // eye; Data_OpeningStoryboards rescue.slap.blows side +1, +1). This still asked for one forehand and one backhand.
+  const blowSides = C.rescue.slap.blows.map((blow) => Math.sign(blow.side));
+  assert.deepEqual(probe.slapDrawn.slice(0, blowSides.length).map((d) => Math.sign(d.side)), blowSides,
+    `the slaps land on the sides rescue.slap.blows gives (${JSON.stringify(blowSides)}: forehands on the left cheek)`);
+  // ---- the hand-back ---------------------------------------------------------------------------------
+  // 2026-10-12 R4-Gates, current hand-back (docs/Data_OpeningSelfRescue20260930.md, Data_OpeningRedraft20261011Contract.md):
+  // Luo shoves the rifle into his hands, so Released hands the player control and RearTrench (Withdraw) begins in the same
+  // frame -- no F pickup any more, and the Released phase is never on screen for a whole frame. The lens itself is off from
+  // that frame (Perception().lens null, HUD mud / flash off, radial blur, side daze and blood edge 0, blood cap lifted); what
+  // stays is the director's concussion residue and, from the cheek cut, its streak on the left cheek
+  // (ReleasedPerception: LENS_CHEEK_RESIDUE x (1 - Smooth(t / releaseDecayS))), fading out over releaseDecayS.
+  const handBack = await page.evaluate(() => {
+    const s = window.Tengxian.Debug.FirstLevelMissionRuntime().frontShow.bunker;
+    return { released: s.beats.has("Released"), releaseAt: s.releaseAt, cut: s.flags["cut:cheek"] != null };
   });
-  const Clean = (at, x) => {
+  assert.ok(handBack.released && handBack.releaseAt != null && !["Trapped", "BunkerRescue"].includes(state.stage),
+    `the director reaches the hand-back and 02's withdrawal begins (${JSON.stringify({ ...handBack, stage: state.stage, phase: state.phase })})`);
+  assert.ok(handBack.cut, "the recruit's cheek cut happened (its streak is the residue checked below)");
+  const decayS = C.perception.releaseDecayS;
+  const Residue = (afterS) => page.evaluate(({ afterS }) => {
+    const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime(), s = r.frontShow.bunker;
+    // The withdrawal's pursuers are live; the lens is what is measured here, so the player is kept standing.
+    for (let i = 0; i < 6000 && r.time - s.releaseAt < afterS; i++) { g.player.health = Math.max(g.player.health, 1e6); g.StepFrames(1, 1 / 60, false); }
+    g.StepFrames(3, 1 / 60, true);
+    const U = g.post.uniformsComposite;
+    return { t: +(r.time - s.releaseAt).toFixed(2), stage: r.flow.stage.id, phase: s.phase, lens: r.Perception().lens,
+      concussion: U.uConcussion.value.x, cheek: U.uCheekCut.value.toArray(), ...window.lensProbe.Drawn() };
+  }, { afterS });
+  const Clean = (x) => {
+    const at = `${x.stage} +${x.t} s`;
     assert.equal(x.lens, null, `${at}: Perception().lens is null`);
     assert.ok(!x.mudOn && !x.flashOn && x.mudOpacity === 0 && x.flashOpacity === 0, `${at}: HUD mud / flash layers off (${JSON.stringify(x)})`);
     assert.equal(x.radialBlur, 0, `${at}: uRadialBlur 0`); assert.equal(x.bloodEdge, 0, `${at}: uBloodEdge.w 0`); assert.equal(x.sideDaze, 0, `${at}: uSideDaze.y 0`);
     assert.equal(x.bloodCap, 1, `${at}: the director's blood layer is uncapped`);
+    assert.equal(x.cheek[0], 0, `${at}: no white sting after the hand-back`);
   };
-  const released = await Residue();
-  console.log("RELEASED", JSON.stringify(released));
-  Clean("Released", released);
-  // The real pickup (F on the rifle) starts RearTrench, outside the storyboard.
-  await page.evaluate(() => { const g = window.Tengxian; g.Debug.Key("KeyF", true); g.StepFrames(90, 1 / 60, false); g.Debug.Key("KeyF", false); g.StepFrames(10, 1 / 60, true); });
-  let after = null;
-  for (let i = 0; i < 20; i++) { after = await Residue(); if (after.stage !== "BunkerRescue" && after.stage !== "Trapped") break; }
-  console.log("AFTER", JSON.stringify(after));
-  assert.ok(!["Trapped", "BunkerRescue"].includes(after.stage), `the pickup leaves 01–02 (stage ${after.stage})`);
-  Clean(after.stage, after);
+  const residue = [];
+  for (const afterS of [0, decayS * 0.25, decayS * 0.6, decayS + 0.5]) residue.push(await Residue(afterS));
+  console.log("RESIDUE", JSON.stringify(residue.map(({ lens, ...x }) => ({ ...x, lens }))));
+  for (const x of residue) Clean(x);
+  const [first, ...later] = residue, last = residue.at(-1);
+  assert.ok(first.concussion > 0 && first.cheek[1] === 1 && first.cheek[2] > LENS_CHEEK_RESIDUE * 0.9,
+    `at the hand-back the concussion residue and the cheek streak (strength ${LENS_CHEEK_RESIDUE}) are there (${JSON.stringify(first)})`);
+  for (let i = 1; i < residue.length - 1; i++)
+    assert.ok(residue[i].concussion < residue[i - 1].concussion && residue[i].cheek[2] < residue[i - 1].cheek[2] && residue[i].cheek[2] > 0,
+      `the residue fades over releaseDecayS (${decayS} s): ${JSON.stringify(residue.map((x) => [x.t, +x.concussion.toFixed(3), +x.cheek[2].toFixed(3)]))}`);
+  assert.ok(last.concussion === 0 && last.cheek[2] === 0, `${decayS + 0.5} s after the hand-back nothing of 01–02 is left (${JSON.stringify(last)})`);
+  assert.ok(later.every((x) => !["Trapped", "BunkerRescue"].includes(x.stage)), "the residue is sampled in the withdrawal, outside 01–02");
   assert.deepEqual(warnings, [], "no OpeningLens event warnings (every event the looks wait for arrived)");
   ok = true;
-  console.log(`ok opening lens in the page: slaps ${probe.slapDrawn.map((d) => d.sideDaze.toFixed(2)).join("/")} on the struck side, first-person mud through Found, residue-free at Released and ${after.stage}`);
+  console.log(`ok opening lens in the page: slaps ${probe.slapDrawn.map((d) => d.sideDaze.toFixed(2)).join("/")} on the struck side, first-person mud through Found, lens off at the hand-back, concussion and cheek streak gone ${decayS} s later`);
 } catch (error) {
   await CaptureFailure(ctx).catch(() => {});
   throw error;
