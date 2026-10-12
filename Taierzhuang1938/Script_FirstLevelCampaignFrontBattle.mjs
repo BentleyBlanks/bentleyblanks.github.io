@@ -13,6 +13,7 @@ import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { TANK } from "./Data_Tuning_Tank.mjs";
 import { FIRST_LEVEL_CHECKPOINT_FRONT_LOST } from "./Data_FirstLevelMissionStages.mjs";
+import { FRONT_NEST_FRONT_POSTS } from "./Data_FirstLevelMissionFront.mjs";
 import { InstallSpeakerActing, CheckFrontActing } from "./Script_FirstLevelCampaignOpening.mjs";
 
 // --front-clear-from-door: see ClearNestFromDoor below (opt-in, not the gate default since the 09-25 review).
@@ -477,7 +478,9 @@ export async function DriveFrontBattle(ctx){
         const evading=window.MissionInputDriver.EvadeGrenade();
         // Anyone who walks up to the junction is answered like a player would (09-25 TankProbe: flank man A came
         // through the abandoned nest to the rear door, 1.1 m off, and bled the waiting bot out while it only watched).
-        const close=evading?null:window.MissionInputDriver.Target?.(8);
+        // 2026-10-12 second round: once the Japanese are in the nest's front half (nestFrontContested, 10-14 m off), the
+        // fight across the yard is 04's gate (nestFrontCleared) - the bot shoots them like a player would.
+        const close=evading?null:window.MissionInputDriver.Target?.(r.Has("nestFrontContested")&&!r.Has("nestFrontCleared")?20:8);
         if(close)window.MissionInputDriver.Shoot(close);
         else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);}
         if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
@@ -489,6 +492,10 @@ export async function DriveFrontBattle(ctx){
       return {stage:r.flow.stage.id,alive:g.player.alive,d:Math.hypot(p.x-x,p.z-z),at:[+p.x.toFixed(2),+p.z.toFixed(2)]};
     },S.rear);
     if(wait.stage==="Tank"||!wait.alive)break;
+    // The beat of the second round: the men in the front half, seen across the yard from the junction (one picture).
+    if(!ctx.nestFrontShot&&await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().Has("nestFrontContested"))){
+      ctx.nestFrontShot=true;await CaptureFocus("NestFrontContested",FRONT_NEST_FRONT_POSTS[1]);
+    }
     if(wait.d>2.5){
       console.log("RIGHT_REAR_REJOIN",JSON.stringify(wait));
       // Back the way the dodge went: along the ammo-house trench (S.route starts at the junction), from its nearest corner.

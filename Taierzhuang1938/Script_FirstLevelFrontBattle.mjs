@@ -682,8 +682,16 @@ export class FirstLevelFrontBattle {
         // Fallback: the player has held the junction B.rearLeaderGraceS and Luo is still on his way - go on anyway.
         if(leaderHere||r.time-this.playerAtRearAt>=B.rearLeaderGraceS){
           r.Record("rightRearReached",leaderHere?undefined:{leaderLate:true,leader:{x:+this.Leader.position.x.toFixed(1),z:+this.Leader.position.z.toFixed(1)}});
-          r.Say("BundleOrder");
         }
+      }
+      // 2026-10-12 second round: the guard's report waits until the fight for the nest's front half is over
+      // (nestFrontCleared, FrontCounterattack.NestFront) and a beat more - Luo looks at the tank, at the sap, then gives
+      // the orders. Not tied to the player still standing on the junction (the first drive of the round had him 4 m
+      // off when the clearing came and the order never followed). A fixture without the module says it at once.
+      if(r.Has("rightRearReached")&&!this.bundleOrderSaid){
+        const clearedAt=r.frontCounter?.NestFrontClearedAt;
+        const cleared=!r.frontCounter||(r.Has("nestFrontCleared")&&(clearedAt==null||r.time-clearedAt>=B.counter.nestFrontOrderPauseS));
+        if(cleared){this.bundleOrderSaid=true;r.Say("BundleOrder");}
       }
     }
   }

@@ -534,11 +534,13 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // BundleOrder / TankSpotted), so the assistant of the LMG pair, guard 7, is the one the hull MG kills in the gap.
   // Sap shells: Type 89 discharger (Data_Battle.SUPPORT.ija launcher radius 5). The sap rounds are ambient (contract §3.1:
   // baseAccuracy 0, no TTK account): sapShellDamage 0 = FireShell feedbackOnly - burst, whistle, concussion, no injury.
-  // The nest rounds are pressure, not the killer: >= 3.5 m from the player (contract), and also ambient (nestShellDamage 0).
-  // The 10-12 drives tried 110 then 40: at 110 six rounds in 40 s on a player sitting on the captured gun cost 23 hp each
-  // and killed him in 03; at 40 each round still cost 3.5-5 hp AND opened a torso wound (Player.TakeHit bleeds on any
-  // damage), nine rounds bled him out with no bandage left. A shell that lands in the yard every 10-16 s for two minutes
-  // cannot carry a wound each, so it carries the burst, the whistle and the concussion (FireShell feedbackOnly) and no hp.
+  // The nest rounds are pressure, not the killer: >= 3.5 m from the player (contract), light and bloodless hurt
+  // (FrontCounterattack.LightShellHurt, second round 10-12): shellHurtMaxHp at <= shellHurtFullM from the burst down to
+  // shellHurtMinHp at shellHurtM, no wound, never below shellHurtFloorHp. The first drives tried Blast at 110 then 40:
+  // at 110 six rounds in 40 s on a player sitting on the captured gun cost 23 hp each and killed him in 03; at 40 each round
+  // still opened a torso wound (Player.TakeHit bleeds on any damage) and nine rounds bled him out. Now a man who sits
+  // through nine rounds (10-16 s apart, 0.13 hp/s regen) is hit by the few that land inside shellHurtM and must move;
+  // the sap rounds keep sapShellHurtScale 0 (ambient, contract: no TTK account, the player is >= 6 m off anyway).
   // launcherFlightS 2.2: over SHELL.incomingMinFlightS so the whistle plays (contract: 落前 1.6 s 啸声).
   // gapRushCloseM: a bounder in rush/charge inside this (2 x gapRadiusM) shuts the window; one bounding between covers 20 m
   // out does not (the first drive showed the window fluttering every 1.5 s on far bounds, holding the first batch for 48 s).
@@ -547,7 +549,14 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   counter:Object.freeze({observeWaitM:4,observeMaxS:12,gapRadiusM:8,gapRushCloseM:16,gapGunners:Object.freeze(["FrontGunner","FrontSupportGunner"]),
     suppressLevel:.3,suppressS:2,windowStaleS:45,woundedGuard:2,woundedDragMps:1.1,woundedDownS:1.5,
     gapSacrificeGuard:7,gapKillM:1.6,gapRunMaxS:9,gapKillShots:5,
-    sapShellFirstS:8,sapShellEveryS:Object.freeze([8,14]),sapShellMax:4,sapShellPlayerClearM:6,sapShellDamage:0,
-    nestShellFirstS:40,nestShellEveryS:Object.freeze([10,16]),nestShellPlayerClearM:3.5,nestShellSquadClearM:2.5,nestShellDamage:0,
+    sapShellFirstS:8,sapShellEveryS:Object.freeze([8,14]),sapShellMax:4,sapShellPlayerClearM:6,sapShellHurtScale:0,
+    nestShellFirstS:40,nestShellEveryS:Object.freeze([10,16]),nestShellPlayerClearM:3.5,nestShellSquadClearM:2.5,nestShellHurtScale:1,
+    shellHurtM:5.5,shellHurtFullM:3.5,shellHurtMaxHp:18,shellHurtMinHp:12,shellHurtFloorHp:1,shellHurtSuppression:.5,
+    // 04 gate nestFrontCleared: the men who climbed into the nest's front half are dead or back north of this z (the
+    // berm crest line is -160.3); BundleOrder waits nestFrontOrderPauseS after it (Luo looks at the tank, the sap, a beat).
+    nestFrontClearZ:-159,nestFrontOrderPauseS:1.5,
+    // Survivors of the front half pull back north (FRONT_NEST_FRONT_PULLBACK) this long after the first of them is in
+    // the yard; the first 04 drive of the second round took 240 s to kill two men crouched behind the yard's front wall.
+    nestFrontHoldS:45,
     launcherFlightS:2.2,nestFrontRadiusM:3,tugS:1.2,tugM:1.4,branchCorridorM:4}),
 });

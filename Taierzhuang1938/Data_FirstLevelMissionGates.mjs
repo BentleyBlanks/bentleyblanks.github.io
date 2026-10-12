@@ -359,7 +359,12 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   nestFrontContested: Gate({
     kind: "scripted", step: "MachineGun", source: "FirstLevelFrontCounterattack.NestFront",
-    text: "玩家退到后墙后 3–4 名日军（侧翼存活者优先，不够从 NorthWestPlateau 槽补）翻进阵位前半边，与后墙隔院对打；不是过关条件",
+    text: "玩家退到后墙后 3–4 名日军（侧翼存活者优先，不够从 NorthWestPlateau 槽补）翻进阵位前半边，与后墙隔院对打（没人可进时记 void）",
+  }),
+  // 2026-10-12 第二轮：隔院近战做成 04 的门，BundleOrder 等它落下再停一拍才说。
+  nestFrontCleared: Gate({
+    kind: "scripted", step: "MachineGun", source: "FirstLevelFrontCounterattack.NestFront",
+    text: "翻进前半边的人全部死亡或缩回土坎以北（nestFrontClearZ）；BundleOrder 等它再停 nestFrontOrderPauseS",
   }),
   // --- Tank --------------------------------------------------------------
   // 契约 §2.6：03 只等老周离枪 ≥10 m（zhouLeftGun）；他走回集结处是 06 之前（05）的背景条件。

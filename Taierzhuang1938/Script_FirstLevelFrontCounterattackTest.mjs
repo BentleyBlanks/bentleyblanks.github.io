@@ -6,10 +6,10 @@
 // 在事实表里）。口径：docs/Data_FirstLevel0311Refactor20261012Contract.md §3.1–3.3。
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { GapWindow, PickSapShellPoint, PickNestShellPoint, EscortsClear, NestFrontPicks, OnAttackBranch } from "./Script_FirstLevelFrontCounterattack.mjs";
+import { GapWindow, PickSapShellPoint, PickNestShellPoint, EscortsClear, NestFrontPicks, OnAttackBranch, LightShellHurt, NestFrontCleared } from "./Script_FirstLevelFrontCounterattack.mjs";
 import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
-import { FRONT_SAP_SHELL_POINTS, FRONT_NEST_SHELL_AREA, FRONT_NEST_FRONT_POSTS, FRONT_TANK_CREW, FRONT_ESCORT_WITHDRAWN } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_SAP_SHELL_POINTS, FRONT_NEST_SHELL_AREA, FRONT_NEST_FRONT_POSTS, FRONT_NEST_FRONT_PULLBACK, FRONT_TANK_CREW, FRONT_ESCORT_WITHDRAWN } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_ENCOUNTERS, MISSION_TACTICS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_FACT_GATES, MISSION_ENCOUNTER_ACTIVATION } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
@@ -139,7 +139,7 @@ const eq = (a, b, message) => { assert.equal(a, b, message); checks++; };
     ok(tactic && tactic.fact === "tankCrewBailed" && tactic.points?.length >= 3, s.id + " runs its flight route on the bail-out fact");
   }
   eq(MISSION_ENCOUNTER_ACTIVATION.tankCrew?.spawn?.fact, "tankFireDisabled", "the crew exists only once the tank is Disabled");
-  for (const id of ["gapRushRepelled", "gapFireSuppressed", "frontObserved", "gapGuardKilled", "nestFrontContested", "sapInfiltrationStarted", "tankCrewBailed", "escortsWithdrawn", "tankAtBendExit", "tankHeard"])
+  for (const id of ["gapRushRepelled", "gapFireSuppressed", "frontObserved", "gapGuardKilled", "nestFrontContested", "nestFrontCleared", "sapInfiltrationStarted", "tankCrewBailed", "escortsWithdrawn", "tankAtBendExit", "tankHeard"])
     ok(MISSION_FACT_GATES[id], "fact gate exists: " + id);
   ok(!MISSION_FACT_GATES.tankPreviewed && !MISSION_FACT_GATES.bundleReturned && !MISSION_FACT_GATES.bundleHouseReached, "retired facts are gone from the gate table");
   ok(MISSION_FACT_GATES.frontRifleDefense.requires.includes("gapRushRepelled") && MISSION_FACT_GATES.frontRifleDefense.requires.includes("gapFireSuppressed"), "frontRifleDefense needs both window facts");
@@ -147,10 +147,21 @@ const eq = (a, b, message) => { assert.equal(a, b, message); checks++; };
   ok(T.gapSacrificeGuard >= B.firstBatch && T.gapSacrificeGuard !== 5, "the sacrificed guard is in the second batch and is not the faced speaker");
   ok(T.woundedGuard < B.firstBatch, "the wounded man is in the first batch");
   ok(T.nestShellPlayerClearM >= 3.5 && T.sapShellPlayerClearM >= 5, "shells keep their distance from the player");
-  eq(T.sapShellDamage, 0, "sap shells are ambient (no TTK account)");
-  // 10-12 drives: at 110 a round cost 23 hp at 3.5 m; at 40 still 3.5-5 hp plus a bleeding wound each (nine rounds bled the
-  // player out). The yard rounds are theatre with concussion: no hp (FireShell feedbackOnly).
-  eq(T.nestShellDamage, 0, "nest shells are pressure, not the killer: no hp, no wound");
+  eq(T.sapShellHurtScale, 0, "sap shells are ambient (no TTK account)");
+  eq(T.nestShellHurtScale, 1, "nest shells carry the light hurt table");
+  // Second round (coordinator): light, bloodless hurt - 12-18 hp inside shellHurtM, never the killing blow.
+  eq(LightShellHurt(T.shellHurtFullM, T), T.shellHurtMaxHp, "full hurt at the player clearance");
+  eq(LightShellHurt(T.shellHurtM, T), T.shellHurtMinHp, "the edge of the hurt radius costs the minimum");
+  eq(LightShellHurt(T.shellHurtM + 0.01, T), 0, "beyond the hurt radius: nothing");
+  ok(LightShellHurt((T.shellHurtFullM + T.shellHurtM) / 2, T) === (T.shellHurtMaxHp + T.shellHurtMinHp) / 2, "linear in between");
+  ok(T.shellHurtMaxHp <= 18 && T.shellHurtMinHp >= 12 && T.shellHurtFullM >= T.nestShellPlayerClearM && T.shellHurtFloorHp >= 1, "12-18 hp, from the clearance out, with a floor");
+  // nestFrontCleared: dead or back north of the berm.
+  const north = T.nestFrontClearZ - 1, inYard = T.nestFrontClearZ + 5;
+  ok(NestFrontCleared([{ alive: false, position: { z: inYard } }, { alive: true, position: { z: north } }], T.nestFrontClearZ), "dead or north of the line: cleared");
+  ok(!NestFrontCleared([{ alive: true, position: { z: inYard } }], T.nestFrontClearZ), "a live man still in the yard: not cleared");
+  ok(NestFrontCleared([], T.nestFrontClearZ), "nobody climbed in: cleared");
+  ok(T.nestFrontOrderPauseS >= 1, "BundleOrder waits a beat after the clearing");
+  ok(FRONT_NEST_FRONT_PULLBACK.z <= T.nestFrontClearZ && T.nestFrontHoldS >= 30 && T.nestFrontHoldS <= 90, "the pull-back point is north of the clear line and the hold keeps 04 inside 90-150 s");
   ok(T.suppressLevel <= 0.3, "the gun counts as suppressed at the AI's own threshold (Script_Ai wake check 0.3)");
   ok(T.gapRushCloseM > T.gapRadiusM, "the rush ring is wider than the gap ring");
   ok(T.gapKillShots >= 3 && T.gapRunMaxS >= 5, "the hull MG walks a burst onto the guard, not an instant kill");
@@ -192,6 +203,10 @@ const eq = (a, b, message) => { assert.equal(a, b, message); checks++; };
   ok(battle.includes("frontCounter.WindowOpenFor") || battle.includes("frontCounter?.WindowOpenFor"), "the first batch asks the window before each man leaves cover");
   ok(battle.includes("g.sacrifice"), "FrontBattle skips the sacrificed guard");
   ok(battle.includes("GapBody"), "FrontBattle tugs at the body in the gap");
+  ok(battle.includes("NestFrontClearedAt") && battle.includes("nestFrontOrderPauseS"), "BundleOrder waits for the nest front to be cleared plus a beat");
+  const { MISSION_STAGES } = await import("./Data_FirstLevelMissionStages.mjs").catch(() => ({ MISSION_STAGES: null }));
+  const mg = (MISSION_STAGES || []).find?.((s) => s.id === "MachineGun");
+  if (mg) ok(["nestFrontContested", "nestFrontCleared"].every((f) => mg.requirements.includes(f)), "04 requires the nest-front fight and its clearing");
 }
 
 console.log(`FirstLevelFrontCounterattackTest 通过：${checks} 条断言`);

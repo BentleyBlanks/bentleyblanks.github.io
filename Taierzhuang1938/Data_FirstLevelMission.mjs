@@ -56,7 +56,8 @@ export const MISSION_STAGES = Object.freeze([
     A.gun,
     // 2026-09-28：不再等 tankBlocksExit。罗班长在后墙岔口说完「顺子，跟我走支沟！」就该带人走；战车那时
     // 多半还在路上（三趟 03→06 连续跑：说完到压到沟口 37–42 s），他原地干站到车到位。车照样开到 Block 封口，05 里记。
-    ["tankPositionPressured", "gapGuardKilled", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
+    // 2026-10-12 第二轮：阵位前半边的隔院近战是 04 的门（nestFrontContested → nestFrontCleared），BundleOrder 在它之后。
+    ["tankPositionPressured", "gapGuardKilled", "nestFrontContested", "nestFrontCleared", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
     null,
   ),
   Stage(

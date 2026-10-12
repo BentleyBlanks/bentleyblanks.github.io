@@ -60,7 +60,7 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
     Object.assign(r.tank,tankPoint);
     if(n>=4)r.flow.facts.add("rightNestCaptured");
     // 2026-10-12: a 05 start has the tank at Block, out of the bend (the push group and the reserves are released on it).
-    if(n>=5){r.flow.facts.add("tankPositionPressured");r.flow.facts.add("tankAtBendExit");}
+    if(n>=5){r.flow.facts.add("tankPositionPressured");r.flow.facts.add("tankAtBendExit");r.flow.facts.add("nestFrontContested");r.flow.facts.add("nestFrontCleared");}
     r.tank.immobilized = n >= 6; r.tank.shots = 1;
     r.column.zhou.health = n >= 15 ? saved.column.litters.find(l=>l.zhou).health
       : n >= 14 ? 45 : 65;

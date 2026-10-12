@@ -381,6 +381,12 @@ export const FRONT_NEST_FRONT_POSTS=Object.freeze([
   Object.freeze({x:27.4,z:-155.4}),Object.freeze({x:29.6,z:-154.2}),Object.freeze({x:31.4,z:-155.6}),Object.freeze({x:28.2,z:-152.4}),
 ]);
 /**
+ * 04 `nestFrontCleared` (second round): the men still alive in the front half after FRONT_BATTLE_TUNING.counter.nestFrontHoldS
+ * pull back here - the flank lane's last crater, north of the berm crest (z -160.3) and of nestFrontClearZ - so the fight
+ * for the yard ends either way (all dead, or back over the berm) and 04 stays inside its 90-150 s.
+ */
+export const FRONT_NEST_FRONT_PULLBACK=Object.freeze({x:39.2,z:-162.2});
+/**
  * 05 `tankCrewBailed`: the two crewmen who bail out when the tank is Disabled (contract §3.3; group `tankCrew`,
  * spawned by FrontCounterattack at the live tank's sides, never at these roster coordinates - they are the Block
  * waypoint's two flanks so the orchestration map draws them where it happens). They run back up the road to Bend.

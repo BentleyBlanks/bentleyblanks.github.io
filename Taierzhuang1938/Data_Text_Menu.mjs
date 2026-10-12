@@ -53,6 +53,8 @@ export const TEXT = Object.freeze({
   "menu.condition.tankPreviewed": "战车在东北道路远段露面",
   "menu.condition.tankHeard": "东北路那头传来战车的发动机声",
   "menu.condition.gapGuardKilled": "看见守军冲缺口被车上机枪打死",
+  "menu.condition.nestFrontContested": "日军翻进阵位前半边",
+  "menu.condition.nestFrontCleared": "打退翻进阵位前半边的日军",
   "menu.condition.escortsWithdrawn": "等跟车步兵退离缺口",
   "menu.condition.tankPositionPressured": "战车炮弹压制已夺取的阵位",
   "menu.condition.remainingGuardsGathered": "余队收拢到缺口前的最后遮挡",

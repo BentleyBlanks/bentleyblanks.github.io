@@ -352,7 +352,7 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
     // 2026-10-12 03–11 重构（契约 §3.1–3.3）：tankPreviewed→tankHeard；04 加 gapGuardKilled；05 去 bundleReturned、加 escortsWithdrawn。
     Support: ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "leftGunHandover", "zhouLeftGun", "tankHeard"],
     // 2026-09-28：tankBlocksExit 不再是 04 的过关条件（班长下完取弹命令就带人走，车在 05 里压到位）。
-    MachineGun: ["tankPositionPressured", "gapGuardKilled", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
+    MachineGun: ["tankPositionPressured", "gapGuardKilled", "nestFrontContested", "nestFrontCleared", "remainingGuardsGathered", "rightRearReached", "bundleOrderHeard"],
     Tank: ["bundleRouteTraversed", "bundleTaken", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "escortsWithdrawn", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned", "zhouGunWounded"],
     Orders: ["ordersReached", "volunteerHeard", "lightShared", "zhouOnLitter", "columnDeparted"],
     // 2026-10-12 0311 B 包（契约 §3.5）：07 加沟口遭遇，mouthCrossed = 活着的担架全部过了开阔地。

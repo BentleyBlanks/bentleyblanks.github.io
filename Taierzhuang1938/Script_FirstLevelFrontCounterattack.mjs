@@ -17,7 +17,7 @@
 import { FRONT_SORTIE as S, FRONT_SPACE as Space, FRONT_TANK_PATH, FrontTankIndex } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { FRONT_SAP_SHELL_POINTS, FRONT_NEST_SHELL_AREA, FRONT_NEST_FRONT_POSTS, FRONT_TANK_CREW, FRONT_ESCORT_WITHDRAWN, FRONT_FLANK_GROUP, FRONT_OFFICER } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_SAP_SHELL_POINTS, FRONT_NEST_SHELL_AREA, FRONT_NEST_FRONT_POSTS, FRONT_NEST_FRONT_PULLBACK, FRONT_TANK_CREW, FRONT_ESCORT_WITHDRAWN, FRONT_FLANK_GROUP, FRONT_OFFICER } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ROUTES as Routes } from "./Data_FirstLevelMissionLayout.mjs";
 import { MissionRouteProjection } from "./Script_FirstLevelMissionColumn.mjs";
@@ -77,6 +77,21 @@ export function NestFrontPicks(candidates, n, nest = S.nest) {
   const score = (c) => (c.flank ? 0 : 1000) + Distance(c.position, nest);
   return live.sort((a, b) => score(a) - score(b)).slice(0, n);
 }
+/**
+ * A discharger round's light hurt on the player (2026-10-12 second round): hp by distance from the burst, shellHurtMaxHp at
+ * <= shellHurtFullM, falling to shellHurtMinHp at shellHurtM, nothing beyond. No wound (Player.TakeHit opens one on any
+ * damage, nine rounds bled the first drives out) and never the killing blow (floor shellHurtFloorHp).
+ */
+export function LightShellHurt(distance, T = C()) {
+  if (!(distance <= T.shellHurtM)) return 0;
+  if (distance <= T.shellHurtFullM) return T.shellHurtMaxHp;
+  const t = (distance - T.shellHurtFullM) / Math.max(1e-6, T.shellHurtM - T.shellHurtFullM);
+  return T.shellHurtMaxHp + (T.shellHurtMinHp - T.shellHurtMaxHp) * t;
+}
+/** nestFrontCleared (04 gate): every man who climbed in is dead or back north of clearZ (the berm). */
+export function NestFrontCleared(men, clearZ) {
+  return men.every((a) => !a.alive || a.position.z <= clearZ);
+}
 /** Player progress along the attack branch past attackRoute[index] (sapInfiltrationStarted when >= 1 m past [1]). */
 export function OnAttackBranch(player, index = 1, route = S.attackRoute) {
   const { progress, distance } = MissionRouteProjection(route, player);
@@ -132,7 +147,7 @@ export class FirstLevelFrontCounterattack {
     const at = PickSapShellPoint(FRONT_SAP_SHELL_POINTS, r.player.position, this.Squad(), T.sapShellPlayerClearM);
     this.sapShell.nextAt = r.time + T.sapShellEveryS[0] + Math.random() * (T.sapShellEveryS[1] - T.sapShellEveryS[0]);
     if (!at) return;
-    this.FireLauncher(at, T.sapShellDamage);
+    this.FireLauncher(at, T.sapShellHurtScale);
     this.sapShell.fired++; this.Note("sapShell", { x: at.x, z: at.z });
   }
   /** After the capture: the discharger finds the nest (contract §3.1), never within nestShellPlayerClearM of the player. */
@@ -143,7 +158,7 @@ export class FirstLevelFrontCounterattack {
     this.nestShell.nextAt = r.time + T.nestShellEveryS[0] + Math.random() * (T.nestShellEveryS[1] - T.nestShellEveryS[0]);
     const at = PickNestShellPoint(FRONT_NEST_SHELL_AREA, r.player.position, this.Squad(), T.nestShellPlayerClearM, T.nestShellSquadClearM);
     if (!at) return;
-    this.FireLauncher(at, T.nestShellDamage);
+    this.FireLauncher(at, T.nestShellHurtScale);
     this.nestShell.fired++; this.Note("nestShell", { x: at.x, z: at.z });
   }
   /** A Type 89 discharger round: comes down steeply from the north-east, whistles for launcherFlightS, bursts on the ground. */
@@ -151,8 +166,26 @@ export class FirstLevelFrontCounterattack {
     const r = this.r, spec = SUPPORT.ija.find((s) => s.id === "launcher"), T = C();
     if (!r.combat?.FireShell || !r.Point) return;
     const from = r.Point({ x: at.x + 18, z: at.z - 26 }, 34), target = r.Point(at, 0.02);
-    // damage 0 = ambient (contract: baseAccuracy 0, no TTK account): FireShell's feedbackOnly keeps burst, whistle and concussion.
-    r.combat.FireShell(from, target, { flight: T.launcherFlightS, kind: "Shell75", radius: spec?.radius ?? 5, damage, incoming: true, report: false, feedbackOnly: !(damage > 0) });
+    // feedbackOnly: burst, whistle and concussion without Blast (which would wound and could kill); the hurt is our own,
+    // light and bloodless (LightShellHurt / HurtPlayer) - the round still makes him move.
+    r.combat.FireShell(from, target, { flight: T.launcherFlightS, kind: "Shell75", radius: spec?.radius ?? 5, damage: 0, incoming: true, report: false, feedbackOnly: true,
+      OnImpact: (impact) => this.HurtPlayer(impact, damage) });
+  }
+  /** The light hurt of a round that burst at `impact`: scale 1 = the full table, 0 = none (the sap rounds are ambient). */
+  HurtPlayer(impact, scale) {
+    const r = this.r, p = r.player, T = C();
+    if (!(scale > 0) || !p?.alive || !impact) return;
+    const d = Math.hypot(impact.x - p.position.x, (impact.y ?? p.position.y) - p.position.y, impact.z - p.position.z);
+    const hp = LightShellHurt(d, T) * scale;
+    if (!(hp > 0)) return;
+    const before = p.health;
+    p.health = Math.max(T.shellHurtFloorHp, p.health - hp);
+    p.bandageRegenTo = 0;
+    p.Suppress?.(T.shellHurtSuppression, "blast");
+    p.hitFlash = Math.min(1, Math.max(p.hitFlash || 0, .25 + hp / 60));
+    p.RecordIncomingFire?.(impact, "hit");
+    p.PushHitEvent?.({ kind: "hurt", part: "torso", damage: before - p.health, severity: Math.min(1, hp / 40), blast: true });
+    this.Note("shellHurt", { hp: +(before - p.health).toFixed(1), d: +d.toFixed(1) });
   }
   /** 03 gap window (contract §3.1): live every frame; the latched facts are recorded the first time each is true. */
   UpdateWindow() {
@@ -229,11 +262,30 @@ export class FirstLevelFrontCounterattack {
       return;
     }
     const st = this.nestFront;
-    if (st.arrived) return;
-    if (st.men.some((a) => a.alive && a.position.x > 24.4 && a.position.x < 33 && a.position.z < -151 && a.position.z > -157.2)) {
-      st.arrived = true; r.Record("nestFrontContested", { men: st.men.filter((a) => a.alive).map((a) => a.missionId) });
+    if (!st.arrived) {
+      // Nobody left to climb in (every candidate dead before the retreat): the beat is void, 04 must not wait for it.
+      if (!st.men.length || st.men.every((a) => !a.alive)) { st.arrived = true; st.clearedAt = r.time; r.Record("nestFrontContested", { void: true }); r.Record("nestFrontCleared", { void: true }); return; }
+      if (st.men.some((a) => a.alive && a.position.x > 24.4 && a.position.x < 33 && a.position.z < -151 && a.position.z > -157.2)) {
+        st.arrived = true; st.arrivedAt = r.time; r.Record("nestFrontContested", { men: st.men.filter((a) => a.alive).map((a) => a.missionId) });
+      }
+      return;
+    }
+    // nestFrontHoldS after the first man is in: whoever is still alive pulls back north over the berm (the fight ends
+    // either way; the first second-round drive took 240 s to kill two men crouched behind the yard's front wall).
+    if (!st.pulledBack && st.clearedAt == null && r.time - (st.arrivedAt ?? st.startedAt) >= T.nestFrontHoldS) {
+      st.pulledBack = true;
+      for (const a of st.men) if (a.alive) { a.tacticalRadiusM = 0; a.contactRadiusBaseM = 0; r.Defend(a, FRONT_NEST_FRONT_PULLBACK, 2, R.defendCoverSlackM); r.ai.SetStance(a, 0, .5, true); }
+      this.Note("nestFrontPullBack", { alive: st.men.filter((a) => a.alive).length });
+    }
+    // 04 gate (second round): the fight for the front half is over when every man who climbed in is dead or back
+    // north of the berm (nestFrontClearZ); BundleOrder waits for it plus a beat (FrontBattle.UpdatePressure).
+    if (st.clearedAt == null && NestFrontCleared(st.men, T.nestFrontClearZ)) {
+      st.clearedAt = r.time;
+      r.Record("nestFrontCleared", { dead: st.men.filter((a) => !a.alive).length, back: st.men.filter((a) => a.alive).length });
     }
   }
+  /** When the nest's front half was cleared (nestFrontCleared), or null. */
+  get NestFrontClearedAt() { return this.nestFront?.clearedAt ?? null; }
   /** 05: the player is up the attack branch -> the sap infiltrators go (MISSION_TACTICS fact). */
   SapInfiltration() {
     const r = this.r;
@@ -269,7 +321,7 @@ export class FirstLevelFrontCounterattack {
   State() {
     return { window: { open: this.window.open, rushRepelled: this.window.rushRepelled, fireSuppressed: this.window.fireSuppressed, openedAt: this.window.openedAt, closedAt: this.window.closedAt },
       sapShells: this.sapShell.fired, nestShells: this.nestShell.fired, gapGuard: this.gapGuard ? { shots: this.gapGuard.shots, dead: !!this.gapGuard.dead } : null,
-      nestFront: this.nestFront ? { men: this.nestFront.men.map((a) => ({ id: a.missionId, alive: !!a.alive })), arrived: this.nestFront.arrived } : null,
+      nestFront: this.nestFront ? { men: this.nestFront.men.map((a) => ({ id: a.missionId, alive: !!a.alive })), arrived: this.nestFront.arrived, arrivedAt: this.nestFront.arrivedAt ?? null, pulledBack: !!this.nestFront.pulledBack, clearedAt: this.nestFront.clearedAt ?? null } : null,
       crewSpawned: this.crewSpawned, gapBody: this.gapBody || null, log: this.log.slice(-16) };
   }
   Dispose() {}
