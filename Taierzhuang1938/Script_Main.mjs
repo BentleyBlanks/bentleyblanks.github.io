@@ -3283,7 +3283,8 @@ async function Boot() {
     });
     window.Taierzhuang.Debug.Blockout = blockout.api;
     StartRun();
-    document.addEventListener("pointerdown", () => audio.Unlock(), { once: true });
+    // 捕获阶段：编辑器界面上的点按会 stopPropagation，第一下点在面板上也要算。
+    document.addEventListener("pointerdown", () => audio.Unlock(), { once: true, capture: true });
     blockout.Start().catch((error) => console.error("[Blockout] start failed", error));
   }
 }

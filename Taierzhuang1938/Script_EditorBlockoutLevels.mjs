@@ -21,8 +21,9 @@ export const BLOCKOUT_LEVELS = Object.freeze([
     scene: Object.freeze({ kind: "file", url: "./Blockout/SecondLevel.scene.json" }) }),
 ]);
 
+// 存档口只认 BLOCKOUT_LEVEL_KEYS。这里只报不抛：Script_Main 开机就 import 本模块，抛了整个游戏起不来。
 for (const level of BLOCKOUT_LEVELS) {
-  if (!BLOCKOUT_LEVEL_KEYS.includes(level.key)) throw new Error(`Blockout level ${level.key} is not in BLOCKOUT_LEVEL_KEYS`);
+  if (!BLOCKOUT_LEVEL_KEYS.includes(level.key)) console.error(`[Blockout] level ${level.key} is not in BLOCKOUT_LEVEL_KEYS`);
 }
 
 /** 高度色带的三个色标（sRGB 0–1）：冷暗 → 中性 → 暖亮。 */
