@@ -6,7 +6,9 @@ import {CommandRoom} from './Script_CommandRoom.mjs';
 import {CommandRoomPreview} from './Script_CommandRoomPreview.mjs';
 import {BootPaper} from './Script_BootPaper.mjs';
 import {AudioEngine} from './Script_Audio.mjs';
-import {GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings, NormalizeGraphicsDetails} from './Script_EditorSettings.mjs';
+import {ApplySavedSettings, NormalizeGraphicsDetails} from './Script_EditorSettings.mjs';
+import {SettingsHost, SETTINGS_PAGE_IDS} from './Script_SettingsHost.mjs';
+import {DEV_TOOLS_ENABLED, DEBUG_TOOL_IDS} from './Data_DevTools.mjs';
 import {LoadGraphicsProfile, LoadWhiteboxConfig, CreateGraphicsProfileApi} from './Script_GraphicsProfile.mjs';
 import {QUALITY_PRESETS} from './Data_Tuning_Graphics.mjs';
 import {CreateGameGraphics} from './Data_Tuning_GameGraphics.mjs';
@@ -47,45 +49,38 @@ NormalizeGraphicsDetails(graphics, {preset});
 if (profile === 'whitebox') Object.assign(graphics, WhiteboxGraphicsOverrides(config));
 const graphicsProfile = CreateGraphicsProfileApi({profile, config,
   post: {quality, passes: [{name: 'commandRoom'}], lastRenderedPasses: ['commandRoom']}, renderer: null});
-let menu, active = null, activeId = null, frameId = 0;
-const settingsRoot = document.createElement('div'); settingsRoot.id = 'edRoot';
-settingsRoot.className = 'menuSettings off'; document.body.appendChild(settingsRoot);
-const host = {renderer, camera, canvas, audio, post: null,
-  game: {graphics, GraphicsProfile: graphicsProfile, ApplyGraphics() {}}, Close: CloseSettings};
-ApplySavedSettings(host);
-const room = new CommandRoom(renderer, {isActive: () => !!menu?.open || !!active,
-  getMenuMode: () => activeId || menu?.mode || 'title'});
+let menu, frameId = 0;
+// 画面 / 声音 / 操作三页：与游戏宿主共用 Script_SettingsHost，这里只管藏菜单与背景声。
+const settings = new SettingsHost({
+  host: {renderer, camera, canvas, audio, post: null, game: {graphics, GraphicsProfile: graphicsProfile, ApplyGraphics() {}}},
+  OnOpen: () => { menu.root.classList.add('off'); audio.SetPaused(true); },
+  OnClose: () => { audio.SetPaused(false); menu?.root.classList.remove('off'); menu?.Show('settings'); },
+});
+ApplySavedSettings(settings.pageHost);
+const room = new CommandRoom(renderer, {isActive: () => !!menu?.open || settings.IsOpen,
+  getMenuMode: () => settings.ActiveId || menu?.mode || 'title'});
 const previewValue = params.get('menuPreview');
 const preview = new CommandRoomPreview(room, () => Progress.Read(), /^[0-6]$/.test(previewValue ?? '') ? Number(previewValue) : null);
-function CloseSettings() {
-  active?.Exit(); active = null; activeId = null;
-  settingsRoot.classList.add('off'); audio.SetPaused(false);
-  menu?.root.classList.remove('off');
-  menu?.Show('settings');
-}
 function OpenSettings(id) {
   if (id === 'tools') return OpenTools();
-  const Settings = [GraphicsSettings, AudioSettings, ControlsSettings].find(item => item.id === id);
-  if (!Settings) return;
-  active?.Exit(); activeId = id; active = new Settings(host);
-  settingsRoot.classList.remove('off'); menu.root.classList.add('off');
-  active.Enter(settingsRoot); audio.SetPaused(true);
+  if (SETTINGS_PAGE_IDS.includes(id)) settings.Open(id);
 }
+// 高级工具要游戏宿主：标题菜单不装编辑器，点了才带 editor=tools 换到游戏入口。剔除开发工具后不响应。
 function OpenTools() {
+  if (!DEV_TOOLS_ENABLED) return;
   const url = new URL(SandboxUrl(location.href, null)); url.searchParams.set('phase', '2'); url.searchParams.set('editor', 'tools');
   location.assign(url.href);
 }
+// 标题菜单没有战局可观察：Debug工具那一页只列出来、全部不可用（菜单上写明进关后去暂停菜单开）。
+const DebugToolStates = () => DEBUG_TOOL_IDS.map(id => ({id, on: false, available: false}));
 document.addEventListener('keydown', event => {
-  if (active && event.key === 'Escape') {
-    event.preventDefault(); event.stopImmediatePropagation(); CloseSettings();
-  }
-  if (event.code === 'Backquote' && !event.repeat && !event.target.closest?.('input, textarea, select')) {
+  if (event.code === 'Backquote' && !event.repeat && !settings.IsOpen && !event.target.closest?.('input, textarea, select')) {
     // Developer tools need the game host; load it only after this explicit shortcut.
+    if (!DEV_TOOLS_ENABLED) return;
     event.preventDefault();
     OpenTools();
   }
 }, true);
-settingsRoot.addEventListener('keydown', event => event.stopPropagation());
 async function PreviewCommandRoom(stage = null, {hideUi = false} = {}) {
   if (!menu?.open || !menu.live) throw Error('Open the title menu before previewing command-room artwork');
   const result = await preview.SetStage(stage);
@@ -103,13 +98,14 @@ function StartLevel(index) {
   location.assign(url.href);
 }
 function StepFrames(count = 1, dt = 1 / 60, render = true) {
-  for (let i = 0; i < count; i++) { menu.Update(dt); active?.Update?.(dt); room.Update(dt); if (render) room.Render(); }
+  for (let i = 0; i < count; i++) { menu.Update(dt); settings.Update(dt); room.Update(dt); if (render) room.Render(); }
 }
 await preview.Load();
 menu = new MainMenu({root: document.getElementById('menu'), camera, staticBackdrop: true,
   campaign: CAMPAIGN_ENTRIES, sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, GORE_RANGE_PHASE],
   CommandRoomPreview: () => preview.State(), PreviewCommandRoom, PrepareBackdrop: () => preview.Load(),
   SliceIndex: () => null, Unlock: () => audio.Unlock(), Settings: OpenSettings,
+  DevToolsAvailable: DEV_TOOLS_ENABLED, DebugTools: DebugToolStates, ToggleDebugTool: DebugToolStates,
   PlaySandbox: GoToSandbox, ExitSandbox: () => GoToSandbox(null), Play: StartLevel,
   DebugOptions: () => debugOptions.Get(), SetDebugOption: (id, enabled) => debugOptions.Set(id, enabled),
   FirstLevelStages: () => FIRST_LEVEL_STAGES.map(stage => ({...stage, current: false})),
@@ -127,7 +123,9 @@ const api = {renderer, camera, scene: room.scene, audio, state, menu, graphics, 
     MenuAct: id => menu.Activate(id), MenuShow: mode => menu.Show(mode), MenuPlay: (index, options) => menu.Play(index, options),
     StartLevel, ResetProgress: () => Progress.Reset(), DebugOptions: () => debugOptions.Get(),
     SetDebugOption: (id, enabled) => debugOptions.Set(id, enabled), Level: () => ({id: 'CommandRoom', standalone: true}),
-    Editor: () => ({active: activeId, capturing: !!active, panelOpen: false, hidden: settingsRoot.classList.contains('off')}),
+    Editor: () => ({active: settings.ActiveId, settings: settings.ActiveId, capturing: settings.IsOpen, panelOpen: false,
+      hidden: settings.root.classList.contains('off')}),
+    DebugTools: DebugToolStates,
   }};
 window.Taierzhuang = window.Tengxian = api;
 menu.Open(); menu.RefreshCommandRoomPreview();
@@ -146,7 +144,7 @@ frameId = requestAnimationFrame(Frame);
 window.addEventListener('resize', () => {renderer.setSize(innerWidth, innerHeight, false);});
 window.addEventListener('pagehide', event => {
   cancelAnimationFrame(frameId);
-  if (!event.persisted) {paper.Hide(); active?.Exit(); room.Dispose(); audio.Dispose(); renderer.dispose();}
+  if (!event.persisted) {paper.Hide(); settings.Dispose(); room.Dispose(); audio.Dispose(); renderer.dispose();}
 });
 window.addEventListener('pageshow', event => {
   if (event.persisted) {previous = performance.now(); frameId = requestAnimationFrame(Frame);}

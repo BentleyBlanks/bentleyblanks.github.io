@@ -174,6 +174,7 @@ export const TEXT = Object.freeze({
   "menu.audio.saved": "更改自动保存",
   "menu.audio.unavailable": "当前模式未启用音频。",
   "menu.settings.controls": "操作",
+  "menu.settings.debugTools": "Debug工具",
   "menu.settings.tools": "高级工具",
   "menu.hint.resume": "从上次通过的下一章接着打",
   "menu.hint.start": "从第一关开始",
@@ -321,6 +322,25 @@ export const TEXT = Object.freeze({
   "menu.debug.infiniteGrenades.label": "无限手榴弹",
   "menu.debug.infiniteGrenades.note": "普通手榴弹不会消耗；开启时会补给一枚",
 
+  // --- 设置 → Debug工具（id 与 Data_DevTools.DEBUG_TOOL_IDS 同一套） ------------
+  // 开发用的观察工具；打包剔除开发工具后这一页整个不出现。
+  "menu.debugTools.intro": "观察正在进行的战局：在这里打开后继续游戏即可边打边看，再点一次关闭。独立窗口类工具会弹出新的浏览器窗口。",
+  "menu.debugTools.unavailable": "这些工具观察的是正在进行的战局。进入关卡后按 Esc，在 设置 → Debug工具 中开关。",
+  "menu.debugTools.debugRendering.label": "Debug Rendering",
+  "menu.debugTools.debugRendering.note": "画面叠加：GBuffer、AO、GI 与后处理靶，着色 / 线框切换，物理碰撞体",
+  "menu.debugTools.profiler.label": "Profiler",
+  "menu.debugTools.profiler.note": "独立窗口：录制与逐帧回放，CPU 逐系统、GPU 逐 pass 耗时",
+  "menu.debugTools.frameDebugger.label": "Frame Debugger",
+  "menu.debugTools.frameDebugger.note": "独立窗口：停住一帧，逐 DC / Pass 回放，检查渲染靶、网格与 Shader",
+  "menu.debugTools.worldInfo.label": "WorldInfo",
+  "menu.debugTools.worldInfo.note": "独立窗口：当前角色的位置、高度、旋转与运动状态",
+  "menu.debugTools.playerState.label": "玩家状态",
+  "menu.debugTools.playerState.note": "独立窗口：血量失血、压制、体力、后坐散布、弹药动作等隐藏状态",
+  "menu.debugTools.ai.label": "敌军 AI",
+  "menu.debugTools.ai.note": "画面叠加：行为图、单兵黑板、视野与掩体、调参热改",
+  "menu.debugTools.fps.label": "FPS 显示",
+  "menu.debugTools.fps.note": "左上角实时帧率",
+
   // --- 运镜时角上那行地名（Data_Menu.MENU_SHOTS 的 titleKey） ----------------
   // 键按地方取不按关号取：同一处地方在两关里架机位，写的是同一行字。
   "menu.shotNote": "{label}　{where}",
@@ -360,6 +380,7 @@ export const GATED_MODULES = Object.freeze([
  * 运行时拼出来的键前缀。
  *   menu.sandbox. —— 沙盒 id（Script_Menu.SANDBOX_MODES，与 Script_Main 的 URL 开关一一对应）
  *   menu.debug.   —— 调试开关 id（Script_DebugOptions.DEBUG_OPTION_KEYS）
+ *   menu.debugTools. —— Debug工具 id（Data_DevTools.DEBUG_TOOL_IDS）
  *   menu.shot.    —— 机位地名（Data_Menu.MENU_SHOTS[*].titleKey 里写死的整键）
  *   menu.slice.   —— 切片显示字段（Data_Menu 的 labelKey / dateKey / placeKey / sandboxGlyphKey）
  */
@@ -368,6 +389,7 @@ export const DYNAMIC_PREFIXES = Object.freeze([
   "menu.settings.",
   "menu.audio.",
   "menu.debug.",
+  "menu.debugTools.",
   "menu.shot.",
   "menu.slice.",
   "menu.condition.",

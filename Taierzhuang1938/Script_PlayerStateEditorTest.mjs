@@ -20,14 +20,11 @@ try {
   await page.waitForFunction(() => window.Taierzhuang?.state.ready && window.Taierzhuang?.editor,
     null, { timeout: 300000 });
   await page.click("#bootStart");
-  await page.click(".edGear");
-  assert.equal(await page.locator(".edPanel.launcher .edSection")
-    .filter({ has: page.locator('[data-editor="playerState"]') }).locator(":scope > .h").textContent(), "调试");
-  // 三个设置 + 六个可叠加（渲染调试/性能剖析/WorldInfo/玩家状态/敌军 AI/关卡编排）+ 十六个编辑器
-  // + 一个「全部关掉」。与 Script_EditorTest、Script_WorldInfoEditorTest 同源，加入口时三处一起改。
-  assert.equal(await page.locator(".edPanel.launcher [data-editor]").count(), 26);
+  // 入口在菜单 设置 → Debug工具（与高级工具分开）；这一趟没有菜单（menu=0），走那一页背后的同一个开关。
+  assert.ok((await page.evaluate(() => window.Taierzhuang.Debug.DebugTools())).some((tool) => tool.id === "playerState" && tool.available));
+  assert.equal(await page.locator('#edRoot [data-editor="playerState"]').count(), 0, "Debug工具不再列在高级工具菜单栏里");
   const popupEvent = page.waitForEvent("popup");
-  await page.click('[data-editor="playerState"]');
+  await page.evaluate(() => window.Taierzhuang.Debug.ToggleDebugTool("playerState"));
   const popup = await popupEvent;
   await popup.waitForSelector('[data-field="health"]');
   assert.equal(await popup.locator("[data-field]").count(), PLAYER_STATE_FIELDS.length);
@@ -112,7 +109,7 @@ try {
   await popup.screenshot({ path: path.join(root, "Taierzhuang1938/_shots/PlayerState.png"), fullPage: true });
   await popup.close();
   await page.waitForFunction(() => !window.Taierzhuang.editor.overlays.has("playerState"));
-  assert.equal(await page.evaluate(() => window.Taierzhuang.editor.entries.get("playerState").classList.contains("on")), false);
+  assert.equal((await page.evaluate(() => window.Taierzhuang.Debug.DebugTools())).find((tool) => tool.id === "playerState").on, false);
   console.log("ok   关闭浮窗后开关自动复位");
 
   const blocked = await page.evaluate(() => {
@@ -124,7 +121,7 @@ try {
     try {
       T.editor.Toggle("playerState");
       return !T.editor.overlays.has("playerState")
-        && !T.editor.entries.get("playerState").classList.contains("on");
+        && !T.Debug.DebugTools().find((tool) => tool.id === "playerState").on;
     } finally { window.open = open; console.error = error; }
   });
   assert.ok(blocked);

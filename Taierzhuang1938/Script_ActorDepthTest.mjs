@@ -33,6 +33,7 @@ try {
   );
   await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
   await page.click(".edGear");
+  await page.click('#edRoot .edMenu[data-menu="character"] > .edMenuTitle');
   await page.click('[data-editor="actor"]');
   await page.waitForFunction(() => {
     const active = window.Taierzhuang?.editor?.active;

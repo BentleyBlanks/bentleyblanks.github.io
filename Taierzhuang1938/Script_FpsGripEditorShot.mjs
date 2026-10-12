@@ -47,7 +47,7 @@ try {
     weaponIds = await page.evaluate(() => window.Taierzhuang.editor.active.Snapshot().supportedWeapons);
   }
   // 入口面板遮住左半画面，没有取证价值；工作面板必须保留。
-  await page.addStyleTag({ content: ".edPanel.launcher,.edGear{display:none!important}" });
+  await page.addStyleTag({ content: ".edMenuBar,.edGear{display:none!important}" });
 
   for (const id of weaponIds) {
     const supported = await page.evaluate((weaponId) => {

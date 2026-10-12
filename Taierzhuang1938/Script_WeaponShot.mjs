@@ -91,7 +91,7 @@ await page.evaluate(() => window.Taierzhuang.Debug.OpenEditor("weapon"));
 await page.evaluate(() => window.Taierzhuang.StepFrames(10));
 
 // 面板与 HUD 挡住展台就白拍了。出图期间整个 DOM 层收掉，只留 canvas。
-await page.addStyleTag({ content: ".edPanel, .edGear, #hud, .hud { display: none !important; }" });
+await page.addStyleTag({ content: ".edPanel, .edGear, .edMenuBar, #hud, .hud { display: none !important; }" });
 
 const Sheet = async (entry) => page.evaluate(async ({ w, flatMode }) => {
   const T = window.Taierzhuang;

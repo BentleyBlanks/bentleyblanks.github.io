@@ -1,17 +1,21 @@
 /* 设置与编辑器：与主菜单共用冷灰 / 旧金配色、矩形控件及选择条。
-   工作区保留紧凑布局与等宽读数；shot=1 仍隐藏全部工具。 */
+   工作区保留紧凑布局与等宽读数；shot=1 仍隐藏全部工具。
+   两棵根：#settingsRoot 是玩家设置页（Script_SettingsHost，随包发布）；
+   #edRoot 是开发工具（高级工具菜单栏 + Inspector、Debug工具叠加层，打包时剔除）。
+   这里的控件样式（.edPanel / .edBtn / 滑杆…）两边共用，菜单栏与 Inspector 停靠只写在 #edRoot 下。 */
 
-#edRoot {
+#edRoot, #settingsRoot {
   position: fixed; inset: 0; z-index: 40;
   pointer-events: none;                       /* 只有面板本身吃鼠标，其余全透 */
   font-family: var(--ui-font);
   color: var(--ui-text);
   font-size: 13px; line-height: 1.5;
 }
-#edRoot.off { display: none; }
+#edRoot { --ed-bar-h: 34px; --ed-inspector-w: 340px; --ed-inspector-wide: 420px; }
+#edRoot.off, #settingsRoot.off { display: none; }
 
 .edFacialTimeline {
-  position: absolute; left: 238px; right: 348px; bottom: 18px;
+  position: absolute; left: 14px; right: calc(var(--ed-inspector-w) + 14px); bottom: 18px;
   padding: 12px 16px; background: var(--ui-panel); border: 1px solid var(--ui-line);
   pointer-events: auto; max-height: 38vh; overflow: auto;
 }
@@ -20,16 +24,15 @@
 .edFacialCaption { min-height: 24px; margin-bottom: 8px; color: var(--ui-gold); }
 [data-facial] textarea { width: 100%; box-sizing: border-box; resize: vertical; }
 @media (max-width: 1050px) {
-  .edFacialTimeline { left: 14px; right: 348px; max-height: 32vh; }
-  #edRoot:has([data-facial]) .edPanel.launcher { display: none !important; }
+  .edFacialTimeline { max-height: 32vh; }
 }
 @media (max-width: 650px) {
-  #edRoot .edPanel.work[data-facial] { top: 54px; bottom: 44vh; right: 8px; width: 220px; }
+  #edRoot .edPanel.work[data-facial] { bottom: 44vh; }
   .edFacialTimeline { left: 8px; right: 8px; bottom: 8px; max-height: 38vh; }
 }
 
 /* 数字一律等宽：调参时读数跳动会让人以为值在抖 */
-#edRoot .num, #edRoot input[type="number"], #edRoot .edVal, #edRoot .edMono {
+:is(#edRoot, #settingsRoot) :is(.num, input[type="number"], .edVal, .edMono) {
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
   font-variant-numeric: tabular-nums;
 }
@@ -62,14 +65,10 @@
   backdrop-filter: blur(2px);
   box-shadow: 0 6px 26px rgba(0, 0, 0, 0.55);
 }
-.edPanel.launcher { left: 14px; width: 210px; bottom: auto; max-height: calc(100% - 102px); }
 .edPanel.work { right: 14px; width: 320px; }
 .edPanel.wide { width: 396px; }
-.edPanel.assetStandards {
-  left: 238px; right: auto; width: min(1120px, calc(100vw - 252px));
-}
-/* 渲染调试是可叠加浮窗：避开左侧入口与右侧的互斥编辑器，不抢它们的位置。 */
-.edPanel.debugRendering { left: 238px; right: auto; width: 368px; bottom: 18px; }
+/* 渲染调试是可叠加浮窗：停在左侧，避开右侧的 Inspector，不抢它的位置。 */
+.edPanel.debugRendering { left: 14px; right: auto; width: 368px; bottom: 18px; }
 
 .edHead {
   flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 3px 8px;
@@ -314,8 +313,8 @@
 }
 .edFpsMountLabel.actual { transform: translate(-50%, 62%); border-style: dashed; }
 .edFpsLegend {
-  position: absolute; left: 240px; bottom: 22px; display: flex; flex-wrap: wrap; gap: 5px 10px;
-  max-width: calc(100vw - 600px); padding: 5px 8px; border-radius: 0;
+  position: absolute; left: 14px; bottom: 22px; display: flex; flex-wrap: wrap; gap: 5px 10px;
+  max-width: calc(100vw - var(--ed-inspector-w) - 42px); padding: 5px 8px; border-radius: 0;
   pointer-events: none; background: rgba(7, 7, 6, 0.72);
   border: 1px solid rgba(214, 217, 209, 0.18);
   font: 10px/1.35 ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -324,6 +323,7 @@
 .edFpsLegend span::before { content: "● "; }
 .edFpsLegend::after { content: attr(data-view); color: var(--ui-muted); }
 body.edFpsClean #edRoot .edPanel,
+body.edFpsClean #edRoot .edMenuBar,
 body.edFpsClean #weaponRangePanel,
 body.edFpsClean #edRoot .edGear,
 body.edFpsClean #edRoot .edHint { display: none !important; }
@@ -333,52 +333,105 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 
 /* 窄屏：面板改成上下叠、宽度跟着视口 */
 @media (max-width: 900px) {
-  .edPanel.launcher { width: 160px; }
-  .edPanel.work { width: 250px; }
-  .edPanel.wide { width: 280px; }
-  .edPanel.assetStandards { left: 174px; width: calc(100% - 188px); }
+  #edRoot { --ed-inspector-w: 300px; --ed-inspector-wide: 320px; }
   .edAssetRuleCards { grid-template-columns: 1fr; }
-  .edPanel.debugRendering { left: 174px; width: min(280px, calc(100% - 188px)); }
-  .edFpsLegend { left: 14px; max-width: calc(100vw - 28px); }
+  .edPanel.debugRendering { width: min(280px, calc(100% - var(--ed-inspector-w) - 42px)); }
   .edControlGrid { grid-template-columns: 1fr; }
-}
-
-/* 工具目录沿用任务列表的文字选项；数值区维持明确的输入边框。 */
-.edPanel.launcher .edBtn {
-  border: 1px solid transparent; background: transparent; min-height: 32px;
-  padding: 6px 8px; text-align: left; color: var(--ui-text); font-weight: 700;
-}
-.edPanel.launcher .edBtn:hover, .edPanel.launcher .edBtn.on {
-  color: var(--ui-gold); background: var(--ui-selection); border-image: var(--ui-selection-edge);
 }
 .edPanel input[type="range"]:hover::-webkit-slider-thumb,
 .edPanel input[type="range"]:focus-visible::-webkit-slider-thumb { background: var(--ui-gold); }
-body.edToolsOpen #edRoot::before {
-  content: "设置与工具"; position: absolute; inset: 0 0 auto; height: 64px;
-  box-sizing: border-box; padding: 15px 24px; background: var(--ui-black);
-  color: var(--ui-bright); border-bottom: 1px solid var(--ui-line);
-  font-size: 24px; font-weight: 700; letter-spacing: 0.06em;
+
+/* --- 高级工具：顶部菜单栏 ------------------------------------------------ */
+/* Unity 式：一条菜单栏 + 下拉，选中的工具在右侧 Inspector 里。只在高级工具开着时出现。 */
+.edMenuBar {
+  position: absolute; inset: 0 0 auto; height: var(--ed-bar-h); box-sizing: border-box;
+  display: none; align-items: stretch; gap: 0; pointer-events: auto;
+  background: var(--ui-black); border-bottom: 1px solid var(--ui-line);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  overflow-x: auto; overflow-y: hidden;
 }
-body.edToolsOpen:has(#edRoot:not(.off)) #menu:not(.off) .mnFoot,
-body.edToolsOpen:has(#edRoot:not(.off)) #menu:not(.off) .mnShotNote,
-body.edToolsOpen:has(#edRoot:not(.off)) #menu:not(.off) .mnList,
-body.edToolsOpen:has(#edRoot:not(.off)) #menu:not(.off) .mnTitle { visibility: hidden; }
+/* 主题给 #edRoot 下所有元素配了细滚动条（Style_Interface，id 选择器），这里要压过它 */
+#edRoot .edMenuBar { scrollbar-width: none; }
+#edRoot .edMenuBar::-webkit-scrollbar { display: none; }
+#edRoot.toolsOpen .edMenuBar { display: flex; }
+#edRoot.toolsOpen .edGear { display: none; }
+.edMenuBrand {
+  flex: 0 0 auto; display: flex; align-items: center; padding: 0 16px 0 14px;
+  color: var(--ui-bright); font-weight: 700; font-size: 13px; letter-spacing: 0.08em;
+  border-right: 1px solid var(--ui-line);
+}
+.edMenus { flex: 0 0 auto; display: flex; align-items: stretch; }
+.edMenu { position: static; display: flex; }
+.edMenuTitle {
+  cursor: pointer; border: 0; border-radius: 0; background: transparent; padding: 0 12px;
+  color: var(--ui-text); font: 13px/1 var(--ui-font); white-space: nowrap;
+}
+.edMenuTitle:hover, .edMenu.open > .edMenuTitle { background: var(--ui-selection); color: var(--ui-gold); }
+.edMenuDrop {
+  position: fixed; z-index: 2; display: none; min-width: 210px; padding: 4px 0;
+  background: #101312; border: 1px solid var(--ui-line); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+.edMenu.open > .edMenuDrop { display: block; }
+.edMenuItem {
+  cursor: pointer; display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box;
+  min-height: 28px; padding: 4px 14px 4px 8px; border: 0; border-radius: 0; background: transparent;
+  color: var(--ui-text); font: 12.5px/1.4 var(--ui-font); text-align: left; white-space: nowrap;
+}
+.edMenuItem:hover:not(:disabled), .edMenuItem:focus-visible { background: var(--ui-selection); color: var(--ui-gold); }
+.edMenuItem:disabled { cursor: default; color: var(--ui-muted); opacity: 0.55; }
+.edMenuCheck { flex: 0 0 14px; text-align: center; color: var(--ui-gold); }
+.edMenuItem.on .edMenuCheck::before { content: "✓"; }
+.edMenuItem.on .edMenuLabel { color: var(--ui-gold); }
+.edMenuLabel { flex: 1 1 auto; }
+.edMenuTail { flex: 0 0 auto; color: var(--ui-muted); font-size: 11px; }
+.edMenuStatus {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 12px; color: var(--ui-muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.edMenuExit {
+  flex: 0 0 auto; cursor: pointer; width: 40px; border: 0; border-left: 1px solid var(--ui-line); border-radius: 0;
+  background: transparent; color: var(--ui-muted); font-size: 18px; line-height: 1;
+}
+.edMenuExit:hover { color: var(--ui-gold); background: var(--ui-selection); }
+
+/* --- 高级工具：右侧 Inspector -------------------------------------------- */
+/* 每个编辑器仍是自己的 Panel({variant:"work"})，在这里统一停靠到菜单栏下面的右侧；
+   Debug Rendering / 敌军 AI 是叠加浮窗、资产规范是整张表，不进 Inspector。 */
+#edRoot :is(.edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards), .edPanel.edInspectorEmpty) {
+  top: var(--ed-bar-h); right: 0; bottom: 0; width: var(--ed-inspector-w);
+  border-width: 0 0 0 1px; box-shadow: -6px 0 22px rgba(0, 0, 0, 0.45); backdrop-filter: none;
+}
+#edRoot .edPanel.work.wide:not(.debugRendering):not(.ai):not(.assetStandards) { width: var(--ed-inspector-wide); }
+#edRoot :is(.edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards), .edPanel.edInspectorEmpty)::before {
+  content: "Inspector"; flex: 0 0 auto; padding: 5px 14px 4px; background: #0b0d0d;
+  color: var(--ui-muted); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+  border-bottom: 1px solid var(--ui-line);
+}
+#edRoot .edPanel.edInspectorEmpty .edHead .edTitle { color: var(--ui-muted); }
+#edRoot .edPanel.assetStandards { top: var(--ed-bar-h); left: 0; right: 0; bottom: 0; width: auto; border-width: 0; }
+#edRoot.toolsOpen .edHint { top: calc(var(--ed-bar-h) + 10px); }
+[hidden].edPanel { display: none !important; }
+
 @media (max-width: 600px) {
-  .edPanel.launcher { left: 10px; right: 10px; width: auto; max-height: 26vh; }
-  .edPanel.work, .edPanel.wide, .edPanel.assetStandards {
-    left: 10px; right: 10px; width: auto; top: calc(26vh + 96px); bottom: 10px;
+  /* 窄屏：Inspector 改成底部抽屉，上面留出画面 */
+  #edRoot :is(.edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards), .edPanel.edInspectorEmpty),
+  #edRoot .edPanel.work.wide:not(.debugRendering):not(.ai):not(.assetStandards) {
+    left: 0; right: 0; width: auto; top: auto; height: 52vh; border-width: 1px 0 0;
   }
+  #edRoot .edPanel.work[data-facial] { bottom: 0; }
   .edPanel.debugRendering { left: 10px; right: 10px; width: auto; top: 84px; bottom: 10px; z-index: 1; }
   .edHint { top: 10px; max-width: calc(100% - 150px); left: 10px; transform: none; }
+  #edRoot.toolsOpen .edHint { top: calc(var(--ed-bar-h) + 6px); }
+  .edFacialTimeline { left: 8px; right: 8px; }
 }
 
 /* Empty status messages do not take up space in compact testing panels. */
 .edNote:empty { display: none; }
 
 /* --- 敌军 AI 编辑器（叠加层） -------------------------------------------- */
-/* 位置：让开左侧入口面板与 Debug Rendering（left:238，宽 368），也不占右侧互斥
-   编辑器的位子 —— 这三样常常同时开着。窄屏由下面的媒体查询接管。 */
-.edPanel.ai { left: 620px; right: auto; width: 420px; bottom: 18px; }
+/* 位置：让开 Debug Rendering（left:14，宽 368），也不占右侧 Inspector 的位子 ——
+   这三样常常同时开着。窄屏由下面的媒体查询接管。 */
+.edPanel.ai { left: 396px; right: auto; width: 420px; bottom: 18px; }
 
 /* 六个分节常驻 DOM（外部按 [data-page] 数得到六个），只有当前那一页显示。 */
 .edAiPage { display: none; }
@@ -426,10 +479,10 @@ body.edToolsOpen:has(#edRoot:not(.off)) #menu:not(.off) .mnTitle { visibility: h
 .edAiFlash { animation: edAiFlash 1.1s linear 1; }
 
 @media (max-width: 1200px) {
-  .edPanel.ai { left: 238px; width: min(420px, calc(100vw - 266px)); }
+  .edPanel.ai { left: 14px; width: min(420px, calc(100vw - var(--ed-inspector-w) - 42px)); }
 }
 @media (max-width: 900px) {
-  .edPanel.ai { left: 174px; width: min(360px, calc(100% - 188px)); }
+  .edPanel.ai { width: min(360px, calc(100% - var(--ed-inspector-w) - 42px)); }
 }
 @media (max-width: 600px) {
   .edPanel.ai { left: 10px; right: 10px; width: auto; top: 84px; bottom: 10px; z-index: 1; }

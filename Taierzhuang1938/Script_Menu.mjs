@@ -718,9 +718,9 @@ export class MainMenu {
     this.el.pauseObjective.hidden = !objective;
     this.el.pauseObjective.scrollTop = 0;
     this.RenderObjectiveProgress(mode === "pause" ? this.host.CurrentObjectiveProgress?.() : null);
-    const panel = ["levels","codex","credits","debug","settings"].includes(mode);
+    const panel = ["levels","codex","credits","debug","debugTools","settings"].includes(mode);
     if (panel && (wasMode === "pause" || wasMode === "title")) this.settingsReturnMode = this.panelReturnMode = wasMode;
-    if (mode === "debug") this.panelReturnMode = "settings";
+    if (mode === "debug" || mode === "debugTools") this.panelReturnMode = "settings";
     else if (mode === "settings") this.panelReturnMode = this.settingsReturnMode || "title";
     this.root.classList.toggle("panelOn", panel);
     this.el.panel.classList.toggle("on", panel);
@@ -747,17 +747,23 @@ export class MainMenu {
       this.el.panelTitle.textContent = T("menu.item.settings");
       this.el.panelBody.textContent = "";
       const list = document.createElement("div"); list.className = "mnSettingsList";
-      for (const id of ["graphics","sound","controls","debug","tools"]) {
+      // 开发工具两项（Debug工具 / 高级工具）打包剔除后不列：宿主不给 DevToolsAvailable 就没有。
+      const ids = ["graphics","sound","controls","debug"];
+      if (this.host.DevToolsAvailable) ids.push("debugTools","tools");
+      for (const id of ids) {
         const button = document.createElement("button"); button.type = "button";
         button.className = "mnSettingsItem";button.dataset.setting = id;
         button.textContent = T(id === "debug" ? "menu.item.debug" : `menu.settings.${id}`);
-        button.addEventListener("click",()=>id === "debug" ? this.Show("debug") : this.host.Settings?.(id));
+        button.addEventListener("click",()=>id === "debug" || id === "debugTools" ? this.Show(id) : this.host.Settings?.(id));
         list.appendChild(button);
       }
       this.el.panelBody.appendChild(list);
     } else if (mode === "debug") {
       this.el.panelTitle.textContent = T("menu.item.debug");
       this.BuildDebugOptions();
+    } else if (mode === "debugTools") {
+      this.el.panelTitle.textContent = T("menu.settings.debugTools");
+      this.BuildDebugTools();
     }
     if (!panel && wasMode === "levels") {
       this.itemEls[this.itemIndex]?.focus({ preventScroll: true });
@@ -837,6 +843,55 @@ export class MainMenu {
       Button("clean",()=>this.SetCommandRoomPreviewUi(true)),Button("exit",()=>this.RunCommandRoomPreview("saved",note,controls)));
     bar.append(heading,controls,note);
   }
+  /**
+   * 设置 → Debug工具：观察战局的叠加层与 FPS 显示。每次从 host 重建 ——
+   * 浮窗被叉掉、被浏览器拦下时，这里显示的就是实际的开 / 关。
+   * 标题菜单没有战局，host 回报 available=false，整页只读。
+   */
+  BuildDebugTools() {
+    const tools = this.host.DebugTools?.() || [];
+    const wrap = document.createElement("div");
+    wrap.className = "mnDebug mnDebugTools";
+    const intro = document.createElement("p");
+    intro.className = "mnDebugIntro";
+    intro.textContent = T(tools.some((tool) => tool.available) ? "menu.debugTools.intro" : "menu.debugTools.unavailable");
+    wrap.appendChild(intro);
+    for (const tool of tools) {
+      const label = T(`menu.debugTools.${tool.id}.label`);
+      const row = document.createElement("label");
+      row.className = "mnDebugRow";
+      row.dataset.tool = tool.id;
+      row.classList.toggle("on", !!tool.on);
+      row.classList.toggle("disabled", !tool.available);
+      const copy = document.createElement("span");
+      copy.className = "mnDebugCopy";
+      const name = document.createElement("b");
+      name.textContent = label;
+      const note = document.createElement("small");
+      note.textContent = T(`menu.debugTools.${tool.id}.note`);
+      copy.append(name, note);
+      const control = document.createElement("span");
+      control.className = "mnDebugControl";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = !!tool.on;
+      input.disabled = !tool.available;
+      input.setAttribute("aria-label", label);
+      const state = document.createElement("i");
+      state.textContent = input.checked ? T("menu.toggle.on") : T("menu.toggle.off");
+      input.addEventListener("change", () => {
+        this.host.ToggleDebugTool?.(tool.id);
+        this.BuildDebugTools();
+        this.el.panelBody.querySelector(`[data-tool="${tool.id}"] input`)?.focus({ preventScroll: true });
+      });
+      control.append(input, state);
+      row.append(copy, control);
+      wrap.appendChild(row);
+    }
+    this.el.panelBody.textContent = "";
+    this.el.panelBody.appendChild(wrap);
+  }
+
   BuildDebugOptions() {
     const values = this.host.DebugOptions?.() || {};
     const wrap = document.createElement("div");
@@ -1091,6 +1146,7 @@ export class MainMenu {
       case "codex": this.Show("codex"); return;
       case "credits": this.Show("credits"); return;
       case "debug": this.Show("debug"); return;
+      case "debugTools": this.Show("debugTools"); return;
       case "resume": this.host.Resume?.(); return;
       case "settings": this.Show("settings"); return;
       case "exitSandbox": this.host.ExitSandbox?.(); return;

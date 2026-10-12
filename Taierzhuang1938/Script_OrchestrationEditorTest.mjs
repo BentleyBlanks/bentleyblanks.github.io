@@ -87,17 +87,16 @@ try {
   }, { key: STORAGE_KEY, layoutKey: LAYOUT_KEY, filterKey: FILTER_KEY });
 
   // -------------------------------------------------------------------------
-  // 1) 入口：26 个按钮，工作台在「编辑器」组里
+  // 1) 入口：高级工具菜单栏共 19 项，工作台在「关卡」菜单里
   //    （它在语义上仍是叠加层 —— 独立窗口、不接管相机、keepOnClose —— 但用户
-  //     去找它时想的是「我要编关卡」，所以按钮画在编辑器组）
+  //     去找它时想的是「我要编关卡」，所以放在关卡菜单，不在 设置 → Debug工具）
   // -------------------------------------------------------------------------
-  Check("入口面板共 26 个按钮", await page.locator(".edPanel.launcher [data-editor]").count() === 26,
-    `实际 ${await page.locator(".edPanel.launcher [data-editor]").count()}`);
-  const group = await page.locator(".edPanel.launcher .edSection")
-    .filter({ has: page.locator('[data-editor="orchestration"]') }).locator(":scope > .h").textContent();
-  Check("关卡编排入口在「编辑器」组", group === "编辑器", `实际「${group}」`);
-  Check("关卡编排只登记一个入口按钮",
-    await page.locator('.edPanel.launcher [data-editor="orchestration"]').count() === 1);
+  Check("高级工具菜单栏共 19 项", await page.locator("#edRoot .edMenuBar [data-editor]").count() === 19,
+    `实际 ${await page.locator("#edRoot .edMenuBar [data-editor]").count()}`);
+  const group = await page.locator('#edRoot [data-editor="orchestration"]').getAttribute("data-group");
+  Check("关卡编排入口在「关卡」菜单", group === "level", `实际「${group}」`);
+  Check("关卡编排只登记一个入口",
+    await page.locator('#edRoot [data-editor="orchestration"]').count() === 1);
 
   // -------------------------------------------------------------------------
   // 2) 打开：独立弹窗，三栏与时间轴都在

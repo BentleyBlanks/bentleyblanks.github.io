@@ -1,12 +1,18 @@
-// 编辑器套件的外壳：右上角那个齿轮 + 一张「各编辑器入口开关」的面板 + 调度。
+// 高级工具（编辑器套件）的外壳：Unity 式的顶部菜单栏 + 右侧 Inspector + 调度。
+//
+// ## 开发工具，打包时整组剔除
+// 运行时只经 Script_DevTools.mjs 建这个套件（剔除版返回 null）。玩家设置（画面 / 声音 /
+// 操作）不在这里，归 Script_SettingsHost；「Debug工具」那几个叠加层的代码仍在这里，
+// 但入口挪到了菜单 设置 → Debug工具（DebugToolStates / ToggleDebugTool），菜单栏里不再列。
 //
 // ## 一次只开一个
-// 十五个编辑器里多数要**接管相机**（摄影棚 / 过场 / 自由飞行），
+// 十七个互斥编辑器里多数要**接管相机**（摄影棚 / 过场 / 自由飞行），
 // 同时开两个的结果是两边每帧各写一次 camera.position，画面会抖。
-// 所以入口面板是一排开关，但语义是「换到这一个」：开新的自动关旧的。
-// 这条写在面板上，不让人猜。
+// 所以菜单栏里的工具语义是「换到这一个」：开新的自动关旧的；再点一次当前那个就关掉它。
+// 关掉当前工具（Inspector 上的 ×）只回到空 Inspector，不退出高级工具；
+// 退出走菜单栏右端 ×、Esc 或 `。
 //
-// ## 打开编辑器 = 暂停玩法
+// ## 打开高级工具 = 暂停玩法
 // 与过场同一条通道：Script_Main 的 Frame() 看到 editor.Capturing 就只走
 // editor.Update + 渲染，玩法（玩家、AI、特效、剧本）全停。
 // 不停的话你在摄影棚里看模型的时候会被外面的日军打死 —— 这不是玩笑，
@@ -22,7 +28,8 @@
 // ?shot=1 下整棵 DOM 加 .off（display:none）——出图脚本与开机冒烟的截图里
 // 不许出现任何编辑器痕迹。API 仍然在，测试可以直接调 Open()。
 
-import { El } from "./Script_EditorUi.mjs";
+import { El, Panel, Note } from "./Script_EditorUi.mjs";
+import { DEBUG_TOOL_IDS } from "./Data_DevTools.mjs";
 import { Studio, FlyCam, ViewportInput } from "./Script_EditorStage.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
 import { FacialEditor } from "./Script_EditorFacial.mjs";
@@ -49,35 +56,36 @@ import { AiEditor } from "./Script_EditorAi.mjs";
 import { OrchestrationEditor } from "./Script_EditorOrchestration.mjs";
 import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
 import { TextureEditor } from "./Script_EditorTextures.mjs";
-import {
-  GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings,
-} from "./Script_EditorSettings.mjs";
 
-/**
- * 入口表。顺序就是面板上的顺序。
- *
- * 设置与编辑器分两组：**它们不是一回事**。设置改的是玩家自己的偏好、要落盘、
- * 与这一局无关；编辑器改的是这一局的运行时状态、退出时必须还干净。
- * 摆在同一排会让人以为「画质」也是个要小心退出的东西。
- */
-const SETTINGS = [ControlsSettings, GraphicsSettings, AudioSettings];
+/** 互斥编辑器：接管画面（多数还接管相机），任何时候只有一个活着。 */
 const EDITORS = [
   ActorEditor, FacialEditor, SquadMarchEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor, TimelineEditor,
   SceneEditor, PropLibraryEditor, AssetStandardsEditor, PropPcgEditor, TerrainEditor, SplineEditor, DestructionEditor,
   FullSceneEditor, SamplePointEditor,
 ];
-const ALL = [...SETTINGS, ...EDITORS];
-// 渲染调试只读地观察后处理靶，不接管相机，因此允许叠在任意一个互斥编辑器上。
-// 性能剖析同理：它甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
-// 关卡编排工作台也在这一组：它是独立窗口里的 2D 俯视图 + 流程/时间轴，
+// 叠加层：不接管相机、不参与互斥，可以叠在任意一个编辑器上，也可以关掉菜单回去边打边看。
+// 渲染调试只读地观察后处理靶；性能剖析甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
+// 关卡编排工作台也是叠加层：独立窗口里的 2D 俯视图 + 流程/时间轴，
 // 既不碰 three 场景也不接管相机，「边打边看走到哪一步」正是它的主用例。
 const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor, OrchestrationEditor];
-// 面板上的**分组**与上面那条「叠加语义」是两件事。关卡编排在语义上仍是叠加层
-// （独立窗口、不接管相机、keepOnClose，走 ToggleOverlay），但用户去找它的时候
-// 想的是「我要编关卡」，不是「我要调试」—— 所以按钮画进「编辑器」组。
-// 分两张表是为了让 this.entries 每个 id 只登记一次（同一个按钮画两遍就有两处开关）。
-const DEBUG_ENTRIES = OVERLAYS.filter((editor) => editor !== OrchestrationEditor);
-const EDITOR_ENTRIES = [...EDITORS, OrchestrationEditor, TextureEditor];
+// 「Debug工具」= 除关卡编排外的叠加层。入口在菜单 设置 → Debug工具（Data_DevTools.DEBUG_TOOL_IDS 定顺序），
+// 高级工具的菜单栏里不再列 —— 关卡编排语义上仍是叠加层，但人找它时想的是「我要编关卡」。
+const DEBUG_OVERLAYS = OVERLAYS.filter((editor) => editor !== OrchestrationEditor);
+
+/**
+ * 菜单栏。顺序就是栏上的顺序；每个工具只登记一次（同一项画两遍就有两处开关）。
+ * 「游戏」菜单（退出、回主菜单）不在这张表里，由 BuildDom 单独画。
+ * 带 window 标记的项打开的是独立窗口，条目后缀 ↗。
+ */
+const TOOL_MENUS = [
+  { id: "scene", label: "场景", items: [SceneEditor, TerrainEditor, SplineEditor, PropPcgEditor, FullSceneEditor, SamplePointEditor, DestructionEditor] },
+  { id: "level", label: "关卡", items: [OrchestrationEditor, TimelineEditor, SquadMarchEditor] },
+  { id: "character", label: "角色", items: [ActorEditor, FacialEditor] },
+  { id: "weapon", label: "武器", items: [WeaponEditor, FirstPersonEditor] },
+  { id: "media", label: "特效与声音", items: [VfxEditor, AudioEditor] },
+  { id: "assets", label: "资产", items: [PropLibraryEditor, AssetStandardsEditor, TextureEditor] },
+];
+const WINDOW_TOOLS = new Set([OrchestrationEditor.id, TextureEditor.id]);
 
 export class EditorSuite {
   /**
@@ -85,7 +93,8 @@ export class EditorSuite {
    *   renderer / scene / camera / canvas / library / lights / vfx —— 渲染侧
    *   actorFactory / viewmodel / audio / cutscene             —— 各编辑器要用的系统
    *   game        { state, player, PHASES, JumpToLevel, get battlefield, get currentWeapon }
-   *   ReturnToMainMenu  从暂停面板退出当前战局并打开主菜单；无主菜单的测试模式不传
+   *   ReturnToMainMenu  从高级工具退出当前战局并打开主菜单；无主菜单的测试模式不传
+   *   SettingsOpen      玩家设置页开着时返回 true（那时 ` 不开高级工具）
    *   shot        出图模式（整棵 DOM 藏起来）
    */
   constructor(host) {
@@ -96,7 +105,9 @@ export class EditorSuite {
     this.overlays = new Map();
     this.panelOpen = false;
     this.entries = new Map();
-    this.fpsToggle = null;
+    this.menus = new Map();
+    this.openMenuId = null;
+    this.hidden = false;
     // 场景关卡与地形是两个入口，但编辑的是同一份叠加文档。只放在本 EditorSuite
     // 会话内：切换工具不丢未保存改动，真正退出工具后运行时场景仍会清干净。
     this.worldEditDocument = null;
@@ -112,19 +123,14 @@ export class EditorSuite {
 
     this.BuildDom();
     this.BindInput();
-    // 存下来的画质/音量在这一刻装回去。只在打开面板时才生效的设置不叫设置。
-    try {
-      ApplySavedSettings(this.editorHost);
-    } catch (error) {
-      console.warn("[Editor] 设置装不回去：", error);
-    }
+    this.RefreshStatus();
   }
 
   // -------------------------------------------------------------------------
   // 状态
   // -------------------------------------------------------------------------
 
-  /** 玩法要不要停。面板开着也算 —— 它就是暂停菜单。 */
+  /** 玩法要不要停。高级工具开着也算 —— 空 Inspector 时也是暂停。 */
   get Capturing() { return this.panelOpen || !!this.active; }
 
   get ActiveId() { return this.activeId; }
@@ -155,7 +161,8 @@ export class EditorSuite {
       SetWorldEditDocument: (data) => {
         suite.worldEditDocument = data ? JSON.parse(JSON.stringify(data)) : null;
       },
-      Close: () => suite.Close(),
+      // 工作窗自己的 ×：只关这个工具，回到空 Inspector，不退出高级工具
+      Close: () => suite.CloseTool(),
       CloseDebugRendering: () => suite.CloseOverlay(DebugRenderingEditor.id),
       CloseProfiler: () => suite.CloseOverlay(ProfilerEditor.id),
       CloseFrameDebugger: () => suite.CloseOverlay(FrameDebuggerEditor.id),
@@ -163,8 +170,6 @@ export class EditorSuite {
       ClosePlayerState: () => suite.CloseOverlay(PlayerStateEditor.id),
       CloseAi: () => suite.CloseOverlay(AiEditor.id),
       CloseOrchestration: () => suite.CloseOverlay(OrchestrationEditor.id),
-      // 性能剖析在面板关着（玩法进行中）时要把自己的页面内小面板收起来
-      get launcherOpen() { return suite.panelOpen; },
     };
   }
 
@@ -186,8 +191,8 @@ export class EditorSuite {
 
     const gear = El("button", "edGear");
     gear.type = "button";
-    gear.title = "设置与工具（`）";
-    gear.setAttribute("aria-label", "设置与工具");
+    gear.title = "高级工具（`）";
+    gear.setAttribute("aria-label", "高级工具");
     gear.addEventListener("click", () => this.TogglePanel());
     root.appendChild(gear);
     this.gear = gear;
@@ -198,84 +203,122 @@ export class EditorSuite {
     this.cross.appendChild(El("span", "", "真实弹道"));
     root.appendChild(this.cross);
 
-    // 入口面板
-    const panel = El("div", "edPanel launcher");
-    panel.style.display = "none";
-    const head = El("div", "edHead");
-    head.appendChild(El("div", "edTitle", "工具目录"));
-    const x = El("button", "edX", "×");
-    x.type = "button";
-    x.setAttribute("aria-label", "关闭设置与工具");
-    x.addEventListener("click", () => this.TogglePanel(false));
-    head.appendChild(x);
-    panel.appendChild(head);
-    const body = El("div", "edBody");
-    panel.appendChild(body);
-    root.appendChild(panel);
-    this.launcher = panel;
+    // --- 顶部菜单栏 ---------------------------------------------------------
+    const bar = El("div", "edMenuBar");
+    bar.setAttribute("role", "menubar");
+    bar.setAttribute("aria-label", "高级工具");
+    bar.appendChild(El("div", "edMenuBrand", "高级工具"));
+    const menus = El("div", "edMenus");
+    bar.appendChild(menus);
+    this.status = El("div", "edMenuStatus");
+    bar.appendChild(this.status);
+    const exit = El("button", "edMenuExit", "×");
+    exit.type = "button";
+    exit.title = "退出高级工具（Esc / `）";
+    exit.setAttribute("aria-label", "退出高级工具");
+    exit.addEventListener("click", () => this.TogglePanel(false));
+    bar.appendChild(exit);
+    root.appendChild(bar);
+    this.menuBar = bar;
 
-    const Group = (title, list) => {
-      const section = El("div", "edSection");
-      section.appendChild(El("div", "h", title));
-      const box = El("div", "b");
-      for (const Editor of list) {
-        const button = El("button", "edBtn wide", Editor.label);
-        button.type = "button";
-        button.title = Editor.hint;
-        // 冒烟测试按这个属性找按钮：按 nth-child 找的话，面板一分组就全错位了
-        button.dataset.editor = Editor.id;
-        button.addEventListener("click", () => this.Toggle(Editor.id));
-        box.appendChild(button);
-        this.entries.set(Editor.id, button);
-      }
-      section.appendChild(box);
-      body.appendChild(section);
-      return box;
+    const Menu = (id, label) => {
+      const wrap = El("div", "edMenu");
+      wrap.dataset.menu = id;
+      const title = El("button", "edMenuTitle", label);
+      title.type = "button";
+      title.setAttribute("aria-haspopup", "menu");
+      title.setAttribute("aria-expanded", "false");
+      title.addEventListener("click", () => this.OpenMenu(this.openMenuId === id ? null : id));
+      // 菜单栏惯例：已经展开一个的时候，鼠标滑到隔壁标题就换过去，不用再点
+      title.addEventListener("pointerenter", () => { if (this.openMenuId && this.openMenuId !== id) this.OpenMenu(id); });
+      const drop = El("div", "edMenuDrop");
+      drop.setAttribute("role", "menu");
+      wrap.append(title, drop);
+      menus.appendChild(wrap);
+      this.menus.set(id, { wrap, title, drop });
+      return drop;
     };
-    if (this.host.ReturnToMainMenu) {
-      const section = El("div", "edSection");
-      section.appendChild(El("div", "h", "游戏"));
-      const button = El("button", "edBtn wide", "返回主菜单");
+    const Item = (drop, label, onClick, { hint = "", window = false, role = "menuitem" } = {}) => {
+      const button = El("button", "edMenuItem");
       button.type = "button";
-      button.dataset.action = "main-menu";
-      button.title = "放弃当前战局，回到主菜单";
-      button.addEventListener("click", () => {
+      button.setAttribute("role", role);
+      button.appendChild(El("span", "edMenuCheck"));
+      button.appendChild(El("span", "edMenuLabel", label));
+      if (window) button.appendChild(El("span", "edMenuTail", "↗"));
+      if (hint) button.title = hint;
+      button.addEventListener("click", () => { this.OpenMenu(null); onClick(); });
+      drop.appendChild(button);
+      return button;
+    };
+
+    const game = Menu("game", "游戏");
+    this.closeToolItem = Item(game, "关闭当前工具", () => this.CloseTool(), { hint: "关掉 Inspector 里的工具，留在高级工具里" });
+    this.closeToolItem.dataset.action = "close-tool";
+    if (this.host.ReturnToMainMenu) {
+      const mainMenu = Item(game, "返回主菜单", () => {
         // 先让编辑器归还相机、HUD 与声音，再由游戏装配层切换菜单状态。
-        // 顺序反过来会让 Close() 在主菜单已经打开后又改一次暂停状态。
+        // 顺序反过来会让退出时在主菜单已经打开后又改一次暂停状态。
         this.TogglePanel(false);
         this.host.ReturnToMainMenu();
-      });
-      section.appendChild(button);
-      body.appendChild(section);
+      }, { hint: "放弃当前战局，回到主菜单" });
+      mainMenu.dataset.action = "main-menu";
     }
-    Group("设置", SETTINGS);
-    const debugGroup = Group("调试", DEBUG_ENTRIES);
-    this.fpsToggle = El("button", "edBtn wide", "显示 FPS");
-    this.fpsToggle.type = "button";
-    this.fpsToggle.dataset.action = "fps";
-    this.fpsToggle.title = "显示或隐藏左上角实时帧率";
-    this.fpsToggle.addEventListener("click", () => {
-      const current = this.host.game.GetFpsVisible?.() ?? true;
-      this.host.game.SetFpsVisible?.(!current);
-      this.RefreshFpsToggle();
-    });
-    debugGroup.appendChild(this.fpsToggle);
-    Group("编辑器", EDITOR_ENTRIES);
+    const quit = Item(game, "退出高级工具", () => this.TogglePanel(false), { hint: "Esc / `" });
+    quit.dataset.action = "exit-tools";
 
-    const off = El("button", "edBtn wide danger", "全部关掉");
-    off.type = "button";
-    off.dataset.editor = "";
-    // 「全部关掉」按字面办：连 keepOnClose 的叠加层（Debug Rendering / 性能剖析）
-    // 也一起收。只有「关面板回去打仗」那条路才保留它们。
-    off.addEventListener("click", () => this.Close({ all: true }));
-    body.appendChild(off);
+    for (const menu of TOOL_MENUS) {
+      const drop = Menu(menu.id, menu.label);
+      for (const Editor of menu.items) {
+        const button = Item(drop, Editor.label, () => this.Toggle(Editor.id),
+          { hint: Editor.hint, window: WINDOW_TOOLS.has(Editor.id), role: "menuitemcheckbox" });
+        // 冒烟测试按这个属性找条目：按 nth-child 找的话，菜单一调整顺序就全错位了
+        button.dataset.editor = Editor.id;
+        button.dataset.group = menu.id;
+        this.entries.set(Editor.id, button);
+      }
+    }
 
-    this.status = El("div", "edNote warn", "");
-    body.appendChild(this.status);
+    // 点菜单栏以外的地方收起下拉（捕获阶段：画布上的拖拽 / 笔刷也要先收菜单）
+    this._onPointerDown = (event) => {
+      if (this.openMenuId && !this.menuBar.contains(event.target)) this.OpenMenu(null);
+    };
+    document.addEventListener("pointerdown", this._onPointerDown, true);
 
+    // --- Inspector 空态 ------------------------------------------------------
+    // 选了工具之后，各编辑器自己的工作窗（.edPanel.work）停在同一个位置，样式见 Style_Editor.css。
+    // 不带 .work：测试与出图脚本按 .edPanel.work 找「当前工具的工作窗」，空态不该被数进去。
+    const empty = Panel({ title: "未选择工具", variant: "edInspectorEmpty" });
+    Note(empty.body, "从顶部菜单栏选一个工具，它的参数会显示在这里。再点一次菜单里打勾的那项、或点工作窗右上的 × 就关掉它。");
+    Note(empty.body, "Debug Rendering、Profiler、Frame Debugger、WorldInfo、玩家状态、敌军 AI 与 FPS 显示在菜单 设置 → Debug工具。");
+    root.appendChild(empty.root);
+    this.emptyInspector = empty.root;
 
     this.workHost = El("div");
     root.appendChild(this.workHost);
+  }
+
+  /** 展开一个下拉菜单；null = 全部收起。 */
+  OpenMenu(id) {
+    this.openMenuId = id && this.menus.has(id) ? id : null;
+    for (const [menuId, menu] of this.menus) {
+      const open = menuId === this.openMenuId;
+      menu.wrap.classList.toggle("open", open);
+      menu.title.setAttribute("aria-expanded", String(open));
+      if (!open) continue;
+      // 下拉用 fixed 定位：窄屏菜单栏要横向滚动，absolute 的下拉会被裁掉
+      const rect = menu.title.getBoundingClientRect();
+      menu.drop.style.left = "0px";
+      const width = menu.drop.offsetWidth;
+      menu.drop.style.left = `${Math.max(0, Math.min(rect.left, innerWidth - width - 4))}px`;
+      menu.drop.style.top = `${rect.bottom}px`;
+    }
+  }
+
+  /** 藏起整个开发工具层（主菜单 / 暂停菜单开着时）。出图模式恒藏。 */
+  SetHidden(hidden) {
+    this.hidden = !!hidden;
+    if (this.hidden) this.OpenMenu(null);
+    this.root.classList.toggle("off", this.hidden || this.shot);
   }
 
   SetHint(text) {
@@ -294,21 +337,18 @@ export class EditorSuite {
     this.cross.classList.toggle("calibration", !!on && mode === "calibration");
   }
 
-  RefreshFpsToggle() {
-    if (!this.fpsToggle) return;
-    const on = this.host.game.GetFpsVisible?.() ?? true;
-    this.fpsToggle.classList.toggle("on", on);
-    this.fpsToggle.setAttribute("aria-pressed", String(on));
-    this.fpsToggle.textContent = on ? "FPS 显示：开" : "FPS 显示：关";
-  }
-
   RefreshStatus() {
     document.body.classList.toggle("edToolsOpen", this.panelOpen);
+    this.root.classList.toggle("toolsOpen", this.panelOpen);
     for (const [id, button] of this.entries) {
-      button.classList.toggle("on", id === this.activeId || this.overlays.has(id));
+      const on = id === this.activeId || this.overlays.has(id);
+      button.classList.toggle("on", on);
+      button.setAttribute("aria-checked", String(on));
     }
+    if (this.closeToolItem) this.closeToolItem.disabled = !this.active;
     if (this.gear) this.gear.classList.toggle("on", this.Capturing);
-    this.RefreshFpsToggle();
+    if (this.emptyInspector) this.emptyInspector.hidden = !this.panelOpen || !!this.active;
+    if (!this.panelOpen) this.OpenMenu(null);
     // 暂停 = 背景层也得停。玩法停了声音不停是两条独立的通道：
     // 环境床是一张自己在跑的 WebAudio 图 + 一个 400 ms 的调度器，
     // Frame() 提前返回一点也拦不住它（见 Script_Audio.SetPaused 的账）。
@@ -321,32 +361,38 @@ export class EditorSuite {
       if (this.host.audio && this.host.audio.SetPaused) this.host.audio.SetPaused(silenceBackground);
     }
     if (this.status) {
-      const overlayNote = this.overlays.size ? " · 调试叠加中" : "";
-      this.status.textContent = this.active
-        ? `${this.activeId} 接管中 · 玩法已暂停${this.activeId === AudioEditor.id ? " · 背景试听已启用" : ""}${overlayNote}`
-        : `玩法已暂停（面板开着）${overlayNote}`;
+      const label = this.active ? (EDITORS.find((editor) => editor.id === this.activeId)?.label || this.activeId) : "未选择工具";
+      const overlayNote = this.overlays.size ? ` · 叠加 ${this.overlays.size} 个` : "";
+      this.status.textContent = `${label} · 玩法已暂停${this.activeId === AudioEditor.id ? " · 背景试听已启用" : ""}${overlayNote}`;
     }
-    document.body.classList.toggle("edHideHud", !!this.active);
+    // 高级工具是一整张工作台：开着就收 HUD（空 Inspector 时也收）。
+    document.body.classList.toggle("edHideHud", this.panelOpen || !!this.active);
   }
 
   // -------------------------------------------------------------------------
   // 开关
   // -------------------------------------------------------------------------
 
+  /** 打开 / 退出高级工具。退出 = 关掉当前工具 + 收起非常驻叠加层 + 回到来的那一层菜单。 */
   TogglePanel(force) {
     const next = force === undefined ? !this.panelOpen : !!force;
-    this.panelOpen = next;
-    this.launcher.style.display = next ? "flex" : "none";
-    if (!next) this.Close();
-    else this.host.ReleasePointerLock();
-    this.RefreshStatus();
+    if (next) {
+      // 工作台接管整张画面：从主菜单 / 暂停菜单进来时先把菜单交接掉（返回层由装配层记着）。
+      if (!this.panelOpen) this.host.game.PrepareEditor?.();
+      this.panelOpen = true;
+      this.host.ReleasePointerLock();
+      this.RefreshStatus();
+      return;
+    }
+    this.Exit();
   }
 
+  /** 菜单栏里点一项。当前开着的那项再点一次 = 关掉它。 */
   Toggle(id) {
     if (id === TextureEditor.id) return this.Open(id);
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
-    if (this.activeId === id) this.Close();
-    else this.Open(id);
+    if (this.activeId === id) { this.CloseTool(); return null; }
+    return this.Open(id);
   }
 
   /** 叠加工具不参与 active 的互斥规则；切换场景/地形等工具时必须留下它。 */
@@ -379,6 +425,35 @@ export class EditorSuite {
     this.RefreshStatus();
   }
 
+  // -------------------------------------------------------------------------
+  // Debug工具（菜单 设置 → Debug工具 那一页用）
+  // -------------------------------------------------------------------------
+
+  /** 每项的开关状态。available=false 的项在菜单里置灰。 */
+  DebugToolStates() {
+    return DEBUG_TOOL_IDS.map((id) => {
+      if (id === "fps") {
+        return { id, on: this.host.game.GetFpsVisible?.() ?? true, available: !!this.host.game.SetFpsVisible };
+      }
+      return { id, on: this.overlays.has(id), available: DEBUG_OVERLAYS.some((editor) => editor.id === id) };
+    });
+  }
+
+  /** 开关一项，返回开关之后的全表（浮窗被浏览器拦下时那一项仍是关）。 */
+  ToggleDebugTool(id) {
+    if (id === "fps") {
+      const current = this.host.game.GetFpsVisible?.() ?? true;
+      this.host.game.SetFpsVisible?.(!current);
+    } else if (DEBUG_OVERLAYS.some((editor) => editor.id === id)) {
+      this.ToggleOverlay(id);
+    }
+    return this.DebugToolStates();
+  }
+
+  // -------------------------------------------------------------------------
+  // 互斥编辑器
+  // -------------------------------------------------------------------------
+
   /** 打开一个编辑器。**任何时候都只有一个活着。** */
   Open(id) {
     if (id === TextureEditor.id) {
@@ -386,18 +461,16 @@ export class EditorSuite {
       catch (error) { this.SetHint(error.message); return null; }
     }
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
-    const Editor = ALL.find((e) => e.id === id);
+    const Editor = EDITORS.find((e) => e.id === id);
     if (!Editor) return null;
     if (this.host.game.FrameDebugger?.frozen) this.host.game.FrameDebugger.Resume();
     // 换编辑器不算结束会话，不能半路把之前的菜单重新盖回来。
-    if (this.active) this.Close({ switching: true });
-    // 设置可以留在暂停菜单上调；真正的编辑器必须接管整张画面。
-    // 以前只有 SceneEditor 自己做这一步，构件库等摄影棚工具就会把
-    // 「继续 / 设置 / 调试选项」留在背后，既像 UI 叠层又容易误以为
-    // 还在游戏流程里。把交接放在所有 EDITORS 的公共入口，不能漏工具。
-    if (EDITORS.includes(Editor)) this.host.game.PrepareEditor?.();
+    if (this.active) this.CloseTool({ refresh: false });
+    // 真正的编辑器必须接管整张画面：主菜单本身有运镜，暂停菜单有「继续 / 设置 / 调试选项」，
+    // 都不该和编辑器叠在同一张画面上。以前只有 SceneEditor 自己做这一步，构件库等摄影棚工具
+    // 就会把暂停菜单留在背后。交接放在公共入口，不能漏工具。
+    this.host.game.PrepareEditor?.();
     this.panelOpen = true;
-    this.launcher.style.display = "flex";
     this.host.ReleasePointerLock();
     this.active = new Editor(this.editorHost);
     this.activeId = id;
@@ -414,7 +487,8 @@ export class EditorSuite {
     return this.active;
   }
 
-  Close({ switching = false, all = false } = {}) {
+  /** 关掉当前工具（Inspector 回到空态），高级工具本身还开着。 */
+  CloseTool({ refresh = true } = {}) {
     if (this.active && this.host.game.FrameDebugger?.frozen) this.host.game.FrameDebugger.Resume();
     if (this.active) {
       try { this.active.Exit(); } catch (error) { console.error("[Editor] 关闭出错：", error); }
@@ -424,19 +498,30 @@ export class EditorSuite {
     this.viewport.enabled = false;
     this.SetHint("");
     this.SetCrosshair(false);
-    // 只有「完全关闭」才收叠加窗。编辑器之间的切换要保留 Debug Rendering。
-    // keepOnClose 的叠加层（Debug Rendering / 性能剖析）连完全关闭也不收：
-    // 它们看的、量的就是战斗中的帧，「关面板回去打」正是主用例 —— 运行时才复现的
-    // 渲染 bug（第一人称手上的黑块）只能开着调试视图边打边看。要停：面板里再点
-    // 一次、叉掉浮窗，或按「全部关掉」（all）。
-    if (!switching) {
-      for (const id of [...this.overlays.keys()]) {
-        const Editor = OVERLAYS.find((entry) => entry.id === id);
-        if (all || !Editor || !Editor.keepOnClose) this.CloseOverlay(id);
-      }
+    if (refresh) this.RefreshStatus();
+  }
+
+  /**
+   * 退出高级工具。keepOnClose 的叠加层（Debug工具那几个、关卡编排）不收：
+   * 它们看的、量的就是战斗中的帧，「关掉回去打」正是主用例 —— 运行时才复现的
+   * 渲染 bug（第一人称手上的黑块）只能开着调试视图边打边看。要停：设置 → Debug工具
+   * 里再点一次、叉掉浮窗，或 all=true（套件销毁时）。
+   */
+  Exit({ all = false } = {}) {
+    this.CloseTool({ refresh: false });
+    for (const id of [...this.overlays.keys()]) {
+      const Editor = OVERLAYS.find((entry) => entry.id === id);
+      if (all || !Editor || !Editor.keepOnClose) this.CloseOverlay(id);
     }
+    this.panelOpen = false;
     this.RefreshStatus();
-    if (!switching) this.host.game.FinishEditorSession?.();
+    this.host.game.FinishEditorSession?.();
+  }
+
+  /** 旧接口：switching=true 只换掉当前工具；否则等于退出高级工具。 */
+  Close({ switching = false, all = false } = {}) {
+    if (switching) this.CloseTool();
+    else this.Exit({ all });
   }
 
   // -------------------------------------------------------------------------
@@ -482,7 +567,18 @@ export class EditorSuite {
       const tag = event.target && event.target.tagName;
       const isRange = tag === "INPUT" && event.target.type === "range";
       if (!isRange && (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT")) return;
-      if (event.code === "Backquote") { this.TogglePanel(); event.preventDefault(); return; }
+      if (event.code === "Backquote") {
+        // 玩家设置页开着时不开高级工具：那一页归菜单管，两层叠在一起谁也关不干净。
+        if (this.host.SettingsOpen?.()) return;
+        this.TogglePanel(); event.preventDefault(); return;
+      }
+      // 下拉菜单开着时 Esc 只收菜单，不退出高级工具
+      if (event.code === "Escape" && this.openMenuId) {
+        this.OpenMenu(null);
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
       if (event.code === "Escape" && this.Capturing) {
         // 过场正在播的时候 Esc 归过场（跳过），别顺手把编辑器也关了
         const playing = this.host.cutscene && this.host.cutscene.Playing;
@@ -535,19 +631,20 @@ export class EditorSuite {
       this.active.Update(dt);
     } catch (error) {
       console.error(`[Editor] ${this.activeId} 每帧出错，已关掉：`, error);
-      this.Close();
+      this.CloseTool();
     }
   }
 
   Dispose() {
-    this.Close({ all: true });
+    this.Exit({ all: true });
+    document.removeEventListener("pointerdown", this._onPointerDown, true);
     document.removeEventListener("keydown", this._onKeyDown);
     document.removeEventListener("keydown", this._onTab, true);
     document.removeEventListener("keyup", this._onKeyUp);
     this.viewport.Dispose();
     this.studio.Dispose();
     if (this.root) this.root.remove();
-    document.body.classList.remove("edToolsOpen");
+    document.body.classList.remove("edToolsOpen", "edHideHud");
   }
 }
 

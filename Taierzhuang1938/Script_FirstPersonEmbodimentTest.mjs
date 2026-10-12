@@ -18,7 +18,7 @@ try {
   page.on("pageerror",e=>errors.push(String(e)));
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?weapons=1&shot=1&manual=1&quality=medium&scale=small`,{timeout:120000});
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:180000});
-  await page.addStyleTag({content:"#hud,.hud,.edPanel,.edGear{display:none!important}"});
+  await page.addStyleTag({content:"#hud,.hud,.edPanel,.edGear,.edMenuBar{display:none!important}"});
   const report=await page.evaluate(async()=>{
     const T=window.Taierzhuang;
     const THREE=await import("./vendor/three/build/three.module.js");
