@@ -123,6 +123,30 @@ export function BuildFrontWhitebox(groundAt) {
     [2, 46.3, -160.2, .6, .28, .45, .9], [3, 40.6, -161.7, .6, .2, .4, .2], [4, 41.9, -162.9, .55, .25, .5, 1.1]])
     Detail(`RoadsideCornerRubble${i}`, x, z, w, h, d, "plaster", { ry });
 
+  // 2026-10-12 (03–11 refactor §3.3, Concept_05A): the two bundles beside the fallen comrade in the attack branch's middle
+  // leg (FRONT_SORTIE.bundles; the body is MISSION_AFTERMATH's AftermathBundleBearer, the pick-up MissionBundle at
+  // bundleDrop). Non-colliding, on the sap floor: five stick grenades bound together read as a 0.3 x 0.2 m bundle.
+  for (const [i, b] of [[0, { x: 39.55, z: -146.9 }], [1, { x: 39.75, z: -147.7 }]]) {
+    Detail(`BundleDropBundle${i}`, b.x, b.z, .32, .11, .2, "timber", { ry: i ? .9 : .35 });
+    Detail(`BundleDropHead${i}`, b.x + (i ? .1 : -.08), b.z + (i ? -.09 : .07), .16, .13, .16, "metal", { ry: i ? .9 : .35 });
+  }
+  // 2026-10-12 (§3.2, Concept_04): a second Type 89 burning on the slope east of CrestEast, seen from the nest's firing
+  // positions over the north ruin's shoulder, 35 m off the tank road and off every lane: a hull and turret mass with its
+  // engine deck torn open (two angled plates), the soot column is Data_FirstLevelDistantSmoke.LANDMARK_COLUMNS
+  // "BurningTankSlope". It says "this one is not the only tank".
+  {
+    const x = 96, z = -216, ry = .55, c = Math.cos(ry), s = Math.sin(ry);
+    const At = (dx, dz) => ({ x: x + dx * c + dz * s, z: z - dx * s + dz * c });
+    Footed("BurningTankHull", x, z, 2.2, 1.25, 4.3, "metal", { ry });
+    const t = At(0, -.3);
+    Detail("BurningTankTurret", t.x, t.z, 1.5, .8, 1.6, "metal", { ry, y: groundAt(x, z) + 1.25 + .4 });
+    const g = At(0, -1.6);
+    Detail("BurningTankGun", g.x, g.z, .18, .18, 1.6, "metal", { ry, y: groundAt(x, z) + 1.25 + .55 });
+    const d = At(.3, 1.5);
+    Detail("BurningTankDeckPlate", d.x, d.z, 1.1, .08, 1.0, "metal", { ry: ry + .4, y: groundAt(x, z) + 1.6 });
+    for (const [i, dx, dz] of [[0, -1.25, 0], [1, 1.25, 0]]) { const p = At(dx, dz); Detail(`BurningTankTrack${i}`, p.x, p.z, .35, .9, 4.4, "metal", { ry }); }
+    for (const [i, dx, dz, w] of [[0, -1.6, 2.6, .5], [1, 1.9, -2.2, .4], [2, 2.4, 1.4, .35]]) { const p = At(dx, dz); Detail(`BurningTankDebris${i}`, p.x, p.z, w, .22, w * .8, "metal", { ry: ry + i }); }
+  }
   // Behind the stopped tank, seen from the throw spot (concept 05: a row of
   // broken one-storey houses, a dead tree): two ruins north of the road's west
   // end, clear of the escort craters (z −171…−172), the body field north-east of

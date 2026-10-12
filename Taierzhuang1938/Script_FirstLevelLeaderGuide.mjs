@@ -27,7 +27,7 @@ export class FirstLevelLeaderGuide {
   Enter(stage) {
     this.stage = stage.id; this.variant = null; this.firstOrder = true;
     // A story step that opens with a fight to hold gets its order at once.
-    const spec = MISSION_LEADER_STAGES[stage.id], holding = spec?.holdUntil && !this.r.Has(spec.holdUntil);
+    const spec = MISSION_LEADER_STAGES[stage.id], holding = spec?.holdUntil && (!spec.holdFrom || this.r.Has(spec.holdFrom)) && !this.r.Has(spec.holdUntil);
     this.nextVoiceAt = this.r.time + (spec?.story && !holding ? G.storyOrderDelayS : G.initialOrderS);
     this.r.voice.CancelGuidance(); this.waitSince = null; this.aheadSince = null;
     if(this.Leader) { this.Leader.missionGuideWaiting = false; this.Leader.missionGuideGesture = 0; }
@@ -115,7 +115,8 @@ export class FirstLevelLeaderGuide {
     // holdUntil：事实落下之前标记指 holdTarget。缺省口径是 BridgeCover 那种「守住射位」：动作词 cover、
     // 守着时喊本步的 cue、守完不再喊。08 Village 反过来（先去主街口看见街堵了，再进灶屋）：
     // holdMode "move"、守着时不喊（holdCue null）、落下之后才喊 afterHoldCue（GuideKitchen）。
-    if(spec.holdUntil){
+    // holdFrom（2026-10-12 0311 B 包）：这条事实落下之前不进「守着」那一档（07 沟口的机枪只在接火之后才指）。
+    if(spec.holdUntil&&(!spec.holdFrom||r.Has(spec.holdFrom))){
       if(!r.Has(spec.holdUntil)){
         target=spec.holdTarget;mode=label=spec.holdMode||"cover";variant+="Hold";
         if(spec.holdCue!==undefined)cue=spec.holdCue;
@@ -123,12 +124,14 @@ export class FirstLevelLeaderGuide {
       else cue=spec.afterHoldCue??null;
     }
     if(variant==="Tank"){
+      // 2026-10-12（契约 §3.3）：去程沿攻击支路到弟兄倒下处捡弹（bundleRoutePoint 家族门的点），捡到后标记指沟口攻击位。
       const returning=r.Has("bundleTaken")&&r.Inventory().bundles>0;
-      target=returning?MissionRouteLookahead(MISSION_ROUTES.bundleReturn,r.player.position):
-        Sortie.route.find((point,index)=>!r.Has(`bundleRoutePoint${index}`))||A.bundle;
-      if(!returning&&Distance(r.player.position,A.bundle)<Sortie.supplierRangeM)target=A.bundle;
-      mode=label=returning?"throw":target===A.bundle?"collect":"move";
-      cue=returning?"GuideThrow":"GuideBundle";variant+=returning?"Return":"Outward";
+      const outward=[...Sortie.attackRoute.slice(0,4),Sortie.bundleDrop];
+      target=returning?MissionRouteLookahead(MISSION_ROUTES.attack,r.player.position):
+        outward.find((point,index)=>!r.Has(`bundleRoutePoint${index}`))||A.bundleDrop;
+      if(!returning&&Distance(r.player.position,A.bundleDrop)<Sortie.supplierRangeM)target=A.bundleDrop;
+      mode=label=returning?"throw":target===A.bundleDrop?"collect":"move";
+      cue=returning?"GuideThrow":"GuideFollow";variant+=returning?"Return":"Outward";
     }
     if(variant==="MachineGun"){
       const gun=r.emplacement.Emplacement(r.gunId);
@@ -146,7 +149,8 @@ export class FirstLevelLeaderGuide {
     }
     if(variant==="Courtyard") {
       if(r.Has("villageGunSilent")){target=A.gate;mode=label="open";}
-      if(r.Has("courtyardGateOpen")&&r.Has("villageGunSilent")){target=A.courtCover;mode=label="cover";cue="GuideCourtCover";variant+="Cover";}
+      // 2026-10-12 0311 C 包（契约 §3.8）：院门开了守院门外东侧墙角 A.laneEast，看绕行巷东头。
+      if(r.Has("courtyardGateOpen")&&r.Has("villageGunSilent")){target=A.laneEast;mode=label="cover";cue="GuideCourtCover";variant+="Cover";}
     }
     if(variant==="Transfer") {
       const id=r.transferBeats?.started.findLast(id=>!r.transferBeats.cleared.includes(id));

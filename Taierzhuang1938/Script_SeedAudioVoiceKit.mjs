@@ -364,7 +364,7 @@ export function EncodeSegment(wav, output, { startS = 0, endS = null, fadeS = 0.
 }
 
 // ============================================================================
-// 保共振峰变调、循环句的首尾（2026-10-12 R4-Voice，VoiceSync §0.17）
+// 保共振峰变调、循环句的首尾（2026-10-12 R4-Voice，VoiceSync §0.18）
 // ============================================================================
 
 export const PITCH_SHIFT_METHOD = "ffmpeg rubberband（librubberband）pitch=2^(半音/12)、formant=preserved、pitchq=quality；时长不变，渲染延迟按 1 ms 包络互相关量出来剪掉";

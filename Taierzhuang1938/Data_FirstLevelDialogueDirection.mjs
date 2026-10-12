@@ -204,7 +204,7 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     // voices.comrade 仍是 comradeWounded（Cast/AudioVoiceCast_ComradeWounded.mp3），与拖出 / 审问 / 嚎三场同一条。
     // 2026-10-12 R4-Voice（集成负责人授权）：装着的 R2 这条切句时保共振峰降 7 个半音（pitchShift，rubberband formant=preserved、
     // 时长不变、不用 asetrate），基频中位 327 → 219 Hz（MeasureVoice）；rubberband 吃掉的 6.6 dB 补回，有声段 −27.96 dBFS（原清单值 −27.95），
-    // 真峰值 −13.6 dBTP，仍比嚎低 6.9 / 12.4 dB。整段录音与提示词不动，f0Hz 由门禁核（VoiceSync §0.17）。
+    // 真峰值 −13.6 dBTP，仍比嚎低 6.9 / 12.4 dB。整段录音与提示词不动，f0Hz 由门禁核（VoiceSync §0.18）。
     "01": P("low", 0.7, { after: "event:woundPress", offsetS: 0, masterDb: -27.5, maxSeconds: 1.2, pitchShift: { semitones: -7 }, f0Hz: [180, 230],
       delivery: "不是在说话、也不是喊：牙关咬紧、嘴闭着，剧痛的叫声闷在喉咙里出不来，只从喉咙和鼻子里挤出两下短促发抖的闷哼，第二下更短、又硬咽回去；不张嘴、不放声、不哭、不求饶；整条一秒左右，不超过一秒" }),
   }, { voices: { comrade: "comradeWounded" } }),
@@ -271,9 +271,23 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "06": P("normal", 0.7, { delivery: "不容商量" }),
   }),
 
-  // —— 03–06：cue id 与台词不变。
+  // —— 03–06：cue id 与台词不变（2026-10-12 03–11 重构新加 / 改字的几场见各自头注，录音 Voice 包第三波补）。
+  // 03 观察口（契约 §3.1）：支沟里的观察口，班长站上射击台，伸臂指着前头土坎后趴着的守军、再指缺口；顺子刚赶到他身后两三米。
+  FrontObservation: Scene(true, "支沟观察口的射击台上，罗班长半蹲着伸臂指向前头四五十米土坎背坡里趴着的守军，顺子刚从沟里赶到他身后两三米；前面枪声密，两人隔着两步要喊着说", {
+    "01": P("shout", 0.75, { context: "伸臂指着背坡里趴着的那几个人", delivery: "喊给顺子听，先问一句「看到没得」再压下去说，语速不快，每个字都要清楚" }),
+    "02": P("shout", 0.8, { pauseBeforeS: 0.6, context: "手臂转过去指缺口那段塌浅的沟", delivery: "短促、咬字重，「过一个打一个」一字一顿" }),
+  }),
   FrontBlockade: Scene(true, `${FRONT}。老周趴在机枪后面腿上缠着绷带，冲刚赶到的罗班长喊；罗班长回完老周，转头叮嘱身边的顺子`, {
     "01": P("shout", 0.85, { delivery: "腿伤疼，吃力地吼" }), "02": P("shout", 0.75), "03": P("normal", 0.7, { delivery: "转头压给顺子" }),
+  }),
+  // 03 第一批过缺口：刘文财蹲在沟口看着人一个个跑过来数数。
+  FirstBatchCount: Scene(true, "支沟口，刘文财蹲在沟沿后面看着第一批守军一个接一个跑过缺口进沟，边看边数", {
+    "01": P("shout", 0.7, { delivery: "数人，「一个」「三个」之间有真的等人跑过来的停顿，数到「五个」松一口气地喊出来" }),
+  }),
+  // 03 战车起步之后、第一批撤完时：守军慌着喊，班长压住他。
+  TankSpotted: Scene(true, `${FRONT}。路那头传来发动机和履带声，土坎后一个守军认出是战车慌着喊；罗班长在阵位里隔着二三十米回喊，先顾眼前`, {
+    "01": P("shout", 0.9, { spatial: "head", context: "听见履带声，往路那头看", delivery: "慌，先是不敢信地迟疑半句「战车……」，再扯着嗓子喊出来" }),
+    "02": P("shout", 0.8, { delivery: "硬、短，把人拽回眼前的事" }),
   }),
   FrontApproach: Scene(true, `${FRONT}。罗班长带着顺子贴墙往前摸，先压低声音提醒，等口子被火力压住再喊冲`, {
     "01": P("low", 0.7), "02": P("shout", 0.75, { after: "gate", offsetS: 0 }),
@@ -287,19 +301,31 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   TankHeard: Scene(true, `${FRONT}。第一批守军刚撤下来，路那头传来发动机和履带声、残墙后闪过车影；顺子在夺下的机枪位上问，罗班长在他旁边两三米，认出是战车，压着他先顾眼前`, {
     "01": P("normal", 0.7, { delivery: "竖着耳朵，心里发毛，江湖油子的腔调，嗓门带劲，语速偏快" }), "02": P("shout", 0.75, { delivery: "先认出来是什么，再把人拽回眼前的事" }),
   }),
+  // 2026-10-12 改字：何有田喊两遍「战车」，罗班长先把火力引到跟车的。
   TankRoadContact: Scene(true, `${FRONT}。何有田先看见路上开出来的日军战车，喊罗班长；罗班长隔着几米回喊`, {
-    "01": P("shout", 0.9, { delivery: "吃惊的急喊" }), "02": P("shout", 0.8),
+    "01": P("shout", 0.9, { delivery: "吃惊的急喊，「战车」连喊两遍，第二遍更响" }), "02": P("shout", 0.8, { delivery: "命令在前，提醒在后，不换气" }),
   }),
+  // 2026-10-12 并成一句。
   TankArmor: Scene(true, `${FRONT}。顺子的子弹打在战车钢板上直冒火花、叮当乱响，罗班长在他旁边几米吼他别浪费子弹`, {
-    "01": P("shout", 0.85, { delivery: "又急又气" }), "02": P("shout", 0.8, { delivery: "短促的命令" }),
+    "01": P("shout", 0.85, { delivery: "又急又气，前半句骂、后半句是命令，一口气" }),
   }),
   TankTerror: Scene(true, `${FRONT}。战车的机枪扫过来，罗班长冲站起来的人吼`, { "01": P("shout", 1) }),
-  BundleOrder: Scene(true, `${FRONT}。一名守军喊着报告旧弹药屋里还有集束手榴弹，罗班长分派人手，顺子在他身边问了一句`, {
-    "01": P("shout", 0.8), "02": P("shout", 0.75), "03": P("normal", 0.7, { delivery: "转头对身边的顺子" }),
+  // 04 缺口里倒下一个：刘文财在沟口数剩下的人。
+  // 2026-10-12 D 包录音：原表演说明「前面一个停顿是看着人倒下」被模型念了出来（第 3 次生成转写「人倒下,还剩两果」），第 2 次把省略号
+  // 演成 3 s 的嘟囔，第 1 次干净但整段信噪比 25.9 dB；停顿改写成明确的无声空当（pauseBeforeS），不再描述停顿里在看什么。
+  GapGuardDown: Scene(true, "支沟口，刘文财刚看着一个守军冲缺口被车上机枪打倒在口子正中，隔了一拍低声数剩下的人", {
+    "01": P("low", 0.6, { pauseBeforeS: 0.8, delivery: "开口前只是无声地停一拍（省略号不出声、不哼、不念任何字），然后「还剩两个」平平地、压着说出来，这四个字之外一个字不多，不煽情" }),
+  }),
+  // 2026-10-12 改写（契约 §3.2）：守军报的是先前抱着集束弹从支沟摸过去没回来的弟兄；罗班长看车、看沟、停一拍再分工。
+  BundleOrder: Scene(true, `${FRONT}。阵位后墙下的岔口，一名退下来的守军喊着报告先前有个弟兄抱着集束弹从支沟摸过去了没回来；罗班长看了一眼路上的战车、再看支沟，停了一拍才分派人手，顺子在他身边问了一句`, {
+    "01": P("shout", 0.8, { delivery: "喘着报告，「外头……」先顿一下，后面一口气说完，带着慌" }),
+    "02": P("shout", 0.75, { pauseBeforeS: 1.4, context: "看了一眼路上的车、再看支沟，停了一拍", delivery: "想定了，两道命令分别压给两个人" }),
+    "03": P("normal", 0.7, { delivery: "转头对身边的顺子，短" }),
     "04": P("normal", 0.7, { delivery: "嘴上发怵却硬撑着，江湖油子的腔调，语气冲，尾音上挑" }), "05": P("normal", 0.75, { delivery: "不耐烦地打断" }),
   }),
+  // 2026-10-12 改字：不再提屋，只说贴着沟走。
   BundleGo: Scene(true, `${FRONT}。何有田在机枪位顶着，催罗班长快走；罗班长带顺子下沟`, {
-    "01": P("shout", 0.8), "02": P("normal", 0.7),
+    "01": P("shout", 0.8), "02": P("normal", 0.7, { delivery: "两个短命令，「贴到走」压低" }),
   }),
   BundleProne: Scene(true, "交通沟里贴着土坡低身移动，罗班长在顺子前面一两米，压着嗓子提醒，看见岔口有人再急促报警", {
     "01": P("low", 0.75), "02": P("low", 0.8, { after: "gate", offsetS: 0 }),
@@ -311,10 +337,14 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
   BundleSupply: Scene(true, "旧弹药屋门口，守屋的老兵指着里面的箱子，罗班长接过来就催顺子往回走", {
     "01": P("normal", 0.6), "02": P("normal", 0.7),
   }),
-  BundleBrief: Scene(true, "拿到集束弹沿原交通沟往回跑，罗班长在顺子前面一两米，边跑边回头交代怎么炸战车；顺子喘着问一句，罗班长答得短", {
-    "01": P("normal", 0.7, { delivery: "回头压给顺子，要他记住" }), "02": P("normal", 0.7, { delivery: "喘着，一字一顿" }),
-    "03": P("normal", 0.75, { delivery: "喘着，说得急，一口气交代完" }), "04": P("normal", 0.65, { delivery: "喘着，有点佩服，江湖油子的腔调，尾音上挑" }),
-    "05": P("normal", 0.6, { delivery: "喘着，轻描淡写，不想多说" }),
+  // 05 捡弹点（契约 §3.3）：支沟中段，先前那个弟兄倒在沟里，两捆弹在他身边；罗班长先一步到，低头看了一眼。
+  BundleFound: Scene(true, "攻击支沟中段，一个川军弟兄趴在沟底不动了，两捆集束弹在他手边的泥里；罗班长跑到他跟前停了半步，顺子跟在后面一两米", {
+    "01": P("low", 0.55, { context: "低头看着沟底的人，停了半步", delivery: "压着嗓子，前面的停顿是认出人来，三个字说得很轻" }),
+    "02": P("shout", 0.8, { pauseBeforeS: 0.5, context: "一抬头，指着他手边的弹", delivery: "立刻收住情绪，短促的命令，两个短句" }),
+  }),
+  // 2026-10-12 改写：跑动中两句，不再一问一答。
+  BundleBrief: Scene(true, "捡起集束弹沿支沟往沟口跑，罗班长在顺子前面一两米，边跑边回头交代怎么炸战车", {
+    "01": P("normal", 0.75, { delivery: "回头压给顺子，喘着，两个短句" }), "02": P("normal", 0.75, { delivery: "喘着，说得急，一口气交代完" }),
   }),
   BundleReturnCall: Scene(true, "何有田在二三十米外的机枪位上隔着枪声喊，罗班长在沟里回喊，再叮嘱身边的顺子", {
     "01": P("shout", 0.85, { spatial: "offscreen" }), "02": P("shout", 0.75),
@@ -340,11 +370,20 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "05": P("low", 0.35, { emit: [{ id: "BorrowLightMatchesPocketed", at: "end" }] }),
     // 两处动作空当：第五句后顺子把火柴往兜里一收（约 2 s）、第六句后老周摸出烟包递一根过去（约 3 s）。
     "06": P("low", 0.5, { delivery: "江湖油子的腔调，半是占便宜半是让步，压着嗓子但有笑意", offsetS: 2.0, emit: [{ id: "BorrowLightCigaretteOffered", at: "end" }] }),
-    "07": P("normal", 0.4, { offsetS: 3.0 }), "08": P("normal", 0.6, { delivery: "江湖油子的腔调，故意挑理，带笑，尾音上挑" }), "09": P("low", 0.35),
+    // 2026-10-12 借火改两次 F（0311 契约 §3.4）：老周递出烟（BorrowLightCigaretteOffered）之后等玩家第二次按 F
+    //（Script_FirstLevelCollection 发 BorrowLightMatchAsked），7–9 句与划火才接着来。
+    // 2026-10-12 D 包：这里不能写 pauseBeforeS —— 它进整段提示词，录音（2026-09-30 顺子重录版）的提示词里从来没有它，写了就与清单的
+    // promptHash 对不上（--audio 门禁红）而台词一字没改；动作空当本来就由播放时的 after/offsetS 给，不靠录音里的停顿。
+    "07": P("normal", 0.4, { after: "event:BorrowLightMatchAsked", offsetS: 0.4 }), "08": P("normal", 0.6, { delivery: "江湖油子的腔调，故意挑理，带笑，尾音上挑" }), "09": P("low", 0.35),
   }),
   ZhouLift: Scene(true, "担架员走到老周跟前催他上担架，例行公事的大嗓门；老周含着刚点着的烟，含混、赖着不肯动，最后一句是嘟囔给自己听的", {
     "01": P("shout", 0.6), "02": P("low", 0.35, { delivery: "含着烟，含混" }), "03": P("shout", 0.6),
     "04": P("breath", 0.3, { delivery: "嘟囔" }),
+  }),
+  // 2026-10-12 03–11 重构 B 包（契约 §3.4）：洼地东北沟沿上蹲着捡弹壳的女娃，担架员隔着十几米冲她喊，庄稼人在旁边接一句。
+  NierShells: Scene(true, "背坡伤员集结处。洼地东北角的沟沿上蹲着一个女娃在捡弹壳，一个担架员站在洼地里隔着十几米冲坡上喊她下来；她不理。旁边一个鲁南本地的庄稼人不紧不慢地接一句，北方官话", {
+    "01": P("shout", 0.7, { spatial: "head", delivery: "例行公事的大嗓门，带点急，冲坡上喊；喊完等了一下她没反应" }),
+    "02": P("normal", 0.4, { pauseBeforeS: 1.2, context: "看了一眼坡上的女娃，又看了一眼喊话的担架员", delivery: "不紧不慢，像说邻家的事；北方官话（鲁南口音），不是四川话；「喊不应的」说得笃定" }),
   }),
 });
 

@@ -126,15 +126,9 @@ export class FirstLevelFrontShow {
     const r = this.r, tank = r.tank;
     if(!r.Has("bundleTaken")&&r.Near(FRONT_SORTIE.damagedLip,3)
       &&!r.BlocksSight(r.view.TankMuzzle(tank),r.Point(r.player.position,1.65),r.view.tankCollider))r.Say("BundleProne");
-    // 2026-09-27 用户追加：往弹药屋跑最后一段沟时边跑边交代为什么要集束弹、屋里为什么有（BundleWhy）；
-    // 拿到弹往回跑时交代往哪扔（BundleBrief，投出第一捆 / 车解决了就掐掉：FrontBattle.UpdateSortie）。
-    if (!r.Has("bundleTaken")) {
-      const door = Distance(r.player.position, FRONT_SORTIE.leaderDoorSide);
-      const bendClear = FRONT_SORTIE.enemies.every((spec) => !r.enemies?.get?.(spec.id)?.alive);
-      if (door < F.bundleWhyDoorForceM || (bendClear && door < F.bundleWhyDoorM)) r.Say("BundleWhy");
-    } else {
-      // 问题已经过时：拿到弹时还没开口就不说了（正在说的让它说完，句子短）。
-      r.frontScenes?.Drop?.("BundleWhy");
+    // 2026-09-27 用户追加：拿到弹往沟口跑时交代往哪扔（BundleBrief，投出第一捆 / 车解决了就掐掉：FrontBattle.UpdateSortie）。
+    // 2026-10-12（03–11 重构 §3.3）：BundleWhy（屋头有现成的）退出流程；弹在沟里捡，BundleFound 由 FrontBattle 在捡弹点说。
+    if (r.Has("bundleTaken")) {
       // 只要一次：投出去 / 车解决了以后被掐掉的，不再排回来。
       if (!this.bundleBriefAsked && !r.Has(TankClearFact(tank))) { this.bundleBriefAsked = true; r.Say("BundleBrief"); }
     }
@@ -169,7 +163,9 @@ export class FirstLevelFrontShow {
         z: r.player.position.z - Math.sin(yaw) * F.southWhisperSideM,
       }, R.squadCatchupMps);
     }
-    if (near || r.time - this.southAt >= F.southWhisperFallbackS) {
+    // 2026-10-12 0311 B 包：沟里先是幺娃丢弹壳逗妮儿（NierFollow），私语在它之后；妮儿不在（没接上）就按原兜底时间说。
+    const afterNier = r.Has("nierFollowHeard") || r.time - this.southAt >= F.southWhisperFallbackS;
+    if ((near || r.time - this.southAt >= F.southWhisperFallbackS) && afterNier) {
       this.whisperDone = true;
       r.Say("SouthWhisper");
     }

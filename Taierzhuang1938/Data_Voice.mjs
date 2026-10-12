@@ -266,6 +266,18 @@ const BATTLE_LINES = [
   { key: "move_go",         kind: "move",   file: "AudioVoice_MoveGo.mp3", dur: 1.84,  role: "班长",    pitch: -2,                  text: "走！莫站到起！" },
   { key: "move_nogun",      kind: "move",   file: "AudioVoice_MoveNogun.mp3", dur: 2.22,  role: "班长",    pitch: -2,  event: true,  text: "莫得枪的，跟到走！" },
 
+  // ===== 妮儿（第一关 06–11 耿家的聋女娃，Script_FirstLevelGengFamily，2026-10-12 03–11 重构 D 包）=====
+  // 她听不见、不说话，只有又粗又响、不收敛的叫声（捡弹壳被逗、被老耿扇、拍车板指屋顶、跑到躲处、看着顺子笑一声）。
+  // 非词人声不走上面口令的 TTS 分支（Script_VoiceBake 跳过带 generated 的行），由 Script_SeedAudioNierShoutBake.mjs 按
+  // 音效的写法用 seed-audio-1.0 生成，电平齐到口令同一档（−16.1 dBFS，真峰值 ≤ −1 dBTP）；记录在 Audio/Data_NierShoutManifest.json。
+  // side "civil" / kind "nier"：不进中日两套口令的随机池；Script_FirstLevelGengFamily 直接按 voice.<key> 点名播（不走 Bark 的
+  // 同类闸与变调）。免费素材库查过（Sonniss GDC 2016–2023 全部 VBR MP3 清单）：只有 3 条孩童喊叫，都是说词的（「Hey」「Hi-ya」）
+  // 或成年女声尖叫，没有一条是聋孩子那种直愣愣的叫，所以生成。
+  { key: "nier_shout_01", kind: "nier", side: "civil", file: "AudioVoice_NierShout_01.mp3", dur: 0.66, role: "妮儿", pitch: 0,
+    generated: "Script_SeedAudioNierShoutBake.mjs", text: "啊——！" },
+  { key: "nier_shout_02", kind: "nier", side: "civil", file: "AudioVoice_NierShout_02.mp3", dur: 1.18, role: "妮儿", pitch: 0,
+    generated: "Script_SeedAudioNierShoutBake.mjs", text: "嗳——！" },
+
   // ===== 日方（濑谷支队）=====================================================
   //
   // **text 必须是纯假名，一个汉字都不能有。** seed-audio 从文本本身判断语言：

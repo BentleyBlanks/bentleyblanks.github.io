@@ -246,7 +246,9 @@ export const TANK = Object.freeze({
     // 喊人：往车的那一侧收。
     rallyRadiusM: 3,
     // 车还在远处（03 从图外开进来）时，护兵照旧打自己的仗；车开到离他这么近才接过来跟车。
-    joinRangeM: 30,
+    // 2026-10-12 契约 §3.2：放宽到车一出路弯就跟 —— 出生点 (99–107, −208…−215) 到 BendExit (60,−177) 约 50 m；
+    // 04 检查点把他们放在 (60–69, −204…−212)，离 Pressure 35 m 以内。
+    joinRangeM: 60,
     // 从这一步起，车还没开过 BendExit 时护兵去看守位（路点的 escortOverwatch，见 TANK_ESCORT_OVERWATCH）。03 不去：
     // 那块土台对夺下的机枪敞着，09-25 空转探针 c3（进图就去）四个护兵 03 里就被打掉两个、一枪没开。[需]
     overwatchFromStage: "MachineGun",
@@ -387,6 +389,13 @@ export const TANK = Object.freeze({
     coolVolume: 0.8,
   }),
 
+  // --- 05 盯支沟（2026-10-12 契约 §3.3 `sapWatch`） ----------------------------------------------
+  // 玩家在攻击支路里（取弹 / 回程 / 到攻击位之前）时，车把炮口转向支沟、隔一会儿轰一发沟沿：区域目标取支路上离他
+  // 最近的取整点再沿沟往车那头推 playerClearM + 散布上限，真炸点离玩家 ≥ playerClearM；沟 1.6 m 深，蹲着走看不见
+  // （区域目标看不见 → 打沟沿，墙后只剩压制），站起来被看见就直接打人。节奏用炮手自己的 6–9 s（intervalMidS ± jitter），
+  // 这里只给上限内再抖一档 —— 隔 6–10 s。
+  sapWatch: Object.freeze({ stage: "Tank", playerClearM: 3.5, intervalMinS: 6, intervalMaxS: 10 }),
+
   // --- 事实判据（运行时读） -------------------------------------------------------
   // tankPositionPressured「炮弹实际命中右侧射位周边」：阵位四周的墙（东墙 6.5 m、北面残墙 5 m）
   // 挡下的炮弹落在 7.5–9.5 m 上（2026-09-23 实跑），旧的 8 m 让玩家在阵位上多挨三发才放行撤退。
@@ -456,7 +465,8 @@ export const TANK = Object.freeze({
   // null = 不喊（tankDisabled 由 05 的剧情对白「停了！口子能过！」交代；观察窗关上只有音效）。
   // 同一个 key 两次之间至少隔 barkCooldownS。数量克制：中方三句、日方一句新录，护兵散开借现成的「伏せろ」。
   barkCues: Object.freeze({
-    turretTraverse: Object.freeze({ key: "tank_turret", kind: "tank", who: "luo" }),   // 预兆链前两次
+    // 2026-10-12 契约 §3.2：「炮塔转过来了！」撤下（咔嗒声停了就开炮，没人再提醒）；键留在录音稿里（SQUAD_BARK_RETIRED.leader）。
+    turretTraverse: null,
     tankWindow: Object.freeze({ key: "tank_window", kind: "tank", who: "luo" }),       // 05：炮塔在打缺口、玩家在攻击支路上
     trackCut: Object.freeze({ key: "tank_track", kind: "tank", who: "luo" }),          // MobilityKill
     tankDisabled: null,
@@ -528,7 +538,8 @@ const OVERWATCH = Object.freeze({ escortOverwatch: TANK_ESCORT_OVERWATCH });
 const TANK_PACE = Object.freeze({
   Start: { stage: "Support", ...OVERWATCH }, Cutting: { stage: "Support", ...OVERWATCH },
   CrestEast: { stage: "Support", ...OVERWATCH }, Shadow: { stage: "Support", ...OVERWATCH },
-  HullDown: { stage: "Support", preview: true, ...OVERWATCH },
+  // 2026-10-12 契约 §3.1：不再是露面点（preview 去掉、holdS 0）——折返顶只掉头，不停车等人看；tankHeard 在起步时记。
+  HullDown: { stage: "Support", ...OVERWATCH },
   Descent: { stage: "Support", ...OVERWATCH },
   // 03 露面以后退回北残院后面，在路弯里等 04（从机枪座看不见）。
   Bend: { stage: "Support", ...OVERWATCH },
@@ -558,9 +569,10 @@ export const FRONT_TANK_BRAIN_PATH = Object.freeze({
     Seg(FRONT_SORTIE.attackRoute[3], null, "Tank")]),
   // 区域火力（05）：攻击支路（FRONT_SORTIE.attackRoute，后墙岔口 → 路边攻击位）。玩家进了沟线 radiusM 以内，
   // 沿线离他最近、按 stepM 取整的那一点就是区域目标；领了集束弹、人在 watch.rangeM 以内（取弹沟回程）先盯沟口。
+  // 2026-10-12（契约 §3.3 sapWatch）：弹在支沟里，玩家一进 05 就在这条沟上 —— 不再等 bundleTaken；落点按 TANK.sapWatch 推开。
   lanes: Object.freeze([
-    Object.freeze({ id: "attackLane", stage: "Tank", requireFact: "bundleTaken", radiusM: 3.5, stepM: 3, weight: 2.5,
-      scatterM: Object.freeze([1.2, 2.6]), watch: Object.freeze({ rangeM: 30, weight: 1.6 }),
+    Object.freeze({ id: "attackLane", stage: "Tank", requireFact: null, radiusM: 3.5, stepM: 3, weight: 2.5,
+      scatterM: Object.freeze([1.0, 2.0]), watch: Object.freeze({ rangeM: 30, weight: 1.6 }), sapWatch: true,
       points: Object.freeze(FRONT_SORTIE.attackRoute.map((p) => Object.freeze({ x: p.x, z: p.z }))) }),
   ]),
   stageOrder: Object.freeze(["Support", "MachineGun", "Tank", "Orders"]),

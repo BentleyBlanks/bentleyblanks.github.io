@@ -1,0 +1,76 @@
+{
+  "model": "seed-audio-1.0",
+  "cues": {
+    "nier_shout_01": {
+      "file": "AudioVoice_NierShout_01.mp3",
+      "sha256": "86844458a86c74d2644115ed576d639f61bfb8d937390c99a4b0d7d06df3b551",
+      "bytes": 8822,
+      "seconds": 0.66,
+      "prompt": "录音棚近讲干声，单声道，只有这一个孩子的声音：没有任何环境声、音效、音乐、混响和其他人声，开头立即发声，结尾不留长空白。角色：一个十一岁的中国农村女孩，天生听不见、也不会说话，所以叫出来的声音从来不收敛：又粗又响、直愣愣的、不像正常孩子那样圆润；是女童的嗓子（高、亮，不是大人的声音），但很野、很冲。她隔着十几米看见了什么，冲着人用尽力气叫一声：一声短促、响亮、粗野的「啊——！」，大约半秒到一秒，不是词、不是尖叫、不是哭、不是笑；只叫这一声，不重复，不念任何说明。",
+      "promptHash": "b9eae5484818a3ea5d31e940823af32a1ca494abca387baa367a912e6bfc260d",
+      "candidate": 1,
+      "takes": 2,
+      "score": 0,
+      "why": [],
+      "measure": {
+        "seconds": 0.66,
+        "leadS": 0.06,
+        "tailS": 0.06,
+        "voicedS": 0.54,
+        "activeRmsDb": -16.13,
+        "noiseDb": -55.5,
+        "snrDb": 39.36,
+        "peakDb": -4.44,
+        "lowShare": 0.019,
+        "f0": {
+          "median": 314,
+          "p10": 302,
+          "p90": 320,
+          "frames": 9
+        },
+        "truePeakDb": -4.28
+      },
+      "gainDb": -0.63,
+      "clipRuns": 0,
+      "transcript": "啊!",
+      "targetDb": -16.1,
+      "mastering": "ActiveRmsToShoutBandTruePeakMinus1"
+    },
+    "nier_shout_02": {
+      "file": "AudioVoice_NierShout_02.mp3",
+      "sha256": "30440568d1a611650a4df4398017ddb33d58795d66115d0f461baaee2d563daa",
+      "bytes": 15091,
+      "seconds": 1.18,
+      "prompt": "录音棚近讲干声，单声道，只有这一个孩子的声音：没有任何环境声、音效、音乐、混响和其他人声，开头立即发声，结尾不留长空白。角色：一个十一岁的中国农村女孩，天生听不见、也不会说话，所以叫出来的声音从来不收敛：又粗又响、直愣愣的、不像正常孩子那样圆润；是女童的嗓子（高、亮，不是大人的声音），但很野、很冲。她高兴地冲着人叫了一声，带着笑意、嗓门很大：一声粗而响的「嗳——！」，大约半秒到一秒，不是词、不是尖叫、不是哭；只叫这一声，不重复，不念任何说明。",
+      "promptHash": "612804c90e6e81c5743c573b34ba150a20bfd24cee1bba912914e0eb78fa2d2d",
+      "candidate": 1,
+      "takes": 2,
+      "score": 0,
+      "why": [],
+      "measure": {
+        "seconds": 1.18,
+        "leadS": 0.06,
+        "tailS": 0.06,
+        "voicedS": 1.06,
+        "activeRmsDb": -16.09,
+        "noiseDb": -60.08,
+        "snrDb": 43.99,
+        "peakDb": -4.66,
+        "lowShare": 0.015,
+        "f0": {
+          "median": 327,
+          "p10": 219,
+          "p90": 333,
+          "frames": 40
+        },
+        "truePeakDb": -4.71
+      },
+      "gainDb": -2.19,
+      "clipRuns": 0,
+      "transcript": "啊!",
+      "targetDb": -16.1,
+      "mastering": "ActiveRmsToShoutBandTruePeakMinus1"
+    }
+  },
+  "updatedAt": "2026-10-12T10:49:12.321Z"
+}

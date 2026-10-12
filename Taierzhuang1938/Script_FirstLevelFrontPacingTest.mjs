@@ -342,7 +342,7 @@ const Ok = (label) => console.log(`ok ${label}`);
   gun.rounds = 30; gun.belts = 4; emplacement.mounted = gun.id; r.player.position = { ...S.seat };
   g = battle.Guide();
   assert.ok(g.label === "front" && g.mode === "cover", "03 on the gun, before the preview: the gap");
-  facts.add("tankPreviewed");
+  facts.add("tankHeard");
   g = battle.Guide();
   const beside = Math.hypot(B.guideTankLeadM, B.guideTankSideM);
   // Bearing from the player: the marker sits off the tank's line by guideTankSideM (not on the turret).
@@ -1046,7 +1046,8 @@ function WalkRuntime(extra = {}) {
   const w = battle.walks.get(luo.id); w.stallAccepted = true; w.index = 1;
   assert.equal(battle.Walk(luo), true, "a spot the stall fallback accepted stays accepted (no stall loop)");
   const src = Read("Script_FirstLevelFrontBattle.mjs");
-  assert.equal((src.match(/LeaderCover\(\)\]/g) || []).length, 3, "capture, 04 and after-capture cover legs all end on LeaderCover()");
+  // 2026-10-12: the capture leg is built by CaptureRouteWithObservation (two of the four: its fallback and its spur route).
+  assert.equal((src.match(/LeaderCover\(\)\]/g) || []).length, 4, "capture (both branches of CaptureRouteWithObservation), 04 and after-capture cover legs all end on LeaderCover()");
   assert.ok(!/\[S\.leaderCover\]|,S\.leaderCover\]/.test(src), "no leg ends on the bare leaderCover point");
   checks += 8;
   Ok("⑬ Luo walks right into his cover and back into it after a step back");

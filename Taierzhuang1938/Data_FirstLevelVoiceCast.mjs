@@ -126,6 +126,29 @@ export const FIRST_LEVEL_VOICE_CAST = Object.freeze({
     persona: "四川成年男性，劳累喘气，抬担架时短促报路，例行公事的大嗓门",
     sample: "前头有坑，脚底下看到点。一、二，起！稳到，莫晃。这个伤员腿断了，抬平点。歇一哈，歇一哈，手麻了。好，再走。",
   }),
+  // 2026-10-12 03–11 重构（契约 §5.2）：老耿与庄稼人是鲁南本地人，北方官话占位（用户之后按耿家庄口音改）；
+  // 定妆音第三波（Voice 包）再烘，这里先把人设与定妆台词定下来。
+  geng: Object.freeze({
+    faction: "civil", lang: "zh-north", projection: "normal", f0: [85, 150],
+    persona: "六十出头的鲁南庄稼汉，赶驴车的；嗓子干、硬、带沙，嘴硬抠门，帮人从不说是帮；北方官话（鲁南口音），不说四川话，不哭不软",
+    // 2026-10-12 D 包：B 包起草的定妆台词是 GengCart / GengGate 的剧情原句，整段 cue 挂它作参考音时模型接着把独白念了出来
+    //（GengCart 两条 take 都多出「缸别碰…俺这车可不是白给人用的」）。定妆音只许念非剧情内容（本文件头注），换成下面这段。
+    sample: "这头驴是俺前年秋后从集上牵回来的，花了十二块大洋，比人金贵。地里的活它干，进城拉脚也是它，你们当兵的别嫌俺啰嗦。"
+      + "车板子让人踩坏了，俺上哪儿说理去？天黑以前得赶路，城门一关，谁也不等谁。俺不是不帮你们，俺是怕误了事。",
+    // 2026-10-12 D 包：不带参考音生成的候选基频都在人设区间（85–150）之外 —— 第 1 轮（缺省表演说明）195 / 219 Hz 是年轻人的
+    // 亮嗓，第 2 轮把「低、干、沙、喊哑」写进表演说明反而拔到 286–327 Hz（成了挤着嗓子的嘶喊）。与顺子 2026-09-30 同一个
+    // 教训：参考音决定音高，提示词决定不了。baseFile 是第 1 轮 #2（195 Hz、信噪比 86 dB、字错率 0.05）用 rubberband 保共振峰
+    // 降 6 个半音做成的音色参照（133 Hz），只作 @音频1 定音高与年龄感，成品定妆音是带着它再生成的干声。
+    baseFile: "Cast/AudioVoiceCastBase_Geng20261012.mp3",
+    sampleDelivery: "六十出头的老汉的嗓子：音高压得很低，用胸腔发声，干、硬，带一点沙，不是嘶喊；"
+      + "说话不快，一句一句砸出来，骂驴那句狠、护缸护车那几句抠门又硬气，最后一句是冲人喊的；"
+      + "绝不拔高嗓子，不要年轻人的亮嗓，不要尖细，不喊破，不耳语，语速自然",
+  }),
+  peasant: Object.freeze({
+    faction: "civil", lang: "zh-north", projection: "normal", f0: [95, 165],
+    persona: "鲁南本地的中年庄稼人，北方官话（鲁南口音），不急不吼，像说邻家的事",
+    sample: "老耿家的妮儿，打小就听不见，喊不应的，你别费那个劲。她爹赶车去了，车上拉着一家的被褥。庄子里的人走了大半，剩下的都在往南边挪。",
+  }),
   // 2026-09-26 用户：「翻译的语气太温柔了，至少也是个汉奸语气、恶狠狠变态的语气」——人设改成明确的汉奸腔，
   // 定妆音重烘（定妆台词前半对日本兵谄媚、后半对俘虏阴狠，两副面孔都录进参考音里）。
   // f0 区间随人设上调：定妆是演出来的谄媚尖嗓与冷笑，不是平稳说话，两条候选中位数 216 / 225 Hz，
@@ -230,7 +253,9 @@ export const SQUAD_BARK_KEYS = Object.freeze({
 /** 2026-09-27 撤下、但还在录音稿里的键（按套）。squad / leader 里的 rally_shoot、move_go 只是 AI 不再喊，玩家下令照旧用。 */
 const SQUAD_RETIRED = Object.freeze(["spot_east", "spot_gap", "spot_wall", "move_flank", "move_go", "warn_down", "rally_shoot",
   "hurt_medic", "ammo_ask", "ammo_out"]);
-export const SQUAD_BARK_RETIRED = Object.freeze({ squad: SQUAD_RETIRED, leader: SQUAD_RETIRED, player: Object.freeze(["move_flank"]) });
+// 2026-10-12（03–11 重构契约 §3.2「战车不做 boss」）：「炮塔转过来了！」从罗班长那一套撤下（录音稿不动，Data_Tuning_Tank
+// barkCues.turretTraverse 置 null）——咔嗒声一停就开炮，没人再提醒。
+export const SQUAD_BARK_RETIRED = Object.freeze({ squad: SQUAD_RETIRED, leader: Object.freeze([...SQUAD_RETIRED, "tank_turret"]), player: Object.freeze(["move_flank"]) });
 /** 撤下且已从 Data_Voice 删掉的句子原文：只给录音稿重建提示词用（Script_SeedAudioSquadBarkBake.BarkPrompt）。 */
 export const SQUAD_BARK_RETIRED_TEXT = Object.freeze({
   spot_east: "东边！东边有鬼子！", spot_gap: "缺口！鬼子钻进来了！", spot_wall: "墙上！鬼子爬上墙了！",

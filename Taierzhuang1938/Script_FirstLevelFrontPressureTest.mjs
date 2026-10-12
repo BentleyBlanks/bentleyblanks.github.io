@@ -168,9 +168,11 @@ console.log(`ok ① pressure / backdrop data: ${FRONT_PRESSURE_PHASES.length} ph
   has.add("frontBattleStarted"); Eq(FrontPressurePhase("Support", Has)?.id, "assault");
   has.add("rightNestCaptured"); Eq(FrontPressurePhase("Support", Has)?.id, "nestLost");
   has.add("frontRifleDefense"); Eq(FrontPressurePhase("Support", Has)?.id, "firstWithdrawal");
-  has.add("rifleWithdrawalResolved"); has.add("tankPreviewed"); Eq(FrontPressurePhase("Support", Has)?.id, "tankShown");
+  // 2026-10-12 (03–11 refactor §3.2): tankShown is the tank out of the bend (tankAtBendExit), a 04 phase - 03 ends on firstDone.
+  has.add("rifleWithdrawalResolved"); has.add("tankHeard"); Eq(FrontPressurePhase("Support", Has)?.id, "firstDone");
+  has.add("tankAtBendExit"); Eq(FrontPressurePhase("MachineGun", Has)?.id, "tankShown");
   has.add("tankPositionPressured"); Eq(FrontPressurePhase("MachineGun", Has)?.id, "tankPressure");
-  Eq(FrontPressurePhase("Support", Has)?.id, "tankShown", "a phase only runs in its own steps");
+  Eq(FrontPressurePhase("Support", Has)?.id, "firstDone", "a phase only runs in its own steps");
   has.add("bundleTaken"); has.add("tankImmobilized"); Eq(FrontPressurePhase("Tank", Has)?.id, "secondWithdrawal");
   has.add("lastGuardsWithdrawn"); Eq(FrontPressurePhase("Tank", Has)?.id, "disengage");
   Eq(FrontPressurePhase("Orders", Has), null, "06 and later have no pressure phase");
@@ -223,7 +225,7 @@ console.log(`ok ① pressure / backdrop data: ${FRONT_PRESSURE_PHASES.length} ph
   const back = (i) => ({ ...line(i), missionAssault: { mode: "hold", index: 1, points: s.points } });
   Eq(FrontChargeCheck([0, 1, 2, 3].map(back), rule, 31, { x: 0, z: -142 }), "notForward");
 }
-const PRESSURE_ENCOUNTERS = ["approach", "front", "frontFlank", "frontOfficer", "machineGun", "tank", "bundleApproach", "village"];
+const PRESSURE_ENCOUNTERS = ["approach", "front", "frontFlank", "frontOfficer", "machineGun", "tank", "sapInfiltrators", "village"];
 function MakeActor(encounter, spec) {
   const weapon = WEAPONS[spec.weapon || "Type38"];
   const points = ["front", "machineGun"].includes(encounter) && !spec.hold ? FrontAssaultLane(spec.x, spec.z) : [];
@@ -378,9 +380,9 @@ function MakeWorld(stage = "BunkerRescue") {
     Check(flank.slice(2).every((a) => a.missionAssault.index === AssaultTop(a.missionAssault) - 2),
       "two flank men down: the other two fall back two craters");
   }
-  // Machine-gun attack: charge once, then repelled.
-  world.facts.add("tankPreviewed"); r.time = 6; pressure.Update();
-  Check(FrontGroupMembers("mgAttack", enemies).every((a) => !a.missionDormant && !a.scriptedNoncombatant), "the tank shows: the push group wakes");
+  // Machine-gun attack: charge once, then repelled. 2026-10-12: the push group wakes when the tank is out of the bend (04).
+  r.flow.stage.id = "MachineGun"; world.facts.add("tankAtBendExit"); r.time = 6; pressure.Update();
+  Check(FrontGroupMembers("mgAttack", enemies).every((a) => !a.missionDormant && !a.scriptedNoncombatant), "the tank is out of the bend: the push group wakes");
   Eq(pressure.phase.id, "tankShown");
   // Men of the machine-gun attack killed while they were still waiting are not the attack's casualties.
   const mgWait = FrontGroupMembers("mgAttack", enemies);
@@ -455,7 +457,7 @@ function MakeWorld(stage = "BunkerRescue") {
     const mgMen = FrontGroupMembers("mgAttack", e4);
     const half = Math.ceil(mgMen.length / 2);
     for (const a of mgMen.slice(0, half)) a.alive = false;
-    w4.facts.add("tankPreviewed"); r4.time = 2; p4.Update(); r4.time = 2.3; p4.Update();
+    r4.flow.stage.id = "MachineGun"; w4.facts.add("tankAtBendExit"); r4.time = 2; p4.Update(); r4.time = 2.3; p4.Update();
     Check(!p4.events.some((e) => e.kind === "fallback" && e.group === "mgAttack"),
       "half the attack killed while waiting: it does not fall back the moment it shows");
     const st = p4.groupState.get("mgAttack");
@@ -464,15 +466,18 @@ function MakeWorld(stage = "BunkerRescue") {
     r4.time = 2.6; p4.Update();
     Check(p4.events.some((e) => e.kind === "fallback" && e.group === "mgAttack"), "half of the men it went in with: now it falls back");
   }
-  // Reinforcements (contract §2.8 / §6): nobody before the tank has pressed the nest; 2+2 in 04, 1 more in 05, never twice.
+  // Reinforcements (contract §2.8 / §6; 2026-10-12 §3.2: released the moment the tank is out of the bend, with the push
+  // group and the escorts): nobody before that; 2+2 in 04, 1 more in 05, never twice.
   {
     const { r: r5, world: w5, enemies: e5, Drain, pressure: p5 } = MakeWorld("MachineGun");
-    for (const f of ["frontBattleStarted", "rightNestCaptured", "frontRifleDefense", "rifleWithdrawalResolved", "tankPreviewed"]) w5.facts.add(f);
+    for (const f of ["frontBattleStarted", "rightNestCaptured", "frontRifleDefense", "rifleWithdrawalResolved", "tankHeard"]) w5.facts.add(f);
     r5.time = 1; p5.Update(); Drain();
-    Eq(w5.spawned.length, 0, "no reserve before tankPositionPressured");
-    w5.facts.add("tankPositionPressured"); r5.time = 2; p5.Update(); Drain();
+    Eq(w5.spawned.length, 0, "no reserve before the tank is out of the bend");
+    w5.facts.add("tankAtBendExit"); r5.time = 2; p5.Update(); Drain();
     const byEntry = (entry) => w5.spawned.filter((id) => roster.get(id).entry === entry).length;
-    Eq([byEntry("NorthWestPlateau"), byEntry("RoadCutting")], [2, 2], "04 releases two from each hidden entry");
+    Eq([byEntry("NorthWestPlateau"), byEntry("RoadCutting")], [2, 2], "04 releases two from each hidden entry as the tank leaves the bend");
+    w5.facts.add("tankPositionPressured"); r5.time = 2.2; p5.Update(); Drain();
+    Eq(w5.spawned.length, 4, "the pressure phase adds nobody");
     r5.time = 2.5; p5.Update(); Drain(); Eq(w5.spawned.length, 4, "the same man is never queued twice");
     const westMan = e5.get(w5.spawned.find((id) => roster.get(id).entry === "NorthWestPlateau"));
     const roadMan = e5.get(w5.spawned.find((id) => roster.get(id).entry === "RoadCutting"));
@@ -488,8 +493,8 @@ function MakeWorld(stage = "BunkerRescue") {
   }
   // Phase exit logs why a configured charge never happened; a hold phase freezes a former assault man in place.
   {
-    const { r: r3, world: w3, enemies: e3, pressure: p3 } = MakeWorld("Support");
-    for (const f of ["frontBattleStarted", "tankPreviewed"]) w3.facts.add(f);
+    const { r: r3, world: w3, enemies: e3, pressure: p3 } = MakeWorld("MachineGun");
+    for (const f of ["frontBattleStarted", "tankAtBendExit"]) w3.facts.add(f);
     r3.time = 1; p3.Update(); Eq(p3.phase.id, "tankShown");
     r3.time = 2; p3.Update();
     w3.facts.add("tankPositionPressured"); r3.flow.stage.id = "Tank"; r3.time = 3; p3.Update();

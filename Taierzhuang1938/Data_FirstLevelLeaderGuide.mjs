@@ -9,15 +9,23 @@ export const MISSION_LEADER_STAGES = Object.freeze({
   RearTrench: Entry("follow", "RearTrench", null, {story: true, rejoinRoute: true}),
   Support: Entry("follow", "Support", A.front),
   MachineGun: Entry("cover", "Gun", A.front, {story: true}),
-  Tank: Entry("collect", "Bundle", A.bundle, {story: true}),
+  // 2026-10-12 契约 §3.3：05 的弹在攻击支路中段倒下的弟兄身边（A.bundleDrop），不再指旧弹药屋。旧 GuideBundle 的录音
+  // 讲的是北边侧沟与补给屋，本轮不播：去程喊 GuideFollow，捡弹后沿用 GuideThrow（Script_FirstLevelLeaderGuide.View）。
+  Tank: Entry("collect", "Follow", A.bundleDrop, {story: true}),
   Orders: Entry("rally", "Collection", A.collection, {story: true}),
-  South: Entry("follow", "South", null, {story: true, rejoinRoute: true}),
+  // 07（2026-10-12 0311 B 包）：沟口机枪一响（holdFrom mouthContact）到担架过完开阔地（holdUntil mouthCrossed）之间，
+  // 标记指东边田埂上的机枪（cover），守着时不喊；过完接着带路。
+  South: Entry("follow", "South", null, {story: true, rejoinRoute: true,
+    holdFrom: "mouthContact", holdUntil: "mouthCrossed", holdTarget: A.mouthEmbankment, holdMode: "cover", holdCue: null, afterHoldCue: "GuideSouth"}),
   // 08 先看见街堵了，再进灶屋（2026-09-28 引导轮，docs/Data_FirstLevelGuidance20260928.md §5 B）：
   // `streetBlockSeen` 只在主街北口那个 box 里落（Gates 表），标记与班长若一开始就指灶屋，玩家跟着进屋
   // 就永远过不了 08。所以落下之前标记指主街口（动作词仍是「前往」、不喊灶屋那句），落下之后才指灶屋、喊 GuideKitchen。
-  Village: Entry("move", "Kitchen", {x:58,z:-9}, {story: true,
+  // 2026-10-12 0311 C 包：标记只指看得见的东西 —— 落下之后指灶屋北门（门洞外，不是屋里的一个点）；西侧夹道是另一条路，
+  // 不打标记（任务字写着「从灶屋或西边夹道绕」）。
+  Village: Entry("move", "Kitchen", {x:58,z:-17.8}, {story: true,
     holdTarget: {x:76,z:-24}, holdUntil: "streetBlockSeen", holdMode: "move", holdCue: null, afterHoldCue: "GuideKitchen"}),
   Melee: Entry("clear", "Melee", A.melee),
+  // 10：清窗口机枪 → 打开院门 → 院门开了守院门外东侧墙角 A.laneEast 看巷口（Script_FirstLevelLeaderGuide.View 的 Courtyard 分支）。
   Courtyard: Entry("clear", "Gate", P.sideRoomGunner),
   TransferApproach: Entry("follow", "Follow", null, {rejoinRoute: true}),
   // 12 守来时路：命令指着村口低墙上顺子的射位（docs/Data_FirstLevelTransferCover20260927.md）。

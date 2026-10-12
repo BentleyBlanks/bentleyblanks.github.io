@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {CloneSlimeVolume,PoseSlimeVolume,StepSlimeVolume,WriteSlimeSurface} from './Script_SlimePhysics.mjs?v=ear043-runtime-performance-20261003';
+import {WaxGravityMm} from './Script_WaxFlight.mjs?v=ear046-click-care-20261012';
 import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // 盘内藏品只保存外观与独立运动状态，不再持有耳壁物理体或参与客人评分。
@@ -123,7 +124,8 @@ export function CreateCollectionTray({scene, tray, camera, Project, size, scoop,
       if(p.fall){
         p.fall+=dt;
         // 离盘后按世界竖直方向下落，盘子回平也不会把耳垢接回。
-        p.fallVelocity.y-=50*dt;p.fallPosition.addScaledVector(p.fallVelocity,dt);
+        // Exact free-fall displacement in millimetres, independent of frame rate.
+        p.fallPosition.addScaledVector(p.fallVelocity,dt);p.fallPosition.y-=WaxGravityMm*dt*dt*.5;p.fallVelocity.y-=WaxGravityMm*dt;
         p.position.copy(group.worldToLocal(p.fallPosition.clone()));dirty=true;
         if(p.fall>1.2){pieces.splice(i,1);p.geometry.dispose();p.material.dispose();deleted=true;}
         continue;

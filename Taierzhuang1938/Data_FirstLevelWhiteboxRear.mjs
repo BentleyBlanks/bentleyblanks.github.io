@@ -833,5 +833,31 @@ export function BuildRearWhitebox(groundAt) {
   for (let i = 0; i < 6; i++)
     Night(`NightStreetRubble${i}`, i % 2 ? -155.5 : -156.4, 296 + i * 4.1, .5 + (i % 3) * .15, .25, .45,
       "earthDark", 0, { solid: false, ry: i * .8 });
+
+  // 2026-10-12 03–11 重构 B 包（docs/Data_FirstLevel0311Refactor20261012Contract.md §3.5 / §4）：07 沟口东侧的田埂与坟包，
+  // 给东头赶来的日军当掩体（高 0.9–1.3 m）。每道土埂都横在「射手趴的点 → 沟南口 (−8,−36)」这条线上：
+  // 射手在东北面（MISSION_TACTICS 的末点，离埂心 1.25–1.75 m），埂挡住从沟口看过来的视线。
+  // 不动 southWalk 的路线点与电线杆（最近的 SouthExitPole0 在 (2,−31.5)，离这几块 ≥ 12 m）；
+  // southTraffic 大车路（(4,−66)→(−4,−35)）与坟包 B 之间留 ≥ 0.8 m。
+  {
+    const MOUTH = { x: -8, z: -36 };
+    /** 横在 post→沟口 这条线上的土埂：埂心离 post 这么远（朝沟口），长边与那条线垂直。 */
+    const Bank = (id, post, standM, w, h, d, semantic = "earthDark") => {
+      const dx = MOUTH.x - post.x, dz = MOUTH.z - post.z, len = Math.hypot(dx, dz), ux = dx / len, uz = dz / len;
+      const x = post.x + ux * standM, z = post.z + uz * standM;
+      // 长边沿 (uz, −ux)… 体块的局部 x 轴朝 (cos ry, −sin ry)，取 v = (uz, −ux) 的反向 (−uz, ux) 都行，这里取 (uz, −ux)。
+      const ry = Math.atan2(ux, uz);
+      return Grounded(id, x, z, w, h, d, semantic, ry);
+    };
+    // 歪把子的土埂（A.mouthEmbankment = (15.2,−44.9) 是射手趴的点）。
+    Bank("MouthEmbankment", { x: 15.2, z: -44.9 }, 1.25, 6, 1.15, 1.5);
+    // 三道给步枪手的：东边田埂 A、西边坟包 A（南田的坟地）、南边田埂 B。
+    Bank("MouthFieldBankA", { x: 27.2, z: -49.2 }, 1.2, 5.5, 1.0, 1.4);
+    Bank("MouthGraveMoundA", { x: 9.6, z: -59.6 }, 1.75, 2.8, 1.25, 2.4);
+    Bank("MouthFieldBankB", { x: 27.4, z: -39.4 }, 1.2, 5, 1.05, 1.4);
+    // 坟包 A 的坟头与旁边一座小坟（布景，不挡人）。
+    Detail("MouthGraveMoundACap", 8.55, -58.19, 1.6, .3, 1.4, "earthDark", { y: groundAt(8.55, -58.19) + 1.25 + .15 });
+    Grounded("MouthGraveMoundB", 5, -56, 2.2, 1.0, 1.9, "earthDark", .5);
+  }
   return { replaceBlockIds, blocks, nightBlocks };
 }
