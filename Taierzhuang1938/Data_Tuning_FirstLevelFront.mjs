@@ -511,5 +511,10 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // that wall end for 1.8 s (relay r2 wrap-up probe gwprobe probe6, cut#1).
   giveWaySpotArrivalM:.12,
   giveWayPassM:.7,giveWaySpeedMps:2.4,giveWayReleaseM:1.8,giveWayClearS:.6,giveWayReturnS:4,giveWayReturnM:.15,
+  // giveWayStillClearS: a player standing still that long (no movement keys, not moving) at least giveWayNearM from the spot
+  // he left also counts as clear (then giveWayClearS as usual). 2026-10-12 R4-Gates: the player crouched by the captured gun
+  // 1.6 m from Luo's spot, inside giveWayReleaseM, held him aside 0.7 m short of his cover for 22 s (R3 drive fin2). 1.5 s:
+  // longer than the pauses of a player coming through the door (a look round, a reload), short of the 4 s cover check.
+  giveWayStillClearS:1.5,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });
