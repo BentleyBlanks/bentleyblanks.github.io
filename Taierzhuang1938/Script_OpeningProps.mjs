@@ -7,6 +7,7 @@
 // 0.28 s pose blend when a clip changes (BeginBlend + mix), an owned bayonet rides its scabbard
 // mount between clips, and a weapon a clip throws away can be left in the world (DropWeapon).
 import * as THREE from "three";
+import { mergeGeometries } from "./vendor/three/examples/jsm/utils/BufferGeometryUtils.js";
 import { SET_MATERIALS as OPENING_SET_MATERIALS, REDRAFT_PROPS } from "./Data_OpeningSet0103.mjs";
 
 const Clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -561,15 +562,17 @@ function WeaponObject(owned, spec, ctx) {
   const muzzle = built.muzzle?.clone?.() || new THREE.Vector3(0, 0.035, -1);
   if (spec.bipod) {
     const b = spec.bipod, steel = materials.steel || PropMaterial(owned, { color: 0x333331, metalness: 0.7, roughness: 0.5 });
-    const top = new THREE.Vector3(0, muzzle.y - 0.012, muzzle.z + b.fromMuzzleM), feet = [];
+    const top = new THREE.Vector3(0, muzzle.y - 0.012, muzzle.z + b.fromMuzzleM), feet = [], legs = [];
     for (const side of [-1, 1]) {
       const dir = new THREE.Vector3(side * Math.sin(b.spreadDeg / 2 * DEG), -Math.cos(b.rakeDeg * DEG), -Math.sin(b.rakeDeg * DEG)).normalize();
-      const leg = PropMesh(owned, new THREE.CylinderGeometry(b.radiusM, b.radiusM * 0.8, b.legM, 6), steel, "OpeningProp_Type11Bipod");
-      leg.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
-      leg.position.copy(top).addScaledVector(dir, b.legM / 2);
-      group.add(leg);
+      const at = new THREE.Matrix4().compose(top.clone().addScaledVector(dir, b.legM / 2),
+        new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir), new THREE.Vector3(1, 1, 1));
+      legs.push(new THREE.CylinderGeometry(b.radiusM, b.radiusM * 0.8, b.legM, 6).applyMatrix4(at));
       feet.push(top.clone().addScaledVector(dir, b.legM));
     }
+    // 两条腿同一材质：烘进一份几何，一趟少一个 draw（2026-10-12 R4-Perf；原来两只网格，形状逐顶点相同）。
+    group.add(PropMesh(owned, mergeGeometries(legs, false), steel, "OpeningProp_Type11Bipod"));
+    for (const leg of legs) leg.dispose();
     // 两只脚的中点（局部）：PlaceOnBipod 把它放到垫尸背上。
     group.userData.bipodFoot = feet[0].add(feet[1]).multiplyScalar(0.5);
   }

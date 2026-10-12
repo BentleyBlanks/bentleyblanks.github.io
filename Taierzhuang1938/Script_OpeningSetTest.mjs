@@ -987,7 +987,7 @@ function FakeVfx() {
 // ---------------------------------------------------------------- 6. 2026-10-11 开场重构（契约 docs/Data_OpeningRedraft20261011Contract.md §5）
 // 标记名、净空、贴地 / 叠放、跳下点、手榴弹停点、折角爆点、道具接口、离开收走、三角形预算。地面一律用游戏里的高度场（P012，宿主的 groundAt）。
 {
-  const { SET_MARKS: M, CORPSES, BODY_POSES, REDRAFT_PROPS, REDRAFT_STAGES, REDRAFT_TRIANGLE_BUDGET, CorpseFootprint, COMRADE_KNEEL } = await import("./Data_OpeningSet0103.mjs");
+  const { SET_MARKS: M, CORPSES, BODY_POSES, REDRAFT_PROPS, REDRAFT_STAGES, REDRAFT_TRIANGLE_BUDGET, CorpseFootprint, COMRADE_KNEEL, CORPSE_RENDER } = await import("./Data_OpeningSet0103.mjs");
   const { MISSION_PLACEMENT } = await import("./Data_FirstLevelMissionLayout.mjs");
   const { MISSION_STAGE_ROUTES } = await import("./Data_FirstLevelMissionTopology.mjs");
   const { BuildRedraftProp, CountTriangles } = await import("./Script_OpeningProps.mjs");
@@ -1185,6 +1185,32 @@ function FakeVfx() {
   let peak = 0;
   for (let i = 0; i < 20; i++) { set.Update(1 / 60, "Trapped", "Interrogation", { collapsed: true, blastAge: 40 }); peak = Math.max(peak, Math.abs(set.redraft.corpses.Get("mg.corpseUpper").group.matrixWorld.elements[13] - before)); }
   assert.ok(peak > 0.01 && peak <= 0.021 && Math.abs(set.redraft.corpses.Get("mg.corpseUpper").group.matrixWorld.elements[13] - before) < 1e-6, `the burst jolts the upper body (${peak.toFixed(3)} m) and it settles back`);
+  // 2026-10-12 R4-Perf：垫尸静止时画批次实例（五具共用一套批次），被震 / 被拖的那几帧画自己的网格；两边不会同时画、也不会都不画。
+  {
+    const corpses = set.redraft.corpses, upperBody = corpses.Get("mg.corpseUpper");
+    const SlotsOn = (b) => b.slots.map((s) => s.batch.mesh.getVisibleAt(s.id));
+    const Mode = (b) => ({ mesh: b.group.visible, batch: SlotsOn(b).every(Boolean), none: SlotsOn(b).every((v) => !v) });
+    let m = Mode(upperBody);
+    assert.ok(!m.mesh && m.batch, `a still MG body draws through the shared batches, not its own meshes ${JSON.stringify(m)}`);
+    const at = new THREE.Matrix4(); upperBody.slots[0].batch.mesh.getMatrixAt(upperBody.slots[0].id, at);
+    assert.ok(at.elements.every((v, i) => Math.abs(v - upperBody.matrix.elements[i]) < 1e-5), "its batch instance sits where the body lies (float32 instance texture)");
+    set.JoltCorpse("mg.corpseUpper");
+    set.Update(1 / 60, "Trapped", "Interrogation", { collapsed: true, blastAge: 40 });
+    m = Mode(upperBody);
+    assert.ok(m.mesh && m.none, `while it jolts it draws its own meshes (moving instances stay out of batches) ${JSON.stringify(m)}`);
+    for (let i = 0; i < 20; i++) set.Update(1 / 60, "Trapped", "Interrogation", { collapsed: true, blastAge: 40 });
+    m = Mode(upperBody);
+    assert.ok(!m.mesh && m.batch, `back in the batch once it is still again ${JSON.stringify(m)}`);
+    set.PlaceCorpse("mg.corpseLower", { pose: "floor", x: 10.4, z: -123.4, headYawDeg: 90, settle: false });
+    assert.ok(Mode(corpses.Get("mg.corpseLower")).mesh, "dragging a body shows its meshes at once");
+    set.PlaceCorpse("mg.corpseLower", { pose: "onLip" }); set.PlaceCorpse("mg.corpseUpper", { pose: "stacked" });
+    for (let i = 0; i < 3; i++) set.Update(1 / 60, "Trapped", "Interrogation", { collapsed: true, blastAge: 40 });
+    assert.ok(!Mode(corpses.Get("mg.corpseLower")).mesh, "and the batch again once it lies still");
+    for (const b of corpses.batches) {
+      const small = b.geometries.every((g) => (g.index ? g.index.count : g.attributes.position.count) / 3 < CORPSE_RENDER.smallPartTriangles);
+      assert.equal(b.mesh.castShadow, !small, `${b.mesh.name}: only parts of ${CORPSE_RENDER.smallPartTriangles}+ triangles cast shadows`);
+    }
+  }
   // 冷启动 02：没演过 01 的选章 / 回跳，垫尸已经在沟沿上叠好，门口两具在位。
   {
     const s2 = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: GG, corpseSource: (k) => protos[k] });
