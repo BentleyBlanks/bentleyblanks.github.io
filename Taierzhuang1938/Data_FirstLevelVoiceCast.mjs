@@ -230,7 +230,9 @@ export const SQUAD_BARK_KEYS = Object.freeze({
 /** 2026-09-27 撤下、但还在录音稿里的键（按套）。squad / leader 里的 rally_shoot、move_go 只是 AI 不再喊，玩家下令照旧用。 */
 const SQUAD_RETIRED = Object.freeze(["spot_east", "spot_gap", "spot_wall", "move_flank", "move_go", "warn_down", "rally_shoot",
   "hurt_medic", "ammo_ask", "ammo_out"]);
-export const SQUAD_BARK_RETIRED = Object.freeze({ squad: SQUAD_RETIRED, leader: SQUAD_RETIRED, player: Object.freeze(["move_flank"]) });
+// 2026-10-12（03–11 重构契约 §3.2「战车不做 boss」）：「炮塔转过来了！」从罗班长那一套撤下（录音稿不动，Data_Tuning_Tank
+// barkCues.turretTraverse 置 null）——咔嗒声一停就开炮，没人再提醒。
+export const SQUAD_BARK_RETIRED = Object.freeze({ squad: SQUAD_RETIRED, leader: Object.freeze([...SQUAD_RETIRED, "tank_turret"]), player: Object.freeze(["move_flank"]) });
 /** 撤下且已从 Data_Voice 删掉的句子原文：只给录音稿重建提示词用（Script_SeedAudioSquadBarkBake.BarkPrompt）。 */
 export const SQUAD_BARK_RETIRED_TEXT = Object.freeze({
   spot_east: "东边！东边有鬼子！", spot_gap: "缺口！鬼子钻进来了！", spot_wall: "墙上！鬼子爬上墙了！",

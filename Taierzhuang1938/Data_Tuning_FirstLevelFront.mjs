@@ -512,4 +512,29 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   giveWaySpotArrivalM:.12,
   giveWayPassM:.7,giveWaySpeedMps:2.4,giveWayReleaseM:1.8,giveWayClearS:.6,giveWayReturnS:4,giveWayReturnM:.15,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
+  // ---- 2026-10-12 03–11 refactor (contract §3.1–3.3), Script_FirstLevelFrontCounterattack ----
+  // observation: Luo stops in the spur off the support sap (FRONT_SPACE.observation) and talks once the player is within
+  // observeWaitM of him (contract: <= 4 m); a player who walks on past the spur mouth releases him (he says it on the move).
+  // gapRadiusM: "冲到缺口边" = a live attacker within this of FRONT_SORTIE.gap (the gap sap is 6 m long, the last
+  // bound line 11 m north of the scrape). gapGunners: the two fire-base LMGs that cover the gap (FRONT_PRESSURE_GROUPS.fireBase).
+  // suppressLevel: Data_Tuning_FirstLevel.tacticalSuppression's band (a man at 0.5 drops into the pinned branch,
+  // FIRE_BASE fireStanceMaxSuppression 0.5); suppressS 2: the contract's "压住 >= 2 s". windowStaleS 45: a shut window
+  // that never reopens cannot hold the waiting batch for good (the old assaultWindowFallbackS 90 is the open-at-all guard).
+  // woundedDragMps: a wounded man dragged by the next one, under R.walkSpeedMps 1.7. woundedGuard 2: contract §3.1.
+  // gapSacrificeGuard 7 (contract names guard 5): guard 5 is the second batch's talking face (FACED_FRONT_GUARD_INDEX,
+  // BundleOrder / TankSpotted), so the assistant of the LMG pair, guard 7, is the one the hull MG kills in the gap.
+  // Sap shells: Type 89 discharger (Data_Battle.SUPPORT.ija launcher radius 5). The sap rounds are ambient (contract §3.1:
+  // baseAccuracy 0, no TTK account): sapShellDamage 0 = FireShell feedbackOnly - burst, whistle, concussion, no injury.
+  // The nest rounds hurt, but they are pressure, not the killer: >= 3.5 m from the player (contract) and nestShellDamage 40,
+  // which Blast's falloff (1 - d / (5 * 1.9))^2 turns into <= 9 hp at 3.5 m. The 10-12 first drive had 110 here: six rounds in
+  // 40 s on a player sitting on the captured gun (23 hp each at 3.5 m) killed him in 03 while waiting for the handover.
+  // launcherFlightS 2.2: over SHELL.incomingMinFlightS so the whistle plays (contract: 落前 1.6 s 啸声).
+  // gapRushCloseM: a bounder in rush/charge inside this (2 x gapRadiusM) shuts the window; one bounding between covers 20 m
+  // out does not (the first drive showed the window fluttering every 1.5 s on far bounds, holding the first batch for 48 s).
+  counter:Object.freeze({observeWaitM:4,observeMaxS:12,gapRadiusM:8,gapRushCloseM:16,gapGunners:Object.freeze(["FrontGunner","FrontSupportGunner"]),
+    suppressLevel:.5,suppressS:2,windowStaleS:45,woundedGuard:2,woundedDragMps:1.1,woundedDownS:1.5,
+    gapSacrificeGuard:7,gapKillM:1.6,gapRunMaxS:9,gapKillShots:5,
+    sapShellFirstS:8,sapShellEveryS:Object.freeze([8,14]),sapShellMax:4,sapShellPlayerClearM:6,sapShellDamage:0,
+    nestShellFirstS:40,nestShellEveryS:Object.freeze([10,16]),nestShellPlayerClearM:3.5,nestShellSquadClearM:2.5,nestShellDamage:40,
+    launcherFlightS:2.2,nestFrontRadiusM:3,tugS:1.2,tugM:1.4,branchCorridorM:4}),
 });

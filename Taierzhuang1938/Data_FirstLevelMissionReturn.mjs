@@ -8,7 +8,8 @@ const overrides={
   RearTrench:Stage.rearTrench,
   Support:Routes.support,
   MachineGun:Routes.rightRear,
-  Tank:[...Routes.bundle,...Routes.bundleReturn,...Routes.attack,...Routes.orders],
+  // 2026-10-12：05 不再去旧弹药屋，走廊 = 攻击支路（去、回）+ 撤回集结处。
+  Tank:[...Routes.attack,...Routes.orders],
   // 06 接令：战车刚停下时玩家还在北头的集束弹沟里。回头警告的走廊必须从那儿一路
   // 接回集结处（ordersRejoin 的尾段就是 collectionReturn），只给 collectionReturn
   // 的话，站在弹药屋边上就会被判成「偏离路线」。

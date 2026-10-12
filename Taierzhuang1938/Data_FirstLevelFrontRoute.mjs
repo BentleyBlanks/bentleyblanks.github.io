@@ -30,7 +30,10 @@ export const FRONT_TANK_PATH=Object.freeze([
   // above the crest against the sky. Then the road doubles back east down the slope behind the ruin to the bend.
   Way("CrestEast",92,-206.5,"cruise",{note:"far end of the plateau-edge road (turret glimpsed at 80+ m before the ruin hides it)"}),
   Way("Shadow",72,-204.5,"cruise",{note:"behind NorthRuin (seen from the seat the ruin covers bearings 31-50 deg)"}),
-  Way("HullDown",49.5,-202.4,"hullDown",{faceTo:"nest",turretTo:"nest",holdS:15,note:"03 preview (K5): switchback top on the crest, 55 m; hull hidden by the cutting lip, turret on the skyline"}),
+  // 2026-10-12 (03–11 refactor contract §3.1): no 15 s hull-down preview any more. The switchback top stays a hullDown
+  // stop (the brain turns round on the spot there), but holdS is 0: it does not wait to be looked at, and nothing is
+  // recorded here (tankHeard is recorded when the engine first moves off Start, Script_FirstLevelTankRuntime).
+  Way("HullDown",49.5,-202.4,"hullDown",{faceTo:"nest",turretTo:"nest",note:"switchback top on the crest, 55 m: turn round and go on (no preview hold since 2026-10-12)"}),
   Way("Descent",60.5,-199.8,"cruise",{note:"doubles back east down the slope, into the ruin's shadow again"}),
   Way("Bend",64,-189.5,"cruise",{note:"the bend, behind NorthRuin"}),
   Way("BendExit",60,-177,"cruise",{note:"04 emerges from the bend (K6); the south road forks here and is cut by the crater roadblock 9 m on"}),
@@ -91,6 +94,15 @@ export const FRONT_SORTIE=Object.freeze({
   // player walked past his elbow just as BundleAttack.01 started (0.9 m, 78 of 115 frames).
   leaderAttackSide:Point(42.1,-159.9),
   throw:Point(43.6,-159.6),orders:Point(-34,-99),
+  // 2026-10-12 (03–11 refactor contract §3.3): the bundles are no longer fetched from the ammo house. A comrade went up
+  // this sap with two bundles before 04 and was shot leaning out at the sap mouth; he lies in the sap's middle leg
+  // (between attackRoute[2] and [3], 0.5 m off the walking line toward the east wall) with the two bundles beside him:
+  // MISSION_ANCHORS.bundleDrop, the F pick-up (MissionBundle), MISSION_AFTERMATH's AftermathBundleBearer body.
+  bundleDrop:Point(40.1,-147.4),
+  // Where he lies (head toward the sap mouth he was shot from) and where the two bundles rest: beside his hands, on the
+  // walking line's side so the player sees them from the junction.
+  bundleBody:Object.freeze({x:40.35,z:-147.9,yaw:2.95}),
+  bundles:[Point(39.55,-146.9),Point(39.75,-147.7)],
   // The left gun stands 0.6 m in front of its seat, on its own sandbag rest (Data_FirstLevelMissionLayout LeftGunRest):
   // the gunner at the seat has the butt at his shoulder. At (-33.8,-157.6) it stood 1.22 m off the seat with nothing
   // under it, 1.45 m over the pit floor - an empty gun in mid-air, the man at the seat 1.2 m behind it (2026-09-25
@@ -111,11 +123,15 @@ export const FRONT_SORTIE=Object.freeze({
   crawlClearanceM:.96,crawlRoofM:1.1,crawlRadiusM:3.8,crawlEntryMarginM:.75,
   checkpointRadiusM:3.2,supplierRangeM:7,leaderArrivalM:3,leaderWaitM:10,leaderCrawlMps:1.1,
   trenchBottomM:3.8,trenchDepthM:1.85,trenchBankM:1.6,
-  // 05 cut-in pair: from the blocked south road through the road link into the ammo sap ahead of the player.
-  // They slipped into the road link sap from the blocked south road during 04 (dug in, out of sight).
-  // hold: they keep to the sap (peek/hide) and face the ammo-sap junction. Free to roam (hold:false) they walked
-  // west up the sap during 03, saw the gap across our backfield from 65 m and kept FrontBattle.InfantryBlockade on.
-  enemies:[{id:'BundleBendA',x:59.6,z:-128.4,hold:true,role:'cutIn',faceTo:{x:44.6,z:-125.6}},{id:'BundleBendB',x:56.8,z:-127.4,hold:true,role:'cutIn',faceTo:{x:44.6,z:-125.6}}],
+  // 05 sap infiltrators (2026-10-12 contract §3.3 / §5.3 `sapInfiltrators`, formerly the two-man cut-in pair): four men
+  // dug in along the road link sap east of the old ammo sap. When the player goes up the attack branch
+  // (sapInfiltrationStarted) they come west through the road link in two waves (A/B, then C/D), down the old ammo sap
+  // to the rear junction behind the pair - the nest's back door - and one of them (SapInfilC) carries a grenade for it.
+  // hold: until then they keep to the sap (peek/hide) and face the ammo-sap junction. Free to roam (hold:false) they
+  // walked west up the sap during 03, saw the gap across our backfield from 65 m and kept FrontBattle.InfantryBlockade on.
+  // Starts >= 0.8 m apart (FrontTopologyTest) and at least 60 m / hidden from every friendly post.
+  enemies:[{id:'BundleBendA',x:59.6,z:-128.4,hold:true,role:'cutIn',faceTo:{x:44.6,z:-125.6}},{id:'BundleBendB',x:56.8,z:-127.4,hold:true,role:'cutIn',faceTo:{x:44.6,z:-125.6}},
+    {id:'SapInfilC',x:58.2,z:-127.8,hold:true,role:'cutIn',faceTo:{x:44.6,z:-125.6},grenades:1},{id:'SapInfilD',x:52.4,z:-126.3,hold:true,role:'cutIn',faceTo:{x:44.6,z:-125.6}}],
   // Terrain road polyline = the tank path plus a 5 m dead-end stub at the berm-end crater.
   road:[...T.map(p=>Point(p.x,p.z)),Point(31,-166.4)],
   // Old keys, resolved by waypoint id (integration decision 2026-09-23: resolve, never renumber).

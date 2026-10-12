@@ -12,7 +12,7 @@
 // Script_CharacterSpeechTest fails when a spoken Han character is missing here.
 export const HAN_PINYIN = Object.freeze({
   ai: "挨矮", an: "岸",
-  ba: "把拔八", ban: "班绊板", bei: "备北", ben: "本", bi: "闭比", bian: "边遍", bie: "别", bing: "兵饼",
+  ba: "把拔八", bao: "抱", ban: "班绊板", bei: "备北", ben: "本", bi: "闭比", bian: "边遍", bie: "别", bing: "兵饼",
   bo: "拨", bu: "不部补步",
   cai: "才财", ce: "侧", ceng: "蹭", cha: "差岔", chang: "场", chao: "抄吵", che: "撤车", cheng: "城成", chi: "吃", chong: "冲",
   chou: "臭抽", chu: "出处", chuan: "穿川", chuang: "窗", ci: "刺", cong: "从", cuan: "蹿",
@@ -26,7 +26,7 @@ export const HAN_PINYIN = Object.freeze({
   gou: "沟狗够", gu: "股", guai: "拐", guan: "官管惯", guang: "光", gui: "鬼龟", gun: "滚", guo: "过",
   ha: "哈", hai: "还", hao: "好耗", he: "何", hen: "很", hou: "后厚", hu: "护", hua: "话",
   huan: "换", hui: "回", hun: "混", huo: "活伙火",
-  ji: "几机集挤己继记", jia: "夹架家", jian: "见奸", jiao: "交脚叫", jie: "接借街结", jin: "紧进劲今",
+  ji: "几机集挤己继记", jia: "夹架家", jian: "见奸捡", jiao: "交脚叫", jie: "接借街结", jin: "紧进劲今",
   jiu: "就旧九", jun: "君",
   ka: "卡", kai: "开", kan: "坎看槛", kao: "靠", ke: "磕壳颗瞌", ken: "肯", keng: "坑", kong: "空",
   kou: "口", ku: "裤", kuai: "快块", kun: "捆",
@@ -50,7 +50,7 @@ export const HAN_PINYIN = Object.freeze({
   ya: "压哑", yan: "沿烟掩眼", yao: "咬要幺药", ye: "也夜", yi: "一以", ying: "硬应", yong: "用",
   you: "有又右", yuan: "员原院", yun: "运",
   za: "咋", zai: "在再", zao: "遭早灶", zen: "怎", zha: "炸", zhan: "战站", zhang: "长账",
-  zhao: "照找", zhe: "着这", zhen: "真阵", zheng: "整", zhi: "指只", zhong: "重", zhou: "周", zhu: "住珠",
+  zhao: "照找", zhe: "着这", zhen: "真阵", zheng: "整", zhi: "指只支", zhong: "重", zhou: "周", zhu: "住珠",
   zhuan: "转专", zhuang: "装", zhui: "追", zhun: "准", zi: "子自", zou: "走", zuan: "钻", zui: "嘴最", zuo: "左",
   // 2026-10-11 01–02 Notion 稿新出现的音节（数数、记账、嚎叫的「啊」「呃」「嘶」等）。
   e: "呃", a: "啊", bang: "帮膀", xin: "新", yang: "样", qiu: "求", han: "汉", pei: "配", chui: "锤", que: "雀",
