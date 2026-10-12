@@ -174,33 +174,47 @@ export async function Drive(ctx) {
       await FightUntil(page, "roofThrowerDown", "m.facts.includes('roofThrowerDown')", 90);
       const roof = await VillageState();
       console.log("ROOF_THROWER", JSON.stringify({ roof: roof.streetFight.yard, placed: roof.roofPlaced, log: roof.log.filter((e) => /roof|throw/.test(e.name)) }));
+      // 院里的物资箱（MissionSupplyCourtyard，院门内西侧）：夹道这一趟到连屋南门前枪里已经快打空了（实跑：弹尽死在门口）。
+      await Route([{ x: 50, z: 27 }, { x: 50, z: 31.5 }], "CourtyardSupply", { fight: true });
+      const supply = await Interact();
+      assert.equal(supply.kind, "supply", "the courtyard crate provides real supplies");
+      await page.evaluate(() => { const g = window.Tengxian; g.Debug.Key("KeyB"); g.StepFrames(1, 1 / 60, false); });
       // 侧间窗口那挺机枪：从后院东北角绕过去（侧间南门洞 x 65.6–69.6）。
       await Route([{ x: 56, z: 22 }, { x: 64, z: 20.2 }, { x: 67.6, z: 19.4 }], "YardToSideRoomDoor", { fight: true });
-      await FightUntilFact(page, "villageGunSilent", 120);
+      // villageGunSilent 这条事实归 10（Courtyard 步里才记）：这里只认人真的打死了。
+      await FightUntil(page, "villageGun:dead", "!r.enemies.get('VillageGunner')?.alive", 120);
       // 连屋：从南门进（58,15.5），过道里藏着的那个从北门扑出来 —— 同一套进门遭伏击。
       await Route([{ x: 60, z: 19.5 }, { x: 58, z: 17.8 }, { x: 58, z: 13.5 }], "ConnectedHouseSouthDoor", { fight: false, stopFact: "kitchenAmbushSprung" });
+      // 他一扑出来就退回院子当中隔开距离打（四个上刺刀的会从南门一个一个出来；在门洞里跟四把刺刀顶，实跑三趟都死在门口）。
+      await Route([{ x: 58, z: 19 }, { x: 52, z: 24 }, { x: 47, z: 27 }], "BackIntoYard", { fight: true });
     } else {
       // 09 进门遭伏击（2026-09-28，COD5 万岁冲锋式一次性按键）：跨出灶屋南门进过道，
       // 过道西段藏着的那个扑出来把顺子撞翻、压刀。这一段不开枪（fight:false）——
       // 要验的是按键反刺那条路；「提前击败」「被捅死重来」「追不上作罢」在 Script_FirstLevelMidTest。
       await Route([{ x: 58, z: -4 }, { x: 58, z: 0.2 }], "KitchenLink", { fight: false, stopFact: "kitchenAmbushSprung" });
     }
-    const pinned = await page.evaluate(() => {
+    const pinned = await page.evaluate((waitFrames) => {
       const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
       for (const key of ["KeyW", "KeyS", "KeyA", "KeyD", "ShiftLeft"]) g.Debug.Key(key, false);
-      for (let i = 0; i < 300 && r.village.ambush.Phase !== "prompt" && g.player.alive; i++) g.StepFrames(1, 1 / 60, false);
+      for (let i = 0; i < waitFrames && r.village.ambush.Phase !== "prompt" && g.player.alive; i++) g.StepFrames(1, 1 / 60, false);
       g.StepFrames(6, 1 / 60, false);
       g.StepFrames(1, 1 / 60, true);
       return { phase: r.village.ambush.Phase, prompt: r.AmbushPromptView(), cinematic: r.AmbushCinematic,
         drop: +(g.player.meleeCameraDrop || 0).toFixed(3), alive: g.player.alive, hud: document.getElementById("hud")?.className,
         facts: g.Debug.FirstLevelMission().facts.filter((fact) => /kitchenAmbush/.test(fact)) };
-    });
+    }, sideRoute === "alley" ? 1 : 300);
     console.log("KITCHEN_AMBUSH_PROMPT", JSON.stringify(pinned));
+    // 走夹道那一趟从连屋南门进：他从过道北口那扇门扑出来要跑 17 m，lungeMaxS 1.4 s 够不着就作罢转普通白刃兵
+    //（kitchenAmbushBroken，Script_FirstLevelKitchenAmbush 的既定收尾，QTE 本身一字没动）—— 那一趟只验「他真扑出来了」。
+    let countered = null, risen = null;
+    if (sideRoute === "alley" && pinned.phase !== "prompt") {
+      assert.ok(pinned.facts.includes("kitchenAmbushSprung") && ["done", "preempted", "lunge"].includes(pinned.phase), "从南门进连屋：他真扑出来了（够不着就作罢转白刃）：" + JSON.stringify(pinned));
+    } else {
     assert.equal(pinned.phase, "prompt", "进过道就被扑倒压住、屏幕上给出按键环：" + JSON.stringify(pinned));
     assert.ok(pinned.cinematic && pinned.prompt?.mode === "press" && pinned.prompt.key === "F" && pinned.drop > 0.9,
       "HUD 让位、倒地镜头、一次性按键环（F）：" + JSON.stringify(pinned));
     await page.screenshot({ path: path.join(output, "Scene_KitchenAmbushPrompt.png") });
-    const countered = await page.evaluate(() => {
+    countered = await page.evaluate(() => {
       const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
       g.Debug.Key("KeyF");
       g.StepFrames(12, 1 / 60, false);
@@ -209,7 +223,7 @@ export async function Drive(ctx) {
       return mid;
     });
     await page.screenshot({ path: path.join(output, "Scene_KitchenAmbushCounter.png") });
-    const risen = await page.evaluate(() => {
+    risen = await page.evaluate(() => {
       const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
       for (let i = 0; i < 300 && r.village.ambush.Phase !== "done" && g.player.alive; i++) g.StepFrames(1, 1 / 60, false);
       return { phase: r.village.ambush.Phase, control: r.controls?.kind || null, alive: g.player.alive,
@@ -220,7 +234,10 @@ export async function Drive(ctx) {
     assert.ok(countered.phase === "countered" && !countered.lead, "按上 F：他死在反刺这一下上：" + JSON.stringify(countered));
     assert.ok(risen.phase === "done" && risen.control === null && risen.alive, "起完身还权：" + JSON.stringify(risen));
     assert.ok(Math.abs(risen.pitch) < 0.2, "起完身是平视的，不是仰着头看屋顶：" + risen.pitch);
+    }
     await Capture("KitchenAmbushRisen");
+    // 走夹道那一趟领头那个还活着（作罢转白刃）：边打边等其余三个放出来。
+    if (sideRoute === "alley") await FightUntilFact(page, "meleeBreachStarted", 40);
     const breach = await page.evaluate(async () => {
       const g = window.Tengxian;
       for (let i = 0; i < 1800; i++) {
@@ -265,6 +282,11 @@ export async function Drive(ctx) {
       await FightUntil(page, "roofThrowerDown", "m.facts.includes('roofThrowerDown')", 90);
       const roof = await VillageState();
       console.log("ROOF_THROWER", JSON.stringify({ roof: roof.streetFight.yard, placed: roof.roofPlaced, log: roof.log.filter((e) => /roof|throw/.test(e.name)) }));
+      // 院里的物资箱先补一次（10 巷口要打两拨八个人）。
+      await Route([{ x: 50, z: 27 }, { x: 50, z: 31.5 }], "CourtyardSupply", { fight: true });
+      const supply = await Interact();
+      assert.equal(supply.kind, "supply", "the courtyard crate provides real supplies");
+      await page.evaluate(() => { const g = window.Tengxian; g.Debug.Key("KeyB"); g.StepFrames(1, 1 / 60, false); });
       // 走灶屋这一趟由玩家按 F 开门（老耿的拔闩在走夹道那一趟验）。
       await Route([{ x: 53, z: 28 }, { x: 53, z: 32.8 }], "CourtyardGate", { fight: true });
       await Interact();

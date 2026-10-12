@@ -372,4 +372,19 @@ node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-
 CAMPAIGN_SIDE_ROUTE=alley node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-jumps --stage-from=8 --stage-to=11 --evidence-tag=Alley
 ```
 
-实机证据在 `Taierzhuang1938/_shots/FirstLevelStageVillage_Kitchen/` 与 `_Alley/`（§6 机位：`Scene_Concept08StreetMouth` `Scene_Concept09WestAlley` `Scene_Concept09Courtyard` `Scene_Concept10GateLane` `Scene_Concept11TransferPoint`）。07+ 指纹（`Data_FirstLevelSpaceSouthFingerprint.json`）按本轮白盒重生（baseline `0311-c-village-20261012`）。
+实机证据在 `Taierzhuang1938/_shots/FirstLevelStageVillage_Kitchen/` 与 `_Alley/`（§6 机位：`Scene_Concept08StreetMouth` `Scene_Concept09WestAlley` `Scene_Concept09Courtyard` `Scene_Concept10GateLane` `Scene_Concept11TransferPoint`；回执 `Data_VillageSegment.json`）。07+ 指纹（`Data_FirstLevelSpaceSouthFingerprint.json`）按本轮白盒重生（baseline `0311-c-village-20261012`）。
+
+### 7.6 2026-10-12 实跑定论（两条侧路各一趟，8→11 真走完）
+
+| 站 | 走灶屋 | 走西侧夹道 | 改稿 ±40% |
+| --- | --- | --- | --- |
+| 08 Village | 88 s | 88 s | 72–168 |
+| 09（Melee 进步到院门真开） | 57 s（驾驶器不探索、四个人 10 s 打完；步骤本身 30 s） | 87 s | 72–168 |
+| 10（院门开到出村） | 79 s | 111 s | 72–210 |
+| 11 TransferApproach | 50 s | 47 s | 36–84 |
+
+- 从连屋**南门**进（走夹道那一趟）：领头那个从过道北口那扇门扑出来要跑 17 m，`lungeMaxS` 1.4 s 够不着就作罢转普通白刃兵（`kitchenAmbushBroken`，拍表既定收尾；QTE 一字没动）—— 从灶屋进才有一次性按键。
+- 实跑改掉的三处：① 街口两个人只给一个终点会贴着灶屋西墙滑进夹道（`VILLAGE_STREET_APPROACH` 折线）；09 起撤回灶屋北门（`RecallStreetPosts`），不然 10 从主街那一侧接线卡在障碍前、队尾掩护永远脱离不了。② 第一拨追兵开门前就到巷子里等着，门一开贴脸齐射 —— 改成 fact 门控（`courtyardGateOpen`）1/12/24/36 s 一个一个来，第二拨 30/42/54/66 s。③ `MeleeAlley` 摆远一点还没走到窗口就被从窗里打死，摆在窗外又挨 08 的流弹：装睡期间挂 `scriptEssential`，放出那一刻摘。
+- 灶屋西间的粮缸原先摆在隔墙边，罗班长被挤进去卡在缸与隔墙之间 0.9 m 的缝里（整队停在灶屋）：缸挪到西墙根。
+- **整帧预算**：08 起连续跑到 11 回看村路那一帧（`Capture("TransferVillageRoad")`，村里多出二十来具尸体 + 耿家一车人）量到 9.04–9.19 M（上限 9.0 M），两级阴影一起落在量的那一帧；跳转进 11 只量到 8.14 M（一级）。两趟驾驶都是在这最后一张截图上翻红，其余全过；留给集成定夺（连续跑的尸体数 / 阴影级联调度）。
+- `outsideWatched`（何有田到街口压东窗那一点）两趟都在 40 s 内没落：他到主街口就跟东巷来的人接火、不再往街里走 —— 不是过关条件，KitchenDetour 第二句照说。
