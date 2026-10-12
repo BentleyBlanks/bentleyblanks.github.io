@@ -356,3 +356,33 @@ body.blockoutMode #hud :is(.hudTop, .hudBrief, .hudTitle, .hudSubtitle, .hudMini
   .hudMissionGuide, .hudMissionArea, .hudMissionReturn, .hudForceStatus, .hudHint, .hudActions,
   .hudNote, .hudEpilogue, .hudCinematicPrompt) { display: none !important; }
 body.blockoutMode #hud .hudFps { top: 56px; left: auto; right: 18px; }
+
+/* --- 小窗口（应用内浏览器面板、半屏窗口）：收紧尺寸，导航栏占满小地图右边的底边 ---------------- */
+@media (max-width: 1099px), (max-height: 719px) {
+  .boCard { width: 300px; padding: 9px 10px 10px 12px; }
+  .boStageNo { font-size: 18px; }
+  .boStageTitle { font-size: 14px; }
+  .boHow { margin-top: 7px; }
+  .boChip { font-size: 11px; }
+  .boMini { width: 150px; height: 150px; }
+  .boNav {
+    left: 178px; right: 12px; transform: none; width: auto; height: 52px;
+    grid-template-columns: 28px minmax(0, 1fr) 28px auto; column-gap: 8px; padding: 0 10px 0 8px;
+  }
+  .boNavBtn { width: 28px; height: 28px; }
+  .boNavSide { min-width: 0; }
+  .boKeys { display: none; }
+  .boSeg, .boStageNum { min-width: 10px; }
+  .boStageNum { font-size: 9px; }
+}
+/* 高度不够时卡片只留「此时 / 下一步」，提示标签与备注让给小地图 */
+@media (max-height: 600px) {
+  .boHow, .boNotes { display: none; }
+}
+/* 很窄时右上那条挪到齿轮下面，不压左上的卡片 */
+@media (max-width: 899px) {
+  .boTopBar { top: 62px; right: 14px; }
+  .boLevelBtn { min-width: 0; max-width: 150px; }
+  body.blockoutMode #hud .hudFps { top: 104px; }
+}
+
