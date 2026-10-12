@@ -45,7 +45,8 @@ const ROUTE_RETRY_BUDGET = 2;
 export const CAMPAIGN_SEGMENT_STARTS = Object.freeze([8, 11, 15, 18]);
 /** `--stage-to` 允许的终点：Front 段末（7）、Mid 段末（14）、整关（18）。 */
 // 2 = 01–02 to the collection hand-over (the opening package's own acceptance, 03 not driven).
-export const CAMPAIGN_SEGMENT_ENDS = Object.freeze([2, 3, 6, 7, 14, 18]);
+// 11：2026-10-12 0311 C 包的 08→11 验收（`--stage-from=8 --stage-to=11`，走完 11 就收）。
+export const CAMPAIGN_SEGMENT_ENDS = Object.freeze([2, 3, 6, 7, 11, 14, 18]);
 /**
  * 不带 `--stage-jumps` 也能起跑的冷启动点（`missionStage=N`，玩家阵亡重来 / 选章落在这里）：
  * 01 开局、03 前沿、04 / 05 检查点、06 集结处。从这里起一路真输入推进，中途不再跳。

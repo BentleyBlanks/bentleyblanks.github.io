@@ -303,3 +303,73 @@ node Taierzhuang1938/Script_MotionVectorContractTest.mjs
 | `MISSION_PURSUIT_ROUTE` | 第一轮 (100,120.5)→(84,117)→(74,114.8)→(61,114.8)；现在 (100,120.5)→(86,117)→(74,112)→(61,112) | 穿门洞，不穿墙 |
 | bay 车 `approachRoute` 与上车位 | 经 (86,123)、(80,123)，终点 (80,120) → 经 (82.6,116.6)、(79.4,117)，终点 (79,120) | 东墙 z ≥ 117.85 连续，车盒不能压进墙 |
 | `triageGap` | z 112–118 → 关闭 | 敞口收成门洞 |
+
+## 7. 2026-10-12 08–11 耿家庄（03–11 重构 C 包）
+
+口径：[0311 重构契约](Data_FirstLevel0311Refactor20261012Contract.md) §1.6–1.7、§3.6–3.9、§5；改稿「08 主街口 / 09 穿屋到后院 / 10 守巷口 / 11 桥头接运点」。08–10 的村子就是耿家庄，灶屋与连屋是老耿家；照 COD 巷战套路重排：主街是杀伤区，两条侧路汇到后院，自己人在街口压火力、玩家包抄，推进点一过街口就不再补人，10 的防守只看东边、一分半以内。老耿 / 妮儿 / 黑子 / 驴车由 B 包的 `Script_FirstLevelGengFamily` 装配（06 出场），本包只加方法、不改签名。
+
+### 7.1 文件
+
+| 文件 | 管什么 |
+| --- | --- |
+| `Script_FirstLevelStreetFight.mjs`（新） | **纯规则**（零 three、零场景）：08 逐个放人与推进点、人口预算、09 夹道 ≥ 8 m 窜出、后院计时投弹 / 指人、10 第二拨 90 s 上限、机枪压住-抬头的放行门、推车 10 s 窗口；`ThrowPowerFor` 按射程反解投弹力道 |
+| `Script_FirstLevelVillageBlock.mjs` | 纯规则的副作用：街口两人、老耿三段演出、生人、唤醒、摆屋顶、剧本投弹、老耿开后门状态机、驴车堵门 / 让路 / 过门槛、推车交互 |
+| `Script_FirstLevelTransferCart.mjs` | 11：驴车从主街南段走到接运点东侧停车位（`gengCartArrived`）、`GengCart` 三句、`AskGeng`（F 或 20 s 自动） |
+| `Script_FirstLevelGengFamily.mjs` | 加的方法：`CartFollowRoute` `CartHalt` `GengFace` `GengCrouchAt` `GengFollowCart` `NierRideCart` `CartSeatPoints`；驴车起点改 `A.gengCartYard` |
+| `Data_Tuning_FirstLevelMid.mjs` | `streetFight` 一段（每条带出处） |
+| `Data_FirstLevelWhiteboxVillage.mjs` | 机枪屋东墙后段开侧门（门洞 z 12.6–14.2）、灶屋道具（灶上没锅、捆口粮缸、炕上半打的包袱）、后院的缸与桌、巷东头草垛 |
+| `Script_FirstLevelMissionRuntime.mjs` | 薄钩子：`OpenCourtyardGate()`（玩家 F 与老耿拔闩同一个口）、`MissionCartPush` / `MissionAskGeng` 两个交互点、10 的担架放行门加 `village.LaneOpen()`、`courtyardPassed` 加 `village.CartLeft()` |
+| `Script_FirstLevelStreetFightTest.mjs`（新） | 纯 Node 门；`Script_FirstLevelMidTest` 的假宿主补了生成队列与耿家桩 |
+| `Script_FirstLevelCampaignMid.mjs` | 驾驶脚本 08–11：`CAMPAIGN_SIDE_ROUTE=alley` 走西侧夹道（缺省走灶屋）；`--stage-to=11` 走完 11 就收（Kit 的 `CAMPAIGN_SEGMENT_ENDS` 加 11） |
+
+### 7.2 逐站
+
+**08 主街口**（约 2 分）
+
+- 东窗 `RearWindow` 改歪把子 hold，顺街扫。何有田 + 刘文财走到 `P.streetBlock.frontParty` 蹲下压东窗（何有田到位记 `outsideWatched`，既有）；喊话的前队两个退到担架墙后北沿 `frontPartyWait`。
+- `streetPush` 4 人：`streetBlockSeen` 起按 `pushGapsS`（0/6/12/18 s）逐个从东巷放出（`SpawnEncounterActor` 走运行时同一条生成队列），折线贴街东房前墙（x 78.4–78.6）往北压到街北半段再转守区；村落活人 ≥ 14 不放。**推进点**：玩家跨进灶屋北门（`kitchenEntered`）或西侧夹道（`westAlleyEntered`，interior 门 `P.westAlley`）→ `sideRouteEntered` → `streetPushStopped`，没放出来的不放。
+- 老耿：`streetBlockSeen` 之后玩家走到他 11 m 内 → `gengHouseOffered`、`GengHouse` 三句、`GengPose('slap')`、妮儿 `RunTo` 担架墙后；1.6 s 后转身指灶屋门（`GengFace`）；说完 `GengCrouchAt` 门边蹲着不进屋。`KitchenDetour` 照旧。
+- 08 requirements：`streetBlockSeen, littersInCover, sideRouteEntered`。灶屋 / 连屋从 `MISSION_CIVILIAN_AFTERMATH_HOUSES` 退出。
+
+**09 穿屋到后院**（约 2 分）
+
+- 过道伏击 QTE 原样；从后院那一头进连屋（走夹道的人）也触发（`roomInterior` 本来就在触发盒里）。
+- `MeleeAlley` 折线改成先穿侧间到连屋东窗外 (66.6,6.6) 停 1.5 s —— `UpdateWindowThrow` 在他到那一点时走 AI 的投掷链（`actor.BeginGrenadeThrow` → `combat.Throw`，owner ija）往屋里 (58.4,6.2) 扔一颗，再从东门进。`meleeResolved` 仍是四人全灭（含他）。
+- 西侧夹道：跨进记 `westAlleyEntered`，同时在机枪屋里生出装睡的 `AlleyPop`；从进来的那一头走 ≥ 8 m（`AlleyDepth`）→ `alleyPopped`：醒、嚎「突撃」、按 `MISSION_TACTICS.AlleyPop` 从侧门洞拐进夹道冲向玩家。
+- 后院：`RoofThrower` 进 09 按表生（装睡），`UpdateRoofThrower` 把他摆到侧间屋顶东坡面块 `SideRoomSlope1` 上（`A.roofPost`，高 `roofTopM` 3.78，物理胶囊站在实心坡面上，`tacticalRadiusM 0` + `Defend(…,0,0)` 钉住）。玩家进后院（`yardBox`，09/10 步内）1.8 s 妮儿 `PointAt` 他（`roofThrowerSpotted`）、6 s 他朝玩家投弹（落点在玩家身前 2.2 m）；先打死记 `roofThrowerDown`，指与投都不发生。
+- 妮儿与老耿进 09 走夹道回后院（`RunTo` 两点 / `GengGoTo` 回调链），妮儿 `NierRideCart`：**占位是跟在车尾后一步**（百姓是物理胶囊、驴车没有碰撞盒，真坐上去会掉下来）。
+
+**10 守巷口**（约 2–2.5 分）
+
+- `GengGate` 五句：`villageGunSilent` 一落就喊；老耿走到缸边 `GengPose('vat')` 2.4 s → 走到桌边 `table` 2.6 s（何有田走到 `heTable`）→ 走到门闩 `unbar` 1.4 s → `OpenCourtyardGate()`（玩家先按 F 也是同一个口，`courtyardGateOpen` 仍是「门真开了」）→ 驴车 `CartTo` 门洞、`blocking` 2.2 s（担架不许过）→ `lead-donkey`、`GengFollowCart`、车退到院南墙根 `cartWallFoot`。每拍都是人真走到才进下一拍。
+- 玩家守 `A.laneEast`（院门外东侧墙角，LeaderGuide 的 cover 目标改指它）看东边。`courtyard` 组 4 人（+D）；`laneWave2` 4 人在开门后按 `laneWaveGapsS`（3/8/13/18 s）逐个放出，`LaneGunner` 架在巷东头主街口贴街东墙的草垛 `LaneHaystack` 西边 (77.5,42.5)；开门 90 s 记 `laneWave2Spent`、不再补人。担架在院门 14 m 圈内只在 `LaneOpen()`（机枪没来 / 死了 / suppressed ≥ 2 s，抬头 1.5 s 后关）且车不堵门时走；第一次压住记 `laneMgSuppressed`。
+- 驴车夹在担架队中间：过门的担架到一半（向上取整）且门开着，车走到门槛 `CartHalt`；车尾 `MissionCartPush`（`cartPushPoint`）10 s 内按 F → `cartPushed` + `CartPush` 三句；没按 → 何有田走到 `heCartPush` 推（班长那句不说）；之后车沿 `GENG_CART_LANE_ROUTE` 出院门走绕行巷到主街南段西侧等着。`courtyardPassed` 加「车心过院门以南 2.5 m」。
+
+**11 桥头接运点**（约 1 分）
+
+- `TransferApproach` 进步：`CartFollowRoute(GengCartTransferRoute())` 过门楼（x 76.6）、村口通行口（x 79.5）到 `gengCartBay` (91.6,108.2)（跳转进 11 时车先瞬到主街南段等着的点）；到了记 `gengCartArrived`、`GengCart` 三句在车旁自说；`AskGeng`：玩家到 `askPoint` 按 F（`MissionAskGeng`，离老耿 ≤ 2.6 m），或 `GengCart` 说完且到场 20 s 没按自动播；`gengAsked` 由 VoiceDone 记。requirements 不变。
+
+### 7.3 数值出处
+
+全在 `Data_Tuning_FirstLevelMid.streetFight`（每条带注释）。投弹：`Combat.Throw` 的抛物线（竖直分量 = 初速 × 0.26、重力 19.6、初速 14–26 m/s）按射程与高差二分反解；`laneMgSuppressS` 与 07 沟口同口径（2 s）。节奏表 `targetSeconds`（±40%）由驾驶脚本断言。
+
+### 7.4 新增的内部辅助事实
+
+`gengHouseOffered` `sideRouteEntered`（08 过关）`westAlleyEntered` `streetPushStopped` `alleyPopped` `roofThrowerSpotted` `roofThrowerDown` `gengGateHeard` `laneMgSuppressed` `laneWave2Spent` `cartPushed` `gengCartArrived` `gengAsked`，全部登记进 `MISSION_FACT_GATES`；`MISSION_VOICE_FACTS` 加 `GengGate→gengGateHeard`、`AskGeng→gengAsked`。08–14 的 requirements 仍是 29 条（Village 一条换名：`kitchenEntered → sideRouteEntered`）。
+
+### 7.5 验收
+
+```
+node Taierzhuang1938/Script_FirstLevelStreetFightTest.mjs
+node Taierzhuang1938/Script_FirstLevelMidTest.mjs
+node Taierzhuang1938/Script_FirstLevelMissionTest.mjs
+node Taierzhuang1938/Script_MissionGatesTest.mjs
+node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs
+node Taierzhuang1938/Script_FirstLevelSpaceTest.mjs
+node Taierzhuang1938/Script_FirstLevelWhiteboxVillageTest.mjs
+node Taierzhuang1938/Script_FirstLevelGengFamilyTest.mjs
+node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-jumps --stage-from=8 --stage-to=11 --evidence-tag=Kitchen
+CAMPAIGN_SIDE_ROUTE=alley node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-jumps --stage-from=8 --stage-to=11 --evidence-tag=Alley
+```
+
+实机证据在 `Taierzhuang1938/_shots/FirstLevelStageVillage_Kitchen/` 与 `_Alley/`（§6 机位：`Scene_Concept08StreetMouth` `Scene_Concept09WestAlley` `Scene_Concept09Courtyard` `Scene_Concept10GateLane` `Scene_Concept11TransferPoint`）。07+ 指纹（`Data_FirstLevelSpaceSouthFingerprint.json`）按本轮白盒重生（baseline `0311-c-village-20261012`）。

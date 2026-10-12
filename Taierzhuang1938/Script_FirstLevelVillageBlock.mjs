@@ -300,7 +300,7 @@ export class FirstLevelVillageBlock {
     return true;
   }
   UpdateStreetFight(dt) {
-    const r = this.r, T = M.streetFight, family = r.gengFamily;
+    const r = this.r, family = r.gengFamily;
     const events = this.rules.Update(dt, this.Scene());
     for (const event of events) {
       if (event === "spawnPusher") { if (this.SpawnMember("streetPush", this.pushSpawned)) this.pushSpawned++; }
@@ -323,7 +323,6 @@ export class FirstLevelVillageBlock {
     }
     this.UpdateSideRoutes();
     this.UpdateRoofThrower();
-    void T;
   }
   /** 09 夹道那个：生出来先装睡（机枪屋里），窜出来之前不开枪、不被当成威胁。 */
   UpdateSideRoutes() {
