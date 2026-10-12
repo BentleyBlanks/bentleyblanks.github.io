@@ -289,7 +289,7 @@ export class EditorBlockout {
     const layout = this.phase.whitebox.layout;
     this.DressWorld(layout);
     // 文件场景每次进关都重读（可能被生成器改过），块数不变时地图的缓存认不出来：先丢掉
-    if (this.level.scene?.kind === "file") this.map.ClearCache(this.levelKey);
+    if (this.level.scene?.kind === "file") this.map.ClearCache?.(this.levelKey);
     this.map.SetScene({ levelKey: this.levelKey, ...BlockoutMapScene(layout, this.groundAt) });
     if (this.firstBakeDone) this.StartBake();
     else this.bakeWait = { frames: 0, since: null };

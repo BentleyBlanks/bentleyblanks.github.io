@@ -164,7 +164,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 | `intent` | 可选：此刻「即将去」的折线，画成虚线箭头；没有且下一关键帧里这个人换了位置，则自动取下一关键帧的 `path`/直线 |
 | `speedMps` | 可选过渡速度；缺省 ija 2.8、nra 2.4、civ 1.6、litter 1.2、tank 2.0 |
 | `guess` | 可选 `true`：位置是推测的（游戏数据里没写），界面上用虚线圈 + 「?」 |
-| `bearers` | 只对 `kind: "litter"`：抬担架的人数 0–2（缺省 2）；`0` = 担架放在地上 / 床边、没人抬。担架的 `state: "down"` 只表示抬担架的人倒了 |
+| `bearers` | 只对 `kind: "litter"`：抬担架的人数 0–2（缺省 2）；`0` = 担架放在地上 / 床边、没人抬；`1` = 只画前面一个抬担架的人（后头由玩家或别的单位抬着，或搁在地上）。担架的 `state: "down"` 只表示抬担架的人倒了 |
 
 `Script_EditorBlockoutConfig.mjs`（纯，node 与浏览器共用，LocalPreview 也要 import，**导入时不得抛错、不得碰 DOM / three**）：
 
@@ -210,6 +210,7 @@ export class BlockoutUi {
   SetCard({ stage, stageTitle, name, what, next: { text, distanceM, relYawDeg } | null, how, notes, guessCount })
   SetLayers({ arcs, intents, labels, xray })
   SetStatus({ state: "ok"|"synced"|"error"|"loading", message, writable, saveReason })
+  SetTransition({ active, rate })   // 过渡中导航栏显示「快进 ×n」（rate > 1 时）
   Toast(text, kind /* "info"|"ok"|"warn"|"error" */)
   SetInteractive(on)                // false = 指针锁定中
   SetMapOpen(on)
@@ -239,7 +240,7 @@ export class BlockoutMap {
   SetLayers({ arcs, intents, labels })
   PaintMini(canvas, { pxPerM })            // 北朝上，以玩家为中心并夹在边界内
   PaintFull(canvas)                        // 用内部视图 {cx,cz,pxPerM}
-  FitBounds(); ZoomAt(px, py, factor); PanBy(dxPx, dyPx);
+  FitBounds(); ZoomAt(px, py, factor); PanBy(dxPx, dyPx); ClearCache(levelKey?) /* 场景文件重读后丢掉烘好的静态层 */;
   PickKeyframe(px, py) /* → index | -1 */; ScreenToWorld(px, py); WorldToScreen(x, z);
   Dispose()
 }
@@ -339,6 +340,8 @@ Config()                     // → 归一化后的配置（深拷贝）
 - 启动：读 `BLOCKOUT_LEVELS` 与当前关卡配置 → 校验（错误进状态点与提示条，配置坏了仍能走场景）→ 建 UI / 地图 / 标记 / 演员 → 跳到 `kf` 指定的关键帧。
 - 切关：回收演员与标记 → `await JumpToLevel(i)` → 重新取 battlefield 等（一律经 getter，旧引用会失效）→ 读新配置 → 地图 `SetScene` + `Bake` → `history.replaceState` 改 URL。
 - 外部修改同步：页面可见时每 2 s 读一次配置文本，变了就重新归一化并按当前关键帧 `id` 重新摆（不重建场景）；状态点蓝闪 + 提示条。这是「AI 改完 JSON、编辑器里自动看到」的闭环。
+  - 只换进**能解析、校验通过、有关键帧**的配置；改坏了（半截文件、校验错误、文件暂时不见）就保留上一份能用的配置与当前位置，状态点变红并写原因、只提示一次，期间「记下当前机位」拒绝保存。首次载入时配置就坏，才退回只有出生点的空配置（场景照样能走）。
+  - 玩家只在当前关键帧的 `player` 块变了、或这个关键帧被删掉时才挪位置；改别的（单位、文字、POI）不打断人在场景里走动。
 - 下一步指示：每帧算玩家到 `next` 的距离与相对角，喂给卡片箭头。
 
 ### 6.3 地形与水的样子
@@ -350,7 +353,7 @@ Config()                     // → 归一化后的配置（深拷贝）
 ## 7. 存档（`Script_EditorBlockoutStore.mjs` + 本机端点）
 
 - 读：`fetch("./Blockout/<Level>.json?t=" + Date.now(), { cache: "no-store" })`；404 / 非 JSON 视为没有配置（界面提示）。
-- 写（只在本机 LocalPreview 下可写）：`GET /__blockout/status`（只收 GET / HEAD）→ `{ writable, root, revisions: { <Level>: "<sha1 原始字节>" | null }, reason? }`（不可写时 `reason` 写原因）；`POST /__blockout/save`，body `{ level, doc, revision }`：`revision` 必填（字符串，文件不存在时才可为 `null`），`doc.level` 必须等于 `level`。成功 200 `{ ok, level, file, revision, warnings }`（客户端留下返回的 `revision` 供下次保存）；状态码：方法不对 405、非本机 / Host / Origin 不对 403、Content-Type 不对 415、超 4 MB 413、坏 JSON / 校验不过 / 嵌套过深 400（带 `details`）、level 或路径不对 403、版本号不符 409（带当前 `revision`）、写盘失败 500。
+- 写（只在本机 LocalPreview 下可写）：`GET /__blockout/status`（只收 GET / HEAD）→ `{ writable, root, revisions: { <Level>: "<sha1 原始字节>" | null }, reason? }`（不可写时 `reason` 写原因）；`POST /__blockout/save`，body `{ level, doc, revision }`：`revision` 必填（字符串，文件不存在时才可为 `null`），`doc.level` 必须等于 `level`。成功 200 `{ ok, level, file, revision, warnings }`（客户端留下返回的 `revision` 供下次保存）；状态码：方法不对 405、非本机 / Host / Origin 不对 403、Content-Type 不对 415、超 4 MB 413、坏 JSON / 校验不过 / 嵌套过深 400（校验不过 / 嵌套过深时带 `details`）、level 或路径不对 403、版本号不符 409（带当前 `revision`）、写盘失败 500。
 - 版本号 = 文件**原始字节**的 sha1（工作区是 CRLF 时也一样）：客户端读配置时按响应的原始字节（`arrayBuffer`）算 sha1，作为「我改的是哪一版」随保存发出；不得用状态口当下返回的版本号（那会把外部刚改的内容静默盖掉）。
 - 端点（照 `Script_TextureImportServer` 的加固写法）：本机 socket + Host 只认 localhost / 127.0.0.1、`Content-Type: application/json`、同源 Origin、body ≤ 4 MB、`level ∈ BLOCKOUT_LEVEL_KEYS` 且路径过 `BLOCKOUT_CONFIG_FILE_RE`、解析后路径必须在根目录下、`ValidateBlockout` 不过返回 400 + `details`、`revision` 不符返回 409、`.tmp` + rename 原子写（`JSON.stringify(doc, null, 2) + "\n"`）。任何拒绝都不落一个字节。路由放在 405 闸之前。场景文件 v1 不开放写。
 - 不可写时（Pages、测试服、局域网、旧的预览进程）：存进 `localStorage`（键 `tengxian1938_blockout_<Level>`）+ 提供下载 JSON，界面写明原因。

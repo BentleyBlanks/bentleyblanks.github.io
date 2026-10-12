@@ -128,7 +128,8 @@ const configDoc = NormalizeBlockout(JSON.parse(originalText));
 const K = (id) => configDoc.keyframes.findIndex(k => k.id === id);
 const ConfigText = (doc) => `${JSON.stringify(doc, null, 2)}\n`;
 const CONFIG_RE = /\/Blockout\/FirstLevel\.json(\?|$)/;
-const SYNC_BUDGET_MS = BLOCKOUT_EDITOR.pollS * 1000 + 2000;
+// 契约 §10：外部改了配置 3 s 内同步（轮询 2 s + 读文件 + 重摆，实测约 2.0 s）。
+const SYNC_BUDGET_MS = 3000;
 
 // ---------------------------------------------------------------------------
 // 浏览器
@@ -495,7 +496,7 @@ try {
   const afterSync = await State();
   const posAfter = await PlayerPos();
   metrics.sync = { ms: sync1.ms, resyncMs: afterSync.lastSyncMs != null ? Math.round(afterSync.lastSyncMs * 10) / 10 : null, budgetMs: SYNC_BUDGET_MS };
-  Check(`外部改了配置，轮询间隔 + 2 s（${SYNC_BUDGET_MS} ms）内同步：卡片换字、停在同一关键帧`, sync1.ok && afterSync.id === editId && afterSync.configState !== "error",
+  Check(`外部改了配置，${SYNC_BUDGET_MS} ms 内同步：卡片换字、停在同一关键帧`, sync1.ok && afterSync.id === editId && afterSync.configState !== "error",
     `${sync1.ms} ms（重摆 ${metrics.sync.resyncMs} ms），${JSON.stringify({ id: afterSync.id, state: afterSync.configState })}`);
   Check("外部同步时玩家留在原地（这一关键帧的 player 没改）", Math.hypot(posAfter.x - posBefore.x, posAfter.z - posBefore.z) < 0.05,
     `挪了 ${Math.hypot(posAfter.x - posBefore.x, posAfter.z - posBefore.z).toFixed(3)} m（之前走到 ${JSON.stringify(walked)}）`);

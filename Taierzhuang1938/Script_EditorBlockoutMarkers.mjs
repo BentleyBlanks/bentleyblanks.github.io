@@ -45,7 +45,12 @@ export const BLOCKOUT_FAN = Object.freeze({
  * 照地形逐点贴地的地环会顺着沟壁竖起来，低机位看就是一大片斜着的色块；压平在脚下就不会。
  */
 const UNIT_GROUND_CLAMP = Object.freeze({ above: 0.2, below: 0.6 });
-const SPOT_GROUND_CLAMP = Object.freeze({ above: 0.35, below: 1.0 });
+// 大地环（战车 / 担架 / 车）压得太死会整段埋进坡里：允许的起伏随半径放大。
+function UnitClamp(radius) {
+  return { above: Math.max(UNIT_GROUND_CLAMP.above, 0.3 * radius), below: Math.max(UNIT_GROUND_CLAMP.below, 0.5 * radius) };
+}
+// POI 与「下一步」的地环不压：它们半径大（2–6 m），压平后贴着坡的那半圈会埋进土里
+// （14-1 的飞机转弯点、15-1 的下一步地环实测埋深 2 m 以上），顺地形贴就好。
 
 /** 起点离相机 distanceM 时扇子的不透明度系数（0…1，按 fadeStep 量化）。 */
 export function FanFade(distanceM) {
@@ -330,9 +335,7 @@ export class BlockoutMarkers {
     for (const poi of this.pois) {
       const color = BLOCKOUT_MARKER_COLORS[poi.kind] || BLOCKOUT_MARKER_COLORS.poi;
       chunk.Pillar(poi.x, poi.z, 8, 0.06, Rgba(color, 0.95), 3);
-      chunk.ClampAround(poi.x, poi.z, SPOT_GROUND_CLAMP);
       chunk.Ring(poi.x, poi.z, Math.max(0.6, poi.radiusM || 2), 0.12, Rgba(color, 0.85), { segments: 36 });
-      chunk.ClampAround(0, 0, null);
     }
     this.chunks.set("pois", { sig: "", chunk });
     this.dirty = true;
@@ -361,7 +364,7 @@ export class BlockoutMarkers {
     const color = BLOCKOUT_MARKER_COLORS[unit.side] || BLOCKOUT_MARKER_COLORS.nra;
     const ring = RING_RADIUS[unit.kind] || RING_RADIUS.soldier;
     // 地环与朝向箭头压在脚下（贴沟壁站的人，地环不顺着沟壁竖起来）
-    chunk.ClampAround(unit.x, unit.z, UNIT_GROUND_CLAMP);
+    chunk.ClampAround(unit.x, unit.z, UnitClamp(ring));
     chunk.Ring(unit.x, unit.z, ring, unit.kind === "tank" ? 0.2 : 0.11, Rgba(color, 0.95), { dash: !!unit.guess, segments: unit.kind === "tank" ? 40 : 24 });
     // 朝向短箭头：从地环边上伸出去
     const fx = -Math.sin(unit.yawDeg * DEG), fz = -Math.cos(unit.yawDeg * DEG);
@@ -408,7 +411,6 @@ export class BlockoutMarkers {
     chunk.Pillar(n.x, n.z, 14, 0.16, Rgba(gold, 1), 6);
     const base = Math.max(0.8, n.radiusM || 3);
     const breath = 1 + 0.1 * Math.sin(this.time * 3.2);
-    chunk.ClampAround(n.x, n.z, SPOT_GROUND_CLAMP);
     chunk.Ring(n.x, n.z, base * breath, 0.18, Rgba(gold, 0.95), { segments: 40 });
     chunk.Ring(n.x, n.z, base * 0.35, 0.1, Rgba(gold, 0.7), { segments: 20 });
     return chunk;

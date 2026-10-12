@@ -205,6 +205,8 @@
   font-size: 12px; line-height: 1.5; color: var(--bo-text); white-space: normal; user-select: text;
 }
 .boStatus:hover .boStatusTip, .boStatus:focus .boStatusTip { display: block; }
+/* 状态点与提示框之间 6 px 的空隙：透明的一条把悬停接上，鼠标能移进提示框里选中、复制错误原因。 */
+.boStatusTip::before { content: ""; position: absolute; left: 0; right: 0; top: -7px; height: 7px; }
 .boTipHead { color: var(--bo-bright); font-weight: 700; margin-bottom: 4px; }
 .boStatus[data-state="error"] .boTipHead { color: var(--bo-bad); }
 .boTipLine { overflow-wrap: anywhere; }

@@ -628,7 +628,7 @@ WASD / 开火 / 换弹照旧）和按关键帧摆的敌我单位；没有任务�
 - 版本号对不上回 409 并带上盘上当前的 `revision`：文件在编辑器外被人或 AI 改过。等 2 s 同步（或 `Reload()`）
   读到新内容后再记一次，不要直接拿 409 里的版本号重发。
 - 其他拒绝：方法不对 405；不是本机、Host / Origin 不对、level 不在名单里 403；Content-Type 不是
-  `application/json` 415；超过 4 MB 413；坏 JSON、校验不过、嵌套太深 400（带 `details`）；写盘失败 500。
+  `application/json` 415；超过 4 MB 413；坏 JSON、校验不过、嵌套太深 400（校验不过 / 嵌套太深时带 `details`）；写盘失败 500。
   任何拒绝都不落一个字节。
 
 写不了时（Pages、测试服、局域网、旧的预览进程）存进 `localStorage["tengxian1938_blockout_<Level>"]` 并提供
