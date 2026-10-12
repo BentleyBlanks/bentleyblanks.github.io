@@ -149,8 +149,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // 2026-10-12 R4-Gates: TankHeard.02 (3.44 s, one stressed syllable at 0.15 s, before the line has faded in) said by Luo
   // kneeling on the aim with his face already on the player turned his head 0.017-0.022 rad (breathing only) over 53-182 seen
   // frames: the front line gate (CheckFrontActing, > 0.03) went red 2 of 9 R3 drives. Face tracks: the low-passed jaw spans
-  // 0.41 on the median line (TankHeard.02 0.44, tenth percentile 0.15): 0.1 rad x 0.4 = 2.3 deg.
-  aimedTalk:Object.freeze({ jawNodRad:.1, jawFollowHz:6 }),
+  // 0.41 on the median line (TankHeard.02 0.44, tenth percentile 0.15). The dip follows the line's fade-in, not the acting's
+  // speech weight: that one already rides the voice level (the track's jaw), so jaw x speech went as the square of the mouth and
+  // quiet syllables hardly moved the head (round-4 integration drive: TankHeard.02 turn 0.029 over 68 seen frames; the
+  // isolated replay in OpeningActorPerformanceBrowserTest, kneeling, 0.026 in its worst 68 frames). 0.14 rad: 0.14 x 0.41 =
+  // 3.3 deg on the median line, at most ~7 deg on a wide-open shout; TankHeard.02 at least 0.05 rad in any 68 frames.
+  aimedTalk:Object.freeze({ jawNodRad:.14, jawFollowHz:6 }),
   heldLife:Object.freeze({ stillRadS:.35, inS:.6, outS:.12,
     breathRad:.018, breathHz:.28, swayRad:.012, swayHz:.11,
     headYawRad:.12, headYawHz:[.07,.19], headPitchRad:.03, headPitchHz:.13, neckShare:.5, faceAimedShare:.25 }),

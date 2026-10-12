@@ -249,7 +249,7 @@ export class OpeningActorPerformance {
       // stress the stress nod alone left a long line with the breathing only (TankHeard.02, 0.02 rad).
       const A=OPENING_STORYBOARDS.aimedTalk,jaw=talking?Clamp(this.rig.facial?.jaw||0):0;
       this.talkJaw+=(jaw-this.talkJaw)*(1-Math.exp(-dt*A.jawFollowHz));
-      this.Turn(bones.head,this.right,Clamp(this.lookPitch,-.10,.10)-.065*emphasis+.012*breath-A.jawNodRad*this.talkJaw*this.speech);
+      this.Turn(bones.head,this.right,Clamp(this.lookPitch,-.10,.10)-.065*emphasis+.012*breath-A.jawNodRad*this.talkJaw*Smooth(lineAge/.22));
     }else{
       this.Turn(neck,this.up,this.lookYaw*.65);
       this.Turn(bones.head,this.up,this.lookYaw*.35);

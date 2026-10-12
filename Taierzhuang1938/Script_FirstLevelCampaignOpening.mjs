@@ -723,8 +723,11 @@ export async function InstallSpeakerActing(page){
           if(row.acted===1||row.acted===30||row.acted===90)(row.diag??=[]).push({n:row.acted,t:+(r.time??0).toFixed(2),st:soldier.state,
             stance:soldier.stance,rootVis:!!soldier.actor?.root?.visible,d:+Math.sqrt(soldier.actor?.renderDistanceSq??0).toFixed(1),
             tick:r.ai?.tickIndex,id:soldier.id,mixer:+(rig.mixer?.time??-1).toFixed(3),clip:rig.currentId??null,
+            // layer = the shared SpeakerHeadLayer: its clock stands still while the director acts this rig (it returns before
+            // ticking when rig.openingActorPerformanceState is set) -- director.* is the acting that runs then.
             layer:layer?{on:layer.enabled,speak:layer.speaking,clock:+(layer.clock??0).toFixed(2)}:null,
-            director:director?{speak:!!director.speaking,prot:!!director.protected}:null,rest:!!soldier.missionSurfaceRest,
+            director:director?{speak:!!director.speaking,prot:!!director.protected,headOnly:!!director.headOnly,speech:+(director.speech??0).toFixed(3),
+              jaw:+(rig.facial?.jaw??-1).toFixed(3),talkJaw:+(rig.openingActorPerformance?.talkJaw??-1).toFixed(3)}:null,rest:!!soldier.missionSurfaceRest,
             evade:!!soldier.missionGrenadeEvade,carriage:!!soldier.missionCarriageAction,head:head.toArray().map(v=>+v.toFixed(4))});
           // Evidence: one first-person picture per line, taken the 15th frame he is acted and seen (the drive's
           // StepFrames wrapper renders and reads it back in the same task, see InstallSpeakerGlance).
