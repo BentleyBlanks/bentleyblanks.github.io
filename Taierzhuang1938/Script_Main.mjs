@@ -9536,7 +9536,10 @@ function RenderSceneContent(dt) {
   // 不单独开段的话这两三毫秒会被算进「misc 其他 GL」，那一行就永远解释不清。
   profiler.B("matrix");
   profiler.GpuPush("matrix");
+  // 远平面外的飞机拉进来画、画完位置放回（Script_Aircraft.FitToCamera 头注）。
+  aircraft?.FitToCamera(camera);
   scene.updateMatrixWorld();
+  aircraft?.RestoreFit();
   profiler.GpuPop();
   profiler.E("matrix");
   // 阴影趟静态投影体合批的逐帧对账：读的是刚更新完的 matrixWorld，必须排在它之后、

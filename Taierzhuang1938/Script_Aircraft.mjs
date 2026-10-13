@@ -74,6 +74,14 @@ function DisposeObject(root) {
   });
 }
 
+/**
+ * FitToCamera 的最小视角（翼展对眼睛张的角，弧度）与补大上限。0.014 rad 在 1080p、垂直 70° 视野上约 12 个像素：
+ * Ki-30（翼展 14.6 m）一千米外、Ki-21（22.5 m）一千六百米外开始补，再远最多放大 FIT_MAX_BOOST 倍。
+ * 实拍（04、1280×720、低画质）：一千五百米外迎头来的 Ki-30 不补只剩烟里一道两三个像素的灰线。
+ */
+const FIT_MIN_ANGULAR_RAD = 0.014;
+const FIT_MAX_BOOST = 1.8;   // 再大楔形里相邻两架（横距 32–38 m）的翼尖就碰上了
+
 /** 航线走完之后那一架藏多久再归队（见文件头）。 */
 const REJOIN_HIDE_S = 2.5;
 
@@ -349,7 +357,44 @@ export class AircraftFlight {
     return group;
   }
 
+  /**
+   * 远平面以外的飞机拉进来画（2026-10-14 用户：「飞机离远了就看不到了」）。
+   * 第一关远平面 650 m（白盒 1100 m），而空袭编队在落区前 2 km 进场、过后 1.7 km 才离场 ——
+   * 远平面一裁，编队在天上凭空出现、凭空消失。远平面不能为几架飞机整关推远（剔除与深度精度都靠它）。
+   * 做法：超出 fitShare·far 的那一架沿视线挪到 fitShare·far 处、按距离同比缩小 —— 屏幕上的方向与大小
+   * 不变（再远一点另按 FIT_MIN_ANGULAR_RAD 补大），只是深度近了：比它近的地物照样挡住它，远平面那一圈里的地物挡不住它（天上本来就没东西）。
+   * 只在出画那一刻挪：Script_Main 在整帧唯一一次 updateMatrixWorld 前调本方法、之后调 RestoreFit，
+   * 玩法读到的 position 始终是真位置。
+   */
+  FitToCamera(camera, fitShare = 0.9) {
+    this.RestoreFit();
+    const limit = camera.far * fitShare;
+    const e = camera.matrixWorld.elements, cx = e[12], cy = e[13], cz = e[14];
+    this._fitted ??= [];
+    for (const root of this.group.children) {
+      if (!root.visible || root.isInstancedMesh) continue;   // 炸弹那一组的位姿在实例矩阵里，网格本身钉在原点
+      const p = root.position, dx = p.x - cx, dy = p.y - cy, dz = p.z - cz;
+      const d = Math.hypot(dx, dy, dz);
+      // 远到翼展不足 FIT_MIN_ANGULAR_RAD 时按距离补大（同炸弹的 minAngularRad）：两三公里外的编队还读得出是飞机。
+      const span = root.userData.wingspan || 0;
+      const boost = span > 0 ? Math.min(FIT_MAX_BOOST, Math.max(1, FIT_MIN_ANGULAR_RAD * d / span)) : 1;
+      const k = d > limit ? limit / d : 1;
+      if (k === 1 && boost === 1) continue;
+      this._fitted.push({ root, x: p.x, y: p.y, z: p.z, s: root.scale.x });
+      if (k < 1) p.set(cx + dx * k, cy + dy * k, cz + dz * k);
+      root.scale.setScalar(root.scale.x * k * boost);
+    }
+  }
+
+  /** 把 FitToCamera 挪过的放回真位置（世界矩阵留着出画用的那一份，下一帧 updateMatrixWorld 再算）。 */
+  RestoreFit() {
+    if (!this._fitted?.length) return;
+    for (const f of this._fitted) { f.root.position.set(f.x, f.y, f.z); f.root.scale.setScalar(f.s); }
+    this._fitted.length = 0;
+  }
+
   Dispose() {
+    this.RestoreFit();
     for (const key of [...(this.formations?.keys() || [])]) this.SetFormation(key, null);
     this.clonePool?.clear();
     for (const set of this.bombSets?.values() || []) { this._Show(set.mesh, false); set.mesh.dispose(); }

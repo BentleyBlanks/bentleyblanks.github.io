@@ -150,7 +150,14 @@ export const FIRST_LEVEL_AIR_RAID = Object.freeze({
    * 引擎声：整轮一条合成持续音挂在长机上，逐帧搬位置 + 多普勒（与扫射航线同一条 cue）。
    */
   audio: Object.freeze({
-    cue: "explosionFar", volume: 1.5, minGapS: 0.4, chargeRefKg: 22, volumeMaxGain: 1.35,
+    cue: "explosionFar", volume: 1.5, minGapS: 0.28, chargeRefKg: 22, volumeMaxGain: 1.35,
+    /**
+     * 近一点的那几颗换中距素材（2026-10-14 用户：「扔下来的炸弹没有什么声音」）。实测 04：两百米上的 50 kg 弹
+     * 有效电平 −9 dB，身边一发炮弹 +8 dB —— 远炸素材在混音表里本来就 −6 dB（MIX_GAIN.explosionFar 0.5），
+     * 又吃扩展声源的遮挡封顶 0.5（−6 dB + 4 kHz）。22 kg 装药在两三百米上物理上是全场最响的东西之一：
+     * nearWithinM 以内走 explosionMid（满档、按爆炸封顶 0.25 遮挡），同样走 priority 保底（预算闸偷不走）。
+     */
+    nearCue: "explosionMid", nearWithinM: 360,
     thumpCue: "explosionFar", thumpVolume: 1.1, thumpAirCutHz: 320, thumpDelayS: 0.03,
     droneCue: "planeDrone", droneVolume: 1.0, droneSizeM: 70, droneStopFadeS: 1.5, droneRetryS: 0.5,
     /** 长机离听者多近才起引擎声（米）：1400 m 上约 −25 dB，之后一路涨到头顶。 */
@@ -180,21 +187,21 @@ export const FIRST_LEVEL_AIR_RAID = Object.freeze({
      * 【同日改】第一版对齐爆炸声到耳朵的时刻、按真实时间一次排好，用户：「炸弹还没掉地上啸声就结束了」——
      * 游戏时钟一卡就落后于音频时钟。现在按游戏时钟每帧变速（Script_FirstLevelAirRaid.Whistle 头注）。
      *   durS         成品长度（Script_SeedAudioBombWhistleBake 的 BOMB_WHISTLE_PICK.durS）；落地前这么久起播
-     *   perWave      一轮最多几颗有啸声：长机头一颗 + 离听者最近的那一颗（一串十几颗都啸就成了一片噪声，电影里也只听见一两声）
+     *   perWave      一轮最多几颗有啸声：长机头一颗 + 离听者最近的两颗（10-14 由 2 改 3；一串十几颗都啸就成了一片噪声，电影里也只听见一两声）
      *   gapS         两颗有啸声的弹落地至少隔多久（太近的第二声被第一声的爆炸盖住，不如不给）
      *   share        声源摆在「听者 → 弹此刻的位置」连线上这一比例处，跟着弹一起落（与场外炮击的 incomingShare 同一个道理：
      *                摆在两三百米外的真位置上，衰到几乎听不见）
      *   minHeightM   声源不低于听者与落点中较高者之上这么多米（贴地的话沟沿一挡就闷）
      *   sizeM        声源尺寸（panner 的 refDistance）：三百米的落点摆在一百米外，按枪口的 3.5 m 衰减就没了
-     *   volume       按 300 m 落点算：啸声有效电平比同一颗的爆炸本体低约 3 dB；素材尾巴比有声段均值高十来 dB
+     *   volume       按 300 m 落点算：啸声有效电平比同一颗的爆炸本体低约 3 dB；素材尾巴比有声段均值高十来 dB（10-14：0.65 → 1.2，爆炸近档换了中距素材后啸声跟着抬 +5 dB，实测仍比爆炸低 2–4 dB）
      *   pitchSpread  逐颗变调总宽（同一轮两声别一模一样）；变调后的长度按 durS / pitch 算
      *   rateMin / rateMax  跟游戏时钟的变速倍率范围（rateMin 与 Script_Audio 的 VARISPEED_MIN 同一个数，寿命按它留）
      *   rateFollow   每帧往目标倍率走多少（帧间隔抖动别变成音高抖动）；syncMinS 离落地这么近就不再调
      *   stopFadeS    落地那一帧硬停的淡出（只防咔哒）
      *   speedTauS / speedMin  游戏时钟相对音频时钟快慢的平均时间常数与下限（起播时刻按它往后推，见 TrackGameSpeed）
      */
-    whistle: Object.freeze({ cue: "bombWhistle", durS: 2.78, perWave: 2, gapS: 1.0, share: 0.35, minHeightM: 25, sizeM: 30,
-      volume: 0.65, pitchSpread: 0.06, rateMin: 0.8, rateMax: 1.25, rateFollow: 0.25, syncMinS: 0.1, stopFadeS: 0.015,
+    whistle: Object.freeze({ cue: "bombWhistle", durS: 2.78, perWave: 3, gapS: 0.8, share: 0.35, minHeightM: 25, sizeM: 30,
+      volume: 1.2, pitchSpread: 0.06, rateMin: 0.8, rateMax: 1.25, rateFollow: 0.25, syncMinS: 0.1, stopFadeS: 0.015,
       speedTauS: 1.0, speedMin: 0.3 }),
   }),
   /**

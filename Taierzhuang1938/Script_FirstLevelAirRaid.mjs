@@ -621,7 +621,9 @@ export class FirstLevelAirRaid {
       this.voices = this.voices.filter((e) => e.v !== b.whistleVoice);
       b.whistleVoice = null;
     }
-    const priority = !!((b.lead || b.whistleAt != null) && A.leadPriority);
+    // 近的那几颗换中距素材、同样保底（Data_FirstLevelAirRaid.audio.nearCue 头注）。
+    const near = A.nearCue && d <= (A.nearWithinM ?? 0);
+    const priority = !!((b.lead || b.whistleAt != null || near) && A.leadPriority);
     // 普通的那几声给「已经啸起来、还没落地、账上又没占着格」的弹留位（它的啸声被引擎提前回收或偷掉时）。
     const keyed = b.lead || b.whistleAt != null;
     const owed = keyed ? 0 : plan.bombs.filter((o) => o !== b && !o.landed && o.whistled
@@ -629,7 +631,7 @@ export class FirstLevelAirRaid {
     if (keyed || this.time - this.lastSoundAt >= A.minGapS) {
       if (this.Room(1 + owed)) {
         this.lastSoundAt = this.time;
-        this.Voice(this.host.audio?.Play?.(A.cue, { position: pos, volume: A.volume * speech, soundField: true, bus: "sfx",
+        this.Voice(this.host.audio?.Play?.(near ? A.nearCue : A.cue, { position: pos, volume: A.volume * speech, soundField: true, bus: "sfx",
           selfCapped: true, priority, airCut: cut(0) }));
       } else this.layersDropped += 1;
     }

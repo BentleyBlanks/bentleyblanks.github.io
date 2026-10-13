@@ -157,7 +157,7 @@ function WaveNow(raid, stage = "Support") {
   assert.ok(log.visuals.some((v) => v.bomb === "Bomb250kg" && v.radius > 20), "250 kg 级的画面半径过 20 m（立方根缩放）");
   // 声部。
   assert.ok(peakBusy <= R.audio.maxVoices, `本层同时 ${peakBusy} 条 ≤ ${R.audio.maxVoices}`);
-  const booms = audio.calls.filter((c) => c.cue === R.audio.cue && !c.delay);
+  const booms = audio.calls.filter((c) => (c.cue === R.audio.cue || c.cue === R.audio.nearCue) && !c.delay);
   assert.ok(booms.length >= raid.waves * 2 && booms.every((c) => c.soundField && c.bus === "sfx" && c.selfCapped),
     `爆炸 ${booms.length} 声（每轮至少两声），全走 soundField / sfx / selfCapped`);
   assert.ok(Math.max(...booms.map((c) => c.volume)) <= R.audio.volume * R.audio.volumeMaxGain + 1e-6, "重磅弹的音量加厚有封顶");
@@ -234,7 +234,7 @@ function WaveNow(raid, stage = "Support") {
       assert.ok(pd > 0 && pd < flat(b) * 3, `${key}：摆在听者与弹之间（${pd.toFixed(0)} m）`);
       assert.ok(c.selfCapped && c.bus === "sfx" && c.sourceSizeM === W.sizeM, `${key}：走 sfx / selfCapped / 声源尺寸`);
       // 啸声硬停之后一定有爆炸：落地那一帧给了本体，而且走 priority。
-      const boom = audio.calls.find((x) => x.cue === R.audio.cue && !x.delay && Math.abs(x.position.x - b.at.x) < 1e-6 && Math.abs(x.position.z - b.at.z) < 1e-6);
+      const boom = audio.calls.find((x) => (x.cue === R.audio.cue || x.cue === R.audio.nearCue) && !x.delay && Math.abs(x.position.x - b.at.x) < 1e-6 && Math.abs(x.position.z - b.at.z) < 1e-6);
       assert.ok(boom && boom.priority, `${key}：有啸声的那一颗爆炸出声且保底`);
       checked += 1;
     }
