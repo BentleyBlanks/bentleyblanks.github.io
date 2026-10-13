@@ -43,6 +43,7 @@ CHARS_SCRIPT = os.path.join(HERE, "Script_FontChars.mjs")
 
 # (输出名, 源字体名, 用哪张字表)
 JOBS = [
+    ("Font_AboutText", "NotoSerifSC-Regular.otf", "about"),
     ("Font_Title", "NotoSerifSC-Black.otf", "title"),
     ("Font_TitleText", "NotoSerifSC-Black.otf", "ui"),
     ("Font_UiSans_Regular", "NotoSansSC-Regular.otf", "ui"),
@@ -54,6 +55,11 @@ JOBS = [
 # 清单：Script_TextTest 拿它和现在的文案对账。写字表本身而不是哈希，
 # 是为了红的时候能直接把缺的那几个字打出来。
 MANIFESTS = {
+    "Font_AboutText.json": {
+        "faces": ["Font_AboutText.woff2"],
+        "font": "Noto Serif SC Regular / About dossier body",
+        "charsKey": "about",
+    },
     "Font_Title.json": {
         "faces": ["Font_Title.woff2"],
         "font": "Noto Serif SC Black / 思源宋体 Black",

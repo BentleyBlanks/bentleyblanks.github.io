@@ -180,7 +180,7 @@ export const TEXT = Object.freeze({
   "menu.hint.start": "从第一关开始",
   "menu.hint.levels": "正式章节与测试场景两组，任选一条直接进",
   "menu.hint.codex": "哪些数是史料、哪些是推定",
-  "menu.hint.credits": "史料口径与虚构人物的交代",
+  "menu.hint.credits": "作品介绍、制作与鸣谢、史料及版权",
   "menu.hint.settings": "操作、画面与声音",
   "menu.hint.debug": "碰撞、移动、伤害与补给的测试开关",
 

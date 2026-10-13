@@ -1,5 +1,11 @@
 # 打包字体
 
+2026-10-13：「关于」卷宗新增 `Font_AboutText.woff2`，使用 Noto Serif SC Regular，
+只覆盖 `Data_Text_About` 的正文与按钮（约 56 KB），打开关于时才加载。
+`Script_FontChars.AboutChars` 与 `Script_TextTest` 共用字表；沿用本目录 SIL OFL 1.1。
+完整重烘还需要把同一 notofonts/noto-cjk 源目录中的 `NotoSerifSC-Regular.otf` 下载到源字体目录；
+单独重烘：`python Taierzhuang1938/Font/Script_FontSubset.py <源目录> --only Font_AboutText`。
+
 游戏自带三套字体，全部是 **SIL Open Font License 1.1**：可随游戏一起分发、可商用、
 可子集化，唯一硬约束是不得单独售卖字体本身，且保留 `LICENSE_OFL.txt`。
 

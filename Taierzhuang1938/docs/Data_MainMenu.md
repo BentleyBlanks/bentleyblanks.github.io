@@ -1,5 +1,35 @@
 # 主菜单与选章 —— 指挥室场景与线性任务列表
 
+## 关于页：档案卷宗（2026-10-13）
+
+用户选定 A 卷宗方案后，正式「关于」由 `Script_About.mjs` 展示四个分栏：
+关于作品、制作与鸣谢、史料与虚构、版权与授权。`Data_About.mjs` 管页面结构与来源链接，
+`Data_Text_About.mjs` 管可翻译文案；工作室署名为 **印河**，制作人为 **BB**。
+正文与链接均为 DOM，底图只含无字旧纸、文件夹及铜夹。仍显示当前指挥室或暂停背景，
+不创建另一份房间或下载战场、音频。新的纸图约 194 KiB，宋体正文子集约 56 KiB，均在打开关于时才请求。
+
+桌面左侧纵向标签，窄屏改横排标签；标准桌面四页各自一屏可读，窄屏与来源明细只滚动正文。
+标签支持方向键、Home/End 与 Tab，阅读区保留原生键盘滚动。Esc 或返回先收起来源明细，
+再返回菜单；「史实注记」可返回原来的关于分栏。减少动态效果时不引入翻页动画。
+来源页为有记录的条目节选，不把它描述成全资产授权审计；明细逐条链接到来源和许可。
+
+纸图由内置 imagegen 根据已确认方案生成（当次指定的 Lovart 在本机与插件目录均无可用入口），
+通过 `_import/Script_EncodeAboutDossier.py --source <生成原图.png>` 编码并保留 alpha；
+提示词、来源哈希与登记分别在 `_import/Prompts/Texture_AboutDossier.txt`、
+`_import/TextureBakes/Texture_AboutDossier.json` 和 `Data_TextureManifest.mjs`。
+参考图、验收截图及临时预览页只留本地。
+
+验收：`node Taierzhuang1938/Script_AboutBrowserTest.mjs` 覆盖四页、署名、懒加载、
+来源明细、键盘、史实页往返与窄屏/短屏；另跑 Text、ModuleGraph、TextureStandards、
+MenuStartup（源码与发布包）和菜单已有回归。
+
+本轮实测 AboutBrowser（源码与发布包）、MenuStartup（源码与发布包）、MenuPresentation、
+Text、TextGather、ModuleGraph、TextureStandards、PublishAssets 与 TestRunner 自测通过。
+quick / prepush 均在前 7 项通过后停于既有 `SpeakerGestureTest`：
+`FrontObservation.02: luo gestured on his previous line too`。该测试、手势表、对白表与前沿场景表
+均与发布基准 `origin/master` 一致，未改动或放宽断言，不宣称全游戏回归通过。
+注册关于页门禁时也补齐了既有 `FirstLevelScoreRedesign` 两份文件的 audio 领域映射；不改变音乐。
+
 ## 指挥室场景（2026-10-04）
 
 正式标题菜单现使用 `Script_CommandRoom.mjs` 加载 BlenderMCP 自建的

@@ -94,7 +94,13 @@ export const LatinOf = (chars) => [...chars]
   .filter((ch) => { const c = ch.codePointAt(0); return c >= 0x20 && c <= 0x7e; })
   .join("");
 
+/** Readable Song body for the dossier only; loaded on opening About. */
+export async function AboutChars() {
+  const { TEXT } = await import(pathToFileURL(path.join(projectDir, "Data_Text_About.mjs")).href);
+  return Charset([...Object.values(TEXT), ALWAYS]);
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const ui = await UiChars();
-  process.stdout.write(JSON.stringify({ title: await TitleChars(), ui, latin: LatinOf(ui) }));
+  process.stdout.write(JSON.stringify({ title: await TitleChars(), ui, latin: LatinOf(ui), about: await AboutChars() }));
 }

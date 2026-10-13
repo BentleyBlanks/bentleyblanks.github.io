@@ -18,10 +18,11 @@
 import * as THREE from "three";
 import { FovFromFocalMm } from "./Script_CameraLens.mjs";
 import { ValueNoise2, Clamp, Clamp01 } from "./Script_Noise.mjs";
-import { MENU, CREDITS, PRESUMED_STAGING, CAST } from "./Data_TengxianScript.mjs";
+import { MENU, PRESUMED_STAGING, CAST } from "./Data_TengxianScript.mjs";
+import { AboutDossier } from "./Script_About.mjs";
 import { MENU_SCENE, ShotsFor } from "./Data_Menu.mjs";
 import { PRESUMED } from "./Data_Tengxian.mjs";
-// 界面文案走字符串表（Data_Text_Menu.mjs），内容原稿（MENU / CREDITS / CAST）留在
+// 界面文案走字符串表（Data_Text_Menu / Data_Text_About），内容原稿（MENU / CAST）留在
 // Data_TengxianScript 里，显示时按 id 过 Localize —— 口径见 docs/Data_TextAndTuning.md §3。
 import { T, Localize } from "./Script_Text.mjs";
 import { CastNameId, LevelFieldId } from "./Script_TextIds.mjs";
@@ -32,8 +33,6 @@ import { COMMAND_ROOM_MAPS } from "./Data_CommandRoomPapers.mjs";
 function MenuTextId(field) { return `menu.${field}`; }
 /** 标题下那几行史实小字。 */
 function MenuLineId(index) { return `menu.lines.${index}`; }
-/** 鸣谢一行。 */
-function CreditsLineId(index) { return `credits.${index}`; }
 /** 说话人 / 人物显示名：与 Script_Story、Script_Cutscene 同一条口径。 */
 function CastName(id) { return Localize(CastNameId(id), CAST[id]?.short || CAST[id]?.name || id); }
 
@@ -284,13 +283,21 @@ export class MainMenu {
     this.el.panelBack = mk("mnBack", foot, "button");
     this.el.panelBack.textContent = T("menu.back");
     mk("mnCampaignKeys", foot).textContent = T("menu.foot.escBack");
-    this.el.panelBack.addEventListener("click", () => this.Show(this.panelReturnMode));
+    this.el.panelBack.addEventListener("click", () => {
+      if (this.mode === "credits" && this.about?.Back()) return;
+      this.Show(this.panelReturnMode);
+    });
     this.el.panelBody = mk("mnPanelBody", this.el.panel);
     this.el.panel.appendChild(foot);
 
     this.BuildLevels();
     this.el.text = document.createElement("div");
     this.el.text.className = "mnText";
+    this.about = new AboutDossier({ onHistory: () => {
+      this.aboutReturnMode = this.panelReturnMode;
+      this.Show("codex");
+      this.panelReturnMode = "credits";
+    } });
     // 最后建：确认框必须压在列表、目标栏与面板之上。
     this.BuildConfirm();
   }
@@ -672,7 +679,7 @@ export class MainMenu {
     this.open = false;
     this.live = false;
     this.root.classList.add("off");
-    this.root.classList.remove("pause", "panelOn", "levelsOn");
+    this.root.classList.remove("pause", "panelOn", "levelsOn", "aboutOn");
     this.el.panel.classList.remove("on");
     this.el.fade.style.opacity = "0";
   }
@@ -744,6 +751,12 @@ export class MainMenu {
     this.root.classList.toggle("panelOn", panel);
     this.el.panel.classList.toggle("on", panel);
     this.root.classList.toggle("levelsOn", mode === "levels");
+    this.root.classList.toggle("aboutOn", mode === "credits");
+    this.el.panelBack.textContent = T(mode === "credits" ? "menu.foot.escBack" : "menu.back");
+    if (mode === "credits" && wasMode === "codex" && this.aboutReturnMode) {
+      this.panelReturnMode = this.aboutReturnMode;
+      this.aboutReturnMode = null;
+    }
     if (mode === "levels") {
       this.el.panelTitle.textContent = T("menu.panel.levels");
       this.el.panelBody.textContent = "";
@@ -758,10 +771,8 @@ export class MainMenu {
     } else if (mode === "credits") {
       this.el.panelTitle.textContent = Localize(MenuTextId("credits"), MENU.credits);
       this.el.panelBody.textContent = "";
-      this.el.text.innerHTML = CREDITS
-        .map((line, index) => (line
-          ? `<p>${Localize(CreditsLineId(index), line)}</p>` : `<p class="mnGap"></p>`)).join("");
-      this.el.panelBody.appendChild(this.el.text);
+      this.el.panelBody.appendChild(this.about.root);
+      this.about.Open();
     } else if (mode === "settings") {
       this.el.panelTitle.textContent = T("menu.item.settings");
       this.el.panelBody.textContent = "";
@@ -784,7 +795,7 @@ export class MainMenu {
       this.el.panelTitle.textContent = T("menu.settings.debugTools");
       this.BuildDebugTools();
     }
-    if (!panel && wasMode === "levels") {
+    if (!panel && (wasMode === "levels" || wasMode === "credits")) {
       this.itemEls[this.itemIndex]?.focus({ preventScroll: true });
     }
   }
@@ -1253,6 +1264,7 @@ export class MainMenu {
         case "Escape":
           // 按住不放的自动重复不再往回退：一路退过暂停层就成了「继续」。
           if (event.repeat) { event.preventDefault(); return; }
+          if (this.mode === "credits" && this.about.Back()) { event.preventDefault(); return; }
           if (panel) {
             if (this.mode === "levels") this.BackFromLevels();
             else this.Show(this.panelReturnMode);

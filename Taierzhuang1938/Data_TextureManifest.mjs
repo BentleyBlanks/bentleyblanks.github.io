@@ -1185,6 +1185,14 @@ export const TEXTURE_MANIFEST = Object.freeze([
     ],
   },
   {
+    id: "AboutDossier", kind: "menu", tier: "ui",
+    bake: "_import/Script_EncodeAboutDossier.py", bakeRecord: "_import/TextureBakes/Texture_AboutDossier.json",
+    source: { provider: "imagegen", date: "2026-10-13", ref: "Approved About dossier, blank alpha cutout", prompt: "_import/Prompts/Texture_AboutDossier.txt" },
+    consumers: [{ file: "Style_About.css", token: "Texture_AboutDossierImage" }],
+    files: [["Menu/Texture_AboutDossierImage.webp", "Image", 1402, 1122]],
+    note: "Blank paper, folder and bronze clip only. Text and links remain live DOM; requested only when About opens.",
+  },
+  {
     "id": "BootPaperPbr",
     "kind": "menu",
     "tier": "ui",
