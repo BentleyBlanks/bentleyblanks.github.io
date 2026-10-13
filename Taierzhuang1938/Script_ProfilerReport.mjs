@@ -97,6 +97,27 @@ export const GPU_NOTES = {
   misc: "其他 GL（状态切换、纹理/缓冲上传）",
 };
 
+/** 事件标记的类别（帧图小旗的颜色与事件页的分组）。没登记的类别照原样显示、灰色。 */
+export const MARK_KINDS = {
+  stage: { label: "阶段", color: "#e9d8a6" },
+  explosion: { label: "爆炸", color: "#e0884f" },
+  death: { label: "阵亡", color: "#c9574f" },
+  spawn: { label: "补兵", color: "#7fb3c8" },
+  quality: { label: "降档", color: "#b48ad6" },
+  compile: { label: "现编着色器", color: "#dfbd68" },
+};
+
+/** stat unit 的「卡在哪」三种答案。 */
+export const BOTTLENECK_LABELS = { game: "CPU · 逻辑", draw: "CPU · 渲染提交", gpu: "GPU" };
+
+/** 帧状态的中文（与 Script_Profiler.FRAME_STATES 同表；这里再写一份免得显示层去 import 内核）。 */
+export const STATE_LABELS = {
+  play: "游戏中", cutscene: "过场", menu: "菜单", paused: "暂停", editor: "编辑器接管",
+  loading: "加载/预热", failure: "失败画面", hidden: "页面在后台",
+};
+
+const PRESSURE_TEXT = ["空闲", "一般", "吃紧", "满载"];
+
 /** 表尾固定说明：GPU 读数什么时候只是提交时间的影子。 */
 export const SHADOW_NOTE =
   "读法：某个 pass 的 GPU 读数接近它的「提交 CPU」时，说明 GPU 在等 CPU 喂 draw，"
@@ -214,6 +235,138 @@ export function GpuRows(summary) {
 }
 
 // ---------------------------------------------------------------------------
+// 第四版：stat unit / 卡顿 / 机器忙闲 / 渲染统计 / 计数器 / 事件（面板与 CLI 共用的句子与行）
+// ---------------------------------------------------------------------------
+
+/**
+ * 「卡在哪」：每帧比一次 GPU 与主线程、主线程里比一次逻辑与提交，取票数最多的那一边。
+ * @returns {{ key, label, share, game, draw, gpu, browser, overlay, main } | null}
+ */
+export function Bottleneck(summary) {
+  const unit = summary.unit;
+  if (!unit) return null;
+  const bound = unit.bound || {};
+  const total = (bound.game || 0) + (bound.draw || 0) + (bound.gpu || 0);
+  const key = unit.bottleneck;
+  return {
+    key,
+    label: key ? BOTTLENECK_LABELS[key] : "—",
+    share: total && key ? bound[key] / total : 0,
+    frames: total,
+    votes: bound,
+    game: unit.game.avg,
+    draw: unit.draw.avg,
+    overlay: unit.overlay.avg,
+    gpu: summary.gpuFrames ? summary.gpuTotal.avg : null,
+    browser: summary.browser ? summary.browser.avg : null,
+    main: summary.cpuTotal.avg,
+  };
+}
+
+export function UnitLine(summary) {
+  const b = Bottleneck(summary);
+  if (!b) return "—";
+  const head = b.key ? `卡在 ${b.label}（${b.votes[b.key]}/${b.frames} 帧）` : "没有可判定的帧";
+  return `${head} ｜ 逻辑 ${F(b.game)} ｜ 渲染提交 ${F(b.draw)} ｜ GPU ${b.gpu == null ? "—" : F(b.gpu)}`
+    + ` ｜ 浏览器侧 ${b.browser == null ? "—" : F(b.browser)} ｜ 剖析面板自身 ${F(b.overlay)} ms`;
+}
+
+export function HitchLine(summary) {
+  const h = summary.hitch;
+  if (!h) return "—";
+  return `${Math.round(h.refreshHz)} Hz 屏，预算 ${F(h.budgetMs)} ms（${Math.round(h.targetFps)} fps）`
+    + ` ｜ 超预算 ${h.overBudgetPct.toFixed(1)}% 帧 ｜ 掉 vsync ${h.missedVsync} 次（${h.missedVsyncPct.toFixed(0)}%）`
+    + ` ｜ 卡顿 ≥50ms ${h.minor} · ≥100ms ${h.major} · ≥250ms ${h.severe}（${(h.minorPerMin + h.majorPerMin + h.severePerMin).toFixed(0)} 次/分）`
+    + ` ｜ 1% low ${F(h.low1Fps, 1)} fps`;
+}
+
+/** 机器忙闲的一句话；`busy` 是 Worker 探针的「慢几倍」，`pressure` 是系统 CPU 压力四档的帧数。 */
+export function BusyLine(summary) {
+  const parts = [];
+  if (summary.busy) {
+    const verdict = summary.busy.med >= 1.6 ? "很忙（别的程序在抢 CPU，毫秒数被放大）"
+      : summary.busy.med >= 1.25 ? "偏忙" : "正常";
+    parts.push(`比空闲时慢 ${summary.busy.med.toFixed(2)} 倍（中位，最慢 ${summary.busy.max.toFixed(2)} 倍）：${verdict}`);
+  }
+  if (summary.pressure) {
+    const levels = summary.pressure.levels;
+    const shown = levels.map((n, i) => (n ? `${PRESSURE_TEXT[i]} ${Math.round((n / summary.pressure.frames) * 100)}%` : null))
+      .filter(Boolean).join("、");
+    parts.push(`系统 CPU 压力：${shown}`);
+  }
+  return parts.length ? parts.join(" ｜ ") : "（没有忙闲读数：旧版录制，或浏览器不支持 Worker / Compute Pressure）";
+}
+
+/** 帧状态一句话：这一段里有多少帧没进汇总、各是什么。 */
+export function StateLine(summary) {
+  if (!summary.states) return "";
+  const parts = Object.entries(summary.states).sort((a, b) => b[1] - a[1])
+    .map(([key, n]) => `${STATE_LABELS[key] || key} ${n}`);
+  const head = summary.excluded ? `汇总只算游戏中与过场（${summary.frames} 帧），排除 ${summary.excluded} 帧` : `全部 ${summary.frames} 帧`;
+  return `${head}：${parts.join("、")}`;
+}
+
+/**
+ * 渲染统计（stat scenerendering / rhi）：逐 pass 的 draw、材质切换、程序切换、变体重算、实例、
+ * 提交 CPU 与「每个 draw 多少微秒」。只列有 draw 的 pass，按提交 CPU 降序。
+ */
+export function RenderStatRows(summary) {
+  const render = summary.render || {};
+  const calls = summary.gpuCalls || {};
+  const cpu = summary.gpuCpu || {};
+  const keys = new Set([...Object.keys(calls), ...Object.keys(render.matSw || {})]);
+  const rows = [];
+  for (const key of keys) {
+    const draws = calls[key] ? calls[key].avg : 0;
+    if (!(draws > 0.05)) continue;
+    const submit = cpu[key] ? cpu[key].avg : 0;
+    rows.push({
+      key,
+      depth: key.split("/").length - 1,
+      draws,
+      matSw: render.matSw?.[key]?.avg ?? null,
+      progSw: render.progSw?.[key]?.avg ?? null,
+      flips: render.flips?.[key]?.avg ?? null,
+      instances: render.instances?.[key]?.avg ?? null,
+      cpuMs: submit,
+      usPerDraw: draws > 0 ? (submit * 1000) / draws : null,
+      tris: summary.gpuTris?.[key]?.avg ?? null,
+    });
+  }
+  // 父 pass 在前、子级跟在后面（shadow → shadow/c0…），同层按提交 CPU 降序
+  const roots = rows.filter((row) => row.depth === 0).sort((a, b) => b.cpuMs - a.cpuMs);
+  const out = [];
+  for (const root of roots) {
+    out.push(root);
+    for (const kid of rows.filter((row) => row.key.startsWith(`${root.key}/`)).sort((a, b) => a.key.localeCompare(b.key))) out.push(kid);
+  }
+  return out;
+}
+
+export function MarkLabel(kind) {
+  return MARK_KINDS[kind]?.label || kind;
+}
+
+/** 逐 draw 清单按某个字段分组：[{ key, draws, materials, matSwitches, tris, instances, us }]，draw 多的在前。 */
+export function GroupDraws(draws, field) {
+  const groups = new Map();
+  for (const draw of draws || []) {
+    const key = field === "material" ? `${draw.material}（${draw.materialType}）` : draw[field];
+    let group = groups.get(key);
+    if (!group) { group = { key, draws: 0, materials: new Set(), matSwitches: 0, tris: 0, instances: 0, us: 0, passes: new Set() }; groups.set(key, group); }
+    group.draws += 1;
+    group.materials.add(draw.materialId);
+    if (draw.matSwitch) group.matSwitches += 1;
+    group.tris += draw.tris || 0;
+    group.instances += draw.instances || 0;
+    group.us += draw.us || 0;
+    group.passes.add(draw.pass);
+  }
+  return [...groups.values()].map((group) => ({ ...group, materials: group.materials.size, passes: [...group.passes].join(" ") }))
+    .sort((a, b) => b.draws - a.draws);
+}
+
+// ---------------------------------------------------------------------------
 // 纯文本排版（CLI 与「导出快照」共用）
 // ---------------------------------------------------------------------------
 
@@ -270,6 +423,26 @@ export function FormatSnapshot(snapshot) {
     + ` ｜ 主线程 avg ${F(summary.cpuTotal.avg)} ms`
     + ` ｜ GPU avg ${summary.gpuFrames ? F(summary.gpuTotal.avg) : "—"} ms`
     + ` ｜ draw ${summary.calls} ｜ 三角 ${Millions(summary.triangles)}`);
+  if (summary.unit) {
+    out.push("");
+    out.push("结论（stat unit）");
+    out.push(`  ${UnitLine(summary)}`);
+    if (summary.hitch) out.push(`  ${HitchLine(summary)}`);
+    out.push(`  机器：${BusyLine(summary)}`);
+    if (summary.states) out.push(`  帧：${StateLine(summary)}`);
+    if (summary.stages?.length) out.push(`  阶段：${summary.stages.join(" → ")}`);
+  }
+  if (snapshot.environment) {
+    const env = snapshot.environment;
+    const bits = [];
+    if (env.quality) bits.push(`画质 ${env.quality}`);
+    if (env.internal) bits.push(`内部 ${env.internal}`);
+    if (env.output) bits.push(`输出 ${env.output}`);
+    if (env.autoQuality) bits.push(`自动降档 ${env.autoQuality.enabled ? `第 ${env.autoQuality.step} 级 ×${env.autoQuality.scale}` : "关"}`);
+    if (env.timerResolutionMs != null) bits.push(`计时精度 ${env.timerResolutionMs} ms${env.crossOriginIsolated ? "（隔离）" : ""}`);
+    if (env.hardwareConcurrency) bits.push(`${env.hardwareConcurrency} 线程`);
+    out.push(`  环境：${bits.join(" ｜ ")}`);
+  }
 
   out.push("");
   out.push("CPU · 主线程（ms/帧）");
@@ -328,6 +501,51 @@ export function FormatSnapshot(snapshot) {
     summary.gpuFrames ? F(summary.gpuTotal.p95) : "—",
     summary.gpuFrames ? F(summary.gpuTotal.max) : "—", "", "", "", `采样帧 ${summary.gpuFrames}`]);
   out.push(...Table(gpuColumns, gpuRows));
+
+  const renderRows = RenderStatRows(summary);
+  if (renderRows.length && summary.render?.matSw && Object.keys(summary.render.matSw).length) {
+    out.push("");
+    out.push("渲染统计（每帧；材质切换 = three 整套重传 uniform 的次数，变体重算 = 同一材质换了 program）");
+    const columns = [
+      { head: "pass", width: 22, align: "left" },
+      { head: "draw", width: 7, align: "right" },
+      { head: "材质切换", width: 9, align: "right" },
+      { head: "程序切换", width: 9, align: "right" },
+      { head: "变体重算", width: 9, align: "right" },
+      { head: "实例", width: 8, align: "right" },
+      { head: "提交CPU", width: 8, align: "right" },
+      { head: "µs/draw", width: 8, align: "right" },
+    ];
+    out.push(...Table(columns, renderRows.map((row) => [
+      `${"  ".repeat(row.depth)}${row.depth ? Tail(row.key) : row.key}`, F(row.draws, 1), F(row.matSw, 1), F(row.progSw, 1),
+      F(row.flips, 2), Int(row.instances), F(row.cpuMs), F(row.usPerDraw, 1),
+    ])));
+    const totals = summary.render.totals;
+    out.push(`  整帧：draw ${F(totals.calls.avg, 0)} ｜ 材质切换 ${F(totals.matSw.avg, 0)} ｜ 程序切换 ${F(totals.progSw.avg, 0)}`
+      + ` ｜ 变体重算 ${F(totals.flips.avg, 1)} ｜ 实例 ${Int(totals.instances.avg)}`);
+  }
+
+  if (summary.counters?.length) {
+    out.push("");
+    out.push(`计数器（每 ${snapshot.counterEvery || 6} 帧取一次）`);
+    const columns = [
+      { head: "计数器", width: 22, align: "left" },
+      { head: "avg", width: 9, align: "right" },
+      { head: "min", width: 9, align: "right" },
+      { head: "max", width: 9, align: "right" },
+      { head: "最后", width: 9, align: "right" },
+    ];
+    out.push(...Table(columns, summary.counters.map((row) => [row.name, F(row.avg, 1), F(row.min, 1), F(row.max, 1), F(row.last, 1)])));
+  }
+
+  if (summary.marks?.length) {
+    out.push("");
+    const counts = Object.entries(summary.markCounts).map(([kind, n]) => `${MarkLabel(kind)} ${n}`).join("，");
+    out.push(`事件标记 ${summary.marks.length} 个（${counts}）`);
+    for (const mark of summary.marks.filter((m) => m.kind !== "death" && m.kind !== "explosion").slice(0, 20)) {
+      out.push(`  #${mark.id} ${MarkLabel(mark.kind)} ${mark.label}`);
+    }
+  }
 
   out.push("");
   out.push("掉帧取证（窗口内最差一帧）");
@@ -500,5 +718,55 @@ export function FormatFrameTimeline(record, names, { top = 25 } = {}) {
   return out.join("\n");
 }
 
-export default { CpuRows, GpuRows, FormatSnapshot, FormatFrameTimeline, WorstLine, EventsLine, RootOf,
-  DecodeSamples, DecodeGpuSegments, CPU_LABELS, GPU_NOTES, SHADOW_NOTE };
+/** 一帧的逐 draw 清单（文本）：按 pass、按顶层子树、按材质三张分组表。 */
+export function FormatDrawCapture(record, { top = 20 } = {}) {
+  const draws = record && record.draws;
+  if (!draws || !draws.length) return "（这一帧没有抓 draw 清单）";
+  const out = [`draw 清单 · 第 #${record.id} 帧：${draws.length} 个 draw`];
+  const columns = (head) => [
+    { head, width: 40, align: "left" },
+    { head: "draw", width: 6, align: "right" },
+    { head: "材质", width: 6, align: "right" },
+    { head: "换材质", width: 7, align: "right" },
+    { head: "三角", width: 9, align: "right" },
+    { head: "实例", width: 7, align: "right" },
+    { head: "CPU µs", width: 8, align: "right" },
+  ];
+  for (const [field, head] of [["pass", "pass"], ["top", "顶层子树"], ["material", "材质"]]) {
+    out.push("");
+    out.push(...Table(columns(head), GroupDraws(draws, field).slice(0, top).map((g) => [
+      g.key, String(g.draws), String(g.materials), String(g.matSwitches), Millions(g.tris), String(g.instances), F(g.us, 0),
+    ])));
+  }
+  return out.join("\n");
+}
+
+/** JS 采样结果（文本）：自身耗时、含子调用、按桶归属。 */
+export function FormatSampler(result, { top = 25 } = {}) {
+  if (!result) return "（没有采样结果）";
+  const perFrame = result.frames > 0 ? (ms) => `${F(ms / result.frames, 3)} ms/帧` : (ms) => `${F(ms, 1)} ms`;
+  const out = [`JS 采样：${result.samples} 个样本 / ${F(result.durationMs / 1000, 1)} s（间隔 ≈ ${F(result.intervalMs, 1)} ms）`
+    + `${result.frames ? ` ｜ 覆盖 ${result.frames} 帧` : ""} ｜ 非 JS/空闲 ${result.idleSamples}`];
+  const Rows = (title, rows) => {
+    out.push("");
+    out.push(title);
+    for (const row of rows.slice(0, top)) {
+      out.push(`  ${row.pct.toFixed(1).padStart(5)}%  ${perFrame(row.ms).padStart(14)}  ${row.key || row.file}`);
+    }
+  };
+  Rows("自身耗时", result.self);
+  Rows("含子调用", result.total);
+  if (result.buckets?.length) {
+    out.push("");
+    out.push("按桶归属（样本落在哪一条 B/E 里）");
+    for (const bucket of result.buckets.slice(0, 12)) {
+      out.push(`  ${bucket.pct.toFixed(1).padStart(5)}%  ${CPU_LABELS[bucket.key] ? `${bucket.key} · ${CPU_LABELS[bucket.key]}` : bucket.key}`);
+      for (const fn of bucket.top.slice(0, 4)) out.push(`           ${fn.pct.toFixed(0).padStart(3)}%  ${fn.fn}`);
+    }
+  }
+  return out.join("\n");
+}
+
+export default { CpuRows, GpuRows, FormatSnapshot, FormatFrameTimeline, FormatDrawCapture, FormatSampler, WorstLine, EventsLine, RootOf,
+  DecodeSamples, DecodeGpuSegments, CPU_LABELS, GPU_NOTES, SHADOW_NOTE, MARK_KINDS, BOTTLENECK_LABELS, STATE_LABELS,
+  Bottleneck, UnitLine, HitchLine, BusyLine, StateLine, RenderStatRows, GroupDraws, MarkLabel };

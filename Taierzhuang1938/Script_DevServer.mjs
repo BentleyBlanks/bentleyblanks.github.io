@@ -62,6 +62,8 @@ export function ServeRoot(rootDir, port = 0) {
         "Content-Type": MIME[path.extname(filePath).toLowerCase()] ?? "application/octet-stream",
         "Cache-Control": "no-store",
         "Content-Length": stat.size,
+        // 与本地预览同一条：只为 Profiler 的 JS 采样（Script_ProfilerSampler）开 Document-Policy。
+        ...(/\.html?$/i.test(filePath) ? { "Document-Policy": "js-profiling" } : {}),
       });
       fs.createReadStream(filePath).pipe(response);
     });

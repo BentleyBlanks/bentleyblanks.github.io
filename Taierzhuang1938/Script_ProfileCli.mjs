@@ -25,6 +25,8 @@
 //   --frame=<帧号|worst>   与 --print=<录制文件> 连用：只看这一帧的表 + 时间轴（最长的 B/E 实例与 GPU 分段）
 //   --range=<a-b>          与 --print=<录制文件> 连用：只汇总帧号 a 到 b（面板「拖选一段」同一口径）
 //   --cpuprofile           CDP 采样剖析，另打「自身耗时前 40」
+//   --all-frames           与 --print=<录制> 连用：连暂停/菜单/加载帧一起汇总（默认只算游戏中与过场）
+//   --target-fps=60        预算线按这个帧率算（默认按录制里估出来的刷新率）
 //
 // ## 读数注意
 // `--frames` 那条路每帧要让出一次 event-loop（否则 GPU 计时查询永远收不回来），
@@ -37,7 +39,7 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { MISSION_ANCHORS, PoseView, ParseCustomView, FoldProfile } from "./Script_FrameProbeViews.mjs";
-import { FormatSnapshot, FormatFrameTimeline } from "./Script_ProfilerReport.mjs";
+import { FormatSnapshot, FormatFrameTimeline, FormatDrawCapture, FormatSampler } from "./Script_ProfilerReport.mjs";
 import { RECORDING_FORMAT, FramesFromRecording, SummarizeFrames } from "./Script_Profiler.mjs";
 
 const project = path.dirname(fileURLToPath(import.meta.url));
@@ -223,7 +225,11 @@ async function RunLive({ seconds, record }) {
  */
 function PrintRecording(data) {
   const frames = FramesFromRecording(data);
-  const flags = { timerAvailable: !!data.timerAvailable, loafAvailable: !!data.loafAvailable };
+  const flags = { timerAvailable: !!data.timerAvailable, loafAvailable: !!data.loafAvailable,
+    // 第四版：计数器名表；默认只算「游戏中 + 过场」帧（1 版录制按「没干活的帧 = 暂停」推断），--all-frames 全算
+    counterNames: (data.counters || []).map((counter) => counter.label || counter.name),
+    activeOnly: !argv.includes("--all-frames"),
+    targetFps: Number(Arg("target-fps", "0")) || 0 };
   const frameArg = Arg("frame", "");
   const rangeArg = Arg("range", "");
   let rows = frames;
@@ -250,16 +256,20 @@ function PrintRecording(data) {
   const summary = SummarizeFrames(rows, flags);
   console.log(FormatSnapshot({
     label: `${data.label || "录制"}${record ? ` · 第 #${record.id} 帧` : (rangeArg ? ` · 帧 ${rangeArg}` : "")}`,
-    rendererName: data.rendererName, canvas: data.canvas, postTarget: data.postTarget, when: data.when,
+    rendererName: data.rendererName || data.environment?.gpu, canvas: data.canvas || data.environment?.output,
+    postTarget: data.postTarget || data.environment?.internal, when: data.when,
+    environment: data.environment || null,
     summary,
   }));
   if (record) {
     console.log("");
     console.log(FormatFrameTimeline(record, data.names || [], { top: Number(Arg("top", "25")) }));
+    if (record.draws) { console.log(""); console.log(FormatDrawCapture(record)); }
   } else {
     console.log("");
     console.log(`录制共 ${frames.length} 帧（#${frames[0]?.id ?? "—"}–#${frames[frames.length - 1]?.id ?? "—"}）；`
-      + "加 --frame=<帧号|worst> 看单帧时间轴，--range=a-b 只汇总一段。");
+      + "加 --frame=<帧号|worst> 看单帧时间轴，--range=a-b 只汇总一段，--all-frames 连暂停/菜单帧一起算。");
+    if (data.sampler) { console.log(""); console.log(FormatSampler(data.sampler)); }
   }
 }
 

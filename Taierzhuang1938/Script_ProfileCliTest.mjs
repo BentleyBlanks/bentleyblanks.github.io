@@ -41,7 +41,8 @@ function Run(args, timeoutMs = 20 * 60 * 1000) {
 if (fs.existsSync(jsonPath)) fs.rmSync(jsonPath);
 
 const cli = path.join(project, "Script_ProfileCli.mjs");
-const run = await Run([cli, "--view=train", "--frames=30", "--quality=low",
+// 军列开场 10-12 退役（c4b1d261），train 机位跟着没了；掩蔽部机位不跳关、最快
+const run = await Run([cli, "--view=bunker", "--frames=30", "--quality=low",
   "--width=640", "--height=400", `--label=${label}`]);
 if (run.code !== 0) {
   console.log(run.stdout.slice(-4000));
@@ -56,7 +57,7 @@ Check("落盘了 JSON", fs.existsSync(jsonPath), jsonPath);
 if (fs.existsSync(jsonPath)) {
   const snapshot = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
   const summary = snapshot.summary;
-  Check("JSON 有机位与模式", snapshot.view === "train" && /StepFrames/.test(snapshot.mode || ""),
+  Check("JSON 有机位与模式", snapshot.view === "bunker" && /StepFrames/.test(snapshot.mode || ""),
     `${snapshot.view} / ${snapshot.mode}`);
   Check("JSON 有 GPU 名与合成靶", !!snapshot.rendererName && !!snapshot.postTarget,
     `${snapshot.rendererName} / ${snapshot.postTarget}`);

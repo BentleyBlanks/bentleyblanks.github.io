@@ -61,13 +61,114 @@
 // （「材质名（类型）@ 物体 < 带名字的父节点」），录制文件里直接写着是谁在现编。
 // 找主人要走一遍场景树，只在出现新程序的那一帧走（本来就卡了几百毫秒的那一帧）。
 //
+// ## 第四版（2026-10-14，对标 UE 的 stat unit / Insights）
+// 用户录了一段 20 fps 的战斗，结论要靠五个外部取证脚本才拿得到（哪一步慢、谁在占 draw、
+// 机器是不是被别的程序占着、哪些帧是暂停空转）。这一版把这些搬进内核：
+//   · **帧状态与阶段**：装配层每帧报 `SetFrameContext(状态, 阶段)`。暂停/菜单/加载帧照记，
+//     但汇总默认只算「游戏中 + 过场」（那份录制前 495 帧是暂停空转，把 fps 抬成了 36.8）。
+//   · **机器忙闲**（UE Insights 的 Context Switches 那一类问题）：Worker 里每半秒跑一段固定
+//     整数运算，耗时 ÷ 本机最快记录 = 「比空闲时慢几倍」；另读浏览器的 Compute Pressure
+//     （系统 CPU 压力四档）。那份录制同样的活单价是空闲时的 1.7–2.0 倍，旧版完全看不出来。
+//   · **渲染统计**（stat scenerendering / stat rhi）：剖析期间包一层 renderer.renderBufferDirect，
+//     按 GPU 分段记材质切换、程序切换、变体重算（同一材质换了 program）、实例数；
+//     `RequestDrawCapture()` 抓下一帧的逐 draw 清单（GPU Visualizer 的逐 draw 事件）。
+//   · **计数器**（Insights 的 Counters）：`AddCounter(名字, 取值)`，每 COUNTER_EVERY 帧取一次。
+//   · **事件标记**（Insights 的 Bookmarks）：`Mark(类别, 文字)`，阶段切换、爆炸、阵亡、自动降档……
+//   · 每帧记 `t0`（主线程开工的绝对时刻），JS 采样（Script_ProfilerSampler）按它把函数样本
+//     归到桶里。
+//
 // 不 import three：拿的是 renderer 的裸 WebGL2 上下文与 info 表；要包的
 // Object3D.prototype 由装配层从构造参数传进来。Node 也能 import 本文件
 // （命令行读录制文件、纯 Node 回归），模块顶层不碰任何浏览器 API。
 
 /** 录制文件的格式名（ExportRecording / ImportRecording / 命令行 --print 认它）。 */
 export const RECORDING_FORMAT = "tengxian-profiler-recording";
-export const RECORDING_VERSION = 1;
+/** 2 = 第四版（帧状态/阶段/忙闲/渲染统计/计数器/事件/draw 清单）；1 版文件照读，缺的字段当没有。 */
+export const RECORDING_VERSION = 2;
+
+/**
+ * 帧状态（装配层 SetFrameContext 报上来的那个字）。只有「游戏中」与「过场」算活动帧，
+ * 其余照记、照画在帧图上（灰底），但默认不进汇总。
+ */
+export const FRAME_STATES = {
+  play: "游戏中",
+  cutscene: "过场",
+  menu: "菜单",
+  paused: "暂停",
+  editor: "编辑器接管",
+  loading: "加载/预热",
+  failure: "失败画面",
+  hidden: "页面在后台",
+};
+const ACTIVE_STATES = new Set(["play", "cutscene"]);
+
+/**
+ * 算「渲染提交」（UE stat unit 的 Draw）的 CPU 桶：RenderScene 里打的那几个。
+ * 其余根桶（AI、物理、剧情、玩家……）都是「逻辑」（Game）。`overlay` 是剖析面板自己，
+ * 单列，不算进任何一边。
+ */
+export const RENDER_BUCKETS = ["post", "matrix", "shadowBatch", "actorBatch", "frameSetup", "firstPersonShadow", "gi"];
+const RENDER_BUCKET_SET = new Set(RENDER_BUCKETS);
+
+/** 卡顿三档的下限（ms）：≥50 轻、≥100 中、≥250 重。 */
+export const HITCH_MINOR_MS = 50;
+export const HITCH_MAJOR_MS = 100;
+export const HITCH_SEVERE_MS = 250;
+
+/** 计数器每隔几帧取一次值（取值函数可能要扫一遍演员表，不值得每帧跑）。 */
+export const COUNTER_EVERY = 6;
+
+/** 忙闲探针：Worker 里每次跑多少次整数迭代、多久跑一次。空闲的 5800X 上约 3–4 ms。 */
+const BUSY_ITERATIONS = 4000000;
+const BUSY_PERIOD_MS = 500;
+/** 本机最快一次的探针耗时存在这里（跨会话），「慢几倍」就是相对它算的。 */
+const BUSY_BASELINE_KEY = "tz.profiler.busyBaseline.v1";
+/** Compute Pressure 的四档（-1 = 浏览器不支持或还没报）。 */
+export const PRESSURE_LEVELS = ["nominal", "fair", "serious", "critical"];
+export const PRESSURE_LABELS = ["空闲", "一般", "吃紧", "满载"];
+
+/**
+ * 帧是否算「活动帧」（进汇总）。旧版（1 版）录制没有 state：主线程几乎没干活、
+ * 一个桶都没记的帧就是暂停/菜单空转（2026-10-14 那份录制前 495 帧都是这样），其余算活动。
+ */
+export function IsActiveFrame(row) {
+  if (row.state) return ACTIVE_STATES.has(row.state);
+  if (row.cpuMs < 0.2 && (!row.cpu || Object.keys(row.cpu).length === 0)) return false;
+  return true;
+}
+
+/** 帧状态（旧录制推断）：给帧图上灰底、事件页分组用。 */
+export function FrameStateOf(row) {
+  if (row.state) return row.state;
+  return IsActiveFrame(row) ? "play" : "paused";
+}
+
+/**
+ * 从活帧间隔里猜显示器的刷新周期（ms）。rAF 时间戳贴着 vsync，间隔几乎是周期的整数倍
+ * （那份录制全是 10.0 / 20.0 / 30.0 / 39.9 —— 100 Hz 屏）。从长周期往短周期试，
+ * 第一个「所有间隔离整数倍都不远」的就是它；短周期总能套住长周期的倍数，所以不能反着试。
+ */
+export function EstimateVsyncMs(intervals) {
+  const usable = intervals.filter((value) => value > 3 && value < 250);
+  if (usable.length < 20) return 1000 / 60;
+  const CANDIDATES = [1000 / 30, 1000 / 50, 1000 / 60, 1000 / 75, 1000 / 90, 1000 / 100, 1000 / 120,
+    1000 / 144, 1000 / 165, 1000 / 240];
+  for (const period of CANDIDATES) {
+    let off = 0;
+    let shorter = 0;
+    for (const value of usable) {
+      const ratio = value / period;
+      if (ratio < 0.85) shorter += 1;
+      off += Math.abs(ratio - Math.round(ratio));
+    }
+    // 有一成以上的帧比这个周期还短，说明屏幕比它刷得快，换下一个候选
+    if (shorter > usable.length * 0.1) continue;
+    if (off / usable.length < 0.07) return period;
+  }
+  // 都套不上（StepFrames、合成器不贴 vsync）：退回最短的那一档活帧间隔
+  const sorted = [...usable].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length * 0.05)] || 1000 / 60;
+}
 
 /** 每条 CPU 样本占几格：[名字号, 深度, 起点 ms, 时长 ms]。 */
 export const SAMPLE_STRIDE = 4;
@@ -99,15 +200,23 @@ function RollUpPaths(bag) {
   }
 }
 
+/**
+ * avg / 中位 / p95 / max / min（Insights Timers 表的那几列）。p99 只在帧时间那一行用得上，
+ * 但算它不花什么钱，统一给。
+ */
 function Percentiles(values) {
-  if (values.length === 0) return { avg: 0, p95: 0, max: 0 };
+  if (values.length === 0) return { avg: 0, med: 0, p95: 0, p99: 0, max: 0, min: 0 };
   const sorted = [...values].sort((a, b) => a - b);
   let sum = 0;
   for (const value of sorted) sum += value;
+  const At = (q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
   return {
     avg: sum / sorted.length,
-    p95: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))],
+    med: At(0.5),
+    p95: At(0.95),
+    p99: At(0.99),
     max: sorted[sorted.length - 1],
+    min: sorted[0],
   };
 }
 
@@ -137,9 +246,20 @@ export function IsLiveFrame(row) {
  * 走的都是这一条，不会出现两处口径各算各的。只有一帧时 avg = p95 = max。
  * options.buckets = false 走便宜路径：跳过逐桶/逐 pass 的分位数统计。
  */
-export function SummarizeFrames(rows, {
+export function SummarizeFrames(allRows, {
   seconds = null, buckets = true, timerAvailable = false, loafAvailable = false,
+  activeOnly = true, targetFps = 0, counterNames = null,
 } = {}) {
+  // 帧状态分布（全部帧），以及默认只算活动帧（游戏中 + 过场）。一帧活动帧都没有
+  // （整段都在菜单里）就退回全部帧，别让表整张空掉。
+  const states = {};
+  for (const row of allRows) {
+    const key = FrameStateOf(row);
+    states[key] = (states[key] || 0) + 1;
+  }
+  const activeRows = activeOnly ? allRows.filter(IsActiveFrame) : allRows;
+  const rows = activeRows.length ? activeRows : allRows;
+  const excluded = allRows.length - rows.length;
   const live = rows.filter(IsLiveFrame);
   const frame = Percentiles(live.map((row) => row.interval));
   const cpuTotal = Percentiles(rows.map((row) => row.cpuMs));
@@ -202,9 +322,155 @@ export function SummarizeFrames(rows, {
   const first = rows.length ? rows[0] : null;
   const last = rows.length ? rows[rows.length - 1] : null;
   const spanSeconds = first && last ? (last.t - first.t + (last.interval || 0)) / 1000 : 0;
+
+  // --- stat unit：逻辑（Game）/ 渲染提交（Draw）/ GPU / 浏览器侧，以及每帧卡在哪一边 ---
+  // 浏览器里主线程只有一条，逻辑和提交是串着跑的，所以 CPU 一侧的账是两者之和；
+  // GPU 读数比整个主线程还长的帧才算「卡在 GPU」。
+  const unitGame = [];
+  const unitDraw = [];
+  const unitOverlay = [];
+  const bound = { game: 0, draw: 0, gpu: 0 };
+  for (const row of rows) {
+    let draw = 0;
+    let overlay = 0;
+    const cpu = row.cpu || {};
+    for (const key in cpu) {
+      if (key.indexOf("/") >= 0) continue;
+      if (RENDER_BUCKET_SET.has(key)) draw += cpu[key];
+      else if (key === "overlay") overlay += cpu[key];
+    }
+    const game = Math.max(0, row.cpuMs - draw - overlay);
+    unitGame.push(game);
+    unitDraw.push(draw);
+    unitOverlay.push(overlay);
+    if (!IsLiveFrame(row) || row.cpuMs < 0.2) continue;
+    if (row.gpuTotal != null && row.gpuTotal > row.cpuMs) bound.gpu += 1;
+    else if (draw > game) bound.draw += 1;
+    else bound.game += 1;
+  }
+  const boundTotal = bound.game + bound.draw + bound.gpu;
+  const bottleneck = boundTotal === 0 ? null
+    : Object.keys(bound).reduce((best, key) => (bound[key] > bound[best] ? key : best), "game");
+
+  // --- 卡顿与预算（UE stat unitgraph 的预算线 + CSV 报表的超预算比例 / 掉 vsync）---
+  const intervals = live.map((row) => row.interval);
+  const vsyncMs = EstimateVsyncMs(intervals);
+  const budgetMs = targetFps > 0 ? 1000 / targetFps : vsyncMs;
+  let overBudget = 0;
+  let missedVsync = 0;
+  let minor = 0;
+  let major = 0;
+  let severe = 0;
+  for (const value of intervals) {
+    if (value > budgetMs * 1.1) overBudget += 1;
+    missedVsync += Math.max(0, Math.round(value / vsyncMs) - 1);
+    if (value >= HITCH_SEVERE_MS) severe += 1;
+    else if (value >= HITCH_MAJOR_MS) major += 1;
+    // 卡顿分三档按绝对时长（与刷新率无关：100 Hz 屏上「两倍预算」才 20 ms，几乎每帧都算，没意义）
+    else if (value >= HITCH_MINOR_MS) minor += 1;
+  }
+  const minutes = Math.max(spanSeconds / 60, 1e-6);
+  const hitch = {
+    vsyncMs,
+    refreshHz: 1000 / vsyncMs,
+    budgetMs,
+    targetFps: 1000 / budgetMs,
+    overBudget,
+    overBudgetPct: intervals.length ? (overBudget / intervals.length) * 100 : 0,
+    missedVsync,
+    // 该显示的 vsync 里有多少没换上新画面（UE CSV 报表的 MVP 一类口径）
+    missedVsyncPct: intervals.length ? (missedVsync / (missedVsync + intervals.length)) * 100 : 0,
+    minor, major, severe,
+    minorPerMin: minor / minutes, majorPerMin: major / minutes, severePerMin: severe / minutes,
+    low1Fps: frame.p99 > 0 ? 1000 / frame.p99 : 0,
+  };
+
+  // --- 机器忙闲（Worker 探针「慢几倍」+ 系统 CPU 压力）---
+  const busyValues = [];
+  const pressure = [0, 0, 0, 0];
+  let pressureFrames = 0;
+  for (const row of rows) {
+    if (row.busy > 0) busyValues.push(row.busy);
+    if (row.pressure >= 0 && row.pressure <= 3) { pressure[row.pressure] += 1; pressureFrames += 1; }
+  }
+  const busy = busyValues.length ? { ...Percentiles(busyValues), frames: busyValues.length } : null;
+
+  // --- 渲染统计（逐 pass 的材质/程序切换、变体重算、实例数）---
+  const RenderTotals = (field) => Percentiles(rows.map((row) => {
+    const bag = row[field];
+    if (!bag) return 0;
+    let sum = 0;
+    for (const key in bag) if (key.indexOf("/") < 0) sum += bag[key];
+    return sum;
+  }));
+  const render = {
+    matSw: BucketStats("rsMat"),
+    progSw: BucketStats("rsProg"),
+    flips: BucketStats("rsFlip"),
+    instances: BucketStats("rsInst"),
+    totals: {
+      matSw: RenderTotals("rsMat"),
+      progSw: RenderTotals("rsProg"),
+      flips: RenderTotals("rsFlip"),
+      instances: RenderTotals("rsInst"),
+      calls: Percentiles(rows.map((row) => row.calls || 0)),
+      triangles: Percentiles(rows.map((row) => row.triangles || 0)),
+    },
+  };
+
+  // --- 计数器（每 COUNTER_EVERY 帧一组值，按下标对齐 counterNames）---
+  const counterRows = rows.filter((row) => row.ctr && row.ctr.length);
+  const counterCount = counterRows.reduce((n, row) => Math.max(n, row.ctr.length), 0);
+  const counters = [];
+  for (let i = 0; i < counterCount; i += 1) {
+    const values = [];
+    for (const row of counterRows) {
+      const value = row.ctr[i];
+      if (Number.isFinite(value)) values.push(value);
+    }
+    if (!values.length) continue;
+    const stat = Percentiles(values);
+    counters.push({ index: i, name: counterNames && counterNames[i] ? counterNames[i] : `#${i}`,
+      avg: stat.avg, min: stat.min, max: stat.max, last: values[values.length - 1] });
+  }
+
+  // --- 事件标记与阶段 ---
+  const marks = [];
+  const markCounts = {};
+  const stages = [];
+  for (const row of allRows) {
+    if (row.stage && stages[stages.length - 1] !== row.stage) stages.push(row.stage);
+    if (!row.marks) continue;
+    for (const [kind, label] of row.marks) {
+      marks.push({ id: row.id, kind, label });
+      markCounts[kind] = (markCounts[kind] || 0) + 1;
+    }
+  }
+  const drawCaptures = allRows.filter((row) => row.draws).map((row) => row.id);
+
   return {
     seconds: seconds === null ? Math.round(spanSeconds * 100) / 100 : seconds,
     frames: rows.length,
+    framesAll: allRows.length,
+    excluded,
+    states,
+    activeOnly: activeOnly && activeRows.length > 0,
+    unit: {
+      game: Percentiles(unitGame),
+      draw: Percentiles(unitDraw),
+      overlay: Percentiles(unitOverlay),
+      bound,
+      bottleneck,
+    },
+    hitch,
+    busy,
+    pressure: pressureFrames ? { frames: pressureFrames, levels: pressure } : null,
+    render,
+    counters,
+    marks,
+    markCounts,
+    stages,
+    drawCaptures,
     firstId: first ? first.id : null,
     lastId: last ? last.id : null,
     fps: frame.avg > 0 ? 1000 / frame.avg : 0,
@@ -244,7 +510,8 @@ function FrameToJson(record) {
     for (let i = 0; i < array.length; i += 1) out[i] = Math.round(array[i] * 1000) / 1000;
     return out;
   };
-  return { ...record, samples: Round(record.samples), gpuSegs: Round(record.gpuSegs), gpuSegMs: Round(record.gpuSegMs) };
+  return { ...record, samples: Round(record.samples), gpuSegs: Round(record.gpuSegs), gpuSegMs: Round(record.gpuSegMs),
+    ctr: Round(record.ctr) };
 }
 
 function FrameFromJson(frame) {
@@ -339,6 +606,89 @@ export class FrameProfiler {
     this._knownPrograms = new Set();
     this._memory = null;
     this._info = renderer ? renderer.info : null;
+
+    // --- 第四版 ---
+    // 帧状态与阶段（装配层每帧 SetFrameContext；阶段一变自动打一个 stage 标记）
+    this._state = "play";
+    this._stage = null;
+    // 事件标记：本帧攒的 [类别, 文字]，帧末挂进记录（帧与帧之间打的挂到下一帧）
+    this._marks = [];
+    // 计数器：[{ name, label, unit, group, get }]，下标就是录制里 ctr 数组的下标，只追加不删
+    this.counters = [];
+    // 环境（装配层给一个取值函数：画质档、内部分辨率、开着的特效……）；导出录制时取一次
+    this.environment = null;
+    // 渲染统计：包 renderBufferDirect，按当前 GPU 分段记
+    this._rbdOrig = null;
+    this._rbdWrapper = null;
+    this.rsMat = Object.create(null);    // 材质切换次数
+    this.rsProg = Object.create(null);   // 程序切换次数（useProgram 换人）
+    this.rsFlip = Object.create(null);   // 变体重算：同一材质这次画的 program 与上次不同
+    this.rsInst = Object.create(null);   // 实例数（InstancedMesh.count / BatchedMesh 多绘 / 实例化几何）
+    this._lastMaterialId = -1;
+    this._lastProgram = null;
+    // 抓一帧 draw 清单：RequestDrawCapture 置位，下一帧 BeginFrame 开始记、EndFrame 挂进记录
+    this._captureNext = false;
+    this._capturing = false;
+    this._drawList = null;
+    // 机器忙闲：Worker 探针最近一次「慢几倍」与系统 CPU 压力档（-1 = 不可用）
+    this.busy = 0;
+    this.busyMs = 0;
+    this.busyBaselineMs = 0;
+    this._busyWorker = null;
+    this._busyTimer = null;
+    this._busyUrl = null;
+    this._busyWarm = 0;
+    this.pressure = -1;
+    this.pressureAvailable = false;
+    this._pressureObserver = null;
+    // 汇总口径（面板的「只看游戏帧」「目标帧率」；0 = 按估出来的刷新率）
+    this.activeOnly = true;
+    this.targetFps = 0;
+  }
+
+  // -------------------------------------------------------------------------
+  // 第四版的装配接口（Script_Main 调）
+  // -------------------------------------------------------------------------
+
+  /**
+   * 每帧开工前报一次：这一帧是什么状态（FRAME_STATES 的 key）、第一关的哪个阶段。
+   * 关着时也记住最新值（便宜的两次赋值），打开剖析器的第一帧就有上下文。
+   */
+  SetFrameContext(state, stage = null) {
+    this._state = state || "play";
+    if (stage !== this._stage) {
+      const previous = this._stage;
+      this._stage = stage;
+      if (this.recording && previous !== null && stage) this.Mark("stage", String(stage));
+    }
+  }
+
+  /** 事件标记（帧图上的小旗、事件页的一行）。类别见 Script_ProfilerReport.MARK_KINDS。 */
+  Mark(kind, label = "") {
+    if (!this.recording) return;
+    if (this._marks.length < 64) this._marks.push([kind, String(label).slice(0, 120)]);
+  }
+
+  /**
+   * 登记一个计数器。`get()` 返回数字（取不到就返回 NaN / null）；同名重复登记只换取值函数
+   * （换关会重建系统，下标不能变）。
+   */
+  AddCounter(name, get, { label = name, unit = "", group = "" } = {}) {
+    const existing = this.counters.find((counter) => counter.name === name);
+    if (existing) { existing.get = get; existing.label = label; existing.unit = unit; existing.group = group; return; }
+    this.counters.push({ name, label, unit, group, get });
+  }
+
+  /** 计数器名表（与录制里每帧 ctr 的下标对齐）。 */
+  CounterMeta() {
+    return this.counters.map(({ name, label, unit, group }) => ({ name, label, unit, group }));
+  }
+
+  /** 抓下一帧的逐 draw 清单（帧末挂在那一帧记录的 `draws` 上）。 */
+  RequestDrawCapture() {
+    if (!this.on) return false;
+    this._captureNext = true;
+    return true;
   }
 
   // -------------------------------------------------------------------------
@@ -366,6 +716,7 @@ export class FrameProfiler {
     if (this._post) this._post.profiler = this;
     this._WrapShadow();
     this._WrapMatrix();
+    this._WrapDraws();
     try {
       this._observer = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) this._ltMs += entry.duration;
@@ -373,6 +724,8 @@ export class FrameProfiler {
       this._observer.observe({ type: "longtask" });
     } catch (error) { this._observer = null; /* Firefox/Safari 没有 longtask */ }
     this._ObserveLongAnimationFrames();
+    this._StartBusyMeter();
+    this._ObservePressure();
   }
 
   Disable() {
@@ -400,8 +753,24 @@ export class FrameProfiler {
       proto.traverse = this._matrixOrig.traverse;
       this._matrixOrig = null;
     }
+    if (this._rbdOrig) {
+      // 只在当前还是我们那一层时还原（Frame Debugger 抓帧期间会在外面再包一层，它收尾时也是同一条规矩）；
+      // 被别人包在里面的话留着无妨：剖析关着时它只是一次布尔判断就直通
+      if (this.renderer.renderBufferDirect === this._rbdWrapper) this.renderer.renderBufferDirect = this._rbdOrig;
+      this._rbdOrig = null;
+      this._rbdWrapper = null;
+    }
+    this._captureNext = false;
+    this._capturing = false;
+    this._drawList = null;
     if (this._observer) { this._observer.disconnect(); this._observer = null; }
     if (this._loafObserver) { this._loafObserver.disconnect(); this._loafObserver = null; }
+    this._StopBusyMeter();
+    if (this._pressureObserver) {
+      try { this._pressureObserver.disconnect(); } catch (error) { /* 已断开 */ }
+      this._pressureObserver = null;
+    }
+    this.pressure = -1;
   }
 
   // -------------------------------------------------------------------------
@@ -464,9 +833,45 @@ export class FrameProfiler {
       loafAvailable: this.source ? this.source.loafAvailable : !!this._loafObserver,
       historyMax: this.historyMax,
       names: this.names.slice(),
+      // 第四版：计数器名表（与每帧 ctr 下标对齐）、环境、忙闲基准
+      counters: this.source ? (this.source.counters || []) : this.CounterMeta(),
+      environment: this.source ? (this.source.environment || null) : this.Environment(),
+      busyBaselineMs: this.source ? (this.source.busyBaselineMs || 0) : this.busyBaselineMs,
       ...meta,
       frames: this.history.map(FrameToJson),
     };
+  }
+
+  /**
+   * 这台机器、这一局的环境（stat unit 旁边那一栏）：计时精度、刷新率、画质档、分辨率、
+   * 开着的特效。画质部分由装配层的 `environment()` 提供；剖析器只补自己知道的。
+   */
+  Environment() {
+    let extra = null;
+    try { extra = typeof this.environment === "function" ? this.environment() : null; } catch (error) { extra = null; }
+    const isolated = typeof crossOriginIsolated !== "undefined" ? !!crossOriginIsolated : false;
+    return {
+      ...extra,
+      crossOriginIsolated: isolated,
+      // 不隔离的页面 performance.now 只有 0.1 ms 粒度：单个 B/E 的 0.1 ms 不是真值，平均才可信
+      timerResolutionMs: this._TimerResolution(),
+      hardwareConcurrency: typeof navigator !== "undefined" ? navigator.hardwareConcurrency || null : null,
+      deviceMemoryGb: typeof navigator !== "undefined" ? navigator.deviceMemory || null : null,
+      pressureAvailable: this.pressureAvailable,
+      busyMeter: !!this._busyWorker,
+      jsHeap: !!this._memory,
+    };
+  }
+
+  _TimerResolution() {
+    if (typeof performance === "undefined") return null;
+    let best = Infinity;
+    let last = performance.now();
+    for (let i = 0; i < 2000 && best > 0.001; i += 1) {
+      const now = performance.now();
+      if (now > last) { best = Math.min(best, now - last); last = now; }
+    }
+    return Number.isFinite(best) ? Math.round(best * 10000) / 10000 : null;
   }
 
   /**
@@ -487,6 +892,11 @@ export class FrameProfiler {
       when: data.when || "",
       timerAvailable: !!data.timerAvailable,
       loafAvailable: !!data.loafAvailable,
+      // 第四版字段（1 版录制没有：计数器表空、环境未知）
+      counters: Array.isArray(data.counters) ? data.counters : [],
+      environment: data.environment || null,
+      busyBaselineMs: data.busyBaselineMs || 0,
+      version: data.version || 1,
     };
     this._gap = false;
     this.revision += 1;
@@ -583,6 +993,168 @@ export class FrameProfiler {
   }
 
   /**
+   * 渲染统计（UE stat rhi / scenerendering 那一类）：包一层 renderBufferDirect。
+   *
+   * three 每次换材质（`material.id` 变了）都要把这只材质的 uniform 整套重传一遍 ——
+   * 2026-10-14 那份 20 fps 录制里主画面 196 个 draw 用了 129 种材质，每个 draw 23 µs，
+   * 而预通道一种 override 材质画 183 个只要 6 µs。所以「材质切换」是渲染提交最该看的数。
+   * 「变体重算」= 同一只材质这一 draw 画出来用的 program 与上一次不同（蒙皮/实例/合批之间
+   * 共用的深度材质会来回翻），每次都要走一遍 getParameters。
+   *
+   * 开销：每个 draw 一次 WeakMap 查找 + 几次自增（约 0.2–0.4 µs），记在渲染提交里。
+   * renderBufferDirect 是 three 在构造函数里挂在实例上的，所以包实例、还实例。
+   */
+  _WrapDraws() {
+    const renderer = this.renderer;
+    if (!renderer || this._rbdOrig || typeof renderer.renderBufferDirect !== "function") return;
+    const original = renderer.renderBufferDirect;
+    const properties = renderer.properties;
+    if (!properties) return;
+    this._rbdOrig = original;
+    const profiler = this;
+    renderer.renderBufferDirect = this._rbdWrapper = function ProfiledRenderBufferDirect(camera, scene, geometry, material, object, group) {
+      if (!profiler.recording || !material) return original.call(this, camera, scene, geometry, material, object, group);
+      const props = properties.get(material);
+      const before = props.currentProgram;
+      const capture = profiler._capturing;
+      const started = capture ? performance.now() : 0;
+      const result = original.call(this, camera, scene, geometry, material, object, group);
+      profiler._NoteDraw(material, props, before, object, geometry, group, capture ? performance.now() - started : 0);
+      return result;
+    };
+  }
+
+  _NoteDraw(material, props, before, object, geometry, group, ms) {
+    const pass = this._segName || "misc";
+    if (material.id !== this._lastMaterialId) {
+      this._lastMaterialId = material.id;
+      this.rsMat[pass] = (this.rsMat[pass] || 0) + 1;
+    }
+    const program = props.currentProgram;
+    if (program !== this._lastProgram) {
+      this._lastProgram = program;
+      this.rsProg[pass] = (this.rsProg[pass] || 0) + 1;
+    }
+    if (before && program !== before) this.rsFlip[pass] = (this.rsFlip[pass] || 0) + 1;
+    const instances = object?.isInstancedMesh ? object.count
+      : object?.isBatchedMesh ? (object._multiDrawCount ?? 1)
+        : geometry?.isInstancedBufferGeometry ? geometry.instanceCount : 1;
+    this.rsInst[pass] = (this.rsInst[pass] || 0) + (instances || 0);
+    if (!this._capturing || !this._drawList || this._drawList.length >= 4000) return;
+    // 逐 draw 清单：只在被点名的那一帧记（要走父链找顶层子树，常态不做）
+    let top = object;
+    while (top && top.parent && top.parent !== this._scene) top = top.parent;
+    const index = geometry?.index;
+    const position = geometry?.attributes?.position;
+    let count = index ? index.count : (position ? position.count : 0);
+    if (group) count = Math.min(count, group.count);
+    if (geometry?.drawRange && Number.isFinite(geometry.drawRange.count)) count = Math.min(count, geometry.drawRange.count);
+    const kind = object?.isBatchedMesh ? "batch" : object?.isInstancedMesh ? "inst"
+      : object?.isSkinnedMesh ? "skin" : object?.isPoints ? "pts" : object?.isLine ? "line"
+        : geometry?.isInstancedBufferGeometry ? "instGeo" : "mesh";
+    this._drawList.push({
+      pass,
+      object: String(object?.name || object?.type || "?"),
+      top: top && top.parent === this._scene ? String(top.name || top.type) : "(不在场景树里)",
+      material: String(material.name || material.type),
+      materialType: material.type,
+      materialId: material.id,
+      kind,
+      tris: Math.round((count / 3) * Math.max(1, instances || 0)),
+      instances: instances || 0,
+      us: Math.round(ms * 1000),   // 微秒（不隔离的页面量化到 100 µs：单个不可信，合计可信）
+      matSwitch: this._drawList.length === 0 || this._drawList[this._drawList.length - 1].materialId !== material.id,
+      flip: !!(before && program !== before),
+    });
+  }
+
+  /**
+   * 机器忙闲探针。Worker 里跑一段固定的整数运算（不碰内存、不分配），耗时 ÷ 本机最快一次
+   * = 「比空闲时慢几倍」。放 Worker 而不是主线程：主线程跑 3 ms 会直接顶掉一帧；Worker 在别的
+   * 核上跑，系统被别的进程占满时它一样抢不到核、一样变慢，量的正是这件事。
+   * 最快记录存 localStorage（跨会话）：刚打开剖析器那一刻机器可能就已经很忙，只拿当次的最小值
+   * 当基准会把「一直很忙」读成「正常」。前三次是 JIT 预热，不算。
+   */
+  _StartBusyMeter() {
+    if (this._busyWorker || typeof Worker === "undefined" || typeof Blob === "undefined" || typeof URL === "undefined") return;
+    const source = `const N=${BUSY_ITERATIONS};onmessage=()=>{const t=performance.now();let x=1;`
+      + "for(let i=0;i<N;i++){x=(Math.imul(x,1664525)+1013904223)|0;}"
+      + "postMessage({ms:performance.now()-t,x});};";
+    try {
+      this._busyUrl = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+      this._busyWorker = new Worker(this._busyUrl);
+    } catch (error) {
+      this._busyWorker = null;
+      return;
+    }
+    this._busyWarm = 0;
+    this.busyBaselineMs = this._LoadBusyBaseline();
+    this._busyWorker.onmessage = (event) => this._OnBusySample(event.data && event.data.ms);
+    this._busyTimer = setInterval(() => { if (this._busyWorker) this._busyWorker.postMessage(0); }, BUSY_PERIOD_MS);
+    this._busyWorker.postMessage(0);
+  }
+
+  _StopBusyMeter() {
+    if (this._busyTimer) { clearInterval(this._busyTimer); this._busyTimer = null; }
+    if (this._busyWorker) { this._busyWorker.terminate(); this._busyWorker = null; }
+    if (this._busyUrl) { URL.revokeObjectURL(this._busyUrl); this._busyUrl = null; }
+    this.busy = 0;
+  }
+
+  _OnBusySample(ms) {
+    if (!(ms > 0)) return;
+    this._busyWarm += 1;
+    if (this._busyWarm <= 3) return;
+    this.busyMs = ms;
+    if (!(this.busyBaselineMs > 0) || ms < this.busyBaselineMs) {
+      this.busyBaselineMs = ms;
+      this._SaveBusyBaseline(ms);
+    }
+    this.busy = ms / this.busyBaselineMs;
+  }
+
+  _BusyKey() {
+    const ua = typeof navigator !== "undefined" ? `${navigator.userAgent}|${navigator.hardwareConcurrency}` : "";
+    return `${BUSY_BASELINE_KEY}|${ua}`;
+  }
+
+  _LoadBusyBaseline() {
+    try {
+      const value = Number(localStorage.getItem(this._BusyKey()));
+      return value > 0 ? value : 0;
+    } catch (error) { return 0; }
+  }
+
+  _SaveBusyBaseline(ms) {
+    try { localStorage.setItem(this._BusyKey(), String(ms)); } catch (error) { /* 隐私模式：只在本次会话里记 */ }
+  }
+
+  /**
+   * Compute Pressure（Chromium 125+）：系统整体 CPU 压力四档。它看的是整台机器，
+   * 所以能直接回答「是不是别的程序在占 CPU」。不支持或拒绝就留 -1。
+   */
+  _ObservePressure() {
+    this.pressure = -1;
+    this.pressureAvailable = false;
+    if (typeof PressureObserver !== "function") return;
+    try {
+      this._pressureObserver = new PressureObserver((records) => {
+        const last = records[records.length - 1];
+        const level = last ? PRESSURE_LEVELS.indexOf(last.state) : -1;
+        if (level >= 0) this.pressure = level;
+      });
+      this.pressureAvailable = true;
+      const pending = this._pressureObserver.observe("cpu", { sampleInterval: 1000 });
+      if (pending && typeof pending.catch === "function") {
+        pending.catch(() => { this.pressureAvailable = false; this.pressure = -1; });
+      }
+    } catch (error) {
+      this._pressureObserver = null;
+      this.pressureAvailable = false;
+    }
+  }
+
+  /**
    * long-animation-frame：浏览器自己报的那一段（渲染开始、样式布局开始、阻塞时长）。
    * 它是「整帧 − 主线程」那一行的唯一具名来源；不支持的浏览器就只剩减法。
    */
@@ -640,6 +1212,17 @@ export class FrameProfiler {
     for (const key in this.gpuCpu) this.gpuCpu[key] = 0;
     for (const key in this.gpuCalls) this.gpuCalls[key] = 0;
     for (const key in this.gpuTris) this.gpuTris[key] = 0;
+    for (const key in this.rsMat) this.rsMat[key] = 0;
+    for (const key in this.rsProg) this.rsProg[key] = 0;
+    for (const key in this.rsFlip) this.rsFlip[key] = 0;
+    for (const key in this.rsInst) this.rsInst[key] = 0;
+    this._lastMaterialId = -1;
+    this._lastProgram = null;
+    if (this._captureNext) {
+      this._captureNext = false;
+      this._capturing = true;
+      this._drawList = [];
+    }
     // 上一帧漏掉的 E()（提前 return 的分支）不许跨帧生效：留着的话下一次同名 E
     // 会把两帧之间的所有时间一口气记成一个几十毫秒的假桶。
     for (const key in this._open) this._open[key] = undefined;
@@ -727,6 +1310,25 @@ export class FrameProfiler {
     RollUpPaths(this.gpuCpu);
     RollUpPaths(this.gpuCalls);
     RollUpPaths(this.gpuTris);
+    RollUpPaths(this.rsMat);
+    RollUpPaths(this.rsProg);
+    RollUpPaths(this.rsFlip);
+    RollUpPaths(this.rsInst);
+    // 计数器每 COUNTER_EVERY 帧取一组（取值函数抛错/取不到记 NaN，不让一个坏计数器拖垮整帧）
+    let ctr = null;
+    if (this.counters.length && this.frameId % COUNTER_EVERY === 0) {
+      ctr = new Float64Array(this.counters.length);
+      for (let i = 0; i < this.counters.length; i += 1) {
+        let value = NaN;
+        try { value = Number(this.counters[i].get()); } catch (error) { value = NaN; }
+        ctr[i] = Number.isFinite(value) ? value : NaN;
+      }
+    }
+    const marks = this._marks.length ? this._marks.slice() : null;
+    this._marks.length = 0;
+    const draws = this._capturing ? this._drawList : null;
+    this._capturing = false;
+    this._drawList = null;
     const cpu = {};
     let bucketSum = 0;
     for (const key in this.cpu) {
@@ -750,8 +1352,20 @@ export class FrameProfiler {
     this.history.push({
       id: this.frameId,
       t: this._lastRaf,
+      t0: this._frameStart,   // 主线程开工的绝对时刻（JS 采样按它把函数样本归到桶）
       interval: this.interval,
       gap: this._gap,     // 暂停后的第一帧：间隔是暂停时长，不进帧率统计
+      state: this._state,
+      stage: this._stage,
+      busy: this.busy > 0 ? Math.round(this.busy * 1000) / 1000 : null,
+      pressure: this.pressure,
+      rsMat: Pack(this.rsMat),
+      rsProg: Pack(this.rsProg),
+      rsFlip: Pack(this.rsFlip),
+      rsInst: Pack(this.rsInst),
+      ctr,
+      marks,
+      draws,
       cpuMs,
       cpu,
       cpuCalls: Pack(this.cpuCalls),
@@ -828,6 +1442,9 @@ export class FrameProfiler {
   _StartSeg() {
     this._segName = this._stack.length ? this._stack[this._stack.length - 1] : "misc";
     this._segCpuStart = performance.now();
+    // 每一趟 renderer.render 开头 three 都把「当前材质」清掉，所以每段的第一个 draw 必然换材质
+    this._lastMaterialId = -1;
+    this._lastProgram = null;
     // 剖析期间 info.autoReset 已经是 false，所以这两个数在整帧里单调增，
     // 段内增量就是这一趟真的提交了多少 draw / 多少三角。
     if (this._info) {
@@ -979,10 +1596,17 @@ export class FrameProfiler {
     return -1;
   }
 
+  /**
+   * 汇总口径的公共参数：GPU 计时与 LoAF 可不可用、计数器名表、只算活动帧、目标帧率
+   * （面板可改；0 = 按估出来的刷新率）。
+   */
   _SummaryFlags() {
-    return this.source
-      ? { timerAvailable: this.source.timerAvailable, loafAvailable: this.source.loafAvailable }
-      : { timerAvailable: this.timerAvailable, loafAvailable: !!this._loafObserver };
+    const base = this.source
+      ? { timerAvailable: this.source.timerAvailable, loafAvailable: this.source.loafAvailable,
+        counterNames: (this.source.counters || []).map((counter) => counter.label || counter.name) }
+      : { timerAvailable: this.timerAvailable, loafAvailable: !!this._loafObserver,
+        counterNames: this.counters.map((counter) => counter.label || counter.name) };
+    return { ...base, activeOnly: this.activeOnly, targetFps: this.targetFps };
   }
 
   // -------------------------------------------------------------------------

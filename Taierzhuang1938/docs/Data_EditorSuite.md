@@ -701,9 +701,48 @@ node Taierzhuang1938/Script_EditorBlockoutCli.mjs kf <Level> <id>               
 与 Debug Rendering 同在 设置 → Debug工具，不接管相机、不暂停玩法 ——
 它量的就是战斗中的帧。面板里就是一颗开关（**没有页面内面板**，用户点名去掉的）：
 点开即 `FrameProfiler.Enable()`（内核在 `Script_Profiler.mjs`，表格排版在
-`Script_ProfilerReport.mjs`）并弹一个 `window.open` 独立窗口：帧时间条图、
-CPU 主线程逐系统、GPU 逐 pass、最近 10 秒最差一帧的桶归因、GC/长任务/堆分配速率、
-场景节点普查，以及「导出快照 JSON」「导出文本表格」（选中了就是选区的数，单帧另附时间轴）。
+`Script_ProfilerReport.mjs`，函数采样在 `Script_ProfilerSampler.mjs`）并弹一个
+`window.open` 独立窗口。
+
+#### 第四版（2026-10-14，对标 UE 的 stat unit / Unreal Insights）
+
+起因：用户录了一段 20 fps 的战斗，结论要靠五个外部取证脚本才拿得到 —— 哪一步慢、谁占着
+draw、机器是不是被别的会话的无头浏览器占着（那份录制同样的活单价是空闲时的 1.7–2.0 倍）、
+前 495 帧其实是暂停空转。用户原话「看起来很全其实不够细，也不够美观；对标 UE 的 Profiler」。
+外观跟游戏设置页同一套（暗色渐变底、象牙白、橄榄灰细线、左侧金边选中条、衬线标题），
+**不要**换通用编辑器皮。窗口从上到下：
+
+| 区 | 对标 UE | 内容 |
+|---|---|---|
+| 读数条 | `stat unit` | 帧率（1% low）、整帧、**逻辑**（Game）、**渲染提交**（Draw：`RENDER_BUCKETS` 那几个 CPU 桶）、GPU、浏览器侧、**机器忙闲**，最后一格写结论「卡在 CPU · 渲染提交 / CPU · 逻辑 / GPU」（逐帧投票：GPU 比整个主线程长算 GPU，否则主线程里逻辑与提交谁大算谁）。下面一行：刷新率与预算、超预算比例、掉 vsync、卡顿三档（≥50/100/250 ms）、帧状态、阶段 |
+| 帧图 | `stat unitgraph` | 根桶堆叠 + 浏览器侧 + GPU 折线 + **预算线**（按帧间隔估出来的刷新率，或工具条选的目标帧率）。顶道：红=顶出纵轴、白=GC、金=现编着色器、彩色=事件标记、竖线=阶段切换/自动降档。底道：机器忙闲（琥珀 ≥1.25 倍、红 ≥1.6 倍）。灰底=非游戏帧 |
+| 时间轴 | Insights Timing | 选中一帧时出现（同旧版） |
+| 计时页 | Insights Timers | CPU 树表（点 ▾ 折叠），avg / 中位 / p95 / max / 调用 / **单次**（桶耗时 ÷ 调用次数）/ 矩阵访问 / 分配 |
+| GPU 页 | `stat gpu` | 同旧版 |
+| 渲染统计页 | `stat scenerendering` / `stat rhi` | 逐 pass：draw、**材质切换**、程序切换、**变体重算**、实例、提交 CPU、**µs/draw** |
+| 计数器页 | Insights Counters | 敌我存活、阵亡、粒子实例、刚体、碰撞体、同时发声、着色器程序、几何体、纹理、JS 堆、机器忙闲；带曲线，点一行叠画到帧图上 |
+| 事件页 | Insights Bookmarks / Log | 阶段、爆炸、阵亡、补兵、自动降档、现编着色器、GC、≥50 ms 卡顿；按类别筛，点一行定位那一帧 |
+| Draw 清单页 | GPU Visualizer 逐 draw | 「抓下一帧」记每个 draw 的 pass / 物体 / 顶层子树 / 材质 / 三角 / 实例 / CPU µs，按 pass、子树、材质、物体分组 |
+| 函数采样页 | Insights CPU 采样 | 浏览器 JS Self-Profiling：自身耗时、含子调用、**按桶归属**（样本时刻落进哪一帧的哪一条 B/E）、按文件。要求页面响应头 `Document-Policy: js-profiling` —— 本地预览与测试服都发，GitHub Pages 发不了（线上这一页显示不可用）。浏览器采样间隔约 10–16 ms，要采够秒数 |
+| 场景普查 / 取证与导出 | `memreport` 一类 | 普查同旧版；取证页另列环境（显卡、画质档、内部/输出分辨率、自动降档级别、计时精度、CPU 线程、各探针可不可用） |
+
+内核新增（都只在 `Enable()` 期间装、`Disable()` 一件不剩地还原，`Script_ProfilerTest` 盯着）：
+- **帧状态与阶段**：`Script_Main` 每帧 `SetFrameContext(状态, 阶段)`（`ProfilerFrameState` 的分支顺序照抄 `LoopStep`）。
+  汇总默认只算 `play` / `cutscene`（`profiler.activeOnly`，面板「只看游戏帧」可关）；一帧活动帧都没有时退回全部帧。
+  1 版录制没有 state：主线程没干活、一个桶都没记的帧推断为暂停。阶段一变自动打一个 `stage` 标记。
+- **机器忙闲**：Worker 里每 0.5 s 跑一段固定整数运算（约 3–4 ms），耗时 ÷ 本机最快一次（存 localStorage，
+  跨会话）= 「慢几倍」；另读 Compute Pressure（系统 CPU 压力四档）。Worker 在别的核上跑，系统被占满时它一样抢不到核。
+- **渲染统计**：包实例上的 `renderer.renderBufferDirect`，按当前 GPU 分段数材质切换（`material.id` 变）、
+  程序切换、变体重算（同一材质这次画用的 program 跟上次不同）、实例数；`RequestDrawCapture()` 抓下一帧逐 draw 清单。
+  每个 draw 多约 0.2–0.4 µs，记在渲染提交里。
+- **计数器** `AddCounter(名字, 取值, { label, unit, group })`：每 `COUNTER_EVERY`（6）帧取一次，坏取值函数记 NaN 不拖垮整帧；
+  录制里每帧 `ctr` 按下标对齐 `counters` 名表（只追加不删）。登记在 `Script_Main`（剖析器构造之后）。
+- **事件** `Mark(类别, 文字)`：`Script_Main` 打阶段（自动）、爆炸（`onBlast`）、阵亡/补兵（存活人数差）、自动降档。
+- 每帧另记 `t0`（主线程开工的绝对时刻），JS 采样按它归桶。录制文件版本 2，另存 `counters` / `environment` /
+  `busyBaselineMs`（以及面板做过采样时的 `sampler` 结果）；1 版文件照读。
+
+命令行：`--print=<录制>` 默认也只算游戏帧，打出「结论（stat unit）」段；`--all-frames` 连暂停帧一起算，
+`--target-fps=60` 改预算线。录制里有 draw 清单的帧用 `--frame=<帧号>` 会一并打出来。
 
 #### 录制与回放（照 Unity Profiler）
 

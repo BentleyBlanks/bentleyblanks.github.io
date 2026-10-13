@@ -24,12 +24,13 @@ node Taierzhuang1938/Script_TzmShot.mjs --id Type89Tank         # TZM 三视图�
 ### 性能与调试
 
 ```powershell
-node Taierzhuang1938/Script_ProfileCli.mjs --view=train --frames=300 --label=train_after
+node Taierzhuang1938/Script_ProfileCli.mjs --view=bunker --frames=300 --label=bunker_after
 node Taierzhuang1938/Script_ProfileCli.mjs --view=front --live --seconds=8   # 真 rAF：帧率与「浏览器侧」只有这条可信
 node Taierzhuang1938/Script_ProfileCli.mjs --stage=14 --view=front --cpuprofile
 node Taierzhuang1938/Script_ProfileCli.mjs --print=Taierzhuang1938/_shots/Profile/Profile_x.json
 node Taierzhuang1938/Script_ProfileCli.mjs --view=front --live --seconds=8 --record --label=front   # 另存逐帧录制 Profile_front.rec.json
 node Taierzhuang1938/Script_ProfileCli.mjs --print=Taierzhuang1938/_shots/Profile/Profile_front.rec.json --frame=worst   # 单帧表 + 时间轴；--range=a-b 汇总一段
+node Taierzhuang1938/Script_ProfileCli.mjs --print=<面板保存的录制.json>   # 用户发来的录制：先看「结论（stat unit）」段与机器忙闲；--all-frames 连暂停帧一起算
 node Taierzhuang1938/Script_FrameProfileTest.mjs   # 整帧 CPU/GPU 剖析：逐项消融 GI/SSAO/阴影/MSAA
 node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=x   # 第一关三机位帧取证（CPU/GPU 分桶、GC、日军位移）
 node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --strict    # 同 §17.1 口径：3394×1348/high、dt=0、逐 pass GPU/submit/draw 归账（可加 --ablate= / --root=）
@@ -42,21 +43,26 @@ node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --pixel=x,y --pass-im
 **命令行剖析 `Script_ProfileCli.mjs`**：起一次浏览器、摆好机位、开剖析器跑一段，
 把**和编辑器面板一模一样的那几张表**打到终端上（整帧/主线程/GPU 抬头、CPU 分层表
 含矩阵访问与堆分配、GPU 逐 pass 含提交 CPU/draw/三角、最差帧取证、事件、场景普查）。
-参数：`--view=train|front|frontEast|x,y,z,yaw,pitch`（三个预设与
+参数：`--view=bunker|front|frontEast|x,y,z,yaw,pitch`（三个预设与
 `Script_FirstLevelFrameProbe` 共用 `Script_FrameProbeViews.mjs`）、`--stage=<编号或 id>`
 （第一关阶段跳转）、`--url=a=1&b=2`（追加查询串）、`--frames=300` 或 `--live --seconds=5`、
 `--quality/--width/--height`、`--label/--json`、`--print=<文件>`（只排表，不起浏览器；
 面板的「导出快照 JSON」也能读）、`--cpuprofile`（CDP 采样，另打自身耗时前 40）、
 `--record`（另存整条逐帧录制 `.rec.json`，面板「加载录制」能读回来逐帧翻）；
 `--print=<录制文件>` 再加 `--frame=<帧号|worst>`（这一帧的表 + 最长的 B/E 实例与 GPU 分段）
-或 `--range=a-b`（只汇总这一段），口径与面板选帧 / 拖选同一个 `SummarizeFrames`。
+或 `--range=a-b`（只汇总这一段），口径与面板选帧 / 拖选同一个 `SummarizeFrames`；
+默认只算「游戏中 + 过场」帧（`--all-frames` 全算），`--target-fps=60` 改预算线。
+**读用户的录制先看「结论」段**：卡在哪一边、预算与卡顿、**机器忙闲**（慢 1.6 倍以上 = 别的程序在抢 CPU，
+毫秒数整体被放大，先排除这一条再谈优化；2026-10-14 那份 20 fps 录制一半的损失就是这个）。
 结果落 `_shots/Profile/`（忽略目录）。
 **`--frames` 那条路每帧要让出一次 event-loop**（否则 GPU 计时查询收不回来），
 所以整帧间隔不是真帧率；要看帧率用 `--live`。
 冒烟 `Script_ProfileCliTest`（tier 2 的 perf 档，不进自动门禁）。
 
 **实机常驻剖析器**：编辑器面板「调试 → Profiler」弹独立窗口，玩法照跑
-（CPU 逐系统含子桶 / GPU 逐 pass 含 draw 与三角 / 掉帧取证 / GC / 场景节点普查），
+（第四版对标 UE stat unit / Insights：读数条写「卡在哪」、预算线、机器忙闲、渲染统计〔材质切换/变体重算/µs per draw〕、
+计数器、事件标记、抓一帧 draw 清单、游戏内 JS 函数采样〔`Script_ProfilerSampler`，要 `Document-Policy: js-profiling`，本地预览有、线上没有〕；
+CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查），
 照 Unity Profiler 做了**录制与回放**：暂停冻住环形缓冲、点帧图选一帧看这一帧的表与时间轴
 （每一对 B/E 一条、GPU 分段一行）、拖选一段看 avg/p95/max、逐帧/跳尖峰、存读录制 JSON。
 **没有页面内面板**（用户点名去掉的）。内核 `Script_Profiler.mjs` +

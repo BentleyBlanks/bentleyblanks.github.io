@@ -180,6 +180,27 @@ try {
       && T.profiler.names.includes("ai/act"), `samples=${newest.samples?.length}`);
     Check("记录里有 GPU 分段时间轴", !!newest.gpuSegs && newest.gpuSegs.length > 0);
     Check("记录里有逐桶调用次数", (newest.cpuCalls?.["ai/act"] || 0) > 0, `ai/act=${newest.cpuCalls?.["ai/act"]}`);
+    // --- 第四版：帧状态 / 渲染统计 / 计数器 / draw 清单 / 面板页签 ---
+    Check("renderBufferDirect 已被包", T.renderer.renderBufferDirect.name === "ProfiledRenderBufferDirect");
+    Check("记录里有帧状态", typeof newest.state === "string" && newest.state.length > 0, `state=${newest.state}`);
+    Check("记录里有逐 pass 材质切换", !!newest.rsMat && Object.values(newest.rsMat).some((value) => value > 0),
+      JSON.stringify(newest.rsMat));
+    Check("记录里有 t0（采样归属用）", Number.isFinite(newest.t0) && newest.t0 > 0);
+    Check("计数器登记了", T.profiler.counters.length >= 8, `n=${T.profiler.counters.length}`);
+    T.StepFrames(12);
+    Check("计数器隔帧取值", T.profiler.history.some((row) => row.ctr && row.ctr.length === T.profiler.counters.length));
+    T.profiler.RequestDrawCapture();
+    T.StepFrames(1);
+    const captured = T.profiler.history[T.profiler.history.length - 1];
+    Check("抓下一帧的 draw 清单", Array.isArray(captured.draws) && captured.draws.length > 0
+      && captured.draws.every((draw) => draw.pass && draw.material && draw.top), `n=${captured.draws?.length}`);
+    Check("draw 清单之后不再抓", !T.profiler.history[T.profiler.history.length - 1].draws || T.profiler._capturing === false);
+    const liveSummary = T.profiler.Summary(30);
+    Check("汇总有 stat unit 与卡顿", !!liveSummary.unit && !!liveSummary.hitch && liveSummary.hitch.vsyncMs > 0);
+    Check("汇总有渲染统计", !!liveSummary.render && Object.keys(liveSummary.render.matSw).length > 0);
+    for (const tab of ["render", "counters", "events", "draws", "sampler", "census", "export", "gpu", "cpu"]) panel.SetTab(tab);
+    Check("页签全部能切、最后停在计时页", panel.tab === "cpu" && panel.ui.pages.get("cpu").classList.contains("on"));
+    Check("读数条写出结论", panel.ui.cards.verdict.v.textContent.length > 1, panel.ui.cards.verdict.v.textContent);
     panel.TogglePause();
     Check("录制键暂停：钩子还在、不再记录", T.profiler.on && !T.profiler.recording
       && proto.updateMatrixWorld.name === "ProfiledUpdateMatrixWorld");
@@ -234,6 +255,9 @@ try {
     Check("updateWorldMatrix 已还原", proto.updateWorldMatrix.name !== "ProfiledUpdateWorldMatrix");
     Check("traverse 已还原", proto.traverse.name !== "ProfiledTraverse");
     Check("LoAF 观察者已断开", T.profiler._loafObserver === null);
+    Check("renderBufferDirect 已还原", T.renderer.renderBufferDirect.name !== "ProfiledRenderBufferDirect");
+    Check("忙闲探针 Worker 已停", T.profiler._busyWorker === null && T.profiler._busyTimer === null);
+    Check("CPU 压力观察者已断开", T.profiler._pressureObserver === null);
     const lengthBefore = T.profiler.history.length;
     T.StepFrames(5);
     Check("关掉后不再记帧", T.profiler.history.length === lengthBefore);

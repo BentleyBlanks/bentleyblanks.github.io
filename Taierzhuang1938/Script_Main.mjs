@@ -561,6 +561,79 @@ const frameDebugger = new FrameDebugger(renderer, { post, profiler,
 // StepFrames（出图 / 测试 / 过场手动步进）一律不喂 —— 那些帧的间隔不是帧率。
 const autoQuality = new AutoQuality();
 
+// --- 剖析器第四版的接线（Script_Profiler 文件头「第四版」）---------------------------
+// 环境：录制文件里写清这一局是什么画质、什么分辨率、开着哪些特效 —— 2026-10-14 那份录制
+// 里 SSR/TAA/体积雾都没在跑、内部分辨率被压到 0.85，旧版录制看不出来，只能倒推。
+profiler.environment = () => {
+  const flags = {};
+  if (typeof graphics !== "undefined" && graphics) {
+    for (const [key, value] of Object.entries(graphics)) {
+      if (typeof value === "number" || typeof value === "boolean" || typeof value === "string") flags[key] = value;
+    }
+  }
+  const gl = renderer.getContext();
+  const debug = gl.getExtension("WEBGL_debug_renderer_info");
+  return {
+    gpu: debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+    quality: post?.quality ?? QUALITY,
+    output: `${renderer.domElement.width}x${renderer.domElement.height}`,
+    internal: post ? `${post.width}x${post.height}` : null,
+    window: `${window.innerWidth}x${window.innerHeight}`,
+    dpr: window.devicePixelRatio || 1,
+    autoQuality: { enabled: autoQuality.enabled, step: autoQuality.step, scale: autoQuality.scale },
+    graphics: flags,
+  };
+};
+// 计数器（Insights 的 Counters）：每 COUNTER_EVERY 帧取一次。取值函数读的是模块级的
+// let 绑定，换关重建系统之后自动读到新实例；系统还没建好时返回 NaN（面板显示「—」）。
+{
+  const Count = (list, test) => { if (!list) return NaN; let n = 0; for (const item of list) if (test(item)) n += 1; return n; };
+  profiler.AddCounter("ai.nra", () => Count(ai?.soldiers, (s) => s.side === "nra" && s.alive), { label: "我方存活", group: "人物" });
+  profiler.AddCounter("ai.ija", () => Count(ai?.soldiers, (s) => s.side === "ija" && s.alive), { label: "敌方存活", group: "人物" });
+  profiler.AddCounter("ai.dead", () => Count(ai?.soldiers, (s) => !s.alive), { label: "阵亡（还在场上）", group: "人物" });
+  profiler.AddCounter("vfx.instances", () => {
+    const particles = vfx?.particles?.renderer;
+    if (!particles) return NaN;
+    let n = 0;
+    for (const stream of particles.streams?.values?.() || []) n += stream.geometry?.instanceCount || 0;
+    for (const pool of Object.values(particles.pools || {})) n += pool.geometry?.instanceCount || 0;
+    for (const pool of particles.volumes?.pools?.values?.() || []) n += pool.geometry?.instanceCount || 0;
+    return n;
+  }, { label: "粒子实例", group: "特效" });
+  profiler.AddCounter("physics.bodies", () => physics?.world?.bodies?.len?.() ?? NaN, { label: "刚体", group: "物理" });
+  profiler.AddCounter("physics.colliders", () => physics?.world?.colliders?.len?.() ?? NaN, { label: "碰撞体", group: "物理" });
+  profiler.AddCounter("audio.voices", () => audio?.activeVoices?.size ?? NaN, { label: "同时发声", group: "声音" });
+  profiler.AddCounter("render.programs", () => renderer.info.programs?.length ?? NaN, { label: "着色器程序", group: "渲染" });
+  profiler.AddCounter("render.geometries", () => renderer.info.memory.geometries, { label: "几何体", group: "渲染" });
+  profiler.AddCounter("render.textures", () => renderer.info.memory.textures, { label: "纹理", group: "渲染" });
+  profiler.AddCounter("js.heapMb", () => (performance.memory ? performance.memory.usedJSHeapSize / 1048576 : NaN),
+    { label: "JS 堆", unit: "MB", group: "内存" });
+  profiler.AddCounter("machine.busy", () => (profiler.busy > 0 ? profiler.busy : NaN), { label: "机器忙闲（慢几倍）", unit: "×", group: "机器" });
+}
+/** 这一帧是什么状态（剖析器帧图的灰底、汇总只算「游戏中 + 过场」）。分支顺序照抄 LoopStep。 */
+function ProfilerFrameState() {
+  if (document.hidden) return "hidden";
+  if (state.warming || !state.ready) return "loading";
+  if (menu?.open && menu.mode === "failure") return "failure";
+  if (UiCapturing()) return "editor";
+  if (state.menu && menu && menu.live) return "menu";
+  if (cutscene && cutscene.Playing) return "cutscene";
+  if (!state.running) return "paused";
+  return "play";
+}
+let profilerAlive = -1;
+/** 每帧开工前给剖析器报上下文；只在剖析器开着时做事（关着时一次布尔检查）。 */
+function ProfilerFrameContext() {
+  if (!profiler.on) return;
+  profiler.SetFrameContext(ProfilerFrameState(), missionRuntime?.flow?.stage?.id ?? null);
+  // 阵亡/补兵：存活人数一掉就打一面小旗（逐兵挂钩要改 Soldier，这里按人数差就够定位）
+  if (!profiler.recording || !ai) return;
+  const alive = ai.aliveCount;
+  if (profilerAlive >= 0 && alive < profilerAlive) profiler.Mark("death", `阵亡 ${profilerAlive - alive}`);
+  else if (profilerAlive >= 0 && alive > profilerAlive) profiler.Mark("spawn", `补兵 +${alive - profilerAlive}`);
+  profilerAlive = alive;
+}
+
 /**
  * 画质旋钮。
  *
@@ -1732,6 +1805,7 @@ async function Boot() {
     // 爆炸也是刺激（docs/Data_EnemyAi.md §4.1）。`hurtSide` 是**挨炸的那一方**，
     // 声源那一方是它的反面 —— 感知层按 side 过滤「同阵营的响动不算敌情」。
     onBlast: (e) => {
+      if (e) profiler.Mark("explosion", e.kind || "爆炸");
       if (!ai || !e) return;
       // 投掷者本人（玩家 / 某个兵）要跟着传：没有 ref 的那条记忆只是一个坐标，
       // 大脑接不回成目标，人听见炸响也只会原地发呆。
@@ -9674,6 +9748,7 @@ function StepFrames(count = 1, dt = 1 / 60, render = true) {
   if (frameDebugger.frozen) return;
   if (frameDebugger.state === "armed" && render && !state.warming) { RenderScene(0); return; }
   for (let i = 0; i < count; i += 1) {
+    ProfilerFrameContext();
     profiler.BeginFrame(performance.now());
     // 编辑器接管时必须压过主菜单。否则从菜单打开场景编辑器后，
     // StepFrames 只会推进菜单运镜，换切片后编辑器无法把地形/碰撞层接到新场景。
@@ -9737,9 +9812,13 @@ function Loop(now) {
   // 混进窗口只会让阶梯在进出菜单时来回跳。跳过的那一帧留下的长间隔会被
   // maxIntervalMs 自己滤掉，不用额外清状态。
   if (state.running && !state.menu && !state.warming) {
-    if (autoQuality.Frame(now)) ApplyGraphics();
+    if (autoQuality.Frame(now)) {
+      ApplyGraphics();
+      profiler.Mark("quality", `自动降档 → 第 ${autoQuality.step} 级（分辨率 ×${autoQuality.scale}）`);
+    }
   }
   // 剖析帧边界包在分支外面：LoopStep 的三条早退路径（菜单帧 / 停摆）也各是一帧。
+  ProfilerFrameContext();
   profiler.BeginFrame(now);
   LoopStep(dt);
   profiler.EndFrame();

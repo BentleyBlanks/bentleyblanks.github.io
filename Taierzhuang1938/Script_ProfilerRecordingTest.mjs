@@ -7,7 +7,9 @@
 //   3. SummaryRange 单帧 / 一段与 Summary 同一口径；FindSpike 找得到手造的尖峰；
 //   4. ExportRecording → JSON → ImportRecording 往返后汇总不变，导入即停录，
 //      接着录会先清掉导入的帧；缓冲缩小从最老的一头丢；
-//   5. 显示层：调用次数列、单帧时间轴文本；命令行 --print=<录制> --frame / --range 能读。
+//   5. 显示层：调用次数列、单帧时间轴文本；命令行 --print=<录制> --frame / --range 能读；
+//   6. 第四版：帧状态过滤、阶段/事件标记、计数器、stat unit 结论、刷新率与卡顿、1 版录制推断、
+//      JS 采样按桶归属、draw 清单分组、命令行 --all-frames。
 //
 // 用法：node Taierzhuang1938/Script_ProfilerRecordingTest.mjs
 
@@ -16,8 +18,9 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { FrameProfiler, RECORDING_FORMAT, IsLiveFrame, SummarizeFrames } from "./Script_Profiler.mjs";
+import { FrameProfiler, RECORDING_FORMAT, IsLiveFrame, IsActiveFrame, SummarizeFrames, EstimateVsyncMs } from "./Script_Profiler.mjs";
 import { CpuRows, FormatSnapshot, FormatFrameTimeline, DecodeSamples } from "./Script_ProfilerReport.mjs";
+import { FoldTrace } from "./Script_ProfilerSampler.mjs";
 
 const project = path.dirname(fileURLToPath(import.meta.url));
 let failed = 0;
@@ -183,6 +186,103 @@ Check("命令行 --range 只汇总那一段", rangeRun.status === 0 && rangeRun.
 const missRun = spawnSync(process.execPath, [cli, `--print=${file}`, "--frame=1"], { encoding: "utf8" });
 Check("命令行要一帧不在录制里时报错退出", missRun.status === 2);
 fs.rmSync(tmp, { recursive: true, force: true });
+
+// --- 6. 第四版：帧状态 / 阶段 / 计数器 / 事件 / stat unit / 卡顿 / 旧录制推断 / 采样归属 ---
+profiler.Clear();
+let counterValue = 0;
+profiler.AddCounter("unit.value", () => (counterValue += 1), { label: "单元计数", group: "测试" });
+profiler.AddCounter("unit.broken", () => { throw new Error("坏计数器"); }, { label: "坏的" });
+profiler.SetFrameContext("play", "MachineGun");
+for (let i = 0; i < 12; i += 1) StepFrame(10);
+profiler.SetFrameContext("paused", "MachineGun");
+for (let i = 0; i < 6; i += 1) StepFrame(10);
+profiler.SetFrameContext("play", "Tank");
+profiler.Mark("explosion", "grenade");
+for (let i = 0; i < 12; i += 1) StepFrame(i === 5 ? 120 : 10);
+const v4 = profiler.Summary(60);
+Check("帧状态记进每一帧", profiler.history.some((row) => row.state === "paused") && profiler.history.some((row) => row.state === "play"));
+Check("汇总只算游戏中的帧（暂停帧排除）", v4.excluded === 6 && v4.states.paused === 6 && v4.frames === 24,
+  `frames=${v4.frames} excluded=${v4.excluded} states=${JSON.stringify(v4.states)}`);
+Check("阶段一变自动打 stage 标记", v4.marks.some((mark) => mark.kind === "stage" && mark.label === "Tank"),
+  JSON.stringify(v4.marks));
+Check("Mark 进了事件表", v4.marks.some((mark) => mark.kind === "explosion" && mark.label === "grenade"));
+Check("阶段序列", v4.stages.join(",") === "MachineGun,Tank", v4.stages.join(","));
+const ctrRows = profiler.history.filter((row) => row.ctr);
+Check("计数器隔 COUNTER_EVERY 帧取一次", ctrRows.length >= 4 && ctrRows.length <= 6, `ctr 帧=${ctrRows.length}`);
+Check("坏计数器记 NaN、不拖垮整帧", ctrRows.every((row) => Number.isNaN(row.ctr[1])));
+Check("计数器汇总有 avg/min/max", v4.counters.some((row) => row.name === "单元计数" && row.max > row.min),
+  JSON.stringify(v4.counters));
+Check("stat unit：渲染提交 = post 桶", Math.abs(v4.unit.draw.avg - v4.cpu.post.avg) < 1e-6,
+  `draw=${v4.unit.draw.avg} post=${v4.cpu.post.avg}`);
+Check("stat unit 给出结论（没有 GPU 读数时在 CPU 两边里选）", ["game", "draw"].includes(v4.unit.bottleneck), v4.unit.bottleneck);
+Check("100 Hz 的帧间隔估出 10 ms 周期", Math.abs(v4.hitch.vsyncMs - 10) < 1e-6, `vsync=${v4.hitch.vsyncMs}`);
+Check("120 ms 的那一帧记一次 ≥100 ms 卡顿", v4.hitch.major === 1, JSON.stringify(v4.hitch));
+Check("掉 vsync 计数（120 ms = 掉 11 个）", v4.hitch.missedVsync >= 11, `missed=${v4.hitch.missedVsync}`);
+Check("60 Hz 间隔估出 16.7 ms", Math.abs(EstimateVsyncMs(Array.from({ length: 60 }, (_, i) => (i % 5 ? 16.7 : 33.3))) - 1000 / 60) < 0.01);
+Check("目标帧率覆盖预算线", SummarizeFrames(profiler.history, { targetFps: 60 }).hitch.budgetMs === 1000 / 60);
+const report = await import("./Script_ProfilerReport.mjs");
+Check("结论句子", report.UnitLine(v4).startsWith("卡在 CPU"), report.UnitLine(v4));
+Check("卡顿句子", report.HitchLine(v4).includes("100 Hz"), report.HitchLine(v4));
+Check("帧状态句子", report.StateLine(v4).includes("暂停 6"), report.StateLine(v4));
+Check("文本快照有「结论（stat unit）」段", FormatSnapshot({ label: "v4", summary: v4 }).includes("结论（stat unit）"));
+// v2 录制往返：state / stage / ctr / marks / 计数器名表
+const v2 = JSON.parse(JSON.stringify(profiler.ExportRecording({ label: "v2" })));
+Check("录制版本 2、带计数器名表", v2.version === 2 && v2.counters[0].label === "单元计数");
+const replay2 = new FrameProfiler(null);
+replay2.ImportRecording(v2, "v2.json");
+const after2 = replay2.Summary(60);
+Check("v2 往返后状态过滤与计数器一致", after2.excluded === 6 && after2.counters.some((row) => row.name === "单元计数"),
+  `excluded=${after2.excluded}`);
+// 1 版录制没有 state：主线程没干活、一个桶都没有的帧推断为暂停
+const v1Frames = [
+  ...Array.from({ length: 10 }, (_, i) => ({ id: i + 1, t: i * 10, interval: 10, cpuMs: 0, cpu: {}, other: 0 })),
+  ...Array.from({ length: 10 }, (_, i) => ({ id: i + 11, t: 100 + i * 40, interval: 40, cpuMs: 30, cpu: { post: 20, ai: 8 }, other: 2 })),
+];
+const v1 = SummarizeFrames(v1Frames);
+Check("旧录制：空转帧推断为暂停并排除", v1.excluded === 10 && v1.frames === 10 && v1.unit.bottleneck === "draw",
+  `excluded=${v1.excluded} bottleneck=${v1.unit.bottleneck}`);
+Check("旧录制：IsActiveFrame 对空转帧为假", !IsActiveFrame(v1Frames[0]) && IsActiveFrame(v1Frames[15]));
+// JS 采样的按桶归属：样本时刻落进哪一帧、哪一条 B/E
+const sampleNames = ["ai", "ai/act", "post"];
+const fakeFrames = [{ id: 1, t0: 1000, cpuMs: 20,
+  samples: Float32Array.from([0, 0, 0, 8, 1, 1, 1, 5, 2, 0, 10, 9]) }];
+const trace = {
+  resources: ["http://x/Taierzhuang1938/Script_Ai.mjs?v=1", "http://x/three.module.js"],
+  frames: [{ name: "Act", resourceId: 0, line: 10 }, { name: "projectObject", resourceId: 1, line: 20 }, { name: "Update", resourceId: 0, line: 5 }],
+  stacks: [{ frameId: 2 }, { frameId: 0, parentId: 0 }, { frameId: 1 }],
+  samples: [
+    { timestamp: 1002, stackId: 1 },   // ai/act 里（深度 1 赢过 ai）
+    { timestamp: 1007, stackId: 0 },   // ai 自身
+    { timestamp: 1012, stackId: 2 },   // post
+    { timestamp: 1025 },               // 帧外、非 JS
+  ],
+};
+const folded = FoldTrace(trace, { frames: fakeFrames, names: sampleNames });
+const bucketOf = (key) => folded.buckets.find((bucket) => bucket.key === key);
+Check("采样归属：ai/act 最深的那一条赢", bucketOf("ai/act")?.samples === 1 && bucketOf("ai")?.samples === 1
+  && bucketOf("post")?.samples === 1, JSON.stringify(folded.buckets.map((b) => [b.key, b.samples])));
+Check("采样：自身耗时表头是 Act/Update/projectObject", folded.self.length === 3 && folded.total.some((row) => row.name === "Update" && row.samples === 2));
+Check("采样：非 JS 样本单独计数", folded.idleSamples === 1);
+Check("采样文本可排", report.FormatSampler(folded).includes("按桶归属"));
+// 逐 draw 清单分组
+const draws = [
+  { pass: "main", top: "A", material: "m1", materialType: "MeshStandardMaterial", materialId: 1, tris: 10, instances: 1, us: 20, matSwitch: true },
+  { pass: "main", top: "A", material: "m1", materialType: "MeshStandardMaterial", materialId: 1, tris: 10, instances: 1, us: 5, matSwitch: false },
+  { pass: "prepass", top: "B", material: "m2", materialType: "ShaderMaterial", materialId: 2, tris: 5, instances: 3, us: 4, matSwitch: true },
+];
+const byTop = report.GroupDraws(draws, "top");
+Check("draw 清单按子树分组", byTop[0].key === "A" && byTop[0].draws === 2 && byTop[0].materials === 1 && byTop[0].matSwitches === 1);
+Check("draw 清单文本可排", report.FormatDrawCapture({ id: 7, draws }).includes("顶层子树"));
+// 命令行读 v2 录制：结论段与「排除暂停帧」
+const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "profiler-v2-"));
+const file2 = path.join(tmp2, "Profile_v2.rec.json");
+fs.writeFileSync(file2, JSON.stringify(v2));
+const v2Run = spawnSync(process.execPath, [cli, `--print=${file2}`], { encoding: "utf8" });
+Check("命令行读 v2 录制打出结论与帧状态", v2Run.status === 0 && v2Run.stdout.includes("结论（stat unit）")
+  && v2Run.stdout.includes("排除 6 帧"), `code=${v2Run.status} ${v2Run.stderr.slice(0, 200)}`);
+const allRun = spawnSync(process.execPath, [cli, `--print=${file2}`, "--all-frames"], { encoding: "utf8" });
+Check("--all-frames 连暂停帧一起算", allRun.status === 0 && allRun.stdout.includes("全部 30 帧"), allRun.stdout.split("\n").find((l) => l.includes("帧：")) || "");
+fs.rmSync(tmp2, { recursive: true, force: true });
 
 // --- 关 ---
 profiler.Disable();

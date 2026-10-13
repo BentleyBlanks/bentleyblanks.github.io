@@ -15,7 +15,8 @@
 //   3. 它会走浏览器缓存，改完刷新看到的还是旧的。这里一律 no-store。
 //
 // 响应头刻意跟线上保持一致（**不**发 COOP/COEP）：本地能跑而线上跑不了的东西，
-// 本地预览就白做了。
+// 本地预览就白做了。唯一例外是 HTML 带 `Document-Policy: js-profiling`：只打开浏览器的
+// JS 采样接口给开发工具用（滕县 Profiler 的「采样」页），不改变游戏本身能做什么。
 //
 // 三个只在回环上可写的本地口（线上 Pages 没有，编辑器自动退化）：
 //   /__tuning/*   敌军 AI 编辑器把滑杆的数存回 Data_Tuning_*.mjs（docs/Data_EnemyAi.md §14.3）；
@@ -110,6 +111,10 @@ function SendFile(request, response, filePath, stat) {
     "Cache-Control": "no-store",
     "Accept-Ranges": "bytes",
   };
+  // 唯一一处与线上不同的响应头：只开 JS 采样接口（滕县 Profiler 面板「采样」页的
+  // `new Profiler()`，见 Taierzhuang1938/Script_ProfilerSampler.mjs）。它不改变页面能做什么，
+  // 只是让开发期能在游戏里做函数级采样；Pages 发不了这个头，线上那一页显示「不可用」。
+  if (/\.html?$/i.test(filePath)) headers["Document-Policy"] = "js-profiling";
   const range = request.headers.range;
   if (range) {
     const match = /^bytes=(\d*)-(\d*)$/.exec(range);
