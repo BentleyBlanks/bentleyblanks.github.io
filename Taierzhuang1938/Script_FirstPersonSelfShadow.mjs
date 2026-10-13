@@ -13,6 +13,7 @@
 import * as THREE from "three";
 // 视模那一份材质要重挂一次间接光补丁（去掉 SSR，见 CloneOwnedMaterial 的账）。
 import { ApplyPatches, IndirectLightingPatches, PatchesOf, SSR_PATCH_KEY } from "./Script_MaterialPatches.mjs";
+import { OverrideVariants } from "./Script_OverrideVariants.mjs";
 
 export const FIRST_PERSON_SHADOW_LAYER = 29;
 
@@ -211,6 +212,9 @@ export class FirstPersonSelfShadow {
       blending: THREE.NoBlending,
     });
     this.depthMaterial.name = "FirstPersonSelfShadowDepthMaterial";
+    // 手臂（蒙皮）与枪（普通网格）共用一只覆盖材质时，这一趟每帧要翻两次程序（getProgram）：蒙皮件一份、
+    // 普通件一份（Script_OverrideVariants 抬头）。MeshDepthMaterial 没有自定义 uniform，直接 clone。
+    this.depthVariants = new OverrideVariants(this.depthMaterial, (base) => base.clone());
 
     const e = this.extent;
     this.shadowCamera = new THREE.OrthographicCamera(-e, e, e, -e, 0.02, 6.0);
@@ -453,7 +457,7 @@ ${SHADOW_FRAGMENT_GLSL}`)
       renderer.setRenderTarget(this.target);
       renderer.setClearColor(0xffffff, 1);
       renderer.clear(true, true, true);
-      renderer.render(depthScene, this.shadowCamera);
+      this.depthVariants.Run(renderer, () => renderer.render(depthScene, this.shadowCamera));
       this.renderedFrames += 1;
     } finally {
       shadowMap.needsUpdate = previousShadowNeedsUpdate;
@@ -498,6 +502,7 @@ ${SHADOW_FRAGMENT_GLSL}`)
   Dispose() {
     this.SetEnabled(false);
     this.target.dispose();
+    this.depthVariants.Dispose();
     this.depthMaterial.dispose();
     for (const material of this.ownedMaterials) material.dispose();
     this.ownedMaterials.clear();

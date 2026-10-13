@@ -65,6 +65,7 @@ import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_
 import { TerrainBlendUniforms, TERRAIN_BLEND_GLSL } from './Script_TerrainBlend.mjs';
 import { TRENCH_SURFACE } from './Data_TrenchSurface.mjs';
 import { HZB, VELOCITY } from "./Data_Tuning_Graphics.mjs";
+import { OverrideKind, OverrideVariants } from "./Script_OverrideVariants.mjs";
 
 /**
  * 前景（第一人称手 / 枪）在预通道里的**常数近景深度**。
@@ -92,11 +93,7 @@ export function InvalidatePrepassSkip() { MARK_STAMP += 1; }
  * 实例颜色）。同一种挨着画，一趟只翻几次程序；其余次序与 three 的 painterSortStable 相同。
  */
 function PrepassKind(item) {
-  const object = item.object, morph = item.geometry.morphAttributes;
-  let kind = object.isBatchedMesh ? 48 : object.isInstancedMesh ? 32 : object.isSkinnedMesh ? 16 : 0;
-  if ((object.isInstancedMesh && object.instanceColor) || (object.isBatchedMesh && object.colorTexture)) kind += 8;
-  if (morph.position || morph.normal || morph.color) kind += 4;
-  return kind;
+  return OverrideKind(item.object, item.geometry);
 }
 export function PrepassOpaqueSort(a, b) {
   if (a.groupOrder !== b.groupOrder) return a.groupOrder - b.groupOrder;
@@ -184,8 +181,10 @@ export function MarkForegroundPrepass(root) {
 //     第二个 out 要么冲突要么永远写不出去。
 // 非 Raw 材质本来就永远是 `#version 300 es`，`#include <chunk>` 与 `varying` 照常可用。
 // ---------------------------------------------------------------------------
-function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) {
-  const uniforms = {
+function MakeNormalDepthMaterial(destruction = null, { velocity = false, shared = null } = {}) {
+  // shared：按物体种类分份的变体（Script_OverrideVariants）。着色器源码与基础材质逐字相同（program 缓存
+  // 命中，不编译），uniform 对象、破口开关、前景深度这些「钩子改的」状态全部共用基础材质的那一份。
+  const uniforms = shared ? shared.uniforms : {
     uTerrainBlendValid: { value: 0 },
     uTerrainBlendNormalDepth: TerrainBlendUniforms.uTerrainBlendNormalDepth,
     uTerrainBlendSize: TerrainBlendUniforms.uTerrainBlendSize,
@@ -197,7 +196,7 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
     uCutoutTest: { value: 0 },
     uCutoutOpacity: { value: 1 },
   };
-  if (velocity) {
+  if (velocity && !shared) {
     uniforms.uViewProjection = { value: new THREE.Matrix4() };
     uniforms.uPrevViewProjection = { value: new THREE.Matrix4() };
     uniforms.uPrevModelMatrix = { value: new THREE.Matrix4() };
@@ -206,8 +205,8 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
     uniforms.uVelocityValid = { value: 0 };
     uniforms.uVelocityClamp = { value: VELOCITY.clampUv };
   }
-  const damageEnabled = { value: 0 };
-  if (destruction) BindDestructionUniforms(uniforms, destruction, damageEnabled);
+  const damageEnabled = shared ? shared.userData.damageObjectEnabled : { value: 0 };
+  if (destruction && !shared) BindDestructionUniforms(uniforms, destruction, damageEnabled);
   const velocityVertex = velocity ? /* glsl */`
         {
           // 世界坐标自己算：实例化 / 合批 / 蒙皮的矩阵顺序照抄 <project_vertex>。
@@ -361,6 +360,15 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}` : ""}
   // 同一套「按 draw 开关」的手法给第一人称用（MarkForegroundPrepass 读这个）。
   material.userData.foregroundDepth = uniforms.uForegroundDepth;
   material.userData.velocity = velocity;
+  if (shared) {
+    // 钩子（破口裁切 / 速度矩阵 / 前景深度）把「下一 draw 要重传 uniform」写在基础材质上，three 在
+    // 变体上读：让两边是同一位，不然这一 draw 的改动会被落下。
+    Object.defineProperty(material, "uniformsNeedUpdate", {
+      configurable: true,
+      get: () => shared.uniformsNeedUpdate,
+      set: (value) => { shared.uniformsNeedUpdate = value; },
+    });
+  }
   return material;
 }
 
@@ -405,6 +413,10 @@ export class PrepassPass {
     this.velocityEnabled = !!(pipeline.preset.velocity && pipeline.hdrCapable);
     this.hzbEnabled = !!(pipeline.preset.hzb && pipeline.hdrCapable);
     this.material = MakeNormalDepthMaterial(destruction, { velocity: this.velocityEnabled });
+    // 蒙皮 / 实例 / 批次各一份自己的覆盖材质，只在 renderBufferDirect 那一步换人（Script_OverrideVariants 抬头）：
+    // 共用一只的话 PrepassOpaqueSort 排好序之后一帧仍翻 4 次程序（getProgram）。
+    this.variants = new OverrideVariants(this.material, (base) =>
+      MakeNormalDepthMaterial(destruction, { velocity: this.velocityEnabled, shared: base }));
     this.target = null;
     this.hzbLevels = [];
     this.hzb = null;
@@ -869,6 +881,8 @@ export class PrepassPass {
     // 覆盖材质只有一份 materialProperties：three 按物体自己的材质 id 排序，普通 / 蒙皮 /
     // 实例 / 批次交错着画，每换一种就整套重算一次程序参数（05 战车段每帧 13 次）。
     // 先按种类归堆，同种里仍按材质 id、深度排；深度趟的结果与先后无关。
+    // 2026-10-14：归堆只能把翻转压到「种类数」次（一帧 4 次 getProgram）；再往下要每种一份自己的覆盖材质，
+    // 见上面 `variants` 与 Script_OverrideVariants —— 材质对象不同，种类之间就不再互相翻 setProgram 那几位。
     renderer.setOpaqueSort(PrepassOpaqueSort);
     const staticBatch = this.staticBatch;
     if (staticBatch) {
@@ -876,7 +890,7 @@ export class PrepassPass {
       staticBatch.BeginPrepass(this._NoteStatic);
     }
     try {
-      renderer.render(scene, camera);
+      this.variants.Run(renderer, () => renderer.render(scene, camera));
     } finally {
       staticBatch?.EndPrepass();
       renderer.setOpaqueSort(null);
@@ -918,6 +932,7 @@ export class PrepassPass {
     if (this.target) this.target.dispose();
     for (const rt of this.hzbLevels) rt.dispose();
     this.hzbLevels = [];
+    this.variants.Dispose();
     this.material.dispose();
     this.matHzb.dispose();
   }

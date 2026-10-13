@@ -5771,6 +5771,29 @@ CaptiveWall 12.5 → 12.1 ms、Charge 16.8 → 16.7 ms，尸体 draw 30 → 18�
   `userData.warmCastShadow` 让 `WarmLevel` 的全场强制出画帧临时全开，批次版深度变体照旧在预热里取键。
 * 回归口：`Script_FirstLevelMissionAftermathTest` 核对阴影趟出的表恰好是第 0 档实例、换档后主画面拿回全表。
 
+**每帧 getProgram 12 → 2**（`Script_OverrideVariants` / `Script_PostPrepass` / `Script_FirstPersonSelfShadow` / `Script_BreakableTrees`）：
+
+用 `customProgramCacheKey` 钩子逐次记「哪个 pass、哪种物体、哪只材质」（04 前沿机位，每帧）：
+
+| 材质 | 每帧次数 | 原因 | 处理 |
+| --- | --- | --- | --- |
+| 预通道覆盖材质 `ShaderMaterial` | 4 | 一只材质，普通 → 蒙皮 → 实例 → 批次逐种翻 `setProgram` 的种类位；`PrepassOpaqueSort` 已经按种类归堆，翻转压在「种类数」次，再多省不掉 | 每种一份自己的覆盖材质（共用 uniform 对象），只在 `renderBufferDirect` 那一步换人 |
+| 阴影趟 `_depthMaterial`（three 内置） | 4 | 白盒体块（普通网格）和 `BreakableTrees` 的 513 只 InstancedMesh（没挂 `customDepthMaterial`）挨着画，实例 ↔ 普通来回翻 | 树批次挂 `AttachShadowDepth`（共用实例深度材质），与普通网格分开 |
+| `FirstPersonSelfShadowDepthMaterial` | 2 | 手臂（蒙皮）与枪（普通）共用一只 | 同预通道的做法，`depthVariants` |
+| `FirstLevelMissionTerrainLayers` | 2 | 地形融合 pass 的代理场景自己没灯、渲染靶也不同，与主画面共用同一只材质，每趟在两个 pass 之间翻（推断，未单独验证） | 没动（见下） |
+
+覆盖材质分份的要点：
+
+* three 的 `renderObjects` 只认 `scene.overrideMaterial` 一只，所以不改场景；`OverrideVariants.Run` 在那一趟临时把
+  `renderer.renderBufferDirect` 换成「材质是基础覆盖材质就按物体种类换成对应变体」的包装，趟末还原。
+  对象的 `onBeforeRender` 钩子与 `material.onBeforeRender`（破口裁切 / 速度矩阵 / 前景深度）仍然拿到基础材质，
+  它们改的是共用的 uniform 对象；变体的 `uniformsNeedUpdate` 指向基础材质那一位，钩子写的「下一 draw 重传」不会落下。
+* **程序不会变多**：变体与基础材质着色器源码、defines 逐字相同，program 缓存按「源码 + 参数」找，不看材质对象，
+  第一次出现某个种类只是 `getProgram` 命中已有的 WebGLProgram（不编译不链接）。验：`WhiteboxShaderWarmTest` 开机 link 94 个、
+  主场景现建 0 个与改前一致；`SavedGraphicsWarmTest` 爆炸前后 program 207 → 207。所以预热口径（§18）不用改。
+* 地形融合那 2 次没动：要消掉得给代理场景造一份孪生材质（带 onBeforeCompile 补丁与整套地表 uniform，且与源材质的
+  破口 / 弹坑覆盖要保持同步），为约 0.07 ms 不值。
+
 ## 18. 预热账：进过场与开机的着色器编译
 
 > 三段账合在一节：进过场那十几秒（2026-08 的原始做法）、八子系统合流之后的开机

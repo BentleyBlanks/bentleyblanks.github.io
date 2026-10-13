@@ -4,6 +4,7 @@ import { mergeGeometries } from "./vendor/three/examples/jsm/utils/BufferGeometr
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ClusterDistantGeometry } from "./Script_DistantGeometry.mjs";
 import { BREAKABLE_TREES as T } from "./Data_Tuning_BreakableTrees.mjs";
+import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { MakeTreePlacements, TreeBlastDamage } from "./Data_BreakableTreePlacements.mjs";
 
 const up = new THREE.Vector3(0,1,0);
@@ -176,6 +177,9 @@ export class BreakableTrees {
         const batch = new THREE.InstancedMesh(geometry, material, sector.trees.length);
         batch.name = `Trees_${sector.key}_${name}`;
         batch.castShadow = true; batch.receiveShadow = true;
+        // 阴影趟挂共用的实例深度材质：不挂的话它们吃 three 的 `_depthMaterial`，和普通网格挨着画，
+        // 每帧在「实例 / 普通」之间来回翻 getProgram（第一关 04 机位每帧 4 次，Script_ShadowDepth 抬头）。
+        AttachShadowDepth(batch);
         sector.batches.push({ batch, Member }); this.root.add(batch);
       };
       for (const [level, geometry] of this.intact.lods.entries()) {
@@ -230,7 +234,7 @@ export class BreakableTrees {
       const geometry=part.lods.at(-1),mesh=part.name==="Stump"
         ?new THREE.InstancedMesh(geometry,part.charred,1):new THREE.Mesh(geometry,part.falling);
       if(mesh.isInstancedMesh)mesh.setMatrixAt(0,new THREE.Matrix4());
-      mesh.name=`TreeWarm_${part.name}${part.cap?"Cap":""}`;mesh.castShadow=true;mesh.receiveShadow=true;
+      mesh.name=`TreeWarm_${part.name}${part.cap?"Cap":""}`;mesh.castShadow=true;mesh.receiveShadow=true;AttachShadowDepth(mesh);
       mesh.frustumCulled=false;mesh.position.set(this.trees[0]?.x||0,-500,this.trees[0]?.z||0);
       mesh.onAfterShadow=()=>{shadowed=true;};
       mesh.onAfterRender=renderer=>{

@@ -880,7 +880,7 @@ const changedDomainRules = [
   // Script_SkinnedClone 还被 /Skinn/ 那条拉进 motionVector（骨骼历史按 Skeleton 记）。
   // Script_ShadowSkip 是阴影烘焙那一趟的子树跳过包装（ShadowSkipTest 是它的纯 Node 门禁）。
   // 预通道藏出分类按顶层子树增量重建（PrepassSkipTest 是它的纯 Node 门禁）。
-  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch|Script_PostPrepass|Script_PrepassSkip|Script_PrepassStaticBatch/ },
+  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_OverrideVariants|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch|Script_PostPrepass|Script_PrepassSkip|Script_PrepassStaticBatch/ },
   // 2026.09.19 第二波：被测对象从军列车厢里的腊肉/背包换成 12/13 牛马车上老周的担架与车上近景件
   // （军列开场已下线）。改牛马车的那两个模块也要拉进这个域。
   {domain:"firstLevel",pattern:/CartCorpseBump/},
