@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {CreatePrecisionInput} from './Script_PrecisionInput.mjs?v=ear047-precision-20261013';
+import {CreatePrecisionInput} from './Script_PrecisionInput.mjs?v=ear048-pointer-alignment-20261013';
 import {CreateRenderQualitySettings} from './Script_RenderQualitySettings.mjs?v=ear040-render-settings-20260912';
 import {ResolveRenderQuality} from './Data_RenderQuality.mjs?v=ear040-render-settings-20260912';
 import {ContactFriction} from './Script_ContactFriction.mjs?v=ear035-sticky-scrape-audio-20260912';
@@ -7,7 +7,7 @@ import {CreatePhysicsSettings} from './Script_PhysicsSettings.mjs?v=ear028-physi
 import {CUSTOMER_EARS,CustomerEarType} from './Data_CustomerTypes.mjs?v=ear029-oily-coating-20260912';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear043-runtime-performance-20261003';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear047-precision-20261013';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear048-pointer-alignment-20261013';
 import { CreateAudio } from './Script_Audio.js?v=ear035-sticky-scrape-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear040-render-settings-20260912';
@@ -16,7 +16,7 @@ import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear046-click-care-20261012';
 
-const VERSION = 'ear047-precision-20261013';
+const VERSION = 'ear048-pointer-alignment-20261013';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结', oily:'油性凝胶' };
@@ -98,7 +98,7 @@ export async function Start() {
   const instrumentShop=CreateInstrumentShop({app,shop,view,Cancel,Sound,UpdateInventory});
   const DialogOpen=()=>$('settings-dialog').open||instrumentShop.open;
   precisionInput=CreatePrecisionInput({canvas,Enabled:()=>phase==='playing'&&!DialogOpen()&&!view.busy&&!document.hidden,
-    Cancel,SelectTool:index=>SetTool(['scoop','tweezers','drops','brush','suction','feather'][index]),ViewTray:ToggleTray,Wake:()=>audio.unlock()});
+    Cancel,SelectTool:index=>SetTool(['scoop','tweezers','drops','brush','suction','feather'][index]),ViewTray:ToggleTray,Wake:()=>audio.unlock(),ToolScreen:()=>view.ToolPose().toolScreen});
   $('manual-tray').onclick=()=>{ToggleTray();canvas.focus({preventScroll:true});};
   $('lamp-toggle').onclick=()=>{const on=view.ToggleLamp();$('lamp-toggle').setAttribute('aria-pressed',String(on));$('lamp-toggle').textContent='☼ 检查灯 · '+(on?'开':'关');Sound('uiTap',.2);};
   const rng = MakeRng(20260911 + shop.day * 307 + shop.state.totalCustomers * 997);
@@ -387,8 +387,9 @@ export async function Start() {
     if(practice){$('service-time').textContent='不限时';$('service-clock').dataset.urgent='false';}
     const transferring=String(!!view.transfer);if(app.dataset.transferring!==transferring)app.dataset.transferring=transferring;
     const rendering=view.ToolPose(),precision=view.PrecisionProbe();
+    if(rendering.toolVisible)precisionInput.SyncTool(rendering.toolScreen,{constrained:precision.contact||precision.blocked,transitioning:!view.ready});
     $('tool-depth').textContent=precision.trayView?'盘面操作':rendering.toolDepth<=0?'耳口外':rendering.toolDepth.toFixed(1)+' mm';
-    const tip=$('tool-reticle');tip.hidden=phase!=='playing'||DialogOpen()||!rendering.toolVisible||rendering.toolScreen.z<-1||rendering.toolScreen.z>1;
+    const tip=$('tool-reticle');tip.hidden=phase!=='playing'||DialogOpen()||!rendering.toolVisible||!precisionInput.Probe().pointerInside||rendering.toolScreen.z<-1||rendering.toolScreen.z>1;
     tip.style.left=rendering.toolScreen.x+'px';tip.style.top=rendering.toolScreen.y+'px';tip.dataset.contact=String(precision.contact);
     audio.Update(dt); core.Render();
   }

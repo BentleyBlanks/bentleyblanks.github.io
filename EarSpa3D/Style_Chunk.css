@@ -137,6 +137,6 @@ dialog{padding:23px;max-height:calc(100dvh - 24px)}#settings-dialog>.dialog-head
 #tool-reticle{position:absolute;z-index:7;pointer-events:none;width:8px;height:8px;border:1px solid #f4deab;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 2px #1d171a99}
 #tool-reticle[data-contact=true]{border-color:#eab380;box-shadow:0 0 0 2px #3c2416aa}
 #tool-reticle[hidden]{display:none}
-#ear-app[data-phase=playing] #ear-canvas{cursor:default}
-#ear-app[data-dragging=true] #ear-canvas{cursor:grabbing}
+#ear-app[data-phase=playing] #ear-canvas{cursor:none}
+#ear-app[data-dragging=true] #ear-canvas{cursor:none}
 @media(max-width:600px){#click-help{font-size:9px;padding:7px 8px;max-width:100%}#tool-depth{font-size:10px;padding:7px}#manual-tray,#action-cancel{font-size:10px;min-height:33px}}

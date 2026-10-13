@@ -615,6 +615,12 @@ export async function CreateImmersiveScene({ core }) {
     const cameraDepth=Math.max(.5,previous.clone().sub(camera.position).dot(forward));
     const pixelScale=2*cameraDepth*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/height;
     desired.addScaledVector(right,frame.dx*pixelScale).addScaledVector(up,-frame.dy*pixelScale).addScaledVector(forward,frame.depth);
+    if(frame.aim){
+      // Position the real working end on the cursor ray at its current insertion
+      // depth. Geometry collision below remains authoritative; no wax is picked.
+      const depth=desired.clone().sub(camera.position).dot(forward);
+      if(depth>.05){ray.setFromCamera(new THREE.Vector2(frame.aim.x/width*2-1,1-frame.aim.y/height*2),camera);desired.copy(ray.ray.origin).addScaledVector(ray.ray.direction,depth/ray.ray.direction.dot(forward));}
+    }
     if(precisionTray){desired.x=Clamp(desired.x,tray.position.x-62,tray.position.x+62);desired.z=Clamp(desired.z,tray.position.z-52,tray.position.z+52);desired.y=Math.max(tray.position.y-1.9,desired.y);}
     const rotation=manualRotation.clone();
     rotation.premultiply(new THREE.Quaternion().setFromAxisAngle(up,frame.yaw));
