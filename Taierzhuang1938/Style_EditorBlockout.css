@@ -1,20 +1,27 @@
 /* 白盒关卡编辑器（docs/Data_EditorBlockout.md §4）。
-   沿用 Style_Interface.css 的 --ui-* 令牌：冷灰 / 旧金、直角、1 px 细线；金色只给「当前 / 选中」；
-   数字等宽。面板是半透明深色 + 轻微背景模糊，压在 3D 画面上不挡视线。
-   中文先用系统黑体：编辑器文字不在打包字体子集里，逐字回落会一句话混两种字形。 */
+   外观与高级工具（Style_Editor.css 的 #edRoot --ed-*）同一套，也就是启动界面设置页的视觉语言：
+   半透明暗色渐变底、象牙白文字、橄榄灰细线、左侧金边 + 渐变的选中条、宽字距小标题、衬线标题、
+   金色填充细轨 + 竖条游标、直角控件；数字等宽。两边的取值同源，改一边时另一边一起改。 */
 
 .boRoot {
-  --bo-font: "TzUiLatin", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "TzUiSans", sans-serif;
+  --bo-font: var(--ui-font);
+  --bo-serif: var(--ui-story-font);
   --bo-num: var(--ui-mono, "Cascadia Mono", Consolas, monospace);
-  --bo-panel: rgba(12, 15, 16, 0.76);
-  --bo-panel-solid: rgba(12, 15, 16, 0.94);
-  --bo-line: rgba(196, 198, 187, 0.2);
-  --bo-line-strong: rgba(196, 198, 187, 0.34);
-  --bo-text: var(--ui-text, #d6d9d1);
-  --bo-bright: var(--ui-bright, #eeefec);
-  --bo-muted: var(--ui-muted, #a3aaa4);
-  --bo-faint: rgba(214, 217, 209, 0.46);
-  --bo-gold: var(--ui-gold, #dfbd68);
+  --bo-panel: linear-gradient(90deg, #080907e6, #11120ede 65%, #14150cd6);
+  --bo-panel-solid: linear-gradient(90deg, #080907f7, #11120ef2);
+  --bo-line: #c1bdab30;
+  --bo-line-strong: #c1bdab55;
+  --bo-edge: #c1bdab40;
+  --bo-text: #deddd2;
+  --bo-bright: #eeeee7;
+  --bo-muted: #aaa99b;
+  --bo-faint: #989b8b;
+  --bo-gold: #edca83;
+  --bo-gold-text: #e6cb91;
+  --bo-gold-hi: #ffe0a1;
+  --bo-gold-fill: #d9bb7b;
+  --bo-sel: linear-gradient(90deg, #d8d4c324, #bbb7a906);
+  --bo-sel-strong: linear-gradient(90deg, #d8d4c333, #bbb7a90d);
   --bo-ok: #8fca7a;
   --bo-sync: #86c9dc;
   --bo-bad: #d6604a;
@@ -38,11 +45,9 @@
 
 .boPanel {
   background: var(--bo-panel);
-  border: 1px solid var(--bo-line);
+  border: 1px solid var(--bo-edge);
   border-radius: 0;
-  -webkit-backdrop-filter: blur(10px) saturate(1.1);
-  backdrop-filter: blur(10px) saturate(1.1);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 20px 50px #0009;
 }
 
 /* --- 按钮与提示 ---------------------------------------------------------- */
@@ -55,7 +60,7 @@
   transition: color 0.12s linear, border-color 0.12s linear, background-color 0.12s linear;
 }
 .boBtn svg { width: 16px; height: 16px; display: block; }
-.boBtn:hover { color: var(--bo-bright); background: rgba(214, 217, 209, 0.07); }
+.boBtn:hover { color: var(--bo-gold-hi); background: var(--bo-sel); }
 .boBtn:disabled { opacity: 0.3; cursor: default; background: transparent; color: var(--bo-muted); }
 .boBtn:focus-visible { outline: 1px solid var(--bo-gold); outline-offset: 1px; }
 .boIconBtn { width: 30px; height: 30px; }
@@ -64,8 +69,8 @@
   content: attr(data-tip);
   position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
   padding: 4px 8px; white-space: nowrap;
-  font: 12px/1.4 var(--bo-font); color: var(--bo-bright);
-  background: var(--bo-panel-solid); border: 1px solid var(--bo-line-strong);
+  font: 12px/1.4 var(--bo-font); color: var(--bo-bright); letter-spacing: 0.06em;
+  background: var(--bo-panel-solid); border: 1px solid var(--bo-edge);
   pointer-events: none; opacity: 0; z-index: 6;
   transition: opacity 0.1s linear 0s;
 }
@@ -76,55 +81,55 @@
 .boKbd {
   display: inline-block; min-width: 15px; padding: 0 3px;
   font: 600 9.5px/13px var(--bo-num); text-align: center; color: var(--bo-text);
-  border: 1px solid rgba(214, 217, 209, 0.26); border-bottom-color: rgba(214, 217, 209, 0.4);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--bo-edge);
+  background: #13140b88;
 }
 
 /* --- 左上：关键帧卡片 ------------------------------------------------------ */
 .boCard {
   position: absolute; left: 16px; top: 16px;
-  width: 380px; padding: 11px 12px 12px 14px;
+  width: 380px; padding: 12px 12px 13px 16px;
 }
 .boCardHead {
   display: flex; align-items: flex-start; gap: 8px;
-  padding-bottom: 9px; margin-bottom: 8px;
-  border-bottom: 1px solid var(--bo-line);
+  padding-bottom: 10px; margin-bottom: 9px;
+  border-bottom: 1px solid var(--bo-line-strong);
 }
 .boCardTitle { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; row-gap: 0; padding-top: 2px; }
 .boStageNo {
   font: 600 22px/1 "TzUiLatin", var(--bo-num); color: var(--bo-gold);
   font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
 }
-.boStageTitle { font-size: 15px; font-weight: 700; color: var(--bo-bright); letter-spacing: 0.02em; }
-.boPlace { font-size: 13px; color: var(--bo-muted); }
-.boSave, .boCopy { flex: 0 0 auto; margin: -3px 0 0 0; color: var(--bo-text); border-color: var(--bo-line); }
+.boStageTitle { font: 700 16px/1.3 var(--bo-serif); color: var(--bo-bright); letter-spacing: 0.08em; }
+.boPlace { font-size: 12px; color: var(--bo-muted); letter-spacing: 0.12em; }
+.boSave, .boCopy { flex: 0 0 auto; margin: -3px 0 0 0; color: var(--bo-text); border-color: var(--bo-edge); background: #13140b55; }
 .boSave { margin-right: -4px; }
-.boSave:hover, .boCopy:hover { border-color: var(--bo-line-strong); }
+.boSave:hover, .boCopy:hover { border-color: #cdb77b88; }
 
 .boLine { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 10px; margin: 6px 0 0; }
 .boLine:first-of-type { margin-top: 0; }
-.boKey { color: var(--bo-faint); font-size: 12px; letter-spacing: 0.06em; line-height: 19px; }
+.boKey { color: var(--bo-faint); font-size: 12px; letter-spacing: 0.16em; line-height: 19px; }
 .boVal { color: var(--bo-text); line-height: 19px; }
 .boVal.muted { color: var(--bo-faint); }
 .boNextVal { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .boArrow {
   flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border: 1px solid var(--bo-line-strong); border-radius: 50%;
-  color: var(--bo-bright); transform-origin: 50% 50%;
+  width: 20px; height: 20px; border: 1px solid #cdb77b88; border-radius: 50%;
+  color: var(--bo-gold); transform-origin: 50% 50%;
 }
 .boArrow svg { width: 13px; height: 13px; stroke-width: 1.8; }
-.boNextText { flex: 1 1 auto; min-width: 0; color: var(--bo-bright); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boNextText { flex: 1 1 auto; min-width: 0; color: var(--bo-gold-text); font-weight: 700; letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .boDist { flex: 0 0 auto; font: 12px/19px var(--bo-num); color: var(--bo-muted); font-variant-numeric: tabular-nums; }
 
 .boHow { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 0 54px; }
 .boChip {
-  padding: 1px 7px; font-size: 11.5px; line-height: 18px;
-  color: rgba(214, 217, 209, 0.78); border: 1px solid rgba(214, 217, 209, 0.16);
-  background: rgba(255, 255, 255, 0.025);
+  padding: 1px 8px; font-size: 11.5px; line-height: 18px; letter-spacing: 0.06em;
+  color: #b9bcb7; border: 1px solid var(--bo-line);
+  background: transparent;
 }
 .boNotes {
   margin: 9px 0 0 54px; padding-left: 8px;
-  border-left: 2px solid rgba(214, 217, 209, 0.16);
+  border-left: 1px solid var(--bo-edge);
   font-size: 11.5px; line-height: 1.5; color: var(--bo-faint);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;   /* 一行；全文在悬停提示里 */
 }
@@ -143,50 +148,49 @@
 .boLevel { position: relative; }
 .boLevelBtn {
   height: 34px; min-width: 176px; max-width: 280px; padding: 0 9px 0 12px; justify-content: space-between; gap: 10px;
-  background: var(--bo-panel); border: 1px solid var(--bo-line);
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  color: var(--bo-bright); font-size: 13px;
+  background: var(--bo-panel); border: 1px solid var(--bo-edge);
+  color: var(--bo-bright); font-size: 13px; letter-spacing: 0.08em;
 }
-.boLevelBtn:hover { border-color: var(--bo-line-strong); background: var(--bo-panel); }
+.boLevelBtn:hover { border-color: #cdb77b88; background: var(--bo-panel); color: var(--bo-gold-hi); }
 .boLevelBtn:disabled { opacity: 1; cursor: default; color: var(--bo-bright); background: var(--bo-panel); }
 .boLevelBtn:disabled .boChevron { opacity: 0.25; }
 .boLevelName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .boChevron { display: inline-flex; color: var(--bo-muted); transition: transform 0.15s ease; }
 .boChevron svg { width: 14px; height: 14px; }
 .boLevel.open .boChevron { transform: rotate(180deg); }
-.boLevel.open .boLevelBtn { border-color: var(--bo-line-strong); }
+.boLevel.open .boLevelBtn { border-color: var(--bo-gold); color: var(--bo-gold); }
 .boLevelBtn[data-tip]::after { display: none; }
 .boLevelMenu {
   position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%;
-  padding: 4px 0; display: none; z-index: 7; background: var(--bo-panel-solid);
+  padding: 8px 0; display: none; z-index: 7; background: var(--bo-panel-solid);
+  border: 1px solid var(--bo-edge); box-shadow: 0 20px 44px #000b;
 }
 .boLevel.open .boLevelMenu { display: block; }
 .boLevelItem {
   display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 7px 14px 7px 10px; border: 0; background: transparent; border-radius: 0;
-  color: var(--bo-text); font: 13px/1.4 var(--bo-font); text-align: left; white-space: nowrap; cursor: pointer;
+  min-height: 36px; padding: 0 18px 0 13px; border: 0; border-left: 3px solid transparent; background: transparent; border-radius: 0;
+  color: #c6c7bd; font: 14px/1.4 var(--bo-font); letter-spacing: 0.08em; text-align: left; white-space: nowrap; cursor: pointer;
 }
-.boLevelItem:hover { background: var(--ui-selection, rgba(214, 217, 209, 0.08)); color: var(--bo-bright); }
-.boLevelMark { width: 2px; height: 14px; background: transparent; }
-.boLevelItem.on { color: var(--bo-gold); }
-.boLevelItem.on .boLevelMark { background: var(--bo-gold); }
+.boLevelItem:hover { background: var(--bo-sel); border-left-color: var(--bo-gold); color: var(--bo-gold); }
+/* 当前关：金字 + 一枚 5 px 金方块（与高级工具菜单、设置页开关的标记同一种） */
+.boLevelMark { width: 5px; height: 5px; background: transparent; }
+.boLevelItem.on { color: var(--bo-gold-text); }
+.boLevelItem.on .boLevelMark { background: currentColor; }
 
 .boLayers {
-  display: flex; background: var(--bo-panel); border: 1px solid var(--bo-line);
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  display: flex; background: var(--bo-panel); border: 1px solid var(--bo-edge);
 }
-.boLayer { width: 34px; height: 32px; color: rgba(214, 217, 209, 0.42); }
-.boLayer + .boLayer { border-left: 1px solid rgba(196, 198, 187, 0.1); }
-.boLayer.on { color: var(--bo-gold); background: rgba(223, 189, 104, 0.08); }
-.boLayer.on:hover { color: var(--bo-gold); background: rgba(223, 189, 104, 0.14); }
+.boLayer { width: 34px; height: 32px; color: #8d8f86; border-bottom: 2px solid transparent; }
+.boLayer + .boLayer { border-left: 1px solid var(--bo-line); }
+.boLayer.on { color: var(--bo-gold); background: var(--bo-sel-strong); border-bottom-color: var(--bo-gold); }
+.boLayer.on:hover { color: var(--bo-gold-hi); background: var(--bo-sel-strong); }
 .boLayer.all::before {
   content: ""; position: absolute; right: 4px; top: 4px; width: 4px; height: 4px; background: var(--bo-gold);
 }
 
 .boStatus {
   position: relative; width: 34px; display: flex; align-items: center; justify-content: center;
-  background: var(--bo-panel); border: 1px solid var(--bo-line); cursor: default; outline: none;
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  background: var(--bo-panel); border: 1px solid var(--bo-edge); cursor: default; outline: none;
 }
 .boStatus:focus-visible { outline: 1px solid var(--bo-gold); outline-offset: 1px; }
 .boDot { width: 8px; height: 8px; border-radius: 50%; background: var(--bo-muted); }
@@ -202,13 +206,13 @@
 }
 .boStatusTip {
   position: absolute; top: calc(100% + 6px); right: -1px; width: 300px;
-  padding: 9px 12px 10px; display: none; z-index: 7; background: var(--bo-panel-solid);
+  padding: 10px 14px 11px; display: none; z-index: 7; background: var(--bo-panel-solid); border: 1px solid var(--bo-edge);
   font-size: 12px; line-height: 1.5; color: var(--bo-text); white-space: normal; user-select: text;
 }
 .boStatus:hover .boStatusTip, .boStatus:focus .boStatusTip { display: block; }
 /* 状态点与提示框之间 6 px 的空隙：透明的一条把悬停接上，鼠标能移进提示框里选中、复制错误原因。 */
 .boStatusTip::before { content: ""; position: absolute; left: 0; right: 0; top: -7px; height: 7px; }
-.boTipHead { color: var(--bo-bright); font-weight: 700; margin-bottom: 4px; }
+.boTipHead { color: var(--bo-bright); font-weight: 700; letter-spacing: 0.06em; margin-bottom: 4px; }
 .boStatus[data-state="error"] .boTipHead { color: var(--bo-bad); }
 .boTipLine { overflow-wrap: anywhere; }
 .boTipLine + .boTipLine { margin-top: 2px; }
@@ -217,15 +221,15 @@
 /* --- 左下：小地图 --------------------------------------------------------- */
 .boMini {
   position: absolute; left: 16px; bottom: 16px; width: 220px; height: 220px; box-sizing: content-box;
-  border: 1px solid var(--bo-line-strong); background: #1a1d1e; cursor: pointer;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+  border: 1px solid var(--bo-edge); background: #11120e; cursor: pointer;
+  box-shadow: 0 20px 50px #0009;
 }
-.boMini:hover { border-color: rgba(214, 217, 209, 0.6); }
+.boMini:hover { border-color: #cdb77b88; }
 .boMiniCanvas { display: block; width: 100%; height: 100%; }
 .boMiniHint {
   position: absolute; right: 5px; bottom: 5px;
   display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px 2px 3px;
-  font-size: 11px; line-height: 15px; color: var(--bo-text); background: rgba(12, 15, 16, 0.78);
+  font-size: 11px; line-height: 15px; letter-spacing: 0.06em; color: var(--bo-text); background: #080907d9;
 }
 
 /* --- 底部：导航栏 --------------------------------------------------------- */
@@ -235,29 +239,29 @@
   width: min(1140px, 64vw, calc(100vw - 508px)); height: 58px; padding: 0 12px 0 10px; z-index: 6;
   display: grid; grid-template-columns: 30px minmax(0, 1fr) 30px 30px auto; align-items: center; column-gap: 10px;
 }
-.boNavBtn { width: 30px; height: 30px; color: var(--bo-text); border-color: var(--bo-line); }
-.boNavBtn:hover { border-color: var(--bo-line-strong); }
+.boNavBtn { width: 30px; height: 30px; color: var(--bo-text); border-color: var(--bo-edge); background: #13140b55; }
+.boNavBtn:hover { border-color: #cdb77b88; }
 .boTrackWrap { position: relative; height: 44px; display: flex; flex-direction: column; justify-content: center; cursor: pointer; touch-action: none; }
 .boTrack { display: flex; gap: 3px; height: 20px; align-items: center; }
 /* 段宽按关键帧数，但每段至少 16 px（阶段号读得出）；下面那排阶段号用同一套 flex 参数，逐段对齐 */
 .boSeg { position: relative; flex: 1 1 0; min-width: 16px; height: 20px; }
 .boSegLine, .boSegFill { position: absolute; left: 0; top: 50%; height: 2px; margin-top: -1px; }
-.boSegLine { right: 0; background: rgba(214, 217, 209, 0.16); }
-.boSegFill { width: 0; background: rgba(214, 217, 209, 0.5); }
+.boSegLine { right: 0; background: #a4a59450; }
+.boSegFill { width: 0; background: var(--bo-gold-fill); }
 .boSeg.passed .boSegFill { width: 100%; }
 /* 关键帧刻度：时间轴上的小菱形 */
 .boTick {
   position: absolute; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
-  transform: rotate(45deg); background: rgba(214, 217, 209, 0.34);
+  transform: rotate(45deg); background: #a4a594aa;
   transition: transform 0.1s ease, background-color 0.1s linear;
 }
-.boTick.passed { background: rgba(214, 217, 209, 0.78); }
+.boTick.passed { background: var(--bo-gold-fill); }
 .boTick.hover { background: var(--bo-bright); transform: rotate(45deg) scale(1.6); }
 .boTick.current { opacity: 0; }
 .boKnob {
-  position: absolute; top: 50%; width: 6px; height: 18px; margin: -9px 0 0 -3px; z-index: 2;
-  background: var(--bo-gold);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 12px rgba(223, 189, 104, 0.35);
+  position: absolute; top: 50%; width: 7px; height: 18px; margin: -9px 0 0 -3.5px; z-index: 2; border-radius: 1px;
+  background: #e4d9bb;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 12px rgba(223, 189, 104, 0.3);
 }
 .boGhost { background: transparent; border: 1px solid var(--bo-gold); box-shadow: none; opacity: 0.85; z-index: 3; }
 .boNav.playing .boKnob:not(.boGhost) { animation: boKnobPlay 0.9s ease-in-out infinite; }
@@ -265,14 +269,14 @@
 .boStageNums { display: flex; gap: 3px; margin-top: 3px; }
 .boStageNum {
   flex: 1 1 0; min-width: 16px; overflow: hidden; text-align: center;
-  font: 10px/12px var(--bo-num); color: rgba(214, 217, 209, 0.42); font-variant-numeric: tabular-nums;
+  font: 10px/12px var(--bo-num); color: #8d8f86; font-variant-numeric: tabular-nums;
 }
 .boStageNum.current { color: var(--bo-gold); }
 .boNavTip {
   position: absolute; bottom: calc(100% + 2px); left: 0; transform: translateX(-50%);
   padding: 4px 9px; white-space: nowrap; pointer-events: none;
-  font: 12px/1.4 var(--bo-font); color: var(--bo-bright);
-  background: var(--bo-panel-solid); border: 1px solid var(--bo-line-strong);
+  font: 12px/1.4 var(--bo-font); color: var(--bo-bright); letter-spacing: 0.06em;
+  background: var(--bo-panel-solid); border: 1px solid var(--bo-edge);
   opacity: 0; transition: opacity 0.08s linear;
 }
 .boNavTip.on { opacity: 1; }
@@ -281,10 +285,10 @@
 .boCount { font: 600 13px/16px var(--bo-num); color: var(--bo-bright); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .boFast {
   padding: 0 6px; font-size: 11px; line-height: 16px; color: var(--bo-bright); white-space: nowrap;
-  border: 1px solid var(--bo-line-strong); background: rgba(214, 217, 209, 0.08);
+  border: 1px solid #cdb77b88; color: var(--bo-gold-text); background: var(--bo-sel-strong);
 }
 .boFast:empty { display: none; }
-.boKeys { display: flex; align-items: center; gap: 3px; font-size: 10px; line-height: 13px; color: var(--bo-faint); white-space: nowrap; }
+.boKeys { display: flex; align-items: center; gap: 3px; font-size: 10px; line-height: 13px; letter-spacing: 0.06em; color: var(--bo-faint); white-space: nowrap; }
 .boKeys .boKbd { font-size: 9px; line-height: 12px; min-width: 13px; color: var(--bo-muted); }
 .boKeys > span { margin-right: 6px; }
 .boKeys > span:last-child { margin-right: 0; }
@@ -300,15 +304,15 @@
 }
 .boMapOverlay.open { display: flex; }
 /* 右上角是游戏的齿轮按钮（距右边约 52 px）：外框两边各让 60 px，窄窗口里关闭叉才不被它压住 */
-.boMapFrame { width: min(92vw, calc(100vw - 120px)); height: calc(100% - 24px); display: flex; flex-direction: column; background: var(--bo-panel-solid); }
+.boMapFrame { width: min(92vw, calc(100vw - 120px)); height: calc(100% - 24px); display: flex; flex-direction: column; background: var(--bo-panel-solid); border: 1px solid var(--bo-edge); }
 .boMapHead {
   flex: 0 0 44px; display: flex; align-items: center; gap: 22px;
-  padding: 0 7px 0 16px; border-bottom: 1px solid var(--bo-line);
+  padding: 0 7px 0 18px; border-bottom: 1px solid var(--bo-line-strong);
 }
 .boMapTitle { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
-.boMapName { font-size: 14px; font-weight: 700; color: var(--bo-bright); letter-spacing: 0.04em; }
-.boMapLevel { font-size: 12px; color: var(--bo-muted); }
-.boLegend { display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: var(--bo-muted); white-space: nowrap; overflow: hidden; }
+.boMapName { font: 700 17px/1.3 var(--bo-serif); color: var(--bo-bright); letter-spacing: 0.1em; }
+.boMapLevel { font-size: 12px; color: var(--bo-muted); letter-spacing: 0.12em; }
+.boLegend { display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: var(--bo-muted); letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; }
 .boLegendItem { display: inline-flex; align-items: center; gap: 6px; }
 .boGlyph { position: relative; display: inline-block; width: 11px; height: 11px; flex: 0 0 auto; }
 .boGlyph.enemy { width: 0; height: 0; border-left: 5.5px solid transparent; border-right: 5.5px solid transparent; border-bottom: 10px solid var(--bo-enemy); }
@@ -328,10 +332,10 @@
 .boCopyBox {
   position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 7;
   width: min(720px, calc(100vw - 32px)); display: flex; flex-direction: column;
-  background: var(--bo-panel-solid); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  background: var(--bo-panel-solid); border: 1px solid var(--bo-edge); box-shadow: 0 20px 50px #000b;
 }
 .boCopyHead { display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 14px; border-bottom: 1px solid var(--bo-line); }
-.boCopyTitle { font-size: 14px; font-weight: 700; color: var(--bo-bright); letter-spacing: 0.04em; white-space: nowrap; }
+.boCopyTitle { font: 700 15px/1.3 var(--bo-serif); color: var(--bo-bright); letter-spacing: 0.08em; white-space: nowrap; }
 .boCopyHint { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--bo-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .boCopyText {
   display: block; width: 100%; height: min(320px, 50vh); margin: 0; padding: 10px 14px; resize: none;
@@ -346,9 +350,9 @@
 }
 .boToast {
   display: flex; align-items: center; gap: 10px; max-width: min(560px, 60vw);
-  padding: 7px 14px 7px 10px; font-size: 13px; color: var(--bo-bright);
-  background: var(--bo-panel-solid); border: 1px solid var(--bo-line);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  padding: 7px 16px 7px 10px; font-size: 13px; color: var(--bo-bright); letter-spacing: 0.06em;
+  background: var(--bo-panel-solid); border: 1px solid var(--bo-edge);
+  box-shadow: 0 12px 32px #0009;
   opacity: 0; transform: translateY(-6px); transition: opacity 0.18s ease, transform 0.18s ease;
 }
 .boToast.on { opacity: 1; transform: none; }
