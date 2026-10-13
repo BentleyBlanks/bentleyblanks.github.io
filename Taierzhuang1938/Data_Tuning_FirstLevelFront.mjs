@@ -256,7 +256,7 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // window opened (the idle probe's nestLost phase, median 16 s; the 31st is the stuck postB3, 255 s), so 90 s leaves
   // every normal run alone.
   assaultWindowFallbackS:90,
-  guardHeightM:1.2,blockadeRangeM:85,gatherSpacingM:1.35,zhouHealth:80,
+  guardHeightM:1.2,blockadeRangeM:85,blockadeRecheckS:.15,gatherSpacingM:1.35,zhouHealth:80,
   // Zhou's age on the crosshair card (both bodies: 03-05 at the gun, 06 seated). The random identity pool gave him
   // 17 / 29 / 32 across runs ("老周 17 岁"); the cast note says 三十多岁 (Data_FirstLevelMissionDialogue MISSION_VOICE_CAST.zhou).
   zhouAge:34,

@@ -5794,6 +5794,21 @@ CaptiveWall 12.5 → 12.1 ms、Charge 16.8 → 16.7 ms，尸体 draw 30 → 18�
 * 地形融合那 2 次没动：要消掉得给代理场景造一份孪生材质（带 onBeforeCompile 补丁与整套地表 uniform，且与源材质的
   破口 / 弹坑覆盖要保持同步），为约 0.07 ms 不值。
 
+**看不见的人 / 任务射线降频**（任务逻辑那一块，同一机位）：
+
+* 取证：`MissionPeople.Person` 一帧 16 次调用（集结处伤员 / 医护 / 担架员 + 车队驾驶员），全在身后 80—290 m，**早就按画面外 8 Hz 节流**，
+  实际每帧 1.9 次真解姿势 = 0.33 ms；AI 士兵那边画面外的人本来就整棵摘出场景、不进 `ActorAnimate`（实测 48 人里每帧 3.2 次，全在画面里）。
+  所以 AI 的 `UpdateMissionSentry → UpdateP012OpeningPose` 那 0.45 ms 是画面里的人，**没有可省的屏外部分**，没动。
+* 改法：`MissionPeople.Person` 里画面外且离玩家超过 `MISSION_PEOPLE_TUNING.offscreenFarM`（30 m，比阴影距离 24 m 多留一拍）的人，解姿势间隔由
+  1/8 s 放到 `offscreenFarAnimationS`（1 s）。回到视野那一帧仍立刻补一次（原有逻辑）；另加一条「排好的下一次解姿势不许比现在这个距离该有的间隔更晚」，
+  从远处走近 / 距离档变密当帧就补算。实测 1.91 → 0.25 次 / 帧，`Person` 0.33 → 0.09 ms。回归口 `Script_FirstLevelMissionPeopleCadenceTest`。
+* 射线（两处，都是缓存模拟时间 0.15 s，时间倒退当场作废）：`FirstLevelOpening.FireWindows` 每个活敌每帧两条 `BlocksSight`
+  （`OPENING.sightRecheckS`，按敌人 id 错开起算点）；`FrontBattle.InfantryBlockade` 缺口三点 × 每个敌人的 `Threatens`
+  （`FRONT_BATTLE_TUNING.blockadeRecheckS`，`UpdateGuards` 里的第二次调用共用）。两者都只用来排开火窗口（3.5 s 一轮转）/ 判突击窗口，
+  开火的人在 `TryFire` 里还会自己再验一次视线；晚 0.15 s 知道没有可见差别。其余几十处 `BlocksSight / Threatens` 调用点
+  （任务节点的一次性判定、过场触发、坦克射击、导引）要么不是每帧、要么判定结果直接触发剧情，没动。
+  `Script_FirstLevelMissionTest` 里 FireWindows 的单元断言同帧换墙再问，要等缓存过期才看得到，已改成先断言缓存期内沿用、再推进 `sightRecheckS` 后断言新结果。
+
 ## 18. 预热账：进过场与开机的着色器编译
 
 > 三段账合在一节：进过场那十几秒（2026-08 的原始做法）、八子系统合流之后的开机

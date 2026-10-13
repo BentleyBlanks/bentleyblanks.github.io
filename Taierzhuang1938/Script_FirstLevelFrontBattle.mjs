@@ -564,7 +564,13 @@ export class FirstLevelFrontBattle {
   }
   InfantryBlockade(){
     const r=this.r;
-    return [S.gap,{x:S.gap.x,z:S.gap.z-2},{x:S.gap.x,z:S.gap.z+2}].some(p=>r.Threatens(p,null,B.guardHeightM,B.blockadeRangeM));
+    // 缺口三点 × 每个敌人一条带地形的射线，每帧都问一遍约 0.37 ms（04 前沿机位）。口子封没封是任务节奏的判据
+    // （突击窗口 / 缺口重开），晚 B.blockadeRecheckS 秒知道没有任何区别，按模拟时间缓存（时间倒退——读档 / 重开——当场作废）。
+    const cache=this.blockadeCache;
+    if(cache&&r.time>=cache.at&&r.time-cache.at<B.blockadeRecheckS)return cache.value;
+    const value=[S.gap,{x:S.gap.x,z:S.gap.z-2},{x:S.gap.x,z:S.gap.z+2}].some(p=>r.Threatens(p,null,B.guardHeightM,B.blockadeRangeM));
+    this.blockadeCache={at:r.time,value};
+    return value;
   }
   TankBlockade(){
     const r=this.r,t=r.tank;

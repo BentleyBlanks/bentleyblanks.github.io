@@ -281,6 +281,16 @@ export class FirstLevelOpening {
     const r=this.r,active=FIRE_WINDOW_STAGES.includes(r.flow.stage.id),captive=r.frontShow?.bunker?.CameraActive===true;
     const candidates=[];
     let visible=0;
+    // 两条视线射线按敌人缓存 C.sightRecheckS 秒（模拟时间；时间倒退——读档 / 重开——当场作废）。
+    // 只缓存「通不通」，投影判断、距离判断仍每帧现算；结果只用来排开火窗口与诊断计数。
+    const memo=this.sightMemo||(this.sightMemo=new Map()),ttl=C.sightRecheckS;
+    const Sight=(a,slot,Compute)=>{
+      let m=memo.get(a.id);
+      if(!m||r.time<m.at||r.time-m.at>=ttl){
+        m={at:m&&r.time>=m.at?r.time:r.time-(a.id*.0371)%ttl,seen:undefined,shot:undefined};memo.set(a.id,m);
+      }
+      return m[slot]??(m[slot]=Compute());
+    };
     for(const a of r.enemies.values()){
       if(a.lastFire>0&&a.lastFire!==this.fireSeen.get(a.id)){
         this.fireSeen.set(a.id,a.lastFire);
@@ -296,8 +306,8 @@ export class FirstLevelOpening {
       a.missionFireHold=true;
       const projected=a.position.clone();projected.y+=1;projected.project(r.player.camera);
       if(Math.abs(projected.x)<=1&&Math.abs(projected.y)<=1&&projected.z>=-1&&projected.z<=1&&
-        !r.BlocksSight(r.player.EyePosition,r.Point(a.position,1)))visible++;
-      if(Distance(a.position,r.player.position)<90 && !r.BlocksSight(r.Point(a.position,a.stance===2?.35:a.stance===1?.85:1.3),r.player.EyePosition))candidates.push(a);
+        Sight(a,"seen",()=>!r.BlocksSight(r.player.EyePosition,r.Point(a.position,1))))visible++;
+      if(Distance(a.position,r.player.position)<90 && Sight(a,"shot",()=>!r.BlocksSight(r.Point(a.position,a.stance===2?.35:a.stance===1?.85:1.3),r.player.EyePosition)))candidates.push(a);
     }
     const shift=Math.floor(r.time/C.fireSlotSeconds);
     candidates.sort((a,b)=>a.id-b.id);

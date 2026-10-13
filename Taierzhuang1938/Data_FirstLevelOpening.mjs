@@ -90,5 +90,9 @@ export const OPENING = Object.freeze({
   // 其余被禁火的人只许看、进掩体、探头、举枪，一发不打。
   playerSuppressLimit: 3,
   fireSlotSeconds: 3.5,
+  // FireWindows 每个活着的敌人每帧两条带地形的射线（敌人看得见玩家吗 / 玩家屏上看得见这个敌人吗，04 前沿机位 0.31 ms/帧）。
+  // 开火窗口三秒半才轮一次，开火的人 TryFire 里还要自己再验一遍视线，所以这两条结果缓存这么久（秒，模拟时间）。
+  // 每个敌人按 id 错开起算点，免得全部在同一帧重算。
+  sightRecheckS: 0.15,
   frontReachRadiusM: 9,
 });

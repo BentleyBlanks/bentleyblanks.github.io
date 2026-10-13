@@ -50,10 +50,14 @@ export class MissionPeople {
     if(this.viewCulling){
       const sphere=this.viewSphere;sphere.center.set(x,actor.root.position.y+C.viewCullCentreM,z);sphere.radius=C.viewCullRadiusM;
       const inView=this.viewFrustum.intersectsSphere(sphere);
-      if(!inView)interval=Math.max(interval,C.offscreenAnimationS);
+      // 画面外且超出阴影距离（away 取不到＝没给 focus，按近的算）：身子和影子都没人看得见，放到 1 s 一解。
+      if(!inView)interval=Math.max(interval,this.focus&&away>C.offscreenFarM?C.offscreenFarAnimationS:C.offscreenAnimationS);
       else if(entry.offscreen)entry.nextPoseAt=null;
       entry.offscreen=!inView;
     }
+    // 排好的下一次解姿势不许比「现在这个距离 / 视野该有的间隔」更晚：人从远处走近、或距离档变密，当帧就补算，
+    // 不等上一档排下的那一长拍（1 s 的远档尤其要这条）。稳态下 nextPoseAt ≤ time + interval 恒成立，这行不触发。
+    if(entry.nextPoseAt!=null&&entry.nextPoseAt>this.time+interval)entry.nextPoseAt=null;
     if(alive&&entry.nextPoseAt!=null&&this.time<entry.nextPoseAt)return actor;
     entry.nextPoseAt=interval?(Math.floor((this.time+entry.phase)/interval)+1)*interval-entry.phase:this.time;
     const poseDt=Math.min(.2,this.time-(entry.lastPoseAt??this.time-this.dt));entry.lastPoseAt=this.time;pose?.Restore();

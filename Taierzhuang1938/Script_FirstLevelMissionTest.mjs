@@ -622,7 +622,10 @@ console.log("ok all mission gates require recorded gameplay facts and restore ex
     r.frontShow.bunker.CameraActive=false;opening.FireWindows();
     assert.ok(opening.playerShooters.length>0,"player firing slots resume when camera control ends");
     r.flow.stage.id="Support";
+  // FireWindows 的两条视线射线按敌人缓存 OPENING.sightRecheckS 秒（模拟时间）：墙一出现，等缓存过期那一次重算才看得到。
   r.BlocksSight=(from)=>from===enemies[7].position;opening.FireWindows();
+  assert.equal(enemies[7].missionFireHold,false,"a sight result is reused inside the recheck window (no per-frame rays)");
+  r.time+=OPENING.sightRecheckS*1.05;opening.FireWindows();
   assert.equal(enemies[7].missionFireHold,true,"wall-blocked close enemy cannot displace visible shooters");
   for(const [i,a] of enemies.entries())a.missionFireGroup=i===6?'Rail':'Flank';
   for(let slot=0;slot<8;slot++){

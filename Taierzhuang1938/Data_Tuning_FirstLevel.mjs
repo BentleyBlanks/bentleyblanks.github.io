@@ -510,7 +510,11 @@ export const MISSION_PEOPLE_TUNING=Object.freeze({aftermathTiers:Object.freeze([
 ]),aftermathRefreshM:.35,aftermathRefreshDot:.00012,closeAnimationM:8,nearAnimationM:45,farAnimationM:90,nearAnimationS:1/20,idleAnimationS:1/10,midAnimationS:1/15,farAnimationS:1/8,
 // 画面外（视锥外，球心离地 viewCullCentreM、半径 viewCullRadiusM 留出一具人连担架的余量）按这个间隔解姿势，回到画面那一帧立刻补一次。
 // 2026-10-02：03 集结处 / 12 接运点这批人每帧完整解姿势是任务逻辑里最大的一项（1.0 / 1.7 ms），身后的人也照算。
-offscreenAnimationS:1/8,viewCullCentreM:.9,viewCullRadiusM:2.6,walkThresholdMps:.08,gaitSpeedMps:3.6,carrySourceMps:1.4,loadSinkM:0,loadLeanRad:0,breathRate:1.7,watchYawRad:.18});
+offscreenAnimationS:1/8,
+// 2026-10-14：画面外且离玩家超过 offscreenFarM 的人再放慢到 offscreenFarAnimationS。04 前沿机位 16 个集结处 / 车队的人全在身后 80—290 m，
+// 8 Hz 解姿势仍占 0.33 ms/帧；超过阴影距离（ACTOR_DETAIL.shadowM 24 m）又不在画面里的人，谁也看不见他的身子和影子，
+// 回到视野那一帧（或走进 offscreenFarM 以内）仍立刻补一次。offscreenFarM 比 shadowM 多留 6 m，给人走近时多一拍。
+offscreenFarM:30,offscreenFarAnimationS:1,viewCullCentreM:.9,viewCullRadiusM:2.6,walkThresholdMps:.08,gaitSpeedMps:3.6,carrySourceMps:1.4,loadSinkM:0,loadLeanRad:0,breathRate:1.7,watchYawRad:.18});
 
 // 老周身上的血（用户 2026-09-16：「应该是伤痕累累，血迹斑斑」）。担架上的两条画法共用这一张表：
 // 带骨架的伤员走 CharacterWounds.Add（沿世界竖直向下投到外层表面），实例化的烘焙姿势直接在烘焙空间摆球。
