@@ -17,6 +17,7 @@ node EarSpa3D/Script_PeelPhysicsTest.mjs
 
 | 改动范围 | 对应检查（按实际影响选用） |
 | --- | --- |
+| 病例目标、交单、练习与深部路线 | `Script_CareCasesTest.mjs` 验证指定原生材料、多代碎片与可选挑战；`Script_CareCasesPlayTest.mjs --url=...` 用真实键鼠逐关验证剥离、穿插软化、深部闭镊、撤出落盘、主动交单、重练／下一病例、练习恢复与超时；`Script_EconomyTest.mjs` 验证部分清洁和单次病例报酬 |
 | 鼠标与工作端定位 | `Script_PointerAlignmentTest.mjs` 检查自由空间屏幕误差、单一工作端光标、切工具／进退后的对齐、转腕与慢移释放不跳跃、碰壁反向无空行程、真实碰撞与 UI 恢复 |
 | 精细操作、工作面与边缘接触 | `Script_PrecisionPlayTest.mjs` 为现行真实输入验收，覆盖自由平移、进退、转腕、空夹、双侧闭镊、软化、耳勺逐点剥离、盘外重夹、质量和取消；`Script_InstrumentInteractionTest.mjs`、`Script_WaxEdgeContactTest.mjs` 保留工作端与边缘独立断言；旧点击／拖拽设置迁移 |
 | 薄壳、剥离与黏聚断裂 | `Script_PeelPhysicsTest.mjs`、`Script_SoftWaxPhysicsTest.mjs`、`Script_SoftWaxPlayTest.mjs`、`Script_CohesivePhysicsTest.mjs`、`Script_CohesiveScrapingPlayTest.mjs`、`Script_DirectionalPhysicsTest.mjs` |

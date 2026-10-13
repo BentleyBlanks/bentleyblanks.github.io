@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {CARE_CASE_IDS,CustomerCase,CaseProgress} from './Data_CareCases.mjs';
+let checks=0;
+function Check(ok,label){assert.ok(ok,label);checks++;}
+Check(CARE_CASE_IDS.join(',')==='drySheet,softenedWax,deepBend','only requested cases 1, 2 and 5 are added');
+Check(CustomerCase({id:'d1c0',earType:'mixed'})==='drySheet'&&CustomerCase({id:'d1c1',earType:'mixed'})==='softenedWax'&&CustomerCase({id:'d2c1',earType:'mixed'})==='deepBend','business visits rotate the three cases deterministically');
+Check(CustomerCase({id:'d3c0',earType:'oily'})===null,'existing oil service keeps its independent coating layout');
+Check(!CaseProgress('drySheet',[{id:3,state:'held'}],[]).complete,'detached or carried material does not complete a goal');
+Check(!CaseProgress('drySheet',[],[{id:2,mass:.9}]).complete,'unrelated wax cannot satisfy a target');
+Check(!CaseProgress('drySheet',[],[{id:'3.0',mass:.4},{id:'3.0',mass:.4}]).complete,'duplicate fragment receipts cannot complete a target');
+const fractured=[{id:3,state:'fractured'},{id:'3.0',fragment:true},{id:'3.1',fragment:true}];
+Check(!CaseProgress('drySheet',fractured,[{id:'3.0',mass:.4}]).complete,'a missing physical fragment keeps the goal incomplete');
+const recovered=CaseProgress('drySheet',fractured,[{id:'3.0',mass:.4},{id:'3.1.0',mass:.2},{id:'3.1.1',mass:.3}]);
+Check(recovered.complete&&!recovered.optional&&recovered.ratio===1,'all generations count by original material without granting intact challenge');
+Check(CaseProgress('drySheet',[{id:3,state:'collected'}],[{id:3,mass:.9}]).optional,'intact collected dry sheet meets the optional challenge');
+Check(!CaseProgress('softenedWax',[{id:2,softened:1}],[]).complete,'softening alone is not collection');
+Check(!CaseProgress('softenedWax',[],[{id:2,mass:.9,softened:1}]).complete,'both wet-case targets must be collected');
+Check(CaseProgress('softenedWax',[],[{id:2,mass:.9,softened:.7},{id:3,mass:.9}]).optional,'softening-at-collection meets the wet-case challenge');
+Check(!CaseProgress('softenedWax',[{id:2,softened:1}],[{id:2,mass:.9,softened:.2},{id:3,mass:.9}]).optional,'later softening cannot rewrite the actual collection quality');
+Check(CaseProgress('softenedWax',[],[{id:2,mass:.9},{id:3,mass:.9}]).complete,'a successful alternative physical route cannot soft-lock the case');
+Check(!CaseProgress('deepBend',[],[{id:7,mass:.9},{id:3,mass:.9}]).complete,'deep goal requires the actual specified obstruction');
+Check(CaseProgress('deepBend',[],[{id:8,mass:.9}]).complete,'deep target completes without clearing unrelated entrance wax');
+console.log('PASS '+checks+' care-case goal checks');

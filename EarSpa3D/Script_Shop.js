@@ -213,7 +213,10 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
     const comboBonus = Math.min(24, Math.round((summary?.bestCombo ?? 0) * 1.5));
     const perfect = clean > 0.97 && comfort > 0.7;
     const perfectBonus = perfect ? Math.round(customer.basePay * 0.5) : 0;
-    const payout = labor + tip + comboBonus + perfectBonus;
+    // A completed request can be handed in before optional whole-ear cleaning.
+    // Cleanliness and its existing bonuses still use only actually collected mass.
+    const caseBonus = summary?.caseResult?.complete && clean > 0 ? Math.round(customer.basePay * .6 * shop.priceMul) : 0;
+    const payout = labor + tip + comboBonus + perfectBonus + caseBonus;
 
     state.coins += payout;
     state.totalEarned += payout;
@@ -226,7 +229,8 @@ export function CreateShop({ seed = 20260910, storage = null } = {}) {
 
     const entry = {
       day: state.day, name: customer.name, tier: customer.tierName,
-      payout, labor, tip, comboBonus, perfectBonus,
+      payout, labor, tip, comboBonus, perfectBonus, caseBonus,
+      caseId: summary?.caseResult?.id || null, caseComplete: !!summary?.caseResult?.complete,
       clean, comfort, relax, verdict: summary?.verdict || "",
       harvest: summary?.harvest?.length ?? 0,
     };
