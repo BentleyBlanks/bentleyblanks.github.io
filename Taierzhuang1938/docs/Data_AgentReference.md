@@ -739,6 +739,9 @@ node Taierzhuang1938/Script_FrameDebugCli.mjs --view=front --pixel=x,y --pass-im
   每关一份 `Blockout/<Level>.json`（第二关另有 `.scene.json` 场景），外部改动 2 s 内同步，生成器 `Script_EditorBlockoutCli.mjs`；
   `window.Tengxian.Debug.Blockout` 给测试与 agent 用。口径 `docs/Data_EditorBlockout.md`，回归口
   `Script_EditorBlockout{Config,Save,Map,Browser}Test.mjs`。
+  用户贴来以「【滕县白盒编辑器 · 当前位置】」开头的一段文字，是编辑器里按 P / 复制按钮复制的现场（§4.2）：
+  末行 `数据：{...}` 是 JSON（`ParseBlockoutSnapshot` 可解析），关键帧 id 对应 `Blockout/<Level>.json` 的 `keyframes[].id`，
+  「重现这个机位」链接（带 `pose=`）原样打开就是用户那个画面。
   WorldInfo 独立浮窗显示当前角色 Transform 与高度；回归口 `Script_WorldInfoEditorTest.mjs`。
   玩家状态（PlayerState）独立浮窗显示血量失血、压制晕眩、体力、后坐散布、弹药动作等隐藏状态；回归口 `Script_PlayerStateEditorTest.mjs`。
   出图模式（`?shot=1`）下整棵编辑器 DOM 是 display:none，进不了截图。

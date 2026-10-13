@@ -37,6 +37,7 @@ const ICONS = Object.freeze({
   close: SVG('<path d="M4 4l8 8M12 4l-8 8"/>'),
   chevron: SVG('<path d="M4.5 6.5 8 10l3.5-3.5"/>'),
   camera: SVG('<path d="M2.5 5.5h2.2l1.2-1.8h4.2l1.2 1.8h2.2v7h-11z"/><circle cx="8" cy="8.9" r="2.2"/>'),
+  copy: SVG('<rect x="5.5" y="5.5" width="7.5" height="8" rx=".6"/><path d="M3 10.5V3.6c0-.3.3-.6.6-.6h6.9"/>'),
   arcs: SVG('<path d="M3 13 13 6.2A8.5 8.5 0 0 0 9.4 2.6Z" fill="currentColor" fill-opacity=".22"/><path d="M3 13 13 6.2M3 13 9.4 2.6"/>'),
   intents: SVG('<path d="M2.5 12.5 4 11M5.6 9.4l1.4-1.4M8.6 6.4 10 5" /><path d="M9.2 3h3.8v3.8"/>'),
   labels: SVG('<path d="M2.5 3.5h6.2l4.8 4.5-4.8 4.5H2.5z"/><circle cx="5.3" cy="8" r=".9" fill="currentColor" stroke="none"/>'),
@@ -59,7 +60,7 @@ const ARC_TIPS = Object.freeze({
 });
 const STATUS_TEXT = Object.freeze({ ok: "配置已载入", synced: "配置在外部改过，已同步", error: "配置有错", loading: "正在读配置" });
 
-const KEY_ACTIONS = Object.freeze({ Period: "next", NumpadDecimal: "next", Comma: "prev", KeyM: "map", KeyY: "replay", Escape: "escape" });
+const KEY_ACTIONS = Object.freeze({ Period: "next", NumpadDecimal: "next", Comma: "prev", KeyM: "map", KeyY: "replay", KeyP: "copy", Escape: "escape" });
 
 function El(tag, className = "", text = "") {
   const el = document.createElement(tag);
@@ -84,7 +85,7 @@ function Kbd(text) { return El("kbd", "boKbd", text); }
 export class BlockoutUi {
   /**
    * @param {HTMLElement} root  挂载点（一般是 document.body）
-   * @param {{onPrev?, onNext?, onSeek?, onLevel?, onLayer?, onSavePose?, onReplay?, onOpenMap?, onCloseMap?, onMapPick?}} handlers
+   * @param {{onPrev?, onNext?, onSeek?, onLevel?, onLayer?, onSavePose?, onCopy?, onReplay?, onOpenMap?, onCloseMap?, onMapPick?}} handlers
    */
   constructor(root, handlers = {}) {
     this.handlers = handlers || {};
@@ -163,15 +164,19 @@ export class BlockoutUi {
     // 按住不连发（与总控在 document 上的按键一致）：按住 . 不会一口气翻过好几个关键帧。
     if (e.repeat) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // 「复制当前位置」的备用文字框里：除了 Esc 关框，键都留给文字框（不翻关键帧）
+    if (e.target?.closest?.(".boCopyBox") && e.code !== "Escape") return;
     const action = KEY_ACTIONS[e.code];
     if (!action) return;
     e.preventDefault();
     if (action === "next") this.Call("onNext");
     else if (action === "prev") this.Call("onPrev");
     else if (action === "replay") this.Call("onReplay");
+    else if (action === "copy") this.Call("onCopy");
     else if (action === "map") this.Call(this.mapOpen ? "onCloseMap" : "onOpenMap");
     else if (action === "escape") {
-      if (this.levelMenuOpen) this.CloseLevelMenu();
+      if (this.copyBox && !this.copyBox.hidden) this.HideCopyText();
+      else if (this.levelMenuOpen) this.CloseLevelMenu();
       else if (this.mapOpen) this.Call("onCloseMap");
     }
   }
@@ -188,7 +193,10 @@ export class BlockoutUi {
     this.btnSave = Button("boIconBtn boSave", { icon: "camera", tip: "记下当前机位" });
     this.btnSave.dataset.tipSide = "left";
     this.Listen(this.btnSave, "click", () => this.Call("onSavePose"));
-    head.append(titleWrap, this.btnSave);
+    this.btnCopy = Button("boIconBtn boCopy", { icon: "copy", tip: "复制当前位置，贴给 agent（P）" });
+    this.btnCopy.dataset.tipSide = "left";
+    this.Listen(this.btnCopy, "click", () => this.Call("onCopy"));
+    head.append(titleWrap, this.btnCopy, this.btnSave);
 
     const what = El("div", "boLine boWhat");
     what.append(El("span", "boKey", "此时"));
@@ -308,7 +316,7 @@ export class BlockoutUi {
     this.elFast = El("span", "boFast");
     counter.append(this.elFast, this.elCount);
     const keys = El("div", "boKeys");
-    keys.append(Kbd(","), Kbd("."), El("span", "", "切换"), Kbd("Y"), El("span", "", "重播"), Kbd("M"), El("span", "", "地图"), Kbd("Esc"), El("span", "", "鼠标"));
+    keys.append(Kbd(","), Kbd("."), El("span", "", "切换"), Kbd("Y"), El("span", "", "重播"), Kbd("P"), El("span", "", "复制位置"), Kbd("M"), El("span", "", "地图"), Kbd("Esc"), El("span", "", "鼠标"));
     side.append(counter, keys);
 
     nav.append(this.btnPrev, wrap, this.btnNext, this.btnReplay, side);
@@ -685,6 +693,38 @@ export class BlockoutUi {
       this.HideNavTip();
       if (this.root.contains(document.activeElement)) document.activeElement.blur();
     }
+  }
+
+  /** 「复制当前位置」写不进剪贴板时的备用框：文字已全选，用户按 Ctrl+C；Esc / 关闭按钮收起。 */
+  ShowCopyText(text) {
+    if (this.disposed) return;
+    if (!this.copyBox) {
+      const box = El("div", "boCopyBox boPanel");
+      box.setAttribute("role", "dialog");
+      box.setAttribute("aria-label", "复制当前位置");
+      const head = El("div", "boCopyHead");
+      head.append(El("span", "boCopyTitle", "复制当前位置"), El("span", "boCopyHint", "按 Ctrl+C 复制，整段贴给 agent"));
+      const close = Button("boIconBtn boClose", { icon: "close", tip: "关闭（Esc）" });
+      close.dataset.tipSide = "left";
+      this.Listen(close, "click", () => this.HideCopyText());
+      head.append(close);
+      this.copyArea = El("textarea", "boCopyText");
+      this.copyArea.readOnly = true;
+      this.copyArea.spellcheck = false;
+      box.append(head, this.copyArea);
+      this.copyBox = box;
+      this.root.appendChild(box);
+    }
+    this.copyArea.value = String(text || "");
+    this.copyBox.hidden = false;
+    this.copyArea.focus({ preventScroll: true });
+    this.copyArea.select();
+  }
+
+  HideCopyText() {
+    if (!this.copyBox) return;
+    this.copyBox.hidden = true;
+    if (this.copyBox.contains(document.activeElement)) document.activeElement.blur();
   }
 
   SetMapOpen(on) {

@@ -20,6 +20,8 @@
 //      - 摆位间距：人离玩家 ≥ 1 m（倒地的 ≥ 0.5 m）、人离担架中心 ≥ 1.3 m、人离抬担架的人站的那一段 ≥ 0.6 m、
 //        任意两个单位 ≥ 0.8 m；下一步目标离玩家不到 2 m 的只写文字
 //      - 军官是 kind officer（拔刀军官、桥头军官）；床位上的老周担架 bearers 0、不是 down；Litter6 的抬担架的人倒了还是 down
+//   9. 「复制当前位置」（Script_EditorBlockoutSnapshot）：相对朝向的左右、pose 参数往返、文字带齐关卡 / 关键帧 / 机位 / 准星 / 重现链接，
+//      最后一行 JSON 能原样解析回来
 // ===========================================================================
 
 import assert from "node:assert/strict";
@@ -41,6 +43,9 @@ import {
 import { MID_TUNING } from "./Data_Tuning_FirstLevelMid.mjs";
 import { BuildSecondLevelConfig, SecondLevelZhaiWallBlocks, SecondLevelCourtyardBlocks, DecodeHeightAt, SECOND_LEVEL_BOUNDS } from "./Script_EditorBlockoutSecondLevel.mjs";
 import { Main as CliMain, StringifyBlockout } from "./Script_EditorBlockoutCli.mjs";
+import {
+  BuildBlockoutSnapshot, FormatBlockoutSnapshot, ParseBlockoutSnapshot, PoseParam, ParsePoseParam, BearingText,
+} from "./Script_EditorBlockoutSnapshot.mjs";
 import { MISSION_PLACEMENT as P, MISSION_ANCHORS as A, MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { WHITEBOX_0518_CAMERA_BY_ID } from "./Data_FirstLevelWhitebox0518Cameras.mjs";
 import { END_TUNING } from "./Data_Tuning_FirstLevelEnd.mjs";
@@ -561,6 +566,47 @@ Check("第二关：玩家点在边界内、不在实心块里；寨门 / 两处�
     const got = DecodeHeightAt(t, x - t.minX, z - t.minZ);
     assert.ok(Math.abs(got - y) <= 0.011, `(${x},${z}) 高度 ${got}，城区地面 ${y}`);
   }
+});
+
+Check("复制当前位置：左右朝向、pose 往返、文字带齐、末行 JSON 能解析回来", () => {
+  // 面朝北（yaw 0）：西边（-x）在左、东边（+x）在右；朝向 +90 = 面朝西，北（-z）在右
+  assert.equal(BearingText(0), "正前方");
+  assert.equal(BearingText(30), "左前 30°");
+  assert.equal(BearingText(-120), "右后 120°");
+  assert.equal(BearingText(179), "正后方");
+  const pose = { x: -35.123, z: -97.304, yawDeg: 200, pitchDeg: -5.04, stance: "crouch" };
+  assert.equal(PoseParam(pose), "-35.12,-97.3,-160,-5,crouch");
+  assert.deepEqual(ParsePoseParam(PoseParam(pose)), { x: -35.12, z: -97.3, yawDeg: -160, pitchDeg: -5, stance: "crouch" });
+  assert.equal(ParsePoseParam("abc"), null);
+  assert.equal(ParsePoseParam(""), null);
+  assert.deepEqual(ParsePoseParam("1,2"), { x: 1, z: 2, yawDeg: 0, pitchDeg: 0, stance: "stand" });
+  const snap = BuildBlockoutSnapshot({
+    level: { key: "FirstLevel", label: "第一关", configPath: "Taierzhuang1938/Blockout/FirstLevel.json" },
+    keyframe: { id: "06-1", index: 19, count: 44, stage: 6, stageTitle: "集结处接令", name: "借火位", what: "回到集结处",
+      next: { text: "上坡", x: -26, z: -110 }, player: { x: -36.5, z: -98.5, yawDeg: -148.4, pitchDeg: -12.8, stance: "stand" } },
+    player: { x: -35, y: 1.2, z: -97, eyeY: 2.8, yawDeg: 0, pitchDeg: 0, stance: "stand" },
+    aim: { kind: "block", x: -35, y: 2, z: -105, distM: 8.04, id: "WallA", tag: "whiteboxWall" },
+    units: [{ id: "luo", name: "罗班长", side: "nra", kind: "soldier", x: -40, z: -97 }, { id: "far", name: "远处", side: "ija", x: 100, z: 100 }],
+    pois: [{ id: "box", name: "弹药箱", kind: "poi", x: -30, z: -97 }],
+    map: null,
+    url: "http://127.0.0.1:8080/Taierzhuang1938/index.html?editor=blockout&level=FirstLevel&kf=06-1",
+  });
+  assert.equal(snap.keyframe.offsetM, 2.1);
+  assert.deepEqual(snap.near.map(n => [n.id, n.relDeg]), [["luo", 90], ["box", -90]], "罗班长在西边（左 90°）、弹药箱在东边（右 90°），远处的不列");
+  assert.equal(snap.next.relDeg, -35, "下一步在东北：右前 35°");
+  assert.ok(snap.reproduce.endsWith("kf=06-1&pose=-35,-97,0,0,stand"), snap.reproduce);
+  assert.deepEqual(ParsePoseParam(new URL(snap.reproduce).searchParams.get("pose")), { x: -35, z: -97, yawDeg: 0, pitchDeg: 0, stance: "stand" });
+  const text = FormatBlockoutSnapshot(snap);
+  for (const piece of ["第一关（FirstLevel）", "Taierzhuang1938/Blockout/FirstLevel.json", "关键帧：06-1（第 20/44 个）06 集结处接令 · 借火位",
+    "下一步：上坡", "右前 35°", "我现在：x -35.00", "离关键帧机位 2.1 m", "准星对着：体块 WallA", "罗班长（友） 左前 90° 5.0 m", "弹药箱（要点） 右前 90° 5.0 m", "重现这个机位：http"]) {
+    assert.ok(text.includes(piece), `文字里应当有「${piece}」：\n${text}`);
+  }
+  assert.deepEqual(ParseBlockoutSnapshot(text), JSON.parse(JSON.stringify(snap)));
+  assert.equal(ParseBlockoutSnapshot("随便一段话"), null);
+  // 没打到东西、没有关键帧也能出字
+  const bare = FormatBlockoutSnapshot(BuildBlockoutSnapshot({ level: { key: "SecondLevel" }, keyframe: null,
+    player: { x: 1, y: 0, z: 2, eyeY: 1.6, yawDeg: 0, pitchDeg: 0 }, aim: { kind: "none" }, units: [], pois: [] }));
+  assert.ok(bare.includes("关键帧：（没有）") && bare.includes("准星对着：天空"), bare);
 });
 
 console.log(unitWarnings.length ? `警告：${unitWarnings.length} 个单位落在实心块里（不算失败）：\n  ${unitWarnings.join("\n  ")}` : "单位都不在实心块里");

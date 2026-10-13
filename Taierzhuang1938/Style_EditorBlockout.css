@@ -32,7 +32,7 @@
 }
 .boRoot *, .boRoot *::before, .boRoot *::after { box-sizing: border-box; }
 .boRoot [hidden] { display: none !important; }
-.boRoot :is(.boCard, .boTopBar, .boMini, .boNav, .boMusic, .boMapOverlay.open) { pointer-events: auto; }
+.boRoot :is(.boCard, .boTopBar, .boMini, .boNav, .boMusic, .boMapOverlay.open, .boCopyBox) { pointer-events: auto; }
 .boRoot.inert, .boRoot.inert * { pointer-events: none !important; }
 .boRoot.inert [data-tip]::after { display: none; }
 
@@ -97,8 +97,9 @@
 }
 .boStageTitle { font-size: 15px; font-weight: 700; color: var(--bo-bright); letter-spacing: 0.02em; }
 .boPlace { font-size: 13px; color: var(--bo-muted); }
-.boSave { flex: 0 0 auto; margin: -3px -4px 0 0; color: var(--bo-text); border-color: var(--bo-line); }
-.boSave:hover { border-color: var(--bo-line-strong); }
+.boSave, .boCopy { flex: 0 0 auto; margin: -3px 0 0 0; color: var(--bo-text); border-color: var(--bo-line); }
+.boSave { margin-right: -4px; }
+.boSave:hover, .boCopy:hover { border-color: var(--bo-line-strong); }
 
 .boLine { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 10px; margin: 6px 0 0; }
 .boLine:first-of-type { margin-top: 0; }
@@ -321,6 +322,21 @@
 .boMapBody { position: relative; flex: 1 1 auto; min-height: 0; }
 .boMapCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 .boMapCanvas.dragging { cursor: grabbing; }
+
+/* --- 复制当前位置的备用框（剪贴板写不进去时才出现，§4.2） ------------------------- */
+.boCopyBox {
+  position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 7;
+  width: min(720px, calc(100vw - 32px)); display: flex; flex-direction: column;
+  background: var(--bo-panel-solid); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+.boCopyHead { display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 14px; border-bottom: 1px solid var(--bo-line); }
+.boCopyTitle { font-size: 14px; font-weight: 700; color: var(--bo-bright); letter-spacing: 0.04em; white-space: nowrap; }
+.boCopyHint { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--bo-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.boCopyText {
+  display: block; width: 100%; height: min(320px, 50vh); margin: 0; padding: 10px 14px; resize: none;
+  border: 0; outline: none; background: transparent; color: var(--bo-text);
+  font: 12px/1.6 var(--bo-num); white-space: pre; overflow: auto;
+}
 
 /* --- 中上：提示条 --------------------------------------------------------- */
 .boToasts {

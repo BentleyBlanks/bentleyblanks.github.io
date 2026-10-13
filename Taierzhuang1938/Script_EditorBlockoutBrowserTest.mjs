@@ -38,6 +38,7 @@ import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
 import { BLOCKOUT_EDITOR } from "./Script_EditorBlockout.mjs";
 import { LitterSlots, LitterPose, BLOCKOUT_PUPPETS } from "./Script_EditorBlockoutPuppets.mjs";
 import { FanFade, BLOCKOUT_FAN } from "./Script_EditorBlockoutMarkers.mjs";
+import { ParseBlockoutSnapshot } from "./Script_EditorBlockoutSnapshot.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -725,6 +726,87 @@ try {
   Check("没有本机存档口时「记下当前机位」退化成本地草稿并写明原因", save.mode === "local" && save.draft && !!save.reason, JSON.stringify(save));
   const persisted = await page.evaluate(() => { try { return localStorage.getItem("tengxian1938_debug_options_v1"); } catch (error) { return "?"; } });
   Check("无敌 / 无限弹药只在本会话生效，不写调试选项存档", persisted === null, String(persisted));
+
+  // 「复制当前位置」（§4.2）：按钮 / P 键写剪贴板；写不进去弹出选好文字的框；「重现」链接原样打开回到同一机位
+  console.log("--- copy snapshot");
+  await GoTo("06-1");
+  await B(() => window.Tengxian.Debug.Blockout.PlacePlayer({ x: -33.4, z: -96.2, yawDeg: -120, pitchDeg: -4, stance: "stand" }));
+  await page.waitForTimeout(300);
+  await B(() => { window.__copied = []; navigator.clipboard.writeText = async (text) => { window.__copied.push(text); }; });
+  await page.click(".boCopy");
+  await WaitSync(() => window.__copied.length >= 1, null, 3000);
+  const copied = await B(() => ({ text: window.__copied[0] || "", player: { x: window.Tengxian.player.position.x, z: window.Tengxian.player.position.z,
+    yawDeg: window.Tengxian.player.yaw * 180 / Math.PI } }));
+  const snap = ParseBlockoutSnapshot(copied.text);
+  Check("复制按钮把当前位置写进剪贴板：关卡、关键帧、玩家机位对得上，末行数据能解析回来",
+    !!snap && snap.level === "FirstLevel" && snap.keyframe?.id === "06-1" && Math.abs(snap.player.x - copied.player.x) < 0.01
+      && Math.abs(snap.player.z - copied.player.z) < 0.01 && Math.abs(snap.player.yawDeg - copied.player.yawDeg) < 0.06
+      && /关键帧：06-1/.test(copied.text) && /重现这个机位：http/.test(copied.text) && ["block", "ground", "none"].includes(snap.aim.kind),
+    copied.text.split("\n").slice(0, 9).join(" / ").slice(0, 400));
+  await page.keyboard.press("KeyP");
+  const viaKey = await WaitSync(() => window.__copied.length >= 2, null, 3000);
+  Check("按 P 也能复制", viaKey.ok);
+  // 低头看脚下：准星落在地面；对着一块有名字的墙：认得出是哪一块
+  // 相机跟着玩家要等下一帧才转过去：摆完人等两帧再取快照
+  const ground = await B(async () => {
+    const Frames = (n) => new Promise(resolve => { let k = 0; const step = () => (++k >= n ? resolve() : requestAnimationFrame(step)); requestAnimationFrame(step); });
+    const Bl = window.Tengxian.Debug.Blockout;
+    const p = window.Tengxian.player.position;
+    Bl.PlacePlayer({ x: p.x, z: p.z, yawDeg: -120, pitchDeg: -75, stance: "stand" });
+    await Frames(2);
+    return Bl.Snapshot().aim;
+  });
+  Check("低头时准星落点是地面、就在脚边", ground.kind === "ground" && ground.distM < 4, JSON.stringify(ground));
+  const named = await B(async () => {
+    const Frames = (n) => new Promise(resolve => { let k = 0; const step = () => (++k >= n ? resolve() : requestAnimationFrame(step)); requestAnimationFrame(step); });
+    const T = window.Tengxian, Bl = T.Debug.Blockout;
+    const tried = [];
+    const blocks = T.battlefield.layout.blocks.filter(b => b.id && b.solid !== false && !b.ry && b.h >= 2.2 && b.w >= 2 && b.d >= 1 && b.tag !== "airWall" && !b.blockoutWater);
+    for (const b of blocks.slice(0, 60)) {
+      const x = b.x + b.w / 2 + 3, z = b.z;
+      Bl.PlacePlayer({ x, z, yawDeg: 90, pitchDeg: 0, stance: "stand" });
+      const p = T.player.position;
+      if (Math.abs(p.x - x) > 0.05 || Math.abs(p.z - z) > 0.05) continue;
+      await Frames(2);
+      const aim = Bl.Snapshot().aim;
+      tried.push(`${b.id}:${aim.id || aim.kind}`);
+      if (aim.kind === "block" && aim.id === b.id) return { ok: true, id: b.id, distM: aim.distM, tried: tried.length };
+    }
+    return { ok: false, tried: tried.slice(0, 8) };
+  });
+  Check("准星对着体块时写得出体块 id（离墙 3 m 看过去）", named.ok && Math.abs(named.distM - 3) < 0.4, JSON.stringify(named));
+  await GoTo("06-1");
+  // 剪贴板两条路都被拒：弹出选好文字的框，Esc 收起；框里按 . 不翻关键帧
+  await B(() => {
+    navigator.clipboard.writeText = async () => { throw new DOMException("denied", "NotAllowedError"); };
+    document.execCommand = () => false;
+  });
+  await page.click(".boCopy");
+  await WaitSync(() => !!document.querySelector(".boCopyBox:not([hidden])"), null, 3000);
+  const box = await B(() => {
+    const area = document.querySelector(".boCopyBox:not([hidden]) .boCopyText");
+    return { shown: !!area, focused: document.activeElement === area, selected: area ? area.selectionEnd - area.selectionStart : 0,
+      length: area?.value.length || 0, hasData: /\n数据：\{/.test(area?.value || "") };
+  });
+  const indexBefore = (await State()).index;
+  await page.keyboard.press("Period");
+  const indexAfter = (await State()).index;
+  await page.keyboard.press("Escape");
+  const boxHidden = await B(() => !document.querySelector(".boCopyBox:not([hidden])"));
+  Check("剪贴板写不进去时弹出选好文字的框，框里按 . 不翻关键帧，Esc 收起",
+    box.shown && box.focused && box.selected === box.length && box.hasData && indexAfter === indexBefore && boxHidden,
+    JSON.stringify({ ...box, indexBefore, indexAfter, boxHidden }));
+  // 「重现」链接：重新打开页面，落在同一关键帧、同一机位，地址栏里的 pose 被收掉
+  const reproduce = new URL(snap.reproduce);
+  await page.goto(reproduce.toString(), { waitUntil: "load", timeout: 180000 });
+  await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000 });
+  await page.waitForTimeout(300);
+  const reopened = await B(() => ({ state: window.Tengxian.Debug.Blockout.State(), x: window.Tengxian.player.position.x, z: window.Tengxian.player.position.z,
+    yawDeg: window.Tengxian.player.yaw * 180 / Math.PI, search: location.search }));
+  Check("「重现」链接打开后回到同一关键帧与机位，地址栏不再带 pose",
+    reopened.state.id === "06-1" && Math.hypot(reopened.x - snap.player.x, reopened.z - snap.player.z) < 0.3
+      && Math.abs(reopened.yawDeg - snap.player.yawDeg) < 0.2 && !/pose=/.test(reopened.search),
+    JSON.stringify({ id: reopened.state.id, x: reopened.x.toFixed(2), z: reopened.z.toFixed(2), yaw: reopened.yawDeg.toFixed(1), want: snap.player, search: reopened.search }));
 
   Check("全程没有未捕获错误", errors.length === 0, errors.slice(0, 5).join(" | "));
 } finally {

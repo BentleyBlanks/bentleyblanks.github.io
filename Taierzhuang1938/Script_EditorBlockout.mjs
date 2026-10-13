@@ -7,7 +7,9 @@
 //   页面可见时每 2 s 读一次配置原文，变了就按当前关键帧 id 重新摆（AI 改完 JSON、这里自动看到）；
 //   外面改到一半（文件暂时没了、JSON 写了一半、校验不过）不换掉已经载入的配置，只亮红点报原因；
 //   玩家留在原地，只有当前关键帧的 player 改了才挪过去；
-//   「记下当前机位」把玩家现在的位置 / 朝向 / 姿态写回当前关键帧并保存（带上读配置时的版本号，§7）。
+//   「记下当前机位」把玩家现在的位置 / 朝向 / 姿态写回当前关键帧并保存（带上读配置时的版本号，§7）；
+//   「复制当前位置」（P）把关卡 / 关键帧 / 机位 / 准星落点 / 附近的人整理成一段文字放进剪贴板，贴给 agent 用（§4.2）；
+//   地址栏带 pose=x,z,朝向,俯仰,姿态 时，落到关键帧后再把玩家摆到这个机位（那段文字里的「重现」链接就是它）。
 //
 // 界面（Script_EditorBlockoutUi）与纸面俯视图（Script_EditorBlockoutMap）只走 §4 / §4.1 的接口；
 // 全关总图上的鼠标（滚轮缩放、拖动平移、双击看全图、点关键帧）归地图模块，点选经 onMapPick 回到这里。
@@ -18,8 +20,9 @@ import {
   BLOCKOUT_LEVELS, BLOCKOUT_PHASES, BlockoutTintColor, BlockoutWaterBlocks, BlockoutMapScene,
 } from "./Script_EditorBlockoutLevels.mjs";
 import {
-  ValidateBlockout, NormalizeBlockout, KeyframeIndex, PlanTransition, DefaultArc, YawDegFromTo,
+  ValidateBlockout, NormalizeBlockout, KeyframeIndex, PlanTransition, DefaultArc, YawDegFromTo, BlockoutConfigPath,
 } from "./Script_EditorBlockoutConfig.mjs";
+import { BuildBlockoutSnapshot, FormatBlockoutSnapshot, ParsePoseParam } from "./Script_EditorBlockoutSnapshot.mjs";
 import { BlockoutPuppets } from "./Script_EditorBlockoutPuppets.mjs";
 import { BlockoutMarkers } from "./Script_EditorBlockoutMarkers.mjs";
 import { BlockoutStore } from "./Script_EditorBlockoutStore.mjs";
@@ -33,6 +36,8 @@ import { MarkNoPrepass } from "./Script_Post.mjs";
 const DEG = Math.PI / 180;
 /** 打开全关总图时短边大约看多少米（玩家附近一片，不是全图）。 */
 const MAP_FOCUS_SPAN_M = 220;
+/** 「复制当前位置」里准星射线打多远。 */
+const AIM_RAY_M = 300;
 
 export const BLOCKOUT_EDITOR = Object.freeze({
   pollS: 2,
@@ -50,6 +55,24 @@ export const BLOCKOUT_EDITOR = Object.freeze({
 
 function WrapDeg(deg) { let d = ((deg + 180) % 360 + 360) % 360 - 180; if (d === -180) d = 180; return d; }
 function Round(value, digits) { const k = 10 ** digits; return Math.round(value * k) / k; }
+
+/** 写剪贴板：先走 navigator.clipboard，被拒（非安全上下文、没焦点、宿主不给权限）再走 execCommand。→ 用上的方法名 | null。 */
+async function WriteClipboard(text) {
+  try {
+    if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return "clipboard"; }
+  } catch (error) { /* 落到下面 */ }
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;";
+  const active = document.activeElement;
+  document.body.appendChild(area);
+  let ok = false;
+  try { area.select(); ok = document.execCommand("copy"); } catch (error) { ok = false; }
+  area.remove();
+  if (active && active !== document.body && typeof active.focus === "function") active.focus({ preventScroll: true });
+  return ok ? "execCommand" : null;
+}
 
 /** 地面米格线（1 m 细线、10 m 粗线），世界坐标 XZ。只挂在本关地面那份材质上。 */
 const GRID_PATCH = MakePatch({
@@ -167,6 +190,7 @@ export class EditorBlockout {
       onLevel: (key) => { this.SwitchLevel(key); },
       onLayer: (name, on) => { this.SetLayers({ [name]: on }); },
       onSavePose: () => { this.SavePose(); },
+      onCopy: () => { this.CopySnapshot(); },
       onReplay: () => { this.Replay(); },
       onOpenMap: () => { this.ToggleMap(true); },
       onCloseMap: () => { this.ToggleMap(false); },
@@ -189,6 +213,11 @@ export class EditorBlockout {
       SetLayers: (partial) => this.SetLayers(partial),
       Config: () => (this.doc ? JSON.parse(JSON.stringify(this.doc)) : null),
       SavePose: () => this.SavePose(),
+      // 「复制当前位置」（§4.2）：Snapshot() 是快照对象，SnapshotText() 是贴给 agent 的那段文字，
+      // CopySnapshot() 真去写剪贴板（→ { ok, method, text }）。
+      Snapshot: () => this.Snapshot(),
+      SnapshotText: () => { const snap = this.Snapshot(); return snap ? FormatBlockoutSnapshot(snap) : null; },
+      CopySnapshot: () => this.CopySnapshot(),
       Stats: () => this.Stats(),
       // 取证 / 出图用：把玩家摆到任意机位（{x,z,yawDeg,pitchDeg?,stance?}），不改关键帧。
       PlacePlayer: (pose) => { this.PlacePlayer(pose); return { x: this.game.player.position.x, z: this.game.player.position.z }; },
@@ -218,9 +247,12 @@ export class EditorBlockout {
     await this.LoadConfig();
     this.SetupLevel();
     const kf = this.params.get("kf");
+    // 「重现」链接带来的机位：落到关键帧之后再摆（地址栏里的 pose 由 ReplaceUrl 去掉，之后翻关键帧不再套用）
+    const pose = ParsePoseParam(this.params.get("pose"));
     let index = kf != null ? KeyframeIndex(this.doc, kf) : 0;
     if (index < 0) index = 0;
     await this.GoTo(index, { animate: false });
+    if (pose) { this.PlacePlayer(pose); this.UpdateCard(true); }
     this.ready = true;
     this.pollTimer = setInterval(() => { this.Poll(); }, BLOCKOUT_EDITOR.pollS * 1000);
     // 存档口只问一次：界面要写明「这里能不能直接存」。
@@ -445,6 +477,7 @@ export class EditorBlockout {
       url.searchParams.set("level", this.levelKey);
       const id = this.keyframe?.id;
       if (id) url.searchParams.set("kf", id); else url.searchParams.delete("kf");
+      url.searchParams.delete("pose");
       history.replaceState(history.state, "", url);
     } catch (error) { /* 地址栏改不了不影响编辑 */ }
   }
@@ -824,6 +857,7 @@ export class EditorBlockout {
       if (event.code === "Period") { event.preventDefault(); this.Next(); }
       else if (event.code === "Comma") { event.preventDefault(); this.Prev(); }
       else if (event.code === "KeyY") { event.preventDefault(); this.Replay(); }
+      else if (event.code === "KeyP" && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); this.CopySnapshot(); }
       else if (event.code === "Escape" && this.mapOpen) { event.preventDefault(); this.ToggleMap(false); }
     };
     document.addEventListener("keydown", this.onKeyDown);
@@ -930,6 +964,81 @@ export class EditorBlockout {
     this.SetupLevelLists();
     this.PushStatus();
     return result;
+  }
+
+  // -------------------------------------------------------------------------
+  // 复制当前位置（§4.2）
+
+  /** 准星正前方打一条射线（连地表）：打到体块 → 体块 id（从本关布局里按中心与尺寸认回来）。 */
+  AimHit(eye, dir) {
+    const field = this.game.battlefield;
+    if (!field?.Raycast) return { kind: "none" };
+    let hit = null;
+    try { hit = field.Raycast(eye, dir, AIM_RAY_M, { terrain: true }); } catch (error) { hit = null; }
+    if (!hit || !(hit.t >= 0)) return { kind: "none" };
+    const at = { x: eye.x + dir.x * hit.t, y: eye.y + dir.y * hit.t, z: eye.z + dir.z * hit.t, distM: hit.t };
+    const box = hit.box;
+    // 地表两种记录：高度场瓦片（terrain: true）与解析地表（Script_Physics 的 TERRAIN_RECORD：tag dirt、没有中心 c）
+    if (!box || box.terrain || (box.tag === "dirt" && !Array.isArray(box.c))) return { kind: "ground", ...at };
+    const block = this.BlockOfCollider(box);
+    return { kind: "block", ...at, id: block?.id || "", semantic: block?.semantic || "", tag: box.tag || "" };
+  }
+
+  /** 碰撞盒（c 中心、h 半尺寸）→ 本关布局里的那一块（按 x / z / 宽 / 深认，厘米取整）。 */
+  BlockOfCollider(box) {
+    const layout = this.game.battlefield?.layout;
+    if (!layout?.blocks || !Array.isArray(box?.c) || !Array.isArray(box?.h)) return null;
+    const Key = (x, z, w, d) => [x, z, w, d].map(v => Math.round(v * 100)).join("|");
+    if (this.blockIndex?.layout !== layout) {
+      const map = new Map();
+      for (const b of layout.blocks) if (b?.id) map.set(Key(b.x, b.z, b.w, b.d), b);
+      this.blockIndex = { layout, map };
+    }
+    return this.blockIndex.map.get(Key(box.c[0], box.c[2], box.h[0] * 2, box.h[2] * 2)) || null;
+  }
+
+  /** 现场 → 快照对象（Script_EditorBlockoutSnapshot.BuildBlockoutSnapshot）。没有玩家时 null。 */
+  Snapshot() {
+    const player = this.game.player, kf = this.keyframe;
+    if (!player || !this.doc) return null;
+    const camera = this.host.camera;
+    const eye = camera.getWorldPosition(new THREE.Vector3());
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const canvas = this.ui.fullCanvas, view = this.map.view;
+    return BuildBlockoutSnapshot({
+      level: { key: this.levelKey, label: this.level?.label || this.doc.title || "", configPath: BlockoutConfigPath(this.levelKey) },
+      keyframe: kf ? {
+        id: kf.id, index: this.index, count: this.doc.keyframes.length, stage: kf.stage, stageTitle: kf.stageTitle,
+        name: kf.name, what: kf.what, next: kf.next || null, player: kf.player,
+      } : null,
+      player: {
+        x: player.position.x, y: player.position.y, z: player.position.z, eyeY: eye.y,
+        yawDeg: player.yaw / DEG, pitchDeg: player.pitch / DEG, stance: player.stance,
+      },
+      aim: this.AimHit(eye, dir),
+      units: this.liveUnits.filter(u => u.visible !== false),
+      pois: kf?.pois || [],
+      map: this.mapOpen && view ? { open: true, cx: view.cx, cz: view.cz, spanM: (canvas?.clientWidth || 0) / view.pxPerM } : null,
+      url: location.href,
+    });
+  }
+
+  /** P / 复制按钮：快照文字写进剪贴板；写不进去就弹一个选好文字的框让人按 Ctrl+C。 */
+  async CopySnapshot() {
+    const snap = this.Snapshot();
+    if (!snap) { this.ui.Toast("还没进场景，没有可复制的位置", "error"); return { ok: false, method: null, text: "" }; }
+    const text = FormatBlockoutSnapshot(snap);
+    this.lastSnapshotText = text;
+    const method = await WriteClipboard(text);
+    const where = (snap.keyframe?.id ? snap.keyframe.id + "，" : "") + "x " + snap.player.x.toFixed(1) + "  z " + snap.player.z.toFixed(1);
+    if (method) {
+      this.ui.Toast("已复制当前位置（" + where + "），直接粘贴给 agent", "ok");
+    } else {
+      this.ReleasePointerLock();
+      this.ui.ShowCopyText(text);
+      this.ui.Toast("这个窗口不让写剪贴板：文字已经选好，按 Ctrl+C 复制", "warn");
+    }
+    return { ok: !!method, method, text };
   }
 
   // -------------------------------------------------------------------------

@@ -18,11 +18,12 @@
 ## 1. 入口与总体结构
 
 ```
-index.html?editor=blockout&level=FirstLevel[&kf=03-2][&quality=whitebox]
+index.html?editor=blockout&level=FirstLevel[&kf=03-2][&pose=x,z,朝向,俯仰,姿态][&quality=whitebox]
 ```
 
 - `editor=blockout` 已经能把启动路由到 `Script_Main`（`Data_StartupRouting.IsMenuStartup` 认 `editor`），**不改路由表**。
 - `level` 缺省 `FirstLevel`；`kf` 缺省第一个关键帧。
+- `pose`（2026-10-13 追加）：落到关键帧之后再把玩家摆到这个机位（米 / 度，如 `-35.12,-97.3,-140.2,-5,stand`），就是 §4.2「复制当前位置」里那条「重现」链接；进来后地址栏去掉它（之后翻关键帧不再套用）。不合法就当没给。
 - **菜单入口（用户 2026-10-13 追加）**：高级工具（同日另一轮已改成顶部菜单栏 + Inspector）的「关卡」菜单第一项「白盒关卡编辑器」（照 `TextureEditor` 的写法：一个只带静态 `id = "blockout"` / `label` / `hint` / `Open()` 的小类，放在 `Script_EditorBlockoutEntry.mjs`，`Script_Editor.mjs` 把它放进 `TOOL_MENUS` 的「关卡」并在 `Toggle` / `Open` 里按 id 特判）。`Open()` 跳到 `?editor=blockout&level=FirstLevel`（保留当前 `quality` / `scale` / `audio` 参数，去掉 `whitebox` / `missionStage` / `phase` 等关卡参数）。已经在编辑器模式里时，这个按钮显示为当前项，点了不重载。菜单栏条目数因此 +1：`Script_EditorTest` 的 19 → 20。轻量菜单（`Script_MenuStartup`）里的「高级工具」本来就跳到带编辑器面板的完整页面，不另加入口。
 - 该模式下：
   - `PHASE_TABLE` 换成 `BLOCKOUT_PHASES`（每个关卡一个 phase），关卡间切换走现成的 `JumpToLevel(i)`（整片拆除重建）。
@@ -191,7 +192,7 @@ export function DefaultArc(unit);                   // §5.3
 
 | 位置 | 内容 |
 | --- | --- |
-| 左上 · 关键帧卡片（宽约 380 px） | 第 1 行：金色阶段号「03」+ 阶段标题 + 灰色「· 站位名」。第 2 行「此时」+ `what`。第 3 行「下一步」+ 指向目标的小箭头（随视角转，正前方朝上）+ `next.text` + 距离「52 m」。可选第 4 行：`how` 小标签；`notes` 一行弱显示；有 `guess` 单位时一行「n 个位置是推测的」。右上角一个小按钮「记下当前机位」（§7）。 |
+| 左上 · 关键帧卡片（宽约 380 px） | 第 1 行：金色阶段号「03」+ 阶段标题 + 灰色「· 站位名」；右上两个小按钮「复制当前位置」（§4.2）与「记下当前机位」（§7）。第 2 行「此时」+ `what`。第 3 行「下一步」+ 指向目标的小箭头（随视角转，正前方朝上）+ `next.text` + 距离「52 m」。可选第 4 行：`how` 小标签；`notes` 一行弱显示；有 `guess` 单位时一行「n 个位置是推测的」。右上角一个小按钮「记下当前机位」（§7）。 |
 | 右上 · 关卡与图层（齿轮按钮左侧） | 关卡下拉（显示当前关卡名 + 下拉箭头）；4 个图标开关：射界 / 去向 / 标签 / 穿墙显示；配置状态小点（绿 = 已载入，蓝闪 = 检测到外部修改已同步，红 = 配置有错，悬停看原因）。 |
 | 左下 · 小地图（220×220 CSS px，按 DPR 出图） | 北朝上、跟随玩家；纸面风格；角落小字「M 展开」。 |
 | 底部居中 · 导航栏（宽 min(1140 px, 64vw)，全关总图打开时仍在最上层可点） | 左右两个箭头按钮 + 一个重播按钮（当前是第一个关键帧时置灰）；中间轨道按阶段分段（段宽按该阶段关键帧数），段下方小字阶段号 01…18；每个关键帧一个刻度，当前关键帧金色滑块；悬停刻度弹出「03 · 观察射台」；点击跳转、拖动松手跳转；右侧计数「03 · 2/3」；最右一行极小的按键提示「, . 切换　M 地图　Esc 鼠标」。 |
@@ -201,7 +202,7 @@ export function DefaultArc(unit);                   // §5.3
 
 - 游戏 HUD：编辑器模式给 `body` 加 `blockoutMode` 类，隐藏任务字、简报卡、字幕、旧小地图、人数池等；保留准星、弹药、受伤反馈。
 - 指针锁：锁定时编辑器界面可见但不可点（`pointer-events:none`）；Esc 解锁后可点；点 3D 画面重新锁定（现有逻辑）。窗口不给锁（Claude 桌面应用的内置浏览器面板会报 `SecurityError` / `WrongDocumentError`「root document … not valid for pointer lock」）时，`Script_Main` 改成**按住右键拖动转视角**、左键照常开枪，提示一次 `hud.hint.dragLook`；正常浏览器不受影响。编辑器 DOM 上的 `mousedown`/`wheel`/`keydown` 必须 `stopPropagation`，否则会触发抢锁、滚轮换枪。
-- 按键（锁定 / 未锁定都有效）：`.` 下一个（带过渡动画）、`,` 上一个（直接到位）、`M` 全关总图（替代原 M 小地图）、`Y` 重播进入当前关键帧的过渡。不得占用 `KEYMAP` 已绑的键。
+- 按键（锁定 / 未锁定都有效）：`.` 下一个（带过渡动画）、`,` 上一个（直接到位）、`M` 全关总图（替代原 M 小地图）、`Y` 重播进入当前关键帧的过渡、`P` 复制当前位置（§4.2）。不得占用 `KEYMAP` 已绑的键。
 
 ```js
 export class BlockoutUi {
@@ -246,6 +247,21 @@ export class BlockoutMap {
   Dispose()
 }
 ```
+
+### 4.2 复制当前位置（`Script_EditorBlockoutSnapshot.mjs`，纯，零 three / DOM）
+
+用户要把「我现在在哪、看着什么、在哪个关键帧」一键交给 agent，不走下载文件（用户 2026-10-13）。卡片右上的复制按钮或 `P`：
+
+1. 总控 `Snapshot()` 收现场：关卡、当前关键帧（id、序号、阶段、此时、下一步、关键帧机位）、玩家（位置、眼高、朝向、俯仰、姿态）、
+   准星正前方一条 300 m 射线（连地表；打到体块时按碰撞盒的中心与宽深从本关布局 `layout.blocks` 认回体块 `id`）、30 m 内的单位与 POI（最多 8 个，按远近）、
+   全关总图开着时的视图中心与横向米数、当前地址。
+2. `BuildBlockoutSnapshot` 取整成只有数字和字符串的对象（`schema: "tengxian-blockout-snapshot/1"`），`FormatBlockoutSnapshot` 排成一段文字：
+   前面几行给人看（关卡与配置路径、关键帧、下一步在我哪边多远、我现在、准星对着什么、附近有谁、「重现这个机位」链接、坐标口径），
+   **最后一行 `数据：{...}` 是整份快照的 JSON**，数字以它为准；`ParseBlockoutSnapshot(text)` 找这一行解析回来。
+3. 写剪贴板：`navigator.clipboard.writeText` → 被拒再 `document.execCommand("copy")` → 两条都不行就松开鼠标、弹出一个文字已全选的框（按 Ctrl+C，Esc 收起；框里按键不翻关键帧）。
+
+**agent 收到这段文字时**：「关键帧」那一行的 id 就是 `Blockout/<Level>.json` 里 `keyframes[].id`；「我现在」的 x / z / 朝向 / 俯仰可以原样写进那个关键帧的 `player`；
+「准星对着：体块 X」的 X 是本关布局里的块 id；要看画面就无头打开「重现这个机位」链接截图。相对方位「左前 23°」= 要往左转 23° 才正对。
 
 ## 5. 关键帧、过渡与标记
 
@@ -334,6 +350,9 @@ Reload()                     // 重读配置
 Units()                      // → 演员现场位置
 ToggleMap(open?); SetLayers(partial);
 Config()                     // → 归一化后的配置（深拷贝）
+PlacePlayer(pose)            // 把玩家摆到任意机位，不改关键帧（相机要等下一帧才转过去）
+Snapshot(); SnapshotText()   // §4.2 快照对象 / 贴给 agent 的文字（取的是相机当前朝向：摆完人先等一帧）
+CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "clipboard"|"execCommand"|null, text }>
 ```
 
 ### 6.2 总控（`Script_EditorBlockout.mjs`）
@@ -463,3 +482,4 @@ Config()                     // → 归一化后的配置（深拷贝）
 - 2026-10-13（集成）：四包合并；§5.4 信号按剧情时刻；§3 担架加 `bearers`；§5.5 射界扇只画不穿墙的一遍并在近处淡出；§7 写明端点的必填字段、返回与状态码、版本号按原始字节；校验器报错不再回显嵌套值（防预览服务栈溢出）。
 - 2026-10-13（配乐）：右上加「配乐」胶囊与面板（`Script_EditorBlockoutMusic.mjs`）：新方案 / 现行 / 关跟着关键帧换曲、曲库点播；数据与口径见 [第一关配乐重配](Data_FirstLevelScoreRedesign.md)。自带 AudioContext，不进游戏音乐总线；偏好记 sessionStorage。`hudFps` 在编辑器模式下挪到 96 px 让出位置。
 - 2026-10-13（用户反馈第一轮）：锁不住鼠标的窗口退化成按住右键拖动转视角；全关总图打开时对准玩家、导航栏压在总图上面仍可用；导航栏加重播按钮（同 `Y`）。
+- 2026-10-13（复制当前位置）：卡片加「复制当前位置」按钮与 `P` 键（§4.2），文字末行带整份 JSON；入口加 `pose=` 参数，「重现」链接原样打开回到同一机位。
