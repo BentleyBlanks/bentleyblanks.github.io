@@ -543,7 +543,7 @@ async function CheckInterface() {
   for(const mode of ['codex','credits','debug']) {
     await page.evaluate(mode=>window.Taierzhuang.menu.Show(mode),mode);
     await Shot(mode);
-    await page.locator('.mnBack').focus();await page.keyboard.press('Enter');
+    await page.locator(mode==='codex'?'.hcFooter [data-hc-action="back"]':'.mnBack').focus();await page.keyboard.press('Enter');
     Check(mode+'页脚返回可用',await page.evaluate(m=>window.Taierzhuang.menu.mode===(m==='debug'?'settings':'title'),mode));
     if(mode==='debug')await page.keyboard.press('Escape');
   }

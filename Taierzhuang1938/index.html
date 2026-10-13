@@ -214,7 +214,7 @@
         "./Script_About.mjs": "./Script_About.mjs?v=20261013231001",
         "./Data_Text_Hud.mjs": "./Data_Text_Hud.mjs?v=20261013110000",
         "./Data_HudWeaponIcons.mjs": "./Data_HudWeaponIcons.mjs?v=20260914013001",
-        "./Data_Text_Menu.mjs": "./Data_Text_Menu.mjs?v=20261013231001",
+        "./Data_Text_Menu.mjs": "./Data_Text_Menu.mjs?v=20261013233001",
         "./Data_Text_Input.mjs": "./Data_Text_Input.mjs?v=20260916060001",
         "./Data_Text_Boot.mjs": "./Data_Text_Boot.mjs?v=20261002050000",
         "./Data_Text_Gameplay.mjs": "./Data_Text_Gameplay.mjs?v=20260930180000",
@@ -569,9 +569,11 @@
         "./Data_Weapons.mjs": "./Data_Weapons.mjs?v=20260915213000",
         "./Data_Battle.mjs": "./Data_Battle.mjs?v=202609071600",
         "./Data_History.mjs": "./Data_History.mjs?v=1",
+        "./Data_HistoryCodex.mjs": "./Data_HistoryCodex.mjs?v=20261013233001",
+        "./Script_HistoryCodex.mjs": "./Script_HistoryCodex.mjs?v=20261013233001",
         "./Data_Script.mjs": "./Data_Script.mjs?v=1",
         "./Data_Menu.mjs": "./Data_Menu.mjs?v=202609071700",
-        "./Script_Menu.mjs": "./Script_Menu.mjs?v=20261013231001",
+        "./Script_Menu.mjs": "./Script_Menu.mjs?v=20261013233001",
         "./Script_CommandRoomAtmosphere.mjs": "./Script_CommandRoomAtmosphere.mjs?v=202610130055",
         "./Script_CommandRoomPreview.mjs": "./Script_CommandRoomPreview.mjs?v=202610060100",
         "./Script_CommandRoom.mjs": "./Script_CommandRoom.mjs?v=202610100430",
@@ -680,14 +682,15 @@
   <!-- 打包字体。加载画面第一屏就要用，预加载省一次 swap 闪；URL 必须与
        Style_Interface.css 的 @font-face 逐字一致，写歪了就是两个 URL、下两遍。
        只预加载常规字重那三个：Bold 与 SemiBold 出现得晚，走 swap 就够。 -->
-  <link rel="preload" as="font" type="font/woff2" href="./Font/Font_Title.woff2?v=20261013231001" crossorigin>
-  <link rel="preload" as="font" type="font/woff2" href="./Font/Font_UiSans_Regular.woff2?v=20261013231001" crossorigin>
-  <link rel="preload" as="font" type="font/woff2" href="./Font/Font_UiLatin_Regular.woff2?v=20261013231001" crossorigin>
-  <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261013231001">
+  <link rel="preload" as="font" type="font/woff2" href="./Font/Font_Title.woff2?v=20261013233001" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="./Font/Font_UiSans_Regular.woff2?v=20261013233001" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="./Font/Font_UiLatin_Regular.woff2?v=20261013233001" crossorigin>
+  <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261013233001">
   <link rel="stylesheet" href="./Style_Game.css?v=2026100601">
   <!-- 菜单、加载与工具窗共用 Style_Interface.css；各表只定义对应布局。 -->
   <link rel="stylesheet" href="./Style_Menu.css?v=202610132203">
   <link rel="stylesheet" href="./Style_About.css?v=20261013231001">
+  <link rel="stylesheet" href="./Style_HistoryCodex.css?v=20261013233001">
   <!-- 编辑器套件的样式。出图模式下整棵 DOM 是 display:none，进不了任何一张截图。 -->
   <link rel="stylesheet" href="./Style_Editor.css?v=20261013210001">
   <!-- 白盒关卡编辑器（?editor=blockout）：卡片、导航栏、小地图与全关总图外框。不在该模式时一个元素都不挂。 -->

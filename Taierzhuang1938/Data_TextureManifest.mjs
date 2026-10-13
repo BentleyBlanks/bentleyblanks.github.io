@@ -1558,4 +1558,29 @@ export const TEXTURE_MANIFEST = Object.freeze([
       ["Texture_RailBallastOrm.webp", "Orm", 256, 256],
     ],
   },
+  {
+    id: "HistoryCodexPortrait", kind: "menu", tier: "lazy",
+    source: {provider: "user", date: "2026-10-13", ref: "https://app.notion.com/p/3ed60335331c81bc84b5cafa945a4751", license: "Historical documentary reproduction; original publication and provenance retained in docs/Data_HistoryCodex.md; not asserted CC0."},
+    bake: "_import/Script_HistoryCodexBake.py", consumers: [{file: "Data_HistoryCodex.mjs", token: "WangMingzhang"}],
+    files: [["Menu/History/Texture_HistoryWangMingzhangImage.webp", "Image", 817, 1063]],
+  },
+  {
+    id: "HistoryCodexMemoir", kind: "menu", tier: "lazy",
+    source: {provider: "user", date: "2026-10-13", ref: "https://ks3-cn-beijing.ksyun.com/attachment/b1a9f551fb36af74de7926b2ba283874", license: "Attributed source scans supplied through the user's research archive; copyright remains with the original rights holders, not asserted CC0."},
+    bake: "_import/Script_HistoryCodexBake.py", consumers: [{file: "Data_HistoryCodex.mjs", token: "ZhangMemoir"}],
+    files: Array.from({length: 17}, (_, index) => [`Menu/History/Texture_HistoryZhangMemoir${String(index + 1).padStart(2, "0")}Image.webp`, "Image", 800, 1200]),
+  },
+  {
+    id: "HistoryCodexPress", kind: "menu", tier: "lazy",
+    source: {provider: "user", date: "2026-10-13", ref: "https://www.xinhuanet.com/mil/2015-06/28/c_127959205_6.htm", license: "1938 newspaper documentary reproduction, with publication and reproduction source credited; not asserted CC0."},
+    bake: "_import/Script_HistoryCodexBake.py", consumers: [{file: "Data_HistoryCodex.mjs", token: "XinhuaDaily19380408"}],
+    files: [["Menu/History/Texture_HistoryXinhuaDaily19380408Image.webp", "Image", 550, 465]],
+  },
+  {
+    id: "HistoryCodexPhoto", kind: "menu", tier: "lazy",
+    source: {provider: "user", date: "2026-10-13", ref: "https://www.krzzjn.com/show-1209-76894.html", license: "Historical documentary reproduction; reproduction marks and source retained; photographer unconfirmed, not asserted CC0."},
+    bake: "_import/Script_HistoryCodexBake.py", consumers: [{file: "Data_HistoryCodex.mjs", token: "WuhanMemorial"}],
+    files: [["Menu/History/Texture_HistoryWuhanMemorialImage.webp", "Image", 319, 450]],
+  },
+
 ]);

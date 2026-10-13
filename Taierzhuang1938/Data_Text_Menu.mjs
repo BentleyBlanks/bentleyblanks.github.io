@@ -268,10 +268,44 @@ export const TEXT = Object.freeze({
   "menu.record.notCleared": "尚未通过",
 
   // --- 史实注记页 -----------------------------------------------------------
+  "menu.codex.title": "史实注记",
+  "menu.codex.gameTitle": "台儿庄：血战滕县",
+  "menu.codex.categories": "史料分类",
+  "menu.codex.category.all": "全部资料",
+  "menu.codex.category.people": "人物",
+  "menu.codex.category.history": "历史资料",
+  "menu.codex.category.documents": "历史文献",
+  "menu.codex.category.press": "报刊读物",
+  "menu.codex.category.photos": "历史照片",
+  "menu.codex.openEntry": "打开：{title}",
+  "menu.codex.backList": "返回列表",
+  "menu.codex.related": "相关资料",
+  "menu.codex.sources": "查看出处",
+  "menu.codex.close": "关闭",
+  "menu.codex.restoration": "复原说明",
+  "menu.codex.browseKeys": "↑↓ 选择 · Enter 打开",
+  "menu.codex.detailKeys": "R 查看出处 · Esc 返回",
+  "menu.codex.map": "态势示意",
+  "menu.codex.imageViewer": "史料影像阅览区",
+  "menu.codex.imageError": "影像未能载入，请返回后重试或查看出处。",
+  "menu.codex.zoomIn": "放大",
+  "menu.codex.zoomOut": "缩小",
+  "menu.codex.fit": "适合页面",
+  "menu.codex.expand": "展开原图",
+  "menu.codex.collapse": "收起原图",
+  "menu.codex.zoomHint": "滚轮缩放 · 放大后拖动查看 · F 展开",
+  "menu.codex.previousPage": "上一页",
+  "menu.codex.nextPage": "下一页",
+  "menu.codex.printedPage": "印刷页 {page}",
+  "menu.codex.documentTabs": "文献阅读方式",
+  "menu.codex.summary": "内容提要",
+  "menu.codex.sourceInfo": "史料说明",
+  "menu.codex.contents": "文献目录",
+  "menu.codex.excerpt": "原文摘录",
   "menu.codex.intro": "这一作把史料与推定分开记账。下面两张表里的数<b>全部是推定</b>，"
     + "游戏内任何文本都不许把它们说成史实；找到实测数据就改表，并把该条删掉。",
-  "menu.codex.geometryHeading": "城的几何 · Data_Tengxian.PRESUMED",
-  "menu.codex.stagingHeading": "演出与关卡 · Data_TengxianScript.PRESUMED_STAGING",
+  "menu.codex.geometryHeading": "城防与场景的复原依据",
+  "menu.codex.stagingHeading": "人物、演出与关卡的艺术处理",
 
   // --- 调试面板（id 与 Script_DebugOptions.DEBUG_OPTIONS_DEFAULTS 同一套） ----
   // note 那一行**玩家看得见**（面板上开关名底下的小字），不是注释。
@@ -377,6 +411,7 @@ export const TEXT = Object.freeze({
 
 export const GATED_MODULES = Object.freeze([
   "Script_Menu.mjs",
+  "Script_HistoryCodex.mjs",
 ]);
 
 /**
@@ -388,6 +423,7 @@ export const GATED_MODULES = Object.freeze([
  *   menu.slice.   —— 切片显示字段（Data_Menu 的 labelKey / dateKey / placeKey / sandboxGlyphKey）
  */
 export const DYNAMIC_PREFIXES = Object.freeze([
+  "menu.codex.",
   "menu.sandbox.",
   "menu.settings.",
   "menu.audio.",

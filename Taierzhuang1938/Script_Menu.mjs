@@ -28,6 +28,7 @@ import { T, Localize } from "./Script_Text.mjs";
 import { CastNameId, LevelFieldId } from "./Script_TextIds.mjs";
 import { DRIFT, CAMERA } from "./Data_Tuning_Menu.mjs";
 import { COMMAND_ROOM_MAPS } from "./Data_CommandRoomPapers.mjs";
+import { HistoryCodex } from "./Script_HistoryCodex.mjs";
 
 /** 主菜单四项与两行标题的内容 id（`menu.<字段>`，译文放 `content.menu.<字段>`）。 */
 function MenuTextId(field) { return `menu.${field}`; }
@@ -298,6 +299,7 @@ export class MainMenu {
       this.Show("codex");
       this.panelReturnMode = "credits";
     } });
+    this.historyCodex = new HistoryCodex({ onExit: () => this.Show(this.panelReturnMode), restorationHtml: () => this.CodexHtml() });
     // 最后建：确认框必须压在列表、目标栏与面板之上。
     this.BuildConfirm();
   }
@@ -673,13 +675,14 @@ export class MainMenu {
   }
 
   Close() {
+    this.historyCodex.Hide();
     this.SetCommandRoomPreviewUi(false);
     this.ClearSandboxComplete();
     this.DismissConfirm();
     this.open = false;
     this.live = false;
     this.root.classList.add("off");
-    this.root.classList.remove("pause", "panelOn", "levelsOn", "aboutOn");
+    this.root.classList.remove("pause", "panelOn", "levelsOn", "aboutOn", "codexOn");
     this.el.panel.classList.remove("on");
     this.el.fade.style.opacity = "0";
   }
@@ -757,6 +760,8 @@ export class MainMenu {
       this.panelReturnMode = this.aboutReturnMode;
       this.aboutReturnMode = null;
     }
+    this.root.classList.toggle("codexOn", mode === "codex");
+    if (wasMode === "codex" && mode !== "codex") this.historyCodex.Hide();
     if (mode === "levels") {
       this.el.panelTitle.textContent = T("menu.panel.levels");
       this.el.panelBody.textContent = "";
@@ -766,8 +771,8 @@ export class MainMenu {
     } else if (mode === "codex") {
       this.el.panelTitle.textContent = Localize(MenuTextId("codex"), MENU.codex);
       this.el.panelBody.textContent = "";
-      this.el.text.innerHTML = this.CodexHtml();
-      this.el.panelBody.appendChild(this.el.text);
+      this.el.panelBody.appendChild(this.historyCodex.root);
+      this.historyCodex.Open();
     } else if (mode === "credits") {
       this.el.panelTitle.textContent = Localize(MenuTextId("credits"), MENU.credits);
       this.el.panelBody.textContent = "";
@@ -1256,6 +1261,7 @@ export class MainMenu {
       }
       // 确认框在阵亡页之上时，Esc 也是「取消」，所以排在阵亡页吞 Esc 之前。
       if (this.confirmItem) { this.ConfirmKey(event); return; }
+      if (this.mode === "codex") { this.historyCodex.Key(event); return; }
       if (this.mode === "failure" && (event.repeat || event.key === "Escape")) {
         event.preventDefault(); return;
       }
@@ -1462,6 +1468,7 @@ export class MainMenu {
   }
 
   Dispose() {
+    this.historyCodex.Hide();
     document.removeEventListener("keydown", this.onKey);
     this.root.removeEventListener("keydown", this.onNativeKey);
     window.removeEventListener("resize", this.onResize);

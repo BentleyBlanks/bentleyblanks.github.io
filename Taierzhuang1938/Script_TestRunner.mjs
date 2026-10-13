@@ -47,6 +47,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  HistoryCodexBrowserTest: {file:"Script_HistoryCodexBrowserTest.mjs",timeoutMs:300000,desc:"Archive: five details, 17 pages, zoom/pan, sources, back stack and mobile"},
   TracerLifetimeTest: {file:"Script_TracerLifetimeTest.mjs",desc:"Production tracer short-hit boundary, lifetime, endpoint and strict particle validation"},
   AircraftGeometryTest: { file: "Script_AircraftGeometryTest.mjs", desc: "Reviewed Ki21/Ki30 geometry: triangle reduction, source bounds, protected parts and byte-identical images" },
   PublishAssetsTest: {file:"Script_PublishAssetsTest.mjs",timeoutMs:120000,desc:"GPU publish pipeline: source/dimension/color contracts, cache validation and overrides"},
@@ -483,6 +484,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "HistoryCodexBrowserTest",
   "PublishAssetsBrowserTest",
   "DevToolsIsolationTest",
   "MenuStartupTest",
@@ -673,6 +675,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   whiteboxQuality: { label: "白盒画质配置与实机", tests: ["WhiteboxQualityTest", "WhiteboxQualityBrowserTest", "WhiteboxShaderWarmTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
@@ -799,6 +802,8 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"historyCodex",pattern:/HistoryCodex|Texture\/Menu\/History\//},
+  {domain:"audio",pattern:/FirstLevelScoreRedesign/},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },
   {domain:"textureAssets",pattern:/(?:AssetPublish|BuildPublishAssets|ValidatePublishAssets|PublishCache|PublishAssets|ModelImports)/},
   {domain: "menu", pattern: /(?:StartupRouting|MenuStartup|Script_Entry|GameGraphics|CameraLens|About)/},

@@ -24,6 +24,7 @@ const UI_MODULES = [
   "Data_TengxianScript.mjs", // 标题 / 关于页 / 七章的名字、地点与简报
   "Data_Menu.mjs",           // 主菜单机位说明
   "Data_History.mjs",        // 史实注记页
+  "Data_HistoryCodex.mjs",   // 资料馆的史料原稿
   "Data_Levels.mjs",         // 关卡名与目标
   "Data_Range.mjs",          // 靶场工位说明
 ];
