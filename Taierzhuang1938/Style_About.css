@@ -14,9 +14,11 @@
 .aboutTab[aria-selected="true"]{border-left-color:#edca83;color:#edca83;background:linear-gradient(90deg,#d7ceb52b,transparent)}
 .aboutTab:hover{color:#f5d799}
 .aboutTab:focus-visible{outline:1px solid #edca83;outline-offset:4px}
-.aboutPaper{position:relative;min-width:0;min-height:0;padding:9.2% 12.5% 6.8% 18%;display:flex;flex-direction:column;color:#332a1f;font-family:"TzAbout","Noto Serif SC",SimSun,serif;isolation:isolate}
+/* Row percentages follow the stretched artwork's height; percentage padding would follow its width. */
+.aboutPaper{position:relative;min-width:0;min-height:0;display:grid;grid-template-rows:calc(13% + 12px) minmax(0,1fr) auto calc(4.5% + 12px);color:#332a1f;font-family:"TzAbout","Noto Serif SC",SimSun,serif;isolation:isolate}
 .aboutPaper::before{content:"";position:absolute;inset:0;z-index:-1;background:url("./Texture/Menu/Texture_AboutDossierImage.webp?v=20261013231001") center/100% 100% no-repeat;pointer-events:none}
-.aboutReader{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#7c634b77 transparent;padding:0 10px 4px 0;scroll-padding:12px;outline-offset:3px}
+.aboutReader,.aboutPaperFooter{min-width:0;margin-left:18%;margin-right:12.5%}
+.aboutReader{grid-row:2;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#7c634b77 transparent;padding:0 10px 4px 0;scroll-padding:12px;outline-offset:3px}
 .aboutPaperHead{margin-bottom:2.8vh}
 .aboutHeading{margin:0 0 .8vh;font:900 clamp(26px,3.2vw,54px)/1.25 var(--ui-story-font);letter-spacing:.015em;color:#2c241b}
 .aboutSubtitle{margin:0;font-size:clamp(13px,1.35vw,23px);line-height:1.55;letter-spacing:.05em}
@@ -27,7 +29,7 @@
 .aboutDedication{font-size:clamp(16px,1.55vw,25px);line-height:1.6;letter-spacing:.08em;text-align:right;margin:1.2vh 0 .2vh;font-style:italic}
 .aboutAuthors{display:flex;align-items:baseline;gap:0 16px;flex-wrap:wrap;font-size:clamp(15px,1.4vw,23px);line-height:1.6;margin:0}
 .aboutAuthors dt{margin:0}.aboutAuthors dd{margin:0 22px 0 0}
-.aboutPaperFooter{display:flex;align-items:center;justify-content:space-between;gap:16px;flex:0 0 auto;padding-top:1.7vh}
+.aboutPaperFooter{grid-row:3;display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:8px}
 .aboutAction{cursor:pointer;border:0;border-bottom:1px solid #57422b;background:none;color:#45341f;font:400 clamp(14px,1.3vw,22px)/1.5 "TzAbout",serif;padding:3px 0 5px;text-align:left}
 .aboutAction:hover{color:#7b4b18;border-color:currentColor}
 .aboutAction:focus-visible,.aboutSourceLinks a:focus-visible,.aboutReader:focus-visible{outline:2px solid #8c632e;outline-offset:4px}
@@ -38,7 +40,6 @@
 .aboutSourceLinks{display:flex;flex-wrap:wrap;gap:12px 22px;margin-top:8px}
 .aboutSourceLinks a{color:#775022;font-size:clamp(13px,1vw,17px);text-underline-offset:4px}
 @media(min-width:761px) and (min-height:541px){
- .aboutDossier:not([data-page="work"]) .aboutPaper{padding-top:8.3%;padding-bottom:4.7%}
  .aboutDossier:not([data-page="work"]) .aboutHeading{font-size:clamp(26px,3vw,50px)}
  .aboutDossier:not([data-page="work"]) .aboutSubtitle{line-height:1.4}
  .aboutDossier:not([data-page="work"]) .aboutPaperHead{margin-bottom:.8vh}
@@ -56,11 +57,12 @@
  .aboutTabs{padding:1.2vh 3% .8vh;gap:3px;flex-direction:row;align-self:stretch}
  .aboutTab{min-width:0;min-height:42px;flex:1;padding:8px 2px;font-size:14px;letter-spacing:0;text-align:center;border-left:0;border-bottom:3px solid transparent}
  .aboutTab[aria-selected="true"]{border-bottom-color:#edca83;background:linear-gradient(0deg,#d7ceb51c,transparent)}
- .aboutPaper{flex:1;padding:12% 9% 9% 14%;min-height:0}
+ .aboutPaper{flex:1;min-height:0}
+ .aboutReader,.aboutPaperFooter{margin-left:14%;margin-right:9%}
  .aboutHeading{font-size:27px}.aboutSubtitle{font-size:13px}.aboutPaperHead{margin-bottom:17px}
  .aboutSection{padding-top:12px;margin-top:12px}.aboutSection h3{font-size:19px}.aboutSection p{font-size:15px;line-height:1.75}
  .aboutAuthors{font-size:15px;gap:0 8px}.aboutAuthors dd{margin-right:10px}
  .aboutDedication{font-size:16px;margin-top:18px}.aboutPaperFooter{padding-top:12px;gap:8px}.aboutAction{font-size:13px}.aboutFolio{font-size:11px}
 }
-@media(max-height:540px) and (min-width:761px){.aboutTabs{padding-top:4vh}.aboutTab{min-height:38px;font-size:19px}.aboutPaper{padding-top:7%;padding-bottom:5%}.aboutHeading{font-size:28px}.aboutPaperHead{margin-bottom:12px}.aboutSection h3{font-size:20px}.aboutSection p{font-size:15px}}
+@media(max-height:540px) and (min-width:761px){.aboutTabs{padding-top:4vh}.aboutTab{min-height:38px;font-size:19px}.aboutHeading{font-size:28px}.aboutPaperHead{margin-bottom:12px}.aboutSection h3{font-size:20px}.aboutSection p{font-size:15px}}
 @media(prefers-reduced-motion:reduce){.aboutDossier *{scroll-behavior:auto}}

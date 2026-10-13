@@ -25,10 +25,16 @@ const Readable = async () => {
   await page.evaluate(() => document.fonts.ready);
   const state = await page.locator(".aboutReader").evaluate(reader => {
     const bounds=reader.getBoundingClientRect(), paper=reader.closest(".aboutPaper").getBoundingClientRect();
+    const footer=reader.closest(".aboutPaper").querySelector(".aboutPaperFooter").getBoundingClientRect();
     return {width:bounds.width,height:bounds.height,scroll:reader.scrollHeight,client:reader.clientHeight,overflow:reader.scrollWidth>reader.clientWidth+1,
+      clipGap:bounds.top-paper.top-paper.height*.13,footerGap:paper.bottom-footer.bottom-paper.height*.045,
+      readerFooterGap:footer.top-bounds.bottom,
       inPaper:bounds.left>=paper.left && bounds.right<=paper.right && bounds.top>=paper.top && bounds.bottom<=paper.bottom};
   });
   assert.ok(state.inPaper && !state.overflow && state.width>100 && state.height>80, JSON.stringify(state));
+  // The artwork clip extends through the top 13%; its worn bottom edge occupies 4.5%.
+  // Check visible-art clearances independently of the CSS layout implementation.
+  assert.ok(state.clipGap>=8 && state.footerGap>=8 && state.readerFooterGap>=-1,"Text must clear clip, paper edge and footer: "+JSON.stringify(state));
   return state;
 };
 try {
@@ -76,15 +82,27 @@ try {
  assert.equal(await page.evaluate(()=>window.Tengxian.menu.mode),"title");
  await page.click('[data-act="credits"]');
  await page.setViewportSize({width:390,height:844});
- for(const entry of ABOUT_PAGES){await page.locator('[data-about="'+entry.id+'"]').click();await Readable();}
+ for(const entry of ABOUT_PAGES){
+   await page.locator('[data-about="'+entry.id+'"]').click();
+   snapshots.push({viewport:{width:390,height:844},page:entry.id,...await Readable()});
+ }
  await page.screenshot({path:path.join(out,"Scene_Mobile.png")});
  const allInside=await page.locator(".aboutTab,.aboutAction,.mnPanelFoot .mnBack").evaluateAll(elements=>elements.every(element=>{
    const r=element.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth+1 && r.top>=0 && r.bottom<=innerHeight+1;
  }));
  assert.ok(allInside,"mobile navigation and return stay in viewport");
  await page.emulateMedia({reducedMotion:"reduce"});
- await page.setViewportSize({width:1000,height:500});
- await page.locator('[data-about="work"]').click();await Readable();
+ for (const viewport of [
+   {width:1200,height:960}, {width:1000,height:800}, {width:900,height:1100},
+   {width:760,height:1024}, {width:761,height:1024}, {width:844,height:390}, {width:1000,height:500},
+ ]) {
+   await page.setViewportSize(viewport);
+   for(const entry of ABOUT_PAGES) {
+     await page.locator('[data-about="'+entry.id+'"]').click();
+     snapshots.push({viewport,page:entry.id,...await Readable()});
+   }
+   if(viewport.width===1200) await page.screenshot({path:path.join(out,"Scene_Sidebar.png")});
+ }
  assert.deepEqual(errors,[]);
  await fs.writeFile(path.join(out,"Data_AboutBrowserCheck.json"),JSON.stringify({snapshots,errors},null,2));
  console.log("PASS About: four sections, real authors, lazy assets/fonts, attribution details, keyboard scroll/tabs, history round-trip, Escape, narrow/short layouts");

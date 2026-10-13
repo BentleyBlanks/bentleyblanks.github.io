@@ -19,6 +19,10 @@
 `_import/TextureBakes/Texture_AboutDossier.json` 和 `Data_TextureManifest.mjs`。
 参考图、验收截图及临时预览页只留本地。
 
+同日修复侧栏高窄窗口的文字遮挡：卷宗上下安全区按纸张的实际高度计算，正文起点避开
+铜夹，页脚避开破损纸边；正文和页脚由独立网格行分配空间。验收新增侧栏、竖向窗口、
+横屏与 760/761 像素断点，共九种视口，检查四页文字与装饰、页脚均不重叠。
+
 验收：`node Taierzhuang1938/Script_AboutBrowserTest.mjs` 覆盖四页、署名、懒加载、
 来源明细、键盘、史实页往返与窄屏/短屏；另跑 Text、ModuleGraph、TextureStandards、
 MenuStartup（源码与发布包）和菜单已有回归。
