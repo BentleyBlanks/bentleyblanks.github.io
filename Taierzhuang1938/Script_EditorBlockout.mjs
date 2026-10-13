@@ -30,6 +30,9 @@ import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs
 import { MarkNoPrepass } from "./Script_Post.mjs";
 
 const DEG = Math.PI / 180;
+/** 打开全关总图时短边大约看多少米（玩家附近一片，不是全图）。 */
+const MAP_FOCUS_SPAN_M = 220;
+
 export const BLOCKOUT_EDITOR = Object.freeze({
   pollS: 2,
   mapHz: 8,
@@ -558,6 +561,8 @@ export class EditorBlockout {
     this.markers.SetNext(kf.next && Number.isFinite(kf.next.x) ? kf.next : null);
     this.ui.SetKeyframes(this.KeyframeList(), index);
     this.map.SetKeyframes(this.doc.keyframes.map(k => ({ id: k.id, stage: k.stage, player: { x: k.player.x, z: k.player.z } })), index);
+    // 地图开着时跳关键帧：图跟着挪到新站位（比例不变）
+    if (this.mapOpen) this.FocusMapOnPlayer();
     this.cardKey = "";
     this.UpdateCard(true);
     this.mapTimer = 0;
@@ -783,10 +788,24 @@ export class EditorBlockout {
     if (next) {
       // 要能在图上缩放、点选：把鼠标还给用户
       this.ReleasePointerLock();
-      this.map.FitBounds();
+      // 打开时看的是玩家附近，不是全图（全图双击就有）；上次手动调过的比例留着
+      this.FocusMapOnPlayer();
+    } else if (this.map.view && this.map.viewTouched) {
+      this.mapZoom = this.map.view.pxPerM;
     }
     this.mapTimer = 0;
     return this.mapOpen;
+  }
+
+  /** 全关总图对准玩家当前位置：比例用上次留下的，没有就让短边看到约 MAP_FOCUS_SPAN_M 米。 */
+  FocusMapOnPlayer() {
+    const p = this.game.player?.position;
+    if (!p) { this.map.FitBounds(); return; }
+    const canvas = this.ui.fullCanvas;
+    const short = Math.min(canvas?.clientWidth || 1000, canvas?.clientHeight || 700);
+    const zoom = this.map.viewTouched && this.map.view ? this.map.view.pxPerM
+      : (this.mapZoom ?? Math.min(8, Math.max(1.5, short / MAP_FOCUS_SPAN_M)));
+    this.map.FocusOn(p.x, p.z, zoom);
   }
 
   BindKeys() {

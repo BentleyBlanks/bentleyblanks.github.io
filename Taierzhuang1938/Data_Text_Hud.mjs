@@ -147,6 +147,7 @@ export const TEXT = Object.freeze({
   "hud.hint.mortarOnTheWay": "炮弹在路上（还剩 {left} 发）",
   "hud.hint.fireBlocks": "火里过不去。",
   "hud.hint.pointerLock": "点一下画面，接管镜头",
+  "hud.hint.dragLook": "这个窗口锁不住鼠标：按住右键拖动转视角",
 
   // --- 字幕（hud.Say）。说话人也是文本：具名的人取 CAST id 经 Localize，
   //     玩家自己没有 CAST 条目（他每一关演的都是别人），所以单列一条。

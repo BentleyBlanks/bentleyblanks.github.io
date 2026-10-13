@@ -33,6 +33,7 @@ const SVG = (body, view = "0 0 16 16") => `<svg viewBox="${view}" aria-hidden="t
 const ICONS = Object.freeze({
   prev: SVG('<path d="M10 3.5 5.5 8l4.5 4.5"/>'),
   next: SVG('<path d="M6 3.5 10.5 8 6 12.5"/>'),
+  replay: SVG('<path d="M3.4 8.2a4.6 4.6 0 1 0 1.5-3.6"/><path d="M3.2 2.7v2.6h2.6"/>'),
   close: SVG('<path d="M4 4l8 8M12 4l-8 8"/>'),
   chevron: SVG('<path d="M4.5 6.5 8 10l3.5-3.5"/>'),
   camera: SVG('<path d="M2.5 5.5h2.2l1.2-1.8h4.2l1.2 1.8h2.2v7h-11z"/><circle cx="8" cy="8.9" r="2.2"/>'),
@@ -282,6 +283,8 @@ export class BlockoutUi {
     this.btnNext = Button("boNavBtn boNextBtn", { icon: "next", tip: "下一个（.）" });
     this.Listen(this.btnPrev, "click", () => this.Call("onPrev"));
     this.Listen(this.btnNext, "click", () => this.Call("onNext"));
+    this.btnReplay = Button("boNavBtn boReplay", { icon: "replay", tip: "重播这一段：人从上一个关键帧走过来（Y）" });
+    this.Listen(this.btnReplay, "click", () => this.Call("onReplay"));
 
     const wrap = El("div", "boTrackWrap");
     wrap.setAttribute("role", "slider");
@@ -305,10 +308,10 @@ export class BlockoutUi {
     this.elFast = El("span", "boFast");
     counter.append(this.elFast, this.elCount);
     const keys = El("div", "boKeys");
-    keys.append(Kbd(","), Kbd("."), El("span", "", "切换"), Kbd("M"), El("span", "", "地图"), Kbd("Esc"), El("span", "", "鼠标"));
+    keys.append(Kbd(","), Kbd("."), El("span", "", "切换"), Kbd("Y"), El("span", "", "重播"), Kbd("M"), El("span", "", "地图"), Kbd("Esc"), El("span", "", "鼠标"));
     side.append(counter, keys);
 
-    nav.append(this.btnPrev, wrap, this.btnNext, side);
+    nav.append(this.btnPrev, wrap, this.btnNext, this.btnReplay, side);
     this.navEl = nav;
     this.root.appendChild(nav);
   }
@@ -465,6 +468,7 @@ export class BlockoutUi {
     if (idx < 0) this.knob.remove();
     this.btnPrev.disabled = idx <= 0;
     this.btnNext.disabled = idx < 0 || idx >= n - 1;
+    this.btnReplay.disabled = idx <= 0;
     const kf = this.keyframes[idx];
     if (kf) {
       const seg = this.segments.find(s => idx >= s.start && idx < s.start + s.items.length);

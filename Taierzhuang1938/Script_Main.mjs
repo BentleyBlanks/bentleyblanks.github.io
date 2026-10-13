@@ -2733,6 +2733,7 @@ async function Boot() {
         fake: FAKE_POINTER_LOCK,
         browserLocked: document.pointerLockElement !== null,
         mouseFree: altMouseFree,
+        dragLook: lockUnavailable,
         // raw input 有没有真的要到，以及尖刺闸门丢过几个假位移（见 AcceptLookMotion）
         rawInput: rawInputActive, rawInputSupported,
         spikesDropped: lookSpike.dropped, lastSpike: lookSpike.last,
@@ -6201,6 +6202,27 @@ window.addEventListener("keyup", (event) => {
   if (state.running && !state.menu && !state.cutscene) RequestPointerLock();
 }, true);
 
+/**
+ * 嵌入式页面（应用内浏览器面板一类）整页拿不到指针锁：浏览器直接 reject SecurityError / WrongDocumentError
+ * 「root document ... not valid for pointer lock」，再点多少次都一样。这时退回「按住右键拖动转视角」：
+ * 左键照常开火，右键按住期间的 mousemove 进转头（不开镜）。只认这一种拒绝 —— 手势过期、Esc 冷却
+ * 那几种是一时的，照旧提示玩家再点一下。
+ */
+let lockUnavailable = false;
+let dragLooking = false;
+function LockRefusedForGood(error) {
+  // 普通锁报 SecurityError，带 unadjustedMovement 的锁报 WrongDocumentError，说的是同一句话
+  return !!error && (error.name === "SecurityError" || error.name === "WrongDocumentError")
+    && /root document|not valid for pointer lock/i.test(String(error.message || ""));
+}
+function EnterDragLook() {
+  if (lockUnavailable) return;
+  lockUnavailable = true;
+  dragLooking = false;
+  hud?.Hint(T("hud.hint.dragLook"), 5.0);
+}
+window.addEventListener("blur", () => { dragLooking = false; });
+
 /** 现在锁在我们的画布上没有（两条后端统一的读法，全文件只认这一个）。 */
 function PointerLocked() {
   return FAKE_POINTER_LOCK ? fakeLocked : document.pointerLockElement === canvas;
@@ -6226,7 +6248,7 @@ function RequestPointerLock() {
     if (!fakeLocked) { fakeLocked = true; OnPointerLockChange(); }
     return;
   }
-  const nudge = () => hud?.Hint(T("hud.hint.pointerLock"), 3.0);
+  const nudge = (error) => { if (LockRefusedForGood(error)) EnterDragLook(); else hud?.Hint(T("hud.hint.pointerLock"), 3.0); };
   // **先要 raw input**（unadjustedMovement）。事故：镜头在鼠标往一个方向推到一定
   // 距离之后会突然跳切到另一个角度。页内链路（mousemove -> lookX -> yaw -> 相机）
   // 逐帧量过是连续的，跳的是浏览器送来的 movementX/Y 本身：Chromium on Windows
@@ -6240,7 +6262,7 @@ function RequestPointerLock() {
       const pending = canvas.requestPointerLock?.();
       if (pending && typeof pending.catch === "function") pending.catch(nudge);
     } catch (error) {
-      nudge();
+      nudge(error);
     }
   };
   if (!rawInputSupported) { requestPlain(); return; }
@@ -6249,7 +6271,7 @@ function RequestPointerLock() {
     if (pending && typeof pending.then === "function") {
       pending.then(() => { rawInputActive = true; }, (error) => {
         if (error && error.name === "NotSupportedError") { rawInputSupported = false; requestPlain(); }
-        else nudge();
+        else nudge(error);
       });
     }
   } catch (error) {
@@ -6916,11 +6938,17 @@ const router = new InputRouter({
     if (!state.running) return false;
     // 编辑器开着：这一下鼠标是在点面板/摆东西，不是在抢指针锁开枪
     if (UiCapturing()) return false;
-    if (!PointerLocked() && !SHOT) { RequestPointerLock(); return false; }
+    if (!PointerLocked() && !SHOT) {
+      // 整页拿不到锁：不再「第一下只抢锁」，点击照常进游戏（右键拖动转视角见 Capture）
+      if (lockUnavailable) return true;
+      RequestPointerLock(); return false;
+    }
     return true;
   },
   // 白刃输入先于 KEYMAP；QTE 接管抵抗输入，避免 F 同时触发拾枪。
   Capture: (_event, detail) => {
+    if (detail.code === "Blur") dragLooking = false;
+    if (lockUnavailable && !PointerLocked() && detail.code === "Mouse2") { dragLooking = !!detail.down; return true; }
     if (frameDebugger.frozen) return false;
     if(detail.code==='Blur')return !!meleeCombat?.HandleInput('Blur',false);
     if(!state.ready || !state.running || state.menu || state.cutscene || UiCapturing())return false;
@@ -7058,7 +7086,7 @@ document.addEventListener("mousemove", (e) => {
   // 这条**不查指针锁**：轮盘只要一个方向向量，而 movementX/Y 在锁与不锁下都送达
   // （出图/测试模式下根本拿不到指针锁，查了就等于轮盘在那些模式里是死的）。
   if (state.ordersOpen) { wheel.Move(e.movementX, e.movementY); return; }
-  if (!PointerLocked()) return;
+  if (!PointerLocked() && !(lockUnavailable && dragLooking)) return;
   input.lookX += e.movementX;
   input.lookY += e.movementY;
 });

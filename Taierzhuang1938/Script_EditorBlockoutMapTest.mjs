@@ -632,9 +632,11 @@ try {
     const p = map.WorldToScreen(kf.player.x, kf.player.z);
     const back = map.ScreenToWorld(p.x, p.y);
     out.roundTrip = Math.hypot(back.x - kf.player.x, back.z - kf.player.z);
-    const before = map.ScreenToWorld(300, 200);
-    map.ZoomAt(300, 200, 2.5);
-    const after = map.ScreenToWorld(300, 200);
+    // 锚点取在纸面里（关卡中心附近），放大后视图中心不会被夹回边界内
+    const anchor = map.WorldToScreen(-30, 60);
+    const before = map.ScreenToWorld(anchor.x, anchor.y);
+    map.ZoomAt(anchor.x, anchor.y, 2.5);
+    const after = map.ScreenToWorld(anchor.x, anchor.y);
     out.zoomScale = map.view.pxPerM / out.fit.pxPerM;
     out.zoomDrift = Math.hypot(after.x - before.x, after.z - before.z);
     map.FocusOn(-30, 60, map.view.pxPerM);

@@ -414,6 +414,11 @@ try {
   await page.screenshot({ path: path.join(shotDir, "FirstLevel_FullMap.png") });
   {
     const v0 = await B(() => window.Tengxian.Debug.Blockout.MapView());
+    // 打开时对准玩家附近（不是全图）：视图中心就是玩家脚下、比例比全图大
+    const opened = await B(() => ({ p: { x: window.Tengxian.player.position.x, z: window.Tengxian.player.position.z }, b: window.Tengxian.battlefield.bounds }));
+    const fitScaleUpper = Math.min(1e9, v0.pxPerM);
+    Check("全关总图打开时对准玩家附近", Near(v0.cx, opened.p.x, 0.5) && Near(v0.cz, opened.p.z, 0.5),
+      JSON.stringify({ v0, player: opened.p }));
     const rect = (await B(() => window.Tengxian.Debug.Blockout.MapPoint(0))).rect;
     const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
     await page.mouse.move(cx, cy);
@@ -435,8 +440,9 @@ try {
     await page.mouse.dblclick(sx, sy);
     await page.waitForTimeout(250);
     const v3 = await B(() => window.Tengxian.Debug.Blockout.MapView());
-    Check("全关总图：双击回到全图", Near(v3.pxPerM, v0.pxPerM, 1e-6 * v0.pxPerM) && Near(v3.cx, v0.cx, 1e-6) && Near(v3.cz, v0.cz, 1e-6),
-      JSON.stringify({ v0, v3 }));
+    const levelCx = (opened.b.minX + opened.b.maxX) / 2, levelCz = (opened.b.minZ + opened.b.maxZ) / 2;
+    Check("全关总图：双击回到全图（关卡中心、比例比打开时小）", Near(v3.cx, levelCx, 0.5) && Near(v3.cz, levelCz, 0.5) && v3.pxPerM < fitScaleUpper,
+      JSON.stringify({ v0, v3, levelCx, levelCz }));
     // 点一个离别的点都远的关键帧点
     const points = await B((n) => { const out = []; for (let i = 0; i < n; i++) out.push(window.Tengxian.Debug.Blockout.MapPoint(i)); return out; }, configDoc.keyframes.length);
     const current = (await State()).index;
@@ -692,7 +698,11 @@ try {
   Check("切到第二关：场景边界与地形都换了、地址栏改了", second.state.level === "SecondLevel" && second.layoutId === "BlockoutSecondLevel"
     && second.bounds.minX !== firstBounds.minX && /level=SecondLevel/.test(second.url) && second.groundAtCenter < -1,
   JSON.stringify({ bounds: second.bounds, layout: second.layoutId, gully: second.groundAtCenter.toFixed(2), url: second.url, ms: metrics.switchMs }));
-  await page.waitForTimeout(800);
+  // 烘图走空闲回调，满负载的机器上 0.8 s 不一定排得到：等到烘完（上限 8 s）再判
+  await WaitSync(() => {
+    const map = window.Tengxian.Debug.Blockout.Stats().map;
+    return map.levelKey === "SecondLevel" && map.doneAt !== null;
+  }, null, 8000);
   const secondBake = await B(() => window.Tengxian.Debug.Blockout.Stats().map);
   Check("切关建完就烘这一关的纸面地图", secondBake.levelKey === "SecondLevel" && secondBake.doneAt !== null, JSON.stringify({ levelKey: secondBake.levelKey, doneAt: secondBake.doneAt }));
   await page.screenshot({ path: path.join(shotDir, "SecondLevel.png") });

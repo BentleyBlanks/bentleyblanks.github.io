@@ -231,8 +231,8 @@
 .boNav {
   position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
   /* §4：min(1100 px, 62vw)；窄屏再让出左下小地图（16 + 222）两侧各 16 px，不贴上去 */
-  width: min(1100px, 62vw, calc(100vw - 508px)); height: 58px; padding: 0 12px 0 10px;
-  display: grid; grid-template-columns: 30px minmax(0, 1fr) 30px auto; align-items: center; column-gap: 10px;
+  width: min(1140px, 64vw, calc(100vw - 508px)); height: 58px; padding: 0 12px 0 10px; z-index: 6;
+  display: grid; grid-template-columns: 30px minmax(0, 1fr) 30px 30px auto; align-items: center; column-gap: 10px;
 }
 .boNavBtn { width: 30px; height: 30px; color: var(--bo-text); border-color: var(--bo-line); }
 .boNavBtn:hover { border-color: var(--bo-line-strong); }
@@ -290,13 +290,14 @@
 .boNav.empty .boTrackWrap { cursor: default; }
 
 /* --- 全关总图外框 --------------------------------------------------------- */
+/* 底边留给导航栏（它叠在总图上面、照样能点）：地图开着也能切关键帧 */
 .boMapOverlay {
-  position: absolute; inset: 0; z-index: 5; display: none;
+  position: absolute; inset: 0 0 var(--bo-nav-room, 86px) 0; z-index: 5; display: none;
   align-items: center; justify-content: center;
   background: rgba(3, 4, 4, 0.38);
 }
 .boMapOverlay.open { display: flex; }
-.boMapFrame { width: 92vw; height: 88vh; display: flex; flex-direction: column; background: var(--bo-panel-solid); }
+.boMapFrame { width: 92vw; height: calc(100% - 24px); display: flex; flex-direction: column; background: var(--bo-panel-solid); }
 .boMapHead {
   flex: 0 0 44px; display: flex; align-items: center; gap: 22px;
   padding: 0 7px 0 16px; border-bottom: 1px solid var(--bo-line);
@@ -367,11 +368,12 @@ body.blockoutMode #hud .hudFps { top: 56px; left: auto; right: 18px; }
   .boMini { width: 150px; height: 150px; }
   .boNav {
     left: 178px; right: 12px; transform: none; width: auto; height: 52px;
-    grid-template-columns: 28px minmax(0, 1fr) 28px auto; column-gap: 8px; padding: 0 10px 0 8px;
+    grid-template-columns: 28px minmax(0, 1fr) 28px 28px auto; column-gap: 8px; padding: 0 10px 0 8px;
   }
   .boNavBtn { width: 28px; height: 28px; }
   .boNavSide { min-width: 0; }
   .boKeys { display: none; }
+  .boRoot { --bo-nav-room: 78px; }
   .boSeg, .boStageNum { min-width: 10px; }
   .boStageNum { font-size: 9px; }
   /* 导航栏占满了底边：右下角的弹药与状态读数抬到它上面，不被盖住 */
