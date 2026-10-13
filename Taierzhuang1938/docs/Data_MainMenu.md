@@ -23,6 +23,12 @@
 铜夹，页脚避开破损纸边；正文和页脚由独立网格行分配空间。验收新增侧栏、竖向窗口、
 横屏与 760/761 像素断点，共九种视口，检查四页文字与装饰、页脚均不重叠。
 
+透视与印刷字续修：`Data_About.ABOUT_PAPER` 记录底图正面纸张四角，正文、分隔线和页脚
+共用一个透视文字层，随窗口尺寸重新投影；点击、选字和滚动仍使用原生 DOM。
+墨色以 multiply 与实际纸图混合，并换用单独子集化的 Noto Serif SC SemiBold 标题，
+减轻原先 Black 标题的界面感。ResizeObserver 只在尺寸变化时计算，菜单销毁时断开。
+浏览器检查另验证四角与纸图的误差、共享文字平面及投影后的安全区；不以旋转截图替代实装。
+
 验收：`node Taierzhuang1938/Script_AboutBrowserTest.mjs` 覆盖四页、署名、懒加载、
 来源明细、键盘、史实页往返与窄屏/短屏；另跑 Text、ModuleGraph、TextureStandards、
 MenuStartup（源码与发布包）和菜单已有回归。

@@ -255,6 +255,7 @@ Ok(`闸门模块 ${gatedClean}/${gated.size} 个干净`);
   const { TitleChars, UiChars, AboutChars } = await import(pathToFileURL(path.join(fontDir, "Script_FontChars.mjs")).href);
   const jobs = [
     { manifest: "Font_AboutText.json", label: "关于页宋体", Chars: AboutChars },
+    { manifest: "Font_AboutHeading.json", label: "关于页印刷标题", Chars: AboutChars },
     { manifest: "Font_Title.json", label: "标题字体", Chars: TitleChars },
     // logo 同款宋体排提示与字幕，字表与界面字体同一张。
     { manifest: "Font_TitleText.json", label: "提示与字幕字体", Chars: UiChars },

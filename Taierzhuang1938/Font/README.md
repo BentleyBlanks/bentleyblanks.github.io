@@ -6,6 +6,11 @@
 完整重烘还需要把同一 notofonts/noto-cjk 源目录中的 `NotoSerifSC-Regular.otf` 下载到源字体目录；
 单独重烘：`python Taierzhuang1938/Font/Script_FontSubset.py <源目录> --only Font_AboutText`。
 
+关于页标题与小标题另用 `Font_AboutHeading.woff2`（Noto Serif SC SemiBold，约 57 KB），
+与正文字体共用 `AboutChars`，按需加载，避免借用主界面的 Black 字重。
+源文件为同一 notofonts/noto-cjk 目录中的 `NotoSerifSC-SemiBold.otf`；
+重烘使用同一脚本的 `--only Font_AboutHeading`。
+
 游戏自带三套字体，全部是 **SIL Open Font License 1.1**：可随游戏一起分发、可商用、
 可子集化，唯一硬约束是不得单独售卖字体本身，且保留 `LICENSE_OFL.txt`。
 
