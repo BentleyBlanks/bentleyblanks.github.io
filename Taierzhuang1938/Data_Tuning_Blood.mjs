@@ -11,14 +11,15 @@ export const BLOOD_QUALITY = Object.freeze({
 });
 export const BLOOD_MOTION = Object.freeze({ gravity: 9.81, drag: .65, dropLife: 1.8,
   mistLife: [.30, .76], mistRadius: [.045, .34], mistOpacity: .42,
-  mistCount: 10, burstMistCount: 14, dropCount: 9, burstDropCount: 14,
+  mistCount: 10, burstMistCount: 8, dropCount: 9, burstDropCount: 24,
+  burstMistLife: [.18, .38], burstMistRadius: [.035, .2], burstMistOpacity: .32,
   farStart: 28, farScaleMax: 1.65, maxDistance: 100,
   corpseSeconds: 9, corpseRate: 3.5, corpseSpeed: [.12, .4], corpseDropRadius: .22,
 });
 // Arterial source (source option `arterial:true`): a severed stump pumps in heartbeats rather
 // than leaking at a constant rate. Each beat opens a short systolic jet — a tight cone of
-// long drops dense enough to read as one arcing stream — and falls back to a weak dribble
-// that pools under the stump. Pressure decays exponentially (blood loss) and the heart slows,
+// curved liquid ligaments dense enough to read as an arcing stream — then weak dribbles
+// that pool under the stump. Pressure decays exponentially (blood loss) and the heart slows,
 // so the jets shorten over the source's `seconds`. Old constant-rate spurts (2.4 s, tiny
 // drops) were unreadable beyond two metres: 2026-09-13 player feedback, Dismemberment §11.8.
 //   beatHz        heart rate at the start → end of the window (138 → 66 bpm)
@@ -26,25 +27,30 @@ export const BLOOD_MOTION = Object.freeze({ gravity: 9.81, drag: .65, dropLife: 
 //   pressureTauS  e-folding time of jet pressure; tailS fades the last seconds to zero
 //   diastoleFlow  flow between jets as a fraction of the peak
 //   dropHalfWidth / stretchPerSpeed / stretch  stream drop shape in metres (length follows speed)
-//   farStartM / farScaleMax  widen the stream with distance so it keeps ~2 px out to ~25 m
-//   upBias / minUp  lift the jet axis: a prone body's shoulder stump faces the ground, and a
-//                   jet fired into the dirt is invisible (first capture, 2026-09-13)
+//   farStartM / farScaleMax  moderate distance compensation without oversized red streaks
+//   upBias        slight outlet lift; never reverse a downward-facing stump
 //   speedJitter / jetSpread / beatWobble  a coherent jet: tiny per-drop scatter inside one beat
 //                   (a wide cone reads as a fan of dashes), a small aim change between beats
-//   beatSpeedDip   exit speed only sags this much at the edges of a beat; pressure sets the reach.
-//                   A speed that follows the full beat curve makes late fast drops overtake early
-//                   slow ones, and each beat collapses into a clump instead of a line
+//   exit speed stays fixed within each beat, then falls with pressure at the next beat;
+//                   later fast drops must not overtake early drops and collapse into a clump
 //   color          arterial blood is brighter than the fresh-spatter tone while it flies
 export const BLOOD_ARTERIAL = Object.freeze({
   beatHz: [2.3, 1.1], systole: .36, pressureTauS: 2.6, tailS: 1.6, diastoleFlow: .1,
-  upBias: .55, minUp: .3, speedJitter: .04, jetSpread: .03, beatWobble: .1, maxDropsPerFrame: 10,
-  beatSpeedDip: .22,
-  color: 0xb3261c,
+  // Preserve the cut's direction, including downward stumps. A small lift follows the
+  // local outlet; the former forced upward cone made fallen bodies spray like fountains.
+  upBias: .08, speedJitter: .012, jetSpread: .012, beatWobble: .065, maxDropsPerFrame: 10,
+  color: 0xa51e16,
   dribbleSpread: .3, dribbleSpeed: [.12, .55], poolDropRadius: .13,
   splashRadius: [.06, .13], splashDepositChance: .4, poolDeposits: 18,
-  dropHalfWidth: [.02, .03], stretchPerSpeed: .04, stretch: [.05, .24],
-  farStartM: 6, farScaleMax: 3,
-  mistPerBeat: 4, mistMinPressure: .22, mistSpeed: [.9, 2.1], mistRadius: [.04, .18], mistLife: [.22, .5],
+  dropHalfWidth: [.011, .019], stretchPerSpeed: .06, stretch: [.04, .32],
+  sprayFraction: .22, spraySpread: .16, spraySpeed: [.68, .94], sprayHalfWidth: [.003, .007],
+  farStartM: 12, farScaleMax: 1.8,
+  mistPerBeat: 1, mistMinPressure: .4, mistSpeed: [.7, 1.5], mistRadius: [.025, .1], mistLife: [.16, .3],
+});
+// A short curved liquid ligament pinches into a compact drop during flight. The same
+// bounded particle channel handles both; no extra renderer, texture or simulation pass.
+export const BLOOD_LIQUID = Object.freeze({
+  segments: 6, breakupS: [.14, .5], tailRetention: .22, maxTrailS: .065,
 });
 // Headshot (`BloodEffects.Headshot`, 2026-09-13 player feedback: "爆头了飙血不够显著").
 // A body hit is a 0.5–1 `Emit`: ~10 faint mist puffs and 9 specks. A rifle bullet through a

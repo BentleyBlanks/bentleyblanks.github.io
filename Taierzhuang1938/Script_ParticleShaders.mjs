@@ -1,6 +1,7 @@
 // Particle renderer materials. Scheduling, modules and ownership live in ParticleSystem.
 import {PARTICLE_GPU_MODULES} from './Script_ParticleGpuModules.mjs';
 import {PARTICLE_DENSITY_GLSL} from './Script_ParticleDensity.mjs';
+import {BLOOD_LIQUID} from './Data_Tuning_Blood.mjs';
 export const GLSL_NOISE = /* glsl */`
 float Hash21(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -191,7 +192,18 @@ void main() {
   vec3 dir = normalize(iVelocity + vec3(0.0, 1e-5, 0.0));
 #endif
   vec3 side = normalize(cross(dir, normalize(toCam + vec3(1e-5))));
-#ifdef SHAPE_MUD
+#ifdef SHAPE_BLOODDROP
+  // Sample the same damped ballistic curve as the head, instead of drawing a straight
+  // dash behind it. Clamp to birth so a fresh jet cannot extend through the source.
+  float breakup = smoothstep(${BLOOD_LIQUID.breakupS[0]}, ${BLOOD_LIQUID.breakupS[1]}, age);
+  float trailS = min(${BLOOD_LIQUID.maxTrailS}, iExtra.x / max(length(iVelocity), 0.25));
+  trailS *= mix(1.0, ${BLOOD_LIQUID.tailRetention}, breakup);
+  float sampleAge = max(0.0, age - (1.0 - corner.x) * 0.5 * trailS);
+  vec3 along = (iVelocity - iAccel / k) * ((exp(-k * age) - exp(-k * sampleAge)) / k)
+    + iAccel * ((sampleAge - age) / k);
+  vec3 tangent = iVelocity * exp(-k * sampleAge) + iAccel * ((1.0 - exp(-k * sampleAge)) / k);
+  side = normalize(cross(normalize(tangent + vec3(0.0, 1e-5, 0.0)), normalize(toCam + vec3(1e-5))));
+#elif defined(SHAPE_MUD)
   // 泥浆：拖尾 = 瞬时速度 × 快门（iExtra.x 秒），越飞越慢拖尾越短；下限是一颗泥团自己的长度
   float streakLen = max(size * 1.5, length(instant) * iExtra.x);
   vec3 along = dir * ((corner.x - 1.0) * 0.5 * streakLen);
@@ -401,10 +413,22 @@ void main() {
   float erosion=smoothstep(.19+vAge01*.15,.65,n+fine*.3);
   mask=edge*erosion*(.38+.62*fine);
 #elif defined(SHAPE_BLOODDROP)
-  float head=1.0-smoothstep(.14,.95,length(vec2((p.x-.48)*1.3,p.y)));
-  float tail=(1.0-smoothstep(.08,.38,abs(p.y)))*smoothstep(-1.0,.55,p.x);
-  mask=max(head,tail*.6)*(1.0-smoothstep(.8,1.0,abs(p.x)));
-  color*=uSkyColor+uSunColor*.5;
+  // Rounded liquid core, asymmetric narrowing and a restrained wet reflection. The
+  // silhouette stays dense; the old soft mask made every droplet look like a red feather.
+  float along=(p.x+1.0)*.5;
+  float ripple=sin(along*13.0+vSeed*29.0)*.08+sin(along*24.0+vSeed*43.0)*.035;
+  float taper=mix(.24,.86,smoothstep(.0,.64,along));
+  float cap=sqrt(max(0.0,1.0-pow((along-.5)*2.0,2.0)));
+  float width=max(.025,(taper+ripple)*cap);
+  float center=sin(along*8.0+vSeed*31.0)*.08*sin(along*3.14159265);
+  float across=(p.y-center)/width;
+  float aa=max(fwidth(across),.055);
+  mask=1.0-smoothstep(1.0-aa,1.0+aa,abs(across));
+  float roundness=sqrt(max(0.0,1.0-across*across));
+  vec3 illumination=uSkyColor+uSunColor*.5;
+  color*=illumination*(.62+.38*roundness);
+  float wet=pow(max(0.0,1.0-abs(across+.28)),22.0)*(.1+.1*sin(along*17.0+vSeed*13.0));
+  color+=illumination*vec3(.12,.035,.025)*wet;
 #elif defined(SHAPE_MUD)
   // 近爆甩出来的湿泥（开场 SB02）：头是一团不规则的泥，身后一条被运动拉开的涂抹拖尾。
   // vShape.x：-1 拖尾末端，+1 泥团前沿；y 横向。两层噪声啃边，边是软的但团是实的。

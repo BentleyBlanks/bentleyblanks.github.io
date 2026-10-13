@@ -27,7 +27,7 @@ const ray=new THREE.Raycaster();vfx.SetBloodSurface((from,dir,distance)=>{ray.se
 const post=new PostPipeline(renderer,{width:1280,height:720,quality:"medium"});
 let time=0;
 function Draw(){vfx.SetDepthSource(post.NormalDepthTexture,post.width,post.height,post.SceneDepthTexture);post.Render(scene,camera,{taa:false,motionBlur:0,grain:0,vignette:0,autoExposure:false,exposure:1,fog:{density:0}});}
-function Step(frames){for(let i=0;i<frames;i++){time+=1/60;vfx.Update(1/60,camera,time);}Draw();}
+function Step(frames,dt=1/60){for(let i=0;i<frames;i++){time+=dt;vfx.Update(dt,camera,time);}Draw();}
 function Clear(){vfx.ClearParticles();}
 window.B={THREE,scene,camera,vfx,post,renderer,ground,wall,ramp,platform,Draw,Step,Clear};
 Draw();await new Promise(resolve=>{const poll=()=>vfx.bloodEffects.texture?resolve():setTimeout(poll,30);poll();});Draw();window.ready=true;
@@ -166,6 +166,35 @@ try{
   assert.equal(lifecycle.zeroY,0,"Horizontal blood source must preserve zero Y direction");
   assert(lifecycle.roof.length>0&&lifecycle.roof.every(y=>Math.abs(y-.875)<1e-5),"Platform catches droplets exactly on its top surface");
   assert(lifecycle.stopped);assert.equal(lifecycle.kept,1);assert.equal(lifecycle.dynamic,0);assert.equal(lifecycle.drops,0);
+  const arterial=await page.evaluate(()=>{
+    const {THREE,scene,vfx,Step,Clear}=B,b=vfx.bloodEffects;
+    const node=new THREE.Group();scene.add(node);node.position.set(-.8,1.15,0);
+    function Start(axis={x:1,y:.12,z:0}){return vfx.BloodSpurt(node,null,axis,{arterial:true,seconds:7,rate:150,speed:[3,5.6],decals:10});}
+    const counts=[];
+    for(const hz of [30,60,120]){Clear();const before=b.stats.emitted;Start();Step(hz*2,1/hz);counts.push(b.stats.emitted-before);}
+    Clear();Start();const start=b.stats.emitted;Step(60);const first=b.stats.emitted-start;
+    Step(180);const later=b.stats.emitted;Step(60);const fifth=b.stats.emitted-later;
+    Clear();node.position.set(0,1.15,0);Start();node.position.x=.6;Step(1,.08);
+    const origins=b.activeDrops.map(d=>d.origin.x),born=b.activeDrops.map(d=>d.born);
+    const moving={count:origins.length,min:Math.min(...origins),max:Math.max(...origins),distinct:new Set(born).size};
+    Clear();node.position.set(0,.6,0);Start({x:0,y:-1,z:0});Step(5);
+    const down=b.activeDrops.map(d=>d.velocity.y),before=b.stats.impacts;Step(30);
+    const impacts=b.stats.impacts-before;
+    node.removeFromParent();Step(1);const detached=b.sources.size;Clear();
+    return {counts,first,fifth,moving,down,impacts,detached,capacity:b.drops.capacity};
+  });
+  assert(Math.max(...arterial.counts)-Math.min(...arterial.counts)<=3,`Pump emission stays consistent at 30/60/120 Hz: ${JSON.stringify(arterial.counts)}`);
+  assert(arterial.first>arterial.fifth*2&&arterial.fifth>0,"Pressure loss visibly reduces the spray without stopping prematurely");
+  assert(arterial.moving.count>=3&&arterial.moving.distinct===arterial.moving.count&&arterial.moving.min>.0&&arterial.moving.max<.6,
+    `A moving cut emits at distinct positions/times along its motion: ${JSON.stringify(arterial.moving)}`);
+  assert(arterial.down.length>0&&arterial.down.every(y=>y<0)&&arterial.impacts>0,"Downward stumps spray into the receiving surface, never flip upward");
+  assert.equal(arterial.detached,0);
+  await page.evaluate(()=>{const {THREE,scene,vfx,Clear,Step}=B;Clear();const node=new THREE.Group();node.position.set(-.8,1.15,.1);scene.add(node);B.arterialNode=node;
+    vfx.BloodSpurt(node,null,{x:1,y:.12,z:0},{arterial:true,seconds:7,rate:150,speed:[3,5.6],decals:10});Step(8);});
+  await page.screenshot({path:path.join(shots,"BloodArterialJet.png")});
+  await page.evaluate(()=>B.Step(40));
+  await page.screenshot({path:path.join(shots,"BloodArterialBreakup.png")});
+  await page.evaluate(()=>{B.arterialNode.removeFromParent();B.Clear();});
   const budget=await page.evaluate(()=>{
     const {THREE,vfx,scene,Step,Clear}=B,node=new THREE.Group();scene.add(node);node.position.y=1;
     for(let i=0;i<100;i++){vfx.BloodBurst(node.position,new THREE.Vector3(0,1,0),2);vfx.BloodSpurt(node,null,{x:0,y:1,z:0});}
@@ -175,6 +204,6 @@ try{
   });
   assert(budget.drops<=budget.dropLimit&&budget.sources<=budget.sourceLimit&&budget.mistInstances<=budget.mistLimit,"Burst overload stays within all fixed pools");
   assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(shots,"Data_BloodEffectsResults.json"),JSON.stringify({impacts,projection,planar,stripes,modes,lifecycle,budget,errors},null,2));
+  fs.writeFileSync(path.join(shots,"Data_BloodEffectsResults.json"),JSON.stringify({impacts,projection,planar,stripes,modes,lifecycle,arterial,budget,errors},null,2));
   console.log("PASS BloodEffects: rendered projection, mist, physical impacts, platform, zero-axis source, separate pools, detach and clear",JSON.stringify({impacts,projection}));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

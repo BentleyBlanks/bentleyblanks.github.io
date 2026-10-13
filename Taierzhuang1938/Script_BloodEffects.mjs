@@ -1,11 +1,12 @@
 import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 import * as THREE from "three";
-import { BLOOD_TEXTURE, BLOOD_QUALITY, BLOOD_MOTION as C, BLOOD_ARTERIAL as A, BLOOD_HEADSHOT as H, BloodPosition } from "./Data_Tuning_Blood.mjs";
+import { BLOOD_TEXTURE, BLOOD_QUALITY, BLOOD_MOTION as C, BLOOD_ARTERIAL as A, BLOOD_HEADSHOT as H, BLOOD_LIQUID, BloodPosition } from "./Data_Tuning_Blood.mjs";
 import { SurfaceDecalLayer } from "./Script_SurfaceDecals.mjs";
 
 const position=new THREE.Vector3(),direction=new THREE.Vector3(),velocity=new THREE.Vector3();
 const next=new THREE.Vector3(),segment=new THREE.Vector3(),hitPoint=new THREE.Vector3(),hitNormal=new THREE.Vector3();
 const quaternion=new THREE.Quaternion();
+const emissionPosition=new THREE.Vector3();
 const fresh=new THREE.Color(0x931f1a).toArray(),dark=new THREE.Color(0x461410).toArray();
 const arterial=new THREE.Color(A.color).toArray();
 
@@ -21,7 +22,7 @@ export class BloodEffects {
     this.mist=CreatePool(this.limits.mist,{shape:"bloodmist",orient:"billboard",lit:true,aerial:true,
       softRange:.09,renderOrder:6,blending:THREE.NormalBlending,preserveTargetAlpha:true});
     this.drops=CreatePool(this.limits.drops,{shape:"blooddrop",orient:"stretch",litSurface:false,
-      softRange:0,renderOrder:6,blending:THREE.NormalBlending,preserveTargetAlpha:true});
+      segments:BLOOD_LIQUID.segments,softRange:0,renderOrder:6,blending:THREE.NormalBlending,preserveTargetAlpha:true});
     this.decals=this.CreateLayer(root,this.limits.decals,false);
     this.texture=null;
     new ManagedTextureLoader().load(new URL(BLOOD_TEXTURE,import.meta.url).href,texture=>{
@@ -52,10 +53,11 @@ export class BloodEffects {
     const distance=this.eye.distanceTo(p);if(distance>C.maxDistance)return;
     const far=Math.min(C.farScaleMax,Math.max(1,distance/C.farStart));
     const count=Math.round((burst?C.burstMistCount:C.mistCount)*amount);
+    const mistLife=burst?C.burstMistLife:C.mistLife,mistRadius=burst?C.burstMistRadius:C.mistRadius;
     for(let i=0;i<count;i++){
       this.Cone(direction,burst?1.05:.62,this.Range(1.8,5.0)*Math.sqrt(amount),velocity);
-      const s=this.SpawnData(p,velocity,this.Range(...C.mistLife),C.mistRadius[0]*far,C.mistRadius[1]*far*this.Range(.6,1.2));
-      s.ay=-2.8;s.drag=4.5;s.opacity=C.mistOpacity;s.fadeIn=.015;s.spin=this.Range(-1.2,1.2);
+      const s=this.SpawnData(p,velocity,this.Range(...mistLife),mistRadius[0]*far,mistRadius[1]*far*this.Range(.6,1.2));
+      s.ay=-2.8;s.drag=4.5;s.opacity=burst?C.burstMistOpacity:C.mistOpacity;s.fadeIn=.015;s.spin=this.Range(-1.2,1.2);
       this.mist.Spawn(s,this.time);
     }
     const drops=Math.round((burst?C.burstDropCount:C.dropCount)*amount);
@@ -114,13 +116,16 @@ export class BloodEffects {
     if(this.sources.size>=this.limits.sources)this.sources.delete(this.sources.keys().next().value);
     const id=this.nextSource++;
     direction.set(axis?.x??0,axis?.y??1,axis?.z??0);if(direction.lengthSq()<1e-8)direction.set(0,1,0);
-    this.sources.set(id,{node,offset:new THREE.Vector3(offset?.x??0,offset?.y??0,offset?.z??0),
+    node.updateWorldMatrix(true,false);
+    const localOffset=new THREE.Vector3(offset?.x??0,offset?.y??0,offset?.z??0);
+    this.sources.set(id,{node,offset:localOffset,
       direction:direction.clone().normalize(),seconds:Math.max(.05,options.seconds??2.4),
       rate:Math.max(0,options.rate??26),speed:options.speed??[2.2,5.2],spread:options.spread??.45,
       pool:!!options.pool,worldDirection:!!options.worldDirection,arterial:!!options.arterial,
       deposits:options.decals??8,poolDeposits:options.poolDecals??A.poolDeposits,phase:0,
+      previousPosition:localOffset.clone().applyMatrix4(node.matrixWorld),
       age:0,accumulator:0,root:options.root??null});
-    node.updateWorldMatrix(true,false);return id;
+    return id;
   }
   // Heartbeat pump for a severed stump (BLOOD_ARTERIAL): each beat jets a coherent stream,
   // then dribbles into a pool; pressure and heart rate fall over the source's lifetime.
@@ -132,10 +137,13 @@ export class BloodEffects {
     const beat=source.phase%1,jet=beat<A.systole?Math.sin(Math.PI*beat/A.systole):0;
     const onset=before===0||Math.floor(source.phase)!==Math.floor(before);
     // The torn vessel shifts a little between beats; within one beat the stream holds its line.
-    if(onset)source.wobble=[this.Range(-A.beatWobble,A.beatWobble),this.Range(-A.beatWobble,A.beatWobble),this.Range(-A.beatWobble,A.beatWobble)];
-    // Stumps on a fallen body often face the ground; lift the jet so the arc stays readable.
+    if(onset){
+      source.wobble=[this.Range(-A.beatWobble,A.beatWobble),this.Range(-A.beatWobble,A.beatWobble),this.Range(-A.beatWobble,A.beatWobble)];
+      source.beatSpeed=source.speed[0]+(source.speed[1]-source.speed[0])*Math.sqrt(pressure);
+    }
+    // Follow the stump; downward outlets must hit the ground rather than reverse upwards.
     const w=source.wobble||[0,0,0];
-    axis.set(axis.x+w[0],Math.max(axis.y+A.upBias,A.minUp)+w[1],axis.z+w[2]).normalize();
+    axis.set(axis.x+w[0],axis.y+A.upBias+w[1],axis.z+w[2]).normalize();
     const far=Math.min(A.farScaleMax,Math.max(1,this.eye.distanceTo(p)/A.farStartM));
     if(onset&&pressure>A.mistMinPressure){
       for(let i=0;i<A.mistPerBeat;i++){
@@ -145,22 +153,26 @@ export class BloodEffects {
         this.mist.Spawn(s,this.time);
       }
     }
-    source.accumulator+=source.rate*dt*pressure*Math.max(jet,A.diastoleFlow);
+    const emissionRate=source.rate*pressure*Math.max(jet,A.diastoleFlow);
+    source.accumulator+=emissionRate*dt;
     const count=Math.min(A.maxDropsPerFrame,Math.floor(source.accumulator));source.accumulator-=count;
     const jetting=jet>A.diastoleFlow;
     // Exit speed follows the beat profile, not a per-drop dice roll: drops leaving together
     // must land together, or the jet reads as a scattered fan of dashes.
-    const jetSpeed=(source.speed[0]+(source.speed[1]-source.speed[0])*Math.sqrt(pressure))
-      *(1-A.beatSpeedDip*(1-jet));
+    const jetSpeed=source.beatSpeed;
     for(let i=0;i<count;i++){
-      const speed=jetting?jetSpeed*this.Range(1-A.speedJitter,1+A.speedJitter):this.Range(...A.dribbleSpeed);
-      this.Cone(axis,jetting?A.jetSpread:A.dribbleSpread,speed,velocity);
-      const size=this.Range(...A.dropHalfWidth)*far*(jetting?1:.75);
-      const stretch=Math.min(A.stretch[1],Math.max(A.stretch[0],speed*A.stretchPerSpeed));
-      const lag=dt*(i+.5)/count;
-      if(jetting)this.Drop(p,velocity,{radius:this.Range(...A.splashRadius),size,stretch,lag,color:arterial,
+      const spray=jetting&&this.random()<A.sprayFraction;
+      const speed=jetting?jetSpeed*(spray?this.Range(...A.spraySpeed):this.Range(1-A.speedJitter,1+A.speedJitter)):this.Range(...A.dribbleSpeed);
+      this.Cone(axis,jetting?(spray?A.spraySpread:A.jetSpread):A.dribbleSpread,speed,velocity);
+      const size=this.Range(...(spray?A.sprayHalfWidth:A.dropHalfWidth))*far*(jetting?Math.sqrt(pressure):.55);
+      const stretch=Math.min(A.stretch[1],Math.max(A.stretch[0],speed*A.stretchPerSpeed))*(spray ? .2 : 1);
+      // Use the actual accumulator crossing time, including the previous fractional drop.
+      // Interpolate a moving stump at birth; never stack a frame's drops at its final pose.
+      const lag=Math.min(dt,(count-1-i+source.accumulator)/Math.max(emissionRate,1e-6));
+      emissionPosition.lerpVectors(source.previousPosition,p,1-lag/dt);
+      if(jetting)this.Drop(emissionPosition,velocity,{radius:this.Range(...A.splashRadius),size,stretch,lag,color:arterial,
         deposit:source.deposits>0&&this.random()<A.splashDepositChance&&source.deposits-->0});
-      else this.Drop(p,velocity,{radius:A.poolDropRadius,pool:true,size,stretch,lag,deposit:source.poolDeposits-->0});
+      else this.Drop(emissionPosition,velocity,{radius:A.poolDropRadius,pool:true,size,stretch,lag,deposit:source.poolDeposits-->0});
     }
   }
   Corpse(actor){
@@ -185,10 +197,10 @@ export class BloodEffects {
       if(source.age>=source.seconds||!source.node.parent||(source.root&&!source.root.parent)){this.sources.delete(id);continue;}
       source.node.updateWorldMatrix(true,false);
       position.copy(source.offset).applyMatrix4(source.node.matrixWorld);
-      if(this.eye.distanceTo(position)>C.maxDistance)continue;
+      if(this.eye.distanceTo(position)>C.maxDistance){source.previousPosition.copy(position);continue;}
       direction.copy(source.direction);
       if(!source.worldDirection){source.node.getWorldQuaternion(quaternion);direction.applyQuaternion(quaternion);}
-      if(source.arterial){this.Pump(source,dt,position,direction);continue;}
+      if(source.arterial){this.Pump(source,dt,position,direction);source.previousPosition.copy(position);continue;}
       const pressure=Math.max(0,1-source.age/source.seconds);
       const pulse=source.pool?1:.55+.45*Math.pow(.5+.5*Math.sin(source.age*12),3);
       source.accumulator+=source.rate*dt*pressure*pulse;
