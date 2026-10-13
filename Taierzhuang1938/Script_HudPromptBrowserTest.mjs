@@ -15,18 +15,22 @@ page.on("pageerror", (error) => errors.push(String(error)));
 try {
   const port = server.address().port;
   await page.goto(
-    `http://127.0.0.1:${port}/Taierzhuang1938/?phase=3&quality=low&scale=small&menu=0`,
+    `http://127.0.0.1:${port}/Taierzhuang1938/?phase=3&quality=low&scale=small&manual=1`,
     { waitUntil: "load", timeout: 120000 },
   );
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });
+  await page.waitForFunction(() => window.Taierzhuang?.state?.ready && window.Taierzhuang?.Debug?.MenuAct, null, { timeout: 180000 });
+
+  await page.evaluate(() => {
+    const T=window.Taierzhuang;T.menu.OpenPause();T.Debug.MenuAct("settings");
+  });
+  await page.locator('#menu [data-setting="controls"]').click();
 
   const controls = await page.evaluate(() => {
     const T = window.Taierzhuang;
-    T.editor.Open("controls");
     return {
-      active: T.editor.ActiveId,
-      rows: document.querySelectorAll(".edControlRow").length,
-      text: document.querySelector(".edPanel.work")?.textContent || "",
+      active: T.Debug.Editor().settings,
+      rows: document.querySelectorAll("#settingsRoot .edControlRow").length,
+      text: document.querySelector("#settingsRoot .edPanel.work")?.textContent || "",
     };
   });
   assert.equal(controls.active, "controls");
@@ -34,6 +38,9 @@ try {
   assert.match(controls.text, /拾枪、换枪/);
   assert.match(controls.text, /包扎止血/);
   assert.match(controls.text, /M显示 \/ 隐藏战场地图/);
+  await page.locator('#settingsRoot .edPanel.work .edX').click();
+  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("resume"));
+  assert.equal(await page.evaluate(() => window.Taierzhuang.menu.open),false,"settings closes back into the live game");
 
   const mapToggle = await page.evaluate(() => {
     const T = window.Taierzhuang;
@@ -116,12 +123,13 @@ try {
   assert.equal(prompts.on, true);
   assert.deepEqual(prompts.rows, [["B", "包扎止血"]]);
   assert.deepEqual(prompts.rowBox, ["0px", "rgba(0, 0, 0, 0)"], "提示没有外框与底板");
-  // 9-13 用户定：clamp(20px, 3vh, 34px) 的 40%，再放大 20%。
-  const expectPx = Math.min(16.32, Math.max(9.6, prompts.viewH * 0.0144));
+  // Selected D gives the solitary bandage action a readable lower-middle anchor.
+  const expectPx = Math.min(22, Math.max(11, prompts.viewH * 0.02));
   assert.ok(Math.abs(prompts.labelPx - expectPx) < 0.1, `提示字号应为 ${expectPx.toFixed(1)} px，实际 ${prompts.labelPx}`);
   assert.match(prompts.family, /^"?TzTitleText/, "提示用 logo 同款字体");
   assert.match(prompts.subtitleFamily, /^"?TzTitleText/, "字幕用 logo 同款字体");
-  assert.ok(Math.abs(prompts.centerX - prompts.viewW / 2) < 2 && prompts.top > prompts.viewH / 2,
+  assert.ok(Math.abs(prompts.centerX - prompts.viewW / 2) < 2
+    && prompts.top >= prompts.viewH * .64 && prompts.top <= prompts.viewH * .69,
     `提示应居中在准星下方：${JSON.stringify(prompts)}`);
   assert.ok(prompts.titles.some((title) => title === "包扎止血"));
 
@@ -186,6 +194,9 @@ try {
       grenadesHeld: String(Math.max(0, Math.floor(T.state.grenades || 0))),
       background: getComputedStyle(document.querySelector(".combatMain")).backgroundImage,
       strokeWidth: Number.parseFloat(getComputedStyle(document.querySelector(".ammoCurrent")).webkitTextStrokeWidth),
+      ammoFont: getComputedStyle(document.querySelector(".ammoCurrent")).fontFamily,
+      ammoShadow: getComputedStyle(document.querySelector(".ammoCurrent")).textShadow,
+      equipmentSeparator: getComputedStyle(document.querySelector(".combatEquipment")).borderRightWidth,
       changed, idle, touched, idleAgain, pinned,
     };
   });
@@ -195,13 +206,32 @@ try {
   assert.equal(combatHud.stanceNodes, 0, "HUD 不再显示站 / 蹲 / 趴");
   assert.equal(combatHud.grenadeCount, combatHud.grenadesHeld, "手榴弹数与弹药同一行，读的是身上真实的数");
   assert.equal(combatHud.background, "none", "COD 式弹药块没有底板");
-  assert.ok(combatHud.strokeWidth >= 0.9, "弹药数字要有硬黑描边");
+  assert.equal(combatHud.strokeWidth, 0, "selected B uses soft shadow instead of a heavy black outline");
+  assert.match(combatHud.ammoFont, /Georgia/, "selected B has serif ammunition numerals");
+  assert.notEqual(combatHud.ammoShadow, "none", "ivory ammo remains readable against bright terrain");
+  assert.equal(combatHud.equipmentSeparator, "1px", "grenade silhouettes have a fine separator from ammo");
   assert.equal(combatHud.changed.awake, true, "弹药数一变就亮");
   assert.equal(combatHud.idle.awake, false, `几秒不交互就隐掉，实际 ${JSON.stringify(combatHud.idle)}`);
   assert.equal(combatHud.touched.awake, true, "Touch 之后要亮");
   assert.equal(combatHud.idleAgain.awake, false, "Touch 也会过期");
   assert.equal(combatHud.pinned.awake, true, "低弹钉住不淡");
   assert.equal(combatHud.pinned.combatPinned, true);
+
+  const grenadeReadouts = await page.evaluate(() => [0,1,2,4,7].map(grenades => {
+    window.Taierzhuang.hud.SetState({ammo:5,clips:3,magazine:5,grenades});
+    const item=document.querySelector(".equipment.grenade"), count=item.querySelector("b");
+    return {grenades,visible:[...item.querySelectorAll("svg")].filter(svg=>getComputedStyle(svg).display!=="none").length,
+      label:item.getAttribute("aria-label"),count:count.textContent,overflow:item.classList.contains("overflow"),
+      countWidth:count.getBoundingClientRect().width,opacity:+getComputedStyle(item).opacity};
+  }));
+  assert.deepEqual(grenadeReadouts.map(item=>item.visible),[1,1,2,4,1],"real grenade counts use bounded silhouettes and numeric overflow");
+  for (const item of grenadeReadouts) {
+    assert.equal(item.count,String(item.grenades));
+    assert.equal(item.label,`手榴弹 ${item.grenades}`,"screen readers retain the exact grenade count");
+    assert.equal(item.overflow,item.grenades>4);
+    assert.ok(item.grenades>4 ? item.countWidth>4 : item.countWidth<=1,"only overflow needs a visible number");
+  }
+  assert.ok(grenadeReadouts[0].opacity<=.31,"empty grenade slot retains a dim silhouette");
 
   const codObjective = await page.evaluate(async () => {
     const T = window.Taierzhuang;
@@ -232,6 +262,11 @@ try {
       updateTransform: updateStyle.transform,
       updateFontSize: Number.parseFloat(updateStyle.fontSize),
       updateFontWeight: Number.parseInt(updateStyle.fontWeight, 10),
+      updateWidth: updateText.getBoundingClientRect().width,
+      updateClip: updateStyle.clipPath,
+      symbolCount: objective.querySelectorAll(".objectiveSymbol").length,
+      rule: style.borderBottomWidth,
+      shadow: textStyle.textShadow,
       left: box.left,
       top: box.top,
       force: forceStatus?.textContent,
@@ -250,17 +285,17 @@ try {
   assert.equal(codObjective.animationName, "hudObjectiveChanged");
   assert.ok(codObjective.animationDuration >= 6 && codObjective.animationDuration <= 7,
     `目标通知停留时长应接近 COD 实机，实际 ${codObjective.animationDuration}s`);
-  assert.equal(codObjective.fontSize, 17);
-  assert.equal(codObjective.fontWeight, 700);
+  assert.ok(codObjective.fontSize>=14&&codObjective.fontSize<=18,"selected objective stays small and readable at 720p");
+  assert.equal(codObjective.fontWeight, 600);
   assert.match(codObjective.color, /^rgba\(/, "目标文字不能回退成不透明纯白");
-  assert.ok(codObjective.strokeWidth >= 0.9, "COD 目标文字必须保留足够清楚的硬黑描边");
+  assert.equal(codObjective.strokeWidth,0,"selected objective uses a soft shadow without a hard outline");
+  assert.notEqual(codObjective.shadow,"none");
   assert.equal(codObjective.updateTransform, "none", "目标更新回执不得滑入抢视线");
-  assert.equal(codObjective.updateFontSize, codObjective.fontSize, "两行应为 COD 式同级字号");
-  assert.equal(codObjective.updateFontWeight, codObjective.fontWeight, "两行应为 COD 式同级字重");
-  assert.ok(codObjective.left <= 12, `目标通知应贴近左上安全边，实际 left=${codObjective.left}`);
-  // 左上角帧率读数固定在 top:10px，目标通知整块下移一行（Style_Game.css .hudTop top:30px）。
-  assert.ok(codObjective.top >= 26 && codObjective.top <= 34,
-    `目标通知纵向位置应贴近 COD 实机，实际 top=${codObjective.top}`);
+  assert.ok(codObjective.updateWidth<=1&&codObjective.updateClip!=="none","update acknowledgement stays accessible without adding a second visible row");
+  assert.equal(codObjective.symbolCount,1);
+  assert.equal(codObjective.rule,"1px");
+  assert.ok(codObjective.left>=36&&codObjective.left<=64,`selected objective has a calm left safe margin: ${codObjective.left}`);
+  assert.ok(codObjective.top>=42&&codObjective.top<=64,`selected objective has a calm top safe margin: ${codObjective.top}`);
   assert.equal(codObjective.force, "城中仍在坚守者：35 人");
   assert.equal(codObjective.forceFlashing, true);
   assert.equal(codObjective.forceIsIndependent, true);
@@ -312,14 +347,10 @@ try {
 
   const weaponPrompts = await page.evaluate(() => {
     const T = window.Taierzhuang;
-    const victim = T.ai.soldiers.find((soldier) => soldier.alive) || T.ai.soldiers[0];
-    if (!victim) return null;
-    victim.weaponId = "Type38";
-    victim.position.set(T.player.position.x + 1, T.player.position.y, T.player.position.z);
-    if (victim.alive) victim.Kill();
-    if (!victim.drop) victim.drop = { weaponId: "Type38", clips: 0, taken: false };
-    victim.drop.weaponId = "Type38";
-    victim.drop.taken = false;
+    // Archived slices no longer promise a live soldier roster. Use the real ground-weapon
+    // path, as WeaponPickupTest does, so this fixture tests HUD pickup semantics directly.
+    T.player.yaw=0;T.player.pitch=-.6;T.player.stance="stand";
+    T.Debug.DropWeapon("Type38",{x:T.player.position.x,z:T.player.position.z-1.1,yaw:Math.PI/2,ammo:4});
     // 主、副武器都满了才是「换上」；空着副武器槽是「拾起」（COD 式两枪槽）。
     T.state.slots.secondary = "ZhongZheng";
     T.StepFrames(12);
@@ -356,6 +387,9 @@ try {
 
   const cleared = await page.evaluate(() => {
     const T = window.Taierzhuang;
+    // Consume the fixture's ground weapon through the real tap-F path before testing idle HUD.
+    T.Debug.Key("KeyF",true);T.StepFrames(1,1/60,false);
+    T.Debug.Key("KeyF",false);T.StepFrames(12,1/60,false);
     T.player.bleeding = 0;
     T.player.bandages = 0;
     // 装得上刺刀的步枪在手，闲时依然不显示 X。
@@ -364,6 +398,7 @@ try {
       if (!soldier.alive && soldier.drop) soldier.drop.taken = true;
     }
     T.state.slots.secondary = null;
+    T.player.yaw=Math.PI;T.player.pitch=0;
     T.StepFrames(12);
     return { prompts: T.Debug.Prompts(), on: document.querySelector(".hudActions")?.classList.contains("on") };
   });

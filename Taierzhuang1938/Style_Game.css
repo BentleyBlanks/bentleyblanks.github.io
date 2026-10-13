@@ -23,6 +23,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   position: fixed; inset: 0; pointer-events: none;
   font-size: 14px; line-height: 1.5;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  --hud-edge-x: max(20px, 2.6vw, env(safe-area-inset-right));
+  --hud-edge-bottom: max(24px, 4.5vh, env(safe-area-inset-bottom));
 }
 
 /* 压制：径向暗角 + 轻微去色。ER2 的压制表现就是这个。 */
@@ -36,19 +38,20 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudDamage {
   position: absolute; inset: 0; opacity: 0;
   pointer-events: none; overflow: hidden;
-  --blood-clear: 82%; --blood-size: 148%; --blood-pulse: 1.1s;
+  --blood-clear: 92%; --blood-size: 132%; --blood-pulse: 1.1s;
   transition: opacity 0.09s linear;
   background: radial-gradient(ellipse closest-side at center,
     transparent var(--blood-clear),
-    rgba(142,6,14,0.46) calc(var(--blood-clear) + 22%),
-    rgba(78,0,7,0.9) 112%);
+    rgba(25,0,3,0.08) calc(var(--blood-clear) + 18%),
+    rgba(16,0,2,0.24) 125%);
 }
 .hudDamage::before {
   content: ""; position: absolute; inset: 0;
-  background: url("./Texture/Hud/Texture_HudCriticalBlood.webp?v=20260928") center / var(--blood-size) var(--blood-size) no-repeat;
+  background: url("./Texture/Hud/Texture_HudPeripheralBlood.webp?v=20261013HudBlend1") center / var(--blood-size) var(--blood-size) no-repeat;
   opacity: 0.88;
+  filter: blur(clamp(0.6px, 0.15vh, 1.8px));
 }
-/* 只动画化子层 opacity，不对全屏纹理逐帧做 brightness/filter。 */
+/* A fixed peripheral-focus blur is cached; only opacity animates with the heartbeat. */
 .hudDamage.low::before { animation: hudPulse var(--blood-pulse) ease-in-out infinite; }
 
 /*
@@ -88,10 +91,10 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudLensFlash.on { visibility: visible; }
 .hudHealthWarning {
-  position: absolute; right: 22px; bottom: 122px; z-index: 7;
-  max-width: calc(100vw - 32px); opacity: 0;
-  color: #ff655c; font: 700 clamp(12px, 1.15vw, 16px)/1.5 var(--ui-font);
-  text-shadow: 0 1px 3px #180000, 0 0 6px #000;
+  /* Injury is visible through the selected blood mask and contextual bandage prompt.
+     Keep the urgent text as an accessible live status without a second HUD warning panel. */
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; opacity: 0;
 }
 .hudHealthWarning.on { opacity: 1; }
 @keyframes hudPulse {
@@ -107,12 +110,12 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
    只有从身边掠过的近失弹为白色，背后压一层暗影保证在沙地和天空上都读得出。 */
 .hudHitDirs {
   position: absolute; left: 50%; top: 50%;
-  width: clamp(180px, 46vmin, 500px); aspect-ratio: 1;
+  width: max(180px, 76vmin); aspect-ratio: 1;
   transform: translate(-50%, -50%);
   pointer-events: none; overflow: visible; z-index: 6;
 }
 .hudHitArc { fill: url(#hudHitFillHit); }
-.hudHitGlow { fill: url(#hudHitFillHit); opacity: 0.7; }
+.hudHitGlow { fill: url(#hudHitFillHit); opacity: 0.4; }
 .hudHitDir.near .hudHitArc { fill: url(#hudHitFillNear); }
 .hudHitDir.near .hudHitGlow { fill: url(#hudHitShade); opacity: 0.45; }
 @media (prefers-reduced-motion: reduce) {
@@ -130,11 +133,10 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudFps.low { color: rgba(224,176,98,0.72); }
 
-/* COD《战争世界》实机目标通知：两行同级、硬黑描边、无底板。
-   整块只在目标更新时出现，停留数秒后一起淡出；平时由世界标记继续指路。 */
+/* Selected B: one small objective, a target symbol and a faint rule. Updates still fade out. */
 .hudTop {
-  position: absolute; top: 30px; left: 8px;
-  width: min(460px, calc(100vw - 16px));
+  position: absolute; top: max(42px, 7.5vh); left: max(20px, 4vw, env(safe-area-inset-left));
+  width: min(460px, calc(100vw - 80px));
   display: flex; flex-direction: column; align-items: flex-start;
   font-family: var(--ui-font);
 }
@@ -143,20 +145,23 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 .hudObjective {
   min-width: 0; max-width: 100%; box-sizing: border-box;
-  display: flex; flex-direction: column; align-items: flex-start;
-  padding: 0; background: none; border: 0; filter: none; opacity: 0;
+  display: grid; grid-template-columns: 1.25em minmax(0, 1fr); align-items: center; column-gap: 0.6em;
+  min-width: min(200px, 100%); padding: 0 8px 8px 0;
+  background: none; border: 0; border-bottom: 1px solid rgba(242,237,218,0.2); filter: none; opacity: 0;
+  font-size: clamp(14px, 2.15vh, 22px);
 }
-.hudObjective .o,
-.hudObjective .objectiveUpdate {
-  max-width: 100%; font-size: 17px; line-height: 1.16;
-  color: rgba(224,223,217,0.96); font-weight: 700; letter-spacing: 0;
-  -webkit-text-stroke: 1px rgba(0,0,0,0.96);
-  paint-order: stroke fill;
-  text-shadow: 1px 1px 0 rgba(0,0,0,0.9);
+.hudObjective .objectiveSymbol {
+  width: 1.25em; height: 1.25em; fill: none; stroke: currentColor; stroke-width: 1.8;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7));
+}
+.hudObjective .o {
+  max-width: 100%; font-size: inherit; line-height: 1.25;
+  color: rgba(242,237,218,0.98); font-weight: 600; letter-spacing: 0;
+  -webkit-text-stroke: 0; text-shadow: 0 1px 3px rgba(0,0,0,0.8);
 }
 .hudObjective .o { text-wrap: balance; }
 .hudObjective .objectiveUpdate {
-  margin-top: 0;
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
 .hudForceStatus {
   position: absolute; top: 32px; right: 28px; max-width: min(300px, 44vw);
@@ -183,7 +188,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 /* 右下偏上：只有出现伤情、屏息或命令时才亮，且几秒不变就隐掉（Data_Tuning_Hud.IDLE_FADE.stateS）。
    `.on` 是「有东西可写」，`.awake` 是「刚变过」，两者都在才亮。淡入快、淡出慢，与弹药块同一手感。 */
 .hudState {
-  position: absolute; right: 22px; bottom: 96px;
+  position: absolute; right: var(--hud-edge-x); bottom: calc(var(--hud-edge-bottom) + 11vh);
   display: flex; justify-content: flex-end; gap: 9px; max-width: 360px;
   padding: 0; font: 700 11px/1.4 var(--ui-font);
   color: rgba(224,223,217,0.9); opacity: 0; transition: opacity 0.6s ease;
@@ -195,49 +200,62 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudState .w { color: var(--warn); }
 .hudState .h { color: var(--ours); }
 .hudState .c { color: var(--paper); }
+/* B/D mockup: avoid duplicating blood + the actionable B prompt with an injury inventory row. */
+.hudState .b, .hudState .w, .hudState .g {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
 
-/* 右下战斗信息，照 COD《战争世界》单人战役：投掷物（图标 + 数）在左、当前弹大数在右、
-   备弹小数跟在斜线后，同一行；上面一行小字是武器名。没有底板、没有姿态人形 ——
-   全靠硬黑描边压在画面上（与左上目标通知同一套画法）。
+/* 2026-10-13 selected B: grenade silhouettes, a fine separator, then a weapon-name/ammo column.
+   Ivory serif numbers and a soft shadow stay readable without a panel or hard black outlines.
    整块只在交互后亮几秒（IDLE_FADE.combatS，由 Script_Hud 拨 `.awake`），
    空膛 / 低弹钉住不淡；淡入 0.12 s、淡出 0.6 s。 */
 .hudCombat {
-  position: absolute; right: 22px; bottom: 20px;
+  position: absolute; right: var(--hud-edge-x); bottom: var(--hud-edge-bottom);
   display: flex; flex-direction: column; align-items: flex-end;
-  color: rgba(224,223,217,0.96); font-family: var(--ui-font);
+  color: #f2edda; font-family: var(--ui-story-font);
   opacity: 0; transition: opacity 0.6s ease;
-  -webkit-text-stroke: 1px rgba(0,0,0,0.96); paint-order: stroke fill;
-  text-shadow: 1px 1px 0 rgba(0,0,0,0.9);
+  -webkit-text-stroke: 0;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.82);
 }
 .hudCombat.awake { opacity: 1; transition: opacity 0.12s ease; }
+.combatReadout { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2vh; }
 .combatWeapon {
-  min-height: 15px; padding: 0 2px 3px; text-align: right;
-  color: rgba(224,223,217,0.74); font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
-  -webkit-text-stroke-width: 0.7px;
+  min-height: 1.15em; padding: 0 1px 2px; text-align: left;
+  color: #f2edda; font-size: clamp(12px, 2.25vh, 24px); font-weight: 600; line-height: 1.15; letter-spacing: 0;
 }
-.combatMain { display: flex; align-items: flex-end; gap: 18px; }
+.combatMain { display: flex; align-items: flex-end; gap: clamp(9px, 1.5vh, 18px); }
 .combatAmmo { display: flex; align-items: baseline; }
-.ammoCurrent { font: 700 38px/1 "Cascadia Mono", Consolas, monospace; letter-spacing: -0.04em; }
+.ammoCurrent { font: 700 clamp(38px, 7vh, 88px)/0.94 Georgia, "Times New Roman", serif; font-variant-numeric: lining-nums tabular-nums; letter-spacing: -0.04em; }
 .ammoDivider {
-  width: 2px; height: 26px; margin: 0 9px; align-self: center;
-  background: rgba(224,223,217,0.72); transform: skewX(-14deg);
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.75);
+  margin: 0 0.22em 0 0.3em; color: #f2edda;
+  font: 400 clamp(19px, 3.5vh, 42px)/1 Georgia, "Times New Roman", serif;
 }
-.ammoReserve { color: rgba(224,223,217,0.8); font: 700 18px/1 "Cascadia Mono", Consolas, monospace; }
-.hudCombat.lowAmmo .ammoCurrent { color: var(--warn); }
-.hudCombat.emptyAmmo .ammoCurrent { color: var(--theirs); animation: hudAmmoPulse 0.9s ease-in-out infinite; }
+.ammoReserve { color: #f2edda; font: 700 clamp(19px, 3.5vh, 42px)/1 Georgia, "Times New Roman", serif; font-variant-numeric: lining-nums tabular-nums; }
+.hudCombat.lowAmmo .ammoCurrent { color: #df252c; }
+.hudCombat.emptyAmmo .ammoCurrent { color: #df252c; animation: hudAmmoPulse 0.9s ease-in-out infinite; }
 @keyframes hudAmmoPulse { 50% { opacity: 0.48; } }
 .combatEquipment {
-  display: flex; align-items: flex-end; gap: 12px; padding-bottom: 5px;
-  color: rgba(224,223,217,0.92);
+  display: flex; align-items: flex-end; gap: 9px;
+  padding: 0 clamp(9px, 1.4vh, 17px) 0 0; border-right: 1px solid rgba(242,237,218,0.72);
+  color: #f2edda;
 }
 .equipment { display: flex; align-items: center; gap: 4px; }
 .equipment svg {
   width: 20px; height: 20px; fill: none; stroke: currentColor;
   stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
-  filter: drop-shadow(1px 1px 0 rgba(0,0,0,0.9)) drop-shadow(-1px -1px 0 rgba(0,0,0,0.7));
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7));
 }
 .equipment b { font: 700 15px/1 "Cascadia Mono", Consolas, monospace; }
+.grenadeStack { display: flex; align-items: flex-end; gap: clamp(3px, 0.55vh, 6px); }
+.equipment .grenadeStack svg { display: none; width: clamp(16px, 2.5vh, 31px); height: clamp(34px, 5.5vh, 66px); stroke-width: 1.35; }
+.grenade[data-count="0"] .grenadeStack svg:first-child,
+.grenade[data-count="1"] .grenadeStack svg:first-child,
+.grenade[data-count="2"] .grenadeStack svg:nth-child(-n+2),
+.grenade[data-count="3"] .grenadeStack svg:nth-child(-n+3),
+.grenade[data-count="4"] .grenadeStack svg:nth-child(-n+4),
+.grenade.overflow .grenadeStack svg:first-child { display: block; }
+.grenade:not(.overflow) b { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.grenade.overflow b::before { content: "×"; margin-right: 2px; }
 /* 空的格子整个不画（集束 / 迫击炮平时都是 0，摆一排灰 0 只是噪音）；
    手榴弹是 COD 里常驻的那一格，打光了压暗留着 —— 「没弹了」本身是信息。 */
 .equipment.empty { display: none; }
@@ -287,6 +305,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   white-space: nowrap; pointer-events: none;
 }
 .hudActions.on { opacity: 1; }
+.hudActions.bandageOnly { font-size: clamp(11px, 2vh, 22px); }
+.hudActions.bandageOnly .hudAction kbd { font-size: .9em; min-width: 1.5em; height: 1.5em; border-radius: .15em; }
 .hudAction {
   --c: #ece3cc;
   display: flex; flex-direction: column; align-items: center; gap: 0.2em;
@@ -602,10 +622,12 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudMarkers { position: absolute; inset: 0; }
 .hudMissionGuide { position:absolute; left:0; top:0; width:0; height:0; z-index:2; pointer-events:none; color:#eee4b0; text-shadow:0 1px 2px #000,1px 0 2px #000,-1px 0 2px #000; font-weight:600; transition:opacity .2s; }
 .hudMissionGuide[hidden] { display:none; }
-.hudMissionGuide.leader { color:#bdd998; }
+.hudMissionGuide.leader { color:#f2edda; }
 .hudMissionGuide .guideAction,.hudMissionGuide .guideDetail { position:absolute; left:0; width:190px; text-align:center; transform:translateX(-50%); white-space:nowrap; }
 .hudMissionGuide .guideAction { bottom:15px; font-size:14px; letter-spacing:1px; }
 .hudMissionGuide .guideDetail { top:15px; font-size:12px; color:#eeeee4; }
+.hudMissionGuide.leader .guideAction { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.hudMissionGuide.leader .guideDetail { top:auto; bottom:20px; font-size:clamp(12px,1.85vh,19px); font-weight:500; }
 .hudMissionGuide .guideDiamond { position:absolute; left:-6px; top:-6px; width:10px; height:10px; border:2px solid currentColor; transform:rotate(45deg); box-shadow:0 0 2px #000,inset 0 0 2px #000; }
 .hudMissionGuide .guideArrow { display:none; position:absolute; left:-5px; top:-5px; width:9px; height:9px; border-left:2px solid currentColor; border-top:2px solid currentColor; transform:rotate(calc(var(--guide-angle) + 45deg)); }
 .hudMissionGuide.offscreen .guideDiamond { display:none; }
@@ -639,15 +661,16 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
     width: min(76vw, 350px);
   }
   .hudObjective { width: 100%; }
-  .hudObjective .o,
-  .hudObjective .objectiveUpdate {
-    font-size: 15px;
-    -webkit-text-stroke-width: 0.8px;
-  }
+  .hudObjective .o { font-size: 14px; }
   .hudForceStatus { top: max(30px, calc(env(safe-area-inset-top) + 20px)); right: 10px; font-size: 9px; }
   .hudMinimap { left: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: 124px; height: 124px; }
   .hudCombat { right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); }
   .ammoCurrent { font-size: 30px; }
+  .ammoReserve, .ammoDivider { font-size: 18px; }
+  .combatWeapon { font-size: 12px; }
+  .combatMain { gap: 9px; }
+  .combatEquipment { gap: 6px; padding-right: 9px; }
+  .equipment .grenadeStack svg { width: 15px; height: 32px; }
   .hudState { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 74px); max-width: 230px; }
   .hudCarry { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 170px); }
   .hudTelegraph { right: 10px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 170px); width: 132px; }

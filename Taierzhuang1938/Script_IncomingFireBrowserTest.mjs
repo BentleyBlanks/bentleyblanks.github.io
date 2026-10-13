@@ -249,6 +249,10 @@ try {
     p.spawnGrace=0;p.TakeHit(10000,"torso");T.StepFrames(1,1/60,false);
     result.disabledLethal=!p.Alive;
     result.deathMenu=T.menu.mode;
+    // The death menu deliberately ignores activation until its reveal is readable.
+    // Advance that real transition before asking it to restore the checkpoint.
+    for(let frame=0;frame<240&&T.menu.deathReveal<.5;frame++)T.StepFrames(1,1/60,false);
+    if(T.menu.deathReveal<.5)throw new Error("Death menu never became actionable");
     T.Debug.MenuAct("continueCheckpoint");
     result.checkpointAlive=p.Alive;
     // Turning on protection clears injury feedback immediately, without a damage frame.

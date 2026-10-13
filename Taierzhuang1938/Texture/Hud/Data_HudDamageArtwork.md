@@ -1,5 +1,16 @@
 # 低血量素材
 
+## 2026-10-13：用户选定 B / D HUD
+
+常规受伤改用 `Texture_HudPeripheralBlood.webp`，由内置 imagegen 根据用户选定的 D 濒危示意生成透明外缘血污。原 `Texture_HudCriticalBlood.webp` 继续供开场导演血层使用。
+
+- 源图为 1672 × 941 RGBA；采用第一次生成的较轻版本，第二次更密的候选未采用。中央 60% × 60% 区域的 alpha 最大值为 2/255，61.3% 像素完全透明；不把带场景或 HUD 的示意图直接铺到游戏上。
+- 原始 PNG 保留在本机生成目录。`_import/Script_ImportHudBlood.py <source.png>` 只做 WebP q78 编码，尺寸与每一个 alpha 像素保持不变；没有后期涂绘、抠图或裁切。
+- 完整生成及复查提示词：[`_import/Prompts/Texture_HudPeripheralBlood.txt`](../../_import/Prompts/Texture_HudPeripheralBlood.txt)。清单为 `Data_TextureManifest.HudPeripheralBlood`，由 `Style_Game.css` 按血量渐入，方向弧仍是程序矢量。
+- 源图透明中心、渐进受伤、低血量搏动、实际命中/近失颜色及转身方向均沿用 `Script_IncomingFireBrowserTest` 验证。
+
+## 历史素材
+
 2026-09-15：受击方向弧不再使用贴图，改为程序几何（`Script_Hud.HitDirArcPath`，见 [玩家挨打这条链](../../docs/Data_PlayerDamage.md)），原 `Texture_HudDamageArc.png` 与其提示词已删除。
 
 下面的静态 UI 素材由第一级内置 `image_gen__imagegen` 生成，未使用付费回退。

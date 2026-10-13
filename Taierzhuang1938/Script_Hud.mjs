@@ -137,7 +137,7 @@ export function ShowTelegraphPaper(view) {
 }
 
 const EQUIPMENT_ICONS = {
-  grenade: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7h7l2 3v7.5A3.5 3.5 0 0 1 14.5 21h-4A3.5 3.5 0 0 1 7 17.5V10l2-3Z"/><path d="M10 7V4h5v3m0-2h3l1-2"/></svg>`,
+  grenade: `<svg viewBox="0 0 20 44" aria-hidden="true"><g transform="rotate(12 10 22)"><path d="M6 3h8v11H6zM8 14v5H6v22h8V19h-2v-5M8 17h4"/></g></svg>`,
   bundle: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8h3v11H7zM14 8h3v11h-3zM10.5 6h3v14h-3zM8 5V3m8 2V3m-4.5 3V3"/></svg>`,
   mortar: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4 3 1-3.8 12.5-3-1zM9 17l7 3m-10-2-2 3m11-1 3 1"/><path d="m9.5 3.5 2 .6-.6 2-2-.6z"/></svg>`,
 };
@@ -273,6 +273,7 @@ export class Hud {
     this.actionPrompts = [];
     this.actionPromptSignature = "";
     this.actionPromptsHeight = 0;
+    this.bandagePromptOnly = false;
     /** 负重条与进度环各自的「上一次画的是什么」，签名不变就一个属性都不动。 */
     this.carrySignature = "";
     this.interactRingOn = false;
@@ -412,7 +413,7 @@ export class Hud {
     this.el.top = mk("hudTop");
     this.el.phase = mk("hudPhase", this.el.top);
     this.el.objective = mk("hudObjective", this.el.top);
-    this.el.objective.innerHTML = `<span class="o"></span>`
+    this.el.objective.innerHTML = `<svg class="objectiveSymbol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 1v4m11 7h-4M12 23v-4M1 12h4"/></svg><span class="o"></span>`
       + `<span class="objectiveUpdate">${T("hud.objective.updated")}</span>`;
     this.el.objectiveText = this.el.objective.querySelector(".o");
     this.el.objective.setAttribute("role", "status");
@@ -423,18 +424,20 @@ export class Hud {
     this.el.forceStatus.setAttribute("aria-live", "polite");
     this.el.state = mk("hudState");
     this.el.combat = mk("hudCombat");
-    // COD《战争世界》右下角那一排：投掷物（图标 + 数）在左，弹药大数在右，同一行。
-    // 没有姿态人形、没有姿态按钮、没有底板 —— 只有硬黑描边的字。
+    // Selected B layout: bounded grenade silhouettes, fine separator, serif ammo and weapon name.
+    // Keep the numeric count for accessibility and overflow; repeated icons never grow without bound.
     this.el.combat.innerHTML = `
-      <div class="combatWeapon"></div>
       <div class="combatMain">
         <div class="combatEquipment">
-          <span class="equipment grenade" aria-label="${T("hud.equipment.grenade")}">${EQUIPMENT_ICONS.grenade}<b>0</b></span>
+          <span class="equipment grenade" aria-label="${T("hud.equipment.grenade")}"><span class="grenadeStack" aria-hidden="true">${EQUIPMENT_ICONS.grenade.repeat(4)}</span><b>0</b></span>
           <span class="equipment bundle" aria-label="${T("hud.equipment.bundle")}">${EQUIPMENT_ICONS.bundle}<b>0</b></span>
           <span class="equipment mortar" aria-label="${T("hud.equipment.mortar")}">${EQUIPMENT_ICONS.mortar}<b>0</b></span>
         </div>
-        <div class="combatAmmo" aria-label="${T("hud.aria.ammo")}">
-          <span class="ammoCurrent">00</span><span class="ammoDivider"></span><span class="ammoReserve">00</span>
+        <div class="combatReadout">
+          <div class="combatWeapon"></div>
+          <div class="combatAmmo" aria-label="${T("hud.aria.ammo")}">
+            <span class="ammoCurrent">00</span><span class="ammoDivider" aria-hidden="true">/</span><span class="ammoReserve">00</span>
+          </div>
         </div>
       </div>`;
     this.el.combatWeapon = this.el.combat.querySelector(".combatWeapon");
@@ -620,8 +623,8 @@ export class Hud {
   }
 
   SetObjective(text, ours, theirs) {
-    // COD《战争世界》的目标通知只有两层：眼下可执行的一句动作 + 独立的更新回执。
-    // 两行作为同一则通知一起出现、一起淡出；路线与距离由常驻世界标记承担。
+    // Selected B shows one action with a target symbol; the update acknowledgement remains accessible.
+    // Both belong to the same fading notification; world markers carry route and distance.
     //
     // 兵员池机制一点没动：减到零仍是全作唯一失败条件。这里只把它从目标 DOM 里
     // 拆出去，数值变化时在右上角独立闪现，避免与行动动词共用一条阅读路径。
@@ -804,7 +807,8 @@ export class Hud {
     // 提示离准心最近（那是现在能做的事）；按住型的进度环亮着时提示让到环下面；
     // 识别卡排在提示之后。
     const below = grenadeAiming ? 48 : this.crosshairGap + geo.arm + 14;
-    const promptY = this.interactRingOn ? Math.max(below, 96) : below;
+    const promptY = Math.max(this.interactRingOn ? Math.max(below, 96) : below,
+      this.bandagePromptOnly ? window.innerHeight * .15 : 0);
     SetVar(this.el.actions, "--y", `${promptY.toFixed(1)}px`);
     const targetY = this.actionPrompts.length ? promptY + this.actionPromptsHeight + 6 : below + 2;
     SetVar(this.el.target, "--y", `${targetY.toFixed(1)}px`);
@@ -898,6 +902,10 @@ export class Hud {
       if (!item.countEl) item.countEl = item.querySelector("b");
       SetText(item.countEl, String(count));
       SetClass(item, "empty", count <= 0);
+      SetAttr(item, "data-count", String(count));
+      SetClass(item, "overflow", count > 4);
+      const label = key === "grenades" ? T("hud.equipment.grenade") : key === "bundles" ? T("hud.equipment.bundle") : T("hud.equipment.mortar");
+      SetAttr(item, "aria-label", `${label} ${count}`);
       counts.push(count);
     }
     // 空膛 / 低弹钉住不淡：这会儿那个红数字就是警告本身。
@@ -960,7 +968,7 @@ export class Hud {
       }
       defs.appendChild(grad);
     };
-    Gradient("hudHitFillHit", [[0, "#7a0906", 0], [0.2, "#a8120d", 0.7], [0.5, "#ef2a1c", 1], [0.8, "#a8120d", 0.7], [1, "#7a0906", 0]]);
+    Gradient("hudHitFillHit", [[0, "#7a0b16", 0], [0.2, "#a81c26", 0.7], [0.5, "#e32630", 1], [0.8, "#a81c26", 0.7], [1, "#7a0b16", 0]]);
     Gradient("hudHitFillNear", [[0, "#ffffff", 0], [0.2, "#f2eee6", 0.65], [0.5, "#ffffff", 1], [0.8, "#f2eee6", 0.65], [1, "#ffffff", 0]]);
     Gradient("hudHitShade", [[0, "#000000", 0], [0.5, "#000000", 1], [1, "#000000", 0]]);
     const blur = document.createElementNS(NS, "filter");
@@ -1267,6 +1275,8 @@ export class Hud {
     if (signature === this.actionPromptSignature) return;
     this.actionPromptSignature = signature;
     this.actionPrompts = next;
+    this.bandagePromptOnly = next.length === 1 && next[0].kind === "bandage";
+    SetClass(this.el.actions, "bandageOnly", this.bandagePromptOnly);
     this.el.actions.textContent = "";
     const holdKeys = T("hud.key.holdF");
     for (const prompt of next) {
@@ -1797,7 +1807,7 @@ export class Hud {
     SetAttr(el,"data-mode",view.label);
     SetAttr(el,"aria-label",`${view.action} ${view.name} ${T("firstLevel.leader.distance",{distance:Math.ceil(view.distance)})}`);
     SetText(this.el.guideAction,view.action);
-    SetText(this.el.guideDetail,`${view.leaderTarget?view.name+" · ":""}${T("firstLevel.leader.distance",{distance:Math.ceil(view.distance)})}`);
+    SetText(this.el.guideDetail,`${view.leaderTarget?view.name+" ":""}${T("firstLevel.leader.distance",{distance:Math.ceil(view.distance)})}`);
     SetStyle(el,"transform",`translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`);
     SetVar(el,"--guide-angle",`${Math.atan2(point.y-height*.5,point.x-width*.5)*180/Math.PI+90}deg`);
   }

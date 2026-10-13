@@ -1101,6 +1101,13 @@ export const TEXTURE_MANIFEST = Object.freeze([
     ],
   },
   {
+    id: "HudPeripheralBlood", kind: "hud", tier: "ui",
+    source: { provider: "imagegen", date: "2026-10-13", prompt: "_import/Prompts/Texture_HudPeripheralBlood.txt" },
+    bake: "_import/Script_ImportHudBlood.py",
+    consumers: [{ file: "Style_Game.css", token: "Texture_HudPeripheralBlood" }],
+    files: [["Hud/Texture_HudPeripheralBlood.webp", "Image", 1672, 941]],
+  },
+  {
     id: "HudCriticalBlood", kind: "hud", tier: "ui",
     source: { provider: "imagegen", date: "2026-09-11", prompt: "Texture/Hud/Data_HudDamageArtwork.md" },
     consumers: [{ file: "Style_Game.css", token: "Texture_HudCriticalBlood" }],
