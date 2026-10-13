@@ -770,7 +770,7 @@ node Taierzhuang1938/Script_TextTest.mjs
 # 浏览器
 node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图（110 条）：数像素、PickAt、组/威胁把手、视口快照与完整底图合成、工具回调
 node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（153 条）：三栏/分栏线/时间轴折叠、事实与 flow 一致、顶栏只剩一枚状态、时间轴接住时钟与「正在等」空心标记、live 指纹含玩家朝向与班里人、跟随实时不抢视野、标注输入框、分类抽屉与敌军布设表、右栏两页签、完整底图下载、批注对话框（阶段/状态下拉框、@ 提及、候选位 ✕、Delete 删草图）、批注退化与图片补传、关窗还干净
-node Taierzhuang1938/Script_EditorTest.mjs --launcher-only  # 高级工具菜单栏 19 项
+node Taierzhuang1938/Script_EditorTest.mjs --launcher-only  # 高级工具菜单栏 20 项
 node Taierzhuang1938/Script_WorldInfoEditorTest.mjs
 node Taierzhuang1938/Script_PlayerStateEditorTest.mjs
 

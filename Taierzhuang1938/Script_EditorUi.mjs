@@ -122,7 +122,13 @@ export function Slider(parent, {
   input.value = String(value);
   const readout = El("span", "edVal");
   const Fmt = format || ((v) => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2)));
-  const Show = () => { readout.textContent = Fmt(parseFloat(input.value)); };
+  const Show = () => {
+    readout.textContent = Fmt(parseFloat(input.value));
+    // 已拖过的那一段的比例：高级工具的主题用它把轨道前半段涂成强调色（设置页不读它）
+    const span = parseFloat(input.max) - parseFloat(input.min);
+    const t = span > 0 ? (parseFloat(input.value) - parseFloat(input.min)) / span : 0;
+    input.style.setProperty("--fill", `${(Math.max(0, Math.min(1, t)) * 100).toFixed(1)}%`);
+  };
   Show();
   input.addEventListener("input", () => { Show(); if (onInput) onInput(parseFloat(input.value)); });
   cell.appendChild(input);

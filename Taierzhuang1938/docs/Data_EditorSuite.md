@@ -5,8 +5,10 @@
 设置与编辑器使用 `Style_Interface.css` 的 World at War 主题，`Style_Editor.css` 定义工具布局。
 黑色标题栏、冷灰底色、旧金选中条与菜单一致；读数保留等宽字体，阵营和错误状态保留语义色。
 通用按钮、开关、选项及关闭按钮使用原生 button，支持 Tab / Enter / Space；开关和选项同步
-`aria-pressed`。高级工具是 Unity 式布局：顶部菜单栏 + 右侧 Inspector（菜单栏高 34 px，
-Inspector 宽 340 / 宽版 420 px，CSS 变量 `--ed-bar-h` / `--ed-inspector-w`）；窄屏时菜单栏横向滚动，
+`aria-pressed`。高级工具是 Unity 式布局：顶部菜单栏 + 右侧 Inspector（菜单栏高 40 px，
+Inspector 宽 360 / 宽版 440 px，CSS 变量 `--ed-bar-h` / `--ed-inspector-w`）；外观是独立的现代深色编辑器主题
+（中性深灰 + 单一强调色 `--ed-accent`、卡片式分节、圆角控件、系统 UI 字体），只作用于 `#edRoot`，
+并在那一层把 `--ui-*` 改指新主题，各编辑器自己的样式随之换皮；玩家设置页仍是游戏风格。窄屏时菜单栏横向滚动，
 Inspector 改成底部抽屉。玩家设置页画在 `#settingsRoot`，开发工具画在 `#edRoot`，两棵根分开。
 Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接。
 
@@ -15,8 +17,8 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 
 开发工具分两块，**都不对玩家开放**，出图模式（`?shot=1`）下整棵 DOM 是 `display:none`：
 
-- **高级工具**（菜单 设置 → 高级工具、齿轮或 `` ` ``）：十七个互斥编辑器 + 关卡编排、贴图管理两个独立窗口，
-  共 19 项，分在顶部菜单栏的「场景 / 关卡 / 角色 / 武器 / 特效与声音 / 资产」六个菜单里（表在
+- **高级工具**（菜单 设置 → 高级工具、齿轮或 `` ` ``）：十七个互斥编辑器 + 关卡编排、贴图管理两个独立窗口
+  + 白盒关卡编辑器跳转入口，共 20 项，分在顶部菜单栏的「场景 / 关卡 / 角色 / 武器 / 特效与声音 / 资产」六个菜单里（表在
   `Script_Editor.TOOL_MENUS`），「游戏」菜单放关闭当前工具、返回主菜单、退出。选中的工具显示在右侧 Inspector。
 - **Debug工具**（菜单 设置 → Debug工具）：六个可叠加的观察层 Debug Rendering / Profiler / Frame Debugger /
   WorldInfo / 玩家状态 / 敌军 AI，外加 FPS 显示。代码仍在编辑器套件里（`EditorSuite.DebugToolStates` /
