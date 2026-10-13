@@ -3,15 +3,15 @@
 @font-face {font-family:"TzAboutHeading";src:url("./Font/Font_AboutHeading.woff2?v=20261013235501") format("woff2");font-weight:600;font-display:swap}
 #menu.aboutOn .mnPanel::after{background:linear-gradient(90deg,#070806c9 0%,#0a0a087a 28%,#10110f18 70%)}
 #menu.aboutOn .mnPanelHead{min-height:19vh;padding-top:5.5vh;padding-bottom:1.5vh}
-#menu.aboutOn .mnPanelTitle{font-family:var(--ui-story-font);font-size:clamp(38px,5.1vw,82px);letter-spacing:.035em}
-#menu.aboutOn .mnPanelHead::after{font-family:"TzAbout",serif;font-size:clamp(14px,1.35vw,23px);letter-spacing:.08em}
+#menu.aboutOn .mnPanelTitle{font-family:var(--ui-story-font);font-size:var(--menu-font-page);letter-spacing:.035em}
+#menu.aboutOn .mnPanelHead::after{font-family:"TzAbout",serif;font-size:var(--menu-font-meta);letter-spacing:.08em}
 #menu.aboutOn .mnPanelBody{position:relative;min-height:0}
 #menu.aboutOn .mnPanelFoot{position:absolute;left:0;bottom:1.5vh;width:26%;padding:0 5.1%;min-height:5vh}
 #menu.aboutOn .mnPanelFoot .mnCampaignKeys{display:none}
-#menu.aboutOn .mnBack{white-space:nowrap;font-family:"TzAbout",var(--ui-font);font-size:clamp(14px,1.25vw,21px)}
+#menu.aboutOn .mnBack{white-space:nowrap;font-family:"TzAbout",var(--ui-font);font-size:var(--menu-font-body)}
 .aboutDossier{width:100%;min-width:0;min-height:0;display:grid;grid-template-columns:26% 65%;gap:0;align-items:stretch;padding:1vh 0 2.3vh}
 .aboutTabs{display:flex;flex-direction:column;align-self:start;padding:8vh 0 0 5.1vw;gap:1.5vh}
-.aboutTab{display:block;width:100%;min-height:6.2vh;border:0;border-left:5px solid transparent;padding:9px 16px 9px 24px;text-align:left;cursor:pointer;background:transparent;color:#e4e0d5;font:400 clamp(18px,1.9vw,32px)/1.4 "TzAbout",var(--ui-font);letter-spacing:.10em;white-space:nowrap}
+.aboutTab{display:block;width:100%;min-height:6.2vh;border:0;border-left:5px solid transparent;padding:9px 16px 9px 24px;text-align:left;cursor:pointer;background:transparent;color:#e4e0d5;font:400 var(--menu-font-nav)/1.4 "TzAbout",var(--ui-font);letter-spacing:.10em;white-space:nowrap}
 .aboutTab[aria-selected="true"]{border-left-color:#edca83;color:#edca83;background:linear-gradient(90deg,#d7ceb52b,transparent)}
 .aboutTab:hover{color:#f5d799}
 .aboutTab:focus-visible{outline:1px solid #edca83;outline-offset:4px}
@@ -23,38 +23,38 @@
 .aboutReader,.aboutPaperFooter{min-width:0;margin-left:8.5%;margin-right:8.5%}
 .aboutReader{grid-row:2;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#7c634b77 transparent;padding:0 10px 4px 0;scroll-padding:12px;outline-offset:3px}
 .aboutPaperHead{margin-bottom:2.8vh}
-.aboutHeading{margin:0 0 .8vh;font:600 clamp(26px,2.9vw,48px)/1.3 "TzAboutHeading","TzAbout",serif;letter-spacing:.035em;color:#453422}
-.aboutSubtitle{margin:0;font-size:clamp(13px,1.35vw,23px);line-height:1.55;letter-spacing:.05em}
+.aboutHeading{margin:0 0 .8vh;font:600 var(--menu-font-heading)/1.3 "TzAboutHeading","TzAbout",serif;letter-spacing:.035em;color:#453422}
+.aboutSubtitle{margin:0;font-size:var(--menu-font-meta);line-height:1.55;letter-spacing:.05em}
 .aboutSection{padding-top:1.8vh;margin-top:1.8vh;border-top:1px solid #74563855}
 .aboutSection:first-of-type{padding-top:0;margin-top:0;border:0}
-.aboutSection h3{font:600 clamp(17px,1.7vw,28px)/1.35 "TzAboutHeading","TzAbout",serif;margin:0 0 .6vh;color:#4a3724}
-.aboutSection p{font-size:clamp(14px,1.33vw,22px);line-height:1.6;margin:0}
-.aboutDedication{font-size:clamp(16px,1.55vw,25px);line-height:1.6;letter-spacing:.08em;text-align:right;margin:1.2vh 0 .2vh;font-style:italic}
-.aboutAuthors{display:flex;align-items:baseline;gap:0 16px;flex-wrap:wrap;font-size:clamp(15px,1.4vw,23px);line-height:1.6;margin:0}
+.aboutSection h3{font:600 var(--menu-font-section)/1.35 "TzAboutHeading","TzAbout",serif;margin:0 0 .6vh;color:#4a3724}
+.aboutSection p{font-size:var(--menu-font-body);line-height:1.6;margin:0}
+.aboutDedication{font-size:var(--menu-font-body);line-height:1.6;letter-spacing:.08em;text-align:right;margin:1.2vh 0 .2vh;font-style:italic}
+.aboutAuthors{display:flex;align-items:baseline;gap:0 16px;flex-wrap:wrap;font-size:var(--menu-font-body);line-height:1.6;margin:0}
 .aboutAuthors dt{margin:0}.aboutAuthors dd{margin:0 22px 0 0;font:600 1em "TzAboutHeading","TzAbout",serif}
 .aboutPaperFooter{grid-row:3;display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:8px}
-.aboutAction{cursor:pointer;border:0;border-bottom:1px solid #74563888;background:none;color:inherit;font:400 clamp(14px,1.3vw,22px)/1.5 "TzAbout",serif;padding:3px 0 5px;text-align:left}
+.aboutAction{cursor:pointer;border:0;border-bottom:1px solid #74563888;background:none;color:inherit;font:400 var(--menu-font-body)/1.5 "TzAbout",serif;padding:3px 0 5px;text-align:left}
 .aboutAction:hover{color:#7b4b18;border-color:currentColor}
 .aboutAction:focus-visible,.aboutSourceLinks a:focus-visible,.aboutReader:focus-visible{outline:2px solid #8c632e;outline-offset:4px}
-.aboutFolio{font-size:clamp(12px,1.1vw,18px);white-space:nowrap;font-variant-numeric:tabular-nums}
+.aboutFolio{font-size:var(--menu-font-small);white-space:nowrap;font-variant-numeric:tabular-nums}
 .aboutSource{border-top:1px solid #675c4150;padding:15px 0}
-.aboutSourceName{margin:0 0 5px;font:600 clamp(16px,1.4vw,22px)/1.4 "TzAboutHeading","TzAbout",serif}
-.aboutSourceCredit{margin:0;font-size:clamp(14px,1.15vw,18px);line-height:1.6}
+.aboutSourceName{margin:0 0 5px;font:600 var(--menu-font-section)/1.4 "TzAboutHeading","TzAbout",serif}
+.aboutSourceCredit{margin:0;font-size:var(--menu-font-body);line-height:1.6}
 .aboutSourceLinks{display:flex;flex-wrap:wrap;gap:12px 22px;margin-top:8px}
-.aboutSourceLinks a{color:#775022;font-size:clamp(13px,1vw,17px);text-underline-offset:4px}
+.aboutSourceLinks a{color:#775022;font-size:var(--menu-font-meta);text-underline-offset:4px}
 @media(min-width:761px) and (min-height:541px){
- .aboutDossier:not([data-page="work"]) .aboutHeading{font-size:clamp(26px,2.75vw,46px)}
+ .aboutDossier:not([data-page="work"]) .aboutHeading{font-size:var(--menu-font-heading)}
  .aboutDossier:not([data-page="work"]) .aboutSubtitle{line-height:1.4}
  .aboutDossier:not([data-page="work"]) .aboutPaperHead{margin-bottom:.8vh}
  .aboutDossier:not([data-page="work"]) .aboutSection{padding-top:.55vh;margin-top:.55vh}
  .aboutDossier:not([data-page="work"]) .aboutSection:first-of-type{padding-top:0;margin-top:0}
- .aboutDossier:not([data-page="work"]) .aboutSection h3{font-size:clamp(17px,1.6vw,27px)}
- .aboutDossier:not([data-page="work"]) .aboutSection p{font-size:clamp(14px,1.24vw,21px);line-height:1.48}
- .aboutDossier:not([data-page="work"]) .aboutDedication{margin-top:.6vh;font-size:clamp(16px,1.3vw,22px)}
+ .aboutDossier:not([data-page="work"]) .aboutSection h3{font-size:var(--menu-font-section)}
+ .aboutDossier:not([data-page="work"]) .aboutSection p{font-size:var(--menu-font-body);line-height:1.48}
+ .aboutDossier:not([data-page="work"]) .aboutDedication{margin-top:.6vh;font-size:var(--menu-font-body)}
 }
 @media(max-width:760px){
  #menu.aboutOn .mnPanelHead{min-height:12vh;padding-top:3vh;padding-bottom:1.5vh;margin:0 5%}
- #menu.aboutOn .mnPanelTitle{font-size:36px}
+ #menu.aboutOn .mnPanelTitle{font-size:var(--menu-font-page)}
  #menu.aboutOn .mnPanelFoot{position:static;width:100%;padding:0 5%;min-height:6vh}
  .aboutDossier{display:flex;flex-direction:column;padding:0 1% 0;gap:0}
  .aboutTabs{padding:1.2vh 3% .8vh;gap:3px;flex-direction:row;align-self:stretch}
@@ -62,14 +62,14 @@
  .aboutTab[aria-selected="true"]{border-bottom-color:#edca83;background:linear-gradient(0deg,#d7ceb51c,transparent)}
  .aboutPaper{flex:1;min-height:0}
  .aboutReader,.aboutPaperFooter{margin-left:6%;margin-right:6%}
- .aboutHeading{font-size:27px}.aboutSubtitle{font-size:13px}.aboutPaperHead{margin-bottom:17px}
- .aboutSection{padding-top:12px;margin-top:12px}.aboutSection h3{font-size:19px}.aboutSection p{font-size:15px;line-height:1.75}
- .aboutAuthors{font-size:15px;gap:0 8px}.aboutAuthors dd{margin-right:10px}
- .aboutDedication{font-size:16px;margin-top:18px}.aboutPaperFooter{padding-top:12px;gap:8px}.aboutAction{font-size:13px}.aboutFolio{font-size:11px}
+ .aboutHeading{font-size:var(--menu-font-heading)}.aboutSubtitle{font-size:13px}.aboutPaperHead{margin-bottom:17px}
+ .aboutSection{padding-top:12px;margin-top:12px}.aboutSection h3{font-size:var(--menu-font-section)}.aboutSection p{font-size:var(--menu-font-body);line-height:1.75}
+ .aboutAuthors{font-size:var(--menu-font-body);gap:0 8px}.aboutAuthors dd{margin-right:10px}
+ .aboutDedication{font-size:var(--menu-font-body);margin-top:18px}.aboutPaperFooter{padding-top:12px;gap:8px}.aboutAction{font-size:13px}.aboutFolio{font-size:11px}
 }
 @media(min-width:761px) and (min-height:650px) and (max-aspect-ratio:3/2){
- .aboutSection p,.aboutDossier:not([data-page="work"]) .aboutSection p{font-size:clamp(15px,1.48vw,21px);line-height:1.6}
+ .aboutSection p,.aboutDossier:not([data-page="work"]) .aboutSection p{font-size:var(--menu-font-body);line-height:1.6}
  .aboutDossier:not([data-page="work"]) .aboutSection{padding-top:1vh;margin-top:1vh}
 }
-@media(max-height:540px) and (min-width:761px){.aboutTabs{padding-top:4vh}.aboutTab{min-height:38px;font-size:19px}.aboutHeading{font-size:28px}.aboutPaperHead{margin-bottom:12px}.aboutSection h3{font-size:20px}.aboutSection p{font-size:15px}}
+@media(max-height:540px) and (min-width:761px){.aboutTabs{padding-top:4vh}.aboutTab{min-height:38px;font-size:var(--menu-font-nav)}.aboutHeading{font-size:var(--menu-font-heading)}.aboutPaperHead{margin-bottom:12px}.aboutSection h3{font-size:var(--menu-font-section)}.aboutSection p{font-size:var(--menu-font-body)}}
 @media(prefers-reduced-motion:reduce){.aboutDossier *{scroll-behavior:auto}}
