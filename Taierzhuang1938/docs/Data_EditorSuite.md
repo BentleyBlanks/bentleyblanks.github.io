@@ -5,10 +5,11 @@
 设置与编辑器使用 `Style_Interface.css` 的 World at War 主题，`Style_Editor.css` 定义工具布局。
 黑色标题栏、冷灰底色、旧金选中条与菜单一致；读数保留等宽字体，阵营和错误状态保留语义色。
 通用按钮、开关、选项及关闭按钮使用原生 button，支持 Tab / Enter / Space；开关和选项同步
-`aria-pressed`。高级工具是 Unity 式布局：顶部菜单栏 + 右侧 Inspector（菜单栏高 40 px，
-Inspector 宽 360 / 宽版 440 px，CSS 变量 `--ed-bar-h` / `--ed-inspector-w`）；外观是独立的现代深色编辑器主题
-（中性深灰 + 单一强调色 `--ed-accent`、卡片式分节、圆角控件、系统 UI 字体），只作用于 `#edRoot`，
-并在那一层把 `--ui-*` 改指新主题，各编辑器自己的样式随之换皮；玩家设置页仍是游戏风格。窄屏时菜单栏横向滚动，
+`aria-pressed`。高级工具是 Unity 式布局：顶部菜单栏 + 右侧 Inspector（菜单栏高 46 px，
+Inspector 宽 380 / 宽版 460 px，CSS 变量 `--ed-bar-h` / `--ed-inspector-w`）。外观沿用启动界面（指挥室菜单、
+设置 / 声音页）的视觉语言：半透明暗色渐变底、象牙白文字、橄榄灰细线、左侧金边 + 渐变的选中条、宽字距分组标题、
+衬线标题（TzTitleText）、金色填充细轨 + 竖条滑块、直角控件；取值与 `Style_Menu.css` 的设置页同源（`#edRoot` 上的 `--ed-*`）。
+2026-10-13 试过一版中性深灰 + 蓝色强调的「现代编辑器」皮，用户否了：要和启动界面同一种风格。窄屏时菜单栏横向滚动，
 Inspector 改成底部抽屉。玩家设置页画在 `#settingsRoot`，开发工具画在 `#edRoot`，两棵根分开。
 Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接。
 

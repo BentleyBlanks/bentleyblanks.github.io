@@ -11,7 +11,7 @@
   color: var(--ui-text);
   font-size: 13px; line-height: 1.5;
 }
-#edRoot { --ed-bar-h: 40px; --ed-inspector-w: 360px; --ed-inspector-wide: 440px; }
+#edRoot { --ed-bar-h: 46px; --ed-inspector-w: 380px; --ed-inspector-wide: 460px; }
 #edRoot.off, #settingsRoot.off { display: none; }
 
 .edFacialTimeline {
@@ -333,7 +333,7 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 
 /* 窄屏：面板改成上下叠、宽度跟着视口 */
 @media (max-width: 900px) {
-  #edRoot { --ed-inspector-w: 320px; --ed-inspector-wide: 340px; }
+  #edRoot { --ed-inspector-w: 320px; --ed-inspector-wide: 350px; }
   .edAssetRuleCards { grid-template-columns: 1fr; }
   .edPanel.debugRendering { width: min(280px, calc(100% - var(--ed-inspector-w) - 42px)); }
   .edControlGrid { grid-template-columns: 1fr; }
@@ -342,66 +342,43 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 .edPanel input[type="range"]:focus-visible::-webkit-slider-thumb { background: var(--ui-gold); }
 
 /* =========================================================================
-   高级工具外观：现代深色编辑器主题（只作用于 #edRoot，玩家设置页 #settingsRoot 仍是游戏风格）
-   中性深灰 + 单一强调色、细分隔线、圆角、系统 UI 字体。换强调色只改 --ed-accent 一处。
-   各编辑器自己的样式大多引用 --ui-*，这里在 #edRoot 上把它们改指新主题，不用逐个编辑器改。
+   高级工具外观：沿用启动界面（指挥室菜单 / 设置页）的视觉语言，只作用于 #edRoot。
+   半透明暗色渐变底、象牙白文字、橄榄灰细线、左侧金边 + 渐变的选中条、宽字距小标题、
+   衬线标题（TzTitleText）、金色填充细轨 + 竖条滑块、直角控件。取值与 Style_Menu.css 的
+   设置页 / 声音页同源，改那边的口径时这里一起改。
    ========================================================================= */
 #edRoot {
-  --ed-bg-0: #121316;          /* 菜单栏、最底层 */
-  --ed-bg-1: #18191d;          /* Inspector 底色 */
-  --ed-bg-2: #1f2125;          /* 卡片 / 分节 */
-  --ed-bg-3: #282b30;          /* 按钮、悬停 */
-  --ed-bg-4: #31353b;          /* 按钮悬停 */
-  --ed-field: #121316;         /* 输入框 */
-  --ed-line: rgba(255, 255, 255, 0.07);
-  --ed-line-2: rgba(255, 255, 255, 0.12);
-  --ed-text: #e7e9ec;
-  --ed-text-2: #aab0b9;
-  --ed-text-3: #737a85;
-  --ed-accent: #5b8cff;
-  --ed-accent-2: #87abff;
-  --ed-accent-soft: rgba(91, 140, 255, 0.16);
-  --ed-accent-ring: rgba(91, 140, 255, 0.38);
-  --ed-warn: #f2b84b;
-  --ed-bad: #f26b6b;
-  --ed-good: #4cc38a;
-  --ed-radius: 6px;
-  --ed-radius-lg: 10px;
-  --ed-shadow: 0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
-  --ed-font: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
-  --ed-mono: "Cascadia Mono", "JetBrains Mono", Consolas, ui-monospace, monospace;
-
-  /* 编辑器各自的样式引用这些名字：在开发工具层里换成新主题 */
-  --ui-font: var(--ed-font);
-  --ui-mono: var(--ed-mono);
-  --ui-black: var(--ed-bg-0);
-  --ui-surface: var(--ed-bg-2);
-  --ui-panel: var(--ed-bg-1);
-  --ui-text: var(--ed-text);
-  --ui-bright: #ffffff;
-  --ui-muted: var(--ed-text-2);
-  --ui-gold: var(--ed-accent-2);
-  --ui-line: var(--ed-line);
-  --ui-selection: var(--ed-accent-soft);
-  --ui-selection-edge: linear-gradient(var(--ed-accent), var(--ed-accent)) 1;
-  font-family: var(--ed-font);
-  font-size: 12.5px;
-  -webkit-font-smoothing: antialiased;
+  --ed-panel: linear-gradient(90deg, #080907f0, #11120ee8 65%, #14150ce0);
+  --ed-panel-r: linear-gradient(270deg, #080907f2, #0e0f0cec 55%, #13140fe6);
+  --ed-black: #070807;
+  --ed-field: #0a0b09b8;
+  --ed-rule: #c1bdab55;        /* 主细线（标题下） */
+  --ed-rule-2: #c1bdab30;      /* 次细线（分组下、列表行） */
+  --ed-edge: #c1bdab40;        /* 控件描边 */
+  --ed-text-hi: #eeeee7;
+  --ed-text: #deddd2;
+  --ed-text-2: #c2c3b6;
+  --ed-text-3: #aaa99b;        /* 眉题 / 面包屑 */
+  --ed-text-4: #989b8b;
+  --ed-gold: #edca83;          /* 选中边、主操作 */
+  --ed-gold-text: #e6cb91;
+  --ed-gold-hi: #ffe0a1;
+  --ed-gold-fill: #d9bb7b;
+  --ed-thumb: #e4d9bb;
+  --ed-sel: linear-gradient(90deg, #d8d4c324, #bbb7a906);
+  --ed-sel-strong: linear-gradient(90deg, #d8d4c333, #bbb7a90d);
+  --ed-serif: var(--ui-story-font);
+  --ed-good: var(--ours, #9dc0e4);
+  --ed-bad: var(--theirs, #d6604a);
 }
-#edRoot * { scrollbar-width: thin; scrollbar-color: #3a3e45 transparent; }
-#edRoot ::-webkit-scrollbar { width: 10px; height: 10px; }
-#edRoot ::-webkit-scrollbar-thumb { background: #33373d; border: 3px solid transparent; border-radius: 10px; background-clip: padding-box; }
-#edRoot ::-webkit-scrollbar-thumb:hover { background-color: #444952; }
-#edRoot :is(button, input, select, textarea, summary):focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ed-accent-ring); }
 
 /* --- 高级工具：顶部菜单栏 ------------------------------------------------ */
-/* Unity 式：一条菜单栏 + 下拉，选中的工具在右侧 Inspector 里。只在高级工具开着时出现。 */
+/* Unity 式的菜单栏 + 下拉，外观与指挥室菜单同一套：象牙白宽字距、金色细边。 */
 .edMenuBar {
   position: absolute; inset: 0 0 auto; height: var(--ed-bar-h); box-sizing: border-box;
-  display: none; align-items: center; gap: 2px; padding: 0 6px 0 10px; pointer-events: auto;
+  display: none; align-items: stretch; padding: 0 8px 0 22px; pointer-events: auto;
   /* 不能加 backdrop-filter：它会让菜单栏变成 fixed 下拉的包含块，下拉被栏的 overflow 裁掉 */
-  background: rgba(18, 19, 22, 0.97); border-bottom: 1px solid var(--ed-line);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(180deg, #070807f7, #0b0c0aee); border-bottom: 1px solid var(--ed-rule);
   overflow-x: auto; overflow-y: hidden;
 }
 /* 主题给 #edRoot 下所有元素配了细滚动条，这里要压过它 */
@@ -410,242 +387,206 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 #edRoot.toolsOpen .edMenuBar { display: flex; }
 #edRoot.toolsOpen .edGear { display: none; }
 .edMenuBrand {
-  flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 14px 0 2px; margin-right: 4px;
-  color: var(--ed-text); font-weight: 650; font-size: 13px; letter-spacing: 0.02em;
-  border-right: 1px solid var(--ed-line); height: 20px;
+  flex: 0 0 auto; display: flex; align-items: center; padding-right: 22px; margin-right: 10px;
+  color: var(--ed-text-hi); font: 700 17px/1 var(--ed-serif); letter-spacing: 0.12em; white-space: nowrap;
+  position: relative;
 }
-.edMenuBrand::before {
-  content: ""; width: 16px; height: 16px; border-radius: 5px; flex: 0 0 auto;
-  background: linear-gradient(135deg, var(--ed-accent-2), var(--ed-accent) 55%, #3b5fd6);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset, 0 2px 8px rgba(91, 140, 255, 0.35);
-}
-.edMenus { flex: 0 0 auto; display: flex; align-items: center; gap: 1px; }
+.edMenuBrand::after { content: ""; position: absolute; right: 0; top: 50%; height: 18px; margin-top: -9px; border-right: 1px solid var(--ed-rule); }
+.edMenus { flex: 0 0 auto; display: flex; align-items: stretch; }
 .edMenu { position: static; display: flex; }
 .edMenuTitle {
-  cursor: pointer; height: 26px; padding: 0 10px; border: 0; border-radius: var(--ed-radius); background: transparent;
-  color: var(--ed-text-2); font: 500 12.5px/26px var(--ed-font); white-space: nowrap;
-  transition: background 0.12s, color 0.12s;
+  cursor: pointer; padding: 0 15px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent;
+  color: #b9bcb7; font: 400 14px/1 var(--ui-font); letter-spacing: 0.12em; white-space: nowrap;
+  transition: color 0.12s linear, background 0.12s linear, border-color 0.12s linear;
 }
-.edMenuTitle:hover { background: var(--ed-bg-3); color: var(--ed-text); }
-.edMenu.open > .edMenuTitle { background: var(--ed-accent-soft); color: #fff; }
+.edMenuTitle:hover { color: var(--ed-gold); }
+.edMenu.open > .edMenuTitle { color: var(--ed-gold); border-bottom-color: var(--ed-gold); background: linear-gradient(0deg, #d8d4c31f, transparent 80%); }
 .edMenuDrop {
-  position: fixed; z-index: 2; display: block; min-width: 220px; padding: 5px; box-sizing: border-box;
-  margin-top: 4px; background: rgba(31, 33, 37, 0.98); border: 1px solid var(--ed-line-2);
-  border-radius: var(--ed-radius-lg); box-shadow: var(--ed-shadow); backdrop-filter: blur(16px);
-  opacity: 0; visibility: hidden; transform: translateY(-4px) scale(0.98); transform-origin: top left;
-  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0s linear 0.12s;
+  position: fixed; z-index: 2; display: block; min-width: 236px; padding: 8px 0; box-sizing: border-box;
+  background: linear-gradient(90deg, #080907f7, #11120ef2); border: 1px solid var(--ed-edge); border-top-color: var(--ed-rule);
+  box-shadow: 0 20px 44px #000b;
+  opacity: 0; visibility: hidden; transform: translateY(-3px);
+  transition: opacity 0.12s linear, transform 0.12s ease, visibility 0s linear 0.12s;
 }
-.edMenu.open > .edMenuDrop {
-  opacity: 1; visibility: visible; transform: none;
-  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0s;
-}
+.edMenu.open > .edMenuDrop { opacity: 1; visibility: visible; transform: none; transition: opacity 0.12s linear, transform 0.12s ease, visibility 0s; }
 .edMenuItem {
-  cursor: pointer; display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box;
-  height: 30px; padding: 0 10px 0 6px; border: 0; border-radius: var(--ed-radius); background: transparent;
-  color: var(--ed-text); font: 12.5px/1 var(--ed-font); text-align: left; white-space: nowrap;
+  cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box;
+  min-height: 36px; padding: 0 18px 0 13px; border: 0; border-left: 3px solid transparent; border-radius: 0; background: transparent;
+  color: #c6c7bd; font: 400 14px/1.4 var(--ui-font); letter-spacing: 0.08em; text-align: left; white-space: nowrap;
+  transition: color 0.12s linear, background 0.12s linear;
 }
-.edMenuItem:hover:not(:disabled), .edMenuItem:focus-visible { background: var(--ed-accent); color: #fff; box-shadow: none; }
-.edMenuItem:disabled { cursor: default; color: var(--ed-text-3); }
-.edMenuCheck { flex: 0 0 16px; height: 16px; display: grid; place-items: center; color: var(--ed-accent-2); font-size: 12px; }
-.edMenuItem.on .edMenuCheck::before { content: "✓"; font-weight: 700; }
-.edMenuItem:hover .edMenuCheck { color: #fff; }
+.edMenuItem:hover:not(:disabled), .edMenuItem:focus-visible {
+  color: var(--ed-gold); background: var(--ed-sel); border-left-color: var(--ed-gold); outline: none;
+}
+.edMenuItem:disabled { cursor: default; color: #6f716a; }
+/* 当前开着的那项：金字 + 一枚 5 px 金方块（与设置页开关的标记同一种） */
+.edMenuCheck { flex: 0 0 8px; display: flex; align-items: center; justify-content: center; }
+.edMenuItem.on { color: var(--ed-gold-text); }
+.edMenuItem.on .edMenuCheck::before { content: ""; width: 5px; height: 5px; background: currentColor; }
 .edMenuLabel { flex: 1 1 auto; }
-.edMenuTail { flex: 0 0 auto; color: var(--ed-text-3); font-size: 11px; }
-.edMenuItem:hover .edMenuTail { color: rgba(255, 255, 255, 0.75); }
-.edMenuDrop .edMenuItem[data-action="main-menu"] { margin-top: 5px; position: relative; }
+.edMenuTail { flex: 0 0 auto; color: var(--ed-text-4); font-size: 12px; letter-spacing: 0; }
+.edMenuDrop .edMenuItem[data-action="main-menu"] { margin-top: 9px; position: relative; }
 .edMenuDrop .edMenuItem[data-action="main-menu"]::before {
-  content: ""; position: absolute; left: 6px; right: 6px; top: -3px; height: 1px; background: var(--ed-line);
+  content: ""; position: absolute; left: 16px; right: 16px; top: -5px; border-top: 1px solid var(--ed-rule-2);
 }
 .edMenuStatus {
-  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 7px;
-  padding: 0 10px; color: var(--ed-text-2); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.edMenuStatus::before {
-  content: ""; flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%;
-  background: var(--ed-warn); box-shadow: 0 0 0 3px rgba(242, 184, 75, 0.16);
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 16px; color: var(--ed-text-3); font-size: 12px; letter-spacing: 0.16em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .edMenuExit {
-  flex: 0 0 auto; cursor: pointer; width: 28px; height: 28px; border: 0; border-radius: var(--ed-radius);
-  background: transparent; color: var(--ed-text-2); font-size: 17px; line-height: 1;
-  transition: background 0.12s, color 0.12s;
+  flex: 0 0 auto; cursor: pointer; width: 40px; border: 0; border-radius: 0; background: transparent;
+  color: #bbbbae; font-size: 24px; line-height: 1; transition: color 0.12s linear;
 }
-.edMenuExit:hover { color: #fff; background: rgba(242, 107, 107, 0.85); }
+.edMenuExit:hover { color: var(--ed-gold-hi); }
 
 /* --- 高级工具：右侧 Inspector -------------------------------------------- */
 /* 每个编辑器仍是自己的 Panel({variant:"work"})，在这里统一停靠到菜单栏下面的右侧；
    Debug Rendering / 敌军 AI 是叠加浮窗、资产规范是整张表，不进 Inspector。 */
 #edRoot :is(.edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards), .edPanel.edInspectorEmpty) {
   top: var(--ed-bar-h); right: 0; bottom: 0; width: var(--ed-inspector-w);
-  border: 0; border-left: 1px solid var(--ed-line); border-radius: 0;
-  background: var(--ed-bg-1); box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35); backdrop-filter: none;
+  border: 0; border-left: 1px solid var(--ed-rule); border-radius: 0;
+  background: var(--ed-panel-r); box-shadow: -18px 0 40px #0007; backdrop-filter: none;
 }
 #edRoot .edPanel.work.wide:not(.debugRendering):not(.ai):not(.assetStandards) { width: var(--ed-inspector-wide); }
+/* 顶上一行眉题，与设置页的「设置 / 声音」面包屑同一种字 */
 #edRoot :is(.edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards), .edPanel.edInspectorEmpty)::before {
-  content: "Inspector"; flex: 0 0 auto; display: block; height: 32px; padding: 0 14px; box-sizing: border-box;
-  line-height: 32px; color: var(--ed-text); font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em;
-  background: linear-gradient(var(--ed-accent), var(--ed-accent)) 14px 100% / 52px 2px no-repeat, var(--ed-bg-0);
-  border-bottom: 1px solid var(--ed-line);
+  content: "高级工具 / Inspector"; flex: 0 0 auto; display: block; padding: 16px 22px 0;
+  color: var(--ed-text-3); font-size: 11.5px; letter-spacing: 0.2em;
 }
-#edRoot .edPanel.assetStandards { top: var(--ed-bar-h); left: 0; right: 0; bottom: 0; width: auto; border: 0; border-radius: 0; }
-#edRoot.toolsOpen .edHint { top: calc(var(--ed-bar-h) + 12px); }
+#edRoot .edPanel.assetStandards { top: var(--ed-bar-h); left: 0; right: 0; bottom: 0; width: auto; border: 0; border-radius: 0; background: var(--ed-panel); }
+#edRoot.toolsOpen .edHint { top: calc(var(--ed-bar-h) + 14px); }
 [hidden].edPanel { display: none !important; }
 
-/* 空 Inspector：一个图标 + 两句话 + 快捷键 */
-#edRoot .edInspectorEmpty .edBody { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 56px 28px 24px; }
+/* 空 Inspector：一枚图标 + 衬线标题 + 两句说明 + 快捷键 */
 #edRoot .edInspectorEmpty .edHead { display: none; }
-.edEmptyArt { width: 56px; height: 56px; margin-bottom: 16px; border-radius: 16px; display: grid; place-items: center;
-  background: var(--ed-bg-2); border: 1px solid var(--ed-line); color: var(--ed-accent-2); }
-.edEmptyArt svg { width: 28px; height: 28px; }
-.edEmptyTitle { color: var(--ed-text); font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-#edRoot .edInspectorEmpty .edNote { border: 0; background: none; padding: 0; margin: 4px 0; color: var(--ed-text-3); line-height: 1.65; }
-.edEmptyKeys { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 18px; color: var(--ed-text-3); font-size: 11.5px; }
+#edRoot .edInspectorEmpty .edBody { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 72px 30px 24px; }
+.edEmptyArt { width: 58px; height: 58px; margin-bottom: 20px; display: grid; place-items: center;
+  border: 1px solid var(--ed-edge); background: #13140b55; color: var(--ed-gold); }
+.edEmptyArt svg { width: 26px; height: 26px; }
+.edEmptyTitle { color: var(--ed-text-hi); font: 700 22px/1.3 var(--ed-serif); letter-spacing: 0.12em; margin-bottom: 14px;
+  padding-bottom: 14px; border-bottom: 1px solid var(--ed-rule); min-width: 60%; }
+#edRoot .edInspectorEmpty .edNote { border: 0; background: none; padding: 0; margin: 6px 0; color: var(--ed-text-3); font-size: 12.5px; line-height: 1.9; }
+.edEmptyKeys { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; margin-top: 22px; color: var(--ed-text-4); font-size: 12px; letter-spacing: 0.08em; }
 .edEmptyKeys kbd {
-  display: inline-block; min-width: 18px; padding: 1px 6px; margin-right: 5px; border-radius: 5px; box-sizing: border-box;
-  background: var(--ed-bg-3); border: 1px solid var(--ed-line-2); border-bottom-width: 2px;
-  color: var(--ed-text); font: 11px/16px var(--ed-mono); text-align: center;
+  display: inline-block; min-width: 20px; padding: 2px 7px; margin-right: 7px; box-sizing: border-box;
+  border: 1px solid var(--ed-edge); background: #13140b88; color: var(--ed-text); font: 11px/16px var(--ui-mono); text-align: center;
 }
 
 /* --- 高级工具：面板与控件 ------------------------------------------------ */
-#edRoot .edPanel { background: var(--ed-bg-1); border: 1px solid var(--ed-line-2); border-radius: var(--ed-radius-lg);
-  box-shadow: var(--ed-shadow); color: var(--ed-text); }
-/* 叠加浮窗（Debug Rendering / 敌军 AI）：玻璃质感的浮动窗口 */
-#edRoot .edPanel.debugRendering, #edRoot .edPanel.ai {
-  background: rgba(24, 25, 29, 0.94); backdrop-filter: blur(16px) saturate(1.15); overflow: hidden;
-}
-#edRoot .edHead {
-  padding: 12px 12px 12px 16px; gap: 2px 10px; background: transparent; border-bottom: 1px solid var(--ed-line);
-}
-#edRoot .edHead .edTitle { color: var(--ed-text); font-size: 14px; font-weight: 650; letter-spacing: 0.01em; }
-#edRoot .edHead .edSub { color: var(--ed-text-3); font-size: 11.5px; }
-#edRoot .edHead .edX {
-  width: 26px; height: 26px; line-height: 24px; border: 0; border-radius: var(--ed-radius);
-  background: transparent; color: var(--ed-text-3); font-size: 17px; transition: background 0.12s, color 0.12s;
-}
-#edRoot .edHead .edX:hover { background: var(--ed-bg-3); color: var(--ed-text); }
-#edRoot .edBody { padding: 12px 12px 18px; }
+#edRoot .edPanel { background: var(--ed-panel); border: 1px solid var(--ed-edge); border-radius: 0; box-shadow: 0 20px 50px #000b; color: var(--ed-text); }
+#edRoot .edHead { padding: 8px 14px 16px 22px; gap: 6px 10px; background: transparent; border-bottom: 1px solid var(--ed-rule); }
+#edRoot .edHead .edTitle { color: var(--ed-text-hi); font: 700 21px/1.35 var(--ed-serif); letter-spacing: 0.08em; }
+#edRoot .edHead .edSub { color: var(--ed-text-3); font-size: 12px; letter-spacing: 0.1em; white-space: normal; }
+#edRoot .edHead .edX { width: 32px; height: 32px; line-height: 30px; border: 0; background: none; color: #bbbbae; font-size: 24px; }
+#edRoot .edHead .edX:hover { color: var(--ed-gold-hi); }
+/* 叠加浮窗（Debug Rendering / 敌军 AI）的标题栏不带眉题，顶上留白收紧 */
+#edRoot :is(.edPanel.debugRendering, .edPanel.ai) .edHead { padding-top: 16px; }
+#edRoot .edBody { padding: 8px 22px 26px; }
+/* 标题下固定的一条工具栏（特效编辑器的播放栏）：不随正文滚动 */
+.edPanelBar { flex: 0 0 auto; padding: 0 14px 8px; background: #101416; border-bottom: 1px solid #363d40; }
+#edRoot .edPanelBar { padding: 0 22px 10px; background: #0a0b0999; border-bottom: 1px solid var(--ed-rule); }
 
-/* 分节 = 卡片 */
-#edRoot .edSection {
-  margin: 0 0 10px; padding: 10px 12px 12px; border-radius: var(--ed-radius-lg);
-  background: var(--ed-bg-2); border: 1px solid var(--ed-line);
-}
+/* 分组 = 声音设置页的 audioGroup：宽字距灰字 + 一条细线 */
+#edRoot .edSection { margin: 20px 0 4px; padding: 0; border: 0; background: none; }
+#edRoot .edSection:first-child { margin-top: 12px; }
 #edRoot .edSection > .h {
-  display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 0; border: 0;
-  color: var(--ed-text); font-size: 12px; font-weight: 650; letter-spacing: 0.01em;
+  margin: 0 0 10px; padding: 0 0 9px; border-bottom: 1px solid var(--ed-rule-2);
+  color: var(--ed-text-3); font-size: 12px; font-weight: 400; letter-spacing: 0.2em;
 }
-#edRoot .edSection > .h::before { content: ""; width: 3px; height: 12px; border-radius: 2px; background: var(--ed-accent); flex: 0 0 auto; }
-#edRoot .edSection .edSection { background: var(--ed-bg-1); }
+#edRoot .edRow { gap: 12px; margin: 7px 0; min-height: 28px; }
+#edRoot .edRow > .l { flex-basis: 96px; color: var(--ed-text-2); font-size: 13px; letter-spacing: 0.04em; }
 
-#edRoot .edRow { gap: 10px; margin: 6px 0; min-height: 26px; }
-#edRoot .edRow > .l { flex-basis: 88px; color: var(--ed-text-2); font-size: 12px; }
-
+/* 按钮 = 设置页开关：细描边、直角、宽字距；按下态金字金边 + 5 px 金方块 */
 #edRoot .edBtn {
-  min-height: 28px; padding: 4px 11px; border-radius: var(--ed-radius);
-  background: var(--ed-bg-3); border: 1px solid var(--ed-line-2); color: var(--ed-text);
-  font: 500 12px/1.4 var(--ed-font); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  min-height: 31px; padding: 4px 13px; border: 1px solid var(--ed-edge); border-radius: 0; background: #13140b55;
+  color: #c6c7bd; font: 400 13px/1.4 var(--ui-font); letter-spacing: 0.08em;
+  transition: color 0.12s linear, background 0.12s linear, border-color 0.12s linear;
 }
-#edRoot .edBtn:hover { background: var(--ed-bg-4); color: #fff; }
-#edRoot .edBtn.on { background: var(--ed-accent-soft); border-color: rgba(91, 140, 255, 0.55); color: #dbe6ff; }
-#edRoot .edBtn.on:hover { background: rgba(91, 140, 255, 0.24); }
+#edRoot .edBtn:hover { color: var(--ed-gold-hi); border-color: #cdb77b88; background: var(--ed-sel); }
+#edRoot .edBtn.on { color: var(--ed-gold-text); border-color: #cdb77b88; background: var(--ed-sel-strong); }
+#edRoot .edBtn[aria-pressed]::before { content: ""; display: inline-block; width: 5px; height: 5px; margin: 0 8px 2px 0; background: currentColor; opacity: 0.3; }
+#edRoot .edBtn[aria-pressed="true"]::before { opacity: 1; }
 #edRoot .edBtn:disabled { opacity: 0.45; cursor: default; }
-#edRoot .edBtn.danger:hover { background: rgba(242, 107, 107, 0.18); border-color: rgba(242, 107, 107, 0.55); color: #ffd4d4; }
-#edRoot .edBtns { gap: 6px; margin: 6px 0; }
+#edRoot .edBtn.danger:hover { color: #f0a08f; border-color: #d6604a99; background: linear-gradient(90deg, #d6604a22, transparent); }
+#edRoot .edBtns { gap: 6px; margin: 8px 0; }
 
-#edRoot .edChips { gap: 5px; margin: 6px 0 8px; }
+/* 选项 chips：同一套描边，选中 = 金字金边 + 渐变 */
+#edRoot .edChips { gap: 6px; margin: 8px 0 10px; }
 #edRoot .edChip {
-  height: 26px; padding: 0 11px; border-radius: 999px; background: var(--ed-bg-3); border: 1px solid var(--ed-line);
-  color: var(--ed-text-2); font: 500 12px/24px var(--ed-font); transition: background 0.12s, color 0.12s, border-color 0.12s;
+  min-height: 28px; padding: 3px 12px; border: 1px solid var(--ed-rule-2); border-radius: 0; background: transparent;
+  color: #b9bcb7; font: 400 12.5px/1.5 var(--ui-font); letter-spacing: 0.08em; transition: color 0.12s linear, background 0.12s linear, border-color 0.12s linear;
 }
-#edRoot .edChip:hover { color: var(--ed-text); background: var(--ed-bg-4); }
-#edRoot .edChip.on { background: var(--ed-accent); border-color: var(--ed-accent); color: #fff; }
+#edRoot .edChip:hover { color: var(--ed-gold-hi); border-color: var(--ed-edge); background: var(--ed-sel); }
+#edRoot .edChip.on { color: var(--ed-gold-text); border-color: #cdb77b88; background: var(--ed-sel-strong); }
 
 #edRoot .edPanel :is(select, input[type="text"], input[type="number"], textarea) {
-  min-height: 28px; padding: 4px 8px; border-radius: var(--ed-radius); box-sizing: border-box;
-  background: var(--ed-field); border: 1px solid var(--ed-line-2); color: var(--ed-text); font: 12px/1.4 var(--ed-font);
-  transition: border-color 0.12s, box-shadow 0.12s;
+  min-height: 31px; padding: 4px 9px; border: 1px solid var(--ed-edge); border-radius: 0; box-sizing: border-box;
+  background: var(--ed-field); color: var(--ed-text); font: 13px/1.4 var(--ui-font); letter-spacing: 0.03em;
 }
-#edRoot .edPanel textarea { font-family: var(--ed-mono); font-size: 11.5px; line-height: 1.5; }
-#edRoot .edPanel :is(select, input, textarea):focus { border-color: var(--ed-accent); box-shadow: 0 0 0 3px var(--ed-accent-soft); outline: none; }
-#edRoot .edPanel select option { background: var(--ed-bg-2); color: var(--ed-text); }
+#edRoot .edPanel textarea { font: 11.5px/1.6 var(--ui-mono); letter-spacing: 0; }
+#edRoot .edPanel :is(select, input, textarea):focus { border-color: var(--ed-gold); outline: none; }
+#edRoot .edPanel select option { background: #11120e; color: var(--ed-text); }
 
-/* 滑杆：圆点 + 已填充的一段（--fill 由 Script_EditorUi.Slider 写） */
-#edRoot .edPanel input[type="range"] { height: 18px; --fill: 50%; }
+/* 滑杆 = 声音设置页：3 px 金色填充细轨 + 7×17 竖条滑块（--fill 由 Script_EditorUi.Slider 写） */
+#edRoot .edPanel input[type="range"] { height: 26px; --fill: 50%; cursor: pointer; }
 #edRoot .edPanel input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px; border-radius: 4px;
-  background: linear-gradient(to right, var(--ed-accent) var(--fill), #343840 var(--fill));
+  height: 3px; border-radius: 0; background: linear-gradient(to right, var(--ed-gold-fill) var(--fill), #a4a59450 var(--fill));
 }
-#edRoot .edPanel input[type="range"]::-moz-range-track { height: 4px; border-radius: 4px; background: #343840; }
-#edRoot .edPanel input[type="range"]::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--ed-accent); }
-#edRoot .edPanel input[type="range"]::-webkit-slider-thumb {
-  width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #fff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.45); transition: transform 0.12s;
-}
-#edRoot .edPanel input[type="range"]::-moz-range-thumb {
-  width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
-}
-#edRoot .edPanel input[type="range"]:is(:hover, :focus-visible)::-webkit-slider-thumb { background: #fff; transform: scale(1.15); }
-#edRoot .edPanel input[type="range"]:focus-visible { box-shadow: none; }
-#edRoot .edVal { color: var(--ed-text-2); font-size: 11.5px; }
+#edRoot .edPanel input[type="range"]::-moz-range-track { height: 3px; background: #a4a59450; }
+#edRoot .edPanel input[type="range"]::-moz-range-progress { height: 3px; background: var(--ed-gold-fill); }
+#edRoot .edPanel input[type="range"]::-webkit-slider-thumb { width: 7px; height: 17px; margin-top: -7px; border-radius: 1px; background: var(--ed-thumb); }
+#edRoot .edPanel input[type="range"]::-moz-range-thumb { width: 7px; height: 17px; border: 0; border-radius: 1px; background: var(--ed-thumb); }
+#edRoot .edPanel input[type="range"]:is(:hover, :focus-visible)::-webkit-slider-thumb { background: var(--ed-gold-hi); box-shadow: 0 0 0 3px #dfbd6844; }
+#edRoot .edPanel input[type="range"]:focus-visible { outline: none; }
+#edRoot .edVal { color: var(--ed-text); font-size: 12.5px; }
 /* 滑杆读数那一格是行内写死的 44px，「10.00 s」会折成两行：放宽并不许折行 */
-#edRoot .edRow > .l:has(> .edVal) { flex: 0 0 auto !important; min-width: 44px; white-space: nowrap; }
+#edRoot .edRow > .l:has(> .edVal) { flex: 0 0 auto !important; min-width: 48px; white-space: nowrap; }
 
-#edRoot .edList { border-radius: var(--ed-radius-lg); border: 1px solid var(--ed-line); background: var(--ed-field); padding: 3px; }
-#edRoot .edList .it { min-height: 26px; padding: 3px 8px; margin: 1px 0; border: 0; border-radius: var(--ed-radius); align-items: center; }
-#edRoot .edList .it:hover { background: var(--ed-bg-3); }
-#edRoot .edList .it.on { background: var(--ed-accent-soft); color: #fff; box-shadow: inset 2px 0 0 var(--ed-accent); }
-#edRoot .edList .it .t { color: var(--ed-text-3); }
+/* 列表 = 选章列表：左侧金边 + 渐变的选中条 */
+#edRoot .edList { border: 1px solid var(--ed-rule-2); background: #0a0b0999; }
+#edRoot .edList .it {
+  min-height: 30px; padding: 4px 12px 4px 11px; border: 0; border-left: 3px solid transparent; border-bottom: 1px solid #c1bdab14;
+  align-items: center; color: #c6c7bd; letter-spacing: 0.04em;
+}
+#edRoot .edList .it:hover { background: #d8d4c30f; color: var(--ed-text-hi); }
+#edRoot .edList .it.on { border-left-color: var(--ed-gold); background: var(--ed-sel-strong); color: var(--ed-gold); }
+#edRoot .edList .it .t { color: var(--ed-text-4); letter-spacing: 0.02em; }
 
-#edRoot .edFacts { margin: 6px 0 2px; border-radius: var(--ed-radius); overflow: hidden; }
-#edRoot .edFacts .f { padding: 4px 0; border-bottom: 1px solid var(--ed-line); font-size: 12px; }
+/* 读数：灰键名 + 象牙白等宽值，细线分行 */
+#edRoot .edFacts { margin: 8px 0 2px; }
+#edRoot .edFacts .f { padding: 5px 0; border-bottom: 1px solid #c1bdab1a; font-size: 12.5px; }
 #edRoot .edFacts .f:last-child { border-bottom: 0; }
-#edRoot .edFacts .f .k { color: var(--ed-text-3); }
+#edRoot .edFacts .f .k { color: var(--ed-text-4); letter-spacing: 0.04em; }
 #edRoot .edFacts .f .v { color: var(--ed-text); }
-#edRoot .edFacts .f .v.warn { color: var(--ed-warn); }
+#edRoot .edFacts .f .v.warn { color: var(--ed-gold-text); }
 #edRoot .edFacts .f .v.bad { color: var(--ed-bad); }
 #edRoot .edFacts .f .v.good { color: var(--ed-good); }
 
+/* 说明 = 声音页右栏的正文：灰字宽行距，左侧一条细线；告警用金色 */
 #edRoot .edNote {
-  margin: 6px 0; padding: 7px 10px; border: 0; border-radius: var(--ed-radius);
-  background: rgba(255, 255, 255, 0.035); color: var(--ed-text-2); font-size: 11.5px; line-height: 1.6;
+  margin: 8px 0; padding: 1px 0 1px 11px; border: 0; border-left: 1px solid var(--ed-edge); border-radius: 0; background: none;
+  color: var(--ed-text-4); font-size: 12.5px; line-height: 1.85;
 }
-#edRoot .edNote.warn { background: rgba(242, 184, 75, 0.1); color: #f6d38f; box-shadow: inset 2px 0 0 var(--ed-warn); }
-#edRoot .edJsonFold > summary { border-radius: var(--ed-radius); border-color: var(--ed-line); background: var(--ed-bg-3); padding: 5px 9px; }
-#edRoot .edJsonFold[open] > summary { color: var(--ed-accent-2); border-color: rgba(91, 140, 255, 0.4); }
-#edRoot .edAssetTable th { background: var(--ed-bg-0); color: var(--ed-text-2); border-bottom-color: var(--ed-line-2); }
-#edRoot .edAssetTable td { border-bottom-color: var(--ed-line); }
-#edRoot .edAssetTable tbody tr:hover { background: rgba(91, 140, 255, 0.07); }
-#edRoot .edAssetTable td.status.warn { color: var(--ed-warn); }
-#edRoot .edAssetTable td.status.bad { color: var(--ed-bad); }
-#edRoot .edAssetTable td.status.good { color: var(--ed-good); }
-#edRoot .edAssetRuleCard { border-radius: var(--ed-radius-lg); border-color: var(--ed-line); background: var(--ed-bg-2); }
-#edRoot .edTrack { border-radius: var(--ed-radius); border-color: var(--ed-line-2); background: var(--ed-field); }
-#edRoot .edFacialTimeline, #edRoot .edFpsLegend { border-radius: var(--ed-radius-lg); border-color: var(--ed-line-2); background: rgba(24, 25, 29, 0.94); backdrop-filter: blur(14px); }
+#edRoot .edNote.warn { border-left-color: var(--ed-gold); color: var(--ed-gold-text); }
+#edRoot .edJsonFold > summary { border-radius: 0; border-color: var(--ed-rule-2); background: transparent; letter-spacing: 0.08em; padding: 6px 10px; }
+#edRoot .edJsonFold[open] > summary { color: var(--ed-gold-text); border-color: #cdb77b66; }
+#edRoot .edAssetTable th { background: var(--ed-black); color: var(--ed-text-3); letter-spacing: 0.12em; font-weight: 400; border-bottom-color: var(--ed-rule); }
+#edRoot .edAssetTable td { border-bottom-color: #c1bdab1a; }
+#edRoot .edAssetTable tbody tr:hover { background: var(--ed-sel); }
+#edRoot .edAssetRuleCard { border-radius: 0; border-color: var(--ed-rule-2); background: #0a0b0999; }
+#edRoot :is(.edFacialTimeline, .edFpsLegend) { border-radius: 0; border-color: var(--ed-edge); background: var(--ed-panel); }
 
-/* 场景里的名牌：与主题同一套深底圆角 */
-#edRoot .edMapLabel { border-radius: 5px; padding: 1px 7px; font: 600 11.5px/1.5 var(--ed-font);
-  color: var(--ed-text); background: rgba(18, 19, 22, 0.78); border-color: var(--ed-line-2); text-shadow: none; }
-#edRoot .edMapLabel.road { color: #9cc4ff; border-color: rgba(91, 140, 255, 0.35); }
-#edRoot .edMapLabel.sel { color: #fff; background: var(--ed-accent); border-color: var(--ed-accent); }
-
-/* 右上角入口（高级工具关着时） */
-#edRoot .edGear {
-  width: 38px; min-width: 38px; height: 38px; border-radius: var(--ed-radius-lg);
-  background-color: rgba(18, 19, 22, 0.72); border: 1px solid var(--ed-line-2);
-  backdrop-filter: blur(12px); background-size: 22px 22px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-}
-#edRoot .edGear:hover { background-color: rgba(40, 43, 48, 0.9); border-color: rgba(91, 140, 255, 0.6); }
-#edRoot .edHint {
-  padding: 5px 14px; border-radius: 999px; font-size: 12px; color: #dbe6ff;
-  background: rgba(18, 19, 22, 0.86); border: 1px solid rgba(91, 140, 255, 0.4); backdrop-filter: blur(12px);
-}
+/* 右上角入口（高级工具关着时）与屏幕中央的提示 */
+#edRoot .edGear { background-color: #070807d9; border-color: #c1bdab47; }
+#edRoot .edGear:hover { background-color: #11120e; border-color: #edca83b3; }
+#edRoot .edHint { padding: 5px 16px; border-radius: 0; background: #070807e0; border-color: #edca8366; color: var(--ed-gold); letter-spacing: 0.1em; }
 
 @media (max-width: 600px) {
   /* 窄屏：Inspector 改成底部抽屉，上面留出画面 */
   #edRoot :is(.edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards), .edPanel.edInspectorEmpty),
   #edRoot .edPanel.work.wide:not(.debugRendering):not(.ai):not(.assetStandards) {
-    left: 0; right: 0; width: auto; top: auto; height: 52vh; border-left: 0; border-top: 1px solid var(--ed-line-2);
-    border-radius: 14px 14px 0 0;
+    left: 0; right: 0; width: auto; top: auto; height: 52vh; border-left: 0; border-top: 1px solid var(--ed-rule);
+    background: var(--ed-panel);
   }
   #edRoot .edPanel.work[data-facial] { bottom: 0; }
   .edPanel.debugRendering { left: 10px; right: 10px; width: auto; top: 84px; bottom: 10px; z-index: 1; }
@@ -653,6 +594,7 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   #edRoot.toolsOpen .edHint { top: calc(var(--ed-bar-h) + 6px); }
   .edFacialTimeline { left: 8px; right: 8px; }
   .edMenuStatus { display: none; }
+  .edMenuBrand { font-size: 15px; padding-right: 14px; }
 }
 
 /* Empty status messages do not take up space in compact testing panels. */

@@ -215,7 +215,8 @@ export class VfxEditor {
   }
 
   BuildUi(body) {
-    const transport=El('div');transport.style.cssText='flex:0 0 auto;background:#101416;border-bottom:1px solid #363d40';this.panel.root.insertBefore(transport,body);
+    // 固定在标题下、不随正文滚动的播放栏；配色与内边距归 Style_Editor.css 的 .edPanelBar。
+    const transport=El('div','edPanelBar');this.panel.root.insertBefore(transport,body);
     const playback=Section(transport,'播放与时间');
     const buttons=ButtonRow(playback,[{label:'播放',onClick:()=>this.Play()},{label:'暂停',onClick:()=>this.TogglePause()},
       {label:'单帧',onClick:()=>this.Step()},{label:'归零',onClick:()=>this.Seek(0)},{label:'停止',onClick:()=>this.Stop()}]);
