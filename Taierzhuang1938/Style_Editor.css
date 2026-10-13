@@ -11,7 +11,7 @@
   color: var(--ui-text);
   font-size: 13px; line-height: 1.5;
 }
-#edRoot { --ed-bar-h: 34px; --ed-inspector-w: 340px; --ed-inspector-wide: 420px; }
+#edRoot { --ed-bar-h: 46px; --ed-inspector-w: 380px; --ed-inspector-wide: 460px; }
 #edRoot.off, #settingsRoot.off { display: none; }
 
 .edFacialTimeline {
@@ -333,7 +333,7 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 
 /* 窄屏：面板改成上下叠、宽度跟着视口 */
 @media (max-width: 900px) {
-  #edRoot { --ed-inspector-w: 300px; --ed-inspector-wide: 320px; }
+  #edRoot { --ed-inspector-w: 320px; --ed-inspector-wide: 350px; }
   .edAssetRuleCards { grid-template-columns: 1fr; }
   .edPanel.debugRendering { width: min(280px, calc(100% - var(--ed-inspector-w) - 42px)); }
   .edControlGrid { grid-template-columns: 1fr; }
@@ -341,88 +341,260 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 .edPanel input[type="range"]:hover::-webkit-slider-thumb,
 .edPanel input[type="range"]:focus-visible::-webkit-slider-thumb { background: var(--ui-gold); }
 
+/* =========================================================================
+   高级工具外观：沿用启动界面（指挥室菜单 / 设置页）的视觉语言，只作用于 #edRoot。
+   半透明暗色渐变底、象牙白文字、橄榄灰细线、左侧金边 + 渐变的选中条、宽字距小标题、
+   衬线标题（TzTitleText）、金色填充细轨 + 竖条滑块、直角控件。取值与 Style_Menu.css 的
+   设置页 / 声音页同源，改那边的口径时这里一起改。
+   ========================================================================= */
+#edRoot {
+  --ed-panel: linear-gradient(90deg, #080907f0, #11120ee8 65%, #14150ce0);
+  --ed-panel-r: linear-gradient(270deg, #080907f2, #0e0f0cec 55%, #13140fe6);
+  --ed-black: #070807;
+  --ed-field: #0a0b09b8;
+  --ed-rule: #c1bdab55;        /* 主细线（标题下） */
+  --ed-rule-2: #c1bdab30;      /* 次细线（分组下、列表行） */
+  --ed-edge: #c1bdab40;        /* 控件描边 */
+  --ed-text-hi: #eeeee7;
+  --ed-text: #deddd2;
+  --ed-text-2: #c2c3b6;
+  --ed-text-3: #aaa99b;        /* 眉题 / 面包屑 */
+  --ed-text-4: #989b8b;
+  --ed-gold: #edca83;          /* 选中边、主操作 */
+  --ed-gold-text: #e6cb91;
+  --ed-gold-hi: #ffe0a1;
+  --ed-gold-fill: #d9bb7b;
+  --ed-thumb: #e4d9bb;
+  --ed-sel: linear-gradient(90deg, #d8d4c324, #bbb7a906);
+  --ed-sel-strong: linear-gradient(90deg, #d8d4c333, #bbb7a90d);
+  --ed-serif: var(--ui-story-font);
+  --ed-good: var(--ours, #9dc0e4);
+  --ed-bad: var(--theirs, #d6604a);
+}
+
 /* --- 高级工具：顶部菜单栏 ------------------------------------------------ */
-/* Unity 式：一条菜单栏 + 下拉，选中的工具在右侧 Inspector 里。只在高级工具开着时出现。 */
+/* Unity 式的菜单栏 + 下拉，外观与指挥室菜单同一套：象牙白宽字距、金色细边。 */
 .edMenuBar {
   position: absolute; inset: 0 0 auto; height: var(--ed-bar-h); box-sizing: border-box;
-  display: none; align-items: stretch; gap: 0; pointer-events: auto;
-  background: var(--ui-black); border-bottom: 1px solid var(--ui-line);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  display: none; align-items: stretch; padding: 0 8px 0 22px; pointer-events: auto;
+  /* 不能加 backdrop-filter：它会让菜单栏变成 fixed 下拉的包含块，下拉被栏的 overflow 裁掉 */
+  background: linear-gradient(180deg, #070807f7, #0b0c0aee); border-bottom: 1px solid var(--ed-rule);
   overflow-x: auto; overflow-y: hidden;
 }
-/* 主题给 #edRoot 下所有元素配了细滚动条（Style_Interface，id 选择器），这里要压过它 */
+/* 主题给 #edRoot 下所有元素配了细滚动条，这里要压过它 */
 #edRoot .edMenuBar { scrollbar-width: none; }
 #edRoot .edMenuBar::-webkit-scrollbar { display: none; }
 #edRoot.toolsOpen .edMenuBar { display: flex; }
 #edRoot.toolsOpen .edGear { display: none; }
 .edMenuBrand {
-  flex: 0 0 auto; display: flex; align-items: center; padding: 0 16px 0 14px;
-  color: var(--ui-bright); font-weight: 700; font-size: 13px; letter-spacing: 0.08em;
-  border-right: 1px solid var(--ui-line);
+  flex: 0 0 auto; display: flex; align-items: center; padding-right: 22px; margin-right: 10px;
+  color: var(--ed-text-hi); font: 700 17px/1 var(--ed-serif); letter-spacing: 0.12em; white-space: nowrap;
+  position: relative;
 }
+.edMenuBrand::after { content: ""; position: absolute; right: 0; top: 50%; height: 18px; margin-top: -9px; border-right: 1px solid var(--ed-rule); }
 .edMenus { flex: 0 0 auto; display: flex; align-items: stretch; }
 .edMenu { position: static; display: flex; }
 .edMenuTitle {
-  cursor: pointer; border: 0; border-radius: 0; background: transparent; padding: 0 12px;
-  color: var(--ui-text); font: 13px/1 var(--ui-font); white-space: nowrap;
+  cursor: pointer; padding: 0 15px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent;
+  color: #b9bcb7; font: 400 14px/1 var(--ui-font); letter-spacing: 0.12em; white-space: nowrap;
+  transition: color 0.12s linear, background 0.12s linear, border-color 0.12s linear;
 }
-.edMenuTitle:hover, .edMenu.open > .edMenuTitle { background: var(--ui-selection); color: var(--ui-gold); }
+.edMenuTitle:hover { color: var(--ed-gold); }
+.edMenu.open > .edMenuTitle { color: var(--ed-gold); border-bottom-color: var(--ed-gold); background: linear-gradient(0deg, #d8d4c31f, transparent 80%); }
 .edMenuDrop {
-  position: fixed; z-index: 2; display: none; min-width: 210px; padding: 4px 0;
-  background: #101312; border: 1px solid var(--ui-line); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  position: fixed; z-index: 2; display: block; min-width: 236px; padding: 8px 0; box-sizing: border-box;
+  background: linear-gradient(90deg, #080907f7, #11120ef2); border: 1px solid var(--ed-edge); border-top-color: var(--ed-rule);
+  box-shadow: 0 20px 44px #000b;
+  opacity: 0; visibility: hidden; transform: translateY(-3px);
+  transition: opacity 0.12s linear, transform 0.12s ease, visibility 0s linear 0.12s;
 }
-.edMenu.open > .edMenuDrop { display: block; }
+.edMenu.open > .edMenuDrop { opacity: 1; visibility: visible; transform: none; transition: opacity 0.12s linear, transform 0.12s ease, visibility 0s; }
 .edMenuItem {
-  cursor: pointer; display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box;
-  min-height: 28px; padding: 4px 14px 4px 8px; border: 0; border-radius: 0; background: transparent;
-  color: var(--ui-text); font: 12.5px/1.4 var(--ui-font); text-align: left; white-space: nowrap;
+  cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box;
+  min-height: 36px; padding: 0 18px 0 13px; border: 0; border-left: 3px solid transparent; border-radius: 0; background: transparent;
+  color: #c6c7bd; font: 400 14px/1.4 var(--ui-font); letter-spacing: 0.08em; text-align: left; white-space: nowrap;
+  transition: color 0.12s linear, background 0.12s linear;
 }
-.edMenuItem:hover:not(:disabled), .edMenuItem:focus-visible { background: var(--ui-selection); color: var(--ui-gold); }
-.edMenuItem:disabled { cursor: default; color: var(--ui-muted); opacity: 0.55; }
-.edMenuCheck { flex: 0 0 14px; text-align: center; color: var(--ui-gold); }
-.edMenuItem.on .edMenuCheck::before { content: "✓"; }
-.edMenuItem.on .edMenuLabel { color: var(--ui-gold); }
+.edMenuItem:hover:not(:disabled), .edMenuItem:focus-visible {
+  color: var(--ed-gold); background: var(--ed-sel); border-left-color: var(--ed-gold); outline: none;
+}
+.edMenuItem:disabled { cursor: default; color: #6f716a; }
+/* 当前开着的那项：金字 + 一枚 5 px 金方块（与设置页开关的标记同一种） */
+.edMenuCheck { flex: 0 0 8px; display: flex; align-items: center; justify-content: center; }
+.edMenuItem.on { color: var(--ed-gold-text); }
+.edMenuItem.on .edMenuCheck::before { content: ""; width: 5px; height: 5px; background: currentColor; }
 .edMenuLabel { flex: 1 1 auto; }
-.edMenuTail { flex: 0 0 auto; color: var(--ui-muted); font-size: 11px; }
+.edMenuTail { flex: 0 0 auto; color: var(--ed-text-4); font-size: 12px; letter-spacing: 0; }
+.edMenuDrop .edMenuItem[data-action="main-menu"] { margin-top: 9px; position: relative; }
+.edMenuDrop .edMenuItem[data-action="main-menu"]::before {
+  content: ""; position: absolute; left: 16px; right: 16px; top: -5px; border-top: 1px solid var(--ed-rule-2);
+}
 .edMenuStatus {
   flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end;
-  padding: 0 12px; color: var(--ui-muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: 0 16px; color: var(--ed-text-3); font-size: 12px; letter-spacing: 0.16em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .edMenuExit {
-  flex: 0 0 auto; cursor: pointer; width: 40px; border: 0; border-left: 1px solid var(--ui-line); border-radius: 0;
-  background: transparent; color: var(--ui-muted); font-size: 18px; line-height: 1;
+  flex: 0 0 auto; cursor: pointer; width: 40px; border: 0; border-radius: 0; background: transparent;
+  color: #bbbbae; font-size: 24px; line-height: 1; transition: color 0.12s linear;
 }
-.edMenuExit:hover { color: var(--ui-gold); background: var(--ui-selection); }
+.edMenuExit:hover { color: var(--ed-gold-hi); }
 
 /* --- 高级工具：右侧 Inspector -------------------------------------------- */
 /* 每个编辑器仍是自己的 Panel({variant:"work"})，在这里统一停靠到菜单栏下面的右侧；
    Debug Rendering / 敌军 AI 是叠加浮窗、资产规范是整张表，不进 Inspector。 */
 #edRoot :is(.edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards), .edPanel.edInspectorEmpty) {
   top: var(--ed-bar-h); right: 0; bottom: 0; width: var(--ed-inspector-w);
-  border-width: 0 0 0 1px; box-shadow: -6px 0 22px rgba(0, 0, 0, 0.45); backdrop-filter: none;
+  border: 0; border-left: 1px solid var(--ed-rule); border-radius: 0;
+  background: var(--ed-panel-r); box-shadow: -18px 0 40px #0007; backdrop-filter: none;
 }
 #edRoot .edPanel.work.wide:not(.debugRendering):not(.ai):not(.assetStandards) { width: var(--ed-inspector-wide); }
+/* 顶上一行眉题，与设置页的「设置 / 声音」面包屑同一种字 */
 #edRoot :is(.edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards), .edPanel.edInspectorEmpty)::before {
-  content: "Inspector"; flex: 0 0 auto; padding: 5px 14px 4px; background: #0b0d0d;
-  color: var(--ui-muted); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
-  border-bottom: 1px solid var(--ui-line);
+  content: "高级工具 / Inspector"; flex: 0 0 auto; display: block; padding: 16px 22px 0;
+  color: var(--ed-text-3); font-size: 11.5px; letter-spacing: 0.2em;
 }
-#edRoot .edPanel.edInspectorEmpty .edHead .edTitle { color: var(--ui-muted); }
-#edRoot .edPanel.assetStandards { top: var(--ed-bar-h); left: 0; right: 0; bottom: 0; width: auto; border-width: 0; }
-#edRoot.toolsOpen .edHint { top: calc(var(--ed-bar-h) + 10px); }
+#edRoot .edPanel.assetStandards { top: var(--ed-bar-h); left: 0; right: 0; bottom: 0; width: auto; border: 0; border-radius: 0; background: var(--ed-panel); }
+#edRoot.toolsOpen .edHint { top: calc(var(--ed-bar-h) + 14px); }
 [hidden].edPanel { display: none !important; }
+
+/* 空 Inspector：一枚图标 + 衬线标题 + 两句说明 + 快捷键 */
+#edRoot .edInspectorEmpty .edHead { display: none; }
+#edRoot .edInspectorEmpty .edBody { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 72px 30px 24px; }
+.edEmptyArt { width: 58px; height: 58px; margin-bottom: 20px; display: grid; place-items: center;
+  border: 1px solid var(--ed-edge); background: #13140b55; color: var(--ed-gold); }
+.edEmptyArt svg { width: 26px; height: 26px; }
+.edEmptyTitle { color: var(--ed-text-hi); font: 700 22px/1.3 var(--ed-serif); letter-spacing: 0.12em; margin-bottom: 14px;
+  padding-bottom: 14px; border-bottom: 1px solid var(--ed-rule); min-width: 60%; }
+#edRoot .edInspectorEmpty .edNote { border: 0; background: none; padding: 0; margin: 6px 0; color: var(--ed-text-3); font-size: 12.5px; line-height: 1.9; }
+.edEmptyKeys { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; margin-top: 22px; color: var(--ed-text-4); font-size: 12px; letter-spacing: 0.08em; }
+.edEmptyKeys kbd {
+  display: inline-block; min-width: 20px; padding: 2px 7px; margin-right: 7px; box-sizing: border-box;
+  border: 1px solid var(--ed-edge); background: #13140b88; color: var(--ed-text); font: 11px/16px var(--ui-mono); text-align: center;
+}
+
+/* --- 高级工具：面板与控件 ------------------------------------------------ */
+#edRoot .edPanel { background: var(--ed-panel); border: 1px solid var(--ed-edge); border-radius: 0; box-shadow: 0 20px 50px #000b; color: var(--ed-text); }
+#edRoot .edHead { padding: 8px 14px 16px 22px; gap: 6px 10px; background: transparent; border-bottom: 1px solid var(--ed-rule); }
+#edRoot .edHead .edTitle { color: var(--ed-text-hi); font: 700 21px/1.35 var(--ed-serif); letter-spacing: 0.08em; }
+#edRoot .edHead .edSub { color: var(--ed-text-3); font-size: 12px; letter-spacing: 0.1em; white-space: normal; }
+#edRoot .edHead .edX { width: 32px; height: 32px; line-height: 30px; border: 0; background: none; color: #bbbbae; font-size: 24px; }
+#edRoot .edHead .edX:hover { color: var(--ed-gold-hi); }
+/* 叠加浮窗（Debug Rendering / 敌军 AI）的标题栏不带眉题，顶上留白收紧 */
+#edRoot :is(.edPanel.debugRendering, .edPanel.ai) .edHead { padding-top: 16px; }
+#edRoot .edBody { padding: 8px 22px 26px; }
+/* 标题下固定的一条工具栏（特效编辑器的播放栏）：不随正文滚动 */
+.edPanelBar { flex: 0 0 auto; padding: 0 14px 8px; background: #101416; border-bottom: 1px solid #363d40; }
+#edRoot .edPanelBar { padding: 0 22px 10px; background: #0a0b0999; border-bottom: 1px solid var(--ed-rule); }
+
+/* 分组 = 声音设置页的 audioGroup：宽字距灰字 + 一条细线 */
+#edRoot .edSection { margin: 20px 0 4px; padding: 0; border: 0; background: none; }
+#edRoot .edSection:first-child { margin-top: 12px; }
+#edRoot .edSection > .h {
+  margin: 0 0 10px; padding: 0 0 9px; border-bottom: 1px solid var(--ed-rule-2);
+  color: var(--ed-text-3); font-size: 12px; font-weight: 400; letter-spacing: 0.2em;
+}
+#edRoot .edRow { gap: 12px; margin: 7px 0; min-height: 28px; }
+#edRoot .edRow > .l { flex-basis: 96px; color: var(--ed-text-2); font-size: 13px; letter-spacing: 0.04em; }
+
+/* 按钮 = 设置页开关：细描边、直角、宽字距；按下态金字金边 + 5 px 金方块 */
+#edRoot .edBtn {
+  min-height: 31px; padding: 4px 13px; border: 1px solid var(--ed-edge); border-radius: 0; background: #13140b55;
+  color: #c6c7bd; font: 400 13px/1.4 var(--ui-font); letter-spacing: 0.08em;
+  transition: color 0.12s linear, background 0.12s linear, border-color 0.12s linear;
+}
+#edRoot .edBtn:hover { color: var(--ed-gold-hi); border-color: #cdb77b88; background: var(--ed-sel); }
+#edRoot .edBtn.on { color: var(--ed-gold-text); border-color: #cdb77b88; background: var(--ed-sel-strong); }
+#edRoot .edBtn[aria-pressed]::before { content: ""; display: inline-block; width: 5px; height: 5px; margin: 0 8px 2px 0; background: currentColor; opacity: 0.3; }
+#edRoot .edBtn[aria-pressed="true"]::before { opacity: 1; }
+#edRoot .edBtn:disabled { opacity: 0.45; cursor: default; }
+#edRoot .edBtn.danger:hover { color: #f0a08f; border-color: #d6604a99; background: linear-gradient(90deg, #d6604a22, transparent); }
+#edRoot .edBtns { gap: 6px; margin: 8px 0; }
+
+/* 选项 chips：同一套描边，选中 = 金字金边 + 渐变 */
+#edRoot .edChips { gap: 6px; margin: 8px 0 10px; }
+#edRoot .edChip {
+  min-height: 28px; padding: 3px 12px; border: 1px solid var(--ed-rule-2); border-radius: 0; background: transparent;
+  color: #b9bcb7; font: 400 12.5px/1.5 var(--ui-font); letter-spacing: 0.08em; transition: color 0.12s linear, background 0.12s linear, border-color 0.12s linear;
+}
+#edRoot .edChip:hover { color: var(--ed-gold-hi); border-color: var(--ed-edge); background: var(--ed-sel); }
+#edRoot .edChip.on { color: var(--ed-gold-text); border-color: #cdb77b88; background: var(--ed-sel-strong); }
+
+#edRoot .edPanel :is(select, input[type="text"], input[type="number"], textarea) {
+  min-height: 31px; padding: 4px 9px; border: 1px solid var(--ed-edge); border-radius: 0; box-sizing: border-box;
+  background: var(--ed-field); color: var(--ed-text); font: 13px/1.4 var(--ui-font); letter-spacing: 0.03em;
+}
+#edRoot .edPanel textarea { font: 11.5px/1.6 var(--ui-mono); letter-spacing: 0; }
+#edRoot .edPanel :is(select, input, textarea):focus { border-color: var(--ed-gold); outline: none; }
+#edRoot .edPanel select option { background: #11120e; color: var(--ed-text); }
+
+/* 滑杆 = 声音设置页：3 px 金色填充细轨 + 7×17 竖条滑块（--fill 由 Script_EditorUi.Slider 写） */
+#edRoot .edPanel input[type="range"] { height: 26px; --fill: 50%; cursor: pointer; }
+#edRoot .edPanel input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 0; background: linear-gradient(to right, var(--ed-gold-fill) var(--fill), #a4a59450 var(--fill));
+}
+#edRoot .edPanel input[type="range"]::-moz-range-track { height: 3px; background: #a4a59450; }
+#edRoot .edPanel input[type="range"]::-moz-range-progress { height: 3px; background: var(--ed-gold-fill); }
+#edRoot .edPanel input[type="range"]::-webkit-slider-thumb { width: 7px; height: 17px; margin-top: -7px; border-radius: 1px; background: var(--ed-thumb); }
+#edRoot .edPanel input[type="range"]::-moz-range-thumb { width: 7px; height: 17px; border: 0; border-radius: 1px; background: var(--ed-thumb); }
+#edRoot .edPanel input[type="range"]:is(:hover, :focus-visible)::-webkit-slider-thumb { background: var(--ed-gold-hi); box-shadow: 0 0 0 3px #dfbd6844; }
+#edRoot .edPanel input[type="range"]:focus-visible { outline: none; }
+#edRoot .edVal { color: var(--ed-text); font-size: 12.5px; }
+/* 滑杆读数那一格是行内写死的 44px，「10.00 s」会折成两行：放宽并不许折行 */
+#edRoot .edRow > .l:has(> .edVal) { flex: 0 0 auto !important; min-width: 48px; white-space: nowrap; }
+
+/* 列表 = 选章列表：左侧金边 + 渐变的选中条 */
+#edRoot .edList { border: 1px solid var(--ed-rule-2); background: #0a0b0999; }
+#edRoot .edList .it {
+  min-height: 30px; padding: 4px 12px 4px 11px; border: 0; border-left: 3px solid transparent; border-bottom: 1px solid #c1bdab14;
+  align-items: center; color: #c6c7bd; letter-spacing: 0.04em;
+}
+#edRoot .edList .it:hover { background: #d8d4c30f; color: var(--ed-text-hi); }
+#edRoot .edList .it.on { border-left-color: var(--ed-gold); background: var(--ed-sel-strong); color: var(--ed-gold); }
+#edRoot .edList .it .t { color: var(--ed-text-4); letter-spacing: 0.02em; }
+
+/* 读数：灰键名 + 象牙白等宽值，细线分行 */
+#edRoot .edFacts { margin: 8px 0 2px; }
+#edRoot .edFacts .f { padding: 5px 0; border-bottom: 1px solid #c1bdab1a; font-size: 12.5px; }
+#edRoot .edFacts .f:last-child { border-bottom: 0; }
+#edRoot .edFacts .f .k { color: var(--ed-text-4); letter-spacing: 0.04em; }
+#edRoot .edFacts .f .v { color: var(--ed-text); }
+#edRoot .edFacts .f .v.warn { color: var(--ed-gold-text); }
+#edRoot .edFacts .f .v.bad { color: var(--ed-bad); }
+#edRoot .edFacts .f .v.good { color: var(--ed-good); }
+
+/* 说明 = 声音页右栏的正文：灰字宽行距，左侧一条细线；告警用金色 */
+#edRoot .edNote {
+  margin: 8px 0; padding: 1px 0 1px 11px; border: 0; border-left: 1px solid var(--ed-edge); border-radius: 0; background: none;
+  color: var(--ed-text-4); font-size: 12.5px; line-height: 1.85;
+}
+#edRoot .edNote.warn { border-left-color: var(--ed-gold); color: var(--ed-gold-text); }
+#edRoot .edJsonFold > summary { border-radius: 0; border-color: var(--ed-rule-2); background: transparent; letter-spacing: 0.08em; padding: 6px 10px; }
+#edRoot .edJsonFold[open] > summary { color: var(--ed-gold-text); border-color: #cdb77b66; }
+#edRoot .edAssetTable th { background: var(--ed-black); color: var(--ed-text-3); letter-spacing: 0.12em; font-weight: 400; border-bottom-color: var(--ed-rule); }
+#edRoot .edAssetTable td { border-bottom-color: #c1bdab1a; }
+#edRoot .edAssetTable tbody tr:hover { background: var(--ed-sel); }
+#edRoot .edAssetRuleCard { border-radius: 0; border-color: var(--ed-rule-2); background: #0a0b0999; }
+#edRoot :is(.edFacialTimeline, .edFpsLegend) { border-radius: 0; border-color: var(--ed-edge); background: var(--ed-panel); }
+
+/* 右上角入口（高级工具关着时）与屏幕中央的提示 */
+#edRoot .edGear { background-color: #070807d9; border-color: #c1bdab47; }
+#edRoot .edGear:hover { background-color: #11120e; border-color: #edca83b3; }
+#edRoot .edHint { padding: 5px 16px; border-radius: 0; background: #070807e0; border-color: #edca8366; color: var(--ed-gold); letter-spacing: 0.1em; }
 
 @media (max-width: 600px) {
   /* 窄屏：Inspector 改成底部抽屉，上面留出画面 */
   #edRoot :is(.edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards), .edPanel.edInspectorEmpty),
   #edRoot .edPanel.work.wide:not(.debugRendering):not(.ai):not(.assetStandards) {
-    left: 0; right: 0; width: auto; top: auto; height: 52vh; border-width: 1px 0 0;
+    left: 0; right: 0; width: auto; top: auto; height: 52vh; border-left: 0; border-top: 1px solid var(--ed-rule);
+    background: var(--ed-panel);
   }
   #edRoot .edPanel.work[data-facial] { bottom: 0; }
   .edPanel.debugRendering { left: 10px; right: 10px; width: auto; top: 84px; bottom: 10px; z-index: 1; }
   .edHint { top: 10px; max-width: calc(100% - 150px); left: 10px; transform: none; }
   #edRoot.toolsOpen .edHint { top: calc(var(--ed-bar-h) + 6px); }
   .edFacialTimeline { left: 8px; right: 8px; }
+  .edMenuStatus { display: none; }
+  .edMenuBrand { font-size: 15px; padding-right: 14px; }
 }
 
 /* Empty status messages do not take up space in compact testing panels. */

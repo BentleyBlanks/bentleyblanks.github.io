@@ -290,8 +290,20 @@ export class EditorSuite {
     // 选了工具之后，各编辑器自己的工作窗（.edPanel.work）停在同一个位置，样式见 Style_Editor.css。
     // 不带 .work：测试与出图脚本按 .edPanel.work 找「当前工具的工作窗」，空态不该被数进去。
     const empty = Panel({ title: "未选择工具", variant: "edInspectorEmpty" });
-    Note(empty.body, "从顶部菜单栏选一个工具，它的参数会显示在这里。再点一次菜单里打勾的那项、或点工作窗右上的 × 就关掉它。");
+    const art = El("div", "edEmptyArt");
+    art.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 8.5h18M14.5 8.5V20"/><path d="M17 12h1.5M17 15h1.5"/></svg>';
+    empty.body.appendChild(art);
+    empty.body.appendChild(El("div", "edEmptyTitle", "未选择工具"));
+    Note(empty.body, "从顶部菜单栏选一个工具，它的参数会显示在这里。再点一次菜单里打勾的那项、或点右上的 × 就关掉它。");
     Note(empty.body, "Debug Rendering、Profiler、Frame Debugger、WorldInfo、玩家状态、敌军 AI 与 FPS 显示在菜单 设置 → Debug工具。");
+    const keys = El("div", "edEmptyKeys");
+    for (const [key, text] of [["`", "打开 / 退出"], ["Esc", "退出"]]) {
+      const item = El("span");
+      item.append(El("kbd", "", key), text);
+      keys.appendChild(item);
+    }
+    empty.body.appendChild(keys);
     root.appendChild(empty.root);
     this.emptyInspector = empty.root;
 
@@ -312,7 +324,7 @@ export class EditorSuite {
       menu.drop.style.left = "0px";
       const width = menu.drop.offsetWidth;
       menu.drop.style.left = `${Math.max(0, Math.min(rect.left, innerWidth - width - 4))}px`;
-      menu.drop.style.top = `${rect.bottom}px`;
+      menu.drop.style.top = `${this.menuBar.getBoundingClientRect().bottom}px`;
     }
   }
 

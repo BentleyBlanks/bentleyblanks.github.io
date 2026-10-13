@@ -25,6 +25,7 @@ import { BlockoutMarkers } from "./Script_EditorBlockoutMarkers.mjs";
 import { BlockoutStore } from "./Script_EditorBlockoutStore.mjs";
 import { BlockoutUi } from "./Script_EditorBlockoutUi.mjs";
 import { BlockoutMap } from "./Script_EditorBlockoutMap.mjs";
+import { BlockoutMusic } from "./Script_EditorBlockoutMusic.mjs";
 import { BuildWhiteboxWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
@@ -171,6 +172,8 @@ export class EditorBlockout {
       onCloseMap: () => { this.ToggleMap(false); },
       onMapPick: (index) => { this.GoTo(index, { animate: false }); },
     });
+    // 配乐试听（Script_EditorBlockoutMusic）：现行 / 新方案跟着关键帧换曲，挂在界面根上沿用它的输入拦截
+    this.music = new BlockoutMusic(this.ui.root);
     this.BindKeys();
 
     this.api = {
@@ -193,6 +196,9 @@ export class EditorBlockout {
       MapView: () => this.MapView(),
       MapPoint: (idOrIndex) => this.MapPoint(idOrIndex),
       // 测试用：标记层与俯视图正在用的单位（演员现场位置 + 关键帧数据）。
+      // 配乐试听：State() 看现在该放什么 / 在放什么；MusicMode("redesign"|"current"|"off")
+      Music: () => this.music.State(),
+      MusicMode: (mode) => { this.music.SetMode(mode); return this.music.State(); },
       Marked: () => this.liveUnits.map(u => ({ id: u.id, name: u.name, side: u.side, kind: u.kind, x: u.x, z: u.z, arc: !!u.arc })),
     };
   }
@@ -560,6 +566,7 @@ export class EditorBlockout {
     this.markers.SetPois(kf.pois);
     this.markers.SetNext(kf.next && Number.isFinite(kf.next.x) ? kf.next : null);
     this.ui.SetKeyframes(this.KeyframeList(), index);
+    this.music.SetKeyframe(this.levelKey, kf.id);
     this.map.SetKeyframes(this.doc.keyframes.map(k => ({ id: k.id, stage: k.stage, player: { x: k.player.x, z: k.player.z } })), index);
     // 地图开着时跳关键帧：图跟着挪到新站位（比例不变）
     if (this.mapOpen) this.FocusMapOnPlayer();
@@ -963,6 +970,7 @@ export class EditorBlockout {
     this.puppets.Dispose();
     this.markers.Dispose();
     this.map.Dispose();
+    this.music.Dispose();
     this.ui.Dispose();
     this.root.remove();
   }

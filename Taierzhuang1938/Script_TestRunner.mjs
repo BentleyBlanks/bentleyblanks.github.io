@@ -383,6 +383,7 @@ export const testDefs = {
   SamplePointTest: { file: "Script_SamplePointTest.mjs", desc: "县城采样点覆盖率与位姿口径（纯 Node）" },
   HeightmapVerify: { file: "Script_HeightmapCli.mjs", args: ["verify"], desc: "SRTM 高度数据完整性（需先 download 过）" },
   FirstLevelMissionMusicTest: { file: "Script_FirstLevelMissionMusicTest.mjs", desc: "Seven first-level score assets, story transitions and silence rules" },
+  FirstLevelScoreRedesignTest: { file: "Script_FirstLevelScoreRedesignTest.mjs", desc: "First-level score redesign candidates: blockout keyframe coverage, plan and packaged assets" },
   AmbBedVariantBrowserTest: { file: "Script_AmbBedVariantBrowserTest.mjs", timeoutMs: 900000, desc: "战场远景床（A 底 + B/C/E 后台叠加）真浏览器：第一关默认入口阻塞阶段只请求 A、开机后后台请求 B/C/E、从不请求旧 battleFar；压短间隔后叠加段真的出声（输出端 RMS）、巷道 zone 下换 E；?ambBed=B 只请求 B 不叠加、legacy 只请求旧床、none 都不请求；相机在玩家头部" },
   AmbBedVariantTest: { file: "Script_AmbBedVariantTest.mjs", desc: "战场远景床选择与装载（纯 Node）：?ambBed= / BATTLE_BED_VARIANT 优先级（默认 layered）、layered / legacy / none / A–E 装载计划、开机阻塞下载只含 A 不含旧床与 B/C/E、后台装 B/C/E、清单 bedVariants 与成品哈希 / RMS / 人声筛查记录、提示词禁人声、引擎桩 fetch 下各档请求逐条核对" },
   BattleBedLayersTest: { file: "Script_BattleBedLayersTest.mjs", desc: "战场远景床叠加调度（纯 Node）：B/C 严格交替、随机可复现、间隔 / 时长 / 淡入淡出在数据表范围、进巷道换 E 与滞回、离开回 B/C、切档不硬切、素材没到不出声、换宿主接着播；引擎接线（假 AudioContext）：叠加挂宿主组增益、峰值、+2 节点归还、跟战场强度与 ShapeFarBeds" },
@@ -752,7 +753,7 @@ export const domains = {
     // 所以也挂在这个域下。
     tests: ["CarryTest", "EmplacementTest", "EmplacementViewBrowserTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
-  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "AmbBedVariantTest", "BattleBedLayersTest", "AmbBedVariantBrowserTest", "FirstLevelAirRaidTest", "BombBallisticsTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest", "FirstLevelAudioNodeBudgetTest"] },
+  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelScoreRedesignTest", "FirstLevelBattleSoundTest", "AmbBedVariantTest", "BattleBedLayersTest", "AmbBedVariantBrowserTest", "FirstLevelAirRaidTest", "BombBallisticsTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest", "FirstLevelAudioNodeBudgetTest"] },
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
