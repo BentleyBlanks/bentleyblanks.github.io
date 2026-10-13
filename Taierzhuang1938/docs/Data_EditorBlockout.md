@@ -196,7 +196,7 @@ export function DefaultArc(unit);                   // §5.3
 | 右上 · 关卡与图层（齿轮按钮左侧） | 关卡下拉（显示当前关卡名 + 下拉箭头）；4 个图标开关：射界 / 去向 / 标签 / 穿墙显示；配置状态小点（绿 = 已载入，蓝闪 = 检测到外部修改已同步，红 = 配置有错，悬停看原因）。 |
 | 左下 · 小地图（220×220 CSS px，按 DPR 出图） | 北朝上、跟随玩家；纸面风格；角落小字「M 展开」。 |
 | 底部居中 · 导航栏（宽 min(1140 px, 64vw)，全关总图打开时仍在最上层可点） | 左右两个箭头按钮 + 一个重播按钮（当前是第一个关键帧时置灰）；中间轨道按阶段分段（段宽按该阶段关键帧数），段下方小字阶段号 01…18；每个关键帧一个刻度，当前关键帧金色滑块；悬停刻度弹出「03 · 观察射台」；点击跳转、拖动松手跳转；右侧计数「03 · 2/3」；最右一行极小的按键提示「, . 切换　M 地图　Esc 鼠标」。 |
-| 全关总图（M 打开，铺满导航栏以上的画面） | 纸面大图，**打开时以玩家为中心**（默认约 220 m 见方；用户缩放过就记住那个比例），跳关键帧时跟到新位置；滚轮以光标为中心缩放、拖动平移、双击回到全图；每个关键帧是带阶段号的小点，点之间连一条虚线路线；点击关键帧点直接跳转（图保持打开）；当前关键帧的单位、射界、去向、POI 全画；右上一个关闭按钮，M / Esc 关闭。 |
+| 全关总图（M 打开，图框铺满导航栏以上；半透明遮罩盖满整屏，导航栏浮在遮罩上） | 纸面大图，**开着时鼠标只归地图**（游戏不转头、不开枪、不抢锁、滚轮不换枪；点遮罩空处关图），**打开时以玩家为中心**（默认约 220 m 见方；用户缩放过就记住那个比例），跳关键帧时跟到新位置；滚轮以光标为中心缩放、拖动平移、双击回到全图；每个关键帧是带阶段号的小点，点之间连一条虚线路线；点击关键帧点直接跳转（图保持打开）；当前关键帧的单位、射界、去向、POI 全画；右上一个关闭按钮，M / Esc 关闭。 |
 | 右上 · 配乐（齿轮下面） | 胶囊：现在在放什么；点开面板：新方案 / 现行 / 关三选一（跟着关键帧换曲），两行写各自曲名、电平、理由；曲库逐首点播；音量。见 [第一关配乐重配](Data_FirstLevelScoreRedesign.md) §4。 |
 | 中上 · 提示条 | 短暂提示（「已载入」「配置已在外部修改，已同步」「机位已保存」「配置有 2 处错误」），2.5 s 淡出。 |
 
@@ -336,6 +336,7 @@ export class BlockoutPuppets {
 3. `EnterLevel`：blockout phase 跳过 `companion.BeginLevel`、`setpieces.BeginLevel`；`story.BeginLevel` 传 `{ beats: [] }`；最后的分支加 `else if (BLOCKOUT) { state.pinned = true; }`（在 `SeedSoldiers` 之前）；`Frame` 里每 3 s 的补兵对 BLOCKOUT 不做。
 4. 不建主菜单；启动完成后直接 `StartRun()`，加一次性 `pointerdown` 解锁音频；动态 `import("./Script_EditorBlockout.mjs")` 并构造，挂 `window.Tengxian.Debug.Blockout`。
 5. `Frame` 里紧跟 `editor.UpdateOverlays(dt)` 调 `blockout?.Update(dt)`；`SyncScenario` 的 `signalled` 加 `|| !!blockout?.Signalled(name)`；`case "map"` 在 BLOCKOUT 下改调 `blockout.ToggleMap()`。
+   全关总图开着时（`blockout.CapturesMouse()`）：`RequestPointerLock` 不抢锁、键位路由的 `Guard` 返回 false（不开枪、不起右键拖动转头）、`mousemove` 不转头、`cycleSlot`（滚轮）不换枪；键盘照常（M / Esc 关图、WASD 走动），所以不并进 `UiCapturing`。
 6. 玩家无敌 / 无限弹药：只在本会话生效，不调会写 localStorage 的 `SetDebugOption`。
 7. `Script_Main` 在文本门禁里：新增代码不得含中文字面量；需要的玩家可见文字走 `T()`。
 
@@ -483,3 +484,4 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
 - 2026-10-13（配乐）：右上加「配乐」胶囊与面板（`Script_EditorBlockoutMusic.mjs`）：新方案 / 现行 / 关跟着关键帧换曲、曲库点播；数据与口径见 [第一关配乐重配](Data_FirstLevelScoreRedesign.md)。自带 AudioContext，不进游戏音乐总线；偏好记 sessionStorage。`hudFps` 在编辑器模式下挪到 96 px 让出位置。
 - 2026-10-13（用户反馈第一轮）：锁不住鼠标的窗口退化成按住右键拖动转视角；全关总图打开时对准玩家、导航栏压在总图上面仍可用；导航栏加重播按钮（同 `Y`）。
 - 2026-10-13（复制当前位置）：卡片加「复制当前位置」按钮与 `P` 键（§4.2），文字末行带整份 JSON；入口加 `pose=` 参数，「重现」链接原样打开回到同一机位。
+- 2026-10-13（地图开着鼠标漏到游戏）：遮罩改成盖满整屏（导航栏两边那条原来露着，点一下会重新锁鼠标 / 在面板里直接开枪）；`Script_Main` 加 `BlockoutMouseCaptured()` 闸住抢锁、开枪、转头与滚轮换枪。

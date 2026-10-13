@@ -921,6 +921,14 @@ function UiCapturing() {
   return !!settings?.IsOpen || !!editor?.Capturing;
 }
 
+/**
+ * 白盒编辑器的全关总图开着：鼠标只归地图（不转头、不开枪、不抢锁、滚轮不换枪）。
+ * 键盘照常（M / Esc 关图、WASD 走动），所以不并进 UiCapturing。
+ */
+function BlockoutMouseCaptured() {
+  return BLOCKOUT && !!blockout?.CapturesMouse?.();
+}
+
 /** 开发工具层（齿轮、Debug Rendering 浮窗等）跟着菜单藏 / 现。没有开发工具时什么也不做。 */
 function SetDevToolsHidden(hidden) {
   editor?.SetHidden(hidden || !!SHOT);
@@ -6242,7 +6250,7 @@ let rawInputActive = false;
  * 抓不到就提示玩家点一下，别让人对着不转的镜头猜。
  */
 function RequestPointerLock() {
-  if (SHOT || altMouseFree || UiCapturing()) return;
+  if (SHOT || altMouseFree || UiCapturing() || BlockoutMouseCaptured()) return;
   if (escapeHeld) { lockAfterEscape = true; return; }
   if (FAKE_POINTER_LOCK) {
     if (!fakeLocked) { fakeLocked = true; OnPointerLockChange(); }
@@ -6938,6 +6946,8 @@ const router = new InputRouter({
     if (!state.running) return false;
     // 编辑器开着：这一下鼠标是在点面板/摆东西，不是在抢指针锁开枪
     if (UiCapturing()) return false;
+    // 白盒总图开着：点到图外（导航栏两边的画面）也不开枪、不抢锁、不起右键转头
+    if (BlockoutMouseCaptured()) return false;
     if (!PointerLocked() && !SHOT) {
       // 整页拿不到锁：不再「第一下只抢锁」，点击照常进游戏（右键拖动转视角见 Capture）
       if (lockUnavailable) return true;
@@ -6968,6 +6978,7 @@ const router = new InputRouter({
     // 编辑器开着就把整张键位表闸掉。不闸的话在编辑器里按 R 会真的去装填、
     // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
     if (UiCapturing()) return;
+    if (action === "cycleSlot" && BlockoutMouseCaptured()) return;
     if (["crouch", "prone", "traverse"].includes(action) || action.startsWith("stance:")) {
       if (!state.running || state.menu || !player.Alive || meleeCombat?.Active || emplacement?.Mounted) return;
     }
@@ -7086,6 +7097,7 @@ document.addEventListener("mousemove", (e) => {
   // 这条**不查指针锁**：轮盘只要一个方向向量，而 movementX/Y 在锁与不锁下都送达
   // （出图/测试模式下根本拿不到指针锁，查了就等于轮盘在那些模式里是死的）。
   if (state.ordersOpen) { wheel.Move(e.movementX, e.movementY); return; }
+  if (BlockoutMouseCaptured()) return;
   if (!PointerLocked() && !(lockUnavailable && dragLooking)) return;
   input.lookX += e.movementX;
   input.lookY += e.movementY;

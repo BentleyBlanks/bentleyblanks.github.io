@@ -456,6 +456,31 @@ try {
     const afterPick = await State();
     Check("全关总图：点关键帧点直接跳过去，图保持打开", !!pick && afterPick.index === pick.index && afterPick.mapOpen,
       JSON.stringify({ pick: pick ? configDoc.keyframes[pick.index].id : null, index: afterPick.index, open: afterPick.mapOpen }));
+    // 图开着时鼠标不漏到后面的游戏（用户 10-13：「开地图以后后面的鼠标响应还在」）：
+    // 导航栏两边那条也归遮罩；直接打在游戏画布上的按下 / 滚轮 / 移动不开枪、不抢锁、不换枪、不转头
+    const leak = await B(() => {
+      const T = window.Tengxian, view = document.getElementById("view");
+      const Now = () => ({ yaw: T.player.yaw, pitch: T.player.pitch, slot: T.state.activeSlot, fire: T.Debug.FireCount?.() ?? 0, ads: !!T.player.ads });
+      const before = Now();
+      const nav = document.querySelector(".boNav").getBoundingClientRect(), y = nav.top + nav.height / 2;
+      const Under = (x) => { const el = document.elementFromPoint(x, y); return el?.closest(".boMapOverlay") ? "overlay" : el?.id || el?.className || el?.tagName || null; };
+      const beside = [Under(Math.max(2, nav.left - 10)), Under(Math.min(innerWidth - 2, nav.right + 10))];
+      view.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0, clientX: 300, clientY: 300 }));
+      view.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 2, clientX: 300, clientY: 300 }));
+      document.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, movementX: 40, movementY: 10 }));
+      view.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 120 }));
+      const during = { ...Now(), locked: !!T.Debug.PointerLock?.().locked };
+      view.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 2 }));
+      view.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
+      return { before, during, beside, mapOpen: T.Debug.Blockout.State().mapOpen };
+    });
+    await page.waitForTimeout(300);
+    const leakAfter = await B(() => ({ yaw: window.Tengxian.player.yaw, fire: window.Tengxian.Debug.FireCount?.() ?? 0, locked: !!window.Tengxian.Debug.PointerLock?.().locked }));
+    Check("全关总图开着：导航栏两边归遮罩；画布上按下 / 滚轮 / 移动不开枪、不抢锁、不换枪、不转头",
+      leak.beside.every(b => b === "overlay") && leak.mapOpen && !leak.during.locked && !leakAfter.locked
+        && leak.during.slot === leak.before.slot && leak.during.yaw === leak.before.yaw && leak.during.pitch === leak.before.pitch
+        && !leak.during.ads && leakAfter.fire === leak.before.fire && leakAfter.yaw === leak.before.yaw,
+      JSON.stringify({ ...leak, leakAfter }));
   }
   await B(() => window.Tengxian.Debug.Blockout.ToggleMap(false));
 

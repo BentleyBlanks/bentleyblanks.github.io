@@ -291,9 +291,10 @@
 .boNav.empty .boTrackWrap { cursor: default; }
 
 /* --- 全关总图外框 --------------------------------------------------------- */
-/* 底边留给导航栏（它叠在总图上面、照样能点）：地图开着也能切关键帧 */
+/* 遮罩盖满整屏（导航栏两边那条也盖住，鼠标落不到后面的游戏画面上；点遮罩空处关图）；
+   图框只占导航栏以上：导航栏叠在遮罩上面、照样能点，地图开着也能切关键帧 */
 .boMapOverlay {
-  position: absolute; inset: 0 0 var(--bo-nav-room, 86px) 0; z-index: 5; display: none;
+  position: absolute; inset: 0; padding-bottom: var(--bo-nav-room, 86px); z-index: 5; display: none;
   align-items: center; justify-content: center;
   background: rgba(3, 4, 4, 0.38);
 }

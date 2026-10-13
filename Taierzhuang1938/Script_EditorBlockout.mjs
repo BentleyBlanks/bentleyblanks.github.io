@@ -837,6 +837,9 @@ export class EditorBlockout {
     return this.mapOpen;
   }
 
+  /** Script_Main 问：鼠标现在是不是归编辑器（全关总图开着时游戏不转头、不开枪、不抢锁、滚轮不换枪）。 */
+  CapturesMouse() { return this.mapOpen; }
+
   /** 全关总图对准玩家当前位置：比例用上次留下的，没有就让短边看到约 MAP_FOCUS_SPAN_M 米。 */
   FocusMapOnPlayer() {
     const p = this.game.player?.position;
