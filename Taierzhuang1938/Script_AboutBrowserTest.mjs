@@ -23,24 +23,47 @@ const Ready = () => page.waitForFunction(() => window.Tengxian?.Debug?.CommandRo
 const Stable = () => page.waitForFunction(() => window.Tengxian.Debug.CommandRoom().presentation.panelFocus > .999);
 const Readable = async () => {
   await page.evaluate(() => document.fonts.ready);
+  await page.waitForFunction(() => {
+    const paper=document.querySelector('.aboutPaper'), ink=paper.querySelector('.aboutInkPlane');
+    return ink.dataset.frameSize===Math.round(paper.clientWidth)+'x'+Math.round(paper.clientHeight);
+  });
   const state = await page.locator(".aboutReader").evaluate(reader => {
     const bounds=reader.getBoundingClientRect(), paper=reader.closest(".aboutPaper").getBoundingClientRect();
-    const footer=reader.closest(".aboutPaper").querySelector(".aboutPaperFooter").getBoundingClientRect();
+    const ink=reader.closest('.aboutInkPlane'), footerElement=ink.querySelector('.aboutPaperFooter');
+    const footer=footerElement.getBoundingClientRect(), style=getComputedStyle(ink), matrix=new DOMMatrix(style.transform);
+    const Project=(x,y)=>{const p=matrix.transformPoint({x,y,z:0,w:1});return {x:paper.left+p.x/p.w,y:paper.top+p.y/p.w};};
+    const width=parseFloat(style.width),height=parseFloat(style.height);
+    const corners=[[0,0],[width,0],[width,height],[0,height]].map(([x,y])=>Project(x,y));
+    // Independently measured front-sheet corners from the 1402 x 1122 source artwork.
+    const targets=[[165,70],[1267,81],[1356,1053],[119,1058]];
+    const surfaceError=Math.max(...corners.map((p,i)=>Math.hypot(p.x-paper.left-targets[i][0]/1402*paper.width,p.y-paper.top-targets[i][1]/1122*paper.height)));
+    // Native zero-size probes preserve fractional layout positions under perspective.
+    // Integer offsetTop/offsetHeight can invent a one-pixel overlap at short sizes.
+    const Corner=(element,right,bottom)=>{
+      const position=element.style.position; element.style.position='relative';
+      const probe=document.createElement('span');
+      probe.style.cssText='position:absolute;width:0;height:0;padding:0;margin:0;border:0;pointer-events:none;left:'+(right?'100%':'0')+';top:'+(bottom?'100%':'0');
+      element.append(probe);const point=probe.getBoundingClientRect();probe.remove();element.style.position=position;
+      return point;
+    };
+    const readerFooterGap=Math.min(...[false,true].map(right=>Corner(footerElement,right,false).top-Corner(reader,right,true).top));
     return {width:bounds.width,height:bounds.height,scroll:reader.scrollHeight,client:reader.clientHeight,overflow:reader.scrollWidth>reader.clientWidth+1,
       clipGap:bounds.top-paper.top-paper.height*.13,footerGap:paper.bottom-footer.bottom-paper.height*.045,
-      readerFooterGap:footer.top-bounds.bottom,
+      readerFooterGap,surfaceError,projective:Math.abs(matrix.m24)>1e-7,inkBlend:style.mixBlendMode,
+      matchingPlane:reader.offsetParent===ink&&footerElement.offsetParent===ink,
       inPaper:bounds.left>=paper.left && bounds.right<=paper.right && bounds.top>=paper.top && bounds.bottom<=paper.bottom};
   });
   assert.ok(state.inPaper && !state.overflow && state.width>100 && state.height>80, JSON.stringify(state));
   // The artwork clip extends through the top 13%; its worn bottom edge occupies 4.5%.
   // Check visible-art clearances independently of the CSS layout implementation.
   assert.ok(state.clipGap>=8 && state.footerGap>=8 && state.readerFooterGap>=-1,"Text must clear clip, paper edge and footer: "+JSON.stringify(state));
+  assert.ok(state.matchingPlane&&state.projective&&state.surfaceError<1.5&&state.inkBlend==='multiply',"Live ink must follow the physical sheet: "+JSON.stringify(state));
   return state;
 };
 try {
  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?quality=high`);
  await Ready();
- assert.ok(!requests.some(url=>/Texture_AboutDossier|Font_AboutText/.test(url)), "About art/font stay lazy on title");
+ assert.ok(!requests.some(url=>/Texture_AboutDossier|Font_About(?:Text|Heading)/.test(url)), "About art/font stay lazy on title");
  await page.click('[data-act="credits"]');
  await Stable();
  await page.evaluate(async()=>{

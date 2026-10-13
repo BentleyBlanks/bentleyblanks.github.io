@@ -1,4 +1,12 @@
 // Dossier page structure, independent of gameplay and rendering.
+// Front sheet corners measured on Texture_AboutDossierImage.webp (TL, TR, BR, BL).
+// The ragged folder border is deliberately outside this printable plane.
+export const ABOUT_PAPER = Object.freeze({
+  sourceWidth: 1402, sourceHeight: 1122,
+  corners: [[165, 70], [1267, 81], [1356, 1053], [119, 1058]],
+  layoutWidth: .84, layoutHeight: .92,
+});
+
 export const ABOUT_PAGES = Object.freeze([
   {
     "id": "work",

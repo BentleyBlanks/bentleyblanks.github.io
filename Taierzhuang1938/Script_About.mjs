@@ -1,4 +1,4 @@
-import { ABOUT_PAGES, ABOUT_SOURCES } from "./Data_About.mjs";
+import { ABOUT_PAGES, ABOUT_SOURCES, ABOUT_PAPER } from "./Data_About.mjs";
 import { T } from "./Script_Text.mjs";
 
 function Element(tag, className, parent, text) {
@@ -7,6 +7,25 @@ function Element(tag, className, parent, text) {
   if (text != null) element.textContent = text;
   parent?.append(element);
   return element;
+}
+
+/** Map a flat live-text page onto the four measured corners of the printed sheet. */
+function PaperProjection(width, height) {
+  const points = ABOUT_PAPER.corners.map(([x, y]) => [x / ABOUT_PAPER.sourceWidth * width, y / ABOUT_PAPER.sourceHeight * height]);
+  const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = points;
+  const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
+  const dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+  const denominator = dx1 * dy2 - dx2 * dy1;
+  const g = (dx3 * dy2 - dx2 * dy3) / denominator;
+  const h = (dx1 * dy3 - dx3 * dy1) / denominator;
+  const pageWidth = width * ABOUT_PAPER.layoutWidth, pageHeight = height * ABOUT_PAPER.layoutHeight;
+  const a = x1 - x0 + g * x1, b = x3 - x0 + h * x3;
+  const d = y1 - y0 + g * y1, e = y3 - y0 + h * y3;
+  return { width: pageWidth, height: pageHeight, matrix: [
+    a / pageWidth, d / pageWidth, 0, g / pageWidth,
+    b / pageHeight, e / pageHeight, 0, h / pageHeight,
+    0, 0, 1, 0, x0, y0, 0, 1,
+  ] };
 }
 
 /** A reusable reading panel. It never loads gameplay, models, audio or remote embeds. */
@@ -29,15 +48,30 @@ export class AboutDossier {
     });
     this.paper = Element("section", "aboutPaper", this.root);
     this.paper.id = "aboutPaper"; this.paper.setAttribute("role", "tabpanel");
-    this.reader = Element("div", "aboutReader", this.paper);
+    this.inkPlane = Element("div", "aboutInkPlane", this.paper);
+    this.reader = Element("div", "aboutReader", this.inkPlane);
     this.reader.tabIndex = 0; this.reader.setAttribute("aria-label", T("about.reader"));
-    this.footer = Element("div", "aboutPaperFooter", this.paper);
+    this.footer = Element("div", "aboutPaperFooter", this.inkPlane);
     this.action = Element("button", "aboutAction", this.footer);
     this.action.type = "button"; this.action.addEventListener("click", () => this.Activate());
     this.folio = Element("span", "aboutFolio", this.footer);
     // Arrow keys stay native inside the reading region, including attribution links.
     this.root.addEventListener("keydown", event => this.Key(event));
+    this.paperObserver = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect;
+      this.FitPaper(width, height);
+    });
+    this.paperObserver.observe(this.paper);
     this.Select(this.selected);
+  }
+
+  FitPaper(width, height) {
+    if (!(width > 0 && height > 0)) return;
+    const projection = PaperProjection(width, height);
+    this.inkPlane.style.width = projection.width + "px";
+    this.inkPlane.style.height = projection.height + "px";
+    this.inkPlane.style.transform = "matrix3d(" + projection.matrix.join(",") + ")";
+    this.inkPlane.dataset.frameSize = Math.round(width) + "x" + Math.round(height);
   }
 
   Select(id, { focus = false } = {}) {
@@ -123,7 +157,10 @@ export class AboutDossier {
   }
 
   Open() {
+    this.FitPaper(this.paper.clientWidth, this.paper.clientHeight);
     this.Render();
     this.tabs.find(tab => tab.dataset.about === this.selected)?.focus({ preventScroll: true });
   }
+
+  Dispose() { this.paperObserver.disconnect(); }
 }

@@ -1468,6 +1468,7 @@ export class MainMenu {
   }
 
   Dispose() {
+    this.about.Dispose();
     this.historyCodex.Hide();
     document.removeEventListener("keydown", this.onKey);
     this.root.removeEventListener("keydown", this.onNativeKey);
