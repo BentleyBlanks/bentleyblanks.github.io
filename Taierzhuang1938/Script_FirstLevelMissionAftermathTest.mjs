@@ -142,31 +142,57 @@ try {
   // hold the new tier's index ranges (r185's setGeometryIdAt alone leaves the old ranges in place).
   const batches=await page.evaluate(async()=>{
     const g=window.Tengxian,a=g.Debug.FirstLevelMissionRuntime().view.aftermath,T=await import("three");
+    const depth=new T.MeshDepthMaterial();
     const Check=()=>{
-      let expected=0,actual=0,shownBatches=0;
+      let expected=0,actual=0,shownBatches=0,shadowExpected=0,shadowActual=0,shadowIdsOk=true,castFlagOk=true,casterInstances=0;
+      // 2026-10-14 near / far 并成一只之后，阴影趟只能画第 0 档的实例：逐批核对阴影趟出的表。
+      const wantIds=new Map(a.batches.map(batch=>[batch,new Set()]));
+      for(const instance of a.instances)instance.prototype.parts.forEach((part,p)=>{
+        const want=part.tierSlots[instance.tier];
+        if(want)for(const slot of instance.slots[p])if(slot.on&&slot.batch===want.batch){
+          expected+=want.geometry.index.count;
+          if(instance.tier===0){shadowExpected+=want.geometry.index.count;wantIds.get(slot.batch).add(slot.id);casterInstances++;}
+        }
+      });
       for(const batch of a.batches){
         const mesh=batch.mesh;
+        mesh.onBeforeShadow(g.renderer,mesh,g.camera,g.camera,mesh.geometry,depth);
+        const ids=new Set();
+        for(let i=0;i<mesh._multiDrawCount;i++){shadowActual+=mesh._multiDrawCounts[i];ids.add(mesh._indirectTexture.image.data[i]);}
+        const want=wantIds.get(batch);
+        if(ids.size!==want.size||[...ids].some(id=>!want.has(id)))shadowIdsOk=false;
+        if(mesh.castShadow!==(want.size>0))castFlagOk=false;
+        // 阴影趟之后紧跟的主画面 / 预通道要重新拿到全表。
         mesh.onBeforeRender(g.renderer,g.scene,g.camera,mesh.geometry,mesh.material);
         for(let i=0;i<mesh._multiDrawCount;i++)actual+=mesh._multiDrawCounts[i];
         if(mesh.visible)shownBatches++;
       }
-      for(const instance of a.instances)instance.prototype.parts.forEach((part,p)=>{
-        const want=part.tierSlots[instance.tier];
-        if(want)for(const slot of instance.slots[p])if(slot.on&&slot.batch===want.batch)expected+=want.geometry.index.count;
-      });
-      return {expected,actual,shownBatches,tiers:{...a.visible}};
+      return {expected,actual,shownBatches,shadowExpected,shadowActual,shadowIdsOk,castFlagOk,casterInstances,tiers:{...a.visible}};
     };
     const first=a.instances[0],near=new T.Vector3(first.x,0,first.z);
     a.Update(near);const atNear=Check();
     a.Update(new T.Vector3(first.x+2000,0,first.z));const atFar=Check();
     a.Update(near);const back=Check();
-    return {atNear,atFar,back,batches:a.batches.length,meshes:a.root.children.filter(o=>o.isBatchedMesh).length};
+    // 同一种材质 + 同一张属性表只能有一只批次（near / far 已并成一只）。
+    const keys=a.batches.map(batch=>batch.key);
+    return {atNear,atFar,back,batches:a.batches.length,meshes:a.root.children.filter(o=>o.isBatchedMesh).length,
+      uniqueKeys:new Set(keys).size,materials:new Set(a.batches.map(batch=>batch.material.uuid)).size};
   });
   console.log(JSON.stringify(batches));
   for(const key of ["atNear","atFar","back"])
     assert.ok(batches[key].expected>0&&batches[key].actual===batches[key].expected,`${key}: submitted index ranges follow the current tier`);
   assert.ok(batches.atFar.tiers.detail===0&&batches.atNear.tiers.detail>0,"moving away drops every body out of the detail tier");
-  assert.ok(batches.batches===batches.meshes,"one BatchedMesh per material and near/far group");
+  assert.ok(batches.batches===batches.meshes,"one BatchedMesh per batch record");
+  assert.equal(batches.uniqueKeys,batches.batches,"near and far tiers share one BatchedMesh per material and attribute table");
+  assert.ok(batches.batches<batches.materials*2,"merging near/far leaves fewer batches than the old two-per-material split");
+  // 阴影趟：只画第 0 档的实例（远档不投影），castShadow 跟着「有没有投影者」走；换档后主画面再拿全表。
+  for(const key of ["atNear","atFar","back"]){
+    assert.equal(batches[key].shadowActual,batches[key].shadowExpected,`${key}: shadow pass submits only the detail-tier index ranges`);
+    assert.ok(batches[key].shadowIdsOk,`${key}: shadow pass draws exactly the detail-tier instances`);
+    assert.ok(batches[key].castFlagOk,`${key}: castShadow follows whether the batch has detail-tier instances`);
+  }
+  assert.ok(batches.atNear.casterInstances>0&&batches.atNear.shadowActual>0&&batches.atNear.shadowActual<batches.atNear.actual,"near bodies cast shadows but far-tier bodies in the same mesh do not");
+  assert.ok(batches.atFar.casterInstances===0&&batches.atFar.shadowActual===0,"nothing casts when every body is beyond the detail tier");
   for(const shot of [
     {id:"CorpseRoad",x:-35.75,z:36.9,yaw:Math.PI/4,pitch:-.38},
     {id:"CorpseFormerFloating",x:-10.87,z:-146.9,yaw:Math.PI/4,pitch:-.38},

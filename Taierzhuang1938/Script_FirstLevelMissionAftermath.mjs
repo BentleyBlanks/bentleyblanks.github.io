@@ -46,6 +46,13 @@ import { CreateBodyContactShape, MissionBodySupport } from "./Script_FirstLevelM
 // 【2026-09-28 按材质合批】上面两笔账都是「一只网格一个 draw」的前提。现在每种材质只有 near / far
 // 两只 BatchedMesh（见 BuildBatches），同一种材质不论多少姿势、第 1 档还是第 2 档都在一个 multi-draw
 // 里：加档不再加 draw，只加几何。第一关同屏 draw 由每趟约 103 降到 29 种材质以内。
+//
+// 【2026-10-14 near / far 并成一只】上一笔把一种材质拆成 near（第 0 档，唯一投影的一档）与 far（其余档）两只，
+// 是为了让阴影趟只画近处的尸体。代价是同一种材质每趟 render 要提交两次：04 前沿机枪位一帧 136 个 draw
+// （主画面 47、预通道 47、阴影 42）里近一半是这种「同材质两只」。现在同一种材质 + 同一张属性表只留一只
+// BatchedMesh（属性表不同的批次本来也是不同的 program，仍分开），阴影趟靠 `InstallCasterFirstDrawList`
+// 只画「投影的那几具」：multi-draw 表按「投影者在前」排好，阴影趟把绘制数截到投影者个数，
+// 主画面 / 预通道画全表 —— 三趟共用一张表、一次上传，远档尸体仍然不进阴影图。
 const TIERS = C.aftermathTiers.length;
 const _frustum = new THREE.Frustum();
 const _matrix = new THREE.Matrix4();
@@ -117,10 +124,11 @@ export class MissionAftermath {
    * 【2026-09-28 按材质合批】原来每个「姿势 × 分件 × 档」一只 InstancedMesh（第一关 145 只，同屏画
    * 103 只却只有 29 种材质）：05 战车段每帧预通道 + 主场景 + 阴影合计约 240 个 draw，占渲染提交两成，
    * 而那一帧卡在 CPU 提交（每个 draw 约 21 µs）。现在每种材质两只 BatchedMesh（一趟一个 multi-draw）：
-   * near 只放第 0 档 —— 唯一投影的一档，far 放其余各档。一具尸体的每个分件在它用到的每只批次里各占一个
-   * 实例，矩阵开机写一次；换档只换几何号、出入视锥只换显隐（见 Update）。
+   * 2026-10-14 起 near / far 并成一只（同一种材质 + 同一张属性表）：一具尸体的每个分件在它用到的每只批次里
+   * 占一个实例，矩阵开机写一次；换档只换几何号、出入视锥只换显隐，第 0 档的实例才进阴影趟（见 Update 与
+   * `InstallCasterFirstDrawList`）。
    * 几何号表挂在分件上：`part.tierSlots[tier] = {batch, geometryId}`，合点后一个三角都不剩的档是 null。
-   * @returns {Array<{mesh: THREE.BatchedMesh, material: THREE.Material, near: boolean, shown: number}>}
+   * @returns {Array<{mesh: THREE.BatchedMesh, material: THREE.Material, key: string, shown: number, casters: number}>}
    */
   BuildBatches(){
     const batches=[],byKey=new Map();
@@ -132,9 +140,9 @@ export class MissionAftermath {
       part.tierSlots=part.tiers.map((geometry,tier)=>{
         // 最远那一档合点之后有的分件一个三角都不剩（眼睛、帽徽）：不进批次，那一档就不画它。
         if(!(part.triangles[tier]>0))return null;
-        const near=tier===0,key=`${part.material.uuid}|${near}|${Signature(geometry)}`;
+        const key=`${part.material.uuid}|${Signature(geometry)}`;
         let batch=byKey.get(key);
-        if(!batch){batch={material:part.material,near,geometries:[],ids:new Map(),instances:0,mesh:null,shown:0};byKey.set(key,batch);batches.push(batch);}
+        if(!batch){batch={material:part.material,key,geometries:[],ids:new Map(),instances:0,mesh:null,shown:0,casters:0,casts:null};byKey.set(key,batch);batches.push(batch);}
         if(!batch.ids.has(geometry)){batch.ids.set(geometry,-1);batch.geometries.push(geometry);}
         return {batch,geometry,geometryId:-1};
       });
@@ -147,13 +155,18 @@ export class MissionAftermath {
         const count=geometry.attributes.position.count;vertices+=count;indices+=geometry.index?geometry.index.count:count;
       }
       const mesh=new THREE.BatchedMesh(Math.max(1,batch.instances),Math.max(1,vertices),Math.max(1,indices),batch.material);
-      mesh.name=`MissionAftermath_${i}_${batch.near?"near":"far"}`;
+      mesh.name=`MissionAftermath_${i}`;
       // 逐具的视锥与距离档在 Update 里一次算好（只在相机挪动 / 转向后），三趟 render 不再各剔一遍。
       mesh.frustumCulled=false;mesh.perObjectFrustumCulled=false;mesh.sortObjects=false;
-      // 只有最近那一档投阴影（`ACTOR_DETAIL.shadowM` 以外的尸体在阴影图里看不见）。
-      mesh.castShadow=batch.near;mesh.receiveShadow=true;mesh.visible=false;
+      // 只有第 0 档的实例投阴影（`ACTOR_DETAIL.shadowM` 以外的尸体在阴影图里看不见）：castShadow 跟着
+      // 「这一批现在有没有投影者」走（见 Update），阴影趟画哪几个实例由 InstallCasterFirstDrawList 管。
+      mesh.castShadow=false;mesh.receiveShadow=true;mesh.visible=false;
+      // 预热那一帧要让每只批次都投一次影，好把批次版深度变体编出来（Script_Main.WarmLevel 认这个标记）。
+      mesh.userData.warmCastShadow=true;
       for(const geometry of batch.geometries)batch.ids.set(geometry,mesh.addGeometry(geometry));
-      batch.mesh=mesh;this.root.add(mesh);
+      batch.mesh=mesh;batch.casts=new Uint8Array(Math.max(1,batch.instances));
+      InstallCasterFirstDrawList(batch);
+      this.root.add(mesh);
     });
     for(const prototype of this.prototypes.values())for(const part of prototype.parts)
       for(const slot of part.tierSlots)if(slot)slot.geometryId=slot.batch.ids.get(slot.geometry);
@@ -163,7 +176,7 @@ export class MissionAftermath {
         const first=part.tierSlots.find(slot=>slot?.batch===batch);
         const id=batch.mesh.addInstance(first.geometryId);
         batch.mesh.setMatrixAt(id,instance.matrix);batch.mesh.setVisibleAt(id,false);
-        return {batch,id,geometryId:first.geometryId,on:false};
+        return {batch,id,geometryId:first.geometryId,on:false,cast:false};
       }));
     }
     return batches;
@@ -195,7 +208,7 @@ export class MissionAftermath {
       .map(t=>({enter:t.enterM**2,exit:t.exitM**2})));
     const shadow=ACTOR_DETAIL.shadowM**2;
     const visible=this.visible;for(const key in visible)visible[key]=0;
-    for(const batch of this.batches)batch.shown=0;
+    for(const batch of this.batches){batch.shown=0;batch.casters=0;}
     for(const prototype of this.prototypes.values()){
       const parts=prototype.parts;
       for(const instance of prototype.members){
@@ -215,21 +228,23 @@ export class MissionAftermath {
         for(let p=0;p<parts.length;p++){
           const want=shown?parts[p].tierSlots[tier]:null,slots=instance.slots[p];
           for(let s=0;s<slots.length;s++){
-            const slot=slots[s],on=!!want&&want.batch===slot.batch;
+            const slot=slots[s],on=!!want&&want.batch===slot.batch,cast=on&&tier===0;
             if(on&&slot.geometryId!==want.geometryId){
               // r185 的 setGeometryIdAt 只改号不标脏，multi-draw 表不重排就还画旧档：手动标一下。
               slot.batch.mesh.setGeometryIdAt(slot.id,want.geometryId);slot.batch.mesh._visibilityChanged=true;
               slot.geometryId=want.geometryId;
             }
             if(on!==slot.on){slot.batch.mesh.setVisibleAt(slot.id,on);slot.on=on;}
-            if(on)slot.batch.shown++;
+            // 投影者标记也决定 multi-draw 表的排序，变了同样要让下一趟重排。
+            if(cast!==slot.cast){slot.cast=cast;slot.batch.casts[slot.id]=cast?1:0;slot.batch.mesh._visibilityChanged=true;}
+            if(on){slot.batch.shown++;if(cast)slot.batch.casters++;}
           }
         }
         if(shown)visible[TierName(tier)]++;
       }
     }
-    // 空批次整只退出渲染列表：不然一趟不画像素的 setProgram 照样要付。
-    for(const batch of this.batches)batch.mesh.visible=batch.shown>0;
+    // 空批次整只退出渲染列表：不然一趟不画像素的 setProgram 照样要付；没有投影者的批次也不进阴影趟。
+    for(const batch of this.batches){batch.mesh.visible=batch.shown>0;batch.mesh.castShadow=batch.casters>0;}
   }
   Bake(factory,spec){return BakeMissionBody(factory,spec,this.materials);}
   Dispose(){
@@ -242,6 +257,53 @@ export class MissionAftermath {
     for(const texture of this.owned.textures)texture.dispose();
     this.owned.textures.length=0;this.mergeCache.clear();
   }
+}
+
+/**
+ * 给一只尸体 BatchedMesh 换上「投影者在前」的 multi-draw 表。
+ *
+ * three 自带的 `BatchedMesh.onBeforeRender` 按实例号顺序出表，没法让阴影趟只画其中一部分；而尸体层把
+ * near / far 并成一只之后，阴影趟只该画第 0 档的那几具。做法：表按「投影者先、其余后」排好，
+ * `onBeforeRender`（主画面 / 预通道）画全表，`onBeforeShadow`（每个级联一次）把绘制数截到投影者个数。
+ * 表只在实例显隐 / 几何号 / 投影标记变了之后（`_visibilityChanged`）重排一次，三趟共用，
+ * 间接纹理一帧至多上传一次。尸体层这只网格关了逐实例视锥剔除与排序（Update 已经按相机剔过），
+ * 所以表里没有任何随相机变的东西；材质开了 wireframe 这种用不到的路径交还给 three 原实现。
+ * `batch.casts[实例号]` 由 Update 写；`_multiDrawCount` 等字段是 three r185 BatchedMesh 的内部字段，
+ * 与同文件 Update 里改 `_visibilityChanged` 同一口径（vendor 里的 three 是钉死版本）。
+ * @param {{mesh: THREE.BatchedMesh, casts: Uint8Array}} batch
+ */
+function InstallCasterFirstDrawList(batch){
+  const mesh=batch.mesh,base=THREE.BatchedMesh.prototype;
+  let total=0,casters=0,built=false,stock=false;
+  mesh.onBeforeRender=function(renderer,scene,camera,geometry,material){
+    if(material?.wireframe){
+      // 三倍步长 / 线框索引那套留给 three 原实现，整表重排；回到普通材质时必须重建自己的表。
+      built=false;stock=true;this._visibilityChanged=true;
+      return base.onBeforeRender.call(this,renderer,scene,camera,geometry,material);
+    }
+    if(!built||stock||this._visibilityChanged){
+      const index=geometry.getIndex(),bytes=index===null?1:index.array.BYTES_PER_ELEMENT;
+      const info=this._instanceInfo,geometryInfo=this._geometryInfo,starts=this._multiDrawStarts,counts=this._multiDrawCounts,
+        indirect=this._indirectTexture.image.data,casts=batch.casts;
+      let n=0;
+      for(let pass=0;pass<2;pass++){
+        for(let i=0,l=info.length;i<l;i++){
+          const item=info[i];
+          if(!item.visible||!item.active||(casts[i]===1)!==(pass===0))continue;
+          const g=geometryInfo[item.geometryIndex];
+          starts[n]=g.start*bytes;counts[n]=g.count;indirect[n]=i;n++;
+        }
+        if(pass===0)casters=n;
+      }
+      total=n;built=true;stock=false;this._visibilityChanged=false;this._indirectTexture.needsUpdate=true;
+    }
+    this._multiDrawCount=total;
+  };
+  mesh.onBeforeShadow=function(renderer,object,camera,shadowCamera,geometry,depthMaterial,group){
+    // 走原型上的（预热时 `WithShadowDepthRekey` 包过的）实现：它会调 this.onBeforeRender 出表并重取深度程序键。
+    base.onBeforeShadow.call(this,renderer,object,camera,shadowCamera,geometry,depthMaterial,group);
+    this._multiDrawCount=casters;
+  };
 }
 
 /** 档位名（预算报表与 `FirstLevelMissionPresentationTest` 用的就是这三个名字）。 */

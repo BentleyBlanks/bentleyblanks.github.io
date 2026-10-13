@@ -5644,7 +5644,7 @@ composite 的抖动都跟着帧号走，多推一帧就整屏差 ~3/255。§17.1
 | 项 | 改法 | 位置 |
 | --- | --- | --- |
 | 日军 `Material #47`（脸上 44 三角，BLEND + 双面） | three 对「透明 + 双面」每次拆两趟、每趟 `needsUpdate`；人物接材质时置 `forceSinglePass`，尸体层 / 人群的克隆照抄；第一人称枪口焰同理 | `Script_CharacterModel` / `Script_Viewmodel` |
-| 尸体层 | 每种材质 near / far 两只 BatchedMesh | `Script_FirstLevelMissionAftermath.BuildBatches` |
+| 尸体层 | 每种材质 near / far 两只 BatchedMesh（2026-10-14 起并成一只，阴影趟只画第 0 档，见 §17.19） | `Script_FirstLevelMissionAftermath.BuildBatches` |
 | 远景人群 | 「kind × 材质」一只 BatchedMesh，姿势桶只当数据 | `Script_ActorCrowd`，`docs/Data_ActorCrowdLod.md` §4.5 |
 | 燃烧残骸 | 64 m 分区 → 全场按材质各一只（168 → 7 只，8.7 万三角） | `Script_FirstLevelSmokeOrigins` |
 | 地形融合 | 只在结构变了时整场景找源（§1.4.1 那段） | `Script_TerrainBlend` + `PrepassPass.structureGeneration` |
@@ -5752,6 +5752,24 @@ CaptiveWall 12.5 → 12.1 ms、Charge 16.8 → 16.7 ms，尸体 draw 30 → 18�
 * CaptiveWall 剩下的差距：机枪组两人各约 0.5 ms 的 `Actor.Update`（与场上其他细节档人物同价，dt = 0 也照算）与 SweepVictim、刺刀、汉阳造道具的 draw；
   再压就得动人物动画或 CPU 提交的通用开销（定帧剖析里 `updateMatrixWorld` / `updateWorldMatrix` 自身约 3 ms），不在本轮范围。
 * 机枪组两人仍是 8 + 12 个 draw（蒙皮分件按材质，各自的枪由 clip 画、自带的枪藏着）；歪把子五个 GLB 分件五种材质，合要烘图集，第一次取用时现烘会在玩法中途卡一下，没做。
+
+### 17.19 第一关战斗帧 CPU 优化（2026-10-14）：尸体层 near / far 并一只、深度 override 按种类分份、任务射线降频
+
+取证机位：`?whitebox=p012&shot=1&quality=high&missionStage=4` + `PoseView("front")`（04 前沿机枪位朝北，3394×1348），
+安静机器、无 Profiler，渲染提交约 9 ms / 帧；一帧 draw：主画面 196、预通道 183、阴影 ~70，其中尸体批次约 136 个
+（主画面 47 = near 21 + far 26，预通道 47，阴影 42）。
+
+**尸体层 near / far 并一只**（`Script_FirstLevelMissionAftermath.BuildBatches` / `InstallCasterFirstDrawList`）：
+
+* §17.16 为了让阴影趟只画近处的尸体，把一种材质拆成 near（第 0 档）/ far 两只 BatchedMesh；代价是同一种材质每趟要提交两次。
+  现在同一种材质 + 同一张属性表只留一只（属性表不同的批次本来也是不同的 program，仍分开：54 只 → 约 28 只）。
+* 阴影趟怎么只画第 0 档：three 自带的 `BatchedMesh.onBeforeRender` 按实例号出 multi-draw 表，没法画一部分。这里给每只批次换上
+  自己的出表函数：表按「投影者（第 0 档）在前、其余在后」排好，`onBeforeRender`（主画面 / 预通道）画全表，
+  `onBeforeShadow`（每个级联一次）把 `_multiDrawCount` 截到投影者个数。表只在显隐 / 几何号 / 投影标记变了之后重排一次，
+  三趟共用，间接纹理一帧至多上传一次。远档尸体照旧不进阴影图，画面不变。
+* `castShadow` 跟着「这一批现在有没有投影者」开关（没人投影的批次不进阴影趟，省掉空 draw 的 setProgram）；
+  `userData.warmCastShadow` 让 `WarmLevel` 的全场强制出画帧临时全开，批次版深度变体照旧在预热里取键。
+* 回归口：`Script_FirstLevelMissionAftermathTest` 核对阴影趟出的表恰好是第 0 档实例、换档后主画面拿回全表。
 
 ## 18. 预热账：进过场与开机的着色器编译
 

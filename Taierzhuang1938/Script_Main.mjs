@@ -5115,9 +5115,12 @@ async function WarmLevel(phase) {
         body.position.copy(player.position);
         if (!body.visible) { hiddenGroups.push(body); body.visible = true; }
       }
-      const culled = [], hidden = [], instanced = [];
+      const culled = [], hidden = [], instanced = [], warmCast = [];
       scene.traverse((object) => {
         if (!(object.isMesh || object.isPoints || object.isSprite || object.isLine)) return;
+        // userData.warmCastShadow：平时按需开关 castShadow 的网格（尸体层 BatchedMesh 没有投影者时关着），
+        // 预热这一帧临时开着，阴影趟才会给它的深度变体取键（WithShadowDepthRekey），开局不现编。
+        if (object.userData?.warmCastShadow && !object.castShadow) { warmCast.push(object); object.castShadow = true; }
         if (object.frustumCulled) { culled.push(object); object.frustumCulled = false; }
         if (object.isInstancedMesh) {
           if (!object.visible || object.count === 0) { instanced.push({ object, count: object.count, visible: object.visible }); object.visible = true; object.count = Math.max(1, object.count); }
@@ -5146,6 +5149,7 @@ async function WarmLevel(phase) {
         report.terrainTrails = post?.terrainTrailsPass?.Warm(renderer) ?? false;
       } finally {
         for (const object of culled) object.frustumCulled = true;
+        for (const object of warmCast) object.castShadow = false;
         for (const object of hidden) object.visible = false;
         for (const entry of instanced) { entry.object.count = entry.count; entry.object.visible = entry.visible; }
         for (const object of hiddenGroups) object.visible = false;
