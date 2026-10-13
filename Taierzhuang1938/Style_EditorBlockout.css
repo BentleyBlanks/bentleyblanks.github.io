@@ -32,7 +32,7 @@
 }
 .boRoot *, .boRoot *::before, .boRoot *::after { box-sizing: border-box; }
 .boRoot [hidden] { display: none !important; }
-.boRoot :is(.boCard, .boTopBar, .boMini, .boNav, .boMapOverlay.open) { pointer-events: auto; }
+.boRoot :is(.boCard, .boTopBar, .boMini, .boNav, .boMusic, .boMapOverlay.open) { pointer-events: auto; }
 .boRoot.inert, .boRoot.inert * { pointer-events: none !important; }
 .boRoot.inert [data-tip]::after { display: none; }
 
@@ -339,6 +339,61 @@
 .boToast.warn .boToastMark { background: var(--bo-gold); }
 .boToast.error .boToastMark { background: var(--bo-bad); }
 
+/* --- 右上：配乐试听（Script_EditorBlockoutMusic）：胶囊 + 下拉面板 ------------------ */
+.boMusic {
+  position: absolute; top: 56px; right: 16px; width: 330px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+}
+.boMusicPill {
+  height: 28px; max-width: 100%; padding: 0 10px 0 8px; gap: 7px; justify-content: flex-start;
+  background: var(--bo-panel); border: 1px solid var(--bo-line);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  color: var(--bo-text); font-size: 12px;
+}
+.boMusicPill:hover { border-color: var(--bo-line-strong); background: var(--bo-panel); }
+.boMusicPillText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boMusicIcon { display: inline-flex; color: var(--bo-muted); }
+.boMusicIcon svg { width: 14px; height: 14px; }
+.boMusic.playing .boMusicIcon { color: var(--bo-gold); }
+.boMusicPanel { display: none; width: 100%; padding: 8px 10px 9px; }
+.boMusic.open .boMusicPanel { display: block; }
+.boMusicHead { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--bo-line); }
+.boMusicModes { display: flex; border: 1px solid var(--bo-line); }
+.boMusicMode { height: 24px; padding: 0 10px; font-size: 12px; color: var(--bo-muted); }
+.boMusicMode + .boMusicMode { border-left: 1px solid var(--bo-line); }
+.boMusicMode.on { color: var(--bo-gold); background: rgba(223, 189, 104, 0.1); }
+.boMusicVol { flex: 1 1 auto; min-width: 0; height: 16px; margin: 0; accent-color: var(--bo-gold); cursor: pointer; }
+.boMusicRow { display: flex; align-items: flex-start; gap: 6px; padding: 7px 0 6px; border-bottom: 1px solid var(--bo-line); }
+.boMusicRowBody { flex: 1 1 auto; min-width: 0; }
+.boMusicRowTop { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.boMusicTag { flex: 0 0 auto; font-size: 11.5px; color: var(--bo-faint); letter-spacing: 0.04em; width: 3.2em; }
+.boMusicTitle { flex: 1 1 auto; min-width: 0; color: var(--bo-text); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boMusicRow.none .boMusicTitle { color: var(--bo-muted); font-weight: 400; }
+.boMusicRow.on .boMusicTag, .boMusicRow.on .boMusicTitle { color: var(--bo-gold); }
+.boMusicMeta { flex: 0 0 auto; font: 11px/1.4 var(--bo-num); color: var(--bo-muted); }
+.boMusicWhy { margin: 2px 0 0 calc(3.2em + 6px); font-size: 12px; line-height: 1.45; color: var(--bo-muted); }
+.boMusicPlay { width: 26px; height: 26px; flex: 0 0 auto; border-color: var(--bo-line); }
+.boMusicPlay svg { width: 12px; height: 12px; }
+.boMusicRow.on .boMusicPlay { color: var(--bo-gold); border-color: rgba(223, 189, 104, 0.5); }
+.boMusicClock { min-height: 17px; padding-top: 5px; font: 11px/1.5 var(--bo-num); color: var(--bo-faint); }
+.boMusicLib { margin-top: 4px; }
+.boMusicLib summary { cursor: pointer; font-size: 12px; color: var(--bo-muted); padding: 2px 0; }
+.boMusicLib summary:hover { color: var(--bo-bright); }
+.boMusicLibList { max-height: 40vh; overflow-y: auto; margin-top: 4px; }
+.boMusicLibHead { font-size: 11px; color: var(--bo-faint); letter-spacing: 0.06em; padding: 6px 0 2px; }
+.boMusicLibItem {
+  display: flex; align-items: center; gap: 7px; width: 100%; padding: 3px 4px; margin: 0;
+  border: 0; background: transparent; color: var(--bo-text); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+}
+.boMusicLibItem:hover { background: rgba(214, 217, 209, 0.07); }
+.boMusicLibItem.on { color: var(--bo-gold); }
+.boMusicLibItem.missing { opacity: 0.45; }
+.boMusicLibIcon { display: inline-flex; flex: 0 0 auto; color: var(--bo-muted); }
+.boMusicLibItem.on .boMusicLibIcon { color: var(--bo-gold); }
+.boMusicLibIcon svg { width: 11px; height: 11px; }
+.boMusicLibTitle { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boMusicLibNote { flex: 0 0 auto; font-size: 11px; color: var(--bo-faint); }
+
 /* --- 窄屏（≤ 1366 px）：卡片与小地图收一点，导航栏不碰小地图 ------------------ */
 @media (max-width: 1366px) {
   .boCard { width: 352px; }
@@ -355,7 +410,7 @@
 body.blockoutMode #hud :is(.hudTop, .hudBrief, .hudTitle, .hudSubtitle, .hudMinimap, .hudMarkers,
   .hudMissionGuide, .hudMissionArea, .hudMissionReturn, .hudForceStatus, .hudHint, .hudActions,
   .hudNote, .hudEpilogue, .hudCinematicPrompt) { display: none !important; }
-body.blockoutMode #hud .hudFps { top: 56px; left: auto; right: 18px; }
+body.blockoutMode #hud .hudFps { top: 96px; left: auto; right: 18px; }
 
 /* --- 小窗口（应用内浏览器面板、半屏窗口）：收紧尺寸，导航栏占满小地图右边的底边 ---------------- */
 @media (max-width: 1099px), (max-height: 719px) {
@@ -381,11 +436,13 @@ body.blockoutMode #hud .hudFps { top: 56px; left: auto; right: 18px; }
 /* 高度不够时卡片只留「此时 / 下一步」，提示标签与备注让给小地图 */
 @media (max-height: 600px) {
   .boHow, .boNotes { display: none; }
+  .boMusicWhy { display: none; }
 }
 /* 很窄时右上那条挪到齿轮下面，不压左上的卡片 */
 @media (max-width: 899px) {
   .boTopBar { top: 62px; right: 14px; }
   .boLevelBtn { min-width: 0; max-width: 150px; }
-  body.blockoutMode #hud .hudFps { top: 104px; }
+  body.blockoutMode #hud .hudFps { top: 144px; }
+  .boMusic { top: 104px; }
 }
 
