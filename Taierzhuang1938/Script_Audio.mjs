@@ -300,6 +300,8 @@ function BattleEventVolume(x) {
  * 20 ms 淡出 —— 硬掐会「咔」一声，而 20 ms 已经短到听不出是被掐掉的。
  */
 const STEAL_FADE_S = 0.02;
+/** 暂停 / 继续时常驻循环（战车、飞机引擎）的淡出淡入时长（见 AudioEngine.PauseLoops）。 */
+const PAUSE_LOOP_FADE_S = 0.15;
 /** 一次 Play 最多偷几条。偷到第四条还不够说明预算本身设错了，不该在这儿死磕。 */
 const STEAL_MAX_PER_PLAY = 3;
 /**
@@ -6458,7 +6460,41 @@ export class AudioEngine {
       if (saved.ambience && saved.ambience !== "silence") this.Ambience(saved.ambience);
       if (saved.music) this.Music(saved.music);
     }
+    this.PauseLoops(next);
     return this.paused;
+  }
+
+  /**
+   * 常驻循环（战车三条、飞机引擎）跟着暂停静音。
+   *
+   * 它们是 Play 起的 voice，不归背景层管；玩法停了没人再 SetTank / StopVoice，
+   * 于是「暂停了战车还在轰」。这里只把 v.out 淡到零、继续时淡回原值 —— 不停 voice：
+   * 停了再起会重新渐起（03 先闻其声那一段），播放头也接不上。
+   * 暂停期间被 StopVoice 的照常淡出收掉（它自己会 cancel 掉这里排的值），恢复时跳过。
+   */
+  PauseLoops(on) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    if (on) {
+      this.pausedLoops = [];
+      for (const v of this.pendingVoices) {
+        if (!v.loop || v.stopping || !v.out?.gain) continue;
+        const g = v.out.gain, level = g.value;
+        g.cancelScheduledValues(t);
+        g.setValueAtTime(level, t);
+        g.setTargetAtTime(0, t, PAUSE_LOOP_FADE_S / 4);
+        this.pausedLoops.push({ v, level });
+      }
+      return;
+    }
+    for (const { v, level } of this.pausedLoops || []) {
+      if (v.stopping || !v.nodes?.length || !v.out?.gain) continue;
+      const g = v.out.gain;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(g.value, t);
+      g.setTargetAtTime(level, t, PAUSE_LOOP_FADE_S / 4);
+    }
+    this.pausedLoops = null;
   }
 
   /**
