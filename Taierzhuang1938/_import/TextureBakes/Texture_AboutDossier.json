@@ -1,0 +1,18 @@
+{
+  "generator": "Script_EncodeAboutDossier.py",
+  "date": "2026-10-13",
+  "source": {
+    "path": "C:\\Users\\Bentl\\.codex\\generated_images\\01a132fe-628b-72e0-9711-9f33d456767e\\exec-46ead6d0-df5d-46ed-a68e-678f878f5dc1.png",
+    "sha256": "6dd9d2d4a4bf00ae277da334614f06a5a8da28dca76057845936908e57d73454"
+  },
+  "outputs": [
+    {
+      "file": "Texture_AboutDossierImage.webp",
+      "width": 1402,
+      "height": 1122,
+      "bytes": 199008,
+      "sha256": "abf12c858f13ec041db6376443f0a7c7287683849b446fd2725fb3af3de15f90"
+    }
+  ],
+  "encoding": "sRGB WebP quality 88, preserved alpha; no text baked into art"
+}

@@ -29,7 +29,7 @@ try {
     await page.evaluate(m => window.Taierzhuang.menu.Show(m), mode);
     await Settled(mode);
     if (mode === "levels") await page.waitForFunction(() => [...document.querySelectorAll(".mnPanel img")].filter(i => i.offsetParent).every(i => i.complete && i.naturalWidth));
-    const sharpUi = await page.locator(".mnPanelTitle").evaluate(el => {
+    const sharpUi = await page.locator(mode === "codex" ? ".hcHeader h1" : ".mnPanelTitle").evaluate(el => {
       const styles = [];
       for (let p = el; p; p = p.parentElement) styles.push(getComputedStyle(p).filter);
       return styles.every(v => v === "none");

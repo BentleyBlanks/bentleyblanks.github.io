@@ -1,18 +1,20 @@
 // Independent position, wrist rotation, insertion and grip. No wax selection or
 // motion animation belongs to input: contact is resolved by the visible tool.
-export function CreatePrecisionInput({canvas,Enabled,Cancel,SelectTool,ViewTray,Wake}) {
+export function CreatePrecisionInput({canvas,Enabled,Cancel,SelectTool,ViewTray,Wake,ToolScreen}) {
   const keys=new Set(),actions=new Set();
   let cursor=null,capture=null,rotating=false,dx=0,dy=0,depth=0,yaw=0,pitch=0;
+  let offset={x:0,y:0},pointerInside=false;
   const bindings=[];
   function Listen(target,name,handler,options){target.addEventListener(name,handler,options);bindings.push([target,name,handler,options]);}
-  function Point(event){return{x:event.clientX,y:event.clientY};}
-  function Reset(){keys.clear();actions.clear();cursor=null;rotating=false;dx=dy=depth=yaw=pitch=0;const id=capture;capture=null;if(id!=null&&canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
+  function Point(event){const rect=canvas.getBoundingClientRect();return{x:event.clientX-rect.left,y:event.clientY-rect.top};}
+  function Clutch(screen=ToolScreen()){if(cursor&&screen&&screen.z>-1&&screen.z<1)offset={x:screen.x-cursor.x,y:screen.y-cursor.y};}
+  function Reset(){keys.clear();actions.clear();cursor=null;offset={x:0,y:0};rotating=false;dx=dy=depth=yaw=pitch=0;const id=capture;capture=null;if(id!=null&&canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
   function Stop(){Reset();Cancel();}
-  Listen(canvas,'pointerenter',event=>{cursor=Point(event);});
-  Listen(canvas,'pointerleave',()=>{if(capture==null)cursor=null;});
+  Listen(canvas,'pointerenter',event=>{pointerInside=true;cursor=Point(event);offset={x:0,y:0};if(actions.size)Clutch();});
+  Listen(canvas,'pointerleave',()=>{pointerInside=false;if(capture==null)cursor=null;});
   Listen(canvas,'pointerdown',event=>{
     if(!Enabled()||event.isPrimary===false||![0,2].includes(event.button))return;
-    event.preventDefault();Wake();canvas.focus({preventScroll:true});cursor=Point(event);
+    event.preventDefault();Wake();canvas.focus({preventScroll:true});cursor=Point(event);pointerInside=true;
     if(event.button===0)actions.add('pointer');else rotating=true;
     capture=event.pointerId;canvas.setPointerCapture(capture);
   });
@@ -24,7 +26,7 @@ export function CreatePrecisionInput({canvas,Enabled,Cancel,SelectTool,ViewTray,
     cursor=next;
   });
   Listen(canvas,'pointerup',event=>{
-    if(event.button===0)actions.delete('pointer');if(event.button===2)rotating=false;
+    if(event.button===0)actions.delete('pointer');if(event.button===2){rotating=false;Clutch();}
     if(!actions.has('pointer')&&!rotating){const id=capture;capture=null;if(id!=null&&canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
   });
   Listen(canvas,'pointercancel',Stop);
@@ -51,12 +53,18 @@ export function CreatePrecisionInput({canvas,Enabled,Cancel,SelectTool,ViewTray,
   function Read(dt){
     if(!Enabled()){Reset();return{dx:0,dy:0,depth:0,yaw:0,pitch:0,roll:0,acting:false,rotating:false};}
     const fine=keys.has('ShiftLeft')||keys.has('ShiftRight'),scale=fine?.25:1;
-    const frame={dx:(dx+((keys.has('ArrowRight')?1:0)-(keys.has('ArrowLeft')?1:0))*80*dt)*scale,
-      dy:(dy+((keys.has('ArrowDown')?1:0)-(keys.has('ArrowUp')?1:0))*80*dt)*scale,
+    const keyX=((keys.has('ArrowRight')?1:0)-(keys.has('ArrowLeft')?1:0))*80*dt,keyY=((keys.has('ArrowDown')?1:0)-(keys.has('ArrowUp')?1:0))*80*dt;
+    const frame={aim:cursor&&!rotating&&!fine&&!keyX&&!keyY?{x:cursor.x+offset.x,y:cursor.y+offset.y}:null,
+      dx:((fine?dx:0)+keyX)*scale,dy:((fine?dy:0)+keyY)*scale,
       depth:(depth+((keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0))*3*dt)*scale,
       yaw:yaw*scale,pitch:pitch*scale,roll:((keys.has('KeyE')?1:0)-(keys.has('KeyQ')?1:0))*1.1*dt*scale,
       acting:actions.size>0,rotating,fine};
     dx=dy=depth=yaw=pitch=0;return frame;
   }
-  return{Read,Reset,Probe(){return{acting:actions.size>0,rotating,captured:capture!=null,keys:[...keys]};},Dispose(){Reset();for(const [target,name,handler,options]of bindings)target.removeEventListener(name,handler,options);}};
+  function SyncTool(screen,{constrained=false,transitioning=false}={}){
+    if(!cursor)return;
+    const clutch=rotating||keys.has('ShiftLeft')||keys.has('ShiftRight')||[...keys].some(key=>key.startsWith('Arrow'))||transitioning;
+    if(clutch||constrained&&Math.hypot(screen.x-cursor.x-offset.x,screen.y-cursor.y-offset.y)>.5)Clutch(screen);
+  }
+  return{Read,Reset,SyncTool,Probe(){return{acting:actions.size>0,rotating,captured:capture!=null,keys:[...keys],pointerInside,pointer:cursor?{...cursor}:null,offset:{...offset},aim:cursor?{x:cursor.x+offset.x,y:cursor.y+offset.y}:null};},Dispose(){Reset();for(const [target,name,handler,options]of bindings)target.removeEventListener(name,handler,options);}};
 }

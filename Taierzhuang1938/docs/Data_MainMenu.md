@@ -1,5 +1,39 @@
 # 主菜单与选章 —— 指挥室场景与线性任务列表
 
+## 关于页：档案卷宗（2026-10-13）
+
+用户选定 A 卷宗方案后，正式「关于」由 `Script_About.mjs` 展示四个分栏：
+关于作品、制作与鸣谢、史料与虚构、版权与授权。`Data_About.mjs` 管页面结构与来源链接，
+`Data_Text_About.mjs` 管可翻译文案；工作室署名为 **印河**，制作人为 **BB**。
+正文与链接均为 DOM，底图只含无字旧纸、文件夹及铜夹。仍显示当前指挥室或暂停背景，
+不创建另一份房间或下载战场、音频。新的纸图约 194 KiB，宋体正文子集约 56 KiB，均在打开关于时才请求。
+
+桌面左侧纵向标签，窄屏改横排标签；标准桌面四页各自一屏可读，窄屏与来源明细只滚动正文。
+标签支持方向键、Home/End 与 Tab，阅读区保留原生键盘滚动。Esc 或返回先收起来源明细，
+再返回菜单；「史实注记」可返回原来的关于分栏。减少动态效果时不引入翻页动画。
+来源页为有记录的条目节选，不把它描述成全资产授权审计；明细逐条链接到来源和许可。
+
+纸图由内置 imagegen 根据已确认方案生成（当次指定的 Lovart 在本机与插件目录均无可用入口），
+通过 `_import/Script_EncodeAboutDossier.py --source <生成原图.png>` 编码并保留 alpha；
+提示词、来源哈希与登记分别在 `_import/Prompts/Texture_AboutDossier.txt`、
+`_import/TextureBakes/Texture_AboutDossier.json` 和 `Data_TextureManifest.mjs`。
+参考图、验收截图及临时预览页只留本地。
+
+同日修复侧栏高窄窗口的文字遮挡：卷宗上下安全区按纸张的实际高度计算，正文起点避开
+铜夹，页脚避开破损纸边；正文和页脚由独立网格行分配空间。验收新增侧栏、竖向窗口、
+横屏与 760/761 像素断点，共九种视口，检查四页文字与装饰、页脚均不重叠。
+
+验收：`node Taierzhuang1938/Script_AboutBrowserTest.mjs` 覆盖四页、署名、懒加载、
+来源明细、键盘、史实页往返与窄屏/短屏；另跑 Text、ModuleGraph、TextureStandards、
+MenuStartup（源码与发布包）和菜单已有回归。
+
+本轮实测 AboutBrowser（源码与发布包）、MenuStartup（源码与发布包）、MenuPresentation、
+Text、TextGather、ModuleGraph、TextureStandards、PublishAssets 与 TestRunner 自测通过。
+quick / prepush 均在前 7 项通过后停于既有 `SpeakerGestureTest`：
+`FrontObservation.02: luo gestured on his previous line too`。该测试、手势表、对白表与前沿场景表
+均与发布基准 `origin/master` 一致，未改动或放宽断言，不宣称全游戏回归通过。
+注册关于页门禁时也补齐了既有 `FirstLevelScoreRedesign` 两份文件的 audio 领域映射；不改变音乐。
+
 ## 指挥室场景（2026-10-04）
 
 正式标题菜单现使用 `Script_CommandRoom.mjs` 加载 BlenderMCP 自建的
@@ -35,6 +69,7 @@ UV1 使用离线 xatlas 按实际表面连续性展开，并检查纸张正反�
 暂停、阵亡及进入游戏保留原场景和相机。
 
 标题菜单为开始、选章、史实注记、关于、设置五项；调试选项只放在设置内。
+史实注记已接入五类图文资料总览与详情阅读，人物／战役／文献／报刊／照片分别采用对应版式；素材来源、17页文献阅览器与复原说明入口见 [资料馆](Data_HistoryCodex.md)。
 选章、资料、关于、设置统一使用宋体标题、暖白文字、旧金竖条和半透明横条，
 标题态的二级页面及声音、画面、操作设置继续显示指挥室。关闭具体设置后回到
 设置目录，再返回原主菜单或暂停页。暂停继续保留真实战场和武器。
@@ -309,40 +344,41 @@ Profiler 独立窗口复制入口的主题样式 URL，与主页面使用同一�
 
 ## 选章
 
-选章按 2008《Call of Duty: World at War》的任务选择画面制作。
+选章保留 2008《Call of Duty: World at War》的纵向任务清单；2026-10-13 按用户选中的 imagegen 新版 03 落地大图与下缘简报，基础按钮与当前启动页一致。
 指定参考来自 [Notion「COD/战地 选关UI 参考」](https://www.notion.so/3cc60335331c8149be4cf97d4d9a1822)
 中的 2008 条目：[原始参考图](https://news.softpedia.com/images/extra/GAMES/large/COWAWtextscr_002-large.jpg)。
 该页末尾的旧推荐仍提及 WWII 地图；本次用户明确指定 World at War，现状以这里为准。
 
-- 全屏半透明渐变覆盖指挥室；左侧是紧凑的纵向文字任务列表。当前章节用金黄色文字与
-  淡灰横条标识，不再使用战区地图、地图节点、横向时间轴或缩略图卡。
-- 右侧是横向任务图，下方依次是金色任务名、日期地点、一句行动目标；底部显示真实的
-  章节通过记录。游戏没有难度完成档案，因此不照搬参考图中的最高难度或勋章。
+- 指挥室保留窗光与桌面，遮罩集中在文字区域；左侧六章纵向清单使用启动页的黑体、透明底、浅灰渐变选中条与左侧细金线。正式章节与测试列表分别显示，页脚「训练与测试」切换分组。
+- 右侧任务图扩大并在左右与下缘渐隐，白色宋体任务名、日期地点与行动目标叠放在画面下缘；「开始任务」与启动页按钮同样式，旁边保留真实的章节通过记录。游戏没有难度完成档案，不显示虚构难度、勋章或完成百分比。
 - 任务图片沿用菜单已有的原创资产；背景与标题页共用真实指挥室。
   参考截图仅用于内部比对，不放进发布资产。
-- 鼠标悬停或键盘焦点更新简报，单击条目或按 Enter 直接进入；七章全部可选。
+- 鼠标悬停或键盘焦点更新简报，单击条目或按 Enter 直接进入；开始按钮也能进入当前任务。六章按 `CAMPAIGN_ENTRIES` 显示，只有第一关可玩，其余占位章仍提示「敬请期待」，开始按钮不可用。
   原生返回按钮保留 Enter / Space 行为，Esc 回到打开选章前的主菜单或暂停菜单。
-- 窄屏将列表与简报上下排布，可垂直滚动；触控行保留足够点击高度，返回按钮固定在下栏。
+- 方向键只在当前显示的分组内移动；训练页按 Esc 或返回先回到此前章节，再按一次返回原主菜单或暂停页。窄屏将列表与简报上下排布，可垂直滚动；触控行至少 44px，返回与训练入口固定在下栏。
 
 进度仍读写 `tengxian1938_progress_v2`（`{ furthest, cleared }`）。
 测试入口不参与进度，默认选中项和主菜单“继续”只由正式战役决定。
 
 局部验收：`node Taierzhuang1938/Script_MenuTest.mjs --levels-only`。
-它复用正式页面与浏览器 TestKit，检查七章图片、真实鼠标/键盘行为、返回导航、
+它复用正式页面与浏览器 TestKit，检查六章图片、大图叠放、真实鼠标/键盘行为、开始按钮、分组切换与返回导航、
 桌面/笔记本/手机/窄横屏布局，并保存 `_shots/Scene_MissionList*.png`。
 完整菜单冒烟仍涵盖实际进入战役、过场、暂停、进度与沙盒往返。
 
-### 「测试场景」组：核心玩法沙盒与在验关卡白盒
+### 「测试场景」组：核心玩法沙盒
 
-正式章节之后隔一条分隔线，是「测试场景」组：
+由选章页脚「训练与测试」进入「测试场景」组；它与正式章节复用简报和开始按钮，条目仍来自宿主注入的沙盒列表：
 
 | 条目 | 标号 | 切片 | query |
 | --- | --- | --- | --- |
+| 操作交互测试场 | 跃 | `Data_MovementRange.MOVEMENT_RANGE_PHASE` | `?movement=1` |
 | 枪械白盒靶场 | 枪 | `Data_WeaponRange.WEAPON_RANGE_PHASE` | `?weapons=1` |
 | 玩法测试靶场 | 靶 | `Data_Range.RANGE_PHASE` | `?range=1` |
 | 爆炸测试场 | 爆 | `Data_ExplosionRange.EXPLOSION_RANGE_PHASE` | `?explosions=1` |
 | 白刃战 QTE 测试场 | 刃 | `Data_MeleeQte.MELEE_QTE_PHASE` | `?melee=1` |
-| 第一关 · P0/P1/P2 场景白盒 | 012 | `Data_FirstLevelP012Whitebox.FIRST_LEVEL_P012_WHITEBOX_PHASE` | `?whitebox=p012` |
+| 断肢测试场 | 肢 | `Data_GoreRange.GORE_RANGE_PHASE` | `?gore=1` |
+
+`?whitebox=p012` 是第一关的正式战役入口，不再作为测试条目重复列出。
 
 旧「第一关 · 全新策划白盒」已移除，旧 `?whitebox=1` 链接回到正式菜单。
 

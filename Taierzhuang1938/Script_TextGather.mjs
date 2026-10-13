@@ -43,6 +43,7 @@ import {
   LEVELS, CUTSCENES, CUTSCENE_ORDER, CAST, MENU, CREDITS, CHAPTERS,
 } from "./Data_TengxianScript.mjs";
 import { HISTORY_NOTES, BATTLE_TIMELINE, EPILOGUE_LINES } from "./Data_History.mjs";
+import { HistoryCodexContent } from "./Data_HistoryCodex.mjs";
 import { VOICE_LINES } from "./Data_Voice.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { MISSION_STAGES,FIRST_LEVEL_MISSION_PHASE } from "./Data_FirstLevelMission.mjs";
@@ -205,6 +206,7 @@ for (const line of VOICE_LINES) {
 }
 
 // --- 史料 -------------------------------------------------------------------
+for (const row of HistoryCodexContent()) Add({...row, source: "Data_HistoryCodex", hooked: true});
 for (const [cardId, note] of Object.entries(HISTORY_NOTES)) {
   const source = "Data_History · HISTORY_NOTES";
   Add({ id: HistoryCardId(cardId, "title"), text: note.title, source, tier: note.tier, hooked: false });

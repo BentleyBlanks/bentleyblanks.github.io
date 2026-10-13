@@ -19,18 +19,18 @@ const Distance=(a,b)=>Math.hypot(...a.map((x,i)=>x-b[i]));
 function Check(ok,label){assert.ok(ok,label);report.checks.push(label);}
 page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)report.errors.push(r.status()+' '+r.url());});
 let cursor={x:width*.51,y:height*.49};
-async function Rebase(){await page.mouse.move(-10,-10);cursor={x:width*.51,y:height*.49};await page.mouse.move(cursor.x,cursor.y);}
+async function Rebase(){await page.mouse.move(-10,-10);const p=await Probe();cursor={x:p.stage.x+p.rendering.toolScreen.x,y:p.stage.y+p.rendering.toolScreen.y};await page.mouse.move(cursor.x,cursor.y);}
 async function MoveToWorld(target,count=80){
   await Rebase();
   for(let i=0;i<count;i++){
     const command=await page.evaluate(({target,left})=>{
       const p=__EarSpaProbe(),camera=__EarSpaDebug.core.camera,m=camera.matrixWorld.elements,forward=[-m[8],-m[9],-m[10]];
       const Dot=(a,b)=>a.reduce((sum,x,k)=>sum+x*b[k],0),delta=target.map((x,k)=>x-p.rendering.toolPosition[k]);
-      const scale=2*Math.max(.5,Dot(p.rendering.toolPosition.map((x,k)=>x-camera.position.toArray()[k]),forward))*Math.tan(camera.fov*Math.PI/360)/p.stage.height;
-      return{dx:Dot(delta,[m[0],m[1],m[2]])/scale/left,dy:-Dot(delta,[m[4],m[5],m[6]])/scale/left,depth:Dot(delta,forward)/left};
+      const next=camera.position.clone().fromArray(p.rendering.toolPosition.map((x,k)=>x+delta[k]/left)),screen=__EarSpaDebug.view.Project(next);
+      return{x:screen.x+p.stage.x-(p.input.offset?.x||0),y:screen.y+p.stage.y-(p.input.offset?.y||0),screen,depth:Dot(delta,forward)/left};
     },{target,left:count-i});
-    if(cursor.x+command.dx<width*.1||cursor.x+command.dx>width*.87||cursor.y+command.dy<height*.12||cursor.y+command.dy>height*.89)await Rebase();
-    cursor.x+=command.dx;cursor.y+=command.dy;await page.mouse.move(cursor.x,cursor.y);
+    if(command.x<width*.1||command.x>width*.87||command.y<height*.12||command.y>height*.89){await Rebase();const p=await Probe();command.x=command.screen.x+p.stage.x-(p.input.offset?.x||0);command.y=command.screen.y+p.stage.y-(p.input.offset?.y||0);}
+    cursor={x:command.x,y:command.y};await page.mouse.move(cursor.x,cursor.y);
     if(Math.abs(command.depth)>.0005)await page.mouse.wheel(0,command.depth/.004);await Step(1);
   }
   return Probe();

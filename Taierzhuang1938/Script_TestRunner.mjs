@@ -47,11 +47,13 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  HistoryCodexBrowserTest: {file:"Script_HistoryCodexBrowserTest.mjs",timeoutMs:300000,desc:"Archive: five details, 17 pages, zoom/pan, sources, back stack and mobile"},
   TracerLifetimeTest: {file:"Script_TracerLifetimeTest.mjs",desc:"Production tracer short-hit boundary, lifetime, endpoint and strict particle validation"},
   AircraftGeometryTest: { file: "Script_AircraftGeometryTest.mjs", desc: "Reviewed Ki21/Ki30 geometry: triangle reduction, source bounds, protected parts and byte-identical images" },
   PublishAssetsTest: {file:"Script_PublishAssetsTest.mjs",timeoutMs:120000,desc:"GPU publish pipeline: source/dimension/color contracts, cache validation and overrides"},
   PublishAssetsBrowserTest: {file:"Script_PublishAssetsBrowserTest.mjs",timeoutMs:600000,desc:"Published GPU loaders: BC7/DXT formats, RGBA fallback, both UV directions and model pixel comparisons"},
   MenuStartupTest: {file:"Script_MenuStartupTest.mjs",timeoutMs:180000,desc:"Standalone source/bundle menu: no gameplay payload, resource budget, settings and navigation"},
+  AboutBrowserTest: {file:"Script_AboutBrowserTest.mjs",timeoutMs:180000,desc:"Dossier navigation, verified authors, lazy assets, license details, history return and responsive reading"},
   EmbeddedTextureTest: {file:"Script_EmbeddedTextureTest.mjs",desc:"Lossless GLB WebP: exact decoded RGBA, resolution and geometry buffers"},
   CommandRoomBrowserTest: {file:"Script_CommandRoomBrowserTest.mjs",timeoutMs:120000,desc:"Command-room mesh parallax, depth-occluded window beam, particles and renderer isolation"},
   CommandRoomPublicationTest: {file:"Script_CommandRoomPublicationTest.mjs",timeoutMs:600000,desc:"Real published room colors and byte-exact HDR irradiance preservation"},
@@ -482,6 +484,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "HistoryCodexBrowserTest",
   "PublishAssetsBrowserTest",
   "DevToolsIsolationTest",
   "MenuStartupTest",
@@ -565,7 +568,7 @@ export const browserTests = new Set([
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
   "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
-  "ClusteredLightsTest", "MaterialUpgradeTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest",
+  "ClusteredLightsTest", "MaterialUpgradeTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "AboutBrowserTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "TerrainBlendTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
@@ -672,6 +675,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   whiteboxQuality: { label: "白盒画质配置与实机", tests: ["WhiteboxQualityTest", "WhiteboxQualityBrowserTest", "WhiteboxShaderWarmTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
@@ -757,7 +761,7 @@ export const domains = {
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
-  menu: { label: "主菜单/加载画面", tests: ["MenuStartupTest", "FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootPaperPbrTest", "BootInteractionTest"] },
+  menu: { label: "主菜单/加载画面", tests: ["MenuStartupTest", "AboutBrowserTest", "FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootPaperPbrTest", "BootInteractionTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutConfigTest", "EditorBlockoutSaveTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
@@ -798,9 +802,11 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"historyCodex",pattern:/HistoryCodex|Texture\/Menu\/History\//},
+  {domain:"audio",pattern:/FirstLevelScoreRedesign/},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },
   {domain:"textureAssets",pattern:/(?:AssetPublish|BuildPublishAssets|ValidatePublishAssets|PublishCache|PublishAssets|ModelImports)/},
-  {domain: "menu", pattern: /(?:StartupRouting|MenuStartup|Script_Entry|GameGraphics|CameraLens)/},
+  {domain: "menu", pattern: /(?:StartupRouting|MenuStartup|Script_Entry|GameGraphics|CameraLens|About)/},
   {domain: "textureAssets", pattern: /EmbeddedTexture/},
   {domain:"particles",pattern:/Script_Particle|Data_ParticleSmoke|Data_ParticleVolume|Data_Tuning_Particles|Script_Vfx|Script_EditorVfx|Script_EditorParticleInspector|\/Volume\//},
   { domain: "menu", pattern: /TextureBake|Script_Main\.mjs|Script_Materials\.mjs/ },
@@ -994,7 +1000,7 @@ const changedDomainRules = [
   // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
   { domain: "ai", pattern: /(Script_Ai|LitterBlock|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion|MissionSetpieces)/i },
   { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Telegraph|Whitebox|DebugOptions|Script_Input|Style_Game|index\.html)/i },
-  { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound)/i },
+  { domain: "audio", pattern: /(Audio|Sfx|Music|Amb|Sound|FirstLevelScoreRedesign)/i },
   { domain: "voice", pattern: /(Voice|Dialogue|Speech)/i },
   { domain: "menu", pattern: /(Menu|Style_Interface|BootPaper|index\.html|Font_Title|\/Font\/)/i },
   { domain: "editor", pattern: /(Editor|Style_Interface|AssetStandards|Pcg|Data_Levels|SamplePoint|Data_Dressing|Data_ExternalAssets|WestSuburbBlocks|_import)/i },

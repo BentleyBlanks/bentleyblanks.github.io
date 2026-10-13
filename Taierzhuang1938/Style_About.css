@@ -1,0 +1,68 @@
+/* Approved archival dossier: physical paper art, live text, persistent navigation. */
+@font-face {font-family:"TzAbout";src:url("./Font/Font_AboutText.woff2?v=20261013231001") format("woff2");font-weight:400;font-display:swap}
+#menu.aboutOn .mnPanel::after{background:linear-gradient(90deg,#070806c9 0%,#0a0a087a 28%,#10110f18 70%)}
+#menu.aboutOn .mnPanelHead{min-height:19vh;padding-top:5.5vh;padding-bottom:1.5vh}
+#menu.aboutOn .mnPanelTitle{font-family:var(--ui-story-font);font-size:clamp(38px,5.1vw,82px);letter-spacing:.035em}
+#menu.aboutOn .mnPanelHead::after{font-family:"TzAbout",serif;font-size:clamp(14px,1.35vw,23px);letter-spacing:.08em}
+#menu.aboutOn .mnPanelBody{position:relative;min-height:0}
+#menu.aboutOn .mnPanelFoot{position:absolute;left:0;bottom:1.5vh;width:26%;padding:0 5.1%;min-height:5vh}
+#menu.aboutOn .mnPanelFoot .mnCampaignKeys{display:none}
+#menu.aboutOn .mnBack{white-space:nowrap;font-family:"TzAbout",var(--ui-font);font-size:clamp(14px,1.25vw,21px)}
+.aboutDossier{width:100%;min-width:0;min-height:0;display:grid;grid-template-columns:26% 65%;gap:0;align-items:stretch;padding:1vh 0 2.3vh}
+.aboutTabs{display:flex;flex-direction:column;align-self:start;padding:8vh 0 0 5.1vw;gap:1.5vh}
+.aboutTab{display:block;width:100%;min-height:6.2vh;border:0;border-left:5px solid transparent;padding:9px 16px 9px 24px;text-align:left;cursor:pointer;background:transparent;color:#e4e0d5;font:400 clamp(18px,1.9vw,32px)/1.4 "TzAbout",var(--ui-font);letter-spacing:.10em;white-space:nowrap}
+.aboutTab[aria-selected="true"]{border-left-color:#edca83;color:#edca83;background:linear-gradient(90deg,#d7ceb52b,transparent)}
+.aboutTab:hover{color:#f5d799}
+.aboutTab:focus-visible{outline:1px solid #edca83;outline-offset:4px}
+/* Row percentages follow the stretched artwork's height; percentage padding would follow its width. */
+.aboutPaper{position:relative;min-width:0;min-height:0;display:grid;grid-template-rows:calc(13% + 12px) minmax(0,1fr) auto calc(4.5% + 12px);color:#332a1f;font-family:"TzAbout","Noto Serif SC",SimSun,serif;isolation:isolate}
+.aboutPaper::before{content:"";position:absolute;inset:0;z-index:-1;background:url("./Texture/Menu/Texture_AboutDossierImage.webp?v=20261013231001") center/100% 100% no-repeat;pointer-events:none}
+.aboutReader,.aboutPaperFooter{min-width:0;margin-left:18%;margin-right:12.5%}
+.aboutReader{grid-row:2;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#7c634b77 transparent;padding:0 10px 4px 0;scroll-padding:12px;outline-offset:3px}
+.aboutPaperHead{margin-bottom:2.8vh}
+.aboutHeading{margin:0 0 .8vh;font:900 clamp(26px,3.2vw,54px)/1.25 var(--ui-story-font);letter-spacing:.015em;color:#2c241b}
+.aboutSubtitle{margin:0;font-size:clamp(13px,1.35vw,23px);line-height:1.55;letter-spacing:.05em}
+.aboutSection{padding-top:1.8vh;margin-top:1.8vh;border-top:1px solid #675c4150}
+.aboutSection:first-of-type{padding-top:0;margin-top:0;border:0}
+.aboutSection h3{font:700 clamp(17px,1.7vw,28px)/1.35 var(--ui-story-font);margin:0 0 .6vh;color:#33291f}
+.aboutSection p{font-size:clamp(14px,1.33vw,22px);line-height:1.6;margin:0}
+.aboutDedication{font-size:clamp(16px,1.55vw,25px);line-height:1.6;letter-spacing:.08em;text-align:right;margin:1.2vh 0 .2vh;font-style:italic}
+.aboutAuthors{display:flex;align-items:baseline;gap:0 16px;flex-wrap:wrap;font-size:clamp(15px,1.4vw,23px);line-height:1.6;margin:0}
+.aboutAuthors dt{margin:0}.aboutAuthors dd{margin:0 22px 0 0}
+.aboutPaperFooter{grid-row:3;display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:8px}
+.aboutAction{cursor:pointer;border:0;border-bottom:1px solid #57422b;background:none;color:#45341f;font:400 clamp(14px,1.3vw,22px)/1.5 "TzAbout",serif;padding:3px 0 5px;text-align:left}
+.aboutAction:hover{color:#7b4b18;border-color:currentColor}
+.aboutAction:focus-visible,.aboutSourceLinks a:focus-visible,.aboutReader:focus-visible{outline:2px solid #8c632e;outline-offset:4px}
+.aboutFolio{font-size:clamp(12px,1.1vw,18px);white-space:nowrap;font-variant-numeric:tabular-nums}
+.aboutSource{border-top:1px solid #675c4150;padding:15px 0}
+.aboutSourceName{margin:0 0 5px;font-size:clamp(16px,1.4vw,22px);font-weight:700}
+.aboutSourceCredit{margin:0;font-size:clamp(14px,1.15vw,18px);line-height:1.6}
+.aboutSourceLinks{display:flex;flex-wrap:wrap;gap:12px 22px;margin-top:8px}
+.aboutSourceLinks a{color:#775022;font-size:clamp(13px,1vw,17px);text-underline-offset:4px}
+@media(min-width:761px) and (min-height:541px){
+ .aboutDossier:not([data-page="work"]) .aboutHeading{font-size:clamp(26px,3vw,50px)}
+ .aboutDossier:not([data-page="work"]) .aboutSubtitle{line-height:1.4}
+ .aboutDossier:not([data-page="work"]) .aboutPaperHead{margin-bottom:.8vh}
+ .aboutDossier:not([data-page="work"]) .aboutSection{padding-top:.55vh;margin-top:.55vh}
+ .aboutDossier:not([data-page="work"]) .aboutSection:first-of-type{padding-top:0;margin-top:0}
+ .aboutDossier:not([data-page="work"]) .aboutSection h3{font-size:clamp(17px,1.6vw,27px)}
+ .aboutDossier:not([data-page="work"]) .aboutSection p{font-size:clamp(14px,1.24vw,21px);line-height:1.48}
+ .aboutDossier:not([data-page="work"]) .aboutDedication{margin-top:.6vh;font-size:clamp(16px,1.3vw,22px)}
+}
+@media(max-width:760px){
+ #menu.aboutOn .mnPanelHead{min-height:12vh;padding-top:3vh;padding-bottom:1.5vh;margin:0 5%}
+ #menu.aboutOn .mnPanelTitle{font-size:36px}
+ #menu.aboutOn .mnPanelFoot{position:static;width:100%;padding:0 5%;min-height:6vh}
+ .aboutDossier{display:flex;flex-direction:column;padding:0 1% 0;gap:0}
+ .aboutTabs{padding:1.2vh 3% .8vh;gap:3px;flex-direction:row;align-self:stretch}
+ .aboutTab{min-width:0;min-height:42px;flex:1;padding:8px 2px;font-size:14px;letter-spacing:0;text-align:center;border-left:0;border-bottom:3px solid transparent}
+ .aboutTab[aria-selected="true"]{border-bottom-color:#edca83;background:linear-gradient(0deg,#d7ceb51c,transparent)}
+ .aboutPaper{flex:1;min-height:0}
+ .aboutReader,.aboutPaperFooter{margin-left:14%;margin-right:9%}
+ .aboutHeading{font-size:27px}.aboutSubtitle{font-size:13px}.aboutPaperHead{margin-bottom:17px}
+ .aboutSection{padding-top:12px;margin-top:12px}.aboutSection h3{font-size:19px}.aboutSection p{font-size:15px;line-height:1.75}
+ .aboutAuthors{font-size:15px;gap:0 8px}.aboutAuthors dd{margin-right:10px}
+ .aboutDedication{font-size:16px;margin-top:18px}.aboutPaperFooter{padding-top:12px;gap:8px}.aboutAction{font-size:13px}.aboutFolio{font-size:11px}
+}
+@media(max-height:540px) and (min-width:761px){.aboutTabs{padding-top:4vh}.aboutTab{min-height:38px;font-size:19px}.aboutHeading{font-size:28px}.aboutPaperHead{margin-bottom:12px}.aboutSection h3{font-size:20px}.aboutSection p{font-size:15px}}
+@media(prefers-reduced-motion:reduce){.aboutDossier *{scroll-behavior:auto}}

@@ -1,0 +1,9 @@
+Provider: built-in imagegen, 2026-10-13.
+User preferred Lovart; neither local skill nor connected/catalog plugin was available in this session.
+Reference: user-approved A dossier About mockup, generated in this chat.
+
+Use case: precise-object-edit, game UI production cutout.
+From the reference screen extract/recreate ONLY the blank archival dossier object on the right: its worn dark brown cloth-covered backing folder, two slightly offset creamy old paper sheets, irregular subtly frayed paper edges, and the small weathered bronze clip at the upper left.
+REMOVE ALL TEXT AND LINES printed on the paper. The paper center must be EMPTY, warm ivory and subtly fibrous, clean and low contrast enough for dark readable DOM text. No shadows or stains crossing the middle reading area. Keep some light edge mottling like the reference. No symbols, letters, words or page numbers anywhere.
+Remove the entire command room, desk, hat, ink bottle, menus and external background. Output the complete folder object as an isolated cutout on a REAL TRANSPARENT alpha background. Preserve actual paper edges, thin folder border and a small soft natural object shadow within the transparent margin. Do not produce a checkerboard pattern.
+Near-front-facing flat UI composition, not an angled table view. A very slight trapezoid is fine but keep the center rectangular and practical for live text overlay. The folder silhouette should fill 92% of the canvas, original width-to-height ratio roughly 1.25:1, landscape 1280x1024 or similar. Copper clip modest, tall narrow, near 22% width at the top, not covering the central text area. Original restrained realistic materials, no new props, decorations, embossed labels or elaborate damage. This is a blank reusable production UI panel, no mockup outer framing.

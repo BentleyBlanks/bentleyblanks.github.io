@@ -137,6 +137,33 @@ dialog{padding:23px;max-height:calc(100dvh - 24px)}#settings-dialog>.dialog-head
 #tool-reticle{position:absolute;z-index:7;pointer-events:none;width:8px;height:8px;border:1px solid #f4deab;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 2px #1d171a99}
 #tool-reticle[data-contact=true]{border-color:#eab380;box-shadow:0 0 0 2px #3c2416aa}
 #tool-reticle[hidden]{display:none}
-#ear-app[data-phase=playing] #ear-canvas{cursor:default}
-#ear-app[data-dragging=true] #ear-canvas{cursor:grabbing}
+#ear-app[data-phase=playing] #ear-canvas{cursor:none}
+#ear-app[data-dragging=true] #ear-canvas{cursor:none}
 @media(max-width:600px){#click-help{font-size:9px;padding:7px 8px;max-width:100%}#tool-depth{font-size:10px;padding:7px}#manual-tray,#action-cancel{font-size:10px;min-height:33px}}
+
+/* Case requests stay beside the physical workspace. Details pause the service. */
+.care-objective[data-case=true]{width:232px;padding:14px 15px}
+.care-objective[data-case=true]>strong{font-family:var(--ui-serif);font-size:21px;margin:7px 0}
+#case-condition{font-size:10px;color:var(--ui-muted);margin:0 0 13px}
+#case-goals{list-style:none;padding:0;margin:0;border-top:1px solid var(--ui-edge)}
+#case-goals li{display:flex;justify-content:space-between;gap:9px;padding:9px 0;border-bottom:1px solid var(--ui-edge);font-size:11px}
+#case-goals b{font-weight:400;color:var(--ui-muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+#case-goals [data-done=true],#case-goals [data-done=true] b{color:#c2c9a7}
+#case-hint{font-size:11px;line-height:1.8;margin:12px 0;color:var(--ui-cream)}
+#case-optional{font-size:10px;line-height:1.7;color:var(--ui-muted);margin:9px 0}
+.case-actions{display:flex;gap:7px;margin:12px 0}
+.case-actions button,#case-resume{min-height:36px;border:1px solid var(--ui-edge);border-radius:5px;background:#201a16dd;color:var(--ui-cream);padding:8px;font-size:11px}
+.case-actions button{flex:1}#case-submit:not(:disabled){background:#715c35b8;border-color:var(--ui-gold)}
+#case-dialog p{font-size:13px;line-height:1.9;color:var(--ui-cream)}#case-dialog .case-note{font-size:11px;color:var(--ui-muted);padding-top:14px;border-top:1px solid var(--ui-edge)}#case-resume{width:100%;margin-top:12px}
+#case-markers{position:absolute;inset:0;z-index:3;pointer-events:none}
+#case-markers span{position:absolute;display:grid;place-items:center;width:21px;height:21px;border:1px solid #ddc091;border-radius:50%;background:#292016b3;color:#f3dfb8;font-size:11px;transform:translate(10px,-120%);box-shadow:0 2px 9px #0007}
+#ear-app:not([data-phase=playing]) #case-markers{display:none}
+@media(min-width:601px){
+  #ear-app:has(.care-objective[data-case=true]) .care-objective{top:calc(var(--ui-top) + 102px)}
+  #ear-app:has(.care-objective[data-case=true]) :is(.view-label,.lamp-toggle,.depth-toggle){top:calc(var(--ui-top) + 58px);left:auto;min-height:36px}
+  #ear-app:has(.care-objective[data-case=true]) .view-label{right:calc(var(--ui-right) + 142px);width:90px}
+  #ear-app:has(.care-objective[data-case=true]) .lamp-toggle{right:calc(var(--ui-right) + 42px);width:94px}
+  #ear-app:has(.care-objective[data-case=true]) .depth-toggle{right:var(--ui-right);width:36px}
+}
+@media(max-width:600px){.care-objective[data-case=true]{width:170px;padding:10px}.care-objective[data-case=true]>strong{font-size:17px}#case-condition{font-size:9px;margin-bottom:8px}#case-hint,#case-optional{display:none}#case-goals li{font-size:10px;padding:7px 0}.case-actions{gap:5px;margin:8px 0}.case-actions button{font-size:10px;padding:7px 3px}}
+@media(max-height:560px) and (min-width:601px){.care-objective[data-case=true]{width:202px;padding:10px}.care-objective[data-case=true]>strong{font-size:17px}#case-hint,#case-optional{display:none}#case-condition{margin-bottom:8px}.case-actions{margin:8px 0}}

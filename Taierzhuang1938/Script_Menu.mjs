@@ -18,22 +18,22 @@
 import * as THREE from "three";
 import { FovFromFocalMm } from "./Script_CameraLens.mjs";
 import { ValueNoise2, Clamp, Clamp01 } from "./Script_Noise.mjs";
-import { MENU, CREDITS, PRESUMED_STAGING, CAST } from "./Data_TengxianScript.mjs";
+import { MENU, PRESUMED_STAGING, CAST } from "./Data_TengxianScript.mjs";
+import { AboutDossier } from "./Script_About.mjs";
 import { MENU_SCENE, ShotsFor } from "./Data_Menu.mjs";
 import { PRESUMED } from "./Data_Tengxian.mjs";
-// 界面文案走字符串表（Data_Text_Menu.mjs），内容原稿（MENU / CREDITS / CAST）留在
+// 界面文案走字符串表（Data_Text_Menu / Data_Text_About），内容原稿（MENU / CAST）留在
 // Data_TengxianScript 里，显示时按 id 过 Localize —— 口径见 docs/Data_TextAndTuning.md §3。
 import { T, Localize } from "./Script_Text.mjs";
 import { CastNameId, LevelFieldId } from "./Script_TextIds.mjs";
 import { DRIFT, CAMERA } from "./Data_Tuning_Menu.mjs";
 import { COMMAND_ROOM_MAPS } from "./Data_CommandRoomPapers.mjs";
+import { HistoryCodex } from "./Script_HistoryCodex.mjs";
 
 /** 主菜单四项与两行标题的内容 id（`menu.<字段>`，译文放 `content.menu.<字段>`）。 */
 function MenuTextId(field) { return `menu.${field}`; }
 /** 标题下那几行史实小字。 */
 function MenuLineId(index) { return `menu.lines.${index}`; }
-/** 鸣谢一行。 */
-function CreditsLineId(index) { return `credits.${index}`; }
 /** 说话人 / 人物显示名：与 Script_Story、Script_Cutscene 同一条口径。 */
 function CastName(id) { return Localize(CastNameId(id), CAST[id]?.short || CAST[id]?.name || id); }
 
@@ -191,7 +191,7 @@ export class MainMenu {
     this.sandboxes = Array.isArray(host.sandboxes)
       ? host.sandboxes.filter(Boolean) : (host.sandbox ? [host.sandbox] : []);
     /**
-     * 列表上真正排出来的条目 = 正式章节 + 测试沙盒。键盘上下也按它走。
+     * 选章条目 = 正式章节 + 测试沙盒。两组分别显示，方向键只在当前分组内移动。
      * **顺序就是分组顺序**：正式章节在前，测试场景在后。
      */
     this.entries = [...this.campaign, ...this.sandboxes];
@@ -284,13 +284,22 @@ export class MainMenu {
     this.el.panelBack = mk("mnBack", foot, "button");
     this.el.panelBack.textContent = T("menu.back");
     mk("mnCampaignKeys", foot).textContent = T("menu.foot.escBack");
-    this.el.panelBack.addEventListener("click", () => this.Show(this.panelReturnMode));
+    this.el.panelBack.addEventListener("click", () => {
+      if (this.mode === "credits" && this.about?.Back()) return;
+      this.Show(this.panelReturnMode);
+    });
     this.el.panelBody = mk("mnPanelBody", this.el.panel);
     this.el.panel.appendChild(foot);
 
     this.BuildLevels();
     this.el.text = document.createElement("div");
     this.el.text.className = "mnText";
+    this.about = new AboutDossier({ onHistory: () => {
+      this.aboutReturnMode = this.panelReturnMode;
+      this.Show("codex");
+      this.panelReturnMode = "credits";
+    } });
+    this.historyCodex = new HistoryCodex({ onExit: () => this.Show(this.panelReturnMode), restorationHtml: () => this.CodexHtml() });
     // 最后建：确认框必须压在列表、目标栏与面板之上。
     this.BuildConfirm();
   }
@@ -472,7 +481,7 @@ export class MainMenu {
   }
 
   /**
-   * 选章面板：World at War 纵向任务列表 + 横向任务图与简报。
+   * 选章面板：纵向任务列表 + 大图下缘简报（用户选定的新版 03）。
    *
    * **两组是规格要求**（docs/Data_MissionRemake.md §9）：
    *   正式章节 —— Data_Menu.CAMPAIGN_ENTRIES：第一关（P0/P1/P2 白盒）带「已通过 / 下一关」
@@ -498,14 +507,24 @@ export class MainMenu {
     const footer = Make("mnCampaignFoot", wrap);
     const back = Make("mnCampaignBack", footer, "button", T("menu.back"));
     back.type = "button";
-    back.addEventListener("click", () => this.Show(this.panelReturnMode));
+    back.addEventListener("click", () => this.BackFromLevels());
     Make("mnCampaignKeys", footer, "span", T("menu.foot.campaign"));
+    this.el.trainingToggle = Make("mnTrainingToggle", footer, "button", T("menu.group.training"));
+    this.el.trainingToggle.type = "button";
+    this.el.trainingToggle.hidden = !this.sandboxes.length;
+    this.el.trainingToggle.addEventListener("click", () => {
+      this.SelectLevel(this.selected < this.campaign.length ? this.campaign.length : this.lastCampaignSelection ?? this.DefaultLevel());
+      this.levelEls[this.selected]?.focus({ preventScroll: true });
+      this.levelEls[this.selected]?.scrollIntoView({ block: "nearest" });
+    });
     this.el.levelsWrap = wrap;
-    const Group = (title, note, cls) => {
-      const head = Make("mnLevelGroup", this.el.levelList);
+    const Group = (title, note, cls, key) => {
+      const section = Make("mnLevelSection", this.el.levelList, "section");
+      this.el[key] = section;
+      const head = Make("mnLevelGroup", section);
       Make("", head, "b", title);
       Make("", head, "small", note);
-      return Make(cls, this.el.levelList);
+      return Make(cls, section);
     };
     this.levelEls = [];
     const Row = (entry, i, track) => {
@@ -538,12 +557,21 @@ export class MainMenu {
       b.addEventListener("click", () => { this.SelectLevel(i); this.Play(i); });
       this.levelEls[i] = b;
     };
-    const official = Group(T("menu.group.official.title"), T("menu.group.official.note"), "mnMissionTrack");
+    const official = Group(T("menu.group.official.title"), T("menu.group.official.note"), "mnMissionTrack", "campaignSection");
     this.campaign.forEach((entry, i) => Row(entry, i, official));
     if (this.sandboxes.length) {
-      const sandbox = Group(T("menu.group.sandbox.title"), T("menu.group.sandbox.note"), "mnSandboxTrack");
+      const sandbox = Group(T("menu.group.sandbox.title"), T("menu.group.sandbox.note"), "mnSandboxTrack", "trainingSection");
       this.sandboxes.forEach((entry, i) => Row(entry, this.campaign.length + i, sandbox));
+      this.el.trainingSection.hidden = true;
     }
+  }
+
+  BackFromLevels() {
+    if (this.selected >= this.campaign.length) {
+      this.SelectLevel(this.lastCampaignSelection ?? this.DefaultLevel());
+      this.levelEls[this.selected]?.scrollIntoView({ block: "nearest" });
+      this.el.trainingToggle.focus({ preventScroll: true });
+    } else this.Show(this.panelReturnMode);
   }
 
   // -------------------------------------------------------------------------
@@ -647,13 +675,14 @@ export class MainMenu {
   }
 
   Close() {
+    this.historyCodex.Hide();
     this.SetCommandRoomPreviewUi(false);
     this.ClearSandboxComplete();
     this.DismissConfirm();
     this.open = false;
     this.live = false;
     this.root.classList.add("off");
-    this.root.classList.remove("pause", "panelOn", "levelsOn");
+    this.root.classList.remove("pause", "panelOn", "levelsOn", "aboutOn", "codexOn");
     this.el.panel.classList.remove("on");
     this.el.fade.style.opacity = "0";
   }
@@ -725,6 +754,14 @@ export class MainMenu {
     this.root.classList.toggle("panelOn", panel);
     this.el.panel.classList.toggle("on", panel);
     this.root.classList.toggle("levelsOn", mode === "levels");
+    this.root.classList.toggle("aboutOn", mode === "credits");
+    this.el.panelBack.textContent = T(mode === "credits" ? "menu.foot.escBack" : "menu.back");
+    if (mode === "credits" && wasMode === "codex" && this.aboutReturnMode) {
+      this.panelReturnMode = this.aboutReturnMode;
+      this.aboutReturnMode = null;
+    }
+    this.root.classList.toggle("codexOn", mode === "codex");
+    if (wasMode === "codex" && mode !== "codex") this.historyCodex.Hide();
     if (mode === "levels") {
       this.el.panelTitle.textContent = T("menu.panel.levels");
       this.el.panelBody.textContent = "";
@@ -734,15 +771,13 @@ export class MainMenu {
     } else if (mode === "codex") {
       this.el.panelTitle.textContent = Localize(MenuTextId("codex"), MENU.codex);
       this.el.panelBody.textContent = "";
-      this.el.text.innerHTML = this.CodexHtml();
-      this.el.panelBody.appendChild(this.el.text);
+      this.el.panelBody.appendChild(this.historyCodex.root);
+      this.historyCodex.Open();
     } else if (mode === "credits") {
       this.el.panelTitle.textContent = Localize(MenuTextId("credits"), MENU.credits);
       this.el.panelBody.textContent = "";
-      this.el.text.innerHTML = CREDITS
-        .map((line, index) => (line
-          ? `<p>${Localize(CreditsLineId(index), line)}</p>` : `<p class="mnGap"></p>`)).join("");
-      this.el.panelBody.appendChild(this.el.text);
+      this.el.panelBody.appendChild(this.about.root);
+      this.about.Open();
     } else if (mode === "settings") {
       this.el.panelTitle.textContent = T("menu.item.settings");
       this.el.panelBody.textContent = "";
@@ -765,7 +800,7 @@ export class MainMenu {
       this.el.panelTitle.textContent = T("menu.settings.debugTools");
       this.BuildDebugTools();
     }
-    if (!panel && wasMode === "levels") {
+    if (!panel && (wasMode === "levels" || wasMode === "credits")) {
       this.itemEls[this.itemIndex]?.focus({ preventScroll: true });
     }
   }
@@ -1035,6 +1070,14 @@ export class MainMenu {
 
   SelectLevel(i) {
     this.selected = Clamp(i, 0, this.entries.length - 1);
+    const training = this.selected >= this.campaign.length;
+    if (!training) this.lastCampaignSelection = this.selected;
+    this.el.campaignSection.hidden = training;
+    if (this.el.trainingSection) this.el.trainingSection.hidden = !training;
+    this.el.trainingToggle.textContent = T(training ? "menu.group.official.title" : "menu.group.training");
+    this.el.trainingToggle.setAttribute("aria-pressed", String(training));
+    this.el.levelList.setAttribute("aria-label", T(training ? "menu.group.training" : "menu.group.official.title"));
+    if (this.mode === "levels") this.el.panelTitle.textContent = T(training ? "menu.group.training" : "menu.panel.levels");
     const progress = Progress.Read();
     this.levelEls.forEach((el, k) => {
       el.classList.toggle("on", k === this.selected);
@@ -1079,7 +1122,7 @@ export class MainMenu {
       return e;
     };
     AppendCopy("mnBriefTitle").textContent = title;
-    // 占位章节没有日期与地点（旧稿的不上屏），那一行整个不出。
+    // 日期与地点来自章节表；两项都没有时省略整行。
     const date = PhaseText(phase, "date");
     const place = PhaseText(phase, "place");
     if (!chapter) AppendCopy("mnMissionWhen").textContent = place;
@@ -1094,7 +1137,18 @@ export class MainMenu {
         || T("menu.level.sandboxGlyph");
       brief.prepend(training);
     }
-    const record = mk("mnMissionRecord");
+    const actions = AppendCopy("mnMissionActions");
+    const start = document.createElement("button");
+    start.className = "mnMissionStart";
+    start.type = "button";
+    start.textContent = T(phase.placeholder ? "menu.mark.todo" : chapter ? "menu.action.startMission" : "menu.action.startTraining");
+    start.disabled = !!phase.placeholder;
+    const selected = this.selected;
+    start.addEventListener("click", () => this.Play(selected));
+    actions.appendChild(start);
+    const record = document.createElement("div");
+    record.className = "mnMissionRecord";
+    actions.appendChild(record);
     const cleared = progress.cleared.includes(phase.id);
     record.classList.toggle("done", chapter && !phase.placeholder && cleared);
     record.classList.toggle("todo", !!phase.placeholder);
@@ -1207,6 +1261,7 @@ export class MainMenu {
       }
       // 确认框在阵亡页之上时，Esc 也是「取消」，所以排在阵亡页吞 Esc 之前。
       if (this.confirmItem) { this.ConfirmKey(event); return; }
+      if (this.mode === "codex") { this.historyCodex.Key(event); return; }
       if (this.mode === "failure" && (event.repeat || event.key === "Escape")) {
         event.preventDefault(); return;
       }
@@ -1215,13 +1270,20 @@ export class MainMenu {
         case "Escape":
           // 按住不放的自动重复不再往回退：一路退过暂停层就成了「继续」。
           if (event.repeat) { event.preventDefault(); return; }
-          if (panel) { this.Show(this.panelReturnMode); event.preventDefault(); }
+          if (this.mode === "credits" && this.about.Back()) { event.preventDefault(); return; }
+          if (panel) {
+            if (this.mode === "levels") this.BackFromLevels();
+            else this.Show(this.panelReturnMode);
+            event.preventDefault();
+          }
           else if (this.mode === "pause") { this.host.Resume?.(); event.preventDefault(); }
           return;
         case "ArrowDown": case "ArrowUp": {
           const delta = event.key === "ArrowDown" ? 1 : -1;
           if (panel && this.mode === "levels") {
-            this.SelectLevel(this.selected + delta);
+            const training = this.selected >= this.campaign.length;
+            this.SelectLevel(Clamp(this.selected + delta, training ? this.campaign.length : 0,
+              training ? this.entries.length - 1 : this.campaign.length - 1));
             this.levelEls[this.selected]?.focus({ preventScroll: true });
             this.levelEls[this.selected]?.scrollIntoView({ block: "nearest" });
           }
@@ -1406,6 +1468,7 @@ export class MainMenu {
   }
 
   Dispose() {
+    this.historyCodex.Hide();
     document.removeEventListener("keydown", this.onKey);
     this.root.removeEventListener("keydown", this.onNativeKey);
     window.removeEventListener("resize", this.onResize);

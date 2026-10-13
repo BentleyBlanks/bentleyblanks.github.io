@@ -7,6 +7,7 @@
 // 重复键在拼表时直接抛 —— 宁可开机红，也不要两处文案互相覆盖而没人知道。
 import { TEXT as HUD } from "./Data_Text_Hud.mjs";
 import { TEXT as MENU } from "./Data_Text_Menu.mjs";
+import { TEXT as ABOUT } from "./Data_Text_About.mjs";
 import { TEXT as INPUT } from "./Data_Text_Input.mjs";
 import { TEXT as BOOT } from "./Data_Text_Boot.mjs";
 import { TEXT as GAMEPLAY } from "./Data_Text_Gameplay.mjs";
@@ -20,6 +21,7 @@ import { TEXT as FIRSTLEVEL } from "./Data_Text_FirstLevel.mjs";
 const TABLES = [
   ["Data_Text_Hud", HUD],
   ["Data_Text_Menu", MENU],
+  ["Data_Text_About", ABOUT],
   ["Data_Text_Input", INPUT],
   ["Data_Text_Boot", BOOT],
   ["Data_Text_Gameplay", GAMEPLAY],

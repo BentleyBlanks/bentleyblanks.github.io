@@ -24,4 +24,11 @@ Check(!poor.BuyTool('brush').ok&&!poor.BuySkin('scoop','jade').ok&&poor.coins===
 const payout=comfort=>{const s=CreateShop({storage:Storage()});s.StartDay(MakeRng(14));const r=s.FinishCustomer({cleanliness01:1,comfort01:comfort,relax01:comfort,bestCombo:2,harvest:[]});const coins=s.coins;Check(s.FinishCustomer({cleanliness01:1,comfort01:1})===null&&s.coins===coins,'每位客人只结算一次');return{...r,rep:s.Snapshot().reputation};};
 const happy=payout(.98),hurt=payout(.3);
 Check(happy.tip>hurt.tip&&happy.payout>hurt.payout&&happy.rep>hurt.rep,'满意度决定小费、总收入和声望');
+const caseShop=CreateShop({storage:Storage()});caseShop.StartDay(MakeRng(14));
+const casePay=caseShop.FinishCustomer({cleanliness01:.1,comfort01:.85,caseResult:{id:'drySheet',complete:true}});
+Check(casePay.clean===.1&&casePay.caseBonus>0&&casePay.perfectBonus===0,'部分精清交单保留实际清洁度，仅增加已完成病例报酬');
+const caseCoins=caseShop.coins;
+Check(caseShop.FinishCustomer({cleanliness01:.1,caseResult:{complete:true}})===null&&caseShop.coins===caseCoins,'重复交单不能重复领取病例报酬');
+const incompleteShop=CreateShop({storage:Storage()});incompleteShop.StartDay(MakeRng(14));
+Check(incompleteShop.FinishCustomer({cleanliness01:.1,comfort01:.85,caseResult:{id:'deepBend',complete:false}}).caseBonus===0,'未完成病例不给目标奖励');
 console.log('PASS '+checks+' economy checks');
