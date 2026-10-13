@@ -919,6 +919,16 @@ async function CheckMissionList() {
       && panel.marks.slice(1).every(t=>t==="未完成"),
     JSON.stringify({names:panel.names,marks:panel.marks,placeholders:panel.placeholders,numbers:panel.numbers}));
   Check("任务选择不再出现地图、横向时间轴或缩略图卡",!panel.oldMap);
+  const presentation = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.mnLevel')].filter(el => el.getClientRects().length);
+    const art = document.querySelector('.mnMissionArt').getBoundingClientRect();
+    const copy = document.querySelector('.mnMissionCopy').getBoundingClientRect();
+    return {visible:rows.length,trainingHidden:document.querySelector('.mnSandboxTrack').closest('section').hidden,
+      heroWidth:art.width,viewport:innerWidth,copyOverArt:copy.top>art.top+art.height*.45&&copy.top<art.bottom,
+      toggle:document.querySelector('.mnTrainingToggle').textContent};
+  });
+  Check('03构图：只显示六章，任务大图与下缘简报叠放，测试收进页脚',presentation.visible===6&&presentation.trainingHidden
+    &&presentation.heroWidth>presentation.viewport*.55&&presentation.copyOverArt&&presentation.toggle==='训练与测试',JSON.stringify(presentation));
   const images=[];
   for(let index=0;index<6;index++){
     await page.locator('.mnMissionTrack .mnLevel').nth(index).hover();
@@ -983,9 +993,26 @@ async function CheckMissionList() {
     await page.keyboard.press('Enter');
     await page.locator('.mnMissionTrack .mnLevel').nth(5).hover();
     await page.keyboard.press('Enter');
+    await page.keyboard.press('ArrowDown');
+    Check('正式章节的方向键不跳进隐藏的测试场景',await page.evaluate(()=>window.Taierzhuang.menu.selected===5));
+    await page.locator('.mnTrainingToggle').click();
+    await page.keyboard.press('ArrowUp');
+    Check('训练入口显示六项测试，方向键停在当前分组',await page.evaluate(()=>window.Taierzhuang.menu.selected===6
+      &&document.querySelector('.mnPanelTitle').textContent==='训练与测试'
+      &&[...document.querySelectorAll('.mnLevel')].filter(el=>el.getClientRects().length).length===6));
     await page.locator('.mnSandboxLevel').nth(1).click();
-    Check("鼠标、Enter、测试入口各只触发一次正确任务",await page.evaluate(()=>window.missionPlayed.join(',')==='3,4,5,7'),
+    await page.locator('.mnMissionStart').click();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Escape');
+    Check('训练页 Esc 返回此前章节，保持正式菜单与暂停的返回层级',await page.evaluate(()=>window.Taierzhuang.menu.mode==='levels'
+      &&window.Taierzhuang.menu.selected===5&&document.querySelector('.mnTrainingToggle').textContent==='训练与测试'));
+    await page.evaluate(()=>window.Taierzhuang.menu.SelectLevel(0));
+    await page.locator('.mnMissionStart').focus();
+    await page.keyboard.press('Enter');
+    Check("鼠标、Enter、测试入口与开始按钮各只触发一次正确任务",await page.evaluate(()=>window.missionPlayed.join(',')==='3,4,5,7,7,7,0'),
       await page.evaluate(()=>window.missionPlayed.join(',')));
+    await page.evaluate(()=>window.Taierzhuang.menu.SelectLevel(1));
+    Check('未完成章节的开始按钮不可进入任务',await page.locator('.mnMissionStart').isDisabled());
     for (const [name,width,height] of [["Laptop",1280,720],["Mobile",390,844],["Landscape",844,390]]) {
       await page.setViewportSize({width,height});
       await page.mouse.move(1,1);
@@ -995,12 +1022,18 @@ async function CheckMissionList() {
         const back=document.querySelector('.mnCampaignBack').getBoundingClientRect();
         return {panelWidth:panel.width,viewport:innerWidth,backBottom:back.bottom,
           viewportHeight:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth,
-          touchRows:[...document.querySelectorAll('.mnLevel')].every(el=>el.getBoundingClientRect().height>=44)};
+          touchRows:[...document.querySelectorAll('.mnLevel')].filter(el=>el.getClientRects().length).every(el=>el.getBoundingClientRect().height>=44)};
       });
       Check(name+"没有横向溢出，返回按钮可达",!layout.overflow&&layout.panelWidth===layout.viewport&&layout.backBottom<=layout.viewportHeight,JSON.stringify(layout));
       if(width<=640)Check("手机任务点击区域至少44px",layout.touchRows);
+      await page.locator('.mnMissionStart').scrollIntoViewIfNeeded();
+      Check(name+'开始按钮可滚动到且不被页脚挡住',await page.locator('.mnMissionStart').evaluate(el=>{
+        const r=el.getBoundingClientRect(),foot=document.querySelector('.mnCampaignFoot').getBoundingClientRect();
+        return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=foot.top+1;
+      }));
       await page.screenshot({path:path.join(outDir,"Scene_MissionList"+name+".png")});
       await page.locator('.mnCampaignBack').focus();
+      await page.locator('.mnTrainingToggle').click();
       await page.locator('.mnSandboxLevel').last().focus();
       Check(name+"最后一个测试入口能滚动到并选中",await page.evaluate(()=>window.Taierzhuang.menu.selected===window.Taierzhuang.menu.entries.length-1));
       const reopened=await page.evaluate(()=>{

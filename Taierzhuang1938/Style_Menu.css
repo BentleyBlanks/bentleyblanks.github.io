@@ -580,3 +580,104 @@ body:has(#settingsRoot:not(.off)) #menu .mnPanel { visibility:hidden; }
  #settingsRoot .audioSettings .edBody {padding-top:16px;padding-bottom:16px}.audioFooter{padding-block:8px}
 }
 @media(prefers-reduced-motion:reduce){.audioRow{transition:none}}
+
+/* Mission selection concept 03: title-menu controls beside a large, feathered mission still. */
+#menu.levelsOn .mnPanel::after {
+  background:linear-gradient(90deg,#060706c9 0%,#0c0e0b80 31%,#11120b24 70%,#10110f15);
+}
+#menu.levelsOn .mnPanelHead { min-height:19vh;padding-top:7vh;padding-bottom:2.5vh; }
+#menu.levelsOn .mnPanelTitle { font-family:var(--ui-story-font);font-size:clamp(32px,4.6vw,86px);letter-spacing:.045em; }
+#menu.levelsOn .mnCampaignMain {
+  grid-template-columns:minmax(280px,31%) minmax(0,1fr);gap:2.5%;
+  padding:1.5vh 3.5% 0 5.1%;overflow:hidden;
+}
+#menu.levelsOn .mnLevelList { padding:3.5vh 0 1vh;scroll-padding:8px; }
+.mnLevelSection[hidden] { display:none; }
+#menu.levelsOn .mnLevelGroup { position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%); }
+#menu.levelsOn .mnLevel {
+  min-height:6.8vh;margin-bottom:1.1vh;padding:8px 18px;grid-template-columns:max-content minmax(0,1fr) auto;
+  gap:clamp(12px,1.2vw,23px);border-left-width:4px;color:#b9bcb7;text-shadow:0 2px 4px #0008;
+}
+#menu.levelsOn .mnLvName { font-size:clamp(18px,1.8vw,31px);font-weight:400;letter-spacing:.06em; }
+#menu.levelsOn .mnLvNo { font-size:clamp(13px,1.2vw,20px);color:inherit; }
+#menu.levelsOn .mnLvMark { font-size:clamp(11px,.85vw,14px);color:#a3aaa4; }
+#menu.levelsOn .mnLevel.on { color:var(--ui-gold); }
+#menu.levelsOn .mnLevel.on .mnLvMark { color:#c4b58d; }
+#menu.levelsOn .mnSandboxLevel { grid-template-columns:28px minmax(0,1fr) auto; }
+#menu.levelsOn .mnSandboxLevel .mnLvName { font-size:clamp(16px,1.4vw,24px); }
+#menu.levelsOn .mnBrief {
+  position:relative;isolation:isolate;justify-content:flex-end;overflow-y:auto;
+  padding:0 2vw 1vh;min-height:0;
+}
+#menu.levelsOn .mnMissionArt {
+  position:absolute;inset:0 -2vw 3% 0;z-index:0;pointer-events:none;width:auto;height:auto;aspect-ratio:auto;
+  border:0;background:transparent;
+  mask-image:linear-gradient(90deg,transparent,#000 5%,#000 97%,transparent),linear-gradient(0deg,transparent 0%,#000 48%,#000 100%);
+  mask-composite:intersect;
+}
+#menu.levelsOn .mnMissionArt img { filter:saturate(.78);object-position:center; }
+#menu.levelsOn .mnMissionArt::after { box-shadow:none;background:linear-gradient(0deg,#03050399,transparent 55%); }
+#menu.levelsOn .mnMissionCopy { padding-top:0;position:relative;z-index:1;text-shadow:0 2px 5px #000c; }
+#menu.levelsOn .mnBriefTitle { font-family:var(--ui-story-font);font-size:clamp(32px,3.5vw,62px);font-weight:700;letter-spacing:.045em;color:#eeeee7;line-height:1.2; }
+#menu.levelsOn .mnMissionWhen { margin-top:12px;font-size:clamp(13px,1.18vw,20px);line-height:1.6;color:#c5c5bd; }
+#menu.levelsOn .mnMissionObjective { margin-top:12px;max-width:36em;font-size:clamp(15px,1.3vw,22px);line-height:1.65;color:#d6d9d1; }
+.mnMissionActions { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px 20px;margin-top:3vh; }
+.mnMissionStart {
+  border:0;border-left:4px solid #edca83;background:linear-gradient(90deg,#d8d4c326,#bbb7a90a);
+  min-height:48px;padding:8px 26px;cursor:pointer;text-align:left;color:var(--ui-gold);
+  font:400 clamp(20px,1.82vw,32px)/1.4 var(--ui-font);letter-spacing:.16em;text-shadow:0 2px 4px #0008;
+}
+.mnMissionStart:hover { color:#ffe0a1;background:linear-gradient(90deg,#d8d4c33a,#bbb7a912); }
+.mnMissionStart:focus-visible { outline:1px solid var(--ui-gold);outline-offset:4px; }
+.mnMissionStart:disabled { cursor:default;color:#a3aaa4;border-left-color:#a3aaa455;background:none; }
+#menu.levelsOn .mnMissionRecord { margin:0;padding:0;gap:8px 16px;flex-wrap:wrap;font-size:11px;color:#a3aaa4; }
+#menu.levelsOn .mnMissionRecord b { font-size:12px;color:#b9bcb7; }
+#menu.levelsOn .mnMissionRecord.done b { color:var(--ui-gold); }
+#menu.levelsOn .mnTrainingPreview { position:absolute;inset:0 0 10%;width:100%;aspect-ratio:auto;z-index:0;pointer-events:none;opacity:.35;border:0; }
+#menu.levelsOn .mnCampaignFoot { min-height:9vh;padding-block:1vh;gap:16px; }
+.mnTrainingToggle { border:0;background:none;min-height:44px;padding:8px 0 8px 16px;color:#c5c5bd;font:inherit;font-size:14px;letter-spacing:.08em;cursor:pointer; }
+.mnTrainingToggle:hover,.mnTrainingToggle:focus-visible { color:var(--ui-gold); }
+.mnTrainingToggle[hidden] { display:none; }
+#menu.levelsOn .mnCampaignKeys { margin-left:auto;font-size:11px;color:#a3aaa4; }
+@media(max-width:1100px) and (min-width:761px) {
+  #menu.levelsOn .mnCampaignMain { grid-template-columns:minmax(260px,35%) minmax(0,1fr);gap:2%; }
+  #menu.levelsOn .mnLevel { grid-template-columns:44px minmax(0,1fr) auto;gap:8px;padding-inline:10px; }
+  #menu.levelsOn .mnLvName { font-size:18px; }
+  #menu.levelsOn .mnLvNo { font-size:12px; }
+  #menu.levelsOn .mnLvMark { font-size:10px; }
+}
+@media(max-width:760px) {
+  #menu.levelsOn .mnPanelHead { min-height:104px;padding:22px 0 18px; }
+  #menu.levelsOn .mnPanelTitle { font-size:34px; }
+  #menu.levelsOn .mnCampaignMain { display:flex;flex-direction:column;gap:22px;overflow-y:auto;padding:14px 5.1% 18px; }
+  #menu.levelsOn .mnLevelList { flex:0 0 auto;max-height:none;overflow:visible;padding:0; }
+  #menu.levelsOn .mnLevel { min-height:48px;margin-bottom:4px;padding:8px 12px;grid-template-columns:48px minmax(0,1fr) auto;gap:8px; }
+  #menu.levelsOn .mnLvName { font-size:19px; }
+  #menu.levelsOn .mnLvNo { font-size:12px; }
+  #menu.levelsOn .mnLvMark { font-size:11px; }
+  #menu.levelsOn .mnSandboxLevel { grid-template-columns:25px minmax(0,1fr) auto; }
+  #menu.levelsOn .mnSandboxLevel .mnLvName { font-size:16px; }
+  #menu.levelsOn .mnBrief { flex:0 0 auto;width:100%;min-height:440px;overflow:visible;padding:0 10px 10px; }
+  #menu.levelsOn .mnMissionArt { inset:0 -2% 8%; }
+  #menu.levelsOn .mnBriefTitle { font-size:34px; }
+  #menu.levelsOn .mnMissionWhen { font-size:13px; }
+  #menu.levelsOn .mnMissionObjective { font-size:15px; }
+  .mnMissionActions { margin-top:22px;gap:14px; }
+  #menu.levelsOn .mnMissionRecord { width:100%;justify-content:flex-start; }
+  #menu.levelsOn .mnCampaignFoot { min-height:66px;flex-wrap:wrap;gap:0 16px;padding:6px 5.1%; }
+  #menu.levelsOn .mnCampaignKeys { order:3;width:100%;font-size:10px; }
+  .mnTrainingToggle { margin-left:auto;font-size:13px; }
+}
+@media(max-height:560px) and (min-width:761px) {
+  #menu.levelsOn .mnPanelHead { min-height:72px;padding:16px 0 12px; }
+  #menu.levelsOn .mnPanelTitle { font-size:32px; }
+  #menu.levelsOn .mnCampaignMain { padding-top:10px; }
+  #menu.levelsOn .mnLevelList { padding-top:0; }
+  #menu.levelsOn .mnLevel { min-height:44px;margin-bottom:2px; }
+  #menu.levelsOn .mnBriefTitle { font-size:28px; }
+  #menu.levelsOn .mnMissionWhen { font-size:12px;margin-top:6px; }
+  #menu.levelsOn .mnMissionObjective { font-size:14px;margin-top:8px; }
+  #menu.levelsOn .mnMissionActions { margin-top:12px;gap:8px; }
+  .mnMissionStart { font-size:18px;min-height:44px;padding:6px 18px; }
+  #menu.levelsOn .mnCampaignFoot { min-height:54px;padding-block:4px; }
+}
