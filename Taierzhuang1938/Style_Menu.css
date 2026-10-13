@@ -27,7 +27,7 @@
   padding-bottom:1.35vh;border-bottom:1px solid #b5b4a65c; }
 #menu.commandRoom .mnTitleSub { margin-top:1.4vh;font-size:clamp(12px,1.25vw,22px);letter-spacing:.21em;color:#c5c5bd; }
 #menu.commandRoom .mnList { left:5.1%;top:40.7%;bottom:14%;width:min(450px,31vw);gap:.8vh;overflow:visible; }
-#menu.commandRoom .mnItem { min-height:5.75vh;padding:5px 1.6vw;font-size:clamp(19px,1.82vw,32px);
+#menu.commandRoom .mnItem { min-height:5.75vh;padding:5px 1.6vw;font-size:clamp(15.2px,1.456vw,25.6px);
   font-weight:400;letter-spacing:.16em;border:0;border-left:5px solid transparent;color:#b9bcb7; }
 #menu.commandRoom .mnItem.on { color:var(--ui-gold);background:linear-gradient(90deg,#d8d4c326,#bbb7a90a);
   border-left-color:#edca83;border-image:none; }
@@ -43,7 +43,7 @@
  #menu.commandRoom .mnTitleMain{font-size:6.9vh}
  #menu.commandRoom .mnTitleSub{font-size:3vh}
  #menu.commandRoom .mnList{top:35%;bottom:15%;overflow-y:auto;width:42vw;gap:0}
- #menu.commandRoom .mnItem{min-height:32px;font-size:18px;padding-block:3px}
+ #menu.commandRoom .mnItem{min-height:32px;font-size:14.4px;padding-block:3px}
  #menu.commandRoom .mnFoot{font-size:10px;bottom:5%}
 }
 
