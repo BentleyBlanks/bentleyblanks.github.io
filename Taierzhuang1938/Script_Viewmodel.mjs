@@ -2289,13 +2289,21 @@ export class Viewmodel {
   }
 
   /** 投弹。power 0..1 是蓄力（只影响出手速度与摆幅，不影响时长）。 */
-  TriggerThrow(power = 1) {
+  TriggerThrow(power = 1, { kind = null, onRelease = null } = {}) {
     // 其余 Trigger* 都有这道闸，只有这个漏了：空手时 _StepAction 会直接 return，
     // action 的 t 永远推不到 1，onThrowRelease / onActionEnd 一次都不触发，
     // 这一发就被静默吞掉了。
-    if (!this.rig) return false;
     if (this.IsBusy()) return false;
-    this._StartAction("throw", 0.82);
+    let restoreWeapon = null;
+    if (kind === "Grenade" && this.weaponId !== "Grenade") {
+      restoreWeapon = { id:this.weaponId, variant:this.weaponVariant, armPose:this.armPoseKey,
+        boltOpen:this.boltOpen, pendingBoltAt:this.pendingBoltAt, pendingHoldOpen:this.pendingHoldOpen };
+      this.Equip("Grenade", 0, { instant:true });
+    }
+    if (!this.rig) return false;
+    this._StartAction("throw", FPS_GRENADE_THROW.durationS);
+    this.action.restoreWeapon = restoreWeapon;
+    this.action.onRelease = onRelease;
     this.action.power = Clamp01(power);
     // 手里已经是手榴弹就用它自己；否则左手掏一颗出来（步枪单手垂下）
     this.action.offhand = !this.weapon || this.weapon.kind !== "throwable";
@@ -2318,7 +2326,7 @@ export class Viewmodel {
     if (!this.action) return false;
     return this.action.kind === "bolt" || this.action.kind === "reload"
       || this.action.kind === "melee" || this.action.kind === "meleeWind"
-      || this.action.kind === "fixBayonet";
+      || this.action.kind === "fixBayonet" || this.action.kind === "throw";
   }
 
   /** 枪口世界坐标。注意要反解掉 FOV/深度压缩，否则弹道会从"缩小后的假位置"射出。 */
@@ -2820,6 +2828,13 @@ export class Viewmodel {
     }
     if (a.kind === "throw") this.offhandGrenade.visible = false;
     this.action = null;
+    if (a.kind === "throw" && a.restoreWeapon) {
+      const saved = a.restoreWeapon;
+      this.Equip(saved.id, saved.variant, { armPose:saved.armPose });
+      this.boltOpen = saved.boltOpen;
+      this.pendingBoltAt = saved.pendingBoltAt;
+      this.pendingHoldOpen = saved.pendingHoldOpen;
+    }
     if (this.onActionEnd) this.onActionEnd(a.kind);
   }
 
@@ -3422,37 +3437,48 @@ export class Viewmodel {
     const t=Clamp01(this.action.t),frames=FPS_GRENADE_THROW.frames,cursor=t*(frames.length-1);
     const a=frames[Math.floor(cursor)],b=frames[Math.min(frames.length-1,Math.floor(cursor)+1)],mix=cursor%1;
     const values=a.map((n,i)=>Mix(n,b[i],mix));
-    this.weaponMount.position.fromArray(values);
-    this.weaponMount.quaternion.fromArray(a,3).slerp(new THREE.Quaternion().fromArray(b,3),mix);
+    const amplitude=Mix(FPS_GRENADE_THROW.powerMinAmplitude,1,this.action.power);
+    this.weaponMount.position.fromArray(frames[0]).lerp(new THREE.Vector3().fromArray(values),amplitude);
+    const rotation=new THREE.Quaternion().fromArray(a,3).slerp(new THREE.Quaternion().fromArray(b,3),mix);
+    this.weaponMount.quaternion.fromArray(frames[0],3).slerp(rotation,amplitude);
+    if(this.action.restoreWeapon) this.weaponMount.position.y-=FPS_GRENADE_THROW.quickDrawDropM
+      *(1-Ease.InOut(Ease.Seg(t,0,FPS_GRENADE_THROW.quickDrawEnd)));
     const rig=this.riggedArms;
-    rig.videoBody={...this.armPose.hip.body,elbowPoles:{...this.armPose.hip.body.elbowPoles},authoredElbows:true};
-    const withdraw=Ease.InOut(Ease.Seg(t,0,.18))*(1-Ease.InOut(Ease.Seg(t,.76,1)));
+    // The authored palm orientation owns the throw, including during sprint/ADS.
+    rig.SetPoseState({ads:0,sprint:0});
+    rig.videoBody={shoulders:{right:values.slice(10,13),left:values.slice(13,16)},
+      elbowPoles:{right:values.slice(16,19),left:values.slice(19,22)},authoredElbows:true};
+    const [leaveStart,leaveEnd,returnStart,returnEnd]=FPS_GRENADE_THROW.withdraw;
+    const withdraw=Ease.InOut(Ease.Seg(t,leaveStart,leaveEnd))*(1-Ease.InOut(Ease.Seg(t,returnStart,returnEnd)));
     rig.SetContactWeight("l",1-withdraw);
     const hand=this.handLeft.group;
     const target=this.armAnchor.localToWorld(new THREE.Vector3().fromArray(values,7));
     hand.position.lerp(hand.parent.worldToLocal(target),withdraw);
-    const opening=Ease.InOut(Ease.Seg(t,.44,.52))*(1-Ease.InOut(Ease.Seg(t,.76,.92)));
+    const [openStart,openEnd,closeStart,closeEnd]=FPS_GRENADE_THROW.opening;
+    const opening=Ease.InOut(Ease.Seg(t,openStart,openEnd))*(1-Ease.InOut(Ease.Seg(t,closeStart,closeEnd)));
     rig.SetContactWeight("r",1-opening);
     rig.operationPose.r={shape:"open",nextShape:"open",shapeMix:0};
   }
 
   _ReleaseThrow(t,power,offhand) {
     // Release after the current frame's hand targets and bones are evaluated.
-    if (t >= 0.48 && this.action && !this.action.released) {
+    if (t >= FPS_GRENADE_THROW.release && this.action && !this.action.released) {
       this.action.released = true;
       if (offhand) this.offhandGrenade.visible = false;
       else if (this.rig.parts.grenade) this.rig.parts.grenade.visible = false;
-      if (this.onThrowRelease) {
+      if (this.onThrowRelease || this.action.onRelease) {
         const out = new THREE.Vector3();
         this.root.updateWorldMatrix(true,true);
         (offhand ? this.handLeft.group : this.weaponMount).getWorldPosition(out);
         this.root.worldToLocal(out);
         out.divide(this.compensation);
         this.root.localToWorld(out);
-        this.onThrowRelease(out, power);
+        this.action.onRelease?.(out, power);
+        this.onThrowRelease?.(out, power);
       }
     }
-    if (t > 0.85 && this.rig.parts.grenade) this.rig.parts.grenade.visible = true;
+    if (t > FPS_GRENADE_THROW.reappear && this.rig.parts.grenade && !this.action?.restoreWeapon)
+      this.rig.parts.grenade.visible = true;
   }
 
   // -------------------------------------------------------------------------

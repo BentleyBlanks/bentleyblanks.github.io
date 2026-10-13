@@ -185,8 +185,11 @@ export class CombatSystem {
       + (weapon.throwSpeedMax - weapon.throwSpeedMin) * Clamp01(power);
     const velocity = direction.clone().normalize().multiplyScalar(speed);
     velocity.y += speed * THROW.arcLift;            // 抛物线：手榴弹是抛出去的，不是打出去的
-    const start = fromPosition.clone().addScaledVector(direction, THROW.muzzleAheadM);
-    start.y += THROW.muzzleRiseM;
+    const start = fromPosition.clone();
+    if (!options?.handRelease) {
+      start.addScaledVector(direction, THROW.muzzleAheadM);
+      start.y += THROW.muzzleRiseM;
+    }
     // owner 决定伤谁、算不算玩家的战绩（见 Detonate）。**默认仍是 "player"** ——
     // 玩家投掷与剧本齐投（VolleyThrow）那两条老路径一个字都不用改；
     // 日军投弹显式传 { owner: "ija", ownerId } 才会走另一条分支。

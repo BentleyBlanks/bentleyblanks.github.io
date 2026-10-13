@@ -3,9 +3,13 @@ from pathlib import Path
 import bpy,json,math
 from mathutils import Matrix,Vector
 root=Path(GRENADE_PROJECT_ROOT)
-source=Path.home()/'OneDrive/AI/Models/Blender/Taierzhuang1938/GrenadeThrow_20260916/Animation_GrenadeThrow.blend'
-bpy.ops.wm.open_mainfile(filepath=str(source))
+source=Path.home()/'OneDrive/AI/Models/Blender/Taierzhuang1938/GrenadeThrow_20261014/Animation_GrenadeThrow.blend'
+if Path(bpy.data.filepath)!=source:
+    raise RuntimeError('Open the task GrenadeThrow_20261014 source before baking the evaluated rig')
 scene=bpy.context.scene
+for obj in list(bpy.data.objects):
+    if obj.type in {'MESH','ARMATURE','CAMERA','LIGHT'} or obj.name.startswith(('Model_Grenade','Scene_GrenadeViewScale')):
+        bpy.data.objects.remove(obj,do_unlink=True)
 data=json.loads((root/'_shots/GrenadeThrow/Data_GrenadeTrace.json').read_text())
 convert=Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))
 before=set(bpy.data.objects);bpy.ops.import_scene.gltf(filepath=str(root/'Model/Model_FpsHanYangHands.glb'))
@@ -38,7 +42,7 @@ for i,entry in enumerate(data['frames']):
     for channel in ['location','rotation_quaternion','scale']:weapon.keyframe_insert(channel,frame=i+1)
     for obj in prop.children_recursive:
         if obj.type=='MESH':
-            obj.hide_render=i/120>=.48 and i/120<=.85;obj.keyframe_insert('hide_render',frame=i+1)
+            obj.hide_render=i/120>=.48 and i/120<=.89;obj.keyframe_insert('hide_render',frame=i+1)
 arm.animation_data.action.name='Animation_GrenadeEvaluatedArms'
 weapon.animation_data.action.name='Animation_GrenadeEvaluatedProp'
 for obj in [arm,weapon]:
@@ -51,6 +55,14 @@ cam=bpy.data.cameras.new('Camera_Grenade');camera=bpy.data.objects.new(cam.name,
 camera.matrix_world=convert;cam.lens=36/(2*(1280/720)*math.tan(math.radians(55)/2));cam.clip_start=.01;scene.camera=camera
 scene.render.resolution_x=1280;scene.render.resolution_y=720;scene.render.resolution_percentage=100
 scene.render.fps_base=.82
+# Source opens as a usable lit animation studio, with the same camera as QA.
+world=bpy.data.worlds.new('World_GrenadeStudio');scene.world=world;world.use_nodes=True
+world.node_tree.nodes['Background'].inputs[0].default_value=(.12,.16,.20,1)
+world.node_tree.nodes['Background'].inputs[1].default_value=.45
+lightData=bpy.data.lights.new('Light_GrenadeKey','AREA');lightData.energy=110;lightData.shape='DISK';lightData.size=2
+light=bpy.data.objects.new(lightData.name,lightData);scene.collection.objects.link(light)
+light.location=(-.8,-.4,1.3);light.rotation_euler=(Vector((0,.4,-.1))-light.location).to_track_quat('-Z','Y').to_euler()
+scene.render.engine='CYCLES';scene.cycles.samples=16
 for img in bpy.data.images:
     if img.source=='FILE' and img.has_data and not img.packed_file:img.pack()
 scene.frame_set(39)

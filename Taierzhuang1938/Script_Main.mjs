@@ -6046,6 +6046,7 @@ function WeaponVariantFor(weaponId, value = 0) {
 function SyncMissionHands({ instant = false } = {}) {
   if (!missionRuntime || !viewmodel || mountView.active) return;
   const weaponId = missionRuntime.EmptyHands ? null : currentWeapon;
+  if (!missionRuntime.EmptyHands && viewmodel.action?.restoreWeapon?.id === weaponId) return;
   if (viewmodel.weaponId !== weaponId || viewmodel.armPoseKey !== weaponId) {
     viewmodel.Equip(weaponId, weaponId ? SlotWeaponVariant(state.activeSlot) : 0, { instant });
     SyncBayonet();
@@ -7270,7 +7271,7 @@ function CancelReload() {
 /** 按住蓄力：手榴弹可以攥着数几秒再扔，落地即炸。 */
 function BeginCook(kind) {
   if(missionRuntime?.EmptyHands)return false;
-  if (!player.Alive || state.cooking || combat.Returning) return;
+  if (!player.Alive || state.cooking || combat.Returning || viewmodel.IsBusy?.()) return;
   const infiniteGrenades = EffectiveInfiniteGrenades();
   if (kind === "Grenade" && !infiniteGrenades && state.grenades <= 0) { hud.Hint(T("hud.hint.noGrenades"), 2); return; }
   if (kind === "GrenadeBundle" && state.bundles <= 0) { hud.Hint(T("hud.hint.noBundles"), 2); return; }
@@ -7287,8 +7288,23 @@ function ReleaseCook() {
   // 所以「想扔远」和「想落地即炸」是一对取舍，不是白拿的收益。
   const power = Clamp01(state.cook / 1.1);
   const cooked = Math.max(0, state.cook - 0.35);
+  state.cook = 0;
+  if (kind === "Grenade") {
+    // The ordinary grenade (including G from a rifle) leaves the evaluated
+    // palm on the release frame. Cooking continues during the windup.
+    viewmodel.TriggerThrow(power, { kind, onRelease:(hand, releasedPower) => {
+      if (!player.Alive) return;
+      EmitPlayerGrenade(kind, releasedPower, hand, cooked + viewmodel.action.t * viewmodel.action.duration, true);
+    } });
+    return;
+  }
+  EmitPlayerGrenade(kind, power, player.EyePosition.clone(), cooked);
+  viewmodel.TriggerThrow?.(power);
+}
+
+function EmitPlayerGrenade(kind, power, origin, cooked, handRelease = false) {
   const dir = player.AimDirection(_aimDir).clone();
-  const projectile = combat.Throw(kind, power, player.EyePosition.clone(), dir, cooked);
+  const projectile = combat.Throw(kind, power, origin, dir, cooked, { handRelease });
   if (projectile && kind === "Grenade") p012Runtime?.RecordGrenade(player.position);
   if (projectile && kind === "Grenade" && p012Flow) projectile.OnHit = (target, damage, position) => p012Flow.RecordSouthGrenadeEffect(target, damage, position);
   // 夹到 0：BeginCook 已经挡过"没货就别拔弦"，但调试口（Debug.Throw）是直接
@@ -7303,8 +7319,6 @@ function ReleaseCook() {
     state.bundles = Math.max(0, state.bundles - 1);
     if (projectile && state.bundles === 0) playerVent.Empty("grenade");
   }
-  viewmodel.TriggerThrow?.(power);
-  state.cook = 0;
 }
 
 /** 白刃快捷出招也经过统一时序，不保留旧大刀即时伤害旁路。 */

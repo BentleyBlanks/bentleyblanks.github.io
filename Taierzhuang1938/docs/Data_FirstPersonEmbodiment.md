@@ -173,6 +173,39 @@ MotionVectorContract、ExplosionRules、ExplosionRange 通过。通用 BootTest 
 报告第一关 `readableIjaMaterials=0`；在未修改主检出上复测同一条件仍为 0，
 这是本次之外的材质接入问题。七切片完整开机回归未完成，不能称为全量通过。
 
+### 普通手雷过肩投掷（2026-10-14，覆盖上一节动作）
+
+普通手雷现在使用 Blender 制作的「肩侧后引 → 加速甩出 → 松指 → 顺势下收 → 回位」单条动作。
+`Data_FpsGrenadeThrow` 同时提供握点、四元数、左手退让、肩位与肘极点；轻投缩小摆幅，
+时长仍为 0.82 秒，脱手仍为归一化 0.48（0.3936 秒）。恢复段手指随前臂朝下，避免腕角约束换分支造成肘部翻转。
+动作期间掌向由此片段统一控制，不混入冲刺或开镜的持握旋转。原普通手雷模型与双臂模型不变。
+
+G 快捷投普通手雷也调用同一动作，临时收起手中武器，结束后恢复原型号、变体和拉栓状态；
+空手亦可使用已有库存。重复投掷输入不能重启正在播放的动作。集束弹和返掷保留各自路径。
+
+`ReleaseCook` 将普通手雷交给当前动作的 `onRelease`，在本帧双臂解算之后从实际握点发射，
+不再于起手时从眼位提前生成。`Combat.Throw` 的 `handRelease` 选项只跳过旧眼位发射偏移，
+初速、抛物线、伤害与碰撞不变；库存到释放时扣一次，蓄力引信继续计入起手时间。
+投掷前被换装/剧情取消不扣库存，死亡后不补发。完成后主线持枪同步恢复正常。
+
+可编辑源工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/GrenadeThrow_20261014/Animation_GrenadeThrow.blend`。
+`_blender/Script_GrenadeThrowStudio.py` 生成带事件标记的控制曲线与运行时数据；
+`_blender/Script_GrenadeThrowRigBake.py` 把测试导出的 121 帧、53 根骨骼及手雷装入同一工程。
+通过仓库 `scripts/Script_BlenderMcp.mjs start/exec/stop` 在本任务独立实例重建，
+执行时传 `GRENADE_PROJECT_ROOT`；先运行 Studio，再运行 GrenadeThrowTest，最后 RigBake。
+工程、回放页和截图均只留本地；回放入口为 `_shots/GrenadeThrow/index.html`，支持实时播放、暂停、拖动及力度切换。
+
+验收入口：`Script_GrenadeThrowTest`（完整轨迹人体约束、三档力度、站立/冲刺/开镜/蹲姿、
+普通持弹/持枪快捷/空手三路实际释放与引信、库存与原武器恢复），
+`Script_FpsArmTest --only=Grenade`、`Script_ExplosionRangeTest`（G/H 输入与真实爆炸），以及 ModuleGraph / MotionVectorContract。
+实测报告保留于 `_shots/GrenadeThrow/`；不把独立动作验收称作完整战役回归。
+
+本轮实测：握点误差 0、腕角最大约 64°、完整力度相邻采样肘位最大 25.5 mm；
+三路游戏释放/库存/引信与四种姿态通过，FpsArmTest 585/585、ExplosionRules/ExplosionRange、
+ModuleGraph、Text、TestRunner 与 MotionVectorContract 通过。全仓 `prepush --fail-fast`
+在 `SpeakerGestureTest` 的 `FrontObservation.02: luo gestured on his previous line too` 停止；
+未修改主检出 `2ec581c5` 上复测得到同一错误，该全仓门禁未通过。
+
 ### 架设机枪（2026-09-27）
 
 接管机枪不再收枪只看世界模型。对标 COD WWII / BFV 的固定机枪与两脚架：**枪钉在工事上、人贴上去**。

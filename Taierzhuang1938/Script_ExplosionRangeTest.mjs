@@ -62,7 +62,9 @@ try {
       const t = window.Taierzhuang, field = t.combat.host.battlefield;
       t.Debug.Explosions.Reset(); t.player.Spawn(2600, 2590, 0); t.player.pitch = 0;
       const before = id === "Grenade" ? t.state.grenades : t.state.bundles;
-      t.Debug.Key(key, true); t.StepFrames(30); t.Debug.Key(key, false); t.StepFrames(1);
+      t.Debug.Key(key, true); t.StepFrames(30); t.Debug.Key(key, false);
+      // Ordinary grenades now wait for the palm's release frame (~0.39 s).
+      t.StepFrames(30);
       const launched = t.combat.projectiles.some((p) => p.kind === id);
       const programs = t.renderer.info.programs.length;
       t.StepFrames(285);
