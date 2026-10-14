@@ -1,9 +1,10 @@
 // Player-facing archive. Contemporary sources, retrospective accounts and game diagrams remain distinct.
 // Images are documentary reproductions; the approved Imagegen concepts are layout references only.
-export const HISTORY_CODEX_VERSION = "20261013233001";
+export const HISTORY_CODEX_VERSION = "2026101501";
 const Image = name => `./Texture/Menu/History/Texture_History${name}Image.webp?v=${HISTORY_CODEX_VERSION}`;
 export const HISTORY_CODEX_CATEGORIES = ["people", "history", "documents", "press", "photos"];
 export const HISTORY_CODEX_TUNING = Object.freeze({ zoomMin: 1, zoomMax: 4, zoomStep: .25, wheelStep: .15 });
+export const HISTORY_BOOK_TUNING = Object.freeze({ pageWidth: 800, pageHeight: 1200, minPageWidth: 260, maxPageWidth: 1000, turnMs: 720, shadowOpacity: .38, warmRadius: 3, dragThreshold: 5, cornerFraction: .18, swipeCommitFraction: .35, zoomStep: .25, zoomMax: 4, doubleZoom: 2 });
 
 export const HISTORY_CODEX_ENTRIES = [
   {
@@ -60,6 +61,49 @@ export const HISTORY_CODEX_ENTRIES = [
     ],
     sourceNote: "回忆材料 · 与同期档案互核",
     sources: [{ title: "张宣武回忆录扫描原件", url: "https://ks3-cn-beijing.ksyun.com/attachment/b1a9f551fb36af74de7926b2ba283874", note: "印刷页61—77；扫描文件共17页，不把回忆文章标作1938年同期文件。" }],
+  },
+  {
+    id: "SichuanConscription", category: "history", title: "四川征兵与“抓壮丁”", subtitle: "1938—1945 · 战时社会背景",
+    summary: "征兵制度、强拉现象与纠弊记录。", image: Image("ConscriptionProcedure"),
+    imageAlt: "《四川省志·军事志》第550页的常备兵征送程序图", caption: "地方志整理图 · 非战时原件",
+    sections: [
+      { title: "入伍并非同一种经历", text: "抗战中，四川向前线输送大量兵员。自愿参军、依法征集和非法强拉同时存在；“壮丁”一词本身不能说明一个人是怎样入伍的。" },
+      { title: "制度与执行", text: "《四川省志·军事志》记载了壮丁调查、体检、抽签及交接程序，也记录了强拉、买卖和徇私等弊病。1940年3月的档案目录另载禁止虐待壮丁、严防差役勒索的命令。" },
+      { title: "放回各自的年代", text: "四川军管区及统一征募办法在1938年中陆续建立，后续规定仍在变化。此处1940—1945年的材料用于介绍战争期间的社会背景，不代表1938年某位滕县守军的个人经历；征兵总数也不能当作被抓人数。" },
+    ],
+    timeline: [
+      { date: "1938.06", title: "兵役机构", text: "四川军管区于6月1日成立，师、团管区随后设置。地方志所载机构和程序不能不加区别地用于更早的时期。" },
+      { date: "1940.03", title: "纠弊记录", text: "3月19日《事略稿本》的馆藏目录记载，蒋中正电贺国光要求改善四川役政，禁止虐待壮丁并防止差役勒索。目录可证这一记录存在，不能据此断言命令已落实。" },
+      { date: "1944.04", title: "征集程序", text: "4月12日院字第2676号解释回应四川法院疑问，指出未依法抽签，或已中签而尚未受征集者，也在“不应征集之壮丁”范围内。这是1944年的解释。" },
+    ],
+    related: ["LeshanConscription1943", "ZhongjiangConscription1945"],
+    sources: [
+      { title: "《四川省志·军事志》：兵役", url: "https://www.scdfz.org.cn/upload/main/contentmanage/article/file/201702232017118370.pdf", note: "第544、547—550页。图取第550页；地方志为事后整理，原图保留页码。" },
+      { title: "国史馆藏《事略稿本》1940年3月19日记录", url: "https://catalog.digitalarchives.tw/item/00/69/51/b9.html", note: "典藏号002-060100-00138-019，数位典藏联合目录。本条依据目录著录，不假称取得电报手稿或完整逐字原文。" },
+      { title: "司法院院字第2676号解释：公开转录", url: "https://zh.wikisource.org/wiki/司法院院字第2676號解釋", note: "1944年4月12日；转录所据《司法院解释汇编》第4册第2336页。与国史馆015-010305-0021卷的日期和主题互核，未取得原刊影印。" },
+    ],
+  },
+  {
+    id: "LeshanConscription1943", category: "documents", title: "乐山县请求缓征公文", subtitle: "1943年背景 · 四川乐山",
+    summary: "旱灾、地方困难与补兵任务。", caption: "战时公文照片 · 晚于滕县战役", image: Image("LeshanConscription1943"),
+    imageAlt: "乐山县政府请求暂缓征兵的公文照片", pages: [Image("LeshanConscription1943")],
+    sections: [
+      { title: "名额与农时", text: "地方文史资料介绍，1943年乐山县面临旱灾和治安困难，县长易民苏曾请求暂缓征兵，第五区也提出核减配额。材料反映兵员需求与地方承受能力之间的矛盾。" },
+      { title: "怎样读这张影像", text: "原网页将此图注为乐山县政府延缓征兵的请求。图中文字较小，不能凭它可靠复原全部正文；缓征申请也不能证明所涉兵员都由强拉而来。" },
+    ],
+    contents: [], sourceNote: "档案照片 · 未确认完整档号与具体发文日",
+    sources: [{ title: "魏奕雄：抗战期间乐山向前线输送兵员情况", url: "https://m.krzzjn.com/show-924-92518.html", note: "2019年3月1日公开资料，包含公文照片与1943年缓征叙述。原图400×599像素；未放大补字。" }],
+  },
+  {
+    id: "ZhongjiangConscription1945", category: "documents", title: "中江壮丁待遇代电", subtitle: "1945年5月18日 · 四川中江",
+    summary: "关于捆绑押交与新兵生活的战时报告。", caption: "中国第二历史档案馆藏 · 代电局部", image: Image("ZhongjiangConscription1945"),
+    imageAlt: "1945年5月18日成都行辕政治部反映中江壮丁待遇的代电局部", pages: [Image("ZhongjiangConscription1945")],
+    sections: [
+      { title: "公文中的强制与虐待", text: "这份成都行辕政治部致军事委员会政治部的代电，反映四川中江县所驻部队接收壮丁后的处境。档案报道记有捆绑押交、拥挤、疾病及照护不足等问题。" },
+      { title: "个案的范围", text: "公开影像只是代电的一部分，不能代替完整卷宗。这是抗战末期的一份地方报告，不据此推定全体川军的入伍经历，也不把它当作1938年滕县战场的现场记录。" },
+    ],
+    contents: [], sourceNote: "原载《中国档案报》2019年7月26日 · 公开影像未列完整档号",
+    sources: [{ title: "童玉汝：抗战时期国民政府征兵黑幕", url: "https://m.krzzjn.com/show-897-132654.html", note: "原载《中国档案报》总第3404期第2版；刊出中国第二历史档案馆藏代电局部。保留原图299×369像素，不将它标为抓丁现场照片。" }],
   },
   {
     id: "XinhuaDaily", category: "press", title: "新华日报", subtitle: "1938年4月8日",

@@ -588,9 +588,9 @@ profiler.environment = () => {
 // let 绑定，换关重建系统之后自动读到新实例；系统还没建好时返回 NaN（面板显示「—」）。
 {
   const Count = (list, test) => { if (!list) return NaN; let n = 0; for (const item of list) if (test(item)) n += 1; return n; };
-  profiler.AddCounter("ai.nra", () => Count(ai?.soldiers, (s) => s.side === "nra" && s.alive), { label: "我方存活", group: "人物" });
-  profiler.AddCounter("ai.ija", () => Count(ai?.soldiers, (s) => s.side === "ija" && s.alive), { label: "敌方存活", group: "人物" });
-  profiler.AddCounter("ai.dead", () => Count(ai?.soldiers, (s) => !s.alive), { label: "阵亡（还在场上）", group: "人物" });
+  profiler.AddCounter("ai.nra", () => Count(ai?.soldiers, (s) => s.side === "nra" && s.alive), { label: "我方存活", group: "人物" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
+  profiler.AddCounter("ai.ija", () => Count(ai?.soldiers, (s) => s.side === "ija" && s.alive), { label: "敌方存活", group: "人物" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
+  profiler.AddCounter("ai.dead", () => Count(ai?.soldiers, (s) => !s.alive), { label: "阵亡（还在场上）", group: "人物" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
   profiler.AddCounter("vfx.instances", () => {
     const particles = vfx?.particles?.renderer;
     if (!particles) return NaN;
@@ -599,16 +599,16 @@ profiler.environment = () => {
     for (const pool of Object.values(particles.pools || {})) n += pool.geometry?.instanceCount || 0;
     for (const pool of particles.volumes?.pools?.values?.() || []) n += pool.geometry?.instanceCount || 0;
     return n;
-  }, { label: "粒子实例", group: "特效" });
-  profiler.AddCounter("physics.bodies", () => physics?.world?.bodies?.len?.() ?? NaN, { label: "刚体", group: "物理" });
-  profiler.AddCounter("physics.colliders", () => physics?.world?.colliders?.len?.() ?? NaN, { label: "碰撞体", group: "物理" });
-  profiler.AddCounter("audio.voices", () => audio?.activeVoices?.size ?? NaN, { label: "同时发声", group: "声音" });
-  profiler.AddCounter("render.programs", () => renderer.info.programs?.length ?? NaN, { label: "着色器程序", group: "渲染" });
-  profiler.AddCounter("render.geometries", () => renderer.info.memory.geometries, { label: "几何体", group: "渲染" });
-  profiler.AddCounter("render.textures", () => renderer.info.memory.textures, { label: "纹理", group: "渲染" });
+  }, { label: "粒子实例", group: "特效" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
+  profiler.AddCounter("physics.bodies", () => physics?.world?.bodies?.len?.() ?? NaN, { label: "刚体", group: "物理" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
+  profiler.AddCounter("physics.colliders", () => physics?.world?.colliders?.len?.() ?? NaN, { label: "碰撞体", group: "物理" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
+  profiler.AddCounter("audio.voices", () => audio?.activeVoices?.size ?? NaN, { label: "同时发声", group: "声音" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
+  profiler.AddCounter("render.programs", () => renderer.info.programs?.length ?? NaN, { label: "着色器程序", group: "渲染" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
+  profiler.AddCounter("render.geometries", () => renderer.info.memory.geometries, { label: "几何体", group: "渲染" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
+  profiler.AddCounter("render.textures", () => renderer.info.memory.textures, { label: "纹理", group: "渲染" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
   profiler.AddCounter("js.heapMb", () => (performance.memory ? performance.memory.usedJSHeapSize / 1048576 : NaN),
-    { label: "JS 堆", unit: "MB", group: "内存" });
-  profiler.AddCounter("machine.busy", () => (profiler.busy > 0 ? profiler.busy : NaN), { label: "机器忙闲（慢几倍）", unit: "×", group: "机器" });
+    { label: "JS 堆", unit: "MB", group: "内存" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
+  profiler.AddCounter("machine.busy", () => (profiler.busy > 0 ? profiler.busy : NaN), { label: "机器忙闲（慢几倍）", unit: "×", group: "机器" }); // @text-ok Profiler-only diagnostic labels; never shown in player UI.
 }
 /** 这一帧是什么状态（剖析器帧图的灰底、汇总只算「游戏中 + 过场」）。分支顺序照抄 LoopStep。 */
 function ProfilerFrameState() {
@@ -629,8 +629,8 @@ function ProfilerFrameContext() {
   // 阵亡/补兵：存活人数一掉就打一面小旗（逐兵挂钩要改 Soldier，这里按人数差就够定位）
   if (!profiler.recording || !ai) return;
   const alive = ai.aliveCount;
-  if (profilerAlive >= 0 && alive < profilerAlive) profiler.Mark("death", `阵亡 ${profilerAlive - alive}`);
-  else if (profilerAlive >= 0 && alive > profilerAlive) profiler.Mark("spawn", `补兵 +${alive - profilerAlive}`);
+  if (profilerAlive >= 0 && alive < profilerAlive) profiler.Mark("death", `阵亡 ${profilerAlive - alive}`); // @text-ok Profiler event annotations are developer diagnostics.
+  else if (profilerAlive >= 0 && alive > profilerAlive) profiler.Mark("spawn", `补兵 +${alive - profilerAlive}`); // @text-ok Profiler event annotations are developer diagnostics.
   profilerAlive = alive;
 }
 
@@ -1805,7 +1805,7 @@ async function Boot() {
     // 爆炸也是刺激（docs/Data_EnemyAi.md §4.1）。`hurtSide` 是**挨炸的那一方**，
     // 声源那一方是它的反面 —— 感知层按 side 过滤「同阵营的响动不算敌情」。
     onBlast: (e) => {
-      if (e) profiler.Mark("explosion", e.kind || "爆炸");
+      if (e) profiler.Mark("explosion", e.kind || "爆炸"); // @text-ok Profiler event annotations are developer diagnostics.
       if (!ai || !e) return;
       // 投掷者本人（玩家 / 某个兵）要跟着传：没有 ref 的那条记忆只是一个坐标，
       // 大脑接不回成目标，人听见炸响也只会原地发呆。
@@ -9832,7 +9832,7 @@ function Loop(now) {
   if (state.running && !state.menu && !state.warming) {
     if (autoQuality.Frame(now)) {
       ApplyGraphics();
-      profiler.Mark("quality", `自动降档 → 第 ${autoQuality.step} 级（分辨率 ×${autoQuality.scale}）`);
+      profiler.Mark("quality", `自动降档 → 第 ${autoQuality.step} 级（分辨率 ×${autoQuality.scale}）`); // @text-ok Profiler event annotations are developer diagnostics.
     }
   }
   // 剖析帧边界包在分支外面：LoopStep 的三条早退路径（菜单帧 / 停摆）也各是一帧。

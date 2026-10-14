@@ -287,6 +287,13 @@ export const TEXT = Object.freeze({
   "menu.codex.detailKeys": "R 查看出处 · Esc 返回",
   "menu.codex.map": "态势示意",
   "menu.codex.imageViewer": "史料影像阅览区",
+  "menu.codex.bookViewer": "历史文献书本，拖动书角或用左右方向键翻页",
+  "menu.codex.bookFacsimile": "文献影印阅读",
+  "menu.codex.bookHint": "拖动书角翻页 · 双击纸页放大",
+  "menu.codex.bookSingleHint": "双击纸页放大",
+  "menu.codex.bookZoomHint": "滚轮缩放 · 拖动查看 · Esc 回到书本",
+  "menu.codex.returnBook": "回到书本",
+  "menu.codex.scanPage": "影像页 {page}",
   "menu.codex.imageError": "影像未能载入，请返回后重试或查看出处。",
   "menu.codex.zoomIn": "放大",
   "menu.codex.zoomOut": "缩小",
@@ -412,6 +419,7 @@ export const TEXT = Object.freeze({
 export const GATED_MODULES = Object.freeze([
   "Script_Menu.mjs",
   "Script_HistoryCodex.mjs",
+  "Script_HistoryBook.mjs",
 ]);
 
 /**

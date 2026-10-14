@@ -83,6 +83,9 @@ export const TEXTURE_PROVIDERS = Object.freeze({
  * 体积预算（字节）。boot 总额以 Script_BootPayloadTest 为准（这里不重复）；
  * 按需集：每关总额与每套上限在 Data_LevelTextureSets；这里是**整层**（含历史 legacy）上限。
  */
+// Three user-requested archive sources add 158.4 KiB after native-size conversion.
+// Their small allowance belongs only to the lazy archive, never the boot payload.
+const HISTORY_SOURCE_ADDITIONS_BYTES = 192 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -100,10 +103,10 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
     // Only the selected pair is requested (< 1 MB), not the whole campaign set.
-    lazy: 14 * 1024 * 1024, // Also includes lossless command-room irradiance.
+    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES, // Also includes lossless command-room irradiance.
     editor: 0.25 * 1024 * 1024,
   }),
-  totalBytes: 62 * 1024 * 1024,      // Reference 10 adds one level-only loose-soil PBR; boot assets unchanged.
+  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES, // New archive sources remain lazy; boot assets unchanged.
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -1588,6 +1591,16 @@ export const TEXTURE_MANIFEST = Object.freeze([
     source: {provider: "user", date: "2026-10-13", ref: "https://www.krzzjn.com/show-1209-76894.html", license: "Historical documentary reproduction; reproduction marks and source retained; photographer unconfirmed, not asserted CC0."},
     bake: "_import/Script_HistoryCodexBake.py", consumers: [{file: "Data_HistoryCodex.mjs", token: "WuhanMemorial"}],
     files: [["Menu/History/Texture_HistoryWuhanMemorialImage.webp", "Image", 319, 450]],
+  },
+  {
+    id: "HistoryCodexConscription", kind: "menu", tier: "lazy",
+    source: {provider: "user", date: "2026-10-14", ref: "https://app.notion.com/p/3f960335331c81e58824e011707ddc85", license: "Attributed historical documents and a provincial gazetteer diagram. Source URLs and transformations recorded in _import/Data_HistoryConscriptionImages.json; no CC0 claim."},
+    bake: "_import/Script_HistoryConscriptionBake.py", consumers: [{file: "Data_HistoryCodex.mjs", token: "SichuanConscription"}],
+    files: [
+      ["Menu/History/Texture_HistoryConscriptionProcedureImage.webp", "Image", 1070, 1505],
+      ["Menu/History/Texture_HistoryLeshanConscription1943Image.webp", "Image", 400, 599],
+      ["Menu/History/Texture_HistoryZhongjiangConscription1945Image.webp", "Image", 299, 369],
+    ],
   },
 
 ]);

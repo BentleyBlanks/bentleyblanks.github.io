@@ -18,9 +18,8 @@
 .hcCategories button:hover { color:#edca83; }
 .hcScroll { flex:1; min-height:0; overflow:auto; scrollbar-width:thin; scrollbar-color:#a89c75 #15171155; padding:4px; margin:-4px; }
 .hcGrid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:14px; align-content:start; }
-.hcGrid.all { height:100%; grid-template-rows:repeat(2,minmax(210px,1fr)); }
+.hcGrid.all { min-height:100%; grid-auto-rows:minmax(210px,auto); }
 .hcCard { grid-column:span 2; display:flex; gap:clamp(13px,1.5vw,27px); min-width:0; min-height:235px; text-align:left; padding:16px; position:relative; border:1px solid #c1bdab52!important; background:#11130d36!important; }
-.hcGrid.all .hcCard:nth-child(4), .hcGrid.all .hcCard:nth-child(5) { grid-column:span 3; }
 .hcCard::before { content:""; position:absolute; inset:-1px auto -1px -1px; width:4px; background:transparent; }
 .hcCard.selected, .hcCard:hover { border-color:#dbc18d99!important; background:#d8d4c30c!important; }
 .hcCard.selected::before, .hcCard:hover::before { background:#edca83; }
@@ -73,6 +72,7 @@
 .hcBattleVisual { display:flex; min-height:0; flex-direction:column; gap:10px; overflow:auto; scrollbar-width:thin; }
 .hcMap { display:block; width:100%; min-height:130px; flex:1; max-height:39vh; object-fit:contain; overflow:hidden; font-family:var(--ui-font); }
 .hcBattleVisual > small { color:#aaa99b; font-size:12px; }
+.hcContextScan { display:block; width:100%; flex:1; min-height:130px; max-height:39vh; object-fit:contain; }
 .hcBattleVisual .hcTimeline { margin:8px 0; flex:0; }
 .hcStage { flex:0; border:1px solid #c1bdab44; border-left:4px solid #edca83; padding:10px 13px; }
 .hcStage p { margin:0; color:#d5d4ca; font-size:var(--menu-font-meta); line-height:1.7; }
@@ -88,6 +88,42 @@
 .hcPaging { display:flex; align-items:center; gap:10px; white-space:nowrap; }
 .hcReaderHint { flex:0; color:#aaa99b; font-size:12px; }
 .hcReader.expanded { position:fixed; inset:3vh 3vw; z-index:80; padding:20px; background:#090c08fa; border:1px solid #c1bdab77; box-shadow:0 0 0 5vw #000b; }
+/* Documents are bound paper. The original scan is always the page texture. */
+.hcKind-documents { grid-template-columns:minmax(0,1.65fr) minmax(280px,.9fr); }
+.hcBookReader { gap:15px; padding:8px 8px 0; }
+.hcBookViewport { position:relative; flex:1; min-height:220px; min-width:0; touch-action:none; user-select:none; isolation:isolate; }
+.hcBookViewport:focus-visible { outline:1px solid #d9c28c80; outline-offset:9px; }
+.hcBookHost.stf__parent { width:100%!important; height:100%; min-width:0!important; min-height:0!important; position:relative; z-index:1; }
+.hcBookHost .stf__wrapper { width:100%; height:100%; padding:0!important; }
+.hcBookBoard { position:absolute; background:#3c3220; border-radius:2px 4px 5px 2px; transform:translateY(3px); box-shadow:0 3px 0 #c2b9a4,0 5px 0 #7c7462,0 7px 0 #a99e85,0 10px 0 #302a1f,0 15px 26px #000a,0 0 0 5px #332e21; pointer-events:none; }
+.hcBookPage { background:#faf9f4; color:#342f25; overflow:hidden; border:1px solid #d9d5c9; }
+.hcBookPage img { width:100%; height:100%; display:block; object-fit:contain; user-select:none; pointer-events:auto; }
+.hcBookPage img:not([src]) { visibility:hidden; }
+.hcBookPage::after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,#0002,transparent 6%,transparent 94%,#0001); }
+.hcBookPage.--left::after { background:linear-gradient(90deg,#0001,transparent 4%,transparent 83%,#2b20140b 92%,#271e1338); }
+.hcBookPage.--right::after { background:linear-gradient(90deg,#271e1340,#2b20140b 8%,transparent 17%,transparent 96%,#0001); }
+.hcBookFlyleaf { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:12%; text-align:center; background:linear-gradient(90deg,#eeeadf,#f9f6ed 22%,#f4f0e5 90%,#e1dacb); }
+.hcBookFlyleaf h3 { font-family:"TzTitleText",var(--ui-title-font); font-size:clamp(17px,1.6vw,29px); line-height:1.7; font-weight:500; letter-spacing:.08em; margin:0; }
+.hcBookFlyleaf p { font-size:clamp(11px,.9vw,16px); margin:0; line-height:1.8; }
+.hcBookFlyleaf small { font-size:clamp(10px,.75vw,13px); color:#80745f; letter-spacing:.12em; line-height:1.7; }
+.hcBookFlyleaf small:first-child { margin-bottom:24px; padding-bottom:15px; border-bottom:1px solid #ac9c7866; }
+.hcBookFlyleaf small:last-child { margin-top:38px; }
+.hcBookPageError { position:absolute; inset:15%; display:grid; place-content:center; color:#695e4c; font-size:14px; line-height:1.8; }
+.hcBookPageError[hidden] { display:none; }
+.hcBookFailure { position:absolute; inset:30%; z-index:10; color:#d6c6a5; }
+.hcBookFoot { display:flex; align-items:center; gap:8px; flex:none; min-height:25px; padding:0 3px; font-size:var(--menu-font-small); color:#b6b0a0; }
+.hcBookFolio { margin-left:auto; white-space:nowrap; color:#d5ccb8; }
+.hcBookKey { width:24px; height:25px; padding:0; opacity:0; }
+.hcBookKey:focus-visible,.hcBookFoot:hover .hcBookKey:not(:disabled) { opacity:1; }
+.hcBookReader[data-book-orientation="portrait"] .hcBookGesture { font-size:11px; }
+.hcBookLens { position:fixed; inset:0; width:94vw; height:94vh; max-width:none; max-height:none; padding:15px; border:1px solid #bfb29966; background:#15160ff5; color:#d8d0bd; }
+.hcBookLens[open] { display:flex; flex-direction:column; gap:12px; }
+.hcBookLens::backdrop { background:#050704d9; }
+.hcBookLensClose { align-self:flex-end; min-height:35px; padding:5px 14px!important; border:1px solid #bfb29966!important; }
+.hcBookLensViewport { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; touch-action:none; }
+.hcBookLensViewport img { flex:none; max-width:none; max-height:none; user-select:none; }
+.hcBookLensViewport.zoomed { cursor:grab; }.hcBookLensViewport.zoomed:active { cursor:grabbing; }
+.hcBookLens small { text-align:center; color:#a9a28f; font-size:12px; }
 .hcReadTabs { display:flex; gap:26px; border-bottom:1px solid #c1bdab44; margin:16px 0; }
 .hcReadTabs button { padding:8px 0; border-bottom:3px solid transparent; color:#c3c3b8; }
 .hcReadTabs button.selected { color:#edca83; border-bottom-color:#edca83; }
@@ -148,3 +184,6 @@
   .hcFooterEnd { gap:10px; }.hcFooter { font-size:11px; }
   .hcRestoration .mnCodexRow { grid-template-columns:1fr; gap:3px; }
 }
+.hcBookFlyleafContent { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:20px; }
+
+.hcBookFlyleaf h3, .hcBookFlyleaf p { text-wrap:balance; }

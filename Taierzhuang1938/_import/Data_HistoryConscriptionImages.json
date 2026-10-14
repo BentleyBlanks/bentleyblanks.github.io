@@ -1,0 +1,29 @@
+[
+  {
+    "file": "Texture/Menu/History/Texture_HistoryConscriptionProcedureImage.webp",
+    "source": "https://www.scdfz.org.cn/upload/main/contentmanage/article/file/201702232017118370.pdf",
+    "sourceSha256": "31fb3695693ab17f2b0b4e01da35dc9431ce95c8229d007adbd61b438e88a417",
+    "sha256": "f99039978c4bdd41693ec5fca11bba31dca9d4108e4dcee1e50a1d4802e89722",
+    "width": 1070,
+    "height": 1505,
+    "method": "Complete PDF page 550 rendered at 144 dpi; lossless WebP"
+  },
+  {
+    "file": "Texture/Menu/History/Texture_HistoryLeshanConscription1943Image.webp",
+    "source": "https://www.krzzjn.com/uploadfile/2019/0301/20190301094155192.jpg",
+    "sourceSha256": "aaf311bab3f55ccfcb016d29e7e9b8c37e989b714d95cc547fc18697fdb1ea7c",
+    "sha256": "2cbcc25d029e0f4f9626acfc4beb420a4ad3497d5766c7fcc1ff5801a8cbf7ac",
+    "width": 400,
+    "height": 599,
+    "method": "Native photograph dimensions, WebP quality 95; no resampling"
+  },
+  {
+    "file": "Texture/Menu/History/Texture_HistoryZhongjiangConscription1945Image.webp",
+    "source": "https://www.krzzjn.com/uploadfile/2023/0621/20230621110407146.jpg",
+    "sourceSha256": "7a2efc35ade68613fb6619be28248189b93439775ac5a3aeecd1cd625e8e6991",
+    "sha256": "0896eb01d6989291fe83cf621c8763c94dcc79d0d1edd6bb43e6cc4699172735",
+    "width": 299,
+    "height": 369,
+    "method": "Native photograph dimensions, WebP quality 95; no resampling"
+  }
+]
