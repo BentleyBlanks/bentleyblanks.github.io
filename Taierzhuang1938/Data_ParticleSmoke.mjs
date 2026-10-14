@@ -1,5 +1,6 @@
 import {BATTLE_SMOKE_STYLES} from './Data_Tuning_BattleSmoke.mjs';
 import {PARTICLE_VOLUME_ASSETS} from './Data_ParticleVolumeAssets.mjs';
+import {STATIC_SMOKE_ART} from './Data_Tuning_Particles.mjs';
 
 const Position=v=>[v.x,v.y,v.z];
 // One 3D fluid sequence owns each stationary plume. The actual wreck outlet,
@@ -27,11 +28,11 @@ export function BattleSmokeModules(source,quality='high'){
 }
 
 export function StaticSmokeModules(source,wind){
- const height=source.groundHug?Math.max(.8,source.sizeEnd*.65):Math.max(2,Math.min(24,source.life*source.rise*.65));
- const spread=Math.max(.6,source.sizeEnd),drift=Math.hypot(wind.x,wind.z)*source.life;
+ const height=source.groundHug?Math.max(.8,source.sizeEnd*.65):Math.max(2,Math.min(24,source.life*source.rise*STATIC_SMOKE_ART.heightScale));
+ const spread=Math.max(.6,source.sizeEnd)*(source.kind==='black'?STATIC_SMOKE_ART.blackSpread:STATIC_SMOKE_ART.lightSpread),drift=Math.hypot(wind.x,wind.z)*source.life;
  return {preset:'VolumePlume',name:'SourceSmoke/'+source.seed,position:Position(source.position),modules:{
    main:{duration:120,loop:true,prewarm:false,startLifetime:120,startSpeed:0,startSize:1,maxParticles:1,simulationSpace:'local',randomSeed:source.seed>>>0,
      startRotation:Math.atan2(wind.x,wind.z||1e-6),startColor:[...source.colorA.map((n,i)=>(n*.3+source.colorB[i]*.7)/[.32,.31,.29][i]),1]},
-   renderer:{volumeAsset:source.kind==='black'?'ChimneySmoke':'DenseSmoke',bounds:[spread,height,Math.max(spread,drift+spread*.5)],density:Math.max(.2,Math.min(32,source.opacity*32)),volumeSpeed:Math.max(.35,Math.min(2,5/source.life))},
+   renderer:{volumeAsset:source.kind==='black'?'ChimneySmoke':'DenseSmoke',bounds:[spread,height,Math.max(spread*STATIC_SMOKE_ART.windAspect,drift+spread*.5)],density:Math.max(.2,Math.min(32,source.opacity*STATIC_SMOKE_ART.densityScale)),volumeSpeed:Math.max(.35,Math.min(2,5/source.life))},
  }};
 }

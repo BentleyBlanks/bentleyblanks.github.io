@@ -11,6 +11,7 @@ await fs.writeFile(check,`<!doctype html><meta charset="utf-8"><style>body{margi
 import * as THREE from 'three';
 import {ParticleEffects} from './Script_ParticleEffects.mjs';
 import {CreateParticleEnvironment} from './Script_ParticleEnvironment.mjs';
+import {CreateParticleVolumeMaterial} from './Script_ParticleVolumeMaterial.mjs';
 const W=1280,H=720,renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});renderer.setSize(W,H);renderer.setPixelRatio(1);renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.append(renderer.domElement);
 const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(48,W/H,.05,1000),environment=CreateParticleEnvironment();
 environment.shared.uSkyColor.value.set(.13,.16,.20);environment.shared.uSunColor.value.set(1.7,1.6,1.45);environment.shared.uSunDirection.value.set(-.6,.8,.4).normalize();environment.shared.uResolution.value.set(W,H);
@@ -50,6 +51,23 @@ window.Test={renderer,scene,camera,api,environment,Pixels,Difference,
   const h=preset==='VolumeFire'?2.2:8;camera.position.set(Math.sin(angle)*h*2,h*.75,Math.cos(angle)*h*2);camera.lookAt(0,h*.5,0);camera.updateMatrixWorld(true);Pixels();
  },
  SetLight(direction){environment.shared.uSunDirection.value.fromArray(direction).normalize();Pixels();},
+ Boundary(){
+  // An open simulation outlet contains density right up to a domain face.
+  // Observe optical depth on the GPU: it must dilute over many pixels before
+  // leaving that face, while the lower smoke body stays connected and dense.
+  const field={metadata:{asset:'DenseSmoke',dimensions:[8,8,8],atlasTiles:[2,1,1],frames:2,duration:3,anchor:[.5,0,.5],channels:1},size:[16,8,8],data:new Uint8Array(1024).fill(128)};
+  const material=CreateParticleVolumeMaterial(field,{extinction:4,shared:{uParticleDensity:environment.shared.uParticleDensity}});
+  material.uniforms.uLightColor.value.set(0,0,0);material.uniforms.uAmbientColor.value.set(0,0,0);
+  const fixture=new THREE.Scene(),mesh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),material),view=new THREE.PerspectiveCamera(48,W/H,.05,100);
+  mesh.scale.set(4,4,4);mesh.position.y=2;mesh.updateMatrixWorld(true);material.uniforms.uWorldToVolume.value.copy(mesh.matrixWorld).invert();fixture.add(mesh);
+  view.position.set(0,2,9);view.lookAt(0,2,0);view.updateMatrixWorld(true);
+  const color=renderer.getClearColor(new THREE.Color()),alpha=renderer.getClearAlpha();
+  function Profile(){renderer.setClearColor(0xffffff,.37);renderer.setRenderTarget(target);renderer.render(fixture,view);const pixels=new Uint8Array(W*H*4);renderer.readRenderTargetPixels(target,0,0,W,H,pixels);
+   const values=[];for(let y=H/2;y<H;y++)values.push(1-pixels[(y*W+W/2)*4]/255);
+   return {softRows:values.filter(n=>n>.02&&n<.65).length,core:1-pixels[(Math.floor(H*.43)*W+W/2)*4]/255,peak:Math.max(...values)};}
+  const diluted=Profile();material.uniforms.uVolumeDissipation.value.set(0,0,0);const clipped=Profile();
+  renderer.setClearColor(color,alpha);renderer.setRenderTarget(null);mesh.geometry.dispose();material.dispose();return {diluted,clipped,error:gl.getError()};
+ },
  Beauty(){renderer.setRenderTarget(beautyTarget);renderer.render(scene,camera);renderer.setRenderTarget(null);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.render(displayScene,displayCamera);renderer.toneMapping=THREE.NoToneMapping;},
  Dispose(){api.Dispose();target.dispose();beautyTarget.dispose();display.geometry.dispose();display.material.dispose();environment.Dispose();return {children:scene.children.length,error:gl.getError()};}
 };window.ready=true;
@@ -67,12 +85,15 @@ try{
   await page.evaluate(async p=>{await Test.Show(p,.8,.8);Test.Beauty();},preset);await page.screenshot({path:path.join(out,'Scene_'+preset+'.png')});
  }
  const lifecycle=await page.evaluate(()=>Test.BurstAndCycle());assert.equal(lifecycle.pending,0);assert.ok(lifecycle.born>500);assert.ok(Math.abs(lifecycle.position[0]-.4)<1e-6);assert.equal(lifecycle.pausedRejects,true);assert.ok(lifecycle.cycleStep<lifecycle.normalStep*3+200,'lifetime cycling must not reset the fluid animation');
+ const boundary=await page.evaluate(()=>Test.Boundary());
+ assert.ok(boundary.diluted.softRows>boundary.clipped.softRows+12,'smoke must dilute before an open simulation face: '+JSON.stringify(boundary));
+ assert.ok(boundary.diluted.core>.75,'dissipation must retain the lower dense smoke body');assert.equal(boundary.error,0);
  await page.evaluate(()=>Test.Show('VolumeDensePlume',0,1));
  for(const [name,direction]of [['Front',[0,.4,1]],['Side',[1,.4,0]],['Back',[0,.4,-1]]]){
   await page.evaluate(d=>{Test.SetLight(d);Test.Beauty();},direction);await page.screenshot({path:path.join(out,'Scene_Lighting'+name+'.png')});
  }
  const disposal=await page.evaluate(()=>Test.Dispose());assert.deepEqual(disposal,{children:0,error:0});assert.deepEqual(errors,[]);
- await fs.writeFile(path.join(out,'Report.json'),JSON.stringify({results,lifecycle,disposal,errors},null,2));
+ await fs.writeFile(path.join(out,'Report.json'),JSON.stringify({results,lifecycle,boundary,disposal,errors},null,2));
  console.log('ok particle volumes: actual shared modules, replay/pause, light/density changes, depth occlusion, target alpha and disposal');
  console.log(JSON.stringify(results.map(({preset,visible,animated,tuned})=>({preset,visible,animated,tuned}))));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));await fs.rm(check,{force:true});}

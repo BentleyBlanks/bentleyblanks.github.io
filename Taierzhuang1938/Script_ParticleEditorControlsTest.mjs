@@ -67,6 +67,22 @@ try{
  assert.equal(await page.evaluate(()=>Tengxian.ParticleEditor.customLayers.length),0);
  await page.evaluate(()=>{Tengxian.ParticleEditor.Seek(.6);Tengxian.ParticleEditor.selectedLayer='preset:FireTongue';Tengxian.ParticleEditor.RefreshLayers(true);Tengxian.StepFrames(3,0,true);});
  await page.locator('[data-particle-module="sizeOverLifetime"] > summary').click();await page.screenshot({path:path.join(out,'Scene_ParticleEditor.png')});
+ const smokeFraming=await page.evaluate(async()=>{
+   const g=Tengxian,e=g.ParticleEditor;e.SelectEffect('SmokeBlack');await g.Particles.Ready();e.FrameEffect();
+   const {system}=[...g.Particles.systems.values()].find(entry=>entry.name.startsWith('SourceSmoke/')),m=system.modules;
+   const anchor=g.Particles.renderer.volumes.pools.get(m.renderer.volumeAsset).asset.metadata.anchor;
+   const angle=m.main.startRotation+m.renderer.volumeYaw,c=Math.cos(angle),s=Math.sin(angle),point=e.studio.orbit.target.clone(),projections=[];
+   for(const yaw of [.9,2.47,4.04]){
+     e.studio.orbit.yaw=yaw;e.studio.ApplyCamera();e.studio.camera.updateMatrixWorld(true);
+     let maxY=0;for(let corner=0;corner<8;corner++){
+       const x=((corner&1?1:0)-anchor[0])*m.renderer.bounds[0],y=((corner&2?1:0)-anchor[1])*m.renderer.bounds[1],z=((corner&4?1:0)-anchor[2])*m.renderer.bounds[2];
+       point.set(x*c+z*s+system.position[0],y+system.position[1],-x*s+z*c+system.position[2]).project(e.studio.camera);maxY=Math.max(maxY,Math.abs(point.y));
+     }
+     projections.push({yaw,maxY});
+   }
+   return {height:m.renderer.bounds[1],distance:e.studio.orbit.dist,projections};
+ });
+ assert.ok(smokeFraming.projections.every(view=>view.maxY<.98),'the complete black smoke volume must fit from three directions: '+JSON.stringify(smokeFraming));
  const result=await page.evaluate(()=>{const g=Tengxian,e=g.ParticleEditor,original=e.savedParticleEffects,worldBefore=JSON.stringify(original.Inspect());
    const result={editor:e.Inspect(),worldBefore,lightingSources:e.savedLighting.fireSources.size,glError:g.renderer.getContext().getError()};
    const savedLimit=e.savedStudioMaxDistance;e.SelectEffect('BombHeavy');result.bombCameraDistance=e.studio.orbit.dist;result.selectedEffect=e.effectList.Value();
@@ -75,7 +91,7 @@ try{
    result.cameraLimitRestored=g.editor.studio.maxDistance===savedLimit;
    if(g.post.whiteboxScene){result.whiteboxRestored=g.post.whiteboxScene.config===g.post.whiteboxConfig;g.StepFrames(1,0,true);result.gameEffectsHidden=!g.vfx.root.visible;}
    return result;});
- await fs.writeFile(path.join(out,'Report.json'),JSON.stringify({result,errors},null,2));
+ await fs.writeFile(path.join(out,'Report.json'),JSON.stringify({result,smokeFraming,errors},null,2));
  assert.equal(result.worldBefore,baseline.particles);assert.equal(result.restored,true);assert.equal(result.lightPause,true);assert.equal(result.lightRestore,true);assert.equal(result.glError,0);assert.deepEqual(errors,[]);
  assert.ok(result.bombCameraDistance>80);assert.equal(result.selectedEffect,'BombHeavy');assert.equal(result.cameraLimitRestored,true);
  if(whitebox){assert.equal(result.whiteboxRestored,true);assert.equal(result.gameEffectsHidden,true);}

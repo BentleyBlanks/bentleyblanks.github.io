@@ -4,6 +4,17 @@ export const PARTICLE_LIMITS = Object.freeze({systems:384,curveSamples:48,
   high:{flame:2048,smoke:768,ember:384,mote:640,windowMote:512,volume:2048},ultra:{flame:2560,smoke:768,ember:512,mote:800,windowMote:512,volume:2560}});
 export const BURNING_LIGHT = Object.freeze({count:4,viewDistance:28,intensity:14,radius:9,height:.6,color:0xff852a});
 export const PARTICLE_VOLUME = Object.freeze({steps:{low:4,medium:6,high:8,ultra:10},extinction:2.8,shadow:2.4,sourceFadeSeconds:.16});
+// The source simulations have open domain outlets: density must dilute before
+// reaching those faces. X/Z are lateral mixing widths; Y is the upper plume.
+// No lower-face fade: the smoke still connects to its physical emitter.
+export const PARTICLE_VOLUME_PLUME=Object.freeze({
+  ChimneySmoke:{dissipation:[.16,.32,.22],detail:.12},
+  DenseSmoke:{dissipation:[.16,.34,.24],detail:.16},
+});
+export const PARTICLE_VOLUME_LIGHTING=Object.freeze({multipleScattering:.18,secondaryExtinction:.35});
+// Persistent source plumes need space for entrainment on both horizontal axes.
+// The chimney simulation's long wind axis must not be squeezed into a sheet.
+export const STATIC_SMOKE_ART=Object.freeze({blackSpread:1.65,lightSpread:1.2,windAspect:1.35,densityScale:24,heightScale:.65});
 export const PARTICLE_MESH = Object.freeze({casingCapacity:64,casingSides:8,casingLife:[2.4,4],metalness:.72,roughness:.3});
 // Visual envelopes, independent of damage radius. Fragmentation blasts have a
 // short hot core; burning fuel in a disabled tank sustains the luminous phase.

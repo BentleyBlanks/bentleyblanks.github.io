@@ -6,7 +6,7 @@ import { El, Panel, Section, Slider, Select, Toggle, ButtonRow, Facts, Note, Lis
   from "./Script_EditorUi.mjs";
 import { SCENE_EFFECTS } from "./Script_Vfx.mjs";
 import {ParticleInspector} from './Script_EditorParticleInspector.mjs';
-import {MergeParticleModules,NormalizeParticleModules} from './Script_ParticleModules.mjs';
+import {MergeParticleModules,NormalizeParticleModules,EvaluateCurve} from './Script_ParticleModules.mjs';
 import {Mulberry32} from './Script_Noise.mjs';
 import {FIRST_LEVEL_DISTANT_SMOKE} from './Data_FirstLevelDistantSmoke.mjs';
 
@@ -323,7 +323,8 @@ export class VfxEditor {
     this.playing=true;this.Advance(0);this.host.post?.NotifyCameraCut();this.RefreshLayers(true);this.UpdateFacts();
     if(api.Inspect().volumes.some(volume=>!volume.ready)){
       const waiting='正在载入三维流体数据…';this.Status(waiting);
-      api.Ready().then(()=>{if(this.panel&&this.host.vfx.particles===api&&this.message.textContent===waiting){this.Status('三维体积就绪');this.host.post?.NotifyCameraCut();}})
+      const selected=this.effectId;
+      api.Ready().then(()=>{if(this.panel&&this.host.vfx.particles===api&&this.message.textContent===waiting){this.Status('三维体积就绪');if(this.effectId===selected)this.FrameEffect();this.host.post?.NotifyCameraCut();}})
         .catch(error=>{if(this.panel&&this.host.vfx.particles===api)this.Status('三维体积载入失败：'+error.message,true);});
     }
   }
@@ -341,9 +342,26 @@ export class VfxEditor {
   QueueSeek(seconds){this.seekTarget=seconds;if(this.seekFrame)return;this.seekFrame=requestAnimationFrame(()=>{this.seekFrame=0;if(this.panel)this.Try(()=>this.Seek(this.seekTarget))});}
   FrameEffect(){
     const id=this.effectId,small=/^(Muzzle|Impact|Blood|ShellCasings)/.test(id);
-    const height=/^Bomb/.test(id)?(id==='BombHeavy'?42:28)*this.scale:/Explosion/.test(id)?(id==='ExplosionShell'?9:6)*this.scale:/Smoke|Plume/.test(id)?7:small?1.8:3.4*this.scale;
+    let height=/^Bomb/.test(id)?(id==='BombHeavy'?42:28)*this.scale:/Explosion/.test(id)?(id==='ExplosionShell'?9:6)*this.scale:/Smoke|Plume/.test(id)?7:small?1.8:3.4*this.scale;
+    let center=null;
+    if(/Smoke|Plume/.test(id)){
+      const api=this.host.vfx.particles,box=new THREE.Box3(),point=new THREE.Vector3();
+      for(const {system}of api.systems.values()){
+        const m=system.modules;
+        if(m.renderer.mode!=='bakedVolume'||!m.renderer.enabled||!(system.particles.length||system.emitting&&m.emission.enabled))continue;
+        const asset=api.renderer.volumes.pools.get(m.renderer.volumeAsset)?.asset,anchor=asset?.metadata.anchor||[.5,0,.5];
+        const size=EvaluateCurve(m.main.startSize,0),angle=EvaluateCurve(m.main.startRotation,0)+m.renderer.volumeYaw,c=Math.cos(angle),s=Math.sin(angle);
+        for(let corner=0;corner<8;corner++){
+          const x=((corner&1?1:0)-anchor[0])*m.renderer.bounds[0]*size,y=((corner&2?1:0)-anchor[1])*m.renderer.bounds[1]*size,z=((corner&4?1:0)-anchor[2])*m.renderer.bounds[2]*size;
+          point.set(x*c+z*s+system.position[0],y+system.position[1],-x*s+z*c+system.position[2]);box.expandByPoint(point);
+        }
+      }
+      if(!box.isEmpty()){box.getSize(point);height=Math.max(point.x,point.y,point.z);center=box.getCenter(new THREE.Vector3());}
+    }
     this.studio.maxDistance=Math.max(40,height*2.5);
-    this.studio.Frame(height,small?2.5:Math.max(4,height*2.2));this.host.post?.NotifyCameraCut();
+    this.studio.Frame(height,small?2.5:Math.max(4,height*2.2));
+    if(center){this.studio.orbit.target.copy(center);this.studio.ApplyCamera();}
+    this.host.post?.NotifyCameraCut();
   }
   AddLayer(preset){return this.Try(()=>{const api=this.host.vfx.particles,created=api.Create({preset,name:'自建 '+preset});const key='custom:'+(++this.customIndex);
     api.Get(created.id).editorKey=key;this.customLayers.push({key,definition:api.Export(created.id)});this.customIds.push(created.id);this.selectedLayer=key;this.playing=true;this.RefreshLayers(true);return created;});}

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {PARTICLE_GPU_MODULES} from './Script_ParticleGpuModules.mjs';
+import {PARTICLE_VOLUME_PLUME,PARTICLE_VOLUME_LIGHTING} from './Data_Tuning_Particles.mjs';
 
 const textureCache=new WeakMap();
 
@@ -14,6 +15,11 @@ uniform float uVolumeFrames;
 uniform float uVolumeDuration;
 uniform float uVolumeTime;
 uniform float uVolumeLoop;
+uniform vec3 uVolumeDissipation;
+uniform float uVolumeDetail;
+#ifdef PARTICLE_VOLUME_DETAIL
+uniform sampler3D uParticleDensity;
+#endif
 #ifdef PARTICLE_VOLUME_INSTANCED
 varying float vVolumeTime;
 varying vec4 vVolumeLook;
@@ -29,18 +35,34 @@ vec2 VolumeAtTime(vec3 uv,float seconds){
  float frame=clamp(seconds/uVolumeDuration,0.,.999999)*(uVolumeFrames-1.);
  float first=floor(frame);return mix(VolumeFrame(uv,first),VolumeFrame(uv,min(first+1.,uVolumeFrames-1.)),fract(frame));
 }
+vec2 VolumeEnvelope(vec3 uv,vec2 field,float clock){
+ if(uVolumeDissipation.y<=0.||field.r<.0001)return field;
+ // Coherent ascending detail modulates dilution, rather than moving the box
+ // faces. Both camera and sun rays sample exactly the same density field.
+ float eddy=.5;
+#ifdef PARTICLE_VOLUME_DETAIL
+ eddy=texture(uParticleDensity,uv*vec3(3.7,5.1,4.3)+vec3(.17,-clock*.075,.31)).g;
+#endif
+ float upper=smoothstep(0.,uVolumeDissipation.y*mix(.75,1.25,eddy),1.-uv.y);
+ float mixing=smoothstep(.08,.45,uv.y);
+ vec2 margin=min(uv.xz,1.-uv.xz);
+ vec2 side=smoothstep(vec2(0.),max(vec2(.001),uVolumeDissipation.xz*mix(.35,1.,mixing)),margin);
+ float erosion=1.-uVolumeDetail*mixing*smoothstep(.3,.8,eddy);
+ field.r*=upper*side.x*side.y*erosion;
+ return field;
+}
 vec2 VolumeSample(vec3 uv){
  float clock=uVolumeTime,loop=uVolumeLoop;
 #ifdef PARTICLE_VOLUME_INSTANCED
  clock=vVolumeTime;loop=vVolumeLook.w;
 #endif
- if(loop<.5)return VolumeAtTime(uv,clock);
+ if(loop<.5)return VolumeEnvelope(uv,VolumeAtTime(uv,clock),clock);
  // Forward-only overlap: both halves keep the original simulation motion.
  float blendSeconds=uVolumeDuration*.16,period=uVolumeDuration-blendSeconds;
  float t=mod(max(0.,clock),period);
  vec2 first=VolumeAtTime(uv,t+blendSeconds);
- if(t<period-blendSeconds)return first;
- return mix(first,VolumeAtTime(uv,t-(period-blendSeconds)),smoothstep(period-blendSeconds,period,t));
+ if(t>=period-blendSeconds)first=mix(first,VolumeAtTime(uv,t-(period-blendSeconds)),smoothstep(period-blendSeconds,period,t));
+ return VolumeEnvelope(uv,first,clock);
 }
 `;
 
@@ -107,6 +129,7 @@ uniform float uFlameExtinction;
 uniform float uStepCount;
 uniform float uShadowCount;
 uniform float uPhaseG;
+uniform vec2 uMultipleScattering;
 uniform sampler2D uNormalDepth;
 uniform vec2 uResolution;
 uniform float uDepthValid;
@@ -170,7 +193,9 @@ void main(){
    float t=(float(j)+.5)/shadowSteps;
    tau+=VolumeSample(uv+lightLocal*lightDistance*t).r*extinction*opacityScale*lightDistance/shadowSteps;
   }
-  vec3 incident=uAmbientColor+uLightColor*exp(-tau)*scatteringPhase;
+  // A second, more isotropic scattering order lights the interior of a cloud
+  // without removing its extinction or replacing it with a solid grey shell.
+  vec3 incident=uAmbientColor+uLightColor*(exp(-tau)*scatteringPhase+uMultipleScattering.x*exp(-tau*uMultipleScattering.y));
   float next=exp(-sigma*ds),alpha=1.-next;
   radiance+=transmission*tint*(uAlbedo*incident*alpha+FireRadiance(field.g,emission)*opacityScale*(sigma>.0001?alpha/sigma:ds));
   transmission*=next;
@@ -185,20 +210,22 @@ void main(){
 }
 `;
 export function CreateParticleVolumeMaterial(asset,{time=0,extinction=3,emission=0,flameExtinction=12,albedo=[.45,.43,.40],steps=64,shadowSteps=5,instanced=false,shared={}}={}){
- const {metadata:m,size,data}=asset;let cached=textureCache.get(asset);
+ const {metadata:m,size,data}=asset,art=PARTICLE_VOLUME_PLUME[m.asset]||{};let cached=textureCache.get(asset);
  if(!cached){const texture=new THREE.Data3DTexture(data,...size);
   texture.format=m.channels===1?THREE.RedFormat:THREE.RGFormat;texture.type=THREE.UnsignedByteType;
   texture.minFilter=texture.magFilter=THREE.LinearFilter;texture.unpackAlignment=1;texture.generateMipmaps=false;texture.needsUpdate=true;
   cached={texture,references:0};textureCache.set(asset,cached);}
  cached.references++;const texture=cached.texture;
  const material=new THREE.ShaderMaterial({vertexShader:VERTEX,fragmentShader:FRAGMENT,
-  defines:instanced?{PARTICLE_VOLUME_INSTANCED:''}:{},
+  defines:{...(instanced?{PARTICLE_VOLUME_INSTANCED:''}:{}),...(art.detail&&shared.uParticleDensity?{PARTICLE_VOLUME_DETAIL:''}:{})},
   uniforms:{uVolume:{value:texture},uVolumeDimensions:{value:new THREE.Vector3(...m.dimensions)},uVolumeTiles:{value:new THREE.Vector3(...m.atlasTiles)},
    uVolumeAnchor:{value:new THREE.Vector3(...m.anchor)},uNormalDepth:{value:null},uDepthValid:{value:0},uResolution:{value:new THREE.Vector2(1,1)},uGlobalFade:{value:1},
+   uVolumeDissipation:{value:new THREE.Vector3(...(art.dissipation||[0,0,0]))},uVolumeDetail:{value:art.detail||0},
    uFogDensity:{value:0},uFogMax:{value:0},uFogColorSky:{value:new THREE.Vector3()},
    uVolumeFrames:{value:m.frames},uVolumeDuration:{value:m.duration},uVolumeTime:{value:time},uVolumeLoop:{value:1},uWorldToVolume:{value:new THREE.Matrix4()},
    uLightDirection:{value:new THREE.Vector3(-.6,.8,.4).normalize()},uLightColor:{value:new THREE.Vector3(1.7,1.6,1.45)},uAmbientColor:{value:new THREE.Vector3(.13,.16,.20)},
-   uAlbedo:{value:new THREE.Vector3(...albedo)},uExtinction:{value:extinction},uEmission:{value:emission},uFlameExtinction:{value:flameExtinction},uStepCount:{value:steps},uShadowCount:{value:shadowSteps},uPhaseG:{value:.25},...shared},
+   uAlbedo:{value:new THREE.Vector3(...albedo)},uExtinction:{value:extinction},uEmission:{value:emission},uFlameExtinction:{value:flameExtinction},uStepCount:{value:steps},uShadowCount:{value:shadowSteps},uPhaseG:{value:.25},
+   uMultipleScattering:{value:new THREE.Vector2(art.dissipation?PARTICLE_VOLUME_LIGHTING.multipleScattering:0,PARTICLE_VOLUME_LIGHTING.secondaryExtinction)},...shared},
   side:THREE.BackSide,transparent:true,depthTest:false,depthWrite:false,blending:THREE.CustomBlending,blendSrc:THREE.OneFactor,blendDst:THREE.OneMinusSrcAlphaFactor,
   blendSrcAlpha:THREE.ZeroFactor,blendDstAlpha:THREE.OneFactor,blendEquation:THREE.AddEquation,blendEquationAlpha:THREE.AddEquation});
  material.name='ParticleVolume_'+m.asset;material.userData.preserveTargetAlpha=true;

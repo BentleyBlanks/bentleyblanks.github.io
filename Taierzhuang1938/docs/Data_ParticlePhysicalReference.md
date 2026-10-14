@@ -28,6 +28,26 @@
 
 ## 当前进度
 
+### 白灰烟、扬尘与黑烟边界修正（2026-10-15）
+
+用户的三张特效编辑器截图对应 `SmokeWhite`、`SmokeDust`、`SmokeBlack`。前两种烟的原模拟在出口面仍有密度，直接取样会留下平直的上边缘；黑烟的横向范围和风向范围被压窄，编辑器又一律按 7 m 烟高取景，而该源的实际体积高约 15.6 m。
+
+共享体积着色器现在在上部和两侧按三维涡流逐渐稀释密度，保留底部源头；相机光线与光源遮光光线都使用同一场。第二阶散射近似补充烟体内部受光。常驻源同时扩大横向卷吸空间、保留风向轴厚度并降低消光倍率，改善近景实心感；这些参数统一在 `Data_Tuning_Particles`，没有增加体积资产、实例数量或现场流体求解。
+
+“适配镜头”从当前活动烟体的三维范围、源点、朝向和资产 anchor 计算中心与距离；首次异步载入结束后重新适配。已清空的爆炸池不参与取景。原来的高度不再把黑烟顶部裁在屏幕外。
+
+本地高画质实拍 `tmp/EffectReview/Game02_*` 检查三种效果的正面、侧面和背面；`Game_MotionReport` 检查 0.1 / 0.35 / 1.2 / 3 / 4 / 6 / 8 s。粒子暂停时生产时钟与状态不变；完整画面中的曝光适应、TAA 和背景变化不能用来判断烟体是否仍在移动，隔离 GPU 回归另检查粒子暂停像素逐字节相同。
+
+`ParticleVolumeBrowserTest` 新增模拟开放出口的 GPU 消光剖面：上部平滑透光区从对照的 131 行增加到 174 行，下部光学不透明度仍约 0.98。`ParticleEditorControlsTest` 另用三方向完整体积投影检查黑烟不被上下视口裁切。已有五套序列的重放、暂停、动画、深度遮挡、HDR 目标 alpha 和释放回归继续适用。
+
+初步固定场景对照是 1280×720、高档、每种烟 15 个有效 GPU 样本，仅包括单个生产烟体及显示转换，不是整关帧率：白灰烟 / 扬尘 / 黑烟约 0.71 / 0.57 / 0.35 ms，修正后约 1.06 / 0.87 / 0.64 ms。扩大范围与细节有开销；空密度区域提前跳过细节取样后，扬尘从第一版约 2.56 ms 回落到约 0.87 ms。数据不替代下文旧版整关 10 / 28 / 70 m 剖析，也不构成全场性能提高的结论。
+
+本轮 quick / prepush 在 `SpeakerGestureTest` 的 `FrontObservation.02: luo gestured on his previous line too` 处停止；同一 `0ff3dddd` 提交的干净主检出也复现该失败。不得将它报告为全仓全绿，特效相关检查单独记录。
+
+最终定向通过：ParticleModulesTest、ParticleVolumeTest、ParticleVolumeBrowserTest、ParticleBrowserTest、ParticleChannelsTest、FirstLevelSmokeOriginsTest、FirstLevelDistantSmokeTest、FirstLevelDistantSmokeBrowserTest、ParticleEditorControlsTest、ParticleEditorWhiteboxTest、ParticleEditorTest、MotionVectorContractTest、BootStallTest、ModuleGraphTest、TestRunnerTest。黑烟完整范围三方向的最大纵向 NDC 为 0.821 / 0.853 / 0.821，均在视口内；首次发射前也按已启用的发射器适配，不能等粒子出生后才恢复正确距离。
+
+BootTest 在 240 s 时限内未完成，阶段 0 还报告旧四种爆炸图集未生成实例及点光包络断言失败，因此该门没有通过。对干净主检出 `4bf1f217` 的最小 Vfx 实验先载入全部爆炸图和遮罩，再强制四种图集变体并推进五帧，四种旧图集的实例与活粒子同样均为 0；这是旧图集断言的基线证据，不能用它冒充完整七关启动验收。
+
 已接入五套 CC0 序列：营火、工业烟流、浓烟、土尘冲击与燃油爆炸。完整来源、格式和重建命令见 [体积资产](../Volume/README.md)。它们共用原 ParticleSystem 的时钟、曲线和固定种子，通过实例立方体进行真正三维取样；没有另建预览专用效果。
 
 63 处残骸火焰和背景烟已替换；普通场景烟、破片爆炸、燃油爆炸和航空炸弹的冷却烟体已接入。枪口瞬光、弹道、碎屑、土柱抛射与痕迹继续沿用各自的物理／玩法规则。
