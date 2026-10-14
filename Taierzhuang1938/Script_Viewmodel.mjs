@@ -320,6 +320,10 @@ function BuildMaterials(library) {
     dadao: SafeMaterial(library, "DadaoPbr",
       { repeat: 1, roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 },
       { color: 0x77736f, roughness: 0.58, metalness: 0.72 }),
+    zb26Steel: SafeMaterial(library, "Zb26VeteranSteel", { roughness: 1, metalness: 1, normalScale: 1 },
+      { color: 0x45474a, roughness: 0.7, metalness: 0.7 }),
+    zb26Wood: SafeMaterial(library, "Zb26VeteranWood", { roughness: 1, metalness: 0, normalScale: 1 },
+      { color: 0x5f3c20, roughness: 0.8, metalness: 0 }),
     // 枪托是打磨过的胡桃木/榆木，比门板亮一档；normalScale 压到 0.24，
     // 同理：木纹格距从 0.34 收到 0.085 之后，0.6 的法线强度会把木纹凿成沟
     wood: SafeMaterial(library, "WoodStock", { repeat: 1, roughness: 0.72, metalness: 0, normalScale: 0.32 },
@@ -1117,6 +1121,7 @@ const MODEL_FP = new Set([
 
 /** 模型里的材质名 -> 视图模型这套材质。加载器不造材质，名字得在这里落地。 */
 const VM_MATERIAL_BY_MESH = {
+  zb26Steel: "zb26Steel", zb26Wood: "zb26Wood",
   steel: "steel", blade: "blade", grip: "grip", dadao: "dadao", wood: "wood", accessory: "cloth", red: "redCloth",
   leather: "leather", uniform: "cloth", skin: "skin", helmet: "steel",
   accentA: "redCloth", accentB: "brass", shoe: "leather",
@@ -1134,7 +1139,7 @@ const IRON_SIGHT_REPAIRS = {
   ZhongZheng: { x: 0, y: 0.072, frontZ: -0.8355, frontBase: 0.048, rearZ: -0.2804, rearBase: 0.048 },
   HanYang: { x: 0, y: 0.072, frontZ: -0.9603, frontBase: 0.049, rearZ: -0.3506, rearBase: 0.057 },
   Type38: { x: 0, y: 0.070, frontZ: -0.9882, frontBase: 0.052, rearZ: -0.310, rearBase: 0.050 },
-  Zb26: { x: -0.0234, y: 0.095, frontZ: -0.7616, frontBase: 0.060, rearZ: -0.205, rearBase: 0.061 },
+  Zb26: { x: -0.0234, y: 0.095, frontZ: -0.836, frontBase: 0.060, rearZ: -0.205, rearBase: 0.061 },
   ServicePistol: { x: 0, y: 0.052, frontZ: -0.164, frontBase: 0.044, rearZ: 0.014, rearBase: 0.046 },
   Type11: { x: 0.00145, y: 0.157, frontZ: -0.7426, frontBase: 0.102, rearZ: -0.2022, rearBase: 0.129 },
   Type92Hmg: { replaceBlade: true, x: 0, y: 0.104, frontZ: -0.5901, frontBase: 0.076, rearZ: -0.1718, rearBase: 0.080 },
@@ -1317,7 +1322,13 @@ function BuildFromModel(materials, weapon, key, doc) {
       mesh.geometry.computeBoundingSphere();
     });
   }
-  const ironSights = RepairIronSights(group, materials, key, sight);
+  const authoredFront = built.nodes.get("frontSight"), authoredRear = built.nodes.get("rearSight");
+  let ironSights;
+  if (key === "Zb26" && authoredFront && authoredRear) {
+    const CollectMeshes = (root) => { const list = []; root.traverse((mesh) => { if (mesh.isMesh) list.push(mesh); }); return list; };
+    ironSights = { front: CollectMeshes(authoredFront), rear: CollectMeshes(authoredRear),
+      frontRegion: { x: sight.x, z: -0.836, base: 0.060 } };
+  } else ironSights = RepairIronSights(group, materials, key, sight);
   const magazine = Mount("magazine", new THREE.Vector3(0, 0, -0.08));
   // ADS eye relief keeps the complete stock in front of the camera. Hiding the
   // rear submesh exposes its uncapped inner faces and makes the rifle look cut.
@@ -1351,8 +1362,16 @@ function BuildFromModel(materials, weapon, key, doc) {
       boltHandleNode.position.fromArray(mechanism.handle).sub(pivot); boltProxy.add(boltHandleNode);
     }
   }
-  if (key === "Zb26") magazinePart = SplitFpsMechanism(group,key,"VmMagazine_Zb26",new THREE.Vector3(),
-    (p)=>p.y>0.071 && p.z< -0.166 && p.z> -0.30 && Math.abs(p.x)<0.021);
+  if (key === "Zb26") {
+    const authoredMagazine = built.nodes.get("magazineBody");
+    if (authoredMagazine) {
+      group.updateMatrixWorld(true);
+      group.attach(authoredMagazine);
+      authoredMagazine.name = "VmMagazine_Zb26";
+      magazinePart = authoredMagazine;
+    } else magazinePart = SplitFpsMechanism(group,key,"VmMagazine_Zb26",new THREE.Vector3(),
+      (p)=>p.y>0.071 && p.z< -0.166 && p.z> -0.30 && Math.abs(p.x)<0.021);
+  }
   if (key === "ServicePistol") boltProxy = SplitFpsMechanism(group,key,"VmSlide_ServicePistol",new THREE.Vector3(),
     (p,name,vertices)=>name.endsWith("steel") && vertices.every(v=>v.y>=0.0179) && p.z> -0.11 && p.z<0.035);
   const boltHandle = mechanism ? new THREE.Vector3().fromArray(mechanism.handle) : sight

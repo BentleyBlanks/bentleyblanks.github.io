@@ -1,0 +1,60 @@
+{
+  "generator": "audit",
+  "date": "2026-10-15",
+  "name": "Zb26VeteranSteel",
+  "preset": null,
+  "source": null,
+  "heightSource": null,
+  "params": {
+    "tileM": null,
+    "pack": "orm",
+    "normalConvention": "gl"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_Zb26VeteranSteelBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 105224,
+      "sha256": "f62099d801dd5af6a985a94d6ff1dada3367ad7f80d85f72897ea0b35bbcbf3a"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_Zb26VeteranSteelNormal.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 9402,
+      "sha256": "035e830355c099bb9c3fd818ffd92f852b63a98795d4bb61ee62ac62ab6635d6"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_Zb26VeteranSteelOrm.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 161730,
+      "sha256": "794866caa2cb3e38141638983adcb78372a2e5e4c33271697f3dd3a6b0d076e3"
+    }
+  ],
+  "totalBytes": 276356,
+  "metrics": {
+    "meanSrgb": [
+      0.2334,
+      0.2412,
+      0.2475
+    ],
+    "luma": 0.2407,
+    "lumaStd": 0.1538,
+    "sat": 0.0569,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.2289,
+    "seam": 0.0006,
+    "interior": 0.0211,
+    "seamRatio": 0.027,
+    "border": 0.311,
+    "swing": 0.4709,
+    "texelsPerMeter": null
+  },
+  "gateProblems": []
+}

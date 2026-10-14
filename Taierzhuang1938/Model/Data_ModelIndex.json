@@ -612,43 +612,6 @@
    "triangleLimit": 30000
   },
   {
-   "name": "Zb26",
-   "category": "weapon",
-   "file": "Model_Zb26.tzm.json",
-   "triangles": 7781,
-   "meshBlocks": 2,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 270081,
-   "materials": [
-    "steel",
-    "wood"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.03843,
-     -0.12294,
-     -0.91
-    ],
-    "max": [
-     0.04156,
-     0.204,
-     0.255
-    ]
-   },
-   "sourceTriangles": 7811,
-   "targetTriangles": 7811,
-   "triangleLimit": 30000
-  },
-  {
    "name": "Type38",
    "category": "weapon",
    "file": "Model_Type38.tzm.json",
@@ -1080,6 +1043,43 @@
    "sourceTriangles": 82142,
    "targetTriangles": 82142,
    "triangleLimit": 80000
+  },
+  {
+   "name": "Zb26",
+   "category": "weapon",
+   "file": "Model_Zb26.tzm.json",
+   "triangles": 26028,
+   "meshBlocks": 6,
+   "nodes": 11,
+   "joints": 0,
+   "bytes": 740008,
+   "materials": [
+    "zb26Steel",
+    "zb26Wood"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.04,
+     -0.119,
+     -0.91
+    ],
+    "max": [
+     0.0405,
+     0.204,
+     0.255
+    ]
+   },
+   "sourceTriangles": 26065,
+   "targetTriangles": 26065,
+   "triangleLimit": 30000
   }
  ]
 }

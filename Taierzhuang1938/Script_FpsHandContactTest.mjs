@@ -73,7 +73,7 @@ try {
         const normal=new THREE.Vector3(0,1,0).transformDirection(vm.rig.group.matrixWorld.clone().invert().multiply(bone.matrixWorld));
         const gunSurface=id!=="ServicePistol"?Triangles(vm.rig.group,o=>o.name.startsWith(id+"_")):null;
         const support=gunSurface?[0,1,2,3,4].map(digit=>Nearest(Pad("l",digit),gunSurface)):[];
-        result.poses.push({id,pose,support,point:point.toArray(),trigger:target?.toArray(),distance:target?point.distanceTo(target):Infinity,
+        result.poses.push({id,pose,support,supportPoints:gunSurface?[0,1,2,3,4].map(digit=>Pad("l",digit).toArray()):[],point:point.toArray(),trigger:target?.toArray(),distance:target?point.distanceTo(target):Infinity,
           facing:normal.z,holdingDrift:pose==="ads"?point.distanceTo(hip):0,triggerTravel:pose==="fire"?point.distanceTo(hip):0,wrist:{...arms.wristBend}});
       }
       editor.SetPose("hip");for(let i=0;i<90;i++)editor.Update(1/60);

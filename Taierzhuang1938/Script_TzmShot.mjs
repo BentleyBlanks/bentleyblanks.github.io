@@ -1,6 +1,6 @@
 // TZM 模型出图：把 Model/ 里指定的 .tzm.json 用真材质摆到台架拍三视图。
 //
-// 用法：node Taierzhuang1938/Script_TzmShot.mjs --id Type89Tank [--out dir]
+// 用法：node Taierzhuang1938/Script_TzmShot.mjs --id=Zb26 [--out=dir]
 //
 // 与 _blender/Verify.mjs 同一套接线（真浏览器 + 真材质 + 渲染一帧），只是把
 // 结果写成 PNG —— 换模后先用它肉眼验收，再跑 Verify 的数值断言。
@@ -61,6 +61,9 @@ const result = await page.evaluate(async ({ id, outDir }) => {
   const library = new MaterialLibrary(renderer, { textureSize: 128 });
   for (const _ of library.PrepareSteps(["ClothNra", "ClothIja", "Steel", "SteelHelmet",
     "WoodStock", "Stone", "WoodBeam", "WoodDoor", "RoofTile"])) { /* 逐配方烘 */ }
+  for (const entry of Object.values(MESHES)) {
+    for (const set of entry.pbrSets || []) await library.LoadExternalSet(set.name, set);
+  }
   for (const part of ["Armor", "Track"]) {
     await library.LoadExternalSet(`Type89${part}`, {
       albedo: `./Texture/Texture_Type89${part}Base.webp`,
@@ -86,6 +89,8 @@ const result = await page.evaluate(async ({ id, outDir }) => {
     blade: Plain("DadaoBlade", { color: 0x929aa2, roughness: 0.34, metalness: 0.95 }),
     grip: Plain("DadaoGrip", { color: 0x8f7c61, roughness: 0.78, metalness: 0 }),
     dadao: Plain("DadaoPbrFallback", { color: 0x77736f, roughness: 0.58, metalness: 0.72 }),
+    zb26Steel: library.Get("Zb26VeteranSteel", { roughness: 1, metalness: 1, normalScale: 1 }),
+    zb26Wood: library.Get("Zb26VeteranWood", { roughness: 1, metalness: 0, normalScale: 1 }),
     type89Armor: library.Get("Type89Armor", { side: THREE.DoubleSide }),
     type89Barrel: library.Get("Type89Armor", { side: THREE.DoubleSide }),
     type89Track: library.Get("Type89Track", { side: THREE.DoubleSide }),
@@ -124,9 +129,17 @@ const result = await page.evaluate(async ({ id, outDir }) => {
       const data = renderer.domElement.toDataURL("image/png");
       out.push({ id: modelId, name, data });
     };
-    await Shot("side", [0, 0.25, 1]);      // 站 -Z 看（侧面：车头朝左）
-    await Shot("front34", [-1, 0.35, -1]); // 左前 3/4（看得到车头与炮塔）
-    await Shot("top", [0.01, 1, 0.01]);    // 俯视
+    if (entry.category === "weapon") {
+      // Weapons extend along Z. Look from X for a full side view, and fit
+      // their actual length rather than using the wide vehicle camera.
+      await Shot("side", [1, 0.10, 0], center, r * 1.15);
+      await Shot("front34", [-1, 0.40, -0.45], center, r * 1.3);
+      await Shot("top", [0.01, 1, 0.01], center, r * 1.5);
+    } else {
+      await Shot("side", [0, 0.25, 1]);
+      await Shot("front34", [-1, 0.35, -1]);
+      await Shot("top", [0.01, 1, 0.01]);
+    }
     if (entry.category === "soldier") {
       // 后上方看头。头饰与颅骨在后脑相切，穿模的样子是**头饰后半一条肉色折线**
       // （游戏里低头看脚边的尸体大致就是这个角度）——三视图那三张离得太远，

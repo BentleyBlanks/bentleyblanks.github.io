@@ -28,6 +28,7 @@ import ImportWeapons                 # noqa: E402
 import ImportLugouqiaoWeapons        # noqa: E402
 import ImportBayonets                # noqa: E402
 import ImportVehicles                # noqa: E402
+from Script_Zb26Rebuild import BuildZb26 as BuildHistoricalZb26  # noqa: E402
 from AssetBudgets import WEAPON_TRIANGLE_LIMIT, VEHICLE_TRIANGLE_LIMIT  # noqa: E402
 
 # 三角预算。超了不是警告是**失败** —— 换模最容易翻车的就是这里，
@@ -128,7 +129,7 @@ def main():
                  "鲁南女性平民：大襟褂（衣襟从领口斜扣到左腋下）、肥裤扎脚、"
                  "包头巾 + 颈后裹着的纂儿、千层底布鞋。身上没有任何军用装具。"))
     for name, builder in BuildWeapons.WEAPON_BUILDERS.items():
-        imported = ImportWeapons.BuilderFor(name)
+        imported = BuildHistoricalZb26 if name == "Zb26" else ImportWeapons.BuilderFor(name)
         jobs.append((name, "weapon", imported or builder, ""))
     # 这两把没有程序化 TZM 成品；可重分发源模存在时才落盘。源文件缺席则运行时
     # 退回 Script_Actor 的程序化兜底，不阻断克隆仓库的构建。
@@ -278,4 +279,5 @@ def main():
     print("BUILD_OK")
 
 
-main()
+if __name__ == "__main__":
+    main()

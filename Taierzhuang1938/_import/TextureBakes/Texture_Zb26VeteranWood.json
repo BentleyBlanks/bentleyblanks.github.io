@@ -1,0 +1,60 @@
+{
+  "generator": "audit",
+  "date": "2026-10-15",
+  "name": "Zb26VeteranWood",
+  "preset": null,
+  "source": null,
+  "heightSource": null,
+  "params": {
+    "tileM": null,
+    "pack": "orm",
+    "normalConvention": "gl"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_Zb26VeteranWoodBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 70782,
+      "sha256": "c6b2d992dda66edee5ea12880db0ed36c1e62f2b1baf5912e344b0ee2b7f0c74"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_Zb26VeteranWoodNormal.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 102694,
+      "sha256": "16c62341ceaeb72929bf370e908e9413a9f5c086b5c700fa29f3c22498403390"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_Zb26VeteranWoodOrm.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 48420,
+      "sha256": "fc8ea994f81ec0f57ac43866052f7ad9c7487969828c609f2afac38246f45eb8"
+    }
+  ],
+  "totalBytes": 221896,
+  "metrics": {
+    "meanSrgb": [
+      0.2169,
+      0.1389,
+      0.0756
+    ],
+    "luma": 0.1438,
+    "lumaStd": 0.0686,
+    "sat": 0.6513,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.2479,
+    "seam": 0.0854,
+    "interior": 0.0072,
+    "seamRatio": 11.826,
+    "border": 0.566,
+    "swing": 0.4066,
+    "texelsPerMeter": null
+  },
+  "gateProblems": []
+}

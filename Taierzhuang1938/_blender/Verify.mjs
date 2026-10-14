@@ -360,6 +360,9 @@ const result = await page.evaluate(async () => {
   const library = new MaterialLibrary(renderer, { textureSize: 128 });
   for (const _ of library.PrepareSteps(["ClothNra", "ClothIja", "Steel", "SteelHelmet",
     "WoodStock", "Stone", "WoodBeam", "WoodDoor", "RoofTile"])) { /* 逐配方烘 */ }
+  for (const entry of Object.values(MESHES)) {
+    for (const set of entry.pbrSets || []) await library.LoadExternalSet(set.name, set);
+  }
   await library.LoadExternalSet("DadaoPbr", {
     albedo: "./Texture/Texture_DadaoBase.webp",
     normal: "./Texture/Texture_DadaoNormal.webp",
@@ -395,6 +398,8 @@ const result = await page.evaluate(async () => {
     blade: library.Plain("DadaoBlade", { color: 0x929aa2, roughness: 0.34, metalness: 0.95 }),
     grip: library.Plain("DadaoGrip", { color: 0x8f7c61, roughness: 0.78, metalness: 0 }),
     dadao: library.Get("DadaoPbr", { roughness: 1, metalness: 1, normalScale: 1 }),
+    zb26Steel: library.Get("Zb26VeteranSteel", { roughness: 1, metalness: 1, normalScale: 1 }),
+    zb26Wood: library.Get("Zb26VeteranWood", { roughness: 1, metalness: 0, normalScale: 1 }),
     type89Armor: library.Get("Type89Armor", { side: THREE.DoubleSide }),
     type89Barrel: library.Get("Type89Armor", { side: THREE.DoubleSide }),
     type89Track: library.Get("Type89Track", { side: THREE.DoubleSide }),

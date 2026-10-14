@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "type11-source-winding-20260916";
+const MESH_REV = "zb26-veteran-20261015";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -148,12 +148,18 @@ export const MESHES = {
   },
   Zb26: {
     file: "Model_Zb26.tzm.json", category: "weapon",
-    triangles: 7781, meshBlocks: 2, nodes: 7, joints: 0,
-    materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.07999, 0.32660, 1.16500], lengthM: 1.165,
+    triangles: 26028, meshBlocks: 6, nodes: 11, joints: 0,
+    materials: ["zb26Steel", "zb26Wood"], mounts: WEAPON_MOUNTS,
+    span: [0.08050, 0.32300, 1.16500], lengthM: 1.165,
     draws: { high: 2, medium: 2, low: 2 },
-    note: "ZB-26 轻机枪。几何来自 Larkien 的 Sketchfab CC-BY-4.0 模型；"
-      + "保留上插直弹匣、提把、两脚架、木托与木握把，按史实全长 1.165 m 重建。",
+    pbrSets: [
+      { name: "Zb26VeteranSteel", albedo: "./Texture/Texture_Zb26VeteranSteelBase.webp?v=zb26-c-20261015",
+        normal: "./Texture/Texture_Zb26VeteranSteelNormal.webp?v=zb26-c-20261015", orm: "./Texture/Texture_Zb26VeteranSteelOrm.webp?v=zb26-c-20261015" },
+      { name: "Zb26VeteranWood", albedo: "./Texture/Texture_Zb26VeteranWoodBase.webp?v=zb26-c-20261015",
+        normal: "./Texture/Texture_Zb26VeteranWoodNormal.webp?v=zb26-c-20261015", orm: "./Texture/Texture_Zb26VeteranWoodOrm.webp?v=zb26-c-20261015" },
+    ],
+    note: "ZB-26 轻机枪。根据 1937 年历史照片、VHÚ 馆藏两侧照片和用户选定的 imagegen C 旧化参考，经 BlenderMCP 重建。"
+      + "全长 1.165 m；折叠脚架、独立弹匣与拉机柄、左偏实体瞄具、原 UV 钢件与胡桃木旧化图集。",
   },
   Type38: {
     file: "Model_Type38.tzm.json", category: "weapon",

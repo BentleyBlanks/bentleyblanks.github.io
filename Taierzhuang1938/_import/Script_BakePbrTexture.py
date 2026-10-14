@@ -272,7 +272,8 @@ def EdgeBrightnessSwing(srgb):
 def BorderContrastRatio(srgb, width_frac=0.047):
     lum = Luma(srgb)
     detail = lum - GaussianPeriodic(lum, 3)
-    local = np.sqrt(GaussianPeriodic(detail * detail, 6))
+    # FFT roundoff can make a mathematically nonnegative variance ~-1e-20.
+    local = np.sqrt(np.maximum(GaussianPeriodic(detail * detail, 6), 0))
     rows, cols = local.mean(1), local.mean(0)
     n = len(rows)
     width = max(8, int(n * width_frac))

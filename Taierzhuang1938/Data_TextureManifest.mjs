@@ -103,10 +103,10 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
     // Only the selected pair is requested (< 1 MB), not the whole campaign set.
-    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES, // Also includes lossless command-room irradiance.
+    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + 512 * 1024, // Also includes lossless command-room irradiance.
     editor: 0.25 * 1024 * 1024,
   }),
-  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES, // New archive sources remain lazy; boot assets unchanged.
+  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + 512 * 1024, // Archive sources plus the 512 KiB approved ZB-26 allocation; boot assets unchanged.
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -269,6 +269,24 @@ export const TEXTURE_MANIFEST = Object.freeze([
     source: { provider: "imagegen", date: "2026-10-13", ref: "exec-cd6b09a9-774a-4cae-ae9b-077e770742dd.png", prompt: "_import/Prompts/Texture_CommandRoomPapers.txt", note: "15% smaller glyphs and more informal fountain-pen handwriting; historical wording preserved." },
     consumers: [{ file: "Data_CommandRoomPapers.mjs", token: "CommandRoomLetterFinal" }],
     files: [["Menu/CommandRoom/Texture_CommandRoomLetterFinalImage.webp", "Image", 1122, 1402]],
+  },
+  {
+    id: "Zb26VeteranSteel", kind: "material", tier: "lazy",
+    toneClass: null, toneReason: "Original-UV atlas baked from the Blender exterior: selective bluing wear, small scratches and dusty crevices, with no lighting baked into albedo.",
+    metersPerTile: null, normalConvention: "gl",
+    bake: "_import/Script_Zb26TextureBake.py", bakeRecord: "_import/TextureBakes/Texture_Zb26VeteranSteel.json",
+    source: { provider: "procedural", date: "2026-10-15", ref: "_blender/Script_Zb26Rebuild.py", note: "BlenderMCP reconstruction from museum/history photos and user-approved imagegen style C; authored UVs and spatial ORM. Loaded with the weapon model for gameplay and editor use across levels." },
+    consumers: [{ file: "Data_Meshes.mjs", token: "Zb26VeteranSteel" }, { file: "Script_Actor.mjs", token: "Zb26VeteranSteel" }, { file: "Script_Viewmodel.mjs", token: "Zb26VeteranSteel" }],
+    files: [["Texture_Zb26VeteranSteelBase.webp", "Base", 1024, 1024], ["Texture_Zb26VeteranSteelNormal.webp", "Normal", 1024, 1024], ["Texture_Zb26VeteranSteelOrm.webp", "Orm", 1024, 1024]],
+  },
+  {
+    id: "Zb26VeteranWood", kind: "material", tier: "lazy",
+    toneClass: null, toneReason: "Original-UV walnut stock/grip atlas; physical dents and fine grain, without tiled architectural wood or baked lighting.",
+    metersPerTile: null, normalConvention: "gl",
+    bake: "_import/Script_Zb26TextureBake.py", bakeRecord: "_import/TextureBakes/Texture_Zb26VeteranWood.json",
+    source: { provider: "procedural", date: "2026-10-15", ref: "_blender/Script_Zb26Rebuild.py", note: "BlenderMCP author materials matching the approved C reference; loaded with ZB-26 rather than menu startup." },
+    consumers: [{ file: "Data_Meshes.mjs", token: "Zb26VeteranWood" }, { file: "Script_Actor.mjs", token: "Zb26VeteranWood" }, { file: "Script_Viewmodel.mjs", token: "Zb26VeteranWood" }],
+    files: [["Texture_Zb26VeteranWoodBase.webp", "Base", 1024, 1024], ["Texture_Zb26VeteranWoodNormal.webp", "Normal", 1024, 1024], ["Texture_Zb26VeteranWoodOrm.webp", "Orm", 1024, 1024]],
   },
   {
     id: "WeaponSteelV2", kind: "material", tier: "boot",

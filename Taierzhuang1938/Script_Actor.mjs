@@ -3680,6 +3680,14 @@ export class ActorFactory {
     ]);
     const ids = [...wanted].filter((id) => MESHES[id]);
     this.meshLoading = (async () => {
+      // Authored weapon atlases load with their models, before either world
+      // actors or FPS rigs obtain materials. They never enter menu startup.
+      const pbrSets = new Map(ids.flatMap((id) => (MESHES[id].pbrSets || []).map((set) => [set.name, set])));
+      const textureFailures = [];
+      await Promise.all([...pbrSets.values()].map(async (set) => {
+        try { await this.library.LoadExternalSet(set.name, set); }
+        catch { textureFailures.push(set.name); }
+      }));
       const [docs, riggedAssets, characterAssets] = await Promise.all([
         Promise.all(ids.map((id) => LoadDocument(MeshUrl(id)))),
         LoadRiggedAssets(),
@@ -3693,6 +3701,7 @@ export class ActorFactory {
         loaded: this.meshDocs.size,
         missing: ids.filter((id) => !this.meshDocs.has(id)),
         ready: true,
+        textureFailures,
         rigged: riggedAssets.report,
         characters: characterAssets.report,
       };
@@ -4209,6 +4218,10 @@ export class ActorFactory {
       grenade: this.Material("grenade", () => lib.Get("GrenadePbr", {
         roughness: 1, metalness: 1, normalScale: 0.85,
       })),
+      zb26Steel: this.Material("zb26Steel", () => lib.Get(lib.baked?.has("Zb26VeteranSteel") ? "Zb26VeteranSteel" : "Steel",
+        { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 })),
+      zb26Wood: this.Material("zb26Wood", () => lib.Get(lib.baked?.has("Zb26VeteranWood") ? "Zb26VeteranWood" : "WoodStock",
+        { roughness: 1, metalness: 0, normalScale: 1 })),
       // 卢沟桥合集保留源 UV 与逐件贴图；这里的 key 必须与 TZM 材质桶逐字一致。
       lqOfficerSword: this.Material("lqOfficerSword", () => lib.Get("LugouqiaoOfficerSword")),
       lqType11AmmoBox: this.Material("lqType11AmmoBox", () => lib.Get("LugouqiaoType11AmmoBox")),
