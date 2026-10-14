@@ -53,14 +53,16 @@ export class TerrainBlendPass {
     if(generation===undefined || ctx.scene!==this.scanScene || generation!==this.scanGeneration){
       this.candidates.length=0;
       ctx.scene.traverse(object=>{
-        if(object.isMesh && !object.isInstancedMesh && object.material?.userData.terrainBlendSource)
+        // A multi-material prop has no array-level userData. Terrain source
+        // materials are scalar; ordinary prop slots must be ignored here.
+        if(object.isMesh && !object.isInstancedMesh && object.material?.userData?.terrainBlendSource)
           this.candidates.push(object);
       });
       this.scanScene=ctx.scene;this.scanGeneration=generation;
     }
     this.sources.length=0;
     for(const object of this.candidates)
-      if(object.material?.userData.terrainBlendSource && ShownIn(object,ctx.scene))this.sources.push(object);
+      if(object.material?.userData?.terrainBlendSource && ShownIn(object,ctx.scene))this.sources.push(object);
   }
   Enabled(){return !!(this.pipeline.preset.terrainBlend && this.pipeline.hdrCapable && this.sources.length);}
   Idle(ctx){

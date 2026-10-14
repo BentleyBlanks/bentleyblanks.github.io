@@ -75,13 +75,13 @@ export const FPS_PACKET_RELOAD = Object.freeze({
     ...FPS_RIFLE_RELOAD.hand.slice(-3),
   ],
   tactical: {
-    oldClipVisible: [0.275, 0.365],
-    oldClip: [[0.275, 0], [0.310, 1], [0.360, 2]],
+    oldClipVisible: [0.275, 0.385],
+    oldClip: [[0.275, 0], [0.310, 1], [0.385, 2]],
     clip: [
-      [0.365, 0.140, -0.220, 0.140, 0.500, 0, 0.700],
-      [0.405, 0.105, -0.105, 0.095, 0.360, 0.045, 0.470],
-      [0.470, 0.035, 0.063, 0.025, 0.160, -0.030, 0.150],
-      [0.515, 0.004, 0.039, 0.003, 0.030, 0, 0.035],
+      [0.390, 0.140, -0.220, 0.140, 0.500, 0, 0.700],
+      [0.435, 0.105, -0.105, 0.095, 0.360, 0.045, 0.470],
+      [0.490, 0.035, 0.063, 0.025, 0.160, -0.030, 0.150],
+      [0.525, 0.004, 0.039, 0.003, 0.030, 0, 0.035],
       [0.540, 0, 0.010, 0, 0, 0, 0], [1, 0, 0.010, 0, 0, 0, 0],
     ],
     press: [[0, 0], [0.560, 0], [0.585, 0.10], [0.665, 0.88], [0.700, 1], [1, 1]],
@@ -90,8 +90,8 @@ export const FPS_PACKET_RELOAD = Object.freeze({
       ...FPS_RIFLE_RELOAD.hand.slice(0, 3),
       { at: 0.275, anchor: "latch", shape: "latch" },
       { at: 0.310, anchor: "oldClip" },
-      { at: 0.360, anchor: "oldClip" },
-      { at: 0.385, anchor: "clip" }, { at: 0.530, anchor: "clip" },
+      { at: 0.385, anchor: "oldClip" },
+      { at: 0.405, anchor: "clip" }, { at: 0.530, anchor: "clip" },
       { at: 0.580, anchor: "press", arc: [0.008, 0.012, 0.004] },
       { at: 0.700, anchor: "press" },
       { at: 0.755, anchor: "clear", shape: "relax", through: true },
@@ -116,6 +116,56 @@ export const FPS_RELOAD_PROPS = Object.freeze({
 });
 
 export const FPS_BOLT_HAND = Object.freeze({
-  approachAt: .040, graspAt: .070, releaseGap: .010, clearFraction: .40,
+  graspAt: .140, approachFraction:.60, liftLead:.105, releaseGap: .010, clearFraction: .40,
+  liftLeadByWeapon:{HanYang:.130},
   clearOffset: [.016,.008,.020],
+});
+
+export const FPS_TOP_MAG_RELOAD = Object.freeze({
+  blend:[[0,0],[.15,1],[.88,1],[1,0]],
+  bodyOffset:{shoulders:{right:[.004,.010,-.035],left:[0,.012,0]},elbowPoles:{right:[.04,0,0],left:[-.02,0,0]}},
+  support:[
+    [0,0,0,0,0,0,0],[.15,-.030,-.048,.072,.20,.27,-.38],
+    [.28,-.033,-.054,.077,.18,.29,-.40],[.43,-.027,-.043,.069,.21,.25,-.35],
+    [.64,-.031,-.047,.073,.20,.28,-.38],[.76,-.034,-.058,.080,.17,.30,-.41],
+    [.82,-.030,-.050,.072,.22,.27,-.37],[.90,-.025,-.043,.062,.19,.24,-.32],
+    [.98,-.003,-.006,.008,.025,.035,-.045],[1,0,0,0,0,0,0],
+  ],
+  oldMagazine:[[0,0,0,0],[.16,0,0,0],[.28,.006,.105,.020],[.32,.025,.115,.030]],
+  newMagazine:[
+    [.43,.150,-.310,.140],[.55,.100,-.080,.070],[.64,.020,.100,.010],
+    [.70,0,.050,0],[.76,0,0,0],[1,0,0,0],
+  ],
+  discardAt:.32,drawAt:.43,holdUntil:.78,
+  charge:[[0,0],[.82,0],[.875,1],[.935,0],[1,0]],
+});
+
+// Type 11: six intact five-round rifle chargers stacked vertically. The
+// follower is lifted before loading; rounds are stripped only while firing.
+// FW Type 11 Nambu and Japanese Infantry Weapons, Intelligence Bulletin.
+// Hopper bounds measured on the private, grip-normalized imported mesh.
+export const FPS_HOPPER_RELOAD = Object.freeze({
+  blend:[[0,0],[.16,1],[.88,1],[1,0]],
+  bodyOffset:{shoulders:{right:[.004,.012,-.030],left:[0,.012,0]},elbowPoles:{right:[.04,.02,0],left:[-.02,0,0]}},
+  support:[
+    [0,0,0,0,0,0,0],[.16,-.022,.008,.060,.10,.24,-.30],
+    [.26,-.025,-.007,.064,.08,.26,-.32],[.30,-.021,.009,.059,.11,.23,-.29],
+    [.36,-.025,-.004,.064,.08,.26,-.32],[.40,-.021,.010,.059,.11,.23,-.29],
+    [.46,-.025,-.006,.064,.08,.26,-.32],[.50,-.021,.010,.059,.11,.23,-.29],
+    [.56,-.025,-.007,.064,.08,.26,-.32],[.60,-.021,.009,.059,.11,.23,-.29],
+    [.66,-.025,-.006,.064,.08,.26,-.32],[.70,-.021,.010,.059,.11,.23,-.29],
+    [.76,-.026,-.008,.066,.08,.27,-.33],[.80,-.021,.009,.059,.11,.23,-.29],
+    [.88,-.020,.009,.055,.12,.22,-.27],[1,0,0,0,0,0,0],
+  ],
+  seat:[-.118,-.063,-.120], layerPitchM:.0131,
+  // The rear handle lifts the follower up and forward around its front hinge.
+  followerPivot:[-.113,.0245,-.1698], followerAngleRad:-1.42,
+  followerHandleOffset:[-.015,0,.038],
+  follower:[[0,0],[.07,0],[.16,1],[.80,1],[.88,0],[1,0]],
+  drawAt:.20, cycle:.10, alignPhase:.35, seatPhase:.60, releasePhase:.64, clearPhase:.76,
+  approachHeightM:.075,
+  pouchOffset:[.10,-.060,.090], clearOffset:[.015,.025,.018],
+  oldStackLift:[[0,0],[.13,0],[.16,1],[.195,2],[1,2]],
+  oldStackVisibleUntil:.195,
+  clipDropVelocity:[-.08,-.28,.035],
 });

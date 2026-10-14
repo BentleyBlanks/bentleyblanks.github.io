@@ -73,6 +73,49 @@ try {
       Check(returned<.001,`${id}: bolt is not home after closing`);
       row.boltTravelM=atBack;row.loaded=atLoaded;row.turnMismatchRad=maxTurnMismatch;cases.push(row);
     }
+    const boltMotion=[];
+    for(const id of ["HanYang","ZhongZheng","Type38"]) {
+      editor.SetWeapon(id);Step(5,90);vm.TriggerBolt();
+      let previous={position:vm.handRight.group.position.clone(),rotation:vm.handRight.group.quaternion.clone()},maxStep=0,maxTurn=0,worstAt=0;
+      while(vm.action) {
+        Step(5);const hand=vm.handRight.group;
+        if(previous) {
+          const distance=previous.position.distanceTo(hand.position);
+          if(distance>maxStep)worstAt=vm.action?.t??1;
+          maxStep=Math.max(maxStep,distance);maxTurn=Math.max(maxTurn,previous.rotation.angleTo(hand.quaternion)*180/Math.PI);
+        }
+        previous={position:hand.position.clone(),rotation:hand.quaternion.clone()};
+      }
+      Check(maxStep<.055,`${id}: normal bolt hand jumps ${(maxStep*1000).toFixed(1)} mm at ${worstAt.toFixed(3)}`);
+      Check(maxTurn<20,`${id}: normal bolt hand turns ${maxTurn.toFixed(1)} degrees per frame`);
+      boltMotion.push({id,maxStep,maxTurn,worstAt});
+    }
+    // Type 11 takes complete horizontal chargers. Independent vertex bounds
+    // catch the previous six vertical clips with disappearing loose rounds.
+    const hopper=[];
+    editor.SetWeapon("Type11");Step(0,90);vm.TriggerReload({remainingRounds:0});
+    Check(!!vm.rig.parts.hopperFollower,"Type11: hopper follower is a static cap");
+    for(let layer=1;layer<=6;layer++) {
+      const target=.27+(layer-1)*.10;
+      while(vm.action&&vm.action.t<target)Step(0);
+      const props=vm.hopperClips.filter(prop=>prop.visible);
+      Check(props.length===layer,`Type11: expected ${layer} retained chargers, got ${props.length}`);
+      Check(vm.rig.parts.hopperFollower.rotation.x< -1,"Type11: follower must open up and forward before loading");
+      for(let i=0;i<props.length;i++) {
+        const prop=props[i],rounds=prop.userData.rounds,points=[];
+        rounds.traverse(mesh=>{if(mesh.isMesh)for(let j=0;j<mesh.geometry.attributes.position.count;j++)
+          points.push(Point(mesh,new THREE.Vector3().fromBufferAttribute(mesh.geometry.attributes.position,j)));});
+        const bounds=new THREE.Box3().setFromPoints(points),size=bounds.getSize(new THREE.Vector3());
+        Check(size.x>.050&&size.y<.013,"Type11: five-round charger is standing upright");
+        Check(rounds.visible&&rounds.position.lengthSq()===0,"Type11: rounds stripped from charger during loading");
+        if(i)Check(Math.abs(prop.position.y-props[i-1].position.y-.0131)<1e-5,"Type11: chargers do not form a vertical stack");
+      }
+      hopper.push({t:vm.action.t,chargers:props.length});
+    }
+    while(vm.action)Step(30);
+    Step(30);Step(25);
+    Check(vm.hopperClips.filter(prop=>prop.visible).length===5,"Type11: empty bottom charger does not advance the stack");
+    Check(vm.debris.some(d=>d.alive>0&&d.mesh.userData.debrisKind==="hopperCharger"),"Type11: empty charger does not drop from the hopper bottom");
     editor.SetWeapon("HanYang"); vm.autoBolt=true; Step(2,90);
     vm.TriggerFire();
     let packet=null;
@@ -85,15 +128,16 @@ try {
     let worldError=null;
     if(packet) {
       Check(packet.mesh.geometry===vm.packetProp.userData.body.geometry,"packet drop uses a scaled cartridge stand-in");
+      Check(packet.mesh.parent.isScene&&!packet.mesh.userData.foregroundPrepass,"released packet retains foreground depth or zero camera velocity");
       const position=packet.worldPosition.clone(), rotation=game.camera.quaternion.clone(), cameraPosition=game.camera.position.clone();
       game.camera.rotation.y+=.40;game.camera.position.x+=.10;vm._StepDebris(0);
       const actual=packet.mesh.getWorldPosition(new THREE.Vector3());worldError=actual.distanceTo(position);
       Check(worldError<1e-6,"released packet follows the player's view instead of remaining in world space");
       game.camera.quaternion.copy(rotation);game.camera.position.copy(cameraPosition);vm._StepDebris(0);
     }
-    return {cases,worldError,failures};
+    return {cases,boltMotion,hopper,worldError,failures};
   });
   await fs.writeFile(path.join(output,"Data_Mechanics.json"),JSON.stringify({...report,errors},null,2));
   assert.deepEqual(errors,[],"no page errors");assert.deepEqual(report.failures,[],"rifle mechanical authenticity");
-  console.log(`ok rifle mechanisms: ${report.cases.length} empty/partial cycles, complete bolt travel, retained packet and world-space release`);
+  console.log(`ok firearm mechanisms: ${report.cases.length} empty/partial rifle cycles, ${report.hopper.length} retained hopper layers, complete bolts and world-space release`);
 } finally { await browser.close(); await new Promise(resolve=>server.close(resolve)); }

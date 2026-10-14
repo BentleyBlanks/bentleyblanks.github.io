@@ -32,8 +32,10 @@ export function GunReadyFromCover(clearance, visualLower = 0) {
 // Callbacks are driven by crossings, so slow frames cannot skip a mechanical
 // event, and repeated evaluation / completion cannot duplicate ammo or sounds.
 export class FirearmReloadTimeline {
-  constructor(weapon) {
-    this.events = RELOAD_EVENTS[weapon?.reloadKind] || RELOAD_EVENTS.stripper;
+  constructor(weapon, action = {}) {
+    const kind=weapon?.reloadKind==="enBloc"&&action.packetRounds>0?"enBlocPartial":weapon?.reloadKind;
+    this.events = RELOAD_EVENTS[kind] || RELOAD_EVENTS.stripper;
+    if(action.startedOpen)this.events=this.events.filter(event=>event.id!=="open");
     this.next = 0;
   }
   Advance(normalized, emit) {

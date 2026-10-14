@@ -1049,7 +1049,7 @@ export class VfxSystem {
       s.life=this._Range(...quick.life);s.sizeStart=quick.size[0]*scale;s.sizeEnd=quick.size[1]*scale;
       s.opacity=quick.opacity;s.fadeIn=.04;s.angle=this._Range(0,6.283);s.spin=this._Signed(.9);
       s.colorA=VFX_PALETTE.powderThin;s.colorB=VFX_PALETTE.powderSmoke;s.seed=this.random();
-      this.pools.smoke.Spawn(s,this.time);
+      this.pools.smoke.Spawn({...s,firearmSmoke:profile.id},this.time);
     }
     this._playerWispTimes ||= {};
     const previous=this._playerWispTimes[profile.id] ?? -Infinity;
@@ -1063,7 +1063,7 @@ export class VfxSystem {
       s.life=this._Range(...linger.life);s.sizeStart=linger.size[0]*scale;s.sizeEnd=linger.size[1]*scale;
       s.opacity=linger.opacity;s.fadeIn=.22;s.angle=this._Range(0,6.283);s.spin=this._Signed(.45);
       s.colorA=VFX_PALETTE.powderThin;s.colorB=VFX_PALETTE.powderSmoke;s.seed=this.random();
-      this.pools.smoke.Spawn(s,this.time);
+      this.pools.smoke.Spawn({...s,firearmSmoke:profile.id},this.time);
     }
     this.lastMuzzleProfile={kind:profile.id,player:true,life:profile.lifeS,
       smokeCount:count,wispCount:emitWisp?1:0,size:profile.widthM*scale};

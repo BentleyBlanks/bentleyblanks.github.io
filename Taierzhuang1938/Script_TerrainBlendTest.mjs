@@ -23,6 +23,11 @@ try{
     const {PrepassPass}=await import('./Script_PostPrepass.mjs');
     const renderer=new T.WebGLRenderer();renderer.setSize(384,192);renderer.setClearColor(0,0);
     const scene=new T.Scene(),camera=new T.PerspectiveCamera(40,2,.01,20);
+    // Released magazines/rounds use material groups. A non-terrain material
+    // array must be ignored safely by both source scans in the terrain pass.
+    const propGeometry=new T.BoxGeometry(.01,.01,.01);
+    const prop=new T.Mesh(propGeometry,[new T.MeshStandardMaterial(),new T.MeshStandardMaterial()]);
+    prop.position.set(9,9,9);scene.add(prop);
     camera.position.set(0,2.4,3);camera.lookAt(0,0,0);camera.updateMatrixWorld();
     const pipeline={renderer,hdrCapable:true,hdrType:T.HalfFloatType,preset:{terrainBlend:true,velocity:true,hzb:false},targets:{}};
     const pass=new TerrainBlendPass(pipeline);pass.Resize(384,192);

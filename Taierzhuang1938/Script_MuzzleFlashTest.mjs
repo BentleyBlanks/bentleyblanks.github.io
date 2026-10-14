@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const out = path.join(root, "Taierzhuang1938/_shots/MuzzleFlash");
 fs.mkdirSync(out, { recursive: true });
@@ -19,7 +20,7 @@ try {
     await page.goto(`${base}/Taierzhuang1938/?shot=1&weapons=1&manual=1&quality=${quality}&scale=small`, { waitUntil: "load", timeout: 120000 });
     await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 240000 });
     await page.waitForFunction(() => window.Taierzhuang.viewmodel.materials.flash.map.image?.width > 0);
-    for (const id of ["HanYang", "Type38"]) {
+    for (const id of ["HanYang", "Type38", "Zb26", "Type92Hmg"]) {
       for (const ads of [false, true]) {
         const key = `${quality}_${id}_${ads ? "Ads" : "Hip"}`;
         await page.evaluate(({ id, ads }) => {
@@ -113,6 +114,46 @@ try {
         await page.screenshot({ path: path.join(out, `${key}_After.png`) });
         results.push({ key, shot, response, ended });
         console.log(`PASS ${key}: ${response.changed} gun pixels lit, mean gain ${response.averageGain.toFixed(1)}/255`);
+        if(ads&&["Zb26","Type92Hmg"].includes(id)) {
+          const sustained=await page.evaluate(async()=>{
+            const T=window.Taierzhuang,THREE=await import("three"),pool=T.vfx.pools.smoke;
+            const before=T.state.playerShots;let peakSmoke=0,peakTotalSmoke=0;
+            T.Debug.Mouse(0,true);
+            for(let i=0;i<240;i++) {
+              T.StepFrames(1,1/60,false);
+              peakTotalSmoke=Math.max(peakTotalSmoke,pool.system.particles.length);
+              peakSmoke=Math.max(peakSmoke,pool.system.particles.filter(p=>p.packed?.firearmSmoke).length);
+            }
+            T.Debug.Mouse(0,false);T.StepFrames(2,1/60,true);
+            const target=new THREE.WebGLRenderTarget(1280,720),previous=T.renderer.getRenderTarget();
+            const smokeVisible=pool.mesh.visible;
+            const Pixels=()=>{
+              T.renderer.setRenderTarget(target);T.renderer.clear();T.renderer.render(T.scene,T.camera);
+              const bytes=new Uint8Array(128*128*4);
+              T.renderer.readRenderTargetPixels(target,576,296,128,128,bytes);return bytes;
+            };
+            try {
+              const smoky=Pixels();pool.mesh.visible=false;const clear=Pixels();
+              let difference=0,severe=0;
+              for(let i=0;i<smoky.length;i+=4) {
+                const delta=(Math.abs(smoky[i]-clear[i])+Math.abs(smoky[i+1]-clear[i+1])+Math.abs(smoky[i+2]-clear[i+2]))/3;
+                difference+=delta;if(delta>64)severe++;
+              }
+              return {shots:T.state.playerShots-before,peakSmoke,peakTotalSmoke,profile:T.viewmodel.flashProfile.id,
+                meanAimDifference:difference/(128*128),severeAimFraction:severe/(128*128)};
+            } finally {pool.mesh.visible=smokeVisible;T.renderer.setRenderTarget(previous);target.dispose();}
+          });
+          const expectedShots=4/WEAPONS[id].fireIntervalS;
+          assert(Math.abs(sustained.shots-expectedShots)<=1,
+            `${key}: sustained real automatic fire at its authored cadence: ${JSON.stringify(sustained)}`);
+          assert.equal(sustained.profile,id==="Zb26"?"lmg":"hmg",`${key}: gun-specific discharge recipe`);
+          assert(sustained.peakSmoke>0&&sustained.peakSmoke<32,`${key}: bounded muzzle smoke population: ${JSON.stringify(sustained)}`);
+          assert(sustained.meanAimDifference<15&&sustained.severeAimFraction<.03,
+            `${key}: smoke preserves the aiming region: ${JSON.stringify(sustained)}`);
+          await page.screenshot({path:path.join(out,`${key}_Sustained.png`)});
+          results.push({key:`${key}_Sustained`,...sustained});
+          console.log(`PASS ${key} sustained: ${sustained.shots} shots, ${sustained.peakSmoke} smoke particles, aim delta ${sustained.meanAimDifference.toFixed(2)}/255`);
+        }
       }
     }
   }

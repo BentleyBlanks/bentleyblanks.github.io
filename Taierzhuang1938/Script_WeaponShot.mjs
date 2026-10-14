@@ -94,7 +94,7 @@ page.on("console", (message) => {
 // menu=0：跳过主菜单直接进关。菜单是一整层盖在 canvas 上的 DOM，
 // 出图要的是台架那一帧，不是菜单的运镜。
 try {
-await page.goto(`${baseUrl}/Taierzhuang1938/?quality=high&scale=small&${reloadSheet ? "range=1&shot=1" : "phase=0"}&menu=0`,
+await page.goto(`${baseUrl}/Taierzhuang1938/?quality=high&scale=small&${reloadSheet ? "weapons=1&shot=1&manual=1" : "phase=0"}&menu=0`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(30));

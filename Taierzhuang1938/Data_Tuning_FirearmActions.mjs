@@ -10,13 +10,23 @@ export const RELOAD_EVENTS = Object.freeze({
     Event(0.105, "open", "bolt", { offset: 0, maxDuration: 0.28, volume: 0.45 }),
     Event(0.50, "insert", "stripperLoad", { maxDuration: 0.55, volume: 0.75 }),
     Event(0.65, "loaded"),
-    Event(0.925, "close", "bolt", { offset: 0.50, maxDuration: 0.26, volume: 0.5 }),
+    Event(0.825, "close", "bolt", { offset: 0.50, maxDuration: 0.18, volume: 0.45 }),
+    Event(0.925, "lock", "bolt", { offset: 0.70, maxDuration: 0.06, volume: 0.5 }),
   ]),
   enBloc: Object.freeze([
     Event(0.105, "open", "bolt", { maxDuration: 0.28, volume: 0.45 }),
     Event(0.50, "insert", "stripperLoad", { maxDuration: 0.55, volume: 0.75 }),
     Event(0.65, "loaded"),
-    Event(0.925, "close", "bolt", { offset: 0.50, maxDuration: 0.26, volume: 0.5 }),
+    Event(0.825, "close", "bolt", { offset: 0.50, maxDuration: 0.18, volume: 0.45 }),
+    Event(0.925, "lock", "bolt", { offset: 0.70, maxDuration: 0.06, volume: 0.5 }),
+  ]),
+  enBlocPartial: Object.freeze([
+    Event(0.105,"open","bolt",{maxDuration:0.28,volume:0.45}),
+    Event(0.275,"releasePacket","bolt",{maxDuration:0.06,volume:0.30}),
+    Event(0.54,"insert","stripperLoad",{maxDuration:0.55,volume:0.75}),
+    Event(0.70,"loaded"),
+    Event(0.825,"close","bolt",{offset:0.50,maxDuration:0.18,volume:0.45}),
+    Event(0.925,"lock","bolt",{offset:0.70,maxDuration:0.06,volume:0.5}),
   ]),
   topMag: Object.freeze([
     Event(0.16, "remove", "magIn", { maxDuration: 0.18, volume: 0.4 }),
@@ -25,9 +35,10 @@ export const RELOAD_EVENTS = Object.freeze({
     Event(0.88, "close", "bolt", { offset: 0.50, maxDuration: 0.26, volume: 0.5 }),
   ]),
   hopper: Object.freeze([
-    ...Array.from({ length: 6 }, (_, index) => Event(0.235 + index * 0.10, `clip${index + 1}`,
+    ...Array.from({ length: 6 }, (_, index) => Event(0.26 + index * 0.10, `clip${index + 1}`,
       "stripperLoad", { maxDuration: 0.24, volume: 0.55 })),
     Event(0.78, "loaded"),
+    Event(0.80, "follower", "bolt", { offset: 0.70, maxDuration: 0.10, volume: 0.35 }),
   ]),
   stripFeed: Object.freeze([
     Event(0.20, "remove", "bolt", { maxDuration: 0.20, volume: 0.4 }),

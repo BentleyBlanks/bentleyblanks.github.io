@@ -163,9 +163,8 @@ export const MESHES = {
   },
   Type38: {
     file: "Model_Type38.tzm.json", category: "weapon",
-    // meshBlocks 4 / nodes 8：三八式在某一轮换模后多了一个 adsNear 挂点，
-    // 木/钢两桶也各裂成两块，而这张表当时没跟着改 —— Verify 第一关一直报红。
-    // WP-E1 照 Model/Data_ModelIndex.json 补正（数字来自构建期实测，不是猜的）。
+    // Complete bolt assembly plus measured feed/ejection/open-stroke mounts.
+    // World batching remains two material draws; source triangles are conserved.
     triangles: 12467, meshBlocks: 5, nodes: 12, joints: 0,
     materials: ["steel", "wood"], mounts: [...WEAPON_MOUNTS,"feedMouth","ejection","boltOpen"],
     span: [0.09801, 0.19730, 1.27600], lengthM: 1.276,

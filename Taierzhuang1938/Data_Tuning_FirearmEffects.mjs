@@ -13,7 +13,7 @@ export const FIREARM_EFFECTS = Object.freeze({
   }),
   lmg: Object.freeze({
     ...MUZZLE_FLASH, id:"lmg", lifeS:.026, lightLifeS:.036,
-    widthM:.070, lengthM:.175, coreM:.078, radiance:6.0,
+    widthM:.082, lengthM:.190, coreM:.104, radiance:6.4,
     minScale:.86, maxScale:1.08, lightIntensity:19,
     quickSmoke:{count:1,life:[.12,.18],speed:3.0,size:[.022,.110],opacity:.075},
     lingering:{intervalS:.24,life:[.48,.68],size:[.018,.13],opacity:.055},
@@ -38,3 +38,21 @@ export function FirearmEffects(weaponOrKind) {
   const kind=typeof weaponOrKind==="string"?weaponOrKind:weaponOrKind?.kind;
   return FIREARM_EFFECTS[kind] || FIREARM_EFFECTS.boltRifle;
 }
+
+// The new ZB-26 receiver's lower plate is at y=-.005 m. Its port is below the
+// feeding line, so both the release point and velocity differ from a side port.
+export const CASE_EJECTION = Object.freeze({
+  Zb26: {point:[0,-.006,-.205],minimum:[-.06,-1.55,.02],maximum:[.10,-1.10,.20]},
+  default: {minimum:[1.9,1.4,-.30],maximum:[2.7,2.1,.20]},
+});
+
+// Imported dark steel/paint atlases need a diffuse contribution under the
+// game's probe lighting. Pure-metal scalars made the feed mechanisms black.
+// These private viewmodel options preserve the authored maps and world assets.
+export const VIEWMODEL_FIREARM_SURFACES = Object.freeze({
+  zb26Steel: {roughness:1,metalness:.65,normalScale:1},
+  type11AmmoBox: {roughness:.88,metalness:.25,normalScale:.65},
+  type11Body: {roughness:.88,metalness:.35,normalScale:.65},
+  type11BodyAlt: {roughness:.90,metalness:.35,normalScale:.65},
+  type11Fore: {roughness:.85,metalness:0,normalScale:.65},
+});

@@ -30,6 +30,14 @@ for (const weapon of Object.values(WEAPONS).filter(w => w.reloadKind)) {
 const early = new FirearmReloadTimeline(WEAPONS.HanYang), cancelled = [];
 early.Advance(0.4, e => cancelled.push(e));
 assert.ok(!cancelled.some(e => e.id === "loaded"), "cancelling before insertion never grants rounds");
+const partial=new FirearmReloadTimeline(WEAPONS.HanYang,{packetRounds:2}),partialEvents=[];
+partial.Advance(.66,event=>partialEvents.push(event));
+assert.ok(!partialEvents.some(event=>event.id==="loaded"),"a partial packet must be removed before the fresh one can finish insertion");
+partial.Advance(1,event=>partialEvents.push(event));
+assert.equal(partialEvents.find(event=>event.id==="loaded").at,.70);
+assert.equal(partialEvents.filter(event=>event.id==="loaded").length,1);
+const alreadyOpen=new FirearmReloadTimeline(WEAPONS.HanYang,{startedOpen:true});
+assert.ok(!alreadyOpen.events.some(event=>event.id==="open"),"an already open bolt must not replay its opening cue");
 assert.equal(RecoilAfterInput(12, -10), 2);
 assert.equal(RecoilAfterInput(2, -10), 0);
 assert.equal(RecoilAfterInput(-4, 3), -1);

@@ -138,12 +138,13 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
       const support = spec.actions.reload.family === "boxMag" ? "right" : "left";
       const working = support === "right" ? "left" : "right";
       const rifle = ["ZhongZheng", "HanYang", "Type38"].includes(weapon);
+      const traceMotion = rifle || ["Zb26", "Type11"].includes(weapon);
       const motion = { weapon, adsEntry, maxHandStepM: 0, maxHandTurnDeg: 0, maxGunTurnDeg: 0,
         midSupportTravelM: 0, midFrames: 0, longestStillS: 0, stillS: 0 };
       let previous = null;
       const TraceStep = () => {
         Step(1, { ads: adsEntry });
-        if (!rifle) return;
+        if (!traceMotion) return;
         const hand = vm.handRight.group, gun = vm.reloadPivot;
         const current = { t: vm.action?.t ?? 1, hand: hand.position.clone(), rotation: hand.quaternion.clone(),
           gun: gun.position.clone(), gunRotation: gun.quaternion.clone() };
@@ -186,7 +187,7 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
       }
       let guard = 0;
       while (vm.action && guard++ < 300) TraceStep();
-      if (rifle) out.reloadMotion.push(motion);
+      if (traceMotion) out.reloadMotion.push(motion);
       Step(180, { ads: adsEntry });
       out.reloadCases.push({ weapon, adsEntry, t: 1, action: vm.action?.kind || null,
         neutral: !!vm.reloadPivot && vm.reloadPivot.position.length() < 1e-8
@@ -250,7 +251,9 @@ for (const entry of report.reloadMotion) {
   checks.push([`${label} 连续回手和转腕`, entry.maxHandStepM < 0.055 && entry.maxHandTurnDeg < 20
     && entry.maxGunTurnDeg < 6,
   `hand=${(entry.maxHandStepM * 1000).toFixed(1)}mm at ${entry.handStepAt.toFixed(3)} turn=${entry.maxHandTurnDeg.toFixed(1)}° gun=${entry.maxGunTurnDeg.toFixed(1)}°/frame`]);
-  checks.push([`${label} 装填发力带动支撑手`, entry.midFrames > 90 && entry.midSupportTravelM > 0.025
+  const minimumFrames = ["Zb26", "Type11"].includes(entry.weapon)
+    ? Math.min(90, WEAPONS[entry.weapon].reloadTimeS * 60 * .45) : 90;
+  checks.push([`${label} 装填发力带动支撑手`, entry.midFrames > minimumFrames && entry.midSupportTravelM > 0.025
     && entry.longestStillS < 0.25,
   `travel=${(entry.midSupportTravelM * 1000).toFixed(1)}mm longest hold=${entry.longestStillS.toFixed(3)}s`]);
 }
