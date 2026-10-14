@@ -18,7 +18,10 @@ const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
 page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
 
-await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?shot=1&phase=2&quality=medium&scale=small`,
+try {
+// The production firearm range has the same player/viewmodel host and avoids
+// loading an unrelated campaign battlefield for an arm/contact regression.
+await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?weapons=1&shot=1&manual=1&quality=medium&scale=small`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
 
@@ -99,6 +102,7 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
   });
   const out = {
     reloadCases: [],
+    reloadMotion: [],
     cases: [], weaponIds: Object.keys(FPS_ARM_POSES), limits: FPS_ARM_LIMITS,
     source: arms?.report?.source, chains: arms?.report?.chains, bones: arms?.report?.bones,
     skinnedMeshes: arms?.report?.skinnedMeshes, profiles: arms?.report?.profiles || [],
@@ -133,9 +137,35 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
       Equip(weapon); Step(90, { ads: adsEntry }); vm.TriggerReload();
       const support = spec.actions.reload.family === "boxMag" ? "right" : "left";
       const working = support === "right" ? "left" : "right";
+      const rifle = ["ZhongZheng", "HanYang", "Type38"].includes(weapon);
+      const motion = { weapon, adsEntry, maxHandStepM: 0, maxHandTurnDeg: 0, maxGunTurnDeg: 0,
+        midSupportTravelM: 0, midFrames: 0, longestStillS: 0, stillS: 0 };
+      let previous = null;
+      const TraceStep = () => {
+        Step(1, { ads: adsEntry });
+        if (!rifle) return;
+        const hand = vm.handRight.group, gun = vm.reloadPivot;
+        const current = { t: vm.action?.t ?? 1, hand: hand.position.clone(), rotation: hand.quaternion.clone(),
+          gun: gun.position.clone(), gunRotation: gun.quaternion.clone() };
+        if (previous) {
+          const handStep = current.hand.distanceTo(previous.hand);
+          if (handStep > motion.maxHandStepM) motion.handStepAt = current.t;
+          motion.maxHandStepM = Math.max(motion.maxHandStepM, handStep);
+          motion.maxHandTurnDeg = Math.max(motion.maxHandTurnDeg, THREE.MathUtils.radToDeg(current.rotation.angleTo(previous.rotation)));
+          const gunTurn = current.gunRotation.angleTo(previous.gunRotation), gunStep = current.gun.distanceTo(previous.gun);
+          motion.maxGunTurnDeg = Math.max(motion.maxGunTurnDeg, THREE.MathUtils.radToDeg(gunTurn));
+          if (previous.t >= 0.30 && current.t <= 0.80) {
+            motion.midFrames += 1;
+            motion.midSupportTravelM += gunStep;
+            motion.stillS = gunStep < 0.00002 && gunTurn < 0.0002 ? motion.stillS + 1 / 60 : 0;
+            motion.longestStillS = Math.max(motion.longestStillS, motion.stillS);
+          }
+        }
+        previous = current;
+      };
       for (const targetT of [0.18, 0.40, 0.62, 0.90]) {
         let guard = 0;
-        while (vm.action && vm.action.t < targetT && guard++ < 300) Step(1, { ads: adsEntry });
+        while (vm.action && vm.action.t < targetT && guard++ < 300) TraceStep();
         vm.root.updateWorldMatrix(true, true);
         const hand = support === "right" ? vm.handRight.group : vm.handLeft.group;
         const actual = vm.statePivot.worldToLocal(hand.getWorldPosition(new THREE.Vector3()));
@@ -154,6 +184,9 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
             ? Math.hypot(vm.reloadPivot.rotation.x, vm.reloadPivot.rotation.y, vm.reloadPivot.rotation.z) : 0,
         });
       }
+      let guard = 0;
+      while (vm.action && guard++ < 300) TraceStep();
+      if (rifle) out.reloadMotion.push(motion);
       Step(180, { ads: adsEntry });
       out.reloadCases.push({ weapon, adsEntry, t: 1, action: vm.action?.kind || null,
         neutral: !!vm.reloadPivot && vm.reloadPivot.position.length() < 1e-8
@@ -212,6 +245,15 @@ for (const entry of report.reloadCases) {
     && (entry.t !== 0.62 || entry.workingHandTravelM > 0.015),
   `hand=${entry.workingHandTravelM.toFixed(4)}m tilt=${entry.pivotRotation.toFixed(4)}`]);
 }
+for (const entry of report.reloadMotion) {
+  const label = `${entry.weapon} ${entry.adsEntry ? "ADS" : "hip"} reload motion`;
+  checks.push([`${label} 连续回手和转腕`, entry.maxHandStepM < 0.055 && entry.maxHandTurnDeg < 20
+    && entry.maxGunTurnDeg < 6,
+  `hand=${(entry.maxHandStepM * 1000).toFixed(1)}mm at ${entry.handStepAt.toFixed(3)} turn=${entry.maxHandTurnDeg.toFixed(1)}° gun=${entry.maxGunTurnDeg.toFixed(1)}°/frame`]);
+  checks.push([`${label} 装填发力带动支撑手`, entry.midFrames > 90 && entry.midSupportTravelM > 0.025
+    && entry.longestStillS < 0.25,
+  `travel=${(entry.midSupportTravelM * 1000).toFixed(1)}mm longest hold=${entry.longestStillS.toFixed(3)}s`]);
+}
 
 let failed = 0;
 for (const [name, ok, detail] of checks) {
@@ -219,6 +261,8 @@ for (const [name, ok, detail] of checks) {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
 }
 console.log(`\n第一人称骨骼双臂：${checks.length - failed}/${checks.length} 过`);
-await browser.close();
-server.close();
-process.exit(failed ? 1 : 0);
+process.exitCode = failed ? 1 : 0;
+} finally {
+  await browser.close();
+  server.close();
+}

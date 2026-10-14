@@ -16,6 +16,7 @@
 //   --fp   拍第一人称那一份（腰射 / 开镜 / 开火 / 拉栓）。第一人称与台架是**两套
 //          几何**（见 Script_EditorWeapon 抬头），台架改好了不等于手里那把也对。
 //   --reload 拍全枪械换弹：腰射/ADS起手两行，各四个机械关键帧；附同名JSON投影轨迹。
+//   --reload-times=.285,.42,.50,.78 指定四个装填时刻；--base-url=http://127.0.0.1:8099 复用本地预览。
 // 默认输出到 Taierzhuang1938/_shots/（已 gitignore）。
 
 import path from "node:path";
@@ -35,6 +36,10 @@ const flat = args.includes("--flat");
 const firstPerson = args.includes("--fp");
 // Repeatable reload review: four mechanical keyframes, hip and ADS entry rows.
 const reloadSheet = args.includes("--reload");
+const reloadTimes = args.find(a => a.startsWith("--reload-times="))?.slice(15).split(",").map(Number)
+  || [0.18, 0.40, 0.62, 0.90];
+if (reloadTimes.length !== 4 || reloadTimes.some((t, i) => !Number.isFinite(t) || t <= 0 || t >= 1
+  || (i && t <= reloadTimes[i - 1]))) throw new Error("--reload-times requires four increasing times between 0 and 1");
 const debugArg = args.find((a) => a.startsWith("--debug="));
 const debugView = debugArg ? debugArg.slice(8) : "final";
 const DEBUG_MODES = { final: 0, normal: 0, baseColor: 6, roughness: 7, metalness: 8 };
@@ -67,8 +72,9 @@ const WEAPONS = [
 
 const VIEWPORT = { width: 1280, height: 720 };
 
-const server = await ServeRoot(rootDir, 0);
-const port = server.address().port;
+const previewUrl = args.find(a => a.startsWith("--base-url="))?.slice(11).replace(/\/$/, "");
+const server = previewUrl ? null : await ServeRoot(rootDir, 0);
+const baseUrl = previewUrl || `http://127.0.0.1:${server.address().port}`;
 const browser = await LaunchBrowser();
 const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
 
@@ -83,7 +89,7 @@ page.on("console", (message) => {
 
 // menu=0：跳过主菜单直接进关。菜单是一整层盖在 canvas 上的 DOM，
 // 出图要的是台架那一帧，不是菜单的运镜。
-await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=high&scale=small&${reloadSheet ? "range=1&shot=1" : "phase=0"}&menu=0`,
+await page.goto(`${baseUrl}/Taierzhuang1938/?quality=high&scale=small&${reloadSheet ? "range=1&shot=1" : "phase=0"}&menu=0`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
 await page.evaluate(() => window.Taierzhuang.StepFrames(30));
@@ -207,7 +213,7 @@ const FpSheet = async (entry) => page.evaluate(async ({ w }) => {
   return sheet.toDataURL("image/png");
 }, { w: entry });
 
-const ReloadSheet = async (entry) => page.evaluate(async ({ w }) => {
+const ReloadSheet = async (entry) => page.evaluate(async ({ w, times }) => {
   const T = window.Taierzhuang, editor = T.editor.active;
   editor.SetMode("fp");
   const src = document.getElementById("view");
@@ -215,7 +221,6 @@ const ReloadSheet = async (entry) => page.evaluate(async ({ w }) => {
   const sheet = document.createElement("canvas");
   sheet.width = cw * 4; sheet.height = ch * 2;
   const ctx = sheet.getContext("2d");
-  const times = [0.18, 0.40, 0.62, 0.90];
   const samples = [];
   for (let row = 0; row < 2; row += 1) {
     editor.SetWeapon(w.id, w.variant || 0);
@@ -244,7 +249,7 @@ const ReloadSheet = async (entry) => page.evaluate(async ({ w }) => {
     }
   }
   return { image: sheet.toDataURL("image/png"), samples };
-}, { w: entry });
+}, { w: entry, times: reloadTimes });
 
 let list = only
   ? WEAPONS.filter((w) => only.includes(w.id) || only.includes(w.shotId))
@@ -269,7 +274,7 @@ for (const entry of list) {
 }
 
 await browser.close();
-server.close();
+server?.close();
 if (problems.length) {
   for (const p of problems) console.log(`FAIL ${p}`);
   process.exit(1);

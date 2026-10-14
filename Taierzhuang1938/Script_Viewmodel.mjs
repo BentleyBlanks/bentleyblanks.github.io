@@ -50,6 +50,7 @@ import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
 import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_PlayerDeath.mjs";
 
 import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
+import { FPS_RIFLE_RELOAD } from "./Data_Tuning_FpsReload.mjs";
 
 const DEG = Math.PI / 180;
 
@@ -143,6 +144,30 @@ const Ease = {
   /** 冲—回：0→1→0，用于突刺、拍弹匣这种"去了又回"的动作。 */
   Pulse: (t) => Math.sin(Clamp01(t) * Math.PI),
 };
+
+// Monotone cubic with shared tangents: carry velocity through intermediate
+// poses, stop at genuine holds, and never overshoot the authored contact range.
+function ReloadTrack(keys, t, column = 1) {
+  if (t <= keys[0][0]) return keys[0][column];
+  if (t >= keys.at(-1)[0]) return keys.at(-1)[column];
+  let end = 1;
+  while (t >= keys[end][0]) end += 1;
+  const Slope = i => (keys[i + 1][column] - keys[i][column]) / (keys[i + 1][0] - keys[i][0]);
+  const Tangent = i => {
+    if (i === 0 || i === keys.length - 1) return 0;
+    const a = Slope(i - 1), b = Slope(i);
+    if (a * b <= 0) return 0;
+    const previous = keys[i][0] - keys[i - 1][0], next = keys[i + 1][0] - keys[i][0];
+    const w1 = 2 * next + previous, w2 = next + 2 * previous;
+    return (w1 + w2) / (w1 / a + w2 / b);
+  };
+  const start = end - 1, span = keys[end][0] - keys[start][0];
+  const u = (t - keys[start][0]) / span, u2 = u * u, u3 = u2 * u;
+  return (2 * u3 - 3 * u2 + 1) * keys[start][column]
+    + (u3 - 2 * u2 + u) * Tangent(start) * span
+    + (-2 * u3 + 3 * u2) * keys[end][column]
+    + (u3 - u2) * Tangent(end) * span;
+}
 
 /** 就地缩放 UV（合并前用；合并后属性是拼起来的，改不动单块）。 */
 function ScaleUvInPlace(geometry, su, sv) {
@@ -2961,6 +2986,7 @@ export class Viewmodel {
     const position = value => Array.isArray(value) ? new THREE.Vector3().fromArray(value) : value;
     const hand = side === "right" ? this.handRight.group : this.handLeft.group;
     hand.position.lerpVectors(position(start.position),position(end.position),mix);
+    if (end.arc) hand.position.addScaledVector(position(end.arc), 4 * mix * (1 - mix));
     const rotation = frame => new THREE.Quaternion().setFromEuler(new THREE.Euler(...(frame.rotation || FPS_HAND_SHAPES[frame.shape]?.rotation || base.rotation),"YXZ"));
     hand.quaternion.copy(rotation(start)).slerp(rotation(end),mix);
     if (this.riggedArms) {
@@ -2978,8 +3004,8 @@ export class Viewmodel {
   }
 
   /** Rotate the weapon around its supporting palm, keeping shoulders stable. */
-  _PoseReload(support, weight, x, y, z, rx, ry, rz) {
-    this.reloadBlend = weight;
+  _PoseReload(support, weight, x, y, z, rx, ry, rz, blend = weight) {
+    this.reloadBlend = blend;
     const pivot = this.reloadPivot;
     const anchor = this.handBase[support];
     pivot.rotation.set(rx * weight, ry * weight, rz * weight, "YXZ");
@@ -3000,41 +3026,38 @@ export class Viewmodel {
   _AnimReloadStripper(t) {
     const rig = this.rig;
     const bolt = rig.parts.bolt;
-    const travel = rig.boltTravel;
+    const motion = FPS_RIFLE_RELOAD;
 
-    // 左掌支撑护木，枪围绕它抬起露出机匣；肩膀不随枪绕相机横移。
-    const raise = Ease.InOut(Ease.Seg(t, 0.00, 0.18)) - Ease.InOut(Ease.Seg(t, 0.88, 1.00));
-    this._PoseReload("left", raise, -0.045, -0.025, 0.093, 0.10, 0.40, -0.55);
+    // 左掌支撑护木；取夹卸力、压弹下沉、推栓回带，最后才回到据枪。
+    const raise = ReloadTrack(motion.blend, t);
+    const pose = Array.from({ length: 6 }, (_, i) => ReloadTrack(motion.support, t, i + 1));
+    this._PoseReload("left", 1, ...pose, raise);
 
     if (bolt) {
-      const open = this.boltOpen ? 1 : Ease.InOut(Ease.Seg(t, 0.10, 0.26));
-      const close = Ease.InOut(Ease.Seg(t, 0.84, 0.96));
-      bolt.rotation.z = 1.35 * Clamp01(open - Ease.InOut(Ease.Seg(t, 0.91, 1.00)));
-      bolt.position.z = travel * Clamp01(open - close);
+      // 抬柄后再后拉，推回后再闭锁；空仓留开的枪机不重复开栓。
+      const turnT = this.boltOpen ? Math.max(t, motion.boltTurn[2][0]) : t;
+      const slideT = this.boltOpen ? Math.max(t, motion.boltSlide[2][0]) : t;
+      bolt.rotation.z = 1.35 * ReloadTrack(motion.boltTurn, turnT);
+      bolt.position.z = rig.boltTravel * ReloadTrack(motion.boltSlide, slideT);
       if (rig.parts.dustCover) rig.parts.dustCover.position.z = bolt.position.z;
     }
 
-    // 桥夹：从画面右下（腰间弹袋）升上来，坐进导槽
+    // 桥夹从腰间绕开机匣、对准导槽，再压入；工作手跟随同一个实物变换。
     const seat = rig.clipSeat;
-    const bring = Ease.Out(Ease.Seg(t, 0.26, 0.50));
-    const press = Ease.InOut(Ease.Seg(t, 0.52, 0.65));
-    const pull = Ease.In(Ease.Seg(t, 0.72, 0.80));
-    if (t < 0.82) {
-      this.clipProp.visible = t >= 0.30;
-      const from = this._tmpVec.set(seat.x + 0.14, seat.y - 0.26, seat.z + 0.16);
-      const to = this._tmpVec2.set(seat.x, seat.y + 0.010, seat.z);
-      this.clipProp.position.lerpVectors(from, to, bring);
-      // The clip stays in its guide while cartridges are pushed down.
-      this.clipProp.position.y += pull * 0.16;
-      this.clipProp.position.x += pull * 0.05;
-      this.clipProp.rotation.set(Mix(0.5, 0.0, bring), 0, Mix(0.7, 0.0, bring), "YXZ");
+    const press = ReloadTrack(motion.press, t);
+    this.clipProp.position.set(seat.x + ReloadTrack(motion.clip, t, 1),
+      seat.y + ReloadTrack(motion.clip, t, 2), seat.z + ReloadTrack(motion.clip, t, 3));
+    this.clipProp.rotation.set(ReloadTrack(motion.clip, t, 4), ReloadTrack(motion.clip, t, 5),
+      ReloadTrack(motion.clip, t, 6), "YXZ");
+    if (t < motion.clipVisible[1]) {
+      this.clipProp.visible = t >= motion.clipVisible[0];
       // 5 发压进弹仓：弹头逐颗沉下去
       const rounds = this.clipProp.userData.rounds;
       rounds.position.y = -press * 0.056;
       rounds.visible = press < 0.98;
     } else {
       this.clipProp.visible = false;
-      if (t >= 0.82 && this.action && !this.action.tossed) {
+      if (this.action && !this.action.tossed) {
         this.action.tossed = true;
         this._SpawnClipToss();
       }
@@ -3044,19 +3067,18 @@ export class Viewmodel {
     const carry = this._HandPlacement("clip",this.clipProp.position,this.clipProp.quaternion);
     const topRound = this.clipProp.position.clone().add(new THREE.Vector3(0,0.0506-press*0.056,0.009));
     const push = this._HandPlacement("press",topRound);
-    const boltPoint = this._BoltHandPoint();
-    this._WorkingHandPath("right", t, [
-      {at:0.10,position:boltPoint,shape:"open",rotation:FPS_HAND_SHAPES.bolt.rotation},
-      {at:0.22,position:boltPoint,shape:"bolt"},
-      {at:0.30,...carry},
-      {at:0.49,...carry},
-      {at:0.54,...push},
-      {at:0.65,...push},
-      {at:0.70,...carry},
-      {at:0.80,...carry},
-      {at:0.85,position:boltPoint,shape:"bolt"},
-      {at:0.94,position:boltPoint,shape:"bolt"},
-    ]);
+    const anchors = { clip: carry, press: push,
+      bolt: { position: this._BoltHandPoint(), rotation: FPS_HAND_SHAPES.bolt.rotation, shape: "bolt" } };
+    this._WorkingHandPath("right", t, motion.hand.map(frame => {
+      const point = { ...anchors[frame.anchor], ...frame };
+      if (frame.offset) point.position = point.position.clone().add(new THREE.Vector3().fromArray(frame.offset));
+      if (frame.gripRotationMix) {
+        const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(...point.rotation, "YXZ"));
+        rotation.slerp(new THREE.Quaternion().setFromEuler(this.handBaseRot.right), frame.gripRotationMix);
+        point.rotation = new THREE.Euler().setFromQuaternion(rotation, "YXZ").toArray().slice(0, 3);
+      }
+      return point;
+    }));
   }
 
   /**

@@ -113,6 +113,22 @@ BlenderMCP 在上述独立工程执行 `_import/Script_FpsAnimationStudio.py` �
 `Script_FpsArmTest` 覆盖全部装备与开火、拉栓、装填、刺刀、投掷、近战动作；
 `Script_WeaponShot --fp` 负责人工检查手与枪的实际轮廓。接触残差合格不等于画面合格。
 
+2026-10-15 起，汉阳造、中正式、三八式的桥夹换弹共用 `Data_Tuning_FpsReload`：
+左掌支撑下的枪身、桥夹与枪机用共享切线的单调三次曲线求值；取夹、压弹和闭锁各自带动枪身，
+回稳有小幅余势。桥夹沿弧线抬至机匣上方、落进导槽，在压弹期间保持落座；
+工作手只有离开实物时添加弧线偏移，持夹与拇指压弹继续跟随实际部件的掌面和手型。
+开栓按「抬柄 → 后拉」分拍，闭栓按「推回 → 压柄」分拍；空仓已经开着的枪机保持后位，
+换弹时长、弹量、输入与动作完成回调沿用原契约。未添加或重烘骨骼片段。
+`Script_FpsArmTest` 追加腰射与开镜起手的完整时序检查，限制单帧手位、转腕和枪身转角，
+并检查装填中段的受力位移与静止时长。高画质检查用：
+
+```powershell
+node Taierzhuang1938/Script_WeaponShot.mjs --reload --only=HanYang,ZhongZheng,Type38
+node Taierzhuang1938/Script_WeaponShot.mjs --reload --only=HanYang,ZhongZheng,Type38 --reload-times=.285,.42,.50,.78
+```
+
+可加 `--base-url=http://127.0.0.1:<LocalPreview 实际端口>` 复用本任务预览服务，输出仍仅留 `_shots/`。
+
 `Script_FpsHandContactTest` 进一步测量六把随身枪的蒙皮指腹到真实扳机、机柄、桥夹、
 弹匣和套筒表面的距离，以及五把长枪左手五个指腹到护木的距离，
 覆盖腰射、开镜、射击及完整换弹/拉栓逐帧动作。
