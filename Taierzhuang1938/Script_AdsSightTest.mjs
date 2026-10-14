@@ -199,8 +199,8 @@ try {
           let zLo = Infinity, zHi = -Infinity;
           rig.group.traverse((o) => {
             if (!o.isMesh || !o.visible || !o.geometry || !o.geometry.attributes.position) return;
-            const name = o.name || "";
-            if (name.indexOf("Bayonet") === 0) return;
+            const name = (o.name || "").toLowerCase();
+            if (name.indexOf("bayonet") === 0) return;
             // Imported source material buckets also participate in muzzle-axis sampling.
             if (name.indexOf("steel") < 0 && name.indexOf("lq") < 0) return;
             const pos = o.geometry.attributes.position;
@@ -287,13 +287,27 @@ try {
             frontHit = hit; frontHitLocal = local; frontVisible = true;
           }
         }
-        const rearTops = (vm.rig.ironSights?.rear || []).map((mesh) => {
+        // Imported sights may merge both notch shoulders into one mesh with
+        // its origin at the weapon root. Measure the real crowns, not mesh
+        // count or mesh origins; retain the same two-shoulder / 2px assertions.
+        const rearVertices = [];
+        const inverseRig = vm.rig.group.matrixWorld.clone().invert();
+        for (const mesh of vm.rig.ironSights?.rear || []) {
           const pos = mesh.geometry.attributes.position;
-          let top = -Infinity;
-          for (let i = 0; i < pos.count; i += 1) top = Math.max(top, pos.getY(i));
-          const point = new THREE.Vector3(0, top, 0).applyMatrix4(mesh.matrixWorld).project(T.camera);
-          return { x: point.x * halfWidth, y: -point.y * halfHeight };
-        });
+          for (let i = 0; i < pos.count; i++) {
+            const world = new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+            rearVertices.push({ world, local: world.clone().applyMatrix4(inverseRig) });
+          }
+        }
+        const rearTop = Math.max(-Infinity, ...rearVertices.map(v => v.local.y));
+        const crowns = rearVertices.filter(v => v.local.y >= rearTop - 0.00005);
+        const rearTops = [-1, 1].map(side => crowns.filter(v => (v.local.x - vm.rig.sight.x) * side > 0))
+          .filter(points => points.length > 0).map(points => {
+            const projected = points.map(v => v.world.clone().project(T.camera));
+            return { x: (Math.min(...projected.map(v => v.x)) + Math.max(...projected.map(v => v.x))) * halfWidth / 2,
+              y: -(Math.min(...projected.map(v => v.y)) + Math.max(...projected.map(v => v.y))) * halfHeight / 2,
+              vertices: points.length };
+          });
         rows[id] = {
           frontVisible, frontHit: frontHitLocal && { name: frontHit.object.name, z: frontHitLocal.z },
           rearTops,
