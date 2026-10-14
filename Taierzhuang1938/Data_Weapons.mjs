@@ -87,7 +87,7 @@ export const WEAPONS = {
     kind: "boltRifle",
     ammo: "Mauser792",
     lengthM: 1.250, barrelM: 0.740, massKg: 4.06,
-    magazine: 5, reloadKind: "stripper",
+    magazine: 5, reloadKind: "enBloc",       // Mannlicher packet enters the magazine intact
     damage: 74, headMultiplier: 2.6, effectiveRangeM: 400,
     // 专用实录拆成枪声 shotCue 与枪机 boltCue 两条（Data_SfxSources）。枪机那条随拉栓动作
     // 起播：头 0.23 s 是手去够枪机，0.82 s 的动作时钟让抬柄/后拉/推回/闭锁节点落在实录冲头上。

@@ -53,7 +53,7 @@ import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
 import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_PlayerDeath.mjs";
 
 import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
-import { FPS_RIFLE_RELOAD } from "./Data_Tuning_FpsReload.mjs";
+import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS } from "./Data_Tuning_FpsReload.mjs";
 
 const DEG = Math.PI / 180;
 
@@ -356,6 +356,7 @@ function BuildMaterials(library) {
       },
       { color: 0x7d5a3c, roughness: 0.78, metalness: 0 }),
     brass: library.Plain("VmBrass", { color: 0xb08a3c, roughness: 0.34, metalness: 0.95 }),
+    copper: library.Plain("VmBulletCopper", { color: 0xf3c8b3, roughness: 0.42, metalness: 0.94 }),
     // 【2026-08-20 修「枪是一块黑板」】上面那段注释里写明的教训（纯金属没有漫反射项）
     // 当时只改了 steel，隔四行的 blued 漏掉了 —— 于是全屏最黑的东西是枪机、弹匣、桥夹。
     //
@@ -1682,6 +1683,7 @@ export class Viewmodel {
 
     // --- 抛壳 / 抛桥夹的小道具池 ---------------------------------------------
     this.debris = this._BuildDebrisPool(6);
+    this.reloadMagazineGeometry = new Map();
 
     // --- 手榴弹（副手投弹用，平时藏着）---------------------------------------
     this.offhandGrenade = BuildGrenadeProp(this.materials, "offhand", this.grenadeAsset);
@@ -1691,9 +1693,15 @@ export class Viewmodel {
     this.offhandGrenade.rotation.set(Math.PI / 2 - 0.4, 0, 0);
 
     // --- 桥夹道具（装填用）---------------------------------------------------
+    this.reloadRoundGeometries = new Map();
     this.clipProp = this._BuildClipProp();
     this.clipProp.visible = false;
     this.reloadPivot.add(this.clipProp);
+    this.packetProp = this._BuildClipProp(true);
+    this.packetProp.name = "VmMannlicherPacket";
+    this.usedPacketProp = this._BuildClipProp(true);
+    this.usedPacketProp.name = "VmRemovedMannlicherPacket";
+    this.reloadPivot.add(this.packetProp, this.usedPacketProp);
     this.magazineProp = new THREE.Group();
     this.magazineProp.name = "VmPistolReloadMagazine";
     const magazineBody = new THREE.Mesh(Box(0.019,0.073,0.026,VM_TILE.steel,"PistolMagazine",{x:0,y:0.035,z:-0.006}),this.materials.blued);
@@ -1759,6 +1767,9 @@ export class Viewmodel {
       this.root.add(mesh);
       pool.push({
         mesh, alive: 0, life: 0,
+        shellGeometry, releaseSource: null, releaseOffset: null,
+        worldPosition: new THREE.Vector3(), worldBasis: new THREE.Matrix4(),
+        worldRotation: new THREE.Quaternion(), sourceQuaternion: new THREE.Quaternion(),
         velocity: new THREE.Vector3(), spin: new THREE.Vector3(),
       });
     }
@@ -1788,28 +1799,111 @@ export class Viewmodel {
    * 早先我把它们做成竖着的，一插进导槽就成了五根立着的柱子，一眼假。
    * 五发合并成一个网格：它们是一起动的，没必要各占一个 draw call。
    */
-  _BuildClipProp() {
+  _BuildClipProp(packet = false) {
     const group = new THREE.Group();
+    group.visible = false;
+    const wall = FPS_RELOAD_PROPS.packetWallThickness;
+    const frame = [];
+    if (packet) {
+      for (const side of [-1, 1]) {
+        for (const y of [0.001, 0.055]) frame.push(Box(wall, 0.006, 0.027, VM_TILE.steel, "PacketRim", { x: side * 0.0068, y, z: 0.017 }));
+        for (const z of [0.0055, 0.0295]) frame.push(Box(wall, 0.048, 0.0035, VM_TILE.steel, "PacketRail", { x: side * 0.0068, y: 0.028, z }));
+        frame.push(Box(0.0035, wall, 0.023, VM_TILE.steel, "PacketFeedLip", { x: side * 0.0051, y: 0.0575, z: 0.017 }));
+      }
+      frame.push(Box(0.0136, 0.006, wall, VM_TILE.steel, "PacketBackRim", { x: 0, y: 0.001, z: 0.031 }));
+      frame.push(Box(0.0136, 0.006, wall, VM_TILE.steel, "PacketBackRim", { x: 0, y: 0.055, z: 0.031 }));
+    } else {
+      frame.push(Box(0.0136, 0.060, wall, VM_TILE.steel, "ChargerBack", { x: 0, y: 0.028, z: 0.030 }));
+      for (const side of [-1, 1]) frame.push(Box(wall, 0.060, 0.004, VM_TILE.steel, "ChargerLip", { x: side * 0.0065, y: 0.028, z: 0.0285 }));
+    }
     const clipBody = new THREE.Mesh(
-      Box(0.011, 0.060, 0.008, VM_TILE.steel, "clipBody", { x: 0, y: 0.028, z: 0.024 }),
+      MergeGeometries(frame),
       this.materials.blued);
     clipBody.frustumCulled = false;
-
-    const roundGeometries = [];
-    for (let i = 0; i < 5; i += 1) {
-      const y = i * 0.0115;
-      roundGeometries.push(Tube(0.0044, 0.0046, 0.048, 6, VM_TILE.steel, { x:0, y, z: 0 }));
-      // 弹尖朝 -Z：Tube 的 rTop 对应 +Z 端，所以尖头要放在 rBottom 上
-      roundGeometries.push(Tube(0.0044, 0.0006, 0.020, 6, VM_TILE.steel, { x:0, y, z: -0.034 }));
+    const rounds = new THREE.Group();
+    const geometry = this._ReloadRoundGeometry("Legacy", 5);
+    for (const [key, material] of [["cases", this.materials.brass], ["bullets", this.materials.brass]]) {
+      const mesh = new THREE.Mesh(geometry[key], material);
+      mesh.frustumCulled = false;
+      rounds.add(mesh);
     }
-    const rounds = new THREE.Mesh(MergeGeometries(roundGeometries), this.materials.brass);
-    rounds.frustumCulled = false;
-
-    group.add(clipBody);
-    group.add(rounds);
+    group.add(clipBody, rounds);
     group.userData.rounds = rounds;
     group.userData.body = clipBody;
+    group.userData.packet = packet;
+    group.userData.profile = "Legacy";
     return group;
+  }
+
+  _ReloadRoundGeometry(profileId, count) {
+    const key = `${profileId}:${count}`;
+    if (this.reloadRoundGeometries.has(key)) return this.reloadRoundGeometries.get(key);
+    const spec = FPS_RELOAD_PROPS.profiles[profileId], cases = [], bullets = [];
+    for (let i = 5 - count; i < 5; i += 1) {
+      const front = -spec.caseLength / 2;
+      const profile = [[0, front], [spec.neckRadius, front], [spec.neckRadius, front + 0.008],
+        [spec.baseRadius * 0.94, front + 0.013], [spec.baseRadius, -front - 0.002],
+        [spec.baseRadius, -front], [0, -front]].map(([r, y]) => new THREE.Vector2(r, y));
+      const casing = new THREE.LatheGeometry(profile, 10);
+      casing.rotateX(Math.PI / 2); casing.translate(0, i * spec.spacing, 0); cases.push(this._CleanReloadLathe(casing));
+      const length = spec.bulletLength, radius = spec.bulletRadius;
+      const nose = spec.roundNose
+        ? [[0, -length / 2], [radius * 0.48, -length / 2 + 0.0006], [radius * 0.90, -length / 2 + 0.0035], [radius, -length / 2 + 0.007]]
+        : [[0, -length / 2], [radius * 0.35, -length / 2 + 0.003], [radius, length * 0.12]];
+      nose.push([radius, length / 2], [0, length / 2]);
+      const bullet = new THREE.LatheGeometry(nose.map(([r, y]) => new THREE.Vector2(r, y)), 10);
+      bullet.rotateX(Math.PI / 2); bullet.translate(0, i * spec.spacing, front - length / 2 + 0.0003); bullets.push(this._CleanReloadLathe(bullet));
+    }
+    const geometry = { cases: MergeGeometries(cases), bullets: MergeGeometries(bullets) };
+    this.reloadRoundGeometries.set(key, geometry);
+    return geometry;
+  }
+
+  _CleanReloadLathe(geometry) {
+    const indices = geometry.index, positions = geometry.attributes.position, keep = [];
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    for (let i = 0; i < indices.count; i += 3) {
+      const ia = indices.getX(i), ib = indices.getX(i + 1), ic = indices.getX(i + 2);
+      a.fromBufferAttribute(positions, ia); b.fromBufferAttribute(positions, ib); c.fromBufferAttribute(positions, ic);
+      if (b.sub(a).cross(c.sub(a)).lengthSq() > 1e-22) keep.push(ia, ib, ic);
+    }
+    geometry.setIndex(keep);
+    return geometry;
+  }
+
+  _ConfigureReloadProp(prop, profileId, count = 5) {
+    const profile = FPS_RELOAD_PROPS.profiles[profileId];
+    const rounds = prop.userData.rounds;
+    const geometry = this._ReloadRoundGeometry(profileId, Math.max(1, count));
+    rounds.children[0].geometry = geometry.cases;
+    rounds.children[1].geometry = geometry.bullets;
+    rounds.children[1].material = this.materials[profile.jacket];
+    rounds.position.set(0, 0, 0); rounds.visible = count > 0;
+    prop.userData.body.scale.set(profile.baseRadius / 0.00595, profile.spacing / 0.0121, profile.caseLength / 0.057);
+    prop.userData.profile = profileId;
+    prop.userData.roundTopM = 4 * profile.spacing + profile.baseRadius;
+  }
+
+  _ReloadClipGrip(prop) {
+    const profile = FPS_RELOAD_PROPS.profiles[prop.userData.profile];
+    const back = 0.030 * profile.caseLength / 0.057;
+    const anchor = prop.position.clone().add(new THREE.Vector3(0, 0, back - FPS_RELOAD_PROPS.gripReferenceBackM).applyQuaternion(prop.quaternion));
+    return this._HandPlacement("clip", anchor, prop.quaternion);
+  }
+
+  _LooseRoundGeometry(profileId) {
+    const spec = FPS_RELOAD_PROPS.profiles[profileId];
+    const rounds = this._ReloadRoundGeometry(profileId, 1);
+    if (!rounds.loose) {
+      const cases = rounds.cases.clone().translate(0, -4 * spec.spacing, 0);
+      const bullets = rounds.bullets.clone().translate(0, -4 * spec.spacing, 0);
+      const count = cases.index?.count ?? cases.attributes.position.count;
+      rounds.loose = MergeGeometries([cases, bullets]);
+      rounds.loose.clearGroups();
+      rounds.loose.addGroup(0, count, 0);
+      rounds.loose.addGroup(count, (rounds.loose.index?.count ?? rounds.loose.attributes.position.count) - count, 1);
+    }
+    return rounds.loose;
   }
 
   // -------------------------------------------------------------------------
@@ -1841,6 +1935,7 @@ export class Viewmodel {
     this.weaponId = weaponId || null;
     this.weaponVariant = Number.isInteger(variant) && variant > 0 ? variant : 0;
     this.weapon = weaponId ? WEAPONS[weaponId] || null : null;
+    this.spentCasePending = false;
     this.armPoseKey = weaponId ? armPose || weaponId : null;
     this.action = null;
     this.carryOverride = null;
@@ -1850,6 +1945,8 @@ export class Viewmodel {
     this.flashTime = 999;
     this.flash.visible = false;
     this.clipProp.visible = false;
+    this.packetProp.visible = false;
+    this.usedPacketProp.visible = false;
     this.magazineProp.visible = false;
     this.feedStripProp.visible = false;
     this.offhandGrenade.visible = false;
@@ -1869,6 +1966,14 @@ export class Viewmodel {
       this.markForegroundPrepass();
       return this;
     }
+
+    const reloadProfile = FPS_RELOAD_PROPS.profiles[weaponId] ? weaponId
+      : this.weapon.ammo === "Arisaka65" ? "Type38" : "ZhongZheng";
+    this._ConfigureReloadProp(this.clipProp, reloadProfile);
+    this._ConfigureReloadProp(this.packetProp, "HanYang");
+    this._ConfigureReloadProp(this.usedPacketProp, "HanYang");
+    this.visualAmmo = this.weapon.magazine ?? null;
+    if (this.weapon.reloadKind === "enBloc") for (let count = 1; count < 5; count += 1) this._ReloadRoundGeometry("HanYang", count);
 
     // 先试 TZM 模型（MODEL_FP 里的几把），读不到或没登记就退回手搭 rig。
     // 所有可持枪械优先走 TZM：三八式防尘盖、捷克式上插直匣等识别细节已在模型里。
@@ -2244,6 +2349,7 @@ export class Viewmodel {
       // 它跟着 onBoltStart 在动作真正开始时起播。
       this.pendingBoltAt = this.weapon.boltDelayS ?? 0.20;
     }
+    if (this.weapon.kind === "boltRifle") this.spentCasePending = true;
 
     const out = new THREE.Vector3();
     this.MuzzleWorld(out);
@@ -2267,6 +2373,9 @@ export class Viewmodel {
    */
   _StartBolt() {
     this._StartAction("bolt", this.weapon.boltTimeS || 1.05);
+    this.action.roundsRemaining = this.visualAmmo;
+    this.action.startedOpen = this.boltOpen;
+    this.action.ejectSpent = this.spentCasePending;
     if (this.onBoltStart) this.onBoltStart(this.weapon);
   }
 
@@ -2281,7 +2390,7 @@ export class Viewmodel {
   }
 
   /** 装填。按 reloadKind 分支：桥夹 / 上插弹匣 / 漏斗。 */
-  TriggerReload() {
+  TriggerReload({ remainingRounds = 0 } = {}) {
     if (!this.weapon || !this.rig) return false;
     if (this.IsBusy()) return false;
     const kind = this.weapon.reloadKind;
@@ -2289,6 +2398,13 @@ export class Viewmodel {
     this.pendingBoltAt = -1;
     this._StartAction("reload", this.weapon.reloadTimeS || 3.0);
     this.action.reloadKind = kind;
+    const rounds = Number.isFinite(remainingRounds) ? Clamp(Math.floor(remainingRounds), 0, this.weapon.magazine || 5) : 0;
+    this.action.roundsRemaining = rounds;
+    this.action.startedOpen = this.boltOpen;
+    this.action.ejectSpent = !!this.spentCasePending && !this.boltOpen;
+    this.action.ejectLive = !this.spentCasePending && !this.boltOpen && rounds > 0;
+    this.action.packetRounds = Math.max(0, rounds - (this.action.ejectLive ? 1 : 0));
+    if (kind === "enBloc") this._ConfigureReloadProp(this.usedPacketProp, "HanYang", this.action.packetRounds);
     this.action.reloadTimeline = new FirearmReloadTimeline(this.weapon);
     return true;
   }
@@ -2481,8 +2597,9 @@ export class Viewmodel {
     const jumpFall = grounded ? 0 : Clamp01(-verticalVelocity / 8);
     const sprint = Clamp01(input.sprint ?? 0);
     const crouch = Clamp01(input.crouch ?? 0);
-    const lowAmmo = !!input.lowAmmo;
+    if (Number.isFinite(input.ammo)) this.visualAmmo = Math.max(0, input.ammo);
     if (Number.isFinite(input.ammo)) this.feedRounds = input.ammo;
+    const lowAmmo = Number.isFinite(input.ammo) ? input.ammo <= 0 : !!input.lowAmmo;
     const wallTarget = this.weapon?.ammo ? Clamp01(input.wallLower ?? 0) : 0;
     const wallTime = wallTarget > (this.wallLower || 0) ? WALL_CARRY.lowerS : WALL_CARRY.raiseS;
     this.wallLower = (this.wallLower || 0) + (wallTarget - (this.wallLower || 0)) * (1 - Math.exp(-step / wallTime));
@@ -2895,6 +3012,9 @@ export class Viewmodel {
       this.boltOpen = false;
       this.pendingHoldOpen = false;
       this.clipProp.visible = false;
+      this.packetProp.visible = false;
+      this.usedPacketProp.visible = false;
+      this.spentCasePending = false;
       this.magazineProp.visible = false;
       this.feedRounds = this.weapon?.magazine || 0;
     }
@@ -2922,6 +3042,7 @@ export class Viewmodel {
   _ResetAnimatedParts() {
     this.meleeVideoFrame = null;
     if (this.riggedArms) this.riggedArms.videoBody = null;
+    if (this.riggedArms) this.riggedArms.reloadBodyOffset = null;
     this.actionPivot.position.set(0, 0, 0);
     this.actionPivot.rotation.set(0, 0, 0);
     this.reloadPivot.position.set(0, 0, 0);
@@ -2953,6 +3074,8 @@ export class Viewmodel {
       bayonet.rotation.copy(this.bayonetHome.rotation);
     }
     if (!this.action || this.action.kind !== "reload") this.clipProp.visible = false;
+    this.packetProp.visible = false;
+    this.usedPacketProp.visible = false;
     if (!this.action || this.action.kind !== "reload") this.magazineProp.visible = false;
     this.feedStripProp.visible = this.weapon?.reloadKind === "stripFeed" && this.feedRounds > 0;
     if (this.feedStripProp.visible) {
@@ -2985,13 +3108,21 @@ export class Viewmodel {
     if (rig.parts.dustCover) rig.parts.dustCover.position.z = slide;   // 三八大盖随栓前后滑
 
     // 抛壳：栓刚拉过一半时弹壳跳出来
-    if (t >= 0.34 && this.action && !this.action.ejected) {
+    if (back >= 0.82 && this.action && !this.action.ejected) {
       this.action.ejected = true;
-      this._SpawnShell(Mulberry32(HashString(`${this.seed}:eject:${this.shotIndex}`)));
+      const random = Mulberry32(HashString(`${this.seed}:eject:${this.shotIndex}`));
+      if (this.action.ejectSpent) this._SpawnShell(random);
+      else if (this.action.roundsRemaining > 0 && !this.action.startedOpen) this._SpawnCartridge(random);
+      this.spentCasePending = false;
+    }
+    if (!holdOpen && fwd >= 0.95 && this.weapon.reloadKind === "enBloc"
+      && this.action?.roundsRemaining === 1 && !this.action.packetDropped) {
+      this.action.packetDropped = true;
+      this._SpawnPacketDrop();
     }
 
     // 右手：握把 → 机柄 → 跟着栓走 → 回握把
-    const grip = this._BoltHandPoint(), rotation = FPS_HAND_SHAPES.bolt.rotation;
+    const placement = this._BoltHandPlacement(), grip = placement.position, rotation = placement.rotation;
     this._WorkingHandPath("right", t, [
       { at:0.16, position:grip.clone().add(new THREE.Vector3(0.016,0,0.018)), shape:"open", rotation },
       { at:0.23, position:grip, shape:"bolt", rotation },
@@ -3023,6 +3154,14 @@ export class Viewmodel {
       this.rig.group.worldToLocal(point);
     } else point.z += this.rig.parts.bolt?.position.z || 0;
     return point.add(new THREE.Vector3().fromArray(FPS_HAND_SHAPES.bolt.palmOffset));
+  }
+
+  _BoltHandPlacement() {
+    const offset = new THREE.Vector3().fromArray(FPS_HAND_SHAPES.bolt.palmOffset);
+    const knob = this._BoltHandPoint().sub(offset);
+    const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1),
+      (this.rig.parts.bolt?.rotation.z || 0) - FPS_RIFLE_RELOAD.boltContactReferenceRad);
+    return this._HandPlacement("bolt", knob, turn);
   }
 
   _HandPlacement(shape, anchor, quaternion = null) {
@@ -3062,6 +3201,7 @@ export class Viewmodel {
     if (family === "topMag") return this._AnimReloadTopMag(t);
     if (family === "hopper") return this._AnimReloadHopper(t);
     if (family === "boxMag") return this._AnimReloadBoxMag(t);
+    if (family === "enBloc") return this._AnimReloadPacket(t);
     return this._AnimReloadStripper(t);
   }
 
@@ -3081,19 +3221,19 @@ export class Viewmodel {
   }
 
   /**
-   * 桥夹装填（中正式 / 汉阳造 / 三八式）：
+   * 桥夹装填（中正式 / 三八式）：
    * 开栓 → 右手从腰间取桥夹 → 插进桥夹导槽 → **拇指一推 5 发** → 抽出空夹丢掉 → 闭栓。
    * 一发一发往里塞是错的（史料明确写了是桥夹压入）。
    */
-  _AnimReloadStripper(t) {
+  _PoseRifleReload(t, motion) {
     const rig = this.rig;
     const bolt = rig.parts.bolt;
-    const motion = FPS_RIFLE_RELOAD;
 
     // 左掌支撑护木；取夹卸力、压弹下沉、推栓回带，最后才回到据枪。
     const raise = ReloadTrack(motion.blend, t);
     const pose = Array.from({ length: 6 }, (_, i) => ReloadTrack(motion.support, t, i + 1));
     this._PoseReload("left", 1, ...pose, raise);
+    if (this.riggedArms) this.riggedArms.reloadBodyOffset = motion.bodyOffset;
 
     if (bolt) {
       // 抬柄后再后拉，推回后再闭锁；空仓留开的枪机不重复开栓。
@@ -3103,34 +3243,9 @@ export class Viewmodel {
       bolt.position.z = rig.boltTravel * ReloadTrack(motion.boltSlide, slideT);
       if (rig.parts.dustCover) rig.parts.dustCover.position.z = bolt.position.z;
     }
+  }
 
-    // 桥夹从腰间绕开机匣、对准导槽，再压入；工作手跟随同一个实物变换。
-    const seat = rig.clipSeat;
-    const press = ReloadTrack(motion.press, t);
-    this.clipProp.position.set(seat.x + ReloadTrack(motion.clip, t, 1),
-      seat.y + ReloadTrack(motion.clip, t, 2), seat.z + ReloadTrack(motion.clip, t, 3));
-    this.clipProp.rotation.set(ReloadTrack(motion.clip, t, 4), ReloadTrack(motion.clip, t, 5),
-      ReloadTrack(motion.clip, t, 6), "YXZ");
-    if (t < motion.clipVisible[1]) {
-      this.clipProp.visible = t >= motion.clipVisible[0];
-      // 5 发压进弹仓：弹头逐颗沉下去
-      const rounds = this.clipProp.userData.rounds;
-      rounds.position.y = -press * 0.056;
-      rounds.visible = press < 0.98;
-    } else {
-      this.clipProp.visible = false;
-      if (this.action && !this.action.tossed) {
-        this.action.tossed = true;
-        this._SpawnClipToss();
-      }
-    }
-
-    // 右手：握把 → 腰间 → 托着桥夹 → 拇指压 → 回握把
-    const carry = this._HandPlacement("clip",this.clipProp.position,this.clipProp.quaternion);
-    const topRound = this.clipProp.position.clone().add(new THREE.Vector3(0,0.0506-press*0.056,0.009));
-    const push = this._HandPlacement("press",topRound);
-    const anchors = { clip: carry, press: push,
-      bolt: { position: this._BoltHandPoint(), rotation: FPS_HAND_SHAPES.bolt.rotation, shape: "bolt" } };
+  _ReloadHandFrames(t, motion, anchors) {
     this._WorkingHandPath("right", t, motion.hand.map(frame => {
       const point = { ...anchors[frame.anchor], ...frame };
       if (frame.offset) point.position = point.position.clone().add(new THREE.Vector3().fromArray(frame.offset));
@@ -3141,6 +3256,98 @@ export class Viewmodel {
       }
       return point;
     }));
+  }
+
+  _ReloadInsertionDepth(prop, motion) {
+    const guideHeight = ReloadTrack(motion.clip, motion.seatedAt ?? 0.50, 2);
+    return guideHeight + prop.userData.roundTopM + motion.loadedRoundClearanceM;
+  }
+
+  _ReloadPressGrip(prop) {
+    const top = new THREE.Vector3(0, prop.userData.roundTopM + prop.userData.rounds.position.y, 0.009)
+      .applyQuaternion(prop.quaternion).add(prop.position);
+    return this._HandPlacement("press", top, prop.quaternion);
+  }
+
+  _SetReloadClipPose(prop, t, motion) {
+    const seat = this.rig.clipSeat;
+    prop.position.set(seat.x + ReloadTrack(motion.clip, t, 1),
+      seat.y + ReloadTrack(motion.clip, t, 2), seat.z + ReloadTrack(motion.clip, t, 3));
+    prop.rotation.set(ReloadTrack(motion.clip, t, 4), ReloadTrack(motion.clip, t, 5),
+      ReloadTrack(motion.clip, t, 6), "YXZ");
+  }
+
+  _AnimReloadStripper(t) {
+    const motion = FPS_RIFLE_RELOAD;
+    this._PoseRifleReload(t, motion);
+    this._EjectReloadChamber(t);
+
+    // 桥夹从腰间绕开机匣、对准导槽，再压入；工作手跟随同一个实物变换。
+    const press = ReloadTrack(motion.press, t);
+    this._SetReloadClipPose(this.clipProp, t, motion);
+    const depth = this._ReloadInsertionDepth(this.clipProp, motion);
+    if (t < motion.clipVisible[1]) {
+      this.clipProp.visible = t >= motion.clipVisible[0];
+      // 5 发压进弹仓：弹头逐颗沉下去
+      const rounds = this.clipProp.userData.rounds;
+      rounds.position.y = -press * depth;
+      rounds.visible = press < 0.98;
+    } else {
+      this.clipProp.visible = false;
+      if (this.action && !this.action.tossed) {
+        this.action.tossed = true;
+        this._SpawnClipToss();
+      }
+    }
+
+    // 右手：握把 → 腰间 → 托着桥夹 → 拇指压 → 回握把
+    this._ReloadHandFrames(t, motion, { clip: this._ReloadClipGrip(this.clipProp),
+      press: this._ReloadPressGrip(this.clipProp), bolt: this._BoltHandPlacement() });
+  }
+
+  _AnimReloadPacket(t) {
+    const base = FPS_PACKET_RELOAD;
+    const tactical = this.action?.packetRounds > 0;
+    const motion = tactical ? { ...base, ...base.tactical } : base;
+    this._PoseRifleReload(t, motion);
+    this._EjectReloadChamber(t);
+    this.clipProp.visible = false;
+    const packet = this.packetProp, used = this.usedPacketProp;
+    const press = ReloadTrack(motion.press, t);
+    const depth = this._ReloadInsertionDepth(packet, motion);
+    this._SetReloadClipPose(packet, Math.min(t, motion.seatedAt), motion);
+    packet.position.y -= press * depth;
+    packet.visible = t >= motion.clip[0][0] && t < motion.retainedAt;
+    packet.userData.rounds.position.y = 0;
+    packet.userData.rounds.visible = true;
+    used.visible = false;
+    if (tactical) {
+      const phase = ReloadTrack(motion.oldClip, t), seat = this.rig.clipSeat;
+      const loaded = new THREE.Vector3(seat.x, seat.y + 0.010 - depth, seat.z);
+      const caught = new THREE.Vector3(seat.x, seat.y + 0.016, seat.z);
+      const pouch = new THREE.Vector3(seat.x + 0.140, seat.y - 0.220, seat.z + 0.140);
+      used.position.lerpVectors(phase <= 1 ? loaded : caught, phase <= 1 ? caught : pouch,
+        phase <= 1 ? phase : phase - 1);
+      used.rotation.set(0.5 * Math.max(0, phase - 1), 0, 0.7 * Math.max(0, phase - 1), "YXZ");
+      used.visible = t >= motion.oldClipVisible[0] && t < motion.oldClipVisible[1];
+    }
+    const push = this._ReloadPressGrip(packet);
+    const clear = { ...push, position: push.position.clone().add(new THREE.Vector3().fromArray(base.clearOffset)) };
+    const latch = { position: this.handBase.right.clone().add(new THREE.Vector3().fromArray(base.latchOffset)),
+      rotation: this.handBaseRot.right.toArray().slice(0, 3), shape: "latch" };
+    this._ReloadHandFrames(t, motion, { clip: this._ReloadClipGrip(packet), oldClip: this._ReloadClipGrip(used),
+      press: push, clear, latch, bolt: this._BoltHandPlacement() });
+  }
+
+  _EjectReloadChamber() {
+    const a = this.action;
+    if (!a || a.ejected || a.startedOpen || !this.rig.boltTravel
+      || this.rig.parts.bolt.position.z < this.rig.boltTravel * 0.82) return;
+    a.ejected = true;
+    const random = Mulberry32(HashString(`${this.seed}:reloadEject:${this.shotIndex}`));
+    if (a.ejectSpent) this._SpawnShell(random);
+    else if (a.ejectLive) this._SpawnCartridge(random);
+    this.spentCasePending = false;
   }
 
   /**
@@ -3625,58 +3832,115 @@ export class Viewmodel {
     if (!this.rig) return;
     const slot = this.debris.find((d) => d.alive <= 0);
     if (!slot) return;                          // 池子满了就不抛 —— 宁可少一个壳，不要爆内存
-    this.rig.group.updateWorldMatrix(true, false);
-    const local = this._tmpVec.copy(this.rig.ejectAt);
-    this.rig.group.localToWorld(local);
-    this.root.worldToLocal(local);
-    slot.mesh.position.copy(local);
-    slot.mesh.visible = true;
-    // 碎屑挂在 root 上（没被 fovRig 压缩），所以要手动补上同一个缩放，
-    // 否则弹壳会比它刚从里面跳出来的那支枪大三成
-    slot.mesh.scale.setScalar(this.compensation.x);
-    slot.alive = 1;
-    slot.life = 0;
-    // 抛壳方向：右上前方，速度带一点确定性抖动
-    slot.velocity.set(1.9 + rnd() * 0.8, 1.4 + rnd() * 0.7, -0.3 + rnd() * 0.5);
+    const down = this.weaponId === "Zb26";
+    const offset = down ? new THREE.Vector3(0, -0.055, -0.170) : this.rig.ejectAt;
+    slot.velocity.set(down ? 0.10 + rnd() * 0.15 : 1.9 + rnd() * 0.8,
+      down ? -1.3 - rnd() * 0.35 : 1.4 + rnd() * 0.7, -0.3 + rnd() * 0.5);
     slot.spin.set(12 + rnd() * 10, 6 + rnd() * 8, 9 + rnd() * 6);
-    if (this.onEject) this.onEject(local);
+    this._ReleaseDebris(slot, this.rig.group, slot.shellGeometry, this.materials.brass, offset, "shell");
+    if (this.onEject) {
+      this.rig.group.updateWorldMatrix(true, false);
+      const local = this.rig.group.localToWorld(offset.clone());
+      this.onEject(this.root.worldToLocal(local));
+    }
   }
 
   _SpawnClipToss(isMagazine = false) {
     const slot = this.debris.find((d) => d.alive <= 0);
     if (!slot) return;
     const rnd = Mulberry32(HashString(`${this.seed}:clip:${this.shotIndex}`));
-    this.rig.group.updateWorldMatrix(true, false);
-    const local = this._tmpVec.copy(this.rig.clipSeat);
-    this.rig.group.localToWorld(local);
-    this.root.worldToLocal(local);
-    slot.mesh.position.copy(local);
-    slot.mesh.visible = true;
-    // 空桥夹/空弹匣比弹壳大：借同一个网格放大，省一份几何
-    const c = this.compensation.x;
-    slot.mesh.scale.set(c * (isMagazine ? 3.2 : 2.0), c * (isMagazine ? 3.6 : 1.4), c * (isMagazine ? 1.6 : 1.1));
-    slot.alive = 1;
-    slot.life = 0;
-    slot.velocity.set(0.9 + rnd() * 0.5, 0.9 + rnd() * 0.4, 0.4 + rnd() * 0.4);
+    const source = isMagazine ? this.rig.parts.magazine : this.clipProp.userData.body;
+    if (!source) return;
+    const shape = isMagazine ? this._MagazineDebrisGeometry(source) : {geometry: source.geometry, material: source.material};
+    slot.velocity.fromArray(FPS_RELOAD_PROPS.clipReleaseVelocity).multiplyScalar(0.85 + rnd() * 0.3);
     slot.spin.set(5 + rnd() * 4, 3 + rnd() * 3, 7 + rnd() * 4);
+    this._ReleaseDebris(slot, source, shape.geometry, shape.material, null, isMagazine ? "magazine" : "charger");
   }
 
-  /**
-   * 碎屑在 root（相机）空间里飞。
-   * 这是个明知的近似：严格说弹壳应该留在世界里，但视图模型没有世界的引用，
-   * 而 0.6 秒的生命期里玩家根本分辨不出它有没有跟着镜头走。
-   * 真要世界里的弹壳，用 onEject 回调在外面生成。
-   */
+  _SpawnCartridge(rnd) {
+    const slot = this.debris.find(d => d.alive <= 0);
+    if (!slot) return;
+    const profileId = this.clipProp.userData.profile;
+    const profile = FPS_RELOAD_PROPS.profiles[profileId];
+    slot.velocity.set(1.0 + rnd() * 0.3, 0.7 + rnd() * 0.2, 0.1);
+    slot.spin.set(8, 4, 10);
+    this._ReleaseDebris(slot, this.rig.group, this._LooseRoundGeometry(profileId),
+      [this.materials.brass, this.materials[profile.jacket]], this.rig.ejectAt, "cartridge");
+  }
+
+  _SpawnPacketDrop() {
+    const slot = this.debris.find(d => d.alive <= 0);
+    if (!slot) return;
+    const prop = this.packetProp;
+    const depth = this._ReloadInsertionDepth(prop, FPS_PACKET_RELOAD);
+    const offset = this.rig.clipSeat.clone().add(new THREE.Vector3(0, 0.010 - depth, 0));
+    slot.velocity.fromArray(FPS_RELOAD_PROPS.packetDropVelocity);
+    slot.spin.set(1.3, 0.7, -0.8);
+    this._ReleaseDebris(slot, this.rig.group, prop.userData.body.geometry, this.materials.blued, offset, "packet");
+  }
+
+  _MagazineDebrisGeometry(source) {
+    const key = `${this.weaponId}:${this.weaponVariant}`;
+    if (this.reloadMagazineGeometry.has(key)) return this.reloadMagazineGeometry.get(key);
+    source.updateWorldMatrix(true, true);
+    const inverse = source.matrixWorld.clone().invert(), geometries = [], materials = [], groups = [];
+    let offset = 0;
+    source.traverse(node => {
+      if (!node.isMesh) return;
+      const geometry = node.geometry.clone().applyMatrix4(inverse.clone().multiply(node.matrixWorld));
+      const slots = Array.isArray(node.material) ? node.material : [node.material];
+      const base = materials.length, count = geometry.index?.count ?? geometry.attributes.position.count;
+      for (const group of geometry.groups.length ? geometry.groups : [{start:0, count, materialIndex:0}])
+        groups.push({start:offset + group.start, count:group.count, materialIndex:base + group.materialIndex});
+      materials.push(...slots); geometries.push(geometry); offset += count;
+    });
+    const geometry = MergeGeometries(geometries);
+    geometry.clearGroups();
+    for (const group of groups) geometry.addGroup(group.start, group.count, group.materialIndex);
+    const shape = { geometry, material: materials };
+    this.reloadMagazineGeometry.set(key, shape);
+    return shape;
+  }
+
+  _ReleaseDebris(slot, source, geometry, material, offset, kind) {
+    slot.mesh.geometry = geometry; slot.mesh.material = material;
+    slot.mesh.visible = true; slot.mesh.matrixAutoUpdate = false;
+    slot.mesh.userData.debrisKind = kind;
+    slot.releaseSource = source;
+    slot.releaseOffset = offset?.clone() || null;
+    slot.alive = 1; slot.life = 0;
+    slot.worldRotation.identity();
+  }
+
+  // Physics is evaluated in world space. The root-local draw matrix only
+  // cancels the viewmodel's camera parent; release-frame scale/shear is kept.
   _StepDebris(dt) {
+    this.root.updateWorldMatrix(true, false);
+    const inverse = this.root.matrixWorld.clone().invert();
     for (const slot of this.debris) {
       if (slot.alive <= 0) continue;
+      if (slot.releaseSource) {
+        const source = slot.releaseSource;
+        source.updateWorldMatrix(true, false);
+        slot.worldBasis.copy(source.matrixWorld);
+        if (slot.releaseOffset) slot.worldBasis.multiply(new THREE.Matrix4().makeTranslation(...slot.releaseOffset.toArray()));
+        slot.worldPosition.setFromMatrixPosition(slot.worldBasis);
+        slot.worldBasis.setPosition(0, 0, 0);
+        source.getWorldQuaternion(slot.sourceQuaternion);
+        slot.velocity.applyQuaternion(slot.sourceQuaternion).multiplyScalar(this.compensation.x);
+        slot.gravity = 9.8 * this.compensation.x;
+        slot.releaseSource = null; slot.releaseOffset = null;
+      } else {
+        slot.velocity.y -= slot.gravity * dt;
+        slot.worldPosition.addScaledVector(slot.velocity, dt);
+        slot.worldRotation.premultiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(
+          slot.spin.x * dt, slot.spin.y * dt, slot.spin.z * dt)));
+      }
       slot.life += dt;
       if (slot.life > 0.62) { slot.alive = 0; slot.mesh.visible = false; continue; }
-      slot.velocity.y -= 9.8 * dt;
-      slot.mesh.position.addScaledVector(slot.velocity, dt);
-      slot.mesh.rotation.x += slot.spin.x * dt;
-      slot.mesh.rotation.y += slot.spin.y * dt;
-      slot.mesh.rotation.z += slot.spin.z * dt;
+      slot.mesh.matrix.makeRotationFromQuaternion(slot.worldRotation).multiply(slot.worldBasis).setPosition(slot.worldPosition);
+      slot.mesh.matrix.premultiply(inverse);
+      slot.mesh.matrixWorldNeedsUpdate = true;
     }
   }
 
@@ -3694,6 +3958,12 @@ export class Viewmodel {
         node.geometry.dispose();
       }
     });
+    for (const geometries of this.reloadRoundGeometries.values()) for (const geometry of Object.values(geometries)) {
+      if (geometry?.isBufferGeometry && !seen.has(geometry)) { seen.add(geometry); geometry.dispose(); }
+    }
+    for (const {geometry} of this.reloadMagazineGeometry.values()) if (!seen.has(geometry)) {
+      seen.add(geometry); geometry.dispose();
+    }
     for (const hand of [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft]) {
       for (const mesh of hand.meshes) if (mesh.geometry) mesh.geometry.dispose();
     }

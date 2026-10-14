@@ -376,6 +376,7 @@ export class FpsArmRig {
     this.poseState.fire = THREE.MathUtils.clamp(fire,0,1);
     this.poseState.melee = melee;
     this.poseState.reload = reload;
+    this.poseState.reloadBlend = THREE.MathUtils.clamp(reloadBlend, 0, 1);
     this.poseState.ads = THREE.MathUtils.clamp(ads, 0, 1);
     this.poseState.sprint = THREE.MathUtils.clamp(sprint, 0, 1);
     if (this.poseSpec && this.contactTargets) {
@@ -509,7 +510,11 @@ export class FpsArmRig {
         left: MixVector(a.elbowPoles.left, b.elbowPoles.left, t),
       },
     });
-    return MixBody(MixBody(hip, ads, this.poseState.ads), sprint, this.poseState.sprint);
+    const body = MixBody(MixBody(hip, ads, this.poseState.ads), sprint, this.poseState.sprint);
+    const offset = this.poseState.reload && this.reloadBodyOffset;
+    if (offset) for (const group of ["shoulders", "elbowPoles"]) for (const side of ["right", "left"])
+      body[group][side] = body[group][side].map((value, axis) => value + (offset[group]?.[side]?.[axis] || 0) * this.poseState.reloadBlend);
+    return body;
   }
 
   _MeasureArms() {

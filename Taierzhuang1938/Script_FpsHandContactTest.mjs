@@ -77,24 +77,27 @@ try {
           facing:normal.z,holdingDrift:pose==="ads"?point.distanceTo(hip):0,triggerTravel:pose==="fire"?point.distanceTo(hip):0,wrist:{...arms.wristBend}});
       }
       editor.SetPose("hip");for(let i=0;i<90;i++)editor.Update(1/60);
-      for(const action of ["reload",...(["ZhongZheng","HanYang","Type38"].includes(id)?["bolt"]:[])]){
-        if(action==="reload")vm.TriggerReload();else vm.TriggerBolt();
+      for(const action of ["reload",...(id==="HanYang"?["reloadPartial"]:[]),...(["ZhongZheng","HanYang","Type38"].includes(id)?["bolt"]:[])]){
+        if(action.startsWith("reload"))vm.TriggerReload({remainingRounds:action==="reloadPartial"?3:0});else vm.TriggerBolt();
         const row={id,action,maxGrip:0,maxWrist:0,maxFingerTranslation:0,unreachable:0,propSamples:[],worstGrip:null,worstWrist:null};
         for(let frame=0;vm.action&&frame<1200;frame++){
           editor.Update(1/60);Refresh();result.samples++;
           const t=vm.action?.t??1,grip=Math.max(arms.gripError.r,arms.gripError.l),wrist=Math.max(arms.wristBend.r,arms.wristBend.l);
           if(grip>row.maxGrip)row.worstGrip={t,grip};
-          if(wrist>row.maxWrist)row.worstWrist={t,wrist};
+          if(wrist>row.maxWrist)row.worstWrist={t,wrist,bySide:{...arms.wristBend},reach:{...arms.reachRatio}};
           row.maxGrip=Math.max(row.maxGrip,grip);row.maxWrist=Math.max(row.maxWrist,wrist);
           if(!arms.reachable.r||!arms.reachable.l)row.unreachable++;
           arms.fingerBones.r.concat(arms.fingerBones.l).forEach((b,i)=>row.maxFingerTranslation=Math.max(row.maxFingerTranslation,b.position.distanceTo(originalPositions[i])));
           if(frame%5||!vm.action)continue;
           let prop=null,side="r",digits=[0,1],kind="";
           if(action==="bolt"&&t>.25&&t<.78){prop=vm.rig.parts.bolt;kind="bolt";}
-          if(action==="reload"){
+          if(action.startsWith("reload")){
             if(["ZhongZheng","HanYang","Type38"].includes(id)){
-              if((t>.32&&t<.48)||(t>.72&&t<.79)){prop=vm.clipProp.userData.body;kind="clip";}
-              else if(t>.56&&t<.63){prop=vm.clipProp.userData.rounds;digits=[0];kind="press";}
+              const packet=id==="HanYang",partial=action==="reloadPartial",held=packet?vm.packetProp:vm.clipProp;
+              if((t>(partial ? .40 : .33)&&t<(partial ? .52 : .48))||(!packet&&t>.71&&t<.75)){
+                prop=held.userData.body;kind=packet?"packet":"clip";
+              }else if(t>(partial ? .60 : .56)&&t<(partial ? .68 : .63)){prop=held.userData.rounds;digits=[0];kind="press";}
+              else if(partial&&t>.32&&t<.35){prop=vm.usedPacketProp.userData.body;kind="oldPacket";}
             }else if(id==="Zb26"&&((t>.17&&t<.30)||(t>.58&&t<.73))){prop=vm.rig.parts.magazine;digits=[0,2];kind="magazine";}
             else if(id==="ServicePistol"){
               side="l";
