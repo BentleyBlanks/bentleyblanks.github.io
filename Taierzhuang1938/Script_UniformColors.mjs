@@ -10,7 +10,7 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // section, and every other tagged part (IJA wool, skin, gear, garb) gets its own
 // variant here, palette or not (IJA passes a null palette).
 import * as THREE from "three";
-import { NRA_UNIFORM_COLORS, NRA_CLOTH_DETAIL, CLOTH_SHEEN } from "./Data_Tuning_Materials.mjs";
+import { NRA_UNIFORM_COLORS, NRA_CLOTH_DETAIL, FPS_CLOTH_DETAIL, CLOTH_SHEEN } from "./Data_Tuning_Materials.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { CharacterClothPatches, CharacterSurfaceMaterial, CharacterSurfaceOf } from "./Script_CharacterSurface.mjs";
@@ -72,7 +72,16 @@ function UniformMaterial(material, palette) {
   const target = new THREE.Color(NRA_UNIFORM_COLORS[palette]);
   const base = new THREE.Color(NRA_UNIFORM_COLORS.sourceBlue);
   const baseLuma = base.r * .2126 + base.g * .7152 + base.b * .0722;
-  const detail = ClothDetailUniforms();
+  const firstPerson = /^Fps/.test(CharacterSurfaceOf(source)?.modelId || "");
+  const settings = firstPerson ? FPS_CLOTH_DETAIL : NRA_CLOTH_DETAIL;
+  // The texture uniform stays shared so asynchronous image replacement reaches
+  // both profiles; only the per-material numerical uniforms differ.
+  const detail = firstPerson ? {
+    ...ClothDetailUniforms(),
+    uNraClothDetailTile: { value: new THREE.Vector4(settings.weaveTile, settings.grimeTile, settings.normalStrength, settings.mottleTile) },
+    uNraClothDetailAlbedo: { value: new THREE.Vector3(settings.weaveAlbedo, settings.grimeAlbedo, settings.mottleAlbedo) },
+    uNraClothRoughness: { value: new THREE.Vector4(settings.roughness, settings.atlasRoughness, settings.weaveRoughness, settings.grimeRoughness) },
+  } : ClothDetailUniforms();
   const grimeOffset = new THREE.Vector2(...(NRA_CLOTH_DETAIL.grimeOffset[palette] || [0, 0]));
   const patch = MakePatch({
     // 配色只进 uniform，GLSL 与配色无关：key 不带配色，三种配色共用程序（以前一种配色一份，
@@ -173,12 +182,13 @@ uniform vec4 uNraClothRoughness;`],
   }
   if (tinted.normalMap && tinted.normalScale) {
     // Keep the sign GLTFLoader chose (it flips y for some tangent frames), change only the strength.
-    const k = NRA_CLOTH_DETAIL.atlasNormalScale;
+    const k = settings.atlasNormalScale;
     tinted.normalScale.set(Math.sign(tinted.normalScale.x || 1) * k, Math.sign(tinted.normalScale.y || 1) * k);
   }
   ApplyPatches(tinted, [...(PatchesOf(tinted) || []), patch,
     ...CharacterClothPatches(CharacterSurfaceOf(source), NRA_CLOTH_DETAIL.grimeOffset[palette] || [0, 0])]);
   tinted.userData.nraUniformPalette = palette;
+  tinted.userData.nraUniformDetailProfile = firstPerson ? "firstPerson" : "actor";
   sourceMaterials.set(tinted, source);
   choices.set(palette, tinted);
   return tinted;

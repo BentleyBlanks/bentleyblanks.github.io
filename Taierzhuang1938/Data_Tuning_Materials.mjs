@@ -77,6 +77,23 @@ export const NRA_CLOTH_DETAIL = Object.freeze({
   grimeRoughness: 0.06,
 });
 
+// The FPS cuff is only 20–50 cm from the eye. The actor profile exaggerates
+// threads for metre-range readability; at hand distance it becomes corduroy.
+// Keep the same texture/program, with finer threads and subdued micro relief.
+export const FPS_CLOTH_DETAIL = Object.freeze({
+  ...NRA_CLOTH_DETAIL,
+  weaveTile: 28,
+  normalStrength: 0.28,
+  atlasNormalScale: 0.28,
+  weaveAlbedo: 0.055,
+  mottleAlbedo: 0.10,
+  grimeAlbedo: 0.20,
+  roughness: 0.90,
+  atlasRoughness: 0.18,
+  weaveRoughness: 0.045,
+  grimeRoughness: 0.04,
+});
+
 // ——— 2026-09-28 人物表面（3A 迭代 B3，口径 docs/Data_CharacterStandard.md「人物表面」）———
 //
 // 人物 GLB 的材质**按「模型 id × 材质名」分部件**，不按材质名猜：日军四款的材质全叫

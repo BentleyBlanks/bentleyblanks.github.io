@@ -50,3 +50,44 @@
 高画质已查看四种装备的玩家与外部视角，并检查大刀关键帧。
 
 全仓 quick 为 95／98：`SpeakerGestureTest`、`TextTest`、`IjaAlertGaitTest` 的三个失败已在未修改的主检出复现，分别属于说话手势、既有中文硬编码与日军进场步态；不计为本次武器修复通过。
+
+## 袖口与近景布料（2026-10-15，后续修整）
+
+第一人称近看时，旧袖口覆盖腕关节和部分手背；第三人称布料细节在此距离又显得过粗。
+本次用 Blender 的 `FpsTailoredSleeves` 形态键收窄袖口、退回袖边，并沿原边界加入轻微卷边。
+原拓扑保持 3,916 顶点／7,608 三角形，修改其中 739 个顶点；游戏 GLB 仍为 6,139,476 字节。
+右袖末端向前臂退约 3.5 cm，左袖约 1.35 cm（游戏骨架缩放 0.7 后）。
+袖口近端截面的 95 分位半径由右 6.48 cm／左 7.68 cm 收为右 4.67 cm／左 5.53 cm。
+
+`FPS_CLOTH_DETAIL` 沿用同一张纹理、同一着色程序，细化布纹频率并减弱凹凸与明暗。
+通过材质上的模型标签选择第一人称参数；场景军装仍用原参数。
+异步加载的纹理 uniform 保持共享，数值 uniform 独立，不新增采样器。
+
+原始工程在 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\FpsHandRealism_20261015\Model_FpsHandRealism.blend`。
+同目录的 `Model_FpsHandsBeforeTailoring.glb` 是未修袖口的原始输入；SHA-256 为
+`201385ad575a48ab0e003bdd77fcde2ba76d9f94a070e48d8dfe6233722f3d63`，也可从提交 `b6a87898` 的游戏模型恢复。
+
+重建时用生命周期脚本打开此工程，任务名 `FpsHandRealism_20261015`；
+MCP Python 设置 `FPS_PROJECT_ROOT` 为本 worktree 的 `Taierzhuang1938` 路径，再执行
+`_blender/Script_FpsSleeveTailoring.py`。输入哈希不符会拒绝重烘，防止反复缩窄。
+脚本只重写原 GLB 的衣料 POSITION／NORMAL，写入前逐字节检查其他二进制数据不变；
+骨架、逆绑定、皮肤、手指、权重、UV 和内嵌图都保留，避免重新导出骨轴破坏握持。
+工程含贴图和可逆形态键；完成后仍需 `stop --save` 与 `status --scan`。
+
+`FpsSleeveTest` 检查真实 GLB 袖口边界、四件装备固定骨段与握点残差、实机近景材质参数，
+并在 high 画质输出玩家／右后方检查图，原图在 `_shots/FpsSleeves`。
+本轮未把现有手部外观评为 3A：去掉贴图的 Blender 检查显示左掌旧有放大量造成厚度比右掌约大 22%，
+指关节和腕部表面也需继续修形；涉及指腹接触面的调整必须重新验收握持，不能只整体缩小。
+
+本次袖口版本通过 `FpsSleeveTest`、`FpsArmTest`、完整 `FpsHandContactTest`、
+`GrenadeThrowTest`、`DadaoSwingTest`、`MotionVectorContractTest`；
+材质门禁的 12 个画质／场景组合通过。另有资产、骨架、人物表面、模块图与测试注册检查通过。
+合入主线 `beebbd8d` 的新版捷克式及逐指适配后，再次通过袖口／画面、指腹接触、资产规范、
+模块图、场景几何和运动矢量检查。大刀截图脚本补上窗口尺寸同步与静止帧预热，
+复测首帧正常，避免把窗口改尺寸后的空缓冲当成动作画面。
+
+`BootTest` 未通过，不能报告全部门禁全绿。本树在 phase 0 报爆炸点光包络／旧爆炸贴图实例断言，
+phase 1 报日军远景辨识材质为 0，随后达到 240 秒上限。
+用同一测试的 `--baseline-root` 只读检查未修改的主线 `beebbd8d`：
+phase 0 等待资源 30 秒超时，phase 1／2 同样报日军远景辨识材质为 0，并达到同一 240 秒总上限。
+两次启动结果分别保留，不把不同的 phase 0 表现说成已逐条复现，也未削弱或删除原断言。

@@ -369,6 +369,7 @@ export const testDefs = {
   SprintViewmodelTest: { file: "Script_SprintViewmodelTest.mjs", desc: "冲刺第一人称持械视觉回归" },
   FirstPersonEmbodimentTest: { file: "Script_FirstPersonEmbodimentTest.mjs", desc: "全枪人体关节、空手摆臂与低头身体回归" },
   FpsArmTest: { file: "Script_FpsArmTest.mjs", desc: "第一人称国军 01 双手：手扣在枪上、腕袖不糊屏" },
+  FpsSleeveTest: { file: "Script_FpsSleeveTest.mjs", desc: "第一人称袖口净空、实体轮廓与近景棉布材质" },
   FpsHandContactTest: { file: "Script_FpsHandContactTest.mjs", desc: "实际指腹与扳机、枪栓、桥夹、弹匣及套筒的接触与动作可达性" },
   EmplacementViewBrowserTest: { file: "Script_EmplacementViewBrowserTest.mjs", timeoutMs: 8 * 60 * 1000,
     desc: "接管机枪第一人称：双手握枪（IK/指腹/涂色像素）、枪与世界模型同位、开镜居中、连发与换弹板不离座、拉机柄、离位还原" },
@@ -565,7 +566,7 @@ export const browserTests = new Set([
   "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootInteractionTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
-  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
+  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
   "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
@@ -708,7 +709,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "ModelFacingTest",
       // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
       "HitReactionTest", "HitReactionBrowserTest",

@@ -139,10 +139,13 @@ try{
   visibility.push({viewport,checks});
  }
  await page.setViewportSize({width:1280,height:720});
+ await page.waitForFunction(()=>Math.abs(Taierzhuang.camera.aspect-1280/720)<1e-4,null,{timeout:10000});
  fs.writeFileSync(path.join(out,'Data_DadaoSwingAcceptance.json'),JSON.stringify({metrics,visibility,cutPlaneDriftDeg:data.cutPlaneDriftDeg,interruptionError:data.interruptionError,recoverySeekError:data.recoverySeekError},null,2));
  if(data.sourceFrames.length)fs.writeFileSync(path.join(out,'Data_DadaoSourceBake.json'),JSON.stringify({boneNames:data.boneNames,frames:data.sourceFrames}));
  for(const phase of [0,.24,.34,.4,.55,.85]){
-  await page.evaluate(phase=>{Taierzhuang.Debug.MeleeCombat.Preview('Light',phase);Taierzhuang.StepFrames(1,1/60,true);},phase);
+  // ResizeObserver and the temporal render targets must settle before the first
+  // capture. A single immediate frame after resizing can be an empty buffer.
+  await page.evaluate(phase=>{Taierzhuang.Debug.MeleeCombat.Preview('Light',phase);Taierzhuang.StepFrames(2,0,true);},phase);
   await page.screenshot({path:path.join(out,`Scene_Dadao_${Math.round(phase*100)}.png`)});
  }
  const inspector=await page.evaluate(async()=>{
