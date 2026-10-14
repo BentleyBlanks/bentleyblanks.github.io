@@ -508,8 +508,10 @@ async function CheckInterface() {
   await page.keyboard.press('Escape');
   Check('关闭设置工作窗后主菜单文字与键盘恢复',await page.locator('.mnList').evaluate(el=>getComputedStyle(el).visibility==='visible'));
   await page.locator('.mnItem').nth(1).focus();await page.keyboard.press('Enter');
+  await page.waitForFunction(()=>window.Taierzhuang.menu.mode==='levels');
   Check('Tab 焦点对应实际激活项',await page.evaluate(()=>window.Taierzhuang.menu.mode==='levels'));
   await page.locator('.mnCampaignBack').focus();await page.keyboard.press('Space');
+  await page.waitForFunction(()=>window.Taierzhuang.menu.mode==='title');
   Check('选章返回也支持 Space',await page.evaluate(()=>window.Taierzhuang.menu.mode==='title'));
   await page.evaluate(()=>window.Taierzhuang.Debug.MenuAct('settings'));
   await page.locator('[data-setting="tools"]').click();
@@ -927,8 +929,8 @@ async function CheckMissionList() {
       heroWidth:art.width,viewport:innerWidth,copyOverArt:copy.top>art.top+art.height*.45&&copy.top<art.bottom,
       toggle:document.querySelector('.mnTrainingToggle').textContent};
   });
-  Check('03构图：只显示六章，任务大图与下缘简报叠放，测试收进页脚',presentation.visible===6&&presentation.trainingHidden
-    &&presentation.heroWidth>presentation.viewport*.55&&presentation.copyOverArt&&presentation.toggle==='训练与测试',JSON.stringify(presentation));
+  Check('03构图：只显示六章，任务大图与下缘简报叠放，标题旁可切测试场景',presentation.visible===6&&presentation.trainingHidden
+    &&presentation.heroWidth>presentation.viewport*.55&&presentation.copyOverArt&&presentation.toggle==='测试场景',JSON.stringify(presentation));
   const images=[];
   for(let index=0;index<6;index++){
     await page.locator('.mnMissionTrack .mnLevel').nth(index).hover();
@@ -981,9 +983,11 @@ async function CheckMissionList() {
   await page.screenshot({path:path.join(outDir,"Scene_MissionListPlaceholder.png")});
   await page.locator('.mnCampaignBack').focus();
   await page.keyboard.press('Enter');
+  await page.waitForFunction(()=>window.Taierzhuang.menu.mode==='title');
   Check("返回按钮 Enter 确实返回主菜单",await page.evaluate(()=>window.Taierzhuang.menu.mode==='title'&&window.Taierzhuang.state.menu));
   await page.evaluate(()=>{const menu=window.Taierzhuang.menu;menu.OpenPause();menu.Show('levels');});
   await page.keyboard.press('Escape');
+  await page.waitForFunction(()=>window.Taierzhuang.menu.mode==='pause');
   Check("暂停选章的 Esc 返回暂停菜单",await page.evaluate(()=>window.Taierzhuang.menu.mode==='pause'));
   await page.evaluate(()=>{const menu=window.Taierzhuang.menu;menu.ToTitle();menu.Show('levels');
     window.missionOriginalPlay=menu.Play;window.missionPlayed=[];menu.Play=(index)=>window.missionPlayed.push(index);});
@@ -1005,7 +1009,7 @@ async function CheckMissionList() {
     await page.keyboard.press('Enter');
     await page.keyboard.press('Escape');
     Check('训练页 Esc 返回此前章节，保持正式菜单与暂停的返回层级',await page.evaluate(()=>window.Taierzhuang.menu.mode==='levels'
-      &&window.Taierzhuang.menu.selected===5&&document.querySelector('.mnTrainingToggle').textContent==='训练与测试'));
+      &&window.Taierzhuang.menu.selected===5&&document.querySelector('.mnTrainingToggle').textContent==='测试场景'));
     await page.evaluate(()=>window.Taierzhuang.menu.SelectLevel(0));
     await page.locator('.mnMissionStart').focus();
     await page.keyboard.press('Enter');

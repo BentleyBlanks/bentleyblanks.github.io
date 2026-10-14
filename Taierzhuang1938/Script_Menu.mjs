@@ -26,7 +26,7 @@ import { PRESUMED } from "./Data_Tengxian.mjs";
 // Data_TengxianScript 里，显示时按 id 过 Localize —— 口径见 docs/Data_TextAndTuning.md §3。
 import { T, Localize } from "./Script_Text.mjs";
 import { CastNameId, LevelFieldId } from "./Script_TextIds.mjs";
-import { DRIFT, CAMERA } from "./Data_Tuning_Menu.mjs";
+import { DRIFT, CAMERA, PRESENTATION } from "./Data_Tuning_Menu.mjs";
 import { COMMAND_ROOM_MAPS } from "./Data_CommandRoomPapers.mjs";
 import { HistoryCodex } from "./Script_HistoryCodex.mjs";
 
@@ -220,6 +220,8 @@ export class MainMenu {
     this.target = new THREE.Vector3();
 
     this.el = {};
+    this.briefCache = new Map();
+    this.motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     this.Build();
     // 建完先藏起来。以前构造完必定紧跟一次 Open()，所以这一行不写也看不出来；
     // 靶场里菜单只当暂停层用（开机不 Open），不藏就是一屏标题盖在场地上。
@@ -278,7 +280,7 @@ export class MainMenu {
 
     // --- 面板（选章 / 史实注记 / 关于）-------------------------------------
     this.el.panel = mk("mnPanel");
-    const head = mk("mnPanelHead", this.el.panel);
+    const head = this.el.panelHead = mk("mnPanelHead", this.el.panel);
     this.el.panelTitle = mk("mnPanelTitle", head);
     const foot = mk("mnPanelFoot mnCampaignFoot", this.el.panel);
     this.el.panelBack = mk("mnBack", foot, "button");
@@ -475,9 +477,13 @@ export class MainMenu {
   }
 
   Highlight(i) {
-    this.itemIndex = Clamp(i, 0, this.items.length - 1);
-    this.itemEls.forEach((el, k) => el.classList.toggle("on", k === this.itemIndex));
-    this.el.itemHint.textContent = this.items[this.itemIndex]?.hint || "";
+    const next = Clamp(i, 0, this.items.length - 1);
+    if (next === this.itemIndex && this.itemEls[next]?.classList.contains("on")) return;
+    this.itemEls[this.itemIndex]?.classList.remove("on");
+    this.itemIndex = next;
+    this.itemEls[next]?.classList.add("on");
+    const hint = this.items[next]?.hint || "";
+    if (this.el.itemHint.textContent !== hint) this.el.itemHint.textContent = hint;
   }
 
   /**
@@ -509,7 +515,7 @@ export class MainMenu {
     back.type = "button";
     back.addEventListener("click", () => this.BackFromLevels());
     Make("mnCampaignKeys", footer, "span", T("menu.foot.campaign"));
-    this.el.trainingToggle = Make("mnTrainingToggle", footer, "button", T("menu.group.training"));
+    this.el.trainingToggle = Make("mnTrainingToggle", this.el.panelHead, "button", T("menu.group.sandbox.title"));
     this.el.trainingToggle.type = "button";
     this.el.trainingToggle.hidden = !this.sandboxes.length;
     this.el.trainingToggle.addEventListener("click", () => {
@@ -571,7 +577,7 @@ export class MainMenu {
       this.SelectLevel(this.lastCampaignSelection ?? this.DefaultLevel());
       this.levelEls[this.selected]?.scrollIntoView({ block: "nearest" });
       this.el.trainingToggle.focus({ preventScroll: true });
-    } else this.Show(this.panelReturnMode);
+    } else this.Navigate(this.panelReturnMode);
   }
 
   // -------------------------------------------------------------------------
@@ -675,6 +681,7 @@ export class MainMenu {
   }
 
   Close() {
+    this.CancelNavigation();
     this.historyCodex.Hide();
     this.SetCommandRoomPreviewUi(false);
     this.ClearSandboxComplete();
@@ -730,7 +737,32 @@ export class MainMenu {
     }
   }
 
+  CancelNavigation() {
+    this.pageAnimation?.cancel();
+    this.pageAnimation = null;
+    this.pendingMode = null;
+  }
+
+  // Only page navigation waits for a short fade; hover selection always commits immediately.
+  Navigate(mode) {
+    this.CancelNavigation();
+    if (!this.open || mode === this.mode || this.motionQuery.matches) { this.Show(mode); return; }
+    this.pendingMode = mode;
+    const fade = this.root.animate([{opacity: 1}, {opacity: 0}],
+      {duration: PRESENTATION.pageFadeOutMs, easing: "ease-out", fill: "forwards"});
+    this.pageAnimation = fade;
+    fade.onfinish = () => {
+      if (this.pageAnimation !== fade) return;
+      this.Show(mode);
+      const reveal = this.root.animate([{opacity: 0}, {opacity: 1}],
+        {duration: PRESENTATION.pageFadeInMs, easing: "ease-out"});
+      this.pageAnimation = reveal;
+      reveal.onfinish = () => { if (this.pageAnimation === reveal) this.pageAnimation = null; };
+    };
+  }
+
   Show(mode) {
+    this.CancelNavigation();
     this.SetCommandRoomPreviewUi(false);
     this.root.classList.toggle("commandRoom", !!this.host.staticBackdrop && this.live);
     const wasMode = this.mode;
@@ -766,7 +798,7 @@ export class MainMenu {
       this.el.panelTitle.textContent = T("menu.panel.levels");
       this.el.panelBody.textContent = "";
       this.el.panelBody.appendChild(this.el.levelsWrap);
-      this.SelectLevel(this.DefaultLevel());
+      this.SelectLevel(this.DefaultLevel(), {refresh: true});
       this.levelEls[this.selected]?.scrollIntoView({ block: "nearest" });
     } else if (mode === "codex") {
       this.el.panelTitle.textContent = Localize(MenuTextId("codex"), MENU.codex);
@@ -1068,13 +1100,16 @@ export class MainMenu {
     this.el.panelBody.appendChild(wrap);
   }
 
-  SelectLevel(i) {
+  SelectLevel(i, {refresh = false} = {}) {
+    const next = Clamp(i, 0, this.entries.length - 1);
+    if (!refresh && next === this.selected && this.el.brief.firstChild) return;
+    const wasTraining = this.selected >= this.campaign.length;
     this.selected = Clamp(i, 0, this.entries.length - 1);
     const training = this.selected >= this.campaign.length;
     if (!training) this.lastCampaignSelection = this.selected;
     this.el.campaignSection.hidden = training;
     if (this.el.trainingSection) this.el.trainingSection.hidden = !training;
-    this.el.trainingToggle.textContent = T(training ? "menu.group.official.title" : "menu.group.training");
+    this.el.trainingToggle.textContent = T(training ? "menu.group.official.title" : "menu.group.sandbox.title");
     this.el.trainingToggle.setAttribute("aria-pressed", String(training));
     this.el.levelList.setAttribute("aria-label", T(training ? "menu.group.training" : "menu.group.official.title"));
     if (this.mode === "levels") this.el.panelTitle.textContent = T(training ? "menu.group.training" : "menu.panel.levels");
@@ -1093,11 +1128,55 @@ export class MainMenu {
       mark.className = `mnLvMark${done ? " done" : ""}`;
     });
 
+    this.briefLeaving?.remove();
+    this.briefAnimations?.forEach(animation => animation.cancel());
+    const brief = this.el.brief;
+    const animate = !refresh && !this.motionQuery.matches && brief.firstChild;
+    const leaving = animate ? brief.cloneNode(true) : null;
+    // Retain the action's footprint so the outgoing copy stays aligned, but expose only
+    // the live action to queries and input. The entire snapshot is inert/aria-hidden below.
+    leaving?.querySelectorAll(".mnMissionStart").forEach(node => node.classList.replace("mnMissionStart", "mnMissionStartGhost"));
+    leaving?.querySelectorAll(".mnBriefNotice").forEach(node => node.remove());
+    brief.querySelector(".mnBriefNotice")?.remove();
+    brief.replaceChildren();
+    const cacheKey = `${this.selected}:${progress.cleared.join(",")}`;
+    const cached = this.briefCache.get(cacheKey);
+    if (cached) brief.append(...cached);
+    else this.BuildBrief(progress);
+    brief.classList.toggle("sandbox", !IsChapter(this.entries[this.selected]));
+    this.briefCache.set(cacheKey, [...brief.children]);
+    if (leaving) {
+      leaving.classList.add("mnBriefLeaving");
+      leaving.inert = true;
+      leaving.setAttribute("aria-hidden", "true");
+      this.briefAnimations = [...brief.children].map(child => child.animate(
+        child.classList.contains("mnMissionCopy")
+          ? [{opacity: 0, offset: 0}, {opacity: 0, offset: .45}, {opacity: 1, offset: 1}]
+          : [{opacity: 0}, {opacity: 1}],
+        {duration: PRESENTATION.briefFadeMs, easing: "linear"}));
+      const oldCopy = leaving.querySelector(".mnMissionCopy");
+      if (oldCopy) this.briefAnimations.push(oldCopy.animate(
+        [{opacity: 1, offset: 0}, {opacity: 0, offset: .45}, {opacity: 0, offset: 1}],
+        {duration: PRESENTATION.briefFadeMs, easing: "linear"}));
+      brief.appendChild(leaving);
+      this.briefLeaving = leaving;
+      const fade = leaving.animate([{opacity: 1}, {opacity: 0}],
+        {duration: PRESENTATION.briefFadeMs, easing: "ease-out"});
+      this.briefAnimations.push(fade);
+      fade.onfinish = () => { leaving.remove(); if (this.briefLeaving === leaving) this.briefLeaving = null; };
+    }
+    if (wasTraining !== training && !this.motionQuery.matches) {
+      this.levelGroupAnimation?.cancel();
+      this.levelGroupAnimation = this.el.levelList.animate([{opacity: .3}, {opacity: 1}],
+        {duration: PRESENTATION.briefFadeMs, easing: "ease-out"});
+    }
+  }
+
+  BuildBrief(progress) {
     const phase = this.entries[this.selected];
     const chapter = IsChapter(phase);
     const title = MissionName(PhaseText(phase, "label"));
     const brief = this.el.brief;
-    brief.textContent = "";
     const mk = (cls, tag = "div") => {
       const e = document.createElement(tag);
       e.className = cls;
@@ -1196,7 +1275,7 @@ export class MainMenu {
         this.Play(index, { cutscenes: true });
         return;
       }
-      case "levels": this.Show("levels"); return;
+      case "levels": this.Navigate("levels"); return;
       case "codex": this.Show("codex"); return;
       case "credits": this.Show("credits"); return;
       case "debug": this.Show("debug"); return;
@@ -1252,6 +1331,10 @@ export class MainMenu {
     this.onKey = (event) => {
       // 设置窗口接管键盘时，不让 Enter / 方向键穿透到背后的菜单。
       if (!this.open || document.querySelector("body.edToolsOpen #edRoot:not(.off)")) return;
+      if (this.pendingMode) {
+        if (event.key === "Escape") this.Navigate(this.mode);
+        event.preventDefault(); return;
+      }
       if (this.commandRoomPreviewHidden) {
         if (event.key === "Escape" && !event.repeat) {
           this.SetCommandRoomPreviewUi(false);
@@ -1468,6 +1551,10 @@ export class MainMenu {
   }
 
   Dispose() {
+    this.CancelNavigation();
+    this.briefAnimations?.forEach(animation => animation.cancel());
+    this.levelGroupAnimation?.cancel();
+    this.briefCache.clear();
     this.about.Dispose();
     this.historyCodex.Hide();
     document.removeEventListener("keydown", this.onKey);

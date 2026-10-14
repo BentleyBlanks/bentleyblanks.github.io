@@ -9,7 +9,7 @@ export const COMMAND_ROOM = Object.freeze({
   depthOfField: Object.freeze({ focusMaterial: "CommandRoomLetter", focus: 1.3, range: .12, focusPadding: .025,
     aperture: 10, maxRadius: 3.2,
     panelBlur: 7.5, transitionSeconds: .18 }),
-  parallax: Object.freeze({ horizontal: .0425, vertical: .0225, focusDistance: 1.65, aimFollow: .28, responseSeconds: .24 }),
+  parallax: Object.freeze({ horizontal: .0425, vertical: .0225, focusDistance: 1.65, aimFollow: .28, responseSeconds: .045 }),
   // UV1 irradiance from Blender Cycles, separate from all surface albedos.
   bakedLighting: Object.freeze({ name: "CommandRoomLighting", scale: 32, intensity: 3.141592653589793 }),
   outside: Object.freeze({ color: 0xffffff, intensity: .45 }),

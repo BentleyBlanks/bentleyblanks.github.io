@@ -197,10 +197,12 @@ try {
   await page.screenshot({path:path.join(out,"Scene_CommandRoomAtmosphere.png")});
   await page.mouse.move(1260,24);
   result.first=await page.evaluate(()=>Advance(1/60));
+  result.responsive=await page.evaluate(()=>Advance(.1));
   result.settled=await page.evaluate(()=>({state:Advance(1.6),points:Project()}));
   const base=result.initial.state.camera.position,position=result.settled.state.camera.position;
   const distance=p=>Math.hypot(...p.map((v,i)=>v-base[i]));
-  assert.ok(distance(result.first.camera.position)>0&&distance(result.first.camera.position)<distance(position)*.3,"Camera must ease, not snap");
+  assert.ok(distance(result.first.camera.position)>distance(position)*.25&&distance(result.first.camera.position)<distance(position)*.4,"Camera responds on its first frame while retaining light smoothing");
+  assert.ok(distance(result.responsive.camera.position)>distance(position)*.9,"Camera reaches over 90% of pointer motion within 117 ms");
   assert.ok(distance(position)/result.initial.state.calibration.environmentScale>.06&&distance(position)/result.initial.state.calibration.environmentScale<.10,
     "Camera movement preserves the reference parallax after metre calibration");
   const movements=result.settled.points.map((p,i)=>p[0]-result.initial.points[i][0]);

@@ -30,3 +30,10 @@ export const CAMERA = Object.freeze({
    */
   groundClearanceM: 1.6,
 });
+
+/** Short menu-only fades; pointer hover never waits for these animations. */
+export const PRESENTATION = Object.freeze({
+  pageFadeOutMs: 65,
+  pageFadeInMs: 115,
+  briefFadeMs: 150,
+});

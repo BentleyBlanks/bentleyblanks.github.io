@@ -43,19 +43,24 @@ export class CommandRoom {
     this.aim = new THREE.Vector3();
     this.offset = new THREE.Vector3();
     this.motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    this.pointerBounds = this.renderer.domElement.getBoundingClientRect();
     this.OnPointerMove = event => {
       if (event.pointerType === "touch" || this.motionQuery.matches || !this.isActive() || document.pointerLockElement) return;
-      const rect = this.renderer.domElement.getBoundingClientRect();
+      const rect = this.pointerBounds;
       if (!rect.width || !rect.height) return;
       this.pointerTarget.set(THREE.MathUtils.clamp((event.clientX-rect.left)/rect.width*2-1,-1,1),
         THREE.MathUtils.clamp(1-(event.clientY-rect.top)/rect.height*2,-1,1));
     };
     this.ResetPointer = () => this.pointerTarget.set(0,0);
+    this.OnResize = () => {
+      this.pointerBounds = this.renderer.domElement.getBoundingClientRect();
+      this.ResetPointer();
+    };
     this.OnMotionPreference = () => { this.ResetPointer(); if (this.motionQuery.matches) this.pointer.set(0,0); };
     document.addEventListener("pointermove",this.OnPointerMove,{passive:true});
     document.addEventListener("pointerleave",this.ResetPointer);
     window.addEventListener("blur",this.ResetPointer);
-    window.addEventListener("resize",this.ResetPointer);
+    window.addEventListener("resize",this.OnResize);
     this.motionQuery.addEventListener("change",this.OnMotionPreference);
   }
   Load(progress = {}) {
@@ -297,7 +302,7 @@ export class CommandRoom {
     document.removeEventListener("pointermove",this.OnPointerMove);
     document.removeEventListener("pointerleave",this.ResetPointer);
     window.removeEventListener("blur",this.ResetPointer);
-    window.removeEventListener("resize",this.ResetPointer);
+    window.removeEventListener("resize",this.OnResize);
     this.motionQuery.removeEventListener("change",this.OnMotionPreference);
     this.atmosphere?.Dispose();
     this.reflection?.dispose();

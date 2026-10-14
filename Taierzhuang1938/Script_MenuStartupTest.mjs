@@ -42,6 +42,7 @@ try {
     assert.deepEqual(forbidden, [], 'menu must never download game models, audio, animations or physics');
     assert.ok(snapshot.bytes < 35 * 1024 * 1024, 'uncompressed title payload has a full-resource budget');
     await page.screenshot({path: path.join(out, `Scene_${deployed ? 'Bundle' : 'Source'}.png`)});
+    await CheckMenuResponse(page);
     await page.click('[data-act="settings"]'); await page.click('[data-setting="sound"]');
     await page.locator('#audio-master').fill('64');
     await page.getByRole('button', {name: '返回', exact: true}).click();
@@ -61,3 +62,64 @@ try {
     await browser.close(); browser = null;
   }
 } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }
+
+async function CheckMenuResponse(page) {
+  await page.locator('[data-act="levels"]').hover();
+  assert.equal(await page.locator('[data-act="levels"]').evaluate(el => getComputedStyle(el).transitionDuration), '0s');
+  await page.click('[data-act="levels"]');
+  await page.waitForFunction(() => Tengxian.menu.mode === 'levels' && !Tengxian.menu.pageAnimation);
+  assert.ok(await page.getByRole('button', {name: '测试场景', exact: true}).isVisible());
+  const response = await page.evaluate(() => {
+    const m = Tengxian.menu;
+    m.SelectLevel(0);
+    const image = m.el.brief.querySelector('img');
+    const copyTop = m.el.brief.querySelector('.mnMissionCopy').getBoundingClientRect().top;
+    m.SelectLevel(0);
+    const sameImage = image === m.el.brief.querySelector('img');
+    m.SelectLevel(1);
+    const copyShift = Math.abs(copyTop - m.briefLeaving.querySelector('.mnMissionCopy').getBoundingClientRect().top);
+    const immediate = m.levelEls[1].getAttribute('aria-current') === 'true';
+    const fade = m.briefAnimations.map(a => a.effect.getTiming().duration);
+    m.SelectLevel(2); m.SelectLevel(0);
+    const cachedImage = image === m.el.brief.querySelector('img');
+    return {sameImage, immediate, cachedImage, fade, copyShift,
+      actions: m.el.brief.querySelectorAll('.mnMissionStart').length,
+      snapshots: m.el.brief.querySelectorAll('.mnBriefLeaving').length};
+  });
+  assert.ok(response.sameImage && response.immediate && response.cachedImage, 'hover commits immediately and reuses decoded images');
+  assert.ok(response.fade.length > 1 && response.fade.every(ms => ms === 150));
+  assert.equal(response.actions, 1); assert.equal(response.snapshots, 1);
+  assert.ok(response.copyShift < 1, 'outgoing text retains its layout during the crossfade');
+  await page.waitForFunction(() => !document.querySelector('.mnBriefLeaving'));
+  await page.getByRole('button', {name: '测试场景', exact: true}).click();
+  assert.equal(await page.locator('.mnSandboxLevel:visible').count(), 6);
+  const routes = await page.evaluate(() => {
+    const m = Tengxian.menu, play = m.host.PlaySandbox, keys = [];
+    m.host.PlaySandbox = key => keys.push(key);
+    try { for (let i = m.campaign.length; i < m.entries.length; i++) m.levelEls[i].click(); }
+    finally { m.host.PlaySandbox = play; }
+    return keys;
+  });
+  assert.deepEqual(routes, ['movement', 'weapons', 'range', 'explosions', 'melee', 'gore']);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.mnChapterLevel:visible').count(), 6);
+  for (const viewport of [{width:390,height:844}, {width:844,height:390}]) {
+    await page.setViewportSize(viewport);
+    const layout = await page.locator('.mnTrainingToggle').evaluate(el => {
+      const r=el.getBoundingClientRect();
+      return {fits:r.x>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight, height:r.height};
+    });
+    assert.ok(layout.fits && layout.height>=44, 'test scenes remain visible on phone and short screens');
+  }
+  await page.setViewportSize({width:1280,height:720});
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.ok(await page.evaluate(() => {
+    const m=Tengxian.menu; m.SelectLevel(1); m.Navigate('title');
+    return m.mode==='title' && !m.pageAnimation && !document.querySelector('.mnBriefLeaving');
+  }));
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  assert.ok(await page.evaluate(() => {
+    const m=Tengxian.menu; m.Navigate('levels'); m.Navigate('title');
+    return m.mode==='title' && !m.pendingMode && !m.pageAnimation;
+  }), 'a quick return cancels pending navigation');
+}
