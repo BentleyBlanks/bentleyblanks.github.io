@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "zb26-veteran-20261015";
+const MESH_REV = "rifle-mechanisms-zb26-veteran-20261015";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -128,8 +128,8 @@ export const MESHES = {
 
   ZhongZheng: {
     file: "Model_ZhongZheng.tzm.json", category: "weapon",
-    triangles: 6703, meshBlocks: 2, nodes: 7, joints: 0,
-    materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
+    triangles: 6703, meshBlocks: 3, nodes: 11, joints: 0,
+    materials: ["steel", "wood"], mounts: [...WEAPON_MOUNTS,"feedMouth","ejection","boltOpen"],
     span: [0.05556, 0.16470, 1.11000], lengthM: 1.110,
     draws: { high: 2, medium: 2, low: 2 },
     note: "中正式。完整几何来自 Poly Haven CC0 Bolt Action Rifle 7.62；"
@@ -138,9 +138,9 @@ export const MESHES = {
   },
   HanYang: {
     file: "Model_HanYang.tzm.json", category: "weapon",
-    triangles: 2672, meshBlocks: 2, nodes: 7, joints: 0,
-    materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.08117, 0.19311, 1.24977], lengthM: 1.250,
+    triangles: 2672, meshBlocks: 4, nodes: 12, joints: 0,
+    materials: ["steel", "wood"], mounts: [...WEAPON_MOUNTS,"feedMouth","ejection","boltOpen"],
+    span: [0.08049, 0.19341, 1.25000], lengthM: 1.250,
     note: "汉阳造。几何来自 CC-BY Gewehr 88（Sketchfab / TastyTony）—— 汉阳八八式"
       + "的母型就是 Gewehr 88：整长套筒、曼利夏漏夹弹仓与露出式通条都是模型自带的，"
       + "不再用 Kar98k 拉长加假套筒。",
@@ -166,9 +166,9 @@ export const MESHES = {
     // meshBlocks 4 / nodes 8：三八式在某一轮换模后多了一个 adsNear 挂点，
     // 木/钢两桶也各裂成两块，而这张表当时没跟着改 —— Verify 第一关一直报红。
     // WP-E1 照 Model/Data_ModelIndex.json 补正（数字来自构建期实测，不是猜的）。
-    triangles: 12467, meshBlocks: 4, nodes: 8, joints: 0,
-    materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.09814, 0.19673, 1.27529], lengthM: 1.276,
+    triangles: 12467, meshBlocks: 5, nodes: 12, joints: 0,
+    materials: ["steel", "wood"], mounts: [...WEAPON_MOUNTS,"feedMouth","ejection","boltOpen"],
+    span: [0.09801, 0.19730, 1.27600], lengthM: 1.276,
     draws: { high: 2, medium: 2, low: 2 },
     note: "三八式。几何来自 CC-BY Type 38 Arisaka rifle（Sketchfab / Snijboer）："
       + "机匣上方的防尘滑盖、近乎水平的直拉机柄、护翼准星、两道箍与通条齐备。",

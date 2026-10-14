@@ -40,7 +40,7 @@
    "bounds": {
     "min": [
      -0.25937,
-     0.0,
+     0,
      -0.2047
     ],
     "max": [
@@ -82,7 +82,7 @@
    "bounds": {
     "min": [
      -0.25048,
-     0.0,
+     0,
      -0.16774
     ],
     "max": [
@@ -123,7 +123,7 @@
    "bounds": {
     "min": [
      -0.244,
-     0.0,
+     0,
      -0.15602
     ],
     "max": [
@@ -164,7 +164,7 @@
    "bounds": {
     "min": [
      -0.23982,
-     0.0,
+     0,
      -0.13811
     ],
     "max": [
@@ -223,7 +223,7 @@
    "bounds": {
     "min": [
      -0.321,
-     0.0,
+     0,
      -0.14267
     ],
     "max": [
@@ -252,7 +252,7 @@
    "bounds": {
     "min": [
      -0.072,
-     0.0,
+     0,
      -0.125
     ],
     "max": [
@@ -281,7 +281,7 @@
    "bounds": {
     "min": [
      -0.55,
-     0.0,
+     0,
      -0.0275
     ],
     "max": [
@@ -310,7 +310,7 @@
    "bounds": {
     "min": [
      -0.18,
-     0.0,
+     0,
      -0.24
     ],
     "max": [
@@ -341,7 +341,7 @@
    "bounds": {
     "min": [
      -0.23,
-     0.0,
+     0,
      -0.23
     ],
     "max": [
@@ -372,7 +372,7 @@
    "bounds": {
     "min": [
      -0.3,
-     0.0,
+     0,
      -0.28662
     ],
     "max": [
@@ -401,7 +401,7 @@
    "bounds": {
     "min": [
      -0.605,
-     0.0,
+     0,
      -0.035
     ],
     "max": [
@@ -460,7 +460,7 @@
    "bounds": {
     "min": [
      -0.5374,
-     0.0,
+     0,
      -0.17
     ],
     "max": [
@@ -542,10 +542,10 @@
    "category": "weapon",
    "file": "Model_ZhongZheng.tzm.json",
    "triangles": 6703,
-   "meshBlocks": 2,
-   "nodes": 7,
+   "meshBlocks": 3,
+   "nodes": 11,
    "joints": 0,
-   "bytes": 183823,
+   "bytes": 182741,
    "materials": [
     "steel",
     "wood"
@@ -556,7 +556,10 @@
     "gripR",
     "gripL",
     "sight",
-    "magazine"
+    "magazine",
+    "feedMouth",
+    "ejection",
+    "boltOpen"
    ],
    "bounds": {
     "min": [
@@ -579,10 +582,10 @@
    "category": "weapon",
    "file": "Model_HanYang.tzm.json",
    "triangles": 2672,
-   "meshBlocks": 2,
-   "nodes": 7,
+   "meshBlocks": 4,
+   "nodes": 12,
    "joints": 0,
-   "bytes": 97346,
+   "bytes": 98333,
    "materials": [
     "steel",
     "wood"
@@ -593,7 +596,10 @@
     "gripR",
     "gripL",
     "sight",
-    "magazine"
+    "magazine",
+    "feedMouth",
+    "ejection",
+    "boltOpen"
    ],
    "bounds": {
     "min": [
@@ -616,10 +622,10 @@
    "category": "weapon",
    "file": "Model_Type38.tzm.json",
    "triangles": 12467,
-   "meshBlocks": 4,
-   "nodes": 8,
+   "meshBlocks": 5,
+   "nodes": 12,
    "joints": 0,
-   "bytes": 285390,
+   "bytes": 285158,
    "materials": [
     "steel",
     "wood"
@@ -630,7 +636,10 @@
     "gripR",
     "gripL",
     "sight",
-    "magazine"
+    "magazine",
+    "feedMouth",
+    "ejection",
+    "boltOpen"
    ],
    "bounds": {
     "min": [
@@ -956,7 +965,7 @@
    "bounds": {
     "min": [
      -1.075,
-     0.0,
+     0,
      -2.15
     ],
     "max": [
@@ -994,7 +1003,7 @@
    "bounds": {
     "min": [
      -1.2375,
-     0.0,
+     0,
      -2.75
     ],
     "max": [
@@ -1031,7 +1040,7 @@
    "bounds": {
     "min": [
      -1.035,
-     0.0,
+     0,
      -2.19
     ],
     "max": [

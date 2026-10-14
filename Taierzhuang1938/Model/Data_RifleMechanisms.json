@@ -1,0 +1,39 @@
+{
+  "ZhongZheng": {
+    "blend": "Taierzhuang1938\\RifleReloadRealism_20261015\\Model_ZhongZhengMechanism.blend",
+    "triangles": 6703,
+    "parts": {
+      "boltBody": 1552
+    },
+    "feedMouth": [
+      0.0,
+      0.04,
+      -0.17
+    ]
+  },
+  "HanYang": {
+    "blend": "Taierzhuang1938\\RifleReloadRealism_20261015\\Model_HanYangMechanism.blend",
+    "triangles": 2672,
+    "parts": {
+      "boltBody": 374,
+      "cockingPiece": 76
+    },
+    "feedMouth": [
+      0.0,
+      0.041,
+      -0.187
+    ]
+  },
+  "Type38": {
+    "blend": "Taierzhuang1938\\RifleReloadRealism_20261015\\Model_Type38Mechanism.blend",
+    "triangles": 12467,
+    "parts": {
+      "boltBody": 1924
+    },
+    "feedMouth": [
+      0.0,
+      0.047,
+      -0.185
+    ]
+  }
+}

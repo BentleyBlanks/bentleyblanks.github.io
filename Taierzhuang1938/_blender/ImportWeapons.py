@@ -33,6 +33,7 @@ T_STEEL = "gunSteel"
 T_WOOD = "gunWood"
 BUDGET = WEAPON_TRIANGLE_LIMIT
 BUILD_STATS = {}
+MECHANISM_LAYER = "TzmFirearmMechanism"
 
 
 def _ExternalRoot():
@@ -373,12 +374,16 @@ def _SplitByColor(part, image, metallic=False):
     wood = bmesh.new()
     steel_verts = {}
     wood_verts = {}
+    source_ints = list(part.faces.layers.int)
+    steel_ints = {layer.name: steel.faces.layers.int.new(layer.name) for layer in source_ints}
+    wood_ints = {layer.name: wood.faces.layers.int.new(layer.name) for layer in source_ints}
+    mechanism = part.faces.layers.int.get(MECHANISM_LAYER)
 
     def Target(bm, map_v, face):
         return (bm, map_v)
 
     for face in part.faces:
-        if uv_layer is None:
+        if uv_layer is None or (mechanism is not None and face[mechanism] > 0):
             bucket = "steel"
         else:
             u = v = 0.0
@@ -404,6 +409,8 @@ def _SplitByColor(part, image, metallic=False):
         try:
             new_f = bm.faces.new(verts)
             new_f.smooth = face.smooth
+            layers = wood_ints if bm is wood else steel_ints
+            for layer in source_ints: new_f[layers[layer.name]] = face[layer]
         except ValueError:
             pass  # 重复面：丢
     part.free()
@@ -436,7 +443,7 @@ def _WeldDistance(diagonal):
 
 
 def _Collect(mat_index=None, skip=(), name_bucket=None, mat_name=None, color_split=False,
-             metal_split=False, metal_image=None, source_normals=False):
+             metal_split=False, metal_image=None, source_normals=False, mechanisms=None):
     """把场景里的网格按 steel/wood 收成两个 bmesh。跳过 skip 里的对象名。"""
     skip = {s.lower() for s in skip}
     buckets = {"steel": [], "wood": []}
@@ -451,6 +458,14 @@ def _Collect(mat_index=None, skip=(), name_bucket=None, mat_name=None, color_spl
         mesh = evaluated.to_mesh()
         raw = bmesh.new()
         raw.from_mesh(mesh)
+        if mechanisms:
+            names = []
+            parent = obj
+            while parent:
+                names.append(parent.name.split('.')[0].lower()); parent = parent.parent
+            code = next((value for name, value in mechanisms.items() if name.lower() in names), 0)
+            layer = raw.faces.layers.int.new(MECHANISM_LAYER)
+            for face in raw.faces: face[layer] = code
         if source_normals:
             authored = raw.loops.layers.float_vector.new(AUTHORED_NORMAL_LAYER)
             raw.faces.ensure_lookup_table()
@@ -1011,12 +1026,56 @@ def _SplitAdsNear(bm, cut_z):
     return body, near
 
 
+def _TagHanYangMechanism(steel):
+    """Identify complete source islands after normalization; never cut a shell."""
+    layer = steel.faces.layers.int.get(MECHANISM_LAYER) or steel.faces.layers.int.new(MECHANISM_LAYER)
+    source = steel.faces.layers.int.new('MechanismSourceFace')
+    steel.faces.index_update()
+    for face in steel.faces: face[source] = face.index
+    by_index = {face.index: face for face in steel.faces}
+    counts = {1: 0, 2: 0}
+    for island in _SplitIslands(steel):
+        low, high = _Aabb([island])
+        handle = low.x > .002 and low.z > -.160 and high.z < -.134 and low.y > .029
+        shaft = low.x > -.010 and high.x < .010 and low.z < -.220 and -.095 < high.z < -.075 and low.y > .030
+        cocking = low.z > -.091 and high.z < -.050 and low.y > .028 and high.y < .056 and high.x-low.x < .021
+        code = 1 if handle or shaft else 2 if cocking else 0
+        if code:
+            original = island.faces.layers.int.get('MechanismSourceFace')
+            for face in island.faces: by_index[face[original]][layer] = code
+            counts[code] += 1
+        island.free()
+    assert counts[1] == 4 and counts[2] == 2, ('HanYang source parts changed', counts)
+
+
+def _ExtractMechanisms(root, steel, name):
+    if name == 'HanYang': _TagHanYangMechanism(steel)
+    layer = steel.faces.layers.int.get(MECHANISM_LAYER)
+    if layer is None: return {}
+    report = {}
+    for code, part_name in [(1, 'boltBody'), (2, 'cockingPiece')]:
+        if not any(face[layer] == code for face in steel.faces): continue
+        part = steel.copy(); part_layer = part.faces.layers.int.get(MECHANISM_LAYER)
+        bmesh.ops.delete(part, geom=[face for face in part.faces if face[part_layer] != code], context='FACES')
+        bmesh.ops.delete(part, geom=[vertex for vertex in part.verts if not vertex.link_faces], context='VERTS')
+        low, high = _Aabb([part])
+        report[part_name] = {'min': list(low), 'max': list(high), 'faces': len(part.faces)}
+        root.Child(part_name).Add('steel', part, tile=T_STEEL)
+    drop = [face for face in steel.faces if face[layer] > 0]
+    if drop:
+        bmesh.ops.delete(steel, geom=drop, context='FACES')
+        bmesh.ops.delete(steel, geom=[vertex for vertex in steel.verts if not vertex.link_faces], context='VERTS')
+    if name in ('HanYang', 'ZhongZheng', 'Type38'):
+        assert 'boltBody' in report, ('Missing authored bolt', name)
+    return report
+
+
 def BuildImported(name):
     spec = SOURCES[name]
     path = _Src(spec["file"], spec.get("external", False))
     if not os.path.isfile(path):
         raise FileNotFoundError(path)
-    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.wm.read_homefile(use_empty=True, use_factory_startup=True)
     _ImportFile(path)
     metal_image = None
     if spec.get("metalMask"):
@@ -1027,7 +1086,9 @@ def BuildImported(name):
                        color_split=spec.get("colorSplit", False),
                        metal_split=spec.get("metalSplit", False),
                        metal_image=metal_image,
-                       source_normals=spec.get("sourcePbr", False))
+                       source_normals=spec.get("sourcePbr", False),
+                       mechanisms={"bolt_action_rifle_7_62_bolt_a": 1, "bolt_action_rifle_7_62_bolt_b": 1}
+                         if name == "ZhongZheng" else {"Bolt_Part": 1} if name == "Type38" else None)
     if "steel" not in buckets:
         raise RuntimeError("%s 导入后没有钢件" % name)
     wood = buckets.get("wood")
@@ -1082,6 +1143,8 @@ def BuildImported(name):
     lo, hi = _Aabb(bms)
     root = Node("root")
     body = root.Child("body")
+    mechanism_report = _ExtractMechanisms(root, steel, name)
+    BUILD_STATS[name]['mechanisms'] = mechanism_report
     cut_z = spec.get("adsNearZ")
     if cut_z is not None:
         steel, near_steel = _SplitAdsNear(steel, cut_z)
@@ -1109,6 +1172,11 @@ def BuildImported(name):
             body.Add("wood", wood, tile=T_WOOD)
         body.Add("steel", steel, tile=T_STEEL)
     _Mounts(body, spec["lengthM"], spec["kind"], lo, hi, spec, steel)
+    if name in ('HanYang', 'ZhongZheng', 'Type38'):
+        feed = {'HanYang': (0,.041,-.187), 'ZhongZheng': (0,.040,-.170), 'Type38': (0,.047,-.185)}[name]
+        body.Child('feedMouth', t=feed)
+        body.Child('ejection', t=(.016,feed[1]+.001,feed[2]))
+        body.Child('boltOpen', t=(0,0,.120 if name=='Type38' else .078))
     return root
 
 

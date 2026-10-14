@@ -490,14 +490,14 @@ export class FirstPersonEditor {
     camera.updateProjectionMatrix();
   }
 
-  Trigger(action) {
+  Trigger(action, reloadOptions = { remainingRounds: 0 }) {
     this.ClearAnimation();
     const viewmodel = this.host.viewmodel;
     const weapon = WEAPONS[this.weaponId];
     if (!viewmodel || !CanAction(weapon, action)) return false;
     if (action === "fire") viewmodel.TriggerFire();
     else if (action === "bolt") viewmodel.TriggerBolt();
-    else if (action === "reload") viewmodel.TriggerReload();
+    else if (action === "reload") viewmodel.TriggerReload(reloadOptions);
     else if (action === "melee") viewmodel.TriggerMelee();
     else if (action === "throw") viewmodel.TriggerThrow(1);
     return true;

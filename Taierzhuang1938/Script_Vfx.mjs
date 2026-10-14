@@ -35,7 +35,7 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 
 import * as THREE from "three";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
-import { MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
+import { FirearmEffects } from "./Data_Tuning_FirearmEffects.mjs";
 import { VEHICLE_TRACER, HARD_SURFACE_SPARKS } from "./Data_Tuning_BulletVisual.mjs";
 import { BloodEffects } from "./Script_BloodEffects.mjs";
 import { BattleSmoke } from "./Script_BattleSmoke.mjs";
@@ -909,6 +909,7 @@ export class VfxSystem {
    */
   MuzzleFlash(position, direction, { scale = 1, kind = "rifle", player = false } = {}) {
     const profile = MUZZLE_KINDS[kind] || MUZZLE_KINDS.rifle;
+    const playerProfile = player ? FirearmEffects(kind) : null;
     const dir = TMP_A.copy(direction).normalize();
     const size = profile.size * scale;
     const smokeCount = Math.max(1, Math.round(profile.smoke * this.spawnScale));
@@ -922,12 +923,16 @@ export class VfxSystem {
     };
     if (this.lights) {
       const intensity = 24 * scale * Math.max(0.65, Math.min(1.6, profile.size / 0.29));
-      this.lights.FlashMuzzle(position, player ? MUZZLE_FLASH.lightIntensity * scale : intensity, {
-        duration: player ? MUZZLE_FLASH.lightLifeS : profile.life * 1.12,
-        color: player ? MUZZLE_FLASH.lightColor : 0xffd9a0,
-        radius: player ? MUZZLE_FLASH.lightRadiusM : 22,
+      this.lights.FlashMuzzle(position, player ? playerProfile.lightIntensity * scale : intensity, {
+        duration: player ? playerProfile.lightLifeS : profile.life * 1.12,
+        color: player ? playerProfile.lightColor : 0xffd9a0,
+        radius: player ? playerProfile.lightRadiusM : 22,
         priority: player,
       });
+    }
+    if(player) {
+      this._PlayerMuzzleSmoke(position,dir,scale,playerProfile);
+      return;
     }
 
     // The player's flame is attached to the viewmodel muzzle. A second world
@@ -1027,6 +1032,41 @@ export class VfxSystem {
       s.seed = this.random();
       this.pools.smoke.Spawn(s, this.time);
     }
+  }
+
+  _PlayerMuzzleSmoke(position, direction, scale, profile) {
+    const quick=profile.quickSmoke,linger=profile.lingering;
+    const count=Math.max(1,Math.round(quick.count*this.spawnScale));
+    for(let i=0;i<count;i++) {
+      const s=ResetSpawn(),along=.035+i*.025;
+      s.x=position.x+direction.x*along+this._Signed(.012);
+      s.y=position.y+direction.y*along+this._Signed(.012);
+      s.z=position.z+direction.z*along+this._Signed(.012);
+      s.vx=direction.x*quick.speed+this._Signed(.15);
+      s.vy=direction.y*quick.speed+this._Signed(.12);
+      s.vz=direction.z*quick.speed+this._Signed(.15);
+      s.ax=this.wind.x*.35;s.ay=.16;s.az=this.wind.z*.35;s.drag=6.5;
+      s.life=this._Range(...quick.life);s.sizeStart=quick.size[0]*scale;s.sizeEnd=quick.size[1]*scale;
+      s.opacity=quick.opacity;s.fadeIn=.04;s.angle=this._Range(0,6.283);s.spin=this._Signed(.9);
+      s.colorA=VFX_PALETTE.powderThin;s.colorB=VFX_PALETTE.powderSmoke;s.seed=this.random();
+      this.pools.smoke.Spawn(s,this.time);
+    }
+    this._playerWispTimes ||= {};
+    const previous=this._playerWispTimes[profile.id] ?? -Infinity;
+    const emitWisp=this.time<previous||this.time-previous>=linger.intervalS;
+    if(emitWisp) {
+      this._playerWispTimes[profile.id]=this.time;
+      const s=ResetSpawn();
+      s.x=position.x+direction.x*.035;s.y=position.y+direction.y*.035;s.z=position.z+direction.z*.035;
+      s.vx=direction.x*.16+this.wind.x*.10;s.vy=direction.y*.12+.16;s.vz=direction.z*.16+this.wind.z*.10;
+      s.ax=this.wind.x*.8;s.ay=.14;s.az=this.wind.z*.8;s.drag=.85;
+      s.life=this._Range(...linger.life);s.sizeStart=linger.size[0]*scale;s.sizeEnd=linger.size[1]*scale;
+      s.opacity=linger.opacity;s.fadeIn=.22;s.angle=this._Range(0,6.283);s.spin=this._Signed(.45);
+      s.colorA=VFX_PALETTE.powderThin;s.colorB=VFX_PALETTE.powderSmoke;s.seed=this.random();
+      this.pools.smoke.Spawn(s,this.time);
+    }
+    this.lastMuzzleProfile={kind:profile.id,player:true,life:profile.lifeS,
+      smokeCount:count,wispCount:emitWisp?1:0,size:profile.widthM*scale};
   }
 
   /**

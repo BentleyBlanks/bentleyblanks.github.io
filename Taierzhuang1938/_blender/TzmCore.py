@@ -390,12 +390,15 @@ def Join(*meshes):
     out = bmesh.new()
     out_uv = None
     out_authored_normal = None
+    out_face_ints = {}
     for src in meshes:
         if src is None:
             continue
         src.verts.index_update()
         src_uv = src.loops.layers.uv.active
         src_authored_normal = src.loops.layers.float_vector.get(AUTHORED_NORMAL_LAYER)
+        face_ints = [(layer, out_face_ints.setdefault(layer.name, out.faces.layers.int.get(layer.name)
+                     or out.faces.layers.int.new(layer.name))) for layer in src.faces.layers.int]
         if src_uv is not None and out_uv is None:
             # Imported assets may carry an authored UV atlas. Most TZM models still
             # use deterministic box projection, but preserve the layer for the few
@@ -409,6 +412,8 @@ def Join(*meshes):
             try:
                 nf = out.faces.new([remap[v.index] for v in f.verts])
                 nf.smooth = f.smooth
+                for src_layer, dst_layer in face_ints:
+                    nf[dst_layer] = f[src_layer]
                 if src_uv is not None and out_uv is not None:
                     for src_loop, out_loop in zip(f.loops, nf.loops):
                         out_loop[out_uv].uv = src_loop[src_uv].uv
@@ -957,4 +962,4 @@ def WriteTzm(root, path, name, notes="", audit=True):
 def ResetScene():
     """清空场景。布尔/减面借了 bpy 的对象，跑完一个模型就扫干净，
     不然下一个模型的 depsgraph 里还挂着上一个的残骸。"""
-    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.wm.read_homefile(use_empty=True, use_factory_startup=True)

@@ -33,7 +33,7 @@ def Subset(block, indices):
 def Repair(projectRoot):
     path = Path(projectRoot) / 'Model/Model_HanYang.tzm.json'
     doc = json.loads(path.read_text(encoding='utf-8'))
-    if any(node['name'] == 'boltHandle' for node in doc['nodes']):
+    if any(node['name'] in ('boltHandle', 'boltBody') for node in doc['nodes']):
         return {'alreadyRepaired': True}
     blockIndex = next(i for i, block in enumerate(doc['meshes']) if block['material'] == 'steel')
     block = doc['meshes'][blockIndex]

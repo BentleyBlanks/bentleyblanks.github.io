@@ -17,6 +17,7 @@
 //          几何**（见 Script_EditorWeapon 抬头），台架改好了不等于手里那把也对。
 //   --reload 拍全枪械换弹：腰射/ADS起手两行，各四个机械关键帧；附同名JSON投影轨迹。
 //   --reload-times=.285,.42,.50,.78 指定四个装填时刻；--base-url=http://127.0.0.1:8099 复用本地预览。
+//   --reload-motion 另存正常时钟的连续原始帧；--reload-rounds=3 检查有余弹的装填。
 // 默认输出到 Taierzhuang1938/_shots/（已 gitignore）。
 
 import path from "node:path";
@@ -35,7 +36,10 @@ const only = onlyArg ? onlyArg.slice(7).split(",") : null;
 const flat = args.includes("--flat");
 const firstPerson = args.includes("--fp");
 // Repeatable reload review: four mechanical keyframes, hip and ADS entry rows.
-const reloadSheet = args.includes("--reload");
+const reloadMotion = args.includes("--reload-motion");
+const reloadSheet = args.includes("--reload") || reloadMotion;
+const reloadRounds = Number(args.find(a => a.startsWith("--reload-rounds="))?.slice(16) || 0);
+if (!Number.isInteger(reloadRounds) || reloadRounds < 0 || reloadRounds > 30) throw new Error("Invalid initial reload round count");
 const reloadTimes = args.find(a => a.startsWith("--reload-times="))?.slice(15).split(",").map(Number)
   || [0.18, 0.40, 0.62, 0.90];
 if (reloadTimes.length !== 4 || reloadTimes.some((t, i) => !Number.isFinite(t) || t <= 0 || t >= 1
@@ -89,6 +93,7 @@ page.on("console", (message) => {
 
 // menu=0：跳过主菜单直接进关。菜单是一整层盖在 canvas 上的 DOM，
 // 出图要的是台架那一帧，不是菜单的运镜。
+try {
 await page.goto(`${baseUrl}/Taierzhuang1938/?quality=high&scale=small&${reloadSheet ? "range=1&shot=1" : "phase=0"}&menu=0`,
   { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
@@ -213,7 +218,7 @@ const FpSheet = async (entry) => page.evaluate(async ({ w }) => {
   return sheet.toDataURL("image/png");
 }, { w: entry });
 
-const ReloadSheet = async (entry) => page.evaluate(async ({ w, times }) => {
+const ReloadSheet = async (entry) => page.evaluate(async ({ w, times, motionCapture, remainingRounds }) => {
   const T = window.Taierzhuang, editor = T.editor.active;
   editor.SetMode("fp");
   const src = document.getElementById("view");
@@ -226,7 +231,7 @@ const ReloadSheet = async (entry) => page.evaluate(async ({ w, times }) => {
     editor.SetWeapon(w.id, w.variant || 0);
     editor.ads = row;
     T.StepFrames(90);
-    editor.Trigger("reload");
+    editor.Trigger("reload", { remainingRounds });
     // Exercise leaving ADS before reload. The editor pins its calibration FOV
     // to this switch, unlike runtime's action-aware FOV suppression.
     editor.ads = 0;
@@ -248,8 +253,20 @@ const ReloadSheet = async (entry) => page.evaluate(async ({ w, times }) => {
       ctx.fillText(`${w.id} / ${row ? "ADS entry" : "Hip entry"} / ${times[col]}`, x + 12, y + 23);
     }
   }
-  return { image: sheet.toDataURL("image/png"), samples };
-}, { w: entry, times: reloadTimes });
+  const motion = [];
+  if (motionCapture) {
+    editor.SetWeapon(w.id, w.variant || 0); editor.ads = 0; T.StepFrames(90);
+    editor.Trigger("reload", {remainingRounds});
+    const frame = document.createElement("canvas"); frame.width=src.width; frame.height=src.height;
+    const draw = frame.getContext("2d");
+    for(let i=0;i<400&&T.viewmodel.action;i+=3) {
+      T.StepFrames(i ? 3 : 1);
+      draw.drawImage(src,0,0);
+      motion.push({frame:i,normalized:T.viewmodel.action?.t??1,image:frame.toDataURL("image/jpeg",.84)});
+    }
+  }
+  return { image: sheet.toDataURL("image/png"), samples, motion };
+}, { w: entry, times: reloadTimes, motionCapture:reloadMotion, remainingRounds:reloadRounds });
 
 let list = only
   ? WEAPONS.filter((w) => only.includes(w.id) || only.includes(w.shotId))
@@ -266,17 +283,26 @@ for (const entry of list) {
   const reload = reloadSheet ? await ReloadSheet(entry) : null;
   const dataUrl = reload ? reload.image : firstPerson ? await FpSheet(entry) : await Sheet(entry);
   const file = path.join(outDir,
-    `Weapon_${entry.shotId || entry.id}${reloadSheet ? "_Reload" : firstPerson ? "_Fp" : ""}${flat ? "_Flat" : ""}`
+    `Weapon_${entry.shotId || entry.id}${reloadSheet ? "_Reload" : firstPerson ? "_Fp" : ""}${reloadRounds?`_Partial${reloadRounds}`:""}${flat ? "_Flat" : ""}`
     + `${debugView === "final" ? "" : `_Debug${debugView[0].toUpperCase()}${debugView.slice(1)}`}.png`);
   fs.writeFileSync(file, Buffer.from(dataUrl.split(",")[1], "base64"));
   if (reload) fs.writeFileSync(file.replace(/\.png$/, ".json"), JSON.stringify(reload.samples, null, 2));
+  if (reload?.motion.length) {
+    const folder=path.join(outDir,`Motion_${entry.id}_${reloadRounds?`Partial${reloadRounds}`:"Empty"}`);
+    fs.mkdirSync(folder,{recursive:true});
+    reload.motion.forEach((frame,index)=>fs.writeFileSync(path.join(folder,`Frame_${String(index).padStart(3,"0")}.jpg`),Buffer.from(frame.image.split(",")[1],"base64")));
+    fs.writeFileSync(path.join(folder,"Data_Timeline.json"),JSON.stringify(reload.motion.map(({image,...frame})=>frame),null,2));
+    console.log(`motion ${entry.id}: ${reload.motion.length} frames at 20 fps → ${folder}`);
+  }
   console.log(`ok   ${path.basename(file)}  ${(fs.statSync(file).size / 1024).toFixed(0)} KB`);
 }
 
-await browser.close();
-server?.close();
 if (problems.length) {
   for (const p of problems) console.log(`FAIL ${p}`);
-  process.exit(1);
+  process.exitCode=1;
 }
 console.log(`\n出图完成：${list.length} 张 → ${outDir}`);
+} finally {
+  await browser.close();
+  if (server) await new Promise(resolve=>server.close(resolve));
+}

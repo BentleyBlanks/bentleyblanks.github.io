@@ -373,6 +373,7 @@ export const testDefs = {
   FpsArmTest: { file: "Script_FpsArmTest.mjs", desc: "第一人称国军 01 双手：手扣在枪上、腕袖不糊屏" },
   FpsSleeveTest: { file: "Script_FpsSleeveTest.mjs", desc: "第一人称袖口净空、实体轮廓与近景棉布材质" },
   FpsHandContactTest: { file: "Script_FpsHandContactTest.mjs", desc: "实际指腹与扳机、枪栓、桥夹、弹匣及套筒的接触与动作可达性" },
+  FpsReloadMechanicsTest: { file: "Script_FpsReloadMechanicsTest.mjs", desc: "真实枪机主体、漏夹留置、完整压入和世界空间抛出" },
   EmplacementViewBrowserTest: { file: "Script_EmplacementViewBrowserTest.mjs", timeoutMs: 8 * 60 * 1000,
     desc: "接管机枪第一人称：双手握枪（IK/指腹/涂色像素）、枪与世界模型同位、开镜居中、连发与换弹板不离座、拉机柄、离位还原" },
   FpsGripEditorTest: { file: "Script_FpsGripEditorTest.mjs", desc: "第一人称持枪检查编辑器：装备/双视角/真实挂点/骨骼残差与退出还原" },
@@ -568,7 +569,7 @@ export const browserTests = new Set([
   "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootInteractionTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
-  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsGripEditorTest",
+  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsReloadMechanicsTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
   "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
@@ -711,7 +712,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmActionsTest", "FirearmHandlingBrowserTest", "FirearmResponseBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "ModelFacingTest",
       // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
       "HitReactionTest", "HitReactionBrowserTest",
@@ -998,7 +999,7 @@ const changedDomainRules = [
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
   // Hitbox 也挂 combat：人物子弹代理改了就是改了打中哪儿。
-  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|CameraShake|FpsArm|FpsHand|FpsAnatomy|FpsReload|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe|ModelFacing|Model_\w+\.glb)/i },
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|CameraShake|FpsArm|FpsHand|FpsAnatomy|FpsReload|FirearmEffects|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe|ModelFacing|Model_\w+\.glb)/i },
   { domain: "interact", pattern: /(Carry|Interact|Emplacement|MountedGrip|Telegraph|Checkpoint|Script_Input|Hud|Prompt)/i },
   // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
   { domain: "ai", pattern: /(Script_Ai|LitterBlock|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion|MissionSetpieces)/i },

@@ -53,7 +53,8 @@ import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
 import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_PlayerDeath.mjs";
 
 import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
-import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS } from "./Data_Tuning_FpsReload.mjs";
+import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND } from "./Data_Tuning_FpsReload.mjs";
+import { FirearmEffects } from "./Data_Tuning_FirearmEffects.mjs";
 
 const DEG = Math.PI / 180;
 
@@ -1346,17 +1347,26 @@ function BuildFromModel(materials, weapon, key, doc) {
   let boltProxy = null;
   let magazinePart = null;
   let boltHandleNode = null;
+  let cockingPiece = null;
   if (mechanism) {
     const pivot = new THREE.Vector3().fromArray(mechanism.pivot);
     const authoredHandle = built.nodes.get("boltHandle");
-    if (authoredHandle) {
+    const authoredBolt = built.nodes.get("boltBody");
+    if (authoredHandle || authoredBolt) {
       const parent = new THREE.Group(); parent.name = `VmBolt_${key}Pivot`;
       parent.position.copy(pivot); group.add(parent);
       boltProxy = new THREE.Group(); boltProxy.name = `VmBolt_${key}`;
       parent.add(boltProxy);
       // The authored closed islands must move intact, including their socket.
       group.updateMatrixWorld(true);
-      boltProxy.attach(authoredHandle);
+      if (authoredHandle) boltProxy.attach(authoredHandle);
+      if (authoredBolt) boltProxy.attach(authoredBolt);
+      const authoredCocking = built.nodes.get("cockingPiece");
+      if (authoredCocking) {
+        cockingPiece = new THREE.Group(); cockingPiece.name = `VmCocking_${key}`;
+        parent.add(cockingPiece);
+        cockingPiece.attach(authoredCocking);
+      }
     } else boltProxy = SplitFpsMechanism(group,key,`VmBolt_${key}`,pivot,
       (p,name)=>name.endsWith("steel") && p.x>mechanism.cutX && Math.abs(p.z-pivot.z)<mechanism.width
         && p.y>Math.min(mechanism.handle[1],pivot.y)-0.015 && p.y<Math.max(mechanism.handle[1],pivot.y)+0.015);
@@ -1380,13 +1390,16 @@ function BuildFromModel(materials, weapon, key, doc) {
   const boltHandle = mechanism ? new THREE.Vector3().fromArray(mechanism.handle) : sight
     ? sight.clone().add(new THREE.Vector3(0.046, -0.010, 0.135))
     : new THREE.Vector3(0.046, 0.035, -0.04);
-  const ejectAt = sight
+  const ejectAt = Mount("ejection", null) || (sight
     ? sight.clone().add(new THREE.Vector3(0.026, 0.004, 0.055))
-    : new THREE.Vector3(0.026, 0.035, -0.06);
+    : new THREE.Vector3(0.026, 0.035, -0.06));
   const clipSeat = magazine.clone();
   // Box magazines enter at the grip heel; stripper clips enter above the action.
   if (!armPose.actions.reload?.handPath) clipSeat.y += 0.045;
   if (mechanism) clipSeat.fromArray(mechanism.seat);
+  const feedMouth = Mount("feedMouth", null);
+  if (feedMouth) clipSeat.copy(feedMouth);
+  const boltOpenMount = Mount("boltOpen", null);
   if (key === "Type11") clipSeat.set(-0.110,0.025,-0.135);
   if (key === "Type92Hmg") clipSeat.fromArray(STRIP_FEED_RELOAD.seat);
   const hr = armPose.contacts.right;
@@ -1394,8 +1407,8 @@ function BuildFromModel(materials, weapon, key, doc) {
 
   return {
     group,
-    parts: { bolt: boltProxy, magazine: magazinePart, dustCover: null, bayonet: null },
-    boltTravel: isBoltRifle ? 0.078 : key === "ServicePistol" ? 0.030 : key === "Zb26" ? 0.060 : 0,
+    parts: { bolt: boltProxy, cockingPiece, magazine: magazinePart, dustCover: null, bayonet: null },
+    boltTravel: isBoltRifle ? boltOpenMount?.z || 0.078 : key === "ServicePistol" ? 0.030 : key === "Zb26" ? 0.060 : 0,
     boltHandleNode,
     ejectAt,
     clipSeat,
@@ -1732,24 +1745,31 @@ export class Viewmodel {
    */
   _BuildFlash() {
     const group = new THREE.Group();
+    this.flashGeometries = new Map();
+    this.flashProfile = FirearmEffects("boltRifle");
+    const mesh = new THREE.Mesh(this._FlashGeometry(this.flashProfile), this.materials.flash);
+    mesh.frustumCulled = false; mesh.castShadow = false;
+    group.add(mesh); group.visible = false;
+    return group;
+  }
+
+  _FlashGeometry(profile) {
+    if (this.flashGeometries.has(profile.id)) return this.flashGeometries.get(profile.id);
     const petals = [];
     for (let i = 0; i < 3; i += 1) {
-      const petal = new THREE.PlaneGeometry(MUZZLE_FLASH.widthM, MUZZLE_FLASH.lengthM);
+      const petal = new THREE.PlaneGeometry(profile.widthM, profile.lengthM);
       petal.rotateX(-Math.PI / 2);
-      petal.translate(0, 0, -MUZZLE_FLASH.lengthM / 2);
+      petal.translate(0, 0, -profile.lengthM / 2);
       petal.rotateZ((i / 3) * Math.PI);
       petals.push(petal);
     }
     // End-on core remains visible through iron sights when the long cards are edge-on.
-    const core = new THREE.PlaneGeometry(MUZZLE_FLASH.coreM, MUZZLE_FLASH.coreM);
+    const core = new THREE.PlaneGeometry(profile.coreM, profile.coreM);
     core.translate(0, 0, -0.025);
     petals.push(core);
-    const mesh = new THREE.Mesh(MergeGeometries(petals), this.materials.flash);
-    mesh.frustumCulled = false;
-    mesh.castShadow = false;
-    group.add(mesh);
-    group.visible = false;
-    return group;
+    const geometry=MergeGeometries(petals);
+    this.flashGeometries.set(profile.id,geometry);
+    return geometry;
   }
 
   /** 抛壳/抛桥夹的小道具：共用一个池子，最多同时 6 个飞在画面里。 */
@@ -1973,6 +1993,9 @@ export class Viewmodel {
     this._ConfigureReloadProp(this.packetProp, "HanYang");
     this._ConfigureReloadProp(this.usedPacketProp, "HanYang");
     this.visualAmmo = this.weapon.magazine ?? null;
+    this.flashProfile=FirearmEffects(this.weapon);
+    this.flash.children[0].geometry=this._FlashGeometry(this.flashProfile);
+    this.materials.flash.color.set(this.flashProfile.color).multiplyScalar(this.flashProfile.radiance);
     if (this.weapon.reloadKind === "enBloc") for (let count = 1; count < 5; count += 1) this._ReloadRoundGeometry("HanYang", count);
 
     // 先试 TZM 模型（MODEL_FP 里的几把），读不到或没登记就退回手搭 rig。
@@ -2334,7 +2357,7 @@ export class Viewmodel {
     // 枪焰：旋转按发数派生，连发时每一发的形状不同
     this.flashTime = 0;
     this.flash.rotation.z = rnd() * Math.PI * 2;
-    const size = Mix(MUZZLE_FLASH.minScale, MUZZLE_FLASH.maxScale, rnd());
+    const size = Mix(this.flashProfile.minScale, this.flashProfile.maxScale, rnd());
     this.flashBaseScale = size;
     this.materials.flash.opacity = 1;
     this.flash.scale.setScalar(size);
@@ -2390,7 +2413,7 @@ export class Viewmodel {
   }
 
   /** 装填。按 reloadKind 分支：桥夹 / 上插弹匣 / 漏斗。 */
-  TriggerReload({ remainingRounds = 0 } = {}) {
+  TriggerReload({ remainingRounds = this.visualAmmo ?? 0 } = {}) {
     if (!this.weapon || !this.rig) return false;
     if (this.IsBusy()) return false;
     const kind = this.weapon.reloadKind;
@@ -3006,6 +3029,7 @@ export class Viewmodel {
         this.rig.parts.bolt.position.z = this.rig.boltTravel;
         this.rig.parts.bolt.rotation.z = 1.35;
         if (this.rig.parts.dustCover) this.rig.parts.dustCover.position.z = this.rig.boltTravel;
+        if (this.rig.parts.cockingPiece) this.rig.parts.cockingPiece.position.z = this.rig.boltTravel;
       }
     }
     if (a.kind === "reload") {
@@ -3065,6 +3089,7 @@ export class Viewmodel {
     if (bolt && !this.boltOpen) { bolt.position.z = 0; bolt.rotation.z = 0; }
     const cover = this.rig.parts.dustCover;
     if (cover && !this.boltOpen) cover.position.z = 0;
+    if (this.rig.parts.cockingPiece && !this.boltOpen) this.rig.parts.cockingPiece.position.z = 0;
     const mag = this.rig.parts.magazine;
     if (mag) { mag.position.set(0, 0, 0); mag.visible = true; }
     // 刀件：装/卸刺刀那一段会把它挪走，其余任何一帧都必须是静止值
@@ -3097,15 +3122,17 @@ export class Viewmodel {
 
     const timing = this.actionSpec?.bolt?.timing || [0.22, 0.52, 0.82];
     const [liftEnd, backEnd, forwardEnd] = timing;
-    const lift = Ease.InOut(Ease.Seg(t, 0.00, liftEnd));
-    const back = Ease.InOut(Ease.Seg(t, Math.max(0, liftEnd - 0.02), backEnd));
+    const lockEnd=this.actionSpec?.bolt?.lockEnd ?? .93;
+    const lift = Ease.InOut(Ease.Seg(t, FPS_BOLT_HAND.graspAt, liftEnd));
+    const back = Ease.InOut(Ease.Seg(t, liftEnd, backEnd));
     const fwd = holdOpen ? 0 : Ease.InOut(Ease.Seg(t, Math.min(0.95, backEnd + 0.03), forwardEnd));
-    const drop = holdOpen ? 0 : Ease.InOut(Ease.Seg(t, Math.max(0, forwardEnd - 0.02), 1.00));
+    const drop = holdOpen ? 0 : Ease.InOut(Ease.Seg(t, forwardEnd, lockEnd));
 
     const slide = (back - fwd) * travel;
     bolt.rotation.z = 1.35 * (lift - drop);
     bolt.position.z = slide;
     if (rig.parts.dustCover) rig.parts.dustCover.position.z = slide;   // 三八大盖随栓前后滑
+    if (rig.parts.cockingPiece) rig.parts.cockingPiece.position.z = slide;
 
     // 抛壳：栓刚拉过一半时弹壳跳出来
     if (back >= 0.82 && this.action && !this.action.ejected) {
@@ -3123,11 +3150,15 @@ export class Viewmodel {
 
     // 右手：握把 → 机柄 → 跟着栓走 → 回握把
     const placement = this._BoltHandPlacement(), grip = placement.position, rotation = placement.rotation;
+    const releaseAt=holdOpen?Math.min(.78,backEnd+.08):lockEnd+FPS_BOLT_HAND.releaseGap;
+    const clearRotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation,"YXZ"))
+      .slerp(new THREE.Quaternion().setFromEuler(this.handBaseRot.right),.55);
     this._WorkingHandPath("right", t, [
-      { at:0.16, position:grip.clone().add(new THREE.Vector3(0.016,0,0.018)), shape:"open", rotation },
-      { at:0.23, position:grip, shape:"bolt", rotation },
-      { at:0.80, position:grip, shape:"bolt", rotation },
-      { at:0.87, position:grip.clone().add(new THREE.Vector3(0.015,0,0.02)), shape:"open", rotation },
+      { at:FPS_BOLT_HAND.approachAt, position:grip.clone().add(new THREE.Vector3().fromArray(FPS_BOLT_HAND.clearOffset)), shape:"relax", rotation, through:true },
+      { at:FPS_BOLT_HAND.graspAt, ...placement },
+      { at:releaseAt, ...placement },
+      { at:Mix(releaseAt,1,FPS_BOLT_HAND.clearFraction), position:grip.clone().add(new THREE.Vector3().fromArray(FPS_BOLT_HAND.clearOffset)),
+        shape:"relax", rotation:new THREE.Euler().setFromQuaternion(clearRotation,"YXZ").toArray().slice(0,3), through:true },
     ]);
 
     // 整枪：拉栓时枪身会被带得往右后仰一点（右手在使劲）
@@ -3182,13 +3213,43 @@ export class Viewmodel {
     const frames = [base,...points,{...base,at:1}];
     const index = Math.max(1,frames.findIndex(p=>p.at>=t));
     const start = frames[index-1], end = frames[index];
-    const mix = Ease.InOut(Ease.Seg(t,start.at,end.at));
+    const u = Ease.Seg(t,start.at,end.at), mix = Ease.InOut(u);
     const position = value => Array.isArray(value) ? new THREE.Vector3().fromArray(value) : value;
     const hand = side === "right" ? this.handRight.group : this.handLeft.group;
     hand.position.lerpVectors(position(start.position),position(end.position),mix);
     if (end.arc) hand.position.addScaledVector(position(end.arc), 4 * mix * (1 - mix));
     const rotation = frame => new THREE.Quaternion().setFromEuler(new THREE.Euler(...(frame.rotation || FPS_HAND_SHAPES[frame.shape]?.rotation || base.rotation),"YXZ"));
     hand.quaternion.copy(rotation(start)).slerp(rotation(end),mix);
+    if (start.through || end.through) {
+      const span = end.at - start.at;
+      const Tangent = i => frames[i].through && i > 0 && i < frames.length - 1
+        ? position(frames[i+1].position).clone().sub(position(frames[i-1].position))
+          .multiplyScalar(span / (frames[i+1].at - frames[i-1].at)) : new THREE.Vector3();
+      const u2 = u*u, u3 = u2*u;
+      hand.position.copy(position(start.position)).multiplyScalar(2*u3-3*u2+1)
+        .addScaledVector(Tangent(index-1),u3-2*u2+u)
+        .addScaledVector(position(end.position),-2*u3+3*u2)
+        .addScaledVector(Tangent(index),u3-u2);
+      if (end.arc) hand.position.addScaledVector(position(end.arc),4*mix*(1-mix));
+      const Log = q => {
+        if(q.w<0)q.set(-q.x,-q.y,-q.z,-q.w);
+        const vector=new THREE.Vector3(q.x,q.y,q.z), length=vector.length();
+        return length>1e-8?vector.multiplyScalar(2*Math.atan2(length,q.w)/length):vector;
+      };
+      const Control = (i, sign) => {
+        const q=rotation(frames[i]);
+        if(!frames[i].through||i===0||i===frames.length-1)return q;
+        const before=frames[i].at-frames[i-1].at,after=frames[i+1].at-frames[i].at;
+        const inverse=q.clone().invert();
+        const a=Log(inverse.clone().multiply(rotation(frames[i-1]))).multiplyScalar(-after/before);
+        const b=Log(inverse.multiply(rotation(frames[i+1]))).multiplyScalar(before/after);
+        const omega=a.add(b).multiplyScalar(sign*span/(3*(before+after))), angle=omega.length();
+        return angle>1e-8?q.multiply(new THREE.Quaternion().setFromAxisAngle(omega.divideScalar(angle),angle)):q;
+      };
+      const a=rotation(start),b=Control(index-1,1),c=Control(index,-1),d=rotation(end);
+      const ab=a.clone().slerp(b,u),bc=b.clone().slerp(c,u),cd=c.clone().slerp(d,u);
+      hand.quaternion.copy(ab.slerp(bc,u)).slerp(bc.clone().slerp(cd,u),u);
+    }
     if (this.riggedArms) {
       this.riggedArms.SetContactWeight(key,1-Mix(start.weight ?? 1,end.weight ?? 1,mix));
       this.riggedArms.operationPose[key] = {shape:start.shape || end.shape,nextShape:end.shape || start.shape,shapeMix:mix};
@@ -3242,6 +3303,7 @@ export class Viewmodel {
       bolt.rotation.z = 1.35 * ReloadTrack(motion.boltTurn, turnT);
       bolt.position.z = rig.boltTravel * ReloadTrack(motion.boltSlide, slideT);
       if (rig.parts.dustCover) rig.parts.dustCover.position.z = bolt.position.z;
+      if (rig.parts.cockingPiece) rig.parts.cockingPiece.position.z = bolt.position.z;
     }
   }
 
@@ -3326,9 +3388,9 @@ export class Viewmodel {
       const loaded = new THREE.Vector3(seat.x, seat.y + 0.010 - depth, seat.z);
       const caught = new THREE.Vector3(seat.x, seat.y + 0.016, seat.z);
       const pouch = new THREE.Vector3(seat.x + 0.140, seat.y - 0.220, seat.z + 0.140);
-      used.position.lerpVectors(phase <= 1 ? loaded : caught, phase <= 1 ? caught : pouch,
-        phase <= 1 ? phase : phase - 1);
-      used.rotation.set(0.5 * Math.max(0, phase - 1), 0, 0.7 * Math.max(0, phase - 1), "YXZ");
+      const catchBlend = Ease.InOut(phase <= 1 ? phase : phase - 1);
+      used.position.lerpVectors(phase <= 1 ? loaded : caught, phase <= 1 ? caught : pouch, catchBlend);
+      used.rotation.set(phase <= 1 ? 0 : 0.5 * catchBlend, 0, phase <= 1 ? 0 : 0.7 * catchBlend, "YXZ");
       used.visible = t >= motion.oldClipVisible[0] && t < motion.oldClipVisible[1];
     }
     const push = this._ReloadPressGrip(packet);
@@ -3820,10 +3882,11 @@ export class Viewmodel {
     if (!this.flash.visible) return;
     this.flashTime += dt;
     // Shared bounded pulse; preserve each shot's seeded size throughout its decay.
-    const life = Clamp01(this.flashTime / MUZZLE_FLASH.lifeS);
+    const profile=this.flashProfile;
+    const life = Clamp01(this.flashTime / profile.lifeS);
     if (life >= 1) { this.flash.visible = false; return; }
-    const shrink = 1 - life * life;
-    this.flash.scale.setScalar(this.flashBaseScale * Mix(MUZZLE_FLASH.endScale, 1, shrink));
+    const shrink = Math.pow(1-life,1.5);
+    this.flash.scale.setScalar(this.flashBaseScale * Mix(profile.endScale, 1, Math.sqrt(1-life)));
     this.materials.flash.opacity = shrink;
     this.flash.rotation.z += dt * 6;
   }
@@ -3964,6 +4027,7 @@ export class Viewmodel {
     for (const {geometry} of this.reloadMagazineGeometry.values()) if (!seen.has(geometry)) {
       seen.add(geometry); geometry.dispose();
     }
+    for(const geometry of this.flashGeometries.values())if(!seen.has(geometry)){seen.add(geometry);geometry.dispose();}
     for (const hand of [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft]) {
       for (const mesh of hand.meshes) if (mesh.geometry) mesh.geometry.dispose();
     }

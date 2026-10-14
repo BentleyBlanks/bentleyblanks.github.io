@@ -434,12 +434,12 @@ export class WeaponEditor {
     if (this.benchBayonet) this.benchBayonet.visible = fixed;
   }
 
-  Trigger(kind) {
+  Trigger(kind, reloadOptions = { remainingRounds: 0 }) {
     const viewmodel = this.host.viewmodel;
     if (this.mode === "fp" && viewmodel && CanAction(this.weaponId, kind)) {
       if (kind === "fire") viewmodel.TriggerFire();
       else if (kind === "bolt") viewmodel.TriggerBolt();
-      else if (kind === "reload") viewmodel.TriggerReload();
+      else if (kind === "reload") viewmodel.TriggerReload(reloadOptions);
       else if (kind === "melee") viewmodel.TriggerMelee();
       else if (kind === "throw") viewmodel.TriggerThrow(1);
     }

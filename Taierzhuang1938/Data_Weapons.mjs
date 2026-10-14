@@ -69,7 +69,7 @@ export const WEAPONS = {
     lengthM: 1.110, barrelM: 0.600, massKg: 4.0,
     magazine: 5, reloadKind: "stripper",     // 5 发桥夹自上方压入固定弹仓
     damage: 78, headMultiplier: 2.6, effectiveRangeM: 500,
-    boltTimeS: 1.05,                          // 拉栓一次：抬-拉-推-闭
+    boltDelayS: 0.07, boltTimeS: 1.18,       // Same 1.25 s total cycle, including hand recovery
     fireIntervalS: 1.25,
     reloadTimeS: 3.4,
     recoil: { pitch: 2.9, yaw: 0.55, kick: 0.055, recoverS: 0.24, recoverFrac: 1.0 },
@@ -90,11 +90,11 @@ export const WEAPONS = {
     magazine: 5, reloadKind: "enBloc",       // Mannlicher packet enters the magazine intact
     damage: 74, headMultiplier: 2.6, effectiveRangeM: 400,
     // 专用实录拆成枪声 shotCue 与枪机 boltCue 两条（Data_SfxSources）。枪机那条随拉栓动作
-    // 起播：头 0.23 s 是手去够枪机，0.82 s 的动作时钟让抬柄/后拉/推回/闭锁节点落在实录冲头上。
-    // 拉栓延迟与其他步枪同为默认 0.20 s；射击间隔 = 延迟 + 拉栓，与中正式、三八式同一口径。
+    // 起播：抬柄/推回仍对齐 0.23/0.52 s，闭锁约 0.79 s；其后留出回握。
+    // 从旧 0.20 s 等待中借 0.13 s 给手部动作，总周期仍为 1.02 s，射击间隔不变。
     // 2026-09-13 那版是一整条录音，动作要硬等 1.65 s、间隔 2.50 s —— 玩家嫌开完枪「有个延迟」。
     shotCue: "rifleHanYang", boltCue: "boltHanYang",
-    boltTimeS: 0.82, fireIntervalS: 1.05, reloadTimeS: 3.8,
+    boltDelayS: 0.07, boltTimeS: 0.95, fireIntervalS: 1.05, reloadTimeS: 3.8,
     recoil: { pitch: 3.1, yaw: 0.62, kick: 0.06, recoverS: 0.26, recoverFrac: 1.0 },
     swayScale: 1.12, adsTimeS: 0.32, adsFovScale: 0.74,
     spreadHipDeg: 3.0, spreadAdsDeg: 0.26,
@@ -211,7 +211,7 @@ export const WEAPONS = {
     lengthM: 1.276, bayonetTotalM: 1.663, massKg: 3.73,
     magazine: 5, reloadKind: "stripper",
     damage: 72, headMultiplier: 2.6, effectiveRangeM: 460,
-    boltTimeS: 1.15, fireIntervalS: 1.35, reloadTimeS: 3.5,
+    boltDelayS: 0.07, boltTimeS: 1.28, fireIntervalS: 1.35, reloadTimeS: 3.5,
     aiAccuracy: 0.62, aiBurstMin: 1, aiBurstMax: 2, aiAimTimeS: 0.85,
     bayonet: true, bayonetLengthM: 0.51,
     note: "机匣上方有防尘滑盖，拉栓时随之前后滑动 —— 这是它最强的剪影特征。",
