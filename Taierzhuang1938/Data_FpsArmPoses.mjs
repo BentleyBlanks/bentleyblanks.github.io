@@ -5,6 +5,7 @@
 // FPS_ARM_POSES 已经逐枪展开，运行时不再把 rifle/lmg/pistol 五个通用姿势当成答案。
 //
 // 坐标：武器局部 -Z 朝前、+Y 向上、+X 向右；rotation 是 YXZ 欧拉角。
+import { FPS_WEAPON_GRIPS } from "./Data_FpsWeaponGrips.mjs";
 
 
 const Freeze = (value) => Object.freeze(value);
@@ -118,9 +119,7 @@ export const FPS_ARM_POSES = Freeze({
   }),
   Zb26: WeaponPose({
     family: "lmg", hip: FixedPose(V(0.110, -0.172, -0.330), V(0.075, -0.080, 0.040)), ads: Sight(0.550), sprint: RifleSprint,
-    right: Contact(V(0.0252,-0.083,-0.10038), V(0.1106,3.011392654,1.736396327), CLOSED, TRIGGER, {"fingers":[[0,3.99,9.36],[21.3,71.4,18.59],[27.9,65.8,18.53],[26.08,76,0],[27.46,35.6,54.15]],"fingerSplay":[0,-11.16,-31.95,-5.25,-35],"thumbDirection":[-0.35,-0.921,0.354],"thumbRoll":-76.08,"triggerFingers":[21.3,73.4,19.59],"triggerSplay":0}),
-    left: Contact(V(0.00987,-0.02669,-0.35151), V(-0.1152,1.332796327,-3.153592654), CLOSED, TRIGGER, {"fingers":[[0,48.29,60],[36.12,91.4,12.4],[14.12,93,10.47],[10.6,77,24.94],[1.41,65.4,1.69]],"fingerSplay":[0,-21.8,7.77,-24.61,-35],"thumbDirection":[0.042,-0.415,-0.117],"thumbRoll":91.92,"triggerFingers":[12,28,18],"triggerSplay":0}),
-    bodyHip: RifleBody(-0.575), bodyAds: RifleAdsBody(-0.555), bodySprint: RifleSprintBody(-0.500),
+    ...FPS_WEAPON_GRIPS.Zb26,
     actions: { reload: { family: "topMag", timing: V(0.32, 0.55, 0.76) } },
   }),
   Type92Hmg: WeaponPose({
@@ -155,18 +154,18 @@ export const FPS_ARM_POSES = Freeze({
   }),
   Grenade: WeaponPose({
     family: "throwable", hip: FixedPose(V(0.100, -0.140, -0.420), V(0.150, -0.250, 0.100)), ads: FixedPose(V(0.080, -0.100, -0.350), V(0.28, -0.10, 0.05)), sprint: ThrowableSprint,
-    right: Contact(V(0, 0, 0), V(0.10, 3.141592654, 1.570796327), CLOSED), left: Contact(V(-0.090, -0.035, 0.080), V(-0.85212, 2.76034, -2.50878), SUPPORT),
-    bodyHip: Body(V(.19,-.38,.02),V(-.19,-.40,.04),V(1,0,0),V(-.4,-.8,.15)), bodyAds: Body(V(.19,-.38,.02),V(-.19,-.40,.04),V(1,0,0),V(-.4,-.8,.15)), bodySprint: Body(V(.19,-.38,.02),V(-.19,-.40,.04),V(1,0,0),V(-.4,-.8,.15)), actions: { throw: { family: "stickGrenade", release: 0.48 } },
+    ...FPS_WEAPON_GRIPS.Grenade,
+    actions: { throw: { family: "stickGrenade", release: 0.48 } },
   }),
   GrenadeBundle: WeaponPose({
-    family: "throwable", hip: FixedPose(V(0.100, -0.140, -0.420), V(0.150, -0.250, 0.100)), ads: FixedPose(V(0.080, -0.100, -0.350), V(0.28, -0.10, 0.05)), sprint: FixedPose(V(0.130, -0.090, -0.250), V(-0.48, 0.34, 0.24)),
-    right: Contact(V(0, 0, 0.390), V(0.15106, -2.02303, -2.55292), CLOSED), left: Contact(V(-0.105, -0.045, 0.075), V(-1.29538, 1.24026, 2.15563), SUPPORT),
-    bodyHip: ThrowableBody(), bodyAds: ThrowableBody(), bodySprint: ThrowableBody(), actions: { throw: { family: "bundleGrenade", release: 0.50 } },
+    family: "throwable",
+    ...FPS_WEAPON_GRIPS.GrenadeBundle,
+    actions: { throw: { family: "bundleGrenade", release: 0.50 } },
   }),
   Dadao: WeaponPose({
     family: "melee", hip: FixedPose(V(0.235, -0.195, -0.520), V(0.942425592, -0.447601613, -0.535596284)), ads: FixedPose(V(0.175, -0.170, -0.470), V(0.900, -0.540, -1.500)), sprint: FixedPose(V(0.255, -0.225, -0.500), V(-0.130, -0.520, 1.890)),
-    right: Contact(V(0, 0, 0.030), V(0.05208, -1.93229, -1.75862), CLOSED, CLOSED, {thumbDirection:[0,-.7,1],thumbRoll:0}), left: Contact(V(0, 0, 0.155), V(0.20553, -2.61358, -0.42501), CLOSED, CLOSED, {thumbDirection:[0,-.7,1],thumbRoll:0}),
-    bodyHip: BladeBody(-0.500, -0.175), bodyAds: BladeBody(-0.470, -0.175), bodySprint: BladeBody(-0.440, -0.165), actions: { melee: { family: "dadao", release: 0.18 } },
+    ...FPS_WEAPON_GRIPS.Dadao,
+    actions: { melee: { family: "dadao", release: 0.18 } },
   }),
   OfficerSwordSet: WeaponPose({
     family: "melee", hip: FixedPose(V(0.205, -0.180, -0.500), V(0.660, -0.570, 1.480)), ads: FixedPose(V(0.155, -0.155, -0.450), V(0.820, -0.500, -1.520)), sprint: FixedPose(V(0.230, -0.215, -0.480), V(-0.160, -0.460, 1.820)),
@@ -218,9 +217,6 @@ export function FpsMountedPoseKey(weaponId) {
 // 刀具和投掷物保留其状态接触；枪械握持坐标系固定在武器局部，
 // 腰射/ADS/冲刺只移动武器本身，不旋转手掌去抵消不合理的肘平面。
 export const FPS_ARM_STATE_ROTATIONS = Freeze({
-  Grenade: Freeze({ ads: StateContacts(V(0.47682, -2.25383, -2.35885), V(-0.04976, 1.95825, 2.94739)), sprint: StateContacts(V(-0.69827, -2.06503, -2.19207), V(-0.44412, 1.71442, -1.41136)) }),
-  GrenadeBundle: Freeze({ ads: StateContacts(V(0.27029, -2.14081, -2.48461), V(-1.29617, -0.29859, -2.97260)), sprint: StateContacts(V(-0.53731, 1.84973, -2.48936), V(-0.96956, 1.92130, -0.20501)) }),
-  Dadao: Freeze({ ads: StateContacts(V(1.00986, -1.23190, -1.06748), V(0.01292, 2.28903, 2.98643)), sprint: StateContacts(V(-0.03165, -2.61229, -1.31738), V(0.19628, -2.95993, -0.35701)) }),
   OfficerSwordSet: Freeze({ ads: StateContacts(V(0.99884, -1.28117, -1.03785), V(-0.11189, 2.30043, 2.79591)), sprint: StateContacts(V(-0.30442, -2.64893, -1.21062), V(0.44444, -2.98694, -0.63058)) }),
 });
 

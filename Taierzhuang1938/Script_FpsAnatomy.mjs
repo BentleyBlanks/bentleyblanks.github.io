@@ -91,12 +91,16 @@ export function ApplyAnatomicalFingers(rig) {
       if (!match) continue;
       const finger = Number(match[1]); const segment = Number(match[2] || 0);
       const authored = contact?.fingerRotations?.[match[1]+(match[2]||'')];
+      const authoredTrigger = contact?.triggerRotations?.[match[1]+(match[2]||'')];
+      const AuthoredRotation = () => {
+        const rotation = new THREE.Quaternion().fromArray(authored).normalize();
+        return authoredTrigger && fire ? rotation.slerp(new THREE.Quaternion().fromArray(authoredTrigger).normalize(),fire) : rotation;
+      };
       const BlendAuthored = () => {
-        if (authored) bone.quaternion.copy(new THREE.Quaternion().fromArray(authored).normalize()
-          .slerp(bone.quaternion, workingBlend));
+        if (authored) bone.quaternion.copy(AuthoredRotation().slerp(bone.quaternion, workingBlend));
       };
       if (authored && workingBlend === 0) {
-        bone.quaternion.fromArray(authored).normalize();
+        bone.quaternion.copy(AuthoredRotation());
         continue;
       }
       const baseCurl = contact?.fingers?.[finger] || (rig.unarmed ? [55, 76, 40].map((value,index)=>THREE.MathUtils.lerp([18,28,18][index],value,rig.poseState.sprint)) : firearm && side === "r" && finger === 1

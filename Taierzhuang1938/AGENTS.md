@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **第一人称四件装备握持（2026-10-15）**：普通／集束手榴弹、大刀、捷克式用 Blender 重标掌面与逐指旋转，数据在 `Data_FpsWeaponGrips`；集束弹与捷克式采用固定骨段裸手。普通弹取消重复轴旋转，集束弹恢复实物柄尺寸；大刀肩位与连续肘轨由数据驱动。源工程、重建和实测见 [握持修复](docs/Data_FpsWeaponGripRepair20261015.md)，门禁 `FpsArmTest` / `FpsHandContactTest --only=Zb26` / `GrenadeThrowTest` / `DadaoSwingTest` / `FpsGripEditorTest` / `MotionVectorContractTest`。
+
 - **Profiler 第四版（2026-10-14，对标 UE stat unit / Insights）**：独立窗口改成「读数条（逻辑/渲染提交/GPU/浏览器侧/机器忙闲 + 结论「卡在哪」）+ 带预算线与事件道的帧图 + 九个页签（计时/GPU/渲染统计/计数器/事件/Draw 清单/函数采样/场景普查/取证）」，外观跟设置页一套。内核每帧记帧状态与阶段（汇总默认只算游戏中与过场）、Worker 忙闲探针与 Compute Pressure、逐 pass 材质切换/变体重算、计数器、事件标记、可点名抓一帧 draw 清单；`Script_ProfilerSampler` 在游戏里做 JS 函数采样（要 `Document-Policy: js-profiling`，本地预览与测试服发，Pages 没有）。**读用户发来的录制先看机器忙闲**：2026-10-14 那份 20 fps 录制同样的活单价是空闲时 1.7–2.0 倍（别的会话的无头浏览器占着 CPU 与显卡）。口径 [编辑器套件 · Profiler](docs/Data_EditorSuite.md)；门禁 `Script_ProfilerTest`（浏览器）、`Script_ProfilerRecordingTest`（纯 node）、`Script_ProfileCliTest`。
 - **史实注记资料馆（2026-10-15）**：五类资料共八条，`Data_HistoryCodex` 记录出处与年代；新增四川征兵概览、1943年乐山缓征和1945年中江代电。`Script_HistoryCodex` 共用菜单壳，历史文献交给 `Script_HistoryBook`：软纸书角拖拽、回弹、正反翻页、横屏对页与竖屏单页、双击放大，静止和退出均不留渲染循环。接入、第三方许可、档案与重建见 [资料馆](docs/Data_HistoryCodex.md)；门禁 `HistoryCodexBrowserTest`，并检查 MenuStartup／Text／ModuleGraph／TextureStandards。
 

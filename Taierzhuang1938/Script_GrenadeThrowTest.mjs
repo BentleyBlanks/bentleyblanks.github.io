@@ -114,6 +114,32 @@ try{
  });
  fs.writeFileSync(path.join(out,'Data_QuickThrowAnatomy.json'),JSON.stringify(quickAnatomy,null,2));
  for(const row of quickAnatomy){assert(row.active>.95,'stance must actually settle before the throw');assert(row.elbowStep<.085,`quick throw elbow flips: ${JSON.stringify(row)}`);assert(row.wrist<=FPS_ARM_LIMITS.wristBendDeg+.1&&row.grip<=FPS_ARM_LIMITS.positionResidualM);}
- assert.deepEqual(errors,[]);console.log('PASS repaired grenade hands and full throw');
+ const bundle=await page.evaluate(async()=>{
+  const THREE=await import('./vendor/three/build/three.module.js'),v=Taierzhuang.viewmodel;
+  v.action=null;v.Equip('GrenadeBundle',0,{instant:true});
+  const input={ads:0,sprint:0,moveSpeed:0,grounded:true,crouch:0,elapsed:0};
+  for(let i=0;i<90;i++)v.Update(1/60,input);
+  const r=v.riggedArms,hold=r.fingerBones.r.find(b=>/finger11$/i.test(b.name)).quaternion.clone();
+  const result={fixed:r.fixedRestLengths,scale:v.rig.group.scale.toArray(),grip:0,wrist:0,step:0,opened:0,releases:0,lengths:[]};
+  v.onThrowRelease=()=>result.releases++;v.TriggerThrow(1,{kind:'GrenadeBundle'});
+  let previous=null;
+  for(let i=0;i<120;i++){
+   v.action.t=i/120;v.Update(0,input);
+   const P=b=>r._InAnchor(b,new THREE.Vector3());
+   const elbow=P(r.bones.r.forearm);
+   if(previous)result.step=Math.max(result.step,elbow.distanceTo(previous));previous=elbow;
+   result.wrist=Math.max(result.wrist,...Object.values(r.wristBend));
+   if(i/120<.47)result.grip=Math.max(result.grip,...Object.values(r.gripError));
+   if(i===72)result.opened=hold.angleTo(r.fingerBones.r.find(b=>/finger11$/i.test(b.name)).quaternion);
+   result.lengths.push(P(r.bones.r.upperArm).distanceTo(elbow),elbow.distanceTo(P(r.bones.r.hand)));
+  }
+  return result;
+ });
+ assert(bundle.fixed&&bundle.scale.every(n=>Math.abs(n-1)<1e-6),'bundle uses fixed bones and a full-sized wooden handle');
+ assert(bundle.grip<=FPS_ARM_LIMITS.positionResidualM&&bundle.wrist<=FPS_ARM_LIMITS.wristBendDeg+.1,'bundle two-hand throw remains anatomical');
+ assert(bundle.step<.085&&bundle.opened>.2&&bundle.releases===1,'bundle releases once with open fingers and continuous elbows');
+ for(const offset of [0,1]){const lengths=bundle.lengths.filter((_,i)=>i%2===offset);assert(Math.max(...lengths)-Math.min(...lengths)<.001,'bundle arm does not stretch');}
+ fs.writeFileSync(path.join(out,'Data_BundleAnatomy.json'),JSON.stringify(bundle,null,2));
+ assert.deepEqual(errors,[]);console.log('PASS repaired grenade/bundle hands and full throws');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
 

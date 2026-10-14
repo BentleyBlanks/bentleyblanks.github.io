@@ -941,10 +941,9 @@ function AddGrenadeBody(steel, key, x = 0, y = 0, z = -0.055) {
 function BuildGrenadeProp(materials, key, grenadeAsset = null) {
   const imported = CloneGrenadeAsset(grenadeAsset, { firstPerson: true });
   if (imported) {
-    // GLB vertex bounds: long axis Y (-0.110..0.110 m), wide head at -Y.
-    // Keep the hand prop contract shared with the procedural fallback: head -Z.
+    // Blender exports the long axis as Z, with the head at -Z.
+    // A second quarter turn here put the wooden handle inside the wrist.
     const group = new THREE.Group();
-    imported.rotation.x = Math.PI / 2;
     group.add(imported);
     return group;
   }
@@ -1011,9 +1010,8 @@ function BuildGrenadeBundle(materials, weapon, key) {
     rope.position.z = z;
     group.add(rope);
   }
-  // 七枚实际叠在一起的横向体积远大于一颗普通弹；第一人称等比缩小并后移，
-  // 仍保留捆扎结构，同时不把准星与正前方目标压没。
-  group.scale.setScalar(0.62);
+  // Preserve the measured 29 mm wooden handle and the full seven-head volume.
+  // The view pose positions the bundle; shrinking it also shrank the grip.
   group.position.set(0.050, -0.030, -0.140);
   group.rotation.set(-0.35, 0, 0);
 
@@ -1624,7 +1622,9 @@ export class Viewmodel {
           this.armRigs.HanYang=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.Type38=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.Grenade=new FpsArmRig(riggedAssets.fpsHanYang,library);
+          this.armRigs.GrenadeBundle=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.Dadao=new FpsArmRig(riggedAssets.fpsHanYang,library);
+          this.armRigs.Zb26=new FpsArmRig(riggedAssets.fpsHanYang,library);
         }
       } catch (error) {
         console.warn(`[Viewmodel] FPS 手臂实例化失败，退回旧手模：${String(error).slice(0, 180)}`);
@@ -2640,7 +2640,7 @@ export class Viewmodel {
       if (this.meleeVideoFrame) this._ApplyMeleeVideo();
       if(this.weaponId === "Grenade" && this.action?.kind === "throw" && !this.action.offhand) this._ApplyGrenadeThrow();
       if (!this.skeletalAnimation?.Update(step,input)) this.riggedArms.Update(step);
-      if(this.weaponId === "Grenade" && this.action?.kind === "throw" && !this.action.offhand) this._ReleaseThrow(this.action.t,this.action.power,false);
+      if(["Grenade","GrenadeBundle"].includes(this.weaponId) && this.action?.kind === "throw" && !this.action.offhand) this._ReleaseThrow(this.action.t,this.action.power,false);
     }
     if (!this.weapon && !this.riggedArms) this._UpdateUnarmedHands(gait, sprint, grounded ? 1 : 0);
     this.body?.Update(step, input.carryBodyVisible ? { ...input, playerYaw: input.carryBodyYaw ?? input.playerYaw,
@@ -3452,7 +3452,14 @@ export class Viewmodel {
       this.actionPivot.rotation.set(swing * 0.9, -0.35 * cock + 0.30 * whip, 0.25 * cock, "YXZ");
     }
 
-    if(offhand || this.weaponId !== "Grenade" || !this.riggedArms) this._ReleaseThrow(t,power,offhand);
+    if(this.weaponId === "GrenadeBundle" && this.riggedArms && !offhand) {
+      const opening=Ease.InOut(Ease.Seg(t,.47,.55))*(1-Ease.InOut(Ease.Seg(t,.82,.94)));
+      for(const side of ["r","l"]) {
+        this.riggedArms.SetContactWeight(side,1-opening);
+        this.riggedArms.operationPose[side]={shape:"open",nextShape:"open",shapeMix:0};
+      }
+    }
+    if(offhand || !["Grenade","GrenadeBundle"].includes(this.weaponId) || !this.riggedArms) this._ReleaseThrow(t,power,offhand);
   }
 
   _ApplyGrenadeThrow() {
@@ -3484,14 +3491,14 @@ export class Viewmodel {
 
   _ReleaseThrow(t,power,offhand) {
     // Release after the current frame's hand targets and bones are evaluated.
-    if (t >= FPS_GRENADE_THROW.release && this.action && !this.action.released) {
+    if (t >= (this.actionSpec.throw?.release ?? FPS_GRENADE_THROW.release) && this.action && !this.action.released) {
       this.action.released = true;
       if (offhand) this.offhandGrenade.visible = false;
       else if (this.rig.parts.grenade) this.rig.parts.grenade.visible = false;
       if (this.onThrowRelease || this.action.onRelease) {
         const out = new THREE.Vector3();
         this.root.updateWorldMatrix(true,true);
-        (offhand ? this.handLeft.group : this.weaponMount).getWorldPosition(out);
+        (offhand ? this.handLeft.group : this.riggedArms?.gripNodes.r || this.gripContactRight).getWorldPosition(out);
         this.root.worldToLocal(out);
         out.divide(this.compensation);
         this.root.localToWorld(out);

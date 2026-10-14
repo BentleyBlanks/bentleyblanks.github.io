@@ -480,7 +480,7 @@ export class FpsArmRig {
     // Two-handed blade work needs the support shoulder behind the grip. The
     // inspection pose's forward shoulder folds the new anatomical arm across
     // the camera and cannot accommodate the blade's diagonal follow-through.
-    if (this.poseState.melee && this.poseSpec.family === "melee") {
+    if (this.poseState.melee && this.poseSpec.family === "melee" && !this.fixedRestLengths) {
       return {shoulders:{right:[0.19,-0.40,-0.15],left:[-0.19,-0.40,-0.10]},
         elbowPoles:{right:[0.30,-0.80,0.12],left:[-0.30,-0.80,0.12]}};
     }
