@@ -91,3 +91,49 @@ phase 1 报日军远景辨识材质为 0，随后达到 240 秒上限。
 用同一测试的 `--baseline-root` 只读检查未修改的主线 `beebbd8d`：
 phase 0 等待资源 30 秒超时，phase 1／2 同样报日军远景辨识材质为 0，并达到同一 240 秒总上限。
 两次启动结果分别保留，不把不同的 phase 0 表现说成已逐条复现，也未削弱或删除原断言。
+
+## 手部体积、掌面与近景皮肤（2026-10-15）
+
+后续检查找到旧修形的不对称倍率：左掌法向放大 1.60／右掌 1.30，
+左指横截面放大 1.48／右指 1.12（拇指为 1.42／1.15）。
+`Script_FpsHandAnatomy.py` 在 Blender 中按原关节权重反解旧体积场，再施加与右手一致的倍率；
+采用可逆 `FpsBalancedHandVolume` 形态键，法线按同一变换修正，保留原有平滑表面。
+三处掌厚左右比由约 1.23 回到 1.0000–1.0003，指节半径差异小于 2%。
+独立 `FpsHandAnatomyTest` 直接测 GLB 截面，旧资产会明确失败。
+本次只改皮肤 POSITION／NORMAL；骨骼、逆绑定、权重、UV、内嵌图及已修好的袖口逐字节保留。
+
+肤质采用独立 `FPS_SKIN_DETAIL`：减轻远景手部的双倍积泥与粗大毛孔，保留皱褶和局部污渍。
+实际使用这份手模的第一人称装备统一采用近景参数；场景人物仍用原参数，纹理与着色程序继续共享。
+
+握持按真实网格重新校正。大刀原左手的食指位于小指靠柄尾的一侧，拇指容易靠到尾环；
+现在改为常规双手下劈握法，两手食指均朝刀刃，左拇指在刀柄另一侧对握。
+`DadaoSwingTest` 从真实骨骼检查每一帧的食指／小指顺序，避免反向握姿再次混入。
+集束弹支撑中指、捷克式拇指／食指／小指也按实体表面调整。
+拟合采用各骨骼的逆绑定与原始顶点重新蒙皮，核对与运行时的顶点重放误差后再写数据；
+指腹目标与完整指节的穿入分别计量，握点残差为零不能代替表面检查。
+
+共享手模收回体积后，汉阳造支撑拇指／食指曾出现约 4.8 mm 间隙，现已重新贴合。
+还修正了静止呼吸片段覆盖新指型的问题：仅重烘既有 Idle 中九条恒定手指旋转轨道，
+原有呼吸、臂部、所有位置、武器控制轨与时长保持原值。
+`FpsAnimationTest` 增加恒定握持轨与当前握姿一致性的断言。
+
+源目录为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/FpsHandAnatomy_20261015`。
+几何工程 `Model_FpsHandAnatomy.blend` 保留旧形与新形；输入 GLB 为
+`Model_FpsHandsBeforeAnatomy.glb`，哈希 `6df171a4ceee91d06023f8c53ab95b33ec13e9085d1cf82644fd4853e23e701b`。
+通过本任务独占 MCP 执行 `Script_FpsHandAnatomy.py`（设置 `FPS_PROJECT_ROOT` 与
+`FPS_HAND_EXPORT=True`）；`Script_FpsWeaponGripExport.mjs --clean` 导出真实蒙皮和检查图，
+`Script_FpsAnatomyGripFit.py` 负责握持校正，`Script_FpsIdleGripRefresh.py` 同步既有呼吸片段。
+源目录保留输入与拟合报告，原始 `.blend` 和截图均不进入网站仓库。
+这一节记录手部迭代，整体 3A 真实感目标仍需继续视觉审查。
+
+合入主线 `c5e4439c` 的新装填机构后，12 项专项检查通过：模块图、测试注册、资产规范、
+手形截面、全武器手臂、真实指腹接触、新装填机构、投弹、大刀动作、呼吸片段浏览器播放、
+运动矢量，以及 high 画质 GI 关／开的采样器检查。此结果不等于全仓所有门禁通过。
+大刀两侧食指相对小指的刀柄轴距离均约 −7.18 cm，整条挥刀逐帧保持朝向刀刃；
+轻斩的腕角上限仍约 63°，刀尖路径与刃向沿用已验证的轨迹。
+
+最终 `Animation_FpsHandAnatomy.blend` 同时保留 `Scene_FpsHandAnatomySculpt` 与
+`Scene_FpsHandAnatomyPlayback`。后者包含四种握持及普通弹／大刀的采样回放。
+四种静态蒙皮均逐顶点与运行时核对，最大误差小于 0.000001 m；
+检查件材质不替代游戏内高画质验收。用新工程重建时给 `Script_FpsSkinRepairStudio.py`
+传入任务名 `FpsHandAnatomy_20261015` 及对应 sculpt／replay 场景名，可保留可逆形态键。

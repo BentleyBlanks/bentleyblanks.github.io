@@ -55,12 +55,16 @@ try{
   const report=await page.evaluate(id=>{
    const T=Taierzhuang,e=T.editor.active;e.SetWeapon(id);e.SetPose('hip');e.SetView('player');e.SetAnimationClean(true);
    for(let i=0;i<90;i++)e.Update(1/60);T.StepFrames(1);
-   const r=T.viewmodel.riggedArms,cloth=[];
-   r.root.traverse(o=>{if(o.isMesh)for(const m of [].concat(o.material))if(m.userData.nraUniformDetailProfile)cloth.push({name:m.name,profile:m.userData.nraUniformDetailProfile,normal:m.normalScale?.toArray()});});
-   return {id,fixed:r.fixedRestLengths,grip:{...r.gripError},cloth};
+   const r=T.viewmodel.riggedArms,cloth=[],skin=[];
+   r.root.traverse(o=>{if(o.isMesh)for(const m of [].concat(o.material)){
+    if(m.userData.nraUniformDetailProfile)cloth.push({name:m.name,profile:m.userData.nraUniformDetailProfile,normal:m.normalScale?.toArray()});
+    if(m.userData.characterSurface?.role==='skin')skin.push({name:m.name,profile:m.userData.characterSkinDetailProfile,roughness:m.roughness});
+   }});
+   return {id,fixed:r.fixedRestLengths,grip:{...r.gripError},cloth,skin};
   },id);
   assert(report.fixed&&Math.max(...Object.values(report.grip))<.006,`${id}: changing the sleeve disturbed grip/bone length`);
   assert(report.cloth.length&&report.cloth.every(m=>m.profile==='firstPerson'&&Math.abs(Math.abs(m.normal[0])-.28)<1e-6),`${id}: FPS material profile is missing`);
+  assert(report.skin.length&&report.skin.every(m=>m.profile==='firstPerson'&&Math.abs(m.roughness-.62)<1e-6),`${id}: close-up skin profile is missing`);
   materials.push(report);
   await page.screenshot({path:path.join(out,`Image_${id}_Player.png`)});
   await page.evaluate(()=>{const e=Taierzhuang.editor.active;e.SetView('inspect');e.SetInspectPreset('rightRear');Taierzhuang.StepFrames(1);});

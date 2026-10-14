@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {FPS_SKELETAL_ANIMATION} from './Data_FpsSkeletalAnimation.mjs';
+import {FpsArmPose} from './Data_FpsArmPoses.mjs';
 const project=path.dirname(fileURLToPath(import.meta.url));
 let count=0;
 for(const id of FPS_SKELETAL_ANIMATION.weaponIds){
@@ -17,6 +18,13 @@ for(const id of FPS_SKELETAL_ANIMATION.weaponIds){
       for(let n=0;n<values.length;n+=7)assert.ok(Math.abs(Math.hypot(...values.slice(n+3,n+7))-1)<.00002,`${id} ${name}: normalized rotation`);
     }
     if(name==='Idle')assert.ok(clip.bones.some(values=>values.length>7&&Math.max(...values.map((value,index)=>Math.abs(value-values[index%7])))>.001),'holding loop must contain actual bone motion');
+    if(name==='Idle')for(const [index,bone] of asset.bones.entries()){
+      const match=bone.match(/_(R|L)_Finger(\d)(\d)?$/i);if(!match||clip.bones[index].length!==7)continue;
+      const authored=FpsArmPose(id).contacts[match[1].toLowerCase()==='r'?'right':'left'].fingerRotations?.[match[2]+(match[3]||'')];
+      if(!authored)continue;
+      const rotation=clip.bones[index].slice(3),dot=rotation.reduce((sum,v,i)=>sum+v*authored[i],0)/(Math.hypot(...rotation)*Math.hypot(...authored));
+      assert(Math.abs(dot)>1-1e-6,`${id} ${bone}: holding animation overrides the current authored grip`);
+    }
     if(['Idle','Walk','Run'].includes(name))for(const values of [...clip.bones,...Object.values(clip.controls)]){
       if(values.length>7)for(let n=0;n<7;n++)assert.ok(Math.abs(values[n]-values.at(-7+n))<.0001,`${id} ${name}: closed bone loop`);
     }

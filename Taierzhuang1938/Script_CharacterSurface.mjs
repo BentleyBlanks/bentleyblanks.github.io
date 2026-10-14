@@ -19,7 +19,7 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 //     不采细节包。门禁 Script_SamplerBudgetTest、Script_CharacterSurfaceTest。
 import * as THREE from "three";
 import {
-  CHARACTER_SURFACE_PARTS, CHARACTER_GRIME, CHARACTER_SKIN, IJA_UNIFORM_COLORS, IJA_WOOL_DETAIL, CLOTH_SHEEN,
+  CHARACTER_SURFACE_PARTS, CHARACTER_GRIME, CHARACTER_SKIN, FPS_SKIN_DETAIL, IJA_UNIFORM_COLORS, IJA_WOOL_DETAIL, CLOTH_SHEEN,
   CHARACTER_WHITE_VERTEX_COLOR_MODELS,
 } from "./Data_Tuning_Materials.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
@@ -304,12 +304,21 @@ float charMud = 0.0, charWet = 0.0, charWear = vCharGrime.z, charDust = vCharGri
 
 /** 皮肤：去粉偏黄褐、微细节（毛孔 / 皮纹）、褶皱积泥、污渍、脸上的汗。 */
 function SkinPatch(tile, part) {
-  const H = CHARACTER_SKIN.hands;
+  const S = part.firstPersonSkin ? FPS_SKIN_DETAIL : CHARACTER_SKIN, H = S.hands;
   const uniforms = {
     uCharSkinTile: { value: tile },
     // 逐部件（手那份皮更脏更暗）：x 污渍倍率、y 明度倍率。uniform，不分程序。
     uCharSkinPart: { value: new THREE.Vector2(part.hands ? H.dirt : 1, part.hands ? H.value : 1) },
   };
+  if (part.firstPersonSkin) Object.assign(uniforms, {
+    // Keep the asynchronously loaded detail-map uniform shared. Numeric values
+    // belong to this material; actor skin continues to use the original profile.
+    uCharSkinTone: { value: Linear(S.tone) },
+    uCharSkinGrade: { value: new THREE.Vector4(S.toneMix, S.desat, S.value, S.cavityAlbedo) },
+    uCharSkinNormal: { value: new THREE.Vector4(S.normalStrength, S.oilRoughness, S.fade[0], S.fade[1]) },
+    uCharSkinDirt: { value: new THREE.Vector4(S.creaseDirt, S.creaseBias, S.smudge, S.smudgeScale) },
+    uCharSkinDirtTint: { value: Linear(S.dirtTint) },
+  });
   return MakePatch({
     key: CHARACTER_SURFACE_PATCH_KEYS.skin,
     uniforms: (target) => { Object.assign(target, Shared().skin, uniforms); },
@@ -543,7 +552,8 @@ export function CharacterSurfaceMaterial(material, { rigid = false } = {}) {
   const heightOffset = rigid ? 10 : 0;
   const mine = [COMMON_PATCH];
   if (part.role === "skin") {
-    const S = CHARACTER_SKIN;
+    const S = part.firstPersonSkin ? FPS_SKIN_DETAIL : CHARACTER_SKIN;
+    variant.userData.characterSkinDetailProfile = part.firstPersonSkin ? "firstPerson" : "actor";
     if (variant.isMeshPhysicalMaterial) variant.specularIntensity = S.specularIntensity;
     variant.roughness = S.roughness;
     if (part.noMap) variant.color.set(S.wristColor);

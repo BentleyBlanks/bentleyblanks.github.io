@@ -161,9 +161,9 @@ export const CHARACTER_SURFACE_PARTS = Object.freeze({
   // 汉阳造手的网格比身体大 1.36 倍、视模再缩 0.7，屏幕上的 UV 密度与身体的 John_Color 相当。
   FpsArms: Object.freeze({ "John_All Body": SkinPart(1.93, HANDS), "Material #1721585337": NraClothPart() }),
   FpsHanYang: Object.freeze({
-    "Material_HanYangSkin": SkinPart(1.9, HANDS),
+    "Material_HanYangSkin": SkinPart(1.9, { ...HANDS, firstPersonSkin: true, normalScale: 0.45 }),
     // 腕环那 160 个三角的 UV 横跨 atlas 的手背、脚掌与底色，贴不了图：改成与前臂同色的皮肤。
-    "Material_HanYangWrist": SkinPart(1.9, { ...HANDS, noMap: true }),
+    "Material_HanYangWrist": SkinPart(1.9, { ...HANDS, firstPersonSkin: true, noMap: true }),
     "Material #1721585337": NraClothPart({ elbowX: 0.555, cuffX: 0.92 }),
   }),
   FirstPersonBody: Object.freeze({ "Material #1721585337": NraClothPart() }),
@@ -260,6 +260,24 @@ export const CHARACTER_SKIN = Object.freeze({
   wristColor: 0xb07e5a,
   // 手那份皮的倍率：[污渍 / 褶皱积泥, 明度]（分镜 01/02/04A/05：手是脏的、黄褐的，最近处最显）。
   hands: Object.freeze({ dirt: 2.0, value: 0.8 }),
+});
+
+// The player sees these hands at 20–50 cm. The actor treatment's doubled dirt
+// and coarse pores obscure the anatomy at that distance.
+export const FPS_SKIN_DETAIL = Object.freeze({
+  ...CHARACTER_SKIN,
+  tileMeters: 0.028,
+  normalStrength: 0.24,
+  cavityAlbedo: 0.10,
+  tone: 0xb28363,
+  toneMix: 0.55,
+  value: 0.90,
+  roughness: 0.62,
+  specularIntensity: 0.60,
+  creaseDirt: 0.30,
+  smudge: 0.18,
+  dirtTint: 0x70533d,
+  hands: Object.freeze({ dirt: 1.1, value: 0.94 }),
 });
 
 /**

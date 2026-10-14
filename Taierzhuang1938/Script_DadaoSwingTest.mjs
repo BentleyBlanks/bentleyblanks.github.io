@@ -27,6 +27,13 @@ try{
   const T=Taierzhuang,L=T.Debug.MeleeCombat;L.Select('DadaoOne');L.Pause(true);T.StepFrames(90,1/60,false);
   const v=T.viewmodel,r=v.riggedArms,bones=[];r.root.traverse(o=>{if(o.isBone)bones.push(o);});
   const result={clips:[],boneNames:bones.map(b=>b.name),sourceFrames:[]};
+  const HiltOrder=()=>Object.fromEntries(['r','l'].map(side=>{
+   const root=digit=>r.fingerBones[side].find(b=>b.name.toLowerCase().endsWith('finger'+digit));
+   const index=v.rig.group.worldToLocal(root(1).getWorldPosition(new THREE.Vector3()));
+   const little=v.rig.group.worldToLocal(root(4).getWorldPosition(new THREE.Vector3()));
+   return [side,index.z-little.z];
+  }));
+  result.hiltGripOrder=HiltOrder();
   if(r!==v.armRigs.Dadao||!r.fixedRestLengths)throw Error('Dadao must use the repaired fixed-length hands');
   const model=v.rig.group.getObjectByName('Model_DadaoEdgeMount');
   if(!model)throw Error('Missing measured Dadao edge mount');
@@ -57,7 +64,7 @@ try{
     const edge=new THREE.Vector3(0,1,0).transformDirection(modelMatrix);
     frames.push({t:i/120,tip:tip.toArray(),edge:edge.toArray(),normal:new THREE.Vector3(1,0,0).transformDirection(modelMatrix).toArray(),grip:Math.max(r.gripError.r,r.gripError.l),
      wrist:Math.max(r.wristBend.r,r.wristBend.l),wristPair:{...r.wristBend},right:P(r.bones.r.hand),left:P(r.bones.l.hand),
-     upper:P(r.bones.r.upperArm),elbow:P(r.bones.r.forearm),leftElbow:P(r.bones.l.forearm),weapon:matrix.toArray()});
+     upper:P(r.bones.r.upperArm),elbow:P(r.bones.r.forearm),leftElbow:P(r.bones.l.forearm),weapon:matrix.toArray(),hiltGripOrder:HiltOrder()});
     if(exportSource&&action==='Light')result.sourceFrames.push({bones:bones.map(b=>Matrix(b,T.camera)),weapon:Matrix(v.rig.group,T.camera)});
    }
    result.clips.push({action,duration,windup:spec.windup,active:spec.active,frames});
@@ -82,12 +89,14 @@ try{
   return result;
  },process.argv.includes('--export-source'));
  if(process.argv.includes('--trace'))fs.writeFileSync(path.join(out,'Data_DadaoSwingTrace.json'),JSON.stringify(data));
+ assert(Object.values(data.hiltGripOrder).every(distance=>distance<-.04),'Both sword hands must have index knuckles toward the blade; a reversed support palm hooks the pommel');
  const Dist=(a,b)=>Math.hypot(...a.map((n,i)=>n-b[i]));
  assert(data.cutPlaneDriftDeg<.1,`Blade twists during downstroke/follow-through: ${data.cutPlaneDriftDeg} degrees`);
  const metrics=[];
  for(const clip of data.clips){
   assert(clip.frames[0].edge[2]<-.8,`${clip.action}: real cutting edge must face forward in guard`);
   for(const f of clip.frames){
+   assert(Object.values(f.hiltGripOrder).every(distance=>distance<-.04),`${clip.action} ${f.t}: default two-hand power grip reverses on the hilt`);
    const dot=f.normal.reduce((sum,n,i)=>sum+n*clip.frames[0].normal[i],0);
    assert(Math.acos(Math.min(1,Math.max(-1,dot)))*180/Math.PI<.1,`${clip.action} ${f.t}: blade rolls out of its cutting plane`);
    assert(f.grip<=FPS_ARM_LIMITS.positionResidualM,`${clip.action}: grip ${f.grip}`);
@@ -140,7 +149,7 @@ try{
  }
  await page.setViewportSize({width:1280,height:720});
  await page.waitForFunction(()=>Math.abs(Taierzhuang.camera.aspect-1280/720)<1e-4,null,{timeout:10000});
- fs.writeFileSync(path.join(out,'Data_DadaoSwingAcceptance.json'),JSON.stringify({metrics,visibility,cutPlaneDriftDeg:data.cutPlaneDriftDeg,interruptionError:data.interruptionError,recoverySeekError:data.recoverySeekError},null,2));
+ fs.writeFileSync(path.join(out,'Data_DadaoSwingAcceptance.json'),JSON.stringify({metrics,visibility,hiltGripOrder:data.hiltGripOrder,cutPlaneDriftDeg:data.cutPlaneDriftDeg,interruptionError:data.interruptionError,recoverySeekError:data.recoverySeekError},null,2));
  if(data.sourceFrames.length)fs.writeFileSync(path.join(out,'Data_DadaoSourceBake.json'),JSON.stringify({boneNames:data.boneNames,frames:data.sourceFrames}));
  for(const phase of [0,.24,.34,.4,.55,.85]){
   // ResizeObserver and the temporal render targets must settle before the first

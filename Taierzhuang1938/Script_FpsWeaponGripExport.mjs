@@ -1,5 +1,5 @@
 // Export evaluated production palms, skinned vertices and weapons for Blender calibration.
-// Usage: node Taierzhuang1938/Script_FpsWeaponGripExport.mjs [local output directory] [--only=Grenade,Dadao]
+// Usage: node Taierzhuang1938/Script_FpsWeaponGripExport.mjs [local output directory] [--only=Grenade,Dadao] [--clean]
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -21,7 +21,7 @@ try{
  await page.evaluate(()=>{const T=Taierzhuang;T.Debug.OpenEditor('firstPerson');T.StepFrames(2);});
  await page.addStyleTag({content:'.edMenuBar,.edGear{display:none!important}'});
  for(const id of ids){
-  await page.evaluate(id=>{const T=Taierzhuang,e=T.editor.active;e.SetWeapon(id);e.SetPose('hip');e.SetView('player');for(let i=0;i<90;i++)e.Update(1/60);T.StepFrames(1);},id);
+  await page.evaluate(({id,clean})=>{const T=Taierzhuang,e=T.editor.active;e.SetWeapon(id);e.SetPose('hip');e.SetView('player');if(clean)e.SetAnimationClean(true);for(let i=0;i<90;i++)e.Update(1/60);T.StepFrames(1);},{id,clean:process.argv.includes('--clean')});
   const pkg=await page.evaluate(async()=>{
    const THREE=await import('./vendor/three/build/three.module.js');
    const T=Taierzhuang,vm=T.viewmodel,arms=vm.riggedArms,G=vm.rig.group;
@@ -48,6 +48,7 @@ try{
     for(let i=0;i<n;i++){mesh.getVertexPosition(i,v).applyMatrix4(mesh.matrixWorld).applyMatrix4(inv);pos.push(...v.toArray().map(R));for(let j=0;j<4;j++){infl.push(geo.attributes.skinIndex.getComponent(i,j));wts.push(geo.attributes.skinWeight.getComponent(i,j));}}
     skin.push({name:mesh.name,pos,idx:geo.index?Array.from(geo.index.array):null,bones:mesh.skeleton.bones.map(b=>b.name),infl,wts,
       rest:Array.from(geo.attributes.position.array),uv:geo.attributes.uv?Array.from(geo.attributes.uv.array):null,
+      normals:geo.attributes.normal?Array.from({length:n},(_,i)=>[geo.attributes.normal.getX(i),geo.attributes.normal.getY(i),geo.attributes.normal.getZ(i)]).flat():null,
       bindMatrix:mesh.bindMatrix.toArray(),inverseBinds:mesh.skeleton.boneInverses.map(m=>m.toArray()),
       materialNames:[].concat(mesh.material).map(m=>m.name)});
    });

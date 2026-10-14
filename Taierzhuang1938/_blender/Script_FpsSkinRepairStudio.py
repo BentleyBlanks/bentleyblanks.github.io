@@ -7,12 +7,14 @@ import bpy,json,math
 from pathlib import Path
 from mathutils import Matrix,Vector,Quaternion
 root=Path(FPS_GRIP_PROJECT_ROOT);folder=Path(FPS_GRIP_INPUT);source=Path(FPS_GRIP_SOURCE)
-previous=bpy.context.scene
-assert previous.get('BlenderMcpTask')=='FpsWeaponGrips_20261014'
+task=globals().get('FPS_GRIP_TASK','FpsWeaponGrips_20261014')
+previous=bpy.data.scenes.get(globals().get('FPS_GRIP_SCULPT_SCENE','')) or bpy.context.scene
+bpy.context.window.scene=previous
+assert previous.get('BlenderMcpTask')==task
 if bpy.context.mode!='OBJECT':bpy.ops.object.mode_set(mode='OBJECT')
-previous.name='Scene_FpsWeaponControls'
-scene=bpy.data.scenes.new('Scene_FpsRepairFinal');bpy.context.window.scene=scene
-scene['BlenderMcpTask']='FpsWeaponGrips_20261014';scene.unit_settings.system='METRIC'
+previous.name=globals().get('FPS_GRIP_SCULPT_SCENE','Scene_FpsWeaponControls')
+scene=bpy.data.scenes.new(globals().get('FPS_GRIP_REPLAY_SCENE','Scene_FpsRepairFinal'));bpy.context.window.scene=scene
+scene['BlenderMcpTask']=task;scene.unit_settings.system='METRIC'
 convert=Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))
 def M(v):return Matrix([v[i::4] for i in range(4)])
 def Unit(m):
@@ -63,6 +65,9 @@ for id in ['Grenade','GrenadeBundle','Dadao','Zb26']:
    uv=mesh.uv_layers.new(name='UVMap')
    for loop in mesh.loops:uv.data[loop.index].uv=(skin['uv'][loop.vertex_index*2],1-skin['uv'][loop.vertex_index*2+1])
   for polygon in mesh.polygons:polygon.use_smooth=True
+  if skin.get('normals'):
+   normalMatrix=bind.to_3x3().inverted().transposed()
+   mesh.normals_split_custom_set_from_vertices([(normalMatrix@Vector(skin['normals'][i:i+3])).normalized() for i in range(0,len(skin['normals']),3)])
   groups=[obj.vertex_groups.new(name=name) for name in skin['bones']]
   for i in range(len(vertices)):
    for k in range(4):
@@ -127,7 +132,7 @@ if controls:
  controls.name='Scene_FpsWeaponControls'
  for collection in controls.collection.children:collection.hide_render=True;collection.hide_viewport=True
 for other in list(bpy.data.scenes):
- if other not in [scene,controls] and other.get('BlenderMcpTask')=='FpsWeaponGrips_20261014':bpy.data.scenes.remove(other)
+ if task=='FpsWeaponGrips_20261014' and other not in [scene,controls] and other.get('BlenderMcpTask')==task:bpy.data.scenes.remove(other)
 scene.render.engine='BLENDER_EEVEE';scene.render.use_compositing=False;scene.render.use_sequencer=False;scene.render.use_freestyle=False
 scene.frame_start=1;scene.frame_end=121;scene.render.resolution_x=1280;scene.render.resolution_y=720;scene.render.resolution_percentage=100
 for name in ['Script_FpsWeaponGripFit.py','Script_FpsDadaoElbowFit.py','Script_FpsDadaoPhysicalStroke.py','Script_FpsSkinRepairStudio.py']:
@@ -135,5 +140,5 @@ for name in ['Script_FpsWeaponGripFit.py','Script_FpsDadaoElbowFit.py','Script_F
 for img in bpy.data.images:
  if img.source=='FILE' and img.has_data and not img.packed_file:img.pack()
 (source/'Data_SkinReplayValidation.json').write_text(json.dumps(reports,indent=2),encoding='utf-8')
-bpy.ops.wm.save_as_mainfile(filepath=str(source/'Animation_FpsWeaponGrips.blend'),compress=True)
+bpy.ops.wm.save_as_mainfile(filepath=str(source/globals().get('FPS_GRIP_BLEND_NAME','Animation_FpsWeaponGrips.blend')),compress=True)
 print(json.dumps({'file':bpy.data.filepath,'weapons':list(collections),'skinValidation':reports}))
