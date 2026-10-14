@@ -193,6 +193,11 @@ GLB 根节点 extras 里带 `teamOffsetM` 与 `strideM`，与数据表对不上�
 Blender 导出的时间轴从 1/30 s 起，加载时挪到 0（不挪的话循环长 1.033 s，蹄子比车慢 21%）。
 历史造型参考为 1930 年前后中国牛车照片及山东地方交通资料；生图概念稿只作建模参考，
 可编辑 `.blend` 保存在仓库外的 `OneDrive/AI/Models/Blender/Taierzhuang1938/OxCart`。
+2026-10-14 修复四肢脱节：每条腿从肩胯到脚踝使用同一连续网格，关节两侧混合蒙皮，腿根内收并固定到躯干，
+脚踝末端伸入蹄冠并跟随蹄骨。绑定使用建模静止姿态，避免把第 1 帧已弯曲的姿态当成混合蒙皮的绑定姿态。
+抬脚和落脚的水平速度与支撑段连续，抬升及屈膝曲线端点速度为零；保留上述步幅、车辕位置与轮径。
+本次源工程及修改前备份在该目录的 `WalkRepair20261014/`；Blender 播放 1–30 帧，第 31 帧保留为 GLB 循环闭合键。
+`Script_DraftCartEditorTest` 追加两种牲口全部四条腿的关节权重、支撑蹄位移及循环接缝检查。
 参考：[1930 年中国牛车照片](https://www.bridgemanimages.com/en-US/williams-maynard-owen/chinese-peasants-with-cart-pulled-by-an-ox-pass-a-city-gate-1930-photo/photograph/asset/8777732)、
 [烟台交易运输民俗中的木轮铁瓦和骡马牛牵引记载](https://dsyjy.yantai.gov.cn/art/2010/7/26/art_1335_378567.html)。
 

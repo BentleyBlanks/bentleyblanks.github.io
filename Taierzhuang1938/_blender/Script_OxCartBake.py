@@ -16,7 +16,7 @@ from mathutils import Matrix, Vector
 project = Path(bpy.context.scene['OxCartProject']) if 'OxCartProject' in bpy.context.scene else Path(__file__).resolve().parents[1]
 model_dir = project / 'Model' / 'OxCart'
 model_dir.mkdir(parents=True, exist_ok=True)
-private_dir = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OxCart')
+private_dir = Path(scene_dir) if (scene_dir := bpy.context.scene.get('OxCartSourceDir')) else Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OxCart')
 private_dir.mkdir(parents=True, exist_ok=True)
 
 for previous in list(bpy.data.objects): bpy.data.objects.remove(previous, do_unlink=True)
@@ -594,6 +594,7 @@ TEAM_OFFSET_M = 3.3
 # Walk: stride (m travelled per clip loop) and the planted share of each loop.
 GAIT = {'Horse': dict(stride=1.25, duty=.62, bob=.012, nod=.055),
         'Ox': dict(stride=1.05, duty=.64, bob=.010, nod=.030)}
+ANIMAL_BIND_BASIS = {}
 
 # Each leg is a hidden upper joint (P0 shoulder/hip -> P1 elbow/stifle, inside
 # the body) plus the visible column P1 -> P2 knee/hock -> P3 fetlock.  All the
@@ -672,8 +673,12 @@ def LegPose(leg, gait, step, root_z):
         # Planted: the fetlock tracks backwards at exactly road speed.
         return (P3[0]+sweep/2-sweep*step/gait['duty'], P3[1]-root_z), 0, 0
     progress = (step-gait['duty'])/(1-gait['duty'])
-    eased = progress*progress*(3-2*progress)
-    arc = math.sin(math.pi*progress)
+    # Match the planted hoof's backwards velocity at toe-off and touchdown.
+    # The slight overshoot is the natural follow-through before the leg swings
+    # forward; a smoothstep with zero endpoint velocity made the foot jerk.
+    tangent = -(1-gait['duty'])/gait['duty']
+    eased = progress*progress*(3-2*progress) + tangent*progress*(1-progress)*(1-2*progress)
+    arc = math.sin(math.pi*progress)**2
     return ((P3[0]-sweep/2+sweep*eased, P3[1]+leg['lift']*arc-root_z),
             leg['fold']*arc, arc)
 
@@ -689,7 +694,43 @@ def TorsoRing(stations, y, angles, outset, x_sign=1):
              center_z+(half_height+outset)*math.sin(math.radians(a))) for a in angles]
 
 
-def BuildLeg(kind, coat, lower_coat, col, root, side, front):
+def SkinLeg(obj, stations, sides, joints):
+    """Continuous skin, with overlapping influences around each real joint.
+
+    The top rings follow the torso, so the shoulder/hip never leaves the body.
+    At the fetlock the tube reaches inside the hoof and follows the hoof bone.
+    A maximum of two influences keeps the existing compact runtime skin format.
+    """
+    body, pivot, elbow, knee, foot = joints
+    groups = {joint.name: obj.vertex_groups.new(name=joint.name) for joint in joints}
+    z0, z1, z2, z3 = (joint.location.z for joint in (pivot, elbow, knee, foot))
+    for ring, station in enumerate(stations):
+        z = station[0]
+        if z >= z0-.06:
+            a, b, t = body, pivot, 0
+        elif z > z0-.18:
+            a, b, t = body, pivot, (z0-.06-z)/.12
+        elif z > z1+.08:
+            a, b, t = pivot, elbow, 0
+        elif z > z1-.08:
+            a, b, t = pivot, elbow, (z1+.08-z)/.16
+        elif z > z2+.075:
+            a, b, t = elbow, knee, 0
+        elif z > z2-.075:
+            a, b, t = elbow, knee, (z2+.075-z)/.15
+        elif z > z3+.055:
+            a, b, t = knee, foot, 0
+        elif z > z3-.035:
+            a, b, t = knee, foot, (z3+.055-z)/.09
+        else:
+            a, b, t = knee, foot, 1
+        t = max(0,min(1,t)); t = t*t*(3-2*t)
+        indices = range(ring*sides,(ring+1)*sides)
+        if t < 1: groups[a.name].add(indices,1-t,'REPLACE')
+        if t > 0: groups[b.name].add(indices,t,'REPLACE')
+
+
+def BuildLeg(kind, coat, lower_coat, col, root, body, side, front):
     leg = LEGS[kind][front]
     x = side*leg['x']
     name = f'{kind}{"Front" if front else "Rear"}{"Left" if side<0 else "Right"}'
@@ -699,21 +740,49 @@ def BuildLeg(kind, coat, lower_coat, col, root, side, front):
     knee = Empty(name+'KneePivot',(x,y2,z2),col,elbow)
     hoof_pivot = Empty(name+'HoofPivot',(x,y3,z3),col,knee)
     loft = lambda stations: [(z,x,y,rx,ry) for z,y,rx,ry in stations]
-    if 'thigh' in leg:
-        (tx,ty,tz),scale = leg['thigh']
-        Ellipsoid(name+'Upper',(side*tx,ty,tz),scale,coat,col,pivot,16,12)
-    LoftZ(name+'Forearm',SmoothStations(loft(leg['mid']),2),coat,col,elbow)
+    # One closed tube replaces the disconnected upper/forearm/cannon/pastern
+    # pieces. Extra rings at every joint preserve volume under blended skinning.
+    upper_rx, upper_ry = ((.13,.18) if not front else (.105,.15)) if kind == 'Horse' else ((.14,.18) if not front else (.12,.16))
+    mid = leg['mid']
+    root_stations = [
+        (z0-.04,y0,upper_rx*.50,upper_ry*.55),
+        (z0-.09,y0+(y1-y0)*.16,upper_rx*.82,upper_ry*.80),
+        ((z0-.09+z1+.07)/2,y0+(y1-y0)*.45,upper_rx*.90,upper_ry*.90),
+        (z1+.07,y1-.055,mid[0][2]*1.18,mid[0][3]*1.08),
+        (z1,y1,mid[0][2]*1.12,mid[0][3]*1.04),
+    ]
+    cannon = leg['cannon']
+    forearm = [row for row in mid if row[0] > z2+.055]
+    joint_rx = max(mid[-1][2],cannon[0][2])
+    joint_ry = max(mid[-1][3],cannon[0][3])
+    knee_stations = [(z2+.055,y2,joint_rx,joint_ry),
+                     (z2,y2,joint_rx*1.06,joint_ry*1.04),
+                     (z2-.055,y2+.004,cannon[1][2],cannon[1][3])]
+    shin = [row for row in cannon if z2-.055 > row[0] > z3+.035]
+    foot_rx, foot_ry = (.043,.052) if kind == 'Horse' else (.052,.058)
+    foot_stations = [(z3+.035,y3-.002,foot_rx*1.08,foot_ry*1.08),
+                     (z3,y3,foot_rx,foot_ry),
+                     (z3-.045,y3+.012,foot_rx*.92,foot_ry*.90),
+                     (.068,y3+.023,foot_rx*1.07,foot_ry)]
+    coarse = loft(root_stations+forearm+knee_stations+shin+foot_stations)
+    # Bury the capped root towards the torso centre, rather than leaving a
+    # shoulder-shaped disc outside the narrow top of the barrel.
+    coarse[0] = (coarse[0][0],x*.4,*coarse[0][2:])
+    coarse[1] = (coarse[1][0],x*.8,*coarse[1][2:])
+    stations = SmoothStations(coarse,2)
+    limb = LoftZ(name+'ContinuousLeg',stations,coat,col,root,16)
+    if lower_coat != coat:
+        limb.data.materials.append(lower_coat)
+        for polygon in limb.data.polygons:
+            z = sum(limb.data.vertices[i].co.z for i in polygon.vertices)/len(polygon.vertices)
+            polygon.material_index = 1 if z < z2 else 0
+    SkinLeg(limb,stations,16,(body,pivot,elbow,knee,hoof_pivot))
     if 'hock' in leg:
         hy,hz,rx,ry,rz = leg['hock']
         Ellipsoid(name+'HockPoint',(x,hy,hz),(rx,ry,rz),coat,col,elbow,12,8)
-    LoftZ(name+'Cannon',SmoothStations(loft(leg['cannon']),2),lower_coat,col,knee)
     if kind == 'Horse':
-        LoftZ(name+'Pastern',loft([(.16,y3,.043,.052),(.11,y3+.012,.037,.044),
-              (.07,y3+.022,.046,.052)]),lower_coat,col,hoof_pivot)
         HorseHoof(name+'Hoof',x,y3+.025,hoof,col,hoof_pivot)
     else:
-        LoftZ(name+'Pastern',loft([(.13,y3,.052,.058),(.085,y3+.008,.05,.052)]),
-              lower_coat,col,hoof_pivot)
         for digit in (-1,1):
             HoofDigit(name+f'HoofDigit{digit}',x+digit*.043,y3+.01,digit,hoof,col,hoof_pivot)
             Ellipsoid(name+f'DewClaw{digit}',(x+digit*.035,y3-.055,.10),
@@ -926,11 +995,12 @@ def BuildAnimal(kind):
     body, head_pivot, tail = (BuildHorse if kind == 'Horse' else BuildOx)(col, root)
     lower_coat = horse_leg if kind == 'Horse' else ox_coat
     legs = [BuildLeg(kind, horse_coat if kind == 'Horse' else ox_coat, lower_coat,
-                     col, root, side, front) for side in (-1,1) for front in (True,False)]
+                     col, root, body, side, front) for side in (-1,1) for front in (True,False)]
     # Lateral-sequence walk: LH, LF, RH, RF a quarter loop apart.
     offsets = {(-1,False): 0, (-1,True): .25, (1,False): .5, (1,True): .75}
     animated = [root, body, head_pivot, tail]
     for entry in legs: animated += [entry['pivot'], entry['elbow'], entry['knee'], entry['hoof']]
+    ANIMAL_BIND_BASIS.update({obj.name: obj.matrix_basis.copy() for obj in animated})
     keys = {obj.name: [] for obj in animated}
     worst = 0
     for frame in range(1, 32):
@@ -973,6 +1043,21 @@ def BuildAnimal(kind):
 
 ox_col=BuildAnimal('Ox')
 horse_col=BuildAnimal('Horse')
+
+def SetAnimalBindPose(col, mute):
+    """Build the skin in its authored rest pose, independent of gait frame 1.
+
+    Binding a blended tube to frame 1's already bent pivots would apply the
+    frame-1 deformation twice and pull its shoulder away from the torso.
+    """
+    for obj in col.objects:
+        if obj.type != 'EMPTY' or obj.name not in ANIMAL_BIND_BASIS: continue
+        if obj.animation_data:
+            for track in obj.animation_data.nla_tracks: track.mute = mute
+        if mute: obj.matrix_basis = ANIMAL_BIND_BASIS[obj.name].copy()
+    bpy.context.view_layer.update()
+
+for collection in (ox_col,horse_col): SetAnimalBindPose(collection,True)
 
 def Consolidate(col):
     """Keep moving pivots, but batch the many planks and spoke pieces by material."""
@@ -1020,7 +1105,7 @@ for collection in (cart_col,ox_col,horse_col): Consolidate(collection)
 # Consolidate still left ~60 separately-drawn pieces per cart (28 cart + 31/36
 # animal), and every piece is submitted in two shadow cascades, the prepass and
 # the main pass. Each model now exports as ONE skinned mesh whose primitives are
-# one per material: the moving pivots become bones (rigid 1.0 weights), untextured
+# one per material: the moving pivots become bones (blended limbs, rigid props), untextured
 # paints collapse into two vertex-colour materials, and ForgedWheelTire (the same
 # ForgedIron maps as BlackenedIron) folds into BlackenedIron.  Cart 5 draws,
 # ox 5, horse 4 per pass.  Bone names are the old pivot names, so WheelLeft /
@@ -1048,24 +1133,28 @@ def PivotOf(obj):
     return parent
 
 def BatchForRuntime(col, prefix, clip=None):
+    if clip: SetAnimalBindPose(col,True)
     scene.frame_set(1)
     bpy.context.view_layer.update()
     empties = [o for o in col.objects if o.type == 'EMPTY']
     meshes = [o for o in col.objects if o.type == 'MESH']
     # 1. Materials: textured ones stay, flat paints become a vertex colour.
     for obj in meshes:
-        mat = obj.data.materials[0] if obj.data.materials else None
-        if mat and mat.name in MATERIAL_FOLD:
-            mat = bpy.data.materials[MATERIAL_FOLD[mat.name]]
-            obj.data.materials[0] = mat
-        textured = bool(mat) and any(node.type == 'TEX_IMAGE' for node in mat.node_tree.nodes)
-        color = (1, 1, 1, 1)
-        if mat and not textured:
-            shader = mat.node_tree.nodes.get('Principled BSDF')
-            color = tuple(shader.inputs['Base Color'].default_value)
-            obj.data.materials[0] = flat_metal if shader.inputs['Metallic'].default_value > 0 else flat_paint
+        colors = []
+        for index, mat in enumerate(obj.data.materials):
+            if mat and mat.name in MATERIAL_FOLD:
+                mat = bpy.data.materials[MATERIAL_FOLD[mat.name]]
+                obj.data.materials[index] = mat
+            textured = bool(mat) and any(node.type == 'TEX_IMAGE' for node in mat.node_tree.nodes)
+            color = (1,1,1,1)
+            if mat and not textured:
+                shader = mat.node_tree.nodes.get('Principled BSDF')
+                color = tuple(shader.inputs['Base Color'].default_value)
+                obj.data.materials[index] = flat_metal if shader.inputs['Metallic'].default_value > 0 else flat_paint
+            colors.append(color)
         paint = obj.data.color_attributes.new('FlatColor', 'FLOAT_COLOR', 'CORNER')
-        for item in paint.data: item.color = color
+        for polygon in obj.data.polygons:
+            for index in polygon.loop_indices: paint.data[index].color = colors[polygon.material_index] if colors else (1,1,1,1)
         # 2. One UV layer that holds exactly what TEXCOORD_0 held before (textured
         #    pieces without UVs sampled texel 0,0 — keep that look, don't re-unwrap).
         uvs = obj.data.uv_layers
@@ -1076,7 +1165,7 @@ def BatchForRuntime(col, prefix, clip=None):
             keep = uvs[0].name
             for name in [layer.name for layer in uvs if layer.name != keep]: uvs.remove(uvs[name])
             uvs[0].name = 'UVMap'
-    # 3. Armature: one bone per pivot empty, rest = the pivot's frame-1 world matrix.
+    # 3. Armature: one bone per pivot empty, in the original unposed bind frame.
     rest = {e.name: e.matrix_world.normalized() for e in empties}
     armature = bpy.data.armatures.new(prefix + 'Rig')
     rig = bpy.data.objects.new(prefix + 'Rig', armature)
@@ -1095,8 +1184,19 @@ def BatchForRuntime(col, prefix, clip=None):
         pivot = PivotOf(e)
         if pivot is not None: bones[e.name].parent = bones[pivot.name]
     bpy.ops.object.mode_set(mode='OBJECT')
+    # Freeze the geometry while the authored bind pose is still evaluated.
+    # Weighted limbs keep their joint groups; rigid props receive one influence.
+    for obj in meshes:
+        if not obj.vertex_groups:
+            pivot = PivotOf(obj)
+            group = obj.vertex_groups.new(name=pivot.name)
+            group.add(range(len(obj.data.vertices)),1.0,'REPLACE')
+        world = obj.matrix_world.copy()
+        obj.parent = None
+        obj.matrix_world = world
     # 4. Bake the pivots' walk onto the bones (same frames the NLA export sampled).
     if clip:
+        SetAnimalBindPose(col,False)
         bone_rest = {bone.name: bone.matrix_local.copy() for bone in armature.bones}
         rig.animation_data_create()
         action = bpy.data.actions.new(clip)
@@ -1121,14 +1221,7 @@ def BatchForRuntime(col, prefix, clip=None):
         rig.animation_data.action = None
         scene.frame_set(1)
         bpy.context.view_layer.update()
-    # 5. Rigid skin: every piece follows its pivot bone with weight 1.0.
-    for obj in meshes:
-        pivot = PivotOf(obj)
-        group = obj.vertex_groups.new(name=pivot.name)
-        group.add(range(len(obj.data.vertices)), 1.0, 'REPLACE')
-        world = obj.matrix_world.copy()
-        obj.parent = None
-        obj.matrix_world = world
+    # 5. One runtime mesh, retaining the continuous leg's blended skin weights.
     bpy.ops.object.select_all(action='DESELECT')
     for obj in meshes: obj.select_set(True)
     bpy.context.view_layer.objects.active = meshes[0]
@@ -1279,5 +1372,22 @@ scene.frame_set(1)
 for col in (cart_col,horse_col): col.hide_viewport=True
 for obj in ox_col.objects:
     if obj.type=='EMPTY': obj.hide_set(False)
+# Open the editable source on one visible team; the other animal remains in
+# its own collection, with its own editable walk action. Key 31 closes the GLB
+# loop, but the Blender playback range excludes that duplicated first pose.
+scene.frame_end = 30
+scene.frame_set(1)
+horse_col.hide_viewport = True
+horse_col.hide_render = True
+bpy.ops.object.select_all(action='DESELECT')
+bpy.context.view_layer.objects.active = bpy.data.objects['OxBatch']
+bpy.data.objects['OxBatch'].select_set(True)
+for screen in bpy.data.screens:
+    for area in screen.areas:
+        if area.type == 'VIEW_3D':
+            area.spaces.active.region_3d.view_location = Vector((0,2.0,1.0))
+            area.spaces.active.region_3d.view_rotation = Vector((9,8,5)).to_track_quat('Z','Y')
+            area.spaces.active.region_3d.view_distance = 10.5
+            area.spaces.active.shading.type = 'MATERIAL'
 bpy.ops.wm.save_as_mainfile(filepath=str(private_dir/'Scene_OxCart.blend'))
 print('Ox cart exports:',[(p.name,p.stat().st_size) for p in model_dir.glob('*.glb')])

@@ -8,12 +8,13 @@ import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 import { MID_TUNING as MID } from "./Data_Tuning_FirstLevelMid.mjs";
 
-const VERSION = "20260927031500";
+const VERSION = "2026101401";
 const KIND_NAME = Object.freeze({ ox: "Ox", horse: "Horse" });
 /**
  * 2026-09-27 起车与牲口各是**一只蒙皮网格、按材质分图元**（_blender/Script_OxCartBake.py
  * 的 BatchForRuntime）：车 5 个 draw、牛 5 个、马 4 个，原来是 28 + 31/36 个分件。
  * 活动节点变成同名骨头（WheelLeft / OxFrontLeftPivot…），Walk 动画照旧按名字绑定。
+ * 2026-10-14 四条腿改成连续网格，肩胯、膝和脚踝采用相邻骨骼混合权重。
  * 下面这张表把沿用下来的分件身份映射到合并后承载它的那只网格（按材质名），
  * 一只网格可以承载好几个身份（车板与车栏都是 WeatheredElm）。
  */
