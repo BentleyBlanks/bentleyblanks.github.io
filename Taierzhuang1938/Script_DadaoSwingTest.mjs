@@ -145,5 +145,29 @@ try{
   await page.evaluate(phase=>{Taierzhuang.Debug.MeleeCombat.Preview('Light',phase);Taierzhuang.StepFrames(1,1/60,true);},phase);
   await page.screenshot({path:path.join(out,`Scene_Dadao_${Math.round(phase*100)}.png`)});
  }
- console.log(JSON.stringify({metrics,visibility}));console.log('PASS Dadao descending edge-first stroke, anatomy, recovery and interruption');
+ const inspector=await page.evaluate(async()=>{
+  const THREE=await import('./vendor/three/build/three.module.js');
+  const {MELEE_WEAPONS}=await import('./Data_MeleeCombat.mjs');
+  const T=Taierzhuang;T.Debug.OpenEditor('firstPerson');
+  const editor=T.editor.active;editor.SetWeapon('Dadao');editor.SetPose('hip');
+  for(let i=0;i<90;i++)editor.Update(1/60);
+  editor.Trigger('melee');const v=T.viewmodel,r=v.riggedArms;
+  const result={duration:v.action.duration,sources:[],grip:0,wrist:0,step:0,support:1};let previous=null;
+  for(let i=0;i<120;i++){
+   v.action.t=i/120;editor.Update(0);v.root.updateWorldMatrix(true,true);
+   result.sources.push(v.meleeVideoFrame?.source||null);
+   result.grip=Math.max(result.grip,r.gripError.r,r.gripError.l);result.wrist=Math.max(result.wrist,r.wristBend.r,r.wristBend.l);
+   result.support=Math.min(result.support,r.contactWeight.l);
+   const elbow=r._InAnchor(r.bones.l.forearm,new THREE.Vector3());
+   if(previous)result.step=Math.max(result.step,elbow.distanceTo(previous));previous=elbow;
+  }
+  const spec=MELEE_WEAPONS.Dadao.light;result.expectedDuration=spec.windup+spec.active+spec.recovery;
+  return result;
+ });
+ assert.equal(inspector.duration,inspector.expectedDuration,'inspector uses the combat stroke clock');
+ assert(inspector.sources.every(source=>source==='BlenderDadaoPowerSwing'),'inspector must evaluate the Blender stroke');
+ assert(inspector.support>.999&&inspector.grip<=FPS_ARM_LIMITS.positionResidualM,'inspector retains both real hilt contacts');
+ assert(inspector.wrist<=FPS_ARM_LIMITS.wristBendDeg+.01&&inspector.step<.085,'inspector has continuous anatomical elbows');
+ fs.writeFileSync(path.join(out,'Data_DadaoInspectorAcceptance.json'),JSON.stringify(inspector,null,2));
+ console.log(JSON.stringify({metrics,visibility,inspector}));console.log('PASS Dadao descending edge-first stroke, anatomy, recovery, interruption and inspector action');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

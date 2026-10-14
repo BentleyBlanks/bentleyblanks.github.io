@@ -36,6 +36,7 @@ import { SampleMeleeFirstPerson, SampleMeleeVideo } from "./Script_MeleeAnimatio
 import { FPS_GRENADE_THROW } from "./Data_FpsGrenadeThrow.mjs";
 import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
+import { MELEE_WEAPONS } from "./Data_MeleeCombat.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs";
 import { MakeBox, MergeGeometries } from "./Script_Geo.mjs";
 import { MarkForegroundPrepass } from "./Script_Post.mjs";
@@ -2261,7 +2262,9 @@ export class Viewmodel {
     const fixed = this.bayonetFixed && !!this.weapon.bayonet;
     if (!mode) mode = isBlade ? "slash" : (fixed ? "thrust" : "bash");
     const spec = GUN_MELEE[mode === "cut" ? "slash" : mode];
-    const duration = isBlade ? (this.weapon.swingTimeS || 0.62) : (spec?.timeS || 0.55);
+    const stroke = this.weaponId === "Dadao" && mode === "slash" ? MELEE_WEAPONS.Dadao.light : null;
+    const duration = stroke ? stroke.windup + stroke.active + stroke.recovery
+      : isBlade ? (this.weapon.swingTimeS || 0.62) : (spec?.timeS || 0.55);
     const a = this._StartAction("melee", duration);
     a.melee = mode;
     a.power = Clamp01(power);
@@ -3272,6 +3275,14 @@ export class Viewmodel {
 
   /** 近战：刺刀劈刺（thrust）/ 刺刀挥砍（cut）/ 大刀劈砍（slash）/ 枪托砸（bash）。 */
   _AnimMelee(t, mode, power = 1) {
+    if (this.weaponId === "Dadao" && mode === "slash" && this.riggedArms) {
+      // The inspector's action button and legacy direct callers use the same
+      // authored stroke as combat, including the supporting hand and elbows.
+      this.riggedArms.SetContactWeight("r", 1);
+      this.riggedArms.SetContactWeight("l", 1);
+      this.meleeVideoFrame = SampleMeleeVideo({ weapon:"Dadao", clip:"DadaoLight", action:"Light", normalized:t });
+      return;
+    }
     this.riggedArms?.SetContactWeight("r", 1);
     this.riggedArms?.SetContactWeight("l", 0);
     const actionPulse = Ease.Pulse(t);
