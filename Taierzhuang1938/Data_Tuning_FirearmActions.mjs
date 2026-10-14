@@ -10,19 +10,19 @@ export const RELOAD_EVENTS = Object.freeze({
     Event(0.105, "open", "bolt", { offset: 0, maxDuration: 0.28, volume: 0.45 }),
     Event(0.50, "insert", "stripperLoad", { maxDuration: 0.55, volume: 0.75 }),
     Event(0.65, "loaded"),
-    Event(0.925, "close", "bolt", { offset: 0.85, maxDuration: 0.26, volume: 0.5 }),
+    Event(0.925, "close", "bolt", { offset: 0.50, maxDuration: 0.26, volume: 0.5 }),
   ]),
   enBloc: Object.freeze([
     Event(0.105, "open", "bolt", { maxDuration: 0.28, volume: 0.45 }),
     Event(0.50, "insert", "stripperLoad", { maxDuration: 0.55, volume: 0.75 }),
     Event(0.65, "loaded"),
-    Event(0.925, "close", "bolt", { offset: 0.85, maxDuration: 0.26, volume: 0.5 }),
+    Event(0.925, "close", "bolt", { offset: 0.50, maxDuration: 0.26, volume: 0.5 }),
   ]),
   topMag: Object.freeze([
     Event(0.16, "remove", "magIn", { maxDuration: 0.18, volume: 0.4 }),
     Event(0.70, "insert", "magIn", { maxDuration: 0.3, volume: 0.75 }),
     Event(0.76, "loaded"),
-    Event(0.88, "close", "bolt", { offset: 0.85, maxDuration: 0.26, volume: 0.5 }),
+    Event(0.88, "close", "bolt", { offset: 0.50, maxDuration: 0.26, volume: 0.5 }),
   ]),
   hopper: Object.freeze([
     ...Array.from({ length: 6 }, (_, index) => Event(0.235 + index * 0.10, `clip${index + 1}`,
@@ -33,13 +33,13 @@ export const RELOAD_EVENTS = Object.freeze({
     Event(0.20, "remove", "bolt", { maxDuration: 0.20, volume: 0.4 }),
     Event(0.58, "insert", "stripperLoad", { maxDuration: 0.5, volume: 0.7 }),
     Event(0.72, "loaded"),
-    Event(0.88, "close", "bolt", { offset: 0.85, maxDuration: 0.26, volume: 0.5 }),
+    Event(0.88, "close", "bolt", { offset: 0.50, maxDuration: 0.26, volume: 0.5 }),
   ]),
   boxMag: Object.freeze([
     Event(0.15, "remove", "magIn", { maxDuration: 0.18, volume: 0.4 }),
     Event(0.67, "insert", "magIn", { maxDuration: 0.3, volume: 0.7 }),
     Event(0.71, "loaded"),
-    Event(0.88, "close", "bolt", { offset: 0.85, maxDuration: 0.26, volume: 0.5 }),
+    Event(0.88, "close", "bolt", { offset: 0.50, maxDuration: 0.26, volume: 0.5 }),
   ]),
 });
 

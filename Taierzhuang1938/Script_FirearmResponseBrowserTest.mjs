@@ -47,7 +47,7 @@ try {
     const starts=[],createSource=g.audio.ctx.createBufferSource.bind(g.audio.ctx);
     g.audio.ctx.createBufferSource=()=>{const source=createSource(),start=source.start.bind(source);
       source.start=(at,offset,duration)=>{starts.push({offset,duration});return start(at,offset,duration);};return source;};
-    originalPlay("bolt",{firstPerson:true,priority:true,offset:.85,maxDuration:.26});
+    originalPlay("bolt",{firstPerson:true,priority:true,offset:.50,maxDuration:.26});
     g.audio.ctx.createBufferSource=createSource;
     data.audioSlice=starts;
     for(const id of ["ZhongZheng","HanYang","Type38","Zb26","Type11","Type92Hmg"]){
@@ -113,24 +113,34 @@ try {
     const sprintStart=g.state.elapsed,times=[];let old=g.state.playerShots;
     for(let n=0;n<60;n++){Step(1);if(g.state.playerShots>old){times.push(g.state.elapsed-sprintStart);old=g.state.playerShots;}}
     D.Mouse(0,false);D.Key("KeyW",false);data.sprint=times;
+    Equip("Zb26");D.Key("KeyW",true);D.Key("ShiftLeft",true);Step(90);D.Key("ShiftLeft",false);
+    const tapBefore=g.state.playerShots;D.Mouse(0,true);Step(3);D.Mouse(0,false);Step(60);D.Key("KeyW",false);
+    data.sprintTap=g.state.playerShots-tapBefore;
     data.shoulder=[];
     for(const id of ["Zb26","Type11"]){
       const p=new PlayerController(g.camera,g.player.world);p.grounded=true;p.position.set(2400,0,2460);
       for(let i=0;i<150;i++)p.Update(1/60,{ads:true,forward:0,strafe:0,lookX:0,lookY:0},WEAPONS[id],{allowUndeployedAds:false});
       const unsupported=p.SpreadDeg(WEAPONS[id]);p.bipod=true;
-      data.shoulder.push({id,ads:p.ads,unsupported,supported:p.SpreadDeg(WEAPONS[id]),hasBipod:!!WEAPONS[id].bipod});
+      const supported=p.SpreadDeg(WEAPONS[id]);
+      p.Update(1/60,{ads:true,forward:1,strafe:0,lookX:0,lookY:0},WEAPONS[id]);
+      data.shoulder.push({id,ads:p.ads,unsupported,supported,hasBipod:!!WEAPONS[id].bipod,movingReleased:!p.bipod});
     }
     Equip("HanYang");g.player.Spawn(2351.8,2460,Math.PI/2);Step(150);Step(1,1/60,true);
     const shots0=g.state.playerShots;Click();Step(1,1/60,true);
     data.cover={blocked:g.player.gunClearance.blocked,shots:g.state.playerShots-shots0,reticle:D.Reticle()};
     g.player.yaw=-Math.PI/2;Step(150);const shots1=g.state.playerShots;Click();data.cover.restored=g.state.playerShots-shots1;
+    Step(150);g.player.Spawn(2351.3,2460,Math.PI/2);Step(150);
+    const blockedTapBefore=g.state.playerShots;Click();g.player.yaw=-Math.PI/2;Step(60);
+    data.cover.blockedTapDidNotQueue=g.state.playerShots===blockedTapBefore;
+    g.player.Spawn(2351.3,2460,Math.PI/2);Step(150);g.player.yaw=-Math.PI/2;
+    const clearTapBefore=g.state.playerShots;Click();Step(60);data.cover.clearTap=g.state.playerShots-clearTapBefore;
     g.audio.Play=originalPlay;g.audio.PlayGunshot=originalGunshot;
     return data;
   });
   for(const item of report.images){fs.writeFileSync(path.join(out,`Scene_${item.id}Reload.png`),Buffer.from(item.png.split(",")[1],"base64"));}
   delete report.images;
   Check("Decoded production audio is ready",report.audioReady&&report.audioErrors.length===0,report.audioErrors);
-  Check("Reload mechanics use the requested recording segment",report.audioSlice.some(s=>Math.abs(s.offset-.85)<1e-6&&s.duration<=.260001),report.audioSlice);
+  Check("Reload mechanics use the requested recording segment",report.audioSlice.some(s=>Math.abs(s.offset-.50)<1e-6&&s.duration>.15&&s.duration<=.260001),report.audioSlice);
   for(const row of report.firearms){
     const voice=row.voices.find(v=>v.cue===row.expectedCue);
     Check(`${row.id}: simultaneous ADS tap fires one round with one correct sample`,row.shots===1&&voice?.sources===1&&voice.firstPerson,row);
@@ -153,8 +163,11 @@ try {
   Check("A rapid second semi-auto tap is retained until ready",report.semi.mode==="semi"&&report.semi.shots===2,report.semi);
   Check("Sprint release has one readiness window then regular cadence",report.sprint[0]>=.22&&report.sprint[0]<.28
     &&report.sprint.slice(1).every((t,i)=>Math.abs(t-report.sprint[i]-.12)<.025),report.sprint);
-  for(const row of report.shoulder)Check(`${row.id}: campaign-rule standing ADS and bipod benefit`,row.ads>.99&&row.hasBipod&&row.supported<row.unsupported*.5,row);
-  Check("Cover uses the same blocked state and recovers after turning away",report.cover.blocked&&report.cover.shots===0&&report.cover.restored===1,report.cover);
+  Check("A short tap on sprint release survives the raising animation",report.sprintTap===1,report.sprintTap);
+  for(const row of report.shoulder)Check(`${row.id}: campaign-rule standing ADS and bipod benefit`,row.ads>.99&&row.hasBipod
+    &&row.supported<row.unsupported*.5&&row.movingReleased,row);
+  Check("Cover uses the same blocked state and recovers after turning away",report.cover.blocked&&report.cover.shots===0
+    &&report.cover.restored===1&&report.cover.blockedTapDidNotQueue&&report.cover.clearTap===1,report.cover);
   Check("No browser errors",errors.length===0,errors);
   assert.ok(checks.every(c=>c.ok),`${checks.filter(c=>!c.ok).length} firearm response checks failed`);
 } finally {

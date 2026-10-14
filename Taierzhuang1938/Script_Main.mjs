@@ -7235,9 +7235,9 @@ function ClearFirearmRequests() {
   state.reloadAction = null;
 }
 
-function QueueFirearmShot() {
+function QueueFirearmShot(graceS = FIRE_CONTROL.inputBufferS) {
   state.queuedFire = { weapon: currentWeapon, slot: state.activeSlot,
-    until: state.elapsed + FIRE_CONTROL.inputBufferS };
+    until: state.elapsed + graceS };
 }
 
 function BufferedFirearmShot() {
@@ -8120,7 +8120,8 @@ function TryFire(dt, returningGrenade = false) {
   // 而原来枪在半空里照样打得出去 —— 于是"冲进院子贴脸开枪"是零成本最优解。
   // 0.22 s 是「摆回来一大半但还没稳」的点：够短，不至于让人觉得枪卡住了。
   if (player.sprint > 0.35 || state.elapsed - sprintReleaseAt < SPRINT_FIRE_DELAY_S) {
-    if (fireEdge && !input.sprint && WEAPONS[currentWeapon]?.ammo) QueueFirearmShot();
+    if (fireEdge && (!input.sprint || player.wantAds) && WEAPONS[currentWeapon]?.ammo)
+      QueueFirearmShot(FIRE_CONTROL.inputBufferS + Math.max(0, SPRINT_FIRE_DELAY_S - (state.elapsed - sprintReleaseAt)));
     return;
   }
   if (state.activeSlot === "throwable") {
@@ -8132,7 +8133,7 @@ function TryFire(dt, returningGrenade = false) {
   const clearance = player.UpdateGunClearance(weapon);
   if (!GunReadyFromCover(clearance, viewmodel.wallLower)) {
     if (clearance.blocked) state.queuedFire = null;
-    else if (fireEdge) QueueFirearmShot();
+    else if (fireEdge) QueueFirearmShot(FIRE_CONTROL.inputBufferS + WALL_CARRY.raiseS);
     return;
   }
   const infiniteAmmo = EffectiveInfiniteAmmo();
@@ -8361,7 +8362,7 @@ function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourc
   vfx.MuzzleFlash(from,direction,{scale:1.1,kind:"hmg"});
   // 每发一条从枪口到弹着点的光束（不是步枪那种 1/5 的短曳光）：玩家要看得清火力从哪儿来、
   // 扫到了哪儿。口径见 Data_Tuning_BulletVisual。
-  vfx.TracerBeam(from,end,{kind:"ija"});audio.PlayGunshot(gunCue,{position:from,volume:.85,...(gunOpts||{})});
+  vfx.TracerBeam(from,end,{kind:"ija"});audio.PlayGunshot(gunCue,{position:from,volume:.85,weaponClass:"mg",...(gunOpts||{}),burst:1});
   // damageScale 0 = 战车机枪首次接触「走进来」的那一串（Script_FirstLevelTankBrain）：弹道、近失压制、
   // 曳光与弹着照旧，只是不伤人 —— 不能走 TakeHit(0)，那一下也会亮受击反馈。
   if(result.soldier&&!(damageScale>0)){}

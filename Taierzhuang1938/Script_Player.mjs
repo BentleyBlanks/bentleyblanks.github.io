@@ -603,6 +603,10 @@ export class PlayerController {
 
   Update(dt, input, weapon, aiming = null) {
     this.firearmHandling.Step(dt, Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / SPREAD.moveRefMps));
+    // Support is a stationary posture; moving away or leaving the ground folds
+    // the bipod instead of carrying its accuracy bonus around the battlefield.
+    if (this.bipod && (!this.grounded
+      || Math.hypot(input.forward || 0, input.strafe || 0) > FREE_AIM.walkThreshold)) this.bipod = false;
     // 这一帧玩家「想往哪走」（世界水平方向，长度 0..1，没按方向键是 0）。被人身体挡住时 velocity 只剩贴边滑的
     // 那一分量，正面顶住时接近 0；01–06 守位队友让路（FrontScenes.GiveWay）要看的是他想去哪。
     this.moveWishX = 0; this.moveWishZ = 0;

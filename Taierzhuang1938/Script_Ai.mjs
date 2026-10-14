@@ -4198,7 +4198,8 @@ export class AiDirector {
       if (impact) vfx.Impact(impact, normal, surface, { weaponKind: s.weapon.kind });
     }
     const gunCue = this.GunCue(s);
-    if (this.ctx.audio) this.ctx.audio.PlayGunshot(gunCue, { position: fromV.clone(), volume: 1 });
+    if (this.ctx.audio) this.ctx.audio.PlayGunshot(gunCue, { position: fromV.clone(), volume: 1,
+      burst: 1, weaponClass: s.weapon.rpm ? "mg" : "rifle" });
     this.ctx.audioWiring?.AiBolt(s, s.weapon.kind === "boltRifle");
     // 从玩家身边掠过的那几发照样压他、照样有弹啸 —— 近失弹本身就是这条火力存在的理由。
     const player = this.ctx.player;
@@ -5160,7 +5161,8 @@ export class AiDirector {
       // PlayGunshot 而不是 Play：一百米外那一枪要换成**另一段录音**，
       // 不是同一段加低通（Script_Audio.FAR_CUE 那段注释）。
       // 步枪走两层交叉淡入，机枪没有远场素材、内部自动落回 Play()。
-      audio.PlayGunshot(name, { position: fromV.clone(), volume: 1 });
+      audio.PlayGunshot(name, { position: fromV.clone(), volume: 1,
+        burst: 1, weaponClass: s.weapon.rpm ? "mg" : "rifle" });
     }
     // 每发之后的拉栓。玩家自己那一支早就有了（Script_Main.TryFire），
     // 而**满场几十个兵一条 foley 都没有** —— 于是敌人开枪只是一记枪声，
