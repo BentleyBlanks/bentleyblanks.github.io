@@ -77,7 +77,7 @@ try {
           facing:normal.z,holdingDrift:pose==="ads"?point.distanceTo(hip):0,triggerTravel:pose==="fire"?point.distanceTo(hip):0,wrist:{...arms.wristBend}});
       }
       editor.SetPose("hip");for(let i=0;i<90;i++)editor.Update(1/60);
-      for(const action of ["reload",...(id==="HanYang"?["reloadPartial"]:[]),...(["ZhongZheng","HanYang","Type38"].includes(id)?["bolt"]:[])]){
+      for(const action of ["reload",...(["ZhongZheng","HanYang","Type38"].includes(id)?["reloadPartial","bolt"]:[])]){
         if(action.startsWith("reload"))vm.TriggerReload({remainingRounds:action==="reloadPartial"?3:0});else vm.TriggerBolt();
         const row={id,action,maxGrip:0,maxWrist:0,maxFingerTranslation:0,unreachable:0,propSamples:[],worstGrip:null,worstWrist:null};
         for(let frame=0;vm.action&&frame<1200;frame++){
@@ -93,7 +93,7 @@ try {
           if(action==="bolt"&&t>.25&&t<.78){prop=vm.rig.parts.bolt;kind="bolt";}
           if(action.startsWith("reload")){
             if(["ZhongZheng","HanYang","Type38"].includes(id)){
-              const packet=id==="HanYang",partial=action==="reloadPartial",held=packet?vm.packetProp:vm.clipProp;
+              const packet=id==="HanYang",partial=packet&&action==="reloadPartial",held=packet?vm.packetProp:vm.clipProp;
               if((t>(partial ? .40 : .33)&&t<(partial ? .52 : .48))||(!packet&&t>.71&&t<.75)){
                 prop=held.userData.body;kind=packet?"packet":"clip";
               }else if(t>(partial ? .60 : .56)&&t<(partial ? .68 : .63)){prop=held.userData.rounds;digits=[0];kind="press";}

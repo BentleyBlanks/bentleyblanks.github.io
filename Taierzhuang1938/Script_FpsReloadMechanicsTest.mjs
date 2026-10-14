@@ -28,13 +28,19 @@ try {
       vm.root.updateWorldMatrix(true,true);
       return vm.rig.group.worldToLocal(object.localToWorld(point.clone()));
     };
-    for (const id of ["HanYang","ZhongZheng","Type38"]) for (const remaining of id==="HanYang"?[0,3]:[0]) {
+    for (const id of ["HanYang","ZhongZheng","Type38"]) for (const remaining of [0,3]) {
       editor.SetWeapon(id); editor.SetPose("hip"); editor.SetView("player"); Step(remaining, 90);
       const body = vm.rig.group.getObjectByName("boltBody");
       Check(!!body, `${id}: complete authored bolt body is missing`);
       vm.root.updateWorldMatrix(true,true);
       const original = body && vm.rig.group.worldToLocal(body.getWorldPosition(new THREE.Vector3()));
       vm.TriggerReload({remainingRounds:remaining});
+      if(id!=="HanYang") {
+        const expected=5-(remaining-(remaining>0?1:0));
+        const geometry=vm.clipProp.userData.rounds.children[0].geometry;
+        const single=vm._ReloadRoundGeometry(vm.clipProp.userData.profile,1).cases;
+        Check(geometry.index.count===single.index.count*expected,`${id}/${remaining}: charger contains the wrong number of live cartridges`);
+      }
       let seated = null, atBack = null, atLoaded = null, returned = null;
       const previous = new THREE.Quaternion(); let tracking = false, maxTurnMismatch = 0;
       const row = {id,remaining,maxSupportWrist:0,maxReach:0,packetPullbackM:0};
@@ -51,7 +57,7 @@ try {
           previous.copy(hand); row.previousTurn=turn; tracking=true;
         }
         const prop = id==="HanYang"?vm.packetProp:vm.clipProp;
-        const loadedAt = remaining>0?.700:.650;
+        const loadedAt = id==="HanYang"&&remaining>0?.700:.650;
         if(t>=loadedAt && !atLoaded) {
           const rounds = prop.userData.rounds;
           const points=[];

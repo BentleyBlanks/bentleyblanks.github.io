@@ -2025,7 +2025,8 @@ export class Viewmodel {
     this.flashProfile=FirearmEffects(this.weapon);
     this.flash.children[0].geometry=this._FlashGeometry(this.flashProfile);
     this.materials.flash.color.set(this.flashProfile.color).multiplyScalar(this.flashProfile.radiance);
-    if (this.weapon.reloadKind === "enBloc") for (let count = 1; count < 5; count += 1) this._ReloadRoundGeometry("HanYang", count);
+    if (["enBloc","stripper"].includes(this.weapon.reloadKind))
+      for (let count = 1; count < 5; count += 1) this._ReloadRoundGeometry(reloadProfile, count);
 
     // 先试 TZM 模型（MODEL_FP 里的几把），读不到或没登记就退回手搭 rig。
     // 所有可持枪械优先走 TZM：三八式防尘盖、捷克式上插直匣等识别细节已在模型里。
@@ -2456,6 +2457,8 @@ export class Viewmodel {
     this.action.ejectSpent = !!this.spentCasePending && !this.boltOpen;
     this.action.ejectLive = !this.spentCasePending && !this.boltOpen && rounds > 0;
     this.action.packetRounds = Math.max(0, rounds - (this.action.ejectLive ? 1 : 0));
+    this.action.loadRounds = (this.weapon.magazine || 5) - this.action.packetRounds;
+    if (kind === "stripper") this._ConfigureReloadProp(this.clipProp, this.clipProp.userData.profile, this.action.loadRounds);
     if (kind === "enBloc") this._ConfigureReloadProp(this.usedPacketProp, "HanYang", this.action.packetRounds);
     this.action.reloadTimeline = new FirearmReloadTimeline(this.weapon,this.action);
     return true;
@@ -3394,9 +3397,12 @@ export class Viewmodel {
     const depth = this._ReloadInsertionDepth(this.clipProp, motion);
     if (t < motion.clipVisible[1]) {
       this.clipProp.visible = t >= motion.clipVisible[0];
-      // 5 发压进弹仓：弹头逐颗沉下去
+      // A partially filled charger starts at its bottom stop. Its shorter push
+      // fills only the free magazine slots, including an ejected live chamber.
       const rounds = this.clipProp.userData.rounds;
-      rounds.position.y = -press * depth;
+      const profile=FPS_RELOAD_PROPS.profiles[this.clipProp.userData.profile];
+      const unusedSlots=(5-(this.action?.loadRounds??5))*profile.spacing;
+      rounds.position.y = -unusedSlots - press * (depth-unusedSlots);
       rounds.visible = press < 0.98;
     } else {
       this.clipProp.visible = false;
