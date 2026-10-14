@@ -58,6 +58,7 @@ export function GunClearance(weapon, eye, forward, right, raycast) {
     if (Number.isFinite(hit?.t) && hit.t >= 0) distance = Math.min(distance, hit.t);
   }
   const full = reach * WALL_CARRY.fullLowerRatio;
-  return { lower: Clamp01((probeLength - distance) / (probeLength - full)),
-    blocked: distance < reach * WALL_CARRY.blockRatio, distance };
+  const lower = Clamp01((probeLength - distance) / (probeLength - full));
+  return { lower,
+    blocked: distance < reach * WALL_CARRY.blockRatio || lower > WALL_CARRY.fireReadyLower, distance };
 }

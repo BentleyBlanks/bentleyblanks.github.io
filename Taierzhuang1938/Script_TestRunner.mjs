@@ -340,6 +340,8 @@ export const testDefs = {
   HeadshotTest: { file: "Script_HeadshotTest.mjs", desc: "Real headshot damage and far-pose hitbox alignment" },
   MuzzleFlashTest: { file: "Script_MuzzleFlashTest.mjs", desc: "Rifle fire/ADS, real PBR light response, NPC contention and decay" },
   FirearmHandlingTest: { file: "Script_FirearmHandlingTest.mjs", desc: "Dense spread / bloom recovery / automatic recoil / barrel clearance (pure Node)" },
+  FirearmActionsTest: { file: "Script_FirearmActionsTest.mjs", desc: "Frame-independent cadence, reload events, counter-steer recoil and cover readiness (pure Node)" },
+  FirearmResponseBrowserTest: { file: "Script_FirearmResponseBrowserTest.mjs", desc: "Production input, audio sources, reload ledger, sustained recoil and both light-machine-gun sights" },
   FirearmHandlingBrowserTest: { file: "Script_FirearmHandlingBrowserTest.mjs", desc: "Real firing, stance, automatic bursts and near-wall lowering" },
   GunFeelTest: { file: "Script_GunFeelTest.mjs", desc: "枪感短链八条" },
   FixedCenterAimTest: { file: "Script_FixedCenterAimTest.mjs", desc: "HUD/弹道/照门三心归一回归" },
@@ -515,7 +517,7 @@ export const browserTests = new Set([
   "MissionAreaGuardBrowserTest",
   "MuzzleFlashTest", "HeadshotTest",
   "SquadMarchCoverBrowserTest",
-  "FirearmHandlingBrowserTest",
+  "FirearmHandlingBrowserTest", "FirearmResponseBrowserTest",
   "CharacterSpeechBrowserTest",
   "SpeakerGestureClipsBrowserTest",
   "SpeakerGestureLayerBrowserTest",
@@ -708,7 +710,7 @@ export const domains = {
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
-    tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
+    tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmActionsTest", "FirearmHandlingBrowserTest", "FirearmResponseBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "ModelFacingTest",
       // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
@@ -862,7 +864,7 @@ const changedDomainRules = [
   {domain:"firstLevel",pattern:/FirstLevelFrontPressure|FirstLevelBackdropSquads|FirstLevelEnemyIdleProbe/},
   {domain:"ai",pattern:/FirstLevelFrontPressure|FirstLevelBackdropSquads/},
   {domain:"missionGuide",pattern:/FirstLevelLeaderGuide|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelMissionRuntime|Script_FirstLevelMissionVoice|NpcMissionGuide|NpcGuideGesture|Tuning_MissionGuide/},
-  { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },
+  { domain: "combat", pattern: /FirearmHandling|FirearmActions|FirearmResponse|MuzzleFlash|Headshot/i },
   {domain:"firstLevel",pattern:/Type89Damage/},
   {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|CharacterFaceBlood|SpeechEnvelope|NraFacial|Nra05Facial|Lugou\w*Facial|SpeakerBinder|SpeakerHeadLayer|SpeakerGesture|SpeakingCast|FaceTrack|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
   // Script_LayeredGait（分层步态，docs/Data_ActorLocomotion.md）由 ActorLocomotionTest 验收：2026-09-28 补上映射。

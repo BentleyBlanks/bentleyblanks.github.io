@@ -3594,7 +3594,11 @@ function SampleRecipe(buffers, name) {
       } else if (SAMPLE_VARISPEED.has(name)) {
         VarispeedSample(A, v, src, buf, rate);
       } else {
-        v.Start(src, v.t + i * interval, buf.duration / Math.max(0.1, rate));
+        // Mechanical reload events reuse a bounded piece of a recording.
+        // Default offset=0/maxDuration=Infinity preserves whole-cue playback.
+        const offset = Clamp(v.offset || 0, 0, Math.max(0, buf.duration - 0.01));
+        const duration = Math.min(buf.duration - offset, v.maxDuration) / Math.max(0.1, rate);
+        v.Start(src, v.t + i * interval, duration, offset);
       }
     }
     if (wet !== undefined && v.wetGain) v.wetGain.gain.value = wet;

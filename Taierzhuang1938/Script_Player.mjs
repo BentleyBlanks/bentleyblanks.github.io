@@ -27,6 +27,7 @@ import {
 import { CoverLean, LeanClearance } from "./Script_CoverLean.mjs";
 import { AUTOMATIC_RECOIL } from "./Data_Tuning_FirearmHandling.mjs";
 import { FirearmHandling, GunClearance } from "./Script_FirearmHandling.mjs";
+import { RecoilAfterInput } from "./Script_FirearmActions.mjs";
 import { CameraShake } from "./Script_CameraShake.mjs";
 import { BlockPlayerStep, PLAYER_ACTOR_BLOCK } from "./Script_PlayerActorBlock.mjs";
 import { BlockPlayerByLitters } from "./Script_LitterBlock.mjs";
@@ -338,8 +339,7 @@ export class PlayerController {
       && this.sprint < COVER_LEAN.maxSprint;
     const manual = allowed ? Clamp(input.lean || 0, -1, 1) : 0;
     this.autoLean = this.coverLean.Update(dt, {
-      enabled: allowed && !manual && (this.wantAds || (input.ads && this.gunClearance.blocked
-        && (!weapon?.bipod || aiming?.allowUndeployedAds))) && !!weapon?.magazine && weapon.kind !== "throwable"
+      enabled: allowed && !manual && (this.wantAds || (input.ads && this.gunClearance.blocked)) && !!weapon?.magazine && weapon.kind !== "throwable"
         && Math.abs(this.pitch) <= COVER_LEAN.maxPitchRad
         && Math.hypot(this.velocity.x, this.velocity.z) <= COVER_LEAN.maxSpeedMps,
       eye, right, forward: this.AimDirection(this._forward), raycast, clearance,
@@ -635,6 +635,15 @@ export class PlayerController {
     const dx = -input.lookX * sens * adsScale;
     const dy = -input.lookY * sens * adsScale;
 
+    if (this.recoilDelayS > 0) {
+      const oldPitch = this.recoilPending.pitch, oldYaw = this.recoilPending.yaw;
+      this.recoilPending.pitch = RecoilAfterInput(oldPitch, dy);
+      this.recoilPending.yaw = RecoilAfterInput(oldYaw, dx);
+      this.recoilTotal -= oldPitch - this.recoilPending.pitch;
+      if (oldPitch !== this.recoilPending.pitch || oldYaw !== this.recoilPending.yaw)
+        this.recoilPeak = Math.hypot(this.recoilPending.pitch, this.recoilPending.yaw);
+    }
+
     // 后坐回落 —— 照战地的曲线，不是指数衰减。曲线的形状与出处见
     // `Data_Tuning_Player.RECOIL` 的头注与 docs/Data_BattlefieldNumbers.md。
     this.recoilSince += dt;
@@ -740,12 +749,11 @@ export class PlayerController {
     this.stanceBlend.prone += ((this.stance === "prone" ? 1 : 0) - this.stanceBlend.prone) * rate;
 
     // --- 开镜 / 冲刺 / 侧身 --------------------------------------------------
-    // ER2 的规矩：架式武器不架起两脚架就不许开镜（MG42/白朗宁/反坦克枪都是）。
-    // 捷克式套这条正好 —— 全班就这一挺，架起来才有 800 m 有效射程。
-    const bipodBlocked = !!(weapon && weapon.bipod) && !this.bipod && !aiming?.allowUndeployedAds;
+    // Both light machine guns can shoulder their sights while standing.
+    // Deploying the bipod still supplies the existing stability / turn-rate tradeoff.
     // 抬着东西时枪根本不在手上（视图模型也收了），开镜与冲刺一并封掉。
     const loaded = this.carrySpeedScale < 1;
-    const wantAds = input.ads && !bipodBlocked && !this.gunClearance.blocked && this.grounded && !loaded ? 1 : 0;
+    const wantAds = input.ads && !this.gunClearance.blocked && this.grounded && !loaded ? 1 : 0;
     // 存下来给相机用。相机侧的 FOV 过渡（固定 150 ms）要跟玩家读同一个"意图"，
     // 而不是自己再去看一遍 input.ads —— 那样会漏掉两脚架未架起时的封锁。
     this.wantAds = wantAds === 1;

@@ -1,6 +1,8 @@
 import { CreateGameGraphics } from "./Data_Tuning_GameGraphics.mjs";
 import { ManagedTextureLoader, SetTextureImportRenderer } from "./Script_TextureImports.mjs";
 import { SampleShotDisk, IsAutomaticGun } from "./Script_FirearmHandling.mjs";
+import { FirearmCadence, GunReadyFromCover } from "./Script_FirearmActions.mjs";
+import { FIRE_CONTROL } from "./Data_Tuning_FirearmActions.mjs";
 import { AUTOMATIC_RECOIL, WALL_CARRY } from "./Data_Tuning_FirearmHandling.mjs";
 import { CollectBulletNearMisses, ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 // 《台儿庄：血战滕县》装配层：把渲染、城、玩家、AI、特效、音效、HUD、过场拼起来。
@@ -1424,6 +1426,10 @@ async function Boot() {
   });
   camera.add(viewmodel.root);
   viewmodel.onBoltStart = PlayRecordedBoltCycle;
+  viewmodel.onReloadEvent = OnReloadEvent;
+  viewmodel.onActionEnd = (kind, action) => {
+    if (kind === "reload" && state.reloadAction?.action === action) state.reloadAction = null;
+  };
   scene.add(camera);
   // 视图模型按“前景”口径进深度法线预通道（真法线 + 常数近景深度标签）。
   // Equip() 末尾会自己调一次，这里再调一次纯属兜底（构造期的抛壳池与弹夹道具）。
@@ -1873,6 +1879,8 @@ async function Boot() {
   // 架设机枪（第五关那挺）。射速、过热、卡壳、弹药全在 Script_Emplacement；
   // 装配层只给它三样：声音/提示、**把一发真的打出去**、以及把指向交回给世界模型。
   emplacement = new EmplacementSystem({
+    PlayGunshot: (name, opts) => audio.PlayGunshot(name, { ...opts,
+      position: new THREE.Vector3(opts.position.x, opts.position.y, opts.position.z) }),
     Play: (name, opts) => audio.Play(name, opts && opts.position
       ? { ...opts, position: new THREE.Vector3(opts.position.x, opts.position.y, opts.position.z) }
       : opts),
@@ -3174,7 +3182,7 @@ async function Boot() {
       // 只读快照，每 0.1 秒调一次；编辑器不去摸这里的模块变量。
       PlayerRuntime: () => ({
         weapon: WEAPONS[currentWeapon] ?? null,
-        fireCooldown: Math.max(0, fireCooldown),   // 计数器会减过零，零以下就是「可以开火」
+        fireCooldown: Math.max(0, fireCadence.remainingS),
         scriptInvulnS: Math.max(0, scriptInvulnUntil - state.elapsed),
         infiniteAmmo: EffectiveInfiniteAmmo(),
         infiniteGrenades: EffectiveInfiniteGrenades(),
@@ -4430,7 +4438,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
       Pickup: (id) => {
         if (!PickUpWeapon(id, 999)) return false;
         if (state.activeSlot !== "primary") SwitchSlot("primary");
-        fireCooldown = 0;
+        fireCadence.Reset();
         return true;
       },
       Refill: () => {
@@ -5912,6 +5920,8 @@ function FindOpenSpot(cx, cz, radius, seed, limits = null) {
  * 所以从**当前路标**往回退一段生。
  */
 function RespawnPlayer(initial = false) {
+  ClearFirearmRequests();
+  fireCadence.Reset(); sprintReleaseAt = -99; sprintWasOn = false;
   const phase = PHASE_TABLE[state.phaseIndex];
   // 换人上来的是空手的：上一个人抬着的担架留在他倒下的地方，不跟着换的人走。
   carry?.Reset("respawn");
@@ -6098,6 +6108,8 @@ function StashActiveSlot() {
 
 /** 把某个槽端到手上：弹仓、刺刀从它的账上取，视图模型与武器名跟着换。 */
 function ActivateSlot(slot) {
+  ClearFirearmRequests();
+  fireCadence.Reset();
   state.activeSlot = slot;
   if (IsGunSlot(slot)) {
     state.lastGunSlot = slot;
@@ -6879,6 +6891,7 @@ const p012Debug = new FirstLevelP012Debug({
  * 而且不换关不重生就再也回不来（换槽的 SwitchSlot 不碰 root.visible）。
  */
 function SuspendGameplay() {
+  state.queuedFire = null; state.queuedReload = null;
   meleeCombat?.HandleInput("Blur", false);
   missionRuntime?.voice.Pause();
   state.running = false;
@@ -7216,53 +7229,92 @@ function AimPoint(maxDist = 120) {
 // 动作：装填 / 投弹 / 白刃 / 支援
 // ---------------------------------------------------------------------------
 
-/** 装填。桥夹压入固定弹仓，一次五发；没有备弹就只能去死人身上找。 */
+function ClearFirearmRequests() {
+  state.queuedReload = null;
+  state.queuedFire = null;
+  state.reloadAction = null;
+}
+
+function QueueFirearmShot() {
+  state.queuedFire = { weapon: currentWeapon, slot: state.activeSlot,
+    until: state.elapsed + FIRE_CONTROL.inputBufferS };
+}
+
+function BufferedFirearmShot() {
+  const request = state.queuedFire;
+  if (!request) return false;
+  if (request.weapon !== currentWeapon || request.slot !== state.activeSlot
+    || request.until < state.elapsed || !player.Alive || emplacement?.Mounted) {
+    state.queuedFire = null; return false;
+  }
+  return true;
+}
+
+function UpdateReloadRequest() {
+  const request = state.queuedReload;
+  if (!request) return;
+  const action = viewmodel.action;
+  if (request.weapon !== currentWeapon || request.slot !== state.activeSlot || !player.Alive
+    || request.until < state.elapsed || emplacement?.Mounted || missionRuntime?.controls || missionRuntime?.EmptyHands
+    || state.cooking || (action && action.kind !== "bolt")) {
+    state.queuedReload = null; return;
+  }
+  if (!viewmodel.IsBusy()) { state.queuedReload = null; Reload(); }
+}
+
+// Reload sounds and ammunition follow the actual animation's event crossings.
+function OnReloadEvent(event, action) {
+  const pending = state.reloadAction;
+  if (!pending || pending.action !== action || pending.weapon !== currentWeapon
+    || pending.slot !== state.activeSlot || !player.Alive || emplacement?.Mounted) return;
+  if (event.id === "loaded" && !pending.committed) {
+    pending.committed = true;
+    state.ammo = WEAPONS[currentWeapon].magazine;
+    if (pending.range) state.clips = 999;
+    else if (pending.consumeReserve) state.clips = Math.max(0, state.clips - 1);
+    SyncP012ActiveMagazine(state);
+  }
+  if (event.cue) audio.Play(event.cue, { volume: event.volume ?? 0.6,
+    offset: event.offset ?? 0, maxDuration: event.maxDuration ?? Infinity,
+    priority: true, firstPerson: true, burst: 1 });
+}
+
+/** R during a bolt cycle is retained for that cycle; ammo enters on insertion. */
 function Reload() {
   if(missionRuntime?.EmptyHands)return false;
   if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
-  if (!player.Alive || viewmodel.IsBusy?.()) return false;
+  if (!player.Alive || emplacement?.Mounted) return false;
   const w = WEAPONS[currentWeapon];
-  // 弹药在按下 R 那一刻就入账了；记下按之前的账，换弹中途拔刀时退回去。
-  state.reloadUndo = { slot: state.activeSlot, ammo: state.ammo, clips: state.clips };
-  if (typeof weaponRange !== "undefined" && weaponRange && w?.magazine) {
-    state.ammo = w.magazine; state.clips = 999;
-    if (state.mags[state.activeSlot]) state.mags[state.activeSlot] = { ammo: state.ammo, clips: state.clips };
-    viewmodel.TriggerReload();
-    audio.Play(w.reloadKind === "topMag" ? "magIn" : "stripperLoad", { volume: 0.75 });
+  if (!w?.ammo || !w.reloadKind || !IsGunSlot(state.activeSlot)) return false;
+  const range = !!weaponRange;
+  const infiniteAmmo = EffectiveInfiniteAmmo();
+  const full = state.ammo >= w.magazine;
+  if (!range && !(p012Runtime && full) && (full || (!infiniteAmmo && state.clips <= 0))) return false;
+  if (viewmodel.IsBusy?.()) {
+    if (viewmodel.action?.kind !== "bolt") return false;
+    state.queuedReload = { weapon: currentWeapon, slot: state.activeSlot,
+      until: state.elapsed + viewmodel.action.duration * (1 - viewmodel.action.t) + FIRE_CONTROL.inputBufferS };
+    state.queuedFire = null;
     return true;
   }
-  if (p012Runtime && w && state.ammo >= (w.magazine ?? 5)) {
-    viewmodel.TriggerReload(); audio.Play("bolt", { volume: 0.7 });
-    p012Runtime.weaponActionPending = true;
-    p012Runtime.manualReloadPending = false; return true;
-  }
-  const infiniteAmmo = EffectiveInfiniteAmmo();
-  if (!w || (!infiniteAmmo && state.clips <= 0) || state.ammo >= (w.magazine ?? 5)) return false;
-  const hadReserve = state.clips > 0;
-  if (!infiniteAmmo) state.clips -= 1;
-  state.ammo = w.magazine ?? 5;
-  viewmodel.TriggerReload();
+  if (!viewmodel.TriggerReload({ remainingRounds: state.ammo })) return false;
+  state.queuedReload = null; state.queuedFire = null;
+  state.reloadAction = { action: viewmodel.action, weapon: currentWeapon, slot: state.activeSlot,
+    range, committed: false, consumeReserve: !range && !infiniteAmmo && !full };
   if (p012Runtime) {
     p012Runtime.weaponActionPending = true;
-    p012Runtime.manualReloadPending = hadReserve;
-    SyncP012ActiveMagazine(state);
+    p012Runtime.manualReloadPending = !full && state.clips > 0;
   }
-  audio.Play(w.reloadKind === "topMag" ? "magIn" : "stripperLoad", { volume: 0.75 });
   return true;
 }
 
 /**
- * 取消正在播的换弹（换弹中拔刀）。没压完就不算装上：弹仓与备弹回到按 R 之前，
- * 第一关「手动装填」的完成记录也不记。不在换弹里返回 false，调用方照旧挡住。
+ * Before insertion nothing is spent; after insertion the loaded rounds stay.
+ * Cancelling never grants the campaign's completed-manual-reload receipt.
  */
 function CancelReload() {
   if (viewmodel.action?.kind !== "reload") return false;
-  const undo = state.reloadUndo;
-  state.reloadUndo = null;
-  if (undo && undo.slot === state.activeSlot) {
-    state.ammo = undo.ammo; state.clips = undo.clips;
-    if (state.mags[undo.slot]) state.mags[undo.slot] = { ammo: undo.ammo, clips: undo.clips };
-  }
+  ClearFirearmRequests();
   if (p012Runtime) { p012Runtime.weaponActionPending = false; p012Runtime.manualReloadPending = false; }
   viewmodel.action = null;
   return true;
@@ -7275,6 +7327,7 @@ function BeginCook(kind) {
   const infiniteGrenades = EffectiveInfiniteGrenades();
   if (kind === "Grenade" && !infiniteGrenades && state.grenades <= 0) { hud.Hint(T("hud.hint.noGrenades"), 2); return; }
   if (kind === "GrenadeBundle" && state.bundles <= 0) { hud.Hint(T("hud.hint.noBundles"), 2); return; }
+  state.queuedFire = null; state.queuedReload = null;
   state.cooking = kind;
   state.cook = 0;
   audio.Play("grenadePin", { volume: 0.7 });
@@ -7716,7 +7769,7 @@ function CallMortar() {
 // 开火
 // ---------------------------------------------------------------------------
 // 脚步与落地的边沿状态搬进 Script_AudioWiring（那里还要按脚下材质挑 cue）。
-let fireCooldown = 0;
+const fireCadence = new FirearmCadence();
 let fireEdge = false;                 // 这一帧是不是"刚按下"（单发模式与投掷物槽要用）
 const _muzzle = new THREE.Vector3();
 const _boltAt = new THREE.Vector3();
@@ -7777,7 +7830,7 @@ let firePunch = 0;
 // 方子 4「冲刺→开火延迟」：实测松开冲刺后 sprintSpring 要 771 ms 才回位，
 // 0.22 s 是「摆回来一大半但还没稳」的点。不加这一条，
 // 「冲进院子贴脸开枪」是零成本最优解 —— 而这是全场最该有代价的动作。
-const SPRINT_FIRE_DELAY_S = 0.22;
+const SPRINT_FIRE_DELAY_S = FIRE_CONTROL.sprintFireDelayS;
 let sprintReleaseAt = -99;
 let sprintWasOn = false;
 // 方子 3「接上 sway 输入」：Script_Viewmodel 的三个弹簧全写好了，
@@ -8009,10 +8062,10 @@ function ConfirmHit(died) {
 }
 
 function TryFire(dt, returningGrenade = false) {
-  fireCooldown -= dt;
-  if(missionRuntime?.controls || missionRuntime?.EmptyHands)return;
-  if (returningGrenade) return;
-  if (p012Runtime?.binocularOwned) return;
+  fireCadence.Step(dt);
+  if(missionRuntime?.controls || missionRuntime?.EmptyHands || returningGrenade || p012Runtime?.binocularOwned) {
+    state.queuedFire = null; return;
+  }
   // 架着机枪：左键交给机枪那条射速与过热闸（Script_Emplacement.Update 里排），
   // 步枪链整条短路 —— 手上那支枪这会儿背在背上。
   // `debugEmplacedFire` 是冒烟用的「一直扣着扳机」：真人按住鼠标时 input.fire 每帧
@@ -8022,12 +8075,19 @@ function TryFire(dt, returningGrenade = false) {
     emplacement.SetFire((!!input.fire || debugEmplacedFire) && player.Alive);
     return;
   }
-  if (!input.fire || fireCooldown > 0 || !player.Alive) return;
+  const buffered = BufferedFirearmShot();
+  if ((!input.fire && !buffered) || !player.Alive) return;
   // 手上占着东西：左键不是开枪，是**把它摔了**（「可扔下快速恢复」那一条）。
   // 挨打的时候玩家去够的键本来就是左键，不该让他先想起来 F 在哪。
   // 担架 canThrow:false —— 那是个人，不是麻袋，摔不掉，左键就什么也不做。
   if (carry?.Blocking) { if (fireEdge) carry.Throw("fire"); return; }
-  if (viewmodel.IsBusy?.()) return;
+  if (viewmodel.IsBusy?.()) {
+    const action = viewmodel.action;
+    if (fireEdge && WEAPONS[currentWeapon]?.ammo && ["bolt", "reload"].includes(action.kind)
+      && action.duration * (1 - action.t) <= FIRE_CONTROL.inputBufferS) QueueFirearmShot();
+    else if (!["bolt", "reload"].includes(action.kind)) state.queuedFire = null;
+    return;
+  }
   // 翻墙翻到一半、或者人泡在水里：枪都不在手上/在水里，打不出去。
   // 这两条是"翻越"与"下水软墙"各自的代价，不写在这里就等于没有代价
   if (player.Busy || player.InWater) return;
@@ -8059,21 +8119,31 @@ function TryFire(dt, returningGrenade = false) {
   // 实测松开冲刺后视图模型的 sprintSpring 要 771 ms 才回位，
   // 而原来枪在半空里照样打得出去 —— 于是"冲进院子贴脸开枪"是零成本最优解。
   // 0.22 s 是「摆回来一大半但还没稳」的点：够短，不至于让人觉得枪卡住了。
-  if (player.sprint > 0.35) return;
-  if (state.elapsed - sprintReleaseAt < SPRINT_FIRE_DELAY_S) return;
+  if (player.sprint > 0.35 || state.elapsed - sprintReleaseAt < SPRINT_FIRE_DELAY_S) {
+    if (fireEdge && !input.sprint && WEAPONS[currentWeapon]?.ammo) QueueFirearmShot();
+    return;
+  }
   if (state.activeSlot === "throwable") {
     if (fireEdge && !state.cooking) BeginCook(state.slots.throwable);
     return;
   }
   const weapon = WEAPONS[currentWeapon];
   if (!weapon) return;
-  if (player.UpdateGunClearance(weapon).blocked || (viewmodel.wallLower || 0) > WALL_CARRY.fireReadyLower) return;
+  const clearance = player.UpdateGunClearance(weapon);
+  if (!GunReadyFromCover(clearance, viewmodel.wallLower)) {
+    if (clearance.blocked) state.queuedFire = null;
+    else if (fireEdge) QueueFirearmShot();
+    return;
+  }
   const infiniteAmmo = EffectiveInfiniteAmmo();
-  // 开镜播完之前不给开枪：ER2 的枪举到位才打得出去，
-  // 否则"右键 + 左键一起按"永远比先瞄再打划算，开镜就没有意义了。
-  if (player.wantAds && player.ads < 0.9) return;
+  // ADS already interpolates real dispersion: firing during the raise uses
+  // that current accuracy, so a quick simultaneous aim/fire tap is not lost.
   // 单发模式（仅捷克式）：一次按下只出一发
-  if (weapon.rpm && state.fireMode === "semi" && !fireEdge) return;
+  if (weapon.rpm && state.fireMode === "semi" && !fireEdge && !buffered) return;
+  if (!fireCadence.Ready()) {
+    if (fireEdge && fireCadence.remainingS <= FIRE_CONTROL.inputBufferS) QueueFirearmShot();
+    return;
+  }
   // 空仓的分支已经上移到冲刺闸前面（空枪左键 = 白刃那一支）。空膛"咔"的三维
   // 分离账（pitch 1.55 / 音量 0.34 / 时长 65%，与拉栓在时长、频心、响度上同时
   // 分开）也搬过去了 —— 它现在是白刃起手的第一声。走到这里 ammo 一定 > 0。
@@ -8092,7 +8162,8 @@ function TryFire(dt, returningGrenade = false) {
     ai.NoteStimulus(WEAPONS[currentWeapon]?.rpm ? "machinegun" : "gunshot",
       player.position, { side: "nra", isPlayer: true, ref: player });
   }
-  fireCooldown = weapon.fireIntervalS ?? 1.2;
+  fireCadence.Fired(weapon.fireIntervalS ?? 1.2, fireEdge || buffered || !IsAutomaticGun(weapon));
+  state.queuedFire = null;
 
   viewmodel.TriggerFire();
   // 枪感方子 2：开火那一下画面要"顿"。这是第 1 轮唯一的 0 分项。
@@ -8118,10 +8189,10 @@ function TryFire(dt, returningGrenade = false) {
   // 它会原样落回 Play()，行为与改之前一模一样；连 PlayGunshot 都没有才退回 Play。
   // priority：与几十个 AI 共用同一个 22 ms 去重窗口时，玩家自己的枪声实测丢 8.3%。
   // 别的都可以丢，自己扣的扳机不许没声。
-  const playerGunCue = weapon.shotCue || (currentWeapon === "Zb26" ? "zb26" : "rifleNra");
+  const playerGunCue = weapon.shotCue || "rifleNra";
   const playerGunOpts = {
     position: _muzzle.clone(), priority: true,
-    firstPerson: true, weaponClass: WeaponClassOf(currentWeapon),
+    firstPerson: true, weaponClass: WeaponClassOf(currentWeapon), burst: 1,
   };
   if (audio.PlayGunshot) audio.PlayGunshot(playerGunCue, playerGunOpts);
   else audio.Play(playerGunCue, playerGunOpts);
@@ -8567,7 +8638,7 @@ function SyncMountedView(dt) {
   // 换弹板：Script_Emplacement 起了 reloadT，视图模型就把这一把的换匣动作播一遍；
   // 卡壳时每拉一下枪机（stats.pulls 涨一次），右手就去拉一下机柄。
   if (mountView.active && gun) {
-    if (gun.reloadT > 0 && !mountView.reloading) mountView.reloading = viewmodel.TriggerReload();
+    if (gun.reloadT > 0 && !mountView.reloading) mountView.reloading = viewmodel.TriggerReload({ remainingRounds: gun.rounds });
     else if (gun.reloadT <= 0) mountView.reloading = false;
     if (emplacement.stats.pulls > (mountView.pulls ?? emplacement.stats.pulls)) viewmodel.TriggerCharge();
   }
@@ -8969,7 +9040,14 @@ function Frame(dt, render = true) {
     profiler.E("hud");
   }
 
+  // Mark the actual sprint release before this frame can fire. The raise and
+  // the 220ms readiness window run together instead of adding two waits.
+  const sprintOn = player.sprint > 0.35 && input.sprint && !player.wantAds;
+  if (sprintWasOn && !sprintOn) sprintReleaseAt = state.elapsed;
+  sprintWasOn = sprintOn;
+  UpdateReloadRequest();
   if (player.Alive) TryFire(dt, combat.Returning);
+  else ClearFirearmRequests();
   // 松开左键时把攥着的手榴弹扔出去（投掷物槽里左键 = G 键的等价物）
   if (state.activeSlot === "throwable" && state.cooking && !input.fire) ReleaseCook();
   // 白刃蓄力步进。鼠标那条的"松手"在这里判（键盘那条走 OnAction 的 up 边沿）；
@@ -9047,11 +9125,6 @@ function Frame(dt, render = true) {
   }
   p012Binoculars?.Update({owned:!!p012Runtime?.binocularOwned,raised:p012BinocularRaised},dt);
 
-  // 枪感方子 4 的另一半：记下松开冲刺的时刻（TryFire 读它）
-  const sprintOn = player.sprint > 0.35;
-  if (sprintWasOn && !sprintOn) sprintReleaseAt = state.elapsed;
-  sprintWasOn = sprintOn;
-
   // 枪感方子 3：**把视线增量接进 sway 弹簧。**
   // 三个弹簧、限幅、增量换算 Script_Viewmodel 全写好了，而这里一直传的是 0 ——
   // 实测相机转了 398° 而三个弹簧恒等于 0，等于整套"枪滞后于视线"没接线。
@@ -9092,7 +9165,8 @@ function Frame(dt, render = true) {
     crouch: player.stanceBlend.crouch, elapsed: state.elapsed,
     // 枪感方子 1 的另一半：最后一发打完栓停在后面不推回。
     // 即使 HUD 已显示弹药，枪机停后仍是玩家不移开视线就能读到的空仓通道。
-    lowAmmo: state.ammo <= 1,
+    lowAmmo: state.ammo <= 0,
+    ammo: emplacement?.Mounted ? emplacement.Emplacement(emplacement.MountedId)?.rounds : state.ammo,
     meleeCombat: meleePreview && meleeCombat?.ViewPose() ? MeleePreviewPose(player, meleeCombat.ViewPose()) : meleeCombat?.ViewPose() || null,
   });
   }
@@ -9380,7 +9454,8 @@ function Frame(dt, render = true) {
   hud.SetCrosshair({
     // 抬着东西时准心收掉：枪不在手上，画一个散布锥就是在骗人。
     // 架着机枪反过来**要**留着：弹道收敛到准心指着的那个点上（EMPLACED_CONVERGE_M）。
-    visible: DIFFICULTY.showCrosshair !== false && player.Alive && !player.gunClearance.blocked
+    visible: DIFFICULTY.showCrosshair !== false && player.Alive
+      && (empView || GunReadyFromCover(player.gunClearance, viewmodel.wallLower))
       && !state.ordersOpen && !state.cutscene && !meleeCombat?.Active && !carry?.Blocking && !p012Runtime?.binocularOwned && !missionRuntime?.EmptyHands,
     spreadDeg,
     fovDeg: camera.fov,

@@ -36,6 +36,8 @@ import { SampleMeleeFirstPerson, SampleMeleeVideo } from "./Script_MeleeAnimatio
 import { FPS_GRENADE_THROW } from "./Data_FpsGrenadeThrow.mjs";
 import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
+import { FirearmReloadTimeline } from "./Script_FirearmActions.mjs";
+import { STRIP_FEED_RELOAD } from "./Data_Tuning_FirearmActions.mjs";
 import { MELEE_WEAPONS } from "./Data_MeleeCombat.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs";
 import { MakeBox, MergeGeometries } from "./Script_Geo.mjs";
@@ -1385,6 +1387,7 @@ function BuildFromModel(materials, weapon, key, doc) {
   if (!armPose.actions.reload?.handPath) clipSeat.y += 0.045;
   if (mechanism) clipSeat.fromArray(mechanism.seat);
   if (key === "Type11") clipSeat.set(-0.110,0.025,-0.135);
+  if (key === "Type92Hmg") clipSeat.fromArray(STRIP_FEED_RELOAD.seat);
   const hr = armPose.contacts.right;
   const hl = armPose.contacts.left;
 
@@ -1622,6 +1625,7 @@ export class Viewmodel {
     this.onEject = null;
     this.onThrowRelease = null;
     this.onActionEnd = null;
+    this.onReloadEvent = null;
     this.onBoltStart = null;
 
     // --- 手 -----------------------------------------------------------------
@@ -1697,6 +1701,10 @@ export class Viewmodel {
     this.magazineProp.add(magazineBody,magazineHeel);
     this.magazineProp.visible=false;
     this.reloadPivot.add(this.magazineProp);
+    this.feedStripProp = this._BuildFeedStripProp();
+    this.feedStripProp.visible = false;
+    this.reloadPivot.add(this.feedStripProp);
+    this.feedRounds = 30;
 
     this._geometries = new Set();
     this._tmpVec = new THREE.Vector3();
@@ -1755,6 +1763,23 @@ export class Viewmodel {
       });
     }
     return pool;
+  }
+
+  _BuildFeedStripProp() {
+    const group = new THREE.Group();
+    group.name = "VmType92FeedStrip";
+    const plate = new THREE.Mesh(Box(STRIP_FEED_RELOAD.widthM, 0.002, 0.025, VM_TILE.steel,
+      "FeedStrip", { x: -STRIP_FEED_RELOAD.widthM / 2, y: 0, z: 0.014 }), this.materials.blued);
+    const geometry = [];
+    for (let i = 0; i < STRIP_FEED_RELOAD.roundCount; i++) {
+      const x = -(i + 0.5) * STRIP_FEED_RELOAD.roundPitchM;
+      geometry.push(Tube(0.0041, 0.0046, 0.052, 6, VM_TILE.steel, { x, y: 0.004, z: 0 }));
+      geometry.push(Tube(0.0041, 0.0006, 0.021, 6, VM_TILE.steel, { x, y: 0.004, z: -0.0365 }));
+    }
+    const rounds = new THREE.Mesh(MergeGeometries(geometry), this.materials.brass);
+    for (const mesh of [plate, rounds]) { mesh.frustumCulled = false; mesh.castShadow = false; group.add(mesh); }
+    group.userData.rounds = rounds;
+    return group;
   }
 
   /**
@@ -1826,6 +1851,7 @@ export class Viewmodel {
     this.flash.visible = false;
     this.clipProp.visible = false;
     this.magazineProp.visible = false;
+    this.feedStripProp.visible = false;
     this.offhandGrenade.visible = false;
     if (!this.weapon) {
       this.rig = null;
@@ -1945,6 +1971,7 @@ export class Viewmodel {
     this.sprintPose = this._PoseFromSpec(this.armPose.sprint.weapon);
 
     this._CollectAdsHideParts();
+    this.feedRounds = this.weapon.magazine || 0;
 
     // 深度预算：整体等比缩 s（画面不变，但枪不再插墙）
     this._RecomputeCompensation(60);
@@ -2168,6 +2195,7 @@ export class Viewmodel {
     // 大刀和手榴弹没有"开火"。不挡住的话大刀会喷枪焰，这种 bug 一上截图就要返工
     if (this.weapon.kind === "melee" || this.weapon.kind === "throwable") return null;
     this.shotIndex += 1;
+    if (this.weapon.reloadKind === "stripFeed") this.feedRounds = Math.max(0, this.feedRounds - 1);
     const automatic = AUTOMATIC_RECOIL[this.weapon.kind];
     const recoil = this.weapon.recoil || { pitch: automatic?.pitchDeg ?? 2.0, yaw: automatic?.yawDeg ?? 0.4, kick: 0.03 };
     // 每一发的偏航从"第几发"派生：确定性，但连发时不会两发一样
@@ -2261,6 +2289,7 @@ export class Viewmodel {
     this.pendingBoltAt = -1;
     this._StartAction("reload", this.weapon.reloadTimeS || 3.0);
     this.action.reloadKind = kind;
+    this.action.reloadTimeline = new FirearmReloadTimeline(this.weapon);
     return true;
   }
 
@@ -2453,6 +2482,7 @@ export class Viewmodel {
     const sprint = Clamp01(input.sprint ?? 0);
     const crouch = Clamp01(input.crouch ?? 0);
     const lowAmmo = !!input.lowAmmo;
+    if (Number.isFinite(input.ammo)) this.feedRounds = input.ammo;
     const wallTarget = this.weapon?.ammo ? Clamp01(input.wallLower ?? 0) : 0;
     const wallTime = wallTarget > (this.wallLower || 0) ? WALL_CARRY.lowerS : WALL_CARRY.raiseS;
     this.wallLower = (this.wallLower || 0) + (wallTarget - (this.wallLower || 0)) * (1 - Math.exp(-step / wallTime));
@@ -2831,6 +2861,7 @@ export class Viewmodel {
     if (!this.action || !this.rig) return;
     const a = this.action;
     a.t += dt / a.duration;
+    a.reloadTimeline?.Advance(a.t, event => this.onReloadEvent?.(event, a));
     if (a.kind === "meleeWind") {
       a.t = Math.min(a.t, 1);      // 蓄力顶满就停住，出招由松手驱动，不自动结束
     } else if (a.t >= 1) {
@@ -2850,6 +2881,7 @@ export class Viewmodel {
   }
 
   _EndAction(a) {
+    a.reloadTimeline?.Advance(1, event => this.onReloadEvent?.(event, a));
     if (a.kind === "bolt") {
       // 打空时枪机留在后方：这一下必须让玩家看见（配合 HUD 的"空仓"提示）
       this.boltOpen = !!this.pendingHoldOpen;
@@ -2864,6 +2896,7 @@ export class Viewmodel {
       this.pendingHoldOpen = false;
       this.clipProp.visible = false;
       this.magazineProp.visible = false;
+      this.feedRounds = this.weapon?.magazine || 0;
     }
     // 收招只把**没装配**的刺刀收回去；上了刺刀的枪收招后刀还在枪上
     if (a.kind === "melee" && this.rig.parts.bayonet && !this.bayonetFixed) {
@@ -2882,7 +2915,7 @@ export class Viewmodel {
       this.pendingBoltAt = saved.pendingBoltAt;
       this.pendingHoldOpen = saved.pendingHoldOpen;
     }
-    if (this.onActionEnd) this.onActionEnd(a.kind);
+    if (this.onActionEnd) this.onActionEnd(a.kind, a);
   }
 
   /** 把所有会被动画改动的东西恢复到静止姿态。 */
@@ -2921,6 +2954,12 @@ export class Viewmodel {
     }
     if (!this.action || this.action.kind !== "reload") this.clipProp.visible = false;
     if (!this.action || this.action.kind !== "reload") this.magazineProp.visible = false;
+    this.feedStripProp.visible = this.weapon?.reloadKind === "stripFeed" && this.feedRounds > 0;
+    if (this.feedStripProp.visible) {
+      this.feedStripProp.position.copy(this.rig.clipSeat);
+      this.feedStripProp.position.x += (30 - this.feedRounds) * STRIP_FEED_RELOAD.roundPitchM;
+      this.feedStripProp.rotation.set(0, 0, 0);
+    }
   }
 
   /**
@@ -3019,6 +3058,7 @@ export class Viewmodel {
 
   _AnimReload(t, kind) {
     const family = this.actionSpec?.reload?.family || kind;
+    if (family === "stripFeed") return this._AnimReloadStripFeed(t);
     if (family === "topMag") return this._AnimReloadTopMag(t);
     if (family === "hopper") return this._AnimReloadHopper(t);
     if (family === "boxMag") return this._AnimReloadBoxMag(t);
@@ -3201,6 +3241,31 @@ export class Viewmodel {
         {at:at+0.090,...carry,shape:"open"});
     }
     this._WorkingHandPath("right",t,frames);
+  }
+
+  /** Type 92: take a rigid strip, align it with the left mouth, feed sideways. */
+  _AnimReloadStripFeed(t) {
+    const spec = STRIP_FEED_RELOAD, seat = this.rig.clipSeat, strip = this.feedStripProp;
+    const settle = Ease.InOut(Ease.Seg(t, 0, 0.16)) - Ease.InOut(Ease.Seg(t, 0.90, 1));
+    this._PoseReload("left", settle, -0.015, -0.015, 0.025, 0.025, 0.08, -0.08);
+    this.clipProp.visible = false;
+    const bring = Ease.InOut(Ease.Seg(t, spec.showAt, 0.54));
+    const insert = Ease.InOut(Ease.Seg(t, 0.54, spec.seatedAt));
+    strip.visible = t >= spec.showAt;
+    strip.position.copy(seat);
+    strip.position.x -= (1 - insert) * 0.16;
+    strip.position.y += (1 - bring) * -0.10;
+    strip.position.z += (1 - bring) * 0.10;
+    strip.rotation.set((1 - bring) * 0.18, 0, (1 - bring) * -0.18);
+    const palm = strip.position.clone().add(new THREE.Vector3(-0.045, 0.015, 0.018));
+    const held = this._HandPlacement("clip", palm, strip.quaternion);
+    this._WorkingHandPath("right", t, [
+      { at: 0.15, position: seat.clone().add(new THREE.Vector3(-0.02, 0.02, 0.015)), shape: "open", rotation: held.rotation },
+      { at: 0.28, position: seat.clone().add(new THREE.Vector3(-0.12, -0.12, 0.14)), shape: "open", rotation: held.rotation },
+      { at: spec.showAt, ...held }, { at: 0.54, ...held }, { at: spec.seatedAt, ...held },
+      { at: 0.82, position: palm.clone().add(new THREE.Vector3(0.02, 0.025, 0.03)), shape: "open", rotation: held.rotation },
+      { at: spec.handBackAt, position: this.handBase.right, rotation: this.armPose.contacts.right.rotation, shape: "open", gripRotationMix: 1 },
+    ]);
   }
 
   /**

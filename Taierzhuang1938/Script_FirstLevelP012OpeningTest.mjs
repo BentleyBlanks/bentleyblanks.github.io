@@ -8,6 +8,9 @@ import { AmmoReadout } from "./Script_Hud.mjs";
 // 抠出来的 Main 函数在 vm 里跑，模块作用域不在场：提示语走 T，所以把**真的那一份**
 // 喂进上下文（不是替身），缺键会当场读成键名，与线上行为一致。
 import { T } from "./Script_Text.mjs";
+import { FirearmCadence } from "./Script_FirearmActions.mjs";
+import { FIRE_CONTROL } from "./Data_Tuning_FirearmActions.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
 import { AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload, RestoreP012ManualReload } from "./Script_FirstLevelP012Opening.mjs";
 
 import { FIRST_LEVEL_P012_WHITEBOX_PHASE as openingPhase } from "./Data_FirstLevelP012Whitebox.mjs";
@@ -24,12 +27,13 @@ assert.equal(debugOptions.Enabled("infiniteAmmo"), true, "reproduce an existing 
 let busy = false;
 const state = { activeSlot: "primary", slots: { primary: "HanYang" }, mags: { primary: { ammo: 0, clips: 0 } }, ammo: 0, clips: 0, playerShots: 0, grenades: 0 };
 const context = vm.createContext({ T, PHASE_TABLE: [openingPhase], combat: { Returning: false }, state, debugOptions, currentWeapon: "HanYang", p012Runtime: null, missionRuntime: null,
-  WEAPONS: { HanYang: { magazine: 5 } }, AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload,
-  player: { Alive: true, Busy: false, InWater: false }, viewmodel: { IsBusy: () => busy, TriggerReload: () => { busy = true; } },
-  audio: { Play() {} }, hud: { Hint() {} }, fireCooldown: 0, fireEdge: true,
+  WEAPONS, AllowP012InfiniteAmmo, SyncP012ActiveMagazine, CompleteP012ManualReload,
+  BLOCKOUT:false, weaponRange:null, FIRE_CONTROL, IsGunSlot:slot=>slot==="primary"||slot==="secondary",
+  player: { Alive: true, Busy: false, InWater: false }, viewmodel: { IsBusy: () => busy, TriggerReload() { busy = true; this.action={kind:"reload"}; return true; } },
+  audio: { Play() {} }, hud: { Hint() {} }, fireCadence: new FirearmCadence(), fireEdge: true,
   emplacement: null, carry: null, meleeCombat: null, input: { fire: true }, BeginMeleeCharge: () => { state.meleeCharge = true; },
 });
-vm.runInContext(["EffectiveInfiniteAmmo", "EffectiveInfiniteGrenades", "EnsureDebugInventory", "BeginCook", "Reload", "TryFire"].map(MainFunction).join("\n"), context);
+vm.runInContext(["EffectiveInfiniteAmmo", "EffectiveInfiniteGrenades", "EnsureDebugInventory", "BeginCook", "Reload", "TryFire", "BufferedFirearmShot", "OnReloadEvent"].map(MainFunction).join("\n"), context);
 context.EnsureDebugInventory();
 assert.equal(state.ammo, 5, "ordinary chapters retain the existing debug refill");
 
@@ -46,6 +50,8 @@ context.EnsureDebugInventory();
 assert.deepEqual([state.ammo, state.clips], [0, 3]);
 assert.deepEqual([AmmoReadout({ ...state, magazine: 5 }).current, AmmoReadout({ ...state, magazine: 5 }).reserve], ["00", "15"]);
 assert.equal(context.Reload(), true, "actual optional R consumes real reserve");
+assert.deepEqual([state.ammo,state.clips],[0,3],"R down does not grant rounds or consume reserve before insertion");
+context.OnReloadEvent({id:"loaded"},context.viewmodel.action);
 assert.deepEqual([state.ammo, state.clips], [5, 2]);
 assert.deepEqual([state.mags.primary.ammo,state.mags.primary.clips],[5,2],"actual R synchronizes the active slot ledger");
 assert.equal(context.p012Runtime.manualReloadPending, true);

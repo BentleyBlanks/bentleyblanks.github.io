@@ -44,6 +44,8 @@ import { Mulberry32, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { T } from "./Script_Text.mjs";
 import { EMPLACEMENT_KINDS } from "./Data_Emplacements.mjs";
 import { EMPLACEMENT as TUNING } from "./Data_Tuning_Interact.mjs";
+import { FirearmReloadTimeline } from "./Script_FirearmActions.mjs";
+import { FIRE_CONTROL } from "./Data_Tuning_FirearmActions.mjs";
 
 const TAU = Math.PI * 2;
 const D2R = Math.PI / 180;
@@ -297,6 +299,11 @@ export class EmplacementSystem {
   Vacate(reason = "player") {
     const gun = this.mounted;
     if (!gun) return false;
+    // Leaving stops the hand action. A strip already inserted remains loaded;
+    // a reserved but uninserted strip follows the existing spent-reserve rule.
+    gun.reloadT = 0;
+    gun.reloadTimeline = null;
+    gun.fireContinuing = false;
     this.mounted = null;
     this.firing = false;
     this.clearing = false;
@@ -455,7 +462,8 @@ export class EmplacementSystem {
     // 那一板也回不来 —— 弹药经济必须在**取用**的那一刻结账。
     gun.belts -= 1;
     gun.reloadT = Math.max(TUNING.minReloadS, Number(gun.weapon.reloadTimeS) || TUNING.reloadFallbackS);
-    this.host.Play?.(gun.kind.sfxReload, { volume: 0.6 });
+    gun.reloadDuration = gun.reloadT;
+    gun.reloadTimeline = new FirearmReloadTimeline(gun.weapon);
     this.stats.reloads += 1;
     return true;
   }
@@ -481,7 +489,12 @@ export class EmplacementSystem {
   // -------------------------------------------------------------------------
 
   /** 左键按住/松开。真正的射速与过热闸在 Update 里推。 */
-  SetFire(down) { this.firing = !!down && !!this.mounted; return this.firing; }
+  SetFire(down) {
+    const next = !!down && !!this.mounted;
+    if (this.mounted && (!next || !this.firing)) this.mounted.fireContinuing = false;
+    this.firing = next;
+    return this.firing;
+  }
 
   /** 这一发从哪儿出去、朝哪儿。世界模型与枪口焰也读它。 */
   Muzzle(gun = this.mounted) {
@@ -529,9 +542,16 @@ export class EmplacementSystem {
       }
       if (gun.reloadT > 0) {
         gun.reloadT = Math.max(0, gun.reloadT - step);
-        if (gun.reloadT === 0) gun.rounds = gun.kind.beltRounds;
+        gun.reloadTimeline?.Advance(1 - gun.reloadT / gun.reloadDuration, event => {
+          if (event.id === "loaded") gun.rounds = gun.kind.beltRounds;
+          if (event.cue && this.mounted === gun) this.host.Play?.(event.cue, {
+            volume: event.volume ?? 0.6, offset: event.offset ?? 0,
+            maxDuration: event.maxDuration ?? Infinity, firstPerson: true, priority: true, burst: 1,
+          });
+        });
+        if (gun.reloadT === 0) { gun.rounds = gun.kind.beltRounds; gun.reloadTimeline = null; }
       }
-      if (gun.fireCooldown > 0) gun.fireCooldown = Math.max(0, gun.fireCooldown - step);
+      gun.fireCooldown = Math.max(-step, gun.fireCooldown - step);
       // 战位上的人没了（阵亡/被移走）：战位空出来。
       if (gun.npc && gun.npc.alive === false) this.NpcVacate(gun.id, "gunnerDown");
     }
@@ -590,14 +610,18 @@ export class EmplacementSystem {
         }
       } else if (!block) {
         const interval = Math.max(TUNING.minFireIntervalS, Number(gun.weapon.fireIntervalS) || 0.3);
+        if (!gun.fireContinuing) gun.fireCooldown = Math.max(0, gun.fireCooldown);
+        gun.fireContinuing = true;
         // 一帧可能跨过不止一个射击间隔（低帧率），但**每帧最多两发**：
         // 不封顶的话卡一下就会在同一帧喷十几发，热量与弹药一起瞬间见底。
-        for (let n = 0; n < TUNING.maxShotsPerFrame && gun.fireCooldown <= 0 && !this.FireBlock(gun); n += 1) {
+        for (let n = 0; n < TUNING.maxShotsPerFrame && gun.fireCooldown <= FIRE_CONTROL.timerEpsilonS && !this.FireBlock(gun); n += 1) {
           gun.fireCooldown += interval;
           shots.push(this.EmitShot(gun));
         }
       }
+      if (block) gun.fireContinuing = false;
     }
+    else gun.fireContinuing = false;
     if (this.host.Aim) this.host.Aim(this.View());
     return shots.length ? shots : null;
   }
@@ -625,7 +649,9 @@ export class EmplacementSystem {
       heat: gun.heat,
       side: gun.side,
     };
-    this.host.Play?.(gun.kind.sfxFire, { position: { ...muzzle.origin }, priority: true });
+    (this.host.PlayGunshot || this.host.Play)?.(gun.kind.sfxFire, {
+      position: { ...muzzle.origin }, priority: true, firstPerson: true, weaponClass: "mg", burst: 1,
+    });
     this.host.Fire?.(shot);
     // 过热：到红线就强制停火，退到 resumeHeat 才放行。
     if (!gun.overheated && gun.heat >= 1) {

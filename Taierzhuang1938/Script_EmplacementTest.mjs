@@ -587,4 +587,23 @@ console.log("ok  交互预制：接管点走 S1 框架、锚在射手位、补�
 
 console.log("ok  换关兜底：按 tag 清、整表清、Reset 不污染取证");
 
+for (const kindId of ["Zb26Nest", "Type92Hmg"]) {
+  for (const fps of [30, 60, 120]) {
+    const {sys,id,log}=MakeRig({kindId});const player=MakePlayer();sys.Occupy(id,player);sys.SetFire(true);
+    const fired=Step(sys,player,1.8,1/fps),interval=WEAPONS[EMPLACEMENT_KINDS[kindId].weaponId].fireIntervalS;
+    Check(Math.abs(fired-1.8/interval)<=1,`${kindId} preserves cadence at ${fps} FPS`);
+    const voices=log.played.filter(p=>p.name===EMPLACEMENT_KINDS[kindId].sfxFire);
+    Check(voices.length===fired&&voices.every(p=>p.opts.burst===1&&p.opts.firstPerson),"one player-perspective cue per actual round");
+  }
+}
+for (const inserted of [false,true]) {
+  const {sys,id}=MakeRig();const player=MakePlayer();sys.Occupy(id,player);
+  const gun=sys.Emplacement(id);gun.rounds=1;sys.Reload();
+  Check(gun.rounds===1,"starting reload does not fill the feed strip");
+  Step(sys,player,gun.weapon.reloadTimeS*(inserted?.75:.2));
+  Check(gun.rounds===(inserted?30:1),"ammunition follows the insertion event");
+  sys.Vacate("cancelReload");Step(sys,player,6);
+  Check(gun.rounds===(inserted?30:1)&&gun.reloadT===0,"leaving cannot finish an uninserted reload in the background");
+}
+
 console.log(`\nEmplacementTest 通过：${checks} 条断言`);

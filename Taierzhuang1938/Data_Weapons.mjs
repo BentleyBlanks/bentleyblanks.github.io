@@ -64,6 +64,7 @@ export const WEAPONS = {
     fullName: "中正式步骑枪（民国二十四年式）",
     side: "nra",
     kind: "boltRifle",
+    shotCue: "rifleNra",
     ammo: "Mauser792",
     lengthM: 1.110, barrelM: 0.600, massKg: 4.0,
     magazine: 5, reloadKind: "stripper",     // 5 发桥夹自上方压入固定弹仓
@@ -106,6 +107,7 @@ export const WEAPONS = {
     fullName: "ZB vz.26 轻机枪",
     side: "nra",
     kind: "lmg",
+    shotCue: "zb26",
     ammo: "Mauser792",
     lengthM: 1.165, barrelM: 0.602, massKg: 10.5,
     magazine: 20, reloadKind: "topMag",       // 20 发弧形弹匣**上方**插入
@@ -204,6 +206,7 @@ export const WEAPONS = {
     fullName: "三八式步枪",
     side: "ija",
     kind: "boltRifle",
+    shotCue: "rifleIja",
     ammo: "Arisaka65",
     lengthM: 1.276, bayonetTotalM: 1.663, massKg: 3.73,
     magazine: 5, reloadKind: "stripper",
@@ -219,6 +222,7 @@ export const WEAPONS = {
     fullName: "十一年式轻机枪",
     side: "ija",
     kind: "lmg",
+    shotCue: "type11", bipod: true,
     ammo: "Arisaka65",
     lengthM: 1.100, massKg: 10.2,
     magazine: 30, reloadKind: "hopper",        // 左侧漏斗，装 6 个 5 发桥夹
@@ -234,6 +238,7 @@ export const WEAPONS = {
     fullName: "九二式重机枪",
     side: "ija",
     kind: "hmg",
+    shotCue: "type92",
     ammo: "Arisaka77",
     lengthM: 1.156, massKg: 55.3,
     magazine: 30, reloadKind: "stripFeed",     // 30 发金属保弹板横向供弹

@@ -126,7 +126,7 @@ export const FPS_ARM_POSES = Freeze({
     family: "lmg", hip: FixedPose(V(0.110, -0.172, -0.330), V(0.075, -0.080, 0.040)), ads: Sight(0.400), sprint: RifleSprint,
     right: Contact(V(0.01200, -0.03600, 0.01500), V(-0.523611478, 3.141592654, 1.570796327), CLOSED, TRIGGER), left: Contact(V(0.00000, -0.03500, -0.47000), V(-0.582726784, 2.373142020, -2.817487415), SUPPORT),
     bodyHip: RifleBody(-0.575), bodyAds: RifleAdsBody(-0.555), bodySprint: RifleSprintBody(-0.500),
-    actions: { reload: { family: "hopper", timing: V(0.32, 0.55, 0.76) } },
+    actions: { reload: { family: "stripFeed", timing: V(0.34, 0.58, 0.72) } },
   }),
   Type11: WeaponPose({
     family: "lmg", hip: FixedPose(V(0.115, -0.180, -0.340), V(0.080, -0.075, 0.040)), ads: Sight(0.550), sprint: RifleSprint,

@@ -416,6 +416,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - 回归口 `Script_MovementRangeTest.mjs`（physics 域）；测量口径与维护见 [操作测试场](Data_MovementRange.md)。
 
 ### 枪械射击白盒（?weapons=1，全枪械专项）
+- 射击响应、装填事件与站立机枪瞄准契约见 [枪械输入与装填同步](Data_FirearmResponse.md)。
 - `Data_WeaponRange.mjs` 动态收集枪表并定义精确距离/圆弧移动靶；`Script_WeaponRangeField.mjs` 管合批白盒、长桌和距离牌。
 - `Script_WeaponRangeRuntime.mjs` 管桌面拾取、移靶、无限弹/换弹测试和 `Debug.WeaponRange`；射击、装填、伤害仍走正式链路。
 - 回归口 `Script_WeaponRangeTest.mjs`（combat 域）；逐枪实体瞄具对齐由 `Script_AdsSightTest.mjs` 验证。现状与接口见 `docs/Data_WeaponRange.md`。
