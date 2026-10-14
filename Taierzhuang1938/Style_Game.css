@@ -206,13 +206,13 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 }
 
 /* 2026-10-13 selected B: grenade silhouettes, a fine separator, then a weapon-name/ammo column.
-   Ivory serif numbers and a soft shadow stay readable without a panel or hard black outlines.
+   2026-10-14: restore the original UI labels and compact monospace numerals with soft shadows.
    整块只在交互后亮几秒（IDLE_FADE.combatS，由 Script_Hud 拨 `.awake`），
    空膛 / 低弹钉住不淡；淡入 0.12 s、淡出 0.6 s。 */
 .hudCombat {
   position: absolute; right: var(--hud-edge-x); bottom: var(--hud-edge-bottom);
   display: flex; flex-direction: column; align-items: flex-end;
-  color: #f2edda; font-family: var(--ui-story-font);
+  color: #f2edda; font-family: var(--ui-font);
   opacity: 0; transition: opacity 0.6s ease;
   -webkit-text-stroke: 0;
   text-shadow: 0 1px 3px rgba(0,0,0,0.82);
@@ -221,16 +221,16 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .combatReadout { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2vh; }
 .combatWeapon {
   min-height: 1.15em; padding: 0 1px 2px; text-align: left;
-  color: #f2edda; font-size: clamp(12px, 2.25vh, 24px); font-weight: 600; line-height: 1.15; letter-spacing: 0;
+  color: #f2edda; font-size: 11px; font-weight: 700; line-height: 1.15; letter-spacing: 0.1em;
 }
 .combatMain { display: flex; align-items: flex-end; gap: clamp(9px, 1.5vh, 18px); }
 .combatAmmo { display: flex; align-items: baseline; }
-.ammoCurrent { font: 700 clamp(38px, 7vh, 88px)/0.94 Georgia, "Times New Roman", serif; font-variant-numeric: lining-nums tabular-nums; letter-spacing: -0.04em; }
+.ammoCurrent { font: 700 38px/1 "Cascadia Mono", Consolas, monospace; font-variant-numeric: lining-nums tabular-nums; letter-spacing: -0.04em; }
 .ammoDivider {
   margin: 0 0.22em 0 0.3em; color: #f2edda;
-  font: 400 clamp(19px, 3.5vh, 42px)/1 Georgia, "Times New Roman", serif;
+  font: 400 18px/1 "Cascadia Mono", Consolas, monospace;
 }
-.ammoReserve { color: #f2edda; font: 700 clamp(19px, 3.5vh, 42px)/1 Georgia, "Times New Roman", serif; font-variant-numeric: lining-nums tabular-nums; }
+.ammoReserve { color: #f2edda; font: 700 18px/1 "Cascadia Mono", Consolas, monospace; font-variant-numeric: lining-nums tabular-nums; }
 .hudCombat.lowAmmo .ammoCurrent { color: #df252c; }
 .hudCombat.emptyAmmo .ammoCurrent { color: #df252c; animation: hudAmmoPulse 0.9s ease-in-out infinite; }
 @keyframes hudAmmoPulse { 50% { opacity: 0.48; } }

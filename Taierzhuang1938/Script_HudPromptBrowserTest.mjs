@@ -195,6 +195,8 @@ try {
       background: getComputedStyle(document.querySelector(".combatMain")).backgroundImage,
       strokeWidth: Number.parseFloat(getComputedStyle(document.querySelector(".ammoCurrent")).webkitTextStrokeWidth),
       ammoFont: getComputedStyle(document.querySelector(".ammoCurrent")).fontFamily,
+      weaponFont: getComputedStyle(document.querySelector(".combatWeapon")).fontFamily,
+      reserveFont: getComputedStyle(document.querySelector(".ammoReserve")).fontFamily,
       ammoShadow: getComputedStyle(document.querySelector(".ammoCurrent")).textShadow,
       equipmentSeparator: getComputedStyle(document.querySelector(".combatEquipment")).borderRightWidth,
       changed, idle, touched, idleAgain, pinned,
@@ -207,7 +209,9 @@ try {
   assert.equal(combatHud.grenadeCount, combatHud.grenadesHeld, "手榴弹数与弹药同一行，读的是身上真实的数");
   assert.equal(combatHud.background, "none", "COD 式弹药块没有底板");
   assert.equal(combatHud.strokeWidth, 0, "selected B uses soft shadow instead of a heavy black outline");
-  assert.match(combatHud.ammoFont, /Georgia/, "selected B has serif ammunition numerals");
+  assert.match(combatHud.ammoFont, /^"?Cascadia Mono/, "ammo uses the original compact monospace numerals");
+  assert.equal(combatHud.reserveFont, combatHud.ammoFont, "current and reserve ammo use the same font");
+  assert.match(combatHud.weaponFont, /^"?TzUiLatin.*TzUiSans/, "Chinese and Latin weapon labels use the original UI font stack");
   assert.notEqual(combatHud.ammoShadow, "none", "ivory ammo remains readable against bright terrain");
   assert.equal(combatHud.equipmentSeparator, "1px", "grenade silhouettes have a fine separator from ammo");
   assert.equal(combatHud.changed.awake, true, "弹药数一变就亮");
