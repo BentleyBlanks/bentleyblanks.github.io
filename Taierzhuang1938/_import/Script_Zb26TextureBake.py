@@ -19,7 +19,10 @@ def Main():
             target = project / "Texture" / ("Texture_" + stem + channel + ".webp")
             with Image.open(source) as image:
                 image = image.convert("RGB")
-                image.save(target, "WEBP", quality=90 if channel == "Base" else 95, method=6)
+                # Spatial ORM tolerates modest scalar quantization; keep tangent
+                # normals at high quality so grazing highlights remain smooth.
+                quality = 90 if channel == "Base" else 82 if channel == "Orm" else 95
+                image.save(target, "WEBP", quality=quality, method=6)
             print(target.name, target.stat().st_size, flush=True)
         # Preserve Cycles' baked tangent normals and spatial roughness/metalness;
         # inferring these from the albedo would turn bluing wear into false bumps.

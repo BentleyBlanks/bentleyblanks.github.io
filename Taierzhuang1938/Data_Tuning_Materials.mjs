@@ -380,6 +380,10 @@ export const SURFACE_RECIPES = {
   Sandbag: { pomDepth: 0.010, detailWeight: 0.6, detailTile: 8, grime: 0.45 },
   // ——— 不给 POM 的：小件、金属、布，凹凸尺度小于一个像素，只吃细节法线 ———
   Steel: { detailWeight: 0.5, detailTile: 10, microShadow: 0.6 },
+  // Authored weapon atlases already contain micron-scale relief. Applying the
+  // shared tiled detail a second time makes the machined faces look hammered.
+  Zb26VeteranSteel: { detailWeight: 0, detailTile: 1, microShadow: 0.6 },
+  Zb26VeteranWood: { detailWeight: 0, detailTile: 1, microShadow: 0.8 },
   SteelHelmet: { detailWeight: 0.5, detailTile: 10, microShadow: 0.6 },
   WoodStock: { detailWeight: 0.7, detailTile: 10 },
   HandcartWood: { detailWeight: 0.7, detailTile: 10, grime: 0.3 },

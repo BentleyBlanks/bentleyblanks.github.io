@@ -17,11 +17,25 @@
 - 编码与审计：[_import/Script_Zb26TextureBake.py](../_import/Script_Zb26TextureBake.py)，保留 Blender 烘的原 UV 法线和空间 ORM，再用 `Script_BakePbrTexture.py --audit` 记录实际产物。
 - 可编辑工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Zb26/Scene_Zb26Veteran20261015.blend`。全分辨率源图在相邻 `SourceMaps/`，贴图已打包进 blend；参考与验收图片留在相邻目录。
 
-原始几何 26,065 三角；TZM 编译剔除 37 个不可见微小三角，交付 26,028 三角，未做减面，仍在 30,000 红线内。11 节点、6 网格块、零关节；世界实例按两种材质合为 2 次绘制。弹匣、拉机柄和前后瞄具保留独立节点，第一人称换弹不再靠空间切割这些作者零件。
+原始几何 25,663 三角；TZM 编译剔除 37 个不可见微小三角，交付 25,626 三角，未做减面，仍在 30,000 红线内。11 节点、6 网格块、零关节；世界实例按两种材质合为 2 次绘制。弹匣、拉机柄和前后瞄具保留独立节点，第一人称换弹不再靠空间切割这些作者零件。
 
 全长 1.165 m，Y 向上、枪口沿 -Z；原有 muzzle / gripR / gripL / sight / magazine 插槽保留。瞄准线保持 x=-0.0234 m、y=0.095 m；前准星按馆藏轮廓移到 z=-0.836 m。携行模型折叠脚架，左手接触按实际导气管表面重新适配，不能用放宽接触门槛代替。
 
-两套专属 1K Base / Normal / Orm 在 `Data_Meshes.pbrSets` 登记，随模型预载，用于游戏和编辑器，未加入菜单或 boot PBR_SETS。新增约 0.47 MiB，给 lazy 与全目录明确增加 512 KiB 配额；单张、单套、开机、场景和枪械面数红线保留。新增贴图均有缓存戳、清单及 SHA-256 烘焙记录。
+钢件 Base 为 2K，Normal / Orm 及整套木材图集为 1K，在 `Data_Meshes.pbrSets` 登记，随模型预载，用于游戏和编辑器，未加入菜单或 boot PBR_SETS。钢件单独为机匣预留 UV 面积，避免散热环占满图集；2K 理由在贴图清单登记。沿用初次交付给 lazy 与全目录增加的 512 KiB 配额及原有余量；单张、单套、开机、场景和枪械面数红线保留。贴图均有缓存戳、清单及 SHA-256 烘焙记录。
+
+## 实感优化迭代
+
+最新可编辑工程另存于 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Zb26/Iterations/Realism20261015/Scene_Zb26Veteran20261015.blend`，避免覆盖初次交付源工程。重建时设置 `ZB26_SOURCE_DIR` 为该迭代目录。
+
+馆藏两侧照片用于修正机匣顶盖、侧板凹槽、右侧外观窗口、左侧调节轮、双加强筋弹匣及圆弧扳机护圈；仅制作外部游戏道具。钢件螺钉有实体槽，机匣为圆角放样，冷却环环向分段重新分配为 20 段，保留原始拓扑预算。TZM 保留 Blender 作者逐角法线。
+
+钢材旧化改为面域属性 `Zb26EdgeWear`：实际倒角与环缘接受磨损，平面不再被曲率误判而整面花斑。定点短划伤与稀疏纵向擦痕独立于微米级表面法线，缝隙积尘与 ORM 使用实际 AO。木材以内置 imagegen 生成的无光照胡桃木素材作为基色，分部件局部坐标保持顺纹，微孔和 ORM 另行烘焙。重建输入为 `_import/Source/Zb26/Texture_WalnutAuthor.webp`，完整提示词在 `_import/Prompts/Texture_Zb26WalnutAuthor.txt`；原始生成图保存在工程的 `References/Texture_WalnutAuthorOriginal.png`。来源图不作为运行时贴图单独加载。
+
+`Data_Tuning_Materials` 为两套作者图集明确设置 `detailWeight: 0`，避免再叠一层通用颗粒法线。对照使用同机位、同光照的 1280×720 中性工作室图，以及实际 high 画质腰射和开镜；这些检查证明本次具体改进，不等于宣称整个游戏或该资产已达到 3A 制作质量。
+
+第一人称探针光照下原始钢材反射偏暗，沿用 `VIEWMODEL_FIREARM_SURFACES` 的 0.65 金属度标量，单独为 ZB-26 登记 2 倍线性反射校准及 1.45 环境强度；不更改其他枪材质。腰射和开镜各绘制 32 帧后取图，避免仅两帧的时域噪点影响判断。该预览的运行时回读确认 `color=[2,2,2]`、`metalness=0.65` 与新版贴图 URL。
+
+本轮通过模型管线、4,100 项贴图规范、面数预算、模块图、3 姿态手部接触（初测 181 帧；合并主线加速换弹与扫描手后 160 帧）、626 项骨骼双臂、准心校准、49 个 GPU 运动向量场景、材质升级、采样器预算、ADS 瞄具和枪械动作检查。GPU 发布资产在完整 staging 构建、校验、合包，浏览器核对压缩格式、回退与实际像素。全仓 quick 为 100 过、3 失败，失败仍为此前的 SpeakerGestureTest / IjaAlertGaitTest / MissionOrchestrationFilterTest；没有宣称完整 prepush 的 204 项全部执行或全仓全绿。
 
 ## 复现与验收
 

@@ -50,7 +50,7 @@ export const CASE_EJECTION = Object.freeze({
 // game's probe lighting. Pure-metal scalars made the feed mechanisms black.
 // These private viewmodel options preserve the authored maps and world assets.
 export const VIEWMODEL_FIREARM_SURFACES = Object.freeze({
-  zb26Steel: {roughness:1,metalness:.65,normalScale:1},
+  zb26Steel: {roughness:1,metalness:.65,normalScale:1,reflectanceScale:2,envMapIntensity:1.45},
   type11AmmoBox: {roughness:.88,metalness:.25,normalScale:.65},
   type11Body: {roughness:.88,metalness:.35,normalScale:.65},
   type11BodyAlt: {roughness:.90,metalness:.35,normalScale:.65},

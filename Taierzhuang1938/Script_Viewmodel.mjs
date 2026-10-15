@@ -281,6 +281,7 @@ function SafeMaterial(library, name, options, fallback) {
 }
 
 function BuildMaterials(library) {
+  const { reflectanceScale: zb26Reflectance, ...zb26Finish } = VIEWMODEL_FIREARM_SURFACES.zb26Steel;
   return {
     // normalScale 跟着 VM_TILE 一起收：格距缩到 1/5.5 之后，同一张法线图在屏幕上
     // 的坡度会陡 5.5 倍，0.8 会把机加工纹重新打成浮雕。metalness 也从 1.0 退到 0.84 ——
@@ -323,7 +324,11 @@ function BuildMaterials(library) {
     dadao: SafeMaterial(library, "DadaoPbr",
       { repeat: 1, roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 },
       { color: 0x77736f, roughness: 0.58, metalness: 0.72 }),
-    zb26Steel: SafeMaterial(library, "Zb26VeteranSteel", VIEWMODEL_FIREARM_SURFACES.zb26Steel,
+    zb26Steel: SafeMaterial(library, "Zb26VeteranSteel", {
+      ...zb26Finish,
+      color: new THREE.Color(zb26Reflectance, zb26Reflectance, zb26Reflectance),
+      tintId: "vmZb26VeteranReflectance",
+    },
       { color: 0x45474a, roughness: 0.7, metalness: 0.7 }),
     zb26Wood: SafeMaterial(library, "Zb26VeteranWood", { roughness: 1, metalness: 0, normalScale: 1 },
       { color: 0x5f3c20, roughness: 0.8, metalness: 0 }),

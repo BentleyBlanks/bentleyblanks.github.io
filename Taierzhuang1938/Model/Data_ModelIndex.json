@@ -1057,11 +1057,11 @@
    "name": "Zb26",
    "category": "weapon",
    "file": "Model_Zb26.tzm.json",
-   "triangles": 26028,
+   "triangles": 25626,
    "meshBlocks": 6,
    "nodes": 11,
    "joints": 0,
-   "bytes": 740238,
+   "bytes": 721806,
    "materials": [
     "zb26Steel",
     "zb26Wood"
@@ -1086,8 +1086,8 @@
      0.255
     ]
    },
-   "sourceTriangles": 26065,
-   "targetTriangles": 26065,
+   "sourceTriangles": 25663,
+   "targetTriangles": 25663,
    "triangleLimit": 30000
   }
  ]
