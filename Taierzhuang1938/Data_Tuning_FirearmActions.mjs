@@ -39,6 +39,8 @@ export const RELOAD_EVENTS = Object.freeze({
       "stripperLoad", { maxDuration: 0.24, volume: 0.55 })),
     Event(0.78, "loaded"),
     Event(0.80, "follower", "bolt", { offset: 0.70, maxDuration: 0.10, volume: 0.35 }),
+    Event(0.875,"chargePull","bolt",{maxDuration:0.16,volume:0.45,emptyOnly:true}),
+    Event(0.910,"chargeReturn","bolt",{offset:0.50,maxDuration:0.14,volume:0.40,emptyOnly:true}),
   ]),
   stripFeed: Object.freeze([
     Event(0.20, "remove", "bolt", { maxDuration: 0.20, volume: 0.4 }),

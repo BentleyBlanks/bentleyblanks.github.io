@@ -54,6 +54,27 @@ try {
       });return triangles;
     };
     const Nearest=(point,triangles)=>{let distance=Infinity;const closest=new THREE.Vector3();for(const tri of triangles){tri.closestPointToPoint(point,closest);distance=Math.min(distance,point.distanceTo(closest));}return distance;};
+    const FingerPenetration=(side,part)=>{
+      const triangles=Triangles(part),direction=new THREE.Vector3(1,.371,.137).normalize(),hit=new THREE.Vector3();
+      let vertices=0,inside=0,maxDepth=0;
+      arms.root.traverse(mesh=>{
+        if(!mesh.isSkinnedMesh)return;
+        const a=mesh.geometry.attributes,indices=new Set(mesh.skeleton.bones.map((bone,i)=>{
+          const name=bone.name.toLowerCase().replace(/[^a-z0-9]/g,"");return new RegExp(side+"finger[0-4][0-2]?$").test(name)?i:-1;
+        }).filter(i=>i>=0));
+        for(let i=0;i<a.position.count;i++){
+          let owned=0;for(let k=0;k<4;k++)if(indices.has(a.skinIndex.getComponent(i,k)))owned+=a.skinWeight.getComponent(i,k);
+          if(owned<.95)continue;vertices++;
+          const point=vm.rig.group.worldToLocal(mesh.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(mesh.matrixWorld)),depth=Nearest(point,triangles);
+          if(depth>.012)continue;
+          const ray=new THREE.Ray(point,direction),hits=[];
+          for(const triangle of triangles)if(ray.intersectTriangle(triangle.a,triangle.b,triangle.c,false,hit)){
+            const distance=point.distanceTo(hit);if(distance>1e-8&&!hits.some(value=>Math.abs(value-distance)<1e-7))hits.push(distance);
+          }
+          if(hits.length%2){inside++;maxDepth=Math.max(maxDepth,depth);}
+        }
+      });return {vertices,inside,maxDepth};
+    };
     const TriggerPoint=(id)=>{
       const origin=new THREE.Vector3(...probes[id]);origin.z-=.012;
       const ray=new THREE.Ray(origin,new THREE.Vector3(0,0,1));let best=Infinity,hit=null;const point=new THREE.Vector3();
@@ -85,7 +106,7 @@ try {
           if(!vm.boltOpen)throw new Error(id+": the open-bolt reload contact case did not start open");
         }
         if(action.startsWith("reload"))vm.TriggerReload({remainingRounds:action==="reloadPartial"?3:0});else vm.TriggerBolt();
-        const row={id,action,maxGrip:0,maxWrist:0,maxFingerTranslation:0,unreachable:0,propSamples:[],worstGrip:null,worstWrist:null};
+        const row={id,action,maxGrip:0,maxWrist:0,maxFingerTranslation:0,unreachable:0,propSamples:[],skinSamples:[],worstGrip:null,worstWrist:null};
         for(let frame=0;vm.action&&frame<1200;frame++){
           editor.Update(1/60);Refresh();result.samples++;
           const t=vm.action?.t??1,grip=Math.max(arms.gripError.r,arms.gripError.l),wrist=Math.max(arms.wristBend.r,arms.wristBend.l);
@@ -112,9 +133,14 @@ try {
             }else if(id==="Type11"&&t>.20&&t<.80&&((t-.20)%.10)<.032){prop=vm.clipProp.userData.body;kind="hopperClip";}
           }
           if(prop){const triangles=Triangles(prop);for(const digit of digits)row.propSamples.push({t,kind,digit,distance:Nearest(Pad(side,digit),triangles)});}
-          if(id==="Type11"&&action.startsWith("reload")&&t>.09&&t<.875) {
+          if(id==="Type11"&&action.startsWith("reload")&&t>.09&&t<(action==="reloadPartial"?.875:.837)) {
             const triangles=Triangles(vm.rig.parts.hopperFollower);
             for(const digit of [0,1,2])row.propSamples.push({t,kind:"follower",digit,distance:Nearest(Pad("l",digit),triangles)});
+          }
+          if(id==="Type11"&&action==="reload"&&t>.875&&t<.945) {
+            const triangles=Triangles(vm.rig.parts.operatingHandle);
+            for(const digit of [0,1,2])row.propSamples.push({t,kind:"operatingHandle",digit,distance:Nearest(Pad("l",digit),triangles)});
+            if(frame%15===0)row.skinSamples.push({t,...FingerPenetration("l",vm.rig.parts.operatingHandle)});
           }
         }
         result.actions.push(row);for(let i=0;i<60;i++)editor.Update(1/60);
@@ -138,6 +164,10 @@ try {
     Check(action.unreachable===0,`${action.id} ${action.action}: ${action.unreachable} unreachable frames`);
     Check(action.propSamples.length>0,`${action.id} ${action.action}: no moving-part contact was sampled`);
     for(const sample of action.propSamples)Check(sample.distance<(sample.kind==="bolt"?.012:.009),`${action.id} ${sample.kind} at ${sample.t.toFixed(3)}: digit ${sample.digit} misses the prop by ${(sample.distance*1000).toFixed(1)} mm`);
+    if(action.id==="Type11"&&action.action==="reload") {
+      Check(action.skinSamples.length>0&&action.skinSamples.every(sample=>sample.vertices>1000),"Type11: operating-handle contact did not inspect the complete finger skin");
+      for(const sample of action.skinSamples)Check(sample.maxDepth<.002,`Type11: finger skin penetrates the operating handle ${(sample.maxDepth*1000).toFixed(2)} mm at ${sample.t.toFixed(3)}`);
+    }
   }
   assert.deepEqual(errors,[],"no page errors");
   assert.deepEqual(failures,[],"first-person skin contact regression");

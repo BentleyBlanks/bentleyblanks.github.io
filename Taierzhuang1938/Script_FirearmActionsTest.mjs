@@ -43,6 +43,13 @@ for(const roundsRemaining of [0,3]) {
   assert.ok(!zb.events.some(event=>event.id==="close"),"ZB26 stays cocked during empty and partial magazine changes");
   assert.equal(zb.events.find(event=>event.id==="loaded").at,.76);
 }
+for(const roundsRemaining of [0,13]) {
+  const hopper=new FirearmReloadTimeline(WEAPONS.Type11,{roundsRemaining}),events=[];
+  for(const t of [.79,.90,.95,1,1])hopper.Advance(t,event=>events.push(event));
+  assert.equal(events.filter(event=>event.id==="loaded").length,1,"Type11 keeps a single insertion commit");
+  assert.deepEqual(events.filter(event=>event.id.startsWith("charge")).map(event=>event.id),
+    roundsRemaining?[]:["chargePull","chargeReturn"],"only the empty hopper plays the complete charging stroke");
+}
 assert.equal(RecoilAfterInput(12, -10), 2);
 assert.equal(RecoilAfterInput(2, -10), 0);
 assert.equal(RecoilAfterInput(-4, 3), -1);

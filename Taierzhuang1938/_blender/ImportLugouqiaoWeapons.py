@@ -12,7 +12,7 @@ import math
 import bpy
 import bmesh
 
-from TzmCore import AUTHORED_NORMAL_LAYER, MATERIAL_NAMES, Node, Transform, TransformMatrix, TubeZ
+from TzmCore import AUTHORED_NORMAL_LAYER, MATERIAL_NAMES, Node, Transform, TransformMatrix, TubeZ, Box
 from ImportWeapons import (
     _Aabb, _AlignLongAxisToZ, _AutoSmooth, _DecimateToBudget,
     _FlipIfGripIsAbove, _FlipIfStockIsForward, _Mounts, _OrientAllSteelFirearm,
@@ -43,7 +43,7 @@ SOURCES = {
                    # the barrel end as the stock.  The resulting mesh points
                    # opposite to muzzle/gripL in both actor and viewmodel rigs.
                    "forceFlip": True,
-                   "note": "十一年式轻机枪；源节点 QEDQD，保留 body/body2/fore/ammobox 四张原贴图。源文件中的分解展示件保留在独立 Blend，运行时只取装配态枪体。"},
+                   "note": "十一年式轻机枪；源节点 QEDQD，保留 body/body2/fore/ammobox 四张原贴图。源文件中的分解展示件保留在独立 Blend，运行时只取装配态枪体；按手册补齐独立操作柄与导轨。"},
     "MediumMortar": {"lengthM": 1.444, "kind": "assembly", "side": "neutral",
                    "note": "源节点 sphere3；民二十年式八二迫击炮（按 Stokes-Brandt 外形认领）。"},
 }
@@ -190,6 +190,40 @@ def _collect(asset):
     return joined
 
 
+def _CompleteType11OperatingHandle(body):
+    """Add the missing left operating handle; retain every imported gun face.
+
+    MID Special Series 19 (1943), figures 56-59, printed pp. 88-93: the
+    upturned handle is drawn back, then pushed to its forward latch. Dimensions
+    fit the reviewed receiver; the 110-mm stroke clears a 6.5-mm cartridge.
+    Original geometry has an offset from its already normalized FPS mounts.
+    """
+    source_x, source_y = .06315, .146
+    base = (-.0185, -.012, -.065)
+    guide = body.Child("operatingHandleGuide")
+    for y in (-.0215, -.0025):
+        guide.Add("steel", Box(.006, .0025, .137, bevel=.0004), tile="gunSteel",
+                  x=source_x-.0185, y=source_y+y, z=-.010)
+    handle = body.Child("operatingHandle", joint=True)
+    handle.Add("steel", Box(.0035, .016, .027, bevel=.0005), tile="gunSteel",
+               x=source_x+base[0], y=source_y+base[1], z=base[2])
+    profile = [(0,.005),(-.029,.005),(-.035,.009),(-.035,.024),
+               (-.043,.027),(-.049,.020),(-.048,.009),(-.044,-.001),
+               (-.035,-.008),(0,-.008)]
+    mesh=bmesh.new()
+    rings=[[mesh.verts.new((source_x+base[0]+x,source_y+base[1]+y,base[2]+z))
+            for x,y in profile] for z in (-.0055,.0055)]
+    mesh.faces.new(tuple(reversed(rings[0])));mesh.faces.new(rings[1])
+    for i in range(len(profile)):
+        j=(i+1)%len(profile);mesh.faces.new((rings[0][i],rings[0][j],rings[1][j],rings[1][i]))
+    bmesh.ops.recalc_face_normals(mesh,faces=list(mesh.faces))
+    handle.Add("steel",mesh,tile="gunSteel")
+    # These markers use the same FPS frame as the original grip/muzzle mounts.
+    handle.Child("fpsOperatingHandleContact",t=(-.060,.003,-.065))
+    body.Child("operatingHandleStroke",t=(0,0,.110))
+    return sum(len(face.verts)-2 for node in (guide,handle) for material,mesh,tile in node.parts for face in mesh.faces)
+
+
 def BuildImported(name):
     spec = SOURCES[name]
     path = os.path.join(SOURCE_DIR, "Model_Lugouqiao%s.blend" % name)
@@ -234,6 +268,10 @@ def BuildImported(name):
     for material, mesh in zip(material_names, bms):
         body.Add(material, mesh, tile=_tile_for(material))
     _Mounts(body, spec["lengthM"], spec["kind"], lo, hi, spec, steel)
+    if name == "Type11":
+        # Preserve the raw source count; only the explicitly authored repair
+        # allowance is added to this asset's build target, below the 30k limit.
+        BUILD_STATS[name]["targetTriangles"] += _CompleteType11OperatingHandle(body)
     return root
 
 

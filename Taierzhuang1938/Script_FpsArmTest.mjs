@@ -134,7 +134,7 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
       out.cases.push(Metrics(weapon, action));
     }
     if (spec.actions.reload) for (const adsEntry of [0, 1]) {
-      Equip(weapon); Step(90, { ads: adsEntry }); vm.TriggerReload();
+      Equip(weapon); Step(90, { ads: adsEntry }); vm.TriggerReload(weapon==="Type11"?{remainingRounds:0}:undefined);
       const support = spec.actions.reload.family === "boxMag" ? "right" : "left";
       const working = support === "right" ? "left" : "right";
       const rifle = ["ZhongZheng", "HanYang", "Type38"].includes(weapon);
@@ -247,9 +247,8 @@ for (const entry of report.reloadCases) {
   if(entry.weapon === "Type11") {
     // The spring follower needs a real hand throughout loading. Finger pads
     // against its mesh are independently checked by FpsHandContactTest.
-    checks.push([`${label} 左手扶压弹板或连续回收`, entry.cameraLayerRotation < 1e-8
-      && entry.supportWeight < .01 && (entry.t < .88 ? entry.supportOperation === "hopperFollower"
-        : entry.supportNextOperation === "recover"),
+    checks.push([`${label} 左手扶压弹板或抓握操作柄`, entry.cameraLayerRotation < 1e-8
+      && entry.supportWeight < .01 && entry.supportOperation === (entry.t<.84?"hopperFollower":"type11Charge"),
     `operation=${entry.supportOperation} weight=${entry.supportWeight}`]);
   } else checks.push([`${label} 支撑手不随相机轴横飞`, entry.supportTravelM < 0.11
       && entry.cameraLayerRotation < 1e-8 && entry.supportWeight > 0.99,

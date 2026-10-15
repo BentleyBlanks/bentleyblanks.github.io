@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "rifle-mechanisms-zb26-manufacture-hanyang-tail-20261015";
+const MESH_REV = "rifle-mechanisms-zb26-manufacture-type11-charge-20261015";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -241,13 +241,13 @@ export const MESHES = {
   },
   Type11: {
     file: "Model_Type11.tzm.json", category: "weapon",
-    triangles: 8252, meshBlocks: 5, nodes: 7, joints: 0,
-    materials: ["lqType11AmmoBox", "lqType11Body", "lqType11BodyAlt", "lqType11Fore", "lqWeaponPlain"],
-    mounts: WEAPON_MOUNTS,
+    triangles: 8420, meshBlocks: 7, nodes: 11, joints: 1,
+    materials: ["lqType11AmmoBox", "lqType11Body", "lqType11BodyAlt", "lqType11Fore", "lqWeaponPlain", "steel"],
+    mounts: [...WEAPON_MOUNTS,"fpsOperatingHandleContact","operatingHandleStroke"],
     span: [0.24071, 0.25577, 1.10027], lengthM: 1.100,
-    draws: { high: 5, medium: 5, low: 5 },
+    draws: { high: 7, medium: 7, low: 7 },
     note: "卢沟桥资源包源节点 QEDQD：十一年式轻机枪。保留 body/body2/fore/ammobox"
-      + "四张 DDS 的原 UV 与独立材质槽；项目原 CC-BY 模型仍保留作对比参考。",
+      + "四张 DDS 的原 UV 与独立材质槽；补齐独立左侧操作柄与导轨。项目原 CC-BY 模型仍保留作对比参考。",
   },
   OfficerSwordSet: {
     file: "Model_OfficerSwordSet.tzm.json", category: "weapon", triangles: 7801, meshBlocks: 2, nodes: 5, joints: 0,

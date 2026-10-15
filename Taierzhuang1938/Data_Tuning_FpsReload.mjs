@@ -190,6 +190,19 @@ export const FPS_HOPPER_RELOAD = Object.freeze({
   followerApproach:{at:.035,positionMix:.70,rotationMix:.30,offset:[-.012,-.020,.040]},
   followerRecovery:{at:.9325,positionMix:.30,rotationMix:.30,offset:[-.012,-.020,.040]},
   follower:[[0,0],[.07,0],[.16,1],[.80,1],[.88,0],[1,0]],
+  // Empty hopper: close the follower, keep the firing hand on the grip, then
+  // draw back and return the separate left operating handle (MID SS19 pp.92-93).
+  emptyFollower:[[0,0],[.07,0],[.16,1],[.78,1],[.84,0],[1,0]],
+  emptyRightRecovery:[.802,.850],
+  charge:{
+    graspAt:.875,releaseAt:.945,clearAt:.966,returnAt:.995,
+    slide:[[0,0],[.875,0],[.910,1],[.940,0],[1,0]],
+    approachAt:.862,approachMix:.55,approachOffset:[-.010,.010,.008],
+    recoveryPositionMix:.20,recoveryRotationMix:.30,recoveryOffset:[-.010,.008,.010],
+    leftShoulderOffset:[0,.030,-.070],body:[[0,0],[.81,0],[.86,1],[.96,1],[1,0]],
+    support:[[0,0,0,0,0,0,0],[.78,0,0,0,0,0,0],
+      [.86,0,.065,-.045,0,0,-.10],[.94,0,.065,-.045,0,0,-.10],[1,0,0,0,0,0,0]],
+  },
   drawAt:.20, cycle:.10, alignPhase:.35, seatPhase:.60, releasePhase:.64, clearPhase:.76,
   approachHeightM:.075,
   pouchOffset:[.10,-.060,.090], clearOffset:[.015,.025,.018],

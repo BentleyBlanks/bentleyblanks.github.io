@@ -1,0 +1,16 @@
+{
+  "rawSourceTriangles": 8255,
+  "preservedSourceTriangles": 8252,
+  "triangles": 8420,
+  "addedTriangles": 168,
+  "operatingHandleTriangles": 80,
+  "handleContact": [
+    -0.06,
+    0.003,
+    -0.065
+  ],
+  "strokeM": 0.11,
+  "blend": "Taierzhuang1938\\Type11Mechanism_20261015\\Model_Type11Mechanism.blend",
+  "blendFrame": "first-person normalized, Z-up; source UVs/normals and packed base textures",
+  "reference": "MID Special Series 19 (1943), printed pp. 88-93, figures 56-59"
+}

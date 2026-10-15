@@ -157,13 +157,25 @@ const MaterialTriangles = (id) => {
   const doc = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", MESHES[id].file), "utf8"));
   return new Map(doc.meshes.map((mesh) => [mesh.material, mesh.idxCount / 3]));
 };
-const type11Buckets = MaterialTriangles("Type11");
-const type11SourceTriangles = built.get("Type11")?.sourceTriangles || MESHES.Type11.triangles;
-Report(type11Buckets.size === 5
-  && (type11Buckets.get("lqWeaponPlain") || 0) <= type11SourceTriangles * 0.10,
-  "十一年式五个材质桶均命中，默认材质不超过选定源几何的 10%");
 const type11Doc = JSON.parse(fs.readFileSync(
   path.join(projectDir, "Model", MESHES.Type11.file), "utf8"));
+const type11SourceMeshes = type11Doc.nodes.find(node=>node.name==="body")?.meshes || [];
+const type11Buckets = new Map(type11SourceMeshes.map(index=>{
+  const mesh=type11Doc.meshes[index];return [mesh.material,mesh.idxCount/3];
+}));
+const type11SourceTriangles = built.get("Type11")?.sourceTriangles || MESHES.Type11.triangles;
+Report(type11SourceMeshes.length === 5 && type11Buckets.size === 5
+  && ["lqType11AmmoBox","lqType11Body","lqType11BodyAlt","lqType11Fore","lqWeaponPlain"].every(name=>type11Buckets.has(name))
+  && (type11Buckets.get("lqWeaponPlain") || 0) <= type11SourceTriangles * 0.10,
+  "十一年式五个材质桶均命中，默认材质不超过选定源几何的 10%");
+const type11RepairNodes=type11Doc.nodes.filter(node=>["operatingHandle","operatingHandleGuide"].includes(node.name));
+const type11RepairMeshes=type11RepairNodes.flatMap(node=>node.meshes||[]);
+Report(type11RepairNodes.length===2&&type11RepairMeshes.length===2
+  &&new Set([...type11SourceMeshes,...type11RepairMeshes]).size===type11Doc.meshes.length
+  &&type11RepairMeshes.every(index=>type11Doc.meshes[index].material==="steel")
+  &&type11RepairMeshes.reduce((sum,index)=>sum+type11Doc.meshes[index].idxCount/3,0)===168
+  &&type11Doc.nodes.find(node=>node.name==="operatingHandle")?.joint===true,
+  "十一年式补件仅为独立操作柄与固定导轨，新增 168 面；原五桶保持独立");
 const type11AmmoBox = type11Doc.meshes.find((mesh) => mesh.material === "lqType11AmmoBox");
 const type11AmmoCenterX = type11AmmoBox
   ? type11AmmoBox.posMin[0] + type11AmmoBox.posScale[0] * 65535 * 0.5

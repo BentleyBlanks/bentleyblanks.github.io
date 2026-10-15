@@ -36,6 +36,7 @@ export class FirearmReloadTimeline {
     const kind=weapon?.reloadKind==="enBloc"&&action.packetRounds>0?"enBlocPartial":weapon?.reloadKind;
     this.events = RELOAD_EVENTS[kind] || RELOAD_EVENTS.stripper;
     if(action.startedOpen)this.events=this.events.filter(event=>event.id!=="open");
+    if(action.roundsRemaining>0)this.events=this.events.filter(event=>!event.emptyOnly);
     if(weapon?.reloadKind==="topMag"&&weapon.reloadNeedsCharge===false)
       this.events=this.events.filter(event=>event.id!=="close");
     this.next = 0;

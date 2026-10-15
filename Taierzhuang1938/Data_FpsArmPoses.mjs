@@ -56,6 +56,7 @@ export const FPS_HAND_SHAPES = Freeze({
   // Thumb opposes the index/middle fingers on the follower rim; the other
   // digits stay relaxed. Calibrated with the spring follower closed and open.
   hopperFollower: Freeze({ side: "l", palmOffset: V(-0.03018,0.000661172,0.038449285), rotation: V(0.024889709,-0.08501921,1.90290484), fingers: Freeze([V(0,79,23),V(90,58.8,30.85),V(53.36,95.1,0),V(46.232,49,62.985),V(40.48,41.3,25.36)]), thumbDirection: V(0.165,-0.942,-0.378), thumbRoll: 45, fingerSplay: Freeze([0,-29.365,-35,-35,-35]) }),
+  type11Charge: Freeze({ side: "l", palmOffset: V(-0.0268,-0.0082,0.0274), rotation: V(0.104889709,-0.08501921,2.03390484), fingers: Freeze([V(0,79,23),V(55.5,105,0),V(53.36,95.1,0),V(46.232,49,62.985),V(40.48,41.3,25.36)]), thumbDirection: V(0.165,-0.942,-0.378), thumbRoll: 45, fingerSplay: Freeze([0,-18,-35,-35,-35]) }),
 });
 
 const RifleBody = (leftZ = -0.600) => Body(

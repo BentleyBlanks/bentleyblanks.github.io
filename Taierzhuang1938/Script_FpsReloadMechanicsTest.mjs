@@ -183,10 +183,15 @@ try {
     Check(manualChargeTravelM>vm.rig.boltTravel*.98,"Zb26: manual cocking no longer uses the full charging stroke");
     // Type 11 takes complete horizontal chargers. Independent vertex bounds
     // catch the previous six vertical clips with disappearing loose rounds.
-    const hopper=[];
+    const hopper=[],hopperCharge=[];
     for(const remaining of [0,13]) {
       editor.SetWeapon("Type11");Step(remaining,90);vm.TriggerReload({remainingRounds:remaining});
       Check(!!vm.rig.parts.hopperFollower,"Type11: hopper follower is a static cap");
+      const handle=vm.rig.parts.operatingHandle;
+      Check(!!handle&&vm.rig.operatingHandleTravel>.09,"Type11: the left operating handle has no complete charging stroke");
+      let handleTriangles=0;
+      handle?.traverse(mesh=>{if(mesh.isMesh)handleTriangles+=(mesh.geometry.index?.count||mesh.geometry.attributes.position.count)/3;});
+      Check(handleTriangles>=50,"Type11: the operating handle is only an empty marker");
       for(let layer=1;layer<=6;layer++) {
         const target=.27+(layer-1)*.10;
         while(vm.action&&vm.action.t<target)Step(remaining);
@@ -206,7 +211,21 @@ try {
         }
         hopper.push({remaining,t:vm.action.t,chargers:props.length});
       }
-      while(vm.action)Step(30);
+      let chargingTravelM=0,chargingFrames=0;
+      while(vm.action) {
+        Step(30);const t=vm.action?.t??1,travel=handle?.position.z||0;
+        chargingTravelM=Math.max(chargingTravelM,travel);
+        if(travel>.005) {
+          chargingFrames++;
+          Check(vm.riggedArms.contactWeight.r>.99,"Type11: firing hand must support the rifle during left-hand cocking");
+          Check(vm.riggedArms.operationPose.l?.shape==="type11Charge"&&vm.riggedArms.contactWeight.l<.01,
+            "Type11: the operating handle moves without the left hand gripping it");
+        }
+      }
+      Check(remaining>0?chargingTravelM<1e-8:chargingTravelM>vm.rig.operatingHandleTravel*.98,
+        "Type11: charge after an empty reload and retain the cocked state during partial reloading");
+      Check(Math.abs(handle?.position.z||0)<1e-8,"Type11: operating handle does not return to its forward latch");
+      hopperCharge.push({remaining,chargingTravelM,chargingFrames,handleTriangles});
       Step(30);Step(25);
       Check(vm.hopperClips.filter(prop=>prop.visible).length===5,"Type11: empty bottom charger does not advance the stack");
       Check(vm.debris.some(d=>d.alive>0&&d.mesh.userData.debrisKind==="hopperCharger"),"Type11: empty charger does not drop from the hopper bottom");
@@ -230,7 +249,7 @@ try {
       Check(worldError<1e-6,"released packet follows the player's view instead of remaining in world space");
       game.camera.quaternion.copy(rotation);game.camera.position.copy(cameraPosition);vm._StepDebris(0);
     }
-    return {cases,boltMotion,heldOpen,magazines,manualChargeTravelM,hopper,worldError,failures};
+    return {cases,boltMotion,heldOpen,magazines,manualChargeTravelM,hopper,hopperCharge,worldError,failures};
   });
   await fs.writeFile(path.join(output,"Data_Mechanics.json"),JSON.stringify({...report,errors},null,2));
   assert.deepEqual(errors,[],"no page errors");assert.deepEqual(report.failures,[],"rifle mechanical authenticity");

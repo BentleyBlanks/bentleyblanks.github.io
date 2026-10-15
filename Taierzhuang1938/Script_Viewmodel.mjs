@@ -1356,6 +1356,7 @@ function BuildFromModel(materials, weapon, key, doc) {
   let boltHandleNode = null;
   let cockingPiece = null;
   let hopperFollower = null;
+  let operatingHandle = null,operatingHandleContact = null;
   if (mechanism) {
     const pivot = new THREE.Vector3().fromArray(mechanism.pivot);
     const authoredHandle = built.nodes.get("boltHandle");
@@ -1400,6 +1401,10 @@ function BuildFromModel(materials, weapon, key, doc) {
     (p,name,vertices)=>name.endsWith("lqType11AmmoBox") && (vertices.every(v=>v.y>.020)
       || vertices.every(v=>v.x>-.079 && v.x<-.061 && v.y>-.011)));
   hopperFollower?.traverse(mesh=>{if(mesh.isMesh)mesh.material=materials.lqType11Follower;});
+  if(key === "Type11") {
+    operatingHandle=built.nodes.get("operatingHandle") || null;
+    operatingHandleContact=built.nodes.get("fpsOperatingHandleContact") || null;
+  }
   const boltHandle = mechanism ? new THREE.Vector3().fromArray(mechanism.handle) : sight
     ? sight.clone().add(new THREE.Vector3(0.046, -0.010, 0.135))
     : new THREE.Vector3(0.046, 0.035, -0.04);
@@ -1420,7 +1425,8 @@ function BuildFromModel(materials, weapon, key, doc) {
 
   return {
     group,
-    parts: { bolt: boltProxy, cockingPiece, magazine: magazinePart, hopperFollower, dustCover: null, bayonet: null },
+    parts: { bolt: boltProxy, cockingPiece, magazine: magazinePart, hopperFollower, operatingHandle, dustCover: null, bayonet: null },
+    operatingHandleContact,operatingHandleTravel:Mount("operatingHandleStroke",null)?.z || 0,
     boltTravel: isBoltRifle ? boltOpenMount?.z || 0.078 : key === "ServicePistol" ? 0.030 : key === "Zb26" ? 0.060 : 0,
     boltHandleNode,
     ejectAt,
@@ -3131,6 +3137,7 @@ export class Viewmodel {
     const mag = this.rig.parts.magazine;
     if (mag) { mag.position.set(0, 0, 0); mag.visible = true; }
     if (this.rig.parts.hopperFollower) this.rig.parts.hopperFollower.rotation.x=0;
+    if (this.rig.parts.operatingHandle) this.rig.parts.operatingHandle.position.z=0;
     if (this.weapon?.reloadKind === "hopper") {
       if (this.visualAmmo < this.hopperLastAmmo && Math.ceil(this.visualAmmo/5)<Math.ceil(this.hopperLastAmmo/5)) this._SpawnHopperChargerDrop();
       this.hopperLastAmmo=this.visualAmmo;
@@ -3343,11 +3350,12 @@ export class Viewmodel {
    * 开栓 → 右手从腰间取桥夹 → 插进桥夹导槽 → **拇指一推 5 发** → 抽出空夹丢掉 → 闭栓。
    * 一发一发往里塞是错的（史料明确写了是桥夹压入）。
    */
-  _PoseReloadMotion(t, motion) {
+  _PoseReloadMotion(t, motion, supportAdjustment = null) {
     // Rotate about the supporting grip. Type 11 rests its stock against the
     // body while the left forearm cradles the receiver and holds the follower.
     const raise = ReloadTrack(motion.blend, t);
-    const pose = Array.from({ length: 6 }, (_, i) => ReloadTrack(motion.support, t, i + 1));
+    const pose = Array.from({ length: 6 }, (_, i) => ReloadTrack(motion.support, t, i + 1)
+      + (supportAdjustment ? ReloadTrack(supportAdjustment,t,i+1) : 0));
     this._PoseReload(motion.supportHand || "left", 1, ...pose, raise);
     if (this.riggedArms) {
       const body=motion.bodyOffset;
@@ -3583,11 +3591,24 @@ export class Viewmodel {
   /** Lift the follower, lay complete chargers in the hopper, lower it under load. */
   _AnimReloadHopper(t) {
     const spec=FPS_HOPPER_RELOAD, prop=this.clipProp;
-    this._PoseReloadMotion(t,spec);
-    const follower=this.rig.parts.hopperFollower;
     const remaining=this.action.roundsRemaining,partial=remaining>0;
+    this._PoseReloadMotion(t,spec,partial?null:spec.charge.support);
+    const follower=this.rig.parts.hopperFollower;
+    const followerTrack=partial?spec.follower:spec.emptyFollower;
     const followerT = partial && t < .16 ? .07 + .09 * Ease.Seg(t,.07,.115) : t;
-    if(follower)follower.rotation.x=spec.followerAngleRad*ReloadTrack(spec.follower,followerT);
+    if(follower)follower.rotation.x=spec.followerAngleRad*ReloadTrack(followerTrack,followerT);
+    let charge=null;
+    if(!partial&&this.rig.parts.operatingHandle&&this.rig.operatingHandleContact) {
+      this.rig.parts.operatingHandle.position.z=this.rig.operatingHandleTravel*ReloadTrack(spec.charge.slide,t);
+      this.rig.group.updateWorldMatrix(true,true);
+      const point=this.rig.group.worldToLocal(this.rig.operatingHandleContact.getWorldPosition(new THREE.Vector3()));
+      charge=this._HandPlacement("type11Charge",point);
+      if(this.riggedArms) {
+        const body=this.riggedArms.reloadBodyOffset,weight=ReloadTrack(spec.charge.body,t);
+        this.riggedArms.reloadBodyOffset={...body,shoulders:{...body.shoulders,
+          left:body.shoulders.left.map((value,axis)=>value+spec.charge.leftShoulderOffset[axis]*weight)}};
+      }
+    }
     const spacing=FPS_RELOAD_PROPS.profiles.Type38.spacing;
     const seat=new THREE.Vector3(spec.seat[0]+2*spacing,spec.seat[1],spec.seat[2]);
     const pouch=seat.clone().add(new THREE.Vector3().fromArray(spec.pouchOffset));
@@ -3614,7 +3635,7 @@ export class Viewmodel {
     if(phase<spec.alignPhase)prop.position.lerpVectors(pouch,above,Ease.InOut(phase/spec.alignPhase));
     else prop.position.lerpVectors(above,target,Ease.InOut(Ease.Seg(phase,spec.alignPhase,spec.seatPhase)));
     const Grip=(anchor)=>this._HandPlacement("clip",anchor,turn);
-    const followerTurn=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),spec.followerAngleRad*ReloadTrack(spec.follower,followerT));
+    const followerTurn=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),spec.followerAngleRad*ReloadTrack(followerTrack,followerT));
     const followerPoint=new THREE.Vector3().fromArray(spec.followerPivot).add(new THREE.Vector3().fromArray(spec.followerRimOffset).applyQuaternion(followerTurn));
     const held=this._HandPlacement("hopperFollower",followerPoint,followerTurn);
     const leftBaseRotation=this.handBaseRot.left.toArray().slice(0,3);
@@ -3622,14 +3643,26 @@ export class Viewmodel {
       new THREE.Quaternion().setFromEuler(this.handBaseRot.left).slerp(
         new THREE.Quaternion().setFromEuler(new THREE.Euler(...held.rotation,"YXZ")),weight),"YXZ").toArray().slice(0,3);
     const approach=spec.followerApproach,recovery=spec.followerRecovery;
-    this._WorkingHandPath("left",t,[
+    const leftFrames=[
       {at:approach.at,position:this.handBase.left.clone().lerp(held.position,approach.positionMix).add(new THREE.Vector3().fromArray(approach.offset)),
         rotation:LeftRotation(approach.rotationMix),shape:"relax",through:true},
-      {at:.07,...held},{at:.88,...held},
-      {at:recovery.at,position:held.position.clone().lerp(this.handBase.left,recovery.positionMix).add(new THREE.Vector3().fromArray(recovery.offset)),
+      {at:.07,...held},{at:followerTrack.at(-2)[0],...held},
+    ];
+    if(charge) {
+      const rotation=(a,b,weight)=>new THREE.Euler().setFromQuaternion(
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(...a,"YXZ"))
+          .slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(...b,"YXZ")),weight),"YXZ").toArray().slice(0,3);
+      const c=spec.charge;
+      leftFrames.push({at:c.approachAt,position:held.position.clone().lerp(charge.position,c.approachMix)
+        .add(new THREE.Vector3().fromArray(c.approachOffset)),rotation:rotation(held.rotation,charge.rotation,c.approachMix),shape:charge.shape,through:true},
+        {at:c.graspAt,...charge},{at:c.releaseAt,...charge},
+        {at:c.clearAt,position:charge.position.clone().lerp(this.handBase.left,c.recoveryPositionMix)
+          .add(new THREE.Vector3().fromArray(c.recoveryOffset)),rotation:rotation(charge.rotation,leftBaseRotation,c.recoveryRotationMix),shape:"recover",through:true},
+        {at:c.returnAt,position:this.handBase.left,rotation:leftBaseRotation,weight:0,shape:"recover"});
+    }else leftFrames.push({at:recovery.at,position:held.position.clone().lerp(this.handBase.left,recovery.positionMix).add(new THREE.Vector3().fromArray(recovery.offset)),
         rotation:LeftRotation(recovery.rotationMix),shape:"recover",through:true},
-      {at:.985,position:this.handBase.left,rotation:leftBaseRotation,weight:0,shape:"recover"},
-    ]);
+      {at:.985,position:this.handBase.left,rotation:leftBaseRotation,weight:0,shape:"recover"});
+    this._WorkingHandPath("left",t,leftFrames);
     const frames=partial
       ? [{at:.115,...Grip(oldGrip||pouch),shape:"relax",through:true},
         {at:.13,...Grip(oldGrip||pouch)},{at:.19,...Grip(oldGrip||pouch)},{at:.195,...Grip(pouch)}]
@@ -3644,8 +3677,9 @@ export class Viewmodel {
     }
     const rightBaseRotation=this.handBaseRot.right.toArray().slice(0,3);
     const topClear=clear.clone().add(new THREE.Vector3(0,5*spec.layerPitchM,0));
-    frames.push({at:.82,position:topClear.lerp(this.handBase.right,.5),rotation:rightBaseRotation,shape:"recover",through:true},
-      {at:.875,position:this.handBase.right,rotation:rightBaseRotation,weight:0,shape:"recover"});
+    const rightRecovery=charge?spec.emptyRightRecovery:[.82,.875];
+    frames.push({at:rightRecovery[0],position:topClear.lerp(this.handBase.right,.5),rotation:rightBaseRotation,shape:"recover",through:true},
+      {at:rightRecovery[1],position:this.handBase.right,rotation:rightBaseRotation,weight:0,shape:"recover"});
     this._WorkingHandPath("right",t,frames);
   }
 

@@ -80,14 +80,15 @@ try {
     // remain observed while hundreds of simulated frames are advanced at once.
     g.audio.Play=(cue,options={})=>{events.push({cue,t:g.state.elapsed,options});return null;};
     g.audio.PlayGunshot=(cue,options={})=>g.audio.Play(cue,options);
-    for(const id of ["HanYang","Zb26","Type11","Type92Hmg"]){
-      Equip(id);range.SetAmmoMode("reload");g.state.ammo=1;events.length=0;
+    for(const id of ["HanYang","Zb26","Type11","Type92Hmg"])for(const startingAmmo of id==="Type11"?[0,1]:[1]){
+      Equip(id);range.SetAmmoMode("reload");g.state.ammo=startingAmmo;events.length=0;
       const start=g.state.elapsed;D.Key("KeyR");const immediate=g.state.ammo;
-      let commitS=null;
+      let commitS=null,maxOperatingTravelM=0;
       for(let n=0;n<Math.ceil((WEAPONS[id].reloadTimeS+.2)*60);n++){
-        Step(1);if(commitS===null&&g.state.ammo>1)commitS=g.state.elapsed-start;
+        Step(1);if(commitS===null&&g.state.ammo>startingAmmo)commitS=g.state.elapsed-start;
+        maxOperatingTravelM=Math.max(maxOperatingTravelM,g.viewmodel.rig.parts.operatingHandle?.position.z||0);
       }
-      data.reloads.push({id,immediate,commitS,expectedCommitS:RELOAD_EVENTS[WEAPONS[id].reloadKind].find(e=>e.id==="loaded").at*WEAPONS[id].reloadTimeS,
+      data.reloads.push({id,startingAmmo,immediate,commitS,maxOperatingTravelM,expectedCommitS:RELOAD_EVENTS[WEAPONS[id].reloadKind].find(e=>e.id==="loaded").at*WEAPONS[id].reloadTimeS,
         ammo:g.state.ammo,capacity:WEAPONS[id].magazine,complete:!g.viewmodel.action,sounds:events.filter(e=>/bolt|magIn|stripperLoad/.test(e.cue)).map(e=>({cue:e.cue,at:e.t-start}))});
     }
     Equip("HanYang");range.SetAmmoMode("reload");g.state.ammo=1;D.Key("KeyR");Step(20);D.Key("Digit3");Step(15);
@@ -150,8 +151,12 @@ try {
     Check(`${row.kindId}: reload inserts ammo during the mechanical action`,row.reloadBefore<row.reloadAfter&&row.reloadStarted==="reload",row);
     if(row.kindId==="Type92Hmg")Check("Type92 uses a visible lateral feed strip",row.family==="stripFeed"&&row.stripVisible,row);
   }
-  for(const row of report.reloads)Check(`${row.id}: ammo and sounds wait for reload events`,row.immediate===1&&Math.abs(row.commitS-row.expectedCommitS)<.04
-    &&row.ammo===row.capacity&&row.complete&&row.sounds.length>0&&row.sounds.every(s=>s.at>0),row);
+  for(const row of report.reloads){
+    Check(`${row.id}: ammo and sounds wait for reload events`,row.immediate===row.startingAmmo&&Math.abs(row.commitS-row.expectedCommitS)<.04
+      &&row.ammo===row.capacity&&row.complete&&row.sounds.length>0&&row.sounds.every(s=>s.at>0),row);
+    if(row.id==="Type11")Check(`Type11/${row.startingAmmo}: operating handle uses the original ammo snapshot`,
+      row.startingAmmo?row.maxOperatingTravelM===0:row.maxOperatingTravelM>.108,row);
+  }
   Check("Cancel before insertion keeps old ammo; after insertion keeps loaded rounds",report.cancel.early.slot==="melee"&&report.cancel.early.ammo===1
     &&report.cancel.late.slot==="melee"&&report.cancel.late.ammo===5,report.cancel);
   Check("R during the bolt action starts reload when the bolt finishes",report.queuedReload.action==="reload"&&report.queuedReload.ammo===report.queuedReload.before,report.queuedReload);
