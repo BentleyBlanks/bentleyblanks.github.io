@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "asset": "Model/Model_FpsHanYangHands.glb",
+  "baker": "_blender/Script_FpsGripCorrectiveBake.py",
+  "basis": {
+    "git": {
+      "commit": "39439df5266709417b72c558c5da752ec1d0b0a2",
+      "path": "Taierzhuang1938/Model/Model_FpsHanYangHands.glb"
+    },
+    "sha256": "15b1587cfbe4ee0522d15e71baf32eec5a5a99102fb62eed46b99ab1ed32ae01",
+    "bytes": 3688272,
+    "binaryBytes": 3667368,
+    "binarySha256": "b1b2ece23cb30fb0d18f05a6503583221c1c692d571be6356b22bdd9685ae54a",
+    "accessors": 14,
+    "bufferViews": 18,
+    "protectedDocumentSha256": "1e0565bdceccdfb0909c0e8d7e4054d6b73752391c8209d1c8da19ad2c78f1db"
+  },
+  "correctives": [
+    {
+      "name": "Grip_Zb26LeftCompression",
+      "weapon": "Zb26",
+      "side": "l",
+      "maxAuthoredPoseDeltaMm": 3.5,
+      "targetIndex": 0,
+      "material": "Material_HanYangScanSkin",
+      "vertexCount": 29019,
+      "defaultWeight": 0,
+      "minimumHandWeight": 0.95,
+      "positionZeroTolerance": 1e-10,
+      "maxBindDelta": 0.006,
+      "maximumChangedVertices": 1689,
+      "targetSha256": {
+        "POSITION": "6b9da9df0415412344dabbb191dde68a378a5ff6ff4d26b4b7b225bd02703b20",
+        "NORMAL": "cc0e823de57efee6b5362ccbf54428c1883d48bd34c036ec56c1a003ed1d4f50",
+        "TANGENT": "5c519d6c2dbc167a78d7bf41f5ef0e03a06ecf4368c1fc2d046ad5263f737a4c"
+      }
+    },
+    {
+      "name": "Grip_DadaoLeftContact",
+      "weapon": "Dadao",
+      "side": "l",
+      "maxAuthoredPoseDeltaMm": 3,
+      "targetIndex": 1,
+      "material": "Material_HanYangScanSkin",
+      "vertexCount": 29019,
+      "defaultWeight": 0,
+      "minimumHandWeight": 0.95,
+      "positionZeroTolerance": 1e-10,
+      "maxBindDelta": 0.006,
+      "maximumChangedVertices": 114,
+      "targetSha256": {
+        "POSITION": "f1e8fa69a2e493b5759811b24b89a32b00567009763560613bc181c8b91f55ce",
+        "NORMAL": "00da9dd3111decb01376d8ff307da135555dc775ce7d68c61b6acc9b7f880ffb",
+        "TANGENT": "cbe067b1abfe2903d39dd659b1bbf54aaa7c4c50820cbbf31145c6f60acc8f62"
+      }
+    },
+    {
+      "name": "Grip_DadaoRightContact",
+      "weapon": "Dadao",
+      "side": "r",
+      "maxAuthoredPoseDeltaMm": 3,
+      "targetIndex": 2,
+      "material": "Material_HanYangScanSkin",
+      "vertexCount": 29019,
+      "defaultWeight": 0,
+      "minimumHandWeight": 0.95,
+      "positionZeroTolerance": 1e-10,
+      "maxBindDelta": 0.006,
+      "maximumChangedVertices": 87,
+      "targetSha256": {
+        "POSITION": "03860ac730b648e0e0648495f5acbd6789e61dc02e5ac96e16055f52f79a1352",
+        "NORMAL": "6b5a1a23fb2e46bb572f137d97796d7b502ff062b0dfaa982ec8eb608356a9eb",
+        "TANGENT": "681d5fd7a135ea4005d5b3be539d1cd8a881e469e08411ea4c6550af56a1ffb5"
+      }
+    },
+    {
+      "name": "Grip_GrenadeBundleRightContact",
+      "weapon": "GrenadeBundle",
+      "side": "r",
+      "maxAuthoredPoseDeltaMm": 0.5,
+      "targetIndex": 3,
+      "material": "Material_HanYangScanSkin",
+      "vertexCount": 29019,
+      "defaultWeight": 0,
+      "minimumHandWeight": 0.95,
+      "positionZeroTolerance": 1e-10,
+      "maxBindDelta": 0.00065,
+      "maximumChangedVertices": 55,
+      "targetSha256": {
+        "POSITION": "dcfce14b1c33c018886b05914cb102fafb72b0f58958b503976e3109037c569e",
+        "NORMAL": "608d6ed1552aa95ff46db17bf8186020521f6ec2fca9610c703e3177cec8f265",
+        "TANGENT": "54ba7b19586f636c604e81dc65908ab57c515d77641a30ee43d5a6217d6f5306"
+      }
+    },
+    {
+      "name": "Grip_GrenadeBundleLeftSupport",
+      "weapon": "GrenadeBundle",
+      "side": "l",
+      "maxAuthoredPoseDeltaMm": 3.7,
+      "targetIndex": 4,
+      "material": "Material_HanYangScanSkin",
+      "vertexCount": 29019,
+      "defaultWeight": 0,
+      "minimumHandWeight": 0.95,
+      "positionZeroTolerance": 1e-10,
+      "maxBindDelta": 0.006,
+      "maximumChangedVertices": 657,
+      "targetSha256": {
+        "POSITION": "13ef1fb520ba378475657bae78a4dc7aa894b39d8c7ac541bdc797e4d0f986d2",
+        "NORMAL": "ce2739484ea4ebeb881fbcc04203bbcf4abc4837564550a57167c655a3235b47",
+        "TANGENT": "ef11802265899bb67ab0cca4789a8197cb716823f65a02c4db43642835ab684c"
+      }
+    }
+  ]
+}

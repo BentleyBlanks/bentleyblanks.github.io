@@ -19,7 +19,7 @@ import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } 
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Script_FpsAnatomy.mjs";
 import { LoadFpsSkeletalAnimations } from "./Script_FpsSkeletalAnimation.mjs";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261015085800", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261015194000", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",
@@ -28,6 +28,124 @@ const PROFILE_CLIPS = Object.freeze({
   throwable: "AttackCommand",
 });
 const DEG = Math.PI / 180;
+const GRIP_CORRECTIVE_POSES = Object.freeze({
+  Grip_Zb26LeftCompression: { weaponId: "Zb26", poseAliases: ["Zb26@mounted"], side: "l" },
+  Grip_DadaoLeftContact: { weaponId: "Dadao", side: "l" },
+  Grip_DadaoRightContact: { weaponId: "Dadao", side: "r" },
+  Grip_GrenadeBundleLeftSupport: { weaponId: "GrenadeBundle", side: "l" },
+  Grip_GrenadeBundleRightContact: { weaponId: "GrenadeBundle", side: "r" },
+});
+const GRIP_CORRECTIVE_ATTRIBUTES = Object.freeze(["position", "normal", "tangent"]);
+// SkeletonUtils shares geometry, including the prepared asset used for shader
+// warmup. Keep the authored buffers outside userData and carry them to each clone.
+const GRIP_CORRECTIVE_GEOMETRIES = new WeakMap();
+
+function HasGripCorrectives(mesh) {
+  return mesh.isSkinnedMesh && Object.keys(GRIP_CORRECTIVE_POSES).some(name => Number.isInteger(mesh.morphTargetDictionary?.[name]));
+}
+
+function CopyGripBasis(destination, basis) {
+  if (!basis.isInterleavedBufferAttribute) {
+    destination.array.set(basis.array);
+    return;
+  }
+  // Preserve the original stored components, including signed zero and tangent w.
+  for (let vertex = 0; vertex < basis.count; vertex++) {
+    const offset = vertex * basis.data.stride + basis.offset;
+    for (let component = 0; component < basis.itemSize; component++) {
+      destination.array[vertex * basis.itemSize + component] = basis.data.array[offset + component];
+    }
+  }
+}
+
+function CloneGripAttribute(basis) {
+  const attribute = basis.isInterleavedBufferAttribute
+    ? new THREE.BufferAttribute(new basis.data.array.constructor(basis.count * basis.itemSize), basis.itemSize, basis.normalized)
+    : basis.clone();
+  if (basis.isInterleavedBufferAttribute) CopyGripBasis(attribute, basis);
+  attribute.name = basis.name;
+  attribute.setUsage(THREE.DynamicDrawUsage);
+  return attribute;
+}
+
+function PrepareFpsGripGeometry(mesh) {
+  if (!HasGripCorrectives(mesh) || mesh._fpsGripCorrectiveData) return;
+  const source = mesh.geometry;
+  let data = GRIP_CORRECTIVE_GEOMETRIES.get(source);
+  if (!data) {
+    const basisAttributes = {};
+    for (const name of GRIP_CORRECTIVE_ATTRIBUTES) {
+      if (source.attributes[name]) basisAttributes[name] = source.attributes[name];
+    }
+    data = {
+      basisAttributes,
+      morphAttributes: { ...source.morphAttributes },
+      relative: source.morphTargetsRelative,
+    };
+  }
+  const geometry = source.clone();
+  for (const [name, basis] of Object.entries(data.basisAttributes)) geometry.setAttribute(name, CloneGripAttribute(basis));
+  // The P/N/T values are evaluated below. Leaving any GPU morph channel would
+  // both apply it twice and consume a seventeenth sampler on the scan material.
+  geometry.morphAttributes = {};
+  GRIP_CORRECTIVE_GEOMETRIES.set(geometry, data);
+  mesh.geometry = geometry;
+  mesh._fpsGripCorrectiveData = data;
+  const previousWeights = mesh.morphTargetInfluences.map(() => 0);
+  mesh._RefreshFpsGripGeometry = () => {
+    const weights = mesh.morphTargetInfluences;
+    if (weights.length === previousWeights.length && weights.every((weight, index) => weight === previousWeights[index])) return false;
+    for (const [name, basis] of Object.entries(data.basisAttributes)) {
+      const destination = geometry.attributes[name];
+      const targets = data.morphAttributes[name];
+      if (!targets?.length) continue;
+      const active = [];
+      for (let index = 0; index < targets.length; index++) {
+        if (weights[index] && targets[index]) active.push({ target: targets[index], weight: weights[index] });
+      }
+      CopyGripBasis(destination, basis);
+      if (active.length) {
+        for (let vertex = 0; vertex < basis.count; vertex++) {
+          for (let component = 0; component < Math.min(3, basis.itemSize); component++) {
+            const rest = basis.getComponent(vertex, component);
+            let value = rest;
+            for (const { target, weight } of active) {
+              value += (target.getComponent(vertex, component) - (data.relative ? 0 : rest)) * weight;
+            }
+            // One Float32 writeback after the complete sum; tangent w stays Basis.
+            destination.setComponent(vertex, component, value);
+          }
+        }
+      }
+      destination.needsUpdate = true;
+    }
+    previousWeights.length = weights.length;
+    for (let index = 0; index < weights.length; index++) previousWeights[index] = weights[index];
+    return true;
+  };
+  mesh._RefreshFpsGripGeometry();
+}
+
+async function PrepareFpsGripAsset(gltf) {
+  const meshes = [];
+  gltf.scene.traverse(mesh => { if (HasGripCorrectives(mesh)) meshes.push(mesh); });
+  // GLTFLoader imports position/normal morphs but omits glTF's VEC3 tangent
+  // deltas. Load those original accessors before removing GPU morph attributes.
+  await Promise.all(meshes.map(async mesh => {
+    const parser = gltf.parser;
+    const reference = parser?.associations.get(mesh);
+    const targets = parser?.json.meshes[reference?.meshes]?.primitives[reference?.primitives]?.targets;
+    if (targets?.some(target => target.TANGENT !== undefined)) {
+      mesh.geometry.morphAttributes.tangent = await Promise.all(targets.map(target => target.TANGENT === undefined
+        ? new THREE.Float32BufferAttribute(new Float32Array(mesh.geometry.attributes.tangent.count * 3), 3)
+        : parser.getDependency("accessor", target.TANGENT)));
+    }
+  }));
+  // The loaded template is also submitted to shader warmup, before FpsArmRig
+  // instances exist, so it must already have the same sampler-free geometry.
+  for (const mesh of meshes) PrepareFpsGripGeometry(mesh);
+  return gltf;
+}
 
 // 视图模型把真尺寸枪放在眼前展示，双臂跟着缩到同一套画面比例。肩锚留在视锥下沿
 // 外：玩家只看见袖口和手从画面下沿伸进来，不会看见没有躯干的肩截面。
@@ -79,7 +197,7 @@ function ApplyTransform(entry) {
 }
 
 function LoadOne(key) {
-  return LOADER.loadAsync(URLS[key]).catch((error) => {
+  return LOADER.loadAsync(URLS[key]).then(PrepareFpsGripAsset).catch((error) => {
     console.warn(`[RiggedModel] ${key} 读取失败，退回程序化模型：${String(error).slice(0, 180)}`);
     return null;
   });
@@ -131,6 +249,17 @@ export class FpsArmRig {
     this.root.traverse(object=>{if(object.userData.fpsFixedRestLengths)this.fixedRestLengths=true;});
     this.root.name = "RiggedFpsArmsNra01";
     this.mesh = FirstSkinnedMesh(this.root);
+    this.gripCorrectives = [];
+    this.gripCorrectiveMeshes = [];
+    this.root.traverse(mesh => {
+      if (!HasGripCorrectives(mesh)) return;
+      PrepareFpsGripGeometry(mesh);
+      this.gripCorrectiveMeshes.push(mesh);
+      for (const [name, pose] of Object.entries(GRIP_CORRECTIVE_POSES)) {
+        const index = mesh.morphTargetDictionary?.[name];
+        if (Number.isInteger(index)) this.gripCorrectives.push({ mesh, index, name, ...pose });
+      }
+    });
     this.mixer = new THREE.AnimationMixer(this.root);
     this.anchor = null;
     this.targets = null;
@@ -765,6 +894,8 @@ export class FpsArmRig {
   }
 
   Detach() {
+    for (const { mesh, index } of this.gripCorrectives) mesh.morphTargetInfluences[index] = 0;
+    for (const mesh of this.gripCorrectiveMeshes) mesh._RefreshFpsGripGeometry();
     if (this.root.parent) this.root.parent.remove(this.root);
     for (const mesh of this.legacyMeshes) mesh.visible = true;
     this.legacyMeshes.length = 0;
@@ -774,8 +905,21 @@ export class FpsArmRig {
     this.root.visible = true;
   }
 
+  // Blender's local soft-tissue shape belongs to its authored equipment grasp.
+  // The ordinary bind skin returns as that hand releases the equipment.
+  _ApplyGripCorrectives() {
+    for (const { mesh, index, weaponId, poseAliases, side } of this.gripCorrectives) {
+      // The mounted ZB uses the same authored hand frames and finger rotations.
+      const matchesPose = this.weaponId === weaponId || poseAliases?.includes(this.weaponId);
+      const holding = matchesPose ? THREE.MathUtils.clamp(this.contactWeight[side], 0, 1) : 0;
+      mesh.morphTargetInfluences[index] = holding * holding * (3 - 2 * holding);
+    }
+    for (const mesh of this.gripCorrectiveMeshes) mesh._RefreshFpsGripGeometry();
+  }
+
   Update(dt = 1 / 60) {
     if (!this.root.parent || !this.targets || !this.anchor) return;
+    this._ApplyGripCorrectives();
     this.solveDt = THREE.MathUtils.clamp(dt,0,0.05);
     this._PlaceShoulders();
     this.anchor.updateWorldMatrix(true, false);
@@ -795,6 +939,7 @@ export class FpsArmRig {
 
   /** Measure the final authored pose without modifying its bone transforms. */
   MeasureSkeletalPose() {
+    this._ApplyGripCorrectives();
     this.root.updateWorldMatrix(true,true);
     this.wristBend ||= {r:0,l:0};
     for(const side of ["r","l"]){
@@ -826,5 +971,6 @@ export class FpsArmRig {
     this.Detach();
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
+    for (const mesh of this.gripCorrectiveMeshes) mesh.geometry.dispose();
   }
 }

@@ -26,7 +26,9 @@ try{
   const {FPS_ARM_POSES:poses}=await import('./Data_FpsArmPoses.mjs');
   const T=Taierzhuang,L=T.Debug.MeleeCombat;L.Select('DadaoOne');L.Pause(true);T.StepFrames(90,1/60,false);
   const v=T.viewmodel,r=v.riggedArms,bones=[];r.root.traverse(o=>{if(o.isBone)bones.push(o);});
-  const result={clips:[],boneNames:bones.map(b=>b.name),sourceFrames:[]};
+  const result={clips:[],boneNames:bones.map(b=>b.name),sourceFrames:[],
+   camera:{projectionMatrix:T.camera.projectionMatrix.toArray(),fov:T.camera.fov,aspect:T.camera.aspect,viewport:{width:1280,height:720}},
+   strokeControlSignature:stroke.strokeControlSignature||null,runtimeStroke:structuredClone(stroke)};
   const HiltOrder=()=>Object.fromEntries(['r','l'].map(side=>{
    const root=digit=>r.fingerBones[side].find(b=>b.name.toLowerCase().endsWith('finger'+digit));
    const index=v.rig.group.worldToLocal(root(1).getWorldPosition(new THREE.Vector3()));
@@ -62,6 +64,116 @@ try{
   const model=v.rig.group.getObjectByName('Model_DadaoEdgeMount');
   if(!model)throw Error('Missing measured Dadao edge mount');
   model.updateWorldMatrix(true,true);
+  const bladeSurface=[],surfaceBox=new THREE.Box3(),weaponInverse=v.rig.group.matrixWorld.clone().invert();
+  model.traverse(o=>{
+   if(!o.isMesh)return;
+   const g=o.geometry,p=g.attributes.position,index=g.index,m=weaponInverse.clone().multiply(o.matrixWorld);
+   for(let i=0;i<(index?.count||p.count);i+=3){
+    const points=[0,1,2].map(k=>new THREE.Vector3().fromBufferAttribute(p,index?index.getX(i+k):i+k).applyMatrix4(m));
+    const box=new THREE.Box3().setFromPoints(points);surfaceBox.union(box);
+    bladeSurface.push({triangle:new THREE.Triangle(...points),box});
+   }
+  });
+  const sleeveRadii={r:0,l:0},sleeveSamples=17,sleeveRange=[.20,.68],sleeveMargin=.001;
+  const anchorInverse=v.armAnchor.matrixWorld.clone().invert();
+  for(const side of ['r','l']){
+   const elbow=r.bones[side].forearm.getWorldPosition(new THREE.Vector3()).applyMatrix4(anchorInverse);
+   const wrist=r.bones[side].hand.getWorldPosition(new THREE.Vector3()).applyMatrix4(anchorInverse);
+   const axis=wrist.clone().sub(elbow),length=axis.length();axis.normalize();
+   r.root.traverse(mesh=>{
+    if(!mesh.isSkinnedMesh)return;
+    const g=mesh.geometry,bone=mesh.skeleton.bones.indexOf(r.bones[side].forearm);if(bone<0)return;
+    const matrix=anchorInverse.clone().multiply(mesh.matrixWorld);
+    for(let i=0;i<g.attributes.position.count;i++){
+     let strongest=-1,weight=-1;
+     for(let k=0;k<4;k++){const w=g.attributes.skinWeight.getComponent(i,k);if(w>weight){weight=w;strongest=g.attributes.skinIndex.getComponent(i,k);}}
+     if(strongest!==bone)continue;
+     const point=mesh.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(matrix).sub(elbow),along=point.dot(axis),fraction=along/length;
+     if(fraction<sleeveRange[0]||fraction>sleeveRange[1])continue;
+     sleeveRadii[side]=Math.max(sleeveRadii[side],point.addScaledVector(axis,-along).length());
+    }
+   });
+   if(!sleeveRadii[side])throw Error('No measured middle-forearm sleeve surface '+side);
+  }
+  const sleeveMeshes=[];
+  r.root.traverse(mesh=>{
+   if(!mesh.isSkinnedMesh)return;
+   const g=mesh.geometry,names=mesh.skeleton.bones.map(b=>b.name.toLowerCase().replace(/[^a-z0-9]/g,'')),owner=[];
+   for(let i=0;i<g.attributes.position.count;i++){
+    let strongest=-1,weight=-1;for(let k=0;k<4;k++){const w=g.attributes.skinWeight.getComponent(i,k);if(w>weight){weight=w;strongest=g.attributes.skinIndex.getComponent(i,k);}}
+    owner.push(names[strongest]);
+   }
+   for(const side of ['r','l']){
+    const faces=[];for(let i=0;i<(g.index?.count||g.attributes.position.count);i+=3){const face=[0,1,2].map(k=>g.index?g.index.getX(i+k):i+k);if(face.some(j=>owner[j]?.endsWith(side+'forearm')))faces.push(face);}
+    if(faces.length)sleeveMeshes.push({mesh,side,faces});
+   }
+  });
+  const SurfaceBvh=items=>{
+   const box=new THREE.Box3();for(const item of items)box.union(item.box);
+   if(items.length<=12)return {box,items};
+   const size=box.getSize(new THREE.Vector3()),axis=size.x>size.y&&size.x>size.z?'x':size.y>size.z?'y':'z';
+   items.sort((a,b)=>(a.box.min[axis]+a.box.max[axis])-(b.box.min[axis]+b.box.max[axis]));const middle=items.length>>1;
+   return {box,left:SurfaceBvh(items.slice(0,middle)),right:SurfaceBvh(items.slice(middle))};
+  };
+  const swordBvh=SurfaceBvh(bladeSurface.slice());
+  const SegmentDistance=(p1,q1,p2,q2)=>{
+   const d1=q1.clone().sub(p1),d2=q2.clone().sub(p2),v=p1.clone().sub(p2),a=d1.dot(d1),e=d2.dot(d2),f=d2.dot(v);let s,t;
+   const clamp=THREE.MathUtils.clamp;
+   if(a<=1e-25&&e<=1e-25)return v.length();
+   if(a<=1e-25){s=0;t=clamp(f/e,0,1);}else{
+    const c=d1.dot(v);if(e<=1e-25){t=0;s=clamp(-c/a,0,1);}else{
+     const b=d1.dot(d2),den=a*e-b*b;s=den>1e-25?clamp((b*f-c*e)/den,0,1):0;t=(b*s+f)/e;
+     if(t<0){t=0;s=clamp(-c/a,0,1);}else if(t>1){t=1;s=clamp((b-c)/a,0,1);}
+    }
+   }
+   return v.addScaledVector(d1,s).addScaledVector(d2,-t).length();
+  };
+  const TriangleDistance=(a,b)=>{
+   const aa=[a.a,a.b,a.c],bb=[b.a,b.b,b.c],ray=new THREE.Ray(),hit=new THREE.Vector3(),closest=new THREE.Vector3();let distance=Infinity;
+   for(const [points,triangle] of [[aa,b],[bb,a]])for(let i=0;i<3;i++){
+    const edge=points[(i+1)%3].clone().sub(points[i]),length=edge.length();if(length<1e-15)continue;
+    ray.set(points[i],edge.multiplyScalar(1/length));if(ray.intersectTriangle(triangle.a,triangle.b,triangle.c,false,hit)&&hit.distanceTo(points[i])<=length+1e-10)return 0;
+   }
+   for(const point of aa){b.closestPointToPoint(point,closest);const gap=point.distanceTo(closest);if(Number.isFinite(gap))distance=Math.min(distance,gap);}
+   for(const point of bb){a.closestPointToPoint(point,closest);const gap=point.distanceTo(closest);if(Number.isFinite(gap))distance=Math.min(distance,gap);}
+   for(let i=0;i<3;i++)for(let j=0;j<3;j++)distance=Math.min(distance,SegmentDistance(aa[i],aa[(i+1)%3],bb[j],bb[(j+1)%3]));
+   if(!Number.isFinite(distance))throw Error('Non-finite sleeve/sword triangle distance');
+   return distance;
+  };
+  result.forearmClearance={radiusMeters:sleeveRadii,envelopeIsDiagnosticOnly:true,fractionRange:sleeveRange,marginMeters:sleeveMargin,
+   skinnedSubmeshes:[...new Set(sleeveMeshes.map(entry=>entry.mesh.name))],
+   method:'All actual skinned sleeve triangles clipped to the middle20–68% axis interval, including extra garment meshes; actual sword triangle distance. Circular envelopes are diagnostic only.'};
+  const SleeveClearance=(elbow,wrist,side,weapon)=>{
+   const inverse=weapon.clone().invert(),first=new THREE.Vector3().fromArray(elbow).applyMatrix4(inverse),last=new THREE.Vector3().fromArray(wrist).applyMatrix4(inverse),axis=last.clone().sub(first),length=axis.length();axis.normalize();
+   const scale=new THREE.Vector3().setFromMatrixScale(weapon);if(Math.max(scale.x,scale.y,scale.z)-Math.min(scale.x,scale.y,scale.z)>2e-5)throw Error('Remove render affine layer before sleeve clearance');
+   const unit=(scale.x+scale.y+scale.z)/3,margin=sleeveMargin/unit,worldInverse=v.rig.group.matrixWorld.clone().invert();let minimum=margin;
+   for(const entry of sleeveMeshes){
+    if(entry.side!==side)continue;
+    const matrix=worldInverse.clone().multiply(entry.mesh.matrixWorld),vertices=new Map();
+    const Vertex=i=>{if(!vertices.has(i)){const point=entry.mesh.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(matrix);vertices.set(i,{point,fraction:point.clone().sub(first).dot(axis)/length});}return vertices.get(i);};
+    for(const face of entry.faces){
+     const points=face.map(Vertex),fractions=points.map(p=>p.fraction);if(Math.min(...fractions)>.68||Math.max(...fractions)<.20)continue;
+     const box=new THREE.Box3().setFromPoints(points.map(p=>p.point)).expandByScalar(margin);if(!box.intersectsBox(surfaceBox))continue;
+     let polygon=points;
+     for(const [bound,sign] of [[.20,1],[.68,-1]]){
+      const clipped=[];for(let i=0;i<polygon.length;i++){
+       const end=polygon[i],start=polygon[(i+polygon.length-1)%polygon.length],inside=(start.fraction-bound)*sign>=0,next=(end.fraction-bound)*sign>=0;
+       if(inside!==next)clipped.push({point:start.point.clone().lerp(end.point,(bound-start.fraction)/(end.fraction-start.fraction)),fraction:bound});
+       if(next)clipped.push(end);
+      }polygon=clipped;if(!polygon.length)break;
+     }
+     for(let i=1;i<polygon.length-1;i++){
+      const triangle=new THREE.Triangle(polygon[0].point,polygon[i].point,polygon[i+1].point),bounds=new THREE.Box3().setFromPoints([triangle.a,triangle.b,triangle.c]).expandByScalar(margin),stack=[swordBvh];
+      while(stack.length){
+       const node=stack.pop();if(!node.box.intersectsBox(bounds))continue;
+       if(node.items){for(const item of node.items)if(item.box.intersectsBox(bounds))minimum=Math.min(minimum,TriangleDistance(triangle,item.triangle));}
+       else stack.push(node.left,node.right);
+      }
+     }
+    }
+   }
+   return minimum*unit;
+  };
   const band=[];
   model.traverse(o=>{if(!o.isMesh)return;const p=o.geometry.attributes.position;
    for(let i=0;i<p.count;i++){const point=model.worldToLocal(o.localToWorld(new THREE.Vector3().fromBufferAttribute(p,i)));
@@ -86,9 +198,11 @@ try{
     const modelMatrix=new THREE.Matrix4().multiplyMatrices(inverse,model.matrixWorld);
     const tip=new THREE.Vector3(0,-.012074,-.626).applyMatrix4(modelMatrix);
     const edge=new THREE.Vector3(0,1,0).transformDirection(modelMatrix);
+    const rightWrist=P(r.bones.r.hand),leftWrist=P(r.bones.l.hand),rightElbow=P(r.bones.r.forearm),leftElbow=P(r.bones.l.forearm);
     frames.push({t:i/120,tip:tip.toArray(),edge:edge.toArray(),normal:new THREE.Vector3(1,0,0).transformDirection(modelMatrix).toArray(),grip:Math.max(r.gripError.r,r.gripError.l),
-     wrist:Math.max(r.wristBend.r,r.wristBend.l),wristPair:{...r.wristBend},right:P(r.bones.r.hand),left:P(r.bones.l.hand),
-     upper:P(r.bones.r.upperArm),elbow:P(r.bones.r.forearm),leftElbow:P(r.bones.l.forearm),weapon:matrix.toArray(),hiltGripOrder:HiltOrder(),powerGrip:i%60===0?PowerGrip():null});
+     wrist:Math.max(r.wristBend.r,r.wristBend.l),wristPair:{...r.wristBend},right:rightWrist,left:leftWrist,
+     upper:P(r.bones.r.upperArm),elbow:rightElbow,leftElbow,weapon:matrix.toArray(),hiltGripOrder:HiltOrder(),powerGrip:i%60===0?PowerGrip():null,
+     sleeveClearance:{r:SleeveClearance(rightElbow,rightWrist,'r',matrix),l:SleeveClearance(leftElbow,leftWrist,'l',matrix)}});
     if(exportSource&&action==='Light')result.sourceFrames.push({bones:bones.map(b=>Matrix(b,T.camera)),weapon:Matrix(v.rig.group,T.camera)});
    }
    result.clips.push({action,duration,windup:spec.windup,active:spec.active,frames});
@@ -111,8 +225,14 @@ try{
   const transition=SampleMeleeVideo({clip:'DadaoParryLeft',action:'ParryLeft',normalized:0,transition:{from,mix:0}});
   result.interruptionError=Math.max(...previous.values.map((n,i)=>Math.abs(n-transition.values[i])));
   return result;
- },process.argv.includes('--export-source'));
+ // Every acceptance run freezes its actual Light bone/weapon matrices. A
+ // default prepush run must never leave a previous sourceBake beside new data.
+ },true);
  if(process.argv.includes('--trace'))fs.writeFileSync(path.join(out,'Data_DadaoSwingTrace.json'),JSON.stringify(data));
+ assert.equal(data.sourceFrames.length,121,'Acceptance must capture fresh actual Light source matrices');
+ assert.deepEqual(data.runtimeStroke,FPS_DADAO_SWING,'Runtime stroke differs from the current authored data, including fitted elbows and action parameters');
+ fs.writeFileSync(path.join(out,'Data_DadaoSourceBake.json'),JSON.stringify({boneNames:data.boneNames,frames:data.sourceFrames,camera:data.camera,strokeControlSignature:data.strokeControlSignature,runtimeStroke:data.runtimeStroke,captureRole:'ProductionDadaoSwingTest',capturedAt:new Date().toISOString()}));
+ assert.equal(FPS_DADAO_SWING.elbowFitStatus,'fitted','Export the bootstrap trace, fit the current grip elbows in Blender, then rebake before acceptance');
  assert(Object.values(data.hiltGripOrder).every(distance=>distance<-.04),'Both sword hands must have index knuckles toward the blade; a reversed support palm hooks the pommel');
  const Dist=(a,b)=>Math.hypot(...a.map((n,i)=>n-b[i]));
  assert(data.cutPlaneDriftDeg<.1,`Blade twists during downstroke/follow-through: ${data.cutPlaneDriftDeg} degrees`);
@@ -125,6 +245,8 @@ try{
    assert(Math.acos(Math.min(1,Math.max(-1,dot)))*180/Math.PI<.1,`${clip.action} ${f.t}: blade rolls out of its cutting plane`);
    assert(f.grip<=FPS_ARM_LIMITS.positionResidualM,`${clip.action}: grip ${f.grip}`);
    assert(f.wrist<=FPS_ARM_LIMITS.wristBendDeg+.01,`${clip.action} ${f.t}: wrist ${f.wrist} ${JSON.stringify(f.wristPair)}`);
+   for(const side of ['r','l'])assert(f.sleeveClearance[side]>=data.forearmClearance.marginMeters-2e-5,
+    `${clip.action} ${f.t}: ${side} middle sleeve intersects measured sword surface (${f.sleeveClearance[side]} m clearance)`);
    if(f.powerGrip){
     assert(f.powerGrip.thumbToIndexM<.003,`${clip.action} ${f.t}: thumb must close onto the curled index (${f.powerGrip.thumbToIndexM} m)`);
     assert(f.powerGrip.indexKnuckleZ>.004,`${clip.action} ${f.t}: dominant hand must sit below the guard`);
@@ -136,10 +258,8 @@ try{
   for(let i=1;i<clip.frames.length;i++)for(const key of ['elbow','leftElbow'])
    assert(Dist(clip.frames[i-1][key],clip.frames[i][key])<.085,`${clip.action} ${clip.frames[i].t}: elbow flips between frames`);
   if(clip.action==='Charge')continue;
-  for(const f of clip.frames.filter(f=>f.t>=.55&&f.t<=.85)){
-   assert(f.elbow[1]<f.right[1]-.035,`${clip.action} ${f.t}: dominant elbow folds over the grip`);
-   assert(f.leftElbow[1]<f.left[1]-.035,`${clip.action} ${f.t}: support elbow folds over the grip`);
-  }
+  // A narrow-side grasp permits the hand to finish below its elbow. The
+  // measured sleeve/sword geometry above replaces the old screen-Y proxy.
   const start=Math.ceil(clip.windup/clip.duration*120),end=Math.floor((clip.windup+clip.active)/clip.duration*120);
   let travel=0,alignment=0,peak=0;
   for(let i=start;i<end;i++){
@@ -179,7 +299,6 @@ try{
  await page.waitForFunction(()=>Math.abs(Taierzhuang.camera.aspect-1280/720)<1e-4,null,{timeout:10000});
  const powerGrip=data.clips.flatMap(clip=>clip.frames.filter(f=>f.powerGrip).map(f=>({action:clip.action,t:f.t,...f.powerGrip})));
  fs.writeFileSync(path.join(out,'Data_DadaoSwingAcceptance.json'),JSON.stringify({metrics,visibility,powerGrip,hiltGripOrder:data.hiltGripOrder,cutPlaneDriftDeg:data.cutPlaneDriftDeg,interruptionError:data.interruptionError,recoverySeekError:data.recoverySeekError},null,2));
- if(data.sourceFrames.length)fs.writeFileSync(path.join(out,'Data_DadaoSourceBake.json'),JSON.stringify({boneNames:data.boneNames,frames:data.sourceFrames}));
  for(const phase of [0,.24,.34,.4,.55,.85]){
   // ResizeObserver and the temporal render targets must settle before the first
   // capture. A single immediate frame after resizing can be an empty buffer.

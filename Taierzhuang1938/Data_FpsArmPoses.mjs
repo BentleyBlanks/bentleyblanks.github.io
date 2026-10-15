@@ -6,6 +6,7 @@
 //
 // 坐标：武器局部 -Z 朝前、+Y 向上、+X 向右；rotation 是 YXZ 欧拉角。
 import { FPS_WEAPON_GRIPS } from "./Data_FpsWeaponGrips.mjs";
+import { FPS_DADAO_SWING } from "./Data_FpsDadaoSwing.mjs";
 
 
 const Freeze = (value) => Object.freeze(value);
@@ -173,7 +174,7 @@ export const FPS_ARM_POSES = Freeze({
     actions: { throw: { family: "bundleGrenade", release: 0.50 } },
   }),
   Dadao: WeaponPose({
-    family: "melee", hip: FixedPose(V(0.235, -0.195, -0.520), V(0.942425592, -0.447601613, -0.535596284)), ads: FixedPose(V(0.175, -0.170, -0.470), V(0.900, -0.540, -1.500)), sprint: FixedPose(V(0.255, -0.225, -0.500), V(-0.130, -0.520, 1.890)),
+    family: "melee", hip: FixedPose(V(...FPS_DADAO_SWING.guardWeaponPosition), V(...FPS_DADAO_SWING.guardWeaponRotation)), ads: FixedPose(V(0.175, -0.170, -0.470), V(0.900, -0.540, -1.500)), sprint: FixedPose(V(0.255, -0.225, -0.500), V(-0.130, -0.520, 1.890)),
     ...FPS_WEAPON_GRIPS.Dadao,
     actions: { melee: { family: "dadao", release: 0.18 } },
   }),

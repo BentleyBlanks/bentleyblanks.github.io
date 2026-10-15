@@ -59,8 +59,8 @@ export function SampleMeleeVideo(pose, transition = true) {
     const rotation = new THREE.Quaternion().fromArray(a,3).slerp(new THREE.Quaternion().fromArray(b,3),mix).normalize();
     rotation.toArray(values,3);
     if(authored && /Compact/.test(pose.action)) {
-      for(let j=0;j<3;j++)values[j]*=.8;
-      new THREE.Quaternion().slerp(rotation,.85).toArray(values,3);
+      for(let j=0;j<3;j++)values[j]*=clip.compactPositionScale;
+      new THREE.Quaternion().slerp(rotation,clip.compactRotationScale).toArray(values,3);
     }
     // Blend evaluated motion in one space. Applying the destination clip's
     // amplitude after a transition would also rescale its outgoing pose.

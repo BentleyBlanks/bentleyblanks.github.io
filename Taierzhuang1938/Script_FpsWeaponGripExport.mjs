@@ -44,16 +44,29 @@ try{
      pads[`${side}${digit}2`]={bone:bone.name,point:point.toArray()};
     }
    }
-   arms.root.traverse(mesh=>{if(!mesh.isSkinnedMesh||!mesh.visible)return;const geo=mesh.geometry,n=geo.attributes.position.count,pos=[],infl=[],wts=[],v=new THREE.Vector3();
+   arms.root.traverse(mesh=>{if(!mesh.isSkinnedMesh||!mesh.visible)return;mesh._RefreshFpsGripGeometry?.();const geo=mesh.geometry,n=geo.attributes.position.count,pos=[],infl=[],wts=[],v=new THREE.Vector3();
+    const correctiveData=mesh._fpsGripCorrectiveData,basisAttributes=correctiveData?.basisAttributes||geo.attributes,
+      logicalMorphs=correctiveData?.morphAttributes||geo.morphAttributes,morphRelative=correctiveData?.relative??geo.morphTargetsRelative;
+    const morphWeights=mesh.morphTargetInfluences||[],activeMorph=morphWeights.some(weight=>Math.abs(weight)>1e-8);
+    const AttributeValues=attribute=>attribute?Array.from({length:attribute.count},(_,i)=>[attribute.getX(i),attribute.getY(i),attribute.getZ(i)]).flat():null;
+    const PreSkin=name=>{const attribute=geo.attributes[name];if(!attribute)return null;const targets=geo.morphAttributes[name]||[],p=new THREE.Vector3(),delta=new THREE.Vector3(),values=[];
+     // CPU corrective attributes already contain the logical morph blend.
+     // Read them once; adding the saved targets here would double the shape.
+     if(correctiveData)return AttributeValues(attribute);
+     for(let i=0;i<n;i++){p.fromBufferAttribute(attribute,i);for(let j=0;j<targets.length;j++)if(morphWeights[j]){delta.fromBufferAttribute(targets[j],i);if(!geo.morphTargetsRelative)delta.sub(v.fromBufferAttribute(attribute,i));p.addScaledVector(delta,morphWeights[j]);}if(name==='normal'&&activeMorph)p.normalize();values.push(...p.toArray());}return values;};
     for(let i=0;i<n;i++){mesh.getVertexPosition(i,v).applyMatrix4(mesh.matrixWorld).applyMatrix4(inv);pos.push(...v.toArray().map(R));for(let j=0;j<4;j++){infl.push(geo.attributes.skinIndex.getComponent(i,j));wts.push(geo.attributes.skinWeight.getComponent(i,j));}}
     skin.push({name:mesh.name,pos,idx:geo.index?Array.from(geo.index.array):null,bones:mesh.skeleton.bones.map(b=>b.name),infl,wts,
-      rest:Array.from(geo.attributes.position.array),uv:geo.attributes.uv?Array.from(geo.attributes.uv.array):null,
-      normals:geo.attributes.normal?Array.from({length:n},(_,i)=>[geo.attributes.normal.getX(i),geo.attributes.normal.getY(i),geo.attributes.normal.getZ(i)]).flat():null,
+      // rest/normals are evaluated before skinning, so exact CPU LBS also
+      // reproduces a loaded grip corrective. baseRest remains asset provenance.
+      rest:PreSkin('position'),baseRest:correctiveData||activeMorph?AttributeValues(basisAttributes.position):undefined,
+      morphState:logicalMorphs.position?.length?{names:mesh.morphTargetDictionary,weights:Array.from(morphWeights),relative:morphRelative,evaluation:correctiveData?'cpu-attributes':undefined}:null,
+      uv:geo.attributes.uv?Array.from(geo.attributes.uv.array):null,normals:PreSkin('normal'),
+      baseNormals:(correctiveData||activeMorph)&&basisAttributes.normal?AttributeValues(basisAttributes.normal):undefined,
       bindMatrix:mesh.bindMatrix.toArray(),inverseBinds:mesh.skeleton.boneInverses.map(m=>m.toArray()),
       materialNames:[].concat(mesh.material).map(m=>m.name)});
    });
    const bones=[];arms.root.traverse(o=>{if(o.isBone)bones.push(o);});
-   return {weapon:vm.weaponId,armPose:vm.armPoseKey,contacts:vm.armPose.contacts,gun,chain,pads,skin,fixedRestLengths:arms.fixedRestLengths,report:arms.report,
+   return {weapon:vm.weaponId,armPose:vm.armPoseKey,contacts:vm.armPose.contacts,gun,chain,pads,skin,fixedRestLengths:arms.fixedRestLengths,report:arms.report,wristBend:{...arms.wristBend},contactWeight:{...arms.contactWeight},
     boneNames:bones.map(b=>b.name),boneParents:bones.map(b=>b.parent?.isBone?b.parent.name:null),boneMatrices:bones.map(b=>b.matrixWorld.toArray()),weaponMatrix:G.matrixWorld.toArray(),cameraMatrix:T.camera.matrixWorld.toArray(),armMatrix:arms.root.matrixWorld.toArray()};
   });
   await fs.writeFile(path.join(out,`Data_${id}.json`),JSON.stringify(pkg));console.log(id,JSON.stringify(pkg.report));

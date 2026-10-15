@@ -72,8 +72,15 @@ for m in new['materials']:RemapTextures(m)
 for p in newMesh['primitives']:
  p['indices']+=accessorOffset;p['material']+=materialOffset
  for key in p['attributes']:p['attributes'][key]+=accessorOffset
+ for target in p.get('targets',[]):
+  for key in target:target[key]+=accessorOffset
 for key in ['bufferViews','accessors','images','textures','samplers','materials']:doc.setdefault(key,[]).extend(new.get(key,[]))
 doc['meshes'][oldMeshIndex]['primitives']=newMesh['primitives']
+# Preserve authored corrective names/defaults when a full surface rebuild is
+# requested. Append-only corrective baking uses Script_FpsGripCorrectiveBake.
+for key in ['weights','extras']:
+ if key in newMesh:doc['meshes'][oldMeshIndex][key]=copy.deepcopy(newMesh[key])
+ elif key in doc['meshes'][oldMeshIndex]:del doc['meshes'][oldMeshIndex][key]
 for key in ['extensionsUsed','extensionsRequired']:doc[key]=list(dict.fromkeys(doc.get(key,[])+new.get(key,[])))
 doc['buffers'][0]['byteLength']=len(binary)
 doc['asset'].setdefault('extras',{})['handSurfaceCandidate']={'source':'Artec Group inc., Hand scan','url':'https://www.artec3d.com/3d-models/hand','license':'CC BY 3.0, bundled archive license','modifications':'landmark fit, volume-preserving warp, decimation, rig weights, wrist transitions, texture transfer','sourceBlend':'Model_FpsScannedHandPrototype.blend'}

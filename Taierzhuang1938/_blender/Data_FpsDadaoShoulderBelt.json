@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "authoringTask": "FpsGripConformity_20261015",
+  "sourceTraceSignature": "76af827cf340978292bf4f4d22435aa46448fde497b60c1b64cee6262fb64bd3",
+  "kinematicSignature": "14b1a9476159edc2cf602d6d20e740ca1009ccfc601bdaa4c69fc385581ac5c3",
+  "sourceArmLength": 0.57233826,
+  "sourceToRuntimeScale": 0.9756173748889421,
+  "rotationVectorDeg": [
+    -9.715117426354174,
+    -3.4398597118550702,
+    -14.83815759470402
+  ],
+  "translationAnchorMeters": [
+    0.004121003195214855,
+    0.008626649497596837,
+    -0.0029489544013892844
+  ],
+  "weightRise": [
+    0.28,
+    0.43
+  ],
+  "weightFall": [
+    0.58,
+    0.78
+  ],
+  "weightInterpolation": "quintic smootherstep product",
+  "maximumShoulderDisplacementMm": [
+    35.193783172857856,
+    54.33741226003437
+  ],
+  "maximumShoulderWidthErrorMeters": 1.1102230246251565e-16,
+  "targetMinimumWristDeg": 63.0,
+  "maximumPredictedMinimumWristDeg": [
+    48.86959646351854,
+    63.00000000000047
+  ],
+  "forearmClearance": {
+    "fractionRange": [
+      0.2,
+      0.68
+    ],
+    "samples": 17,
+    "marginMeters": 0.001,
+    "sourceBasisSha256": "15b1587cfbe4ee0522d15e71baf32eec5a5a99102fb62eed46b99ab1ed32ae01",
+    "measurement": "Maximum actual forearm-owned skin radius over elbow-to-wrist fractions .20\u2013.68, from frozen06 posed source; excludes wrist/hand connection. Distance sampling includes half-step Lipschitz allowance.",
+    "radiusMeters": {
+      "r": 0.057243596483024475,
+      "l": 0.06162117202159535
+    }
+  },
+  "weaponSurfaceSha256": "e9b02d16a67609bd7cd9b815fa02d504ba798d6619c3d3f2033ff2ff05c836b0",
+  "notes": "Rigid shoulder-pair rotation about its midpoint plus small common translation. Prop trajectory, hand local contact frames and arm lengths are unchanged. First/last offsets are exactly zero; gameplay actions share source phase mapping."
+}

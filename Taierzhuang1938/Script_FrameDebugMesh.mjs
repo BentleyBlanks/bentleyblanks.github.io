@@ -30,7 +30,50 @@ export class FrameDebugMesh {
     const geometry = ref.geometry.clone(); this.geometry = geometry;
     const position = geometry.attributes.position;
     // Bake the displayed pose, including skin and morph targets, into the preview.
-    if (ref.object.getVertexPosition && (ref.object.isSkinnedMesh || ref.object.morphTargetInfluences)) {
+    const corrective = ref.object._fpsGripCorrectiveData;
+    if (corrective) {
+      const p = new THREE.Vector3(), preSkin = new THREE.Vector3(), base = new THREE.Vector3(), delta = new THREE.Vector3(), direction = new THREE.Vector3();
+      const read = (name, index, result) => {
+        const attribute = geometry.attributes[name], basis = corrective.basisAttributes[name];
+        if (!attribute || !basis) return false;
+        // At one, display the actual CPU Float32 attributes. At zero, recover
+        // immutable Basis; intermediate values use the saved logical targets.
+        if (morph === 1) result.fromBufferAttribute(ref.geometry.attributes[name], index);
+        else {
+          result.fromBufferAttribute(basis, index); base.copy(result);
+          const targets = corrective.morphAttributes[name] || [];
+          for (let j = 0; j < targets.length; j++) {
+            if (!targets[j]) continue;
+            delta.fromBufferAttribute(targets[j], index);
+            if (!corrective.relative) delta.sub(base);
+            result.addScaledVector(delta, (ref.object.morphTargetInfluences?.[j] || 0) * morph);
+          }
+          // Match the backend's single attribute writeback before skinning.
+          attribute.setXYZ(index, result.x, result.y, result.z);
+          result.fromBufferAttribute(attribute, index);
+        }
+        return true;
+      };
+      for (let i = 0; i < position.count; i++) {
+        read('position', i, p);
+        preSkin.copy(p);
+        if (ref.object.isSkinnedMesh) ref.object.applyBoneTransform(i, p);
+        position.setXYZ(i, p.x, p.y, p.z);
+        for (const name of ['normal', 'tangent']) {
+          if (!read(name, i, direction)) continue;
+          if (ref.object.isSkinnedMesh) {
+            direction.add(preSkin);
+            ref.object.applyBoneTransform(i, direction);
+            direction.sub(p).normalize();
+          }
+          geometry.attributes[name].setXYZ(i, direction.x, direction.y, direction.z);
+          if (name === 'tangent' && geometry.attributes[name].itemSize > 3)
+            geometry.attributes[name].setW(i, corrective.basisAttributes[name].getW(i));
+        }
+      }
+      geometry.deleteAttribute('skinIndex'); geometry.deleteAttribute('skinWeight'); geometry.morphAttributes = {};
+      if (!geometry.attributes.normal) geometry.computeVertexNormals();
+    } else if (ref.object.getVertexPosition && (ref.object.isSkinnedMesh || ref.object.morphTargetInfluences)) {
       const p = new THREE.Vector3(), base = new THREE.Vector3(), delta = new THREE.Vector3();
       for (let i = 0; i < position.count; i++) {
         base.fromBufferAttribute(ref.geometry.attributes.position, i); p.copy(base);

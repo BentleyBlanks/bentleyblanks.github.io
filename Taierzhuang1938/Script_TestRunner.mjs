@@ -263,6 +263,7 @@ export const testDefs = {
   FlareTest: { file: "Script_FlareTest.mjs", desc: "照明弹：五相位时间线、光强包络、敌我暴露倍率与暗适应、姿态比例不变、定时序列、音效降级（纯 Node，毫秒级）" },
   TelegraphTest: { file: "Script_TelegraphTest.mjs", desc: "发报：码组推进、接头松脱与重连、报码纸勾选、走开进度保留、两个交互点预制、音效降级（纯 Node，毫秒级）" },
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
+  FpsGripCorrectiveAssetTest: { file: "Script_FpsGripCorrectiveAssetTest.mjs", desc: "握持 ShapeKey：原 GLB 前缀与描述不变、默认关闭、三通道与手部权重隔离（纯 Node）" },
   ProneCrawlTest: { file: "Script_ProneCrawlTest.mjs", timeoutMs: 300000, desc: "Shared Blender crawl: visible limbs, distance clock, terrain contact, fixed bone lengths and loop seam" },
   ActorLocomotionTest: { file: "Script_ActorLocomotionTest.mjs", timeoutMs: 240000, desc: "实测步幅、世界支撑脚、转弯与位移时钟" },
   IjaAlertGaitTest: { file: "Script_IjaAlertGaitTest.mjs", desc: "01 日军先头兵警戒持枪小跑/走/站（BlenderMCP 烘焙）：循环接缝、双手够到枪且每步不拧袖、枪口朝前下、头扫视、小跑有腾空、七套模型骨名能绑、导演入场用 alert+trot 并到位甩枪上背" },
@@ -356,6 +357,7 @@ export const testDefs = {
   MeleeAnimationTest: { file: "Script_MeleeAnimationTest.mjs", timeoutMs: 15 * 60 * 1000, desc: "Blender 全骨骼与第一人称 54 动作、握持可见性及源工程样本" },
   GrenadeThrowTest: { file: "Script_GrenadeThrowTest.mjs", timeoutMs: 600000, desc: "Grenade repaired hands, full throw anatomy and release" },
   DadaoSwingTest: { file: "Script_DadaoSwingTest.mjs", timeoutMs: 10 * 60 * 1000, desc: "Dadao cutting-edge travel, speed, recovery, grip and wrist limits" },
+  FpsDadaoProjectionTest: { file: "Script_FpsDadaoProjectionTest.mjs", timeoutMs: 10 * 60 * 1000, desc: "大刀实际相机斜劈、刀身可读性与左下随势（五种攻击、两种画幅）" },
   MeleeCombatTest: { file: "Script_MeleeCombatTest.mjs", desc: "通用白刃规则、拨挡窗口、F 推架、两类僵持、伤害和多人隔离（纯 Node）" },
   MeleeQteTest: { file: "Script_MeleeQteTest.mjs", desc: "白刃 QTE（?melee=1）：独立战斗、站立/倒地成功失败、真实输入、接触、骨骼与画面" },
   MeleeKillBloodTest: { file: "Script_MeleeKillBloodTest.mjs", desc: "玩家真实大刀击杀日军：两张真透明局部溅血随机切换、非受伤与短时淡出" },
@@ -564,7 +566,7 @@ export const browserTests = new Set([
   'FirstLevelP012AnimationTest',
   'FirstLevelP012TerrainBrowserTest',
   "TrainLibraryTest",
-  'ProneCrawlTest', 'ActorLocomotionTest', 'BackRifleRunTest', 'MeleeAnimationTest', 'DadaoSwingTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
+  'ProneCrawlTest', 'ActorLocomotionTest', 'BackRifleRunTest', 'MeleeAnimationTest', 'DadaoSwingTest', 'FpsDadaoProjectionTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
   "HitReactionBrowserTest", "NeckDeathBrowserTest",
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
   "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest",
@@ -713,7 +715,7 @@ export const domains = {
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmActionsTest", "FirearmHandlingBrowserTest", "FirearmResponseBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsGripCorrectiveAssetTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "FpsDadaoProjectionTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "ModelFacingTest",
       // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
       "HitReactionTest", "HitReactionBrowserTest",
@@ -808,6 +810,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "combat", pattern: /FpsGripCorrective|FpsZbContactGeometry|Script_RiggedModel\.mjs/ },
   {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|page-flip|Texture\/Menu\/History\//},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },
   {domain:"textureAssets",pattern:/(?:AssetPublish|BuildPublishAssets|ValidatePublishAssets|PublishCache|PublishAssets|ModelImports)/},
@@ -921,7 +924,7 @@ const changedDomainRules = [
   {domain:"firstLevel",pattern:/FirstLevel(Bunker|Collection|BorrowLight|VillageBlock|TransferCart|QuietMarch|Bridge|NightGate)|Data_Tuning_FirstLevel(Front|Mid|End)|FirstLevel(Front|Mid|End)Test/},
   // 屋内伏击那一拍 2026.09.19 下线（09 改成连屋近战，担架不进屋）：采样器与它的门禁已删，
   // Animation/FirstLevelAmbush/ 的 JSON 保留但已无消费者，改它不再牵动任何测试。
-  {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
+  {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|FpsDadao|Animation\/FirstPerson\/Data_Fps/},
   { domain: "combat", pattern: /CoverLean/i },
   // 断肢：规则/数值/视觉三层与测试场都归 combat（它挂在 TakeHit/Kill 那条链上）。
   { domain: "combat", pattern: /Gore|Dismember|Blood|CharacterWounds|SurfaceDecals/i },

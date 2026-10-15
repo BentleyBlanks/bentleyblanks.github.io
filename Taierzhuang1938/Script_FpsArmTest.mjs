@@ -1,6 +1,7 @@
 // 第一人称共享双臂的人体闸：覆盖全部逐枪姿势、状态和机械动作。
 
 import path from "node:path";
+import fs from "node:fs";
 import { WEAPONS, SHELVED_WEAPONS } from "./Data_Weapons.mjs";
 const onlyIds = process.argv.find((arg) => arg.startsWith("--only="))?.slice(7).split(",") || null;
 // 姿势数据仍要逐枪齐全（expectedIds 不排除停用武器）；但停用的手枪不再装上去逐状态量握持。
@@ -17,6 +18,15 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
 page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+const acceptanceFile = path.join(projectDir, "_shots", "FpsArm", "Data_FpsArmAcceptance.json");
+let acceptanceReport = null;
+const checks = [];
+const SaveAcceptance = (phase, extra = {}) => {
+  fs.mkdirSync(path.dirname(acceptanceFile), { recursive: true });
+  fs.writeFileSync(acceptanceFile, JSON.stringify({ phase, onlyIds, report: acceptanceReport, checks, errors,
+    ...extra }, null, 2));
+};
+SaveAcceptance("started");
 
 try {
 // The production firearm range has the same player/viewmodel host and avoids
@@ -74,8 +84,7 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
       const indices = node.geometry.index;
       const toAnchor = new THREE.Matrix4().copy(inverseAnchor).multiply(node.matrixWorld);
       const deformed = Array.from({ length: positions.count }, (_, index) => {
-        const point = new THREE.Vector3().fromBufferAttribute(positions, index);
-        node.applyBoneTransform(index, point);
+        const point = node.getVertexPosition(index, new THREE.Vector3());
         return point.applyMatrix4(toAnchor);
       });
       const Edge = (a, b) => { maximum = Math.max(maximum, deformed[a].distanceTo(deformed[b])); };
@@ -98,9 +107,73 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
     handTranslation: { ...arms.handTranslation }, stretch: { ...arms.stretch },
     reachRatio: { ...arms.reachRatio }, reachable: { ...arms.reachable },
     jointTwist: structuredClone(arms.jointTwist), contactWeight: { ...arms.contactWeight },
+    gripCorrectives: CorrectiveWeights(arms),
     skinMaxEdgeM: SkinMaxEdgeM(),
   });
+  const morphProbeCache = new WeakMap();
+  const CorrectiveWeights = rig => rig.gripCorrectives.map(({ mesh, index, name, weaponId, side }) => {
+    const data = mesh._fpsGripCorrectiveData, gpu = mesh.geometry.morphAttributes;
+    return { name, weaponId, side, weight: mesh.morphTargetInfluences[index],
+      evaluation: data ? "cpu-attributes" : "gpu-morph",
+      gpuMorphPositionCount: gpu.position?.length || 0,
+      gpuMorphTargetSlots: Object.values(gpu).reduce((sum, channels) => sum + channels.length, 0),
+      evaluatedVertexCount: mesh.geometry.attributes.position.count,
+      originalBasisAttributes: Object.fromEntries(["position", "normal", "tangent"].map(semantic =>
+        [semantic, data?.basisAttributes?.[semantic]?.count || 0])),
+      originalMorphAttributes: Object.fromEntries(["position", "normal", "tangent"].map(semantic =>
+        [semantic, { targets: data?.morphAttributes?.[semantic]?.length || 0,
+          vertices: data?.morphAttributes?.[semantic]?.[index]?.count || 0 }])),
+    };
+  });
+  // Keep the current bones fixed. Compare the real evaluated skin with its
+  // Basis and full corrective, rather than reproducing the controller curve.
+  const MorphGeometry = () => {
+    arms.anchor.updateWorldMatrix(true, false); arms.root.updateWorldMatrix(true, true);
+    const inverse = arms.anchor.matrixWorld.clone().invert();
+    return arms.gripCorrectives.filter(c => c.weaponId === arms.weaponId).map(c => {
+      let cached = morphProbeCache.get(c.mesh);
+      if (!cached) { cached = new Map(); morphProbeCache.set(c.mesh, cached); }
+      let probes = cached.get(c.index);
+      if (!probes) {
+        const data = c.mesh._fpsGripCorrectiveData;
+        const target = (data?.morphAttributes || c.mesh.geometry.morphAttributes).position?.[c.index];
+        const basis = (data?.basisAttributes || c.mesh.geometry.attributes).position;
+        const relative = data?.relative ?? c.mesh.geometry.morphTargetsRelative;
+        const ranked = target ? Array.from({ length: target.count }, (_, i) => {
+          const delta = new THREE.Vector3().fromBufferAttribute(target, i);
+          if (!relative) delta.sub(new THREE.Vector3().fromBufferAttribute(basis, i));
+          return { index: i, length: delta.length() };
+        }).filter(p => p.length > 1e-8).sort((a, b) => b.length - a.length) : [];
+        probes = ranked.slice(0, 24).map(p => p.index); cached.set(c.index, probes);
+      }
+      const influences = c.mesh.morphTargetInfluences, saved = influences.slice();
+      const toAnchor = inverse.clone().multiply(c.mesh.matrixWorld);
+      const Read = () => probes.map(i => c.mesh.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(toAnchor));
+      const Refresh = () => c.mesh._RefreshFpsGripGeometry?.();
+      try {
+        // Read the actual runtime geometry before changing logical weights.
+        // CPU baking must already have synchronized it during the real update.
+        const actual = Read(); influences.fill(0); Refresh(); const basis = Read();
+        influences[c.index] = 1; Refresh(); const full = Read();
+        const currentDistances = actual.map((p, i) => p.distanceTo(basis[i]));
+        const fullDistances = full.map((p, i) => p.distanceTo(basis[i]));
+        const sum = values => values.reduce((a, b) => a + b, 0);
+        return { name: c.name, side: c.side, probeCount: probes.length, weight: saved[c.index],
+          currentMaximumM: Math.max(0, ...currentDistances), fullMaximumM: Math.max(0, ...fullDistances),
+          actualToFullRatio: sum(currentDistances) / Math.max(sum(fullDistances), 1e-20) };
+      } finally { saved.forEach((value, i) => { influences[i] = value; }); Refresh(); }
+    });
+  };
+  const MorphState = (label, extra = {}) => ({ label, weapon: vm.weaponId, t: vm.action?.t ?? null,
+    activeAction: vm.action?.kind || null,
+    action: vm.action ? { kind: vm.action.kind, offhand: !!vm.action.offhand, t: vm.action.t } : null,
+    operation: Object.fromEntries(["r", "l"].map(side => [side, arms.operationPose[side] ? {
+      shape: arms.operationPose[side].shape || null, nextShape: arms.operationPose[side].nextShape || null,
+      source: arms.operationPose[side].source || null,
+    } : null])),
+    contactWeight: { ...arms.contactWeight }, weights: CorrectiveWeights(arms), geometry: MorphGeometry(), ...extra });
   const out = {
+    morphLifecycle: [], morphPool: [],
     reloadCases: [],
     reloadMotion: [],
     cases: [], weaponIds: Object.keys(FPS_ARM_POSES), limits: FPS_ARM_LIMITS,
@@ -199,11 +272,114 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
           && Math.abs(vm.reloadPivot.quaternion.w - 1) < 1e-8 });
     }
   }
+  const runBundleMorph = (!onlyIds || onlyIds.includes("GrenadeBundle")) && !shelved.includes("GrenadeBundle");
+  const runOperationMorph = runBundleMorph || ((!onlyIds || onlyIds.includes("Zb26")) && !shelved.includes("Zb26"));
+  out.morphExpected = { bundle: runBundleMorph, operation: runOperationMorph };
+  let heldBundleRig = null;
+  if (runBundleMorph) {
+    Equip("GrenadeBundle"); Step(90); out.morphLifecycle.push(MorphState("bundleHeld"));
+    vm.TriggerThrow(1);
+    const intermediate = []; let guard = 0;
+    while (vm.action && vm.action.t < .60 && guard++ < 240) {
+      Step(1);
+      const keys = CorrectiveWeights(arms).filter(c => c.weaponId === "GrenadeBundle");
+      if (keys.length === 2 && keys.every(c => c.weight > .02 && c.weight < .98))
+        intermediate.push(MorphState("bundleIntermediate"));
+    }
+    if (intermediate.length) out.morphLifecycle.push({ ...intermediate[0], label: "bundleMidEarly" },
+      { ...intermediate[intermediate.length - 1], label: "bundleMidLate" });
+    while (vm.action && vm.action.t < .65 && guard++ < 300) Step(1);
+    out.morphLifecycle.push(MorphState("bundleReleased", { actionStillRunning: !!vm.action }));
+    // Begin switching with nonzero keys, so Detach cannot pass vacuously after release.
+    Equip("GrenadeBundle"); Step(60); heldBundleRig = arms;
+    const before = CorrectiveWeights(heldBundleRig);
+    Equip("Zb26"); Step(60);
+    out.morphPool.push({ label: "bundleToZb", weapon: "Zb26", before, oldDetached: !heldBundleRig.root.parent,
+      oldWeights: CorrectiveWeights(heldBundleRig), activeWeights: CorrectiveWeights(arms),
+      independentInfluences: heldBundleRig.gripCorrectives.every(old => arms.gripCorrectives.some(current =>
+        current.name === old.name && current.mesh.morphTargetInfluences !== old.mesh.morphTargetInfluences)) });
+  }
+  if (runOperationMorph) {
+    if (!runBundleMorph) { Equip("Zb26"); Step(60); }
+    vm.TriggerReload(); let reloadGuard = 0;
+    while (vm.action && !(arms.contactWeight.r < .001 && arms.contactWeight.l > .999) && reloadGuard++ < 300) Step(1);
+    out.morphLifecycle.push(MorphState("reloadLeftSupport"));
+    while (vm.action && reloadGuard++ < 600) Step(1);
+    Step(60);
+    out.morphLifecycle.push(MorphState("operationHeld")); vm.TriggerThrow(1); let guard = 0;
+    // Zb magazine work is done by the right hand; the left keeps supporting it.
+    // Its real offhand throw releases the left hand and therefore its left key.
+    while (vm.action && !(arms.contactWeight.l < .001 && vm.action.kind === "throw" && vm.action.offhand === true) && guard++ < 300) Step(1);
+    out.morphLifecycle.push(MorphState("operationReleased", { operation: arms.operationPose.l?.shape
+      || arms.operationPose.l?.nextShape || arms.operationPose.l?.source
+      || (vm.action?.kind === "throw" && vm.action.offhand === true ? "offhandThrow" : null),
+      actionStillRunning: !!vm.action, operationSampleActionStillRunning: !!vm.action, operationSampleGuard: guard,
+      operationSampleNextShape: arms.operationPose.l?.nextShape || null, operationSampleSource: arms.operationPose.l?.source || null }));
+    while (vm.action && guard++ < 600) Step(1);
+    Step(90); out.morphLifecycle.push(MorphState("operationRecovered", { actionFinished: !vm.action }));
+  }
+  if (heldBundleRig) {
+    Equip("GrenadeBundle"); Step(60);
+    out.morphPool.push({ label: "bundleReused", weapon: "GrenadeBundle", reusedSameRig: arms === heldBundleRig,
+      activeWeights: CorrectiveWeights(arms) });
+    out.morphLifecycle.push(MorphState("bundleReused"));
+  }
   red.dispose();
   return out;
 }, { onlyIds, shelved: SHELVED_WEAPONS });
 
-const checks = [];
+acceptanceReport = report;
+SaveAcceptance("evaluated");
+const morphStates = new Map(report.morphLifecycle.map(entry => [entry.label, entry]));
+const ExpectMorphState = label => {
+  const entry = morphStates.get(label);
+  checks.push([`${label} 生命周期采样存在`, !!entry, entry ? `t=${entry.t}` : "missing"]);
+  return entry;
+};
+for (const entry of report.morphLifecycle) {
+  checks.push([`${entry.label} 只启用当前装备修形`, entry.weights.every(c => c.weaponId === entry.weapon || c.weight < 1e-6),
+    JSON.stringify(entry.weights)]);
+  checks.push([`${entry.label} 读取真实非零皮面修形`, entry.geometry.length === (entry.weapon === "Zb26" ? 1 : 2)
+    && entry.geometry.every(c => c.probeCount > 0 && c.fullMaximumM > .00002), JSON.stringify(entry.geometry)]);
+}
+if (report.morphExpected.bundle) {
+  for (const label of ["bundleHeld", "bundleReused"]) {
+    const entry = ExpectMorphState(label);
+    if (entry) checks.push([`${label} 真实皮面完整重新握持`, entry.geometry.every(c => c.weight > .999 && c.actualToFullRatio > .98), JSON.stringify(entry.geometry)]);
+  }
+  const early = ExpectMorphState("bundleMidEarly"), late = ExpectMorphState("bundleMidLate");
+  if (early && late) checks.push(["集束弹释放中皮面连续退形", late.t > early.t && early.geometry.every(a => {
+    const b = late.geometry.find(c => c.name === a.name);
+    return b && a.weight > .02 && a.weight < .98 && b.weight > .02 && b.weight < .98
+      && a.actualToFullRatio > .02 && a.actualToFullRatio < .98 && b.actualToFullRatio > .02
+      && b.actualToFullRatio < a.actualToFullRatio - .01;
+  }), JSON.stringify({ early, late })]);
+  const released = ExpectMorphState("bundleReleased");
+  if (released) checks.push(["集束弹完全释放时同骨皮面回到Basis", released.actionStillRunning && released.t >= .6
+    && released.geometry.every(c => released.contactWeight[c.side] < .001 && c.weight < 1e-6 && c.currentMaximumM < 1e-8), JSON.stringify(released)]);
+  checks.push(["切枪与复用均覆盖武器池", report.morphPool.length === 2, JSON.stringify(report.morphPool)]);
+}
+if (report.morphExpected.operation) {
+  const support = ExpectMorphState("reloadLeftSupport"), held = ExpectMorphState("operationHeld"),
+    released = ExpectMorphState("operationReleased"), recovered = ExpectMorphState("operationRecovered");
+  if (support) checks.push(["Zb右手换匣时左承托实际修形持续启用", support.action?.kind === "reload"
+    && support.contactWeight.r < .001 && support.contactWeight.l > .999
+    && support.geometry.every(c => c.side === "l" && c.weight > .999 && c.actualToFullRatio > .98), JSON.stringify(support)]);
+  if (held) checks.push(["工作手离枪前真实修形启用", held.geometry.every(c => c.weight > .999 && c.actualToFullRatio > .98), JSON.stringify(held.geometry)]);
+  if (released) checks.push(["副手投弹离枪时同骨皮面回到Basis", released.actionStillRunning
+    && released.action?.kind === "throw" && released.action.offhand === true && released.contactWeight.l < .001
+    && released.geometry.every(c => c.weight < 1e-6 && c.currentMaximumM < 1e-8), JSON.stringify(released)]);
+  if (recovered) checks.push(["操作完成后实际皮面重新握持", recovered.actionFinished
+    && recovered.geometry.every(c => c.weight > .999 && c.actualToFullRatio > .98), JSON.stringify(recovered.geometry)]);
+}
+for (const entry of report.morphPool) {
+  checks.push([`${entry.label} 当前rig修形不串装备`, entry.activeWeights.every(c =>
+    c.weaponId === entry.weapon ? c.weight > .999 : c.weight < 1e-6), JSON.stringify(entry.activeWeights)]);
+  if (entry.label === "bundleToZb") checks.push(["Detach清空有形变的旧rig且池权重数组独立",
+    entry.before.filter(c => c.weaponId === "GrenadeBundle").every(c => c.weight > .999)
+      && entry.oldDetached && entry.oldWeights.every(c => c.weight < 1e-6) && entry.independentInfluences, JSON.stringify(entry)]);
+  if (entry.label === "bundleReused") checks.push(["集束弹复用原池对象后重新隔离", entry.reusedSameRig, String(entry.reusedSameRig)]);
+}
 checks.push(["完整逐枪姿势数据", report.weaponIds.length === expectedIds.length && expectedIds.every((id) => report.weaponIds.includes(id)), `${report.weaponIds.length} 件装备`]);
 checks.push(["国军 01 骨骼双臂接入", report.source === "LugouNra01Skeletal" && report.chains === 2
   && report.skinnedMeshes === 1 && report.bones >= 45, `${report.bones} bones / ${report.chains} chains`]);
@@ -213,6 +389,19 @@ for (const entry of report.cases) {
   const label = `${entry.weapon} ${entry.state}`;
   if (["ZhongZheng", "HanYang", "Type38", "Grenade", "GrenadeBundle", "Dadao", "Zb26", "Type11"].includes(entry.weapon)) checks.push([`${label} 使用重做的固定骨段裸手`, entry.fixedRestLengths === true, String(entry.fixedRestLengths)]);
   const staticContact = entry.contactWeight.r > 0.99 && entry.contactWeight.l > 0.99;
+  if (entry.gripCorrectives.length) checks.push([`${label} 修形使用CPU几何且不占GPU morph槽`,
+    entry.gripCorrectives.every(c => c.evaluation === "cpu-attributes" && c.gpuMorphPositionCount === 0 && c.gpuMorphTargetSlots === 0
+      && ["position", "normal", "tangent"].every(semantic => c.originalBasisAttributes[semantic] === c.evaluatedVertexCount
+        && c.originalMorphAttributes[semantic].targets > 0 && c.originalMorphAttributes[semantic].vertices === c.evaluatedVertexCount)),
+    JSON.stringify(entry.gripCorrectives)]);
+  for (const corrective of entry.gripCorrectives) {
+    if (entry.weapon !== corrective.weaponId || entry.contactWeight[corrective.side] < .001) checks.push([`${label} ${corrective.name} 不泄露到其它握持`,
+      corrective.weight < 1e-6, String(corrective.weight)]);
+    else if (entry.contactWeight[corrective.side] > .999) checks.push([`${label} ${corrective.name} 使用源工程指腹修形`,
+      corrective.weight > .999, String(corrective.weight)]);
+  }
+  if (["Zb26","Dadao","GrenadeBundle"].includes(entry.weapon)) checks.push([`${label} 装备专用指腹修形齐全`,
+    entry.gripCorrectives.filter(c=>c.weaponId===entry.weapon).length === (entry.weapon==="Zb26"?1:2), JSON.stringify(entry.gripCorrectives)]);
   if (entry.painted != null) checks.push([`${label} 玩家相机轮廓可读`, entry.painted >= 0.003 && entry.painted <= 0.22,
     `${(entry.painted * 100).toFixed(1)}%`]);
   checks.push([`${label} 无骨段拉伸`, entry.stretch.r <= report.limits.maxStretchRatio
@@ -275,8 +464,19 @@ for (const [name, ok, detail] of checks) {
   if (!ok) failed += 1;
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
 }
+const failures = checks.filter(([, ok]) => !ok).map(([name, , detail]) => ({ name, detail }));
+SaveAcceptance("completed", { failed, failures });
 console.log(`\n第一人称骨骼双臂：${checks.length - failed}/${checks.length} 过`);
+console.log(`完整报告：${acceptanceFile}`);
+if (failures.length) {
+  console.error(`\nFpsArmTest 失败摘要（${failures.length}）：`);
+  for (const failure of failures) console.error(`FAIL ${failure.name} — ${failure.detail || ""}`);
+}
 process.exitCode = failed ? 1 : 0;
+} catch (error) {
+  SaveAcceptance("exception", { exception: error.stack || String(error) });
+  console.error(`FAIL FpsArmTest exception — ${error.message}; 完整报告：${acceptanceFile}`);
+  throw error;
 } finally {
   await browser.close();
   server.close();

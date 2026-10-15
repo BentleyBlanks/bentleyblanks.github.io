@@ -2,7 +2,7 @@
 //
 // 守的是「手看得见、而且握在枪上」这件事本身，不只是几个开关：
 //   · 视图模型换成这挺枪的 `<id>@mounted`，世界模型让位；双臂 IK 残差在 FPS_ARM_LIMITS 内；
-//   · 十个指腹离枪面 ≤ 4 mm（与 FpsHandContactTest 同一把尺）；
+//   · Zb26 用共享真实承托面积／扳机／末节深度门；其它枪保留十个指腹代理 ≤ 4 mm；
 //   · 把双臂涂成品红直接渲一帧数像素 —— visible=true 不等于画面里有（见 AGENTS 验收口径）；
 //   · 视图模型那挺枪与世界模型同位（枪钉在工事上，动的是眼睛），开镜照门落在屏幕正中；
 //   · 连发与换弹板时枪不离座（换匣只动右手）、准星上跳不经 cameraKick 记账；小卡拉枪机时右手去拉机柄；
@@ -16,6 +16,7 @@ import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { FRONT_SORTIE } from "./Data_FirstLevelFrontRoute.mjs";
 import { FPS_ARM_LIMITS } from "./Data_FpsArmPoses.mjs";
+import { ZbContactGeometryFailures } from "./Script_FpsZbContactGeometry.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(here, "_shots", "EmplacementView");
@@ -58,15 +59,25 @@ try {
     vm.root.updateMatrixWorld(true);
     arms.root.traverse((m) => { if (m.isSkinnedMesh) m.skeleton.update(); });
     const G = vm.rig.group, inv = G.matrixWorld.clone().invert();
-    const tris = [];
-    G.traverse((o) => {
+    const pads = []; let zbGeometry = null, zbAuthoredContactsSame = null;
+    if (vm.weaponId === "Zb26") {
+      const { MeasureZbContactGeometry } = await import("./Script_FpsZbContactGeometry.mjs");
+      const { FpsArmPose } = await import("./Data_FpsArmPoses.mjs");
+      const normal = FpsArmPose("Zb26"), mounted = arms.poseSpec;
+      zbAuthoredContactsSame = ["right", "left"].every(side =>
+        Object.keys(mounted.contacts[side].fingerRotations || {}).length === 15
+        && ["position", "rotation", "fingerRotations", "triggerRotations"].every(field =>
+          JSON.stringify(normal.contacts[side][field]) === JSON.stringify(mounted.contacts[side][field])));
+      zbGeometry = MeasureZbContactGeometry(THREE, { weaponGroup: G, arms });
+    } else {
+      const tris = [];
+      G.traverse((o) => {
       if (!o.isMesh || o.isSkinnedMesh) return;
       for (let q = o; q && q !== G.parent; q = q.parent) if (!q.visible) return;
       const p = o.geometry.attributes.position, index = o.geometry.index, m = inv.clone().multiply(o.matrixWorld);
       for (let i = 0; i < (index?.count || p.count); i += 3) tris.push(new THREE.Triangle(...[0, 1, 2].map((j) =>
         new THREE.Vector3().fromBufferAttribute(p, index ? index.getX(i + j) : i + j).applyMatrix4(m))));
     });
-    const pads = [];
     for (const side of ["r", "l"]) for (let digit = 0; digit < 5; digit++) {
       const bone = arms.anatomy[side].curls.find((c) => c.bone.name.toLowerCase().endsWith(`finger${digit}2`)).bone, pts = [];
       arms.root.traverse((mesh) => {
@@ -83,6 +94,7 @@ try {
       for (const t of tris) { t.closestPointToPoint(pad, c); d = Math.min(d, pad.distanceTo(c)); }
       pads.push({ side, digit, mm: +(d * 1000).toFixed(2), ok: d <= padLimit });
     }
+    }
     // 视图模型那挺枪与世界模型：枪口同位（世界模型此刻藏着，但节点照常跟着射界转）。
     world.updateMatrixWorld(true);
     const worldMuzzle = world.getObjectByName("muzzle")?.getWorldPosition(new THREE.Vector3());
@@ -95,6 +107,8 @@ try {
       mounted: g.emplacement.MountedId, weapon: vm.weaponId, gunWeapon: gun.kind.weaponId, pose: vm.armPoseKey,
       vmVisible: vm.root.visible, worldVisible: world.visible, mountSet: !!vm.mount, compensation: vm.compensation.toArray(),
       reach: arms.reachable, grip: arms.gripError, rot: arms.rotationError, pads,
+      zbGeometry, zbAuthoredContactsSame, rigPoseKey: arms.weaponId,
+      correctiveWeights: arms.gripCorrectives.map(({ mesh, index, name }) => ({ name, weight: mesh.morphTargetInfluences[index] })),
       muzzleGapM: worldMuzzle ? worldMuzzle.distanceTo(vmMuzzle) : null,
       eyeErrorM: inCam.distanceTo(hip),
     };
@@ -108,7 +122,17 @@ try {
   assert.deepEqual(m.compensation, [1, 1, 1], "no fake-depth squash on a gun that rests on the parapet");
   assert.ok(m.reach.r && m.reach.l, "both arms reach their grips " + JSON.stringify(m.reach));
   assert.ok(m.grip.r <= FPS_ARM_LIMITS.positionResidualM && m.grip.l <= FPS_ARM_LIMITS.positionResidualM, "palm residual " + JSON.stringify(m.grip));
-  assert.ok(m.pads.every((p) => p.ok), "every finger pad touches the gun " + JSON.stringify(m.pads));
+  if (m.weapon === "Zb26") {
+    assert.equal(m.rigPoseKey, m.pose, "the real arm rig uses the mounted pose key");
+    assert.ok(m.zbAuthoredContactsSame, "mounted Zb preserves the authored hand frames and all fifteen finger rotations");
+    const leftKey = m.correctiveWeights.filter(c => c.name === "Grip_Zb26LeftCompression");
+    assert.equal(leftKey.length, 1, "mounted Zb discovers its authored left compression key");
+    assert.ok(leftKey[0].weight > .999, "mounted holding enables its same-pose left compression " + JSON.stringify(leftKey));
+    assert.ok(m.correctiveWeights.filter(c => c.name !== "Grip_Zb26LeftCompression").every(c => c.weight < 1e-6),
+      "mounted Zb does not activate other weapons' corrections " + JSON.stringify(m.correctiveWeights));
+    assert.ok(m.zbGeometry, "mounted Zb measures the actual deformed skin and actual weapon geometry");
+    assert.deepEqual(ZbContactGeometryFailures(m.zbGeometry, "mounted Zb26"), [], "mounted Zb real support/trigger/distal contact");
+  } else assert.ok(m.pads.every((p) => p.ok), "every finger pad touches the gun " + JSON.stringify(m.pads));
   assert.ok(m.muzzleGapM !== null && m.muzzleGapM < 0.01, "viewmodel gun coincides with the emplaced gun: " + m.muzzleGapM);
   assert.ok(m.eyeErrorM < 0.005, "camera sits at the mounted eye behind the gun: " + m.eyeErrorM);
   const glideStep = receipts.glide.slice(1).map((p, i) => Math.hypot(p[0] - receipts.glide[i][0], p[1] - receipts.glide[i][1], p[2] - receipts.glide[i][2]));

@@ -8,6 +8,7 @@ import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {ServeRoot} from "./Script_DevServer.mjs";
 import {FPS_ARM_LIMITS} from "./Data_FpsArmPoses.mjs";
 import {SHELVED_WEAPONS} from "./Data_Weapons.mjs";
+import {ZbContactGeometryFailures} from "./Script_FpsZbContactGeometry.mjs";
 
 const project=path.dirname(fileURLToPath(import.meta.url));
 const output=path.join(project,"_shots","FpsHandContact");await fs.mkdir(output,{recursive:true});
@@ -20,6 +21,7 @@ try {
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:240000});
   const report=await page.evaluate(async({only,shelved})=>{
     const THREE=await import("./vendor/three/build/three.module.js");
+    const {MeasureZbContactGeometry}=await import("./Script_FpsZbContactGeometry.mjs");
     const T=window.Taierzhuang,vm=T.viewmodel;let arms=vm.riggedArms;
     T.Debug.OpenEditor("firstPerson");const editor=T.editor.active;
     const probes={ZhongZheng:[.002,-.023,-.0558],HanYang:[.002,-.019,-.0838],Type38:[.003,-.021,-.1288],
@@ -92,10 +94,11 @@ try {
         if(pose==="fire"){vm.TriggerFire();editor.Update(1/120);}
         Refresh();const point=Pad("r",1),bone=pads[id+'r1'].bone;
         const normal=new THREE.Vector3(0,1,0).transformDirection(vm.rig.group.matrixWorld.clone().invert().multiply(bone.matrixWorld));
-        const gunSurface=id!=="ServicePistol"?Triangles(vm.rig.group,o=>o.name.startsWith(id+"_")):null;
+        const gunSurface=id!=="ServicePistol"&&id!=="Zb26"?Triangles(vm.rig.group,o=>o.name.startsWith(id+"_")):null;
         const support=gunSurface?[0,1,2,3,4].map(digit=>Nearest(Pad("l",digit),gunSurface)):[];
+        const zbContact=id==='Zb26'?MeasureZbContactGeometry(THREE,{weaponGroup:vm.rig.group,arms}):null;
         result.poses.push({id,pose,support,supportPoints:gunSurface?[0,1,2,3,4].map(digit=>Pad("l",digit).toArray()):[],point:point.toArray(),trigger:target?.toArray(),distance:target?point.distanceTo(target):Infinity,
-          facing:normal.z,holdingDrift:pose==="ads"?point.distanceTo(hip):0,triggerTravel:pose==="fire"?point.distanceTo(hip):0,wrist:{...arms.wristBend}});
+          facing:normal.z,holdingDrift:pose==="ads"?point.distanceTo(hip):0,triggerTravel:pose==="fire"?point.distanceTo(hip):0,wrist:{...arms.wristBend},supportSkin:zbContact?.support??null,triggerSkin:zbContact?.trigger??null});
       }
       editor.SetPose("hip");for(let i=0;i<90;i++)editor.Update(1/60);
       for(const action of ["reload",...(["ZhongZheng","HanYang","Type38","Zb26","Type11"].includes(id)?["reloadPartial"]:[]),
@@ -151,11 +154,12 @@ try {
   await fs.writeFile(path.join(output,"Data_Contacts.json"),JSON.stringify({...report,errors},null,2));
   const failures=[];const Check=(condition,message)=>{if(!condition)failures.push(message);};
   for(const pose of report.poses){
-    Check(pose.distance<.006,`${pose.id} ${pose.pose}: index pad misses trigger by ${(pose.distance*1000).toFixed(1)} mm`);
+    if(pose.id!=='Zb26')Check(pose.distance<.006,`${pose.id} ${pose.pose}: index pad misses trigger by ${(pose.distance*1000).toFixed(1)} mm`);
     Check(pose.facing>.45,`${pose.id} ${pose.pose}: index pad does not face the trigger (${pose.facing.toFixed(2)})`);
     Check(pose.holdingDrift<.001,`${pose.id}: ADS changes the finger contact`);
     if(pose.pose==="fire")Check(pose.triggerTravel>.0001,`${pose.id}: firing does not flex the trigger finger`);
     for(const [digit,distance] of pose.support.entries())Check(distance<.004,`${pose.id} ${pose.pose}: support digit ${digit} is ${(distance*1000).toFixed(1)} mm from the fore-end surface`);
+    if(pose.id==='Zb26')failures.push(...ZbContactGeometryFailures({support:pose.supportSkin,trigger:pose.triggerSkin},`Zb26 ${pose.pose}`));
   }
   for(const action of report.actions){
     Check(action.maxGrip<FPS_ARM_LIMITS.positionResidualM,`${action.id} ${action.action}: hand leaves target ${JSON.stringify(action.worstGrip)}`);
