@@ -15,10 +15,11 @@ import bpy
 from mathutils import Matrix, Euler
 
 
-def Bake(projectRoot):
+def Bake(projectRoot, weaponIds=None):
     project = Path(projectRoot).resolve()
     assert project.name == 'Taierzhuang1938' and (project / '_blender/BuildAll.py').is_file()
-    names = ['ZhongZheng', 'HanYang', 'Type38']
+    names = ['ZhongZheng', 'HanYang', 'Type38'] if weaponIds is None else list(weaponIds)
+    assert names and set(names) <= {'ZhongZheng', 'HanYang', 'Type38'}
     index_path = project / 'Model/Data_ModelIndex.json'
     previous_index = json.loads(index_path.read_text(encoding='utf-8'))
     previous_order = {entry['name']: index for index, entry in enumerate(previous_index['models'])}
@@ -35,7 +36,8 @@ def Bake(projectRoot):
     updated_index = json.loads(index_path.read_text(encoding='utf-8'))
     updated_index['models'].sort(key=lambda entry: previous_order.get(entry['name'], len(previous_order)))
     index_path.write_text(json.dumps(updated_index,ensure_ascii=False,indent=1)+'\n',encoding='utf-8')
-    report = {}
+    output = project / 'Model/Data_RifleMechanisms.json'
+    report = json.loads(output.read_text(encoding='utf-8')) if output.exists() else {}
     source_dir = Path.home() / 'OneDrive/AI/Models/Blender/Taierzhuang1938/RifleReloadRealism_20261015'
     source_dir.mkdir(parents=True, exist_ok=True)
     basis = Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))
@@ -74,7 +76,6 @@ def Bake(projectRoot):
             'parts': {node['name']:sum(doc['meshes'][i]['idxCount']//3 for i in node.get('meshes',[]))
                       for node in doc['nodes'] if node['name'] in ('boltBody','cockingPiece')},
             'feedMouth':next(node['t'] for node in doc['nodes'] if node['name']=='feedMouth')}
-    output = project / 'Model/Data_RifleMechanisms.json'
     output.write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
     print(json.dumps(report,ensure_ascii=False))
     return report

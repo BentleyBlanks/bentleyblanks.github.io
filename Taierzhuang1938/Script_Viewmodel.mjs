@@ -1676,6 +1676,7 @@ export class Viewmodel {
           this.armRigs.GrenadeBundle=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.Dadao=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.Zb26=new FpsArmRig(riggedAssets.fpsHanYang,library);
+          this.armRigs.Type11=new FpsArmRig(riggedAssets.fpsHanYang,library);
         }
       } catch (error) {
         console.warn(`[Viewmodel] FPS 手臂实例化失败，退回旧手模：${String(error).slice(0, 180)}`);
@@ -3614,12 +3615,13 @@ export class Viewmodel {
     const LeftRotation=weight=>new THREE.Euler().setFromQuaternion(
       new THREE.Quaternion().setFromEuler(this.handBaseRot.left).slerp(
         new THREE.Quaternion().setFromEuler(new THREE.Euler(...held.rotation,"YXZ")),weight),"YXZ").toArray().slice(0,3);
+    const approach=spec.followerApproach,recovery=spec.followerRecovery;
     this._WorkingHandPath("left",t,[
-      {at:.04,position:this.handBase.left.clone().lerp(held.position,.45).add(new THREE.Vector3(-.012,.012,0)),
-        rotation:LeftRotation(.45),shape:"relax",through:true},
+      {at:approach.at,position:this.handBase.left.clone().lerp(held.position,approach.positionMix).add(new THREE.Vector3().fromArray(approach.offset)),
+        rotation:LeftRotation(approach.rotationMix),shape:"relax",through:true},
       {at:.07,...held},{at:.88,...held},
-      {at:.94,position:held.position.clone().lerp(this.handBase.left,.65).add(new THREE.Vector3(-.008,.012,0)),
-        rotation:LeftRotation(.35),shape:"recover",through:true},
+      {at:recovery.at,position:held.position.clone().lerp(this.handBase.left,recovery.positionMix).add(new THREE.Vector3().fromArray(recovery.offset)),
+        rotation:LeftRotation(recovery.rotationMix),shape:"recover",through:true},
       {at:.985,position:this.handBase.left,rotation:leftBaseRotation,weight:0,shape:"recover"},
     ]);
     const frames=partial

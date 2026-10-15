@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **换弹尾片与十一年式手部（2026-10-15）**：汉阳造带孔机匣尾片回到固定枪体，避免拉栓后悬空；十一年式复用扫描手与固定骨段，逐指校准静态握持，并调整扶板的靠近／归位路线。源工程、重建入口与量测见 [第一人称换弹真实度](docs/Data_RifleReloadRealism.md)；定向验收 `FpsArmTest` / `FpsHandContactTest` / `FpsReloadMechanicsTest` / `FpsSleeveTest` / `AdsSightTest` / `MotionVectorContractTest`。
+
 - **第一人称扫描手形（2026-10-15）**：四件装备的共享双手改用 Artec 扫描配准的连续手／腕／前臂皮肤，保留原骨架与衣袖；大刀右手下移并以拇指扣食指，捷克式托枪手后移避开折叠脚架。重烘入口 `_blender/Script_FpsScannedHandsBake.py`，源工程、许可和接触指标见 [握持修复末节](docs/Data_FpsWeaponGripRepair20261015.md#扫描手形连续腕部与力量握持2026-10-15)。`DadaoSwingTest` 同时检查力量握持的真实皮肤接触。
 
 - **第一人称四件装备握持（2026-10-15）**：普通／集束手榴弹、大刀、捷克式用 Blender 重标掌面与逐指旋转，数据在 `Data_FpsWeaponGrips`；集束弹与捷克式采用固定骨段裸手。普通弹取消重复轴旋转，集束弹恢复实物柄尺寸；大刀肩位与连续肘轨由数据驱动。源工程、重建和实测见 [握持修复](docs/Data_FpsWeaponGripRepair20261015.md)，门禁 `FpsArmTest` / `FpsHandContactTest --only=Zb26` / `GrenadeThrowTest` / `DadaoSwingTest` / `FpsGripEditorTest` / `MotionVectorContractTest`。

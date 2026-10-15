@@ -18,7 +18,7 @@ export const MODEL_BASE = "./Model/";
 /** 人物 / 枪 TZM 换了内容就加一，避免 Pages 继续使用旧模型缓存。 */
 // 士兵预览必须把模型文件与角色/加载器模块当作同一份发布物。单独换模型而
 // 浏览器仍命中旧模块缓存，会造成面板写着 model、骨架却按旧布局拆散的假成功。
-const MESH_REV = "rifle-mechanisms-zb26-manufacture-20261015";
+const MESH_REV = "rifle-mechanisms-zb26-manufacture-hanyang-tail-20261015";
 
 /**
  * 人物骨架的关节名 —— 与 Script_Actor.mjs 的 Actor 构造函数逐字对齐。
@@ -138,7 +138,7 @@ export const MESHES = {
   },
   HanYang: {
     file: "Model_HanYang.tzm.json", category: "weapon",
-    triangles: 2672, meshBlocks: 4, nodes: 12, joints: 0,
+    triangles: 2828, meshBlocks: 4, nodes: 12, joints: 0,
     materials: ["steel", "wood"], mounts: [...WEAPON_MOUNTS,"feedMouth","ejection","boltOpen"],
     span: [0.08049, 0.19341, 1.25000], lengthM: 1.250,
     note: "汉阳造。几何来自 CC-BY Gewehr 88（Sketchfab / TastyTony）—— 汉阳八八式"

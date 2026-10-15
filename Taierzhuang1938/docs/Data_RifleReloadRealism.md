@@ -71,13 +71,26 @@
 
 `_blender/Script_RifleMechanismBake.py` 只重建中正式、汉阳造、三八式；
 源对象/完整连通岛导出到 `boltBody`，汉阳造后套另导出为只平移的 `cockingPiece`。
-原有三角数分别为 6703、2672、12467，不增加或丢弃原枪体面；世界模型闭锁外形保持。
+原有三角数分别为 6703、2672、12467，全部原枪体面保留；世界模型闭锁外形保持。
 另以 `81bc4ee8` 的闭锁模型逐三角面配对：21,842 面全部匹配，最大顶点差异小于 0.01 mm，
 来自分块后的独立位置量化；不以面数一致代替几何复核。
 `feedMouth` 与 `ejection` 使用机匣实际开口坐标，不再复用机柄后方的占位点。
 三八式旧 78 mm 行程不足以让完整枪机退出装填区，源模型 `boltOpen` 标记改为 120 mm；
 其余两支保持 78 mm。运行时读取标记，动作时长、输入、射速均由并行主机逻辑控制。
 Blender 原始工程保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/RifleReloadRealism_20261015/`。
+
+### 用户截图中的汉阳造尾片
+
+后拉时出现的长尖片来自拆件归属错误：固定机匣尾片与上方保险片被一起标为 `cockingPiece`，
+尾片随枪机移动 78 mm，离开原来的枪托螺钉。现仅上方活动件保留在后套节点，带孔尾片回到枪体。
+后方击针联杆及其侧面的 96 个原始面也从旋转栓体分离到仅平移的后套，抬柄时不再甩到侧面。
+参考 [Gewehr 88 实物分解照片](https://www.sar-shop.de/WebRoot/Store/Shops/61028398/5CFE/6918/226B/EA20/587F/0A0C/6D05/C6DA/F4.JPG)
+与 [W. H. B. Smith 的开栓侧视图](https://sportsmansvintagepress.com/read-free/mauser-rifles-pistols-table-of-contents/gewehr-88-commission-rifle/)，
+在原模型后腔包络内补齐非旋转后套的连接体，增加 156 面，当前共 2,828 面；
+原始 2,672 面全部逐面匹配，最大顶点差小于 0.01 mm。
+实际尾片特征点从 78 mm 位移恢复到零；`FpsReloadMechanicsTest` 在空仓、余弹的完整换弹中检查它保持固定。
+重建可调用 `Script_RifleMechanismBake.Bake(projectRoot, ["HanYang"])`，保留其他枪的机构清单，
+不必重烘另外两支步枪。源工程沿用 `Model_HanYangMechanism.blend`。
 
 ## 连续动作与机枪
 
@@ -96,6 +109,15 @@ Blender 原始工程保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/RifleR
 扶板手型独立保存在 `FPS_HAND_SHAPES.hopperFollower`，基于实际蒙皮指腹与原板面校准，
 同时约束关闭、抬起、打开和放下阶段的腕角；拇指与食指、中指相对扣住板沿，其余两指保持放松。
 靠近与回收时掌位、朝向同步插值，余弹流程也先抓稳再抬板。静态托枪与所有手指骨段长度保持。
+
+十一年式随后接入既有 Artec 扫描手／腕／前臂资产，采用固定骨段，不再使用旧桥接器的放大骨段。
+原桥接器隐式肩位改为该枪的显式肩位，枪体、掌位和瞄具保持。Blender 按完整蒙皮逐指拟合握持，
+扳机指到实际扳机约 0.995 mm，支撑五指最大取样间隙约 2.20 mm；握持手指的最大表面穿入约 1.74 mm。
+右食指保留独立扳机屈曲。靠近时掌位先到板沿附近再转腕，回手按相反顺序展开前臂。
+源工程在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type11ScannedHands_20261015/Model_Type11ScannedHands.blend`；
+同目录保存输入、拟合报告、许可证及脚本；重建入口 `_blender/Script_Type11HandFit.py`，
+设置 `FPS_PROJECT_ROOT`，并可将 `FPS_TYPE11_INPUT` 指向源目录重用 `Data_Type11HandInput.json`。
+该工程只输出握持旋转，游戏继续复用已登记的扫描手 GLB；来源与许可见[扫描手说明](Data_FpsWeaponGripRepair20261015.md#扫描手形连续腕部与力量握持2026-10-15)。
 九二式继续使用独立横向保弹板及主机事件接口。
 
 释放的弹壳、漏夹、桥夹和弹匣保留释放帧变换，转移到世界场景，使用正常场景深度与运动矢量；
@@ -161,5 +183,11 @@ Blender 原始工程保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/RifleR
 机械流程同时确认捷克式手动拉机柄仍有约 59.8 mm 的完整行程，十一年式分别检查空仓与 13 发余弹。
 高画质连续帧在 `MachineGunReload/FinalEmpty`、`HopperFinal` 和 `HopperPartialFinal`；
 正常与半速视频仅留本地，不进入发布包。
+
+尾部最终拆分后，`BoltTail/Data_FinalMechanicsV2.log` 的实际换弹循环确认：尾片保持固定、
+后套长条件不滚转且跟随 78 mm 行程、轴线上有完整后套支承；空仓与余弹均通过。
+`Data_FinalAds.log` 确认汉阳造瞄准视野正常，新增几何已按既有“原模保留 + 补件”规范登记。
+此前 `BoltTail/Data_GatesV1.log` 的八项专项覆盖扫描手、手部接触、衣袖、机械、瞄准、运动矢量和资产接口；
+最终结构定稿另用单项入口复测，测试队列的锁等待超时不计作通过。
 
 Blender 源工程已保存。本任务的 `Script_BlenderMcp status --scan` 无自有存活实例；其它会话的实例未操作。

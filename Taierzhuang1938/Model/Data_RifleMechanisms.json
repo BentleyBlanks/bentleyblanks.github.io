@@ -13,10 +13,10 @@
   },
   "HanYang": {
     "blend": "Taierzhuang1938\\RifleReloadRealism_20261015\\Model_HanYangMechanism.blend",
-    "triangles": 2672,
+    "triangles": 2828,
     "parts": {
-      "boltBody": 374,
-      "cockingPiece": 76
+      "boltBody": 278,
+      "cockingPiece": 284
     },
     "feedMouth": [
       0.0,

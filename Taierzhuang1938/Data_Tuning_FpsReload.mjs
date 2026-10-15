@@ -178,6 +178,10 @@ export const FPS_HOPPER_RELOAD = Object.freeze({
   // The left hand lifts the rear rim up and forward around the front hinge.
   followerPivot:[-.113,.0245,-.1698], followerAngleRad:-1.42,
   followerRimOffset:[-.060,0,.038],
+  // The palm approaches before turning into the grip; release reverses that
+  // order so the forearm can unfold without overbending the fixed wrist.
+  followerApproach:{at:.035,positionMix:.70,rotationMix:.30,offset:[-.012,-.020,.040]},
+  followerRecovery:{at:.9325,positionMix:.30,rotationMix:.30,offset:[-.012,-.020,.040]},
   follower:[[0,0],[.07,0],[.16,1],[.80,1],[.88,0],[1,0]],
   drawAt:.20, cycle:.10, alignPhase:.35, seatPhase:.60, releasePhase:.64, clearPhase:.76,
   approachHeightM:.075,

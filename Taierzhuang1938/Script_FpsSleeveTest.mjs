@@ -51,7 +51,7 @@ try{
  await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:240000});
  await page.evaluate(()=>{Taierzhuang.Debug.OpenEditor('firstPerson');Taierzhuang.editor.active.SetAnimationClean(true);});
  const materials=[];
- for(const id of ['Grenade','GrenadeBundle','Dadao','Zb26']){
+ for(const id of ['Grenade','GrenadeBundle','Dadao','Zb26','Type11']){
   const report=await page.evaluate(id=>{
    const T=Taierzhuang,e=T.editor.active;e.SetWeapon(id);e.SetPose('hip');e.SetView('player');e.SetAnimationClean(true);
    for(let i=0;i<90;i++)e.Update(1/60);T.StepFrames(1);

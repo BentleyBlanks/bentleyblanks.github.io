@@ -34,6 +34,24 @@ try {
       Check(!!body, `${id}: complete authored bolt body is missing`);
       vm.root.updateWorldMatrix(true,true);
       const original = body && vm.rig.group.worldToLocal(body.getWorldPosition(new THREE.Vector3()));
+      let rearTang=null,rearBar=null;
+      if(id==="HanYang") {
+        // This screw-bearing receiver leaf stays on the stock. It was once
+        // misclassified as a cocking piece and floated behind the open bolt.
+        const target=new THREE.Vector3(.002103,.031152,-.054788);let best=Infinity;
+        vm.rig.group.traverse(mesh=>{
+          if(!mesh.isMesh||mesh.isSkinnedMesh||!mesh.name.endsWith("_steel"))return;
+          const p=mesh.geometry.attributes.position;
+          for(let i=0;i<p.count;i++) {
+            const local=new THREE.Vector3().fromBufferAttribute(p,i),position=Point(mesh,local),distance=position.distanceTo(target);
+            if(distance<best){best=distance;rearTang={mesh,local,position};}
+            if(!rearBar&&Math.abs(position.x)<.005&&position.y>.0545&&position.z>-.120&&position.z<-.087)
+              rearBar={mesh,local,position};
+          }
+        });
+        Check(best<.0001,"HanYang: rear tang feature is missing from the actual rifle geometry");
+        Check(!!rearBar,"HanYang: the rear cocking bar is missing from the actual rifle geometry");
+      }
       vm.TriggerReload({remainingRounds:remaining});
       if(id!=="HanYang") {
         const expected=5-(remaining-(remaining>0?1:0));
@@ -43,13 +61,37 @@ try {
       }
       let seated = null, atBack = null, atLoaded = null, returned = null;
       const previous = new THREE.Quaternion(); let tracking = false, maxTurnMismatch = 0;
-      const row = {id,remaining,maxSupportWrist:0,maxReach:0,packetPullbackM:0};
+      const row = {id,remaining,maxSupportWrist:0,maxReach:0,packetPullbackM:0,maxRearTangDriftM:0,maxRearBarRollM:0,maxRearBarSlideErrorM:0};
       for(let frame=0;vm.action&&frame<500;frame++) {
         Step(remaining); vm.root.updateWorldMatrix(true,true);
         const t = vm.action?.t ?? 1;
+        if(rearTang)row.maxRearTangDriftM=Math.max(row.maxRearTangDriftM,Point(rearTang.mesh,rearTang.local).distanceTo(rearTang.position));
+        if(rearBar){
+          const p=Point(rearBar.mesh,rearBar.local);
+          row.maxRearBarRollM=Math.max(row.maxRearBarRollM,Math.hypot(p.x-rearBar.position.x,p.y-rearBar.position.y));
+          row.maxRearBarSlideErrorM=Math.max(row.maxRearBarSlideErrorM,Math.abs(p.z-rearBar.position.z-vm.rig.parts.bolt.position.z));
+        }
         row.maxSupportWrist = Math.max(row.maxSupportWrist,vm.riggedArms.wristBend.l);
         row.maxReach = Math.max(row.maxReach,...Object.values(vm.riggedArms.reachRatio));
-        if (t>=.25 && atBack===null && body) atBack=vm.rig.group.worldToLocal(body.getWorldPosition(new THREE.Vector3())).z-original.z;
+        if (t>=.25 && atBack===null && body) {
+          atBack=vm.rig.group.worldToLocal(body.getWorldPosition(new THREE.Vector3())).z-original.z;
+          if(id==="HanYang") {
+            // Opening the cylinder must expose a solid supported plug, rather
+            // than leaving the safety paddle floating above an empty tube.
+            const ray=new THREE.Ray(new THREE.Vector3(0,.042,.05),new THREE.Vector3(0,0,-1)),hit=new THREE.Vector3();
+            const inverse=vm.rig.group.matrixWorld.clone().invert();let closest=Infinity;
+            vm.rig.parts.cockingPiece.traverse(mesh=>{
+              if(!mesh.isMesh)return;const p=mesh.geometry.attributes.position,index=mesh.geometry.index,m=inverse.clone().multiply(mesh.matrixWorld);
+              for(let i=0;i<index.count;i+=3) {
+                const triangle=[0,1,2].map(j=>new THREE.Vector3().fromBufferAttribute(p,index.getX(i+j)).applyMatrix4(m));
+                if(ray.intersectTriangle(...triangle,false,hit))closest=Math.min(closest,ray.origin.distanceTo(hit));
+              }
+            });
+            row.rearPlugHitZ=.05-closest;
+            Check(Number.isFinite(closest)&&row.rearPlugHitZ>vm.rig.boltTravel-.095&&row.rearPlugHitZ<vm.rig.boltTravel-.070,
+              "HanYang: the open bolt has no supporting rear plug");
+          }
+        }
         if(t>=.107&&t<=.150) {
           const hand = vm.handRight.group.quaternion;
           const turn = vm.rig.parts.bolt.rotation.z;
@@ -77,6 +119,9 @@ try {
       Check(maxTurnMismatch<.002,`${id}: the working palm does not rotate with the bolt handle`);
       Check(row.packetPullbackM<.001,`${id}: the newly inserted packet is pulled back out`);
       Check(returned<.001,`${id}: bolt is not home after closing`);
+      if(id==="HanYang")Check(row.maxRearTangDriftM<.00001,"HanYang: the receiver tang travels with the bolt tail");
+      if(id==="HanYang")Check(row.maxRearBarRollM<.00001&&row.maxRearBarSlideErrorM<.00001,
+        "HanYang: the cocking bar must translate without rolling with the bolt cylinder");
       row.boltTravelM=atBack;row.loaded=atLoaded;row.turnMismatchRad=maxTurnMismatch;cases.push(row);
     }
     const boltMotion=[];

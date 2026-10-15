@@ -1027,25 +1027,57 @@ def _SplitAdsNear(bm, cut_z):
 
 
 def _TagHanYangMechanism(steel):
-    """Identify complete source islands after normalization; never cut a shell."""
+    """Keep source faces intact while separating the fused rear cocking bar."""
     layer = steel.faces.layers.int.get(MECHANISM_LAYER) or steel.faces.layers.int.new(MECHANISM_LAYER)
     source = steel.faces.layers.int.new('MechanismSourceFace')
     steel.faces.index_update()
     for face in steel.faces: face[source] = face.index
     by_index = {face.index: face for face in steel.faces}
     counts = {1: 0, 2: 0}
+    rearBarFaces = 0
     for island in _SplitIslands(steel):
         low, high = _Aabb([island])
         handle = low.x > .002 and low.z > -.160 and high.z < -.134 and low.y > .029
         shaft = low.x > -.010 and high.x < .010 and low.z < -.220 and -.095 < high.z < -.075 and low.y > .030
-        cocking = low.z > -.091 and high.z < -.050 and low.y > .028 and high.y < .056 and high.x-low.x < .021
+        # The lower perforated leaf belongs to the receiver tang and remains
+        # over its stock screw. Only the upper safety/cocking island travels.
+        cocking = low.z > -.091 and high.z < -.050 and low.y > .048 and high.y < .056 and high.x-low.x < .021
         code = 1 if handle or shaft else 2 if cocking else 0
         if code:
             original = island.faces.layers.int.get('MechanismSourceFace')
-            for face in island.faces: by_index[face[original]][layer] = code
+            for face in island.faces:
+                # The static source welds the long cocking bar to the bolt
+                # cylinder. Its upper rear faces translate with the sleeve;
+                # they must not roll sideways with the bolt handle.
+                rearBar = shaft and all(vertex.co.y > .048 and vertex.co.z > -.143 for vertex in face.verts)
+                if rearBar: rearBarFaces += 1
+                by_index[face[original]][layer] = 2 if rearBar else code
             counts[code] += 1
         island.free()
-    assert counts[1] == 4 and counts[2] == 2, ('HanYang source parts changed', counts)
+    assert counts[1] == 4 and counts[2] == 1, ('HanYang source parts changed', counts)
+    assert rearBarFaces == 96, ('HanYang cocking bar faces changed', rearBarFaces)
+
+
+def _CompleteHanYangCockingSleeve(part):
+    """Complete the non-rotating sleeve exposed by the animated bolt.
+
+    The selected static rifle has a safety paddle but no supporting body once
+    its bolt cylinder turns. Fit the plug inside the original rear receiver
+    envelope; the imported exterior faces remain intact.
+    """
+    segments = 16
+    profile = [(-.154,.0060),(-.127,.0060),(-.125,.0088),(-.078,.0088),(-.074,.0070)]
+    rings = []
+    for z,radius in profile:
+        rings.append([part.verts.new((radius*math.cos(2*math.pi*i/segments),
+            .042+radius*math.sin(2*math.pi*i/segments),z)) for i in range(segments)])
+    for first,second in zip(rings,rings[1:]):
+        for i in range(segments):
+            face=part.faces.new((first[i],first[(i+1)%segments],second[(i+1)%segments],second[i]))
+            face.smooth=True
+    part.faces.new(tuple(reversed(rings[0])))
+    part.faces.new(tuple(rings[-1]))
+    part.normal_update()
 
 
 def _ExtractMechanisms(root, steel, name):
@@ -1058,6 +1090,8 @@ def _ExtractMechanisms(root, steel, name):
         part = steel.copy(); part_layer = part.faces.layers.int.get(MECHANISM_LAYER)
         bmesh.ops.delete(part, geom=[face for face in part.faces if face[part_layer] != code], context='FACES')
         bmesh.ops.delete(part, geom=[vertex for vertex in part.verts if not vertex.link_faces], context='VERTS')
+        if name == 'HanYang' and part_name == 'cockingPiece':
+            _CompleteHanYangCockingSleeve(part)
         low, high = _Aabb([part])
         report[part_name] = {'min': list(low), 'max': list(high), 'faces': len(part.faces)}
         root.Child(part_name).Add('steel', part, tile=T_STEEL)

@@ -581,11 +581,11 @@
    "name": "HanYang",
    "category": "weapon",
    "file": "Model_HanYang.tzm.json",
-   "triangles": 2672,
+   "triangles": 2828,
    "meshBlocks": 4,
    "nodes": 12,
    "joints": 0,
-   "bytes": 98333,
+   "bytes": 102421,
    "materials": [
     "steel",
     "wood"
