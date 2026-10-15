@@ -194,7 +194,11 @@ void main(){
 #endif
  if(uDepthValid>.5){
    float depth=texture2D(uNormalDepth,gl_FragCoord.xy/uResolution).w;
-   if(depth>0.){if(vShape.w>0.)alpha*=clamp((depth-vDepth)/max(vShape.w,.001),0.,1.);}
+   if(depth>0.){
+#ifndef PARTICLE_VOLUME
+    if(vShape.w>0.)alpha*=clamp((depth-vDepth)/max(vShape.w,.001),0.,1.);
+#endif
+   }
    else color=mix(color,uFogColorSky,min(uFogMax,1.-exp(-uFogDensity*vDistance*.55)));
  }
  if(alpha<.002)discard;

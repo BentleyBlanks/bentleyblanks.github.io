@@ -2,6 +2,7 @@
 import {PARTICLE_GPU_MODULES} from './Script_ParticleGpuModules.mjs';
 import {PARTICLE_DENSITY_GLSL} from './Script_ParticleDensity.mjs';
 import {BLOOD_LIQUID} from './Data_Tuning_Blood.mjs';
+import {PARTICLE_SURFACE_ART} from './Data_Tuning_Particles.mjs';
 export const GLSL_NOISE = /* glsl */`
 float Hash21(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -26,6 +27,7 @@ uniform float uParticleAspect;
 varying vec3 vVolumeRight;
 varying vec3 vVolumeUp;
 varying vec3 vVolumeToward;
+varying float vVolumeDepthRadius;
 #endif
 attribute vec2 iSpawnLife;   // x 生成时刻 y 寿命（0 = 空槽）
 attribute vec3 iOrigin;
@@ -164,6 +166,11 @@ void main() {
   world.z+=(sin(flowClock*1.37+phase*1.9)-sin(phase*1.9))*moduleParameters.z*.7;
   vec2 corner = position.xy*vec2(1.,uParticleAspect);
   vShape = position.xy;
+#ifdef SHAPE_RING
+  corner*=${PARTICLE_SURFACE_ART.ringSupport.toFixed(2)};vShape*=${PARTICLE_SURFACE_ART.ringSupport.toFixed(2)};
+#elif defined(SHAPE_MARKER)
+  corner*=${PARTICLE_SURFACE_ART.markerSupport.toFixed(2)};vShape*=${PARTICLE_SURFACE_ART.markerSupport.toFixed(2)};
+#endif
 
   vec3 offset;
 #if defined(ORIENT_NORMAL)
@@ -256,6 +263,7 @@ void main() {
   vec3 vz=normalize(toCamOrZ(world));
   float spin=iSpin.x+iSpin.y*age+moduleParameters.y*life;
   vVolumeRight=vx*cos(spin)+vy*sin(spin);vVolumeUp=-vx*sin(spin)+vy*cos(spin);vVolumeToward=vz;
+  vVolumeDepthRadius=size*dot(vz,vec3(viewMatrix[0][2],viewMatrix[1][2],viewMatrix[2][2]));
 #endif
   vec4 viewPos = viewMatrix * modelMatrix * vec4(finalPos, 1.0);
   vViewDepth = -viewPos.z;
@@ -313,6 +321,7 @@ uniform vec2 uParticleVolume;
 varying vec3 vVolumeRight;
 varying vec3 vVolumeUp;
 varying vec3 vVolumeToward;
+varying float vVolumeDepthRadius;
 #endif
 uniform sampler2D uNormalDepth;
 uniform float uDepthValid;   // 1 = uNormalDepth 是真的预通道靶，不是 1x1 兜底
@@ -377,6 +386,7 @@ varying vec3 vViewDir;     // 世界空间视线（相机 -> 粒子），前向�
 #endif
 
 void main() {
+  float sceneDepth=uDepthValid>.5?texture2D(uNormalDepth,gl_FragCoord.xy/uResolution).w:0.;
   vec2 p = vShape;
   float d = length(p);
   float mask = 0.0;
@@ -396,6 +406,7 @@ void main() {
     float z=span*(1.-2.*(float(j)+.5)/float(PARTICLE_VOLUME_STEPS));
     vec3 q=vVolumeRight*p.x+vVolumeUp*p.y+vVolumeToward*z;
     float density=ParticleDensity(q,vSeed,vAgeS);
+    if(sceneDepth>0.)density*=smoothstep(0.,max(.05,uSoftRange),sceneDepth-(vViewDepth-z*vVolumeDepthRadius));
     float toward=dot(q,lightDir),path=max(0.,sqrt(max(0.,toward*toward+1.-dot(q,q)))-toward);
     float absorption=ParticleDensity(q+lightDir*path*.45,vSeed,vAgeS);
     float transmission=exp(-absorption*path*uParticleVolume.y);
@@ -466,6 +477,7 @@ void main() {
   float across = exp(-p.y * p.y * 5.5);
   float head = clamp(p.x * 0.5 + 0.5, 0.0, 1.0);
   mask = across * mix(0.03, 1.0, pow(head, 2.2));
+  mask*=smoothstep(0.,${PARTICLE_SURFACE_ART.streakTailFade.toFixed(2)},head)*(1.-smoothstep(${PARTICLE_SURFACE_ART.streakHeadFade.toFixed(2)},1.,head));
 #elif defined(SHAPE_BEAM)
   // 一发子弹的光束（TracerBeam）。整条线从枪口铺到弹着点，但不是一下子全亮：
   // 弹头按「已活秒数 / 飞行时间」从枪口飞过去，掠过的那一段按余辉常数暗下去。
@@ -482,6 +494,7 @@ void main() {
   float muzzle = smoothstep(0.0, max(vBeamMuzzleFade, 1e-3), along * vBeam.z);
   // 弹头胖一点、余辉细一点：线宽由顶点给的是像素保底，这里只分配亮度的横向分布。
   float across = exp(-p.y * p.y * mix(3.2, 1.8, head));
+  across*=1.-smoothstep(${PARTICLE_SURFACE_ART.beamSideFade.toFixed(2)},1.,abs(p.y));
   mask = across * max(head, trail) * muzzle;
   color = mix(vColorAlt, vColor, clamp(head * 1.5, 0.0, 1.0));
 #elif defined(SHAPE_RING)
@@ -505,7 +518,7 @@ void main() {
   float inside = step(abs(ruv.x - 0.5), 0.5) * step(abs(ruv.y - 0.5), 0.5);
   vec4 tex = texture2D(uSpriteMap, clamp(ruv, 0.0, 1.0)) * inside;
   // 尘团不跟准星收缩：它是地面上的事，贴地铺开，随倒计时慢慢变浓。
-  float dustTex = texture2D(uSpriteMap, p * 0.5 + 0.5).b;
+  float dustTex = texture2D(uSpriteMap, p * 0.5 + 0.5).b*(1.-smoothstep(.94,1.,max(abs(p.x),abs(p.y))));
   float aa = fwidth(d) * 1.2;
   float lineW = 0.014;
   // 1) 主收缩环：从外圈一路收到中心亮核，先慢后快。
@@ -638,9 +651,6 @@ void main() {
 
   // rtNormalDepth 的 w 是线性视深度；清成 0 的像素代表"这一路没打到东西"（= 天空）。
   // 软粒子与大气透视都要这个值，所以只取一次。
-  float sceneDepth = uDepthValid > 0.5
-    ? texture2D(uNormalDepth, gl_FragCoord.xy / uResolution).w
-    : 0.0;
 
 #ifdef SHAPE_DECAL
   // 贴花只是命中点切平面上的 quad，不是真正投影到承载几何上的网格。过去它靠 12 mm
@@ -677,9 +687,11 @@ void main() {
   // uSoftRange = 0 表示这个池**贴着面**存在（弹孔贴花、贴地尘环）：它们与背景的
   // 深度差本来就只有那点法线偏移，一做软化就整体淡到看不见 —— 弹孔一度完全不显形
   // 就是栽在这儿。贴面的池靠 polygonOffset 防 z-fighting，不靠软粒子。
+#ifndef VOLUME_SMOKE
   if (uSoftEnabled > 0.5 && uSoftRange > 0.0 && sceneDepth > 0.001) {
     alpha *= clamp((sceneDepth - vViewDepth) / uSoftRange, 0.0, 1.0);
   }
+#endif
   // 贴脸淡出：拿不到深度图时这是唯一的保险，也防止一片烟糊满屏幕
   alpha *= clamp((vViewDepth - uNearFade * 0.4) / max(uNearFade, 0.001), 0.0, 1.0);
   if (alpha <= 0.002) discard;

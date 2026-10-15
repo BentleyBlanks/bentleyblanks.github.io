@@ -8,10 +8,14 @@ export const PARTICLE_VOLUME = Object.freeze({steps:{low:4,medium:6,high:8,ultra
 // reaching those faces. X/Z are lateral mixing widths; Y is the upper plume.
 // No lower-face fade: the smoke still connects to its physical emitter.
 export const PARTICLE_VOLUME_PLUME=Object.freeze({
+  Campfire:{dissipation:[.08,.25,.08],detail:0,multipleScattering:0},
   ChimneySmoke:{dissipation:[.16,.32,.22],detail:.12},
   DenseSmoke:{dissipation:[.16,.34,.24],detail:.16},
 });
 export const PARTICLE_VOLUME_LIGHTING=Object.freeze({multipleScattering:.18,secondaryExtinction:.35});
+// Ring density extends beyond radius 1; pad its support without enlarging the
+// authored radius. Otherwise the quad's four sides cut the outer dust band.
+export const PARTICLE_SURFACE_ART=Object.freeze({ringSupport:1.4,markerSupport:1.04,streakTailFade:.05,streakHeadFade:.9,beamSideFade:.8});
 // Persistent source plumes need space for entrainment on both horizontal axes.
 // The chimney simulation's long wind axis must not be squeezed into a sheet.
 export const STATIC_SMOKE_ART=Object.freeze({blackSpread:1.65,lightSpread:1.2,windAspect:1.35,densityScale:24,heightScale:.65});

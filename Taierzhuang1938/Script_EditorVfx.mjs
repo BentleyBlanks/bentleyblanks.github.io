@@ -6,9 +6,10 @@ import { El, Panel, Section, Slider, Select, Toggle, ButtonRow, Facts, Note, Lis
   from "./Script_EditorUi.mjs";
 import { SCENE_EFFECTS } from "./Script_Vfx.mjs";
 import {ParticleInspector} from './Script_EditorParticleInspector.mjs';
-import {MergeParticleModules,NormalizeParticleModules,EvaluateCurve} from './Script_ParticleModules.mjs';
+import {MergeParticleModules,NormalizeParticleModules,EvaluateCurve,IntegrateCurve} from './Script_ParticleModules.mjs';
 import {Mulberry32} from './Script_Noise.mjs';
 import {FIRST_LEVEL_DISTANT_SMOKE} from './Data_FirstLevelDistantSmoke.mjs';
+import {PARTICLE_SURFACE_ART} from './Data_Tuning_Particles.mjs';
 
 const INSTANT_EFFECTS = [
   ...[['VolumeFire','三维体积 · 营火',true],['VolumePlume','三维体积 · 烟流',true],['VolumeDensePlume','三维体积 · 浓烟',true],['VolumeDustImpact','三维体积 · 土尘冲击',false],['VolumeExplosion','三维体积 · 燃油爆炸',false]].map(([id,name,continuous])=>({
@@ -344,19 +345,41 @@ export class VfxEditor {
     const id=this.effectId,small=/^(Muzzle|Impact|Blood|ShellCasings)/.test(id);
     let height=/^Bomb/.test(id)?(id==='BombHeavy'?42:28)*this.scale:/Explosion/.test(id)?(id==='ExplosionShell'?9:6)*this.scale:/Smoke|Plume/.test(id)?7:small?1.8:3.4*this.scale;
     let center=null;
-    if(/Smoke|Plume/.test(id)){
+    {
       const api=this.host.vfx.particles,box=new THREE.Box3(),point=new THREE.Vector3();
-      for(const {system}of api.systems.values()){
+      for(const [particleId,{system}]of api.systems){
         const m=system.modules;
         if(m.renderer.mode!=='bakedVolume'||!m.renderer.enabled||!(system.particles.length||system.emitting&&m.emission.enabled))continue;
         const asset=api.renderer.volumes.pools.get(m.renderer.volumeAsset)?.asset,anchor=asset?.metadata.anchor||[.5,0,.5];
-        const size=EvaluateCurve(m.main.startSize,0),angle=EvaluateCurve(m.main.startRotation,0)+m.renderer.volumeYaw,c=Math.cos(angle),s=Math.sin(angle);
-        for(let corner=0;corner<8;corner++){
-          const x=((corner&1?1:0)-anchor[0])*m.renderer.bounds[0]*size,y=((corner&2?1:0)-anchor[1])*m.renderer.bounds[1]*size,z=((corner&4?1:0)-anchor[2])*m.renderer.bounds[2]*size;
-          point.set(x*c+z*s+system.position[0],y+system.position[1],-x*s+z*c+system.position[2]);box.expandByPoint(point);
+        const samples=api.GetParticles(particleId,{limit:256});
+        const records=system.particles.length?system.particles:[{size:EvaluateCurve(m.main.startSize,0),rotation:EvaluateCurve(m.main.startRotation,0)}];
+        for(let i=0;i<records.length;i++){
+          const p=records[i],sample=samples[i],t=sample?Math.max(0,Math.min(1,sample.age/p.life)):0;
+          const size=sample?.size??p.size,bounds=m.renderer.bounds.map((n,axis)=>n*(p.volume?.bounds[axis]??1));
+          const angle=p.rotation+m.renderer.volumeYaw+(m.rotationOverLifetime.enabled?IntegrateCurve(m.rotationOverLifetime.angularVelocity,t,p.seed)*p.life:0),c=Math.cos(angle),s=Math.sin(angle);
+          const origin=sample?.age<0?p.origin.map((n,axis)=>n+(m.main.simulationSpace==='local'?system.position[axis]:0)):sample?.position??system.position;
+          for(let corner=0;corner<8;corner++){
+            const x=((corner&1?1:0)-anchor[0])*bounds[0]*size,y=((corner&2?1:0)-anchor[1])*bounds[1]*size,z=((corner&4?1:0)-anchor[2])*bounds[2]*size;
+            point.set(x*c+z*s+origin[0],y+origin[1],-x*s+z*c+origin[2]);box.expandByPoint(point);
+          }
         }
       }
-      if(!box.isEmpty()){box.getSize(point);height=Math.max(point.x,point.y,point.z);center=box.getCenter(new THREE.Vector3());}
+      // Ground-aligned previews have no height but still need their full radius
+      // and an aim point on the surface. The old generic eye-height target cut
+      // water rings and incoming reticles along the bottom of the viewport.
+      if(box.isEmpty())for(const [particleId,{system}]of api.systems){
+        const stream=api.renderer.streams.get(system),shape=stream?.config.shape;
+        if(!['ring','marker'].includes(shape)||!system.modules.renderer.enabled)continue;
+        const samples=api.GetParticles(particleId,{limit:256});
+        for(let i=0;i<samples.length;i++){
+          const p=system.particles[i],sample=samples[i];if(!p.packed||sample.age<0)continue;
+          const radius=Math.max(p.packed.sizeStart,p.packed.sizeEnd)*(shape==='ring'?PARTICLE_SURFACE_ART.ringSupport:PARTICLE_SURFACE_ART.markerSupport);
+          const normal=new THREE.Vector3(p.packed.nx,p.packed.ny,p.packed.nz).normalize();
+          const tangent=new THREE.Vector3().crossVectors(Math.abs(normal.y)>.92?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0),normal).normalize(),bitangent=new THREE.Vector3().crossVectors(normal,tangent);
+          for(let corner=0;corner<4;corner++){point.fromArray(sample.position).addScaledVector(tangent,(corner&1?1:-1)*radius).addScaledVector(bitangent,(corner&2?1:-1)*radius);box.expandByPoint(point);}
+        }
+      }
+      if(!box.isEmpty()){box.getSize(point);height=Math.max(small?1.8:0,point.x,point.y,point.z);center=box.getCenter(new THREE.Vector3());}
     }
     this.studio.maxDistance=Math.max(40,height*2.5);
     this.studio.Frame(height,small?2.5:Math.max(4,height*2.2));

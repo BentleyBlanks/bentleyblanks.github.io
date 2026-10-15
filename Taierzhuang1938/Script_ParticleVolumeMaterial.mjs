@@ -225,7 +225,7 @@ export function CreateParticleVolumeMaterial(asset,{time=0,extinction=3,emission
    uVolumeFrames:{value:m.frames},uVolumeDuration:{value:m.duration},uVolumeTime:{value:time},uVolumeLoop:{value:1},uWorldToVolume:{value:new THREE.Matrix4()},
    uLightDirection:{value:new THREE.Vector3(-.6,.8,.4).normalize()},uLightColor:{value:new THREE.Vector3(1.7,1.6,1.45)},uAmbientColor:{value:new THREE.Vector3(.13,.16,.20)},
    uAlbedo:{value:new THREE.Vector3(...albedo)},uExtinction:{value:extinction},uEmission:{value:emission},uFlameExtinction:{value:flameExtinction},uStepCount:{value:steps},uShadowCount:{value:shadowSteps},uPhaseG:{value:.25},
-   uMultipleScattering:{value:new THREE.Vector2(art.dissipation?PARTICLE_VOLUME_LIGHTING.multipleScattering:0,PARTICLE_VOLUME_LIGHTING.secondaryExtinction)},...shared},
+   uMultipleScattering:{value:new THREE.Vector2(art.multipleScattering??(art.dissipation?PARTICLE_VOLUME_LIGHTING.multipleScattering:0),PARTICLE_VOLUME_LIGHTING.secondaryExtinction)},...shared},
   side:THREE.BackSide,transparent:true,depthTest:false,depthWrite:false,blending:THREE.CustomBlending,blendSrc:THREE.OneFactor,blendDst:THREE.OneMinusSrcAlphaFactor,
   blendSrcAlpha:THREE.ZeroFactor,blendDstAlpha:THREE.OneFactor,blendEquation:THREE.AddEquation,blendEquationAlpha:THREE.AddEquation});
  material.name='ParticleVolume_'+m.asset;material.userData.preserveTargetAlpha=true;

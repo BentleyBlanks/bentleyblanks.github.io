@@ -20,6 +20,28 @@ try{
  const Read=()=>{renderer.render(scene,camera);const p=new Uint8Array(960*640*4);gl.readPixels(0,0,960,640,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;};
  const Diff=(a,b)=>{let n=0;for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>9)n++;return n;};
  const empty=Read();vfx.Update(1/60,camera,1/60);
+ // A wall cutting through a three-dimensional puff must retain its front
+ // lobe. The former centre-plane fade erased the entire puff in this case.
+ const boundaries={volumes:[]},depth=new THREE.DataTexture(new Float32Array([0,0,0,7.9]),1,1,THREE.RGBAFormat,THREE.FloatType);depth.needsUpdate=true;
+ for(const mode of ['channel','modular']){
+   vfx.ClearParticles();api.Resume();let id;
+   if(mode==='channel'){const s=ResetVfxSpawn();s.y=1;s.sizeStart=s.sizeEnd=1.3;s.life=2;s.opacity=1;s.fadeIn=0;s.colorA=s.colorB=[.6,.4,.2];vfx.pools.smoke.Spawn(s,vfx.time);id=vfx.pools.smoke.particleId;}
+   else id=api.Create({preset:'SootRoot',position:[0,1,0],modules:{main:{prewarm:false,startSize:1.3,startLifetime:2,startColor:[.6,.4,.2,1],maxParticles:1},emission:{rateOverTime:0,bursts:[{time:0,count:1}]},shape:{enabled:false},velocityOverLifetime:{enabled:false},sizeOverLifetime:{enabled:false},colorOverLifetime:{enabled:false},renderer:{softRange:.05,nearFade:0}}}).id;
+   api.Simulate(id,.1,{restart:mode==='modular'});vfx.SetDepthSource(null);const full=Diff(empty,Read());
+   depth.image.data[3]=7.9;depth.needsUpdate=true;vfx.SetDepthSource(depth);const partial=Diff(empty,Read());
+   depth.image.data[3]=5;depth.needsUpdate=true;const blocked=Diff(empty,Read());boundaries.volumes.push({mode,full,partial,blocked});
+   if(mode==='modular')api.Remove(id);
+ }
+ vfx.SetDepthSource(null);depth.dispose();api.Play(vfx.pools.smoke.particleId);vfx.ClearParticles();api.Resume();
+ // The ring's authored band reaches beyond radius 1. Rendering there should
+ // remain possible, while the new outer support must be completely invisible.
+ const oldPosition=camera.position.clone(),oldQuaternion=camera.quaternion.clone(),oldBackground=scene.background.clone();
+ camera.position.set(0,8,0);camera.lookAt(0,0,0);camera.updateMatrixWorld(true);scene.background.setRGB(1,1,1);
+ const ring=ResetVfxSpawn();ring.y=.01;ring.ny=1;ring.sizeStart=ring.sizeEnd=1;ring.life=2;ring.opacity=1;ring.fadeIn=0;ring.seed=.3;ring.colorA=ring.colorB=[0,0,0];
+ vfx.pools.ring.Spawn(ring,vfx.time);vfx.Update(1/60,camera,vfx.time+1/60);const ringPixels=Read();
+ const At=(x,z)=>{const p=new THREE.Vector3(x,.01,z).project(camera),px=Math.round((p.x*.5+.5)*960),py=Math.round((p.y*.5+.5)*640);return 1-ringPixels[(py*960+px)*4]/255;};
+ boundaries.ring={outerBand:Math.max(At(1.02,0),At(-1.02,0),At(0,1.02),At(0,-1.02)),supportEdge:Math.max(At(1.4,0),At(-1.4,0),At(0,1.4),At(0,-1.4))};
+ camera.position.copy(oldPosition);camera.quaternion.copy(oldQuaternion);camera.updateMatrixWorld(true);scene.background.copy(oldBackground);vfx.ClearParticles();api.Resume();
  const routes=[];
  for(const [name,channel]of Object.entries(vfx.pools)){
    const s=ResetVfxSpawn();s.y=1;s.sizeStart=.35;s.sizeEnd=.7;s.life=2;s.opacity=.7;s.colorA=[1,.6,.25];s.colorB=[.2,.2,.2];
@@ -52,7 +74,7 @@ try{
  for(const e of api.Inspect().entries)api.Pause(e.id);
  const births=vfx.pools.smoke.system.emitted;vfx.Impact(new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,-1),'brick');vfx.debris.Clear();
  vfx.Update(.1,camera,vfx.time+.1);const paused=Read();
- const result={routes,meshRoutes,shots,visible:Diff(empty,a),replay:Diff(a,b),pause:Diff(b,paused),
+ const result={boundaries,routes,meshRoutes,shots,visible:Diff(empty,a),replay:Diff(a,b),pause:Diff(b,paused),
    stoppedExternalEmission:vfx.pools.smoke.system.emitted===births,glError:gl.getError(),alpha:Array.from(paused).filter((n,i)=>i%4===3&&n!==255).length};
  api.Configure(id,{colorOverLifetime:{gradient:[[0,[.02,.15,1,.8]],[1,[.02,.05,.3,0]]]}});result.colorChange=Diff(paused,Read());
  const original=api.Export(id),clone=api.Import(original);result.exportProfile=clone.profile;api.Remove(clone.id);
@@ -73,6 +95,8 @@ try{
  await page.waitForFunction(()=>window.result,null,{timeout:90000});await page.screenshot({path:path.join(out,'Channels.png')});
  const result=await page.evaluate(()=>window.finish());await fs.writeFile(path.join(out,'Report.json'),JSON.stringify({result,errors},null,2));
  assert.deepEqual(errors,[]);assert.equal(result.routes.length,19);
+ for(const volume of result.boundaries.volumes){assert.ok(volume.full>500&&volume.partial>100,volume.mode+' retains the visible front lobe: '+JSON.stringify(volume));assert.ok(volume.partial<volume.full,volume.mode+' clips the rear volume');assert.equal(volume.blocked,0,volume.mode+' fully blocked');}
+ assert.ok(result.boundaries.ring.outerBand>.01,'ring band beyond the old quad remains visible');assert.equal(result.boundaries.ring.supportEdge,0,'ring support ends in zero density');
  for(const route of result.routes){assert.ok(route.owned,route.name);assert.equal(route.backend,'modules');assert.equal(route.glError,0,route.name);}
  for(const route of result.meshRoutes){assert.ok(route.owned&&route.visible>20,route.name);assert.equal(route.pause,0,route.name);assert.equal(route.glError,0,route.name);}
  for(const shot of result.shots){assert.ok(shot.channels.length>0,shot.name);assert.equal(shot.glError,0,shot.name);}

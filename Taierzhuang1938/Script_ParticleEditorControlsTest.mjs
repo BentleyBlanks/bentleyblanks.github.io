@@ -83,6 +83,49 @@ try{
    return {height:m.renderer.bounds[1],distance:e.studio.orbit.dist,projections};
  });
  assert.ok(smokeFraming.projections.every(view=>view.maxY<.98),'the complete black smoke volume must fit from three directions: '+JSON.stringify(smokeFraming));
+ const otherFraming=await page.evaluate(async()=>{
+   const g=Tengxian,e=g.ParticleEditor,point=e.studio.orbit.target.clone(),report=[];
+   for(const effect of ['FireSmall','FireMedium','GroundFire','BurningWreck','BurningHouse','VolumeFire','VolumeDustImpact','VolumeExplosion','ExplosionTank','BombSmall','BombHeavy']){
+     e.SelectEffect(effect);await g.Particles.Ready();
+     for(const time of [.05,1.2]){
+       e.Seek(time);e.FrameEffect();
+       for(const yaw of [.9,2.47,4.04]){
+         e.studio.orbit.yaw=yaw;e.studio.ApplyCamera();e.studio.camera.updateMatrixWorld(true);let maxY=0;
+         for(const pool of g.Particles.renderer.volumes.pools.values())for(let i=0;i<pool.capacity;i++){
+           const owner=pool.owners[i],p=pool.records[i];if(!owner||!p||owner.time<p.birth||owner.time>=p.birth+p.life)continue;
+           const sample=g.Particles.GetParticles([...g.Particles.systems].find(([,entry])=>entry.system===owner)[0],{limit:256})[owner.particles.indexOf(p)];
+           if(!sample)continue;const a=pool.arrays,anchor=pool.asset.metadata.anchor,size=sample.size,angle=a.iSize[i*4+1]+a.iSize[i*4+2],c=Math.cos(angle),s=Math.sin(angle);
+           for(let corner=0;corner<8;corner++){
+             const x=((corner&1?1:0)-anchor[0])*a.iBounds[i*4]*size,y=((corner&2?1:0)-anchor[1])*a.iBounds[i*4+1]*size,z=((corner&4?1:0)-anchor[2])*a.iBounds[i*4+2]*size;
+             point.set(x*c+z*s+sample.position[0],y+sample.position[1],-x*s+z*c+sample.position[2]).project(e.studio.camera);maxY=Math.max(maxY,Math.abs(point.y));
+           }
+         }
+         report.push({effect,time,yaw,maxY});
+       }
+     }
+   }
+   return report;
+ });
+ assert.ok(otherFraming.every(view=>view.maxY<.98),'fire and transient volume bounds fit the preview: '+JSON.stringify(otherFraming.filter(view=>view.maxY>=.98)));
+ const surfaceFraming=await page.evaluate(async()=>{
+   const g=Tengxian,e=g.ParticleEditor,point=e.studio.orbit.target.clone(),report=[];
+   for(const effect of ['ImpactWater','Incoming']){
+     e.SelectEffect(effect);e.Seek(.12);e.FrameEffect();
+     for(const yaw of [.9,2.47,4.04]){
+       e.studio.orbit.yaw=yaw;e.studio.ApplyCamera();e.studio.camera.updateMatrixWorld(true);let maxY=0;
+       for(const entry of g.Particles.systems.values()){
+         const stream=g.Particles.renderer.streams.get(entry.system),shape=stream?.config.shape;if(!['ring','marker'].includes(shape))continue;
+         for(const p of entry.system.particles){
+           const s=p.packed;if(!s)continue;const r=Math.max(s.sizeStart,s.sizeEnd)*(shape==='ring'?1.4:1.04);
+           for(let corner=0;corner<4;corner++){point.set(s.x+(corner&1?1:-1)*r,s.y,s.z+(corner&2?1:-1)*r).project(e.studio.camera);maxY=Math.max(maxY,Math.abs(point.y));}
+         }
+       }
+       report.push({effect,yaw,maxY});
+     }
+   }
+   return report;
+ });
+ assert.ok(surfaceFraming.every(view=>view.maxY<.98),'water and warning rings stay inside the viewport: '+JSON.stringify(surfaceFraming));
  const result=await page.evaluate(()=>{const g=Tengxian,e=g.ParticleEditor,original=e.savedParticleEffects,worldBefore=JSON.stringify(original.Inspect());
    const result={editor:e.Inspect(),worldBefore,lightingSources:e.savedLighting.fireSources.size,glError:g.renderer.getContext().getError()};
    const savedLimit=e.savedStudioMaxDistance;e.SelectEffect('BombHeavy');result.bombCameraDistance=e.studio.orbit.dist;result.selectedEffect=e.effectList.Value();
@@ -91,7 +134,7 @@ try{
    result.cameraLimitRestored=g.editor.studio.maxDistance===savedLimit;
    if(g.post.whiteboxScene){result.whiteboxRestored=g.post.whiteboxScene.config===g.post.whiteboxConfig;g.StepFrames(1,0,true);result.gameEffectsHidden=!g.vfx.root.visible;}
    return result;});
- await fs.writeFile(path.join(out,'Report.json'),JSON.stringify({result,smokeFraming,errors},null,2));
+ await fs.writeFile(path.join(out,'Report.json'),JSON.stringify({result,smokeFraming,otherFraming,surfaceFraming,errors},null,2));
  assert.equal(result.worldBefore,baseline.particles);assert.equal(result.restored,true);assert.equal(result.lightPause,true);assert.equal(result.lightRestore,true);assert.equal(result.glError,0);assert.deepEqual(errors,[]);
  assert.ok(result.bombCameraDistance>80);assert.equal(result.selectedEffect,'BombHeavy');assert.equal(result.cameraLimitRestored,true);
  if(whitebox){assert.equal(result.whiteboxRestored,true);assert.equal(result.gameEffectsHidden,true);}
