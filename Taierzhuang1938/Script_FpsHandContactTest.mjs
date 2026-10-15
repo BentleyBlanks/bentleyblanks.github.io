@@ -56,6 +56,25 @@ try {
       });return triangles;
     };
     const Nearest=(point,triangles)=>{let distance=Infinity;const closest=new THREE.Vector3();for(const tri of triangles){tri.closestPointToPoint(point,closest);distance=Math.min(distance,point.distanceTo(closest));}return distance;};
+    // A fixed box-derived marker can sit inside a thick thumb, or on its nail
+    // side after opposition. Inspect the actual distal skin for these newly
+    // fitted grips, and separately reject penetration of the whole finger.
+    const DistalGap=(side,digit,triangles)=>{
+      let distance=Infinity,vertices=0;
+      arms.root.traverse(mesh=>{
+        if(!mesh.isSkinnedMesh)return;const a=mesh.geometry.attributes;
+        const bone=mesh.skeleton.bones.findIndex(b=>b.name.toLowerCase().replace(/[^a-z0-9]/g,"").endsWith(side+"finger"+digit+"2"));
+        if(bone<0)return;
+        for(let i=0;i<a.position.count;i++){
+          let weight=0;for(let k=0;k<4;k++)if(a.skinIndex.getComponent(i,k)===bone)weight+=a.skinWeight.getComponent(i,k);
+          if(weight<.95)continue;vertices++;
+          const point=vm.rig.group.worldToLocal(mesh.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(mesh.matrixWorld));
+          distance=Math.min(distance,Nearest(point,triangles));
+        }
+      });
+      if(vertices<20)throw new Error("Missing distal skin: "+side+digit);
+      return distance;
+    };
     const FingerPenetration=(side,part)=>{
       const triangles=Triangles(part),direction=new THREE.Vector3(1,.371,.137).normalize(),hit=new THREE.Vector3();
       let vertices=0,inside=0,maxDepth=0;
@@ -135,7 +154,16 @@ try {
               else if(t>.81&&t<.89){prop=vm.rig.parts.bolt;kind="slide";}
             }else if(id==="Type11"&&t>.20&&t<.80&&((t-.20)%.10)<.032){prop=vm.clipProp.userData.body;kind="hopperClip";}
           }
-          if(prop){const triangles=Triangles(prop);for(const digit of digits)row.propSamples.push({t,kind,digit,distance:Nearest(Pad(side,digit),triangles)});}
+          if(prop){
+            const skinContact=(id==="HanYang"&&["packet","oldPacket","press"].includes(kind))||kind==="hopperClip";
+            const triangles=Triangles(prop);
+            for(const digit of digits)row.propSamples.push({t,kind,digit,skinContact,
+              distance:skinContact?DistalGap(side,digit,triangles):Nearest(Pad(side,digit),triangles)});
+            if(skinContact&&frame%15===0){
+              const whole=kind==="press"?vm.packetProp:kind==="oldPacket"?vm.usedPacketProp:kind==="packet"?vm.packetProp:vm.clipProp;
+              row.skinSamples.push({t,kind,...FingerPenetration("r",whole)});
+            }
+          }
           if(id==="Type11"&&action.startsWith("reload")&&t>.09&&t<(action==="reloadPartial"?.875:.837)) {
             const triangles=Triangles(vm.rig.parts.hopperFollower);
             for(const digit of [0,1,2])row.propSamples.push({t,kind:"follower",digit,distance:Nearest(Pad("l",digit),triangles)});
@@ -143,7 +171,7 @@ try {
           if(id==="Type11"&&action==="reload"&&t>.875&&t<.945) {
             const triangles=Triangles(vm.rig.parts.operatingHandle);
             for(const digit of [0,1,2])row.propSamples.push({t,kind:"operatingHandle",digit,distance:Nearest(Pad("l",digit),triangles)});
-            if(frame%15===0)row.skinSamples.push({t,...FingerPenetration("l",vm.rig.parts.operatingHandle)});
+            if(frame%15===0)row.skinSamples.push({t,kind:"operatingHandle",...FingerPenetration("l",vm.rig.parts.operatingHandle)});
           }
         }
         result.actions.push(row);for(let i=0;i<60;i++)editor.Update(1/60);
@@ -167,10 +195,16 @@ try {
     Check(action.maxFingerTranslation<1e-6,`${action.id}: finger bone lengths change during animation`);
     Check(action.unreachable===0,`${action.id} ${action.action}: ${action.unreachable} unreachable frames`);
     Check(action.propSamples.length>0,`${action.id} ${action.action}: no moving-part contact was sampled`);
-    for(const sample of action.propSamples)Check(sample.distance<(sample.kind==="bolt"?.012:.009),`${action.id} ${sample.kind} at ${sample.t.toFixed(3)}: digit ${sample.digit} misses the prop by ${(sample.distance*1000).toFixed(1)} mm`);
+    for(const sample of action.propSamples)Check(sample.distance<(sample.skinContact ? .003 : sample.kind==="bolt" ? .012 : .009),`${action.id} ${sample.kind} at ${sample.t.toFixed(3)}: digit ${sample.digit} misses the prop by ${(sample.distance*1000).toFixed(1)} mm`);
+    if(["HanYang","Type11"].includes(action.id)&&action.action.startsWith("reload")){
+      const loading=action.skinSamples.filter(sample=>sample.kind!=="operatingHandle");
+      Check(loading.length>0&&loading.every(sample=>sample.vertices>4000),`${action.id}: loading grip did not inspect complete finger skin`);
+      for(const sample of loading)Check(sample.maxDepth<.002,`${action.id} ${sample.kind}: finger skin penetrates ammunition ${(sample.maxDepth*1000).toFixed(2)} mm at ${sample.t.toFixed(3)}`);
+    }
     if(action.id==="Type11"&&action.action==="reload") {
-      Check(action.skinSamples.length>0&&action.skinSamples.every(sample=>sample.vertices>1000),"Type11: operating-handle contact did not inspect the complete finger skin");
-      for(const sample of action.skinSamples)Check(sample.maxDepth<.002,`Type11: finger skin penetrates the operating handle ${(sample.maxDepth*1000).toFixed(2)} mm at ${sample.t.toFixed(3)}`);
+      const handle=action.skinSamples.filter(sample=>sample.kind==="operatingHandle");
+      Check(handle.length>0&&handle.every(sample=>sample.vertices>4000),"Type11: operating-handle contact did not inspect the complete finger skin");
+      for(const sample of handle)Check(sample.maxDepth<.002,`Type11: finger skin penetrates the operating handle ${(sample.maxDepth*1000).toFixed(2)} mm at ${sample.t.toFixed(3)}`);
     }
   }
   assert.deepEqual(errors,[],"no page errors");

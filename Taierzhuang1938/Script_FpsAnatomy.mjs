@@ -74,11 +74,12 @@ export function ApplyAnatomicalFingers(rig) {
     const shape = operation ? Shape(operation.shape) : null;
     const next = operation ? Shape(operation.nextShape) : null;
     const mix = operation?.shapeMix || 0;
+    const DigitMix = digit => operation?.digitMix?.[digit] ?? mix;
     const working = shape && next ? {
-      fingers: shape.fingers.map((angles,i)=>angles.map((v,j)=>THREE.MathUtils.lerp(v,next.fingers[i][j],mix))),
-      thumbDirection: shape.thumbDirection.map((v,i)=>THREE.MathUtils.lerp(v,next.thumbDirection[i],mix)),
-      thumbRoll: THREE.MathUtils.lerp(shape.thumbRoll || 0,next.thumbRoll || 0,mix),
-      fingerSplay: Array.from({length:5},(_,i)=>THREE.MathUtils.lerp(shape.fingerSplay?.[i] || 0,next.fingerSplay?.[i] || 0,mix)),
+      fingers: shape.fingers.map((angles,i)=>angles.map((v,j)=>THREE.MathUtils.lerp(v,next.fingers[i][j],DigitMix(i)))),
+      thumbDirection: shape.thumbDirection.map((v,i)=>THREE.MathUtils.lerp(v,next.thumbDirection[i],DigitMix(0))),
+      thumbRoll: THREE.MathUtils.lerp(shape.thumbRoll || 0,next.thumbRoll || 0,DigitMix(0)),
+      fingerSplay: Array.from({length:5},(_,i)=>THREE.MathUtils.lerp(shape.fingerSplay?.[i] || 0,next.fingerSplay?.[i] || 0,DigitMix(i))),
       side: shape.side || next.side || "r",
     } : shape || next;
     const workingBlend = working ? 1-rig.contactWeight[side] : 0;

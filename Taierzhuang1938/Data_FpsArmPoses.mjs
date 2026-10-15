@@ -40,10 +40,21 @@ const WeaponPose = ({ family, hip, ads, sprint, right, left, adsRight = right, a
 const CLOSED = V(56, 74, 46);
 const SUPPORT = V(48, 66, 42);
 const TRIGGER = V(16, 22, 10);
+// Thumb on the upper edge, index supporting the lower edge. Fitted against
+// the complete scanned finger skin and the loaded packet, not pad markers.
+const PacketClip = Freeze({ side:"r",palmOffset:V(.067,.014,.0012),rotation:V(-.336,3.076,.714),
+  fingers:Freeze([V(0,14.5,.5),V(75,50,27.5),V(77.5,35,19.25),V(55,75,41.25),V(58,78,42.9)]),
+  thumbDirection:V(1.020,-.096,.732),thumbRoll:-20,fingerSplay:Freeze([0,9,-15.25,-3,-6]) });
 // Working-hand poses are blended with the per-weapon holding pose. The thumb
 // opposes the fingers independently. MCP/PIP/DIP angles are ordered
 // thumb/index/middle/ring/little; offsets and rotations are in prop space.
 export const FPS_HAND_SHAPES = Freeze({
+  packetClip: PacketClip,
+  hopperClip: PacketClip,
+  // Keep the palm above the receiver; only the opposed thumb loads the packet.
+  packetPress: Freeze({side:"r",palmOffset:V(.0186,.0479,-.0282),rotation:V(-.12,3.14,.2),
+    fingers:Freeze([V(0,25,15),V(8,22,12),V(12,28,15),V(18,34,18),V(24,40,22)]),
+    thumbDirection:V(-.25,-.8,.5),thumbRoll:-26.16,fingerSplay:Freeze([0,5,0,-3,-6])}),
   open: Freeze({ fingers: Freeze([V(0,10,8),V(6,12,8),V(10,18,10),V(14,22,12),V(18,26,14)]), thumbDirection: V(0.4,-0.38,0.83), thumbRoll: 0, side: "r" }),
   latch: Freeze({ fingers: Freeze([V(0,30,20),V(0,8,6),V(55,65,40),V(55,65,40),V(55,65,40)]), thumbDirection: V(-0.2,-0.7,0.1), thumbRoll: -60, side: "r" }),
   relax: Freeze({ fingers: Freeze([V(0,20,18),V(18,30,15),V(26,36,18),V(34,42,20),V(38,46,22)]), thumbDirection: V(0.1,-0.55,0.6), thumbRoll: -20, side: "r" }),

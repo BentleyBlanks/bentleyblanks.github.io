@@ -6,7 +6,7 @@
 
 ## 当前入口与任务范围
 
-- **换弹机构与手部（2026-10-15）**：汉阳造带孔机匣尾片回到固定枪体，抬柄补全 90°，普通拉栓以小幅收枪配合；持枪呼吸保留留后枪机状态。十一年式复用扫描手与固定骨段，逐指校准握持与扶板路线；空仓补齐独立左侧操作柄、抓柄后拉和送回，余弹保持待发。源工程、重建入口与量测见 [第一人称换弹真实度](docs/Data_RifleReloadRealism.md)；定向验收 `_blender/Verify.mjs` / `FpsAnimationTest` / `FpsArmTest` / `FpsHandContactTest` / `FpsReloadMechanicsTest` / `FpsSleeveTest` / `AdsSightTest` / `MotionVectorContractTest`。
+- **换弹机构与手部（2026-10-15）**：汉阳造带孔机匣尾片回到固定枪体，抬柄补全 90°，普通拉栓以小幅收枪配合；持枪呼吸保留留后枪机状态。十一年式复用扫描手与固定骨段，逐指校准握持与扶板路线；空仓补齐独立左侧操作柄、抓柄后拉和送回，余弹保持待发。两枪右手按实拍重做上缘拇指与下缘食指夹持、掌心抬起压弹和逐指松手，枪体受力后肘肩错时跟随；皮肤接触与整根手指穿插同时验收。源工程、重建入口与量测见 [第一人称换弹真实度](docs/Data_RifleReloadRealism.md)；定向验收 `_blender/Verify.mjs` / `FpsAnimationTest` / `FpsArmTest` / `FpsHandContactTest` / `FpsReloadMechanicsTest` / `FpsSleeveTest` / `AdsSightTest` / `MotionVectorContractTest`。
 
 - **第一人称扫描手形与实体贴合（2026-10-15）**：Artec 连续手／腕／前臂皮肤保留原 Basis、骨架与衣袖；捷克式左手托机匣、大刀双手贴刀柄窄侧、集束弹右手对握木柄／左手承托实物绑带。五个局部 Blender 形态键按装备／手侧及握持权重启用，默认关闭；名单与原始字节哈希在 `Model/Data_FpsGripCorrectives.json`。扫描重建 `_blender/Script_FpsScannedHandsBake.py`，追加修形 `_blender/Script_FpsGripCorrectiveBake.py`；当前源工程、原始许可及完整实体／蒙皮验收见 [握持修复](docs/Data_FpsWeaponGripRepair20261015.md)。
 

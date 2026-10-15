@@ -2,6 +2,21 @@
 // weapon reload duration; distances are metres and rotations are YXZ radians.
 // Support poses describe the load through the left palm, not camera movement.
 export const FPS_RIFLE_RELOAD = Object.freeze({
+  // A load acts on the supporting hand before the elbow settles. Responses
+  // use seconds so preview scrubbing and a different frame rate agree.
+  effort: {
+    frequencyHz: 3.6, decayPerS: 13, impulseGain:2.4,tailFadeAt:.7,shoulderScale:.18,
+    elbowDelayS: .035, shoulderDelayS: .055,
+    tailS: .46, finishAt: .985,
+    events: [
+      {at:.145,pose:[0,.002,.003,.012,.004,-.008],right:[.015,.010,.008],left:[-.008,-.005,.004]},
+      {at:.235,pose:[.001,-.002,.008,-.010,.006,.012],right:[.025,-.012,.018],left:[-.010,-.008,.005]},
+      {at:.555,pose:[-.001,-.007,.002,-.018,.004,-.012],right:[.025,-.025,.012],left:[-.014,-.016,.006]},
+      {at:.650,pose:[0,.003,-.002,.010,-.003,.007],right:[-.012,.016,-.006],left:[.005,.010,-.003]},
+      {at:.890,pose:[0,-.002,-.006,.009,-.004,-.008],right:[-.018,-.010,-.016],left:[.006,-.008,-.004]},
+      {at:.935,pose:[0,-.003,.002,-.008,.004,.010],right:[.012,-.010,.008],left:[-.005,-.006,.002]},
+    ],
+  },
   blend: [[0, 0], [0.18, 1], [0.88, 1], [1, 0]],
   bodyOffset: {
     shoulders: { right: [0.004, 0.012, -0.065], left: [-0.006, 0.040, -0.012] },
@@ -57,7 +72,7 @@ export const FPS_RIFLE_RELOAD = Object.freeze({
   hand: [
     { at: 0.055, anchor: "bolt", shape: "relax", offset: [0.016, 0.008, 0.018], arc: [0.008, 0.012, 0.008], through: true },
     { at: 0.085, anchor: "bolt" },
-    { at: 0.245, anchor: "bolt" },
+    { at: 0.235, anchor: "bolt" },
     { at: 0.315, anchor: "clip", arc: [0.030, -0.012, 0.020], flow: true },
     { at: 0.490, anchor: "clip" },
     { at: 0.540, anchor: "press", arc: [0.008, 0.012, 0.004], flow: true },
@@ -82,10 +97,22 @@ export const FPS_PACKET_RELOAD = Object.freeze({
   latchOffset: [0.008, 0.006, -0.025],
   hand: [
     ...FPS_RIFLE_RELOAD.hand.slice(0, 7),
-    { at: 0.730, anchor: "clear", toward: "bolt", anchorMix: 0.35, shape: "recover", through: true },
+    { at: 0.730, anchor: "clear", toward: "bolt", anchorMix: 0.35, shape: "recover", through: true, fingerLagS:[0,.025,.040,.055,.065] },
     ...FPS_RIFLE_RELOAD.hand.slice(-3),
   ],
   tactical: {
+    effort: {
+      frequencyHz:3.6,decayPerS:13,impulseGain:2.4,tailFadeAt:.7,shoulderScale:.18,
+      elbowDelayS:.035,shoulderDelayS:.055,tailS:.46,finishAt:.985,
+      events: [
+        {at:.145,pose:[0,.002,.003,.012,.004,-.008],right:[.015,.010,.008],left:[-.008,-.005,.004]},
+        {at:.235,pose:[.001,-.002,.008,-.010,.006,.012],right:[.025,-.012,.018],left:[-.010,-.008,.005]},
+        {at:.595,pose:[-.001,-.007,.002,-.018,.004,-.012],right:[.025,-.025,.012],left:[-.014,-.016,.006]},
+        {at:.700,pose:[0,.003,-.002,.010,-.003,.007],right:[-.012,.016,-.006],left:[.005,.010,-.003]},
+        {at:.890,pose:[0,-.002,-.006,.009,-.004,-.008],right:[-.018,-.010,-.016],left:[.006,-.008,-.004]},
+        {at:.935,pose:[0,-.003,.002,-.008,.004,.010],right:[.012,-.010,.008],left:[-.005,-.006,.002]},
+      ],
+    },
     oldClipVisible: [0.275, 0.385],
     oldClip: [[0.275, 0], [0.310, 1], [0.385, 2]],
     clip: [
@@ -99,13 +126,13 @@ export const FPS_PACKET_RELOAD = Object.freeze({
     seatedAt: 0.54, retainedAt: 0.725,
     hand: [
       ...FPS_RIFLE_RELOAD.hand.slice(0, 3),
-      { at: 0.275, anchor: "latch", shape: "latch", flow: true },
+      { at: 0.265, anchor: "latch", shape: "latch", flow: true },
       { at: 0.310, anchor: "oldClip" },
       { at: 0.385, anchor: "oldClip" },
       { at: 0.405, anchor: "clip", flow: true }, { at: 0.530, anchor: "clip" },
       { at: 0.580, anchor: "press", arc: [0.008, 0.012, 0.004], flow: true },
       { at: 0.700, anchor: "press" },
-      { at: 0.755, anchor: "clear", toward: "bolt", anchorMix: 0.45, shape: "recover", through: true },
+      { at: 0.755, anchor: "clear", toward: "bolt", anchorMix: 0.45, shape: "recover", through: true, fingerLagS:[0,.025,.040,.055,.065] },
       ...FPS_RIFLE_RELOAD.hand.slice(-3),
     ],
   },
@@ -168,17 +195,28 @@ export const FPS_TOP_MAG_RELOAD = Object.freeze({
 // FW Type 11 Nambu and Japanese Infantry Weapons, Intelligence Bulletin.
 // Hopper bounds measured on the private, grip-normalized imported mesh.
 export const FPS_HOPPER_RELOAD = Object.freeze({
+  effort: {
+    frequencyHz:3.9,decayPerS:15,impulseGain:2.4,tailFadeAt:.7,shoulderScale:.18,
+    elbowDelayS:.035,shoulderDelayS:.055,tailS:.40,finishAt:.985,
+    events:[
+      {at:.16,pose:[-.001,-.003,.003,-.010,.004,-.010],right:[.010,-.006,.006],left:[-.012,-.014,.008]},
+      {at:.84,emptyOnly:true,pose:[0,-.003,.002,-.010,0,-.008],right:[.008,-.006,.004],left:[-.012,-.012,.006]},
+      {at:.88,partialOnly:true,pose:[0,-.003,.002,-.010,0,-.008],right:[.008,-.006,.004],left:[-.012,-.012,.006]},
+      {at:.910,emptyOnly:true,pose:[.001,0,.007,-.008,.005,.012],right:[.008,-.010,.008],left:[-.020,.008,.024]},
+      {at:.940,emptyOnly:true,pose:[0,-.002,-.005,.009,-.003,-.008],right:[-.005,-.006,-.004],left:[.012,-.006,-.014]},
+    ],
+    seatPose:[0,-.004,.001,-.010,.003,-.008],
+    seatRight:[.014,-.018,.008],seatLeft:[-.006,-.008,.003],
+    cycleStrength:[1,.88,1.04,.92,1.08,.96],
+  },
   supportHand:"right",
   blend:[[0,0],[.16,1],[.88,1],[1,0]],
   bodyOffset:{shoulders:{right:[.004,.012,-.030],left:[0,.012,0]},elbowPoles:{right:[.04,.02,0],left:[-.02,0,0]}},
   support:[
     [0,0,0,0,0,0,0],[.16,-.022,.008,.060,.10,.24,-.30],
-    [.26,-.025,-.007,.064,.08,.26,-.32],[.30,-.021,.009,.059,.11,.23,-.29],
-    [.36,-.025,-.004,.064,.08,.26,-.32],[.40,-.021,.010,.059,.11,.23,-.29],
-    [.46,-.025,-.006,.064,.08,.26,-.32],[.50,-.021,.010,.059,.11,.23,-.29],
-    [.56,-.025,-.007,.064,.08,.26,-.32],[.60,-.021,.009,.059,.11,.23,-.29],
-    [.66,-.025,-.006,.064,.08,.26,-.32],[.70,-.021,.010,.059,.11,.23,-.29],
-    [.76,-.026,-.008,.066,.08,.27,-.33],[.80,-.021,.009,.059,.11,.23,-.29],
+    [.24,-.025,.003,.064,.09,.26,-.32],
+    [.52,-.024,.005,.062,.10,.25,-.31],
+    [.76,-.025,.003,.064,.09,.26,-.32],[.80,-.021,.009,.059,.11,.23,-.29],
     [.88,-.020,.009,.055,.12,.22,-.27],[1,0,0,0,0,0,0],
   ],
   seat:[-.118,-.063,-.120], layerPitchM:.0131,
@@ -194,17 +232,22 @@ export const FPS_HOPPER_RELOAD = Object.freeze({
   // draw back and return the separate left operating handle (MID SS19 pp.92-93).
   emptyFollower:[[0,0],[.07,0],[.16,1],[.78,1],[.84,0],[1,0]],
   emptyRightRecovery:[.802,.850],
+  rightRecoveryRotationMix:.45,
   charge:{
     graspAt:.875,releaseAt:.945,clearAt:.966,returnAt:.995,
     slide:[[0,0],[.875,0],[.910,1],[.940,0],[1,0]],
     approachAt:.862,approachMix:.55,approachOffset:[-.010,.010,.008],
-    recoveryPositionMix:.20,recoveryRotationMix:.30,recoveryOffset:[-.010,.008,.010],
+    recoveryPositionMix:.20,recoveryRotationMix:.38,recoveryOffset:[-.010,.008,.010],
     leftShoulderOffset:[0,.030,-.070],body:[[0,0],[.81,0],[.86,1],[.96,1],[1,0]],
     support:[[0,0,0,0,0,0,0],[.78,0,0,0,0,0,0],
       [.86,0,.065,-.045,0,0,-.10],[.94,0,.065,-.045,0,0,-.10],[1,0,0,0,0,0,0]],
   },
-  drawAt:.20, cycle:.10, alignPhase:.35, seatPhase:.60, releasePhase:.64, clearPhase:.76,
+  // Small timing differences avoid six identical stop-start motions. The last
+  // charger is still seated before the unchanged inventory commit at .78.
+  drawAt:.20, cycle:.10, cycles:[.20,.296,.401,.497,.602,.701,.80],
+  alignPhase:.35, seatPhase:.60, releasePhase:.64, clearPhase:.76,
   approachHeightM:.075,
+  releaseFingerLagS:[0,.008,.014,.020,.026],
   pouchOffset:[.10,-.060,.090], clearOffset:[.015,.025,.018],
   oldStackLift:[[0,0],[.13,0],[.16,1],[.195,2],[1,2]],
   oldStackVisibleUntil:.195,

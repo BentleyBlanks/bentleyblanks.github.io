@@ -1934,7 +1934,7 @@ export class Viewmodel {
     const profile = FPS_RELOAD_PROPS.profiles[prop.userData.profile];
     const back = 0.030 * profile.caseLength / 0.057;
     const anchor = prop.position.clone().add(new THREE.Vector3(0, 0, back - FPS_RELOAD_PROPS.gripReferenceBackM).applyQuaternion(prop.quaternion));
-    return this._HandPlacement("clip", anchor, prop.quaternion);
+    return this._HandPlacement(this.weaponId==="HanYang"?"packetClip":"clip", anchor, prop.quaternion);
   }
 
   _LooseRoundGeometry(profileId) {
@@ -3316,7 +3316,11 @@ export class Viewmodel {
     }
     if (this.riggedArms) {
       this.riggedArms.SetContactWeight(key,1-Mix(start.weight ?? 1,end.weight ?? 1,mix));
-      this.riggedArms.operationPose[key] = {shape:start.shape || end.shape,nextShape:end.shape || start.shape,shapeMix:mix};
+      const digitMix=end.fingerLagS?.map(delay=>{
+        const at=start.at+Math.min(delay/(this.action?.duration||1),(end.at-start.at)*.7);
+        const phase=Ease.Seg(t,at,end.at);return phase*phase*(3-2*phase);
+      });
+      this.riggedArms.operationPose[key] = {shape:start.shape || end.shape,nextShape:end.shape || start.shape,shapeMix:mix,digitMix};
     }
   }
 
@@ -3350,19 +3354,39 @@ export class Viewmodel {
    * 开栓 → 右手从腰间取桥夹 → 插进桥夹导槽 → **拇指一推 5 发** → 抽出空夹丢掉 → 闭栓。
    * 一发一发往里塞是错的（史料明确写了是桥夹压入）。
    */
-  _PoseReloadMotion(t, motion, supportAdjustment = null) {
+  _PoseReloadMotion(t, motion, supportAdjustment = null, effortEvents = motion.effort?.events) {
     // Rotate about the supporting grip. Type 11 rests its stock against the
     // body while the left forearm cradles the receiver and holds the follower.
     const raise = ReloadTrack(motion.blend, t);
+    const effort=motion.effort,duration=this.action?.duration || this.weapon.reloadTimeS;
+    const Response=(event,delay=0)=>{
+      const age=(t-event.at)*duration-delay;
+      if(age<=0||age>=effort.tailS)return 0;
+      const tail=1-Ease.InOut(Ease.Seg(age,effort.tailS*effort.tailFadeAt,effort.tailS));
+      return Math.exp(-effort.decayPerS*age)*Math.sin(2*Math.PI*effort.frequencyHz*age)*effort.impulseGain*tail
+        *(1-Ease.InOut(Ease.Seg(t,effort.finishAt,1)));
+    };
     const pose = Array.from({ length: 6 }, (_, i) => ReloadTrack(motion.support, t, i + 1)
       + (supportAdjustment ? ReloadTrack(supportAdjustment,t,i+1) : 0));
+    if(effort)for(const event of effortEvents || []){
+      const response=Response(event);for(let i=0;i<6;i++)pose[i]+=(event.pose?.[i]||0)*response;
+    }
     this._PoseReload(motion.supportHand || "left", 1, ...pose, raise);
     if (this.riggedArms) {
       const body=motion.bodyOffset;
-      this.riggedArms.reloadBodyOffset = motion.elbows ? {...body,elbowPoles:{
-        right:body.elbowPoles.right.map((value,axis)=>value+ReloadTrack(motion.elbows,t,axis+1)),
-        left:body.elbowPoles.left.map((value,axis)=>value+ReloadTrack(motion.elbows,t,axis+4)),
-      }} : body;
+      this.riggedArms.reloadBodyOffset = {
+        shoulders:{},elbowPoles:{},
+      };
+      for(const side of ["right","left"])for(const group of ["shoulders","elbowPoles"]){
+        this.riggedArms.reloadBodyOffset[group][side]=body[group][side].map((value,axis)=>{
+          const lead=group==="elbowPoles"&&motion.elbows?ReloadTrack(motion.elbows,t,axis+(side==="right"?1:4)):0;
+          let response=0;
+          if(effort)for(const event of effortEvents || [])response+=(event[side]?.[axis]||0)
+            *Response(event,group==="elbowPoles"?effort.elbowDelayS:effort.shoulderDelayS)
+            *(group==="shoulders"?effort.shoulderScale:1);
+          return value+lead+response;
+        });
+      }
     }
   }
 
@@ -3411,7 +3435,7 @@ export class Viewmodel {
   _ReloadPressGrip(prop) {
     const top = new THREE.Vector3(0, prop.userData.roundTopM + prop.userData.rounds.position.y, 0.009)
       .applyQuaternion(prop.quaternion).add(prop.position);
-    return this._HandPlacement("press", top, prop.quaternion);
+    return this._HandPlacement(this.weaponId==="HanYang"?"packetPress":"press", top, prop.quaternion);
   }
 
   _SetReloadClipPose(prop, t, motion) {
@@ -3592,7 +3616,11 @@ export class Viewmodel {
   _AnimReloadHopper(t) {
     const spec=FPS_HOPPER_RELOAD, prop=this.clipProp;
     const remaining=this.action.roundsRemaining,partial=remaining>0;
-    this._PoseReloadMotion(t,spec,partial?null:spec.charge.support);
+    const events=spec.effort.events.filter(event=>!(event.emptyOnly&&partial)&&!(event.partialOnly&&!partial));
+    for(let i=0;i<6;i++)events.push({at:spec.cycles[i]+(spec.cycles[i+1]-spec.cycles[i])*spec.seatPhase,
+      pose:spec.effort.seatPose.map(v=>v*spec.effort.cycleStrength[i]),
+      right:spec.effort.seatRight,left:spec.effort.seatLeft});
+    this._PoseReloadMotion(t,spec,partial?null:spec.charge.support,events);
     const follower=this.rig.parts.hopperFollower;
     const followerTrack=partial?spec.follower:spec.emptyFollower;
     const followerT = partial && t < .16 ? .07 + .09 * Ease.Seg(t,.07,.115) : t;
@@ -3614,8 +3642,8 @@ export class Viewmodel {
     const pouch=seat.clone().add(new THREE.Vector3().fromArray(spec.pouchOffset));
     const clear=seat.clone().add(new THREE.Vector3().fromArray(spec.clearOffset));
     const turn=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2);
-    const active=Clamp(Math.floor((t-spec.drawAt)/spec.cycle),0,5);
-    const start=spec.drawAt+active*spec.cycle,phase=Clamp01((t-start)/spec.cycle);
+    const active=Clamp(spec.cycles.findLastIndex(at=>t>=at),0,5);
+    const start=spec.cycles[active],cycle=spec.cycles[active+1]-start,phase=Clamp01((t-start)/cycle);
     const placed=t<spec.drawAt?0:Math.min(6,active+(phase>=spec.seatPhase?1:0));
     const oldTop=Math.max(0,Math.ceil(remaining/5)-1)*spec.layerPitchM;
     let oldGrip=null;
@@ -3634,7 +3662,7 @@ export class Viewmodel {
     const above=target.clone().add(new THREE.Vector3(0,spec.approachHeightM,0));
     if(phase<spec.alignPhase)prop.position.lerpVectors(pouch,above,Ease.InOut(phase/spec.alignPhase));
     else prop.position.lerpVectors(above,target,Ease.InOut(Ease.Seg(phase,spec.alignPhase,spec.seatPhase)));
-    const Grip=(anchor)=>this._HandPlacement("clip",anchor,turn);
+    const Grip=(anchor)=>this._HandPlacement("hopperClip",anchor,turn);
     const followerTurn=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),spec.followerAngleRad*ReloadTrack(followerTrack,followerT));
     const followerPoint=new THREE.Vector3().fromArray(spec.followerPivot).add(new THREE.Vector3().fromArray(spec.followerRimOffset).applyQuaternion(followerTurn));
     const held=this._HandPlacement("hopperFollower",followerPoint,followerTurn);
@@ -3668,17 +3696,20 @@ export class Viewmodel {
         {at:.13,...Grip(oldGrip||pouch)},{at:.19,...Grip(oldGrip||pouch)},{at:.195,...Grip(pouch)}]
       : [{at:.19,...Grip(pouch),shape:"relax",through:true}];
     for(let i=0;i<6;i++) {
-      const at=spec.drawAt+i*spec.cycle,position=seat.clone();position.y+=i*spec.layerPitchM;
+      const at=spec.cycles[i],cycle=spec.cycles[i+1]-at,position=seat.clone();position.y+=i*spec.layerPitchM;
       const carried=position.clone().add(new THREE.Vector3(0,spec.approachHeightM,0));
-      frames.push({at,...Grip(pouch)},{at:at+spec.alignPhase*spec.cycle,...Grip(carried)},
-        {at:at+spec.seatPhase*spec.cycle,...Grip(position)},
-        {at:at+spec.releasePhase*spec.cycle,...Grip(position)},
-        {at:at+spec.clearPhase*spec.cycle,...Grip(position.clone().add(new THREE.Vector3().fromArray(spec.clearOffset))),shape:"relax",through:true});
+      frames.push({at,...Grip(pouch)},{at:at+spec.alignPhase*cycle,...Grip(carried)},
+        {at:at+spec.seatPhase*cycle,...Grip(position)},
+        {at:at+spec.releasePhase*cycle,...Grip(position)},
+        {at:at+spec.clearPhase*cycle,...Grip(position.clone().add(new THREE.Vector3().fromArray(spec.clearOffset))),shape:"relax",through:true,fingerLagS:spec.releaseFingerLagS});
     }
     const rightBaseRotation=this.handBaseRot.right.toArray().slice(0,3);
     const topClear=clear.clone().add(new THREE.Vector3(0,5*spec.layerPitchM,0));
     const rightRecovery=charge?spec.emptyRightRecovery:[.82,.875];
-    frames.push({at:rightRecovery[0],position:topClear.lerp(this.handBase.right,.5),rotation:rightBaseRotation,shape:"recover",through:true},
+    const rightRecoveryRotation=new THREE.Euler().setFromQuaternion(
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(...Grip(topClear).rotation,"YXZ"))
+        .slerp(new THREE.Quaternion().setFromEuler(this.handBaseRot.right),spec.rightRecoveryRotationMix),"YXZ").toArray().slice(0,3);
+    frames.push({at:rightRecovery[0],position:topClear.lerp(this.handBase.right,.5),rotation:rightRecoveryRotation,shape:"recover",through:true},
       {at:rightRecovery[1],position:this.handBase.right,rotation:rightBaseRotation,weight:0,shape:"recover"});
     this._WorkingHandPath("right",t,frames);
   }
