@@ -43,7 +43,7 @@ export const SOURCE_ASSET_STANDARDS = Object.freeze({
     note: "现代瞄准镜、包布与独立子弹不属于游戏选定几何。" },
   HanYang: { name: "汉阳造", group: "firearm", sourceTriangles: 2672,
     sourceTexture: "有（源材质）", runtimeTexture: SharedWeaponPbr },
-  Zb26: { name: "ZB-26", group: "firearm", sourceTriangles: 25663,
+  Zb26: { name: "ZB-26", group: "firearm", sourceTriangles: 29967,
     sourceTexture: "BlenderMCP 作者材质", runtimeTexture: "专用 1K 原 UV 钢件 / 胡桃木 Base + Normal + Orm",
     note: "历史照片、馆藏两侧照片与用户选定的 imagegen C 旧化参考重建；未减面，TZM 编译跳过 37 个不可见微小三角。" },
   Type38: { name: "三八式", group: "firearm", sourceTriangles: 12475,

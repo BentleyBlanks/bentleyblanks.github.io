@@ -16,44 +16,44 @@
       "file": "Texture_Zb26VeteranWoodBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 114554,
-      "sha256": "46669b50dbec4e201b9e0a7d8163781a57077d9a9df49c7f7ec00876926f4123"
+      "bytes": 119076,
+      "sha256": "e924f26e54c1f8b746e4d74a4cc3b4cad1ebbe9878d36e144b2a0dff42a9415e"
     },
     {
       "channel": "Normal",
       "file": "Texture_Zb26VeteranWoodNormal.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 5274,
-      "sha256": "cfecb2d22ec120f27ca3ef57e98d58a27e5e604c79da40717d1e7a323976038d"
+      "bytes": 5294,
+      "sha256": "f83822b2613ad0ebedb915e8d44eb3d6a36fc1e0e13a3f3264c31418ecb06f3d"
     },
     {
       "channel": "Orm",
       "file": "Texture_Zb26VeteranWoodOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 26718,
-      "sha256": "94858ff1d061ce5db45feaf67b71bf852d597da79db8702fe47bb263d6dd862b"
+      "bytes": 27728,
+      "sha256": "14bdecd614b055072b1a0a933f562ea473b64fa28541911ea87aea7bad1987f1"
     }
   ],
-  "totalBytes": 146546,
+  "totalBytes": 152098,
   "metrics": {
     "meanSrgb": [
-      0.2255,
-      0.1413,
-      0.0932
+      0.2302,
+      0.1448,
+      0.0954
     ],
-    "luma": 0.1533,
-    "lumaStd": 0.0853,
-    "sat": 0.5868,
+    "luma": 0.1568,
+    "lumaStd": 0.0861,
+    "sat": 0.5854,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.2832,
-    "seam": 0.0879,
-    "interior": 0.0135,
-    "seamRatio": 6.529,
-    "border": 0.293,
-    "swing": 0.4571,
+    "lowFreq": 0.2714,
+    "seam": 0.1023,
+    "interior": 0.0153,
+    "seamRatio": 6.689,
+    "border": 0.159,
+    "swing": 0.3369,
     "texelsPerMeter": null
   },
   "gateProblems": []

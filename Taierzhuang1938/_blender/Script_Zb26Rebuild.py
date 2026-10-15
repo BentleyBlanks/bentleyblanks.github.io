@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """Build the approved C/veteran ZB-26 exterior and its original-UV atlases.
 
-Run through scripts/Script_BlenderMcp.mjs, never against another task's scene.
+On the desktop use scripts/Script_BlenderMcp.mjs, never another task's scene.
+Independent Blender environments can use Script_Zb26Standalone.py directly.
 BuildAll imports BuildZb26 for deterministic single-asset rebuilds. The editable
 scene and full-resolution author maps stay outside the Pages repository.
 """
@@ -19,7 +20,7 @@ from mathutils import Matrix, Vector
 here = Path(__file__).resolve().parent
 project = here.parent
 repository = project.parent
-sourceDir = Path(os.environ.get("ZB26_SOURCE_DIR", "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Zb26"))
+sourceDir = Path(os.environ.get("ZB26_SOURCE_DIR", "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Zb26/Iterations/Manufacture20261015"))
 blendPath = sourceDir / "Scene_Zb26Veteran20261015.blend"
 mapDir = sourceDir / "SourceMaps"
 taskName = "Zb26Veteran20261015"
@@ -175,6 +176,30 @@ def Guard(name, outer, inner, width=0.006, centerX=0, material="zb26Steel", node
     return obj
 
 
+def RoundedTriggerGuard():
+    # Constant-width stamped strip with four small corner chamfers. The old
+    # concentric 24-gons made both the silhouette and edge reflections faceted.
+    count, hx, radial, chamfer = 60, .003, .003, .0006
+    crossSection = [(-hx,-radial+chamfer),(-hx+chamfer,-radial),
+        (hx-chamfer,-radial),(hx,-radial+chamfer),(hx,radial-chamfer),
+        (hx-chamfer,radial),(-hx+chamfer,radial),(-hx,radial-chamfer)]
+    vertices, faces = [], []
+    for j in range(count):
+        angle = j*math.tau/count
+        center = Vector((0,-.032+.026*math.sin(angle),-.058+.038*math.cos(angle)))
+        outward = Vector((0,math.sin(angle)/.026,math.cos(angle)/.038)).normalized()
+        for x, r in crossSection:
+            vertices.append(tuple(center+Vector((x,0,0))+outward*r))
+    for j in range(count):
+        for k in range(8):
+            faces.append((j*8+k,j*8+(k+1)%8,((j+1)%count)*8+(k+1)%8,((j+1)%count)*8+k))
+    obj = Mesh("TriggerGuard",vertices,faces,smooth=True)
+    obj.data.set_sharp_from_angle(angle=.6)
+    for polygon in obj.data.polygons:
+        obj.data.attributes["Zb26EdgeWear"].data[polygon.index].value = .5 if polygon.index%2==0 else 0
+    return obj
+
+
 def Screw(name, center, axis="X", radius=0.0025, node="body"):
     end = Vector(center)
     start = end.copy()
@@ -205,13 +230,19 @@ def CutPocket(obj, name, center, size, bevel=0.001):
     bpy.data.objects.remove(cutter, do_unlink=True)
 
 
-def SideRing(name, x, cy, cz, outer, inner, width, segments=40):
+def SideRing(name, x, cy, cz, outer, inner, width, segments=40, knurl=0):
     obj = Lathe(name, [(x-width/2, inner), (x-width/2, outer-.0003),
                       (x, outer), (x+width/2, outer-.0003), (x+width/2, inner)],
                 segments=segments, center=(0, 0), closed=True)
     for vertex in obj.data.vertices:
         px, py, pz = vertex.co
+        radius = math.hypot(px, py)
+        if knurl and radius > outer-.0004:
+            angle = math.atan2(py, px)
+            relief = .00022 * (.5+.5*math.cos(angle*knurl))
+            px, py = px*(1+relief/radius), py*(1+relief/radius)
         vertex.co = (pz, cy+py, cz-px)
+    obj.data.update()
     return obj
 
 
@@ -241,7 +272,7 @@ def BuildExterior():
     Box("PortLatch", (.023, .063, -.207), (.003, .006, .021), bevel=.0008)
     Box("FeedSeat", (0, 0.066, -0.228), (0.040, 0.014, 0.080), bevel=0.001)
     Rod("LeftElevationDrum", (-0.017, 0.036, -0.177), (-0.029, 0.036, -0.177), 0.021, segments=48)
-    SideRing("ElevationDrumRim", -.0295, .036, -.177, .0213, .0182, .0020)
+    SideRing("ElevationDrumRim", -.0295, .036, -.177, .0213, .0182, .0020, segments=96, knurl=32)
     SideRing("ElevationDrumHub", -.030, .036, -.177, .0075, .0040, .0015, segments=28)
     Screw("ElevationDrumCenter", (-0.032, 0.036, -0.177), radius=0.0033)
     Rod("SelectorPivot", (-.017, .005, -.083), (-.024, .005, -.083), .005, segments=24)
@@ -267,7 +298,7 @@ def BuildExterior():
         Lathe("CoolingFin%02d" % j,
               [(z - w / 2, 0.0075), (z - w / 2, radius - 0.00035), (z - w / 2 + 0.00035, radius),
                (z + w / 2 - 0.00035, radius), (z + w / 2, radius - 0.00035), (z + w / 2, 0.0075)],
-              segments=20, closed=True)
+              segments=24, closed=True)
     # Separate lower gas tube, its front support and short ribbed front collar.
     Lathe("GasTube", [(-0.274, 0.0115), (-0.332, 0.010), (-0.802, 0.009), (-0.832, 0.0115)],
           center=(0, -0.009), segments=24)
@@ -317,9 +348,7 @@ def BuildExterior():
     bm.to_mesh(grip.data)
     bm.free()
     # Closed trigger guard and curved solid trigger, ahead of the grip.
-    outer = [(-.032+.029*math.sin(j*math.tau/24), -.058+.041*math.cos(j*math.tau/24)) for j in range(24)]
-    inner = [(-.032+.023*math.sin(j*math.tau/24), -.058+.035*math.cos(j*math.tau/24)) for j in range(24)]
-    Guard("TriggerGuard", outer, inner, width=0.006)
+    RoundedTriggerGuard()
     for z in (-0.025, -0.090):
         Box("TriggerGuardMount" + str(z), (0, -0.002, z), (0.011, 0.016, 0.019))
     Rod("TriggerUpper", (0, -0.008, -0.050), (0, -0.032, -0.059), 0.0023, segments=12)
@@ -334,8 +363,9 @@ def BuildExterior():
     # Original short wooden carrying handle and its barrel-mounted steel arm.
     Rod("CarryPivot", (0.009, 0.043, -0.321), (0.031, 0.043, -0.321), 0.007, segments=20)
     Rod("CarryArm", (0.028, 0.043, -0.321), (0.030, 0.066, -0.350), 0.0037, segments=16)
-    Rod("CarryWood", (0.031, 0.066, -0.346), (0.031, 0.066, -0.421), 0.0070,
-        material="zb26Wood", segments=24)
+    Lathe("CarryWood", [(-.346,.0057),(-.351,.0068),(-.360,.0071),
+                       (-.407,.0071),(-.416,.0067),(-.421,.0059)],
+          center=(.031,.066), material="zb26Wood", segments=24)
     Rod("CarryEndCap", (0.031, 0.066, -0.418), (0.031, 0.066, -0.426), 0.0073, segments=20)
     # Folding bipod in the carried state; both legs physically attach to pivot.
     Lathe("BipodPivotBand", [(-0.691, 0.016), (-0.712, 0.016)], center=(0, -0.009), segments=24)
@@ -418,8 +448,8 @@ def SurfaceNoise(tree, position, scale, detail=3):
     return node.outputs["Fac"]
 
 
-def ScuffMask(tree, geometry):
-    """Sparse exterior handling scars, specified in metres on the side faces."""
+def PlanarScuffs(tree, geometry, plane, axis, strokes, absolute=False):
+    """Sparse handling scars in metres; normal gating keeps them on a surface."""
     def VectorMath(operation, a, b=None):
         node = tree.nodes.new("ShaderNodeVectorMath")
         node.operation = operation
@@ -431,19 +461,16 @@ def ScuffMask(tree, geometry):
             else:
                 tree.links.new(value, node.inputs[i])
         return node
-    projected = VectorMath("MULTIPLY", geometry.outputs["Position"], (0,1,1)).outputs[0]
+    projected = VectorMath("MULTIPLY", geometry.outputs["Position"], plane).outputs[0]
+    components = [i for i, value in enumerate(plane) if value]
     mask = 0
-    for y, z, dy, dz, width in (
-        (.043,-.038,.0015,-.016,.00027), (.040,-.051,.0006,-.009,.00018),
-        (.019,-.105,.0025,-.020,.00028), (.020,-.109,.0010,-.010,.00018),
-        (.013,-.138,.0006,-.011,.00023), (.048,-.281,-.001,-.010,.00032),
-        (.058,-.192,.0008,-.013,.00020), (.181,-.206,-.010,-.0012,.00030),
-        (.192,-.249,-.011,.0005,.00022), (.096,-.207,.013,-.0006,.00024)):
-        start, delta = (0,y,z), (0,dy,dz)
+    for a, b, da, db, width in strokes:
+        start = tuple(a if i==components[0] else b if i==components[1] else 0 for i in range(3))
+        delta = tuple(da if i==components[0] else db if i==components[1] else 0 for i in range(3))
         offset = VectorMath("SUBTRACT", projected, start).outputs[0]
         dot = VectorMath("DOT_PRODUCT", offset, delta).outputs["Value"]
         t = MathNode(tree, "MINIMUM", 1, MathNode(tree, "MAXIMUM", 0,
-            MathNode(tree, "DIVIDE", dot, dy*dy+dz*dz)))
+            MathNode(tree, "DIVIDE", dot, da*da+db*db)))
         scale = VectorMath("SCALE", delta)
         tree.links.new(t, scale.inputs["Scale"])
         closest = VectorMath("ADD", scale.outputs[0], start).outputs[0]
@@ -452,7 +479,50 @@ def ScuffMask(tree, geometry):
         mask = MathNode(tree, "MAXIMUM", mask, stroke)
     normal = tree.nodes.new("ShaderNodeSeparateXYZ")
     tree.links.new(geometry.outputs["Normal"], normal.inputs[0])
-    return MathNode(tree, "MULTIPLY", mask, Ramp(tree, MathNode(tree, "ABSOLUTE", normal.outputs["X"]), .8, .96))
+    facing = MathNode(tree, "ABSOLUTE", normal.outputs[axis]) if absolute else normal.outputs[axis]
+    return MathNode(tree, "MULTIPLY", mask, Ramp(tree, facing, .8, .96))
+
+
+def ScuffMask(tree, geometry):
+    side = PlanarScuffs(tree, geometry, (0,1,1), "X", (
+        (.043,-.038,.0015,-.016,.00027), (.040,-.051,.0006,-.009,.00018),
+        (.019,-.105,.0025,-.020,.00028), (.020,-.109,.0010,-.010,.00018),
+        (.013,-.138,.0006,-.011,.00023), (.048,-.281,-.001,-.010,.00032),
+        (.058,-.192,.0008,-.013,.00020), (.181,-.206,-.010,-.0012,.00030),
+        (.192,-.249,-.011,.0005,.00022), (.096,-.207,.013,-.0006,.00024)), absolute=True)
+    top = PlanarScuffs(tree, geometry, (1,0,1), "Y", (
+        (-.015,-.014,.0004,-.018,.00038), (-.0154,-.039,.0002,-.011,.00020),
+        (.014,-.035,-.001,-.012,.00030), (-.006,-.071,.006,-.009,.00022),
+        (-.004,-.073,.002,-.003,.00012), (.010,-.123,.0015,-.012,.00021),
+        (.012,-.131,.0005,-.007,.00015), (-.012,-.151,.004,-.008,.00032),
+        (.013,-.183,-.001,-.012,.00028), (-.011,-.186,.002,-.009,.00023)))
+    return MathNode(tree, "MAXIMUM", side, top)
+
+
+def ReceiverStamp(tree, geometry):
+    """Project the simplified maker's stamp onto the two receiver side panels."""
+    position = tree.nodes.new("ShaderNodeSeparateXYZ")
+    normal = tree.nodes.new("ShaderNodeSeparateXYZ")
+    tree.links.new(geometry.outputs["Position"], position.inputs[0])
+    tree.links.new(geometry.outputs["Normal"], normal.inputs[0])
+    rightU = MathNode(tree, "DIVIDE", MathNode(tree, "SUBTRACT",
+        MathNode(tree, "MULTIPLY", position.outputs["Z"], -1), .010), .140)
+    rightSide = MathNode(tree, "GREATER_THAN", normal.outputs["X"], 0)
+    u = MathNode(tree, "ADD", MathNode(tree, "MULTIPLY", rightSide, rightU),
+        MathNode(tree, "MULTIPLY", MathNode(tree, "SUBTRACT", 1, rightSide),
+                 MathNode(tree, "SUBTRACT", 1, rightU)))
+    v = MathNode(tree, "DIVIDE", MathNode(tree, "SUBTRACT", position.outputs["Y"], .020), .024)
+    coordinates = tree.nodes.new("ShaderNodeCombineXYZ")
+    tree.links.new(u, coordinates.inputs["X"])
+    tree.links.new(v, coordinates.inputs["Y"])
+    image = tree.nodes.new("ShaderNodeTexImage")
+    image.image = bpy.data.images.load(str(project / "_import/Source/Zb26/Texture_ReceiverStampMask.png"), check_existing=True)
+    image.image.colorspace_settings.name = "Non-Color"
+    image.extension = "CLIP"
+    tree.links.new(coordinates.outputs[0], image.inputs["Vector"])
+    sideNormal = Ramp(tree, MathNode(tree, "ABSOLUTE", normal.outputs["X"]), .96, .999)
+    sidePlane = MathNode(tree, "GREATER_THAN", MathNode(tree, "ABSOLUTE", position.outputs["X"]), .0178)
+    return MathNode(tree, "MULTIPLY", image.outputs["Color"], MathNode(tree, "MULTIPLY", sideNormal, sidePlane))
 
 
 def AuthorMaterial(key):
@@ -472,6 +542,9 @@ def AuthorMaterial(key):
     ao = tree.nodes.new("ShaderNodeAmbientOcclusion")
     ao.inputs["Distance"].default_value = 0.009
     ao.samples = 16
+    aoValue = ao.outputs["AO"]
+    stamp = None
+    scuffs = None
     if key == "zb26Steel":
         # Worn bluing stays coherent. Broken edge polish and sparse directional
         # scars carry the age; no Voronoi web or thresholded camouflage patches.
@@ -481,8 +554,24 @@ def AuthorMaterial(key):
         scratchPatch = SurfaceNoise(tree, position, (95, 95, 95))
         scratches = MathNode(tree, "MULTIPLY", Ramp(tree, scratch, .69, .78), Ramp(tree, scratchPatch, .53, .71))
         wear = MathNode(tree, "MAXIMUM", edge, MathNode(tree, "MULTIPLY", scratches, .58))
-        wear = MathNode(tree, "MAXIMUM", wear, MathNode(tree, "MULTIPLY", ScuffMask(tree, geometry), .72))
+        scuffs = ScuffMask(tree, geometry)
+        wear = MathNode(tree, "MAXIMUM", wear, MathNode(tree, "MULTIPLY", scuffs, .72))
         base = Mix(tree, noise, (.075, .079, .081), (.095, .093, .086))
+        steelCoordinates = tree.nodes.new("ShaderNodeVectorMath")
+        steelCoordinates.operation = "MULTIPLY"
+        steelCoordinates.inputs[1].default_value = (4,4,4)
+        tree.links.new(position, steelCoordinates.inputs[0])
+        steelGrain = tree.nodes.new("ShaderNodeTexImage")
+        steelGrain.image = bpy.data.images.load(str(project / "_import/Source/Zb26/Texture_SteelAuthor.webp"), check_existing=True)
+        steelGrain.image.colorspace_settings.name = "sRGB"
+        steelGrain.projection, steelGrain.projection_blend = "BOX", .2
+        tree.links.new(steelCoordinates.outputs[0], steelGrain.inputs["Vector"])
+        calibratedGrain = tree.nodes.new("ShaderNodeMixRGB")
+        calibratedGrain.blend_type = "MULTIPLY"
+        calibratedGrain.inputs[0].default_value = 1
+        calibratedGrain.inputs[2].default_value = (1.12,1.12,1.12,1)
+        tree.links.new(steelGrain.outputs["Color"], calibratedGrain.inputs[1])
+        base = Mix(tree, .62, base, calibratedGrain.outputs[0])
         base = Mix(tree, wear, base, (.24, .235, .215))
         dust = MathNode(tree, "MULTIPLY", MathNode(tree, "SUBTRACT", 1, ao.outputs["AO"]),
                         MathNode(tree, "ADD", .18, MathNode(tree, "MULTIPLY", noise, .38)))
@@ -491,6 +580,10 @@ def AuthorMaterial(key):
             MathNode(tree, "ADD", .43, MathNode(tree, "MULTIPLY", noise, .15)),
             MathNode(tree, "MULTIPLY", wear, .19)), MathNode(tree, "MULTIPLY", dust, .32))
         metal = MathNode(tree, "SUBTRACT", .91, MathNode(tree, "MULTIPLY", dust, .72))
+        stamp = ReceiverStamp(tree, geometry)
+        base = Mix(tree, MathNode(tree, "MULTIPLY", stamp, .25), base, (.12,.115,.105))
+        rough = MathNode(tree, "ADD", rough, MathNode(tree, "MULTIPLY", stamp, .08))
+        aoValue = MathNode(tree, "MULTIPLY", aoValue, MathNode(tree, "SUBTRACT", 1, MathNode(tree, "MULTIPLY", stamp, .18)))
         height = fine
         bumpDistance = 0.000006
     else:
@@ -513,7 +606,24 @@ def AuthorMaterial(key):
     bump.inputs["Strength"].default_value = 0.36
     bump.inputs["Distance"].default_value = bumpDistance
     tree.links.new(height, bump.inputs["Height"])
-    tree.links.new(bump.outputs["Normal"], shader.inputs["Normal"])
+    surfaceNormal = bump.outputs["Normal"]
+    if scuffs is not None:
+        abrasion = tree.nodes.new("ShaderNodeBump")
+        abrasion.inputs["Distance"].default_value = .000025
+        abrasion.inputs["Strength"].default_value = .7
+        abrasion.invert = True
+        tree.links.new(scuffs, abrasion.inputs["Height"])
+        tree.links.new(surfaceNormal, abrasion.inputs["Normal"])
+        surfaceNormal = abrasion.outputs["Normal"]
+    if stamp is not None:
+        engraving = tree.nodes.new("ShaderNodeBump")
+        engraving.inputs["Distance"].default_value = .00016
+        engraving.inputs["Strength"].default_value = 1
+        engraving.invert = True
+        tree.links.new(stamp, engraving.inputs["Height"])
+        tree.links.new(surfaceNormal, engraving.inputs["Normal"])
+        surfaceNormal = engraving.outputs["Normal"]
+    tree.links.new(surfaceNormal, shader.inputs["Normal"])
     tree.links.new(base, shader.inputs["Base Color"])
     tree.links.new(rough, shader.inputs["Roughness"])
     if isinstance(metal, (int, float)):
@@ -521,7 +631,7 @@ def AuthorMaterial(key):
     else:
         tree.links.new(metal, shader.inputs["Metallic"])
     material["Zb26Material"] = key
-    return material, {"base": base, "rough": rough, "metal": metal, "ao": ao.outputs["AO"], "shader": shader, "output": output}
+    return material, {"base": base, "rough": rough, "metal": metal, "ao": aoValue, "shader": shader, "output": output}
 
 
 def CombineAndUnwrap():
@@ -639,7 +749,7 @@ def BakeAtlases(objects, keys=None):
         else:
             tree.links.new(sockets["metal"], packed.inputs["Blue"])
         for channel in ("Base", "Normal", "Orm"):
-            size = 2048 if key == "zb26Steel" and channel == "Base" else 1024
+            size = 2048 if key == "zb26Steel" and channel in ("Base", "Normal") else 1024
             image = bpy.data.images.new("Texture_" + materialStems[key] + channel + "Source", width=size, height=size, alpha=False)
             image.colorspace_settings.name = "sRGB" if channel == "Base" else "Non-Color"
             fill = (0.075, 0.079, 0.083, 1) if key == "zb26Steel" else (0.085, 0.043, 0.021, 1)
@@ -744,7 +854,7 @@ def SetupPreview(objects):
     cameraData.type, cameraData.ortho_scale = "ORTHO", 1.50
     scene.camera = camera
     scene["BlenderMcpTask"] = taskName
-    for area in bpy.context.screen.areas:
+    for area in (bpy.context.screen.areas if bpy.context.screen else ()):
         if area.type == "VIEW_3D":
             area.spaces.active.region_3d.view_location = target
             area.spaces.active.region_3d.view_distance = 1.5

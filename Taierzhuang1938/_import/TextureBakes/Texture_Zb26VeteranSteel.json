@@ -16,44 +16,44 @@
       "file": "Texture_Zb26VeteranSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 213746,
-      "sha256": "b2c9ab180ca9ee8f2a35d756c87963d1bb9691b97ef17c50ed3ca600a16db178"
+      "bytes": 306106,
+      "sha256": "cbd60980aa10583e29fbca3a0ec19ebd9bd4aba175ce90e3212e13abd8beb5b4"
     },
     {
       "channel": "Normal",
       "file": "Texture_Zb26VeteranSteelNormal.webp",
-      "width": 1024,
-      "height": 1024,
-      "bytes": 48686,
-      "sha256": "3de94642cce62cd0c709d9c78e5b0057a579de79d1da09749d5c54786bc08b0a"
+      "width": 2048,
+      "height": 2048,
+      "bytes": 72806,
+      "sha256": "90379b4d75f9e549bae211ac434f940d7a63dc7ea53177328511c767722d0fe8"
     },
     {
       "channel": "Orm",
       "file": "Texture_Zb26VeteranSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 133922,
-      "sha256": "61f010c9eb15cd8f944cd727ba6a9b825df72122d4abdd29333eeb3f053c2425"
+      "bytes": 133460,
+      "sha256": "3b81bfbab3aed253b72aebb24019dbf308b7a2db97c279f03d72b4e571dcdbe9"
     }
   ],
-  "totalBytes": 396354,
+  "totalBytes": 512372,
   "metrics": {
     "meanSrgb": [
-      0.2162,
-      0.2176,
-      0.2148
+      0.2158,
+      0.2175,
+      0.2139
     ],
-    "luma": 0.2162,
-    "lumaStd": 0.1267,
-    "sat": 0.0132,
+    "luma": 0.2157,
+    "lumaStd": 0.1274,
+    "sat": 0.0166,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.164,
+    "lowFreq": 0.167,
     "seam": 0.0,
-    "interior": 0.0071,
-    "seamRatio": 0.003,
-    "border": 0.156,
-    "swing": 0.6063,
+    "interior": 0.0127,
+    "seamRatio": 0.0,
+    "border": 0.154,
+    "swing": 0.6035,
     "texelsPerMeter": null
   },
   "gateProblems": []

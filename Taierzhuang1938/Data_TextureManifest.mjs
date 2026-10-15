@@ -86,6 +86,10 @@ export const TEXTURE_PROVIDERS = Object.freeze({
 // Three user-requested archive sources add 158.4 KiB after native-size conversion.
 // Their small allowance belongs only to the lazy archive, never the boot payload.
 const HISTORY_SOURCE_ADDITIONS_BYTES = 192 * 1024;
+// Hero receiver: 2K base/normal with independent blued-steel micrograin and
+// shallow factory/contact detail. +128 KiB over the original ZB-26 allowance;
+// no new runtime maps, material draws, boot payload or per-file/set limits.
+const ZB26_AUTHOR_ATLAS_BYTES = 640 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -103,10 +107,10 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
     // Only the selected pair is requested (< 1 MB), not the whole campaign set.
-    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + 512 * 1024, // Also includes lossless command-room irradiance.
+    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES, // Also includes lossless command-room irradiance.
     editor: 0.25 * 1024 * 1024,
   }),
-  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + 512 * 1024, // Archive sources plus the 512 KiB approved ZB-26 allocation; boot assets unchanged.
+  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -272,13 +276,13 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "Zb26VeteranSteel", kind: "material", tier: "lazy",
-    sizeReason: "2K base atlas resolves localized edge polish and sparse scratches on the first-person receiver; separate UV area protects receiver density from the cooling rings. Normal and ORM remain 1K.",
+    sizeReason: "2K base and tangent-normal atlases resolve localized wear and shallow factory lettering on the first-person receiver. Separate UV area protects the receiver from the cooling rings; ORM stays 1K.",
     toneClass: null, toneReason: "Original-UV atlas baked from the Blender exterior: selective bluing wear, small scratches and dusty crevices, with no lighting baked into albedo.",
     metersPerTile: null, normalConvention: "gl",
     bake: "_import/Script_Zb26TextureBake.py", bakeRecord: "_import/TextureBakes/Texture_Zb26VeteranSteel.json",
-    source: { provider: "procedural", date: "2026-10-15", ref: "_blender/Script_Zb26Rebuild.py", note: "BlenderMCP reconstruction from museum/history photos and user-approved imagegen style C; authored UVs and spatial ORM. Loaded with the weapon model for gameplay and editor use across levels." },
+    source: { provider: "imagegen", date: "2026-10-15", ref: "exec-ea20679e-29b3-4dab-b7b8-20eca770290e.png", prompt: "_import/Prompts/Texture_Zb26SteelAuthor.txt", note: "Delit blued-steel micrograin in _import/Source/Zb26/Texture_SteelAuthor.webp blended in Blender with authored edge/contact wear. Separate procedural machining, abrasion and stamp normals; independent spatial ORM. Loaded with the weapon rather than menu startup." },
     consumers: [{ file: "Data_Meshes.mjs", token: "Zb26VeteranSteel" }, { file: "Script_Actor.mjs", token: "Zb26VeteranSteel" }, { file: "Script_Viewmodel.mjs", token: "Zb26VeteranSteel" }],
-    files: [["Texture_Zb26VeteranSteelBase.webp", "Base", 2048, 2048], ["Texture_Zb26VeteranSteelNormal.webp", "Normal", 1024, 1024], ["Texture_Zb26VeteranSteelOrm.webp", "Orm", 1024, 1024]],
+    files: [["Texture_Zb26VeteranSteelBase.webp", "Base", 2048, 2048], ["Texture_Zb26VeteranSteelNormal.webp", "Normal", 2048, 2048], ["Texture_Zb26VeteranSteelOrm.webp", "Orm", 1024, 1024]],
   },
   {
     id: "Zb26VeteranWood", kind: "material", tier: "lazy",
