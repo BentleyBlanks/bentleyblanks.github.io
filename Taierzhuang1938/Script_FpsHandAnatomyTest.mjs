@@ -13,7 +13,11 @@ function Read(index){
   return a.normalized?n/(a.componentType===5121?255:65535):n;
  }));
 }
-const material=doc.materials.findIndex(m=>m.name==='Material_HanYangSkin');
+// The scanned surface has one hand/wrist/forearm atlas. Keep the original
+// material fallback so this probe can also measure historical reference GLBs.
+const material=doc.materials.findIndex(m=>m.name==='Material_HanYangScanSkin')>=0
+ ?doc.materials.findIndex(m=>m.name==='Material_HanYangScanSkin')
+ :doc.materials.findIndex(m=>m.name==='Material_HanYangSkin');
 const mesh=doc.meshes.findIndex(m=>m.primitives.some(p=>p.material===material)),primitive=doc.meshes[mesh].primitives.find(p=>p.material===material);
 const skin=doc.skins[doc.nodes.find(n=>n.mesh===mesh).skin];
 const names=skin.joints.map(i=>doc.nodes[i].name.toLowerCase().replace(/[^a-z0-9]/g,''));

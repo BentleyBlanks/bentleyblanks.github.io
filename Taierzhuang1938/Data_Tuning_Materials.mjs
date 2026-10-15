@@ -158,12 +158,11 @@ export const CHARACTER_SURFACE_PARTS = Object.freeze({
   }),
   TengxianNra06: Object.freeze({ "Material #9": SkinPart(0.508), "John_All Body": SkinPart(1.879, HANDS) }),
   // 第一人称：默认骨骼双臂、汉阳造双手（第一关全程用它）、低头看见的身体。
-  // 汉阳造手的网格比身体大 1.36 倍、视模再缩 0.7，屏幕上的 UV 密度与身体的 John_Color 相当。
+  // 默认双臂沿用身体图集；扫描双手使用独立的手／腕／前臂图集密度。
   FpsArms: Object.freeze({ "John_All Body": SkinPart(1.93, HANDS), "Material #1721585337": NraClothPart() }),
   FpsHanYang: Object.freeze({
-    "Material_HanYangSkin": SkinPart(1.9, { ...HANDS, firstPersonSkin: true, normalScale: 0.45 }),
-    // 腕环那 160 个三角的 UV 横跨 atlas 的手背、脚掌与底色，贴不了图：改成与前臂同色的皮肤。
-    "Material_HanYangWrist": SkinPart(1.9, { ...HANDS, firstPersonSkin: true, noMap: true }),
+    // One continuous hand/wrist/forearm atlas; the source wrist patch is gone.
+    "Material_HanYangScanSkin": SkinPart(0.45, { ...HANDS, firstPersonSkin: true, normalScale: 0.85 }),
     "Material #1721585337": NraClothPart({ elbowX: 0.555, cuffX: 0.92 }),
   }),
   FirstPersonBody: Object.freeze({ "Material #1721585337": NraClothPart() }),

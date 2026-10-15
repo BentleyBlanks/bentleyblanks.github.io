@@ -19,7 +19,7 @@ import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } 
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Script_FpsAnatomy.mjs";
 import { LoadFpsSkeletalAnimations } from "./Script_FpsSkeletalAnimation.mjs";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261015050000", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261015085800", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",
@@ -216,11 +216,11 @@ export class FpsArmRig {
     }
 
     // 人物表面部件（Data_Tuning_Materials.CHARACTER_SURFACE_PARTS）：汉阳造双手与默认骨骼双臂
-    // 是两份不同的 GLB（腕环、袖长不同），按有没有汉阳造的皮肤材质分。要在 ConfigureExternalPbr 之前打标。
+    // 是两份不同的 GLB，按专用皮肤材质识别。要在 ConfigureExternalPbr 之前打标。
     let hanYangHands = false;
     this.root.traverse((object) => {
       for (const material of object.isMesh ? [].concat(object.material) : []) {
-        if (material?.name === "Material_HanYangSkin") hanYangHands = true;
+        if (["Material_HanYangSkin", "Material_HanYangScanSkin"].includes(material?.name)) hanYangHands = true;
       }
     });
     TagCharacterSurface(this.root, hanYangHands ? "FpsHanYang" : "FpsArms");

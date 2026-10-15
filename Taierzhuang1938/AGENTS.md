@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **第一人称扫描手形（2026-10-15）**：四件装备的共享双手改用 Artec 扫描配准的连续手／腕／前臂皮肤，保留原骨架与衣袖；大刀右手下移并以拇指扣食指，捷克式托枪手后移避开折叠脚架。重烘入口 `_blender/Script_FpsScannedHandsBake.py`，源工程、许可和接触指标见 [握持修复末节](docs/Data_FpsWeaponGripRepair20261015.md#扫描手形连续腕部与力量握持2026-10-15)。`DadaoSwingTest` 同时检查力量握持的真实皮肤接触。
+
 - **第一人称四件装备握持（2026-10-15）**：普通／集束手榴弹、大刀、捷克式用 Blender 重标掌面与逐指旋转，数据在 `Data_FpsWeaponGrips`；集束弹与捷克式采用固定骨段裸手。普通弹取消重复轴旋转，集束弹恢复实物柄尺寸；大刀肩位与连续肘轨由数据驱动。源工程、重建和实测见 [握持修复](docs/Data_FpsWeaponGripRepair20261015.md)，门禁 `FpsArmTest` / `FpsHandContactTest --only=Zb26` / `GrenadeThrowTest` / `DadaoSwingTest` / `FpsGripEditorTest` / `MotionVectorContractTest`。
 
 - **Profiler 第四版（2026-10-14，对标 UE stat unit / Insights）**：独立窗口改成「读数条（逻辑/渲染提交/GPU/浏览器侧/机器忙闲 + 结论「卡在哪」）+ 带预算线与事件道的帧图 + 九个页签（计时/GPU/渲染统计/计数器/事件/Draw 清单/函数采样/场景普查/取证）」，外观跟设置页一套。内核每帧记帧状态与阶段（汇总默认只算游戏中与过场）、Worker 忙闲探针与 Compute Pressure、逐 pass 材质切换/变体重算、计数器、事件标记、可点名抓一帧 draw 清单；`Script_ProfilerSampler` 在游戏里做 JS 函数采样（要 `Document-Policy: js-profiling`，本地预览与测试服发，Pages 没有）。**读用户发来的录制先看机器忙闲**：2026-10-14 那份 20 fps 录制同样的活单价是空闲时 1.7–2.0 倍（别的会话的无头浏览器占着 CPU 与显卡）。口径 [编辑器套件 · Profiler](docs/Data_EditorSuite.md)；门禁 `Script_ProfilerTest`（浏览器）、`Script_ProfilerRecordingTest`（纯 node）、`Script_ProfileCliTest`。

@@ -244,6 +244,16 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 - SHA-256：`2f625d3ce46c723c54f3a78a94cd54aef808ef2480b470dd70bf7b6fdbb42c14`。
 - `Script_SurfaceDecals` 取 alpha 作为液滴／毛细渗透细节，血色与湿干状态由共享材质定义。
 
+## 第一人称扫描双手（2026-10-15）
+
+`Model/Model_FpsHanYangHands.glb` 的手部扫描几何来自 **Hand by Artec Group inc. / Artec 3D**，
+<https://www.artec3d.com/3d-models/hand>。采用下载包附带的 **CC BY 3.0 Unported**；
+许可原文为 [License_ArtecHand.txt](../Model/License_ArtecHand.txt)，许可网址为
+<https://creativecommons.org/licenses/by/3.0/>。修改包括骨骼配准、减面、权重、镜像、腕部连接、UV 与贴图烘焙。
+扫描本身没有颜色图；皮肤颜色沿用既有手模并重烘，原骨架和军装保持原来源。
+当前网页指向 CC BY 4.0，但这里保留实际下载包的 3.0 许可。Innerscene / MakeHuman CC0 手只作对比参考，未并入运行时。
+重建、源工程与验收见 [第一人称握持修复](../docs/Data_FpsWeaponGripRepair20261015.md)。
+
 ## 2026-09-26 通用壕沟自然石材
 
 `Texture_TrenchStone{Base,Normal,Orm}.webp` 来自 [Poly Haven / Rock Boulder Dry](https://polyhaven.com/a/rock_boulder_dry)，CC0；Dimitrios Savva 摄影、Rico Cilliers 处理。重建脚本为 `Script_ImportTrenchMaterials.py`。`Model_TrenchStone.glb`、`Model_TrenchDryGrass.glb` 及泥土高度遮罩由本仓 `Script_BakeTrenchSurface.py` 原创生成；源工程位置与接入见 [壕沟表面](../docs/Data_TrenchSurface.md)。

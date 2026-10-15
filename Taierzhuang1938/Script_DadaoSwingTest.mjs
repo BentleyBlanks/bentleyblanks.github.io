@@ -34,6 +34,30 @@ try{
    return [side,index.z-little.z];
   }));
   result.hiltGripOrder=HiltOrder();
+  // A power-grip thumb closes over the index. Requiring every fingertip to
+  // contact the weapon instead allowed an extended thumb against the guard.
+  const powerGripMeshes=[];
+  r.root.traverse(mesh=>{
+   if(!mesh.isSkinnedMesh)return;
+   const g=mesh.geometry,names=mesh.skeleton.bones.map(b=>b.name.toLowerCase().replace(/[^a-z0-9]/g,''));
+   const thumb=names.findIndex(n=>n.endsWith('rfinger02')),index=names.findIndex(n=>n.endsWith('rfinger1'));
+   if(thumb<0||index<0)return;
+   const Weight=(i,bone)=>{let w=0;for(let k=0;k<4;k++)if(g.attributes.skinIndex.getComponent(i,k)===bone)w+=g.attributes.skinWeight.getComponent(i,k);return w;};
+   const tips=[],weights=[];for(let i=0;i<g.attributes.position.count;i++){if(Weight(i,thumb)>.8)tips.push(i);weights.push(Weight(i,index));}
+   const faces=[];for(let i=0;i<(g.index?.count||g.attributes.position.count);i+=3){const f=[0,1,2].map(k=>g.index?g.index.getX(i+k):i+k);if(f.every(j=>weights[j]>.25)&&f.some(j=>weights[j]>.6))faces.push(f);}
+   if(tips.length||faces.length)powerGripMeshes.push({mesh,tips,faces});
+  });
+  const PowerGrip=()=>{
+   const inverse=v.rig.group.matrixWorld.clone().invert(),tips=[],triangles=[];
+   for(const {mesh,tips:ids,faces} of powerGripMeshes){
+    mesh.skeleton.update();const matrix=inverse.clone().multiply(mesh.matrixWorld),points=new Map();
+    const Point=i=>{if(!points.has(i))points.set(i,mesh.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(matrix));return points.get(i);};
+    tips.push(...ids.map(Point));for(const face of faces)triangles.push(new THREE.Triangle(...face.map(Point)));
+   }
+   let gap=Infinity;const closest=new THREE.Vector3();for(const tip of tips)for(const tri of triangles){tri.closestPointToPoint(tip,closest);gap=Math.min(gap,tip.distanceTo(closest));}
+   const index=r.fingerBones.r.find(b=>b.name.toLowerCase().endsWith('finger1'));
+   return {thumbToIndexM:gap,indexKnuckleZ:v.rig.group.worldToLocal(index.getWorldPosition(new THREE.Vector3())).z};
+  };
   if(r!==v.armRigs.Dadao||!r.fixedRestLengths)throw Error('Dadao must use the repaired fixed-length hands');
   const model=v.rig.group.getObjectByName('Model_DadaoEdgeMount');
   if(!model)throw Error('Missing measured Dadao edge mount');
@@ -64,7 +88,7 @@ try{
     const edge=new THREE.Vector3(0,1,0).transformDirection(modelMatrix);
     frames.push({t:i/120,tip:tip.toArray(),edge:edge.toArray(),normal:new THREE.Vector3(1,0,0).transformDirection(modelMatrix).toArray(),grip:Math.max(r.gripError.r,r.gripError.l),
      wrist:Math.max(r.wristBend.r,r.wristBend.l),wristPair:{...r.wristBend},right:P(r.bones.r.hand),left:P(r.bones.l.hand),
-     upper:P(r.bones.r.upperArm),elbow:P(r.bones.r.forearm),leftElbow:P(r.bones.l.forearm),weapon:matrix.toArray(),hiltGripOrder:HiltOrder()});
+     upper:P(r.bones.r.upperArm),elbow:P(r.bones.r.forearm),leftElbow:P(r.bones.l.forearm),weapon:matrix.toArray(),hiltGripOrder:HiltOrder(),powerGrip:i%60===0?PowerGrip():null});
     if(exportSource&&action==='Light')result.sourceFrames.push({bones:bones.map(b=>Matrix(b,T.camera)),weapon:Matrix(v.rig.group,T.camera)});
    }
    result.clips.push({action,duration,windup:spec.windup,active:spec.active,frames});
@@ -101,6 +125,10 @@ try{
    assert(Math.acos(Math.min(1,Math.max(-1,dot)))*180/Math.PI<.1,`${clip.action} ${f.t}: blade rolls out of its cutting plane`);
    assert(f.grip<=FPS_ARM_LIMITS.positionResidualM,`${clip.action}: grip ${f.grip}`);
    assert(f.wrist<=FPS_ARM_LIMITS.wristBendDeg+.01,`${clip.action} ${f.t}: wrist ${f.wrist} ${JSON.stringify(f.wristPair)}`);
+   if(f.powerGrip){
+    assert(f.powerGrip.thumbToIndexM<.003,`${clip.action} ${f.t}: thumb must close onto the curled index (${f.powerGrip.thumbToIndexM} m)`);
+    assert(f.powerGrip.indexKnuckleZ>.004,`${clip.action} ${f.t}: dominant hand must sit below the guard`);
+   }
   }
   const upper=clip.frames.map(f=>Dist(f.upper,f.elbow)),lower=clip.frames.map(f=>Dist(f.elbow,f.right));
   assert(Math.max(...upper)-Math.min(...upper)<.001,'Upper arm must not stretch');
@@ -149,7 +177,8 @@ try{
  }
  await page.setViewportSize({width:1280,height:720});
  await page.waitForFunction(()=>Math.abs(Taierzhuang.camera.aspect-1280/720)<1e-4,null,{timeout:10000});
- fs.writeFileSync(path.join(out,'Data_DadaoSwingAcceptance.json'),JSON.stringify({metrics,visibility,hiltGripOrder:data.hiltGripOrder,cutPlaneDriftDeg:data.cutPlaneDriftDeg,interruptionError:data.interruptionError,recoverySeekError:data.recoverySeekError},null,2));
+ const powerGrip=data.clips.flatMap(clip=>clip.frames.filter(f=>f.powerGrip).map(f=>({action:clip.action,t:f.t,...f.powerGrip})));
+ fs.writeFileSync(path.join(out,'Data_DadaoSwingAcceptance.json'),JSON.stringify({metrics,visibility,powerGrip,hiltGripOrder:data.hiltGripOrder,cutPlaneDriftDeg:data.cutPlaneDriftDeg,interruptionError:data.interruptionError,recoverySeekError:data.recoverySeekError},null,2));
  if(data.sourceFrames.length)fs.writeFileSync(path.join(out,'Data_DadaoSourceBake.json'),JSON.stringify({boneNames:data.boneNames,frames:data.sourceFrames}));
  for(const phase of [0,.24,.34,.4,.55,.85]){
   // ResizeObserver and the temporal render targets must settle before the first

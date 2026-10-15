@@ -104,8 +104,9 @@ for id in ['Grenade','GrenadeBundle','Dadao','Zb26']:
  cam=bpy.data.cameras.new('Camera_FpsFinal'+id);camera=bpy.data.objects.new(cam.name,cam);collection.objects.link(camera);camera.matrix_world=convert
  cam.lens=36/(2*(1600/900)*math.tan(math.radians(55)/2));cam.clip_start=.01;cameras[id]=camera
  animation=None
- if id=='Dadao':animation=json.loads((root/'_shots/DadaoPower/Acceptance/Data_DadaoSourceBake.json').read_text())
- if id=='Grenade':animation=json.loads((root/'_shots/GrenadeThrow/Data_GrenadeTrace.json').read_text())
+ animationSource=globals().get('FPS_GRIP_ANIMATION_SOURCE')
+ if id=='Dadao':animation=json.loads((Path(animationSource)/'Data_DadaoSourceBake.json' if animationSource else root/'_shots/DadaoPower/Acceptance/Data_DadaoSourceBake.json').read_text())
+ if id=='Grenade':animation=json.loads((Path(animationSource)/'Data_GrenadeTrace.json' if animationSource else root/'_shots/GrenadeThrow/Data_GrenadeTrace.json').read_text())
  if animation:
   for i,entry in enumerate(animation['frames']):
    scene.frame_set(i+1);Pose(entry['bones'],i+1);weapon.matrix_world=convert@M(entry['weapon'])

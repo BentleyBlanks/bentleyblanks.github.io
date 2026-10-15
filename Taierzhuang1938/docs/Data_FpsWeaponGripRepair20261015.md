@@ -1,7 +1,7 @@
 # 第一人称手榴弹、集束弹、大刀与捷克式修复
 
 2026-10-15，按用户所发第一人称检查图，通过本任务独占的 BlenderMCP 实例重新标定这四件装备。
-实际游戏继续使用原有武器网格与已校正的 `Model_FpsHanYangHands.glb`；本轮产物是掌面、逐指骨骼旋转和大刀运动轨。
+武器保留原网格；`Model_FpsHanYangHands.glb` 的皮肤已用扫描手形重建，并重新拟合掌面、逐指旋转。大刀沿用 Blender 劈砍轨，补正护手下的力量握持。最新源工程见本文末节，前面的记录保留迭代依据。
 
 ## 握持与接线
 
@@ -137,3 +137,50 @@ phase 0 等待资源 30 秒超时，phase 1／2 同样报日军远景辨识材�
 四种静态蒙皮均逐顶点与运行时核对，最大误差小于 0.000001 m；
 检查件材质不替代游戏内高画质验收。用新工程重建时给 `Script_FpsSkinRepairStudio.py`
 传入任务名 `FpsHandAnatomy_20261015` 及对应 sculpt／replay 场景名，可保留可逆形态键。
+
+## 扫描手形、连续腕部与力量握持（2026-10-15）
+
+双手、腕部与前臂合为连续皮肤网格，采用 Artec 的真实手部扫描配准到原有骨骼。
+配准在掌面平面内调整关节点，并保留厚度；不使用曾把手指压薄的三维共面插值候选。
+手腕去掉扫描封口，与原前臂连接，连接区域没有开放边。左右手按相同骨骼中心镜像。
+皮肤为 47,764 个三角，运行时 UV 分点后 29,019 个顶点；衣袖、53 根骨骼、关节顺序、
+逆绑定、固定骨段标记与既有动作契约保持不变。
+
+皮肤使用一套 4096² Base / Normal 图集。颜色由既有皮肤转移、平滑，指甲保留原颜色；
+不再让旧身体图集的折痕横跨手腕。扫描法线在腕部 24 mm 过渡带渐退到焊接网格法线，
+避免高模截口产生光照断层。材质 `Material_HanYangScanSkin` 同时覆盖手、腕和前臂；
+旧腕环无图材质退出运行时。骨架与衣袖的原始数据由烘焙脚本保留，不重新导出它们。
+清除未引用数据后 GLB 为 3,688,272 bytes，原版为 6,139,476 bytes。
+
+- 普通／集束手榴弹重新贴合指腹与握柄、弹头表面；集束弹保留托举分工。
+- 大刀右手沿柄下移 20 mm，拇指扣住食指近节，而不是伸向护手或刀身。
+  因此拇指到武器的距离不是该握法的验收指标；应检查拇指与食指的真实皮肤表面。
+  `DadaoSwingTest` 在六种攻击的起点、中点和终点检查这一接触及护手下的食指关节。
+  本轮 18 个采样点的拇指／食指表面间隙最大约 0.079 mm。
+- 捷克式支撑手沿枪身后移 20 mm，再拟合五指。扫描表面检查的最大穿入由食指约
+  2.76 mm 降到约 0.42 mm；支撑手五指最大穿入均低于 0.5 mm，指腹间隙低于 1.1 mm。
+  不删除折叠脚架，也不放宽既有接触门禁。
+
+源目录：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/FpsScannedHandPrototype_20261015`。
+工程为 `Model_FpsScannedHandPrototype.blend`，输入 `Model_FpsHandsBeforeScan.glb` 的 SHA-256
+为 `0668606ced664768f78b244ce2b8d80dd5576900e0d80cc648e97c2b9e178d22`。
+配准、高低模、权重、腕部连接、图集与指型拟合脚本均保留在该工程及其 `Scripts/` 目录。
+`Scene_ScannedHandRegistration` 保留可编辑几何，`Scene_ScannedHandPlayback` 包含四件装备握持，
+以及普通弹投掷和大刀挥动回放。静态蒙皮与实机逐顶点核对，最大误差为 0.000000668 m。
+`Final/` 保存实机姿势包，`AnimationTraces/` 保存动作轨；重建回放时给 `Script_FpsSkinRepairStudio.py`
+设置 `FPS_GRIP_ANIMATION_SOURCE` 到该目录，不依赖临时 worktree 内的截图目录。
+游戏重烘入口为 `_blender/Script_FpsScannedHandsBake.py`：用仓库 BlenderMCP 生命周期 CLI
+打开上述工程，设置 `FPS_PROJECT_ROOT` 到本任务的 `Taierzhuang1938`，再执行该脚本。
+可设置 `FPS_SCAN_OUTPUT` 导出审阅件；省略时写入游戏模型。脚本验证输入哈希，重烘皮肤，
+合并原骨架／衣袖，清除未引用缓冲，并核对骨骼变换与逆绑定逐字节一致。
+
+扫描来源：[Hand — Artec Group inc.](https://www.artec3d.com/3d-models/hand)。下载包附带
+CC BY 3.0 Unported，原文保存为 [License_ArtecHand.txt](../Model/License_ArtecHand.txt)。
+本项目修改了配准、拓扑密度、权重、腕部连接、UV 和贴图；网页当前指向的 4.0 不替换下载包的 3.0。
+Innerscene / MakeHuman 的 CC0 手仅用于早期对比，没有进入本轮运行时网格。
+
+本轮 18 项专项检查通过：ModuleGraph、TestRunner、AssetStandards、TextureStandards、RiggedModel、
+CharacterSurface、FpsHandAnatomy、FpsAnimation，及 FpsArm、FpsSleeve、FpsHandContact（全部在架武器）、
+FpsReloadMechanics、FpsGripEditor、GrenadeThrow、FpsAnimation 浏览器播放、MotionVectorContract、
+SamplerBudget（high，GI 关／开）、含力量握持断言的 DadaoSwing。四件装备另有实机近景与挥刀采样图。
+这不等于全仓所有门禁通过；此前 BootTest 的历史失败记录未以本轮专项结果替代。
