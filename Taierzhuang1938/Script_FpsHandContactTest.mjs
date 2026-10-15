@@ -78,7 +78,12 @@ try {
       }
       editor.SetPose("hip");for(let i=0;i<90;i++)editor.Update(1/60);
       for(const action of ["reload",...(["ZhongZheng","HanYang","Type38","Zb26","Type11"].includes(id)?["reloadPartial"]:[]),
-        ...(["ZhongZheng","HanYang","Type38"].includes(id)?["bolt"]:[])]){
+        ...(["ZhongZheng","HanYang","Type38"].includes(id)?["reloadOpen","bolt"]:[])]){
+        if(action==="reloadOpen") {
+          vm.pendingHoldOpen=true;vm.TriggerBolt();
+          while(vm.action)editor.Update(1/60);
+          if(!vm.boltOpen)throw new Error(id+": the open-bolt reload contact case did not start open");
+        }
         if(action.startsWith("reload"))vm.TriggerReload({remainingRounds:action==="reloadPartial"?3:0});else vm.TriggerBolt();
         const row={id,action,maxGrip:0,maxWrist:0,maxFingerTranslation:0,unreachable:0,propSamples:[],worstGrip:null,worstWrist:null};
         for(let frame=0;vm.action&&frame<1200;frame++){

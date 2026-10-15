@@ -4,6 +4,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {FPS_SKELETAL_ANIMATION} from './Data_FpsSkeletalAnimation.mjs';
 import {FpsArmPose} from './Data_FpsArmPoses.mjs';
+import * as THREE from './vendor/three/build/three.module.js';
+import {FpsSkeletalAnimation} from './Script_FpsSkeletalAnimation.mjs';
 const project=path.dirname(fileURLToPath(import.meta.url));
 let count=0;
 for(const id of FPS_SKELETAL_ANIMATION.weaponIds){
@@ -31,6 +33,32 @@ for(const id of FPS_SKELETAL_ANIMATION.weaponIds){
   }
 }
 console.log(`PASS ${count} Blender bone clips: finite transforms, normalized rotations, complete loops`);
+// Exercise the shipped holding clip against a genuinely open mechanism. The
+// body must keep animating without the old closed-rifle bake resetting the bolt.
+{
+  const asset=JSON.parse(await fs.readFile(path.join(project,'Animation/FirstPerson/Data_FpsHanYangAnimations.json'),'utf8'));
+  const index=asset.clips.Idle.bones.findIndex(values=>values.length>7
+    &&values.some((value,i)=>Math.abs(value-values[i%7])>.001));
+  const bone=new THREE.Bone();bone.name=asset.bones[index];
+  const root=new THREE.Group();root.add(bone);
+  const arms={root,contactWeight:{r:1,l:1},operationPose:{r:null,l:null},MeasureSkeletalPose(){}};
+  const vm={weaponId:'HanYang',riggedArms:arms,root,armAnchor:new THREE.Group(),
+    swayPivot:new THREE.Group(),statePivot:new THREE.Group(),flash:{visible:false},
+    sprintSpring:{value:0},adsSpring:{value:0},flashTime:99,boltOpen:true};
+  const bolt=new THREE.Group(),mount=new THREE.Group();
+  bolt.position.z=.078;bolt.rotation.z=Math.PI/2;
+  const animation=new FpsSkeletalAnimation(vm,{HanYang:asset});
+  animation.Controls=()=>({part_bolt:bolt,weaponMount:mount});
+  assert.equal(animation.Update(1/60,{elapsed:.3}),true,'holding clip still plays with the bolt open');
+  const before=bone.quaternion.clone(),position=bone.position.clone();
+  animation.Update(1/60,{elapsed:.7});
+  assert(before.angleTo(bone.quaternion)>1e-5||position.distanceTo(bone.position)>1e-5,'the body retains its breathing motion');
+  assert.equal(bolt.position.z,.078,'breathing must retain the open bolt travel');
+  assert(Math.abs(bolt.rotation.z-Math.PI/2)<1e-8,'breathing must retain the unlocked handle angle');
+  animation.SetPreview('Idle',{time:.3});
+  assert(Math.abs(bolt.position.z)<1e-8&&Math.abs(bolt.rotation.z)<1e-8,'explicit clip preview still applies its authored mechanism');
+  console.log('PASS holding motion retains live mechanism state and explicit previews retain full controls');
+}
 if(process.argv.includes('--browser')){
   const {LaunchBrowser}=await import('../PrairieFire1937/Script_BrowserTestKit.mjs');
   const {ServeRoot}=await import('./Script_DevServer.mjs');

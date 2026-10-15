@@ -90,7 +90,7 @@ export const WEAPONS = {
     magazine: 5, reloadKind: "enBloc",       // Mannlicher packet enters the magazine intact
     damage: 74, headMultiplier: 2.6, effectiveRangeM: 400,
     // 专用实录拆成枪声 shotCue 与枪机 boltCue 两条（Data_SfxSources）。枪机那条随拉栓动作
-    // 起播：抬柄/推回仍对齐 0.23/0.52 s，闭锁约 0.79 s；其后留出回握。
+    // 起播：完整抬柄约 0.26 s，推回仍从 0.52 s 开始，闭锁约 0.79 s；其后留出回握。
     // 从旧 0.20 s 等待中借 0.13 s 给手部动作，总周期仍为 1.02 s，射击间隔不变。
     // 2026-09-13 那版是一整条录音，动作要硬等 1.65 s、间隔 2.50 s —— 玩家嫌开完枪「有个延迟」。
     shotCue: "rifleHanYang", boltCue: "boltHanYang",

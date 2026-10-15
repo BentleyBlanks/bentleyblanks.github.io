@@ -34,6 +34,8 @@ try {
       Check(!!body, `${id}: complete authored bolt body is missing`);
       vm.root.updateWorldMatrix(true,true);
       const original = body && vm.rig.group.worldToLocal(body.getWorldPosition(new THREE.Vector3()));
+      const handleRadius = Point(vm.rig.boltHandleNode,new THREE.Vector3())
+        .sub(Point(vm.rig.parts.bolt,new THREE.Vector3())).setZ(0).normalize();
       let rearTang=null,rearBar=null;
       if(id==="HanYang") {
         // This screw-bearing receiver leaf stays on the stock. It was once
@@ -76,6 +78,10 @@ try {
         if (t>=.25 && atBack===null && body) {
           atBack=vm.rig.group.worldToLocal(body.getWorldPosition(new THREE.Vector3())).z-original.z;
           if(id==="HanYang") {
+            const liftedRadius=Point(vm.rig.boltHandleNode,new THREE.Vector3())
+              .sub(Point(vm.rig.parts.bolt,new THREE.Vector3())).setZ(0).normalize();
+            row.handleLiftRad=handleRadius.angleTo(liftedRadius);
+            Check(Math.abs(row.handleLiftRad-Math.PI/2)<.0001,"HanYang: the physical handle stops short of its 90-degree unlocked position");
             // Opening the cylinder must expose a solid supported plug, rather
             // than leaving the safety paddle floating above an empty tube.
             const ray=new THREE.Ray(new THREE.Vector3(0,.042,.05),new THREE.Vector3(0,0,-1)),hit=new THREE.Vector3();
@@ -141,6 +147,16 @@ try {
       Check(maxTurn<20,`${id}: normal bolt hand turns ${maxTurn.toFixed(1)} degrees per frame`);
       boltMotion.push({id,maxStep,maxTurn,worstAt});
     }
+    // The last-shot hold and the next reload must share the same fully raised
+    // pose; a different resting angle causes a visible snap at the next R.
+    editor.SetWeapon("HanYang");Step(0,90);vm.pendingHoldOpen=true;vm.TriggerBolt();
+    while(vm.action)Step(0);
+    const heldOpen={angleRad:vm.rig.parts.bolt.rotation.z,travelM:vm.rig.parts.bolt.position.z};
+    Check(vm.boltOpen&&Math.abs(heldOpen.angleRad-Math.PI/2)<.0001,"HanYang: last-shot hold is not fully unlocked");
+    vm.TriggerReload({remainingRounds:0});Step(0);
+    Check(Math.abs(vm.rig.parts.bolt.rotation.z-heldOpen.angleRad)<.0001
+      &&Math.abs(vm.rig.parts.bolt.position.z-heldOpen.travelM)<.0001,"HanYang: reloading from an open bolt snaps the mechanism");
+    while(vm.action)Step(0);
     const magazines=[];
     for(const remaining of [0,3]) {
       editor.SetWeapon("Zb26");Step(remaining,90);vm.TriggerReload({remainingRounds:remaining});
@@ -214,7 +230,7 @@ try {
       Check(worldError<1e-6,"released packet follows the player's view instead of remaining in world space");
       game.camera.quaternion.copy(rotation);game.camera.position.copy(cameraPosition);vm._StepDebris(0);
     }
-    return {cases,boltMotion,magazines,manualChargeTravelM,hopper,worldError,failures};
+    return {cases,boltMotion,heldOpen,magazines,manualChargeTravelM,hopper,worldError,failures};
   });
   await fs.writeFile(path.join(output,"Data_Mechanics.json"),JSON.stringify({...report,errors},null,2));
   assert.deepEqual(errors,[],"no page errors");assert.deepEqual(report.failures,[],"rifle mechanical authenticity");

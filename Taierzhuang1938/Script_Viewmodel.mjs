@@ -3065,7 +3065,7 @@ export class Viewmodel {
       this.boltOpen = !!this.pendingHoldOpen;
       if (this.boltOpen && this.rig.parts.bolt) {
         this.rig.parts.bolt.position.z = this.rig.boltTravel;
-        this.rig.parts.bolt.rotation.z = 1.35;
+        this.rig.parts.bolt.rotation.z = this._BoltLiftAngle();
         if (this.rig.parts.dustCover) this.rig.parts.dustCover.position.z = this.rig.boltTravel;
         if (this.rig.parts.cockingPiece) this.rig.parts.cockingPiece.position.z = this.rig.boltTravel;
       }
@@ -3175,7 +3175,7 @@ export class Viewmodel {
     const drop = holdOpen ? 0 : Ease.InOut(Ease.Seg(t, forwardEnd, lockEnd));
 
     const slide = (back - fwd) * travel;
-    bolt.rotation.z = 1.35 * (lift - drop);
+    bolt.rotation.z = this._BoltLiftAngle() * (lift - drop);
     bolt.position.z = slide;
     if (rig.parts.dustCover) rig.parts.dustCover.position.z = slide;   // 三八大盖随栓前后滑
     if (rig.parts.cockingPiece) rig.parts.cockingPiece.position.z = slide;
@@ -3215,6 +3215,8 @@ export class Viewmodel {
     const load = Ease.Pulse(t);
     this.actionPivot.position.set(load * 0.012, load * 0.010, load * 0.016);
     this.actionPivot.rotation.set(load * 0.055, load * -0.10, load * 0.075, "YXZ");
+    const supportOffset=FPS_BOLT_HAND.supportOffsetByWeapon[this.weaponId];
+    if(supportOffset)this._PoseReload("left",Math.sin(Math.PI*t)**2,...supportOffset,0,0,0,0);
   }
 
   /** 手先到机柄上，机柄往后拉满再送回（手跟着机柄节点走），最后回握把。 */
@@ -3225,6 +3227,10 @@ export class Viewmodel {
       { at: 0.26, position: handle, shape: "bolt" },
       { at: 0.80, position: handle, shape: "bolt" },
     ]);
+  }
+
+  _BoltLiftAngle() {
+    return FPS_BOLT_HAND.liftAngleRadByWeapon[this.weaponId] ?? FPS_BOLT_HAND.liftAngleRad;
   }
 
   _BoltHandPoint() {
@@ -3361,7 +3367,7 @@ export class Viewmodel {
       // 抬柄后再后拉，推回后再闭锁；空仓留开的枪机不重复开栓。
       const turnT = this.boltOpen ? Math.max(t, motion.boltTurn[2][0]) : t;
       const slideT = this.boltOpen ? Math.max(t, motion.boltSlide[2][0]) : t;
-      bolt.rotation.z = 1.35 * ReloadTrack(motion.boltTurn, turnT);
+      bolt.rotation.z = this._BoltLiftAngle() * ReloadTrack(motion.boltTurn, turnT);
       bolt.position.z = rig.boltTravel * ReloadTrack(motion.boltSlide, slideT);
       if (rig.parts.dustCover) rig.parts.dustCover.position.z = bolt.position.z;
       if (rig.parts.cockingPiece) rig.parts.cockingPiece.position.z = bolt.position.z;

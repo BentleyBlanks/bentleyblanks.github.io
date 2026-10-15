@@ -46,7 +46,7 @@ export class FpsSkeletalAnimation {
       ...Object.fromEntries(Object.entries(vm.rig?.parts||{}).map(([key,obj])=>['part_'+key,obj]))};
   }
 
-  Apply(name,time,{weight=1,controls=null,visible=false}={}) {
+  Apply(name,time,{weight=1,controls=null,visible=false,preserveParts=false}={}) {
     const clip=this.Clip(name),asset=this.assets?.[this.vm.weaponId];
     if(!clip||!asset)return false;
     for(let i=0;i<asset.bones.length;i++){
@@ -58,6 +58,7 @@ export class FpsSkeletalAnimation {
     const objects=this.Controls();
     for(const [key,values] of Object.entries(clip.controls)){
       if(controls&&!controls.includes(key))continue;
+      if(preserveParts&&key.startsWith('part_'))continue;
       const obj=objects[key];if(!obj)continue;
       this.Sample(values,clip,time);
       if(weight===1){obj.position.copy(this.position);obj.quaternion.copy(this.quaternion);}
@@ -114,7 +115,9 @@ export class FpsSkeletalAnimation {
     }else{
       if(input.meleeCombat||(input.moveSpeed||0)>.05||vm.sprintSpring.value>.001||vm.adsSpring.value>.001||vm.action||vm.flashTime<.6)return false;
       this.clock=input.elapsed??this.clock+dt;
-      this.Apply('Idle',LoopTime(this.clock,this.Clip('Idle').duration));
+      // Holding motion owns the body pose, while the firearm state owns its
+      // mechanism. An Idle bake from a closed rifle must not close a held bolt.
+      this.Apply('Idle',LoopTime(this.clock,this.Clip('Idle').duration),{preserveParts:true});
     }
     vm.root.updateWorldMatrix(true,true);
     arms.MeasureSkeletalPose();

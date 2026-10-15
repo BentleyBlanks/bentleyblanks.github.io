@@ -127,8 +127,15 @@ export const FPS_RELOAD_PROPS = Object.freeze({
 });
 
 export const FPS_BOLT_HAND = Object.freeze({
+  // Smith's Gewehr 88 cutaway specifies a full quarter-turn before withdrawal.
+  // Keep the palm's measured 1.35-rad reference independent of mechanism travel.
+  liftAngleRad: 1.35,
+  liftAngleRadByWeapon: { HanYang: Math.PI / 2 },
+  // Bring the rifle slightly toward the shoulder while the bolt is worked;
+  // a fully lifted handle must not force a straight arm or stretch the wrist.
+  supportOffsetByWeapon: { HanYang: [0, 0, 0.020] },
   graspAt: .140, approachFraction:.60, liftLead:.105, releaseGap: .010, clearFraction: .40,
-  liftLeadByWeapon:{HanYang:.130},
+  liftLeadByWeapon:{HanYang:.160},
   clearOffset: [.016,.008,.020],
 });
 
